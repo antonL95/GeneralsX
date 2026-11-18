@@ -33,6 +33,7 @@
 
 #include "WWMath/wwmath.h"
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 #include "Common/INIException.h"
 #include "Common/INIMath.h"
 #include "Common/INIPreprocessor.h"
@@ -184,6 +185,7 @@ INI::INI()
 	m_readBuffer = nullptr;
 	m_readBufferNext = 0;
 	m_readBufferUsed = 0;
+	m_lineStart = 0;
 	m_filename					= "None";
 	m_loadType					= INI_LOAD_INVALID;
 	m_lineNum						= 0;
@@ -368,6 +370,7 @@ void INI::prepFile( AsciiString filename, INILoadType loadType )
 	preprocessor.clearWarnings();
 
 	m_readBufferNext = 0;
+	m_lineStart = 0;
 	m_readBufferUsed = static_cast<unsigned>(expanded.size());
 	m_readBuffer = new char[expanded.size() + 1];
 	memcpy(m_readBuffer, expanded.data(), expanded.size());
@@ -461,6 +464,7 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 		// read all lines in the file
 		DEBUG_ASSERTCRASH( m_endOfFile == FALSE, ("INI::load, EOF at the beginning!") );
 		UnsignedInt lineCount = 0;
+		Bool resyncAfterAuditRecord = FALSE;
 		while( m_endOfFile == FALSE )
 		{
 			lineCount++;
@@ -473,35 +477,58 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 			readLine();
 
 			AsciiString currentLine = m_buffer;
+			const Bool atLineStart = m_buffer[0] != ' ';
 
 			// the first word is the type of data we're processing
 			const char *token = strtok( m_buffer, getSeps() );
 			if( token )
 			{
 				INIBlockParse parse = findBlockParse(token);
+				if (resyncAfterAuditRecord)
+				{
+					if (parse == nullptr || !atLineStart)
+						continue;
+					resyncAfterAuditRecord = FALSE;
+				}
 				if (parse)
 				{
 					#ifdef DEBUG_CRASHING
 					static_assert(ARRAY_SIZE(m_curBlockStart) >= ARRAY_SIZE(m_buffer), "Incorrect array size");
 					strcpy(m_curBlockStart, m_buffer);
 					#endif
+					const UnsignedInt blockLine = getLineNum();
 					try {
+						INIAudit::Scope auditScope(currentLine.str());
 						(*parse)( this );
-
-					// GeneralsX @bugfix Copilot 20/09/2026 Preserve the innermost INI field diagnostic.
-					} catch (const INIException&) {
-						throw;
+					} catch (const INIException& error) {
+						if (!INIAudit::isEnabled())
+							throw;
+						INIAudit::recordWithContext("error", currentLine.str(), error.mFailureMessage ? error.mFailureMessage : "", m_filename.str(), blockLine);
+						resyncAfterAuditRecord = TRUE;
 					} catch (...) {
-						DEBUG_CRASH(("Error parsing block '%s' in INI file '%s'", token, m_filename.str()) );
-						char buff[1024];
-						snprintf(buff, ARRAY_SIZE(buff), "Error parsing INI file '%s' (Line: '%s')\n",
-							m_filename.str(), currentLine.str());
+						if (INIAudit::isEnabled())
+						{
+							INIAudit::recordWithContext("error", currentLine.str(), "block parse failed", m_filename.str(), blockLine);
+							resyncAfterAuditRecord = TRUE;
+						}
+						else
+						{
+							DEBUG_CRASH(("Error parsing block '%s' in INI file '%s'", token, m_filename.str()) );
+							char buff[1024];
+							snprintf(buff, ARRAY_SIZE(buff), "Error parsing INI file '%s' (Line: '%s')\n",
+								m_filename.str(), currentLine.str());
 
-						throw INIException(buff);
+							throw INIException(buff);
+						}
 					}
 					#ifdef DEBUG_CRASHING
 						strcpy(m_curBlockStart, "NO_BLOCK");
 					#endif
+				}
+				else if (INIAudit::isEnabled())
+				{
+					INIAudit::recordWithContext("block", "", token, m_filename.str(), getLineNum());
+					resyncAfterAuditRecord = TRUE;
 				}
 				else
 				{
@@ -533,6 +560,43 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 	return 1;
 }
 
+Bool INI::skipBlockWithoutOwner(const void* owner, const char* blockType)
+{
+	if (owner != nullptr || !INIAudit::isEnabled())
+		return FALSE;
+	INIAudit::record("order", std::string(blockType) + " parsed before the subsystem that owns it exists", m_filename.str(), getLineNum());
+	skipBlockForAudit();
+	return TRUE;
+}
+
+std::string INI::currentRawLine() const
+{
+	if (m_readBuffer == nullptr || m_readBufferNext < m_lineStart)
+		return std::string();
+	std::string line(m_readBuffer + m_lineStart, m_readBufferNext - m_lineStart);
+	while (!line.empty() && (line.back() == '\n' || line.back() == '\r'))
+		line.pop_back();
+	return line;
+}
+
+Bool INI::nextLineOpensBlockForAudit() const
+{
+	if (m_readBuffer == nullptr)
+		return FALSE;
+	return INIAudit::nextLineIsDeeper(m_readBuffer, m_readBufferNext, m_readBufferUsed, INIAudit::indentation(currentRawLine()));
+}
+
+void INI::skipBlockForAudit()
+{
+	const std::size_t headerIndentation = INIAudit::indentation(currentRawLine());
+	while (m_endOfFile == FALSE)
+	{
+		readLine();
+		if (INIAudit::closesSkippedBlock(currentRawLine(), headerIndentation))
+			return;
+	}
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Read a line from the already open file.  Any comments will be removed and
 	* therefore ignored from any given line
@@ -552,6 +616,7 @@ void INI::readLine()
 	}
 	else
 	{
+		m_lineStart = m_readBufferNext;
 		// read up till the newline or semicolon character, or until out of space
 		char *p = m_buffer;
 		while (p != m_buffer+INI_MAX_CHARS_PER_LINE)
@@ -1610,6 +1675,7 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 
 		// read next line
 		readLine();
+		const std::string auditLine = INIAudit::isEnabled() ? std::string(m_buffer) : std::string();
 
 		// check for end token
 		const char* field = strtok( m_buffer, INI::getSeps() );
@@ -1631,14 +1697,21 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 					if (parse)
 					{
 						// parse this block and check for parse errors
+						const UnsignedInt fieldLine = getLineNum();
 						try {
-
-						(*parse)( this, what, (char *)what + offset + parseTableList.getNthExtraOffset(ptIdx), userData );
-
-						// GeneralsX @bugfix Copilot 20/09/2026 Do not replace nested field errors with an enclosing module.
-						} catch (const INIException&) {
-							throw;
+							INIAudit::Scope auditScope(auditLine.c_str());
+							(*parse)( this, what, (char *)what + offset + parseTableList.getNthExtraOffset(ptIdx), userData );
+						} catch (const INIException& error) {
+							if (!INIAudit::isEnabled())
+								throw;
+							INIAudit::record("field-error", auditLine + " | " + (error.mFailureMessage ? error.mFailureMessage : ""), m_filename.str(), fieldLine);
 						} catch (...) {
+							if (INIAudit::isEnabled())
+							{
+								INIAudit::record("field-error", auditLine, m_filename.str(), fieldLine);
+								found = true;
+								break;
+							}
 							DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Error reading field '%s' of block '%s'",
 																 INI::getLineNum(), INI::getFilename().str(), field, m_curBlockStart) );
 
@@ -1655,8 +1728,15 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 					}
 				}
 
+				if (!found && INIAudit::isEnabled() && nextLineOpensBlockForAudit())
+				{
+					INIAudit::record("subblock", field, m_filename.str(), getLineNum());
+					skipBlockForAudit();
+					found = true;
+				}
 				if (!found)
 				{
+					INIAudit::record("field", field, m_filename.str(), getLineNum());
 					DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Unknown field '%s' in block '%s'",
 														 INI::getLineNum(), INI::getFilename().str(), field, m_curBlockStart) );
 				}

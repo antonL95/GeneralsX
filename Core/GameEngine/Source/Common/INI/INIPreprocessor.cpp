@@ -249,7 +249,9 @@ void INIPreprocessor::registerDefine(const Line& line)
 		m_defines[name] = value;
 		return;
 	}
-	warn(line, "#define " + name + " defined more than once");
+	if (it->second == value)
+		return;
+	warn(line, "#define " + name + " defined more than once with a different value");
 	it->second = value;
 }
 

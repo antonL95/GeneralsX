@@ -270,6 +270,10 @@ public:
 
 	void initFromINI( void *what, const FieldParse* parseTable );
 	void initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList );
+	void skipBlockForAudit();
+	Bool nextLineOpensBlockForAudit() const;
+	std::string currentRawLine() const;
+	Bool skipBlockWithoutOwner(const void* owner, const char* blockType);
 	void initFromINIMultiProc( void *what, BuildMultiIniFieldProc proc );
 
 	static void parseUnsignedByte( INI *ini, void *instance, void *store, const void* userData );
@@ -408,6 +412,7 @@ protected:
 	char* m_readBuffer;                       ///< internal read buffer
 	unsigned m_readBufferNext;                ///< next char in read buffer
 	unsigned m_readBufferUsed;                ///< number of bytes in read buffer
+	unsigned m_lineStart;
 
 	AsciiString m_filename;										///< filename of file currently loading
 	INILoadType m_loadType;										///< load type for current file

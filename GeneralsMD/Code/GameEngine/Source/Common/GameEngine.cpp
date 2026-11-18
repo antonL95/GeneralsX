@@ -40,6 +40,7 @@
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 #include "Common/INIException.h"
 #include "Common/MessageStream.h"
 #include "Common/ThingFactory.h"
@@ -111,6 +112,7 @@
 #include "GameNetwork/GameSpy/GameResultsThread.h"
 
 #include "Common/version.h"
+#include <cstdlib>
 
 
 //-------------------------------------------------------------------------------------------------
@@ -802,6 +804,11 @@ void GameEngine::init()
 		DEBUG_LOG(("INI CRC is 0x%8.8X", TheGlobalData->m_iniCRC));
 
 		TheSubsystemList->postProcessLoadAll();
+		if (INIAudit::isEnabled())
+		{
+			INIAudit::recordWithContext("done", "GameEngine::init", "all subsystems initialized", "", 0);
+			std::_Exit(0);
+		}
 
 		// GeneralsX @bugfix Copilot 11/05/2026 Prevent uncapped render when FPS limiter is enabled but no valid limit value was loaded.
 		if (TheGlobalData->m_useFpsLimit && TheGlobalData->m_framesPerSecondLimit <= 0)
@@ -895,6 +902,11 @@ void GameEngine::init()
 	}
 	catch (ErrorCode ec)
 	{
+		if (INIAudit::isEnabled())
+		{
+			INIAudit::recordWithContext("fatal", "GameEngine::init", "error code " + std::to_string(static_cast<unsigned>(ec)), "", 0);
+			std::_Exit(2);
+		}
 		if (ec == ERROR_INVALID_D3D)
 		{
 			RELEASE_CRASHLOCALIZED("ERROR:D3DFailurePrompt", "ERROR:D3DFailureMessage");
@@ -902,6 +914,11 @@ void GameEngine::init()
 	}
 	catch (INIException e)
 	{
+		if (INIAudit::isEnabled())
+		{
+			INIAudit::recordWithContext("fatal", "GameEngine::init", e.mFailureMessage ? e.mFailureMessage : "INIException", "", 0);
+			std::_Exit(2);
+		}
 		if (e.mFailureMessage)
 			RELEASE_CRASH((e.mFailureMessage));
 		else
@@ -910,6 +927,11 @@ void GameEngine::init()
 	}
 	catch (...)
 	{
+		if (INIAudit::isEnabled())
+		{
+			INIAudit::recordWithContext("fatal", "GameEngine::init", "uncaught exception", "", 0);
+			std::_Exit(2);
+		}
 		RELEASE_CRASH(("Uncaught Exception during initialization."));
 	}
 

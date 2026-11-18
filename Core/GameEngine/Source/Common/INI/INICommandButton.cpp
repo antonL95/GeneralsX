@@ -50,6 +50,8 @@ void ControlBar::parseCommandButtonDefinition( INI *ini )
 {
 	// read the name
 	AsciiString name = ini->getNextToken();
+	if (ini->skipBlockWithoutOwner(TheControlBar, "CommandButton"))
+		return;
 
 	// find existing item if present
 	CommandButton *button = TheControlBar->findNonConstCommandButton( name );

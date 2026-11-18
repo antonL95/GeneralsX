@@ -109,6 +109,14 @@ TEST(INIPreprocessor, DuplicateDefinesWarnAndTheLastOneWins)
 	EXPECT_NE(preprocessor.getWarnings()[0].find("more than once"), std::string::npos);
 }
 
+TEST(INIPreprocessor, RepeatingADefineWithTheSameValueIsSilent)
+{
+	INIPreprocessor preprocessor(nullptr);
+	preprocessor.process("Data\\INI\\GameData.ini", "#define BONUS 10\n");
+	EXPECT_EQ(preprocessor.process("Data\\INI\\GameData.ini", "#define BONUS 10\nV = BONUS\n"), "\nV = 10\n");
+	EXPECT_TRUE(preprocessor.getWarnings().empty());
+}
+
 TEST(INIPreprocessor, DefineWithoutValueWarns)
 {
 	INIPreprocessor preprocessor(nullptr);

@@ -2018,6 +2018,8 @@ CommandButton *ControlBar::newCommandButtonOverride( CommandButton *buttonToOver
 	// read the name
 	const char* c = ini->getNextToken();
 	name.set( c );
+	if (ini->skipBlockWithoutOwner(TheControlBar, "CommandSet"))
+		return;
 
 	// find existing item if present
 	commandSet = TheControlBar->findNonConstCommandSet( name );

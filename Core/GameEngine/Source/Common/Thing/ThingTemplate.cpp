@@ -43,6 +43,7 @@
 #include "Common/GameCommon.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 #include "Common/MessageStream.h"
 #include "Common/Module.h"
 #include "Common/ModuleFactory.h"
@@ -554,6 +555,13 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 									tokenStr.str(), self->getName().str() ));
 		throw;
 
+	}
+
+	if (INIAudit::isEnabled() && !TheModuleFactory->isModuleKnown(tokenStr, type == 999 ? MODULETYPE_BEHAVIOR : type))
+	{
+		INIAudit::record("module", tokenStr.str(), ini->getFilename().str(), ini->getLineNum());
+		ini->skipBlockForAudit();
+		return;
 	}
 
 	Int interfaceMask;

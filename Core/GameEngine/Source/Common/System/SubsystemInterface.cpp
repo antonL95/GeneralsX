@@ -27,6 +27,9 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/SubsystemInterface.h"
+#include "Common/INI.h"
+#include "Common/INIAudit.h"
+#include "Common/INIException.h"
 #include "Common/Xfer.h"
 
 
@@ -150,6 +153,22 @@ void SubsystemInterfaceList::removeSubsystem(SubsystemInterface* sys)
 	}
 #endif
 }
+static void loadSubsystemDirectory(INI& ini, const AsciiString& name, const char* path, Xfer* pXfer)
+{
+	if (!INIAudit::isEnabled())
+	{
+		ini.loadFileDirectory(path, INI_LOAD_OVERWRITE, pXfer);
+		return;
+	}
+	try {
+		ini.loadFileDirectory(path, INI_LOAD_OVERWRITE, pXfer);
+	} catch (const INIException& error) {
+		INIAudit::recordWithContext("subsystem", name.str(), std::string(path) + " | " + (error.mFailureMessage ? error.mFailureMessage : ""), "", 0);
+	} catch (...) {
+		INIAudit::recordWithContext("subsystem", name.str(), std::string(path) + " | load failed", "", 0);
+	}
+}
+
 //-----------------------------------------------------------------------------
 void SubsystemInterfaceList::initSubsystem(SubsystemInterface* sys, const char* path1, const char* path2, Xfer *pXfer, AsciiString name)
 {
@@ -169,7 +188,18 @@ void SubsystemInterfaceList::initSubsystem(SubsystemInterface* sys, const char* 
 	
 	fprintf(stderr, "[SUBSYS] initSubsystem('%s') - About to call sys->init()\n", name.str());
 	fflush(stderr);
-	sys->init();
+	if (INIAudit::isEnabled())
+	{
+		try {
+			sys->init();
+		} catch (...) {
+			INIAudit::recordWithContext("subsystem", name.str(), "init failed", "", 0);
+		}
+	}
+	else
+	{
+		sys->init();
+	}
 	fprintf(stderr, "[SUBSYS] initSubsystem('%s') - sys->init() completed\n", name.str());
 	fflush(stderr);
 
@@ -177,14 +207,14 @@ void SubsystemInterfaceList::initSubsystem(SubsystemInterface* sys, const char* 
 	if (path1) {
 		fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') START\n", name.str(), path1);
 		fflush(stderr);
-		ini.loadFileDirectory(path1, INI_LOAD_OVERWRITE, pXfer );
+		loadSubsystemDirectory(ini, name, path1, pXfer);
 		fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') DONE\n", name.str(), path1);
 		fflush(stderr);
 	}
 	if (path2) {
 		fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') START\n", name.str(), path2);
 		fflush(stderr);
-		ini.loadFileDirectory(path2, INI_LOAD_OVERWRITE, pXfer );
+		loadSubsystemDirectory(ini, name, path2, pXfer);
 		fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') DONE\n", name.str(), path2);
 		fflush(stderr);
 	}
