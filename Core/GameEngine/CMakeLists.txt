@@ -63,6 +63,8 @@ set(GAMEENGINE_SRC
 #    Include/Common/Handicap.h
 #    Include/Common/IgnorePreferences.h
     Include/Common/INI.h
+    Include/Common/INIMath.h
+    Include/Common/INIPreprocessor.h
 #    Include/Common/INIException.h
 #    Include/Common/KindOf.h
 #    Include/Common/LadderPreferences.h
@@ -598,6 +600,7 @@ set(GAMEENGINE_SRC
     Source/Common/GameUtility.cpp
 #    Source/Common/GlobalData.cpp
     Source/Common/INI/INI.cpp
+    Source/Common/INI/INIPreprocessor.cpp
     Source/Common/INI/INIAiData.cpp
     Source/Common/INI/INIAnimation.cpp
     Source/Common/INI/INIAudioEventInfo.cpp

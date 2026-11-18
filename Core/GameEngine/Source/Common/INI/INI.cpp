@@ -34,6 +34,8 @@
 #include "WWMath/wwmath.h"
 #include "Common/INI.h"
 #include "Common/INIException.h"
+#include "Common/INIMath.h"
+#include "Common/INIPreprocessor.h"
 
 #include "Common/DamageFX.h"
 #include "Common/file.h"
@@ -312,6 +314,24 @@ UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer 
 	return filesRead;
 }
 
+static bool readIncludedFile(const std::string& path, std::string& contents)
+{
+	File* file = TheFileSystem->openFile(path.c_str(), File::READ);
+	if (file == nullptr)
+		return false;
+	const Int size = file->size();
+	char* data = file->readEntireAndClose();
+	contents.assign(data, size);
+	delete[] data;
+	return true;
+}
+
+static INIPreprocessor& getPreprocessor()
+{
+	static INIPreprocessor preprocessor(readIncludedFile);
+	return preprocessor;
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void INI::prepFile( AsciiString filename, INILoadType loadType )
@@ -335,9 +355,23 @@ void INI::prepFile( AsciiString filename, INILoadType loadType )
 
 	}
 
+	const Int size = file->size();
+	char* raw = file->readEntireAndClose();
+	INIPreprocessor& preprocessor = getPreprocessor();
+	const std::string expanded = preprocessor.process(filename.str(), std::string(raw, size));
+	delete[] raw;
+	for (const std::string& warning : preprocessor.getWarnings())
+	{
+		fprintf(stderr, "[INI] %s\n", warning.c_str());
+	}
+	fflush(stderr);
+	preprocessor.clearWarnings();
+
 	m_readBufferNext = 0;
-	m_readBufferUsed = file->size();
-	m_readBuffer = file->readEntireAndClose();
+	m_readBufferUsed = static_cast<unsigned>(expanded.size());
+	m_readBuffer = new char[expanded.size() + 1];
+	memcpy(m_readBuffer, expanded.data(), expanded.size());
+	m_readBuffer[expanded.size()] = 0;
 
 	// save our filename
 	m_filename = filename;
@@ -1817,8 +1851,27 @@ Type scanType(const char* tokenString)
 #endif
 
 //-------------------------------------------------------------------------------------------------
+template <typename Type>
+static Type scanMath(INIMathFunction function, Type (*scan)(const char*))
+{
+	try
+	{
+		return evaluateINIMath<Type>(function, []() { return INI::getNextToken(); }, scan);
+	}
+	catch (const INIMathError& error)
+	{
+		fprintf(stderr, "[INI] %s\n", error.what());
+		fflush(stderr);
+		throw INI_INVALID_DATA;
+	}
+}
+
 /*static*/ Int INI::scanInt(const char* token)
 {
+	const INIMathFunction math = findINIMathFunction(token);
+	if (math != INI_MATH_NONE)
+		return scanMath<Int>(math, &INI::scanInt);
+
 #if USE_STD_FROM_CHARS_PARSING == 1
 	return scanType<Int>(token);
 #else
@@ -1838,6 +1891,10 @@ Type scanType(const char* tokenString)
 //-------------------------------------------------------------------------------------------------
 /*static*/ UnsignedInt INI::scanUnsignedInt(const char* token)
 {
+	const INIMathFunction math = findINIMathFunction(token);
+	if (math != INI_MATH_NONE)
+		return scanMath<UnsignedInt>(math, &INI::scanUnsignedInt);
+
 #if USE_STD_FROM_CHARS_PARSING == 1
 	return scanType<UnsignedInt>(token);
 #else
@@ -1857,6 +1914,10 @@ Type scanType(const char* tokenString)
 //-------------------------------------------------------------------------------------------------
 /*static*/ Real INI::scanReal(const char* token)
 {
+	const INIMathFunction math = findINIMathFunction(token);
+	if (math != INI_MATH_NONE)
+		return scanMath<Real>(math, &INI::scanReal);
+
 #if USE_STD_FROM_CHARS_PARSING == 1
 	return scanType<Real>(token);
 #else
