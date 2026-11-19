@@ -57,6 +57,9 @@ static const char* const TheOCLCreateLocTypeNames[] =
 	"USE_OWNER_OBJECT",
 	"CREATE_ABOVE_LOCATION",
 	"CREATE_AT_EDGE_FARTHEST_FROM_TARGET",
+	"CREATE_AT_EDGE_NEAR_TARGET_AND_MOVE_TO_LOCATION",
+	"CREATE_CLOSEST_TO_SPAWN_POINT",
+	"USE_SECONDARY_OBJECT_LOCATION",
 	nullptr
 };
 static_assert(ARRAY_SIZE(TheOCLCreateLocTypeNames) == OCL_CREATE_LOC_COUNT + 1, "Incorrect array size");
@@ -162,6 +165,12 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 	Coord3D creationCoord;
 	switch (modData->m_createLoc)
 	{
+		case CREATE_AT_EDGE_NEAR_TARGET_AND_MOVE_TO_LOCATION:
+		case CREATE_CLOSEST_TO_SPAWN_POINT:
+		case USE_SECONDARY_OBJECT_LOCATION:
+		case OCL_CREATE_LOC_COUNT:
+			break;
+
 		case CREATE_AT_EDGE_NEAR_SOURCE:
 			creationCoord = TheTerrainLogic->findClosestEdgePoint( getObject()->getPosition() );
 			ObjectCreationList::create( ocl, getObject(), &creationCoord, loc );

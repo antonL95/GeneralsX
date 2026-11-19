@@ -2318,6 +2318,11 @@ Bool Locomotor::handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coo
 	// keep the agent aligned on the terrain
 	switch(m_template->m_behaviorZ)
 	{
+		case Z_FLOATING_Z:
+		case Z_SCALING_WALLS:
+			requiresConstantCalling = FALSE;
+			break;
+
 		case Z_NO_Z_MOTIVE_FORCE:
 			// nothing to do.
 			requiresConstantCalling = FALSE;

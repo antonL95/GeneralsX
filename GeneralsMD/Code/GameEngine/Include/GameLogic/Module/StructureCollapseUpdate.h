@@ -50,6 +50,8 @@ enum StructureCollapsePhaseType CPP_11(: Int)
 	SCPHASE_BURST,
 	SCPHASE_FINAL,
 
+	SCPHASE_ALMOST_FINAL,
+
 	SC_PHASE_COUNT
 };
 

@@ -70,6 +70,8 @@ enum SoundType CPP_11(: Int)
 	ST_ALLIES								= 0x0040,
 	ST_ENEMIES							= 0x0080,
 	ST_EVERYONE							= 0x0100,
+	ST_FAKE = 1 << 9,
+	ST_DEFAULT = 1 << 10,
 };
 
 extern const char *const theAudioControlNames[];
@@ -80,6 +82,10 @@ enum AudioControl CPP_11(: Int)
 	AC_ALL									= 0x0004,
 	AC_POSTDELAY						= 0x0008,
 	AC_INTERRUPT						= 0x0010,
+	AC_SEQUENTIAL = 1 << 5,
+	AC_RANDOMSTART = 1 << 6,
+	AC_FADE_ON_KILL = 1 << 7,
+	AC_FADE_ON_START = 1 << 8,
 };
 
 class DynamicAudioEventInfo;

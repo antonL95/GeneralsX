@@ -43,12 +43,6 @@ public:
 		Bool onlyIfOnLand = FALSE;
 	};
 
-	struct WeaponBone
-	{
-		Int slot;
-		AsciiString bone;
-	};
-
 	struct ModelState
 	{
 		ModelConditionInfo draw;
@@ -56,7 +50,6 @@ public:
 		std::vector<std::vector<AsciiString>> textures;
 		std::vector<FXEvent> fxEvents;
 		std::vector<ParticleAttachment> particles;
-		std::vector<WeaponBone> extraLaunchBones;
 		AsciiString tooltip;
 		AsciiString stateName;
 		AsciiString animationPrefix;

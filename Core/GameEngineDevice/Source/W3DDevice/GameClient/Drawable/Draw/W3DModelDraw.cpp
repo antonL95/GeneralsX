@@ -4520,9 +4520,10 @@ void W3DModelDraw::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = 2;
-	XferVersion version = currentVersion;
-	xfer->xferVersion( &version, currentVersion );
+	const Bool extendedSlots = !m_weaponRecoilInfoVec[QUATERNARY_WEAPON].empty() ||
+		!m_weaponRecoilInfoVec[QUINARY_WEAPON].empty();
+	XferVersion version = extendedSlots ? 3 : 2;
+	xfer->xferVersion( &version, 3 );
 
 	// extend base class
 	DrawModule::xfer( xfer );
@@ -4530,7 +4531,8 @@ void W3DModelDraw::xfer( Xfer *xfer )
 	// weapon recoil info vectors
 	UnsignedByte recoilInfoCount;
 	WeaponRecoilInfo weaponRecoilInfo;
-	for( Int i = 0; i < WEAPONSLOT_COUNT; ++i )
+	const Int slotCount = version >= 3 ? WEAPONSLOT_COUNT : QUATERNARY_WEAPON;
+	for( Int i = 0; i < slotCount; ++i )
 	{
 
 		// count of data here

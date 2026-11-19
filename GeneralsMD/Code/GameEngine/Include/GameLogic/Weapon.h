@@ -80,6 +80,8 @@ enum WeaponPrefireType CPP_11(: Int)
 	PREFIRE_PER_ATTACK,	///< Use the prefire delay each time we attack a new target
 	PREFIRE_PER_CLIP,		///< Use the prefire attack delay for each new clip
 
+	PREFIRE_PER_POSITION,
+
 	PREFIRE_COUNT
 };
 
@@ -89,6 +91,7 @@ static const char *const TheWeaponPrefireNames[] =
 	"PER_SHOT",
 	"PER_ATTACK",
 	"PER_CLIP",
+	"PER_POSITION",
 	nullptr
 };
 static_assert(ARRAY_SIZE(TheWeaponPrefireNames) == PREFIRE_COUNT + 1, "Incorrect array size");
@@ -146,7 +149,9 @@ enum WeaponCollideMaskType CPP_11(: Int)
 	WEAPON_COLLIDE_WALLS									= 0x0020,
 	WEAPON_COLLIDE_SMALL_MISSILES					= 0x0040, //All missiles are also projectiles!
 	WEAPON_COLLIDE_BALLISTIC_MISSILES			= 0x0080, //All missiles are also projectiles!
-	WEAPON_COLLIDE_CONTROLLED_STRUCTURES	= 0x0100	//this is "ONLY structures belonging to the projectile's controller".
+	WEAPON_COLLIDE_CONTROLLED_STRUCTURES	= 0x0100,
+	WEAPON_COLLIDE_NEUTRAL = 1 << 9,
+	WEAPON_COLLIDE_MONSTERS = 1 << 10,
 };
 
 #ifdef DEFINE_WEAPONCOLLIDEMASK_NAMES
@@ -161,6 +166,8 @@ static const char *const TheWeaponCollideMaskNames[] =
 	"SMALL_MISSILES",			//All missiles are also projectiles!
 	"BALLISTIC_MISSILES", //All missiles are also projectiles!
 	"CONTROLLED_STRUCTURES",
+	"NEUTRAL",
+	"MONSTERS",
 	nullptr
 };
 #endif

@@ -44,7 +44,17 @@ enum ShadowType CPP_11(: Int)
 	SHADOW_DYNAMIC_PROJECTION				= 0x00000008,		//extra setting for shadows which need dynamic updates
 	SHADOW_DIRECTIONAL_PROJECTION		= 0x00000010,		//extra setting for shadow decals that rotate with sun direction
 	SHADOW_ALPHA_DECAL							= 0x00000020,		//not really for shadows but for other decal uses. Alpha blended.
-	SHADOW_ADDITIVE_DECAL						= 0x00000040		//not really for shadows but for other decal uses. Additive blended.
+	SHADOW_ADDITIVE_DECAL						= 0x00000040,
+	SHADOW_VOLUME_NEW = 1 << 7,
+	SHADOW_VOLUME_NON_SELF_1 = 1 << 8,
+	SHADOW_VOLUME_NON_SELF_2 = 1 << 9,
+	SHADOW_VOLUME_NON_SELF_3 = 1 << 10,
+	SHADOW_ALPHA_DECAL_DYNAMIC = 1 << 11,
+	SHADOW_ADDITIVE_DECAL_DYNAMIC = 1 << 12,
+	SHADOW_MERGE_DECAL = 1 << 13,
+	SHADOW_DECAL_TERRAIN_CLAIM = 1 << 14,
+	SHADOW_VOLUME_OR_DECAL = 1 << 15,
+	SHADOW_VOLUME_NEW_OR_DECAL = 1 << 16,
 };
 #ifdef DEFINE_SHADOW_NAMES
 static const char* const TheShadowNames[] =
@@ -56,6 +66,16 @@ static const char* const TheShadowNames[] =
 	"SHADOW_DIRECTIONAL_PROJECTION",
 	"SHADOW_ALPHA_DECAL",
 	"SHADOW_ADDITIVE_DECAL",
+	"SHADOW_VOLUME_NEW",
+	"SHADOW_VOLUME_NON_SELF_1",
+	"SHADOW_VOLUME_NON_SELF_2",
+	"SHADOW_VOLUME_NON_SELF_3",
+	"SHADOW_ALPHA_DECAL_DYNAMIC",
+	"SHADOW_ADDITIVE_DECAL_DYNAMIC",
+	"SHADOW_MERGE_DECAL",
+	"SHADOW_DECAL_TERRAIN_CLAIM",
+	"SHADOW_VOLUME_OR_DECAL",
+	"SHADOW_VOLUME_NEW_OR_DECAL",
 	nullptr
 };
 #endif  // end DEFINE_SHADOW_NAMES

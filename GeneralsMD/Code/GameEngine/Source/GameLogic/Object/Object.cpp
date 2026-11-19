@@ -144,6 +144,20 @@ static const ModelConditionFlags s_allWeaponFireFlags[WEAPONSLOT_COUNT] =
 		MODELCONDITION_RELOADING_C,
 		MODELCONDITION_PREATTACK_C,
 		MODELCONDITION_USING_WEAPON_C
+	),
+	MAKE_MODELCONDITION_MASK5(
+		MODELCONDITION_FIRING_D,
+		MODELCONDITION_BETWEEN_FIRING_SHOTS_D,
+		MODELCONDITION_RELOADING_D,
+		MODELCONDITION_PREATTACK_D,
+		MODELCONDITION_USING_WEAPON_D
+	),
+	MAKE_MODELCONDITION_MASK5(
+		MODELCONDITION_FIRING_E,
+		MODELCONDITION_BETWEEN_FIRING_SHOTS_E,
+		MODELCONDITION_RELOADING_E,
+		MODELCONDITION_PREATTACK_E,
+		MODELCONDITION_USING_WEAPON_E
 	)
 };
 
@@ -4109,16 +4123,18 @@ void Object::xfer( Xfer *xfer )
 #if RTS_GENERALS
 
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = 7;
+	const XferVersion legacyVersion = 7;
 #else
-	const XferVersion currentVersion = 8;
+	const XferVersion legacyVersion = 8;
 #endif
 
 #else
-	const XferVersion currentVersion = 9;
+	const XferVersion legacyVersion = 9;
 #endif
-	XferVersion version = currentVersion;
-	xfer->xferVersion( &version, currentVersion );
+	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
+		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
+	XferVersion version = extendedSlots ? 10 : legacyVersion;
+	xfer->xferVersion( &version, 10 );
 
 	// object ID
 	ObjectID id = getID();
@@ -4548,7 +4564,8 @@ void Object::xfer( Xfer *xfer )
 		// xfer the weaponSetFlags FIRST, since we need 'em to restore the weaponSet properly. (srj)
 		m_curWeaponSetFlags.xfer( xfer );
 		xfer->xferUnsignedInt(&m_weaponBonusCondition);
-		xfer->xferUser(&m_lastWeaponCondition, sizeof(m_lastWeaponCondition));
+		const Int slotCount = version >= 10 ? WEAPONSLOT_COUNT : QUATERNARY_WEAPON;
+		xfer->xferUser(m_lastWeaponCondition, slotCount * sizeof(m_lastWeaponCondition[0]));
 
 		// do the weaponSet itself after all the weapon-related stuff, just in case
 		xfer->xferSnapshot(&m_weaponSet);

@@ -60,6 +60,12 @@ enum LocomotorAppearance CPP_11(: Int)
 	LOCO_OTHER,
 	LOCO_MOTORCYCLE, // Added in Zero Hour
 
+	LOCO_FOUR_LEGS_HUGE,
+	LOCO_GIANT_BIRD,
+	LOCO_HORDE,
+	LOCO_HUGE_TWO_LEGS,
+	LOCO_SHIP,
+
 	LOCOMOTOR_APPEARANCE_COUNT
 };
 
@@ -85,6 +91,11 @@ static const char *const TheLocomotorAppearanceNames[] =
 	"OTHER",
 	"MOTORCYCLE",
 
+	"FOUR_LEGS_HUGE",
+	"GIANT_BIRD",
+	"HORDE",
+	"HUGE_TWO_LEGS",
+	"SHIP",
 	nullptr
 };
 static_assert(ARRAY_SIZE(TheLocomotorAppearanceNames) == LOCOMOTOR_APPEARANCE_COUNT + 1, "Array size");
@@ -102,6 +113,9 @@ enum LocomotorBehaviorZ CPP_11(: Int)
 	Z_RELATIVE_TO_GROUND_AND_BUILDINGS,	// stays fixed at surface-rel height including buildings, regardless of physics
 	Z_SMOOTH_RELATIVE_TO_HIGHEST_LAYER,	// try to follow a height relative to the highest layer.
 
+	Z_FLOATING_Z,
+	Z_SCALING_WALLS,
+
 	LOCOMOTOR_BEHAVIOR_Z_COUNT
 };
 
@@ -117,6 +131,8 @@ static const char *const TheLocomotorBehaviorZNames[] =
 	"FIXED_RELATIVE_TO_GROUND_AND_BUILDINGS",
 	"RELATIVE_TO_HIGHEST_LAYER",
 
+	"FLOATING_Z",
+	"SCALING_WALLS",
 	nullptr
 };
 static_assert(ARRAY_SIZE(TheLocomotorBehaviorZNames) == LOCOMOTOR_BEHAVIOR_Z_COUNT + 1, "Array size");

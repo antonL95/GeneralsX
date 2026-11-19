@@ -49,6 +49,11 @@ enum EditorSortingType CPP_11(: Int)
 	ES_ROAD,						// road objects...should never actually be in the object panel.
 	ES_WAYPOINT,					// waypoint objects...should never actually be in the object panel.
 
+	ES_UNIT,
+	ES_EMITTERS,
+	ES_SCORCH,
+	ES_OBSOLETE,
+
 	ES_NUM_SORTING_TYPES,
 	ES_FIRST = 0,
 };
@@ -71,6 +76,10 @@ static const char *const EditorSortingNames[] =
 	"ROAD",
 	"WAYPOINT",
 
+	"UNIT",
+	"EMITTERS",
+	"SCORCH",
+	"OBSOLETE",
 	nullptr
 };
 static_assert(ARRAY_SIZE(EditorSortingNames) == ES_NUM_SORTING_TYPES + 1, "Incorrect array size");

@@ -51,6 +51,8 @@ enum SlowDeathPhaseType CPP_11(: Int)
 	SDPHASE_MIDPOINT,
 	SDPHASE_FINAL,
 
+	SDPHASE_HIT_GROUND,
+
 	SD_PHASE_COUNT
 };
 
@@ -61,6 +63,7 @@ static const char *const TheSlowDeathPhaseNames[] =
 	"MIDPOINT",
 	"FINAL",
 
+	"HIT_GROUND",
 	nullptr
 };
 static_assert(ARRAY_SIZE(TheSlowDeathPhaseNames) == SD_PHASE_COUNT + 1, "Incorrect array size");

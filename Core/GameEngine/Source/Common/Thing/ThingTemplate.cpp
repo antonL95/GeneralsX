@@ -253,7 +253,7 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "GeometryMinorRadius",	GeometryInfo::parseGeometryMinorRadius,	nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
 	{ "GeometryHeight",				GeometryInfo::parseGeometryHeight,			nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
 	{ "GeometryIsSmall",			GeometryInfo::parseGeometryIsSmall,			nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
-	{ "Shadow",								INI::parseBitString8,		TheShadowNames,		offsetof( ThingTemplate, m_shadowType ) },
+	{ "Shadow",								INI::parseBitString32,		TheShadowNames,		offsetof( ThingTemplate, m_shadowType ) },
 	{ "ShadowSizeX",					INI::parseReal,						nullptr,	offsetof( ThingTemplate, m_shadowSizeX ) },
 	{ "ShadowSizeY",					INI::parseReal,						nullptr,	offsetof( ThingTemplate, m_shadowSizeY ) },
 	{ "ShadowOffsetX",				INI::parseReal,						nullptr,	offsetof( ThingTemplate, m_shadowOffsetX ) },

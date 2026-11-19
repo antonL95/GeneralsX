@@ -775,7 +775,7 @@ private:
 	Byte					m_buildCompletion;					///< how the units come into the world when build is complete
 	Byte					m_editorSorting;						///< editor sorting type, see EditorSortingType enum
 	Byte					m_structureRubbleHeight;
-	Byte					m_shadowType;								///< settings which determine the type of shadow rendered
+	UnsignedInt			m_shadowType;
 	Byte					m_moduleParsingMode;
 	UnsignedByte	m_crusherLevel;							///< crusher > crushable level to actually crush
 	UnsignedByte	m_crushableLevel;						///< Specifies the level of crushability (must be hit by a crusher greater than this to crush me).

@@ -42,6 +42,8 @@
 #include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "Common/GameAudio.h"
+#include "Common/KindOf.h"
+#include "Common/ObjectStatusTypes.h"
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
@@ -2056,6 +2058,18 @@ static Type scanMath(INIMathFunction function, Type (*scan)(const char*))
 			return count;
 		}
 	}
+
+	if (nameList == ObjectStatusMaskType::getBitNames())
+	{
+		if (stricmp(token, "USING_ABILITY") == 0)
+			return OBJECT_STATUS_IS_USING_ABILITY;
+		if (strnicmp(token, "RIDER", 5) == 0 && token[5] >= '1' && token[5] <= '8' && token[6] == '\0')
+			return OBJECT_STATUS_RIDER1 + token[5] - '1';
+	}
+#if !RTS_GENERALS
+	if (nameList == KindOfMaskType::getBitNames() && stricmp(token, "AIRFIELD") == 0)
+		return KINDOF_FS_AIRFIELD;
+#endif
 
 	DEBUG_CRASH(("token %s is not a valid member of the index list",token));
 	throw INI_INVALID_DATA;

@@ -192,6 +192,22 @@ const char* const ArmorSetFlags::s_bitNameList[] =
 	"CRATE_UPGRADE_ONE",
 	"CRATE_UPGRADE_TWO",
 
+	"ALTERNATE_FORMATION",
+	"MOUNTED",
+	"PLAYER_UPGRADE_2",
+	"PLAYER_UPGRADE_3",
+	"UNBESIEGEABLE",
+	"AS_TOWER",
+	"CREATE_A_HERO_01",
+	"CREATE_A_HERO_02",
+	"CREATE_A_HERO_03",
+	"CREATE_A_HERO_04",
+	"CREATE_A_HERO_05",
+	"CREATE_A_HERO_06",
+	"CREATE_A_HERO_07",
+	"CREATE_A_HERO_08",
+	"CREATE_A_HERO_09",
+	"CREATE_A_HERO_10",
 	nullptr
 };
 static_assert(ARRAY_SIZE(ArmorSetFlags::s_bitNameList) == ArmorSetFlags::NumBits + 1, "Incorrect array size");

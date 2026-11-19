@@ -49,7 +49,11 @@ enum LocomotorSurfaceType CPP_11(: Int)
 	LOCOMOTORSURFACE_WATER			= (1 << 1),									///< water area
 	LOCOMOTORSURFACE_CLIFF			= (1 << 2),									///< steep altitude change
 	LOCOMOTORSURFACE_AIR				= (1 << 3),									///< airborne
-	LOCOMOTORSURFACE_RUBBLE			= (1 << 4)									///< building rubble
+	LOCOMOTORSURFACE_RUBBLE			= (1 << 4),
+	LOCOMOTORSURFACE_OBSTACLE = 1 << 5,
+	LOCOMOTORSURFACE_IMPASSABLE = 1 << 6,
+	LOCOMOTORSURFACE_DEEP_WATER = 1 << 7,
+	LOCOMOTORSURFACE_WALL_RAILING = 1 << 8,
 };
 
 typedef Int LocomotorSurfaceTypeMask;
@@ -66,6 +70,10 @@ static const char *const TheLocomotorSurfaceTypeNames[] =
 	"AIR",
 	"RUBBLE",
 
+	"OBSTACLE",
+	"IMPASSABLE",
+	"DEEP_WATER",
+	"WALL_RAILING",
 	nullptr
 };
 #endif

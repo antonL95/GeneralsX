@@ -202,6 +202,8 @@ const char *const theSoundTypeNames[] =
 	"ALLIES",
 	"ENEMIES",
 	"EVERYONE",
+	"FAKE",
+	"DEFAULT",
 	nullptr
 };
 
@@ -212,6 +214,10 @@ const char *const theAudioControlNames[] =
 	"ALL",
 	"POSTDELAY",
 	"INTERRUPT",
+	"SEQUENTIAL",
+	"RANDOMSTART",
+	"FADE_ON_KILL",
+	"FADE_ON_START",
 	nullptr
 };
 

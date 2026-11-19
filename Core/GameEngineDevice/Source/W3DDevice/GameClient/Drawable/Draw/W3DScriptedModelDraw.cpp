@@ -298,14 +298,7 @@ void W3DScriptedModelDrawModuleData::parseTexture(INI* ini, void*, void* store, 
 
 void W3DScriptedModelDrawModuleData::parseWeaponLaunchBone(INI* ini, void* instance, void*, const void*)
 {
-	const char* token = ini->getNextToken();
-	Int slot;
-	if (stricmp(token, "QUATERNARY") == 0)
-		slot = 4;
-	else if (stricmp(token, "QUINARY") == 0)
-		slot = 5;
-	else
-		slot = INI::scanIndexList(token, TheWeaponSlotTypeNames) + 1;
+	const Int slot = INI::scanIndexList(ini->getNextToken(), TheWeaponSlotTypeNames);
 
 	AsciiString name = ini->getNextAsciiString();
 	name.toLower();
@@ -313,23 +306,8 @@ void W3DScriptedModelDrawModuleData::parseWeaponLaunchBone(INI* ini, void* insta
 		name.clear();
 
 	auto* state = static_cast<ModelState*>(instance);
-	if (slot <= WEAPONSLOT_COUNT)
-	{
-		state->draw.m_weaponProjectileLaunchBoneName[slot - 1] = name;
-		state->draw.addPublicBone(name);
-	}
-	else
-	{
-		for (WeaponBone& entry : state->extraLaunchBones)
-		{
-			if (entry.slot == slot)
-			{
-				entry.bone = name;
-				return;
-			}
-		}
-		state->extraLaunchBones.push_back({ slot, name });
-	}
+	state->draw.m_weaponProjectileLaunchBoneName[slot] = name;
+	state->draw.addPublicBone(name);
 }
 
 void W3DScriptedModelDrawModuleData::parseFXEvent(INI* ini, void*, void* store, const void*)

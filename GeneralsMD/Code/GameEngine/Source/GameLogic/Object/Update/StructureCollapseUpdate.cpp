@@ -57,6 +57,7 @@ static const char *const TheStructureCollapsePhaseNames[] =
 	"BURST",
 	"FINAL",
 
+	"ALMOST_FINAL",
 	nullptr
 };
 static_assert(ARRAY_SIZE(TheStructureCollapsePhaseNames) == SC_PHASE_COUNT + 1, "Wrong array size");
