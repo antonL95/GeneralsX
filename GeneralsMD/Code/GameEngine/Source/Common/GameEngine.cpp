@@ -807,7 +807,8 @@ void GameEngine::init()
 		if (INIAudit::isEnabled())
 		{
 			INIAudit::recordWithContext("done", "GameEngine::init", "all subsystems initialized", "", 0);
-			std::_Exit(0);
+			if (!std::getenv("GENERALSX_ASSET_SMOKE"))
+				std::_Exit(0);
 		}
 
 		// GeneralsX @bugfix Copilot 11/05/2026 Prevent uncapped render when FPS limiter is enabled but no valid limit value was loaded.

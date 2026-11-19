@@ -222,6 +222,9 @@ endif()
 add_library(z_gameenginedevice STATIC)
 
 target_sources(z_gameenginedevice PRIVATE ${GAMEENGINEDEVICE_SRC})
+target_sources(z_gameenginedevice PRIVATE
+    $<$<PLATFORM_ID:Linux>:${CMAKE_SOURCE_DIR}/Core/GameEngineDevice/Source/StdDevice/Common/AssetProbe.cpp>
+)
 
 target_include_directories(z_gameenginedevice PUBLIC
     Include

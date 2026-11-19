@@ -168,6 +168,8 @@ class ChunkLoadClass
 public:
 
 	ChunkLoadClass(FileClass * file);
+	using AuditObserver = void (*)(FileClass *file, uint32 id, int endPosition, uint32 bytesConsumed);
+	static AuditObserver Audit_Observer;
 
 	// Chunk methods
 	bool					Open_Chunk();

@@ -28,6 +28,8 @@
 
 #pragma once
 
+class File;
+
 #define K_HEIGHT_MAP_VERSION_1	1	// Height map cell = 5.0
 #define K_HEIGHT_MAP_VERSION_2	2	// Height map cell = 10.0
 #define K_HEIGHT_MAP_VERSION_3	3	// Added m_borderSize
@@ -94,6 +96,7 @@ public:
 	CachedFileInputStream();
 	~CachedFileInputStream();
 	Bool open(AsciiString path);	///< Returns true if open succeeded.
+	Bool open(File *file);
 	void close();  ///< Explict close.  Destructor closes if file is left open.
 	virtual Int read(void *pData, Int numBytes) override;
 	virtual UnsignedInt tell() override;

@@ -87,6 +87,9 @@ const Char *g_strFile = "data/Generals.str";     ///< STR file path
 
 // Extern declarations (from GameMain.cpp)
 extern Int GameMain();
+#if defined(__linux__)
+extern int RunAssetProbe(const char *reportPath);
+#endif
 
 /**
  * FilterSoftwareVulkanICDs
@@ -254,6 +257,11 @@ int main(int argc, char* argv[])
 
 		// Initialize memory manager early (required by NEW operator)
 		initMemoryManager();
+
+#if defined(__linux__)
+		if (const char *reportPath = std::getenv("GENERALSX_ASSET_AUDIT"))
+			_exit(RunAssetProbe(reportPath));
+#endif
 
 		// GeneralsX @bugfix BenderAI 14/02/2026 Initialize Version singleton
 		// GameEngine::init() calls updateWindowTitle() which uses TheVersion

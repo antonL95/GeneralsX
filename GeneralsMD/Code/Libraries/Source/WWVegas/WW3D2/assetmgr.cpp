@@ -655,23 +655,27 @@ bool WW3DAssetManager::Load_3D_Assets(FileClass & w3dfile)
 	}
 
 	ChunkLoadClass cload(&w3dfile);
+	bool auditPassed = true;
 
 	while (cload.Open_Chunk()) {
 
 		switch (cload.Cur_Chunk_ID()) {
 
 			case W3D_CHUNK_HIERARCHY:
-				HTreeManager.Load_Tree(cload);
+				if (HTreeManager.Load_Tree(cload) != 0)
+					auditPassed = false;
 				break;
 
 			case W3D_CHUNK_ANIMATION:
 			case W3D_CHUNK_COMPRESSED_ANIMATION:
 			case W3D_CHUNK_MORPH_ANIMATION:
-				HAnimManager.Load_Anim(cload);
+				if (HAnimManager.Load_Anim(cload) != 0)
+					auditPassed = false;
 				break;
 
 			default:
-				Load_Prototype(cload);
+				if (!Load_Prototype(cload))
+					auditPassed = false;
 				break;
 		}
 
@@ -680,7 +684,7 @@ bool WW3DAssetManager::Load_3D_Assets(FileClass & w3dfile)
 
 	w3dfile.Close();
 
-	return true;
+	return !ChunkLoadClass::Audit_Observer || auditPassed;
 }
 
 

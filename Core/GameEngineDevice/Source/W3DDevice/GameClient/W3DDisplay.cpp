@@ -2369,6 +2369,18 @@ AGAIN:
 #endif
 				// render is all done!
 				WW3D::End_Render();
+				static const bool captureAssetSmoke = std::getenv("GENERALSX_ASSET_SMOKE") != nullptr;
+				if (captureAssetSmoke)
+				{
+					static bool captured = false;
+					if (!captured)
+					{
+						captured = true;
+						std::fprintf(stderr, "Asset smoke: completed a render pass\n");
+						std::fflush(stderr);
+						takeScreenShot(SCREENSHOT_PNG, DEFAULT_JPEG_QUALITY);
+					}
+				}
 			}
 			else
 			{

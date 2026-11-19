@@ -444,6 +444,8 @@ bool ChunkLoadClass::Open_Chunk()
  * HISTORY:                                                                                    *
  *   07/17/1997 GH  : Created.                                                                 *
  *=============================================================================================*/
+ChunkLoadClass::AuditObserver ChunkLoadClass::Audit_Observer = nullptr;
+
 bool ChunkLoadClass::Close_Chunk()
 {
 	// if user didn't close any micro chunks that he opened, bad things could happen
@@ -454,6 +456,9 @@ bool ChunkLoadClass::Close_Chunk()
 
 	int csize = HeaderStack[StackIndex-1].Get_Size();
 	int pos = PositionStack[StackIndex-1];
+
+	if (Audit_Observer)
+		Audit_Observer(File, Cur_Chunk_ID(), File->Seek(0, SEEK_CUR) + csize - pos, pos);
 
 	if (pos < csize) {
 		File->Seek(csize - pos,SEEK_CUR);
