@@ -587,6 +587,21 @@ Bool INI::nextLineOpensBlockForAudit() const
 	return INIAudit::nextLineIsDeeper(m_readBuffer, m_readBufferNext, m_readBufferUsed, INIAudit::indentation(currentRawLine()));
 }
 
+std::string INI::readRawBlock(const char* endToken)
+{
+	std::string body;
+	while (!isEOF())
+	{
+		readLine();
+		const char* token = strtok(m_buffer, getSeps());
+		if (token && stricmp(token, endToken) == 0 && !getNextTokenOrNull())
+			return body;
+		body += currentRawLine();
+		body += '\n';
+	}
+	throw INI_MISSING_END_TOKEN;
+}
+
 void INI::skipBlockForAudit()
 {
 	const std::size_t headerIndentation = INIAudit::indentation(currentRawLine());

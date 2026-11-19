@@ -318,7 +318,10 @@ W3DAnimationInfo::W3DAnimationInfo( const W3DAnimationInfo &r ) :
 #endif
 	m_distanceCovered(r.m_distanceCovered),
 	m_isIdleAnim(r.m_isIdleAnim),
-	m_naturalDurationInMsec(r.m_naturalDurationInMsec)
+	m_naturalDurationInMsec(r.m_naturalDurationInMsec),
+	m_playbackMode(r.m_playbackMode),
+	m_minSpeed(r.m_minSpeed),
+	m_maxSpeed(r.m_maxSpeed)
 {
 #ifdef RETAIN_ANIM_HANDLES
 	if (m_handle)
@@ -333,6 +336,9 @@ W3DAnimationInfo& W3DAnimationInfo::operator=(const W3DAnimationInfo &r)
 	m_distanceCovered = r.m_distanceCovered;
 	m_naturalDurationInMsec = r.m_naturalDurationInMsec;
 	m_isIdleAnim = r.m_isIdleAnim;
+	m_playbackMode = r.m_playbackMode;
+	m_minSpeed = r.m_minSpeed;
+	m_maxSpeed = r.m_maxSpeed;
 
 #ifdef RETAIN_ANIM_HANDLES
 	REF_PTR_RELEASE(m_handle);
@@ -344,6 +350,13 @@ W3DAnimationInfo& W3DAnimationInfo::operator=(const W3DAnimationInfo &r)
 	return (*this);
 }
 
+
+void W3DAnimationInfo::setPlayback(RenderObjClass::AnimMode mode, Real minSpeed, Real maxSpeed)
+{
+	m_playbackMode = mode;
+	m_minSpeed = minSpeed;
+	m_maxSpeed = maxSpeed;
+}
 
 //-------------------------------------------------------------------------------------------------
 // note that this now returns an ADDREFED handle, which must be released by the caller!
@@ -663,8 +676,10 @@ void ModelConditionInfo::validateCachedBones(RenderObjClass* robj, Real scale) c
 	}
 	if (animToUse != nullptr)
 	{
-		// make sure we're in frame zero.
-		Int whichFrame = testFlagBit(m_flags, PRISTINE_BONE_POS_IN_FINAL_FRAME) ? animToUse->Get_Num_Frames()-1 : 0;
+		const Int lastFrame = animToUse->Get_Num_Frames() - 1;
+		Int whichFrame = testFlagBit(m_flags, PRISTINE_BONE_POS_IN_FINAL_FRAME) ? lastFrame : 0;
+		if (m_pristineBoneFrame >= 0)
+			whichFrame = min(m_pristineBoneFrame, lastFrame);
 		robj->Set_Animation(animToUse, whichFrame, RenderObjClass::ANIM_MODE_MANUAL);
 		// must balance the addref, above
 		REF_PTR_RELEASE(animToUse);
@@ -1016,6 +1031,7 @@ void ModelConditionInfo::clear()
 	m_transitionSig = NO_TRANSITION;
 	m_animMinSpeedFactor = 1.0f;
 	m_animMaxSpeedFactor = 1.0f;
+	m_pristineBoneFrame = -1;
 	m_pristineBones.clear();
 	m_validStuff = 0;
 }
@@ -1419,7 +1435,7 @@ static Bool doesStateExist(const ModelConditionVector& v, const ModelConditionFl
 }
 
 //-------------------------------------------------------------------------------------------------
-void W3DModelDrawModuleData::parseConditionState(INI* ini, void *instance, void * /*store*/, const void* userData)
+const FieldParse* W3DModelDrawModuleData::conditionStateParseTable()
 {
 	static const FieldParse myFieldParse[] =
 	{
@@ -1450,6 +1466,16 @@ void W3DModelDrawModuleData::parseConditionState(INI* ini, void *instance, void 
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
+	return myFieldParse;
+}
+
+const char* const* W3DModelDrawModuleData::animationFlagNames()
+{
+	return ACBitsNames;
+}
+
+void W3DModelDrawModuleData::parseConditionState(INI* ini, void* instance, void*, const void* userData)
+{
 	ModelConditionInfo info;
 	W3DModelDrawModuleData* self = (W3DModelDrawModuleData*)instance;
 	// GeneralsX @bugfix BenderAI 13/02/2026 Use uintptr_t for pointer cast (fighter19 64-bit pattern)
@@ -1638,7 +1664,7 @@ void W3DModelDrawModuleData::parseConditionState(INI* ini, void *instance, void 
 		break;
 	}
 
-	ini->initFromINI(&info, myFieldParse);
+	ini->initFromINI(&info, conditionStateParseTable());
 
 	if (info.m_modelName.isEmpty())
 	{
@@ -2364,8 +2390,8 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 			if (animHandle)
 			{
 				Int startFrame = 0;
-				if (m_curState->m_mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS ||
-						m_curState->m_mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS)
+				const Int mode = animInfo.getPlaybackMode(m_curState->m_mode);
+				if (mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS || mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS)
 				{
 					startFrame = animHandle->Get_Num_Frames()-1;
 				}
@@ -2393,14 +2419,15 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 					startFrame = REAL_TO_INT(prevAnimFraction * animHandle->Get_Num_Frames()-1);
 				}
 
-				m_renderObject->Set_Animation(animHandle, startFrame, m_curState->m_mode);
+				m_renderObject->Set_Animation(animHandle, startFrame, mode);
 				REF_PTR_RELEASE(animHandle);
 				animHandle = nullptr;
 
 				if (m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD)
 				{
 					HLodClass *hlod = (HLodClass*)m_renderObject;
-					Real factor = GameClientRandomValueReal( m_curState->m_animMinSpeedFactor, m_curState->m_animMaxSpeedFactor );
+					Real factor = GameClientRandomValueReal(animInfo.getMinSpeed(m_curState->m_animMinSpeedFactor),
+						animInfo.getMaxSpeed(m_curState->m_animMaxSpeedFactor));
 					hlod->Set_Animation_Frame_Rate_Multiplier( factor );
 				}
 			}

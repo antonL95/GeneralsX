@@ -66,6 +66,7 @@ set(GAMEENGINE_SRC
     Include/Common/INIAudit.h
     Include/Common/INIMath.h
     Include/Common/INIPreprocessor.h
+    Include/Common/ScriptedModelConditions.inc
 #    Include/Common/INIException.h
 #    Include/Common/KindOf.h
 #    Include/Common/LadderPreferences.h

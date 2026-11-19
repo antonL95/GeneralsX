@@ -105,6 +105,10 @@ private:
 	mutable Real					m_naturalDurationInMsec;
 	Bool									m_isIdleAnim;					// if true, we pick another animation at random when this one completes
 
+	Int m_playbackMode = -1;
+	Real m_minSpeed = 1.0f;
+	Real m_maxSpeed = 1.0f;
+
 public:
 	W3DAnimationInfo(const AsciiString& name, Bool isIdle, Real distanceCovered);
 	W3DAnimationInfo(const W3DAnimationInfo &r);
@@ -117,6 +121,10 @@ public:
 	Bool isIdleAnim() const { return m_isIdleAnim; }
 	Real getDistanceCovered() const { return m_distanceCovered; }
 	Real getNaturalDurationInMsec() const { return m_naturalDurationInMsec; }
+	void setPlayback(RenderObjClass::AnimMode mode, Real minSpeed, Real maxSpeed);
+	Int getPlaybackMode(Int stateMode) const { return m_playbackMode < 0 ? stateMode : m_playbackMode; }
+	Real getMinSpeed(Real stateSpeed) const { return m_playbackMode < 0 ? stateSpeed : m_minSpeed; }
+	Real getMaxSpeed(Real stateSpeed) const { return m_playbackMode < 0 ? stateSpeed : m_maxSpeed; }
 
 };
 typedef std::vector<W3DAnimationInfo>	W3DAnimationVector;
@@ -230,6 +238,8 @@ struct ModelConditionInfo
 	mutable Bool											m_hasRecoilBonesOrMuzzleFlashes[WEAPONSLOT_COUNT];
 	mutable Byte											m_validStuff;
 
+	Int m_pristineBoneFrame;
+
 	enum
 	{
 		PRISTINE_BONES_VALID		= 0x0001,
@@ -318,7 +328,7 @@ public:
 	void validateStuffForTimeAndWeather(const Drawable* draw, Bool night, Bool snowy) const;
 	static void buildFieldParse(MultiIniFieldParse& p);
  	AsciiString getBestModelNameForWB(const ModelConditionFlags& c) const;
-	const ModelConditionInfo* findBestInfo(const ModelConditionFlags& c) const;
+	virtual const ModelConditionInfo* findBestInfo(const ModelConditionFlags& c) const;
 	void preloadAssets( TimeOfDay timeOfDay, Real scale ) const;
 #ifdef CACHE_ATTACH_BONE
 	const Vector3* getAttachToDrawableBoneOffset(const Drawable* draw) const;
@@ -328,8 +338,12 @@ public:
 	virtual const W3DModelDrawModuleData* getAsW3DModelDrawModuleData() const override { return this; }
 	virtual StaticGameLODLevel getMinimumRequiredGameLOD() const override { return m_minLODRequired;}
 
+protected:
+	static const FieldParse* conditionStateParseTable();
+	static const char* const* animationFlagNames();
+
 private:
-	static void parseConditionState( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
+	static void parseConditionState(INI* ini, void* instance, void*, const void*);
 
 public:
  	virtual void crc( Xfer *xfer ) override;

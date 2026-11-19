@@ -146,6 +146,24 @@ const char* const ModelConditionFlags::s_bitNameList[] =
 
 	"PREORDER",
 
+	"DISGUISED",
+	"RIDER1",
+	"RIDER2",
+	"RIDER3",
+	"RIDER4",
+	"RIDER5",
+	"RIDER6",
+	"RIDER7",
+	"RIDER8",
+	"STUNNED",
+	"STUNNED_FLAILING",
+	"USER_1",
+	"USER_2",
+
+#define SCRIPTED_MODEL_CONDITION(name) #name,
+#include "Common/ScriptedModelConditions.inc"
+#undef SCRIPTED_MODEL_CONDITION
+
 	nullptr
 };
 static_assert(ARRAY_SIZE(ModelConditionFlags::s_bitNameList) == ModelConditionFlags::NumBits + 1, "Incorrect array size");

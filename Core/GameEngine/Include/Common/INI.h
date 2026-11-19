@@ -276,6 +276,7 @@ public:
 	void skipBlockForAudit();
 	Bool nextLineOpensBlockForAudit() const;
 	std::string currentRawLine() const;
+	std::string readRawBlock(const char* endToken);
 	Bool skipBlockWithoutOwner(const void* owner, const char* blockType);
 	void initFromINIMultiProc( void *what, BuildMultiIniFieldProc proc );
 

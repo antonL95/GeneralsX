@@ -236,6 +236,10 @@ enum ModelConditionFlagType CPP_11(: Int)
 // existing values!
 //
 
+#define SCRIPTED_MODEL_CONDITION(name) MODELCONDITION_##name,
+#include "Common/ScriptedModelConditions.inc"
+#undef SCRIPTED_MODEL_CONDITION
+
 	MODELCONDITION_COUNT,
 	MODELCONDITION_FIRST = 0,
 };

@@ -172,6 +172,10 @@ const char* const ModelConditionFlags::s_bitNameList[] =
 
 	"DISGUISED",
 
+#define SCRIPTED_MODEL_CONDITION(name) #name,
+#include "Common/ScriptedModelConditions.inc"
+#undef SCRIPTED_MODEL_CONDITION
+
 	nullptr
 };
 static_assert(ARRAY_SIZE(ModelConditionFlags::s_bitNameList) == ModelConditionFlags::NumBits + 1, "Incorrect array size");
