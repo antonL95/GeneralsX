@@ -53,6 +53,7 @@
 
 #include "Common/file.h"
 #include "Utility/stringex.h"
+#include <cstdio>
 
 
 #define K_OBSOLETE_HEIGHT_MAP_VERSION 8
@@ -374,6 +375,13 @@ TileData *WorldHeightMap::m_alphaTiles[NUM_ALPHA_TILES]={0};
 //
 WorldHeightMap::~WorldHeightMap()
 {
+	releaseMapData();
+	for (Int i = 0; i < NUM_ALPHA_TILES; ++i)
+		REF_PTR_RELEASE(m_alphaTiles[i]);
+}
+
+void WorldHeightMap::releaseMapData()
+{
 	delete[](m_data);
 	m_data = nullptr;
 
@@ -405,9 +413,6 @@ WorldHeightMap::~WorldHeightMap()
 	for (i=0; i<NUM_SOURCE_TILES; i++) {
 		REF_PTR_RELEASE(m_sourceTiles[i]);
 		REF_PTR_RELEASE(m_edgeTiles[i]);
-	}
-	for (i=0; i<NUM_ALPHA_TILES; i++) {
-		REF_PTR_RELEASE(m_alphaTiles[i]);
 	}
 	REF_PTR_RELEASE(m_terrainTex);
 	REF_PTR_RELEASE(m_alphaTerrainTex);
@@ -462,6 +467,41 @@ static Bool ParseFunkyTilingDataChunk(DataChunkInput &file, DataChunkInfo *info,
 }
 #endif
 
+void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metadataOnly)
+{
+	const AsciiString& root = AsciiString::TheEmptyString;
+	file.registerVersionedParser("HeightMapData", root, metadataOnly ? nullptr : ParseSizeOnlyInChunk,
+		K_HEIGHT_MAP_VERSION_4, true);
+	file.registerVersionedParser("BlendTileData", root, nullptr, K_BLEND_TILE_VERSION_8, true);
+	file.registerVersionedParser("SidesList", root, SidesList::ParseSidesDataChunk,
+		SidesList::MAX_MAP_SIDES_VERSION, true);
+	file.registerVersionedParser("Teams", root, SidesList::ParseMapTeamsDataChunk, 1, true);
+
+	if (!metadataOnly)
+	{
+		file.registerVersionedParser("WorldInfo", root, ParseWorldDictDataChunk, K_WORLDDICT_VERSION_1);
+		file.registerVersionedParser("ObjectsList", root, ParseObjectsDataChunk, K_OBJECTS_VERSION_3);
+		file.registerVersionedParser("PolygonTriggers", root, PolygonTrigger::ParsePolygonTriggersDataChunk,
+			K_TRIGGERS_VERSION_4);
+	}
+	else
+		file.registerVersionedParser("PolygonTriggers", root, nullptr, K_TRIGGERS_VERSION_4);
+
+	file.registerVersionedParser("GlobalLighting", root, nullptr, K_LIGHTING_VERSION_3, true);
+	file.registerVersionedParser("MPPositionList", root, nullptr, 0);
+	file.registerVersionedParser("LibraryMapLists", root, nullptr, 1);
+	file.registerVersionedParser("PlayerScriptsList", root, nullptr, 6);
+	file.registerVersionedParser("BuildLists", root, nullptr, 1);
+	file.registerVersionedParser("TriggerAreas", root, nullptr, 1);
+	file.registerVersionedParser("StandingWaterAreas", root, nullptr, 2);
+	file.registerVersionedParser("RiverAreas", root, nullptr, 2);
+	file.registerVersionedParser("StandingWaveAreas", root, nullptr, 2);
+	file.registerVersionedParser("PostEffectsChunk", root, nullptr, 1);
+	file.registerVersionedParser("EnvironmentData", root, nullptr, 3);
+	file.registerVersionedParser("NamedCameras", root, nullptr, 2);
+	file.registerVersionedParser("CameraAnimationList", root, nullptr, 3);
+	file.registerVersionedParser("SkyboxSettings", root, nullptr, 1);
+}
 /**
 * WorldHeightMap - read a height map from a file.
 * Format is  Chunky.
@@ -490,27 +530,44 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 	}
 
 	DataChunkInput file( pStrm );
+	const AsciiString& root = AsciiString::TheEmptyString;
 
 	if (logicalDataOnly) {
-		file.registerParser( "HeightMapData", AsciiString::TheEmptyString, ParseSizeOnlyInChunk );
-		file.registerParser( "WorldInfo", AsciiString::TheEmptyString, ParseWorldDictDataChunk );
-		file.registerParser( "ObjectsList", AsciiString::TheEmptyString, ParseObjectsDataChunk );
+		RegisterLogicalMapParsers(file, false);
 		freeListOfMapObjects(); // just in case.
-		file.registerParser( "PolygonTriggers", AsciiString::TheEmptyString, PolygonTrigger::ParsePolygonTriggersDataChunk );
 		PolygonTrigger::deleteTriggers(); // just in case.
-		TheSidesList->emptySides();
-		file.registerParser("SidesList", AsciiString::TheEmptyString,	SidesList::ParseSidesDataChunk );
+		TheSidesList->clear();
 	}	else {
-		file.registerParser( "HeightMapData", AsciiString::TheEmptyString, ParseHeightMapDataChunk );
-		file.registerParser( "BlendTileData", AsciiString::TheEmptyString, ParseBlendTileDataChunk );
+		file.registerVersionedParser("HeightMapData", root, ParseHeightMapDataChunk, K_HEIGHT_MAP_VERSION_4, true);
+		file.registerVersionedParser("BlendTileData", root, ParseBlendTileDataChunk, K_BLEND_TILE_VERSION_8, true);
 #ifdef EVAL_TILING_MODES
-		file.registerParser( "FUNKY_TILING", AsciiString::TheEmptyString, ParseFunkyTilingDataChunk );
+		file.registerVersionedParser("FUNKY_TILING", root, ParseFunkyTilingDataChunk, 1);
 #endif
-		file.registerParser( "GlobalLighting", AsciiString::TheEmptyString, ParseLightingDataChunk );
+		file.registerVersionedParser("GlobalLighting", root, ParseLightingDataChunk, K_LIGHTING_VERSION_3, true);
 	}
-	if (!file.parse(this)) {
-
-		throw(ERROR_CORRUPT_FILE_FORMAT);
+	try
+	{
+		if (!file.parse(this))
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		if (const DataChunkInfo *unsupported = file.getUnsupportedRequiredChunk())
+		{
+			fprintf(stderr, "Map load stopped at %s v%u after reading %d sides and %d teams\n",
+				unsupported->label.str(), static_cast<unsigned>(unsupported->version),
+				TheSidesList->getNumSides(), TheSidesList->getNumTeams());
+			fflush(stderr);
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		}
+	}
+	catch (...)
+	{
+		releaseMapData();
+		if (logicalDataOnly)
+		{
+			freeListOfMapObjects();
+			PolygonTrigger::deleteTriggers();
+			TheSidesList->clear();
+		}
+		throw;
 	}
 	// patch bad maps.
 	if (!logicalDataOnly) {
@@ -844,8 +901,10 @@ Bool WorldHeightMap::ParseLightingDataChunk(DataChunkInput &file, DataChunkInfo 
 */
 Bool WorldHeightMap::ParseObjectsDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
+	if (file.getUnsupportedRequiredChunk())
+		return true;
 	file.m_currentObject = nullptr;
-	file.registerParser( "Object", info->label, ParseObjectDataChunk );
+	file.registerVersionedParser("Object", info->label, ParseObjectDataChunk, K_OBJECTS_VERSION_3);
 	return (file.parse(userData));
 }
 

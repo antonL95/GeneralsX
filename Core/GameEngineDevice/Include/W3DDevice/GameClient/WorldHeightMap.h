@@ -186,7 +186,7 @@ protected:
 	Int	m_alphaTexHeight; /// Height of m_alphaTerrainTex allocated.
 
 	/** The texture that contains custom blend edge tiles. */
-	AlphaEdgeTextureClass *m_alphaEdgeTex;
+	AlphaEdgeTextureClass *m_alphaEdgeTex = nullptr;
 	Int	m_alphaEdgeHeight; /// Height of m_alphaEdgeTex allocated.
 
 	/// Drawing info - re the part of the map that is being drawn.
@@ -223,12 +223,14 @@ protected:	 // file reader callbacks.
 	static Bool ParseObjectDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	Bool ParseObjectData(DataChunkInput &file, DataChunkInfo *info, void *userData, Bool readDict);
 	static Bool ParseLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	void releaseMapData();
 
 protected:
 	WorldHeightMap();			///< Simple constructor for WorldHeightMapEdit class.
 
 public: // constructors/destructors
 	WorldHeightMap(ChunkInputStream *pFile, Bool bHMapOnly=false);	// read from file.
+	static void RegisterLogicalMapParsers(DataChunkInput &file, Bool metadataOnly);
 	virtual ~WorldHeightMap() override;			// destroy.
 
 public:  // Boundary info

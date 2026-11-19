@@ -88,7 +88,7 @@ const Char *g_strFile = "data/Generals.str";     ///< STR file path
 // Extern declarations (from GameMain.cpp)
 extern Int GameMain();
 #if defined(__linux__)
-extern int RunAssetProbe(const char *reportPath);
+extern int RunAssetProbe(const char *reportPath, bool mapSidesOnly);
 #endif
 
 /**
@@ -259,8 +259,10 @@ int main(int argc, char* argv[])
 		initMemoryManager();
 
 #if defined(__linux__)
+		if (const char *reportPath = std::getenv("GENERALSX_MAP_AUDIT"))
+			_exit(RunAssetProbe(reportPath, true));
 		if (const char *reportPath = std::getenv("GENERALSX_ASSET_AUDIT"))
-			_exit(RunAssetProbe(reportPath));
+			_exit(RunAssetProbe(reportPath, false));
 #endif
 
 		// GeneralsX @bugfix BenderAI 14/02/2026 Initialize Version singleton

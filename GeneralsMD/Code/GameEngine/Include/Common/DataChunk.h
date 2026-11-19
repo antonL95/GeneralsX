@@ -162,6 +162,8 @@ public:
 	AsciiString label;																	// the data chunk label to match
 	AsciiString parentLabel;														// the parent chunk's label (the scope)
 	void *userData;																	// user data pointer
+	DataChunkVersionType maxVersion;
+	Bool required;
 };
 EMPTY_DTOR(UserParser)
 
@@ -170,7 +172,7 @@ EMPTY_DTOR(UserParser)
 //----------------------------------------------------------------------
 class DataChunkInput
 {
-	enum {CHUNK_HEADER_BYTES = 4}; // 2 shorts in chunk file header.
+	enum {CHUNK_HEADER_BYTES = sizeof(UnsignedInt) + sizeof(DataChunkVersionType) + sizeof(Int)};
 protected:
 	ChunkInputStream*					m_file;															// input file stream
 	DataChunkTableOfContents	m_contents;							// table of contents of data chunk types
@@ -181,6 +183,8 @@ protected:
 	void clearChunkStack();										// clear the stack
 
 	void decrementDataLeft( int size );							// update data left in chunk(s)
+	void readChunkBytes(void *data, Int size);
+	DataChunkInfo m_unsupportedRequiredChunk{};
 
 public:
 	void *m_currentObject;														// user parse routines can use this to allow one chunk
@@ -198,6 +202,12 @@ public:
 	// register a parser function for data chunks with labels matching "label", whose parent
 	// chunks labels match "parentLabel" (or null for global scope)
 	void registerParser( const AsciiString& label, const AsciiString& parentLabel, DataChunkParserPtr parser, void *userData = nullptr );
+	void registerVersionedParser(const AsciiString& label, const AsciiString& parentLabel,
+		DataChunkParserPtr parser, DataChunkVersionType maxVersion, Bool required = false);
+	const DataChunkInfo *getUnsupportedRequiredChunk() const
+	{
+		return m_unsupportedRequiredChunk.label.isEmpty() ? nullptr : &m_unsupportedRequiredChunk;
+	}
 
 	Bool parse( void *userData = nullptr );						// parse the chunk stream using registered parsers
 																									// assumed to be at the start of chunk when called

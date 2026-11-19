@@ -195,7 +195,7 @@ static Bool ParseObjectDataChunk(DataChunkInput &file, DataChunkInfo *info, void
 static Bool ParseObjectsDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
 	file.m_currentObject = nullptr;
-	file.registerParser( "Object", info->label, ParseObjectDataChunk );
+	file.registerVersionedParser("Object", info->label, ParseObjectDataChunk, K_OBJECTS_VERSION_3);
 	return (file.parse(userData));
 }
 
@@ -267,12 +267,15 @@ static Bool loadMap( AsciiString filename )
 
 	m_waypoints = NEW WaypointMap;
 
-	file.registerParser( "HeightMapData", AsciiString::TheEmptyString, ParseSizeOnlyInChunk );
-	file.registerParser( "WorldInfo", AsciiString::TheEmptyString, ParseWorldDictDataChunk );
-	file.registerParser( "ObjectsList", AsciiString::TheEmptyString, ParseObjectsDataChunk );
+	const AsciiString& root = AsciiString::TheEmptyString;
+	file.registerVersionedParser("HeightMapData", root, ParseSizeOnlyInChunk, 5, true);
+	file.registerVersionedParser("WorldInfo", root, ParseWorldDictDataChunk, K_WORLDDICT_VERSION_1);
+	file.registerVersionedParser("ObjectsList", root, ParseObjectsDataChunk, K_OBJECTS_VERSION_3);
 	if (!file.parse(nullptr)) {
 		throw(ERROR_CORRUPT_FILE_FORMAT);
 	}
+	if (file.getUnsupportedRequiredChunk())
+		return FALSE;
 
 	m_mapDX = m_width  - 2*m_borderSize;
 	m_mapDY = m_height - 2*m_borderSize;
@@ -689,7 +692,11 @@ Bool MapCache::addMap(
 
 	DEBUG_LOG(("MapCache::addMap(): caching '%s' because '%s' was not found", fname.str(), lowerFname.str()));
 
-	loadMap(fname); // Just load for querying the data, since we aren't playing this map.
+	if (!loadMap(fname))
+	{
+		resetMap();
+		return FALSE;
+	}
 
 	// The map is now loaded.  Pick out what we need.
 	MapMetaData md;
@@ -1427,7 +1434,8 @@ Image *getMapPreviewImage( AsciiString mapName )
 		if (file.isValidFileType()) {
 			// Backwards compatible files aren't valid data chunk files.
 			// Read the waypoints.
-			file.registerParser( "MapPreview", AsciiString::TheEmptyString, parseMapPreviewChunk );
+			file.registerVersionedParser("MapPreview", AsciiString::TheEmptyString, parseMapPreviewChunk,
+				K_MAPPREVIEW_VERSION_1);
 			if (!file.parse(nullptr)) {
 				DEBUG_CRASH(("Unable to read MapPreview info."));
 				deleteInstance(mapPreviewImage);

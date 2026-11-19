@@ -145,6 +145,22 @@ void PlayerList::newGame()
 
 	DEBUG_ASSERTCRASH(this != nullptr, ("null this"));
 
+	if (TheSidesList->getNumSides() >= MAX_PLAYER_COUNT)
+	{
+		Int playerCount = 1;
+		for (Int side = 0; side < TheSidesList->getNumSides(); ++side)
+		{
+			if (TheSidesList->getSideInfo(side)->getDict()->getAsciiString(TheKey_playerName).isNotEmpty())
+				++playerCount;
+		}
+		if (playerCount > MAX_PLAYER_COUNT)
+		{
+			fprintf(stderr, "Map requires %d runtime players (limit %d)\n", playerCount, MAX_PLAYER_COUNT);
+			fflush(stderr);
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		}
+	}
+
 	reset();
 
 	// ok, now create the rest of players we need.

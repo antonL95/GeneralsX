@@ -6,9 +6,12 @@
 #include "Common/DataChunk.h"
 #include "Common/GlobalData.h"
 #include "Common/MapReaderWriterInfo.h"
+#include "Common/NameKeyGenerator.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/SidesList.h"
 #include "StdDevice/Common/StdLocalFileSystem.h"
 #include "W3DDevice/GameClient/W3DFileSystem.h"
+#include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/ddsfile.h"
 #include "WW3D2/w3d_file.h"
@@ -433,7 +436,8 @@ const MapRule mapRules[] = {
 	{"", "WorldInfo", K_WORLDDICT_VERSION_1},
 	{"", "ObjectsList", K_OBJECTS_VERSION_3},
 	{"", "PolygonTriggers", K_TRIGGERS_VERSION_4},
-	{"", "SidesList", 3},
+	{"", "SidesList", SidesList::MAX_MAP_SIDES_VERSION},
+	{"", "Teams", 1},
 	{"", "GlobalLighting", K_LIGHTING_VERSION_3},
 	{"", "WaypointsList", K_WAYPOINTS_VERSION_1},
 	{"", "MapPreview", K_MAPPREVIEW_VERSION_1},
@@ -559,6 +563,76 @@ bool probeMap(const std::string& name, const Entry& entry)
 			std::to_string(version) + ":" + status, count);
 	}
 	return ok;
+}
+
+bool probeMapSides(const std::string& name, const Entry& entry)
+{
+	CachedFileInputStream stream;
+	if (!stream.open(openEntry(entry)))
+	{
+		record("map-error", name, "open");
+		return false;
+	}
+
+	SidesList sides;
+	TheSidesList = &sides;
+	bool parsed = false;
+	try
+	{
+		DataChunkInput input(&stream);
+		WorldHeightMap::RegisterLogicalMapParsers(input, true);
+		parsed = input.parse();
+		if (parsed)
+		{
+			record("map-sides", name, "SidesList", "", sides.getNumSides());
+			record("map-teams", name, "Teams", "", sides.getNumTeams());
+			record("map-side-flag", name, "SidesList", "", sides.getMapSideFlag());
+			if (const DataChunkInfo *unsupported = input.getUnsupportedRequiredChunk())
+				record("map-stop", name, unsupported->label.str(), std::to_string(unsupported->version));
+		}
+	}
+	catch (ErrorCode error)
+	{
+		record("map-error", name, "exception", std::to_string(static_cast<unsigned>(error)));
+		TheSidesList = nullptr;
+		return false;
+	}
+	TheSidesList = nullptr;
+	if (!parsed)
+		record("map-error", name, "parse");
+	return parsed;
+}
+
+int probeMapSides(const Inventory& inventory)
+{
+	NameKeyGenerator keys;
+	keys.init();
+	TheNameKeyGenerator = &keys;
+
+	const std::string selected = lowerPath(TheGlobalData->m_initialFile.str());
+	bool ok = true;
+	if (!selected.empty())
+	{
+		const auto entry = inventory.find(selected);
+		if (entry == inventory.end())
+		{
+			record("map-error", selected, "missing");
+			ok = false;
+		}
+		else
+			ok = probeMapSides(entry->first, entry->second);
+	}
+	else
+	{
+		for (const auto& [name, entry] : inventory)
+		{
+			if (extension(name) == ".map" && !probeMapSides(name, entry))
+				ok = false;
+		}
+	}
+	TheNameKeyGenerator = nullptr;
+	const int closeResult = std::fclose(report);
+	return !ok || closeResult != 0;
 }
 
 void scanIni(const std::string& name, const Entry& entry)
@@ -691,7 +765,7 @@ bool collectReferences(const char *reportPath, const Inventory& inventory)
 }
 }
 
-int RunAssetProbe(const char *reportPath)
+int RunAssetProbe(const char *reportPath, bool mapSidesOnly)
 {
 	report = std::fopen(reportPath, "w");
 	if (!report)
@@ -704,6 +778,8 @@ int RunAssetProbe(const char *reportPath)
 	big.init();
 	CommandLine::parseCommandLineForModInit();
 	big.loadMods();
+	if (mapSidesOnly)
+		CommandLine::parseCommandLineForEngineInit();
 	Inventory inventory;
 	inventoryArchives(big, inventory);
 	inventoryLoose(fs::current_path(), inventory);
@@ -713,6 +789,8 @@ int RunAssetProbe(const char *reportPath)
 		if (TheGlobalData->m_modDir.isNotEmpty())
 			inventoryLoose(TheGlobalData->m_modDir.str(), inventory);
 	}
+	if (mapSidesOnly)
+		return probeMapSides(inventory);
 	ProbeFileFactory factory(inventory);
 	_TheFileFactory = &factory;
 

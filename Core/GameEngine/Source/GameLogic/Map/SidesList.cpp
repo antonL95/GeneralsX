@@ -53,10 +53,12 @@
 #include "GameLogic/AI.h"
 #include "GameLogic/Scripts.h"
 #include "GameLogic/SidesList.h"
+#include <cstdio>
 
 static const Int K_SIDES_DATA_VERSION_1 = 1;
 static const Int K_SIDES_DATA_VERSION_2 = 2;	// includes Team list.
 static const Int K_SIDES_DATA_VERSION_3 = 3;	// includes Team list.
+static const Int K_SIDES_DATA_VERSION_5 = 5;
 
 /* ********* SidesInfo class ****************************/
 /**
@@ -205,7 +207,7 @@ Int SidesInfo::removeFromBuildList(BuildListInfo *pBuildList)
 /**
  SidesList - Constructor.
 */
-SidesList::SidesList() : m_numSides(0), m_numSkirmishSides(0)
+SidesList::SidesList() : m_numSides(0), m_mapSideFlag(false), m_numSkirmishSides(0)
 {
 }
 
@@ -249,27 +251,49 @@ Bool SidesList::ParseSidesDataChunk(DataChunkInput &file, DataChunkInfo *info, v
 	if (TheSidesList==nullptr)
 		return false;
 
-	TheSidesList->clear();
+	const Bool externalTeams = info->version >= K_SIDES_DATA_VERSION_5;
+	if (externalTeams)
+		TheSidesList->emptySides();
+	else
+		TheSidesList->clear();
+	if (info->version >= MAX_MAP_SIDES_VERSION)
+	{
+		const UnsignedByte flag = file.readByte();
+		if (flag > 1)
+			return false;
+		TheSidesList->m_mapSideFlag = flag != 0;
+	}
 	Int count = file.readInt();
+	const Int limit = externalTeams ? Int(MAX_MAP_SIDES) : Int(MAX_PLAYER_COUNT);
+	if (count < 0 || count > limit)
+	{
+		fprintf(stderr, "Map chunk SidesList v%u has %d sides (limit %d)\n",
+			static_cast<unsigned>(info->version), count, limit);
+		fflush(stderr);
+		return false;
+	}
 	Int i, j;
-	TheSidesList->emptySides();
 	for (i=0; i<count; i++)
 	{
-		if (i >= MAX_PLAYER_COUNT) break;
 		Dict d =  file.readDict();
-		TheSidesList->addSide(&d);
-		BuildListInfo* pBuildList;
-		Int count = file.readInt();
-		for (j=0; j<count; j++)
+		SidesInfo& side = TheSidesList->m_sides[TheSidesList->m_numSides++];
+		side.init(&d);
+		const Int buildCount = file.readInt();
+		if (externalTeams &&
+			(buildCount < 0 || static_cast<UnsignedInt>(buildCount) > file.getChunkDataSizeLeft() / 34))
+			return false;
+		for (j=0; j<buildCount; j++)
 		{
-			pBuildList = newInstance( BuildListInfo );
+			BuildListInfo *pBuildList = newInstance(BuildListInfo);
+			side.addToBuildList(pBuildList, j);
 			pBuildList->setBuildingName(file.readAsciiString());
 			pBuildList->setTemplateName(file.readAsciiString());
 			Coord3D loc;
 			loc.x = file.readReal();
 			loc.y = file.readReal();
 			loc.z = file.readReal();
-			loc.z = 0; // force to ground level
+			if (!externalTeams)
+				loc.z = 0;
 			pBuildList->setLocation(loc);
 			pBuildList->setAngle(file.readReal());
 			pBuildList->setInitiallyBuilt(file.readByte());
@@ -282,9 +306,11 @@ Bool SidesList::ParseSidesDataChunk(DataChunkInput &file, DataChunkInfo *info, v
 				pBuildList->setUnsellable(file.readByte());
 				pBuildList->setRepairable(file.readByte());
 			}
-			TheSidesList->getSideInfo(i)->addToBuildList(pBuildList, j);
 		}
 	}
+	if (externalTeams)
+		return file.atEndOfChunk();
+
 	if (info->version >= K_SIDES_DATA_VERSION_2)
 	{
 		count = file.readInt();
@@ -296,7 +322,7 @@ Bool SidesList::ParseSidesDataChunk(DataChunkInput &file, DataChunkInfo *info, v
 		}
 	}
 
-	file.registerParser( "PlayerScriptsList", info->label, ScriptList::ParseScriptsDataChunk );
+	file.registerVersionedParser("PlayerScriptsList", info->label, ScriptList::ParseScriptsDataChunk, 5, true);
 	if (!file.parse(nullptr)) {
 		throw(ERROR_CORRUPT_FILE_FORMAT);
 	}
@@ -319,6 +345,23 @@ Bool SidesList::ParseSidesDataChunk(DataChunkInput &file, DataChunkInfo *info, v
 	return true;
 }
 
+Bool SidesList::ParseMapTeamsDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
+{
+	if (!TheSidesList || file.getChunkDataSizeLeft() < sizeof(Int))
+		return false;
+
+	const Int count = file.readInt();
+	if (count < 0 || static_cast<UnsignedInt>(count) > file.getChunkDataSizeLeft() / sizeof(UnsignedShort))
+		return false;
+
+	TheSidesList->emptyTeams();
+	for (Int i = 0; i < count; ++i)
+	{
+		const Dict team = file.readDict();
+		TheSidesList->addTeam(&team);
+	}
+	return file.atEndOfChunk();
+}
 
 /**
 * SidesList::WriteSidesDataChunk - Writes a Sides chunk.
@@ -332,6 +375,8 @@ void SidesList::WriteSidesDataChunk(DataChunkOutput &chunkWriter)
 	DEBUG_ASSERTCRASH(TheSidesList, ("TheSidesList is null"));
 	if (TheSidesList==nullptr)
 		return;
+	if (TheSidesList->getNumSides() > MAX_PLAYER_COUNT)
+		throw ERROR_CORRUPT_FILE_FORMAT;
 	/**********HEIGHT MAP DATA ***********************/
 	chunkWriter.openDataChunk("SidesList", K_SIDES_DATA_VERSION_3);
 
@@ -628,7 +673,8 @@ void SidesList::emptySides()
 
 	m_numSides = 0;
 	m_numSkirmishSides = 0;
-	for (i = 0; i < MAX_PLAYER_COUNT; i++) {
+	m_mapSideFlag = false;
+	for (i = 0; i < MAX_MAP_SIDES; i++) {
 		m_sides[i].clear();
 	}
 	for (i = 0; i < MAX_SKIRMISH_SIDES; i++) {
@@ -675,9 +721,7 @@ void SidesList::removeSide(Int i)
 	for ( ; i < m_numSides-1; i++)
 		m_sides[i] = m_sides[i+1];
 
-	for ( ; i < MAX_PLAYER_COUNT; i++)
-		m_sides[i].clear();
-
+	m_sides[i].clear();
 	--m_numSides;
 }
 

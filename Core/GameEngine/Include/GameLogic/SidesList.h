@@ -144,6 +144,8 @@ public:
 
 	/// Reads sides (including build list info && player dicts.)
 	static Bool ParseSidesDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	static Bool ParseMapTeamsDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	Bool getMapSideFlag() const { return m_mapSideFlag; }
 	/// Writes sides (including build list info.)
 	static void WriteSidesDataChunk(DataChunkOutput &chunkWriter);
 
@@ -183,6 +185,8 @@ public:
 	enum
 	{
 		MAX_TEAM_DEPTH = 3,
+		MAX_MAP_SIDES = 20,
+		MAX_MAP_SIDES_VERSION = 6,
 		// GeneralsX @bugfix fbraz3 05/10/2026 Expand skirmish sides capacity to accommodate mod rosters on custom maps (#335).
 		MAX_SKIRMISH_SIDES = 64
 	};
@@ -195,7 +199,8 @@ protected:
 	virtual void loadPostProcess() override;
 
 	Int					m_numSides;
-	SidesInfo		m_sides[MAX_PLAYER_COUNT];
+	SidesInfo		m_sides[MAX_MAP_SIDES];
+	Bool				m_mapSideFlag;
 
 	Int					m_numSkirmishSides;
 	// GeneralsX @bugfix fbraz3 05/10/2026 Size skirmish sides array with MAX_SKIRMISH_SIDES to prevent buffer overflow (#335).

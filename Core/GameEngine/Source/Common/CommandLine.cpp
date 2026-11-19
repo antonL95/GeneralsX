@@ -691,6 +691,12 @@ Int parsePreload( char *args[], int num )
 
 Int parseFile(char *args[], int num)
 {
+	if (std::getenv("GENERALSX_MAP_AUDIT"))
+	{
+		if (num > 1)
+			TheWritableGlobalData->m_initialFile = args[1];
+		return 2;
+	}
 #if !defined(RTS_DEBUG)
 	if (!std::getenv("GENERALSX_ASSET_SMOKE"))
 		return 1;

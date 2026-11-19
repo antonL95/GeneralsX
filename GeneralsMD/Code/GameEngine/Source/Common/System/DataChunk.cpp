@@ -33,6 +33,12 @@
 #include "Common/DataChunk.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
+#include <cstdio>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <string>
 
 // If verbose, lots of debug logging.
 #define not_VERBOSE
@@ -553,26 +559,21 @@ void DataChunkTableOfContents::read( ChunkInputStream &s)
 		return;	 // Don't throw, may happen with legacy files.
 	}
 
-	// get number of symbols in table
-	s.read( (char *)&count, sizeof(Int) );
+	if (s.read(&count, sizeof(count)) != sizeof(count) || count < 0)
+		return;
 
 	for( i=0; i<count; i++ )
 	{
-		// allocate new id mapping
+		char name[256];
+		UnsignedInt id;
+		if (s.read(&len, sizeof(len)) != sizeof(len)
+			|| s.read(name, len) != len
+			|| s.read(&id, sizeof(id)) != sizeof(id))
+			return;
+		name[len] = '\000';
 		m = newInstance(Mapping);
-
-		// read string length
-		s.read( (char *)&len, sizeof(unsigned char) );
-
-		// allocate and read in string
-		if (len>0) {
-			char *str = m->name.getBufferForRead(len);
-			s.read( str, len );
-			str[len] = '\000';
-		}
-
-		// read id
-		s.read( (char *)&m->id, sizeof(UnsignedInt) );
+		m->name.set(name);
+		m->id = id;
 
 		// prepend to list
 		m->next = this->m_list;
@@ -628,10 +629,41 @@ void DataChunkInput::registerParser( const AsciiString& label, const AsciiString
 	p->parentLabel.set(parentLabel );
 	p->parser = parser;
 	p->userData = userData;
+	p->maxVersion = std::numeric_limits<DataChunkVersionType>::max();
+	p->required = false;
 
 	// prepend parser to parser list
 	p->next = m_parserList;
 	m_parserList = p;
+}
+
+void DataChunkInput::registerVersionedParser(const AsciiString& label, const AsciiString& parentLabel,
+	DataChunkParserPtr parser, DataChunkVersionType maxVersion, Bool required)
+{
+	registerParser(label, parentLabel, parser);
+	m_parserList->maxVersion = maxVersion;
+	m_parserList->required = required;
+}
+
+static void reportSkippedChunk(const DataChunkInfo& info, Bool deferred)
+{
+	static std::mutex mutex;
+	static std::set<std::pair<std::string, DataChunkVersionType>> reported;
+	const std::lock_guard<std::mutex> lock(mutex);
+	if (reported.emplace(info.label.str(), info.version).second)
+	{
+		fprintf(stderr, "Map chunk %s v%u skipped (%s)\n", info.label.str(),
+			static_cast<unsigned>(info.version), deferred ? "deferred" : "unsupported version");
+		fflush(stderr);
+	}
+}
+
+static void reportChunkTolerance(std::once_flag& flag, const char *message)
+{
+	std::call_once(flag, [message] {
+		fprintf(stderr, "%s\n", message);
+		fflush(stderr);
+	});
 }
 
 // parse the chunk stream using registered parsers
@@ -660,16 +692,19 @@ Bool DataChunkInput::parse( void *userData )
 		if (m_chunkStack) {
 			// If we are parsing chunks in a chunk, check current length.
 			if (m_chunkStack->dataLeft < CHUNK_HEADER_BYTES) {
-				DEBUG_ASSERTCRASH( m_chunkStack->dataLeft==0, ("Unexpected extra data in chunk."));
+				if (m_chunkStack->dataLeft > 0)
+				{
+					static std::once_flag reportedPadding;
+					reportChunkTolerance(reportedPadding, "Ignoring trailing bytes inside chunk");
+				}
 				break;
 			}
 		}
 		// open the chunk
+		const InputChunk *parent = m_chunkStack;
 		label = openDataChunk( &ver );
-		if (atEndOfFile()) {
-			// FILE * returns eof after you read past end of file, so check.
+		if (m_chunkStack == parent)
 			break;
-		}
 
 		// find a registered parser for this chunk
 		for( parser=m_parserList; parser; parser=parser->next )
@@ -691,7 +726,18 @@ Bool DataChunkInput::parse( void *userData )
 					info.version = ver;
 					info.dataSize = getChunkDataSize();
 
-					if (parser->parser( *this, &info, userData ) == false)
+					if (ver > parser->maxVersion)
+					{
+						reportSkippedChunk(info, false);
+						if (parser->required && !getUnsupportedRequiredChunk())
+							m_unsupportedRequiredChunk = info;
+					}
+					else if (!parser->parser)
+					{
+						if (!parser->required)
+							reportSkippedChunk(info, true);
+					}
+					else if (!parser->parser(*this, &info, userData))
 						return false;
 					break;
 				}
@@ -724,6 +770,7 @@ void DataChunkInput::reset()
 {
 	clearChunkStack();
 	m_file->absoluteSeek( m_fileposOfFirstChunk );
+	m_unsupportedRequiredChunk = {};
 }
 
 // Checks if the file has our initial tag word.
@@ -734,23 +781,28 @@ Bool DataChunkInput::isValidFileType()
 
 AsciiString DataChunkInput::openDataChunk(DataChunkVersionType *ver )
 {
+	const UnsignedInt start = m_file->tell();
+	UnsignedInt id;
+	DataChunkVersionType version;
+	Int dataSize;
+	if (m_file->read(&id, sizeof(id)) != sizeof(id)
+		|| m_file->read(&version, sizeof(version)) != sizeof(version)
+		|| m_file->read(&dataSize, sizeof(dataSize)) != sizeof(dataSize))
+	{
+		decrementDataLeft(static_cast<Int>(m_file->tell() - start));
+		static std::once_flag reportedPartialHeader;
+		reportChunkTolerance(reportedPartialHeader, "Ignoring a partial chunk header at end of file");
+		*ver = 0;
+		return AsciiString::TheEmptyString;
+	}
+	decrementDataLeft(CHUNK_HEADER_BYTES);
+
+	const AsciiString label = m_contents.getName(id);
 	// allocate a new chunk and place it on top of the chunk stack
 	InputChunk *c = newInstance(InputChunk);
-	c->id = 0;
-	c->version = 0;
-	c->dataSize = 0;
-	//DEBUG_LOG(("Opening data chunk at offset %d (%x)", m_file->tell(), m_file->tell()));
-	// read the chunk ID
-	m_file->read( (char *)&c->id, sizeof(UnsignedInt) );
-	decrementDataLeft( sizeof(UnsignedInt) );
-
-	// read the chunk version number
-	m_file->read( (char *)&c->version, sizeof(DataChunkVersionType) );
-	decrementDataLeft( sizeof(DataChunkVersionType) );
-
-	// read the chunk data size
-	m_file->read( (char *)&c->dataSize, sizeof(Int) );
-	decrementDataLeft( sizeof(Int) );
+	c->id = id;
+	c->version = version;
+	c->dataSize = dataSize;
 
 	// all of the data remains to be read
 	c->dataLeft = c->dataSize;
@@ -760,10 +812,7 @@ AsciiString DataChunkInput::openDataChunk(DataChunkVersionType *ver )
 
 	c->next = m_chunkStack;
 	m_chunkStack = c;
-	if (this->atEndOfFile()) {
-		return AsciiString::TheEmptyString;
-	}
-	return m_contents.getName( c->id );
+	return label;
 }
 
 // close chunk and move to start of next chunk
@@ -775,16 +824,22 @@ void DataChunkInput::closeDataChunk()
 		return;
 	}
 
-	if (m_chunkStack->dataLeft > 0)
+	InputChunk *c = m_chunkStack;
+	if (c->dataSize >= 0 && c->dataLeft != 0)
 	{
-		// skip past the remainder of this chunk
-		m_file->absoluteSeek( m_file->tell()+m_chunkStack->dataLeft );
-		decrementDataLeft( m_chunkStack->dataLeft );
-
+		const UnsignedInt position = m_file->tell();
+		const UnsignedInt end = c->chunkStart + static_cast<UnsignedInt>(c->dataSize);
+		if (end < c->chunkStart || !m_file->absoluteSeek(end))
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		if (m_file->tell() != end)
+		{
+			static std::once_flag reportedShortSkip;
+			reportChunkTolerance(reportedShortSkip, "Chunk ends beyond the available file data");
+		}
+		decrementDataLeft(static_cast<Int>(static_cast<Int64>(m_file->tell()) - position));
 	}
 
 	// pop the chunk off the stack
-	InputChunk *c = m_chunkStack;
 	m_chunkStack = m_chunkStack->next;
 	deleteInstance(c);
 }
@@ -873,35 +928,41 @@ void DataChunkInput::decrementDataLeft( Int size )
 Real DataChunkInput::readReal()
 {
 	Real r;
-	DEBUG_ASSERTCRASH(m_chunkStack->dataLeft>=sizeof(Real), ("Read past end of chunk."));
-	m_file->read( (char *)&r, sizeof(Real) );
-	decrementDataLeft( sizeof(Real) );
+	readChunkBytes(&r, sizeof(r));
 	return r;
 }
 
 Int DataChunkInput::readInt()
 {
 	Int i;
-	DEBUG_ASSERTCRASH(m_chunkStack->dataLeft>=sizeof(Int), ("Read past end of chunk."));
-	m_file->read( (char *)&i, sizeof(Int) );
-	decrementDataLeft( sizeof(Int) );
+	readChunkBytes(&i, sizeof(i));
 	return i;
 }
 
 Byte DataChunkInput::readByte()
 {
 	Byte b;
-	DEBUG_ASSERTCRASH(m_chunkStack->dataLeft>=sizeof(Byte), ("Read past end of chunk."));
-	m_file->read( (char *)&b, sizeof(Byte) );
-	decrementDataLeft( sizeof(Byte) );
+	readChunkBytes(&b, sizeof(b));
 	return b;
 }
 
 void DataChunkInput::readArrayOfBytes(char *ptr, Int len)
 {
-	DEBUG_ASSERTCRASH(m_chunkStack->dataLeft>=len, ("Read past end of chunk."));
-	m_file->read( ptr, len );
-	decrementDataLeft( len );
+	readChunkBytes(ptr, len);
+}
+
+void DataChunkInput::readChunkBytes(void *data, Int size)
+{
+	if (!m_chunkStack || size < 0)
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	if (size > m_chunkStack->dataLeft)
+	{
+		static std::once_flag reportedOverread;
+		reportChunkTolerance(reportedOverread, "Reading past the declared chunk end");
+	}
+	if (m_file->read(data, size) != size)
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	decrementDataLeft(size);
 }
 
 NameKeyType DataChunkInput::readNameKey()
@@ -921,10 +982,7 @@ NameKeyType DataChunkInput::readNameKey()
 Dict DataChunkInput::readDict()
 {
 	UnsignedShort len;
-	DEBUG_ASSERTCRASH(m_chunkStack->dataLeft>=sizeof(UnsignedShort), ("Read past end of chunk."));
-	m_file->read( &len, sizeof(UnsignedShort) );
-	decrementDataLeft( sizeof(UnsignedShort) );
-	DEBUG_ASSERTCRASH(m_chunkStack->dataLeft>=len, ("Read past end of chunk."));
+	readChunkBytes(&len, sizeof(len));
 
 	Dict d(len);
 
@@ -966,15 +1024,11 @@ Dict DataChunkInput::readDict()
 AsciiString DataChunkInput::readAsciiString()
 {
 	UnsignedShort len;
-	DEBUG_ASSERTCRASH(m_chunkStack->dataLeft>=sizeof(UnsignedShort), ("Read past end of chunk."));
-	m_file->read( &len, sizeof(UnsignedShort) );
-	decrementDataLeft( sizeof(UnsignedShort) );
-	DEBUG_ASSERTCRASH(m_chunkStack->dataLeft>=len, ("Read past end of chunk."));
+	readChunkBytes(&len, sizeof(len));
 	AsciiString theString;
 	if (len>0) {
 		char *str = theString.getBufferForRead(len);
-		m_file->read( str, len );
-		decrementDataLeft( len );
+		readChunkBytes(str, len);
 		// add null delimiter to string.  Note that getBufferForRead allocates space for terminating null.
 		str[len] = '\000';
 	}
@@ -988,29 +1042,24 @@ UnicodeString DataChunkInput::readUnicodeString()
 	// On Linux sizeof(WideChar)==4; reading len*sizeof(WideChar) bytes over-consumed file data,
 	// corrupting chunk dataLeft and preventing PlayerScriptsList from being parsed (no scripts/camera).
 	UnsignedShort len;
-	DEBUG_ASSERTCRASH(m_chunkStack->dataLeft>=sizeof(UnsignedShort), ("Read past end of chunk."));
-	m_file->read( &len, sizeof(UnsignedShort) );
-	decrementDataLeft( sizeof(UnsignedShort) );
-	const Int bytesInFile = (Int)len * (Int)sizeof(UnsignedShort);  // always 2 bytes/char in file
-	DEBUG_ASSERTCRASH(m_chunkStack->dataLeft>=bytesInFile, ("Read past end of chunk."));
+	readChunkBytes(&len, sizeof(len));
+	const Int bytesInFile = len * sizeof(UnsignedShort);
 	UnicodeString theString;
 	if (len>0) {
 		WideChar *str = theString.getBufferForRead(len);
 		if (sizeof(WideChar) == sizeof(UnsignedShort))
 		{
 			// Windows: WideChar is 2 bytes - read directly
-			m_file->read( (char*)str, bytesInFile );
+			readChunkBytes(str, bytesInFile);
 		}
 		else
 		{
 			// Linux: WideChar is 4 bytes - read UTF-16 then widen each char
-			UnsignedShort *tmp = NEW UnsignedShort[len + 1];
-			m_file->read( (char*)tmp, bytesInFile );
+			std::unique_ptr<UnsignedShort[]> tmp(NEW UnsignedShort[len]);
+			readChunkBytes(tmp.get(), bytesInFile);
 			for (Int i = 0; i < (Int)len; i++)
 				str[i] = (WideChar)tmp[i];
-			delete[] tmp;
 		}
-		decrementDataLeft( bytesInFile );
 		// add null delimiter to string.  Note that getBufferForRead allocates space for terminating null.
 		str[len] = '\000';
 	}
