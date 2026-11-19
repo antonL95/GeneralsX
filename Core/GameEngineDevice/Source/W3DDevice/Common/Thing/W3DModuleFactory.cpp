@@ -34,6 +34,7 @@
 #include "W3DDevice/GameClient/Module/W3DDependencyModelDraw.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "W3DDevice/GameClient/Module/W3DScriptedModelDraw.h"
+#include "W3DDevice/GameClient/Module/W3DHordeModelDraw.h"
 #include "W3DDevice/GameClient/Module/W3DLaserDraw.h"
 #include "W3DDevice/GameClient/Module/W3DOverlordTankDraw.h"
 #include "W3DDevice/GameClient/Module/W3DOverlordTruckDraw.h"
@@ -64,6 +65,7 @@ void W3DModuleFactory::init()
 	addModule( W3DDebrisDraw );
 	addModule( W3DModelDraw );
 	addModule( W3DScriptedModelDraw );
+	addModule( W3DHordeModelDraw );
 	addModule( W3DLaserDraw );
 	addModule( W3DOverlordTankDraw );
 #if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)

@@ -55,6 +55,7 @@ static void drawFramerateBar();
 #include "Common/GameEngine.h"
 #include "Common/ThingFactory.h"
 #include "Common/GlobalData.h"
+#include "Common/HordeFormation.h"
 #include "Common/INIAudit.h"
 #include "Common/PerfTimer.h"
 #include "Common/FileSystem.h"
@@ -2140,44 +2141,100 @@ static Bool poseAssetSmokeModel(WW3DAssetManager& assets, RenderObjClass& model,
 	return valid;
 }
 
-static Bool drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real aspect)
+struct AssetSmokePart
 {
-	RenderObjClass* model = assets.Create_Render_Obj(name);
-	if (!model)
-	{
-		fprintf(stderr, "Asset smoke: cannot create W3D model '%s'\n", name);
-		fflush(stderr);
-		return FALSE;
-	}
+	AsciiString model;
+	Vector3 offset;
+};
 
+static std::vector<AssetSmokePart> findAssetSmokeHordeParts(const char* name)
+{
+	std::vector<AssetSmokePart> parts;
+	const ThingTemplate* object = TheThingFactory ? TheThingFactory->findTemplate(name, FALSE) : nullptr;
+	if (!object)
+		return parts;
+
+	const ModuleInfo& behaviors = object->getBehaviorModuleInfo();
+	for (Int i = 0; i < behaviors.getCount() && parts.empty(); ++i)
+	{
+		const ModuleData* module = behaviors.getNthData(i);
+		const HordeLayout* layout = module ? module->getAsHordeLayout() : nullptr;
+		if (!layout)
+			continue;
+		for (const HordeMemberSlot& member : layout->initialMembers(layout->capacity()))
+		{
+			const std::string& memberName = layout->payloads()[member.payload].name;
+			const AsciiString model = findAssetSmokeObjectModel(memberName.c_str());
+			HordePoint position;
+			if (member.slot >= 0)
+				position = layout->slots()[member.slot].position;
+			fprintf(stderr, "Asset smoke: horde '%s' member '%s' slot %d at (%.1f, %.1f) model '%s'\n",
+				name, memberName.c_str(), member.slot, position.x, position.y, model.str());
+			if (model.isNotEmpty())
+				parts.push_back({ model, Vector3(position.x, position.y, 0.0f) });
+		}
+	}
+	fflush(stderr);
+	return parts;
+}
+
+static Bool drawAssetSmokeParts(WW3DAssetManager& assets, const std::vector<AssetSmokePart>& parts, Real aspect)
+{
+	std::vector<RenderObjClass*> models;
+	const auto release = [&models]()
+	{
+		for (RenderObjClass* model : models)
+			model->Release_Ref();
+	};
 	const char* animation = std::getenv("GENERALSX_ASSET_SMOKE_ANIMATION");
-	if (animation && *animation && !poseAssetSmokeModel(assets, *model, animation))
+	AABoxClass bounds;
+	for (const AssetSmokePart& part : parts)
 	{
-		fprintf(stderr, "Asset smoke: cannot pose model '%s' with animation '%s'\n", name, animation);
-		fflush(stderr);
-		model->Release_Ref();
+		RenderObjClass* model = assets.Create_Render_Obj(part.model.str());
+		if (!model)
+		{
+			fprintf(stderr, "Asset smoke: cannot create W3D model '%s'\n", part.model.str());
+			continue;
+		}
+		if (animation && *animation && !poseAssetSmokeModel(assets, *model, animation))
+		{
+			fprintf(stderr, "Asset smoke: cannot pose model '%s' with animation '%s'\n", part.model.str(), animation);
+			fflush(stderr);
+			model->Release_Ref();
+			release();
+			return FALSE;
+		}
+		model->Set_Position(part.offset);
+		model->Update_Sub_Object_Transforms();
+		AABoxClass box = model->Get_Bounding_Box();
+		for (Int index = 0; index < model->Get_Num_Sub_Objects(); ++index)
+		{
+			RenderObjClass* child = model->Get_Sub_Object(index);
+			box.Add_Box(child->Get_Bounding_Box());
+			child->Release_Ref();
+		}
+		if (models.empty())
+			bounds = box;
+		else
+			bounds.Add_Box(box);
+		models.push_back(model);
+	}
+	fflush(stderr);
+	if (models.empty())
 		return FALSE;
-	}
 
-	model->Update_Sub_Object_Transforms();
-	AABoxClass bounds = model->Get_Bounding_Box();
-	for (Int index = 0; index < model->Get_Num_Sub_Objects(); ++index)
-	{
-		RenderObjClass* child = model->Get_Sub_Object(index);
-		bounds.Add_Box(child->Get_Bounding_Box());
-		child->Release_Ref();
-	}
 	const Real radius = bounds.Extent.Length();
 	if (!(radius > 0.0f) || !std::isfinite(radius))
 	{
-		fprintf(stderr, "Asset smoke: model '%s' has invalid bounds\n", name);
+		fprintf(stderr, "Asset smoke: model '%s' has invalid bounds\n", parts.front().model.str());
 		fflush(stderr);
-		model->Release_Ref();
+		release();
 		return FALSE;
 	}
 
 	const Vector3 origin(0.0f, 0.0f, 0.0f);
-	model->Set_Position(model->Get_Position() - bounds.Center);
+	for (RenderObjClass* model : models)
+		model->Set_Position(model->Get_Position() - bounds.Center);
 	CameraClass camera;
 	Matrix3D cameraTransform;
 	cameraTransform.Look_At(Vector3(2.0f, -2.6f, 1.4f) * radius, origin, 0.0f);
@@ -2201,13 +2258,15 @@ static Bool drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real
 	{
 		RenderInfoClass renderInfo(camera);
 		renderInfo.light_environment = &lighting;
-		WW3D::Render(*model, renderInfo);
+		for (RenderObjClass* model : models)
+			WW3D::Render(*model, renderInfo);
 		WW3D::End_Render(false);
-		fprintf(stderr, "Asset smoke: completed a render pass for '%s' (radius %.2f)\n", name, radius);
+		fprintf(stderr, "Asset smoke: completed a render pass for '%s' (%d models, radius %.2f)\n",
+			parts.front().model.str(), static_cast<Int>(models.size()), radius);
 		fflush(stderr);
 		W3D_TakeCompressedScreenshot(SCREENSHOT_PNG, DEFAULT_JPEG_QUALITY, true);
 	}
-	model->Release_Ref();
+	release();
 	return rendered;
 }
 
@@ -2271,18 +2330,22 @@ void W3DDisplay::draw()
 	if (((smokeModel && *smokeModel) || (smokeObject && *smokeObject)) &&
 		TheGlobalData->m_initialFile.isEmpty())
 	{
+		std::vector<AssetSmokePart> parts;
 		AsciiString model = smokeModel;
 		if (smokeObject && *smokeObject)
 		{
+			parts = findAssetSmokeHordeParts(smokeObject);
 			model = findAssetSmokeObjectModel(smokeObject);
-			if (model.isEmpty())
-				fprintf(stderr, "Asset smoke: no default draw model for object '%s'\n", smokeObject);
-			else
+			if (model.isNotEmpty())
 				fprintf(stderr, "Asset smoke: object '%s' uses default model '%s'\n", smokeObject, model.str());
+			else if (parts.empty())
+				fprintf(stderr, "Asset smoke: no default draw model for object '%s'\n", smokeObject);
 			fflush(stderr);
 		}
-		const Bool rendered = model.isNotEmpty() &&
-			drawAssetSmokeModel(*m_assetManager, model.str(), static_cast<Real>(getWidth()) / getHeight());
+		if (model.isNotEmpty())
+			parts.insert(parts.begin(), { model, Vector3(0.0f, 0.0f, 0.0f) });
+		const Bool rendered = !parts.empty() &&
+			drawAssetSmokeParts(*m_assetManager, parts, static_cast<Real>(getWidth()) / getHeight());
 		TheGameEngine->setQuitting(rendered || !INIAudit::isEnabled());
 		return;
 	}

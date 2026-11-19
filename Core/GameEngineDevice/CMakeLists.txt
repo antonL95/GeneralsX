@@ -17,6 +17,7 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/GameClient/Module/W3DLaserDraw.h
     Include/W3DDevice/GameClient/Module/W3DModelDraw.h
     Include/W3DDevice/GameClient/Module/W3DScriptedModelDraw.h
+    Include/W3DDevice/GameClient/Module/W3DHordeModelDraw.h
     Include/W3DDevice/GameClient/Module/W3DOverlordAircraftDraw.h
     Include/W3DDevice/GameClient/Module/W3DOverlordTankDraw.h
     Include/W3DDevice/GameClient/Module/W3DOverlordTruckDraw.h
@@ -102,6 +103,7 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/Drawable/Draw/W3DLaserDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DModelDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DScriptedModelDraw.cpp
+    Source/W3DDevice/GameClient/Drawable/Draw/W3DHordeModelDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DOverlordAircraftDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DOverlordTankDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DOverlordTruckDraw.cpp

@@ -5,6 +5,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/INITest.cpp
     GameEngine/Common/INIAuditTest.cpp
     GameEngine/Common/HeightMapSamplesTest.cpp
+    GameEngine/Common/HordeFormationTest.cpp
     GameEngine/Common/RetailFileLayersTest.cpp
     GameEngine/Common/INIMathTest.cpp
     GameEngine/Common/INIPreprocessorTest.cpp

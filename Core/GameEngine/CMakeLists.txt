@@ -66,6 +66,7 @@ set(GAMEENGINE_SRC
     Include/Common/SpecialPowerINI.h
     Include/GameLogic/Module/AISpecialPowerUpdate.h
     Include/Common/INIAudit.h
+    Include/Common/HordeFormation.h
     Include/Common/RetailFileLayers.h
     Include/Common/INIMath.h
     Include/Common/INIPreprocessor.h
@@ -604,6 +605,7 @@ set(GAMEENGINE_SRC
 #    Source/Common/GameLOD.cpp
 #    Source/Common/GameMain.cpp
     Source/Common/GameUtility.cpp
+    Source/Common/HordeFormation.cpp
 #    Source/Common/GlobalData.cpp
     Source/Common/INI/INI.cpp
     Source/Common/INI/INIAudit.cpp

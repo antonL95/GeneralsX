@@ -61,6 +61,7 @@
 #include "GameLogic/Module/HealContain.h"
 #include "GameLogic/Module/GarrisonContain.h"
 #include "GameLogic/Module/InternetHackContain.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RailedTransportContain.h"
 #include "GameLogic/Module/RiderChangeContain.h"
 #include "GameLogic/Module/TransportContain.h"
@@ -341,6 +342,7 @@ void ModuleFactory::init()
 	addModule( GarrisonContain );
 	addModule( InternetHackContain );
 	addModule( TransportContain );
+	addModule( HordeContain );
 	addModule( RiderChangeContain );
 	addModule( RailedTransportContain );
 	addModule( MobNexusContain );
