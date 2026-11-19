@@ -431,6 +431,30 @@ bool ChunkLoadClass::Open_Chunk()
 	return true;
 }
 
+uint32 ChunkLoadClass::Cur_Chunk_Remaining()
+{
+	return Cur_Chunk_Length() - PositionStack[StackIndex - 1];
+}
+
+bool ChunkLoadClass::Open_Chunk_Bounded()
+{
+	const uint32 remaining = Cur_Chunk_Remaining();
+	if (remaining < sizeof(ChunkHeader))
+		return false;
+
+	const int start = File->Seek(0, SEEK_CUR);
+	if (!Open_Chunk()) {
+		File->Seek(start, SEEK_SET);
+		return false;
+	}
+	if (Cur_Chunk_Length() <= remaining - sizeof(ChunkHeader))
+		return true;
+
+	--StackIndex;
+	File->Seek(start, SEEK_SET);
+	return false;
+}
+
 
 /***********************************************************************************************
  * ChunkLoadClass::Close_Chunk -- Close a chunk, seeks to the end if needed                    *

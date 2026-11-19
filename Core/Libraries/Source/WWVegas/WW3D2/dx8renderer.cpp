@@ -946,6 +946,8 @@ public:
 
 	VertexMaterialClass* Peek_Material(unsigned idx,unsigned pass)
 	{
+		if (mmc->Has_Fx_Materials() && idx < unsigned(mmc->Get_Polygon_Count()))
+			return mmc->Peek_Polygon_Material(idx, pass);
 		if (mmc->Has_Material_Array(pass)) {
 			if (idx>=unsigned(mmc->Get_Polygon_Count())) {
 				WWASSERT(mmc->Get_Gap_Filler());

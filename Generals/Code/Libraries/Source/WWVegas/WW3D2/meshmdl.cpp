@@ -94,6 +94,7 @@ MeshModelClass::MeshModelClass(const MeshModelClass & that) :
 	}
 	CurMatDesc = DefMatDesc;
 
+	FxMaterials = that.FxMaterials;
 	clone_materials(that);
 }
 
@@ -127,6 +128,7 @@ MeshModelClass & MeshModelClass::operator = (const MeshModelClass & that)
 			AlternateMatDesc = W3DNEW MeshMatDescClass(*(that.AlternateMatDesc));
 		}
 
+		FxMaterials = that.FxMaterials;
 		clone_materials(that);
 
 		delete GapFiller;
@@ -140,6 +142,7 @@ MeshModelClass & MeshModelClass::operator = (const MeshModelClass & that)
 
 void MeshModelClass::Reset(int polycount,int vertcount,int passcount)
 {
+	FxMaterials.reset();
 	//DMS - We must delete the gapfiller object BEFORE the geometry is reset.  Otherwise,
 	// the number of stages and passes gets reset and the gapfiller cannot deallocate properly.
 	delete GapFiller;

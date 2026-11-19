@@ -95,6 +95,9 @@
 #include "osdep.h"
 #endif
 
+#include "w3dfxmaterial.h"
+#include <tuple>
+
 #define MESH_SINGLE_MATERIAL_HACK		0		// (gth) forces all multi-material meshes to use their first material only. (NOT RECOMMENDED, TESTING ONLY!)
 #define MESH_FORCE_STATIC_SORT_HACK	0		// (gth) forces all sorting meshes to use static sort level 1 instead.
 /**
@@ -196,6 +199,17 @@ private:
 	MeshMatDescClass											AlternateMatDesc;
 
 	SimpleVecClass<Vector2>									TempUVArray;
+	std::shared_ptr<W3dFx::Mesh> Fx;
+	std::vector<std::tuple<VertexMaterialClass *, int, bool>> FxVertexMaterials;
+	bool FxInvalid = false;
+
+	W3dFx::Mesh & Get_Fx()
+	{
+		if (!Fx)
+			Fx = std::make_shared<W3dFx::Mesh>();
+		return *Fx;
+	}
+
 
 	/*
 	** Record when we load the DIG chunk
@@ -206,6 +220,7 @@ private:
 	friend class MeshModelClass;
 };
 
+#include "w3dfxmeshio.h"
 
 /*
 ** MeshSaveContextClass
@@ -380,6 +395,10 @@ WW3DErrorType MeshModelClass::Load_W3D(ChunkLoadClass & cload)
 	}
 
 	read_chunks(cload,context);
+	if (context->FxInvalid || !install_fx_materials(context)) {
+		delete context;
+		return WW3D_ERROR_LOAD_FAILED;
+	}
 
 	/*
 	** If this is a pre-3.0 mesh and it has vertex influences,
@@ -532,6 +551,20 @@ WW3DErrorType MeshModelClass::read_chunks(ChunkLoadClass & cload,MeshLoadContext
 			case W3D_CHUNK_MATERIAL_PASS:
 					error = read_material_pass(cload,context);
 					break;
+
+			case W3D_CHUNK_FX_SHADERS:
+					if (!W3dFx::readMaterials(cload, context->Get_Fx()))
+						context->FxInvalid |= !W3dFx::loadProblem(Get_Name(), cload.Cur_Chunk_ID());
+					break;
+
+			case W3D_CHUNK_VERTEX_TANGENTS:
+			case W3D_CHUNK_VERTEX_BINORMALS: {
+					auto & fx = context->Get_Fx();
+					auto & vectors = cload.Cur_Chunk_ID() == W3D_CHUNK_VERTEX_TANGENTS ? fx.tangents : fx.bitangents;
+					if (!W3dFx::readTangentChunk(cload, VertexCount, vectors))
+						context->FxInvalid |= !W3dFx::loadProblem(Get_Name(), cload.Cur_Chunk_ID());
+					break;
+			}
 
 			case W3D_CHUNK_DEFORM:
 					WWDEBUG_SAY(("Obsolete deform chunk encountered in mesh: %s.%s", context->Header.ContainerName,context->Header.MeshName));
@@ -1062,6 +1095,12 @@ WW3DErrorType MeshModelClass::read_material_pass(ChunkLoadClass & cload,MeshLoad
 
 			case W3D_CHUNK_TEXTURE_STAGE:
 				error = read_texture_stage(cload,context);
+				break;
+
+			case W3D_CHUNK_FXSHADER_IDS:
+			case W3D_CHUNK_STAGE_TEXCOORDS:
+				if (!read_fx_pass_chunk(cload, context))
+					context->FxInvalid |= !W3dFx::loadProblem(Get_Name(), cload.Cur_Chunk_ID());
 				break;
 		};
 
@@ -1689,7 +1728,7 @@ void MeshModelClass::post_process()
 void MeshModelClass::post_process_fog()
 {
 	// If two pass...
-	if (DefMatDesc->Get_Pass_Count() == 2) {
+	if (!FxMaterials && DefMatDesc->Get_Pass_Count() == 2) {
 
 		// If single shader on both passes...
 		if (!DefMatDesc->ShaderArray[0] && !DefMatDesc->ShaderArray[1]) {
@@ -1765,6 +1804,9 @@ void MeshModelClass::post_process_fog()
 
 	// Mesh is not one of the special two-pass combinations. Apply a per-pass generic fix-up.
 	for (int pass = 0; pass < DefMatDesc->PassCount; pass++) {
+		if (FxMaterials && static_cast<std::size_t>(pass) < FxMaterials->passes.size() &&
+				!FxMaterials->passes[pass].vertexMaterials.empty())
+			continue;
 		DefMatDesc->Shader [pass].Enable_Fog (Get_Name());
 		if (DefMatDesc->ShaderArray [pass]) {
 			for (int tri = 0; tri < DefMatDesc->ShaderArray [pass]->Get_Count(); tri++) {
@@ -1881,6 +1923,8 @@ void MeshModelClass::install_materials(MeshLoadContextClass * context)
 		lighting_enabled=false;
 	}
 	DefMatDesc->Post_Load_Process (lighting_enabled,this);
+	for (const auto & [material, pass, unlit] : context->FxVertexMaterials)
+		DefMatDesc->Configure_Material(material, pass, lighting_enabled && !unlit);
 	if (AlternateMatDesc != nullptr) {
 		AlternateMatDesc->Post_Load_Process (lighting_enabled,this);
 	}

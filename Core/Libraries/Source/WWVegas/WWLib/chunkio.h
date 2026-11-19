@@ -173,9 +173,11 @@ public:
 
 	// Chunk methods
 	bool					Open_Chunk();
+	bool					Open_Chunk_Bounded();
 	bool					Close_Chunk();
 	uint32				Cur_Chunk_ID();
 	uint32				Cur_Chunk_Length();
+	uint32				Cur_Chunk_Remaining();
 	int					Cur_Chunk_Depth();
 	int					Contains_Chunks();
 

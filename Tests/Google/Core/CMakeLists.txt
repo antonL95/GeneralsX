@@ -9,11 +9,15 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/INIPreprocessorTest.cpp
     GameEngine/Common/BfmeAssetPathTest.cpp
     Libraries/Compression/CompressionManagerTest.cpp
+    Libraries/WW3D2/W3dFxMaterialTest.cpp
 )
 
 add_library(corei_googletest INTERFACE)
 
 target_sources(corei_googletest INTERFACE ${COREI_GOOGLETEST_SRC})
+
+target_include_directories(corei_googletest INTERFACE
+    "${CMAKE_SOURCE_DIR}/Core/Libraries/Source/WWVegas/WW3D2")
 
 target_link_libraries(corei_googletest INTERFACE
     comctl32

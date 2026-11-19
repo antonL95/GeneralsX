@@ -233,6 +233,9 @@ set_target_properties(g_ww3d2 PROPERTIES OUTPUT_NAME ww3d2)
 
 target_sources(g_ww3d2 PRIVATE ${WW3D2_SRC})
 
+set_property(SOURCE meshmdlio.cpp APPEND PROPERTY INCLUDE_DIRECTORIES
+    "${CMAKE_SOURCE_DIR}/Core/GameEngine/Include")
+
 target_include_directories(g_ww3d2 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
 )

@@ -52,6 +52,9 @@
 #include "meshgeometry.h"
 #include "meshmatdesc.h"
 #include "WW3D2/dx8list.h"
+#include <memory>
+
+namespace W3dFx { struct Mesh; }
 
 class TextureClass;
 class RenderInfoClass;
@@ -165,6 +168,8 @@ public:
 	// material description.
 	/////////////////////////////////////////////////////////////////////////////////////
 	void							Set_Pass_Count(int passes)														{ CurMatDesc->Set_Pass_Count(passes); }
+	bool Has_Fx_Materials() const { return FxMaterials != nullptr; }
+	VertexMaterialClass * Peek_Polygon_Material(unsigned polygon, unsigned pass);
 	int							Get_Pass_Count() const														{ return CurMatDesc->Get_Pass_Count(); }
 
 	const Vector2 *			Get_UV_Array(int pass = 0, int stage = 0)									{ return CurMatDesc->Get_UV_Array(pass,stage); }
@@ -311,6 +316,8 @@ protected:
 
 	// mat info support
 	void install_materials(MeshLoadContextClass * loadinfo);
+	bool install_fx_materials(MeshLoadContextClass * context);
+	bool read_fx_pass_chunk(ChunkLoadClass & cload,MeshLoadContextClass * context);
 	void clone_materials(const MeshModelClass & srcmesh);
 	void install_alternate_material_desc(MeshLoadContextClass * context);
 
@@ -319,6 +326,7 @@ protected:
 	// AlternateMatDes - an optional alternate material description, allocated at load time if needed
 	// CurMatDesc - pointer to the currently active material description.
 	MeshMatDescClass *									DefMatDesc;
+	std::shared_ptr<const W3dFx::Mesh>					FxMaterials;
 	MeshMatDescClass *									AlternateMatDesc;
 	MeshMatDescClass *									CurMatDesc;
 
