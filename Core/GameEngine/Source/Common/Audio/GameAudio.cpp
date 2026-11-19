@@ -282,6 +282,8 @@ void AudioManager::reset()
 //-------------------------------------------------------------------------------------------------
 void AudioManager::update()
 {
+	if (!TheTacticalView)
+		return;
 	Coord3D cameraPivot = TheTacticalView->getPosition();
 	Real angle = TheTacticalView->getAngle();
 	Matrix3D rot = Matrix3D::Identity;

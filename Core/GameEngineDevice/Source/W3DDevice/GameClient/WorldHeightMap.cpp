@@ -425,11 +425,10 @@ void WorldHeightMap::releaseMapData()
 	delete[](m_cellCliffState);
 	m_cellCliffState = nullptr;
 
-	int i;
-	for (i=0; i<NUM_SOURCE_TILES; i++) {
-		REF_PTR_RELEASE(m_sourceTiles[i]);
-		REF_PTR_RELEASE(m_edgeTiles[i]);
-	}
+	for (TileData *&tile : m_sourceTiles)
+		REF_PTR_RELEASE(tile);
+	for (TileData *&tile : m_edgeTiles)
+		REF_PTR_RELEASE(tile);
 	REF_PTR_RELEASE(m_terrainTex);
 	REF_PTR_RELEASE(m_alphaTerrainTex);
 	REF_PTR_RELEASE(m_alphaEdgeTex);
@@ -467,12 +466,14 @@ WorldHeightMap::WorldHeightMap(Bool initializeEditor):
 {
 	Int i;
 	for (i=0; i<NUM_SOURCE_TILES; i++) {
-		m_sourceTiles[i] = nullptr;
 		m_edgeTiles[i] = nullptr;
 	}
 
 	if (initializeEditor)
 	{
+		m_sourceTiles.resize(NUM_SOURCE_TILES);
+		m_blendedTiles.resize(NUM_BLEND_TILES);
+		m_cliffInfo.resize(NUM_CLIFF_INFO);
 		TheSidesList->validateSides();
 		setupAlphaTiles();
 	}
@@ -491,7 +492,7 @@ void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metada
 {
 	const AsciiString& root = AsciiString::TheEmptyString;
 	file.registerVersionedParser("HeightMapData", root, ParseSizeOnlyInChunk, K_HEIGHT_MAP_VERSION_5, true);
-	file.registerVersionedParser("BlendTileData", root, nullptr, K_BLEND_TILE_VERSION_8, true);
+	file.registerVersionedParser("BlendTileData", root, ParseLogicalBlendTileDataChunk, 18, true);
 	file.registerVersionedParser("SidesList", root, SidesList::ParseSidesDataChunk,
 		SidesList::MAX_MAP_SIDES_VERSION, true);
 	file.registerVersionedParser("Teams", root, SidesList::ParseMapTeamsDataChunk, 1, true);
@@ -526,6 +527,7 @@ RefCountPtr<WorldHeightMap> WorldHeightMap::readAuditMap(DataChunkInput &file)
 {
 	RefCountPtr<WorldHeightMap> map;
 	map.Assign_No_Add_Ref(NEW WorldHeightMap(false));
+	map->m_readAuditBlendTiles = true;
 	RegisterLogicalMapParsers(file, true);
 	if (!file.parse(map.Peek()))
 		return {};
@@ -538,7 +540,7 @@ RefCountPtr<WorldHeightMap> WorldHeightMap::readAuditMap(DataChunkInput &file)
 *	Input: ChunkInputStream,
 *
 */
-WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
+WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly, Bool legacyBlendOnly):
 	m_width(0), m_height(0),  m_dataSize(0), m_data(nullptr), m_cellFlipState(nullptr), m_seismicUpdateFlag(nullptr), m_seismicZVelocities(nullptr),
 	m_drawOriginX(0),	m_cellCliffState(nullptr), m_drawOriginY(0),
 	m_numTextureClasses(0),
@@ -554,7 +556,6 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 
 	int i;
 	for (i=0; i<NUM_SOURCE_TILES; i++) {
-		m_sourceTiles[i]=nullptr;
 		m_edgeTiles[i]=nullptr;
 	}
 
@@ -568,7 +569,8 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 		TheSidesList->clear();
 	}	else {
 		file.registerVersionedParser("HeightMapData", root, ParseHeightMapDataChunk, K_HEIGHT_MAP_VERSION_5, true);
-		file.registerVersionedParser("BlendTileData", root, ParseBlendTileDataChunk, K_BLEND_TILE_VERSION_8, true);
+		file.registerVersionedParser("BlendTileData", root, ParseBlendTileDataChunk,
+			legacyBlendOnly ? K_BLEND_TILE_VERSION_8 : 18, true);
 #ifdef EVAL_TILING_MODES
 		file.registerVersionedParser("FUNKY_TILING", root, ParseFunkyTilingDataChunk, 1);
 #endif
@@ -586,6 +588,8 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 			fflush(stderr);
 			throw ERROR_CORRUPT_FILE_FORMAT;
 		}
+		if (!logicalDataOnly && !m_tileNdxes)
+			throw ERROR_CORRUPT_FILE_FORMAT;
 		if (!logicalDataOnly && m_bfmeLighting)
 			applyBfmeLighting();
 	}
@@ -890,7 +894,6 @@ void WorldHeightMap::readBfmeLighting(DataChunkInput &file, unsigned version)
 
 void WorldHeightMap::applyBfmeLighting() const
 {
-	TheWritableGlobalData->m_timeOfDay = m_bfmeLighting->timeOfDay;
 	for (Int day = TIME_OF_DAY_FIRST; day < TIME_OF_DAY_COUNT; ++day)
 	{
 		for (Int slot = 0; slot < MAX_GLOBAL_LIGHTS; ++slot)
@@ -899,6 +902,7 @@ void WorldHeightMap::applyBfmeLighting() const
 			TheWritableGlobalData->m_terrainObjectsLighting[day][slot] = m_bfmeLighting->objects[day][slot];
 		}
 	}
+	TheWritableGlobalData->setTimeOfDay(m_bfmeLighting->timeOfDay);
 	if (TheW3DShadowManager)
 		TheW3DShadowManager->setShadowColor(m_bfmeLighting->shadowColor);
 }
@@ -1126,19 +1130,65 @@ void WorldHeightMap::readHeightData(DataChunkInput &file, unsigned version, Bool
 Bool WorldHeightMap::ParseBlendTileDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
 	WorldHeightMap *pThis = (WorldHeightMap *)userData;
-	return pThis->ParseBlendTileData(file, info, userData);
+	return pThis->ParseBlendTileData(file, info, true);
+}
+
+Bool WorldHeightMap::ParseLogicalBlendTileDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
+{
+	auto *map = static_cast<WorldHeightMap *>(userData);
+	if (!map->m_data) {
+		if (info->version > K_BLEND_TILE_VERSION_8)
+			file.skipUnsupportedRequiredChunk(*info);
+		return true;
+	}
+	if (info->version <= K_BLEND_TILE_VERSION_8 && !map->m_readAuditBlendTiles)
+		return true;
+	return map->ParseBlendTileData(file, info, false);
+}
+
+Bool WorldHeightMap::writeBlendTileChecksums(const char *path) const
+{
+	if (!m_tileNdxes)
+		return false;
+	FILE *output = std::fopen(path, "w");
+	if (!output)
+		return false;
+	auto writeLayer = [output](const char *name, const auto *values, Int count, unsigned bytes) {
+		unsigned long long hash = 14695981039346656037ull;
+		for (Int i = 0; i < count; ++i) {
+			unsigned value = values[i];
+			for (unsigned j = 0; j < bytes; ++j) {
+				hash = (hash ^ (value & 255u)) * 1099511628211ull;
+				value >>= 8;
+			}
+		}
+		std::fprintf(output, "%s\t%d\t%016llx\n", name, count, hash);
+	};
+	std::fprintf(output, "tables\t%d\t%d\t%d\t%d\n", m_numBitmapTiles, m_numBlendedTiles,
+		m_numCliffInfo, m_numTextureClasses);
+	writeLayer("tile", m_tileNdxes, m_dataSize, 2);
+	writeLayer("blend", m_blendTileNdxes, m_dataSize, 4);
+	writeLayer("extraBlend", m_extraBlendTileNdxes, m_dataSize, 4);
+	writeLayer("cliff", m_cliffInfoNdxes, m_dataSize, 4);
+	writeLayer("impassable", m_cellCliffState, m_flipStateWidth * m_height, 1);
+	writeLayer("impassableToPlayers", m_impassableToPlayers.data(), m_impassableToPlayers.size(), 1);
+	writeLayer("passageWidths", m_passageWidths.data(), m_passageWidths.size(), 1);
+	writeLayer("taintable", m_taintable.data(), m_taintable.size(), 1);
+	writeLayer("extraPassable", m_extraPassable.data(), m_extraPassable.size(), 1);
+	writeLayer("flammability", m_flammability.data(), m_flammability.size(), 1);
+	writeLayer("visibility", m_visibility.data(), m_visibility.size(), 1);
+	const Bool ok = !std::ferror(output);
+	return std::fclose(output) == 0 && ok;
 }
 
 /** Function to read in the tiles for a texture class. */
-void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
+void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData, Bool bfme)
 {
-	char path[_MAX_PATH];
-	path[0] = 0;
 	File *theFile = nullptr;
 
 	// get the file from the description in TheTerrainTypes
-	TerrainType *terrain = TheTerrainTypes->findTerrain( texClass->name );
-	char texturePath[ _MAX_PATH ];
+	TerrainType *terrain = TheTerrainTypes ? TheTerrainTypes->findTerrain(texClass->name) : nullptr;
+	AsciiString texturePath;
 	if (terrain==nullptr)
 	{
 #ifdef LOAD_TEST_ASSETS
@@ -1147,15 +1197,17 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 	}
 	else
 	{
-		snprintf( texturePath, ARRAY_SIZE(texturePath), "%s%s", TERRAIN_TGA_DIR_PATH, terrain->getTexture().str() );
-		theFile = TheFileSystem->openFile( texturePath, File::READ|File::BINARY);
+		texturePath.format("%s%s", TERRAIN_TGA_DIR_PATH, terrain->getTexture().str());
+		theFile = TheFileSystem->openFile(texturePath.str(), File::READ | File::BINARY);
 	}
 
+	Bool loaded = false;
 	if (theFile != nullptr) {
 		GDIFileStream theStream(theFile);
 		InputStream *pStr = &theStream;
 		Bool isLegacyGrid = false;
-		Int numTiles = WorldHeightMap::countTiles(pStr, nullptr, texClass->numTiles, &isLegacyGrid);
+		Bool halfTile = false;
+		Int numTiles = WorldHeightMap::countTiles(pStr, bfme ? &halfTile : nullptr, texClass->numTiles, &isLegacyGrid);
 		theFile->seek(0, File::START);
 		if (numTiles >= texClass->numTiles) {
 			numTiles = texClass->numTiles;
@@ -1166,9 +1218,14 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 					break;
 				}
 			}
-			WorldHeightMap::readTiles(pStr, tileData+texClass->firstTile, width, isLegacyGrid);
+			loaded = WorldHeightMap::readTiles(pStr, tileData + texClass->firstTile, width, isLegacyGrid);
 		}
 		theFile->close();
+	}
+	if (bfme && (!loaded || std::getenv("GENERALSX_ASSET_SMOKE_TERRAIN"))) {
+		std::fprintf(stderr, "Terrain texture %s: %s (%s)\n", texClass->name.str(),
+			texturePath.isEmpty() ? "no Terrain definition" : texturePath.str(), loaded ? "loaded" : "unavailable");
+		std::fflush(stderr);
 	}
 }
 
@@ -1179,17 +1236,17 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 *	Input: DataChunkInput
 *
 */
-Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *info, void *userData)
+Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *info, Bool loadTextures)
 {
 	int i, j;
 	Int len = file.readInt();
-	if (m_dataSize != len) {
+	if (m_tileNdxes || m_dataSize != len || len <= 0) {
 		throw ERROR_CORRUPT_FILE_FORMAT	;
 	}
 	m_tileNdxes = MSGNEW("WorldHeightMap_ParseBlendTileData") Short[m_dataSize];
-	m_cliffInfoNdxes = MSGNEW("WorldHeightMap_ParseBlendTileData") Short[m_dataSize];
-	m_blendTileNdxes = MSGNEW("WorldHeightMap_ParseBlendTileData") Short[m_dataSize];
-	m_extraBlendTileNdxes = MSGNEW("WorldHeightMap_ParseBlendTileData") Short[m_dataSize];
+	m_cliffInfoNdxes = MSGNEW("WorldHeightMap_ParseBlendTileData") Int[m_dataSize]{};
+	m_blendTileNdxes = MSGNEW("WorldHeightMap_ParseBlendTileData") Int[m_dataSize]{};
+	m_extraBlendTileNdxes = MSGNEW("WorldHeightMap_ParseBlendTileData") Int[m_dataSize]{};
 	// Note - we have one less cell than the width & height. But for paranoia, allocate
 	// extra row. jba.
 	//
@@ -1204,17 +1261,29 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 	memset(m_cellCliffState,0,numBytesX*numBytesY);	//clear all flags
 
 	file.readArrayOfBytes((char*)m_tileNdxes, m_dataSize*sizeof(Short));
-	file.readArrayOfBytes((char*)m_blendTileNdxes, m_dataSize*sizeof(Short));
+	const Bool wideIndices = info->version >= 14;
+	auto readIndices = [&](Int *indices) {
+		const unsigned bytes = wideIndices ? 4 : 2;
+		if (static_cast<unsigned>(m_dataSize) > file.getChunkDataSizeLeft() / bytes)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		if (wideIndices) {
+			file.readArrayOfBytes(reinterpret_cast<char *>(indices), m_dataSize * sizeof(Int));
+		} else {
+			std::vector<Short> legacy(m_dataSize);
+			file.readArrayOfBytes(reinterpret_cast<char *>(legacy.data()), m_dataSize * sizeof(Short));
+			for (Int cell = 0; cell < m_dataSize; ++cell)
+				indices[cell] = info->version <= K_BLEND_TILE_VERSION_8
+					? static_cast<Int>(legacy[cell]) : static_cast<UnsignedShort>(legacy[cell]);
+		}
+	};
+	readIndices(m_blendTileNdxes);
 	if (info->version >= K_BLEND_TILE_VERSION_6) {
-		file.readArrayOfBytes((char*)m_extraBlendTileNdxes, m_dataSize*sizeof(Short));
-		//Allow clearing of extra blend tiles via ini and resaving of map.
-		//Useful for flushing out initial maps made with buggy 3-way blending.
-		if (!TheGlobalData->m_use3WayTerrainBlends)
-			memset(m_extraBlendTileNdxes,0,m_dataSize*sizeof(Short));
+		readIndices(m_extraBlendTileNdxes);
+		if (loadTextures && !TheGlobalData->m_use3WayTerrainBlends)
+			std::fill_n(m_extraBlendTileNdxes, m_dataSize, 0);
 	}
-	if (info->version >= K_BLEND_TILE_VERSION_5) {
-		file.readArrayOfBytes((char*)m_cliffInfoNdxes, m_dataSize*sizeof(Short));
-	}
+	if (info->version >= K_BLEND_TILE_VERSION_5)
+		readIndices(m_cliffInfoNdxes);
 	if (info->version >= K_BLEND_TILE_VERSION_7) {
 		if (info->version==K_BLEND_TILE_VERSION_7) {
 			Int byteWidth = (m_width+1)/8; // previous incorrect length that got used to save the file.  jba. [4/3/2003]
@@ -1232,18 +1301,37 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 	} else {
 		initCliffFlagsFromHeights();
 	}
+	auto readLayer = [&](std::vector<UnsignedByte> &layer, Int size) {
+		if (static_cast<unsigned>(size) > file.getChunkDataSizeLeft())
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		layer.resize(size);
+		file.readArrayOfBytes(reinterpret_cast<char *>(layer.data()), size);
+	};
+	const Int packedSize = m_height * m_flipStateWidth;
+	if (info->version >= 10) readLayer(m_impassableToPlayers, packedSize);
+	if (info->version >= 11) readLayer(m_passageWidths, packedSize);
+	if (info->version >= 14) readLayer(m_taintable, packedSize);
+	if (info->version >= 15) readLayer(m_extraPassable, packedSize);
+	if (info->version >= 16) readLayer(m_flammability, m_dataSize);
+	if (info->version >= 17) readLayer(m_visibility, packedSize);
 	m_numBitmapTiles = file.readInt();
-	DEBUG_ASSERTCRASH(m_numBitmapTiles>0 && m_numBitmapTiles<2048, ("Unlikely numBitmapTiles."));
+	if (m_numBitmapTiles < 0 || m_numBitmapTiles > 16384)
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	m_sourceTiles.resize(m_numBitmapTiles);
 	m_numBlendedTiles = file.readInt();
-	DEBUG_ASSERTCRASH(m_numBlendedTiles>0 && m_numBlendedTiles<NUM_BLEND_TILES+1, ("Unlikely numBlendedTiles."));
+	if (m_numBlendedTiles < 1)
+		throw ERROR_CORRUPT_FILE_FORMAT;
 	if (info->version >= K_BLEND_TILE_VERSION_5) {
 		m_numCliffInfo = file.readInt();
 	} else {
 		m_numCliffInfo = 1;	// cliffInfo[0] is the default info.
 	}
-// --> file loading here
+	if (m_numCliffInfo < 0)
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	m_numCliffInfo = std::max(1, m_numCliffInfo);
 	m_numTextureClasses	= file.readInt();
-	DEBUG_ASSERTCRASH(m_numTextureClasses>0 && m_numTextureClasses<200, ("Unlikely m_numTextureClasses."));
+	if (m_numTextureClasses < 0 || m_numTextureClasses > NUM_TEXTURE_CLASSES)
+		throw ERROR_CORRUPT_FILE_FORMAT;
 	for (i=0; i<m_numTextureClasses; i++) {
 		m_textureClasses[i].globalTextureClass = -1;
 		m_textureClasses[i].firstTile = file.readInt();
@@ -1255,22 +1343,43 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 	/*	Int legacy = */ file.readInt();
 
 		m_textureClasses[i].name = file.readAsciiString();
-		readTexClass(&m_textureClasses[i], m_sourceTiles);
+		const auto &texture = m_textureClasses[i];
+		if (texture.firstTile < 0 || texture.numTiles < 0 || texture.firstTile > m_numBitmapTiles ||
+			texture.numTiles > m_numBitmapTiles - texture.firstTile || texture.width < 0 ||
+			static_cast<long long>(texture.width) * texture.width > texture.numTiles)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		if (loadTextures && texture.numTiles)
+			readTexClass(&m_textureClasses[i], m_sourceTiles.data(), info->version > K_BLEND_TILE_VERSION_8);
 	}
 	m_numEdgeTextureClasses = 0;
 	m_numEdgeTiles = 0;
 	if (info->version >= K_BLEND_TILE_VERSION_4) {
 		m_numEdgeTiles	= file.readInt();
 		m_numEdgeTextureClasses	= file.readInt();
+		if (m_numEdgeTiles < 0 || m_numEdgeTiles > NUM_SOURCE_TILES ||
+			m_numEdgeTextureClasses < 0 || m_numEdgeTextureClasses > NUM_TEXTURE_CLASSES)
+			throw ERROR_CORRUPT_FILE_FORMAT;
 		for (i=0; i<m_numEdgeTextureClasses; i++) {
 			m_edgeTextureClasses[i].globalTextureClass = -1;
 			m_edgeTextureClasses[i].firstTile = file.readInt();
 			m_edgeTextureClasses[i].numTiles = file.readInt();
 			m_edgeTextureClasses[i].width = file.readInt();
 			m_edgeTextureClasses[i].name = file.readAsciiString();
-			readTexClass(&m_edgeTextureClasses[i], m_edgeTiles);
+			const auto &texture = m_edgeTextureClasses[i];
+			if (texture.firstTile < 0 || texture.numTiles < 0 || texture.firstTile > NUM_SOURCE_TILES ||
+				texture.numTiles > NUM_SOURCE_TILES - texture.firstTile)
+				throw ERROR_CORRUPT_FILE_FORMAT;
+			if (loadTextures && texture.numTiles)
+				readTexClass(&m_edgeTextureClasses[i], m_edgeTiles);
 		}
 	}
+	const unsigned blendBytes = 13 + (info->version >= K_BLEND_TILE_VERSION_3) +
+		4 * (info->version >= K_BLEND_TILE_VERSION_4);
+	if (static_cast<unsigned long long>(m_numBlendedTiles - 1) * blendBytes +
+		static_cast<unsigned long long>(m_numCliffInfo - 1) * 38 > file.getChunkDataSizeLeft())
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	m_blendedTiles.resize(m_numBlendedTiles);
+	m_cliffInfo.resize(m_numCliffInfo);
 	for (i=1; i<m_numBlendedTiles; i++) {
 		Int flag;
 		m_blendedTiles[i].blendNdx = file.readInt();
@@ -1281,8 +1390,8 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 		m_blendedTiles[i].inverted = file.readByte();
 		//Allow clearing of extra blend tiles via ini and resaving of map.
 		//Useful for flushing out initial maps made with buggy 3-way blending.
-		if (!TheGlobalData->m_use3WayTerrainBlends)
-			m_blendedTiles[i].inverted &= ~FLIPPED_MASK;	//filter out extra flips from 3-way
+		if (loadTextures && !TheGlobalData->m_use3WayTerrainBlends)
+			m_blendedTiles[i].inverted &= ~FLIPPED_MASK;
 
 		if (info->version >= K_BLEND_TILE_VERSION_3) {
 			m_blendedTiles[i].longDiagonal = file.readByte();
@@ -1349,7 +1458,7 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 */
 Bool WorldHeightMap::ParseObjectDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
-	WorldHeightMap *pThis = (WorldHeightMap *)file.m_userData;
+	auto *pThis = static_cast<WorldHeightMap *>(userData);
 	return pThis->ParseObjectData(file, info, userData, info->version >= K_OBJECTS_VERSION_2);
 }
 
@@ -1728,7 +1837,7 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 					availableGrid[row+j][column+i] = false;
 					Int baseNdx = m_textureClasses[texClass].firstTile + i + j*width;
 					// In case we are just checking for room...
-					if (m_sourceTiles[baseNdx] == nullptr) continue;
+					if (!getSourceTile(baseNdx)) continue;
 					Int x = xOrigin + i*TILE_PIXEL_EXTENT;
 					Int y = yOrigin + (width-j-1)*TILE_PIXEL_EXTENT;
 					m_sourceTiles[baseNdx]->m_tileLocationInTexture.x = x;
@@ -1809,13 +1918,13 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 */
 void WorldHeightMap::getUVForNdx(Int tileNdx, float *minU, float *minV, float *maxU, float*maxV)
 {
-	Short baseNdx = tileNdx>>2;
-	if (m_sourceTiles[baseNdx] == nullptr) {
+	const TileData *tile = getSourceTile(tileNdx >> 2);
+	if (!tile) {
 		// Missing texture.
 		*minU = *minV = *maxU = *maxV = 0.0f;
 		return;
 	}
-	ICoord2D pos = m_sourceTiles[baseNdx]->m_tileLocationInTexture;
+	ICoord2D pos = tile->m_tileLocationInTexture;
 	*minU = pos.x;
 	*minV = pos.y;
 	*maxU = *minU+TILE_PIXEL_EXTENT;
@@ -2177,7 +2286,7 @@ Bool WorldHeightMap::getExtraAlphaUVData(Int xIndex, Int yIndex, float U[4], flo
 	*cliff = FALSE;
 
 	if ( (ndx>=0) && (ndx<m_dataSize) && m_tileNdxes) {
-		Short blendNdx = m_extraBlendTileNdxes[ndx];
+		Int blendNdx = m_extraBlendTileNdxes[ndx];
 		if (blendNdx == 0) {
 			return FALSE;
 		} else {
@@ -2263,7 +2372,7 @@ void WorldHeightMap::getAlphaUVData(Int xIndex, Int yIndex, float U[4], float V[
 	Bool needFlip = false;
 
 	if ((ndx<m_dataSize) && m_tileNdxes) {
-		Short blendNdx = m_blendTileNdxes[ndx];
+		Int blendNdx = m_blendTileNdxes[ndx];
 		if (blendNdx == 0) {
 			stretchedForCliff = getUVForTileIndex(ndx, m_tileNdxes[ndx], U, V);
 			alpha[0] = alpha[1] = alpha[2] = alpha[3] = 0;
@@ -2624,8 +2733,8 @@ UnsignedByte * WorldHeightMap::getPointerToTileData(Int xIndex, Int yIndex, Int 
 	TBlendTileInfo *pBlend = nullptr;
 	Short tileNdx = m_tileNdxes[ndx];
 	if (getRawTileData(tileNdx, width, s_buffer, DATA_LEN_BYTES)) {
-		Short blendTileNdx = m_blendTileNdxes[ndx];
-		if (blendTileNdx>0 && blendTileNdx < NUM_BLEND_TILES) {
+		Int blendTileNdx = m_blendTileNdxes[ndx];
+		if (blendTileNdx>0 && blendTileNdx < m_numBlendedTiles) {
 			pBlend = &m_blendedTiles[blendTileNdx];
 			if (getRawTileData(pBlend->blendNdx, width, s_blendBuffer, DATA_LEN_BYTES)) {
 				UnsignedByte *pAlpha = getRGBAlphaDataForWidth(width, pBlend);
@@ -2753,10 +2862,7 @@ void WorldHeightMap::setupAlphaTiles()
 Bool  WorldHeightMap::getRawTileData(Short tileNdx, Int width,
 																				 UnsignedByte *buffer, Int bufLen)
 {
-	TileData *pSrc = nullptr;
-	if (tileNdx/4 < NUM_SOURCE_TILES) {
-		pSrc = m_sourceTiles[tileNdx/4];
-	}
+	TileData *pSrc = getSourceTile(tileNdx >> 2);
 	if (bufLen < (width*width*TILE_BYTES_PER_PIXEL)) {
 		return(false);
 	}

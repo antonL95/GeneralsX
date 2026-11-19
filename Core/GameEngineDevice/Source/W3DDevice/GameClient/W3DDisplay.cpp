@@ -87,6 +87,7 @@ static void drawFramerateBar();
 #include "W3DDevice/GameClient/W3DProfilerFrameCapture.h"
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
+#include "GameClient/TerrainVisual.h"
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DTerrainTracks.h"
 #include "W3DDevice/GameClient/W3DWater.h"
@@ -2210,6 +2211,36 @@ static Bool drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real
 	return rendered;
 }
 
+static Bool drawAssetSmokeTerrain(AsciiString filename, Real aspect)
+{
+	if (!TheTerrainVisual || !TheTerrainVisual->load(filename) || !TheTerrainRenderObject)
+		return false;
+	const WorldHeightMap *map = TheTerrainRenderObject->getMap();
+	if (!map)
+		return false;
+
+	const Vector3 pivot((map->getXExtent() - 2 * map->getBorderSizeInline()) * MAP_XY_FACTOR * 0.5f,
+		(map->getYExtent() - 2 * map->getBorderSizeInline()) * MAP_XY_FACTOR * 0.5f, 100.0f);
+	CameraClass camera;
+	Matrix3D transform;
+	transform.Look_At(pivot + Vector3(140.0f, -280.0f, 700.0f), pivot, 0.0f);
+	camera.Set_Transform(transform);
+	camera.Set_User_Data(W3DDisplay::m_3DScene);
+	camera.Set_View_Plane(Vector2(-0.55f * aspect, -0.55f), Vector2(0.55f * aspect, 0.55f));
+	camera.Set_Clip_Planes(5.0f, 2500.0f);
+	TheTerrainRenderObject->updateCenter(&camera, &pivot, nullptr);
+
+	if (WW3D::Begin_Render(true, true, Vector3(0.1f, 0.13f, 0.17f)) != WW3D_ERROR_OK)
+		return false;
+	RenderInfoClass renderInfo(camera);
+	WW3D::Render(*TheTerrainRenderObject, renderInfo);
+	WW3D::End_Render(false);
+	std::fprintf(stderr, "Asset smoke: rendered terrain from '%s'\n", filename.str());
+	std::fflush(stderr);
+	W3D_TakeCompressedScreenshot(SCREENSHOT_PNG, DEFAULT_JPEG_QUALITY, true);
+	return true;
+}
+
 void W3DDisplay::draw()
 {
 	//USE_PERF_TIMER(W3DDisplay_draw)
@@ -2224,6 +2255,14 @@ void W3DDisplay::draw()
 
 	if (TheGlobalData->m_headless)
 		return;
+
+	if (std::getenv("GENERALSX_ASSET_SMOKE") && std::getenv("GENERALSX_ASSET_SMOKE_TERRAIN") &&
+		TheGlobalData->m_initialFile.isNotEmpty())
+	{
+		TheGameEngine->setQuitting(drawAssetSmokeTerrain(TheGlobalData->m_initialFile,
+			static_cast<Real>(getWidth()) / getHeight()));
+		return;
+	}
 
 	static const char* smokeModel = std::getenv("GENERALSX_ASSET_SMOKE")
 		? std::getenv("GENERALSX_ASSET_SMOKE_MODEL") : nullptr;

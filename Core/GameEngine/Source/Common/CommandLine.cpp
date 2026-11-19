@@ -698,13 +698,14 @@ Int parseFile(char *args[], int num)
 		return 2;
 	}
 #if !defined(RTS_DEBUG)
-	if (!std::getenv("GENERALSX_ASSET_SMOKE"))
+	if (!RetailFileLayers::enabled() && !std::getenv("GENERALSX_ASSET_SMOKE"))
 		return 1;
 #endif
 	if (num > 1)
 	{
 		TheWritableGlobalData->m_initialFile = args[1];
-		ConvertShortMapPathToLongMapPath(TheWritableGlobalData->m_initialFile);
+		if (!RetailFileLayers::enabled() || !TheFileSystem->doesFileExist(args[1]))
+			ConvertShortMapPathToLongMapPath(TheWritableGlobalData->m_initialFile);
 	}
 	return 2;
 }

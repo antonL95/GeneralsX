@@ -657,6 +657,14 @@ bool probeMapSides(const std::string& name, const Entry& entry, const char *heig
 				TheSidesList = nullptr;
 				return false;
 			}
+			const char *blendDump = TheGlobalData->m_initialFile.isNotEmpty()
+				? std::getenv("GENERALSX_MAP_BLEND_DUMP") : nullptr;
+			if (blendDump && !map->writeBlendTileChecksums(blendDump))
+			{
+				record("map-error", name, "blend-dump");
+				TheSidesList = nullptr;
+				return false;
+			}
 		}
 	}
 	catch (ErrorCode error)

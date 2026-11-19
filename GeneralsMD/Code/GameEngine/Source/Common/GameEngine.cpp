@@ -814,7 +814,9 @@ void GameEngine::init()
 				std::_Exit(0);
 			const char* object = std::getenv("GENERALSX_ASSET_SMOKE_OBJECT");
 			const char* model = std::getenv("GENERALSX_ASSET_SMOKE_MODEL");
-			if (((object && *object) || (model && *model)) && TheGlobalData->m_initialFile.isEmpty())
+			const Bool terrain = std::getenv("GENERALSX_ASSET_SMOKE_TERRAIN") &&
+				TheGlobalData->m_initialFile.isNotEmpty();
+			if (terrain || (((object && *object) || (model && *model)) && TheGlobalData->m_initialFile.isEmpty()))
 			{
 				if (!TheDisplay || TheGlobalData->m_headless)
 					std::_Exit(2);

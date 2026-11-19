@@ -3189,13 +3189,15 @@ void InGameUI::destroyPlacementIcons()
 
 		if( m_placeIcon[ i ] )
 		{
-			TheTerrainVisual->removeFactionBibDrawable(m_placeIcon[ i ]);
+			if (TheTerrainVisual)
+				TheTerrainVisual->removeFactionBibDrawable(m_placeIcon[ i ]);
 			TheGameClient->destroyDrawable( m_placeIcon[ i ] );
 		}
 		m_placeIcon[ i ] = nullptr;
 
 	}
-	TheTerrainVisual->removeAllBibs();
+	if (TheTerrainVisual)
+		TheTerrainVisual->removeAllBibs();
 
 }
 

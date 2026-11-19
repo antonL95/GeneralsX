@@ -138,6 +138,7 @@ protected:
 	Int m_dataSize;			///< size of m_data.
 	UnsignedShort *m_data;
 	unsigned m_heightSampleBytes = 1;
+	Bool m_readAuditBlendTiles = false;
 	Real m_heightScale = MAP_HEIGHT_SCALE;
 
   UnsignedByte *m_seismicUpdateFlag;  ///< array of bits to prevent ovelapping physics-update regions from doubling effects on shared cells
@@ -151,22 +152,23 @@ protected:
 
 	/// Texture indices.
 	Short  *m_tileNdxes;  ///< matches m_Data, indexes into m_SourceTiles.
-	Short  *m_blendTileNdxes;  ///< matches m_Data, indexes into m_blendedTiles.  0 means no blend info.
-	Short  *m_cliffInfoNdxes;  ///< matches m_Data, indexes into m_cliffInfo.	 0 means no cliff info.
-	Short  *m_extraBlendTileNdxes;  ///< matches m_Data, indexes into m_extraBlendedTiles.  0 means no blend info.
+	Int *m_blendTileNdxes;
+	Int *m_cliffInfoNdxes;
+	Int *m_extraBlendTileNdxes;
 
 
 	Int m_numBitmapTiles;	// Number of tiles initialized from bitmaps in m_SourceTiles.
 	Int m_numEdgeTiles;	// Number of tiles initialized from bitmaps in m_SourceTiles.
 	Int m_numBlendedTiles;	// Number of blended tiles created from bitmap tiles.
 
-	TileData			*m_sourceTiles[NUM_SOURCE_TILES];	///< Tiles for m_textureClasses
+	std::vector<TileData *> m_sourceTiles;
 	TileData			*m_edgeTiles[NUM_SOURCE_TILES];	///< Tiles for m_textureClasses
 
-	TBlendTileInfo	m_blendedTiles[NUM_BLEND_TILES];
-	TBlendTileInfo	m_extraBlendedTiles[NUM_BLEND_TILES];
+	std::vector<TBlendTileInfo> m_blendedTiles;
 
-	TCliffInfo	m_cliffInfo[NUM_CLIFF_INFO];
+	std::vector<TCliffInfo> m_cliffInfo;
+	std::vector<UnsignedByte> m_impassableToPlayers, m_passageWidths, m_taintable;
+	std::vector<UnsignedByte> m_extraPassable, m_flammability, m_visibility;
 	Int m_numCliffInfo; ///< Number of cliffInfo's used in m_cliffInfo.
 
 	// Texture classes.  There is one texture class for each bitmap read in.
@@ -206,13 +208,13 @@ protected:
 
 
 protected:
-	TileData *getSourceTile(UnsignedInt ndx) { if (ndx<NUM_SOURCE_TILES) return(m_sourceTiles[ndx]); return(nullptr); };
+	TileData *getSourceTile(UnsignedInt ndx) { if (ndx < m_sourceTiles.size()) return(m_sourceTiles[ndx]); return(nullptr); };
 	TileData *getEdgeTile(UnsignedInt ndx) { if (ndx<NUM_SOURCE_TILES) return(m_edgeTiles[ndx]); return(nullptr); };
 	/// UV mapping data for a cell to map into the terrain texture.
 	void getUVForNdx(Int ndx, float *minU, float *minV, float *maxU, float*maxV);
 	Bool getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float V[4]);
 	Int getTextureClassFromNdx(Int tileNdx);
-	void readTexClass(TXTextureClass *texClass, TileData **tileData);
+	void readTexClass(TXTextureClass *texClass, TileData **tileData, Bool bfme = false);
 	Int updateTileTexturePositions(Int *edgeHeight); ///< Places each tile in the texture.
 	void initCliffFlagsFromHeights();
 	void setCellCliffFlagFromHeights(Int xIndex, Int yIndex);
@@ -222,7 +224,8 @@ protected:	 // file reader callbacks.
 	static Bool ParseSizeOnlyInChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	void readHeightData(DataChunkInput &file, unsigned version, Bool logicalDataOnly);
 	static Bool ParseBlendTileDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
-	Bool ParseBlendTileData(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	static Bool ParseLogicalBlendTileDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	Bool ParseBlendTileData(DataChunkInput &file, DataChunkInfo *info, Bool loadTextures);
 	static Bool ParseWorldDictDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseObjectsDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseObjectDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
@@ -242,9 +245,10 @@ protected:
 	explicit WorldHeightMap(Bool initializeEditor = true);
 
 public: // constructors/destructors
-	WorldHeightMap(ChunkInputStream *pFile, Bool bHMapOnly=false);	// read from file.
+	WorldHeightMap(ChunkInputStream *pFile, Bool bHMapOnly=false, Bool legacyBlendOnly=false);
 	static void RegisterLogicalMapParsers(DataChunkInput &file, Bool metadataOnly);
 	static RefCountPtr<WorldHeightMap> readAuditMap(DataChunkInput &file);
+	Bool writeBlendTileChecksums(const char *path) const;
 	virtual ~WorldHeightMap() override;			// destroy.
 
 public:  // Boundary info

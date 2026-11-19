@@ -39,6 +39,7 @@
 #include "Common/FileSystem.h"
 #include "Common/FramePacer.h"
 #include "Common/INIException.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/GameType.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/NameKeyGenerator.h"
@@ -1102,7 +1103,7 @@ void ControlBar::init()
 		m_contextParent[ CP_MASTER ] = TheWindowManager->winGetWindowFromId( nullptr, id );
 		if (!m_contextParent[ CP_MASTER ])
 		{
-			if (TheGlobalData && !TheGlobalData->m_headless && TheFileSystem->doesFileExist("Window\\ControlBar.wnd"))
+			if (TheGlobalData && !TheGlobalData->m_headless && !RetailFileLayers::enabled() && TheFileSystem->doesFileExist("Window\\ControlBar.wnd"))
 				throw INIException("ControlBar.wnd is missing ControlBarParent");
 			return;
 		}
@@ -3056,6 +3057,8 @@ void ControlBar::toggleControlBarStage()
 // Functions for repositioning/resizing the control bar
 void ControlBar::switchControlBarStage( ControlBarStages stage )
 {
+	if (!m_contextParent[ CP_MASTER ])
+		return;
 	if(stage < CONTROL_BAR_STAGE_DEFAULT || stage >= MAX_CONTROL_BAR_STAGES)
 		return;
 	switch (stage) {

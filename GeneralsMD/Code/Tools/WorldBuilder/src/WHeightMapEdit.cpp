@@ -111,9 +111,9 @@ WorldHeightMapEdit::WorldHeightMapEdit(Int width, Int height, UnsignedByte initi
 	m_height = height;
 	m_borderSize = border;
 	m_tileNdxes = new Short[m_dataSize];
-	m_blendTileNdxes = new Short[m_dataSize];
-	m_extraBlendTileNdxes = new Short[m_dataSize];
-	m_cliffInfoNdxes = new Short[m_dataSize];
+	m_blendTileNdxes = new Int[m_dataSize];
+	m_extraBlendTileNdxes = new Int[m_dataSize];
+	m_cliffInfoNdxes = new Int[m_dataSize];
 	m_data = new UnsignedShort[m_dataSize + m_width+1];
 	m_numBitmapTiles = 0;
 	m_numBlendedTiles = 1;
@@ -206,9 +206,9 @@ m_warnTooManyBlend(false)
 		m_edgeTextureClasses[i] = pThis->m_edgeTextureClasses[i];
 	}
 	m_tileNdxes = new Short[m_dataSize];
-	m_blendTileNdxes = new Short[m_dataSize];
-	m_extraBlendTileNdxes = new Short[m_dataSize];
-	m_cliffInfoNdxes = new Short[m_dataSize];
+	m_blendTileNdxes = new Int[m_dataSize];
+	m_extraBlendTileNdxes = new Int[m_dataSize];
+	m_cliffInfoNdxes = new Int[m_dataSize];
 	// Note - we have one less cell than the width & height. But for paranoia, allocate
 	// extra row. jba.
 	//
@@ -259,10 +259,13 @@ m_warnTooManyBlend(false)
  then loads the texture classes.
 */
 WorldHeightMapEdit::WorldHeightMapEdit(ChunkInputStream *pStrm):
-	WorldHeightMap(pStrm),
+	WorldHeightMap(pStrm, false, true),
 	m_warnTooManyTex(false),
 	m_warnTooManyBlend(false)
 {
+	m_sourceTiles.resize(NUM_SOURCE_TILES);
+	m_blendedTiles.resize(NUM_BLEND_TILES);
+	m_cliffInfo.resize(NUM_CLIFF_INFO);
 	Bool didMajorRemap = false;
 	Int i, j;
 	for (i=0; i<m_numGlobalTextureClasses; i++) {
@@ -612,9 +615,11 @@ void WorldHeightMapEdit::saveToFile(DataChunkOutput &chunkWriter)
 	chunkWriter.openDataChunk("BlendTileData", blendTileVersion);
 		chunkWriter.writeInt(m_dataSize);
 		chunkWriter.writeArrayOfBytes((char*)m_tileNdxes, m_dataSize*sizeof(Short));
-		chunkWriter.writeArrayOfBytes((char*)m_blendTileNdxes, m_dataSize*sizeof(Short));
-		chunkWriter.writeArrayOfBytes((char*)m_extraBlendTileNdxes, m_dataSize*sizeof(Short));
-		chunkWriter.writeArrayOfBytes((char*)m_cliffInfoNdxes, m_dataSize*sizeof(Short));
+		std::vector<Short> legacyIndices(m_dataSize);
+		for (const Int *indices : {m_blendTileNdxes, m_extraBlendTileNdxes, m_cliffInfoNdxes}) {
+			std::copy_n(indices, m_dataSize, legacyIndices.begin());
+			chunkWriter.writeArrayOfBytes(reinterpret_cast<char *>(legacyIndices.data()), m_dataSize * sizeof(Short));
+		}
 		if (blendTileVersion >= K_BLEND_TILE_VERSION_7) {
 			if (blendTileVersion == K_BLEND_TILE_VERSION_7) {
 				// Version 7 uses the legacy row width, even when the in-memory rows are wider.
@@ -1826,10 +1831,10 @@ Bool WorldHeightMapEdit::resize(Int newXSize, Int newYSize, Int newHeight, Int n
 
 
 	Short *tileNdxes = new Short[newDataSize];
-	Short *blendTileNdxes = new Short[newDataSize];
-	Short *extraBlendTileNdxes = new Short[newDataSize];
+	Int *blendTileNdxes = new Int[newDataSize];
+	Int *extraBlendTileNdxes = new Int[newDataSize];
 	UnsignedShort *data = new UnsignedShort[newDataSize];
-	Short  *cliffInfoNdxes = new Short[newDataSize];
+	Int *cliffInfoNdxes = new Int[newDataSize];
 
 	Int i, j;
 	for (i=0; i<newXSize; i++) {
