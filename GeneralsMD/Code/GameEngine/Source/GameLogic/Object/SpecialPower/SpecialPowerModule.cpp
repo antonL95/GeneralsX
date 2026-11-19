@@ -30,10 +30,13 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <memory>
+
 #include "Common/GameAudio.h"
 #include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
+#include "Common/INIException.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/Science.h"
@@ -58,6 +61,21 @@
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+namespace
+{
+const char* const modifierCategories[] =
+{
+	"NONE", "LEADERSHIP", "FORMATION", "SPELL", "WEAPON", "STRUCTURE", "LEVEL",
+	"BUFF", "DEBUFF", "STUN", "INNATE_ARMOR", "INNATE_DAMAGEMULT", "INNATE_VISION",
+	"INNATE_AUTOHEAL", "INNATE_HEALTH", nullptr
+};
+
+const char* const weatherTypes[] =
+{
+	"NONE", "CLOUDY", "RAINY", "CLOUDYRAINY", "SUNNY", nullptr
+};
+}
+
 SpecialPowerModuleData::SpecialPowerModuleData()
 {
 
@@ -83,6 +101,32 @@ SpecialPowerModuleData::SpecialPowerModuleData()
 		{ "StartsReady",							INI::parseBool,									nullptr, offsetof( SpecialPowerModuleData, m_startsReady ) },
 		{ "InitiateSound",						INI::parseAudioEventRTS,				nullptr, offsetof( SpecialPowerModuleData, m_initiateSound ) },
 		{ "ScriptedSpecialPowerOnly", INI::parseBool,									nullptr, offsetof( SpecialPowerModuleData, m_scriptedSpecialPowerOnly ) },
+		{ "AffectAllies", INI::parseBool, nullptr, offsetof( SpecialPowerModuleData, m_affectAllies ) },
+		{ "AntiCategory", INI::parseIndexList, modifierCategories, offsetof( SpecialPowerModuleData, m_antiCategory ) },
+		{ "AttributeModifier", INI::parseAsciiString, nullptr, offsetof( SpecialPowerModuleData, m_attributeModifier ) },
+		{ "AttributeModifierAffects", SpecialPowerObjectFilter::parse, nullptr, offsetof( SpecialPowerModuleData, m_attributeModifierAffects ) },
+		{ "AttributeModifierAffectsSelf", INI::parseBool, nullptr, offsetof( SpecialPowerModuleData, m_attributeModifierAffectsSelf ) },
+		{ "AttributeModifierFX", INI::parseAsciiString, nullptr, offsetof( SpecialPowerModuleData, m_attributeModifierFX ) },
+		{ "AttributeModifierRange", INI::parseReal, nullptr, offsetof( SpecialPowerModuleData, m_attributeModifierRange ) },
+		{ "AttributeModifierWeatherBased", INI::parseBool, nullptr, offsetof( SpecialPowerModuleData, m_attributeModifierWeatherBased ) },
+		{ "AvailableAtStart", INI::parseBool, nullptr, offsetof( SpecialPowerModuleData, m_availableAtStart ) },
+		{ "ChangeWeather", INI::parseIndexList, weatherTypes, offsetof( SpecialPowerModuleData, m_changeWeather ) },
+		{ "DisableDuringAnimDuration", INI::parseBool, nullptr, offsetof( SpecialPowerModuleData, m_disableDuringAnimDuration ) },
+		{ "DistanceFromCommandCenter", INI::parseReal, nullptr, offsetof( SpecialPowerModuleData, m_distanceFromCommandCenter ) },
+		{ "GiveLevels", INI::parseInt, nullptr, offsetof( SpecialPowerModuleData, m_giveLevels ) },
+		{ "IdleWhenStartingPower", INI::parseBool, nullptr, offsetof( SpecialPowerModuleData, m_idleWhenStartingPower ) },
+		{ "InitiateFX", INI::parseAsciiString, nullptr, offsetof( SpecialPowerModuleData, m_initiateFX ) },
+		{ "OnTriggerRechargeSpecialPower", INI::parseAsciiStringVector, nullptr, offsetof( SpecialPowerModuleData, m_onTriggerRechargeSpecialPower ) },
+		{ "ReEnableAntiCategory", INI::parseBool, nullptr, offsetof( SpecialPowerModuleData, m_reEnableAntiCategory ) },
+		{ "RequirementsFilterMPSkirmish", SpecialPowerObjectFilter::parse, nullptr, offsetof( SpecialPowerModuleData, m_requirementsFilterMPSkirmish ) },
+		{ "RequirementsFilterStrategic", SpecialPowerObjectFilter::parse, nullptr, offsetof( SpecialPowerModuleData, m_requirementsFilterStrategic ) },
+		{ "SetModelCondition", parseSpecialPowerModelCondition, nullptr, offsetof( SpecialPowerModuleData, m_setModelCondition ) },
+		{ "SetModelConditionTime", INI::parseReal, nullptr, offsetof( SpecialPowerModuleData, m_setModelConditionTime ) },
+		{ "TargetAllSides", INI::parseBool, nullptr, offsetof( SpecialPowerModuleData, m_targetAllSides ) },
+		{ "TargetEnemy", INI::parseBool, nullptr, offsetof( SpecialPowerModuleData, m_targetEnemy ) },
+		{ "TriggerFX", INI::parseAsciiString, nullptr, offsetof( SpecialPowerModuleData, m_triggerFX ) },
+		{ "UseDistanceFromCommandCenter", INI::parseBool, nullptr, offsetof( SpecialPowerModuleData, m_useDistanceFromCommandCenter ) },
+		{ "WeatherDuration", INI::parseDurationUnsignedInt, nullptr, offsetof( SpecialPowerModuleData, m_weatherDuration ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
@@ -95,6 +139,18 @@ SpecialPowerModuleData::SpecialPowerModuleData()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+ModuleData* SpecialPowerModule::friend_newModuleData(INI* ini)
+{
+	auto data = std::unique_ptr<SpecialPowerModuleData>(MSGNEW("AllModuleData") SpecialPowerModuleData);
+	if (ini)
+	{
+		ini->initFromINIMultiProc(data.get(), SpecialPowerModuleData::buildFieldParse);
+		if (!data->m_specialPowerTemplate)
+			throw INIException("SpecialPowerModule requires a defined SpecialPowerTemplate");
+	}
+	return data.release();
+}
+
 SpecialPowerModule::SpecialPowerModule( Thing *thing, const ModuleData *moduleData )
 									: BehaviorModule( thing, moduleData )
 {
@@ -139,6 +195,7 @@ SpecialPowerModule::SpecialPowerModule( Thing *thing, const ModuleData *moduleDa
 	if( m_pausedCount == 0 &&
 			getSpecialPowerTemplate()->isSharedNSync() == TRUE &&
 			getSpecialPowerTemplate()->hasPublicTimer() == TRUE &&
+			TheInGameUI &&
 			getObject()->getControllingPlayer() &&
 			getObject()->isKindOf( KINDOF_STRUCTURE ) )
 	{
@@ -162,7 +219,7 @@ const AudioEventRTS& SpecialPowerModule::getInitiateSound() const
 SpecialPowerModule::~SpecialPowerModule()
 {
 
- 	if( getSpecialPowerModuleData()->m_specialPowerTemplate->hasPublicTimer() == TRUE &&
+	if( TheInGameUI && getSpecialPowerModuleData()->m_specialPowerTemplate->hasPublicTimer() == TRUE &&
 			getObject()->getControllingPlayer() )
  		TheInGameUI->removeSuperweapon( getObject()->getControllingPlayer()->getPlayerIndex(),
 																		getPowerName(),
@@ -231,7 +288,7 @@ void SpecialPowerModule::onSpecialPowerCreation()
 		pauseCountdown( TRUE );
 
 	// add this weapon to the UI if it has a public timer for all to see
-	if( getSpecialPowerModuleData()->m_specialPowerTemplate->hasPublicTimer() == TRUE &&
+	if( TheInGameUI && getSpecialPowerModuleData()->m_specialPowerTemplate->hasPublicTimer() == TRUE &&
 			getObject()->getControllingPlayer() &&
 			getObject()->isKindOf( KINDOF_STRUCTURE ) )
 	{
@@ -479,6 +536,10 @@ Bool SpecialPowerModule::initiateIntentToDoSpecialPower( const Object *targetObj
 		DEBUG_ASSERTCRASH(!valid, ("Using MissileLauncherBuildingUpdate escape path when valid is set to true"));
 		return false;
 	}
+
+	if (!valid && getSpecialPowerModuleData()->m_updateModuleStartsAttack &&
+		getModuleNameKey() == NAMEKEY("SpecialPowerModule"))
+		return FALSE;
 
 	getObject()->getControllingPlayer()->getAcademyStats()->recordSpecialPowerUsed( getSpecialPowerModuleData()->m_specialPowerTemplate );
 
@@ -890,6 +951,7 @@ void SpecialPowerModule::loadPostProcess()
 	if( m_pausedCount == 0 &&
 			getSpecialPowerTemplate()->isSharedNSync() == TRUE &&
 			getSpecialPowerTemplate()->hasPublicTimer() == TRUE &&
+			TheInGameUI &&
 			getObject()->getControllingPlayer() &&
 			getObject()->isKindOf( KINDOF_STRUCTURE ) )
 	{

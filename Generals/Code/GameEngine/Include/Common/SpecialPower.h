@@ -35,8 +35,10 @@
 #include "Common/GameMemory.h"
 #include "Common/SubsystemInterface.h"
 #include "Common/BitFlags.h"
+#include "Common/SpecialPowerINI.h"
 #include "Common/Overridable.h"
 #include "Common/Override.h"
+#include "Common/ObjectStatusTypes.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class ObjectCreationList;
@@ -143,6 +145,21 @@ private:
 	Bool							m_publicTimer;				///< display a countdown timer for this special power for all to see
 	Bool							m_sharedNSync;				///< If true, this is a special that is shared between all of a player's command centers
 	Bool							m_shortcutPower;		///< Is this shortcut power capable of being fired by the side panel?
+
+	UnsignedInt m_flags = 0;
+	SpecialPowerObjectFilter m_objectFilter;
+	Real m_maxCastRange = 0;
+	SpecialPowerObjectFilter m_forbiddenObjectFilter;
+	Real m_forbiddenObjectRange = 0;
+	std::vector<AsciiString> m_requiredSciences;
+	Int m_unitCost = 0;
+	Int m_unitCostDeathType = 0;
+	ObjectStatusMaskType m_preventActivationConditions;
+	AsciiString m_unitSpecificSoundToUseAsInitiateIntendToDoVoice;
+	AsciiString m_unitSpecificSoundToUseAsEnterStateInitiateIntendToDoVoice;
+	AsciiString m_evaEventToPlayOnSuccess;
+	Int m_lightPointCost = 0;
+	AsciiString m_palantirMovie;
 
 	static const FieldParse m_specialPowerFieldParse[];		///< the parse table
 

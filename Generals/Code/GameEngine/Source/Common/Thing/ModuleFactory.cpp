@@ -240,6 +240,8 @@
 #include "GameLogic/Module/DemoralizeSpecialPower.h"
 #endif
 #include "GameLogic/Module/OCLSpecialPower.h"
+#include "GameLogic/Module/AISpecialPowerUpdate.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SpecialAbility.h"
 #include "GameLogic/Module/SpyVisionSpecialPower.h"
 #include "GameLogic/Module/CashBountyPower.h"
@@ -490,6 +492,8 @@ void ModuleFactory::init()
 	addModule( DemoralizeSpecialPower );
 #endif
 	addModule( OCLSpecialPower );
+	addModule( SpecialPowerModule );
+	addModule( AISpecialPowerUpdate );
 	addModule( SpecialAbility );
 	addModule( SpyVisionSpecialPower );
 	addModule( CashBountyPower );

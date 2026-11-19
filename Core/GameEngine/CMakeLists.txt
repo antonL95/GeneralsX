@@ -63,6 +63,8 @@ set(GAMEENGINE_SRC
 #    Include/Common/Handicap.h
 #    Include/Common/IgnorePreferences.h
     Include/Common/INI.h
+    Include/Common/SpecialPowerINI.h
+    Include/GameLogic/Module/AISpecialPowerUpdate.h
     Include/Common/INIAudit.h
     Include/Common/INIMath.h
     Include/Common/INIPreprocessor.h
@@ -623,6 +625,7 @@ set(GAMEENGINE_SRC
     Source/Common/INI/INIObject.cpp
     Source/Common/INI/INIParticleSys.cpp
     Source/Common/INI/INISpecialPower.cpp
+    Source/GameLogic/Object/Update/AISpecialPowerUpdate.cpp
     Source/Common/INI/INITerrain.cpp
     Source/Common/INI/INITerrainBridge.cpp
     Source/Common/INI/INITerrainRoad.cpp

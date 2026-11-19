@@ -287,8 +287,31 @@ void SpecialPowerStore::parseSpecialPowerDefinition( INI *ini )
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+namespace
+{
+const char* const specialPowerFlags[] =
+{
+	"NEEDS_TARGET", "WATER_OK", "NEEDS_OBJECT_FILTER", "LIMIT_DISTANCE",
+	"NO_FORBIDDEN_OBJECTS", "RESPECT_RECHARGE_TIME_DISCOUNT", "PATHABLE_ONLY", nullptr
+};
+}
+
 /* static */ const FieldParse SpecialPowerTemplate::m_specialPowerFieldParse[] =
 {
+	{ "Flags", INI::parseBitString32, specialPowerFlags, offsetof( SpecialPowerTemplate, m_flags ) },
+	{ "ObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( SpecialPowerTemplate, m_objectFilter ) },
+	{ "MaxCastRange", INI::parseReal, nullptr, offsetof( SpecialPowerTemplate, m_maxCastRange ) },
+	{ "ForbiddenObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( SpecialPowerTemplate, m_forbiddenObjectFilter ) },
+	{ "ForbiddenObjectRange", INI::parseReal, nullptr, offsetof( SpecialPowerTemplate, m_forbiddenObjectRange ) },
+	{ "RequiredSciences", INI::parseAsciiStringVector, nullptr, offsetof( SpecialPowerTemplate, m_requiredSciences ) },
+	{ "UnitCost", INI::parseInt, nullptr, offsetof( SpecialPowerTemplate, m_unitCost ) },
+	{ "UnitCostDeathType", INI::parseInt, nullptr, offsetof( SpecialPowerTemplate, m_unitCostDeathType ) },
+	{ "PreventActivationConditions", ObjectStatusMaskType::parseFromINI, nullptr, offsetof( SpecialPowerTemplate, m_preventActivationConditions ) },
+	{ "UnitSpecificSoundToUseAsInitiateIntendToDoVoice", INI::parseAsciiString, nullptr, offsetof( SpecialPowerTemplate, m_unitSpecificSoundToUseAsInitiateIntendToDoVoice ) },
+	{ "UnitSpecificSoundToUseAsEnterStateInitiateIntendToDoVoice", INI::parseAsciiString, nullptr, offsetof( SpecialPowerTemplate, m_unitSpecificSoundToUseAsEnterStateInitiateIntendToDoVoice ) },
+	{ "EvaEventToPlayOnSuccess", INI::parseAsciiString, nullptr, offsetof( SpecialPowerTemplate, m_evaEventToPlayOnSuccess ) },
+	{ "LightPointCost", INI::parseInt, nullptr, offsetof( SpecialPowerTemplate, m_lightPointCost ) },
+	{ "PalantirMovie", INI::parseAsciiString, nullptr, offsetof( SpecialPowerTemplate, m_palantirMovie ) },
 
 	{ "ReloadTime",								INI::parseDurationUnsignedInt,		nullptr,	offsetof( SpecialPowerTemplate, m_reloadTime ) },
 	{ "RequiredScience",					INI::parseScience,								nullptr, offsetof( SpecialPowerTemplate, m_requiredScience ) },

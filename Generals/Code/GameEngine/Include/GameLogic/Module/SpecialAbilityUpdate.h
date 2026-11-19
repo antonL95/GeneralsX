@@ -32,6 +32,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/AudioEventRTS.h"
 #include "Common/INI.h"
+#include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameClient/ParticleSys.h"
 
@@ -47,6 +48,35 @@ enum SpecialPowerType CPP_11(: Int);
 class SpecialAbilityUpdateModuleData : public UpdateModuleData
 {
 public:
+	Bool m_approachUntilMembersInRange = FALSE;
+	UnsignedInt m_attributeModifierDuration = 0;
+	Bool m_chargeAttackSpeedBoost = FALSE;
+	AsciiString m_contactPointOverride;
+	SpecialPowerAnimation m_customAnimAndDuration;
+	Real m_effectRange = 0;
+	SpecialPowerAnimation m_grabPassengerAnimAndDuration;
+	Real m_grabPassengerHealGainPercent = 0;
+	Bool m_ignoreFacingCheck = FALSE;
+	Bool m_instant = FALSE;
+	Bool m_killAttributeModifierOnExit = FALSE;
+	Bool m_killAttributeModifierOnRejected = FALSE;
+	Bool m_mustFinishAbility = FALSE;
+	Int m_persistentCount = 0;
+	UnsignedInt m_rejectedConditions = 0;
+	UnsignedInt m_requiredConditions = 0;
+	AsciiString m_triggerAttributeModifier;
+	Int m_unpackingVariation = 0;
+	UnsignedInt m_freezeAfterTriggerDuration = 0;
+	Bool m_disableWhenWearingTheRing = FALSE;
+	Bool m_needCollisionBeforeTrigger = FALSE;
+	Bool m_suppressForHordes = FALSE;
+	AsciiString m_chainedButton;
+	Int m_triggerModelCondition = -1;
+	Real m_triggerModelConditionDuration = 0;
+	AsciiString m_activeLoopSound;
+	UnsignedInt m_paralyzeDurationWhenCompleted = 0;
+	UnsignedInt m_paralyzeDurationWhenAborted = 0;
+
 	AsciiString						m_specialObjectName;
 	AsciiString						m_specialObjectAttachToBoneName;
 	const SpecialPowerTemplate*	m_specialPowerTemplate;		///< pointer to the special power template
@@ -114,9 +144,38 @@ public:
 	{
     UpdateModuleData::buildFieldParse(p);
 
+		static const char* const abilityConditions[] = { "MOUNTED", "WEAPON_TOGGLE", nullptr };
 		static const FieldParse dataFieldParse[] =
 		{
 			//Primary data values
+			{ "ApproachUntilMembersInRange", INI::parseBool, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_approachUntilMembersInRange ) },
+			{ "AttributeModifierDuration", INI::parseDurationUnsignedInt, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_attributeModifierDuration ) },
+			{ "ChargeAttackSpeedBoost", INI::parseBool, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_chargeAttackSpeedBoost ) },
+			{ "ContactPointOverride", INI::parseAsciiString, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_contactPointOverride ) },
+			{ "CustomAnimAndDuration", SpecialPowerAnimation::parse, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_customAnimAndDuration ) },
+			{ "EffectRange", INI::parseReal, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_effectRange ) },
+			{ "GrabPassengerAnimAndDuration", SpecialPowerAnimation::parse, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_grabPassengerAnimAndDuration ) },
+			{ "GrabPassengerHealGainPercent", INI::parsePercentToReal, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_grabPassengerHealGainPercent ) },
+			{ "IgnoreFacingCheck", INI::parseBool, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_ignoreFacingCheck ) },
+			{ "Instant", INI::parseBool, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_instant ) },
+			{ "KillAttributeModifierOnExit", INI::parseBool, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_killAttributeModifierOnExit ) },
+			{ "KillAttributeModifierOnRejected", INI::parseBool, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_killAttributeModifierOnRejected ) },
+			{ "MustFinishAbility", INI::parseBool, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_mustFinishAbility ) },
+			{ "PersistentCount", INI::parseInt, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_persistentCount ) },
+			{ "RejectedConditions", INI::parseBitString32, abilityConditions, offsetof( SpecialAbilityUpdateModuleData, m_rejectedConditions ) },
+			{ "RequiredConditions", INI::parseBitString32, abilityConditions, offsetof( SpecialAbilityUpdateModuleData, m_requiredConditions ) },
+			{ "TriggerAttributeModifier", INI::parseAsciiString, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_triggerAttributeModifier ) },
+			{ "UnpackingVariation", INI::parseInt, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_unpackingVariation ) },
+			{ "FreezeAfterTriggerDuration", INI::parseDurationUnsignedInt, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_freezeAfterTriggerDuration ) },
+			{ "DisableWhenWearingTheRing", INI::parseBool, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_disableWhenWearingTheRing ) },
+			{ "NeedCollisionBeforeTrigger", INI::parseBool, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_needCollisionBeforeTrigger ) },
+			{ "SuppressForHordes", INI::parseBool, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_suppressForHordes ) },
+			{ "ChainedButton", INI::parseAsciiString, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_chainedButton ) },
+			{ "TriggerModelCondition", parseSpecialPowerModelCondition, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_triggerModelCondition ) },
+			{ "TriggerModelConditionDuration", INI::parseReal, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_triggerModelConditionDuration ) },
+			{ "ActiveLoopSound", INI::parseAsciiString, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_activeLoopSound ) },
+			{ "ParalyzeDurationWhenCompleted", INI::parseDurationUnsignedInt, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_paralyzeDurationWhenCompleted ) },
+			{ "ParalyzeDurationWhenAborted", INI::parseDurationUnsignedInt, nullptr, offsetof( SpecialAbilityUpdateModuleData, m_paralyzeDurationWhenAborted ) },
 			{ "SpecialPowerTemplate",				INI::parseSpecialPowerTemplate,		nullptr, offsetof( SpecialAbilityUpdateModuleData, m_specialPowerTemplate ) },
 			{ "StartAbilityRange",					INI::parseReal,										nullptr, offsetof( SpecialAbilityUpdateModuleData, m_startAbilityRange ) },
 			{ "AbilityAbortRange",					INI::parseReal,										nullptr, offsetof( SpecialAbilityUpdateModuleData, m_abilityAbortRange ) },

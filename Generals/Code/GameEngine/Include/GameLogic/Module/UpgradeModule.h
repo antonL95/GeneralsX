@@ -70,6 +70,7 @@ public:
 	mutable UpgradeMaskType						m_activationMask;				///< Activation only supports a single name currently
 	mutable UpgradeMaskType						m_conflictingMask;			///< Conflicts support multiple listings, and they are an OR
 	mutable Bool											m_requiresAllTriggers;
+	Bool m_permanent = FALSE;
 
 	UpgradeMuxData()
 	{
@@ -87,6 +88,7 @@ public:
 			{ "ConflictsWith",	INI::parseAsciiStringVector, nullptr, offsetof( UpgradeMuxData, m_conflictingUpgradeNames ) },
 			{ "FXListUpgrade",	INI::parseFXList, nullptr, offsetof( UpgradeMuxData, m_fxListUpgrade ) },
 			{ "RequiresAllTriggers", INI::parseBool, nullptr, offsetof( UpgradeMuxData, m_requiresAllTriggers ) },
+			{ "Permanent", INI::parseBool, nullptr, offsetof( UpgradeMuxData, m_permanent ) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		return dataFieldParse;

@@ -102,6 +102,8 @@ static void parseOCLUpgradePair( INI* ini, void * /*instance*/, void *store, con
 		{ "CreateLocation", INI::parseIndexList, TheOCLCreateLocTypeNames, offsetof( OCLSpecialPowerModuleData, m_createLoc ) },
 		{ "ReferenceObject", INI::parseAsciiString, nullptr, offsetof( OCLSpecialPowerModuleData, m_referenceThingName ) },
 		{ "OCLAdjustPositionToPassable", INI::parseBool, nullptr, offsetof( OCLSpecialPowerModuleData, m_isOCLAdjustPositionToPassable ) },
+		{ "NearestSecondaryObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( OCLSpecialPowerModuleData, m_nearestSecondaryObjectFilter ) },
+		{ "UpgradeName", INI::parseAsciiString, nullptr, offsetof( OCLSpecialPowerModuleData, m_upgradeName ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);

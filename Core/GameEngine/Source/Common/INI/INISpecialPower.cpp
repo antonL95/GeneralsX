@@ -31,7 +31,63 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/INI.h"
+#include "Common/ModelState.h"
 #include "Common/SpecialPower.h"
+#include "Common/SpecialPowerINI.h"
+
+void SpecialPowerObjectFilter::parse(INI* ini, void*, void* store, const void*)
+{
+	static const char* const rules[] =
+	{
+		"SELF", "ALLIES", "ENEMIES", "NEUTRALS", "SUICIDE", "NOT_SIMILAR", "NOT_AIRBORNE",
+		"PROJECTILES", "SAME_HEIGHT_ONLY", "MINES", "ALL", "ANY", "NONE", "SAME_PLAYER", nullptr
+	};
+	SpecialPowerObjectFilter filter;
+	for (const char* token = ini->getNextToken(); token; token = ini->getNextTokenOrNull())
+	{
+		if (token[0] == '+' || token[0] == '-')
+		{
+			if (!token[1])
+				throw INI_INVALID_DATA;
+			const Bool include = token[0] == '+';
+			const char* name = token + 1;
+			const char* const* kinds = KindOfMaskType::getBitNames();
+			Int index = 0;
+			while (kinds[index] && stricmp(name, kinds[index]) != 0)
+				++index;
+			if (kinds[index])
+				(include ? filter.m_includeKinds : filter.m_excludeKinds).set(index);
+			else
+				(include ? filter.m_includeObjects : filter.m_excludeObjects).emplace_back(name);
+		}
+		else
+		{
+			const char* rule = stricmp(token, "NEUTRAL") == 0 ? "NEUTRALS" : token;
+			filter.m_rules |= 1u << INI::scanIndexList(rule, rules);
+		}
+	}
+	*static_cast<SpecialPowerObjectFilter*>(store) = std::move(filter);
+}
+
+void SpecialPowerAnimation::parse(INI* ini, void*, void* store, const void*)
+{
+	SpecialPowerAnimation anim;
+	anim.m_condition = INI::scanIndexList(ini->getNextSubToken("AnimState"), ModelConditionFlags::getBitNames());
+	anim.m_duration = INI::scanUnsignedInt(ini->getNextSubToken("AnimTime"));
+	if (const char* token = ini->getNextTokenOrNull(ini->getSepsColon()))
+	{
+		if (stricmp(token, "TriggerTime") != 0)
+			throw INI_INVALID_DATA;
+		anim.m_triggerTime = INI::scanUnsignedInt(ini->getNextToken(ini->getSepsColon()));
+	}
+	*static_cast<SpecialPowerAnimation*>(store) = anim;
+}
+
+void parseSpecialPowerModelCondition(INI* ini, void*, void* store, const void*)
+{
+	*static_cast<Int*>(store) =
+		INI::scanIndexList(ini->getNextSubToken("ModelConditionState"), ModelConditionFlags::getBitNames());
+}
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------

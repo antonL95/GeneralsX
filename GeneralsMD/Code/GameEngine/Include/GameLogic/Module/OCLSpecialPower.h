@@ -81,6 +81,9 @@ public:
 	OCLSpecialPowerModuleData();
 	static void buildFieldParse(MultiIniFieldParse& p);
 
+	SpecialPowerObjectFilter m_nearestSecondaryObjectFilter;
+	AsciiString m_upgradeName;
+
 };
 
 //-------------------------------------------------------------------------------------------------

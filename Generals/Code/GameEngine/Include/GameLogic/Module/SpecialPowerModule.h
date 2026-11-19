@@ -33,6 +33,7 @@
 #include "Common/AudioEventRTS.h"
 #include "Common/Module.h"
 #include "GameLogic/Module/BehaviorModule.h"
+#include "Common/SpecialPowerINI.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Object;
@@ -86,6 +87,33 @@ public:
 	Bool							m_startsPaused; ///< Paused on creation, someone else will have to unpause (like upgrade module, or script)
 	Bool							m_startsReady; ///< If true, the special power will be ready immediately, otherwise it will have a reload time on creation.
 	Bool							m_scriptedSpecialPowerOnly;
+
+	Bool m_affectAllies = FALSE;
+	Int m_antiCategory = 0;
+	AsciiString m_attributeModifier;
+	SpecialPowerObjectFilter m_attributeModifierAffects;
+	Bool m_attributeModifierAffectsSelf = FALSE;
+	AsciiString m_attributeModifierFX;
+	Real m_attributeModifierRange = 0;
+	Bool m_attributeModifierWeatherBased = FALSE;
+	Bool m_availableAtStart = FALSE;
+	Int m_changeWeather = 0;
+	Bool m_disableDuringAnimDuration = FALSE;
+	Real m_distanceFromCommandCenter = 0;
+	Int m_giveLevels = 0;
+	Bool m_idleWhenStartingPower = FALSE;
+	AsciiString m_initiateFX;
+	std::vector<AsciiString> m_onTriggerRechargeSpecialPower;
+	Bool m_reEnableAntiCategory = FALSE;
+	SpecialPowerObjectFilter m_requirementsFilterMPSkirmish;
+	SpecialPowerObjectFilter m_requirementsFilterStrategic;
+	Int m_setModelCondition = -1;
+	Real m_setModelConditionTime = 0;
+	Bool m_targetAllSides = FALSE;
+	Bool m_targetEnemy = FALSE;
+	AsciiString m_triggerFX;
+	Bool m_useDistanceFromCommandCenter = FALSE;
+	UnsignedInt m_weatherDuration = 0;
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -94,10 +122,16 @@ class SpecialPowerModule : public BehaviorModule,
 													 public SpecialPowerModuleInterface
 {
 
-	MEMORY_POOL_GLUE_ABC( SpecialPowerModule )
-	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( SpecialPowerModule, SpecialPowerModuleData )
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( SpecialPowerModule, "SpecialPowerModule" )
+	MAKE_STANDARD_MODULE_MACRO( SpecialPowerModule )
+
+	const SpecialPowerModuleData* getSpecialPowerModuleData() const
+	{
+		return static_cast<const SpecialPowerModuleData*>(getModuleData());
+	}
 
 public:
+	static ModuleData* friend_newModuleData(INI* ini);
 
 	SpecialPowerModule( Thing* thing, const ModuleData* moduleData );
 

@@ -50,6 +50,8 @@ public:
 
 	const SpecialPowerTemplate *m_specialPower;
 
+	Bool m_obeyRechargeOnTrigger = FALSE;
+
 };
 
 //-------------------------------------------------------------------------------------------------

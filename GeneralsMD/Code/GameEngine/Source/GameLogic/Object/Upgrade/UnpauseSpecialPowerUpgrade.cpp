@@ -54,6 +54,7 @@ UnpauseSpecialPowerUpgradeModuleData::UnpauseSpecialPowerUpgradeModuleData()
 	static const FieldParse dataFieldParse[] =
 	{
 		{ "SpecialPowerTemplate", INI::parseSpecialPowerTemplate, nullptr, offsetof( UnpauseSpecialPowerUpgradeModuleData, m_specialPower ) },
+		{ "ObeyRechageOnTrigger", INI::parseBool, nullptr, offsetof( UnpauseSpecialPowerUpgradeModuleData, m_obeyRechargeOnTrigger ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
