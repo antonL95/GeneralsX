@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Lib/BaseType.h"
 
@@ -139,6 +142,35 @@ enum ThingTemplateAudioType CPP_11(: Int)
 	TTAUDIO_voiceAttackSpecial,				///< Unit is ordered to use a special attack
 	TTAUDIO_voiceAttackAir,						///< Unit is ordered to attack an airborne unit
 	TTAUDIO_voiceGuard,								///< Unit is ordered to guard an area
+
+	TTAUDIO_soundAmbientBattle,
+	TTAUDIO_soundCrushing,
+	TTAUDIO_soundImpact,
+	TTAUDIO_soundImpactCyclonic,
+	TTAUDIO_voiceAlert,
+	TTAUDIO_voiceAttackCharge,
+	TTAUDIO_voiceAttackMachine,
+	TTAUDIO_voiceAttackStructure,
+	TTAUDIO_voiceCombineWithHorde,
+	TTAUDIO_voiceEnterStateAttack,
+	TTAUDIO_voiceEnterStateAttackAir,
+	TTAUDIO_voiceEnterStateAttackCharge,
+	TTAUDIO_voiceEnterStateAttackMachine,
+	TTAUDIO_voiceEnterStateAttackStructure,
+	TTAUDIO_voiceEnterStateMove,
+	TTAUDIO_voiceEnterStateMoveOverWalls,
+	TTAUDIO_voiceEnterStateMoveToCamp,
+	TTAUDIO_voiceEnterStateMoveToHigherGround,
+	TTAUDIO_voiceEnterStateMoveWhileAttacking,
+	TTAUDIO_voiceEnterStateRetreatToCastle,
+	TTAUDIO_voiceFullyCreated,
+	TTAUDIO_voiceMoveOverWalls,
+	TTAUDIO_voiceMoveToCamp,
+	TTAUDIO_voiceMoveToHigherGround,
+	TTAUDIO_voiceMoveWhileAttacking,
+	TTAUDIO_voiceRetreatToCastle,
+	TTAUDIO_voiceSelectBattle,
+	TTAUDIO_voiceSelectUnderConstruction,
 
 	TTAUDIO_COUNT
 };
@@ -359,9 +391,192 @@ private:
 #endif
 
 public:
+	struct GeometryDetails
+	{
+		AsciiString name;
+		Coord3D offset{};
+		Bool active = TRUE;
+		Bool usedForHealthBox = TRUE;
+	};
 
+	struct AdditionalGeometry
+	{
+		GeometryInfo shape{GEOMETRY_SPHERE, FALSE, 1, 1, 1};
+		GeometryDetails details;
+	};
+
+	struct OtherGeometry
+	{
+		GeometryInfo shape{GEOMETRY_SPHERE, FALSE, 1, 1, 1};
+		Real offsetX = 0;
+	};
+
+	struct ContactPoint
+	{
+		Coord3D position{};
+		UnsignedInt flags = 0;
+	};
+
+	struct AutoResolveReference
+	{
+		AsciiString name;
+		std::vector<AsciiString> requiredUpgrades;
+		std::vector<AsciiString> excludedUpgrades;
+	};
+
+	struct FormationDecal
+	{
+		AsciiString texture;
+		Int width = 0;
+		Int height = 0;
+	};
+
+	struct Flammability
+	{
+		Int fuel = 0;
+		Int maxBurnRate = 0;
+		Int decay = 0;
+		Int resistance = 0;
+		Real fuelFactor = 0;
+	};
+
+	struct ThreatBreakdown
+	{
+		AsciiString tag;
+		Int aiKindOf = -1;
+	};
+
+	struct RotWKLocomotorSet
+	{
+		AsciiString condition;
+		AsciiString locomotor;
+		Real speed = 0;
+	};
+
+	struct ClientBehavior
+	{
+		AsciiString name;
+		AsciiString tag;
+		std::string iniBody;
+	};
+
+	struct RotWKObjectData
+	{
+		Int voicePriority = 0;
+		Int evaEventSecondDamageFarFromFirstTimeoutMS = 0;
+		Int commandPoints = 0;
+		Int bountyValue = 0;
+		Int formationWidth = 0;
+		Int formationDepth = 0;
+		Int campnessValue = 0;
+		Int heroSortOrder = 0;
+		Int commandPointBonus = 0;
+		Int selectionPriority = 0;
+		Int shadowOpacityStart = 0;
+		Int shadowOpacityPeak = 0;
+		Int shadowOpacityEnd = 0;
+		Int displayMeleeDamage = 0;
+		Int displayRangedDamage = 0;
+		Int supplyOverride = 0;
+		Real threatLevel = 0;
+		Real visionBonusTestRadius = 0;
+		Real evaEventSecondDamageFarFromFirstScanRange = 0;
+		Real emotionRange = 0;
+		Real crushKnockback = 0;
+		Real crushZFactor = 0;
+		Real pathfindDiameter = 0;
+		Real camouflageDetectionMultiplier = 1.0f;
+		Real buildFadeInOnCreateTime = 0;
+		Real ramPower = 0;
+		Real ramZMult = 1.0f;
+		Real healthBoxHeightOffset = 0;
+		Real minZIncreaseForVoiceMoveToHigherGround = 0;
+		Real healthBoxScale = 1.0f;
+		Real shadowOpacityFadeOutTime = 0;
+		Real shadowOpacityFadeInTime = 0;
+		Real liveCameraPitch = 0;
+		Real shadowSunAngle = 0;
+		Real shadowMaxHeight = 0;
+		Real campnessValueRadius = 0;
+		Real removeTerrainRadius = 0;
+		Real shockwaveResistance = 0;
+		Real visionBonusPercentPerFoot = 0;
+		Real visionRear = 1.0f;
+		Real visionSide = 1.0f;
+		Real maxVisionBonusPercent = 0;
+		Real crushDecelerationPercent = 0;
+		Real minCrushVelocityPercent = 0;
+		Bool keepSelectableWhenDead = FALSE;
+		Bool useCrushAttack = FALSE;
+		Bool crushOnlyWhileCharging = FALSE;
+		Bool forceLuaRegistration = FALSE;
+		Bool isAutoBuilt = FALSE;
+		Bool showHealthInSelectionDecal = FALSE;
+		Bool isGrabbable = FALSE;
+		Bool isHarvestable = FALSE;
+		Bool canPathThroughGates = FALSE;
+		Bool shadowOverrideLODVisibility = FALSE;
+		Bool crushAllies = FALSE;
+		AsciiString evaEventDamagedOwner;
+		AsciiString evaEnemyObjectSightedEvent;
+		AsciiString evaEventSecondDamageFarFromFirstOwner;
+		AsciiString evaEventDamagedFromShroudedSourceOwner;
+		AsciiString evaEventDamagedByFireOwner;
+		AsciiString evaEventAmbushed;
+		AsciiString evaEventDieOwner;
+		AsciiString evaEventDieAlly;
+		AsciiString evaEventDieEnemy;
+		AsciiString evaOnFirstSightingEventNonEnemy;
+		AsciiString evaOnFirstSightingEventEnemy;
+		AsciiString evaEnemyObjectSightedAfterRespawnEvent;
+		AsciiString evaEventDetectedOwner;
+		AsciiString evaEventDetectedEnemy;
+		AsciiString evaEventDetectedAlly;
+		AsciiString descriptionStrategic;
+		AsciiString crowdResponseKey;
+		AsciiString displayNameStrategic;
+		AsciiString description;
+		AsciiString crushWeapon;
+		AsciiString hotkey;
+		AsciiString crushRevengeWeapon;
+		AsciiString recruitText;
+		AsciiString reviveText;
+		AsciiString displayNameInvisibleForEnemy;
+		AsciiString experienceScalarTable;
+		AsciiString autoResolveUnitType;
+		AsciiString autoResolveCombatChain;
+		AsciiString autoResolveBody;
+		AsciiString autoResolveLeadership;
+		std::vector<AsciiString> worldMapArmoryUpgradesAllowed;
+		std::vector<AsciiString> equivalentTo;
+		std::vector<AsciiString> buildFadeInOnCreateList;
+		std::vector<AsciiString> browser;
+		Int mountedCrusherLevel = 0;
+		Int mountedCrushableLevel = 0;
+		Coord3D liveCameraOffset{};
+		Coord2D geometryRotationAnchorOffset{};
+		Real geometryFrontAngle = 0;
+		Byte thingClass = 0;
+		Byte deadCollideSize = -1;
+		GeometryDetails primaryGeometry;
+		std::vector<AdditionalGeometry> additionalGeometries;
+		std::vector<OtherGeometry> otherGeometries;
+		std::vector<ContactPoint> geometryContactPoints;
+		std::vector<ContactPoint> attackContactPoints;
+		std::vector<AutoResolveReference> autoResolveArmor;
+		std::vector<AutoResolveReference> autoResolveWeapon;
+		std::vector<ThreatBreakdown> threatBreakdowns;
+		FormationDecal formationPreviewDecal;
+		FormationDecal formationPreviewItemDecal;
+		Flammability flammability;
+		std::vector<RotWKLocomotorSet> locomotorSets;
+		std::vector<ClientBehavior> clientBehaviors;
+	};
 
 	ThingTemplate();
+
+	const RotWKObjectData& getRotWKObjectData() const { return m_rotwk; }
+	void parseObjectFields(INI* ini, Bool isChild);
 
 	// copy the guts of that into this, but preserve this' name, id, and list-links.
 	void copyFrom(const ThingTemplate* that);
@@ -598,7 +813,6 @@ public:
 
 	/// get us the table to parse the fields for thing templates
 	const FieldParse* getFieldParse() const { return s_objectFieldParseTable; }
-	const FieldParse* getReskinFieldParse() const { return s_objectReskinFieldParseTable; }
 
 	Bool isBuildFacility() const { return m_isBuildFacility; }
 	Real getPlacementViewAngle() const { return m_placementViewAngle; }
@@ -652,6 +866,20 @@ protected:
 	static void parseModuleName(INI* ini, void *instance, void* /*store*/, const void* userData);
 	static void parseIntList(INI* ini, void *instance, void* store, const void* userData);
 
+	static void parsePrimaryGeometry(INI* ini, void* instance, void* store, const void* userData);
+	static void parseAdditionalGeometry(INI* ini, void* instance, void* store, const void* userData);
+	static void parseGeometrySize(INI* ini, void* instance, void* store, const void* userData);
+	static void parseGeometryDetail(INI* ini, void* instance, void* store, const void* userData);
+	static void parseOtherGeometry(INI* ini, void* instance, void* store, const void* userData);
+	static void parseContactPoint(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotWKBlock(INI* ini, void* instance, void* store, const void* userData);
+	static void parseAutoResolve(INI* ini, void* instance, void* store, const void* userData);
+	static void parseThreatBreakdown(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotWKLocomotorSet(INI* ini, void* instance, void* store, const void* userData);
+	static void parseClientBehavior(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotWKAudio(INI* ini, void* instance, void* store, const void* userData);
+	static void parseCrushableLevel(INI* ini, void* instance, void* store, const void* userData);
+
 	static void parsePerUnitSounds(INI* ini, void *instance, void* store, const void* userData);
 	static void parsePerUnitFX(INI* ini, void *instance, void* store, const void* userData);
 
@@ -667,7 +895,6 @@ protected:
 
 private:
 	static const FieldParse s_objectFieldParseTable[];		///< the parse table
-	static const FieldParse s_objectReskinFieldParseTable[];		///< the parse table
 	static AudioEventRTS s_audioEventNoSound;
 
 private:
@@ -780,7 +1007,8 @@ private:
 	UnsignedByte	m_crusherLevel;							///< crusher > crushable level to actually crush
 	UnsignedByte	m_crushableLevel;						///< Specifies the level of crushability (must be hit by a crusher greater than this to crush me).
 
-
+	RotWKObjectData m_rotwk;
+	Bool m_parsingAdditionalGeometry = FALSE;
 };
 
 //-----------------------------------------------------------------------------

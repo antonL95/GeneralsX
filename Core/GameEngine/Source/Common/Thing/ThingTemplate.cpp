@@ -109,28 +109,85 @@ static void parseKindOfFromINI(INI* ini, void* instance, void *store, const void
 #endif
 }
 
-/*
-	NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem!
+namespace
+{
+using Template = ThingTemplate;
 
-	"s_objectReskinFieldParseTable" is intended to be used for parsing the "ObjectReskin" keyword, and
-	should only allow you to specify things that affect the appearance of a template.
+const char* const thingClassNames[] = {
+	"UNSPECIFIED", "HORDE_UNIT", "CHARACTER_UNIT", "CAVALRY_UNIT", "MEDIUM_MONSTER", "LARGE_MONSTER",
+	"PROP", "CIV_BUILDING", "WALL_PIECE", "FACTION_BUILDING", "LANDMARK_BUILDING", "GROUND_COVER",
+	"BUSH", "TREE", "MACHINE", "BUFF", nullptr
+};
+const char* const deadCollideSizeNames[] = { "SMALL", "MEDIUM", "LARGE", nullptr };
+const char* const aiKindOfNames[] = {
+	"INFANTRY", "ARCHER", "PIKEMAN", "CAVALRY", "CREEP", "CREEP_STRUCTURE", "STRUCTURE", "SIEGEWEAPON",
+	"SLAYER", "WALL", "HERO", "BATTLE_TOWER", "SHIP_BATTLESHIP", "SHIP_BOMBARD", "MONSTER", "FLYERS",
+	"PATROL", "SPAM", nullptr
+};
+const char* const contactPointNames[] = { "Repair", "Swoop", "Grab", "Ram", "Bomb", "Menu", nullptr };
+const char* const clientBehaviorNames[] = {
+	"AnimationSoundClientBehavior", "ModelConditionAudioLoopClientBehavior",
+	"ModelConditionSoundSelectorClientBehavior", "RandomSoundSelectorClientBehavior",
+	"TerrainResourceClientBehavior", "UpgradeSoundSelectorClientBehavior", nullptr
+};
+const char* const clientBehaviorBlocks[] = { "SoundState", "SoundUpgrade", "UnitSpecificSounds", nullptr };
 
-	The idea is that some units are functionally the same, but different visually; rather than replicate
-	all the settings, you can specify it as "this one is like that one, but looks different".
+const INIFieldParseProc geometryMajorRadius = GeometryInfo::parseGeometryMajorRadius;
+const INIFieldParseProc geometryMinorRadius = GeometryInfo::parseGeometryMinorRadius;
+const INIFieldParseProc geometryHeight = GeometryInfo::parseGeometryHeight;
+const INIFieldParseProc geometryIsSmall = GeometryInfo::parseGeometryIsSmall;
 
-	Thus, currently, the only things in the reskin table are:
+const FieldParse geometryNameField = {
+	"GeometryName", INI::parseQuotedAsciiString, nullptr, offsetof(Template::GeometryDetails, name)
+};
+const FieldParse geometryOffsetField = {
+	"GeometryOffset", INI::parseCoord3D, nullptr, offsetof(Template::GeometryDetails, offset)
+};
+const FieldParse geometryActiveField = {
+	"GeometryActive", INI::parseBool, nullptr, offsetof(Template::GeometryDetails, active)
+};
+const FieldParse geometryHealthBoxField = {
+	"GeometryUsedForHealthBox", INI::parseBool, nullptr, offsetof(Template::GeometryDetails, usedForHealthBox)
+};
 
-		-- DrawModules
-		-- DrawModuleData
-		-- Geometry
+const FieldParse autoResolveArmorFields[] = {
+	{ "Armor", INI::parseAsciiString, nullptr, offsetof(Template::AutoResolveReference, name) },
+	{ "RequiredUpgrades", INI::parseAsciiStringVector, nullptr, offsetof(Template::AutoResolveReference, requiredUpgrades) },
+	{ "ExcludedUpgrades", INI::parseAsciiStringVector, nullptr, offsetof(Template::AutoResolveReference, excludedUpgrades) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+const FieldParse autoResolveWeaponFields[] = {
+	{ "Weapon", INI::parseAsciiString, nullptr, offsetof(Template::AutoResolveReference, name) },
+	{ "RequiredUpgrades", INI::parseAsciiStringVector, nullptr, offsetof(Template::AutoResolveReference, requiredUpgrades) },
+	{ "ExcludedUpgrades", INI::parseAsciiStringVector, nullptr, offsetof(Template::AutoResolveReference, excludedUpgrades) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+const FieldParse decalFields[] = {
+	{ "Texture", INI::parseAsciiString, nullptr, offsetof(Template::FormationDecal, texture) },
+	{ "Width", INI::parseInt, nullptr, offsetof(Template::FormationDecal, width) },
+	{ "Height", INI::parseInt, nullptr, offsetof(Template::FormationDecal, height) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+const FieldParse flammabilityFields[] = {
+	{ "Fuel", INI::parseInt, nullptr, offsetof(Template::Flammability, fuel) },
+	{ "MaxBurnRate", INI::parseInt, nullptr, offsetof(Template::Flammability, maxBurnRate) },
+	{ "Decay", INI::parseInt, nullptr, offsetof(Template::Flammability, decay) },
+	{ "Resistance", INI::parseInt, nullptr, offsetof(Template::Flammability, resistance) },
+	{ "FuelFactor", INI::parseReal, nullptr, offsetof(Template::Flammability, fuelFactor) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+const FieldParse threatBreakdownFields[] = {
+	{ "AIKindOf", INI::parseIndexList, aiKindOfNames, offsetof(Template::ThreatBreakdown, aiKindOf) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+const FieldParse locomotorSetFields[] = {
+	{ "Condition", INI::parseAsciiString, nullptr, offsetof(Template::RotWKLocomotorSet, condition) },
+	{ "Locomotor", INI::parseAsciiString, nullptr, offsetof(Template::RotWKLocomotorSet, locomotor) },
+	{ "Speed", INI::parseReal, nullptr, offsetof(Template::RotWKLocomotorSet, speed) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+}
 
-	So: if you add/remove/modify any settings that deal with visual appearance, you *may* want to
-	add 'em to the reskin table... but do so VERY CAUTIOUSLY and with careful deliberation (and
-	after checking around for other opinions).
-
-*/
-
-// NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
 const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 {
 	{ "DisplayName",					INI::parseAndTranslateLabel,					nullptr,								offsetof( ThingTemplate, m_displayName ) },
@@ -159,7 +216,6 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 
 	{ "Side",									INI::parseAsciiString,								nullptr,	offsetof( ThingTemplate, m_defaultOwningSide ) },
 
-// NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
 	{ "Prerequisites",				ThingTemplate::parsePrerequisites,	nullptr, 0 },
 	{ "Buildable",						INI::parseByteSizedIndexList,				BuildableStatusNames, offsetof( ThingTemplate, m_buildable) },
 	{ "BuildCost",						INI::parseUnsignedShort,						nullptr,		offsetof( ThingTemplate, m_buildCost ) },
@@ -176,12 +232,10 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "CommandSet",						INI::parseAsciiString,							nullptr,		offsetof( ThingTemplate, m_commandSetString ) },
 	{ "BuildVariations",			INI::parseAsciiStringVector,				nullptr,		offsetof( ThingTemplate, m_buildVariations ) },
 
-// NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
 	{ "Behavior",							ThingTemplate::parseModuleName,		(const void*)MODULETYPE_BEHAVIOR, offsetof(ThingTemplate, m_behaviorModuleInfo) },
 	{ "Body",									ThingTemplate::parseModuleName,		(const void*)999, offsetof(ThingTemplate, m_behaviorModuleInfo) },
 	{ "Draw",									ThingTemplate::parseModuleName,		(const void*)MODULETYPE_DRAW, offsetof(ThingTemplate, m_drawModuleInfo) },
 	{ "ClientUpdate",					ThingTemplate::parseModuleName,		(const void*)MODULETYPE_CLIENT_UPDATE, offsetof(ThingTemplate, m_clientUpdateModuleInfo) },
-// NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
 
 	{ "SelectPortrait",					INI::parseAsciiString,	nullptr,		offsetof( ThingTemplate, m_selectedPortraitImageName ) },
 	{ "ButtonImage",						INI::parseAsciiString,	nullptr,		offsetof( ThingTemplate, m_buttonImageName ) },
@@ -198,7 +252,6 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "UpgradeCameo4",		INI::parseAsciiString,	nullptr,		offsetof( ThingTemplate, m_upgradeCameoUpgradeNames[ 3 ] ) },
 	{ "UpgradeCameo5",		INI::parseAsciiString,	nullptr,		offsetof( ThingTemplate, m_upgradeCameoUpgradeNames[ 4 ] ) },
 
-// NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
 
 	{ "VoiceSelect",					INI::parseDynamicAudioEventRTS,	nullptr,		offsetof( ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceSelect]) },
 	{ "VoiceGroupSelect",			INI::parseDynamicAudioEventRTS,	nullptr,		offsetof( ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceGroupSelect]) },
@@ -248,11 +301,11 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "UnitSpecificSounds",		ThingTemplate::parsePerUnitSounds, nullptr, offsetof(ThingTemplate, m_perUnitSounds) },
 	{ "UnitSpecificFX",				ThingTemplate::parsePerUnitFX, nullptr, offsetof(ThingTemplate, m_perUnitFX) },
 	{ "Scale",								INI::parseReal,						nullptr,		offsetof( ThingTemplate, m_assetScale ) },
-	{ "Geometry",							GeometryInfo::parseGeometryType,				nullptr,  offsetof( ThingTemplate, m_geometryInfo ) },
-	{ "GeometryMajorRadius",	GeometryInfo::parseGeometryMajorRadius,	nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
-	{ "GeometryMinorRadius",	GeometryInfo::parseGeometryMinorRadius,	nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
-	{ "GeometryHeight",				GeometryInfo::parseGeometryHeight,			nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
-	{ "GeometryIsSmall",			GeometryInfo::parseGeometryIsSmall,			nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
+	{ "Geometry", parsePrimaryGeometry, nullptr, offsetof(ThingTemplate, m_geometryInfo) },
+	{ "GeometryMajorRadius", parseGeometrySize, &geometryMajorRadius, offsetof(ThingTemplate, m_geometryInfo) },
+	{ "GeometryMinorRadius", parseGeometrySize, &geometryMinorRadius, offsetof(ThingTemplate, m_geometryInfo) },
+	{ "GeometryHeight", parseGeometrySize, &geometryHeight, offsetof(ThingTemplate, m_geometryInfo) },
+	{ "GeometryIsSmall", parseGeometrySize, &geometryIsSmall, offsetof(ThingTemplate, m_geometryInfo) },
 	{ "Shadow",								INI::parseBitString32,		TheShadowNames,		offsetof( ThingTemplate, m_shadowType ) },
 	{ "ShadowSizeX",					INI::parseReal,						nullptr,	offsetof( ThingTemplate, m_shadowSizeX ) },
 	{ "ShadowSizeY",					INI::parseReal,						nullptr,	offsetof( ThingTemplate, m_shadowSizeY ) },
@@ -273,35 +326,305 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "ThreatValue",						INI::parseUnsignedShort,		nullptr, offsetof(ThingTemplate, m_threatValue ) },
   { "MaxSimultaneousOfType",	ThingTemplate::parseMaxSimultaneous,		nullptr, offsetof(ThingTemplate, m_maxSimultaneousOfType ) },
   { "MaxSimultaneousLinkKey",	NameKeyGenerator::parseStringAsNameKeyType,		nullptr, offsetof(ThingTemplate, m_maxSimultaneousLinkKey ) }, // Added in Zero Hour
-	{ "CrusherLevel",					INI::parseUnsignedByte,			nullptr, offsetof( ThingTemplate, m_crusherLevel ) },
-	{ "CrushableLevel",				INI::parseUnsignedByte,			nullptr, offsetof( ThingTemplate, m_crushableLevel ) },
+	{ "CrusherLevel", INI::parseUnsignedByte, nullptr, offsetof(ThingTemplate, m_crusherLevel) },
+	{ "CrushableLevel", parseCrushableLevel, nullptr, offsetof(ThingTemplate, m_crushableLevel) },
+
+	{ "AdditionalGeometry", parseAdditionalGeometry, nullptr, 0 },
+	{ "AttackContactPoint", parseContactPoint, nullptr, offsetof(ThingTemplate, m_rotwk.attackContactPoints) },
+	{ "AutoResolveArmor", parseAutoResolve, autoResolveArmorFields, offsetof(ThingTemplate, m_rotwk.autoResolveArmor) },
+	{ "AutoResolveBody", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.autoResolveBody) },
+	{ "AutoResolveCombatChain", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.autoResolveCombatChain) },
+	{ "AutoResolveLeadership", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.autoResolveLeadership) },
+	{ "AutoResolveUnitType", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.autoResolveUnitType) },
+	{ "AutoResolveWeapon", parseAutoResolve, autoResolveWeaponFields, offsetof(ThingTemplate, m_rotwk.autoResolveWeapon) },
+	{ "BountyValue", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.bountyValue) },
+	{ "Browser", INI::parseAsciiStringVector, nullptr, offsetof(ThingTemplate, m_rotwk.browser) },
+	{ "BuildFadeInOnCreateList", INI::parseAsciiStringVector, nullptr, offsetof(ThingTemplate, m_rotwk.buildFadeInOnCreateList) },
+	{ "BuildFadeInOnCreateTime", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.buildFadeInOnCreateTime) },
+	{ "CamouflageDetectionMultiplier", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.camouflageDetectionMultiplier) },
+	{ "CampnessValue", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.campnessValue) },
+	{ "CampnessValueRadius", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.campnessValueRadius) },
+	{ "CanPathThroughGates", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.canPathThroughGates) },
+	{ "ClientBehavior", parseClientBehavior, nullptr, 0 },
+	{ "CommandPointBonus", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.commandPointBonus) },
+	{ "CommandPoints", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.commandPoints) },
+	{ "CrowdResponseKey", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.crowdResponseKey) },
+	{ "CrushAllies", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.crushAllies) },
+	{ "CrushDecelerationPercent", INI::parsePercentToReal, nullptr, offsetof(ThingTemplate, m_rotwk.crushDecelerationPercent) },
+	{ "CrushKnockback", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.crushKnockback) },
+	{ "CrushOnlyWhileCharging", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.crushOnlyWhileCharging) },
+	{ "CrushRevengeWeapon", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.crushRevengeWeapon) },
+	{ "CrushWeapon", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.crushWeapon) },
+	{ "CrushZFactor", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.crushZFactor) },
+	{ "DeadCollideSize", INI::parseByteSizedIndexList, deadCollideSizeNames, offsetof(ThingTemplate, m_rotwk.deadCollideSize) },
+	{ "Description", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.description) },
+	{ "DescriptionStrategic", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.descriptionStrategic) },
+	{ "DisplayMeleeDamage", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.displayMeleeDamage) },
+	{ "DisplayNameInvisibleForEnemy", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.displayNameInvisibleForEnemy) },
+	{ "DisplayNameStrategic", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.displayNameStrategic) },
+	{ "DisplayRangedDamage", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.displayRangedDamage) },
+	{ "EmotionRange", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.emotionRange) },
+	{ "EquivalentTo", INI::parseAsciiStringVector, nullptr, offsetof(ThingTemplate, m_rotwk.equivalentTo) },
+	{ "EvaEnemyObjectSightedAfterRespawnEvent", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEnemyObjectSightedAfterRespawnEvent) },
+	{ "EvaEnemyObjectSightedEvent", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEnemyObjectSightedEvent) },
+	{ "EvaEventAmbushed", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventAmbushed) },
+	{ "EvaEventDamagedByFireOwner", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventDamagedByFireOwner) },
+	{ "EvaEventDamagedFromShroudedSourceOwner", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventDamagedFromShroudedSourceOwner) },
+	{ "EvaEventDamagedOwner", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventDamagedOwner) },
+	{ "EvaEventDetectedAlly", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventDetectedAlly) },
+	{ "EvaEventDetectedEnemy", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventDetectedEnemy) },
+	{ "EvaEventDetectedOwner", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventDetectedOwner) },
+	{ "EvaEventDieAlly", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventDieAlly) },
+	{ "EvaEventDieEnemy", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventDieEnemy) },
+	{ "EvaEventDieOwner", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventDieOwner) },
+	{ "EvaEventSecondDamageFarFromFirstOwner", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventSecondDamageFarFromFirstOwner) },
+	{ "EvaEventSecondDamageFarFromFirstScanRange", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventSecondDamageFarFromFirstScanRange) },
+	{ "EvaEventSecondDamageFarFromFirstTimeoutMS", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.evaEventSecondDamageFarFromFirstTimeoutMS) },
+	{ "EvaOnFirstSightingEventEnemy", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaOnFirstSightingEventEnemy) },
+	{ "EvaOnFirstSightingEventNonEnemy", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaOnFirstSightingEventNonEnemy) },
+	{ "ExperienceScalarTable", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.experienceScalarTable) },
+	{ "Flammability", parseRotWKBlock, flammabilityFields, offsetof(ThingTemplate, m_rotwk.flammability) },
+	{ "ForceLuaRegistration", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.forceLuaRegistration) },
+	{ "FormationDepth", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.formationDepth) },
+	{ "FormationPreviewDecal", parseRotWKBlock, decalFields, offsetof(ThingTemplate, m_rotwk.formationPreviewDecal) },
+	{ "FormationPreviewItemDecal", parseRotWKBlock, decalFields, offsetof(ThingTemplate, m_rotwk.formationPreviewItemDecal) },
+	{ "FormationWidth", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.formationWidth) },
+	{ "GeometryActive", parseGeometryDetail, &geometryActiveField, 0 },
+	{ "GeometryContactPoint", parseContactPoint, nullptr, offsetof(ThingTemplate, m_rotwk.geometryContactPoints) },
+	{ "GeometryFrontAngle", INI::parseAngleReal, nullptr, offsetof(ThingTemplate, m_rotwk.geometryFrontAngle) },
+	{ "GeometryName", parseGeometryDetail, &geometryNameField, 0 },
+	{ "GeometryOffset", parseGeometryDetail, &geometryOffsetField, 0 },
+	{ "GeometryOther", parseOtherGeometry, nullptr, offsetof(ThingTemplate, m_rotwk.otherGeometries) },
+	{ "GeometryRotationAnchorOffset", INI::parseCoord2D, nullptr, offsetof(ThingTemplate, m_rotwk.geometryRotationAnchorOffset) },
+	{ "GeometryUsedForHealthBox", parseGeometryDetail, &geometryHealthBoxField, 0 },
+	{ "HealthBoxHeightOffset", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.healthBoxHeightOffset) },
+	{ "HealthBoxScale", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.healthBoxScale) },
+	{ "HeroSortOrder", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.heroSortOrder) },
+	{ "Hotkey", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.hotkey) },
+	{ "IsAutoBuilt", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.isAutoBuilt) },
+	{ "IsGrabbable", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.isGrabbable) },
+	{ "IsHarvestable", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.isHarvestable) },
+	{ "KeepSelectableWhenDead", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.keepSelectableWhenDead) },
+	{ "LiveCameraOffset", INI::parseCoord3D, nullptr, offsetof(ThingTemplate, m_rotwk.liveCameraOffset) },
+	{ "LiveCameraPitch", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.liveCameraPitch) },
+	{ "LocomotorSet", parseRotWKLocomotorSet, nullptr, offsetof(ThingTemplate, m_rotwk.locomotorSets) },
+	{ "MaxVisionBonusPercent", INI::parsePercentToReal, nullptr, offsetof(ThingTemplate, m_rotwk.maxVisionBonusPercent) },
+	{ "MinCrushVelocityPercent", INI::parsePercentToReal, nullptr, offsetof(ThingTemplate, m_rotwk.minCrushVelocityPercent) },
+	{ "MinZIncreaseForVoiceMoveToHigherGround", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.minZIncreaseForVoiceMoveToHigherGround) },
+	{ "MountedCrushableLevel", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.mountedCrushableLevel) },
+	{ "MountedCrusherLevel", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.mountedCrusherLevel) },
+	{ "PathfindDiameter", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.pathfindDiameter) },
+	{ "RamPower", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.ramPower) },
+	{ "RamZMult", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.ramZMult) },
+	{ "RecruitText", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.recruitText) },
+	{ "RemoveTerrainRadius", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.removeTerrainRadius) },
+	{ "ReviveText", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.reviveText) },
+	{ "SelectionPriority", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.selectionPriority) },
+	{ "ShadowMaxHeight", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.shadowMaxHeight) },
+	{ "ShadowOpacityEnd", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.shadowOpacityEnd) },
+	{ "ShadowOpacityFadeInTime", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.shadowOpacityFadeInTime) },
+	{ "ShadowOpacityFadeOutTime", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.shadowOpacityFadeOutTime) },
+	{ "ShadowOpacityPeak", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.shadowOpacityPeak) },
+	{ "ShadowOpacityStart", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.shadowOpacityStart) },
+	{ "ShadowOverrideLODVisibility", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.shadowOverrideLODVisibility) },
+	{ "ShadowSunAngle", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.shadowSunAngle) },
+	{ "ShockwaveResistance", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.shockwaveResistance) },
+	{ "ShowHealthInSelectionDecal", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.showHealthInSelectionDecal) },
+	{ "SoundAmbientBattle", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_soundAmbientBattle]) },
+	{ "SoundCrushing", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_soundCrushing]) },
+	{ "SoundImpact", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_soundImpact]) },
+	{ "SoundImpactCyclonic", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_soundImpactCyclonic]) },
+	{ "SupplyOverride", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.supplyOverride) },
+	{ "ThingClass", INI::parseByteSizedIndexList, thingClassNames, offsetof(ThingTemplate, m_rotwk.thingClass) },
+	{ "ThreatBreakdown", parseThreatBreakdown, nullptr, offsetof(ThingTemplate, m_rotwk.threatBreakdowns) },
+	{ "ThreatLevel", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.threatLevel) },
+	{ "UseCrushAttack", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.useCrushAttack) },
+	{ "VisionBonusPercentPerFoot", INI::parsePercentToReal, nullptr, offsetof(ThingTemplate, m_rotwk.visionBonusPercentPerFoot) },
+	{ "VisionBonusTestRadius", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.visionBonusTestRadius) },
+	{ "VisionRear", INI::parsePercentToReal, nullptr, offsetof(ThingTemplate, m_rotwk.visionRear) },
+	{ "VisionSide", INI::parsePercentToReal, nullptr, offsetof(ThingTemplate, m_rotwk.visionSide) },
+	{ "VoiceAlert", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceAlert]) },
+	{ "VoiceAttackCharge", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceAttackCharge]) },
+	{ "VoiceAttackMachine", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceAttackMachine]) },
+	{ "VoiceAttackStructure", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceAttackStructure]) },
+	{ "VoiceCombineWithHorde", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceCombineWithHorde]) },
+	{ "VoiceEnterStateAttack", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateAttack]) },
+	{ "VoiceEnterStateAttackAir", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateAttackAir]) },
+	{ "VoiceEnterStateAttackCharge", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateAttackCharge]) },
+	{ "VoiceEnterStateAttackMachine", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateAttackMachine]) },
+	{ "VoiceEnterStateAttackStructure", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateAttackStructure]) },
+	{ "VoiceEnterStateMove", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateMove]) },
+	{ "VoiceEnterStateMoveOverWalls", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateMoveOverWalls]) },
+	{ "VoiceEnterStateMoveToCamp", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateMoveToCamp]) },
+	{ "VoiceEnterStateMoveToHigherGround", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateMoveToHigherGround]) },
+	{ "VoiceEnterStateMoveWhileAttacking", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateMoveWhileAttacking]) },
+	{ "VoiceEnterStateRetreatToCastle", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceEnterStateRetreatToCastle]) },
+	{ "VoiceFullyCreated", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceFullyCreated]) },
+	{ "VoiceMoveOverWalls", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceMoveOverWalls]) },
+	{ "VoiceMoveToCamp", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceMoveToCamp]) },
+	{ "VoiceMoveToHigherGround", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceMoveToHigherGround]) },
+	{ "VoiceMoveWhileAttacking", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceMoveWhileAttacking]) },
+	{ "VoicePriority", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.voicePriority) },
+	{ "VoiceRetreatToCastle", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceRetreatToCastle]) },
+	{ "VoiceSelectBattle", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceSelectBattle]) },
+	{ "VoiceSelectUnderConstruction", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceSelectUnderConstruction]) },
+	{ "WorldMapArmoryUpgradesAllowed", INI::parseAsciiStringVector, nullptr, offsetof(ThingTemplate, m_rotwk.worldMapArmoryUpgradesAllowed) },
 
 	{ nullptr, nullptr, nullptr, 0 }
-
 };
-// NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
 
-// NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
-const FieldParse ThingTemplate::s_objectReskinFieldParseTable[] =
+void ThingTemplate::parseObjectFields(INI* ini, Bool isChild)
 {
-	{ "Draw",									ThingTemplate::parseModuleName,		(const void*)MODULETYPE_DRAW, offsetof(ThingTemplate, m_drawModuleInfo) },
+	LatchRestore<Bool> geometry(m_parsingAdditionalGeometry, FALSE);
+	if (isChild)
+		ini->initChildObject(this, getFieldParse());
+	else
+		ini->initFromINI(this, getFieldParse());
+}
 
-	{ "Geometry",							GeometryInfo::parseGeometryType,				nullptr,  offsetof( ThingTemplate, m_geometryInfo ) },
-	{ "GeometryMajorRadius",	GeometryInfo::parseGeometryMajorRadius,	nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
-	{ "GeometryMinorRadius",	GeometryInfo::parseGeometryMinorRadius,	nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
-	{ "GeometryHeight",				GeometryInfo::parseGeometryHeight,			nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
-	{ "GeometryIsSmall",			GeometryInfo::parseGeometryIsSmall,			nullptr,		offsetof( ThingTemplate, m_geometryInfo ) },
-	{ "FenceWidth",						INI::parseReal,													nullptr,		offsetof( ThingTemplate, m_fenceWidth ) },
-	{ "FenceXOffset",					INI::parseReal,													nullptr,		offsetof( ThingTemplate, m_fenceXOffset ) },
+void ThingTemplate::parsePrimaryGeometry(INI* ini, void* instance, void* store, const void* userData)
+{
+	GeometryInfo::parseGeometryType(ini, instance, store, userData);
+	static_cast<ThingTemplate*>(instance)->m_parsingAdditionalGeometry = FALSE;
+}
 
-  // Needed to avoid some cheats with the scud storm rebuild hole
-  { "MaxSimultaneousOfType",	ThingTemplate::parseMaxSimultaneous,		nullptr, offsetof(ThingTemplate, m_maxSimultaneousOfType ) }, // Added in Zero Hour
-  { "MaxSimultaneousLinkKey",	NameKeyGenerator::parseStringAsNameKeyType,		nullptr, offsetof(ThingTemplate, m_maxSimultaneousLinkKey ) }, // Added in Zero Hour
+void ThingTemplate::parseAdditionalGeometry(INI* ini, void* instance, void*, const void*)
+{
+	auto& self = *static_cast<ThingTemplate*>(instance);
+	AdditionalGeometry entry;
+	GeometryInfo::parseGeometryType(ini, instance, &entry.shape, nullptr);
+	self.m_rotwk.additionalGeometries.push_back(entry);
+	self.m_parsingAdditionalGeometry = TRUE;
+}
 
-	{ nullptr, nullptr, nullptr, 0 }
+void ThingTemplate::parseGeometrySize(INI* ini, void* instance, void* store, const void* userData)
+{
+	auto& self = *static_cast<ThingTemplate*>(instance);
+	auto* shape = static_cast<GeometryInfo*>(store);
+	if (self.m_parsingAdditionalGeometry)
+		shape = &self.m_rotwk.additionalGeometries.back().shape;
+	const auto parse = *static_cast<const INIFieldParseProc*>(userData);
+	parse(ini, instance, shape, nullptr);
+}
 
-};
-// NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
+void ThingTemplate::parseGeometryDetail(INI* ini, void* instance, void*, const void* userData)
+{
+	auto& self = *static_cast<ThingTemplate*>(instance);
+	auto& details = self.m_parsingAdditionalGeometry ?
+		self.m_rotwk.additionalGeometries.back().details : self.m_rotwk.primaryGeometry;
+	const auto& field = *static_cast<const FieldParse*>(userData);
+	field.parse(ini, instance, reinterpret_cast<char*>(&details) + field.offset, field.userData);
+}
+
+void ThingTemplate::parseOtherGeometry(INI* ini, void*, void* store, const void*)
+{
+	auto& entries = *static_cast<std::vector<OtherGeometry>*>(store);
+	const auto type = static_cast<GeometryType>(INI::scanIndexList(ini->getNextSubToken("GeomType"), GeometryNames));
+	const Bool small = INI::scanBool(ini->getNextSubToken("IsSmall"));
+	const Real height = INI::scanReal(ini->getNextSubToken("Height"));
+	const Real major = INI::scanReal(ini->getNextSubToken("MajorRadius"));
+	const Real minor = INI::scanReal(ini->getNextSubToken("MinorRadius"));
+	const Real offsetX = INI::scanReal(ini->getNextSubToken("OffsetX"));
+	entries.push_back({ GeometryInfo(type, small, height, major, minor), offsetX });
+}
+
+void ThingTemplate::parseContactPoint(INI* ini, void* instance, void* store, const void*)
+{
+	auto& points = *static_cast<std::vector<ContactPoint>*>(store);
+	ContactPoint point;
+	INI::parseCoord3D(ini, instance, &point.position, nullptr);
+	for (const char* token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+		point.flags |= 1u << INI::scanIndexList(token, contactPointNames);
+	points.push_back(point);
+}
+
+void ThingTemplate::parseRotWKBlock(INI* ini, void*, void* store, const void* userData)
+{
+	ini->initFromINI(store, static_cast<const FieldParse*>(userData));
+}
+
+void ThingTemplate::parseAutoResolve(INI* ini, void*, void* store, const void* userData)
+{
+	auto& entries = *static_cast<std::vector<AutoResolveReference>*>(store);
+	AutoResolveReference entry;
+	ini->initFromINI(&entry, static_cast<const FieldParse*>(userData));
+	entries.push_back(std::move(entry));
+}
+
+void ThingTemplate::parseThreatBreakdown(INI* ini, void*, void* store, const void*)
+{
+	auto& entries = *static_cast<std::vector<ThreatBreakdown>*>(store);
+	ThreatBreakdown entry;
+	entry.tag = ini->getNextToken();
+	ini->initFromINI(&entry, threatBreakdownFields);
+	const auto existing = std::find_if(entries.begin(), entries.end(), [&entry](const ThreatBreakdown& other) {
+		return other.tag == entry.tag;
+	});
+	if (existing == entries.end())
+		entries.push_back(entry);
+	else
+		*existing = entry;
+}
+
+void ThingTemplate::parseRotWKLocomotorSet(INI* ini, void*, void* store, const void*)
+{
+	auto& entries = *static_cast<std::vector<RotWKLocomotorSet>*>(store);
+	RotWKLocomotorSet entry;
+	ini->initFromINI(&entry, locomotorSetFields);
+	const auto existing = std::find_if(entries.begin(), entries.end(), [&entry](const RotWKLocomotorSet& other) {
+		return other.condition.compareNoCase(entry.condition) == 0;
+	});
+	if (existing == entries.end())
+		entries.push_back(entry);
+	else
+		*existing = entry;
+}
+
+void ThingTemplate::parseClientBehavior(INI* ini, void* instance, void*, const void*)
+{
+	auto& self = *static_cast<ThingTemplate*>(instance);
+	ClientBehavior entry;
+	entry.name = ini->getNextToken();
+	entry.tag = ini->getNextToken();
+	const UnsignedInt line = ini->getLineNum();
+	entry.iniBody = ini->readRawBlock(ini->getEndToken(), clientBehaviorBlocks);
+	if (INIAudit::isEnabled())
+		INIAudit::record("module", entry.name.str(), ini->getFilename().str(), line);
+	else
+		INI::scanIndexList(entry.name.str(), clientBehaviorNames);
+
+	if (self.m_moduleBeingReplacedName.isNotEmpty() && self.m_moduleBeingReplacedName != entry.name)
+		throw INI_INVALID_DATA;
+	if (self.m_moduleBeingReplacedTag.isNotEmpty() && self.m_moduleBeingReplacedTag == entry.tag)
+		throw INI_INVALID_DATA;
+
+	auto& entries = self.m_rotwk.clientBehaviors;
+	const auto existing = std::find_if(entries.begin(), entries.end(), [&entry](const ClientBehavior& other) {
+		return other.tag == entry.tag;
+	});
+	if (existing == entries.end())
+		entries.push_back(std::move(entry));
+	else
+		*existing = std::move(entry);
+}
+
+void ThingTemplate::parseRotWKAudio(INI* ini, void* instance, void* store, const void* userData)
+{
+	RefCountPtr<DynamicAudioEventRTS> audio;
+	INI::parseDynamicAudioEventRTS(ini, instance, &audio, userData);
+	*static_cast<RefCountPtr<DynamicAudioEventRTS>*>(store) = audio;
+}
+
+void ThingTemplate::parseCrushableLevel(INI* ini, void*, void* store, const void*)
+{
+	const Int level = INI::scanInt(ini->getNextToken());
+	if (level < -1 || level > 255)
+	{
+		DEBUG_CRASH(("Bad CrushableLevel"));
+		throw ERROR_BUG;
+	}
+	*static_cast<UnsignedByte*>(store) = static_cast<UnsignedByte>(level);
+}
 
 // ------------------------------------------------------------------------------------------------
 /** See if the tag string is present in any of the module info entries here */
@@ -965,6 +1288,17 @@ Bool ThingTemplate::removeModuleInfo(const AsciiString& moduleToRemove, AsciiStr
 	if (m_clientUpdateModuleInfo.clearModuleDataWithTag(moduleToRemove, clearedModuleNameOut))
 	{
 		DEBUG_ASSERTCRASH(!removed, ("Hmm, multiple removed in ThingTemplate::removeModuleInfo, should this be possible?"));
+		removed = true;
+	}
+
+	const auto& clientBehaviors = m_rotwk.clientBehaviors;
+	const auto clientBehavior = std::find_if(clientBehaviors.begin(), clientBehaviors.end(),
+		[&moduleToRemove](const ClientBehavior& entry) { return entry.tag == moduleToRemove; });
+	if (clientBehavior != clientBehaviors.end())
+	{
+		DEBUG_ASSERTCRASH(!removed, ("Duplicate ClientBehavior tag"));
+		clearedModuleNameOut = clientBehavior->name;
+		m_rotwk.clientBehaviors.erase(clientBehavior);
 		removed = true;
 	}
 

@@ -429,7 +429,7 @@ void ThingFactory::parseObjectDefinition( INI* ini, const AsciiString& name, con
 	if (parent)
 	{
 		thingTemplate->copyFromChildParent(parent, ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES);
-		ini->initChildObject(thingTemplate, thingTemplate->getFieldParse());
+		thingTemplate->parseObjectFields(ini, TRUE);
 	}
 	else if (sourceName.isNotEmpty())
 	{
@@ -439,7 +439,7 @@ void ThingFactory::parseObjectDefinition( INI* ini, const AsciiString& name, con
 			thingTemplate->copyFrom(reskinTmpl);
 			thingTemplate->setCopiedFromDefault();
 			thingTemplate->setReskinnedFrom(reskinTmpl);
-			ini->initFromINI( thingTemplate, thingTemplate->getReskinFieldParse() );
+			thingTemplate->parseObjectFields(ini, FALSE);
 		}
 		else
 		{
@@ -449,7 +449,7 @@ void ThingFactory::parseObjectDefinition( INI* ini, const AsciiString& name, con
 	}
 	else
 	{
-		ini->initFromINI( thingTemplate, thingTemplate->getFieldParse() );
+		thingTemplate->parseObjectFields(ini, FALSE);
 	}
 
 	thingTemplate->validate();

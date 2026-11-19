@@ -589,15 +589,31 @@ Bool INI::nextLineOpensBlockForAudit() const
 	return INIAudit::nextLineIsDeeper(m_readBuffer, m_readBufferNext, m_readBufferUsed, INIAudit::indentation(currentRawLine()));
 }
 
-std::string INI::readRawBlock(const char* endToken)
+std::string INI::readRawBlock(const char* endToken, const char* const* nestedBlocks)
 {
 	std::string body;
+	Int depth = 0;
 	while (!isEOF())
 	{
 		readLine();
 		const char* token = strtok(m_buffer, getSeps());
 		if (token && stricmp(token, endToken) == 0 && !getNextTokenOrNull())
-			return body;
+		{
+			if (depth == 0)
+				return body;
+			--depth;
+		}
+		else if (token && nestedBlocks)
+		{
+			for (const char* const* block = nestedBlocks; *block; ++block)
+			{
+				if (stricmp(token, *block) == 0)
+				{
+					++depth;
+					break;
+				}
+			}
+		}
 		body += currentRawLine();
 		body += '\n';
 	}
