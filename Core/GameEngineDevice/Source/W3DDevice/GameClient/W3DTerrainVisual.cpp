@@ -400,14 +400,15 @@ void W3DTerrainVisual::handleSeismicSimulations()
           {
             if ( ! m_clientHeightMap->getSeismicUpdateFlag( x, y ) )
             {
-              UnsignedByte heightOfOriginal = m_logicHeightMap->getHeight( x, y ); // LOGIC, YES DEFINITELY THE LOGIC
+              Int heightOfOriginal = m_logicHeightMap->getHeight( x, y );
 
               Real oldSpeed = m_clientHeightMap->getSeismicZVelocity( x, y );
               Real newSpeed = ssn->applyGravity( oldSpeed );// - 0.5f;
 
               m_clientHeightMap->setSeismicZVelocity( x, y, newSpeed );
 
-              Int heightToUse = m_clientHeightMap->getHeight( x, y ) + newSpeed ;
+              Int heightToUse = m_clientHeightMap->getHeight( x, y ) +
+                newSpeed * (MAP_HEIGHT_SCALE / m_clientHeightMap->getHeightScale());
 
 
               if (heightToUse <= heightOfOriginal)
@@ -419,8 +420,8 @@ void W3DTerrainVisual::handleSeismicSimulations()
               {
                 ++fallCount;
 
-                if ( heightToUse > 255 )
-                  heightToUse = 255;
+                if ( heightToUse > m_clientHeightMap->getMaxHeightValue() )
+                  heightToUse = m_clientHeightMap->getMaxHeightValue();
 
               }
     			    m_clientHeightMap->setRawHeight( x, y, heightToUse );
@@ -891,6 +892,11 @@ Bool W3DTerrainVisual::getWaterGridHeight( Real worldX, Real worldY, Real *heigh
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+Real W3DTerrainVisual::getRawMapHeightScale() const
+{
+	return m_logicHeightMap ? m_logicHeightMap->getHeightScale() : MAP_HEIGHT_SCALE;
+}
+
 void W3DTerrainVisual::setRawMapHeight(const ICoord2D *gridPos, Int height)
 {
   // This method writes to the m_logicHeightMap member,
@@ -1226,19 +1232,27 @@ void W3DTerrainVisual::xfer( Xfer *xfer )
 
 	// Write out the terrain height data.
 	if (version >= 2) {
-		UnsignedByte *data = m_logicHeightMap->getDataPtr();
-		Int len = m_logicHeightMap->getXExtent()*m_logicHeightMap->getYExtent();
+		const unsigned sampleBytes = m_logicHeightMap->getHeightSampleBytes();
+		const Int cellCount = m_logicHeightMap->getXExtent() * m_logicHeightMap->getYExtent();
+		Int len = cellCount * static_cast<Int>(sampleBytes);
 		Int xferLen = len;
 		xfer->xferInt(&xferLen);
 		if (len!=xferLen) {
 			DEBUG_CRASH(("Bad height map length."));
+			if (sampleBytes == 2 || xferLen < 0)
+				throw SC_INVALID_DATA;
 			if (len>xferLen) {
 				len = xferLen;
 			}
 		}
-		xfer->xferUser(data, len);
+		std::span<UnsignedShort> samples(m_logicHeightMap->getDataPtr(), len / sampleBytes);
+		std::vector<UnsignedByte> bytes(len);
+		if (xfer->getXferMode() != XFER_LOAD)
+			HeightMapSamples::encode(samples, bytes, sampleBytes);
+		xfer->xferUser(bytes.data(), len);
 		if (xfer->getXferMode() == XFER_LOAD)
     {
+			HeightMapSamples::decode(bytes, samples, sampleBytes);
 			// Update the display height map.
 			m_terrainRenderObject->staticLightingChanged();
 		}

@@ -658,6 +658,13 @@ static void reportSkippedChunk(const DataChunkInfo& info, Bool deferred)
 	}
 }
 
+void DataChunkInput::skipUnsupportedRequiredChunk(const DataChunkInfo &info)
+{
+	reportSkippedChunk(info, false);
+	if (!getUnsupportedRequiredChunk())
+		m_unsupportedRequiredChunk = info;
+}
+
 static void reportChunkTolerance(std::once_flag& flag, const char *message)
 {
 	std::call_once(flag, [message] {
@@ -728,9 +735,10 @@ Bool DataChunkInput::parse( void *userData )
 
 					if (ver > parser->maxVersion)
 					{
-						reportSkippedChunk(info, false);
-						if (parser->required && !getUnsupportedRequiredChunk())
-							m_unsupportedRequiredChunk = info;
+						if (parser->required)
+							skipUnsupportedRequiredChunk(info);
+						else
+							reportSkippedChunk(info, false);
 					}
 					else if (!parser->parser)
 					{

@@ -425,7 +425,7 @@ Int W3DProjectedShadowManager::renderProjectedTerrainShadow(W3DProjectedShadow *
 				{
 					pvVertices->x=(float)i*MAP_XY_FACTOR;
 					pvVertices->y=ycoord;
-					pvVertices->z=(float)hmap->getHeight(i,j)*MAP_HEIGHT_SCALE;
+					pvVertices->z=hmap->toWorldHeight(hmap->getHeight(i,j));
 					pvVertices++;
 				}
 			}
@@ -1184,7 +1184,7 @@ void W3DProjectedShadowManager::queueDecal(W3DProjectedShadow *shadow, Bool sunC
 					{
 						hmapVertex.X=(float)(i-borderSize)*MAP_XY_FACTOR;
 						// GeneralsX @bugfix Copilot 11/05/2026 Use MAX portability macro when clamping bridge-layer shadow height.
-						hmapVertex.Z=MAX((float)hmap->getHeight(i,j)*MAP_HEIGHT_SCALE,layerHeight);
+						hmapVertex.Z=MAX(hmap->toWorldHeight(hmap->getHeight(i,j)),layerHeight);
 						pvVertices->x=hmapVertex.X;
 						pvVertices->y=hmapVertex.Y;
 						pvVertices->z=hmapVertex.Z;
@@ -1203,7 +1203,7 @@ void W3DProjectedShadowManager::queueDecal(W3DProjectedShadow *shadow, Bool sunC
 				for (i=startX; i <= endX; i++)
 				{
 					hmapVertex.X=(float)(i-borderSize)*MAP_XY_FACTOR;
-					hmapVertex.Z=(float)hmap->getHeight(i,j)*MAP_HEIGHT_SCALE+0.01f * MAP_XY_FACTOR;
+					hmapVertex.Z=hmap->toWorldHeight(hmap->getHeight(i,j))+0.01f * MAP_XY_FACTOR;
 					pvVertices->x=hmapVertex.X;
 					pvVertices->y=hmapVertex.Y;
 					pvVertices->z=hmapVertex.Z;

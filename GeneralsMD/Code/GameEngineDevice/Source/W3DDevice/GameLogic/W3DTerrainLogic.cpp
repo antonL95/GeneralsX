@@ -147,13 +147,13 @@ Bool W3DTerrainLogic::loadMap( AsciiString filename , Bool query )
 
 		for (j=0; j<m_mapDY; j++) {
 			for (i=0; i<m_mapDX; i++) {
-				Short cur = terrainHeightMap->getHeight(i,j);
+				Int cur = terrainHeightMap->getHeight(i,j);
 				if (cur<minHt) minHt = cur;
 				if (maxHt<cur) maxHt = cur;
 			}
 		}
-		m_mapMinZ = minHt * MAP_HEIGHT_SCALE;
-		m_mapMaxZ = maxHt * MAP_HEIGHT_SCALE;
+		m_mapMinZ = terrainHeightMap->toWorldHeight(minHt);
+		m_mapMaxZ = terrainHeightMap->toWorldHeight(maxHt);
 		//release temporary object used for loading height values
 		REF_PTR_RELEASE(terrainHeightMap);
 	}

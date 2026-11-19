@@ -53,6 +53,8 @@
 
 #include "Common/file.h"
 #include "Utility/stringex.h"
+#include <algorithm>
+#include <array>
 #include <cstdio>
 
 
@@ -370,14 +372,28 @@ const ThingTemplate *MapObject::getThingTemplate() const
 
 TileData *WorldHeightMap::m_alphaTiles[NUM_ALPHA_TILES]={0};
 
+struct WorldHeightMap::BfmeLighting
+{
+	GlobalData::TerrainLighting terrain[TIME_OF_DAY_COUNT][MAX_GLOBAL_LIGHTS]{};
+	GlobalData::TerrainLighting objects[TIME_OF_DAY_COUNT][MAX_GLOBAL_LIGHTS]{};
+	GlobalData::TerrainLighting infantry[TIME_OF_DAY_COUNT][MAX_GLOBAL_LIGHTS]{};
+	TimeOfDay timeOfDay;
+	UnsignedInt shadowColor;
+	std::array<UnsignedByte, 44> opaque;
+	RGBColor noCloudFactor{};
+};
+
 //
 // WorldHeightMap destructor .
 //
 WorldHeightMap::~WorldHeightMap()
 {
 	releaseMapData();
-	for (Int i = 0; i < NUM_ALPHA_TILES; ++i)
-		REF_PTR_RELEASE(m_alphaTiles[i]);
+	if (m_releaseAlphaTiles)
+	{
+		for (Int i = 0; i < NUM_ALPHA_TILES; ++i)
+			REF_PTR_RELEASE(m_alphaTiles[i]);
+	}
 }
 
 void WorldHeightMap::releaseMapData()
@@ -435,7 +451,7 @@ void WorldHeightMap::freeListOfMapObjects()
  Note that there is 1 m_numBlendedTiles, which is the implied
  transparent tile for non-blended tiles.
 */
-WorldHeightMap::WorldHeightMap():
+WorldHeightMap::WorldHeightMap(Bool initializeEditor):
 	m_width(0), m_height(0),  m_dataSize(0), m_data(nullptr), m_cellFlipState(nullptr), m_seismicUpdateFlag(nullptr), m_seismicZVelocities(nullptr),
 	m_drawOriginX(0), m_drawOriginY(0),
 	m_numTextureClasses(0),
@@ -446,7 +462,8 @@ WorldHeightMap::WorldHeightMap():
 	m_tileMode(TILE_4x4),
 #endif
 	m_numCliffInfo(1),
-	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1)
+	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
+	m_releaseAlphaTiles(initializeEditor)
 {
 	Int i;
 	for (i=0; i<NUM_SOURCE_TILES; i++) {
@@ -454,8 +471,11 @@ WorldHeightMap::WorldHeightMap():
 		m_edgeTiles[i] = nullptr;
 	}
 
-	TheSidesList->validateSides();
-	setupAlphaTiles();
+	if (initializeEditor)
+	{
+		TheSidesList->validateSides();
+		setupAlphaTiles();
+	}
 }
 
 #ifdef EVAL_TILING_MODES
@@ -470,8 +490,7 @@ static Bool ParseFunkyTilingDataChunk(DataChunkInput &file, DataChunkInfo *info,
 void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metadataOnly)
 {
 	const AsciiString& root = AsciiString::TheEmptyString;
-	file.registerVersionedParser("HeightMapData", root, metadataOnly ? nullptr : ParseSizeOnlyInChunk,
-		K_HEIGHT_MAP_VERSION_4, true);
+	file.registerVersionedParser("HeightMapData", root, ParseSizeOnlyInChunk, K_HEIGHT_MAP_VERSION_5, true);
 	file.registerVersionedParser("BlendTileData", root, nullptr, K_BLEND_TILE_VERSION_8, true);
 	file.registerVersionedParser("SidesList", root, SidesList::ParseSidesDataChunk,
 		SidesList::MAX_MAP_SIDES_VERSION, true);
@@ -487,7 +506,7 @@ void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metada
 	else
 		file.registerVersionedParser("PolygonTriggers", root, nullptr, K_TRIGGERS_VERSION_4);
 
-	file.registerVersionedParser("GlobalLighting", root, nullptr, K_LIGHTING_VERSION_3, true);
+	file.registerVersionedParser("GlobalLighting", root, ParseLogicalLightingDataChunk, K_LIGHTING_VERSION_8, true);
 	file.registerVersionedParser("MPPositionList", root, nullptr, 0);
 	file.registerVersionedParser("LibraryMapLists", root, nullptr, 1);
 	file.registerVersionedParser("PlayerScriptsList", root, nullptr, 6);
@@ -501,6 +520,16 @@ void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metada
 	file.registerVersionedParser("NamedCameras", root, nullptr, 2);
 	file.registerVersionedParser("CameraAnimationList", root, nullptr, 3);
 	file.registerVersionedParser("SkyboxSettings", root, nullptr, 1);
+}
+
+RefCountPtr<WorldHeightMap> WorldHeightMap::readAuditMap(DataChunkInput &file)
+{
+	RefCountPtr<WorldHeightMap> map;
+	map.Assign_No_Add_Ref(NEW WorldHeightMap(false));
+	RegisterLogicalMapParsers(file, true);
+	if (!file.parse(map.Peek()))
+		return {};
+	return map;
 }
 /**
 * WorldHeightMap - read a height map from a file.
@@ -538,12 +567,12 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 		PolygonTrigger::deleteTriggers(); // just in case.
 		TheSidesList->clear();
 	}	else {
-		file.registerVersionedParser("HeightMapData", root, ParseHeightMapDataChunk, K_HEIGHT_MAP_VERSION_4, true);
+		file.registerVersionedParser("HeightMapData", root, ParseHeightMapDataChunk, K_HEIGHT_MAP_VERSION_5, true);
 		file.registerVersionedParser("BlendTileData", root, ParseBlendTileDataChunk, K_BLEND_TILE_VERSION_8, true);
 #ifdef EVAL_TILING_MODES
 		file.registerVersionedParser("FUNKY_TILING", root, ParseFunkyTilingDataChunk, 1);
 #endif
-		file.registerVersionedParser("GlobalLighting", root, ParseLightingDataChunk, K_LIGHTING_VERSION_3, true);
+		file.registerVersionedParser("GlobalLighting", root, ParseLightingDataChunk, K_LIGHTING_VERSION_8, true);
 	}
 	try
 	{
@@ -557,6 +586,8 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 			fflush(stderr);
 			throw ERROR_CORRUPT_FILE_FORMAT;
 		}
+		if (!logicalDataOnly && m_bfmeLighting)
+			applyBfmeLighting();
 	}
 	catch (...)
 	{
@@ -604,12 +635,12 @@ Bool WorldHeightMap::isTerrainFlat(const IRegion2D& bounds) const
 	if (width <= 0 || height <= 0)
 		return true;
 
-	const UnsignedByte* firstRow = m_data + (bounds.lo.y + m_borderSize) * m_width + bounds.lo.x + m_borderSize;
-	const UnsignedByte referenceHeight = firstRow[0];
+	const UnsignedShort* firstRow = m_data + (bounds.lo.y + m_borderSize) * m_width + bounds.lo.x + m_borderSize;
+	const UnsignedShort referenceHeight = firstRow[0];
 	for (Int j = 0; j < height; j++)
 	{
-		const UnsignedByte* row = firstRow + j * m_width;
-		if (memcchr(row, referenceHeight, width) != nullptr)
+		const UnsignedShort* row = firstRow + j * m_width;
+		if (!std::all_of(row, row + width, [referenceHeight](UnsignedShort sample) { return sample == referenceHeight; }))
 			return false;
 	}
 
@@ -818,8 +849,81 @@ Bool WorldHeightMap::ParseWorldDictDataChunk(DataChunkInput &file, DataChunkInfo
 *	Input: DataChunkInput
 *
 */
+static GlobalData::TerrainLighting readMapLight(DataChunkInput &file)
+{
+	return {
+		{file.readReal(), file.readReal(), file.readReal()},
+		{file.readReal(), file.readReal(), file.readReal()},
+		{file.readReal(), file.readReal(), file.readReal()}
+	};
+}
+
+void WorldHeightMap::readBfmeLighting(DataChunkInput &file, unsigned version)
+{
+	auto lighting = std::make_unique<BfmeLighting>();
+	const Bool hasNoCloudFactor = version >= K_LIGHTING_VERSION_8;
+	constexpr unsigned days = TIME_OF_DAY_COUNT - TIME_OF_DAY_FIRST;
+	const unsigned expectedSize = sizeof(Int) * 2 + days * MAX_GLOBAL_LIGHTS * 3 * 9 * sizeof(Real)
+		+ lighting->opaque.size() + (hasNoCloudFactor ? 3 * sizeof(Real) : 0);
+	if (file.getChunkDataSizeLeft() != expectedSize)
+		throw ERROR_CORRUPT_FILE_FORMAT;
+
+	const Int timeOfDay = file.readInt();
+	if (timeOfDay < TIME_OF_DAY_FIRST || timeOfDay >= TIME_OF_DAY_COUNT)
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	lighting->timeOfDay = static_cast<TimeOfDay>(timeOfDay);
+	for (Int day = TIME_OF_DAY_FIRST; day < TIME_OF_DAY_COUNT; ++day)
+	{
+		for (Int slot = 0; slot < MAX_GLOBAL_LIGHTS; ++slot)
+		{
+			lighting->terrain[day][slot] = readMapLight(file);
+			lighting->objects[day][slot] = readMapLight(file);
+			lighting->infantry[day][slot] = readMapLight(file);
+		}
+	}
+	lighting->shadowColor = file.readInt();
+	file.readArrayOfBytes(reinterpret_cast<char *>(lighting->opaque.data()), lighting->opaque.size());
+	if (hasNoCloudFactor)
+		lighting->noCloudFactor = {file.readReal(), file.readReal(), file.readReal()};
+	m_bfmeLighting = std::move(lighting);
+}
+
+void WorldHeightMap::applyBfmeLighting() const
+{
+	TheWritableGlobalData->m_timeOfDay = m_bfmeLighting->timeOfDay;
+	for (Int day = TIME_OF_DAY_FIRST; day < TIME_OF_DAY_COUNT; ++day)
+	{
+		for (Int slot = 0; slot < MAX_GLOBAL_LIGHTS; ++slot)
+		{
+			TheWritableGlobalData->m_terrainLighting[day][slot] = m_bfmeLighting->terrain[day][slot];
+			TheWritableGlobalData->m_terrainObjectsLighting[day][slot] = m_bfmeLighting->objects[day][slot];
+		}
+	}
+	if (TheW3DShadowManager)
+		TheW3DShadowManager->setShadowColor(m_bfmeLighting->shadowColor);
+}
+
+std::span<const UnsignedByte> WorldHeightMap::getOpaqueBfmeLighting() const
+{
+	if (m_bfmeLighting)
+		return m_bfmeLighting->opaque;
+	return {};
+}
+
+Bool WorldHeightMap::ParseLogicalLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
+{
+	if (info->version >= K_LIGHTING_VERSION_7)
+		static_cast<WorldHeightMap *>(userData)->readBfmeLighting(file, info->version);
+	else if (info->version > K_LIGHTING_VERSION_3)
+		file.skipUnsupportedRequiredChunk(*info);
+	return true;
+}
+
 Bool WorldHeightMap::ParseLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
+	if (info->version > K_LIGHTING_VERSION_3)
+		return ParseLogicalLightingDataChunk(file, info, userData);
+
 		TheWritableGlobalData->m_timeOfDay = (TimeOfDay)file.readInt();
 		Int i;
 		GlobalData::TerrainLighting	initLightValues	= { { 0,0,0},{0,0,0},{0,0,-1.0f}};
@@ -921,11 +1025,6 @@ Bool WorldHeightMap::isValidMapSize(Int width, Int height, Int borderSize)
 	return true;
 }
 
-static Bool isValidHeightDataSize(DataChunkInput &file, Int dataSize, Int width, Int height)
-{
-	return dataSize > 0 && dataSize == width * height && (UnsignedInt)dataSize <= file.getChunkDataSizeLeft();
-}
-
 /**
 * WorldHeightMap::ParseHeightMapData - read a height map chunk.
 * Format is the newer CHUNKY format.
@@ -935,101 +1034,31 @@ static Bool isValidHeightDataSize(DataChunkInput &file, Int dataSize, Int width,
 */
 Bool WorldHeightMap::ParseHeightMapDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
-	WorldHeightMap *pThis = (WorldHeightMap *)userData;
-	return pThis->ParseHeightMapData(file, info, userData);
-}
-
-/**
-* WorldHeightMap::ParseHeightMapData - read a height map chunk.
-* Format is the newer CHUNKY format.
-*	See WHeightMapEdit.cpp for the writer.
-*	Input: DataChunkInput
-*
-*/
-Bool WorldHeightMap::ParseHeightMapData(DataChunkInput &file, DataChunkInfo *info, void *userData)
-{
-	m_width = file.readInt();
-	m_height = file.readInt();
-	if (info->version >= K_HEIGHT_MAP_VERSION_3) {
-		m_borderSize = file.readInt();
-	} else {
-		m_borderSize = 0;
-	}
-
-	if (!isValidMapSize(m_width, m_height, m_borderSize)) {
-		throw ERROR_CORRUPT_FILE_FORMAT;
-	}
-
-	if (info->version >= K_HEIGHT_MAP_VERSION_4) {
-		Int numBorders = file.readInt();
-		m_boundaries.resize(numBorders);
-		for (int i = 0; i < numBorders; ++i) {
-			m_boundaries[i].x = file.readInt();
-			m_boundaries[i].y = file.readInt();
-		}
-	} else {
-		m_boundaries.resize(1);
-		m_boundaries[0].x = m_width - 2 * m_borderSize;
-		m_boundaries[0].y = m_height - 2 * m_borderSize;
-	}
-
-	m_dataSize = file.readInt();
-	if (!isValidHeightDataSize(file, m_dataSize, m_width, m_height)) {
-		throw ERROR_CORRUPT_FILE_FORMAT	;
-	}
-
-	m_data = MSGNEW("WorldHeightMap_ParseHeightMapData") UnsignedByte[m_dataSize];
-
-	Int numBytesX = (m_width+7)/8;	//how many bytes to fit all bitflags
-	Int numBytesY = m_height;
-	m_seismicUpdateWidth=numBytesX;
-	m_seismicUpdateFlag	= MSGNEW("WorldHeightMap::ParseHeightMapData _ m_seismicUpdateFlag allocated") UnsignedByte[numBytesX*numBytesY];
-  clearSeismicUpdateFlags();
-  m_seismicZVelocities = MSGNEW("WorldHeightMap_ParseHeightMapData _ zvelocities allocated") Real[m_dataSize];
-  fillSeismicZVelocities( 0 );
-
-
-	file.readArrayOfBytes((char *)m_data, m_dataSize);
-	// Resize me.
-	if (info->version == K_HEIGHT_MAP_VERSION_1) {
-		Int newWidth = (m_width+1)/2;
-		Int newHeight = (m_height+1)/2;
-		Int i, j;
-		for (i=0; i<newHeight; i++) {
-			for (j=0; j<newWidth; j++) {
-				m_data[i*newWidth+j] = m_data[2*i*m_width+2*j];
-			}
-		}
-	}
+	auto *map = static_cast<WorldHeightMap *>(userData);
+	map->readHeightData(file, info->version, false);
+	const Int bytesPerRow = (map->m_width + 7) / 8;
+	map->m_seismicUpdateWidth = bytesPerRow;
+	map->m_seismicUpdateFlag = MSGNEW("WorldHeightMap::m_seismicUpdateFlag") UnsignedByte[bytesPerRow * map->m_height];
+	map->clearSeismicUpdateFlags();
+	map->m_seismicZVelocities = MSGNEW("WorldHeightMap::m_seismicZVelocities") Real[map->m_dataSize];
+	map->fillSeismicZVelocities(0);
 	DEBUG_ASSERTCRASH(file.atEndOfChunk(), ("Unexpected data left over."));
 	return true;
 }
 
-/**
-* WorldHeightMap::ParseHeightMapData - read a height map chunk.
-* Format is the newer CHUNKY format.
-*	See WHeightMapEdit.cpp for the writer.
-*	Input: DataChunkInput
-*
-*/
 Bool WorldHeightMap::ParseSizeOnlyInChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
-	WorldHeightMap *pThis = (WorldHeightMap *)userData;
-	return pThis->ParseSizeOnly(file, info, userData);
+	static_cast<WorldHeightMap *>(userData)->readHeightData(file, info->version, true);
+	return true;
 }
 
-/**
-* WorldHeightMap::ParseHeightMapData - read a height map chunk.
-* Format is the newer CHUNKY format.
-*	See WHeightMapEdit.cpp for the writer.
-*	Input: DataChunkInput
-*
-*/
-Bool WorldHeightMap::ParseSizeOnly(DataChunkInput &file, DataChunkInfo *info, void *userData)
+void WorldHeightMap::readHeightData(DataChunkInput &file, unsigned version, Bool logicalDataOnly)
 {
+	if (m_data || (version == K_HEIGHT_MAP_VERSION_5 && file.getChunkDataSizeLeft() < 5 * sizeof(Int)))
+		throw ERROR_CORRUPT_FILE_FORMAT;
 	m_width = file.readInt();
 	m_height = file.readInt();
-	if (info->version >= K_HEIGHT_MAP_VERSION_3) {
+	if (version >= K_HEIGHT_MAP_VERSION_3) {
 		m_borderSize = file.readInt();
 	} else {
 		m_borderSize = 0;
@@ -1039,8 +1068,12 @@ Bool WorldHeightMap::ParseSizeOnly(DataChunkInput &file, DataChunkInfo *info, vo
 		throw ERROR_CORRUPT_FILE_FORMAT;
 	}
 
-	if (info->version >= K_HEIGHT_MAP_VERSION_4) {
+	if (version >= K_HEIGHT_MAP_VERSION_4) {
 		Int numBorders = file.readInt();
+		const auto remaining = file.getChunkDataSizeLeft();
+		if (numBorders < 0 || remaining < sizeof(Int) ||
+			static_cast<unsigned>(numBorders) > (remaining - sizeof(Int)) / (2 * sizeof(Int)))
+			throw ERROR_CORRUPT_FILE_FORMAT;
 		m_boundaries.resize(numBorders);
 		for (int i = 0; i < numBorders; ++i) {
 			m_boundaries[i].x = file.readInt();
@@ -1053,14 +1086,20 @@ Bool WorldHeightMap::ParseSizeOnly(DataChunkInput &file, DataChunkInfo *info, vo
 	}
 
 	m_dataSize = file.readInt();
-	if (!isValidHeightDataSize(file, m_dataSize, m_width, m_height)) {
-		throw ERROR_CORRUPT_FILE_FORMAT	;
-	}
+	m_heightSampleBytes = HeightMapSamples::bytesPerSample(version);
+	m_heightScale = HeightMapSamples::scale(m_heightSampleBytes, MAP_HEIGHT_SCALE);
+	const unsigned payloadBytes = static_cast<unsigned>(m_dataSize) * m_heightSampleBytes;
+	const unsigned remaining = file.getChunkDataSizeLeft();
+	if (m_dataSize != m_width * m_height || payloadBytes > remaining ||
+		(m_heightSampleBytes == 2 && payloadBytes != remaining))
+		throw ERROR_CORRUPT_FILE_FORMAT;
 
-	m_data = MSGNEW("WorldHeightMap_ParseSizeOnly") UnsignedByte[m_dataSize];
-	file.readArrayOfBytes((char *)m_data, m_dataSize);
-	// Resize me.
-	if (info->version == K_HEIGHT_MAP_VERSION_1) {
+	std::vector<UnsignedByte> bytes(payloadBytes);
+	file.readArrayOfBytes(reinterpret_cast<char *>(bytes.data()), payloadBytes);
+	m_data = MSGNEW("WorldHeightMap::m_data") UnsignedShort[m_dataSize];
+	HeightMapSamples::decode(bytes, {m_data, static_cast<std::size_t>(m_dataSize)}, m_heightSampleBytes);
+
+	if (version == K_HEIGHT_MAP_VERSION_1) {
 		Int newWidth = (m_width+1)/2;
 		Int newHeight = (m_height+1)/2;
 		Int i, j;
@@ -1069,10 +1108,12 @@ Bool WorldHeightMap::ParseSizeOnly(DataChunkInput &file, DataChunkInfo *info, vo
 				m_data[i*newWidth+j] = m_data[2*i*m_width+2*j];
 			}
 		}
-		m_width = newWidth;
-		m_height = newHeight;
+		if (logicalDataOnly)
+		{
+			m_width = newWidth;
+			m_height = newHeight;
+		}
 	}
-	return true;
 }
 
 /**
@@ -1329,7 +1370,7 @@ Bool WorldHeightMap::ParseObjectData(DataChunkInput &file, DataChunkInfo *info, 
 	loc.z = file.readReal();
 
 	Real minZ = -100*MAP_XY_FACTOR;
-	Real maxZ = (255*10)*MAP_HEIGHT_SCALE;
+	Real maxZ = toWorldHeight(getMaxHeightValue() * 10);
 
 	if (info->version <= K_OBJECTS_VERSION_2) {
 		loc.z = 0;
@@ -1937,7 +1978,7 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 
 		static Real TALL_STRETCH_LIMIT = 2.0f;
 		static Real DIAMOND_STRETCH_LIMIT = 2.4f;
-		static Real HEIGHT_SCALE = MAP_HEIGHT_SCALE / MAP_XY_FACTOR;
+		const Real HEIGHT_SCALE = getHeightScale() / MAP_XY_FACTOR;
 
 		Real nU, nV, xU, xV;
 		nU=nV=xU=xV = 0.0f;
@@ -2474,10 +2515,10 @@ void WorldHeightMap::initCliffFlagsFromHeights()
 /** Sets the cliff flag for a cell based on height. */
 void WorldHeightMap::setCellCliffFlagFromHeights(Int xIndex, Int yIndex)
 {
-	Real height1 = getHeight(xIndex, yIndex)*MAP_HEIGHT_SCALE;
-	Real height2 = getHeight(xIndex+1, yIndex)*MAP_HEIGHT_SCALE;
-	Real height3 = getHeight(xIndex, yIndex+1)*MAP_HEIGHT_SCALE;
-	Real height4 = getHeight(xIndex+1, yIndex+1)*MAP_HEIGHT_SCALE;
+	Real height1 = toWorldHeight(getHeight(xIndex, yIndex));
+	Real height2 = toWorldHeight(getHeight(xIndex+1, yIndex));
+	Real height3 = toWorldHeight(getHeight(xIndex, yIndex+1));
+	Real height4 = toWorldHeight(getHeight(xIndex+1, yIndex+1));
 	Real minZ = height1;
 	if (minZ > height2) minZ = height2;
 	if (minZ > height3) minZ = height3;

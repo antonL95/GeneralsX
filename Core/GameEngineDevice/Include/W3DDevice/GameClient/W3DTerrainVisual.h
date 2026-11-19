@@ -121,6 +121,7 @@ public:
 	//
 	virtual void setRawMapHeight(const ICoord2D *gridPos, Int height) override;
 	virtual Int getRawMapHeight(const ICoord2D *gridPos) override;
+	virtual Real getRawMapHeightScale() const override;
 
 	/// Replace the skybox texture
 	virtual void replaceSkyboxTextures(const AsciiString *oldTexName[NumSkyboxTextures], const AsciiString *newTexName[NumSkyboxTextures]) override;

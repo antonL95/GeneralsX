@@ -468,10 +468,9 @@ Vector3 *W3DShadowGeometryHeightmapMesh::GetVertex (int dwVertId, Vector3 *pvVer
 	Int row=dwVertId/m_width;
 	Int column=dwVertId-row*m_width;
 
-	UnsignedByte *data=map->getDataPtr();
 	pvVertex->X=(m_patchOriginX+column)*MAP_XY_FACTOR;
 	pvVertex->Y=(m_patchOriginY+row)*MAP_XY_FACTOR;
-	pvVertex->Z=(Real)data[(m_patchOriginX+column)+(m_patchOriginY+row)*map->getXExtent()]*MAP_HEIGHT_SCALE;
+	pvVertex->Z=map->toWorldHeight(map->getQuickHeight(m_patchOriginX+column, m_patchOriginY+row));
 
 	return pvVertex;
 }
@@ -1374,7 +1373,11 @@ void W3DVolumetricShadow::updateOptimalExtrusionPadding()
 
 		m_extraExtrusionPadding = objPos.Z - baseGroundHeight + SHADOW_EXTRUSION_BUFFER;
 
-		DEBUG_ASSERTCRASH(m_extraExtrusionPadding <= (255.0f*MAP_HEIGHT_SCALE),("Warning: Volumetric Shadow UpdateOptimalExtrusionPadding too large"));
+#ifdef DEBUG_CRASHING
+		const auto *map = TheTerrainRenderObject->getMap();
+		const Real maxHeight = map ? map->toWorldHeight(map->getMaxHeightValue()) : K_MAX_HEIGHT * MAP_HEIGHT_SCALE;
+		DEBUG_ASSERTCRASH(m_extraExtrusionPadding <= maxHeight, ("Warning: Volumetric Shadow UpdateOptimalExtrusionPadding too large"));
+#endif
 	}
 }
 

@@ -270,6 +270,7 @@ public:
 	//
 	virtual void setRawMapHeight(const ICoord2D *gridPos, Int height)=0;
 	virtual Int getRawMapHeight(const ICoord2D *gridPos)=0;
+	virtual Real getRawMapHeightScale() const;
 
 
   ////////////////////////////////////////////////////

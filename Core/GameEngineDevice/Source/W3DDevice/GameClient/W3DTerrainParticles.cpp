@@ -212,7 +212,7 @@ UnsignedShort W3DTerrainParticles::addVertex(const WorldHeightMap& map, const Pa
 	vertex.diffuse = particle.diffuse;
 	vertex.x = x * MAP_XY_FACTOR;
 	vertex.y = y * MAP_XY_FACTOR;
-	vertex.z = map.getQuickHeight(x + map.getBorderSizeInline(), y + map.getBorderSizeInline()) * MAP_HEIGHT_SCALE + TerrainParticles::Z_OFFSET;
+	vertex.z = map.toWorldHeight(map.getQuickHeight(x + map.getBorderSizeInline(), y + map.getBorderSizeInline())) + TerrainParticles::Z_OFFSET;
 	const Real deltaX = vertex.x - particle.loc.X;
 	const Real deltaY = vertex.y - particle.loc.Y;
 	const Real localX = particle.cosine * deltaX - particle.sine * deltaY;

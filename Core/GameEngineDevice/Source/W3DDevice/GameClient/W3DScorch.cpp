@@ -134,7 +134,7 @@ static Real getMapHeight(WorldHeightMap& map, Int x, Int y)
 {
 	x += map.getBorderSizeInline();
 	y += map.getBorderSizeInline();
-	return map.getDataPtr()[x + y * map.getXExtent()] * MAP_HEIGHT_SCALE;
+	return map.toWorldHeight(map.getQuickHeight(x, y));
 }
 
 void W3DScorch::updateScorches(WorldHeightMap& map)

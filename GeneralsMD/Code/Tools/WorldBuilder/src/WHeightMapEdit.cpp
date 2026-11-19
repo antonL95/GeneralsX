@@ -114,7 +114,7 @@ WorldHeightMapEdit::WorldHeightMapEdit(Int width, Int height, UnsignedByte initi
 	m_blendTileNdxes = new Short[m_dataSize];
 	m_extraBlendTileNdxes = new Short[m_dataSize];
 	m_cliffInfoNdxes = new Short[m_dataSize];
-	m_data = new UnsignedByte[m_dataSize + m_width+1];
+	m_data = new UnsignedShort[m_dataSize + m_width+1];
 	m_numBitmapTiles = 0;
 	m_numBlendedTiles = 1;
 	m_numCliffInfo = 1;
@@ -178,6 +178,8 @@ m_warnTooManyBlend(false)
 	REF_PTR_SET(m_terrainTex, pThis->m_terrainTex);
 	REF_PTR_SET(m_alphaTerrainTex, pThis->m_alphaTerrainTex);
 	m_dataSize = pThis->m_dataSize;
+	m_heightSampleBytes = pThis->m_heightSampleBytes;
+	m_heightScale = pThis->m_heightScale;
 	m_terrainTexHeight = pThis->m_terrainTexHeight;
 	m_alphaTexHeight = pThis->m_alphaTexHeight;
 	m_alphaEdgeHeight = pThis->m_alphaEdgeHeight;
@@ -219,7 +221,7 @@ m_warnTooManyBlend(false)
 	m_cellCliffState	= new UnsignedByte[numBytesX*numBytesY];
 	memset(m_cellFlipState,0,numBytesX*numBytesY);	//clear all flags
 	memset(m_cellCliffState,0,numBytesX*numBytesY);	//clear all flags
-	m_data = new UnsignedByte[m_dataSize + m_width+1];
+	m_data = new UnsignedShort[m_dataSize + m_width+1];
 	if (m_data == nullptr) {
 		AfxMessageBox(IDS_OUT_OF_MEMORY);
 		m_dataSize = 0;
@@ -576,7 +578,7 @@ void WorldHeightMapEdit::saveToFile(DataChunkOutput &chunkWriter)
 	int i;
 
 	/**********HEIGHT MAP DATA ***********************/
-	chunkWriter.openDataChunk("HeightMapData", K_HEIGHT_MAP_VERSION_4);
+	chunkWriter.openDataChunk("HeightMapData", m_heightSampleBytes == 2 ? K_HEIGHT_MAP_VERSION_5 : K_HEIGHT_MAP_VERSION_4);
 	Int numBoundaries = m_boundaries.size();
 		chunkWriter.writeInt(m_width);
 		chunkWriter.writeInt(m_height);
@@ -587,7 +589,9 @@ void WorldHeightMapEdit::saveToFile(DataChunkOutput &chunkWriter)
 			chunkWriter.writeInt(m_boundaries[i].y);
 		}
 		chunkWriter.writeInt(m_dataSize);
-		chunkWriter.writeArrayOfBytes((char *)m_data, m_dataSize);
+		std::vector<UnsignedByte> heights(m_dataSize * m_heightSampleBytes);
+		HeightMapSamples::encode({m_data, static_cast<std::size_t>(m_dataSize)}, heights, m_heightSampleBytes);
+		chunkWriter.writeArrayOfBytes(reinterpret_cast<char *>(heights.data()), heights.size());
 
 	/*
 		chunkWriter.writeInt(m_width);
@@ -1824,7 +1828,7 @@ Bool WorldHeightMapEdit::resize(Int newXSize, Int newYSize, Int newHeight, Int n
 	Short *tileNdxes = new Short[newDataSize];
 	Short *blendTileNdxes = new Short[newDataSize];
 	Short *extraBlendTileNdxes = new Short[newDataSize];
-	UnsignedByte *data = new UnsignedByte[newDataSize];
+	UnsignedShort *data = new UnsignedShort[newDataSize];
 	Short  *cliffInfoNdxes = new Short[newDataSize];
 
 	Int i, j;
@@ -1871,7 +1875,7 @@ Bool WorldHeightMapEdit::resize(Int newXSize, Int newYSize, Int newHeight, Int n
 	delete(m_cliffInfoNdxes);
 	delete(m_blendTileNdxes);
 	delete(m_extraBlendTileNdxes);
-	delete(m_data);
+	delete[](m_data);
 	m_tileNdxes = tileNdxes;
 	m_blendTileNdxes = blendTileNdxes;
 	m_extraBlendTileNdxes = extraBlendTileNdxes;

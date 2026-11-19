@@ -640,8 +640,8 @@ void W3DRoadBuffer::loadFloat4PtSection(RoadSegment *pRoad, Vector2 loc,
 			nextColumn.lightGradient = false;
 			nextColumn.uIndex = i;
 
-			Real minHeight=m_map->getMaxHeightValue()*MAP_HEIGHT_SCALE;
-			Real maxHeight = m_map->getMinHeightValue()*MAP_HEIGHT_SCALE;
+			Real minHeight=m_map->toWorldHeight(m_map->getMaxHeightValue());
+			Real maxHeight = m_map->toWorldHeight(m_map->getMinHeightValue());
 			for (j=0; j<vCount; j++) {
 				Real jFactor = ((Real)j / (vCount-1));
 				Real jBarFactor = 1.0f-jFactor;
@@ -864,8 +864,8 @@ void W3DRoadBuffer::loadLit4PtSection(RoadSegment *pRoad, UnsignedShort *ib, Ver
 			nextColumn.lightGradient = false;
 			nextColumn.uIndex = i;
 
-			Real minHeight=m_map->getMaxHeightValue()*MAP_HEIGHT_SCALE;
-			Real maxHeight = m_map->getMinHeightValue()*MAP_HEIGHT_SCALE;
+			Real minHeight=m_map->toWorldHeight(m_map->getMaxHeightValue());
+			Real maxHeight = m_map->toWorldHeight(m_map->getMinHeightValue());
 			for (j=0; j<vCount; j++) {
 				Real jFactor = ((Real)j / (vCount-1));
 				Real jBarFactor = 1.0f-jFactor;

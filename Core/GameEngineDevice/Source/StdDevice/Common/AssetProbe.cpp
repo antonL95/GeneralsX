@@ -19,6 +19,7 @@
 #include "WWLib/chunkio.h"
 
 #include <algorithm>
+#include <bit>
 #include <cerrno>
 #include <cctype>
 #include <cstdio>
@@ -431,14 +432,14 @@ struct MapRule
 };
 
 const MapRule mapRules[] = {
-	{"", "HeightMapData", K_HEIGHT_MAP_VERSION_4},
+	{"", "HeightMapData", K_HEIGHT_MAP_VERSION_5},
 	{"", "BlendTileData", K_BLEND_TILE_VERSION_8},
 	{"", "WorldInfo", K_WORLDDICT_VERSION_1},
 	{"", "ObjectsList", K_OBJECTS_VERSION_3},
 	{"", "PolygonTriggers", K_TRIGGERS_VERSION_4},
 	{"", "SidesList", SidesList::MAX_MAP_SIDES_VERSION},
 	{"", "Teams", 1},
-	{"", "GlobalLighting", K_LIGHTING_VERSION_3},
+	{"", "GlobalLighting", K_LIGHTING_VERSION_8},
 	{"", "WaypointsList", K_WAYPOINTS_VERSION_1},
 	{"", "MapPreview", K_MAPPREVIEW_VERSION_1},
 	{"", "FUNKY_TILING", 1},
@@ -513,7 +514,8 @@ bool walkMap(DataChunkInput& input, CachedFileInputStream& stream, const std::st
 		const auto rule = std::find_if(std::begin(mapRules), std::end(mapRules), [&](const MapRule& row) {
 			return row.name == label && row.parent == parent;
 		});
-		const bool versionKnown = rule != std::end(mapRules) && version > 0 && version <= rule->maxVersion;
+		const bool versionKnown = rule != std::end(mapRules) && version > 0 && version <= rule->maxVersion &&
+			(label != "GlobalLighting" || version <= K_LIGHTING_VERSION_3 || version >= K_LIGHTING_VERSION_7);
 		const char *status = rule == std::end(mapRules) ? "unknown" :
 			!versionKnown ? "version" : parentHandled ? "known" : "unreachable";
 		++tally[{parent, label, version, status}];
@@ -565,7 +567,36 @@ bool probeMap(const std::string& name, const Entry& entry)
 	return ok;
 }
 
-bool probeMapSides(const std::string& name, const Entry& entry)
+bool writeMapHeights(const char *path, const WorldHeightMap &map)
+{
+	std::FILE *dump = std::fopen(path, "wb");
+	if (!dump)
+		return false;
+	const Int width = map.getXExtent();
+	const Int height = map.getYExtent();
+	std::fprintf(dump, "%d %d %u %a\n", width, height, map.getHeightSampleBytes(), map.getHeightScale());
+	for (Int y = 0; y < height; ++y)
+	{
+		for (Int x = 0; x < width; ++x)
+		{
+			const UnsignedShort sample = map.getHeight(x, y);
+			const UnsignedInt worldBits = std::bit_cast<UnsignedInt>(map.toWorldHeight(sample));
+			const UnsignedByte cell[] = {
+				static_cast<UnsignedByte>(sample),
+				static_cast<UnsignedByte>(sample >> 8),
+				static_cast<UnsignedByte>(worldBits),
+				static_cast<UnsignedByte>(worldBits >> 8),
+				static_cast<UnsignedByte>(worldBits >> 16),
+				static_cast<UnsignedByte>(worldBits >> 24)
+			};
+			std::fwrite(cell, sizeof(cell), 1, dump);
+		}
+	}
+	const bool ok = !std::ferror(dump);
+	return std::fclose(dump) == 0 && ok;
+}
+
+bool probeMapSides(const std::string& name, const Entry& entry, const char *heightDump = nullptr)
 {
 	CachedFileInputStream stream;
 	if (!stream.open(openEntry(entry)))
@@ -580,8 +611,8 @@ bool probeMapSides(const std::string& name, const Entry& entry)
 	try
 	{
 		DataChunkInput input(&stream);
-		WorldHeightMap::RegisterLogicalMapParsers(input, true);
-		parsed = input.parse();
+		const auto map = WorldHeightMap::readAuditMap(input);
+		parsed = map.Peek() != nullptr;
 		if (parsed)
 		{
 			record("map-sides", name, "SidesList", "", sides.getNumSides());
@@ -589,6 +620,28 @@ bool probeMapSides(const std::string& name, const Entry& entry)
 			record("map-side-flag", name, "SidesList", "", sides.getMapSideFlag());
 			if (const DataChunkInfo *unsupported = input.getUnsupportedRequiredChunk())
 				record("map-stop", name, unsupported->label.str(), std::to_string(unsupported->version));
+			if (map->getXExtent() > 0)
+				record("map-heights", name, std::to_string(map->getXExtent()), std::to_string(map->getYExtent()),
+					map->getXExtent() * map->getYExtent());
+			const auto opaque = map->getOpaqueBfmeLighting();
+			if (!opaque.empty())
+			{
+				constexpr char digits[] = "0123456789abcdef";
+				std::string hex;
+				hex.reserve(2 * opaque.size());
+				for (UnsignedByte byte : opaque)
+				{
+					hex += digits[byte >> 4];
+					hex += digits[byte & 0xf];
+				}
+				record("map-lighting-opaque", name, std::move(hex), "", opaque.size());
+			}
+			if (heightDump && (map->getXExtent() == 0 || !writeMapHeights(heightDump, *map)))
+			{
+				record("map-error", name, "height-dump");
+				TheSidesList = nullptr;
+				return false;
+			}
 		}
 	}
 	catch (ErrorCode error)
@@ -620,7 +673,7 @@ int probeMapSides(const Inventory& inventory)
 			ok = false;
 		}
 		else
-			ok = probeMapSides(entry->first, entry->second);
+			ok = probeMapSides(entry->first, entry->second, std::getenv("GENERALSX_MAP_HEIGHT_DUMP"));
 	}
 	else
 	{

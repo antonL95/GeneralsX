@@ -242,7 +242,7 @@ BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 	m_updating = false;
 	//Set height to the maximum value that can be stored.
 	//We should refine this with actual value.
-	m_maxHeight=(pow(256.0, sizeof(HeightSampleType))-1.0)*MAP_HEIGHT_SCALE;
+	m_maxHeight=K_MAX_HEIGHT * MAP_HEIGHT_SCALE;
 	m_minHeight=0;
 	m_shoreLineTilePositions=nullptr;
 	m_numShoreLineTiles=0;
@@ -707,8 +707,8 @@ bool BaseHeightMapRenderObjClass::Cast_Ray(RayCollisionTestClass & raytest)
 	const Int overhang = 2*VERTEX_BUFFER_TILE_LENGTH + borderSize; // Allow picking past the edge for scrolling & objects.
 
 	// The initial hit boxes are very rough and are only meant to narrow the search before the triangle intersection.
-	const Real mapMinHeight = MAP_HEIGHT_SCALE * m_map->getMinHeightValue();
-	const Real mapMaxHeight = MAP_HEIGHT_SCALE * m_map->getMaxHeightValue();
+	const Real mapMinHeight = m_map->toWorldHeight(m_map->getMinHeightValue());
+	const Real mapMaxHeight = m_map->toWorldHeight(m_map->getMaxHeightValue());
 	const Vector3 minPt(MAP_XY_FACTOR*(-overhang), MAP_XY_FACTOR*(-overhang), mapMinHeight);
 	const Vector3 maxPt(MAP_XY_FACTOR*(m_map->getXExtent()+overhang), MAP_XY_FACTOR*(m_map->getYExtent()+overhang), mapMaxHeight);
 	const MinMaxAABoxClass mmbox(minPt, maxPt);
@@ -780,13 +780,13 @@ bool BaseHeightMapRenderObjClass::Cast_Ray(RayCollisionTestClass & raytest)
 
 		for (j=startCellY; j<=endCellY; j++) {
 			for (i=startCellX; i<=endCellX; i++) {
-				Short cur = getClipHeight(i+borderSize,j+borderSize);
+				Int cur = getClipHeight(i+borderSize,j+borderSize);
 				if (cur<minHt) minHt = cur;
 				if (maxHt<cur) maxHt = cur;
 			}
 		}
-		Vector3 minPt(MAP_XY_FACTOR*(startCellX-1), MAP_XY_FACTOR*(startCellY-1), MAP_HEIGHT_SCALE*(minHt-1));
-		Vector3 maxPt(MAP_XY_FACTOR*(endCellX+1), MAP_XY_FACTOR*(endCellY+1), MAP_HEIGHT_SCALE*(maxHt+1));
+		Vector3 minPt(MAP_XY_FACTOR*(startCellX-1), MAP_XY_FACTOR*(startCellY-1), m_map->toWorldHeight(minHt-1));
+		Vector3 maxPt(MAP_XY_FACTOR*(endCellX+1), MAP_XY_FACTOR*(endCellY+1), m_map->toWorldHeight(maxHt+1));
 		MinMaxAABoxClass mmbox(minPt, maxPt);
 		hbox.Init(mmbox);
 	}
@@ -814,19 +814,19 @@ bool BaseHeightMapRenderObjClass::Cast_Ray(RayCollisionTestClass & raytest)
 				//bottom triangle first
 				P0.X=ADJUST_FROM_INDEX_TO_REAL(X);
 				P0.Y=ADJUST_FROM_INDEX_TO_REAL(Y);
-				P0.Z=MAP_HEIGHT_SCALE*(float)getClipHeight(X, Y);
+				P0.Z=m_map->toWorldHeight(getClipHeight(X, Y));
 
 				P1.X=ADJUST_FROM_INDEX_TO_REAL(X+1);
 				P1.Y=ADJUST_FROM_INDEX_TO_REAL(Y);
-				P1.Z=MAP_HEIGHT_SCALE*(float)getClipHeight(X+1, Y);
+				P1.Z=m_map->toWorldHeight(getClipHeight(X+1, Y));
 
 				P2.X=ADJUST_FROM_INDEX_TO_REAL(X+1);
 				P2.Y=ADJUST_FROM_INDEX_TO_REAL(Y+1);
-				P2.Z=MAP_HEIGHT_SCALE*(float)getClipHeight(X+1, Y+1);
+				P2.Z=m_map->toWorldHeight(getClipHeight(X+1, Y+1));
 
 				P3.X=ADJUST_FROM_INDEX_TO_REAL(X);
 				P3.Y=ADJUST_FROM_INDEX_TO_REAL(Y+1);
-				P3.Z=MAP_HEIGHT_SCALE*(float)getClipHeight(X, Y+1);
+				P3.Z=m_map->toWorldHeight(getClipHeight(X, Y+1));
 
 
 				tri.V[0] = &P0;
@@ -933,23 +933,23 @@ Real BaseHeightMapRenderObjClass::getHeightMapHeight(Real x, Real y, Coord3D* no
 			normal->y = 0.0f;
 			normal->z = 1.0f;
 		}
-		return getClipHeight(ix, iy) * MAP_HEIGHT_SCALE;
+		return logicHeightMap->toWorldHeight(getClipHeight(ix, iy));
 	}
 
-	const UnsignedByte* data = logicHeightMap->getDataPtr();
+	const UnsignedShort* data = logicHeightMap->getDataPtr();
 	int idx = ix + iy*xExtent;
 	float p0 = data[idx];
 	float p2 = data[idx + xExtent + 1];
 	if (fy > fx) // test if we are in the upper triangle
 	{
 		float p3 = data[idx + xExtent];
-		height = (p3 + (1.0f-fy)*(p0-p3) + fx*(p2-p3)) * MAP_HEIGHT_SCALE;
+		height = logicHeightMap->toWorldHeight(p3 + (1.0f-fy)*(p0-p3) + fx*(p2-p3));
 	}
 	else
 	{
 		// we are in the lower triangle
 		float p1 = data[idx + 1];
-		height = (p1 + fy*(p2-p1) + (1.0f-fx)*(p0-p1)) * MAP_HEIGHT_SCALE;
+		height = logicHeightMap->toWorldHeight(p1 + fy*(p2-p1) + (1.0f-fx)*(p0-p1));
 	}
 
 //  DEBUG_ASSERTCRASH( height < 30, ("SOMEBODY THINKS THE CLIENT HEIGHTMAP IS GOOD ENOUGH FOR LOGIC SAMPLING."));
@@ -969,7 +969,7 @@ Real BaseHeightMapRenderObjClass::getHeightMapHeight(Real x, Real y, Coord3D* no
  		int idx0 = ix + iy*xExtent;
  		int idx3 = ix + iy*xExtent+xExtent;
 		int idx9 = ix + (iy+2)*xExtent;
-		UnsignedByte d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11;
+		UnsignedShort d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11;
 		d0 = data[idx0];
 		d1 = data[idx0+1];
 		d2 = data[idx3+1];
@@ -1005,8 +1005,8 @@ Real BaseHeightMapRenderObjClass::getHeightMapHeight(Real x, Real y, Coord3D* no
 
 
 			Vector3 l2r, n2f, normalAtTexel;
-			l2r.Set(2*MAP_XY_FACTOR/MAP_HEIGHT_SCALE, 0, deltaZ_X);
-			n2f.Set(0, 2*MAP_XY_FACTOR/MAP_HEIGHT_SCALE, deltaZ_Y);
+			l2r.Set(2*MAP_XY_FACTOR/logicHeightMap->getHeightScale(), 0, deltaZ_X);
+			n2f.Set(0, 2*MAP_XY_FACTOR/logicHeightMap->getHeightScale(), deltaZ_Y);
 			Vector3::Normalized_Cross_Product(l2r,n2f, &normalAtTexel);
 			normal->x = normalAtTexel.X;
 			normal->y = normalAtTexel.Y;
@@ -1098,7 +1098,7 @@ Bool BaseHeightMapRenderObjClass::isClearLineOfSight(const Coord3D& pos, const C
 	Real zinc = dz * nsInv;
 
 	Bool result = true;
-	const UnsignedByte* data = logicHeightMap->getDataPtr();
+	const UnsignedShort* data = logicHeightMap->getDataPtr();
 	Int xExtent = logicHeightMap->getXExtent();
 	Int yExtent = logicHeightMap->getYExtent();
 	for (Int curpixel = 0; curpixel < numpixels; curpixel++)
@@ -1119,7 +1119,7 @@ Bool BaseHeightMapRenderObjClass::isClearLineOfSight(const Coord3D& pos, const C
 		height = MAX(height, (float)data[idx + xExtent + 1]);
 		// @fix Convert raw heightmap byte to world-space Z before comparing with LOS line.
 		// Without this, raw values (0-255) are compared against world Z, breaking LOS.
-		height *= MAP_HEIGHT_SCALE;
+		height = logicHeightMap->toWorldHeight(height);
 		// if terrainHeight > z, we can't see, so punt.
 		// add a little fudge to account for slop.
 		const Real LOS_FUDGE = 0.5f;
@@ -1247,11 +1247,11 @@ Real BaseHeightMapRenderObjClass::getMaxCellHeight(Real x, Real y) const
 	if (iY >= (logicHeightMap->getYExtent()-1)) {
 		iY = logicHeightMap->getYExtent()-2;
 	}
-	UnsignedByte *data = logicHeightMap->getDataPtr();
-	p0=data[iX+iY*logicHeightMap->getXExtent()]*MAP_HEIGHT_SCALE;
-	p1=data[(iX+offset)+iY*logicHeightMap->getXExtent()]*MAP_HEIGHT_SCALE;
-	p2=data[(iX+offset)+(iY+offset)*logicHeightMap->getXExtent()]*MAP_HEIGHT_SCALE;
-	p3=data[iX+(iY+offset)*logicHeightMap->getXExtent()]*MAP_HEIGHT_SCALE;
+	const UnsignedShort *data = logicHeightMap->getDataPtr();
+	p0=logicHeightMap->toWorldHeight(data[iX+iY*logicHeightMap->getXExtent()]);
+	p1=logicHeightMap->toWorldHeight(data[(iX+offset)+iY*logicHeightMap->getXExtent()]);
+	p2=logicHeightMap->toWorldHeight(data[(iX+offset)+(iY+offset)*logicHeightMap->getXExtent()]);
+	p3=logicHeightMap->toWorldHeight(data[iX+(iY+offset)*logicHeightMap->getXExtent()]);
 
 	height=p0;
 	// GeneralsX @bugfix BenderAI 13/02/2026 Replace __max with MAX (fighter19 pattern)
@@ -1322,7 +1322,7 @@ Bool BaseHeightMapRenderObjClass::evaluateAsVisibleCliff(Int xIndex, Int yIndex,
 
 	// Note: getHeight will protect us from going out of bounds by returning 0 if we give it
 	// a value outside of its bounds.
-	UnsignedByte bytes[4] =
+	UnsignedShort samples[4] =
 	{
 		m_map->getHeight(xIndex + 0, yIndex + 0),
 		m_map->getHeight(xIndex + 1, yIndex + 0),
@@ -1332,10 +1332,10 @@ Bool BaseHeightMapRenderObjClass::evaluateAsVisibleCliff(Int xIndex, Int yIndex,
 
 	Real heights[4] =
 	{
-		INT_TO_REAL(bytes[0]) * MAP_HEIGHT_SCALE,
-		INT_TO_REAL(bytes[1]) * MAP_HEIGHT_SCALE,
-		INT_TO_REAL(bytes[2]) * MAP_HEIGHT_SCALE,
-		INT_TO_REAL(bytes[3]) * MAP_HEIGHT_SCALE,
+		m_map->toWorldHeight(samples[0]),
+		m_map->toWorldHeight(samples[1]),
+		m_map->toWorldHeight(samples[2]),
+		m_map->toWorldHeight(samples[3]),
 	};
 
 	Bool anyImpassable = FALSE;
@@ -1613,12 +1613,12 @@ void BaseHeightMapRenderObjClass::updateShorelineTile(Int i, Int j, Int border, 
 
 	Real X0=(i-border)*MAP_XY_FACTOR;
 	Real Y0=(j-border)*MAP_XY_FACTOR;
-	waterSide=(waterZ0=TheWaterRenderObj->getWaterHeight(X0,Y0)) > ((terrainZ0=MAP_HEIGHT_SCALE*pMap->getHeight(i,j)));
+	waterSide=(waterZ0=TheWaterRenderObj->getWaterHeight(X0,Y0)) > ((terrainZ0=pMap->toWorldHeight(pMap->getHeight(i,j))));
 	Real X1=(i-border+1)*MAP_XY_FACTOR;
 	Real Y1=(j-border+1)*MAP_XY_FACTOR;
-	waterSide |=((waterZ1=TheWaterRenderObj->getWaterHeight(X1,Y0)) > ((terrainZ1=MAP_HEIGHT_SCALE*pMap->getHeight(i+1,j)))) << 1;
-	waterSide |=((waterZ2=TheWaterRenderObj->getWaterHeight(X1,Y1)) > ((terrainZ2=MAP_HEIGHT_SCALE*pMap->getHeight(i+1,j+1)))) << 2;
-	waterSide |=((waterZ3=TheWaterRenderObj->getWaterHeight(X0,Y1)) > ((terrainZ3=MAP_HEIGHT_SCALE*pMap->getHeight(i,j+1)))) << 3;
+	waterSide |=((waterZ1=TheWaterRenderObj->getWaterHeight(X1,Y0)) > ((terrainZ1=pMap->toWorldHeight(pMap->getHeight(i+1,j))))) << 1;
+	waterSide |=((waterZ2=TheWaterRenderObj->getWaterHeight(X1,Y1)) > ((terrainZ2=pMap->toWorldHeight(pMap->getHeight(i+1,j+1))))) << 2;
+	waterSide |=((waterZ3=TheWaterRenderObj->getWaterHeight(X0,Y1)) > ((terrainZ3=pMap->toWorldHeight(pMap->getHeight(i,j+1))))) << 3;
 
 	if (!waterSide || (waterZ0*waterZ1*waterZ2*waterZ3) <= 0)
 		return;	//all verts are on positive (surface) side of water so don't need blending.  Or one of them is outside the water plane bounds (waterHeight <= 0!)
@@ -1803,10 +1803,6 @@ Int BaseHeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pM
 	if (m_roadBuffer)
 		m_roadBuffer->setMap(m_map);
 #endif
-	HeightSampleType *data = nullptr;
-	if (pMap) {
-		data = pMap->getDataPtr();
-	}
 
 	if (m_treeBuffer) {
 		Region2D bounds;
@@ -1833,13 +1829,13 @@ Int BaseHeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pM
 
 			for (j=0; j<m_mapDY; j++) {
 				for (i=0; i<m_mapDX; i++) {
-					Short cur = pMap->getHeight(i,j);
+					Int cur = pMap->getHeight(i,j);
 					if (cur<minHt) minHt = cur;
 					if (maxHt<cur) maxHt = cur;
 				}
 			}
-			m_minHeight = minHt * MAP_HEIGHT_SCALE;
-			m_maxHeight = maxHt * MAP_HEIGHT_SCALE;
+			m_minHeight = pMap->toWorldHeight(minHt);
+			m_maxHeight = pMap->toWorldHeight(maxHt);
 
 			//Find all shoreline tiles so they can get extra alpha blend
 			updateShorelineTiles(0,0,m_mapDX-1,m_mapDY-1,pMap);
@@ -1859,7 +1855,7 @@ Int BaseHeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pM
 	if (m_stageTwoTexture == nullptr && m_treeBuffer) {
 		needToAllocate = true;
 	}
-	if (data && needToAllocate)
+	if (pMap && pMap->getDataPtr() && needToAllocate)
 	{
 		//requested heightmap different from old one.
 		//allocate a new one.
@@ -1957,8 +1953,8 @@ Int BaseHeightMapRenderObjClass::getStaticDiffuse(Int x, Int y)
 	}
 
 	//top-left sample
-	l2r.Set(2*MAP_XY_FACTOR,0,MAP_HEIGHT_SCALE*(m_map->getHeight(up1, y) - m_map->getHeight(un0, y)));
-	n2f.Set(0,2*MAP_XY_FACTOR,MAP_HEIGHT_SCALE*(m_map->getHeight(x, vp1) - m_map->getHeight(x, vn0)));
+	l2r.Set(2*MAP_XY_FACTOR,0,m_map->toWorldHeight(m_map->getHeight(up1, y) - m_map->getHeight(un0, y)));
+	n2f.Set(0,2*MAP_XY_FACTOR,m_map->toWorldHeight(m_map->getHeight(x, vp1) - m_map->getHeight(x, vn0)));
 
 	Vector3::Normalized_Cross_Product(l2r,n2f, &normalAtTexel);
 
@@ -1966,7 +1962,7 @@ Int BaseHeightMapRenderObjClass::getStaticDiffuse(Int x, Int y)
 	vertex.x=ADJUST_FROM_INDEX_TO_REAL(x);
 	vertex.y=ADJUST_FROM_INDEX_TO_REAL(y);
 
-	vertex.z=  ((float)m_map->getHeight(x,y))*MAP_HEIGHT_SCALE;
+	vertex.z=  m_map->toWorldHeight(m_map->getHeight(x,y));
 	vertex.u1=0;
 	vertex.v1=0;
 	vertex.u2=1;

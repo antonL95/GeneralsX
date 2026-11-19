@@ -204,6 +204,7 @@ public:
 	void registerParser( const AsciiString& label, const AsciiString& parentLabel, DataChunkParserPtr parser, void *userData = nullptr );
 	void registerVersionedParser(const AsciiString& label, const AsciiString& parentLabel,
 		DataChunkParserPtr parser, DataChunkVersionType maxVersion, Bool required = false);
+	void skipUnsupportedRequiredChunk(const DataChunkInfo &info);
 	const DataChunkInfo *getUnsupportedRequiredChunk() const
 	{
 		return m_unsupportedRequiredChunk.label.isEmpty() ? nullptr : &m_unsupportedRequiredChunk;

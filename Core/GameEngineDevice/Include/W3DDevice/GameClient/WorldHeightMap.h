@@ -31,11 +31,15 @@
 
 #include "Lib/BaseType.h"
 #include "WWLib/refcount.h"
+#include "WWLib/ref_ptr.h"
 #include "WWMath/vector3.h"
 #include "W3DDevice/GameClient/TileData.h"
+#include "W3DDevice/GameClient/HeightMapSamples.h"
 #include "Common/MapObject.h"
 
 #include "Common/STLTypedefs.h"
+#include <memory>
+#include <span>
 typedef std::vector<ICoord2D> VecICoord2D;
 
 
@@ -132,7 +136,9 @@ protected:
 	Int m_borderSize;		///< Non-playable border area.
 	VecICoord2D m_boundaries;	///< the in-game boundaries
 	Int m_dataSize;			///< size of m_data.
-	UnsignedByte *m_data;	///< array of z(height) values in the height map.
+	UnsignedShort *m_data;
+	unsigned m_heightSampleBytes = 1;
+	Real m_heightScale = MAP_HEIGHT_SCALE;
 
   UnsignedByte *m_seismicUpdateFlag;  ///< array of bits to prevent ovelapping physics-update regions from doubling effects on shared cells
   UnsignedInt   m_seismicUpdateWidth; ///< width of the array holding SeismicUpdateFlags
@@ -213,9 +219,8 @@ protected:
 
 protected:	 // file reader callbacks.
 	static Bool ParseHeightMapDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
-	Bool ParseHeightMapData(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseSizeOnlyInChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
-	Bool ParseSizeOnly(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	void readHeightData(DataChunkInput &file, unsigned version, Bool logicalDataOnly);
 	static Bool ParseBlendTileDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	Bool ParseBlendTileData(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseWorldDictDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
@@ -223,14 +228,23 @@ protected:	 // file reader callbacks.
 	static Bool ParseObjectDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	Bool ParseObjectData(DataChunkInput &file, DataChunkInfo *info, void *userData, Bool readDict);
 	static Bool ParseLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	static Bool ParseLogicalLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	void releaseMapData();
 
+private:
+	struct BfmeLighting;
+	std::unique_ptr<BfmeLighting> m_bfmeLighting;
+	Bool m_releaseAlphaTiles = true;
+	void readBfmeLighting(DataChunkInput &file, unsigned version);
+	void applyBfmeLighting() const;
+
 protected:
-	WorldHeightMap();			///< Simple constructor for WorldHeightMapEdit class.
+	explicit WorldHeightMap(Bool initializeEditor = true);
 
 public: // constructors/destructors
 	WorldHeightMap(ChunkInputStream *pFile, Bool bHMapOnly=false);	// read from file.
 	static void RegisterLogicalMapParsers(DataChunkInput &file, Bool metadataOnly);
+	static RefCountPtr<WorldHeightMap> readAuditMap(DataChunkInput &file);
 	virtual ~WorldHeightMap() override;			// destroy.
 
 public:  // Boundary info
@@ -238,10 +252,14 @@ public:  // Boundary info
 
 public:  // height map info.
 	static Int getMinHeightValue() {return K_MIN_HEIGHT;}
-	static Int getMaxHeightValue() {return K_MAX_HEIGHT;}
+	Int getMaxHeightValue() const { return m_heightSampleBytes == 2 ? 65535 : K_MAX_HEIGHT; }
 	static Bool isValidMapSize(Int width, Int height, Int borderSize); ///< Within MAX_MAP_DIMENSION and MAX_MAP_AREA, width and height include the border
 
-	UnsignedByte *getDataPtr() {return m_data;}
+	UnsignedShort *getDataPtr() { return m_data; }
+	unsigned getHeightSampleBytes() const { return m_heightSampleBytes; }
+	Real getHeightScale() const { return m_heightScale; }
+	Real toWorldHeight(Real sample) const { return HeightMapSamples::toWorldHeight(sample, m_heightScale); }
+	std::span<const UnsignedByte> getOpaqueBfmeLighting() const;
 
 
 	Int getXExtent() const {return m_width;}	///<number of vertices in x
@@ -269,10 +287,10 @@ public:  // height map info.
 	virtual Int getBorderSize() override {return m_borderSize;}
   Int getBorderSizeInline() const { return m_borderSize; }
 	/// Get height with the offset that HeightMapRenderObjClass uses built in.
-	UnsignedByte getDisplayHeight(Int x, Int y) { return m_data[x+m_drawOriginX+m_width*(y+m_drawOriginY)];}
+	UnsignedShort getDisplayHeight(Int x, Int y) { return m_data[x+m_drawOriginX+m_width*(y+m_drawOriginY)]; }
 
 	/// Get height in normal coordinates.
-	UnsignedByte getHeight(Int xIndex, Int yIndex)
+	UnsignedShort getHeight(Int xIndex, Int yIndex) const
 	{
 		Int ndx = (yIndex*m_width)+xIndex;
 		if ((ndx>=0) && (ndx<m_dataSize) && m_data)
@@ -282,7 +300,7 @@ public:  // height map info.
 	};
 
 	///Faster version of above function without all the safety checks
-	UnsignedByte getQuickHeight(Int xIndex, Int yIndex) const
+	UnsignedShort getQuickHeight(Int xIndex, Int yIndex) const
 	{
 		return m_data[yIndex * m_width + xIndex];
 	}
@@ -346,9 +364,10 @@ public:  // Flat tile texture info.
 	UnsignedByte *getRGBAlphaDataForWidth(Int width, TBlendTileInfo *pBlend);
 
 public:  // modify height value
-	void setRawHeight(Int xIndex, Int yIndex, UnsignedByte height) {
+	void setRawHeight(Int xIndex, Int yIndex, Int height) {
 		Int ndx = (yIndex*m_width)+xIndex;
-		if ((ndx>=0) && (ndx<m_dataSize) && m_data) m_data[ndx]=height;
+		if ((ndx>=0) && (ndx<m_dataSize) && m_data)
+			m_data[ndx] = m_heightSampleBytes == 2 ? static_cast<UnsignedShort>(height) : static_cast<UnsignedByte>(height);
 	};
 public: // Read tile utilities. jba [7/9/2003]
 	// GeneralsX @feature mrkinglollipop 11/07/2026 Adds expectedTileCount/pIsLegacyGrid so the caller's

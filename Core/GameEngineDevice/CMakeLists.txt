@@ -85,6 +85,7 @@ set(GAMEENGINEDEVICE_SRC
 #    Include/W3DDevice/GameClient/W3DWaypointBuffer.h
 #    Include/W3DDevice/GameClient/W3DWebBrowser.h
     Include/W3DDevice/GameClient/WorldHeightMap.h
+    Include/W3DDevice/GameClient/HeightMapSamples.h
 #    Include/W3DDevice/GameLogic/W3DGameLogic.h
 #    Include/W3DDevice/GameLogic/W3DGhostObject.h
 #    Include/W3DDevice/GameLogic/W3DTerrainLogic.h

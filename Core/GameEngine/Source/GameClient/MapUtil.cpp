@@ -268,7 +268,7 @@ static Bool loadMap( AsciiString filename )
 	m_waypoints = NEW WaypointMap;
 
 	const AsciiString& root = AsciiString::TheEmptyString;
-	file.registerVersionedParser("HeightMapData", root, ParseSizeOnlyInChunk, 5, true);
+	file.registerVersionedParser("HeightMapData", root, ParseSizeOnlyInChunk, K_HEIGHT_MAP_VERSION_5, true);
 	file.registerVersionedParser("WorldInfo", root, ParseWorldDictDataChunk, K_WORLDDICT_VERSION_1);
 	file.registerVersionedParser("ObjectsList", root, ParseObjectsDataChunk, K_OBJECTS_VERSION_3);
 	if (!file.parse(nullptr)) {

@@ -34,6 +34,7 @@ class File;
 #define K_HEIGHT_MAP_VERSION_2	2	// Height map cell = 10.0
 #define K_HEIGHT_MAP_VERSION_3	3	// Added m_borderSize
 #define K_HEIGHT_MAP_VERSION_4	4	// Major rev. See comments at bottom of file.
+#define K_HEIGHT_MAP_VERSION_5	5
 #define K_BLEND_TILE_VERSION_1	1	// Height map cell = 5.0
 #define K_BLEND_TILE_VERSION_2	2	// Height map cell = 10.0
 #define K_BLEND_TILE_VERSION_3	3	// Added long diagonal blends.
@@ -53,6 +54,8 @@ class File;
 #define K_TRIGGERS_VERSION_3 3		// Added m_isRiver & m_riverStart
 #define K_TRIGGERS_VERSION_4 4		// Added layer name. Added in Zero Hour.
 #define K_LIGHTING_VERSION_1	1
+#define K_LIGHTING_VERSION_7	7
+#define K_LIGHTING_VERSION_8	8
 #define K_LIGHTING_VERSION_2	2	// Added 2 additional global lights for objects.
 #define K_LIGHTING_VERSION_3	3	// Added 2 additional global lights for terrain.
 #define K_WORLDDICT_VERSION_1 1

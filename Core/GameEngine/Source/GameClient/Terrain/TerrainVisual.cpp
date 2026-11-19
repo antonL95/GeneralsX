@@ -28,6 +28,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/MapObject.h"
 #include "Common/Xfer.h"
 #include "GameClient/TerrainVisual.h"
 
@@ -54,6 +55,11 @@ TerrainVisual::TerrainVisual()
 TerrainVisual::~TerrainVisual()
 {
 
+}
+
+Real TerrainVisual::getRawMapHeightScale() const
+{
+	return MAP_HEIGHT_SCALE;
 }
 
 //-------------------------------------------------------------------------------------------------
