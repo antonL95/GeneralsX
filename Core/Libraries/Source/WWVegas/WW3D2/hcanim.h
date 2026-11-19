@@ -85,6 +85,7 @@ public:
 	virtual float							Get_Frame_Rate() override { return FrameRate; }
 	virtual float							Get_Total_Time() override { return (float)NumFrames / FrameRate; }
 	int							Get_Flavor() { return Flavor; }
+	unsigned Get_Unknown_Motion_Channels() const { return UnknownMotionChannels; }
 
 	virtual void							Get_Translation(Vector3& translation, int pividx,float frame) const override;
 	virtual void							Get_Orientation(Quaternion& orientation, int pividx,float frame) const override;
@@ -109,6 +110,7 @@ private:
 	int							NumFrames;
 	int							NumNodes;
 	int							Flavor;
+	unsigned UnknownMotionChannels = 0;
 	float							FrameRate;
 
 	NodeCompressedMotionStruct *		NodeMotion;

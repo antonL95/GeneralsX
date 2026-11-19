@@ -36,6 +36,8 @@ static void drawFramerateBar();
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 #include <numeric>
 #include <cmath>
+#include "WW3D2/hanim.h"
+#include "WW3D2/htree.h"
 #include <stdlib.h>
 #include <windows.h>
 // GeneralsX @bugfix BenderAI 13/02/2026 - io.h is Windows-specific, use unistd.h on Linux
@@ -2105,6 +2107,38 @@ static AsciiString findAssetSmokeObjectModel(const char* name)
 	return {};
 }
 
+static Bool poseAssetSmokeModel(WW3DAssetManager& assets, RenderObjClass& model, const char* animation)
+{
+	const HTreeClass* tree = model.Get_HTree();
+	if (!tree)
+		return FALSE;
+
+	std::string name = animation;
+	if (name.find('.') == std::string::npos)
+		name = std::string(tree->Get_Name()) + "." + name;
+
+	HAnimClass* motion = assets.Get_HAnim(name.c_str());
+	if (!motion)
+		return FALSE;
+
+	const char* value = std::getenv("GENERALSX_ASSET_SMOKE_FRAME");
+	char* end = nullptr;
+	const Real frame = value ? std::strtof(value, &end) : 0.0f;
+	const Bool valid = (!value || (end != value && *end == '\0')) &&
+		std::isfinite(frame) && frame >= 0.0f && frame <= motion->Get_Num_Frames() - 1 &&
+		strcasecmp(tree->Get_Name(), motion->Get_HName()) == 0 &&
+		tree->Num_Pivots() == motion->Get_Num_Pivots();
+	if (valid)
+	{
+		model.Set_Animation(motion, frame, RenderObjClass::ANIM_MODE_MANUAL);
+		fprintf(stderr, "Asset smoke: animation '%s', frame %.3f of %d\n",
+			name.c_str(), frame, motion->Get_Num_Frames());
+		fflush(stderr);
+	}
+	motion->Release_Ref();
+	return valid;
+}
+
 static Bool drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real aspect)
 {
 	RenderObjClass* model = assets.Create_Render_Obj(name);
@@ -2112,6 +2146,15 @@ static Bool drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real
 	{
 		fprintf(stderr, "Asset smoke: cannot create W3D model '%s'\n", name);
 		fflush(stderr);
+		return FALSE;
+	}
+
+	const char* animation = std::getenv("GENERALSX_ASSET_SMOKE_ANIMATION");
+	if (animation && *animation && !poseAssetSmokeModel(assets, *model, animation))
+	{
+		fprintf(stderr, "Asset smoke: cannot pose model '%s' with animation '%s'\n", name, animation);
+		fflush(stderr);
+		model->Release_Ref();
 		return FALSE;
 	}
 

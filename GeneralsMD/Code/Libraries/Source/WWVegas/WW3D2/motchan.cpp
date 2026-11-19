@@ -50,6 +50,7 @@
 #include "WWLib/Vector.h"
 #include "WWMath/wwmath.h"
 #include "WWMath/quat.h"
+#include "WW3D2/w3dbfmechunks.h"
 //#include <Windows.h>
 // Static Table, for Adaptive Delta Decompressor
 #define FILTER_TABLE_SIZE (256)
@@ -75,7 +76,17 @@ static float filtertable[FILTER_TABLE_SIZE] = {
 	10000000.0f,
 
 };
-static bool table_valid = false;
+static void initialize_filter_table()
+{
+	static const bool initialized = [] {
+		for (int i = 0; i < FILTER_TABLE_GEN_SIZE; ++i) {
+			const float ratio = float(i) / float(FILTER_TABLE_GEN_SIZE);
+			filtertable[i + FILTER_TABLE_GEN_START] = 1.0f - WWMath::Sin(DEG_TO_RAD(90.0f * ratio));
+		}
+		return true;
+	}();
+	(void)initialized;
+}
 
 /***********************************************************************************************
  * MotionChannelClass::MotionChannelClass -- constructor                                       *
@@ -404,6 +415,38 @@ bool TimeCodedMotionChannelClass::Load_W3D(ChunkLoadClass & cload)
 	}
 	return true;
 }
+
+bool TimeCodedMotionChannelClass::Load_BFME_Motion(ChunkLoadClass & cload, unsigned frames, bool & unknownScalar)
+{
+	static_assert(W3dBfme::SteppedMovement == W3D_TIMECODED_BINARY_MOVEMENT_FLAG);
+	const unsigned length = cload.Cur_Chunk_Length();
+	if (length < 8 || length > 8 + 65536 * 18)
+		return false;
+
+	std::vector<W3dBfme::Byte> bytes(length);
+	if (cload.Read(bytes.data(), length) != length)
+		return false;
+
+	initialize_filter_table();
+	W3dBfme::Motion motion;
+	const auto result = W3dBfme::DecodeMotion(bytes, frames, filtertable, motion);
+	unknownScalar = result == W3dBfme::MotionResult::UnknownScalar;
+	if (result != W3dBfme::MotionResult::Decoded)
+		return unknownScalar;
+
+	Free();
+	Type = motion.Type;
+	PivotIdx = motion.Pivot;
+	VectorLen = motion.VectorLength;
+	PacketSize = VectorLen + 1;
+	NumTimeCodes = motion.Packets.size() / PacketSize;
+	CachedIdx = 0;
+	LastTimeCodeIdx = (NumTimeCodes - 1) * PacketSize;
+	Data = MSGW3DNEWARRAY("TimeCodedMotionChannelClass::Data") uint32[motion.Packets.size()];
+	memcpy(Data, motion.Packets.data(), motion.Packets.size() * sizeof(*Data));
+	return true;
+}
+
 
 
 /***********************************************************************************************
@@ -855,23 +898,7 @@ AdaptiveDeltaMotionChannelClass::AdaptiveDeltaMotionChannelClass() :
 	Scale(0.0f)
 {
 
-	if (false == table_valid) {
-		// Create Filter Table, used in delta compression
-
-		for (int i=0; i<FILTER_TABLE_GEN_SIZE; i++)
-		{
-			float ratio = i;
-
-			//ratio = ((ratio + 1.0f) / 128.0f);
-			ratio/=((float) FILTER_TABLE_GEN_SIZE);
-
-			filtertable[i + FILTER_TABLE_GEN_START] = 1.0f - WWMath::Sin( DEG_TO_RAD(90.0f * ratio));
-		}
-
-		table_valid = true;
-
-	}
-
+	initialize_filter_table();
 }
 
 /***********************************************************************************************

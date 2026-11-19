@@ -223,6 +223,7 @@ set(WW3D2_SRC
     w3d_dep.h
     #w3d_file.h
     w3d_obsolete.h
+    w3dbfmechunks.h
     w3dfxmaterial.h
     w3dfxmeshio.h
     w3d_util.cpp

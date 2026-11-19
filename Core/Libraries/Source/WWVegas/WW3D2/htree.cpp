@@ -52,6 +52,7 @@
 
 
 #include "htree.h"
+#include "Common/RetailFileLayers.h"
 #include "hanim.h"
 #include "hcanim.h"
 #include <assert.h>
@@ -218,6 +219,7 @@ int HTreeClass::Load_W3D(ChunkLoadClass & cload)
 	** Now, read in all of the other chunks for this hierarchy.
 	*/
 
+	bool pivotsLoaded = false;
 	while (cload.Open_Chunk()) {
 
 		switch (cload.Cur_Chunk_ID()) {
@@ -226,6 +228,7 @@ int HTreeClass::Load_W3D(ChunkLoadClass & cload)
 				if (!read_pivots(cload,pre30)) {
 					goto Error;
 				}
+				pivotsLoaded = true;
 				break;
 
 			default:
@@ -234,6 +237,9 @@ int HTreeClass::Load_W3D(ChunkLoadClass & cload)
 		}
 		cload.Close_Chunk();
 	}
+
+	if (RetailFileLayers::enabled() && !pivotsLoaded && !(pre30 && NumPivots == 1 && read_pivots(cload,pre30)))
+		goto Error;
 
 	return OK;
 

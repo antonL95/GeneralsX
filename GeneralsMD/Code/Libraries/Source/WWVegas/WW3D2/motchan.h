@@ -218,6 +218,7 @@ public:
 	~TimeCodedMotionChannelClass();
 
 	bool	Load_W3D(ChunkLoadClass & cload);
+	bool Load_BFME_Motion(ChunkLoadClass & cload, unsigned frames, bool & unknownScalar);
 	int	Get_Type() { return Type; }
 	int	Get_Pivot() { return PivotIdx; }
 	void	Get_Vector(float32 frame, float * setvec);

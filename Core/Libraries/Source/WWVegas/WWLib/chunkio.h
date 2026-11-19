@@ -167,14 +167,14 @@ class ChunkLoadClass
 {
 public:
 
-	ChunkLoadClass(FileClass * file);
+	ChunkLoadClass(FileClass * file, bool checkBounds = false);
 	using AuditObserver = void (*)(FileClass *file, uint32 id, int endPosition, uint32 bytesConsumed);
 	static AuditObserver Audit_Observer;
 
 	// Chunk methods
 	bool					Open_Chunk();
 	bool					Open_Chunk_Bounded();
-	bool					Close_Chunk();
+	bool					Close_Chunk(bool observe = true);
 	uint32				Cur_Chunk_ID();
 	uint32				Cur_Chunk_Length();
 	uint32				Cur_Chunk_Remaining();
@@ -199,9 +199,11 @@ public:
 
 private:
 
+	bool open_chunk();
 	enum { MAX_STACK_DEPTH = 256 };
 
 	FileClass *			File;
+	int FileEnd;
 
 	// Chunk reading support
 	int					StackIndex;

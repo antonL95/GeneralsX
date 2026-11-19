@@ -281,6 +281,10 @@ void MeshModelClass::get_deformed_vertices(Vector3 *dst_vert,const HTreeClass * 
 		const Matrix3D & tm = htree->Get_Transform(bonelink[vi]);
 		Matrix3D::Transform_Vector(tm, src_vert[vi], &(dst_vert[vi]));
 	}
+	if (Vertex2 && SkinInfluences) {
+		for (int vi = 0; vi < VertexCount; ++vi)
+			blend_second_skin_bone(vi, htree, dst_vert[vi], nullptr);
+	}
 }
 
 
@@ -315,6 +319,10 @@ void MeshModelClass::get_deformed_vertices(Vector3 *dst_vert, Vector3 *dst_norm,
 		mytm.Set_Translation(Vector3(0.0f,0.0f,0.0f));
 		VectorProcessorClass::Transform(dst_norm+vi,src_norm+vi,mytm,cnt-vi);
 		vi=cnt;
+	}
+	if (Vertex2 && SkinInfluences) {
+		for (int vi = 0; vi < VertexCount; ++vi)
+			blend_second_skin_bone(vi, htree, dst_vert[vi], &dst_norm[vi]);
 	}
 }
 
@@ -368,6 +376,21 @@ void MeshModelClass::compose_deformed_vertex_buffer(
 
 		vi=cnt;
 	}
+	if (Vertex2 && SkinInfluences) {
+		for (int index = 0; index < vertex_count; ++index) {
+			auto & vertex = verts[index];
+			Vector3 position(vertex.x, vertex.y, vertex.z);
+			Vector3 normal(vertex.nx, vertex.ny, vertex.nz);
+			if (blend_second_skin_bone(index, htree, position, &normal)) {
+				vertex.x = position.X;
+				vertex.y = position.Y;
+				vertex.z = position.Z;
+				vertex.nx = normal.X;
+				vertex.ny = normal.Y;
+				vertex.nz = normal.Z;
+			}
+		}
+	}
 }
 
 
@@ -399,6 +422,14 @@ void MeshModelClass::get_deformed_screenspace_vertices(Vector4 *dst_vert,const R
 
 			vi=cnt;
 		}
+		if (Vertex2 && SkinInfluences) {
+			for (int vi = 0; vi < vertex_count; ++vi) {
+				Vector3 position;
+				Matrix3D::Transform_Vector(htree->Get_Transform(bonelink[vi]), src_vert[vi], &position);
+				if (blend_second_skin_bone(vi, htree, position, nullptr))
+					Matrix4x4::Transform_Vector(prj, position, &dst_vert[vi]);
+			}
+		}
 	} else {
 		VectorProcessorClass::Transform(
 			dst_vert,
@@ -419,6 +450,17 @@ void MeshModelClass::Make_Geometry_Unique()
 	ShareBufferClass<Vector3> * norms = NEW_REF(ShareBufferClass<Vector3>,(*VertexNorm));
 	REF_PTR_SET(VertexNorm,norms);
 	REF_PTR_RELEASE(norms);
+
+	if (Vertex2) {
+		auto * positions = NEW_REF(ShareBufferClass<Vector3>,(*Vertex2));
+		REF_PTR_SET(Vertex2,positions);
+		REF_PTR_RELEASE(positions);
+	}
+	if (VertexNorm2) {
+		auto * normals = NEW_REF(ShareBufferClass<Vector3>,(*VertexNorm2));
+		REF_PTR_SET(VertexNorm2,normals);
+		REF_PTR_RELEASE(normals);
+	}
 
 #if (!OPTIMIZE_PLANEEQ_RAM)
 	ShareBufferClass<Vector4> * peq = NEW_REF(ShareBufferClass<Vector4>,(*PlaneEq, "MeshModelClass::PlaneEq"));

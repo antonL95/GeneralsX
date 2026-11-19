@@ -384,8 +384,9 @@ int ChunkSaveClass::Cur_Chunk_Depth()
  * HISTORY:                                                                                    *
  *   07/17/1997 GH  : Created.                                                                 *
  *=============================================================================================*/
-ChunkLoadClass::ChunkLoadClass(FileClass * file) :
+ChunkLoadClass::ChunkLoadClass(FileClass * file, bool checkBounds) :
 	File(file),
+	FileEnd(checkBounds ? file->Size() : -1),
 	StackIndex(0),
 	InMicroChunk(false),
 	MicroChunkPosition(0)
@@ -409,6 +410,11 @@ ChunkLoadClass::ChunkLoadClass(FileClass * file) :
  *   07/17/1997 GH  : Created.                                                                 *
  *=============================================================================================*/
 bool ChunkLoadClass::Open_Chunk()
+{
+	return FileEnd >= 0 ? Open_Chunk_Bounded() : open_chunk();
+}
+
+bool ChunkLoadClass::open_chunk()
 {
 	// if user didn't close any micro chunks that he opened, bad things could happen
 	assert(InMicroChunk == false);
@@ -438,12 +444,20 @@ uint32 ChunkLoadClass::Cur_Chunk_Remaining()
 
 bool ChunkLoadClass::Open_Chunk_Bounded()
 {
-	const uint32 remaining = Cur_Chunk_Remaining();
+	const int start = File->Seek(0, SEEK_CUR);
+	if (start < 0 || StackIndex >= MAX_STACK_DEPTH - 1)
+		return false;
+
+	const int end = FileEnd >= 0 ? FileEnd : File->Size();
+	if (start > end || end - start < int(sizeof(ChunkHeader)))
+		return false;
+	uint32 remaining = end - start;
+	if (StackIndex > 0 && Cur_Chunk_Remaining() < remaining)
+		remaining = Cur_Chunk_Remaining();
 	if (remaining < sizeof(ChunkHeader))
 		return false;
 
-	const int start = File->Seek(0, SEEK_CUR);
-	if (!Open_Chunk()) {
+	if (!open_chunk()) {
 		File->Seek(start, SEEK_SET);
 		return false;
 	}
@@ -470,7 +484,7 @@ bool ChunkLoadClass::Open_Chunk_Bounded()
  *=============================================================================================*/
 ChunkLoadClass::AuditObserver ChunkLoadClass::Audit_Observer = nullptr;
 
-bool ChunkLoadClass::Close_Chunk()
+bool ChunkLoadClass::Close_Chunk(bool observe)
 {
 	// if user didn't close any micro chunks that he opened, bad things could happen
 	assert(InMicroChunk == false);
@@ -481,7 +495,7 @@ bool ChunkLoadClass::Close_Chunk()
 	int csize = HeaderStack[StackIndex-1].Get_Size();
 	int pos = PositionStack[StackIndex-1];
 
-	if (Audit_Observer)
+	if (observe && Audit_Observer)
 		Audit_Observer(File, Cur_Chunk_ID(), File->Seek(0, SEEK_CUR) + csize - pos, pos);
 
 	if (pos < csize) {

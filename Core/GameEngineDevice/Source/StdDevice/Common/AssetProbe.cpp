@@ -314,6 +314,7 @@ struct ModelChunk
 	unsigned id;
 	int end;
 	unsigned length;
+	bool unknownMotionScalar;
 };
 
 void reference(const std::string& file, const std::string& name, const char *source)
@@ -373,7 +374,13 @@ bool catalogModel(ProbeFile& file, ChunkLoadClass& chunks, const std::string& pa
 		if (length > static_cast<unsigned>(end - start - 8))
 			return false;
 		const int chunkEnd = start + 8 + length;
-		catalog.push_back({parent, id, chunkEnd, length});
+		bool unknownMotionScalar = false;
+		if (id == W3D_CHUNK_COMPRESSED_ANIMATION_MOTION_CHANNEL && length >= 8)
+		{
+			uint8 header[4];
+			unknownMotionScalar = chunks.Read(header, sizeof(header)) == sizeof(header) && header[3] == 15;
+		}
+		catalog.push_back({parent, id, chunkEnd, length, unknownMotionScalar});
 		if (chunks.Contains_Chunks() && chunks.Cur_Chunk_Depth() < 128)
 		{
 			if (!catalogModel(file, chunks, path, chunkEnd, id, catalog))
@@ -407,11 +414,14 @@ bool probeModel(const std::string& name, const Entry& entry)
 	ChunkLoadClass::Audit_Observer = observeChunk;
 	const bool loaded = manager.Load_3D_Assets(file);
 	ChunkLoadClass::Audit_Observer = nullptr;
+	unsigned unknownMotionScalars = 0;
 	std::map<std::tuple<unsigned, unsigned, bool>, unsigned> unsupported;
 	for (const auto& chunk : catalog)
 	{
 		const auto seen = consumedChunks.find({chunk.id, chunk.end});
 		const bool unopened = seen == consumedChunks.end();
+		if (chunk.unknownMotionScalar && !unopened && seen->second == chunk.length)
+			++unknownMotionScalars;
 		if (unopened || (chunk.length > 0 && seen->second == 0))
 			++unsupported[{chunk.parent, chunk.id, unopened}];
 	}
@@ -421,6 +431,10 @@ bool probeModel(const std::string& name, const Entry& entry)
 		record(unopened ? "model-unvisited" : "model-skipped", name, hexId(id),
 			parent == ~0u ? "root" : hexId(parent), count);
 	}
+	if (unknownMotionScalars != 0)
+		record("model-motion", name, "skipped-type-15", "", unknownMotionScalars);
+	if (loaded && !intact && !catalog.empty())
+		record("model-recovery", name, "partial");
 	return loaded && intact && !catalog.empty();
 }
 

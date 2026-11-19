@@ -522,6 +522,14 @@ WW3DErrorType MeshModelClass::read_chunks(ChunkLoadClass & cload,MeshLoadContext
 					error = read_vertex_colors(cload,context);
 					break;
 
+			case W3D_CHUNK_VERTICES_2:
+					read_second_skin_stream(cload, Vertex2);
+					break;
+
+			case W3D_CHUNK_NORMALS_2:
+					read_second_skin_stream(cload, VertexNorm2);
+					break;
+
 			case W3D_CHUNK_VERTEX_INFLUENCES:
 					// call up to MeshGeometryClass
 					error = read_vertex_influences(cload);

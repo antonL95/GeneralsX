@@ -420,6 +420,7 @@ enum {
 		W3D_CHUNK_COMPRESSED_ANIMATION_HEADER,							// describes playback rate, number of frames, and type of compression
 		W3D_CHUNK_COMPRESSED_ANIMATION_CHANNEL,						// compressed channel, format dependent on type of compression
 		W3D_CHUNK_COMPRESSED_BIT_CHANNEL,								// compressed bit stream channel, format dependent on type of compression
+		W3D_CHUNK_COMPRESSED_ANIMATION_MOTION_CHANNEL = 0x00000284,
 
 	W3D_CHUNK_MORPH_ANIMATION							=0x000002C0,	// hierarchy morphing animation data (morphs between poses, for facial animation)
 		W3D_CHUNK_MORPHANIM_HEADER,										// W3dMorphAnimHeaderStruct describes playback rate, number of frames, and type of compression
@@ -527,6 +528,9 @@ enum {
 
 			W3D_CHUNK_SHDSUBMESH_VERTEX_COLOR,							// per-vertex color
 			W3D_CHUNK_SHDSUBMESH_VERTEX_INFLUENCES,					// byte-per-vertex, WWSkin support
+
+	W3D_CHUNK_VERTICES_2 = 0x00000C00,
+	W3D_CHUNK_NORMALS_2 = 0x00000C01,
 };
 
 

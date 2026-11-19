@@ -86,6 +86,7 @@
 
 
 #include "meshgeometry.h"
+#include "WW3D2/w3dbfmechunks.h"
 #include "aabtree.h"
 #include "WWLib/chunkio.h"
 #include "WWMath/aabox.h"
@@ -220,6 +221,9 @@ MeshGeometryClass & MeshGeometryClass::operator = (const MeshGeometryClass & tha
 		REF_PTR_SET(PlaneEq,that.PlaneEq);
 		REF_PTR_SET(VertexShadeIdx,that.VertexShadeIdx);
 		REF_PTR_SET(VertexBoneLink,that.VertexBoneLink);
+		REF_PTR_SET(SkinInfluences,that.SkinInfluences);
+		REF_PTR_SET(Vertex2,that.Vertex2);
+		REF_PTR_SET(VertexNorm2,that.VertexNorm2);
 
 		// Clone the cull tree..
 		REF_PTR_RELEASE(CullTree);
@@ -281,6 +285,9 @@ void MeshGeometryClass::Reset_Geometry(int polycount,int vertcount)
 	REF_PTR_RELEASE(PlaneEq);
 	REF_PTR_RELEASE(VertexShadeIdx);
 	REF_PTR_RELEASE(VertexBoneLink);
+	REF_PTR_RELEASE(SkinInfluences);
+	REF_PTR_RELEASE(Vertex2);
+	REF_PTR_RELEASE(VertexNorm2);
 	REF_PTR_RELEASE(CullTree);
 
 	PolyCount = polycount;
@@ -1742,6 +1749,14 @@ WW3DErrorType MeshGeometryClass::read_chunks(ChunkLoadClass & cload)
 					error = read_user_text(cload);
 					break;
 
+			case W3D_CHUNK_VERTICES_2:
+					read_second_skin_stream(cload, Vertex2);
+					break;
+
+			case W3D_CHUNK_NORMALS_2:
+					read_second_skin_stream(cload, VertexNorm2);
+					break;
+
 			case W3D_CHUNK_VERTEX_INFLUENCES:
 					error = read_vertex_influences(cload);
 					break;
@@ -1935,20 +1950,63 @@ WW3DErrorType MeshGeometryClass::read_user_text(ChunkLoadClass & cload)
  *=============================================================================================*/
 WW3DErrorType MeshGeometryClass::read_vertex_influences(ChunkLoadClass & cload)
 {
-	W3dVertInfStruct vinf;
 	uint16 * links = get_bone_links(true);
 	WWASSERT(links);
+	auto * influences = NEW_REF(ShareBufferClass<W3dBfme::Influence>,(VertexCount, "MeshGeometryClass::SkinInfluences"));
 
-	for (int i=0; i<Get_Vertex_Count(); i++) {
-
-		if (cload.Read(&vinf,sizeof(W3dVertInfStruct)) != sizeof(W3dVertInfStruct)) {
+	for (int i = 0; i < VertexCount; ++i) {
+		W3dBfme::Byte bytes[8];
+		if (cload.Read(bytes, sizeof(bytes)) != sizeof(bytes)) {
+			REF_PTR_RELEASE(influences);
 			return WW3D_ERROR_LOAD_FAILED;
 		}
-		links[i] = vinf.BoneIdx;
+		const auto influence = W3dBfme::ReadInfluence(bytes);
+		links[i] = influence.Bone0;
+		influences->Get_Array()[i] = influence;
 	}
-	Set_Flag(SKIN,true);
 
+	REF_PTR_SET(SkinInfluences,influences);
+	REF_PTR_RELEASE(influences);
+	Set_Flag(SKIN,true);
 	return WW3D_ERROR_OK;
+}
+
+void MeshGeometryClass::read_second_skin_stream(ChunkLoadClass & cload, ShareBufferClass<Vector3> * & stream)
+{
+	const unsigned length = cload.Cur_Chunk_Length();
+	if (VertexCount <= 0 || length % 12 != 0 || length / 12 != unsigned(VertexCount))
+		return;
+
+	std::vector<W3dBfme::Byte> bytes(length);
+	if (cload.Read(bytes.data(), length) != length)
+		return;
+
+	auto * vectors = NEW_REF(ShareBufferClass<Vector3>,(VertexCount, "MeshGeometryClass::SecondSkinStream"));
+	W3dBfme::ReadVectorStream(bytes, VertexCount, [&](unsigned index, float x, float y, float z) {
+		vectors->Get_Array()[index].Set(x, y, z);
+	});
+	REF_PTR_SET(stream,vectors);
+	REF_PTR_RELEASE(vectors);
+}
+
+bool MeshGeometryClass::blend_second_skin_bone(int index, const HTreeClass * htree, Vector3 & position, Vector3 * normal)
+{
+	const auto & influence = SkinInfluences->Get_Array()[index];
+	if (influence.Weight1 == 0 || influence.Bone1 >= htree->Num_Pivots())
+		return false;
+
+	const Matrix3D & transform = htree->Get_Transform(influence.Bone1);
+	const float weight0 = influence.Weight0 / 100.0f;
+	const float weight1 = influence.Weight1 / 100.0f;
+	Vector3 second;
+	Matrix3D::Transform_Vector(transform, Vertex2->Get_Array()[index], &second);
+	position = position * weight0 + second * weight1;
+	if (normal && VertexNorm2) {
+		Matrix3D::Rotate_Vector(transform, VertexNorm2->Get_Array()[index], &second);
+		*normal = *normal * weight0 + second * weight1;
+		normal->Normalize();
+	}
+	return true;
 }
 
 
@@ -2011,6 +2069,12 @@ void MeshGeometryClass::Scale(const Vector3 &sc)
 		vert[i].Z *= sc.Z;
 	}
 
+	if (Vertex2) {
+		Vector3 * second = Vertex2->Get_Array();
+		for (int i = 0; i < VertexCount; ++i)
+			second[i].Scale(sc);
+	}
+
 	BoundBoxMin.Scale(sc);
 	BoundBoxMax.Scale(sc);
 	BoundSphereCenter.Scale(sc);
@@ -2056,6 +2120,10 @@ void MeshGeometryClass::get_deformed_vertices(Vector3 *dst_vert,const HTreeClass
 		const Matrix3D & tm = htree->Get_Transform(bonelink[vi]);
 		Matrix3D::Transform_Vector(tm, src_vert[vi], &(dst_vert[vi]));
 	}
+	if (Vertex2 && SkinInfluences) {
+		for (int vi = 0; vi < VertexCount; ++vi)
+			blend_second_skin_bone(vi, htree, dst_vert[vi], nullptr);
+	}
 }
 
 
@@ -2091,6 +2159,10 @@ void MeshGeometryClass::get_deformed_vertices(Vector3 *dst_vert, Vector3 *dst_no
 		VectorProcessorClass::Transform(dst_norm+vi,src_norm+vi,mytm,cnt-vi);
 		vi=cnt;
 	}
+	if (Vertex2 && SkinInfluences) {
+		for (int vi = 0; vi < VertexCount; ++vi)
+			blend_second_skin_bone(vi, htree, dst_vert[vi], &dst_norm[vi]);
+	}
 }
 
 // Destination pointers MUST point to arrays large enough to hold all vertices
@@ -2120,6 +2192,14 @@ void MeshGeometryClass::get_deformed_screenspace_vertices(Vector4 *dst_vert,cons
 				cnt-vi);
 
 			vi=cnt;
+		}
+		if (Vertex2 && SkinInfluences) {
+			for (int vi = 0; vi < vertex_count; ++vi) {
+				Vector3 position;
+				Matrix3D::Transform_Vector(htree->Get_Transform(bonelink[vi]), src_vert[vi], &position);
+				if (blend_second_skin_bone(vi, htree, position, nullptr))
+					Matrix4x4::Transform_Vector(prj, position, &dst_vert[vi]);
+			}
 		}
 	} else {
 		VectorProcessorClass::Transform(

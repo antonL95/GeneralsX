@@ -56,6 +56,7 @@ class AABoxClass;
 class OBBoxClass;
 class SphereClass;
 class ChunkLoadClass;
+namespace W3dBfme { struct Influence; }
 class AABTreeClass;
 class HTreeClass;
 class RenderInfoClass;
@@ -214,6 +215,8 @@ protected:
 	WW3DErrorType				read_triangles(ChunkLoadClass & cload);
 	WW3DErrorType				read_user_text(ChunkLoadClass & cload);
 	WW3DErrorType				read_vertex_influences(ChunkLoadClass & cload);
+	void read_second_skin_stream(ChunkLoadClass & cload, ShareBufferClass<Vector3> * & stream);
+	bool blend_second_skin_bone(int index, const HTreeClass * htree, Vector3 & position, Vector3 * normal);
 	WW3DErrorType				read_vertex_shade_indices(ChunkLoadClass & cload);
 	WW3DErrorType				read_aabtree(ChunkLoadClass &cload);
 
@@ -240,6 +243,9 @@ protected:
 	ShareBufferClass<Vector4> *						PlaneEq;
 	ShareBufferClass<uint32> *							VertexShadeIdx;
 	ShareBufferClass<uint16> *							VertexBoneLink;
+	ShareBufferClass<W3dBfme::Influence> * SkinInfluences = nullptr;
+	ShareBufferClass<Vector3> * Vertex2 = nullptr;
+	ShareBufferClass<Vector3> * VertexNorm2 = nullptr;
 	ShareBufferClass<uint8> *							PolySurfaceType;
 
 	Vector3													BoundBoxMin;

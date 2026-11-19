@@ -78,6 +78,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "assetmgr.h"
+#include "Common/RetailFileLayers.h"
 #include <assert.h>
 
 #include "WWLib/bittype.h"
@@ -654,37 +655,54 @@ bool WW3DAssetManager::Load_3D_Assets(FileClass & w3dfile)
 		return false;
 	}
 
-	ChunkLoadClass cload(&w3dfile);
+	ChunkLoadClass cload(&w3dfile, RetailFileLayers::enabled());
 	bool auditPassed = true;
+	bool loadedAsset = false;
+	const int start = w3dfile.Seek(0, SEEK_CUR);
 
 	while (cload.Open_Chunk()) {
+		if (cload.Cur_Chunk_ID() == W3D_CHUNK_HIERARCHY) {
+			const bool loaded = HTreeManager.Load_Tree(cload) == 0;
+			loadedAsset |= loaded;
+			auditPassed &= loaded;
+			while (cload.Cur_Chunk_Depth() > 0)
+				cload.Close_Chunk();
+		} else {
+			cload.Close_Chunk(false);
+		}
+	}
 
+	if (start < 0 || w3dfile.Seek(start, SEEK_SET) != start) {
+		w3dfile.Close();
+		return false;
+	}
+
+	while (cload.Open_Chunk()) {
+		bool loaded;
 		switch (cload.Cur_Chunk_ID()) {
-
 			case W3D_CHUNK_HIERARCHY:
-				if (HTreeManager.Load_Tree(cload) != 0)
-					auditPassed = false;
-				break;
+				cload.Close_Chunk(false);
+				continue;
 
 			case W3D_CHUNK_ANIMATION:
 			case W3D_CHUNK_COMPRESSED_ANIMATION:
 			case W3D_CHUNK_MORPH_ANIMATION:
-				if (HAnimManager.Load_Anim(cload) != 0)
-					auditPassed = false;
+				loaded = HAnimManager.Load_Anim(cload) == 0;
 				break;
 
 			default:
-				if (!Load_Prototype(cload))
-					auditPassed = false;
+				loaded = Load_Prototype(cload);
 				break;
 		}
 
-		cload.Close_Chunk();
+		loadedAsset |= loaded;
+		auditPassed &= loaded;
+		while (cload.Cur_Chunk_Depth() > 0)
+			cload.Close_Chunk();
 	}
 
 	w3dfile.Close();
-
-	return !ChunkLoadClass::Audit_Observer || auditPassed;
+	return !ChunkLoadClass::Audit_Observer || (loadedAsset && auditPassed);
 }
 
 

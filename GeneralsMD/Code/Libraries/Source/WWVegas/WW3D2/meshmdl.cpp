@@ -290,6 +290,17 @@ void MeshModelClass::Make_Geometry_Unique()
 	REF_PTR_SET(VertexNorm,norms);
 	REF_PTR_RELEASE(norms);
 
+	if (Vertex2) {
+		auto * positions = NEW_REF(ShareBufferClass<Vector3>,(*Vertex2));
+		REF_PTR_SET(Vertex2,positions);
+		REF_PTR_RELEASE(positions);
+	}
+	if (VertexNorm2) {
+		auto * normals = NEW_REF(ShareBufferClass<Vector3>,(*VertexNorm2));
+		REF_PTR_SET(VertexNorm2,normals);
+		REF_PTR_RELEASE(normals);
+	}
+
 #if (!OPTIMIZE_PLANEEQ_RAM)
 	ShareBufferClass<Vector4> * peq = NEW_REF(ShareBufferClass<Vector4>,(*PlaneEq, "MeshModelClass::PlaneEq"));
 	REF_PTR_SET(PlaneEq,peq);

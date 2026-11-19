@@ -237,6 +237,7 @@ int HCompressedAnimClass::Load_W3D(ChunkLoadClass & cload)
 	** First make sure we release any memory in use
 	*/
 	Free();
+	UnknownMotionChannels = 0;
 
 	/*
 	**	Open the first chunk, it should be the animation header
@@ -341,6 +342,25 @@ int HCompressedAnimClass::Load_W3D(ChunkLoadClass & cload)
 					}
 				}
 				break;
+
+			case W3D_CHUNK_COMPRESSED_ANIMATION_MOTION_CHANNEL:
+			{
+				if (Flavor != ANIM_FLAVOR_TIMECODED)
+					break;
+				auto* channel = W3DNEW TimeCodedMotionChannelClass;
+				bool unknownScalar = false;
+				if (!channel->Load_BFME_Motion(cload, NumFrames, unknownScalar)) {
+					delete channel;
+					goto Error;
+				}
+				if (unknownScalar)
+					++UnknownMotionChannels;
+				if (unknownScalar || channel->Get_Pivot() >= NumNodes)
+					delete channel;
+				else
+					add_channel(channel);
+				break;
+			}
 
 			case W3D_CHUNK_COMPRESSED_BIT_CHANNEL:
 			{

@@ -10,6 +10,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/INIPreprocessorTest.cpp
     GameEngine/Common/BfmeAssetPathTest.cpp
     Libraries/Compression/CompressionManagerTest.cpp
+    Libraries/WW3D2/W3dBfmeChunksTest.cpp
     Libraries/WW3D2/W3dFxMaterialTest.cpp
 )
 
