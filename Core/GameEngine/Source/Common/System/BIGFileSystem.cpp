@@ -37,12 +37,14 @@
 #include "Common/GameMemory.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/Registry.h"
+#include "Common/RetailFileLayers.h"
 
 #include "Utility/endian_compat.h"
 
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #if defined(_UNIX)
 #include <strings.h>
@@ -55,6 +57,48 @@
 
 
 static const char *BIGFileIdentifier = "BIGF";
+
+namespace RetailFileLayers
+{
+	static bool s_enabled = false;
+
+	bool enabled()
+	{
+		return s_enabled;
+	}
+
+	void enable()
+	{
+		s_enabled = true;
+	}
+
+	static AsciiString& baseDirectoryStorage()
+	{
+		static AsciiString directory;
+		return directory;
+	}
+
+	void setBaseDirectory(const char* path)
+	{
+		baseDirectoryStorage() = path;
+		enable();
+	}
+
+	const AsciiString& baseDirectory()
+	{
+		return baseDirectoryStorage();
+	}
+
+	const AsciiString& languageDirectory()
+	{
+		static const AsciiString directory = [] {
+			AsciiString path;
+			path.format("./lang/%s/", GetRegistryLanguage().str());
+			return path;
+		}();
+		return directory;
+	}
+}
 
 namespace {
 
@@ -518,6 +562,12 @@ void BIGFileSystem::init() {
 		return;
 	}
 
+	if (RetailFileLayers::enabled())
+	{
+		TheLocalFileSystem->setAssetRootPath(AsciiString::TheEmptyString);
+		return;
+	}
+
 	AsciiString primaryAssetsDirectory;
 	const Bool loadedPrimaryAssets = loadPrimaryGameAssets(this, &primaryAssetsDirectory);
 	DEBUG_ASSERTCRASH(loadedPrimaryAssets, ("No BIG files were loaded for the primary game assets."));
@@ -740,8 +790,50 @@ Bool BIGFileSystem::loadArchiveFilesFromDirectory(AsciiString dir, AsciiString f
 	return actuallyAdded;
 }
 
+void BIGFileSystem::loadRetailArchives(const AsciiString& directory, const AsciiString& namePrefix, Bool overwrite)
+{
+	FilenameList names;
+	TheLocalFileSystem->getFileListInDirectory("", directory, "*.big", names, FALSE);
+	std::vector<AsciiString> paths(names.begin(), names.end());
+	std::sort(paths.begin(), paths.end(), [](const AsciiString& lhs, const AsciiString& rhs) {
+		return RetailFileLayers::archiveNameLess(lhs.str(), rhs.str());
+	});
+	for (const auto& path : paths)
+	{
+		const std::string_view fullPath(path.str());
+		const auto basename = fullPath.substr(fullPath.find_last_of("/\\") + 1);
+		if (namePrefix.isEmpty() || AsciiString(basename.data()).startsWithNoCase(namePrefix))
+			loadOneArchiveFile(path, overwrite);
+	}
+}
+
 void BIGFileSystem::loadMods()
 {
+	if (RetailFileLayers::enabled())
+	{
+		const AsciiString language = GetRegistryLanguage();
+		loadRetailArchives("./lang/", language, FALSE);
+		loadRetailArchives("./", "", FALSE);
+		loadRetailArchives("./apt/", "", FALSE);
+
+		if (RetailFileLayers::baseDirectory().isNotEmpty())
+		{
+			AsciiString root = RetailFileLayers::baseDirectory();
+			if (!root.endsWith("/") && !root.endsWith("\\"))
+				root.concat('/');
+			AsciiString localized = root;
+			localized.concat("lang/");
+			loadRetailArchives(localized, language, FALSE);
+			loadRetailArchives(root, "", FALSE);
+		}
+
+		if (TheGlobalData->m_modDir.isNotEmpty())
+			loadRetailArchives(TheGlobalData->m_modDir, "", TRUE);
+		if (TheGlobalData->m_modBIG.isNotEmpty())
+			loadOneArchiveFile(TheGlobalData->m_modBIG, TRUE);
+		return;
+	}
+
 	if (TheGlobalData->m_modBIG.isNotEmpty())
 	{
 		ArchiveFile *archiveFile = openArchiveFile(TheGlobalData->m_modBIG.str());

@@ -64,6 +64,8 @@ public:
 
 	virtual void loadMods() override;
 protected:
+	void loadRetailArchives(const AsciiString& directory, const AsciiString& namePrefix, Bool overwrite);
+
 	// GeneralsX @bugfix UnicodeApocalypse 11/09/2026 Opens one BIG file and merges it into the directory tree.
 	// Returns TRUE if opened and added.
 	Bool loadOneArchiveFile(const AsciiString& archivePath, Bool overwrite);

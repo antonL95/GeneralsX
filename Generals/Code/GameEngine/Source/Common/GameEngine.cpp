@@ -47,6 +47,7 @@
 #include "Common/FileSystem.h"
 #include "Common/ArchiveFileSystem.h"
 #include "Common/LocalFileSystem.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/RandomValue.h"
@@ -492,7 +493,8 @@ void GameEngine::init()
 			// Data/INI/GameData.ini. That loose file shadows the BIG-archived one when the engine loads
 			// GameData above, so replaying it here restores user precedence over SagePatch. Installs
 			// without a loose GameData.ini are unaffected, and the archived original is never reloaded.
-			if (TheLocalFileSystem->doesFileExist(USER_GAME_DATA_INI_PATH))
+			if (TheLocalFileSystem->doesFileExist(USER_GAME_DATA_INI_PATH) ||
+				RetailFileLayers::hasLooseOverride(USER_GAME_DATA_INI_PATH))
 			{
 				ini.load(USER_GAME_DATA_INI_PATH, INI_LOAD_OVERWRITE, nullptr);
 			}

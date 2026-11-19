@@ -1,9 +1,12 @@
 #include "Common/ArchiveFile.h"
 #include "Common/BIGFileSystem.h"
 #include "Common/BfmeAssetPath.h"
+#include "Common/CommandLine.h"
 #include "Common/CriticalSection.h"
 #include "Common/DataChunk.h"
+#include "Common/GlobalData.h"
 #include "Common/MapReaderWriterInfo.h"
+#include "Common/RetailFileLayers.h"
 #include "StdDevice/Common/StdLocalFileSystem.h"
 #include "W3DDevice/GameClient/W3DFileSystem.h"
 #include "WW3D2/assetmgr.h"
@@ -24,7 +27,6 @@
 #include <set>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <vector>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -157,26 +159,12 @@ private:
 	const Inventory& m_files;
 };
 
-enum class AssetRoot
+class ProbeBIGFileSystem : public BIGFileSystem
 {
-	Base,
-	Expansion,
-	Mod
+public:
+	const ArchiveFileMap& archives() const { return m_archiveFileMap; }
+	using ArchiveFileSystem::getArchiveFile;
 };
-
-int archivePriority(const fs::path& relative, AssetRoot root)
-{
-	const std::string directory = lowerPath(relative.parent_path().string());
-	if (directory.empty())
-		return 2;
-	if (root == AssetRoot::Mod)
-		return 0;
-	if (directory == "apt" && root == AssetRoot::Expansion)
-		return 1;
-	if (directory == "lang" && lowerPath(relative.filename().string()).starts_with("english"))
-		return 3;
-	return 0;
-}
 
 bool activeLoose(const fs::path& relative)
 {
@@ -191,37 +179,35 @@ bool activeLoose(const fs::path& relative)
 		lowerPath(relative.extension().string()) != ".big";
 }
 
-void inventoryRoot(const fs::path& root, AssetRoot kind, BIGFileSystem& big, Inventory& inventory,
-	Inventory& loose,
-	std::vector<std::unique_ptr<ArchiveFile>>& archives)
+void inventoryLoose(const fs::path& root, Inventory& inventory, bool localized = false)
 {
-	std::vector<fs::path> archivePaths;
+	std::error_code error;
+	if (!fs::is_directory(root, error))
+		return;
+
 	std::vector<fs::path> loosePaths;
 	for (const auto& file : fs::recursive_directory_iterator(root))
 	{
 		if (!file.is_regular_file() || file.is_symlink())
 			continue;
 		const fs::path relative = file.path().lexically_relative(root);
-		if (lowerPath(relative.extension().string()) == ".big")
-			archivePaths.push_back(relative);
-		else if (kind != AssetRoot::Base && activeLoose(relative))
+		if (localized ? lowerPath(relative.extension().string()) != ".big" : activeLoose(relative))
 			loosePaths.push_back(relative);
 	}
-
-	std::sort(archivePaths.begin(), archivePaths.end(), [kind](const fs::path& lhs, const fs::path& rhs) {
-		const int left = archivePriority(lhs, kind);
-		const int right = archivePriority(rhs, kind);
-		if (left != right)
-			return left < right;
-		const auto lhsKey = std::make_tuple(lowerPath(lhs.string()), lhs);
-		const auto rhsKey = std::make_tuple(lowerPath(rhs.string()), rhs);
-		const bool laterWins = kind == AssetRoot::Mod || (kind == AssetRoot::Expansion && left == 3);
-		return laterWins ? lhsKey < rhsKey : lhsKey > rhsKey;
-	});
-
-	for (const auto& relative : archivePaths)
+	std::sort(loosePaths.begin(), loosePaths.end());
+	for (const auto& relative : loosePaths)
 	{
-		const std::string archivePath = (root / relative).string();
+		const std::string name = lowerPath(relative.string());
+		inventory.insert_or_assign(name, Entry{nullptr, (root / relative).string()});
+	}
+}
+
+void inventoryArchives(const ProbeBIGFileSystem& big, Inventory& inventory)
+{
+	FilenameList files;
+	for (const auto& [path, archive] : big.archives())
+	{
+		const auto archivePath = fs::absolute(path.str()).lexically_normal().string();
 		unsigned char header[12] = {};
 		if (std::FILE *file = std::fopen(archivePath.c_str(), "rb"))
 		{
@@ -242,36 +228,17 @@ void inventoryRoot(const fs::path& root, AssetRoot kind, BIGFileSystem& big, Inv
 		const unsigned count = (unsigned(header[8]) << 24) | (unsigned(header[9]) << 16) |
 			(unsigned(header[10]) << 8) | header[11];
 
-		std::unique_ptr<ArchiveFile> archive(big.openArchiveFile(archivePath.c_str()));
-		record("archive", archivePath, archive ? "ok" : "rejected", magic, count);
-		if (!archive)
-			continue;
-
+		record("archive", archivePath, "ok", magic, count);
 		FilenameList names;
 		archive->getFileListInDirectory("", "", "*", names, TRUE);
-		const bool active = archivePriority(relative, kind) != 0;
-		record("archive-index", archivePath, active ? "overlay" : "auxiliary", magic, names.size());
-		if (!active)
-			continue;
-		for (const auto& path : names)
-		{
-			std::string name = lowerPath(path.str());
-			inventory[name] = {archive.get(), name};
-		}
-		archives.push_back(std::move(archive));
+		record("archive-index", archivePath, "overlay", magic, names.size());
+		files.merge(names);
 	}
-	std::sort(loosePaths.begin(), loosePaths.end());
-	for (const auto& relative : loosePaths)
-		loose[lowerPath(relative.string())] = {nullptr, (root / relative).string()};
-	if (kind == AssetRoot::Expansion)
+	for (const auto& path : files)
 	{
-		for (const auto& relative : loosePaths)
-		{
-			const std::string name = lowerPath(relative.string());
-			constexpr std::string_view language = "lang/english/";
-			if (name.starts_with(language))
-				loose[name.substr(language.size())] = {nullptr, (root / relative).string()};
-		}
+		const std::string name = lowerPath(path.str());
+		if (ArchiveFile* archive = big.getArchiveFile(path))
+			inventory.emplace(name, Entry{archive, name});
 	}
 }
 
@@ -732,15 +699,20 @@ int RunAssetProbe(const char *reportPath)
 
 	ProbeLocalFileSystem local;
 	TheLocalFileSystem = &local;
-	BIGFileSystem big;
+	ProbeBIGFileSystem big;
+	CommandLine::parseCommandLineForStartup();
+	big.init();
+	CommandLine::parseCommandLineForModInit();
+	big.loadMods();
 	Inventory inventory;
-	Inventory loose;
-	std::vector<std::unique_ptr<ArchiveFile>> archives;
-	inventoryRoot("/game-install/bfme2", AssetRoot::Base, big, inventory, loose, archives);
-	inventoryRoot("/game-install/rotwk", AssetRoot::Expansion, big, inventory, loose, archives);
-	inventoryRoot("/game-install/aotr", AssetRoot::Mod, big, inventory, loose, archives);
-	for (auto& [name, entry] : loose)
-		inventory.insert_or_assign(name, std::move(entry));
+	inventoryArchives(big, inventory);
+	inventoryLoose(fs::current_path(), inventory);
+	if (RetailFileLayers::enabled())
+	{
+		inventoryLoose(RetailFileLayers::languageDirectory().str(), inventory, true);
+		if (TheGlobalData->m_modDir.isNotEmpty())
+			inventoryLoose(TheGlobalData->m_modDir.str(), inventory);
+	}
 	ProbeFileFactory factory(inventory);
 	_TheFileFactory = &factory;
 
@@ -748,7 +720,8 @@ int RunAssetProbe(const char *reportPath)
 	for (const auto& [name, entry] : inventory)
 	{
 		const std::string ext = extension(name);
-		const std::string source = entry.archive ? entry.archive->getName().str() : entry.path;
+		const auto source = fs::absolute(entry.archive ? entry.archive->getName().str() : entry.path)
+			.lexically_normal().string();
 		record("entry", name, ext, source);
 		if (ext == ".w3d")
 			modelNames.insert(fs::path(name).filename().string());

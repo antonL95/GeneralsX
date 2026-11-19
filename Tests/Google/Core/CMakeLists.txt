@@ -4,6 +4,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/AsciiStringTest.cpp
     GameEngine/Common/INITest.cpp
     GameEngine/Common/INIAuditTest.cpp
+    GameEngine/Common/RetailFileLayersTest.cpp
     GameEngine/Common/INIMathTest.cpp
     GameEngine/Common/INIPreprocessorTest.cpp
     GameEngine/Common/BfmeAssetPathTest.cpp

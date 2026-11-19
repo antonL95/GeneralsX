@@ -60,6 +60,7 @@
 #include "Common/BitFlagsIO.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
@@ -885,6 +886,10 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 	ModuleType type = (ModuleType)(UnsignedInt)(uintptr_t)userData;
 	const char* token = ini->getNextToken();
 	AsciiString tokenStr = token;
+	if (type == MODULETYPE_DRAW && INIAudit::isEnabled() &&
+		std::getenv("GENERALSX_ASSET_SMOKE") && std::getenv("GENERALSX_ASSET_SMOKE_OBJECT") &&
+		tokenStr == "W3DHordeModelDraw")
+		tokenStr = "W3DScriptedModelDraw";
 
 	// get the tag string (it is now required)
 	AsciiString moduleTagStr;

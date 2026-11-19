@@ -53,6 +53,7 @@ static void drawFramerateBar();
 #include "Common/GameEngine.h"
 #include "Common/ThingFactory.h"
 #include "Common/GlobalData.h"
+#include "Common/INIAudit.h"
 #include "Common/PerfTimer.h"
 #include "Common/FileSystem.h"
 #include "Common/LocalFileSystem.h"
@@ -61,6 +62,7 @@ static void drawFramerateBar();
 #include "Common/ThingTemplate.h"
 #include "Common/GameLOD.h"
 #include "Common/DrawModule.h"
+#include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 
@@ -2085,14 +2087,32 @@ void W3DDisplay::step()
 /** Draw the entire W3D Display */
 //=============================================================================
 //DECLARE_PERF_TIMER(W3DDisplay_draw)
-static void drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real aspect)
+static AsciiString findAssetSmokeObjectModel(const char* name)
+{
+	const ThingTemplate* object = TheThingFactory ? TheThingFactory->findTemplate(name, FALSE) : nullptr;
+	if (!object)
+		return {};
+
+	const ModuleInfo& modules = object->getDrawModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		const ModuleData* module = modules.getNthData(i);
+		const auto* draw = module ? module->getAsW3DModelDrawModuleData() : nullptr;
+		const auto* state = draw ? draw->findBestInfo(ModelConditionFlags()) : nullptr;
+		if (state && state->m_modelName.isNotEmpty() && state->m_modelName.compareNoCase("NONE") != 0)
+			return state->m_modelName;
+	}
+	return {};
+}
+
+static Bool drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real aspect)
 {
 	RenderObjClass* model = assets.Create_Render_Obj(name);
 	if (!model)
 	{
 		fprintf(stderr, "Asset smoke: cannot create W3D model '%s'\n", name);
 		fflush(stderr);
-		return;
+		return FALSE;
 	}
 
 	model->Update_Sub_Object_Transforms();
@@ -2109,7 +2129,7 @@ static void drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real
 		fprintf(stderr, "Asset smoke: model '%s' has invalid bounds\n", name);
 		fflush(stderr);
 		model->Release_Ref();
-		return;
+		return FALSE;
 	}
 
 	const Vector3 origin(0.0f, 0.0f, 0.0f);
@@ -2132,7 +2152,8 @@ static void drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real
 	lighting.Add_Light(light);
 	lighting.Pre_Render_Update(cameraTransform);
 
-	if (WW3D::Begin_Render(true, true, Vector3(0.10f, 0.13f, 0.17f)) == WW3D_ERROR_OK)
+	const Bool rendered = WW3D::Begin_Render(true, true, Vector3(0.10f, 0.13f, 0.17f)) == WW3D_ERROR_OK;
+	if (rendered)
 	{
 		RenderInfoClass renderInfo(camera);
 		renderInfo.light_environment = &lighting;
@@ -2143,6 +2164,7 @@ static void drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real
 		W3D_TakeCompressedScreenshot(SCREENSHOT_PNG, DEFAULT_JPEG_QUALITY, true);
 	}
 	model->Release_Ref();
+	return rendered;
 }
 
 void W3DDisplay::draw()
@@ -2162,10 +2184,24 @@ void W3DDisplay::draw()
 
 	static const char* smokeModel = std::getenv("GENERALSX_ASSET_SMOKE")
 		? std::getenv("GENERALSX_ASSET_SMOKE_MODEL") : nullptr;
-	if (smokeModel && *smokeModel && TheGlobalData->m_initialFile.isEmpty())
+	static const char* smokeObject = std::getenv("GENERALSX_ASSET_SMOKE")
+		? std::getenv("GENERALSX_ASSET_SMOKE_OBJECT") : nullptr;
+	if (((smokeModel && *smokeModel) || (smokeObject && *smokeObject)) &&
+		TheGlobalData->m_initialFile.isEmpty())
 	{
-		drawAssetSmokeModel(*m_assetManager, smokeModel, static_cast<Real>(getWidth()) / getHeight());
-		TheGameEngine->setQuitting(TRUE);
+		AsciiString model = smokeModel;
+		if (smokeObject && *smokeObject)
+		{
+			model = findAssetSmokeObjectModel(smokeObject);
+			if (model.isEmpty())
+				fprintf(stderr, "Asset smoke: no default draw model for object '%s'\n", smokeObject);
+			else
+				fprintf(stderr, "Asset smoke: object '%s' uses default model '%s'\n", smokeObject, model.str());
+			fflush(stderr);
+		}
+		const Bool rendered = model.isNotEmpty() &&
+			drawAssetSmokeModel(*m_assetManager, model.str(), static_cast<Real>(getWidth()) / getHeight());
+		TheGameEngine->setQuitting(rendered || !INIAudit::isEnabled());
 		return;
 	}
 

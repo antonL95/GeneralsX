@@ -48,6 +48,7 @@
 #include "Common/FileSystem.h"
 #include "Common/ArchiveFileSystem.h"
 #include "Common/LocalFileSystem.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/RandomValue.h"
@@ -87,6 +88,7 @@
 #include "GameLogic/SidesList.h"
 
 #include "GameClient/ClientInstance.h"
+#include "GameClient/Display.h"
 #include "GameClient/FXList.h"
 #include "GameClient/GameClient.h"
 
@@ -561,7 +563,8 @@ void GameEngine::init()
 			// Data/INI/GameData.ini. That loose file shadows the BIG-archived one when the engine loads
 			// GameData above, so replaying it here restores user precedence over SagePatch. Installs
 			// without a loose GameData.ini are unaffected, and the archived original is never reloaded.
-			if (TheLocalFileSystem->doesFileExist(USER_GAME_DATA_INI_PATH))
+			if (TheLocalFileSystem->doesFileExist(USER_GAME_DATA_INI_PATH) ||
+				RetailFileLayers::hasLooseOverride(USER_GAME_DATA_INI_PATH))
 			{
 				ini.load(USER_GAME_DATA_INI_PATH, INI_LOAD_OVERWRITE, nullptr);
 			}
@@ -809,6 +812,16 @@ void GameEngine::init()
 			INIAudit::recordWithContext("done", "GameEngine::init", "all subsystems initialized", "", 0);
 			if (!std::getenv("GENERALSX_ASSET_SMOKE"))
 				std::_Exit(0);
+			const char* object = std::getenv("GENERALSX_ASSET_SMOKE_OBJECT");
+			const char* model = std::getenv("GENERALSX_ASSET_SMOKE_MODEL");
+			if (((object && *object) || (model && *model)) && TheGlobalData->m_initialFile.isEmpty())
+			{
+				if (!TheDisplay || TheGlobalData->m_headless)
+					std::_Exit(2);
+				setQuitting(FALSE);
+				TheDisplay->draw();
+				std::_Exit(getQuitting() ? 0 : 2);
+			}
 		}
 
 		// GeneralsX @bugfix Copilot 11/05/2026 Prevent uncapped render when FPS limiter is enabled but no valid limit value was loaded.

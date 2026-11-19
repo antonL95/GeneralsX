@@ -51,11 +51,49 @@
 
 #include "Common/ArchiveFileSystem.h"
 #include "Common/GameAudio.h"
+#include "Common/GlobalData.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/PerfTimer.h"
+#include "Common/RetailFileLayers.h"
 
 #include "Lib/PathUtil.h"
 
+#include <array>
+#include <string>
+
+namespace
+{
+	std::array<AsciiString, 2> retailLooseRoots(const char* filename)
+	{
+		if (!RetailFileLayers::enabled() || !filename || filename[0] == '/' ||
+			filename[0] == '\\' || strchr(filename, ':'))
+			return {};
+
+		return {TheGlobalData->m_modDir, RetailFileLayers::languageDirectory()};
+	}
+
+	void insertVirtualFilename(FilenameList& filenames, const char* path)
+	{
+		std::string normalized(path);
+		std::replace(normalized.begin(), normalized.end(), '/', '\\');
+		if (normalized.starts_with(".\\"))
+			normalized.erase(0, 2);
+		filenames.insert(AsciiString(normalized.c_str()));
+	}
+}
+
+bool RetailFileLayers::hasLooseOverride(const char* filename)
+{
+	for (auto path : retailLooseRoots(filename))
+	{
+		if (path.isEmpty())
+			continue;
+		path.concat(filename);
+		if (TheLocalFileSystem->doesFileExist(path.str()))
+			return true;
+	}
+	return false;
+}
 
 DECLARE_PERF_TIMER(FileSystem)
 
@@ -175,11 +213,13 @@ void		FileSystem::reset()
 File*		FileSystem::openFile( const Char *filename, Int access, size_t bufferSize, FileInstance instance )
 {
 	USE_PERF_TIMER(FileSystem)
+	if (RetailFileLayers::enabled() && instance != 0)
+		return nullptr;
 	File *file = nullptr;
 
 	// GeneralsX @bugfix felipebraz 02/10/2026 Allow mod archives (e.g. !*.big, custom SkirmishScripts)
 	// to override stock loose files that otherwise shadow mod contents.
-	const Bool hasModOverride = (TheArchiveFileSystem != nullptr) &&
+	const Bool hasModOverride = !RetailFileLayers::enabled() && (TheArchiveFileSystem != nullptr) &&
 	                            !(access & File::WRITE) &&
 	                            TheArchiveFileSystem->hasModArchiveOverride(filename);
 
@@ -197,6 +237,17 @@ File*		FileSystem::openFile( const Char *filename, Int access, size_t bufferSize
 
 	if ( TheLocalFileSystem != nullptr )
 	{
+		if (!(access & (File::WRITE | File::CREATE)))
+		{
+			for (auto path : retailLooseRoots(filename))
+			{
+				if (path.isEmpty())
+					continue;
+				path.concat(filename);
+				if (File* looseFile = TheLocalFileSystem->openFile(path.str(), access, bufferSize))
+					return looseFile;
+			}
+		}
 		if (remainingInstance != 0)
 		{
 			if (TheLocalFileSystem->doesFileExist(filename))
@@ -245,6 +296,8 @@ File*		FileSystem::openFile( const Char *filename, Int access, size_t bufferSize
 Bool FileSystem::doesFileExist(const Char *filename, FileInstance instance) const
 {
 	USE_PERF_TIMER(FileSystem)
+	if (RetailFileLayers::enabled() && instance != 0)
+		return FALSE;
 
 #if ENABLE_FILESYSTEM_EXISTENCE_CACHE
 	{
@@ -265,7 +318,7 @@ Bool FileSystem::doesFileExist(const Char *filename, FileInstance instance) cons
 	FileInstance remainingInstance = instance;
 
 	// GeneralsX @bugfix felipebraz 02/10/2026 Prioritize mod archive existence if an override is active.
-	const Bool hasModOverride = (TheArchiveFileSystem != nullptr) &&
+	const Bool hasModOverride = !RetailFileLayers::enabled() && (TheArchiveFileSystem != nullptr) &&
 	                            TheArchiveFileSystem->hasModArchiveOverride(filename);
 
 	if (hasModOverride)
@@ -284,6 +337,9 @@ Bool FileSystem::doesFileExist(const Char *filename, FileInstance instance) cons
 		}
 		remainingInstance -= modArchiveCount;
 	}
+
+	if (RetailFileLayers::hasLooseOverride(filename))
+		return TRUE;
 
 	if (TheLocalFileSystem->doesFileExist(filename))
 	{
@@ -331,6 +387,24 @@ Bool FileSystem::doesFileExist(const Char *filename, FileInstance instance) cons
 void FileSystem::getFileListInDirectory(const AsciiString& directory, const AsciiString& searchName, FilenameList &filenameList, Bool searchSubdirectories) const
 {
 	USE_PERF_TIMER(FileSystem)
+	if (RetailFileLayers::enabled())
+	{
+		for (const auto& root : retailLooseRoots(directory.str()))
+		{
+			if (root.isEmpty())
+				continue;
+			FilenameList layer;
+			TheLocalFileSystem->getFileListInDirectory(directory, root, searchName, layer, searchSubdirectories);
+			for (const auto& path : layer)
+				insertVirtualFilename(filenameList, path.str() + root.getLength());
+		}
+		FilenameList install;
+		TheLocalFileSystem->getFileListInDirectory("", directory, searchName, install, searchSubdirectories);
+		TheArchiveFileSystem->getFileListInDirectory("", directory, searchName, install, searchSubdirectories);
+		for (const auto& path : install)
+			insertVirtualFilename(filenameList, path.str());
+		return;
+	}
 	TheLocalFileSystem->getFileListInDirectory(AsciiString::TheEmptyString, directory, searchName, filenameList, searchSubdirectories);
 	TheArchiveFileSystem->getFileListInDirectory(AsciiString::TheEmptyString, directory, searchName, filenameList, searchSubdirectories);
 }
@@ -348,11 +422,13 @@ Bool FileSystem::getFileInfo(const AsciiString& filename, FileInfo *fileInfo, Fi
 		return FALSE;
 	}
 	memset(fileInfo, 0, sizeof(*fileInfo));
+	if (RetailFileLayers::enabled() && instance != 0)
+		return FALSE;
 
 	FileInstance remainingInstance = instance;
 
 	// GeneralsX @bugfix felipebraz 02/10/2026 Prioritize mod archive metadata if an override is active.
-	const Bool hasModOverride = (TheArchiveFileSystem != nullptr) &&
+	const Bool hasModOverride = !RetailFileLayers::enabled() && (TheArchiveFileSystem != nullptr) &&
 	                            TheArchiveFileSystem->hasModArchiveOverride(filename.str());
 
 	if (hasModOverride)
@@ -363,6 +439,15 @@ Bool FileSystem::getFileInfo(const AsciiString& filename, FileInfo *fileInfo, Fi
 			return TheArchiveFileSystem->getFileInfo(filename, fileInfo, remainingInstance, ArchiveFileSystem::ARCHIVE_FILTER_MOD_ONLY);
 		}
 		remainingInstance -= modArchiveCount;
+	}
+
+	for (auto path : retailLooseRoots(filename.str()))
+	{
+		if (path.isEmpty())
+			continue;
+		path.concat(filename);
+		if (TheLocalFileSystem->getFileInfo(path, fileInfo))
+			return TRUE;
 	}
 
 	if (TheLocalFileSystem->getFileInfo(filename, fileInfo)) {

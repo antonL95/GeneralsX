@@ -34,6 +34,7 @@
 #include "Common/CommandLine.h"
 #include "Common/CRCDebug.h"
 #include "Common/LocalFileSystem.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/version.h"
 #include "Common/WorkingDirectory.h"
 #include "GameClient/ClientInstance.h"
@@ -1128,7 +1129,7 @@ Int parseMod(char *args[], Int num)
 		if (statBuf.st_mode & _S_IFDIR)
 		{
 			if (!modPath.endsWith("\\") && !modPath.endsWith("/"))
-				modPath.concat('\\');
+				modPath.concat(RetailFileLayers::enabled() ? '/' : '\\');
 			DEBUG_LOG(("Mod dir is '%s'.", modPath.str()));
 			TheWritableGlobalData->m_modDir = modPath;
 		}
@@ -1141,6 +1142,23 @@ Int parseMod(char *args[], Int num)
 		return 2;
 	}
 	return 1;
+}
+
+static Int parseRetailFileLayers(char*[], Int)
+{
+	RetailFileLayers::enable();
+	return 1;
+}
+
+static Int parseBfme2(char* args[], Int num)
+{
+	if (num < 2 || args[1][0] == '-')
+	{
+		fprintf(stderr, "-bfme2 requires an installation directory\n");
+		return 1;
+	}
+	RetailFileLayers::setBaseDirectory(args[1]);
+	return 2;
 }
 
 #ifdef DEBUG_LOGGING
@@ -1183,6 +1201,8 @@ Int parseClearDebugLevel(char *args[], int num)
 // Note that except for TheGlobalData, no other global objects exist yet when these are parsed.
 static CommandLineParam paramsForStartup[] =
 {
+	{ "-retailFileLayers", parseRetailFileLayers },
+	{ "-bfme2", parseBfme2 },
 	{ "-win", parseWin },
 	{ "-fullscreen", parseNoWin },
 

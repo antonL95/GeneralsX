@@ -25,6 +25,15 @@ Common command line parameters for `GeneralsX` (Generals) and `GeneralsXZH` (Zer
 | Parameter | Description | Example |
 |-----------|-------------|---------|
 | `-mod <path>` | Loads a mod from directory or .big file | `./GeneralsXZH -mod /path/to/mod.big` |
+| `-retailFileLayers` | Reads loose files and BIG archives in Rise of the Witch-king priority from the working directory and optional mod | `GeneralsXZH -retailFileLayers -mod /path/to/aotr` |
+| `-bfme2 <directory>` | Enables retail file layers and supplies the optional BFME II archive directory | `GeneralsXZH -mod /path/to/aotr -bfme2 /path/to/bfme2` |
+
+For Rise of the Witch-king, launch from its install directory. Pass the Age of the Ring
+directory to `-mod`. A loose mod file takes precedence over localized and ordinary
+loose files in the install. Mod archives come next, followed by localized, root and
+APT archives in Rise of the Witch-king. BFME II archives supply the remaining paths.
+The engine uses the detected language for `lang/<language>/` loose files and
+`lang/<language>*.big` archives.
 
 ## Replay & Multiplayer
 

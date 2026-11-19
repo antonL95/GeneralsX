@@ -29,6 +29,7 @@
 #include "Common/AsciiString.h"
 #include "Common/GameMemory.h"
 #include "Common/PerfTimer.h"
+#include "Common/RetailFileLayers.h"
 #include "StdDevice/Common/StdLocalFileSystem.h"
 #include "StdDevice/Common/StdLocalFile.h"
 
@@ -130,6 +131,8 @@ static std::filesystem::path fixFilenameFromWindowsPath(const Char *filename, In
 			}
 		}
 		// Traverse path to try and match case-insensitively
+		if (RetailFileLayers::enabled() && path.is_relative())
+			path = "." / path;
 		std::filesystem::path parent = path.parent_path();
 
 		std::filesystem::path pathFixed;
@@ -318,6 +321,12 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 
 	auto iter = std::filesystem::directory_iterator(fixedDirectory.c_str(), ec);
 
+	if (ec && RetailFileLayers::enabled())
+	{
+		fixedDirectory = fixFilenameFromWindowsPath(fixedDirectory.c_str(), File::READ).string();
+		iter = std::filesystem::directory_iterator(fixedDirectory, ec);
+	}
+
 	if (ec) {
 		DEBUG_LOG(("StdLocalFileSystem::getFileListInDirectory - Error opening directory %s", fixedDirectory.c_str()));
 		return;
@@ -338,7 +347,14 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 			// if we haven't already, add this filename to the list.
 			// a stl set should only allow one copy of each filename
 			AsciiString newFilename = iter->path().string().c_str();
-			if (filenameList.find(newFilename) == filenameList.end()) {
+			const auto existing = filenameList.find(newFilename);
+			if (existing == filenameList.end()) {
+				filenameList.insert(newFilename);
+			}
+			else if (RetailFileLayers::enabled() &&
+				RetailFileLayers::archiveNameLess(newFilename.str(), existing->str()))
+			{
+				filenameList.erase(existing);
 				filenameList.insert(newFilename);
 			}
 		}

@@ -66,6 +66,7 @@ set(GAMEENGINE_SRC
     Include/Common/SpecialPowerINI.h
     Include/GameLogic/Module/AISpecialPowerUpdate.h
     Include/Common/INIAudit.h
+    Include/Common/RetailFileLayers.h
     Include/Common/INIMath.h
     Include/Common/INIPreprocessor.h
     Include/Common/BfmeAssetPath.h

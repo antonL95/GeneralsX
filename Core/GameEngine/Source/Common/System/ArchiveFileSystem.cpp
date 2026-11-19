@@ -50,6 +50,7 @@
 #include "Common/ArchiveFileSystem.h"
 #include "Common/AsciiString.h"
 #include "Common/PerfTimer.h"
+#include "Common/RetailFileLayers.h"
 
 
 //----------------------------------------------------------------------------
@@ -162,6 +163,16 @@ void ArchiveFileSystem::loadIntoDirectoryTree(ArchiveFile *archiveFile, Bool ove
 		}
 
 		ArchivedFileLocationMap::iterator fileIt;
+		if (RetailFileLayers::enabled())
+		{
+			fileIt = dirInfo->m_files.find(token);
+			if (fileIt == dirInfo->m_files.end())
+				dirInfo->m_files.emplace(token, archiveFile);
+			else if (overwrite)
+				fileIt->second = archiveFile;
+			++it;
+			continue;
+		}
 		if (overwrite)
 		{
 			// When overwriting, try place the new value at the beginning of the key list.
