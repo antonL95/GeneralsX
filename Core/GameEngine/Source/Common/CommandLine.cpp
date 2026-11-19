@@ -688,22 +688,26 @@ Int parsePreload( char *args[], int num )
 #endif
 
 
-#if defined(RTS_DEBUG)
-Int parseDisplayDebug(char *args[], int)
-{
-	TheWritableGlobalData->m_displayDebug = TRUE;
-
-	return 1;
-}
-
 Int parseFile(char *args[], int num)
 {
+#if !defined(RTS_DEBUG)
+	if (!std::getenv("GENERALSX_ASSET_SMOKE"))
+		return 1;
+#endif
 	if (num > 1)
 	{
 		TheWritableGlobalData->m_initialFile = args[1];
 		ConvertShortMapPathToLongMapPath(TheWritableGlobalData->m_initialFile);
 	}
 	return 2;
+}
+
+#if defined(RTS_DEBUG)
+Int parseDisplayDebug(char *args[], int)
+{
+	TheWritableGlobalData->m_displayDebug = TRUE;
+
+	return 1;
 }
 
 
@@ -1302,6 +1306,7 @@ static CommandLineParam paramsForEngineInit[] =
 	// Number of frames between each CRC that is written to replay files in singleplayer games.
 	{ "-ReplayCRCInterval", parseReplayCRCInterval },
 #endif
+	{ "-file", parseFile },
 #if defined(RTS_DEBUG)
 	{ "-saveAllStats", parseSaveAllStats },
 	{ "-noDraw", parseNoDraw },
@@ -1327,7 +1332,6 @@ static CommandLineParam paramsForEngineInit[] =
 	{ "-jabber", parseJabber },
 	{ "-munkee", parseMunkee },
 	{ "-displayDebug", parseDisplayDebug },
-	{ "-file", parseFile },
 
 //	{ "-preload", parsePreload },
 

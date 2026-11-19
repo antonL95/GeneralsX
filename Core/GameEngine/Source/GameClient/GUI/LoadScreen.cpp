@@ -1212,6 +1212,8 @@ void ShellGameLoadScreen::init( GameInfo *game )
 	// create the layout of the load screen
 	m_loadScreen = TheWindowManager->winCreateFromScript( "Menus/ShellGameLoadScreen.wnd" );
 	DEBUG_ASSERTCRASH(m_loadScreen, ("Can't initialize the ShellGame loadscreen"));
+	if (!m_loadScreen)
+		return;
 	m_loadScreen->winHide(FALSE);
 	m_loadScreen->winBringToTop();
 
@@ -1243,7 +1245,8 @@ void ShellGameLoadScreen::reset()
 void ShellGameLoadScreen::update( Int percent )
 {
 	TheMouse->setCursorTooltip(UnicodeString::TheEmptyString);
-	GadgetProgressBarSetProgress(m_progressBar, percent);
+	if (m_progressBar)
+		GadgetProgressBarSetProgress(m_progressBar, percent);
 
 	// Do this last!
 	LoadScreen::update( percent );

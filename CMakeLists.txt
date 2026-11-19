@@ -72,7 +72,7 @@ include(cmake/dx8.cmake)
 # Linux/macOS port: Make DXVK headers accessible globally so Core libraries
 # (Debug, WWLib, WWMath, etc.) can access platform compatibility and Windows base types
 if(UNIX)
-    if(APPLE)
+    if(APPLE OR DXVK_LINUX_ARM64)
         include_directories(
             ${dxvk_SOURCE_DIR}/include/native
             ${dxvk_SOURCE_DIR}/include/native/windows
@@ -170,6 +170,10 @@ if(RTS_BUILD_GENERALS)
     if(TARGET sage_patch)
         add_dependencies(g_generals sage_patch)
     endif()
+endif()
+
+if(DXVK_LINUX_ARM64)
+    configure_dxvk_linux_arm64()
 endif()
 
 if(RTS_BUILD_OPTION_TESTS)

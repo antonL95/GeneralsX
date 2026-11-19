@@ -41,6 +41,7 @@
 // #define MAINTAIN_LEGACY_FILES
 
 #include "Common/ArchiveFile.h"
+#include "Common/BfmeAssetPath.h"
 #include "Common/Debug.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
@@ -361,6 +362,16 @@ char const * GameFileClass::Set_Name( char const *filename )
 			{
 				strlcpy(m_filename, altFilename, _MAX_PATH);
 			}
+		}
+	}
+
+	if (m_fileExists == FALSE && (fileType == FILE_TYPE_W3D || isImageFileType(fileType)))
+	{
+		const auto path = makeBfmeAssetPath(fileType == FILE_TYPE_W3D ? W3D_DIR_PATH : "Art/CompiledTextures/", filename);
+		if (!path.empty() && path.size() < ARRAY_SIZE(m_filePath) && TheFileSystem->doesFileExist(path.c_str()))
+		{
+			strlcpy(m_filePath, path.c_str(), ARRAY_SIZE(m_filePath));
+			m_fileExists = TRUE;
 		}
 	}
 

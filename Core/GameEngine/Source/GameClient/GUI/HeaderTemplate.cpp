@@ -56,6 +56,8 @@
 
 #include "Common/INI.h"
 #include "Common/FileSystem.h"
+#include "Common/GlobalData.h"
+#include "Common/INIAudit.h"
 #include "Common/Registry.h"
 #include "GameClient/HeaderTemplate.h"
 #include "GameClient/GameFont.h"
@@ -135,7 +137,10 @@ void HeaderTemplateManager::init()
 		fname.format("Data\\%s\\HeaderTemplate", GetRegistryLanguage().str());
 
 		INI ini;
-		ini.loadFileDirectory( fname, INI_LOAD_OVERWRITE, nullptr );
+		INI::LoadFlags flags = INI::LoadFlags_SearchSubDirs;
+		if (TheGlobalData && TheGlobalData->m_headless && INIAudit::isEnabled())
+			flags |= INI::LoadFlags_ExpectFileFound;
+		ini.loadFileDirectory( fname, INI_LOAD_OVERWRITE, nullptr, flags );
 	}
 
 	populateGameFonts();

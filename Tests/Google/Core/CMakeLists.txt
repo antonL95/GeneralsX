@@ -6,6 +6,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/INIAuditTest.cpp
     GameEngine/Common/INIMathTest.cpp
     GameEngine/Common/INIPreprocessorTest.cpp
+    GameEngine/Common/BfmeAssetPathTest.cpp
     Libraries/Compression/CompressionManagerTest.cpp
 )
 

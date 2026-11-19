@@ -561,11 +561,8 @@ ArchiveFile * BIGFileSystem::openArchiveFile(const Char *filename) {
 
 	AsciiString asciibuf;
 	char buffer[_MAX_PATH];
-	fp->read(buffer, 4); // read the "BIG" at the beginning of the file.
-	buffer[4] = 0;
-	if (strcmp(buffer, BIGFileIdentifier) != 0 &&
-		!(strcmp(buffer, "BIG4") == 0 && std::getenv("GENERALSX_ASSET_AUDIT") &&
-		  std::getenv("GENERALSX_ASSET_AUDIT_BIG4"))) {
+	if (fp->read(buffer, 4) != 4 ||
+		(memcmp(buffer, BIGFileIdentifier, 4) != 0 && memcmp(buffer, "BIG4", 4) != 0)) {
 		DEBUG_CRASH(("Error reading BIG file identifier in file %s", filename));
 		fp->close();
 		fp = nullptr;

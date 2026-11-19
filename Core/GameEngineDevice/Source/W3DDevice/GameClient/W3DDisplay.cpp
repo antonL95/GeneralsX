@@ -35,6 +35,7 @@ static void drawFramerateBar();
 
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 #include <numeric>
+#include <cmath>
 #include <stdlib.h>
 #include <windows.h>
 // GeneralsX @bugfix BenderAI 13/02/2026 - io.h is Windows-specific, use unistd.h on Linux
@@ -49,6 +50,7 @@ static void drawFramerateBar();
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "Common/FramePacer.h"
+#include "Common/GameEngine.h"
 #include "Common/ThingFactory.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
@@ -107,6 +109,7 @@ static void drawFramerateBar();
 #include "WW3D2/dx8webbrowser.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/hlod.h"
+#include "WW3D2/lightenvironment.h"
 #include "WW3D2/meshmatdesc.h"
 #include "WW3D2/meshmdl.h"
 #include "WW3D2/rddesc.h"
@@ -1121,6 +1124,8 @@ void W3DDisplay::init()
 
 		if (renderDeviceError != WW3D_ERROR_OK)
 		{
+			fprintf(stderr, "ERROR: WW3D could not create a Direct3D render device (%d)\n", renderDeviceError);
+			fflush(stderr);
 			WW3D::Shutdown();
 			WWMath::Shutdown();
 			throw ERROR_INVALID_D3D;	//failed to initialize.  User probably doesn't have DX 8.1
@@ -2080,6 +2085,66 @@ void W3DDisplay::step()
 /** Draw the entire W3D Display */
 //=============================================================================
 //DECLARE_PERF_TIMER(W3DDisplay_draw)
+static void drawAssetSmokeModel(WW3DAssetManager& assets, const char* name, Real aspect)
+{
+	RenderObjClass* model = assets.Create_Render_Obj(name);
+	if (!model)
+	{
+		fprintf(stderr, "Asset smoke: cannot create W3D model '%s'\n", name);
+		fflush(stderr);
+		return;
+	}
+
+	model->Update_Sub_Object_Transforms();
+	AABoxClass bounds = model->Get_Bounding_Box();
+	for (Int index = 0; index < model->Get_Num_Sub_Objects(); ++index)
+	{
+		RenderObjClass* child = model->Get_Sub_Object(index);
+		bounds.Add_Box(child->Get_Bounding_Box());
+		child->Release_Ref();
+	}
+	const Real radius = bounds.Extent.Length();
+	if (!(radius > 0.0f) || !std::isfinite(radius))
+	{
+		fprintf(stderr, "Asset smoke: model '%s' has invalid bounds\n", name);
+		fflush(stderr);
+		model->Release_Ref();
+		return;
+	}
+
+	const Vector3 origin(0.0f, 0.0f, 0.0f);
+	model->Set_Position(model->Get_Position() - bounds.Center);
+	CameraClass camera;
+	Matrix3D cameraTransform;
+	cameraTransform.Look_At(Vector3(2.0f, -2.6f, 1.4f) * radius, origin, 0.0f);
+	camera.Set_Transform(cameraTransform);
+	camera.Set_Projection_Type(CameraClass::ORTHO);
+	const Real halfHeight = radius * 1.35f;
+	const Real halfWidth = halfHeight * aspect;
+	camera.Set_View_Plane(Vector2(-halfWidth, -halfHeight), Vector2(halfWidth, halfHeight));
+	camera.Set_Clip_Planes(radius * 0.05f, radius * 10.0f);
+
+	LightClass light(LightClass::DIRECTIONAL);
+	light.Set_Transform(cameraTransform);
+	light.Set_Diffuse(Vector3(0.65f, 0.65f, 0.65f));
+	LightEnvironmentClass lighting;
+	lighting.Reset(origin, Vector3(0.45f, 0.45f, 0.45f));
+	lighting.Add_Light(light);
+	lighting.Pre_Render_Update(cameraTransform);
+
+	if (WW3D::Begin_Render(true, true, Vector3(0.10f, 0.13f, 0.17f)) == WW3D_ERROR_OK)
+	{
+		RenderInfoClass renderInfo(camera);
+		renderInfo.light_environment = &lighting;
+		WW3D::Render(*model, renderInfo);
+		WW3D::End_Render(false);
+		fprintf(stderr, "Asset smoke: completed a render pass for '%s' (radius %.2f)\n", name, radius);
+		fflush(stderr);
+		W3D_TakeCompressedScreenshot(SCREENSHOT_PNG, DEFAULT_JPEG_QUALITY, true);
+	}
+	model->Release_Ref();
+}
+
 void W3DDisplay::draw()
 {
 	//USE_PERF_TIMER(W3DDisplay_draw)
@@ -2094,6 +2159,15 @@ void W3DDisplay::draw()
 
 	if (TheGlobalData->m_headless)
 		return;
+
+	static const char* smokeModel = std::getenv("GENERALSX_ASSET_SMOKE")
+		? std::getenv("GENERALSX_ASSET_SMOKE_MODEL") : nullptr;
+	if (smokeModel && *smokeModel && TheGlobalData->m_initialFile.isEmpty())
+	{
+		drawAssetSmokeModel(*m_assetManager, smokeModel, static_cast<Real>(getWidth()) / getHeight());
+		TheGameEngine->setQuitting(TRUE);
+		return;
+	}
 
 	// TheSuperHackers @feature bobtista 10/07/2026 Show messages for screenshots finished by the screenshot thread.
 	W3D_UpdateScreenshotMessages();

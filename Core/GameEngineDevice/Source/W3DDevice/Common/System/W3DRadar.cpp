@@ -31,6 +31,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/AudioEventRTS.h"
 #include "Common/Debug.h"
+#include "Common/Errors.h"
 #include "Common/GlobalData.h"
 #include "Common/GameUtility.h"
 #include "Common/Player.h"
@@ -108,6 +109,13 @@ static WW3DFormat findFormat(const WW3DFormat formats[], WW3DFormat fallback = W
 //-------------------------------------------------------------------------------------------------
 void W3DRadar::initializeTextureFormats()
 {
+	if (!DX8Wrapper::Get_Current_Caps())
+	{
+		fprintf(stderr, "ERROR: Cannot initialize radar without a graphics device\n");
+		fflush(stderr);
+		throw ERROR_INVALID_D3D;
+	}
+
 	const WW3DFormat terrainFormats[] =
 	{
 		WW3D_FORMAT_R8G8B8,

@@ -2035,7 +2035,7 @@ void InGameUI::update()
 //
 //	}  // end if
 	Player* moneyPlayer = TheControlBar->getCurrentlyViewedPlayer();
-	if( moneyPlayer)
+	if( moneyPlayer && moneyWin && powerWin )
 	{
 		Money *money = moneyPlayer->getMoney();
 		Bool wantShowIncome = TheGlobalData->m_showMoneyPerMinute;
@@ -2076,8 +2076,10 @@ void InGameUI::update()
 	}
 	else
 	{
-		moneyWin->winHide(TRUE);
-		powerWin->winHide(TRUE);
+		if (moneyWin)
+			moneyWin->winHide(TRUE);
+		if (powerWin)
+			powerWin->winHide(TRUE);
 	}
 
 	// Update the floating Text;
@@ -4346,12 +4348,12 @@ void InGameUI::playCameoMovie( const AsciiString& movieName )
 // ------------------------------------------------------------------------------------------------
 void InGameUI::stopCameoMovie()
 {
-//RightHUD
-	//GameWindow *window = TheWindowManager->winGetWindowFromId(nullptr,TheNameKeyGenerator->nameToKey( "ControlBar.wnd:CameoMovieWindow" ));
-	GameWindow *window = TheWindowManager->winGetWindowFromId(nullptr,TheNameKeyGenerator->nameToKey( "ControlBar.wnd:RightHUD" ));
-//	window->winHide(FALSE);
-	WinInstanceData *winData = window->winGetInstanceData();
-	winData->setVideoBuffer(nullptr);
+	if (TheWindowManager)
+	{
+		GameWindow *window = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey("ControlBar.wnd:RightHUD"));
+		if (window)
+			window->winGetInstanceData()->setVideoBuffer(nullptr);
+	}
 
 	delete m_cameoVideoBuffer;
 	m_cameoVideoBuffer = nullptr;

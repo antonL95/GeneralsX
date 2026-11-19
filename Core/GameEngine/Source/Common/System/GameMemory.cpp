@@ -3457,17 +3457,17 @@ void operator delete[](void * p, const char *, int)
 void *operator new(size_t size, std::align_val_t alignment)
 {
 	void *p = nullptr;
-	if (::posix_memalign(&p, static_cast<size_t>(alignment), size) != 0)
+	size_t allocationAlignment = static_cast<size_t>(alignment);
+	if (allocationAlignment < sizeof(void*))
+		allocationAlignment = sizeof(void*);
+	if (::posix_memalign(&p, allocationAlignment, size) != 0)
 		throw std::bad_alloc();
 	return p;
 }
 
 void *operator new[](size_t size, std::align_val_t alignment)
 {
-	void *p = nullptr;
-	if (::posix_memalign(&p, static_cast<size_t>(alignment), size) != 0)
-		throw std::bad_alloc();
-	return p;
+	return ::operator new(size, alignment);
 }
 
 void operator delete(void *p, std::align_val_t) noexcept

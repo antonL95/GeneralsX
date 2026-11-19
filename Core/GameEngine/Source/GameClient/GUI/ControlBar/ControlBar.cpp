@@ -36,7 +36,9 @@
 #define DEFINE_RADIUSCURSOR_NAMES
 
 #include "Common/ActionManager.h"
+#include "Common/FileSystem.h"
 #include "Common/FramePacer.h"
+#include "Common/INIException.h"
 #include "Common/GameType.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/NameKeyGenerator.h"
@@ -1098,7 +1100,13 @@ void ControlBar::init()
 		NameKeyType id;
 		id = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:ControlBarParent" );
 		m_contextParent[ CP_MASTER ] = TheWindowManager->winGetWindowFromId( nullptr, id );
-	m_contextParent[ CP_MASTER ]->winGetPosition(&m_defaultControlBarPosition.x, &m_defaultControlBarPosition.y);
+		if (!m_contextParent[ CP_MASTER ])
+		{
+			if (TheGlobalData && !TheGlobalData->m_headless && TheFileSystem->doesFileExist("Window\\ControlBar.wnd"))
+				throw INIException("ControlBar.wnd is missing ControlBarParent");
+			return;
+		}
+		m_contextParent[ CP_MASTER ]->winGetPosition(&m_defaultControlBarPosition.x, &m_defaultControlBarPosition.y);
 
 		m_scienceLayout = TheWindowManager->winCreateLayout("GeneralsExpPoints.wnd");
 		m_scienceLayout->hide(TRUE);
@@ -1407,7 +1415,7 @@ void ControlBar::reset()
 //-------------------------------------------------------------------------------------------------
 void ControlBar::update()
 {
-	if (TheGlobalData->m_headless)
+	if (TheGlobalData->m_headless || !m_contextParent[ CP_MASTER ])
 		return;
 	getStarImage();
 	updateRadarAttackGlow();
@@ -2163,6 +2171,8 @@ CBCommandStatus ControlBar::processContextSensitiveButtonTransition( GameWindow 
 //-------------------------------------------------------------------------------------------------
 void ControlBar::switchToContext( ControlBarContext context, Drawable *draw )
 {
+	if (!m_contextParent[ CP_MASTER ])
+		return;
 
 	// restore the right hud to a plain window
 	setPortraitByObject( nullptr );
@@ -3004,7 +3014,7 @@ void ControlBar::showPurchaseScience()
 
 void ControlBar::hidePurchaseScience()
 {
-	if(m_contextParent[ CP_PURCHASE_SCIENCE ]->winIsHidden())
+	if(!m_contextParent[ CP_PURCHASE_SCIENCE ] || m_contextParent[ CP_PURCHASE_SCIENCE ]->winIsHidden())
 		return;
 
 	if( m_contextParent[ CP_PURCHASE_SCIENCE ] )

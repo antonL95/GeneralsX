@@ -1,5 +1,6 @@
 #include "Common/ArchiveFile.h"
 #include "Common/BIGFileSystem.h"
+#include "Common/BfmeAssetPath.h"
 #include "Common/CriticalSection.h"
 #include "Common/DataChunk.h"
 #include "Common/MapReaderWriterInfo.h"
@@ -124,6 +125,21 @@ private:
 	const Entry *m_entry;
 };
 
+Inventory::const_iterator resolveModel(const Inventory& inventory, const std::string& path)
+{
+	auto entry = inventory.find(path);
+	if (entry == inventory.end() && extension(path) == ".w3d")
+	{
+		const auto name = fs::path(path).filename().string();
+		entry = inventory.find("data/english/art/w3d/" + name);
+		if (entry == inventory.end())
+			entry = inventory.find("art/w3d/" + name);
+		if (entry == inventory.end())
+			entry = inventory.find(makeBfmeAssetPath("art/w3d/", name));
+	}
+	return entry;
+}
+
 class ProbeFileFactory : public FileFactoryClass
 {
 public:
@@ -131,15 +147,7 @@ public:
 
 	FileClass *Get_File(const char *name) override
 	{
-		std::string path = lowerPath(name);
-		auto entry = m_files.find(path);
-		if (entry == m_files.end() && extension(path) == ".w3d")
-		{
-			path = fs::path(path).filename().string();
-			entry = m_files.find("art/w3d/" + path.substr(0, 2) + "/" + path);
-			if (entry == m_files.end())
-				entry = m_files.find("art/w3d/" + path);
-		}
+		const auto entry = resolveModel(m_files, lowerPath(name));
 		return new ProbeFile(entry == m_files.end() ? nullptr : &entry->second, name);
 	}
 
@@ -236,12 +244,6 @@ void inventoryRoot(const fs::path& root, AssetRoot kind, BIGFileSystem& big, Inv
 
 		std::unique_ptr<ArchiveFile> archive(big.openArchiveFile(archivePath.c_str()));
 		record("archive", archivePath, archive ? "ok" : "rejected", magic, count);
-		if (!archive && magic == "BIG4")
-		{
-			setenv("GENERALSX_ASSET_AUDIT_BIG4", "1", 1);
-			archive.reset(big.openArchiveFile(archivePath.c_str()));
-			unsetenv("GENERALSX_ASSET_AUDIT_BIG4");
-		}
 		if (!archive)
 			continue;
 
@@ -669,15 +671,18 @@ std::string resolveTexture(const Inventory& inventory, const std::string& refere
 		const auto name = stem + suffix;
 		if (reference.find('/') != std::string::npos && inventory.count(name))
 			return name;
-		const std::string compiled = "art/compiledtextures/" + name.substr(0, 2) + "/" + name;
-		if (inventory.count(compiled))
-			return compiled;
 		for (const char *prefix : {"data/english/art/textures/", "art/textures/", "art/terrain/", ""})
 		{
 			const std::string key = prefix + name;
 			if (inventory.find(key) != inventory.end())
 				return key;
 		}
+	}
+	for (const char *suffix : {".dds", ".tga"})
+	{
+		const auto compiled = makeBfmeAssetPath("art/compiledtextures/", stem + suffix);
+		if (inventory.count(compiled))
+			return compiled;
 	}
 	return {};
 }
@@ -731,7 +736,6 @@ int RunAssetProbe(const char *reportPath)
 	Inventory inventory;
 	Inventory loose;
 	std::vector<std::unique_ptr<ArchiveFile>> archives;
-	unsetenv("GENERALSX_ASSET_AUDIT_BIG4");
 	inventoryRoot("/game-install/bfme2", AssetRoot::Base, big, inventory, loose, archives);
 	inventoryRoot("/game-install/rotwk", AssetRoot::Expansion, big, inventory, loose, archives);
 	inventoryRoot("/game-install/aotr", AssetRoot::Mod, big, inventory, loose, archives);
@@ -740,11 +744,24 @@ int RunAssetProbe(const char *reportPath)
 	ProbeFileFactory factory(inventory);
 	_TheFileFactory = &factory;
 
+	std::set<std::string> modelNames;
 	for (const auto& [name, entry] : inventory)
 	{
 		const std::string ext = extension(name);
 		const std::string source = entry.archive ? entry.archive->getName().str() : entry.path;
 		record("entry", name, ext, source);
+		if (ext == ".w3d")
+			modelNames.insert(fs::path(name).filename().string());
+	}
+	for (const auto& name : modelNames)
+	{
+		const auto entry = resolveModel(inventory, name);
+		if (entry == inventory.end())
+			record("model-resolution", name, "missing");
+		else if (entry->first == makeBfmeAssetPath("art/w3d/", name))
+			record("model-resolution", name, "bfme", entry->first);
+		else
+			record("model-resolution", name, "stock", entry->first);
 	}
 
 	for (const auto& [name, entry] : inventory)

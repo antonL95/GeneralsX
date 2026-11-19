@@ -727,6 +727,13 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		*/
 		WWDEBUG_SAY(("Enumerate devices"));
 		Enumerate_Devices();
+		if (Get_Render_Device_Count() == 0)
+		{
+			fprintf(stderr, "ERROR: DX8Wrapper::Init() - No usable Direct3D adapters found\n");
+			fflush(stderr);
+			Shutdown();
+			return false;
+		}
 		WWDEBUG_SAY(("DX8Wrapper Init completed"));
 	}
 

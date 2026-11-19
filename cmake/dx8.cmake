@@ -193,6 +193,78 @@ elseif(APPLE AND SAGE_USE_MOLTENVK)
   message(STATUS "DXVK source directory: ${DXVK_SOURCE_DIR}")
   message(STATUS "DXVK d3d8 library:     ${DXVK_D3D8_LIB}")
 
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+  find_program(DXVK_MESON meson REQUIRED)
+  find_program(DXVK_NINJA ninja REQUIRED)
+  find_program(DXVK_GLSLANG NAMES glslang glslangValidator REQUIRED)
+  set(DXVK_LINUX_ARM64 TRUE)
+
+  FetchContent_Declare(dxvk_linux_arm64
+    GIT_REPOSITORY https://github.com/generalsx-project/dxvk.git
+    GIT_TAG f66da559fd48cd55ddfebca38ed0f708c0f76a24
+  )
+  FetchContent_MakeAvailable(dxvk_linux_arm64)
+  set(dxvk_SOURCE_DIR "${dxvk_linux_arm64_SOURCE_DIR}")
+  set(DXVK_INCLUDE_DIR "${dxvk_SOURCE_DIR}/include/native")
+
+  function(configure_dxvk_linux_arm64)
+    include(ExternalProject)
+    set(build_dir "${CMAKE_BINARY_DIR}/_deps/dxvk-build-linux-arm64")
+    set(pkg_path "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
+    if(TARGET SDL3-shared)
+      set(pc_dir "${CMAKE_CURRENT_BINARY_DIR}/dxvk-pkgconfig")
+      file(GENERATE OUTPUT "${pc_dir}/SDL3.pc" CONTENT
+"Name: sdl3
+Description: SDL3 built by GeneralsX
+Version: ${SDL3_VERSION}
+Libs: -L$<TARGET_FILE_DIR:SDL3-shared> -lSDL3
+Cflags: -I${SDL3_SOURCE_DIR}/include
+")
+      set(pkg_path "${pc_dir}:${pkg_path}")
+    endif()
+
+    set(d3d8 "src/d3d8/libdxvk_d3d8.so.0.20600")
+    set(d3d9 "src/d3d9/libdxvk_d3d9.so.0.20600")
+    ExternalProject_Add(dxvk_linux_arm64_build
+      SOURCE_DIR "${dxvk_SOURCE_DIR}"
+      BINARY_DIR "${build_dir}"
+      DOWNLOAD_COMMAND ""
+      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+        "CC=${CMAKE_C_COMPILER}" "CXX=${CMAKE_CXX_COMPILER}"
+        "PKG_CONFIG_PATH=${pkg_path}" "LDFLAGS=-Wl,-rpath,'$ORIGIN'"
+        ${DXVK_MESON} setup <BINARY_DIR> <SOURCE_DIR> --reconfigure
+        --buildtype=release -Ddxvk_native_wsi=sdl3
+        -Dcpp_args=-DVK_ENABLE_BETA_EXTENSIONS
+        -Denable_dxgi=false -Denable_d3d10=false -Denable_d3d11=false
+      BUILD_COMMAND ${DXVK_NINJA} -C <BINARY_DIR> "${d3d8}" "${d3d9}"
+      BUILD_BYPRODUCTS "${build_dir}/${d3d8}" "${build_dir}/${d3d9}"
+      INSTALL_COMMAND ""
+    )
+    if(TARGET SDL3-shared)
+      add_dependencies(dxvk_linux_arm64_build SDL3-shared)
+    endif()
+
+    foreach(game IN ITEMS g_generals z_generals)
+      if(TARGET ${game})
+        set(game_dir "$<TARGET_FILE_DIR:${game}>")
+        add_custom_target(${game}_dxvk
+          COMMAND ${CMAKE_COMMAND} -E make_directory "${game_dir}"
+          COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${build_dir}/${d3d8}" "${build_dir}/${d3d9}" "${game_dir}"
+          COMMAND ${CMAKE_COMMAND} -E create_symlink libdxvk_d3d8.so.0.20600 "${game_dir}/libdxvk_d3d8.so.0"
+          COMMAND ${CMAKE_COMMAND} -E create_symlink libdxvk_d3d9.so.0.20600 "${game_dir}/libdxvk_d3d9.so.0"
+          COMMAND ${CMAKE_COMMAND} -E create_symlink libdxvk_d3d8.so.0 "${game_dir}/libdxvk_d3d8.so"
+          COMMAND ${CMAKE_COMMAND} -E create_symlink libdxvk_d3d9.so.0 "${game_dir}/libdxvk_d3d9.so"
+          DEPENDS "${build_dir}/${d3d8}" "${build_dir}/${d3d9}"
+          VERBATIM
+        )
+        add_dependencies(${game}_dxvk dxvk_linux_arm64_build)
+        add_dependencies(${game} ${game}_dxvk)
+        set_property(TARGET ${game} APPEND PROPERTY BUILD_RPATH "$ORIGIN")
+      endif()
+    endforeach()
+  endfunction()
+
 else()
   # Linux: Fetch pre-built DXVK native binary for DirectX→Vulkan translation
   # Native 32-bit and 64-bit Linux binaries (.so)

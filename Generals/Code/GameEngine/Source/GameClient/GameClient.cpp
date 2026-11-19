@@ -441,7 +441,8 @@ void GameClient::reset()
 #endif
 
 	// need to reset the in game UI to clear drawables before they are destroyed
-	TheInGameUI->reset();
+	if (TheInGameUI)
+		TheInGameUI->reset();
 
 	// destroy all Drawables
 	for( Drawable *draw = m_drawableList, *nextDraw = nullptr; draw; draw = nextDraw )
@@ -451,11 +452,16 @@ void GameClient::reset()
 	}
 	m_drawableList = nullptr;
 
-	TheDisplay->reset();
-	TheTerrainVisual->reset();
-	TheRayEffects->reset();
-	TheVideoPlayer->reset();
-	TheEva->reset();
+	if (TheDisplay)
+		TheDisplay->reset();
+	if (TheTerrainVisual)
+		TheTerrainVisual->reset();
+	if (TheRayEffects)
+		TheRayEffects->reset();
+	if (TheVideoPlayer)
+		TheVideoPlayer->reset();
+	if (TheEva)
+		TheEva->reset();
 
 	// clear any drawable TOC we might have
 	m_drawableTOC.clear();

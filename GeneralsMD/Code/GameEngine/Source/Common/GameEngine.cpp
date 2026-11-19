@@ -947,11 +947,13 @@ void GameEngine::init()
 void GameEngine::reset()
 {
 
-	WindowLayout *background = TheWindowManager->winCreateLayout("Menus/BlankWindow.wnd");
-	DEBUG_ASSERTCRASH(background,("We Couldn't Load Menus/BlankWindow.wnd"));
-	background->hide(FALSE);
-	background->bringForward();
-	background->getFirstWindow()->winClearStatus(WIN_STATUS_IMAGE);
+	WindowLayout *background = TheWindowManager ? TheWindowManager->winCreateLayout("Menus/BlankWindow.wnd") : nullptr;
+	if (background && background->getFirstWindow())
+	{
+		background->hide(FALSE);
+		background->bringForward();
+		background->getFirstWindow()->winClearStatus(WIN_STATUS_IMAGE);
+	}
 	Bool deleteNetwork = false;
 	if (TheGameLogic->isInMultiplayerGame())
 		deleteNetwork = true;

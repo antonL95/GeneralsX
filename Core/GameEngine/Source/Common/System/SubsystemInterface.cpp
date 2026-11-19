@@ -27,6 +27,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/SubsystemInterface.h"
+#include "Common/Errors.h"
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
 #include "Common/INIException.h"
@@ -192,6 +193,10 @@ void SubsystemInterfaceList::initSubsystem(SubsystemInterface* sys, const char* 
 	{
 		try {
 			sys->init();
+		} catch (ErrorCode error) {
+			if (error == ERROR_INVALID_D3D)
+				throw;
+			INIAudit::recordWithContext("subsystem", name.str(), "init failed", "", 0);
 		} catch (...) {
 			INIAudit::recordWithContext("subsystem", name.str(), "init failed", "", 0);
 		}

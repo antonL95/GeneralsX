@@ -169,7 +169,7 @@ void W3D_UpdateScreenshotMessages()
 	}
 }
 
-void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality)
+void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality, bool synchronous)
 {
 	static constexpr const char* const ScreenshotFormatExtensions[] = { "jpg", "png" };
 	static_assert(ARRAY_SIZE(ScreenshotFormatExtensions) == SCREENSHOT_FORMAT_COUNT, "Incorrect array size");
@@ -240,6 +240,12 @@ void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality)
 	surfaceCopy->Unlock();
 	surfaceCopy->Release_Ref();
 	surfaceCopy = nullptr;
+
+	if (synchronous)
+	{
+		screenshotThreadFunc(threadData);
+		return;
+	}
 
 #ifdef _WIN32
 	const HANDLE hThread = CreateThread(nullptr, 0, screenshotThreadFunc, threadData, 0, nullptr);
