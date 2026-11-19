@@ -42,11 +42,15 @@
 // SDL3_image now finds system libpng via pkg-config (CMAKE_PREFIX_PATH reordered in cmake/sdl3.cmake)
 #include <SDL3_image/SDL_image.h>
 // GeneralsX @bugfix BenderAI 22/02/2026 Add array header for AnimatedCursor
+#include <algorithm>
 #include <array>
+#include <memory>
+#include <string>
 // GeneralsX @bugfix BenderAI 22/02/2026 Add file system includes for cursor loading
 #include "Common/Debug.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
+#include "Common/RetailFileLayers.h"
 
 /**
  * AnimatedCursor - Helper struct for cursor animation (fighter19 pattern)
@@ -54,7 +58,7 @@
  */
 struct AnimatedCursor {
 	SDL_Cursor* m_cursor = nullptr;
-	std::array<SDL_Surface*, MAX_2D_CURSOR_ANIM_FRAMES> m_frameSurfaces;
+	std::array<SDL_Surface*, MAX_2D_CURSOR_ANIM_FRAMES> m_frameSurfaces{};
 	int m_frameCount = 0;
 	int m_frameRate = 0; // the time a frame is displayed in 1/60th of a second
 
@@ -185,14 +189,38 @@ AnimatedCursor* SDL3Mouse::loadCursorFromFile(const char* filepath)
 	}
 
 	// Read entire file and close it
-	Int size  = file->size();
+	const Int size = file->size();
+	if (size < static_cast<Int>(sizeof(RIFFChunk)) || size > 16 * 1024 * 1024)
+	{
+		file->close();
+		return nullptr;
+	}
 	char* file_buffer = file->readEntireAndClose();
 
 	if (!file_buffer)
 	{
 		DEBUG_LOG(("SDL3Mouse::loadCursorFromFile: Failed to read ANI cursor [%s]", filepath));
-		file->close();
 		return NULL;
+	}
+
+	constexpr char curSignature[] = {'\0', '\0', '\2', '\0'};
+	if (memcmp(file_buffer, curSignature, sizeof(curSignature)) == 0)
+	{
+		std::unique_ptr<char[]> bytes(file_buffer);
+		SDL_IOStream* stream = SDL_IOFromConstMem(bytes.get(), size);
+		if (!stream)
+			return nullptr;
+		auto cursor = std::make_unique<AnimatedCursor>();
+		SDL_Surface* surface = IMG_LoadTyped_IO(stream, true, "CUR");
+		if (!surface)
+			return nullptr;
+		cursor->m_frameSurfaces[0] = surface;
+		cursor->m_frameCount = 1;
+		const auto props = SDL_GetSurfaceProperties(surface);
+		const int x = std::clamp(static_cast<int>(SDL_GetNumberProperty(props, SDL_PROP_SURFACE_HOTSPOT_X_NUMBER, 0)), 0, surface->w - 1);
+		const int y = std::clamp(static_cast<int>(SDL_GetNumberProperty(props, SDL_PROP_SURFACE_HOTSPOT_Y_NUMBER, 0)), 0, surface->h - 1);
+		cursor->m_cursor = SDL_CreateColorCursor(surface, x, y);
+		return cursor->m_cursor ? cursor.release() : nullptr;
 	}
 
 	RIFFChunk *riff_header = (RIFFChunk*)file_buffer;
@@ -417,17 +445,24 @@ void SDL3Mouse::initCursorResources(void)
 	for (Int cursor=FIRST_CURSOR; cursor<NUM_MOUSE_CURSORS; cursor++)
 	{
 		for (Int direction=0; direction<m_cursorInfo[cursor].numDirections; direction++)
-		{	if (!cursorResources[cursor][direction] && !m_cursorInfo[cursor].textureName.isEmpty())
-			{	//this cursor has never been loaded before.
-				char resourcePath[256];
-				//Check if this is a directional cursor
+		{
+			if (!cursorResources[cursor][direction] && !m_cursorInfo[cursor].textureName.isEmpty())
+			{
+				std::string name = m_cursorInfo[cursor].textureName.str();
+				const auto dot = name.find_last_of('.');
+				const bool explicitExtension = dot != std::string::npos &&
+					(stricmp(name.c_str() + dot, ".ani") == 0 || stricmp(name.c_str() + dot, ".cur") == 0);
+				const std::string extension = explicitExtension ? name.substr(dot) : ".ani";
+				if (explicitExtension)
+					name.resize(dot);
 				if (m_cursorInfo[cursor].numDirections > 1)
-					sprintf(resourcePath,"Data/Cursors/%s%d.ani",m_cursorInfo[cursor].textureName.str(),direction);
-				else
-					sprintf(resourcePath,"Data/Cursors/%s.ani",m_cursorInfo[cursor].textureName.str());
-
-				cursorResources[cursor][direction]=loadCursorFromFile(resourcePath);
-				DEBUG_ASSERTCRASH(cursorResources[cursor][direction], ("MissingCursor %s\n",resourcePath));
+					name += std::to_string(direction);
+				const char* directory = RetailFileLayers::enabled() ? "data/cursors/" : "Data/Cursors/";
+				std::string resourcePath = directory + name + extension;
+				if (!explicitExtension && !TheFileSystem->doesFileExist(resourcePath.c_str()))
+					resourcePath.replace(resourcePath.size() - 4, 4, ".cur");
+				cursorResources[cursor][direction] = loadCursorFromFile(resourcePath.c_str());
+				DEBUG_ASSERTCRASH(cursorResources[cursor][direction], ("MissingCursor %s\n", resourcePath.c_str()));
 			}
 		}
 	}

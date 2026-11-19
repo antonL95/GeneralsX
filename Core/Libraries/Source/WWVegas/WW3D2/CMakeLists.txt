@@ -211,6 +211,8 @@ set(WW3D2_SRC
     texture.h
     texturefilter.cpp
     texturefilter.h
+    textureimage.cpp
+    textureimage.h
     textureloader.cpp
     textureloader.h
     texturethumbnail.cpp
@@ -276,6 +278,7 @@ endif()
 
 target_link_libraries(corei_ww3d2 INTERFACE
     core_browserengine
+    stb
     core_wwlib
     core_wwmath
     corei_platform

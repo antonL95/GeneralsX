@@ -14,6 +14,7 @@
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/ddsfile.h"
+#include "WW3D2/textureimage.h"
 #include "WW3D2/w3d_file.h"
 #include "WWLib/TARGA.h"
 #include "WWLib/chunkio.h"
@@ -746,6 +747,27 @@ void scanIni(const std::string& name, const Entry& entry)
 
 bool probeTexture(const std::string& path)
 {
+	if (extension(path) == ".jpg")
+	{
+		TextureImage texture;
+		const bool loaded = texture.Load_Jpeg(path.c_str());
+		if (loaded)
+		{
+			record("texture-format", path, texture.Has_Companion() ? "companion" : "opaque", "jpg");
+			const auto* pixels = reinterpret_cast<const unsigned char*>(texture.GetImage());
+			unsigned minimum = 255;
+			unsigned maximum = 0;
+			for (int i = 0; i < texture.Header.Width * texture.Header.Height; ++i)
+			{
+				const unsigned alpha = pixels[4 * i + 3];
+				minimum = std::min(minimum, alpha);
+				maximum = std::max(maximum, alpha);
+			}
+			record("texture-alpha", path, std::to_string(minimum), std::to_string(maximum));
+		}
+		return loaded;
+	}
+
 	if (extension(path) == ".dds")
 	{
 		file_auto_ptr file(_TheFileFactory, path.c_str());
@@ -792,6 +814,9 @@ std::string resolveTexture(const Inventory& inventory, const std::string& refere
 		if (inventory.count(compiled))
 			return compiled;
 	}
+	const auto jpeg = lowerPath(makeBfmeJpegPath(stem + ".jpg"));
+	if (inventory.count(jpeg))
+		return jpeg;
 	return {};
 }
 

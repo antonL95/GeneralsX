@@ -21,6 +21,31 @@
 #include "texture.h"
 #include "dx8wrapper.h"
 #include <d3dx8core.h>
+#include <cstdio>
+#include <mutex>
+#include <string>
+#include <unordered_set>
+
+void MissingTexture::Log(const char* filename)
+{
+	static std::mutex mutex;
+	static std::unordered_set<std::string> names;
+	std::string name(filename);
+	for (char& c : name)
+	{
+		if (c >= 'A' && c <= 'Z')
+			c += 'a' - 'A';
+		else if (c == '\\')
+			c = '/';
+	}
+
+	const std::lock_guard lock(mutex);
+	if (names.insert(name).second)
+	{
+		std::fprintf(stderr, "[TEX_MISSING] '%s'\n", filename);
+		std::fflush(stderr);
+	}
+}
 
 static unsigned missing_image_width=128;
 static unsigned missing_image_height=128;

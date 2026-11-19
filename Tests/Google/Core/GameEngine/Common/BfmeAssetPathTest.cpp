@@ -22,3 +22,22 @@ TEST(BfmeAssetPath, RejectsPathsAndNamesWithoutTwoStemCharacters)
 	EXPECT_TRUE(makeBfmeAssetPath("art/w3d/", "units/hero.w3d").empty());
 	EXPECT_TRUE(makeBfmeAssetPath("art/w3d/", "units\\hero.w3d").empty());
 }
+
+TEST(BfmeAssetPath, ShardsJpegAndItsCompanionTogether)
+{
+	EXPECT_EQ(makeBfmeJpegPath("rjsky01.jpg"), "Art/CompiledTextures/rj/rjsky01.jpg");
+	EXPECT_EQ(makeBfmeJpegPath("rjsky01.png"), "Art/CompiledTextures/rj/rjsky01.png");
+	EXPECT_EQ(makeBfmeJpegPath("amonsul .jpeg.jpg"), "Art/CompiledTextures/am/amonsul .jpeg.jpg");
+}
+
+TEST(BfmeAssetPath, UsesFlatTextureDirectoryForAptAndShortNames)
+{
+	EXPECT_EQ(makeBfmeJpegPath("apt_menu.jpg"), "Art/Textures/apt_menu.jpg");
+	EXPECT_EQ(makeBfmeJpegPath("a .png"), "Art/Textures/a .png");
+}
+
+TEST(BfmeAssetPath, RetainsFullyQualifiedTexturePaths)
+{
+	EXPECT_EQ(makeBfmeJpegPath("Art/Textures/a.jpg"), "Art/Textures/a.jpg");
+	EXPECT_EQ(makeBfmeJpegPath("Art\\Textures\\a.png"), "Art\\Textures\\a.png");
+}

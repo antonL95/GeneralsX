@@ -51,7 +51,7 @@
 #include "dx8wrapper.h"
 #include "dx8caps.h"
 #include "missingtexture.h"
-#include "WWLib/TARGA.h"
+#include "textureimage.h"
 #include <d3dx8tex.h>
 #include "WWDebug/wwmemlog.h"
 #include "formconv.h"
@@ -554,7 +554,7 @@ IDirect3DSurface8* TextureLoader::Load_Surface_Immediate(
 
 	bool compressed=Is_Format_Compressed(texture_format,allow_compression);
 
-	if (compressed) {
+	if (compressed && filename.Get_Length() >= 3) {
 		IDirect3DTexture8* comp_tex=Load_Compressed_Texture(filename,0,MIP_LEVELS_1,WW3D_FORMAT_UNKNOWN);
 		if (comp_tex) {
 			IDirect3DSurface8* d3d_surface=nullptr;
@@ -565,8 +565,11 @@ IDirect3DSurface8* TextureLoader::Load_Surface_Immediate(
 	}
 
 	// Make sure the file can be opened. If not, return missing texture.
-	Targa targa;
-	if (TARGA_ERROR_HANDLER(targa.Open(filename, TGA_READMODE),filename)) return MissingTexture::_Create_Missing_Surface();
+	TextureImage targa;
+	if (TARGA_ERROR_HANDLER(targa.Open(filename, TGA_READMODE),filename)) {
+		MissingTexture::Log(filename);
+		return MissingTexture::_Create_Missing_Surface();
+	}
 
 	// DX8 uses image upside down compared to TGA
 	targa.Header.ImageDescriptor ^= TGAIDF_YORIGIN;
@@ -589,7 +592,10 @@ IDirect3DSurface8* TextureLoader::Load_Surface_Immediate(
 	// NOTE: We load the palette but we do not yet support paletted textures!
 	char palette[256*4];
 	targa.SetPalette(palette);
-	if (TARGA_ERROR_HANDLER(targa.Load(filename, TGAF_IMAGE, false),filename)) return MissingTexture::_Create_Missing_Surface();
+	if (TARGA_ERROR_HANDLER(targa.Load(filename, TGAF_IMAGE, false),filename)) {
+		MissingTexture::Log(filename);
+		return MissingTexture::_Create_Missing_Surface();
+	}
 
 	unsigned char* src_surface=(unsigned char*)targa.GetImage();
 
@@ -623,13 +629,14 @@ IDirect3DSurface8* TextureLoader::Load_Surface_Immediate(
 	unsigned src_pitch=src_width*src_bpp;
 
 	IDirect3DSurface8* d3d_surface = DX8Wrapper::_Create_DX8_Surface(width,height,dest_format);
-	WWASSERT(d3d_surface);
 	D3DLOCKED_RECT locked_rect;
-	DX8_ErrorCode(
-		d3d_surface->LockRect(
-			&locked_rect,
-			nullptr,
-			0));
+	if (!d3d_surface || FAILED(d3d_surface->LockRect(&locked_rect, nullptr, 0))) {
+		if (d3d_surface)
+			d3d_surface->Release();
+		delete[] converted_surface;
+		MissingTexture::Log(filename);
+		return MissingTexture::_Create_Missing_Surface();
+	}
 
 	BitmapHandlerClass::Copy_Image(
 		(unsigned char*)locked_rect.pBits,
@@ -1324,10 +1331,7 @@ void TextureLoadTaskClass::Apply_Missing_Texture()
 		return;
 	}
 
-#ifndef _WIN32
-	// DIAG: log which textures fall back to the magenta placeholder
-	fprintf(stderr, "[TEX_MISSING] '%s'\n", static_cast<const char*>(Texture->Get_Full_Path()));
-#endif
+	MissingTexture::Log(Texture->Get_Full_Path());
 
 	D3DTexture = MissingTexture::_Get_Missing_Texture();
 	if (D3DTexture == nullptr)
@@ -1436,7 +1440,7 @@ static bool	Get_Texture_Information
 			return true;
 		}
 
-		Targa targa;
+		TextureImage targa;
 		if (TARGA_ERROR_HANDLER(targa.Open(filename, TGA_READMODE), filename))
 		{
 			return false;
@@ -1813,7 +1817,7 @@ bool TextureLoadTaskClass::Load_Uncompressed_Mipmap()
 		return false;
 	}
 
-	Targa targa;
+	TextureImage targa;
 	if (TARGA_ERROR_HANDLER(targa.Open(Texture->Get_Full_Path(), TGA_READMODE), Texture->Get_Full_Path())) {
 		return false;
 	}

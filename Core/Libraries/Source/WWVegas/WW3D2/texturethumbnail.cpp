@@ -19,7 +19,7 @@
 #include "texturethumbnail.h"
 #include "WWLib/hashtemplate.h"
 #include "missingtexture.h"
-#include "WWLib/TARGA.h"
+#include "textureimage.h"
 #include "ww3dformat.h"
 #include "ddsfile.h"
 #include "textureloader.h"
@@ -205,7 +205,7 @@ ThumbnailClass::ThumbnailClass(ThumbnailManagerClass* manager, const StringClass
 	// If DDS file can't be used try loading from TGA
 	else {
 		// Make sure the file can be opened. If not, return missing texture.
-		Targa targa;
+		TextureImage targa;
 		if (TARGA_ERROR_HANDLER(targa.Open(filename,TGA_READMODE),filename)) return;
 
 		// DX8 uses image upside down compared to TGA
@@ -264,7 +264,7 @@ ThumbnailClass::ThumbnailClass(ThumbnailManagerClass* manager, const StringClass
 
 		// Get time stamp from the tga file
 		{
-			file_auto_ptr my_tga_file(_TheFileFactory,filename);
+			file_auto_ptr my_tga_file(_TheFileFactory,targa.Resolved_Name());
 			WWASSERT(my_tga_file->Is_Available());
 			my_tga_file->Open();
 			DateTime=my_tga_file->Get_Date_Time();

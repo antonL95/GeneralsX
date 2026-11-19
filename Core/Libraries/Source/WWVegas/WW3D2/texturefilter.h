@@ -57,7 +57,7 @@ enum MipCountType
 	MIP_LEVELS_10,
 	MIP_LEVELS_11,
 	MIP_LEVELS_12,
-	MIP_LEVELS_MAX			// This isn't to be used (use MIP_LEVELS_ALL instead), it is just an enum for creating static tables etc.
+	MIP_LEVELS_MAX = 32
 };
 
 

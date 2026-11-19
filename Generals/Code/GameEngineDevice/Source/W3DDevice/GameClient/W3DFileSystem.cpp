@@ -48,6 +48,7 @@
 #include "Common/GlobalData.h"
 #include "Common/MapObject.h"
 #include "Common/Registry.h"
+#include "Common/RetailFileLayers.h"
 #include "W3DDevice/GameClient/W3DFileSystem.h"
 
 // GeneralsX @bugfix BenderAI 10/03/2026 - io.h is Windows-specific, use unistd.h on Linux
@@ -157,7 +158,25 @@ char const * GameFileClass::Set_Name( char const *filename )
 	// save the filename
 	strlcpy( m_filename, filename, _MAX_PATH );
 
+
+	const char* extension = strrchr(filename, '.');
+	if (RetailFileLayers::enabled() && extension && (stricmp(extension, ".jpg") == 0 || stricmp(extension, ".png") == 0))
+	{
+		auto path = makeBfmeJpegPath(filename);
+		m_fileExists = !path.empty() && path.size() < ARRAY_SIZE(m_filePath) &&
+			TheFileSystem->doesFileExist(path.c_str());
+		if (m_fileExists)
+			strlcpy(m_filePath, path.c_str(), ARRAY_SIZE(m_filePath));
+		return m_filename;
+	}
+
 	GameFileType fileType = getFileType(filename);
+	if (RetailFileLayers::enabled() && isImageFileType(fileType) && strpbrk(filename, "/\\") && TheFileSystem->doesFileExist(filename))
+	{
+		strlcpy(m_filePath, filename, ARRAY_SIZE(m_filePath));
+		m_fileExists = TRUE;
+		return m_filename;
+	}
 
 	// all .w3d files are in W3D_DIR_PATH, all .tga files are in TGA_DIR_PATH
 	if( fileType == FILE_TYPE_W3D )
