@@ -31,6 +31,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/INI.h"
+#include "Common/LatchRestore.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
 #include "GameLogic/Module/OpenContain.h"
@@ -46,6 +47,22 @@ void INI::parseObjectDefinition( INI* ini )
 {
 	AsciiString name = ini->getNextToken();
 	ThingFactory::parseObjectDefinition(ini, name, AsciiString::TheEmptyString);
+}
+
+void INI::parseChildObjectDefinition( INI* ini )
+{
+	if (ini->skipBlockWithoutOwner(TheThingFactory, "ChildObject"))
+		return;
+
+	AsciiString name = ini->getNextToken();
+	AsciiString parent = ini->getNextToken();
+	ThingFactory::parseObjectDefinition(ini, name, parent, TRUE);
+}
+
+void INI::initChildObject( void* what, const FieldParse* parseTable )
+{
+	LatchRestore<INILoadType> loadType(m_loadType, INI_LOAD_CHILD_OBJECT);
+	initFromINI(what, parseTable);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -47,6 +47,7 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/Drawable.h"
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 
 
 enum { TEMPLATE_HASH_SIZE = 12288 };
@@ -374,8 +375,26 @@ AsciiString TheThingTemplateBeingParsedName;
 //-------------------------------------------------------------------------------------------------
 /** Parse Object entry */
 //-------------------------------------------------------------------------------------------------
-/*static*/ void ThingFactory::parseObjectDefinition( INI* ini, const AsciiString& name, const AsciiString& reskinFrom )
+void ThingFactory::parseObjectDefinition( INI* ini, const AsciiString& name, const AsciiString& sourceName, Bool isChild )
 {
+	const ThingTemplate* parent = nullptr;
+	if (isChild)
+	{
+		parent = TheThingFactory->findTemplate(sourceName, FALSE);
+		if (!parent)
+		{
+			if (INIAudit::isEnabled())
+			{
+				INIAudit::record("error", std::string("ChildObject parent not found: ") + sourceName.str(), ini->getFilename().str(), ini->getLineNum());
+				ini->skipBlockForAudit();
+				return;
+			}
+			DEBUG_CRASH(("ChildObject must come after the original Object (%s, %s).", sourceName.str(), name.str()));
+			throw INI_INVALID_DATA;
+		}
+		parent = static_cast<const ThingTemplate*>(parent->getFinalOverride());
+	}
+
 #if defined(RTS_DEBUG) || defined(DEBUG_CRASHING)
 	TheThingTemplateBeingParsedName = name;
 #endif
@@ -407,9 +426,14 @@ AsciiString TheThingTemplateBeingParsedName;
 		thingTemplate = TheThingFactory->newOverride( thingTemplate );
 	}
 
-	if (reskinFrom.isNotEmpty())
+	if (parent)
 	{
-		const ThingTemplate* reskinTmpl = TheThingFactory->findTemplate(reskinFrom);
+		thingTemplate->copyFromChildParent(parent, ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES);
+		ini->initChildObject(thingTemplate, thingTemplate->getFieldParse());
+	}
+	else if (sourceName.isNotEmpty())
+	{
+		const ThingTemplate* reskinTmpl = TheThingFactory->findTemplate(sourceName);
 		if (reskinTmpl)
 		{
 			thingTemplate->copyFrom(reskinTmpl);
@@ -419,7 +443,7 @@ AsciiString TheThingTemplateBeingParsedName;
 		}
 		else
 		{
-			DEBUG_CRASH(("ObjectReskin must come after the original Object (%s, %s).",reskinFrom.str(),name.str()));
+			DEBUG_CRASH(("ObjectReskin must come after the original Object (%s, %s).",sourceName.str(),name.str()));
 			throw INI_INVALID_DATA;
 		}
 	}

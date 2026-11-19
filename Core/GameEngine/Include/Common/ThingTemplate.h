@@ -336,6 +336,7 @@ public:
 	Bool clearModuleDataWithTag(const AsciiString& tagToClear, AsciiString& clearedModuleNameOut);
 	Bool clearCopiedFromDefaultEntries(Int interfaceMask, const AsciiString &name, const ThingTemplate *fullTemplate );
 	Bool clearAiModuleInfo();
+	void clearBodyModuleInfo();
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -606,6 +607,7 @@ public:
 	Real getFactoryExtraBibWidth() const { return m_factoryExtraBibWidth; }
 
 	void setCopiedFromDefault();
+	void copyFromChildParent(const ThingTemplate* parent, Bool isOverride);
 
 	void setReskinnedFrom(const ThingTemplate* tt) { DEBUG_ASSERTCRASH(m_reskinnedFrom == nullptr, ("should be null")); m_reskinnedFrom = tt; }
 

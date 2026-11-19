@@ -122,6 +122,8 @@ enum WeaponSetConditionType CPP_11(: Int)
 //-------------------------------------------------------------------------------------------------
 class WeaponTemplateSet
 {
+	friend class ThingTemplate;
+
 private:
 	const ThingTemplate*		m_thingTemplate;	// needed for save/load
 	WeaponSetFlags					m_types;

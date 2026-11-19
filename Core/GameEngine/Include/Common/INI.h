@@ -49,7 +49,8 @@ enum INILoadType CPP_11(: Int)
 	INI_LOAD_INVALID,						///< invalid load type
 	INI_LOAD_OVERWRITE,					///< create new or load *over* existing data instance
 	INI_LOAD_CREATE_OVERRIDES,	///< create new or load into *new* override data instance
-	INI_LOAD_MULTIFILE					///< create new or continue loading into existing data instance.
+	INI_LOAD_MULTIFILE,
+	INI_LOAD_CHILD_OBJECT
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -197,6 +198,7 @@ public:
 
 	// data type parsing (the highest level of what type of thing we're parsing)
 	static void parseObjectDefinition( INI *ini );
+	static void parseChildObjectDefinition( INI *ini );
 	static void parseObjectReskinDefinition( INI *ini );
 	static void parseWeaponTemplateDefinition( INI *ini );
 	static void parseScienceDefinition( INI *ini );
@@ -269,6 +271,7 @@ public:
 	static const char *getEndToken()    { return "End"; }        ///< token to represent an end of data block
 
 	void initFromINI( void *what, const FieldParse* parseTable );
+	void initChildObject( void *what, const FieldParse* parseTable );
 	void initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList );
 	void skipBlockForAudit();
 	Bool nextLineOpensBlockForAudit() const;

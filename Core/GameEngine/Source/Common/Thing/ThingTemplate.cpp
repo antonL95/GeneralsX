@@ -44,6 +44,7 @@
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
+#include "Common/LatchRestore.h"
 #include "Common/MessageStream.h"
 #include "Common/Module.h"
 #include "Common/ModuleFactory.h"
@@ -57,6 +58,8 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingSort.h"
 #include "Common/BitFlagsIO.h"
+
+#include <algorithm>
 
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
@@ -532,10 +535,29 @@ Bool ModuleInfo::clearAiModuleInfo()
 }
 
 //-------------------------------------------------------------------------------------------------
+void ModuleInfo::clearBodyModuleInfo()
+{
+	m_info.erase(std::remove_if(m_info.begin(), m_info.end(), [](const Nugget& entry)
+	{
+		return (entry.interfaceMask & MODULEINTERFACE_BODY) != 0;
+	}), m_info.end());
+}
+
+static Bool skipInvalidModuleForAudit(INI* ini, const char* detail)
+{
+	if (!INIAudit::isEnabled())
+		return FALSE;
+
+	INIAudit::record("field-error", detail, ini->getFilename().str(), ini->getLineNum());
+	ini->skipBlockForAudit();
+	return TRUE;
+}
+
 void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const void* userData)
 {
 	ThingTemplate* self = (ThingTemplate*)instance;
 	ModuleInfo* mi = (ModuleInfo*)store;
+	const Bool isChild = ini->getLoadType() == INI_LOAD_CHILD_OBJECT;
 	// GeneralsX @build BenderAI 11/02/2026 - Use uintptr_t for pointer-to-int cast (64-bit compat)
 	ModuleType type = (ModuleType)(UnsignedInt)(uintptr_t)userData;
 	const char* token = ini->getNextToken();
@@ -574,6 +596,8 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 		interfaceMask = TheModuleFactory->findModuleInterfaceMask(tokenStr, type);
 		if ((interfaceMask & (MODULEINTERFACE_BODY)) == 0)
 		{
+			if (skipInvalidModuleForAudit(ini, "Only Body allowed here"))
+				return;
 			DEBUG_CRASH(("Only Body allowed here"));
 			throw INI_INVALID_DATA;
 		}
@@ -583,6 +607,8 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 		interfaceMask = TheModuleFactory->findModuleInterfaceMask(tokenStr, type);
 		if ((interfaceMask & (MODULEINTERFACE_BODY)) != 0)
 		{
+			if (skipInvalidModuleForAudit(ini, "Body must be declared with the Body field"))
+				return;
 			DEBUG_CRASH(("No Body allowed here"));
 			throw INI_INVALID_DATA;
 		}
@@ -597,12 +623,14 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 		}
 		else
 		{
+			if (skipInvalidModuleForAudit(ini, "Override modules must be added through AddModule or ReplaceModule"))
+				return;
 			DEBUG_CRASH(("[LINE: %d - FILE: '%s'] You must use AddModule to add modules in override INI files.",
 				ini->getLineNum(), ini->getFilename().str(), self->getName().str()));
 			throw INI_INVALID_DATA;
 		}
 	}
-	else
+	else if (!isChild)
 	{
 
 //    if (self->getName().compare("GLAVehicleQuadCannon"))
@@ -617,6 +645,8 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 			self->m_moduleBeingReplacedName.isNotEmpty() &&
 			self->m_moduleBeingReplacedName != tokenStr)
 	{
+		if (skipInvalidModuleForAudit(ini, "ReplaceModule must use the same module class"))
+			return;
 		DEBUG_CRASH(("[LINE: %d - FILE: '%s'] ReplaceModule must replace modules with another module of the same type, but you are attempting to replace a %s with a %s for Object %s.",
 			ini->getLineNum(), ini->getFilename().str(), self->m_moduleBeingReplacedName.str(), tokenStr.str(), self->getName().str()));
 		throw INI_INVALID_DATA;
@@ -626,9 +656,24 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 			self->m_moduleBeingReplacedTag.isNotEmpty() &&
 			self->m_moduleBeingReplacedTag == moduleTagStr)
 	{
+		if (skipInvalidModuleForAudit(ini, "ReplaceModule must use a new module tag"))
+			return;
 		DEBUG_CRASH(("[LINE: %d - FILE: '%s'] ReplaceModule must specify a new, unique tag for the replaced module, but you are not doing so for %s (%s) for Object %s.",
 			ini->getLineNum(), ini->getFilename().str(), moduleTagStr.str(), self->m_moduleBeingReplacedName.str(), self->getName().str()));
 		throw INI_INVALID_DATA;
+	}
+
+	if (isChild)
+	{
+		const auto* draw = self->m_drawModuleInfo.getNuggetWithTag(moduleTagStr);
+		if (draw && draw->first != tokenStr)
+		{
+			if (skipInvalidModuleForAudit(ini, "ChildObject must use the same module class to replace a draw tag"))
+				return;
+			DEBUG_CRASH(("ChildObject %s cannot replace draw module %s with class %s.",
+				self->getName().str(), moduleTagStr.str(), tokenStr.str()));
+			throw INI_INVALID_DATA;
+		}
 	}
 
 	ModuleData* data = TheModuleFactory->newModuleDataFromINI(ini, tokenStr, type, moduleTagStr);
@@ -641,6 +686,15 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 			//Kris: Commented this out for SPAM reasons. Do we really need this?
 			//DEBUG_LOG(("replaced an AI for %s!",self->getName().str()));
 		}
+	}
+
+	if (isChild)
+	{
+		if ((interfaceMask & MODULEINTERFACE_BODY) != 0)
+			mi->clearBodyModuleInfo();
+
+		AsciiString replacedModuleName;
+		self->removeModuleInfo(moduleTagStr, replacedModuleName);
 	}
 
 	Bool inheritable = (self->m_moduleParsingMode == MODULEPARSE_INHERITABLE);
@@ -775,15 +829,15 @@ void ThingTemplate::parseAddModule(INI *ini, void *instance, void *store, const 
 	// don't care about the result.
 	ThingTemplate* self = (ThingTemplate*)instance;
 
-	ModuleParseMode oldMode = (ModuleParseMode)self->m_moduleParsingMode;
-	if (oldMode != MODULEPARSE_NORMAL)
+	if (self->m_moduleParsingMode != MODULEPARSE_NORMAL)
+	{
+		if (skipInvalidModuleForAudit(ini, "AddModule must be declared at object scope"))
+			return;
 		throw INI_INVALID_DATA;
+	}
 
-	self->m_moduleParsingMode = MODULEPARSE_ADD_REMOVE_REPLACE;
-
+	LatchRestore<Byte> mode(self->m_moduleParsingMode, MODULEPARSE_ADD_REMOVE_REPLACE);
 	ini->initFromINI(self, self->getFieldParse());
-
-	self->m_moduleParsingMode = oldMode;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -793,22 +847,22 @@ void ThingTemplate::parseRemoveModule(INI *ini, void *instance, void *store, con
 {
 	ThingTemplate* self = (ThingTemplate*)instance;
 
-	ModuleParseMode oldMode = (ModuleParseMode)self->m_moduleParsingMode;
-	if (oldMode != MODULEPARSE_NORMAL)
+	if (self->m_moduleParsingMode != MODULEPARSE_NORMAL)
 		throw INI_INVALID_DATA;
-
-	self->m_moduleParsingMode = MODULEPARSE_ADD_REMOVE_REPLACE;
 
 	const char *modToRemove = ini->getNextToken();
 	AsciiString removedModuleName;
 	Bool removed = self->removeModuleInfo(modToRemove, removedModuleName);
 	if (!removed)
 	{
+		if (INIAudit::isEnabled())
+		{
+			INIAudit::record("field-error", std::string("RemoveModule target not found: ") + modToRemove, ini->getFilename().str(), ini->getLineNum());
+			return;
+		}
 		DEBUG_ASSERTCRASH(removed, ("RemoveModule %s was not found for %s. The game will crash now!",modToRemove, self->getName().str()));
 		throw INI_INVALID_DATA;
 	}
-
-	self->m_moduleParsingMode = oldMode;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -818,29 +872,31 @@ void ThingTemplate::parseReplaceModule(INI *ini, void *instance, void *store, co
 {
 	ThingTemplate* self = (ThingTemplate*)instance;
 
-	ModuleParseMode oldMode = (ModuleParseMode)self->m_moduleParsingMode;
-	if (oldMode != MODULEPARSE_NORMAL)
+	if (self->m_moduleParsingMode != MODULEPARSE_NORMAL)
+	{
+		if (skipInvalidModuleForAudit(ini, "ReplaceModule must be declared at object scope"))
+			return;
 		throw INI_INVALID_DATA;
+	}
 
-	self->m_moduleParsingMode = MODULEPARSE_ADD_REMOVE_REPLACE;
-
-	const char *modToRemove = ini->getNextToken();
+	const AsciiString modToRemove = ini->getNextToken();
 	AsciiString removedModuleName;
 	Bool removed = self->removeModuleInfo(modToRemove, removedModuleName);
 	if (!removed)
 	{
-		DEBUG_CRASH(("[LINE: %d - FILE: '%s'] ReplaceModule %s was not found for %s; cannot continue.",
-															ini->getLineNum(), ini->getFilename().str(), modToRemove, self->getName().str()));
-		throw INI_INVALID_DATA;
+		if (!INIAudit::isEnabled())
+		{
+			DEBUG_CRASH(("[LINE: %d - FILE: '%s'] ReplaceModule %s was not found for %s; cannot continue.",
+				ini->getLineNum(), ini->getFilename().str(), modToRemove.str(), self->getName().str()));
+			throw INI_INVALID_DATA;
+		}
+		INIAudit::record("field-error", std::string("ReplaceModule target not found: ") + modToRemove.str(), ini->getFilename().str(), ini->getLineNum());
 	}
 
-	self->m_moduleBeingReplacedName = removedModuleName;
-	self->m_moduleBeingReplacedTag = modToRemove;
+	LatchRestore<Byte> mode(self->m_moduleParsingMode, MODULEPARSE_ADD_REMOVE_REPLACE);
+	LatchRestore<AsciiString> name(self->m_moduleBeingReplacedName, removedModuleName);
+	LatchRestore<AsciiString> tag(self->m_moduleBeingReplacedTag, modToRemove);
 	ini->initFromINI(self, self->getFieldParse());
-	self->m_moduleBeingReplacedName.clear();
-	self->m_moduleBeingReplacedTag.clear();
-
-	self->m_moduleParsingMode = oldMode;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -850,15 +906,15 @@ void ThingTemplate::parseInheritableModule(INI *ini, void *instance, void *store
 {
 	ThingTemplate* self = (ThingTemplate*)instance;
 
-	ModuleParseMode oldMode = (ModuleParseMode)self->m_moduleParsingMode;
-	if (oldMode != MODULEPARSE_NORMAL)
+	if (self->m_moduleParsingMode != MODULEPARSE_NORMAL)
+	{
+		if (skipInvalidModuleForAudit(ini, "InheritableModule must be declared at object scope"))
+			return;
 		throw INI_INVALID_DATA;
+	}
 
-	self->m_moduleParsingMode = MODULEPARSE_INHERITABLE;
-
+	LatchRestore<Byte> mode(self->m_moduleParsingMode, MODULEPARSE_INHERITABLE);
 	ini->initFromINI(self, self->getFieldParse());
-
-	self->m_moduleParsingMode = oldMode;
 }
 
 
@@ -1283,6 +1339,18 @@ void ThingTemplate::setCopiedFromDefault()
 }
 
 //-------------------------------------------------------------------------------------------------
+void ThingTemplate::copyFromChildParent(const ThingTemplate* parent, Bool isOverride)
+{
+	Overridable* nextOverride = friend_getNextOverride();
+	copyFrom(parent);
+	setNextOverride(nextOverride);
+	markAsOverride(isOverride);
+
+	setCopiedFromDefault();
+	for (WeaponTemplateSet& weaponSet : m_weaponTemplateSets)
+		weaponSet.m_thingTemplate = this;
+}
+
 ThingTemplate::~ThingTemplate()
 {
 	// note, we don't need to take any special action for Armor/WeaponSets...

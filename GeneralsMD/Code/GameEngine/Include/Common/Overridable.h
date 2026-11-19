@@ -94,9 +94,9 @@ class Overridable : public MemoryPoolObject
 		}
 
 		// used by ini-parsing functions to mark specific Overridables as overrides
-		void markAsOverride()
+		void markAsOverride(Bool isOverride = true)
 		{
-			m_isOverride = true;
+			m_isOverride = isOverride;
 		}
 
 		// used in factory reset() calls at the end of a game to clean up overrides.  Can return nullptr
