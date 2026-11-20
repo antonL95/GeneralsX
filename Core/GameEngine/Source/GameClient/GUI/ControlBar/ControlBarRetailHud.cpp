@@ -31,6 +31,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/RespawnModules.h"
 
@@ -255,7 +256,7 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	const Int inset = pressed ? MAX(1, width / 18) : 0;
 	drawFilledCircle(x, y, width, height, GameMakeColor(6, 6, 6, 255));
 
-	const Image *image = window->winGetEnabledImage(0);
+	const Image *image = TheControlBar->getRetailButtonImage(window);
 	TheDisplay->setCircularClip(cx, cy, radius);
 	if (TheDisplay->hasImageTexture(image))
 	{
@@ -273,6 +274,12 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	{
 		const Int percent = static_cast<Int>(progress * 100.0f + 0.5f);
 		TheDisplay->drawRemainingRectClock(x, y, width, height, percent, GameMakeColor(0, 0, 0, 150));
+	}
+	else
+	{
+		const Real ready = TheControlBar->getRetailRecharge(window);
+		if (ready >= 0.0f && ready < 1.0f)
+			TheDisplay->drawRemainingRectClock(x, y, width, height, static_cast<Int>(ready * 100.0f + 0.5f), GameMakeColor(255, 255, 255, 26));
 	}
 	TheDisplay->setCircularClip(0, 0, 0);
 	if (highlight)
@@ -1001,4 +1008,27 @@ void ControlBar::updateRetailHud()
 		}
 	}
 	updateRetailCounters();
+}
+
+const Image* ControlBar::getRetailButtonImage(GameWindow *window) const
+{
+	const Image *image = window->winGetEnabledImage(0);
+	const CommandButton *command = static_cast<const CommandButton*>(GadgetButtonGetData(window));
+	const Object *obj = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+	if (!command || !obj || !command->getToggleButtonImage() ||
+		!command->hasRotwkOption(CommandButtonRules::ROTWK_TOGGLE_IMAGE_ON_WEAPONSET) || !command->getFlagsUsedForToggle().any())
+		return image;
+	return obj->getWeaponSetFlags().testForAll(command->getFlagsUsedForToggle()) ? command->getToggleButtonImage() : image;
+}
+
+Real ControlBar::getRetailRecharge(const GameWindow *window) const
+{
+	const CommandButton *command = static_cast<const CommandButton *>(GadgetButtonGetData(const_cast<GameWindow *>(window)));
+	if (!command || !m_currentSelectedDrawable || command->getCommandType() != GUI_COMMAND_SPECIAL_POWER || !command->getSpecialPowerTemplate())
+		return -1.0f;
+	Object *obj = m_currentSelectedDrawable->getObject();
+	SpecialPowerModuleInterface *power = obj ? obj->getSpecialPowerModule(command->getSpecialPowerTemplate()) : nullptr;
+	if (!power || power->isReady())
+		return -1.0f;
+	return std::clamp(power->getPercentReady(), 0.0f, 1.0f);
 }

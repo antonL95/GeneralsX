@@ -59,6 +59,8 @@
 #include "GameLogic/Module/LaserUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
+#include "Common/AbilityRules.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/StickyBombUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
@@ -198,6 +200,7 @@ UpdateSleepTime SpecialAbilityUpdate::update()
 	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
 
 	validateSpecialObjects();
+	updateTimedCondition();
 
   //Important! This check will see if there has been any commands issued by either the player
   //or script. When told to do something else, we need to immediately cleanup our special ability.
@@ -247,6 +250,13 @@ UpdateSleepTime SpecialAbilityUpdate::update()
   //will never be handled, nor do things that aren't in a packing state.
   if( handlePackingProcessing() )
   {
+    return calcSleepTime();
+  }
+
+  if( m_holdFrames > 0 )
+  {
+    if( --m_holdFrames == 0 )
+      finishTriggeredAbility();
     return calcSleepTime();
   }
 
@@ -364,6 +374,8 @@ UpdateSleepTime SpecialAbilityUpdate::update()
       else
       {
         endPreparation();
+        if( beginHold() )
+          return calcSleepTime();
         if( needToPack() )
         {
           //STEP 5 -- PACK
@@ -444,6 +456,9 @@ UpdateSleepTime SpecialAbilityUpdate::update()
         else
           endPreparation();
 
+        if( beginHold() )
+          return calcSleepTime();
+
         if( needToPack() )
         {
           //STEP 5 -- PACK
@@ -482,6 +497,9 @@ Bool SpecialAbilityUpdate::initiateIntentToDoSpecialPower( const SpecialPowerTem
     //Check to make sure our modules are connected.
     return FALSE;
   }
+
+  if( usesRotwkRules() && !acceptsIntent( targetObj, targetPos ) )
+    return FALSE;
 
   //Clear target values
   m_targetID = INVALID_ID;
@@ -527,6 +545,18 @@ Bool SpecialAbilityUpdate::initiateIntentToDoSpecialPower( const SpecialPowerTem
   }
 
   m_active = true;
+
+  if( usesRotwkRules() )
+  {
+    m_rotwkTriggers = 0;
+    m_holdFrames = 0;
+    ModelConditionFlags conditions;
+    addAbilityConditions( conditions );
+    getObject()->clearAndSetModelConditionFlags( m_rotwkConditions, conditions );
+    m_rotwkConditions = conditions;
+    if( data->m_instant )
+      m_withinStartAbilityRange = true;
+  }
 
   //Prevent other mutually exclusive specials from running (kill them now if we're starting something else)
   SpecialAbilityUpdate *disableSA;
@@ -613,6 +643,12 @@ void SpecialAbilityUpdate::onExit( Bool cleanup )
   m_active = false;
   m_withinStartAbilityRange = false;
   m_packingState = STATE_NONE;
+  m_holdFrames = 0;
+  if( m_rotwkConditions.any() )
+  {
+    getObject()->clearModelConditionFlags( m_rotwkConditions );
+    m_rotwkConditions.clear();
+  }
 
 //  This is the althernate way to one-at-a-time BlackLotus' specials; we'll keep it commented her until Dustin decides, or until 12/10/02
 //  setBusy( FALSE );// My owner is no longer using me
@@ -1087,6 +1123,8 @@ void SpecialAbilityUpdate::startPreparation()
     getObject()->getAI()->aiIdle( CMD_FROM_AI ); // just in case.  jba.
   }
   getObject()->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IS_USING_ABILITY ) );
+  if( usesRotwkRules() )
+    getObject()->setModelConditionState( MODELCONDITION_PREPARING );
 
   m_prepSoundLoop = data->m_prepSoundLoop;
   m_prepSoundLoop.setObjectID( getObject()->getID() );
@@ -1259,6 +1297,9 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
   const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
   const SpecialPowerTemplate *spTemplate = data->m_specialPowerTemplate;
   Object *object = getObject();
+
+  if( usesRotwkRules() )
+    applyRotwkTrigger();
 
   //Award experience to units for triggering the ability (optional and ini specified).
   //NOTE: Be aware of persistent abilities that call trigger over and over again!
@@ -1882,6 +1923,9 @@ Bool SpecialAbilityUpdate::needToFace() const
   if ( !data->m_needToFaceTarget )
     return false;
 
+  if( usesRotwkRules() && ( data->m_ignoreFacingCheck || data->m_instant ) )
+    return false;
+
 	//Return true if we haven't initiated facing or if we haven't completed it.
 	return !m_facingInitiated || !m_facingComplete;
 }
@@ -1955,6 +1999,8 @@ Object* SpecialAbilityUpdate::findSpecialObjectWithProducerID( const Object *tar
 void SpecialAbilityUpdate::endPreparation()
 {
 	getObject()->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IS_USING_ABILITY ) );
+	if( usesRotwkRules() )
+		getObject()->clearModelConditionState( MODELCONDITION_PREPARING );
 	TheAudio->removeAudioEvent( m_prepSoundLoop.getPlayingHandle() );
 
 	// Based on the special that we just finished preparing (either by failure or success),
@@ -2072,4 +2118,112 @@ void SpecialAbilityUpdate::loadPostProcess()
 	// extend base class
 	UpdateModule::loadPostProcess();
 
+}
+
+Bool SpecialAbilityUpdate::usesRotwkRules()
+{
+	return RetailFileLayers::enabled();
+}
+
+UnsignedInt SpecialAbilityUpdate::abilityConditionsOf( const Object *obj )
+{
+	UnsignedInt conditions = 0;
+	if( obj->testWeaponSetFlag( WEAPONSET_MOUNTED ) )
+		conditions |= AbilityRules::ABILITY_CONDITION_MOUNTED;
+	if( obj->testWeaponSetFlag( WEAPONSET_TOGGLE_1 ) )
+		conditions |= AbilityRules::ABILITY_CONDITION_WEAPON_TOGGLE;
+	return conditions;
+}
+
+Bool SpecialAbilityUpdate::isPersistentAbility() const
+{
+	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
+	if( data->m_persistentPrepFrames == 0 )
+		return FALSE;
+	if( !usesRotwkRules() )
+		return TRUE;
+	return AbilityRules::repeatsTrigger( TRUE, m_rotwkTriggers, data->m_persistentCount );
+}
+
+UnsignedInt SpecialAbilityUpdate::holdFramesAfterTrigger() const
+{
+	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
+	UnsignedInt hold = 0;
+	if( !skipsContinue() && data->m_persistentCount == 0 )
+		hold = data->m_persistentPrepFrames;
+	return std::max( hold, data->m_freezeAfterTriggerDuration );
+}
+
+void SpecialAbilityUpdate::addAbilityConditions( ModelConditionFlags &flags ) const
+{
+	const std::string name = AbilityRules::packingTypeCondition( getSpecialAbilityUpdateModuleData()->m_unpackingVariation );
+	if( !name.empty() )
+		flags.setBitByName( name.c_str() );
+}
+
+Bool SpecialAbilityUpdate::acceptsIntent( const Object *, const Coord3D * ) const
+{
+	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
+	return AbilityRules::conditionsAllow( data->m_requiredConditions, data->m_rejectedConditions, abilityConditionsOf( getObject() ) );
+}
+
+void SpecialAbilityUpdate::startTimedCondition( Int condition, UnsignedInt frames )
+{
+	if( condition < 0 || frames == 0 )
+		return;
+	if( m_timedCondition >= 0 && m_timedCondition != condition )
+		getObject()->clearModelConditionState( (ModelConditionFlagType)m_timedCondition );
+	getObject()->setModelConditionState( (ModelConditionFlagType)condition );
+	m_timedCondition = condition;
+	m_timedConditionEndFrame = TheGameLogic->getFrame() + frames;
+}
+
+void SpecialAbilityUpdate::updateTimedCondition()
+{
+	if( m_timedCondition < 0 || TheGameLogic->getFrame() < m_timedConditionEndFrame )
+		return;
+	getObject()->clearModelConditionState( (ModelConditionFlagType)m_timedCondition );
+	m_timedCondition = -1;
+}
+
+Bool SpecialAbilityUpdate::beginHold()
+{
+	if( !usesRotwkRules() )
+		return FALSE;
+	m_holdFrames = holdFramesAfterTrigger();
+	if( m_holdFrames == 0 )
+		return FALSE;
+	AIUpdateInterface *ai = getObject()->getAI();
+	if( ai )
+		ai->aiBusy( CMD_FROM_AI );
+	return TRUE;
+}
+
+void SpecialAbilityUpdate::finishTriggeredAbility()
+{
+	if( needToPack() )
+		startPacking( true );
+	else
+		finishAbility();
+}
+
+void SpecialAbilityUpdate::applyRotwkTrigger()
+{
+	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
+	++m_rotwkTriggers;
+	if( data->m_triggerModelCondition >= 0 )
+	{
+		startTimedCondition( data->m_triggerModelCondition, secondsToFrames( data->m_triggerModelConditionDuration ) );
+		return;
+	}
+	const SpecialPowerModule *spm = static_cast<const SpecialPowerModule*>( getObject()->getSpecialPowerModule( data->m_specialPowerTemplate ) );
+	if( spm && spm->getPowerModuleData()->m_setModelCondition >= 0 )
+		startTimedCondition( spm->getPowerModuleData()->m_setModelCondition, secondsToFrames( spm->getPowerModuleData()->m_setModelConditionTime ) );
+}
+
+UnsignedInt SpecialAbilityUpdate::secondsToFrames( Real seconds )
+{
+	if( seconds <= 0.0f )
+		return 0;
+	return (UnsignedInt)REAL_TO_INT_CEIL( seconds * LOGICFRAMES_PER_SECOND );
 }

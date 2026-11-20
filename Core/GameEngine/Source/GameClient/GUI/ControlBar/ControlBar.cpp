@@ -128,7 +128,7 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 	{ "DescriptLabel",				INI::parseAsciiString,			 nullptr, offsetof( CommandButton, m_descriptionLabel ) },
 	{ "PurchasedLabel",				INI::parseAsciiString,			 nullptr, offsetof( CommandButton, m_purchasedLabel ) },
 	{ "ConflictingLabel",			INI::parseAsciiString,			 nullptr, offsetof( CommandButton, m_conflictingLabel ) },
-	{ "ButtonImage",					INI::parseAsciiString,			 nullptr, offsetof( CommandButton, m_buttonImageName ) },
+	{ "ButtonImage",					CommandButton::parseButtonImages,			 nullptr, offsetof( CommandButton, m_buttonImageName ) },
 	{ "CursorName",						INI::parseAsciiString,			 nullptr, offsetof( CommandButton, m_cursorName ) },
 	{ "InvalidCursorName",		INI::parseAsciiString,       nullptr, offsetof( CommandButton, m_invalidCursorName ) },
 	{ "ButtonBorderType",			INI::parseLookupList,				 CommandButtonMappedBorderTypeNames, offsetof( CommandButton, m_commandButtonBorder ) },
@@ -142,6 +142,9 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 	{ "ShowProductionCount", INI::parseBool, nullptr, offsetof(CommandButton, m_showProductionCount) },
 	{ "CommandRangeStart", INI::parseInt, nullptr, offsetof(CommandButton, m_commandRangeStart) },
 	{ "CommandRangeCount", INI::parseInt, nullptr, offsetof(CommandButton, m_commandRangeCount) },
+	{ "AutoAbility", INI::parseBool, nullptr, offsetof(CommandButton, m_autoAbility) },
+	{ "PresetRange", INI::parseReal, nullptr, offsetof(CommandButton, m_presetRange) },
+	{ "FlagsUsedForToggle", WeaponSetFlags::parseFromINI, nullptr, offsetof(CommandButton, m_flagsUsedForToggle) },
 
 	{ nullptr,						nullptr,												 nullptr, 0 }
 
@@ -2704,6 +2707,11 @@ void CommandButton::cacheButtonImage()
 			DEBUG_ASSERTCRASH( m_buttonImage, ("CommandButton: %s is looking for button image %s but can't find it. Skipping...", m_name.str(), m_buttonImageName.str() ) );
 		m_buttonImageName.clear();	// we're done with this, so nuke it
 	}
+	if( m_toggleButtonImageName.isNotEmpty() )
+	{
+		m_toggleButtonImage = TheMappedImageCollection->findImageByName( m_toggleButtonImageName );
+		m_toggleButtonImageName.clear();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4069,4 +4077,11 @@ GameFont *ControlBar::overrideTooltipGadgetFont( GameWindow *win )
 
 	// Return the new font so callers can use it for measurement
 	return newFont;
+}
+
+void CommandButton::parseButtonImages( INI *ini, void *instance, void *store, const void * )
+{
+	*static_cast<AsciiString*>( store ) = ini->getNextToken();
+	if( const char *toggle = ini->getNextTokenOrNull() )
+		static_cast<CommandButton*>( instance )->m_toggleButtonImageName = toggle;
 }

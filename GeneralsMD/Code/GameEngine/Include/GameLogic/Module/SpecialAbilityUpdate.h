@@ -32,6 +32,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/AudioEventRTS.h"
 #include "Common/INI.h"
+#include "Common/ModelState.h"
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameClient/ParticleSys.h"
@@ -258,6 +259,7 @@ public:
 	UnsignedInt getSpecialObjectMax() const;
 	Object* findSpecialObjectWithProducerID( const Object *target );
 	SpecialPowerType getSpecialPowerType() const;
+	static UnsignedInt secondsToFrames( Real seconds );
 
 protected:
 	void onExit( Bool cleanup );
@@ -277,7 +279,7 @@ protected:
 	Bool approachTarget();			//Approaches the target before starting the special attack (if appropriate)
 	void startPreparation();		//Begins the preparation of ability -- like firing off a hacker attack, or laser tracer, etc.
 	Bool continuePreparation();	//Updates the preparation of ability -- like recalculating tracer lines.
-	void triggerAbilityEffect();	//After the preparation time has elapsed, this part actually triggers the desired effect of the special ability.
+	virtual void triggerAbilityEffect();
 	void finishAbility();
 
 	void validateSpecialObjects();
@@ -293,12 +295,27 @@ protected:
 
 	Bool isPreparationComplete() const { return !m_prepFrames; }
 	void endPreparation();
-	Bool isPersistentAbility() const { return getSpecialAbilityUpdateModuleData()->m_persistentPrepFrames > 0; }
+	Bool isPersistentAbility() const;
 	void resetPreparation() { m_prepFrames = getSpecialAbilityUpdateModuleData()->m_persistentPrepFrames; }
 
 	Bool isFacing();
 	Bool needToFace() const;
 	void startFacing();
+
+	static Bool usesRotwkRules();
+	static UnsignedInt abilityConditionsOf( const Object *obj );
+	virtual Bool skipsContinue() const { return FALSE; }
+	virtual UnsignedInt holdFramesAfterTrigger() const;
+	virtual void addAbilityConditions( ModelConditionFlags &flags ) const;
+	virtual Bool acceptsIntent( const Object *targetObj, const Coord3D *targetPos ) const;
+	void startTimedCondition( Int condition, UnsignedInt frames );
+	void updateTimedCondition();
+	void finishTriggeredAbility();
+	Bool beginHold();
+	void applyRotwkTrigger();
+	ObjectID getAbilityTargetID() const { return m_targetID; }
+	const Coord3D& getAbilityTargetPos() const { return m_targetPos; }
+	Bool hasAbilityTargetPos() const { return m_targetPos.x || m_targetPos.y || m_targetPos.z; }
 
   // Lorenzen added this additional flag to support the NapalmBombDrop
   // It causes this update to force a recharge of the SPM between drops
@@ -310,7 +327,7 @@ protected:
 
 	UpdateSleepTime calcSleepTime()
 	{
-		return (m_active || getSpecialAbilityUpdateModuleData()->m_alwaysValidateSpecialObjects) ? UPDATE_SLEEP_NONE : UPDATE_SLEEP_FOREVER;
+		return (m_active || m_timedCondition >= 0 || getSpecialAbilityUpdateModuleData()->m_alwaysValidateSpecialObjects) ? UPDATE_SLEEP_NONE : UPDATE_SLEEP_FOREVER;
 	}
 
 private:
@@ -340,4 +357,9 @@ private:
 	Bool													m_facingComplete;
 	Bool													m_withinStartAbilityRange;
 	Bool													m_doDisableFXParticles;      // smaller targets cause this flag to toggle, making the particle effect more sparse
+	ModelConditionFlags m_rotwkConditions;
+	Int m_rotwkTriggers = 0;
+	UnsignedInt m_holdFrames = 0;
+	Int m_timedCondition = -1;
+	UnsignedInt m_timedConditionEndFrame = 0;
 };

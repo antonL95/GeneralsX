@@ -30,6 +30,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/AbilityRules.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
@@ -1431,6 +1432,9 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			// sanity
 			DEBUG_ASSERTCRASH( command->getSpecialPowerTemplate() != nullptr,
 												 ("The special power in the command '%s' is null", command->getName().str()) );
+			if( RetailFileLayers::enabled() && !AbilityRules::mountButtonAllowed( command->hasRotwkOption( CommandButtonRules::ROTWK_MOUNTED_ONLY ),
+				command->hasRotwkOption( CommandButtonRules::ROTWK_UNMOUNTED_ONLY ), obj->testWeaponSetFlag( WEAPONSET_MOUNTED ) ) )
+				return COMMAND_RESTRICTED;
 			// get special power module from the object to execute it
 			SpecialPowerModuleInterface *mod = obj->getSpecialPowerModule( command->getSpecialPowerTemplate() );
 

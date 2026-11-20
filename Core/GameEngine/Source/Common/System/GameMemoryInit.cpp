@@ -91,7 +91,15 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "DelayedDeathBody", 64, 32 },
 	{ "PorcupineFormationBodyModule", 256, 64 },
 	{ "SymbioticStructuresBody", 16, 16 },
-	{ "DetachableRiderBody", 16, 16 }
+	{ "DetachableRiderBody", 16, 16 },
+	{ "WeaponFireSpecialAbilityUpdate", 256, 64 },
+	{ "ToggleMountedSpecialAbilityUpdate", 64, 32 },
+	{ "ActivateModuleSpecialPower", 64, 32 },
+	{ "HeroModeSpecialAbilityUpdate", 32, 16 },
+	{ "WeaponModeSpecialPowerUpdate", 64, 32 },
+	{ "MonitorConditionUpdate", 64, 32 },
+	{ "AutoAbilityBehavior", 512, 128 },
+	{ "PlayerHealSpecialPower", 32, 16 }
 };
 
 //-----------------------------------------------------------------------------

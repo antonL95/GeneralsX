@@ -24,6 +24,7 @@
 #include "Common/PlayerTemplate.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/Science.h"
+#include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
@@ -34,6 +35,7 @@
 #include "GameClient/GadgetPushButton.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
+#include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/View.h"
 #include "GameLogic/GameLogic.h"
@@ -48,6 +50,10 @@
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/RotwkAbilityModules.h"
+#endif
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -284,9 +290,10 @@ void dumpHud(unsigned int frame)
 		if (!window || !button || window->winIsHidden())
 			continue;
 		const ThingTemplate* hero = TheControlBar ? TheControlBar->getRetailHero(window) : nullptr;
-		std::fprintf(stderr, "TEST hud %u slot=%d %s type=%d %s hero=%s\n", frame, slot, button->getName().str(),
+		const Image* image = TheControlBar ? TheControlBar->getRetailButtonImage(window) : nullptr;
+		std::fprintf(stderr, "TEST hud %u slot=%d %s type=%d %s hero=%s image=%s\n", frame, slot, button->getName().str(),
 			static_cast<int>(button->getCommandType()), BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED) ? "enabled" : "disabled",
-			hero ? hero->getName().str() : "-");
+			hero ? hero->getName().str() : "-", image ? image->getName().str() : "-");
 		if (hero)
 		{
 			Drawable* selected = TheInGameUI->getFirstSelectedDrawable();
@@ -774,6 +781,123 @@ void parseHordeTestWeapon(INI* ini)
 		ini->initFromINI(weapon, weapon->getFieldParse());
 }
 
+void dumpAbilities(const Command& command, Object* obj, unsigned int frame)
+{
+	static const char* const conditions[] = { "MOUNTED", "UNPACKING", "PREPARING", "PACKING", "SPECIAL_WEAPON_ONE",
+		"SPECIAL_WEAPON_TWO", "SPECIAL_WEAPON_THREE", "SPECIAL_WEAPON_FIVE", "PACKING_TYPE_1", "PACKING_TYPE_2", "USER_3" };
+	std::string shown;
+	if (const Drawable* draw = obj->getDrawable())
+	{
+		for (const char* name : conditions)
+		{
+			const Int bit = ModelConditionFlags::getSingleBitFromName(name);
+			if (bit >= 0 && draw->getModelConditionFlags().test(bit))
+				shown += std::string(shown.empty() ? "" : ",") + name;
+		}
+	}
+	const AIUpdateInterface* ai = obj->getAI();
+	const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+	const BodyModuleInterface* body = obj->getBodyModule();
+	const Weapon* weapon = obj->getWeaponInWeaponSlot(PRIMARY_WEAPON);
+	std::fprintf(stderr, "TEST ability %u %s %s id=%u mounted=%d locoset=%d locomotor=%s speed=%.1f weapon=%s cmdset=%s using=%d health=%.1f/%.1f pos=%.1f,%.1f cond=%s\n",
+		frame, command.player.c_str(), command.target.c_str(), static_cast<unsigned>(obj->getID()),
+		obj->testWeaponSetFlag(WEAPONSET_MOUNTED) ? 1 : 0, ai ? static_cast<int>(ai->getCurLocomotorSetType()) : -1,
+		locomotor ? locomotor->getTemplateName().str() : "-", locomotor ? locomotor->getMaxSpeedForCondition(BODY_PRISTINE) : 0.0f,
+		weapon ? weapon->getName().str() : "-", obj->getCommandSetString().str(),
+		obj->testStatus(OBJECT_STATUS_IS_USING_ABILITY) ? 1 : 0, body ? body->getHealth() : 0.0f, body ? body->getMaxHealth() : 0.0f,
+		obj->getPosition()->x, obj->getPosition()->y, shown.empty() ? "-" : shown.c_str());
+	for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+	{
+		SpecialPowerModuleInterface* power = (*module)->getSpecialPower();
+		if (!power)
+			continue;
+		int automatic = -1;
+#if !RTS_GENERALS
+		if (const AutoAbilityBehavior* behavior = AutoAbilityBehavior::find(obj, power->getSpecialPowerTemplate()))
+			automatic = behavior->isAutoActive() ? 1 : 0;
+#endif
+		std::fprintf(stderr, "TEST power %u %u %s ready=%d percent=%.3f readyFrame=%u auto=%d\n", frame,
+			static_cast<unsigned>(obj->getID()), power->getPowerName().str(), power->isReady() ? 1 : 0, power->getPercentReady(),
+			power->getReadyFrame(), automatic);
+	}
+}
+
+void aimPendingCommand(const Command& command, Object* source, unsigned int frame)
+{
+	const CommandButton* button = TheInGameUI ? TheInGameUI->getGUICommand() : nullptr;
+	if (!button || !button->getSpecialPowerTemplate())
+	{
+		std::fprintf(stderr, "TEST frame %u: aim without a pending special power\n", frame);
+		return;
+	}
+	Object* target = findTarget(command);
+	Coord3D point;
+	if (target)
+		point = *target->getPosition();
+	else if (!readPoint(command, source, point))
+	{
+		std::fprintf(stderr, "TEST frame %u: aim %s has no target %s\n", frame, button->getName().str(), command.structure.c_str());
+		return;
+	}
+	const Bool wantsObject = BitIsSet(button->getOptions(), COMMAND_OPTION_NEED_OBJECT_TARGET);
+	if (wantsObject && (!target || !button->isValidObjectTarget(source, target)))
+	{
+		std::fprintf(stderr, "TEST frame %u: aim %s invalid object target %s\n", frame, button->getName().str(), command.structure.c_str());
+		return;
+	}
+	GameMessage* msg = nullptr;
+	if (wantsObject)
+	{
+		msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT);
+		msg->appendIntegerArgument(button->getSpecialPowerTemplate()->getID());
+		msg->appendObjectIDArgument(target->getID());
+	}
+	else
+	{
+		msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION);
+		msg->appendIntegerArgument(button->getSpecialPowerTemplate()->getID());
+		msg->appendLocationArgument(point);
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_NETWORKING)
+		msg->appendRealArgument(INVALID_ANGLE);
+#endif
+		msg->appendObjectIDArgument(target ? target->getID() : INVALID_ID);
+	}
+	msg->appendIntegerArgument(button->getOptions());
+	msg->appendObjectIDArgument(INVALID_ID);
+	TheInGameUI->setGUICommand(nullptr);
+	std::fprintf(stderr, "TEST frame %u: aim %s at %s (%.1f, %.1f)\n", frame, button->getName().str(),
+		target ? target->getTemplate()->getName().str() : "point", point.x, point.y);
+}
+
+void pressPowerButton(const Command& command, Object* obj, unsigned int frame)
+{
+	const CommandSet* set = TheControlBar ? TheControlBar->findCommandSet(obj->getCommandSetString()) : nullptr;
+	const CommandButton* button = nullptr;
+	for (Int i = 0; set && !button && i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
+	{
+		const CommandButton* candidate = set->getCommandButton(i);
+		if (candidate && candidate->getSpecialPowerTemplate() &&
+			stricmp(candidate->getSpecialPowerTemplate()->getName().str(), command.structure.c_str()) == 0)
+			button = candidate;
+	}
+	if (!button)
+	{
+		std::fprintf(stderr, "TEST frame %u: power %s has no button\n", frame, command.structure.c_str());
+		return;
+	}
+	selectObject(obj);
+	std::fprintf(stderr, "TEST frame %u: power %s button %s\n", frame, command.structure.c_str(), button->getName().str());
+	if (BitIsSet(button->getOptions(), COMMAND_OPTION_NEED_OBJECT_TARGET) || BitIsSet(button->getOptions(), NEED_TARGET_POS))
+	{
+		TheInGameUI->setGUICommand(button);
+		return;
+	}
+	GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER);
+	msg->appendIntegerArgument(button->getSpecialPowerTemplate()->getID());
+	msg->appendIntegerArgument(button->getOptions());
+	msg->appendObjectIDArgument(INVALID_ID);
+}
+
 void execute(const Command& command, unsigned int frame)
 {
 	if (command.action == "logall")
@@ -1049,6 +1173,33 @@ void execute(const Command& command, unsigned int frame)
 	{
 		logObject(obj, frame);
 	}
+	else if (command.action == "ability")
+		dumpAbilities(command, obj, frame);
+	else if (command.action == "aim")
+		aimPendingCommand(command, obj, frame);
+	else if (command.action == "power")
+		pressPowerButton(command, obj, frame);
+	else if (command.action == "objupgrade")
+	{
+		const UpgradeTemplate* upgrade = TheUpgradeCenter ? TheUpgradeCenter->findUpgrade(command.structure.c_str()) : nullptr;
+		if (upgrade)
+			obj->giveUpgrade(upgrade);
+		std::fprintf(stderr, "TEST frame %u: objupgrade object %u %s %s\n", frame, static_cast<unsigned>(obj->getID()),
+			command.structure.c_str(), upgrade ? "given" : "missing");
+	}
+#if !RTS_GENERALS
+	else if (command.action == "autoability")
+	{
+		const Int state = command.structure == "on" ? 1 : (command.structure == "off" ? -1 : 0);
+		static const NameKeyType key = NAMEKEY("AutoAbilityBehavior");
+		for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+		{
+			if ((*module)->getModuleNameKey() == key)
+				static_cast<AutoAbilityBehavior*>(*module)->setToggledState(state);
+		}
+		std::fprintf(stderr, "TEST frame %u: autoability object %u %s\n", frame, static_cast<unsigned>(obj->getID()), command.structure.c_str());
+	}
+#endif
 	else if (command.action == "select")
 	{
 		selectObject(obj);

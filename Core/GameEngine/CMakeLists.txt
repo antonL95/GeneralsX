@@ -70,6 +70,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/RotWKBodyModules.h
     Include/GameLogic/HeroRoster.h
     Include/Common/HeroRules.h
+    Include/Common/AbilityRules.h
     Include/GameClient/CommandButtonRules.h
     Include/GameLogic/CastleRules.h
     Include/GameLogic/RotwkLocomotorRules.h

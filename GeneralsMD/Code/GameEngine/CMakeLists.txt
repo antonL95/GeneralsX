@@ -423,6 +423,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/SpawnPointProductionExitUpdate.h
     Include/GameLogic/Module/SpecialAbility.h
     Include/GameLogic/Module/SpecialAbilityUpdate.h
+    Include/GameLogic/Module/RotwkAbilityModules.h
     Include/GameLogic/Module/SpecialPowerCompletionDie.h
     Include/GameLogic/Module/SpecialPowerCreate.h
     Include/GameLogic/Module/SpecialPowerModule.h
@@ -1036,6 +1037,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/SlavedUpdate.cpp
     Source/GameLogic/Object/Update/SmartBombTargetHomingUpdate.cpp
     Source/GameLogic/Object/Update/SpecialAbilityUpdate.cpp
+    Source/GameLogic/Object/Update/RotwkAbilityModules.cpp
     Source/GameLogic/Object/Update/SpecialPowerUpdateModule.cpp
     Source/GameLogic/Object/Update/SpectreGunshipDeploymentUpdate.cpp
     Source/GameLogic/Object/Update/SpectreGunshipUpdate.cpp

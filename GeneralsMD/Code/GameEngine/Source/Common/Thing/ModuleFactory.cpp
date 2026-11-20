@@ -282,6 +282,7 @@
 #include "GameLogic/Module/OCLSpecialPower.h"
 #include "GameLogic/Module/AISpecialPowerUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/SpecialAbility.h"
 #include "GameLogic/Module/SpyVisionSpecialPower.h"
 #include "GameLogic/Module/CashBountyPower.h"
@@ -481,6 +482,13 @@ void ModuleFactory::init()
 		addModule( RespawnUpdate );
 		addModule( HordeAIUpdate );
 		addModule( CommandPointsUpgrade );
+		addModule( WeaponFireSpecialAbilityUpdate );
+		addModule( ToggleMountedSpecialAbilityUpdate );
+		addModule( ActivateModuleSpecialPower );
+		addModule( HeroModeSpecialAbilityUpdate );
+		addModule( WeaponModeSpecialPowerUpdate );
+		addModule( MonitorConditionUpdate );
+		addModule( AutoAbilityBehavior );
 	}
 	addModule( MissileLauncherBuildingUpdate );
 	addModule( SupplyCenterProductionExitUpdate );
@@ -596,6 +604,7 @@ void ModuleFactory::init()
 	{
 		addModule( SpecialPowerModule );
 		addModule( AISpecialPowerUpdate );
+		addModule( PlayerHealSpecialPower );
 	}
 	addModule( FireWeaponPower );
 	addModule( SpecialAbility );

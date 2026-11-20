@@ -40,6 +40,7 @@
 #include "Common/ModuleFactory.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
@@ -57,6 +58,7 @@
 #include "GameClient/Eva.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/ControlBar.h"
+#include "GameClient/FXList.h"
 
 
 
@@ -176,6 +178,8 @@ SpecialPowerModule::SpecialPowerModule( Thing *thing, const ModuleData *moduleDa
 			startPowerRecharge();
 
 			if (startsReady())
+				m_availableOnFrame = TheGameLogic->getFrame();
+			else if (RetailFileLayers::enabled() && static_cast<const SpecialPowerModuleData*>(moduleData)->m_availableAtStart)
 				m_availableOnFrame = TheGameLogic->getFrame();
 		}
 	}
@@ -561,6 +565,9 @@ Bool SpecialPowerModule::initiateIntentToDoSpecialPower( const Object *targetObj
 void SpecialPowerModule::triggerSpecialPower( const Coord3D *location )
 {
 	aboutToDoSpecialPower( location );	// do BEFORE recharge
+
+	if( RetailFileLayers::enabled() )
+		applyRotwkTrigger( location );
 
 	createViewObject(location);
 
@@ -967,4 +974,22 @@ void SpecialPowerModule::loadPostProcess()
 
 
 
+}
+
+void SpecialPowerModule::applyRotwkTrigger( const Coord3D *location )
+{
+	const SpecialPowerModuleData *data = getSpecialPowerModuleData();
+	Object *self = getObject();
+	if( data->m_triggerFX.isNotEmpty() && TheFXListStore )
+	{
+		const FXList *fx = TheFXListStore->findFXList( data->m_triggerFX.str() );
+		FXList::doFXPos( fx, location ? location : self->getPosition() );
+	}
+	for( const AsciiString &name : data->m_onTriggerRechargeSpecialPower )
+	{
+		const SpecialPowerTemplate *other = TheSpecialPowerStore->findSpecialPowerTemplate( name );
+		SpecialPowerModuleInterface *module = other ? self->getSpecialPowerModule( other ) : nullptr;
+		if( module && module != this )
+			module->startPowerRecharge();
+	}
 }

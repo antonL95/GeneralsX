@@ -37,6 +37,7 @@
 #include "Common/CRCDebug.h"
 #include "Common/GlobalData.h"
 #include "Common/ModuleFactory.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
@@ -219,6 +220,8 @@ Int AIUpdateModuleData::findLocomotorSetType(const AsciiString& name)
 		if (name.compareNoCase(TheLocomotorSetNames[i]) == 0)
 			return i;
 	}
+	if (name.compareNoCase("SET_MOUNTED") == 0)
+		return LOCOMOTORSET_MOUNTED;
 	return -1;
 }
 
@@ -838,6 +841,9 @@ void AIUpdateInterface::setLocomotorUpgrade(Bool set)
 Bool AIUpdateInterface::chooseLocomotorSet(LocomotorSetType wst)
 {
 	DEBUG_ASSERTCRASH(wst != LOCOMOTORSET_NORMAL_UPGRADED, ("never pass LOCOMOTORSET_NORMAL_UPGRADED here"));
+	if (wst == LOCOMOTORSET_NORMAL && RetailFileLayers::enabled() && getObject()->testWeaponSetFlag(WEAPONSET_MOUNTED) &&
+		getObject()->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_MOUNTED))
+		wst = LOCOMOTORSET_MOUNTED;
 	if (wst == LOCOMOTORSET_NORMAL && m_upgradedLocomotors)
 		wst = LOCOMOTORSET_NORMAL_UPGRADED;
 

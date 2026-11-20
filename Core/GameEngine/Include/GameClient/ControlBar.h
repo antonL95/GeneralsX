@@ -36,6 +36,7 @@
 #include "Common/Science.h"
 #include "GameClient/Color.h"
 #include "GameClient/CommandButtonRules.h"
+#include "GameLogic/WeaponSetFlags.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Drawable;
@@ -394,6 +395,11 @@ public:
 	Bool isNeededUpgradeAny() const { return m_neededUpgradeAny; }
 	Int getCommandRangeStart() const { return m_commandRangeStart; }
 	Int getCommandRangeCount() const { return m_commandRangeCount; }
+	Bool isAutoAbility() const { return m_autoAbility; }
+	Real getPresetRange() const { return m_presetRange; }
+	const WeaponSetFlags& getFlagsUsedForToggle() const { return m_flagsUsedForToggle; }
+	const Image* getToggleButtonImage() const { return m_toggleButtonImage; }
+	static void parseButtonImages( INI *ini, void *instance, void *store, const void *userData );
 	const Image* getButtonImage() const { return m_buttonImage;	}
 	void cacheButtonImage();
 
@@ -458,6 +464,11 @@ private:
 	Bool m_showProductionCount = FALSE;
 	Int m_commandRangeStart = -1;
 	Int m_commandRangeCount = 0;
+	Bool m_autoAbility = FALSE;
+	Real m_presetRange = 0.0f;
+	WeaponSetFlags m_flagsUsedForToggle;
+	AsciiString m_toggleButtonImageName;
+	const Image *m_toggleButtonImage = nullptr;
 
 };
 
@@ -1006,6 +1017,8 @@ public:
 	Bool isOverRetailSocket(Int px, Int py) const;
 	void getRetailProduction(const GameWindow *window, Int &count, Real &progress) const;
 	CommandAvailability getRetailButtonAvailability(GameWindow *window) const;
+	const Image* getRetailButtonImage(GameWindow *window) const;
+	Real getRetailRecharge(const GameWindow *window) const;
 	void showRetailCommandTooltip(GameWindow *window) const;
 
 protected:

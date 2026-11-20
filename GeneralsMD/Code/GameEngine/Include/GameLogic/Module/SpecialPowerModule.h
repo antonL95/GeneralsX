@@ -99,7 +99,7 @@ public:
 	AsciiString m_attributeModifierFX;
 	Real m_attributeModifierRange = 0;
 	Bool m_attributeModifierWeatherBased = FALSE;
-	Bool m_availableAtStart = FALSE;
+	Bool m_availableAtStart = TRUE;
 	Int m_changeWeather = 0;
 	Bool m_disableDuringAnimDuration = FALSE;
 	Real m_distanceFromCommandCenter = 0;
@@ -198,6 +198,7 @@ public:
 
 	//If the special power launches a construction site, we need to know the final product for placement purposes.
 	virtual const ThingTemplate* getReferenceThingTemplate() const override { return nullptr; }
+	const SpecialPowerModuleData* getPowerModuleData() const { return getSpecialPowerModuleData(); }
 
 protected:
 
@@ -206,6 +207,7 @@ protected:
 	void createViewObject( const Coord3D *location );
 	void resolveSpecialPower();
 	void aboutToDoSpecialPower( const Coord3D *location );
+	void applyRotwkTrigger( const Coord3D *location );
 
 	UnsignedInt m_availableOnFrame;			///< on this frame, this special power is available
 	Int m_pausedCount;									///< Reference count of sources pausing me

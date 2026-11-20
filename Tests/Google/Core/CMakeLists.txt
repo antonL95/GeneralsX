@@ -13,6 +13,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/TerrainResourceRulesTest.cpp
     GameEngine/Common/CommandButtonRulesTest.cpp
     GameEngine/Common/HeroRulesTest.cpp
+    GameEngine/Common/AbilityRulesTest.cpp
     GameEngine/Common/CommandPointRulesTest.cpp
     GameEngine/Common/CastleTemplateTest.cpp
     GameEngine/Common/WeaponNuggetRulesTest.cpp
