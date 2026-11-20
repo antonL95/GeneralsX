@@ -330,6 +330,7 @@ void ScriptList::loadPostProcess()
 ScriptList *ScriptList::duplicate() const
 {
 	ScriptList *pNew = newInstance(ScriptList);
+	pNew->m_bfmeNextOrder = m_bfmeNextOrder;
 
 	{
 		const ScriptGroup *src = this->m_firstGroup;
@@ -376,6 +377,7 @@ ScriptList *ScriptList::duplicateAndQualify(const AsciiString& qualifier,
 			const AsciiString& playerTemplateName, const AsciiString& newPlayerName) const
 {
 	ScriptList *pNew = newInstance(ScriptList);
+	pNew->m_bfmeNextOrder = m_bfmeNextOrder;
 
 	{
 		const ScriptGroup *src = this->m_firstGroup;
@@ -737,6 +739,8 @@ void ScriptGroup::loadPostProcess()
 ScriptGroup *ScriptGroup::duplicate() const
 {
 	ScriptGroup *pNew = newInstance(ScriptGroup);
+	pNew->m_bfmeDepth = m_bfmeDepth;
+	pNew->m_bfmeOrder = m_bfmeOrder;
 
 	{
 		Script *src = this->m_firstScript;
@@ -772,6 +776,8 @@ ScriptGroup *ScriptGroup::duplicateAndQualify(const AsciiString& qualifier,
 			const AsciiString& playerTemplateName, const AsciiString& newPlayerName) const
 {
 	ScriptGroup *pNew = newInstance(ScriptGroup);
+	pNew->m_bfmeDepth = m_bfmeDepth;
+	pNew->m_bfmeOrder = m_bfmeOrder;
 
 	{
 		Script *src = this->m_firstScript;
@@ -994,6 +1000,8 @@ void Script::loadPostProcess()
 Script *Script::duplicate() const
 {
 	Script *pNew = newInstance(Script);
+	pNew->m_bfmeOrder = m_bfmeOrder;
+	pNew->m_bfme = m_bfme;
 
 	pNew->m_scriptName = m_scriptName;
 	pNew->m_comment = m_comment;
@@ -1029,6 +1037,8 @@ Script *Script::duplicateAndQualify(const AsciiString& qualifier,
 			const AsciiString& playerTemplateName, const AsciiString& newPlayerName) const
 {
 	Script *pNew = newInstance(Script);
+	pNew->m_bfmeOrder = m_bfmeOrder;
+	pNew->m_bfme = m_bfme;
 
 	pNew->m_scriptName = m_scriptName;
 	pNew->m_scriptName.concat(qualifier);
@@ -1531,6 +1541,8 @@ void Condition::setConditionType(enum ConditionType type)
 
 Condition *Condition::duplicate() const
 {
+	if (m_bfme.fromMap)
+		return BfmeMapScripts::copyCondition(*this);
 	Condition *pNew = newInstance(Condition)(m_conditionType);
 	Int i;
 	for (i=0; i<m_numParms && i<pNew->m_numParms; i++) {
@@ -1552,6 +1564,8 @@ Condition *Condition::duplicate() const
 Condition *Condition::duplicateAndQualify(const AsciiString& qualifier,
 			const AsciiString& playerTemplateName, const AsciiString& newPlayerName) const
 {
+	if (m_bfme.fromMap)
+		return BfmeMapScripts::copyCondition(*this, &qualifier, &playerTemplateName, &newPlayerName);
 	Condition *pNew = newInstance(Condition)(m_conditionType);
 	Int i;
 	for (i=0; i<m_numParms && i<pNew->m_numParms; i++) {
@@ -2218,6 +2232,8 @@ void ScriptAction::setActionType(enum ScriptActionType type)
 
 ScriptAction *ScriptAction::duplicate() const
 {
+	if (m_bfme.fromMap)
+		return BfmeMapScripts::copyAction(*this);
 	ScriptAction *pNew = newInstance(ScriptAction)(m_actionType);
 	Int i;
 	for (i=0; i<m_numParms; i++) {
@@ -2243,6 +2259,8 @@ ScriptAction *ScriptAction::duplicate() const
 ScriptAction *ScriptAction::duplicateAndQualify(const AsciiString& qualifier,
 			const AsciiString& playerTemplateName, const AsciiString& newPlayerName) const
 {
+	if (m_bfme.fromMap)
+		return BfmeMapScripts::copyAction(*this, &qualifier, &playerTemplateName, &newPlayerName);
 	ScriptAction *pNew = newInstance(ScriptAction)(m_actionType);
 	Int i;
 	for (i=0; i<m_numParms; i++) {

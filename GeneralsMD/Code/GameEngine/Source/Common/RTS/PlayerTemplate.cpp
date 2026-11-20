@@ -50,6 +50,8 @@
 #include "Common/PlayerTemplate.h"
 #include "Common/Player.h"
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Science.h"
 #include "GameClient/Image.h"
 
@@ -67,6 +69,7 @@
 {
 	static const FieldParse TheFieldParseTable[] =
 	{
+		{ "DefaultPlayerAIType", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_defaultPlayerAIType) },
 		{ "Side",											INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_side ) },
 		{ "BaseSide",								INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_baseSide ) },
 		{ "PlayableSide",							INI::parseBool,																	nullptr, offsetof( PlayerTemplate, m_playableSide ) },
@@ -121,7 +124,7 @@
 		{ nullptr,											nullptr,																				nullptr, 0 },
 	};
 
-	return TheFieldParseTable;
+	return TheFieldParseTable + (RetailFileLayers::enabled() && !INIAudit::isEnabled() ? 0 : 1);
 }
 
 AsciiString PlayerTemplate::getStartingUnit( Int i ) const

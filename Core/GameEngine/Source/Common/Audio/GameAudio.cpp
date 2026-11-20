@@ -51,6 +51,8 @@
 #include "Common/AudioHandleSpecialValues.h"
 #include "Common/AudioRequest.h"
 #include "Common/AudioSettings.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/FileSystem.h"
 #include "Common/GameEngine.h"
 #include "Common/GameMusic.h"
@@ -90,6 +92,7 @@ static void parseSpeakerType( INI *ini, void *instance, void *store, const void 
 // Field Parse table for Audio Settings ///////////////////////////////////////////////////////////
 static const FieldParse audioSettingsFieldParseTable[] =
 {
+	{ "MusicScriptLibraryName", INI::parseQuotedAsciiString, nullptr, offsetof(AudioSettings, m_musicScriptLibraryName) },
 	{ "AudioRoot",						INI::parseAsciiString,							nullptr,							offsetof( AudioSettings, m_audioRoot) },
 	{ "SoundsFolder",					INI::parseAsciiString,							nullptr,							offsetof( AudioSettings, m_soundsFolder) },
 	{ "MusicFolder",					INI::parseAsciiString,							nullptr,							offsetof( AudioSettings, m_musicFolder) },
@@ -932,7 +935,7 @@ MiscAudio *AudioManager::friend_getMiscAudio()
 //-------------------------------------------------------------------------------------------------
 const FieldParse *AudioManager::getFieldParseTable() const
 {
-	return audioSettingsFieldParseTable;
+	return audioSettingsFieldParseTable + (RetailFileLayers::enabled() && !INIAudit::isEnabled() ? 0 : 1);
 }
 
 //-------------------------------------------------------------------------------------------------

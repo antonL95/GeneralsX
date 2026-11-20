@@ -35,6 +35,10 @@
 #include "Common/Snapshot.h"
 #include "Common/GameMemory.h"
 #include "Common/STLTypedefs.h"
+#include <functional>
+#include <map>
+#include <string>
+#include <vector>
 
 class DataChunkInput;
 struct DataChunkInfo;
@@ -129,9 +133,9 @@ public:
 
 	jba.
 */
-class SidesList : public SubsystemInterface,
-									public Snapshot
+class SidesList : public SubsystemInterface, public Snapshot
 {
+	friend class BfmeMapScripts;
 
 public:
 
@@ -146,6 +150,7 @@ public:
 	static Bool ParseSidesDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseMapTeamsDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	Bool getMapSideFlag() const { return m_mapSideFlag; }
+	void setScriptDump(std::function<void(const char *, const AsciiString &, Int)> dump) { m_scriptDump = dump; }
 	Bool usesRotwkRoster() const;
 	AsciiString getSlotPlayerName(Int slot, Int startPosition, Bool observer) const;
 	/// Writes sides (including build list info.)
@@ -204,6 +209,14 @@ protected:
 	SidesInfo		m_sides[MAX_MAP_SIDES];
 	Bool				m_mapSideFlag;
 	UnsignedInt		m_mapSidesVersion;
+	std::function<void(const char *, const AsciiString &, Int)> m_scriptDump;
+	struct SideScriptLibraries
+	{
+		AsciiString owner;
+		std::vector<AsciiString> paths;
+	};
+	std::vector<SideScriptLibraries> m_scriptLibraries;
+	std::map<std::string, AsciiString> m_playerAILibraries;
 
 	Int					m_numSkirmishSides;
 	// GeneralsX @bugfix fbraz3 05/10/2026 Size skirmish sides array with MAX_SKIRMISH_SIDES to prevent buffer overflow (#335).

@@ -836,16 +836,8 @@ void Player::initFromDict(const Dict* d)
 		{
 			SidesInfo* humanTemplate = TheSidesList->findSkirmishSideInfo("SkirmishHuman");
 			SidesInfo* slotSide = TheSidesList->findSideInfo(pname);
-			if (humanTemplate && humanTemplate->getScriptList() && slotSide)
-			{
-				AsciiString qualifier;
-				qualifier.format("%d", m_mpStartIndex);
-				AsciiString sourceName("SkirmishHuman");
-				sourceName.concat(qualifier);
-				ScriptList* scripts = humanTemplate->getScriptList()->duplicateAndQualify(qualifier, sourceName, pname);
-				deleteInstance(slotSide->getScriptList());
-				slotSide->setScriptList(scripts);
-			}
+			if (humanTemplate && slotSide)
+				BfmeMapScripts::attachPlayerTemplate(*TheSidesList, *humanTemplate, *slotSide, m_mpStartIndex);
 		}
 		else if (!rotwk && TheSidesList->getNumSkirmishSides()>0) {
 			// Human player gets scripts from CIVILIAN player.
@@ -890,7 +882,7 @@ void Player::initFromDict(const Dict* d)
 		Int i, skirmishNdx;
 		Bool found = false;
 		AsciiString  qualTemplatePlayerName;
-		for (skirmishNdx=0; skirmishNdx<TheSidesList->getNumSkirmishSides(); skirmishNdx++) {
+		for (skirmishNdx=0; !rotwk && skirmishNdx<TheSidesList->getNumSkirmishSides(); skirmishNdx++) {
 			AsciiString templateName = TheSidesList->getSkirmishSideInfo(skirmishNdx)->getDict()->getAsciiString(TheKey_playerFaction);
 			pt = ThePlayerTemplateStore->findPlayerTemplate(NAMEKEY(templateName));
 			if (pt && pt->getSide() == mySide) {
@@ -912,16 +904,12 @@ void Player::initFromDict(const Dict* d)
 
 		if (rotwk)
 		{
-			SidesInfo* slotSide = TheSidesList->findSideInfo(pname);
-			if (found && slotSide && TheSidesList->getSkirmishSideInfo(skirmishNdx)->getScriptList())
-			{
-				AsciiString qualifier;
-				qualifier.format("%d", m_mpStartIndex);
-				ScriptList* scripts = TheSidesList->getSkirmishSideInfo(skirmishNdx)->getScriptList()->duplicateAndQualify(
-					qualifier, qualTemplatePlayerName, pname);
-				deleteInstance(slotSide->getScriptList());
-				slotSide->setScriptList(scripts);
-			}
+			AsciiString name("Skirmish");
+			name.concat(mySide);
+			SidesInfo *aiTemplate = TheSidesList->findSkirmishSideInfo(name);
+			SidesInfo *slotSide = TheSidesList->findSideInfo(pname);
+			if (aiTemplate && slotSide)
+				BfmeMapScripts::attachPlayerTemplate(*TheSidesList, *aiTemplate, *slotSide, m_mpStartIndex);
 		}
 		else if (!found)
 		{

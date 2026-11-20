@@ -736,6 +736,7 @@ void SidesList::emptySides()
 	m_numSkirmishSides = 0;
 	m_mapSideFlag = false;
 	m_mapSidesVersion = 0;
+	m_scriptLibraries.clear();
 	for (i = 0; i < MAX_MAP_SIDES; i++) {
 		m_sides[i].clear();
 	}

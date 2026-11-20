@@ -46,6 +46,7 @@ struct AudioSettings
 	}
 
 	AsciiString m_audioRoot;
+	AsciiString m_musicScriptLibraryName;
 	AsciiString m_soundsFolder;
 	AsciiString m_musicFolder;
 	AsciiString m_streamingFolder;

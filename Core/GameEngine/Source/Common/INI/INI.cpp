@@ -33,6 +33,7 @@
 
 #include "WWMath/wwmath.h"
 #include "Common/INI.h"
+#include "GameLogic/BfmeMapScripts.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/INIException.h"
@@ -504,6 +505,8 @@ void INI::unPrepFile()
 //-------------------------------------------------------------------------------------------------
 static INIBlockParse findBlockParse(const char* token)
 {
+	if (!INIAudit::isEnabled() && RetailFileLayers::enabled() && strcmp(token, "PlayerAIType") == 0)
+		return BfmeMapScripts::parsePlayerAIType;
 	for (size_t i = 0; i < ARRAY_SIZE(theTypeTable); ++i)
 	{
 		if (strcmp(theTypeTable[i].token, token) == 0)

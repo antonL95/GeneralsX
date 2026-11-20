@@ -528,6 +528,7 @@ set(GAMEENGINE_SRC
 #    Include/GameLogic/Scripts.h
     Include/GameLogic/MapPlayerRoster.h
     Include/GameLogic/SidesList.h
+    Include/GameLogic/BfmeMapScripts.h
 #    Include/GameLogic/Squad.h
     Include/GameLogic/TerrainLogic.h
 #    Include/GameLogic/TurretAI.h
@@ -916,6 +917,7 @@ set(GAMEENGINE_SRC
 #    Source/GameLogic/AI/TurretAI.cpp
     Source/GameLogic/Map/PolygonTrigger.cpp
     Source/GameLogic/Map/SidesList.cpp
+    Source/GameLogic/Map/BfmeMapScripts.cpp
     Source/GameLogic/Map/TerrainLogic.cpp
 #    Source/GameLogic/Object/Armor.cpp
 #    Source/GameLogic/Object/Behavior/AutoHealBehavior.cpp

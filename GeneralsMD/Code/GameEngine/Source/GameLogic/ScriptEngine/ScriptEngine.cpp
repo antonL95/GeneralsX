@@ -57,6 +57,7 @@
 #include "GameLogic/ScriptConditions.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/SidesList.h"
+#include "GameLogic/MapPlayerRoster.h"
 
 
 // These are for debugger window
@@ -5577,6 +5578,13 @@ void ScriptEngine::update()
 		m_currentPlayer = ThePlayerList->getNthPlayer(i);
 		ScriptList *pSL = TheSidesList->getSideInfo(i)->getScriptList();
 		if (!pSL) continue;
+		if (pSL->hasBfmeOrder())
+		{
+			ScriptGroup *group = pSL->getScriptGroup();
+			executeBfmeScripts(pSL->getScript(), group, 1, true);
+			m_currentPlayer = nullptr;
+			continue;
+		}
 		executeScripts(pSL->getScript());
 		ScriptGroup *pGroup;
 		for (pGroup = pSL->getScriptGroup(); pGroup; pGroup=pGroup->getNext()) {
@@ -5586,7 +5594,7 @@ void ScriptEngine::update()
 			if (pGroup->isSubroutine()) {
 				continue; // Don't execute subroutine groups.
 			}
-			executeScripts(pGroup->getScript());
+			executeGroupScripts(pGroup);
 		}
 		m_currentPlayer = nullptr;
 	}
@@ -5951,8 +5959,15 @@ PolygonTrigger *ScriptEngine::getQualifiedTriggerAreaByName( AsciiString name )
 //-------------------------------------------------------------------------------------------------
 /** getTeamNamed */
 //-------------------------------------------------------------------------------------------------
-Team * ScriptEngine::getTeamNamed(const AsciiString& teamName)
+Team * ScriptEngine::getTeamNamed(const AsciiString& authoredName)
 {
+	AsciiString teamName = authoredName;
+	if (TheSidesList && TheSidesList->usesRotwkRoster())
+	{
+		const auto qualified = MapPlayerRoster::qualifiedTeam(teamName.str());
+		if (!qualified.empty() && TheTeamFactory->findTeamPrototype(qualified.data()))
+			teamName = AsciiString(qualified.data());
+	}
 	Bool is_GeneralsChallengeContext = TheCampaignManager->getCurrentCampaign() && TheCampaignManager->getCurrentCampaign()->m_isChallengeCampaign;
 	if (teamName == TEAM_THE_PLAYER && is_GeneralsChallengeContext)
 		// Designers have built their Generals' Challenge maps, referencing "teamThePlayer" meaning the local player's default (parent) team.
@@ -6050,7 +6065,7 @@ void ScriptEngine::runScript(const AsciiString& scriptName, Team *pThisTeam)
 	if (pGroup) {
 		if (pGroup->isSubroutine()) {
 			if (pGroup->isActive()) {
-				executeScripts(pGroup->getScript());
+				executeGroupScripts(pGroup);
 			}
 		}	else {
 				AppendDebugMessage("***Attempting to call script that is not a subroutine:***", false);
@@ -6097,7 +6112,7 @@ void ScriptEngine::runObjectScript(const AsciiString& scriptName, Object *pThisO
 	if (pGroup) {
 		if (pGroup->isSubroutine()) {
 			if (pGroup->isActive()) {
-				executeScripts(pGroup->getScript());
+				executeGroupScripts(pGroup);
 			}
 		}	else {
 				AppendDebugMessage("***Attempting to call script that is not a subroutine:***", false);
@@ -6856,7 +6871,7 @@ void ScriptEngine::callSubroutine( ScriptAction *pAction )
 	if (pGroup) {
 		if (pGroup->isSubroutine()) {
 			if (pGroup->isActive()) {
-				executeScripts(pGroup->getScript());
+				executeGroupScripts(pGroup);
 			}
 		}	else {
 				AppendDebugMessage("***Attempting to call script that is not a subroutine:***", false);
@@ -6902,10 +6917,19 @@ void ScriptEngine::checkConditionsForTeamNames(Script *pScript)
 	for (pOr = pScript->getOrCondition(); pOr; pOr = pOr->getNextOrCondition()) {
 		Condition *pCondition;
 		for (pCondition = pOr->getFirstAndCondition(); pCondition; pCondition = pCondition->getNext()) {
+			const BfmeScriptOpcode &opcode = pCondition->getBfmeOpcode();
+			if (!opcode.enabled || !opcode.supported)
+				continue;
 			Int i;
 			for (i=0; i<pCondition->getNumParameters(); i++) {
 				if (Parameter::TEAM == pCondition->getParameter(i)->getParameterType()) {
 					AsciiString teamName = pCondition->getParameter(i)->getString();
+					if (opcode.fromMap)
+					{
+						const auto qualified = MapPlayerRoster::qualifiedTeam(teamName.str());
+						if (!qualified.empty() && TheTeamFactory->findTeamPrototype(qualified.data()))
+							teamName = AsciiString(qualified.data());
+					}
 					TeamPrototype *proto = TheTeamFactory->findTeamPrototype(teamName);
 					if (proto==nullptr) continue; // Undefined team - don't bother.
 					Bool singleton = proto->getIsSingleton();
@@ -7601,7 +7625,8 @@ Bool ScriptEngine::evaluateConditions( Script *pScript, Team *thisTeam, Player *
 		if (!pCondition) continue; // No conditions, so go to the next or.
 		Bool andTerm = true;
 		while (pCondition && andTerm) {
-			if (!evaluateCondition(pCondition)) {
+			const BfmeScriptOpcode &opcode = pCondition->getBfmeOpcode();
+			if (opcode.enabled && (!opcode.supported || evaluateCondition(pCondition) == opcode.inverted)) {
 				andTerm = false;
 				break; // Short circuit the and evauation - after the first false, we can quit.
 			}
@@ -7633,6 +7658,9 @@ void ScriptEngine::executeActions( ScriptAction *pActionHead )
 	ScriptAction *pCurAction;
 	UnicodeString uStr1;
 	for (pCurAction = pActionHead; pCurAction; pCurAction = pCurAction->getNext()) {
+		const BfmeScriptOpcode &opcode = pCurAction->getBfmeOpcode();
+		if (!opcode.enabled || !opcode.supported)
+			continue;
 		switch (pCurAction->getActionType()) {
 			default: if (TheScriptActions) TheScriptActions->executeAction(pCurAction); break;
 			case ScriptAction::SET_COUNTER: setCounter(pCurAction);	break;
@@ -7977,6 +8005,11 @@ void ScriptEngine::evaluateAndProgressAllSequentialScripts()
 				ScriptAction *action = seqScript->m_scriptToExecuteSequentially->getAction();
 				while (action && instruction) {
 					--instruction;
+					action = action->getNext();
+				}
+				while (action && (!action->getBfmeOpcode().enabled || !action->getBfmeOpcode().supported))
+				{
+					++seqScript->m_currentInstruction;
 					action = action->getNext();
 				}
 
@@ -10429,3 +10462,35 @@ static void _cleanUpVTune()
 }
 #endif	// VTUNE
 
+
+void ScriptEngine::executeBfmeScripts(Script *script, ScriptGroup *&group, Int depth, Bool active)
+{
+	while (script || (group && group->getBfmeDepth() == depth))
+	{
+		if (group && group->getBfmeDepth() == depth &&
+			(!script || group->getBfmeOrder() < script->getBfmeOrder()))
+		{
+			ScriptGroup *current = group;
+			group = group->getNext();
+			executeBfmeScripts(current->getScript(), group, depth + 1,
+				active && current->isActive() && !current->isSubroutine());
+		}
+		else
+		{
+			if (active && !script->isSubroutine())
+				executeScript(script);
+			script = script->getNext();
+		}
+	}
+}
+
+void ScriptEngine::executeGroupScripts(ScriptGroup *group)
+{
+	if (group->getBfmeDepth() == 0)
+	{
+		executeScripts(group->getScript());
+		return;
+	}
+	ScriptGroup *child = group->getNext();
+	executeBfmeScripts(group->getScript(), child, group->getBfmeDepth() + 1, true);
+}

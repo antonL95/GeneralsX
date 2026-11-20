@@ -75,6 +75,8 @@
 #define INNER_PERIMETER "InnerPerimeter"
 #define OUTER_PERIMETER "OuterPerimeter"
 
+#include "GameLogic/BfmeMapScripts.h"
+
 class Parameter;
 class Script;
 class OrCondition;
@@ -111,6 +113,9 @@ class ScriptGroup : public MemoryPoolObject, public Snapshot
 // additional properties.
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(ScriptGroup, "ScriptGroup")
+	friend class BfmeMapScripts;
+	Int m_bfmeDepth = 0;
+	Int m_bfmeOrder = 0;
 protected:
 
 	// snapshot methods
@@ -144,6 +149,8 @@ public:
 
 	const AsciiString& getName() const { return m_groupName;}
 	Bool isActive() const { return m_isGroupActive;}
+	Int getBfmeDepth() const { return m_bfmeDepth; }
+	Int getBfmeOrder() const { return m_bfmeOrder; }
 	Bool isSubroutine() const { return m_isGroupSubroutine;}
 	Bool hasWarnings() const { return m_hasWarnings;}
 	ScriptGroup *getNext() const {return m_nextGroup;};
@@ -163,6 +170,7 @@ public:
 class OrCondition : public MemoryPoolObject
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(OrCondition, "OrCondition")
+	friend class BfmeMapScripts;
 protected:
 	OrCondition *m_nextOr;   // Next or clause.
 	Condition *m_firstAnd;	 // These are Anded.
@@ -201,6 +209,10 @@ enum {MAX_PARMS=12};
 class ScriptAction : public MemoryPoolObject // This is the action class.
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(ScriptAction, "ScriptAction")
+	friend class BfmeMapScripts;
+	BfmeScriptOpcode m_bfme;
+public:
+	const BfmeScriptOpcode &getBfmeOpcode() const { return m_bfme; }
 // friend bad for MPOs. (srj)
 //friend class EditAction;
 public:
@@ -593,6 +605,17 @@ or clauses is true, the m_action list is executed.  . */
 class Script : public MemoryPoolObject, public Snapshot
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(Script, "Script")
+	friend class BfmeMapScripts;
+	Int m_bfmeOrder = 0;
+	struct BfmeFields
+	{
+		Bool sequential = false;
+		Bool loop = false;
+		Int loopCount = 0;
+		UnsignedByte targetType = 0;
+		AsciiString target;
+		AsciiString filter;
+	} m_bfme;
 protected:	// Note - If you add any member vars, you must take them into account in duplicate() and updateFrom(), as well as file read/write.
 
 	// snapshot methods
@@ -627,6 +650,7 @@ protected:	// Note - If you add any member vars, you must take them into account
 
 public:
 	Script();
+	Int getBfmeOrder() const { return m_bfmeOrder; }
 	//~Script();
 	Script *duplicate() const;	// note, duplicates just this node, not the full list.
 	Script *duplicateAndQualify(const AsciiString& qualifier,
@@ -702,6 +726,8 @@ public:
 class Parameter : public MemoryPoolObject
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(Parameter, "Parameter")
+	friend class BfmeMapScripts;
+	Int m_bfmeType = -1;
 // friend bad for MPOs. (srj)
 //friend class EditParameter;
 //friend class EditCoordParameter;
@@ -846,6 +872,10 @@ ConditionTemplates created in ScriptEngine::init.
 class Condition : public MemoryPoolObject  // This is the conditional class.
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(Condition, "Condition")
+	friend class BfmeMapScripts;
+	BfmeScriptOpcode m_bfme;
+public:
+	const BfmeScriptOpcode &getBfmeOpcode() const { return m_bfme; }
 // friend bad for MPOs. (srj)
 //friend class EditCondition;
 public:
@@ -1059,6 +1089,8 @@ class ScriptList : public MemoryPoolObject, public Snapshot
 // the top level scripts, and the script groups.
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(ScriptList, "ScriptList")
+	friend class BfmeMapScripts;
+	Int m_bfmeNextOrder = 0;
 protected:
 
 	// snapshot methods
@@ -1075,6 +1107,7 @@ protected:
 
 public:
 	ScriptList();
+	Bool hasBfmeOrder() const { return m_bfmeNextOrder > 0; }
 	//~ScriptList();
 
 public:

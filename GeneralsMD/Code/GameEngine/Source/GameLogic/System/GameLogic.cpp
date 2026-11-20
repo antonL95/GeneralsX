@@ -1634,6 +1634,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		d.setBool(TheKey_teamIsSingleton, true);
 		TheSidesList->addTeam(&d);
 	//}
+	BfmeMapScripts::loadLibraries(*TheSidesList, TheGameEngine->isMultiplayerSession() || isSkirmishOrSkirmishReplay);
 	TheSidesList->validateSides();
 
 	// update the loadscreen
@@ -1642,6 +1643,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	// update the player list to match the new map.
 	TheTeamFactory->reset();
 	ThePlayerList->newGame();
+	BfmeMapScripts::reportRuntime(*TheSidesList);
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_PLAYER_LIST_RESET);
@@ -1652,7 +1654,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_SCRIPT_ENGINE_NEW_MAP);
 
-	if (TheGameEngine->isMultiplayerSession() || isSkirmishOrSkirmishReplay)
+	if (!TheSidesList->usesRotwkRoster() && (TheGameEngine->isMultiplayerSession() || isSkirmishOrSkirmishReplay))
 	{
 		// if there are no other teams (happens for debugging) don't end the game immediately
 		Int numTeams = 0; // this can be higher than expected, but is accurate for determining 0, 1, 2+

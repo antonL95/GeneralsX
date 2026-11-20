@@ -637,6 +637,13 @@ bool probeMapSides(const std::string& name, const Entry& entry, const char *heig
 
 	SidesList sides;
 	TheSidesList = &sides;
+	if (std::getenv("GENERALSX_MAP_SCRIPT_DUMP"))
+	{
+		record("map-script-dump", name, "PlayerScriptsList", "", 0);
+		sides.setScriptDump([&name](const char *kind, const AsciiString &label, Int depth) {
+			record("map-script-node", name, kind, hexBytes(label.str()), depth);
+		});
+	}
 	bool parsed = false;
 	try
 	{

@@ -45,6 +45,7 @@
 
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/SidesList.h"
+#include "GameLogic/BfmeMapScripts.h"
 
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "W3DDevice/GameClient/TileData.h"
@@ -512,8 +513,8 @@ void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metada
 
 	file.registerVersionedParser("GlobalLighting", root, ParseLogicalLightingDataChunk, K_LIGHTING_VERSION_8, true);
 	file.registerVersionedParser("MPPositionList", root, nullptr, 0);
-	file.registerVersionedParser("LibraryMapLists", root, nullptr, 1);
-	file.registerVersionedParser("PlayerScriptsList", root, nullptr, 6);
+	file.registerVersionedParser("LibraryMapLists", root, BfmeMapScripts::parseLibraryLists, 1);
+	file.registerVersionedParser("PlayerScriptsList", root, BfmeMapScripts::parsePlayerLists, 6, true);
 	file.registerVersionedParser("BuildLists", root, nullptr, 1);
 	file.registerVersionedParser("TriggerAreas", root, ParseTriggerAreas, 1);
 	file.registerVersionedParser("StandingWaterAreas", root, ParseStandingWaterAreas, 2);
