@@ -134,10 +134,10 @@ void StancesBehavior::setStance(Int stance)
 	if (next == m_appliedModifier)
 		return;
 	if (m_appliedModifier.isNotEmpty())
-		AttributeModifiers::remove(self, m_appliedModifier);
+		AttributeModifiers::remove(self, m_appliedModifier, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));
 	m_appliedModifier = next;
 	if (m_appliedModifier.isNotEmpty())
-		AttributeModifiers::apply(self, m_appliedModifier, 0);
+		AttributeModifiers::apply(self, m_appliedModifier, 0, 0, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));
 #endif
 }
 

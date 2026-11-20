@@ -248,6 +248,12 @@ const char* nuggetTypeName(WeaponNuggetType type)
 	return "Nugget";
 }
 
+Real nuggetBaseDamage(const WeaponNugget& nugget, const Object* source, Real scalar)
+{
+	return AttributeModifierRules::baseDamageWithAdd(nugget.m_damage * scalar, nugget.m_acceptDamageAdd,
+		AttributeModifiers::value(source, AttributeModifierRules::DAMAGE_ADD));
+}
+
 }
 
 Bool objectFilterMatches(const SpecialPowerObjectFilter& filter, const Object* source, const Object* target)
@@ -370,10 +376,9 @@ Real WeaponTemplate::estimateNuggetDamage(const Object* sourceObj, const Object*
 		}
 		if (!nugget.dealsDamage() || nugget.m_damage <= 0.0f)
 			continue;
-		const Real amount = nugget.m_damage * bonus.getField(WeaponBonus::DAMAGE);
 		if (!victimObj)
 		{
-			total += amount;
+			total += nuggetBaseDamage(nugget, sourceObj, 1.0f) * bonus.getField(WeaponBonus::DAMAGE);
 			continue;
 		}
 		if (!nugget.affects(sourceObj, victimObj))
@@ -382,7 +387,7 @@ Real WeaponTemplate::estimateNuggetDamage(const Object* sourceObj, const Object*
 		damageInfo.m_damageType = nugget.m_damageType;
 		damageInfo.m_deathType = nugget.m_deathType;
 		damageInfo.m_sourceID = sourceObj->getID();
-		damageInfo.m_amount = amount * nugget.scalarFor(sourceObj, victimObj);
+		damageInfo.m_amount = nuggetBaseDamage(nugget, sourceObj, nugget.scalarFor(sourceObj, victimObj)) * bonus.getField(WeaponBonus::DAMAGE);
 		total += victimObj->estimateDamage(damageInfo);
 	}
 	return total;
@@ -524,7 +529,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 	const auto damage = [&](Object* victim, Bool killSelf)
 	{
 		const Real scalar = nugget.scalarFor(source, victim);
-		const Real amount = killSelf ? HUGE_DAMAGE_AMOUNT : nugget.m_damage * bonus.getField(WeaponBonus::DAMAGE) * scalar;
+		const Real amount = killSelf ? HUGE_DAMAGE_AMOUNT : nuggetBaseDamage(nugget, source, scalar) * bonus.getField(WeaponBonus::DAMAGE);
 		if (amount <= 0.0f)
 			return;
 

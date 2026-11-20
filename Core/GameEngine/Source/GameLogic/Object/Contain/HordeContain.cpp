@@ -418,10 +418,6 @@ void HordeContain::onRemoving( Object *rider )
 	}
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained, false );
 	OpenContain::onRemoving( rider );
-#if !RTS_GENERALS
-	if( AttributeModifierHelper* helper = rider->getAttributeModifierHelper() )
-		helper->refreshDerived();
-#endif
 }
 
 void HordeContain::onCapture( Player *oldOwner, Player *newOwner )

@@ -25,8 +25,8 @@ public:
 
 	virtual UpdateSleepTime update() override;
 
-	AttributeModifierRules::ApplyResult apply( Int list, UnsignedInt durationFrames, UnsignedInt antiMask );
-	Bool remove( Int list );
+	AttributeModifierRules::ApplyResult apply( Int list, UnsignedInt durationFrames, UnsignedInt antiMask, AttributeModifierRules::Owner owner );
+	Bool remove( Int list, AttributeModifierRules::Owner owner );
 	void removeCategories( UnsignedInt mask );
 	void removeTimed();
 	void clearAll();
@@ -69,9 +69,12 @@ private:
 namespace AttributeModifiers
 {
 const AttributeModifierRules::Totals* totalsOf( const Object* obj );
-Bool apply( Object* target, Int list, UnsignedInt durationFrames = AttributeModifierHelper::USE_LIST_DURATION, UnsignedInt antiMask = 0 );
-Bool apply( Object* target, const AsciiString& listName, UnsignedInt durationFrames = AttributeModifierHelper::USE_LIST_DURATION, UnsignedInt antiMask = 0 );
-Bool remove( Object* target, const AsciiString& listName );
+AttributeModifierRules::Owner ownerOf( const Object* obj, NameKeyType moduleTag );
+Bool apply( Object* target, Int list, UnsignedInt durationFrames = AttributeModifierHelper::USE_LIST_DURATION, UnsignedInt antiMask = 0,
+	AttributeModifierRules::Owner owner = AttributeModifierRules::ANONYMOUS_OWNER );
+Bool apply( Object* target, const AsciiString& listName, UnsignedInt durationFrames = AttributeModifierHelper::USE_LIST_DURATION, UnsignedInt antiMask = 0,
+	AttributeModifierRules::Owner owner = AttributeModifierRules::ANONYMOUS_OWNER );
+Bool remove( Object* target, const AsciiString& listName, AttributeModifierRules::Owner owner );
 Int findList( const AsciiString& listName );
 UnsignedInt categoryMask( const std::vector<Int>& categories );
 
@@ -96,6 +99,6 @@ enum Sides
 
 Bool sidesMatch( const Object* source, const Object* target, const SpecialPowerObjectFilter* filter, Sides sides );
 void applyInRange( Object* source, const Coord3D* center, Real range, const SpecialPowerObjectFilter* filter, Bool affectSelf,
-	Int list, UnsignedInt durationFrames, UnsignedInt antiMask, const AsciiString& fxName, Sides sides = SIDES_ALLIES );
+	Int list, UnsignedInt durationFrames, UnsignedInt antiMask, const AsciiString& fxName, Sides sides = SIDES_ALLIES, Bool affectAllies = TRUE );
 void describe( const Object* obj, AsciiString& out );
 }

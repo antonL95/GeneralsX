@@ -38,9 +38,10 @@ class AttributeModifierStore : public SubsystemInterface
 {
 public:
 	virtual void init() override {}
-	virtual void reset() override {}
+	virtual void reset() override;
 	virtual void update() override {}
 
+	void markDefaults();
 	Int findIndex(const AsciiString& name) const;
 	Int findIndex(const char* name) const;
 	const ModifierListTemplate* get(Int index) const;
@@ -57,6 +58,11 @@ private:
 	std::vector<ModifierListTemplate> m_lists;
 	std::map<std::string, Int> m_index;
 	std::vector<StanceTemplateData> m_stances;
+
+	Bool m_hasDefaults = FALSE;
+	std::vector<ModifierListTemplate> m_defaultLists;
+	std::map<std::string, Int> m_defaultIndex;
+	std::vector<StanceTemplateData> m_defaultStances;
 };
 
 extern AttributeModifierStore* TheAttributeModifierStore;

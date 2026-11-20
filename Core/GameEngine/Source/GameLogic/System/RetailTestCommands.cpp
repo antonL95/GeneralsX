@@ -525,12 +525,12 @@ void logModifiedObject(const char* label, const Object* obj, unsigned int frame)
 	const StancesBehavior* stances = StancesBehavior::find(obj);
 	AsciiString lists;
 	AttributeModifiers::describe(obj, lists);
-	std::fprintf(stderr, "TEST mods %u %s id=%u(%s) stance=%s health=%.1f/%.1f armorSlash=%.3f armorMagic=%.3f damage=%.3f range=%.1f rof=%.3f speed=%.2f vision=%.1f shroud=%.1f xp=%.3f production=%.3f recharge=%.3f lists=[%s]\n",
+	std::fprintf(stderr, "TEST mods %u %s id=%u(%s) stance=%s health=%.1f/%.1f armorSlash=%.3f armorMagic=%.3f damage=%.3f damageAdd=%.1f range=%.1f rof=%.3f speed=%.2f vision=%.1f shroud=%.1f xp=%.3f production=%.3f recharge=%.3f lists=[%s]\n",
 		frame, label, static_cast<unsigned>(obj->getID()), obj->getTemplate()->getName().str(),
 		stances ? AttributeModifierRules::stanceNames()[stances->getStance()] : "-",
 		body ? body->getHealth() : 0.0f, body ? body->getMaxHealth() : 0.0f,
 		AttributeModifiers::damageTakenFactor(obj, DAMAGE_SLASH), AttributeModifiers::damageTakenFactor(obj, DAMAGE_MAGIC),
-		AttributeModifiers::damageDealtFactor(obj), weapon ? weapon->getAttackRange(obj) : 0.0f, AttributeModifiers::rateOfFireFactor(obj),
+		AttributeModifiers::damageDealtFactor(obj), AttributeModifiers::value(obj, AttributeModifierRules::DAMAGE_ADD), weapon ? weapon->getAttackRange(obj) : 0.0f, AttributeModifiers::rateOfFireFactor(obj),
 		locomotor ? locomotor->getMaxSpeedForCondition(BODY_PRISTINE, obj) : 0.0f, obj->getVisionRange(), obj->getShroudClearingRange(),
 		AttributeModifiers::experienceFactor(obj), AttributeModifiers::productionFactor(obj), AttributeModifiers::rechargeFactor(obj),
 		lists.str());
@@ -1891,6 +1891,20 @@ void execute(const Command& command, unsigned int frame)
 	{
 		const Bool applied = AttributeModifiers::apply(obj, AsciiString(command.structure.c_str()));
 		std::fprintf(stderr, "TEST frame %u: modapply object %u %s %d\n", frame, static_cast<unsigned>(obj->getID()), command.structure.c_str(), applied ? 1 : 0);
+	}
+	else if (command.action == "hordeleave")
+	{
+		ContainModuleInterface* contain = HordeContain::get(obj) ? obj->getContain() : nullptr;
+		const ContainedItemsList* members = contain ? contain->getContainedItemsList() : nullptr;
+		if (members && !members->empty())
+		{
+			Object* member = members->front();
+			logModifiedObject("leaving", member, frame);
+			contain->removeFromContain(member, FALSE);
+			logModifiedObject("left", member, frame);
+			std::fprintf(stderr, "TEST frame %u: hordeleave member %u containedBy=%u\n", frame, static_cast<unsigned>(member->getID()),
+				member->getContainedBy() ? static_cast<unsigned>(member->getContainedBy()->getID()) : 0u);
+		}
 	}
 #endif
 	else if (command.action == "objupgrade")

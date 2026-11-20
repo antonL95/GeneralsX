@@ -7,12 +7,14 @@
 #include "Common/AbilityRules.h"
 #include "Common/AttributeModifierRules.h"
 #include "Common/Player.h"
+#include "Common/PlayerTemplate.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/Damage.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -78,6 +80,25 @@ Bool hasUpgradeNamed(const Object* obj, const AsciiString& name)
 Bool traces()
 {
 	return RetailTestCommands::tracesCombat();
+}
+
+Bool isEvil(const Object* obj)
+{
+	const Player* player = obj->getControllingPlayer();
+	const PlayerTemplate* side = player ? player->getPlayerTemplate() : nullptr;
+	return side && side->isEvil();
+}
+
+Int rankOf(const Object* obj)
+{
+	const ExperienceTracker* tracker = obj->getExperienceTracker();
+	return tracker ? tracker->getRank() : 0;
+}
+
+Bool healedRecently(const BodyModuleInterface* body, UnsignedInt window)
+{
+	const UnsignedInt* last = body->getLastHealingTimestamp();
+	return last && AttributeModifierRules::healedWithin(TheGameLogic->getFrame(), *last, window);
 }
 }
 
@@ -152,7 +173,9 @@ void AttributeModifierAuraUpdate::pulse()
 		return;
 	const UnsignedInt duration = pulseDuration(list, data->m_refreshDelay);
 	const SpecialPowerObjectFilter* filter = data->m_hasObjectFilter ? &data->m_objectFilter : nullptr;
-	const AttributeModifiers::Sides sides = data->m_targetEnemy ? AttributeModifiers::SIDES_ENEMIES : AttributeModifiers::SIDES_ALLIES;
+	const Bool alignmentFilter = data->m_affectGood || data->m_affectEvil;
+	const AttributeModifiers::Sides sides = alignmentFilter ? AttributeModifiers::SIDES_ALL
+		: data->m_targetEnemy ? AttributeModifiers::SIDES_ENEMIES : AttributeModifiers::SIDES_ALLIES;
 	const FXList* antiFX = data->m_antiCategories && data->m_antiFX.isNotEmpty() && TheFXListStore ?
 		TheFXListStore->findFXList(data->m_antiFX.str()) : nullptr;
 	const auto affect = [&](Object* target)
@@ -164,6 +187,10 @@ void AttributeModifierAuraUpdate::pulse()
 		if (filter && !objectFilterMatches(*filter, self, target))
 			return;
 		if (target != self && !AttributeModifiers::sidesMatch(self, target, filter, sides))
+			return;
+		if (alignmentFilter && !AttributeModifierRules::alignmentAllowed(data->m_affectGood, data->m_affectEvil, isEvil(target)))
+			return;
+		if (!AttributeModifierRules::rankAllowed(data->m_maxActiveRank, rankOf(target)))
 			return;
 		if (AttributeModifiers::apply(target, list, duration, data->m_antiCategories))
 		{
@@ -303,7 +330,7 @@ UpdateSleepTime PassiveAreaEffectBehavior::update()
 		for (Int list : lists)
 			AttributeModifiers::apply(target, list, pulseDuration(list, delay), data->m_antiCategories);
 		BodyModuleInterface* body = target->getBodyModule();
-		if (healFraction > 0.0f && body && body->getHealth() < body->getMaxHealth())
+		if (healFraction > 0.0f && body && body->getHealth() < body->getMaxHealth() && !(data->m_nonStackable && healedRecently(body, delay)))
 		{
 			DamageInfo heal;
 			heal.in.m_damageType = DAMAGE_HEALING;
@@ -365,7 +392,7 @@ void AttributeModifierUpgrade::upgradeImplementation()
 {
 	const AttributeModifierUpgradeModuleData* data = getAttributeModifierUpgradeModuleData();
 	Object* self = getObject();
-	const Bool applied = AttributeModifiers::apply(self, data->m_attributeModifier);
+	const Bool applied = AttributeModifiers::apply(self, data->m_attributeModifier, AttributeModifierHelper::USE_LIST_DURATION, 0, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));
 	if (traces())
 		std::fprintf(stderr, "TEST modifier upgrade frame=%u object=%u(%s) list=%s applied=%d\n", TheGameLogic->getFrame(),
 			static_cast<unsigned>(self->getID()), self->getTemplate()->getName().str(), data->m_attributeModifier.str(), applied ? 1 : 0);
@@ -375,7 +402,7 @@ Bool AttributeModifierUpgrade::resetUpgrade( const UpgradeMaskType& keyMask )
 {
 	const Bool reset = UpgradeMux::resetUpgrade(keyMask);
 	if (reset)
-		AttributeModifiers::remove(getObject(), getAttributeModifierUpgradeModuleData()->m_attributeModifier);
+		AttributeModifiers::remove(getObject(), getAttributeModifierUpgradeModuleData()->m_attributeModifier, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));
 	return reset;
 }
 
@@ -407,7 +434,7 @@ void applyHordeFormationModifiers( Object* horde )
 	if (!contain)
 		return;
 	for (const AsciiString& name : contain->getFormationModifiers())
-		AttributeModifiers::apply(horde, name, 0);
+		AttributeModifiers::apply(horde, name, 0, 0, AttributeModifiers::ownerOf(horde, contain->getModuleTagNameKey()));
 }
 }
 
@@ -421,6 +448,6 @@ void removeHordeFormationModifiers( Object* horde )
 	if (!contain)
 		return;
 	for (const AsciiString& name : contain->getFormationModifiers())
-		AttributeModifiers::remove(horde, name);
+		AttributeModifiers::remove(horde, name, AttributeModifiers::ownerOf(horde, contain->getModuleTagNameKey()));
 }
 }

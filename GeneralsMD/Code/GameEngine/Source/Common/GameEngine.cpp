@@ -846,6 +846,7 @@ void GameEngine::init()
 		{
 			initSubsystem(TheAttributeModifierStore, "TheAttributeModifierStore", MSGNEW("GameEngineSubsystem") AttributeModifierStore(), &xferCRC, nullptr, "Data\\INI\\AttributeModifier");
 			ini.loadFileDirectory("Data\\INI\\Stances", INI_LOAD_OVERWRITE, &xferCRC);
+			TheAttributeModifierStore->markDefaults();
 		}
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////

@@ -173,6 +173,23 @@ void ModifierListTemplate::playFX(const Object* obj, Bool end) const
 	}
 }
 
+void AttributeModifierStore::markDefaults()
+{
+	m_defaultLists = m_lists;
+	m_defaultIndex = m_index;
+	m_defaultStances = m_stances;
+	m_hasDefaults = TRUE;
+}
+
+void AttributeModifierStore::reset()
+{
+	if (!m_hasDefaults)
+		return;
+	m_lists = m_defaultLists;
+	m_index = m_defaultIndex;
+	m_stances = m_defaultStances;
+}
+
 Int AttributeModifierStore::findIndex(const AsciiString& name) const
 {
 	if (name.isEmpty())

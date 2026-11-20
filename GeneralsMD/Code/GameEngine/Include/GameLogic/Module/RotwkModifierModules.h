@@ -21,8 +21,8 @@ public:
 	UnsignedInt m_requiredConditions = 0;
 	UnsignedInt m_antiCategories = 0;
 	AsciiString m_antiFX;
-	Bool m_affectGood = TRUE;
-	Bool m_affectEvil = TRUE;
+	Bool m_affectGood = FALSE;
+	Bool m_affectEvil = FALSE;
 	Bool m_runWhileDead = FALSE;
 	Bool m_allowSelf = FALSE;
 	Bool m_affectContainedOnly = FALSE;

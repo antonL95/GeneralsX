@@ -6,6 +6,7 @@
 #include <cstdio>
 
 #include "Common/GlobalData.h"
+#include "Common/NameKeyGenerator.h"
 #include "Common/SpecialPowerINI.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
@@ -42,6 +43,40 @@ AttributeModifierHelper* helperOf(const Object* obj)
 const UpgradeTemplate* upgradeNamed(const AsciiString& name)
 {
 	return TheUpgradeCenter ? TheUpgradeCenter->findUpgrade(name) : nullptr;
+}
+
+Owner makeOwner(UnsignedInt objectID, NameKeyType moduleKey)
+{
+	return (static_cast<Owner>(objectID) << 32) | static_cast<Owner>(static_cast<UnsignedInt>(moduleKey));
+}
+
+UnsignedInt ownerObjectOf(Owner owner)
+{
+	return static_cast<UnsignedInt>(owner >> 32);
+}
+
+NameKeyType ownerModuleOf(Owner owner)
+{
+	return static_cast<NameKeyType>(static_cast<UnsignedInt>(owner & 0xFFFFFFFFu));
+}
+
+void xferHolds(Xfer* xfer, std::vector<Hold>& holds)
+{
+	UnsignedShort count = static_cast<UnsignedShort>(holds.size());
+	xfer->xferUnsignedShort( &count );
+	if (xfer->getXferMode() == XFER_LOAD)
+		holds.assign(count, Hold());
+	for (Hold& hold : holds)
+	{
+		UnsignedInt objectID = ownerObjectOf(hold.owner);
+		const NameKeyType moduleKey = ownerModuleOf(hold.owner);
+		AsciiString moduleName = hold.owner != ANONYMOUS_OWNER ? TheNameKeyGenerator->keyToName(moduleKey) : AsciiString::TheEmptyString;
+		xfer->xferUnsignedInt( &objectID );
+		xfer->xferAsciiString( &moduleName );
+		xfer->xferUnsignedInt( &hold.endFrame );
+		if (xfer->getXferMode() == XFER_LOAD)
+			hold.owner = moduleName.isEmpty() ? ANONYMOUS_OWNER : makeOwner(objectID, TheNameKeyGenerator->nameToKey(moduleName));
+	}
 }
 }
 
@@ -91,7 +126,7 @@ Bool AttributeModifierHelper::hasAnyModifier() const
 	return horde && !horde->m_stack.active().empty();
 }
 
-ApplyResult AttributeModifierHelper::apply( Int list, UnsignedInt durationFrames, UnsignedInt antiMask )
+ApplyResult AttributeModifierHelper::apply( Int list, UnsignedInt durationFrames, UnsignedInt antiMask, Owner owner )
 {
 	if (!TheAttributeModifierStore || !TheAttributeModifierStore->get(list) || getObject()->isEffectivelyDead())
 		return IGNORED;
@@ -100,7 +135,7 @@ ApplyResult AttributeModifierHelper::apply( Int list, UnsignedInt durationFrames
 		durationFrames = def.durationFrames;
 	const UnsignedInt now = TheGameLogic->getFrame();
 	std::vector<int> removed;
-	const ApplyResult result = m_stack.apply(list, endFrameFor(now, durationFrames), antiMask, DefLookup(), &removed);
+	const ApplyResult result = m_stack.apply(list, endFrameFor(now, durationFrames), antiMask, DefLookup(), &removed, owner);
 	std::vector<Int> added;
 	if (result == APPLIED)
 		added.push_back(list);
@@ -110,13 +145,13 @@ ApplyResult AttributeModifierHelper::apply( Int list, UnsignedInt durationFrames
 	return result;
 }
 
-Bool AttributeModifierHelper::remove( Int list )
+Bool AttributeModifierHelper::remove( Int list, Owner owner )
 {
-	if (!m_stack.remove(list))
-		return FALSE;
-	changed({}, {list});
+	const Bool removed = m_stack.remove(list, owner, TheGameLogic->getFrame());
+	if (removed)
+		changed({}, {list});
 	scheduleWake();
-	return TRUE;
+	return removed;
 }
 
 void AttributeModifierHelper::removeCategories( UnsignedInt mask )
@@ -129,16 +164,10 @@ void AttributeModifierHelper::removeCategories( UnsignedInt mask )
 
 void AttributeModifierHelper::removeTimed()
 {
-	std::vector<Int> removed;
-	for (const Active& active : m_stack.active())
-	{
-		if (active.endFrame != 0)
-			removed.push_back(active.list);
-	}
-	for (Int list : removed)
-		m_stack.remove(list);
+	const std::vector<int> removed = m_stack.removeTimed();
 	if (!removed.empty())
-		changed({}, removed);
+		changed({}, std::vector<Int>(removed.begin(), removed.end()));
+	scheduleWake();
 }
 
 void AttributeModifierHelper::clearAll()
@@ -350,12 +379,19 @@ void AttributeModifierHelper::crc( Xfer *xfer )
 		xfer->xferInt( &list );
 		xfer->xferUnsignedInt( &endFrame );
 		xfer->xferUnsignedInt( &antiMask );
+		for (const Hold& hold : active.holds)
+		{
+			UnsignedInt ownerObject = ownerObjectOf(hold.owner);
+			UnsignedInt holdEnd = hold.endFrame;
+			xfer->xferUnsignedInt( &ownerObject );
+			xfer->xferUnsignedInt( &holdEnd );
+		}
 	}
 }
 
 void AttributeModifierHelper::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 	ObjectHelper::xfer( xfer );
@@ -377,6 +413,10 @@ void AttributeModifierHelper::xfer( Xfer *xfer )
 		xfer->xferAsciiString( &name );
 		xfer->xferUnsignedInt( &active.endFrame );
 		xfer->xferUnsignedInt( &active.antiMask );
+		if (version >= 2)
+			xferHolds( xfer, active.holds );
+		else
+			active.holds.assign(1, Hold{ANONYMOUS_OWNER, active.endFrame});
 		if (xfer->getXferMode() == XFER_LOAD)
 		{
 			active.list = TheAttributeModifierStore ? TheAttributeModifierStore->findIndex(name) : -1;
@@ -445,24 +485,29 @@ Int findList( const AsciiString& listName )
 	return TheAttributeModifierStore ? TheAttributeModifierStore->findIndex(listName) : -1;
 }
 
-Bool apply( Object* target, Int list, UnsignedInt durationFrames, UnsignedInt antiMask )
+Owner ownerOf( const Object* obj, NameKeyType moduleTag )
+{
+	return obj ? makeOwner(static_cast<UnsignedInt>(obj->getID()), moduleTag) : ANONYMOUS_OWNER;
+}
+
+Bool apply( Object* target, Int list, UnsignedInt durationFrames, UnsignedInt antiMask, Owner owner )
 {
 	AttributeModifierHelper* helper = helperOf(target);
 	if (!helper || list < 0)
 		return FALSE;
-	return helper->apply(list, durationFrames, antiMask) != IGNORED;
+	return helper->apply(list, durationFrames, antiMask, owner) != IGNORED;
 }
 
-Bool apply( Object* target, const AsciiString& listName, UnsignedInt durationFrames, UnsignedInt antiMask )
+Bool apply( Object* target, const AsciiString& listName, UnsignedInt durationFrames, UnsignedInt antiMask, Owner owner )
 {
-	return apply(target, findList(listName), durationFrames, antiMask);
+	return apply(target, findList(listName), durationFrames, antiMask, owner);
 }
 
-Bool remove( Object* target, const AsciiString& listName )
+Bool remove( Object* target, const AsciiString& listName, Owner owner )
 {
 	AttributeModifierHelper* helper = helperOf(target);
 	const Int list = findList(listName);
-	return helper && list >= 0 && helper->remove(list);
+	return helper && list >= 0 && helper->remove(list, owner);
 }
 
 UnsignedInt categoryMask( const std::vector<Int>& categories )
@@ -550,7 +595,7 @@ Bool sidesMatch( const Object* source, const Object* target, const SpecialPowerO
 }
 
 void applyInRange( Object* source, const Coord3D* center, Real range, const SpecialPowerObjectFilter* filter, Bool affectSelf,
-	Int list, UnsignedInt durationFrames, UnsignedInt antiMask, const AsciiString& fxName, Sides sides )
+	Int list, UnsignedInt durationFrames, UnsignedInt antiMask, const AsciiString& fxName, Sides sides, Bool affectAllies )
 {
 	if (!source || list < 0 || !ThePartitionManager)
 		return;
@@ -574,6 +619,8 @@ void applyInRange( Object* source, const Coord3D* center, Real range, const Spec
 		if (filter && !objectFilterMatches(*filter, source, target))
 			continue;
 		if (!sidesMatch(source, target, filter, sides))
+			continue;
+		if (!affectAllies && target->getControllingPlayer() != source->getControllingPlayer())
 			continue;
 		affect(target);
 	}

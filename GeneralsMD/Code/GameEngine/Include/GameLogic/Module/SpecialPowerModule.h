@@ -93,7 +93,7 @@ public:
 	Bool							m_startsReady; ///< If true, the special power will be ready immediately, otherwise it will have a reload time on creation.
 	Bool							m_scriptedSpecialPowerOnly;
 
-	Bool m_affectAllies = FALSE;
+	Bool m_affectAllies = TRUE;
 	Int m_antiCategory = 0;
 	AsciiString m_attributeModifier;
 	SpecialPowerObjectFilter m_attributeModifierAffects;

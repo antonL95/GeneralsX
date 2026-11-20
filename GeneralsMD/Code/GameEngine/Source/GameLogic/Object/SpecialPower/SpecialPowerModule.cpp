@@ -1011,7 +1011,8 @@ void SpecialPowerModule::applyRotwkTrigger( const Coord3D *location )
 			: data->m_targetEnemy ? AttributeModifiers::SIDES_ENEMIES : AttributeModifiers::SIDES_ALLIES;
 		AttributeModifiers::applyInRange( self, location ? location : self->getPosition(), data->m_attributeModifierRange,
 			&data->m_attributeModifierAffects, data->m_attributeModifierAffectsSelf, AttributeModifiers::findList( data->m_attributeModifier ),
-			AttributeModifierHelper::USE_LIST_DURATION, AttributeModifierRules::categoryBit( data->m_antiCategory ), data->m_attributeModifierFX, sides );
+			AttributeModifierHelper::USE_LIST_DURATION, AttributeModifierRules::categoryBit( data->m_antiCategory ), data->m_attributeModifierFX, sides,
+			data->m_affectAllies );
 	}
 	for( const AsciiString &name : data->m_onTriggerRechargeSpecialPower )
 	{

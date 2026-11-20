@@ -81,9 +81,90 @@ TEST(AttributeModifierRules, DifferentListsStackByKind)
 	EXPECT_FLOAT_EQ(totals.value[ARMOR], 0.5f);
 	EXPECT_FLOAT_EQ(totals.value[DAMAGE_MULT], 3.0f);
 	EXPECT_FLOAT_EQ(totals.value[SPEED], 1.2f);
-	EXPECT_FLOAT_EQ(totals.damageDealtFactor(), 1.1f * 3.0f);
+	EXPECT_FLOAT_EQ(totals.value[DAMAGE_ADD], 0.1f);
+	EXPECT_FLOAT_EQ(totals.damageDealtFactor(), 3.0f);
 	EXPECT_FLOAT_EQ(totals.damageTakenFactor(3, 0.75f), 0.5f);
 	EXPECT_EQ(totals.lists, 2);
+}
+
+TEST(AttributeModifierRules, DamageAddRaisesAcceptingBaseDamageBeforeTheMultiplier)
+{
+	Defs defs;
+	const int draft = defs.add(SPELL, {entry(DAMAGE_ADD, 5.0f)});
+	const int banner = defs.add(LEVEL, {entry(DAMAGE_ADD, 20.0f)});
+	const int mult = defs.add(LEADERSHIP, {entry(DAMAGE_MULT, 1.5f)});
+	Stack stack;
+	stack.apply(draft, 0, 0, defs, nullptr);
+	stack.apply(mult, 0, 0, defs, nullptr);
+	const Totals drafted = totalsOf({&stack}, defs);
+	EXPECT_FLOAT_EQ(baseDamageWithAdd(40.0f, true, drafted.value[DAMAGE_ADD]) * drafted.damageDealtFactor(), 67.5f);
+	EXPECT_FLOAT_EQ(baseDamageWithAdd(40.0f, false, drafted.value[DAMAGE_ADD]) * drafted.damageDealtFactor(), 60.0f);
+	EXPECT_FLOAT_EQ(baseDamageWithAdd(0.0f, true, drafted.value[DAMAGE_ADD]), 0.0f);
+	stack.apply(banner, 0, 0, defs, nullptr);
+	EXPECT_FLOAT_EQ(baseDamageWithAdd(40.0f, true, totalsOf({&stack}, defs).value[DAMAGE_ADD]), 65.0f);
+}
+
+TEST(AttributeModifierRules, RemovalByOwnerKeepsOtherSourcesCopy)
+{
+	Defs defs;
+	const int list = defs.add(FORMATION, {entry(ARMOR, 0.2f)});
+	constexpr Owner stance = 7;
+	constexpr Owner upgrade = 9;
+	Stack stack;
+	EXPECT_EQ(stack.apply(list, 0, 0, defs, nullptr, stance), APPLIED);
+	EXPECT_EQ(stack.apply(list, 0, 0, defs, nullptr, upgrade), REFRESHED);
+	EXPECT_FALSE(stack.remove(list, stance, 10));
+	EXPECT_TRUE(stack.contains(list));
+	EXPECT_TRUE(stack.remove(list, upgrade, 10));
+	EXPECT_FALSE(stack.contains(list));
+
+	stack.apply(list, 0, 0, defs, nullptr, stance);
+	stack.apply(list, 50, 0, defs, nullptr);
+	EXPECT_EQ(stack.active().front().endFrame, 0u);
+	EXPECT_FALSE(stack.remove(list, stance, 20));
+	EXPECT_EQ(stack.active().front().endFrame, 50u);
+	EXPECT_TRUE(stack.expire(50).size() == 1u);
+
+	stack.apply(list, 0, 0, defs, nullptr, stance);
+	stack.apply(list, 30, 0, defs, nullptr);
+	EXPECT_TRUE(stack.remove(list, stance, 40));
+	EXPECT_TRUE(stack.active().empty());
+}
+
+TEST(AttributeModifierRules, RemoveTimedKeepsPermanentHolds)
+{
+	Defs defs;
+	const int list = defs.add(SPELL, {entry(ARMOR, 0.2f)});
+	const int timed = defs.add(SPELL, {entry(SPEED, 1.2f)});
+	Stack stack;
+	stack.apply(list, 0, 0, defs, nullptr, 3);
+	stack.apply(list, 90, 0, defs, nullptr);
+	stack.apply(timed, 90, 0, defs, nullptr);
+	const std::vector<int> removed = stack.removeTimed();
+	ASSERT_EQ(removed.size(), 1u);
+	EXPECT_EQ(removed.front(), timed);
+	ASSERT_EQ(stack.active().size(), 1u);
+	EXPECT_EQ(stack.active().front().holds.size(), 1u);
+	EXPECT_EQ(stack.active().front().endFrame, 0u);
+}
+
+TEST(AttributeModifierRules, AuraTargetRules)
+{
+	EXPECT_TRUE(rankAllowed(0, 9));
+	EXPECT_TRUE(rankAllowed(1, 1));
+	EXPECT_FALSE(rankAllowed(1, 2));
+	EXPECT_TRUE(alignmentAllowed(false, false, true));
+	EXPECT_TRUE(alignmentAllowed(true, false, false));
+	EXPECT_FALSE(alignmentAllowed(true, false, true));
+	EXPECT_TRUE(alignmentAllowed(false, true, true));
+	EXPECT_FALSE(alignmentAllowed(false, true, false));
+}
+
+TEST(AttributeModifierRules, NonStackableHealWindow)
+{
+	EXPECT_TRUE(healedWithin(100, 95, 15));
+	EXPECT_FALSE(healedWithin(110, 95, 15));
+	EXPECT_FALSE(healedWithin(100, 0xFFFFFFFFu, 15));
 }
 
 TEST(AttributeModifierRules, ArmorIsCappedAndNeverHeals)

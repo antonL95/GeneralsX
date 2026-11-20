@@ -679,7 +679,7 @@ void SpecialAbilityUpdate::onExit( Bool cleanup )
   const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
 
   if( usesRotwkRules() && data->m_killAttributeModifierOnExit && data->m_triggerAttributeModifier.isNotEmpty() )
-    AttributeModifiers::remove( getObject(), data->m_triggerAttributeModifier );
+    AttributeModifiers::remove( getObject(), data->m_triggerAttributeModifier, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()) );
 
   getObject()->clearModelConditionFlags(
     MAKE_MODELCONDITION_MASK4( MODELCONDITION_UNPACKING, MODELCONDITION_PACKING, MODELCONDITION_FIRING_A, MODELCONDITION_RAISING_FLAG ) );
@@ -2322,7 +2322,7 @@ void SpecialAbilityUpdate::applyRotwkTrigger()
 	++m_rotwkTriggers;
 	if( data->m_triggerAttributeModifier.isNotEmpty() )
 		AttributeModifiers::apply( getObject(), data->m_triggerAttributeModifier,
-			data->m_attributeModifierDuration > 0 ? data->m_attributeModifierDuration : AttributeModifierHelper::USE_LIST_DURATION );
+			data->m_attributeModifierDuration > 0 ? data->m_attributeModifierDuration : AttributeModifierHelper::USE_LIST_DURATION, 0, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()) );
 	if( data->m_triggerModelCondition >= 0 )
 	{
 		startTimedCondition( data->m_triggerModelCondition, secondsToFrames( data->m_triggerModelConditionDuration ) );

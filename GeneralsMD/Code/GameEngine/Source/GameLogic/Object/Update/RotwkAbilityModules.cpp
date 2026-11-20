@@ -345,7 +345,7 @@ void HeroModeSpecialAbilityUpdate::triggerAbilityEffect()
 	const HeroModeSpecialAbilityUpdateModuleData* data = getHeroModeSpecialAbilityUpdateModuleData();
 	if (data->m_heroAttributeModifier.isNotEmpty())
 		AttributeModifiers::apply(getObject(), data->m_heroAttributeModifier,
-			data->m_heroEffectDuration > 0 ? data->m_heroEffectDuration : AttributeModifierHelper::USE_LIST_DURATION);
+			data->m_heroEffectDuration > 0 ? data->m_heroEffectDuration : AttributeModifierHelper::USE_LIST_DURATION, 0, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));
 }
 
 void HeroModeSpecialAbilityUpdate::crc(Xfer* xfer)
@@ -414,7 +414,7 @@ Bool WeaponModeSpecialPowerUpdate::initiateIntentToDoSpecialPower(const SpecialP
 	m_endFrame = now + std::max<UnsignedInt>(1, data->m_duration);
 	if (data->m_attributeModifier.isNotEmpty())
 		AttributeModifiers::apply(self, data->m_attributeModifier,
-			data->m_duration > 0 ? data->m_duration : AttributeModifierHelper::USE_LIST_DURATION);
+			data->m_duration > 0 ? data->m_duration : AttributeModifierHelper::USE_LIST_DURATION, 0, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));
 
 	SpecialPowerModule* power = powerModuleOf(self, data->m_specialPowerTemplate);
 	if (power)
@@ -441,7 +441,7 @@ void WeaponModeSpecialPowerUpdate::endMode()
 	const WeaponModeSpecialPowerUpdateModuleData* data = getWeaponModeSpecialPowerUpdateModuleData();
 	Object* self = getObject();
 	if (data->m_attributeModifier.isNotEmpty())
-		AttributeModifiers::remove(self, data->m_attributeModifier);
+		AttributeModifiers::remove(self, data->m_attributeModifier, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));
 	for (Int i = 0; i < data->m_weaponSetFlags.size(); ++i)
 	{
 		if (data->m_weaponSetFlags.test(i))

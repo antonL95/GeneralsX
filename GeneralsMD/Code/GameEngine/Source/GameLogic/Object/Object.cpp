@@ -796,6 +796,8 @@ void Object::onRemovedFrom( Object *removedFrom )
 	clearStatus( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_MASKED, OBJECT_STATUS_UNSELECTABLE ) );
 	m_containedBy = nullptr;
 	m_containedByFrame = 0;
+	if( m_attributeModifierHelper )
+		m_attributeModifierHelper->refreshDerived();
 
   handlePartitionCellMaintenance(); // get a clean look, now that I am outdoors, again
 

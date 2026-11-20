@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -168,12 +169,41 @@ struct ListDef
 	bool ignoreIfAnticategoryActive = false;
 };
 
+using Owner = std::uint64_t;
+
+constexpr Owner ANONYMOUS_OWNER = 0;
+
+struct Hold
+{
+	Owner owner = ANONYMOUS_OWNER;
+	unsigned endFrame = 0;
+};
+
 struct Active
 {
 	int list = -1;
 	unsigned endFrame = 0;
 	unsigned antiMask = 0;
+	std::vector<Hold> holds;
 };
+
+inline unsigned combinedEnd(const std::vector<Hold>& holds)
+{
+	unsigned end = 0;
+	for (const Hold& hold : holds)
+	{
+		if (hold.endFrame == 0)
+			return 0;
+		end = std::max(end, hold.endFrame);
+	}
+	return end;
+}
+
+inline void dropExpiredHolds(std::vector<Hold>& holds, unsigned now)
+{
+	holds.erase(std::remove_if(holds.begin(), holds.end(),
+		[now](const Hold& hold) { return hold.endFrame != 0 && hold.endFrame <= now; }), holds.end());
+}
 
 enum ApplyResult
 {
@@ -193,15 +223,20 @@ class Stack
 {
 public:
 	template <class Lookup>
-	ApplyResult apply(int list, unsigned endFrame, unsigned antiMask, const Lookup& defOf, std::vector<int>* removed)
+	ApplyResult apply(int list, unsigned endFrame, unsigned antiMask, const Lookup& defOf, std::vector<int>* removed,
+		Owner owner = ANONYMOUS_OWNER)
 	{
 		const ListDef& def = defOf(list);
 		for (Active& active : m_active)
 		{
 			if (active.list != list)
 				continue;
-			if (active.endFrame != 0 && outlasts(endFrame, active.endFrame))
-				active.endFrame = endFrame;
+			auto hold = std::find_if(active.holds.begin(), active.holds.end(), [owner](const Hold& h) { return h.owner == owner; });
+			if (hold == active.holds.end())
+				active.holds.push_back(Hold{owner, endFrame});
+			else if (hold->endFrame != 0 && outlasts(endFrame, hold->endFrame))
+				hold->endFrame = endFrame;
+			active.endFrame = combinedEnd(active.holds);
 			active.antiMask |= antiMask;
 			removeBlocked(antiMask, list, defOf, removed);
 			return REFRESHED;
@@ -225,22 +260,49 @@ public:
 					++index;
 			}
 		}
-		m_active.push_back(Active{list, endFrame, antiMask});
+		m_active.push_back(Active{list, endFrame, antiMask, {Hold{owner, endFrame}}});
 		removeBlocked(antiMask, list, defOf, removed);
 		return APPLIED;
 	}
 
-	bool remove(int list)
+	bool remove(int list, Owner owner, unsigned now)
 	{
 		for (size_t index = 0; index < m_active.size(); ++index)
 		{
-			if (m_active[index].list == list)
+			Active& active = m_active[index];
+			if (active.list != list)
+				continue;
+			active.holds.erase(std::remove_if(active.holds.begin(), active.holds.end(),
+				[owner](const Hold& hold) { return hold.owner == owner; }), active.holds.end());
+			dropExpiredHolds(active.holds, now);
+			if (active.holds.empty())
 			{
 				m_active.erase(m_active.begin() + static_cast<std::ptrdiff_t>(index));
 				return true;
 			}
+			active.endFrame = combinedEnd(active.holds);
+			return false;
 		}
 		return false;
+	}
+
+	std::vector<int> removeTimed()
+	{
+		std::vector<int> removed;
+		for (size_t index = 0; index < m_active.size();)
+		{
+			Active& active = m_active[index];
+			active.holds.erase(std::remove_if(active.holds.begin(), active.holds.end(),
+				[](const Hold& hold) { return hold.endFrame != 0; }), active.holds.end());
+			if (active.holds.empty())
+				eraseAt(index, &removed);
+			else
+			{
+				active.endFrame = combinedEnd(active.holds);
+				++index;
+			}
+		}
+		return removed;
 	}
 
 	template <class Lookup>
@@ -263,7 +325,10 @@ public:
 			if (m_active[index].endFrame != 0 && m_active[index].endFrame <= now)
 				eraseAt(index, &expired);
 			else
+			{
+				dropExpiredHolds(m_active[index].holds, now);
 				++index;
+			}
 		}
 		return expired;
 	}
@@ -396,10 +461,7 @@ struct Totals
 		return std::max(0.0f, 1.0f - armor);
 	}
 
-	float damageDealtFactor() const
-	{
-		return std::max(0.0f, 1.0f + value[DAMAGE_ADD]) * value[DAMAGE_MULT];
-	}
+	float damageDealtFactor() const { return value[DAMAGE_MULT]; }
 
 	float rangeFactor() const { return std::max(0.0f, 1.0f + value[RANGE]); }
 	float visionFactor() const { return std::max(0.0f, 1.0f + value[VISION]); }
@@ -424,6 +486,28 @@ Totals totalsOf(const std::vector<const Stack*>& stacks, const Lookup& defOf)
 		}
 	}
 	return totals;
+}
+
+inline float baseDamageWithAdd(float scaledBase, bool acceptDamageAdd, float damageAdd)
+{
+	return acceptDamageAdd && scaledBase != 0.0f ? scaledBase + damageAdd : scaledBase;
+}
+
+inline bool rankAllowed(int maxActiveRank, int rank)
+{
+	return maxActiveRank == 0 || rank <= maxActiveRank;
+}
+
+inline bool alignmentAllowed(bool affectGood, bool affectEvil, bool targetEvil)
+{
+	if (affectGood && targetEvil)
+		return false;
+	return !affectEvil || targetEvil;
+}
+
+inline bool healedWithin(unsigned now, unsigned lastHealFrame, unsigned window)
+{
+	return lastHealFrame <= now && now - lastHealFrame < window;
 }
 
 inline unsigned endFrameFor(unsigned now, unsigned durationFrames)
