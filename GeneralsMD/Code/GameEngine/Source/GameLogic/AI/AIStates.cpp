@@ -5442,7 +5442,7 @@ void AIAttackState::crc( Xfer *xfer )
 
 void AIAttackState::xfer( Xfer *xfer )
 {
-  XferVersion currentVersion = 2;
+  XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 

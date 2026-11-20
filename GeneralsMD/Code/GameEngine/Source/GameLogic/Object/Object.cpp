@@ -4750,8 +4750,12 @@ void Object::giveUpgrade( const UpgradeTemplate *upgradeT )
 
 		if (const HordeContain* horde = HordeContain::get(this))
 		{
-			for (Object* member : *horde->getContainedItemsList())
+			std::vector<ObjectID> memberIDs;
+			for (const Object* member : *horde->getContainedItemsList())
+				memberIDs.push_back(member->getID());
+			for (ObjectID memberID : memberIDs)
 			{
+				Object* member = TheGameLogic->findObjectByID(memberID);
 				if (member && !member->isEffectivelyDead() && !HordeContain::get(member) && !member->hasUpgrade(upgradeT))
 					member->giveUpgrade(upgradeT);
 			}
@@ -4777,8 +4781,12 @@ void Object::removeUpgrade( const UpgradeTemplate *upgradeT )
 	}
 	if (const HordeContain* horde = HordeContain::get(this))
 	{
-		for (Object* member : *horde->getContainedItemsList())
+		std::vector<ObjectID> memberIDs;
+		for (const Object* member : *horde->getContainedItemsList())
+			memberIDs.push_back(member->getID());
+		for (ObjectID memberID : memberIDs)
 		{
+			Object* member = TheGameLogic->findObjectByID(memberID);
 			if (member && !member->isEffectivelyDead() && !HordeContain::get(member) && member->hasUpgrade(upgradeT))
 				member->removeUpgrade(upgradeT);
 		}

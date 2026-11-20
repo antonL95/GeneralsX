@@ -111,7 +111,7 @@ UnsignedInt LifetimeUpdate::calcSleepDelay(UnsignedInt minFrames, UnsignedInt ma
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime LifetimeUpdate::update()
 {
-	getObject()->kill(DAMAGE_UNRESISTABLE, getLifetimeUpdateModuleData()->m_deathType);
+	getObject()->kill();
 	return UPDATE_SLEEP_FOREVER;
 }
 
