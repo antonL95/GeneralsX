@@ -51,8 +51,6 @@
 #include "W3DDevice/GameClient/Module/W3DTreeDraw.h"
 #include "W3DDevice/GameClient/Module/W3DPropDraw.h"
 #include "W3DDevice/GameClient/Module/W3DFloorDraw.h"
-#include "Common/INIAudit.h"
-#include "Common/RetailFileLayers.h"
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize method */
@@ -67,8 +65,11 @@ void W3DModuleFactory::init()
 	addModule( W3DDefaultDraw );
 	addModule( W3DDebrisDraw );
 	addModule( W3DModelDraw );
-	addModule( W3DScriptedModelDraw );
-	addModule( W3DHordeModelDraw );
+	if (registersRotwkModules())
+	{
+		addModule( W3DScriptedModelDraw );
+		addModule( W3DHordeModelDraw );
+	}
 	addModule( W3DLaserDraw );
 	addModule( W3DOverlordTankDraw );
 #if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
@@ -89,7 +90,7 @@ void W3DModuleFactory::init()
 	addModule( W3DTreeDraw );
 	addModule( W3DPropDraw );
 #endif
-	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	if (registersRotwkModules())
 		addModule( W3DFloorDraw );
 
 }

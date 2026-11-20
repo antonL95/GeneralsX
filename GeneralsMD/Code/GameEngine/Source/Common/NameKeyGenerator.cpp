@@ -30,6 +30,12 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <utility>
+#include <vector>
+
 // Public Data ////////////////////////////////////////////////////////////////////////////////////
 NameKeyGenerator *TheNameKeyGenerator = nullptr;  ///< name key gen. singleton
 
@@ -143,6 +149,32 @@ void NameKeyGenerator::verifyNameKeyID(UnsignedInt expectedNextID) const
 		("Retail client expects items to start with name key ID %d for unmodded files, but starts with %d", expectedNextID, m_nextID));
 }
 #endif
+
+void NameKeyGenerator::dumpIfRequested(const char* stage) const
+{
+	static const char* const path = std::getenv("GENERALSX_NAMEKEY_DUMP");
+	static Bool started = FALSE;
+	if (path == nullptr || *path == '\0')
+		return;
+
+	FILE* file = std::fopen(path, started ? "a" : "w");
+	if (file == nullptr)
+		return;
+	started = TRUE;
+
+	std::vector<std::pair<UnsignedInt, const char*>> entries;
+	for (Int i = 0; i < SOCKET_COUNT; ++i)
+	{
+		for (const Bucket* b = m_sockets[i]; b; b = b->m_nextInSocket)
+			entries.emplace_back((UnsignedInt)b->m_key, b->m_nameString.str());
+	}
+	std::sort(entries.begin(), entries.end());
+
+	std::fprintf(file, "%s\tnext\t%u\n", stage, m_nextID);
+	for (const auto& entry : entries)
+		std::fprintf(file, "%s\t%u\t%s\n", stage, entry.first, entry.second);
+	std::fclose(file);
+}
 
 //-------------------------------------------------------------------------------------------------
 NameKeyType NameKeyGenerator::nameToKey(const AsciiString& name)

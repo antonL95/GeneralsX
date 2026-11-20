@@ -708,6 +708,7 @@ void GameEngine::init()
 
 		initSubsystem(TheFunctionLexicon,"TheFunctionLexicon", createFunctionLexicon(), nullptr);
 		initSubsystem(TheModuleFactory,"TheModuleFactory", createModuleFactory(), nullptr);
+		TheNameKeyGenerator->dumpIfRequested("moduleFactory");
 		initSubsystem(TheMessageStream,"TheMessageStream", createMessageStream(), nullptr);
 		initSubsystem(TheSidesList,"TheSidesList", MSGNEW("GameEngineSubsystem") SidesList(), nullptr);
 		initSubsystem(TheCaveSystem,"TheCaveSystem", MSGNEW("GameEngineSubsystem") CaveSystem(), nullptr);
@@ -776,8 +777,10 @@ void GameEngine::init()
 			TheNameKeyGenerator->verifyNameKeyID(2265);
 #endif
 
+		TheNameKeyGenerator->dumpIfRequested("thingFactory");
 		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), nullptr);
+		TheNameKeyGenerator->dumpIfRequested("gameClient");
 
 #ifdef SAGE_USE_NGMP
 		if (!TheGlobalData->m_headless)
@@ -852,6 +855,7 @@ void GameEngine::init()
 		DEBUG_LOG(("INI CRC is 0x%8.8X", TheGlobalData->m_iniCRC));
 
 		TheSubsystemList->postProcessLoadAll();
+		TheNameKeyGenerator->dumpIfRequested("init");
 		if (INIAudit::isEnabled())
 		{
 			INIAudit::recordWithContext("done", "GameEngine::init", "all subsystems initialized", "", 0);
@@ -870,6 +874,8 @@ void GameEngine::init()
 				std::_Exit(getQuitting() ? 0 : 2);
 			}
 		}
+		if (std::getenv("GENERALSX_NAMEKEY_DUMP"))
+			std::_Exit(0);
 
 		// GeneralsX @bugfix Copilot 11/05/2026 Prevent uncapped render when FPS limiter is enabled but no valid limit value was loaded.
 		if (TheGlobalData->m_useFpsLimit && TheGlobalData->m_framesPerSecondLimit <= 0)

@@ -37,6 +37,7 @@
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/INIException.h"
+#include "Common/ModuleFactory.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/Science.h"
@@ -538,7 +539,7 @@ Bool SpecialPowerModule::initiateIntentToDoSpecialPower( const Object *targetObj
 	}
 
 	if (!valid && getSpecialPowerModuleData()->m_updateModuleStartsAttack &&
-		getModuleNameKey() == NAMEKEY("SpecialPowerModule"))
+		ModuleFactory::registersRotwkModules() && getModuleNameKey() == NAMEKEY("SpecialPowerModule"))
 		return FALSE;
 
 	getObject()->getControllingPlayer()->getAcademyStats()->recordSpecialPowerUsed( getSpecialPowerModuleData()->m_specialPowerTemplate );

@@ -105,6 +105,8 @@ public:
 	// Get a string out of the INI. Store it into a NameKeyType
 	static void parseStringAsNameKeyType( INI *ini, void *instance, void *store, const void* userData );
 
+	void dumpIfRequested(const char* stage) const;
+
 #if RETAIL_COMPATIBLE_CRC
 #if RTS_ZEROHOUR
 	void syncNameKeyID();

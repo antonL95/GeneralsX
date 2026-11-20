@@ -407,7 +407,7 @@ void ModuleFactory::init()
 	addModule( MobMemberSlavedUpdate );
 	addModule( OCLUpdate );
 	addModule( SpecialAbilityUpdate );
-	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	if (registersRotwkModules())
 	{
 		addModule( StancesBehavior );
 		addModule( LargeGroupAudioUpdate );
@@ -504,8 +504,11 @@ void ModuleFactory::init()
 	addModule( DemoralizeSpecialPower );
 #endif
 	addModule( OCLSpecialPower );
-	addModule( SpecialPowerModule );
-	addModule( AISpecialPowerUpdate );
+	if (registersRotwkModules())
+	{
+		addModule( SpecialPowerModule );
+		addModule( AISpecialPowerUpdate );
+	}
 	addModule( SpecialAbility );
 	addModule( SpyVisionSpecialPower );
 	addModule( CashBountyPower );
@@ -519,6 +522,11 @@ void ModuleFactory::init()
 	addModule( SwayClientUpdate );
 	addModule( BeaconClientUpdate );
 
+}
+
+Bool ModuleFactory::registersRotwkModules()
+{
+	return RetailFileLayers::enabled() || INIAudit::isEnabled();
 }
 
 //-------------------------------------------------------------------------------------------------

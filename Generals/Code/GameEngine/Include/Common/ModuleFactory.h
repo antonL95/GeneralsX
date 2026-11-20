@@ -84,6 +84,7 @@ public:
 	{
 		return name.getLength() < 255 && m_moduleTemplateMap.find(makeDecoratedNameKey(name, type)) != m_moduleTemplateMap.end();
 	}
+	static Bool registersRotwkModules();
 
 	virtual void crc( Xfer *xfer ) override;
 	virtual void xfer( Xfer *xfer ) override;

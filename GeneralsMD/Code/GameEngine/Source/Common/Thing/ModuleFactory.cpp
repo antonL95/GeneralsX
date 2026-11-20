@@ -345,7 +345,8 @@ void ModuleFactory::init()
 	addModule( GarrisonContain );
 	addModule( InternetHackContain );
 	addModule( TransportContain );
-	addModule( HordeContain );
+	if (registersRotwkModules())
+		addModule( HordeContain );
 	addModule( RiderChangeContain );
 	addModule( RailedTransportContain );
 	addModule( MobNexusContain );
@@ -449,7 +450,7 @@ void ModuleFactory::init()
 	addModule( MobMemberSlavedUpdate );
 	addModule( OCLUpdate );
 	addModule( SpecialAbilityUpdate );
-	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	if (registersRotwkModules())
 	{
 		addModule( StancesBehavior );
 		addModule( LargeGroupAudioUpdate );
@@ -560,8 +561,11 @@ void ModuleFactory::init()
 	addModule( DemoralizeSpecialPower );
 #endif
 	addModule( OCLSpecialPower );
-	addModule( SpecialPowerModule );
-	addModule( AISpecialPowerUpdate );
+	if (registersRotwkModules())
+	{
+		addModule( SpecialPowerModule );
+		addModule( AISpecialPowerUpdate );
+	}
 	addModule( FireWeaponPower );
 	addModule( SpecialAbility );
 	addModule( SpyVisionSpecialPower );
@@ -576,6 +580,11 @@ void ModuleFactory::init()
 	addModule( SwayClientUpdate );
 	addModule( BeaconClientUpdate );
 
+}
+
+Bool ModuleFactory::registersRotwkModules()
+{
+	return RetailFileLayers::enabled() || INIAudit::isEnabled();
 }
 
 //-------------------------------------------------------------------------------------------------

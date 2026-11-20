@@ -36,6 +36,7 @@
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/INIException.h"
+#include "Common/ModuleFactory.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/Science.h"
@@ -497,7 +498,7 @@ Bool SpecialPowerModule::initiateIntentToDoSpecialPower( const Object *targetObj
 	//appropriate update module!
 	if( !valid && getSpecialPowerModuleData()->m_updateModuleStartsAttack )
 	{
-		if (getModuleNameKey() == NAMEKEY("SpecialPowerModule"))
+		if (ModuleFactory::registersRotwkModules() && getModuleNameKey() == NAMEKEY("SpecialPowerModule"))
 			return FALSE;
 		DEBUG_CRASH( ("Object does not contain a special power module to execute.  Did you forget to add it to the object INI?"));
 		//DEBUG_CRASH(( "Object does not contain special power module (%s) to execute.  Did you forget to add it to the object INI?",
