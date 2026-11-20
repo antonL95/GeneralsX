@@ -50,8 +50,11 @@ class ActiveBodyModuleData : public BodyModuleData
 public:
 	Real m_maxHealth;
 	Real m_initialHealth;
+	Bool m_initialHealthSet;
 
 	ActiveBodyModuleData();
+
+	Real getStartingHealth() const;
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 };

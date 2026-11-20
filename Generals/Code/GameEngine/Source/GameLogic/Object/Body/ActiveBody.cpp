@@ -36,6 +36,7 @@
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Team.h"
 #include "Common/Thing.h"
 #include "Common/ThingTemplate.h"
@@ -126,6 +127,20 @@ ActiveBodyModuleData::ActiveBodyModuleData()
 {
 	m_maxHealth = 0;
 	m_initialHealth = 0;
+	m_initialHealthSet = FALSE;
+}
+
+static void parseInitialHealth(INI* ini, void* instance, void* store, const void* userData)
+{
+	INI::parseReal(ini, instance, store, userData);
+	static_cast<ActiveBodyModuleData*>(instance)->m_initialHealthSet = TRUE;
+}
+
+Real ActiveBodyModuleData::getStartingHealth() const
+{
+	if (RetailFileLayers::enabled() && !m_initialHealthSet)
+		return m_maxHealth;
+	return m_initialHealth;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -137,7 +152,7 @@ void ActiveBodyModuleData::buildFieldParse(MultiIniFieldParse& p)
 	static const FieldParse dataFieldParse[] =
 	{
 		{ "MaxHealth",						INI::parseReal,						nullptr,		offsetof( ActiveBodyModuleData, m_maxHealth ) },
-		{ "InitialHealth",				INI::parseReal,						nullptr,		offsetof( ActiveBodyModuleData, m_initialHealth ) },
+		{ "InitialHealth",				parseInitialHealth,				nullptr,		offsetof( ActiveBodyModuleData, m_initialHealth ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
@@ -160,10 +175,11 @@ ActiveBody::ActiveBody( Thing *thing, const ModuleData* moduleData ) :
 	m_particleSystems(nullptr),
 	m_indestructible(false)
 {
-	m_currentHealth = getActiveBodyModuleData()->m_initialHealth;
-	m_prevHealth = getActiveBodyModuleData()->m_initialHealth;
+	const Real startingHealth = getActiveBodyModuleData()->getStartingHealth();
+	m_currentHealth = startingHealth;
+	m_prevHealth = startingHealth;
 	m_maxHealth = getActiveBodyModuleData()->m_maxHealth;
-	m_initialHealth = getActiveBodyModuleData()->m_initialHealth;
+	m_initialHealth = startingHealth;
 
 	// force an initially-valid armor setup
 	validateArmorAndDamageFX();
