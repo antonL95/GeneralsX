@@ -46,6 +46,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameLogic/AI.h"
+#include "GameLogic/GhostObject.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/AIPathfind.h"
@@ -316,6 +317,16 @@ void BuildAssistant::xferTheSellList( Xfer *xfer )
 
 }
 
+static Bool clearsSiteOnArrival( Object *constructorObject, const ThingTemplate *what )
+{
+	if( !RetailFileLayers::enabled() || !isDozer( constructorObject ) || TheBuildAssistant->isLineBuildTemplate( what ) )
+		return FALSE;
+
+	const AIUpdateInterface *ai = constructorObject->getAIUpdateInterface();
+	return ai != nullptr && ai->getWorkerAIInterface() == nullptr;
+}
+
+
 //-------------------------------------------------------------------------------------------------
 /** Nice little method to wrap up creating an object from a build */
 //-------------------------------------------------------------------------------------------------
@@ -343,10 +354,13 @@ Object *BuildAssistant::buildObjectNow( Object *constructorObject, const ThingTe
  	if( constructorObject && !isPossibleToMakeUnit(constructorObject, what) )
  		return nullptr;
 
-	// clear out any objects from the building area that are "auto-clearable" when building
-	clearRemovableForConstruction( what, pos, angle );
+	const Bool clearOnArrival = clearsSiteOnArrival( constructorObject, what );
 
-	if ( moveObjectsForConstruction( what, pos, angle, owningPlayer ) == FALSE )
+	// clear out any objects from the building area that are "auto-clearable" when building
+	if( !clearOnArrival )
+		clearRemovableForConstruction( what, pos, angle );
+
+	if ( !clearOnArrival && moveObjectsForConstruction( what, pos, angle, owningPlayer ) == FALSE )
 	{
 		// totally bogus. We tried to move our units out of the way, but they wouldn't.
 		// Chode-boys.
@@ -649,6 +663,33 @@ void BuildAssistant::iterateFootprint( const ThingTemplate *build,
 }
 
 
+static Bool isHiddenFromBuilder( const Object *them, const Object *builderObject, UnsignedInt options )
+{
+	if( !BitIsSet( options, BuildAssistant::IGNORE_HIDDEN_OBJECTS ) || builderObject == nullptr ||
+			builderObject->getRelationship( them ) == ALLIES )
+		return FALSE;
+
+	const Player *player = builderObject->getControllingPlayer();
+	if( player == nullptr )
+		return FALSE;
+
+	ObjectShroudStatus status = them->getShroudedStatus( player->getPlayerIndex() );
+	if( status < OBJECTSHROUD_FOGGED )
+		return FALSE;
+
+	if( BitIsSet( options, BuildAssistant::BLOCK_REMEMBERED_OBJECTS ) && status == OBJECTSHROUD_FOGGED &&
+			them->isKindOf( KINDOF_IMMOBILE ) )
+		return FALSE;
+
+	return TRUE;
+}
+
+static Bool isPartOfConstructionSite( const Object *them, const Object *constructionSite )
+{
+	return constructionSite && ( them == constructionSite || them->getID() == constructionSite->getBuilderID() );
+}
+
+
 //-------------------------------------------------------------------------------------------------
 /** Check for objects preventing building at this location.
 	* TheSuperHackers @tweak Stubbjax 05/09/2025 Return LBC_SHROUD for shrouded objects near the
@@ -659,8 +700,15 @@ Bool BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos,
 																											 Real angle,
 																											 const Object *builderObject,
 																											 UnsignedInt options,
-																											 Player *thePlayer)
+																											 Player *thePlayer,
+																											 const Object *constructionSite)
 {
+	if( BitIsSet( options, BLOCK_REMEMBERED_OBJECTS ) && TheGhostObjectManager && builderObject &&
+			builderObject->getControllingPlayer() &&
+			TheGhostObjectManager->collidesWithOrphanedGhost( worldPos, build->getTemplateGeometryInfo(), angle,
+				builderObject->getControllingPlayer()->getPlayerIndex() ) )
+		return false;
+
 	ObjectIterator *iter =
 			ThePartitionManager->iteratePotentialCollisions( worldPos,
 																											 build->getTemplateGeometryInfo(),
@@ -689,12 +737,8 @@ Bool BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos,
 			}
 		}
 
-		if (RetailFileLayers::enabled() && builderObject && builderObject->getControllingPlayer() &&
-			builderObject->getRelationship(them) != ALLIES &&
-			them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
-		{
+		if( isPartOfConstructionSite( them, constructionSite ) || isHiddenFromBuilder( them, builderObject, options ) )
 			continue;
-		}
 #if !RETAIL_COMPATIBLE_CRC
 		if (!RetailFileLayers::enabled() && builderObject && them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
 			return false;
@@ -769,12 +813,8 @@ Bool BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos,
 
 	for( them = iter2->first(); them; them = iter2->next() )
 	{
-		if (RetailFileLayers::enabled() && builderObject && builderObject->getControllingPlayer() &&
-			builderObject->getRelationship(them) != ALLIES &&
-			them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
-		{
+		if( isPartOfConstructionSite( them, constructionSite ) || isHiddenFromBuilder( them, builderObject, options ) )
 			continue;
-		}
 
 		// ignore any kind of class of objects that we will "remove" for building
 		if( isRemovableForConstruction( them ) == TRUE )
@@ -856,7 +896,8 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 																											 Real angle,
 																											 UnsignedInt options,
 																											 const Object *builderObject,
-																											 Player *player)
+																											 Player *player,
+																											 const Object *constructionSite)
 {
 
 	/* You just can't never build off the map, regardless of options.  jba. */
@@ -891,7 +932,8 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 	//
 	if( BitIsSet( options, NO_OBJECT_OVERLAP ) )
 	{
-		if (!isLocationClearOfObjects(worldPos, build, angle, builderObject, NO_OBJECT_OVERLAP, player))
+		if (!isLocationClearOfObjects(worldPos, build, angle, builderObject,
+			NO_OBJECT_OVERLAP | ( options & ( IGNORE_HIDDEN_OBJECTS | BLOCK_REMEMBERED_OBJECTS ) ), player, constructionSite))
 		{
 			return LBC_OBJECTS_IN_THE_WAY;
 		}
@@ -903,7 +945,7 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 	//
 	if( BitIsSet( options, NO_ENEMY_OBJECT_OVERLAP ) )
 	{
-		if (!isLocationClearOfObjects(worldPos, build, angle, builderObject, NO_ENEMY_OBJECT_OVERLAP, player))
+		if (!isLocationClearOfObjects(worldPos, build, angle, builderObject, NO_ENEMY_OBJECT_OVERLAP, player, constructionSite))
 		{
 			return LBC_OBJECTS_IN_THE_WAY;
 		}
@@ -1394,6 +1436,16 @@ void BuildAssistant::clearRemovableForConstruction( const ThingTemplate *whatToB
 
 }
 
+void BuildAssistant::clearConstructionSite( const Object *site )
+{
+	if( site == nullptr || site->getControllingPlayer() == nullptr )
+		return;
+
+	clearRemovableForConstruction( site->getTemplate(), site->getPosition(), site->getOrientation() );
+	moveObjectsForConstruction( site->getTemplate(), site->getPosition(), site->getOrientation(),
+															site->getControllingPlayer(), site );
+}
+
 // ------------------------------------------------------------------------------------------------
 /** clearRemovable is set up to delete objects that should cease to exist (for instance, trees).
 	* moveObjects will move objects that are owned by the player. It will also return false if
@@ -1402,7 +1454,8 @@ void BuildAssistant::clearRemovableForConstruction( const ThingTemplate *whatToB
 Bool BuildAssistant::moveObjectsForConstruction( const ThingTemplate *whatToBuild,
 																								 const Coord3D *pos,
 																								 Real angle,
-																								 Player *playerToBuild )
+																								 Player *playerToBuild,
+																								 const Object *constructionSite )
 {
 	GeometryInfo gi (GEOMETRY_BOX, false, 10, whatToBuild->getTemplateGeometryInfo().getMajorRadius(),
 		whatToBuild->getTemplateGeometryInfo().getMajorRadius());
@@ -1430,17 +1483,15 @@ Bool BuildAssistant::moveObjectsForConstruction( const ThingTemplate *whatToBuil
 		if (them->isKindOf(KINDOF_INERT))
 			continue;
 
+		if( isPartOfConstructionSite( them, constructionSite ) )
+			continue;
+
 		// Skip KINDOF_ALWAYS_SELECTABLE and isRemovableForConstruction, because if it is
 		// RemovableForConstruction, it just got destroyed, and won't actually be gone until
 		// the end of the frame.  jba.
 		if ( !them->isKindOf( KINDOF_ALWAYS_SELECTABLE ) && !isRemovableForConstruction(them) )
 		{
 			Relationship rel = playerToBuild->getRelationship(them->getTeam());
-			if (RetailFileLayers::enabled() && rel != ALLIES &&
-				them->getShroudedStatus(playerToBuild->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
-			{
-				continue;
-			}
 
 			if (rel == NEUTRAL || rel == ALLIES)
 			{

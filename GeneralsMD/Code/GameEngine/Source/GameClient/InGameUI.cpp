@@ -1707,7 +1707,8 @@ void InGameUI::handleBuildPlacements()
 																												 BuildAssistant::CLEAR_PATH |
 																												 BuildAssistant::NO_OBJECT_OVERLAP |
 																												 BuildAssistant::SHROUD_REVEALED |
-																												 BuildAssistant::IGNORE_STEALTHED,
+																												 BuildAssistant::IGNORE_STEALTHED |
+																												 ( RetailFileLayers::enabled() ? BuildAssistant::IGNORE_HIDDEN_OBJECTS | BuildAssistant::BLOCK_REMEMBERED_OBJECTS : 0 ),
 																												 builderObject,
 																												 nullptr );
 

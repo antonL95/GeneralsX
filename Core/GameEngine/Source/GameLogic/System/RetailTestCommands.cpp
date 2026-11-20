@@ -37,10 +37,12 @@
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/GhostObject.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/BehaviorModule.h"
@@ -650,11 +652,23 @@ void logBuildChecks(Object* builder, const ThingTemplate* what, const Command& c
 		shroud = static_cast<Int>(ThePartitionManager->getShroudStatusForPlayer(
 			builder->getControllingPlayer()->getPlayerIndex(), cellX, cellY));
 	}
+	const UnsignedInt basic = BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::CLEAR_PATH |
+		BuildAssistant::NO_OBJECT_OVERLAP;
+	const UnsignedInt retail = RetailFileLayers::enabled() ? BuildAssistant::IGNORE_HIDDEN_OBJECTS : 0;
+	const UnsignedInt remembered = RetailFileLayers::enabled() ? BuildAssistant::BLOCK_REMEMBERED_OBJECTS : 0;
 	const LegalBuildCode legal = TheBuildAssistant->isLocationLegalToBuild(&location, what, command.angle,
-		BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::CLEAR_PATH | BuildAssistant::NO_OBJECT_OVERLAP |
-			BuildAssistant::USE_QUICK_PATHFIND | BuildAssistant::SHROUD_REVEALED |
-			BuildAssistant::IGNORE_STEALTHED | BuildAssistant::FAIL_STEALTHED_WITHOUT_FEEDBACK,
-		builder, builder->getControllingPlayer());
+		basic | BuildAssistant::USE_QUICK_PATHFIND | BuildAssistant::SHROUD_REVEALED |
+			BuildAssistant::IGNORE_STEALTHED | BuildAssistant::FAIL_STEALTHED_WITHOUT_FEEDBACK | retail | remembered,
+		builder, nullptr);
+	const LegalBuildCode order = TheBuildAssistant->isLocationLegalToBuild(&location, what, command.angle,
+		basic | BuildAssistant::SHROUD_REVEALED | retail, builder, nullptr);
+	const LegalBuildCode ai = TheBuildAssistant->isLocationLegalToBuild(&location, what, command.angle,
+		basic, builder, builder->getControllingPlayer());
+	if (TheTerrainVisual)
+		TheTerrainVisual->removeAllBibs();
+	const Bool ghost = TheGhostObjectManager && builder->getControllingPlayer() &&
+		TheGhostObjectManager->collidesWithOrphanedGhost(&location, what->getTemplateGeometryInfo(), command.angle,
+			builder->getControllingPlayer()->getPlayerIndex());
 	Int cellType = -1;
 	if (TheAI && TheAI->pathfinder())
 	{
@@ -665,9 +679,9 @@ void logBuildChecks(Object* builder, const ThingTemplate* what, const Command& c
 			cellType = static_cast<Int>(pCell->getType());
 	}
 	const UnsignedInt ghosts = TheInGameUI ? TheInGameUI->getPlannedBuildGhostCount() : 0;
-	std::fprintf(stderr, "TEST frame %u: check %s canMake %d possible %d legal %d shroud %d cell %d ghosts %u at %.1f %.1f cost %d money %u\n", frame,
+	std::fprintf(stderr, "TEST frame %u: check %s canMake %d possible %d legal %d order %d ai %d ghost %d shroud %d cell %d ghosts %u at %.1f %.1f cost %d money %u\n", frame,
 		what->getName().str(), static_cast<int>(TheBuildAssistant->canMakeUnit(builder, what)),
-		TheBuildAssistant->isPossibleToMakeUnit(builder, what) ? 1 : 0, static_cast<int>(legal), shroud, cellType, ghosts, location.x, location.y,
+		TheBuildAssistant->isPossibleToMakeUnit(builder, what) ? 1 : 0, static_cast<int>(legal), static_cast<int>(order), static_cast<int>(ai), ghost ? 1 : 0, shroud, cellType, ghosts, location.x, location.y,
 		what->calcCostToBuild(builder->getControllingPlayer()), builder->getControllingPlayer()->getMoney()->countMoney());
 }
 
@@ -1273,6 +1287,27 @@ void execute(const Command& command, unsigned int frame)
 			std::fprintf(stderr, "TEST frame %u: shroudmap for player %d\n", frame,
 				obj->getControllingPlayer()->getPlayerIndex());
 		}
+	}
+	else if (command.action == "reveal" || command.action == "unreveal")
+	{
+		if (ThePartitionManager && obj->getControllingPlayer())
+		{
+			const Int playerIndex = obj->getControllingPlayer()->getPlayerIndex();
+			if (command.action == "reveal")
+				ThePartitionManager->revealMapForPlayerPermanently(playerIndex);
+			else
+				ThePartitionManager->undoRevealMapForPlayerPermanently(playerIndex);
+			std::fprintf(stderr, "TEST frame %u: %s for player %d\n", frame, command.action.c_str(), playerIndex);
+		}
+	}
+	else if (command.action == "seen")
+	{
+		Player* viewer = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
+		if (viewer)
+			std::fprintf(stderr, "TEST frame %u: seen %s id=%u by %d status %d relationship %d\n", frame,
+				obj->getTemplate()->getName().str(), static_cast<unsigned>(obj->getID()), viewer->getPlayerIndex(),
+				static_cast<int>(obj->getShroudedStatus(viewer->getPlayerIndex())),
+				static_cast<int>(viewer->getRelationship(obj->getTeam())));
 	}
 	else if (command.action == "findterrain")
 	{

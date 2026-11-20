@@ -31,6 +31,7 @@
 #include "Common/GameAudio.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
 
@@ -238,7 +239,8 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 																												 BuildAssistant::NO_OBJECT_OVERLAP |
 																												 BuildAssistant::SHROUD_REVEALED |
 																												 BuildAssistant::IGNORE_STEALTHED |
-																												 BuildAssistant::FAIL_STEALTHED_WITHOUT_FEEDBACK,
+																												 BuildAssistant::FAIL_STEALTHED_WITHOUT_FEEDBACK |
+																												 ( RetailFileLayers::enabled() ? BuildAssistant::IGNORE_HIDDEN_OBJECTS | BuildAssistant::BLOCK_REMEMBERED_OBJECTS : 0 ),
 																												 builderObj, nullptr );
 				if( lbc == LBC_OK )
 				{

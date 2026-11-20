@@ -118,7 +118,9 @@ public:
 		SHROUD_REVEALED					= 0x00000010,	///< Check to make sure the shroud is revealed
 		NO_ENEMY_OBJECT_OVERLAP	= 0x00000020,	///< Can't overlap enemy objects only.
 		IGNORE_STEALTHED				= 0x00000040, ///< Units that we can't see are legal to "build" on. (when moving mouse around)
-		FAIL_STEALTHED_WITHOUT_FEEDBACK = 0x00000080 ///< USE WITH IGNORE_STEALTHED except it will fail without BIB feedback (when clicking to place).
+		FAIL_STEALTHED_WITHOUT_FEEDBACK = 0x00000080,
+		IGNORE_HIDDEN_OBJECTS = 0x00000100,
+		BLOCK_REMEMBERED_OBJECTS = 0x00000200
 	};
 
 public:
@@ -153,7 +155,8 @@ public:
 																								 Real angle,  // angle to construct 'build' at
 																								 UnsignedInt options,		// use LocationLegalToBuildOptions
 																								 const Object *builderObject,
-																								 Player *player);
+																								 Player *player,
+																								 const Object *constructionSite = nullptr);
 
 	/// query if we can build at this location
 	virtual LegalBuildCode isLocationClearOfObjects( const Coord3D *worldPos,
@@ -161,7 +164,8 @@ public:
 																								 Real angle,  // angle to construct 'build' a
 																								 const Object *builderObject,
 																								 UnsignedInt options,
-																								 Player *thePlayer);
+																								 Player *thePlayer,
+																								 const Object *constructionSite = nullptr);
 
 	/// Adds bib highlighting for this location.
 	virtual void addBibs( const Coord3D *worldPos,
@@ -191,6 +195,8 @@ public:
 
 	void xferTheSellList(Xfer *xfer );
 
+	void clearConstructionSite( const Object *site );
+
 protected:
 
 	/// some objects will be "cleared" automatically when constructing
@@ -203,7 +209,8 @@ protected:
 	/// will move objects that can move out of the way.
 	/// will return false if there are objects that cannot be moved out of the way.
 	Bool moveObjectsForConstruction( const ThingTemplate *whatToBuild,
-																	 const Coord3D *pos, Real angle, Player *playerToBuild );
+																	 const Coord3D *pos, Real angle, Player *playerToBuild,
+																	 const Object *constructionSite = nullptr );
 
 	Coord3D *m_buildPositions;			///< array used to create a line of build locations (think walls)
 	Int m_buildPositionSize;				///< number of elements in the build position array

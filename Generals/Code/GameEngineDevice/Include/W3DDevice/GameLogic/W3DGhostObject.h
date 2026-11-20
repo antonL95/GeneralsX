@@ -80,6 +80,7 @@ public:
 	virtual void updateOrphanedObjects(int *playerIndexList, int playerIndexCount) override;
 	virtual void releasePartitionData() override;
 	virtual void restorePartitionData() override;
+	virtual Bool collidesWithOrphanedGhost(const Coord3D *pos, const GeometryInfo &geom, Real angle, Int playerIndex) const override;
 
 protected:
 	virtual void crc( Xfer *xfer ) override;

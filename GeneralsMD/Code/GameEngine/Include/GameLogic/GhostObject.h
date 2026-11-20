@@ -36,6 +36,7 @@
 
 class Object;
 class PartitionData;
+class GeometryInfo;
 enum GeometryType CPP_11(: Int);
 enum ObjectID CPP_11(: Int);
 
@@ -84,6 +85,7 @@ public:
 	virtual void updateOrphanedObjects(int *playerIndexList, int playerIndexCount);
 	virtual void releasePartitionData();	///<saves data needed to later rebuild partition manager data.
 	virtual void restorePartitionData();	///<restores ghost objects into the partition manager.
+	virtual Bool collidesWithOrphanedGhost(const Coord3D *pos, const GeometryInfo &geom, Real angle, Int playerIndex) const { return FALSE; }
 	void lockGhostObjects(Bool enableLock) {m_lockGhostObjects=enableLock;}	///<temporary lock on creating new ghost objects. Only used by map border resizing!
 	void saveLockGhostObjects(Bool enableLock) {m_saveLockGhostObjects=enableLock;}
 	inline Bool trackAllPlayers() const; ///< returns whether the ghost object status is tracked for all players or for the local player only

@@ -1996,7 +1996,7 @@ bool GameLogic::onDozerCancelConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr
 #else
 	Object *building = getSingleObjectFromSelection(currentlySelectedGroup.Peek());
 #endif
-	if( building == nullptr )
+	if( building == nullptr || building->isDestroyed() )
 		return false;
 
 	// the player sending this message must actually control this building

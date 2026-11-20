@@ -31,6 +31,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Common/Debug.h"
+#include "Common/Geometry.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/ThingTemplate.h"
@@ -1237,4 +1238,23 @@ void W3DGhostObjectManager::loadPostProcess()
 {
 	// extend base class
 	GhostObjectManager::loadPostProcess();
+}
+
+Bool W3DGhostObjectManager::collidesWithOrphanedGhost(const Coord3D *pos, const GeometryInfo &geom, Real angle, Int playerIndex) const
+{
+	if (playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT)
+		return FALSE;
+
+	for (const W3DGhostObject *mod = m_usedModules; mod; mod = mod->m_nextSystem)
+	{
+		if (mod->m_parentObject != nullptr || mod->m_parentSnapshots[playerIndex] == nullptr)
+			continue;
+
+		GeometryInfo ghostGeom(mod->getGeometryType(), mod->getGeometrySmall(), 1.0f,
+			mod->getGeometryMajorRadius(), mod->getGeometryMinorRadius());
+		if (ThePartitionManager->geomCollidesWithGeom(mod->getParentPosition(), ghostGeom, mod->getParentAngle(),
+				pos, geom, angle))
+			return TRUE;
+	}
+	return FALSE;
 }

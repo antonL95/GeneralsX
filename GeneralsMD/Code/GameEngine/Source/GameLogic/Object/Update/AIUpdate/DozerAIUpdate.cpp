@@ -55,6 +55,7 @@
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/TerrainVisual.h"
 
 
 // FORWARD DECLARATIONS ///////////////////////////////////////////////////////////////////////////
@@ -303,6 +304,29 @@ void DozerActionMoveToActionPosState::loadPostProcess()
 {
 }
 
+static Bool claimConstructionSite( Object *dozer, Object *site )
+{
+	if( !RetailFileLayers::enabled() || site->getConstructionPercent() > 0.0f )
+		return TRUE;
+
+	Player *owner = site->getControllingPlayer();
+	if( owner == nullptr )
+		return TRUE;
+
+	if( owner->getPlayerType() != PLAYER_COMPUTER && !site->testStatus( OBJECT_STATUS_RECONSTRUCTING ) &&
+			TheBuildAssistant->isLocationLegalToBuild( site->getPosition(), site->getTemplate(), site->getOrientation(),
+				BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP, dozer, nullptr, site ) != LBC_OK )
+	{
+		TheTerrainVisual->removeAllBibs();
+		owner->getMoney()->deposit( site->getTemplate()->calcCostToBuild( owner ), TRUE, FALSE );
+		TheGameLogic->destroyObject( site );
+		return FALSE;
+	}
+
+	TheBuildAssistant->clearConstructionSite( site );
+	return TRUE;
+}
+
 //-------------------------------------------------------------------------------------------------
 /** We are supposed to be on route to our action position now, see when we get there or
 	* detect that we have encountered a problem that's going to cause it to give up */
@@ -363,6 +387,17 @@ StateReturnType DozerActionMoveToActionPosState::update()
 	{
 		if( m_task == DOZER_TASK_BUILD )
 		{
+			if( !claimConstructionSite( dozer, goalObject ) )
+			{
+				if( ai )
+				{
+					DozerAIInterface *dozerAI = ai->getDozerAIInterface();
+					if( dozerAI )
+						dozerAI->internalTaskComplete( m_task );
+				}
+				getMachine()->setGoalObject( nullptr );
+				return STATE_FAILURE;
+			}
 
 			//
 			// the object is now no longer awaiting construction, it is being constructed ... note
@@ -1864,7 +1899,8 @@ Object *DozerAIUpdate::construct( const ThingTemplate *what,
 																										 BuildAssistant::TERRAIN_RESTRICTIONS |
 																										 BuildAssistant::CLEAR_PATH |
 																										 BuildAssistant::NO_OBJECT_OVERLAP |
-																										 BuildAssistant::SHROUD_REVEALED,
+																										 BuildAssistant::SHROUD_REVEALED |
+																										 ( RetailFileLayers::enabled() ? BuildAssistant::IGNORE_HIDDEN_OBJECTS : 0 ),
 																										 getObject(), nullptr ) != LBC_OK )
 				return nullptr;
 

@@ -1662,7 +1662,8 @@ void InGameUI::handleBuildPlacements()
 																												 BuildAssistant::TERRAIN_RESTRICTIONS |
 																												 BuildAssistant::CLEAR_PATH |
 																												 BuildAssistant::NO_OBJECT_OVERLAP |
-																												 BuildAssistant::SHROUD_REVEALED,
+																												 BuildAssistant::SHROUD_REVEALED |
+																												 ( RetailFileLayers::enabled() ? BuildAssistant::IGNORE_HIDDEN_OBJECTS | BuildAssistant::BLOCK_REMEMBERED_OBJECTS : 0 ),
 																												 builderObject,
 																												 nullptr );
 
