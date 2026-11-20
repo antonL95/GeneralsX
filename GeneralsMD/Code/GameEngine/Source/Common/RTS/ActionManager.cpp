@@ -41,7 +41,6 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
-#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"

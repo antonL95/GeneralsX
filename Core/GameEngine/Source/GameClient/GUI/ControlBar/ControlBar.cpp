@@ -4079,8 +4079,13 @@ GameFont *ControlBar::overrideTooltipGadgetFont( GameWindow *win )
 	return newFont;
 }
 
-void CommandButton::parseButtonImages( INI *ini, void *instance, void *store, const void * )
+void CommandButton::parseButtonImages( INI *ini, void *instance, void *store, const void *userData )
 {
+	if( !RetailFileLayers::enabled() )
+	{
+		INI::parseAsciiString( ini, instance, store, userData );
+		return;
+	}
 	*static_cast<AsciiString*>( store ) = ini->getNextToken();
 	if( const char *toggle = ini->getNextTokenOrNull() )
 		static_cast<CommandButton*>( instance )->m_toggleButtonImageName = toggle;
