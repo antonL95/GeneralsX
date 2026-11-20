@@ -36,6 +36,7 @@
 //#include "Common/GameFileSystem.h"
 #include "Common/FileSystem.h" // for LOAD_TEST_ASSETS
 #include "Common/GlobalData.h"
+#include "Common/INIAudit.h"
 #include "Common/MapReaderWriterInfo.h"
 #include "Common/TerrainTypes.h"
 #include "Common/ThingFactory.h"
@@ -55,7 +56,9 @@
 #include "Utility/stringex.h"
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
+#include <limits>
 
 
 #define K_OBSOLETE_HEIGHT_MAP_VERSION 8
@@ -513,7 +516,7 @@ void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metada
 	file.registerVersionedParser("PlayerScriptsList", root, nullptr, 6);
 	file.registerVersionedParser("BuildLists", root, nullptr, 1);
 	file.registerVersionedParser("TriggerAreas", root, nullptr, 1);
-	file.registerVersionedParser("StandingWaterAreas", root, nullptr, 2);
+	file.registerVersionedParser("StandingWaterAreas", root, ParseStandingWaterAreas, 2);
 	file.registerVersionedParser("RiverAreas", root, nullptr, 2);
 	file.registerVersionedParser("StandingWaveAreas", root, nullptr, 2);
 	file.registerVersionedParser("PostEffectsChunk", root, nullptr, 1);
@@ -575,6 +578,8 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly, Bo
 		file.registerVersionedParser("FUNKY_TILING", root, ParseFunkyTilingDataChunk, 1);
 #endif
 		file.registerVersionedParser("GlobalLighting", root, ParseLightingDataChunk, K_LIGHTING_VERSION_8, true);
+		if (!legacyBlendOnly && std::getenv("GENERALSX_ASSET_SMOKE_TERRAIN"))
+			file.registerVersionedParser("StandingWaterAreas", root, ParseStandingWaterAreas, 2);
 	}
 	try
 	{
@@ -592,6 +597,12 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly, Bo
 			throw ERROR_CORRUPT_FILE_FORMAT;
 		if (!logicalDataOnly && m_bfmeLighting)
 			applyBfmeLighting();
+		if (logicalDataOnly)
+		{
+			for (auto polygon = m_standingWater.rbegin(); polygon != m_standingWater.rend(); ++polygon)
+				PolygonTrigger::addPolygonTrigger(polygon->release());
+			m_standingWater.clear();
+		}
 	}
 	catch (...)
 	{
@@ -1133,8 +1144,19 @@ Bool WorldHeightMap::ParseBlendTileDataChunk(DataChunkInput &file, DataChunkInfo
 	return pThis->ParseBlendTileData(file, info, true);
 }
 
+static Bool supportsBlendTileVersion(DataChunkVersionType version)
+{
+	return (version >= K_BLEND_TILE_VERSION_1 && version <= K_BLEND_TILE_VERSION_8) || version == 11 || version == 14 ||
+		version == 15 || version == 16 || version == 18;
+}
+
 Bool WorldHeightMap::ParseLogicalBlendTileDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
+	if (!supportsBlendTileVersion(info->version))
+	{
+		file.skipUnsupportedRequiredChunk(*info);
+		return true;
+	}
 	auto *map = static_cast<WorldHeightMap *>(userData);
 	if (!map->m_data) {
 		if (info->version > K_BLEND_TILE_VERSION_8)
@@ -1144,6 +1166,208 @@ Bool WorldHeightMap::ParseLogicalBlendTileDataChunk(DataChunkInput &file, DataCh
 	if (info->version <= K_BLEND_TILE_VERSION_8 && !map->m_readAuditBlendTiles)
 		return true;
 	return map->ParseBlendTileData(file, info, false);
+}
+
+namespace
+{
+class StandingWaterReader
+{
+	DataChunkInput &m_file;
+
+public:
+	explicit StandingWaterReader(DataChunkInput &file) : m_file(file) {}
+
+	template<class T>
+	T read()
+	{
+		T value;
+		if (sizeof(value) > m_file.getChunkDataSizeLeft())
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		m_file.readArrayOfBytes(reinterpret_cast<char *>(&value), sizeof(value));
+		return value;
+	}
+
+	AsciiString readString()
+	{
+		const UnsignedShort size = read<UnsignedShort>();
+		if (size >= AsciiString::MAX_LEN || size > m_file.getChunkDataSizeLeft())
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		AsciiString value;
+		if (size != 0)
+		{
+			char *bytes = value.getBufferForRead(size);
+			m_file.readArrayOfBytes(bytes, size);
+			bytes[size] = '\0';
+		}
+		return value;
+	}
+};
+
+struct WaterEdge
+{
+	ICoord3D low;
+	ICoord3D high;
+
+	double xAt(double y) const
+	{
+		return low.x + (y - low.y) * (high.x - low.x) / (high.y - low.y);
+	}
+};
+
+std::vector<std::array<Coord2D, 4>> tessellateStandingWater(const PolygonTrigger &polygon)
+{
+	constexpr size_t maxPatches = 16384;
+	std::vector<WaterEdge> edges;
+	std::vector<double> levels;
+	const Int count = polygon.getNumPoints();
+	for (Int i = 0; i < count; ++i)
+	{
+		const ICoord3D &a = *polygon.getPoint(i);
+		const ICoord3D &b = *polygon.getPoint((i + 1) % count);
+		levels.push_back(a.y);
+		if (a.y != b.y)
+			edges.push_back(a.y < b.y ? WaterEdge{a, b} : WaterEdge{b, a});
+	}
+	for (size_t i = 0; i < edges.size(); ++i)
+	{
+		const WaterEdge &a = edges[i];
+		for (size_t j = 0; j < i; ++j)
+		{
+			const WaterEdge &b = edges[j];
+			const double low = std::max(a.low.y, b.low.y);
+			const double high = std::min(a.high.y, b.high.y);
+			if (low >= high)
+				continue;
+			const double start = a.xAt(low) - b.xAt(low);
+			const double end = a.xAt(high) - b.xAt(high);
+			if ((start < 0 && end > 0) || (start > 0 && end < 0))
+			{
+				if (levels.size() >= maxPatches)
+					throw ERROR_CORRUPT_FILE_FORMAT;
+				levels.push_back(low + (high - low) * start / (start - end));
+			}
+		}
+	}
+
+	std::sort(levels.begin(), levels.end());
+	levels.erase(std::unique(levels.begin(), levels.end()), levels.end());
+	std::vector<std::array<Coord2D, 4>> patches;
+	std::vector<std::pair<double, size_t>> crossings;
+	for (size_t level = 1; level < levels.size(); ++level)
+	{
+		const double low = levels[level - 1];
+		const double high = levels[level];
+		const double mid = (low + high) * 0.5;
+		if (static_cast<Real>(low) == static_cast<Real>(high))
+			continue;
+		crossings.clear();
+		for (size_t i = 0; i < edges.size(); ++i)
+			if (mid > edges[i].low.y && mid < edges[i].high.y)
+				crossings.emplace_back(edges[i].xAt(mid), i);
+		std::sort(crossings.begin(), crossings.end());
+		for (size_t i = 1; i < crossings.size(); i += 2)
+		{
+			if (static_cast<Real>(crossings[i - 1].first) == static_cast<Real>(crossings[i].first))
+				continue;
+			if (patches.size() >= maxPatches)
+				throw ERROR_CORRUPT_FILE_FORMAT;
+			const WaterEdge &left = edges[crossings[i - 1].second];
+			const WaterEdge &right = edges[crossings[i].second];
+			const Real lowY = static_cast<Real>(low);
+			const Real highY = static_cast<Real>(high);
+			patches.push_back({{
+				{static_cast<Real>(left.xAt(low)), lowY}, {static_cast<Real>(right.xAt(low)), lowY},
+				{static_cast<Real>(right.xAt(high)), highY}, {static_cast<Real>(left.xAt(high)), highY}
+			}});
+		}
+	}
+	return patches;
+}
+}
+
+void WorldHeightMap::WaterPolygonDeleter::operator()(PolygonTrigger *polygon) const
+{
+	deleteInstance(polygon);
+}
+
+Bool WorldHeightMap::ParseStandingWaterAreas(DataChunkInput &file, DataChunkInfo *info, void *userData)
+{
+	auto *map = static_cast<WorldHeightMap *>(userData);
+	if (map->getHeightSampleBytes() != 2)
+		return true;
+
+	std::vector<WaterPolygon> polygons;
+	try
+	{
+		if (info->dataSize > std::numeric_limits<Int>::max())
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		StandingWaterReader reader(file);
+		const UnsignedInt count = reader.read<UnsignedInt>();
+		constexpr UnsignedInt minAreaBytes = 4 * sizeof(UnsignedInt) + sizeof(UnsignedByte) +
+			6 * sizeof(UnsignedShort);
+		if (count > file.getChunkDataSizeLeft() / minAreaBytes)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		for (UnsignedInt area = 0; area < count; ++area)
+		{
+			const UnsignedInt id = reader.read<UnsignedInt>();
+			const AsciiString name = reader.readString();
+			const AsciiString layer = reader.readString();
+			PolygonTrigger::StandingWaterSettings settings;
+			settings.uvScrollSpeed = reader.read<Real>();
+			const UnsignedByte additive = reader.read<UnsignedByte>();
+			settings.additive = additive != 0;
+			settings.bumpTexture = reader.readString();
+			settings.skyTexture = reader.readString();
+			const UnsignedInt points = reader.read<UnsignedInt>();
+			constexpr UnsignedInt maxWaterPoints = 4096;
+			if (id >= std::numeric_limits<Int>::max() || additive > 1 || !std::isfinite(settings.uvScrollSpeed) ||
+				points > maxWaterPoints || points > file.getChunkDataSizeLeft() / (2 * sizeof(Real)))
+				throw ERROR_CORRUPT_FILE_FORMAT;
+
+			WaterPolygon polygon(newInstance(PolygonTrigger)(points, id));
+			polygon->setTriggerName(name);
+			polygon->setLayerName(layer);
+			for (UnsignedInt point = 0; point < points; ++point)
+			{
+				const Real x = reader.read<Real>();
+				const Real y = reader.read<Real>();
+				const Real extent = MAX_MAP_DIMENSION * MAP_XY_FACTOR;
+				if (!(x >= -extent && x <= extent && y >= -extent && y <= extent))
+					throw ERROR_CORRUPT_FILE_FORMAT;
+				polygon->addPoint({static_cast<Int>(x), static_cast<Int>(y), 0});
+			}
+			const UnsignedInt height = reader.read<UnsignedInt>();
+			if (height > std::numeric_limits<Int>::max())
+				throw ERROR_CORRUPT_FILE_FORMAT;
+			settings.fxShader = reader.readString();
+			settings.depthColors = reader.readString();
+			if (points < 3)
+				continue;
+			for (Int point = 0; point < polygon->getNumPoints(); ++point)
+			{
+				ICoord3D vertex = *polygon->getPoint(point);
+				vertex.z = static_cast<Int>(height);
+				polygon->setPoint(vertex, point);
+			}
+			settings.patches = tessellateStandingWater(*polygon);
+			if (settings.patches.empty())
+				continue;
+			polygon->setStandingWater(std::move(settings));
+			polygons.push_back(std::move(polygon));
+		}
+		if (file.getChunkDataSizeLeft() != 0)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+	}
+	catch (ErrorCode)
+	{
+		if (!INIAudit::isEnabled())
+			throw;
+		INIAudit::record("error", "Invalid standing water map chunk", info->label.str(), 0);
+		return true;
+	}
+	for (auto &polygon : polygons)
+		map->m_standingWater.push_back(std::move(polygon));
+	return true;
 }
 
 Bool WorldHeightMap::writeBlendTileChecksums(const char *path) const
@@ -1238,6 +1462,11 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData,
 */
 Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *info, Bool loadTextures)
 {
+	if (!supportsBlendTileVersion(info->version))
+	{
+		file.skipUnsupportedRequiredChunk(*info);
+		return true;
+	}
 	int i, j;
 	Int len = file.readInt();
 	if (m_tileNdxes || m_dataSize != len || len <= 0) {

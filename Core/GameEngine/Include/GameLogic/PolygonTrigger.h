@@ -36,6 +36,8 @@
 #include "Common/GameMemory.h"
 #include "Common/Snapshot.h"
 #include "Common/STLTypedefs.h"
+#include <array>
+#include <memory>
 
 class DataChunkInput;
 class DataChunkOutput;
@@ -66,6 +68,18 @@ class PolygonTrigger : public MemoryPoolObject,
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(PolygonTrigger, "PolygonTrigger")
 
+public:
+	struct StandingWaterSettings
+	{
+		AsciiString bumpTexture;
+		AsciiString skyTexture;
+		AsciiString fxShader;
+		AsciiString depthColors;
+		Real uvScrollSpeed;
+		Bool additive;
+		std::vector<std::array<Coord2D, 4>> patches;
+	};
+
 protected:
 	PolygonTrigger*		m_nextPolygonTrigger;		///< linked list.
 	AsciiString				m_triggerName;		///< The name of this polygon area.
@@ -84,6 +98,7 @@ protected:
 	AsciiString			m_layerName;  ///< Used to specify the layer in the World Builder.
 	Bool				m_shouldRender;
 	Bool				m_selected;
+	std::unique_ptr<StandingWaterSettings> m_standingWater;
 
 	static PolygonTrigger* ThePolygonTriggerListPtr;
 	static Int s_currentID; ///< Current id for new triggers.
@@ -98,7 +113,7 @@ protected:
 	virtual void loadPostProcess() override;
 
 public:
-	PolygonTrigger(Int initialAllocation);
+	PolygonTrigger(Int initialAllocation, Int mapID = -1);
 	//~PolygonTrigger();		///< Note that deleting the head of a list deletes all linked objects in the list.
 
 public:
@@ -111,6 +126,8 @@ public:
 
 public:
 	static void addPolygonTrigger(PolygonTrigger *pTrigger);
+	void setStandingWater(StandingWaterSettings settings);
+	const StandingWaterSettings *getStandingWater() const { return m_standingWater.get(); }
 	static void removePolygonTrigger(PolygonTrigger *pTrigger);
 	void setNextPoly(PolygonTrigger *nextPoly) {m_nextPolygonTrigger = nextPoly;} ///< Link the next map object.
 	void addPoint(const ICoord3D &point);

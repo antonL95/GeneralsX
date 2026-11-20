@@ -69,6 +69,7 @@
 #include "W3DDevice/GameClient/W3DPoly.h"
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
+#include <cmath>
 
 
 
@@ -1670,6 +1671,17 @@ void WaterRenderObjClass::Render(RenderInfoClass & rinfo)
 	if (ShaderClass::Is_Backface_Culling_Inverted())
 		return;	//the water object will not reflect in itself, so don't do anything if rendering a mirror.
 
+	if (TheTerrainRenderObject)
+	{
+		const auto &standingWater = TheTerrainRenderObject->getMap()->getStandingWater();
+		if (!standingWater.empty())
+		{
+			for (const auto &polygon : standingWater)
+				drawStandingWater(*polygon);
+			return;
+		}
+	}
+
 	//this water type needs to rendered after the rest of scene, so buffer it up for later
 
 	// If static sort lists are enabled and this mesh has a sort level, put it on the list instead
@@ -1696,6 +1708,12 @@ void WaterRenderObjClass::Render(RenderInfoClass & rinfo)
 		case WATER_TYPE_2_PVSHADER:
 			//Pixel/Vertex Shader based water which uses an off-screen rendered reflection texture
 			drawSea(rinfo);	//draw water surface
+			for (const PolygonTrigger *polygon = PolygonTrigger::getFirstPolygonTrigger(); polygon;
+				polygon = polygon->getNext())
+			{
+				if (polygon->getStandingWater())
+					drawStandingWater(*polygon);
+			}
 			break;
 
 		case WATER_TYPE_1_FB_REFLECTION:
@@ -2156,6 +2174,10 @@ void WaterRenderObjClass::renderWater()
 	for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext()) {
 		if (pTrig->isWaterArea()) {
 			if (pTrig->getNumPoints()>2) {
+				if (pTrig->getStandingWater()) {
+					drawStandingWater(*pTrig);
+					continue;
+				}
 				if (pTrig->isRiver()) {
 					drawRiverWater(pTrig);
 					continue;
@@ -2540,7 +2562,7 @@ void WaterRenderObjClass::renderWaterMesh()
 
 	DX8Wrapper::Set_Shader(m_shaderClass);
 #if 1
-	setupFlatWaterShader();
+	setupFlatWaterShader(m_riverTexture, TheWaterTransparency->m_additiveBlend);
 #else
 	//DX8Wrapper::Set_Shader(ShaderClass::_PresetOpaqueShader);
 	DX8Wrapper::Set_Texture(0,setting->waterTexture);
@@ -2828,6 +2850,20 @@ static Real wobble(Real baseV, Real offset, Bool wobble)
 /**Utility function used to query water heights in a manner that works in both RTS and WB.*/
 Real WaterRenderObjClass::getWaterHeight(Real x, Real y)
 {
+	if (TheTerrainRenderObject && TheTerrainRenderObject->getMap())
+	{
+		const auto &standingWater = TheTerrainRenderObject->getMap()->getStandingWater();
+		if (!standingWater.empty())
+		{
+			ICoord3D location{REAL_TO_INT_FLOOR(x + 0.5f), REAL_TO_INT_FLOOR(y + 0.5f), 0};
+			Real height = INVALID_WATER_HEIGHT;
+			for (const auto &polygon : standingWater)
+				if (polygon->pointInTrigger(location))
+					height = std::max(height, static_cast<Real>(polygon->getPoint(0)->z));
+			return height;
+		}
+	}
+
 	const WaterHandle *waterHandle = nullptr;
 	Real waterZ = 0.0f;
 	ICoord3D iLoc;
@@ -3181,11 +3217,11 @@ void WaterRenderObjClass::drawReflection(Int triangleCount, Int vertexCount)
 	ShaderClass::Invalidate();	//everything above was set behind the shader's back
 }
 
-void WaterRenderObjClass::setupFlatWaterShader()
+void WaterRenderObjClass::setupFlatWaterShader(TextureClass *texture, Bool additive)
 {
 
-	DX8Wrapper::Set_Texture(0,m_riverTexture);
-	if (!TheWaterTransparency->m_additiveBlend)
+	DX8Wrapper::Set_Texture(0,texture);
+	if (!additive)
 		DX8Wrapper::Set_Shader(ShaderClass::_PresetAlphaShader);
 	else
 		DX8Wrapper::Set_Shader(ShaderClass::_PresetAdditiveShader);
@@ -3193,9 +3229,9 @@ void WaterRenderObjClass::setupFlatWaterShader()
 	VertexMaterialClass *vmat=VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
 	DX8Wrapper::Set_Material(vmat);
 	REF_PTR_RELEASE(vmat);
-	m_riverTexture->Get_Filter().Set_Mag_Filter(TextureFilterClass::FILTER_TYPE_BEST);
-	m_riverTexture->Get_Filter().Set_Min_Filter(TextureFilterClass::FILTER_TYPE_BEST);
-	m_riverTexture->Get_Filter().Set_Mip_Mapping(TextureFilterClass::FILTER_TYPE_BEST);
+	texture->Get_Filter().Set_Mag_Filter(TextureFilterClass::FILTER_TYPE_BEST);
+	texture->Get_Filter().Set_Min_Filter(TextureFilterClass::FILTER_TYPE_BEST);
+	texture->Get_Filter().Set_Mip_Mapping(TextureFilterClass::FILTER_TYPE_BEST);
 
 	DX8Wrapper::Apply_Render_State_Changes();	//force update of view and projection matrices
 
@@ -3282,11 +3318,41 @@ void WaterRenderObjClass::setupFlatWaterShader()
 	}
 }
 
-//-------------------------------------------------------------------------------------------------
-//Draw a 4 sided flat water area.
-//-------------------------------------------------------------------------------------------------
-void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4])
+void WaterRenderObjClass::drawStandingWater(const PolygonTrigger &polygon)
 {
+	const auto &settings = *polygon.getStandingWater();
+	TextureClass *texture = nullptr;
+	if (settings.bumpTexture.isNotEmpty())
+	{
+		texture = WW3DAssetManager::Get_Instance()->Get_Texture(settings.bumpTexture.str());
+		if (texture)
+		{
+			texture->Init();
+			if (texture->Is_Missing_Texture())
+				REF_PTR_RELEASE(texture);
+		}
+	}
+	const Real scroll = static_cast<Real>(std::fmod(
+		static_cast<double>(m_riverVOrigin) * settings.uvScrollSpeed / 0.06, 1.0));
+	const Real height = polygon.getPoint(0)->z;
+	for (const auto &patch : settings.patches)
+	{
+		Vector3 points[4];
+		for (Int vertex = 0; vertex < 4; ++vertex)
+			points[vertex].Set(patch[vertex].x, patch[vertex].y, height);
+		drawTrapezoidWater(points, texture ? texture : m_riverTexture, settings.additive, scroll);
+	}
+	REF_PTR_RELEASE(texture);
+}
+
+void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4], TextureClass *texture, Bool additive, Real scroll)
+{
+	const Bool standingWater = texture != nullptr;
+	if (!standingWater)
+	{
+		texture = m_riverTexture;
+		additive = TheWaterTransparency->m_additiveBlend;
+	}
 	Vector3 origin(points[0]);
 	Vector3 uVec1(points[1]);
 	Vector3 vVec1(points[3]);
@@ -3444,6 +3510,8 @@ void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4])
 				vb->diffuse = customDiffuse;
 				vb->u1 = (vertex.X/waterFactor) + 0.02*cos(11*m_riverVOrigin)*wave;
 				vb->v1 = (vertex.Y/waterFactor) + 0.02*cos(5*m_riverVOrigin)*wave;
+				if (standingWater)
+					vb->v1 += scroll;
 				vb->u2 = vertex.X/BUMP_SIZE;
 				vb->v2 = vertex.Y/BUMP_SIZE + 0.3f*vertex.X/BUMP_SIZE;
 				vb->nx = 0;
@@ -3491,6 +3559,8 @@ void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4])
  				//vb->v1=(vertex.Y/waterFactor) + 0.02*cos(5*m_riverVOrigin)*sin(25*m_riverVOrigin+vertex.Y*PI/(4*MAP_XY_FACTOR));
 				vb->u1=vertex.X*ooWaterFactor + constA*WWMath::Fast_Sin(constC+vertex.X*constD);
 				vb->v1=vertex.Y*ooWaterFactor + constB*WWMath::Fast_Sin(constC+vertex.Y*constD);
+				if (standingWater)
+					vb->v1 += scroll;
 				vb->u2 = vertex.X/BUMP_SIZE;
 				//Old slower version
  				//vb->v2 = vertex.Y/BUMP_SIZE + 0.3f*vertex.X/BUMP_SIZE;
@@ -3513,12 +3583,12 @@ void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4])
 	DX8Wrapper::Set_Index_Buffer(ib_access,0);
 	DX8Wrapper::Set_Vertex_Buffer(vb_access);
 
-	setupFlatWaterShader();// lorenzen sez use the alpha shader
+	setupFlatWaterShader(texture, additive);
 
 	//If video card supports it and it's enabled, feather the water edge using destination alpha
 	if (DX8Wrapper::getBackBufferFormat() == WW3D_FORMAT_A8R8G8B8 && TheGlobalData->m_showSoftWaterEdge && TheWaterTransparency->m_transparentWaterDepth !=0)
 	{		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_DESTALPHA );
-			if (!TheWaterTransparency->m_additiveBlend)
+			if (!additive)
 				DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVDESTALPHA );
 	}
 
@@ -3564,7 +3634,7 @@ void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4])
 	if (m_riverWaterPixelShader) DX8Wrapper::_Get_D3D_Device8()->SetPixelShader(0);
 	if (m_trapezoidWaterPixelShader) DX8Wrapper::_Get_D3D_Device8()->SetPixelShader(0);
 	//Restore alpha blend to default values since we may have changed them to feather edges.
-	if (!TheWaterTransparency->m_additiveBlend)
+	if (!additive)
 	{	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
 	}

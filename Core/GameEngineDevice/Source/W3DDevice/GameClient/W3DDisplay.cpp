@@ -2288,11 +2288,22 @@ static Bool drawAssetSmokeTerrain(AsciiString filename, Real aspect)
 	camera.Set_View_Plane(Vector2(-0.55f * aspect, -0.55f), Vector2(0.55f * aspect, 0.55f));
 	camera.Set_Clip_Planes(5.0f, 2500.0f);
 	TheTerrainRenderObject->updateCenter(&camera, &pivot, nullptr);
+	if (!map->getStandingWater().empty())
+	{
+		if (W3DShroud *shroud = TheTerrainRenderObject->getShroud())
+		{
+			shroud->fillShroudData(TheGlobalData->m_clearAlpha);
+			shroud->setBorderShroudLevel(TheGlobalData->m_clearAlpha);
+			shroud->render(&camera);
+		}
+	}
 
 	if (WW3D::Begin_Render(true, true, Vector3(0.1f, 0.13f, 0.17f)) != WW3D_ERROR_OK)
 		return false;
 	RenderInfoClass renderInfo(camera);
 	WW3D::Render(*TheTerrainRenderObject, renderInfo);
+	if (TheWaterRenderObj && !map->getStandingWater().empty())
+		WW3D::Render(*TheWaterRenderObj, renderInfo);
 	WW3D::End_Render(false);
 	std::fprintf(stderr, "Asset smoke: rendered terrain from '%s'\n", filename.str());
 	std::fflush(stderr);

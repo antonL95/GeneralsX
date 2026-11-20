@@ -41,7 +41,7 @@ Int PolygonTrigger::s_currentID = 1;
 /**
  PolygonTrigger - Constructor.
 */
-PolygonTrigger::PolygonTrigger(Int initialAllocation) :
+PolygonTrigger::PolygonTrigger(Int initialAllocation, Int mapID) :
 m_nextPolygonTrigger(nullptr),
 m_points(nullptr),
 m_numPoints(0),
@@ -56,7 +56,7 @@ m_riverStart(0)
 	if (initialAllocation < 2) initialAllocation = 2;
 	m_points = NEW ICoord3D[initialAllocation];		// pool[]ify
 	m_sizePoints = initialAllocation;
-	m_triggerID = s_currentID++;
+	m_triggerID = mapID < 0 ? s_currentID++ : mapID;
 
 	m_waterHandle.m_polygon = this;
 
@@ -307,6 +307,14 @@ void PolygonTrigger::addPolygonTrigger(PolygonTrigger *pTrigger)
 	}
 	pTrigger->m_nextPolygonTrigger = ThePolygonTriggerListPtr;
 	ThePolygonTriggerListPtr = pTrigger;
+	if (pTrigger->m_standingWater && pTrigger->m_triggerID >= s_currentID)
+		s_currentID = pTrigger->m_triggerID + 1;
+}
+
+void PolygonTrigger::setStandingWater(StandingWaterSettings settings)
+{
+	m_standingWater = std::make_unique<StandingWaterSettings>(std::move(settings));
+	setWaterArea(true);
 }
 
 /**
@@ -484,7 +492,9 @@ Bool PolygonTrigger::pointInTrigger(ICoord3D &point) const
 		Int dy = pt2.y-pt1.y;
 		Int dx = pt2.x-pt1.x;
 
-		Real intersectionX = pt1.x + (dx * (point.y-pt1.y)) / ((Real)dy);
+		const Real numerator = m_standingWater ? static_cast<Real>(Int64(dx) * (point.y - pt1.y))
+			: static_cast<Real>(dx * (point.y - pt1.y));
+		Real intersectionX = pt1.x + numerator / static_cast<Real>(dy);
 		if (intersectionX >= point.x) {
 			inside = !inside;
 		}

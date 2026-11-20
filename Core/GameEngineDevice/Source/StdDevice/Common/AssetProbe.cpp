@@ -633,6 +633,7 @@ bool probeMapSides(const std::string& name, const Entry& entry, const char *heig
 			record("map-sides", name, "SidesList", "", sides.getNumSides());
 			record("map-teams", name, "Teams", "", sides.getNumTeams());
 			record("map-side-flag", name, "SidesList", "", sides.getMapSideFlag());
+			record("map-standing-water", name, "StandingWaterAreas", "", map->getStandingWater().size());
 			if (const DataChunkInfo *unsupported = input.getUnsupportedRequiredChunk())
 				record("map-stop", name, unsupported->label.str(), std::to_string(unsupported->version));
 			if (map->getXExtent() > 0)

@@ -95,6 +95,7 @@ class InputStream;
 class OutputStream;
 class DataChunkInput;
 struct DataChunkInfo;
+class PolygonTrigger;
 class TerrainTextureClass;
 class AlphaTerrainTextureClass;
 class AlphaEdgeTextureClass;
@@ -232,11 +233,18 @@ protected:	 // file reader callbacks.
 	Bool ParseObjectData(DataChunkInput &file, DataChunkInfo *info, void *userData, Bool readDict);
 	static Bool ParseLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseLogicalLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	static Bool ParseStandingWaterAreas(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	void releaseMapData();
 
 private:
 	struct BfmeLighting;
 	std::unique_ptr<BfmeLighting> m_bfmeLighting;
+	struct WaterPolygonDeleter
+	{
+		void operator()(PolygonTrigger *polygon) const;
+	};
+	using WaterPolygon = std::unique_ptr<PolygonTrigger, WaterPolygonDeleter>;
+	std::vector<WaterPolygon> m_standingWater;
 	Bool m_releaseAlphaTiles = true;
 	void readBfmeLighting(DataChunkInput &file, unsigned version);
 	void applyBfmeLighting() const;
@@ -249,6 +257,7 @@ public: // constructors/destructors
 	static void RegisterLogicalMapParsers(DataChunkInput &file, Bool metadataOnly);
 	static RefCountPtr<WorldHeightMap> readAuditMap(DataChunkInput &file);
 	Bool writeBlendTileChecksums(const char *path) const;
+	const auto& getStandingWater() const { return m_standingWater; }
 	virtual ~WorldHeightMap() override;			// destroy.
 
 public:  // Boundary info
