@@ -83,7 +83,8 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "CastleBehavior", 32, 16 },
 	{ "FoundationAIUpdate", 128, 32 },
 	{ "HorseHordeContain", 64, 32 },
-	{ "AODHordeContain", 16, 16 }
+	{ "AODHordeContain", 16, 16 },
+	{ "BezierProjectileBehavior", 512, 128 }
 };
 
 //-----------------------------------------------------------------------------

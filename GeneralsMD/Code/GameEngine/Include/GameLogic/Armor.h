@@ -63,6 +63,9 @@ protected:
 
 private:
 	Real						m_damageCoefficient[DAMAGE_NUM_TYPES];	///< modifiers to damage
+	Real m_flankedPenalty;
+
+	friend class ArmorStore;
 };
 
 //-------------------------------------------------------------------------------------------------

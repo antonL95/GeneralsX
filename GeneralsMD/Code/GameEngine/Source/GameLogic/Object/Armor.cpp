@@ -32,6 +32,8 @@
 
 
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "GameLogic/Armor.h"
 #include "GameLogic/Damage.h"
@@ -61,6 +63,7 @@ void ArmorTemplate::clear()
 	{
 		m_damageCoefficient[i] = 1.0f;
 	}
+	m_flankedPenalty = 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -154,7 +157,20 @@ const ArmorTemplate* ArmorStore::findArmorTemplate(const char* name) const
 	NameKeyType key = TheNameKeyGenerator->nameToKey(c);
 	ArmorTemplate& armorTmpl = TheArmorStore->m_armorTemplates[key];
 	armorTmpl.clear();
-	ini->initFromINI(&armorTmpl, myFieldParse);
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		static const FieldParse rotwkFieldParse[] =
+		{
+			{ "FlankedPenalty", INI::parsePercentToReal, nullptr, offsetof(ArmorTemplate, m_flankedPenalty) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		MultiIniFieldParse fields;
+		fields.add(myFieldParse);
+		fields.add(rotwkFieldParse);
+		ini->initFromINIMulti(&armorTmpl, fields);
+	}
+	else
+		ini->initFromINI(&armorTmpl, myFieldParse);
 }
 
 //-------------------------------------------------------------------------------------------------

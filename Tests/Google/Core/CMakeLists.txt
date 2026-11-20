@@ -12,6 +12,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/RotwkLocomotorRulesTest.cpp
     GameEngine/Common/TerrainResourceRulesTest.cpp
     GameEngine/Common/CastleTemplateTest.cpp
+    GameEngine/Common/WeaponNuggetRulesTest.cpp
     GameEngine/Common/RetailFileLayersTest.cpp
     GameEngine/Common/RetailGameTextTest.cpp
     GameEngine/Common/INIMathTest.cpp

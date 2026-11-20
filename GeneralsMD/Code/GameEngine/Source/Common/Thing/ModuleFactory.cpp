@@ -52,6 +52,7 @@
 #include "GameLogic/Module/BridgeScaffoldBehavior.h"
 #include "GameLogic/Module/BridgeTowerBehavior.h"
 #include "GameLogic/Module/CountermeasuresBehavior.h"
+#include "GameLogic/Module/BezierProjectileBehavior.h"
 #include "GameLogic/Module/DumbProjectileBehavior.h"
 #include "GameLogic/Module/InstantDeathBehavior.h"
 #include "GameLogic/Module/SlowDeathBehavior.h"
@@ -468,6 +469,7 @@ void ModuleFactory::init()
 		addModule( CastleBehavior );
 		addModule( FoundationAIUpdate );
 		addModule( TerrainResourceBehavior );
+		addModule( BezierProjectileBehavior );
 	}
 	addModule( MissileLauncherBuildingUpdate );
 	addModule( SupplyCenterProductionExitUpdate );

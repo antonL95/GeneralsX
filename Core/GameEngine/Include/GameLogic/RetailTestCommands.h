@@ -3,4 +3,5 @@
 namespace RetailTestCommands
 {
 void runFrame(unsigned int frame);
+bool tracesCombat();
 }

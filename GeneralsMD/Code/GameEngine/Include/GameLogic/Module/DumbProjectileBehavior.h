@@ -94,17 +94,20 @@ public:
 	virtual ObjectID projectileGetLauncherID() const override { return m_launcherID; }
 	virtual void setFramesTillCountermeasureDiversionOccurs( UnsignedInt frames ) override {}
 	virtual void projectileNowJammed() override {}
+	virtual void projectileSetLaunchWeapon(const WeaponTemplate* launchWeapon) override { m_launchWeaponTmpl = launchWeapon; }
 
 protected:
 
 	void positionForLaunch(const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse);
-	void detonate();
+	Bool hasLaunched() const { return m_lifespanFrame != 0 || !m_flightPath.empty(); }
+	void detonate(const Object* hit = nullptr);
 
 private:
 
 	ObjectID							m_launcherID;							///< ID of object that launched us (zero if not yet launched)
 	ObjectID							m_victimID;								///< ID of object we are targeting (zero if not yet launched)
 	const WeaponTemplate*	m_detonationWeaponTmpl;		///< weapon to fire at end (or null)
+	const WeaponTemplate* m_launchWeaponTmpl;
 	UnsignedInt						m_lifespanFrame;					///< if we haven't collided by this frame, blow up anyway
 	VecCoord3D						m_flightPath;							///< The frame by frame flight path in a Bezier curve
 	Coord3D								m_flightPathStart;				///< where flight path started (in case we must regen it)

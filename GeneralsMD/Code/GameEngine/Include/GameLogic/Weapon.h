@@ -34,6 +34,7 @@
 #include "Common/GameCommon.h"
 
 #include "GameLogic/Damage.h"
+#include "GameLogic/WeaponNugget.h"
 
 #include "WWMath/matrix3d.h"
 
@@ -108,6 +109,7 @@ enum WeaponAntiMaskType CPP_11(: Int)
 	WEAPON_ANTI_AIRBORNE_INFANTRY	= 0x20, // When set, anti-air weapons will not target infantry paratroopers.
 	WEAPON_ANTI_BALLISTIC_MISSILE	= 0x40, // Specifically large missiles that are vulnerable to base defenses
 	WEAPON_ANTI_PARACHUTE					= 0x80, // Parachutes can be targeted directly
+	WEAPON_ANTI_AIRBORNE_MONSTER = 0x100,
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -386,7 +388,8 @@ public:
 		Bool ignoreRanges,
 		Weapon *firingWeapon,
 		ObjectID* projectileID,
-		Bool inflictDamage
+		Bool inflictDamage,
+		ObjectID detonationVictimID = INVALID_ID
 	) const;
 
 	/**
@@ -470,6 +473,12 @@ public:
 	Bool isShowsAmmoPips() const { return m_isShowsAmmoPips; }
 	Bool isPlayFXWhenStealthed() const { return m_playFXWhenStealthed; }
 	Bool getDieOnDetonate() const { return m_dieOnDetonate; }
+	Bool hasNuggets() const { return !m_nuggets.empty(); }
+	Bool hasProjectileNuggets() const;
+	Bool hasImpactNuggets() const;
+	Bool nuggetsCanDamage(Int depth = 0) const;
+	Bool hitsStoredTarget() const { return m_hitStoredTarget; }
+	Real getMaxWeaponSpeed() const { return m_maxWeaponSpeed; }
 
 	Bool shouldProjectileCollideWith(
 		const Object* projectileLauncher,
@@ -484,6 +493,19 @@ protected:
 
 	// actually deal out the damage.
 	void dealDamageInternal(ObjectID sourceID, ObjectID victimID, const Coord3D *pos, const WeaponBonus& bonus, Bool isProjectileDetonation) const;
+	void dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus) const;
+	void dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus, Bool dotTick = FALSE) const;
+	void launchNuggetProjectiles(const Object* sourceObj, WeaponSlotType wslot, Int specificBarrelToUse, Object* victimObj,
+		const Coord3D& destination, Weapon* firingWeapon, ObjectID* projectileID) const;
+	Real estimateNuggetDamage(const Object* sourceObj, const Object* victimObj, const WeaponBonus& bonus, Int depth) const;
+
+	enum RadiusDamageVerdict
+	{
+		RADIUS_DAMAGE_SKIP,
+		RADIUS_DAMAGE_AFFECT,
+		RADIUS_DAMAGE_KILL_SELF,
+	};
+	static RadiusDamageVerdict judgeRadiusDamageVictim(const Object* source, const Object* victim, const Object* primaryVictim, Int affects);
 	void trimOldHistoricDamage() const;
 	void trimTriggeredHistoricDamage() const;
 	void processHistoricDamage(const Object* source, const Coord3D* pos) const;
@@ -496,8 +518,10 @@ private:
 	static void parseWeaponBonusSet( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseScatterTarget( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseShotDelay( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
+	static void parseHitPercentage(INI* ini, void* instance, void* store, const void* userData);
 
 	static const FieldParse TheWeaponTemplateFieldParseTable[];		///< the parse table for INI definition
+	static const FieldParse TheRotwkWeaponFieldParseTable[];
 
 	AsciiString m_name;											///< name for this weapon
 	NameKeyType m_nameKey;									///< unique name key for this weapon template
@@ -569,6 +593,12 @@ private:
 	ObjectStatusTypes m_damageStatusType;		///< If our damage is Status damage, the status we apply
 	UnsignedInt m_suspendFXDelay;						///< The fx can be suspended for any delay, in frames, then they will execute as normal
 	Bool m_dieOnDetonate;
+	std::vector<WeaponNugget> m_nuggets;
+	Real m_hitPercentage;
+	UnsignedInt m_firingDuration;
+	Real m_maxWeaponSpeed;
+	Bool m_meleeWeapon;
+	Bool m_hitStoredTarget;
 
 	mutable HistoricWeaponDamageList m_historicDamage;
 	mutable UnsignedInt m_historicDamageTriggerId;
@@ -608,7 +638,7 @@ public:
 
 	void fireProjectileDetonationWeapon(const Object *source, Object *target, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage = TRUE );
 
-	void fireProjectileDetonationWeapon(const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage = TRUE );
+	void fireProjectileDetonationWeapon(const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage = TRUE, ObjectID detonationVictimID = INVALID_ID );
 
 	void preFireWeapon( const Object *source, const Object *victim );
 
@@ -786,7 +816,8 @@ protected:
 		Bool ignoreRanges,
 		WeaponBonusConditionFlags extraBonusFlags,
 		ObjectID* projectileID,
-		Bool inflictDamage
+		Bool inflictDamage,
+		ObjectID detonationVictimID = INVALID_ID
 	);
 	Real estimateWeaponDamage(const Object *sourceObj, const Object *victimObj, const Coord3D* victimPos);
 	void reloadWithBonus(const Object *source, const WeaponBonus& bonus, Bool loadInstantly);
@@ -859,7 +890,7 @@ public:
 	void createAndFireTempWeapon(const WeaponTemplate* w, const Object *source, const Coord3D* pos);
 	void createAndFireTempWeapon(const WeaponTemplate* w, const Object *source, Object *target);
 
-	void handleProjectileDetonation( const WeaponTemplate* w, const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage = TRUE );
+	void handleProjectileDetonation( const WeaponTemplate* w, const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage = TRUE, ObjectID detonationVictimID = INVALID_ID );
 
 	static void parseWeaponTemplateDefinition(INI* ini);
 
@@ -872,7 +903,7 @@ protected:
 
 	void deleteAllDelayedDamage();
 	void resetWeaponTemplates();
-	void setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID, const WeaponBonus& bonus);
+	void setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID, const WeaponBonus& bonus, Int nuggetIndex = -1, Bool dotTick = FALSE);
 
 private:
 
@@ -891,6 +922,8 @@ private:
 		ObjectID m_delaySourceID;										///< who dealt the damage (by ID since it might be dead due to delay)
 		ObjectID m_delayIntendedVictimID;						///< who the damage was intended for (or zero if no specific target)
 		WeaponBonus m_bonus;												///< the weapon bonus to use
+		Int m_nuggetIndex;
+		Bool m_dotTick;
 	};
 
 	std::vector<WeaponTemplate*> m_weaponTemplateVector;

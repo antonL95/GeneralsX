@@ -37,7 +37,10 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/Weapon.h"
 
 namespace RetailTestCommands
 {
@@ -277,6 +280,63 @@ void orderToPoint(const Command& command, Object* obj, unsigned int frame)
 		TheInGameUI->createAttackHint(order);
 	std::fprintf(stderr, "TEST frame %u: %s object %u to (%.1f, %.1f)\n", frame, command.action.c_str(),
 		static_cast<unsigned>(obj->getID()), point.x, point.y);
+}
+
+void createObject(const Command& command, unsigned int frame)
+{
+	const ThingTemplate* what = TheThingFactory->findTemplate(command.target.c_str(), FALSE);
+	Player* player = ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey(command.player.c_str()));
+	float x = 0.0f;
+	float y = 0.0f;
+	float angle = 0.0f;
+	if (!what || !player || std::sscanf(command.structure.c_str(), "%f,%f,%f", &x, &y, &angle) < 2)
+	{
+		std::fprintf(stderr, "TEST frame %u: cannot create %s for %s\n", frame, command.target.c_str(), command.player.c_str());
+		return;
+	}
+	Object* obj = TheThingFactory->newObject(what, player->getDefaultTeam());
+	Coord3D pos;
+	pos.set(x, y, TheTerrainLogic->getGroundHeight(x, y));
+	obj->setPosition(&pos);
+	obj->setOrientation(angle * PI / 180.0f);
+	std::fprintf(stderr, "TEST frame %u: create %s for %s id=%u at (%.1f, %.1f)\n", frame, command.target.c_str(),
+		command.player.c_str(), static_cast<unsigned>(obj->getID()), x, y);
+}
+
+Object* findTarget(const Command& command)
+{
+	Command target;
+	char player[64] = {};
+	char name[128] = {};
+	if (std::sscanf(command.structure.c_str(), "%63[^:]:%127[^:]:%d", player, name, &target.ordinal) != 3)
+		return nullptr;
+	target.player = player;
+	target.target = name;
+	return findObject(target);
+}
+
+void attackObject(const Command& command, Object* obj, unsigned int frame)
+{
+	Object* target = findTarget(command);
+	AIUpdateInterface* ai = obj->getAI();
+	if (!target || !ai)
+	{
+		std::fprintf(stderr, "TEST frame %u: cannot attack %s with object %u\n", frame, command.structure.c_str(),
+			static_cast<unsigned>(obj->getID()));
+		return;
+	}
+	ai->aiAttackObject(target, NO_MAX_SHOTS_LIMIT, CMD_FROM_PLAYER);
+	std::fprintf(stderr, "TEST frame %u: attack object %u (%s) by object %u (%s)\n", frame, static_cast<unsigned>(target->getID()),
+		target->getTemplate()->getName().str(), static_cast<unsigned>(obj->getID()), command.target.c_str());
+}
+
+void printHealth(const Command& command, const Object* obj, unsigned int frame)
+{
+	const BodyModuleInterface* body = obj->getBodyModule();
+	std::fprintf(stderr, "TEST health %u %s %s %d id=%u health=%.2f max=%.2f dead=%d pos=%.1f,%.1f\n", frame,
+		command.player.c_str(), command.target.c_str(), command.ordinal, static_cast<unsigned>(obj->getID()),
+		body ? body->getHealth() : 0.0f, body ? body->getMaxHealth() : 0.0f, obj->isEffectivelyDead() ? 1 : 0,
+		obj->getPosition()->x, obj->getPosition()->y);
 }
 
 void listObjects(const Command& command, unsigned int frame)
@@ -547,6 +607,11 @@ void execute(const Command& command, unsigned int frame)
 		}
 		return;
 	}
+	if (command.action == "create")
+	{
+		createObject(command, frame);
+		return;
+	}
 
 	Object* obj = findObject(command);
 	if (!obj)
@@ -622,6 +687,10 @@ void execute(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST frame %u: select object %u (%s)\n", frame, static_cast<unsigned>(obj->getID()),
 			command.target.c_str());
 	}
+	else if (command.action == "attack")
+		attackObject(command, obj, frame);
+	else if (command.action == "health")
+		printHealth(command, obj, frame);
 	else if (command.action == "button")
 		clickButton(command, frame);
 	else if (command.action == "place")
@@ -663,6 +732,13 @@ void execute(const Command& command, unsigned int frame)
 	else
 		orderToPoint(command, obj, frame);
 }
+}
+
+bool tracesCombat()
+{
+	static const bool traces = RetailFileLayers::enabled() && std::getenv("GENERALSX_TEST_COMMANDS") &&
+		*std::getenv("GENERALSX_TEST_COMMANDS");
+	return traces;
 }
 
 void runFrame(unsigned int frame)

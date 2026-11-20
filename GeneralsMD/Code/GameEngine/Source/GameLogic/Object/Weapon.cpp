@@ -43,7 +43,9 @@
 #include "Common/GameAudio.h"
 #include "Common/GameState.h"
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 #include "Common/PerfTimer.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Player.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -69,6 +71,7 @@
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Weapon.h"
+#include "GameLogic/WeaponNuggetRules.h"
 
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AssistedTargetingUpdate.h"
@@ -243,6 +246,23 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 
 };
 
+const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
+{
+	{ "DamageNugget", WeaponNugget::parseDamageNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "DOTNugget", WeaponNugget::parseDOTNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "ProjectileNugget", WeaponNugget::parseProjectileNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "MetaImpactNugget", WeaponNugget::parseMetaImpactNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "WeaponOCLNugget", WeaponNugget::parseWeaponOCLNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "AttributeModifierNugget", WeaponNugget::parseAttributeModifierNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "FiringDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_firingDuration) },
+	{ "HitPercentage", WeaponTemplate::parseHitPercentage, nullptr, offsetof(WeaponTemplate, m_hitPercentage) },
+	{ "MaxWeaponSpeed", INI::parseVelocityReal, nullptr, offsetof(WeaponTemplate, m_maxWeaponSpeed) },
+	{ "MeleeWeapon", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_meleeWeapon) },
+	{ "HitStoredTarget", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_hitStoredTarget) },
+	{ "AntiAirborneMonster", INI::parseBitInInt32, (void*)WEAPON_ANTI_AIRBORNE_MONSTER, offsetof(WeaponTemplate, m_antiMask) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -323,6 +343,11 @@ WeaponTemplate::WeaponTemplate() : m_nextTemplate(nullptr)
 	m_damageStatusType							= OBJECT_STATUS_NONE;
 	m_suspendFXDelay								= 0;
 	m_dieOnDetonate						= FALSE;
+	m_hitPercentage = 100.0f;
+	m_firingDuration = 0;
+	m_maxWeaponSpeed = 0.0f;
+	m_meleeWeapon = FALSE;
+	m_hitStoredTarget = FALSE;
 
 	m_historicDamageTriggerId = 0;
 }
@@ -403,6 +428,11 @@ void WeaponTemplate::reset()
 
 }
 
+void WeaponTemplate::parseHitPercentage(INI* ini, void*, void* store, const void*)
+{
+	*static_cast<Real*>(store) = INI::scanReal(ini->getNextToken(ini->getSepsPercent()));
+}
+
 //-------------------------------------------------------------------------------------------------
 void WeaponTemplate::postProcessLoad()
 {
@@ -458,6 +488,8 @@ void WeaponTemplate::postProcessLoad()
 		m_projectileDetonationOCLNames[i].clear();
 	}
 
+	for (WeaponNugget& nugget : m_nuggets)
+		nugget.postProcessLoad();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -557,6 +589,8 @@ Real WeaponTemplate::getSecondaryDamageRadius(const WeaponBonus& bonus) const
 //-------------------------------------------------------------------------------------------------
 Bool WeaponTemplate::isContactWeapon() const
 {
+	if (m_meleeWeapon)
+		return TRUE;
 #ifdef RATIONALIZE_ATTACK_RANGE
 	// Note - undersize by 1/4 of a pathfind cell, so that the goal is not teetering on the edge
 	// of firing range.  jba.
@@ -582,6 +616,9 @@ Real WeaponTemplate::estimateWeaponTemplateDamage(
 		DEBUG_CRASH(("bad args to estimate"));
 		return 0.0f;
 	}
+
+	if (hasNuggets())
+		return estimateNuggetDamage(sourceObj, victimObj, bonus, 0);
 
 	const Real damageAmount = getPrimaryDamage(bonus);
 	if ( victimObj == nullptr )
@@ -773,7 +810,8 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	Bool ignoreRanges,
 	Weapon *firingWeapon,
 	ObjectID* projectileID,
-	Bool inflictDamage
+	Bool inflictDamage,
+	ObjectID detonationVictimID
 ) const
 {
 
@@ -810,7 +848,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		return 0;
 	}
 
-	DEBUG_ASSERTCRASH((m_primaryDamage > 0)  ||  (victimObj == nullptr), ("You can't really shoot a zero damage weapon at an Object.") );
+	DEBUG_ASSERTCRASH((m_primaryDamage > 0) || hasNuggets() || (victimObj == nullptr), ("You can't really shoot a zero damage weapon at an Object.") );
 
 	ObjectID sourceID = sourceObj->getID();
 	const Coord3D* sourcePos = sourceObj->getPosition();
@@ -976,7 +1014,9 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 
 	Coord3D projectileDestination = *victimPos; //Need to copy this, as we have a pointer to their actual position
 	Real scatterRadius = 0.0f;
-	if( m_scatterRadius > 0.0f || (m_infantryInaccuracyDist > 0.0f && victimObj && victimObj->isKindOf( KINDOF_INFANTRY )) )
+	const Bool nuggetHit = hasNuggets() && (isProjectileDetonation || !WeaponNuggetRules::needsHitRoll(m_hitPercentage) ||
+		WeaponNuggetRules::rollHits(GameLogicRandomValue(0, 99), m_hitPercentage));
+	if( !nuggetHit && (m_scatterRadius > 0.0f || (m_infantryInaccuracyDist > 0.0f && victimObj && victimObj->isKindOf( KINDOF_INFANTRY ))) )
 	{
 		// This weapon scatters, so clear the victimObj, as we are no longer shooting it directly,
 		// and find a random point within the radius to shoot at as victimPos
@@ -1020,6 +1060,14 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		projectileDestination.z = TheTerrainLogic->getLayerHeight( projectileDestination.x, projectileDestination.y, targetLayer );
 	}
 
+	if (hasNuggets() && !isProjectileDetonation && hasProjectileNuggets())
+	{
+		launchNuggetProjectiles(sourceObj, wslot, specificBarrelToUse, nuggetHit ? victimObj : nullptr, projectileDestination,
+			firingWeapon, projectileID);
+		if (!hasImpactNuggets())
+			return 0;
+	}
+
 	if (getProjectileTemplate() == nullptr || isProjectileDetonation)
 	{
 		// see if we need to be called back at a later point to deal the damage.
@@ -1031,6 +1079,11 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		Real delayInFrames = WWMath::Div_FixNaN(v.length(), getWeaponSpeed());
 
 		ObjectID damageID = getDamageDealtAtSelfPosition() ? INVALID_ID : victimID;
+		const Bool nuggetMissed = hasNuggets() && !nuggetHit;
+		if (nuggetMissed)
+			damageID = INVALID_ID;
+		else if (damageID == INVALID_ID)
+			damageID = detonationVictimID;
 
 		if( firingWeapon->isLaser() )
 		{
@@ -1057,7 +1110,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 			return TheGameLogic->getFrame();
 		}
 
-		const Coord3D* damagePos = getDamageDealtAtSelfPosition() ? sourcePos : victimPos;
+		const Coord3D* damagePos = getDamageDealtAtSelfPosition() ? sourcePos : (nuggetMissed ? &projectileDestination : victimPos);
 		if (delayInFrames < 1.0f)
 		{
 			// go ahead and do it now
@@ -1342,6 +1395,37 @@ void WeaponTemplate::processHistoricDamage(const Object* source, const Coord3D* 
 }
 #endif
 
+WeaponTemplate::RadiusDamageVerdict WeaponTemplate::judgeRadiusDamageVictim(const Object* source, const Object* victim,
+	const Object* primaryVictim, Int affects)
+{
+	if (source == nullptr || victim == primaryVictim)
+		return RADIUS_DAMAGE_AFFECT;
+
+	if ((affects & WEAPON_KILLS_SELF) && source == victim)
+		return RADIUS_DAMAGE_KILL_SELF;
+
+	if ((affects & WEAPON_AFFECTS_SELF) == 0 && (source == victim || source->getProducerID() == victim->getID()))
+		return RADIUS_DAMAGE_SKIP;
+
+	if ((affects & WEAPON_DOESNT_AFFECT_SIMILAR) && source->getTemplate()->isEquivalentTo(victim->getTemplate()) &&
+		source->getRelationship(victim) == ALLIES)
+		return RADIUS_DAMAGE_SKIP;
+
+	if ((affects & WEAPON_DOESNT_AFFECT_AIRBORNE) != 0 && victim->isSignificantlyAboveTerrain())
+		return RADIUS_DAMAGE_SKIP;
+
+	const Relationship r = victim->getRelationship(source);
+	Int requiredMask;
+	if (r == ALLIES)
+		requiredMask = WEAPON_AFFECTS_ALLIES;
+	else if (r == ENEMIES)
+		requiredMask = WEAPON_AFFECTS_ENEMIES;
+	else
+		requiredMask = WEAPON_AFFECTS_NEUTRALS;
+
+	return (affects & requiredMask) ? RADIUS_DAMAGE_AFFECT : RADIUS_DAMAGE_SKIP;
+}
+
 //-------------------------------------------------------------------------------------------------
 void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, const Coord3D *pos, const WeaponBonus& bonus, Bool isProjectileDetonation) const
 {
@@ -1362,6 +1446,12 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 	if (primaryVictim)
 	{
 		pos = primaryVictim->getPosition();
+	}
+
+	if (hasNuggets())
+	{
+		dealNuggetsAtImpact(sourceID, victimID, pos, bonus);
+		return;
 	}
 
 	DamageType damageType = getDamageType();
@@ -1415,70 +1505,10 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 
 		for (; curVictim != nullptr; curVictim = iter ? iter->nextWithNumeric(&curVictimDistSqr) : nullptr)
 		{
-			Bool killSelf = false;
-			if (source != nullptr)
-			{
-				// anytime something is designated as the "primary victim" (ie, the direct target
-				// of the weapon), we ignore all the "affects" flags.
-				if (curVictim != primaryVictim)
-				{
-
-					if( (affects & WEAPON_KILLS_SELF) && source == curVictim )
-					{
-						killSelf = true;
-					}
-					else
-					{
-
-						// should object ever be allowed to damage themselves? methinks not...
-						// exception: a few weapons allow this (eg, for suicide bombers).
-						if( (affects & WEAPON_AFFECTS_SELF) == 0 )
-						{
-							// Remember that source is a missile for some units, and they don't want to injure them'selves' either
-							if( source == curVictim || source->getProducerID() == curVictim->getID() )
-							{
-								//DEBUG_LOG(("skipping damage done to SELF..."));
-								continue;
-							}
-						}
-
-						if( affects & WEAPON_DOESNT_AFFECT_SIMILAR )
-						{
-							//This means we probably are affecting allies, but don't want to kill nearby members that are the same type as us.
-							//A good example are a group of terrorists blowing themselves up. We don't want to cause a domino effect that kills
-							//all of them.
-							if( source->getTemplate()->isEquivalentTo(curVictim->getTemplate()) && source->getRelationship( curVictim ) == ALLIES )
-							{
-								continue;
-							}
-						}
-
-						if ((affects & WEAPON_DOESNT_AFFECT_AIRBORNE) != 0 && curVictim->isSignificantlyAboveTerrain())
-						{
-							continue;
-						}
-
-						/*
-							The idea here is: if its our ally(/enemies), AND it's not the direct target, AND the weapon doesn't
-							do radius-damage to allies(/enemies)... skip it.
-						*/
-						Relationship r = curVictim->getRelationship(source);
-						Int requiredMask;
-						if (r == ALLIES)
-							requiredMask = WEAPON_AFFECTS_ALLIES;
-						else if (r == ENEMIES)
-							requiredMask = WEAPON_AFFECTS_ENEMIES;
-						else /* r == NEUTRAL */
-							requiredMask = WEAPON_AFFECTS_NEUTRALS;
-
-						if( !(affects & requiredMask) )
-						{
-							//Skip if we aren't affected by this weapon.
-							continue;
-						}
-					}
-				}
-			}
+			const RadiusDamageVerdict verdict = judgeRadiusDamageVictim(source, curVictim, primaryVictim, affects);
+			if (verdict == RADIUS_DAMAGE_SKIP)
+				continue;
+			const Bool killSelf = verdict == RADIUS_DAMAGE_KILL_SELF;
 
 			DamageInfo damageInfo;
 			damageInfo.in.m_damageType = damageType;
@@ -1606,11 +1636,11 @@ WeaponStore::~WeaponStore()
 }
 
 //-------------------------------------------------------------------------------------------------
-void WeaponStore::handleProjectileDetonation(const WeaponTemplate* wt, const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage )
+void WeaponStore::handleProjectileDetonation(const WeaponTemplate* wt, const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage, ObjectID detonationVictimID )
 {
 	Weapon* w = allocateNewWeapon(wt, PRIMARY_WEAPON);
 	w->loadAmmoNow(source);
-	w->fireProjectileDetonationWeapon( source, pos, extraBonusFlags, inflictDamage );
+	w->fireProjectileDetonationWeapon( source, pos, extraBonusFlags, inflictDamage, detonationVictimID );
 	deleteInstance(w);
 }
 
@@ -1711,7 +1741,10 @@ void WeaponStore::update()
 		{
 			// we never do projectile-detonation-damage via this code path.
 			const Bool isProjectileDetonation = false;
-			ddi->m_delayedWeapon->dealDamageInternal(ddi->m_delaySourceID, ddi->m_delayIntendedVictimID, &ddi->m_delayDamagePos, ddi->m_bonus, isProjectileDetonation);
+			if (ddi->m_nuggetIndex >= 0)
+				ddi->m_delayedWeapon->dealNuggetDamage(ddi->m_nuggetIndex, ddi->m_delaySourceID, ddi->m_delayIntendedVictimID, &ddi->m_delayDamagePos, ddi->m_bonus, ddi->m_dotTick);
+			else
+				ddi->m_delayedWeapon->dealDamageInternal(ddi->m_delaySourceID, ddi->m_delayIntendedVictimID, &ddi->m_delayDamagePos, ddi->m_bonus, isProjectileDetonation);
 			ddi = m_weaponDDI.erase(ddi);
 		}
 		else
@@ -1759,7 +1792,7 @@ void WeaponStore::reset()
 }
 
 //-------------------------------------------------------------------------------------------------
-void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID, const WeaponBonus& bonus)
+void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID, const WeaponBonus& bonus, Int nuggetIndex, Bool dotTick)
 {
 	WeaponDelayedDamageInfo wi;
 	wi.m_delayedWeapon = weapon;
@@ -1768,6 +1801,8 @@ void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* 
 	wi.m_delaySourceID = sourceID;
 	wi.m_delayIntendedVictimID = victimID;
 	wi.m_bonus = bonus;
+	wi.m_nuggetIndex = nuggetIndex;
+	wi.m_dotTick = dotTick;
 	m_weaponDDI.push_back(wi);
 }
 
@@ -1817,8 +1852,15 @@ void WeaponStore::postProcessLoad()
 		weapon = TheWeaponStore->newWeaponTemplate(name);
 	}
 
-	// parse the ini weapon definition
-	ini->initFromINI(weapon, weapon->getFieldParse());
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		MultiIniFieldParse fields;
+		fields.add(weapon->getFieldParse());
+		fields.add(WeaponTemplate::TheRotwkWeaponFieldParseTable);
+		ini->initFromINIMulti(weapon, fields);
+	}
+	else
+		ini->initFromINI(weapon, weapon->getFieldParse());
 
 	if (weapon->m_projectileName.isNone())
 		weapon->m_projectileName.clear();
@@ -2578,7 +2620,8 @@ Bool Weapon::privateFireWeapon(
 	Bool ignoreRanges,
 	WeaponBonusConditionFlags extraBonusFlags,
 	ObjectID* projectileID,
-	Bool inflictDamage
+	Bool inflictDamage,
+	ObjectID detonationVictimID
 )
 {
 	//CRCDEBUG_LOG(("Weapon::privateFireWeapon() for %s", DescribeObject(sourceObj).str()));
@@ -2729,7 +2772,7 @@ Bool Weapon::privateFireWeapon(
 		}
 		else
 		{
-			m_template->fireWeaponTemplate(sourceObj, m_wslot, m_curBarrel, victimObj, victimPos, bonus, isProjectileDetonation, ignoreRanges, this, projectileID, inflictDamage );
+			m_template->fireWeaponTemplate(sourceObj, m_wslot, m_curBarrel, victimObj, victimPos, bonus, isProjectileDetonation, ignoreRanges, this, projectileID, inflictDamage, detonationVictimID );
 		}
 
 		m_lastFireFrame = now;
@@ -2829,10 +2872,10 @@ void Weapon::fireProjectileDetonationWeapon(const Object *source, Object *target
 }
 
 //-------------------------------------------------------------------------------------------------
-void Weapon::fireProjectileDetonationWeapon(const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage )
+void Weapon::fireProjectileDetonationWeapon(const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage, ObjectID detonationVictimID )
 {
 	//CRCDEBUG_LOG(("Weapon::fireProjectileDetonationWeapon() for %s", DescribeObject(source).str()));
-	privateFireWeapon( source, nullptr, pos, true, false, extraBonusFlags, nullptr, inflictDamage );
+	privateFireWeapon( source, nullptr, pos, true, false, extraBonusFlags, nullptr, inflictDamage, detonationVictimID );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2923,6 +2966,9 @@ Bool Weapon::isDamageWeapon() const
 		case DAMAGE_HACK:
 			return FALSE;
 	}
+
+	if (m_template->hasNuggets())
+		return m_template->nuggetsCanDamage();
 
 	//Use no bonus
 	WeaponBonus whoCares;

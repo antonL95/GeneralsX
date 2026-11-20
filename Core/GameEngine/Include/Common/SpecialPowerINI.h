@@ -20,6 +20,7 @@ struct SpecialPowerObjectFilter
 
 	Bool matchesTemplate(const ThingTemplate& thing) const;
 	static void parse(INI* ini, void* instance, void* store, const void* userData);
+	void addTokens(INI* ini, const char* token);
 };
 
 struct SpecialPowerAnimation

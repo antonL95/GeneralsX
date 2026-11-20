@@ -305,6 +305,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/DieModule.h
     Include/GameLogic/Module/DockUpdate.h
     Include/GameLogic/Module/DozerAIUpdate.h
+    Include/GameLogic/Module/BezierProjectileBehavior.h
     Include/GameLogic/Module/DumbProjectileBehavior.h
     Include/GameLogic/Module/DynamicGeometryInfoUpdate.h
     Include/GameLogic/Module/DynamicShroudClearingRangeUpdate.h
@@ -491,6 +492,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/TurretAI.h
     Include/GameLogic/VictoryConditions.h
     Include/GameLogic/Weapon.h
+    Include/GameLogic/WeaponNugget.h
     Include/GameLogic/WeaponBonusConditionFlags.h
     Include/GameLogic/WeaponSet.h
     Include/GameLogic/WeaponSetFlags.h
@@ -847,6 +849,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Behavior/BridgeTowerBehavior.cpp
     Source/GameLogic/Object/Behavior/BunkerBusterBehavior.cpp
     Source/GameLogic/Object/Behavior/CountermeasuresBehavior.cpp
+    Source/GameLogic/Object/Behavior/BezierProjectileBehavior.cpp
     Source/GameLogic/Object/Behavior/DumbProjectileBehavior.cpp
     Source/GameLogic/Object/Behavior/FireWeaponWhenDamagedBehavior.cpp
     Source/GameLogic/Object/Behavior/FireWeaponWhenDeadBehavior.cpp
@@ -1071,6 +1074,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Upgrade/WeaponBonusUpgrade.cpp
     Source/GameLogic/Object/Upgrade/WeaponSetUpgrade.cpp
     Source/GameLogic/Object/Weapon.cpp
+    Source/GameLogic/Object/WeaponNugget.cpp
     Source/GameLogic/Object/WeaponSet.cpp
     Source/GameLogic/ScriptEngine/ScriptActions.cpp
     Source/GameLogic/ScriptEngine/ScriptConditions.cpp

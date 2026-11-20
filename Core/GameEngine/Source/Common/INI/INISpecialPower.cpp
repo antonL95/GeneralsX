@@ -58,14 +58,20 @@ Bool SpecialPowerObjectFilter::matchesTemplate(const ThingTemplate& thing) const
 
 void SpecialPowerObjectFilter::parse(INI* ini, void*, void* store, const void*)
 {
+	SpecialPowerObjectFilter filter;
+	filter.addTokens(ini, ini->getNextToken());
+	*static_cast<SpecialPowerObjectFilter*>(store) = std::move(filter);
+}
+
+void SpecialPowerObjectFilter::addTokens(INI* ini, const char* token)
+{
 	static constexpr const char* rules[] =
 	{
 		"SELF", "ALLIES", "ENEMIES", "NEUTRALS", "SUICIDE", "NOT_SIMILAR", "NOT_AIRBORNE",
 		"PROJECTILES", "SAME_HEIGHT_ONLY", "MINES", "ALL", "ANY", "NONE", "SAME_PLAYER", nullptr
 	};
 	static_assert(std::string_view(rules[12]) == "NONE");
-	SpecialPowerObjectFilter filter;
-	for (const char* token = ini->getNextToken(); token; token = ini->getNextTokenOrNull())
+	for (; token; token = ini->getNextTokenOrNull())
 	{
 		if (token[0] == '+' || token[0] == '-')
 		{
@@ -78,17 +84,16 @@ void SpecialPowerObjectFilter::parse(INI* ini, void*, void* store, const void*)
 			while (kinds[index] && stricmp(name, kinds[index]) != 0)
 				++index;
 			if (kinds[index])
-				(include ? filter.m_includeKinds : filter.m_excludeKinds).set(index);
+				(include ? m_includeKinds : m_excludeKinds).set(index);
 			else
-				(include ? filter.m_includeObjects : filter.m_excludeObjects).emplace_back(name);
+				(include ? m_includeObjects : m_excludeObjects).emplace_back(name);
 		}
 		else
 		{
 			const char* rule = stricmp(token, "NEUTRAL") == 0 ? "NEUTRALS" : token;
-			filter.m_rules |= 1u << INI::scanIndexList(rule, rules);
+			m_rules |= 1u << INI::scanIndexList(rule, rules);
 		}
 	}
-	*static_cast<SpecialPowerObjectFilter*>(store) = std::move(filter);
 }
 
 void SpecialPowerAnimation::parse(INI* ini, void*, void* store, const void*)

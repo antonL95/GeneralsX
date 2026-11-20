@@ -70,6 +70,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/RotwkLocomotorRules.h
     Include/GameLogic/TerrainResourceRules.h
     Include/GameLogic/CastleTemplateStore.h
+    Include/GameLogic/WeaponNuggetRules.h
     Include/GameLogic/RetailTestCommands.h
     Include/GameLogic/Module/CastleBehavior.h
     Include/GameLogic/Module/FoundationAIUpdate.h

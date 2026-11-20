@@ -45,6 +45,7 @@
 #include "GameLogic/Module/MissileAIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Weapon.h"
+#include "GameLogic/WeaponNuggetRules.h"
 
 
 //-----------------------------------------------------------------------------
@@ -111,6 +112,7 @@ DumbProjectileBehavior::DumbProjectileBehavior( Thing *thing, const ModuleData* 
 	m_launcherID = INVALID_ID;
 	m_victimID = INVALID_ID;
 	m_detonationWeaponTmpl = nullptr;
+	m_launchWeaponTmpl = nullptr;
 	m_lifespanFrame = 0;
 	m_flightPath.clear();
 	m_flightPathSegments = 0;
@@ -354,8 +356,9 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
 {
 	const DumbProjectileBehaviorModuleData* d = getDumbProjectileBehaviorModuleData();
 	Object* projectile = getObject();
-	Real weaponSpeed = detWeap ? detWeap->getWeaponSpeed() : 0.0f;
-	Real minWeaponSpeed = detWeap ? detWeap->getMinWeaponSpeed() : 0.0f;
+	const WeaponTemplate* speedWeap = m_launchWeaponTmpl ? m_launchWeaponTmpl : detWeap;
+	Real weaponSpeed = speedWeap ? speedWeap->getWeaponSpeed() : 0.0f;
+	Real minWeaponSpeed = speedWeap ? speedWeap->getMinWeaponSpeed() : 0.0f;
 
 	// if an object, aim at the center, not the ground part
 	Coord3D victimPosToUse;
@@ -364,14 +367,16 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
 	else
 		victimPosToUse = *victimPos;
 
-	if( detWeap  &&  detWeap->isScaleWeaponSpeed() )
+	if( speedWeap && speedWeap->isScaleWeaponSpeed() )
 	{
 		// Some weapons want to scale their start speed to the range
-		Real minRange = detWeap->getMinimumAttackRange();
-		Real maxRange = detWeap->getUnmodifiedAttackRange();
+		Real minRange = speedWeap->getMinimumAttackRange();
+		Real maxRange = speedWeap->getUnmodifiedAttackRange();
 		Real range = WWMath::SqrtOrigin(ThePartitionManager->getDistanceSquared( projectile, &victimPosToUse, FROM_CENTER_2D ) );
 		Real rangeRatio = (range - minRange) / (maxRange - minRange);
 		m_flightPathSpeed = (rangeRatio * (weaponSpeed - minWeaponSpeed)) + minWeaponSpeed;
+		if (m_launchWeaponTmpl)
+			m_flightPathSpeed = WeaponNuggetRules::clampProjectileSpeed(m_flightPathSpeed, m_launchWeaponTmpl->getMaxWeaponSpeed());
 	}
 	else
 	{
@@ -519,8 +524,7 @@ Bool DumbProjectileBehavior::projectileHandleCollision( Object *other )
 
 	}
 
-	// collided with something... blow'd up!
-	detonate();
+	detonate(other);
 
 	// mark ourself as "no collisions" (since we might still exist in slow death mode)
 	getObject()->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_NO_COLLISIONS ) );
@@ -528,7 +532,7 @@ Bool DumbProjectileBehavior::projectileHandleCollision( Object *other )
 }
 
 //-------------------------------------------------------------------------------------------------
-void DumbProjectileBehavior::detonate()
+void DumbProjectileBehavior::detonate(const Object* hit)
 {
   if ( m_hasDetonated )
     return;
@@ -536,7 +540,10 @@ void DumbProjectileBehavior::detonate()
 	Object* obj = getObject();
 	if (m_detonationWeaponTmpl)
 	{
-		TheWeaponStore->handleProjectileDetonation(m_detonationWeaponTmpl, obj, obj->getPosition(), m_extraBonusFlags);
+		ObjectID detonationVictimID = INVALID_ID;
+		if (m_detonationWeaponTmpl->hasNuggets())
+			detonationVictimID = hit ? hit->getID() : (m_detonationWeaponTmpl->hitsStoredTarget() ? m_victimID : INVALID_ID);
+		TheWeaponStore->handleProjectileDetonation(m_detonationWeaponTmpl, obj, obj->getPosition(), m_extraBonusFlags, TRUE, detonationVictimID);
 
 		if ( getDumbProjectileBehaviorModuleData()->m_detonateCallsKill )
 		{
