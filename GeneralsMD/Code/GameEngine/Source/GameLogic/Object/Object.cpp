@@ -4033,7 +4033,7 @@ void Object::crc( Xfer *xfer )
 #if RETAIL_COMPATIBLE_CRC
 	xfer->xferUser(&m_objectUpgradesCompleted,				sizeof(Int64));
 #else
-	xfer->xferUser(&m_objectUpgradesCompleted, sizeof(m_objectUpgradesCompleted));
+	xfer->xferUser(&m_objectUpgradesCompleted, TheUpgradeCenter->getUpgradeMaskCrcBytes());
 #endif
 #ifdef DEBUG_CRC
 	if (doLogging)

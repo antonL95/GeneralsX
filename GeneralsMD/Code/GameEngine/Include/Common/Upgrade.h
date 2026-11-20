@@ -34,6 +34,7 @@
 #include "Common/INI.h"
 #include "Common/Snapshot.h"
 #include "Common/BitFlags.h"
+#include "Common/ZeroHourUpgradeMaskLayout.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Player;
@@ -51,12 +52,11 @@ enum UpgradeStatusType CPP_11(: Int)
 	UPGRADE_STATUS_COMPLETE
 };
 
-//The maximum number of upgrades.
-// TheSuperHackers @tweak Stubbjax 22/01/2026 Increases max upgrade count from Generals:64, Zero Hour:128 to allow for more upgrades.
-// A value of 512 was chosen to allow room for plenty of upgrades while also conserving memory.
-#define UPGRADE_MAX_COUNT 512
+inline constexpr Int UPGRADE_MAX_COUNT = ZeroHourUpgradeMaskLayout::CAPACITY;
+static_assert(UPGRADE_MAX_COUNT >= 512 && UPGRADE_MAX_COUNT % 64 == 0);
 
 typedef BitFlags<UPGRADE_MAX_COUNT, struct UpgradeMaskTypeTag>	UpgradeMaskType;
+static_assert(sizeof(UpgradeMaskType) == UPGRADE_MAX_COUNT / 8);
 
 #define MAKE_UPGRADE_MASK(k) UpgradeMaskType(UpgradeMaskType::kInit, (k))
 #define MAKE_UPGRADE_MASK2(k,a) UpgradeMaskType(UpgradeMaskType::kInit, (k), (a))
@@ -238,6 +238,7 @@ public:
 	virtual void update() override { }										///< subsystem interface
 
 	UpgradeTemplate *firstUpgradeTemplate(); ///< return the first upgrade template
+	Int getUpgradeMaskCrcBytes() const;
 	const UpgradeTemplate *findUpgradeByKey( NameKeyType key ) const; ///< find upgrade by name key
 	const UpgradeTemplate *findUpgrade( const AsciiString& name ) const; ///< find and return upgrade by name
 	const UpgradeTemplate *findUpgrade( const char* name ) const; ///< find and return upgrade by name

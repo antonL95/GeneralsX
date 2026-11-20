@@ -825,6 +825,8 @@ void Xfer::xferUpgradeMask( UpgradeMaskType *upgradeMaskData )
 #else
 		xferImplementation(upgradeMaskData, 16); // The original upgrade mask was 16 bytes in Zero Hour.
 #endif
+#elif RTS_ZEROHOUR
+		xferImplementation(upgradeMaskData, TheUpgradeCenter->getUpgradeMaskCrcBytes());
 #else
 		xferImplementation(upgradeMaskData, sizeof(UpgradeMaskType));
 #endif
