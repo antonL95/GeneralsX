@@ -210,6 +210,7 @@ public:
 	const LocomotorTemplateVector* findLocomotorTemplateVector(LocomotorSetType t) const;
 	static void buildFieldParse(MultiIniFieldParse& p);
 	static void parseLocomotorSet( INI* ini, void *instance, void *store, const void* /*userData*/ );
+	static Int findLocomotorSetType(const AsciiString& name);
 
 private:
 	static void parseTurret( INI* ini, void *instance, void *store, const void* /*userData*/ );

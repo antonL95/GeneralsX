@@ -69,6 +69,7 @@
 #include "GameClient/Shadow.h"
 
 #include "GameLogic/Armor.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
@@ -570,7 +571,23 @@ void ThingTemplate::parseRotWKLocomotorSet(INI* ini, void*, void* store, const v
 {
 	auto& entries = *static_cast<std::vector<RotWKLocomotorSet>*>(store);
 	RotWKLocomotorSet entry;
+	MAYBE_UNUSED const UnsignedInt line = ini->getLineNum();
 	ini->initFromINI(&entry, locomotorSetFields);
+#if !RTS_GENERALS
+	entry.setType = AIUpdateModuleData::findLocomotorSetType(entry.condition);
+	entry.resolved = TheLocomotorStore ? TheLocomotorStore->findOrCreateRotwkVariant(entry.locomotor, entry.speed) : nullptr;
+	if (INIAudit::isEnabled())
+	{
+		if (entry.setType < 0)
+			INIAudit::record("field-error", std::string("Condition = ") + entry.condition.str(), ini->getFilename().str(), line);
+		if (entry.resolved == nullptr)
+			INIAudit::record("field-error", std::string("Locomotor = ") + entry.locomotor.str(), ini->getFilename().str(), line);
+	}
+	else if (entry.resolved == nullptr)
+	{
+		DEBUG_CRASH(("LocomotorSet names unknown locomotor %s", entry.locomotor.str()));
+	}
+#endif
 	const auto existing = std::find_if(entries.begin(), entries.end(), [&entry](const RotWKLocomotorSet& other) {
 		return other.condition.compareNoCase(entry.condition) == 0;
 	});
@@ -578,6 +595,16 @@ void ThingTemplate::parseRotWKLocomotorSet(INI* ini, void*, void* store, const v
 		entries.push_back(entry);
 	else
 		*existing = entry;
+}
+
+const LocomotorTemplate* ThingTemplate::findRotWKLocomotor(Int setType) const
+{
+	for (const RotWKLocomotorSet& entry : m_rotwk.locomotorSets)
+	{
+		if (entry.setType == setType)
+			return entry.resolved;
+	}
+	return nullptr;
 }
 
 void ThingTemplate::parseClientBehavior(INI* ini, void* instance, void*, const void*)

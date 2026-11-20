@@ -40,6 +40,7 @@
 #include "WW3D2/rinfo.h"
 #include "WW3D2/coltest.h"
 #include "WW3D2/lightenvironment.h"
+#include <unordered_set>
 #include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -107,6 +108,7 @@ public:
 
 protected:
 	std::vector<RenderObjClass*> m_floorsDrawnFirst;
+	std::unordered_set<RenderObjClass*> m_floorObjects;
 	void renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, Int localPlayerIndex);
 	void updateFixedLightEnvironments(RenderInfoClass & rinfo);
 	void flushTranslucentObjects(RenderInfoClass & rinfo);

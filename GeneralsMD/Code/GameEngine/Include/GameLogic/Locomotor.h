@@ -154,6 +154,15 @@ public:
 	void friend_setName(const AsciiString& n) { m_name = n; }
 
 	void validate();
+	void applyRotwkSetSpeed(Real speedPerSecond);
+
+	static void parseRotwkSpeedDamaged(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotwkMinSpeed(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotwkMinTurnSpeed(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotwkAcceleration(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotwkBraking(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotwkTurnTime(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotwkTurnTimeDamaged(INI* ini, void* instance, void* store, const void* userData);
 
 private:
 
@@ -247,6 +256,14 @@ private:
 	Real											m_rudderCorrectionRate;
 	Real											m_elevatorCorrectionDegree;
 	Real											m_elevatorCorrectionRate;
+
+	Real											m_rotwkSpeedDamagedFraction;
+	Real											m_rotwkMinSpeedFraction;
+	Real											m_rotwkMinTurnSpeedFraction;
+	UnsignedInt									m_rotwkAccelerationFrames;
+	UnsignedInt									m_rotwkBrakingFrames;
+	UnsignedInt									m_rotwkTurnFrames;
+	UnsignedInt									m_rotwkTurnFramesDamaged;
 };
 
 typedef OVERRIDE<LocomotorTemplate> LocomotorTemplateOverride;
@@ -518,6 +535,8 @@ public:
 	*/
 	const LocomotorTemplate* findLocomotorTemplate(NameKeyType namekey) const;
 	LocomotorTemplate* findLocomotorTemplate(NameKeyType namekey);
+
+	const LocomotorTemplate* findOrCreateRotwkVariant(const AsciiString& locomotorName, Real speedPerSecond);
 
 	Locomotor* newLocomotor(const LocomotorTemplate *tmpl) const
 	{

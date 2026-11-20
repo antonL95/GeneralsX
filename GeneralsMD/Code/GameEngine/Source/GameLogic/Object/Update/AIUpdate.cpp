@@ -195,6 +195,16 @@ const LocomotorTemplateVector* AIUpdateModuleData::findLocomotorTemplateVector(L
 	}
 }
 
+Int AIUpdateModuleData::findLocomotorSetType(const AsciiString& name)
+{
+	for (Int i = 0; TheLocomotorSetNames[i]; ++i)
+	{
+		if (name.compareNoCase(TheLocomotorSetNames[i]) == 0)
+			return i;
+	}
+	return -1;
+}
+
 //-------------------------------------------------------------------------------------------------
 // subclasses may want to override this, to use a subclass of AIStateMachine.
 AIStateMachine* AIUpdateInterface::makeStateMachine()
@@ -842,6 +852,15 @@ Bool AIUpdateInterface::chooseLocomotorSetExplicit(LocomotorSetType wst)
 			if (lt)
 				m_locomotorSet.addLocomotor(lt);
 		}
+		m_curLocomotorSet = wst;
+		return TRUE;
+	}
+	const LocomotorTemplate* rotwk = getObject()->getTemplate()->findRotWKLocomotor(wst);
+	if (rotwk)
+	{
+		m_locomotorSet.clear();
+		m_curLocomotor = nullptr;
+		m_locomotorSet.addLocomotor(rotwk);
 		m_curLocomotorSet = wst;
 		return TRUE;
 	}

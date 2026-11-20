@@ -39,6 +39,7 @@
 #include "Common/Player.h"
 #include "Common/Money.h"
 #include "Common/Radar.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/RandomValue.h"
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
@@ -385,10 +386,11 @@ public:
 	{
 		m_task = task;
 		m_enterFrame = 0;
+		m_builderInside = FALSE;
 	}
 	virtual StateReturnType update() override;
 	virtual StateReturnType onEnter() override;
-	virtual void onExit( StateExitType status ) override { }
+	virtual void onExit( StateExitType status ) override;
 
 protected:
 	// snapshot interface
@@ -400,6 +402,9 @@ protected:
 
 	DozerTask m_task;						///< our task
 	UnsignedInt m_enterFrame;		///< frame we entered this state on
+	Bool m_builderInside;
+
+	void setBuilderInside( Bool inside );
 
 };
 EMPTY_DTOR(DozerActionDoActionState)
@@ -417,12 +422,14 @@ void DozerActionDoActionState::crc( Xfer *xfer )
 void DozerActionDoActionState::xfer( Xfer *xfer )
 {
   // version
-  XferVersion currentVersion = 1;
+  XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
 	xfer->xferUser(&m_task, sizeof(m_task));
 	xfer->xferUnsignedInt(&m_enterFrame);
+	if( version >= 2 )
+		xfer->xferBool(&m_builderInside);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -430,6 +437,23 @@ void DozerActionDoActionState::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void DozerActionDoActionState::loadPostProcess()
 {
+}
+
+void DozerActionDoActionState::setBuilderInside( Bool inside )
+{
+	Object *dozer = getMachineOwner();
+	m_builderInside = inside;
+	dozer->setStatus( MAKE_OBJECT_STATUS_MASK3( OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_MASKED, OBJECT_STATUS_NO_COLLISIONS ), inside );
+	if( Drawable *draw = dozer->getDrawable() )
+		draw->setDrawableHidden( inside );
+	if( inside )
+		TheGameLogic->deselectObject( dozer, PLAYERMASK_ALL, TRUE );
+}
+
+void DozerActionDoActionState::onExit( StateExitType status )
+{
+	if( m_builderInside )
+		setBuilderInside( FALSE );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -514,6 +538,8 @@ StateReturnType DozerActionDoActionState::update()
 				if( ai->isIdle() )
 				{
 					dozerAI->setBuildSubTask( DOZER_DO_BUILD_AT_DOCK );
+					if( RetailFileLayers::enabled() )
+						setBuilderInside( TRUE );
 					// Get the audio sound and start playing the construction sound (get the sound
 					// from the building itself)
 					dozerAI->startBuildingSound( goalObject->getTemplate()->getPerUnitSound( "UnderConstruction" ), goalObject->getID() );

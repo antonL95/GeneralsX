@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "Common/BuildAssistant.h"
 #include "Common/GameEngine.h"
 #include "Common/MessageStream.h"
 #include "Common/NameKeyGenerator.h"
@@ -29,6 +30,9 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/UpgradeModule.h"
+#include "GameLogic/Locomotor.h"
+#include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 
@@ -44,6 +48,9 @@ struct Command
 	std::string target;
 	int ordinal = 0;
 	std::string structure;
+	Coord3D location = {0.0f, 0.0f, 0.0f};
+	Real angle = 0.0f;
+	bool hasLocation = false;
 };
 
 struct MetaKey
@@ -96,14 +103,20 @@ void load()
 		char player[64] = {};
 		char target[128] = {};
 		char structure[128] = {};
-		const int fields = std::sscanf(line, "%u %31s %63s %127s %d %127s", &command.frame, action, player, target,
-			&command.ordinal, structure);
+		float x = 0.0f;
+		float y = 0.0f;
+		float angle = 0.0f;
+		const int fields = std::sscanf(line, "%u %31s %63s %127s %d %127s %f %f %f", &command.frame, action, player, target,
+			&command.ordinal, structure, &x, &y, &angle);
 		if (fields < 5)
 			continue;
 		command.action = action;
 		command.player = player;
 		command.target = target;
 		command.structure = structure;
+		command.hasLocation = fields >= 8;
+		command.location.set(x, y, 0.0f);
+		command.angle = angle;
 		s_commands.push_back(std::move(command));
 	}
 	std::fclose(file);
@@ -139,6 +152,13 @@ Bool readPoint(const Command& command, const Object* obj, Coord3D& point)
 	return TRUE;
 }
 
+void selectGroup(Object* obj)
+{
+	GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+	select->appendBooleanArgument(TRUE);
+	select->appendObjectIDArgument(obj->getID());
+}
+
 void selectObject(Object* obj)
 {
 	if (TheInGameUI && obj->getDrawable())
@@ -146,9 +166,7 @@ void selectObject(Object* obj)
 		TheInGameUI->deselectAllDrawables();
 		TheInGameUI->selectDrawable(obj->getDrawable());
 	}
-	GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
-	select->appendBooleanArgument(TRUE);
-	select->appendObjectIDArgument(obj->getID());
+	selectGroup(obj);
 }
 
 GameWindow* commandWindow(int index)
@@ -362,11 +380,87 @@ void dumpPlayer(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST player_obj %u %s %s id=%u upgradedModules=%d commandSet=%s\n", frame,
 			command.player.c_str(), obj->getTemplate()->getName().str(), static_cast<unsigned>(obj->getID()),
 			upgradedModules, obj->getCommandSetString().str());
+Coord3D groundLocation(const Command& command)
+{
+	Coord3D location = command.location;
+	location.z = TheTerrainLogic->getGroundHeight(location.x, location.y);
+	return location;
+}
+
+void logObject(const Object* obj, unsigned int frame)
+{
+	const Coord3D* pos = obj->getPosition();
+	std::fprintf(stderr, "TEST frame %u: object %u %s pos %.3f %.3f %.3f angle %.4f", frame,
+		static_cast<unsigned>(obj->getID()), obj->getTemplate()->getName().str(), pos->x, pos->y, pos->z,
+		obj->getOrientation());
+	const AIUpdateInterface* ai = obj->getAI();
+	if (ai)
+	{
+		const Locomotor* locomotor = ai->getCurLocomotor();
+		std::fprintf(stderr, " state %d moving %d path %d set %d locomotor %s speed %.4f",
+			static_cast<int>(ai->getAIStateType()), ai->isMoving() ? 1 : 0, ai->getPath() ? 1 : 0,
+			static_cast<int>(ai->getCurLocomotorSetType()), locomotor ? locomotor->getTemplateName().str() : "none",
+			locomotor ? locomotor->getMaxSpeedForCondition(BODY_PRISTINE) : 0.0f);
+	}
+	const PhysicsBehavior* physics = obj->getPhysics();
+	if (physics)
+		std::fprintf(stderr, " velocity %.4f", physics->getVelocityMagnitude());
+	std::fprintf(stderr, " construction %.2f\n", obj->getConstructionPercent());
+}
+
+void logBuildChecks(Object* builder, const ThingTemplate* what, const Command& command, unsigned int frame)
+{
+	const Coord3D location = groundLocation(command);
+	const LegalBuildCode legal = TheBuildAssistant->isLocationLegalToBuild(&location, what, command.angle,
+		BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::CLEAR_PATH | BuildAssistant::NO_OBJECT_OVERLAP |
+			BuildAssistant::USE_QUICK_PATHFIND,
+		builder, builder->getControllingPlayer());
+	std::fprintf(stderr, "TEST frame %u: check %s canMake %d possible %d legal %d at %.1f %.1f cost %d money %u\n", frame,
+		what->getName().str(), static_cast<int>(TheBuildAssistant->canMakeUnit(builder, what)),
+		TheBuildAssistant->isPossibleToMakeUnit(builder, what) ? 1 : 0, static_cast<int>(legal), location.x, location.y,
+		what->calcCostToBuild(builder->getControllingPlayer()), builder->getControllingPlayer()->getMoney()->countMoney());
+}
+
+void logButtons(Object* obj, const Command& command, unsigned int frame)
+{
+	if (!TheControlBar)
+		return;
+	const CommandSet* set = TheControlBar->findCommandSet(obj->getCommandSetString());
+	std::fprintf(stderr, "TEST frame %u: command set %s\n", frame, obj->getCommandSetString().str());
+	if (!set)
+		return;
+	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
+	{
+		const CommandButton* button = set->getCommandButton(i);
+		if (!button)
+			continue;
+		const ThingTemplate* what = button->getThingTemplate();
+		std::fprintf(stderr, "TEST frame %u: slot %d %s type %d object %s\n", frame, i + 1, button->getName().str(),
+			static_cast<int>(button->getCommandType()), what ? what->getName().str() : "-");
+		if (what && button->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT && command.hasLocation)
+			logBuildChecks(obj, what, command, frame);
+	}
+}
+
+void logAllObjects(unsigned int frame)
+{
+	for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+	{
+		const Coord3D* pos = obj->getPosition();
+		const Player* owner = obj->getControllingPlayer();
+		std::fprintf(stderr, "TEST all %u %u %s %.4f %.4f %.4f %.6f %d %.4f %d\n", frame, static_cast<unsigned>(obj->getID()),
+			obj->getTemplate()->getName().str(), pos->x, pos->y, pos->z, obj->getOrientation(),
+			owner ? owner->getPlayerIndex() : -1, obj->getConstructionPercent(), obj->isEffectivelyDead() ? 1 : 0);
 	}
 }
 
 void execute(const Command& command, unsigned int frame)
 {
+	if (command.action == "logall")
+	{
+		logAllObjects(frame);
+		return;
+	}
 	if (command.action == "key")
 	{
 		sendKey(command, frame);
@@ -422,6 +516,10 @@ void execute(const Command& command, unsigned int frame)
 			command.target.c_str());
 		obj->kill();
 	}
+	else if (command.action == "log")
+	{
+		logObject(obj, frame);
+	}
 	else if (command.action == "select")
 	{
 		selectObject(obj);
@@ -432,6 +530,40 @@ void execute(const Command& command, unsigned int frame)
 		clickButton(command, frame);
 	else if (command.action == "place")
 		placeStructure(command, obj, frame);
+	else if (command.action == "move" && command.hasLocation)
+	{
+		const Coord3D location = groundLocation(command);
+		selectGroup(obj);
+		GameMessage* move = TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO);
+		move->appendLocationArgument(location);
+		std::fprintf(stderr, "TEST frame %u: move object %u to %.1f %.1f\n", frame, static_cast<unsigned>(obj->getID()),
+			location.x, location.y);
+	}
+	else if (command.action == "camera" && command.hasLocation && TheTacticalView)
+	{
+		const Coord3D location = groundLocation(command);
+		TheTacticalView->lookAt(&location);
+		std::fprintf(stderr, "TEST frame %u: camera at %.1f %.1f\n", frame, location.x, location.y);
+	}
+	else if (command.action == "buttons")
+	{
+		logButtons(obj, command, frame);
+	}
+	else if (command.action == "construct" && command.hasLocation)
+	{
+		const ThingTemplate* what = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
+		if (!what)
+			return;
+		logBuildChecks(obj, what, command, frame);
+		const Coord3D location = groundLocation(command);
+		selectGroup(obj);
+		GameMessage* build = TheMessageStream->appendMessage(GameMessage::MSG_DOZER_CONSTRUCT);
+		build->appendIntegerArgument(what->getTemplateID());
+		build->appendLocationArgument(location);
+		build->appendRealArgument(command.angle);
+		std::fprintf(stderr, "TEST frame %u: construct %s by object %u at %.1f %.1f\n", frame, command.structure.c_str(),
+			static_cast<unsigned>(obj->getID()), location.x, location.y);
+	}
 	else
 		orderToPoint(command, obj, frame);
 }

@@ -37,6 +37,8 @@
 #define DEFINE_LOCO_APPEARANCE_NAMES
 
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Locomotor.h"
@@ -389,6 +391,14 @@ LocomotorTemplate::LocomotorTemplate()
 	m_elevatorCorrectionDegree  = 0.0f;
 	m_elevatorCorrectionRate    = 0.0f;
 
+	m_rotwkSpeedDamagedFraction = -1.0f;
+	m_rotwkMinSpeedFraction = 0.0f;
+	m_rotwkMinTurnSpeedFraction = -1.0f;
+	m_rotwkAccelerationFrames = 0;
+	m_rotwkBrakingFrames = 0;
+	m_rotwkTurnFrames = 0;
+	m_rotwkTurnFramesDamaged = 0;
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -517,6 +527,94 @@ static void parseFrictionPerSec( INI* ini, void * /*instance*/, void *store, con
 	*(Real *)store = fricPerFrame;
 }
 
+static Bool usesRotwkLocomotorFields()
+{
+	return RetailFileLayers::enabled() || INIAudit::isEnabled();
+}
+
+static void skipNonRotwkField(INI* ini)
+{
+	DEBUG_CRASH(("[LINE: %d - FILE: '%s'] Unknown field in Locomotor", ini->getLineNum(), ini->getFilename().str()));
+	ini->getNextTokenOrNull();
+}
+
+void LocomotorTemplate::parseRotwkSpeedDamaged(INI* ini, void* instance, void* store, const void* userData)
+{
+	if (usesRotwkLocomotorFields())
+		static_cast<LocomotorTemplate*>(instance)->m_rotwkSpeedDamagedFraction = INI::scanPercentToReal(ini->getNextToken());
+	else
+		INI::parseVelocityReal(ini, instance, store, userData);
+}
+
+void LocomotorTemplate::parseRotwkMinSpeed(INI* ini, void* instance, void* store, const void* userData)
+{
+	if (usesRotwkLocomotorFields())
+		static_cast<LocomotorTemplate*>(instance)->m_rotwkMinSpeedFraction = INI::scanPercentToReal(ini->getNextToken());
+	else
+		INI::parseVelocityReal(ini, instance, store, userData);
+}
+
+void LocomotorTemplate::parseRotwkMinTurnSpeed(INI* ini, void* instance, void* store, const void* userData)
+{
+	if (usesRotwkLocomotorFields())
+		static_cast<LocomotorTemplate*>(instance)->m_rotwkMinTurnSpeedFraction = INI::scanPercentToReal(ini->getNextToken());
+	else
+		INI::parseVelocityReal(ini, instance, store, userData);
+}
+
+void LocomotorTemplate::parseRotwkAcceleration(INI* ini, void* instance, void* store, const void* userData)
+{
+	if (usesRotwkLocomotorFields())
+		INI::parseDurationUnsignedInt(ini, instance, &static_cast<LocomotorTemplate*>(instance)->m_rotwkAccelerationFrames, userData);
+	else
+		INI::parseAccelerationReal(ini, instance, store, userData);
+}
+
+void LocomotorTemplate::parseRotwkBraking(INI* ini, void* instance, void* store, const void* userData)
+{
+	if (usesRotwkLocomotorFields())
+		INI::parseDurationUnsignedInt(ini, instance, &static_cast<LocomotorTemplate*>(instance)->m_rotwkBrakingFrames, userData);
+	else
+		INI::parseAccelerationReal(ini, instance, store, userData);
+}
+
+void LocomotorTemplate::parseRotwkTurnTime(INI* ini, void* instance, void* store, const void* userData)
+{
+	if (usesRotwkLocomotorFields())
+		INI::parseDurationUnsignedInt(ini, instance, store, userData);
+	else
+		skipNonRotwkField(ini);
+}
+
+void LocomotorTemplate::parseRotwkTurnTimeDamaged(INI* ini, void* instance, void* store, const void* userData)
+{
+	if (usesRotwkLocomotorFields())
+		INI::parseDurationUnsignedInt(ini, instance, store, userData);
+	else
+		skipNonRotwkField(ini);
+}
+
+void LocomotorTemplate::applyRotwkSetSpeed(Real speedPerSecond)
+{
+	const Real speed = speedPerSecond > 0.0f ? speedPerSecond * SECONDS_PER_LOGICFRAME_REAL : m_maxSpeed;
+	m_maxSpeed = speed;
+	m_maxSpeedDamaged = m_rotwkSpeedDamagedFraction >= 0.0f ? speed * m_rotwkSpeedDamagedFraction : speed;
+	m_minSpeed = speed * m_rotwkMinSpeedFraction;
+	if (m_rotwkMinTurnSpeedFraction >= 0.0f)
+		m_minTurnSpeed = speed * m_rotwkMinTurnSpeedFraction;
+
+	m_acceleration = m_rotwkAccelerationFrames > 0 ? speed / (Real)m_rotwkAccelerationFrames : speed;
+	m_accelerationDamaged = m_acceleration;
+	if (m_rotwkBrakingFrames > 0)
+		m_braking = speed / (Real)m_rotwkBrakingFrames;
+
+	if (m_rotwkTurnFrames > 0)
+		m_maxTurnRate = (2.0f * PI) / (Real)m_rotwkTurnFrames;
+	m_maxTurnRateDamaged = m_rotwkTurnFramesDamaged > 0 ? (2.0f * PI) / (Real)m_rotwkTurnFramesDamaged : m_maxTurnRate;
+
+	validate();
+}
+
 //-------------------------------------------------------------------------------------------------
 const FieldParse* LocomotorTemplate::getFieldParse() const
 {
@@ -524,16 +622,18 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 	{
 		{ "Surfaces", INI::parseBitString32, TheLocomotorSurfaceTypeNames, offsetof(LocomotorTemplate, m_surfaces) },
 		{ "Speed", INI::parseVelocityReal, nullptr, offsetof(LocomotorTemplate, m_maxSpeed) },
-		{ "SpeedDamaged", INI::parseVelocityReal, nullptr, offsetof( LocomotorTemplate, m_maxSpeedDamaged ) },
+		{ "SpeedDamaged", parseRotwkSpeedDamaged, nullptr, offsetof( LocomotorTemplate, m_maxSpeedDamaged ) },
 		{ "TurnRate", INI::parseAngularVelocityReal, nullptr, offsetof(LocomotorTemplate, m_maxTurnRate) },
 		{ "TurnRateDamaged", INI::parseAngularVelocityReal, nullptr, offsetof( LocomotorTemplate, m_maxTurnRateDamaged ) },
-		{ "Acceleration", INI::parseAccelerationReal, nullptr, offsetof(LocomotorTemplate, m_acceleration) },
+		{ "Acceleration", parseRotwkAcceleration, nullptr, offsetof(LocomotorTemplate, m_acceleration) },
 		{ "AccelerationDamaged", INI::parseAccelerationReal, nullptr, offsetof( LocomotorTemplate, m_accelerationDamaged ) },
 		{ "Lift", INI::parseAccelerationReal, nullptr, offsetof(LocomotorTemplate, m_lift) },
 		{ "LiftDamaged", INI::parseAccelerationReal, nullptr, offsetof( LocomotorTemplate, m_liftDamaged ) },
-		{ "Braking", INI::parseAccelerationReal, nullptr, offsetof(LocomotorTemplate, m_braking) },
-		{ "MinSpeed", INI::parseVelocityReal, nullptr, offsetof(LocomotorTemplate, m_minSpeed) },
-		{ "MinTurnSpeed", INI::parseVelocityReal, nullptr, offsetof(LocomotorTemplate, m_minTurnSpeed) },
+		{ "Braking", parseRotwkBraking, nullptr, offsetof(LocomotorTemplate, m_braking) },
+		{ "MinSpeed", parseRotwkMinSpeed, nullptr, offsetof(LocomotorTemplate, m_minSpeed) },
+		{ "MinTurnSpeed", parseRotwkMinTurnSpeed, nullptr, offsetof(LocomotorTemplate, m_minTurnSpeed) },
+		{ "TurnTime", parseRotwkTurnTime, nullptr, offsetof(LocomotorTemplate, m_rotwkTurnFrames) },
+		{ "TurnTimeDamaged", parseRotwkTurnTimeDamaged, nullptr, offsetof(LocomotorTemplate, m_rotwkTurnFramesDamaged) },
 		{ "PreferredHeight", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredHeight) },
 		{ "PreferredHeightDamping", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredHeightDamping) },
 		{ "CirclingRadius", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_circlingRadius) },
@@ -638,6 +738,28 @@ const LocomotorTemplate* LocomotorStore::findLocomotorTemplate(NameKeyType namek
 	{
 		return (*it).second;
 	}
+}
+
+const LocomotorTemplate* LocomotorStore::findOrCreateRotwkVariant(const AsciiString& locomotorName, Real speedPerSecond)
+{
+	AsciiString variantName;
+	variantName.format("%s:%.3f", locomotorName.str(), speedPerSecond);
+	const NameKeyType variantKey = NAMEKEY(variantName);
+	if (const LocomotorTemplate* existing = findLocomotorTemplate(variantKey))
+		return existing;
+
+	const LocomotorTemplate* base = findLocomotorTemplate(NAMEKEY(locomotorName));
+	if (base == nullptr)
+		return nullptr;
+
+	LocomotorTemplate* variant = newInstance(LocomotorTemplate);
+	*variant = *static_cast<const LocomotorTemplate*>(base->getFinalOverride());
+	variant->setNextOverride(nullptr);
+	variant->markAsOverride(false);
+	variant->friend_setName(variantName);
+	variant->applyRotwkSetSpeed(speedPerSecond);
+	m_locomotorTemplates[variantKey] = variant;
+	return variant;
 }
 
 //-------------------------------------------------------------------------------------------------

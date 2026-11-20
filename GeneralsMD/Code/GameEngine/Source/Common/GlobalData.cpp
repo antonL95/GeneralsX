@@ -50,6 +50,7 @@
 #include "Common/GameAudio.h"
 #include "Common/INI.h"
 #include "Common/Registry.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/OptionPreferences.h"
 #include "Common/version.h"
 
@@ -1266,6 +1267,12 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// parse the ini weapon definition
 	ini->initFromINI( TheWritableGlobalData, s_GlobalDataFieldParseTable );
 
+
+	if (RetailFileLayers::enabled())
+	{
+		TheWritableGlobalData->m_useAlternateMouse = TRUE;
+		TheWritableGlobalData->m_useRightMouseScrollWithAlternateMouse = TheWritableGlobalData->m_rightMouseAlwaysScrolls;
+	}
 
 	// override INI values with user preferences
 	OptionPreferences optionPref;

@@ -2,7 +2,9 @@
 #include "Common/GlobalData.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/Xfer.h"
+#include "Common/ThingTemplate.h"
 #include "GameClient/Drawable.h"
+#include "GameClient/View.h"
 #include "W3DDevice/GameClient/Module/W3DFloorDraw.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
@@ -143,6 +145,18 @@ void W3DFloorDraw::removeModel()
 	}
 }
 
+static Int floorPickType(const ThingTemplate* tmplate)
+{
+	if (tmplate == nullptr || tmplate->isKindOf(KINDOF_CLICK_THROUGH))
+		return 0;
+	Int type = 0;
+	if (tmplate->isKindOf(KINDOF_SELECTABLE))
+		type |= PICK_TYPE_SELECTABLE;
+	if (tmplate->isKindOf(KINDOF_FORCEATTACKABLE))
+		type |= PICK_TYPE_FORCEATTACKABLE;
+	return type;
+}
+
 void W3DFloorDraw::updateModel()
 {
 	removeModel();
@@ -154,7 +168,7 @@ void W3DFloorDraw::updateModel()
 	if (!m_model)
 		return;
 
-	m_model->Set_Collision_Type(0);
+	m_model->Set_Collision_Type(floorPickType(getDrawable()->getTemplate()));
 	m_model->Set_User_Data(getDrawable()->getDrawableInfo());
 	W3DDisplay::m_3DScene->addFloorRenderObject(m_model, data->m_forceToBack);
 }

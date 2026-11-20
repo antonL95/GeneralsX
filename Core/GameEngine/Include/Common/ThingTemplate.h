@@ -53,6 +53,7 @@
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class AIUpdateModuleData;
+class LocomotorTemplate;
 class Image;
 class Object;
 class Drawable;
@@ -451,6 +452,8 @@ public:
 		AsciiString condition;
 		AsciiString locomotor;
 		Real speed = 0;
+		Int setType = -1;
+		const LocomotorTemplate* resolved = nullptr;
 	};
 
 	struct ClientBehavior
@@ -576,6 +579,7 @@ public:
 	ThingTemplate();
 
 	const RotWKObjectData& getRotWKObjectData() const { return m_rotwk; }
+	const LocomotorTemplate* findRotWKLocomotor(Int setType) const;
 	void parseObjectFields(INI* ini, Bool isChild);
 
 	// copy the guts of that into this, but preserve this' name, id, and list-links.

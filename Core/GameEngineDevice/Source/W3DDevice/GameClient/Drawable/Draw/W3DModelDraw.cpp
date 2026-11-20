@@ -45,6 +45,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/GameLOD.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
@@ -2240,6 +2241,25 @@ void W3DModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 	}
 }
 
+void W3DModelDraw::driveBuildUpAnimation()
+{
+	if (!RetailFileLayers::enabled() || m_renderObject == nullptr || m_renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD)
+		return;
+	const Object* obj = getDrawable()->getObject();
+	if (obj == nullptr || !obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || obj->getConstructionPercent() < 0.0f)
+		return;
+	HLodClass* hlod = static_cast<HLodClass*>(m_renderObject);
+	float frame = 0.0f;
+	int numFrames = 0;
+	int mode = 0;
+	float mult = 1.0f;
+	HAnimClass* anim = hlod->Peek_Animation_And_Info(frame, numFrames, mode, mult);
+	if (anim == nullptr || mode != RenderObjClass::ANIM_MODE_MANUAL || numFrames < 2)
+		return;
+	const Real progress = min(obj->getConstructionPercent(), 100.0f) / 100.0f;
+	hlod->Set_Animation(anim, progress * (Real)(numFrames - 1), RenderObjClass::ANIM_MODE_MANUAL);
+}
+
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 {
@@ -2294,6 +2314,7 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	}
 
 	adjustAnimSpeedToMovementSpeed();
+	driveBuildUpAnimation();
 
 	// set our position in the render object to our position of the drawable
 	if (m_renderObject)

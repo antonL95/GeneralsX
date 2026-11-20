@@ -249,11 +249,13 @@ void RTS3DScene::Add_Render_Object(RenderObjClass* object)
 void RTS3DScene::Remove_Render_Object(RenderObjClass* object)
 {
 	std::erase(m_floorsDrawnFirst, object);
+	m_floorObjects.erase(object);
 	SimpleSceneClass::Remove_Render_Object(object);
 }
 
 void RTS3DScene::addFloorRenderObject(RenderObjClass* object, Bool forceToBack)
 {
+	m_floorObjects.insert(object);
 	if (forceToBack)
 	{
 		SimpleSceneClass::Add_Render_Object(object);
@@ -266,6 +268,7 @@ void RTS3DScene::addFloorRenderObject(RenderObjClass* object, Bool forceToBack)
 void RTS3DScene::Remove_All_Render_Objects()
 {
 	m_floorsDrawnFirst.clear();
+	m_floorObjects.clear();
 	SimpleSceneClass::Remove_All_Render_Objects();
 }
 
@@ -401,6 +404,7 @@ Bool RTS3DScene::castRay(RayCollisionTestClass & raytest, Bool testAll, Int coll
 				continue;	//no intersection
 
 			//Do a more accurate test against object geometry
+			tempRayTest.CheckTranslucent = m_floorObjects.count(robj) == 0;
 			if (robj->Cast_Ray(tempRayTest))
 			{
 				//Found an object closer than last closest object

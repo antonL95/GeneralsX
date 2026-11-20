@@ -549,6 +549,7 @@ private:
 	void nukeCurrentRender(Matrix3D* xform);
 	void doStartOrStopParticleSys();
 	void adjustAnimSpeedToMovementSpeed();
+	void driveBuildUpAnimation();
 	static void hideAllMuzzleFlashes(const ModelConditionInfo* state, RenderObjClass* renderObject);
 	void hideAllHeadlights(Bool hide);
 	Bool headlightBeam(Vector3& origin, Vector3& direction, Real& reach) const;
