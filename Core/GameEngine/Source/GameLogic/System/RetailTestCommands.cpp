@@ -1172,14 +1172,6 @@ void execute(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST frame %u: produce %s on object %u queued=%d\n", frame, command.structure.c_str(),
 			static_cast<unsigned>(obj->getID()), queued);
 	}
-	else if (command.action == "objupgrade")
-	{
-		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(command.structure.c_str());
-		if (upgrade)
-			obj->giveUpgrade(upgrade);
-		std::fprintf(stderr, "TEST frame %u: objupgrade %s on object %u found=%d\n", frame, command.structure.c_str(),
-			static_cast<unsigned>(obj->getID()), upgrade != nullptr);
-	}
 	else if (command.action == "powers")
 	{
 		for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)

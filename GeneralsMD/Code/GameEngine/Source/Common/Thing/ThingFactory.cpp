@@ -49,6 +49,7 @@
 #include "GameClient/Drawable.h"
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
+#include "Common/GameState.h"
 
 
 enum { TEMPLATE_HASH_SIZE = 12288 };
@@ -356,7 +357,8 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 	ThePartitionManager->registerObject( obj );
 
 	obj->initObject();
-	ExperienceLevelStore::onObjectCreated(obj);
+	if (!TheGameState || !TheGameState->isInLoadGame())
+		ExperienceLevelStore::onObjectCreated(obj);
 
 	return obj;
 
