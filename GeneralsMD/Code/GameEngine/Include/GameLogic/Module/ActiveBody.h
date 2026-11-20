@@ -50,12 +50,15 @@ class ActiveBodyModuleData : public BodyModuleData
 public:
 	Real m_maxHealth;
 	Real m_initialHealth;
+	Bool m_initialHealthSet;
 
 	Real m_subdualDamageCap;								///< Subdual damage will never accumulate past this
 	UnsignedInt m_subdualDamageHealRate;		///< Every this often, we drop subdual damage...
 	Real m_subdualDamageHealAmount;					///< by this much.
 
 	ActiveBodyModuleData();
+
+	Real getStartingHealth() const;
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 };
