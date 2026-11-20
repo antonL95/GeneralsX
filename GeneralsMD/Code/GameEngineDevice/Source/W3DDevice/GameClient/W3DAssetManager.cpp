@@ -347,6 +347,45 @@ Int W3DAssetManager::replaceMeshTexture(RenderObjClass *robj, TextureClass *oldT
 	been customized with house color will not be affected unless they are created after
 	this function is called.
 */
+void W3DAssetManager::replaceInstanceTextures(RenderObjClass* object,
+	const std::vector<std::pair<AsciiString, AsciiString>>& swaps, Int color, const std::vector<AsciiString>* exclusions)
+{
+	Make_Unique(object, TRUE, color != 0);
+	Bool replaced = FALSE;
+	for (const auto& [original, replacement] : swaps)
+		replaced |= replacePrototypeTexture(object, original.str(), replacement.str());
+	if (replaced && color)
+		recolorInstanceParts(object, color, exclusions);
+}
+
+void W3DAssetManager::recolorInstanceParts(RenderObjClass* object, Int color, const std::vector<AsciiString>* exclusions)
+{
+	if (exclusions)
+	{
+		const char* name = object->Get_Name();
+		const char* separator = strchr(name, '.');
+		for (const AsciiString& excluded : *exclusions)
+		{
+			if (!excluded.compareNoCase(name) || (separator && !excluded.compareNoCase(separator + 1)))
+				return;
+		}
+	}
+	if (object->Class_ID() == RenderObjClass::CLASSID_MESH)
+	{
+		Recolor_Mesh(object, color);
+		return;
+	}
+	for (Int i = 0; i < object->Get_Num_Sub_Objects(); ++i)
+	{
+		RenderObjClass* child = object->Get_Sub_Object(i);
+		if (child)
+		{
+			recolorInstanceParts(child, color, exclusions);
+			child->Release_Ref();
+		}
+	}
+}
+
 int W3DAssetManager::replacePrototypeTexture(RenderObjClass *robj, const char * oldname, const char * newname)
 {
 	//search model for old texture

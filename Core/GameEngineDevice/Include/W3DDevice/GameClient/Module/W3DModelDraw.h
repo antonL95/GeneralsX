@@ -149,6 +149,8 @@ typedef std::map< NameKeyType, PristineBoneInfo, std::less<NameKeyType>/**/> Pri
 
 //-------------------------------------------------------------------------------------------------
 
+class SubObjectsUpgradeModuleData;
+
 struct ModelConditionInfo
 {
 	struct HideShowSubObjInfo
@@ -214,6 +216,7 @@ struct ModelConditionInfo
 #endif
 	std::vector<ModelConditionFlags>	m_conditionsYesVec;
 	AsciiString												m_modelName;
+	std::vector<std::pair<AsciiString, AsciiString>> m_textureSwaps;
 	std::vector<HideShowSubObjInfo>		m_hideShowVec;
 	mutable std::vector<AsciiString>	m_publicBones;
 	AsciiString												m_weaponFireFXBoneName[WEAPONSLOT_COUNT];
@@ -517,6 +520,7 @@ private:
 
 
 	const ModelConditionInfo*			m_curState;
+	std::vector<const SubObjectsUpgradeModuleData*> m_textureUpgrades;
 	const ModelConditionInfo*			m_nextState;
 	UnsignedInt										m_nextStateAnimLoopDuration;
 	Int														m_hexColor;

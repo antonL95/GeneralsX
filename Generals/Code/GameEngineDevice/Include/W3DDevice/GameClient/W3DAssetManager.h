@@ -45,6 +45,10 @@
 #pragma once
 
 #include "WW3D2/assetmgr.h"
+#include "Common/AsciiString.h"
+
+#include <utility>
+#include <vector>
 
 class Vector3;
 class VertexMaterialClass;
@@ -75,8 +79,11 @@ public:
 	virtual RenderObjClass * Create_Render_Obj(const char * name,float scale, const int color, const char *oldTexture=nullptr, const char *newTexture=nullptr);
 	///Swaps the specified textures in the render object prototype.
 	int replacePrototypeTexture(RenderObjClass *robj, const char * oldname, const char * newname);
+	void replaceInstanceTextures(RenderObjClass* object, const std::vector<std::pair<AsciiString, AsciiString>>& swaps,
+		Int color = 0, const std::vector<AsciiString>* exclusions = nullptr);
 
 private:
+	void recolorInstanceParts(RenderObjClass* object, Int color, const std::vector<AsciiString>* exclusions);
 	void Make_Mesh_Unique(RenderObjClass *robj,Bool geometry, Bool colors);
 	void Make_HLOD_Unique(RenderObjClass *robj,Bool geometry, Bool colors);
 	void Make_Unique(RenderObjClass *robj,Bool geometry, Bool colors);

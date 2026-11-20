@@ -651,6 +651,18 @@ void execute(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST frame %u: %s %s on object %u\n", frame, command.action.c_str(), command.structure.c_str(),
 			static_cast<unsigned>(obj->getID()));
 	}
+	else if (command.action == "research")
+	{
+		const auto* upgrade = TheUpgradeCenter->findUpgrade(command.structure.c_str());
+		auto* production = obj->getProductionUpdateInterface();
+		const Bool queued = upgrade && production && production->queueUpgrade(upgrade);
+		std::fprintf(stderr, "TEST research %u %s %s queued=%d money=%u\n", frame,
+			command.target.c_str(), command.structure.c_str(), queued, obj->getControllingPlayer()->getMoney()->countMoney());
+	}
+	else if (command.action == "fund")
+	{
+		obj->getControllingPlayer()->getMoney()->setStartingCash(50000);
+	}
 	else if (command.action == "kill")
 	{
 		std::fprintf(stderr, "TEST frame %u: kill object %u (%s)\n", frame, static_cast<unsigned>(obj->getID()),

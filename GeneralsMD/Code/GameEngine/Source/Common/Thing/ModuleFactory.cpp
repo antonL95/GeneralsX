@@ -172,6 +172,8 @@
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/CastleBehavior.h"
+#include "GameLogic/Module/CastleUpgrade.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/MissileLauncherBuildingUpdate.h"
@@ -467,6 +469,8 @@ void ModuleFactory::init()
 		addModule( HordeMemberCollide );
 		addModule( CastleMemberBehavior );
 		addModule( CastleBehavior );
+		addModule( CastleUpgrade );
+		addModule( GeometryUpgrade );
 		addModule( FoundationAIUpdate );
 		addModule( TerrainResourceBehavior );
 		addModule( BezierProjectileBehavior );

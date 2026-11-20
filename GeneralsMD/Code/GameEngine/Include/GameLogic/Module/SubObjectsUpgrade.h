@@ -63,6 +63,15 @@ public:
 	std::vector<AsciiString>					m_showSubObjectNames;
 	std::vector<AsciiString>					m_hideSubObjectNames;
 
+	std::vector<AsciiString> m_excludeSubObjects;
+	std::vector<std::pair<AsciiString, AsciiString>> m_upgradeTextures;
+	Real m_fadeTimeInSeconds = 0.0f;
+	Real m_waitBeforeFadeInSeconds = 0.0f;
+	Bool m_recolorHouse = FALSE;
+	Bool m_skipFadeOnCreate = FALSE;
+	Bool m_hideSubObjectsOnRemove = FALSE;
+	Bool m_unHideSubObjectsOnRemove = FALSE;
+
 	SubObjectsUpgradeModuleData(){}
 
 	static void buildFieldParse(MultiIniFieldParse& p);
@@ -78,6 +87,12 @@ class SubObjectsUpgrade : public UpgradeModule
 public:
 
 	SubObjectsUpgrade( Thing *thing, const ModuleData* moduleData );
+	Bool resetUpgrade(const UpgradeMaskType& keyMask) override;
+	const SubObjectsUpgradeModuleData* getActiveTextureUpgrade() const
+	{
+		const auto* data = getSubObjectsUpgradeModuleData();
+		return isAlreadyUpgraded() && !data->m_upgradeTextures.empty() ? data : nullptr;
+	}
 	// virtual destructor prototype defined by MemoryPoolObject
 
 protected:

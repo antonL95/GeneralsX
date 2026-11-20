@@ -42,6 +42,8 @@
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailConditionMatch.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -57,6 +59,7 @@
 #include "GameLogic/FPUControl.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/SubObjectsUpgrade.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
@@ -1008,6 +1011,7 @@ void ModelConditionInfo::clear()
 #endif
 	m_conditionsYesVec.clear();
 	m_modelName.clear();
+	m_textureSwaps.clear();
 	for (i = 0; i < MAX_TURRETS; ++i)
 	{
 		m_turrets[i].clear();
@@ -1745,6 +1749,8 @@ const ModelConditionInfo* W3DModelDrawModuleData::findBestInfo(const ModelCondit
 {
 	ModelConditionFlags bits = c;
 	bits.clear(m_ignoreConditionStates);
+	if (RetailFileLayers::enabled())
+		return findRetailConditionMatch(m_conditionStates, bits, [](const ModelConditionInfo&) { return true; });
 	return m_conditionStateMap.findBestInfo(m_conditionStates, bits);
 }
 
@@ -3395,6 +3401,24 @@ void W3DModelDraw::hideAllMuzzleFlashes(const ModelConditionInfo* state, RenderO
 }
 
 //-------------------------------------------------------------------------------------------------
+static std::vector<const SubObjectsUpgradeModuleData*> getSubObjectTextureUpgrades(const Drawable& drawable)
+{
+	std::vector<const SubObjectsUpgradeModuleData*> upgrades;
+	const Object* object = drawable.getObject();
+	if (!object)
+		return upgrades;
+
+	const NameKeyType key = NAMEKEY("SubObjectsUpgrade");
+	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != key)
+			continue;
+		if (const auto* data = static_cast<const SubObjectsUpgrade*>(*module)->getActiveTextureUpgrade())
+			upgrades.push_back(data);
+	}
+	return upgrades;
+}
+
 static Bool turretNamesDiffer(const ModelConditionInfo* a, const ModelConditionInfo* b)
 {
 	if (!(a->m_validStuff & ModelConditionInfo::TURRETS_VALID) || !(b->m_validStuff & ModelConditionInfo::TURRETS_VALID))
@@ -3518,6 +3542,7 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 	// or a few other things...)
 	if (m_curState == nullptr ||
 			newState->m_modelName != m_curState->m_modelName ||
+			(RetailFileLayers::enabled() && newState->m_textureSwaps != m_curState->m_textureSwaps) ||
 			turretNamesDiffer(newState, m_curState)
 			// srj sez: I'm not sure why we want to do the "hard stuff" if we have projectile bones; I think
 			// it is a holdover from days gone by when bones were handled quite differently, rather than being cached.
@@ -3537,6 +3562,16 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		else
 		{
 			m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(newState->m_modelName.str(), draw->getScale(), m_hexColor);
+			if (m_renderObject && RetailFileLayers::enabled())
+			{
+				auto* assets = W3DDisplay::m_assetManager;
+				m_textureUpgrades = getSubObjectTextureUpgrades(*draw);
+				if (!newState->m_textureSwaps.empty())
+					assets->replaceInstanceTextures(m_renderObject, newState->m_textureSwaps);
+				for (const auto* upgrade : m_textureUpgrades)
+					assets->replaceInstanceTextures(m_renderObject, upgrade->m_upgradeTextures,
+						upgrade->m_recolorHouse ? m_hexColor : 0, &upgrade->m_excludeSubObjects);
+			}
 			DEBUG_ASSERTCRASH(m_renderObject, ("*** ASSET ERROR: Model %s not found!",newState->m_modelName.str()));
 		}
 
@@ -4489,6 +4524,17 @@ void W3DModelDraw::updateSubObjects()
 {
 	if (!m_renderObject)
 		return;
+
+	if (RetailFileLayers::enabled() && m_curState &&
+		m_textureUpgrades != getSubObjectTextureUpgrades(*getDrawable()))
+	{
+		const ModelConditionInfo* state = m_curState;
+		m_curState = nullptr;
+		m_nextState = nullptr;
+		m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
+		setModelState(state);
+		return;
+	}
 
 	if (!m_subObjectVec.empty())
 	{

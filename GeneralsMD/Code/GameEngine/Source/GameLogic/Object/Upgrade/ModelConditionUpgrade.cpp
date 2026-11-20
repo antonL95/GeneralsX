@@ -30,6 +30,7 @@
 
 #include "GameLogic/Module/ModelConditionUpgrade.h"
 
+#include "Common/ModuleFactory.h"
 #include "Common/ModelState.h"
 #include "GameLogic/Object.h"
 
@@ -52,6 +53,16 @@ void ModelConditionUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "AddConditionFlags", ModelConditionFlags::parseFromINI, nullptr, offsetof(ModelConditionUpgradeModuleData, m_addConditions) },
+			{ "RemoveConditionFlags", ModelConditionFlags::parseFromINI, nullptr, offsetof(ModelConditionUpgradeModuleData, m_removeConditions) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -76,6 +87,8 @@ void ModelConditionUpgrade::upgradeImplementation()
 
 	if( data->m_conditionFlag != MODELCONDITION_INVALID )
 		me->setModelConditionState(data->m_conditionFlag);
+	if (data->m_addConditions.any() || data->m_removeConditions.any())
+		me->clearAndSetModelConditionFlags(data->m_removeConditions, data->m_addConditions);
 }
 
 // ------------------------------------------------------------------------------------------------

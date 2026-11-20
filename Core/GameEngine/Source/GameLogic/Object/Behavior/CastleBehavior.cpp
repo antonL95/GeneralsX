@@ -23,6 +23,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
+#include "GameLogic/Module/CastleUpgrade.h"
 
 CastleBehaviorModuleData::CastleBehaviorModuleData()
 {
@@ -150,6 +151,59 @@ void CastleBehavior::checkKeep()
 		m_keepLost = TRUE;
 		killEverything();
 		return;
+	}
+}
+
+CastleBehavior* CastleBehavior::findForMember(const Object& member)
+{
+	const NameKeyType key = NAMEKEY("CastleBehavior");
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		auto* castle = static_cast<CastleBehavior*>(object->findUpdateModule(key));
+		if (castle && std::find(castle->m_members.begin(), castle->m_members.end(), member.getID()) != castle->m_members.end())
+			return castle;
+	}
+	return nullptr;
+}
+
+void CastleBehavior::grantMemberUpgrade(const Object& source, const UpgradeTemplate& upgrade)
+{
+	const auto grant = [&](Object* member)
+	{
+		if (member && member != &source && !member->isEffectivelyDead() &&
+			member->getControllingPlayer() == source.getControllingPlayer() && !member->hasUpgrade(&upgrade))
+			member->giveUpgrade(&upgrade);
+	};
+	for (ObjectID id : m_members)
+	{
+		Object* member = TheGameLogic->findObjectByID(id);
+		grant(member);
+		if (member)
+		{
+			if (const auto* foundation = FoundationAIUpdate::find(*member))
+				grant(foundation->getStructure());
+		}
+	}
+}
+
+void CastleBehavior::applyKeepUpgrades(Object& member) const
+{
+	const Object* keep = TheGameLogic->findObjectByID(m_keep);
+	if (!keep || keep->getControllingPlayer() != member.getControllingPlayer())
+		return;
+
+	const NameKeyType key = NAMEKEY("CastleUpgrade");
+	for (BehaviorModule* const* module = keep->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != key)
+			continue;
+		const auto* castleUpgrade = static_cast<const CastleUpgrade*>(*module);
+		if (castleUpgrade->isAlreadyUpgraded())
+		{
+			const UpgradeTemplate* upgrade = castleUpgrade->getGrantedUpgrade();
+			if (upgrade && !member.hasUpgrade(upgrade))
+				member.giveUpgrade(upgrade);
+		}
 	}
 }
 

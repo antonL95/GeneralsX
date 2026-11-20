@@ -47,6 +47,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #define DEFINE_OBJECT_STATUS_NAMES
+#include "Common/ModuleFactory.h"
 #include "Common/Player.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
@@ -55,6 +56,17 @@
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+namespace
+{
+void parseUpgradeTexture(INI* ini, void*, void* store, const void*)
+{
+	AsciiString original = ini->getNextAsciiString();
+	ini->getNextToken();
+	AsciiString replacement = ini->getNextAsciiString();
+	static_cast<std::vector<std::pair<AsciiString, AsciiString>>*>(store)->emplace_back(original, replacement);
+}
+}
+
 void SubObjectsUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
   UpgradeModuleData::buildFieldParse(p);
@@ -66,6 +78,22 @@ void SubObjectsUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "UpgradeTexture", parseUpgradeTexture, nullptr, offsetof(SubObjectsUpgradeModuleData, m_upgradeTextures) },
+			{ "ExcludeSubobjects", INI::parseAsciiStringVectorAppend, nullptr, offsetof(SubObjectsUpgradeModuleData, m_excludeSubObjects) },
+			{ "FadeTimeInSeconds", INI::parseReal, nullptr, offsetof(SubObjectsUpgradeModuleData, m_fadeTimeInSeconds) },
+			{ "WaitBeforeFadeInSeconds", INI::parseReal, nullptr, offsetof(SubObjectsUpgradeModuleData, m_waitBeforeFadeInSeconds) },
+			{ "RecolorHouse", INI::parseBool, nullptr, offsetof(SubObjectsUpgradeModuleData, m_recolorHouse) },
+			{ "SkipFadeOnCreate", INI::parseBool, nullptr, offsetof(SubObjectsUpgradeModuleData, m_skipFadeOnCreate) },
+			{ "HideSubObjectsOnRemove", INI::parseBool, nullptr, offsetof(SubObjectsUpgradeModuleData, m_hideSubObjectsOnRemove) },
+			{ "UnHideSubObjectsOnRemove", INI::parseBool, nullptr, offsetof(SubObjectsUpgradeModuleData, m_unHideSubObjectsOnRemove) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -122,6 +150,12 @@ void SubObjectsUpgrade::upgradeImplementation()
 			updateSubObjects = true;
 		}
 
+		if (!data->m_upgradeTextures.empty())
+		{
+			setUpgradeExecuted(TRUE);
+			updateSubObjects = TRUE;
+		}
+
 		if( updateSubObjects )
 		{
 			draw->updateSubObjects();
@@ -130,6 +164,30 @@ void SubObjectsUpgrade::upgradeImplementation()
 }
 
 //------------------------------------------------------------------------------------------------
+Bool SubObjectsUpgrade::resetUpgrade(const UpgradeMaskType& keyMask)
+{
+	if (!UpgradeModule::resetUpgrade(keyMask))
+		return FALSE;
+
+	const auto* data = getSubObjectsUpgradeModuleData();
+	if (Drawable* draw = getObject()->getDrawable())
+	{
+		if (data->m_hideSubObjectsOnRemove)
+		{
+			for (const AsciiString& name : data->m_showSubObjectNames)
+				draw->showSubObject(name, FALSE);
+		}
+		if (data->m_unHideSubObjectsOnRemove)
+		{
+			for (const AsciiString& name : data->m_hideSubObjectNames)
+				draw->showSubObject(name, TRUE);
+		}
+		if (data->m_hideSubObjectsOnRemove || data->m_unHideSubObjectsOnRemove || !data->m_upgradeTextures.empty())
+			draw->updateSubObjects();
+	}
+	return TRUE;
+}
+
 void SubObjectsUpgrade::crc( Xfer *xfer )
 {
 

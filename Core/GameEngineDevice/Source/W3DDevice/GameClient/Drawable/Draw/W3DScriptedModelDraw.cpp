@@ -6,9 +6,12 @@
 #include "Common/BitFlagsIO.h"
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
+#include "Common/RetailConditionMatch.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/ParticleSys.h"
 #include "GameLogic/WeaponSet.h"
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
@@ -117,7 +120,7 @@ void W3DScriptedModelDrawModuleData::parseModelState(INI* ini, void* instance, v
 		{ "Shadow", INI::parseAsciiString, nullptr, offsetof(ModelState, shadow) },
 		{ "ShadowTexture", INI::parseAsciiString, nullptr, offsetof(ModelState, shadowTexture) },
 		{ "StateName", INI::parseQuotedAsciiString, nullptr, offsetof(ModelState, stateName) },
-		{ "Texture", parseTexture, nullptr, offsetof(ModelState, textures) },
+		{ "Texture", parseTexture, nullptr, offsetof(ModelState, draw.m_textureSwaps) },
 		{ "ShadowSizeX", INI::parseInt, nullptr, offsetof(ModelState, shadowSizeX) },
 		{ "ShadowSizeY", INI::parseInt, nullptr, offsetof(ModelState, shadowSizeY) },
 		{ "ShadowMaxHeight", INI::parseInt, nullptr, offsetof(ModelState, shadowMaxHeight) },
@@ -191,6 +194,7 @@ void W3DScriptedModelDrawModuleData::parseAnimationState(INI* ini, void* instanc
 	auto* self = static_cast<W3DScriptedModelDrawModuleData*>(instance);
 	const StateType type = static_cast<StateType>(reinterpret_cast<uintptr_t>(userData));
 	AnimationState state;
+	state.idle = type == StateType::Idle;
 	AsciiString transition;
 	if (type == StateType::Transition)
 	{
@@ -198,7 +202,8 @@ void W3DScriptedModelDrawModuleData::parseAnimationState(INI* ini, void* instanc
 		state.stateName = transition;
 	}
 	ModelConditionFlags flags;
-	readConditions(ini, flags);
+	if (type == StateType::Animation || !ModuleFactory::registersRotwkModules())
+		readConditions(ini, flags);
 	state.draw.m_conditionsYesVec.push_back(flags);
 
 	ini->initFromINI(&state, fields);
@@ -216,6 +221,8 @@ void W3DScriptedModelDrawModuleData::parseAnimationState(INI* ini, void* instanc
 	}
 	if (type == StateType::Transition)
 		self->m_namedTransitions.emplace(stateKey(transition), std::move(state));
+	else if (state.idle && RetailFileLayers::enabled())
+		self->m_animationStates.insert(self->m_animationStates.begin(), std::move(state));
 	else
 		self->m_animationStates.push_back(std::move(state));
 }
@@ -295,7 +302,17 @@ void W3DScriptedModelDrawModuleData::parseTexture(INI* ini, void*, void* store, 
 	INI::parseAsciiStringVector(ini, nullptr, &row, nullptr);
 	if (row.empty())
 		throw INI_INVALID_DATA;
-	static_cast<std::vector<std::vector<AsciiString>>*>(store)->push_back(std::move(row));
+	if (row.size() < 2)
+		return;
+	auto& swaps = *static_cast<std::vector<std::pair<AsciiString, AsciiString>>*>(store);
+	const auto it = std::find_if(swaps.begin(), swaps.end(), [&](const auto& swap)
+	{
+		return !swap.first.compareNoCase(row[0]);
+	});
+	if (it == swaps.end())
+		swaps.emplace_back(row[0], row[1]);
+	else
+		it->second = row[1];
 }
 
 void W3DScriptedModelDrawModuleData::parseWeaponLaunchBone(INI* ini, void* instance, void*, const void*)
@@ -387,22 +404,32 @@ const ModelConditionInfo* W3DScriptedModelDrawModuleData::findBestInfo(const Mod
 	ModelConditionFlags conditions = flags;
 	conditions.clear(m_ignoreConditionStates);
 	const AnimationState* best = nullptr;
-	Int bestMatches = 0;
-	Int bestExtra = MODELCONDITION_COUNT + 1;
-	for (const AnimationState& state : m_animationStates)
+	if (RetailFileLayers::enabled())
 	{
-		const ModelConditionFlags& required = state.draw.m_conditionsYesVec.front();
-		const Int matches = conditions.countIntersection(required);
-		const Int extra = conditions.countInverseIntersection(required);
-		if (matches > bestMatches || (matches == bestMatches && extra < bestExtra))
+		best = findRetailConditionMatch(m_animationStates, conditions,
+			[](const AnimationState& state) { return state.idle; }, &AnimationState::draw);
+	}
+	else
+	{
+		Int bestMatches = 0;
+		Int bestExtra = MODELCONDITION_COUNT + 1;
+		for (const AnimationState& state : m_animationStates)
 		{
-			best = &state;
-			bestMatches = matches;
-			bestExtra = extra;
+			const ModelConditionFlags& required = state.draw.m_conditionsYesVec.front();
+			const Int matches = conditions.countIntersection(required);
+			const Int extra = conditions.countInverseIntersection(required);
+			if (matches > bestMatches || (matches == bestMatches && extra < bestExtra))
+			{
+				best = &state;
+				bestMatches = matches;
+				bestExtra = extra;
+			}
 		}
+		if (bestMatches == 0 && bestExtra != 0)
+			best = nullptr;
 	}
 
-	if (!best || (bestMatches == 0 && bestExtra != 0))
+	if (!best)
 		return model;
 
 	const auto key = std::make_pair(model - m_conditionStates.data(), best - m_animationStates.data());

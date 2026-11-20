@@ -18,6 +18,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/CreateModule.h"
 
 namespace
@@ -113,6 +114,8 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player)
 		structure->setModelConditionState(MODELCONDITION_BUILD_VARIATION_TWO);
 
 	m_structure = structure->getID();
+	if (const CastleBehavior* castle = CastleBehavior::findForMember(*foundation))
+		castle->applyKeepUpgrades(*structure);
 	showFoundation(FALSE);
 	setWakeFrame(foundation, UPDATE_SLEEP_NONE);
 	return structure;

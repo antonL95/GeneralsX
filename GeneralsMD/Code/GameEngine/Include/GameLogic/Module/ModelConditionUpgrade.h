@@ -30,6 +30,7 @@
 #pragma once
 
 #include "GameLogic/Module/UpgradeModule.h"
+#include "Common/ModelState.h"
 
 enum ModelConditionFlagType CPP_11(: Int);
 //-----------------------------------------------------------------------------
@@ -37,6 +38,8 @@ class ModelConditionUpgradeModuleData : public UpgradeModuleData
 {
 public:
 	ModelConditionFlagType m_conditionFlag;
+	ModelConditionFlags m_addConditions;
+	ModelConditionFlags m_removeConditions;
 
 	ModelConditionUpgradeModuleData();
 

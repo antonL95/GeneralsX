@@ -1,5 +1,7 @@
 #pragma once
 
+class UpgradeTemplate;
+
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/UpdateModule.h"
@@ -77,6 +79,9 @@ public:
 	UpdateSleepTime update() override;
 	Bool isUnpacked() const { return m_unpacked; }
 	Real getMaxCastleRadius() const { return getCastleBehaviorModuleData()->m_maxCastleRadius; }
+	static CastleBehavior* findForMember(const Object& member);
+	void grantMemberUpgrade(const Object& source, const UpgradeTemplate& upgrade);
+	void applyKeepUpgrades(Object& member) const;
 
 private:
 	void unpack();

@@ -47,7 +47,6 @@ public:
 	{
 		ModelConditionInfo draw;
 		AsciiString skeleton;
-		std::vector<std::vector<AsciiString>> textures;
 		std::vector<FXEvent> fxEvents;
 		std::vector<ParticleAttachment> particles;
 		AsciiString tooltip;
@@ -99,6 +98,7 @@ public:
 		Bool similarRestart = FALSE;
 		Bool shareAnimation = FALSE;
 		Bool allowRepeat = FALSE;
+		Bool idle = FALSE;
 	};
 
 	static void buildFieldParse(MultiIniFieldParse& p);

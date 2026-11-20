@@ -73,6 +73,8 @@ set(GAMEENGINE_SRC
     Include/GameLogic/WeaponNuggetRules.h
     Include/GameLogic/RetailTestCommands.h
     Include/GameLogic/Module/CastleBehavior.h
+    Include/GameLogic/Module/CastleUpgrade.h
+    Include/GameLogic/Module/GeometryUpgrade.h
     Include/GameLogic/Module/FoundationAIUpdate.h
     Include/GameLogic/Module/TerrainResourceBehavior.h
     Include/Common/INIAudit.h
@@ -85,6 +87,7 @@ set(GAMEENGINE_SRC
     Include/Common/INIMath.h
     Include/Common/INIPreprocessor.h
     Include/Common/BitFlagsCrc.h
+    Include/Common/RetailConditionMatch.h
     Include/Common/BfmeAssetPath.h
     Include/Common/ScriptedModelConditions.inc
 #    Include/Common/INIException.h
@@ -666,6 +669,8 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Map/CastleTemplateStore.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
+    Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
+    Source/GameLogic/Object/Upgrade/GeometryUpgrade.cpp
     Source/GameLogic/Object/Update/FoundationAIUpdate.cpp
     Source/GameLogic/Object/Update/TerrainResourceBehavior.cpp
     Source/Common/INI/INITerrain.cpp
