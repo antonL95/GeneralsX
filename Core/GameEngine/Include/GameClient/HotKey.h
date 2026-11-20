@@ -76,6 +76,7 @@ class HotKey
 public:
 	HotKey();
 	GameWindow *m_win;
+	GameWindow *m_dispatchWindow = nullptr;
 	AsciiString m_key;
 	// we may need a checkmark system.
 };
@@ -92,7 +93,7 @@ public:
 	virtual void reset() override;															///< Reset
 	//-----------------------------------------------------------------------------------------------
 
-	void addHotKey( GameWindow *win, const AsciiString& key);
+	void addHotKey( GameWindow *win, const AsciiString& key, GameWindow *dispatchWindow = nullptr);
 	Bool executeHotKey( const AsciiString& key); // called front eh HotKeyTranslator
 
 	AsciiString searchHotKey( const AsciiString& label);

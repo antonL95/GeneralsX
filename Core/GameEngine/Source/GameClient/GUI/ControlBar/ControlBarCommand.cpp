@@ -222,7 +222,7 @@ void ControlBar::doTransportInventoryUI( Object *transport, const CommandSet *co
 			// set the inventory exit command into the window (even if it's one of the hidden ones
 			// it's OK cause we'll never see it to click it
 			//
-			setControlCommand( m_commandWindows[ i ], commandButton );
+			setControlCommand( m_commandWindows[ i ], commandButton, !m_retailSelectionName );
 
 		}
 
@@ -336,7 +336,7 @@ void ControlBar::populateCommand( Object *obj )
 				m_commandWindows[ i ]->winEnable( TRUE );
 
 				// populate the visible button with data from the command button
-				setControlCommand( m_commandWindows[ i ], commandButton );
+				setControlCommand( m_commandWindows[ i ], commandButton, !m_retailSelectionName );
 
 				//
 				// commands that require sciences we don't have are hidden so they never show up
@@ -845,6 +845,9 @@ void ControlBar::updateContextCommand()
 		// is the command available
 		CommandAvailability availability = m_retailSelectionName && command->getCommandType() == GUI_COMMAND_NONE
 			? COMMAND_RESTRICTED : getCommandAvailability(command, obj, win);
+		const Int retailSlot = m_retailSelectionName ? getRetailSlot(win) : -1;
+		if (retailSlot >= 0)
+			m_retailAvailability[retailSlot] = availability;
 
 		// enable/disable the window control
 		switch( availability )
@@ -866,6 +869,15 @@ void ControlBar::updateContextCommand()
 			default:
 				win->winEnable( TRUE );
 				break;
+		}
+		if (retailSlot >= 0 && (availability == COMMAND_RESTRICTED || availability == COMMAND_CANT_AFFORD)
+			&& BitIsSet(win->winGetStatus(), WIN_STATUS_RIGHT_CLICK))
+		{
+			Int count;
+			Real progress;
+			getRetailProduction(win, count, progress);
+			if (count > 0)
+				win->winEnable(TRUE);
 		}
 
 		//Determine by the production type of this button, whether or not the created object
@@ -1168,9 +1180,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 				return COMMAND_RESTRICTED;
 
 			if( !player->canAffordBuild( whatToBuild ) )
-			{
-				return COMMAND_RESTRICTED;//COMMAND_CANT_AFFORD;
-			}
+				return m_retailSelectionName ? COMMAND_CANT_AFFORD : COMMAND_RESTRICTED;
 
 			break;
 		}
@@ -1210,6 +1220,9 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 				return COMMAND_RESTRICTED;
 
 			CanMakeType makeType = TheBuildAssistant->canMakeUnit( obj, command->getThingTemplate() );
+			if (m_retailSelectionName)
+				return makeType == CANMAKE_OK ? COMMAND_AVAILABLE
+					: makeType == CANMAKE_NO_MONEY ? COMMAND_CANT_AFFORD : COMMAND_RESTRICTED;
 			if( makeType == CANMAKE_MAXED_OUT_FOR_PLAYER || makeType == CANMAKE_PARKING_PLACES_FULL )
 			{
 				//Disable the button if the player has a max amount of these units in build queue or existence.
@@ -1232,11 +1245,11 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			// if we can build it, we must also NOT already have it or be building it
 			if( player->hasUpgradeComplete( command->getUpgradeTemplate() ) == TRUE ||
 					player->hasUpgradeInProduction( command->getUpgradeTemplate() ) == TRUE )
-				return COMMAND_CANT_AFFORD;//COMMAND_RESTRICTED;
+				return m_retailSelectionName ? COMMAND_RESTRICTED : COMMAND_CANT_AFFORD;
 
 			// if this is an upgrade create we must be able to build it.
 			if( TheUpgradeCenter->canAffordUpgrade( player, command->getUpgradeTemplate() ) == FALSE )
-				return COMMAND_RESTRICTED;//COMMAND_CANT_AFFORD;
+				return m_retailSelectionName ? COMMAND_CANT_AFFORD : COMMAND_RESTRICTED;
 
 			for( size_t i = 0; i < command->getScienceVec().size(); i++ )
 			{
@@ -1269,10 +1282,10 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			if( obj->hasUpgrade( command->getUpgradeTemplate() ) == TRUE ||
 					pu->isUpgradeInQueue( command->getUpgradeTemplate() ) == TRUE ||
 					obj->affectedByUpgrade( command->getUpgradeTemplate() ) == FALSE )
-				return COMMAND_CANT_AFFORD;//COMMAND_RESTRICTED;
+				return m_retailSelectionName ? COMMAND_RESTRICTED : COMMAND_CANT_AFFORD;
 
 			if( TheUpgradeCenter->canAffordUpgrade( player, command->getUpgradeTemplate() ) == FALSE )
-				return COMMAND_RESTRICTED;//COMMAND_CANT_AFFORD;
+				return m_retailSelectionName ? COMMAND_CANT_AFFORD : COMMAND_RESTRICTED;
 
 			for( size_t i = 0; i < command->getScienceVec().size(); i++ )
 			{

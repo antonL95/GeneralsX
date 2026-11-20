@@ -42,6 +42,7 @@
 #include "GameClient/GameText.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Image.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/GlobalLanguage.h"
@@ -869,6 +870,7 @@ void Mouse::setCursorTooltip( UnicodeString tooltip, Int delay, const RGBColor *
 	//DEBUG_LOG(("%d Tooltip: %ls", TheGameClient->getFrame(), tooltip.str()));
 
 	m_isTooltipEmpty = tooltip.isEmpty();
+	m_retailCommandTooltip = FALSE;
   m_tooltipDelay = delay;
 
 	Bool forceRecalc = FALSE;
@@ -935,6 +937,14 @@ void Mouse::setCursorTooltip( UnicodeString tooltip, Int delay, const RGBColor *
 		m_tooltipBackColor = m_tooltipColorBackground;
 	}
 
+}
+
+void Mouse::setRetailCommandTooltip(UnicodeString tooltip)
+{
+	const Real scale = TheDisplay->getHeight() / 768.0f;
+	const Real defaultWidth = TheDisplay->getWidth() * m_tooltipWidth;
+	setCursorTooltip(tooltip, -1, nullptr, defaultWidth > 0.0f ? 342.0f * scale / defaultWidth : 1.0f);
+	m_retailCommandTooltip = TRUE;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1162,6 +1172,50 @@ void Mouse::resetTooltipDelay()
 	m_displayTooltip = FALSE;
 }
 
+Bool Mouse::drawRetailCommandTooltip()
+{
+	if (!TheMappedImageCollection)
+		return FALSE;
+	const Image *top = TheMappedImageCollection->findImageByName("UiRetailHelpTop");
+	const Image *left = TheMappedImageCollection->findImageByName("UiRetailHelpLeft");
+	const Image *right = TheMappedImageCollection->findImageByName("UiRetailHelpRight");
+	const Image *bottom = TheMappedImageCollection->findImageByName("UiRetailHelpBottom");
+	if (!TheDisplay->hasImageTexture(top) || !TheDisplay->hasImageTexture(left)
+		|| !TheDisplay->hasImageTexture(right) || !TheDisplay->hasImageTexture(bottom))
+		return FALSE;
+
+	const Real scale = TheDisplay->getHeight() / 768.0f;
+	const Int topHeight = MAX(1, static_cast<Int>(35 * scale));
+	const Int bottomHeight = MAX(1, static_cast<Int>(27 * scale));
+	const Int bodyPadding = MAX(1, static_cast<Int>(5 * scale));
+	const Int leftWidth = MAX(1, static_cast<Int>(34 * scale));
+	const Int rightWidth = MAX(1, static_cast<Int>(30 * scale));
+	Int textWidth, textHeight;
+	m_tooltipDisplayString->getSize(&textWidth, &textHeight);
+	const Int width = MAX(textWidth + leftWidth + rightWidth, static_cast<Int>(405 * scale));
+	const Int height = textHeight + topHeight + bottomHeight + 2 * bodyPadding;
+	Int x = m_currMouse.pos.x + 20;
+	if (x + width > m_maxX)
+		x = m_currMouse.pos.x - width - 20;
+	x = MAX(0, x);
+	const Int y = MAX(0, MIN(m_currMouse.pos.y, m_maxY - height));
+	const Int middleY = y + topHeight;
+	const Int bottomY = y + height - bottomHeight;
+	TheDisplay->drawFillRect(x + leftWidth / 2, middleY, width - (leftWidth + rightWidth) / 2,
+		bottomY - middleY, GameMakeColor(18, 16, 13, 232));
+	TheDisplay->drawImage(top, x, y, x + width, middleY);
+	TheDisplay->drawImage(left, x, middleY, x + leftWidth, bottomY);
+	TheDisplay->drawImage(right, x + width - rightWidth, middleY, x + width, bottomY);
+	TheDisplay->drawImage(bottom, x, bottomY, x + width, y + height);
+	ICoord2D lo = { 0, 0 };
+	ICoord2D hi = { TheDisplay->getWidth(), TheDisplay->getHeight() };
+	IRegion2D clipRegion = { lo, hi };
+	m_tooltipDisplayString->setClipRegion(&clipRegion);
+	m_tooltipDisplayString->draw(x + leftWidth, middleY + bodyPadding,
+		GameMakeColor(240, 231, 204, 255), GameMakeColor(0, 0, 0, 255));
+	return TRUE;
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Draw the mouse tooltip if one is set */
 //-------------------------------------------------------------------------------------------------
@@ -1174,6 +1228,8 @@ void Mouse::drawTooltip()
 	/// @todo: Still need to put in display logic so it puts the tool tips in a visible position on the edge of the screen
 	if( m_displayTooltip && TheDisplay && m_tooltipDisplayString && (m_tooltipDisplayString->getTextLength() > 0) && !m_isTooltipEmpty)
 	{
+		if (m_retailCommandTooltip && drawRetailCommandTooltip())
+			return;
 		Int width, xPos;
 		Int height, yPos;
 		m_tooltipDisplayString->getSize(&width,&height);

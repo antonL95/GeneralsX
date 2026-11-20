@@ -3382,6 +3382,28 @@ void W3DDisplay::drawRectClock(Int startX, Int startY, Int width, Int height, In
 //--------------------------------------------------------------------------------------------------------------------
 void W3DDisplay::drawRemainingRectClock(Int startX, Int startY, Int width, Int height, Int percent, UnsignedInt color)
 {
+	if (m_circleClipRadius > 0)
+	{
+		if (percent < 0 || percent >= 100)
+			return;
+		setup2DRenderState(nullptr, DRAW_IMAGE_ALPHA, FALSE);
+		const Int segments = 100;
+		const Real step = 6.283185307f / segments;
+		const Vector2 center(m_circleClipX, m_circleClipY);
+		const Vector2 uv(0.0f, 0.0f);
+		for (Int i = percent; i < segments; ++i)
+		{
+			const Real first = i * step;
+			const Real last = (i + 1) * step;
+			const Vector2 a(center.X + m_circleClipRadius * WWMath::Sin(first), center.Y - m_circleClipRadius * WWMath::Cos(first));
+			const Vector2 b(center.X + m_circleClipRadius * WWMath::Sin(last), center.Y - m_circleClipRadius * WWMath::Cos(last));
+			m_2DRender->Add_Tri(center, a, b, uv, uv, uv, color);
+		}
+		if (!m_isBatching)
+			m_2DRender->Render();
+		return;
+	}
+
 	// sanity
 	if( percent < 0 || percent > 99 )
 		return;

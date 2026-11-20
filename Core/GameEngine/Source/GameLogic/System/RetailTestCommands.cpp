@@ -735,6 +735,12 @@ void execute(const Command& command, unsigned int frame)
 		clickWindow(retailSlotWindow(std::atoi(command.structure.c_str())), std::atoi(command.structure.c_str()), frame);
 		return;
 	}
+	if (command.action == "deselect")
+	{
+		TheInGameUI->deselectAllDrawables();
+		std::fprintf(stderr, "TEST frame %u: deselect all\n", frame);
+		return;
+	}
 	if (command.action == "cash")
 	{
 		Player* player = findPlayer(command);

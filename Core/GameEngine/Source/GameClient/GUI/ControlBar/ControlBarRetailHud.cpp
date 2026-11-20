@@ -12,6 +12,7 @@
 #include "Common/Money.h"
 #include "Common/Science.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 
 #include "GameClient/ControlBar.h"
 #include "GameClient/Display.h"
@@ -22,8 +23,10 @@
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
+#include "GameClient/GameText.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Mouse.h"
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/HeroRoster.h"
@@ -208,11 +211,31 @@ WindowMsgHandledType retailSideBarInput(GameWindow *, UnsignedInt msg, WindowMsg
 	return TheControlBar->isOverRetailSocket(mData1 & 0xFFFF, mData1 >> 16) ? MSG_HANDLED : MSG_IGNORED;
 }
 
+void retailCommandTooltip(GameWindow *window, WinInstanceData *, UnsignedInt)
+{
+	TheControlBar->showRetailCommandTooltip(window);
+}
+
+void setRetailRightClick(GameWindow *window, Bool enabled)
+{
+	if (enabled)
+	{
+		window->winSetStatus(WIN_STATUS_RIGHT_CLICK);
+		BitSet(window->winGetInstanceData()->m_status, WIN_STATUS_RIGHT_CLICK);
+	}
+	else
+	{
+		window->winClearStatus(WIN_STATUS_RIGHT_CLICK);
+		BitClear(window->winGetInstanceData()->m_status, WIN_STATUS_RIGHT_CLICK);
+	}
+}
+
 void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 {
 	Int x, y, width, height;
 	windowRect(window, x, y, width, height);
-	const Bool enabled = BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED);
+	const CommandAvailability availability = TheControlBar->getRetailButtonAvailability(window);
+	const Bool enabled = availability == COMMAND_AVAILABLE || availability == COMMAND_ACTIVE;
 	const Bool highlight = enabled && BitIsSet(instance->getState(), WIN_STATE_HILITED);
 	const Bool pressed = BitIsSet(instance->getState(), WIN_STATE_SELECTED);
 	const Int slot = TheControlBar->getRetailSlot(window);
@@ -237,9 +260,10 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	if (TheDisplay->hasImageTexture(image))
 	{
 		Display::DrawImageMode mode = Display::DRAW_IMAGE_ALPHA;
-		if (!enabled && !BitIsSet(window->winGetStatus(), WIN_STATUS_ALWAYS_COLOR))
+		if (!enabled)
 			mode = Display::DRAW_IMAGE_GRAYSCALE;
-		TheDisplay->drawImage(image, x + inset, y + inset, x + width - inset, y + height - inset, 0xFFFFFFFF, mode);
+		const Color tint = enabled ? 0xFFFFFFFF : GameMakeColor(142, 142, 142, 255);
+		TheDisplay->drawImage(image, x + inset, y + inset, x + width - inset, y + height - inset, tint, mode);
 	}
 
 	Int count = 0;
@@ -247,19 +271,34 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	TheControlBar->getRetailProduction(window, count, progress);
 	if (count > 0)
 	{
-		const Int filled = static_cast<Int>(std::floor(height * (1.0f - progress) + 0.5f));
-		if (filled > 0)
-			TheDisplay->drawFillRect(x, y, width, filled, GameMakeColor(0, 0, 0, 150));
+		const Int percent = static_cast<Int>(progress * 100.0f + 0.5f);
+		TheDisplay->drawRemainingRectClock(x, y, width, height, percent, GameMakeColor(255, 255, 255, 26));
 	}
-	if (highlight)
-		TheDisplay->drawFillRect(x, y, width, height, GameMakeColor(255, 236, 170, 48));
 	TheDisplay->setCircularClip(0, 0, 0);
+	if (highlight)
+		drawFilledCircle(x, y, width, height, GameMakeColor(255, 236, 170, 48));
 
 	drawDesignImage("UiRetailGlass", DesignRect{ 0.0f, 0.0f, static_cast<Real>(width), static_cast<Real>(height) }, x, y, 1.0f,
 		highlight ? 0xFFFFFFFF : 0xD0FFFFFF);
 
-	if (count > 1)
-		drawShadowedText(instance->getTextDisplayString(), x, y + height / 4, width, height, 2, GameMakeColor(255, 255, 255, 255));
+	if (availability == COMMAND_RESTRICTED)
+	{
+		const Int size = MAX(3, width / 4);
+		const Int left = cx - size / 2;
+		const Int top = cy - size / 2;
+		const Color metal = GameMakeColor(211, 194, 153, 255);
+		TheDisplay->drawOpenRect(left + size / 4, top, size / 2, size / 2, 1.0f, metal);
+		TheDisplay->drawFillRect(left, top + size / 2, size, size / 2, metal);
+	}
+
+	DisplayString *countText = instance->getTextDisplayString();
+	if (count > 0)
+		drawShadowedText(countText, x, y + height * 5 / 18, width, height, 2, GameMakeColor(255, 255, 255, 255));
+	if (availability == COMMAND_CANT_AFFORD)
+	{
+		const Int offset = countText && countText->getTextLength() > 0 ? -height / 4 : height * 5 / 18;
+		drawShadowedText(instance->getTooltipDisplayString(), x, y + offset, width, height, 2, GameMakeColor(255, 89, 72, 255));
+	}
 }
 }
 
@@ -309,24 +348,42 @@ Int ControlBar::getRetailSlot(const GameWindow *window) const
 
 void ControlBar::getRetailProduction(const GameWindow *window, Int &count, Real &progress) const
 {
+	getRetailProductionEntries(window, count, progress);
+}
+
+const ProductionEntry *ControlBar::getRetailProductionEntries(const GameWindow *window, Int &count, Real &progress) const
+{
 	count = 0;
 	progress = 0.0f;
 	const CommandButton *command = static_cast<const CommandButton *>(GadgetButtonGetData(const_cast<GameWindow *>(window)));
+	if (command && m_currentSelectedDrawable && m_currContext == CB_CONTEXT_UNDER_CONSTRUCTION
+		&& command->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT_CANCEL)
+	{
+		const Object *structure = m_currentSelectedDrawable->getObject();
+		if (structure)
+		{
+			count = 1;
+			progress = std::clamp(structure->getConstructionPercent() / 100.0f, 0.0f, 1.0f);
+		}
+		return nullptr;
+	}
 	if (!command || !m_currentSelectedDrawable || m_currContext != CB_CONTEXT_COMMAND)
-		return;
+		return nullptr;
 	Object *factory = m_currentSelectedDrawable->getObject();
 	ProductionUpdateInterface *production = factory ? factory->getProductionUpdateInterface() : nullptr;
 	if (!production)
-		return;
+		return nullptr;
 
 	Bool first = TRUE;
+	const ProductionEntry *lastMatch = nullptr;
+	const ThingTemplate *unit = command->getThingTemplate();
+	if (command->getCommandType() == GUI_COMMAND_REVIVE)
+		unit = getRetailHero(window);
 	for (const ProductionEntry *entry = production->firstProduction(); entry; entry = production->nextProduction(entry))
 	{
 		Bool matches = FALSE;
-		if (command->getCommandType() == GUI_COMMAND_UNIT_BUILD)
-			matches = entry->getProductionType() == PRODUCTION_UNIT && entry->getProductionObject() == command->getThingTemplate();
-		else if (command->getCommandType() == GUI_COMMAND_REVIVE)
-			matches = entry->getProductionType() == PRODUCTION_UNIT && entry->getProductionObject() == getRetailHero(window);
+		if (unit && (command->getCommandType() == GUI_COMMAND_UNIT_BUILD || command->getCommandType() == GUI_COMMAND_REVIVE))
+			matches = entry->getProductionType() == PRODUCTION_UNIT && entry->getProductionObject()->isEquivalentTo(unit);
 		else if (command->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE || command->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE)
 			matches = entry->getProductionType() == PRODUCTION_UPGRADE && entry->getProductionUpgrade() == command->getUpgradeTemplate();
 		if (matches)
@@ -334,9 +391,140 @@ void ControlBar::getRetailProduction(const GameWindow *window, Int &count, Real 
 			if (count == 0)
 				progress = first ? entry->getPercentComplete() / 100.0f : 0.0f;
 			++count;
+			lastMatch = entry;
 		}
 		first = FALSE;
 	}
+	return lastMatch;
+}
+
+CBCommandStatus ControlBar::cancelRetailProduction(GameWindow *window) const
+{
+	if (!m_currentSelectedDrawable || !m_currentSelectedDrawable->isSelected()
+		|| !m_currentSelectedDrawable->getObject() || !m_currentSelectedDrawable->getObject()->isLocallyControlled()
+		|| !BitIsSet(window->winGetStatus(), WIN_STATUS_RIGHT_CLICK))
+		return CBC_COMMAND_NOT_USED;
+	Int count;
+	Real progress;
+	const ProductionEntry *entry = getRetailProductionEntries(window, count, progress);
+	if (entry && entry->getProductionType() == PRODUCTION_UNIT)
+	{
+		GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UNIT_CREATE);
+		msg->appendIntegerArgument(entry->getProductionID());
+	}
+	return CBC_COMMAND_USED;
+}
+
+CommandAvailability ControlBar::getRetailButtonAvailability(GameWindow *window) const
+{
+	const Int slot = getRetailSlot(window);
+	if (slot < 0 || m_currContext == CB_CONTEXT_MULTI_SELECT)
+		return BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
+	return m_retailAvailability[slot];
+}
+
+Int ControlBar::getRetailCommandCost(const CommandButton *command, const GameWindow *window) const
+{
+	Object *obj = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+	Player *player = obj ? obj->getControllingPlayer() : nullptr;
+	if (!command || !player)
+		return -1;
+	switch (command->getCommandType())
+	{
+		case GUI_COMMAND_UNIT_BUILD:
+		case GUI_COMMAND_DOZER_CONSTRUCT:
+			return command->getThingTemplate() ? command->getThingTemplate()->calcCostToBuild(player) : -1;
+		case GUI_COMMAND_PLAYER_UPGRADE:
+		case GUI_COMMAND_OBJECT_UPGRADE:
+			return command->getUpgradeTemplate() ? command->getUpgradeTemplate()->calcCostToBuild(player) : -1;
+		case GUI_COMMAND_REVIVE:
+		{
+			const ThingTemplate *hero = getRetailHero(window);
+			return hero ? HeroRoster::price(player, hero).cost : -1;
+		}
+		default:
+			return -1;
+	}
+}
+
+void ControlBar::showRetailCommandTooltip(GameWindow *window) const
+{
+	const CommandButton *command = static_cast<const CommandButton *>(GadgetButtonGetData(window));
+	if (!command || window->winIsHidden())
+		return;
+
+	UnicodeString text;
+	const ThingTemplate *hero = getRetailHero(window);
+	const ThingTemplate *unit = command->getThingTemplate();
+	if (hero)
+		unit = hero;
+	if (hero)
+		text = hero->getDisplayName();
+	else
+		text = TheGameText->fetchOrSubstitute(command->getTextLabel().str(), L"");
+	if (text.isEmpty() && unit)
+		text = unit->getDisplayName();
+	if (text.isEmpty())
+		return;
+
+	UnicodeString description = TheGameText->fetchOrSubstitute(command->getDescriptionLabel().str(), L"");
+	if (!description.isEmpty())
+	{
+		text.concat(L"\n");
+		text.concat(description);
+	}
+	const Int cost = getRetailCommandCost(command, window);
+	if (cost >= 0)
+	{
+		UnicodeString price;
+		price.format(TheGameText->fetchOrSubstitute("TOOLTIP:UnitCost", L"Cost: %d"), cost);
+		text.concat(L"\n");
+		text.concat(price);
+	}
+	const CommandAvailability availability = getRetailButtonAvailability(window);
+	UnicodeString reason;
+	if (availability == COMMAND_CANT_AFFORD)
+		reason = TheGameText->fetchOrSubstitute("TOOLTIP:TooltipNotEnoughMoneyToBuild", L"Not enough resources");
+	else if (availability == COMMAND_RESTRICTED)
+	{
+		Object *obj = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+		CanMakeType makeType = CANMAKE_OK;
+		if (obj && unit && (command->getCommandType() == GUI_COMMAND_UNIT_BUILD || command->getCommandType() == GUI_COMMAND_REVIVE))
+			makeType = TheBuildAssistant->canMakeUnit(obj, unit);
+		if (makeType == CANMAKE_QUEUE_FULL)
+			reason = TheGameText->fetchOrSubstitute("TOOLTIP:TooltipCannotPurchaseBecauseQueueFull", L"Production queue is full");
+		else if (makeType == CANMAKE_MAXED_OUT_FOR_PLAYER || makeType == CANMAKE_PARKING_PLACES_FULL)
+			reason.set(L"Unit limit reached");
+		else
+		{
+			reason = TheGameText->fetchOrSubstitute(command->getLacksPrerequisiteLabel().str(), L"");
+			if (reason.isEmpty() && obj && !HeroRoster::buttonUpgradesMet(command, obj->getControllingPlayer(), obj))
+			{
+				for (const UpgradeTemplate *upgrade : command->getNeededUpgrades())
+				{
+					const AsciiString &name = upgrade->getUpgradeName();
+					if (name.startsWith("Upgrade_ObjectLevel") || name.startsWith("Upgrade_StructureLevel"))
+					{
+						reason.set(L"Requires a higher level");
+						break;
+					}
+				}
+			}
+			if (reason.isEmpty())
+			{
+				if (makeType == CANMAKE_NO_PREREQ || !command->getNeededUpgrades().empty() || (obj && unit && !obj->getControllingPlayer()->canBuild(unit)))
+					reason.set(L"Prerequisite missing");
+				else
+					reason.set(L"Unavailable");
+			}
+		}
+	}
+	if (!reason.isEmpty())
+	{
+		text.concat(L"\n");
+		text.concat(reason);
+	}
+	TheMouse->setRetailCommandTooltip(text);
 }
 
 void ControlBar::initRetailHud()
@@ -377,6 +565,7 @@ void ControlBar::initRetailHud()
 			throw INIException("RetailHud.wnd is missing a command button");
 		m_retailVisible[i]->winSetOwner(master);
 		m_retailVisible[i]->winSetDrawFunc(drawRetailCommand);
+		m_retailVisible[i]->winSetTooltipFunc(retailCommandTooltip);
 		m_retailHolders[i]->winSetOwner(master);
 		m_commandWindows[i] = m_retailHolders[i];
 		m_retailSlotOf[i] = -1;
@@ -390,10 +579,15 @@ void ControlBar::resetRetailCommandWindows()
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
 	{
 		m_retailVisible[i]->winHide(TRUE);
+		BitClear(m_retailVisible[i]->winGetInstanceData()->m_state, WIN_STATE_SELECTED | WIN_STATE_HILITED);
+		m_retailHolders[i]->winHide(TRUE);
+		GadgetButtonSetData(m_retailHolders[i], nullptr);
 		m_commandWindows[i] = m_retailHolders[i];
 		m_retailSlotOf[i] = -1;
-		m_retailCountShown[i] = 0;
+		m_retailHeroOf[i] = -1;
+		m_retailAvailability[i] = COMMAND_AVAILABLE;
 	}
+	m_retailShownMask = 0;
 }
 
 Bool ControlBar::retailExtraEntryUsable(const CommandButton *command, const Object *obj) const
@@ -500,9 +694,12 @@ void ControlBar::assignRetailSlots(const CommandSet *commandSet, Object *obj, In
 		}
 		GameWindow *target = m_retailVisible[placement.slot];
 		setControlCommand(target, placement.command);
+		const GUICommandType type = placement.command->getCommandType();
+		setRetailRightClick(target, type == GUI_COMMAND_UNIT_BUILD || type == GUI_COMMAND_REVIVE);
 		const Bool enabled = placement.entry >= MAX_COMMANDS_PER_SET
 			|| BitIsSet(m_retailHolders[placement.entry]->winGetStatus(), WIN_STATUS_ENABLED);
 		target->winEnable(enabled);
+		m_retailAvailability[placement.slot] = enabled ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		target->winHide(FALSE);
 		GadgetButtonSetText(target, UnicodeString::TheEmptyString);
 		m_commandWindows[index] = target;
@@ -601,7 +798,8 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 					break;
 			}
 			const CanMakeType makeType = TheBuildAssistant->canMakeUnit(obj, HeroRoster::heroAt(player, hero));
-			return makeType == CANMAKE_OK ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
+			return makeType == CANMAKE_OK ? COMMAND_AVAILABLE
+				: makeType == CANMAKE_NO_MONEY ? COMMAND_CANT_AFFORD : COMMAND_RESTRICTED;
 		}
 		default:
 			return COMMAND_RESTRICTED;
@@ -664,6 +862,7 @@ void ControlBar::populateRetailUnderConstruction(Object *obj)
 	if (obj && cancel && obj->isLocallyControlled())
 	{
 		setControlCommand(target, cancel);
+		setRetailRightClick(target, FALSE);
 		target->winEnable(TRUE);
 		target->winHide(FALSE);
 		m_commandWindows[0] = target;
@@ -679,13 +878,6 @@ void ControlBar::updateRetailCounters()
 	if (!player)
 		return;
 	const UnsignedInt now = TheGameLogic ? TheGameLogic->getFrame() : 0;
-	if (m_retailMoney >= 0 && now >= m_retailCounterFrame && now - m_retailCounterFrame < CounterInterval)
-		return;
-	m_retailCounterFrame = now;
-
-	const Int used = player->getCommandPointsUsed();
-	const Int maximum = player->getCommandPointsTotal();
-
 	const Int money = static_cast<Int>(player->getMoney()->countMoney());
 	UnicodeString text;
 	if (money != m_retailMoney)
@@ -694,6 +886,13 @@ void ControlBar::updateRetailCounters()
 		text.format(L"%d", money);
 		GadgetStaticTextSetText(m_retailResources, text);
 	}
+	if (m_retailUsedPoints >= 0 && now >= m_retailCounterFrame && now - m_retailCounterFrame < CounterInterval)
+		return;
+	m_retailCounterFrame = now;
+
+	const Int used = player->getCommandPointsUsed();
+	const Int maximum = player->getCommandPointsTotal();
+
 	if (used != m_retailUsedPoints || maximum != m_retailMaxPoints)
 	{
 		m_retailUsedPoints = used;
@@ -714,13 +913,27 @@ void ControlBar::updateRetailHud()
 		Int count = 0;
 		Real progress = 0.0f;
 		getRetailProduction(window, count, progress);
-		if (count != m_retailCountShown[i])
-		{
-			m_retailCountShown[i] = count;
-			UnicodeString text;
-			if (count > 1)
-				text.format(L"%d", count);
+		const CommandButton *command = static_cast<const CommandButton *>(GadgetButtonGetData(window));
+		UnicodeString text;
+		if (count > 0 && m_currContext == CB_CONTEXT_UNDER_CONSTRUCTION)
+			text.format(L"%d%%", static_cast<Int>(progress * 100.0f));
+		else if (count > 0 && command && command->showsProductionCount())
+			text.format(L"%d", count);
+		WinInstanceData *instance = window->winGetInstanceData();
+		if (instance->getText().compare(text) != 0)
 			GadgetButtonSetText(window, text);
+
+		if (getRetailButtonAvailability(window) == COMMAND_CANT_AFFORD)
+		{
+			const Int cost = getRetailCommandCost(command, window);
+			if (cost >= 0)
+			{
+				UnicodeString costText;
+				costText.format(L"%d", cost);
+				if (instance->getTooltipText().compare(costText) != 0)
+					instance->setTooltipText(costText);
+				instance->getTooltipDisplayString()->setFont(instance->getFont());
+			}
 		}
 	}
 	updateRetailCounters();

@@ -314,7 +314,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 271 94;
 			SIZE = 36 36;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -325,7 +325,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 317 110;
 			SIZE = 36 36;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -336,7 +336,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 343 152;
 			SIZE = 36 36;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -347,7 +347,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 343 202;
 			SIZE = 36 36;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -358,7 +358,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 311 240;
 			SIZE = 36 36;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -369,7 +369,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 264 252;
 			SIZE = 36 36;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 	ENDALLCHILDREN
 	END
@@ -392,7 +392,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 9;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -403,7 +403,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 55;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -414,7 +414,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 101;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -425,7 +425,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 147;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -436,7 +436,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 193;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -447,7 +447,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 239;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -458,7 +458,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 285;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -469,7 +469,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 331;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -480,7 +480,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 377;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -491,7 +491,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 423;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -502,7 +502,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 469;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 		WINDOW
 			WINDOWTYPE = PUSHBUTTON;
@@ -513,7 +513,7 @@ CHILD
 			ANCHOR = LEFT TOP;
 			OFFSET = 9 515;
 			SIZE = 42 42;
-			FONT = NAME: "Albertus MT", SIZE: 12, BOLD: 1;
+			FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
 		END
 	ENDALLCHILDREN
 	END

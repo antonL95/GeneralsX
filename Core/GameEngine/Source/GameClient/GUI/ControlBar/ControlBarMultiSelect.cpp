@@ -134,7 +134,7 @@ void ControlBar::addCommonCommands( Drawable *draw, Bool firstDrawable )
 				m_commandWindows[ i ]->winEnable( TRUE );
 
 				// set the command into the control
-				setControlCommand( m_commandWindows[ i ], command );
+				setControlCommand( m_commandWindows[ i ], command, !m_retailSelectionName );
 
 			}
 
@@ -169,7 +169,7 @@ void ControlBar::addCommonCommands( Drawable *draw, Bool firstDrawable )
 				m_commandWindows[ i ]->winEnable( TRUE );
 
 				// set the command into the control
-				setControlCommand( m_commandWindows[ i ], command );
+				setControlCommand( m_commandWindows[ i ], command, !m_retailSelectionName );
 			}
 			else if( command != m_commonCommands[ i ] && !attackMove )
 			{

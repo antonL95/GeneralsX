@@ -138,6 +138,8 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 	{ "Radial", INI::parseBool, nullptr, offsetof(CommandButton, m_radial) },
 	{ "NeededUpgrade", CommandButton::parseNeededUpgrades, nullptr, offsetof(CommandButton, m_neededUpgrades) },
 	{ "NeededUpgradeAny", INI::parseBool, nullptr, offsetof(CommandButton, m_neededUpgradeAny) },
+	{ "LacksPrerequisiteLabel", INI::parseAsciiString, nullptr, offsetof(CommandButton, m_lacksPrerequisiteLabel) },
+	{ "ShowProductionCount", INI::parseBool, nullptr, offsetof(CommandButton, m_showProductionCount) },
 	{ "CommandRangeStart", INI::parseInt, nullptr, offsetof(CommandButton, m_commandRangeStart) },
 	{ "CommandRangeCount", INI::parseInt, nullptr, offsetof(CommandButton, m_commandRangeCount) },
 
@@ -2304,6 +2306,11 @@ void ControlBar::switchToContext( ControlBarContext context, Drawable *draw )
 
 		m_currContext = context;
 		resetRetailCommandWindows();
+		if (TheInGameUI->getSelectCount() == 0)
+		{
+			m_retailRange = CommandButtonRules::VisibleRange();
+			m_retailRangeObject = 0;
+		}
 		if (context == CB_CONTEXT_COMMAND)
 		{
 			populateCommand(obj);
@@ -2317,8 +2324,6 @@ void ControlBar::switchToContext( ControlBarContext context, Drawable *draw )
 		}
 		else if (context == CB_CONTEXT_UNDER_CONSTRUCTION)
 			populateRetailUnderConstruction(obj);
-		else
-			assignRetailSlots(nullptr, nullptr, 0);
 
 		const ExitInterface *exit = obj ? obj->getObjectExitInterface() : nullptr;
 		showRallyPoint(context == CB_CONTEXT_COMMAND && exit && obj->isLocallyControlled() ? exit->getRallyPoint() : nullptr);
@@ -2607,7 +2612,7 @@ void ControlBar::setCommandBarBorder( GameWindow *button, CommandButtonMappedBor
 //-------------------------------------------------------------------------------------------------
 /** Set the command data into the control */
 //-------------------------------------------------------------------------------------------------
-void ControlBar::setControlCommand( GameWindow *button, const CommandButton *commandButton )
+void ControlBar::setControlCommand( GameWindow *button, const CommandButton *commandButton, Bool registerHotKey )
 {
 
 	// the window must be a gadget button
@@ -2676,11 +2681,11 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 
 	setCommandBarBorder(button, commandButton->getCommandButtonMappedBorderType());
 
-	if (TheHotKeyManager)
+	if (TheHotKeyManager && registerHotKey)
 	{
 		AsciiString hotKey =	TheHotKeyManager->searchHotKey(commandButton->getTextLabel());
 		if(hotKey.isNotEmpty())
-			TheHotKeyManager->addHotKey(button, hotKey);
+			TheHotKeyManager->addHotKey(button, hotKey, m_retailSelectionName ? button->winGetOwner() : nullptr);
 	}
 	GadgetButtonSetAltSound(button, "GUICommandBarClick");
 

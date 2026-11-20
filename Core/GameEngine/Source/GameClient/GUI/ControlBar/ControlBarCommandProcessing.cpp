@@ -120,6 +120,17 @@ CBCommandStatus ControlBar::processCommandTransitionUI( GameWindow *control, Gad
 CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 																							GadgetGameMessage gadgetMessage )
 {
+	if (m_retailSelectionName && control && getRetailSlot(control) >= 0)
+	{
+		if (control->winIsHidden() || TheInGameUI->getSelectCount() == 0)
+			return CBC_COMMAND_NOT_USED;
+		if (gadgetMessage == GBM_SELECTED_RIGHT)
+			return cancelRetailProduction(control);
+		const CommandAvailability availability = getRetailButtonAvailability(control);
+		if (availability != COMMAND_AVAILABLE && availability != COMMAND_ACTIVE)
+			return CBC_COMMAND_USED;
+	}
+
 	// get the command pointer from the control user data we put in the button
 	const CommandButton *commandButton = (const CommandButton *)GadgetButtonGetData(control);
 	if( !commandButton )

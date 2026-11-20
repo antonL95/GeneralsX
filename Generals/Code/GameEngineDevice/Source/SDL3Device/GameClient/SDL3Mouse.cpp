@@ -542,6 +542,8 @@ void SDL3Mouse::setCursor(MouseCursor cursor)
 void SDL3Mouse::draw(void)
 {
 	setCursor(m_currentCursor);
+	if (m_retailCommandTooltip && m_visible)
+		drawTooltip();
 }
 
 #ifndef M_PI

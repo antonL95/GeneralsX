@@ -141,19 +141,22 @@ void HotKeyManager::reset()
 }
 
 //-----------------------------------------------------------------------------
-void HotKeyManager::addHotKey( GameWindow *win, const AsciiString& keyIn)
+void HotKeyManager::addHotKey( GameWindow *win, const AsciiString& keyIn, GameWindow *dispatchWindow)
 {
 	AsciiString key = keyIn;
 	key.toLower();
 	HotKeyMap::iterator it = m_hotKeyMap.find(key);
 	if( it != m_hotKeyMap.end() )
 	{
+		if (dispatchWindow)
+			return;
 		DEBUG_CRASH(("Hotkey %s is already mapped to window %s, current window is %s", key.str(), it->second.m_win->winGetInstanceData()->m_decoratedNameString.str(), win->winGetInstanceData()->m_decoratedNameString.str()));
 		return;
 	}
 	HotKey newHK;
 	newHK.m_key.set(key);
 	newHK.m_win = win;
+	newHK.m_dispatchWindow = dispatchWindow;
 	m_hotKeyMap[key] = newHK;
 }
 
@@ -172,7 +175,8 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 	{
 		if( BitIsSet( win->winGetStatus(), WIN_STATUS_ENABLED ) )
  		{
- 			TheWindowManager->winSendSystemMsg( win->winGetParent(), GBM_SELECTED, (WindowMsgData)win, win->winGetWindowId() );
+			GameWindow *dispatch = it->second.m_dispatchWindow ? it->second.m_dispatchWindow : win->winGetParent();
+			TheWindowManager->winSendSystemMsg( dispatch, GBM_SELECTED, (WindowMsgData)win, win->winGetWindowId() );
 
  			// here we make the same click sound that the GUI uses when you click a button
  			AudioEventRTS buttonClick("GUIClick");

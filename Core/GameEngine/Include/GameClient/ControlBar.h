@@ -60,6 +60,7 @@ class UpgradeTemplate;
 class ControlBarResizer;
 class GameWindowTransitionsHandler;
 class DisplayString;
+class ProductionEntry;
 
 enum ProductionID CPP_11(: Int);
 
@@ -369,6 +370,8 @@ public:
 	const AsciiString& getInvalidCursorName() const { return m_invalidCursorName; }
 	const AsciiString& getTextLabel() const { return m_textLabel; }
 	const AsciiString& getDescriptionLabel() const { return m_descriptionLabel; }
+	const AsciiString& getLacksPrerequisiteLabel() const { return m_lacksPrerequisiteLabel; }
+	Bool showsProductionCount() const { return m_showProductionCount; }
 	const AsciiString& getPurchasedLabel() const { return m_purchasedLabel; }
 	const AsciiString& getConflictingLabel() const { return m_conflictingLabel; }
 	const AudioEventRTS* getUnitSpecificSound() const { return &m_unitSpecificSound; }
@@ -451,6 +454,8 @@ private:
 	UnsignedInt m_rotwkOptions = 0;
 	std::vector<const UpgradeTemplate*> m_neededUpgrades;
 	Bool m_neededUpgradeAny = FALSE;
+	AsciiString m_lacksPrerequisiteLabel;
+	Bool m_showProductionCount = FALSE;
 	Int m_commandRangeStart = -1;
 	Int m_commandRangeCount = 0;
 
@@ -822,7 +827,7 @@ public:
 	void updateBorderColor( Color color) {m_commandBarBorderColor = color;	}
 
 	/// set the command data into the button
-	void setControlCommand( GameWindow *button, const CommandButton *commandButton );
+	void setControlCommand( GameWindow *button, const CommandButton *commandButton, Bool registerHotKey = TRUE );
 
 	void getForegroundMarkerPos(Int *x, Int *y);
 	void getBackgroundMarkerPos(Int *x, Int *y);
@@ -957,7 +962,7 @@ protected:
 	GameWindow *m_retailHolders[MAX_COMMANDS_PER_SET] = {};
 	GameWindow *m_retailVisible[MAX_COMMANDS_PER_SET] = {};
 	Int m_retailSlotOf[MAX_COMMANDS_PER_SET] = {};
-	Int m_retailCountShown[MAX_COMMANDS_PER_SET] = {};
+	CommandAvailability m_retailAvailability[MAX_COMMANDS_PER_SET] = {};
 	UnsignedInt m_retailCounterFrame = 0;
 	Int m_retailMoney = -1;
 	Int m_retailUsedPoints = -1;
@@ -983,6 +988,9 @@ protected:
 	void applyRetailHeroImage(GameWindow *window, Int hero) const;
 	CommandAvailability getRetailCommandAvailability(const CommandButton *command, Object *obj, GameWindow *win) const;
 	CBCommandStatus processRetailCommand(const CommandButton *command, GameWindow *control, Object *obj);
+	const ProductionEntry *getRetailProductionEntries(const GameWindow *window, Int &count, Real &progress) const;
+	CBCommandStatus cancelRetailProduction(GameWindow *window) const;
+	Int getRetailCommandCost(const CommandButton *command, const GameWindow *window) const;
 	void resetRetailCommandWindows();
 	void updateRetailHud();
 	void updateRetailCounters();
@@ -997,6 +1005,8 @@ public:
 	void drawRetailSocketFills() const;
 	Bool isOverRetailSocket(Int px, Int py) const;
 	void getRetailProduction(const GameWindow *window, Int &count, Real &progress) const;
+	CommandAvailability getRetailButtonAvailability(GameWindow *window) const;
+	void showRetailCommandTooltip(GameWindow *window) const;
 
 protected:
 
