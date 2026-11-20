@@ -48,6 +48,7 @@
 
 #include "Common/GameCommon.h"
 #include "Common/PlayerTemplate.h"
+#include "Common/PlayerTemplateRules.h"
 #include "Common/Player.h"
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
@@ -67,9 +68,30 @@
 //-------------------------------------------------------------------------------------------------
 /*static*/ const FieldParse* PlayerTemplate::getFieldParse()
 {
+	static constexpr Int ROTWK_FIELD_COUNT = 21;
 	static const FieldParse TheFieldParseTable[] =
 	{
 		{ "DefaultPlayerAIType", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_defaultPlayerAIType) },
+		{ "Evil", INI::parseBool, nullptr, offsetof(PlayerTemplate, m_evil) },
+		{ "MaxLevelSP", INI::parseInt, nullptr, offsetof(PlayerTemplate, m_maxLevelSP) },
+		{ "MaxLevelMP", INI::parseInt, nullptr, offsetof(PlayerTemplate, m_maxLevelMP) },
+		{ "StartingUnitTacticalWOTR", INI::parseAsciiStringVectorAppend, nullptr, offsetof(PlayerTemplate, m_startingUnitsTacticalWOTR) },
+		{ "IntrinsicSciencesMP", INI::parseScienceVector, nullptr, offsetof(PlayerTemplate, m_intrinsicSciencesMP) },
+		{ "SpellBook", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_spellBook) },
+		{ "SpellBookMp", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_spellBookMp) },
+		{ "PurchaseScienceCommandSet", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_purchaseScienceCommandSet) },
+		{ "PurchaseScienceCommandSetMP", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_purchaseScienceCommandSetMP) },
+		{ "LightPointsUpSound", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_lightPointsUpSound) },
+		{ "ObjectiveAddedSound", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_objectiveAddedSound) },
+		{ "ObjectiveCompletedSound", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_objectiveCompletedSound) },
+		{ "InitialUpgrades", INI::parseAsciiStringVector, nullptr, offsetof(PlayerTemplate, m_initialUpgrades) },
+		{ "BuildableHeroesMP", INI::parseAsciiStringVector, nullptr, offsetof(PlayerTemplate, m_buildableHeroesMP) },
+		{ "BuildableRingHeroesMP", INI::parseAsciiStringVector, nullptr, offsetof(PlayerTemplate, m_buildableRingHeroesMP) },
+		{ "SpellStoreCurrentPowerLabel", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_spellStoreCurrentPowerLabel) },
+		{ "SpellStoreMaximumPowerLabel", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_spellStoreMaximumPowerLabel) },
+		{ "ResourceModifierObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(PlayerTemplate, m_resourceModifierObjectFilter) },
+		{ "ResourceModifierValues", PlayerTemplate::parseResourceModifierValues, nullptr, offsetof(PlayerTemplate, m_resourceModifierValues) },
+		{ "MultiSelectionPortrait", INI::parseAsciiString, nullptr, offsetof(PlayerTemplate, m_multiSelectionPortrait) },
 		{ "Side",											INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_side ) },
 		{ "BaseSide",								INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_baseSide ) },
 		{ "PlayableSide",							INI::parseBool,																	nullptr, offsetof( PlayerTemplate, m_playableSide ) },
@@ -134,7 +156,37 @@
 		{ nullptr,											nullptr,																				nullptr, 0 },
 	};
 
-	return TheFieldParseTable + (RetailFileLayers::enabled() && !INIAudit::isEnabled() ? 0 : 1);
+	return TheFieldParseTable + (PlayerTemplateRules::parsesRotwkFields(RetailFileLayers::enabled(), INIAudit::isEnabled()) ? 0 : ROTWK_FIELD_COUNT);
+}
+
+const ScienceVec& PlayerTemplate::getIntrinsicSciences(Bool isMultiplayerOrSkirmish) const
+{
+	return PlayerTemplateRules::selectVariant(isMultiplayerOrSkirmish != FALSE, m_intrinsicSciencesMP, m_intrinsicSciences);
+}
+
+AsciiString PlayerTemplate::getPurchaseScienceCommandSet(Bool isMultiplayerOrSkirmish) const
+{
+	return (isMultiplayerOrSkirmish && m_purchaseScienceCommandSetMP.isNotEmpty()) ? m_purchaseScienceCommandSetMP : m_purchaseScienceCommandSet;
+}
+
+Int PlayerTemplate::getMaxLevel(Bool isMultiplayerOrSkirmish) const
+{
+	return PlayerTemplateRules::selectLevelVariant(isMultiplayerOrSkirmish != FALSE, m_maxLevelMP, m_maxLevelSP);
+}
+
+AsciiString PlayerTemplate::getSpellBook(Bool isMultiplayerOrSkirmish) const
+{
+	return (isMultiplayerOrSkirmish && m_spellBookMp.isNotEmpty()) ? m_spellBookMp : m_spellBook;
+}
+
+void PlayerTemplate::parseResourceModifierValues(INI* ini, void*, void* store, const void*)
+{
+	std::vector<Int>* values = static_cast<std::vector<Int>*>(store);
+	values->clear();
+	for (const char* token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+	{
+		values->push_back(INI::scanInt(token));
+	}
 }
 
 AsciiString PlayerTemplate::getStartingUnit( Int i ) const
@@ -220,7 +272,10 @@ PlayerTemplate::PlayerTemplate() :
 	m_playableSide(false),
   m_oldFaction(false),
 	m_intrinsicSPP(0),
-	m_specialPowerShortcutButtonCount(0)
+	m_specialPowerShortcutButtonCount(0),
+	m_evil(FALSE),
+	m_maxLevelSP(0),
+	m_maxLevelMP(0)
 {
 	m_preferredColor.red = m_preferredColor.green = m_preferredColor.blue = 0.0f;
 	for (Coord3D& offset : m_startingUnitOffsets)

@@ -18,6 +18,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/BitFlagsCrcTest.cpp
     GameEngine/Common/UpgradeMaskTest.cpp
     GameEngine/Common/MapPlayerRosterTest.cpp
+    GameEngine/Common/PlayerTemplateRulesTest.cpp
     GameEngine/Common/BfmeAssetPathTest.cpp
     GameEngine/Common/BfmeScriptRulesTest.cpp
     GameEngine/Common/FontSubstitutionTest.cpp

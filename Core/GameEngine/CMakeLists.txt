@@ -114,6 +114,7 @@ set(GAMEENGINE_SRC
 #    Include/Common/Player.h
 #    Include/Common/PlayerList.h
 #    Include/Common/PlayerTemplate.h
+    Include/Common/PlayerTemplateRules.h
 #    Include/Common/ProductionPrerequisite.h
 #    Include/Common/QuickmatchPreferences.h
 #    Include/Common/QuotedPrintable.h

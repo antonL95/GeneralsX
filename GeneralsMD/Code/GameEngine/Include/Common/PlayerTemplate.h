@@ -50,6 +50,7 @@
 #include "Common/Handicap.h"
 #include "Common/Money.h"
 #include "Common/Science.h"
+#include "Common/SpecialPowerINI.h"
 #include "Common/AsciiString.h"
 #include "Common/UnicodeString.h"
 #include "Common/NameKeyGenerator.h"
@@ -123,10 +124,35 @@ public:
 	AsciiString getMedallionSelected() const { return m_strMedallionSelected; }
 
 	const ScienceVec& getIntrinsicSciences() const { return m_intrinsicSciences; }
+	const ScienceVec& getIntrinsicSciencesMP() const { return m_intrinsicSciencesMP; }
+	const ScienceVec& getIntrinsicSciences(Bool isMultiplayerOrSkirmish) const;
 	Int getIntrinsicSciencePurchasePoints() const { return m_intrinsicSPP; }
 	AsciiString getPurchaseScienceCommandSetRank1() const {return m_purchaseScienceCommandSetRank1;	}
 	AsciiString getPurchaseScienceCommandSetRank3() const {return m_purchaseScienceCommandSetRank3;	}
 	AsciiString getPurchaseScienceCommandSetRank8() const {return m_purchaseScienceCommandSetRank8;	}
+	AsciiString getPurchaseScienceCommandSet() const { return m_purchaseScienceCommandSet; }
+	AsciiString getPurchaseScienceCommandSetMP() const { return m_purchaseScienceCommandSetMP; }
+	AsciiString getPurchaseScienceCommandSet(Bool isMultiplayerOrSkirmish) const;
+
+	Bool isEvil() const { return m_evil; }
+	Int getMaxLevelSP() const { return m_maxLevelSP; }
+	Int getMaxLevelMP() const { return m_maxLevelMP; }
+	Int getMaxLevel(Bool isMultiplayerOrSkirmish) const;
+	const std::vector<AsciiString>& getStartingUnitsTacticalWOTR() const { return m_startingUnitsTacticalWOTR; }
+	AsciiString getSpellBook() const { return m_spellBook; }
+	AsciiString getSpellBookMp() const { return m_spellBookMp; }
+	AsciiString getSpellBook(Bool isMultiplayerOrSkirmish) const;
+	AsciiString getLightPointsUpSound() const { return m_lightPointsUpSound; }
+	AsciiString getObjectiveAddedSound() const { return m_objectiveAddedSound; }
+	AsciiString getObjectiveCompletedSound() const { return m_objectiveCompletedSound; }
+	const std::vector<AsciiString>& getInitialUpgrades() const { return m_initialUpgrades; }
+	const std::vector<AsciiString>& getBuildableHeroesMP() const { return m_buildableHeroesMP; }
+	const std::vector<AsciiString>& getBuildableRingHeroesMP() const { return m_buildableRingHeroesMP; }
+	AsciiString getSpellStoreCurrentPowerLabel() const { return m_spellStoreCurrentPowerLabel; }
+	AsciiString getSpellStoreMaximumPowerLabel() const { return m_spellStoreMaximumPowerLabel; }
+	const SpecialPowerObjectFilter& getResourceModifierObjectFilter() const { return m_resourceModifierObjectFilter; }
+	const std::vector<Int>& getResourceModifierValues() const { return m_resourceModifierValues; }
+	AsciiString getMultiSelectionPortrait() const { return m_multiSelectionPortrait; }
 
 	AsciiString getSpecialPowerShortcutCommandSet() const {return m_specialPowerShortcutCommandSet;	}
 	AsciiString getSpecialPowerShortcutWinName() const {return m_specialPowerShortcutWinName;	}
@@ -147,6 +173,7 @@ protected:
 	static void parseProductionCostChange( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parseProductionTimeChange( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parseProductionVeterancyLevel( INI* ini, void *instance, void *store, const void* /*userData*/ );
+	static void parseResourceModifierValues( INI* ini, void *instance, void *store, const void* userData );
 
 private:
 
@@ -198,6 +225,27 @@ private:
 	AsciiString m_strMedallionNormal;
 	AsciiString m_strMedallionHilite;
 	AsciiString m_strMedallionSelected;
+
+	Bool m_evil;
+	Int m_maxLevelSP;
+	Int m_maxLevelMP;
+	std::vector<AsciiString> m_startingUnitsTacticalWOTR;
+	ScienceVec m_intrinsicSciencesMP;
+	AsciiString m_spellBook;
+	AsciiString m_spellBookMp;
+	AsciiString m_purchaseScienceCommandSet;
+	AsciiString m_purchaseScienceCommandSetMP;
+	AsciiString m_lightPointsUpSound;
+	AsciiString m_objectiveAddedSound;
+	AsciiString m_objectiveCompletedSound;
+	std::vector<AsciiString> m_initialUpgrades;
+	std::vector<AsciiString> m_buildableHeroesMP;
+	std::vector<AsciiString> m_buildableRingHeroesMP;
+	AsciiString m_spellStoreCurrentPowerLabel;
+	AsciiString m_spellStoreMaximumPowerLabel;
+	SpecialPowerObjectFilter m_resourceModifierObjectFilter;
+	std::vector<Int> m_resourceModifierValues;
+	AsciiString m_multiSelectionPortrait;
 };
 
 // ----------------------------------------------------------------------------------------------

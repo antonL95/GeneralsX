@@ -12,9 +12,13 @@
 #include "Common/MessageStream.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/Player.h"
+#include "Common/PlayerList.h"
+#include "Common/PlayerTemplate.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/Science.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GadgetPushButton.h"
@@ -23,6 +27,8 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/View.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/BehaviorModule.h"
+#include "GameLogic/Module/UpgradeModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 
@@ -273,6 +279,92 @@ void listObjects(const Command& command, unsigned int frame)
 	}
 }
 
+void dumpPlayer(const Command& command, unsigned int frame)
+{
+	if (!ThePlayerList)
+		return;
+	Player* player = ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey(command.player.c_str()));
+	if (!player)
+	{
+		std::fprintf(stderr, "TEST player %u %s missing\n", frame, command.player.c_str());
+		return;
+	}
+	const PlayerTemplate* pt = player->getPlayerTemplate();
+	if (!pt)
+	{
+		std::fprintf(stderr, "TEST player %u %s no_template\n", frame, command.player.c_str());
+		return;
+	}
+	std::string upgrades;
+	if (TheUpgradeCenter)
+	{
+		for (const AsciiString& name : pt->getInitialUpgrades())
+		{
+			const UpgradeTemplate* ut = TheUpgradeCenter->findUpgrade(name);
+			if (ut && player->hasUpgradeComplete(ut))
+			{
+				if (!upgrades.empty())
+					upgrades += ',';
+				upgrades += name.str();
+			}
+		}
+	}
+	std::string sciences;
+	if (TheScienceStore)
+	{
+		for (const ScienceType sci : pt->getIntrinsicSciences(TRUE))
+		{
+			if (player->hasScience(sci))
+			{
+				if (!sciences.empty())
+					sciences += ',';
+				sciences += TheScienceStore->getInternalNameForScience(sci).str();
+			}
+		}
+		for (const ScienceType sci : pt->getIntrinsicSciences(FALSE))
+		{
+			if (player->hasScience(sci))
+			{
+				const char* sciName = TheScienceStore->getInternalNameForScience(sci).str();
+				if (sciences.find(sciName) == std::string::npos)
+				{
+					if (!sciences.empty())
+						sciences += ',';
+					sciences += sciName;
+				}
+			}
+		}
+	}
+	std::fprintf(stderr,
+		"TEST player %u %s template=%s evil=%d maxLevelMP=%d maxLevelSP=%d spellBook=%s store=%s heroes=%zu ringHeroes=%zu resModVals=%zu resModFilterObjs=%zu portrait=%s upgrades=%s sciences=%s\n",
+		frame, command.player.c_str(), pt->getName().str(), pt->isEvil() ? 1 : 0, pt->getMaxLevelMP(), pt->getMaxLevelSP(),
+		pt->getSpellBook(TRUE).str(), pt->getPurchaseScienceCommandSet(TRUE).str(), pt->getBuildableHeroesMP().size(),
+		pt->getBuildableRingHeroesMP().size(), pt->getResourceModifierValues().size(),
+		pt->getResourceModifierObjectFilter().m_includeObjects.size(), pt->getMultiSelectionPortrait().str(),
+		upgrades.empty() ? "-" : upgrades.c_str(), sciences.empty() ? "-" : sciences.c_str());
+
+	std::vector<Object*> owned;
+	for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+	{
+		if (obj->getControllingPlayer() == player)
+			owned.push_back(obj);
+	}
+	std::sort(owned.begin(), owned.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
+	for (Object* obj : owned)
+	{
+		int upgradedModules = 0;
+		for (BehaviorModule** mod = obj->getBehaviorModules(); mod && *mod; ++mod)
+		{
+			const UpgradeModuleInterface* upg = (*mod)->getUpgrade();
+			if (upg && upg->isAlreadyUpgraded())
+				++upgradedModules;
+		}
+		std::fprintf(stderr, "TEST player_obj %u %s %s id=%u upgradedModules=%d commandSet=%s\n", frame,
+			command.player.c_str(), obj->getTemplate()->getName().str(), static_cast<unsigned>(obj->getID()),
+			upgradedModules, obj->getCommandSetString().str());
+	}
+}
+
 void execute(const Command& command, unsigned int frame)
 {
 	if (command.action == "key")
@@ -283,6 +375,11 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action == "list")
 	{
 		listObjects(command, frame);
+		return;
+	}
+	if (command.action == "player")
+	{
+		dumpPlayer(command, frame);
 		return;
 	}
 	if (command.action == "quit")

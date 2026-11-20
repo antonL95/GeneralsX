@@ -58,6 +58,8 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
+#include "Common/PlayerTemplateRules.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ProductionPrerequisite.h"
 #include "Common/Radar.h"
 #include "Common/ResourceGatheringManager.h"
@@ -81,6 +83,7 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Scripts.h"
 #include "GameLogic/PartitionManager.h"
@@ -478,6 +481,17 @@ void Player::init(const PlayerTemplate* pt)
 
 	// reset rank info
 	resetRank();
+	if (PlayerTemplateRules::grantsInitialUpgrades(RetailFileLayers::enabled()) && pt && TheUpgradeCenter)
+	{
+		for (const AsciiString& upgradeName : pt->getInitialUpgrades())
+		{
+			const UpgradeTemplate* upgradeTemplate = TheUpgradeCenter->findUpgrade(upgradeName);
+			if (upgradeTemplate)
+			{
+				addUpgrade(upgradeTemplate, UPGRADE_STATUS_COMPLETE);
+			}
+		}
+	}
 	m_sciencesDisabled.clear();
 	m_sciencesHidden.clear();
 	m_specialPowerReadyTimerList.clear();
@@ -2445,7 +2459,12 @@ void Player::resetSciences()
 	m_sciences.clear();
 
 	if (getPlayerTemplate())
-		m_sciences = getPlayerTemplate()->getIntrinsicSciences();
+	{
+		const Bool isMpOrSkirmish = TheGameInfo != nullptr ||
+			(TheGameLogic && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInSkirmishGame()));
+		const Bool useMp = PlayerTemplateRules::usesMpVariant(RetailFileLayers::enabled(), isMpOrSkirmish);
+		m_sciences = getPlayerTemplate()->getIntrinsicSciences(useMp);
+	}
 
 	for (Int i = 1; i <= m_rankLevel; ++i)
 	{
