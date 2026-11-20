@@ -60,6 +60,44 @@
 WindowLayout *popupCommunicatorLayout = nullptr;
 
 
+static Bool outsideRetailRadar(GameWindow *window, UnsignedInt msg, WindowMsgData mData1)
+{
+	if (msg != GWM_MOUSE_POS && msg != GWM_LEFT_DOWN && msg != GWM_RIGHT_DOWN)
+		return FALSE;
+	Int x, y, width, height;
+	window->winGetScreenPosition(&x, &y);
+	window->winGetSize(&width, &height);
+	const Int dx = static_cast<Int>(mData1 & 0xFFFF) - x - width / 2;
+	const Int localY = static_cast<Int>(mData1 >> 16) - y;
+	const Int dy = localY - height / 2;
+	const Int radius = MIN(width, height) / 2;
+	return dx * dx + dy * dy > radius * radius || localY * 100 > height * 84;
+}
+
+static Bool setRetailRallyPoints(const DrawableList *drawables, const Coord3D &world)
+{
+	Bool anyStructure = FALSE;
+	for (DrawableList::const_iterator it = drawables->begin(); it != drawables->end(); ++it)
+	{
+		const Object *obj = (*it) ? (*it)->getObject() : nullptr;
+		if (!obj || !obj->isKindOf(KINDOF_STRUCTURE))
+			return FALSE;
+		anyStructure = TRUE;
+	}
+	if (!anyStructure)
+		return FALSE;
+	for (DrawableList::const_iterator it = drawables->begin(); it != drawables->end(); ++it)
+	{
+		Object *obj = (*it)->getObject();
+		if (!obj->isLocallyControlled() || !obj->getObjectExitInterface())
+			continue;
+		GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_SET_RALLY_POINT);
+		msg->appendObjectIDArgument(obj->getID());
+		msg->appendLocationArgument(world);
+	}
+	return TRUE;
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Input procedure for the left HUD */
 //-------------------------------------------------------------------------------------------------
@@ -72,6 +110,9 @@ WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg,
 	//
 	if( !rts::localPlayerHasRadar() )
 		return MSG_HANDLED;
+
+	if (RetailFileLayers::enabled() && outsideRetailRadar(window, msg, mData1))
+		return MSG_IGNORED;
 
 	// If the middle mouse button is depressed, then just let the message fall all the
 	// way back to the usual middle mouse button processing.
@@ -215,6 +256,26 @@ WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg,
 
 		}
 
+		case GWM_LEFT_DRAG:
+		case GWM_RIGHT_DRAG:
+		{
+			const Bool lookButton = TheGlobalData->m_useAlternateMouse ? msg == GWM_LEFT_DRAG : msg == GWM_RIGHT_DRAG;
+			if (!RetailFileLayers::enabled() || (!lookButton && !TheInGameUI->getAllSelectedLocalDrawables()->empty()))
+				break;
+			ICoord2D mouse;
+			mouse.x = mData1 & 0xFFFF;
+			mouse.y = mData1 >> 16;
+			ICoord2D screenPos;
+			window->winGetScreenPosition(&screenPos.x, &screenPos.y);
+			mouse.x -= screenPos.x;
+			mouse.y -= screenPos.y;
+			ICoord2D radar;
+			Coord3D world;
+			if (TheRadar->localPixelToRadar(&mouse, &radar) && TheRadar->radarToWorld(&radar, &world))
+				TheTacticalView->userLookAt(&world);
+			break;
+		}
+
 		// ------------------------------------------------------------------------
 		case GWM_RIGHT_UP:// Here to eat
 		case GWM_LEFT_UP:// Here to eat
@@ -290,7 +351,7 @@ WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg,
 					// Play the unit voice response
 					pickAndPlayUnitVoiceResponse(TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_DO_ATTACKMOVETO);
 				}
-				else
+				else if (!RetailFileLayers::enabled() || !setRetailRallyPoints(drawableList, world))
 				{
 					GameMessage *newMsg = nullptr;
 

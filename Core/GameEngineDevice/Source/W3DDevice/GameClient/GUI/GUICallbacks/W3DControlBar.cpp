@@ -69,23 +69,13 @@ void W3DLeftHUDDraw( GameWindow *window, WinInstanceData *instData )
 		Int x, y, width, height;
 		window->winGetScreenPosition(&x, &y);
 		window->winGetSize(&width, &height);
-		const Image *backing = TheMappedImageCollection->findImageByName("UiRetailRadarBacking");
-		const Image *frame = TheMappedImageCollection->findImageByName("UiRetailRadarFrame");
-		if (TheDisplay->hasImageTexture(backing))
-			TheDisplay->drawImage(backing, x, y, x + width, y + height);
-
-		const Int inset = MAX(2, width / 15);
-		const Int radius = MIN(width, height) / 2 - inset;
+		const Int radius = MIN(width, height) / 2;
 		if (radius > 0 && TheRadar->isRadarWindow(window))
 		{
-			W3DDisplay *display = static_cast<W3DDisplay *>(TheDisplay);
-			display->setCircularClip(x + width / 2, y + height / 2, radius);
-			TheRadar->draw(x + 1, y + 1, width - 2, height - 2);
-			display->setCircularClip(0, 0, 0);
+			TheDisplay->setCircularClip(x + width / 2, y + height / 2, radius);
+			TheRadar->draw(x, y, width, height);
+			TheDisplay->setCircularClip(0, 0, 0);
 		}
-
-		if (TheDisplay->hasImageTexture(frame))
-			TheDisplay->drawImage(frame, x, y, x + width, y + height);
 		return;
 	}
 

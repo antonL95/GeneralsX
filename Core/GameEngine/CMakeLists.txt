@@ -790,6 +790,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/ControlBar/ControlBarScheme.cpp
     Source/GameClient/GUI/ControlBar/ControlBarStructureInventory.cpp
     Source/GameClient/GUI/ControlBar/ControlBarUnderConstruction.cpp
+    Source/GameClient/GUI/ControlBar/ControlBarRetailHud.cpp
 #    Source/GameClient/GUI/DisconnectMenu/DisconnectMenu.cpp
     Source/GameClient/GUI/EstablishConnectionsMenu/EstablishConnectionsMenu.cpp
     Source/GameClient/GUI/Gadget/GadgetCheckBox.cpp

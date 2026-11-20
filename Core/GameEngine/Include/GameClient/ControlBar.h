@@ -349,6 +349,8 @@ public:
 	Int getMaxShotsToFire() const { return m_maxShotsToFire; }
 	const ScienceVec& getScienceVec() const { return m_science; }
 	CommandButtonMappedBorderType getCommandButtonMappedBorderType() const { return m_commandButtonBorder; }
+	Bool isInPalantir() const { return m_inPalantir; }
+	Bool isRadial() const { return m_radial; }
 	const Image* getButtonImage() const { return m_buttonImage;	}
 	void cacheButtonImage();
 
@@ -404,6 +406,8 @@ private:
 	mutable const Image*					m_buttonImage;								///< button image
 	// bleah. shouldn't be mutable, but is. sue me. (srj)
 	mutable Int										m_flashCount;                 ///< the number of times a cameo is supposed to flash
+	Bool											m_inPalantir = FALSE;
+	Bool											m_radial = FALSE;
 
 };
 
@@ -433,6 +437,7 @@ public:
 
 	const AsciiString& getName() const { return m_name; }
 	const CommandButton* getCommandButton(Int i) const;
+	Int getInitialVisible() const { return m_initialVisible; }
 
 	// only for the control bar.
 	CommandSet* friend_getNext() { return m_next; }
@@ -446,6 +451,7 @@ private:
 
 	AsciiString m_name;															  ///< name of this command set
 	const CommandButton *m_command[ MAX_COMMANDS_PER_SET ]; ///< the set of command buttons that make this set
+	Int m_initialVisible = 0;
 
 	CommandSet *m_next;
 
@@ -901,8 +907,33 @@ protected:
 	GameWindow *m_contextParent[ NUM_CONTEXT_PARENTS ];		///< "parent" window for buttons that are part of the context sensitive interface
 	GameWindow *m_retailSelectionName = nullptr;
 	GameWindow *m_retailPortrait = nullptr;
+	GameWindow *m_retailResources = nullptr;
+	GameWindow *m_retailCommandPoints = nullptr;
+	GameWindow *m_retailHolders[MAX_COMMANDS_PER_SET] = {};
+	GameWindow *m_retailVisible[MAX_COMMANDS_PER_SET] = {};
+	Int m_retailSlotOf[MAX_COMMANDS_PER_SET] = {};
+	Int m_retailCountShown[MAX_COMMANDS_PER_SET] = {};
+	UnsignedInt m_retailCounterFrame = 0;
+	Int m_retailMoney = -1;
+	Int m_retailUsedPoints = -1;
+	Int m_retailMaxPoints = -1;
 
 	void initRetailHud();
+	void assignRetailSlots(Int initialVisible);
+	void resetRetailCommandWindows();
+	void updateRetailHud();
+	void updateRetailCounters();
+	void populateRetailUnderConstruction(Object *obj);
+
+public:
+	Bool isRetailHud() const { return m_retailSelectionName != nullptr; }
+	Int getRetailSlot(const GameWindow *window) const;
+	void drawRetailTexts() const;
+	void drawRetailSocketFills() const;
+	Bool isOverRetailSocket(Int px, Int py) const;
+	void getRetailProduction(const GameWindow *window, Int &count, Real &progress) const;
+
+protected:
 
 	Drawable *m_currentSelectedDrawable;					///< currently selected drawable for the context sensitive interface
 	ControlBarContext m_currContext;							///< our current displayed context

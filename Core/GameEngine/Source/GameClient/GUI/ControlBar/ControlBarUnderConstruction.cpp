@@ -119,7 +119,7 @@ void ControlBar::updateContextUnderConstruction()
 	}
 
 	// if the construction percent has changed since what was last shown to the user update the text
-	if( m_displayedConstructPercent != obj->getConstructionPercent() )
+	if( !m_retailSelectionName && m_displayedConstructPercent != obj->getConstructionPercent() )
 		updateConstructionTextDisplay( obj );
 
 }
