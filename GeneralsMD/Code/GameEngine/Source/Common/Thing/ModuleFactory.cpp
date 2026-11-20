@@ -174,6 +174,7 @@
 #include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/CastleUpgrade.h"
 #include "GameLogic/Module/GeometryUpgrade.h"
+#include "GameLogic/Module/RespawnModules.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/MissileLauncherBuildingUpdate.h"
@@ -474,6 +475,7 @@ void ModuleFactory::init()
 		addModule( FoundationAIUpdate );
 		addModule( TerrainResourceBehavior );
 		addModule( BezierProjectileBehavior );
+		addModule( RespawnUpdate );
 	}
 	addModule( MissileLauncherBuildingUpdate );
 	addModule( SupplyCenterProductionExitUpdate );
@@ -566,6 +568,8 @@ void ModuleFactory::init()
 	addModule( StructureBody );
 	addModule( HiveStructureBody );
 	addModule( UndeadBody );
+	if (registersRotwkModules())
+		addModule( RespawnBody );
 
 	// contain modules
 	// (none)

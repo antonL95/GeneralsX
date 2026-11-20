@@ -373,6 +373,7 @@ public:
 		If "Tag" is not the next token, an error is thrown.
 	*/
 	static const char* getNextSubToken(const char* expected);
+	static Bool findDefine(const char* name, AsciiString& value);
 
 	/**
 		return the next ascii string. this is usually the same the result of getNextToken(),

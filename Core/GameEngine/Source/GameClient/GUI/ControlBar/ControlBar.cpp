@@ -39,6 +39,7 @@
 #include "Common/FileSystem.h"
 #include "Common/FramePacer.h"
 #include "Common/INIException.h"
+#include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/GameType.h"
 #include "Common/MultiplayerSettings.h"
@@ -107,11 +108,16 @@ const Image* ControlBar::m_rankHeroicIcon		= nullptr;
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+static Bool parsesRotwkButtons()
+{
+	return RetailFileLayers::enabled() || INIAudit::isEnabled();
+}
+
 const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 {
 
 	{ "Command",							CommandButton::parseCommand, nullptr, offsetof( CommandButton, m_command ) },
-	{ "Options",							INI::parseBitString32,		   TheCommandOptionNames, offsetof( CommandButton, m_options ) },
+	{ "Options",							CommandButton::parseOptions,		   TheCommandOptionNames, offsetof( CommandButton, m_options ) },
 	{ "Object",								INI::parseThingTemplate,		 nullptr, offsetof( CommandButton, m_thingTemplate ) },
 	{ "Upgrade",							INI::parseUpgradeTemplate,	 nullptr, offsetof( CommandButton, m_upgradeTemplate ) },
 	{ "WeaponSlot",						INI::parseLookupList,				 TheWeaponSlotTypeNamesLookupList, offsetof( CommandButton, m_weaponSlot ) },
@@ -130,6 +136,10 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 	{ "UnitSpecificSound",		INI::parseAudioEventRTS,		 nullptr, offsetof( CommandButton, m_unitSpecificSound ) },
 	{ "InPalantir", INI::parseBool, nullptr, offsetof(CommandButton, m_inPalantir) },
 	{ "Radial", INI::parseBool, nullptr, offsetof(CommandButton, m_radial) },
+	{ "NeededUpgrade", CommandButton::parseNeededUpgrades, nullptr, offsetof(CommandButton, m_neededUpgrades) },
+	{ "NeededUpgradeAny", INI::parseBool, nullptr, offsetof(CommandButton, m_neededUpgradeAny) },
+	{ "CommandRangeStart", INI::parseInt, nullptr, offsetof(CommandButton, m_commandRangeStart) },
+	{ "CommandRangeCount", INI::parseInt, nullptr, offsetof(CommandButton, m_commandRangeCount) },
 
 	{ nullptr,						nullptr,												 nullptr, 0 }
 
@@ -569,9 +579,57 @@ void CommandButton::parseCommand( INI* ini, void *instance, void *store, const v
 		return;
 	}
 
+	if (parsesRotwkButtons())
+	{
+		const Int rotwk = CommandButtonRules::nameIndex(CommandButtonRules::rotwkCommandNames(), token);
+		if (rotwk >= 0)
+		{
+			*(GUICommandType *)store = (GUICommandType)(GUI_COMMAND_SECONDARY_UNIT_BUILD + rotwk);
+			return;
+		}
+	}
+
 	// if we're here the command was not found
 	throw INI_INVALID_DATA;
 
+}
+
+void CommandButton::parseOptions( INI* ini, void *instance, void *store, const void *userData )
+{
+	if (!parsesRotwkButtons())
+	{
+		INI::parseBitString32(ini, instance, store, userData);
+		return;
+	}
+
+	std::vector<std::string> tokens;
+	for (const char *token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+	{
+		if (stricmp(token, "NONE") != 0)
+			tokens.push_back(token);
+	}
+	const CommandButtonRules::OptionBits bits = CommandButtonRules::splitOptions(tokens, TheCommandOptionNames);
+	if (!bits.unknown.empty())
+		throw INI_INVALID_NAME_LIST;
+	*static_cast<UnsignedInt *>(store) = bits.zeroHour;
+	static_cast<CommandButton *>(instance)->m_rotwkOptions = bits.rotwk;
+}
+
+void CommandButton::parseNeededUpgrades( INI* ini, void *, void *store, const void * )
+{
+	if (!TheUpgradeCenter)
+		throw ERROR_BUG;
+	std::vector<const UpgradeTemplate*> &upgrades = *static_cast<std::vector<const UpgradeTemplate*> *>(store);
+	upgrades.clear();
+	for (const char *token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+	{
+		if (stricmp(token, "NONE") == 0)
+			continue;
+		const UpgradeTemplate *upgrade = TheUpgradeCenter->findUpgrade(token);
+		if (!upgrade)
+			throw INI_INVALID_DATA;
+		upgrades.push_back(upgrade);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -754,6 +812,21 @@ const FieldParse CommandSet::m_commandSetFieldParseTable[] =
 	{ "16",			CommandSet::parseCommandButton, (void *)15,		offsetof( CommandSet, m_command ) },
 	{ "17",			CommandSet::parseCommandButton, (void *)16,		offsetof( CommandSet, m_command ) },
 	{ "18",			CommandSet::parseCommandButton, (void *)17,		offsetof( CommandSet, m_command ) },
+	{ "19",			CommandSet::parseCommandButton, (void *)18,		offsetof( CommandSet, m_command ) },
+	{ "20",			CommandSet::parseCommandButton, (void *)19,		offsetof( CommandSet, m_command ) },
+	{ "21",			CommandSet::parseCommandButton, (void *)20,		offsetof( CommandSet, m_command ) },
+	{ "22",			CommandSet::parseCommandButton, (void *)21,		offsetof( CommandSet, m_command ) },
+	{ "23",			CommandSet::parseCommandButton, (void *)22,		offsetof( CommandSet, m_command ) },
+	{ "24",			CommandSet::parseCommandButton, (void *)23,		offsetof( CommandSet, m_command ) },
+	{ "25",			CommandSet::parseCommandButton, (void *)24,		offsetof( CommandSet, m_command ) },
+	{ "26",			CommandSet::parseCommandButton, (void *)25,		offsetof( CommandSet, m_command ) },
+	{ "27",			CommandSet::parseCommandButton, (void *)26,		offsetof( CommandSet, m_command ) },
+	{ "28",			CommandSet::parseCommandButton, (void *)27,		offsetof( CommandSet, m_command ) },
+	{ "29",			CommandSet::parseCommandButton, (void *)28,		offsetof( CommandSet, m_command ) },
+	{ "30",			CommandSet::parseCommandButton, (void *)29,		offsetof( CommandSet, m_command ) },
+	{ "31",			CommandSet::parseCommandButton, (void *)30,		offsetof( CommandSet, m_command ) },
+	{ "32",			CommandSet::parseCommandButton, (void *)31,		offsetof( CommandSet, m_command ) },
+	{ "33",			CommandSet::parseCommandButton, (void *)32,		offsetof( CommandSet, m_command ) },
 	{ "InitialVisible", INI::parseInt, nullptr, offsetof(CommandSet, m_initialVisible) },
 	{ nullptr,			nullptr,														 nullptr,				0	}
 
@@ -826,6 +899,12 @@ void CommandButton::copyButtonTextFrom( const CommandButton *button, Bool shortc
 //-------------------------------------------------------------------------------------------------
 void CommandSet::parseCommandButton( INI* ini, void *instance, void *store, const void *userData )
 {
+	if (static_cast<Int>(reinterpret_cast<intptr_t>(userData)) >= MAX_COMMANDS_PER_SET && !parsesRotwkButtons())
+	{
+		DEBUG_CRASH(("[LINE: %d - FILE: '%s'] Unknown field in command set", ini->getLineNum(), ini->getFilename().str()));
+		return;
+	}
+
 	const char *token = ini->getNextToken();
 
 	// get find the command button from this name
@@ -847,7 +926,7 @@ void CommandSet::parseCommandButton( INI* ini, void *instance, void *store, cons
 	Int buttonIndex = static_cast<Int>(reinterpret_cast<intptr_t>(userData));
 
 	// sanity
-	DEBUG_ASSERTCRASH( buttonIndex < MAX_COMMANDS_PER_SET, ("parseCommandButton: button index '%d' out of range",
+	DEBUG_ASSERTCRASH( buttonIndex < CommandButtonRules::RETAIL_COMMANDS_PER_SET, ("parseCommandButton: button index '%d' out of range",
 										 buttonIndex) );
 
 	// save it
@@ -861,7 +940,7 @@ CommandSet::CommandSet(const AsciiString& name) :
 	m_name(name),
 	m_next(nullptr)
 {
-	for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+	for( Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; i++ )
 		m_command[ i ] = nullptr;
 }
 
@@ -2229,17 +2308,17 @@ void ControlBar::switchToContext( ControlBarContext context, Drawable *draw )
 		{
 			populateCommand(obj);
 			const CommandSet *commandSet = findCommandSet(obj->getCommandSetString());
-			assignRetailSlots(commandSet ? commandSet->getInitialVisible() : 0);
+			assignRetailSlots(commandSet, obj, commandSet ? commandSet->getInitialVisible() : 0);
 		}
 		else if (context == CB_CONTEXT_MULTI_SELECT)
 		{
 			populateMultiSelect();
-			assignRetailSlots(0);
+			assignRetailSlots(nullptr, nullptr, 0);
 		}
 		else if (context == CB_CONTEXT_UNDER_CONSTRUCTION)
 			populateRetailUnderConstruction(obj);
 		else
-			assignRetailSlots(0);
+			assignRetailSlots(nullptr, nullptr, 0);
 
 		const ExitInterface *exit = obj ? obj->getObjectExitInterface() : nullptr;
 		showRallyPoint(context == CB_CONTEXT_COMMAND && exit && obj->isLocallyControlled() ? exit->getRallyPoint() : nullptr);

@@ -193,6 +193,9 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		obj->markSingleUseCommandUsed(); //Yeah, an object can only use one single use command...
 	}
 
+	if( commandButton->getCommandType() >= GUI_COMMAND_SECONDARY_UNIT_BUILD )
+		return processRetailCommand( commandButton, control, obj );
+
 	TheInGameUI->placeBuildAvailable( nullptr, nullptr );
 
 	//Play any available unit specific sound for button

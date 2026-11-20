@@ -58,6 +58,7 @@
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GadgetPushButton.h"
+#include "GameLogic/HeroRoster.h"
 
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
@@ -1097,6 +1098,8 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 	// if the command requires an upgrade and we don't have it we can't do it
 	if( BitIsSet( command->getOptions(), NEED_UPGRADE ) )
 	{
+		if( !command->getNeededUpgrades().empty() && !HeroRoster::buttonUpgradesMet( command, player, obj ) )
+			return COMMAND_RESTRICTED;
 		const UpgradeTemplate *upgradeT = command->getUpgradeTemplate();
 		if (upgradeT)
 		{
@@ -1123,6 +1126,9 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 	}
 
 	Bool queueMaxed = pu ? ( pu->getProductionCount() == MAX_BUILD_QUEUE_BUTTONS ) : FALSE;
+
+	if( command->getCommandType() >= GUI_COMMAND_SECONDARY_UNIT_BUILD )
+		return getRetailCommandAvailability( command, obj, win );
 
 	switch( command->getCommandType() )
 	{

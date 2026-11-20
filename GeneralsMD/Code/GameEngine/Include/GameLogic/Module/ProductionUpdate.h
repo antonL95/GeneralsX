@@ -105,6 +105,8 @@ protected:
 	Int m_productionQuantityTotal;										///< it is now possible to construct multiple units simultaneously.
 	Int m_productionQuantityProduced;									///< And we need to allow pausing within an entry, so we keep track of number of sub-successes
 	ExitDoorType m_exitDoor;
+	Int m_costPaid = -1;
+	Int m_framesOverride = -1;
 
 	ProductionEntry *m_next;													///< next in list
 	ProductionEntry *m_prev;													///< prev in list

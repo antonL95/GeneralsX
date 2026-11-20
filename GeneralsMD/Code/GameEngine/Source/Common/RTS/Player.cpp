@@ -60,6 +60,7 @@
 #include "Common/PlayerTemplate.h"
 #include "Common/PlayerTemplateRules.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/HeroRoster.h"
 #include "Common/ProductionPrerequisite.h"
 #include "Common/Radar.h"
 #include "Common/ResourceGatheringManager.h"
@@ -482,6 +483,7 @@ void Player::init(const PlayerTemplate* pt)
 
 	// reset rank info
 	resetRank();
+	HeroRoster::reset(m_playerIndex);
 	if (PlayerTemplateRules::grantsInitialUpgrades(RetailFileLayers::enabled()) && pt && TheUpgradeCenter)
 	{
 		for (const AsciiString& upgradeName : pt->getInitialUpgrades())

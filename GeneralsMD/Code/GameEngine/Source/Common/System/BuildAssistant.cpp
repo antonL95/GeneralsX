@@ -54,6 +54,8 @@
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
+#include "GameLogic/HeroRoster.h"
+#include "Common/RetailFileLayers.h"
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 BuildAssistant *TheBuildAssistant = nullptr;
@@ -1275,8 +1277,9 @@ Bool BuildAssistant::isPossibleToMakeUnit( Object *builder, const ThingTemplate 
 	//
 	const CommandButton *commandButton;
 	const CommandButton *foundCommand = nullptr;
+	const Int commandCount = RetailFileLayers::enabled() ? (Int)CommandButtonRules::RETAIL_COMMANDS_PER_SET : (Int)MAX_COMMANDS_PER_SET;
 	Int i;
-	for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+	for( i = 0; i < commandCount; i++ )
 	{
 
 		// get this button
@@ -1287,6 +1290,10 @@ Bool BuildAssistant::isPossibleToMakeUnit( Object *builder, const ThingTemplate 
 			foundCommand = commandButton;
 
 	}
+	if( foundCommand == nullptr && RetailFileLayers::enabled() &&
+			HeroRoster::isReviveTemplateInSet( commandSet, builder->getControllingPlayer(), builder, whatToBuild ) )
+		return builder->getControllingPlayer()->canBuild( whatToBuild );
+
 	if( foundCommand == nullptr )
 		return FALSE;
 
@@ -1333,6 +1340,16 @@ CanMakeType BuildAssistant::canMakeUnit( Object *builder, const ThingTemplate *w
   if ( player && !player->canBuildMoreOfType( whatToBuild ) )
     return CANMAKE_MAXED_OUT_FOR_PLAYER;
 
+	const Bool rosterHero = RetailFileLayers::enabled() && HeroRoster::findIndex( player, whatToBuild ) >= 0;
+	if( rosterHero )
+	{
+		const Int heroIndex = HeroRoster::findIndex( player, whatToBuild );
+		if( HeroRoster::stateAt( player, heroIndex ) == HeroRules::State::Lost )
+			return CANMAKE_NO_PREREQ;
+		if( HeroRoster::isAlive( player, whatToBuild ) || HeroRoster::isQueued( player, whatToBuild ) )
+			return CANMAKE_MAXED_OUT_FOR_PLAYER;
+	}
+
 	if (!isPossibleToMakeUnit(builder, whatToBuild))
 		return CANMAKE_NO_PREREQ;
 
@@ -1345,7 +1362,12 @@ CanMakeType BuildAssistant::canMakeUnit( Object *builder, const ThingTemplate *w
 
 	// make sure we have enough money to build this
 	Money *money = player->getMoney();
-	if( whatToBuild->calcCostToBuild( player ) > money->countMoney() )
+	if( rosterHero )
+	{
+		if( HeroRoster::price( player, whatToBuild ).cost > static_cast<Int>( money->countMoney() ) )
+			return CANMAKE_NO_MONEY;
+	}
+	else if( whatToBuild->calcCostToBuild( player ) > money->countMoney() )
 		return CANMAKE_NO_MONEY;
 
 	// get the command set for the producer object

@@ -54,6 +54,8 @@
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameLogic/HeroRoster.h"
+#include "Common/RetailFileLayers.h"
 
 
 // PUBLIC /////////////////////////////////////////////////////////////////////////////////////////
@@ -394,10 +396,22 @@ Bool ProductionUpdate::queueCreateUnit( const ThingTemplate *unitType, Productio
 	// take the cost for the build away from the player
 	Player *player = getObject()->getControllingPlayer();
 	Money *money = player->getMoney();
-	money->withdraw( unitType->calcCostToBuild( player ) );
+	Int costPaid = -1;
+	Int framesOverride = -1;
+	if( RetailFileLayers::enabled() && HeroRoster::findIndex( player, unitType ) >= 0 )
+	{
+		const HeroRules::Price price = HeroRoster::price( player, unitType );
+		costPaid = price.cost;
+		framesOverride = static_cast<Int>( price.frames );
+		money->withdraw( costPaid );
+	}
+	else
+		money->withdraw( unitType->calcCostToBuild( player ) );
 
 	// allocate a new production entry
 	ProductionEntry *production = newInstance(ProductionEntry);
+	production->m_costPaid = costPaid;
+	production->m_framesOverride = framesOverride;
 
 	// Check to see if there is a quantity modifier entry. What this means is if we are building a particular unit
 	// and it has a modifier, we build that number of objects instead of just one. A good example is the Chinese
@@ -664,7 +678,9 @@ UpdateSleepTime ProductionUpdate::update()
 
 	// how many total logic frames does it take to produce this unit
 	Int totalProductionFrames;
-	if( production->m_type == PRODUCTION_UNIT )
+	if( production->m_type == PRODUCTION_UNIT && production->m_framesOverride > 0 )
+		totalProductionFrames = production->m_framesOverride;
+	else if( production->m_type == PRODUCTION_UNIT )
 		totalProductionFrames = production->m_objectToProduce->calcTimeToBuild( player );
 	else
 		totalProductionFrames = production->m_upgradeToResearch->calcTimeToBuild( player );
@@ -774,6 +790,8 @@ UpdateSleepTime ProductionUpdate::update()
 																	creationBuilding->getControllingPlayer()->getDefaultTeam() );
 
 							newObj->setProducer(creationBuilding);
+							if( RetailFileLayers::enabled() )
+								HeroRoster::onHeroProduced( newObj );
 
 							// call the exit interface to do the rally point and position stuff
 							exitInterface->exitObjectViaDoor( newObj, exitDoor );
@@ -1095,7 +1113,7 @@ Bool ProductionUpdate::cancelUnitCreate( ProductionEntry *production )
 
 	// give the player the cost of the object back
 	Money *money = player->getMoney();
-	money->deposit( production->m_objectToProduce->calcCostToBuild( player ), TRUE, FALSE );
+	money->deposit( production->m_costPaid >= 0 ? production->m_costPaid : production->m_objectToProduce->calcCostToBuild( player ), TRUE, FALSE );
 
 	// remove from queue list
 	removeFromProductionQueue( production );

@@ -1,6 +1,11 @@
 #include "PreRTS.h"
 
+#include <vector>
+
 #include "Common/INIException.h"
+#include "Common/BuildAssistant.h"
+#include "Common/MessageStream.h"
+#include "Common/SpecialPower.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -18,10 +23,13 @@
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Image.h"
+#include "GameClient/InGameUI.h"
 
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/HeroRoster.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/ProductionUpdate.h"
+#include "GameLogic/Module/RespawnModules.h"
 
 namespace
 {
@@ -317,6 +325,8 @@ void ControlBar::getRetailProduction(const GameWindow *window, Int &count, Real 
 		Bool matches = FALSE;
 		if (command->getCommandType() == GUI_COMMAND_UNIT_BUILD)
 			matches = entry->getProductionType() == PRODUCTION_UNIT && entry->getProductionObject() == command->getThingTemplate();
+		else if (command->getCommandType() == GUI_COMMAND_REVIVE)
+			matches = entry->getProductionType() == PRODUCTION_UNIT && entry->getProductionObject() == getRetailHero(window);
 		else if (command->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE || command->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE)
 			matches = entry->getProductionType() == PRODUCTION_UPGRADE && entry->getProductionUpgrade() == command->getUpgradeTemplate();
 		if (matches)
@@ -386,33 +396,265 @@ void ControlBar::resetRetailCommandWindows()
 	}
 }
 
-void ControlBar::assignRetailSlots(Int initialVisible)
+Bool ControlBar::retailExtraEntryUsable(const CommandButton *command, const Object *obj) const
 {
-	Int side = RetailRingSlots;
-	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
+	if (!command || !obj || BitIsSet(command->getOptions(), SCRIPT_ONLY) || command->getCommandType() == GUI_COMMAND_EXIT_CONTAINER)
+		return FALSE;
+	const Player *player = obj->getControllingPlayer();
+	const SpecialPowerTemplate *power = command->getSpecialPowerTemplate();
+	if (BitIsSet(command->getOptions(), NEED_SPECIAL_POWER_SCIENCE) && power && player
+		&& power->getRequiredScience() != SCIENCE_INVALID && !player->hasScience(power->getRequiredScience()))
+		return FALSE;
+	return TRUE;
+}
+
+Bool ControlBar::retailEntryShown(const CommandSet *commandSet, Int entry, const CommandButton *command, Object *obj, Int &hero) const
+{
+	hero = -1;
+	if (!obj)
+		return TRUE;
+	if (command->getCommandType() == GUI_COMMAND_REVIVE)
 	{
-		GameWindow *holder = m_retailHolders[i];
-		if (holder->winIsHidden())
+		hero = HeroRoster::reviveSlotForEntry(commandSet, entry);
+		const HeroRules::Slot slot = HeroRoster::slotFor(obj->getControllingPlayer(), obj, command, hero);
+		if (slot == HeroRules::Slot::Hidden)
+			return FALSE;
+		return slot != HeroRules::Slot::Disabled || !command->hasRotwkOption(CommandButtonRules::ROTWK_HIDE_WHILE_DISABLED);
+	}
+	if (!command->hasRotwkOption(CommandButtonRules::ROTWK_HIDE_WHILE_DISABLED))
+		return TRUE;
+	GameWindow *probe = m_retailHolders[MIN(entry, MAX_COMMANDS_PER_SET - 1)];
+	const CommandAvailability availability = getCommandAvailability(command, obj, probe);
+	return availability != COMMAND_HIDDEN && availability != COMMAND_RESTRICTED && availability != COMMAND_CANT_AFFORD;
+}
+
+void ControlBar::collectRetailPlacements(const CommandSet *commandSet, Object *obj, Int initialVisible,
+	std::vector<RetailPlacement> &placements) const
+{
+	placements.clear();
+	Int side = RetailRingSlots;
+	const Int entries = commandSet ? static_cast<Int>(CommandButtonRules::RETAIL_COMMANDS_PER_SET) : static_cast<Int>(MAX_COMMANDS_PER_SET);
+	for (Int i = 0; i < entries; ++i)
+	{
+		const CommandButton *command = nullptr;
+		if (i < MAX_COMMANDS_PER_SET)
+		{
+			GameWindow *holder = m_retailHolders[i];
+			if (holder->winIsHidden())
+				continue;
+			command = static_cast<const CommandButton *>(GadgetButtonGetData(holder));
+		}
+		else
+		{
+			command = commandSet->getCommandButton(i);
+			if (!retailExtraEntryUsable(command, obj))
+				continue;
+		}
+		if (!command)
 			continue;
-		const CommandButton *command = static_cast<const CommandButton *>(GadgetButtonGetData(holder));
 		Int slot = -1;
-		if (command && i < RetailRingSlots && command->isInPalantir())
+		Int hero = -1;
+		if (i < RetailRingSlots && command->isInPalantir())
 			slot = i;
-		else if (command && command->getCommandType() != GUI_COMMAND_NONE
+		else if (command->getCommandType() != GUI_COMMAND_NONE
 			&& (command->isRadial() || !command->isInPalantir())
-			&& (initialVisible <= 0 || i < initialVisible) && side < MAX_COMMANDS_PER_SET)
+			&& CommandButtonRules::inSideColumn(i, commandSet ? m_retailRange : CommandButtonRules::VisibleRange(), initialVisible) && side < MAX_COMMANDS_PER_SET
+			&& retailEntryShown(commandSet, i, command, obj, hero))
 			slot = side++;
-		if (slot < 0)
-			continue;
-		GameWindow *target = m_retailVisible[slot];
-		setControlCommand(target, command);
-		target->winEnable(BitIsSet(holder->winGetStatus(), WIN_STATUS_ENABLED));
+		if (slot >= 0)
+			placements.push_back(RetailPlacement{ i, command, slot, hero });
+	}
+}
+
+void ControlBar::assignRetailSlots(const CommandSet *commandSet, Object *obj, Int initialVisible)
+{
+	const UnsignedInt objectID = obj ? static_cast<UnsignedInt>(obj->getID()) : 0;
+	if (commandSet && objectID != m_retailRangeObject)
+	{
+		m_retailRange = CommandButtonRules::VisibleRange();
+		m_retailRangeObject = objectID;
+	}
+	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
+		m_retailHeroOf[i] = -1;
+
+	std::vector<RetailPlacement> placements;
+	collectRetailPlacements(commandSet, obj, initialVisible, placements);
+
+	Bool used[MAX_COMMANDS_PER_SET] = {};
+	for (const RetailPlacement &placement : placements)
+		if (placement.entry < MAX_COMMANDS_PER_SET)
+			used[placement.entry] = TRUE;
+
+	m_retailShownMask = 0;
+	for (const RetailPlacement &placement : placements)
+	{
+		Int index = placement.entry;
+		if (index >= MAX_COMMANDS_PER_SET)
+		{
+			index = 0;
+			while (index < MAX_COMMANDS_PER_SET && used[index])
+				++index;
+			if (index >= MAX_COMMANDS_PER_SET)
+				break;
+			used[index] = TRUE;
+		}
+		GameWindow *target = m_retailVisible[placement.slot];
+		setControlCommand(target, placement.command);
+		const Bool enabled = placement.entry >= MAX_COMMANDS_PER_SET
+			|| BitIsSet(m_retailHolders[placement.entry]->winGetStatus(), WIN_STATUS_ENABLED);
+		target->winEnable(enabled);
 		target->winHide(FALSE);
 		GadgetButtonSetText(target, UnicodeString::TheEmptyString);
-		m_commandWindows[i] = target;
-		m_retailSlotOf[i] = slot;
+		m_commandWindows[index] = target;
+		m_retailSlotOf[index] = placement.slot;
+		m_retailHeroOf[placement.slot] = placement.hero;
+		if (placement.hero >= 0)
+			applyRetailHeroImage(target, placement.hero);
+		m_retailShownMask |= 1ull << placement.entry;
 	}
+	if (obj)
+		updateContextCommand();
 	updateRetailHud();
+}
+
+void ControlBar::checkRetailPlacements()
+{
+	if (m_currContext != CB_CONTEXT_COMMAND || !m_currentSelectedDrawable)
+		return;
+	Object *obj = m_currentSelectedDrawable->getObject();
+	if (!obj)
+		return;
+	const CommandSet *commandSet = findCommandSet(obj->getCommandSetString());
+	if (!commandSet)
+		return;
+	std::vector<RetailPlacement> placements;
+	collectRetailPlacements(commandSet, obj, commandSet->getInitialVisible(), placements);
+	unsigned long long mask = 0;
+	for (const RetailPlacement &placement : placements)
+		mask |= 1ull << placement.entry;
+	if (mask != m_retailShownMask)
+		markUIDirty();
+}
+
+Int ControlBar::getRetailHeroIndex(const GameWindow *window) const
+{
+	const Int slot = getRetailSlot(window);
+	return slot >= 0 && slot < MAX_COMMANDS_PER_SET ? m_retailHeroOf[slot] : -1;
+}
+
+const ThingTemplate *ControlBar::getRetailHero(const GameWindow *window) const
+{
+	const Int hero = getRetailHeroIndex(window);
+	if (hero < 0 || !m_currentSelectedDrawable || !m_currentSelectedDrawable->getObject())
+		return nullptr;
+	return HeroRoster::heroAt(m_currentSelectedDrawable->getObject()->getControllingPlayer(), hero);
+}
+
+void ControlBar::applyRetailHeroImage(GameWindow *window, Int hero) const
+{
+	const Object *obj = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+	const Player *player = obj ? obj->getControllingPlayer() : nullptr;
+	const ThingTemplate *heroTemplate = HeroRoster::heroAt(player, hero);
+	if (!heroTemplate)
+		return;
+	const Image *image = heroTemplate->getButtonImage();
+	if (HeroRoster::stateAt(player, hero) == HeroRules::State::Revivable)
+	{
+		const ModuleInfo &modules = heroTemplate->getBehaviorModuleInfo();
+		for (Int i = 0; i < modules.getCount(); ++i)
+		{
+			if (modules.getNthName(i).compareNoCase("RespawnUpdate") != 0)
+				continue;
+			const RespawnUpdateModuleData *data = static_cast<const RespawnUpdateModuleData *>(modules.getNthData(i));
+			const Image *revive = data->m_buttonImage.isEmpty() ? nullptr : findImage(data->m_buttonImage.str());
+			if (revive)
+				image = revive;
+			break;
+		}
+	}
+	if (image)
+		window->winSetEnabledImage(0, image);
+}
+
+CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton *command, Object *obj, GameWindow *win) const
+{
+	switch (command->getCommandType())
+	{
+		case GUI_COMMAND_PUSH_VISIBLE_COMMAND_RANGE:
+		case GUI_COMMAND_POP_VISIBLE_COMMAND_RANGE:
+			return COMMAND_AVAILABLE;
+		case GUI_COMMAND_REVIVE:
+		{
+			if (getRetailSlot(win) < 0)
+				return COMMAND_AVAILABLE;
+			const Int hero = getRetailHeroIndex(win);
+			const Player *player = obj->getControllingPlayer();
+			switch (HeroRoster::slotFor(player, obj, command, hero))
+			{
+				case HeroRules::Slot::Hidden:
+					return COMMAND_HIDDEN;
+				case HeroRules::Slot::Disabled:
+					return COMMAND_RESTRICTED;
+				case HeroRules::Slot::Busy:
+					return COMMAND_AVAILABLE;
+				default:
+					break;
+			}
+			const CanMakeType makeType = TheBuildAssistant->canMakeUnit(obj, HeroRoster::heroAt(player, hero));
+			return makeType == CANMAKE_OK ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
+		}
+		default:
+			return COMMAND_RESTRICTED;
+	}
+}
+
+CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, GameWindow *control, Object *obj)
+{
+	switch (command->getCommandType())
+	{
+		case GUI_COMMAND_PUSH_VISIBLE_COMMAND_RANGE:
+			m_retailRange = CommandButtonRules::pushRange(command->getCommandRangeStart(), command->getCommandRangeCount());
+			markUIDirty();
+			return CBC_COMMAND_USED;
+		case GUI_COMMAND_POP_VISIBLE_COMMAND_RANGE:
+			m_retailRange = CommandButtonRules::VisibleRange();
+			markUIDirty();
+			return CBC_COMMAND_USED;
+		case GUI_COMMAND_REVIVE:
+		{
+			const ThingTemplate *hero = getRetailHero(control);
+			applyRetailHeroImage(control, getRetailHeroIndex(control));
+			ProductionUpdateInterface *production = obj ? obj->getProductionUpdateInterface() : nullptr;
+			if (!hero || !production)
+				return CBC_COMMAND_NOT_USED;
+			for (const ProductionEntry *entry = production->firstProduction(); entry; entry = production->nextProduction(entry))
+			{
+				if (entry->getProductionType() == PRODUCTION_UNIT && entry->getProductionObject() == hero)
+				{
+					if (command->hasRotwkOption(CommandButtonRules::ROTWK_CANCELABLE))
+					{
+						GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UNIT_CREATE);
+						msg->appendIntegerArgument(entry->getProductionID());
+					}
+					return CBC_COMMAND_USED;
+				}
+			}
+			const CanMakeType makeType = TheBuildAssistant->canMakeUnit(obj, hero);
+			if (makeType == CANMAKE_NO_MONEY)
+			{
+				TheInGameUI->message("GUI:NotEnoughMoneyToBuild");
+				return CBC_COMMAND_USED;
+			}
+			if (makeType != CANMAKE_OK)
+				return CBC_COMMAND_USED;
+			GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
+			msg->appendIntegerArgument(hero->getTemplateID());
+			msg->appendIntegerArgument(production->requestUniqueUnitID());
+			return CBC_COMMAND_USED;
+		}
+		default:
+			return CBC_COMMAND_NOT_USED;
+	}
 }
 
 void ControlBar::populateRetailUnderConstruction(Object *obj)
@@ -472,6 +714,7 @@ void ControlBar::updateRetailCounters()
 
 void ControlBar::updateRetailHud()
 {
+	checkRetailPlacements();
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
 	{
 		if (m_retailSlotOf[i] < 0)

@@ -12,6 +12,7 @@
 #include "Common/BuildAssistant.h"
 #include "Common/GameEngine.h"
 #include "Common/MessageStream.h"
+#include "Common/Money.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -29,6 +30,8 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/View.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/HeroRoster.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/UpgradeModule.h"
@@ -186,6 +189,129 @@ GameWindow* commandWindow(int index)
 	AsciiString name;
 	name.format("ControlBar.wnd:ButtonCommand%02d", index);
 	return TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey(name));
+}
+
+GameWindow* retailSlotWindow(int slot)
+{
+	if (!TheWindowManager || slot < 0)
+		return nullptr;
+	AsciiString name;
+	if (slot < 6)
+		name.format("ControlBar.wnd:RingButton%d", slot + 1);
+	else
+		name.format("ControlBar.wnd:SideButton%02d", slot - 5);
+	return TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey(name));
+}
+
+Player* findPlayer(const Command& command)
+{
+	return ThePlayerList ? ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey(command.player.c_str())) : nullptr;
+}
+
+const char* stateName(HeroRules::State state)
+{
+	switch (state)
+	{
+		case HeroRules::State::Revivable:
+			return "revivable";
+		case HeroRules::State::Lost:
+			return "lost";
+		default:
+			return "recruitable";
+	}
+}
+
+void dumpHeroes(const Command& command, unsigned int frame)
+{
+	const Player* player = findPlayer(command);
+	if (!player)
+		return;
+	std::fprintf(stderr, "TEST heroes %u %s money=%u count=%d\n", frame, command.player.c_str(),
+		player->getMoney()->countMoney(), HeroRoster::count(player));
+	for (int i = 0; i < HeroRoster::count(player); ++i)
+	{
+		const ThingTemplate* hero = HeroRoster::heroAt(player, i);
+		const HeroRules::Price price = HeroRoster::price(player, hero);
+		const HeroRules::Price revive = HeroRoster::revivePrice(hero, HeroRoster::savedLevelAt(player, i));
+		int veterancy = -1;
+		for (Object* obj = TheGameLogic->getFirstObject(); obj && hero; obj = obj->getNextObject())
+			if (obj->getControllingPlayer() == player && !obj->isEffectivelyDead() && hero->isEquivalentTo(obj->getTemplate()))
+				veterancy = static_cast<int>(obj->getVeterancyLevel());
+		std::fprintf(stderr, "TEST hero %u %s %d %s state=%s alive=%d queued=%d level=%d cost=%d frames=%u buildCost=%d buildFrames=%d revive=%d/%u veterancy=%d\n",
+			frame, command.player.c_str(), i, hero ? hero->getName().str() : "-", stateName(HeroRoster::stateAt(player, i)),
+			HeroRoster::isAlive(player, hero) ? 1 : 0, HeroRoster::isQueued(player, hero) ? 1 : 0,
+			HeroRoster::savedLevelAt(player, i), price.cost, price.frames, hero ? hero->calcCostToBuild(player) : 0,
+			hero ? hero->calcTimeToBuild(player) : 0, revive.cost, revive.frames, veterancy);
+	}
+}
+
+void dumpProduction(const Command& command, unsigned int frame)
+{
+	const Player* player = findPlayer(command);
+	for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+	{
+		ProductionUpdateInterface* production = obj->getControllingPlayer() == player ? obj->getProductionUpdateInterface() : nullptr;
+		if (!production)
+			continue;
+		for (const ProductionEntry* entry = production->firstProduction(); entry; entry = production->nextProduction(entry))
+			std::fprintf(stderr, "TEST production %u %s %u %s percent=%.1f exit=%d disabled=%d\n", frame, obj->getTemplate()->getName().str(),
+				static_cast<unsigned>(obj->getID()), entry->getProductionObject() && entry->getProductionType() == PRODUCTION_UNIT ? entry->getProductionObject()->getName().str() : "upgrade",
+				entry->getPercentComplete(), obj->getObjectExitInterface() ? 1 : 0, obj->isDisabled() ? 1 : 0);
+	}
+}
+
+void dumpHud(unsigned int frame)
+{
+	for (int slot = 0; slot < 18; ++slot)
+	{
+		GameWindow* window = retailSlotWindow(slot);
+		const CommandButton* button = window ? static_cast<const CommandButton*>(GadgetButtonGetData(window)) : nullptr;
+		if (!window || !button || window->winIsHidden())
+			continue;
+		const ThingTemplate* hero = TheControlBar ? TheControlBar->getRetailHero(window) : nullptr;
+		std::fprintf(stderr, "TEST hud %u slot=%d %s type=%d %s hero=%s\n", frame, slot, button->getName().str(),
+			static_cast<int>(button->getCommandType()), BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED) ? "enabled" : "disabled",
+			hero ? hero->getName().str() : "-");
+	}
+}
+
+void clickWindow(GameWindow* button, int index, unsigned int frame)
+{
+	const CommandButton* commandButton = button ? static_cast<const CommandButton*>(GadgetButtonGetData(button)) : nullptr;
+	if (!button || !commandButton || button->winIsHidden() || !button->winGetOwner())
+	{
+		std::fprintf(stderr, "TEST frame %u: slot %d empty\n", frame, index);
+		return;
+	}
+	const Bool enabled = BitIsSet(button->winGetStatus(), WIN_STATUS_ENABLED);
+	std::fprintf(stderr, "TEST frame %u: slot %d %s type %d %s\n", frame, index, commandButton->getName().str(),
+		static_cast<int>(commandButton->getCommandType()), enabled ? "enabled" : "disabled");
+	if (!enabled || commandButton->getCommandType() == GUI_COMMAND_SELL)
+		return;
+	TheWindowManager->winSendSystemMsg(button->winGetOwner(), GBM_SELECTED, (WindowMsgData)button, button->winGetWindowId());
+}
+
+void spawnObject(const Command& command, unsigned int frame)
+{
+	Player* player = findPlayer(command);
+	const ThingTemplate* what = TheThingFactory->findTemplate(command.target.c_str(), FALSE);
+	if (!player || !what)
+		return;
+	Object* anchor = nullptr;
+	for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+	{
+		if (obj->getControllingPlayer() == player && obj->isKindOf(KINDOF_STRUCTURE) && (!anchor || obj->getID() < anchor->getID()))
+			anchor = obj;
+	}
+	if (!anchor)
+		return;
+	Coord3D point;
+	if (!readPoint(command, anchor, point))
+		point = *anchor->getPosition();
+	Object* obj = TheThingFactory->newObject(what, player->getDefaultTeam());
+	obj->setPosition(&point);
+	std::fprintf(stderr, "TEST frame %u: spawn %s id=%u for %s commandSet=%s\n", frame, command.target.c_str(),
+		static_cast<unsigned>(obj->getID()), command.player.c_str(), obj->getCommandSetString().str());
 }
 
 void clickButton(const Command& command, unsigned int frame)
@@ -584,6 +710,45 @@ void execute(const Command& command, unsigned int frame)
 		dumpPlayer(command, frame);
 		return;
 	}
+	if (command.action == "heroes")
+	{
+		dumpHeroes(command, frame);
+		dumpProduction(command, frame);
+		dumpHud(frame);
+		return;
+	}
+	if (command.action == "slot")
+	{
+		clickWindow(retailSlotWindow(std::atoi(command.structure.c_str())), std::atoi(command.structure.c_str()), frame);
+		return;
+	}
+	if (command.action == "cash")
+	{
+		Player* player = findPlayer(command);
+		if (player)
+		{
+			player->getMoney()->deposit(static_cast<UnsignedInt>(std::atoi(command.structure.c_str())), FALSE, FALSE);
+			std::fprintf(stderr, "TEST frame %u: cash %s +%s = %u\n", frame, command.player.c_str(), command.structure.c_str(),
+				player->getMoney()->countMoney());
+		}
+		return;
+	}
+	if (command.action == "grant")
+	{
+		Player* player = findPlayer(command);
+		const UpgradeTemplate* upgrade = TheUpgradeCenter ? TheUpgradeCenter->findUpgrade(command.structure.c_str()) : nullptr;
+		if (player && upgrade)
+		{
+			player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+			std::fprintf(stderr, "TEST frame %u: grant %s %s\n", frame, command.player.c_str(), command.structure.c_str());
+		}
+		return;
+	}
+	if (command.action == "spawn")
+	{
+		spawnObject(command, frame);
+		return;
+	}
 	if (command.action == "quit")
 	{
 		std::fprintf(stderr, "TEST frame %u: quit\n", frame);
@@ -687,6 +852,12 @@ void execute(const Command& command, unsigned int frame)
 		capture(command, obj, frame);
 	else if (command.action == "repair")
 		repair(command, obj, frame);
+	else if (command.action == "veterancy")
+	{
+		if (obj->getExperienceTracker())
+			obj->getExperienceTracker()->setVeterancyLevel(static_cast<VeterancyLevel>(std::atoi(command.structure.c_str())), FALSE);
+		std::fprintf(stderr, "TEST frame %u: veterancy object %u = %d\n", frame, static_cast<unsigned>(obj->getID()), static_cast<int>(obj->getVeterancyLevel()));
+	}
 	else if (command.action == "log")
 	{
 		logObject(obj, frame);

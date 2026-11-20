@@ -66,6 +66,10 @@ set(GAMEENGINE_SRC
     Include/Common/SpecialPowerINI.h
     Include/GameLogic/Module/AISpecialPowerUpdate.h
     Include/GameLogic/Module/RotwkParseOnlyModules.h
+    Include/GameLogic/Module/RespawnModules.h
+    Include/GameLogic/HeroRoster.h
+    Include/Common/HeroRules.h
+    Include/GameClient/CommandButtonRules.h
     Include/GameLogic/CastleRules.h
     Include/GameLogic/RotwkLocomotorRules.h
     Include/GameLogic/TerrainResourceRules.h
@@ -666,6 +670,8 @@ set(GAMEENGINE_SRC
     Source/Common/INI/INISpecialPower.cpp
     Source/GameLogic/Object/Update/AISpecialPowerUpdate.cpp
     Source/GameLogic/Object/Update/RotwkParseOnlyModules.cpp
+    Source/GameLogic/Object/Update/RespawnModules.cpp
+    Source/GameLogic/System/HeroRoster.cpp
     Source/GameLogic/Map/CastleTemplateStore.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp

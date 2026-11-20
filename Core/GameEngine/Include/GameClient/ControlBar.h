@@ -35,6 +35,7 @@
 #include "Common/Overridable.h"
 #include "Common/Science.h"
 #include "GameClient/Color.h"
+#include "GameClient/CommandButtonRules.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Drawable;
@@ -216,6 +217,36 @@ enum GUICommandType CPP_11(: Int)
 
 	GUI_COMMAND_SELECT_ALL_UNITS_OF_TYPE,
 	GUI_COMMAND_FOUNDATION_CONSTRUCT,
+	GUI_COMMAND_SECONDARY_UNIT_BUILD,
+	GUI_COMMAND_CASTLE_UPGRADE,
+	GUI_COMMAND_EVACUATE_CONTESTED,
+	GUI_COMMAND_AUTOCAST_WEAPON,
+	GUI_COMMAND_CASTLE_UNPACK,
+	GUI_COMMAND_CASTLE_PACK,
+	GUI_COMMAND_TOGGLE_WEAPON,
+	GUI_COMMAND_HORDE_TOGGLE_FORMATION,
+	GUI_COMMAND_SPECIAL_POWER_TOGGLE,
+	GUI_COMMAND_SPELL_BOOK,
+	GUI_COMMAND_ONE_RING,
+	GUI_COMMAND_CREW_EVACUATE,
+	GUI_COMMAND_BLOODTHIRSTY,
+	GUI_COMMAND_CLOSE_GATE,
+	GUI_COMMAND_OPEN_GATE,
+	GUI_COMMAND_TOGGLE_GATE,
+	GUI_COMMAND_TOGGLE_WEAPONSET,
+	GUI_COMMAND_REVIVE,
+	GUI_COMMAND_MONSTERDOCK,
+	GUI_COMMAND_TOGGLE_NO_AUTO_ACQUIRE,
+	GUI_COMMAND_WAKE_AUTO_PICKUP,
+	GUI_COMMAND_CASTLE_UNPACK_EXPLICIT_OBJECT,
+	GUI_COMMAND_START_SELF_REPAIR,
+	GUI_COMMAND_HORDE_SET_FORMATION,
+	GUI_COMMAND_PUSH_VISIBLE_COMMAND_RANGE,
+	GUI_COMMAND_POP_VISIBLE_COMMAND_RANGE,
+	GUI_COMMAND_TOGGLE_STANCE,
+	GUI_COMMAND_SET_STANCE,
+	GUI_COMMAND_START_NEIGHBORHOOD_REPAIR,
+	GUI_COMMAND_CANCEL_NEIGHBORHOOD,
 
 	// add more commands here, don't forget to update the string command list below too ...
 
@@ -274,7 +305,8 @@ static const char *const TheGuiCommandNames[] =
 
 	nullptr
 };
-static_assert(ARRAY_SIZE(TheGuiCommandNames) == GUI_COMMAND_NUM_COMMANDS + 1, "Incorrect array size");
+static_assert(ARRAY_SIZE(TheGuiCommandNames) == GUI_COMMAND_SECONDARY_UNIT_BUILD + 1, "Incorrect array size");
+static_assert(GUI_COMMAND_NUM_COMMANDS - GUI_COMMAND_SECONDARY_UNIT_BUILD == 30, "Incorrect RotWK command count");
 #endif  // end DEFINE_GUI_COMMAND_NAMES
 
 enum CommandButtonMappedBorderType CPP_11(: Int)
@@ -318,6 +350,8 @@ public:
 	const FieldParse *getFieldParse() const { return s_commandButtonFieldParseTable; }
 	static const FieldParse s_commandButtonFieldParseTable[];		///< the parse table
 	static void parseCommand( INI* ini, void *instance, void *store, const void *userData );
+	static void parseOptions( INI* ini, void *instance, void *store, const void *userData );
+	static void parseNeededUpgrades( INI* ini, void *instance, void *store, const void *userData );
 
 	Bool isContextCommand() const;									///< determines if this is a context sensitive command.
 	Bool isValidRelationshipTarget(Relationship r) const;
@@ -351,6 +385,12 @@ public:
 	CommandButtonMappedBorderType getCommandButtonMappedBorderType() const { return m_commandButtonBorder; }
 	Bool isInPalantir() const { return m_inPalantir; }
 	Bool isRadial() const { return m_radial; }
+	UnsignedInt getRotwkOptions() const { return m_rotwkOptions; }
+	Bool hasRotwkOption(UnsignedInt option) const { return (m_rotwkOptions & option) != 0; }
+	const std::vector<const UpgradeTemplate*>& getNeededUpgrades() const { return m_neededUpgrades; }
+	Bool isNeededUpgradeAny() const { return m_neededUpgradeAny; }
+	Int getCommandRangeStart() const { return m_commandRangeStart; }
+	Int getCommandRangeCount() const { return m_commandRangeCount; }
 	const Image* getButtonImage() const { return m_buttonImage;	}
 	void cacheButtonImage();
 
@@ -408,6 +448,11 @@ private:
 	mutable Int										m_flashCount;                 ///< the number of times a cameo is supposed to flash
 	Bool											m_inPalantir = FALSE;
 	Bool											m_radial = FALSE;
+	UnsignedInt m_rotwkOptions = 0;
+	std::vector<const UpgradeTemplate*> m_neededUpgrades;
+	Bool m_neededUpgradeAny = FALSE;
+	Int m_commandRangeStart = -1;
+	Int m_commandRangeCount = 0;
 
 };
 
@@ -450,7 +495,7 @@ private:
 	static void parseCommandButton( INI* ini, void *instance, void *store, const void *userData );
 
 	AsciiString m_name;															  ///< name of this command set
-	const CommandButton *m_command[ MAX_COMMANDS_PER_SET ]; ///< the set of command buttons that make this set
+	const CommandButton *m_command[ CommandButtonRules::RETAIL_COMMANDS_PER_SET ];
 	Int m_initialVisible = 0;
 
 	CommandSet *m_next;
@@ -917,9 +962,27 @@ protected:
 	Int m_retailMoney = -1;
 	Int m_retailUsedPoints = -1;
 	Int m_retailMaxPoints = -1;
+	CommandButtonRules::VisibleRange m_retailRange;
+	UnsignedInt m_retailRangeObject = 0;
+	Int m_retailHeroOf[MAX_COMMANDS_PER_SET] = {};
+	unsigned long long m_retailShownMask = 0;
 
 	void initRetailHud();
-	void assignRetailSlots(Int initialVisible);
+	struct RetailPlacement
+	{
+		Int entry;
+		const CommandButton *command;
+		Int slot;
+		Int hero;
+	};
+	void assignRetailSlots(const CommandSet *commandSet, Object *obj, Int initialVisible);
+	void collectRetailPlacements(const CommandSet *commandSet, Object *obj, Int initialVisible, std::vector<RetailPlacement> &placements) const;
+	Bool retailEntryShown(const CommandSet *commandSet, Int entry, const CommandButton *command, Object *obj, Int &hero) const;
+	Bool retailExtraEntryUsable(const CommandButton *command, const Object *obj) const;
+	void checkRetailPlacements();
+	void applyRetailHeroImage(GameWindow *window, Int hero) const;
+	CommandAvailability getRetailCommandAvailability(const CommandButton *command, Object *obj, GameWindow *win) const;
+	CBCommandStatus processRetailCommand(const CommandButton *command, GameWindow *control, Object *obj);
 	void resetRetailCommandWindows();
 	void updateRetailHud();
 	void updateRetailCounters();
@@ -928,6 +991,8 @@ protected:
 public:
 	Bool isRetailHud() const { return m_retailSelectionName != nullptr; }
 	Int getRetailSlot(const GameWindow *window) const;
+	Int getRetailHeroIndex(const GameWindow *window) const;
+	const ThingTemplate *getRetailHero(const GameWindow *window) const;
 	void drawRetailTexts() const;
 	void drawRetailSocketFills() const;
 	Bool isOverRetailSocket(Int px, Int py) const;

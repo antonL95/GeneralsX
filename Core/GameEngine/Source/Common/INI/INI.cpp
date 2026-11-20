@@ -417,6 +417,15 @@ static INIPreprocessor& getPreprocessor()
 	return preprocessor;
 }
 
+Bool INI::findDefine(const char* name, AsciiString& value)
+{
+	std::string text;
+	if (!name || !getPreprocessor().findDefine(name, text))
+		return FALSE;
+	value = text.c_str();
+	return TRUE;
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void INI::prepFile( AsciiString filename, INILoadType loadType )
