@@ -59,6 +59,7 @@
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/PlayerTemplateRules.h"
+#include "Common/CommandPointRules.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/HeroRoster.h"
 #include "Common/ProductionPrerequisite.h"
@@ -4631,5 +4632,139 @@ void Player::xfer( Xfer *xfer )
 void Player::loadPostProcess()
 {
 
+}
+
+void Player::addCommandPointUpgradeBonus(const void *source, Int amount, const SpecialPowerObjectFilter &requiredObject)
+{
+	for (CommandPointUpgradeBonus &entry : m_commandPointUpgrades)
+	{
+		if (entry.source == source)
+		{
+			entry.amount = amount;
+			entry.requiredObject = requiredObject;
+			return;
+		}
+	}
+	m_commandPointUpgrades.push_back(CommandPointUpgradeBonus{ source, amount, requiredObject });
+}
+
+void Player::removeCommandPointUpgradeBonus(const void *source)
+{
+	for (auto it = m_commandPointUpgrades.begin(); it != m_commandPointUpgrades.end(); ++it)
+	{
+		if (it->source == source)
+		{
+			m_commandPointUpgrades.erase(it);
+			return;
+		}
+	}
+}
+
+Int Player::getCommandPointsUsed() const
+{
+	if (!RetailFileLayers::enabled() || !TheGameLogic)
+		return 0;
+	Int used = 0;
+	for (const Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+	{
+		if (obj->getControllingPlayer() != this || obj->isDestroyed() || obj->isEffectivelyDead())
+			continue;
+		if (obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) || obj->getStatusBits().test(OBJECT_STATUS_SOLD))
+			continue;
+		const ThingTemplate *tmpl = obj->getTemplate();
+		if (!tmpl)
+			continue;
+		used += CommandPointRules::objectUsedCommandPoints(
+			tmpl->getRotWKObjectData().commandPoints,
+			tmpl->isKindOf(KINDOF_SELECTABLE) != FALSE,
+			tmpl->isKindOf(KINDOF_STRUCTURE) != FALSE,
+			tmpl->isKindOf(KINDOF_HORDE) != FALSE);
+	}
+	return used;
+}
+
+Int Player::getCommandPointsTotal() const
+{
+	if (!RetailFileLayers::enabled() || !TheGlobalData)
+		return 0;
+	const GameMode mode = TheGameLogic ? TheGameLogic->getGameMode() : GAME_NONE;
+	const bool isSkirmishOrMP = (mode == GAME_SKIRMISH || mode == GAME_LAN || mode == GAME_INTERNET);
+	Int activePlayers = 0;
+	if (ThePlayerList)
+	{
+		const Int playerCount = ThePlayerList->getPlayerCount();
+		for (Int i = 0; i < playerCount; ++i)
+		{
+			const Player *p = ThePlayerList->getNthPlayer(i);
+			if (p && p->getPlayerTemplate() && p->getPlayerTemplate()->isPlayableSide())
+				++activePlayers;
+		}
+	}
+	const bool isEvil = (m_playerTemplate && m_playerTemplate->isEvil());
+	const bool isAI = (m_playerType == PLAYER_COMPUTER);
+	const CommandPointRules::Pair baseAndCap = CommandPointRules::resolveBaseAndCap(
+		TheGlobalData->m_commandPoints, isSkirmishOrMP, activePlayers, isEvil, isAI, 100);
+
+	Int buildingBonus = 0;
+	if (TheGameLogic)
+	{
+		for (const Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+		{
+			if (obj->getControllingPlayer() != this || obj->isDestroyed() || obj->isEffectivelyDead())
+				continue;
+			if (obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) || obj->getStatusBits().test(OBJECT_STATUS_SOLD))
+				continue;
+			const ThingTemplate *tmpl = obj->getTemplate();
+			if (!tmpl)
+				continue;
+			const Int bonus = tmpl->getRotWKObjectData().commandPointBonus;
+			if (bonus > 0)
+				buildingBonus += bonus;
+		}
+	}
+
+	Int upgradeBonus = 0;
+	for (const CommandPointUpgradeBonus &entry : m_commandPointUpgrades)
+	{
+		const bool hasFilter = entry.requiredObject.m_rules != 0
+			|| entry.requiredObject.m_includeKinds.any()
+			|| entry.requiredObject.m_excludeKinds.any()
+			|| !entry.requiredObject.m_includeObjects.empty()
+			|| !entry.requiredObject.m_excludeObjects.empty();
+		if (!hasFilter)
+		{
+			upgradeBonus += entry.amount;
+			continue;
+		}
+		if (!TheGameLogic)
+			continue;
+		for (const Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+		{
+			if (obj->getControllingPlayer() != this || obj->isDestroyed() || obj->isEffectivelyDead())
+				continue;
+			if (obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) || obj->getStatusBits().test(OBJECT_STATUS_SOLD))
+				continue;
+			const ThingTemplate *tmpl = obj->getTemplate();
+			if (tmpl && entry.requiredObject.matchesTemplate(*tmpl))
+			{
+				upgradeBonus += entry.amount;
+				break;
+			}
+		}
+	}
+
+	return CommandPointRules::computeTotalLimit(baseAndCap.starting, buildingBonus, upgradeBonus, baseAndCap.maximum);
+}
+
+Bool Player::hasEnoughCommandPoints(const ThingTemplate *whatToBuild) const
+{
+	if (!RetailFileLayers::enabled() || !whatToBuild)
+		return TRUE;
+	const Int cost = whatToBuild->getRotWKObjectData().commandPoints;
+	return CommandPointRules::canAffordCommandPoints(
+		getCommandPointsUsed(),
+		getCommandPointsTotal(),
+		cost,
+		whatToBuild->isKindOf(KINDOF_ARMY_OF_DEAD) != FALSE) ? TRUE : FALSE;
 }
 

@@ -263,6 +263,11 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				TheInGameUI->message( "GUI:UnitMaxedOut" );
 				break;
 			}
+			else if (cmt == CANMAKE_NO_COMMAND_POINTS)
+			{
+				TheInGameUI->message("GUI:ErrorNoMoreCommandPoints");
+				break;
+			}
 
 			// tell the UI that we want to build something so we get a building at the cursor
 			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), m_currentSelectedDrawable );
@@ -308,6 +313,11 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				TheInGameUI->message( "GUI:UnitMaxedOut" );
 				break;
 			}
+			else if (cmt == CANMAKE_NO_COMMAND_POINTS)
+			{
+				TheInGameUI->message("GUI:ErrorNoMoreCommandPoints");
+				break;
+			}
 
 			// tell the UI that we want to build something so we get a building at the cursor
 			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), draw );
@@ -348,6 +358,11 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			else if( cmt == CANMAKE_MAXED_OUT_FOR_PLAYER )
 			{
 				TheInGameUI->message( "GUI:UnitMaxedOut" );
+				break;
+			}
+			else if (cmt == CANMAKE_NO_COMMAND_POINTS)
+			{
+				TheInGameUI->message("GUI:ErrorNoMoreCommandPoints");
 				break;
 			}
 
@@ -419,6 +434,11 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			else if( cmt == CANMAKE_MAXED_OUT_FOR_PLAYER )
 			{
 				TheInGameUI->message( "GUI:UnitMaxedOut" );
+				break;
+			}
+			else if (cmt == CANMAKE_NO_COMMAND_POINTS)
+			{
+				TheInGameUI->message("GUI:ErrorNoMoreCommandPoints");
 				break;
 			}
 			else if (cmt != CANMAKE_OK)

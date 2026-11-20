@@ -81,6 +81,8 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/GeometryUpgrade.h
     Include/GameLogic/Module/FoundationAIUpdate.h
     Include/GameLogic/Module/TerrainResourceBehavior.h
+    Include/GameLogic/Module/CommandPointsUpgrade.h
+    Include/Common/CommandPointRules.h
     Include/Common/INIAudit.h
     Include/Common/INIBlockStructure.h
     Include/Common/ZeroHourUpgradeMaskLayout.h
@@ -683,6 +685,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Upgrade/GeometryUpgrade.cpp
     Source/GameLogic/Object/Update/FoundationAIUpdate.cpp
     Source/GameLogic/Object/Update/TerrainResourceBehavior.cpp
+    Source/GameLogic/Object/Upgrade/CommandPointsUpgrade.cpp
     Source/Common/INI/INITerrain.cpp
     Source/Common/INI/INITerrainBridge.cpp
     Source/Common/INI/INITerrainRoad.cpp

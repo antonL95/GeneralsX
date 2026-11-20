@@ -683,17 +683,8 @@ void ControlBar::updateRetailCounters()
 		return;
 	m_retailCounterFrame = now;
 
-	Int used = 0;
-	Int maximum = 0;
-	for (const Object *obj = TheGameLogic ? TheGameLogic->getFirstObject() : nullptr; obj; obj = obj->getNextObject())
-	{
-		if (obj->getControllingPlayer() != player || obj->isEffectivelyDead())
-			continue;
-		const ThingTemplate::RotWKObjectData &data = obj->getTemplate()->getRotWKObjectData();
-		used += data.commandPoints;
-		if (!obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
-			maximum += data.commandPointBonus;
-	}
+	const Int used = player->getCommandPointsUsed();
+	const Int maximum = player->getCommandPointsTotal();
 
 	const Int money = static_cast<Int>(player->getMoney()->countMoney());
 	UnicodeString text;

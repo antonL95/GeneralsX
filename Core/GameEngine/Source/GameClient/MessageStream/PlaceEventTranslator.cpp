@@ -215,6 +215,11 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 						TheInGameUI->message( "GUI:UnitMaxedOut" );
 						break;
 					}
+					else if (cmt == CANMAKE_NO_COMMAND_POINTS)
+					{
+						TheInGameUI->message("GUI:ErrorNoMoreCommandPoints");
+						break;
+					}
 					// get out of pending placement mode, this will also clear the arrow anchor status
 					TheInGameUI->placeBuildAvailable( nullptr, nullptr );
 					break;

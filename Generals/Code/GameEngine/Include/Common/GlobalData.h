@@ -38,6 +38,7 @@
 #include "Common/STLTypedefs.h"
 #include "Common/Money.h"
 #include "Common/SpecialPowerINI.h"
+#include "Common/CommandPointRules.h"
 
 // FORWARD DECLARATIONS ///////////////////////////////////////////////////////////////////////////
 struct FieldParse;
@@ -233,6 +234,7 @@ public:
 	Real m_cameraPitch;
 	SpecialPowerObjectFilter m_victoryStructureFilter;
 	Real m_terrainResourceCellSize = 20.0f;
+	CommandPointRules::Config m_commandPoints;
 	SpecialPowerObjectFilter m_victoryUnitFilter;
 	Real m_cameraYaw;
 #if PRESERVE_RETAIL_SCRIPTED_CAMERA

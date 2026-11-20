@@ -178,6 +178,7 @@
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/CommandPointsUpgrade.h"
 #include "GameLogic/Module/MissileLauncherBuildingUpdate.h"
 #include "GameLogic/Module/StealthDetectorUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
@@ -478,6 +479,7 @@ void ModuleFactory::init()
 		addModule( BezierProjectileBehavior );
 		addModule( RespawnUpdate );
 		addModule( HordeAIUpdate );
+		addModule( CommandPointsUpgrade );
 	}
 	addModule( MissileLauncherBuildingUpdate );
 	addModule( SupplyCenterProductionExitUpdate );

@@ -389,6 +389,10 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 								descrip.concat( TheGameText->fetch( "TOOLTIP:TooltipCannotBuildUnitBecauseMaximumNumber" ) );
 							}
 							break;
+						case CANMAKE_NO_COMMAND_POINTS:
+							descrip.concat(L"\n\n");
+							descrip.concat(TheGameText->fetch("TOOLTIP:TooltipNoMoreCommandPoints"));
+							break;
 						//case CANMAKE_NO_PREREQ:
 						//	descrip.concat( L"\n\n" );
 						//	descrip.concat( TheGameText->fetch( "TOOLTIP:TooltipCannotBuildDueToPrerequisites" ) );

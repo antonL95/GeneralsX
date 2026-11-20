@@ -58,6 +58,7 @@
 #include "Common/Thing.h"
 #include "Common/STLTypedefs.h"
 #include "Common/ScoreKeeper.h"
+#include "Common/SpecialPowerINI.h"
 #include "Common/Team.h"
 #include "Common/Upgrade.h"
 
@@ -269,6 +270,11 @@ public:
 
 	// Can we afford to build?
 	Bool canAffordBuild( const ThingTemplate *whatToBuild ) const;
+	Int getCommandPointsUsed() const;
+	Int getCommandPointsTotal() const;
+	Bool hasEnoughCommandPoints( const ThingTemplate *whatToBuild ) const;
+	void addCommandPointUpgradeBonus( const void *source, Int amount, const SpecialPowerObjectFilter &requiredObject );
+	void removeCommandPointUpgradeBonus( const void *source );
 
 	/// Difficulty level for this player.
 	GameDifficulty getPlayerDifficulty() const;
@@ -825,4 +831,12 @@ private:
 
 	Bool									m_isPlayerDead;
 	Bool									m_logicalRetaliationModeEnabled;
+
+	struct CommandPointUpgradeBonus
+	{
+		const void *source;
+		Int amount;
+		SpecialPowerObjectFilter requiredObject;
+	};
+	std::vector<CommandPointUpgradeBonus> m_commandPointUpgrades;
 };

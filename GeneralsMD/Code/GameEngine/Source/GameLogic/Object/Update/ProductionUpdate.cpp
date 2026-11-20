@@ -35,6 +35,7 @@
 #include "Common/CRCDebug.h"
 #include "Common/GameState.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Radar.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -673,7 +674,12 @@ UpdateSleepTime ProductionUpdate::update()
 
 	}
 
-	// increase the frames we've been under production for
+	if (RetailFileLayers::enabled() && production->m_type == PRODUCTION_UNIT && player &&
+		!player->hasEnoughCommandPoints(production->m_objectToProduce))
+	{
+		return UPDATE_SLEEP_NONE;
+	}
+
 	production->m_framesUnderConstruction++;
 
 	// how many total logic frames does it take to produce this unit

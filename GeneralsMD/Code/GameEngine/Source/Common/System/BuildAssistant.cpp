@@ -34,6 +34,7 @@
 #include "Common/BuildAssistant.h"
 #include "Common/GlobalData.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/GameAudio.h"
 #include "Common/ThingFactory.h"
@@ -1369,6 +1370,9 @@ CanMakeType BuildAssistant::canMakeUnit( Object *builder, const ThingTemplate *w
 	}
 	else if( whatToBuild->calcCostToBuild( player ) > money->countMoney() )
 		return CANMAKE_NO_MONEY;
+
+	if (RetailFileLayers::enabled() && !player->hasEnoughCommandPoints(whatToBuild))
+		return CANMAKE_NO_COMMAND_POINTS;
 
 	// get the command set for the producer object
 	return CANMAKE_OK;

@@ -40,6 +40,8 @@
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/Player.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/PlayerList.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
@@ -872,9 +874,17 @@ public:
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 
+		static const FieldParse retailFieldParse[] =
+		{
+			{ "IgnoreCommandPointLimit", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_ignoreCommandPointLimit) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+
 		MultiIniFieldParse p;
 		p.add(getCommonFieldParse());
 		p.add(myFieldParse);
+		if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+			p.add(retailFieldParse);
 
 		GenericObjectCreationNugget* nugget = newInstance(GenericObjectCreationNugget);
 		nugget->m_nameAreObjects = true;
@@ -899,9 +909,17 @@ public:
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 
+		static const FieldParse retailFieldParse[] =
+		{
+			{ "IgnoreCommandPointLimit", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_ignoreCommandPointLimit) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+
 		MultiIniFieldParse p;
 		p.add(getCommonFieldParse());
 		p.add(myFieldParse);
+		if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+			p.add(retailFieldParse);
 
 		GenericObjectCreationNugget* nugget = newInstance(GenericObjectCreationNugget);
 		nugget->m_nameAreObjects = false;
@@ -1292,6 +1310,13 @@ protected:
 			if (!tmpl)
 				continue;
 
+			if (RetailFileLayers::enabled() && m_nameAreObjects && !m_ignoreCommandPointLimit)
+			{
+				const Player *ownerPlayer = debrisOwner ? debrisOwner->getControllingPlayer() : nullptr;
+				if (ownerPlayer && !ownerPlayer->hasEnoughCommandPoints(tmpl))
+					continue;
+			}
+
 			Object *debris = TheThingFactory->newObject( tmpl, debrisOwner );
 			if( !debris )
 			{
@@ -1439,6 +1464,7 @@ private:
 	Bool											m_ignorePrimaryObstacle;
 	Bool											m_inheritsVeterancy;
 	Bool											m_skipIfSignificantlyAirborne;
+	Bool											m_ignoreCommandPointLimit = FALSE;
 
 };
 EMPTY_DTOR(GenericObjectCreationNugget)

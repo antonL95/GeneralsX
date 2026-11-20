@@ -1246,9 +1246,42 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	}
 	// If we're multifile, then continue loading stuff into the Global Data as normal.
 
+	auto parseCommandPointPair = [](INI* ini, void* instance, void* store, const void* userData)
+	{
+		auto* pair = static_cast<CommandPointRules::Pair*>(store);
+		INI::parseInt(ini, instance, &pair->starting, userData);
+		const char* second = ini->getNextTokenOrNull();
+		pair->maximum = second ? INI::scanInt(second) : 0;
+	};
 	static const FieldParse retailFields[] =
 	{
 		{ "TerrainResourceCellSize", INI::parseReal, nullptr, offsetof(GlobalData, m_terrainResourceCellSize) },
+		{ "GoodCommandPointLimit", INI::parseInt, nullptr, offsetof(GlobalData, m_commandPoints.goodLimit) },
+		{ "EvilCommandPointLimit", INI::parseInt, nullptr, offsetof(GlobalData, m_commandPoints.evilLimit) },
+		{ "GoodCommandPoints", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.good) },
+		{ "EvilCommandPoints", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evil) },
+		{ "GoodCommandPointsBonus", INI::parseInt, nullptr, offsetof(GlobalData, m_commandPoints.goodBonus) },
+		{ "EvilCommandPointsBonus", INI::parseInt, nullptr, offsetof(GlobalData, m_commandPoints.evilBonus) },
+		{ "GoodCommandPointsAI", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.goodAI) },
+		{ "EvilCommandPointsAI", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evilAI) },
+		{ "GoodCommandPointsMP2", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.goodMP[0]) },
+		{ "EvilCommandPointsMP2", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evilMP[0]) },
+		{ "GoodCommandPointsMP3", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.goodMP[1]) },
+		{ "EvilCommandPointsMP3", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evilMP[1]) },
+		{ "GoodCommandPointsMP4", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.goodMP[2]) },
+		{ "EvilCommandPointsMP4", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evilMP[2]) },
+		{ "GoodCommandPointsMP5", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.goodMP[3]) },
+		{ "EvilCommandPointsMP5", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evilMP[3]) },
+		{ "GoodCommandPointsMP6", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.goodMP[4]) },
+		{ "EvilCommandPointsMP6", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evilMP[4]) },
+		{ "GoodCommandPointsMP7", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.goodMP[5]) },
+		{ "EvilCommandPointsMP7", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evilMP[5]) },
+		{ "GoodCommandPointsMP8", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.goodMP[6]) },
+		{ "EvilCommandPointsMP8", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evilMP[6]) },
+		{ "GoodCommandPointsMP56", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.goodMP[4]) },
+		{ "EvilCommandPointsMP56", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evilMP[4]) },
+		{ "GoodCommandPointsMP78", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.goodMP[6]) },
+		{ "EvilCommandPointsMP78", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.evilMP[6]) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	MultiIniFieldParse fields;
