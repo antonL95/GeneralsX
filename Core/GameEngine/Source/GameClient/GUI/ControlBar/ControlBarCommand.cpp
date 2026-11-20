@@ -31,6 +31,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/NameKeyGenerator.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
 #include "Common/Player.h"
@@ -1020,6 +1021,12 @@ static Int getRappellerCount(Object* obj)
 /** What's the status between 'obj' and the 'command' at present.  Can we do it?  Are
 	* we already doing it?  Can ya dig it? */
 //-------------------------------------------------------------------------------------------------
+static Bool buysItsOwnUpgrade( const CommandButton *command )
+{
+	const GUICommandType type = command->getCommandType();
+	return RetailFileLayers::enabled() && ( type == GUI_COMMAND_OBJECT_UPGRADE || type == GUI_COMMAND_PLAYER_UPGRADE );
+}
+
 CommandAvailability ControlBar::getCommandAvailability( const CommandButton *command,
 																												Object *obj,
 																												GameWindow *win,
@@ -1112,7 +1119,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 	{
 		if( !command->getNeededUpgrades().empty() && !HeroRoster::buttonUpgradesMet( command, player, obj ) )
 			return COMMAND_RESTRICTED;
-		const UpgradeTemplate *upgradeT = command->getNeededUpgrades().empty() ? command->getUpgradeTemplate() : nullptr;
+		const UpgradeTemplate *upgradeT = command->getNeededUpgrades().empty() && !buysItsOwnUpgrade( command ) ? command->getUpgradeTemplate() : nullptr;
 		if (upgradeT)
 		{
 			// upgrades come in the form of player upgrades and object upgrades

@@ -272,7 +272,7 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	if (count > 0)
 	{
 		const Int percent = static_cast<Int>(progress * 100.0f + 0.5f);
-		TheDisplay->drawRemainingRectClock(x, y, width, height, percent, GameMakeColor(255, 255, 255, 26));
+		TheDisplay->drawRemainingRectClock(x, y, width, height, percent, GameMakeColor(0, 0, 0, 150));
 	}
 	TheDisplay->setCircularClip(0, 0, 0);
 	if (highlight)
