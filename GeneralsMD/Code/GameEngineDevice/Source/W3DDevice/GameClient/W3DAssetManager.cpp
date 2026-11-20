@@ -68,6 +68,7 @@
 #include "Common/PerfTimer.h"
 #include "Common/GlobalData.h"
 #include "Common/GameCommon.h"
+#include "Common/RetailFileLayers.h"
 
 
 //---------------------------------------------------------------------
@@ -342,11 +343,6 @@ Int W3DAssetManager::replaceMeshTexture(RenderObjClass *robj, TextureClass *oldT
 }
 
 //---------------------------------------------------------------------
-/** Replaces all references to old texture with new texture.  Operation is performed on
-	asset prototype so it will affect most instances of this object.  Objects which have
-	been customized with house color will not be affected unless they are created after
-	this function is called.
-*/
 void W3DAssetManager::replaceInstanceTextures(RenderObjClass* object,
 	const std::vector<std::pair<AsciiString, AsciiString>>& swaps, Int color, const std::vector<AsciiString>* exclusions)
 {
@@ -1174,7 +1170,7 @@ void W3DAssetManager::Make_Mesh_Unique(RenderObjClass *robj, Bool geometry, Bool
 		//mesh has some house color applied so make those components unique to mesh.
 
 		//Create unique data for this mesh
-		if (!geometry)	//scaling geometry automatically makes it unique so not needed here.
+		if (!geometry || RetailFileLayers::enabled())
 			mesh->Make_Unique();
 
 		MeshModelClass * model = mesh->Get_Model();

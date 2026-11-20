@@ -3,9 +3,16 @@
 #include <functional>
 #include <memory>
 
-template<class States, class Flags, class IsFallback, class GetConditions = std::identity>
+enum class RetailEmptyState
+{
+	First,
+	Last
+};
+
+template<class States, class Flags, class GetConditions = std::identity>
 const typename States::value_type* findRetailConditionMatch(const States& states, const Flags& active,
-	IsFallback isFallback, GetConditions getConditions = {})
+	RetailEmptyState emptyState, GetConditions getConditions = {},
+	const typename States::value_type* defaultState = nullptr)
 {
 	const typename States::value_type* fallback = nullptr;
 	for (const auto& state : states)
@@ -19,11 +26,11 @@ const typename States::value_type* findRetailConditionMatch(const States& states
 				if (active.testForAll(required))
 					return std::addressof(state);
 			}
-			else if (!fallback && isFallback(state))
+			else if (!fallback || emptyState == RetailEmptyState::Last)
 			{
 				fallback = std::addressof(state);
 			}
 		}
 	}
-	return fallback;
+	return defaultState ? defaultState : fallback;
 }

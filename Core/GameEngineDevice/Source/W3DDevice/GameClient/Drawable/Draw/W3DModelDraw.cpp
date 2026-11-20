@@ -47,7 +47,6 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
-#include "Common/RetailFileLayers.h"
 #include "Common/GameLOD.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
@@ -1750,7 +1749,11 @@ const ModelConditionInfo* W3DModelDrawModuleData::findBestInfo(const ModelCondit
 	ModelConditionFlags bits = c;
 	bits.clear(m_ignoreConditionStates);
 	if (RetailFileLayers::enabled())
-		return findRetailConditionMatch(m_conditionStates, bits, [](const ModelConditionInfo&) { return true; });
+	{
+		const ModelConditionInfo* defaultState =
+			static_cast<std::size_t>(m_defaultState) < m_conditionStates.size() ? &m_conditionStates[m_defaultState] : nullptr;
+		return findRetailConditionMatch(m_conditionStates, bits, RetailEmptyState::Last, std::identity{}, defaultState);
+	}
 	return m_conditionStateMap.findBestInfo(m_conditionStates, bits);
 }
 

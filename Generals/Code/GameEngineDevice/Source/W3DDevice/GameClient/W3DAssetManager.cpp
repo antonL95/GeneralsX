@@ -313,11 +313,6 @@ Int W3DAssetManager::replaceMeshTexture(RenderObjClass *robj, TextureClass *oldT
 }
 
 //---------------------------------------------------------------------
-/** Replaces all references to old texture with new texture.  Operation is performed on
-	asset prototype so it will affect most instances of this object.  Objects which have
-	been customized with house color will not be affected unless they are created after
-	this function is called.
-*/
 void W3DAssetManager::replaceInstanceTextures(RenderObjClass* object,
 	const std::vector<std::pair<AsciiString, AsciiString>>& swaps, Int color, const std::vector<AsciiString>* exclusions)
 {

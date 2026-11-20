@@ -36,6 +36,7 @@ static void drawFramerateBar();
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 #include <numeric>
 #include <cmath>
+#include <string>
 #include "WW3D2/hanim.h"
 #include "WW3D2/htree.h"
 #include <stdlib.h>
@@ -120,6 +121,7 @@ static void drawFramerateBar();
 #include "WW3D2/textureloader.h"
 #include "WW3D2/dx8webbrowser.h"
 #include "WW3D2/mesh.h"
+#include "WW3D2/matinfo.h"
 #include "WW3D2/hlod.h"
 #include "WW3D2/lightenvironment.h"
 #include "WW3D2/meshmatdesc.h"
@@ -2406,6 +2408,72 @@ static Bool drawAssetSmokeTerrain(AsciiString filename, Real aspect)
 	return true;
 }
 
+using AssetSmokeTextures = std::vector<std::pair<std::string, std::string>>;
+
+static void collectAssetSmokeTextures(RenderObjClass& object, const char* phase, const char* instance,
+	AssetSmokeTextures& textures)
+{
+	if (object.Class_ID() == RenderObjClass::CLASSID_MESH)
+	{
+		MaterialInfoClass* material = object.Get_Material_Info();
+		for (Int i = 0; i < material->Texture_Count(); ++i)
+		{
+			const TextureClass* texture = material->Peek_Texture(i);
+			const char* name = texture ? texture->Get_Texture_Name().str() : "";
+			std::fprintf(stderr, "Texture swap %s %s %s [%d] %s\n", phase, instance, object.Get_Name(), i, name);
+			textures.emplace_back(object.Get_Name(), name);
+		}
+		material->Release_Ref();
+	}
+	for (Int i = 0; i < object.Get_Num_Sub_Objects(); ++i)
+	{
+		RenderObjClass* child = object.Get_Sub_Object(i);
+		collectAssetSmokeTextures(*child, phase, instance, textures);
+		child->Release_Ref();
+	}
+}
+
+static Bool checkAssetSmokeTextureSwap(W3DAssetManager& assets, const char* model, const char* original,
+	const char* replacement)
+{
+	RenderObjClass* first = assets.Create_Render_Obj(model);
+	RenderObjClass* second = assets.Create_Render_Obj(model);
+	if (!first || !second)
+	{
+		REF_PTR_RELEASE(first);
+		REF_PTR_RELEASE(second);
+		return FALSE;
+	}
+
+	const auto textures = [](RenderObjClass& object, const char* phase, const char* instance)
+	{
+		AssetSmokeTextures result;
+		collectAssetSmokeTextures(object, phase, instance, result);
+		return result;
+	};
+	const auto before = textures(*first, "before", "first");
+	const auto secondBefore = textures(*second, "before", "second");
+	auto expected = before;
+	for (auto& entry : expected)
+		if (strcasecmp(entry.second.c_str(), original) == 0)
+			entry.second = replacement;
+
+	assets.replaceInstanceTextures(first, {{original, replacement}});
+	const auto swapped = textures(*first, "swapped", "first");
+	const auto secondSwapped = textures(*second, "swapped", "second");
+	RenderObjClass* later = assets.Create_Render_Obj(model);
+	const auto laterSwapped = later ? textures(*later, "swapped", "later") : AssetSmokeTextures();
+	assets.replaceInstanceTextures(first, {{replacement, original}});
+	const auto restored = textures(*first, "restored", "first");
+	const auto secondRestored = textures(*second, "restored", "second");
+	REF_PTR_RELEASE(later);
+	first->Release_Ref();
+	second->Release_Ref();
+
+	return before == secondBefore && before != expected && swapped == expected &&
+		secondSwapped == before && laterSwapped == before && restored == before && secondRestored == before;
+}
+
 void W3DDisplay::draw()
 {
 	//USE_PERF_TIMER(W3DDisplay_draw)
@@ -2431,6 +2499,19 @@ void W3DDisplay::draw()
 
 	static const char* smokeModel = std::getenv("GENERALSX_ASSET_SMOKE")
 		? std::getenv("GENERALSX_ASSET_SMOKE_MODEL") : nullptr;
+	if (smokeModel && *smokeModel && TheGlobalData->m_initialFile.isEmpty() && RetailFileLayers::enabled())
+	{
+		const char* original = std::getenv("GENERALSX_ASSET_SMOKE_TEXTURE_FROM");
+		const char* replacement = std::getenv("GENERALSX_ASSET_SMOKE_TEXTURE_TO");
+		if (original && *original && replacement && *replacement)
+		{
+			const Bool passed = checkAssetSmokeTextureSwap(*m_assetManager, smokeModel, original, replacement);
+			std::fprintf(stderr, "Texture swap result %s\n", passed ? "PASS" : "FAIL");
+			std::fflush(stderr);
+			TheGameEngine->setQuitting(TRUE);
+			return;
+		}
+	}
 	static const char* smokeObject = std::getenv("GENERALSX_ASSET_SMOKE")
 		? std::getenv("GENERALSX_ASSET_SMOKE_OBJECT") : nullptr;
 	if (((smokeModel && *smokeModel) || (smokeObject && *smokeObject)) &&
