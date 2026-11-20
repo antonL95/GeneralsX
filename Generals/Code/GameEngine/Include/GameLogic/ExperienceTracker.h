@@ -43,6 +43,17 @@ public:
 	ExperienceTracker(Object *parent);
 
 	VeterancyLevel getVeterancyLevel() const { return m_currentLevel; }			///< What level am I?
+	Int getRank() const;
+	Int getRetailThreshold() const { return m_retailThreshold; }
+	Real getRetailExperience() const { return m_retailExperience; }
+	Int getRetailStartingRank() const { return m_retailStartingRank; }
+	void setRetailStartingRank(Int rank) { m_retailStartingRank = rank; }
+	Real getLevelProgress() const;
+	void initializeRetailLevel();
+	void addRetailExperience(Real points, Bool scale = TRUE);
+	void advanceRetailLevel(Real experience, Bool feedback);
+	void setMinRetailRank(Int rank, Bool feedback = FALSE);
+	Bool gainRetailLevels(Int count, Int rankCap = 0, Bool trainableOnly = TRUE);
 	Int getExperienceValue( const Object* killer ) const;										///< How much do give for being killed
 	Int getCurrentExperience() const { return m_currentExperience; };	///< How much experience do I have at the moment?
 	Bool isTrainable() const;																						///< Can I gain experience?
@@ -74,4 +85,7 @@ private:
 	ObjectID					m_experienceSink;										///< ID of object I have pledged my experience point gains to
 	Real							m_experienceScalar;									///< Scales any experience gained by this multiplier.
 	Bool							m_isTrainable;											///< Can I gain experience?
+	Int m_retailThreshold = 0;
+	Int m_retailStartingRank = 1;
+	Real m_retailExperience = 0.0f;
 };

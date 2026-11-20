@@ -269,7 +269,9 @@ protected:
 	Bool approachTarget();			//Approaches the target before starting the special attack (if appropriate)
 	void startPreparation();		//Begins the preparation of ability -- like firing off a hacker attack, or laser tracer, etc.
 	Bool continuePreparation();	//Updates the preparation of ability -- like recalculating tracer lines.
-	void triggerAbilityEffect();	//After the preparation time has elapsed, this part actually triggers the desired effect of the special ability.
+	virtual void triggerAbilityEffect();
+	ObjectID getAbilityTargetID() const { return m_targetID; }
+	const Coord3D& getAbilityTargetPos() const { return m_targetPos; }
 	void finishAbility();
 
 	void validateSpecialObjects();

@@ -26,7 +26,8 @@ struct Entry
 	const ThingTemplate *hero = nullptr;
 	HeroRules::State state = HeroRules::State::Recruitable;
 	Int level = 1;
-	Int experience = 0;
+	Int startingLevel = 1;
+	Real experience = 0.0f;
 	UpgradeMaskType upgrades;
 };
 
@@ -209,9 +210,10 @@ void recordDeath(Object *hero, HeroRules::State outcome)
 	entry->state = outcome;
 	if (outcome != HeroRules::State::Revivable)
 		return;
-	entry->level = HeroRules::levelFromVeterancy(static_cast<Int>(hero->getVeterancyLevel()));
 	const ExperienceTracker *tracker = hero->getExperienceTracker();
-	entry->experience = tracker ? tracker->getCurrentExperience() : 0;
+	entry->level = tracker ? tracker->getRank() : 1;
+	entry->startingLevel = tracker ? tracker->getRetailStartingRank() : 1;
+	entry->experience = tracker ? tracker->getRetailExperience() : 0.0f;
 	entry->upgrades = hero->getObjectCompletedUpgradeMask();
 }
 
@@ -228,9 +230,9 @@ Bool onHeroProduced(Object *hero)
 	ExperienceTracker *tracker = hero->getExperienceTracker();
 	if (tracker)
 	{
-		if (entry->experience > 0)
-			tracker->setExperienceAndLevel(entry->experience, FALSE);
-		tracker->setMinVeterancyLevel(static_cast<VeterancyLevel>(entry->level - 1), FALSE);
+		tracker->advanceRetailLevel(entry->experience, FALSE);
+		tracker->setMinRetailRank(entry->level);
+		tracker->setRetailStartingRank(entry->startingLevel);
 	}
 	if (TheUpgradeCenter)
 	{

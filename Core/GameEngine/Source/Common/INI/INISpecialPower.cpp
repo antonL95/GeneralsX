@@ -45,7 +45,7 @@ Bool SpecialPowerObjectFilter::matchesTemplate(const ThingTemplate& thing) const
 	{
 		return stricmp(name.str(), thing.getName().str()) == 0;
 	};
-	if ((m_rules & RULE_NONE) || thing.isAnyKindOf(m_excludeKinds) ||
+	if (thing.isAnyKindOf(m_excludeKinds) ||
 		std::any_of(m_excludeObjects.begin(), m_excludeObjects.end(), matchesName))
 		return FALSE;
 
@@ -53,7 +53,7 @@ Bool SpecialPowerObjectFilter::matchesTemplate(const ThingTemplate& thing) const
 		return thing.isAnyKindOf(m_includeKinds) ||
 			std::any_of(m_includeObjects.begin(), m_includeObjects.end(), matchesName);
 
-	return TRUE;
+	return (m_rules & RULE_NONE) == 0;
 }
 
 void SpecialPowerObjectFilter::parse(INI* ini, void*, void* store, const void*)

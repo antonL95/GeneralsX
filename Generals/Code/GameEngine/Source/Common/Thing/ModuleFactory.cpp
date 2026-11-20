@@ -163,6 +163,7 @@
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/CommandPointsUpgrade.h"
 #include "GameLogic/Module/MissileLauncherBuildingUpdate.h"
@@ -424,6 +425,10 @@ void ModuleFactory::init()
 		addModule( PickupStuffUpdate );
 		addModule( HitReactionBehavior );
 		addModule( HordeMemberCollide );
+		addModule( ExperienceLevelCreate );
+		addModule( LevelUpUpgrade );
+		addModule( LevelGrantSpecialPower );
+		addModule( ShareExperienceBehavior );
 		addModule( CastleMemberBehavior );
 		addModule( CastleBehavior );
 		addModule( CastleUpgrade );

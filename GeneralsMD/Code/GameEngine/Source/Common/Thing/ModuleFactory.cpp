@@ -65,6 +65,7 @@
 #include "GameLogic/Module/GarrisonContain.h"
 #include "GameLogic/Module/InternetHackContain.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/RailedTransportContain.h"
 #include "GameLogic/Module/RiderChangeContain.h"
 #include "GameLogic/Module/TransportContain.h"
@@ -472,6 +473,10 @@ void ModuleFactory::init()
 		addModule( PickupStuffUpdate );
 		addModule( HitReactionBehavior );
 		addModule( HordeMemberCollide );
+		addModule( ExperienceLevelCreate );
+		addModule( LevelUpUpgrade );
+		addModule( LevelGrantSpecialPower );
+		addModule( ShareExperienceBehavior );
 		addModule( CastleMemberBehavior );
 		addModule( CastleBehavior );
 		addModule( CastleUpgrade );

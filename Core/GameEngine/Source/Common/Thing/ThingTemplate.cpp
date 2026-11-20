@@ -1481,7 +1481,7 @@ ThingTemplate::ThingTemplate() :
 		// -1 means "same value as experienceValues for that level"
 		m_skillPointValues[levelIndex] = USE_EXP_VALUE_FOR_SKILL_VALUE;
 	}
-	m_isTrainable = FALSE;
+	m_isTrainable = RetailFileLayers::enabled();
 	m_enterGuard = FALSE;
 	m_hijackGuard = FALSE;
 

@@ -314,6 +314,7 @@ const char* const specialPowerFlags[] =
 	{ "PalantirMovie", INI::parseAsciiString, nullptr, offsetof( SpecialPowerTemplate, m_palantirMovie ) },
 
 	{ "ReloadTime",								INI::parseDurationUnsignedInt,		nullptr,	offsetof( SpecialPowerTemplate, m_reloadTime ) },
+	{ "RequiredLevel", INI::parseInt, nullptr, offsetof(SpecialPowerTemplate, m_requiredRank) },
 	{ "RequiredScience",					INI::parseScience,								nullptr, offsetof( SpecialPowerTemplate, m_requiredScience ) },
 	{ "InitiateSound",						INI::parseAudioEventRTS,					nullptr,	offsetof( SpecialPowerTemplate, m_initiateSound ) },
 	{ "InitiateAtLocationSound",	INI::parseAudioEventRTS,					nullptr,	offsetof( SpecialPowerTemplate, m_initiateAtLocationSound ) },

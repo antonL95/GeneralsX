@@ -183,26 +183,27 @@ Bool SalvageCrateCollide::executeRetailPickup(Object* other)
 			const auto levelUp = [&levels](Object* unit)
 			{
 				ExperienceTracker* tracker = unit->getExperienceTracker();
-				if (!unit->isEffectivelyDead() && tracker && tracker->isTrainable())
-				{
-					const auto previous = tracker->getVeterancyLevel();
-					tracker->gainExpForLevel(1, FALSE);
-					levels += tracker->getVeterancyLevel() > previous;
-				}
+				if (!unit->isEffectivelyDead() && tracker)
+					levels += tracker->gainRetailLevels(1);
 			};
 			if (data->m_levelUpRadius > 0.0f)
 			{
 				PartitionFilterSamePlayer filter(player);
 				PartitionFilter* filters[] = { &filter, nullptr };
-				ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(other,
+				ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(other->getPosition(),
 					data->m_levelUpRadius, FROM_CENTER_2D, filters, ITER_FASTEST);
 				MemoryPoolObjectHolder hold(iter);
-				std::vector<Object*> units;
+				std::vector<ObjectID> units;
 				for (Object* unit = iter->first(); unit; unit = iter->next())
-					units.push_back(unit);
-				std::sort(units.begin(), units.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
-				for (Object* unit : units)
-					levelUp(unit);
+				{
+					Object* horde = HordeContain::getAnchor(unit);
+					units.push_back(horde ? horde->getID() : unit->getID());
+				}
+				std::sort(units.begin(), units.end());
+				units.erase(std::unique(units.begin(), units.end()), units.end());
+				for (ObjectID id : units)
+					if (Object* unit = TheGameLogic->findObjectByID(id))
+						levelUp(unit);
 			}
 			else
 			{

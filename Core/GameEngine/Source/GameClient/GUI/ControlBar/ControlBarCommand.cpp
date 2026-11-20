@@ -42,6 +42,7 @@
 #include "Common/Upgrade.h"
 #include "Common/BuildAssistant.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/BattlePlanUpdate.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/OverchargeBehavior.h"
@@ -1052,6 +1053,9 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 
 	if (obj == nullptr)
 		return COMMAND_HIDDEN;	// probably better than crashing....
+
+	if (RetailFileLayers::enabled() && command->getRequiredRank() > obj->getExperienceTracker()->getRank())
+		return COMMAND_RESTRICTED;
 
 	Player *player = obj->getControllingPlayer();
 

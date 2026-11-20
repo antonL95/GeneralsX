@@ -29,7 +29,9 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
+#include "GameLogic/ExperienceLevelStore.h"
 #include "Common/ThingTemplate.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
@@ -60,12 +62,17 @@ Int ExperienceTracker::getExperienceValue( const Object* killer ) const
 	if( killer->getRelationship( m_parent ) == ALLIES )
 		return 0;
 
+	if (RetailFileLayers::enabled())
+		return ExperienceLevelStore::award(m_parent, m_retailThreshold);
+
 	return m_parent->getTemplate()->getExperienceValue(m_currentLevel);
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ExperienceTracker::isTrainable() const
 {
+	if (RetailFileLayers::enabled())
+		return m_isTrainable && ExperienceLevelStore::nextThreshold(m_parent, 0) != 0;
 	return m_isTrainable;
 }
 
@@ -103,6 +110,11 @@ ObjectID ExperienceTracker::getExperienceSink() const
 // Set Level to AT LEAST this... if we are already >= this level, do nothing.
 void ExperienceTracker::setMinVeterancyLevel( VeterancyLevel newLevel, Bool provideFeedback )
 {
+	if (RetailFileLayers::enabled())
+	{
+		setMinRetailRank(static_cast<Int>(newLevel) + 1, provideFeedback);
+		return;
+	}
 	// This does not check for IsTrainable, because this function is for explicit setting,
 	// so the setter is assumed to know what they are doing.  The game function
 	// of addExperiencePoints cares about Trainability.
@@ -119,6 +131,11 @@ void ExperienceTracker::setMinVeterancyLevel( VeterancyLevel newLevel, Bool prov
 //-------------------------------------------------------------------------------------------------
 void ExperienceTracker::setVeterancyLevel( VeterancyLevel newLevel, Bool provideFeedback )
 {
+	if (RetailFileLayers::enabled())
+	{
+		setMinRetailRank(static_cast<Int>(newLevel) + 1, provideFeedback);
+		return;
+	}
 	// This does not check for IsTrainable, because this function is for explicit setting,
 	// so the setter is assumed to know what they are doing.  The game function
 	// of addExperiencePoints cares about Trainability, if flagged thus.
@@ -135,6 +152,8 @@ void ExperienceTracker::setVeterancyLevel( VeterancyLevel newLevel, Bool provide
 //-------------------------------------------------------------------------------------------------
 Bool ExperienceTracker::gainExpForLevel(Int levelsToGain, Bool canScaleForBonus)
 {
+	if (RetailFileLayers::enabled())
+		return gainRetailLevels(levelsToGain);
 	Int newLevel = (Int)m_currentLevel + levelsToGain;
 	if (newLevel > LEVEL_LAST)
 		newLevel = LEVEL_LAST;
@@ -151,6 +170,11 @@ Bool ExperienceTracker::gainExpForLevel(Int levelsToGain, Bool canScaleForBonus)
 //-------------------------------------------------------------------------------------------------
 Bool ExperienceTracker::canGainExpForLevel(Int levelsToGain) const
 {
+	if (RetailFileLayers::enabled())
+	{
+		const Int current = m_retailThreshold ? m_retailThreshold : ExperienceLevelStore::nextThreshold(m_parent, 0);
+		return levelsToGain > 0 && isTrainable() && ExperienceLevelStore::nextThreshold(m_parent, current) != 0;
+	}
 	Int newLevel = (Int)m_currentLevel + levelsToGain;
 	// return true if we can gain levels, even if we can't gain ALL the levels requested
 	if (newLevel > LEVEL_LAST)
@@ -161,6 +185,12 @@ Bool ExperienceTracker::canGainExpForLevel(Int levelsToGain) const
 //-------------------------------------------------------------------------------------------------
 void ExperienceTracker::addExperiencePoints( Int experienceGain, Bool canScaleForBonus)
 {
+	if (RetailFileLayers::enabled())
+	{
+		if (Object* recipient = ExperienceLevelStore::recipientFor(m_parent))
+			recipient->getExperienceTracker()->addRetailExperience(experienceGain, canScaleForBonus);
+		return;
+	}
 	if( m_experienceSink != INVALID_ID )
 	{
 		// I have been set up to give my experience to someone else
@@ -206,6 +236,11 @@ void ExperienceTracker::addExperiencePoints( Int experienceGain, Bool canScaleFo
 //-------------------------------------------------------------------------------------------------
 void ExperienceTracker::setExperienceAndLevel( Int experienceIn, Bool provideFeedback )
 {
+	if (RetailFileLayers::enabled())
+	{
+		advanceRetailLevel(experienceIn, provideFeedback);
+		return;
+	}
 	if( m_experienceSink != INVALID_ID )
 	{
 		// I have been set up to give my experience to someone else
@@ -247,6 +282,12 @@ void ExperienceTracker::setExperienceAndLevel( Int experienceIn, Bool provideFee
 //-----------------------------------------------------------------------------
 void ExperienceTracker::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+	{
+		xfer->xferInt(&m_retailThreshold);
+		xfer->xferInt(&m_retailStartingRank);
+		xfer->xferReal(&m_retailExperience);
+	}
 	xfer->xferInt( &m_currentExperience );
 	xfer->xferUser( &m_currentLevel, sizeof( VeterancyLevel ) );
 #if !RETAIL_COMPATIBLE_CRC
@@ -270,6 +311,8 @@ void ExperienceTracker::xfer( Xfer *xfer )
 #else
 	XferVersion currentVersion = 2;
 #endif
+	if (RetailFileLayers::enabled())
+		currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -290,6 +333,12 @@ void ExperienceTracker::xfer( Xfer *xfer )
 
 	if (version >= 2)
 		xfer->xferBool(&m_isTrainable);
+	if (version >= 3)
+	{
+		xfer->xferInt(&m_retailThreshold);
+		xfer->xferInt(&m_retailStartingRank);
+		xfer->xferReal(&m_retailExperience);
+	}
 }
 
 //-----------------------------------------------------------------------------

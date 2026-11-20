@@ -30,6 +30,8 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "GameLogic/ExperienceTracker.h"
+
 #include <memory>
 
 #include "Common/GameAudio.h"
@@ -99,6 +101,7 @@ SpecialPowerModuleData::SpecialPowerModuleData()
 	static const FieldParse dataFieldParse[] =
 	{
 		{ "SpecialPowerTemplate",			INI::parseSpecialPowerTemplate, nullptr, offsetof( SpecialPowerModuleData, m_specialPowerTemplate ) },
+		{ "RequiredLevel", INI::parseInt, nullptr, offsetof(SpecialPowerModuleData, m_requiredRank) },
 		{ "UpdateModuleStartsAttack", INI::parseBool,									nullptr, offsetof( SpecialPowerModuleData, m_updateModuleStartsAttack ) },
 		{ "StartsPaused",							INI::parseBool,									nullptr, offsetof( SpecialPowerModuleData, m_startsPaused ) },
 		{ "StartsReady",							INI::parseBool,									nullptr, offsetof( SpecialPowerModuleData, m_startsReady ) },
@@ -354,8 +357,16 @@ Bool SpecialPowerModule::isModuleForPower( const SpecialPowerTemplate *specialPo
 //-------------------------------------------------------------------------------------------------
 /** Is this special power ready to use */
 //-------------------------------------------------------------------------------------------------
+Int SpecialPowerModule::getRequiredRank() const
+{
+	const auto* data = getSpecialPowerModuleData();
+	return data->m_specialPowerTemplate ? std::max(data->m_requiredRank, data->m_specialPowerTemplate->getRequiredRank()) : data->m_requiredRank;
+}
+
 Bool SpecialPowerModule::isReady() const
 {
+	if (RetailFileLayers::enabled() && getRequiredRank() > 0 && getObject()->getExperienceTracker()->getRank() < getRequiredRank())
+		return FALSE;
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// this is a cheat ... remove this for release!
 	if( TheGlobalData->m_specialPowerUsesDelay == FALSE )
@@ -388,6 +399,8 @@ Bool SpecialPowerModule::isReady() const
 //-------------------------------------------------------------------------------------------------
 Real SpecialPowerModule::getPercentReady() const
 {
+	if (RetailFileLayers::enabled() && getRequiredRank() > 0 && getObject()->getExperienceTracker()->getRank() < getRequiredRank())
+		return 0.0f;
 	if( m_pausedCount > 0 && m_pausedPercent == 1.0f )
 	{
 			//Don't consider it ready if paused.

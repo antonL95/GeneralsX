@@ -17,6 +17,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/Display.h"
 #include "GameClient/DisplayString.h"
+#include "GameClient/DisplayStringManager.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/Gadget.h"
 #include "GameClient/GadgetPushButton.h"
@@ -31,6 +32,8 @@
 #include "GameClient/Mouse.h"
 
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/ExperienceLevelStore.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
@@ -256,6 +259,11 @@ WindowMsgHandledType retailSideBarInput(GameWindow *, UnsignedInt msg, WindowMsg
 void retailCommandTooltip(GameWindow *window, WinInstanceData *, UnsignedInt)
 {
 	TheControlBar->showRetailCommandTooltip(window);
+}
+
+void retailLevelTooltip(GameWindow *, WinInstanceData *, UnsignedInt)
+{
+	TheControlBar->showRetailLevelTooltip();
 }
 
 void setRetailRightClick(GameWindow *window, Bool enabled)
@@ -487,7 +495,33 @@ void ControlBar::drawRetailTexts() const
 	drawTextWindow(m_retailResources, 0, text);
 	drawTextWindow(m_retailCommandPoints, 1, text);
 	if (!m_retailPortrait->winIsHidden())
-		drawTextWindow(m_retailSelectionName, 2, GameMakeColor(255, 255, 255, 255));
+	{
+		const Object* object = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+		if (ExperienceLevelStore::maximumRank(object) > 0)
+		{
+			const auto* tracker = object->getExperienceTracker();
+			Int x, y, width, height;
+			windowRect(m_retailPortrait, x, y, width, height);
+			const Int barWidth = std::max(8, width / 2);
+			const Int barHeight = std::max(4, height / 24);
+			const Int left = x + (width - barWidth) / 2;
+			const Int top = y + height * 4 / 5;
+			const Int fill = static_cast<Int>((barWidth - 2) * tracker->getLevelProgress());
+			TheDisplay->drawFillRect(left, top, barWidth, barHeight, GameMakeColor(29, 21, 10, 240));
+			if (fill > 0)
+				TheDisplay->drawFillRect(left + 1, top + 1, fill, barHeight - 2, GameMakeColor(232, 183, 51, 255));
+			TheDisplay->drawOpenRect(left, top, barWidth, barHeight, 1.0f, GameMakeColor(199, 164, 94, 255));
+			UnicodeString level;
+			level.format(L"Level: %d", tracker->getRank());
+			DisplayString* label = TheDisplayStringManager->newDisplayString();
+			label->setFont(m_retailSelectionName->winGetFont());
+			label->setText(level);
+			drawShadowedText(label, x, top - height / 5, width, height / 5, 2, text);
+			TheDisplayStringManager->freeDisplayString(label);
+		}
+		else
+			drawTextWindow(m_retailSelectionName, 2, GameMakeColor(255, 255, 255, 255));
+	}
 	if (m_currContext == CB_CONTEXT_COMMAND && m_currentSelectedDrawable)
 		drawRetailCitadelQueue(m_currentSelectedDrawable->getObject(), m_retailResources->winGetParent());
 }
@@ -588,6 +622,19 @@ CommandAvailability ControlBar::getRetailButtonAvailability(GameWindow *window) 
 	return m_retailAvailability[slot];
 }
 
+void ControlBar::showRetailLevelTooltip() const
+{
+	const Object* object = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+	const Int maximum = ExperienceLevelStore::maximumRank(object);
+	if (!TheMouse || maximum <= 0)
+		return;
+	UnicodeString tooltip = object->getTemplate()->getDisplayName();
+	UnicodeString levels;
+	levels.format(L"\nLevel: %d\nMaximum Level: %d", object->getExperienceTracker()->getRank(), maximum);
+	tooltip.concat(levels);
+	TheMouse->setRetailCommandTooltip(tooltip);
+}
+
 Int ControlBar::getRetailCommandCost(const CommandButton *command, const GameWindow *window) const
 {
 	Object *obj = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
@@ -670,7 +717,33 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 	}
 	const CommandAvailability availability = getRetailButtonAvailability(window);
 	UnicodeString reason;
-	if (availability == COMMAND_CANT_AFFORD)
+	const Object* selected = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+	Int requiredRank = command->getRequiredRank();
+	if (selected && (availability == COMMAND_RESTRICTED || availability == COMMAND_NOT_READY))
+	{
+		requiredRank = std::max(requiredRank, ExperienceLevelStore::rankForPower(selected, command->getSpecialPowerTemplate()));
+		if (!HeroRoster::buttonUpgradesMet(command, selected->getControllingPlayer(), selected))
+		{
+			Int upgradeRank = 0;
+			for (const UpgradeTemplate* upgrade : command->getNeededUpgrades())
+			{
+				const Int rank = ExperienceLevelStore::rankForUpgrade(selected, upgrade->getUpgradeName());
+				if (command->isNeededUpgradeAny() && !rank)
+				{
+					upgradeRank = 0;
+					break;
+				}
+				if (command->isNeededUpgradeAny())
+					upgradeRank = rank && upgradeRank ? std::min(rank, upgradeRank) : rank;
+				else
+					upgradeRank = std::max(rank, upgradeRank);
+			}
+			requiredRank = std::max(requiredRank, upgradeRank);
+		}
+	}
+	if (selected && requiredRank > selected->getExperienceTracker()->getRank())
+		reason.format(L"Requires Level %d", requiredRank);
+	else if (availability == COMMAND_CANT_AFFORD)
 		reason = TheGameText->fetchOrSubstitute("TOOLTIP:TooltipNotEnoughMoneyToBuild", L"Not enough resources");
 	else if (availability == COMMAND_RESTRICTED)
 	{
@@ -687,18 +760,6 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 		else
 		{
 			reason = TheGameText->fetchOrSubstitute(command->getLacksPrerequisiteLabel().str(), L"");
-			if (reason.isEmpty() && obj && !HeroRoster::buttonUpgradesMet(command, obj->getControllingPlayer(), obj))
-			{
-				for (const UpgradeTemplate *upgrade : command->getNeededUpgrades())
-				{
-					const AsciiString &name = upgrade->getUpgradeName();
-					if (name.startsWith("Upgrade_ObjectLevel") || name.startsWith("Upgrade_StructureLevel"))
-					{
-						reason.set(L"Requires a higher level");
-						break;
-					}
-				}
-			}
 			if (reason.isEmpty())
 			{
 				if (makeType == CANMAKE_NO_PREREQ || !command->getNeededUpgrades().empty() || (obj && unit && !obj->getControllingPlayer()->canBuild(unit)))
@@ -739,6 +800,7 @@ void ControlBar::initRetailHud()
 	frame->winSetDrawFunc(drawRetailPalantirFrame);
 	m_retailPortrait->winSetDrawFunc(drawRetailPortrait);
 	m_retailPortrait->winSetInputFunc(retailPortraitInput);
+	m_retailPortrait->winSetTooltipFunc(retailLevelTooltip);
 
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
 	{

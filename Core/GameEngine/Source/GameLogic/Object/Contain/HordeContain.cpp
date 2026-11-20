@@ -15,6 +15,9 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/ExperienceTracker.h"
+#include "Common/GameState.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/WeaponSet.h"
 #include "GameLogic/WeaponSetFlags.h"
@@ -380,6 +383,8 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 		toggles.set(flag, getObject()->testWeaponSetFlag(flag));
 	if (toggles.any())
 		rider->setWeaponSetFlags(toggles, TRUE);
+	if (RetailFileLayers::enabled() && (!TheGameState || !TheGameState->isInLoadGame()))
+		rider->getExperienceTracker()->setMinRetailRank(getObject()->getExperienceTracker()->getRank());
 	const UpgradeMaskType hordeUpgrades = getObject()->getObjectCompletedUpgradeMask();
 	if (hordeUpgrades.any() && TheUpgradeCenter)
 	{

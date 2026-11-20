@@ -93,6 +93,7 @@ set(GAMEENGINE_SRC
     Include/Common/INIRetailTolerance.h
     Include/Common/HordeFormation.h
     Include/GameLogic/Module/HordeContain.h
+    Include/GameLogic/Module/ExperienceModules.h
     Include/GameLogic/Module/HordeAIUpdate.h
     Include/Common/RetailFileLayers.h
     Include/Common/INILegacyLines.h

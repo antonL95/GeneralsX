@@ -45,6 +45,7 @@
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/ExperienceLevelStore.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
@@ -2755,6 +2756,8 @@ Bool Object::isMobile() const
 //-------------------------------------------------------------------------------------------------
 void Object::scoreTheKill( const Object *victim )
 {
+	if (RetailFileLayers::enabled())
+		ExperienceLevelStore::scoreKill(this, victim);
 	// Do stuff that has nothing to do with experience points here, like tell our Player we killed something
 	/// @todo Multiplayer score hook location?
 
@@ -2796,7 +2799,7 @@ void Object::scoreTheKill( const Object *victim )
 	}
 
 	// Now handle experience, if we can gain any
-	if (m_experienceTracker && m_experienceTracker->isAcceptingExperiencePoints())
+	if (!RetailFileLayers::enabled() && m_experienceTracker && m_experienceTracker->isAcceptingExperiencePoints())
 	{
 		// srj sez: per dustin, no experience (et al) for killing things under construction.
 		if (!victim->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))

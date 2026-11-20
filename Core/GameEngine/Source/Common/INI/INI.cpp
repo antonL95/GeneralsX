@@ -37,6 +37,7 @@
 #include "Common/INIAudit.h"
 #include "Common/INIBlockStructure.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/ExperienceLevelStore.h"
 #include "Common/RotwkDuration.h"
 #include "Common/INIException.h"
 #include "Common/INILegacyLines.h"
@@ -507,6 +508,8 @@ void INI::unPrepFile()
 //-------------------------------------------------------------------------------------------------
 static INIBlockParse findBlockParse(const char* token)
 {
+	if (RetailFileLayers::enabled() && strcmp(token, "ExperienceScalarTable") == 0)
+		return ExperienceLevelStore::parseScalarTable;
 	if (!INIAudit::isEnabled() && RetailFileLayers::enabled() && strcmp(token, "PlayerAIType") == 0)
 		return BfmeMapScripts::parsePlayerAIType;
 	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "FXParticleSystem") == 0)

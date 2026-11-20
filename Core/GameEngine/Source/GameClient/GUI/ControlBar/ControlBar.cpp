@@ -56,6 +56,7 @@
 #include "Common/Recorder.h"
 
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/OCLUpdate.h"
@@ -137,6 +138,7 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 	{ "InPalantir", INI::parseBool, nullptr, offsetof(CommandButton, m_inPalantir) },
 	{ "Radial", INI::parseBool, nullptr, offsetof(CommandButton, m_radial) },
 	{ "NeededUpgrade", CommandButton::parseNeededUpgrades, nullptr, offsetof(CommandButton, m_neededUpgrades) },
+	{ "RequiredLevel", INI::parseInt, nullptr, offsetof(CommandButton, m_requiredRank) },
 	{ "NeededUpgradeAny", INI::parseBool, nullptr, offsetof(CommandButton, m_neededUpgradeAny) },
 	{ "LacksPrerequisiteLabel", INI::parseAsciiString, nullptr, offsetof(CommandButton, m_lacksPrerequisiteLabel) },
 	{ "ShowProductionCount", INI::parseBool, nullptr, offsetof(CommandButton, m_showProductionCount) },
@@ -716,6 +718,9 @@ Bool CommandButton::isValidObjectTarget(const Object* sourceObj, const Object* t
 //-------------------------------------------------------------------------------------------------
 Bool CommandButton::isValidToUseOn(const Object *sourceObj, const Object *targetObj, const Coord3D *targetLocation, CommandSourceType commandSource) const
 {
+	if (RetailFileLayers::enabled() && m_requiredRank > 0 &&
+		(!sourceObj || sourceObj->getExperienceTracker()->getRank() < m_requiredRank))
+		return FALSE;
 	if (m_upgradeTemplate) {
 		// @todo: Make a const version of pui. We're not altering the production queue, so this const-cast
 		// is okay.

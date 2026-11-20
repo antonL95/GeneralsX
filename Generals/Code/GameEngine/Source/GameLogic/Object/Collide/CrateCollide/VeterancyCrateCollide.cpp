@@ -31,6 +31,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "Common/Xfer.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
@@ -90,6 +91,8 @@ Bool VeterancyCrateCollide::isValidToExecute( const Object *other ) const
 	if (levelsToGain <= 0)
 		return false;
 
+	if (RetailFileLayers::enabled() && !d->m_isPilot && HordeContain::get(other->getContainedBy()))
+		other = other->getContainedBy();
 	const ExperienceTracker *et = other->getExperienceTracker();
 	if( !et || !et->isTrainable() )
 	{
@@ -101,7 +104,7 @@ Bool VeterancyCrateCollide::isValidToExecute( const Object *other ) const
 		return false;
 
 	if (RetailFileLayers::enabled() && d->m_affectsUpToLevel > 0 &&
-		et->getVeterancyLevel() + 1 >= d->m_affectsUpToLevel)
+		et->getRank() >= d->m_affectsUpToLevel)
 		return FALSE;
 
 	if( d->m_isPilot )
@@ -139,6 +142,12 @@ Bool VeterancyCrateCollide::executeCrateBehavior( Object *other )
  		return false;
  	}
 
+	if (RetailFileLayers::enabled() && !md->m_isPilot)
+	{
+		Object* horde = HordeContain::getAnchor(other);
+		Object* recipient = horde ? horde : other;
+		return recipient->getExperienceTracker()->gainRetailLevels(getLevelsToGain(), md->m_affectsUpToLevel);
+	}
 	Int levelsToGain = getLevelsToGain();
 	Real range = md->m_rangeOfEffect;
 	if (range == 0)

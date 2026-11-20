@@ -42,3 +42,11 @@ TEST(ExperienceLevelRulesTest, NextLevelSkipsReachedRequirements)
 	EXPECT_EQ(ExperienceLevelRules::nextLevel(levels, 1, true), std::optional<std::size_t>(2));
 	EXPECT_FALSE(ExperienceLevelRules::nextLevel(levels, 4, true).has_value());
 }
+
+TEST(ExperienceLevelRulesTest, ProgressUsesTheCurrentLevelAsItsOrigin)
+{
+	EXPECT_FLOAT_EQ(ExperienceLevelRules::progress(75.0f, 50, 150), 0.25f);
+	EXPECT_FLOAT_EQ(ExperienceLevelRules::progress(25.0f, 50, 150), 0.0f);
+	EXPECT_FLOAT_EQ(ExperienceLevelRules::progress(175.0f, 50, 150), 1.0f);
+	EXPECT_FLOAT_EQ(ExperienceLevelRules::progress(75.0f, 50, 50), 1.0f);
+}

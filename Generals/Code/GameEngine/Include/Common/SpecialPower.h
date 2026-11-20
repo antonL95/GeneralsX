@@ -113,6 +113,7 @@ public:
 	UnsignedInt getID() const { return getFO()->m_id; }
 	SpecialPowerType getSpecialPowerType() const { return getFO()->m_type; }
 	UnsignedInt getReloadTime() const { return getFO()->m_reloadTime; }
+	Int getRequiredRank() const { return getFO()->m_requiredRank; }
 	ScienceType getRequiredScience() const { return getFO()->m_requiredScience; }
 	const AudioEventRTS *getInitiateSound() const { return &getFO()->m_initiateSound; }
 	const AudioEventRTS *getInitiateAtTargetSound() const { return &getFO()->m_initiateAtLocationSound; }
@@ -133,6 +134,7 @@ private:
 	UnsignedInt				m_id;									///< unique identifier
 	SpecialPowerType	m_type;								///< enum allowing for fast type checking for ability processing.
 	UnsignedInt				m_reloadTime;					///< (frames) after using special power, how long it takes to use again
+	Int m_requiredRank = 0;
 	ScienceType				m_requiredScience;		///< science required (if any) to actually execute this power
 	AudioEventRTS			m_initiateSound;			///< sound to play when initiated
 	AudioEventRTS			m_initiateAtLocationSound;		///< sound to play at target location (if any)

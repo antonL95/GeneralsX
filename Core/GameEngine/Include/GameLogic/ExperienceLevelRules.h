@@ -1,11 +1,17 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <optional>
 #include <vector>
 
 namespace ExperienceLevelRules
 {
+inline float progress(float experience, int current, int next)
+{
+	return next > current ? std::clamp((experience - current) / (next - current), 0.0f, 1.0f) : 1.0f;
+}
+
 struct Candidate
 {
 	int requiredExperience;

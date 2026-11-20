@@ -392,6 +392,7 @@ public:
 	Bool isInPalantir() const { return m_inPalantir; }
 	Bool isRadial() const { return m_radial; }
 	UnsignedInt getRotwkOptions() const { return m_rotwkOptions; }
+	Int getRequiredRank() const { return m_requiredRank; }
 	Bool hasRotwkOption(UnsignedInt option) const { return (m_rotwkOptions & option) != 0; }
 	const std::vector<const UpgradeTemplate*>& getNeededUpgrades() const { return m_neededUpgrades; }
 	Bool isNeededUpgradeAny() const { return m_neededUpgradeAny; }
@@ -464,6 +465,7 @@ private:
 	Bool											m_inPalantir = FALSE;
 	Bool											m_radial = FALSE;
 	UnsignedInt m_rotwkOptions = 0;
+	Int m_requiredRank = 0;
 	std::vector<const UpgradeTemplate*> m_neededUpgrades;
 	Bool m_neededUpgradeAny = FALSE;
 	AsciiString m_lacksPrerequisiteLabel;
@@ -1054,6 +1056,7 @@ public:
 	Bool closeRetailTray();
 	Bool isOverRetailTray(Int x, Int y) const;
 	Bool executeRetailTrayHotKey(const AsciiString& key, GameWindow *mappedControl = nullptr);
+	void showRetailLevelTooltip() const;
 
 protected:
 

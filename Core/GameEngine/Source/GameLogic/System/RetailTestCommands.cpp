@@ -46,6 +46,7 @@
 #include "GameLogic/GhostObject.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "Common/SpecialPower.h"
@@ -159,11 +160,13 @@ void load()
 	std::fclose(file);
 }
 
-Object* findObject(const Command& command)
+Object* findObject(const Command& command, bool livingOnly = false)
 {
 	std::vector<Object*> matches;
 	for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
 	{
+		if (livingOnly && obj->isEffectivelyDead())
+			continue;
 		const Player* owner = obj->getControllingPlayer();
 		if (!owner || stricmp(obj->getTemplate()->getName().str(), command.target.c_str()) != 0)
 			continue;
@@ -465,7 +468,7 @@ void createObject(const Command& command, unsigned int frame)
 		command.player.c_str(), static_cast<unsigned>(obj->getID()), x, y);
 }
 
-Object* findTarget(const Command& command)
+Object* findTarget(const Command& command, bool livingOnly = false)
 {
 	Command target;
 	char player[64] = {};
@@ -474,7 +477,7 @@ Object* findTarget(const Command& command)
 		return nullptr;
 	target.player = player;
 	target.target = name;
-	return findObject(target);
+	return findObject(target, livingOnly);
 }
 
 void attackObject(const Command& command, Object* obj, unsigned int frame)
@@ -801,6 +804,34 @@ void roundTripBuilder(Object* obj, unsigned int frame)
 	std::remove(file.str());
 	std::fprintf(stderr, "TEST builder snapshot %u restored task=%d target=%u\n", frame,
 		static_cast<int>(dozer->getCurrentTask()), static_cast<unsigned>(dozer->getTaskTarget(DOZER_TASK_BUILD)));
+}
+
+void roundTripExperience(Object* obj, unsigned int frame)
+{
+	const char* directory = std::getenv("XDG_RUNTIME_DIR");
+	if (!directory)
+		return;
+	AsciiString file;
+	file.format("%s/experience-snapshot", directory);
+	ExperienceTracker* tracker = obj->getExperienceTracker();
+	XferSave save;
+	save.open(file);
+	save.xferSnapshot(tracker);
+	save.close();
+
+	ExperienceTracker* restored = newInstance(ExperienceTracker)(obj);
+	MemoryPoolObjectHolder hold(restored);
+	XferLoad load;
+	load.setOptions(XO_NO_POST_PROCESSING);
+	load.open(file);
+	load.xferSnapshot(restored);
+	load.close();
+	std::remove(file.str());
+	const Bool same = tracker->getRetailExperience() == restored->getRetailExperience() &&
+		tracker->getRetailThreshold() == restored->getRetailThreshold() &&
+		tracker->getRetailStartingRank() == restored->getRetailStartingRank() && tracker->getRank() == restored->getRank();
+	std::fprintf(stderr, "TEST xp-snapshot frame=%u rank=%d xp=%.3f exact=%d\n", frame, restored->getRank(),
+		restored->getRetailExperience(), same);
 }
 
 void logAllObjects(unsigned int frame)
@@ -1253,6 +1284,31 @@ void execute(const Command& command, unsigned int frame)
 			command.target.c_str());
 		obj->kill();
 	}
+	else if (command.action == "killby")
+	{
+		Object* victim = findTarget(command, true);
+		if (victim && !victim->isEffectivelyDead() && victim->getBodyModule())
+		{
+			DamageInfo damage;
+			damage.in.m_damageType = DAMAGE_UNRESISTABLE;
+			damage.in.m_deathType = DEATH_NORMAL;
+			damage.in.m_sourceID = obj->getID();
+			damage.in.m_amount = victim->getBodyModule()->getMaxHealth();
+			damage.in.m_kill = TRUE;
+			victim->attemptDamage(&damage);
+			std::fprintf(stderr, "TEST xp-kill frame=%u killer=%u victim=%u dead=%d\n", frame,
+				static_cast<unsigned>(obj->getID()), static_cast<unsigned>(victim->getID()), victim->isEffectivelyDead());
+		}
+	}
+	else if (command.action == "xpstate")
+	{
+		const auto* tracker = obj->getExperienceTracker();
+		std::fprintf(stderr, "TEST xp-state frame=%u object=%u %s rank=%d max=%d xp=%.3f progress=%.3f\n", frame,
+			static_cast<unsigned>(obj->getID()), obj->getTemplate()->getName().str(), tracker->getRank(),
+			ExperienceLevelStore::maximumRank(obj), tracker->getRetailExperience(), tracker->getLevelProgress());
+	}
+	else if (command.action == "xpsnapshot")
+		roundTripExperience(obj, frame);
 	else if (command.action == "destroy")
 	{
 		std::fprintf(stderr, "TEST frame %u: destroy object %u (%s)\n", frame, static_cast<unsigned>(obj->getID()),

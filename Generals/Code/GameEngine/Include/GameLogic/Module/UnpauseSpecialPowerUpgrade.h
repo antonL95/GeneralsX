@@ -66,6 +66,7 @@ class UnpauseSpecialPowerUpgrade : public UpgradeModule
 public:
 
 	UnpauseSpecialPowerUpgrade( Thing *thing, const ModuleData* moduleData );
+	const UnpauseSpecialPowerUpgradeModuleData* getUnpauseData() const { return getUnpauseSpecialPowerUpgradeModuleData(); }
 	// virtual destructor prototype defined by MemoryPoolObject
 
 protected:

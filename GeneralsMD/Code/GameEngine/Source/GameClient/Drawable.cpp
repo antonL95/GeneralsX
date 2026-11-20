@@ -53,6 +53,7 @@
 #include "Common/Xfer.h"
 
 #include "GameLogic/ExperienceTracker.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/GameLogic.h"		// for logic frame count
 #include "GameLogic/Object.h"
 #include "GameLogic/Locomotor.h"
@@ -3762,6 +3763,28 @@ void Drawable::drawVeterancy( const IRegion2D *healthBarRegion )
 	if( obj->getExperienceTracker() == nullptr )
 	{
 		//Only objects with experience trackers can possibly have veterancy.
+		return;
+	}
+
+	if (RetailFileLayers::enabled())
+	{
+		const Int stars = std::min(4, obj->getExperienceTracker()->getRank() - 1);
+		if (stars <= 0 || obj->isKindOf(KINDOF_HERO) || !obj->isKindOf(KINDOF_INFANTRY))
+			return;
+		Coord3D position;
+		ICoord2D center;
+		obj->getHealthBoxPosition(position);
+		if (!TheTacticalView->worldToScreen(&position, &center))
+			return;
+		const Color white = GameMakeColor(248, 244, 231, 255);
+		const Int y = center.y - 9;
+		for (Int i = 0; i < stars; ++i)
+		{
+			const Int x = center.x + i * 7 - (stars - 1) * 7 / 2;
+			TheDisplay->drawLine(x, y - 3, x, y + 3, 1.0f, white);
+			TheDisplay->drawLine(x - 2, y - 1, x + 2, y + 1, 1.0f, white);
+			TheDisplay->drawLine(x - 2, y + 1, x + 2, y - 1, 1.0f, white);
+		}
 		return;
 	}
 
