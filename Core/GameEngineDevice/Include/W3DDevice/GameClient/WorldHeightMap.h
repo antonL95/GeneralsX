@@ -187,7 +187,8 @@ protected:
 	 Use GetUVData to get the mapping info for height cells to map into the
 	 texture. */
 	TerrainTextureClass *m_terrainTex;
-	Int	m_terrainTexHeight; /// Height of m_terrainTex allocated.
+	Int	m_terrainTexHeight;
+	Int m_tilePixelExtent = TILE_PIXEL_EXTENT;
 	/** The texture that contains the alpha edge tiles that get blended on
 			top of the base texture. getAlphaUVData does the mapping. */
 	AlphaTerrainTextureClass *m_alphaTerrainTex;
@@ -274,6 +275,7 @@ public:  // height map info.
 	UnsignedShort *getDataPtr() { return m_data; }
 	unsigned getHeightSampleBytes() const { return m_heightSampleBytes; }
 	Real getHeightScale() const { return m_heightScale; }
+	Int getTilePixelExtent() const { return m_tilePixelExtent; }
 	Real toWorldHeight(Real sample) const { return HeightMapSamples::toWorldHeight(sample, m_heightScale); }
 	std::vector<UnsignedInt> getBfmeLightingAudit() const;
 

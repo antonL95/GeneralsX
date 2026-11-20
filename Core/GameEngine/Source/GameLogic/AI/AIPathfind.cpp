@@ -447,6 +447,8 @@ void Pathfinder::classifyFence( Object *obj, Bool insert )
  */
 void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 {
+	if (m_map == nullptr)
+		return;
 	if (insert && obj->getStatusBits().test(OBJECT_STATUS_MASKED) && ModuleFactory::registersRotwkModules())
 	{
 		const auto* castle = static_cast<const CastleBehavior*>(obj->findUpdateModule(NAMEKEY("CastleBehavior")));
@@ -542,6 +544,8 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 
 void Pathfinder::internal_classifyObjectFootprint( Object *obj, Bool insert )
 {
+	if (m_map == nullptr)
+		return;
 	const Coord3D *pos = obj->getPosition();
 
 #if !(RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING)

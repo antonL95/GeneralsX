@@ -2146,103 +2146,103 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 {
 	Int i, j;
 	Int maxHeight = 0;
-	const Int tilesPerRow = TEXTURE_WIDTH/(TILE_PIXEL_EXTENT+TILE_OFFSET);
-
-	Bool availableGrid[tilesPerRow][tilesPerRow];
 	Int row, column;
-	for (row=0; row<tilesPerRow; row++) {
-		for (column=0; column<tilesPerRow; column++) {
-			availableGrid[row][column] = true;
-		}
-	}
 
-	for (i=0; i<m_numBitmapTiles; i++) {
-		if (m_sourceTiles[i]) {
-			m_sourceTiles[i]->m_tileLocationInTexture.x = 0;
-			m_sourceTiles[i]->m_tileLocationInTexture.y = 0;
-		}
-	}
+	const Int candidateExtents[] = { TILE_PIXEL_EXTENT, TILE_PIXEL_EXTENT_MIP1, TILE_PIXEL_EXTENT_MIP2 };
+	const Int numCandidates = m_heightSampleBytes > 1 ? 3 : 1;
+	m_tilePixelExtent = TILE_PIXEL_EXTENT;
 
-	/* put the normal tiles into the terrain texture */
-	Int texClass;
-	Int tileWidth;
-	for (tileWidth = tilesPerRow; tileWidth>0; tileWidth--) {
-		for (texClass=0; texClass<m_numTextureClasses; texClass++) {
-			Int width = m_textureClasses[texClass].width;
-			if (width != tileWidth) continue;
-			// Find an available block of space.
-			Bool found = false;
-			for (row=0; row<tilesPerRow-width+1 && !found; row++) {
-				for (column=0; column<tilesPerRow-width+1 && !found; column++) {
-					if (availableGrid[row][column]) {
-						Bool open = true;
-						for (i=0; i<width && open; i++) {
-							for (j=0; j<width&&open; j++) {
-								if (!availableGrid[row+j][column+i]) {
-									open = false;
+	for (Int candidate = 0; candidate < numCandidates; ++candidate) {
+		const Int tileExtent = candidateExtents[candidate];
+		const Int tilesPerRow = TEXTURE_WIDTH / (tileExtent + TILE_OFFSET);
+		std::vector<UnsignedByte> availableGrid(tilesPerRow * tilesPerRow, 1);
+
+		for (i = 0; i < m_numBitmapTiles; i++) {
+			if (m_sourceTiles[i]) {
+				m_sourceTiles[i]->m_tileLocationInTexture.x = 0;
+				m_sourceTiles[i]->m_tileLocationInTexture.y = 0;
+			}
+		}
+
+		maxHeight = 0;
+		Bool allPlaced = true;
+		Int texClass;
+		Int tileWidth;
+		for (tileWidth = tilesPerRow; tileWidth > 0; tileWidth--) {
+			for (texClass = 0; texClass < m_numTextureClasses; texClass++) {
+				Int width = m_textureClasses[texClass].width;
+				if (width != tileWidth) continue;
+				Bool found = false;
+				for (row = 0; row < tilesPerRow - width + 1 && !found; row++) {
+					for (column = 0; column < tilesPerRow - width + 1 && !found; column++) {
+						if (availableGrid[row * tilesPerRow + column]) {
+							Bool open = true;
+							for (i = 0; i < width && open; i++) {
+								for (j = 0; j < width && open; j++) {
+									if (!availableGrid[(row + j) * tilesPerRow + (column + i)]) {
+										open = false;
+									}
 								}
 							}
+							if (open) found = true;
+							break;
 						}
-						if (open) found = true;
-						break;
 					}
+					if (found) break;
 				}
-				if (found) break;
-			}
-			if (!found) {
-				m_textureClasses[texClass].positionInTexture.x = 0;
-				m_textureClasses[texClass].positionInTexture.y = 0;
-				continue;
-			}
+				if (!found) {
+					m_textureClasses[texClass].positionInTexture.x = 0;
+					m_textureClasses[texClass].positionInTexture.y = 0;
+					allPlaced = false;
+					continue;
+				}
 
-			Int xOrigin = TILE_OFFSET/2 + column*(TILE_PIXEL_EXTENT+TILE_OFFSET);
-			Int yOrigin = TILE_OFFSET/2 + row*(TILE_PIXEL_EXTENT+TILE_OFFSET);
-			m_textureClasses[texClass].positionInTexture.x = xOrigin;
-			m_textureClasses[texClass].positionInTexture.y = yOrigin;
-			Int classHeight = yOrigin + width*TILE_PIXEL_EXTENT+ TILE_OFFSET/2;
-			if (maxHeight < classHeight) maxHeight = classHeight;
+				Int xOrigin = TILE_OFFSET / 2 + column * (tileExtent + TILE_OFFSET);
+				Int yOrigin = TILE_OFFSET / 2 + row * (tileExtent + TILE_OFFSET);
+				m_textureClasses[texClass].positionInTexture.x = xOrigin;
+				m_textureClasses[texClass].positionInTexture.y = yOrigin;
+				Int classHeight = yOrigin + width * tileExtent + TILE_OFFSET / 2;
+				if (maxHeight < classHeight) maxHeight = classHeight;
 
-			for (i=0; i<width; i++) {
-				for (j=0; j<width; j++) {
-					availableGrid[row+j][column+i] = false;
-					Int baseNdx = m_textureClasses[texClass].firstTile + i + j*width;
-					// In case we are just checking for room...
-					if (!getSourceTile(baseNdx)) continue;
-					Int x = xOrigin + i*TILE_PIXEL_EXTENT;
-					Int y = yOrigin + (width-j-1)*TILE_PIXEL_EXTENT;
-					m_sourceTiles[baseNdx]->m_tileLocationInTexture.x = x;
-					m_sourceTiles[baseNdx]->m_tileLocationInTexture.y = y;
+				for (i = 0; i < width; i++) {
+					for (j = 0; j < width; j++) {
+						availableGrid[(row + j) * tilesPerRow + (column + i)] = 0;
+						Int baseNdx = m_textureClasses[texClass].firstTile + i + j * width;
+						if (!getSourceTile(baseNdx)) continue;
+						Int x = xOrigin + i * tileExtent;
+						Int y = yOrigin + (width - j - 1) * tileExtent;
+						m_sourceTiles[baseNdx]->m_tileLocationInTexture.x = x;
+						m_sourceTiles[baseNdx]->m_tileLocationInTexture.y = y;
+					}
 				}
 			}
 		}
+
+		m_tilePixelExtent = tileExtent;
+		if (allPlaced)
+			break;
 	}
 
-	for (i=0; i<m_numBitmapTiles; i++) {
+	for (i = 0; i < NUM_SOURCE_TILES; i++) {
 		if (m_edgeTiles[i]) {
 			m_edgeTiles[i]->m_tileLocationInTexture.x = 0;
 			m_edgeTiles[i]->m_tileLocationInTexture.y = 0;
 		}
 	}
 
-	/* put the blend edge tiles into the blend edges texture */
 	Int maxEdgeHeight = 0;
-	// Reset the grid, cause we're using a different texture now.
-	for (row=0; row<tilesPerRow; row++) {
-		for (column=0; column<tilesPerRow; column++) {
-			availableGrid[row][column] = true;
-		}
-	}
-	for (texClass=0; texClass<m_numEdgeTextureClasses; texClass++) {
+	const Int edgeTilesPerRow = TEXTURE_WIDTH / (TILE_PIXEL_EXTENT + TILE_OFFSET);
+	std::vector<UnsignedByte> edgeGrid(edgeTilesPerRow * edgeTilesPerRow, 1);
+	for (Int texClass = 0; texClass < m_numEdgeTextureClasses; texClass++) {
 		Int width = m_edgeTextureClasses[texClass].width;
-		// Find an available block of space.
 		Bool found = false;
-		for (row=0; row<tilesPerRow-width+1 && !found; row++) {
-			for (column=0; column<tilesPerRow-width+1 && !found; column++) {
-				if (availableGrid[row][column]) {
+		for (row = 0; row < edgeTilesPerRow - width + 1 && !found; row++) {
+			for (column = 0; column < edgeTilesPerRow - width + 1 && !found; column++) {
+				if (edgeGrid[row * edgeTilesPerRow + column]) {
 					Bool open = true;
-					for (i=0; i<width && open; i++) {
-						for (j=0; j<width&&open; j++) {
-							if (!availableGrid[row+j][column+i]) {
+					for (i = 0; i < width && open; i++) {
+						for (j = 0; j < width && open; j++) {
+							if (!edgeGrid[(row + j) * edgeTilesPerRow + (column + i)]) {
 								open = false;
 							}
 						}
@@ -2259,22 +2259,20 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 			continue;
 		}
 
-		Int xOrigin = TILE_OFFSET/2 + column*(TILE_PIXEL_EXTENT+TILE_OFFSET);
-		Int yOrigin = TILE_OFFSET/2 + row*(TILE_PIXEL_EXTENT+TILE_OFFSET);
+		Int xOrigin = TILE_OFFSET / 2 + column * (TILE_PIXEL_EXTENT + TILE_OFFSET);
+		Int yOrigin = TILE_OFFSET / 2 + row * (TILE_PIXEL_EXTENT + TILE_OFFSET);
 		m_edgeTextureClasses[texClass].positionInTexture.x = xOrigin;
 		m_edgeTextureClasses[texClass].positionInTexture.y = yOrigin;
-		Int classHeight = yOrigin + width*TILE_PIXEL_EXTENT+ TILE_OFFSET/2;
+		Int classHeight = yOrigin + width * TILE_PIXEL_EXTENT + TILE_OFFSET / 2;
 		if (maxEdgeHeight < classHeight) maxEdgeHeight = classHeight;
 
-		for (i=0; i<width; i++) {
-			for (j=0; j<width; j++) {
-				availableGrid[row+j][column+i] = false;
-				Int baseNdx = m_edgeTextureClasses[texClass].firstTile + i + j*width;
-				// In case we are just checking for room...
-				if (m_edgeTiles[baseNdx] == nullptr) continue;
-				Int x = xOrigin + i*TILE_PIXEL_EXTENT;
-				Int y = yOrigin + (width-j-1)*TILE_PIXEL_EXTENT;
-				// Use negative offsets to differentiate between tiles & edges.
+		for (i = 0; i < width; i++) {
+			for (j = 0; j < width; j++) {
+				edgeGrid[(row + j) * edgeTilesPerRow + (column + i)] = 0;
+				Int baseNdx = m_edgeTextureClasses[texClass].firstTile + i + j * width;
+				if (baseNdx < 0 || baseNdx >= NUM_SOURCE_TILES || m_edgeTiles[baseNdx] == nullptr) continue;
+				Int x = xOrigin + i * TILE_PIXEL_EXTENT;
+				Int y = yOrigin + (width - j - 1) * TILE_PIXEL_EXTENT;
 				m_edgeTiles[baseNdx]->m_tileLocationInTexture.x = x;
 				m_edgeTiles[baseNdx]->m_tileLocationInTexture.y = y;
 			}
@@ -2297,8 +2295,8 @@ void WorldHeightMap::getUVForNdx(Int tileNdx, float *minU, float *minV, float *m
 	ICoord2D pos = tile->m_tileLocationInTexture;
 	*minU = pos.x;
 	*minV = pos.y;
-	*maxU = *minU+TILE_PIXEL_EXTENT;
-	*maxV = *minV+TILE_PIXEL_EXTENT;
+	*maxU = *minU + m_tilePixelExtent;
+	*maxV = *minV + m_tilePixelExtent;
 #ifdef EVAL_TILING_MODES
 	if (m_tileMode == TILE_8x8) {
 		*maxU = *minU+TILE_PIXEL_EXTENT/2.0f;
@@ -2429,18 +2427,19 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 			}
 			if (tilesMatch) {
 				Real minU = m_textureClasses[i].positionInTexture.x;
-				Real maxV = m_textureClasses[i].positionInTexture.y + m_textureClasses[i].width*TILE_PIXEL_EXTENT;
-				minU/=TEXTURE_WIDTH;
-				maxV/=m_terrainTexHeight;
-				Real vFactor = TEXTURE_WIDTH/m_terrainTexHeight;
-				U[0] = info.u0+minU;
-				U[1] = info.u1+minU;
-				U[2] = info.u2+minU;
-				U[3] = info.u3+minU;
-				V[0] = info.v0*vFactor+maxV;
-				V[1] = info.v1*vFactor+maxV;
-				V[2] = info.v2*vFactor+maxV;
-				V[3] = info.v3*vFactor+maxV;
+				Real maxV = m_textureClasses[i].positionInTexture.y + m_textureClasses[i].width * m_tilePixelExtent;
+				minU /= TEXTURE_WIDTH;
+				maxV /= m_terrainTexHeight;
+				Real vFactor = TEXTURE_WIDTH / m_terrainTexHeight;
+				Real uvScale = (Real)m_tilePixelExtent / (Real)TILE_PIXEL_EXTENT;
+				U[0] = info.u0 * uvScale + minU;
+				U[1] = info.u1 * uvScale + minU;
+				U[2] = info.u2 * uvScale + minU;
+				U[3] = info.u3 * uvScale + minU;
+				V[0] = info.v0 * uvScale * vFactor + maxV;
+				V[1] = info.v1 * uvScale * vFactor + maxV;
+				V[2] = info.v2 * uvScale * vFactor + maxV;
+				V[3] = info.v3 * uvScale * vFactor + maxV;
 				return info.flip;
 			}
 		}
@@ -2522,8 +2521,8 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 			Real nUb, nVb, xUb, xVb;
 			nUb = m_textureClasses[texClass].positionInTexture.x;
 			nVb = m_textureClasses[texClass].positionInTexture.y;
-			xUb = nUb+m_textureClasses[texClass].width*TILE_PIXEL_EXTENT;
-			xVb = nVb+m_textureClasses[texClass].width*TILE_PIXEL_EXTENT;
+			xUb = nUb + m_textureClasses[texClass].width * m_tilePixelExtent;
+			xVb = nVb + m_textureClasses[texClass].width * m_tilePixelExtent;
 			nUb/=TEXTURE_WIDTH;
 			nVb/=m_terrainTexHeight;
 			xUb/=TEXTURE_WIDTH;

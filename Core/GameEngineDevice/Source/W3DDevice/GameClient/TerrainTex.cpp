@@ -109,8 +109,8 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 
 	DX8_ErrorCode(surface_level->LockRect(&locked_rect, nullptr, 0));
 
-	Int tilePixelExtent = TILE_PIXEL_EXTENT;
-	Int tilesPerRow = surface_desc.Width/(2*TILE_PIXEL_EXTENT+TILE_OFFSET);
+	Int tilePixelExtent = htMap->getTilePixelExtent();
+	Int tilesPerRow = surface_desc.Width / (2 * tilePixelExtent + TILE_OFFSET);
 	tilesPerRow *= 2;
 //	Int numRows = surface_desc.Height/(tilePixelExtent+TILE_OFFSET);
 #ifdef RTS_DEBUG
@@ -158,7 +158,7 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 			Int width = htMap->m_textureClasses[texClass].width;
 			ICoord2D origin = htMap->m_textureClasses[texClass].positionInTexture;
 			if (origin.x<=0) continue;
-			width *= TILE_PIXEL_EXTENT;
+			width *= tilePixelExtent;
 			// Duplicate 4 columns of pixels before and after.
 			Int j;
 			for (j=0; j<width; j++) {
@@ -229,8 +229,8 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 
 	DX8_ErrorCode(surface_level->LockRect(&locked_rect, nullptr, 0));
 
-	Int tilePixelExtent = TILE_PIXEL_EXTENT;
-	Int tilesPerRow = surface_desc.Width/(2*TILE_PIXEL_EXTENT+TILE_OFFSET);
+	Int tilePixelExtent = htMap->getTilePixelExtent();
+	Int tilesPerRow = surface_desc.Width / (2 * tilePixelExtent + TILE_OFFSET);
 	tilesPerRow *= 2;
 	Int numRows = surface_desc.Height/(tilePixelExtent+TILE_OFFSET);
 #ifdef RTS_DEBUG

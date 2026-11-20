@@ -1041,7 +1041,7 @@ void GameEngine::init()
 				TheWritableGlobalData->m_playIntro = FALSE;
 				TheWritableGlobalData->m_pendingFile = TheGlobalData->m_initialFile;
 
-				const MapMetaData* map = RetailFileLayers::enabled() ? TheMapCache->findMap(fname) : nullptr;
+				const MapMetaData* map = RetailFileLayers::enabled() ? TheMapCache->ensureMap(TheGlobalData->m_initialFile) : nullptr;
 				const Bool skirmish = map && map->m_isMultiplayer && map->m_numPlayers >= 2;
 				if (skirmish)
 					startRetailFileSkirmish(*map);

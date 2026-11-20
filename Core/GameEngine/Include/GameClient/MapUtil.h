@@ -111,6 +111,7 @@ public:
 	AsciiString getMapExtension() const;
 
 	const MapMetaData *findMap(AsciiString mapName);
+	const MapMetaData *ensureMap(const AsciiString &mapName);
 
 	// allow us to create a set of shippable maps to be in mapcache.ini.  For use with -buildMapCache.
 	void addShippingMap(AsciiString mapName) { mapName.toLower(); m_allowedMaps.insert(mapName); }

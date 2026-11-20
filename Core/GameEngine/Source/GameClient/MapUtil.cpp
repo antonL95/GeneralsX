@@ -1163,6 +1163,19 @@ Bool isOfficialMap( AsciiString mapName )
 }
 
 
+const MapMetaData *MapCache::ensureMap(const AsciiString &mapName)
+{
+	if (const MapMetaData *existing = findMap(mapName))
+		return existing;
+	FileInfo fileInfo;
+	if (!TheFileSystem->getFileInfo(mapName, &fileInfo))
+		return nullptr;
+	AsciiString lowerName = mapName;
+	lowerName.toLower();
+	addMap(getMapDir(), mapName, lowerName, fileInfo, TRUE);
+	return findMap(lowerName);
+}
+
 const MapMetaData *MapCache::findMap(AsciiString mapName)
 {
 	if (mapName.isEmpty())

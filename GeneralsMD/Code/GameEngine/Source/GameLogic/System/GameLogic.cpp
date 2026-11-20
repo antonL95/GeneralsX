@@ -1950,8 +1950,11 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// reveal the map for the permanent observer
 	Player *observerPlayer = ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey("ReplayObserver"));
-	ThePartitionManager->revealMapForPlayerPermanently( observerPlayer->getPlayerIndex() );
-	DEBUG_LOG(("Reveal shroud for %ls whose index is %d", observerPlayer->getPlayerDisplayName().str(), observerPlayer->getPlayerIndex()));
+	if (observerPlayer)
+	{
+		ThePartitionManager->revealMapForPlayerPermanently( observerPlayer->getPlayerIndex() );
+		DEBUG_LOG(("Reveal shroud for %ls whose index is %d", observerPlayer->getPlayerDisplayName().str(), observerPlayer->getPlayerIndex()));
+	}
 
 	if (TheGameInfo)
 	{

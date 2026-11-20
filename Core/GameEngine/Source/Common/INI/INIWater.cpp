@@ -34,6 +34,7 @@
 
 #include "Common/INI.h"
 #include "Common/GameType.h"
+#include "Common/RetailFileLayers.h"
 
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/Water.h"
@@ -93,11 +94,9 @@ void INI::parseWaterTransparencyDefinition( INI *ini )
 	} else if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES) {
 		WaterTransparencySetting* wt = (WaterTransparencySetting*) (TheWaterTransparency.getNonOverloadedPointer());
 		WaterTransparencySetting* wtOverride = newInstance(WaterTransparencySetting);
-		*wtOverride = *wt;
-
-		// Mark that it is an override.
+		*wtOverride = RetailFileLayers::enabled() ? *static_cast<WaterTransparencySetting *>(wt->friend_getFinalOverride()) : *wt;
+		wtOverride->setNextOverride(nullptr);
 		wtOverride->markAsOverride();
-
 		wt->friend_getFinalOverride()->setNextOverride(wtOverride);
 	} else {
 		throw INI_INVALID_DATA;
