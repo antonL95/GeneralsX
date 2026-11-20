@@ -268,12 +268,15 @@ int HordeLayout::findSlot(const std::string& unitType, const std::vector<bool>& 
 std::vector<HordeMemberSlot> HordeLayout::initialMembers(int capacity) const
 {
 	std::vector<HordeMemberSlot> members;
+	if (capacity <= 0)
+		return members;
+
 	std::vector<bool> occupied(m_slots.size(), false);
 	for (std::size_t payload = 0; payload < m_payloads.size(); ++payload)
 	{
 		for (int count = 0; count < m_payloads[payload].count; ++count)
 		{
-			if (capacity > 0 && static_cast<int>(members.size()) >= capacity)
+			if (static_cast<int>(members.size()) >= capacity)
 				return members;
 			const int slot = findSlot(m_payloads[payload].name, occupied);
 			if (slot >= 0)

@@ -235,6 +235,8 @@ public:
   virtual void setEvacDisposition( EvacDisposition disp ) override {};
 protected:
 
+	void addToContain(Object* rider, Bool validateAdmission);
+
 	virtual void monitorConditionChanges();				///< check to see if we need to update our occupant positions from a model change or anything else
 	virtual void putObjAtNextFirePoint( Object *obj );	///< place object at position of the next fire point to use
 	virtual void redeployOccupants();							///< redeploy any objects at firepoints due to a model condition change

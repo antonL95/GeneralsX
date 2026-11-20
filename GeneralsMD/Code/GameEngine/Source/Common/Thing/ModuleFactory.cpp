@@ -346,7 +346,11 @@ void ModuleFactory::init()
 	addModule( InternetHackContain );
 	addModule( TransportContain );
 	if (registersRotwkModules())
+	{
 		addModule( HordeContain );
+		addModule( HorseHordeContain );
+		addModule( AODHordeContain );
+	}
 	addModule( RiderChangeContain );
 	addModule( RailedTransportContain );
 	addModule( MobNexusContain );

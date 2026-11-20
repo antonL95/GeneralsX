@@ -49,6 +49,7 @@
 
 // USER INCLUDES
 #include "Common/GameMemory.h"
+#include "Common/RetailFileLayers.h"
 
 struct PoolSizeRec
 {
@@ -64,6 +65,24 @@ struct PoolSizeRec
 #include "GameMemoryInitDMA_GeneralsMD.inl"
 #include "GameMemoryInitPools_GeneralsMD.inl"
 #endif
+
+static const PoolSizeRec RetailPoolSizes[] =
+{
+	{ "W3DScriptedModelDraw", 12288, 1024 },
+	{ "SpecialPowerModule", 768, 128 },
+	{ "AISpecialPowerUpdate", 1024, 128 },
+	{ "W3DHordeModelDraw", 1024, 256 },
+	{ "HordeContain", 256, 64 },
+	{ "W3DFloorDraw", 512, 64 },
+	{ "StancesBehavior", 256, 64 },
+	{ "LargeGroupAudioUpdate", 256, 64 },
+	{ "PickupStuffUpdate", 256, 64 },
+	{ "HitReactionBehavior", 256, 64 },
+	{ "HordeMemberCollide", 512, 128 },
+	{ "CastleMemberBehavior", 128, 32 },
+	{ "HorseHordeContain", 64, 32 },
+	{ "AODHordeContain", 16, 16 }
+};
 
 //-----------------------------------------------------------------------------
 void userMemoryManagerGetDmaParms(Int *numSubPools, const PoolInitRec **pParms)
@@ -86,6 +105,26 @@ void userMemoryAdjustPoolSize(const char *poolName, Int& initialAllocationCount,
 			overflowAllocationCount = p->overflow;
 			return;
 		}
+	}
+
+	if (RetailFileLayers::enabled())
+	{
+		for (const PoolSizeRec& pool : RetailPoolSizes)
+		{
+			if (strcmp(pool.name, poolName) == 0)
+			{
+				initialAllocationCount = pool.initial;
+				overflowAllocationCount = pool.overflow;
+				return;
+			}
+		}
+
+		initialAllocationCount = 32;
+		overflowAllocationCount = 16;
+		fprintf(stderr, "[MemoryPool] %s has no retail size entry. Using %d initial and %d overflow blocks.\n",
+			poolName, initialAllocationCount, overflowAllocationCount);
+		fflush(stderr);
+		return;
 	}
 
 	DEBUG_CRASH(("Initial size for pool %s not found -- you should add it to MemoryInit.cpp",poolName));

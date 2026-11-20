@@ -34,6 +34,7 @@
 #include "Common/Upgrade.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/SpecialPowerINI.h"
 #include "Common/Player.h"
 #include "Common/Xfer.h"
 #include "GameClient/InGameUI.h"
@@ -131,6 +132,53 @@ const FieldParse UpgradeTemplate::m_upgradeFieldParseTable[] =
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+void UpgradeTemplate::parseDefinition(INI* ini)
+{
+	static const char* const aiHeuristics[] =
+	{
+		"AI_UPGRADEHEURISTIC_IMPORTANT",
+		"AI_UPGRADEHEURISTIC_FORTRESS",
+		"AI_UPGRADEHEURISTIC_FACTORY_UNITUNLOCK",
+		"AI_UPGRADEHEURISTIC_ANTISPECIAL",
+		"AI_UPGRADEHEURISTIC_ANTIARCHER",
+		"AI_UPGRADEHEURISTIC_ANTICAVALRY",
+		"AI_UPGRADEHEURISTIC_ANTIINFANTRY",
+		nullptr
+	};
+	static const FieldParse retailFields[] =
+	{
+		{ "Tooltip", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_tooltip) },
+		{ "Cursor", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_cursor) },
+		{ "UpgradeFX", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_upgradeFX) },
+		{ "ResearchCompleteEvaEvent", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_researchCompleteEvaEvent) },
+		{ "LocalPlayerGainsUpgradeEvaEvent", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_localPlayerGainsUpgradeEvaEvent) },
+		{ "AlliedPlayerGainsUpgradeEvaEvent", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_alliedPlayerGainsUpgradeEvaEvent) },
+		{ "EnemyPlayerGainsUpgradeEvaEvent", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_enemyPlayerGainsUpgradeEvaEvent) },
+		{ "LocalPlayerLosesUpgradeEvaEvent", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_localPlayerLosesUpgradeEvaEvent) },
+		{ "AlliedPlayerLosesUpgradeEvaEvent", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_alliedPlayerLosesUpgradeEvaEvent) },
+		{ "EnemyPlayerLosesUpgradeEvaEvent", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_enemyPlayerLosesUpgradeEvaEvent) },
+		{ "UseObjectTemplateForCostDiscount", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_costDiscountObject) },
+		{ "GroupName", INI::parseQuotedAsciiString, nullptr, offsetof(UpgradeTemplate, m_groupName) },
+		{ "GroupOrder", INI::parseUnsignedInt, nullptr, offsetof(UpgradeTemplate, m_groupOrder) },
+		{ "StrategicIcon", INI::parseAsciiString, nullptr, offsetof(UpgradeTemplate, m_strategicIcon) },
+		{ "RequiredObjectFilter", [](INI* ini, void*, void* store, const void*) {
+			auto filter = std::make_shared<SpecialPowerObjectFilter>();
+			SpecialPowerObjectFilter::parse(ini, nullptr, filter.get(), nullptr);
+			*static_cast<std::shared_ptr<const SpecialPowerObjectFilter>*>(store) = std::move(filter);
+		}, nullptr, offsetof(UpgradeTemplate, m_requiredObjectFilter) },
+		{ "SkirmishAIHeuristic", INI::parseIndexList, aiHeuristics, offsetof(UpgradeTemplate, m_skirmishAIHeuristic) },
+		{ "PersistsInCampaign", INI::parseBool, nullptr, offsetof(UpgradeTemplate, m_persistsInCampaign) },
+		{ "NoUpgradeDiscount", INI::parseBool, nullptr, offsetof(UpgradeTemplate, m_noUpgradeDiscount) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+
+	MultiIniFieldParse fields;
+	fields.add(getFieldParse());
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+		fields.add(retailFields);
+	ini->initFromINIMulti(this, fields);
+}
+
 UpgradeTemplate::UpgradeTemplate()
 {
 	m_cost = 0;
@@ -486,11 +534,12 @@ void UpgradeCenter::parseUpgradeDefinition( INI *ini )
 	UpgradeTemplate* upgrade = TheUpgradeCenter->findNonConstUpgradeByKey( NAMEKEY(name) );
 	if( upgrade == nullptr )
 	{
-		if (RetailFileLayers::enabled() && !INIAudit::isEnabled() &&
+		if ((RetailFileLayers::enabled() || INIAudit::isEnabled()) &&
 			TheUpgradeCenter->m_nextTemplateMaskBit >= UPGRADE_MAX_COUNT)
 		{
 			ini->recordSkipped("capacity", "Upgrade");
-			ini->skipBlockForAudit();
+			UpgradeTemplate overflow;
+			overflow.parseDefinition(ini);
 			return;
 		}
 
@@ -503,7 +552,7 @@ void UpgradeCenter::parseUpgradeDefinition( INI *ini )
 	DEBUG_ASSERTCRASH( upgrade, ("parseUpgradeDefinition: Unable to allocate upgrade '%s'", name) );
 
 	// parse the ini definition
-	ini->initFromINI( upgrade, upgrade->getFieldParse() );
+	upgrade->parseDefinition(ini);
 
 }
 

@@ -288,6 +288,11 @@ void OpenContain::addOrRemoveObjFromWorld(Object* obj, Bool add)
 //-------------------------------------------------------------------------------------------------
 void OpenContain::addToContain( Object *rider )
 {
+	addToContain(rider, TRUE);
+}
+
+void OpenContain::addToContain(Object* rider, [[maybe_unused]] Bool validateAdmission)
+{
 	if( getObject()->checkAndDetonateBoobyTrap(rider) )
 	{
 		// Whoops, I was mined.  Cancel if I (or they) am now dead.
@@ -330,7 +335,7 @@ void OpenContain::addToContain( Object *rider )
 	}
 
 #if defined(RTS_DEBUG)
-	if( !isValidContainerFor( rider, false ) )
+	if( validateAdmission && !isValidContainerFor( rider, false ) )
 	{
 		Object *reportObject = rider;
 		if( rider->getContain() )

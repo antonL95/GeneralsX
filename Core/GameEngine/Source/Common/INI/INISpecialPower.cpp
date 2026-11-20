@@ -35,13 +35,16 @@
 #include "Common/SpecialPower.h"
 #include "Common/SpecialPowerINI.h"
 
+#include <string_view>
+
 void SpecialPowerObjectFilter::parse(INI* ini, void*, void* store, const void*)
 {
-	static const char* const rules[] =
+	static constexpr const char* rules[] =
 	{
 		"SELF", "ALLIES", "ENEMIES", "NEUTRALS", "SUICIDE", "NOT_SIMILAR", "NOT_AIRBORNE",
 		"PROJECTILES", "SAME_HEIGHT_ONLY", "MINES", "ALL", "ANY", "NONE", "SAME_PLAYER", nullptr
 	};
+	static_assert(std::string_view(rules[12]) == "NONE");
 	SpecialPowerObjectFilter filter;
 	for (const char* token = ini->getNextToken(); token; token = ini->getNextTokenOrNull())
 	{

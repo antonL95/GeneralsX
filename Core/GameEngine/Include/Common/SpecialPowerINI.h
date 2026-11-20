@@ -9,6 +9,8 @@ class INI;
 
 struct SpecialPowerObjectFilter
 {
+	static constexpr UnsignedInt RULE_NONE = 1u << 12;
+
 	UnsignedInt m_rules = 0;
 	KindOfMaskType m_includeKinds;
 	KindOfMaskType m_excludeKinds;

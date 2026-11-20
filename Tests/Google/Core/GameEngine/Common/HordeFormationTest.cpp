@@ -108,7 +108,7 @@ TEST(HordeFormation, AssignsMembersToMatchingSlotsThenAnyFreeSlot)
 	layout.addRank(rank("RankNumber:2 UnitType:TownsWoman Position:X:25 Y:25"));
 	layout.addPayload("townswoman", 1);
 	layout.addPayload("Townsman", 3);
-	const std::vector<HordeMemberSlot> members = layout.initialMembers(0);
+	const std::vector<HordeMemberSlot> members = layout.initialMembers(4);
 	ASSERT_EQ(members.size(), 4u);
 	EXPECT_EQ(members[0].slot, 2);
 	EXPECT_EQ(members[1].slot, 0);
@@ -126,7 +126,8 @@ TEST(HordeFormation, CapacityLimitsTheInitialMembers)
 	layout.addRank(rank("RankNumber:1 UnitType:A Position:X:0 Y:0 Position:X:0 Y:10 Position:X:0 Y:20"));
 	layout.addPayload("A", 15);
 	EXPECT_EQ(layout.initialMembers(2).size(), 2u);
-	EXPECT_EQ(layout.initialMembers(0).size(), 15u);
+	EXPECT_TRUE(layout.initialMembers(layout.capacity()).empty());
+	EXPECT_TRUE(layout.initialMembers(-1).empty());
 }
 
 TEST(HordeFormation, RotatesOffsetsIntoTheHordeFrame)

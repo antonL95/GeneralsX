@@ -126,3 +126,49 @@ private:
 
 	std::vector<ObjectID> m_slotMembers;
 };
+
+struct HorseHordeContainModuleData : public HordeContainModuleData
+{
+};
+
+struct AODHordeContainModuleData : public HordeContainModuleData
+{
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	Real m_frequencyScale = 0.0f;
+	Real m_frequencyRandomness = 0.0f;
+	Real m_amplitudeScale = 0.0f;
+	Real m_amplitudeRandomness = 0.0f;
+	Real m_stillAmplitude = 0.0f;
+	Real m_frequencyScaleZ = 0.0f;
+	Real m_frequencyRandomnessZ = 0.0f;
+	Real m_amplitudeScaleZ = 0.0f;
+	Real m_amplitudeRandomnessZ = 0.0f;
+	Real m_stillAmplitudeZ = 0.0f;
+	Real m_oathFulfilledZFactor = 0.0f;
+	Real m_largeUnitHeightFactor = 0.0f;
+	Real m_largeUnitMinHeight = 0.0f;
+	Real m_largeUnitMaxHeight = 0.0f;
+	UnsignedInt m_largeUnitTimeout = 0;
+	Real m_largeUnitTailOff = 0.0f;
+	Real m_scatterSpeedFactor = 0.0f;
+	Real m_scatterRandomness = 0.0f;
+};
+
+class HorseHordeContain final : public BehaviorModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( HorseHordeContain, "HorseHordeContain" )
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( HorseHordeContain, HorseHordeContainModuleData )
+
+public:
+	HorseHordeContain(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data) {}
+};
+
+class AODHordeContain final : public BehaviorModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( AODHordeContain, "AODHordeContain" )
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( AODHordeContain, AODHordeContainModuleData )
+
+public:
+	AODHordeContain(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data) {}
+};

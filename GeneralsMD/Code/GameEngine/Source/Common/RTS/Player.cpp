@@ -800,7 +800,7 @@ void Player::initFromDict(const Dict* d)
 	m_mpStartIndex = d->getInt(TheKey_multiplayerStartIndex, &exists);
 	if (rotwk)
 	{
-		skirmish = d->getBool(TheKey_playerIsSkirmish);
+		skirmish = d->getBool(TheKey_playerIsSkirmish, &exists);
 	}
 	else if (d->getBool(TheKey_playerIsSkirmish, &exists))
 	{

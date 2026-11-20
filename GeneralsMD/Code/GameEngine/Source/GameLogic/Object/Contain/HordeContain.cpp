@@ -7,7 +7,6 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
-#include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
@@ -15,6 +14,7 @@
 #include "GameLogic/WeaponSetFlags.h"
 #include "Lib/trig.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 
@@ -38,6 +38,7 @@ Int weaponConditionIndex(const std::string& name)
 
 HordeContainModuleData::HordeContainModuleData()
 {
+	SET_ALL_KINDOFMASK_BITS(m_allowInsideKindOf);
 	m_randomOffset.x = 0.0f;
 	m_randomOffset.y = 0.0f;
 	m_leaderPosition.zero();
@@ -213,6 +214,44 @@ void HordeContainModuleData::parseMeleeBehavior(INI* ini, void*, void* store, co
 	*static_cast<MeleeBehavior*>(store) = std::move(behavior);
 }
 
+void AODHordeContainModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] =
+	{
+		{ "FrequencyScale", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_frequencyScale) },
+		{ "FrequencyRandomness", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_frequencyRandomness) },
+		{ "AmplitudeScale", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_amplitudeScale) },
+		{ "AmplitudeRandomness", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_amplitudeRandomness) },
+		{ "StillAmplitude", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_stillAmplitude) },
+		{ "FrequencyScaleZ", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_frequencyScaleZ) },
+		{ "FrequencyRandomnessZ", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_frequencyRandomnessZ) },
+		{ "AmplitudeScaleZ", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_amplitudeScaleZ) },
+		{ "AmplitudeRandomnessZ", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_amplitudeRandomnessZ) },
+		{ "StillAmplitudeZ", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_stillAmplitudeZ) },
+		{ "OathFulfilledZFactor", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_oathFulfilledZFactor) },
+		{ "LargeUnitHeightFactor", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_largeUnitHeightFactor) },
+		{ "LargeUnitMinHeight", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_largeUnitMinHeight) },
+		{ "LargeUnitMaxHeight", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_largeUnitMaxHeight) },
+		{ "LargeUnitTimeout", INI::parseDurationUnsignedInt, nullptr, offsetof(AODHordeContainModuleData, m_largeUnitTimeout) },
+		{ "LargeUnitTailOff", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_largeUnitTailOff) },
+		{ "ScatterSpeedFactor", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_scatterSpeedFactor) },
+		{ "ScatterRandomness", INI::parseReal, nullptr, offsetof(AODHordeContainModuleData, m_scatterRandomness) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+	HordeContainModuleData::buildFieldParse(p);
+}
+
+HorseHordeContain::~HorseHordeContain() = default;
+void HorseHordeContain::crc(Xfer* xfer) { BehaviorModule::crc(xfer); }
+void HorseHordeContain::xfer(Xfer* xfer) { BehaviorModule::xfer(xfer); }
+void HorseHordeContain::loadPostProcess() { BehaviorModule::loadPostProcess(); }
+
+AODHordeContain::~AODHordeContain() = default;
+void AODHordeContain::crc(Xfer* xfer) { BehaviorModule::crc(xfer); }
+void AODHordeContain::xfer(Xfer* xfer) { BehaviorModule::xfer(xfer); }
+void AODHordeContain::loadPostProcess() { BehaviorModule::loadPostProcess(); }
+
 HordeContain::HordeContain( Thing *thing, const ModuleData *moduleData ) : TransportContain( thing, moduleData )
 {
 }
@@ -227,9 +266,23 @@ Bool HordeContain::isValidContainerFor( const Object* rider, Bool checkCapacity 
 		return FALSE;
 	if (rider->getControllingPlayer() != getObject()->getControllingPlayer())
 		return FALSE;
+	if (!OpenContain::isValidContainerFor(rider, checkCapacity))
+		return FALSE;
 	if (checkCapacity && (Int)getContainCount() >= getContainMax())
 		return FALSE;
-	return TRUE;
+
+	const SpecialPowerObjectFilter& filter = getHordeContainModuleData()->m_passengerFilter;
+	const auto matchesRider = [rider](const AsciiString& name)
+	{
+		return stricmp(rider->getTemplate()->getName().str(), name.str()) == 0;
+	};
+	if (rider->isAnyKindOf(filter.m_excludeKinds) ||
+		std::any_of(filter.m_excludeObjects.begin(), filter.m_excludeObjects.end(), matchesRider))
+		return FALSE;
+	if (filter.m_includeKinds.any() || !filter.m_includeObjects.empty())
+		return rider->isAnyKindOf(filter.m_includeKinds) ||
+			std::any_of(filter.m_includeObjects.begin(), filter.m_includeObjects.end(), matchesRider);
+	return (filter.m_rules & SpecialPowerObjectFilter::RULE_NONE) == 0;
 }
 
 void HordeContain::createPayload()
@@ -237,9 +290,10 @@ void HordeContain::createPayload()
 	const HordeContainModuleData* data = getHordeContainModuleData();
 	const HordeLayout& layout = data->m_layout;
 	Object* horde = getObject();
+	const Int availableSlots = std::max(0, getContainMax()) - static_cast<Int>(getContainCount());
 
 	enableLoadSounds( FALSE );
-	for (const HordeMemberSlot& entry : layout.initialMembers(getContainMax()))
+	for (const HordeMemberSlot& entry : layout.initialMembers(availableSlots))
 	{
 		const HordePayload& payload = layout.payloads()[entry.payload];
 		const ThingTemplate* memberTemplate = TheThingFactory->findTemplate( payload.name.c_str() );
@@ -249,13 +303,7 @@ void HordeContain::createPayload()
 			continue;
 		}
 		Object* member = TheThingFactory->newObject( memberTemplate, horde->getTeam() );
-		if (!isValidContainerFor( member, TRUE ))
-		{
-			DEBUG_CRASH(( "HordeContain: '%s' cannot hold its payload '%s'", horde->getTemplate()->getName().str(), payload.name.c_str() ));
-			TheGameLogic->destroyObject( member );
-			continue;
-		}
-		addToContain( member );
+		OpenContain::addToContain(member, FALSE);
 	}
 	enableLoadSounds( TRUE );
 

@@ -34,12 +34,14 @@
 #include "Common/INI.h"
 #include "Common/Snapshot.h"
 #include "Common/BitFlags.h"
+#include <memory>
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Player;
 class UpgradeTemplate;
 enum NameKeyType CPP_11(: Int);
 class Image;
+struct SpecialPowerObjectFilter;
 enum AcademyClassificationType CPP_11(: Int);
 
 //-------------------------------------------------------------------------------------------------
@@ -200,6 +202,9 @@ public:
 
 protected:
 
+	friend class UpgradeCenter;
+	void parseDefinition(INI* ini);
+
 	UpgradeType m_type;									///< upgrade type (PLAYER or OBJECT)
 	AsciiString m_name;									///< upgrade name
 	NameKeyType m_nameKey;							///< name key
@@ -216,6 +221,25 @@ protected:
 
 	AsciiString m_buttonImageName;			///< "Queue" images to show in the build queue
 	const Image *m_buttonImage;
+
+	AsciiString m_tooltip;
+	AsciiString m_cursor;
+	AsciiString m_upgradeFX;
+	AsciiString m_researchCompleteEvaEvent;
+	AsciiString m_localPlayerGainsUpgradeEvaEvent;
+	AsciiString m_alliedPlayerGainsUpgradeEvaEvent;
+	AsciiString m_enemyPlayerGainsUpgradeEvaEvent;
+	AsciiString m_localPlayerLosesUpgradeEvaEvent;
+	AsciiString m_alliedPlayerLosesUpgradeEvaEvent;
+	AsciiString m_enemyPlayerLosesUpgradeEvaEvent;
+	AsciiString m_costDiscountObject;
+	AsciiString m_groupName;
+	AsciiString m_strategicIcon;
+	std::shared_ptr<const SpecialPowerObjectFilter> m_requiredObjectFilter;
+	UnsignedInt m_groupOrder = 0;
+	Int m_skirmishAIHeuristic = -1;
+	Bool m_persistsInCampaign = FALSE;
+	Bool m_noUpgradeDiscount = FALSE;
 
 	/// INI field table
 	static const FieldParse m_upgradeFieldParseTable[];		///< the parse table
