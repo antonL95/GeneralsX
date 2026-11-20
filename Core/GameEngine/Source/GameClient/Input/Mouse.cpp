@@ -1208,7 +1208,7 @@ Bool Mouse::drawRetailCommandTooltip()
 	TheDisplay->drawImage(right, x + width - rightWidth, middleY, x + width, bottomY);
 	TheDisplay->drawImage(bottom, x, bottomY, x + width, y + height);
 	ICoord2D lo = { 0, 0 };
-	ICoord2D hi = { TheDisplay->getWidth(), TheDisplay->getHeight() };
+	ICoord2D hi = { static_cast<Int>(TheDisplay->getWidth()), static_cast<Int>(TheDisplay->getHeight()) };
 	IRegion2D clipRegion = { lo, hi };
 	m_tooltipDisplayString->setClipRegion(&clipRegion);
 	m_tooltipDisplayString->draw(x + leftWidth, middleY + bodyPadding,
