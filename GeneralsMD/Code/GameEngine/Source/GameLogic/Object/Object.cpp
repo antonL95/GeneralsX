@@ -180,7 +180,7 @@ static ModelConditionFlags weaponFireFlags(Int slot)
 	return flags;
 }
 
-static WeaponSetConditionType retailWeaponCondition(const Object* obj, const Weapon* weapon, UnsignedInt now, Byte lastCondition)
+static WeaponSetConditionType retailWeaponCondition(const Object* obj, const Weapon* weapon, UnsignedInt now, Byte lastCondition, Bool currentSlot)
 {
 	const UnsignedInt lastShot = weapon->getLastShotFrame();
 	if (lastShot == now)
@@ -205,7 +205,7 @@ static WeaponSetConditionType retailWeaponCondition(const Object* obj, const Wea
 	if (status == READY_TO_FIRE && lastCondition == WSF_PREATTACK)
 		return WSF_INVALID;
 	WeaponSetConditionType condition = s_wsfLookup[status];
-	if (status == READY_TO_FIRE && (obj->testStatus(OBJECT_STATUS_IS_AIMING_WEAPON) || obj->testStatus(OBJECT_STATUS_IS_FIRING_WEAPON)))
+	if (currentSlot && status == READY_TO_FIRE && (obj->testStatus(OBJECT_STATUS_IS_AIMING_WEAPON) || obj->testStatus(OBJECT_STATUS_IS_FIRING_WEAPON)))
 		condition = WSF_BETWEEN;
 	return condition;
 }
@@ -4996,7 +4996,7 @@ void Object::adjustModelConditionForWeaponStatus()
 		WeaponSetConditionType conditionToSet = WSF_INVALID;
 		if (retail)
 		{
-			conditionToSet = retailWeaponCondition(this, w, now, m_lastWeaponCondition[i]);
+			conditionToSet = retailWeaponCondition(this, w, now, m_lastWeaponCondition[i], i == m_weaponSet.getCurWeaponSlot());
 		}
 		else if (i != m_weaponSet.getCurWeaponSlot())
 		{

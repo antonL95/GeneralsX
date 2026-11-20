@@ -4389,13 +4389,13 @@ void W3DModelDraw::setWeaponTimingDuration(UnsignedInt numFrames)
 		m_curState->m_animations[m_whichAnimInCurState].usesWeaponTiming())
 	{
 		Real frame = 0.0f;
-		Int numFrames = 0;
+		Int clipFrames = 0;
 		Int mode = 0;
 		Real multiplier = 1.0f;
-		static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, numFrames, mode, multiplier);
+		static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, clipFrames, mode, multiplier);
 		const Bool backwards = mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS;
 		const Bool once = mode == RenderObjClass::ANIM_MODE_ONCE || backwards;
-		const Real remainingFrames = backwards ? frame : static_cast<Real>(numFrames - 1) - frame;
+		const Real remainingFrames = backwards ? frame : static_cast<Real>(clipFrames - 1) - frame;
 		if (once && remainingFrames < 1.0f)
 		{
 			adjustAnimation(m_curState, -1.0f);
