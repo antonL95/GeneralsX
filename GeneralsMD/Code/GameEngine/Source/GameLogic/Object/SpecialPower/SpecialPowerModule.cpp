@@ -43,6 +43,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
@@ -511,8 +512,14 @@ void SpecialPowerModule::startPowerRecharge()
 	}
 	else
 	{
-		// set the frame we will be 100% available on now
-		m_availableOnFrame = TheGameLogic->getFrame() + getSpecialPowerTemplate()->getReloadTime();
+		UnsignedInt reload = getSpecialPowerTemplate()->getReloadTime();
+		if( obj->getAttributeModifierHelper() )
+		{
+			const Real factor = AttributeModifiers::rechargeFactor( obj );
+			if( factor >= 0.0f && factor != 1.0f )
+				reload = (UnsignedInt)REAL_TO_INT_CEIL( INT_TO_REAL( reload ) * factor );
+		}
+		m_availableOnFrame = TheGameLogic->getFrame() + reload;
 	}
 }
 
@@ -997,6 +1004,14 @@ void SpecialPowerModule::applyRotwkTrigger( const Coord3D *location )
 	{
 		const FXList *fx = TheFXListStore->findFXList( data->m_triggerFX.str() );
 		FXList::doFXPos( fx, location ? location : self->getPosition() );
+	}
+	if( data->m_attributeModifier.isNotEmpty() )
+	{
+		const AttributeModifiers::Sides sides = data->m_targetAllSides ? AttributeModifiers::SIDES_ALL
+			: data->m_targetEnemy ? AttributeModifiers::SIDES_ENEMIES : AttributeModifiers::SIDES_ALLIES;
+		AttributeModifiers::applyInRange( self, location ? location : self->getPosition(), data->m_attributeModifierRange,
+			&data->m_attributeModifierAffects, data->m_attributeModifierAffectsSelf, AttributeModifiers::findList( data->m_attributeModifier ),
+			AttributeModifierHelper::USE_LIST_DURATION, AttributeModifierRules::categoryBit( data->m_antiCategory ), data->m_attributeModifierFX, sides );
 	}
 	for( const AsciiString &name : data->m_onTriggerRechargeSpecialPower )
 	{

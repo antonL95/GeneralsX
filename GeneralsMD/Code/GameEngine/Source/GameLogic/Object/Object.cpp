@@ -87,6 +87,8 @@
 #include "GameLogic/Module/DestroyModule.h"
 #include "GameLogic/Module/DieModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
+#include "GameLogic/AttributeModifierStore.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/ObjectDefectionHelper.h"
 #include "GameLogic/Module/ObjectRepulsorHelper.h"
 #include "GameLogic/Module/ObjectSMCHelper.h"
@@ -280,6 +282,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	m_smcHelper(nullptr),
 	m_wsHelper(nullptr),
 	m_defectionHelper(nullptr),
+	m_attributeModifierHelper(nullptr),
 	m_partitionLastLook(nullptr),
 	m_partitionRevealAllLastLook(nullptr),
 	m_partitionLastShroud(nullptr),
@@ -473,6 +476,15 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 		tempWeaponBonusModuleData.setModuleTagNameKey( tempWeaponBonusHelperModuleDataTagNameKey );
 		m_tempWeaponBonusHelper = newInstance(TempWeaponBonusHelper)(this, &tempWeaponBonusModuleData);
 		*curB++ = m_tempWeaponBonusHelper;
+	}
+
+	if (RetailFileLayers::enabled() && TheAttributeModifierStore && !tt->isKindOf(KINDOF_SHRUBBERY))
+	{
+		static const NameKeyType attributeModifierHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_AttributeModifierHelper" );
+		static AttributeModifierHelperModuleData attributeModifierModuleData;
+		attributeModifierModuleData.setModuleTagNameKey( attributeModifierHelperModuleDataTagNameKey );
+		m_attributeModifierHelper = newInstance(AttributeModifierHelper)(this, &attributeModifierModuleData);
+		*curB++ = m_attributeModifierHelper;
 	}
 
 	// behaviors are always done first, so they get into the publicModule arrays
@@ -745,6 +757,7 @@ Object::~Object()
 	m_smcHelper = nullptr;
 	m_wsHelper = nullptr;
 	m_defectionHelper = nullptr;
+	m_attributeModifierHelper = nullptr;
 
 	// reset id to zero so we never mistaken grab "dead" objects
 	m_id = INVALID_ID;
@@ -4828,6 +4841,9 @@ void Object::removeUpgrade( const UpgradeTemplate *upgradeT )
 //-------------------------------------------------------------------------------------------------
 void Object::onCapture( Player *oldOwner, Player *newOwner )
 {
+	if (m_attributeModifierHelper && oldOwner != newOwner)
+		m_attributeModifierHelper->removeTimed();
+
 	// Everybody chills when they captured so they don't keep doing something the new player might not want him to be doing
 	// TheSuperHackers @tweak Stubbjax 19/11/2025 Except when the new owner is an ally, so that Hackers keep on hacking, etc.
 	if( getAIUpdateInterface()  &&  (oldOwner != newOwner) )
@@ -4893,6 +4909,9 @@ void Object::onDie( DamageInfo *damageInfo )
 #endif
 
 	Bool selfInflicted = (damageInfo->in.m_sourceID == getID());
+
+	if (m_attributeModifierHelper)
+		m_attributeModifierHelper->clearAll();
 
 	// FIRST, call our die modules.
 	for (BehaviorModule** d = m_behaviors; *d; ++d)
@@ -5497,6 +5516,8 @@ Real Object::getVisionRange() const
 		}
 	}
 #endif
+	if (m_attributeModifierHelper)
+		return m_visionRange * AttributeModifiers::visionFactor(this);
 	return m_visionRange;
 }
 
@@ -5517,6 +5538,10 @@ Real Object::getShroudClearingRange() const
 		//on the geometry extents so the structure can only see itself.
 		shroudClearingRange = getGeometryInfo().getBoundingCircleRadius();
 	}
+	else if (m_attributeModifierHelper)
+	{
+		shroudClearingRange *= AttributeModifiers::shroudFactor(this);
+	}
 
 #if defined(RTS_DEBUG)
 	if (TheGlobalData->m_debugVisibility)
@@ -5535,6 +5560,13 @@ Real Object::getShroudClearingRange() const
 #endif
 
 	return shroudClearingRange;
+}
+
+void Object::refreshModifiedShroudClearing()
+{
+	const Coord3D* pos = getPosition();
+	if (m_partitionData && (pos->x || pos->y || pos->z))
+		handlePartitionCellMaintenance();
 }
 
 //-------------------------------------------------------------------------------------------------

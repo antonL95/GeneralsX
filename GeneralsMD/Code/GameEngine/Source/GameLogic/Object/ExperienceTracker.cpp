@@ -36,6 +36,7 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 
 
 
@@ -211,6 +212,8 @@ void ExperienceTracker::addExperiencePoints( Int experienceGain, Bool canScaleFo
 	Int amountToGain = experienceGain;
 	if ( canScaleForBonus )
 		amountToGain *= m_experienceScalar;
+	if ( canScaleForBonus && m_parent->getAttributeModifierHelper() )
+		amountToGain *= AttributeModifiers::experienceFactor( m_parent );
 
 
 	m_currentExperience += amountToGain;

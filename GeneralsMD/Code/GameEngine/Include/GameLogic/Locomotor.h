@@ -287,7 +287,7 @@ public:
 	*/
 	Bool locoUpdate_maintainCurrentPosition(Object* obj);
 
-	Real getMaxSpeedForCondition(BodyDamageType condition) const;  ///< get max speed given condition
+	Real getMaxSpeedForCondition(BodyDamageType condition, const Object* obj = nullptr) const;  ///< get max speed given condition
 	Real getMaxTurnRate(BodyDamageType condition) const;  ///< get max turning rate given condition
 	Real getMaxAcceleration(BodyDamageType condition) const;  ///< get acceleration given condition
 	Real getMaxLift(BodyDamageType condition) const;  ///< get acceleration given condition

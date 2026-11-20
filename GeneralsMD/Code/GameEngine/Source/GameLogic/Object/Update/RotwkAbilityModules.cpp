@@ -23,6 +23,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
 
 namespace
@@ -338,6 +339,15 @@ HeroModeSpecialAbilityUpdate::HeroModeSpecialAbilityUpdate(Thing* thing, const M
 {
 }
 
+void HeroModeSpecialAbilityUpdate::triggerAbilityEffect()
+{
+	SpecialAbilityUpdate::triggerAbilityEffect();
+	const HeroModeSpecialAbilityUpdateModuleData* data = getHeroModeSpecialAbilityUpdateModuleData();
+	if (data->m_heroAttributeModifier.isNotEmpty())
+		AttributeModifiers::apply(getObject(), data->m_heroAttributeModifier,
+			data->m_heroEffectDuration > 0 ? data->m_heroEffectDuration : AttributeModifierHelper::USE_LIST_DURATION);
+}
+
 void HeroModeSpecialAbilityUpdate::crc(Xfer* xfer)
 {
 	SpecialAbilityUpdate::crc(xfer);
@@ -402,6 +412,9 @@ Bool WeaponModeSpecialPowerUpdate::initiateIntentToDoSpecialPower(const SpecialP
 
 	const UnsignedInt now = TheGameLogic->getFrame();
 	m_endFrame = now + std::max<UnsignedInt>(1, data->m_duration);
+	if (data->m_attributeModifier.isNotEmpty())
+		AttributeModifiers::apply(self, data->m_attributeModifier,
+			data->m_duration > 0 ? data->m_duration : AttributeModifierHelper::USE_LIST_DURATION);
 
 	SpecialPowerModule* power = powerModuleOf(self, data->m_specialPowerTemplate);
 	if (power)
@@ -427,6 +440,8 @@ void WeaponModeSpecialPowerUpdate::endMode()
 {
 	const WeaponModeSpecialPowerUpdateModuleData* data = getWeaponModeSpecialPowerUpdateModuleData();
 	Object* self = getObject();
+	if (data->m_attributeModifier.isNotEmpty())
+		AttributeModifiers::remove(self, data->m_attributeModifier);
 	for (Int i = 0; i < data->m_weaponSetFlags.size(); ++i)
 	{
 		if (data->m_weaponSetFlags.test(i))

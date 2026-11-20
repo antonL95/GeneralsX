@@ -22,6 +22,10 @@
 #include "GameLogic/WeaponSet.h"
 #include "GameLogic/WeaponSetFlags.h"
 #include "Lib/trig.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/AttributeModifierHelper.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
+#endif
 
 #include <algorithm>
 #include <string>
@@ -315,6 +319,9 @@ void HordeContain::createPayload()
 	const HordeContainModuleData* data = getHordeContainModuleData();
 	const HordeLayout& layout = data->m_layout;
 	Object* horde = getObject();
+#if !RTS_GENERALS
+	RotwkModifierModules::applyHordeFormationModifiers( horde );
+#endif
 	const Int availableSlots = std::max(0, getContainMax()) - static_cast<Int>(getContainCount());
 
 	enableLoadSounds( FALSE );
@@ -375,6 +382,10 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 {
 	OpenContain::onContaining(rider, wasSelected);
 #endif
+#if !RTS_GENERALS
+	if( AttributeModifierHelper* helper = rider->getAttributeModifierHelper() )
+		helper->refreshDerived();
+#endif
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained );
 	if (getHordeContainModuleData()->m_alternateFormation.isNotEmpty())
 		updateFormationModelConditions(rider);
@@ -407,6 +418,10 @@ void HordeContain::onRemoving( Object *rider )
 	}
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained, false );
 	OpenContain::onRemoving( rider );
+#if !RTS_GENERALS
+	if( AttributeModifierHelper* helper = rider->getAttributeModifierHelper() )
+		helper->refreshDerived();
+#endif
 }
 
 void HordeContain::onCapture( Player *oldOwner, Player *newOwner )
@@ -695,7 +710,13 @@ void HordeContain::setAlternateFormation(Bool alternate)
 	if (alternate == isAlternateFormation() || !canSetAlternateFormation(alternate))
 		return;
 
+#if !RTS_GENERALS
+	RotwkModifierModules::removeHordeFormationModifiers( getObject() );
+#endif
 	m_formationOverride = m_formationOverride ? nullptr : findAlternateFormation();
+#if !RTS_GENERALS
+	RotwkModifierModules::applyHordeFormationModifiers( getObject() );
+#endif
 	const HordeLayout& layout = getActiveFormation()->m_layout;
 	std::vector<ObjectID> members(layout.slots().size(), INVALID_ID);
 	std::vector<Coord2D> offsets(members.size(), Coord2D{0.0f, 0.0f});

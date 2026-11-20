@@ -113,3 +113,5 @@ struct WeaponNugget
 	std::vector<AsciiString> m_antiCategories;
 	Bool m_affectHordeMembers = FALSE;
 };
+
+Bool objectFilterMatches(const SpecialPowerObjectFilter& filter, const Object* source, const Object* target);

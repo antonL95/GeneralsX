@@ -99,7 +99,11 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "WeaponModeSpecialPowerUpdate", 64, 32 },
 	{ "MonitorConditionUpdate", 64, 32 },
 	{ "AutoAbilityBehavior", 512, 128 },
-	{ "PlayerHealSpecialPower", 32, 16 }
+	{ "PlayerHealSpecialPower", 32, 16 },
+	{ "AttributeModifierHelper", 8192, 1024 },
+	{ "AttributeModifierAuraUpdate", 1024, 256 },
+	{ "PassiveAreaEffectBehavior", 128, 32 },
+	{ "AttributeModifierUpgrade", 512, 128 }
 };
 
 //-----------------------------------------------------------------------------

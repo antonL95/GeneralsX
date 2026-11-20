@@ -70,6 +70,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/RetailHudExtras.h"
 #include "GameClient/ControlBarScheme.h"
+#include "Common/AttributeModifierRules.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/Display.h"
 #include "GameClient/DisplayStringManager.h"
@@ -148,6 +149,7 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 	{ "AutoAbility", INI::parseBool, nullptr, offsetof(CommandButton, m_autoAbility) },
 	{ "PresetRange", INI::parseReal, nullptr, offsetof(CommandButton, m_presetRange) },
 	{ "FlagsUsedForToggle", WeaponSetFlags::parseFromINI, nullptr, offsetof(CommandButton, m_flagsUsedForToggle) },
+	{ "Stances", CommandButton::parseStances, nullptr, offsetof(CommandButton, m_stances) },
 
 	{ nullptr,						nullptr,												 nullptr, 0 }
 
@@ -4098,11 +4100,16 @@ void CommandButton::parseButtonImages( INI *ini, void *instance, void *store, co
 		INI::parseAsciiString( ini, instance, store, userData );
 		return;
 	}
+	CommandButton *button = static_cast<CommandButton*>( instance );
 	*static_cast<AsciiString*>( store ) = ini->getNextToken();
-	auto* button = static_cast<CommandButton*>(instance);
+	button->m_stateImageNames.assign( 1, *static_cast<AsciiString*>( store ) );
 	const char* alternate = ini->getNextTokenOrNull();
 	button->m_toggleButtonImageName = alternate ? alternate : "";
 	button->m_toggleButtonImage = nullptr;
+	if( alternate )
+		button->m_stateImageNames.emplace_back( alternate );
+	for( const char *more = ini->getNextTokenOrNull(); more; more = ini->getNextTokenOrNull() )
+		button->m_stateImageNames.emplace_back( more );
 }
 
 void CommandButton::parseRetailLabels(INI *ini, void *instance, void *store, const void *userData)
@@ -4125,4 +4132,17 @@ const AsciiString& CommandButton::getRetailChoiceLabel(Int choice) const
 const AsciiString& CommandButton::getRetailChoiceDescription(Int choice) const
 {
 	return choice == 1 && m_toggleDescriptionLabel.isNotEmpty() ? m_toggleDescriptionLabel : getDescriptionLabel();
+}
+
+void CommandButton::parseStances( INI *ini, void *, void *store, const void * )
+{
+	std::vector<Int> &stances = *static_cast<std::vector<Int>*>( store );
+	stances.clear();
+	for( const char *token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull() )
+	{
+		const Int stance = AttributeModifierRules::indexOf( AttributeModifierRules::stanceNames(), token );
+		if( stance <= AttributeModifierRules::STANCE_UNINITIALIZED )
+			throw INI_INVALID_DATA;
+		stances.push_back( stance );
+	}
 }

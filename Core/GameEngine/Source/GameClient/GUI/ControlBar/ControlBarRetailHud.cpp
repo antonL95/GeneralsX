@@ -42,6 +42,8 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/RespawnModules.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
+#include "Common/AttributeModifierRules.h"
 
 namespace
 {
@@ -1216,7 +1218,8 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 				? command->canUseRetailToggle(obj, 0) || command->canUseRetailToggle(obj, 1)
 				: command->canUseRetailToggle(obj, -1)) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		case GUI_COMMAND_TOGGLE_STANCE:
-			return COMMAND_AVAILABLE;
+		case GUI_COMMAND_SET_STANCE:
+			return StancesBehavior::find(obj) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		case GUI_COMMAND_REVIVE:
 		{
 			if (getRetailSlot(win) < 0)
@@ -1273,6 +1276,20 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 			m_retailRange = CommandButtonRules::VisibleRange();
 			markUIDirty();
 			return CBC_COMMAND_USED;
+		case GUI_COMMAND_TOGGLE_STANCE:
+		case GUI_COMMAND_SET_STANCE:
+		{
+			const StancesBehavior *stances = StancesBehavior::find(obj ? obj : getRetailSelection());
+			const std::vector<Int> &cycle = command->getStances();
+			if (!stances || cycle.empty())
+				return CBC_COMMAND_NOT_USED;
+			const Int stance = command->getCommandType() == GUI_COMMAND_SET_STANCE ? cycle.front()
+				: AttributeModifierRules::nextStance(cycle, stances->getStance());
+			GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_SET_STANCE);
+			msg->appendIntegerArgument(stance);
+			markUIDirty();
+			return CBC_COMMAND_USED;
+		}
 		case GUI_COMMAND_REVIVE:
 		{
 			const ThingTemplate *hero = getRetailHero(control);
@@ -1442,6 +1459,18 @@ const Image* ControlBar::getRetailButtonImage(GameWindow *window) const
 		if (const HordeContain* horde = HordeContain::get(obj))
 			if (horde->isAlternateFormation() && command->getToggleButtonImage())
 				return command->getToggleButtonImage();
+	if (command && obj && command->getCommandType() == GUI_COMMAND_TOGGLE_STANCE)
+	{
+		const StancesBehavior *stances = StancesBehavior::find(obj);
+		const Int index = stances ? AttributeModifierRules::stanceImageIndex(command->getStances(), stances->getStance()) : -1;
+		const std::vector<AsciiString> &names = command->getStateImageNames();
+		if (index >= 0 && index < static_cast<Int>(names.size()))
+		{
+			if (const Image *stanceImage = TheMappedImageCollection->findImageByName(names[index]))
+				return stanceImage;
+		}
+		return image;
+	}
 	if (!command || !obj || !command->getToggleButtonImage() ||
 		!command->hasRotwkOption(CommandButtonRules::ROTWK_TOGGLE_IMAGE_ON_WEAPONSET) || !command->getFlagsUsedForToggle().any())
 		return image;

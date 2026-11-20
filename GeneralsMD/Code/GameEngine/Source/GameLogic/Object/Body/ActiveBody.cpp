@@ -59,6 +59,7 @@
 #include "GameLogic/Module/ActiveBody.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BridgeBehavior.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DamageModule.h"
@@ -354,6 +355,8 @@ Real ActiveBody::estimateDamage( DamageInfoInput& damageInfo ) const
 	}
 
 	Real amount = m_curArmor.adjustDamage(damageInfo.m_damageType, damageInfo.m_amount);
+	if (getObject()->getAttributeModifierHelper() && damageInfo.m_damageType != DAMAGE_HEALING && damageInfo.m_damageType != DAMAGE_UNRESISTABLE)
+		amount *= AttributeModifiers::damageTakenFactor(getObject(), damageInfo.m_damageType);
 
 	return amount;
 }
@@ -415,6 +418,8 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 	Bool alreadyHandled = FALSE;
 	Bool allowModifier = TRUE;
 	Real amount = m_curArmor.adjustDamage(damageInfo->in.m_damageType, damageInfo->in.m_amount);
+	if (obj->getAttributeModifierHelper() && damageInfo->in.m_damageType != DAMAGE_HEALING && damageInfo->in.m_damageType != DAMAGE_UNRESISTABLE)
+		amount *= AttributeModifiers::damageTakenFactor(obj, damageInfo->in.m_damageType);
 
 	switch( damageInfo->in.m_damageType )
 	{

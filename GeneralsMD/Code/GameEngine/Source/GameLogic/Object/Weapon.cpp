@@ -74,6 +74,7 @@
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Weapon.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/WeaponNuggetRules.h"
 
 #include "GameLogic/Module/AIUpdate.h"
@@ -2050,6 +2051,13 @@ void Weapon::computeBonus(const Object *source, WeaponBonusConditionFlags extraB
 	const WeaponBonusSet* extra = m_template->getExtraBonus();
 	if (extra)
 		extra->appendBonuses(flags, bonus);
+
+	if (const AttributeModifierRules::Totals* modifiers = AttributeModifiers::totalsOf(source))
+	{
+		bonus.setField(WeaponBonus::DAMAGE, bonus.getField(WeaponBonus::DAMAGE) * modifiers->damageDealtFactor());
+		bonus.setField(WeaponBonus::RANGE, bonus.getField(WeaponBonus::RANGE) * modifiers->rangeFactor());
+		bonus.setField(WeaponBonus::RATE_OF_FIRE, bonus.getField(WeaponBonus::RATE_OF_FIRE) * modifiers->value[AttributeModifierRules::RATE_OF_FIRE]);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------

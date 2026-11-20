@@ -1278,6 +1278,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	static const FieldParse retailFields[] =
 	{
 		{ "TerrainResourceCellSize", INI::parseReal, nullptr, offsetof(GlobalData, m_terrainResourceCellSize) },
+		{ "AttributeModifierArmorMaxBonus", INI::parsePercentToReal, nullptr, offsetof(GlobalData, m_attributeModifierArmorMaxBonus) },
 		{ "GoodCommandPointLimit", INI::parseInt, nullptr, offsetof(GlobalData, m_commandPoints.goodLimit) },
 		{ "EvilCommandPointLimit", INI::parseInt, nullptr, offsetof(GlobalData, m_commandPoints.evilLimit) },
 		{ "GoodCommandPoints", parseCommandPointPair, nullptr, offsetof(GlobalData, m_commandPoints.good) },

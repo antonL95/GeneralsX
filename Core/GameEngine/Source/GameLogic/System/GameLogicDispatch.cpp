@@ -87,6 +87,7 @@
 
 #include "GameNetwork/NetworkInterface.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 
 
 
@@ -749,6 +750,19 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		case GameMessage::MSG_FOUNDATION_CONSTRUCT:
 		{
 			onFoundationConstruct(msg, currentlySelectedGroup);
+			break;
+		}
+		case GameMessage::MSG_SET_STANCE:
+		{
+			if (currentlySelectedGroup && msg->getArgumentCount() > 0)
+			{
+				const Int stance = msg->getArgument(0)->integer;
+				for (ObjectID id : currentlySelectedGroup->getAllIDs())
+				{
+					if (StancesBehavior* stances = StancesBehavior::find(findObjectByID(id)))
+						stances->setStance(stance);
+				}
+			}
 			break;
 		}
 		case GameMessage::MSG_DOZER_CANCEL_CONSTRUCT:

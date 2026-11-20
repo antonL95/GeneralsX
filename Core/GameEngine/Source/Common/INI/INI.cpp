@@ -38,6 +38,9 @@
 #include "Common/INIBlockStructure.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/ExperienceLevelStore.h"
+#if !RTS_GENERALS
+#include "GameLogic/AttributeModifierStore.h"
+#endif
 #include "Common/RotwkDuration.h"
 #include "Common/INIException.h"
 #include "Common/INILegacyLines.h"
@@ -514,6 +517,12 @@ static INIBlockParse findBlockParse(const char* token)
 		return BfmeMapScripts::parsePlayerAIType;
 	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "FXParticleSystem") == 0)
 		return INI::parseFXParticleSystemDefinition;
+#if !RTS_GENERALS
+	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "ModifierList") == 0)
+		return AttributeModifierStore::parseModifierListDefinition;
+	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "StanceTemplate") == 0)
+		return AttributeModifierStore::parseStanceTemplateDefinition;
+#endif
 	for (size_t i = 0; i < ARRAY_SIZE(theTypeTable); ++i)
 	{
 		if (strcmp(theTypeTable[i].token, token) == 0)

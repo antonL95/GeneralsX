@@ -140,6 +140,8 @@ public:
 	void setAlternateFormation(Bool alternate);
 	void toggleWeaponSet(const WeaponSetFlags& flags, Bool enabled);
 	static const HordeContain* get(const Object* object);
+	const HordeContainModuleData* getActiveFormation() const;
+	const std::vector<AsciiString>& getFormationModifiers() const { return getActiveFormation()->m_attributeModifiers; }
 	static Object* getAnchor(Object* member);
 	static Drawable* resolveSelection(Drawable* draw);
 
@@ -149,7 +151,6 @@ protected:
 
 private:
 	const HordeContainModuleData* findAlternateFormation() const;
-	const HordeContainModuleData* getActiveFormation() const;
 	void updateFormationModelConditions(Object* object) const;
 	std::vector<ObjectID> m_slotMembers;
 	std::vector<Coord2D> m_slotOffsets;

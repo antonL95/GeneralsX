@@ -50,6 +50,7 @@
 #include "Common/ArchiveFileSystem.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
@@ -841,6 +842,11 @@ void GameEngine::init()
 
 
 		initSubsystem(TheThingFactory,"TheThingFactory", createThingFactory(), &xferCRC, "Data\\INI\\Default\\Object", "Data\\INI\\Object");
+		if (RetailFileLayers::enabled())
+		{
+			initSubsystem(TheAttributeModifierStore, "TheAttributeModifierStore", MSGNEW("GameEngineSubsystem") AttributeModifierStore(), &xferCRC, nullptr, "Data\\INI\\AttributeModifier");
+			ini.loadFileDirectory("Data\\INI\\Stances", INI_LOAD_OVERWRITE, &xferCRC);
+		}
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
 	GetPrecisionTimer(&endTime64);//////////////////////////////////////////////////////////////////

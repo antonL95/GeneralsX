@@ -235,6 +235,7 @@ public:
 	Real m_cameraPitch;
 	SpecialPowerObjectFilter m_victoryStructureFilter;
 	Real m_terrainResourceCellSize = 20.0f;
+	Real m_attributeModifierArmorMaxBonus = 0.75f;
 	CommandPointRules::Config m_commandPoints;
 	SpecialPowerObjectFilter m_victoryUnitFilter;
 	Real m_cameraYaw;

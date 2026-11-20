@@ -406,6 +406,9 @@ public:
 	const AsciiString& getRetailChoiceDescription(Int choice) const;
 	static void parseRetailLabels(INI *ini, void *instance, void *store, const void *userData);
 	const Image* getToggleButtonImage() const { return m_toggleButtonImage; }
+	const std::vector<Int>& getStances() const { return m_stances; }
+	const std::vector<AsciiString>& getStateImageNames() const { return m_stateImageNames; }
+	static void parseStances( INI *ini, void *instance, void *store, const void *userData );
 	static void parseButtonImages( INI *ini, void *instance, void *store, const void *userData );
 	const Image* getButtonImage() const { return m_buttonImage;	}
 	void cacheButtonImage();
@@ -479,6 +482,8 @@ private:
 	AsciiString m_toggleTextLabel;
 	AsciiString m_toggleDescriptionLabel;
 	const Image *m_toggleButtonImage = nullptr;
+	std::vector<Int> m_stances;
+	std::vector<AsciiString> m_stateImageNames;
 
 };
 

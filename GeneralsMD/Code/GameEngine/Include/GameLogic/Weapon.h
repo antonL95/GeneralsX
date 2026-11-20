@@ -497,6 +497,7 @@ protected:
 	// actually deal out the damage.
 	void dealDamageInternal(ObjectID sourceID, ObjectID victimID, const Coord3D *pos, const WeaponBonus& bonus, Bool isProjectileDetonation) const;
 	void dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus) const;
+	void applyModifierNugget(const WeaponNugget& nugget, const Object* attacker, ObjectID victimID, const Coord3D* pos) const;
 	void dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus, Bool dotTick = FALSE) const;
 	void launchNuggetProjectiles(const Object* sourceObj, WeaponSlotType wslot, Int specificBarrelToUse, Object* victimObj,
 		const Coord3D& destination, Weapon* firingWeapon, ObjectID* projectileID) const;

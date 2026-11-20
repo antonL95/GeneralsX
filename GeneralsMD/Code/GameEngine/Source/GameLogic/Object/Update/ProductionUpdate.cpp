@@ -36,6 +36,8 @@
 #include "Common/GameState.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
+#include <algorithm>
 #include "Common/Radar.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -690,6 +692,12 @@ UpdateSleepTime ProductionUpdate::update()
 		totalProductionFrames = production->m_objectToProduce->calcTimeToBuild( player );
 	else
 		totalProductionFrames = production->m_upgradeToResearch->calcTimeToBuild( player );
+	if( getObject()->getAttributeModifierHelper() )
+	{
+		const Real productionFactor = AttributeModifiers::productionFactor( getObject() );
+		if( productionFactor > 0.0f && productionFactor != 1.0f )
+			totalProductionFrames = std::max<Int>( 1, (Int)REAL_TO_INT_CEIL( INT_TO_REAL( totalProductionFrames ) / productionFactor ) );
+	}
 
 	// figure out our percent complete
 	production->m_percentComplete = INT_TO_REAL( production->m_framesUnderConstruction ) /

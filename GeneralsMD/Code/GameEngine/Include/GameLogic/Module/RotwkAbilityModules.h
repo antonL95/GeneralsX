@@ -126,6 +126,9 @@ class HeroModeSpecialAbilityUpdate : public SpecialAbilityUpdate
 
 public:
 	HeroModeSpecialAbilityUpdate( Thing *thing, const ModuleData *moduleData );
+
+protected:
+	virtual void triggerAbilityEffect() override;
 };
 
 class WeaponModeSpecialPowerUpdateModuleData : public UpdateModuleData

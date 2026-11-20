@@ -71,6 +71,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/HeroRoster.h
     Include/Common/HeroRules.h
     Include/Common/AbilityRules.h
+    Include/Common/AttributeModifierRules.h
     Include/GameClient/CommandButtonRules.h
     Include/GameLogic/CastleRules.h
     Include/GameLogic/RotwkLocomotorRules.h

@@ -16,7 +16,16 @@ class StancesBehavior final : public BehaviorModule
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( StancesBehavior, StancesBehaviorModuleData )
 
 public:
-	StancesBehavior(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data) {}
+	StancesBehavior(Thing* thing, const ModuleData* data);
+
+	virtual void onObjectCreated() override;
+	Int getStance() const { return m_stance; }
+	void setStance(Int stance);
+	static StancesBehavior* find(const Object* obj);
+
+private:
+	Int m_stance;
+	AsciiString m_appliedModifier;
 };
 
 struct LargeGroupAudioUpdateModuleData : public UpdateModuleData

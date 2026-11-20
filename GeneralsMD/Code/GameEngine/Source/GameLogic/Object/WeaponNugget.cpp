@@ -14,6 +14,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -249,6 +250,11 @@ const char* nuggetTypeName(WeaponNuggetType type)
 
 }
 
+Bool objectFilterMatches(const SpecialPowerObjectFilter& filter, const Object* source, const Object* target)
+{
+	return filterMatches(filter, source, target);
+}
+
 void WeaponNugget::parseDamageNugget(INI* ini, void*, void* store, const void*)
 {
 	parseNugget(ini, store, WEAPON_NUGGET_DAMAGE, s_damageFields);
@@ -421,6 +427,42 @@ void WeaponTemplate::launchNuggetProjectiles(const Object* sourceObj, WeaponSlot
 	}
 }
 
+void WeaponTemplate::applyModifierNugget(const WeaponNugget& nugget, const Object* attacker, ObjectID victimID, const Coord3D* pos) const
+{
+	const Int list = AttributeModifiers::findList(nugget.m_attributeModifier);
+	if (list < 0 || !pos)
+		return;
+	UnsignedInt antiMask = 0;
+	for (const AsciiString& name : nugget.m_antiCategories)
+		antiMask |= AttributeModifierRules::categoryBit(AttributeModifierRules::indexOf(AttributeModifierRules::categoryNames(), name.str()));
+	Object* primary = victimID != INVALID_ID ? TheGameLogic->findObjectByID(victimID) : nullptr;
+	const auto affect = [&](Object* victim)
+	{
+		if (victim->isEffectivelyDead() || !nugget.affects(attacker, victim))
+			return;
+		AttributeModifiers::apply(victim, list, AttributeModifierHelper::USE_LIST_DURATION, antiMask);
+		if (RetailTestCommands::tracesCombat())
+			std::fprintf(stderr, "TEST modifier nugget frame=%u weapon=%s list=%s victim=%u(%s)\n", TheGameLogic->getFrame(), m_name.str(),
+				nugget.m_attributeModifier.str(), static_cast<unsigned>(victim->getID()), victim->getTemplate()->getName().str());
+	};
+	if (nugget.m_radius <= 0.0f)
+	{
+		if (primary)
+			affect(primary);
+		return;
+	}
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(pos, nugget.m_radius, FROM_BOUNDINGSPHERE_3D);
+	MemoryPoolObjectHolder hold(iter);
+	for (Object* victim = iter->first(); victim; victim = iter->next())
+	{
+		if (victim->isKindOf(KINDOF_PROJECTILE))
+			continue;
+		if (judgeRadiusDamageVictim(attacker, victim, primary, m_affectsMask) == RADIUS_DAMAGE_SKIP)
+			continue;
+		affect(victim);
+	}
+}
+
 void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus) const
 {
 	const Object* source = TheGameLogic->findObjectByID(sourceID);
@@ -436,6 +478,12 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 	for (size_t index = 0; index < m_nuggets.size(); ++index)
 	{
 		const WeaponNugget& nugget = m_nuggets[index];
+		if (nugget.m_type == WEAPON_NUGGET_ATTRIBUTE_MODIFIER)
+		{
+			if (nugget.isEnabledFor(attacker))
+				applyModifierNugget(nugget, attacker, victimID, pos);
+			continue;
+		}
 		if (!nugget.isImpactNugget() || !nugget.isEnabledFor(attacker))
 			continue;
 		if (nugget.m_delayFrames == 0)

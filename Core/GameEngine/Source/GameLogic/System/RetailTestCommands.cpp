@@ -66,6 +66,10 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #if !RTS_GENERALS
 #include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
+#include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
+#include "Common/AttributeModifierRules.h"
 #endif
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
@@ -510,6 +514,37 @@ void printHealth(const Command& command, const Object* obj, unsigned int frame)
 		body ? body->getHealth() : 0.0f, body ? body->getMaxHealth() : 0.0f, obj->isEffectivelyDead() ? 1 : 0,
 		obj->getPosition()->x, obj->getPosition()->y);
 }
+
+#if !RTS_GENERALS
+void logModifiedObject(const char* label, const Object* obj, unsigned int frame)
+{
+	const BodyModuleInterface* body = obj->getBodyModule();
+	const AIUpdateInterface* ai = obj->getAI();
+	const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+	const Weapon* weapon = obj->getWeaponInWeaponSlot(PRIMARY_WEAPON);
+	const StancesBehavior* stances = StancesBehavior::find(obj);
+	AsciiString lists;
+	AttributeModifiers::describe(obj, lists);
+	std::fprintf(stderr, "TEST mods %u %s id=%u(%s) stance=%s health=%.1f/%.1f armorSlash=%.3f armorMagic=%.3f damage=%.3f range=%.1f rof=%.3f speed=%.2f vision=%.1f shroud=%.1f xp=%.3f production=%.3f recharge=%.3f lists=[%s]\n",
+		frame, label, static_cast<unsigned>(obj->getID()), obj->getTemplate()->getName().str(),
+		stances ? AttributeModifierRules::stanceNames()[stances->getStance()] : "-",
+		body ? body->getHealth() : 0.0f, body ? body->getMaxHealth() : 0.0f,
+		AttributeModifiers::damageTakenFactor(obj, DAMAGE_SLASH), AttributeModifiers::damageTakenFactor(obj, DAMAGE_MAGIC),
+		AttributeModifiers::damageDealtFactor(obj), weapon ? weapon->getAttackRange(obj) : 0.0f, AttributeModifiers::rateOfFireFactor(obj),
+		locomotor ? locomotor->getMaxSpeedForCondition(BODY_PRISTINE, obj) : 0.0f, obj->getVisionRange(), obj->getShroudClearingRange(),
+		AttributeModifiers::experienceFactor(obj), AttributeModifiers::productionFactor(obj), AttributeModifiers::rechargeFactor(obj),
+		lists.str());
+}
+
+void logModifiers(Object* obj, unsigned int frame)
+{
+	logModifiedObject("object", obj, frame);
+	ContainModuleInterface* contain = HordeContain::get(obj) ? obj->getContain() : nullptr;
+	const ContainedItemsList* members = contain ? contain->getContainedItemsList() : nullptr;
+	if (members && !members->empty())
+		logModifiedObject("member", members->front(), frame);
+}
+#endif
 
 void listObjects(const Command& command, unsigned int frame)
 {
@@ -1841,6 +1876,23 @@ void execute(const Command& command, unsigned int frame)
 		aimPendingCommand(command, obj, frame);
 	else if (command.action == "power")
 		pressPowerButton(command, obj, frame);
+#if !RTS_GENERALS
+	else if (command.action == "mods")
+		logModifiers(obj, frame);
+	else if (command.action == "stance")
+	{
+		const Int stance = AttributeModifierRules::indexOf(AttributeModifierRules::stanceNames(), command.structure.c_str());
+		selectGroup(obj);
+		GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_SET_STANCE);
+		msg->appendIntegerArgument(stance);
+		std::fprintf(stderr, "TEST frame %u: stance object %u %s (%d)\n", frame, static_cast<unsigned>(obj->getID()), command.structure.c_str(), stance);
+	}
+	else if (command.action == "modapply")
+	{
+		const Bool applied = AttributeModifiers::apply(obj, AsciiString(command.structure.c_str()));
+		std::fprintf(stderr, "TEST frame %u: modapply object %u %s %d\n", frame, static_cast<unsigned>(obj->getID()), command.structure.c_str(), applied ? 1 : 0);
+	}
+#endif
 	else if (command.action == "objupgrade")
 	{
 		const UpgradeTemplate* upgrade = TheUpgradeCenter ? TheUpgradeCenter->findUpgrade(command.structure.c_str()) : nullptr;

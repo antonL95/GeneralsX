@@ -246,6 +246,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/FPUControl.h
     Include/GameLogic/GameLogic.h
     Include/GameLogic/GhostObject.h
+    Include/GameLogic/AttributeModifierStore.h
     Include/GameLogic/Locomotor.h
     Include/GameLogic/LocomotorSet.h
 #    Include/GameLogic/LogicRandomValue.h
@@ -258,6 +259,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/AssistedTargetingUpdate.h
     Include/GameLogic/Module/AutoDepositUpdate.h
     Include/GameLogic/Module/AutoFindHealingUpdate.h
+    Include/GameLogic/Module/AttributeModifierHelper.h
     Include/GameLogic/Module/AutoHealBehavior.h
     Include/GameLogic/Module/BaikonurLaunchPower.h
     Include/GameLogic/Module/BaseRegenerateUpdate.h
@@ -424,6 +426,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/SpecialAbility.h
     Include/GameLogic/Module/SpecialAbilityUpdate.h
     Include/GameLogic/Module/RotwkAbilityModules.h
+    Include/GameLogic/Module/RotwkModifierModules.h
     Include/GameLogic/Module/SpecialPowerCompletionDie.h
     Include/GameLogic/Module/SpecialPowerCreate.h
     Include/GameLogic/Module/SpecialPowerModule.h
@@ -942,6 +945,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/GhostObject.cpp
     Source/GameLogic/Object/Helper/ObjectDefectionHelper.cpp
     Source/GameLogic/Object/Helper/ObjectHelper.cpp
+    Source/GameLogic/Object/Helper/AttributeModifierHelper.cpp
     Source/GameLogic/Object/Helper/ObjectRepulsorHelper.cpp
     Source/GameLogic/Object/Helper/ObjectSMCHelper.cpp
     Source/GameLogic/Object/Helper/ObjectWeaponStatusHelper.cpp
@@ -1038,6 +1042,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/SmartBombTargetHomingUpdate.cpp
     Source/GameLogic/Object/Update/SpecialAbilityUpdate.cpp
     Source/GameLogic/Object/Update/RotwkAbilityModules.cpp
+    Source/GameLogic/Object/Update/RotwkModifierModules.cpp
     Source/GameLogic/Object/Update/SpecialPowerUpdateModule.cpp
     Source/GameLogic/Object/Update/SpectreGunshipDeploymentUpdate.cpp
     Source/GameLogic/Object/Update/SpectreGunshipUpdate.cpp
@@ -1073,6 +1078,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Upgrade/UpgradeModule.cpp
     Source/GameLogic/Object/Upgrade/WeaponBonusUpgrade.cpp
     Source/GameLogic/Object/Upgrade/WeaponSetUpgrade.cpp
+    Source/GameLogic/Object/AttributeModifierStore.cpp
     Source/GameLogic/Object/Weapon.cpp
     Source/GameLogic/Object/WeaponNugget.cpp
     Source/GameLogic/Object/WeaponSet.cpp

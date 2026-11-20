@@ -2,6 +2,14 @@
 
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 
+#include "Common/AttributeModifierRules.h"
+#include "Common/Xfer.h"
+#include "GameLogic/Object.h"
+#if !RTS_GENERALS
+#include "GameLogic/AttributeModifierStore.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
+#endif
+
 void StancesBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
 	BehaviorModuleData::buildFieldParse(p);
@@ -78,7 +86,6 @@ void CastleMemberBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 	void Module::xfer(Xfer* xfer) { Base::xfer(xfer); } \
 	void Module::loadPostProcess() { Base::loadPostProcess(); }
 
-DEFINE_PARSE_ONLY_SNAPSHOT(StancesBehavior, BehaviorModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(LargeGroupAudioUpdate, UpdateModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(PickupStuffUpdate, UpdateModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(HitReactionBehavior, BehaviorModule)
@@ -86,3 +93,71 @@ DEFINE_PARSE_ONLY_SNAPSHOT(HordeMemberCollide, BehaviorModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(CastleMemberBehavior, BehaviorModule)
 
 #undef DEFINE_PARSE_ONLY_SNAPSHOT
+
+StancesBehavior::StancesBehavior(Thing* thing, const ModuleData* data) :
+	BehaviorModule(thing, data),
+	m_stance(AttributeModifierRules::STANCE_BATTLE)
+{
+}
+
+StancesBehavior::~StancesBehavior() = default;
+
+StancesBehavior* StancesBehavior::find(const Object* obj)
+{
+	if (!obj)
+		return nullptr;
+	static const NameKeyType key = NAMEKEY("StancesBehavior");
+	for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() == key)
+			return static_cast<StancesBehavior*>(*module);
+	}
+	return nullptr;
+}
+
+void StancesBehavior::onObjectCreated()
+{
+	setStance(m_stance);
+}
+
+void StancesBehavior::setStance(Int stance)
+{
+	if (stance <= AttributeModifierRules::STANCE_UNINITIALIZED || stance >= AttributeModifierRules::STANCE_COUNT)
+		return;
+	m_stance = stance;
+#if !RTS_GENERALS
+	if (!TheAttributeModifierStore)
+		return;
+	Object* self = getObject();
+	const StanceTemplateData* stances = TheAttributeModifierStore->findStanceTemplate(getStancesBehaviorModuleData()->m_stanceTemplate);
+	const AsciiString next = stances ? stances->m_modifiers[stance] : AsciiString::TheEmptyString;
+	if (next == m_appliedModifier)
+		return;
+	if (m_appliedModifier.isNotEmpty())
+		AttributeModifiers::remove(self, m_appliedModifier);
+	m_appliedModifier = next;
+	if (m_appliedModifier.isNotEmpty())
+		AttributeModifiers::apply(self, m_appliedModifier, 0);
+#endif
+}
+
+void StancesBehavior::crc(Xfer* xfer)
+{
+	BehaviorModule::crc(xfer);
+	xfer->xferInt(&m_stance);
+}
+
+void StancesBehavior::xfer(Xfer* xfer)
+{
+	XferVersion currentVersion = 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
+	BehaviorModule::xfer(xfer);
+	xfer->xferInt(&m_stance);
+	xfer->xferAsciiString(&m_appliedModifier);
+}
+
+void StancesBehavior::loadPostProcess()
+{
+	BehaviorModule::loadPostProcess();
+}

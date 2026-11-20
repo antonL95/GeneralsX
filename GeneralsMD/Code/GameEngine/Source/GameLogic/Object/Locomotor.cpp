@@ -43,6 +43,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
@@ -1014,7 +1015,7 @@ void Locomotor::startMove()
 }
 
 //-------------------------------------------------------------------------------------------------
-Real Locomotor::getMaxSpeedForCondition(BodyDamageType condition) const
+Real Locomotor::getMaxSpeedForCondition(BodyDamageType condition, const Object* obj) const
 {
 	Real speed;
 
@@ -1022,6 +1023,9 @@ Real Locomotor::getMaxSpeedForCondition(BodyDamageType condition) const
 		speed = m_template->getActualMaxSpeed();
 	else
 		speed = m_template->getActualMaxSpeedDamaged();
+
+	if (obj && obj->getAttributeModifierHelper())
+		speed *= AttributeModifiers::speedFactor(obj);
 
 	Real maxSpeed = getMaxSpeedOverride();
 	if (speed > maxSpeed)
@@ -1200,7 +1204,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	setFlag(MAINTAIN_POS_IS_VALID, false);
 
 	BodyDamageType bdt = obj->getBodyModule()->getDamageState();
-	Real maxSpeed = getMaxSpeedForCondition(bdt);
+	Real maxSpeed = getMaxSpeedForCondition(bdt, obj);
 
 	// sanity, we cannot use desired speed that is greater than our max speed we are capable of moving at
 	if( desiredSpeed > maxSpeed )
@@ -1414,7 +1418,7 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 
 	// sanity, we cannot use desired speed that is greater than our max speed we are capable of moving at
 	BodyDamageType bdt = obj->getBodyModule()->getDamageState();
-	Real maxSpeed = getMaxSpeedForCondition(bdt);
+	Real maxSpeed = getMaxSpeedForCondition(bdt, obj);
 	if( desiredSpeed > maxSpeed )
 		desiredSpeed = maxSpeed;
 
@@ -1526,7 +1530,7 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed)
 {
 	BodyDamageType bdt = obj->getBodyModule()->getDamageState();
-	Real maxSpeed = getMaxSpeedForCondition(bdt);
+	Real maxSpeed = getMaxSpeedForCondition(bdt, obj);
 	Real maxTurnRate = getMaxTurnRate(bdt);
 	Real maxAcceleration = getMaxAcceleration(bdt);
 
@@ -1869,7 +1873,7 @@ void Locomotor::moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, c
 	Real maxAcceleration = getMaxAcceleration( obj->getBodyModule()->getDamageState() );
 
 	// sanity, we cannot use desired speed that is greater than our max speed we are capable of moving at
-	Real maxSpeed = getMaxSpeedForCondition( obj->getBodyModule()->getDamageState() );
+	Real maxSpeed = getMaxSpeedForCondition( obj->getBodyModule()->getDamageState(), obj );
 	if( desiredSpeed > maxSpeed )
 		desiredSpeed = maxSpeed;
 
@@ -1960,7 +1964,7 @@ void Locomotor::moveTowardsPositionClimb(Object* obj, PhysicsBehavior *physics, 
 	Real maxAcceleration = getMaxAcceleration( obj->getBodyModule()->getDamageState() );
 
 	// sanity, we cannot use desired speed that is greater than our max speed we are capable of moving at
-	Real maxSpeed = getMaxSpeedForCondition( obj->getBodyModule()->getDamageState() );
+	Real maxSpeed = getMaxSpeedForCondition( obj->getBodyModule()->getDamageState(), obj );
 	if( desiredSpeed > maxSpeed )
 		desiredSpeed = maxSpeed;
 
@@ -2160,7 +2164,7 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 {
 	BodyDamageType bdt = obj->getBodyModule()->getDamageState();
 
-	Real maxForwardSpeed = getMaxSpeedForCondition(bdt);
+	Real maxForwardSpeed = getMaxSpeedForCondition(bdt, obj);
 	desiredSpeed = clamp(getMinSpeed(), desiredSpeed, maxForwardSpeed);
 	Real actualForwardSpeed = physics->getForwardSpeed3D();
 
@@ -2602,7 +2606,7 @@ void Locomotor::moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, 
 	Real maxAcceleration = getMaxAcceleration(bdt);
 
 	// sanity, we cannot use desired speed that is greater than our max speed we are capable of moving at
-	Real maxSpeed = getMaxSpeedForCondition(bdt);
+	Real maxSpeed = getMaxSpeedForCondition(bdt, obj);
 	if( desiredSpeed > maxSpeed )
 		desiredSpeed = maxSpeed;
 

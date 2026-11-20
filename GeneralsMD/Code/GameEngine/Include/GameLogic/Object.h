@@ -106,6 +106,7 @@ class SubdualDamageHelper;
 class TempWeaponBonusHelper;
 class ObjectWeaponStatusHelper;
 class ObjectDefectionHelper;
+class AttributeModifierHelper;
 
 enum CommandSourceType CPP_11(: Int);
 enum HackerAttackMode CPP_11(: Int);
@@ -235,6 +236,8 @@ public:
 	void createVeterancyLevelFX(VeterancyLevel oldLevel, VeterancyLevel newLevel);
 	ExperienceTracker* getExperienceTracker() {return m_experienceTracker;}
 	const ExperienceTracker* getExperienceTracker() const {return m_experienceTracker;}
+	AttributeModifierHelper* getAttributeModifierHelper() const { return m_attributeModifierHelper; }
+	void refreshModifiedShroudClearing();
 	VeterancyLevel getVeterancyLevel() const;
 
 	inline const AsciiString& getName() const { return m_name; }
@@ -738,7 +741,7 @@ private:
 
 	UnsignedInt		m_smcUntil;
 
-	enum { NUM_SLEEP_HELPERS = 8 };
+	enum { NUM_SLEEP_HELPERS = 9 };
 	ObjectRepulsorHelper*					m_repulsorHelper;
 	ObjectSMCHelper*							m_smcHelper;
 	ObjectWeaponStatusHelper*			m_wsHelper;
@@ -747,6 +750,7 @@ private:
 	SubdualDamageHelper*					m_subdualDamageHelper;
 	TempWeaponBonusHelper*				m_tempWeaponBonusHelper;
 	FiringTracker*								m_firingTracker;	///< Tracker is really a "helper" and is included NUM_SLEEP_HELPERS
+	AttributeModifierHelper*			m_attributeModifierHelper;
 
 	// modules
 	BehaviorModule**							m_behaviors;	// BehaviorModule, not BehaviorModuleInterface

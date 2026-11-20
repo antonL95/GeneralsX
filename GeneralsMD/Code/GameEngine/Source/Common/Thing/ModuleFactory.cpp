@@ -284,6 +284,7 @@
 #include "GameLogic/Module/AISpecialPowerUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/Module/SpecialAbility.h"
 #include "GameLogic/Module/SpyVisionSpecialPower.h"
 #include "GameLogic/Module/CashBountyPower.h"
@@ -469,6 +470,9 @@ void ModuleFactory::init()
 	if (registersRotwkModules())
 	{
 		addModule( StancesBehavior );
+		addModule( AttributeModifierAuraUpdate );
+		addModule( PassiveAreaEffectBehavior );
+		addModule( AttributeModifierUpgrade );
 		addModule( LargeGroupAudioUpdate );
 		addModule( PickupStuffUpdate );
 		addModule( HitReactionBehavior );
