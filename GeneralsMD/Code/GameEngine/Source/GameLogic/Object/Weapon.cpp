@@ -59,6 +59,7 @@
 #include "GameLogic/Damage.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -208,7 +209,7 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 	{ "ContinuousFireTwo",				INI::parseInt,													nullptr,							offsetof(WeaponTemplate, m_continuousFireTwoShotsNeeded) },
 	{ "ContinuousFireCoast",			INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_continuousFireCoastFrames) },
  	{ "AutoReloadWhenIdle",				INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_autoReloadWhenIdleFrames) },
-	{ "ClipReloadTime",						INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_clipReloadTime) },
+	{ "ClipReloadTime",						WeaponTemplate::parseClipReloadTime,			nullptr,							offsetof(WeaponTemplate, m_clipReloadTime) },
 	{ "DelayBetweenShots",				WeaponTemplate::parseShotDelay,					nullptr,							0 },
 	{ "ShotsPerBarrel",						INI::parseInt,													nullptr,							offsetof(WeaponTemplate, m_shotsPerBarrel) },
 	{ "DamageDealtAtSelfPosition",INI::parseBool,													nullptr,							offsetof(WeaponTemplate, m_damageDealtAtSelfPosition) },
@@ -259,6 +260,8 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "MaxWeaponSpeed", INI::parseVelocityReal, nullptr, offsetof(WeaponTemplate, m_maxWeaponSpeed) },
 	{ "MeleeWeapon", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_meleeWeapon) },
 	{ "HitStoredTarget", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_hitStoredTarget) },
+	{ "BombardType", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_bombardType) },
+	{ "NoVictimNeeded", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_noVictimNeeded) },
 	{ "AntiAirborneMonster", INI::parseBitInInt32, (void*)WEAPON_ANTI_AIRBORNE_MONSTER, offsetof(WeaponTemplate, m_antiMask) },
 	{ nullptr, nullptr, nullptr, 0 }
 };
@@ -319,6 +322,7 @@ WeaponTemplate::WeaponTemplate() : m_nextTemplate(nullptr)
 	m_continuousFireCoastFrames			= 0;
  	m_autoReloadWhenIdleFrames			= 0;
 	m_clipReloadTime								= 0;
+	m_maxClipReloadTime								= 0;
 	m_minDelayBetweenShots					= 0;
 	m_maxDelayBetweenShots					= 0;
 	m_fireSoundLoopTime							= 0;
@@ -348,6 +352,8 @@ WeaponTemplate::WeaponTemplate() : m_nextTemplate(nullptr)
 	m_maxWeaponSpeed = 0.0f;
 	m_meleeWeapon = FALSE;
 	m_hitStoredTarget = FALSE;
+	m_bombardType = FALSE;
+	m_noVictimNeeded = FALSE;
 
 	m_historicDamageTriggerId = 0;
 }
@@ -393,10 +399,48 @@ void WeaponTemplate::reset()
 }
 
 //-------------------------------------------------------------------------------------------------
+static void parseRetailWeaponDelay(INI* ini, Int& minFrames, Int& maxFrames)
+{
+	const char* token = ini->getNextToken(ini->getSepsColon());
+	const Bool isRange = stricmp(token, "Min") == 0;
+	const Int minMsecs = INI::scanInt(isRange ? ini->getNextToken(ini->getSepsColon()) : token);
+	Int maxMsecs = minMsecs;
+	if (isRange)
+	{
+		const char* maxLabel = ini->getNextTokenOrNull(ini->getSepsColon());
+		if (maxLabel && stricmp(maxLabel, "Max") == 0)
+			maxMsecs = INI::scanInt(ini->getNextToken(ini->getSepsColon()));
+	}
+	if (minMsecs < 0 || maxMsecs < minMsecs)
+		throw INI_INVALID_DATA;
+
+	minFrames = WWMath::Ceil(ConvertDurationFromMsecsToFrames(static_cast<Real>(minMsecs)));
+	maxFrames = WWMath::Ceil(ConvertDurationFromMsecsToFrames(static_cast<Real>(maxMsecs)));
+}
+
+void WeaponTemplate::parseClipReloadTime(INI* ini, void* instance, void* store, const void* userData)
+{
+	WeaponTemplate* self = static_cast<WeaponTemplate*>(instance);
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		parseRetailWeaponDelay(ini, self->m_clipReloadTime, self->m_maxClipReloadTime);
+	}
+	else
+	{
+		INI::parseDurationUnsignedInt(ini, instance, store, userData);
+		self->m_maxClipReloadTime = self->m_clipReloadTime;
+	}
+}
+
 /*static*/ void WeaponTemplate::parseShotDelay( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ )
 {
 	// This smart parser allows both a single number for traditional delay, and a labeled pair of numbers for a delay range
 	WeaponTemplate* self = (WeaponTemplate*)instance;
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		parseRetailWeaponDelay(ini, self->m_minDelayBetweenShots, self->m_maxDelayBetweenShots);
+		return;
+	}
 	static const char *MIN_LABEL = "Min";
 	static const char *MAX_LABEL = "Max";
 
@@ -549,11 +593,14 @@ Int WeaponTemplate::getDelayBetweenShots(const WeaponBonus& bonus) const
 }
 
 //-------------------------------------------------------------------------------------------------
-Int WeaponTemplate::getClipReloadTime(const WeaponBonus& bonus) const
+Int WeaponTemplate::getClipReloadTime(const WeaponBonus& bonus, Bool rollRange) const
 {
-	// yes, divide, not multiply; the larger the rate-of-fire bonus, the shorter
-	// we want the reload time to be.
-	return REAL_TO_INT_FLOOR(m_clipReloadTime / bonus.getField(WeaponBonus::RATE_OF_FIRE));
+	Int delay = m_clipReloadTime;
+	if (rollRange && m_clipReloadTime < m_maxClipReloadTime)
+		delay = GameLogicRandomValue(m_clipReloadTime, m_maxClipReloadTime);
+	if (RetailFileLayers::enabled())
+		delay -= delay % 3;
+	return REAL_TO_INT_FLOOR(delay / bonus.getField(WeaponBonus::RATE_OF_FIRE));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1996,7 +2043,7 @@ Int Weapon::getClipReloadTime(const Object *source) const
 {
 	WeaponBonus bonus;
 	computeBonus(source, 0, bonus);
-	return m_template->getClipReloadTime(bonus);
+	return m_template->getClipReloadTime(bonus, FALSE);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2044,9 +2091,13 @@ void Weapon::reloadWithBonus(const Object *sourceObj, const WeaponBonus& bonus, 
 		m_ammoInClip = 0x7fffffff;	// 0 == unlimited (or effectively so)
 
 	m_status = RELOADING_CLIP;
-	Real reloadTime = loadInstantly ? 0 : m_template->getClipReloadTime(bonus);
+	Real reloadTime = loadInstantly ? 0 : m_template->getClipReloadTime(bonus, TRUE);
 	m_whenLastReloadStarted = TheGameLogic->getFrame();
 	m_whenWeCanFireAgain = m_whenLastReloadStarted + reloadTime;
+	if (!loadInstantly && RetailTestCommands::tracesCombat())
+		std::fprintf(stderr, "TEST cooldown frame=%u weapon=%s source=%u phase=reload frames=%u\n",
+			m_whenLastReloadStarted, getName().str(), static_cast<UnsignedInt>(sourceObj->getID()),
+			m_whenWeCanFireAgain - m_whenLastReloadStarted);
 	//CRCDEBUG_LOG(("Just set m_whenWeCanFireAgain to %d in Weapon::reloadWithBonus 1", m_whenWeCanFireAgain));
 
 			// if we are sharing reload times
@@ -2102,7 +2153,7 @@ void Weapon::onWeaponBonusChange(const Object *source)
 
 	if( getStatus() == RELOADING_CLIP )
 	{
-		newDelay = m_template->getClipReloadTime(bonus);
+		newDelay = m_template->getClipReloadTime(bonus, TRUE);
 		needUpdate = TRUE;
 	}
 	else if( getStatus() == BETWEEN_FIRING_SHOTS )
@@ -2806,6 +2857,9 @@ Bool Weapon::privateFireWeapon(
 			Int delay = m_template->getDelayBetweenShots(bonus);
 			m_whenLastReloadStarted = now;
 			m_whenWeCanFireAgain = now + delay;
+			if (RetailTestCommands::tracesCombat())
+				std::fprintf(stderr, "TEST cooldown frame=%u weapon=%s source=%u phase=between frames=%d\n",
+					now, getName().str(), static_cast<UnsignedInt>(sourceObj->getID()), delay);
 			//CRCDEBUG_LOG(("Just set m_whenWeCanFireAgain to %d (delay is %d) in Weapon::privateFireWeapon", m_whenWeCanFireAgain, delay));
 
 			// if we are sharing reload times

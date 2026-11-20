@@ -55,6 +55,28 @@ TEST(INIPreprocessor, SubstitutesWholeTokensOnly)
 	EXPECT_EQ(run(preprocessor, "#define ARCHER 7\nA = ARCHER ARCHERS XARCHER ARCHER\n"), "\nA = 7 ARCHERS XARCHER 7\n");
 }
 
+TEST(INIPreprocessor, ExpandsDefinesAfterLabels)
+{
+	INIPreprocessor preprocessor(nullptr);
+	EXPECT_EQ(run(preprocessor,
+		"#define LOW 800\n#define HIGH #ADD( LOW 200 )\n"
+		"ClipReloadTime = mIn:LOW MaX:HIGH\n"
+		"RespawnRules = Time:HIGH Count_2:LOW\n"
+		"Other = X:LOW Max:MISSING Bad-Label:LOW http://LOW\n"
+		"Caption = \"A Time:LOW literal\"\n"),
+		"\n\nClipReloadTime = mIn:800 MaX:#ADD( 800 200 )\n"
+		"RespawnRules = Time:#ADD( 800 200 ) Count_2:800\n"
+		"Other = X:800 Max:MISSING Bad-Label:LOW http://LOW\n"
+		"Caption = \"A Time:LOW literal\"\n");
+}
+
+TEST(INIPreprocessor, LeavesRangeLabelsAloneWhenDisabled)
+{
+	INIPreprocessor preprocessor(nullptr);
+	EXPECT_EQ(preprocessor.process("Data\\INI\\Test.ini", "#define LOW 800\nDelayBetweenShots = Min:LOW Max:900\n", false),
+		"\nDelayBetweenShots = Min:LOW Max:900\n");
+}
+
 TEST(INIPreprocessor, NamesAreCaseSensitive)
 {
 	INIPreprocessor preprocessor(nullptr);

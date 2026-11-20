@@ -409,7 +409,7 @@ public:
 	Real getUnmodifiedAttackRange() const;
 	Real getMinimumAttackRange() const;
 	Int getDelayBetweenShots(const WeaponBonus& bonus) const;
-	Int getClipReloadTime(const WeaponBonus& bonus) const;
+	Int getClipReloadTime(const WeaponBonus& bonus, Bool rollRange) const;
 	Real getPrimaryDamage(const WeaponBonus& bonus) const;
 	Real getPrimaryDamageRadius(const WeaponBonus& bonus) const;
 	Real getSecondaryDamage(const WeaponBonus& bonus) const;
@@ -479,6 +479,8 @@ public:
 	Bool nuggetsCanDamage(Int depth = 0) const;
 	Bool hitsStoredTarget() const { return m_hitStoredTarget; }
 	Real getMaxWeaponSpeed() const { return m_maxWeaponSpeed; }
+	Bool isBombardType() const { return m_bombardType; }
+	Bool canFireWithoutVictim() const { return m_noVictimNeeded; }
 
 	Bool shouldProjectileCollideWith(
 		const Object* projectileLauncher,
@@ -518,6 +520,7 @@ private:
 	static void parseWeaponBonusSet( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseScatterTarget( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseShotDelay( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
+	static void parseClipReloadTime(INI* ini, void* instance, void* store, const void* userData);
 	static void parseHitPercentage(INI* ini, void* instance, void* store, const void* userData);
 
 	static const FieldParse TheWeaponTemplateFieldParseTable[];		///< the parse table for INI definition
@@ -564,7 +567,8 @@ private:
 	UnsignedInt m_fireSoundLoopTime;				///< if nonzero, num frames for looping of fire sound
 	WeaponBonusSet* m_extraBonus;						///< optional extra per-weapon bonus
 	Int m_clipSize;													///< number of 'shots' in a clip
-	Int m_clipReloadTime;										///< when 'clip' is empty, how long it takes to reload (frames)
+	Int m_clipReloadTime;
+	Int m_maxClipReloadTime;
 	Int m_minDelayBetweenShots;							///< min time allowed between firing single shots (frames)
 	Int m_maxDelayBetweenShots;							///< max time allowed between firing single shots (frames)
 	Int m_continuousFireOneShotsNeeded;			///< How many consecutive shots will give my owner the ContinuousFire Property
@@ -599,6 +603,8 @@ private:
 	Real m_maxWeaponSpeed;
 	Bool m_meleeWeapon;
 	Bool m_hitStoredTarget;
+	Bool m_bombardType;
+	Bool m_noVictimNeeded;
 
 	mutable HistoricWeaponDamageList m_historicDamage;
 	mutable UnsignedInt m_historicDamageTriggerId;

@@ -34,12 +34,14 @@
 #include "Common/Player.h"
 #include "Common/ThingTemplate.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DumbProjectileBehavior.h"
 #include "GameLogic/Module/MissileAIUpdate.h"
@@ -369,14 +371,26 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
 
 	if( speedWeap && speedWeap->isScaleWeaponSpeed() )
 	{
-		// Some weapons want to scale their start speed to the range
 		Real minRange = speedWeap->getMinimumAttackRange();
 		Real maxRange = speedWeap->getUnmodifiedAttackRange();
-		Real range = WWMath::SqrtOrigin(ThePartitionManager->getDistanceSquared( projectile, &victimPosToUse, FROM_CENTER_2D ) );
-		Real rangeRatio = (range - minRange) / (maxRange - minRange);
-		m_flightPathSpeed = (rangeRatio * (weaponSpeed - minWeaponSpeed)) + minWeaponSpeed;
-		if (m_launchWeaponTmpl)
-			m_flightPathSpeed = WeaponNuggetRules::clampProjectileSpeed(m_flightPathSpeed, m_launchWeaponTmpl->getMaxWeaponSpeed());
+		Real distanceSquared = ThePartitionManager->getDistanceSquared(projectile, &victimPosToUse, FROM_CENTER_2D);
+		if (RetailFileLayers::enabled())
+		{
+			Real rangeRatio = WWMath::Div_FixNaN(distanceSquared - minRange, maxRange - minRange, 1.0f);
+			Real nominalSpeed = std::max(weaponSpeed, minWeaponSpeed);
+			Real scaledSpeed = minWeaponSpeed + rangeRatio * (nominalSpeed - minWeaponSpeed);
+			m_flightPathSpeed = WeaponNuggetRules::clampProjectileSpeed(scaledSpeed, speedWeap->getMaxWeaponSpeed());
+			if (m_flightPathSpeed < scaledSpeed && RetailTestCommands::tracesCombat())
+				std::fprintf(stderr, "TEST speed frame=%u weapon=%s projectile=%u scaled=%.2f capped=%.2f\n",
+					TheGameLogic->getFrame(), speedWeap->getName().str(), static_cast<UnsignedInt>(projectile->getID()),
+					scaledSpeed, m_flightPathSpeed);
+		}
+		else
+		{
+			Real range = WWMath::SqrtOrigin(distanceSquared);
+			Real rangeRatio = (range - minRange) / (maxRange - minRange);
+			m_flightPathSpeed = (rangeRatio * (weaponSpeed - minWeaponSpeed)) + minWeaponSpeed;
+		}
 	}
 	else
 	{

@@ -37,8 +37,10 @@
 #include "GameLogic/WeaponSet.h"
 
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/BitFlagsIO.h"
@@ -198,6 +200,7 @@ void WeaponTemplateSet::clear()
 		m_template[i] = nullptr;
 		m_autoChooseMask[i] = 0xffffffff;					// by default, allow autochoosing from any CommandSource
 		CLEAR_KINDOFMASK(m_preferredAgainst[i]);	// by default, weapon isn't preferred against anything in particular
+		CLEAR_KINDOFMASK(m_onlyAgainst[i]);
 	}
 }
 
@@ -236,6 +239,19 @@ void WeaponTemplateSet::parsePreferredAgainst(INI* ini, void *instance, void * /
 	KindOfMaskType::parseFromINI(ini, instance, &self->m_preferredAgainst[wslot], nullptr);
 }
 
+void WeaponTemplateSet::parseOnlyAgainst(INI* ini, void* instance, void*, const void*)
+{
+	WeaponTemplateSet* self = static_cast<WeaponTemplateSet*>(instance);
+	const WeaponSlotType slot = static_cast<WeaponSlotType>(INI::scanIndexList(ini->getNextToken(), TheWeaponSlotTypeNames));
+	KindOfMaskType::parseFromINI(ini, instance, &self->m_onlyAgainst[slot], nullptr);
+}
+
+Bool WeaponTemplateSet::canTargetObject(WeaponSlotType slot, const Object* victim) const
+{
+	const KindOfMaskType& onlyAgainst = m_onlyAgainst[slot];
+	return !KINDOFMASK_ANY_SET(onlyAgainst) || victim->isAnyKindOf(onlyAgainst);
+}
+
 //-------------------------------------------------------------------------------------------------
 void WeaponTemplateSet::parseWeaponTemplateSet( INI* ini, const ThingTemplate* tt )
 {
@@ -250,7 +266,22 @@ void WeaponTemplateSet::parseWeaponTemplateSet( INI* ini, const ThingTemplate* t
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
-	ini->initFromINI(this, myFieldParse);
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "OnlyAgainst", WeaponTemplateSet::parseOnlyAgainst, nullptr, 0 },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		MultiIniFieldParse fieldParse;
+		fieldParse.add(myFieldParse);
+		fieldParse.add(retailFields);
+		ini->initFromINIMulti(this, fieldParse);
+	}
+	else
+	{
+		ini->initFromINI(this, myFieldParse);
+	}
 	this->m_thingTemplate = tt;
 }
 
@@ -703,6 +734,13 @@ CanAttackResult WeaponSet::getAbleToAttackSpecificObject( AbleToAttackType attac
 	// if none of the above is true, we can't attack. sorry!
 	//
 	Relationship r = source->getRelationship(victim);
+	if (RetailFileLayers::enabled() && commandSource == CMD_FROM_AI && !isForcedAttack(attackType))
+	{
+		if (victim->isKindOf(KINDOF_INERT))
+			return ATTACKRESULT_NOT_POSSIBLE;
+		if (r == NEUTRAL && !victim->isKindOf(KINDOF_MINE) && !victim->testScriptStatusBit(OBJECT_STATUS_SCRIPT_TARGETABLE))
+			return ATTACKRESULT_NOT_POSSIBLE;
+	}
 	if (r != ENEMIES &&
 			!isForcedAttack(attackType) &&
 // GS			!victim->isKindOf( KINDOF_BRIDGE_TOWER ) && // Repairing bridges cut 12/12/02, so attacking is too
@@ -773,6 +811,26 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 		targetAntiMask = WEAPON_ANTI_GROUND;
 	}
 
+	const Bool retailObjectAttack = victim && RetailFileLayers::enabled();
+	const WeaponSlotType lockedSlot = isCurWeaponLocked() ? m_curWeapon : specificSlot;
+	const auto permitsWeapon = [&](WeaponSlotType slot, const Weapon* weapon)
+	{
+		if (!retailObjectAttack)
+			return true;
+		if (lockedSlot == static_cast<WeaponSlotType>(-1))
+		{
+			if (!(m_curWeaponTemplateSet->getNthCommandSourceMask(slot) & (1u << commandSource)))
+				return false;
+		}
+		else if (slot != lockedSlot)
+		{
+			return false;
+		}
+		return (weapon->getAntiMask() & targetAntiMask) != 0
+			&& !weapon->getTemplate()->isBombardType()
+			&& m_curWeaponTemplateSet->canTargetObject(slot, victim)
+			&& weapon->isWithinTargetPitch(source, victim);
+	};
 
 	// Special Case test for turreted weapons on buildings... since they cannot move, they must be within range of target
 	//Kris: Actually -- let's just do this for all immobile objects. If we can give it orders to attack, then we must check
@@ -793,10 +851,12 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 	const Object *containedBy = source->getContainedBy();
 	Bool hasAWeaponInRange = FALSE;
 	Bool hasAWeapon				 = FALSE;
-	for (Int slot = 0; slot < WEAPONSLOT_COUNT - 1; ++slot)
+	const Int rangeSlotCount = retailObjectAttack ? WEAPONSLOT_COUNT : WEAPONSLOT_COUNT - 1;
+	for (Int slot = 0; slot < rangeSlotCount; ++slot)
 	{
-		Weapon *weaponToTestForRange = m_weapons[ m_curWeapon ];
-		if ( weaponToTestForRange )
+		const WeaponSlotType rangeSlot = retailObjectAttack ? static_cast<WeaponSlotType>(slot) : m_curWeapon;
+		Weapon *weaponToTestForRange = m_weapons[rangeSlot];
+		if (weaponToTestForRange && permitsWeapon(rangeSlot, weaponToTestForRange))
 		{
 			hasAWeapon = TRUE;
 			if ((m_totalAntiMask & targetAntiMask) == 0)//we don't care to check for this weapon
@@ -875,7 +935,7 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 		for( Int i = first; i >= last ; --i )
 		{
 			Weapon *weapon = m_weapons[ i ];
-			if (weapon && weapon->estimateWeaponDamage( source, victim ))
+			if (weapon && permitsWeapon(static_cast<WeaponSlotType>(i), weapon) && weapon->estimateWeaponDamage(source, victim))
 			{
 				//Kris: Aug 22, 2003
 				//Surgical fix so Jarmen Kell doesn't get a targeting cursor on enemy vehicles unless he is in snipe mode.
@@ -958,8 +1018,23 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 	if( isCurWeaponLocked() )
 		return TRUE; // I have been forced into choosing a specific weapon, so it is right until someone says otherwise
 
+	const Bool retail = RetailFileLayers::enabled();
 	if (victim == nullptr)
 	{
+		if (retail)
+		{
+			for (Int i = PRIMARY_WEAPON; i < WEAPONSLOT_COUNT; ++i)
+			{
+				Weapon* weapon = m_weapons[i];
+				if (weapon && weapon->getTemplate()->canFireWithoutVictim()
+					&& (weapon->getStatus() != OUT_OF_AMMO || weapon->getAutoReloadsClip())
+					&& (weapon->getAntiMask() & WEAPON_ANTI_GROUND))
+				{
+					m_curWeapon = static_cast<WeaponSlotType>(i);
+					return TRUE;
+				}
+			}
+		}
 		// Weapon lock is checked first for specific attack- ground powers.  Otherwise, we will reproduce the old behavior
 		// and make only Primary attack the ground.
 		m_curWeapon = PRIMARY_WEAPON;
@@ -990,16 +1065,14 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 
 		// weapon not allowed to be specified via this command source.
 		CommandSourceMask okSrcs = m_curWeaponTemplateSet->getNthCommandSourceMask((WeaponSlotType)i);
-		if( ( okSrcs & (1 << cmdSource) ) == 0 )
-		{
-			if( !( okSrcs & CMD_DEFAULT_SWITCH_WEAPON ) )
-			{
-				continue;
-			}
-		}
+		if ((okSrcs & (1u << cmdSource)) == 0 && (retail || !(okSrcs & CMD_DEFAULT_SWITCH_WEAPON)))
+			continue;
 
 		Weapon* weapon = m_weapons[i];
 		if (weapon == nullptr)
+			continue;
+		if (retail && (weapon->getTemplate()->isBombardType()
+			|| !m_curWeaponTemplateSet->canTargetObject(static_cast<WeaponSlotType>(i), victim)))
 			continue;
 
 		// No bad wrong!  Being out of range does not mean this weapon can not affect the target!
@@ -1020,7 +1093,8 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 
 		Real damage = weapon->estimateWeaponDamage(obj, victim);
 		Real attackRange = weapon->getAttackRange(obj);
-		Bool weaponIsReady = (weapon->getStatus() == READY_TO_FIRE);
+		const WeaponStatus status = weapon->getStatus();
+		Bool weaponIsReady = status == READY_TO_FIRE || (retail && status == PRE_ATTACK);
 
 		const AIUpdateInterface* ai = obj->getAI();
 		if (ai && ai->isWeaponSlotOnTurretAndAimingAtTarget((WeaponSlotType)i, victim))
@@ -1030,6 +1104,8 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 		// exception: 'unresistable' weapons are allowed to do zero damage.
 		if (damage <= 0.0f && weapon->getDamageType() != DAMAGE_UNRESISTABLE)
 			continue;
+		if (retail)
+			damage = damage > 0.0f ? 1.0f : 0.0f;
 
 		/*
 			now that we've eliminated the impossible ones, let's decide which
@@ -1043,7 +1119,8 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 			the weapon "ready" in a more liberal manner.
 		*/
 		const KindOfMaskType& preferredAgainst = m_curWeaponTemplateSet->getNthPreferredAgainstMask((WeaponSlotType)i);
-		if (KINDOFMASK_ANY_SET(preferredAgainst) && victim->isKindOfMulti(preferredAgainst, KINDOFMASK_NONE))
+		if (KINDOFMASK_ANY_SET(preferredAgainst) &&
+			(retail ? victim->isAnyKindOf(preferredAgainst) : victim->isKindOfMulti(preferredAgainst, KINDOFMASK_NONE)))
 		{
 			const Real HUGE_DAMAGE = 1e10;		// wow, that's a lot of damage.
 			const Real HUGE_RANGE = 1e10;

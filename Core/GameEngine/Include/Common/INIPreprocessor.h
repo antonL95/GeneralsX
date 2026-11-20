@@ -15,7 +15,7 @@ public:
 
 	explicit INIPreprocessor(FileReader reader);
 
-	std::string process(const std::string& path, const std::string& contents);
+	std::string process(const std::string& path, const std::string& contents, bool expandLabeledDefines = true);
 
 	void clearDefines();
 	std::size_t getDefineCount() const;
@@ -43,7 +43,7 @@ private:
 
 	void expandIncludes(const std::string& path, const std::string& contents, std::vector<Line>& lines, int depth);
 	void registerDefine(const Line& line);
-	bool substitute(const std::vector<Piece>& pieces, std::vector<Piece>& out, int depth) const;
+	bool substitute(const std::vector<Piece>& pieces, std::vector<Piece>& out, int depth, bool expandLabeledDefines) const;
 	void warn(const Line& line, const std::string& message);
 	void warn(const std::string& path, int lineNumber, const std::string& message);
 

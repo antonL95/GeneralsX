@@ -1,5 +1,6 @@
 #include "Common/INIPreprocessor.h"
 
+#include <algorithm>
 #include <cstring>
 #include <utility>
 
@@ -40,6 +41,20 @@ bool isDefineLine(const std::string& text)
 {
 	return startsWithKeyword(trim(text), "#define");
 }
+
+std::size_t labelLength(const std::string& token)
+{
+	const std::size_t colon = token.find(':');
+	if (colon == std::string::npos || colon == 0 || colon + 1 == token.size())
+		return 0;
+	for (std::size_t i = 0; i < colon; ++i)
+	{
+		const char c = token[i];
+		if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' || (i > 0 && c >= '0' && c <= '9')))
+			return 0;
+	}
+	return colon + 1;
+}
 }
 
 INIPreprocessor::INIPreprocessor(FileReader reader)
@@ -47,7 +62,7 @@ INIPreprocessor::INIPreprocessor(FileReader reader)
 {
 }
 
-std::string INIPreprocessor::process(const std::string& path, const std::string& contents)
+std::string INIPreprocessor::process(const std::string& path, const std::string& contents, bool expandLabeledDefines)
 {
 	std::vector<Line> lines;
 	expandIncludes(path, contents, lines, 0);
@@ -65,7 +80,7 @@ std::string INIPreprocessor::process(const std::string& path, const std::string&
 		if (!isDefineLine(line.text))
 		{
 			std::vector<Piece> pieces;
-			if (!substitute(split(line.text), pieces, 0))
+			if (!substitute(split(line.text), pieces, 0, expandLabeledDefines))
 				warn(line, "#define expansion nested too deeply");
 			out += join(pieces);
 		}
@@ -282,12 +297,25 @@ std::string INIPreprocessor::join(const std::vector<Piece>& pieces)
 	return out;
 }
 
-bool INIPreprocessor::substitute(const std::vector<Piece>& pieces, std::vector<Piece>& out, int depth) const
+bool INIPreprocessor::substitute(const std::vector<Piece>& pieces, std::vector<Piece>& out, int depth, bool expandLabeledDefines) const
 {
 	bool complete = true;
+	bool inQuotes = false;
 	for (const Piece& piece : pieces)
 	{
-		std::map<std::string, std::string>::const_iterator it = piece.isToken ? m_defines.find(piece.text) : m_defines.end();
+		if (!piece.isToken)
+		{
+			out.push_back(piece);
+			continue;
+		}
+		const bool allowLabel = expandLabeledDefines && !inQuotes;
+		if (expandLabeledDefines && (std::count(piece.text.begin(), piece.text.end(), '"') % 2) != 0)
+			inQuotes = !inQuotes;
+
+		auto it = m_defines.find(piece.text);
+		const std::size_t prefix = it == m_defines.end() && allowLabel ? labelLength(piece.text) : 0;
+		if (prefix != 0)
+			it = m_defines.find(piece.text.substr(prefix));
 		if (it == m_defines.end())
 		{
 			out.push_back(piece);
@@ -299,7 +327,9 @@ bool INIPreprocessor::substitute(const std::vector<Piece>& pieces, std::vector<P
 			complete = false;
 			continue;
 		}
-		complete = substitute(split(it->second), out, depth + 1) && complete;
+		if (prefix != 0)
+			out.push_back({piece.text.substr(0, prefix), true});
+		complete = substitute(split(it->second), out, depth + 1, allowLabel) && complete;
 	}
 	return complete;
 }

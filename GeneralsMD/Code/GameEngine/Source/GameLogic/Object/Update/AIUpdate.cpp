@@ -40,6 +40,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -4677,7 +4678,13 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 		//Do not allow units that healed me to get acquired! They are our friends!!!
 		if( bmi->getLastDamageInfo()->in.m_damageType != DAMAGE_HEALING )
 		{
-			return TheGameLogic->findObjectByID(bmi->getLastDamageInfo()->in.m_sourceID);
+			Object* attacker = TheGameLogic->findObjectByID(bmi->getLastDamageInfo()->in.m_sourceID);
+			if (!attacker || !RetailFileLayers::enabled())
+				return attacker;
+			CanAttackResult result = obj->getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, attacker, CMD_FROM_AI);
+			if (result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING)
+				return attacker;
+			return nullptr;
 		}
 	}
 	UnsignedInt flags = AI::CAN_ATTACK;

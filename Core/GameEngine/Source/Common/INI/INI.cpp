@@ -471,7 +471,7 @@ void INI::prepText( AsciiString filename, const std::string& text, INILoadType l
 	}
 
 	INIPreprocessor& preprocessor = getPreprocessor();
-	const std::string expanded = preprocessor.process(filename.str(), text);
+	const std::string expanded = preprocessor.process(filename.str(), text, RetailFileLayers::enabled() || INIAudit::isEnabled());
 	for (const std::string& warning : preprocessor.getWarnings())
 	{
 		fprintf(stderr, "[INI] %s\n", warning.c_str());
