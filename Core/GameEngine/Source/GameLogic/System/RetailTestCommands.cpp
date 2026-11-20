@@ -8,14 +8,23 @@
 #include <string>
 #include <vector>
 
+#include "Common/GameEngine.h"
 #include "Common/MessageStream.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "GameClient/ControlBar.h"
+#include "GameClient/Drawable.h"
+#include "GameClient/GadgetPushButton.h"
+#include "GameClient/GameWindow.h"
+#include "GameClient/GameWindowManager.h"
+#include "GameClient/InGameUI.h"
+#include "GameClient/View.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/TerrainLogic.h"
 
 namespace RetailTestCommands
 {
@@ -29,6 +38,34 @@ struct Command
 	std::string target;
 	int ordinal = 0;
 	std::string structure;
+};
+
+struct MetaKey
+{
+	const char* name;
+	GameMessage::Type type;
+};
+
+const MetaKey s_metaKeys[] = {
+	{ "options", GameMessage::MSG_META_OPTIONS },
+	{ "chat", GameMessage::MSG_META_CHAT_PLAYERS },
+	{ "chatallies", GameMessage::MSG_META_CHAT_ALLIES },
+	{ "diplomacy", GameMessage::MSG_META_DIPLOMACY },
+	{ "idleworker", GameMessage::MSG_META_SELECT_NEXT_IDLE_WORKER },
+	{ "nextworker", GameMessage::MSG_META_SELECT_NEXT_WORKER },
+	{ "hero", GameMessage::MSG_META_SELECT_HERO },
+	{ "selectall", GameMessage::MSG_META_SELECT_ALL },
+	{ "matching", GameMessage::MSG_META_SELECT_MATCHING_UNITS },
+	{ "nextunit", GameMessage::MSG_META_SELECT_NEXT_UNIT },
+	{ "home", GameMessage::MSG_META_VIEW_COMMAND_CENTER },
+	{ "radarevent", GameMessage::MSG_META_VIEW_LAST_RADAR_EVENT },
+	{ "beacon", GameMessage::MSG_META_PLACE_BEACON },
+	{ "stop", GameMessage::MSG_META_STOP },
+	{ "scatter", GameMessage::MSG_META_SCATTER },
+	{ "attackmove", GameMessage::MSG_META_TOGGLE_ATTACKMOVE },
+	{ "controlbar", GameMessage::MSG_META_TOGGLE_CONTROL_BAR },
+	{ "createteam", GameMessage::MSG_META_CREATE_TEAM1 },
+	{ "selectteam", GameMessage::MSG_META_SELECT_TEAM1 },
 };
 
 std::vector<Command> s_commands;
@@ -83,8 +120,184 @@ Object* findObject(const Command& command)
 	return matches[command.ordinal];
 }
 
+Bool readPoint(const Command& command, const Object* obj, Coord3D& point)
+{
+	float x = 0.0f;
+	float y = 0.0f;
+	if (std::sscanf(command.structure.c_str(), "%f,%f", &x, &y) != 2)
+		return FALSE;
+	point = *obj->getPosition();
+	point.x += x;
+	point.y += y;
+	point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+	return TRUE;
+}
+
+void selectObject(Object* obj)
+{
+	if (TheInGameUI && obj->getDrawable())
+	{
+		TheInGameUI->deselectAllDrawables();
+		TheInGameUI->selectDrawable(obj->getDrawable());
+	}
+	GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+	select->appendBooleanArgument(TRUE);
+	select->appendObjectIDArgument(obj->getID());
+}
+
+GameWindow* commandWindow(int index)
+{
+	if (!TheWindowManager)
+		return nullptr;
+	AsciiString name;
+	name.format("ControlBar.wnd:ButtonCommand%02d", index);
+	return TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey(name));
+}
+
+void clickButton(const Command& command, unsigned int frame)
+{
+	const int index = std::atoi(command.structure.c_str());
+	GameWindow* button = commandWindow(index);
+	const CommandButton* commandButton = button ? static_cast<const CommandButton*>(GadgetButtonGetData(button)) : nullptr;
+	if (!button || !commandButton || button->winIsHidden() || !button->winGetOwner())
+	{
+		std::fprintf(stderr, "TEST frame %u: button %d empty\n", frame, index);
+		return;
+	}
+	const Bool enabled = BitIsSet(button->winGetStatus(), WIN_STATUS_ENABLED);
+	std::fprintf(stderr, "TEST frame %u: button %d %s type %d %s\n", frame, index, commandButton->getName().str(),
+		static_cast<int>(commandButton->getCommandType()), enabled ? "enabled" : "disabled");
+	if (!enabled || commandButton->getCommandType() == GUI_COMMAND_SELL)
+		return;
+	TheWindowManager->winSendSystemMsg(button->winGetOwner(), GBM_SELECTED, (WindowMsgData)button, button->winGetWindowId());
+}
+
+void cancelInterface()
+{
+	if (!TheInGameUI)
+		return;
+	TheInGameUI->setGUICommand(nullptr);
+	TheInGameUI->placeBuildAvailable(nullptr, nullptr);
+}
+
+void placeStructure(const Command& command, Object* builder, unsigned int frame)
+{
+	const ThingTemplate* what = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
+	if (!what || !TheInGameUI || !TheTacticalView || !builder->getDrawable())
+		return;
+	selectObject(builder);
+	TheInGameUI->placeBuildAvailable(what, builder->getDrawable());
+	Coord3D anchor = *builder->getPosition();
+	anchor.x += 60.0f;
+	ICoord2D start;
+	TheTacticalView->worldToScreen(&anchor, &start);
+	ICoord2D end = start;
+	end.x += 40;
+	end.y += 20;
+	TheInGameUI->setPlacementStart(&start);
+	TheInGameUI->setPlacementEnd(&end);
+	std::fprintf(stderr, "TEST frame %u: place %s anchored %d\n", frame, command.structure.c_str(),
+		TheInGameUI->isPlacementAnchored() ? 1 : 0);
+}
+
+void sendKey(const Command& command, unsigned int frame)
+{
+	for (const MetaKey& key : s_metaKeys)
+	{
+		if (command.target != key.name)
+			continue;
+		TheMessageStream->appendMessage(key.type);
+		std::fprintf(stderr, "TEST frame %u: key %s\n", frame, key.name);
+		return;
+	}
+	std::fprintf(stderr, "TEST frame %u: unknown key %s\n", frame, command.target.c_str());
+}
+
+void orderToPoint(const Command& command, Object* obj, unsigned int frame)
+{
+	Coord3D point;
+	if (!readPoint(command, obj, point))
+		return;
+	selectObject(obj);
+	GameMessage* order = nullptr;
+	if (command.action == "move")
+		order = TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO);
+	else if (command.action == "waypoint")
+		order = TheMessageStream->appendMessage(GameMessage::MSG_ADD_WAYPOINT);
+	else if (command.action == "attackmove")
+		order = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACKMOVETO);
+	else if (command.action == "guard")
+		order = TheMessageStream->appendMessage(GameMessage::MSG_DO_GUARD_POSITION);
+	else if (command.action == "rally")
+	{
+		order = TheMessageStream->appendMessage(GameMessage::MSG_SET_RALLY_POINT);
+		order->appendObjectIDArgument(obj->getID());
+	}
+	if (!order)
+		return;
+	order->appendLocationArgument(point);
+	if (command.action == "guard")
+		order->appendIntegerArgument(GUARDMODE_NORMAL);
+	if (TheInGameUI && (command.action == "move" || command.action == "waypoint"))
+		TheInGameUI->createMoveHint(order);
+	else if (TheInGameUI && command.action == "attackmove")
+		TheInGameUI->createAttackHint(order);
+	std::fprintf(stderr, "TEST frame %u: %s object %u to (%.1f, %.1f)\n", frame, command.action.c_str(),
+		static_cast<unsigned>(obj->getID()), point.x, point.y);
+}
+
+void listObjects(const Command& command, unsigned int frame)
+{
+	std::vector<Object*> owned;
+	for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+	{
+		const Player* owner = obj->getControllingPlayer();
+		if (owner && stricmp(TheNameKeyGenerator->keyToName(owner->getPlayerNameKey()).str(), command.player.c_str()) == 0)
+			owned.push_back(obj);
+	}
+	std::sort(owned.begin(), owned.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
+	for (const Object* obj : owned)
+	{
+		int ordinal = 0;
+		for (const Object* other : owned)
+		{
+			if (other == obj)
+				break;
+			if (other->getTemplate()->getName() == obj->getTemplate()->getName())
+				++ordinal;
+		}
+		std::fprintf(stderr, "TEST list %u %s %s %d id=%u pos=%.1f,%.1f structure=%d selectable=%d drawable=%d\n", frame,
+			command.player.c_str(), obj->getTemplate()->getName().str(), ordinal, static_cast<unsigned>(obj->getID()),
+			obj->getPosition()->x, obj->getPosition()->y, obj->isKindOf(KINDOF_STRUCTURE) ? 1 : 0,
+			obj->isSelectable() ? 1 : 0, obj->getDrawable() ? 1 : 0);
+	}
+}
+
 void execute(const Command& command, unsigned int frame)
 {
+	if (command.action == "key")
+	{
+		sendKey(command, frame);
+		return;
+	}
+	if (command.action == "list")
+	{
+		listObjects(command, frame);
+		return;
+	}
+	if (command.action == "quit")
+	{
+		std::fprintf(stderr, "TEST frame %u: quit\n", frame);
+		TheGameEngine->setQuitting(TRUE);
+		return;
+	}
+	if (command.action == "cancel")
+	{
+		cancelInterface();
+		std::fprintf(stderr, "TEST frame %u: cancel\n", frame);
+		return;
+	}
+
 	Object* obj = findObject(command);
 	if (!obj)
 	{
@@ -112,6 +325,18 @@ void execute(const Command& command, unsigned int frame)
 			command.target.c_str());
 		obj->kill();
 	}
+	else if (command.action == "select")
+	{
+		selectObject(obj);
+		std::fprintf(stderr, "TEST frame %u: select object %u (%s)\n", frame, static_cast<unsigned>(obj->getID()),
+			command.target.c_str());
+	}
+	else if (command.action == "button")
+		clickButton(command, frame);
+	else if (command.action == "place")
+		placeStructure(command, obj, frame);
+	else
+		orderToPoint(command, obj, frame);
 }
 }
 

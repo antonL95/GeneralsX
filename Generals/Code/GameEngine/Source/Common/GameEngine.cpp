@@ -614,7 +614,10 @@ void GameEngine::init()
 		initSubsystem(TheVictoryConditions,"TheVictoryConditions", createVictoryConditions(), nullptr);
 
 		AsciiString fname;
-		fname.format("Data\\%s\\CommandMap", GetRegistryLanguage().str());
+		if (RetailFileLayers::enabled())
+			fname = "CommandMap";
+		else
+			fname.format("Data\\%s\\CommandMap", GetRegistryLanguage().str());
 		initSubsystem(TheMetaMap,"TheMetaMap", MSGNEW("GameEngineSubsystem") MetaMap(), nullptr, fname.str(), "Data\\INI\\CommandMap");
 
 #if defined(RTS_DEBUG)

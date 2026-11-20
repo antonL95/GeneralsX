@@ -5826,7 +5826,8 @@ void InGameUI::showIdleWorkerLayout()
 	if (!m_idleWorkerWin)
 	{
 		m_idleWorkerWin = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey("ControlBar.wnd:ButtonIdleWorker"));
-		DEBUG_ASSERTCRASH(m_idleWorkerWin, ("InGameUI::showIdleWorkerLayout could not find IdleWorker.wnd to load"));
+		if (!RetailFileLayers::enabled())
+			DEBUG_ASSERTCRASH(m_idleWorkerWin, ("InGameUI::showIdleWorkerLayout could not find IdleWorker.wnd to load"));
 		return;
 	}
 

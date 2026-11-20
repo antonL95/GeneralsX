@@ -42,6 +42,7 @@
 
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/GarrisonContain.h"
@@ -195,7 +196,8 @@ void GarrisonContain::putObjectAtGarrisonPoint( Object *obj,
 	// garrison point ready to shoot
 	//
 	static const ThingTemplate *muzzle = TheThingFactory->findTemplate( "GarrisonGun" );
-	DEBUG_ASSERTCRASH( muzzle, ("Warning, Object 'GarrisonGun' not found and is need for Garrison gun effects") );
+	if( !RetailFileLayers::enabled() )
+		DEBUG_ASSERTCRASH( muzzle, ("Warning, Object 'GarrisonGun' not found and is need for Garrison gun effects") );
 	if( muzzle )
 	{
 		Drawable *draw = TheThingFactory->newDrawable( muzzle );

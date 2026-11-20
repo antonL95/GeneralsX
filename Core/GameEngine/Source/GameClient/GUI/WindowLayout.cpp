@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/RetailFileLayers.h"
 #include "GameClient/WindowLayout.h"
 #include "GameClient/Shell.h"
 #include "GameClient/GameWindowManager.h"
@@ -214,7 +215,8 @@ Bool WindowLayout::load( AsciiString filename )
 	if( target == nullptr )
 	{
 
-		DEBUG_ASSERTCRASH( target, ("WindowLayout::load - Failed to load layout") );
+		if (!RetailFileLayers::enabled())
+			DEBUG_ASSERTCRASH( target, ("WindowLayout::load - Failed to load layout") );
 		DEBUG_LOG(( "WindowLayout::load - Unable to load layout file '%s'", filename.str() ));
 		return FALSE;
 

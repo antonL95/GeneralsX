@@ -40,6 +40,7 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GadgetSlider.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/ControlBar.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DGUICallbacks.h"
@@ -600,6 +601,9 @@ void W3DInGameUI::drawPlaceAngle( View *view )
 //	Coord2D v, p, o;
 	//Real size = 15.0f;
 
+	if( !m_buildingPlacementAnchor && RetailFileLayers::enabled() && !isPlacementAnchored() )
+		return;
+
 	//Create the anchor & arrow if not already created!
 	if( !m_buildingPlacementAnchor )
 	{
@@ -608,7 +612,8 @@ void W3DInGameUI::drawPlaceAngle( View *view )
 		// sanity
 		if( !m_buildingPlacementAnchor )
 		{
-			DEBUG_CRASH( ("Unable to create BuildingPlacementAnchor (Locator01.w3d) -- cursor for placing buildings") );
+			if( !RetailFileLayers::enabled() )
+				DEBUG_CRASH( ("Unable to create BuildingPlacementAnchor (Locator01.w3d) -- cursor for placing buildings") );
 			return;
 		}
 	}
@@ -619,7 +624,8 @@ void W3DInGameUI::drawPlaceAngle( View *view )
 		// sanity
 		if( !m_buildingPlacementArrow )
 		{
-			DEBUG_CRASH( ("Unable to create BuildingPlacementArrow (Locator02.w3d) -- cursor for placing buildings") );
+			if( !RetailFileLayers::enabled() )
+				DEBUG_CRASH( ("Unable to create BuildingPlacementArrow (Locator02.w3d) -- cursor for placing buildings") );
 			return;
 		}
 	}

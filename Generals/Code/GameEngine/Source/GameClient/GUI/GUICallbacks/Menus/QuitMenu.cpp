@@ -38,6 +38,7 @@
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
 #include "Common/Recorder.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/WindowLayout.h"
 #include "GameClient/GameWindowManager.h"
@@ -359,7 +360,8 @@ void ToggleQuitMenu()
 		// load the quit menu from the layout file if needed
 		if( quitMenuLayout == nullptr )
 		{
-			DEBUG_CRASH(("Could not load a quit menu layout"));
+			if (!RetailFileLayers::enabled())
+				DEBUG_CRASH(("Could not load a quit menu layout"));
 			isVisible = FALSE;
 			TheInGameUI->setQuitMenuVisible(FALSE);
 			return;

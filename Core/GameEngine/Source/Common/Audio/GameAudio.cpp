@@ -398,7 +398,8 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 	if (!eventToAdd->getAudioEventInfo()) {
 		getInfoForAudioEvent(eventToAdd);
 		if (!eventToAdd->getAudioEventInfo()) {
-			DEBUG_CRASH(("No info for requested audio event '%s'", eventToAdd->getEventName().str()));
+			if (!RetailFileLayers::enabled())
+				DEBUG_CRASH(("No info for requested audio event '%s'", eventToAdd->getEventName().str()));
 			return AHSV_Error;
 		}
 	}

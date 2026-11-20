@@ -212,6 +212,8 @@ void ShowDiplomacy( Bool immediate )
 	else
 	{
 		theLayout = TheWindowManager->winCreateLayout( "Diplomacy.wnd" );
+		if (!theLayout)
+			return;
 		theWindow = theLayout->getFirstWindow();
 		theLayout->setUpdate(updateFunc);
 		theAnimateWindowManager = NEW AnimateWindowManager;
