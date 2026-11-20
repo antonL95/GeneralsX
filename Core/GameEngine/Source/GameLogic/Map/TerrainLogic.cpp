@@ -34,6 +34,7 @@
 #include "Common/GameState.h"
 #include "Common/MapObject.h"
 #include "Common/Radar.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/WellKnownKeys.h"
@@ -2619,6 +2620,9 @@ void TerrainLogic::setActiveBoundary(Int newActiveBoundary)
 // ------------------------------------------------------------------------------------------------
 void TerrainLogic::flattenTerrain(Object *obj)
 {
+	if (RetailFileLayers::enabled())
+		return;
+
 	if (obj->getGeometryInfo().getIsSmall()) {
 		return;
 	}

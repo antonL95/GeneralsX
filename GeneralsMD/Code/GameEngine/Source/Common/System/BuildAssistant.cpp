@@ -674,6 +674,12 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 	{
 		Bool feedbackWithFailure = TRUE;
 		Relationship rel = builderObject ? builderObject->getRelationship( them ) : NEUTRAL;
+		if (RetailFileLayers::enabled() && builderObject && builderObject->getControllingPlayer() &&
+			rel != ALLIES &&
+			them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
+		{
+			continue;
+		}
 
 		//Kris: If the object is stealthed and we can't see it, pretend we can build there.
 		if( BitIsSet( options, IGNORE_STEALTHED ) )
@@ -714,7 +720,7 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 		}
 
 #if !RETAIL_COMPATIBLE_CRC
-		if (builderObject && them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
+		if (!RetailFileLayers::enabled() && builderObject && them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
 			return LBC_SHROUD;
 #endif
 
@@ -821,6 +827,12 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 	{
 
 		Relationship rel = builderObject ? builderObject->getRelationship( them ) : NEUTRAL;
+		if (RetailFileLayers::enabled() && builderObject && builderObject->getControllingPlayer() &&
+			rel != ALLIES &&
+			them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
+		{
+			continue;
+		}
 		//Kris: If the building is stealthed and we can't see it, pretend we can build there.
 		if( BitIsSet( options, IGNORE_STEALTHED ) )
 		{
@@ -875,7 +887,7 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 
 		// an immobile object will obstruct our building no matter what team it's on
 		if ( them->isKindOf( KINDOF_IMMOBILE ) )	{
-			Bool shrouded = builderObject && them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED;
+			Bool shrouded = !RetailFileLayers::enabled() && builderObject && them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED;
 			/* Check for overlap of my exit rectangle to his geom info. */
 			if (checkMyExit && ThePartitionManager->geomCollidesWithGeom(them->getPosition(), hisBounds, them->getOrientation(),
 				&myExitPos, myGeom, angle)) {
@@ -931,7 +943,7 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 
 	// check shroud level
 	// This should be the first check, since returning other errors for shrouded areas could be used to game the system
-	if( BitIsSet( options, SHROUD_REVEALED ) )
+	if( !RetailFileLayers::enabled() && BitIsSet( options, SHROUD_REVEALED ) )
 	{
 		{
 			Int x, y;
@@ -1005,21 +1017,24 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 	// if clear path is requested check to see if the builder object can get there (unless it's a structure)
 	if( BitIsSet( options, CLEAR_PATH ) && builderObject && !builderObject->isKindOf( KINDOF_IMMOBILE ) )
 	{
-		const AIUpdateInterface *ai = builderObject->getAIUpdateInterface();
+		Bool checkPath = TRUE;
+		if( RetailFileLayers::enabled() && builderObject->getControllingPlayer() )
+		{
+			Int x, y;
+			ThePartitionManager->worldToCell(worldPos->x, worldPos->y, &x, &y);
+			checkPath = ThePartitionManager->getShroudStatusForPlayer(
+				builderObject->getControllingPlayer()->getPlayerIndex(), x, y) == CELLSHROUD_CLEAR;
+		}
+		if( checkPath )
+		{
+			const AIUpdateInterface *ai = builderObject->getAIUpdateInterface();
 
-		//
-		// if there is no AI interface for this object, it cannot possible pass a clear path
-		// check since it will never be able to move there
-		//
-		/**todo remove this if we need to change the semantics of this function of the builderObject
-		// actually being able to get to the destination */
-		//
-		if( ai == nullptr )
-			return LBC_NO_CLEAR_PATH;
-
-		if( ai->isQuickPathAvailable( worldPos ) == FALSE )
+			if( ai == nullptr )
 				return LBC_NO_CLEAR_PATH;
 
+			if( ai->isQuickPathAvailable( worldPos ) == FALSE )
+				return LBC_NO_CLEAR_PATH;
+		}
 	}
 
 	// check basic terrain restrctions
@@ -1481,6 +1496,11 @@ Bool BuildAssistant::moveObjectsForConstruction( const ThingTemplate *whatToBuil
 		if ( !them->isKindOf( KINDOF_ALWAYS_SELECTABLE ) && !isRemovableForConstruction(them) )
 		{
 			Relationship rel = playerToBuild->getRelationship(them->getTeam());
+			if (RetailFileLayers::enabled() && rel != ALLIES &&
+				them->getShroudedStatus(playerToBuild->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
+			{
+				continue;
+			}
 
 			if (rel == NEUTRAL || rel == ALLIES)
 			{

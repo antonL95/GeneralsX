@@ -38,6 +38,8 @@
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/View.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/ExperienceTracker.h"
@@ -639,13 +641,33 @@ void logObject(const Object* obj, unsigned int frame)
 void logBuildChecks(Object* builder, const ThingTemplate* what, const Command& command, unsigned int frame)
 {
 	const Coord3D location = groundLocation(command);
+	Int cellX = 0;
+	Int cellY = 0;
+	Int shroud = -1;
+	if (ThePartitionManager && builder->getControllingPlayer())
+	{
+		ThePartitionManager->worldToCell(location.x, location.y, &cellX, &cellY);
+		shroud = static_cast<Int>(ThePartitionManager->getShroudStatusForPlayer(
+			builder->getControllingPlayer()->getPlayerIndex(), cellX, cellY));
+	}
 	const LegalBuildCode legal = TheBuildAssistant->isLocationLegalToBuild(&location, what, command.angle,
 		BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::CLEAR_PATH | BuildAssistant::NO_OBJECT_OVERLAP |
-			BuildAssistant::USE_QUICK_PATHFIND,
+			BuildAssistant::USE_QUICK_PATHFIND | BuildAssistant::SHROUD_REVEALED |
+			BuildAssistant::IGNORE_STEALTHED | BuildAssistant::FAIL_STEALTHED_WITHOUT_FEEDBACK,
 		builder, builder->getControllingPlayer());
-	std::fprintf(stderr, "TEST frame %u: check %s canMake %d possible %d legal %d at %.1f %.1f cost %d money %u\n", frame,
+	Int cellType = -1;
+	if (TheAI && TheAI->pathfinder())
+	{
+		const Int pCellX = REAL_TO_INT_FLOOR(location.x / PATHFIND_CELL_SIZE);
+		const Int pCellY = REAL_TO_INT_FLOOR(location.y / PATHFIND_CELL_SIZE);
+		PathfindCell* pCell = TheAI->pathfinder()->getCell(LAYER_GROUND, pCellX, pCellY);
+		if (pCell)
+			cellType = static_cast<Int>(pCell->getType());
+	}
+	const UnsignedInt ghosts = TheInGameUI ? TheInGameUI->getPlannedBuildGhostCount() : 0;
+	std::fprintf(stderr, "TEST frame %u: check %s canMake %d possible %d legal %d shroud %d cell %d ghosts %u at %.1f %.1f cost %d money %u\n", frame,
 		what->getName().str(), static_cast<int>(TheBuildAssistant->canMakeUnit(builder, what)),
-		TheBuildAssistant->isPossibleToMakeUnit(builder, what) ? 1 : 0, static_cast<int>(legal), location.x, location.y,
+		TheBuildAssistant->isPossibleToMakeUnit(builder, what) ? 1 : 0, static_cast<int>(legal), shroud, cellType, ghosts, location.x, location.y,
 		what->calcCostToBuild(builder->getControllingPlayer()), builder->getControllingPlayer()->getMoney()->countMoney());
 }
 
@@ -1242,6 +1264,86 @@ void execute(const Command& command, unsigned int frame)
 			std::fprintf(stderr, "TEST conditions %u %s ivory=%d stonework=%d\n", frame, command.target.c_str(),
 				draw->getModelConditionFlags().test(MODELCONDITION_UPGRADE_IVORY_TOWER),
 				draw->getModelConditionFlags().test(MODELCONDITION_UPGRADE_NUMENOR_STONEWORK));
+	}
+	else if (command.action == "shroudmap")
+	{
+		if (ThePartitionManager && obj->getControllingPlayer())
+		{
+			ThePartitionManager->shroudMapForPlayer(obj->getControllingPlayer()->getPlayerIndex());
+			std::fprintf(stderr, "TEST frame %u: shroudmap for player %d\n", frame,
+				obj->getControllingPlayer()->getPlayerIndex());
+		}
+	}
+	else if (command.action == "findterrain")
+	{
+		if (TheAI && TheAI->pathfinder() && ThePartitionManager && obj->getControllingPlayer())
+		{
+			const Int playerIndex = obj->getControllingPlayer()->getPlayerIndex();
+			Bool foundWater = FALSE;
+			Bool foundCliff = FALSE;
+			for (Int cy = 40; cy < 360 && (!foundWater || !foundCliff); cy += 4)
+			{
+				for (Int cx = 40; cx < 360 && (!foundWater || !foundCliff); cx += 4)
+				{
+					PathfindCell* pCell = TheAI->pathfinder()->getCell(LAYER_GROUND, cx, cy);
+					if (!pCell)
+						continue;
+					const Real wx = cx * PATHFIND_CELL_SIZE + 5.0f;
+					const Real wy = cy * PATHFIND_CELL_SIZE + 5.0f;
+					Int sx = 0, sy = 0;
+					ThePartitionManager->worldToCell(wx, wy, &sx, &sy);
+					const Int sh = static_cast<Int>(ThePartitionManager->getShroudStatusForPlayer(playerIndex, sx, sy));
+					if (sh < CELLSHROUD_FOGGED)
+						continue;
+					if (!foundWater && pCell->getType() == PathfindCell::CELL_WATER)
+					{
+						std::fprintf(stderr, "TEST frame %u: found_water %.1f %.1f shroud %d\n", frame, wx, wy, sh);
+						foundWater = TRUE;
+					}
+					if (!foundCliff && pCell->getType() == PathfindCell::CELL_CLIFF)
+					{
+						std::fprintf(stderr, "TEST frame %u: found_cliff %.1f %.1f shroud %d\n", frame, wx, wy, sh);
+						foundCliff = TRUE;
+					}
+				}
+			}
+		}
+	}
+	else if (command.action == "cancelbuild")
+	{
+		selectGroup(obj);
+		TheMessageStream->appendMessage(GameMessage::MSG_DOZER_CANCEL_CONSTRUCT);
+		std::fprintf(stderr, "TEST frame %u: cancelbuild %s id=%u money=%u ghosts=%u\n", frame,
+			obj->getTemplate()->getName().str(), static_cast<unsigned>(obj->getID()),
+			obj->getControllingPlayer() ? obj->getControllingPlayer()->getMoney()->countMoney() : 0,
+			TheInGameUI ? TheInGameUI->getPlannedBuildGhostCount() : 0);
+	}
+	else if (command.action == "height" && command.hasLocation)
+	{
+		const Real cx = command.location.x;
+		const Real cy = command.location.y;
+		std::fprintf(stderr, "TEST frame %u: height at %.1f %.1f center=%.4f n=%.4f s=%.4f e=%.4f w=%.4f\n", frame, cx, cy,
+			TheTerrainLogic->getGroundHeight(cx, cy),
+			TheTerrainLogic->getGroundHeight(cx, cy + 40.0f),
+			TheTerrainLogic->getGroundHeight(cx, cy - 40.0f),
+			TheTerrainLogic->getGroundHeight(cx + 40.0f, cy),
+			TheTerrainLogic->getGroundHeight(cx - 40.0f, cy));
+	}
+	else if (command.action == "placecheck" && command.hasLocation)
+	{
+		const ThingTemplate* what = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
+		if (!what)
+			return;
+		logBuildChecks(obj, what, command, frame);
+	}
+	else if (command.action == "startplace")
+	{
+		const ThingTemplate* what = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
+		if (!what || !TheInGameUI)
+			return;
+		TheInGameUI->placeBuildAvailable(what, obj->getDrawable());
+		std::fprintf(stderr, "TEST frame %u: startplace %s by object %u ghosts %u\n", frame, command.structure.c_str(),
+			static_cast<unsigned>(obj->getID()), TheInGameUI->getPlannedBuildGhostCount());
 	}
 	else if (command.action == "construct" && command.hasLocation)
 	{

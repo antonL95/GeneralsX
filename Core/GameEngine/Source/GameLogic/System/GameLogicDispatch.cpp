@@ -49,6 +49,7 @@
 #include "Common/Upgrade.h"
 #include "Common/StatsCollector.h"
 #include "Common/Radar.h"
+#include "Common/RetailFileLayers.h"
 
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
@@ -2014,12 +2015,10 @@ bool GameLogic::onDozerCancelConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr
 		money->deposit( amount, TRUE, FALSE );
 	}
 
-	//
-	// Destroy the building ... killing the
-	// building will automatically cause the dozer also cancel its own building
-	// behavior and it will go on its merry way doing other assigned tasks
-	//
-	building->kill();
+	if (RetailFileLayers::enabled())
+		TheGameLogic->destroyObject(building);
+	else
+		building->kill();
 
 	return true;
 }

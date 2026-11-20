@@ -435,7 +435,8 @@ public:  // ********************************************************************
 	virtual const CommandButton *getGUICommand() const;								///< get the pending gui command
 
 	// build interface
-	virtual void placeBuildAvailable( const ThingTemplate *build, Drawable *buildDrawable );				///< built thing being placed
+	virtual void placeBuildAvailable( const ThingTemplate *build, Drawable *buildDrawable );
+	UnsignedInt getPlannedBuildGhostCount() const { return static_cast<UnsignedInt>(m_plannedBuildGhosts.size()); }
 	virtual const ThingTemplate *getPendingPlaceType();					///< get item we're trying to place
 	virtual ObjectID getPendingPlaceSourceObjectID();			///< get producing object
 	virtual Bool getPreventLeftClickDeselectionInAlternateMouseModeForOneClick() const { return m_preventLeftClickDeselectionInAlternateMouseModeForOneClick; }
@@ -688,8 +689,10 @@ protected:
 	// Protected Methods ----------------------------------------------------------------------------
 	// ----------------------------------------------------------------------------------------------
 
-	void destroyPlacementIcons();													///< Destroy placement icons
-	void handleBuildPlacements();													///< handle updating of placement icons based on mouse pos
+	void destroyPlacementIcons();
+	void handleBuildPlacements();
+	void updatePlannedBuildGhosts();
+	void destroyPlannedBuildGhosts();
 	void handleRadiusCursor();																	///< handle updating of "radius cursors" that follow the mouse pos
 
 	void incrementSelectCount() { ++m_selectCount; }			///< Increase by one the running total of "selected" drawables
@@ -979,7 +982,8 @@ protected:
 	GameWindow *								m_idleWorkerWin;
 	Int													m_currentIdleWorkerDisplay;
 
-	DrawableID									m_soloNexusSelectedDrawableID;  ///< The drawable of the nexus, if only one angry mob is selected, otherwise, null
+	DrawableID									m_soloNexusSelectedDrawableID;
+	std::map<ObjectID, Drawable *>				m_plannedBuildGhosts;
 
 	// ----------------------------------------------------------------------------------------------
 	// STATIC Protected Data -------------------------------------------------------------------------------

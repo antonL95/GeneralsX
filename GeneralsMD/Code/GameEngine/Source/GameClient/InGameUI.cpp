@@ -30,6 +30,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "GameLogic/Module/HordeContain.h"
 
+#include <set>
 #include <stdio.h>
 
 #define DEFINE_SHADOW_NAMES
@@ -1269,6 +1270,7 @@ InGameUI::~InGameUI()
 
 	// remove any build available status
 	placeBuildAvailable( nullptr, nullptr );
+	destroyPlannedBuildGhosts();
 	setRadiusCursorNone();
 
 	// delete the message resources
@@ -1815,11 +1817,103 @@ void InGameUI::handleBuildPlacements()
 //-------------------------------------------------------------------------------------------------
 /** Pre-draw phase of the in game ui */
 //-------------------------------------------------------------------------------------------------
+void InGameUI::destroyPlannedBuildGhosts()
+{
+	for (std::map<ObjectID, Drawable *>::iterator it = m_plannedBuildGhosts.begin(); it != m_plannedBuildGhosts.end(); ++it)
+	{
+		if (it->second && TheGameClient)
+			TheGameClient->destroyDrawable(it->second);
+	}
+	m_plannedBuildGhosts.clear();
+}
+
+void InGameUI::updatePlannedBuildGhosts()
+{
+	if (!RetailFileLayers::enabled() || !TheGameLogic || !ThePlayerList || !TheGameClient || !TheThingFactory)
+	{
+		destroyPlannedBuildGhosts();
+		return;
+	}
+
+	Player *localPlayer = ThePlayerList->getLocalPlayer();
+	if (!localPlayer)
+	{
+		destroyPlannedBuildGhosts();
+		return;
+	}
+
+	const Real ghostOpacity = 0.4f;
+	std::set<ObjectID> activeIds;
+
+	for (Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+	{
+		if (!obj->isKindOf(KINDOF_STRUCTURE) || obj->isEffectivelyDead())
+			continue;
+		if (!obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || obj->testStatus(OBJECT_STATUS_SOLD))
+			continue;
+
+		Player *owner = obj->getControllingPlayer();
+		if (!owner)
+			continue;
+		if (owner != localPlayer && localPlayer->getRelationship(owner->getDefaultTeam()) != ALLIES)
+			continue;
+
+		const Drawable *objDraw = obj->getDrawable();
+		const Bool awaiting = (objDraw && objDraw->getModelConditionFlags().test(MODELCONDITION_AWAITING_CONSTRUCTION)) || obj->getConstructionPercent() <= 0.0f;
+		if (!awaiting && m_pendingPlaceType == nullptr)
+			continue;
+
+		const ObjectID id = obj->getID();
+		activeIds.insert(id);
+
+		std::map<ObjectID, Drawable *>::iterator existing = m_plannedBuildGhosts.find(id);
+		Drawable *ghost = nullptr;
+		if (existing == m_plannedBuildGhosts.end())
+		{
+			UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES;
+			drawableStatus |= TheGlobalData->m_objectPlacementShadows ? DRAWABLE_STATUS_SHADOWS : 0;
+			ghost = TheThingFactory->newDrawable(obj->getTemplate(), drawableStatus);
+			if (ghost)
+			{
+				if (TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT)
+					ghost->setIndicatorColor(owner->getPlayerNightColor());
+				else
+					ghost->setIndicatorColor(owner->getPlayerColor());
+				m_plannedBuildGhosts[id] = ghost;
+			}
+		}
+		else
+		{
+			ghost = existing->second;
+		}
+
+		if (ghost)
+		{
+			ghost->setPosition(obj->getPosition());
+			ghost->setOrientation(obj->getOrientation());
+			ghost->setDrawableOpacity(ghostOpacity);
+		}
+	}
+
+	for (std::map<ObjectID, Drawable *>::iterator it = m_plannedBuildGhosts.begin(); it != m_plannedBuildGhosts.end(); )
+	{
+		if (activeIds.find(it->first) == activeIds.end())
+		{
+			if (it->second)
+				TheGameClient->destroyDrawable(it->second);
+			m_plannedBuildGhosts.erase(it++);
+		}
+		else
+		{
+			++it;
+		}
+	}
+}
+
 void InGameUI::preDraw()
 {
-
-	// handle any "icons" for the act of building things and placing them in the world
 	handleBuildPlacements();
+	updatePlannedBuildGhosts();
 
 	// handle radius-cursors, if any
 	handleRadiusCursor();
@@ -2171,6 +2265,7 @@ void InGameUI::reset()
 
 	// remove any build available status
 	placeBuildAvailable( nullptr, nullptr );
+	destroyPlannedBuildGhosts();
 
 	// free any message resources allocated
 	freeMessageResources();

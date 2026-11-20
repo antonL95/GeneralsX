@@ -689,8 +689,14 @@ Bool BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos,
 			}
 		}
 
+		if (RetailFileLayers::enabled() && builderObject && builderObject->getControllingPlayer() &&
+			builderObject->getRelationship(them) != ALLIES &&
+			them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
+		{
+			continue;
+		}
 #if !RETAIL_COMPATIBLE_CRC
-		if (builderObject && them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
+		if (!RetailFileLayers::enabled() && builderObject && them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
 			return false;
 #endif
 
@@ -763,6 +769,12 @@ Bool BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos,
 
 	for( them = iter2->first(); them; them = iter2->next() )
 	{
+		if (RetailFileLayers::enabled() && builderObject && builderObject->getControllingPlayer() &&
+			builderObject->getRelationship(them) != ALLIES &&
+			them->getShroudedStatus(builderObject->getControllingPlayer()->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
+		{
+			continue;
+		}
 
 		// ignore any kind of class of objects that we will "remove" for building
 		if( isRemovableForConstruction( them ) == TRUE )
@@ -856,7 +868,7 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 
 	// check shroud level
 	// This should be the first check, since returning other errors for shrouded areas could be used to game the system
-	if( BitIsSet( options, SHROUD_REVEALED ) )
+	if( !RetailFileLayers::enabled() && BitIsSet( options, SHROUD_REVEALED ) )
 	{
 		{
 			Int x, y;
@@ -929,37 +941,32 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 	// if clear path is requested check to see if the builder object can get there
 	if( BitIsSet( options, CLEAR_PATH ) && builderObject )
 	{
-		const AIUpdateInterface *ai = builderObject->getAIUpdateInterface();
-
-		//
-		// if there is no AI interface for this object, it cannot possible pass a clear path
-		// check since it will never be able to move there
-		//
-		/**todo remove this if we need to change the semantics of this function of the builderObject
-		// actually being able to get to the destination */
-		//
-		if( ai == nullptr )
-			return LBC_NO_CLEAR_PATH;
-
-		//
-		// check for an available path using one of two methods (the quick less accurate one,
-		// or the slow more accurate one)
-		//
-		if( BitIsSet( options, USE_QUICK_PATHFIND ) )
+		Bool checkPath = TRUE;
+		if( RetailFileLayers::enabled() && builderObject->getControllingPlayer() )
 		{
+			Int x, y;
+			ThePartitionManager->worldToCell(worldPos->x, worldPos->y, &x, &y);
+			checkPath = ThePartitionManager->getShroudStatusForPlayer(
+				builderObject->getControllingPlayer()->getPlayerIndex(), x, y) == CELLSHROUD_CLEAR;
+		}
+		if( checkPath )
+		{
+			const AIUpdateInterface *ai = builderObject->getAIUpdateInterface();
 
-			if( ai->isQuickPathAvailable( worldPos ) == FALSE )
+			if( ai == nullptr )
 				return LBC_NO_CLEAR_PATH;
 
+			if( BitIsSet( options, USE_QUICK_PATHFIND ) )
+			{
+				if( ai->isQuickPathAvailable( worldPos ) == FALSE )
+					return LBC_NO_CLEAR_PATH;
+			}
+			else
+			{
+				if( ai->isPathAvailable( worldPos ) == FALSE )
+					return LBC_NO_CLEAR_PATH;
+			}
 		}
-		else
-		{
-
-			if( ai->isPathAvailable( worldPos ) == FALSE )
-				return LBC_NO_CLEAR_PATH;
-
-		}
-
 	}
 
 	// check basic terrain restrctions
@@ -1429,6 +1436,11 @@ Bool BuildAssistant::moveObjectsForConstruction( const ThingTemplate *whatToBuil
 		if ( !them->isKindOf( KINDOF_ALWAYS_SELECTABLE ) && !isRemovableForConstruction(them) )
 		{
 			Relationship rel = playerToBuild->getRelationship(them->getTeam());
+			if (RetailFileLayers::enabled() && rel != ALLIES &&
+				them->getShroudedStatus(playerToBuild->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
+			{
+				continue;
+			}
 
 			if (rel == NEUTRAL || rel == ALLIES)
 			{

@@ -468,6 +468,13 @@ CBCommandStatus ControlBar::cancelRetailProduction(GameWindow *window) const
 		|| !m_currentSelectedDrawable->getObject() || !m_currentSelectedDrawable->getObject()->isLocallyControlled()
 		|| !BitIsSet(window->winGetStatus(), WIN_STATUS_RIGHT_CLICK))
 		return CBC_COMMAND_NOT_USED;
+	const CommandButton *command = static_cast<const CommandButton *>(GadgetButtonGetData(window));
+	if (command && m_currContext == CB_CONTEXT_UNDER_CONSTRUCTION
+		&& command->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT_CANCEL)
+	{
+		TheMessageStream->appendMessage(GameMessage::MSG_DOZER_CANCEL_CONSTRUCT);
+		return CBC_COMMAND_USED;
+	}
 	Int count;
 	Real progress;
 	const ProductionEntry *entry = getRetailProductionEntries(window, count, progress);
@@ -945,7 +952,7 @@ void ControlBar::populateRetailUnderConstruction(Object *obj)
 	if (obj && cancel && obj->isLocallyControlled())
 	{
 		setControlCommand(target, cancel);
-		setRetailRightClick(target, FALSE);
+		setRetailRightClick(target, TRUE);
 		target->winEnable(TRUE);
 		target->winHide(FALSE);
 		m_commandWindows[0] = target;
