@@ -205,6 +205,7 @@ set(GAMEENGINE_SRC
     Include/GameClient/GameFont.h
 #    Include/GameClient/GameInfoWindow.h
     Include/GameClient/GameText.h
+    Include/GameClient/RetailGameText.h
     Include/GameClient/GameWindow.h
     Include/GameClient/GameWindowGlobal.h
     Include/GameClient/GameWindowID.h

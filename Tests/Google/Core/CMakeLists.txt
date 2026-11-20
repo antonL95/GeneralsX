@@ -11,6 +11,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/CastleRulesTest.cpp
     GameEngine/Common/CastleTemplateTest.cpp
     GameEngine/Common/RetailFileLayersTest.cpp
+    GameEngine/Common/RetailGameTextTest.cpp
     GameEngine/Common/INIMathTest.cpp
     GameEngine/Common/INIPreprocessorTest.cpp
     GameEngine/Common/INILegacyLinesTest.cpp

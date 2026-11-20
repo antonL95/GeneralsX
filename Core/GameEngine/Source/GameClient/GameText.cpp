@@ -55,7 +55,12 @@
 #include "Common/GlobalData.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/version.h"
+#include "GameClient/RetailGameText.h"
+
+#include <memory>
 
 
 
@@ -204,6 +209,9 @@ class GameTextManager : public GameTextInterface
 		Bool						parseMapStringFile( const char *filename );
 		Bool						readLine( char *buffer, Int max, File *file );
 		Char						readChar( File *file );
+		void						initRetailText();
+		void						loadRetailText(const Char *filename, Bool compiled, StringInfo *&info,
+												   StringLookUp *&lookup, Int& count);
 };
 
 static int __cdecl			compareLUT ( const void *,  const void*);
@@ -293,6 +301,8 @@ GameTextManager::GameTextManager()
 
 GameTextManager::~GameTextManager()
 {
+	if (RetailFileLayers::enabled())
+		reset();
 	deinit();
 }
 
@@ -327,6 +337,12 @@ void GameTextManager::init()
 		m_munkee = 	TheGlobalData->m_munkeeOn;
 	}
 #endif
+
+	if (RetailFileLayers::enabled())
+	{
+		initRetailText();
+		return;
+	}
 
 	if ( m_useStringFile && getStringCount( g_strFile, m_textCount ) )
 	{
@@ -482,6 +498,68 @@ void GameTextManager::init()
 		}
 	}
 
+}
+
+void GameTextManager::initRetailText()
+{
+	if (m_useStringFile)
+		loadRetailText("data/lotr.str", FALSE, m_stringInfo, m_stringLUT, m_textCount);
+	if (!m_stringLUT)
+		loadRetailText("Lotr.csf", TRUE, m_stringInfo, m_stringLUT, m_textCount);
+}
+
+void GameTextManager::loadRetailText(const Char *filename, Bool compiled, StringInfo *&info,
+									 StringLookUp *&lookup, Int& count)
+{
+	const auto close = [](File *file) { file->close(); };
+	std::unique_ptr<File, decltype(close)> file(TheFileSystem->openFile(filename, File::READ | File::BINARY), close);
+	if (!file)
+		return;
+
+	const auto report = [filename](const char* detail) {
+		if (INIAudit::isEnabled())
+			INIAudit::record("text-error", detail, filename, 0);
+		else
+		{
+			fprintf(stderr, "[GameText] %s: %s\n", filename, detail);
+			fflush(stderr);
+			DEBUG_CRASH(("%s: %s", filename, detail));
+		}
+	};
+
+	const Int size = file->size();
+	if (size <= 0 || static_cast<size_t>(size) > RetailGameText::maxFileSize)
+	{
+		report("Invalid file size");
+		return;
+	}
+	std::string bytes(size, '\0');
+	if (file->read(bytes.data(), size) != size)
+	{
+		report("Incomplete file read");
+		return;
+	}
+	file.reset();
+
+	RetailGameText::Catalogue entries;
+	const bool parsed = compiled ? RetailGameText::parseCsf(bytes, entries) : RetailGameText::parseStr(bytes, entries);
+	if (!parsed)
+		report(compiled ? "Invalid CSF file" : "Malformed STR record");
+	if (entries.empty())
+		return;
+
+	count = static_cast<Int>(entries.size());
+	info = NEW StringInfo[count];
+	Int index = 0;
+	for (const auto& item : entries)
+	{
+		const auto& entry = item.second;
+		info[index].label = entry.label.c_str();
+		info[index].text = entry.text.c_str();
+		info[index].speech = entry.speech.c_str();
+		++index;
+	}
+	lookup = buildSortedLUT(info, count);
 }
 
 //============================================================================
@@ -1296,6 +1374,14 @@ quit:
 
 void GameTextManager::initMapStringFile( const AsciiString& filename )
 {
+	if (RetailFileLayers::enabled())
+	{
+		reset();
+		m_mapTextCount = 0;
+		loadRetailText(filename.str(), FALSE, m_mapStringInfo, m_mapStringLUT, m_mapTextCount);
+		return;
+	}
+
 	m_mapTextCount = 0;
 	getStringCount( filename.str(), m_mapTextCount );
 
@@ -1433,7 +1519,7 @@ UnicodeString GameTextManager::fetch( const Char *label, Bool *exists )
 {
 	DEBUG_ASSERTCRASH ( m_initialized, ("String Manager has not been m_initialized") );
 
-	if( m_stringInfo == nullptr )
+	if (m_stringInfo == nullptr && (!RetailFileLayers::enabled() || m_mapStringLUT == nullptr))
 	{
 		if( exists )
 			*exists = FALSE;
@@ -1458,7 +1544,7 @@ UnicodeString GameTextManager::fetch( const Char *label, Bool *exists )
 		lookUp = nullptr;
 	}
 
-	if ( lookUp == nullptr )
+	if (lookUp == nullptr && m_stringLUT)
 	{
 		lookUp = (StringLookUp *) bsearch( &key, (void*) m_stringLUT, m_textCount, sizeof(StringLookUp), compareLUT );
 	}
