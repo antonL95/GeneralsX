@@ -2922,6 +2922,8 @@ void Drawable::drawAmmo( const IRegion2D *healthBarRegion )
 // ------------------------------------------------------------------------------------------------
 void Drawable::drawContained( const IRegion2D *healthBarRegion )
 {
+	if (!healthBarRegion)
+		return;
 	const Object *obj = getObject();
 
 	ContainModuleInterface* container = obj->getContain();
