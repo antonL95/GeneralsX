@@ -1044,6 +1044,7 @@ void ModelConditionInfo::clear()
 	m_animMinSpeedFactor = 1.0f;
 	m_animMaxSpeedFactor = 1.0f;
 	m_pristineBoneFrame = -1;
+	m_enteringStateFX = nullptr;
 	m_pristineBones.clear();
 	m_validStuff = 0;
 }
@@ -3735,6 +3736,15 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 	m_nextState = nextState;
 	m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
 	adjustAnimation(prevState, prevAnimFraction);
+
+	if (newState->m_enteringStateFX != nullptr && prevState != newState)
+	{
+		const Drawable* drawable = getDrawable();
+		if (drawable->getObject() != nullptr)
+			FXList::doFXObj(newState->m_enteringStateFX, drawable->getObject());
+		else
+			FXList::doFXPos(newState->m_enteringStateFX, drawable->getPosition());
+	}
 }
 
 //-------------------------------------------------------------------------------------------------

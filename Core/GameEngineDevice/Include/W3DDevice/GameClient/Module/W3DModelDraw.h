@@ -60,6 +60,7 @@ class Thing;
 class ThingTemplate;
 class RenderObjClass;
 class W3DDynamicLight;
+class FXList;
 class Shadow;
 class TerrainTracksRenderObjClass;
 class HAnimClass;
@@ -245,6 +246,7 @@ struct ModelConditionInfo
 	mutable Byte											m_validStuff;
 
 	Int m_pristineBoneFrame;
+	const FXList* m_enteringStateFX = nullptr;
 
 	enum
 	{

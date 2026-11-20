@@ -925,6 +925,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/System/Debug/AudioDebugDisplay.cpp
     Source/GameClient/System/DebugDisplay.cpp
     Source/GameClient/System/Image.cpp
+    Source/GameClient/System/FXParticleSys.cpp
     Source/GameClient/System/ParticleSys.cpp
     Source/GameClient/System/RayEffect.cpp
     Source/GameClient/System/Smudge.cpp

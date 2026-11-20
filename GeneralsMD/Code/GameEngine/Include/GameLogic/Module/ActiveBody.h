@@ -55,10 +55,14 @@ public:
 	Real m_subdualDamageCap;								///< Subdual damage will never accumulate past this
 	UnsignedInt m_subdualDamageHealRate;		///< Every this often, we drop subdual damage...
 	Real m_subdualDamageHealAmount;					///< by this much.
+	Real m_maxHealthDamaged;
+	Real m_maxHealthReallyDamaged;
 
 	ActiveBodyModuleData();
 
 	Real getStartingHealth() const;
+	Real getDamagedRatio() const;
+	Real getReallyDamagedRatio() const;
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 };

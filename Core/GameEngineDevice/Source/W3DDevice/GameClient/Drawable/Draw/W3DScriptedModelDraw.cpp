@@ -2,6 +2,7 @@
 #define DEFINE_WEAPONSLOTTYPE_NAMES
 
 #include "W3DDevice/GameClient/Module/W3DScriptedModelDraw.h"
+#include "GameClient/FXList.h"
 #include "Common/ModuleFactory.h"
 #include "Common/BitFlagsIO.h"
 #include "Common/INI.h"
@@ -442,6 +443,7 @@ const ModelConditionInfo* W3DScriptedModelDrawModuleData::findBestInfo(const Mod
 		combined.m_flags = best->draw.m_flags;
 		combined.m_transitionKey = best->draw.m_transitionKey;
 		combined.m_pristineBoneFrame = best->draw.m_pristineBoneFrame;
+		combined.m_enteringStateFX = best->enteringStateFX.isEmpty() || TheFXListStore == nullptr ? nullptr : TheFXListStore->findFXList(best->enteringStateFX.str());
 		combined.m_validStuff &= ModelConditionInfo::HAS_PROJECTILE_BONES | ModelConditionInfo::PUBLIC_BONES_VALID;
 		combined.m_particleSysBones.insert(combined.m_particleSysBones.end(),
 			best->draw.m_particleSysBones.begin(), best->draw.m_particleSysBones.end());

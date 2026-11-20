@@ -34,7 +34,9 @@
 #include "Common/FramePacer.h"
 #include "Common/GameState.h"
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 #include "Common/PerfTimer.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/GameLOD.h"
 #include "Common/Xfer.h"
@@ -637,8 +639,10 @@ void Particle::doWindMotion(Real timeScale)
 	v.z = m_pos.z - systemPos.z;
 
 	// distance amounts for full force from wind and no force at all
-	Real fullForceDistance = 75.0f;
-	Real noForceDistance = 200.0f;
+	const ParticleSystemTemplate *windTemplate = m_system->getTemplate();
+	Real fullForceDistance = windTemplate ? windTemplate->getWindFullStrengthDistance() : DEFAULT_WIND_FULL_STRENGTH_DISTANCE;
+	Real noForceDistance = windTemplate ? windTemplate->getWindZeroStrengthDistance() : DEFAULT_WIND_ZERO_STRENGTH_DISTANCE;
+	const Real windStrength = windTemplate ? windTemplate->getWindStrength() : DEFAULT_WIND_STRENGTH;
 
 	//
 	// given the distance from the wind position to the particle ... figure out how much
@@ -649,7 +653,7 @@ void Particle::doWindMotion(Real timeScale)
 	Real distFromWind = v.length();
 	if( distFromWind < noForceDistance )
 	{
-		Real windForceStrength = 2.0f * m_windRandomness * timeScale;
+		Real windForceStrength = windStrength * m_windRandomness * timeScale;
 
 		// only apply force if still within the circle of influence
 		if( distFromWind > fullForceDistance )
@@ -1885,6 +1889,9 @@ Particle *ParticleSystem::createParticle( const ParticleInfo *info,
 		if (TheGlobalData->m_useFX == FALSE)
 			return nullptr;
 
+		if (m_template && !m_template->isRenderable())
+			return nullptr;
+
 		//
 		// Enforce particle limit.
 		// If we are at the limit, destroy the oldest particle in order
@@ -1942,6 +1949,8 @@ const ParticleInfo *ParticleSystem::generateParticleInfo( Int particleNum, Int p
 	// specified, which must know where the particle is in space.
 	info.m_pos = *computeParticlePosition();
 	info.m_vel = *computeParticleVelocity( &info.m_pos );
+	if (m_emissionVolumeType == CYLINDER && m_template)
+		info.m_pos.add(*m_template->getCylinderOffset());
 
 	// transform the position and velocity, if necessary
 	/// @todo Avoid conversion from Coord3D to Vector3 somehow
@@ -3082,6 +3091,11 @@ ParticleSystemTemplate::ParticleSystemTemplate( const AsciiString &name ) :
 	m_name(name)
 {
 	m_slaveTemplate = nullptr;
+	m_isRenderable = TRUE;
+	m_windStrength = DEFAULT_WIND_STRENGTH;
+	m_windFullStrengthDistance = DEFAULT_WIND_FULL_STRENGTH_DISTANCE;
+	m_windZeroStrengthDistance = DEFAULT_WIND_ZERO_STRENGTH_DISTANCE;
+	m_cylinderOffset.zero();
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -3163,7 +3177,10 @@ void ParticleSystemManager::init()
 {
 	/// Read INI data and build templates
 	INI ini;
-	ini.loadFileDirectory( "Data\\INI\\ParticleSystem", INI_LOAD_OVERWRITE, nullptr );
+	if (!RetailFileLayers::enabled())
+		ini.loadFileDirectory( "Data\\INI\\ParticleSystem", INI_LOAD_OVERWRITE, nullptr );
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+		ini.loadFileDirectory( "Data\\INI\\FXParticleSystem", INI_LOAD_OVERWRITE, nullptr );
 
 	// sanity, our lists must be empty!!
 	for( Int i = 0; i < NUM_PARTICLE_PRIORITIES; ++i )
@@ -3819,3 +3836,11 @@ static Real angleBetween(const Coord2D *vecA, const Coord2D *vecB)
 	return -theta;
 }
 
+
+#if !RETAIL_COMPATIBLE_CRC
+void ParticleSystemManagerDummy::init()
+{
+	if (INIAudit::isEnabled())
+		ParticleSystemManager::init();
+}
+#endif

@@ -71,6 +71,8 @@ public:
 	FXVec							m_fxs[SC_PHASE_COUNT];
 	UnsignedInt				m_oclCount[SC_PHASE_COUNT];
 	UnsignedInt				m_fxCount[SC_PHASE_COUNT];
+	Real							m_collapseHeight;
+	Bool							m_destroyObjectWhenDone;
 
 	StructureCollapseUpdateModuleData()
 	{
@@ -80,6 +82,8 @@ public:
 		m_maxShudder = 0;
 		m_collapseDamping = 0.0;
 		m_bigBurstFrequency = 0;
+		m_collapseHeight = -1.0f;
+		m_destroyObjectWhenDone = FALSE;
 
 		for (int i = 0; i < SC_PHASE_COUNT; ++i)
 		{

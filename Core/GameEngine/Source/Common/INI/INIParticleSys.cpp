@@ -56,3 +56,20 @@ void INI::parseParticleSystemDefinition( INI* ini )
 	ini->initFromINI( sysTemplate, sysTemplate->getFieldParse() );
 	sysTemplate->validate();
 }
+
+void INI::parseFXParticleSystemDefinition( INI* ini )
+{
+	if (ini->skipBlockWithoutOwner(TheParticleSystemManager, "FXParticleSystem"))
+		return;
+
+	AsciiString name;
+	name.set( ini->getNextToken() );
+
+	ParticleSystemTemplate *sysTemplate = const_cast<ParticleSystemTemplate*>(TheParticleSystemManager->findTemplate( name ));
+	if (sysTemplate == nullptr)
+		sysTemplate = TheParticleSystemManager->newTemplate( name );
+
+	sysTemplate->resetForFXDefinition();
+	ini->initFromINI( sysTemplate, ParticleSystemTemplate::getFXFieldParse() );
+	sysTemplate->validate();
+}

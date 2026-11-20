@@ -37,6 +37,7 @@
 #include "Common/GlobalData.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
+#include "Common/ModuleFactory.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BoneFXUpdate.h"
 #include "GameLogic/Module/StructureCollapseUpdate.h"
@@ -124,6 +125,16 @@ static void parseOCL( INI* ini, void *instance, void * /*store*/, const void* /*
 	};
   p.add(dataFieldParse);
 	p.add(DieMuxData::getFieldParse(), offsetof( StructureCollapseUpdateModuleData, m_dieMuxData ));
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse rotwkFields[] =
+		{
+			{ "CollapseHeight",				INI::parseReal,	nullptr, offsetof( StructureCollapseUpdateModuleData, m_collapseHeight ) },
+			{ "DestroyObjectWhenDone",	INI::parseBool,	nullptr, offsetof( StructureCollapseUpdateModuleData, m_destroyObjectWhenDone ) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(rotwkFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -236,14 +247,20 @@ UpdateSleepTime StructureCollapseUpdate::update()
 			m_burstFrame += GameLogicRandomValue(d->m_minBurstDelay, d->m_maxBurstDelay);
 		}
 
-//		if ((m_currentHeight + building->getGeometryInfo().getMaxHeightAbovePosition()) <= 0)
-		if ((m_currentHeight + building->getTemplate()->getTemplateGeometryInfo().getMaxHeightAbovePosition()) <= 0)
+		const Real collapseHeight = d->m_collapseHeight >= 0.0f ? d->m_collapseHeight : building->getTemplate()->getTemplateGeometryInfo().getMaxHeightAbovePosition();
+		if ((m_currentHeight + collapseHeight) <= 0)
 		{
 			m_collapseState = COLLAPSESTATE_DONE;
 			doPhaseStuff(SCPHASE_FINAL, building->getPosition());
 			Drawable *drawable = building->getDrawable();
 
 			doCollapseDoneStuff();
+
+			if (d->m_destroyObjectWhenDone)
+			{
+				TheGameLogic->destroyObject(building);
+				return UPDATE_SLEEP_FOREVER;
+			}
 
 			drawable->clearModelConditionState(MODELCONDITION_RUBBLE);
 			drawable->setModelConditionState(MODELCONDITION_POST_COLLAPSE);

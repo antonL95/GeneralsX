@@ -36,6 +36,7 @@
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
 #include "Common/PlayerList.h"
+#include "Common/ModuleFactory.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/Team.h"
 #include "Common/Thing.h"
@@ -102,18 +103,18 @@ BodyParticleSystem::~BodyParticleSystem()
 
 //-------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-static BodyDamageType calcDamageState(Real health, Real maxHealth)
+static BodyDamageType calcDamageState(Real health, Real maxHealth, const ActiveBodyModuleData *data)
 {
 	if (!TheGlobalData)
 		return BODY_PRISTINE;
 
 	Real ratio = health / maxHealth;
 
-	if (ratio > TheGlobalData->m_unitDamagedThresh)
+	if (ratio > data->getDamagedRatio())
 	{
 		return BODY_PRISTINE;
 	}
-	else if (ratio > TheGlobalData->m_unitReallyDamagedThresh)
+	else if (ratio > data->getReallyDamagedRatio())
 	{
 		return BODY_DAMAGED;
 	}
@@ -137,6 +138,22 @@ ActiveBodyModuleData::ActiveBodyModuleData()
 	m_subdualDamageCap = 0;
 	m_subdualDamageHealRate = 0;
 	m_subdualDamageHealAmount = 0;
+	m_maxHealthDamaged = 0;
+	m_maxHealthReallyDamaged = 0;
+}
+
+Real ActiveBodyModuleData::getDamagedRatio() const
+{
+	if (m_maxHealthDamaged > 0.0f && m_maxHealth > 0.0f)
+		return m_maxHealthDamaged / m_maxHealth;
+	return TheGlobalData->m_unitDamagedThresh;
+}
+
+Real ActiveBodyModuleData::getReallyDamagedRatio() const
+{
+	if (m_maxHealthReallyDamaged > 0.0f && m_maxHealth > 0.0f)
+		return m_maxHealthReallyDamaged / m_maxHealth;
+	return TheGlobalData->m_unitReallyDamagedThresh;
 }
 
 static void parseInitialHealth(INI* ini, void* instance, void* store, const void* userData)
@@ -169,6 +186,16 @@ void ActiveBodyModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse rotwkFields[] =
+		{
+			{ "MaxHealthDamaged",				INI::parseReal,	nullptr,	offsetof( ActiveBodyModuleData, m_maxHealthDamaged ) },
+			{ "MaxHealthReallyDamaged",	INI::parseReal,	nullptr,	offsetof( ActiveBodyModuleData, m_maxHealthReallyDamaged ) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(rotwkFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -222,7 +249,7 @@ void ActiveBody::onDelete()
 //-------------------------------------------------------------------------------------------------
 void ActiveBody::setCorrectDamageState()
 {
-	m_curDamageState = calcDamageState(m_currentHealth, m_maxHealth);
+	m_curDamageState = calcDamageState(m_currentHealth, m_maxHealth, getActiveBodyModuleData());
 
 	/// @todo srj -- bleah, this is an icky way to do it. oh well.
 	if (m_curDamageState == BODY_RUBBLE && getObject()->isKindOf(KINDOF_STRUCTURE))
@@ -261,11 +288,11 @@ void ActiveBody::setDamageState( BodyDamageType newState )
 	}
 	else if( newState == BODY_DAMAGED )
 	{
-		ratio = TheGlobalData->m_unitDamagedThresh;
+		ratio = getActiveBodyModuleData()->getDamagedRatio();
 	}
 	else if( newState == BODY_REALLYDAMAGED )
 	{
-		ratio = TheGlobalData->m_unitReallyDamagedThresh;
+		ratio = getActiveBodyModuleData()->getReallyDamagedRatio();
 	}
 	else if( newState == BODY_RUBBLE )
 	{

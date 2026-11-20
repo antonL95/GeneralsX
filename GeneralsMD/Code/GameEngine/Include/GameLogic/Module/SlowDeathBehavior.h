@@ -30,6 +30,7 @@
 #pragma once
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
+#include "Common/ModelState.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/DieModule.h"
 #include "GameLogic/Module/UpdateModule.h"
@@ -90,6 +91,13 @@ public:
 	Real							m_flingForceVariance;
 	Real							m_flingPitch;
 	Real							m_flingPitchVariance;
+	std::vector<AsciiString>	m_sounds[SD_PHASE_COUNT];
+	ModelConditionFlags	m_deathFlags;
+	UnsignedInt				m_fadeDelay;
+	UnsignedInt				m_fadeTime;
+	UnsignedInt				m_decayBeginTime;
+	Bool							m_shadowWhenDead;
+	Bool							m_doNotRandomizeMidpoint;
 
 	enum
 	{
@@ -159,6 +167,7 @@ public:
 protected:
 
 	void doPhaseStuff(SlowDeathPhaseType sdphase);
+	void playPhaseSound(SlowDeathPhaseType sdphase);
 	Bool isSlowDeathActivated() const { return (m_flags & (1<<SLOW_DEATH_ACTIVATED)) != 0; }
 	UnsignedInt getDestructionFrame() const { return m_destructionFrame; }
 
@@ -169,7 +178,8 @@ private:
 		SLOW_DEATH_ACTIVATED,
 		MIDPOINT_EXECUTED,
 		FLUNG_INTO_AIR,
-		BOUNCED
+		BOUNCED,
+		FADE_STARTED
 	};
 
 	UnsignedInt m_sinkFrame;							///< Frame to be sunken into the ground on
@@ -177,4 +187,5 @@ private:
 	UnsignedInt m_destructionFrame;
 	Real				m_acceleratedTimeScale;		///<used to speedup deaths when needed to improve game performance.
 	UnsignedInt	m_flags;
+	UnsignedInt m_fadeFrame;
 };

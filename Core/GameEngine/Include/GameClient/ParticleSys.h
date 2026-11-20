@@ -63,6 +63,10 @@ constexpr const UnsignedInt MIN_VOLUME_PARTICLE_DEPTH = 2;
 constexpr const UnsignedInt OPTIMUM_VOLUME_PARTICLE_DEPTH = 6;
 constexpr const UnsignedInt MAX_VOLUME_PARTICLE_DEPTH = 16;
 
+constexpr const Real DEFAULT_WIND_STRENGTH = 2.0f;
+constexpr const Real DEFAULT_WIND_FULL_STRENGTH_DISTANCE = 75.0f;
+constexpr const Real DEFAULT_WIND_ZERO_STRENGTH_DISTANCE = 200.0f;
+
 // TheSuperHackers @info The X and Y angles are not necessary for particles because there are only 2 placement modes:
 // Billboard (always facing camera) and Ground Aligned, which overwrite any rotations on the X and Y axis by design.
 // Therefore particles can only be rotated on the Z axis. Zero Hour never had X and Y angles, but Generals did.
@@ -589,6 +593,14 @@ public:
 	static void parseRandomRGBColor( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parseRandomRGBColorRate( INI* ini, void *instance, void *store, const void* /*userData*/ );
 
+	static const FieldParse *getFXFieldParse() { return m_fxFieldParseTable; }
+	void resetForFXDefinition();
+	Bool isRenderable() const { return m_isRenderable; }
+	Real getWindStrength() const { return m_windStrength; }
+	Real getWindFullStrengthDistance() const { return m_windFullStrengthDistance; }
+	Real getWindZeroStrengthDistance() const { return m_windZeroStrengthDistance; }
+	const Coord3D *getCylinderOffset() const { return &m_cylinderOffset; }
+
 protected:
 	friend class ParticleSystemManager;					///< @todo remove this friendship
 	friend class ParticleSystem;								///< @todo remove this friendship
@@ -600,12 +612,50 @@ protected:
 	friend void _writeSingleParticleSystem( File *out, ParticleSystemTemplate *templ );
 
 	static const FieldParse m_fieldParseTable[];			///< the parse table for INI definition
+	static const FieldParse m_fxFieldParseTable[];
+	static const FieldParse m_fxSystemFieldParseTable[];
+	static const FieldParse m_fxColorFieldParseTable[];
+	static const FieldParse m_fxAlphaFieldParseTable[];
+	static const FieldParse m_fxDefaultUpdateFieldParseTable[];
+	static const FieldParse m_fxRenderObjectUpdateFieldParseTable[];
+	static const FieldParse m_fxPhysicsFieldParseTable[];
+	static const FieldParse m_fxWindFieldParseTable[];
+	static const FieldParse m_fxEventFieldParseTable[];
+	static const FieldParse m_fxOrthoVelocityFieldParseTable[];
+	static const FieldParse m_fxSphericalVelocityFieldParseTable[];
+	static const FieldParse m_fxHemisphericalVelocityFieldParseTable[];
+	static const FieldParse m_fxCylindricalVelocityFieldParseTable[];
+	static const FieldParse m_fxOutwardVelocityFieldParseTable[];
+	static const FieldParse m_fxPointVolumeFieldParseTable[];
+	static const FieldParse m_fxLineVolumeFieldParseTable[];
+	static const FieldParse m_fxBoxVolumeFieldParseTable[];
+	static const FieldParse m_fxSphereVolumeFieldParseTable[];
+	static const FieldParse m_fxCylinderVolumeFieldParseTable[];
+	static const FieldParse m_fxLightningVolumeFieldParseTable[];
+	static const FieldParse m_fxTerrainFireVolumeFieldParseTable[];
+	static const FieldParse m_fxDefaultDrawFieldParseTable[];
+	static const FieldParse m_fxGpuDrawFieldParseTable[];
+	static const FieldParse m_fxLightningDrawFieldParseTable[];
+	static const FieldParse m_fxRenderObjectDrawFieldParseTable[];
+
+	static void parseFXSystem( INI* ini, void *instance, void *store, const void* userData );
+	static void parseFXModule( INI* ini, void *instance, void *store, const void* userData );
+	static void parseFXPriority( INI* ini, void *instance, void *store, const void* userData );
+	static void parseFXShader( INI* ini, void *instance, void *store, const void* userData );
+	static void parseFXType( INI* ini, void *instance, void *store, const void* userData );
+	static void parseFXUnrendered( INI* ini, void *instance, void *store, const void* userData );
 
 protected:
 	AsciiString								m_name;													///< the name of this template
 
 	// This has to be mutable because of the delayed initialization thing in createSlaveSystem
 	mutable const ParticleSystemTemplate *m_slaveTemplate;		///< if non-null, use this to create a slave system
+
+	Bool m_isRenderable;
+	Real m_windStrength;
+	Real m_windFullStrengthDistance;
+	Real m_windZeroStrengthDistance;
+	Coord3D m_cylinderOffset;
 
 	// template attribute data inherited from ParticleSystemInfo class
 };
@@ -947,7 +997,7 @@ public:
 	// Must not overload init to keep loading the particle system templates,
 	// which are unfortunately needed to preserve the correct logic crc.
 #else
-	virtual void init() override {}
+	virtual void init() override;
 	virtual void reset() override {}
 #endif
 	virtual void update() override {}

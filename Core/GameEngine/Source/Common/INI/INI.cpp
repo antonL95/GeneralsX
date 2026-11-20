@@ -509,6 +509,8 @@ static INIBlockParse findBlockParse(const char* token)
 {
 	if (!INIAudit::isEnabled() && RetailFileLayers::enabled() && strcmp(token, "PlayerAIType") == 0)
 		return BfmeMapScripts::parsePlayerAIType;
+	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "FXParticleSystem") == 0)
+		return INI::parseFXParticleSystemDefinition;
 	for (size_t i = 0; i < ARRAY_SIZE(theTypeTable); ++i)
 	{
 		if (strcmp(theTypeTable[i].token, token) == 0)
