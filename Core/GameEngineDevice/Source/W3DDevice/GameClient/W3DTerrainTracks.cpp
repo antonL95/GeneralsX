@@ -59,6 +59,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Object.h"
 #include "GameClient/Drawable.h"
+#include <algorithm>
 
 
 #define BRIDGE_OFFSET_FACTOR	0.25f	//amount to raise tracks above bridges.
@@ -827,6 +828,9 @@ Try improving the fit to vertical surfaces like cliffs.
 	shadeG*=255.0f;
 	shadeB*=255.0f;
 
+	shadeR = std::clamp(shadeR, 0.0f, 255.0f);
+	shadeG = std::clamp(shadeG, 0.0f, 255.0f);
+	shadeB = std::clamp(shadeB, 0.0f, 255.0f);
 	diffuseLight = REAL_TO_INT(shadeB) | (REAL_TO_INT(shadeG) << 8) | (REAL_TO_INT(shadeR) << 16);
 	Real numFadedEdges=m_maxTankTrackEdges-m_maxTankTrackOpaqueEdges;
 

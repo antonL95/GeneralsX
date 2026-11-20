@@ -70,6 +70,7 @@
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 #include <cmath>
+#include <algorithm>
 
 
 
@@ -2989,6 +2990,9 @@ void WaterRenderObjClass::drawRiverWater(PolygonTrigger *pTrig)
 		}
 	}
 
+	shadeR = std::clamp(shadeR, 0.0f, 255.0f);
+	shadeG = std::clamp(shadeG, 0.0f, 255.0f);
+	shadeB = std::clamp(shadeB, 0.0f, 255.0f);
 	Int diffuse=REAL_TO_INT(shadeB) | (REAL_TO_INT(shadeG) << 8) | (REAL_TO_INT(shadeR) << 16);
 
 	//Keep diffuse from lighting calculations but substitute custom alpha
@@ -3431,6 +3435,9 @@ void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4], Bool standingWat
 		}
 	}
 
+	shadeR = std::clamp(shadeR, 0.0f, 255.0f);
+	shadeG = std::clamp(shadeG, 0.0f, 255.0f);
+	shadeB = std::clamp(shadeB, 0.0f, 255.0f);
 	Int diffuse=REAL_TO_INT(shadeB) | (REAL_TO_INT(shadeG) << 8) | (REAL_TO_INT(shadeR) << 16);
 
 	//Keep diffuse from lighting calculations but substitute custom alpha

@@ -62,6 +62,7 @@
 #include "WW3D2/camera.h"
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/dx8wrapper.h"
+#include <algorithm>
 
 //number of vertex pages allocated - allows double buffering of vertex updates.
 //while one is being rendered, another is being updated.  Improves HW parallelism.
@@ -901,6 +902,9 @@ Try improving the fit to vertical surfaces like cliffs.
 	shadeG*=255.0f;
 	shadeB*=255.0f;
 
+	shadeR = std::clamp(shadeR, 0.0f, 255.0f);
+	shadeG = std::clamp(shadeG, 0.0f, 255.0f);
+	shadeB = std::clamp(shadeB, 0.0f, 255.0f);
 	diffuseLight=REAL_TO_INT(shadeB) | (REAL_TO_INT(shadeG) << 8) | (REAL_TO_INT(shadeR) << 16);
 
 	Matrix3D tm(1);	///set to identity
