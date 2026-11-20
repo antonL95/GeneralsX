@@ -584,6 +584,9 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "ExtraLogging",								INI::parseBool,				nullptr,			offsetof( GlobalData, m_extraLogging ) },
 #endif
 
+	{ "VictoryConditionStructureObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( GlobalData, m_victoryStructureFilter ) },
+	{ "VictoryConditionUnitObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( GlobalData, m_victoryUnitFilter ) },
+
 	{ nullptr,					nullptr,						nullptr,						0 }
 
 };

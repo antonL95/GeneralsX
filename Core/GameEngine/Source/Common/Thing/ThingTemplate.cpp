@@ -2036,7 +2036,8 @@ Int ThingTemplate::calcTimeToBuild( const Player* player) const
 	if (penaltyRate <= 0.0f)
 		penaltyRate = 0.01f;	// Design won't make the minimum 0, they promise
 
-	buildTime /= penaltyRate;//and voila.  Makes sense, designers have control, all is happy.
+	if (!RetailFileLayers::enabled())
+		buildTime /= penaltyRate;
 
 	//	Multiple build facilities can have an added production bonus.
 

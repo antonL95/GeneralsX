@@ -59,6 +59,7 @@
 //#include "GameLogic/PartitionManager.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
@@ -699,6 +700,11 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		case GameMessage::MSG_DOZER_CONSTRUCT_LINE:
 		{
 			onDozerConstruct(msg, currentlySelectedGroup);
+			break;
+		}
+		case GameMessage::MSG_FOUNDATION_CONSTRUCT:
+		{
+			onFoundationConstruct(msg, currentlySelectedGroup);
 			break;
 		}
 		case GameMessage::MSG_DOZER_CANCEL_CONSTRUCT:
@@ -1960,6 +1966,24 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 	//		pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), msg->getType() );
 
 	return true;
+}
+
+bool GameLogic::onFoundationConstruct(GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
+{
+#if RETAIL_COMPATIBLE_AIGROUP
+	Object *foundation = getSingleObjectFromSelection(currentlySelectedGroup);
+#else
+	Object *foundation = getSingleObjectFromSelection(currentlySelectedGroup.Peek());
+#endif
+	if( foundation == nullptr || msg->getArgumentCount() < 1 )
+		return false;
+
+	FoundationAIUpdate *update = FoundationAIUpdate::find( *foundation );
+	if( update == nullptr )
+		return false;
+
+	const ThingTemplate *what = TheThingFactory->findByTemplateID( msg->getArgument( 0 )->integer );
+	return update->construct( what, getMessagePlayer( msg ) ) != nullptr;
 }
 
 bool GameLogic::onDozerCancelConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)

@@ -76,13 +76,17 @@ public:
 	Bool shouldDoOnBuildComplete() const override { return !m_buildComplete; }
 	UpdateSleepTime update() override;
 	Bool isUnpacked() const { return m_unpacked; }
+	Real getMaxCastleRadius() const { return getCastleBehaviorModuleData()->m_maxCastleRadius; }
 
 private:
 	void unpack();
+	void checkKeep();
+	void killEverything();
 
 	Bool m_buildComplete = FALSE;
 	Bool m_pendingUnpack = FALSE;
 	Bool m_unpacked = FALSE;
+	Bool m_keepLost = FALSE;
 	ObjectID m_keep = INVALID_ID;
 	std::vector<ObjectID> m_members;
 };

@@ -726,13 +726,8 @@ void ControlBar::deleteBuildTooltipLayout()
 {
 	m_showBuildToolTipLayout = FALSE;
 	prevWindow= nullptr;
-	m_buildToolTipLayout->hide(TRUE);
-//	if(!m_buildToolTipLayout)
-//		return;
-//
-//	m_buildToolTipLayout->destroyWindows();
-//	deleteInstance(m_buildToolTipLayout);
-//	m_buildToolTipLayout = nullptr;
+	if (m_buildToolTipLayout)
+		m_buildToolTipLayout->hide(TRUE);
 
 	delete theAnimateWindowManager;
 	theAnimateWindowManager = nullptr;

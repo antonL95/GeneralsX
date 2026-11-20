@@ -773,6 +773,16 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 		}
 
+		case GUI_COMMAND_FOUNDATION_CONSTRUCT:
+		{
+			if( commandButton->getThingTemplate() == nullptr )
+				break;
+
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_FOUNDATION_CONSTRUCT );
+			msg->appendIntegerArgument( commandButton->getThingTemplate()->getTemplateID() );
+			break;
+		}
+
 #ifdef ALLOW_SURRENDER
 		// ------------------------------------------------------------------------------------------------
 		case GUI_COMMAND_POW_RETURN_TO_PRISON:

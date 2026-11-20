@@ -3,6 +3,7 @@
 #include "GameLogic/Module/CastleBehavior.h"
 
 #include <algorithm>
+#include <cstdio>
 
 #include "Common/Errors.h"
 #include "Common/INI.h"
@@ -16,9 +17,12 @@
 #include "GameClient/Drawable.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/CastleRules.h"
 #include "GameLogic/CastleTemplateStore.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/Module/FoundationAIUpdate.h"
 
 namespace
 {
@@ -145,7 +149,62 @@ UpdateSleepTime CastleBehavior::update()
 		m_pendingUnpack = FALSE;
 		unpack();
 	}
-	return UPDATE_SLEEP_FOREVER;
+	if (!m_unpacked || m_keepLost || m_keep == INVALID_ID)
+		return UPDATE_SLEEP_FOREVER;
+
+	checkKeep();
+	return m_keepLost ? UPDATE_SLEEP_FOREVER : UPDATE_SLEEP_NONE;
+}
+
+void CastleBehavior::checkKeep()
+{
+	const Object* keep = TheGameLogic->findObjectByID(m_keep);
+	switch (CastleRules::keepAction(keep != nullptr, keep && keep->isEffectivelyDead(),
+		getCastleBehaviorModuleData()->m_keepDeathKillsEverything))
+	{
+	case CastleRules::KeepAction::None:
+		return;
+	case CastleRules::KeepAction::Lost:
+		m_keepLost = TRUE;
+		return;
+	case CastleRules::KeepAction::KillEverything:
+		m_keepLost = TRUE;
+		killEverything();
+		return;
+	}
+}
+
+void CastleBehavior::killEverything()
+{
+	std::vector<ObjectID> pieces;
+	pieces.reserve(m_members.size() + 1);
+	pieces.push_back(getObject()->getID());
+	pieces.insert(pieces.end(), m_members.begin(), m_members.end());
+
+	for (ObjectID id : pieces)
+	{
+		Object* piece = TheGameLogic->findObjectByID(id);
+		if (!piece)
+			continue;
+		if (piece->isKindOf(KINDOF_BASE_FOUNDATION))
+		{
+			const FoundationAIUpdate* foundation = FoundationAIUpdate::find(*piece);
+			Object* structure = foundation ? foundation->getStructure() : nullptr;
+			if (structure && !structure->isEffectivelyDead())
+				structure->kill();
+		}
+		else if (!piece->isEffectivelyDead())
+		{
+			piece->kill();
+		}
+	}
+
+	for (ObjectID id : pieces)
+	{
+		Object* piece = TheGameLogic->findObjectByID(id);
+		if (piece && piece->isKindOf(KINDOF_BASE_FOUNDATION))
+			TheGameLogic->destroyObject(piece);
+	}
 }
 
 void CastleBehavior::unpack()
@@ -162,22 +221,33 @@ void CastleBehavior::unpack()
 	if (faction == data->m_castles.end())
 		return;
 
-	const auto* members = CastleTemplates::find(faction->camp);
+	const CastleTemplates::Members* members = nullptr;
+	try
+	{
+		members = CastleTemplates::find(faction->camp);
+	}
+	catch (ErrorCode)
+	{
+		std::fprintf(stderr, "Castle %s: cannot read the castle templates, nothing unpacked\n", faction->camp.str());
+		return;
+	}
 	if (!members || members->empty())
 		return;
 
 	std::vector<const ThingTemplate*> templates;
 	templates.reserve(members->size());
-	for (const auto& member : *members)
+	for (std::size_t i = 0; i < members->size(); ++i)
 	{
+		const auto& member = (*members)[i];
 		const ThingTemplate* definition = nullptr;
-		if (member.templateName.size() < AsciiString::MAX_LEN)
+		if (!member.templateName.empty() && member.templateName.size() < AsciiString::MAX_LEN)
 			definition = TheThingFactory->findTemplate(member.templateName.c_str(), FALSE);
 		if (!definition || definition->isKindOf(KINDOF_DRAWABLE_ONLY))
 		{
-			if (!INIAudit::isEnabled())
-				throw ERROR_CORRUPT_FILE_FORMAT;
-			INIAudit::record("error", "Invalid castle member template: " + member.templateName, faction->camp.str(), 0);
+			std::fprintf(stderr, "Castle %s: skipped member %u with %s template '%s'\n", faction->camp.str(),
+				static_cast<unsigned>(i), member.templateName.empty() ? "an empty" : "an unknown", member.templateName.c_str());
+			if (INIAudit::isEnabled())
+				INIAudit::record("error", "Invalid castle member template: " + member.templateName, faction->camp.str(), 0);
 			definition = nullptr;
 		}
 		templates.push_back(definition);
@@ -227,7 +297,7 @@ void CastleBehavior::unpack()
 		if (team)
 			team->setActive();
 		if (structure)
-			owner->onStructureConstructionComplete(nullptr, piece, FALSE);
+			owner->onStructureConstructionComplete(nullptr, piece, TRUE);
 		else
 			TheAI->pathfinder()->addObjectToPathfindMap(piece);
 
@@ -244,13 +314,15 @@ void CastleBehavior::crc(Xfer* xfer)
 
 void CastleBehavior::xfer(Xfer* xfer)
 {
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
+	XferVersion version = 2;
+	xfer->xferVersion(&version, 2);
 	UpdateModule::xfer(xfer);
 	xfer->xferBool(&m_buildComplete);
 	xfer->xferBool(&m_pendingUnpack);
 	xfer->xferBool(&m_unpacked);
 	xfer->xferObjectID(&m_keep);
+	if (version >= 2)
+		xfer->xferBool(&m_keepLost);
 
 	UnsignedInt count = static_cast<UnsignedInt>(m_members.size());
 	xfer->xferUnsignedInt(&count);

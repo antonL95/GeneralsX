@@ -100,7 +100,7 @@ inline std::optional<Members> parse(std::span<const std::uint8_t> bytes, unsigne
 			const auto name = reader.text();
 			constexpr float maxOffset = 8192.0f * 10.0f;
 			constexpr float maxAngle = 64.0f;
-			if (name.empty() || name.find('\0') != std::string_view::npos)
+			if (name.find('\0') != std::string_view::npos)
 				return std::nullopt;
 			const Member member{std::string(name), reader.real(), reader.real(), reader.real(), reader.real()};
 			if (std::abs(member.offsetX) > maxOffset || std::abs(member.offsetY) > maxOffset ||

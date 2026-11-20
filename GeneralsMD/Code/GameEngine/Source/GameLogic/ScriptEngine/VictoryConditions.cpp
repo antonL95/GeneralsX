@@ -28,6 +28,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <algorithm>
+
 #include "Common/AudioEventRTS.h"
 #include "Common/GameAudio.h"
 #include "Common/GameCommon.h"
@@ -39,6 +41,8 @@
 #include "Common/PlayerTemplate.h"
 #include "Common/Radar.h"
 #include "Common/Recorder.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/ThingTemplate.h"
 
 #include "GameClient/InGameUI.h"
 #include "GameClient/Diplomacy.h"
@@ -46,7 +50,9 @@
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/MessageBox.h"
 #include "GameClient/GameClient.h"
+#include "GameLogic/CastleRules.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/VictoryConditions.h"
@@ -59,6 +65,52 @@
 
 //-------------------------------------------------------------------------------------------------
 VictoryConditionsInterface *TheVictoryConditions = nullptr;
+
+namespace
+{
+Bool matchesVictoryFilter(const SpecialPowerObjectFilter& filter, const ThingTemplate& thing)
+{
+	const AsciiString& name = thing.getName();
+	const auto named = [&name](const AsciiString& other)
+	{
+		return stricmp(name.str(), other.str()) == 0;
+	};
+	const CastleRules::FilterFacts facts{
+		std::any_of(filter.m_includeObjects.begin(), filter.m_includeObjects.end(), named),
+		std::any_of(filter.m_excludeObjects.begin(), filter.m_excludeObjects.end(), named),
+		thing.isAnyKindOf(filter.m_excludeKinds),
+		filter.m_includeKinds.any(),
+		thing.isAnyKindOf(filter.m_includeKinds),
+		(filter.m_rules & SpecialPowerObjectFilter::RULE_NONE) != 0};
+	return CastleRules::filterMatches(facts);
+}
+
+void findRetailVictoryObject(Object* obj, void* userData)
+{
+	Bool& found = *static_cast<Bool*>(userData);
+	if (found || !obj)
+		return;
+
+	const ThingTemplate& thing = *obj->getTemplate();
+	const CastleRules::VictoryFacts facts{
+		obj->isEffectivelyDead() || obj->isDestroyed(),
+		thing.isKindOf(KINDOF_STRUCTURE),
+		thing.isKindOf(KINDOF_MINE),
+		thing.isKindOf(KINDOF_PROJECTILE),
+		thing.isKindOf(KINDOF_IGNORE_FOR_VICTORY),
+		thing.isKindOf(KINDOF_INERT)};
+	found = CastleRules::countsAsStructure(facts, matchesVictoryFilter(TheGlobalData->m_victoryStructureFilter, thing)) ||
+		CastleRules::countsAsUnit(facts, matchesVictoryFilter(TheGlobalData->m_victoryUnitFilter, thing));
+}
+
+Bool hasRetailVictoryObject(const Player* player)
+{
+	Bool found = FALSE;
+	player->iterateObjects(findRetailVictoryObject, &found);
+	return found;
+}
+}
+
 
 //-------------------------------------------------------------------------------------------------
 inline static Bool areAllies(const Player *p1, const Player *p2)
@@ -326,6 +378,9 @@ Bool VictoryConditions::hasSinglePlayerBeenDefeated(Player *player)
 {
 	if (!player)
 		return false;
+
+	if (RetailFileLayers::enabled())
+		return player->isPlayerDead() || !hasRetailVictoryObject(player);
 
 	KindOfMaskType mask;
 	mask.set(KINDOF_MP_COUNT_FOR_VICTORY);

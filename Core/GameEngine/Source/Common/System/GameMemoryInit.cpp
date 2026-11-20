@@ -81,6 +81,7 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "HordeMemberCollide", 512, 128 },
 	{ "CastleMemberBehavior", 128, 32 },
 	{ "CastleBehavior", 32, 16 },
+	{ "FoundationAIUpdate", 128, 32 },
 	{ "HorseHordeContain", 64, 32 },
 	{ "AODHordeContain", 16, 16 }
 };

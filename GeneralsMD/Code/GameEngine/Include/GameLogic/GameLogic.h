@@ -331,6 +331,7 @@ private:
 	bool onQueueUnitCreate(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onCancelUnitCreate(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDozerConstruct(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
+	bool onFoundationConstruct(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDozerCancelConstruct(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onSell(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onToggleOvercharge(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);

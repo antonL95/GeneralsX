@@ -99,7 +99,9 @@
 
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/CastleRules.h"
 #include "GameLogic/CastleTemplateStore.h"
+#include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/CaveSystem.h"
 #include "GameLogic/CrateSystem.h"
 #include "GameLogic/FPUControl.h"
@@ -108,6 +110,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DestroyModule.h"
 #include "GameLogic/Module/OpenContain.h"
@@ -638,6 +641,16 @@ static void placeNetworkBuildingsForPlayer(Int slotNum, const GameSlot *pSlot, P
 		pos.z = TheTerrainLogic->getGroundHeight( pos.x, pos.y );
 	}
 
+	const Bool retailStart = RetailFileLayers::enabled();
+	const Coord3D buildingPos = *conYard->getPosition();
+	Real retailRadius = 0.0f;
+	if (retailStart)
+	{
+		const CastleBehavior* castle = static_cast<const CastleBehavior*>(conYard->findUpdateModule(NAMEKEY("CastleBehavior")));
+		retailRadius = CastleRules::startingUnitSearchRadius(TRUE, conYard->getGeometryInfo().getBoundingCircleRadius(),
+			castle != nullptr, castle ? castle->getMaxCastleRadius() : 0.0f);
+	}
+
 	for (Int i=0; i<MAX_MP_STARTING_UNITS; ++i)
 	{
 		AsciiString objName = pTemplate->getStartingUnit(i);
@@ -647,9 +660,27 @@ static void placeNetworkBuildingsForPlayer(Int slotNum, const GameSlot *pSlot, P
 			FindPositionOptions options;
 			options.minRadius = conYard->getGeometryInfo().getBoundingSphereRadius() * 0.7f;
 			options.maxRadius = conYard->getGeometryInfo().getBoundingSphereRadius() * 1.3f;
+			if (retailStart)
+			{
+				options.minRadius = retailRadius;
+				options.maxRadius = retailRadius * CastleRules::START_UNIT_RADIUS_SPREAD;
+			}
 			DEBUG_LOG(("Placing starting object %d (%s)", i, objName.str()));
 			ThePartitionManager->update();
-			Bool foundPos = ThePartitionManager->findPositionAround(&pos, &options, &objPos);
+			const Coord3D offset = pTemplate->getStartingUnitOffset(i);
+			Bool foundPos;
+			if (retailStart && !CastleRules::isZeroOffset(offset.x, offset.y, offset.z))
+			{
+				const CastleRules::Offset placed = CastleRules::startingUnitOffset(offset.x, offset.y, offset.z);
+				objPos.x = buildingPos.x + placed.x;
+				objPos.y = buildingPos.y + placed.y;
+				objPos.z = TheTerrainLogic->getGroundHeight(objPos.x, objPos.y);
+				foundPos = TRUE;
+			}
+			else
+			{
+				foundPos = ThePartitionManager->findPositionAround(&pos, &options, &objPos);
+			}
 			if (foundPos)
 			{
 				Object *unit = placeObjectAtPosition(slotNum, objName, objPos, pPlayer, pTemplate);
@@ -4044,6 +4075,8 @@ void GameLogic::update()
 	{
 		TheRecorder->UPDATE();
 	}
+
+	RetailTestCommands::runFrame( m_frame );
 
 	// process client commands
 	{

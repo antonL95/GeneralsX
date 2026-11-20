@@ -24,12 +24,12 @@ void writeString(Bytes& bytes, std::string_view value)
 	bytes.insert(bytes.end(), value.begin(), value.end());
 }
 
-Bytes makeChunk(unsigned version)
+Bytes makeChunk(unsigned version, std::string_view second = "Pad")
 {
 	Bytes bytes;
 	writeWord(bytes, 0x103);
 	writeWord(bytes, 2);
-	for (const auto* name : {"Keep", "Pad"})
+	for (const std::string_view name : {std::string_view("Keep"), second})
 	{
 		writeString(bytes, "");
 		writeString(bytes, name);
@@ -97,4 +97,14 @@ TEST(CastleTemplateTest, RejectsTruncatedBodiesAndUnknownVersions)
 		bytes.pop_back();
 		EXPECT_FALSE(CastleTemplates::parse(bytes, 5)) << bytes.size();
 	}
+}
+
+TEST(CastleTemplateTest, KeepsEmptyTemplateNamesForTheUnpackToSkip)
+{
+	const auto result = CastleTemplates::parse(makeChunk(5, ""), 5);
+	ASSERT_TRUE(result);
+	ASSERT_EQ(result->size(), 2u);
+	EXPECT_EQ((*result)[0].templateName, "Keep");
+	EXPECT_TRUE((*result)[1].templateName.empty());
+	EXPECT_EQ((*result)[1].offsetY, -8.0f);
 }

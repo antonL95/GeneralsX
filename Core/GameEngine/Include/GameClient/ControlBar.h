@@ -215,6 +215,7 @@ enum GUICommandType CPP_11(: Int)
 	GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT, ///< do a shortcut special power using the construct building interface
 
 	GUI_COMMAND_SELECT_ALL_UNITS_OF_TYPE,
+	GUI_COMMAND_FOUNDATION_CONSTRUCT,
 
 	// add more commands here, don't forget to update the string command list below too ...
 
@@ -269,6 +270,7 @@ static const char *const TheGuiCommandNames[] =
 	"SPECIAL_POWER_CONSTRUCT",
 	"SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT",
 	"SELECT_ALL_UNITS_OF_TYPE",
+	"FOUNDATION_CONSTRUCT",
 
 	nullptr
 };

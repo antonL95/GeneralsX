@@ -95,6 +95,7 @@ public:
 
 	AsciiString getStartingBuilding() const { return m_startingBuilding; }
 	AsciiString getStartingUnit( Int i ) const;
+	Coord3D getStartingUnitOffset( Int i ) const;
 
 	const ProductionChangeMap& getProductionCostChanges() const { return m_productionCostChanges; }
 	const ProductionChangeMap& getProductionTimeChanges() const { return m_productionTimeChanges; }
@@ -158,6 +159,7 @@ private:
 	RGBColor				m_preferredColor;			///< our preferred starting color
 	AsciiString			m_startingBuilding;		///< template name of our multiplayer start building (con yard, i'd expect)
 	AsciiString			m_startingUnits[MAX_MP_STARTING_UNITS];		///< template names of our multiplayer start units
+	Coord3D				m_startingUnitOffsets[MAX_MP_STARTING_UNITS];
 	ProductionChangeMap			m_productionCostChanges;
 	ProductionChangeMap			m_productionTimeChanges;
 	ProductionVeterancyMap	m_productionVeterancyLevels;

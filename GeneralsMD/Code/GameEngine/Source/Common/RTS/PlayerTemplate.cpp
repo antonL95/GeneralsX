@@ -87,6 +87,16 @@
 		{ "StartingUnit7",						INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_startingUnits[7] ) },
 		{ "StartingUnit8",						INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_startingUnits[8] ) },
 		{ "StartingUnit9",						INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_startingUnits[9] ) },
+		{ "StartingUnitOffset0",					INI::parseCoord3D,														nullptr, offsetof( PlayerTemplate, m_startingUnitOffsets[0] ) },
+		{ "StartingUnitOffset1",					INI::parseCoord3D,														nullptr, offsetof( PlayerTemplate, m_startingUnitOffsets[1] ) },
+		{ "StartingUnitOffset2",					INI::parseCoord3D,														nullptr, offsetof( PlayerTemplate, m_startingUnitOffsets[2] ) },
+		{ "StartingUnitOffset3",					INI::parseCoord3D,														nullptr, offsetof( PlayerTemplate, m_startingUnitOffsets[3] ) },
+		{ "StartingUnitOffset4",					INI::parseCoord3D,														nullptr, offsetof( PlayerTemplate, m_startingUnitOffsets[4] ) },
+		{ "StartingUnitOffset5",					INI::parseCoord3D,														nullptr, offsetof( PlayerTemplate, m_startingUnitOffsets[5] ) },
+		{ "StartingUnitOffset6",					INI::parseCoord3D,														nullptr, offsetof( PlayerTemplate, m_startingUnitOffsets[6] ) },
+		{ "StartingUnitOffset7",					INI::parseCoord3D,														nullptr, offsetof( PlayerTemplate, m_startingUnitOffsets[7] ) },
+		{ "StartingUnitOffset8",					INI::parseCoord3D,														nullptr, offsetof( PlayerTemplate, m_startingUnitOffsets[8] ) },
+		{ "StartingUnitOffset9",					INI::parseCoord3D,														nullptr, offsetof( PlayerTemplate, m_startingUnitOffsets[9] ) },
 		{ "ProductionCostChange",			PlayerTemplate::parseProductionCostChange,			nullptr, 0 },
 		{ "ProductionTimeChange",			PlayerTemplate::parseProductionTimeChange,			nullptr, 0 },
 		{ "ProductionVeterancyLevel",	PlayerTemplate::parseProductionVeterancyLevel,	nullptr, 0 },
@@ -133,6 +143,18 @@ AsciiString PlayerTemplate::getStartingUnit( Int i ) const
 		return AsciiString::TheEmptyString;
 
 	return m_startingUnits[i];
+}
+
+Coord3D PlayerTemplate::getStartingUnitOffset( Int i ) const
+{
+	if (i < 0 || i >= MAX_MP_STARTING_UNITS)
+	{
+		Coord3D zero;
+		zero.zero();
+		return zero;
+	}
+
+	return m_startingUnitOffsets[i];
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -201,6 +223,8 @@ PlayerTemplate::PlayerTemplate() :
 	m_specialPowerShortcutButtonCount(0)
 {
 	m_preferredColor.red = m_preferredColor.green = m_preferredColor.blue = 0.0f;
+	for (Coord3D& offset : m_startingUnitOffsets)
+		offset.zero();
 	m_beaconTemplate.clear();
 }
 
