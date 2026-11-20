@@ -1497,6 +1497,27 @@ FontCharsClass *	WW3DAssetManager::Get_FontChars( const char * name, int point_s
 	return nullptr;
 }
 
+FontCharsClass *	WW3DAssetManager::Get_FontChars_Pixels( const char * name, int pixel_size, bool is_bold )
+{
+	for ( int i = 0; i < FontCharsList.Count(); i++ ) {
+		if ( FontCharsList[i]->Is_Pixel_Font( name, pixel_size, is_bold ) ) {
+			FontCharsList[i]->Add_Ref();
+			return FontCharsList[i];
+		}
+	}
+
+	FontCharsClass * font = NEW_REF( FontCharsClass, () );
+	if ( font->Initialize_Pixel_Font( name, pixel_size, is_bold ) )
+	{
+		font->Add_Ref();
+		FontCharsList.Add( font );
+		return font;
+	}
+
+	font->Release_Ref();
+	return nullptr;
+}
+
 
 /***********************************************************************************************
  * WW3DAssetManager::Release_All_FontChars -- Release all FontChars from the asset manager     *

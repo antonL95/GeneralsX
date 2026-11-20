@@ -83,6 +83,7 @@
 #include "GameClient/View.h"
 #include "GameClient/VideoPlayer.h"
 #include "GameClient/WindowXlat.h"
+#include "GameClient/UiTest.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/GhostObject.h"
 #include "GameLogic/Object.h"
@@ -588,7 +589,8 @@ void GameClient::update()
 	if( TheMouse )
 	{
 		TheMouse->UPDATE();
-		TheMouse->createStreamMessages();
+		if (!UiTest::isActive())
+			TheMouse->createStreamMessages();
 
 	}
 
@@ -611,6 +613,8 @@ void GameClient::update()
 		TheDisplay->DRAW();
 		return;
 	}
+
+	UiTest::update();
 
 	// update the window system itself
 	{
@@ -747,6 +751,8 @@ void GameClient::update()
 
 		TheDisplay->DRAW();
 	}
+
+	UiTest::finishFrame();
 
 	{
 		// let display string factory handle its update

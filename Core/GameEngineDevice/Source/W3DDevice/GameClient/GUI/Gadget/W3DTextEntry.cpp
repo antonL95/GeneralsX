@@ -373,6 +373,12 @@ void W3DGadgetTextEntryImageDraw( GameWindow *window, WinInstanceData *instData 
 
 	}
 
+	if( leftImage == nullptr || rightImage == nullptr || centerImage == nullptr || smallCenterImage == nullptr )
+	{
+		W3DGadgetTextEntryDraw( window, instData );
+		return;
+	}
+
 	// get image sizes for the ends
 	ICoord2D leftSize, rightSize;
 	leftSize.x = leftImage->getImageWidth();

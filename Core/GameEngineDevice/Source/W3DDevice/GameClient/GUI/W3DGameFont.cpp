@@ -54,13 +54,47 @@
 #include "WW3D2/ww3d.h"
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/render2dsentence.h"
+#include "WW3D2/fontregistry.h"
+#include "Common/file.h"
+#include "Common/FileSystem.h"
+#include "Common/GlobalData.h"
+#include "Common/Registry.h"
+#include "Common/RetailFileLayers.h"
+#include "GameClient/FontSubstitution.h"
 #include "GameClient/GlobalLanguage.h"
+#include "GameClient/UiTest.h"
+
+#include <algorithm>
+#include <set>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <vector>
 
 namespace
 {
+using FontLookup = std::tuple<std::string, Int, Bool, Bool, bool>;
+std::set<FontLookup> FailedFontLookups;
+
+FontCharsClass *GetFontChars(const char *name, Int size, Bool pixels, Bool bold)
+{
+	const bool bundledFallback = FontRegistryClass::Is_Strict_Family(name) &&
+		FontRegistryClass::Allows_Bundled_Fallback();
+	const FontLookup request{name, size, pixels, bold, bundledFallback};
+	if (FailedFontLookups.count(request) != 0)
+		return nullptr;
+
+	FontCharsClass *font = pixels
+		? WW3DAssetManager::Get_Instance()->Get_FontChars_Pixels(name, size, bold)
+		: WW3DAssetManager::Get_Instance()->Get_FontChars(name, size, bold);
+	if (font == nullptr)
+		FailedFontLookups.insert(request);
+	return font;
+}
+
 // GeneralsX @bugfix GitHubCopilot 20/05/2026 Resolve a usable Unicode fallback font on macOS/Linux when localized font names are unavailable.
 // GeneralsX @bugfix GitHubCopilot 29/05/2026 Prevent circular Unicode fallback when the localized unicode family equals the base font family.
-FontCharsClass *LoadUnicodeFallbackFont(Int size, Bool bold, const char *base_name)
+FontCharsClass *LoadUnicodeFallbackFont(Int size, Bool pixels, Bool bold, const char *base_name)
 {
 	const char *preferred_name = nullptr;
 
@@ -93,7 +127,7 @@ FontCharsClass *LoadUnicodeFallbackFont(Int size, Bool bold, const char *base_na
 		if (preferred_name != nullptr && strcmp(font_name, preferred_name) == 0)
 			continue;
 
-		FontCharsClass *font = WW3DAssetManager::Get_Instance()->Get_FontChars(font_name, size, bold);
+		FontCharsClass *font = GetFontChars(font_name, size, pixels, bold);
 		if (font != nullptr) {
 			return font;
 		}
@@ -101,7 +135,7 @@ FontCharsClass *LoadUnicodeFallbackFont(Int size, Bool bold, const char *base_na
 
 	// Now try the localized preferred name as a last resort (it may load on some platforms)
 	if (preferred_name != nullptr && (base_name == nullptr || strcmp(preferred_name, base_name) != 0)) {
-		FontCharsClass *font = WW3DAssetManager::Get_Instance()->Get_FontChars(preferred_name, size, bold);
+		FontCharsClass *font = GetFontChars(preferred_name, size, pixels, bold);
 		if (font != nullptr) {
 			return font;
 		}
@@ -120,7 +154,7 @@ static inline bool IsBrandFontName(const char *name)
 	        strcmp(name, "FontAwesome6Brands-Regular") == 0);
 }
 
-FontCharsClass *LoadBrandFallbackFont(Int size, Bool bold, const char *base_name)
+FontCharsClass *LoadBrandFallbackFont(Int size, Bool pixels, Bool bold, const char *base_name)
 {
 	static const char *kBrandFonts[] = {
 		"Font Awesome 6 Brands Regular",
@@ -133,7 +167,7 @@ FontCharsClass *LoadBrandFallbackFont(Int size, Bool bold, const char *base_name
 		if (base_name != nullptr && strcmp(kBrandFonts[i], base_name) == 0)
 			continue;
 
-		FontCharsClass *font = WW3DAssetManager::Get_Instance()->Get_FontChars(kBrandFonts[i], size, bold);
+		FontCharsClass *font = GetFontChars(kBrandFonts[i], size, pixels, bold);
 		if (font != nullptr) {
 			// GeneralsX @bugfix felipebraz 27/09/2026 Ensure font has the required OS brand glyphs (Apple, Windows, Linux)
 			if (font->Has_Glyph(0xF179) && font->Has_Glyph(0xF17A) && font->Has_Glyph(0xF17C)) {
@@ -144,6 +178,87 @@ FontCharsClass *LoadBrandFallbackFont(Int size, Bool bold, const char *base_name
 	}
 
 	return nullptr;
+}
+
+Bool ReadGameFile(const char *path, std::vector<unsigned char> &data)
+{
+	data.clear();
+	File *file = TheFileSystem->openFile(path, File::READ | File::BINARY);
+	if (file == nullptr)
+		return FALSE;
+	const Int size = file->size();
+	if (size > 0)
+	{
+		data.resize(size);
+		if (file->read(data.data(), size) != size)
+			data.clear();
+	}
+	file->close();
+	return !data.empty();
+}
+
+std::string_view AsText(const std::vector<unsigned char> &data)
+{
+	return std::string_view(reinterpret_cast<const char *>(data.data()), data.size());
+}
+
+Bool ReadLanguageFile(std::vector<unsigned char> &data)
+{
+	AsciiString language = GetRegistryLanguage();
+	language.toLower();
+	AsciiString modPath;
+	modPath.format("%slang/%s/language.ini", TheGlobalData->m_modDir.str(), language.str());
+	return ReadGameFile(modPath.str(), data) || ReadGameFile("language.ini", data);
+}
+
+void RegisterInstallFont(const AsciiString &path)
+{
+	std::vector<unsigned char> data;
+	if (!ReadGameFile(path.str(), data))
+	{
+		fprintf(stderr, "[Font] install font '%s' not found\n", path.str());
+		return;
+	}
+	if (const InstalledFontFace *face = FontRegistryClass::Register_Memory_Font(path.str(), std::move(data)))
+		fprintf(stderr, "[Font] install font '%s' registered as '%s' %s\n", path.str(), face->Family.c_str(), face->Style.c_str());
+}
+
+void LoadInstallFonts()
+{
+	std::vector<unsigned char> language;
+	std::vector<std::string> localFiles;
+	if (ReadLanguageFile(language))
+		localFiles = parseLocalFontFiles(AsText(language));
+	for (const std::string &file : localFiles)
+		RegisterInstallFont(AsciiString(file.c_str()));
+
+	FilenameList fonts;
+	TheFileSystem->getFileListInDirectory(AsciiString::TheEmptyString, "*.ttf", fonts, FALSE);
+	TheFileSystem->getFileListInDirectory(AsciiString::TheEmptyString, "*.otf", fonts, FALSE);
+	for (const AsciiString &file : fonts)
+	{
+		const bool listed = std::any_of(localFiles.begin(), localFiles.end(),
+			[&](const std::string &local) { return fontNamesEqualNoCase(local, file.str()); });
+		if (!listed)
+			RegisterInstallFont(file);
+	}
+	fprintf(stderr, "[Font] %d install fonts from %d LocalFontFile entries and %d archive fonts\n",
+		FontRegistryClass::Count(), static_cast<int>(localFiles.size()), static_cast<int>(fonts.size()));
+}
+
+FontSubstitutionTable LoadFontSubstitutions()
+{
+	std::vector<unsigned char> data;
+	if (!ReadGameFile("data\\ini\\fontsubstitution.ini", data))
+		return FontSubstitutionTable();
+
+	std::vector<std::string> warnings;
+	FontSubstitutionTable table = FontSubstitutionTable::parse(AsText(data), &warnings);
+	for (const std::string &warning : warnings)
+		fprintf(stderr, "[Font] fontsubstitution.ini %s\n", warning.c_str());
+	fprintf(stderr, "[Font] %d font substitutions with %d sizes\n",
+		static_cast<int>(table.fontCount()), static_cast<int>(table.ruleCount()));
+	return table;
 }
 }
 
@@ -161,6 +276,27 @@ FontCharsClass *LoadBrandFallbackFont(Int size, Bool bold, const char *base_name
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
+void W3DFontLibrary::init()
+{
+	FontLibrary::init();
+	FailedFontLookups.clear();
+
+	if (!RetailFileLayers::enabled() && !UiTest::isActive())
+		return;
+
+	FontRegistryClass::Add_Strict_Family("Albertus MT");
+	FontRegistryClass::Add_Strict_Family("Omnia LT Std");
+	FontRegistryClass::Add_Strict_Family("SachaWynter");
+	FontRegistryClass::Add_Strict_Family("SachaWynterTight");
+	if (FontRegistryClass::Count() == 0)
+		LoadInstallFonts();
+	const FontSubstitutionTable substitutions = LoadFontSubstitutions();
+	for (const std::string &name : substitutions.targetNames())
+		FontRegistryClass::Add_Strict_Family(name);
+	setSubstitutions(substitutions);
+	fflush(stderr);
+}
+
 // W3DFontLibrary::loadFontData ===============================================
 /** Load a font */
 //=============================================================================
@@ -171,11 +307,12 @@ Bool W3DFontLibrary::loadFontData( GameFont *font )
 		return FALSE;
 
 	const char* name = font->nameString.str();
-	const Int size = font->pointSize;
+	const Bool pixels = font->pixelSize > 0;
+	const Int size = pixels ? font->pixelSize : font->pointSize;
 	const Bool bold = font->bold;
 
 	// get the font data from the asset manager
-	FontCharsClass *fontChar = WW3DAssetManager::Get_Instance()->Get_FontChars( name, size, bold );
+	FontCharsClass *fontChar = GetFontChars( name, size, pixels, bold );
 
 	if( fontChar == nullptr )
 	{
@@ -193,6 +330,7 @@ Bool W3DFontLibrary::loadFontData( GameFont *font )
 	// should not get an AlternateUnicodeFont set, otherwise Get_Char_Data enters infinite
 	// recursion: e.g. Arial → Arial Unicode MS → Arial → ...
 	{
+		FontRegistryClass::ProbeScope probe;
 		// GeneralsX @bugfix felipebraz 29/09/2026 Brand font aliases must skip Unicode fallback to preserve native glyph lookup
 		bool skipFallback = IsBrandFontName(name);
 		// Skip fallback for fonts that already have full Unicode coverage themselves
@@ -211,13 +349,13 @@ Bool W3DFontLibrary::loadFontData( GameFont *font )
 			}
 		}
 		if (!skipFallback) {
-			fontChar->AlternateUnicodeFont = LoadUnicodeFallbackFont(size, bold, name);
+			fontChar->AlternateUnicodeFont = LoadUnicodeFallbackFont(size, pixels, bold, name);
 		}
 
 		// GeneralsX @feature felipebraz 26/09/2026 Provide brand glyph fallback for UI fonts
 		bool isBrandFont = IsBrandFontName(name);
 		if (!isBrandFont) {
-			fontChar->AlternateBrandFont = LoadBrandFallbackFont(size, bold, name);
+			fontChar->AlternateBrandFont = LoadBrandFallbackFont(size, pixels, bold, name);
 		}
 	}
 

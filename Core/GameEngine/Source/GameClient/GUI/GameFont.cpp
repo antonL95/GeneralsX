@@ -30,6 +30,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "GameClient/GameFont.h"
+#include "GameClient/UiScale.h"
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 FontLibrary *TheFontLibrary = nullptr;
@@ -185,11 +186,68 @@ GameFont *FontLibrary::getFont( AsciiString name, Int pointSize, Bool bold )
 	{
 		return nullptr;
 	}
+
+	FontRequest substituted;
+	if (!m_substitutions.empty() &&
+		m_substitutions.resolve(FontRequest{name.str(), pointSize, bold != FALSE}, substituted))
+	{
+		name = substituted.name.c_str();
+		pointSize = substituted.size;
+		bold = substituted.bold ? TRUE : FALSE;
+	}
+
 	if (pointSize > FONT_POINT_SIZE_MAX)
 	{
 		pointSize = FONT_POINT_SIZE_MAX;
 	}
 
+	return findOrLoadFont( name, pointSize, 0, bold );
+}
+
+GameFont *FontLibrary::getFontPixels( AsciiString name, Int pixelSize, Bool bold )
+{
+	enum { FONT_PIXEL_SIZE_MAX = 683 };
+	if (pixelSize < 1)
+	{
+		return nullptr;
+	}
+	if (pixelSize > FONT_PIXEL_SIZE_MAX)
+	{
+		pixelSize = FONT_PIXEL_SIZE_MAX;
+	}
+	return findOrLoadFont( name, 0, pixelSize, bold );
+}
+
+GameFont *FontLibrary::getFontVariant( const GameFont *font, Bool bold )
+{
+	if (font == nullptr || (font->pointSize < 1 && font->pixelSize < 1))
+	{
+		return nullptr;
+	}
+	return findOrLoadFont( font->nameString, font->pointSize, font->pixelSize, bold );
+}
+
+GameFont *FontLibrary::getUiFont( AsciiString name, Int designSize, Bool bold, Int screenWidth, Int screenHeight )
+{
+	if (designSize < 1)
+	{
+		return nullptr;
+	}
+
+	FontRequest substituted;
+	if (!m_substitutions.empty() &&
+		m_substitutions.resolve(FontRequest{name.str(), designSize, bold != FALSE}, substituted))
+	{
+		name = substituted.name.c_str();
+		designSize = substituted.size;
+		bold = substituted.bold ? TRUE : FALSE;
+	}
+
+	return getFontPixels( name, UiScale::fontPixelSize( designSize, screenWidth, screenHeight ), bold );
+}
+
+GameFont *FontLibrary::findOrLoadFont( const AsciiString& name, Int pointSize, Int pixelSize, Bool bold )
+{
 	GameFont *font;
 
 	// search for font in list
@@ -197,6 +255,7 @@ GameFont *FontLibrary::getFont( AsciiString name, Int pointSize, Bool bold )
 	{
 
 		if( font->pointSize == pointSize &&
+				font->pixelSize == pixelSize &&
 				font->bold == bold &&
 				font->nameString == name
 			)
@@ -217,6 +276,7 @@ GameFont *FontLibrary::getFont( AsciiString name, Int pointSize, Bool bold )
 	// copy font data over to new element
 	font->nameString = name;
 	font->pointSize = pointSize;
+	font->pixelSize = pixelSize;
 	font->bold = bold;
 	font->fontData = nullptr;
 

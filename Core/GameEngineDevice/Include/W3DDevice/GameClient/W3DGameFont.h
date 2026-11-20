@@ -65,6 +65,8 @@ public:
 	W3DFontLibrary() { }
 	virtual ~W3DFontLibrary() override { }
 
+	virtual void init() override;
+
 protected:
 
 	/// load the font data pointer based on everything else we already have set

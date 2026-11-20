@@ -32,6 +32,7 @@
 #include "Common/SubsystemInterface.h"
 #include "Common/AsciiString.h"
 #include "Common/GameMemory.h"
+#include "GameClient/FontSubstitution.h"
 
 //-------------------------------------------------------------------------------------------------
 /** A font for use in the device independent game */
@@ -43,6 +44,7 @@ public:
 	GameFont*			next;  ///< for library use
 	AsciiString		nameString;
 	Int						pointSize;		 ///< point size of font
+	Int						pixelSize;
 	Int						height;				///< pixel height of font
 	void*					fontData;  ///< font data to be filled out for device specific font
 	Bool					bold;				 ///< is this font bold
@@ -68,6 +70,12 @@ public:
 	virtual void update() override { }
 
 	GameFont *getFont( AsciiString name, Int pointSize, Bool bold );  ///< get a font pointer
+	GameFont *getFontPixels( AsciiString name, Int pixelSize, Bool bold );
+	GameFont *getFontVariant( const GameFont *font, Bool bold );
+	GameFont *getUiFont( AsciiString name, Int designSize, Bool bold, Int screenWidth, Int screenHeight );
+
+	void setSubstitutions( const FontSubstitutionTable& table ) { m_substitutions = table; }
+	const FontSubstitutionTable& getSubstitutions() const { return m_substitutions; }
 
 	GameFont *firstFont();  ///< return first font
 	GameFont *nextFont( GameFont *font );  ///< get next font in library
@@ -85,8 +93,11 @@ protected:
 	/// release the font data pointer
 	virtual void releaseFontData( GameFont *font ) { };
 
+	GameFont *findOrLoadFont( const AsciiString& name, Int pointSize, Int pixelSize, Bool bold );
+
 	GameFont *m_fontList;  ///< list of fonts we have loaded
 	Int m_count;  ///< number of unique fonts loaded in this lib
+	FontSubstitutionTable m_substitutions;
 
 };
 

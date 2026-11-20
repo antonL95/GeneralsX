@@ -107,6 +107,7 @@
 #include "GameClient/GlobalLanguage.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GUICallbacks.h"
+#include "GameClient/UiTest.h"
 
 #include "GameNetwork/NetworkInterface.h"
 #include "GameNetwork/GameInfo.h"
@@ -854,7 +855,7 @@ void GameEngine::init()
 		if (INIAudit::isEnabled())
 		{
 			INIAudit::recordWithContext("done", "GameEngine::init", "all subsystems initialized", "", 0);
-			if (!std::getenv("GENERALSX_ASSET_SMOKE"))
+			if (!std::getenv("GENERALSX_ASSET_SMOKE") && !UiTest::isActive())
 				std::_Exit(0);
 			const char* object = std::getenv("GENERALSX_ASSET_SMOKE_OBJECT");
 			const char* model = std::getenv("GENERALSX_ASSET_SMOKE_MODEL");

@@ -69,6 +69,9 @@ set(WW3D2_SRC
     dynamesh.h
     font3d.cpp
     font3d.h
+    fontnames.h
+    fontregistry.cpp
+    fontregistry.h
     formconv.cpp
     formconv.h
     # GeneralsX @build fbraz 10/02/2026 BenderAI - FramGrab uses Windows-only VFW/AVI APIs (Phase 3 out-of-scope)

@@ -20,7 +20,7 @@
 
 #include "GameClient/Display.h"
 
-void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality, bool synchronous = false);
+void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality, bool synchronous = false, const char* outputPath = nullptr);
 
 // Called once per frame on the main thread to show messages for screenshots
 // that the screenshot thread has finished writing.

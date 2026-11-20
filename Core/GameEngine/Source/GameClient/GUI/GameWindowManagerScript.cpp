@@ -528,7 +528,8 @@ static Bool parseTooltip( const char *token, WinInstanceData *instData,
 	* if present */
 //=============================================================================
 static Bool parseScreenRect( const char *token, char *buffer,
-														 Int *x, Int *y, Int *width, Int *height )
+														 Int *x, Int *y, Int *width, Int *height,
+														 IRegion2D *layoutRegion, ICoord2D *layoutResolution )
 {
 	GameWindow *parent = peekWindow();
 	IRegion2D screenRegion;
@@ -553,6 +554,9 @@ static Bool parseScreenRect( const char *token, char *buffer,
 	scanInt( c, createRes.x );
 	c = strtok( nullptr, seps );  // y creation resolution
 	scanInt( c, createRes.y );
+
+	*layoutRegion = screenRegion;
+	*layoutResolution = createRes;
 
 	//
 	// shrink or expand the screen region by the ratio of the current
@@ -2352,6 +2356,8 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 	char token[ 256 ];
 	char *c;
 	Int x, y, width, height;
+	IRegion2D layoutRegion;
+	ICoord2D layoutResolution;
 	void *data = nullptr;
 	ICoord2D parentSize;
 	AsciiString asciibuf;
@@ -2415,7 +2421,7 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 	readUntilSemicolon( inFile, buffer, WIN_BUFFER_LENGTH );
 	c = strtok( buffer, seps );
 	assert( strcmp( c, "SCREENRECT" ) == 0 );
-	if( parseScreenRect( c, buffer, &x, &y, &width, &height ) == FALSE )
+	if( parseScreenRect( c, buffer, &x, &y, &width, &height, &layoutRegion, &layoutResolution ) == FALSE )
 		goto cleanupAndExit;
 
 	// parse all the field definitions
@@ -2480,6 +2486,8 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 					window = createWindow( type, instData.m_id, instData.getStatus(), x, y,
 																 width, height, &instData, data,
 																 systemFunc, inputFunc, tooltipFunc, drawFunc );
+				if( window )
+					window->winSetLayoutRegion( layoutRegion, layoutResolution );
 
 
 				goto cleanupAndExit;
@@ -2495,6 +2503,7 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 
 				if (window == nullptr)
 					goto cleanupAndExit;
+				window->winSetLayoutRegion( layoutRegion, layoutResolution );
 
 				// Parses the CHILD's window info.
 				if( parseChildWindows( window, inFile, buffer ) == FALSE )

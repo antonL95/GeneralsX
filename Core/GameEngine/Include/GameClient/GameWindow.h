@@ -380,6 +380,16 @@ public:
 	void winSetEditData( GameWindowEditData *editData );
 	GameWindowEditData *winGetEditData();
 
+	void winSetLayoutRegion( const IRegion2D& region, const ICoord2D& resolution ) { m_layoutRegion = region; m_layoutResolution = resolution; }
+	Bool winGetLayoutRegion( IRegion2D *region, ICoord2D *resolution ) const
+	{
+		if( m_layoutResolution.x <= 0 || m_layoutResolution.y <= 0 )
+			return FALSE;
+		*region = m_layoutRegion;
+		*resolution = m_layoutResolution;
+		return TRUE;
+	}
+
 protected:
 
 	/// 'images' should be taken care of when we hide ourselves or are destroyed
@@ -429,6 +439,9 @@ protected:
 
 	// game window edit data for the GUIEditor only
 	GameWindowEditData *m_editData;
+
+	IRegion2D m_layoutRegion;
+	ICoord2D m_layoutResolution;
 
 	// vector of window transitions that have a relation to the current GameWindow
 	std::vector<TransitionWindow*> m_transitionWindows;

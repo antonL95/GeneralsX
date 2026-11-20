@@ -117,6 +117,9 @@ GameWindow::GameWindow()
 
 	m_editData = nullptr;
 
+	m_layoutRegion.lo.x = m_layoutRegion.lo.y = m_layoutRegion.hi.x = m_layoutRegion.hi.y = 0;
+	m_layoutResolution.x = m_layoutResolution.y = 0;
+
 }
 
 // GameWindow::~GameWindow ====================================================

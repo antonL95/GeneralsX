@@ -180,6 +180,7 @@ set(GAMEENGINE_SRC
     Include/GameClient/ExtendedMessageBox.h
 #    Include/GameClient/FontDesc.h
     Include/GameClient/FXList.h
+    Include/GameClient/FontSubstitution.h
     Include/GameClient/Gadget.h
     Include/GameClient/GadgetCheckBox.h
     Include/GameClient/GadgetComboBox.h
@@ -242,6 +243,9 @@ set(GAMEENGINE_SRC
     Include/GameClient/Statistics.h
     Include/GameClient/TerrainRoads.h
     Include/GameClient/TerrainVisual.h
+    Include/GameClient/UiLayoutDump.h
+    Include/GameClient/UiScale.h
+    Include/GameClient/UiTest.h
     Include/GameClient/VideoPlayer.h
     Include/GameClient/View.h
     Include/GameClient/Water.h
@@ -742,6 +746,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/DrawGroupInfo.cpp
 #    Source/GameClient/Eva.cpp
     Source/GameClient/FXList.cpp
+    Source/GameClient/FontSubstitution.cpp
 #    Source/GameClient/GameClient.cpp
     Source/GameClient/GameClientDispatch.cpp
     Source/GameClient/GameText.cpp
@@ -873,6 +878,8 @@ set(GAMEENGINE_SRC
     Source/GameClient/System/Smudge.cpp
     Source/GameClient/Terrain/TerrainRoads.cpp
     Source/GameClient/Terrain/TerrainVisual.cpp
+    Source/GameClient/UiLayoutDump.cpp
+    Source/GameClient/UiTest.cpp
     Source/GameClient/VideoPlayer.cpp
     Source/GameClient/VideoStream.cpp
     Source/GameClient/View.cpp

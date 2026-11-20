@@ -76,6 +76,7 @@ static void drawFramerateBar();
 #include "GameClient/Line2D.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/GlobalLanguage.h"
+#include "GameClient/UiTest.h"
 #include "GameClient/Water.h"
 
 #include "GameNetwork/NetworkInterface.h"
@@ -2589,7 +2590,7 @@ AGAIN:
 				// end of video example code
 
 				// draw the mouse
-				if( TheMouse )
+				if( TheMouse && !UiTest::isActive() )
 					TheMouse->DRAW();
 
 				if ( m_videoStream && m_videoBuffer )
@@ -2663,7 +2664,13 @@ AGAIN:
 				}
 #endif
 				// render is all done!
-				WW3D::End_Render();
+				const char* uiTestCapture = UiTest::capturePath();
+				WW3D::End_Render(uiTestCapture == nullptr);
+				if (uiTestCapture)
+				{
+					W3D_TakeCompressedScreenshot(SCREENSHOT_PNG, DEFAULT_JPEG_QUALITY, true, uiTestCapture);
+					UiTest::markCaptured();
+				}
 				static const bool captureAssetSmoke = std::getenv("GENERALSX_ASSET_SMOKE") != nullptr;
 				if (captureAssetSmoke)
 				{

@@ -12,9 +12,12 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/INIPreprocessorTest.cpp
     GameEngine/Common/MapPlayerRosterTest.cpp
     GameEngine/Common/BfmeAssetPathTest.cpp
+    GameEngine/Common/FontSubstitutionTest.cpp
+    GameEngine/Common/UiLayoutDumpTest.cpp
     Libraries/Compression/CompressionManagerTest.cpp
     Libraries/WW3D2/W3dBfmeChunksTest.cpp
     Libraries/WW3D2/W3dFxMaterialTest.cpp
+    Libraries/WW3D2/FontNamesTest.cpp
 )
 
 add_library(corei_googletest INTERFACE)

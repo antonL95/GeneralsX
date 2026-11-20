@@ -286,6 +286,7 @@ public:
 	** Access to FontChars. Used by Render2DSentenceClass. Can return null.
 	*/
 	virtual FontCharsClass *		Get_FontChars( const char * name, int point_size, bool is_bold = false );
+	virtual FontCharsClass *		Get_FontChars_Pixels( const char * name, int pixel_size, bool is_bold = false );
 
 	/*
 	** Discard the cached glyphs of every font without destroying the fonts.

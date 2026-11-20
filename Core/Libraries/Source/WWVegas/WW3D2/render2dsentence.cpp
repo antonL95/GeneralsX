@@ -41,6 +41,8 @@
 #include "WWDebug/wwmemlog.h"
 #include "dx8wrapper.h"
 #include "PlatformPaths.h"
+#include "fontnames.h"
+#include "fontregistry.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -1229,6 +1231,7 @@ FontCharsClass::FontCharsClass () :
 #endif
 	CurrPixelOffset( 0 ),
 	PointSize( 0 ),
+	PixelSize( 0 ),
 	CharHeight( 0 ),
 	GlyphBitmapWidth( 0 ),
 	GlyphBitmapHeight( 0 ),
@@ -1923,7 +1926,7 @@ FontCharsClass::Free_GDI_Font ()
 // Tier 3: Guaranteed fallback to bundled Arial (Liberation Sans)
 ////////////////////////////////////////////////////////////////////////////////////
 const char *
-FontCharsClass::Locate_Font_FontConfig (const char *font_name)
+FontCharsClass::Locate_Font_FontConfig (const char *font_name, bool require_family_match)
 {
 	if ( font_name == nullptr || font_name[0] == '\0' ) {
 		return nullptr;
@@ -1999,7 +2002,7 @@ FontCharsClass::Locate_Font_FontConfig (const char *font_name)
 	                     strcmp( normalized, "fabrands" ) == 0 ||
 	                     strcmp( normalized, "fabrands.ttf" ) == 0);
 
-	if ( is_arial ) {
+	if ( !require_family_match && is_arial ) {
 		if ( is_bold ) {
 			candidates[candidate_count++] = "LiberationSans-Bold";
 			candidates[candidate_count++] = "liberationsans-bold";
@@ -2007,7 +2010,7 @@ FontCharsClass::Locate_Font_FontConfig (const char *font_name)
 		candidates[candidate_count++] = "LiberationSans-Regular";
 		candidates[candidate_count++] = "liberationsans-regular";
 		candidates[candidate_count++] = "LiberationSans";
-	} else if ( is_times ) {
+	} else if ( !require_family_match && is_times ) {
 		if ( is_bold ) {
 			candidates[candidate_count++] = "LiberationSerif-Bold";
 			candidates[candidate_count++] = "liberationserif-bold";
@@ -2015,7 +2018,7 @@ FontCharsClass::Locate_Font_FontConfig (const char *font_name)
 		candidates[candidate_count++] = "LiberationSerif-Regular";
 		candidates[candidate_count++] = "liberationserif-regular";
 		candidates[candidate_count++] = "LiberationSerif";
-	} else if ( is_courier ) {
+	} else if ( !require_family_match && is_courier ) {
 		if ( is_bold ) {
 			candidates[candidate_count++] = "LiberationMono-Bold";
 			candidates[candidate_count++] = "liberationmono-bold";
@@ -2023,7 +2026,7 @@ FontCharsClass::Locate_Font_FontConfig (const char *font_name)
 		candidates[candidate_count++] = "LiberationMono-Regular";
 		candidates[candidate_count++] = "liberationmono-regular";
 		candidates[candidate_count++] = "LiberationMono";
-	} else if ( is_fa_brands ) {
+	} else if ( !require_family_match && is_fa_brands ) {
 		candidates[candidate_count++] = "fa-brands-400";
 		candidates[candidate_count++] = "fa-brands-400.ttf";
 		candidates[candidate_count++] = "FontAwesome6Brands-Regular";
@@ -2069,6 +2072,13 @@ FontCharsClass::Locate_Font_FontConfig (const char *font_name)
 						match_valid = false;
 					}
 				}
+				if ( require_family_match ) {
+					match_valid = false;
+					FcChar8 *family = nullptr;
+					for ( int index = 0; !match_valid && FcPatternGetString( font, FC_FAMILY, index, &family ) == FcResultMatch; ++index ) {
+						match_valid = family != nullptr && FontNames::Same_Family( font_name, (const char*)family );
+					}
+				}
 
 				if ( match_valid ) {
 					FcChar8 *file_path = nullptr;
@@ -2094,7 +2104,7 @@ FontCharsClass::Locate_Font_FontConfig (const char *font_name)
 	// Tier 3: Universal fallback to bundled Arial/Liberation font for recognized core UI fonts
 	// GeneralsX @bugfix felipebraz 26/09/2026 Guard Tier 3 so unresolved Unicode/CJK fonts return nullptr and allow caller fallback delegation
 	//
-	if ( is_arial || is_times || is_courier ) {
+	if ( !require_family_match && (is_arial || is_times || is_courier) ) {
 		static const char *fallback_names_bold[] = {
 			"arialbold.ttf",
 			"arial.ttf",
@@ -2120,6 +2130,18 @@ FontCharsClass::Locate_Font_FontConfig (const char *font_name)
 	return nullptr;
 }
 
+const char *
+FontCharsClass::Locate_Bundled_Fallback_Font ()
+{
+	static const char *candidates[] = { "marcellus", "Marcellus-Regular" };
+	char candidate_path[1024];
+	if ( !Platform::FindLocalFontFile( candidates, 2, candidate_path, sizeof(candidate_path) ) ) {
+		return nullptr;
+	}
+	FreetypeFontPath = candidate_path;
+	return FreetypeFontPath;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////
 //
@@ -2130,6 +2152,7 @@ FontCharsClass::Locate_Font_FontConfig (const char *font_name)
 bool
 FontCharsClass::Create_Freetype_Font (const char *font_name)
 {
+	const bool strict = FontRegistryClass::Is_Strict_Family( font_name );
 	//
 	//	Initialize FreeType library
 	//
@@ -2151,23 +2174,37 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	//	Calculate font height in pixels (96 DPI standard)
 	//
 	const int dotsPerInch = 96;
-	int font_height = FT_MulDiv( PointSize, dotsPerInch, 72 );
+	int font_height = PixelSize > 0 ? PixelSize : FT_MulDiv( PointSize, dotsPerInch, 72 );
 
-	//
-	//	Locate the font file using Fontconfig
-	//
-	const char *font_path = Locate_Font_FontConfig( font_name );
-	if ( font_path == nullptr ) {
-		FT_Done_FreeType( FTLibrary );
-		FTLibrary = nullptr;
-		return false;
+	const InstalledFontFace *installed = FontRegistryClass::Find( font_name, IsBold );
+	if ( installed != nullptr ) {
+		FreetypeFontData = installed->Data;
+		FreetypeFontPath = installed->SourceName.c_str();
+		error = FT_New_Memory_Face( FTLibrary, FreetypeFontData->data(), (FT_Long)FreetypeFontData->size(), 0, &FTFace );
+	} else {
+		const char *font_path = Locate_Font_FontConfig( font_name, strict );
+		if ( font_path == nullptr && strict && FontRegistryClass::Allows_Bundled_Fallback() ) {
+			font_path = Locate_Bundled_Fallback_Font();
+			if ( font_path != nullptr ) {
+				fprintf( stderr, "[Font] '%s' is not installed; using the bundled fallback '%s'\n", font_name, font_path );
+				fflush( stderr );
+			}
+		}
+		if ( font_path == nullptr ) {
+			FT_Done_FreeType( FTLibrary );
+			FTLibrary = nullptr;
+			return false;
+		}
+		error = FT_New_Face( FTLibrary, font_path, 0, &FTFace );
 	}
-
-	//
-	//	Load the font face
-	//
-	error = FT_New_Face( FTLibrary, font_path, 0, &FTFace );
+	if ( FontRegistryClass::Has_Strict_Families() && error == 0 ) {
+		fprintf( stderr, "[Font] '%s' %d%s%s -> %s'%s' (%s)\n", font_name, PixelSize > 0 ? PixelSize : PointSize,
+			PixelSize > 0 ? "px" : "pt", IsBold ? " bold" : "", installed != nullptr ? "install " : "",
+			(const char *)FreetypeFontPath, FTFace->family_name != nullptr ? FTFace->family_name : "?" );
+		fflush( stderr );
+	}
 	if ( error != 0 ) {
+		FreetypeFontData.reset();
 		FT_Done_FreeType( FTLibrary );
 		FTLibrary = nullptr;
 		return false;
@@ -2395,6 +2432,7 @@ FontCharsClass::Free_Freetype_Font (void)
 		FT_Done_Face( FTFace );
 		FTFace = nullptr;
 	}
+	FreetypeFontData.reset();
 
 	//
 	//	Free the FreeType library
@@ -2439,6 +2477,33 @@ FontCharsClass::Initialize_GDI_Font (const char *font_name, int point_size, bool
 #endif
 }
 
+bool
+FontCharsClass::Initialize_Pixel_Font (const char *font_name, int pixel_size, bool is_bold)
+{
+	if ( pixel_size < 1 ) {
+		return false;
+	}
+
+	Name.Format ("%s%dpx", font_name, pixel_size);
+	GDIFontName	= font_name;
+	PixelSize	= pixel_size;
+	PointSize	= max (1, (pixel_size * 72 + 48) / 96);
+	IsBold		= is_bold;
+
+#if defined(SAGE_USE_FREETYPE) && !defined(_WIN32)
+	return Create_Freetype_Font (font_name);
+#else
+	return Create_GDI_Font (font_name);
+#endif
+}
+
+bool
+FontCharsClass::Is_Pixel_Font (const char *font_name, int pixel_size, bool is_bold)
+{
+	return PixelSize > 0 && PixelSize == pixel_size && is_bold == IsBold &&
+		GDIFontName.Compare_No_Case (font_name) == 0;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////
 //
@@ -2453,7 +2518,8 @@ FontCharsClass::Is_Font (const char *font_name, int point_size, bool is_bold)
 	//
 	//	Check to see if both the name and height matches...
 	//
-	if (	(GDIFontName.Compare_No_Case (font_name) == 0) &&
+	if (	(PixelSize == 0) &&
+			(GDIFontName.Compare_No_Case (font_name) == 0) &&
 			(point_size == PointSize) &&
 			(is_bold == IsBold))
 	{

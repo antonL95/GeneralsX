@@ -86,6 +86,7 @@
 #include "GameClient/HotKey.h"
 #include "GameClient/GameWindowTransitions.h"
 #include "GameClient/GUICallbacks.h"
+#include "GameClient/UiTest.h"
 
 #include "GameNetwork/GameInfo.h"
 
@@ -1103,7 +1104,8 @@ void ControlBar::init()
 		m_contextParent[ CP_MASTER ] = TheWindowManager->winGetWindowFromId( nullptr, id );
 		if (!m_contextParent[ CP_MASTER ])
 		{
-			if (TheGlobalData && !TheGlobalData->m_headless && !RetailFileLayers::enabled() && TheFileSystem->doesFileExist("Window\\ControlBar.wnd"))
+			if (TheGlobalData && !TheGlobalData->m_headless && !RetailFileLayers::enabled() && !UiTest::isActive() &&
+				TheFileSystem->doesFileExist("Window\\ControlBar.wnd"))
 				throw INIException("ControlBar.wnd is missing ControlBarParent");
 			return;
 		}

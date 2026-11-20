@@ -35,6 +35,7 @@ struct ScreenshotThreadData
 	ScreenshotThreadData()
 		: pixelData(nullptr)
 	{
+		outputPath[0] = '\0';
 	}
 
 	~ScreenshotThreadData()
@@ -49,6 +50,7 @@ struct ScreenshotThreadData
 	bool is16Bit;
 	char userDataDirectory[_MAX_PATH];
 	char leafname[_MAX_FNAME];
+	char outputPath[_MAX_PATH];
 	int quality;
 	ScreenshotFormat format;
 };
@@ -76,15 +78,23 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 	// TheSuperHackers @feature bobtista 08/07/2026 Save screenshots into a Screenshots subfolder
 	// to keep the user data root folder tidy.
 	char pathname[_MAX_PATH];
-	strlcpy(pathname, data->userDataDirectory, ARRAY_SIZE(pathname));
-	strlcat(pathname, "Screenshots\\", ARRAY_SIZE(pathname));
+	const bool explicitPath = data->outputPath[0] != '\0';
+	if (explicitPath)
+	{
+		strlcpy(pathname, data->outputPath, ARRAY_SIZE(pathname));
+	}
+	else
+	{
+		strlcpy(pathname, data->userDataDirectory, ARRAY_SIZE(pathname));
+		strlcat(pathname, "Screenshots\\", ARRAY_SIZE(pathname));
 #ifdef _WIN32
-	CreateDirectory(pathname, nullptr);
+		CreateDirectory(pathname, nullptr);
 #else
-	std::error_code ec;
-	std::filesystem::create_directory(pathname, ec);
+		std::error_code ec;
+		std::filesystem::create_directory(pathname, ec);
 #endif
-	strlcat(pathname, data->leafname, ARRAY_SIZE(pathname));
+		strlcat(pathname, data->leafname, ARRAY_SIZE(pathname));
+	}
 
 	const unsigned int width = data->width;
 	const unsigned int height = data->height;
@@ -136,13 +146,13 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 			break;
 	}
 
-	if (success)
+	if (success && !explicitPath)
 	{
 		ScreenshotWrittenMessage* message = new ScreenshotWrittenMessage;
 		strlcpy(message->leafname, data->leafname, ARRAY_SIZE(message->leafname));
 		s_screenshotWrittenQueue.Push(message);
 	}
-	else
+	else if (!success)
 	{
 		DEBUG_LOG(("Failed to write screenshot %s", pathname));
 	}
@@ -169,7 +179,7 @@ void W3D_UpdateScreenshotMessages()
 	}
 }
 
-void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality, bool synchronous)
+void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality, bool synchronous, const char* outputPath)
 {
 	static constexpr const char* const ScreenshotFormatExtensions[] = { "jpg", "png" };
 	static_assert(ARRAY_SIZE(ScreenshotFormatExtensions) == SCREENSHOT_FORMAT_COUNT, "Incorrect array size");
@@ -230,6 +240,7 @@ void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality, bool
 	threadData->format = format;
 	strlcpy(threadData->userDataDirectory, TheGlobalData->getPath_UserData().str(), ARRAY_SIZE(threadData->userDataDirectory));
 	strlcpy(threadData->leafname, leafname, ARRAY_SIZE(threadData->leafname));
+	strlcpy(threadData->outputPath, outputPath ? outputPath : "", ARRAY_SIZE(threadData->outputPath));
 
 	// Copy the locked surface with a single memcpy, including any row padding. The pixel
 	// conversion and all file operations are done on the screenshot thread to keep the

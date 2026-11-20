@@ -76,6 +76,7 @@
 #include "GameClient/SelectionXlat.h"
 #include "GameClient/Shadow.h"
 #include "GameClient/GlobalLanguage.h"
+#include "GameClient/UiTest.h"
 
 #include "GameLogic/AIGuard.h"
 #include "GameLogic/Weapon.h"
@@ -3732,6 +3733,9 @@ void InGameUI::disregardDrawable( Drawable *draw )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::postWindowDraw()
 {
+	if (UiTest::isActive())
+		return;
+
 	Int hudOffsetX = 0;
 	Int hudOffsetY = 0;
 

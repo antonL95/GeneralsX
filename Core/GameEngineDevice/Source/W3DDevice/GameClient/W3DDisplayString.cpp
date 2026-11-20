@@ -309,7 +309,7 @@ void W3DDisplayString::setFont( GameFont *font )
 	// set the font in our renderer
 	m_textRenderer.Set_Font( static_cast<FontCharsClass *>(m_font->fontData) );
 
-	if( GameFont *boldFont = TheFontLibrary->getFont( font->nameString, font->pointSize, TRUE ) )
+	if( GameFont *boldFont = TheFontLibrary->getFontVariant( font, TRUE ) )
 	{
 		m_textRendererHotKey.Set_Font( static_cast<FontCharsClass *>(boldFont->fontData) );
 	}

@@ -43,6 +43,9 @@
 #include "WWLib/wwstring.h"
 #include "WWLib/win.h"
 
+#include <memory>
+#include <vector>
+
 // GeneralsX @build fbraz 11/02/2026 BenderAI - FreeType2 for Linux text rendering (Phase 1.5)
 // GeneralsX @feature felipebraz 26/09/2026 Guard fontconfig header for platforms without fontconfig (e.g. iOS)
 #if defined(SAGE_USE_FREETYPE) && !defined(_WIN32)
@@ -115,6 +118,9 @@ public:
 
 	bool	Initialize_GDI_Font( const char *font_name, int point_size, bool is_bold );
 	bool	Is_Font( const char *font_name, int point_size, bool is_bold );
+	bool	Initialize_Pixel_Font( const char *font_name, int pixel_size, bool is_bold );
+	bool	Is_Pixel_Font( const char *font_name, int pixel_size, bool is_bold );
+	int	Get_Pixel_Size() const	{ return PixelSize; }
 	const char * Get_Name()			{ return Name; }
 
 	int	Get_Char_Height()			{ return CharHeight; }
@@ -146,7 +152,8 @@ private:
 	bool							Create_Freetype_Font( const char *font_name );
 	void							Free_Freetype_Font( void );
 	const FontCharsClassCharDataStruct *	Store_Freetype_Char( WCHAR ch );
-	const char *					Locate_Font_FontConfig( const char *font_name );
+	const char *					Locate_Font_FontConfig( const char *font_name, bool require_family_match = false );
+	const char *					Locate_Bundled_Fallback_Font();
 #endif
 	
 	void							Update_Current_Buffer( int char_width );
@@ -170,6 +177,7 @@ private:
 	int									GlyphCellBytes; // worst case bytes for one glyph of this font
 	int									GlyphBlockBytes; // size the glyph blocks ramp up to
 	int									PointSize;
+	int									PixelSize;
 	StringClass							GDIFontName;
 	
 	// GeneralsX @build fbraz 11/02/2026 BenderAI - Platform-specific font rendering members
@@ -186,6 +194,7 @@ private:
 	FT_Library							FTLibrary;
 	FT_Face								FTFace;
 	StringClass							FreetypeFontPath;
+	std::shared_ptr<const std::vector<unsigned char>>	FreetypeFontData;
 #endif
 	
 	FontCharsClassCharDataStruct *					ASCIICharArray[256];

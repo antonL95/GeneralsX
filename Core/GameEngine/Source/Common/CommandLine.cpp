@@ -40,6 +40,7 @@
 #include "GameClient/ClientInstance.h"
 #include "GameClient/TerrainVisual.h" // for TERRAIN_LOD_MIN definition
 #include "GameClient/GameText.h"
+#include "GameClient/UiTest.h"
 #include "GameNetwork/NetworkDefs.h"
 
 
@@ -866,6 +867,26 @@ Int parseNoWindowAnimation(char *args[], int num)
 	return 1;
 }
 
+#if RTS_GENERALS
+static Int rejectUiTest(char *[], int)
+{
+	fprintf(stderr, "-uitest is only supported in Zero Hour (GeneralsXZH).\n");
+	exit(1);
+}
+#else
+static Int parseUiTest(char *args[], int num)
+{
+	const char *layout = (num > 1 && args[1][0] != '-') ? args[1] : "";
+	UiTest::enable(layout);
+	TheWritableGlobalData->m_playIntro = FALSE;
+	TheWritableGlobalData->m_playSizzle = FALSE;
+	TheWritableGlobalData->m_shellMapOn = FALSE;
+	TheWritableGlobalData->m_animateWindows = FALSE;
+
+	return layout[0] ? 2 : 1;
+}
+#endif
+
 Int parseWinCursors(char *args[], int num)
 {
 	TheWritableGlobalData->m_winCursors = TRUE;
@@ -1208,6 +1229,9 @@ Int parseClearDebugLevel(char *args[], int num)
 // Note that except for TheGlobalData, no other global objects exist yet when these are parsed.
 static CommandLineParam paramsForStartup[] =
 {
+#if RTS_GENERALS
+	{ "-uitest", rejectUiTest },
+#endif
 	{ "-retailFileLayers", parseRetailFileLayers },
 	{ "-bfme2", parseBfme2 },
 	{ "-win", parseWin },
@@ -1249,6 +1273,9 @@ static CommandLineParam paramsForEngineInit[] =
 	{ "-nologo", parseNoLogo }, // TheSuperHackers @tweak Is now available in Release builds.
 	{ "-noshellmap", parseNoShellMap },
 	{ "-noShellAnim", parseNoWindowAnimation }, // TheSuperHackers @tweak Is now available in Release builds.
+#if !RTS_GENERALS
+	{ "-uitest", parseUiTest },
+#endif
 	{ "-xres", parseXRes },
 	{ "-yres", parseYRes },
 	{ "-fullVersion", parseFullVersion },
