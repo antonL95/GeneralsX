@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "Common/RotwkDuration.h"
 #include "GameLogic/RotwkLocomotorRules.h"
 
 namespace
@@ -10,24 +11,34 @@ RotwkLocomotorRules::Resolved zeroFallback()
 }
 }
 
-TEST(RotwkLocomotorRulesTest, DurationsRoundUpToRetailLogicFrames)
+TEST(RotwkDurationTest, DurationsRoundUpToRetailLogicFrames)
 {
-	EXPECT_EQ(RotwkLocomotorRules::retailDurationMs(0), 0u);
-	EXPECT_EQ(RotwkLocomotorRules::retailDurationMs(1), 200u);
-	EXPECT_EQ(RotwkLocomotorRules::retailDurationMs(200), 200u);
-	EXPECT_EQ(RotwkLocomotorRules::retailDurationMs(201), 400u);
-	EXPECT_EQ(RotwkLocomotorRules::retailDurationMs(1500), 1600u);
-	EXPECT_EQ(RotwkLocomotorRules::retailDurationMs(1600), 1600u);
+	EXPECT_EQ(RotwkDuration::retailFrames(0), 0u);
+	EXPECT_EQ(RotwkDuration::retailFrames(5), 1u);
+	EXPECT_EQ(RotwkDuration::retailFrames(10), 1u);
+	EXPECT_EQ(RotwkDuration::retailFrames(200), 1u);
+	EXPECT_EQ(RotwkDuration::retailFrames(201), 2u);
+	EXPECT_EQ(RotwkDuration::retailFrames(1500), 8u);
+	EXPECT_EQ(RotwkDuration::retailFrames(1600), 8u);
 }
 
-TEST(RotwkLocomotorRulesTest, DurationFramesUseTheRoundedRetailTime)
+TEST(RotwkDurationTest, EngineFramesUseTheRoundedRetailTime)
 {
-	EXPECT_EQ(RotwkLocomotorRules::durationFrames(1500, 30), 48u);
-	EXPECT_EQ(RotwkLocomotorRules::durationFrames(1600, 30), 48u);
-	EXPECT_EQ(RotwkLocomotorRules::durationFrames(100, 30), 6u);
-	EXPECT_EQ(RotwkLocomotorRules::durationFrames(0, 30), 0u);
-	EXPECT_EQ(RotwkLocomotorRules::durationFrames(1000, 30), 30u);
-	EXPECT_EQ(RotwkLocomotorRules::durationFrames(1500, 5), 8u);
+	EXPECT_EQ(RotwkDuration::engineFrames(RotwkDuration::retailFrames(1500), 30), 48u);
+	EXPECT_EQ(RotwkDuration::engineFrames(RotwkDuration::retailFrames(5), 30), 6u);
+	EXPECT_EQ(RotwkDuration::engineFrames(RotwkDuration::retailFrames(0), 30), 0u);
+	EXPECT_EQ(RotwkDuration::engineFrames(RotwkDuration::retailFrames(1000), 30), 30u);
+	EXPECT_EQ(RotwkDuration::engineFrames(RotwkDuration::retailFrames(1500), 5), 8u);
+}
+
+TEST(RotwkDurationTest, EachEliteBowReloadRollSnapsInRetailFrames)
+{
+	const auto minimum = RotwkDuration::retailFrames(1500);
+	const auto maximum = RotwkDuration::retailFrames(2000);
+	ASSERT_EQ(maximum - minimum, 2u);
+	EXPECT_EQ(RotwkDuration::engineFrames(RotwkDuration::clipReloadFrames(minimum), 30), 36u);
+	EXPECT_EQ(RotwkDuration::engineFrames(RotwkDuration::clipReloadFrames(minimum + 1), 30), 54u);
+	EXPECT_EQ(RotwkDuration::engineFrames(RotwkDuration::clipReloadFrames(maximum), 30), 54u);
 }
 
 TEST(RotwkLocomotorRulesTest, AccelerationUsesTheDamagedSpeedWhenDamaged)
@@ -74,7 +85,7 @@ TEST(RotwkLocomotorRulesTest, UnauthoredLiftKeepsTheTemplateValue)
 TEST(RotwkLocomotorRulesTest, TurnTimeIsOneFullTurn)
 {
 	RotwkLocomotorRules::Authored authored;
-	authored.turnFrames = RotwkLocomotorRules::durationFrames(1500, 30);
+	authored.turnFrames = RotwkDuration::engineFrames(RotwkDuration::retailFrames(1500), 30);
 	const auto resolved = RotwkLocomotorRules::resolve(authored, 2.0f, zeroFallback());
 	EXPECT_FLOAT_EQ(resolved.turnRate, RotwkLocomotorRules::FULL_TURN / 48.0f);
 	EXPECT_FLOAT_EQ(resolved.turnRateDamaged, resolved.turnRate);

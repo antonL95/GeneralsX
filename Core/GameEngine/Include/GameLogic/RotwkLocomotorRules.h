@@ -2,7 +2,6 @@
 
 namespace RotwkLocomotorRules
 {
-inline constexpr unsigned int RETAIL_LOGIC_FRAME_MS = 200;
 inline constexpr float FULL_TURN = 6.28318530718f;
 
 struct Authored
@@ -32,16 +31,6 @@ struct Resolved
 	float turnRate;
 	float turnRateDamaged;
 };
-
-inline unsigned int retailDurationMs(unsigned int ms)
-{
-	return (ms + RETAIL_LOGIC_FRAME_MS - 1) / RETAIL_LOGIC_FRAME_MS * RETAIL_LOGIC_FRAME_MS;
-}
-
-inline unsigned int durationFrames(unsigned int ms, unsigned int framesPerSecond)
-{
-	return (retailDurationMs(ms) * framesPerSecond + 999) / 1000;
-}
 
 inline float rateToReach(float speed, unsigned int frames)
 {

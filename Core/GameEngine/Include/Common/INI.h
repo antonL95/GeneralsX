@@ -334,6 +334,7 @@ public:
 	static void parseDurationReal( INI *ini, void *instance, void *store, const void* userData );
 	// parse a duration in msec and convert to duration in integral number of frames, (unsignedint) rounding UP
 	static void parseDurationUnsignedInt( INI *ini, void *instance, void *store, const void* userData );
+	static void parseEngineDurationUnsignedInt( INI *ini, void *instance, void *store, const void* userData );
 	static void parseDurationUnsignedShort( INI *ini, void *instance, void *store, const void *userData );
 	// parse acceleration in (dist/sec) and convert to (dist/frame)
 	static void parseVelocityReal( INI *ini, void *instance, void *store, const void* userData );
@@ -373,7 +374,6 @@ public:
 		If "Tag" is not the next token, an error is thrown.
 	*/
 	static const char* getNextSubToken(const char* expected);
-	static Bool findDefine(const char* name, AsciiString& value);
 
 	/**
 		return the next ascii string. this is usually the same the result of getNextToken(),

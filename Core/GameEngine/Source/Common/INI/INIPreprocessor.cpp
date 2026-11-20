@@ -99,15 +99,6 @@ std::size_t INIPreprocessor::getDefineCount() const
 	return m_defines.size();
 }
 
-bool INIPreprocessor::findDefine(const std::string& name, std::string& value) const
-{
-	std::map<std::string, std::string>::const_iterator it = m_defines.find(name);
-	if (it == m_defines.end())
-		return false;
-	value = it->second;
-	return true;
-}
-
 const std::vector<std::string>& INIPreprocessor::getWarnings() const
 {
 	return m_warnings;

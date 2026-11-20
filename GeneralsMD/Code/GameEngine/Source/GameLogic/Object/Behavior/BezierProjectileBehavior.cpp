@@ -30,7 +30,7 @@ void BezierProjectileBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "PreLandingEmotionRadius", INI::parseReal, nullptr, offsetof(BezierProjectileBehaviorModuleData, m_preLandingEmotionRadius) },
 		{ "InvisibleFrames", INI::parseInt, nullptr, offsetof(BezierProjectileBehaviorModuleData, m_invisibleFrames) },
 		{ "FinalStuckTime", INI::parseDurationUnsignedInt, nullptr, offsetof(BezierProjectileBehaviorModuleData, m_finalStuckTime) },
-		{ "FadeInTime", INI::parseDurationUnsignedInt, nullptr, offsetof(BezierProjectileBehaviorModuleData, m_fadeInTime) },
+		{ "FadeInTime", INI::parseEngineDurationUnsignedInt, nullptr, offsetof(BezierProjectileBehaviorModuleData, m_fadeInTime) },
 		{ "FirstPercentHeight", INI::parsePercentToReal, nullptr, offsetof(BezierProjectileBehaviorModuleData, m_firstPercentHeight) },
 		{ "SecondPercentHeight", INI::parsePercentToReal, nullptr, offsetof(BezierProjectileBehaviorModuleData, m_secondPercentHeight) },
 		{ nullptr, nullptr, nullptr, 0 }

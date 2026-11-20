@@ -107,12 +107,6 @@ void parseSpecialObjectFilter(INI* ini, void* instance, void*, const void*)
 	nugget.m_hasSpecialObjectFilter = TRUE;
 }
 
-void parseDelay(INI* ini, void*, void* store, const void*)
-{
-	const Real msec = INI::scanReal(ini->getNextToken());
-	*static_cast<UnsignedInt*>(store) = (UnsignedInt)WWMath::Ceil(ConvertDurationFromMsecsToFrames(msec));
-}
-
 Real cosHalfArc(Real degrees)
 {
 	return Cos(degrees * 0.5f * PI / 180.0f);
@@ -148,7 +142,7 @@ const FieldParse s_damageFields[] =
 {
 	{ "Damage", INI::parseReal, nullptr, offsetof(WeaponNugget, m_damage) },
 	{ "Radius", INI::parseReal, nullptr, offsetof(WeaponNugget, m_radius) },
-	{ "DelayTime", parseDelay, nullptr, offsetof(WeaponNugget, m_delayFrames) },
+	{ "DelayTime", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponNugget, m_delayFrames) },
 	{ "DamageType", DamageTypeFlags::parseSingleBitFromINI, nullptr, offsetof(WeaponNugget, m_damageType) },
 	{ "DamageFXType", DamageTypeFlags::parseSingleBitFromINI, nullptr, offsetof(WeaponNugget, m_damageFXType) },
 	{ "DeathType", INI::parseIndexList, TheDeathNames, offsetof(WeaponNugget, m_deathType) },
@@ -172,8 +166,8 @@ const FieldParse s_damageFields[] =
 
 const FieldParse s_dotFields[] =
 {
-	{ "DamageInterval", parseDelay, nullptr, offsetof(WeaponNugget, m_damageIntervalFrames) },
-	{ "DamageDuration", parseDelay, nullptr, offsetof(WeaponNugget, m_damageDurationFrames) },
+	{ "DamageInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponNugget, m_damageIntervalFrames) },
+	{ "DamageDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponNugget, m_damageDurationFrames) },
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
@@ -198,7 +192,7 @@ const FieldParse s_metaImpactFields[] =
 	{ "ShockWaveZMult", INI::parseReal, nullptr, offsetof(WeaponNugget, m_shockWaveZMult) },
 	{ "ShockWaveSpeed", INI::parseVelocityReal, nullptr, offsetof(WeaponNugget, m_shockWaveSpeed) },
 	{ "InvertShockWave", INI::parseBool, nullptr, offsetof(WeaponNugget, m_invertShockWave) },
-	{ "DelayTime", parseDelay, nullptr, offsetof(WeaponNugget, m_delayFrames) },
+	{ "DelayTime", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponNugget, m_delayFrames) },
 	{ "FlipDirection", INI::parseBool, nullptr, offsetof(WeaponNugget, m_flipDirection) },
 	{ "OnlyWhenJustDied", INI::parseBool, nullptr, offsetof(WeaponNugget, m_onlyWhenJustDied) },
 	{ "KillObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(WeaponNugget, m_killObjectFilter) },

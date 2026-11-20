@@ -3,7 +3,6 @@
 #include "GameLogic/Module/RespawnModules.h"
 
 #include <algorithm>
-#include <cctype>
 
 #include "Common/ModelState.h"
 #include "Common/ThingTemplate.h"
@@ -17,18 +16,6 @@
 
 namespace
 {
-const char *resolvedValue(const char *token, AsciiString &storage)
-{
-	if (token && (std::isalpha(static_cast<unsigned char>(*token)) || *token == '_') && INI::findDefine(token, storage))
-		return storage.str();
-	return token;
-}
-
-const char *nextAttribute(INI *ini, const char *label, AsciiString &storage)
-{
-	return resolvedValue(ini->getNextSubToken(label), storage);
-}
-
 UnsignedInt msecsToFrames(UnsignedInt msecs)
 {
 	return static_cast<UnsignedInt>(WWMath::Ceil(ConvertDurationFromMsecsToFrames(static_cast<Real>(msecs))));
@@ -109,21 +96,19 @@ void RespawnBody::loadPostProcess()
 void RespawnUpdateModuleData::parseRespawnRules(INI *ini, void *instance, void *, const void *)
 {
 	RespawnUpdateModuleData *data = static_cast<RespawnUpdateModuleData *>(instance);
-	AsciiString storage;
-	data->m_autoSpawn = INI::scanBool(nextAttribute(ini, "AutoSpawn", storage));
-	data->m_rules.cost = INI::scanInt(nextAttribute(ini, "Cost", storage));
-	data->m_rules.frames = msecsToFrames(INI::scanUnsignedInt(nextAttribute(ini, "Time", storage)));
-	data->m_respawnHealthPercent = static_cast<Int>(INI::scanPercentToReal(nextAttribute(ini, "Health", storage)) * 100.0f + 0.5f);
+	data->m_autoSpawn = INI::scanBool(ini->getNextSubToken("AutoSpawn"));
+	data->m_rules.cost = INI::scanInt(ini->getNextSubToken("Cost"));
+	data->m_rules.frames = msecsToFrames(INI::scanUnsignedInt(ini->getNextSubToken("Time")));
+	data->m_respawnHealthPercent = static_cast<Int>(INI::scanPercentToReal(ini->getNextSubToken("Health")) * 100.0f + 0.5f);
 }
 
 void RespawnUpdateModuleData::parseRespawnEntry(INI *ini, void *instance, void *, const void *)
 {
 	RespawnUpdateModuleData *data = static_cast<RespawnUpdateModuleData *>(instance);
-	AsciiString storage;
 	HeroRules::ReviveEntry entry;
-	entry.level = INI::scanInt(nextAttribute(ini, "Level", storage));
-	entry.cost = INI::scanInt(nextAttribute(ini, "Cost", storage));
-	entry.frames = msecsToFrames(INI::scanUnsignedInt(nextAttribute(ini, "Time", storage)));
+	entry.level = INI::scanInt(ini->getNextSubToken("Level"));
+	entry.cost = INI::scanInt(ini->getNextSubToken("Cost"));
+	entry.frames = msecsToFrames(INI::scanUnsignedInt(ini->getNextSubToken("Time")));
 	data->m_entries.push_back(entry);
 }
 

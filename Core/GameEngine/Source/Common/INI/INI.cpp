@@ -37,6 +37,7 @@
 #include "Common/INIAudit.h"
 #include "Common/INIBlockStructure.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "Common/INIException.h"
 #include "Common/INILegacyLines.h"
 #include "Common/INIMath.h"
@@ -415,15 +416,6 @@ static INIPreprocessor& getPreprocessor()
 {
 	static INIPreprocessor preprocessor(readIncludedFile);
 	return preprocessor;
-}
-
-Bool INI::findDefine(const char* name, AsciiString& value)
-{
-	std::string text;
-	if (!name || !getPreprocessor().findDefine(name, text))
-		return FALSE;
-	value = text.c_str();
-	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2381,7 +2373,18 @@ void INI::parseDurationReal( INI *ini, void * /*instance*/, void *store, const v
 // parse a duration in msec and convert to duration in integral number of frames, (unsignedint) rounding UP
 void INI::parseDurationUnsignedInt( INI *ini, void * /*instance*/, void *store, const void* /*userData*/ )
 {
-	UnsignedInt val = scanUnsignedInt(ini->getNextToken());
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		const UnsignedInt val = scanUnsignedInt(ini->getNextToken());
+		*(UnsignedInt *)store = RotwkDuration::engineFrames(RotwkDuration::retailFrames(val), LOGICFRAMES_PER_SECOND);
+		return;
+	}
+	parseEngineDurationUnsignedInt(ini, nullptr, store, nullptr);
+}
+
+void INI::parseEngineDurationUnsignedInt( INI *ini, void *, void *store, const void* )
+{
+	const UnsignedInt val = scanUnsignedInt(ini->getNextToken());
 	*(UnsignedInt *)store = (UnsignedInt)WWMath::Ceil(ConvertDurationFromMsecsToFrames((Real)val));
 }
 
@@ -2389,8 +2392,9 @@ void INI::parseDurationUnsignedInt( INI *ini, void * /*instance*/, void *store, 
 // parse a duration in msec and convert to duration in integral number of frames, (unsignedshort) rounding UP
 void INI::parseDurationUnsignedShort( INI *ini, void * /*instance*/, void *store, const void* /*userData*/ )
 {
-	UnsignedInt val = scanUnsignedInt(ini->getNextToken());
-	*(UnsignedShort *)store = (UnsignedShort)WWMath::Ceil(ConvertDurationFromMsecsToFrames((Real)val));
+	UnsignedInt frames;
+	parseDurationUnsignedInt(ini, nullptr, &frames, nullptr);
+	*(UnsignedShort *)store = static_cast<UnsignedShort>(frames);
 }
 
 //-------------------------------------------------------------------------------------------------

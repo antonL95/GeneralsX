@@ -211,7 +211,7 @@ const FieldParse EvaCheckInfo::s_evaEventInfo[] =
 {
 	{ "Priority",							INI::parseUnsignedInt,					nullptr,			offsetof( EvaCheckInfo, m_priority ) },
 	{ "TimeBetweenChecksMS",	INI::parseDurationUnsignedInt,	nullptr,			offsetof( EvaCheckInfo, m_framesBetweenChecks ) },
-	{ "ExpirationTimeMS",			INI::parseDurationUnsignedInt,	nullptr,			offsetof( EvaCheckInfo, m_framesToExpire) },
+	{ "ExpirationTimeMS",			INI::parseEngineDurationUnsignedInt,	nullptr,	offsetof( EvaCheckInfo, m_framesToExpire) },
 	{ "SideSounds",						parseSideSoundsList,						nullptr,			offsetof( EvaCheckInfo, m_evaSideSounds ) },
 	{ nullptr, nullptr, nullptr, 0 },
 

@@ -93,6 +93,7 @@ set(GAMEENGINE_SRC
     Include/Common/RetailFileLayers.h
     Include/Common/INILegacyLines.h
     Include/Common/INIMath.h
+    Include/Common/RotwkDuration.h
     Include/Common/INIPreprocessor.h
     Include/Common/BitFlagsCrc.h
     Include/Common/RetailConditionMatch.h

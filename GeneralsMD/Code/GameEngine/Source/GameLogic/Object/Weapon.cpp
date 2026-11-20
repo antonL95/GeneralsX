@@ -46,6 +46,7 @@
 #include "Common/INIAudit.h"
 #include "Common/PerfTimer.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "Common/Player.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -349,7 +350,9 @@ WeaponTemplate::WeaponTemplate() : m_nextTemplate(nullptr)
 	m_dieOnDetonate						= FALSE;
 	m_hitPercentage = 100.0f;
 	m_firingDuration = 0;
-	m_maxWeaponSpeed = 0.0f;
+	m_maxWeaponSpeed = RetailFileLayers::enabled() || INIAudit::isEnabled()
+		? 999999.0f / RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND)
+		: 0.0f;
 	m_meleeWeapon = FALSE;
 	m_hitStoredTarget = FALSE;
 	m_bombardType = FALSE;
@@ -414,8 +417,8 @@ static void parseRetailWeaponDelay(INI* ini, Int& minFrames, Int& maxFrames)
 	if (minMsecs < 0 || maxMsecs < minMsecs)
 		throw INI_INVALID_DATA;
 
-	minFrames = WWMath::Ceil(ConvertDurationFromMsecsToFrames(static_cast<Real>(minMsecs)));
-	maxFrames = WWMath::Ceil(ConvertDurationFromMsecsToFrames(static_cast<Real>(maxMsecs)));
+	minFrames = RotwkDuration::retailFrames(minMsecs);
+	maxFrames = RotwkDuration::retailFrames(maxMsecs);
 }
 
 void WeaponTemplate::parseClipReloadTime(INI* ini, void* instance, void* store, const void* userData)
@@ -574,6 +577,12 @@ Real WeaponTemplate::getUnmodifiedAttackRange() const
 	return m_attackRange;
 }
 
+static Int retailWeaponDelayInEngineFrames(Int frames, Real rateOfFire)
+{
+	const Int adjustedFrames = rateOfFire > 0.0f ? REAL_TO_INT_FLOOR(frames / rateOfFire) : frames;
+	return RotwkDuration::engineFrames(adjustedFrames, LOGICFRAMES_PER_SECOND);
+}
+
 //-------------------------------------------------------------------------------------------------
 Int WeaponTemplate::getDelayBetweenShots(const WeaponBonus& bonus) const
 {
@@ -589,6 +598,8 @@ Int WeaponTemplate::getDelayBetweenShots(const WeaponBonus& bonus) const
 	//CRCDEBUG_LOG(("WeaponTemplate::getDelayBetweenShots() - min:%d max:%d val:%d, bonusROF=%g/%8.8X",
 		//m_minDelayBetweenShots, m_maxDelayBetweenShots, delayToUse, bonusROF, AS_INT(bonusROF)));
 
+	if (RetailFileLayers::enabled())
+		return retailWeaponDelayInEngineFrames(delayToUse, bonusROF);
 	return REAL_TO_INT_FLOOR(delayToUse / bonusROF);
 }
 
@@ -598,9 +609,10 @@ Int WeaponTemplate::getClipReloadTime(const WeaponBonus& bonus, Bool rollRange) 
 	Int delay = m_clipReloadTime;
 	if (rollRange && m_clipReloadTime < m_maxClipReloadTime)
 		delay = GameLogicRandomValue(m_clipReloadTime, m_maxClipReloadTime);
+	const Real bonusROF = bonus.getField(WeaponBonus::RATE_OF_FIRE);
 	if (RetailFileLayers::enabled())
-		delay -= delay % 3;
-	return REAL_TO_INT_FLOOR(delay / bonus.getField(WeaponBonus::RATE_OF_FIRE));
+		return retailWeaponDelayInEngineFrames(RotwkDuration::clipReloadFrames(delay), bonusROF);
+	return REAL_TO_INT_FLOOR(delay / bonusROF);
 }
 
 //-------------------------------------------------------------------------------------------------

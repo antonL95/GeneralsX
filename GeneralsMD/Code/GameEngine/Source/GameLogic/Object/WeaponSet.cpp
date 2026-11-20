@@ -46,6 +46,7 @@
 #include "Common/BitFlagsIO.h"
 
 #include "GameLogic/AI.h"
+#include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -787,10 +788,12 @@ CanAttackResult WeaponSet::getAbleToAttackSpecificObject( AbleToAttackType attac
 	return getAbleToUseWeaponAgainstTarget( attackType, source, victim, victim->getPosition(), commandSource, specificSlot );
 }
 
-//-------------------------------------------------------------------------------------------------
-//This is formerly the 2nd half of getAbleToAttackSpecificObject
-//This function is responsible for determining if our object is physically capable of attacking the target and it
-//supports both victim or position.
+static Bool canUsePositionWeapon(const Weapon* weapon)
+{
+	return weapon && weapon->getTemplate()->canFireWithoutVictim()
+		&& (weapon->getStatus() != OUT_OF_AMMO || weapon->getAutoReloadsClip());
+}
+
 CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType attackType, const Object *source, const Object *victim, const Coord3D *pos, CommandSourceType commandSource, WeaponSlotType specificSlot ) const
 {
 
@@ -811,12 +814,15 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 		targetAntiMask = WEAPON_ANTI_GROUND;
 	}
 
-	const Bool retailObjectAttack = victim && RetailFileLayers::enabled();
+	const Bool retail = RetailFileLayers::enabled();
+	const Bool retailPositionAttack = retail && !victim;
 	const WeaponSlotType lockedSlot = isCurWeaponLocked() ? m_curWeapon : specificSlot;
 	const auto permitsWeapon = [&](WeaponSlotType slot, const Weapon* weapon)
 	{
-		if (!retailObjectAttack)
+		if (!retail)
 			return true;
+		if (retailPositionAttack)
+			return lockedSlot == static_cast<WeaponSlotType>(-1) ? canUsePositionWeapon(weapon) : slot == lockedSlot;
 		if (lockedSlot == static_cast<WeaponSlotType>(-1))
 		{
 			if (!(m_curWeaponTemplateSet->getNthCommandSourceMask(slot) & (1u << commandSource)))
@@ -851,15 +857,15 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 	const Object *containedBy = source->getContainedBy();
 	Bool hasAWeaponInRange = FALSE;
 	Bool hasAWeapon				 = FALSE;
-	const Int rangeSlotCount = retailObjectAttack ? WEAPONSLOT_COUNT : WEAPONSLOT_COUNT - 1;
+	const Int rangeSlotCount = retail ? WEAPONSLOT_COUNT : WEAPONSLOT_COUNT - 1;
 	for (Int slot = 0; slot < rangeSlotCount; ++slot)
 	{
-		const WeaponSlotType rangeSlot = retailObjectAttack ? static_cast<WeaponSlotType>(slot) : m_curWeapon;
+		const WeaponSlotType rangeSlot = retail ? static_cast<WeaponSlotType>(slot) : m_curWeapon;
 		Weapon *weaponToTestForRange = m_weapons[rangeSlot];
 		if (weaponToTestForRange && permitsWeapon(rangeSlot, weaponToTestForRange))
 		{
 			hasAWeapon = TRUE;
-			if ((m_totalAntiMask & targetAntiMask) == 0)//we don't care to check for this weapon
+			if (!retailPositionAttack && (m_totalAntiMask & targetAntiMask) == 0)
 				continue;
 
 			Bool handled = FALSE;
@@ -886,6 +892,8 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 				hasAWeaponInRange = TRUE;
 				break;
 			}
+			if (retailPositionAttack)
+				break;
 		}
 	}
 
@@ -901,7 +909,10 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 
 // ----- things we examine about SOURCE to determine legality of attack
 
-	if (hasAnyDamageWeapon())
+	if (retailPositionAttack && hasAWeapon)
+		return okResult;
+
+	if (!retailPositionAttack && hasAnyDamageWeapon())
 	{
 		if ((m_totalAntiMask & targetAntiMask) == 0)
 			return ATTACKRESULT_INVALID_SHOT;
@@ -1025,15 +1036,13 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 		{
 			for (Int i = PRIMARY_WEAPON; i < WEAPONSLOT_COUNT; ++i)
 			{
-				Weapon* weapon = m_weapons[i];
-				if (weapon && weapon->getTemplate()->canFireWithoutVictim()
-					&& (weapon->getStatus() != OUT_OF_AMMO || weapon->getAutoReloadsClip())
-					&& (weapon->getAntiMask() & WEAPON_ANTI_GROUND))
+				if (canUsePositionWeapon(m_weapons[i]))
 				{
 					m_curWeapon = static_cast<WeaponSlotType>(i);
 					return TRUE;
 				}
 			}
+			return FALSE;
 		}
 		// Weapon lock is checked first for specific attack- ground powers.  Otherwise, we will reproduce the old behavior
 		// and make only Primary attack the ground.
@@ -1105,7 +1114,10 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 		if (damage <= 0.0f && weapon->getDamageType() != DAMAGE_UNRESISTABLE)
 			continue;
 		if (retail)
+		{
+			(void)GameLogicRandomValueReal(0.0f, 1.0f);
 			damage = damage > 0.0f ? 1.0f : 0.0f;
+		}
 
 		/*
 			now that we've eliminated the impossible ones, let's decide which
@@ -1189,9 +1201,8 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 		m_curWeapon = currentDecisionBackup;
 		found = TRUE;
 	}
-	else
+	else if (!retail)
 	{
-		// No weapon at all was found, so we go back to primary.
 		m_curWeapon = PRIMARY_WEAPON;
 	}
 

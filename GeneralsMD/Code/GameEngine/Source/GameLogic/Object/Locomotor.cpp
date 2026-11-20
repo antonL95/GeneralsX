@@ -534,7 +534,9 @@ static void skipNonRotwkField(INI* ini)
 
 static UnsignedInt scanRotwkDurationFrames(INI* ini)
 {
-	return RotwkLocomotorRules::durationFrames(INI::scanUnsignedInt(ini->getNextToken()), LOGICFRAMES_PER_SECOND);
+	UnsignedInt frames;
+	INI::parseDurationUnsignedInt(ini, nullptr, &frames, nullptr);
+	return frames;
 }
 
 void LocomotorTemplate::parseRotwkSpeedDamaged(INI* ini, void* instance, void* store, const void* userData)
