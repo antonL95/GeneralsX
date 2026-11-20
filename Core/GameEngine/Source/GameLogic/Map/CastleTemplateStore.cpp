@@ -1,0 +1,95 @@
+#include "PreRTS.h"
+
+#include "GameLogic/CastleTemplateStore.h"
+
+#include <map>
+
+#include "Common/DataChunk.h"
+#include "Common/Errors.h"
+#include "Common/INIAudit.h"
+#include "Common/MapReaderWriterInfo.h"
+
+namespace CastleTemplates
+{
+namespace
+{
+std::map<std::string, Members> s_camps;
+
+Bool readTemplates(DataChunkInput& file, DataChunkInfo* info, void* userData)
+{
+	if (info->dataSize < 8 || static_cast<std::size_t>(info->dataSize) > MAX_BODY_SIZE)
+		return FALSE;
+
+	auto& result = *static_cast<std::optional<Members>*>(userData);
+	if (result)
+		return FALSE;
+
+	std::vector<std::uint8_t> bytes(info->dataSize);
+	file.readArrayOfBytes(reinterpret_cast<char*>(bytes.data()), info->dataSize);
+	result = parse(bytes, info->version);
+	return result.has_value();
+}
+
+std::optional<Members> load(const AsciiString& path)
+{
+	CachedFileInputStream stream;
+	if (!stream.open(path))
+		return std::nullopt;
+
+	DataChunkInput file(&stream);
+	file.registerParser("CastleTemplates", AsciiString::TheEmptyString, readTemplates);
+	std::optional<Members> result;
+	if (!file.parse(&result))
+		return std::nullopt;
+
+	if (!result)
+		result.emplace();
+	return result;
+}
+
+const Members* reportFailure(const AsciiString& path)
+{
+	if (!INIAudit::isEnabled())
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	INIAudit::record("error", "Cannot load castle template data", path.str(), 0);
+	return nullptr;
+}
+}
+
+const Members* find(const AsciiString& camp)
+{
+	std::string key(camp.str());
+	if (key.empty() || key == "." || key == ".." || key.size() > 255 ||
+		key.find_first_of("/\\:") != std::string::npos)
+		return reportFailure(camp);
+
+	for (char& ch : key)
+		if (ch >= 'A' && ch <= 'Z')
+			ch += 'a' - 'A';
+
+	const auto found = s_camps.find(key);
+	if (found != s_camps.end())
+		return &found->second;
+
+	AsciiString path;
+	path.format("Bases\\%s\\%s.bse", camp.str(), camp.str());
+	std::optional<Members> result;
+	try
+	{
+		result = load(path);
+	}
+	catch (ErrorCode)
+	{
+		return reportFailure(path);
+	}
+
+	if (!result)
+		return reportFailure(path);
+	return &s_camps.emplace(std::move(key), std::move(*result)).first->second;
+}
+
+void reset()
+{
+	s_camps.clear();
+}
+}

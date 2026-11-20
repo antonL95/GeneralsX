@@ -99,6 +99,7 @@
 
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/CastleTemplateStore.h"
 #include "GameLogic/CaveSystem.h"
 #include "GameLogic/CrateSystem.h"
 #include "GameLogic/FPUControl.h"
@@ -460,6 +461,7 @@ void GameLogic::init()
 //-------------------------------------------------------------------------------------------------
 void GameLogic::reset()
 {
+	CastleTemplates::reset();
 	m_thingTemplateBuildableOverrides.clear();
 	m_controlBarOverrides.clear();
 

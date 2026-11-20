@@ -66,6 +66,8 @@ set(GAMEENGINE_SRC
     Include/Common/SpecialPowerINI.h
     Include/GameLogic/Module/AISpecialPowerUpdate.h
     Include/GameLogic/Module/RotwkParseOnlyModules.h
+    Include/GameLogic/CastleTemplateStore.h
+    Include/GameLogic/Module/CastleBehavior.h
     Include/Common/INIAudit.h
     Include/Common/INIBlockStructure.h
     Include/Common/ZeroHourUpgradeMaskLayout.h
@@ -652,6 +654,8 @@ set(GAMEENGINE_SRC
     Source/Common/INI/INISpecialPower.cpp
     Source/GameLogic/Object/Update/AISpecialPowerUpdate.cpp
     Source/GameLogic/Object/Update/RotwkParseOnlyModules.cpp
+    Source/GameLogic/Map/CastleTemplateStore.cpp
+    Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/Common/INI/INITerrain.cpp
     Source/Common/INI/INITerrainBridge.cpp
     Source/Common/INI/INITerrainRoad.cpp

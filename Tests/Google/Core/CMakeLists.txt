@@ -8,6 +8,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/INIRetailToleranceTest.cpp
     GameEngine/Common/HeightMapSamplesTest.cpp
     GameEngine/Common/HordeFormationTest.cpp
+    GameEngine/Common/CastleTemplateTest.cpp
     GameEngine/Common/RetailFileLayersTest.cpp
     GameEngine/Common/INIMathTest.cpp
     GameEngine/Common/INIPreprocessorTest.cpp

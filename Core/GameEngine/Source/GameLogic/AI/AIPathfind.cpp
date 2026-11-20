@@ -45,6 +45,8 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/CastleBehavior.h"
+#include "Common/ModuleFactory.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
@@ -445,6 +447,12 @@ void Pathfinder::classifyFence( Object *obj, Bool insert )
  */
 void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 {
+	if (insert && obj->getStatusBits().test(OBJECT_STATUS_MASKED) && ModuleFactory::registersRotwkModules())
+	{
+		const auto* castle = static_cast<const CastleBehavior*>(obj->findUpdateModule(NAMEKEY("CastleBehavior")));
+		if (castle && castle->isUnpacked())
+			return;
+	}
 	if (obj->isKindOf(KINDOF_MINE)) {
 		return;  // don't pathfind around mines.
 	}

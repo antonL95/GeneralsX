@@ -322,6 +322,14 @@ Object *ThingFactory::newObject( const ThingTemplate *tmplate, Team *team, Objec
 			tmplate = tmp;
 	}
 
+	return newObjectFromExactTemplate(tmplate, team, statusBits);
+}
+
+Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, Team *team, ObjectStatusMaskType statusBits )
+{
+	if (tmplate == nullptr)
+		throw ERROR_BAD_ARG;
+
 	DEBUG_ASSERTCRASH(!tmplate->isKindOf(KINDOF_DRAWABLE_ONLY), ("You may not create Objects with the template %s, only Drawables",tmplate->getName().str()));
 
 	// have the game logic create an object of the correct type.
