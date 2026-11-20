@@ -57,6 +57,8 @@
 #include "GameClient/GameWindowManager.h"
 #include "Common/FramePacer.h"
 #include "Common/GlobalData.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -166,14 +168,25 @@ TransitionWindow::~TransitionWindow()
 
 Bool TransitionWindow::init()
 {
+	const Bool retail = RetailFileLayers::enabled();
+	if(retail && m_win)
+		m_win->unlinkTransitionWindow(this);
+
 	m_winID = TheNameKeyGenerator->nameToKey(m_winName);
 	m_win		= TheWindowManager->winGetWindowFromId(nullptr, m_winID);
 	m_currentFrameDelay = m_frameDelay;
-//	DEBUG_ASSERTCRASH( m_win, ("TransitionWindow::init Failed to find window %s", m_winName.str()));
-//	if( !m_win )
-//		return FALSE;
 
 	delete m_transition;
+	m_transition = nullptr;
+	if(retail && !m_win && m_style != SCREEN_FADE_TRANSITION &&
+		m_style != REVERSE_SOUND_TRANSITION && m_style != CONTROL_BAR_ARROW_TRANSITION)
+	{
+		if(INIAudit::isEnabled())
+			INIAudit::recordWithContext("window-transition", "TransitionWindow::init",
+				m_winName.isEmpty() ? "missing window name" : m_winName.str(), "", 0);
+		return FALSE;
+	}
+
 	m_transition = getTransitionForStyle( m_style );
 	m_transition->init(m_win);
 
@@ -186,11 +199,10 @@ Bool TransitionWindow::init()
 
 void TransitionWindow::update( Int frame )
 {
-	if(frame < m_currentFrameDelay || frame > (m_currentFrameDelay + m_transition->getFrameLength()))
+	if(!m_transition || frame < m_currentFrameDelay || frame > (m_currentFrameDelay + m_transition->getFrameLength()))
 		return;
 
-	if(m_transition)
-		m_transition->update( frame - m_currentFrameDelay);
+	m_transition->update( frame - m_currentFrameDelay);
 }
 
 Bool TransitionWindow::isFinished()
@@ -235,7 +247,7 @@ Int TransitionWindow::getTotalFrames()
 		return m_frameDelay + m_transition->getFrameLength();
 	}
 
-	return m_frameDelay;
+	return RetailFileLayers::enabled() ? 0 : m_frameDelay;
 }
 
 //-----------------------------------------------------------------------------

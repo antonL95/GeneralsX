@@ -33,6 +33,7 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/View.h"
+#include "Common/RetailFileLayers.h"
 
 UnsignedInt View::m_idNext = 1;
 
@@ -101,7 +102,10 @@ void View::init()
 	m_okToAdjustHeight = FALSE;
 
 	m_defaultAngle = DEG_TO_RADF(TheGlobalData->m_cameraYaw);
-	m_defaultPitch = DEG_TO_RADF(TheGlobalData->m_cameraPitch);
+	const Real cameraPitch = TheGlobalData->m_cameraPitch;
+	m_defaultPitch = RetailFileLayers::enabled() && cameraPitch == 0.0f
+		? ViewDefaultPitchRadians
+		: DEG_TO_RADF(cameraPitch);
 	m_angle = m_defaultAngle;
 	m_pitch = m_defaultPitch;
 }

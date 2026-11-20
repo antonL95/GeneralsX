@@ -42,6 +42,7 @@
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -421,7 +422,8 @@ void GameClient::init()
 
 	TheDisplayStringManager->postProcessLoad();
 
-	m_intro = NEW Intro;
+	if (!RetailFileLayers::enabled() || !TheGlobalData->m_initialFile.endsWithNoCase(".map"))
+		m_intro = NEW Intro;
 
 #ifdef PERF_TIMERS
 	TheGraphDraw = new GraphDraw;

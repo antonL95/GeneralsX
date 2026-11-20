@@ -463,7 +463,8 @@ void GameClient::init()
 		TheSnowManager->setName("TheSnowManager");
 	}
 
-	m_intro = NEW Intro;
+	if (!RetailFileLayers::enabled() || !TheGlobalData->m_initialFile.endsWithNoCase(".map"))
+		m_intro = NEW Intro;
 
 #ifdef PERF_TIMERS
 	TheGraphDraw = new GraphDraw;
