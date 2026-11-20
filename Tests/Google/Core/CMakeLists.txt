@@ -10,6 +10,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/HordeFormationTest.cpp
     GameEngine/Common/CastleRulesTest.cpp
     GameEngine/Common/RotwkLocomotorRulesTest.cpp
+    GameEngine/Common/TerrainResourceRulesTest.cpp
     GameEngine/Common/CastleTemplateTest.cpp
     GameEngine/Common/RetailFileLayersTest.cpp
     GameEngine/Common/RetailGameTextTest.cpp

@@ -34,8 +34,27 @@
 #include "Common/ModelState.h"
 #include "Common/SpecialPower.h"
 #include "Common/SpecialPowerINI.h"
+#include "Common/ThingTemplate.h"
 
+#include <algorithm>
 #include <string_view>
+
+Bool SpecialPowerObjectFilter::matchesTemplate(const ThingTemplate& thing) const
+{
+	const auto matchesName = [&thing](const AsciiString& name)
+	{
+		return stricmp(name.str(), thing.getName().str()) == 0;
+	};
+	if ((m_rules & RULE_NONE) || thing.isAnyKindOf(m_excludeKinds) ||
+		std::any_of(m_excludeObjects.begin(), m_excludeObjects.end(), matchesName))
+		return FALSE;
+
+	if (m_includeKinds.any() || !m_includeObjects.empty())
+		return thing.isAnyKindOf(m_includeKinds) ||
+			std::any_of(m_includeObjects.begin(), m_includeObjects.end(), matchesName);
+
+	return TRUE;
+}
 
 void SpecialPowerObjectFilter::parse(INI* ini, void*, void* store, const void*)
 {

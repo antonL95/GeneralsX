@@ -24,27 +24,6 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 
-namespace
-{
-Bool ownsMember(const SpecialPowerObjectFilter& filter, const ThingTemplate& member)
-{
-	const auto matchesName = [&member](const AsciiString& name)
-	{
-		return stricmp(name.str(), member.getName().str()) == 0;
-	};
-	if ((filter.m_rules & SpecialPowerObjectFilter::RULE_NONE) ||
-		member.isAnyKindOf(filter.m_excludeKinds) ||
-		std::any_of(filter.m_excludeObjects.begin(), filter.m_excludeObjects.end(), matchesName))
-		return FALSE;
-
-	if (filter.m_includeKinds.any() || !filter.m_includeObjects.empty())
-		return member.isAnyKindOf(filter.m_includeKinds) ||
-			std::any_of(filter.m_includeObjects.begin(), filter.m_includeObjects.end(), matchesName);
-
-	return TRUE;
-}
-}
-
 CastleBehaviorModuleData::CastleBehaviorModuleData()
 {
 	for (KindOfType kind : {KINDOF_STRUCTURE, KINDOF_WALK_ON_TOP_OF_WALL, KINDOF_BASE_FOUNDATION,
@@ -272,7 +251,7 @@ void CastleBehavior::unpack()
 		Vector3 position;
 		Matrix3D::Transform_Vector(transform, Vector3(member.offsetX, member.offsetY, member.offsetZ), &position);
 		const Coord3D ground = {position.X, position.Y, TheTerrainLogic->getGroundHeight(position.X, position.Y)};
-		Player* owner = ownsMember(data->m_ownedFilter, *definition) ? player : ThePlayerList->getNeutralPlayer();
+		Player* owner = data->m_ownedFilter.matchesTemplate(*definition) ? player : ThePlayerList->getNeutralPlayer();
 		Team* team = owner->getDefaultTeam();
 		const Bool structure = definition->isKindOf(KINDOF_STRUCTURE);
 		const auto construction = MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNDER_CONSTRUCTION);

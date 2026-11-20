@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "Common/BuildAssistant.h"
@@ -29,6 +30,7 @@
 #include "GameClient/View.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BehaviorModule.h"
+#include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/UpgradeModule.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -52,6 +54,9 @@ struct Command
 	Coord3D location = {0.0f, 0.0f, 0.0f};
 	Real angle = 0.0f;
 	bool hasLocation = false;
+	Bool hasPlacementPoint = FALSE;
+	Real x = 0;
+	Real y = 0;
 };
 
 struct MetaKey
@@ -109,7 +114,7 @@ void load()
 		float angle = 0.0f;
 		const int fields = std::sscanf(line, "%u %31s %63s %127s %d %127s %f %f %f", &command.frame, action, player, target,
 			&command.ordinal, structure, &x, &y, &angle);
-		if (fields < 5)
+		if (fields < 5 || (std::string_view(action) == "place" && fields != 6 && fields < 8))
 			continue;
 		command.action = action;
 		command.player = player;
@@ -118,6 +123,9 @@ void load()
 		command.hasLocation = fields >= 8;
 		command.location.set(x, y, 0.0f);
 		command.angle = angle;
+		command.hasPlacementPoint = fields >= 8;
+		command.x = x;
+		command.y = y;
 		s_commands.push_back(std::move(command));
 	}
 	std::fclose(file);
@@ -548,17 +556,36 @@ void execute(const Command& command, unsigned int frame)
 		return;
 	}
 
-	if (command.action == "build")
+	const Bool placeAtPoint = command.action == "place" && command.hasPlacementPoint;
+	if (command.action == "build" || placeAtPoint || command.action == "queue")
 	{
 		const ThingTemplate* what = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
 		if (!what)
 			return;
+		ProductionUpdateInterface* production = obj->getProductionUpdateInterface();
+		if (command.action == "queue" && !production)
+			return;
 		GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
 		select->appendBooleanArgument(TRUE);
 		select->appendObjectIDArgument(obj->getID());
-		GameMessage* build = TheMessageStream->appendMessage(GameMessage::MSG_FOUNDATION_CONSTRUCT);
+		GameMessage::Type type = GameMessage::MSG_FOUNDATION_CONSTRUCT;
+		if (placeAtPoint)
+			type = GameMessage::MSG_DOZER_CONSTRUCT;
+		else if (command.action == "queue")
+			type = GameMessage::MSG_QUEUE_UNIT_CREATE;
+		GameMessage* build = TheMessageStream->appendMessage(type);
 		build->appendIntegerArgument(what->getTemplateID());
-		std::fprintf(stderr, "TEST frame %u: build %s on object %u\n", frame, command.structure.c_str(),
+		if (placeAtPoint)
+		{
+			const Coord3D target = {command.x, command.y, TheTerrainLogic->getGroundHeight(command.x, command.y)};
+			build->appendLocationArgument(target);
+			build->appendRealArgument(0.0f);
+		}
+		else if (command.action == "queue")
+		{
+			build->appendIntegerArgument(production->requestUniqueUnitID());
+		}
+		std::fprintf(stderr, "TEST frame %u: %s %s on object %u\n", frame, command.action.c_str(), command.structure.c_str(),
 			static_cast<unsigned>(obj->getID()));
 	}
 	else if (command.action == "kill")

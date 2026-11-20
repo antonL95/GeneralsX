@@ -44,19 +44,3 @@ TEST(PlayerTemplateRulesTest, SelectsLevelVariantWithSpFallback)
 	EXPECT_EQ(PlayerTemplateRules::selectLevelVariant(true, 25, 10), 25);
 	EXPECT_EQ(PlayerTemplateRules::selectLevelVariant(true, 0, 10), 10);
 }
-
-TEST(PlayerTemplateRulesTest, ResourceModifierPercentFollowsAotrCurve)
-{
-	const std::vector<int> empty;
-	EXPECT_EQ(PlayerTemplateRules::resourceModifierPercent(empty, 0), 100);
-	EXPECT_EQ(PlayerTemplateRules::resourceModifierPercent(empty, 8), 100);
-
-	const std::vector<int> aotr = { 100, 100, 100, 100, 100, 95, 90, 85, 80, 75, 71, 68, 66 };
-	EXPECT_EQ(PlayerTemplateRules::resourceModifierPercent(aotr, 0), 100);
-	EXPECT_EQ(PlayerTemplateRules::resourceModifierPercent(aotr, 1), 100);
-	EXPECT_EQ(PlayerTemplateRules::resourceModifierPercent(aotr, 5), 100);
-	EXPECT_EQ(PlayerTemplateRules::resourceModifierPercent(aotr, 6), 95);
-	EXPECT_EQ(PlayerTemplateRules::resourceModifierPercent(aotr, 10), 75);
-	EXPECT_EQ(PlayerTemplateRules::resourceModifierPercent(aotr, 13), 66);
-	EXPECT_EQ(PlayerTemplateRules::resourceModifierPercent(aotr, 25), 66);
-}

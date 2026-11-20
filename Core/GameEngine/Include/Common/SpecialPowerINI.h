@@ -6,6 +6,7 @@
 #include "Common/KindOf.h"
 
 class INI;
+class ThingTemplate;
 
 struct SpecialPowerObjectFilter
 {
@@ -17,6 +18,7 @@ struct SpecialPowerObjectFilter
 	std::vector<AsciiString> m_includeObjects;
 	std::vector<AsciiString> m_excludeObjects;
 
+	Bool matchesTemplate(const ThingTemplate& thing) const;
 	static void parse(INI* ini, void* instance, void* store, const void* userData);
 };
 

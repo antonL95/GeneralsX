@@ -68,10 +68,12 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/RotwkParseOnlyModules.h
     Include/GameLogic/CastleRules.h
     Include/GameLogic/RotwkLocomotorRules.h
+    Include/GameLogic/TerrainResourceRules.h
     Include/GameLogic/CastleTemplateStore.h
     Include/GameLogic/RetailTestCommands.h
     Include/GameLogic/Module/CastleBehavior.h
     Include/GameLogic/Module/FoundationAIUpdate.h
+    Include/GameLogic/Module/TerrainResourceBehavior.h
     Include/Common/INIAudit.h
     Include/Common/INIBlockStructure.h
     Include/Common/ZeroHourUpgradeMaskLayout.h
@@ -664,6 +666,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailTestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Update/FoundationAIUpdate.cpp
+    Source/GameLogic/Object/Update/TerrainResourceBehavior.cpp
     Source/Common/INI/INITerrain.cpp
     Source/Common/INI/INITerrainBridge.cpp
     Source/Common/INI/INITerrainRoad.cpp

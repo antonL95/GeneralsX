@@ -52,6 +52,8 @@
 #include "Common/FileSystem.h"
 #include "Common/GameAudio.h"
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/OptionPreferences.h"
 #include "Common/version.h"
 
@@ -1244,8 +1246,16 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	}
 	// If we're multifile, then continue loading stuff into the Global Data as normal.
 
-	// parse the ini weapon definition
-	ini->initFromINI( TheWritableGlobalData, s_GlobalDataFieldParseTable );
+	static const FieldParse retailFields[] =
+	{
+		{ "TerrainResourceCellSize", INI::parseReal, nullptr, offsetof(GlobalData, m_terrainResourceCellSize) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	MultiIniFieldParse fields;
+	fields.add(s_GlobalDataFieldParseTable, 0);
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+		fields.add(retailFields, 0);
+	ini->initFromINIMulti(TheWritableGlobalData, fields);
 
 	TheWritableGlobalData->m_userDataDir.clear();
 
