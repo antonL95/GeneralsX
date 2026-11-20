@@ -35,6 +35,13 @@ enum ShadowType CPP_11(: Int);
 class Player;
 class Shadow;
 class RadiusDecalTemplate;
+class DisplayString;
+class Drawable;
+class ThingTemplate;
+class View;
+
+void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, const Drawable* selected,
+	DisplayString*& label);
 
 // ------------------------------------------------------------------------------------------------
 class RadiusDecal

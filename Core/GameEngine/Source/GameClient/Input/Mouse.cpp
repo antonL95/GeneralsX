@@ -1198,7 +1198,13 @@ Bool Mouse::drawRetailCommandTooltip()
 	if (x + width > m_maxX)
 		x = m_currMouse.pos.x - width - 20;
 	x = MAX(0, x);
-	const Int y = MAX(0, MIN(m_currMouse.pos.y, m_maxY - height));
+	constexpr UnsignedInt entryTime = 140;
+	const UnsignedInt elapsed = std::min<UnsignedInt>(timeGetTime() - m_highlightUpdateStart, entryTime);
+	const Real remaining = 1.0f - static_cast<Real>(elapsed) / entryTime;
+	const Int entryOffset = static_cast<Int>(8.0f * scale * remaining * remaining);
+	const Int anchorY = MAX(0, MIN(m_currMouse.pos.y, m_maxY - height));
+	const Int y = anchorY > m_maxY / 2 ? MAX(0, anchorY - entryOffset) :
+		MIN(MAX(0, m_maxY - height), anchorY + entryOffset);
 	const Int middleY = y + topHeight;
 	const Int bottomY = y + height - bottomHeight;
 	TheDisplay->drawFillRect(x + leftWidth / 2, middleY, width - (leftWidth + rightWidth) / 2,

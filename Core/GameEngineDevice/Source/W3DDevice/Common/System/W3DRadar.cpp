@@ -32,10 +32,12 @@
 #include "Common/AudioEventRTS.h"
 #include "Common/Debug.h"
 #include "Common/Errors.h"
+#include "Common/FileSystem.h"
 #include "Common/GlobalData.h"
 #include "Common/GameUtility.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/GameLogic.h"
@@ -52,6 +54,7 @@
 #include "GameClient/Water.h"
 #include "W3DDevice/Common/W3DRadar.h"
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "WW3D2/texture.h"
 #include "WW3D2/dx8caps.h"
@@ -163,6 +166,8 @@ void W3DRadar::deleteResources()
 
 	deleteInstance(m_terrainImage);
 	m_terrainImage = nullptr;
+	deleteInstance(m_mapRadarImage);
+	m_mapRadarImage = nullptr;
 
 	//
 	// delete overlay resources used
@@ -302,6 +307,10 @@ void W3DRadar::drawViewBox( Int pixelX, Int pixelY, Int width, Int height )
 	Real lineWidth = 1.0f;
 	Color topColor = GameMakeColor( 225, 225, 0, 255 );
 	Color bottomColor = GameMakeColor( 158, 158, 0, 255 );
+	const Image *edge = RetailFileLayers::enabled() && TheMappedImageCollection ?
+		TheMappedImageCollection->findImageByName("RadarViewBoxEdge") : nullptr;
+	if (edge && !TheDisplay->hasImageTexture(edge))
+		edge = nullptr;
 
 	//
 	// setup the clipping region ... note that this clipping region is not over just the
@@ -315,6 +324,17 @@ void W3DRadar::drawViewBox( Int pixelX, Int pixelY, Int width, Int height )
 	clipRegion.lo.y = radarWindowScreenPos.y;
 	clipRegion.hi.x = radarWindowScreenPos.x + radarWindowSize.x;
 	clipRegion.hi.y = radarWindowScreenPos.y + radarWindowSize.y;
+	const auto drawEdge = [&](Color first, Color last)
+	{
+		if (!ClipLine2D(&pixelStart, &pixelEnd, &clipStart, &clipEnd, &clipRegion))
+			return;
+		if (edge)
+			static_cast<W3DDisplay*>(TheDisplay)->drawTexturedLine(edge, clipStart, clipEnd, 2.0f);
+		else if (first == last)
+			TheDisplay->drawLine(clipStart.x, clipStart.y, clipEnd.x, clipEnd.y, lineWidth, first);
+		else
+			TheDisplay->drawLine(clipStart.x, clipStart.y, clipEnd.x, clipEnd.y, lineWidth, first, last);
+	};
 
 	// convert top left of screen into world position
 	TheTacticalView->getOrigin( &ulScreen.x, &ulScreen.y );
@@ -346,34 +366,26 @@ void W3DRadar::drawViewBox( Int pixelX, Int pixelY, Int width, Int height )
 	radar.x = ulRadar.x + m_viewBox[ 1 ].x;
 	radar.y = ulRadar.y + m_viewBox[ 1 ].y;
 	radarToPixel( &radar, &pixelEnd, pixelX, pixelY, width, height );
-	if( ClipLine2D( &pixelStart, &pixelEnd, &clipStart, &clipEnd, &clipRegion ) )
-		TheDisplay->drawLine( clipStart.x, clipStart.y, clipEnd.x, clipEnd.y,
-													lineWidth, topColor );
+	drawEdge(topColor, topColor);
 
   // right line
 	pixelStart = pixelEnd;
 	radar.x += m_viewBox[ 2 ].x;
 	radar.y += m_viewBox[ 2 ].y;
 	radarToPixel( &radar, &pixelEnd, pixelX, pixelY, width, height );
-	if( ClipLine2D( &pixelStart, &pixelEnd, &clipStart, &clipEnd, &clipRegion ) )
-		TheDisplay->drawLine( clipStart.x, clipStart.y, clipEnd.x, clipEnd.y,
-													lineWidth, topColor, bottomColor );
+	drawEdge(topColor, bottomColor);
 
   // bottom line
 	pixelStart = pixelEnd;
 	radar.x += m_viewBox[ 3 ].x;
 	radar.y += m_viewBox[ 3 ].y;
 	radarToPixel( &radar, &pixelEnd, pixelX, pixelY, width, height );
-	if( ClipLine2D( &pixelStart, &pixelEnd, &clipStart, &clipEnd, &clipRegion ) )
-		TheDisplay->drawLine( clipStart.x, clipStart.y, clipEnd.x, clipEnd.y,
-													lineWidth, bottomColor );
+	drawEdge(bottomColor, bottomColor);
 
   // left line
 	pixelStart = pixelEnd;
 	pixelEnd = ulPixel;
-	if( ClipLine2D( &pixelStart, &pixelEnd, &clipStart, &clipEnd, &clipRegion ) )
-		TheDisplay->drawLine( clipStart.x, clipStart.y, clipEnd.x, clipEnd.y,
-													lineWidth, bottomColor, topColor );
+	drawEdge(bottomColor, topColor);
 
 }
 
@@ -601,7 +613,7 @@ void W3DRadar::drawEvents( Int pixelX, Int pixelY, Int width, Int height )
 
 			if ( m_event[ i ].type == RADAR_EVENT_BEACON_PULSE )
 				drawSingleBeaconEvent( pixelX, pixelY, width, height, i );
-			else
+			else if (!drawInformationAlert(pixelX, pixelY, width, height, m_event[i]))
 				drawSingleGenericEvent( pixelX, pixelY, width, height, i );
 
 		}
@@ -610,6 +622,28 @@ void W3DRadar::drawEvents( Int pixelX, Int pixelY, Int width, Int height )
 
 }
 
+
+Bool W3DRadar::drawInformationAlert(Int pixelX, Int pixelY, Int width, Int height, const RadarEvent &event)
+{
+	if (!RetailFileLayers::enabled() || event.type != RADAR_EVENT_INFORMATION || !TheMappedImageCollection)
+		return FALSE;
+
+	const UnsignedInt elapsed = TheGameLogic->getFrame() - event.createFrame;
+	const UnsignedInt duration = std::max(1u, event.dieFrame - event.createFrame);
+	const UnsignedInt frame = std::min<UnsignedInt>(15, 16ull * elapsed / duration);
+	AsciiString name;
+	name.format("RadarInfoAlert_%05u", frame);
+	const Image *image = TheMappedImageCollection->findImageByName(name);
+	if (!TheDisplay->hasImageTexture(image))
+		return FALSE;
+
+	ICoord2D center;
+	radarToPixel(&event.radarLoc, &center, pixelX, pixelY, width, height);
+	const Int left = center.x - image->getImageWidth() / 2;
+	const Int top = center.y - image->getImageHeight() / 2;
+	TheDisplay->drawImage(image, left, top, left + image->getImageWidth(), top + image->getImageHeight());
+	return TRUE;
+}
 
 //-------------------------------------------------------------------------------------------------
 /** Draw all the radar icons */
@@ -1006,6 +1040,8 @@ void W3DRadar::reset()
 
 	// extending functionality, call base class
 	Radar::reset();
+	deleteInstance(m_mapRadarImage);
+	m_mapRadarImage = nullptr;
 
 	// clear our texture data, but do not delete the resources
 	SurfaceClass *surface;
@@ -1057,9 +1093,40 @@ void W3DRadar::newMap( TerrainLogic *terrain )
 	if( terrain == nullptr )
 		return;
 
-	// build terrain texture
-	buildTerrainTexture( terrain );
+	loadMapRadarImage();
+	if (m_mapRadarImage)
+		m_reconstructViewBox = TRUE;
+	else
+		buildTerrainTexture(terrain);
 
+}
+
+void W3DRadar::loadMapRadarImage()
+{
+	if (!RetailFileLayers::enabled())
+		return;
+	AsciiString base = TheGlobalData->m_mapName;
+	if (!base.endsWithNoCase(".map"))
+		return;
+	base.truncateBy(4);
+	for (const char *suffix : {"_art.tga", ".tga"})
+	{
+		AsciiString filename = base;
+		filename.concat(suffix);
+		if (!TheFileSystem->doesFileExist(filename.str()))
+			continue;
+
+		Image *image = newInstance(Image);
+		image->setFilename(filename);
+		Region2D uv = {{0.0f, 0.0f}, {1.0f, 1.0f}};
+		image->setUV(&uv);
+		if (TheDisplay->hasImageTexture(image))
+		{
+			m_mapRadarImage = image;
+			return;
+		}
+		deleteInstance(image);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1332,7 +1399,8 @@ void W3DRadar::clearShroud()
 	int pitch;
 	void *pBits = surface->Lock(&pitch);
 	const unsigned int bytesPerPixel = surface->Get_Bytes_Per_Pixel();
-	const Color color = GameMakeColor( 0, 0, 0, 0 );
+	const Color color = RetailFileLayers::enabled() ? GameMakeColor(255, 255, 255, 255) :
+		GameMakeColor(0, 0, 0, 0);
 
 	for( Int y = 0; y < m_textureHeight; y++ )
 	{
@@ -1393,6 +1461,17 @@ void W3DRadar::setShroudLevel(Int shroudX, Int shroudY, CellShroudStatus setting
 	else
 		alpha = 0;
 
+	Color argbColor = GameMakeColor(0, 0, 0, alpha);
+	if (RetailFileLayers::enabled())
+	{
+		const Int light = setting == CELLSHROUD_SHROUDED ? TheGlobalData->m_shroudAlpha :
+			setting == CELLSHROUD_FOGGED ? TheGlobalData->m_fogAlpha : TheGlobalData->m_clearAlpha;
+		const RGBColor tint = setting == CELLSHROUD_SHROUDED || setting == CELLSHROUD_FOGGED ?
+			TheGlobalData->m_shroudColor : RGBColor{1.0f, 1.0f, 1.0f};
+		argbColor = GameMakeColor(REAL_TO_INT(tint.red * light), REAL_TO_INT(tint.green * light),
+			REAL_TO_INT(tint.blue * light), 255);
+	}
+
 	if (m_shroudSurface == nullptr)
 	{
 		// This is expensive.
@@ -1403,7 +1482,6 @@ void W3DRadar::setShroudLevel(Int shroudX, Int shroudY, CellShroudStatus setting
 		int pitch;
 		void *pBits = surface->Lock(&pitch);
 		const unsigned int bytesPerPixel = Get_Bytes_Per_Pixel(surfaceDesc.Format);
-		const Color argbColor = GameMakeColor( 0, 0, 0, alpha );
 		const unsigned int pixelColor = ARGB_Color_To_WW3D_Color(surfaceDesc.Format, argbColor);
 
 		for( Int y = radarMinY; y <= radarMaxY; ++y )
@@ -1423,7 +1501,6 @@ void W3DRadar::setShroudLevel(Int shroudX, Int shroudY, CellShroudStatus setting
 		DEBUG_ASSERTCRASH(m_shroudSurfaceBits != nullptr, ("W3DRadar::setShroudLevel: m_shroudSurfaceBits is not expected null"));
 		DEBUG_ASSERTCRASH(m_shroudSurfaceFormat != WW3D_FORMAT_UNKNOWN, ("W3DRadar::setShroudLevel: m_shroudSurfaceFormat is not expected UNKNOWN"));
 		DEBUG_ASSERTCRASH(m_shroudSurfacePixelSize != 0, ("W3DRadar::setShroudLevel: m_shroudSurfacePixelSize is not expected 0"));
-		const Color argbColor = GameMakeColor( 0, 0, 0, alpha );
 		const unsigned int pixelColor = ARGB_Color_To_WW3D_Color(m_shroudSurfaceFormat, argbColor);
 
 		for( Int y = radarMinY; y <= radarMaxY; ++y )
@@ -1515,7 +1592,7 @@ void W3DRadar::draw( Int pixelX, Int pixelY, Int width, Int height )
 	}
 
 	// draw the terrain texture
-	TheDisplay->drawImage( m_terrainImage, ul.x, ul.y, lr.x, lr.y );
+	TheDisplay->drawImage(m_mapRadarImage ? m_mapRadarImage : m_terrainImage, ul.x, ul.y, lr.x, lr.y);
 
 	// refresh the overlay texture once every so many frames
 	if( TheGameClient->getFrame() % OVERLAY_REFRESH_RATE == 0 )
@@ -1533,7 +1610,8 @@ void W3DRadar::draw( Int pixelX, Int pixelY, Int width, Int height )
 	if (true)
 #endif
 	{
-		TheDisplay->drawImage( m_shroudImage, ul.x, ul.y, lr.x, lr.y );
+		const auto mode = RetailFileLayers::enabled() ? Display::DRAW_IMAGE_MULTIPLY : Display::DRAW_IMAGE_ALPHA;
+		TheDisplay->drawImage(m_shroudImage, ul.x, ul.y, lr.x, lr.y, 0xFFFFFFFF, mode);
 	}
 
 	// draw any icons

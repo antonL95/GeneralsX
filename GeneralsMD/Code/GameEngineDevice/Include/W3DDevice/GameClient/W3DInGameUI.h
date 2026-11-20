@@ -44,6 +44,7 @@
 #include "WW3D2/line3d.h"
 
 class HAnimClass;
+class DisplayString;
 
 // W3DInGameUI ----------------------------------------------------------------
 /** Implementation for the W3D game user interface.  This singleton is
@@ -85,5 +86,6 @@ protected:
 	HAnimClass		 *m_moveHintAnim[ MAX_MOVE_HINTS ];
 	RenderObjClass *m_buildingPlacementAnchor;
 	RenderObjClass *m_buildingPlacementArrow;
+	DisplayString *m_terrainResourceLabel = nullptr;
 
 };

@@ -31,10 +31,96 @@
 
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
+#include "GameClient/Display.h"
+#include "GameClient/DisplayStringManager.h"
+#include "GameClient/Drawable.h"
+#include "GameClient/InGameUI.h"
+#include "GameClient/Mouse.h"
 #include "GameClient/RadiusDecal.h"
 #include "GameClient/Shadow.h"
+#include "GameClient/View.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/TerrainResourceBehavior.h"
+#include "GameLogic/Object.h"
+#include "GameLogic/TerrainLogic.h"
+#include "WWMath/wwmath.h"
+
+void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, const Drawable* selected,
+	DisplayString*& label)
+{
+	const Player* player = ThePlayerList->getLocalPlayer();
+	const Object* object = nullptr;
+	const ThingTemplate* type = placement;
+	Coord3D position;
+	if (placement)
+	{
+		ICoord2D cursor = TheMouse->getMouseStatus()->pos;
+		if (TheInGameUI->isPlacementAnchored())
+		{
+			ICoord2D end;
+			TheInGameUI->getPlacementPoints(&cursor, &end);
+		}
+		if (!view.screenToTerrain(&cursor, &position))
+			return;
+	}
+	else
+	{
+		object = selected ? selected->getObject() : nullptr;
+		if (!object || object->getControllingPlayer() != player || !object->isLogicallyVisible())
+			return;
+		type = object->getTemplate();
+		position = *object->getPosition();
+	}
+
+	Real radius, efficiency;
+	if (!player || !TerrainResourceBehavior::getDisplayInfo(*type, position, *player, object, radius, efficiency))
+		return;
+
+	const Color accent = efficiency >= 0.75f ? GameMakeColor(151, 230, 188, 240) :
+		GameMakeColor(255, 192, 109, 240);
+	const Color shadow = GameMakeColor(19, 29, 32, 218);
+	constexpr Int segments = 64;
+	ICoord2D previous{};
+	Bool previousValid = FALSE;
+	for (Int i = 0; i <= segments; ++i)
+	{
+		const Real angle = i * (WWMATH_TWO_PI / segments);
+		Coord3D point = {position.x + radius * WWMath::Cos(angle), position.y + radius * WWMath::Sin(angle), 0.0f};
+		point.z = TheTerrainLogic->getGroundHeight(point.x, point.y) + 1.0f;
+		ICoord2D screen;
+		const Bool valid = view.worldToScreenTriReturn(&point, &screen) != View::WTS_INVALID;
+		if (previousValid && valid)
+		{
+			TheDisplay->drawLine(previous.x, previous.y, screen.x, screen.y, 4.0f, shadow);
+			TheDisplay->drawLine(previous.x, previous.y, screen.x, screen.y, 2.0f, accent);
+		}
+		if (valid)
+			previous = screen;
+		previousValid = valid;
+	}
+
+	if (object)
+		position.z += object->getGeometryInfo().getMaxHeightAbovePosition();
+	ICoord2D center;
+	if (!view.worldToScreen(&position, &center))
+		return;
+
+	if (!label)
+		label = TheDisplayStringManager->newDisplayString();
+	label->setFont(TheFontLibrary->getFont("Arial", std::max(9u, TheDisplay->getHeight() / 60), TRUE));
+	UnicodeString text;
+	text.format(L"%.0f%%", std::max(0.0f, efficiency * 100.0f));
+	if (label->getText().compare(text) != 0)
+		label->setText(text);
+	Int width, height;
+	label->getSize(&width, &height);
+	const Int x = center.x - width / 2;
+	const Int y = object ? center.y + 8 : center.y - height - 28;
+	TheDisplay->drawFillRect(x - 6, y - 2, width + 12, height + 4, shadow);
+	label->draw(x, y, accent, shadow);
+}
 
 
 // ------------------------------------------------------------------------------------------------

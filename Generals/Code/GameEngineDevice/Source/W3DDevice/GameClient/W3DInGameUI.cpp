@@ -36,6 +36,8 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameClient/Drawable.h"
+#include "GameClient/DisplayStringManager.h"
+#include "GameClient/RadiusDecal.h"
 #include "GameClient/GadgetListBox.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/GameWindowManager.h"
@@ -287,6 +289,9 @@ W3DInGameUI::~W3DInGameUI()
 {
 	Int i;
 
+	if (m_terrainResourceLabel)
+		TheDisplayStringManager->freeDisplayString(m_terrainResourceLabel);
+
 	// remove render objects for hints
 	for( i = 0; i < MAX_MOVE_HINTS; i++ )
 	{
@@ -414,6 +419,9 @@ void W3DInGameUI::draw()
 
 			// draw placement angle selection if needed
 			drawPlaceAngle( view );
+			if (view == TheTacticalView && RetailFileLayers::enabled())
+				drawTerrainResourceIndicator(*view, m_pendingPlaceType,
+					getSelectCount() == 1 ? getFirstSelectedDrawable() : nullptr, m_terrainResourceLabel);
 
 		}
 

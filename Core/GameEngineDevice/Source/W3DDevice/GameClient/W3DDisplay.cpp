@@ -921,6 +921,11 @@ void W3DDisplay::setup2DRenderState(TextureClass *tex, DrawImageMode mode, Bool 
 				m_2DRender->Enable_Alpha(FALSE);
 				m_2DRender->Enable_Grayscale(grayscale);
 				break;
+			case DRAW_IMAGE_MULTIPLY:
+				m_2DRender->Enable_Grayscale(FALSE);
+				m_2DRender->Get_Shader()->Set_Src_Blend_Func(ShaderClass::SRCBLEND_ZERO);
+				m_2DRender->Get_Shader()->Set_Dst_Blend_Func(ShaderClass::DSTBLEND_SRC_COLOR);
+				break;
 		}
 	}
 }
@@ -3112,6 +3117,22 @@ void W3DDisplay::drawLine( Int startX, Int startY,
 	}
 }
 
+void W3DDisplay::drawTexturedLine(const Image *image, ICoord2D start, ICoord2D end, Real width)
+{
+	if (!clipLineToCircle(start.x, start.y, end.x, end.y, width))
+		return;
+	TextureClass *texture = WW3DAssetManager::Get_Instance()->Get_Texture(image->getFilename().str(), MIP_LEVELS_1);
+	if (!texture)
+		return;
+	setup2DRenderState(texture, DRAW_IMAGE_ALPHA, FALSE);
+	const Region2D &uv = *image->getUV();
+	m_2DRender->Add_Line(Vector2(start.x, start.y), Vector2(end.x, end.y),
+		width, RectClass(uv.lo.x, uv.lo.y, uv.hi.x, uv.hi.y));
+	if (!m_isBatching)
+		m_2DRender->Render();
+	texture->Release_Ref();
+}
+
 // W3DDisplay::drawLine =======================================================
 /** draw a line on the display in pixel coordinates with the specified color */
 //=============================================================================
@@ -3819,7 +3840,7 @@ void W3DDisplay::drawImageUV( const Image *image, Int startX, Int startY, Int en
 	{
 		m_2DRender->Render();
 		m_2DRender->Enable_Grayscale(false);
-		if (mode == DRAW_IMAGE_ADDITIVE || mode == DRAW_IMAGE_SOLID)
+		if (mode == DRAW_IMAGE_ADDITIVE || mode == DRAW_IMAGE_SOLID || mode == DRAW_IMAGE_MULTIPLY)
 		{
 			m_2DRender->Enable_Alpha(true);
 		}

@@ -23,6 +23,7 @@
 #include "WWMath/wwmath.h"
 
 #include <cmath>
+#include <limits>
 
 namespace
 {
@@ -35,16 +36,15 @@ struct Claim
 	std::vector<Int> rowWidths;
 };
 
-Claim makeClaim(const Object& object, Real radius, Bool priority, UnsignedInt frame,
+Claim makeClaim(const Coord3D& pos, Real radius, TerrainResourceRules::ClaimOrder order,
 	const Region3D& bounds, Real cellSize)
 {
-	const Coord3D& pos = *object.getPosition();
 	const Int cells = static_cast<Int>(WWMath::Ceil(std::clamp(radius / cellSize, 0.0f, 32767.0f)));
 	return {
 		static_cast<Int>(WWMath::Floor((pos.x - bounds.lo.x) / cellSize + 0.5f)),
 		static_cast<Int>(WWMath::Floor((pos.y - bounds.lo.y) / cellSize + 0.5f)),
 		cells,
-		{priority != FALSE, frame, static_cast<UnsignedInt>(object.getID()), object.getControllingPlayer()->getPlayerIndex()},
+		order,
 		TerrainResourceRules::rowHalfWidths(cells)
 	};
 }
@@ -110,7 +110,10 @@ UpdateSleepTime TerrainResourceBehavior::update()
 	Player* player = object->getControllingPlayer();
 	if (player && player->getPlayerTemplate() && !object->isNeutralControlled())
 	{
-		const UnsignedInt amount = calculateIncome(*player);
+		const auto claim = calculateClaim(*data, *object->getTemplate(), *object->getPosition(), *player,
+			object, m_claimFrame, static_cast<UnsignedInt>(object->getID()));
+		const UnsignedInt amount = TerrainResourceRules::income(data->m_maxIncome, claim.available,
+			claim.total, claim.upgradeScale, 1.0f, claim.playerScale);
 		if (amount)
 		{
 			player->getMoney()->deposit(amount);
@@ -128,25 +131,76 @@ UpdateSleepTime TerrainResourceBehavior::update()
 	return static_cast<UpdateSleepTime>(std::clamp<UnsignedInt>(data->m_interval, 1, UPDATE_SLEEP_FOREVER));
 }
 
-UnsignedInt TerrainResourceBehavior::calculateIncome(const Player& player) const
+Bool TerrainResourceBehavior::getDisplayInfo(const ThingTemplate& type, const Coord3D& position,
+	const Player& player, const Object* object, Real& radius, Real& efficiency)
 {
-	const auto* data = getTerrainResourceBehaviorModuleData();
-	const Object* object = getObject();
+	if (!player.getPlayerTemplate() || (object && (object->isDestroyed() || object->isEffectivelyDead())))
+		return FALSE;
+
+	const TerrainResourceBehaviorModuleData* data = nullptr;
+	UnsignedInt frame = std::numeric_limits<UnsignedInt>::max();
+	UnsignedInt id = std::numeric_limits<UnsignedInt>::max();
+	const NameKeyType moduleKey = NAMEKEY("TerrainResourceBehavior");
+	if (object)
+	{
+		for (BehaviorModule** module = object->getBehaviorModules(); module && *module; ++module)
+		{
+			if ((*module)->getModuleNameKey() != moduleKey)
+				continue;
+			const auto* resource = static_cast<const TerrainResourceBehavior*>(*module);
+			data = resource->getTerrainResourceBehaviorModuleData();
+			if (resource->m_claiming)
+			{
+				frame = resource->m_claimFrame;
+				id = static_cast<UnsignedInt>(object->getID());
+			}
+			break;
+		}
+	}
+	else
+	{
+		const ModuleInfo& modules = type.getBehaviorModuleInfo();
+		for (Int i = 0; i < modules.getCount(); ++i)
+		{
+			if (modules.getNthName(i).compareNoCase("TerrainResourceBehavior") == 0)
+			{
+				data = static_cast<const TerrainResourceBehaviorModuleData*>(modules.getNthData(i));
+				break;
+			}
+		}
+	}
+	if (!data || !data->m_visible || data->m_maxIncome <= 0 || !(data->m_radius > 0.0f))
+		return FALSE;
+
+	const auto claim = calculateClaim(*data, type, position, player, object, frame, id);
+	if (claim.total == 0)
+		return FALSE;
+	radius = data->m_radius;
+	efficiency = static_cast<Real>(claim.available) / static_cast<Real>(claim.total) *
+		claim.upgradeScale * claim.playerScale;
+	return std::isfinite(efficiency);
+}
+
+TerrainResourceBehavior::ClaimYield TerrainResourceBehavior::calculateClaim(
+	const TerrainResourceBehaviorModuleData& data, const ThingTemplate& type, const Coord3D& position,
+	const Player& player, const Object* object, UnsignedInt frame, UnsignedInt id)
+{
 	const Real cellSize = TheGlobalData->m_terrainResourceCellSize;
-	if (!(cellSize >= 0.001f && std::isfinite(cellSize)) || !std::isfinite(data->m_radius))
-		return 0;
+	if (!(cellSize >= 0.001f && std::isfinite(cellSize)) || !std::isfinite(data.m_radius))
+		return {};
 
 	Region3D bounds;
 	TheTerrainLogic->getExtent(&bounds);
-	const Claim claim = makeClaim(*object, data->m_radius, data->m_highPriority, m_claimFrame, bounds, cellSize);
+	const Claim claim = makeClaim(position, data.m_radius,
+		{data.m_highPriority != FALSE, frame, id, player.getPlayerIndex()}, bounds, cellSize);
 	const PlayerTemplate* playerTemplate = player.getPlayerTemplate();
 	const auto& modifiers = playerTemplate->getResourceModifierValues();
 	const auto& modifierFilter = playerTemplate->getResourceModifierObjectFilter();
-	const Bool useModifier = !modifiers.empty() && modifierFilter.matchesTemplate(*object->getTemplate());
-	const UpgradeTemplate* upgrade = data->m_upgrade.isEmpty() ? nullptr : TheUpgradeCenter->findUpgrade(data->m_upgrade);
+	const Bool useModifier = !modifiers.empty() && modifierFilter.matchesTemplate(type);
+	const UpgradeTemplate* upgrade = data.m_upgrade.isEmpty() ? nullptr : TheUpgradeCenter->findUpgrade(data.m_upgrade);
 	const Bool hasUpgrade = upgrade && player.hasUpgradeComplete(upgrade);
 	Bool hasUpgradeBuilding = FALSE;
-	std::size_t buildingCount = 0;
+	std::size_t buildingCount = useModifier && (!object || !isComplete(*object)) ? 1 : 0;
 	std::vector<Claim> blockers;
 	const NameKeyType moduleKey = NAMEKEY("TerrainResourceBehavior");
 	for (Object* other = TheGameLogic->getFirstObject(); other; other = other->getNextObject())
@@ -157,7 +211,7 @@ UnsignedInt TerrainResourceBehavior::calculateIncome(const Player& player) const
 		{
 			if (useModifier && modifierFilter.matchesTemplate(*other->getTemplate()))
 				++buildingCount;
-			if (hasUpgrade && data->m_upgradeFilter.matchesTemplate(*other->getTemplate()))
+			if (hasUpgrade && data.m_upgradeFilter.matchesTemplate(*other->getTemplate()))
 				hasUpgradeBuilding = TRUE;
 		}
 		if (other == object)
@@ -175,11 +229,9 @@ UnsignedInt TerrainResourceBehavior::calculateIncome(const Player& player) const
 			if (!TerrainResourceRules::blocks(claim.order, order))
 				continue;
 			const Coord3D& pos = *other->getPosition();
-			const Coord3D& origin = *object->getPosition();
-			const Real reach = std::max(0.0f, data->m_radius) + std::max(0.0f, otherData->m_radius) + 3.0f * cellSize;
-			if (std::abs(pos.x - origin.x) <= reach && std::abs(pos.y - origin.y) <= reach)
-				blockers.push_back(makeClaim(*other, otherData->m_radius, otherData->m_highPriority,
-					resource->m_claimFrame, bounds, cellSize));
+			const Real reach = std::max(0.0f, data.m_radius) + std::max(0.0f, otherData->m_radius) + 3.0f * cellSize;
+			if (std::abs(pos.x - position.x) <= reach && std::abs(pos.y - position.y) <= reach)
+				blockers.push_back(makeClaim(pos, otherData->m_radius, order, bounds, cellSize));
 		}
 	}
 
@@ -208,9 +260,8 @@ UnsignedInt TerrainResourceBehavior::calculateIncome(const Player& player) const
 				++available;
 		}
 	}
-	return TerrainResourceRules::income(data->m_maxIncome, available, total,
-		hasUpgradeBuilding ? data->m_upgradeScale : 1.0f, 1.0f,
-		useModifier ? TerrainResourceRules::incomeScale(modifiers, buildingCount) : 1.0f);
+	return {available, total, hasUpgradeBuilding ? data.m_upgradeScale : 1.0f,
+		useModifier ? TerrainResourceRules::incomeScale(modifiers, buildingCount) : 1.0f};
 }
 
 void TerrainResourceBehavior::crc(Xfer* xfer)

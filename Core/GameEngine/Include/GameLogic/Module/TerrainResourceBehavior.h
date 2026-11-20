@@ -3,6 +3,11 @@
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/UpdateModule.h"
 
+#include <cstdint>
+
+class Player;
+class ThingTemplate;
+
 class TerrainResourceBehaviorModuleData : public UpdateModuleData
 {
 public:
@@ -27,8 +32,20 @@ public:
 	TerrainResourceBehavior(Thing* thing, const ModuleData* data);
 	UpdateSleepTime update() override;
 
+	static Bool getDisplayInfo(const ThingTemplate& type, const Coord3D& position, const Player& player,
+		const Object* object, Real& radius, Real& efficiency);
+
 private:
-	UnsignedInt calculateIncome(const Player& player) const;
+	struct ClaimYield
+	{
+		std::uint64_t available = 0;
+		std::uint64_t total = 0;
+		Real upgradeScale = 1.0f;
+		Real playerScale = 1.0f;
+	};
+
+	static ClaimYield calculateClaim(const TerrainResourceBehaviorModuleData& data, const ThingTemplate& type,
+		const Coord3D& position, const Player& player, const Object* object, UnsignedInt frame, UnsignedInt id);
 
 	UnsignedInt m_claimFrame = 0;
 	Bool m_claiming = FALSE;

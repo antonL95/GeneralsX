@@ -531,6 +531,18 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 	if (text.isEmpty())
 		return;
 
+	if (!hero && text.find(L'&'))
+	{
+		UnicodeString label;
+		for (const WideChar *ch = text.str(); *ch; ++ch)
+		{
+			if (*ch == L'&' && ch[1] && ch[1] != L' ')
+				++ch;
+			label.concat(*ch);
+		}
+		text = label;
+	}
+
 	UnicodeString description = TheGameText->fetchOrSubstitute(command->getDescriptionLabel().str(), L"");
 	if (!description.isEmpty())
 	{

@@ -77,6 +77,8 @@ protected:
 
 	void drawSingleBeaconEvent( Int pixelX, Int pixelY, Int width, Int height, Int index );
 	void drawSingleGenericEvent( Int pixelX, Int pixelY, Int width, Int height, Int index );
+	Bool drawInformationAlert(Int pixelX, Int pixelY, Int width, Int height, const RadarEvent &event);
+	void loadMapRadarImage();
 
 	void initializeTextureFormats();				///< find format to use for the radar texture
 	void deleteResources();									///< delete resources used
@@ -100,6 +102,7 @@ protected:
 
 	WW3DFormat m_terrainTextureFormat;						///< format to use for terrain texture
 	Image *m_terrainImage;												///< terrain image abstraction for drawing
+	Image *m_mapRadarImage = nullptr;
 	TextureClass *m_terrainTexture;								///< terrain background texture
 
 	WW3DFormat m_overlayTextureFormat;						///< format to use for overlay texture
