@@ -85,6 +85,7 @@
 #include "GameClient/LookAtXlat.h"
 
 #include "GameNetwork/NetworkInterface.h"
+#include "Common/RetailFileLayers.h"
 
 
 
@@ -143,14 +144,12 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 
 	// to see the never-finished code to check all locomotor sets, see past revs of GUICommandTranslator.cpp -MDC
 
-	//
-	// for now, just use the basic human locomotor ... and enable the above code when Steven
-	// tells me how to get the locomotor sets based on a thing template (CBD)
-	//
-	NameKeyType key = NAMEKEY( "BasicHumanLocomotor" );
+	const LocomotorTemplate* rallyLocomotor = TheLocomotorStore->findLocomotorTemplate(
+		NAMEKEY( RetailFileLayers::enabled() ? "HumanLocomotor" : "BasicHumanLocomotor" ) );
 	LocomotorSet locomotorSet;
-	locomotorSet.addLocomotor( TheLocomotorStore->findLocomotorTemplate( key ) );
-	if( TheAI->pathfinder()->clientSafeQuickDoesPathExist( locomotorSet, obj->getPosition(), &pos ) == FALSE )
+	if( rallyLocomotor )
+		locomotorSet.addLocomotor( rallyLocomotor );
+	if( rallyLocomotor && TheAI->pathfinder()->clientSafeQuickDoesPathExist( locomotorSet, obj->getPosition(), &pos ) == FALSE )
 	{
 
 		// user feedback
