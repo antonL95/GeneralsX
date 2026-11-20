@@ -44,6 +44,7 @@
 #include "Common/FramePacer.h"
 #include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Module.h"
 #include "Common/Radar.h"
 #include "Common/RandomValue.h"
@@ -68,6 +69,7 @@
 
 #include "GameLogic/AI.h"			///< For AI debug (yes, I'm cheating for now)
 #include "GameLogic/AIPathfind.h"			///< For AI debug (yes, I'm cheating for now)
+#include "GameLogic/BfmeScriptRules.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/FPUControl.h"							///< GeneralsX @bugfix costin-alupului 20/07/2026 setFPMode() so screen->world pick math runs under the engine's expected FP mode
 #include "GameLogic/GameLogic.h"
@@ -770,6 +772,12 @@ void W3DView::updateCameraTransform()
 //-------------------------------------------------------------------------------------------------
 void W3DView::updateCameraClipPlanes(const Matrix3D &transform)
 {
+	if (RetailFileLayers::enabled() && !TheGlobalData->m_drawEntireTerrain)
+	{
+		m_3DCamera->Set_Clip_Planes(NearZ, BfmeScriptRules::retailFarClip(getClipDepthMultiplier()));
+		return;
+	}
+
 	Real farZ;
 
 	if (TheGlobalData->m_drawEntireTerrain)

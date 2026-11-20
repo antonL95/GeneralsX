@@ -22,10 +22,13 @@
 
 #include "GameClient/Snow.h"
 
+#include <vector>
+
 class DX8IndexBufferClass;
 class RenderInfoClass;
 class TextureClass;
 class AABoxClass;
+class Vector2;
 struct IDirect3DVertexBuffer8;
 
 class W3DSnowManager : public SnowManager
@@ -47,8 +50,20 @@ class W3DSnowManager : public SnowManager
 	Bool	ReAcquireResources();
 
  private:
+	struct RetailBlock
+	{
+		Vector3 origin;
+		Int firstX;
+		Int firstY;
+		Int lastX;
+		Int lastY;
+	};
+
 	void renderRetailTiles(RenderInfoClass &rinfo, const AABoxClass &bbox, Bool usePointSprites);
-	Vector3 retailParticleCenter(Int x, Int y) const;
+	void collectRetailBlocks(RenderInfoClass &rinfo, const Vector3 &origin, Int firstX, Int firstY, Int lastX, Int lastY, const Vector2 &margin);
+	void renderRetailQuads(RenderInfoClass &rinfo);
+	Vector3 retailParticleCenter(const Vector3 &origin, Int x, Int y) const;
+	std::vector<RetailBlock> m_retailBlocks;
 	Vector3 m_tileOrigin;
 	DX8IndexBufferClass	*m_indexBuffer;
 	TextureClass *m_snowTexture;

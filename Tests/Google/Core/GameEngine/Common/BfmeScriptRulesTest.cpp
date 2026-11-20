@@ -112,6 +112,16 @@ TEST(BfmeScriptRules, KeepsPositiveClipDepthMultipliers)
 	EXPECT_EQ(clipDepthMultiplier(-2.0f), 1.0f);
 }
 
+TEST(BfmeScriptRules, ScalesTheRetailFarPlaneByTheMultiplier)
+{
+	EXPECT_EQ(retailFarClip(1.0f), 1800.0f);
+	EXPECT_EQ(retailFarClip(10.0f), 18000.0f);
+	EXPECT_EQ(retailFarClip(5.0f), 9000.0f);
+	EXPECT_FLOAT_EQ(retailFarClip(0.83f), 1494.0f);
+	EXPECT_EQ(retailFarClip(0.0f), 1800.0f);
+	EXPECT_EQ(retailFarClip(-2.0f), 1800.0f);
+}
+
 TEST(BfmeScriptRules, ConvertsCaptionSecondsToMilliseconds)
 {
 	EXPECT_EQ(militaryCaptionMilliseconds(10.0f), 10000);

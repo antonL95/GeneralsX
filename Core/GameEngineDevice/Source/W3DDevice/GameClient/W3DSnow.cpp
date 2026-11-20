@@ -36,6 +36,39 @@
 #define SNOW_BUFFER_SIZE 4096	//size of vertex buffer holding particles.
 #define SNOW_BATCH_SIZE	2048	//we render at most this many particles per drawprimitive call.  This number * 6 must be less than 65536 to fit into index buffer.
 
+static constexpr Int RETAIL_CULL_BLOCK_SIZE = 128;
+
+static const Vector3 QUAD_CORNERS[4] = {
+	Vector3(-0.5f, 0.5f, 0.0f),
+	Vector3(-0.5f, -0.5f, 0.0f),
+	Vector3(0.5f, -0.5f, 0.0f),
+	Vector3(0.5f, 0.5f, 0.0f)
+};
+
+static const Vector2 QUAD_UVS[4] = {
+	Vector2(0.0f, 0.0f),
+	Vector2(0.0f, 1.0f),
+	Vector2(1.0f, 1.0f),
+	Vector2(1.0f, 0.0f)
+};
+
+static void writeSnowQuad(VertexFormatXYZNDUV2 *&verts, const Vector3 &center, Real size)
+{
+	for (Int i = 0; i < 4; i++)
+	{
+		*(Vector3 *)verts = center + QUAD_CORNERS[i] * size;
+		verts->nx = 0;
+		verts->ny = 0;
+		verts->nz = 0;
+		verts->diffuse = 0xffffffff;
+		verts->u1 = QUAD_UVS[i].X;
+		verts->v1 = QUAD_UVS[i].Y;
+		verts->u2 = 0;
+		verts->v2 = 0;
+		verts++;
+	}
+}
+
 struct POINTVERTEX
 {
     Vector3 v;	//center of particle.
@@ -299,7 +332,7 @@ void W3DSnowManager::renderSubBox(RenderInfoClass &rinfo, Int originX, Int origi
 
 				if (m_retailWeather)
 				{
-					*(Vector3 *)verts = retailParticleCenter(x, y);
+					*(Vector3 *)verts = retailParticleCenter(m_tileOrigin, x, y);
 				}
 				else
 				{
@@ -469,13 +502,15 @@ void W3DSnowManager::renderRetailTiles(RenderInfoClass &rinfo, const AABoxClass 
 
 	const Coord2D &wind = TheWeatherSetting->m_snowXYSpeed;
 	const Real margin = std::abs(m_amplitude) + m_quadSize;
-	const Real overscanX = bbox.Extent.X + margin + std::abs(wind.x * m_fullTimePeriod);
-	const Real overscanY = bbox.Extent.Y + margin + std::abs(wind.y * m_fullTimePeriod);
+	const Vector2 drift(margin + std::abs(wind.x * m_fullTimePeriod), margin + std::abs(wind.y * m_fullTimePeriod));
+	const Real overscanX = bbox.Extent.X + drift.X;
+	const Real overscanY = bbox.Extent.Y + drift.Y;
 	const auto cell = [spacing](Real offset, Int count, Int padding) {
 		const Real position = std::floor(offset / spacing) + padding;
 		return static_cast<Int>(std::clamp(position, 0.0f, static_cast<Real>(count)));
 	};
 
+	m_retailBlocks.clear();
 	for (Int ty = 0; ty < tiles; ++ty)
 	{
 		const Int originY = ty * tileHeight;
@@ -496,12 +531,38 @@ void W3DSnowManager::renderRetailTiles(RenderInfoClass &rinfo, const AABoxClass 
 			if (usePointSprites)
 				renderSubBox(rinfo, firstX, firstY, lastX, lastY);
 			else
-				renderAsQuads(rinfo, firstX, firstY, lastX, lastY);
+				collectRetailBlocks(rinfo, m_tileOrigin, firstX, firstY, lastX, lastY, drift);
+		}
+	}
+
+	if (!usePointSprites)
+		renderRetailQuads(rinfo);
+}
+
+void W3DSnowManager::collectRetailBlocks(RenderInfoClass &rinfo, const Vector3 &origin, Int firstX, Int firstY, Int lastX, Int lastY, const Vector2 &margin)
+{
+	const FrustumClass &frustum = rinfo.Camera.Get_Frustum();
+	const Int spacing = static_cast<Int>(m_emitterSpacing);
+	const Int step = (RETAIL_CULL_BLOCK_SIZE + spacing - 1) / spacing;
+	const Real bottom = m_snowCeiling - m_boxDimensions - m_quadSize;
+	const Real top = m_snowCeiling + m_quadSize;
+
+	for (Int y = firstY; y < lastY; y += step)
+	{
+		const Int endY = std::min(y + step, lastY);
+		for (Int x = firstX; x < lastX; x += step)
+		{
+			const Int endX = std::min(x + step, lastX);
+			const Vector3 low(origin.X + x * spacing - margin.X, origin.Y + y * spacing - margin.Y, bottom);
+			const Vector3 high(origin.X + (endX - 1) * spacing + margin.X, origin.Y + (endY - 1) * spacing + margin.Y, top);
+			const AABoxClass box((low + high) * 0.5f, (high - low) * 0.5f);
+			if (CollisionMath::Overlap_Test(frustum, box) != CollisionMath::OUTSIDE)
+				m_retailBlocks.push_back(RetailBlock{origin, x, y, endX, endY});
 		}
 	}
 }
 
-Vector3 W3DSnowManager::retailParticleCenter(Int x, Int y) const
+Vector3 W3DSnowManager::retailParticleCenter(const Vector3 &origin, Int x, Int y) const
 {
 	const Int worldX = x * static_cast<Int>(m_emitterSpacing);
 	const Int worldY = y * static_cast<Int>(m_emitterSpacing);
@@ -514,8 +575,8 @@ Vector3 W3DSnowManager::retailParticleCenter(Int x, Int y) const
 	const Real driftTime = m_velocity != 0.0f ? (phase - initialHeight) / m_velocity : 0.0f;
 	const Coord2D &wind = TheWeatherSetting->m_snowXYSpeed;
 	return Vector3(
-		m_tileOrigin.X + worldX + wind.x * driftTime + m_amplitude * WWMath::Fast_Sin(z * m_frequencyScaleX + worldX),
-		m_tileOrigin.Y + worldY + wind.y * driftTime + m_amplitude * WWMath::Fast_Sin(z * m_frequencyScaleY + worldY),
+		origin.X + worldX + wind.x * driftTime + m_amplitude * WWMath::Fast_Sin(z * m_frequencyScaleX + worldX),
+		origin.Y + worldY + wind.y * driftTime + m_amplitude * WWMath::Fast_Sin(z * m_frequencyScaleY + worldY),
 		z);
 }
 
@@ -590,22 +651,14 @@ void W3DSnowManager::renderAsQuads(RenderInfoClass &rinfo, Int cubeOriginX, Int 
 						goto flush_particles;
 					}
 
-					if (m_retailWeather)
-					{
-						snowCenter = retailParticleCenter(x, y);
-						Matrix3D::Transform_Vector(view, snowCenter, &snowCenterVS);
-					}
-					else
-					{
-						Int noiseOffset = MODPOW2(x + MAXIMUM_CAMERA_DISTANCE, SNOW_NOISE_X) + MODPOW2(y + MAXIMUM_CAMERA_DISTANCE, SNOW_NOISE_Y) * SNOW_NOISE_X;
-						if (noiseOffset > SNOW_NOISE_X * SNOW_NOISE_Y)
-							noiseOffset = 0;
-						const Real h0 = m_snowCeiling - fmod(m_heightTraveled + m_startingHeights[noiseOffset], m_boxDimensions);
-						snowCenter.Set(x * m_emitterSpacing, y * m_emitterSpacing, h0);
-						Matrix3D::Transform_Vector(view, snowCenter, &snowCenterVS);
-						snowCenterVS.X += m_amplitude * WWMath::Fast_Sin(h0 * m_frequencyScaleX + (Real)x);
-						snowCenterVS.Y += m_amplitude * WWMath::Fast_Sin(h0 * m_frequencyScaleY + (Real)y);
-					}
+					Int noiseOffset = MODPOW2(x + MAXIMUM_CAMERA_DISTANCE, SNOW_NOISE_X) + MODPOW2(y + MAXIMUM_CAMERA_DISTANCE, SNOW_NOISE_Y) * SNOW_NOISE_X;
+					if (noiseOffset > SNOW_NOISE_X * SNOW_NOISE_Y)
+						noiseOffset = 0;
+					const Real h0 = m_snowCeiling - fmod(m_heightTraveled + m_startingHeights[noiseOffset], m_boxDimensions);
+					snowCenter.Set(x * m_emitterSpacing, y * m_emitterSpacing, h0);
+					Matrix3D::Transform_Vector(view, snowCenter, &snowCenterVS);
+					snowCenterVS.X += m_amplitude * WWMath::Fast_Sin(h0 * m_frequencyScaleX + (Real)x);
+					snowCenterVS.Y += m_amplitude * WWMath::Fast_Sin(h0 * m_frequencyScaleY + (Real)y);
 
 					for (Int i=0; i<4; i++)
 					{
@@ -637,5 +690,60 @@ flush_particles:
 			DX8Wrapper::Draw_Triangles(	0,numberInBatch*2, 0, numberInBatch*4);
 			totalPart -= numberInBatch;
 		}
+	}
+}
+
+void W3DSnowManager::renderRetailQuads(RenderInfoClass &rinfo)
+{
+	Int remaining = 0;
+	for (const RetailBlock &block : m_retailBlocks)
+		remaining += (block.lastX - block.firstX) * (block.lastY - block.firstY);
+
+	m_totalRendered += remaining;
+	if (remaining == 0)
+		return;
+
+	Matrix3D view;
+	rinfo.Camera.Get_View_Matrix(&view);
+
+	Matrix4x4 identity(true);
+	DX8Wrapper::Set_Transform(D3DTS_VIEW, identity);
+	DX8Wrapper::Set_Index_Buffer(m_indexBuffer, 0);
+
+	size_t blockIndex = 0;
+	Int x = m_retailBlocks[0].firstX;
+	Int y = m_retailBlocks[0].firstY;
+
+	while (remaining > 0)
+	{
+		const Int batchSize = std::min(remaining, SNOW_BATCH_SIZE);
+		DynamicVBAccessClass vb_access(BUFFER_TYPE_DYNAMIC_DX8, dynamic_fvf_type, batchSize * 4);
+		{
+			DynamicVBAccessClass::WriteLockClass lock(&vb_access);
+			VertexFormatXYZNDUV2 *verts = lock.Get_Formatted_Vertex_Array();
+
+			for (Int written = 0; written < batchSize; ++written)
+			{
+				const RetailBlock &block = m_retailBlocks[blockIndex];
+				Vector3 centerVS;
+				Matrix3D::Transform_Vector(view, retailParticleCenter(block.origin, x, y), &centerVS);
+				writeSnowQuad(verts, centerVS, m_quadSize);
+
+				if (++x < block.lastX)
+					continue;
+				x = block.firstX;
+				if (++y < block.lastY)
+					continue;
+				if (++blockIndex < m_retailBlocks.size())
+				{
+					x = m_retailBlocks[blockIndex].firstX;
+					y = m_retailBlocks[blockIndex].firstY;
+				}
+			}
+		}
+
+		DX8Wrapper::Set_Vertex_Buffer(vb_access);
+		DX8Wrapper::Draw_Triangles(0, batchSize * 2, 0, batchSize * 4);
+		remaining -= batchSize;
 	}
 }

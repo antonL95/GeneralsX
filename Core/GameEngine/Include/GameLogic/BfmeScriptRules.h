@@ -94,6 +94,13 @@ constexpr float clipDepthMultiplier(float requested)
 	return requested > 0.0f ? requested : 1.0f;
 }
 
+constexpr float RETAIL_FAR_CLIP_DISTANCE = 1800.0f;
+
+constexpr float retailFarClip(float multiplier)
+{
+	return RETAIL_FAR_CLIP_DISTANCE * clipDepthMultiplier(multiplier);
+}
+
 constexpr int militaryCaptionMilliseconds(float seconds)
 {
 	return seconds > 0.0f ? static_cast<int>(seconds * 1000.0f + 0.5f) : 0;
