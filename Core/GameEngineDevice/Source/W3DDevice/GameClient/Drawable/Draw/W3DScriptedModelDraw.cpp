@@ -406,7 +406,8 @@ const ModelConditionInfo* W3DScriptedModelDrawModuleData::findBestInfo(const Mod
 	const AnimationState* best = nullptr;
 	if (RetailFileLayers::enabled())
 	{
-		best = findRetailConditionMatch(m_animationStates, conditions, RetailEmptyState::First, &AnimationState::draw);
+		best = findRetailConditionMatchIf(m_animationStates, conditions,
+			[](const AnimationState& state) { return state.idle; }, &AnimationState::draw);
 	}
 	else
 	{

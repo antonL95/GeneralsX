@@ -49,7 +49,7 @@ TEST(RetailConditionMatch, ModelPrefersExplicitDefaultThenLastEmptyState)
 	EXPECT_EQ(&states[2], findRetailConditionMatch(states, Flags(3), RetailEmptyState::Last, std::identity{}, &states[0]));
 }
 
-TEST(RetailConditionMatch, AnimationUsesFirstEmptyStateIncludingOrdinaryAnimations)
+TEST(RetailConditionMatch, AnimationFallsBackToAnIdleEmptyStateOnly)
 {
 	struct AnimationState
 	{
@@ -57,8 +57,9 @@ TEST(RetailConditionMatch, AnimationUsesFirstEmptyStateIncludingOrdinaryAnimatio
 		bool idle;
 	};
 	const std::array<AnimationState, 3> states{{{{{0}}, false}, {{{0}}, true}, {{{3}}, false}}};
-	EXPECT_EQ(&states[0], findRetailConditionMatch(states, Flags(1), RetailEmptyState::First, &AnimationState::draw));
-	EXPECT_EQ(&states[2], findRetailConditionMatch(states, Flags(3), RetailEmptyState::First, &AnimationState::draw));
+	const auto idle = [](const AnimationState& state) { return state.idle; };
+	EXPECT_EQ(&states[1], findRetailConditionMatchIf(states, Flags(1), idle, &AnimationState::draw));
+	EXPECT_EQ(&states[2], findRetailConditionMatchIf(states, Flags(3), idle, &AnimationState::draw));
 
 	const std::array<State, 1> conditionalOnly{{{{3}}}};
 	EXPECT_EQ(nullptr, findRetailConditionMatch(conditionalOnly, Flags(0), RetailEmptyState::First));
