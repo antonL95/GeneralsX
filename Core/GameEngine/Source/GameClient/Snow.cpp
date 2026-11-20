@@ -30,12 +30,17 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the Game
 #include "GameClient/Snow.h"
 #include "GameClient/View.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
+#include <cmath>
+#include <limits>
 
 
 SnowManager *TheSnowManager=nullptr;
 
 SnowManager::SnowManager()
 {
+	m_retailWeather = FALSE;
 	m_time = 0;
 	m_velocity = 1;
 	m_isVisible = TRUE;	//default to showing if it's enabled via INI.
@@ -53,31 +58,55 @@ void SnowManager::init()
 
 void SnowManager::updateIniSettings()
 {
+	m_retailWeather = RetailFileLayers::enabled();
+	m_boxDimensions = m_retailWeather ? TheWeatherSetting->m_snowBoxHeight : TheWeatherSetting->m_snowBoxDimensions;
+	m_velocity = m_retailWeather ? TheWeatherSetting->m_snowSpeed : TheWeatherSetting->m_snowVelocity;
+	m_emitterSpacing = m_retailWeather ? TheWeatherSetting->m_snowSpacing : 1.0f / TheWeatherSetting->m_snowBoxDensity;
+
 	Real *dst=m_startingHeights;
 	//initialize a table of random starting positions for each particle.
-	Int boxDimensions = (Int)TheWeatherSetting->m_snowBoxDimensions;
+	Int boxDimensions = (Int)m_boxDimensions;
+	UnsignedInt noise = 1;
 	for (Int y=0; y<SNOW_NOISE_Y; y++)
 	{
 		for (Int x=0; x<SNOW_NOISE_X; x++)
 		{
-			*dst=(Real)(rand()%(boxDimensions));
+			if (m_retailWeather)
+			{
+				noise = noise * 1664525u + 1013904223u;
+				*dst = (Real)((noise >> 8) % boxDimensions);
+			}
+			else
+			{
+				*dst = (Real)(rand() % boxDimensions);
+			}
 			dst++;
 		}
 	}
 
-	m_velocity = TheWeatherSetting->m_snowVelocity;
 	m_frequencyScaleX = TheWeatherSetting->m_snowFrequencyScaleX;
 	m_frequencyScaleY = TheWeatherSetting->m_snowFrequencyScaleY;
 	m_amplitude	= TheWeatherSetting->m_snowAmplitude;
 	m_pointSize = TheWeatherSetting->m_snowPointSize;
 	m_quadSize	= TheWeatherSetting->m_snowQuadSize;
-	m_boxDimensions	= TheWeatherSetting->m_snowBoxDimensions;
-	m_emitterSpacing = 1.0f/TheWeatherSetting->m_snowBoxDensity;
 	m_maxPointSize = TheWeatherSetting->m_snowMaxPointSize;
 	m_minPointSize = TheWeatherSetting->m_snowMinPointSize;
 
 	//Time for snow flake to make it from top to bottom of rendered cube around camera.
-	m_fullTimePeriod = m_boxDimensions/m_velocity;
+	if (m_retailWeather)
+	{
+		m_time = 0.0f;
+		m_fullTimePeriod = m_velocity != 0.0f ? m_boxDimensions / std::abs(m_velocity) : 0.0f;
+	}
+	else
+	{
+		m_fullTimePeriod = m_boxDimensions / m_velocity;
+	}
+}
+
+Bool SnowManager::isPrecipitationEnabled() const
+{
+	return TheWeatherSetting->m_snowEnabled && (!m_retailWeather || TheWeatherSetting->m_isSnowing);
 }
 
 void SnowManager::setVisible(Bool showWeather)
@@ -121,15 +150,68 @@ const FieldParse WeatherSetting::m_weatherSettingFieldParseTable[] =
 	{ nullptr, nullptr, nullptr, 0 },
 };
 
+static void parseWeatherLength(INI *ini, void *, void *store, const void *)
+{
+	const Real value = INI::scanReal(ini->getNextToken());
+	if (!(value >= 1.0f && value < static_cast<Real>(std::numeric_limits<Int>::max())))
+		throw INI_INVALID_DATA;
+	*static_cast<Real *>(store) = value;
+}
+
+static void parseWeatherSpeed(INI *ini, void *, void *store, const void *)
+{
+	const Real value = INI::scanReal(ini->getNextToken());
+	if (!std::isfinite(value))
+		throw INI_INVALID_DATA;
+	*static_cast<Real *>(store) = value;
+}
+
+static void parseLightningFactor(INI *ini, void *, void *store, const void *)
+{
+	const Real minimum = INI::scanReal(ini->getNextToken());
+	const Real maximum = INI::scanReal(ini->getNextToken());
+	Real *range = static_cast<Real *>(store);
+	range[0] = minimum;
+	range[1] = maximum;
+}
+
+static const FieldParse retailWeatherFields[] =
+{
+	{ "IsSnowing", INI::parseBool, nullptr, offsetof(WeatherSetting, m_isSnowing) },
+	{ "SnowBoxHeight", parseWeatherLength, nullptr, offsetof(WeatherSetting, m_snowBoxHeight) },
+	{ "SnowSpacing", parseWeatherLength, nullptr, offsetof(WeatherSetting, m_snowSpacing) },
+	{ "NumberTiles", INI::parseInt, nullptr, offsetof(WeatherSetting, m_numberTiles) },
+	{ "SnowSpeed", parseWeatherSpeed, nullptr, offsetof(WeatherSetting, m_snowSpeed) },
+	{ "SnowXYSpeed", INI::parseCoord2D, nullptr, offsetof(WeatherSetting, m_snowXYSpeed) },
+	{ "LightningEnabled", INI::parseBool, nullptr, offsetof(WeatherSetting, m_lightningEnabled) },
+	{ "LightningFactor", parseLightningFactor, nullptr, offsetof(WeatherSetting, m_lightningFactor) },
+	{ "LightningDuration", INI::parseInt, nullptr, offsetof(WeatherSetting, m_lightningDuration) },
+	{ "LightningChance", INI::parseReal, nullptr, offsetof(WeatherSetting, m_lightningChance) },
+	{ "SpellEnabled", INI::parseBool, nullptr, offsetof(WeatherSetting, m_spellEnabled) },
+	{ "SpellDuration", INI::parseInt, nullptr, offsetof(WeatherSetting, m_spellDuration) },
+	{ "RampControl", INI::parseCoord2D, nullptr, offsetof(WeatherSetting, m_rampControl) },
+	{ "RampSpeed", INI::parseCoord2D, nullptr, offsetof(WeatherSetting, m_rampSpeed) },
+	{ "RampSpacing", INI::parseCoord2D, nullptr, offsetof(WeatherSetting, m_rampSpacing) },
+	{ "HardwareFogEnable", INI::parseBool, nullptr, offsetof(WeatherSetting, m_hardwareFogEnable) },
+	{ "HardwareFogColor", INI::parseRGBColor, nullptr, offsetof(WeatherSetting, m_hardwareFogColor) },
+	{ "HardwareFogStart", INI::parseReal, nullptr, offsetof(WeatherSetting, m_hardwareFogStart) },
+	{ "HardwareFogEnd", INI::parseReal, nullptr, offsetof(WeatherSetting, m_hardwareFogEnd) },
+	{ "CloudTextureSize", INI::parseCoord2D, nullptr, offsetof(WeatherSetting, m_cloudTextureSize) },
+	{ "CloudOffsetPerSecond", INI::parseCoord2D, nullptr, offsetof(WeatherSetting, m_cloudOffsetPerSecond) },
+	{ nullptr, nullptr, nullptr, 0 },
+};
+
 //-------------------------------------------------------------------------------------------------
 void INI::parseWeatherDefinition( INI *ini )
 {
+	const Bool retail = RetailFileLayers::enabled() || INIAudit::isEnabled();
 	if (TheWeatherSetting == nullptr) {
 		TheWeatherSetting = newInstance(WeatherSetting);
 	} else if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES) {
 		WeatherSetting* ws = (WeatherSetting*) (TheWeatherSetting.getNonOverloadedPointer());
 		WeatherSetting* wsOverride = newInstance(WeatherSetting);
-		*wsOverride = *ws;
+		*wsOverride = retail ? *static_cast<WeatherSetting *>(ws->friend_getFinalOverride()) : *ws;
+		wsOverride->setNextOverride(nullptr);
 
 		// Mark that it is an override.
 		wsOverride->markAsOverride();
@@ -141,14 +223,12 @@ void INI::parseWeatherDefinition( INI *ini )
 
 	WeatherSetting* weatherSet = (WeatherSetting*) (TheWeatherSetting.getNonOverloadedPointer());
 	weatherSet = (WeatherSetting*) (weatherSet->friend_getFinalOverride());
-	// parse the data
-	ini->initFromINI( weatherSet, TheWeatherSetting->getFieldParse() );
+	MultiIniFieldParse fields;
+	fields.add(weatherSet->getFieldParse());
+	if (retail)
+		fields.add(retailWeatherFields);
+	ini->initFromINIMulti(weatherSet, fields);
 
 	if (TheSnowManager)
 		TheSnowManager->updateIniSettings();
-
-	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES) {
-		// Check to see if we overrode any textures.
-		// If we did, then we need to replace them in the model.
-	}
 }

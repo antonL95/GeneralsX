@@ -25,6 +25,7 @@
 class DX8IndexBufferClass;
 class RenderInfoClass;
 class TextureClass;
+class AABoxClass;
 struct IDirect3DVertexBuffer8;
 
 class W3DSnowManager : public SnowManager
@@ -46,6 +47,9 @@ class W3DSnowManager : public SnowManager
 	Bool	ReAcquireResources();
 
  private:
+	void renderRetailTiles(RenderInfoClass &rinfo, const AABoxClass &bbox, Bool usePointSprites);
+	Vector3 retailParticleCenter(Int x, Int y) const;
+	Vector3 m_tileOrigin;
 	DX8IndexBufferClass	*m_indexBuffer;
 	TextureClass *m_snowTexture;
 	IDirect3DVertexBuffer8*  m_VertexBufferD3D;

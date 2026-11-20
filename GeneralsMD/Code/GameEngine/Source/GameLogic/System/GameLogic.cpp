@@ -75,6 +75,7 @@
 #include "Common/ThingTemplate.h"
 #include "GameClient/Water.h"
 #include "GameClient/Snow.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
 #include "Common/XferCRC.h"
@@ -534,7 +535,10 @@ void GameLogic::reset()
 
 	// Clean up any weather overrides that were generated for this map.
 	WeatherSetting *ws = (WeatherSetting*) TheWeatherSetting.getNonOverloadedPointer();
+	const Bool refreshWeather = RetailFileLayers::enabled() && ws && ws->getNextOverride();
 	TheWeatherSetting = (WeatherSetting*) ws->deleteOverrides();
+	if (refreshWeather && TheSnowManager)
+		TheSnowManager->updateIniSettings();
 
 	m_rankPointsToAddAtGameStart = 0;
 }

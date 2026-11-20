@@ -20,11 +20,15 @@
 
 #include "W3DDevice/GameClient/W3DSnow.h"
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "GameClient/View.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/rinfo.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/assetmgr.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 
 
@@ -73,8 +77,8 @@ Bool W3DSnowManager::ReAcquireResources()
 {
 	ReleaseResources();
 
-	if (!TheWeatherSetting->m_snowEnabled)
-		return TRUE;	//no need for resources if snow is disabled.
+	if (!isPrecipitationEnabled())
+		return TRUE;
 
 	if (TheWeatherSetting->m_usePointSprites && DX8Wrapper::Get_Current_Caps()->Support_PointSprites())
 	{
@@ -143,6 +147,12 @@ void W3DSnowManager::updateIniSettings()
 	//Call base class
 	SnowManager::updateIniSettings();
 
+	if (m_retailWeather)
+	{
+		ReleaseResources();
+		return;
+	}
+
 	if (m_snowTexture && stricmp(m_snowTexture->Get_Texture_Name(),TheWeatherSetting->m_snowTexture.str()) != 0)
 	{
 		REF_PTR_RELEASE(m_snowTexture);
@@ -157,6 +167,9 @@ void W3DSnowManager::reset()
 
 void W3DSnowManager::update()
 {
+	if (m_retailWeather && (!isPrecipitationEnabled() || m_fullTimePeriod <= 0.0f))
+		return;
+
 	// TheSuperHackers @tweak The snow render update is now decoupled from the logic step.
 	m_time += WW3D::Get_Logic_Frame_Time_Seconds();
 
@@ -284,23 +297,21 @@ void W3DSnowManager::renderSubBox(RenderInfoClass &rinfo, Int originX, Int origi
 					goto flush_particles;
 				}
 
-				//Get initial height from noise table.  We add a large value to make sure it's positive.  Then
-				//modulate by table dimensions to find a value.
-				Int noiseOffset=MODPOW2(x+MAXIMUM_CAMERA_DISTANCE,SNOW_NOISE_X)+MODPOW2(y+MAXIMUM_CAMERA_DISTANCE,SNOW_NOISE_Y)*SNOW_NOISE_X;
-				if (noiseOffset > (SNOW_NOISE_X * SNOW_NOISE_Y))
-					noiseOffset = 0;	//this should never happen but check to prevent buffer over/under flow.
-
-				//find current height
-				Real h0=m_snowCeiling-fmod(m_heightTraveled+m_startingHeights[noiseOffset],m_boxDimensions);
-
-				//find world-space position of snow flake
-				snowCenter.Set(x*m_emitterSpacing,y*m_emitterSpacing,h0);
-
-				//Adjust position so snow flakes don't fall straight down.
-				snowCenter.X += m_amplitude * WWMath::Fast_Sin( h0 * m_frequencyScaleX + (Real)x);
-				snowCenter.Y += m_amplitude * WWMath::Fast_Sin( h0 * m_frequencyScaleY + (Real)y);
-
-				*(Vector3 *)verts=snowCenter;
+				if (m_retailWeather)
+				{
+					*(Vector3 *)verts = retailParticleCenter(x, y);
+				}
+				else
+				{
+					Int noiseOffset = MODPOW2(x + MAXIMUM_CAMERA_DISTANCE, SNOW_NOISE_X) + MODPOW2(y + MAXIMUM_CAMERA_DISTANCE, SNOW_NOISE_Y) * SNOW_NOISE_X;
+					if (noiseOffset > SNOW_NOISE_X * SNOW_NOISE_Y)
+						noiseOffset = 0;
+					const Real h0 = m_snowCeiling - fmod(m_heightTraveled + m_startingHeights[noiseOffset], m_boxDimensions);
+					snowCenter.Set(x * m_emitterSpacing, y * m_emitterSpacing, h0);
+					snowCenter.X += m_amplitude * WWMath::Fast_Sin(h0 * m_frequencyScaleX + (Real)x);
+					snowCenter.Y += m_amplitude * WWMath::Fast_Sin(h0 * m_frequencyScaleY + (Real)y);
+					*(Vector3 *)verts = snowCenter;
+				}
 				verts++;
 
 				numberInBatch++;
@@ -324,7 +335,8 @@ flush_particles:
 
 void W3DSnowManager::render(RenderInfoClass &rinfo)
 {
-	if (!TheWeatherSetting->m_snowEnabled || !m_isVisible)
+	m_totalRendered = 0;
+	if (!isPrecipitationEnabled() || !m_isVisible)
 		return;
 
 	Int usePointSprites = DX8Wrapper::Get_Current_Caps()->Support_PointSprites() && TheWeatherSetting->m_usePointSprites;
@@ -332,25 +344,7 @@ void W3DSnowManager::render(RenderInfoClass &rinfo)
 	//make sure the noise table is powers of 2 in dimensions.
 	WWASSERT(ISPOW2(SNOW_NOISE_X) && ISPOW2(SNOW_NOISE_Y));
 
-	//CameraClass &camera=rinfo.Camera;
-
-	const Coord3D &cPos=TheTacticalView->get3DCameraPosition();
-	Vector3 camPos(cPos.x,cPos.y,cPos.z);
-
-	//Number of emitters from cube center to edge of visible extent.
-	Int mumEmittersInHalf=(Int)floor(m_boxDimensions / m_emitterSpacing * 0.5f);
-
-	//Find origin of visible cube surrounding camera.
-	Int cubeCenterX=(Int)floor(camPos.X/m_emitterSpacing);
-	Int cubeCenterY=(Int)floor(camPos.Y/m_emitterSpacing);
-
-	//Find extents of visible cube surrounding camera.
-	Int cubeOriginX=cubeCenterX - mumEmittersInHalf;	//top/left extents.
-	Int cubeOriginY=cubeCenterY - mumEmittersInHalf;
-	Int cubeDimX=cubeCenterX + mumEmittersInHalf;		//bottom/right extents.
-	Int cubeDimY=cubeCenterY + mumEmittersInHalf;
-
- 	const FrustumClass & frustum = rinfo.Camera.Get_Frustum();
+	const FrustumClass &frustum = rinfo.Camera.Get_Frustum();
 	AABoxClass bbox;
 
 	//Get a bounding box around our visible universe.  Bounded by terrain and the sky
@@ -359,39 +353,43 @@ void W3DSnowManager::render(RenderInfoClass &rinfo)
 
  	TheTerrainRenderObject->getMaximumVisibleBox(frustum, &bbox, TRUE);
 
-	//Particles move outside the visible box as a result of local sine movement
-	//so adjust bounding box to include them.
-	bbox.Extent.X += m_amplitude+m_quadSize;
-	bbox.Extent.Y += m_amplitude+m_quadSize;
+	Int cubeOriginX = 0;
+	Int cubeOriginY = 0;
+	Int cubeDimX = 0;
+	Int cubeDimY = 0;
+	if (!m_retailWeather)
+	{
+		const Coord3D &cPos = TheTacticalView->get3DCameraPosition();
+		const Int halfEmitters = (Int)floor(m_boxDimensions / m_emitterSpacing * 0.5f);
+		const Int cubeCenterX = (Int)floor(cPos.x / m_emitterSpacing);
+		const Int cubeCenterY = (Int)floor(cPos.y / m_emitterSpacing);
+		cubeOriginX = cubeCenterX - halfEmitters;
+		cubeOriginY = cubeCenterY - halfEmitters;
+		cubeDimX = cubeCenterX + halfEmitters;
+		cubeDimY = cubeCenterY + halfEmitters;
 
-	//Clip our visible snow rendering box
-	if ((cubeOriginX * m_emitterSpacing ) < (bbox.Center.X - bbox.Extent.X))
-		cubeOriginX = (Int)floor ((bbox.Center.X - bbox.Extent.X)/m_emitterSpacing);
+		bbox.Extent.X += m_amplitude + m_quadSize;
+		bbox.Extent.Y += m_amplitude + m_quadSize;
+		if (cubeOriginX * m_emitterSpacing < bbox.Center.X - bbox.Extent.X)
+			cubeOriginX = (Int)floor((bbox.Center.X - bbox.Extent.X) / m_emitterSpacing);
+		if (cubeOriginY * m_emitterSpacing < bbox.Center.Y - bbox.Extent.Y)
+			cubeOriginY = (Int)floor((bbox.Center.Y - bbox.Extent.Y) / m_emitterSpacing);
+		if (cubeDimX * m_emitterSpacing > bbox.Center.X + bbox.Extent.X)
+			cubeDimX = (Int)floor((bbox.Center.X + bbox.Extent.X) / m_emitterSpacing);
+		if (cubeDimY * m_emitterSpacing > bbox.Center.Y + bbox.Extent.Y)
+			cubeDimY = (Int)floor((bbox.Center.Y + bbox.Extent.Y) / m_emitterSpacing);
 
-	if ((cubeOriginY * m_emitterSpacing ) < (bbox.Center.Y - bbox.Extent.Y))
-		cubeOriginY = (Int)floor ((bbox.Center.Y - bbox.Extent.Y)/m_emitterSpacing);
+		if (cubeDimX <= cubeOriginX || cubeDimY <= cubeOriginY)
+			return;
 
-	if ((cubeDimX * m_emitterSpacing ) > (bbox.Center.X + bbox.Extent.X))
-		cubeDimX = (Int)floor ((bbox.Center.X + bbox.Extent.X)/m_emitterSpacing);
-
-	if ((cubeDimY * m_emitterSpacing ) > (bbox.Center.Y + bbox.Extent.Y))
-		cubeDimY = (Int)floor ((bbox.Center.Y + bbox.Extent.Y)/m_emitterSpacing);
-
-	if ((cubeDimY - cubeOriginY) < 0 || (cubeDimX-cubeOriginX) < 0)
-		return;	//entire snow box is culled by either x or y screen boundary.
-
-	//Find total number of particles that need rendering.
-	Int totalPart=(cubeDimY-cubeOriginY)*(cubeDimX-cubeOriginX);
-
-	if (totalPart <= 0)
-		return;	//nothing to render.
-
-	//Height at the top of the cube with camera at center.
-	m_snowCeiling = camPos.Z + m_boxDimensions/2.0f;
-
-	//Offset to allow cube extents to move with camera.
-	Real cameraOffset = fmod (camPos.Z,m_boxDimensions);
-	m_heightTraveled=m_time*m_velocity+cameraOffset;	//height that snow flake traveled this frame.
+		m_snowCeiling = cPos.z + m_boxDimensions / 2.0f;
+		m_heightTraveled = m_time * m_velocity + fmod(cPos.z, m_boxDimensions);
+	}
+	else
+	{
+		m_snowCeiling = m_boxDimensions;
+		m_heightTraveled = m_time * m_velocity;
+	}
 
 	Matrix4x4 identity(true);
 	DX8Wrapper::Set_Transform(D3DTS_WORLD,identity);
@@ -403,17 +401,17 @@ void W3DSnowManager::render(RenderInfoClass &rinfo)
 	REF_PTR_RELEASE(vmat);
 
 	//make sure we have all the resources we need
-	if (usePointSprites && !m_VertexBufferD3D)
-		ReAcquireResources();
-
-	if (!usePointSprites && !m_indexBuffer)
-		ReAcquireResources();
+	if ((usePointSprites ? !m_VertexBufferD3D : !m_indexBuffer) && !ReAcquireResources())
+		return;
 
 	DX8Wrapper::Set_Texture(0,m_snowTexture);
 
 	if (!usePointSprites)
 	{
-		renderAsQuads(rinfo,cubeOriginX,cubeOriginY,cubeDimX,cubeDimY);
+		if (m_retailWeather)
+			renderRetailTiles(rinfo, bbox, FALSE);
+		else
+			renderAsQuads(rinfo, cubeOriginX, cubeOriginY, cubeDimX, cubeDimY);
 		return;
 	}
 
@@ -435,18 +433,90 @@ void W3DSnowManager::render(RenderInfoClass &rinfo)
     DX8Wrapper::_Get_D3D_Device8()->SetVertexShader( D3DFVF_POINTVERTEX );
 	m_dwBase = SNOW_BUFFER_SIZE;	//start with a new vertex buffer each frame.
 
-	m_leafDim = 45;	//cull boxes that are 20x20 emitters in size. Making them much smaller will result in too many draw calls.
-	m_totalRendered = 0;	//keep track of how many particles were rendered.
+	m_leafDim = m_retailWeather ? std::numeric_limits<Int>::max() : 45;
 
 	//Particle centers can deviate from center by by amplitude of sine offset.  They also have radius m_quadSize.
 	//Enlarge culling bounds to compensate.
 	m_cullOverscan = m_amplitude+m_quadSize;
-	renderSubBox(rinfo,cubeOriginX,cubeOriginY,cubeDimX,cubeDimY);
+	if (m_retailWeather)
+		renderRetailTiles(rinfo, bbox, TRUE);
+	else
+		renderSubBox(rinfo, cubeOriginX, cubeOriginY, cubeDimX, cubeDimY);
 
 	// Reset render states
     DX8Wrapper::Set_DX8_Render_State( D3DRS_POINTSPRITEENABLE, FALSE );
     DX8Wrapper::Set_DX8_Render_State( D3DRS_POINTSCALEENABLE,  FALSE );
 
+}
+
+void W3DSnowManager::renderRetailTiles(RenderInfoClass &rinfo, const AABoxClass &bbox, Bool usePointSprites)
+{
+	WorldHeightMap *map = TheTerrainRenderObject->getMap();
+	if (!map)
+		return;
+
+	const Int border = map->getBorderSize();
+	const Int width = (map->getXExtent() - 2 * border) * MAP_XY_FACTOR;
+	const Int height = (map->getYExtent() - 2 * border) * MAP_XY_FACTOR;
+	const Int tiles = usePointSprites ? 1 : std::max(1, TheWeatherSetting->m_numberTiles);
+	const Int tileWidth = width / tiles;
+	const Int tileHeight = height / tiles;
+	const Int spacing = static_cast<Int>(m_emitterSpacing);
+	const Int columns = tileWidth / spacing;
+	const Int rows = tileHeight / spacing;
+	if (columns <= 0 || rows <= 0)
+		return;
+
+	const Coord2D &wind = TheWeatherSetting->m_snowXYSpeed;
+	const Real margin = std::abs(m_amplitude) + m_quadSize;
+	const Real overscanX = bbox.Extent.X + margin + std::abs(wind.x * m_fullTimePeriod);
+	const Real overscanY = bbox.Extent.Y + margin + std::abs(wind.y * m_fullTimePeriod);
+	const auto cell = [spacing](Real offset, Int count, Int padding) {
+		const Real position = std::floor(offset / spacing) + padding;
+		return static_cast<Int>(std::clamp(position, 0.0f, static_cast<Real>(count)));
+	};
+
+	for (Int ty = 0; ty < tiles; ++ty)
+	{
+		const Int originY = ty * tileHeight;
+		const Int firstY = cell(bbox.Center.Y - overscanY - originY, rows, 0);
+		const Int lastY = cell(bbox.Center.Y + overscanY - originY, rows, 1);
+		if (lastY <= firstY)
+			continue;
+
+		for (Int tx = 0; tx < tiles; ++tx)
+		{
+			const Int originX = tx * tileWidth;
+			const Int firstX = cell(bbox.Center.X - overscanX - originX, columns, 0);
+			const Int lastX = cell(bbox.Center.X + overscanX - originX, columns, 1);
+			if (lastX <= firstX)
+				continue;
+
+			m_tileOrigin.Set(static_cast<Real>(originX), static_cast<Real>(originY), 0.0f);
+			if (usePointSprites)
+				renderSubBox(rinfo, firstX, firstY, lastX, lastY);
+			else
+				renderAsQuads(rinfo, firstX, firstY, lastX, lastY);
+		}
+	}
+}
+
+Vector3 W3DSnowManager::retailParticleCenter(Int x, Int y) const
+{
+	const Int worldX = x * static_cast<Int>(m_emitterSpacing);
+	const Int worldY = y * static_cast<Int>(m_emitterSpacing);
+	const Int noiseOffset = MODPOW2(worldX + SNOW_NOISE_X / 2, SNOW_NOISE_X)
+		+ MODPOW2(worldY + SNOW_NOISE_Y / 2, SNOW_NOISE_Y) * SNOW_NOISE_X;
+	const Real initialHeight = m_startingHeights[noiseOffset];
+	const Real fall = initialHeight + m_heightTraveled;
+	const Real phase = fall - static_cast<Real>(floor(fall / m_boxDimensions)) * m_boxDimensions;
+	const Real z = m_snowCeiling - phase;
+	const Real driftTime = m_velocity != 0.0f ? (phase - initialHeight) / m_velocity : 0.0f;
+	const Coord2D &wind = TheWeatherSetting->m_snowXYSpeed;
+	return Vector3(
+		m_tileOrigin.X + worldX + wind.x * driftTime + m_amplitude * WWMath::Fast_Sin(z * m_frequencyScaleX + worldX),
+		m_tileOrigin.Y + worldY + wind.y * driftTime + m_amplitude * WWMath::Fast_Sin(z * m_frequencyScaleY + worldY),
+		z);
 }
 
 /**For hardware that doesn't support point sprites*/
@@ -520,24 +590,22 @@ void W3DSnowManager::renderAsQuads(RenderInfoClass &rinfo, Int cubeOriginX, Int 
 						goto flush_particles;
 					}
 
-					//Get initial height from noise table.  We add a large value to make sure it's positive.  Then
-					//modulate by table dimensions to find a value.
-					Int noiseOffset=MODPOW2(x+MAXIMUM_CAMERA_DISTANCE,SNOW_NOISE_X)+MODPOW2(y+MAXIMUM_CAMERA_DISTANCE,SNOW_NOISE_Y)*SNOW_NOISE_X;
-					if (noiseOffset > (SNOW_NOISE_X * SNOW_NOISE_Y))
-						noiseOffset = 0;	//this should never happen but check to prevent buffer over/under flow.
-
-					//find current height
-					Real h0=m_snowCeiling-fmod(m_heightTraveled+m_startingHeights[noiseOffset],m_boxDimensions);
-
-					//find world-space position of snow flake
-					snowCenter.Set(x*m_emitterSpacing,y*m_emitterSpacing,h0);
-
-					//Get view-space position
-					Matrix3D::Transform_Vector(view,snowCenter,&snowCenterVS);
-
-					//Adjust position so snow flakes don't fall straight down.
-					snowCenterVS.X += m_amplitude * WWMath::Fast_Sin( h0 * m_frequencyScaleX + (Real)x);
-					snowCenterVS.Y += m_amplitude * WWMath::Fast_Sin( h0 * m_frequencyScaleY + (Real)y);
+					if (m_retailWeather)
+					{
+						snowCenter = retailParticleCenter(x, y);
+						Matrix3D::Transform_Vector(view, snowCenter, &snowCenterVS);
+					}
+					else
+					{
+						Int noiseOffset = MODPOW2(x + MAXIMUM_CAMERA_DISTANCE, SNOW_NOISE_X) + MODPOW2(y + MAXIMUM_CAMERA_DISTANCE, SNOW_NOISE_Y) * SNOW_NOISE_X;
+						if (noiseOffset > SNOW_NOISE_X * SNOW_NOISE_Y)
+							noiseOffset = 0;
+						const Real h0 = m_snowCeiling - fmod(m_heightTraveled + m_startingHeights[noiseOffset], m_boxDimensions);
+						snowCenter.Set(x * m_emitterSpacing, y * m_emitterSpacing, h0);
+						Matrix3D::Transform_Vector(view, snowCenter, &snowCenterVS);
+						snowCenterVS.X += m_amplitude * WWMath::Fast_Sin(h0 * m_frequencyScaleX + (Real)x);
+						snowCenterVS.Y += m_amplitude * WWMath::Fast_Sin(h0 * m_frequencyScaleY + (Real)y);
+					}
 
 					for (Int i=0; i<4; i++)
 					{

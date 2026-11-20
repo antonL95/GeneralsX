@@ -23,6 +23,8 @@
 #include "Common/SubsystemInterface.h"
 #include "Common/Overridable.h"
 #include "Common/Override.h"
+#include "Lib/Coord2D.h"
+#include "Lib/RGBColor.h"
 #include "WWMath/vector3.h"
 #include "WWMath/vector4.h"
 
@@ -48,6 +50,27 @@ class WeatherSetting : public Overridable
 		Real	m_snowVelocity;			///<used to set speed at which snow falls (world units/sec).
 		Bool    m_usePointSprites;		///<used to disable hardware point-sprite support.
 		Bool	m_snowEnabled;			///<enable/disable snow on the map.
+		Bool	m_isSnowing = FALSE;
+		Real	m_snowBoxHeight = 200.0f;
+		Real	m_snowSpacing = 50.0f;
+		Int		m_numberTiles = 4;
+		Real	m_snowSpeed = 100.0f;
+		Coord2D	m_snowXYSpeed = {};
+		Bool	m_lightningEnabled = FALSE;
+		Real	m_lightningFactor[2] = {};
+		Int		m_lightningDuration = 30;
+		Real	m_lightningChance = 0.0f;
+		Bool	m_spellEnabled = TRUE;
+		Int		m_spellDuration = 200;
+		Coord2D	m_rampControl = {};
+		Coord2D	m_rampSpeed = {};
+		Coord2D	m_rampSpacing = {};
+		Bool	m_hardwareFogEnable = FALSE;
+		RGBColor m_hardwareFogColor = {};
+		Real	m_hardwareFogStart = 300.0f;
+		Real	m_hardwareFogEnd = 1500.0f;
+		Coord2D	m_cloudTextureSize = {};
+		Coord2D	m_cloudOffsetPerSecond = {};
 
 	public:
 		WeatherSetting()
@@ -95,6 +118,8 @@ class SnowManager : public SubsystemInterface
 
   protected :
 
+	Bool isPrecipitationEnabled() const;
+	Bool				m_retailWeather;
 	Real				*m_startingHeights;
 	Real				m_time;	///<time elapsed since it started snowing.
 	Real				m_velocity;	///<positive velocity of falling snow
