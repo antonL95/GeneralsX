@@ -77,6 +77,7 @@ public:
 
 
 private:
+	void renderNode(const Vector3 &position, RenderInfoClass &rinfo);
   void setDefaultLineStyle();
 
 	RenderObjClass *m_waypointNodeRobj;
