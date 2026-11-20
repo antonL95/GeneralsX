@@ -259,8 +259,10 @@ WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg,
 		case GWM_LEFT_DRAG:
 		case GWM_RIGHT_DRAG:
 		{
+			if (!RetailFileLayers::enabled())
+				return MSG_IGNORED;
 			const Bool lookButton = TheGlobalData->m_useAlternateMouse ? msg == GWM_LEFT_DRAG : msg == GWM_RIGHT_DRAG;
-			if (!RetailFileLayers::enabled() || (!lookButton && !TheInGameUI->getAllSelectedLocalDrawables()->empty()))
+			if (!lookButton && !TheInGameUI->getAllSelectedLocalDrawables()->empty())
 				break;
 			ICoord2D mouse;
 			mouse.x = mData1 & 0xFFFF;

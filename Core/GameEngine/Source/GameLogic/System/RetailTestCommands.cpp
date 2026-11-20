@@ -30,8 +30,6 @@
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/UpgradeModule.h"
 #include "GameLogic/Object.h"
-#include "GameClient/Drawable.h"
-#include "GameClient/InGameUI.h"
 #include "GameLogic/TerrainLogic.h"
 
 namespace RetailTestCommands
@@ -417,20 +415,6 @@ void execute(const Command& command, unsigned int frame)
 		build->appendIntegerArgument(what->getTemplateID());
 		std::fprintf(stderr, "TEST frame %u: build %s on object %u\n", frame, command.structure.c_str(),
 			static_cast<unsigned>(obj->getID()));
-	}
-	else if (command.action == "select")
-	{
-		Drawable* draw = obj->getDrawable();
-		if (draw && TheInGameUI)
-		{
-			TheInGameUI->deselectAllDrawables();
-			TheInGameUI->selectDrawable(draw);
-		}
-		GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
-		select->appendBooleanArgument(TRUE);
-		select->appendObjectIDArgument(obj->getID());
-		std::fprintf(stderr, "TEST frame %u: select object %u (%s)\n", frame, static_cast<unsigned>(obj->getID()),
-			command.target.c_str());
 	}
 	else if (command.action == "kill")
 	{
