@@ -273,13 +273,13 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	if (count > 0)
 	{
 		const Int percent = static_cast<Int>(progress * 100.0f + 0.5f);
-		TheDisplay->drawRemainingRectClock(x, y, width, height, percent, GameMakeColor(0, 0, 0, 150));
+		TheDisplay->drawRemainingRectClock(x, y, width, height, percent, GameMakeColor(235, 235, 235, 170));
 	}
 	else
 	{
 		const Real ready = TheControlBar->getRetailRecharge(window);
 		if (ready >= 0.0f && ready < 1.0f)
-			TheDisplay->drawRemainingRectClock(x, y, width, height, static_cast<Int>(ready * 100.0f + 0.5f), GameMakeColor(255, 255, 255, 26));
+			TheDisplay->drawRemainingRectClock(x, y, width, height, static_cast<Int>(ready * 100.0f + 0.5f), GameMakeColor(235, 235, 235, 170));
 	}
 	TheDisplay->setCircularClip(0, 0, 0);
 	if (highlight)
@@ -385,7 +385,7 @@ void drawRetailCitadelQueue(Object *citadel, const GameWindow *palantir)
 		{
 			const Real progress = std::clamp(entry->getPercentComplete(), 0.0f, 100.0f);
 			TheDisplay->drawRemainingRectClock(iconX + 1, iconY + 1, size - 2, size - 2,
-				static_cast<Int>(progress), GameMakeColor(0, 0, 0, 115));
+				static_cast<Int>(progress), GameMakeColor(235, 235, 235, 170));
 		}
 	}
 }
