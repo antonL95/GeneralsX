@@ -35,6 +35,7 @@
 #include "GameClient/GadgetPushButton.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
+#include "GameClient/KeyDefs.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/TerrainVisual.h"
@@ -221,6 +222,8 @@ GameWindow* retailSlotWindow(int slot)
 	AsciiString name;
 	if (slot < 6)
 		name.format("ControlBar.wnd:RingButton%d", slot + 1);
+	else if (slot >= MAX_COMMANDS_PER_SET)
+		name.format("ControlBar.wnd:TrayButton%d", slot - MAX_COMMANDS_PER_SET + 1);
 	else
 		name.format("ControlBar.wnd:SideButton%02d", slot - 5);
 	return TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey(name));
@@ -289,7 +292,7 @@ void dumpProduction(const Command& command, unsigned int frame)
 
 void dumpHud(unsigned int frame)
 {
-	for (int slot = 0; slot < 18; ++slot)
+	for (int slot = 0; slot < MAX_COMMANDS_PER_SET + 3; ++slot)
 	{
 		GameWindow* window = retailSlotWindow(slot);
 		const CommandButton* button = window ? static_cast<const CommandButton*>(GadgetButtonGetData(window)) : nullptr;
@@ -965,9 +968,42 @@ void execute(const Command& command, unsigned int frame)
 		dumpHud(frame);
 		return;
 	}
+	if (command.action == "hud")
+	{
+		dumpHud(frame);
+		return;
+	}
 	if (command.action == "slot")
 	{
 		clickWindow(retailSlotWindow(std::atoi(command.structure.c_str())), std::atoi(command.structure.c_str()), frame);
+		return;
+	}
+	if (command.action == "pointer")
+	{
+		const Int slot = std::atoi(command.structure.c_str());
+		GameWindow* window = retailSlotWindow(slot);
+		if (!window || window->winIsHidden())
+		{
+			std::fprintf(stderr, "TEST frame %u: pointer slot %d empty\n", frame, slot);
+			return;
+		}
+		ICoord2D point;
+		Int width, height;
+		window->winGetScreenPosition(&point.x, &point.y);
+		window->winGetSize(&width, &height);
+		point.x += width / 2;
+		point.y += height / 2;
+		TheMessageStream->appendMessage(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN)->appendPixelArgument(point);
+		TheMessageStream->appendMessage(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP)->appendPixelArgument(point);
+		std::fprintf(stderr, "TEST frame %u: pointer slot %d at %d,%d\n", frame, slot, point.x, point.y);
+		return;
+	}
+	if (command.action == "keyw" || command.action == "escape")
+	{
+		GameMessage* key = TheMessageStream->appendMessage(GameMessage::MSG_RAW_KEY_UP);
+		key->appendIntegerArgument(command.action == "keyw" ? KEY_W : KEY_ESC);
+		key->appendIntegerArgument(KEY_STATE_UP);
+		std::fprintf(stderr, "TEST frame %u: %s\n", frame, command.action.c_str());
 		return;
 	}
 	if (command.action == "deselect")
@@ -1122,6 +1158,11 @@ void execute(const Command& command, unsigned int frame)
 			static_cast<unsigned>(obj->getID()), horde->getContainCount(),
 			obj->getDrawable() && obj->getDrawable()->isSelected() ? 1 : 0);
 		logObject(obj, frame);
+		if (command.action == "hordelog")
+		{
+			std::fprintf(stderr, "TEST horde formation %u %u alternate=%d\n", frame,
+				static_cast<unsigned>(obj->getID()), horde->isAlternateFormation());
+		}
 		for (auto it = members.begin(); it != members.end(); )
 		{
 			Object* member = *it++;
@@ -1132,6 +1173,14 @@ void execute(const Command& command, unsigned int frame)
 				horde->rankCanAttack(member) ? 1 : 0, target ? static_cast<unsigned>(target->getID()) : 0,
 				ai && ai->isAttacking() ? 1 : 0);
 			logObject(member, frame);
+			if (command.action == "hordelog")
+			{
+				const Weapon* weapon = member->getCurrentWeapon();
+				const Coord3D slot = horde->getMemberPosition(member->getID(), FALSE);
+				std::fprintf(stderr, "TEST horde mode %u %u toggle=%d weapon=%s slot=%.3f,%.3f\n", frame,
+					static_cast<unsigned>(member->getID()), member->testWeaponSetFlag(WEAPONSET_TOGGLE_1),
+					weapon ? weapon->getName().str() : "-", slot.x, slot.y);
+			}
 			if (command.action == "hordekill")
 				member->kill();
 		}

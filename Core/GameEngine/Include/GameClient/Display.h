@@ -164,6 +164,7 @@ public:
 
 	virtual void drawImagePart( const Image *image, Int startX, Int startY, Int endX, Int endY,
 		const Region2D &part, Color color = 0xFFFFFFFF, DrawImageMode mode = DRAW_IMAGE_ALPHA );
+	virtual void drawTexturedLine(const Image *image, ICoord2D start, ICoord2D end, Real width);
 	virtual Bool hasImageTexture(const Image *image) { return image != nullptr; }
 	virtual void setCircularClip(Int x, Int y, Int radius) {}
 	void drawImageNineSlice( const Image *image, const UiNineSlice::Insets &insets, Int startX, Int startY,

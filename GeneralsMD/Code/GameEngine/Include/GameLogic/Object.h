@@ -545,6 +545,7 @@ public:
 	void clearAndSetModelConditionFlags( const ModelConditionFlags& clr, const ModelConditionFlags& set );
 
 	void setWeaponSetFlag(WeaponSetType wst);
+	void setWeaponSetFlags(const WeaponSetFlags& flags, Bool enabled);
 	void clearWeaponSetFlag(WeaponSetType wst);
 	inline Bool testWeaponSetFlag(WeaponSetType wst) const { return m_curWeaponSetFlags.test(wst); }
 	inline const WeaponSetFlags& getWeaponSetFlags() const { return m_curWeaponSetFlags; }

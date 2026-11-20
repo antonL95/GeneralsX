@@ -55,6 +55,7 @@
 #include "GameClient/WindowXlat.h"
 #include "GameClient/Shell.h"
 #include "GameClient/Display.h"
+#include "GameClient/ControlBar.h"
 
 
 // DEFINES ////////////////////////////////////////////////////////////////////
@@ -239,8 +240,13 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 
 			// process the mouse event position
 			GameWindowMessage gwm = rawMouseToWindowMessage( msg );
+			const Bool overTray = TheControlBar && TheControlBar->isOverRetailTray(mousePos.x, mousePos.y);
+			if (!overTray && (gwm == GWM_LEFT_DOWN || gwm == GWM_RIGHT_DOWN) && TheControlBar)
+				TheControlBar->closeRetailTray();
 			if( TheWindowManager )
 				returnCode = TheWindowManager->winProcessMouseEvent( gwm, &mousePos, nullptr );
+			if (overTray && (gwm == GWM_LEFT_DOWN || gwm == GWM_LEFT_UP || gwm == GWM_RIGHT_DOWN || gwm == GWM_RIGHT_UP))
+				returnCode = WIN_INPUT_USED;
 
 			if( TheShell && TheShell->isShellActive() )
 				returnCode = WIN_INPUT_USED;
@@ -310,6 +316,9 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 			// get key and state from args
 			UnsignedByte key		= msg->getArgument( 0 )->integer;
 			UnsignedByte state	= msg->getArgument( 1 )->integer;
+
+			if (key == KEY_ESC && BitIsSet(state, KEY_STATE_UP) && TheControlBar && TheControlBar->closeRetailTray())
+				return DESTROY_MESSAGE;
 
 			// process event through window system
 			if( TheWindowManager )

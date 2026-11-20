@@ -38,6 +38,8 @@
 #include "GameClient/CommandButtonRules.h"
 #include "GameLogic/WeaponSetFlags.h"
 
+#include <array>
+
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Drawable;
 class GameFont;
@@ -398,6 +400,10 @@ public:
 	Bool isAutoAbility() const { return m_autoAbility; }
 	Real getPresetRange() const { return m_presetRange; }
 	const WeaponSetFlags& getFlagsUsedForToggle() const { return m_flagsUsedForToggle; }
+	Bool canUseRetailToggle(const Object* object, Int state) const;
+	const AsciiString& getRetailChoiceLabel(Int choice) const;
+	const AsciiString& getRetailChoiceDescription(Int choice) const;
+	static void parseRetailLabels(INI *ini, void *instance, void *store, const void *userData);
 	const Image* getToggleButtonImage() const { return m_toggleButtonImage; }
 	static void parseButtonImages( INI *ini, void *instance, void *store, const void *userData );
 	const Image* getButtonImage() const { return m_buttonImage;	}
@@ -468,6 +474,8 @@ private:
 	Real m_presetRange = 0.0f;
 	WeaponSetFlags m_flagsUsedForToggle;
 	AsciiString m_toggleButtonImageName;
+	AsciiString m_toggleTextLabel;
+	AsciiString m_toggleDescriptionLabel;
 	const Image *m_toggleButtonImage = nullptr;
 
 };
@@ -972,6 +980,9 @@ protected:
 	GameWindow *m_retailCommandPoints = nullptr;
 	GameWindow *m_retailHolders[MAX_COMMANDS_PER_SET] = {};
 	GameWindow *m_retailVisible[MAX_COMMANDS_PER_SET] = {};
+	std::array<GameWindow*, 3> m_retailTrayButtons = {};
+	GameWindow *m_retailTrayAnchor = nullptr;
+	Int m_retailTrayCount = 0;
 	Int m_retailSlotOf[MAX_COMMANDS_PER_SET] = {};
 	CommandAvailability m_retailAvailability[MAX_COMMANDS_PER_SET] = {};
 	UnsignedInt m_retailCounterFrame = 0;
@@ -1006,6 +1017,10 @@ protected:
 	void updateRetailHud();
 	void updateRetailCounters();
 	void populateRetailUnderConstruction(Object *obj);
+	Bool toggleRetailTray(GameWindow *control, const CommandButton *command);
+	Int getRetailTrayChoice(const GameWindow *control) const;
+	void updateRetailTray();
+	const Object* getRetailSelection() const;
 
 public:
 	Bool isRetailHud() const { return m_retailSelectionName != nullptr; }
@@ -1020,6 +1035,9 @@ public:
 	const Image* getRetailButtonImage(GameWindow *window) const;
 	Real getRetailRecharge(const GameWindow *window) const;
 	void showRetailCommandTooltip(GameWindow *window) const;
+	Bool closeRetailTray();
+	Bool isOverRetailTray(Int x, Int y) const;
+	Bool executeRetailTrayHotKey(const AsciiString& key, GameWindow *mappedControl = nullptr);
 
 protected:
 

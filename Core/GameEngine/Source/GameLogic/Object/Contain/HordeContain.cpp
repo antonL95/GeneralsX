@@ -12,6 +12,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
@@ -248,9 +249,25 @@ void AODHordeContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 }
 
 HorseHordeContain::~HorseHordeContain() = default;
-void HorseHordeContain::crc(Xfer* xfer) { BehaviorModule::crc(xfer); }
-void HorseHordeContain::xfer(Xfer* xfer) { BehaviorModule::xfer(xfer); }
-void HorseHordeContain::loadPostProcess() { BehaviorModule::loadPostProcess(); }
+void HorseHordeContain::crc(Xfer* xfer) { HordeContain::crc(xfer); }
+void HorseHordeContain::xfer(Xfer* xfer)
+{
+	XferVersion version = 2;
+	xfer->xferVersion(&version, 2);
+	m_legacySnapshot = version == 1;
+	if (m_legacySnapshot)
+		ObjectModule::xfer(xfer);
+	else
+		HordeContain::xfer(xfer);
+}
+
+void HorseHordeContain::loadPostProcess()
+{
+	if (m_legacySnapshot)
+		BehaviorModule::loadPostProcess();
+	else
+		HordeContain::loadPostProcess();
+}
 
 AODHordeContain::~AODHordeContain() = default;
 void AODHordeContain::crc(Xfer* xfer) { BehaviorModule::crc(xfer); }
@@ -328,7 +345,8 @@ void HordeContain::addToContainList( Object *rider )
 	if (getMemberSlot( rider->getID() ) >= 0)
 		return;
 
-	const HordeLayout& layout = getHordeContainModuleData()->m_layout;
+	const HordeContainModuleData* formation = getActiveFormation();
+	const HordeLayout& layout = formation->m_layout;
 	m_hadMembers = TRUE;
 	m_slotMembers.resize( layout.slots().size(), INVALID_ID );
 	m_slotOffsets.resize(layout.slots().size(), Coord2D{0.0f, 0.0f});
@@ -339,7 +357,7 @@ void HordeContain::addToContainList( Object *rider )
 	if (slot >= 0)
 	{
 		m_slotMembers[slot] = rider->getID();
-		const Coord2D& extent = getHordeContainModuleData()->m_randomOffset;
+		const Coord2D& extent = formation->m_randomOffset;
 		m_slotOffsets[slot].x = extent.x > 0.0f ? GameLogicRandomValueReal(-extent.x, extent.x) : 0.0f;
 		m_slotOffsets[slot].y = extent.y > 0.0f ? GameLogicRandomValueReal(-extent.y, extent.y) : 0.0f;
 	}
@@ -355,6 +373,13 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 	OpenContain::onContaining(rider, wasSelected);
 #endif
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained );
+	if (getHordeContainModuleData()->m_alternateFormation.isNotEmpty())
+		updateFormationModelConditions(rider);
+	WeaponSetFlags toggles;
+	for (const WeaponSetType flag : { WEAPONSET_TOGGLE_1, WEAPONSET_TOGGLE_2, WEAPONSET_TOGGLE_3 })
+		toggles.set(flag, getObject()->testWeaponSetFlag(flag));
+	if (toggles.any())
+		rider->setWeaponSetFlags(toggles, TRUE);
 	const UpgradeMaskType hordeUpgrades = getObject()->getObjectCompletedUpgradeMask();
 	if (hordeUpgrades.any() && TheUpgradeCenter)
 	{
@@ -401,6 +426,8 @@ void HordeContain::crc( Xfer *xfer )
 {
 	TransportContain::crc( xfer );
 	xfer->xferBool(&m_hadMembers);
+	Bool switched = m_formationOverride != nullptr;
+	xfer->xferBool(&switched);
 	for (size_t index = 0; index < m_slotMembers.size(); ++index)
 	{
 		xfer->xferObjectID(&m_slotMembers[index]);
@@ -410,7 +437,7 @@ void HordeContain::crc( Xfer *xfer )
 
 void HordeContain::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = 2;
+	XferVersion currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -426,11 +453,24 @@ void HordeContain::xfer( Xfer *xfer )
 	}
 	else
 		m_restoreHadMembers = TRUE;
+	if (version >= 3)
+	{
+		Bool switched = m_formationOverride != nullptr;
+		xfer->xferBool(&switched);
+		if (xfer->getXferMode() == XFER_LOAD)
+			m_formationOverride = switched ? findAlternateFormation() : nullptr;
+	}
 }
 
 void HordeContain::loadPostProcess()
 {
 	TransportContain::loadPostProcess();
+	if (m_formationOverride)
+	{
+		updateFormationModelConditions(getObject());
+		for (Object* member : getContainList())
+			updateFormationModelConditions(member);
+	}
 	if (m_restoreHadMembers)
 	{
 		m_hadMembers = getContainCount() != 0;
@@ -549,7 +589,7 @@ Drawable* HordeContain::resolveSelection(Drawable* draw)
 Bool HordeContain::rankCanAttack(const Object* member) const
 {
 	const Int slot = getMemberSlot(member->getID());
-	const auto* data = getHordeContainModuleData();
+	const auto* data = getActiveFormation();
 	const Int rank = slot >= 0 ? data->m_layout.slots()[slot].rank : 0;
 	return HordeLayout::rankCanAttack(rank, data->m_ranksToReleaseWhenAttacking, data->m_ranksToJustFreeWhenAttacking);
 }
@@ -558,7 +598,7 @@ Coord3D HordeContain::getMemberPosition(ObjectID id, Bool followLeader) const
 {
 	const Object* horde = getObject();
 	Coord3D position = *horde->getPosition();
-	const auto& layout = getHordeContainModuleData()->m_layout;
+	const auto& layout = getActiveFormation()->m_layout;
 	const Int slot = getMemberSlot(id);
 	if (slot >= 0)
 	{
@@ -584,6 +624,103 @@ Coord3D HordeContain::getMemberPosition(ObjectID id, Bool followLeader) const
 	if (TheTerrainLogic)
 		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
 	return position;
+}
+
+const HordeContainModuleData* HordeContain::findAlternateFormation() const
+{
+	const AsciiString& name = getHordeContainModuleData()->m_alternateFormation;
+	const ThingTemplate* alternate = name.isEmpty() ? nullptr : TheThingFactory->findTemplate(name, FALSE);
+	if (!alternate || alternate == getObject()->getTemplate())
+		return nullptr;
+
+	const ModuleInfo& modules = alternate->getBehaviorModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		const AsciiString module = modules.getNthName(i);
+		if (module.compareNoCase("HordeContain") == 0 || module.compareNoCase("HorseHordeContain") == 0)
+		{
+			const auto* data = static_cast<const HordeContainModuleData*>(modules.getNthData(i));
+			if (!data->m_layout.slots().empty())
+				return data;
+		}
+	}
+	return nullptr;
+}
+
+const HordeContainModuleData* HordeContain::getActiveFormation() const
+{
+	return m_formationOverride ? m_formationOverride : getHordeContainModuleData();
+}
+
+Bool HordeContain::isAlternateFormation() const
+{
+	return getHordeContainModuleData()->m_alternateFormation.isNotEmpty() &&
+		!getActiveFormation()->m_thisFormationIsTheMainFormation;
+}
+
+Bool HordeContain::canSetAlternateFormation(Bool alternate) const
+{
+	const auto* other = m_formationOverride ? getHordeContainModuleData() : findAlternateFormation();
+	if (!other || getContainCount() == 0)
+		return FALSE;
+	return alternate == isAlternateFormation() ||
+		(other->m_thisFormationIsTheMainFormation != alternate && getContainCount() >= other->m_minimumHordeSize);
+}
+
+void HordeContain::updateFormationModelConditions(Object* object) const
+{
+	if (isAlternateFormation())
+	{
+		if (BodyModuleInterface* body = object->getBodyModule())
+			body->setArmorSetFlag(ARMORSET_ALTERNATE_FORMATION);
+		object->clearModelConditionState(MODELCONDITION_PRIMARY_FORMATION);
+		object->setModelConditionState(MODELCONDITION_ALTERNATE_FORMATION);
+	}
+	else
+	{
+		if (BodyModuleInterface* body = object->getBodyModule())
+			body->clearArmorSetFlag(ARMORSET_ALTERNATE_FORMATION);
+		object->clearModelConditionState(MODELCONDITION_ALTERNATE_FORMATION);
+		object->setModelConditionState(MODELCONDITION_PRIMARY_FORMATION);
+	}
+}
+
+void HordeContain::setAlternateFormation(Bool alternate)
+{
+	if (alternate == isAlternateFormation() || !canSetAlternateFormation(alternate))
+		return;
+
+	m_formationOverride = m_formationOverride ? nullptr : findAlternateFormation();
+	const HordeLayout& layout = getActiveFormation()->m_layout;
+	std::vector<ObjectID> members(layout.slots().size(), INVALID_ID);
+	std::vector<Coord2D> offsets(members.size(), Coord2D{0.0f, 0.0f});
+	std::vector<bool> occupied(members.size(), false);
+	updateFormationModelConditions(getObject());
+	for (Object* member : getContainList())
+	{
+		if (member->isEffectivelyDead())
+			continue;
+		const Int slot = layout.findSlot(member->getTemplate()->getName().str(), occupied);
+		if (slot >= 0)
+		{
+			members[slot] = member->getID();
+			occupied[slot] = true;
+			const Int previous = getMemberSlot(member->getID());
+			if (previous >= 0)
+				offsets[slot] = m_slotOffsets[previous];
+		}
+		updateFormationModelConditions(member);
+	}
+	m_slotMembers.swap(members);
+	m_slotOffsets.swap(offsets);
+}
+
+void HordeContain::toggleWeaponSet(const WeaponSetFlags& flags, Bool enabled)
+{
+	getObject()->setWeaponSetFlags(flags, enabled);
+	for (Object* member : getContainList())
+		if (!member->isEffectivelyDead())
+			member->setWeaponSetFlags(flags, enabled);
 }
 
 UpdateSleepTime HordeContain::update()

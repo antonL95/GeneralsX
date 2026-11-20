@@ -309,7 +309,7 @@ UpdateSleepTime HordeAIUpdate::update()
 			}
 		}
 
-		const auto* data = contain->getHordeContainModuleData();
+		const auto* data = contain->getActiveFormation();
 		const Real contactDistance = std::max(8.0f, std::max(data->m_meleeAttackLeashDistance, data->m_meleeBehavior.innerRange));
 		const Real targetRadius = target ? target->getGeometryInfo().getBoundingCircleRadius() : 0.0f;
 		approach(target ? *target->getPosition() : m_orderPosition, std::max(approachRange, contactDistance) + targetRadius);

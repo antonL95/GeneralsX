@@ -26,18 +26,23 @@
 #include "GameClient/GameText.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/HotKey.h"
 #include "GameClient/Mouse.h"
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/RespawnModules.h"
 
 namespace
 {
 constexpr Int RetailRingSlots = 6;
+constexpr Int RetailTraySlots = 3;
+constexpr Int RetailTrayAnchors = 4;
 constexpr Real PalantirDesignWidth = 470.0f;
 constexpr UnsignedInt CounterInterval = 15;
 
@@ -57,10 +62,36 @@ constexpr DesignRect TopPlate = { 51.0f, 60.0f, 155.0f, 64.0f };
 constexpr DesignRect OptionsKey = { 70.0f, 76.0f, 31.0f, 31.0f };
 constexpr DesignRect Objectives = { 156.0f, 76.0f, 31.0f, 31.0f };
 constexpr DesignRect PlaqueArea = { 20.0f, 240.0f, 210.0f, 50.0f };
+constexpr Coord2D RetailTrayPair[RetailTrayAnchors][2] = {
+	{ {263.2f, 54.2f}, {320.9f, 57.3f} },
+	{ {350.0f, 68.0f}, {394.8f, 104.4f} },
+	{ {407.8f, 126.6f}, {423.6f, 182.0f} },
+	{ {421.6f, 211.4f}, {403.2f, 266.0f} },
+};
+constexpr Coord2D RetailTrayTriple[RetailTrayAnchors][RetailTraySlots] = {
+	{ {246.5f, 67.4f}, {293.6f, 47.8f}, {337.7f, 74.8f} },
+	{ {328.9f, 68.8f}, {378.4f, 80.7f}, {398.1f, 128.3f} },
+	{ {390.0f, 115.2f}, {423.7f, 153.2f}, {412.6f, 203.5f} },
+	{ {413.5f, 191.9f}, {419.6f, 242.3f}, {382.0f, 277.4f} },
+};
 
 const Image *findImage(const char *name)
 {
 	return TheMappedImageCollection ? TheMappedImageCollection->findImageByName(name) : nullptr;
+}
+
+Bool usesToggleTray(const CommandButton* command)
+{
+	switch (command->getCommandType())
+	{
+		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
+		case GUI_COMMAND_TOGGLE_WEAPONSET:
+			return command->getToggleButtonImage() != nullptr;
+		case GUI_COMMAND_TOGGLE_STANCE:
+			return TRUE;
+		default:
+			return FALSE;
+	}
 }
 
 Bool playerIsEvil(const Player *player)
@@ -240,7 +271,7 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	const Bool highlight = enabled && BitIsSet(instance->getState(), WIN_STATE_HILITED);
 	const Bool pressed = BitIsSet(instance->getState(), WIN_STATE_SELECTED);
 	const Int slot = TheControlBar->getRetailSlot(window);
-	const Bool side = slot >= RetailRingSlots;
+	const Bool side = slot >= RetailRingSlots && slot < MAX_COMMANDS_PER_SET;
 
 	if (side)
 	{
@@ -327,6 +358,36 @@ Bool ControlBar::isOverRetailSocket(Int px, Int py) const
 
 void ControlBar::drawRetailSocketFills() const
 {
+	const Image *link = m_retailTrayAnchor ? findImage("UiRetailTrayLink") : nullptr;
+	if (link && TheDisplay->hasImageTexture(link))
+	{
+		Int anchorX, anchorY, anchorWidth, anchorHeight;
+		windowRect(m_retailTrayAnchor, anchorX, anchorY, anchorWidth, anchorHeight);
+		for (Int i = 0; i < m_retailTrayCount; ++i)
+		{
+			Int x, y, width, height;
+			windowRect(m_retailTrayButtons[i], x, y, width, height);
+			const Real centerX = x + width * 0.5f;
+			const Real centerY = y + height * 0.5f;
+			const Real xToAnchor = anchorX + anchorWidth * 0.5f - centerX;
+			const Real yToAnchor = anchorY + anchorHeight * 0.5f - centerY;
+			const Real distance = std::hypot(xToAnchor, yToAnchor);
+			if (distance <= 0.0f)
+				continue;
+			const Real downX = xToAnchor / distance;
+			const Real downY = yToAnchor / distance;
+			const Real scale = width / 36.0f;
+			const Real midX = centerX + downX * 10.5f * scale;
+			const Real midY = centerY + downY * 10.5f * scale;
+			const Real halfWidth = 27.0f * scale;
+			const ICoord2D left{ static_cast<Int>(std::round(midX - downY * halfWidth)),
+				static_cast<Int>(std::round(midY + downX * halfWidth)) };
+			const ICoord2D right{ static_cast<Int>(std::round(midX + downY * halfWidth)),
+				static_cast<Int>(std::round(midY - downX * halfWidth)) };
+			TheDisplay->drawTexturedLine(link, left, right, 69.0f * scale);
+		}
+	}
+
 	for (Int i = 0; i < RetailRingSlots; ++i)
 	{
 		Int x, y, width, height;
@@ -404,6 +465,9 @@ void ControlBar::drawRetailTexts() const
 
 Int ControlBar::getRetailSlot(const GameWindow *window) const
 {
+	const Int choice = getRetailTrayChoice(window);
+	if (choice >= 0)
+		return MAX_COMMANDS_PER_SET + choice;
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
 		if (m_commandWindows[i] == window)
 			return m_retailSlotOf[i];
@@ -489,7 +553,7 @@ CBCommandStatus ControlBar::cancelRetailProduction(GameWindow *window) const
 CommandAvailability ControlBar::getRetailButtonAvailability(GameWindow *window) const
 {
 	const Int slot = getRetailSlot(window);
-	if (slot < 0 || m_currContext == CB_CONTEXT_MULTI_SELECT)
+	if (slot < 0 || slot >= MAX_COMMANDS_PER_SET || m_currContext == CB_CONTEXT_MULTI_SELECT)
 		return BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 	return m_retailAvailability[slot];
 }
@@ -532,7 +596,7 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 	if (hero)
 		text = hero->getDisplayName();
 	else
-		text = TheGameText->fetchOrSubstitute(command->getTextLabel().str(), L"");
+		text = TheGameText->fetchOrSubstitute(command->getRetailChoiceLabel(getRetailTrayChoice(window)).str(), L"");
 	if (text.isEmpty() && unit)
 		text = unit->getDisplayName();
 	if (text.isEmpty())
@@ -550,7 +614,7 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 		text = label;
 	}
 
-	UnicodeString description = TheGameText->fetchOrSubstitute(command->getDescriptionLabel().str(), L"");
+	UnicodeString description = TheGameText->fetchOrSubstitute(command->getRetailChoiceDescription(getRetailTrayChoice(window)).str(), L"");
 	if (!description.isEmpty())
 	{
 		text.concat(L"\n");
@@ -655,12 +719,25 @@ void ControlBar::initRetailHud()
 		m_commandWindows[i] = m_retailHolders[i];
 		m_retailSlotOf[i] = -1;
 	}
+	for (Int i = 0; i < RetailTraySlots; ++i)
+	{
+		AsciiString name;
+		name.format("ControlBar.wnd:TrayButton%d", i + 1);
+		GameWindow *button = TheWindowManager->winGetWindowFromId(master, TheNameKeyGenerator->nameToKey(name));
+		if (!button)
+			throw INIException("RetailHud.wnd is missing a tray button");
+		button->winSetOwner(master);
+		button->winSetDrawFunc(drawRetailCommand);
+		button->winSetTooltipFunc(retailCommandTooltip);
+		m_retailTrayButtons[i] = button;
+	}
 	m_contextParent[CP_COMMAND]->winHide(TRUE);
 	switchToContext(CB_CONTEXT_NONE, nullptr);
 }
 
 void ControlBar::resetRetailCommandWindows()
 {
+	closeRetailTray();
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
 	{
 		m_retailVisible[i]->winHide(TRUE);
@@ -673,6 +750,160 @@ void ControlBar::resetRetailCommandWindows()
 		m_retailAvailability[i] = COMMAND_AVAILABLE;
 	}
 	m_retailShownMask = 0;
+}
+
+const Object* ControlBar::getRetailSelection() const
+{
+	const Drawable* draw = m_currentSelectedDrawable;
+	if (!draw && m_currContext == CB_CONTEXT_MULTI_SELECT)
+		draw = TheInGameUI->getFirstSelectedDrawable();
+	return draw ? draw->getObject() : nullptr;
+}
+
+Int ControlBar::getRetailTrayChoice(const GameWindow *control) const
+{
+	if (control)
+		for (Int i = 0; i < RetailTraySlots; ++i)
+			if (m_retailTrayButtons[i] == control)
+				return i;
+	return -1;
+}
+
+Bool ControlBar::closeRetailTray()
+{
+	if (!m_retailTrayAnchor)
+		return FALSE;
+	m_retailTrayAnchor = nullptr;
+	m_retailTrayCount = 0;
+	for (GameWindow *button : m_retailTrayButtons)
+	{
+		button->winHide(TRUE);
+		BitClear(button->winGetInstanceData()->m_state, WIN_STATE_SELECTED | WIN_STATE_HILITED);
+		GadgetButtonSetData(button, nullptr);
+	}
+	return TRUE;
+}
+
+Bool ControlBar::isOverRetailTray(Int px, Int py) const
+{
+	if (!m_retailTrayAnchor)
+		return FALSE;
+	for (Int i = -1; i < m_retailTrayCount; ++i)
+	{
+		Int x, y, width, height;
+		windowRect(i < 0 ? m_retailTrayAnchor : m_retailTrayButtons[i], x, y, width, height);
+		if (px >= x && px < x + width && py >= y && py < y + height)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+Bool ControlBar::toggleRetailTray(GameWindow *control, const CommandButton *command)
+{
+	const Int slot = getRetailSlot(control);
+	if (slot < 0 || slot >= RetailTrayAnchors || !usesToggleTray(command))
+		return FALSE;
+	if (control == m_retailTrayAnchor)
+		return closeRetailTray();
+
+	closeRetailTray();
+	if (command->getCommandType() == GUI_COMMAND_TOGGLE_STANCE)
+	{
+		const Object* obj = getRetailSelection();
+		const CommandSet* set = obj ? findCommandSet(obj->getCommandSetString()) : nullptr;
+		for (Int i = 0; set && i < CommandButtonRules::RETAIL_COMMANDS_PER_SET && m_retailTrayCount < RetailTraySlots; ++i)
+		{
+			const CommandButton* choice = set->getCommandButton(i);
+			if (choice && choice->getCommandType() == GUI_COMMAND_SET_STANCE)
+				setControlCommand(m_retailTrayButtons[m_retailTrayCount++], choice, FALSE);
+		}
+	}
+	else
+	{
+		m_retailTrayCount = 2;
+		for (Int i = 0; i < m_retailTrayCount; ++i)
+			setControlCommand(m_retailTrayButtons[i], command, FALSE);
+	}
+
+	if (m_retailTrayCount == 0)
+		return FALSE;
+	m_retailTrayAnchor = control;
+	updateRetailTray();
+	return TRUE;
+}
+
+void ControlBar::updateRetailTray()
+{
+	if (!m_retailTrayAnchor)
+		return;
+	if (m_retailTrayAnchor->winIsHidden() || getRetailButtonAvailability(m_retailTrayAnchor) == COMMAND_RESTRICTED)
+	{
+		closeRetailTray();
+		return;
+	}
+
+	GameWindow *palantir = m_retailTrayAnchor->winGetParent();
+	Int x, y, width, height;
+	windowRect(palantir, x, y, width, height);
+	const Real scale = width / PalantirDesignWidth;
+	const Int slot = getRetailSlot(m_retailTrayAnchor);
+	const Object* obj = getRetailSelection();
+	for (Int i = 0; i < m_retailTrayCount; ++i)
+	{
+		GameWindow *window = m_retailTrayButtons[i];
+		const CommandButton* command = static_cast<const CommandButton*>(GadgetButtonGetData(window));
+		const Coord2D center = m_retailTrayCount == 3 ? RetailTrayTriple[slot][i] : RetailTrayPair[slot][i];
+		const Int size = MAX(1, static_cast<Int>(std::round(36.0f * scale)));
+		Int currentWidth, currentHeight;
+		window->winGetSize(&currentWidth, &currentHeight);
+		if (currentWidth != size || currentHeight != size)
+			window->winSetSize(size, size);
+		window->winSetPosition(x + static_cast<Int>(std::round(center.x * scale)) - size / 2,
+			y + static_cast<Int>(std::round(center.y * scale)) - size / 2);
+		if (command->getCommandType() == GUI_COMMAND_SET_STANCE)
+		{
+			const CommandAvailability availability = getCommandAvailability(command, const_cast<Object*>(obj), window);
+			window->winEnable(availability == COMMAND_AVAILABLE || availability == COMMAND_ACTIVE);
+		}
+		else
+			window->winEnable(command->canUseRetailToggle(obj, 1 - i));
+		window->winHide(FALSE);
+	}
+}
+
+Bool ControlBar::executeRetailTrayHotKey(const AsciiString& key, GameWindow *mappedControl)
+{
+	if (mappedControl)
+	{
+		const Int slot = getRetailSlot(mappedControl);
+		if (slot < 0 || slot >= MAX_COMMANDS_PER_SET)
+			return FALSE;
+		const CommandButton* command = static_cast<const CommandButton*>(GadgetButtonGetData(mappedControl));
+		const Object* obj = getRetailSelection();
+		if (!command || !command->canUseRetailToggle(obj, -1))
+			return FALSE;
+		if (processRetailCommand(command, mappedControl, nullptr) != CBC_COMMAND_USED)
+			return FALSE;
+		closeRetailTray();
+		return TRUE;
+	}
+
+	for (Int i = 0; i < m_retailTrayCount; ++i)
+	{
+		GameWindow *window = m_retailTrayButtons[i];
+		if (window->winIsHidden() || !BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED))
+			continue;
+		const CommandButton* command = static_cast<const CommandButton*>(GadgetButtonGetData(window));
+		const AsciiString hotkey = TheHotKeyManager->searchHotKey(command->getRetailChoiceLabel(i));
+		const AsciiString toggleKey = command->getCommandType() == GUI_COMMAND_SET_STANCE
+			? AsciiString::TheEmptyString : TheHotKeyManager->searchHotKey(command->getTextLabel());
+		if (hotkey.isNotEmpty() && hotkey.compareNoCase(key) == 0 && hotkey.compareNoCase(toggleKey) != 0)
+		{
+			TheWindowManager->winSendSystemMsg(window->winGetOwner(), GBM_SELECTED, (WindowMsgData)window, window->winGetWindowId());
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
 
 Bool ControlBar::retailExtraEntryUsable(const CommandButton *command, const Object *obj) const
@@ -729,7 +960,7 @@ void ControlBar::collectRetailPlacements(const CommandSet *commandSet, Object *o
 			if (!retailExtraEntryUsable(command, obj))
 				continue;
 		}
-		if (!command)
+		if (!command || command->getCommandType() == GUI_COMMAND_SET_STANCE)
 			continue;
 		Int slot = -1;
 		Int hero = -1;
@@ -865,6 +1096,13 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 		case GUI_COMMAND_PUSH_VISIBLE_COMMAND_RANGE:
 		case GUI_COMMAND_POP_VISIBLE_COMMAND_RANGE:
 			return COMMAND_AVAILABLE;
+		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
+		case GUI_COMMAND_TOGGLE_WEAPONSET:
+			return (usesToggleTray(command)
+				? command->canUseRetailToggle(obj, 0) || command->canUseRetailToggle(obj, 1)
+				: command->canUseRetailToggle(obj, -1)) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
+		case GUI_COMMAND_TOGGLE_STANCE:
+			return COMMAND_AVAILABLE;
 		case GUI_COMMAND_REVIVE:
 		{
 			if (getRetailSlot(win) < 0)
@@ -895,6 +1133,24 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 {
 	switch (command->getCommandType())
 	{
+		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
+		case GUI_COMMAND_TOGGLE_WEAPONSET:
+		{
+			const Object* source = getRetailSelection();
+			const CommandSet* set = source ? findCommandSet(source->getCommandSetString()) : nullptr;
+			const Int choice = getRetailTrayChoice(control);
+			for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			{
+				if (set->getCommandButton(slot) != command)
+					continue;
+				GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_HORDE_COMMAND);
+				msg->appendObjectIDArgument(source->getID());
+				msg->appendIntegerArgument(slot);
+				msg->appendIntegerArgument(choice < 0 ? -1 : 1 - choice);
+				return CBC_COMMAND_USED;
+			}
+			return CBC_COMMAND_NOT_USED;
+		}
 		case GUI_COMMAND_PUSH_VISIBLE_COMMAND_RANGE:
 			m_retailRange = CommandButtonRules::pushRange(command->getCommandRangeStart(), command->getCommandRangeCount());
 			markUIDirty();
@@ -943,6 +1199,30 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 		default:
 			return CBC_COMMAND_NOT_USED;
 	}
+}
+
+Bool CommandButton::canUseRetailToggle(const Object* object, Int state) const
+{
+	if (getCommandType() != GUI_COMMAND_HORDE_TOGGLE_FORMATION && getCommandType() != GUI_COMMAND_TOGGLE_WEAPONSET)
+		return FALSE;
+	if (!object || object->isEffectivelyDead() || object->isDisabled() ||
+		object->testScriptStatusBit(OBJECT_STATUS_SCRIPT_DISABLED) ||
+		object->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED) ||
+		BitIsSet(getOptions(), SCRIPT_ONLY) ||
+		hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE) ||
+		!HeroRoster::buttonUpgradesMet(this, object->getControllingPlayer(), object))
+		return FALSE;
+	const Bool mounted = object->testWeaponSetFlag(WEAPONSET_MOUNTED);
+	if ((mounted && hasRotwkOption(CommandButtonRules::ROTWK_UNMOUNTED_ONLY)) ||
+		(!mounted && hasRotwkOption(CommandButtonRules::ROTWK_MOUNTED_ONLY)) ||
+		(object->isAirborneTarget() && hasRotwkOption(CommandButtonRules::ROTWK_ON_GROUND_ONLY)))
+		return FALSE;
+	if (BitIsSet(getOptions(), MUST_BE_STOPPED) && object->getAI() && object->getAI()->isMoving())
+		return FALSE;
+	if (getCommandType() == GUI_COMMAND_TOGGLE_WEAPONSET)
+		return getFlagsUsedForToggle().any();
+	const HordeContain* horde = HordeContain::get(object);
+	return horde && horde->canSetAlternateFormation(state < 0 ? !horde->isAlternateFormation() : state != 0);
 }
 
 void ControlBar::populateRetailUnderConstruction(Object *obj)
@@ -995,6 +1275,7 @@ void ControlBar::updateRetailCounters()
 void ControlBar::updateRetailHud()
 {
 	checkRetailPlacements();
+	updateRetailTray();
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
 	{
 		if (m_retailSlotOf[i] < 0)
@@ -1033,7 +1314,14 @@ const Image* ControlBar::getRetailButtonImage(GameWindow *window) const
 {
 	const Image *image = window->winGetEnabledImage(0);
 	const CommandButton *command = static_cast<const CommandButton*>(GadgetButtonGetData(window));
-	const Object *obj = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+	const Object *obj = getRetailSelection();
+	const Int choice = getRetailTrayChoice(window);
+	if (choice >= 0 && command && command->getCommandType() != GUI_COMMAND_SET_STANCE)
+		return choice == 1 && command->getToggleButtonImage() ? command->getToggleButtonImage() : command->getButtonImage();
+	if (command && command->hasRotwkOption(CommandButtonRules::ROTWK_TOGGLE_IMAGE_ON_FORMATION))
+		if (const HordeContain* horde = HordeContain::get(obj))
+			if (horde->isAlternateFormation() && command->getToggleButtonImage())
+				return command->getToggleButtonImage();
 	if (!command || !obj || !command->getToggleButtonImage() ||
 		!command->hasRotwkOption(CommandButtonRules::ROTWK_TOGGLE_IMAGE_ON_WEAPONSET) || !command->getFlagsUsedForToggle().any())
 		return image;

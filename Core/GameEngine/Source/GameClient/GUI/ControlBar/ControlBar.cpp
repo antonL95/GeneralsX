@@ -124,8 +124,8 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 	{ "MaxShotsToFire",				INI::parseInt,							 nullptr, offsetof( CommandButton, m_maxShotsToFire ) },
 	{ "Science",							INI::parseScienceVector,					 nullptr, offsetof( CommandButton, m_science ) },
 	{ "SpecialPower",					INI::parseSpecialPowerTemplate,			 nullptr, offsetof( CommandButton, m_specialPower ) },
-	{ "TextLabel",						INI::parseAsciiString,			 nullptr, offsetof( CommandButton, m_textLabel ) },
-	{ "DescriptLabel",				INI::parseAsciiString,			 nullptr, offsetof( CommandButton, m_descriptionLabel ) },
+	{ "TextLabel",						CommandButton::parseRetailLabels,			 nullptr, offsetof( CommandButton, m_textLabel ) },
+	{ "DescriptLabel",				CommandButton::parseRetailLabels,			 nullptr, offsetof( CommandButton, m_descriptionLabel ) },
 	{ "PurchasedLabel",				INI::parseAsciiString,			 nullptr, offsetof( CommandButton, m_purchasedLabel ) },
 	{ "ConflictingLabel",			INI::parseAsciiString,			 nullptr, offsetof( CommandButton, m_conflictingLabel ) },
 	{ "ButtonImage",					CommandButton::parseButtonImages,			 nullptr, offsetof( CommandButton, m_buttonImageName ) },
@@ -4087,6 +4087,30 @@ void CommandButton::parseButtonImages( INI *ini, void *instance, void *store, co
 		return;
 	}
 	*static_cast<AsciiString*>( store ) = ini->getNextToken();
-	if( const char *toggle = ini->getNextTokenOrNull() )
-		static_cast<CommandButton*>( instance )->m_toggleButtonImageName = toggle;
+	auto* button = static_cast<CommandButton*>(instance);
+	const char* alternate = ini->getNextTokenOrNull();
+	button->m_toggleButtonImageName = alternate ? alternate : "";
+	button->m_toggleButtonImage = nullptr;
+}
+
+void CommandButton::parseRetailLabels(INI *ini, void *instance, void *store, const void *userData)
+{
+	INI::parseAsciiString(ini, instance, store, userData);
+	if (!RetailFileLayers::enabled())
+		return;
+
+	auto* button = static_cast<CommandButton*>(instance);
+	AsciiString& alternate = store == &button->m_textLabel ? button->m_toggleTextLabel : button->m_toggleDescriptionLabel;
+	const char* token = ini->getNextTokenOrNull();
+	alternate = token ? token : "";
+}
+
+const AsciiString& CommandButton::getRetailChoiceLabel(Int choice) const
+{
+	return choice == 1 && m_toggleTextLabel.isNotEmpty() ? m_toggleTextLabel : getTextLabel();
+}
+
+const AsciiString& CommandButton::getRetailChoiceDescription(Int choice) const
+{
+	return choice == 1 && m_toggleDescriptionLabel.isNotEmpty() ? m_toggleDescriptionLabel : getDescriptionLabel();
 }

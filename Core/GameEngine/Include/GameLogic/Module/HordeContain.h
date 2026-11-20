@@ -6,6 +6,7 @@
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/Module/TransportContain.h"
+#include "GameLogic/WeaponSetFlags.h"
 
 #include <vector>
 
@@ -134,6 +135,10 @@ public:
 	Object* findNearestLivingMember(const Coord3D& fromPos) const;
 	static Bool addCrateBanner(Object* anchor);
 	Coord3D getMemberPosition(ObjectID id, Bool followLeader) const;
+	Bool canSetAlternateFormation(Bool alternate) const;
+	Bool isAlternateFormation() const;
+	void setAlternateFormation(Bool alternate);
+	void toggleWeaponSet(const WeaponSetFlags& flags, Bool enabled);
 	static const HordeContain* get(const Object* object);
 	static Object* getAnchor(Object* member);
 	static Drawable* resolveSelection(Drawable* draw);
@@ -143,8 +148,12 @@ protected:
 	void redeployOccupants() override {}
 
 private:
+	const HordeContainModuleData* findAlternateFormation() const;
+	const HordeContainModuleData* getActiveFormation() const;
+	void updateFormationModelConditions(Object* object) const;
 	std::vector<ObjectID> m_slotMembers;
 	std::vector<Coord2D> m_slotOffsets;
+	const HordeContainModuleData* m_formationOverride = nullptr;
 	Bool m_hadMembers = FALSE;
 	Bool m_restoreHadMembers = FALSE;
 };
@@ -177,13 +186,16 @@ struct AODHordeContainModuleData : public HordeContainModuleData
 	Real m_scatterRandomness = 0.0f;
 };
 
-class HorseHordeContain final : public BehaviorModule
+class HorseHordeContain final : public HordeContain
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( HorseHordeContain, "HorseHordeContain" )
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( HorseHordeContain, HorseHordeContainModuleData )
 
 public:
-	HorseHordeContain(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data) {}
+	HorseHordeContain(Thing* thing, const ModuleData* data) : HordeContain(thing, data) {}
+
+private:
+	Bool m_legacySnapshot = FALSE;
 };
 
 class AODHordeContain final : public BehaviorModule

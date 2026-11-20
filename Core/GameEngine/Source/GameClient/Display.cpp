@@ -354,6 +354,16 @@ void Display::drawImagePart( const Image *image, Int startX, Int startY, Int end
 	drawImage(image, startX, startY, endX, endY, color, mode);
 }
 
+void Display::drawTexturedLine(const Image *image, ICoord2D start, ICoord2D end, Real width)
+{
+	const Int halfWidth = static_cast<Int>(width * 0.5f);
+	const Bool horizontal = std::abs(end.x - start.x) >= std::abs(end.y - start.y);
+	const Int xPad = horizontal ? 0 : halfWidth;
+	const Int yPad = horizontal ? halfWidth : 0;
+	drawImage(image, MIN(start.x, end.x) - xPad, MIN(start.y, end.y) - yPad,
+		MAX(start.x, end.x) + xPad, MAX(start.y, end.y) + yPad);
+}
+
 void Display::drawImageNineSlice( const Image *image, const UiNineSlice::Insets &insets, Int startX, Int startY,
 	Int endX, Int endY, Real scale, UiNineSlice::Fill edges, UiNineSlice::Fill center, Color color, DrawImageMode mode )
 {

@@ -51,6 +51,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "GameClient/HotKey.h"
+#include "GameClient/ControlBar.h"
 #include "GameClient/KeyDefs.h"
 #include "GameClient/MetaEvent.h"
 #include "GameClient/GameWindow.h"
@@ -165,6 +166,8 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 {
 	AsciiString key = keyIn;
 	key.toLower();
+	if (TheControlBar && TheControlBar->executeRetailTrayHotKey(key))
+		return TRUE;
 	HotKeyMap::iterator it = m_hotKeyMap.find(key);
 	if( it == m_hotKeyMap.end() )
 		return FALSE;
@@ -176,7 +179,8 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 		if( BitIsSet( win->winGetStatus(), WIN_STATUS_ENABLED ) )
  		{
 			GameWindow *dispatch = it->second.m_dispatchWindow ? it->second.m_dispatchWindow : win->winGetParent();
-			TheWindowManager->winSendSystemMsg( dispatch, GBM_SELECTED, (WindowMsgData)win, win->winGetWindowId() );
+			if (!TheControlBar || !TheControlBar->executeRetailTrayHotKey(key, win))
+				TheWindowManager->winSendSystemMsg(dispatch, GBM_SELECTED, (WindowMsgData)win, win->winGetWindowId());
 
  			// here we make the same click sound that the GUI uses when you click a button
  			AudioEventRTS buttonClick("GUIClick");

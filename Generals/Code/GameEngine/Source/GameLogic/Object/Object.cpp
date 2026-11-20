@@ -2878,6 +2878,27 @@ Bool Object::isMassSelectable() const
 }
 
 //-------------------------------------------------------------------------------------------------
+void Object::setWeaponSetFlags(const WeaponSetFlags& flags, Bool enabled)
+{
+	Bool changed = FALSE;
+	for (Int i = 0; i < WEAPONSET_COUNT; ++i)
+	{
+		if (!flags.test(i) || m_curWeaponSetFlags.test(i) == enabled)
+			continue;
+		m_curWeaponSetFlags.set(i, enabled);
+		changed = TRUE;
+		const ModelConditionFlagType condition = TheWeaponSetTypeToModelConditionTypeMap[i];
+		if (condition == MODELCONDITION_INVALID)
+			continue;
+		if (enabled)
+			setModelConditionState(condition);
+		else
+			clearModelConditionState(condition);
+	}
+	if (changed)
+		m_weaponSet.updateWeaponSet(this);
+}
+
 void Object::setWeaponSetFlag(WeaponSetType wst)
 {
 	m_curWeaponSetFlags.set(wst);

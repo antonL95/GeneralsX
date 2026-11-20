@@ -102,7 +102,7 @@ public:
 	virtual void drawLine( Int startX, Int startY, Int endX, Int endY,
 												 Real lineWidth, UnsignedInt lineColor1, UnsignedInt lineColor2 ) override;
 
-	void drawTexturedLine(const Image *image, ICoord2D start, ICoord2D end, Real width);
+	void drawTexturedLine(const Image *image, ICoord2D start, ICoord2D end, Real width) override;
 
 	/// draw a rect border on the display in pixel coordinates with the specified color
 	virtual void drawOpenRect( Int startX, Int startY, Int width, Int height,

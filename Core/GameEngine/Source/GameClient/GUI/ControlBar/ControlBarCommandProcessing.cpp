@@ -205,7 +205,14 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 	}
 
 	if( commandButton->getCommandType() >= GUI_COMMAND_SECONDARY_UNIT_BUILD )
-		return processRetailCommand( commandButton, control, obj );
+	{
+		if (m_retailSelectionName && toggleRetailTray(control, commandButton))
+			return CBC_COMMAND_USED;
+		const CBCommandStatus result = processRetailCommand(commandButton, control, obj);
+		if (getRetailTrayChoice(control) >= 0)
+			closeRetailTray();
+		return result;
+	}
 
 	TheInGameUI->placeBuildAvailable( nullptr, nullptr );
 

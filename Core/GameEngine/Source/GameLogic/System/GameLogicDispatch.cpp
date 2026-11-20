@@ -86,6 +86,7 @@
 #include "GameClient/LookAtXlat.h"
 
 #include "GameNetwork/NetworkInterface.h"
+#include "GameLogic/Module/HordeContain.h"
 
 
 
@@ -496,6 +497,50 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		case GameMessage::MSG_SWITCH_WEAPONS:
 		{
 			onDoSwitchWeapons(msg, currentlySelectedGroup);
+			break;
+		}
+		case GameMessage::MSG_RETAIL_HORDE_COMMAND:
+		{
+			if (!RetailFileLayers::enabled() || !currentlySelectedGroup || !TheControlBar ||
+				msg->getArgumentCount() != 3 ||
+				msg->getArgumentDataType(0) != ARGUMENTDATATYPE_OBJECTID ||
+				msg->getArgumentDataType(1) != ARGUMENTDATATYPE_INTEGER ||
+				msg->getArgumentDataType(2) != ARGUMENTDATATYPE_INTEGER)
+				break;
+
+			Object* source = findObjectByID(msg->getArgument(0)->objectID);
+			const Int slot = msg->getArgument(1)->integer;
+			const Int state = msg->getArgument(2)->integer;
+			if (!source || !currentlySelectedGroup->isMember(source) ||
+				slot < 0 || slot >= CommandButtonRules::RETAIL_COMMANDS_PER_SET || state < -1 || state > 1)
+				break;
+			const CommandSet* sourceSet = TheControlBar->findCommandSet(source->getCommandSetString());
+			const CommandButton* button = sourceSet ? sourceSet->getCommandButton(slot) : nullptr;
+			if (!button)
+				break;
+
+			for (const ObjectID id : currentlySelectedGroup->getAllIDs())
+			{
+				Object* object = findObjectByID(id);
+				const CommandSet* set = object ? TheControlBar->findCommandSet(object->getCommandSetString()) : nullptr;
+				if (!set || set->getCommandButton(slot) != button || !button->canUseRetailToggle(object, state))
+					continue;
+
+				auto* horde = const_cast<HordeContain*>(HordeContain::get(object));
+				if (button->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION)
+				{
+					horde->setAlternateFormation(state < 0 ? !horde->isAlternateFormation() : state != 0);
+				}
+				else
+				{
+					const WeaponSetFlags& flags = button->getFlagsUsedForToggle();
+					const Bool enabled = state < 0 ? !object->getWeaponSetFlags().testForAll(flags) : state != 0;
+					if (horde)
+						horde->toggleWeaponSet(flags, enabled);
+					else
+						object->setWeaponSetFlags(flags, enabled);
+				}
+			}
 			break;
 		}
 		case GameMessage::MSG_SET_MINE_CLEARING_DETAIL:
