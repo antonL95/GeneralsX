@@ -53,6 +53,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ActiveBody.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/BridgeBehavior.h"
 #include "GameLogic/Module/DamageModule.h"
 #include "GameLogic/Module/DieModule.h"
@@ -484,6 +485,7 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 		// if our health has gone down then do run the damage module callback
 		if( m_currentHealth < m_prevHealth )
 		{
+			HordeAIUpdate::retaliate(obj, TheGameLogic->findObjectByID(damageInfo->in.m_sourceID));
 			for (BehaviorModule** m = obj->getBehaviorModules(); *m; ++m)
 			{
 				DamageModuleInterface* d = (*m)->getDamage();

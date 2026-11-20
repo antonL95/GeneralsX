@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/RetailTestCommands.h"
 #include <cmath>	// For isnan() on Linux
 #define DEFINE_WEAPONCONDITIONMAP
 #include "Common/BitFlagsIO.h"
@@ -1374,12 +1375,17 @@ CanAttackResult Object::getAbleToAttackSpecificObject( AbleToAttackType t, const
 	// Otherwise leave it up to our weapons.
 	if (const HordeContain* horde = HordeContain::get(this))
 	{
+		const HordeContain* enemy = HordeContain::get(target);
 		CanAttackResult best = ATTACKRESULT_NOT_POSSIBLE;
 		for (const Object* member : *horde->getContainedItemsList())
 		{
 			if (!member->isEffectivelyDead() && horde->rankCanAttack(member) && member->isAbleToAttack())
 			{
-				const auto result = member->getAbleToAttackSpecificObject(t, target, commandSource);
+				CanAttackResult result;
+				if (enemy)
+					enemy->findAttackTarget(member, t, commandSource, (WeaponSlotType)-1, &result);
+				else
+					result = member->getAbleToAttackSpecificObject(t, target, commandSource);
 				if (result == ATTACKRESULT_POSSIBLE)
 					return result;
 				if (result == ATTACKRESULT_POSSIBLE_AFTER_MOVING)
@@ -4278,6 +4284,7 @@ void Object::onCapture( Player *oldOwner, Player *newOwner )
 /// Object level events that need to happen upon game death
 void Object::onDie( DamageInfo *damageInfo )
 {
+	RetailTestCommands::logHordeDeath(this, damageInfo);
 
 #if defined(RTS_DEBUG)
 	DEBUG_ASSERTCRASH(m_hasDiedAlready == false, ("Object::onDie has been called multiple times. This is invalid. jkmcd"));

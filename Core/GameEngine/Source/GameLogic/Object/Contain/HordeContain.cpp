@@ -14,6 +14,7 @@
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/WeaponSet.h"
 #include "GameLogic/WeaponSetFlags.h"
 #include "Lib/trig.h"
 
@@ -412,18 +413,64 @@ void HordeContain::xfer( Xfer *xfer )
 		xfer->xferBool(&m_hadMembers);
 	}
 	else
-		m_hadMembers = getContainCount() != 0;
+		m_restoreHadMembers = TRUE;
 }
 
 void HordeContain::loadPostProcess()
 {
 	TransportContain::loadPostProcess();
+	if (m_restoreHadMembers)
+	{
+		m_hadMembers = getContainCount() != 0;
+		m_restoreHadMembers = FALSE;
+	}
 }
 
 const HordeContain* HordeContain::get(const Object* object)
 {
 	const ContainModuleInterface* contain = object ? object->getContain() : nullptr;
 	return contain && contain->isHordeContain() ? static_cast<const HordeContain*>(contain) : nullptr;
+}
+
+Object* HordeContain::getAnchor(Object* member)
+{
+	Object* anchor = member ? member->getContainedBy() : nullptr;
+	return get(anchor) ? anchor : nullptr;
+}
+
+Object* HordeContain::findAttackTarget(const Object* attacker, AbleToAttackType attackType,
+	CommandSourceType source, [[maybe_unused]] WeaponSlotType slot, CanAttackResult* attackResult) const
+{
+	if (attackResult)
+		*attackResult = ATTACKRESULT_NOT_POSSIBLE;
+	Object* nearest = nullptr;
+	Real nearestDistance = 0.0f;
+	const Coord3D& pos = *attacker->getPosition();
+	for (Object* candidate : *getContainedItemsList())
+	{
+		if (candidate->isEffectivelyDead() || get(candidate))
+			continue;
+		const Coord3D& targetPos = *candidate->getPosition();
+		const Real x = pos.x - targetPos.x;
+		const Real y = pos.y - targetPos.y;
+		const Real distance = x * x + y * y;
+		if (nearest && (distance > nearestDistance ||
+			(distance == nearestDistance && candidate->getID() >= nearest->getID())))
+			continue;
+#if RTS_ZEROHOUR
+		const auto result = attacker->getAbleToAttackSpecificObject(attackType, candidate, source, slot);
+#else
+		const auto result = attacker->getAbleToAttackSpecificObject(attackType, candidate, source);
+#endif
+		if (result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING)
+		{
+			nearest = candidate;
+			nearestDistance = distance;
+			if (attackResult)
+				*attackResult = result;
+		}
+	}
+	return nearest;
 }
 
 Drawable* HordeContain::resolveSelection(Drawable* draw)

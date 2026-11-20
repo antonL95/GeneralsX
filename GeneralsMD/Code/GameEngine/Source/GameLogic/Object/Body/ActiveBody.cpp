@@ -56,6 +56,8 @@
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ActiveBody.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/BridgeBehavior.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DamageModule.h"
@@ -629,6 +631,7 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 		// if our health has gone down then do run the damage module callback
 		if( m_currentHealth < m_prevHealth )
 		{
+			HordeAIUpdate::retaliate(obj, damager);
 			for (BehaviorModule** m = obj->getBehaviorModules(); *m; ++m)
 			{
 				DamageModuleInterface* d = (*m)->getDamage();
@@ -723,6 +726,8 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 			MemoryPoolObjectHolder hold( iter );
 			for( Object *them = iter->first(); them; them = iter->next() )
 			{
+				if (HordeContain::getAnchor(them))
+					continue;
 				if (!shouldRetaliate(them)) {
 					continue;
 				}

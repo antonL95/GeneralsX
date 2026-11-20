@@ -9,6 +9,8 @@
 
 #include <vector>
 
+enum CanAttackResult CPP_11(: Int);
+
 class HordeContainModuleData : public TransportContainModuleData
 {
 public:
@@ -127,8 +129,11 @@ public:
 
 	Int getMemberSlot( ObjectID id ) const;
 	Bool rankCanAttack(const Object* member) const;
+	Object* findAttackTarget(const Object* attacker, AbleToAttackType attackType, CommandSourceType source,
+		WeaponSlotType slot = (WeaponSlotType)-1, CanAttackResult* attackResult = nullptr) const;
 	Coord3D getMemberPosition(ObjectID id, Bool followLeader) const;
 	static const HordeContain* get(const Object* object);
+	static Object* getAnchor(Object* member);
 	static Drawable* resolveSelection(Drawable* draw);
 
 protected:
@@ -139,6 +144,7 @@ private:
 	std::vector<ObjectID> m_slotMembers;
 	std::vector<Coord2D> m_slotOffsets;
 	Bool m_hadMembers = FALSE;
+	Bool m_restoreHadMembers = FALSE;
 };
 
 struct HorseHordeContainModuleData : public HordeContainModuleData

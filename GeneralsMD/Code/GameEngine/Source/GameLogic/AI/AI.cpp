@@ -39,6 +39,7 @@
 #include "GameLogic/AI.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/SidesList.h"
@@ -549,6 +550,8 @@ public:
 
 	virtual Bool allow(Object* objOther) override
 	{
+		if (HordeContain::get(m_obj))
+			return m_obj->getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, objOther, CMD_FROM_AI) == ATTACKRESULT_POSSIBLE;
 		for (Int i = 0; i < WEAPONSLOT_COUNT;	i++ )
 		{
 			// ignore empty slots.

@@ -1,5 +1,8 @@
 #include "PreRTS.h"
 
+#define DEFINE_DEATH_NAMES
+#include "GameLogic/Damage.h"
+
 #include "GameLogic/RetailTestCommands.h"
 
 #include <algorithm>
@@ -828,6 +831,21 @@ void execute(const Command& command, unsigned int frame)
 			queued = production->queueCreateUnit(type, production->requestUniqueUnitID());
 		std::fprintf(stderr, "TEST horde queue %u %s %d\n", frame, command.structure.c_str(), queued ? 1 : 0);
 	}
+	else if (command.action == "hordenoauto" && HordeContain::get(obj))
+	{
+		const ModuleInfo& modules = obj->getTemplate()->getBehaviorModuleInfo();
+		for (Int i = 0; i < modules.getCount(); ++i)
+		{
+			if (stricmp(modules.getNthName(i).str(), "HordeAIUpdate") != 0)
+				continue;
+			const auto* moduleData = static_cast<const AIUpdateModuleData*>(modules.getNthData(i));
+			auto* data = const_cast<AIUpdateModuleData*>(moduleData);
+			data->m_autoAcquireEnemiesWhenIdle = 0;
+			std::fprintf(stderr, "TEST horde noauto %u %u\n", frame, static_cast<unsigned>(obj->getID()));
+			std::fflush(stderr);
+			break;
+		}
+	}
 	else if (command.action == "hordeproject" && TheTacticalView)
 	{
 		Coord3D point = command.hasLocation ? groundLocation(command) : *obj->getPosition();
@@ -1001,6 +1019,23 @@ bool tracesCombat()
 	static const bool traces = RetailFileLayers::enabled() && std::getenv("GENERALSX_TEST_COMMANDS") &&
 		*std::getenv("GENERALSX_TEST_COMMANDS");
 	return traces;
+}
+
+void logHordeDeath(const Object* object, const DamageInfo* damage)
+{
+	if (!tracesCombat())
+		return;
+	const Object* parent = object->getContainedBy();
+	if (!HordeContain::get(object) && !HordeContain::get(parent))
+		return;
+
+	const Object* source = TheGameLogic->findObjectByID(damage->in.m_sourceID);
+	std::fprintf(stderr, "TEST horde death %u %u %s anchor=%u source=%u(%s) damage=%s death=%s\n",
+		TheGameLogic->getFrame(), static_cast<unsigned>(object->getID()), object->getTemplate()->getName().str(),
+		static_cast<unsigned>(parent ? parent->getID() : INVALID_ID), static_cast<unsigned>(damage->in.m_sourceID),
+		source ? source->getTemplate()->getName().str() : "-",
+		DamageTypeFlags::getNameFromSingleBit(damage->in.m_damageType), TheDeathNames[damage->in.m_deathType]);
+	std::fflush(stderr);
 }
 
 void runFrame(unsigned int frame)
