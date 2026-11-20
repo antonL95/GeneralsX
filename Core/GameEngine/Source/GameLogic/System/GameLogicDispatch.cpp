@@ -86,7 +86,6 @@
 #include "GameClient/LookAtXlat.h"
 
 #include "GameNetwork/NetworkInterface.h"
-#include "Common/RetailFileLayers.h"
 
 
 
