@@ -35,6 +35,7 @@
 #include "Common/Snapshot.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/LocomotorSet.h"
+#include "GameLogic/RotwkLocomotorRules.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Locomotor;
@@ -163,6 +164,8 @@ public:
 	static void parseRotwkBraking(INI* ini, void* instance, void* store, const void* userData);
 	static void parseRotwkTurnTime(INI* ini, void* instance, void* store, const void* userData);
 	static void parseRotwkTurnTimeDamaged(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotwkLift(INI* ini, void* instance, void* store, const void* userData);
+	static void parseRotwkLiftDamaged(INI* ini, void* instance, void* store, const void* userData);
 
 private:
 
@@ -257,13 +260,7 @@ private:
 	Real											m_elevatorCorrectionDegree;
 	Real											m_elevatorCorrectionRate;
 
-	Real											m_rotwkSpeedDamagedFraction;
-	Real											m_rotwkMinSpeedFraction;
-	Real											m_rotwkMinTurnSpeedFraction;
-	UnsignedInt									m_rotwkAccelerationFrames;
-	UnsignedInt									m_rotwkBrakingFrames;
-	UnsignedInt									m_rotwkTurnFrames;
-	UnsignedInt									m_rotwkTurnFramesDamaged;
+	RotwkLocomotorRules::Authored	m_rotwk;
 };
 
 typedef OVERRIDE<LocomotorTemplate> LocomotorTemplateOverride;

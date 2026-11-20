@@ -387,10 +387,13 @@ public:
 		m_task = task;
 		m_enterFrame = 0;
 		m_builderInside = FALSE;
+		m_structureID = INVALID_ID;
 	}
 	virtual StateReturnType update() override;
 	virtual StateReturnType onEnter() override;
 	virtual void onExit( StateExitType status ) override;
+
+	void leaveStructure();
 
 protected:
 	// snapshot interface
@@ -403,8 +406,10 @@ protected:
 	DozerTask m_task;						///< our task
 	UnsignedInt m_enterFrame;		///< frame we entered this state on
 	Bool m_builderInside;
+	ObjectID m_structureID;
 
-	void setBuilderInside( Bool inside );
+	void enterStructure( const Object *structure );
+	void placeOutside( Object *dozer );
 
 };
 EMPTY_DTOR(DozerActionDoActionState)
@@ -429,7 +434,10 @@ void DozerActionDoActionState::xfer( Xfer *xfer )
 	xfer->xferUser(&m_task, sizeof(m_task));
 	xfer->xferUnsignedInt(&m_enterFrame);
 	if( version >= 2 )
+	{
 		xfer->xferBool(&m_builderInside);
+		xfer->xferObjectID(&m_structureID);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -437,23 +445,73 @@ void DozerActionDoActionState::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void DozerActionDoActionState::loadPostProcess()
 {
+	if( m_builderInside )
+		ThePartitionManager->unRegisterObject( getMachineOwner() );
 }
 
-void DozerActionDoActionState::setBuilderInside( Bool inside )
+void DozerActionDoActionState::enterStructure( const Object *structure )
 {
 	Object *dozer = getMachineOwner();
-	m_builderInside = inside;
-	dozer->setStatus( MAKE_OBJECT_STATUS_MASK3( OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_MASKED, OBJECT_STATUS_NO_COLLISIONS ), inside );
+	m_builderInside = TRUE;
+	m_structureID = structure->getID();
+	dozer->setStatus( MAKE_OBJECT_STATUS_MASK3( OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_MASKED, OBJECT_STATUS_NO_COLLISIONS ) );
 	if( Drawable *draw = dozer->getDrawable() )
-		draw->setDrawableHidden( inside );
-	if( inside )
-		TheGameLogic->deselectObject( dozer, PLAYERMASK_ALL, TRUE );
+		draw->setDrawableHidden( TRUE );
+	TheGameLogic->deselectObject( dozer, PLAYERMASK_ALL, TRUE );
+	ThePartitionManager->unRegisterObject( dozer );
+}
+
+void DozerActionDoActionState::placeOutside( Object *dozer )
+{
+	Coord3D pos = *dozer->getPosition();
+	if( const Object *structure = TheGameLogic->findObjectByID( m_structureID ) )
+	{
+		const Coord3D *center = structure->getPosition();
+		const Real clearance = structure->getGeometryInfo().getBoundingCircleRadius() + dozer->getGeometryInfo().getBoundingCircleRadius();
+		Coord2D away;
+		away.x = pos.x - center->x;
+		away.y = pos.y - center->y;
+		const Real distance = away.length();
+		if( distance < clearance )
+		{
+			if( distance > 0.01f )
+			{
+				away.x /= distance;
+				away.y /= distance;
+			}
+			else
+				away.set( 1.0f, 0.0f );
+			pos.x = center->x + away.x * clearance;
+			pos.y = center->y + away.y * clearance;
+		}
+	}
+	TheAI->pathfinder()->adjustToPossibleDestination( dozer, dozer->getAIUpdateInterface()->getLocomotorSet(), &pos );
+	pos.z = TheTerrainLogic->getGroundHeight( pos.x, pos.y );
+	dozer->setPosition( &pos );
+}
+
+void DozerActionDoActionState::leaveStructure()
+{
+	if( !m_builderInside )
+		return;
+	m_builderInside = FALSE;
+
+	Object *dozer = getMachineOwner();
+	if( dozer->isDestroyed() || !dozer->getAIUpdateInterface() )
+		return;
+
+	dozer->clearStatus( MAKE_OBJECT_STATUS_MASK3( OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_MASKED, OBJECT_STATUS_NO_COLLISIONS ) );
+	if( Drawable *draw = dozer->getDrawable() )
+		draw->setDrawableHidden( FALSE );
+	ThePartitionManager->registerObject( dozer );
+	if( !dozer->isEffectivelyDead() )
+		placeOutside( dozer );
+	dozer->handlePartitionCellMaintenance();
 }
 
 void DozerActionDoActionState::onExit( StateExitType status )
 {
-	if( m_builderInside )
-		setBuilderInside( FALSE );
+	leaveStructure();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -516,6 +574,9 @@ StateReturnType DozerActionDoActionState::update()
 		//---------------------------------------------------------------------------------------------
 		case DOZER_TASK_BUILD:
 		{
+			if( RetailFileLayers::enabled() && goalObject->isEffectivelyDead() )
+				return STATE_FAILURE;
+
 			//GS Moved this inside Build, since you are allowed to Repair things that are not your player (canRepairObject handles it)
 			if (dozer->getControllingPlayer() != goalObject->getControllingPlayer())//Yipes, SOmehow I have changed sides in mid build!
 				return STATE_FAILURE;
@@ -538,8 +599,8 @@ StateReturnType DozerActionDoActionState::update()
 				if( ai->isIdle() )
 				{
 					dozerAI->setBuildSubTask( DOZER_DO_BUILD_AT_DOCK );
-					if( RetailFileLayers::enabled() )
-						setBuilderInside( TRUE );
+					if( RetailFileLayers::enabled() && !ai->getWorkerAIInterface() )
+						enterStructure( goalObject );
 					// Get the audio sound and start playing the construction sound (get the sound
 					// from the building itself)
 					dozerAI->startBuildingSound( goalObject->getTemplate()->getPerUnitSound( "UnderConstruction" ), goalObject->getID() );
@@ -821,6 +882,8 @@ public:
   DozerActionStateMachine( Object *owner, DozerTask task );
 	// virtual destructor prototypes provided by memory pool object
 
+	void leaveStructure();
+
 protected:
 	// snapshot interface
 	virtual void crc( Xfer *xfer ) override;
@@ -890,6 +953,11 @@ void DozerActionStateMachine::xfer( Xfer *xfer )
 void DozerActionStateMachine::loadPostProcess()
 {
 	StateMachine::loadPostProcess();
+}
+
+void DozerActionStateMachine::leaveStructure()
+{
+	static_cast<DozerActionDoActionState *>( internalGetState( DOZER_ACTION_DO_ACTION ) )->leaveStructure();
 }
 
 
@@ -1214,7 +1282,7 @@ protected:
 protected:
 
 	DozerTask m_task;									// task for this state (and therefore sub-machine too)
-	StateMachine *m_actionMachine;
+	DozerActionStateMachine *m_actionMachine;
 
 };
 inline DozerActionState::~DozerActionState() { deleteInstance(m_actionMachine); }
@@ -1278,6 +1346,7 @@ StateReturnType DozerActionState::onEnter()
 // ------------------------------------------------------------------------------------------------
 void DozerActionState::onExit( StateExitType status )
 {
+	m_actionMachine->leaveStructure();
 
 	// save the current action of the dozer as none
 	Object *dozer = getMachineOwner();
@@ -1628,7 +1697,11 @@ UpdateSleepTime DozerAIUpdate::update()
 	// do nothing if we're dead
 	///@todo shouldn't this be at a higher level?
 	if( getObject()->isEffectivelyDead() )
+	{
+		if( RetailFileLayers::enabled() && getCurrentTask() != DOZER_TASK_INVALID )
+			m_dozerMachine->resetToDefaultState();
 		return UPDATE_SLEEP_NONE;
+	}
 
 	// get and validate our current task
 	DozerTask currentTask = getCurrentTask();
@@ -1649,6 +1722,9 @@ UpdateSleepTime DozerAIUpdate::update()
 		else if (currentTask == DOZER_TASK_BUILD && targetObject == nullptr)
 			invalidTask = TRUE;
 #endif
+		else if( currentTask == DOZER_TASK_BUILD && RetailFileLayers::enabled() && targetObject &&
+				( targetObject->isEffectivelyDead() || targetObject->getControllingPlayer() != getObject()->getControllingPlayer() ) )
+			invalidTask = TRUE;
 
 		// cancel the task if it's now invalid
 		if( invalidTask == TRUE )

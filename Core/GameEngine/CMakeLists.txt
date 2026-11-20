@@ -67,6 +67,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/AISpecialPowerUpdate.h
     Include/GameLogic/Module/RotwkParseOnlyModules.h
     Include/GameLogic/CastleRules.h
+    Include/GameLogic/RotwkLocomotorRules.h
     Include/GameLogic/CastleTemplateStore.h
     Include/GameLogic/RetailTestCommands.h
     Include/GameLogic/Module/CastleBehavior.h

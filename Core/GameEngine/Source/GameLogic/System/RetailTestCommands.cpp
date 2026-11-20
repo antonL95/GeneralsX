@@ -32,6 +32,7 @@
 #include "GameLogic/Module/UpgradeModule.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
@@ -380,6 +381,9 @@ void dumpPlayer(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST player_obj %u %s %s id=%u upgradedModules=%d commandSet=%s\n", frame,
 			command.player.c_str(), obj->getTemplate()->getName().str(), static_cast<unsigned>(obj->getID()),
 			upgradedModules, obj->getCommandSetString().str());
+	}
+}
+
 Coord3D groundLocation(const Command& command)
 {
 	Coord3D location = command.location;
@@ -405,7 +409,10 @@ void logObject(const Object* obj, unsigned int frame)
 	const PhysicsBehavior* physics = obj->getPhysics();
 	if (physics)
 		std::fprintf(stderr, " velocity %.4f", physics->getVelocityMagnitude());
-	std::fprintf(stderr, " construction %.2f\n", obj->getConstructionPercent());
+	const Drawable* draw = obj->getDrawable();
+	std::fprintf(stderr, " hidden %d masked %d registered %d dead %d construction %.2f\n",
+		draw && draw->isDrawableEffectivelyHidden() ? 1 : 0, obj->testStatus(OBJECT_STATUS_MASKED) ? 1 : 0,
+		obj->friend_getPartitionData() ? 1 : 0, obj->isEffectivelyDead() ? 1 : 0, obj->getConstructionPercent());
 }
 
 void logBuildChecks(Object* builder, const ThingTemplate* what, const Command& command, unsigned int frame)
@@ -440,6 +447,41 @@ void logButtons(Object* obj, const Command& command, unsigned int frame)
 		if (what && button->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT && command.hasLocation)
 			logBuildChecks(obj, what, command, frame);
 	}
+}
+
+Player* findPlayer(const std::string& name)
+{
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		Player* player = ThePlayerList->getNthPlayer(i);
+		if (stricmp(TheNameKeyGenerator->keyToName(player->getPlayerNameKey()).str(), name.c_str()) == 0)
+			return player;
+	}
+	return nullptr;
+}
+
+void capture(const Command& command, Object* obj, unsigned int frame)
+{
+	Player* player = findPlayer(command.structure);
+	if (!player)
+		return;
+	obj->setTeam(player->getDefaultTeam());
+	std::fprintf(stderr, "TEST frame %u: capture object %u by %s\n", frame, static_cast<unsigned>(obj->getID()),
+		command.structure.c_str());
+}
+
+void repair(const Command& command, Object* obj, unsigned int frame)
+{
+	Command targetCommand = command;
+	targetCommand.target = command.structure;
+	targetCommand.ordinal = 0;
+	Object* target = findObject(targetCommand);
+	AIUpdateInterface* ai = obj->getAI();
+	if (!target || !ai)
+		return;
+	ai->aiRepair(target, CMD_FROM_AI);
+	std::fprintf(stderr, "TEST frame %u: repair object %u by %u\n", frame, static_cast<unsigned>(target->getID()),
+		static_cast<unsigned>(obj->getID()));
 }
 
 void logAllObjects(unsigned int frame)
@@ -488,6 +530,15 @@ void execute(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST frame %u: cancel\n", frame);
 		return;
 	}
+	if (command.action == "defeat")
+	{
+		if (Player* player = findPlayer(command.player))
+		{
+			std::fprintf(stderr, "TEST frame %u: defeat %s\n", frame, command.player.c_str());
+			player->killPlayer();
+		}
+		return;
+	}
 
 	Object* obj = findObject(command);
 	if (!obj)
@@ -516,6 +567,24 @@ void execute(const Command& command, unsigned int frame)
 			command.target.c_str());
 		obj->kill();
 	}
+	else if (command.action == "destroy")
+	{
+		std::fprintf(stderr, "TEST frame %u: destroy object %u (%s)\n", frame, static_cast<unsigned>(obj->getID()),
+			command.target.c_str());
+		TheGameLogic->destroyObject(obj);
+	}
+	else if (command.action == "damage")
+	{
+		BodyModuleInterface* body = obj->getBodyModule();
+		if (body)
+			body->internalChangeHealth(-static_cast<Real>(std::atof(command.structure.c_str())));
+		std::fprintf(stderr, "TEST frame %u: damage object %u to %.1f\n", frame, static_cast<unsigned>(obj->getID()),
+			body ? body->getHealth() : 0.0f);
+	}
+	else if (command.action == "capture")
+		capture(command, obj, frame);
+	else if (command.action == "repair")
+		repair(command, obj, frame);
 	else if (command.action == "log")
 	{
 		logObject(obj, frame);

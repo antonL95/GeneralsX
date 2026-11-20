@@ -1,0 +1,72 @@
+#pragma once
+
+namespace RotwkLocomotorRules
+{
+inline constexpr unsigned int RETAIL_LOGIC_FRAME_MS = 200;
+inline constexpr float FULL_TURN = 6.28318530718f;
+
+struct Authored
+{
+	float speedDamagedFraction = -1.0f;
+	float minSpeedFraction = 0.0f;
+	float minTurnSpeedFraction = -1.0f;
+	float liftFraction = -1.0f;
+	float liftDamagedFraction = -1.0f;
+	unsigned int accelerationFrames = 0;
+	unsigned int brakingFrames = 0;
+	unsigned int turnFrames = 0;
+	unsigned int turnFramesDamaged = 0;
+};
+
+struct Resolved
+{
+	float maxSpeed;
+	float maxSpeedDamaged;
+	float minSpeed;
+	float minTurnSpeed;
+	float acceleration;
+	float accelerationDamaged;
+	float braking;
+	float lift;
+	float liftDamaged;
+	float turnRate;
+	float turnRateDamaged;
+};
+
+inline unsigned int retailDurationMs(unsigned int ms)
+{
+	return (ms + RETAIL_LOGIC_FRAME_MS - 1) / RETAIL_LOGIC_FRAME_MS * RETAIL_LOGIC_FRAME_MS;
+}
+
+inline unsigned int durationFrames(unsigned int ms, unsigned int framesPerSecond)
+{
+	return (retailDurationMs(ms) * framesPerSecond + 999) / 1000;
+}
+
+inline float rateToReach(float speed, unsigned int frames)
+{
+	return frames > 0 ? speed / static_cast<float>(frames) : speed;
+}
+
+inline Resolved resolve(const Authored& authored, float speed, const Resolved& fallback)
+{
+	Resolved resolved = fallback;
+	resolved.maxSpeed = speed;
+	resolved.maxSpeedDamaged = authored.speedDamagedFraction >= 0.0f ? speed * authored.speedDamagedFraction : speed;
+	resolved.minSpeed = speed * authored.minSpeedFraction;
+	if (authored.minTurnSpeedFraction >= 0.0f)
+		resolved.minTurnSpeed = speed * authored.minTurnSpeedFraction;
+	resolved.acceleration = rateToReach(speed, authored.accelerationFrames);
+	resolved.accelerationDamaged = rateToReach(resolved.maxSpeedDamaged, authored.accelerationFrames);
+	if (authored.brakingFrames > 0)
+		resolved.braking = speed / static_cast<float>(authored.brakingFrames);
+	if (authored.liftFraction >= 0.0f)
+		resolved.lift = speed * authored.liftFraction;
+	if (authored.liftDamagedFraction >= 0.0f)
+		resolved.liftDamaged = speed * authored.liftDamagedFraction;
+	if (authored.turnFrames > 0)
+		resolved.turnRate = FULL_TURN / static_cast<float>(authored.turnFrames);
+	resolved.turnRateDamaged = authored.turnFramesDamaged > 0 ? FULL_TURN / static_cast<float>(authored.turnFramesDamaged) : resolved.turnRate;
+	return resolved;
+}
+}
