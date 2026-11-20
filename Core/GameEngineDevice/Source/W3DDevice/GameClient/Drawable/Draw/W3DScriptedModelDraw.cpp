@@ -2,6 +2,7 @@
 #define DEFINE_WEAPONSLOTTYPE_NAMES
 
 #include "W3DDevice/GameClient/Module/W3DScriptedModelDraw.h"
+#include "Common/ModuleFactory.h"
 #include "Common/BitFlagsIO.h"
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
@@ -92,7 +93,8 @@ void W3DScriptedModelDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
-	p.add(fields);
+	if (ModuleFactory::registersRotwkModules())
+		p.add(fields);
 	W3DModelDrawModuleData::buildFieldParse(p);
 }
 

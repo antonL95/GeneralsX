@@ -33,13 +33,13 @@
 #include "Common/DrawModule.h"
 #include "Common/AudioEventRTS.h"
 #include "GameClient/ParticleSys.h"
-#include "W3DDevice/GameClient/Module/W3DModelDraw.h"
+#include "W3DDevice/GameClient/Module/W3DScriptedModelDraw.h"
 #include "WW3D2/hanim.h"
 #include "WW3D2/rendobj.h"
 #include "WW3D2/part_emt.h"
 
 //-------------------------------------------------------------------------------------------------
-class W3DTruckDrawModuleData : public W3DModelDrawModuleData
+class W3DTruckDrawModuleData : public W3DScriptedModelDrawModuleData
 {
 public:
 	AsciiString m_dustEffectName;
@@ -58,6 +58,7 @@ public:
 	//And some more
 	AsciiString m_midMidLeftTireBoneName;
 	AsciiString m_midMidRightTireBoneName;
+	AsciiString m_secondaryTireBoneNames[6];
 
 	// Cab bone for a segmented truck.
 	AsciiString m_cabBoneName;

@@ -46,6 +46,9 @@
 #include "WWLib/hashtemplate.h"
 #include "WWLib/simplevec.h"
 
+#include <map>
+#include <string>
+
 class	HAnimClass;
 class	HTreeClass;
 class	ChunkLoadClass;
@@ -393,6 +396,11 @@ protected:
 	*/
 	HTreeManagerClass					HTreeManager;
 	HAnimManagerClass					HAnimManager;
+	std::map<std::string, std::string> BareAnimationNames;
+
+	bool Load_3D_Assets(const char* filename, StringClass* resolvedAnimation);
+	bool Load_3D_Assets(FileClass& w3dfile, StringClass* resolvedAnimation);
+	HAnimClass* Get_Bare_HAnim(const char* name);
 
 	/*
 	** list of Font3DDatas

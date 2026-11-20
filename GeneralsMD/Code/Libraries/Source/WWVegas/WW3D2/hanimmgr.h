@@ -75,7 +75,7 @@ public:
 	HAnimManagerClass();
 	~HAnimManagerClass();
 
-	int			 		Load_Anim(ChunkLoadClass & cload);
+	int			 		Load_Anim(ChunkLoadClass & cload, StringClass* resolved = nullptr);
 	HAnimClass *		Get_Anim(const char * name);
 	HAnimClass *		Peek_Anim(const char * name);
 	bool					Add_Anim(HAnimClass *new_anim);
@@ -88,9 +88,9 @@ public:
 	void					Reset_Missing();
 
 private:
-	int					Load_Compressed_Anim(ChunkLoadClass & cload);
-	int					Load_Raw_Anim(ChunkLoadClass & cload);
-	int					Load_Morph_Anim(ChunkLoadClass & cload);
+	int					Load_Compressed_Anim(ChunkLoadClass & cload, StringClass* resolved);
+	int					Load_Raw_Anim(ChunkLoadClass & cload, StringClass* resolved);
+	int					Load_Morph_Anim(ChunkLoadClass & cload, StringClass* resolved);
 
 	HashTableClass	*	AnimPtrTable;
 	HashTableClass	*	MissingAnimTable;

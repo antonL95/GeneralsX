@@ -297,6 +297,8 @@ static PoolSizeRec PoolSizes[] =
 	{ "W3DDependencyModelDraw", 64, 64 },
 	{ "W3DLaserDraw", 32, 32 },
 	{ "W3DModelDraw", 2048, 512 },
+	{ "W3DQuadrupedDraw", 16, 16 },
+	{ "W3DSailModelDraw", 16, 16 },
 	{ "W3DOverlordTankDraw", 64, 64 },
 	{ "W3DOverlordTruckDraw", 64, 64 },
 	{ "W3DOverlordAircraftDraw", 64, 64 },

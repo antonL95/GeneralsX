@@ -48,6 +48,7 @@
 #include "GameLogic/ScriptEngine.h"
 #include "W3DDevice/GameClient/W3DGameClient.h"
 #include "W3DDevice/GameClient/Module/W3DTruckDraw.h"
+#include "Common/ModuleFactory.h"
 
 
 //-------------------------------------------------------------------------------------------------
@@ -63,7 +64,21 @@ W3DTruckDrawModuleData::~W3DTruckDrawModuleData()
 //-------------------------------------------------------------------------------------------------
 void W3DTruckDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
-  W3DModelDrawModuleData::buildFieldParse(p);
+  W3DScriptedModelDrawModuleData::buildFieldParse(p);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse fields[] =
+		{
+			{ "LeftFrontTireBone2", INI::parseAsciiString, nullptr, offsetof(W3DTruckDrawModuleData, m_secondaryTireBoneNames[0]) },
+			{ "RightFrontTireBone2", INI::parseAsciiString, nullptr, offsetof(W3DTruckDrawModuleData, m_secondaryTireBoneNames[1]) },
+			{ "LeftRearTireBone2", INI::parseAsciiString, nullptr, offsetof(W3DTruckDrawModuleData, m_secondaryTireBoneNames[2]) },
+			{ "RightRearTireBone2", INI::parseAsciiString, nullptr, offsetof(W3DTruckDrawModuleData, m_secondaryTireBoneNames[3]) },
+			{ "MidLeftMidTireBone2", INI::parseAsciiString, nullptr, offsetof(W3DTruckDrawModuleData, m_secondaryTireBoneNames[4]) },
+			{ "MidRightMidTireBone2", INI::parseAsciiString, nullptr, offsetof(W3DTruckDrawModuleData, m_secondaryTireBoneNames[5]) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(fields);
+	}
 
 	static const FieldParse dataFieldParse[] =
 	{

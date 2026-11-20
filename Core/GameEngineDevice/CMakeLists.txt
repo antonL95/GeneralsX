@@ -25,6 +25,8 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/GameClient/Module/W3DProjectileStreamDraw.h
     Include/W3DDevice/GameClient/Module/W3DPropDraw.h
     Include/W3DDevice/GameClient/Module/W3DFloorDraw.h
+    Include/W3DDevice/GameClient/Module/W3DQuadrupedDraw.h
+    Include/W3DDevice/GameClient/Module/W3DSailModelDraw.h
     Include/W3DDevice/GameClient/Module/W3DRopeDraw.h
     Include/W3DDevice/GameClient/Module/W3DScienceModelDraw.h
     Include/W3DDevice/GameClient/Module/W3DSupplyDraw.h
@@ -112,6 +114,8 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/Drawable/Draw/W3DProjectileStreamDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DPropDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DFloorDraw.cpp
+    Source/W3DDevice/GameClient/Drawable/Draw/W3DQuadrupedDraw.cpp
+    Source/W3DDevice/GameClient/Drawable/Draw/W3DSailModelDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DRopeDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DScienceModelDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DSupplyDraw.cpp

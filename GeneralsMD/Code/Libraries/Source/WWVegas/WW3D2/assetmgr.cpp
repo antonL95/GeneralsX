@@ -463,6 +463,7 @@ void WW3DAssetManager::Free_Assets()
 	memset(PrototypeHashTable,0,sizeof(PrototypeClass *) * PROTOTYPE_HASH_TABLE_SIZE);
 
 	// delete all of the anims and trees
+	BareAnimationNames.clear();
 	HAnimManager.Free_All_Anims();
 	HTreeManager.Free_All_Trees();
 
@@ -620,12 +621,17 @@ void WW3DAssetManager::Create_Asset_List(DynamicVectorClass<StringClass> & model
  *=============================================================================================*/
 bool WW3DAssetManager::Load_3D_Assets( const char * filename )
 {
+	return Load_3D_Assets(filename, nullptr);
+}
+
+bool WW3DAssetManager::Load_3D_Assets(const char* filename, StringClass* resolvedAnimation)
+{
 	bool result = false;
 
 	FileClass * file = _TheFileFactory->Get_File( filename );
 	if ( file ) {
 		if ( file->Is_Available() ) {
-			result = WW3DAssetManager::Load_3D_Assets( *file );
+			result = Load_3D_Assets(*file, resolvedAnimation);
 		} else {
 			WWDEBUG_SAY(("Missing asset '%s'.", filename));
 		}
@@ -649,6 +655,11 @@ bool WW3DAssetManager::Load_3D_Assets( const char * filename )
  *   12/21/97   GTH : Created.                                                                 *
  *=============================================================================================*/
 bool WW3DAssetManager::Load_3D_Assets(FileClass & w3dfile)
+{
+	return Load_3D_Assets(w3dfile, nullptr);
+}
+
+bool WW3DAssetManager::Load_3D_Assets(FileClass& w3dfile, StringClass* resolvedAnimation)
 {
 	WWPROFILE( "WW3DAssetManager::Load_3D_Assets" );
 	if (!w3dfile.Open()) {
@@ -687,7 +698,7 @@ bool WW3DAssetManager::Load_3D_Assets(FileClass & w3dfile)
 			case W3D_CHUNK_ANIMATION:
 			case W3D_CHUNK_COMPRESSED_ANIMATION:
 			case W3D_CHUNK_MORPH_ANIMATION:
-				loaded = HAnimManager.Load_Anim(cload) == 0;
+				loaded = HAnimManager.Load_Anim(cload, resolvedAnimation && resolvedAnimation->Is_Empty() ? resolvedAnimation : nullptr) == 0;
 				break;
 
 			default:
@@ -987,9 +998,41 @@ AssetIterator * WW3DAssetManager::Create_Font3DData_Iterator()
  * HISTORY:                                                                                    *
  *   12/21/97   GTH : Created.                                                                 *
  *=============================================================================================*/
+HAnimClass* WW3DAssetManager::Get_Bare_HAnim(const char* name)
+{
+	StringClass key(name, true);
+	_strlwr(key.Peek_Buffer());
+	auto entry = BareAnimationNames.find(key.str());
+	if (entry != BareAnimationNames.end())
+	{
+		if (entry->second.empty())
+			return nullptr;
+		if (HAnimClass* anim = HAnimManager.Get_Anim(entry->second.c_str()))
+			return anim;
+	}
+
+	if (!WW3D_Load_On_Demand)
+		return nullptr;
+
+	const StringClass filename = key + ".w3d";
+	StringClass resolved;
+	Load_3D_Assets(filename.str(), &resolved);
+	BareAnimationNames.insert_or_assign(key.str(), resolved.str());
+	if (resolved.Is_Empty())
+	{
+		fprintf(stderr, "Missing BFME animation '%s' in %s\n", name, filename.str());
+		fflush(stderr);
+		return nullptr;
+	}
+	return HAnimManager.Get_Anim(resolved.str());
+}
+
 HAnimClass *	WW3DAssetManager::Get_HAnim(const char * name)
 {
 	WWPROFILE( "WW3DAssetManager::Get_HAnim" );
+
+	if (RetailFileLayers::enabled() && name && *name && !strchr(name, '.'))
+		return Get_Bare_HAnim(name);
 
 	// Try to find the hanim
 	HAnimClass * anim = HAnimManager.Get_Anim(name);

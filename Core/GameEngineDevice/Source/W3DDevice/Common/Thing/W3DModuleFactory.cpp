@@ -51,6 +51,8 @@
 #include "W3DDevice/GameClient/Module/W3DTreeDraw.h"
 #include "W3DDevice/GameClient/Module/W3DPropDraw.h"
 #include "W3DDevice/GameClient/Module/W3DFloorDraw.h"
+#include "W3DDevice/GameClient/Module/W3DQuadrupedDraw.h"
+#include "W3DDevice/GameClient/Module/W3DSailModelDraw.h"
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize method */
@@ -91,6 +93,10 @@ void W3DModuleFactory::init()
 	addModule( W3DPropDraw );
 #endif
 	if (registersRotwkModules())
+	{
 		addModule( W3DFloorDraw );
+		addModule( W3DQuadrupedDraw );
+		addModule( W3DSailModelDraw );
+	}
 
 }

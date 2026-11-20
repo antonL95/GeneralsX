@@ -32,13 +32,13 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/DrawModule.h"
 #include "GameClient/ParticleSys.h"
-#include "W3DDevice/GameClient/Module/W3DModelDraw.h"
+#include "W3DDevice/GameClient/Module/W3DScriptedModelDraw.h"
 #include "WW3D2/hanim.h"
 #include "WW3D2/rendobj.h"
 #include "WW3D2/part_emt.h"
 
 //-------------------------------------------------------------------------------------------------
-class W3DTankDrawModuleData : public W3DModelDrawModuleData
+class W3DTankDrawModuleData : public W3DScriptedModelDrawModuleData
 {
 public:
 	AsciiString m_treadDebrisNameLeft;

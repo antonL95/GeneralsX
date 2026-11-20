@@ -114,22 +114,22 @@ HAnimManagerClass::~HAnimManagerClass()
  * HISTORY:                                                                                    *
  *   08/11/1997 GH  : Created.                                                                 *
  *=============================================================================================*/
-int HAnimManagerClass::Load_Anim(ChunkLoadClass & cload)
+int HAnimManagerClass::Load_Anim(ChunkLoadClass & cload, StringClass* resolved)
 {
 	WWMEMLOG(MEM_ANIMATION);
 
 	switch (cload.Cur_Chunk_ID())
 	{
 	case W3D_CHUNK_ANIMATION:
-		return Load_Raw_Anim(cload);
+		return Load_Raw_Anim(cload, resolved);
 		break;
 
 	case W3D_CHUNK_COMPRESSED_ANIMATION:
-		return Load_Compressed_Anim(cload);
+		return Load_Compressed_Anim(cload, resolved);
 		break;
 
 	case W3D_CHUNK_MORPH_ANIMATION:
-		return Load_Morph_Anim(cload);
+		return Load_Morph_Anim(cload, resolved);
 		break;
 	}
 
@@ -149,7 +149,7 @@ int HAnimManagerClass::Load_Anim(ChunkLoadClass & cload)
  * HISTORY:                                                                                    *
  *   5/23/2000  pds : Created.                                                                 *
  *=============================================================================================*/
-int HAnimManagerClass::Load_Morph_Anim(ChunkLoadClass & cload)
+int HAnimManagerClass::Load_Morph_Anim(ChunkLoadClass & cload, StringClass* resolved)
 {
 	HMorphAnimClass * newanim = W3DNEW HMorphAnimClass;
 
@@ -164,11 +164,14 @@ int HAnimManagerClass::Load_Morph_Anim(ChunkLoadClass & cload)
 		newanim->Release_Ref();
 		goto Error;
 	} else if (Peek_Anim(newanim->Get_Name()) != nullptr) {
-		// duplicate exists!
-		newanim->Release_Ref();	// Release the one we just loaded
+		if (resolved)
+			*resolved = newanim->Get_Name();
+		newanim->Release_Ref();
 		goto Error;
 	} else {
 		Add_Anim( newanim );
+		if (resolved)
+			*resolved = newanim->Get_Name();
 		newanim->Release_Ref();
 	}
 
@@ -192,7 +195,7 @@ Error:
  * HISTORY:                                                                                    *
  *   5/23/2000  gth : Created.                                                                 *
  *=============================================================================================*/
-int HAnimManagerClass::Load_Raw_Anim(ChunkLoadClass & cload)
+int HAnimManagerClass::Load_Raw_Anim(ChunkLoadClass & cload, StringClass* resolved)
 {
 	HRawAnimClass * newanim = W3DNEW HRawAnimClass;
 
@@ -207,11 +210,14 @@ int HAnimManagerClass::Load_Raw_Anim(ChunkLoadClass & cload)
 		newanim->Release_Ref();
 		goto Error;
 	} else if (Peek_Anim(newanim->Get_Name()) != nullptr) {
-		// duplicate exists!
-		newanim->Release_Ref();	// Release the one we just loaded
+		if (resolved)
+			*resolved = newanim->Get_Name();
+		newanim->Release_Ref();
 		goto Error;
 	} else {
 		Add_Anim( newanim );
+		if (resolved)
+			*resolved = newanim->Get_Name();
 		newanim->Release_Ref();
 	}
 
@@ -235,7 +241,7 @@ Error:
  * HISTORY:                                                                                    *
  *   5/23/2000  gth : Created.                                                                 *
  *=============================================================================================*/
-int HAnimManagerClass::Load_Compressed_Anim(ChunkLoadClass & cload)
+int HAnimManagerClass::Load_Compressed_Anim(ChunkLoadClass & cload, StringClass* resolved)
 {
 	HCompressedAnimClass * newanim = W3DNEW HCompressedAnimClass;
 
@@ -250,11 +256,14 @@ int HAnimManagerClass::Load_Compressed_Anim(ChunkLoadClass & cload)
 		newanim->Release_Ref();
 		goto Error;
 	} else if (Peek_Anim(newanim->Get_Name()) != nullptr) {
-		// duplicate exists!
-		newanim->Release_Ref();	// Release the one we just loaded
+		if (resolved)
+			*resolved = newanim->Get_Name();
+		newanim->Release_Ref();
 		goto Error;
 	} else {
 		Add_Anim( newanim );
+		if (resolved)
+			*resolved = newanim->Get_Name();
 		newanim->Release_Ref();
 	}
 

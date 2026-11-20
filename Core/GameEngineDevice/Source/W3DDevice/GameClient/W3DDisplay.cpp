@@ -57,6 +57,7 @@ static void drawFramerateBar();
 #include "Common/GlobalData.h"
 #include "Common/HordeFormation.h"
 #include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/PerfTimer.h"
 #include "Common/FileSystem.h"
 #include "Common/LocalFileSystem.h"
@@ -2133,7 +2134,7 @@ static Bool poseAssetSmokeModel(WW3DAssetManager& assets, RenderObjClass& model,
 		return FALSE;
 
 	std::string name = animation;
-	if (name.find('.') == std::string::npos)
+	if (!RetailFileLayers::enabled() && name.find('.') == std::string::npos)
 		name = std::string(tree->Get_Name()) + "." + name;
 
 	HAnimClass* motion = assets.Get_HAnim(name.c_str());

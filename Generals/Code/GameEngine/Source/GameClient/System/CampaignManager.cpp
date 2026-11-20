@@ -53,6 +53,8 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameClient/CampaignManager.h"
 #include "GameClient/GameClient.h"
@@ -236,7 +238,10 @@ void CampaignManager::init()
 {
 	INI ini;
 	// Read from INI all the CampaignManager
-	ini.loadFileDirectory( "Data\\INI\\Campaign", INI_LOAD_OVERWRITE, nullptr, INI::LoadFlags_SearchSubDirs );
+	INI::LoadFlags flags = INI::LoadFlags_SearchSubDirs;
+	if (!RetailFileLayers::enabled() && !INIAudit::isEnabled())
+		flags |= INI::LoadFlags_ExpectFileFound;
+	ini.loadFileDirectory( "Data\\INI\\Campaign", INI_LOAD_OVERWRITE, nullptr, flags );
 }
 
 //-----------------------------------------------------------------------------

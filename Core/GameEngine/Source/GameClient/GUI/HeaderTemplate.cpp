@@ -56,7 +56,7 @@
 
 #include "Common/INI.h"
 #include "Common/FileSystem.h"
-#include "Common/GlobalData.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/INIAudit.h"
 #include "Common/Registry.h"
 #include "GameClient/HeaderTemplate.h"
@@ -138,7 +138,7 @@ void HeaderTemplateManager::init()
 
 		INI ini;
 		INI::LoadFlags flags = INI::LoadFlags_SearchSubDirs;
-		if (TheGlobalData && TheGlobalData->m_headless && INIAudit::isEnabled())
+		if (!RetailFileLayers::enabled() && !INIAudit::isEnabled())
 			flags |= INI::LoadFlags_ExpectFileFound;
 		ini.loadFileDirectory( fname, INI_LOAD_OVERWRITE, nullptr, flags );
 	}

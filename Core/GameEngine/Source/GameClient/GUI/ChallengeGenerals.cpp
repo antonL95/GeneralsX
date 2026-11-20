@@ -30,6 +30,8 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "GameClient/ChallengeGenerals.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 
 
 ChallengeGenerals *TheChallengeGenerals = nullptr;
@@ -58,7 +60,10 @@ ChallengeGenerals::~ChallengeGenerals()
 void ChallengeGenerals::init()
 {
 	INI ini;
-	ini.loadFileDirectory( "Data\\INI\\ChallengeMode", INI_LOAD_OVERWRITE, nullptr, INI::LoadFlags_SearchSubDirs );
+	INI::LoadFlags flags = INI::LoadFlags_SearchSubDirs;
+	if (!RetailFileLayers::enabled() && !INIAudit::isEnabled())
+		flags |= INI::LoadFlags_ExpectFileFound;
+	ini.loadFileDirectory( "Data\\INI\\ChallengeMode", INI_LOAD_OVERWRITE, nullptr, flags );
 }
 
 

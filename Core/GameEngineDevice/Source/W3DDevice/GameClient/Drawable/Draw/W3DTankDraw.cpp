@@ -75,7 +75,7 @@ W3DTankDrawModuleData::~W3DTankDrawModuleData()
 //-------------------------------------------------------------------------------------------------
 void W3DTankDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
-  W3DModelDrawModuleData::buildFieldParse(p);
+  W3DScriptedModelDrawModuleData::buildFieldParse(p);
 
 	static const FieldParse dataFieldParse[] =
 	{
