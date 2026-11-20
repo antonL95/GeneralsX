@@ -27,6 +27,7 @@
 // Author: Michael S. Booth, January 2001
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "GameLogic/Module/HordeContain.h"
 
 #include "Common/ActionManager.h"
 #include "Common/GameAudio.h"
@@ -181,6 +182,9 @@ Bool CanSelectDrawable( const Drawable *draw, Bool dragSelecting )
 		return FALSE;
 	}
 
+	if (const Object* horde = obj->getContainedBy(); HordeContain::get(horde))
+		obj = horde;
+
 	// You cannot select something that has a logic override of unselectability or masked
 	if( obj->getStatusBits().testForAny( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_MASKED ) ) )
 	{
@@ -273,6 +277,10 @@ SelectionTranslator::~SelectionTranslator()
 Bool SelectionTranslator::selectFriends( Drawable *draw, GameMessage *createTeamMsg,
 																				 Bool dragSelecting )
 {
+	Drawable* resolved = HordeContain::resolveSelection(draw);
+	if (resolved != draw && resolved->isSelected())
+		return FALSE;
+	draw = resolved;
 	if (CanSelectDrawable( draw, dragSelecting ))
 	{
 		// enforce an optional selection size limit
@@ -617,6 +625,7 @@ GameMessageDisposition SelectionTranslator::onMouseLeftDoubleClick(MAYBE_UNUSED 
 
 	// only allow things that are selectable. Also, we aren't allowed to
 	Drawable *picked = TheTacticalView->pickDrawable( &region.lo, FALSE, PICK_TYPE_SELECTABLE);
+	picked = HordeContain::resolveSelection(picked);
 
 	// If there wasn't anyone to pick, then we want to propagate this double click.
 	if (picked == nullptr)

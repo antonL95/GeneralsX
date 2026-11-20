@@ -101,6 +101,7 @@ private:
 
 class HordeContain : public TransportContain
 {
+	friend class HordeAIUpdate;
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( HordeContain, "HordeContain" )
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( HordeContain, HordeContainModuleData )
 
@@ -110,21 +111,34 @@ public:
 	virtual Bool isValidContainerFor( const Object* obj, Bool checkCapacity ) const override;
 	virtual Bool isEnclosingContainerFor( const Object *obj ) const override { return FALSE; }
 	virtual Bool isDisplayedOnControlBar() const override { return FALSE; }
-	virtual void onContaining( Object *obj, Bool wasSelected ) override;
+	Bool isHordeContain() const override { return TRUE; }
+	void clientVisibleContainedFlashAsSelected() override;
+#if RTS_GENERALS
+	void onContaining(Object* obj) override;
+	Bool isPassengerAllowedToFire() const override { return TRUE; }
+#else
+	void onContaining(Object* obj, Bool wasSelected) override;
+	Bool isPassengerAllowedToFire(ObjectID = INVALID_ID) const override { return TRUE; }
+#endif
+	UpdateSleepTime update() override;
 	virtual void onRemoving( Object *obj ) override;
 	virtual void onCapture( Player *oldOwner, Player *newOwner ) override;
 	virtual void addToContainList( Object *obj ) override;
 
 	Int getMemberSlot( ObjectID id ) const;
+	Bool rankCanAttack(const Object* member) const;
+	Coord3D getMemberPosition(ObjectID id, Bool followLeader) const;
+	static const HordeContain* get(const Object* object);
+	static Drawable* resolveSelection(Drawable* draw);
 
 protected:
 	virtual void createPayload() override;
-	virtual void redeployOccupants() override;
+	void redeployOccupants() override {}
 
 private:
-	void placeMember( Object *member, Int slot ) const;
-
 	std::vector<ObjectID> m_slotMembers;
+	std::vector<Coord2D> m_slotOffsets;
+	Bool m_hadMembers = FALSE;
 };
 
 struct HorseHordeContainModuleData : public HordeContainModuleData

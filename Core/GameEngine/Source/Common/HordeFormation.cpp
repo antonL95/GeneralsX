@@ -1,5 +1,7 @@
 #include "Common/HordeFormation.h"
 
+#include <algorithm>
+
 #include <cctype>
 #include <cerrno>
 #include <climits>
@@ -237,7 +239,11 @@ void HordeLayout::addRank(const HordeRankInfo& rank)
 	std::vector<HordeSlot> added;
 	added.reserve(rank.positions.size());
 	for (std::size_t index = 0; index < rank.positions.size(); ++index)
-		added.push_back({ rank.rankNumber, static_cast<int>(index), rank.unitType, rank.positions[index].point });
+	{
+		const auto& position = rank.positions[index];
+		added.push_back({ rank.rankNumber, static_cast<int>(index), rank.unitType, position.point,
+			position.hasLeader, position.leaderRank, position.leaderIndex });
+	}
 	m_slots.insert(insert, added.begin(), added.end());
 }
 
@@ -294,4 +300,27 @@ HordePoint HordeLayout::rotate(HordePoint offset, float cosAngle, float sinAngle
 	const float forwardY = offset.x * sinAngle;
 	const float sideY = offset.y * cosAngle;
 	return { forwardX - sideX, forwardY + sideY };
+}
+
+int HordeLayout::leaderSlot(int slot) const
+{
+	if (slot < 0 || static_cast<std::size_t>(slot) >= m_slots.size())
+		return -1;
+	const HordeSlot& follower = m_slots[slot];
+	if (!follower.hasLeader || follower.leaderRank >= follower.rank)
+		return -1;
+	for (std::size_t index = 0; index < m_slots.size(); ++index)
+	{
+		const HordeSlot& leader = m_slots[index];
+		if (leader.rank == follower.leaderRank && leader.index == follower.leaderIndex)
+			return static_cast<int>(index);
+	}
+	return -1;
+}
+
+bool HordeLayout::rankCanAttack(int rank, const std::vector<int>& released, const std::vector<int>& free)
+{
+	return (released.empty() && free.empty()) ||
+		std::find(released.begin(), released.end(), rank) != released.end() ||
+		std::find(free.begin(), free.end(), rank) != free.end();
 }

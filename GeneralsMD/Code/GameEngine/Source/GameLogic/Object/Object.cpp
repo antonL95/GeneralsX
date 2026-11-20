@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "GameLogic/Module/HordeContain.h"
 #include <cmath>	// For isnan() on Linux
 #define DEFINE_WEAPONCONDITIONMAP
 #include "Common/BitFlagsIO.h"
@@ -1523,6 +1524,22 @@ CanAttackResult Object::getAbleToAttackSpecificObject( AbleToAttackType t, const
 	//	return FALSE;
 
 	// Otherwise leave it up to our weapons.
+	if (const HordeContain* horde = HordeContain::get(this))
+	{
+		CanAttackResult best = ATTACKRESULT_NOT_POSSIBLE;
+		for (const Object* member : *horde->getContainedItemsList())
+		{
+			if (!member->isEffectivelyDead() && horde->rankCanAttack(member) && member->isAbleToAttack())
+			{
+				const auto result = member->getAbleToAttackSpecificObject(t, target, commandSource, specificSlot);
+				if (result == ATTACKRESULT_POSSIBLE)
+					return result;
+				if (result == ATTACKRESULT_POSSIBLE_AFTER_MOVING)
+					best = result;
+			}
+		}
+		return best;
+	}
 	return m_weaponSet.getAbleToAttackSpecificObject( t, this, target, commandSource, specificSlot );
 }
 
@@ -3302,6 +3319,16 @@ Bool Object::isAbleToAttack() const
 	// or being sold
 	if( testStatus(OBJECT_STATUS_SOLD) )
 		return false;
+
+	if (const HordeContain* horde = HordeContain::get(this))
+	{
+		for (const Object* member : *horde->getContainedItemsList())
+		{
+			if (!member->isEffectivelyDead() && horde->rankCanAttack(member) && member->isAbleToAttack())
+				return TRUE;
+		}
+		return FALSE;
+	}
 
   if ( isDisabledByType( DISABLED_SUBDUED ) )
     return FALSE; // A Microwave Tank is cooking me

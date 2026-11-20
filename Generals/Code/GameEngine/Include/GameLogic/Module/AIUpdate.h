@@ -194,6 +194,12 @@ public:
 	const TurretAIData*		m_turretData[MAX_TURRETS];
 	UnsignedInt						m_moodAttackCheckRate;				///< how frequently we should recheck for enemies due to moods, when idle
 	UnsignedInt						m_autoAcquireEnemiesWhenIdle;
+	AsciiString m_luaEventsList;
+	AsciiString m_attackPriority;
+	UnsignedInt m_minCowerTime = 0;
+	UnsignedInt m_maxCowerTime = 0;
+	Real m_stopChaseDistance = 0.0f;
+	Bool m_canAttackWhileContained = FALSE;
 #ifdef ALLOW_SURRENDER
  	UnsignedInt						m_surrenderDuration;					///< when we surrender, how long we stay surrendered.
 #endif

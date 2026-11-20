@@ -370,7 +370,6 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/ObjectWeaponStatusHelper.h
     Include/GameLogic/Module/OCLSpecialPower.h
     Include/GameLogic/Module/OCLUpdate.h
-    Include/GameLogic/Module/HordeContain.h
     Include/GameLogic/Module/OpenContain.h
     Include/GameLogic/Module/OverchargeBehavior.h
     Include/GameLogic/Module/OverlordContain.h
@@ -907,7 +906,6 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Contain/InternetHackContain.cpp
     Source/GameLogic/Object/Contain/MobNexusContain.cpp
     Source/GameLogic/Object/Contain/OpenContain.cpp
-    Source/GameLogic/Object/Contain/HordeContain.cpp
     Source/GameLogic/Object/Contain/OverlordContain.cpp
     Source/GameLogic/Object/Contain/ParachuteContain.cpp
     Source/GameLogic/Object/Contain/RailedTransportContain.cpp

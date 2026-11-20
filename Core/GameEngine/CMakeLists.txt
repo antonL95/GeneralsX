@@ -86,6 +86,8 @@ set(GAMEENGINE_SRC
     Include/Common/ZeroHourUpgradeMaskLayout.h
     Include/Common/INIRetailTolerance.h
     Include/Common/HordeFormation.h
+    Include/GameLogic/Module/HordeContain.h
+    Include/GameLogic/Module/HordeAIUpdate.h
     Include/Common/RetailFileLayers.h
     Include/Common/INILegacyLines.h
     Include/Common/INIMath.h
@@ -643,6 +645,8 @@ set(GAMEENGINE_SRC
 #    Source/Common/GameMain.cpp
     Source/Common/GameUtility.cpp
     Source/Common/HordeFormation.cpp
+    Source/GameLogic/Object/Contain/HordeContain.cpp
+    Source/GameLogic/Object/Update/HordeAIUpdate.cpp
 #    Source/Common/GlobalData.cpp
     Source/Common/INI/INI.cpp
     Source/Common/INI/INIAudit.cpp

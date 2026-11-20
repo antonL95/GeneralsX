@@ -36,6 +36,7 @@
 #include "Common/GameState.h"
 #include "Common/CRCDebug.h"
 #include "Common/GlobalData.h"
+#include "Common/ModuleFactory.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
@@ -141,6 +142,20 @@ const LocomotorTemplateVector* AIUpdateModuleData::findLocomotorTemplateVector(L
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse rotwkFields[] =
+		{
+			{ "AILuaEventsList", INI::parseAsciiString, nullptr, offsetof(AIUpdateModuleData, m_luaEventsList) },
+			{ "AttackPriority", INI::parseAsciiString, nullptr, offsetof(AIUpdateModuleData, m_attackPriority) },
+			{ "MinCowerTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_minCowerTime) },
+			{ "MaxCowerTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_maxCowerTime) },
+			{ "StopChaseDistance", INI::parseReal, nullptr, offsetof(AIUpdateModuleData, m_stopChaseDistance) },
+			{ "CanAttackWhileContained", INI::parseBool, nullptr, offsetof(AIUpdateModuleData, m_canAttackWhileContained) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(rotwkFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4551,6 +4566,9 @@ Bool AIUpdateInterface::canAutoAcquireWhileStealthed() const
 Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuringIdle )
 {
 	Object *obj = getObject();
+	const Object* horde = obj->getContainedBy();
+	if (horde && horde->getContain()->isHordeContain())
+		return nullptr;
 
 	// if we're dead, we can't attack
 	if (obj->isEffectivelyDead())

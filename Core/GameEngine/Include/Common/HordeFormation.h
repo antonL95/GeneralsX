@@ -61,6 +61,9 @@ struct HordeSlot
 	int index = 0;
 	std::string unitType;
 	HordePoint position;
+	bool hasLeader = false;
+	int leaderRank = 0;
+	int leaderIndex = 0;
 };
 
 struct HordePayload
@@ -86,6 +89,8 @@ public:
 	const std::vector<HordeSlot>& slots() const { return m_slots; }
 	const std::vector<HordePayload>& payloads() const { return m_payloads; }
 
+	int leaderSlot(int slot) const;
+	static bool rankCanAttack(int rank, const std::vector<int>& released, const std::vector<int>& free);
 	int findSlot(const std::string& unitType, const std::vector<bool>& occupied) const;
 	std::vector<HordeMemberSlot> initialMembers(int capacity) const;
 

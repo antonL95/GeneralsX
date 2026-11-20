@@ -2133,7 +2133,7 @@ void AIGroup::groupAttackObjectPrivate( Bool forced, Object *victim, Int maxShot
 		//Determine if this object is a garrisoned container capable of firing!
 		//If so, order everyone inside to attack as well!
 		ContainModuleInterface *contain = theUnit->getContain();
-		if( contain && contain->isPassengerAllowedToFire() )
+		if (contain && !contain->isHordeContain() && contain->isPassengerAllowedToFire())
 		{
 			//Loop through each member and order them to attack the same target (if possible)
 			const ContainedItemsList* items = contain->getContainedItemsList();
@@ -2221,7 +2221,7 @@ void AIGroup::groupAttackPosition( const Coord3D *pos, Int maxShotsToFire, Comma
 		//Determine if this object is a garrisoned container capable of firing!
 		//If so, order everyone inside to attack as well!
 		ContainModuleInterface *contain = (*i)->getContain();
-		if( contain && contain->isPassengerAllowedToFire() )
+		if (contain && !contain->isHordeContain() && contain->isPassengerAllowedToFire())
 		{
 			//Loop through each member and order them to attack the same target (if possible)
 			const ContainedItemsList* items = contain->getContainedItemsList();

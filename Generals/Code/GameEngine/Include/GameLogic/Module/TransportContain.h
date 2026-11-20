@@ -96,11 +96,11 @@ protected:
 	virtual void killRidersWhoAreNotFreeToExit() override;
 	virtual Bool isSpecificRiderFreeToExit(Object* obj);
 
-private:
-
-	void createPayload();
-
+protected:
+	virtual void createPayload();
 	Bool m_payloadCreated;
+
+private:
 	Int m_extraSlotsInUse;
 	UnsignedInt m_frameExitNotBusy;
 

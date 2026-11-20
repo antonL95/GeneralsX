@@ -829,7 +829,7 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 		}
 	}
 
-	if( source->isKindOf( KINDOF_IMMOBILE ) || source->isKindOf( KINDOF_SPAWNS_ARE_THE_WEAPONS ) || containedBy )
+	if( source->isKindOf( KINDOF_IMMOBILE ) || source->isKindOf( KINDOF_SPAWNS_ARE_THE_WEAPONS ) || (containedBy && !containedBy->getContain()->isHordeContain()) )
 	{
 		if ( hasAWeapon && !hasAWeaponInRange && attackType != ATTACK_TUNNEL_NETWORK_GUARD )
 			return ATTACKRESULT_INVALID_SHOT;

@@ -11,6 +11,7 @@
 
 #include "Common/BuildAssistant.h"
 #include "Common/GameEngine.h"
+#include "Common/INI.h"
 #include "Common/MessageStream.h"
 #include "Common/Money.h"
 #include "Common/NameKeyGenerator.h"
@@ -39,6 +40,8 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
@@ -688,6 +691,13 @@ void logAllObjects(unsigned int frame)
 	}
 }
 
+void parseHordeTestWeapon(INI* ini)
+{
+	WeaponTemplate* weapon = const_cast<WeaponTemplate*>(TheWeaponStore->findWeaponTemplate(ini->getNextToken()));
+	if (weapon)
+		ini->initFromINI(weapon, weapon->getFieldParse());
+}
+
 void execute(const Command& command, unsigned int frame)
 {
 	if (command.action == "logall")
@@ -776,6 +786,30 @@ void execute(const Command& command, unsigned int frame)
 		return;
 	}
 
+	if (command.action == "hordeweapon")
+	{
+		AsciiString weapon;
+		weapon.format("HordeTestWeapon %s\n  PrimaryDamage = 1\n  AttackRange = 18\n  DamageType = UNRESISTABLE\nEnd\n", command.target.c_str());
+		INI ini;
+		ini.loadText("HordeTestWeapon.ini", weapon.str(), INI_LOAD_OVERWRITE, "HordeTestWeapon", parseHordeTestWeapon);
+		return;
+	}
+
+	if (command.action == "hordespawn" && command.hasLocation)
+	{
+		Player* player = findPlayer(command.player);
+		const ThingTemplate* type = TheThingFactory->findTemplate(command.target.c_str(), FALSE);
+		if (player && type)
+		{
+			Object* spawned = TheThingFactory->newObject(type, player->getDefaultTeam());
+			const Coord3D position = groundLocation(command);
+			spawned->setPosition(&position);
+			spawned->setOrientation(command.angle);
+			std::fprintf(stderr, "TEST horde spawn %u %s %u\n", frame, command.target.c_str(), static_cast<unsigned>(spawned->getID()));
+		}
+		return;
+	}
+
 	Object* obj = findObject(command);
 	if (!obj)
 	{
@@ -785,7 +819,54 @@ void execute(const Command& command, unsigned int frame)
 	}
 
 	const Bool placeAtPoint = command.action == "place" && command.hasPlacementPoint;
-	if (command.action == "build" || placeAtPoint || command.action == "queue")
+	if (command.action == "hordequeue")
+	{
+		ProductionUpdateInterface* production = obj->getProductionUpdateInterface();
+		const ThingTemplate* type = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
+		Bool queued = FALSE;
+		if (production && type)
+			queued = production->queueCreateUnit(type, production->requestUniqueUnitID());
+		std::fprintf(stderr, "TEST horde queue %u %s %d\n", frame, command.structure.c_str(), queued ? 1 : 0);
+	}
+	else if (command.action == "hordeproject" && TheTacticalView)
+	{
+		Coord3D point = command.hasLocation ? groundLocation(command) : *obj->getPosition();
+		ICoord2D screen;
+		TheTacticalView->worldToScreen(&point, &screen);
+		std::fprintf(stderr, "TEST horde screen %u %s %d %d\n", frame, command.target.c_str(), screen.x, screen.y);
+	}
+	else if (command.action == "hordeattack")
+	{
+		const ObjectID id = static_cast<ObjectID>(std::atoi(command.structure.c_str()));
+		GameMessage* attack = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACK_OBJECT);
+		attack->appendObjectIDArgument(id);
+		std::fprintf(stderr, "TEST horde attack %u %u\n", frame, static_cast<unsigned>(id));
+	}
+	else if (command.action == "hordelog" || command.action == "hordekill")
+	{
+		const HordeContain* horde = HordeContain::get(obj);
+		if (!horde)
+			return;
+		const auto& members = *horde->getContainedItemsList();
+		std::fprintf(stderr, "TEST horde anchor %u %u count %u selected %d\n", frame,
+			static_cast<unsigned>(obj->getID()), horde->getContainCount(),
+			obj->getDrawable() && obj->getDrawable()->isSelected() ? 1 : 0);
+		logObject(obj, frame);
+		for (auto it = members.begin(); it != members.end(); )
+		{
+			Object* member = *it++;
+			AIUpdateInterface* ai = member->getAI();
+			const Object* target = ai ? ai->getGoalObject() : nullptr;
+			std::fprintf(stderr, "TEST horde member %u %u slot %d rankAttack %d target %u attacking %d\n", frame,
+				static_cast<unsigned>(member->getID()), horde->getMemberSlot(member->getID()),
+				horde->rankCanAttack(member) ? 1 : 0, target ? static_cast<unsigned>(target->getID()) : 0,
+				ai && ai->isAttacking() ? 1 : 0);
+			logObject(member, frame);
+			if (command.action == "hordekill")
+				member->kill();
+		}
+	}
+	else if (command.action == "build" || placeAtPoint || command.action == "queue")
 	{
 		const ThingTemplate* what = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
 		if (!what)

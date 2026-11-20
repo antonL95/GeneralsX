@@ -162,6 +162,8 @@
 #include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/MissileLauncherBuildingUpdate.h"
 #include "GameLogic/Module/StealthDetectorUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
@@ -425,6 +427,10 @@ void ModuleFactory::init()
 		addModule( GeometryUpgrade );
 		addModule( FoundationAIUpdate );
 		addModule( TerrainResourceBehavior );
+		addModule( HordeContain );
+		addModule( HorseHordeContain );
+		addModule( AODHordeContain );
+		addModule( HordeAIUpdate );
 	}
 	addModule( MissileLauncherBuildingUpdate );
 	addModule( SupplyCenterProductionExitUpdate );

@@ -7,6 +7,9 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
+#include "GameClient/Drawable.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
@@ -303,7 +306,14 @@ void HordeContain::createPayload()
 			continue;
 		}
 		Object* member = TheThingFactory->newObject( memberTemplate, horde->getTeam() );
+#if RTS_GENERALS
+		OpenContain::addToContain(member);
+#else
 		OpenContain::addToContain(member, FALSE);
+#endif
+		const Coord3D position = getMemberPosition(member->getID(), FALSE);
+		member->setPosition(&position);
+		member->setOrientation(horde->getOrientation());
 	}
 	enableLoadSounds( TRUE );
 
@@ -317,18 +327,31 @@ void HordeContain::addToContainList( Object *rider )
 		return;
 
 	const HordeLayout& layout = getHordeContainModuleData()->m_layout;
+	m_hadMembers = TRUE;
 	m_slotMembers.resize( layout.slots().size(), INVALID_ID );
+	m_slotOffsets.resize(layout.slots().size(), Coord2D{0.0f, 0.0f});
 	std::vector<bool> occupied( m_slotMembers.size(), false );
 	for (size_t index = 0; index < m_slotMembers.size(); ++index)
 		occupied[index] = m_slotMembers[index] != INVALID_ID;
 	const Int slot = layout.findSlot( rider->getTemplate()->getName().str(), occupied );
 	if (slot >= 0)
+	{
 		m_slotMembers[slot] = rider->getID();
+		const Coord2D& extent = getHordeContainModuleData()->m_randomOffset;
+		m_slotOffsets[slot].x = extent.x > 0.0f ? GameLogicRandomValueReal(-extent.x, extent.x) : 0.0f;
+		m_slotOffsets[slot].y = extent.y > 0.0f ? GameLogicRandomValueReal(-extent.y, extent.y) : 0.0f;
+	}
 }
 
-void HordeContain::onContaining( Object *rider, Bool wasSelected )
+#if RTS_GENERALS
+void HordeContain::onContaining(Object* rider)
 {
-	OpenContain::onContaining( rider, wasSelected );
+	OpenContain::onContaining(rider);
+#else
+void HordeContain::onContaining(Object* rider, Bool wasSelected)
+{
+	OpenContain::onContaining(rider, wasSelected);
+#endif
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained );
 }
 
@@ -361,47 +384,126 @@ Int HordeContain::getMemberSlot( ObjectID id ) const
 	return -1;
 }
 
-void HordeContain::redeployOccupants()
-{
-	for (Object* member : getContainList())
-		placeMember( member, getMemberSlot( member->getID() ) );
-}
-
-void HordeContain::placeMember( Object *member, Int slot ) const
-{
-	const Object* horde = getObject();
-	const Real angle = horde->getOrientation();
-	Coord3D position = *horde->getPosition();
-	const std::vector<HordeSlot>& slots = getHordeContainModuleData()->m_layout.slots();
-	if (slot >= 0 && slot < (Int)slots.size())
-	{
-		const HordePoint offset = HordeLayout::rotate( slots[slot].position, Cos( angle ), Sin( angle ) );
-		position.x += offset.x;
-		position.y += offset.y;
-	}
-	if (TheTerrainLogic)
-		position.z = TheTerrainLogic->getGroundHeight( position.x, position.y );
-	member->setPosition( &position );
-	member->setOrientation( angle );
-}
-
 void HordeContain::crc( Xfer *xfer )
 {
 	TransportContain::crc( xfer );
+	xfer->xferBool(&m_hadMembers);
+	for (size_t index = 0; index < m_slotMembers.size(); ++index)
+	{
+		xfer->xferObjectID(&m_slotMembers[index]);
+		xfer->xferCoord2D(&m_slotOffsets[index]);
+	}
 }
 
 void HordeContain::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
 	TransportContain::xfer( xfer );
 
 	xfer->xferSTLObjectIDVector( &m_slotMembers );
+	m_slotOffsets.resize(m_slotMembers.size(), Coord2D{0.0f, 0.0f});
+	if (version >= 2)
+	{
+		for (Coord2D& offset : m_slotOffsets)
+			xfer->xferCoord2D(&offset);
+		xfer->xferBool(&m_hadMembers);
+	}
+	else
+		m_hadMembers = getContainCount() != 0;
 }
 
 void HordeContain::loadPostProcess()
 {
 	TransportContain::loadPostProcess();
+}
+
+const HordeContain* HordeContain::get(const Object* object)
+{
+	const ContainModuleInterface* contain = object ? object->getContain() : nullptr;
+	return contain && contain->isHordeContain() ? static_cast<const HordeContain*>(contain) : nullptr;
+}
+
+Drawable* HordeContain::resolveSelection(Drawable* draw)
+{
+	const Object* member = draw ? draw->getObject() : nullptr;
+	const Object* horde = member ? member->getContainedBy() : nullptr;
+	if (get(horde) && !member->isEffectivelyDead() && horde->getDrawable())
+		return horde->getDrawable();
+	return draw;
+}
+
+Bool HordeContain::rankCanAttack(const Object* member) const
+{
+	const Int slot = getMemberSlot(member->getID());
+	const auto* data = getHordeContainModuleData();
+	const Int rank = slot >= 0 ? data->m_layout.slots()[slot].rank : 0;
+	return HordeLayout::rankCanAttack(rank, data->m_ranksToReleaseWhenAttacking, data->m_ranksToJustFreeWhenAttacking);
+}
+
+Coord3D HordeContain::getMemberPosition(ObjectID id, Bool followLeader) const
+{
+	const Object* horde = getObject();
+	Coord3D position = *horde->getPosition();
+	const auto& layout = getHordeContainModuleData()->m_layout;
+	const Int slot = getMemberSlot(id);
+	if (slot >= 0)
+	{
+		HordePoint offset = layout.slots()[slot].position;
+		offset.x += m_slotOffsets[slot].x;
+		offset.y += m_slotOffsets[slot].y;
+		const Int leaderSlot = followLeader ? layout.leaderSlot(slot) : -1;
+		if (leaderSlot >= 0)
+		{
+			const Object* leader = TheGameLogic->findObjectByID(m_slotMembers[leaderSlot]);
+			if (leader && !leader->isEffectivelyDead())
+			{
+				position = *leader->getPosition();
+				offset.x -= layout.slots()[leaderSlot].position.x + m_slotOffsets[leaderSlot].x;
+				offset.y -= layout.slots()[leaderSlot].position.y + m_slotOffsets[leaderSlot].y;
+			}
+		}
+		const Real angle = horde->getOrientation();
+		const HordePoint worldOffset = HordeLayout::rotate(offset, Cos(angle), Sin(angle));
+		position.x += worldOffset.x;
+		position.y += worldOffset.y;
+	}
+	if (TheTerrainLogic)
+		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+	return position;
+}
+
+UpdateSleepTime HordeContain::update()
+{
+	const auto sleep = TransportContain::update();
+	if (getObject()->isEffectivelyDead())
+		return sleep;
+
+	for (auto it = getContainList().begin(); it != getContainList().end(); )
+	{
+		Object* member = *it++;
+		if (member->isEffectivelyDead())
+			removeFromContain(member);
+	}
+	if (m_hadMembers && getContainCount() == 0)
+	{
+		Object* horde = getObject();
+		horde->setModelConditionState(MODELCONDITION_HORDE_EMPTY);
+		horde->setEffectivelyDead(TRUE);
+		DamageInfo damage;
+		horde->onDie(&damage);
+		TheGameLogic->destroyObject(horde);
+	}
+	return sleep;
+}
+
+void HordeContain::clientVisibleContainedFlashAsSelected()
+{
+	for (Object* member : getContainList())
+	{
+		if (Drawable* draw = member->getDrawable())
+			draw->flashAsSelected();
+	}
 }

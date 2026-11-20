@@ -197,6 +197,12 @@ public:
   Bool        m_forbidPlayerCommands;     ///< Should isAllowedToRespondToAiCommands() filter out commands from the player, thus making it ai-controllable only?
   Bool        m_turretsLinked;						///< Turrets are linked together and attack together.
 	UnsignedInt						m_autoAcquireEnemiesWhenIdle;
+	AsciiString m_luaEventsList;
+	AsciiString m_attackPriority;
+	UnsignedInt m_minCowerTime = 0;
+	UnsignedInt m_maxCowerTime = 0;
+	Real m_stopChaseDistance = 0.0f;
+	Bool m_canAttackWhileContained = FALSE;
 #ifdef ALLOW_SURRENDER
  	UnsignedInt						m_surrenderDuration;					///< when we surrender, how long we stay surrendered.
 #endif

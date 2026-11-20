@@ -28,6 +28,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "GameLogic/Module/HordeContain.h"
 
 #define DEFINE_SHADOW_NAMES
 
@@ -3405,6 +3406,7 @@ Real InGameUI::getPlacementAngle()
 //-------------------------------------------------------------------------------------------------
 void InGameUI::selectDrawable( Drawable *draw )
 {
+	draw = HordeContain::resolveSelection(draw);
 
 	if( draw->isSelected() == FALSE )
 	{

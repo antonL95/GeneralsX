@@ -142,3 +142,29 @@ TEST(HordeFormation, RotatesOffsetsIntoTheHordeFrame)
 	EXPECT_FLOAT_EQ(half.x, -50.0f);
 	EXPECT_FLOAT_EQ(half.y, -20.0f);
 }
+
+TEST(HordeFormation, LeaderReferencesUseAuthoredRankAndIndex)
+{
+	HordeLayout layout;
+	HordeRankInfo rear;
+	rear.rankNumber = 2;
+	rear.positions = {{{-10.0f, 3.0f}, true, 1, 1}, {{-10.0f, 0.0f}, true, 1, 9}};
+	layout.addRank(rear);
+	HordeRankInfo front;
+	front.rankNumber = 1;
+	front.positions = {{{0.0f, 0.0f}}, {{0.0f, 3.0f}}};
+	layout.addRank(front);
+
+	EXPECT_EQ(layout.leaderSlot(2), 1);
+	EXPECT_EQ(layout.leaderSlot(3), -1);
+	EXPECT_EQ(layout.leaderSlot(0), -1);
+	EXPECT_EQ(layout.leaderSlot(-1), -1);
+}
+
+TEST(HordeFormation, AttackRankPolicyUsesAuthoredLists)
+{
+	EXPECT_TRUE(HordeLayout::rankCanAttack(1, {1, 2}, {3}));
+	EXPECT_TRUE(HordeLayout::rankCanAttack(3, {1, 2}, {3}));
+	EXPECT_FALSE(HordeLayout::rankCanAttack(4, {1, 2}, {3}));
+	EXPECT_TRUE(HordeLayout::rankCanAttack(4, {}, {}));
+}

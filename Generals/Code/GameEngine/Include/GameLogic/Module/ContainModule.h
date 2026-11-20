@@ -68,6 +68,7 @@ public:
 
 	// we have a two basic container types that it is convenient to query and use
 	virtual OpenContain *asOpenContain() = 0;
+	virtual Bool isHordeContain() const { return FALSE; }
 
 	// our object changed position... react as appropriate.
 	virtual void containReactToTransformChange() = 0;

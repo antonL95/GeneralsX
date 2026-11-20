@@ -23,6 +23,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"
+#include "GameLogic/Module/HordeContain.h"
 
 #include "GameLogic/Damage.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -357,6 +358,16 @@ Bool addDrawableToList( Drawable *draw, void *userData )
 		return FALSE;
 #endif
 
+	Drawable* selected = HordeContain::resolveSelection(draw);
+	if (selected != draw)
+	{
+		if (!selected->isSelectable() || !selected->getTemplate()->isAnyKindOf(pds->kindofsToMatch))
+			return FALSE;
+		if (std::find(pds->drawableListToFill->begin(), pds->drawableListToFill->end(), selected) == pds->drawableListToFill->end())
+			pds->drawableListToFill->push_back(selected);
+		return TRUE;
+	}
+
 	if (!draw->getTemplate()->isAnyKindOf(pds->kindofsToMatch))
 		return FALSE;
 
@@ -393,6 +404,8 @@ Bool addDrawableToList( Drawable *draw, void *userData )
 	}
 #endif
 
-	pds->drawableListToFill->push_back(draw);
+	if (!HordeContain::get(draw->getObject()) ||
+		std::find(pds->drawableListToFill->begin(), pds->drawableListToFill->end(), draw) == pds->drawableListToFill->end())
+		pds->drawableListToFill->push_back(draw);
 	return TRUE;
 }
