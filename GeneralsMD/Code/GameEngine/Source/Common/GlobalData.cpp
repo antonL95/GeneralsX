@@ -423,6 +423,7 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 */
 
 	{ "BuildSpeed",									INI::parseReal,				nullptr,			offsetof( GlobalData, m_BuildSpeed ) },
+	{ "BuilderMoveFromNewStructureDistance", INI::parseReal, nullptr, offsetof( GlobalData, m_builderMoveFromNewStructureDistance ) },
 	{ "MinDistFromEdgeOfMapForBuild",	 INI::parseReal,				nullptr,			offsetof( GlobalData, m_MinDistFromEdgeOfMapForBuild ) },
 	{ "SupplyBuildBorder",	 INI::parseReal,				nullptr,			offsetof( GlobalData, m_SupplyBuildBorder ) },
 	{ "AllowedHeightVariationForBuilding", INI::parseReal,nullptr,			offsetof( GlobalData, m_allowedHeightVariationForBuilding ) },
@@ -943,6 +944,7 @@ GlobalData::GlobalData()
 	m_defaultIP = 0;
 
 	m_BuildSpeed = 0.0f;
+	m_builderMoveFromNewStructureDistance = 10.0f;
 	m_MinDistFromEdgeOfMapForBuild = 0.0f;
 	m_SupplyBuildBorder = 0.0f;
 	m_allowedHeightVariationForBuilding = 0.0f;

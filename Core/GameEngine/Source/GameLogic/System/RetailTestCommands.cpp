@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 
+#include "Common/ActionManager.h"
 #include "Common/BuildAssistant.h"
 #include "Common/GameEngine.h"
 #include "Common/INI.h"
@@ -26,6 +27,8 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "Common/XferLoad.h"
+#include "Common/XferSave.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GadgetPushButton.h"
@@ -42,10 +45,12 @@
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 
@@ -677,9 +682,53 @@ void repair(const Command& command, Object* obj, unsigned int frame)
 	AIUpdateInterface* ai = obj->getAI();
 	if (!target || !ai)
 		return;
+	std::fprintf(stderr, "TEST builder repair eligibility %u target=%u player=%d ai=%d cursor=%d\n", frame,
+		static_cast<unsigned>(target->getID()), TheActionManager->canRepairObject(obj, target, CMD_FROM_PLAYER),
+		TheActionManager->canRepairObject(obj, target, CMD_FROM_AI),
+		TheInGameUI->canSelectedObjectsDoAction(InGameUI::ACTIONTYPE_REPAIR_OBJECT, target, InGameUI::SELECTION_ANY));
 	ai->aiRepair(target, CMD_FROM_AI);
 	std::fprintf(stderr, "TEST frame %u: repair object %u by %u\n", frame, static_cast<unsigned>(target->getID()),
 		static_cast<unsigned>(obj->getID()));
+}
+
+void roundTripBuilder(Object* obj, unsigned int frame)
+{
+	auto* ai = obj->getAI();
+	auto* dozer = ai ? ai->getDozerAIInterface() : nullptr;
+	const char* directory = std::getenv("XDG_RUNTIME_DIR");
+	if (!dozer || !directory || !obj->testStatus(OBJECT_STATUS_MASKED) || dozer->getCurrentTask() != DOZER_TASK_BUILD)
+	{
+		std::fprintf(stderr, "TEST builder snapshot %u skipped\n", frame);
+		return;
+	}
+
+	AsciiString file;
+	file.format("%s/builder-snapshot", directory);
+	XferSave save;
+	save.open(file);
+	save.xferSnapshot(ai);
+	save.close();
+
+	const Coord3D position = *obj->getPosition();
+	const auto status = obj->getStatusBits();
+	Object* structure = TheGameLogic->findObjectByID(dozer->getTaskTarget(DOZER_TASK_BUILD));
+	dozer->cancelTask(DOZER_TASK_BUILD);
+	if (structure)
+		structure->setModelConditionState(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED);
+	obj->setPosition(&position);
+	obj->setStatus(status);
+	if (auto* draw = obj->getDrawable())
+		draw->setDrawableHidden(TRUE);
+	ThePartitionManager->unRegisterObject(obj);
+
+	XferLoad load;
+	load.setOptions(XO_NO_POST_PROCESSING);
+	load.open(file);
+	load.xferSnapshot(ai);
+	load.close();
+	std::remove(file.str());
+	std::fprintf(stderr, "TEST builder snapshot %u restored task=%d target=%u\n", frame,
+		static_cast<int>(dozer->getCurrentTask()), static_cast<unsigned>(dozer->getTaskTarget(DOZER_TASK_BUILD)));
 }
 
 void logAllObjects(unsigned int frame)
@@ -957,6 +1006,15 @@ void execute(const Command& command, unsigned int frame)
 		capture(command, obj, frame);
 	else if (command.action == "repair")
 		repair(command, obj, frame);
+	else if (command.action == "buildersnapshot")
+		roundTripBuilder(obj, frame);
+	else if ((command.action == "builderscriptmove" || command.action == "builderaimove") && command.hasLocation && obj->getAI())
+	{
+		const Coord3D location = groundLocation(command);
+		obj->getAI()->aiMoveToPosition(&location, command.action == "builderscriptmove" ? CMD_FROM_SCRIPT : CMD_FROM_AI);
+		std::fprintf(stderr, "TEST frame %u: %s object %u to %.1f %.1f\n", frame, command.action.c_str(),
+			static_cast<unsigned>(obj->getID()), location.x, location.y);
+	}
 	else if (command.action == "veterancy")
 	{
 		if (obj->getExperienceTracker())

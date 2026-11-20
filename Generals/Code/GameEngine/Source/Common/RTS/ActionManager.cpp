@@ -39,10 +39,12 @@
 #include "Common/GlobalData.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
 
+#include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/InGameUI.h"
 
@@ -377,6 +379,24 @@ Bool ActionManager::canRepairObject( const Object *obj, const Object *objectToRe
 	// sanity
 	if( obj == nullptr || objectToRepair == nullptr )
 		return FALSE;
+
+	if( RetailFileLayers::enabled() )
+	{
+		const CommandSet *commands = TheControlBar ? TheControlBar->findCommandSet( obj->getCommandSetString() ) : nullptr;
+		Bool allowsRepair = FALSE;
+		for( Int i = 0; commands && i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i )
+		{
+			const CommandButton *button = commands->getCommandButton( i );
+			if( button && button->getCommandType() == GUI_COMMAND_START_NEIGHBORHOOD_REPAIR &&
+				(button->getOptions() & NEED_TARGET_ALLY_OBJECT) )
+			{
+				allowsRepair = TRUE;
+				break;
+			}
+		}
+		if( !allowsRepair )
+			return FALSE;
+	}
 
 	Relationship r = obj->getRelationship(objectToRepair);
 

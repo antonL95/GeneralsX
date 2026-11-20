@@ -39,6 +39,7 @@
 #include "Common/Player.h"
 #include "Common/Money.h"
 #include "Common/Radar.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/RandomValue.h"
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
@@ -567,15 +568,13 @@ StateReturnType DozerActionDoActionState::update()
 					// set the construction at the 100% enum value
 					goalObject->setConstructionPercent( CONSTRUCTION_COMPLETE );
 
-					//
-					// now that we're done with construction we evaluate the visual condition of
-					// the object since while under construction visual changes due to damage state
-					// do not occur.  Note that is was important to call this after we cleared the
-					// model conditions involving construction because part of this evaluation
-					// is to auto populate the model with particle systems when special named
-					// bones for the current given state are provided
-					//
-					body->evaluateVisualCondition();
+					if( RetailFileLayers::enabled() )
+					{
+						if( Drawable *draw = goalObject->getDrawable() )
+							draw->reactToBodyDamageStateChange( body->getDamageState() );
+					}
+					else
+						body->evaluateVisualCondition();
 
 					// this object now has energy influence in the player
 					Player *player = goalObject->getControllingPlayer();

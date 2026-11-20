@@ -63,6 +63,23 @@ class DozerActionStateMachine;
 
 static const Real MIN_ACTION_TOLERANCE = 70.0f;
 
+static Bool usesRetailBuilder(const AIUpdateInterface* ai)
+{
+	return RetailFileLayers::enabled() && !ai->getWorkerAIInterface();
+}
+
+static void moveDozerForTask(AIUpdateInterface* ai, const Coord3D& goal)
+{
+	if (usesRetailBuilder(ai))
+	{
+		AICommandParms parms(AICMD_MOVE_TO_POSITION, CMD_FROM_AI);
+		parms.m_pos = goal;
+		ai->AIUpdateInterface::aiDoCommand(&parms);
+	}
+	else
+		ai->aiMoveToPosition(&goal, CMD_FROM_AI);
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,7 +245,7 @@ StateReturnType DozerActionPickActionPosState::update()
 	machine->setGoalObject( goalObject );
 	machine->setGoalPosition( &goalPos );
 	ai->ignoreObstacle(goalObject);
-	ai->aiMoveToPosition( &goalPos, CMD_FROM_AI );
+	moveDozerForTask( ai, goalPos );
 
 	return STATE_SUCCESS;
 
@@ -446,7 +463,12 @@ void DozerActionDoActionState::xfer( Xfer *xfer )
 void DozerActionDoActionState::loadPostProcess()
 {
 	if( m_builderInside )
-		ThePartitionManager->unRegisterObject( getMachineOwner() );
+	{
+		Object *dozer = getMachineOwner();
+		if( Drawable *draw = dozer->getDrawable() )
+			draw->setDrawableHidden( TRUE );
+		ThePartitionManager->unRegisterObject( dozer );
+	}
 }
 
 void DozerActionDoActionState::enterStructure( const Object *structure )
@@ -467,25 +489,60 @@ void DozerActionDoActionState::placeOutside( Object *dozer )
 	if( const Object *structure = TheGameLogic->findObjectByID( m_structureID ) )
 	{
 		const Coord3D *center = structure->getPosition();
-		const Real clearance = structure->getGeometryInfo().getBoundingCircleRadius() + dozer->getGeometryInfo().getBoundingCircleRadius();
-		Coord2D away;
-		away.x = pos.x - center->x;
-		away.y = pos.y - center->y;
-		const Real distance = away.length();
-		if( distance < clearance )
+		const auto& retail = structure->getTemplate()->getRotWKObjectData();
+		Real radius = structure->getGeometryInfo().getBoundingCircleRadius();
+		Coord2D offset = {retail.primaryGeometry.offset.x, retail.primaryGeometry.offset.y};
+		radius += WWMath::Sqrt( sqr(offset.x) + sqr(offset.y) );
+		for( const auto& geometry : retail.additionalGeometries )
 		{
-			if( distance > 0.01f )
+			if( !geometry.details.active )
+				continue;
+			offset.set( geometry.details.offset.x, geometry.details.offset.y );
+			radius = max( radius, WWMath::Sqrt( sqr(offset.x) + sqr(offset.y) ) + geometry.shape.getBoundingCircleRadius() );
+		}
+		const Real clearance = radius + dozer->getGeometryInfo().getBoundingCircleRadius();
+		auto *ai = dozer->getAIUpdateInterface();
+		const Coord3D *approach = ai->getDozerAIInterface()->getDockPoint( m_task, DOZER_DOCK_POINT_END );
+		Coord2D away;
+		away.x = (approach ? approach->x : pos.x) - center->x;
+		away.y = (approach ? approach->y : pos.y) - center->y;
+		const Real distance = WWMath::Sqrt( sqr(away.x) + sqr(away.y) );
+		if( distance > 0.01f )
+		{
+			away.x /= distance;
+			away.y /= distance;
+		}
+		else
+			away.set( -WWMath::Cos(dozer->getOrientation()), -WWMath::Sin(dozer->getOrientation()) );
+		const Real exitDistance = clearance + PATHFIND_CELL_SIZE_F;
+		Bool foundExit = FALSE;
+		for( Int side = 0; side < 4; ++side )
+		{
+			Coord3D candidate = {center->x + away.x * exitDistance, center->y + away.y * exitDistance, pos.z};
+			if( TheAI->pathfinder()->adjustToPossibleDestination( dozer, ai->getLocomotorSet(), &candidate ) )
 			{
-				away.x /= distance;
-				away.y /= distance;
+				offset.set( candidate.x - center->x, candidate.y - center->y );
+				if( sqr(offset.x) + sqr(offset.y) >= sqr(clearance) )
+				{
+					pos = candidate;
+					foundExit = TRUE;
+					break;
+				}
 			}
-			else
-				away.set( 1.0f, 0.0f );
-			pos.x = center->x + away.x * clearance;
-			pos.y = center->y + away.y * clearance;
+			const Real x = away.x;
+			away.set( -away.y, x );
+		}
+		if( !foundExit )
+		{
+			FindPositionOptions options;
+			options.flags = FPF_CLEAR_CELLS_ONLY;
+			options.minRadius = exitDistance;
+			options.maxRadius = exitDistance + 4 * PATHFIND_CELL_SIZE_F;
+			options.startAngle = WWMath::Atan2( away.y, away.x );
+			options.ignoreObject = dozer;
+			ThePartitionManager->findPositionAround( center, &options, &pos );
 		}
 	}
-	TheAI->pathfinder()->adjustToPossibleDestination( dozer, dozer->getAIUpdateInterface()->getLocomotorSet(), &pos );
 	pos.z = TheTerrainLogic->getGroundHeight( pos.x, pos.y );
 	dozer->setPosition( &pos );
 }
@@ -500,6 +557,7 @@ void DozerActionDoActionState::leaveStructure()
 	if( dozer->isDestroyed() || !dozer->getAIUpdateInterface() )
 		return;
 
+	dozer->getAIUpdateInterface()->getDozerAIInterface()->finishBuildingSound();
 	dozer->clearStatus( MAKE_OBJECT_STATUS_MASK3( OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_MASKED, OBJECT_STATUS_NO_COLLISIONS ) );
 	if( Drawable *draw = dozer->getDrawable() )
 		draw->setDrawableHidden( FALSE );
@@ -586,7 +644,7 @@ StateReturnType DozerActionDoActionState::update()
 			{
 				const Coord3D *dockLocation = dozerAI->getDockPoint( m_task, DOZER_DOCK_POINT_ACTION );
 				if( dockLocation )
-					ai->aiMoveToPosition( dockLocation, CMD_FROM_AI );
+					moveDozerForTask( ai, *dockLocation );
 
 				// we're now moving to the dock location
 				dozerAI->setBuildSubTask( DOZER_MOVING_TO_BUILD_DOCK_LOCATION );
@@ -599,7 +657,7 @@ StateReturnType DozerActionDoActionState::update()
 				if( ai->isIdle() )
 				{
 					dozerAI->setBuildSubTask( DOZER_DO_BUILD_AT_DOCK );
-					if( RetailFileLayers::enabled() && !ai->getWorkerAIInterface() )
+					if( usesRetailBuilder(ai) )
 						enterStructure( goalObject );
 					// Get the audio sound and start playing the construction sound (get the sound
 					// from the building itself)
@@ -645,7 +703,8 @@ StateReturnType DozerActionDoActionState::update()
 					goalObject->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_RECONSTRUCTING ) );
 
 					// stop playing the construction sound!
-					dozerAI->finishBuildingSound();
+					if( !m_builderInside )
+						dozerAI->finishBuildingSound();
 
 					// object will now be idle instead of in one of the construction actions
 					goalObject->clearModelConditionFlags(
@@ -654,15 +713,13 @@ StateReturnType DozerActionDoActionState::update()
 					// set the construction at the 100% enum value
 					goalObject->setConstructionPercent( CONSTRUCTION_COMPLETE );
 
-					//
-					// now that we're done with construction we evaluate the visual condition of
-					// the object since while under construction visual changes due to damage state
-					// do not occur.  Note that is was important to call this after we cleared the
-					// model conditions involving construction because part of this evaluation
-					// is to auto populate the model with particle systems when special named
-					// bones for the current given state are provided
-					//
-					body->evaluateVisualCondition();
+					if( RetailFileLayers::enabled() )
+					{
+						if( Drawable *draw = goalObject->getDrawable() )
+							draw->reactToBodyDamageStateChange( body->getDamageState() );
+					}
+					else
+						body->evaluateVisualCondition();
 
 					// this object now has energy influence in the player
 					Player *player = goalObject->getControllingPlayer();
@@ -727,16 +784,31 @@ StateReturnType DozerActionDoActionState::update()
 
 					// this will allow us to exit the state machine with success
 					complete = TRUE;
-
-					// move off to the end dock position if present
-					const Coord3D *endPos = dozerAI->getDockPoint( m_task, DOZER_DOCK_POINT_END );
-					Coord3D pos = *dozer->getPosition();
-					if( endPos ) {
-						pos = *endPos;
+					if( m_builderInside )
+					{
+						leaveStructure();
+						const Real step = TheGlobalData->m_builderMoveFromNewStructureDistance;
+						Coord3D pos = *dozer->getPosition();
+						const Coord3D *center = goalObject->getPosition();
+						const Real dx = pos.x - center->x;
+						const Real dy = pos.y - center->y;
+						const Real distance = WWMath::Sqrt( sqr(dx) + sqr(dy) );
+						if( step > 0.0f && distance > 0.01f )
+						{
+							pos.x += dx * (step / distance);
+							pos.y += dy * (step / distance);
+							pos.z = TheTerrainLogic->getGroundHeight( pos.x, pos.y );
+							if( TheAI->pathfinder()->adjustToPossibleDestination( dozer, ai->getLocomotorSet(), &pos ) )
+								moveDozerForTask( ai, pos );
+						}
 					}
-					// Our goal may be inside a building, if we are packing them in tight, so try adjusting. jba.
-					TheAI->pathfinder()->adjustToPossibleDestination(dozer, ai->getLocomotorSet(), &pos);
-					ai->aiMoveToPosition( &pos, CMD_FROM_AI );
+					else
+					{
+						const Coord3D *endPos = dozerAI->getDockPoint( m_task, DOZER_DOCK_POINT_END );
+						Coord3D pos = endPos ? *endPos : *dozer->getPosition();
+						TheAI->pathfinder()->adjustToPossibleDestination( dozer, ai->getLocomotorSet(), &pos );
+						moveDozerForTask( ai, pos );
+					}
 
 				}
 
@@ -932,7 +1004,7 @@ void DozerActionStateMachine::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-  XferVersion currentVersion = 1;
+  XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 #else
   XferVersion currentVersion = 2;
 #endif
@@ -2128,11 +2200,16 @@ void DozerAIUpdate::newTask( DozerTask task, Object *target )
 		m_dockPoint[ task ][ DOZER_DOCK_POINT_START ].location	= position;
 		m_dockPoint[ task ][ DOZER_DOCK_POINT_ACTION ].valid		= TRUE;
 		m_dockPoint[ task ][ DOZER_DOCK_POINT_ACTION ].location = position;
-		Coord3D offset;
-		offset.set(position.x-target->getPosition()->x, position.y-target->getPosition()->y, 0);
-		offset.normalize();
-		offset.scale(5*PATHFIND_CELL_SIZE_F);
-		position.add(offset); // move away from the dock point at the end of build.
+		if( task == DOZER_TASK_BUILD && usesRetailBuilder(this) )
+			position = *me->getPosition();
+		else
+		{
+			Coord3D offset;
+			offset.set(position.x-target->getPosition()->x, position.y-target->getPosition()->y, 0);
+			offset.normalize();
+			offset.scale(5*PATHFIND_CELL_SIZE_F);
+			position.add(offset);
+		}
 		m_dockPoint[ task ][ DOZER_DOCK_POINT_END ].valid				= TRUE;
 		m_dockPoint[ task ][ DOZER_DOCK_POINT_END ].location		= position;
 
@@ -2301,6 +2378,13 @@ void DozerAIUpdate::internalCancelTask( DozerTask task )
 	// call the single method that gets called for completing and canceling tasks
 	internalTaskCompleteOrCancelled( task );
 
+	if( task == DOZER_TASK_BUILD && usesRetailBuilder(this) )
+	{
+		Object *target = TheGameLogic->findObjectByID( m_task[task].m_targetObjectID );
+		if( target && target->getBuilderID() == getObject()->getID() )
+			target->clearModelConditionState( MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED );
+	}
+
 	// remove the info for this task
 	m_task[ task ].m_targetObjectID = INVALID_ID;
 	m_task[ task ].m_taskOrderFrame = 0;
@@ -2311,7 +2395,13 @@ void DozerAIUpdate::internalCancelTask( DozerTask task )
 
 	// stop the dozer from moving
 	AIUpdateInterface *ai = getObject()->getAIUpdateInterface();
-	ai->aiIdle( CMD_FROM_AI );
+	if( usesRetailBuilder(ai) )
+	{
+		AICommandParms parms(AICMD_IDLE, CMD_FROM_AI);
+		ai->AIUpdateInterface::aiDoCommand(&parms);
+	}
+	else
+		ai->aiIdle( CMD_FROM_AI );
 
 }
 
@@ -2560,6 +2650,8 @@ void DozerAIUpdate::aiDoCommand(const AICommandParms* parms)
 	{
 		case AICMD_MOVE_AWAY_FROM_UNIT:
 			{
+				if( usesRetailBuilder(this) && isTaskPending( DOZER_TASK_BUILD ) )
+					return;
 				Object *otherObj = parms->m_obj;
 				Bool otherIsDozer = false;
 				if (otherObj) {
@@ -2578,6 +2670,8 @@ void DozerAIUpdate::aiDoCommand(const AICommandParms* parms)
 		// --------------------------------------------------------------------------------------------
 		case AICMD_REPAIR:
 		{
+			if( usesRetailBuilder(this) && !TheActionManager->canRepairObject( getObject(), parms->m_obj, parms->m_cmdSource ) )
+				break;
 
 			// if we have no task right now, go idle so we can immediately respond to this
 			if( getCurrentTask() == DOZER_TASK_INVALID )
@@ -2606,6 +2700,10 @@ void DozerAIUpdate::aiDoCommand(const AICommandParms* parms)
 		// --------------------------------------------------------------------------------------------
 		default:
 		{
+			if( usesRetailBuilder(this) &&
+				(parms->m_cmdSource == CMD_FROM_SCRIPT || parms->m_cmdSource == CMD_FROM_AI) &&
+				isTaskPending( DOZER_TASK_BUILD ) )
+				cancelTask( DOZER_TASK_BUILD );
 
 			// if this is from the player, cancel our current task
 			if( parms->m_cmdSource == CMD_FROM_PLAYER && getCurrentTask() != DOZER_TASK_INVALID )

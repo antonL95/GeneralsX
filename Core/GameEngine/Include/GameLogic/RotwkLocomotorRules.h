@@ -53,6 +53,8 @@ inline Resolved resolve(const Authored& authored, float speed, const Resolved& f
 		resolved.lift = speed * authored.liftFraction;
 	if (authored.liftDamagedFraction >= 0.0f)
 		resolved.liftDamaged = speed * authored.liftDamagedFraction;
+	else if (authored.liftFraction >= 0.0f)
+		resolved.liftDamaged = resolved.lift;
 	if (authored.turnFrames > 0)
 		resolved.turnRate = FULL_TURN / static_cast<float>(authored.turnFrames);
 	resolved.turnRateDamaged = authored.turnFramesDamaged > 0 ? FULL_TURN / static_cast<float>(authored.turnFramesDamaged) : resolved.turnRate;

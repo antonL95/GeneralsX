@@ -384,6 +384,7 @@ public:
 
 	Int m_baseValuePerSupplyBox;
 	Real m_BuildSpeed;
+	Real m_builderMoveFromNewStructureDistance;
 	Real m_MinDistFromEdgeOfMapForBuild;
 	Real m_SupplyBuildBorder;
 	Real m_allowedHeightVariationForBuilding;  ///< how "flat" is still flat enough to build on

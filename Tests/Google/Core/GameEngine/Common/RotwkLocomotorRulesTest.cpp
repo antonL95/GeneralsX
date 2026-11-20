@@ -82,6 +82,14 @@ TEST(RotwkLocomotorRulesTest, UnauthoredLiftKeepsTheTemplateValue)
 	EXPECT_FLOAT_EQ(resolved.liftDamaged, 0.3f);
 }
 
+TEST(RotwkLocomotorRulesTest, UnauthoredDamagedLiftUsesAuthoredLift)
+{
+	RotwkLocomotorRules::Authored authored;
+	authored.liftFraction = 2.0f;
+	const auto resolved = RotwkLocomotorRules::resolve(authored, 3.0f, zeroFallback());
+	EXPECT_FLOAT_EQ(resolved.liftDamaged, 6.0f);
+}
+
 TEST(RotwkLocomotorRulesTest, TurnTimeIsOneFullTurn)
 {
 	RotwkLocomotorRules::Authored authored;
