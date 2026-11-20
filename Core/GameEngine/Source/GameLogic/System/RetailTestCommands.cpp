@@ -1162,6 +1162,22 @@ void execute(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST research %u %s %s queued=%d money=%u\n", frame,
 			command.target.c_str(), command.structure.c_str(), queued, obj->getControllingPlayer()->getMoney()->countMoney());
 	}
+	else if (command.action == "produce")
+	{
+		const ThingTemplate* what = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
+		ProductionUpdateInterface* production = obj->getProductionUpdateInterface();
+		const Bool queued = what && production && production->queueCreateUnit(what, production->requestUniqueUnitID());
+		std::fprintf(stderr, "TEST frame %u: produce %s on object %u queued=%d\n", frame, command.structure.c_str(),
+			static_cast<unsigned>(obj->getID()), queued);
+	}
+	else if (command.action == "objupgrade")
+	{
+		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(command.structure.c_str());
+		if (upgrade)
+			obj->giveUpgrade(upgrade);
+		std::fprintf(stderr, "TEST frame %u: objupgrade %s on object %u found=%d\n", frame, command.structure.c_str(),
+			static_cast<unsigned>(obj->getID()), upgrade != nullptr);
+	}
 	else if (command.action == "fund")
 	{
 		obj->getControllingPlayer()->getMoney()->setStartingCash(50000);

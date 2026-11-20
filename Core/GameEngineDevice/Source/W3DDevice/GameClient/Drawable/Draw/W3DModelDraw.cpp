@@ -4493,9 +4493,26 @@ void W3DModelDraw::traceAnimationState() const
 	Real multiplier = 1.0f;
 	if (m_renderObject && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD)
 		static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, numFrames, mode, multiplier);
-	std::fprintf(stderr, "TEST draw frame %u id %u %s clip %s at %.1f/%d speed %.2f timing end %u flags %s\n",
-		TheGameLogic->getFrame(), static_cast<unsigned>(draw->getID()), name.str(), clip, frame, numFrames, multiplier,
-		m_weaponTimingEnd, flags.c_str());
+	std::string subObjects;
+	if (m_renderObject)
+	{
+		for (Int i = 0; i < m_renderObject->Get_Num_Sub_Objects(); ++i)
+		{
+			RenderObjClass* subObj = m_renderObject->Get_Sub_Object(i);
+			if (subObj == nullptr)
+				continue;
+			if (!subObjects.empty())
+				subObjects += ',';
+			subObjects += subObj->Get_Name();
+			subObjects += subObj->Is_Hidden() ? ":hidden" : ":shown";
+			subObj->Release_Ref();
+		}
+	}
+	const char* model = m_curState != nullptr && m_curState->m_modelName.isNotEmpty() ? m_curState->m_modelName.str() : "-";
+	std::fprintf(stderr, "TEST draw frame %u id %u %s module %s model %s clip %s at %.1f/%d speed %.2f timing end %u flags %s subobjects %s\n",
+		TheGameLogic->getFrame(), static_cast<unsigned>(draw->getID()), name.str(),
+		TheNameKeyGenerator->keyToName(getModuleTagNameKey()).str(), model, clip, frame, numFrames, multiplier,
+		m_weaponTimingEnd, flags.c_str(), subObjects.empty() ? "-" : subObjects.c_str());
 }
 
 //-------------------------------------------------------------------------------------------------
