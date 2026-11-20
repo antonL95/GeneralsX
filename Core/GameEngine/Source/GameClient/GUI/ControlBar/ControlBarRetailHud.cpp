@@ -24,6 +24,7 @@
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GameText.h"
+#include "GameClient/HotKey.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/HotKey.h"
@@ -123,6 +124,15 @@ void drawFilledCircle(Int x, Int y, Int width, Int height, Color color)
 	TheDisplay->setCircularClip(x + width / 2, y + height / 2, radius);
 	TheDisplay->drawFillRect(x, y, width, height, color);
 	TheDisplay->setCircularClip(0, 0, 0);
+}
+
+void drawProductionRing(Int x, Int y, Int width, Int height)
+{
+	const Image *ring = findImage("UiRetailProductionRing");
+	if (!TheDisplay->hasImageTexture(ring))
+		return;
+	const Int grow = MAX(1, width * 13 / 108);
+	TheDisplay->drawImage(ring, x - grow, y - grow, x + width + grow, y + height + grow);
 }
 
 void windowRect(const GameWindow *window, Int &x, Int &y, Int &width, Int &height)
@@ -271,7 +281,12 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	const Bool highlight = enabled && BitIsSet(instance->getState(), WIN_STATE_HILITED);
 	const Bool pressed = BitIsSet(instance->getState(), WIN_STATE_SELECTED);
 	const Int slot = TheControlBar->getRetailSlot(window);
-	const Bool side = slot >= RetailRingSlots && slot < MAX_COMMANDS_PER_SET;
+	const Bool radial = TheControlBar->isRetailRadialButton(window);
+	const Bool side = !radial && slot >= RetailRingSlots && slot < MAX_COMMANDS_PER_SET;
+	Int count = 0;
+	Real progress = 0.0f;
+	TheControlBar->getRetailProduction(window, count, progress);
+	const Bool colored = enabled || count > 0;
 
 	if (side)
 	{
@@ -283,24 +298,26 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 
 	const Int cx = x + width / 2;
 	const Int cy = y + height / 2;
-	const Int radius = MIN(width, height) / 2;
-	const Int inset = pressed ? MAX(1, width / 18) : 0;
-	drawFilledCircle(x, y, width, height, GameMakeColor(6, 6, 6, 255));
+	const Int border = radial ? MAX(1, width * 3 / 54) : 0;
+	const Int radius = MIN(width, height) / 2 - border;
+	const Int inset = border + (pressed ? MAX(1, width / 18) : 0);
+	drawFilledCircle(x + border, y + border, width - 2 * border, height - 2 * border, GameMakeColor(6, 6, 6, 255));
 
 	const Image *image = TheControlBar->getRetailButtonImage(window);
 	TheDisplay->setCircularClip(cx, cy, radius);
 	if (TheDisplay->hasImageTexture(image))
 	{
 		Display::DrawImageMode mode = Display::DRAW_IMAGE_ALPHA;
-		if (!enabled)
+		if (!colored)
 			mode = Display::DRAW_IMAGE_GRAYSCALE;
-		const Color tint = enabled ? 0xFFFFFFFF : GameMakeColor(142, 142, 142, 255);
+		Color tint = 0xFFFFFFFF;
+		if (!colored)
+			tint = availability == COMMAND_CANT_AFFORD ? GameMakeColor(142, 142, 142, 255) : GameMakeColor(92, 92, 92, 255);
 		TheDisplay->drawImage(image, x + inset, y + inset, x + width - inset, y + height - inset, tint, mode);
 	}
+	if (!colored)
+		TheDisplay->drawFillRect(x, y, width, height, GameMakeColor(0, 0, 0, availability == COMMAND_CANT_AFFORD ? 60 : 130));
 
-	Int count = 0;
-	Real progress = 0.0f;
-	TheControlBar->getRetailProduction(window, count, progress);
 	if (count > 0)
 	{
 		const Int percent = static_cast<Int>(progress * 100.0f + 0.5f);
@@ -314,10 +331,22 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	}
 	TheDisplay->setCircularClip(0, 0, 0);
 	if (highlight)
-		drawFilledCircle(x, y, width, height, GameMakeColor(255, 236, 170, 48));
+		drawFilledCircle(x + border, y + border, width - 2 * border, height - 2 * border, GameMakeColor(255, 236, 170, 48));
 
-	drawDesignImage("UiRetailGlass", DesignRect{ 0.0f, 0.0f, static_cast<Real>(width), static_cast<Real>(height) }, x, y, 1.0f,
-		highlight ? 0xFFFFFFFF : 0xD0FFFFFF);
+	const DesignRect whole{ 0.0f, 0.0f, static_cast<Real>(width), static_cast<Real>(height) };
+	if (radial)
+	{
+		const char *ring = pressed && enabled ? "RadialPush" : highlight ? "RadialOver" : "RadialBorder";
+		drawDesignImage(ring, whole, x, y, 1.0f, colored ? 0xFFFFFFFF : GameMakeColor(147, 142, 142, 255));
+	}
+	else
+	{
+		drawDesignImage("UiRetailGlass", whole, x, y, 1.0f, highlight ? 0xFFFFFFFF : 0xD0FFFFFF);
+		if (!side && colored)
+			drawDesignImage(highlight ? "RadialOver" : "RadialBorder", whole, x, y, 1.0f);
+	}
+	if (count > 0)
+		drawProductionRing(x, y, width, height);
 
 	if (availability == COMMAND_RESTRICTED)
 	{
@@ -412,7 +441,7 @@ void drawRetailCitadelQueue(Object *citadel, const GameWindow *palantir)
 	windowRect(palantir, x, y, width, height);
 	const Real scale = width / PalantirDesignWidth;
 	const Int size = MAX(3, static_cast<Int>(32.0f * scale));
-	const Int gap = MAX(1, static_cast<Int>(3.0f * scale));
+	const Int gap = MAX(1, static_cast<Int>(10.0f * scale));
 	const Int columns = MAX(1, static_cast<Int>(PalantirDesignWidth * scale) / (size + gap));
 	const Int left = x + gap;
 	const Int bottom = y + static_cast<Int>(42.0f * scale);
@@ -437,17 +466,17 @@ void drawRetailCitadelQueue(Object *citadel, const GameWindow *palantir)
 			if (!TheDisplay->hasImageTexture(image))
 				image = upgrade->getButtonImage();
 		}
-		TheDisplay->drawFillRect(iconX, iconY, size, size, GameMakeColor(18, 16, 12, 240));
+		drawFilledCircle(iconX, iconY, size, size, GameMakeColor(6, 6, 6, 240));
+		TheDisplay->setCircularClip(iconX + size / 2, iconY + size / 2, size / 2);
 		if (TheDisplay->hasImageTexture(image))
-			TheDisplay->drawImage(image, iconX + 1, iconY + 1, iconX + size - 1, iconY + size - 1);
-		const Color border = index == 0 ? GameMakeColor(240, 215, 149, 255) : GameMakeColor(120, 110, 87, 255);
-		TheDisplay->drawOpenRect(iconX, iconY, size, size, 1.0f, border);
+			TheDisplay->drawImage(image, iconX, iconY, iconX + size, iconY + size);
 		if (index == 0)
 		{
 			const Real progress = std::clamp(entry->getPercentComplete(), 0.0f, 100.0f);
-			TheDisplay->drawRemainingRectClock(iconX + 1, iconY + 1, size - 2, size - 2,
-				static_cast<Int>(progress), GameMakeColor(235, 235, 235, 170));
+			TheDisplay->drawRemainingRectClock(iconX, iconY, size, size, static_cast<Int>(progress), GameMakeColor(235, 235, 235, 170));
 		}
+		TheDisplay->setCircularClip(0, 0, 0);
+		drawProductionRing(iconX, iconY, size, size);
 	}
 }
 }
@@ -465,6 +494,7 @@ void ControlBar::drawRetailTexts() const
 
 Int ControlBar::getRetailSlot(const GameWindow *window) const
 {
+	window = retailRadialSource(window);
 	const Int choice = getRetailTrayChoice(window);
 	if (choice >= 0)
 		return MAX_COMMANDS_PER_SET + choice;
@@ -614,6 +644,16 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 		text = label;
 	}
 
+	AsciiString hotKey = TheHotKeyManager ? TheHotKeyManager->searchHotKey(command->getTextLabel()) : AsciiString::TheEmptyString;
+	hotKey.toUpper();
+	if (!hero && hotKey.isNotEmpty())
+	{
+		UnicodeString shortcut;
+		UnicodeString key;
+		key.translate(hotKey);
+		shortcut.format(L"\nShortcut: %ls", key.str());
+		text.concat(shortcut);
+	}
 	UnicodeString description = TheGameText->fetchOrSubstitute(command->getRetailChoiceDescription(getRetailTrayChoice(window)).str(), L"");
 	if (!description.isEmpty())
 	{
@@ -731,6 +771,12 @@ void ControlBar::initRetailHud()
 		button->winSetTooltipFunc(retailCommandTooltip);
 		m_retailTrayButtons[i] = button;
 	}
+	initRetailRadial(master);
+	for (Int i = 0; i < RETAIL_RADIAL_BUTTONS; ++i)
+	{
+		m_retailRadial[i]->winSetDrawFunc(drawRetailCommand);
+		m_retailRadial[i]->winSetTooltipFunc(retailCommandTooltip);
+	}
 	m_contextParent[CP_COMMAND]->winHide(TRUE);
 	switchToContext(CB_CONTEXT_NONE, nullptr);
 }
@@ -738,6 +784,7 @@ void ControlBar::initRetailHud()
 void ControlBar::resetRetailCommandWindows()
 {
 	closeRetailTray();
+	resetRetailRadial();
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
 	{
 		m_retailVisible[i]->winHide(TRUE);
@@ -987,6 +1034,8 @@ void ControlBar::assignRetailSlots(const CommandSet *commandSet, Object *obj, In
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
 		m_retailHeroOf[i] = -1;
 
+	if (commandSet)
+		beginRetailRadial(obj);
 	std::vector<RetailPlacement> placements;
 	collectRetailPlacements(commandSet, obj, initialVisible, placements);
 
@@ -1025,6 +1074,7 @@ void ControlBar::assignRetailSlots(const CommandSet *commandSet, Object *obj, In
 			applyRetailHeroImage(target, placement.hero);
 		m_retailShownMask |= 1ull << placement.entry;
 	}
+	finishRetailRadial(placements);
 	if (obj)
 		updateContextCommand();
 	updateRetailHud();
@@ -1237,6 +1287,8 @@ void ControlBar::populateRetailUnderConstruction(Object *obj)
 		target->winHide(FALSE);
 		m_commandWindows[0] = target;
 		m_retailSlotOf[0] = 0;
+		beginRetailRadial(obj);
+		addRetailRadialMirror(target, cancel, 0);
 	}
 	setPortraitByObject(obj);
 	updateRetailHud();
@@ -1308,6 +1360,7 @@ void ControlBar::updateRetailHud()
 		}
 	}
 	updateRetailCounters();
+	updateRetailRadial();
 }
 
 const Image* ControlBar::getRetailButtonImage(GameWindow *window) const

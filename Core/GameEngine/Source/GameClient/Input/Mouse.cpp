@@ -563,6 +563,9 @@ Mouse::~Mouse()
 	if(m_tooltipDisplayString)
 		TheDisplayStringManager->freeDisplayString(m_tooltipDisplayString);
 	m_tooltipDisplayString = nullptr;
+	if (m_retailTooltipTitle)
+		TheDisplayStringManager->freeDisplayString(m_retailTooltipTitle);
+	m_retailTooltipTitle = nullptr;
 
 	if( m_cursorTextDisplayString )
 		TheDisplayStringManager->freeDisplayString( m_cursorTextDisplayString );
@@ -621,6 +624,9 @@ void Mouse::onResolutionChanged()
 	if(m_tooltipDisplayString)
 		TheDisplayStringManager->freeDisplayString(m_tooltipDisplayString);
 	m_tooltipDisplayString = nullptr;
+	if (m_retailTooltipTitle)
+		TheDisplayStringManager->freeDisplayString(m_retailTooltipTitle);
+	m_retailTooltipTitle = nullptr;
 
 	m_tooltipDisplayString = TheDisplayStringManager->newDisplayString();
 
@@ -941,9 +947,37 @@ void Mouse::setCursorTooltip( UnicodeString tooltip, Int delay, const RGBColor *
 
 void Mouse::setRetailCommandTooltip(UnicodeString tooltip)
 {
+	UnicodeString title = tooltip;
+	UnicodeString body;
+	const WideChar *text = tooltip.str();
+	const WideChar *newline = text ? wcschr(text, L'\n') : nullptr;
+	if (newline && newline[1])
+	{
+		title.clear();
+		for (const WideChar *ch = text; ch < newline; ++ch)
+			title.concat(*ch);
+		Bool lineStart = TRUE;
+		for (const WideChar *ch = newline + 1; *ch; ++ch)
+		{
+			if (lineStart && (*ch == L'\n' || *ch == L' '))
+				continue;
+			body.concat(*ch);
+			lineStart = *ch == L'\n';
+		}
+	}
+	if (!m_retailTooltipTitle && TheDisplayStringManager)
+		m_retailTooltipTitle = TheDisplayStringManager->newDisplayString();
+	if (!m_retailTooltipTitle)
+		return;
+	if (m_tooltipDisplayString && m_retailTooltipTitle->getFont() != m_tooltipDisplayString->getFont())
+		m_retailTooltipTitle->setFont(m_tooltipDisplayString->getFont());
+	const UnicodeString &shownTitle = body.isEmpty() ? UnicodeString::TheEmptyString : title;
+	if (shownTitle.compare(m_retailTooltipTitle->getText()) != 0)
+		m_retailTooltipTitle->setText(shownTitle);
+
 	const Real scale = TheDisplay->getHeight() / 768.0f;
 	const Real defaultWidth = TheDisplay->getWidth() * m_tooltipWidth;
-	setCursorTooltip(tooltip, -1, nullptr, defaultWidth > 0.0f ? 342.0f * scale / defaultWidth : 1.0f);
+	setCursorTooltip(body.isEmpty() ? title : body, -1, nullptr, defaultWidth > 0.0f ? 342.0f * scale / defaultWidth : 1.0f);
 	m_retailCommandTooltip = TRUE;
 }
 
@@ -1192,19 +1226,19 @@ Bool Mouse::drawRetailCommandTooltip()
 	const Int rightWidth = MAX(1, static_cast<Int>(30 * scale));
 	Int textWidth, textHeight;
 	m_tooltipDisplayString->getSize(&textWidth, &textHeight);
-	const Int width = MAX(textWidth + leftWidth + rightWidth, static_cast<Int>(405 * scale));
-	const Int height = textHeight + topHeight + bottomHeight + 2 * bodyPadding;
-	Int x = m_currMouse.pos.x + 20;
-	if (x + width > m_maxX)
-		x = m_currMouse.pos.x - width - 20;
-	x = MAX(0, x);
+	Int titleWidth = 0;
+	Int titleHeight = 0;
+	if (m_retailTooltipTitle && m_retailTooltipTitle->getTextLength() > 0)
+		m_retailTooltipTitle->getSize(&titleWidth, &titleHeight);
+	const Int width = MAX(MAX(textWidth, titleWidth) + leftWidth + rightWidth, static_cast<Int>(405 * scale));
+	const Int height = titleHeight + textHeight + topHeight + bottomHeight + 2 * bodyPadding;
+	const Int x = MAX(0, (m_maxX - width) / 2);
 	constexpr UnsignedInt entryTime = 140;
 	const UnsignedInt elapsed = std::min<UnsignedInt>(timeGetTime() - m_highlightUpdateStart, entryTime);
 	const Real remaining = 1.0f - static_cast<Real>(elapsed) / entryTime;
 	const Int entryOffset = static_cast<Int>(8.0f * scale * remaining * remaining);
-	const Int anchorY = MAX(0, MIN(m_currMouse.pos.y, m_maxY - height));
-	const Int y = anchorY > m_maxY / 2 ? MAX(0, anchorY - entryOffset) :
-		MIN(MAX(0, m_maxY - height), anchorY + entryOffset);
+	const Int bottomGap = static_cast<Int>(112 * scale);
+	const Int y = MAX(0, m_maxY - height - bottomGap + entryOffset);
 	const Int middleY = y + topHeight;
 	const Int bottomY = y + height - bottomHeight;
 	TheDisplay->drawFillRect(x + leftWidth / 2, middleY, width - (leftWidth + rightWidth) / 2,
@@ -1216,9 +1250,16 @@ Bool Mouse::drawRetailCommandTooltip()
 	ICoord2D lo = { 0, 0 };
 	ICoord2D hi = { static_cast<Int>(TheDisplay->getWidth()), static_cast<Int>(TheDisplay->getHeight()) };
 	IRegion2D clipRegion = { lo, hi };
+	const Int centerX = x + width / 2;
+	if (titleHeight > 0)
+	{
+		m_retailTooltipTitle->setClipRegion(&clipRegion);
+		m_retailTooltipTitle->draw(centerX - titleWidth / 2, middleY + bodyPadding,
+			GameMakeColor(255, 255, 255, 255), GameMakeColor(0, 0, 0, 255));
+	}
 	m_tooltipDisplayString->setClipRegion(&clipRegion);
-	m_tooltipDisplayString->draw(x + leftWidth, middleY + bodyPadding,
-		GameMakeColor(240, 231, 204, 255), GameMakeColor(0, 0, 0, 255));
+	m_tooltipDisplayString->draw(centerX - textWidth / 2, middleY + bodyPadding + titleHeight,
+		titleHeight > 0 ? GameMakeColor(255, 210, 60, 255) : GameMakeColor(255, 255, 255, 255), GameMakeColor(0, 0, 0, 255));
 	return TRUE;
 }
 

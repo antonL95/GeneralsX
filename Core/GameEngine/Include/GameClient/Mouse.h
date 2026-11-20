@@ -395,6 +395,7 @@ protected:
 
 	UnicodeString m_tooltipString;	///< tooltip text
 	DisplayString *m_tooltipDisplayString; ///< tooltipDisplayString
+	DisplayString *m_retailTooltipTitle = nullptr;
 	Bool m_displayTooltip;  /**< when the mouse has been still long enough this will be
 													set to TRUE indicating it's Ok to fire off a tooltip */
 	Bool m_isTooltipEmpty;

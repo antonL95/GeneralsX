@@ -3418,7 +3418,7 @@ void W3DDisplay::drawRemainingRectClock(Int startX, Int startY, Int width, Int h
 			const Real last = (i + 1) * step;
 			const Vector2 a(center.X + m_circleClipRadius * WWMath::Sin(first), center.Y - m_circleClipRadius * WWMath::Cos(first));
 			const Vector2 b(center.X + m_circleClipRadius * WWMath::Sin(last), center.Y - m_circleClipRadius * WWMath::Cos(last));
-			m_2DRender->Add_Tri(center, a, b, uv, uv, uv, color);
+			m_2DRender->Add_Tri(center, b, a, uv, uv, uv, color);
 		}
 		if (!m_isBatching)
 			m_2DRender->Render();

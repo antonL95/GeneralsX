@@ -279,6 +279,7 @@ set(GAMEENGINE_SRC
     Include/GameClient/UiLayoutDump.h
     Include/GameClient/UiNineSlice.h
     Include/GameClient/UiPixelSpace.h
+    Include/GameClient/UiRadialRing.h
     Include/GameClient/UiRelayout.h
     Include/GameClient/UiResolution.h
     Include/GameClient/UiScale.h
@@ -821,6 +822,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/ControlBar/ControlBarStructureInventory.cpp
     Source/GameClient/GUI/ControlBar/ControlBarUnderConstruction.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailHud.cpp
+    Source/GameClient/GUI/ControlBar/ControlBarRetailRadial.cpp
 #    Source/GameClient/GUI/DisconnectMenu/DisconnectMenu.cpp
     Source/GameClient/GUI/EstablishConnectionsMenu/EstablishConnectionsMenu.cpp
     Source/GameClient/GUI/Gadget/GadgetCheckBox.cpp

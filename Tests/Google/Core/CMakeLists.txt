@@ -35,6 +35,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/UiLayoutDumpTest.cpp
     GameEngine/Common/UiNineSliceTest.cpp
     GameEngine/Common/UiPixelSpaceTest.cpp
+    GameEngine/Common/UiRadialRingTest.cpp
     GameEngine/Common/UiRelayoutTest.cpp
     Libraries/Compression/CompressionManagerTest.cpp
     Libraries/WW3D2/W3dBfmeChunksTest.cpp

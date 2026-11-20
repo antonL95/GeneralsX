@@ -993,6 +993,13 @@ protected:
 	UnsignedInt m_retailRangeObject = 0;
 	Int m_retailHeroOf[MAX_COMMANDS_PER_SET] = {};
 	unsigned long long m_retailShownMask = 0;
+	enum { RETAIL_RADIAL_BUTTONS = 12, RETAIL_RADIAL_FIRST_SLOT = MAX_COMMANDS_PER_SET - RETAIL_RADIAL_BUTTONS };
+	GameWindow *m_retailRadialGroup = nullptr;
+	GameWindow *m_retailRadial[RETAIL_RADIAL_BUTTONS] = {};
+	GameWindow *m_retailSideButtons[RETAIL_RADIAL_BUTTONS] = {};
+	GameWindow *m_retailRadialSource[RETAIL_RADIAL_BUTTONS] = {};
+	Int m_retailRadialEntry[RETAIL_RADIAL_BUTTONS] = {};
+	Bool m_retailRadialMode = FALSE;
 
 	void initRetailHud();
 	struct RetailPlacement
@@ -1021,6 +1028,13 @@ protected:
 	Int getRetailTrayChoice(const GameWindow *control) const;
 	void updateRetailTray();
 	const Object* getRetailSelection() const;
+	void initRetailRadial(GameWindow *master);
+	void beginRetailRadial(Object *obj);
+	void addRetailRadialMirror(GameWindow *source, const CommandButton *command, Int entry);
+	void finishRetailRadial(const std::vector<RetailPlacement> &placements);
+	void resetRetailRadial();
+	void updateRetailRadial();
+	const GameWindow *retailRadialSource(const GameWindow *window) const;
 
 public:
 	Bool isRetailHud() const { return m_retailSelectionName != nullptr; }
@@ -1030,6 +1044,8 @@ public:
 	void drawRetailTexts() const;
 	void drawRetailSocketFills() const;
 	Bool isOverRetailSocket(Int px, Int py) const;
+	Bool isOverRetailRadial(Int px, Int py) const;
+	Bool isRetailRadialButton(const GameWindow *window) const;
 	void getRetailProduction(const GameWindow *window, Int &count, Real &progress) const;
 	CommandAvailability getRetailButtonAvailability(GameWindow *window) const;
 	const Image* getRetailButtonImage(GameWindow *window) const;
