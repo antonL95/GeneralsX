@@ -10,6 +10,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/RetailFileLayersTest.cpp
     GameEngine/Common/INIMathTest.cpp
     GameEngine/Common/INIPreprocessorTest.cpp
+    GameEngine/Common/MapPlayerRosterTest.cpp
     GameEngine/Common/BfmeAssetPathTest.cpp
     Libraries/Compression/CompressionManagerTest.cpp
     Libraries/WW3D2/W3dBfmeChunksTest.cpp

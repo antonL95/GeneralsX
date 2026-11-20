@@ -146,6 +146,8 @@ public:
 	static Bool ParseSidesDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseMapTeamsDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	Bool getMapSideFlag() const { return m_mapSideFlag; }
+	Bool usesRotwkRoster() const;
+	AsciiString getSlotPlayerName(Int slot, Int startPosition, Bool observer) const;
 	/// Writes sides (including build list info.)
 	static void WriteSidesDataChunk(DataChunkOutput &chunkWriter);
 
@@ -201,6 +203,7 @@ protected:
 	Int					m_numSides;
 	SidesInfo		m_sides[MAX_MAP_SIDES];
 	Bool				m_mapSideFlag;
+	UnsignedInt		m_mapSidesVersion;
 
 	Int					m_numSkirmishSides;
 	// GeneralsX @bugfix fbraz3 05/10/2026 Size skirmish sides array with MAX_SKIRMISH_SIDES to prevent buffer overflow (#335).
@@ -210,6 +213,7 @@ protected:
 	TeamsInfoRec	m_skirmishTeamrec;
 
 	Bool validateAllyEnemyList(const AsciiString& tname, AsciiString& allies);
+	void prepareRotwkRoster();
 };
 
 

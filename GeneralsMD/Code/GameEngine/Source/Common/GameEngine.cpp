@@ -109,6 +109,7 @@
 #include "GameClient/GUICallbacks.h"
 
 #include "GameNetwork/NetworkInterface.h"
+#include "GameNetwork/GameInfo.h"
 #include "GameNetwork/WOLBrowser/WebBrowser.h"
 #include "GameNetwork/LANAPI.h"
 #include "GameNetwork/GameSpy/GameResultsThread.h"
@@ -160,6 +161,49 @@ GameEngine *TheGameEngine = nullptr;
 
 //-------------------------------------------------------------------------------------------------
 SubsystemInterfaceList* TheSubsystemList = nullptr;
+
+static Int findRetailSkirmishFaction(const char* name)
+{
+	Int firstPlayable = PLAYERTEMPLATE_RANDOM;
+	for (Int i = 0; i < ThePlayerTemplateStore->getPlayerTemplateCount(); ++i)
+	{
+		const PlayerTemplate* faction = ThePlayerTemplateStore->getNthPlayerTemplate(i);
+		if (!faction->isPlayableSide())
+			continue;
+		if (faction->getName() == name)
+			return i;
+		if (firstPlayable == PLAYERTEMPLATE_RANDOM)
+			firstPlayable = i;
+	}
+	return firstPlayable;
+}
+
+static void startRetailFileSkirmish(const MapMetaData& map)
+{
+	delete TheSkirmishGameInfo;
+	TheSkirmishGameInfo = NEW SkirmishGameInfo;
+	TheSkirmishGameInfo->enterGame();
+	TheSkirmishGameInfo->setSeed(0);
+
+	GameSlot human;
+	human.setState(SLOT_PLAYER, UnicodeString(L"Player"));
+	human.setStartPos(0);
+	human.setColor(0);
+	human.setPlayerTemplate(findRetailSkirmishFaction("FactionMen"));
+	TheSkirmishGameInfo->setSlot(0, human);
+	TheSkirmishGameInfo->setLocalIP(human.getIP());
+
+	GameSlot ai;
+	ai.setState(SLOT_EASY_AI);
+	ai.setStartPos(1);
+	ai.setColor(1);
+	ai.setPlayerTemplate(findRetailSkirmishFaction("FactionMordor"));
+	TheSkirmishGameInfo->setSlot(1, ai);
+	TheSkirmishGameInfo->setMap(map.m_fileName);
+	TheSkirmishGameInfo->setMapCRC(map.m_CRC);
+	TheSkirmishGameInfo->setMapSize(map.m_filesize);
+	TheSkirmishGameInfo->startGame(0);
+}
 
 //-------------------------------------------------------------------------------------------------
 template<class SUBSYSTEM>
@@ -890,12 +934,14 @@ void GameEngine::init()
 				TheWritableGlobalData->m_playIntro = FALSE;
 				TheWritableGlobalData->m_pendingFile = TheGlobalData->m_initialFile;
 
-				// shutdown the top, but do not pop it off the stack
-	//			TheShell->hideShell();
+				const MapMetaData* map = RetailFileLayers::enabled() ? TheMapCache->findMap(fname) : nullptr;
+				const Bool skirmish = map && map->m_isMultiplayer && map->m_numPlayers >= 2;
+				if (skirmish)
+					startRetailFileSkirmish(*map);
 
 				// send a message to the logic for a new game
 				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_NEW_GAME );
-				msg->appendIntegerArgument(GAME_SINGLE_PLAYER);
+				msg->appendIntegerArgument(skirmish ? GAME_SKIRMISH : GAME_SINGLE_PLAYER);
 				msg->appendIntegerArgument(DIFFICULTY_NORMAL);
 				msg->appendIntegerArgument(0);
 				InitRandom(0);

@@ -666,6 +666,11 @@ bool probeMapSides(const std::string& name, const Entry& entry, const char *heig
 				TheSidesList = nullptr;
 				return false;
 			}
+			if (sides.usesRotwkRoster() && std::getenv("GENERALSX_ROSTER_LOG"))
+			{
+				sides.prepareForMP_or_Skirmish();
+				record("map-roster-kept", name, "SidesList", "", sides.getNumSides());
+			}
 		}
 	}
 	catch (ErrorCode error)

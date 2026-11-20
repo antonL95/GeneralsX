@@ -51,6 +51,7 @@
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
 #include "GameLogic/AI.h"
+#include "GameLogic/MapPlayerRoster.h"
 #include "GameLogic/Scripts.h"
 #include "GameLogic/SidesList.h"
 #include <cstdio>
@@ -58,7 +59,6 @@
 static const Int K_SIDES_DATA_VERSION_1 = 1;
 static const Int K_SIDES_DATA_VERSION_2 = 2;	// includes Team list.
 static const Int K_SIDES_DATA_VERSION_3 = 3;	// includes Team list.
-static const Int K_SIDES_DATA_VERSION_5 = 5;
 
 /* ********* SidesInfo class ****************************/
 /**
@@ -207,7 +207,7 @@ Int SidesInfo::removeFromBuildList(BuildListInfo *pBuildList)
 /**
  SidesList - Constructor.
 */
-SidesList::SidesList() : m_numSides(0), m_mapSideFlag(false), m_numSkirmishSides(0)
+SidesList::SidesList() : m_numSides(0), m_mapSideFlag(false), m_mapSidesVersion(0), m_numSkirmishSides(0)
 {
 }
 
@@ -251,11 +251,12 @@ Bool SidesList::ParseSidesDataChunk(DataChunkInput &file, DataChunkInfo *info, v
 	if (TheSidesList==nullptr)
 		return false;
 
-	const Bool externalTeams = info->version >= K_SIDES_DATA_VERSION_5;
+	const Bool externalTeams = MapPlayerRoster::isRotwk(info->version);
 	if (externalTeams)
 		TheSidesList->emptySides();
 	else
 		TheSidesList->clear();
+	TheSidesList->m_mapSidesVersion = info->version;
 	if (info->version >= MAX_MAP_SIDES_VERSION)
 	{
 		const UnsignedByte flag = file.readByte();
@@ -536,8 +537,68 @@ static Bool ParseTeamsDataChunk(DataChunkInput &file, DataChunkInfo *info, void 
 	return true;
 }
 
+Bool SidesList::usesRotwkRoster() const
+{
+#if RTS_GENERALS
+	return FALSE;
+#else
+	return MapPlayerRoster::isRotwk(m_mapSidesVersion);
+#endif
+}
+
+AsciiString SidesList::getSlotPlayerName(Int slot, Int startPosition, Bool observer) const
+{
+	return AsciiString(MapPlayerRoster::slotName(usesRotwkRoster(), slot, startPosition, observer).c_str());
+}
+
+void SidesList::prepareRotwkRoster()
+{
+	Int retainedSides = 0;
+	for (Int i = 0; i < m_numSides; ++i)
+	{
+		SidesInfo& side = m_sides[i];
+		const AsciiString name = side.getDict()->getAsciiString(TheKey_playerName);
+		if (MapPlayerRoster::keepsSide(name.str()))
+		{
+			side.getDict()->setBool(TheKey_playerIsHuman, FALSE);
+			if (retainedSides != i)
+				m_sides[retainedSides] = side;
+			++retainedSides;
+		}
+		else
+		{
+			m_skirmishSides[m_numSkirmishSides++] = side;
+		}
+	}
+	for (Int i = retainedSides; i < m_numSides; ++i)
+		m_sides[i].clear();
+	m_numSides = retainedSides;
+
+	TeamsInfoRec retainedTeams;
+	for (Int i = 0; i < getNumTeams(); ++i)
+	{
+		const Dict* team = getTeamInfo(i)->getDict();
+		const AsciiString owner = team->getAsciiString(TheKey_teamOwner);
+		if (MapPlayerRoster::keepsSide(owner.str()))
+			retainedTeams.addTeam(team);
+		else
+			m_skirmishTeamrec.addTeam(team);
+	}
+	m_teamrec = retainedTeams;
+}
+
 void SidesList::prepareForMP_or_Skirmish()
 {
+	if (usesRotwkRoster())
+	{
+		m_skirmishTeamrec.clear();
+		for (Int i = 0; i < m_numSkirmishSides; ++i)
+			m_skirmishSides[i].clear();
+		m_numSkirmishSides = 0;
+		prepareRotwkRoster();
+		return;
+	}
+
 	m_skirmishTeamrec.clear();
 	Int i;
 	for (i = 0; i < getNumTeams(); i++)
@@ -674,6 +735,7 @@ void SidesList::emptySides()
 	m_numSides = 0;
 	m_numSkirmishSides = 0;
 	m_mapSideFlag = false;
+	m_mapSidesVersion = 0;
 	for (i = 0; i < MAX_MAP_SIDES; i++) {
 		m_sides[i].clear();
 	}

@@ -60,11 +60,13 @@
 #include "Common/GameEngine.h"
 #include "Common/GameLOD.h"
 #include "Common/GameState.h"
+#include "Common/INIAudit.h"
 #include "Common/MessageStream.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/CampaignManager.h"
 #include "GameClient/Display.h"
 #include "GameClient/GadgetProgressBar.h"
@@ -1286,6 +1288,13 @@ void MultiPlayerLoadScreen::init( GameInfo *game )
 {
 	// create the layout of the load screen
 	m_loadScreen = TheWindowManager->winCreateFromScript( "Menus/MultiplayerLoadScreen.wnd" );
+	if (!m_loadScreen && RetailFileLayers::enabled())
+	{
+		INIAudit::recordWithContext("map-load-screen", "MultiPlayerLoadScreen::init", "missing window",
+			"Menus/MultiplayerLoadScreen.wnd", 0);
+		TheGameLogic->initTimeOutValues();
+		return;
+	}
 	DEBUG_ASSERTCRASH(m_loadScreen, ("Can't initialize the Multiplayer loadscreen"));
 	m_loadScreen->winHide(FALSE);
 	m_loadScreen->winBringToTop();
@@ -1501,7 +1510,8 @@ void MultiPlayerLoadScreen::update( Int percent )
 
 void MultiPlayerLoadScreen::processProgress(Int playerId, Int percentage)
 {
-
+	if (!m_loadScreen && RetailFileLayers::enabled())
+		return;
 	if( percentage < 0 || percentage > 100 || playerId >= MAX_SLOTS || playerId < 0 || m_playerLookup[playerId] == -1)
 	{
 		DEBUG_CRASH(("Percentage %d was passed in for Player %d", percentage, playerId));

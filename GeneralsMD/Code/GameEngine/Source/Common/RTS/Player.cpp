@@ -795,9 +795,14 @@ void Player::initFromDict(const Dict* d)
 	Bool exists;
 	Bool skirmish = false;
 	Bool forceHuman = false;
+	const Bool rotwk = TheSidesList->usesRotwkRoster();
 	// GeneralsX @bugfix Copilot 22/03/2026 Initialize multiplayer start index before any skirmish name/script qualification.
 	m_mpStartIndex = d->getInt(TheKey_multiplayerStartIndex, &exists);
-	if (d->getBool(TheKey_playerIsSkirmish, &exists))
+	if (rotwk)
+	{
+		skirmish = d->getBool(TheKey_playerIsSkirmish);
+	}
+	else if (d->getBool(TheKey_playerIsSkirmish, &exists))
 	{
 
 		// srj sez: check to ensure the map actually has a skirmish player... ordinarily it should, but
@@ -818,7 +823,6 @@ void Player::initFromDict(const Dict* d)
 		DEBUG_ASSERTCRASH(skirmish, ("Could not find skirmish player for side %s... quietly making into nonskirmish.", getSide().str()));
 		if (!skirmish)
 			forceHuman = true;
-
 	}
 
 	if (d->getBool(TheKey_playerIsHuman) || forceHuman)
@@ -828,7 +832,22 @@ void Player::initFromDict(const Dict* d)
 		{
 			m_isPreorder = TRUE;
 		}
-		if (TheSidesList->getNumSkirmishSides()>0) {
+		if (rotwk && !isPlayerObserver())
+		{
+			SidesInfo* humanTemplate = TheSidesList->findSkirmishSideInfo("SkirmishHuman");
+			SidesInfo* slotSide = TheSidesList->findSideInfo(pname);
+			if (humanTemplate && humanTemplate->getScriptList() && slotSide)
+			{
+				AsciiString qualifier;
+				qualifier.format("%d", m_mpStartIndex);
+				AsciiString sourceName("SkirmishHuman");
+				sourceName.concat(qualifier);
+				ScriptList* scripts = humanTemplate->getScriptList()->duplicateAndQualify(qualifier, sourceName, pname);
+				deleteInstance(slotSide->getScriptList());
+				slotSide->setScriptList(scripts);
+			}
+		}
+		else if (!rotwk && TheSidesList->getNumSkirmishSides()>0) {
 			// Human player gets scripts from CIVILIAN player.
 			AsciiString  mySide = "Civilian";
 			Int i;
@@ -891,7 +910,20 @@ void Player::initFromDict(const Dict* d)
 			m_ai->setAIDifficulty(difficulty);
 		}
 
-		if (!found)
+		if (rotwk)
+		{
+			SidesInfo* slotSide = TheSidesList->findSideInfo(pname);
+			if (found && slotSide && TheSidesList->getSkirmishSideInfo(skirmishNdx)->getScriptList())
+			{
+				AsciiString qualifier;
+				qualifier.format("%d", m_mpStartIndex);
+				ScriptList* scripts = TheSidesList->getSkirmishSideInfo(skirmishNdx)->getScriptList()->duplicateAndQualify(
+					qualifier, qualTemplatePlayerName, pname);
+				deleteInstance(slotSide->getScriptList());
+				slotSide->setScriptList(scripts);
+			}
+		}
+		else if (!found)
 		{
 			DEBUG_CRASH(("Could not find skirmish player for side %s", mySide.str()));
 		} else {

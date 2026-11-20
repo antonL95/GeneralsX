@@ -516,6 +516,7 @@ set(GAMEENGINE_SRC
 #    Include/GameLogic/ScriptConditions.h
 #    Include/GameLogic/ScriptEngine.h
 #    Include/GameLogic/Scripts.h
+    Include/GameLogic/MapPlayerRoster.h
     Include/GameLogic/SidesList.h
 #    Include/GameLogic/Squad.h
     Include/GameLogic/TerrainLogic.h

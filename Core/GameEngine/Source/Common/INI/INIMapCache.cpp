@@ -37,6 +37,7 @@
 #include "Common/NameKeyGenerator.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/QuotedPrintable.h"
+#include "Common/RetailFileLayers.h"
 
 // GeneralsX @bugfix Copilot 27/04/2026 Support both POSIX and Windows separators when deriving map display names.
 static const char *findLastPathSeparator(const AsciiString& path)
@@ -132,11 +133,28 @@ const FieldParse MapMetaDataReader::m_mapFieldParseTable[] =
 
 };
 
+static const FieldParse retailMapFields[] =
+{
+	{ "isScenarioMP", [](INI* ini, void*, void*, const void*) {
+		Bool scenario;
+		INI::parseBool(ini, nullptr, &scenario, nullptr);
+	}, nullptr, 0 },
+	{ "description", [](INI* ini, void*, void*, const void*) {
+		AsciiString description;
+		INI::parseAsciiString(ini, nullptr, &description, nullptr);
+	}, nullptr, 0 },
+	{ "PlayerPosition", [](INI* ini, void*, void*, const void*) {
+		ini->getNextToken();
+		ini->readRawBlock("End");
+	}, nullptr, 0 },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
 void INI::parseMapCacheDefinition( INI* ini )
 {
 	const char *c;
 	AsciiString name;
-	MapMetaDataReader mdr;
+	MapMetaDataReader mdr{};
 	MapMetaData md;
 
 	// read the name
@@ -145,7 +163,11 @@ void INI::parseMapCacheDefinition( INI* ini )
 	name = QuotedPrintableToAsciiString(name);
 	md.m_waypoints.clear();
 
-	ini->initFromINI( &mdr, mdr.getFieldParse() );
+	MultiIniFieldParse fields;
+	fields.add(mdr.getFieldParse());
+	if (RetailFileLayers::enabled())
+		fields.add(retailMapFields);
+	ini->initFromINIMulti(&mdr, fields);
 
 	md.m_extent = mdr.m_extent;
 	md.m_isOfficial = mdr.m_isOfficial != 0;
@@ -191,7 +213,7 @@ void INI::parseMapCacheDefinition( INI* ini )
 #endif
 
 	AsciiString startingCamName;
-	for (Int i=0; i<md.m_numPlayers; ++i)
+	for (Int i = 0; i < md.m_numPlayers && i < MAX_SLOTS; ++i)
 	{
 		startingCamName.format("Player_%d_Start", i+1); // start pos waypoints are 1-based
 		md.m_waypoints[startingCamName] = mdr.m_waypoints[i];

@@ -48,12 +48,14 @@
 #include "Common/DataChunk.h"
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
+#include "Common/INIAudit.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/Team.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
+#include "GameLogic/MapPlayerRoster.h"
 #ifdef RTS_DEBUG
 #include "GameLogic/Object.h"
 #endif
@@ -61,6 +63,7 @@
 #include "GameNetwork/GameInfo.h"
 #include "GameNetwork/NetworkDefs.h"
 #include <algorithm>
+#include <cstdlib>
 
 //-----------------------------------------------------------------------------
 /*extern*/ PlayerList *ThePlayerList = nullptr;
@@ -264,6 +267,26 @@ void PlayerList::newGame()
 	{
 		assignSlotIndices(*TheGameInfo);
 	}
+
+	if (TheSidesList->usesRotwkRoster() && std::getenv("GENERALSX_ROSTER_LOG"))
+	{
+		for (Int i = 0; i < m_playerCount; ++i)
+		{
+			const Player* player = m_players[i];
+			const char* kind = i == 0 ? "neutral" : player->isPlayerObserver() ? "observer" :
+				player->getPlayerType() == PLAYER_HUMAN ? "human" : "computer";
+			fprintf(stderr, "ROSTER\t%d\t%s\t%s", i, player->getPlayerName().str(), kind);
+			for (Int j = 0; j < m_playerCount; ++j)
+			{
+				const Player* other = m_players[j];
+				const Relationship relation = player->getRelationship(other->getDefaultTeam());
+				fprintf(stderr, "\t%s=%s", other->getPlayerName().str(),
+					relation == ALLIES ? "ally" : relation == ENEMIES ? "enemy" : "neutral");
+			}
+			fprintf(stderr, "\n");
+		}
+		fflush(stderr);
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -327,6 +350,22 @@ void PlayerList::updateTeamStates()
 //-----------------------------------------------------------------------------
 Team *PlayerList::validateTeam( AsciiString owner )
 {
+	if (TheSidesList->usesRotwkRoster())
+	{
+		const auto teamName = MapPlayerRoster::qualifiedTeam(owner.str());
+		if (!teamName.empty())
+		{
+			if (Team* team = TheTeamFactory->findTeam(AsciiString(teamName.data())))
+				return team;
+		}
+		if (Team* team = TheTeamFactory->findTeam(owner))
+			return team;
+		if (INIAudit::isEnabled())
+			INIAudit::recordWithContext("map-owner", "PlayerList::validateTeam", owner.str(),
+				TheGlobalData->m_mapName.str(), 0);
+		return getNeutralPlayer()->getDefaultTeam();
+	}
+
 	// owner could be a player or team. first, check team names.
 	Team *t = TheTeamFactory->findTeam(owner);
 	if (t)
@@ -579,15 +618,14 @@ Player *PlayerList::getPlayerFromSlotIndex(Int slotIndex) const
 //-----------------------------------------------------------------------------
 void PlayerList::assignSlotIndices(const GameInfo& gameInfo)
 {
-	AsciiString playerName;
-
 	for (Int i = 0; i < MAX_SLOTS; ++i)
 	{
 		const GameSlot* slot = gameInfo.getConstSlot(i);
 		if (!slot || !slot->isOccupied())
 			continue;
 
-		playerName.format("player%d", i);
+		const AsciiString playerName = TheSidesList->getSlotPlayerName(i, slot->getStartPos(),
+			slot->getPlayerTemplate() == PLAYERTEMPLATE_OBSERVER);
 
 		if (Player* player = findPlayerWithNameKey(TheNameKeyGenerator->nameToKey(playerName)))
 		{

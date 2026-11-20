@@ -1452,6 +1452,8 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			TheSidesList->prepareForMP_or_Skirmish();
 		}
 
+		SidesInfo* creeps = TheSidesList->usesRotwkRoster() ? TheSidesList->findSideInfo("PlyrCreeps") : nullptr;
+		AsciiString creepEnemies;
 		//DEBUG_LOG(("Starting LAN game with %d players", game->getNumPlayers()));
 		for (int i=0; i<MAX_SLOTS; ++i)
 		{
@@ -1469,8 +1471,8 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 			Dict d;
 			d.clear();
-			AsciiString playerName;
-			playerName.format("player%d", i);
+			const AsciiString playerName = TheSidesList->getSlotPlayerName(i, slot->getStartPos(),
+				slot->getPlayerTemplate() == PLAYERTEMPLATE_OBSERVER);
 			d.setAsciiString(TheKey_playerName, playerName);
 			d.setBool(TheKey_playerIsHuman, slot->isHuman());
 			d.setUnicodeString(TheKey_playerDisplayName, slot->getName());
@@ -1501,8 +1503,8 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 				DEBUG_LOG(("Player %d is team %d", j, teamSlot->getTeamNumber()));
 
-				AsciiString teamPlayerName;
-				teamPlayerName.format("player%d", j);
+				const AsciiString teamPlayerName = TheSidesList->getSlotPlayerName(j, teamSlot->getStartPos(),
+					teamSlot->getPlayerTemplate() == PLAYERTEMPLATE_OBSERVER);
 				// if our team is None, or our team is not equal to their team,
 				// then their our enemy
 				Bool isEnemy = FALSE;
@@ -1522,6 +1524,15 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 						alliesString.concat(" ");
 					alliesString.concat(teamPlayerName);
 				}
+			}
+			if (creeps)
+			{
+				if (!enemiesString.isEmpty())
+					enemiesString.concat(" ");
+				enemiesString.concat("PlyrCreeps");
+				if (!creepEnemies.isEmpty())
+					creepEnemies.concat(" ");
+				creepEnemies.concat(playerName);
 			}
 			d.setAsciiString(TheKey_playerAllies, alliesString);
 			d.setAsciiString(TheKey_playerEnemies, enemiesString);
@@ -1588,6 +1599,11 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 			DEBUG_LOG(("Added side %d", i));
 			updateLoadProgress(progressCount + i);
+		}
+		if (creeps)
+		{
+			creeps->getDict()->setAsciiString(TheKey_playerAllies, AsciiString::TheEmptyString);
+			creeps->getDict()->setAsciiString(TheKey_playerEnemies, creepEnemies);
 		}
 	}
 	//if(m_gameMode != GAME_REPLAY)
