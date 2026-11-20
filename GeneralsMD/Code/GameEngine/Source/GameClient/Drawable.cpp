@@ -718,6 +718,16 @@ void Drawable::setAnimationCompletionTime(UnsignedInt numFrames)
 	}
 }
 
+void Drawable::setWeaponTimingDuration(UnsignedInt numFrames)
+{
+	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
+	{
+		ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
+		if (di)
+			di->setWeaponTimingDuration(numFrames);
+	}
+}
+
 //Kris: Manually set a drawable's current animation to specific frame.
 //-------------------------------------------------------------------------------------------------
 void Drawable::setAnimationFrame( int frame )

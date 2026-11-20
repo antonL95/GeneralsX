@@ -994,7 +994,10 @@ void execute(const Command& command, unsigned int frame)
 	{
 		const Coord3D location = groundLocation(command);
 		TheTacticalView->lookAt(&location);
-		std::fprintf(stderr, "TEST frame %u: camera at %.1f %.1f\n", frame, location.x, location.y);
+		if (command.angle > 0.0f)
+			TheTacticalView->setZoom(command.angle);
+		std::fprintf(stderr, "TEST frame %u: camera at %.1f %.1f zoom %.2f\n", frame, location.x, location.y,
+			TheTacticalView->getZoom());
 	}
 	else if (command.action == "buttons")
 	{

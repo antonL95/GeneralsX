@@ -75,6 +75,12 @@
 #include "WW3D2/meshmdl.h"
 #include "Common/BitFlagsIO.h"
 
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#include <vector>
+
 
 //-------------------------------------------------------------------------------------------------
 static inline Bool isValidTimeToCalcLogicStuff()
@@ -324,7 +330,8 @@ W3DAnimationInfo::W3DAnimationInfo( const W3DAnimationInfo &r ) :
 	m_naturalDurationInMsec(r.m_naturalDurationInMsec),
 	m_playbackMode(r.m_playbackMode),
 	m_minSpeed(r.m_minSpeed),
-	m_maxSpeed(r.m_maxSpeed)
+	m_maxSpeed(r.m_maxSpeed),
+	m_useWeaponTiming(r.m_useWeaponTiming)
 {
 #ifdef RETAIN_ANIM_HANDLES
 	if (m_handle)
@@ -342,6 +349,7 @@ W3DAnimationInfo& W3DAnimationInfo::operator=(const W3DAnimationInfo &r)
 	m_playbackMode = r.m_playbackMode;
 	m_minSpeed = r.m_minSpeed;
 	m_maxSpeed = r.m_maxSpeed;
+	m_useWeaponTiming = r.m_useWeaponTiming;
 
 #ifdef RETAIN_ANIM_HANDLES
 	REF_PTR_RELEASE(m_handle);
@@ -2272,6 +2280,8 @@ void W3DModelDraw::driveBuildUpAnimation()
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 {
+	traceAnimationState();
+
 	// update whether or not we should be animating.
 	setPauseAnimation( !getDrawable()->getShouldAnimate(getW3DModelDrawModuleData()->m_animationsRequirePower) );
 
@@ -2460,6 +2470,7 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 						animInfo.getMaxSpeed(m_curState->m_animMaxSpeedFactor));
 					hlod->Set_Animation_Frame_Rate_Multiplier( factor );
 				}
+				applyWeaponTiming();
 			}
 		}
 	}
@@ -4363,6 +4374,118 @@ void W3DModelDraw::setAnimationCompletionTime(UnsignedInt numFrames)
 	{
 		setAnimationLoopDuration(numFrames);
 	}
+}
+
+void W3DModelDraw::setWeaponTimingDuration(UnsignedInt numFrames)
+{
+	if (TheGameLogic == nullptr || numFrames == 0)
+	{
+		m_weaponTimingEnd = 0;
+		return;
+	}
+	m_weaponTimingEnd = TheGameLogic->getFrame() + numFrames;
+	if (m_curState != nullptr && m_whichAnimInCurState >= 0 && m_renderObject != nullptr &&
+		m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD &&
+		m_curState->m_animations[m_whichAnimInCurState].usesWeaponTiming())
+	{
+		Real frame = 0.0f;
+		Int numFrames = 0;
+		Int mode = 0;
+		Real multiplier = 1.0f;
+		static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, numFrames, mode, multiplier);
+		const Bool backwards = mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS;
+		const Bool once = mode == RenderObjClass::ANIM_MODE_ONCE || backwards;
+		const Real remainingFrames = backwards ? frame : static_cast<Real>(numFrames - 1) - frame;
+		if (once && remainingFrames < 1.0f)
+		{
+			adjustAnimation(m_curState, -1.0f);
+			return;
+		}
+	}
+	applyWeaponTiming();
+}
+
+void W3DModelDraw::applyWeaponTiming()
+{
+	if (m_weaponTimingEnd == 0 || TheGameLogic == nullptr || m_curState == nullptr || m_whichAnimInCurState < 0)
+		return;
+	if (!m_curState->m_animations[m_whichAnimInCurState].usesWeaponTiming())
+		return;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (m_weaponTimingEnd <= now || m_renderObject == nullptr || m_renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD)
+		return;
+
+	HLodClass* hlod = static_cast<HLodClass*>(m_renderObject);
+	Real frame = 0.0f;
+	Int numFrames = 0;
+	Int mode = 0;
+	Real multiplier = 1.0f;
+	HAnimClass* anim = hlod->Peek_Animation_And_Info(frame, numFrames, mode, multiplier);
+	if (anim == nullptr || numFrames <= 1 || anim->Get_Frame_Rate() <= 0.0f)
+		return;
+
+	const Bool backwards = mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS || mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS;
+	const Bool loops = mode == RenderObjClass::ANIM_MODE_LOOP || mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS;
+	Real remainingFrames = backwards ? frame : static_cast<Real>(numFrames - 1) - frame;
+	if (loops && remainingFrames < 1.0f)
+		remainingFrames += static_cast<Real>(numFrames - 1);
+	if (remainingFrames < 1.0f)
+		return;
+	const Real naturalMsec = remainingFrames * 1000.0f / anim->Get_Frame_Rate();
+	const Real desiredMsec = static_cast<Real>(m_weaponTimingEnd - now) * MSEC_PER_LOGICFRAME_REAL;
+	hlod->Set_Animation_Frame_Rate_Multiplier(naturalMsec / desiredMsec);
+}
+
+void W3DModelDraw::traceAnimationState() const
+{
+	static const std::vector<AsciiString> traced = []
+	{
+		std::vector<AsciiString> names;
+		const char* list = std::getenv("GENERALSX_TEST_DRAWTRACE");
+		if (list == nullptr)
+			return names;
+		std::string text(list);
+		std::size_t start = 0;
+		while (start <= text.size())
+		{
+			const std::size_t end = std::min(text.find(',', start), text.size());
+			if (end > start)
+				names.emplace_back(text.substr(start, end - start).c_str());
+			start = end + 1;
+		}
+		return names;
+	}();
+	if (traced.empty() || TheGameLogic == nullptr)
+		return;
+
+	const Drawable* draw = getDrawable();
+	const AsciiString& name = draw->getTemplate()->getName();
+	if (std::none_of(traced.begin(), traced.end(), [&](const AsciiString& entry) { return entry.compareNoCase(name) == 0; }))
+		return;
+
+	const ModelConditionFlags& conditions = draw->getModelConditionFlags();
+	std::string flags;
+	for (Int i = 0; i < conditions.size(); ++i)
+	{
+		const char* bit = conditions.getBitNameIfSet(i);
+		if (bit == nullptr)
+			continue;
+		if (!flags.empty())
+			flags += ',';
+		flags += bit;
+	}
+	const char* clip = "-";
+	if (m_curState != nullptr && m_whichAnimInCurState >= 0)
+		clip = m_curState->m_animations[m_whichAnimInCurState].getName().str();
+	Real frame = 0.0f;
+	Int numFrames = 0;
+	Int mode = 0;
+	Real multiplier = 1.0f;
+	if (m_renderObject && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD)
+		static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, numFrames, mode, multiplier);
+	std::fprintf(stderr, "TEST draw frame %u id %u %s clip %s at %.1f/%d speed %.2f timing end %u flags %s\n",
+		TheGameLogic->getFrame(), static_cast<unsigned>(draw->getID()), name.str(), clip, frame, numFrames, multiplier,
+		m_weaponTimingEnd, flags.c_str());
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -218,6 +218,7 @@ void W3DScriptedModelDrawModuleData::parseAnimationState(INI* ini, void* instanc
 		state.draw.m_animations.emplace_back(name, type == StateType::Idle, animation.distance);
 		state.draw.m_animations.back().setPlayback(static_cast<RenderObjClass::AnimMode>(animation.mode),
 			animation.minSpeed, animation.maxSpeed);
+		state.draw.m_animations.back().setUseWeaponTiming(animation.useWeaponTiming);
 	}
 	if (type == StateType::Transition)
 		self->m_namedTransitions.emplace(stateKey(transition), std::move(state));

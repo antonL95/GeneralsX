@@ -53,6 +53,7 @@
 #include "W3DDevice/GameClient/Module/W3DFloorDraw.h"
 #include "W3DDevice/GameClient/Module/W3DQuadrupedDraw.h"
 #include "W3DDevice/GameClient/Module/W3DSailModelDraw.h"
+#include "W3DDevice/GameClient/Module/W3DStreakDraw.h"
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize method */
@@ -97,6 +98,7 @@ void W3DModuleFactory::init()
 		addModule( W3DFloorDraw );
 		addModule( W3DQuadrupedDraw );
 		addModule( W3DSailModelDraw );
+		addModule( W3DStreakDraw );
 	}
 
 }

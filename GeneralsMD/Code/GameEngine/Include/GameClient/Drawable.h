@@ -502,6 +502,7 @@ public:
 		"in between", it is included in the completion time.
 	*/
 	void setAnimationCompletionTime(UnsignedInt numFrames);
+	void setWeaponTimingDuration(UnsignedInt numFrames);
 
 	//Kris: Manually set a drawable's current animation to specific frame.
 	virtual void setAnimationFrame( int frame );

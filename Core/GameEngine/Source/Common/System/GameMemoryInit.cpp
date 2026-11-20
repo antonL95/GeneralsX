@@ -85,6 +85,7 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "HorseHordeContain", 64, 32 },
 	{ "AODHordeContain", 16, 16 },
 	{ "BezierProjectileBehavior", 512, 128 },
+	{ "W3DStreakDraw", 512, 128 },
 	{ "RespawnBody", 64, 32 },
 	{ "RespawnUpdate", 64, 32 }
 };

@@ -43,6 +43,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
@@ -162,6 +163,59 @@ static const ModelConditionFlags s_allWeaponFireFlags[WEAPONSLOT_COUNT] =
 		MODELCONDITION_USING_WEAPON_E
 	)
 };
+
+static ModelConditionFlags weaponFireFlags(Int slot)
+{
+	static const ModelConditionFlags s_retailWeaponFireFlags[WEAPONSLOT_COUNT] =
+	{
+		MAKE_MODELCONDITION_MASK2(MODELCONDITION_FIRING_OR_PREATTACK_A, MODELCONDITION_FIRING_OR_RELOADING_A),
+		MAKE_MODELCONDITION_MASK2(MODELCONDITION_FIRING_OR_PREATTACK_B, MODELCONDITION_FIRING_OR_RELOADING_B),
+		MAKE_MODELCONDITION_MASK2(MODELCONDITION_FIRING_OR_PREATTACK_C, MODELCONDITION_FIRING_OR_RELOADING_C),
+		MAKE_MODELCONDITION_MASK2(MODELCONDITION_FIRING_OR_PREATTACK_D, MODELCONDITION_FIRING_OR_RELOADING_D),
+		MAKE_MODELCONDITION_MASK2(MODELCONDITION_FIRING_OR_PREATTACK_E, MODELCONDITION_FIRING_OR_RELOADING_E)
+	};
+	ModelConditionFlags flags = s_allWeaponFireFlags[slot];
+	if (RetailFileLayers::enabled())
+		flags.set(s_retailWeaponFireFlags[slot]);
+	return flags;
+}
+
+static WeaponSetConditionType retailWeaponCondition(const Object* obj, const Weapon* weapon, UnsignedInt now, Byte lastCondition)
+{
+	const UnsignedInt lastShot = weapon->getLastShotFrame();
+	if (lastShot == now)
+		return WSF_FIRING;
+
+	const WeaponStatus status = weapon->getStatus();
+	if (!obj->testStatus(OBJECT_STATUS_IS_ATTACKING))
+		return WSF_NONE;
+
+	const UnsignedInt firingDuration = weapon->getTemplate()->getFiringDuration();
+	if (lastShot != 0 && now < lastShot + firingDuration)
+		return WSF_FIRING;
+
+	static const WeaponSetConditionType s_wsfLookup[WEAPON_STATUS_COUNT] =
+	{
+		WSF_NONE,
+		WSF_NONE,
+		WSF_BETWEEN,
+		WSF_RELOADING,
+		WSF_PREATTACK,
+	};
+	if (status == READY_TO_FIRE && lastCondition == WSF_PREATTACK)
+		return WSF_INVALID;
+	WeaponSetConditionType condition = s_wsfLookup[status];
+	if (status == READY_TO_FIRE && (obj->testStatus(OBJECT_STATUS_IS_AIMING_WEAPON) || obj->testStatus(OBJECT_STATUS_IS_FIRING_WEAPON)))
+		condition = WSF_BETWEEN;
+	return condition;
+}
+
+static UnsignedInt weaponTimingFrames(const Weapon* weapon, WeaponSetConditionType condition, UnsignedInt now)
+{
+	const UnsignedInt start = condition == WSF_PREATTACK ? weapon->getPreAttackFinishedFrame() : weapon->getLastShotFrame();
+	const UnsignedInt end = start + weapon->getTemplate()->getFiringDuration();
+	return end > now ? end - now : 0;
+}
 
 //-------------------------------------------------------------------------------------------------
 extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -1363,7 +1417,7 @@ void Object::setFiringConditionForCurrentWeapon() const
 	{
 		WeaponSlotType wslot = m_weaponSet.getCurWeaponSlot();
 		ModelConditionFlags c = m_weaponSet.getModelConditionForWeaponSlot(wslot, WSF_FIRING);
-		m_drawable->clearAndSetModelConditionFlags(s_allWeaponFireFlags[wslot], c);
+		m_drawable->clearAndSetModelConditionFlags(weaponFireFlags(wslot), c);
 	}
 }
 
@@ -4928,6 +4982,7 @@ void Object::clearWeaponBonusCondition(WeaponBonusConditionType wst)
 void Object::adjustModelConditionForWeaponStatus()
 {
 	UnsignedInt now = TheGameLogic->getFrame();
+	const Bool retail = RetailFileLayers::enabled();
 
 	for (int i = 0; i < WEAPONSLOT_COUNT; ++i)
 	{
@@ -4939,7 +4994,11 @@ void Object::adjustModelConditionForWeaponStatus()
 		}
 
 		WeaponSetConditionType conditionToSet = WSF_INVALID;
-		if (i != m_weaponSet.getCurWeaponSlot())
+		if (retail)
+		{
+			conditionToSet = retailWeaponCondition(this, w, now, m_lastWeaponCondition[i]);
+		}
+		else if (i != m_weaponSet.getCurWeaponSlot())
 		{
 			// if this isn't the current weapon, then we never set ANYTHING for it.
 			conditionToSet = WSF_NONE;
@@ -4992,8 +5051,16 @@ void Object::adjustModelConditionForWeaponStatus()
 			{
 				m_lastWeaponCondition[i] = conditionToSet;
 				ModelConditionFlags c = m_weaponSet.getModelConditionForWeaponSlot((WeaponSlotType)i, conditionToSet);
-				m_drawable->clearAndSetModelConditionFlags(s_allWeaponFireFlags[i], c);
-				if (conditionToSet == WSF_PREATTACK)
+				m_drawable->clearAndSetModelConditionFlags(weaponFireFlags(i), c);
+				if (retail)
+				{
+					if (i == m_weaponSet.getCurWeaponSlot())
+					{
+						const Bool timed = conditionToSet == WSF_PREATTACK || conditionToSet == WSF_FIRING;
+						m_drawable->setWeaponTimingDuration(timed ? weaponTimingFrames(w, conditionToSet, now) : 0);
+					}
+				}
+				else if (conditionToSet == WSF_PREATTACK)
 				{
 					// in the preattack state, adjust the speed of the preattack anim to match the actual time it will take
 					UnsignedInt preAttackDone = w->getPreAttackFinishedFrame();

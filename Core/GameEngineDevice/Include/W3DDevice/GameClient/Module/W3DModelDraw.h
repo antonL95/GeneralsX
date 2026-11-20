@@ -108,6 +108,7 @@ private:
 	Int m_playbackMode = -1;
 	Real m_minSpeed = 1.0f;
 	Real m_maxSpeed = 1.0f;
+	Bool m_useWeaponTiming = FALSE;
 
 public:
 	W3DAnimationInfo(const AsciiString& name, Bool isIdle, Real distanceCovered);
@@ -125,6 +126,8 @@ public:
 	Int getPlaybackMode(Int stateMode) const { return m_playbackMode < 0 ? stateMode : m_playbackMode; }
 	Real getMinSpeed(Real stateSpeed) const { return m_playbackMode < 0 ? stateSpeed : m_minSpeed; }
 	Real getMaxSpeed(Real stateSpeed) const { return m_playbackMode < 0 ? stateSpeed : m_maxSpeed; }
+	void setUseWeaponTiming(Bool useWeaponTiming) { m_useWeaponTiming = useWeaponTiming; }
+	Bool usesWeaponTiming() const { return m_useWeaponTiming; }
 
 };
 typedef std::vector<W3DAnimationInfo>	W3DAnimationVector;
@@ -431,6 +434,7 @@ public:
 		"in between", it is included in the completion time.
 	*/
 	virtual void setAnimationCompletionTime(UnsignedInt numFrames) override;
+	virtual void setWeaponTimingDuration(UnsignedInt numFrames) override;
 
 	/**
 	  This call is used to pause or resume an animation.
@@ -543,8 +547,11 @@ private:
 	W3DDynamicLight*										m_headlightDynamicLight;						///< native dynamic light for active headlights
 	Bool													m_pauseAnimation;
 	Int														m_animationMode;
+	UnsignedInt										m_weaponTimingEnd = 0;
 
 	void adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction);
+	void applyWeaponTiming();
+	void traceAnimationState() const;
 	Real getCurrentAnimFraction() const;
 	void applyCorrectModelStateAnimation();
 	const ModelConditionInfo* findTransitionForSig(TransitionSig sig) const;

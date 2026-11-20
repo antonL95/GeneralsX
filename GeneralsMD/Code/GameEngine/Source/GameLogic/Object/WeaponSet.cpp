@@ -44,6 +44,7 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/BitFlagsIO.h"
+#include "Common/RetailFileLayers.h"
 
 #include "GameLogic/AI.h"
 #include "GameLogic/LogicRandomValue.h"
@@ -546,6 +547,28 @@ void WeaponSet::updateWeaponSet(const Object* obj)
 	};
 	if (a != WSF_NONE)
 		flags.set(Using[wslot]);
+
+	if (RetailFileLayers::enabled())
+	{
+		static const ModelConditionFlagType FiringOrPreAttack[WEAPONSLOT_COUNT] = {
+			MODELCONDITION_FIRING_OR_PREATTACK_A,
+			MODELCONDITION_FIRING_OR_PREATTACK_B,
+			MODELCONDITION_FIRING_OR_PREATTACK_C,
+			MODELCONDITION_FIRING_OR_PREATTACK_D,
+			MODELCONDITION_FIRING_OR_PREATTACK_E
+		};
+		static const ModelConditionFlagType FiringOrReloading[WEAPONSLOT_COUNT] = {
+			MODELCONDITION_FIRING_OR_RELOADING_A,
+			MODELCONDITION_FIRING_OR_RELOADING_B,
+			MODELCONDITION_FIRING_OR_RELOADING_C,
+			MODELCONDITION_FIRING_OR_RELOADING_D,
+			MODELCONDITION_FIRING_OR_RELOADING_E
+		};
+		if (a == WSF_FIRING || a == WSF_PREATTACK)
+			flags.set(FiringOrPreAttack[wslot]);
+		if (a == WSF_FIRING || a == WSF_RELOADING)
+			flags.set(FiringOrReloading[wslot]);
+	}
 
 	return flags;
 }

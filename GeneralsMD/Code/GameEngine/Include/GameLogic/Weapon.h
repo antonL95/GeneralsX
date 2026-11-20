@@ -450,6 +450,7 @@ public:
 	WeaponPrefireType getPrefireType() const { return m_prefireType; }
 	Bool getAutoReloadsClip() const { return m_reloadType == AUTO_RELOAD; }
 	Int getClipSize() const { return m_clipSize; }
+	UnsignedInt getFiringDuration() const { return m_firingDuration; }
 	Int getContinuousFireOneShotsNeeded() const { return m_continuousFireOneShotsNeeded; }
 	Int getContinuousFireTwoShotsNeeded() const { return m_continuousFireTwoShotsNeeded; }
 	UnsignedInt getContinuousFireCoastFrames() const { return m_continuousFireCoastFrames; }

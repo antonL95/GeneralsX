@@ -204,6 +204,7 @@ public:
 		"in between", it is included in the completion time.
 	*/
 	virtual void setAnimationCompletionTime(UnsignedInt numFrames) = 0;
+	virtual void setWeaponTimingDuration(UnsignedInt) { }
 	virtual Bool updateBonesForClientParticleSystems() = 0;///< this will reposition particle systems on the fly ML
 
 	//Kris: Manually set a drawable's current animation to specific frame.
