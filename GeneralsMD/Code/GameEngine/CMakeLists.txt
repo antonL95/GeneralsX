@@ -1075,6 +1075,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/ScriptEngine/ScriptActions.cpp
     Source/GameLogic/ScriptEngine/ScriptConditions.cpp
     Source/GameLogic/ScriptEngine/ScriptEngine.cpp
+    Source/GameLogic/ScriptEngine/RotwkScriptTemplates.cpp
     Source/GameLogic/ScriptEngine/Scripts.cpp
     Source/GameLogic/ScriptEngine/VictoryConditions.cpp
 #    Source/GameLogic/System/CaveSystem.cpp

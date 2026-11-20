@@ -212,6 +212,8 @@ public:
 	virtual void setZoomToMax();
 	virtual void setZoomToDefault() { m_zoom  = 1.0f; } ///< Set zoom to default value
 	virtual void setOkToAdjustHeight( Bool val ) { m_okToAdjustHeight = val; }	///< Set this to adjust camera height
+	virtual void setClipDepthMultiplier(Real multiplier) { m_clipDepthMultiplier = multiplier; }
+	Real getClipDepthMultiplier() const { return m_clipDepthMultiplier; }
 
 	// TheSuperHackers @info Functions to call for user camera controls, not by the scripted camera.
 	Bool userSetPosition(const Coord3D &pos)             { return doUserAction(&View::setPosition, pos); }
@@ -347,6 +349,7 @@ protected:
 	Real m_lockDist;																						///< how far can we be when tethered?
 
 	Real m_FOV;																									///< the current field of view angle
+	Real m_clipDepthMultiplier;
 	Bool m_mouseLocked;																					///< is the mouse input locked to the tactical view?
 
 	Bool m_okToAdjustHeight;																		///< Should we attempt to adjust camera height?

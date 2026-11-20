@@ -828,7 +828,16 @@ void W3DView::updateCameraClipPlanes(const Matrix3D &transform)
 		}
 	}
 
+	if (!TheGlobalData->m_drawEntireTerrain)
+		farZ *= getClipDepthMultiplier();
+
 	m_3DCamera->Set_Clip_Planes(NearZ, farZ);
+}
+
+void W3DView::setClipDepthMultiplier(Real multiplier)
+{
+	View::setClipDepthMultiplier(multiplier);
+	m_recalcCamera = true;
 }
 
 //-------------------------------------------------------------------------------------------------

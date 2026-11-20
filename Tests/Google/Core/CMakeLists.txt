@@ -15,6 +15,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/UpgradeMaskTest.cpp
     GameEngine/Common/MapPlayerRosterTest.cpp
     GameEngine/Common/BfmeAssetPathTest.cpp
+    GameEngine/Common/BfmeScriptRulesTest.cpp
     GameEngine/Common/FontSubstitutionTest.cpp
     GameEngine/Common/UiAnchorTest.cpp
     GameEngine/Common/UiLayoutDumpTest.cpp

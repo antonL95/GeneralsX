@@ -14,6 +14,7 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/WellKnownKeys.h"
+#include "GameLogic/BfmeScriptRules.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
 #include "GameLogic/SidesList.h"
@@ -26,6 +27,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
 
 namespace
 {
@@ -61,6 +63,13 @@ AsciiString readString(DataChunkInput &file)
 		buffer[size] = '\0';
 	}
 	return result;
+}
+
+void reportOnce(const char *problem, Bool condition, const AsciiString &name)
+{
+	static std::set<std::tuple<std::string, Bool, std::string>> reported;
+	if (reported.emplace(problem, condition, name.str()).second)
+		fprintf(stderr, "BFME %s script %s %s\n", problem, condition ? "condition" : "action", name.str());
 }
 
 AsciiString readChild(DataChunkInput &file, DataChunkVersionType &version)
@@ -293,6 +302,16 @@ Int BfmeMapScripts::readOpcode(DataChunkInput &file, BfmeScriptOpcode &opcode, P
 				continue;
 
 			const Int expected = definition->getNumParameters();
+#if !RTS_GENERALS
+			if (!condition && named && i == ScriptAction::SHOW_MILITARY_CAPTION && count == 2 &&
+				parameters[0]->getParameterType() == Parameter::LOCALIZED_TEXT &&
+				parameters[1]->getParameterType() == Parameter::REAL)
+			{
+				parameters[0]->m_paramType = Parameter::TEXT_STRING;
+				parameters[1]->m_paramType = Parameter::INT;
+				parameters[1]->m_int = BfmeScriptRules::militaryCaptionMilliseconds(parameters[1]->m_real);
+			}
+#endif
 			const Bool ignoreTrailing = !condition && named && i == ScriptAction::TEAM_FOLLOW_WAYPOINTS &&
 				count == expected + 1;
 			opcode.supported = validPrefix >= expected && (count == expected || ignoreTrailing);
@@ -305,16 +324,19 @@ Int BfmeMapScripts::readOpcode(DataChunkInput &file, BfmeScriptOpcode &opcode, P
 					deleteInstance(parameters[--count]);
 					parameters[count] = nullptr;
 				}
+#if !RTS_GENERALS
+				const Int firstRotwk = condition ? static_cast<Int>(Condition::FIRST_ROTWK) : static_cast<Int>(ScriptAction::FIRST_ROTWK);
+				if (i >= firstRotwk && !ScriptEngine::isRotwkImplemented(condition, i))
+					reportOnce("unimplemented", condition, opcode.name);
+#endif
 				return i;
 			}
+			if (named)
+				reportOnce("unsupported signature of", condition, opcode.name);
 			return condition ? static_cast<Int>(Condition::CONDITION_FALSE) : static_cast<Int>(ScriptAction::NO_OP);
 		}
 		if (opcode.name.isNotEmpty())
-		{
-			static std::set<std::pair<Bool, std::string>> reported;
-			if (reported.emplace(condition, opcode.name.str()).second)
-				fprintf(stderr, "BFME unknown script %s %s\n", condition ? "condition" : "action", opcode.name.str());
-		}
+			reportOnce("unknown", condition, opcode.name);
 	}
 	return condition ? static_cast<Int>(Condition::CONDITION_FALSE) : static_cast<Int>(ScriptAction::NO_OP);
 }
@@ -324,9 +346,13 @@ Bool BfmeMapScripts::readParameter(DataChunkInput &file, Parameter *&parameter)
 	parameter = nullptr;
 	need(file, 4);
 	const Int wireType = file.readInt();
+#if RTS_GENERALS
 	const Int mapped = wireType > 29 ? wireType - 1 : wireType;
 	const auto type = wireType == 29 || mapped < 0 || mapped >= Parameter::NUM_ITEMS
 		? Parameter::NUM_ITEMS : static_cast<Parameter::ParameterType>(mapped);
+#else
+	const Parameter::ParameterType type = Parameter::fromBfmeWireType(wireType);
+#endif
 	parameter = newInstance(Parameter)(type);
 	parameter->m_initialized = true;
 	parameter->m_bfmeType = wireType;

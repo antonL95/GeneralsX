@@ -59,6 +59,7 @@
 #include "GameClient/ShellHooks.h"
 
 #include "GameLogic/AI.h"
+#include "GameLogic/BfmeScriptRules.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/SidesList.h"
@@ -1920,6 +1921,15 @@ AsciiString Parameter::getUiText() const
 		case UNIT:
 			uiText.format("Unit '%s'", uiString.str());
 			break;
+		case UNIT_REFERENCE:
+			uiText.format("Unit reference '%s'", uiString.str());
+			break;
+		case MODEL_CONDITION:
+			uiText.format("Model condition '%s'", uiString.str());
+			break;
+		case EVA_EVENT:
+			uiText.format("EVA event '%s'", uiString.str());
+			break;
 		case BRIDGE:
 			uiText.format("Bridge '%s'", uiString.str());
 			break;
@@ -2147,6 +2157,20 @@ void Parameter::WriteParameter(DataChunkOutput &chunkWriter)
 		chunkWriter.writeInt(m_int);
 		chunkWriter.writeReal(m_real);
 		chunkWriter.writeAsciiString(m_string);
+	}
+}
+
+Parameter::ParameterType Parameter::fromBfmeWireType(Int wireType)
+{
+	const BfmeScriptRules::WireType wire = BfmeScriptRules::classifyWire(wireType);
+	switch (wire.kind)
+	{
+		case BfmeScriptRules::WireKind::Legacy: return static_cast<ParameterType>(wire.legacy);
+		case BfmeScriptRules::WireKind::UnitReference: return UNIT_REFERENCE;
+		case BfmeScriptRules::WireKind::ModelCondition: return MODEL_CONDITION;
+		case BfmeScriptRules::WireKind::ObjectType: return OBJECT_TYPE;
+		case BfmeScriptRules::WireKind::EvaEvent: return EVA_EVENT;
+		default: return NUM_ITEMS;
 	}
 }
 

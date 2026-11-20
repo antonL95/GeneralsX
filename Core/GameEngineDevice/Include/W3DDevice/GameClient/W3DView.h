@@ -219,6 +219,7 @@ public:
 	virtual void setZoomToDefault() override;									///< Set zoom to default value
 
 	virtual void setFieldOfView( Real angle ) override;							///< Set the horizontal field of view angle
+	virtual void setClipDepthMultiplier(Real multiplier) override;
 
   virtual WorldToScreenReturn worldToScreenTriReturn( const Coord3D *w, ICoord2D *s ) override;	///< Transform world coordinate "w" into screen coordinate "s"
 	virtual Bool screenToTerrain( const ICoord2D *screen, Coord3D *world ) override;

@@ -240,6 +240,9 @@ public:
 	virtual void newMap(  );	///< reset script engine for new map
 	virtual const ActionTemplate *getActionTemplate( Int ndx); ///< Get the template for a script action.
 	virtual const ConditionTemplate *getConditionTemplate( Int ndx); ///< Get the template for a script Condition.
+	static Bool isRotwkImplemented(Bool condition, Int type);
+	static void reportRotwkUnimplemented(Bool condition, Int type);
+	static void traceRotwk(Bool condition, Int type, Int value);
 	virtual void startEndGameTimer(); ///< Starts the end game timer after a mission is won or lost.
 	Bool isGameEnding() { return m_endGameTimer >= 0;	}
 	virtual void startQuickEndGameTimer(); ///< Starts the quick end game timer after a campaign is won or lost.
@@ -388,6 +391,9 @@ protected:
 	void pauseTimer( ScriptAction *pAction );
 	void restartTimer( ScriptAction *pAction );
 	void setTimer( ScriptAction *pAction, Bool millisecondTimer, Bool random);
+	void setRandomCounter(ScriptAction *pAction, Bool clientSide);
+	void initRotwkTemplates();
+	void dumpTemplates();
 	void adjustTimer( ScriptAction *pAction, Bool millisecondTimer, Bool add);
 	void enableScript( ScriptAction *pAction );
 	void disableScript( ScriptAction *pAction );

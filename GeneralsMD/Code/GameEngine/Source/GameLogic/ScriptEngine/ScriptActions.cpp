@@ -66,6 +66,7 @@
 
 #include "GameLogic/AI.h"
 #include "GameLogic/AISkirmishPlayer.h"
+#include "GameLogic/BfmeScriptRules.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/CaveContain.h"
@@ -6609,6 +6610,11 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 {
 	switch (pAction->getActionType()) {
 		default:
+			if (pAction->getActionType() >= ScriptAction::FIRST_ROTWK)
+			{
+				ScriptEngine::reportRotwkUnimplemented(FALSE, pAction->getActionType());
+				return;
+			}
 			DEBUG_CRASH(("Unknown ScriptAction type %d", pAction->getActionType())); return;
 		case ScriptAction::DEBUG_MESSAGE_BOX:
 			doDebugMessage(pAction->getParameter(0)->getString(), true);
@@ -7438,6 +7444,16 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 
 		case ScriptAction::TEAM_IDLE_FOR_FRAMECOUNT:
 			doTeamIdleForFramecount(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
+			return;
+
+		case ScriptAction::TEAM_IDLE_FOR_SECONDS:
+			doTeamIdleForFramecount(pAction->getParameter(0)->getString(),
+				BfmeScriptRules::secondsToFrames(pAction->getParameter(1)->getInt(), LOGICFRAMES_PER_SECOND));
+			return;
+
+		case ScriptAction::SET_CAMERA_CLIP_DEPTH_MULTIPLIER:
+			if (TheTacticalView)
+				TheTacticalView->setClipDepthMultiplier(BfmeScriptRules::clipDepthMultiplier(pAction->getParameter(0)->getReal()));
 			return;
 
 		case ScriptAction::WATER_CHANGE_HEIGHT:

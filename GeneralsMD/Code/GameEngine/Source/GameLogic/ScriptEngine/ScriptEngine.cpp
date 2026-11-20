@@ -5239,6 +5239,8 @@ void ScriptEngine::init()
 	curTemplate->m_numUiStrings = 1;
 	curTemplate->m_uiStrings[0] = "Show Weather = ";
 
+	initRotwkTemplates();
+
 	Int i;
 	for (i=0; i<Condition::NUM_ITEMS; i++) {
 		AsciiString str;
@@ -5254,6 +5256,7 @@ void ScriptEngine::init()
 		m_actionTemplates[i].m_internalNameKey = NAMEKEY(m_actionTemplates[i].m_internalName);
 	}
 
+	dumpTemplates();
 
 	reset();
 
@@ -6773,6 +6776,18 @@ void ScriptEngine::setTimer( ScriptAction *pAction, Bool millisecondTimer, Bool 
 	m_counters[counterNdx].isCountdownTimer = true;
 }
 
+void ScriptEngine::setRandomCounter(ScriptAction *pAction, Bool clientSide)
+{
+	Int counterNdx = pAction->getParameter(0)->getInt();
+	if (counterNdx == 0) {
+		counterNdx = allocateCounter(pAction->getParameter(0)->getString());
+		pAction->getParameter(0)->friend_setInt(counterNdx);
+	}
+	const Int lo = pAction->getParameter(1)->getInt();
+	const Int hi = pAction->getParameter(2)->getInt();
+	m_counters[counterNdx].value = clientSide ? GameClientRandomValue(lo, hi) : GameLogicRandomValue(lo, hi);
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Stops a timer. */
 //-------------------------------------------------------------------------------------------------
@@ -7081,7 +7096,12 @@ Bool ScriptEngine::evaluateCondition( Condition *pCondition )
 {
 	switch (pCondition->getConditionType()) {
 		default:
-			return TheScriptConditions->evaluateCondition(pCondition);
+		{
+			const Bool result = TheScriptConditions->evaluateCondition(pCondition);
+			if (pCondition->getConditionType() >= Condition::FIRST_ROTWK)
+				traceRotwk(TRUE, pCondition->getConditionType(), result);
+			return result;
+		}
 		case Condition::CONDITION_FALSE: return false;
 		case Condition::CONDITION_TRUE: return true;
 		case Condition::COUNTER: return evaluateCounter(pCondition);
@@ -7674,6 +7694,9 @@ void ScriptEngine::executeActions( ScriptAction *pActionHead )
 			case ScriptAction::SET_MILLISECOND_TIMER: setTimer(pCurAction, true, false);break;
 			case ScriptAction::SET_RANDOM_TIMER: setTimer(pCurAction, false, true);break;
 			case ScriptAction::SET_RANDOM_MSEC_TIMER: setTimer(pCurAction, true, true);break;
+			case ScriptAction::SET_COUNTER_IN_SECONDS: setTimer(pCurAction, true, false); break;
+			case ScriptAction::SET_RANDOM_COUNTER: setRandomCounter(pCurAction, false); break;
+			case ScriptAction::SET_COUNTER_TO_CLIENT_RANDOM_VALUE: setRandomCounter(pCurAction, true); break;
 			case ScriptAction::ADD_TO_MSEC_TIMER: adjustTimer(pCurAction, true, true);break;
 			case ScriptAction::SUB_FROM_MSEC_TIMER: adjustTimer(pCurAction, true, false);break;
 			case ScriptAction::ENABLE_SCRIPT: enableScript(pCurAction);break;
@@ -7693,6 +7716,17 @@ void ScriptEngine::executeActions( ScriptAction *pActionHead )
 			case ScriptAction::SET_DEFAULT_ATTACK_PRIORITY : setPriorityDefault(pCurAction); break;
 
 			case ScriptAction::NO_OP: /* just break. */; break;
+		}
+		const Int type = pCurAction->getActionType();
+		if (type >= ScriptAction::FIRST_ROTWK || type == ScriptAction::NAMED_RECEIVE_UPGRADE)
+		{
+			Int value = 0;
+			if (type == ScriptAction::SET_COUNTER_IN_SECONDS || type == ScriptAction::SET_RANDOM_COUNTER ||
+				type == ScriptAction::SET_COUNTER_TO_CLIENT_RANDOM_VALUE)
+				value = m_counters[pCurAction->getParameter(0)->getInt()].value;
+			else if (type == ScriptAction::SET_CAMERA_CLIP_DEPTH_MULTIPLIER && TheTacticalView)
+				value = REAL_TO_INT_FLOOR(TheTacticalView->getClipDepthMultiplier() * 100.0f + 0.5f);
+			traceRotwk(FALSE, type, value);
 		}
 	}
 }

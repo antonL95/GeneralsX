@@ -44,8 +44,11 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/View.h"
+#include "GameNetwork/GameInfo.h"
 
+#include "GameLogic/BfmeScriptRules.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/RankInfo.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -2735,6 +2738,33 @@ Bool ScriptConditions::evaluatePlayerLostObjectType(Parameter *pPlayerParm, Para
 	return (sumOfObjs < currentCount);
 }
 
+namespace
+{
+Int countPlayersInGame()
+{
+	if (TheGameInfo)
+		return TheGameInfo->getNumNonObserverPlayers();
+	Int count = 0;
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		if (ThePlayerList->getNthPlayer(i)->getPlayerType() == PLAYER_HUMAN)
+			++count;
+	}
+	return count;
+}
+
+Bool evaluateDistanceBetween(Condition *condition)
+{
+	const Object *first = TheScriptEngine->getUnitNamed(condition->getParameter(0)->getString());
+	const Object *second = TheScriptEngine->getUnitNamed(condition->getParameter(1)->getString());
+	if (!first || !second)
+		return false;
+	const Real distanceSquared = ThePartitionManager->getDistanceSquared(first, second, FROM_CENTER_2D);
+	return BfmeScriptRules::compareDistance(condition->getParameter(2)->getInt(), distanceSquared,
+		condition->getParameter(3)->getReal());
+}
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Evaluate a condition */
 //-------------------------------------------------------------------------------------------------
@@ -2742,8 +2772,30 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 {
 	switch (pCondition->getConditionType()) {
 		default:
+			if (pCondition->getConditionType() >= Condition::FIRST_ROTWK)
+			{
+				ScriptEngine::reportRotwkUnimplemented(TRUE, pCondition->getConditionType());
+				return false;
+			}
 			DEBUG_CRASH(("Unknown ScriptCondition type %d", pCondition->getConditionType()));
 			return false;
+		case Condition::IS_GAME_IN_SKIRMISH_OR_MULTIPLAYER:
+			return BfmeScriptRules::skirmishOrMultiplayerIs(TheGameLogic->isInSkirmishGame(),
+				TheGameLogic->isInMultiplayerGame(), pCondition->getParameter(0)->getInt() != 0);
+		case Condition::REGION_CAMPS_SHOULD_UNPACK:
+		case Condition::IS_GAME_MODE_ACTIVE:
+			return false;
+		case Condition::COMPARE_NUM_PLAYERS_IN_GAME:
+			return BfmeScriptRules::compare(pCondition->getParameter(0)->getInt(), countPlayersInGame(),
+				pCondition->getParameter(1)->getInt());
+		case Condition::DISTANCE_BETWEEN_OBJ:
+			return evaluateDistanceBetween(pCondition);
+		case Condition::PLAYER_HAS_REACHED_LEVEL_CAP:
+		{
+			const Player *player = playerFromParam(pCondition->getParameter(0));
+			return player && BfmeScriptRules::levelCapReached(player->getRankLevel(),
+				TheGameLogic->getRankLevelLimit(), TheRankInfoStore->getRankLevelCount());
+		}
 		case Condition::PLAYER_ALL_DESTROYED:
 			return evaluateAllDestroyed(pCondition->getParameter(0));
 		case Condition::PLAYER_ALL_BUILDFACILITIES_DESTROYED:

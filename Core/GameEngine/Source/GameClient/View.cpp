@@ -73,6 +73,7 @@ View::View()
 
 	// default field of view
 	m_FOV = DEG_TO_RADF(50.0f);
+	m_clipDepthMultiplier = 1.0f;
 
 	m_mouseLocked = FALSE;
 
@@ -96,6 +97,7 @@ void View::init()
 	m_cameraLockDrawable = nullptr;
 	m_zoomLimited = TRUE;
 
+	m_clipDepthMultiplier = 1.0f;
 	m_zoom = 1.0f;
 	m_maxHeightAboveGround = TheGlobalData->m_maxCameraHeight;
 	m_minHeightAboveGround = TheGlobalData->m_minCameraHeight;
@@ -116,6 +118,7 @@ void View::reset()
 	m_zoomLimited = TRUE;
 
 	m_userControlLockedUntilFrame = 0u;
+	m_clipDepthMultiplier = 1.0f;
 	m_isUserControlled = true;
 }
 
