@@ -36,13 +36,23 @@
 #include "Common/MiscAudio.h"
 #include "Common/KindOf.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Player.h"
+#include "Common/PlayerTemplate.h"
+#include "Common/ThingFactory.h"
+#include "Common/Upgrade.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/GameText.h"
 #include "GameClient/InGameUI.h"
 #include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/PartitionManager.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
+
+#include <algorithm>
+#include <cstdlib>
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -64,7 +74,9 @@ Bool SalvageCrateCollide::isValidToExecute( const Object *other ) const
 	if( ! CrateCollide::isValidToExecute( other ) )
 		return FALSE;
 
-	// Only salvage units can pick up a Salvage crate
+	if (RetailFileLayers::enabled())
+		return !other->isKindOf(KINDOF_STRUCTURE);
+
 	if( ! other->getTemplate()->isKindOf( KINDOF_SALVAGER ) )
 		return FALSE;
 
@@ -74,6 +86,9 @@ Bool SalvageCrateCollide::isValidToExecute( const Object *other ) const
 //-------------------------------------------------------------------------------------------------
 Bool SalvageCrateCollide::executeCrateBehavior( Object *other )
 {
+	if (RetailFileLayers::enabled())
+		return executeRetailPickup(other);
+
 	if( eligibleForArmorSet(other) )// No percent chance on this one, if you can get it, you get it.
 	{
 		doArmorSet(other);
@@ -108,7 +123,10 @@ Bool SalvageCrateCollide::executeCrateBehavior( Object *other )
 	}
 	else // just assume the testMoneyChance
 	{
-		doMoney( other );
+		const auto* data = getSalvageCrateCollideModuleData();
+		const Int money = data->m_minimumMoney == data->m_maximumMoney ? data->m_minimumMoney :
+			GameLogicRandomValue(data->m_minimumMoney, data->m_maximumMoney);
+		doMoney(other, money);
 		AudioEventRTS soundToPlay = TheAudio->getMiscAudio()->m_crateMoney;
 		soundToPlay.setObjectID( other->getID() );
 		TheAudio->addAudioEvent(&soundToPlay);
@@ -120,6 +138,96 @@ Bool SalvageCrateCollide::executeCrateBehavior( Object *other )
 }
 
 // ------------------------------------------------------------------------------------------------
+
+static Bool rollRetailCrateChance(Real chance)
+{
+	return chance >= 1.0f || (chance > 0.0f && GameLogicRandomValueReal(0.0f, 1.0f) < chance);
+}
+
+Bool SalvageCrateCollide::executeRetailPickup(Object* other)
+{
+	const auto* data = getSalvageCrateCollideModuleData();
+	Player* player = other->getControllingPlayer();
+	Object* anchor = HordeContain::getAnchor(other);
+	if (!anchor)
+		anchor = other;
+	Int money = 0;
+	Int levels = 0;
+	const char* reward = nullptr;
+
+	if (HordeContain::get(anchor) && rollRetailCrateChance(data->m_bannerChance) && HordeContain::addCrateBanner(anchor))
+		reward = "banner";
+	else if (rollRetailCrateChance(data->m_porterChance) && player->getPlayerTemplate())
+	{
+		const auto* porter = TheThingFactory->findTemplate(player->getPlayerTemplate()->getStartingUnit(0));
+		if (porter && porter->isKindOf(KINDOF_DOZER))
+		{
+			Object* unit = TheThingFactory->newObject(porter, player->getDefaultTeam());
+			unit->setPosition(getObject()->getPosition());
+			unit->setOrientation(other->getOrientation());
+			reward = "porter";
+		}
+	}
+	if (!reward)
+	{
+		if (rollRetailCrateChance(data->m_resourceChance))
+		{
+			const Int low = std::min(data->m_minResource, data->m_maxResource);
+			const Int high = std::max(data->m_minResource, data->m_maxResource);
+			money = low < high ? GameLogicRandomValue(low, high) : low;
+			doMoney(other, money);
+			reward = "resources";
+		}
+		else if (rollRetailCrateChance(data->m_levelUpChance))
+		{
+			const auto levelUp = [&levels](Object* unit)
+			{
+				ExperienceTracker* tracker = unit->getExperienceTracker();
+				if (!unit->isEffectivelyDead() && tracker && tracker->isTrainable())
+				{
+					const auto previous = tracker->getVeterancyLevel();
+					tracker->gainExpForLevel(1, FALSE);
+					levels += tracker->getVeterancyLevel() > previous;
+				}
+			};
+			if (data->m_levelUpRadius > 0.0f)
+			{
+				PartitionFilterSamePlayer filter(player);
+				PartitionFilter* filters[] = { &filter, nullptr };
+				ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(other,
+					data->m_levelUpRadius, FROM_CENTER_2D, filters, ITER_FASTEST);
+				MemoryPoolObjectHolder hold(iter);
+				std::vector<Object*> units;
+				for (Object* unit = iter->first(); unit; unit = iter->next())
+					units.push_back(unit);
+				std::sort(units.begin(), units.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
+				for (Object* unit : units)
+					levelUp(unit);
+			}
+			else
+			{
+				levelUp(anchor);
+			}
+			reward = "experience";
+		}
+		else if (data->m_pickupUpgrade.isNotEmpty())
+		{
+			const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(data->m_pickupUpgrade);
+			if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+			{
+				player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+				reward = "upgrade";
+			}
+		}
+	}
+
+	if (std::getenv("GENERALSX_TEST_COMMANDS"))
+		fprintf(stderr, "TEST crate frame=%u crate=%s id=%u collector=%s id=%u reward=%s resources=%d levels=%d\n",
+			TheGameLogic->getFrame(), getObject()->getTemplate()->getName().str(), static_cast<unsigned>(getObject()->getID()),
+			other->getTemplate()->getName().str(), static_cast<unsigned>(other->getID()), reward ? reward : "none", money, levels);
+	return TRUE;
+}
+
 Bool SalvageCrateCollide::eligibleForWeaponSet( Object *other )
 {
 	if( other == nullptr )
@@ -233,20 +341,14 @@ void SalvageCrateCollide::doLevelGain( Object *other )
 }
 
 // ------------------------------------------------------------------------------------------------
-void SalvageCrateCollide::doMoney( Object *other )
+void SalvageCrateCollide::doMoney( Object *other, Int money )
 {
-	const SalvageCrateCollideModuleData *md = getSalvageCrateCollideModuleData();
-
-	Int money;
-	if( md->m_minimumMoney != md->m_maximumMoney )// Random value doesn't like to get a constant range
-		money = GameLogicRandomValue( md->m_minimumMoney, md->m_maximumMoney );
-	else
-		money = md->m_minimumMoney;
-
 	if( money > 0 )
 	{
 		other->getControllingPlayer()->getMoney()->deposit( money );
 		other->getControllingPlayer()->getScoreKeeper()->addMoneyEarned( money );
+		if (!TheInGameUI || !TheGameText)
+			return;
 
 		//Display cash income floating over the crate.  Position is me, everything else is them.
 		UnicodeString moneyString;

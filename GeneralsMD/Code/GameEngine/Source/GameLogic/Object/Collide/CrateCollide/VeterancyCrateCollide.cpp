@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
@@ -99,6 +100,10 @@ Bool VeterancyCrateCollide::isValidToExecute( const Object *other ) const
 	if (!et || !et->canGainExpForLevel(levelsToGain))
 		return false;
 
+	if (RetailFileLayers::enabled() && d->m_affectsUpToLevel > 0 &&
+		et->getVeterancyLevel() + 1 >= d->m_affectsUpToLevel)
+		return FALSE;
+
 	if( d->m_isPilot )
 	{
 		if( other->getControllingPlayer() != getObject()->getControllingPlayer() )
@@ -129,7 +134,7 @@ Bool VeterancyCrateCollide::executeCrateBehavior( Object *other )
  	AIUpdateInterface *ai = (AIUpdateInterface*)getObject()->getAIUpdateInterface();
 	const VeterancyCrateCollideModuleData *md = getVeterancyCrateCollideModuleData();
 
- 	if( !ai || ai->getGoalObject() != other )
+	if ((!RetailFileLayers::enabled() || md->m_isPilot) && (!ai || ai->getGoalObject() != other))
  	{
  		return false;
  	}

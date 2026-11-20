@@ -31,6 +31,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/BitFlagsIO.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "Common/GameAudio.h"
 #include "Common/MiscAudio.h"
@@ -72,6 +73,7 @@ void CrateCollideModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "ForbidOwnerPlayer", INI::parseBool,	nullptr,	offsetof( CrateCollideModuleData, m_isForbidOwnerPlayer ) },
 		{ "BuildingPickup", INI::parseBool,	nullptr,	offsetof( CrateCollideModuleData, m_isBuildingPickup ) },
 		{ "HumanOnly", INI::parseBool,	nullptr,	offsetof( CrateCollideModuleData, m_isHumanOnlyPickup ) },
+		{ "AllowAIPickup", INI::parseBool, nullptr, offsetof( CrateCollideModuleData, m_allowAIPickup ) },
 		{ "AllowMultiPickup", INI::parseBool,	nullptr,	offsetof( CrateCollideModuleData, m_allowMultiPickup ) },
 		{ "PickupScience", INI::parseScience,	nullptr,	offsetof( CrateCollideModuleData, m_pickupScience ) },
 		{ "ExecuteFX", INI::parseFXList, nullptr, offsetof( CrateCollideModuleData, m_executeFX ) },
@@ -150,10 +152,16 @@ Bool CrateCollide::isValidToExecute( const Object *other ) const
 		return FALSE;
 
 	const CrateCollideModuleData* md = getCrateCollideModuleData();
+	const Bool retail = RetailFileLayers::enabled();
+	if (retail && (getObject()->isDestroyed() ||
+		(!md->m_allowAIPickup && other->getControllingPlayer()->getPlayerType() == PLAYER_COMPUTER)))
+		return FALSE;
+
 	Bool validBuildingAttempt = md->m_isBuildingPickup && other->isKindOf( KINDOF_STRUCTURE );
 
 	// Must be a "Unit" type thing.  Real Game Object, not just Object
-	if( other->getAIUpdateInterface() == nullptr  &&  !validBuildingAttempt )// Building exception flag for Drop Zone
+	if (other->getAIUpdateInterface() == nullptr && !validBuildingAttempt &&
+		!(retail && other->isKindOf(KINDOF_HORDE)))
 		return FALSE;
 
 	// must match our kindof flags (if any)

@@ -166,7 +166,7 @@ Object* findObject(const Command& command)
 		const Player* owner = obj->getControllingPlayer();
 		if (!owner || stricmp(obj->getTemplate()->getName().str(), command.target.c_str()) != 0)
 			continue;
-		if (stricmp(TheNameKeyGenerator->keyToName(owner->getPlayerNameKey()).str(), command.player.c_str()) == 0)
+		if (command.player == "*" || stricmp(TheNameKeyGenerator->keyToName(owner->getPlayerNameKey()).str(), command.player.c_str()) == 0)
 			matches.push_back(obj);
 	}
 	std::sort(matches.begin(), matches.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
@@ -1039,14 +1039,25 @@ void execute(const Command& command, unsigned int frame)
 		return;
 	}
 
-	if (command.action == "hordespawn" && command.hasLocation)
+	if ((command.action == "hordespawn" || command.action == "hordespawnnear") && command.hasLocation)
 	{
 		Player* player = findPlayer(command.player);
 		const ThingTemplate* type = TheThingFactory->findTemplate(command.target.c_str(), FALSE);
 		if (player && type)
 		{
+			Coord3D position;
+			if (command.action == "hordespawnnear")
+			{
+				const Object* target = findTarget(command);
+				if (!target)
+					return;
+				position.x = target->getPosition()->x + command.location.x;
+				position.y = target->getPosition()->y + command.location.y;
+				position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+			}
+			else
+				position = groundLocation(command);
 			Object* spawned = TheThingFactory->newObject(type, player->getDefaultTeam());
-			const Coord3D position = groundLocation(command);
 			spawned->setPosition(&position);
 			spawned->setOrientation(command.angle);
 			std::fprintf(stderr, "TEST horde spawn %u %s %u\n", frame, command.target.c_str(), static_cast<unsigned>(spawned->getID()));
@@ -1265,6 +1276,41 @@ void execute(const Command& command, unsigned int frame)
 	}
 	else if (command.action == "attack")
 		attackObject(command, obj, frame);
+	else if (command.action == "moveobject")
+	{
+		if (const Object* target = findTarget(command); target && obj->getAI())
+		{
+			obj->getAI()->aiMoveToPosition(target->getPosition(), CMD_FROM_SCRIPT);
+			std::fprintf(stderr, "TEST moveobject frame=%u object=%u target=%u\n", frame,
+				static_cast<unsigned>(obj->getID()), static_cast<unsigned>(target->getID()));
+		}
+	}
+	else if (command.action == "killspawned")
+	{
+		Int count = 0;
+		for (Object* unit = TheGameLogic->getFirstObject(); unit; unit = unit->getNextObject())
+		{
+			if (unit->getProducerID() == obj->getID() && !unit->isEffectivelyDead())
+			{
+				unit->kill();
+				++count;
+			}
+		}
+		std::fprintf(stderr, "TEST killspawned frame=%u producer=%u count=%d\n", frame,
+			static_cast<unsigned>(obj->getID()), count);
+	}
+	else if (command.action == "neutralstate")
+	{
+		const Drawable* draw = obj->getDrawable();
+		const Object* target = obj->getAI() ? obj->getAI()->getCurrentVictim() : nullptr;
+		std::fprintf(stderr, "TEST neutralstate frame=%u object=%s id=%u owner=%d target=%u capture=%d captured=%d vision=%.1f shroud=%.1f x=%.1f y=%.1f level=%d money=%u\n",
+			frame, obj->getTemplate()->getName().str(), static_cast<unsigned>(obj->getID()),
+			obj->getControllingPlayer()->getPlayerIndex(), target ? static_cast<unsigned>(target->getID()) : 0,
+			draw && draw->getModelConditionFlags().test(MODELCONDITION_START_CAPTURE),
+			draw && draw->getModelConditionFlags().test(MODELCONDITION_CAPTURED), obj->getVisionRange(), obj->getShroudClearingRange(),
+			obj->getPosition()->x, obj->getPosition()->y, static_cast<Int>(obj->getVeterancyLevel()),
+			obj->getControllingPlayer()->getMoney()->countMoney());
+	}
 	else if (command.action == "health")
 		printHealth(command, obj, frame);
 	else if (command.action == "button")

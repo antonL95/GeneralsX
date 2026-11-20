@@ -48,6 +48,9 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/SlavedUpdate.h"
+#include "Common/RetailFileLayers.h"
+
+#include <cstdlib>
 #include "GameLogic/Weapon.h"
 
 
@@ -94,6 +97,23 @@ void SlavedUpdate::onEnslave( const Object *slaver )
 void SlavedUpdate::onSlaverDie( const DamageInfo *info )
 {
 	stopSlavedEffects();
+	if (RetailFileLayers::enabled() && getSlavedUpdateModuleData()->m_dieOnMastersDeath)
+		getObject()->kill();
+}
+
+Real SlavedUpdate::creepLeashRange() const
+{
+	const auto* data = getSlavedUpdateModuleData();
+	return data->m_leashRange > 0.0f ? data->m_leashRange : data->m_guardMaxRange;
+}
+
+Bool SlavedUpdate::targetWithinCreepLeash(const Object* creep, const Object* target)
+{
+	const auto* slave = static_cast<const SlavedUpdate*>(creep->findUpdateModule(NAMEKEY("SlavedUpdate")));
+	const Object* home = slave ? TheGameLogic->findObjectByID(slave->getSlaverID()) : nullptr;
+	const Real leash = home ? slave->creepLeashRange() : 0.0f;
+	return leash <= 0.0f || (ThePartitionManager->getDistanceSquared(creep, home, FROM_CENTER_2D) <= leash * leash &&
+		ThePartitionManager->getDistanceSquared(target, home, FROM_CENTER_2D) <= leash * leash);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -171,6 +191,42 @@ UpdateSleepTime SlavedUpdate::update()
 
 	if (data->m_stayOnSameLayerAsMaster)
 		me->setLayer(master->getLayer());
+
+	if (RetailFileLayers::enabled() && me->isKindOf(KINDOF_CREEP) && creepLeashRange() > 0.0f)
+	{
+		const Real leash = creepLeashRange();
+		const Object* victim = myAI->getCurrentVictim();
+		const Bool returnToRally = victim ? !targetWithinCreepLeash(me, victim) :
+			m_creepNeedsReturn && myAI->isIdle();
+		if (victim || returnToRally)
+			m_creepNeedsReturn = !returnToRally;
+		if (!returnToRally)
+			return UPDATE_SLEEP_NONE;
+		Coord3D rally = *master->getPosition();
+		if (const ExitInterface* exit = master->getObjectExitInterface())
+		{
+			Coord3D exitPoint;
+			if (exit->getNaturalRallyPoint(exitPoint))
+				rally = exitPoint;
+		}
+		const Real wander = MAX(CLOSE_ENOUGH, data->m_guardWanderRange);
+		const Real distanceToRally = ThePartitionManager->getDistanceSquared(me, &rally, FROM_CENTER_2D);
+		if (victim || distanceToRally > wander * wander)
+		{
+			if (victim)
+			{
+				myAI->aiIdle(CMD_FROM_AI);
+				myAI->setCurrentVictim(nullptr);
+			}
+			myAI->aiMoveToPosition(&rally, CMD_FROM_AI);
+			if (std::getenv("GENERALSX_TEST_COMMANDS"))
+				fprintf(stderr, "TEST creep return frame=%u creep=%u lair=%u distanceSq=%.2f leash=%.2f victim=%u victimDistanceSq=%.2f\n",
+					TheGameLogic->getFrame(), static_cast<unsigned>(me->getID()), static_cast<unsigned>(master->getID()),
+					ThePartitionManager->getDistanceSquared(me, master, FROM_CENTER_2D), leash, victim ? static_cast<unsigned>(victim->getID()) : 0,
+					victim ? ThePartitionManager->getDistanceSquared(victim, master, FROM_CENTER_2D) : 0.0f);
+		}
+		return UPDATE_SLEEP_NONE;
+	}
 
 	//Clear the drone spotting bonus to the master. Up to the drone
 	//to satisfy the conditions to set it again for the next update.
@@ -713,12 +769,14 @@ void SlavedUpdate::startSlavedEffects( const Object *slaver )
 	m_guardPointOffset.y += data->m_guardMaxRange * Sin( randomDirection );
 
 	// mark selves as not selectable
-	getObject()->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_UNSELECTABLE ) );
+	if (!RetailFileLayers::enabled() || data->m_markUnselectable)
+		getObject()->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
 }
 
 //-------------------------------------------------------------------------------------------------
 void SlavedUpdate::stopSlavedEffects()
 {
+	m_creepNeedsReturn = FALSE;
 	m_slaver = INVALID_ID;
 	m_guardPointOffset.zero();
 
@@ -735,6 +793,8 @@ void SlavedUpdate::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
+	if (RetailFileLayers::enabled())
+		xfer->xferBool(&m_creepNeedsReturn);
 
 }
 
@@ -747,7 +807,7 @@ void SlavedUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -768,6 +828,8 @@ void SlavedUpdate::xfer( Xfer *xfer )
 
 	// repairing
 	xfer->xferBool( &m_repairing );
+	if (version >= 2)
+		xfer->xferBool(&m_creepNeedsReturn);
 
 }
 

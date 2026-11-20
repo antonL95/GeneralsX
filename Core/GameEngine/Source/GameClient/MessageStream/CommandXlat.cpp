@@ -27,6 +27,8 @@
 // Author: Michael S. Booth, February 2001
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/CollideModule.h"
 
 #include "stdlib.h"				// VC++ wants this here, or gives compile error...
 
@@ -275,7 +277,8 @@ static Bool canSelectionSalvage( const Object *targetObj)
 		return FALSE;
 	}
 
-	if (!targetObj->isSalvageCrate()) {
+	const Bool retail = RetailFileLayers::enabled();
+	if (retail ? !targetObj->isKindOf(KINDOF_CRATE) : !targetObj->isSalvageCrate()) {
 		return FALSE;
 	}
 
@@ -296,7 +299,16 @@ static Bool canSelectionSalvage( const Object *targetObj)
 			continue;
 		}
 
-		if (obj->isKindOf(KINDOF_SALVAGER)) {
+		if (retail)
+		{
+			for (BehaviorModule** module = targetObj->getBehaviorModules(); *module; ++module)
+			{
+				const CollideModuleInterface* collider = (*module)->getCollide();
+				if (collider && collider->wouldLikeToCollideWith(obj))
+					return TRUE;
+			}
+		}
+		else if (obj->isKindOf(KINDOF_SALVAGER)) {
 			return TRUE;
 		}
 	}

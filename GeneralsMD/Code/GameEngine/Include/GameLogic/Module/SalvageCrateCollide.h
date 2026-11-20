@@ -47,9 +47,18 @@ public:
 	Real m_moneyChance;		///< Chance to get money, if weaponChance fails
 	Int m_minimumMoney;		///< How much, if we get money
 	Int m_maximumMoney;		///< How much, if we get money
+	Real m_resourceChance = 0.0f;
+	Real m_levelUpChance = 0.0f;
+	Real m_levelUpRadius = 0.0f;
+	Real m_bannerChance = 0.0f;
+	Real m_porterChance = 0.0f;
+	Int m_minResource = 0;
+	Int m_maxResource = 0;
+	AsciiString m_pickupUpgrade;
 
 	SalvageCrateCollideModuleData()
 	{
+		m_allowAIPickup = FALSE;
 		m_weaponChance = 1.0f;
 		m_levelChance = .25f;
 		m_moneyChance = .75f;
@@ -68,6 +77,14 @@ public:
 			{ "MoneyChance",	INI::parsePercentToReal,	nullptr, offsetof( SalvageCrateCollideModuleData, m_moneyChance ) },
 			{ "MinMoney",			INI::parseInt,						nullptr, offsetof( SalvageCrateCollideModuleData, m_minimumMoney ) },
 			{ "MaxMoney",			INI::parseInt,						nullptr, offsetof( SalvageCrateCollideModuleData, m_maximumMoney ) },
+			{ "ResourceChance", INI::parsePercentToReal, nullptr, offsetof( SalvageCrateCollideModuleData, m_resourceChance ) },
+			{ "MinResource", INI::parseInt, nullptr, offsetof( SalvageCrateCollideModuleData, m_minResource ) },
+			{ "MaxResource", INI::parseInt, nullptr, offsetof( SalvageCrateCollideModuleData, m_maxResource ) },
+			{ "LevelUpChance", INI::parsePercentToReal, nullptr, offsetof( SalvageCrateCollideModuleData, m_levelUpChance ) },
+			{ "LevelUpRadius", INI::parseReal, nullptr, offsetof( SalvageCrateCollideModuleData, m_levelUpRadius ) },
+			{ "BannerChance", INI::parsePercentToReal, nullptr, offsetof( SalvageCrateCollideModuleData, m_bannerChance ) },
+			{ "PorterChance", INI::parsePercentToReal, nullptr, offsetof( SalvageCrateCollideModuleData, m_porterChance ) },
+			{ "Upgrade", INI::parseAsciiString, nullptr, offsetof( SalvageCrateCollideModuleData, m_pickupUpgrade ) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
@@ -107,6 +124,7 @@ private:
 	void doWeaponSet( Object *other );
 	void doArmorSet( Object *other );
 	void doLevelGain( Object *other );
-	void doMoney( Object *other );
+	void doMoney( Object *other, Int money );
+	Bool executeRetailPickup( Object *other );
 
 };

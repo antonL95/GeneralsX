@@ -26,6 +26,7 @@
 // The Artificial Intelligence system
 // Author: Michael S. Booth, November 2000
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/RetailFileLayers.h"
 
 #include "Common/CRCDebug.h"
 #include "Common/GameState.h"
@@ -811,6 +812,8 @@ Object *AI::findClosestRepulsor( const Object *me, Real range)
 Real AI::getAdjustedVisionRangeForObject(const Object *object, Int factorsToConsider)
 {
 	Real originalRange = object->getVisionRange();
+	if (RetailFileLayers::enabled() && object->isKindOf(KINDOF_CREEP))
+		return originalRange;
 	const AIUpdateInterface *ai = object->getAI();
 	const TAiData *aiData = TheAI->getAiData();
 

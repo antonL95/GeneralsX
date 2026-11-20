@@ -38,6 +38,7 @@ const Int SPAWN_UPDATE_RATE = LOGICFRAMES_PER_SECOND/2; ///< This is a low prior
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/DieModule.h"
 #include "GameLogic/Module/DamageModule.h"
+#include "GameLogic/Module/UpgradeModule.h"
 
 //-------------------------------------------------------------------------------------------------
 class ThingTemplate;
@@ -60,6 +61,10 @@ public:
 	DamageTypeFlags m_damageTypesToPropagateToSlaves;
 	std::vector<AsciiString> m_spawnTemplateNameData;
 	DieMuxData m_dieMuxData;
+	UpgradeMuxData m_spawnUpgradeGate;
+	UnsignedInt m_fadeInTime = 0;
+	Bool m_spawnInsideBuilding = TRUE;
+	Bool m_shareUpgrades = FALSE;
 
 	SpawnBehaviorModuleData()
 	{
@@ -91,12 +96,16 @@ public:
 			{ "SpawnedRequireSpawner",		INI::parseBool,										nullptr,	offsetof( SpawnBehaviorModuleData, m_spawnedRequireSpawner ) },
 			{ "PropagateDamageTypesToSlavesWhenExisting",   INI::parseDamageTypeFlags, nullptr, offsetof( SpawnBehaviorModuleData, m_damageTypesToPropagateToSlaves ) },
 			{ "InitialBurst",				      INI::parseInt,						        nullptr, offsetof( SpawnBehaviorModuleData, m_initialBurst ) },
+			{ "FadeInTime", INI::parseDurationUnsignedInt, nullptr, offsetof( SpawnBehaviorModuleData, m_fadeInTime ) },
+			{ "SpawnInsideBuilding", INI::parseBool, nullptr, offsetof( SpawnBehaviorModuleData, m_spawnInsideBuilding ) },
+			{ "ShareUpgrades", INI::parseBool, nullptr, offsetof( SpawnBehaviorModuleData, m_shareUpgrades ) },
 			{ "SlavesHaveFreeWill",				INI::parseBool,										nullptr, offsetof( SpawnBehaviorModuleData, m_slavesHaveFreeWill ) },
 			{ nullptr, nullptr, nullptr, 0 }
 
 		};
     p.add(dataFieldParse);
 		p.add(DieMuxData::getFieldParse(), offsetof( SpawnBehaviorModuleData, m_dieMuxData ));
+		p.add(UpgradeMuxData::getFieldParse(), offsetof( SpawnBehaviorModuleData, m_spawnUpgradeGate ));
 	}
 };
 

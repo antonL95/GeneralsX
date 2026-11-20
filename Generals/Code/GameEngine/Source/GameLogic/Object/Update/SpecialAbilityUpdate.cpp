@@ -58,6 +58,8 @@
 #include "GameLogic/Module/LaserUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
+#include "Common/RetailFileLayers.h"
+#include <cstdlib>
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/StickyBombUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
@@ -488,8 +490,59 @@ Bool SpecialAbilityUpdate::isPowerCurrentlyInUse( const CommandButton *command )
 }
 
 //-------------------------------------------------------------------------------------------------
+static void showRetailCaptureFlag(Object* flag, const Player* player)
+{
+	Drawable* draw = flag->getDrawable();
+	if (!draw)
+		return;
+
+	struct FlagArt
+	{
+		const char* side;
+		const char* mesh;
+	};
+	static const FlagArt art[] = {
+		{ "Isengard", "FLAG_ISENGARD" }, { "WhiteHand", "FLAG_ISENGARD" }, { "Ruffian", "FLAG_ISENGARD" },
+		{ "Mordor", "FLAG_MORDOR" }, { "Morgul", "FLAG_MORDOR" }, { "Rhun", "FLAG_MORDOR" },
+		{ "Men", "FLAG_MEN" }, { "Arthedain", "FLAG_MEN" }, { "Ithilien", "FLAG_MEN" }, { "DolAmroth", "FLAG_MEN" },
+		{ "Arnor", "FLAG_ARNOR" }, { "Shire", "FLAG_ARNOR" },
+		{ "Dwarves", "FLAG_DWARVES" }, { "BotFA", "FLAG_DWARVES" }, { "DurinsFolk", "FLAG_DWARVES" },
+		{ "Elves", "FLAG_ELVES" },
+		{ "Wild", "FLAG_WILD" }, { "SaF", "FLAG_WILD" },
+		{ "Rohan", "FLAG_ROHAN" }, { "Dunharrow", "FLAG_ROHAN" },
+		{ "Angmar", "Cylinder01" },
+		{ "Guldur", "FLAG_DG" }, { "Rhudaur", "FLAG_DG" },
+		{ "Mirkwood", "FLAG_WR" }, { "Dorwinion", "FLAG_WR" }
+	};
+
+	const AsciiString side = player->getSide();
+	const char* visible = "FLAG_NEUTRAL";
+	for (const FlagArt& entry : art)
+	{
+		if (side == entry.side)
+			visible = entry.mesh;
+		draw->showSubObject(entry.mesh, FALSE);
+	}
+	draw->showSubObject("FLAG_ANGMAR", FALSE);
+	draw->showSubObject("FLAG_NEUTRAL", FALSE);
+	draw->showSubObject(visible, TRUE);
+	draw->updateSubObjects();
+}
+
 void SpecialAbilityUpdate::onExit( Bool cleanup )
 {
+	if (m_active && RetailFileLayers::enabled() &&
+		getSpecialAbilityUpdateModuleData()->m_specialPowerTemplate->getSpecialPowerType() == SPECIAL_INFANTRY_CAPTURE_BUILDING)
+	{
+		Object* flag = TheGameLogic->findObjectByID(m_targetID);
+		if (flag && flag->isKindOf(KINDOF_CAPTUREFLAG) && flag->getDrawable() &&
+			flag->getDrawable()->getModelConditionFlags().test(MODELCONDITION_START_CAPTURE))
+		{
+			flag->clearAndSetModelConditionState(MODELCONDITION_START_CAPTURE, MODELCONDITION_CANCEL_CAPTURE);
+			showRetailCaptureFlag(flag, flag->getControllingPlayer());
+		}
+	}
+
 	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
 
 	getObject()->clearModelConditionFlags(
@@ -901,6 +954,11 @@ void SpecialAbilityUpdate::startPreparation()
 		case SPECIAL_INFANTRY_CAPTURE_BUILDING:
 		{
 			Object *target = TheGameLogic->findObjectByID( m_targetID );
+			if (target && RetailFileLayers::enabled() && target->isKindOf(KINDOF_CAPTUREFLAG))
+			{
+				target->clearAndSetModelConditionState(MODELCONDITION_CANCEL_CAPTURE, MODELCONDITION_START_CAPTURE);
+				showRetailCaptureFlag(target, getObject()->getControllingPlayer());
+			}
 			if (target)
 			{
 				if (target->getTeam() == getObject()->getTeam())
@@ -1139,6 +1197,45 @@ Bool SpecialAbilityUpdate::continuePreparation()
 }
 
 //-------------------------------------------------------------------------------------------------
+static void captureLinkedBuilding(Object* flag, Team* oldTeam, Team* newTeam)
+{
+	const Real linkRange = 200.0f;
+	PartitionFilterAcceptByKindOf linkedFilter(MAKE_KINDOF_MASK(KINDOF_LINKED_TO_FLAG), KINDOFMASK_NONE);
+	PartitionFilter* filters[] = { &linkedFilter, nullptr };
+	ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(flag,
+		linkRange, FROM_CENTER_2D, filters, ITER_FASTEST);
+	MemoryPoolObjectHolder hold(iter);
+	Object* nearest = nullptr;
+	Real nearestDistance = linkRange * linkRange;
+	const Bool neutralFlag = !oldTeam->getControllingPlayer()->isPlayableSide();
+	for (Object* candidate = iter->first(); candidate; candidate = iter->next())
+	{
+		if (candidate->isEffectivelyDead() ||
+			(candidate->getControllingPlayer() != oldTeam->getControllingPlayer() &&
+				(!neutralFlag || candidate->getControllingPlayer()->isPlayableSide())))
+			continue;
+		const Real distance = ThePartitionManager->getDistanceSquared(flag, candidate, FROM_CENTER_2D);
+		if (distance < nearestDistance || (distance == nearestDistance && (!nearest || candidate->getID() < nearest->getID())))
+		{
+			nearest = candidate;
+			nearestDistance = distance;
+		}
+	}
+	if (nearest)
+	{
+		nearest->defect(newTeam, 0);
+		if (nearest->getTeam() == newTeam)
+		{
+			nearest->setModelConditionState(MODELCONDITION_CAPTURED);
+			nearest->updateUpgradeModules();
+		}
+	}
+	if (std::getenv("GENERALSX_TEST_COMMANDS"))
+		fprintf(stderr, "TEST capture flag=%u linked=%u owner=%d distanceSq=%.2f\n",
+			static_cast<unsigned>(flag->getID()), nearest ? static_cast<unsigned>(nearest->getID()) : 0,
+			flag->getControllingPlayer()->getPlayerIndex(), nearestDistance);
+}
+
 void SpecialAbilityUpdate::triggerAbilityEffect()
 {
 	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
@@ -1310,7 +1407,17 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
 				TheEva->setShouldPlay( EVA_BuildingStolen );
 			}
 
-			target->defect( object->getControllingPlayer()->getDefaultTeam(), 1); // one frame of flash!
+			Team* oldTeam = target->getTeam();
+			Team* newTeam = object->getControllingPlayer()->getDefaultTeam();
+			const Bool retailFlag = RetailFileLayers::enabled() && target->isKindOf(KINDOF_CAPTUREFLAG);
+			target->defect(newTeam, retailFlag ? 0 : 1);
+			if (retailFlag && target->getTeam() == newTeam)
+			{
+				target->clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_START_CAPTURE, MODELCONDITION_CANCEL_CAPTURE));
+				target->setModelConditionState(MODELCONDITION_CAPTURED);
+				showRetailCaptureFlag(target, target->getControllingPlayer());
+				captureLinkedBuilding(target, oldTeam, newTeam);
+			}
 
 			SpecialPowerModuleInterface *spmInterface = getMySPM();
 			if (spmInterface && spTemplate->getSpecialPowerType() == SPECIAL_BLACKLOTUS_CAPTURE_BUILDING )

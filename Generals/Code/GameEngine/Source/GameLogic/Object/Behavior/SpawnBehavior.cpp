@@ -33,6 +33,8 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
+#include "GameClient/Drawable.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -61,7 +63,8 @@ SpawnBehavior::SpawnBehavior( Thing *thing, const ModuleData* moduleData )
 	// GEE, THIS IS NEW...
 	// NOW, WE CAN HAVE A LIST OF TEMPLATE NAMES
 	m_templateNameIterator = md->m_spawnTemplateNameData.begin();
-	m_spawnTemplate = TheThingFactory->findTemplate( *m_templateNameIterator );
+	m_spawnTemplate = m_templateNameIterator != md->m_spawnTemplateNameData.end() ?
+		TheThingFactory->findTemplate(*m_templateNameIterator) : nullptr;
 	//each time m_spawn template is used, it will increment m_templateNameIterator,
 	//thus scanning through the ordered list of template names
 	//looping back to the beginning
@@ -146,6 +149,8 @@ void SpawnBehavior::onDie( const DamageInfo *damageInfo )
 		Object *currentSpawn = TheGameLogic->findObjectByID( (*iter) );
 		if( currentSpawn )
 		{
+			if (RetailFileLayers::enabled())
+				currentSpawn->setProducer(nullptr);
 			// Go through all my spawns and see if they have a SlavedUpdate I can tell I was killed to
 			for (BehaviorModule** update = currentSpawn->getBehaviorModules(); *update; ++update)
 			{
@@ -157,8 +162,8 @@ void SpawnBehavior::onDie( const DamageInfo *damageInfo )
 				}
 			}
 
-			// our spawner has died, we must invalidate the ID now in the spawned object
-			currentSpawn->setProducer( nullptr );
+			if (!RetailFileLayers::enabled())
+				currentSpawn->setProducer(nullptr);
 
 		}
 	}
@@ -553,6 +558,7 @@ Bool SpawnBehavior::createSpawn()
 {
 	Object *parent = getObject();
 	const SpawnBehaviorModuleData *md = getSpawnBehaviorModuleData();
+	const Bool retail = RetailFileLayers::enabled();
 
 	ExitInterface* exitInterface = parent->getObjectExitInterface();
 	if( exitInterface == nullptr )
@@ -579,7 +585,17 @@ Bool SpawnBehavior::createSpawn()
 													// This assures that an orphan has not just been reclaimed,
 	if( newSpawn == nullptr )	// and that we really want a new spawn, here.
 	{
+		if (m_templateNameIterator == md->m_spawnTemplateNameData.end())
+		{
+			exitInterface->unreserveDoorForExit(exitDoor);
+			return FALSE;
+		}
 		m_spawnTemplate = TheThingFactory->findTemplate( *m_templateNameIterator );
+		if (retail && !m_spawnTemplate)
+		{
+			exitInterface->unreserveDoorForExit(exitDoor);
+			return FALSE;
+		}
 
 		//newSpawn = TheThingFactory->newObject( m_spawnTemplate, parent->getControllingPlayer()->getDefaultTeam() );
 		newSpawn = TheThingFactory->newObject( m_spawnTemplate, parent->getTeam() ); // just a little worried about this...
@@ -609,6 +625,15 @@ Bool SpawnBehavior::createSpawn()
 
 
 	newSpawn->setProducer(parent);
+
+	if (retail && md->m_shareUpgrades)
+	{
+		for (const UpgradeTemplate* upgrade = TheUpgradeCenter->firstUpgradeTemplate(); upgrade; upgrade = upgrade->friend_getNext())
+		{
+			if (upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && parent->hasUpgrade(upgrade) && !newSpawn->hasUpgrade(upgrade))
+				newSpawn->giveUpgrade(upgrade);
+		}
+	}
 
 	// If they have a SlavedUpdate, then I have to tell them who their daddy is from now on.
 	for (BehaviorModule** update = newSpawn->getBehaviorModules(); *update; ++update)
@@ -682,11 +707,26 @@ Bool SpawnBehavior::createSpawn()
 		else
 		{
 			exitInterface->exitObjectViaDoor( newSpawn, exitDoor );
+			if (retail && !md->m_spawnInsideBuilding && newSpawn->getAI())
+			{
+				Coord3D worldPoint;
+				if (exitInterface->getNaturalRallyPoint(worldPoint))
+				{
+					newSpawn->setPosition(&worldPoint);
+					newSpawn->getAI()->aiIdle(CMD_FROM_AI);
+				}
+			}
 		}
 
 	}
 	else
 		exitInterface->unreserveDoorForExit( exitDoor );
+
+	if (retail && !reclaimedOrphan && md->m_fadeInTime)
+	{
+		if (Drawable* draw = newSpawn->getDrawable())
+			draw->fadeIn(md->m_fadeInTime);
+	}
 
 	if( md->m_isOneShotData )
 		m_oneShotCountdown--;
@@ -781,6 +821,19 @@ void SpawnBehavior::onDamage( DamageInfo *info )
 Bool SpawnBehavior::shouldTryToSpawn()
 {
 	const SpawnBehaviorModuleData *modData = getSpawnBehaviorModuleData();
+
+	if (RetailFileLayers::enabled() && (!modData->m_spawnUpgradeGate.m_activationUpgradeNames.empty() ||
+		modData->m_spawnUpgradeGate.m_activationMask.any()))
+	{
+		UpgradeMaskType required, conflicts;
+		modData->m_spawnUpgradeGate.getUpgradeActivationMasks(required, conflicts);
+		const auto* object = getObject();
+		UpgradeMaskType upgrades = object->getObjectCompletedUpgradeMask();
+		upgrades.set(object->getControllingPlayer()->getCompletedUpgradeMask());
+		if (!required.any() || upgrades.testForAny(conflicts) ||
+			!(modData->m_spawnUpgradeGate.m_requiresAllTriggers ? upgrades.testForAll(required) : upgrades.testForAny(required)))
+			return FALSE;
+	}
 
 	// Not if we are turned off
 	if( !m_active )

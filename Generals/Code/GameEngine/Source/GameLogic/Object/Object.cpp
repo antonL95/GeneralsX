@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/RetailTestCommands.h"
 #include <cmath>	// For isnan() on Linux
 #define DEFINE_WEAPONCONDITIONMAP
@@ -1369,6 +1370,10 @@ Bool Object::getAmmoPipShowingInfo(Int& numTotal, Int& numFull) const
 */
 CanAttackResult Object::getAbleToAttackSpecificObject( AbleToAttackType t, const Object* target, CommandSourceType commandSource ) const
 {
+	if (target && RetailFileLayers::enabled() && commandSource == CMD_FROM_AI && isKindOf(KINDOF_CREEP) &&
+		!SlavedUpdate::targetWithinCreepLeash(this, target))
+		return ATTACKRESULT_NOT_POSSIBLE;
+
 	// NO! BAD! WRONG!
 	// If we can't attack at all, then we cannot attack this
 	//if (!isAbleToAttack())

@@ -450,6 +450,37 @@ Object* HordeContain::getAnchor(Object* member)
 	return get(anchor) ? anchor : nullptr;
 }
 
+Bool HordeContain::addCrateBanner(Object* anchor)
+{
+	auto* contain = const_cast<HordeContain*>(get(anchor));
+	if (!contain || anchor->isEffectivelyDead())
+		return FALSE;
+	for (const Object* member : contain->getContainList())
+	{
+		if (member->isKindOf(KINDOF_BANNER) && !member->isEffectivelyDead())
+			return FALSE;
+	}
+
+	const auto* data = contain->getHordeContainModuleData();
+	for (const AsciiString& name : data->m_bannerCarriersAllowed)
+	{
+		const ThingTemplate* type = TheThingFactory->findTemplate(name);
+		if (!type)
+			continue;
+		Object* banner = TheThingFactory->newObject(type, anchor->getTeam());
+#if RTS_GENERALS
+		contain->OpenContain::addToContain(banner);
+#else
+		contain->OpenContain::addToContain(banner, FALSE);
+#endif
+		const Coord3D point = contain->getMemberPosition(banner->getID(), FALSE);
+		banner->setPosition(&point);
+		banner->setOrientation(anchor->getOrientation());
+		return TRUE;
+	}
+	return FALSE;
+}
+
 Object* HordeContain::findAttackTarget(const Object* attacker, AbleToAttackType attackType,
 	CommandSourceType source, [[maybe_unused]] WeaponSlotType slot, CanAttackResult* attackResult) const
 {

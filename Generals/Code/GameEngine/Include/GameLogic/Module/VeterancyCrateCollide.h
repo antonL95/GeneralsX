@@ -43,6 +43,7 @@ public:
 	UnsignedInt m_rangeOfEffect;
 	Bool m_addsOwnerVeterancy;
 	Bool m_isPilot;
+	Int m_affectsUpToLevel = 0;
 
 	VeterancyCrateCollideModuleData()
 	{
@@ -60,6 +61,7 @@ public:
 			{ "EffectRange",	INI::parseUnsignedInt,	nullptr, offsetof( VeterancyCrateCollideModuleData, m_rangeOfEffect ) },
 			{ "AddsOwnerVeterancy",	INI::parseBool,	nullptr, offsetof( VeterancyCrateCollideModuleData, m_addsOwnerVeterancy ) },
 			{ "IsPilot", INI::parseBool, nullptr, offsetof( VeterancyCrateCollideModuleData, m_isPilot ) },
+			{ "AffectsUpToLevel", INI::parseInt, nullptr, offsetof( VeterancyCrateCollideModuleData, m_affectsUpToLevel ) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);

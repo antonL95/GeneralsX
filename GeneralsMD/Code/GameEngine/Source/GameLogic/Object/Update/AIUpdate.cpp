@@ -4772,6 +4772,10 @@ DEBUG_LOG(("GNMT frame %d: %s %08lx (con %s %08lx) uses range %f, flags %08lx, %
 
 	if (newVictim)
 	{
+		if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_CREEP) && std::getenv("GENERALSX_TEST_COMMANDS"))
+			fprintf(stderr, "TEST creep acquire frame=%u creep=%u victim=%u distanceSq=%.2f vision=%.2f\n",
+				now, static_cast<unsigned>(obj->getID()), static_cast<unsigned>(newVictim->getID()),
+				ThePartitionManager->getDistanceSquared(obj, newVictim, FROM_CENTER_2D), rangeToFindWithin);
 		CRCDEBUG_LOG(("AIUpdateInterface::getNextMoodTarget() - %d is attacking %d", obj->getID(), newVictim->getID()));
 /*
 srj debug hack. ignore.

@@ -50,6 +50,9 @@ public:
 
 	//Example: Below are only currently used by various drones owned by rangers/vehicles
 	Int m_attackRange;			//When master attacks a target, I'll go to the target -- how far am I allowed to go in this case.
+	Real m_leashRange = 0.0f;
+	Bool m_dieOnMastersDeath = FALSE;
+	Bool m_markUnselectable = FALSE;
 	Int m_attackWanderRange;//If I'm at the target point, how far can I wander from it.
 	Int m_scoutRange;				//If master is moving somewhere, I'll scout ahead -- how far am I allowed to go?
 	Int m_scoutWanderRange;	//If I'm at the scout point, how far can I wander from it.
@@ -99,6 +102,9 @@ public:
 			{ "GuardMaxRange",			INI::parseInt,	nullptr, offsetof( SlavedUpdateModuleData, m_guardMaxRange ) },
 			{ "GuardWanderRange",		INI::parseInt,	nullptr, offsetof( SlavedUpdateModuleData, m_guardWanderRange ) },
 			{ "AttackRange",				INI::parseInt,	nullptr, offsetof( SlavedUpdateModuleData, m_attackRange ) },
+			{ "LeashRange", INI::parseReal, nullptr, offsetof( SlavedUpdateModuleData, m_leashRange ) },
+			{ "DieOnMastersDeath", INI::parseBool, nullptr, offsetof( SlavedUpdateModuleData, m_dieOnMastersDeath ) },
+			{ "MarkUnselectable", INI::parseBool, nullptr, offsetof( SlavedUpdateModuleData, m_markUnselectable ) },
 			{ "AttackWanderRange",	INI::parseInt,	nullptr, offsetof( SlavedUpdateModuleData, m_attackWanderRange ) },
 			{ "ScoutRange",					INI::parseInt,	nullptr, offsetof( SlavedUpdateModuleData, m_scoutRange ) },
 			{ "ScoutWanderRange",		INI::parseInt,	nullptr, offsetof( SlavedUpdateModuleData, m_scoutWanderRange ) },
@@ -147,6 +153,7 @@ public:
 	virtual SlavedUpdateInterface* getSlavedUpdateInterface() override { return this; }
 
 	virtual ObjectID getSlaverID() const override { return m_slaver; }
+	static Bool targetWithinCreepLeash(const Object* creep, const Object* target);
 	virtual void onEnslave( const Object *slaver ) override;
 	virtual void onSlaverDie( const DamageInfo *info ) override;
 	virtual void onSlaverDamage( const DamageInfo *info ) override;
@@ -166,6 +173,7 @@ public:
 	virtual UpdateSleepTime update() override;	///< Deciding whether or not to make new guys
 
 private:
+	Real creepLeashRange() const;
 	void startSlavedEffects( const Object *slaver );	///< We have been marked as Slaved, so we can't be selected or move too far or other stuff
 	void stopSlavedEffects();		///< We are no longer slaved.
 
@@ -174,4 +182,5 @@ private:
 	Int m_framesToWait;
 	RepairStates m_repairState;
 	Bool m_repairing;
+	Bool m_creepNeedsReturn = FALSE;
 };
