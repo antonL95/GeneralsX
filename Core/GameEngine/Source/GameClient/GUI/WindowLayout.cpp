@@ -169,6 +169,13 @@ void WindowLayout::destroyWindows()
 {
 	GameWindow *window;
 
+	if( !m_tabList.empty() )
+	{
+		if( TheWindowManager->getTabList() == m_tabList )
+			TheWindowManager->clearTabList();
+		m_tabList.clear();
+	}
+
 	while( (window = getFirstWindow()) != nullptr )
 	{
 
@@ -246,6 +253,10 @@ Bool WindowLayout::load( AsciiString filename )
 	setInit( info.init );
 	setUpdate( info.update );
 	setShutdown( info.shutdown );
+
+	m_tabList = info.tabList;
+	if( !m_tabList.empty() )
+		TheWindowManager->registerTabList( m_tabList );
 
 	return TRUE;  // success
 

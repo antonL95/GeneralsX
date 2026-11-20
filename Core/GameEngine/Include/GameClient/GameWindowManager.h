@@ -63,6 +63,7 @@ public:
 	AsciiString updateNameString;								///< update method in string flavor
 	AsciiString  shutdownNameString;						///< shutdown method in string flavor, mmm!
 	std::list<GameWindow *> windows;						///< list of top-level windows in the layout
+	GameWindowList tabList;
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -235,6 +236,7 @@ public:
 
 	virtual void registerTabList( GameWindowList tabList );	///< we have to register a Tab List
 	virtual void clearTabList();	///< we's gotz ta clear the tab list yo!
+	const GameWindowList& getTabList() const { return m_tabList; }
 
 	// --------------------------------------------------------------------------
 	/// process a single mouse event

@@ -16,6 +16,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/MapPlayerRosterTest.cpp
     GameEngine/Common/BfmeAssetPathTest.cpp
     GameEngine/Common/FontSubstitutionTest.cpp
+    GameEngine/Common/UiAnchorTest.cpp
     GameEngine/Common/UiLayoutDumpTest.cpp
     GameEngine/Common/UiNineSliceTest.cpp
     Libraries/Compression/CompressionManagerTest.cpp

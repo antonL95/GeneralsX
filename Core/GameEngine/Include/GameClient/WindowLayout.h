@@ -34,6 +34,8 @@
 #include "Common/GameMemory.h"
 #include "GameClient/GameWindow.h"
 
+#include <list>
+
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class GameWindow;
 class WindowLayout;
@@ -70,6 +72,7 @@ public:
 	void removeWindow( GameWindow *window );				///< remove window from screen
 	void destroyWindows();										///< destroy all windows in this screen
 	GameWindow *getFirstWindow() const;				///< get first window in list for screen
+	const std::list<GameWindow *>& getTabList() const { return m_tabList; }
 
 	// accessing layout callbacks  ------------------------------------------------------------------
 	void runInit( void *userData = nullptr );									///< run the init method if available
@@ -93,6 +96,7 @@ protected:
 	GameWindow *m_windowTail;												///< end of m_windowList
 	Int m_windowCount;															///< how man windows are in the list
 	Bool m_hidden;																	///< visible state of this screen
+	std::list<GameWindow *> m_tabList;
 
 	//
 	// These are callbacks you can attach to a "layout file" ... they are not

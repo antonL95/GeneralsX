@@ -4,8 +4,10 @@
 
 #include "Common/GameEngine.h"
 #include "Common/GlobalData.h"
+#include "Common/NameKeyGenerator.h"
 #include "GameClient/Display.h"
 #include "GameClient/Gadget.h"
+#include "GameClient/GadgetPushButton.h"
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/GameFont.h"
 #include "GameClient/GameWindow.h"
@@ -16,6 +18,7 @@
 #include "GameClient/UiScale.h"
 #include "GameClient/WindowLayout.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -48,6 +51,7 @@ namespace
 		Bool layoutLoaded = FALSE;
 		UiScale::PixelRect frameCanvas = { 0, 0, 0, 0 };
 		std::vector<FrameSpecimen> frames;
+		std::vector<GameWindow*> tabOrder;
 	};
 
 	State& state()
@@ -103,7 +107,8 @@ namespace
 		return layout ? std::string(layout->getFilename().str()) : std::string();
 	}
 
-	void collect(GameWindow* window, const std::string& parentPath, Bool parentVisible, std::vector<UiWindowRecord>& out)
+	void collect(GameWindow* window, const std::string& parentPath, Bool parentVisible, const std::vector<GameWindow*>& tabOrder,
+		std::vector<UiWindowRecord>& out)
 	{
 		for (; window; window = window->winGetNext())
 		{
@@ -141,10 +146,14 @@ namespace
 				record.fontHeight = font->height;
 			}
 
+			const auto tab = std::find(tabOrder.begin(), tabOrder.end(), window);
+			if (tab != tabOrder.end())
+				record.tabOrder = static_cast<int>(tab - tabOrder.begin());
+
 			const std::string path = parentPath.empty() ? record.name : parentPath + "/" + record.name;
 			const Bool visible = record.visible ? TRUE : FALSE;
 			out.push_back(std::move(record));
-			collect(window->winGetChild(), path, visible, out);
+			collect(window->winGetChild(), path, visible, tabOrder, out);
 		}
 	}
 
@@ -272,6 +281,60 @@ namespace
 		}
 	}
 
+	void drawWindowFrame(GameWindow* window, WinInstanceData*)
+	{
+		Int x = 0;
+		Int y = 0;
+		Int width = 0;
+		Int height = 0;
+		window->winGetScreenPosition(&x, &y);
+		window->winGetSize(&width, &height);
+		const Color fill = window->winGetEnabledColor(0);
+		if (fill != WIN_COLOR_UNDEFINED)
+			TheDisplay->drawFillRect(x, y, width, height, fill);
+		if (const UiFrame* frame = static_cast<const UiFrame*>(window->winGetUserData()))
+			frame->draw(x, y, x + width, y + height);
+	}
+
+	void attachWindowFrames(const char* spec)
+	{
+		for (const auto& entry : parseUiWindowAssignments(spec))
+		{
+			GameWindow* window = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey(entry.first.c_str()));
+			const UiFrame* frame = TheUiFrameCollection ? TheUiFrameCollection->find(entry.second.c_str()) : nullptr;
+			const Bool user = window && BitIsSet(window->winGetStyle(), GWS_USER_WINDOW);
+			if (user && frame)
+			{
+				window->winSetUserData(const_cast<UiFrame*>(frame));
+				window->winSetDrawFunc(drawWindowFrame);
+			}
+			std::fprintf(stderr, "UI test: window frame '%s' on '%s': %s\n", entry.second.c_str(), entry.first.c_str(),
+				!window ? "window missing" : !user ? "not a user window" : !frame ? "frame missing" : "attached");
+		}
+	}
+
+	void assignWindowTexts(const char* spec)
+	{
+		for (const auto& entry : parseUiWindowAssignments(spec))
+		{
+			GameWindow* window = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey(entry.first.c_str()));
+			if (window == nullptr)
+			{
+				std::fprintf(stderr, "UI test: window text on '%s': window missing\n", entry.first.c_str());
+				continue;
+			}
+			UnicodeString text;
+			text.translate(entry.second.c_str());
+			const UnsignedInt style = window->winGetStyle();
+			if (BitIsSet(style, GWS_PUSH_BUTTON))
+				GadgetButtonSetText(window, text);
+			else if (BitIsSet(style, GWS_STATIC_TEXT))
+				GadgetStaticTextSetText(window, text);
+			else
+				window->winSetText(text);
+		}
+	}
+
 	void createWindows()
 	{
 		TheWritableGlobalData->m_breakTheMovie = FALSE;
@@ -284,6 +347,7 @@ namespace
 			{
 				layout->hide(FALSE);
 				layout->bringForward();
+				current.tabOrder.assign(layout->getTabList().begin(), layout->getTabList().end());
 			}
 			std::fprintf(stderr, "UI test: layout '%s' %s\n", current.layout.c_str(), layout ? "created" : "could not be loaded");
 		}
@@ -291,6 +355,10 @@ namespace
 			createSpecimen(spec);
 		if (const char* spec = environment("GENERALSX_UITEST_FRAMES"))
 			createFrameSpecimen(spec);
+		if (const char* spec = environment("GENERALSX_UITEST_WINDOW_FRAMES"))
+			attachWindowFrames(spec);
+		if (const char* spec = environment("GENERALSX_UITEST_WINDOW_TEXT"))
+			assignWindowTexts(spec);
 		std::fflush(stderr);
 	}
 
@@ -301,7 +369,7 @@ namespace
 			return;
 
 		std::vector<UiWindowRecord> windows;
-		collect(TheWindowManager->winGetWindowList(), std::string(), TRUE, windows);
+		collect(TheWindowManager->winGetWindowList(), std::string(), TRUE, state().tabOrder, windows);
 
 		UiLayoutSummary summary;
 		summary.width = TheDisplay->getWidth();

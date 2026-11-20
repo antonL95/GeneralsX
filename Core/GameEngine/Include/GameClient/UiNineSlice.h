@@ -56,11 +56,18 @@ namespace UiNineSlice
 		Span high;
 	};
 
-	constexpr int MaxTilesPerAxis = 1024;
+	constexpr int MaxPieces = 4096;
+	constexpr double MinCornerScale = 0.25;
+	constexpr double MaxCornerScale = 4.0;
+	constexpr int MaxPixel = 1 << 24;
 
 	int roundToPixel(double value);
+	double clampCornerScale(double scale);
 	Axis splitAxis(int sourceSize, int insetLow, int insetHigh, int dest0, int dest1, double scale);
+	double tileFactor(const Span& middle, double scale, Fill fill);
 	std::vector<Span> fillSpans(const Span& middle, double scale, Fill fill);
+	std::vector<Span> fillSpansWithFactor(const Span& middle, double scale, Fill fill, double factor);
+	double sliceTileFactor(const Axis& x, const Axis& y, double scale, Fill edges, Fill center);
 	std::vector<Piece> slice(int sourceWidth, int sourceHeight, const Insets& insets, const Rect& dest,
 		double scale, Fill edges, Fill center);
 	bool parseFill(std::string_view token, Fill& fill);

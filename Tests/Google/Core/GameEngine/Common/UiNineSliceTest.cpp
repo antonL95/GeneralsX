@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 namespace
@@ -142,16 +143,89 @@ TEST(UiNineSlice, FractionalTilesRoundByEdgesWithoutGaps)
 	}
 }
 
-TEST(UiNineSlice, TilesThinnerThanAPixelStretch)
+TEST(UiNineSlice, TilesThinnerThanAPixelGrowToAWholePixel)
 {
 	const Span middle = { 0, 50, 10.0, 10.5 };
-	EXPECT_EQ(UiNineSlice::fillSpans(middle, 1.0, Fill::Tile).size(), 1u);
+	const std::vector<Span> spans = UiNineSlice::fillSpans(middle, 1.0, Fill::Tile);
+	ASSERT_EQ(spans.size(), 50u);
+	expectContiguous(spans, 0, 50);
+	for (const Span& span : spans)
+	{
+		EXPECT_EQ(span.dest1 - span.dest0, 1);
+		EXPECT_DOUBLE_EQ(span.source1, 10.5);
+	}
 }
 
-TEST(UiNineSlice, TooManyTilesStretch)
+TEST(UiNineSlice, TooManyTilesGrowTheTileInsteadOfStretching)
 {
-	const Span middle = { 0, 5000, 0.0, 2.0 };
-	EXPECT_EQ(UiNineSlice::fillSpans(middle, 1.0, Fill::Tile).size(), 1u);
+	const Span middle = { 0, 20000, 0.0, 2.0 };
+	EXPECT_DOUBLE_EQ(UiNineSlice::tileFactor(middle, 1.0, Fill::Tile), 3.0);
+	const std::vector<Span> spans = UiNineSlice::fillSpans(middle, 1.0, Fill::Tile);
+	ASSERT_EQ(spans.size(), 3334u);
+	expectContiguous(spans, 0, 20000);
+	EXPECT_EQ(spans[0].dest1, 6);
+	EXPECT_DOUBLE_EQ(spans[0].source1, 2.0);
+	EXPECT_LE(spans.size(), static_cast<size_t>(UiNineSlice::MaxPieces));
+}
+
+TEST(UiNineSlice, TiledCenterIsCappedInTotalPieces)
+{
+	const Rect rect = { 0, 0, 1004, 1004 };
+	const Insets insets = { 2, 2, 2, 2 };
+	const std::vector<Piece> pieces = UiNineSlice::slice(6, 6, insets, rect, 1.0, Fill::Tile, Fill::Tile);
+	EXPECT_LE(pieces.size(), static_cast<size_t>(UiNineSlice::MaxPieces));
+	EXPECT_GT(pieces.size(), 1000u);
+	expectExactCover(pieces, rect);
+	for (const Piece& piece : pieces)
+	{
+		if (piece.dest.x0 >= 2 && piece.dest.x1 <= 1002 && piece.dest.y0 >= 2 && piece.dest.y1 <= 1002 && piece.dest.x1 < 1002)
+		{
+			EXPECT_DOUBLE_EQ(piece.source.x0, 2.0);
+			EXPECT_DOUBLE_EQ(piece.source.x1, 4.0);
+		}
+	}
+}
+
+TEST(UiNineSlice, TileCapLooksTheSameAtEveryResolution)
+{
+	const Insets insets = { 4, 4, 4, 4 };
+	const int resolutions[][2] = { { 1024, 768 }, { 1920, 1080 }, { 2560, 1080 }, { 3840, 2160 } };
+	size_t expected = 0;
+	for (const auto& resolution : resolutions)
+	{
+		const double scale = UiScale::scale(resolution[0], resolution[1]);
+		const UiScale::PixelRect pixels = UiScale::canvasToScreen(0, 0, 1024, 768, resolution[0], resolution[1]);
+		const Rect rect = { pixels.x0, pixels.y0, pixels.x1, pixels.y1 };
+		const UiNineSlice::Axis x = UiNineSlice::splitAxis(12, 4, 4, rect.x0, rect.x1, scale);
+		const UiNineSlice::Axis y = UiNineSlice::splitAxis(12, 4, 4, rect.y0, rect.y1, scale);
+		EXPECT_DOUBLE_EQ(UiNineSlice::sliceTileFactor(x, y, scale, Fill::Tile, Fill::Tile), 4.0);
+		const std::vector<Piece> pieces = UiNineSlice::slice(12, 12, insets, rect, scale, Fill::Tile, Fill::Tile);
+		expectExactCover(pieces, rect);
+		if (expected == 0)
+			expected = pieces.size();
+		EXPECT_EQ(pieces.size(), expected);
+	}
+}
+
+TEST(UiNineSlice, RoundingSaturatesInsteadOfOverflowing)
+{
+	EXPECT_EQ(UiNineSlice::roundToPixel(1.0e300), UiNineSlice::MaxPixel);
+	EXPECT_EQ(UiNineSlice::roundToPixel(-1.0e300), -UiNineSlice::MaxPixel);
+	EXPECT_EQ(UiNineSlice::roundToPixel(std::nan("")), 0);
+	EXPECT_EQ(UiNineSlice::roundToPixel(2.5), 3);
+	EXPECT_EQ(UiNineSlice::roundToPixel(-2.5), -2);
+	const UiNineSlice::Axis axis = UiNineSlice::splitAxis(2000000000, 2000000000, 0, 0, 100, 4.0);
+	EXPECT_EQ(axis.low.dest1, 100);
+	EXPECT_EQ(axis.high.dest0, 100);
+}
+
+TEST(UiNineSlice, CornerScaleIsClampedToASaneRange)
+{
+	EXPECT_DOUBLE_EQ(UiNineSlice::clampCornerScale(1.5), 1.5);
+	EXPECT_DOUBLE_EQ(UiNineSlice::clampCornerScale(0.01), UiNineSlice::MinCornerScale);
+	EXPECT_DOUBLE_EQ(UiNineSlice::clampCornerScale(1.0e30), UiNineSlice::MaxCornerScale);
+	EXPECT_DOUBLE_EQ(UiNineSlice::clampCornerScale(-2.0), 1.0);
+	EXPECT_DOUBLE_EQ(UiNineSlice::clampCornerScale(std::nan("")), 1.0);
 }
 
 TEST(UiNineSlice, EmptyMiddleHasNoSpans)

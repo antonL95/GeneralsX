@@ -246,6 +246,7 @@ set(GAMEENGINE_SRC
     Include/GameClient/Statistics.h
     Include/GameClient/TerrainRoads.h
     Include/GameClient/TerrainVisual.h
+    Include/GameClient/UiAnchor.h
     Include/GameClient/UiFrame.h
     Include/GameClient/UiLayoutDump.h
     Include/GameClient/UiNineSlice.h
@@ -883,6 +884,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/System/Smudge.cpp
     Source/GameClient/Terrain/TerrainRoads.cpp
     Source/GameClient/Terrain/TerrainVisual.cpp
+    Source/GameClient/UiAnchor.cpp
     Source/GameClient/UiFrame.cpp
     Source/GameClient/UiLayoutDump.cpp
     Source/GameClient/UiNineSlice.cpp

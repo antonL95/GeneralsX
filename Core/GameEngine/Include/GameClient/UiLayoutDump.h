@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 struct UiWindowRecord
@@ -22,6 +23,7 @@ struct UiWindowRecord
 	bool fontPixels = false;
 	bool fontBold = false;
 	int fontHeight = 0;
+	int tabOrder = -1;
 };
 
 struct UiLayoutSummary
@@ -51,4 +53,5 @@ struct UiFrameSpecimen
 std::string formatUiLayoutJson(const UiLayoutSummary& summary, std::vector<UiWindowRecord> windows);
 std::vector<UiSpecimenLine> parseUiSpecimen(std::string_view spec);
 std::vector<UiFrameSpecimen> parseUiFrameSpecimen(std::string_view spec);
+std::vector<std::pair<std::string, std::string>> parseUiWindowAssignments(std::string_view spec);
 std::string uiJsonEscape(std::string_view text);

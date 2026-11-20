@@ -154,7 +154,7 @@ void UiFrame::parseCornerScale(INI* ini, void* instance, void*, const void*)
 	const Real scale = INI::scanReal(ini->getNextToken());
 	if (!(scale > 0.0f))
 		throw INI_INVALID_DATA;
-	frameOf(instance)->m_cornerScale = scale;
+	frameOf(instance)->m_cornerScale = static_cast<Real>(UiNineSlice::clampCornerScale(scale));
 }
 
 void UiFrame::parseEdges(INI* ini, void* instance, void*, const void*)

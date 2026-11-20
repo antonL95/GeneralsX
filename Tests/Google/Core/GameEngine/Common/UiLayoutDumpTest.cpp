@@ -130,3 +130,22 @@ TEST(UiFrameSpecimen, ParsesFrameNamesAndDesignRects)
 	EXPECT_EQ(frames[1].frame, "PopupChainSide");
 	EXPECT_EQ(frames[1].height, 200);
 }
+
+TEST(UiLayoutDump, TabOrderIsWrittenOnlyWhenSet)
+{
+	UiWindowRecord first = record("A", "", 0, 0);
+	first.tabOrder = 2;
+	const std::string json = formatUiLayoutJson(UiLayoutSummary{1024, 768, 1.0, ""}, {first, record("B", "", 5, 5)});
+	EXPECT_NE(json.find("\"font\": null, \"tabOrder\": 2}"), std::string::npos);
+	EXPECT_EQ(json.find("\"tabOrder\"", json.find("\"name\": \"B\"")), std::string::npos);
+}
+
+TEST(UiWindowAssignments, ParsesNamesAndValues)
+{
+	const auto entries = parseUiWindowAssignments(" Menu.wnd:Panel = MapPreviewFrame |bad|=x|y=|Menu.wnd:Title=Centered panel 560 x 400");
+	ASSERT_EQ(entries.size(), 2u);
+	EXPECT_EQ(entries[0].first, "Menu.wnd:Panel");
+	EXPECT_EQ(entries[0].second, "MapPreviewFrame");
+	EXPECT_EQ(entries[1].first, "Menu.wnd:Title");
+	EXPECT_EQ(entries[1].second, "Centered panel 560 x 400");
+}

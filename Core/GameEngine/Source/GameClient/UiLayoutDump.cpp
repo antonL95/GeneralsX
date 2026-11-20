@@ -139,6 +139,8 @@ std::string formatUiLayoutJson(const UiLayoutSummary& summary, std::vector<UiWin
 		{
 			out += "null";
 		}
+		if (window.tabOrder >= 0)
+			out += ", \"tabOrder\": " + std::to_string(window.tabOrder);
 		out += '}';
 	}
 
@@ -211,4 +213,25 @@ std::vector<UiFrameSpecimen> parseUiFrameSpecimen(std::string_view spec)
 		frames.push_back(std::move(frame));
 	}
 	return frames;
+}
+
+std::vector<std::pair<std::string, std::string>> parseUiWindowAssignments(std::string_view spec)
+{
+	std::vector<std::pair<std::string, std::string>> entries;
+	while (!spec.empty())
+	{
+		const std::size_t bar = spec.find('|');
+		const std::string_view entry = spec.substr(0, bar);
+		spec.remove_prefix(bar == std::string_view::npos ? spec.size() : bar + 1);
+
+		const std::size_t equals = entry.rfind('=');
+		if (equals == std::string_view::npos)
+			continue;
+		const std::string_view window = trim(entry.substr(0, equals));
+		const std::string_view frame = trim(entry.substr(equals + 1));
+		if (window.empty() || frame.empty())
+			continue;
+		entries.emplace_back(std::string(window), std::string(frame));
+	}
+	return entries;
 }

@@ -70,6 +70,14 @@
 #include "GameClient/GadgetSlider.h"
 #include "GameClient/GameText.h"
 #include "GameClient/HeaderTemplate.h"
+#include "Common/RetailFileLayers.h"
+#include "GameClient/UiAnchor.h"
+#include "GameClient/UiTest.h"
+#include "GameClient/UiScale.h"
+
+#include <algorithm>
+#include <string>
+#include <vector>
 
 
 
@@ -131,6 +139,24 @@ static Color defHiliteColor			= 0;
 static Color defSelectedColor		= 0;
 static Color defTextColor				= 0;
 static GameFont  *defFont				= nullptr;
+
+struct WindowFontRequest
+{
+	Bool requested = FALSE;
+	AsciiString name;
+	Int size = 0;
+	Bool bold = FALSE;
+};
+
+struct TabEntry
+{
+	Int order;
+	Int sequence;
+	GameWindow *window;
+};
+
+static WindowFontRequest theFontRequest;
+static std::vector<TabEntry> theTabEntries;
 
 //
 // These strings must be in the same order as they are in their definitions
@@ -653,6 +679,11 @@ static Bool parseFont( const char *token, WinInstanceData *instData,
 	c = strtok( nullptr, seps );  // label
 	c = strtok( nullptr, seps );  // value
 	scanInt( c, fontBold );
+
+	theFontRequest.requested = TRUE;
+	theFontRequest.name = fontName;
+	theFontRequest.size = fontSize;
+	theFontRequest.bold = fontBold ? TRUE : FALSE;
 
 	if( TheFontLibrary )
 	{
@@ -2343,6 +2374,97 @@ static GameWindowParse gameWindowFieldList[] =
 	{ nullptr, nullptr }
 };
 
+static Bool parseAnchorField( UiAnchor::Keyword keyword, UiAnchor::Spec *spec, File *inFile, char *buffer )
+{
+	AsciiString equals;
+	inFile->scanString( equals );
+	readUntilSemicolon( inFile, buffer, WIN_BUFFER_LENGTH );
+
+	std::string error;
+	if( UiAnchor::applyField( *spec, keyword, buffer, error ) == false )
+	{
+		DEBUG_LOG(( "parseWindow: %s", error.c_str() ));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static Bool applyAnchorLayout( const UiAnchor::Spec& spec, GameWindow *parent, WinInstanceData *instData,
+															 Int *x, Int *y, Int *width, Int *height )
+{
+	std::string error;
+	if( UiAnchor::validate( spec, parent != nullptr, error ) == false )
+	{
+		DEBUG_LOG(( "parseWindow: %s in '%s'", error.c_str(), instData->m_decoratedNameString.str() ));
+		return FALSE;
+	}
+	if( spec.anchored() == false )
+		return TRUE;
+
+	const Int screenWidth = TheDisplay->getWidth();
+	const Int screenHeight = TheDisplay->getHeight();
+	ICoord2D origin = { 0, 0 };
+	UiScale::PixelRect area;
+	if( parent )
+	{
+		ICoord2D size;
+		parent->winGetScreenPosition( &origin.x, &origin.y );
+		parent->winGetSize( &size.x, &size.y );
+		area = { origin.x, origin.y, origin.x + size.x, origin.y + size.y };
+	}
+	else if( spec.safeArea )
+		area = UiAnchor::safeArea( screenWidth, screenHeight, UiAnchor::activeSafeArea() );
+	else
+		area = UiAnchor::screenArea( screenWidth, screenHeight );
+
+	const UiScale::PixelRect rect = UiAnchor::resolve( spec, area, UiScale::scale( screenWidth, screenHeight ) );
+	*x = rect.x0 - origin.x;
+	*y = rect.y0 - origin.y;
+	*width = rect.x1 - rect.x0;
+	*height = rect.y1 - rect.y0;
+
+	if( theFontRequest.requested && TheFontLibrary )
+	{
+		GameFont *font = TheFontLibrary->getUiFont( theFontRequest.name, theFontRequest.size, theFontRequest.bold,
+																								 screenWidth, screenHeight );
+		if( font )
+			instData->m_font = font;
+	}
+	return TRUE;
+}
+
+static void rememberTabOrder( const UiAnchor::Spec& spec, GameWindow *window )
+{
+	if( window && spec.has( UiAnchor::Keyword::TabOrder ) )
+		theTabEntries.push_back( { spec.tabOrder, static_cast<Int>( theTabEntries.size() ), window } );
+}
+
+static void forgetTabOrder( GameWindow *root )
+{
+	theTabEntries.erase( std::remove_if( theTabEntries.begin(), theTabEntries.end(), [root]( const TabEntry& entry )
+	{
+		for( GameWindow *window = entry.window; window; window = window->winGetParent() )
+		{
+			if( window == root )
+				return true;
+		}
+		return false;
+	} ), theTabEntries.end() );
+}
+
+static GameWindowList sortedTabOrder()
+{
+	std::stable_sort( theTabEntries.begin(), theTabEntries.end(), []( const TabEntry& lhs, const TabEntry& rhs )
+	{
+		return lhs.order != rhs.order ? lhs.order < rhs.order : lhs.sequence < rhs.sequence;
+	} );
+	GameWindowList list;
+	for( const TabEntry& entry : theTabEntries )
+		list.push_back( entry.window );
+	theTabEntries.clear();
+	return list;
+}
+
 // parseWindow ================================================================
 /** Parse a WINDOW entry in the script. */
 //=============================================================================
@@ -2361,6 +2483,8 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 	void *data = nullptr;
 	ICoord2D parentSize;
 	AsciiString asciibuf;
+	UiAnchor::Spec anchorSpec;
+	UiAnchor::Keyword anchorKeyword = UiAnchor::Keyword::None;
 
 	//
 	// reset our 'static globals' that house the current parsed window callback
@@ -2374,6 +2498,7 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 	theInputString.clear();
 	theTooltipString.clear();
 	theDrawString.clear();
+	theFontRequest = WindowFontRequest();
 
 	// get the size of the parent, or if no parent present the screen
 	if( parent )
@@ -2477,15 +2602,22 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 			}
 			else if (asciibuf.compare("END") == 0)
 			{
+				if( window == nullptr &&
+						applyAnchorLayout( anchorSpec, parent, &instData, &x, &y, &width, &height ) == FALSE )
+					goto cleanupAndExit;
+
 				// Check to see if we have a header template, if so, set the font equal to that.
 				if(TheHeaderTemplateManager->getFontFromTemplate(instData.m_headerTemplateName))
 					instData.m_font = TheHeaderTemplateManager->getFontFromTemplate(instData.m_headerTemplateName);
 
 				// Create a window using the current description
 				if( window == nullptr )
+				{
 					window = createWindow( type, instData.m_id, instData.getStatus(), x, y,
 																 width, height, &instData, data,
 																 systemFunc, inputFunc, tooltipFunc, drawFunc );
+					rememberTabOrder( anchorSpec, window );
+				}
 				if( window )
 					window->winSetLayoutRegion( layoutRegion, layoutResolution );
 
@@ -2496,6 +2628,9 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 			else if (asciibuf.compare("CHILD") == 0)
 			{
 
+				if( applyAnchorLayout( anchorSpec, parent, &instData, &x, &y, &width, &height ) == FALSE )
+					goto cleanupAndExit;
+
 				// Create a window using the current description
 				window = createWindow( type, instData.m_id, instData.getStatus(), x, y,
 															 width, height, &instData, data,
@@ -2504,16 +2639,26 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 				if (window == nullptr)
 					goto cleanupAndExit;
 				window->winSetLayoutRegion( layoutRegion, layoutResolution );
+				rememberTabOrder( anchorSpec, window );
 
 				// Parses the CHILD's window info.
 				if( parseChildWindows( window, inFile, buffer ) == FALSE )
 				{
 
+					forgetTabOrder( window );
 					TheWindowManager->winDestroy( window );
 					window = nullptr;
 					goto cleanupAndExit;
 
 				}
+
+			}
+			else if( ( RetailFileLayers::enabled() || UiTest::isActive() ) &&
+					 ( anchorKeyword = UiAnchor::keywordOf( asciibuf.str() ) ) != UiAnchor::Keyword::None )
+			{
+
+				if( parseAnchorField( anchorKeyword, &anchorSpec, inFile, buffer ) == FALSE )
+					goto cleanupAndExit;
 
 			}
 			else
@@ -2713,6 +2858,7 @@ void GameWindowManager::freeStaticStrings()
 	theInputString.clear();
 	theTooltipString.clear();
 	theDrawString.clear();
+	theFontRequest.name.clear();
 }
 
 WindowLayoutInfo::WindowLayoutInfo() :
@@ -2755,6 +2901,7 @@ GameWindow *GameWindowManager::winCreateFromScript( AsciiString filenameString,
   // Reset the window stack
   resetWindowStack();
 	resetWindowDefaults();
+	theTabEntries.clear();
 
 	//
 	// get the filename from the parameter, if it doesn't contain a '\' it is
@@ -2917,6 +3064,8 @@ GameWindow *GameWindowManager::winCreateFromScript( AsciiString filenameString,
 	// close the file
 	inFile->close();
 	inFile = nullptr;
+
+	scriptInfo.tabList = sortedTabOrder();
 
 	// if info parameter is provided, copy info to the param
 	if( info )
