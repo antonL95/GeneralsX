@@ -954,6 +954,7 @@ void GameEngine::init()
 	resetSubsystems();
 
 	HideControlBar();
+	INI::finishRetailStartupLoad();
 }
 
 /** -----------------------------------------------------------------------------------------------

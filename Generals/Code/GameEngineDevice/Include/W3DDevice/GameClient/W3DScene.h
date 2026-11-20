@@ -40,6 +40,7 @@
 #include "WW3D2/rinfo.h"
 #include "WW3D2/coltest.h"
 #include "WW3D2/lightenvironment.h"
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 // PROTOTYPES /////////////////////////////////////////////////////////////////
@@ -61,8 +62,13 @@ class RTS3DScene : public SimpleSceneClass, public SubsystemInterface
 
 public:
 
-	RTS3DScene();  ///< RTSScene constructor
+	RTS3DScene();
 	virtual ~RTS3DScene() override;  ///< RTSScene destructor
+
+	void Add_Render_Object(RenderObjClass* object) override;
+	void Remove_Render_Object(RenderObjClass* object) override;
+	void Remove_All_Render_Objects() override;
+	void addFloorRenderObject(RenderObjClass* object, Bool forceToBack);
 
 	/// ray picking against objects in scene
 	Bool castRay(RayCollisionTestClass & raytest, Bool testAll, Int collisionType);
@@ -92,6 +98,7 @@ public:
 	void setGlobalLight(LightClass *pLight,Int lightIndex=0);
 	LightEnvironmentClass &getDefaultLightEnv() {return m_defaultLightEnv;}
 
+
 	virtual void init() override {}
 	virtual void update() override {}
 	virtual void draw() override;
@@ -99,6 +106,7 @@ public:
 	void doRender(CameraClass * cam);
 
 protected:
+	std::vector<RenderObjClass*> m_floorsDrawnFirst;
 	void renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, Int localPlayerIndex);
 	void updateFixedLightEnvironments(RenderInfoClass & rinfo);
 	void flushTranslucentObjects(RenderInfoClass & rinfo);

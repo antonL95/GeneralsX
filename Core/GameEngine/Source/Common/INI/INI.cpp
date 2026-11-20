@@ -34,9 +34,13 @@
 #include "WWMath/wwmath.h"
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/INIException.h"
 #include "Common/INIMath.h"
 #include "Common/INIPreprocessor.h"
+#include "Common/INIRetailTolerance.h"
+
+#include <map>
 
 #include "Common/DamageFX.h"
 #include "Common/file.h"
@@ -64,6 +68,64 @@
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Weapon.h"
+
+namespace
+{
+std::map<std::pair<std::string, std::string>, unsigned> retailSkips;
+bool retailStartupLoadFinished = false;
+unsigned retailLoadDepth = 0;
+
+void printRetailSkips(const char* loadPath = nullptr)
+{
+	if (retailSkips.empty())
+		return;
+
+	if (loadPath)
+		fprintf(stderr, "[Retail INI] Skips loading '%s'\n", loadPath);
+	for (const auto& [entry, count] : retailSkips)
+		fprintf(stderr, "[Retail INI] %s '%s': %u\n", entry.first.c_str(), entry.second.c_str(), count);
+	fflush(stderr);
+	retailSkips.clear();
+}
+
+class RetailLoadScope
+{
+public:
+	explicit RetailLoadScope(const AsciiString& path)
+		: m_path(path), m_active(retailStartupLoadFinished && RetailFileLayers::enabled() && !INIAudit::isEnabled())
+	{
+		if (m_active)
+			++retailLoadDepth;
+	}
+
+	~RetailLoadScope()
+	{
+		if (m_active && --retailLoadDepth == 0)
+			printRetailSkips(m_path.str());
+	}
+
+private:
+	const AsciiString& m_path;
+	const bool m_active;
+};
+
+bool isINIParseError()
+{
+	try
+	{
+		throw;
+	}
+	catch (INIErrorCode)
+	{
+		return true;
+	}
+	catch (...)
+	{
+		return false;
+	}
+}
+
+}
 
 #if __cplusplus >= 201611L
 #define USE_STD_FROM_CHARS_PARSING 1
@@ -203,6 +265,7 @@ INI::INI()
 //-------------------------------------------------------------------------------------------------
 UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadType, Xfer *pXfer, LoadFlags loadFlags )
 {
+	const RetailLoadScope retailLoad(fileDirName);
 	// GeneralsX @feature BenderAI 20/02/2026 Debug hang investigation
 	fprintf(stderr, "[INI] loadFileDirectory('%s') START\n", fileDirName.str());
 	fflush(stderr);
@@ -247,6 +310,11 @@ UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadTyp
 	const Bool expectFileFound = (loadFlags & LoadFlags_ExpectFileFound) != 0;
 	if (expectFileFound && filesRead == 0)
 	{
+		if (RetailFileLayers::enabled() && !INIAudit::isEnabled() && INIRetailTolerance::isOptionalRetailINI(fileDirName.str()))
+		{
+			recordSkipped("missing", fileDirName.str());
+			return 0;
+		}
 		fprintf(stderr, "[INI] ERROR: No files read from directory '%s'\n", fileDirName.str());
 		fflush(stderr);
 		throw INI_CANT_OPEN_FILE;
@@ -264,6 +332,8 @@ UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadTyp
 //-------------------------------------------------------------------------------------------------
 UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer *pXfer, LoadFlags loadFlags )
 {
+	const AsciiString loadPath = dirName;
+	const RetailLoadScope retailLoad(loadPath);
 	// GeneralsX @feature BenderAI 20/02/2026 Debug hang investigation
 	fprintf(stderr, "[INI] loadDirectory('%s') START\n", dirName.str());
 	fflush(stderr);
@@ -448,6 +518,7 @@ static INIFieldParseProc findFieldParse(const FieldParse* parseTable, const char
 //-------------------------------------------------------------------------------------------------
 UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 {
+	const RetailLoadScope retailLoad(filename);
 	// GeneralsX @feature BenderAI 20/02/2026 Debug hang investigation
 	fprintf(stderr, "[INI] load('%s') START\n", filename.str());
 	fflush(stderr);
@@ -467,7 +538,9 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 		// read all lines in the file
 		DEBUG_ASSERTCRASH( m_endOfFile == FALSE, ("INI::load, EOF at the beginning!") );
 		UnsignedInt lineCount = 0;
-		Bool resyncAfterAuditRecord = FALSE;
+		Bool resync = FALSE;
+		const Bool audit = INIAudit::isEnabled();
+		const Bool retail = RetailFileLayers::enabled() && !audit;
 		while( m_endOfFile == FALSE )
 		{
 			lineCount++;
@@ -487,11 +560,11 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 			if( token )
 			{
 				INIBlockParse parse = findBlockParse(token);
-				if (resyncAfterAuditRecord)
+				if (resync)
 				{
 					if (parse == nullptr || !atLineStart)
 						continue;
-					resyncAfterAuditRecord = FALSE;
+					resync = FALSE;
 				}
 				if (parse)
 				{
@@ -500,19 +573,28 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 					strcpy(m_curBlockStart, m_buffer);
 					#endif
 					const UnsignedInt blockLine = getLineNum();
+					const std::string blockName = retail ? token : "";
 					try {
 						INIAudit::Scope auditScope(currentLine.str());
 						(*parse)( this );
 					} catch (const INIException& error) {
-						if (!INIAudit::isEnabled())
+						if (!audit && !retail)
 							throw;
-						INIAudit::recordWithContext("error", currentLine.str(), error.mFailureMessage ? error.mFailureMessage : "", m_filename.str(), blockLine);
-						resyncAfterAuditRecord = TRUE;
+						if (audit)
+							INIAudit::recordWithContext("error", currentLine.str(), error.mFailureMessage ? error.mFailureMessage : "", m_filename.str(), blockLine);
+						else
+							recordSkipped("error", blockName.c_str());
+						resync = TRUE;
 					} catch (...) {
-						if (INIAudit::isEnabled())
+						if (audit)
 						{
 							INIAudit::recordWithContext("error", currentLine.str(), "block parse failed", m_filename.str(), blockLine);
-							resyncAfterAuditRecord = TRUE;
+							resync = TRUE;
+						}
+						else if (retail && isINIParseError())
+						{
+							recordSkipped("error", blockName.c_str());
+							resync = TRUE;
 						}
 						else
 						{
@@ -528,10 +610,14 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 						strcpy(m_curBlockStart, "NO_BLOCK");
 					#endif
 				}
-				else if (INIAudit::isEnabled())
+				else if (audit || retail)
 				{
-					INIAudit::recordWithContext("block", "", token, m_filename.str(), getLineNum());
-					resyncAfterAuditRecord = TRUE;
+					recordSkipped("block", token);
+					if (retail && INIRetailTolerance::hasIndentedBlockEnd({m_readBuffer, m_readBufferUsed}, m_readBufferNext,
+						INIAudit::indentation(currentRawLine())))
+						skipBlockForAudit();
+					else
+						resync = TRUE;
 				}
 				else
 				{
@@ -563,11 +649,28 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 	return 1;
 }
 
+void INI::recordSkipped(const char* kind, const char* detail) const
+{
+	if (INIAudit::isEnabled())
+		INIAudit::record(kind, detail, m_filename.str(), getLineNum());
+	else if (RetailFileLayers::enabled())
+		++retailSkips[{kind, detail}];
+}
+
+void INI::finishRetailStartupLoad()
+{
+	printRetailSkips();
+	retailStartupLoadFinished = true;
+}
+
 Bool INI::skipBlockWithoutOwner(const void* owner, const char* blockType)
 {
-	if (owner != nullptr || !INIAudit::isEnabled())
+	if (owner != nullptr || (!INIAudit::isEnabled() && !RetailFileLayers::enabled()))
 		return FALSE;
-	INIAudit::record("order", std::string(blockType) + " parsed before the subsystem that owns it exists", m_filename.str(), getLineNum());
+	if (INIAudit::isEnabled())
+		INIAudit::record("order", std::string(blockType) + " parsed before the subsystem that owns it exists", m_filename.str(), getLineNum());
+	else
+		recordSkipped("order", blockType);
 	skipBlockForAudit();
 	return TRUE;
 }
@@ -1696,6 +1799,8 @@ void INI::initFromINIMultiProc( void *what, BuildMultiIniFieldProc proc )
 void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList )
 {
 	Bool done = FALSE;
+	const Bool audit = INIAudit::isEnabled();
+	const Bool retail = RetailFileLayers::enabled() && !audit;
 
 	if( what == nullptr )
 	{
@@ -1709,7 +1814,7 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 
 		// read next line
 		readLine();
-		const std::string auditLine = INIAudit::isEnabled() ? std::string(m_buffer) : std::string();
+		const std::string auditLine = audit ? std::string(m_buffer) : std::string();
 
 		// check for end token
 		const char* field = strtok( m_buffer, INI::getSeps() );
@@ -1732,17 +1837,27 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 					{
 						// parse this block and check for parse errors
 						const UnsignedInt fieldLine = getLineNum();
+						const std::string fieldName = retail ? field : "";
 						try {
 							INIAudit::Scope auditScope(auditLine.c_str());
 							(*parse)( this, what, (char *)what + offset + parseTableList.getNthExtraOffset(ptIdx), userData );
 						} catch (const INIException& error) {
-							if (!INIAudit::isEnabled())
+							if (!audit && !retail)
 								throw;
-							INIAudit::record("field-error", auditLine + " | " + (error.mFailureMessage ? error.mFailureMessage : ""), m_filename.str(), fieldLine);
+							if (audit)
+								INIAudit::record("field-error", auditLine + " | " + (error.mFailureMessage ? error.mFailureMessage : ""), m_filename.str(), fieldLine);
+							else
+								recordSkipped("field-error", fieldName.c_str());
 						} catch (...) {
-							if (INIAudit::isEnabled())
+							if (audit)
 							{
 								INIAudit::record("field-error", auditLine, m_filename.str(), fieldLine);
+								found = true;
+								break;
+							}
+							if (retail && isINIParseError())
+							{
+								recordSkipped("field-error", fieldName.c_str());
 								found = true;
 								break;
 							}
@@ -1762,15 +1877,17 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 					}
 				}
 
-				if (!found && INIAudit::isEnabled() && nextLineOpensBlockForAudit())
+				if (!found && (audit || retail))
 				{
-					INIAudit::record("subblock", field, m_filename.str(), getLineNum());
-					skipBlockForAudit();
+					const Bool nested = nextLineOpensBlockForAudit() && (audit ||
+						INIRetailTolerance::hasIndentedBlockEnd({m_readBuffer, m_readBufferUsed}, m_readBufferNext, INIAudit::indentation(currentRawLine())));
+					recordSkipped(nested ? "subblock" : "field", field);
+					if (nested)
+						skipBlockForAudit();
 					found = true;
 				}
 				if (!found)
 				{
-					INIAudit::record("field", field, m_filename.str(), getLineNum());
 					DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Unknown field '%s' in block '%s'",
 														 INI::getLineNum(), INI::getFilename().str(), field, m_curBlockStart) );
 				}

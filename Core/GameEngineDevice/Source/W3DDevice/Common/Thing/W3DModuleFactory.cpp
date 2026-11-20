@@ -50,6 +50,9 @@
 #include "W3DDevice/GameClient/Module/W3DTracerDraw.h"
 #include "W3DDevice/GameClient/Module/W3DTreeDraw.h"
 #include "W3DDevice/GameClient/Module/W3DPropDraw.h"
+#include "W3DDevice/GameClient/Module/W3DFloorDraw.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize method */
@@ -86,5 +89,7 @@ void W3DModuleFactory::init()
 	addModule( W3DTreeDraw );
 	addModule( W3DPropDraw );
 #endif
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+		addModule( W3DFloorDraw );
 
 }

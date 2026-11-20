@@ -44,6 +44,7 @@
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/LatchRestore.h"
 #include "Common/MessageStream.h"
 #include "Common/Module.h"
@@ -866,12 +867,12 @@ void ModuleInfo::clearBodyModuleInfo()
 	}), m_info.end());
 }
 
-static Bool skipInvalidModuleForAudit(INI* ini, const char* detail)
+static Bool skipInvalidModule(INI* ini, const char* detail)
 {
-	if (!INIAudit::isEnabled())
+	if (!INIAudit::isEnabled() && !RetailFileLayers::enabled())
 		return FALSE;
 
-	INIAudit::record("field-error", detail, ini->getFilename().str(), ini->getLineNum());
+	ini->recordSkipped("field-error", detail);
 	ini->skipBlockForAudit();
 	return TRUE;
 }
@@ -902,9 +903,10 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 
 	}
 
-	if (INIAudit::isEnabled() && !TheModuleFactory->isModuleKnown(tokenStr, type == 999 ? MODULETYPE_BEHAVIOR : type))
+	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) &&
+		!TheModuleFactory->isModuleKnown(tokenStr, type == 999 ? MODULETYPE_BEHAVIOR : type))
 	{
-		INIAudit::record("module", tokenStr.str(), ini->getFilename().str(), ini->getLineNum());
+		ini->recordSkipped("module", tokenStr.str());
 		ini->skipBlockForAudit();
 		return;
 	}
@@ -919,7 +921,7 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 		interfaceMask = TheModuleFactory->findModuleInterfaceMask(tokenStr, type);
 		if ((interfaceMask & (MODULEINTERFACE_BODY)) == 0)
 		{
-			if (skipInvalidModuleForAudit(ini, "Only Body allowed here"))
+			if (skipInvalidModule(ini, "Only Body allowed here"))
 				return;
 			DEBUG_CRASH(("Only Body allowed here"));
 			throw INI_INVALID_DATA;
@@ -930,7 +932,7 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 		interfaceMask = TheModuleFactory->findModuleInterfaceMask(tokenStr, type);
 		if ((interfaceMask & (MODULEINTERFACE_BODY)) != 0)
 		{
-			if (skipInvalidModuleForAudit(ini, "Body must be declared with the Body field"))
+			if (skipInvalidModule(ini, "Body must be declared with the Body field"))
 				return;
 			DEBUG_CRASH(("No Body allowed here"));
 			throw INI_INVALID_DATA;
@@ -946,7 +948,7 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 		}
 		else
 		{
-			if (skipInvalidModuleForAudit(ini, "Override modules must be added through AddModule or ReplaceModule"))
+			if (skipInvalidModule(ini, "Override modules must be added through AddModule or ReplaceModule"))
 				return;
 			DEBUG_CRASH(("[LINE: %d - FILE: '%s'] You must use AddModule to add modules in override INI files.",
 				ini->getLineNum(), ini->getFilename().str(), self->getName().str()));
@@ -968,7 +970,7 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 			self->m_moduleBeingReplacedName.isNotEmpty() &&
 			self->m_moduleBeingReplacedName != tokenStr)
 	{
-		if (skipInvalidModuleForAudit(ini, "ReplaceModule must use the same module class"))
+		if (skipInvalidModule(ini, "ReplaceModule must use the same module class"))
 			return;
 		DEBUG_CRASH(("[LINE: %d - FILE: '%s'] ReplaceModule must replace modules with another module of the same type, but you are attempting to replace a %s with a %s for Object %s.",
 			ini->getLineNum(), ini->getFilename().str(), self->m_moduleBeingReplacedName.str(), tokenStr.str(), self->getName().str()));
@@ -979,7 +981,7 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 			self->m_moduleBeingReplacedTag.isNotEmpty() &&
 			self->m_moduleBeingReplacedTag == moduleTagStr)
 	{
-		if (skipInvalidModuleForAudit(ini, "ReplaceModule must use a new module tag"))
+		if (skipInvalidModule(ini, "ReplaceModule must use a new module tag"))
 			return;
 		DEBUG_CRASH(("[LINE: %d - FILE: '%s'] ReplaceModule must specify a new, unique tag for the replaced module, but you are not doing so for %s (%s) for Object %s.",
 			ini->getLineNum(), ini->getFilename().str(), moduleTagStr.str(), self->m_moduleBeingReplacedName.str(), self->getName().str()));
@@ -991,7 +993,7 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 		const auto* draw = self->m_drawModuleInfo.getNuggetWithTag(moduleTagStr);
 		if (draw && draw->first != tokenStr)
 		{
-			if (skipInvalidModuleForAudit(ini, "ChildObject must use the same module class to replace a draw tag"))
+			if (skipInvalidModule(ini, "ChildObject must use the same module class to replace a draw tag"))
 				return;
 			DEBUG_CRASH(("ChildObject %s cannot replace draw module %s with class %s.",
 				self->getName().str(), moduleTagStr.str(), tokenStr.str()));
@@ -1154,7 +1156,7 @@ void ThingTemplate::parseAddModule(INI *ini, void *instance, void *store, const 
 
 	if (self->m_moduleParsingMode != MODULEPARSE_NORMAL)
 	{
-		if (skipInvalidModuleForAudit(ini, "AddModule must be declared at object scope"))
+		if (skipInvalidModule(ini, "AddModule must be declared at object scope"))
 			return;
 		throw INI_INVALID_DATA;
 	}
@@ -1183,6 +1185,11 @@ void ThingTemplate::parseRemoveModule(INI *ini, void *instance, void *store, con
 			INIAudit::record("field-error", std::string("RemoveModule target not found: ") + modToRemove, ini->getFilename().str(), ini->getLineNum());
 			return;
 		}
+		if (RetailFileLayers::enabled())
+		{
+			ini->recordSkipped("field-error", "RemoveModule target not found");
+			return;
+		}
 		DEBUG_ASSERTCRASH(removed, ("RemoveModule %s was not found for %s. The game will crash now!",modToRemove, self->getName().str()));
 		throw INI_INVALID_DATA;
 	}
@@ -1197,7 +1204,7 @@ void ThingTemplate::parseReplaceModule(INI *ini, void *instance, void *store, co
 
 	if (self->m_moduleParsingMode != MODULEPARSE_NORMAL)
 	{
-		if (skipInvalidModuleForAudit(ini, "ReplaceModule must be declared at object scope"))
+		if (skipInvalidModule(ini, "ReplaceModule must be declared at object scope"))
 			return;
 		throw INI_INVALID_DATA;
 	}
@@ -1207,13 +1214,16 @@ void ThingTemplate::parseReplaceModule(INI *ini, void *instance, void *store, co
 	Bool removed = self->removeModuleInfo(modToRemove, removedModuleName);
 	if (!removed)
 	{
-		if (!INIAudit::isEnabled())
+		if (!INIAudit::isEnabled() && !RetailFileLayers::enabled())
 		{
 			DEBUG_CRASH(("[LINE: %d - FILE: '%s'] ReplaceModule %s was not found for %s; cannot continue.",
 				ini->getLineNum(), ini->getFilename().str(), modToRemove.str(), self->getName().str()));
 			throw INI_INVALID_DATA;
 		}
-		INIAudit::record("field-error", std::string("ReplaceModule target not found: ") + modToRemove.str(), ini->getFilename().str(), ini->getLineNum());
+		if (INIAudit::isEnabled())
+			INIAudit::record("field-error", std::string("ReplaceModule target not found: ") + modToRemove.str(), ini->getFilename().str(), ini->getLineNum());
+		else
+			ini->recordSkipped("field-error", "ReplaceModule target not found");
 	}
 
 	LatchRestore<Byte> mode(self->m_moduleParsingMode, MODULEPARSE_ADD_REMOVE_REPLACE);
@@ -1231,7 +1241,7 @@ void ThingTemplate::parseInheritableModule(INI *ini, void *instance, void *store
 
 	if (self->m_moduleParsingMode != MODULEPARSE_NORMAL)
 	{
-		if (skipInvalidModuleForAudit(ini, "InheritableModule must be declared at object scope"))
+		if (skipInvalidModule(ini, "InheritableModule must be declared at object scope"))
 			return;
 		throw INI_INVALID_DATA;
 	}

@@ -39,6 +39,8 @@
 
 #include "Common/Module.h"
 #include "Common/ModuleFactory.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/NameKeyGenerator.h"
 
 // behavior includes
@@ -167,6 +169,7 @@
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/Module/MobMemberSlavedUpdate.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/MissileLauncherBuildingUpdate.h"
 #include "GameLogic/Module/StealthDetectorUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
@@ -446,6 +449,15 @@ void ModuleFactory::init()
 	addModule( MobMemberSlavedUpdate );
 	addModule( OCLUpdate );
 	addModule( SpecialAbilityUpdate );
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		addModule( StancesBehavior );
+		addModule( LargeGroupAudioUpdate );
+		addModule( PickupStuffUpdate );
+		addModule( HitReactionBehavior );
+		addModule( HordeMemberCollide );
+		addModule( CastleMemberBehavior );
+	}
 	addModule( MissileLauncherBuildingUpdate );
 	addModule( SupplyCenterProductionExitUpdate );
 	addModule( SupplyCenterDockUpdate );

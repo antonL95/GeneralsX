@@ -65,7 +65,9 @@ set(GAMEENGINE_SRC
     Include/Common/INI.h
     Include/Common/SpecialPowerINI.h
     Include/GameLogic/Module/AISpecialPowerUpdate.h
+    Include/GameLogic/Module/RotwkParseOnlyModules.h
     Include/Common/INIAudit.h
+    Include/Common/INIRetailTolerance.h
     Include/Common/HordeFormation.h
     Include/Common/RetailFileLayers.h
     Include/Common/INIMath.h
@@ -609,6 +611,7 @@ set(GAMEENGINE_SRC
 #    Source/Common/GlobalData.cpp
     Source/Common/INI/INI.cpp
     Source/Common/INI/INIAudit.cpp
+    Source/Common/INI/INIRetailTolerance.cpp
     Source/Common/INI/INIPreprocessor.cpp
     Source/Common/INI/INIAiData.cpp
     Source/Common/INI/INIAnimation.cpp
@@ -630,6 +633,7 @@ set(GAMEENGINE_SRC
     Source/Common/INI/INIParticleSys.cpp
     Source/Common/INI/INISpecialPower.cpp
     Source/GameLogic/Object/Update/AISpecialPowerUpdate.cpp
+    Source/GameLogic/Object/Update/RotwkParseOnlyModules.cpp
     Source/Common/INI/INITerrain.cpp
     Source/Common/INI/INITerrainBridge.cpp
     Source/Common/INI/INITerrainRoad.cpp

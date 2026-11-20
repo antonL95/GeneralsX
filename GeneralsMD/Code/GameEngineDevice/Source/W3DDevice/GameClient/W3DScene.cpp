@@ -235,7 +235,41 @@ RTS3DScene::~RTS3DScene()
 }
 
 
-void	RTS3DScene::setGlobalLight(LightClass *pLight, Int lightIndex)
+void RTS3DScene::Add_Render_Object(RenderObjClass* object)
+{
+	if (m_floorsDrawnFirst.empty())
+		SimpleSceneClass::Add_Render_Object(object);
+	else
+	{
+		SceneClass::Add_Render_Object(object);
+		RenderList.Add_After(object, m_floorsDrawnFirst.front());
+	}
+}
+
+void RTS3DScene::Remove_Render_Object(RenderObjClass* object)
+{
+	std::erase(m_floorsDrawnFirst, object);
+	SimpleSceneClass::Remove_Render_Object(object);
+}
+
+void RTS3DScene::addFloorRenderObject(RenderObjClass* object, Bool forceToBack)
+{
+	if (forceToBack)
+	{
+		SimpleSceneClass::Add_Render_Object(object);
+		m_floorsDrawnFirst.push_back(object);
+	}
+	else
+		Add_Render_Object(object);
+}
+
+void RTS3DScene::Remove_All_Render_Objects()
+{
+	m_floorsDrawnFirst.clear();
+	SimpleSceneClass::Remove_All_Render_Objects();
+}
+
+void RTS3DScene::setGlobalLight(LightClass *pLight, Int lightIndex)
 {
 	if (m_numGlobalLights < (lightIndex+1))
 		m_numGlobalLights=(lightIndex+1);

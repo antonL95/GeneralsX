@@ -745,13 +745,7 @@ void Drawable::updateSubObjects()
 void Drawable::showSubObject( const AsciiString& name, Bool show )
 {
 	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
-	{
-		ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
-		if (di)
-		{
-			di->showSubObject( name, show );
-		}
-	}
+		(*dm)->showDrawableSubObject(name, show);
 }
 
 #ifdef ALLOW_ANIM_INQUIRIES
@@ -4622,11 +4616,7 @@ void Drawable::updateHiddenStatus()
 		TheInGameUI->deselectDrawable( this );
 
 	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
-	{
-		ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
-		if (di)
-			di->setHidden(hidden != 0);
-	}
+		(*dm)->setDrawableHidden(hidden != 0);
 
 }
 

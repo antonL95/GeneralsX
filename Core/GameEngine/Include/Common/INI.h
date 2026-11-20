@@ -64,7 +64,7 @@ enum
 //-------------------------------------------------------------------------------------------------
 /** Status return codes for the INI reader */
 //-------------------------------------------------------------------------------------------------
-enum
+enum INIErrorCode
 {
 	// we map all of these to the same "real" error code, because
 	// we generally don't care why it failed; but since the code distinguishes,
@@ -274,6 +274,8 @@ public:
 	void initChildObject( void *what, const FieldParse* parseTable );
 	void initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList );
 	void skipBlockForAudit();
+	void recordSkipped(const char* kind, const char* detail) const;
+	static void finishRetailStartupLoad();
 	Bool nextLineOpensBlockForAudit() const;
 	std::string currentRawLine() const;
 	std::string readRawBlock(const char* endToken, const char* const* nestedBlocks = nullptr);

@@ -66,6 +66,7 @@ static void drawFramerateBar();
 #include "Common/GameLOD.h"
 #include "Common/DrawModule.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
+#include "W3DDevice/GameClient/Module/W3DFloorDraw.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 
@@ -2109,6 +2110,21 @@ static AsciiString findAssetSmokeObjectModel(const char* name)
 	return {};
 }
 
+static const W3DFloorDrawModuleData* findAssetSmokeFloor(const char* name, const char* tag)
+{
+	const ThingTemplate* object = TheThingFactory ? TheThingFactory->findTemplate(name, FALSE) : nullptr;
+	if (!object)
+		return nullptr;
+
+	const ModuleInfo& modules = object->getDrawModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		if (modules.getNthName(i) == "W3DFloorDraw" && modules.getNthTag(i).compareNoCase(tag) == 0)
+			return static_cast<const W3DFloorDrawModuleData*>(modules.getNthData(i));
+	}
+	return nullptr;
+}
+
 static Bool poseAssetSmokeModel(WW3DAssetManager& assets, RenderObjClass& model, const char* animation)
 {
 	const HTreeClass* tree = model.Get_HTree();
@@ -2145,6 +2161,7 @@ struct AssetSmokePart
 {
 	AsciiString model;
 	Vector3 offset;
+	const W3DFloorDrawModuleData* floor = nullptr;
 };
 
 static std::vector<AssetSmokePart> findAssetSmokeHordeParts(const char* name)
@@ -2178,7 +2195,7 @@ static std::vector<AssetSmokePart> findAssetSmokeHordeParts(const char* name)
 	return parts;
 }
 
-static Bool drawAssetSmokeParts(WW3DAssetManager& assets, const std::vector<AssetSmokePart>& parts, Real aspect)
+static Bool drawAssetSmokeParts(W3DAssetManager& assets, const std::vector<AssetSmokePart>& parts, Real aspect)
 {
 	std::vector<RenderObjClass*> models;
 	const auto release = [&models]()
@@ -2190,7 +2207,7 @@ static Bool drawAssetSmokeParts(WW3DAssetManager& assets, const std::vector<Asse
 	AABoxClass bounds;
 	for (const AssetSmokePart& part : parts)
 	{
-		RenderObjClass* model = assets.Create_Render_Obj(part.model.str());
+		RenderObjClass* model = part.floor ? part.floor->createModel(assets, 1.0f, TheGlobalData->m_weather) : assets.Create_Render_Obj(part.model.str());
 		if (!model)
 		{
 			fprintf(stderr, "Asset smoke: cannot create W3D model '%s'\n", part.model.str());
@@ -2343,10 +2360,22 @@ void W3DDisplay::draw()
 	{
 		std::vector<AssetSmokePart> parts;
 		AsciiString model = smokeModel;
+		const W3DFloorDrawModuleData* floor = nullptr;
 		if (smokeObject && *smokeObject)
 		{
-			parts = findAssetSmokeHordeParts(smokeObject);
-			model = findAssetSmokeObjectModel(smokeObject);
+			const char* floorTag = std::getenv("GENERALSX_ASSET_SMOKE_FLOOR");
+			if (floorTag && *floorTag)
+			{
+				model.clear();
+				floor = findAssetSmokeFloor(smokeObject, floorTag);
+				if (floor && !floor->m_startHidden && !floor->isHidden(ModelConditionFlags()))
+					model = floor->m_modelName;
+			}
+			else
+			{
+				parts = findAssetSmokeHordeParts(smokeObject);
+				model = findAssetSmokeObjectModel(smokeObject);
+			}
 			if (model.isNotEmpty())
 				fprintf(stderr, "Asset smoke: object '%s' uses default model '%s'\n", smokeObject, model.str());
 			else if (parts.empty())
@@ -2354,7 +2383,7 @@ void W3DDisplay::draw()
 			fflush(stderr);
 		}
 		if (model.isNotEmpty())
-			parts.insert(parts.begin(), { model, Vector3(0.0f, 0.0f, 0.0f) });
+			parts.insert(parts.begin(), { model, Vector3(0.0f, 0.0f, 0.0f), floor });
 		const Bool rendered = !parts.empty() &&
 			drawAssetSmokeParts(*m_assetManager, parts, static_cast<Real>(getWidth()) / getHeight());
 		TheGameEngine->setQuitting(rendered || !INIAudit::isEnabled());

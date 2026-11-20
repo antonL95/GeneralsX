@@ -32,6 +32,8 @@
 
 #define DEFINE_VETERANCY_NAMES
 #include "Common/Upgrade.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Player.h"
 #include "Common/Xfer.h"
 #include "GameClient/InGameUI.h"
@@ -485,6 +487,13 @@ void UpgradeCenter::parseUpgradeDefinition( INI *ini )
 	UpgradeTemplate* upgrade = TheUpgradeCenter->findNonConstUpgradeByKey( NAMEKEY(name) );
 	if( upgrade == nullptr )
 	{
+		if (RetailFileLayers::enabled() && !INIAudit::isEnabled() &&
+			TheUpgradeCenter->m_nextTemplateMaskBit >= UPGRADE_MAX_COUNT)
+		{
+			ini->recordSkipped("capacity", "Upgrade");
+			ini->skipBlockForAudit();
+			return;
+		}
 
 		// allocate a new item
 		upgrade = TheUpgradeCenter->newUpgrade( name );

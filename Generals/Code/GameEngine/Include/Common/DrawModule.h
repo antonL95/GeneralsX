@@ -84,6 +84,8 @@ public:
 	virtual void setTerrainDecalOpacity(Real o) {};
 
 	virtual void setFullyObscuredByShroud(Bool fullyObscured) = 0;
+	virtual void setDrawableHidden(Bool hidden);
+	virtual void showDrawableSubObject(const AsciiString& name, Bool show);
 
 	virtual Bool isVisible() const { return true; }	///< for limiting tree sway, etc to visible objects
 
@@ -225,6 +227,18 @@ public:
 };
 
 //-------------------------------------------------------------------------------------------------
+
+inline void DrawModule::setDrawableHidden(Bool hidden)
+{
+	if (ObjectDrawInterface* draw = getObjectDrawInterface())
+		draw->setHidden(hidden);
+}
+
+inline void DrawModule::showDrawableSubObject(const AsciiString& name, Bool show)
+{
+	if (ObjectDrawInterface* draw = getObjectDrawInterface())
+		draw->showSubObject(name, show);
+}
 
 class RenderCost
 {

@@ -80,7 +80,10 @@ public:
 	ModuleData* newModuleDataFromINI(INI* ini, const AsciiString& name, ModuleType type, const AsciiString& moduleTag);
 
 	Int findModuleInterfaceMask(const AsciiString& name, ModuleType type);
-	Bool isModuleKnown(const AsciiString& name, ModuleType type) { return findModuleTemplate(name, type) != nullptr; }
+	Bool isModuleKnown(const AsciiString& name, ModuleType type) const
+	{
+		return name.getLength() < 255 && m_moduleTemplateMap.find(makeDecoratedNameKey(name, type)) != m_moduleTemplateMap.end();
+	}
 
 	virtual void crc( Xfer *xfer ) override;
 	virtual void xfer( Xfer *xfer ) override;
