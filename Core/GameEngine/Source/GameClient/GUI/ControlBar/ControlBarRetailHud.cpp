@@ -329,6 +329,61 @@ void ControlBar::drawRetailSocketFills() const
 	}
 }
 
+namespace
+{
+void drawRetailCitadelQueue(Object *citadel, const GameWindow *palantir)
+{
+	if (!citadel || !citadel->isKindOf(KINDOF_CASTLE_KEEP))
+		return;
+	const ProductionUpdateInterface *production = citadel->getProductionUpdateInterface();
+	if (!production || !production->firstProduction())
+		return;
+
+	const CommandSet *commands = TheControlBar->findCommandSet(citadel->getCommandSetString());
+	Int x, y, width, height;
+	windowRect(palantir, x, y, width, height);
+	const Real scale = width / PalantirDesignWidth;
+	const Int size = MAX(3, static_cast<Int>(32.0f * scale));
+	const Int gap = MAX(1, static_cast<Int>(3.0f * scale));
+	const Int columns = MAX(1, static_cast<Int>(PalantirDesignWidth * scale) / (size + gap));
+	const Int left = x + gap;
+	const Int bottom = y + static_cast<Int>(42.0f * scale);
+	Int index = 0;
+	for (const ProductionEntry *entry = production->firstProduction(); entry; entry = production->nextProduction(entry), ++index)
+	{
+		const Int iconX = left + (index % columns) * (size + gap);
+		const Int iconY = bottom - size - (index / columns) * (size + gap);
+		const Image *image = nullptr;
+		if (entry->getProductionType() == PRODUCTION_UNIT)
+			image = entry->getProductionObject()->getButtonImage();
+		else if (entry->getProductionType() == PRODUCTION_UPGRADE)
+		{
+			const UpgradeTemplate *upgrade = entry->getProductionUpgrade();
+			for (Int i = 0; commands && !image && i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
+			{
+				const CommandButton *button = commands->getCommandButton(i);
+				if (button && (button->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE || button->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE)
+					&& button->getUpgradeTemplate() == upgrade)
+					image = button->getButtonImage();
+			}
+			if (!TheDisplay->hasImageTexture(image))
+				image = upgrade->getButtonImage();
+		}
+		TheDisplay->drawFillRect(iconX, iconY, size, size, GameMakeColor(18, 16, 12, 240));
+		if (TheDisplay->hasImageTexture(image))
+			TheDisplay->drawImage(image, iconX + 1, iconY + 1, iconX + size - 1, iconY + size - 1);
+		const Color border = index == 0 ? GameMakeColor(240, 215, 149, 255) : GameMakeColor(120, 110, 87, 255);
+		TheDisplay->drawOpenRect(iconX, iconY, size, size, 1.0f, border);
+		if (index == 0)
+		{
+			const Real progress = std::clamp(entry->getPercentComplete(), 0.0f, 100.0f);
+			TheDisplay->drawRemainingRectClock(iconX + 1, iconY + 1, size - 2, size - 2,
+				static_cast<Int>(progress), GameMakeColor(0, 0, 0, 115));
+		}
+	}
+}
+}
+
 void ControlBar::drawRetailTexts() const
 {
 	const Color text = GameMakeColor(236, 228, 206, 255);
@@ -336,6 +391,8 @@ void ControlBar::drawRetailTexts() const
 	drawTextWindow(m_retailCommandPoints, 1, text);
 	if (!m_retailPortrait->winIsHidden())
 		drawTextWindow(m_retailSelectionName, 2, GameMakeColor(255, 255, 255, 255));
+	if (m_currContext == CB_CONTEXT_COMMAND && m_currentSelectedDrawable)
+		drawRetailCitadelQueue(m_currentSelectedDrawable->getObject(), m_retailResources->winGetParent());
 }
 
 Int ControlBar::getRetailSlot(const GameWindow *window) const
@@ -493,6 +550,8 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 			makeType = TheBuildAssistant->canMakeUnit(obj, unit);
 		if (makeType == CANMAKE_QUEUE_FULL)
 			reason = TheGameText->fetchOrSubstitute("TOOLTIP:TooltipCannotPurchaseBecauseQueueFull", L"Production queue is full");
+		else if (makeType == CANMAKE_NO_COMMAND_POINTS)
+			reason = TheGameText->fetchOrSubstitute("TOOLTIP:TooltipNoMoreCommandPoints", L"Not enough command points");
 		else if (makeType == CANMAKE_MAXED_OUT_FOR_PLAYER || makeType == CANMAKE_PARKING_PLACES_FULL)
 			reason.set(L"Unit limit reached");
 		else
@@ -827,7 +886,7 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 				return CBC_COMMAND_NOT_USED;
 			for (const ProductionEntry *entry = production->firstProduction(); entry; entry = production->nextProduction(entry))
 			{
-				if (entry->getProductionType() == PRODUCTION_UNIT && entry->getProductionObject() == hero)
+				if (entry->getProductionType() == PRODUCTION_UNIT && entry->getProductionObject()->isEquivalentTo(hero))
 				{
 					if (command->hasRotwkOption(CommandButtonRules::ROTWK_CANCELABLE))
 					{
@@ -841,6 +900,11 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 			if (makeType == CANMAKE_NO_MONEY)
 			{
 				TheInGameUI->message("GUI:NotEnoughMoneyToBuild");
+				return CBC_COMMAND_USED;
+			}
+			if (makeType == CANMAKE_NO_COMMAND_POINTS)
+			{
+				TheInGameUI->message("GUI:ErrorNoMoreCommandPoints");
 				return CBC_COMMAND_USED;
 			}
 			if (makeType != CANMAKE_OK)

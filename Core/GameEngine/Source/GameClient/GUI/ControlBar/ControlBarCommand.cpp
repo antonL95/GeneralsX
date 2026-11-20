@@ -1112,7 +1112,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 	{
 		if( !command->getNeededUpgrades().empty() && !HeroRoster::buttonUpgradesMet( command, player, obj ) )
 			return COMMAND_RESTRICTED;
-		const UpgradeTemplate *upgradeT = command->getUpgradeTemplate();
+		const UpgradeTemplate *upgradeT = command->getNeededUpgrades().empty() ? command->getUpgradeTemplate() : nullptr;
 		if (upgradeT)
 		{
 			// upgrades come in the form of player upgrades and object upgrades

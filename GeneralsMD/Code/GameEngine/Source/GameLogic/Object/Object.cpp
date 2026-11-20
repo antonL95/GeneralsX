@@ -69,6 +69,7 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/FiringTracker.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/HeroRoster.h"
 #include "GameLogic/Locomotor.h"
 
 #include "GameLogic/Module/AIUpdate.h"
@@ -6465,6 +6466,24 @@ Bool Object::canProduceUpgrade( const UpgradeTemplate *upgrade )
 
 	// We need to have the button to make the upgrade.  CommandSets are a weird Logic/Client hybrid.
 	const CommandSet *set = TheControlBar->findCommandSet(getCommandSetString());
+
+	if (RetailFileLayers::enabled())
+	{
+		if (!set || !upgrade)
+			return FALSE;
+		for (Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
+		{
+			const CommandButton *button = set->getCommandButton(i);
+			if (!button || button->getUpgradeTemplate() != upgrade)
+				continue;
+			const GUICommandType type = button->getCommandType();
+			if (type != GUI_COMMAND_OBJECT_UPGRADE && type != GUI_COMMAND_PLAYER_UPGRADE)
+				continue;
+			if (!BitIsSet(button->getOptions(), NEED_UPGRADE) || HeroRoster::buttonUpgradesMet(button, getControllingPlayer(), this))
+				return TRUE;
+		}
+		return FALSE;
+	}
 
 	for( Int buttonIndex = 0; buttonIndex < MAX_COMMANDS_PER_SET; buttonIndex++ )
 	{

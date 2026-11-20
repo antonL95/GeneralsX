@@ -43,6 +43,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
@@ -67,6 +68,7 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/FiringTracker.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/HeroRoster.h"
 #include "GameLogic/Locomotor.h"
 
 #include "GameLogic/Module/AIUpdate.h"
@@ -5557,13 +5559,18 @@ Bool Object::canProduceUpgrade( const UpgradeTemplate *upgrade )
 	// We need to have the button to make the upgrade.  CommandSets are a weird Logic/Client hybrid.
 	const CommandSet *set = TheControlBar->findCommandSet(getCommandSetString());
 
- 	for( Int buttonIndex = 0; buttonIndex < MAX_COMMANDS_PER_SET; buttonIndex++ )
+	const Bool retail = RetailFileLayers::enabled();
+	if (retail && !set)
+		return FALSE;
+	const Int entries = retail ? static_cast<Int>(CommandButtonRules::RETAIL_COMMANDS_PER_SET) : MAX_COMMANDS_PER_SET;
+	for (Int buttonIndex = 0; buttonIndex < entries; ++buttonIndex)
  	{
  		const CommandButton *button = set->getCommandButton(buttonIndex);
  		if( button &&
 				( (button->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE)  ||  (button->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE) ) && // Or else a button that requires an upgrade will appear the same as a button that gives an upgrade
 				button->getUpgradeTemplate() &&
-				(button->getUpgradeTemplate() == upgrade)
+				(button->getUpgradeTemplate() == upgrade) &&
+				(!retail || !BitIsSet(button->getOptions(), NEED_UPGRADE) || HeroRoster::buttonUpgradesMet(button, getControllingPlayer(), this))
 				)
  			return TRUE; // getUpgradeTemplate only returns something if it is actually an upgrade
  	}

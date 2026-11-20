@@ -265,9 +265,13 @@ void dumpProduction(const Command& command, unsigned int frame)
 		if (!production)
 			continue;
 		for (const ProductionEntry* entry = production->firstProduction(); entry; entry = production->nextProduction(entry))
+		{
+			const char* name = entry->getProductionType() == PRODUCTION_UNIT
+				? entry->getProductionObject()->getName().str() : entry->getProductionUpgrade()->getUpgradeName().str();
 			std::fprintf(stderr, "TEST production %u %s %u %s percent=%.1f exit=%d disabled=%d\n", frame, obj->getTemplate()->getName().str(),
-				static_cast<unsigned>(obj->getID()), entry->getProductionObject() && entry->getProductionType() == PRODUCTION_UNIT ? entry->getProductionObject()->getName().str() : "upgrade",
-				entry->getPercentComplete(), obj->getObjectExitInterface() ? 1 : 0, obj->isDisabled() ? 1 : 0);
+				static_cast<unsigned>(obj->getID()), name, entry->getPercentComplete(),
+				obj->getObjectExitInterface() ? 1 : 0, obj->isDisabled() ? 1 : 0);
+		}
 	}
 }
 
@@ -283,6 +287,13 @@ void dumpHud(unsigned int frame)
 		std::fprintf(stderr, "TEST hud %u slot=%d %s type=%d %s hero=%s\n", frame, slot, button->getName().str(),
 			static_cast<int>(button->getCommandType()), BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED) ? "enabled" : "disabled",
 			hero ? hero->getName().str() : "-");
+		if (hero)
+		{
+			Drawable* selected = TheInGameUI->getFirstSelectedDrawable();
+			if (selected)
+				std::fprintf(stderr, "TEST hud_make %u slot=%d %s reason=%d\n", frame, slot, hero->getName().str(),
+					static_cast<int>(TheBuildAssistant->canMakeUnit(selected->getObject(), hero)));
+		}
 	}
 }
 
@@ -639,7 +650,9 @@ void logButtons(Object* obj, const Command& command, unsigned int frame)
 	std::fprintf(stderr, "TEST frame %u: command set %s\n", frame, obj->getCommandSetString().str());
 	if (!set)
 		return;
-	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
+	Player* player = obj->getControllingPlayer();
+	const ProductionUpdateInterface* production = obj->getProductionUpdateInterface();
+	for (Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
 	{
 		const CommandButton* button = set->getCommandButton(i);
 		if (!button)
@@ -647,6 +660,17 @@ void logButtons(Object* obj, const Command& command, unsigned int frame)
 		const ThingTemplate* what = button->getThingTemplate();
 		std::fprintf(stderr, "TEST frame %u: slot %d %s type %d object %s\n", frame, i + 1, button->getName().str(),
 			static_cast<int>(button->getCommandType()), what ? what->getName().str() : "-");
+		const UpgradeTemplate* upgrade = button->getUpgradeTemplate();
+		if (upgrade && button->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE)
+		{
+			const Bool prereq = !BitIsSet(button->getOptions(), NEED_UPGRADE) || HeroRoster::buttonUpgradesMet(button, player, obj);
+			const char* reason = !prereq ? "missing-upgrade" : obj->hasUpgrade(upgrade) ? "complete"
+				: !production ? "no-producer" : production->isUpgradeInQueue(upgrade) ? "queued"
+				: !obj->affectedByUpgrade(upgrade) ? "no-effect"
+				: !TheUpgradeCenter->canAffordUpgrade(player, upgrade) ? "resources" : "available";
+			std::fprintf(stderr, "TEST upgrade_button %u %s %s reason=%s frames=%d\n", frame, button->getName().str(),
+				upgrade->getUpgradeName().str(), reason, upgrade->calcTimeToBuild(player));
+		}
 		if (what && button->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT && command.hasLocation)
 			logBuildChecks(obj, what, command, frame);
 	}
@@ -1060,6 +1084,13 @@ void execute(const Command& command, unsigned int frame)
 	else if (command.action == "buttons")
 	{
 		logButtons(obj, command, frame);
+	}
+	else if (command.action == "conditions")
+	{
+		if (const Drawable* draw = obj->getDrawable())
+			std::fprintf(stderr, "TEST conditions %u %s ivory=%d stonework=%d\n", frame, command.target.c_str(),
+				draw->getModelConditionFlags().test(MODELCONDITION_UPGRADE_IVORY_TOWER),
+				draw->getModelConditionFlags().test(MODELCONDITION_UPGRADE_NUMENOR_STONEWORK));
 	}
 	else if (command.action == "construct" && command.hasLocation)
 	{
