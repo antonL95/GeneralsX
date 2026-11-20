@@ -2855,7 +2855,7 @@ Real WaterRenderObjClass::getWaterHeight(Real x, Real y)
 		const auto &standingWater = TheTerrainRenderObject->getMap()->getStandingWater();
 		if (!standingWater.empty())
 		{
-			ICoord3D location{REAL_TO_INT_FLOOR(x + 0.5f), REAL_TO_INT_FLOOR(y + 0.5f), 0};
+			ICoord3D location{static_cast<Int>(REAL_TO_INT_FLOOR(x + 0.5f)), static_cast<Int>(REAL_TO_INT_FLOOR(y + 0.5f)), 0};
 			Real height = INVALID_WATER_HEIGHT;
 			for (const auto &polygon : standingWater)
 				if (polygon->pointInTrigger(location))
