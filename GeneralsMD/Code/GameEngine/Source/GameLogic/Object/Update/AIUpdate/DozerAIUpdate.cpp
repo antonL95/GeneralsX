@@ -2701,7 +2701,7 @@ void DozerAIUpdate::aiDoCommand(const AICommandParms* parms)
 		default:
 		{
 			if( usesRetailBuilder(this) &&
-				(parms->m_cmdSource == CMD_FROM_SCRIPT || parms->m_cmdSource == CMD_FROM_AI) &&
+				parms->m_cmdSource == CMD_FROM_SCRIPT &&
 				isTaskPending( DOZER_TASK_BUILD ) )
 				cancelTask( DOZER_TASK_BUILD );
 
