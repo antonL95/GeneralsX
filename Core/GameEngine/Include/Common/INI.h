@@ -195,6 +195,8 @@ public:
 	// Load one specific INI file by name.
 	// Throws if the INI file is not found or is not read correctly.
 	UnsignedInt load( AsciiString filename, INILoadType loadType, Xfer *pXfer );
+	UnsignedInt load( AsciiString filename, INILoadType loadType, Xfer *pXfer,
+		const char *extraBlockToken, INIBlockParse extraBlockParse );
 
 	UnsignedInt loadText( AsciiString name, const char *text, INILoadType loadType,
 		const char *extraBlockToken, INIBlockParse extraBlockParse );

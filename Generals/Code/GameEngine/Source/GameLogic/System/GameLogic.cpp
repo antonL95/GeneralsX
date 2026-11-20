@@ -101,6 +101,7 @@
 #include "GameLogic/CaveSystem.h"
 #include "GameLogic/CrateSystem.h"
 #include "GameLogic/FPUControl.h"
+#include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
@@ -454,6 +455,7 @@ void GameLogic::init()
 void GameLogic::reset()
 {
 	CastleTemplates::reset();
+	ExperienceLevelStore::reset();
 	m_thingTemplateBuildableOverrides.clear();
 	m_controlBarOverrides.clear();
 
@@ -3455,6 +3457,8 @@ void GameLogic::update()
 	{
 		processCommandList( TheCommandList );
 	}
+
+	ExperienceLevelStore::update();
 
 #ifdef ALLOW_NONSLEEPY_UPDATES
 	{

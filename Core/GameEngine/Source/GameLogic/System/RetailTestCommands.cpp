@@ -46,6 +46,8 @@
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/BehaviorModule.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
+#include "Common/SpecialPower.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/UpgradeModule.h"
 #include "GameLogic/Locomotor.h"
@@ -1177,6 +1179,17 @@ void execute(const Command& command, unsigned int frame)
 			obj->giveUpgrade(upgrade);
 		std::fprintf(stderr, "TEST frame %u: objupgrade %s on object %u found=%d\n", frame, command.structure.c_str(),
 			static_cast<unsigned>(obj->getID()), upgrade != nullptr);
+	}
+	else if (command.action == "powers")
+	{
+		for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+		{
+			const SpecialPowerModuleInterface* power = (*module)->getSpecialPower();
+			if (power && power->getSpecialPowerTemplate())
+				std::fprintf(stderr, "TEST power %u object %u %s ready=%d percent=%.3f\n", frame,
+					static_cast<unsigned>(obj->getID()), power->getSpecialPowerTemplate()->getName().str(), power->isReady(),
+					power->getPercentReady());
+		}
 	}
 	else if (command.action == "fund")
 	{

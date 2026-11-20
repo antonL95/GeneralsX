@@ -9,6 +9,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/HeightMapSamplesTest.cpp
     GameEngine/Common/HordeFormationTest.cpp
     GameEngine/Common/CastleRulesTest.cpp
+    GameEngine/Common/ExperienceLevelRulesTest.cpp
     GameEngine/Common/RotwkLocomotorRulesTest.cpp
     GameEngine/Common/TerrainResourceRulesTest.cpp
     GameEngine/Common/CommandButtonRulesTest.cpp

@@ -556,6 +556,19 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 	return parsePreparedFile(filename);
 }
 
+UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer,
+	const char *extraBlockToken, INIBlockParse extraBlockParse )
+{
+	const RetailLoadScope retailLoad(filename);
+	setFPMode();
+
+	s_xfer = pXfer;
+	prepFile(filename, loadType);
+	m_extraBlockToken = extraBlockToken;
+	m_extraBlockParse = extraBlockParse;
+	return parsePreparedFile(filename);
+}
+
 UnsignedInt INI::loadText( AsciiString name, const char *text, INILoadType loadType,
 	const char *extraBlockToken, INIBlockParse extraBlockParse )
 {

@@ -37,6 +37,7 @@
 #include "Common/MapObject.h"
 #include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
+#include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "Common/Player.h"
@@ -355,6 +356,7 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 	ThePartitionManager->registerObject( obj );
 
 	obj->initObject();
+	ExperienceLevelStore::onObjectCreated(obj);
 
 	return obj;
 

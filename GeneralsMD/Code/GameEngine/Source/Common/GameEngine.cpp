@@ -50,6 +50,7 @@
 #include "Common/ArchiveFileSystem.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/ExperienceLevelStore.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/RandomValue.h"
@@ -856,6 +857,7 @@ void GameEngine::init()
 
 		TheNameKeyGenerator->dumpIfRequested("thingFactory");
 		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
+		ExperienceLevelStore::load();
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), nullptr);
 		TheNameKeyGenerator->dumpIfRequested("gameClient");
 
