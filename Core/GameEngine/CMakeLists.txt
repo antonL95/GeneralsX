@@ -67,6 +67,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/AISpecialPowerUpdate.h
     Include/GameLogic/Module/RotwkParseOnlyModules.h
     Include/Common/INIAudit.h
+    Include/Common/INIBlockStructure.h
     Include/Common/ZeroHourUpgradeMaskLayout.h
     Include/Common/INIRetailTolerance.h
     Include/Common/HordeFormation.h
@@ -627,6 +628,7 @@ set(GAMEENGINE_SRC
 #    Source/Common/GlobalData.cpp
     Source/Common/INI/INI.cpp
     Source/Common/INI/INIAudit.cpp
+    Source/Common/INI/INIBlockStructure.cpp
     Source/Common/INI/INIRetailTolerance.cpp
     Source/Common/INI/INIPreprocessor.cpp
     Source/Common/INI/INIAiData.cpp

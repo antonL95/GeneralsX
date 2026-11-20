@@ -22,37 +22,6 @@ std::string reportPath()
 }
 }
 
-TEST(INIAudit, TrimsAndMeasuresIndentationWithTabStops)
-{
-	EXPECT_EQ(INIAudit::trim("  Object Foo \r"), "Object Foo");
-	EXPECT_EQ(INIAudit::trim("   "), "");
-	EXPECT_EQ(INIAudit::indentation("    Behavior = X"), 4u);
-	EXPECT_EQ(INIAudit::indentation("\tBehavior = X"), 4u);
-	EXPECT_EQ(INIAudit::indentation("  \tEnd"), 4u);
-	EXPECT_EQ(INIAudit::indentation("\t\tEnd"), 8u);
-	EXPECT_EQ(INIAudit::indentation("Object Foo"), 0u);
-}
-
-TEST(INIAudit, SkippedBlockClosesOnEndAtOrAboveTheHeaderIndentation)
-{
-	EXPECT_TRUE(INIAudit::closesSkippedBlock("\tEnd", 4));
-	EXPECT_TRUE(INIAudit::closesSkippedBlock("End", 4));
-	EXPECT_TRUE(INIAudit::closesSkippedBlock("    END  ", 4));
-	EXPECT_FALSE(INIAudit::closesSkippedBlock("\t\tEnd", 4));
-	EXPECT_FALSE(INIAudit::closesSkippedBlock("\tEndOfLine = 1", 4));
-	EXPECT_FALSE(INIAudit::closesSkippedBlock("", 4));
-}
-
-TEST(INIAudit, DetectsANestedBlockFromTheNextNonBlankLine)
-{
-	const std::string text = "\n  \n\t\tDamage = 10\n\tEnd\n";
-	EXPECT_TRUE(INIAudit::nextLineIsDeeper(text.data(), 0, text.size(), 4));
-	EXPECT_FALSE(INIAudit::nextLineIsDeeper(text.data(), 0, text.size(), 8));
-	const std::string flat = "\tDamage = 10\n";
-	EXPECT_FALSE(INIAudit::nextLineIsDeeper(flat.data(), 0, flat.size(), 4));
-	EXPECT_FALSE(INIAudit::nextLineIsDeeper(flat.data(), flat.size(), flat.size(), 0));
-}
-
 TEST(INIAudit, FormatsOneTabSeparatedLinePerRecord)
 {
 	EXPECT_EQ(INIAudit::formatRecord("field", "Object  Foo", "  Side\t= Men ", "Data\\INI\\A.ini", 12),

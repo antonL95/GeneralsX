@@ -900,7 +900,7 @@ void ControlBarSchemeManager::parseAnimatingPart(INI *ini, void *instance, void*
 	static const FieldParse myFieldParse[] =
 		{
 			{ "Name",						INI::parseAsciiString,		nullptr, offsetof( ControlBarSchemeAnimation, m_name ) },
-      { "Animation",			INI::parseLookupList,			AnimTypeNames, offsetof( ControlBarSchemeAnimation, m_animType ) },
+      { "Animation",			INI::parseLookupList,			AnimTypeNames, offsetof( ControlBarSchemeAnimation, m_animType ), true },
 			{ "Duration",				INI::parseDurationUnsignedInt,			nullptr, offsetof( ControlBarSchemeAnimation, m_animDuration ) },
 			{ "FinalPos",				INI::parseICoord2D,			nullptr, offsetof( ControlBarSchemeAnimation, m_finalPos ) },
 			{ "ImagePart",			ControlBarSchemeManager::parseAnimatingPartImage,	nullptr, 0 },

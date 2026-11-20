@@ -386,7 +386,7 @@ void ThingFactory::parseObjectDefinition( INI* ini, const AsciiString& name, con
 			if (INIAudit::isEnabled())
 			{
 				INIAudit::record("error", std::string("ChildObject parent not found: ") + sourceName.str(), ini->getFilename().str(), ini->getLineNum());
-				ini->skipBlockForAudit();
+				ini->skipBlock("ChildObject");
 				return;
 			}
 			DEBUG_CRASH(("ChildObject must come after the original Object (%s, %s).", sourceName.str(), name.str()));

@@ -35,6 +35,7 @@
 #include "Common/INI.h"
 #include "GameLogic/BfmeMapScripts.h"
 #include "Common/INIAudit.h"
+#include "Common/INIBlockStructure.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/INIException.h"
 #include "Common/INILegacyLines.h"
@@ -519,29 +520,15 @@ static INIBlockParse findBlockParse(const char* token)
 }
 
 //-------------------------------------------------------------------------------------------------
-static INIFieldParseProc findFieldParse(const FieldParse* parseTable, const char* token, int& offset, const void*& userData)
+static const FieldParse* findFieldParse(const FieldParse* parseTable, const char* token)
 {
 	const FieldParse* parse = parseTable;
 	for (; parse->token; ++parse)
 	{
 		if (strcmp( parse->token, token ) == 0)
-		{
-			offset = parse->offset;
-			userData = parse->userData;
-			return parse->parse;
-		}
+			return parse;
 	}
-
-	if (!parse->token && parse->parse)
-	{
-		offset = parse->offset;
-		userData = token;
-		return parse->parse;
-	}
-	else
-	{
-		return nullptr;
-	}
+	return parse->parse ? parse : nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -578,6 +565,12 @@ UnsignedInt INI::loadText( AsciiString name, const char *text, INILoadType loadT
 	return parsePreparedFile(name);
 }
 
+static Bool auditBlockRanges()
+{
+	static const char* enabled = std::getenv("GENERALSX_INI_AUDIT_RANGES");
+	return enabled && *enabled;
+}
+
 UnsignedInt INI::parsePreparedFile( AsciiString filename )
 {
 	try
@@ -589,6 +582,7 @@ UnsignedInt INI::parsePreparedFile( AsciiString filename )
 		Bool resync = FALSE;
 		const Bool audit = INIAudit::isEnabled();
 		const Bool retail = RetailFileLayers::enabled() && !audit;
+		const Bool traceRanges = audit && auditBlockRanges();
 		while( m_endOfFile == FALSE )
 		{
 			lineCount++;
@@ -616,13 +610,13 @@ UnsignedInt INI::parsePreparedFile( AsciiString filename )
 						continue;
 					resync = FALSE;
 				}
+				const UnsignedInt blockLine = getLineNum();
 				if (parse)
 				{
 					#ifdef DEBUG_CRASHING
 					static_assert(ARRAY_SIZE(m_curBlockStart) >= ARRAY_SIZE(m_buffer), "Incorrect array size");
 					strcpy(m_curBlockStart, m_buffer);
 					#endif
-					const UnsignedInt blockLine = getLineNum();
 					const std::string blockName = retail ? token : "";
 					try {
 						INIAudit::Scope auditScope(currentLine.str());
@@ -656,6 +650,14 @@ UnsignedInt INI::parsePreparedFile( AsciiString filename )
 							throw INIException(buff);
 						}
 					}
+					if ((audit || retail) && blockLine == getLineNum())
+					{
+						INIBlockStructure::LineHead head;
+						if (INIBlockStructure::parseLineHead(currentRawLineView(), head) &&
+							!INIBlockStructure::isSingleLineTopLevel(head.keyword))
+							skipBlock(nullptr);
+						resync = FALSE;
+					}
 					#ifdef DEBUG_CRASHING
 						strcpy(m_curBlockStart, "NO_BLOCK");
 					#endif
@@ -663,11 +665,10 @@ UnsignedInt INI::parsePreparedFile( AsciiString filename )
 				else if (audit || retail)
 				{
 					recordSkipped("block", token);
-					if (retail && INIRetailTolerance::hasIndentedBlockEnd({m_readBuffer, m_readBufferUsed}, m_readBufferNext,
-						INIAudit::indentation(currentRawLine())))
-						skipBlockForAudit();
-					else
-						resync = TRUE;
+					INIBlockStructure::LineHead head;
+					if (INIBlockStructure::parseLineHead(currentRawLineView(), head) &&
+						!INIBlockStructure::isEnd(head) && !INIBlockStructure::isSingleLineTopLevel(head.keyword))
+						skipBlock(token);
 				}
 				else
 				{
@@ -676,6 +677,8 @@ UnsignedInt INI::parsePreparedFile( AsciiString filename )
 					throw INI_UNKNOWN_TOKEN;
 				}
 
+				if (traceRanges)
+					INIAudit::recordWithContext("block-range", currentLine.str(), std::to_string(getLineNum()), m_filename.str(), blockLine);
 			}
 
 		}
@@ -721,25 +724,23 @@ Bool INI::skipBlockWithoutOwner(const void* owner, const char* blockType)
 		INIAudit::record("order", std::string(blockType) + " parsed before the subsystem that owns it exists", m_filename.str(), getLineNum());
 	else
 		recordSkipped("order", blockType);
-	skipBlockForAudit();
+	skipBlock(blockType);
 	return TRUE;
+}
+
+std::string_view INI::currentRawLineView() const
+{
+	if (m_readBuffer == nullptr || m_readBufferNext < m_lineStart)
+		return {};
+	std::string_view line(m_readBuffer + m_lineStart, m_readBufferNext - m_lineStart);
+	while (!line.empty() && (line.back() == '\n' || line.back() == '\r'))
+		line.remove_suffix(1);
+	return line;
 }
 
 std::string INI::currentRawLine() const
 {
-	if (m_readBuffer == nullptr || m_readBufferNext < m_lineStart)
-		return std::string();
-	std::string line(m_readBuffer + m_lineStart, m_readBufferNext - m_lineStart);
-	while (!line.empty() && (line.back() == '\n' || line.back() == '\r'))
-		line.pop_back();
-	return line;
-}
-
-Bool INI::nextLineOpensBlockForAudit() const
-{
-	if (m_readBuffer == nullptr)
-		return FALSE;
-	return INIAudit::nextLineIsDeeper(m_readBuffer, m_readBufferNext, m_readBufferUsed, INIAudit::indentation(currentRawLine()));
+	return std::string(currentRawLineView());
 }
 
 std::string INI::readRawBlock(const char* endToken, const char* const* nestedBlocks)
@@ -767,21 +768,56 @@ std::string INI::readRawBlock(const char* endToken, const char* const* nestedBlo
 				}
 			}
 		}
-		body += currentRawLine();
+		body += currentRawLineView();
 		body += '\n';
 	}
 	throw INI_MISSING_END_TOKEN;
 }
 
-void INI::skipBlockForAudit()
+Bool INI::readBlockBody(const char* enclosing, std::string* body)
 {
-	const std::size_t headerIndentation = INIAudit::indentation(currentRawLine());
-	while (m_endOfFile == FALSE)
+	INIBlockStructure::BlockEnd block(enclosing);
+	while (!isEOF())
 	{
 		readLine();
-		if (INIAudit::closesSkippedBlock(currentRawLine(), headerIndentation))
-			return;
+		const auto line = currentRawLineView();
+		if (block.consume(line))
+			return TRUE;
+		if (body)
+		{
+			*body += line;
+			*body += '\n';
+		}
 	}
+	return FALSE;
+}
+
+std::string INI::readStructuredBlock(const char* enclosing)
+{
+	std::string body;
+	if (!readBlockBody(enclosing, &body))
+		throw INI_MISSING_END_TOKEN;
+	return body;
+}
+
+void INI::skipBlock(const char* enclosing)
+{
+	const auto header = currentRawLineView();
+	INIBlockStructure::LineHead head{};
+	INIBlockStructure::parseLineHead(header, head);
+	const std::string keyword(enclosing ? std::string_view(enclosing) : head.keyword);
+	const UnsignedInt headerLine = getLineNum();
+	if (readBlockBody(keyword.c_str(), nullptr))
+	{
+		if (INIAudit::isEnabled() && auditBlockRanges())
+			INIAudit::recordWithContext("skip-range", std::string(header), std::to_string(getLineNum()), m_filename.str(), headerLine);
+		return;
+	}
+
+	if (INIAudit::isEnabled())
+		INIAudit::record("missing-end", std::string(header), m_filename.str(), headerLine);
+	else
+		recordSkipped("missing-end", keyword.c_str());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1851,6 +1887,9 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 	Bool done = FALSE;
 	const Bool audit = INIAudit::isEnabled();
 	const Bool retail = RetailFileLayers::enabled() && !audit;
+	INIBlockStructure::LineHead enclosing{};
+	if (audit || retail)
+		INIBlockStructure::parseLineHead(currentRawLineView(), enclosing);
 
 	if( what == nullptr )
 	{
@@ -1865,6 +1904,7 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 		// read next line
 		readLine();
 		const std::string auditLine = audit ? std::string(m_buffer) : std::string();
+		const auto rawLine = (audit || retail) ? currentRawLineView() : std::string_view{};
 
 		// check for end token
 		const char* field = strtok( m_buffer, INI::getSeps() );
@@ -1880,17 +1920,17 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 				Bool found = false;
 				for (int ptIdx = 0; ptIdx < parseTableList.getCount(); ++ptIdx)
 				{
-					int offset = 0;
-					const void* userData = nullptr;
-					INIFieldParseProc parse = findFieldParse(parseTableList.getNthFieldParse(ptIdx), field, offset, userData);
-					if (parse)
+					const FieldParse* fieldParse = findFieldParse(parseTableList.getNthFieldParse(ptIdx), field);
+					if (fieldParse && fieldParse->parse)
 					{
 						// parse this block and check for parse errors
 						const UnsignedInt fieldLine = getLineNum();
 						const std::string fieldName = retail ? field : "";
+						Bool failed = FALSE;
 						try {
 							INIAudit::Scope auditScope(auditLine.c_str());
-							(*parse)( this, what, (char *)what + offset + parseTableList.getNthExtraOffset(ptIdx), userData );
+							const void* userData = fieldParse->token ? fieldParse->userData : field;
+							fieldParse->parse(this, what, (char*)what + fieldParse->offset + parseTableList.getNthExtraOffset(ptIdx), userData);
 						} catch (const INIException& error) {
 							if (!audit && !retail)
 								throw;
@@ -1898,27 +1938,29 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 								INIAudit::record("field-error", auditLine + " | " + (error.mFailureMessage ? error.mFailureMessage : ""), m_filename.str(), fieldLine);
 							else
 								recordSkipped("field-error", fieldName.c_str());
+							failed = TRUE;
 						} catch (...) {
 							if (audit)
-							{
 								INIAudit::record("field-error", auditLine, m_filename.str(), fieldLine);
-								found = true;
-								break;
-							}
-							if (retail && isINIParseError())
-							{
+							else if (retail && isINIParseError())
 								recordSkipped("field-error", fieldName.c_str());
-								found = true;
-								break;
+							else
+							{
+								DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Error reading field '%s' of block '%s'",
+																	 INI::getLineNum(), INI::getFilename().str(), field, m_curBlockStart) );
+								char buff[1024];
+								snprintf(buff, ARRAY_SIZE(buff), "[LINE: %d - FILE: '%s'] Error reading field '%s'\n",
+									INI::getLineNum(), INI::getFilename().str(), field);
+								throw INIException(buff);
 							}
-							DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Error reading field '%s' of block '%s'",
-																 INI::getLineNum(), INI::getFilename().str(), field, m_curBlockStart) );
-
-
-							char buff[1024];
-							snprintf(buff, ARRAY_SIZE(buff), "[LINE: %d - FILE: '%s'] Error reading field '%s'\n",
-								INI::getLineNum(), INI::getFilename().str(), field);
-							throw INIException(buff);
+							failed = TRUE;
+						}
+						if (failed && !fieldParse->isScalar && fieldLine == getLineNum())
+						{
+							INIBlockStructure::LineHead head;
+							if (INIBlockStructure::parseLineHead(rawLine, head) &&
+								(!INIBlockStructure::opensRawBlock(head).empty() || INIBlockStructure::opensBlock(head, enclosing.keyword)))
+								skipBlock(nullptr);
 						}
 
 						found = true;
@@ -1929,11 +1971,12 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 
 				if (!found && (audit || retail))
 				{
-					const Bool nested = nextLineOpensBlockForAudit() && (audit ||
-						INIRetailTolerance::hasIndentedBlockEnd({m_readBuffer, m_readBufferUsed}, m_readBufferNext, INIAudit::indentation(currentRawLine())));
+					INIBlockStructure::LineHead head;
+					const Bool nested = INIBlockStructure::parseLineHead(rawLine, head) &&
+						(!INIBlockStructure::opensRawBlock(head).empty() || INIBlockStructure::opensBlock(head, enclosing.keyword));
 					recordSkipped(nested ? "subblock" : "field", field);
 					if (nested)
-						skipBlockForAudit();
+						skipBlock(nullptr);
 					found = true;
 				}
 				if (!found)
@@ -1949,12 +1992,10 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 		// sanity check for reaching end of file with no closing end token
 		if( done == FALSE && INI::isEOF() == TRUE )
 		{
-
-			done = TRUE;
-			DEBUG_CRASH( ("Error parsing block '%s', in INI file '%s'.  Missing '%s' token",
-												 m_curBlockStart, getFilename().str(), getEndToken()) );
+			if (!audit && !retail)
+				DEBUG_CRASH( ("Error parsing block '%s', in INI file '%s'.  Missing '%s' token",
+													 m_curBlockStart, getFilename().str(), getEndToken()) );
 			throw INI_MISSING_END_TOKEN;
-
 		}
 
 	}

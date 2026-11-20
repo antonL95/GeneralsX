@@ -228,7 +228,7 @@ public:
       { "DecayAt",        INI::parseReal,             nullptr, offsetof( TracerFXNugget, m_decayAt ) },
       { "Length",					INI::parseReal,             nullptr, offsetof( TracerFXNugget, m_length ) },
       { "Width",					INI::parseReal,             nullptr, offsetof( TracerFXNugget, m_width ) },
-      { "Color",					INI::parseRGBColor,					nullptr, offsetof( TracerFXNugget, m_color ) },
+      { "Color",					INI::parseRGBColor,					nullptr, offsetof( TracerFXNugget, m_color ), true },
       { "Probability",		INI::parseReal,             nullptr, offsetof( TracerFXNugget, m_probability ) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
@@ -361,7 +361,7 @@ public:
 	{
 		static const FieldParse myFieldParse[] =
 		{
-			{ "Color",						INI::parseRGBColor,								nullptr, offsetof( LightPulseFXNugget, m_color ) },
+			{ "Color",						INI::parseRGBColor,								nullptr, offsetof( LightPulseFXNugget, m_color ), true },
 			{ "Radius",						INI::parseReal,										nullptr, offsetof( LightPulseFXNugget, m_radius ) },
 			{ "RadiusAsPercentOfObjectSize",		INI::parsePercentToReal,	nullptr, offsetof( LightPulseFXNugget, m_boundingCirclePct ) },
 			{ "IncreaseTime",			INI::parseDurationUnsignedInt,	nullptr, offsetof( LightPulseFXNugget, m_increaseFrames ) },

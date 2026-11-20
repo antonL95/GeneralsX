@@ -46,47 +46,6 @@ std::string INIAudit::trim(const std::string& text)
 	const std::size_t end = text.find_last_not_of(" \t\r\n");
 	return text.substr(begin, end - begin + 1);
 }
-
-std::size_t INIAudit::indentation(const std::string& line)
-{
-	std::size_t column = 0;
-	for (char c : line)
-	{
-		if (c == ' ')
-			++column;
-		else if (c == '\t')
-			column = (column / TAB_WIDTH + 1) * TAB_WIDTH;
-		else
-			break;
-	}
-	return column;
-}
-
-bool INIAudit::closesSkippedBlock(const std::string& line, std::size_t headerIndentation)
-{
-	const std::string text = trim(line);
-	if (text.size() != 3)
-		return false;
-	if ((text[0] != 'E' && text[0] != 'e') || (text[1] != 'N' && text[1] != 'n') || (text[2] != 'D' && text[2] != 'd'))
-		return false;
-	return indentation(line) <= headerIndentation;
-}
-
-bool INIAudit::nextLineIsDeeper(const char* buffer, std::size_t next, std::size_t used, std::size_t currentIndentation)
-{
-	while (next < used)
-	{
-		std::size_t end = next;
-		while (end < used && buffer[end] != '\n')
-			++end;
-		const std::string line(buffer + next, end - next);
-		if (!trim(line).empty())
-			return indentation(line) > currentIndentation;
-		next = end + 1;
-	}
-	return false;
-}
-
 std::string INIAudit::sanitize(const std::string& text)
 {
 	std::string clean;

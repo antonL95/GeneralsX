@@ -31,6 +31,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 #include "GameClient/MapUtil.h"
 #include "GameClient/GameText.h"
 #include "GameNetwork/NetworkDefs.h"
@@ -145,7 +146,7 @@ static const FieldParse retailMapFields[] =
 	}, nullptr, 0 },
 	{ "PlayerPosition", [](INI* ini, void*, void*, const void*) {
 		ini->getNextToken();
-		ini->readRawBlock("End");
+		ini->skipBlock("PlayerPosition");
 	}, nullptr, 0 },
 	{ nullptr, nullptr, nullptr, 0 }
 };
@@ -165,7 +166,7 @@ void INI::parseMapCacheDefinition( INI* ini )
 
 	MultiIniFieldParse fields;
 	fields.add(mdr.getFieldParse());
-	if (RetailFileLayers::enabled())
+	if (INIAudit::isEnabled() || RetailFileLayers::enabled())
 		fields.add(retailMapFields);
 	ini->initFromINIMulti(&mdr, fields);
 

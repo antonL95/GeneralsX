@@ -137,7 +137,7 @@ void W3DScriptedModelDrawModuleData::parseModelState(INI* ini, void* instance, v
 	{
 		std::vector<FieldParse> result;
 		for (const FieldParse* field = conditionStateParseTable(); field->token; ++field)
-			result.push_back({ field->token, parseModelDrawField, field, offsetof(ModelState, draw) });
+			result.push_back({ field->token, parseModelDrawField, field, offsetof(ModelState, draw), field->isScalar });
 		result.push_back({ nullptr, nullptr, nullptr, 0 });
 		return result;
 	}();
@@ -350,7 +350,8 @@ void W3DScriptedModelDrawModuleData::parseLuaEvent(INI* ini, void*, void* store,
 
 void W3DScriptedModelDrawModuleData::parseScript(INI* ini, void*, void* store, const void*)
 {
-	*static_cast<std::string*>(store) = ini->readRawBlock("EndScript");
+	*static_cast<std::string*>(store) = ModuleFactory::registersRotwkModules() ?
+		ini->readStructuredBlock("BeginScript") : ini->readRawBlock("EndScript");
 }
 
 void W3DScriptedModelDrawModuleData::parseRandomTexture(INI* ini, void*, void* store, const void*)

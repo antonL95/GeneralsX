@@ -1455,7 +1455,7 @@ const FieldParse* W3DModelDrawModuleData::conditionStateParseTable()
 		{ "WeaponMuzzleFlash", parseWeaponBoneName, nullptr, offsetof(ModelConditionInfo, m_weaponMuzzleFlashName[0]) },
 		{ "WeaponLaunchBone", parseWeaponBoneName, nullptr, offsetof(ModelConditionInfo, m_weaponProjectileLaunchBoneName[0]) },
 		{ "WeaponHideShowBone", parseWeaponBoneName, nullptr, offsetof(ModelConditionInfo, m_weaponProjectileHideShowName[0]) },
-		{ "Animation", parseAnimation, (void*)ANIM_NORMAL, offsetof(ModelConditionInfo, m_animations) },
+		{ "Animation", parseAnimation, (void*)ANIM_NORMAL, offsetof(ModelConditionInfo, m_animations), true },
 		{ "IdleAnimation", parseAnimation, (void*)ANIM_IDLE, offsetof(ModelConditionInfo, m_animations) },
 		{ "AnimationMode", INI::parseIndexList, TheAnimModeNames, offsetof(ModelConditionInfo, m_mode) },
 		{ "TransitionKey", parseLowercaseNameKey, nullptr, offsetof(ModelConditionInfo, m_transitionKey) },

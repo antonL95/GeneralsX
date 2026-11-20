@@ -54,7 +54,7 @@ const FieldParse UiFrame::s_fieldParseTable[] =
 	{ "CornerScale", UiFrame::parseCornerScale, nullptr, 0 },
 	{ "Edges", UiFrame::parseEdges, nullptr, 0 },
 	{ "Center", UiFrame::parseCenter, nullptr, 0 },
-	{ "Color", UiFrame::parseColor, nullptr, 0 },
+	{ "Color", UiFrame::parseColor, nullptr, 0, true },
 	{ nullptr, nullptr, nullptr, 0 }
 };
 

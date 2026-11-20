@@ -18,10 +18,14 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <limits>
+#include <vector>
 #include <gtest/gtest.h>
 
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
+#include "Common/INIException.h"
 
 TEST(INI, OversizedIntegersMatchLegacyParser)
 {
@@ -119,4 +123,48 @@ TEST(INI, InvalidRealsAreRejected)
 		Real legacy;
 		EXPECT_NE(std::sscanf(token, "%f", &legacy), 1);
 	}
+}
+
+TEST(INI, AuditRecoveryKeepsFollowingBlocksAndFields)
+{
+	static std::vector<Int> values;
+	values.clear();
+	const auto parseFixture = [](INI* ini) {
+		static const FieldParse fields[] = {
+			{"Value", INI::parseInt, nullptr, 0},
+			{"Behavior", [](INI*, void*, void*, const void*) { throw INI_INVALID_DATA; }, nullptr, 0},
+			{"Color", [](INI*, void*, void*, const void*) { throw INIException("Invalid color"); }, nullptr, 0, true},
+			{"Draw", [](INI* parser, void*, void*, const void*) {
+				parser->recordSkipped("module", parser->getNextToken());
+				parser->skipBlock("Draw");
+			}, nullptr, 0},
+			{nullptr, nullptr, nullptr, 0}
+		};
+		Int value = 0;
+		ini->initFromINI(&value, fields);
+		values.push_back(value);
+	};
+
+	const std::string report = testing::TempDir() + "ini_structure_recovery.tsv";
+	INIAudit::open(report.c_str());
+	if (!INIAudit::isEnabled())
+	{
+		INIAudit::close();
+		FAIL() << "Could not open " << report;
+	}
+
+	INI ini;
+	EXPECT_NO_THROW(ini.loadText("fixture.ini",
+		"EvaEventForwardReference Example\n"
+		"UnknownTopLevel Test\n"
+		"AnimationState = A\nBeginScript\nend\nEndScript\nEnd\nEnd\n"
+		"Fixture First\n"
+		"Draw = UnknownModule Tag\nModelConditionState = DYING\nEnd\nEnd\n"
+		"Behavior = BadModule Tag\nEnd StateName = X\n"
+		"Color =\nNeededUpgrade = Upgrade_X\n  Value = 11\n"
+		"End\n"
+		"Fixture Second\nValue = 22\nEnd\n", INI_LOAD_OVERWRITE, "Fixture", parseFixture));
+	INIAudit::close();
+	std::remove(report.c_str());
+	EXPECT_EQ(values, (std::vector<Int>{11, 22}));
 }

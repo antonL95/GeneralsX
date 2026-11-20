@@ -31,6 +31,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include <stddef.h>	// for offsetof, which we don't use but everyone who includes us does
+#include <string_view>
 #include "Common/STLTypedefs.h"
 #include "Common/AsciiString.h"
 #include "Common/GameCommon.h"
@@ -116,6 +117,7 @@ struct FieldParse
 	INIFieldParseProc		parse;						///< the parse function
 	const void*					userData;					///< field-specific data
 	Int									offset;						///< offset to data field
+	bool isScalar = false;
 
 	void set(const char* t, INIFieldParseProc p, const void* u, Int o)
 	{
@@ -123,6 +125,7 @@ struct FieldParse
 		parse = p;
 		userData = u;
 		offset = o;
+		isScalar = false;
 	}
 };
 
@@ -276,12 +279,12 @@ public:
 	void initFromINI( void *what, const FieldParse* parseTable );
 	void initChildObject( void *what, const FieldParse* parseTable );
 	void initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList );
-	void skipBlockForAudit();
+	void skipBlock(const char* enclosing);
 	void recordSkipped(const char* kind, const char* detail) const;
 	static void finishRetailStartupLoad();
-	Bool nextLineOpensBlockForAudit() const;
 	std::string currentRawLine() const;
 	std::string readRawBlock(const char* endToken, const char* const* nestedBlocks = nullptr);
+	std::string readStructuredBlock(const char* enclosing);
 	Bool skipBlockWithoutOwner(const void* owner, const char* blockType);
 	void initFromINIMultiProc( void *what, BuildMultiIniFieldProc proc );
 
@@ -419,6 +422,8 @@ protected:
 	void unPrepFile();
 
 	void readLine();
+	std::string_view currentRawLineView() const;
+	Bool readBlockBody(const char* enclosing, std::string* body);
 
 	char* m_readBuffer;                       ///< internal read buffer
 	unsigned m_readBufferNext;                ///< next char in read buffer

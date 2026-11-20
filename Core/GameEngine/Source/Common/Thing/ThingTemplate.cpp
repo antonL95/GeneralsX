@@ -131,7 +131,6 @@ const char* const clientBehaviorNames[] = {
 	"ModelConditionSoundSelectorClientBehavior", "RandomSoundSelectorClientBehavior",
 	"TerrainResourceClientBehavior", "UpgradeSoundSelectorClientBehavior", nullptr
 };
-const char* const clientBehaviorBlocks[] = { "SoundState", "SoundUpgrade", "UnitSpecificSounds", nullptr };
 
 const INIFieldParseProc geometryMajorRadius = GeometryInfo::parseGeometryMajorRadius;
 const INIFieldParseProc geometryMinorRadius = GeometryInfo::parseGeometryMinorRadius;
@@ -588,7 +587,13 @@ void ThingTemplate::parseClientBehavior(INI* ini, void* instance, void*, const v
 	entry.name = ini->getNextToken();
 	entry.tag = ini->getNextToken();
 	const UnsignedInt line = ini->getLineNum();
-	entry.iniBody = ini->readRawBlock(ini->getEndToken(), clientBehaviorBlocks);
+	if (INIAudit::isEnabled() || RetailFileLayers::enabled())
+		entry.iniBody = ini->readStructuredBlock("ClientBehavior");
+	else
+	{
+		const char* const legacyBlocks[] = {"SoundState", "SoundUpgrade", "UnitSpecificSounds", nullptr};
+		entry.iniBody = ini->readRawBlock(ini->getEndToken(), legacyBlocks);
+	}
 	if (INIAudit::isEnabled())
 		INIAudit::record("module", entry.name.str(), ini->getFilename().str(), line);
 	else
@@ -873,7 +878,7 @@ static Bool skipInvalidModule(INI* ini, const char* detail)
 		return FALSE;
 
 	ini->recordSkipped("field-error", detail);
-	ini->skipBlockForAudit();
+	ini->skipBlock(nullptr);
 	return TRUE;
 }
 
@@ -907,7 +912,7 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 		!TheModuleFactory->isModuleKnown(tokenStr, type == 999 ? MODULETYPE_BEHAVIOR : type))
 	{
 		ini->recordSkipped("module", tokenStr.str());
-		ini->skipBlockForAudit();
+		ini->skipBlock(nullptr);
 		return;
 	}
 
