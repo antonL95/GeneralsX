@@ -58,6 +58,8 @@ static void drawFramerateBar();
 #include "Common/HordeFormation.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/MapObject.h"
+#include "Common/MapReaderWriterInfo.h"
 #include "Common/PerfTimer.h"
 #include "Common/FileSystem.h"
 #include "Common/LocalFileSystem.h"
@@ -68,6 +70,7 @@ static void drawFramerateBar();
 #include "Common/DrawModule.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "W3DDevice/GameClient/Module/W3DFloorDraw.h"
+#include "W3DDevice/GameClient/Module/W3DTreeDraw.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 
@@ -128,6 +131,7 @@ static void drawFramerateBar();
 #include "GameLogic/GameLogic.h"
 #ifdef DUMP_PERF_STATS
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/TerrainLogic.h"
 #endif
 
 #include "WinMain.h"
@@ -2164,6 +2168,7 @@ struct AssetSmokePart
 	AsciiString model;
 	Vector3 offset;
 	const W3DFloorDrawModuleData* floor = nullptr;
+	const W3DTreeDrawModuleData* tree = nullptr;
 };
 
 static std::vector<AssetSmokePart> findAssetSmokeHordeParts(const char* name)
@@ -2210,6 +2215,21 @@ static Bool drawAssetSmokeParts(W3DAssetManager& assets, const std::vector<Asset
 	for (const AssetSmokePart& part : parts)
 	{
 		RenderObjClass* model = part.floor ? part.floor->createModel(assets, 1.0f, TheGlobalData->m_weather) : assets.Create_Render_Obj(part.model.str());
+		if (part.tree && model && model->Class_ID() == RenderObjClass::CLASSID_MESH)
+		{
+			const TextureClass* texture = static_cast<MeshClass*>(model)->Peek_Model()->Peek_Texture(0);
+			if (texture && part.tree->m_textureName.isNotEmpty() &&
+				part.tree->m_textureName.compareNoCase(texture->Get_Texture_Name().str()) != 0)
+			{
+				RenderObjClass* variant = assets.Create_Render_Obj(part.model.str(), 1.0f, 0,
+					texture->Get_Texture_Name().str(), part.tree->m_textureName.str());
+				if (variant)
+				{
+					model->Release_Ref();
+					model = variant;
+				}
+			}
+		}
 		if (!model)
 		{
 			fprintf(stderr, "Asset smoke: cannot create W3D model '%s'\n", part.model.str());
@@ -2291,14 +2311,45 @@ static Bool drawAssetSmokeParts(W3DAssetManager& assets, const std::vector<Asset
 
 static Bool drawAssetSmokeTerrain(AsciiString filename, Real aspect)
 {
+	const char* vegetation = RetailFileLayers::enabled() ? std::getenv("GENERALSX_ASSET_SMOKE_VEGETATION") : nullptr;
+	if (vegetation)
+	{
+		CachedFileInputStream stream;
+		if (!stream.open(filename))
+			return false;
+		WorldHeightMap* logicalMap = NEW WorldHeightMap(&stream, TRUE);
+		logicalMap->Release_Ref();
+	}
 	if (!TheTerrainVisual || !TheTerrainVisual->load(filename) || !TheTerrainRenderObject)
 		return false;
 	const WorldHeightMap *map = TheTerrainRenderObject->getMap();
 	if (!map)
 		return false;
+	if (vegetation)
+	{
+		for (MapObject* object = MapObject::getFirstMapObject(); object; object = object->getNext())
+		{
+			const ThingTemplate* thing = object->getThingTemplate();
+			if (!thing || object->getFlag(FLAG_BRIDGE_FLAGS) || object->getFlag(FLAG_ROAD_FLAGS))
+				continue;
+			Coord3D position = *object->getLocation();
+			position.z += TheTerrainRenderObject->getHeightMapHeight(position.x, position.y, nullptr);
+			TheTerrainVisual->placeMapVegetation(*thing, *object->getProperties(), position, normalizeAngle(object->getAngle()));
+		}
+	}
 
-	const Vector3 pivot((map->getXExtent() - 2 * map->getBorderSizeInline()) * MAP_XY_FACTOR * 0.5f,
+	Vector3 pivot((map->getXExtent() - 2 * map->getBorderSizeInline()) * MAP_XY_FACTOR * 0.5f,
 		(map->getYExtent() - 2 * map->getBorderSizeInline()) * MAP_XY_FACTOR * 0.5f, 100.0f);
+	if (vegetation)
+	{
+		Real x, y;
+		if (std::sscanf(vegetation, "%f,%f", &x, &y) == 2 && std::isfinite(x) && std::isfinite(y))
+		{
+			pivot.X = x;
+			pivot.Y = y;
+			pivot.Z = TheTerrainRenderObject->getHeightMapHeight(x, y, nullptr);
+		}
+	}
 	CameraClass camera;
 	Matrix3D transform;
 	transform.Look_At(pivot + Vector3(140.0f, -280.0f, 700.0f), pivot, 0.0f);
@@ -2307,7 +2358,7 @@ static Bool drawAssetSmokeTerrain(AsciiString filename, Real aspect)
 	camera.Set_View_Plane(Vector2(-0.55f * aspect, -0.55f), Vector2(0.55f * aspect, 0.55f));
 	camera.Set_Clip_Planes(5.0f, 2500.0f);
 	TheTerrainRenderObject->updateCenter(&camera, &pivot, nullptr);
-	if (!map->getStandingWater().empty())
+	if (vegetation || !map->getStandingWater().empty())
 	{
 		if (W3DShroud *shroud = TheTerrainRenderObject->getShroud())
 		{
@@ -2323,6 +2374,8 @@ static Bool drawAssetSmokeTerrain(AsciiString filename, Real aspect)
 	WW3D::Render(*TheTerrainRenderObject, renderInfo);
 	if (TheWaterRenderObj && !map->getStandingWater().empty())
 		WW3D::Render(*TheWaterRenderObj, renderInfo);
+	if (vegetation)
+		TheTerrainRenderObject->renderTrees(&camera);
 	WW3D::End_Render(false);
 	std::fprintf(stderr, "Asset smoke: rendered terrain from '%s'\n", filename.str());
 	std::fflush(stderr);
@@ -2363,6 +2416,7 @@ void W3DDisplay::draw()
 		std::vector<AssetSmokePart> parts;
 		AsciiString model = smokeModel;
 		const W3DFloorDrawModuleData* floor = nullptr;
+		const W3DTreeDrawModuleData* tree = nullptr;
 		if (smokeObject && *smokeObject)
 		{
 			const char* floorTag = std::getenv("GENERALSX_ASSET_SMOKE_FLOOR");
@@ -2375,8 +2429,15 @@ void W3DDisplay::draw()
 			}
 			else
 			{
-				parts = findAssetSmokeHordeParts(smokeObject);
-				model = findAssetSmokeObjectModel(smokeObject);
+				const ThingTemplate* thing = TheThingFactory ? TheThingFactory->findTemplate(smokeObject, FALSE) : nullptr;
+				tree = thing ? W3DTreeDraw::getMapDrawData(*thing) : nullptr;
+				if (tree)
+					model = tree->m_modelName;
+				else
+				{
+					parts = findAssetSmokeHordeParts(smokeObject);
+					model = findAssetSmokeObjectModel(smokeObject);
+				}
 			}
 			if (model.isNotEmpty())
 				fprintf(stderr, "Asset smoke: object '%s' uses default model '%s'\n", smokeObject, model.str());
@@ -2385,7 +2446,7 @@ void W3DDisplay::draw()
 			fflush(stderr);
 		}
 		if (model.isNotEmpty())
-			parts.insert(parts.begin(), { model, Vector3(0.0f, 0.0f, 0.0f), floor });
+			parts.insert(parts.begin(), { model, Vector3(0.0f, 0.0f, 0.0f), floor, tree });
 		const Bool rendered = !parts.empty() &&
 			drawAssetSmokeParts(*m_assetManager, parts, static_cast<Real>(getWidth()) / getHeight());
 		TheGameEngine->setQuitting(rendered || !INIAudit::isEnabled());

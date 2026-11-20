@@ -59,6 +59,8 @@
 #include "Common/INI.h"
 #include "Common/LatchRestore.h"
 #include "Common/MapObject.h"
+#include "Common/RetailFileLayers.h"
+#include "GameClient/TerrainVisual.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/OSDisplay.h"
 #include "Common/PerfTimer.h"
@@ -1711,7 +1713,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	DEBUG_LOG(("%s", Buf));
 	#endif
 
-	if( loadingSaveGame == FALSE )
+	if (!loadingSaveGame || RetailFileLayers::enabled())
 	{
 		Int progressCount = LOAD_PROGRESS_LOOP_ALL_THE_FREAKN_OBJECTS;
 		Int timer = timeGetTime();
@@ -1748,6 +1750,15 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			// don't create trees and shrubs if this is one and we have that option off
 			if( thingTemplate->isKindOf( KINDOF_SHRUBBERY ) && !useTrees )
 				continue;
+
+			if (RetailFileLayers::enabled())
+			{
+				Coord3D pos = *pMapObj->getLocation();
+				pos.z += TheTerrainLogic->getGroundHeight(pos.x, pos.y);
+				if (TheTerrainVisual->placeMapVegetation(*thingTemplate, *pMapObj->getProperties(), pos,
+					normalizeAngle(pMapObj->getAngle())) || loadingSaveGame)
+					continue;
+			}
 
 			// Get the team information
 			DEBUG_ASSERTCRASH(pMapObj->getProperties()->getType(TheKey_originalOwner) == Dict::DICT_ASCIISTRING, ("unit %s has no original owner specified (obsolete map file)",pMapObj->getName().str()));

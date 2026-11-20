@@ -57,10 +57,17 @@ enum
 
 #include "W3DDevice/GameClient/W3DTreeBuffer.h"
 
+#include <algorithm>
+#include <cstring>
+#include <vector>
 #include <WW3D2/assetmgr.h>
+#include <WW3D2/ddsfile.h>
 #include <WW3D2/texture.h>
 #include <WW3D2/hlod.h>
 #include "Common/FramePacer.h"
+#include "Common/BfmeAssetPath.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/GameUtility.h"
 #include "Common/MapReaderWriterInfo.h"
 #include "Common/FileSystem.h"
@@ -463,6 +470,65 @@ public:
 //=============================================================================
 /** Creates a new texture. */
 //=============================================================================
+static Int readRetailTreeTiles(const AsciiString& texture, TileData** tiles, Int capacity)
+{
+	auto path = makeBfmeAssetPath("Art/CompiledTextures/", texture.str());
+	if (path.empty())
+		return 0;
+	path.replace(path.rfind('.') + 1, std::string::npos, "dds");
+	FileInfo info;
+	constexpr unsigned maxExtent = 2048;
+	constexpr unsigned headerSize = 4 + sizeof(LegacyDDSURFACEDESC2);
+	if (!TheFileSystem->getFileInfo(path.c_str(), &info) ||
+		info.size() <= headerSize || info.size() > maxExtent * maxExtent * 2)
+		return 0;
+
+	DDSFileClass dds(path.c_str(), 0);
+	if (!dds.Is_Available() || dds.Get_Type() != DDS_TEXTURE)
+		return 0;
+
+	const WW3DFormat format = dds.Get_Format();
+	if (format != WW3D_FORMAT_DXT1 && format != WW3D_FORMAT_DXT3 && format != WW3D_FORMAT_DXT5)
+		return 0;
+	const unsigned width = dds.Get_Width(0);
+	const unsigned height = dds.Get_Height(0);
+	if (!width || !height || width > maxExtent || height > maxExtent ||
+		dds.Get_Level_Size(0) > info.size() - headerSize)
+		return 0;
+
+	Int columns = 1;
+	while (static_cast<unsigned>(columns * TILE_PIXEL_EXTENT) < std::max(width, height))
+		columns *= 2;
+	if (columns * columns > capacity || !dds.Load())
+		return 0;
+
+	constexpr Int pixelSize = TILE_BYTES_PER_PIXEL;
+	const unsigned pitch = ((width + 3) & ~3u) * pixelSize;
+	std::vector<UnsignedByte> pixels(pitch * ((height + 3) & ~3u));
+	dds.Copy_Level_To_Surface(0, WW3D_FORMAT_A8R8G8B8, width, height, pixels.data(), pitch);
+	const Int extent = columns * TILE_PIXEL_EXTENT;
+	for (Int y = 0; y < columns; ++y)
+	{
+		for (Int x = 0; x < columns; ++x)
+		{
+			TileData* tile = MSGNEW("W3DTreeBuffer") TileData;
+			tiles[y * columns + x] = tile;
+			UnsignedByte* output = tile->getDataPtr();
+			for (Int row = 0; row < TILE_PIXEL_EXTENT; ++row)
+			{
+				const unsigned sourceY = height - 1 - (y * TILE_PIXEL_EXTENT + row) * height / extent;
+				for (Int column = 0; column < TILE_PIXEL_EXTENT; ++column)
+				{
+					const unsigned sourceX = (x * TILE_PIXEL_EXTENT + column) * width / extent;
+					std::memcpy(output, &pixels[sourceY * pitch + sourceX * pixelSize], pixelSize);
+					output += pixelSize;
+				}
+			}
+		}
+	}
+	return columns;
+}
+
 void W3DTreeBuffer::updateTexture()
 {
 
@@ -487,9 +553,37 @@ void W3DTreeBuffer::updateTexture()
 	}
 	m_numTiles = 0;
 	File *theFile = nullptr;
+	const Bool retail = RetailFileLayers::enabled();
+	const Int tileCapacity = retail ? maxTilesPerRow * maxTilesPerRow : MAX_TILES;
 	for (i=0; i<m_numTreeTypes; i++) {
 		char texturePath[ _MAX_PATH ];
 		m_treeTypes[i].m_numTiles = 0;
+		if (retail)
+		{
+			TTreeType& type = m_treeTypes[i];
+			type.m_halfTile = FALSE;
+			for (j = 0; j < i; ++j)
+			{
+				if (m_treeTypes[j].m_data->m_textureName.compareNoCase(type.m_data->m_textureName) == 0)
+					break;
+			}
+			if (j < i)
+			{
+				type.m_tileWidth = m_treeTypes[j].m_tileWidth;
+				type.m_halfTile = m_treeTypes[j].m_halfTile;
+				continue;
+			}
+
+			const Int width = readRetailTreeTiles(type.m_data->m_textureName, m_sourceTiles + m_numTiles, tileCapacity - m_numTiles);
+			if (width)
+			{
+				type.m_firstTile = m_numTiles;
+				type.m_tileWidth = width;
+				type.m_numTiles = width * width;
+				m_numTiles += type.m_numTiles;
+				continue;
+			}
+		}
 		snprintf( texturePath, ARRAY_SIZE(texturePath), "%s%s", TERRAIN_TGA_DIR_PATH, m_treeTypes[i].m_data->m_textureName.str() );
 		theFile = TheFileSystem->openFile( texturePath, File::READ|File::BINARY);
 		if (theFile==nullptr) {
@@ -523,7 +617,7 @@ void W3DTreeBuffer::updateTexture()
 				theFile->close();
 				continue;
 			}
-			if (m_numTiles+numTiles<=MAX_TILES) {
+			if (m_numTiles+numTiles<=tileCapacity) {
 				theFile->seek(0, File::START);
 				m_treeTypes[i].m_firstTile = m_numTiles;
 				m_treeTypes[i].m_tileWidth = width;
@@ -538,7 +632,10 @@ void W3DTreeBuffer::updateTexture()
 			}
 			theFile->close();
 		} else {
-			DEBUG_CRASH(("Could not find texture %s", m_treeTypes[i].m_data->m_textureName.str()));
+			if (retail && INIAudit::isEnabled())
+				INIAudit::record("error", "Missing tree texture", m_treeTypes[i].m_data->m_textureName.str(), 0);
+			else
+				DEBUG_CRASH(("Could not find texture %s", m_treeTypes[i].m_data->m_textureName.str()));
 			m_treeTypes[i].m_firstTile = 0;
 			m_treeTypes[i].m_tileWidth = 0;
 			m_treeTypes[i].m_numTiles = 0;
@@ -602,8 +699,10 @@ void W3DTreeBuffer::updateTexture()
 								}
 							}
 						}
-						if (open) found = true;
-						break;
+						if (open)
+							found = true;
+						if (open || !retail)
+							break;
 					}
 				}
 				if (found) break;
@@ -745,8 +844,9 @@ void W3DTreeBuffer::loadTreesInVertexAndIndexBuffers(RefRenderObjListIterator *p
 	m_anythingChanged = false;
 	Int curTree=0;
 	Int bNdx;
+	const Bool retail = RetailFileLayers::enabled();
 	const GlobalData::TerrainLighting *objectLighting = TheGlobalData->m_terrainObjectsLighting[TheGlobalData->m_timeOfDay];
-	for (bNdx=0; bNdx<MAX_BUFFERS; bNdx++) {
+	for (bNdx=0; bNdx<MAX_BUFFERS && m_vertexTree[bNdx]; bNdx++) {
 		m_curNumTreeVertices[bNdx] = 0;
 		m_curNumTreeIndices[bNdx] = 0;
 		if (curTree >= m_numTrees) {
@@ -782,6 +882,8 @@ void W3DTreeBuffer::loadTreesInVertexAndIndexBuffers(RefRenderObjListIterator *p
 			if (type<0 || type>=m_numTreeTypes || m_treeTypes[type].m_mesh == nullptr || m_treeTypes[type].m_data == nullptr) {
 				continue; // Deleted tree, invalid type, missing mesh or missing data. [6/9/2003]
 			}
+			if (retail && m_treeTypes[type].m_tileWidth == 0)
+				continue;
 			if (!m_trees[curTree].visible) continue;
 			Real scale = m_trees[curTree].scale;
 			Vector3 loc = m_trees[curTree].location;
@@ -815,8 +917,6 @@ void W3DTreeBuffer::loadTreesInVertexAndIndexBuffers(RefRenderObjListIterator *p
 
 
 			Int startVertex = m_curNumTreeVertices[bNdx];
-			m_trees[curTree].firstIndex = startVertex;
-			m_trees[curTree].bufferNdx = bNdx;
 			Int i;
 			Int numVertex = m_treeTypes[type].m_mesh->Peek_Model()->Get_Vertex_Count();
 			Vector3 *pVert = m_treeTypes[type].m_mesh->Peek_Model()->Get_Vertex_Array();
@@ -832,6 +932,8 @@ void W3DTreeBuffer::loadTreesInVertexAndIndexBuffers(RefRenderObjListIterator *p
 			if (m_curNumTreeIndices[bNdx]+3*numIndex+6 >= MAX_TREE_INDEX) {
 				break;
 			}
+			m_trees[curTree].firstIndex = startVertex;
+			m_trees[curTree].bufferNdx = bNdx;
 
 			const Vector2*uvs=m_treeTypes[type].m_mesh->Peek_Model()->Get_UV_Array_By_Index(0);
 
@@ -1211,7 +1313,8 @@ void W3DTreeBuffer::unitMoved(Object *unit)
 void W3DTreeBuffer::allocateTreeBuffers()
 {
 	Int i;
-	for	(i=0; i<MAX_BUFFERS; i++) {
+	const Int bufferCount = RetailFileLayers::enabled() ? MAX_BUFFERS : 1;
+	for	(i=0; i<bufferCount; i++) {
 	#ifdef USE_STATIC
 		m_vertexTree[i]=NEW_REF(DX8VertexBufferClass,(DX8_FVF_XYZNDUV1,MAX_TREE_VERTEX+4,DX8VertexBufferClass::USAGE_DEFAULT));
 		m_indexTree[i]=NEW_REF(DX8IndexBufferClass,(MAX_TREE_INDEX+4, DX8IndexBufferClass::USAGE_DEFAULT));
@@ -1407,15 +1510,15 @@ Int W3DTreeBuffer::addTreeType(const W3DTreeDrawModuleData *data)
 /** Adds a tree.  Name is the W3D model name, supported models are
 ALPINE, DECIDUOUS and SHRUB. */
 //=============================================================================
-void W3DTreeBuffer::addTree(DrawableID id, Coord3D location, Real scale, Real angle,
+Bool W3DTreeBuffer::addTree(DrawableID id, Coord3D location, Real scale, Real angle,
 								Real randomScaleAmount, const W3DTreeDrawModuleData *data)
 {
 	if (m_numTrees >= MAX_TREES) {
-		return;
+		return FALSE;
 	}
 	// GeneralsX @bugfix fbraz3 01/10/2026 Issue #347: Guard data != nullptr
 	if (!m_initialized || data == nullptr) {
-		return;
+		return FALSE;
 	}
 	Int treeType = DELETED_TREE_TYPE;
 	Int i;
@@ -1430,7 +1533,7 @@ void W3DTreeBuffer::addTree(DrawableID id, Coord3D location, Real scale, Real an
 	if (treeType<0) {
 		treeType = addTreeType(data);
 		if (treeType<0) {
-			return;
+			return FALSE;
 		}
 		m_needToUpdateTexture = true;
 	}
@@ -1476,6 +1579,7 @@ void W3DTreeBuffer::addTree(DrawableID id, Coord3D location, Real scale, Real an
 	m_trees[m_numTrees].pushAsideSin = 1;
 	m_trees[m_numTrees].m_toppleState = TOPPLE_UPRIGHT;
 	m_numTrees++;
+	return TRUE;
 }
 
 //=============================================================================
@@ -2016,8 +2120,14 @@ void W3DTreeBuffer::xfer( Xfer *xfer )
 	Int i;
 	Int numTrees = m_numTrees;
 	xfer->xferInt(&numTrees);
+	const Bool retail = RetailFileLayers::enabled();
 	if (xfer->getXferMode() == XFER_LOAD)	{
 		m_numTrees = 0;
+		if (retail)
+		{
+			m_updateAllKeys = true;
+			m_anythingChanged = true;
+		}
 		for (i=0; i<PARTITION_WIDTH_HEIGHT*PARTITION_WIDTH_HEIGHT; i++) {
 			m_areaPartition[i] = END_OF_PARTITION;
 		}
@@ -2087,10 +2197,15 @@ void W3DTreeBuffer::xfer( Xfer *xfer )
 		if (xfer->getXferMode() == XFER_LOAD && treeType != DELETED_TREE_TYPE && treeType >= 0 && treeType < m_numTreeTypes && m_treeTypes[treeType].m_data) {
 			Coord3D pos;
 			pos.set(tree.location.X, tree.location.Y, tree.location.Z);
-			Real angle = 0;
-			addTree(tree.drawableID, pos, tree.scale, angle, 0, m_treeTypes[treeType].m_data);
-			if (m_numTrees) {
+			const Bool added = addTree(tree.drawableID, pos, tree.scale, 0.0f, 0.0f, m_treeTypes[treeType].m_data);
+			if (retail ? added : m_numTrees != 0) {
 				TTree *curTree = &m_trees[m_numTrees-1];
+				if (retail)
+				{
+					curTree->sin = tree.sin;
+					curTree->cos = tree.cos;
+					curTree->m_angularAccumulation = tree.m_angularAccumulation;
+				}
 				curTree->m_angularAcceleration = tree.m_angularAcceleration;
 				curTree->m_angularVelocity = tree.m_angularVelocity;
 				curTree->m_toppleDirection = tree.m_toppleDirection;

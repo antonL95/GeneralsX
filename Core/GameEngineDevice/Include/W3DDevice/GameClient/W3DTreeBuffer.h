@@ -184,7 +184,7 @@ public:
 	W3DTreeBuffer();
 	~W3DTreeBuffer();
 	/// Add a tree at location.  Name is the w3d model name.
-	void addTree(DrawableID id, Coord3D location, Real scale, Real angle,
+	Bool addTree(DrawableID id, Coord3D location, Real scale, Real angle,
 								Real randomScaleAmount, const W3DTreeDrawModuleData *data);
 	/// Notify that an object moved, so check for collisions.
 	void unitMoved(Object *unit);
@@ -236,7 +236,7 @@ private:
 				MAX_TILES = 512,
 				NUM_SWAY_ENTRIES = 100,
 				MAX_SWAY_TYPES = 10,
-				MAX_BUFFERS = 1,
+				MAX_BUFFERS = 8,
 				SORT_ITERATIONS_PER_FRAME=10};
 	enum {PARTITION_WIDTH_HEIGHT = 100};
 	enum {MAX_MODEL_SHADOWS = 1024,		///< object trees on a map; Golden Oasis has 278 palms

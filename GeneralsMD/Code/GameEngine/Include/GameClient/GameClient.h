@@ -106,6 +106,7 @@ public:
 
 	void setDrawableIDCounter( DrawableID nextDrawableID ) { m_nextDrawableID = nextDrawableID; }
 	DrawableID getDrawableIDCounter() { return m_nextDrawableID; }
+	DrawableID allocDrawableID();
 
 	virtual Drawable *firstDrawable() { return m_drawableList; }
 
@@ -172,7 +173,6 @@ protected:
 	DrawablePtrHash m_drawableHash;															///< Used for DrawableID lookups
 
 	DrawableID m_nextDrawableID;																///< For allocating drawable id's
-	DrawableID allocDrawableID();													///< Returns a new unique drawable id
 
 	enum { MAX_CLIENT_TRANSLATORS = 32 };
 	TranslatorID m_translators[ MAX_CLIENT_TRANSLATORS ];				///< translators we have used

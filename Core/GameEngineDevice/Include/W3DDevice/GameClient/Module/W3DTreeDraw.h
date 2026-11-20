@@ -33,6 +33,8 @@
 #include "Common/DrawModule.h"
 #include "WW3D2/line3d.h"
 
+class Dict;
+
 //-------------------------------------------------------------------------------------------------
 class W3DTreeDrawModuleData : public ModuleData
 {
@@ -59,6 +61,13 @@ public:
 	Real m_sinkDistance;		// How far it sinks.
 
 	Bool m_doShadow;
+	AsciiString m_morphTree;
+	UnsignedInt m_morphFrames = 0;
+	const FXList* m_morphFX = nullptr;
+	Bool m_taintedTree = FALSE;
+	UnsignedInt m_fadeRate = 0;
+	UnsignedInt m_fadeTarget = 0;
+	Real m_fadeDistance = 0.0f;
 
 	W3DTreeDrawModuleData();
 	virtual ~W3DTreeDrawModuleData() override;
@@ -79,6 +88,8 @@ class W3DTreeDraw : public DrawModule
 public:
 
 	W3DTreeDraw( Thing *thing, const ModuleData* moduleData );
+	static const W3DTreeDrawModuleData* getMapDrawData(const ThingTemplate& thing);
+	static Bool placeMapVegetation(const ThingTemplate& thing, const Dict& properties, const Coord3D& pos, Real angle);
 	// virtual destructor prototype provided by memory pool declaration
 
 	virtual void doDrawModule(const Matrix3D* transformMtx) override {}

@@ -264,6 +264,7 @@ public:
 	) = 0;
 
 	virtual void addProp(const ThingTemplate *tt, const Coord3D *pos, Real angle) = 0;
+	virtual Bool placeMapVegetation(const ThingTemplate& thing, const Dict& properties, const Coord3D& pos, Real angle) = 0;
 
 	//
 	// Modify height.

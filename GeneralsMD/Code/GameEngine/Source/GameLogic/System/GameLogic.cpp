@@ -68,6 +68,7 @@
 #include "Common/Radar.h"
 #include "Common/RandomValue.h"
 #include "Common/Recorder.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/StatsCollector.h"
 #include "Common/ThingFactory.h"
 #include "Common/Team.h"
@@ -1978,6 +1979,10 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			pos.z += TheTerrainLogic->getGroundHeight( pos.x, pos.y );
 			Real angle = normalizeAngle(pMapObj->getAngle());
 
+			if (RetailFileLayers::enabled() &&
+				TheTerrainVisual->placeMapVegetation(*thingTemplate, *pMapObj->getProperties(), pos, angle))
+				continue;
+
 			if (thingTemplate->isKindOf(KINDOF_OPTIMIZED_TREE)) {
 				createOptimizedTree(thingTemplate, &pos, angle);
 			}
@@ -2020,6 +2025,10 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			Coord3D pos = *pMapObj->getLocation();
 			pos.z += TheTerrainLogic->getGroundHeight( pos.x, pos.y );
 			Real angle = normalizeAngle(pMapObj->getAngle());
+
+			if (RetailFileLayers::enabled() &&
+				TheTerrainVisual->placeMapVegetation(*thingTemplate, *pMapObj->getProperties(), pos, angle))
+				continue;
 
 			if (thingTemplate->isKindOf(KINDOF_OPTIMIZED_TREE)) {
 				createOptimizedTree(thingTemplate, &pos, angle);

@@ -29,12 +29,19 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include <stdlib.h>
+#include <cmath>
 
+#include "Common/Dict.h"
+#include "Common/NameKeyGenerator.h"
 #include "Common/Thing.h"
+#include "Common/INIAudit.h"
+#include "Common/ModuleFactory.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Object.h"
 #include "GameClient/Drawable.h"
+#include "GameClient/GameClient.h"
 #include "W3DDevice/GameClient/Module/W3DTreeDraw.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
 
@@ -101,6 +108,21 @@ void W3DTreeDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "MorphTree", INI::parseAsciiString, nullptr, offsetof(W3DTreeDrawModuleData, m_morphTree) },
+			{ "MorphTime", INI::parseDurationUnsignedInt, nullptr, offsetof(W3DTreeDrawModuleData, m_morphFrames) },
+			{ "MorphFX", INI::parseFXList, nullptr, offsetof(W3DTreeDrawModuleData, m_morphFX) },
+			{ "TaintedTree", INI::parseBool, nullptr, offsetof(W3DTreeDrawModuleData, m_taintedTree) },
+			{ "FadeRate", INI::parseUnsignedInt, nullptr, offsetof(W3DTreeDrawModuleData, m_fadeRate) },
+			{ "FadeTarget", INI::parseUnsignedInt, nullptr, offsetof(W3DTreeDrawModuleData, m_fadeTarget) },
+			{ "FadeDistance", INI::parseReal, nullptr, offsetof(W3DTreeDrawModuleData, m_fadeDistance) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,7 +139,53 @@ W3DTreeDraw::W3DTreeDraw( Thing *thing, const ModuleData* moduleData ) : DrawMod
 //-------------------------------------------------------------------------------------------------
 W3DTreeDraw::~W3DTreeDraw()
 {
-	addToTreeBuffer();
+	if (!RetailFileLayers::enabled())
+		addToTreeBuffer();
+}
+
+const W3DTreeDrawModuleData* W3DTreeDraw::getMapDrawData(const ThingTemplate& thing)
+{
+	if (!RetailFileLayers::enabled() ||
+		(!thing.isKindOf(KINDOF_TREE) && !thing.isKindOf(KINDOF_SHRUB) && !thing.isKindOf(KINDOF_OPTIMIZED_PROP)))
+		return nullptr;
+
+	const ModuleInfo& modules = thing.getDrawModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		const ModuleData* module = modules.getNthData(i);
+		if (const auto* tree = module ? module->getAsW3DTreeDrawModuleData() : nullptr)
+			return tree;
+	}
+	return nullptr;
+}
+
+Bool W3DTreeDraw::placeMapVegetation(const ThingTemplate& thing, const Dict& properties, const Coord3D& pos, Real angle)
+{
+	const W3DTreeDrawModuleData* data = getMapDrawData(thing);
+	if (!data)
+		return FALSE;
+	if (!TheTerrainRenderObject)
+		return TRUE;
+
+	const Bool prop = !thing.isKindOf(KINDOF_TREE) && !thing.isKindOf(KINDOF_SHRUB);
+	Bool hasScale;
+	const NameKeyType scaleKey = TheNameKeyGenerator->nameToKey("objectPrototypeScale");
+	const Real mapScale = properties.getReal(scaleKey, &hasScale);
+	const Real scale = thing.getAssetScale() * (hasScale ? mapScale : 1.0f);
+	const DrawableID id = TheGameClient->allocDrawableID();
+	const Bool added = std::isfinite(scale) && scale > 0.0f && (prop
+		? TheTerrainRenderObject->addProp(static_cast<Int>(id), pos, angle, scale, data->m_modelName)
+		: TheTerrainRenderObject->addTree(id, pos, scale, angle, 0.0f, data));
+	if (!added && INIAudit::isEnabled())
+		INIAudit::record("error", "Unable to place map vegetation", thing.getName().str(), 0);
+	if (std::getenv("GENERALSX_ASSET_SMOKE_VEGETATION"))
+	{
+		std::fprintf(stderr, "Asset smoke: vegetation %s %s %s %s at %.1f,%.1f scale %.4f\n",
+			added ? "added" : "failed", prop ? "prop" : "tree", thing.getName().str(), data->m_modelName.str(),
+			pos.x, pos.y, scale);
+		std::fflush(stderr);
+	}
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------

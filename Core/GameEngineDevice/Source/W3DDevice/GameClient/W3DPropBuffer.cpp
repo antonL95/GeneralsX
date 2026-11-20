@@ -176,13 +176,13 @@ Int W3DPropBuffer::addPropType(const AsciiString &modelName)
 /** Adds a prop.  Name is the W3D model name, supported models are
 ALPINE, DECIDUOUS and SHRUB. */
 //=============================================================================
-void W3DPropBuffer::addProp(Int id, Coord3D location, Real angle,Real scale, const AsciiString &modelName)
+Bool W3DPropBuffer::addProp(Int id, Coord3D location, Real angle,Real scale, const AsciiString &modelName)
 {
 	if (m_numProps >= MAX_PROPS) {
-		return;
+		return FALSE;
 	}
 	if (!m_initialized) {
-		return;
+		return FALSE;
 	}
 	Int propType = -1;
 	Int i;
@@ -195,7 +195,7 @@ void W3DPropBuffer::addProp(Int id, Coord3D location, Real angle,Real scale, con
 	if (propType<0) {
 		propType = addPropType(modelName);
 		if (propType<0) {
-			return;
+			return FALSE;
 		}
 	}
 
@@ -218,6 +218,7 @@ void W3DPropBuffer::addProp(Int id, Coord3D location, Real angle,Real scale, con
 	m_props[m_numProps].visible = false;
 
 	m_numProps++;
+	return TRUE;
 }
 
 //=============================================================================
@@ -323,6 +324,8 @@ void W3DPropBuffer::drawProps(RenderInfoClass &rinfo)
 {
 	USE_PERF_TIMER(Prop_Render)
 
+	const Bool terrainSmoke = std::getenv("GENERALSX_ASSET_SMOKE_TERRAIN") &&
+		std::getenv("GENERALSX_ASSET_SMOKE_VEGETATION");
 	Int i;
 	if (m_doCull) {
 		cull(&rinfo.Camera);
@@ -359,8 +362,7 @@ void W3DPropBuffer::drawProps(RenderInfoClass &rinfo)
 		if (m_props[i].m_robj==nullptr) {
 			continue;
 		}
-		if (!ThePlayerList || !ThePartitionManager) {
-			//  in Worldbuilder. No shroud either. jba. [6/9/2003]
+		if (terrainSmoke || !ThePlayerList || !ThePartitionManager) {
 			m_props[i].ss = OBJECTSHROUD_CLEAR;
 		}
 		if (m_props[i].ss == OBJECTSHROUD_INVALID) {

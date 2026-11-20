@@ -152,14 +152,14 @@ public:
 	void doTheLight(VERTEX_FORMAT *vb, const Vector3*light, Vector3*normal, RefRenderObjListIterator *pLightsIterator, UnsignedByte alpha);
 	void addScorch(Vector3 location, Real radius, Scorches type);
 	void addStaticScorch(Vector3 location, Real radius, Scorches type);
-	void addTree(DrawableID id, Coord3D location, Real scale, Real angle,
+	Bool addTree(DrawableID id, Coord3D location, Real scale, Real angle,
 								Real randomScaleAmount,  const W3DTreeDrawModuleData *data);
 	void removeAllTrees();
 	void removeTree(DrawableID id);
 	Bool updateTreePosition(DrawableID id, Coord3D location, Real angle);
 	void renderTrees(CameraClass * camera); ///< renders the tree buffer.
 
-	void addProp(Int id, Coord3D location, Real angle, Real scale, const AsciiString &modelName);
+	Bool addProp(Int id, Coord3D location, Real angle, Real scale, const AsciiString &modelName);
 	void removeProp(Int id);
 	void removeAllProps();
 

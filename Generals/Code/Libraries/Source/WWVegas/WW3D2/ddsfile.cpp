@@ -1132,7 +1132,33 @@ bool DDSFileClass::Get_4x4_Block(
 	case WW3D_FORMAT_DXT2:
 		return false;
 	case WW3D_FORMAT_DXT3:
-		return false;
+		{
+			const unsigned blocksPerRow = (Get_Width(level) + 3) / 4;
+			const unsigned char* block = Get_Memory_Pointer(level) +
+				((source_y / 4) * blocksPerRow + source_x / 4) * 16;
+			unsigned col0 = RGB565_To_ARGB8888(block[8] | (block[9] << 8));
+			unsigned col1 = RGB565_To_ARGB8888(block[10] | (block[11] << 8));
+			if (has_hsv_shift) {
+				Recolor(col0, hsv_shift);
+				Recolor(col1, hsv_shift);
+			}
+			const unsigned colors[] = { col0, col1, Combine_Colors(col1, col0, 85), Combine_Colors(col0, col1, 85) };
+			bool containsAlpha = false;
+			for (unsigned y = 0; y < 4; ++y) {
+				unsigned char* row = dest_ptr + y * dest_pitch;
+				unsigned alpha = block[y * 2] | (block[y * 2 + 1] << 8);
+				unsigned indices = block[12 + y];
+				for (unsigned x = 0; x < 4; ++x) {
+					const unsigned opacity = (alpha & 15) * 17;
+					const unsigned pixel = colors[indices & 3] | (opacity << 24);
+					BitmapHandlerClass::Write_B8G8R8A8(row + x * dest_bpp, dest_format, pixel);
+					containsAlpha |= opacity != 255;
+					alpha >>= 4;
+					indices >>= 2;
+				}
+			}
+			return containsAlpha;
+		}
 	case WW3D_FORMAT_DXT4:
 		return false;
 	case WW3D_FORMAT_DXT5:

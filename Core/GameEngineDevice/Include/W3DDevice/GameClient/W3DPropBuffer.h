@@ -100,7 +100,7 @@ public:
 	W3DPropBuffer();
 	~W3DPropBuffer();
 	/// Add a prop at location.  Name is the w3d model name.
-	void addProp(Int id, Coord3D location, Real angle, Real scale, const AsciiString &modelName);
+	Bool addProp(Int id, Coord3D location, Real angle, Real scale, const AsciiString &modelName);
 	/// Remove a prop.
 	void removeProp(Int id);
 	/// Remove a prop.

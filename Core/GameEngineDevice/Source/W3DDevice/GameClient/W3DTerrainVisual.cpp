@@ -49,6 +49,7 @@
 
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DTerrainVisual.h"
+#include "W3DDevice/GameClient/Module/W3DTreeDraw.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
@@ -1075,6 +1076,11 @@ void W3DTerrainVisual::removeTreesAndPropsForConstruction(const Coord3D* pos,
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+Bool W3DTerrainVisual::placeMapVegetation(const ThingTemplate& thing, const Dict& properties, const Coord3D& pos, Real angle)
+{
+	return W3DTreeDraw::placeMapVegetation(thing, properties, pos, angle);
+}
+
 void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *pos, Real angle)
 {
 	ModelConditionFlags state;

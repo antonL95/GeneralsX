@@ -2024,12 +2024,10 @@ void BaseHeightMapRenderObjClass::removeTreesAndPropsForConstruction(const Coord
 //=============================================================================
 /** Adds a tree to the tree buffer.*/
 //=============================================================================
-void BaseHeightMapRenderObjClass::addTree(DrawableID id, Coord3D location, Real scale, Real angle,
+Bool BaseHeightMapRenderObjClass::addTree(DrawableID id, Coord3D location, Real scale, Real angle,
 								Real randomScaleAmount,  const W3DTreeDrawModuleData *data)
 {
-	if (m_treeBuffer) {
-		m_treeBuffer->addTree(id, location, scale, angle, randomScaleAmount, data);
-	}
+	return m_treeBuffer && m_treeBuffer->addTree(id, location, scale, angle, randomScaleAmount, data);
 };
 
 //=============================================================================
@@ -2074,12 +2072,10 @@ Bool BaseHeightMapRenderObjClass::updateTreePosition(DrawableID id, Coord3D loca
 //=============================================================================
 /** Adds a prop to the prop buffer.*/
 //=============================================================================
-void BaseHeightMapRenderObjClass::addProp(Int id, Coord3D location, Real angle, Real scale,
+Bool BaseHeightMapRenderObjClass::addProp(Int id, Coord3D location, Real angle, Real scale,
 																					const AsciiString &modelName)
 {
-	if (m_propBuffer) {
-		m_propBuffer->addProp(id, location, angle, scale, modelName);
-	}
+	return m_propBuffer && m_propBuffer->addProp(id, location, angle, scale, modelName);
 };
 
 
