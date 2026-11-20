@@ -283,6 +283,16 @@ void Shell::recreateWindowLayouts()
 	}
 }
 
+void Shell::onResolutionChanged()
+{
+	if( TheWindowManager->hasAnchoredWindows() )
+	{
+		TheWindowManager->relayout();
+		return;
+	}
+	recreateWindowLayouts();
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Find a screen via the .wnd script filename loaded */
 //-------------------------------------------------------------------------------------------------

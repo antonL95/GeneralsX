@@ -1594,6 +1594,17 @@ void	WW3DAssetManager::Free_All_FontChars_Glyph_Caches()
 	}
 }
 
+void	WW3DAssetManager::Release_Unused_Pixel_FontChars()
+{
+	for ( int i = FontCharsList.Count() - 1; i >= 0; i-- ) {
+		FontCharsClass * font = FontCharsList[i];
+		if ( font->Get_Pixel_Size() > 0 && font->Num_Refs() == 1 ) {
+			FontCharsList.Delete( i );
+			font->Release_Ref();
+		}
+	}
+}
+
 /***********************************************************************************************
  * WW3DAssetManager::Register_Prototype_Loader -- add a new loader to the system               *
  *                                                                                             *

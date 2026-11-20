@@ -101,3 +101,12 @@ void DisplayStringManager::unLink( DisplayString *string )
 	}
 
 }
+
+void DisplayStringManager::collectFonts( std::vector<const GameFont *>& fonts ) const
+{
+	for( DisplayString *string = m_stringList; string; string = string->next() )
+	{
+		if( GameFont *font = string->getFont() )
+			fonts.push_back( font );
+	}
+}

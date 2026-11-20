@@ -246,6 +246,32 @@ GameFont *FontLibrary::getUiFont( AsciiString name, Int designSize, Bool bold, I
 	return getFontPixels( name, UiScale::fontPixelSize( designSize, screenWidth, screenHeight ), bold );
 }
 
+static Bool sharesFace( const GameFont *font, const std::vector<const GameFont *>& inUse )
+{
+	for( const GameFont *used : inUse )
+	{
+		if( used == font ||
+				( used->pixelSize == font->pixelSize && used->pointSize == font->pointSize && used->nameString == font->nameString ) )
+			return TRUE;
+	}
+	return FALSE;
+}
+
+void FontLibrary::releaseUnusedPixelFonts( const std::vector<const GameFont *>& inUse )
+{
+	GameFont *next = nullptr;
+	for( GameFont *font = m_fontList; font; font = next )
+	{
+		next = font->next;
+		if( font->pixelSize <= 0 || sharesFace( font, inUse ) )
+			continue;
+		unlinkFont( font );
+		releaseFontData( font );
+		deleteInstance( font );
+	}
+	releaseUnusedFontData();
+}
+
 GameFont *FontLibrary::findOrLoadFont( const AsciiString& name, Int pointSize, Int pixelSize, Bool bold )
 {
 	GameFont *font;

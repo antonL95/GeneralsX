@@ -737,6 +737,28 @@ void W3DDisplay::setGamma(Real gamma, Real bright, Real contrast, Bool calibrate
 //=============================================================================
 Bool W3DDisplay::setDisplayMode( UnsignedInt xres, UnsignedInt yres, UnsignedInt bitdepth, Bool windowed )
 {
+	return applyDisplayMode( xres, yres, bitdepth, windowed, TRUE );
+}
+
+Bool W3DDisplay::setRenderSize( UnsignedInt xres, UnsignedInt yres )
+{
+	return applyDisplayMode( xres, yres, getBitDepth(), getWindowed(), FALSE );
+}
+
+Bool W3DDisplay::resizeWindow( UnsignedInt pixelWidth, UnsignedInt pixelHeight )
+{
+#ifdef SAGE_USE_SDL3
+	if (!getWindowed())
+		return FALSE;
+	SDL3_ApplyWindowModeForRenderConfig(TRUE, pixelWidth, pixelHeight);
+	return TRUE;
+#else
+	return FALSE;
+#endif
+}
+
+Bool W3DDisplay::applyDisplayMode( UnsignedInt xres, UnsignedInt yres, UnsignedInt bitdepth, Bool windowed, Bool sizeWindow )
+{
 	const UnsignedInt oldWidth = getWidth();
 	const UnsignedInt oldHeight = getHeight();
 	const UnsignedInt oldBitDepth = getBitDepth();
@@ -745,7 +767,8 @@ Bool W3DDisplay::setDisplayMode( UnsignedInt xres, UnsignedInt yres, UnsignedInt
 	if (WW3D_ERROR_OK == WW3D::Set_Device_Resolution(xres,yres,bitdepth,windowed,true))
 	{
 		#ifdef SAGE_USE_SDL3
-		SDL3_ApplyWindowModeForRenderConfig(windowed, xres, yres);
+		if (sizeWindow)
+			SDL3_ApplyWindowModeForRenderConfig(windowed, xres, yres);
 		#endif
 		Render2DClass::Set_Screen_Resolution(RectClass(0, 0, xres, yres));
 		Display::setDisplayMode(xres, yres, bitdepth, windowed);

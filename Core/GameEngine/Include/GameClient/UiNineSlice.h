@@ -60,9 +60,11 @@ namespace UiNineSlice
 	constexpr double MinCornerScale = 0.25;
 	constexpr double MaxCornerScale = 4.0;
 	constexpr int MaxPixel = 1 << 24;
+	constexpr int MaxFactorDoublings = 64;
 
 	int roundToPixel(double value);
 	double clampCornerScale(double scale);
+	double smallestFactor(bool (*fits)(double factor, const void* context), const void* context);
 	Axis splitAxis(int sourceSize, int insetLow, int insetHigh, int dest0, int dest1, double scale);
 	double tileFactor(const Span& middle, double scale, Fill fill);
 	std::vector<Span> fillSpans(const Span& middle, double scale, Fill fill);

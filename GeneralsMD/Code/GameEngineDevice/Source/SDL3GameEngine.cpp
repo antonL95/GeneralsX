@@ -42,6 +42,7 @@
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Gadget.h"
+#include "GameClient/UiResolution.h"
 #include "W3DDevice/GameLogic/W3DGameLogic.h"
 #include "W3DDevice/GameClient/W3DGameClient.h"
 #include "W3DDevice/Common/W3DModuleFactory.h"
@@ -339,6 +340,7 @@ void SDL3GameEngine::pollSDL3Events(void)
 				break;
 
 			case SDL_EVENT_WINDOW_RESIZED:
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 				handleWindowEvent(event.window);
 				break;
 
@@ -482,8 +484,9 @@ void SDL3GameEngine::handleMouseWheelEvent(const SDL_MouseWheelEvent& event)
  */
 void SDL3GameEngine::handleWindowEvent(const SDL_WindowEvent& event)
 {
-	// TODO: Phase 2 - Handle window resize, notify graphics subsystem
-	// fprintf(stderr, "DEBUG: Window event (type=%d)\n", event.type);
+	if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
+		UiResolution::followWindowPixels(event.data1, event.data2);
+	}
 }
 
 /**

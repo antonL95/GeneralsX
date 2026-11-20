@@ -54,16 +54,20 @@ namespace UiNineSlice
 		}
 
 		template <typename Fits>
-		double smallestFactor(Fits fits)
+		double searchSmallestFactor(Fits fits)
 		{
 			if (fits(1.0))
 				return 1.0;
 			double low = 1.0;
 			double high = 2.0;
+			int doublings = 1;
 			while (!fits(high))
 			{
+				if (doublings >= MaxFactorDoublings)
+					return high;
 				low = high;
 				high *= 2.0;
+				++doublings;
 			}
 			while (high - low > 1.0)
 			{
@@ -75,6 +79,11 @@ namespace UiNineSlice
 			}
 			return high;
 		}
+	}
+
+	double smallestFactor(bool (*fits)(double factor, const void* context), const void* context)
+	{
+		return searchSmallestFactor([fits, context](double factor) { return fits(factor, context); });
 	}
 
 	int roundToPixel(double value)
@@ -119,7 +128,7 @@ namespace UiNineSlice
 	double tileFactor(const Span& middle, double scale, Fill fill)
 	{
 		scale = validScale(scale);
-		return smallestFactor([&](double factor) {
+		return searchSmallestFactor([&](double factor) {
 			return tilesCoverAPixel(middle, scale, fill, factor) && spanCount(middle, scale, fill, factor) <= MaxPieces;
 		});
 	}
@@ -164,7 +173,7 @@ namespace UiNineSlice
 	double sliceTileFactor(const Axis& x, const Axis& y, double scale, Fill edges, Fill center)
 	{
 		scale = validScale(scale);
-		return smallestFactor([&](double factor) {
+		return searchSmallestFactor([&](double factor) {
 			if (!tilesCoverAPixel(x.middle, scale, edges, factor) || !tilesCoverAPixel(y.middle, scale, edges, factor) ||
 				!tilesCoverAPixel(x.middle, scale, center, factor) || !tilesCoverAPixel(y.middle, scale, center, factor))
 				return false;

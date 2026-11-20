@@ -68,6 +68,8 @@ public:
 	virtual void setHeight( UnsignedInt height ) override;
 	virtual Bool getViewportRect( Int& x, Int& y, Int& width, Int& height ) const override;
 	virtual Bool setDisplayMode( UnsignedInt xres, UnsignedInt yres, UnsignedInt bitdepth, Bool windowed ) override;
+	virtual Bool setRenderSize( UnsignedInt xres, UnsignedInt yres ) override;
+	virtual Bool resizeWindow( UnsignedInt pixelWidth, UnsignedInt pixelHeight ) override;
 	virtual Int getDisplayModeCount() override;	///<return number of display modes/resolutions supported by video card.
 	virtual void getDisplayModeDescription(Int modeIndex, Int *xres, Int *yres, Int *bitDepth) override;	///<return description of mode
  	virtual void setGamma(Real gamma, Real bright, Real contrast, Bool calibrate) override;
@@ -158,6 +160,7 @@ public:
 
 protected:
 
+	Bool applyDisplayMode( UnsignedInt xres, UnsignedInt yres, UnsignedInt bitdepth, Bool windowed, Bool sizeWindow );
 	void initAssets();									///< init assets for WW3D
 	void init3DScene();									///< init 3D scene for WW3D
 	void init2DScene();									///< init 2D scene for WW3D

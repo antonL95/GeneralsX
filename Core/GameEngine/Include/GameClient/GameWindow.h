@@ -61,6 +61,7 @@
 // FORWARD REFERENCES /////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 class GameWindow;
+namespace UiRelayout { struct WindowRule; }
 class WindowLayout;
 class GameFont;
 class TransitionWindow;
@@ -390,6 +391,9 @@ public:
 		return TRUE;
 	}
 
+	void winSetLayoutRule( const UiRelayout::WindowRule& rule );
+	const UiRelayout::WindowRule& winGetLayoutRule() const;
+
 protected:
 
 	/// 'images' should be taken care of when we hide ourselves or are destroyed
@@ -442,6 +446,7 @@ protected:
 
 	IRegion2D m_layoutRegion;
 	ICoord2D m_layoutResolution;
+	UiRelayout::WindowRule *m_layoutRule;
 
 	// vector of window transitions that have a relation to the current GameWindow
 	std::vector<TransitionWindow*> m_transitionWindows;

@@ -72,6 +72,7 @@
 #include "GameClient/HeaderTemplate.h"
 #include "Common/RetailFileLayers.h"
 #include "GameClient/UiAnchor.h"
+#include "GameClient/UiRelayout.h"
 #include "GameClient/UiTest.h"
 #include "GameClient/UiScale.h"
 
@@ -588,12 +589,14 @@ static Bool parseScreenRect( const char *token, char *buffer,
 	// shrink or expand the screen region by the ratio of the current
 	// resolution divided by the creation resolution
 	//
-	Real xScale = (Real)TheDisplay->getWidth() / (Real)createRes.x;
-	Real yScale = (Real)TheDisplay->getHeight() / (Real)createRes.y;
-	screenRegion.lo.x = (Int)((Real)screenRegion.lo.x * xScale);
-	screenRegion.lo.y = (Int)((Real)screenRegion.lo.y * yScale);
-	screenRegion.hi.x = (Int)((Real)screenRegion.hi.x * xScale);
-	screenRegion.hi.y = (Int)((Real)screenRegion.hi.y * yScale);
+	const int region[4] = { screenRegion.lo.x, screenRegion.lo.y, screenRegion.hi.x, screenRegion.hi.y };
+	const int resolution[2] = { createRes.x, createRes.y };
+	const UiScale::PixelRect stretched = UiRelayout::stretchedRect( region, resolution,
+																																 (Int)TheDisplay->getWidth(), (Int)TheDisplay->getHeight() );
+	screenRegion.lo.x = stretched.x0;
+	screenRegion.lo.y = stretched.y0;
+	screenRegion.hi.x = stretched.x1;
+	screenRegion.hi.y = stretched.y1;
 
 	//
 	// given the screen region upper left compute the upper left that we
@@ -2404,20 +2407,17 @@ static Bool applyAnchorLayout( const UiAnchor::Spec& spec, GameWindow *parent, W
 	const Int screenWidth = TheDisplay->getWidth();
 	const Int screenHeight = TheDisplay->getHeight();
 	ICoord2D origin = { 0, 0 };
-	UiScale::PixelRect area;
+	UiScale::PixelRect parentRect = { 0, 0, 0, 0 };
 	if( parent )
 	{
 		ICoord2D size;
 		parent->winGetScreenPosition( &origin.x, &origin.y );
 		parent->winGetSize( &size.x, &size.y );
-		area = { origin.x, origin.y, origin.x + size.x, origin.y + size.y };
+		parentRect = { origin.x, origin.y, origin.x + size.x, origin.y + size.y };
 	}
-	else if( spec.safeArea )
-		area = UiAnchor::safeArea( screenWidth, screenHeight, UiAnchor::activeSafeArea() );
-	else
-		area = UiAnchor::screenArea( screenWidth, screenHeight );
 
-	const UiScale::PixelRect rect = UiAnchor::resolve( spec, area, UiScale::scale( screenWidth, screenHeight ) );
+	const UiScale::PixelRect rect = UiRelayout::anchoredRect( spec, parent ? &parentRect : nullptr, screenWidth, screenHeight,
+																														UiAnchor::activeSafeArea() );
 	*x = rect.x0 - origin.x;
 	*y = rect.y0 - origin.y;
 	*width = rect.x1 - rect.x0;
@@ -2431,6 +2431,31 @@ static Bool applyAnchorLayout( const UiAnchor::Spec& spec, GameWindow *parent, W
 			instData->m_font = font;
 	}
 	return TRUE;
+}
+
+static UiRelayout::WindowRule layoutRuleOf( const UiAnchor::Spec& spec, const IRegion2D& region, const ICoord2D& resolution )
+{
+	UiRelayout::WindowRule rule;
+	if( spec.anchored() )
+	{
+		rule.rule = UiRelayout::Rule::Anchored;
+		rule.anchor = spec;
+		if( theFontRequest.requested )
+		{
+			rule.fontName = theFontRequest.name.str();
+			rule.fontSize = theFontRequest.size;
+			rule.fontBold = theFontRequest.bold ? true : false;
+		}
+		return rule;
+	}
+	rule.rule = UiRelayout::Rule::Stretched;
+	rule.region[0] = region.lo.x;
+	rule.region[1] = region.lo.y;
+	rule.region[2] = region.hi.x;
+	rule.region[3] = region.hi.y;
+	rule.resolution[0] = resolution.x;
+	rule.resolution[1] = resolution.y;
+	return rule;
 }
 
 static void rememberTabOrder( const UiAnchor::Spec& spec, GameWindow *window )
@@ -2617,6 +2642,8 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 																 width, height, &instData, data,
 																 systemFunc, inputFunc, tooltipFunc, drawFunc );
 					rememberTabOrder( anchorSpec, window );
+					if( window )
+						window->winSetLayoutRule( layoutRuleOf( anchorSpec, layoutRegion, layoutResolution ) );
 				}
 				if( window )
 					window->winSetLayoutRegion( layoutRegion, layoutResolution );
@@ -2640,6 +2667,7 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 					goto cleanupAndExit;
 				window->winSetLayoutRegion( layoutRegion, layoutResolution );
 				rememberTabOrder( anchorSpec, window );
+				window->winSetLayoutRule( layoutRuleOf( anchorSpec, layoutRegion, layoutResolution ) );
 
 				// Parses the CHILD's window info.
 				if( parseChildWindows( window, inFile, buffer ) == FALSE )
@@ -2656,6 +2684,15 @@ static GameWindow *parseWindow( File *inFile, char *buffer )
 			else if( ( RetailFileLayers::enabled() || UiTest::isActive() ) &&
 					 ( anchorKeyword = UiAnchor::keywordOf( asciibuf.str() ) ) != UiAnchor::Keyword::None )
 			{
+
+				if( window )
+				{
+					DEBUG_LOG(( "parseWindow: %s after CHILD in '%s'", asciibuf.str(), instData.m_decoratedNameString.str() ));
+					forgetTabOrder( window );
+					TheWindowManager->winDestroy( window );
+					window = nullptr;
+					goto cleanupAndExit;
+				}
 
 				if( parseAnchorField( anchorKeyword, &anchorSpec, inFile, buffer ) == FALSE )
 					goto cleanupAndExit;
@@ -3055,7 +3092,8 @@ GameWindow *GameWindowManager::winCreateFromScript( AsciiString filenameString,
 			if( firstWindow == nullptr )
 				firstWindow = window;
 
-			scriptInfo.windows.push_back(window);
+			if( window )
+				scriptInfo.windows.push_back(window);
 
     }
 

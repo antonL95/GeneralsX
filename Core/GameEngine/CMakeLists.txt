@@ -250,6 +250,9 @@ set(GAMEENGINE_SRC
     Include/GameClient/UiFrame.h
     Include/GameClient/UiLayoutDump.h
     Include/GameClient/UiNineSlice.h
+    Include/GameClient/UiPixelSpace.h
+    Include/GameClient/UiRelayout.h
+    Include/GameClient/UiResolution.h
     Include/GameClient/UiScale.h
     Include/GameClient/UiTest.h
     Include/GameClient/VideoPlayer.h
@@ -889,6 +892,9 @@ set(GAMEENGINE_SRC
     Source/GameClient/UiFrame.cpp
     Source/GameClient/UiLayoutDump.cpp
     Source/GameClient/UiNineSlice.cpp
+    Source/GameClient/UiPixelSpace.cpp
+    Source/GameClient/UiRelayout.cpp
+    Source/GameClient/UiResolution.cpp
     Source/GameClient/UiTest.cpp
     Source/GameClient/VideoPlayer.cpp
     Source/GameClient/VideoStream.cpp

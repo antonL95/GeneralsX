@@ -295,6 +295,7 @@ public:
 	** Discard the cached glyphs of every font without destroying the fonts.
 	*/
 	virtual void Free_All_FontChars_Glyph_Caches();
+	virtual void Release_Unused_Pixel_FontChars();
 
 	/*
 	** Access to HTrees, Used by Animatable3DObj's

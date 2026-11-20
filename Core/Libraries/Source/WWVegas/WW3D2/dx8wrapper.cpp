@@ -171,7 +171,6 @@ int DX8Wrapper::s_dstX = 0;
 int DX8Wrapper::s_dstY = 0;
 int DX8Wrapper::s_dstW = 0;
 int DX8Wrapper::s_dstH = 0;
-float DX8Wrapper::s_pixelDensity = 1.0f;
 IDirect3DTexture8* DX8Wrapper::s_offscreenTex = nullptr;
 IDirect3DSurface8* DX8Wrapper::s_offscreenSurf = nullptr;
 IDirect3DSurface8* DX8Wrapper::s_depthSurf = nullptr;
@@ -221,19 +220,7 @@ bool DX8Wrapper::Pillarbox_Setup(int gameW, int gameH)
 			if (!GetNativeDisplaySize(bbW, bbH, density)) {
 				bbW = gameW;
 				bbH = gameH;
-				density = 1.0f;
 			}
-		}
-	} else {
-		// GeneralsX @bugfix macOS HiDPI: the backbuffer size came from the present
-		// parameters (in physical pixels), so the density query above was skipped and
-		// s_pixelDensity would wrongly stay 1.0. Fetch it explicitly so Pillarbox_Get_Rect
-		// can convert the viewport rect back to logical points - SDL delivers mouse
-		// coordinates in points, so without this, clicks land at the wrong position.
-		int pointsW = 0, pointsH = 0;
-		float queriedDensity = 1.0f;
-		if (GetWindowSize(pointsW, pointsH, queriedDensity) && queriedDensity > 0.0f) {
-			density = queriedDensity;
 		}
 	}
 
@@ -257,7 +244,6 @@ bool DX8Wrapper::Pillarbox_Setup(int gameW, int gameH)
 
 	// Cache backbuffer size and compute aspect-correct fit rect once
 	s_bbW = bbW; s_bbH = bbH;
-	s_pixelDensity = density;
 	float gameAspect = (float)gameW / (float)gameH;
 	float bbAspect = (float)bbW / (float)bbH;
 	if (bbAspect > gameAspect) {
@@ -359,10 +345,10 @@ void DX8Wrapper::Pillarbox_End()
 bool DX8Wrapper::Pillarbox_Get_Rect(int& x, int& y, int& w, int& h)
 {
 	if (!s_pillarboxEnabled) return false;
-	x = (int)(s_dstX / s_pixelDensity);
-	y = (int)(s_dstY / s_pixelDensity);
-	w = (int)(s_dstW / s_pixelDensity);
-	h = (int)(s_dstH / s_pixelDensity);
+	x = s_dstX;
+	y = s_dstY;
+	w = s_dstW;
+	h = s_dstH;
 	return true;
 }
 

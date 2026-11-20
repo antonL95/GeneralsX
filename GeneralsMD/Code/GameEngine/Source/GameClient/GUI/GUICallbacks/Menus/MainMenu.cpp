@@ -831,7 +831,7 @@ void DeclineResolution()
 		optionPref["Resolution"] = prefString;
 		optionPref.write();
 
-		TheShell->recreateWindowLayouts();
+		TheShell->onResolutionChanged();
 
 		TheInGameUI->recreateControlBar();
 	}

@@ -383,5 +383,10 @@ void W3DFontLibrary::releaseFontData( GameFont *font )
 
 }
 
+void W3DFontLibrary::releaseUnusedFontData()
+{
+	WW3DAssetManager::Get_Instance()->Release_Unused_Pixel_FontChars();
+}
+
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////
 

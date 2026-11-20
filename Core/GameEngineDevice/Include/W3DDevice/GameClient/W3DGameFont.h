@@ -73,6 +73,7 @@ protected:
 	virtual Bool loadFontData( GameFont *font ) override;
 	/// release the font data pointer
 	virtual void releaseFontData( GameFont *font ) override;
+	virtual void releaseUnusedFontData() override;
 
 };
 

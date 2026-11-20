@@ -38,6 +38,7 @@
 // GeneralsX @bugfix felipebraz 20/02/2026 Include Display to get internal resolution for coordinate scaling
 #include "GameClient/Display.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/UiPixelSpace.h"
 // GeneralsX @bugfix BenderAI 22/02/2026 Add SDL3_image for cursor loading
 // SDL3_image now finds system libpng via pkg-config (CMAKE_PREFIX_PATH reordered in cmake/sdl3.cmake)
 #include <SDL3_image/SDL_image.h>
@@ -875,52 +876,20 @@ void SDL3Mouse::scaleMouseCoordinates(float rawX, float rawY, Uint32 windowID, i
 		return;
 	}
 
-	int windowWidth = 0, windowHeight = 0;
-	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+	UiPixelSpace::WindowSize size;
+	SDL_GetWindowSize(window, &size.pointWidth, &size.pointHeight);
+	SDL_GetWindowSizeInPixels(window, &size.pixelWidth, &size.pixelHeight);
 
-	if (windowWidth <= 0 || windowHeight <= 0) {
-		scaledX = static_cast<int>(rawX);
-		scaledY = static_cast<int>(rawY);
-		return;
+	UiPixelSpace::Viewport viewport;
+	Int viewportX = 0, viewportY = 0, viewportWidth = 0, viewportHeight = 0;
+	if (TheDisplay->getViewportRect(viewportX, viewportY, viewportWidth, viewportHeight)) {
+		viewport = { viewportX, viewportY, viewportWidth, viewportHeight };
 	}
 
-	int internalWidth  = TheDisplay->getWidth();
-	int internalHeight = TheDisplay->getHeight();
-	if (internalWidth <= 0 || internalHeight <= 0) {
-		scaledX = static_cast<int>(rawX);
-		scaledY = static_cast<int>(rawY);
-		return;
-	}
-
-	float viewportX = 0.0f;
-	float viewportY = 0.0f;
-	float viewportWidth = static_cast<float>(windowWidth);
-	float viewportHeight = static_cast<float>(windowHeight);
-	int pbX, pbY, pbW, pbH;
-	if (TheDisplay->getViewportRect(pbX, pbY, pbW, pbH)) {
-		// GeneralsX @bugfix Copilot 06/09/2026 Recreate the renderer's aspect-fit rectangle directly
-		// in SDL logical window coordinates. The cached viewport is derived from physical pixels and
-		// rounded to integers; converting it back before mapping Retina input can shift edge hit tests.
-		const float gameAspect = static_cast<float>(internalWidth) / static_cast<float>(internalHeight);
-		const float windowAspect = viewportWidth / viewportHeight;
-		if (windowAspect > gameAspect) {
-			viewportWidth = viewportHeight * gameAspect;
-			viewportX = (static_cast<float>(windowWidth) - viewportWidth) * 0.5f;
-		} else if (windowAspect < gameAspect) {
-			viewportHeight = viewportWidth / gameAspect;
-			viewportY = (static_cast<float>(windowHeight) - viewportHeight) * 0.5f;
-		}
-	}
-
-	float localX = rawX - viewportX;
-	float localY = rawY - viewportY;
-	if (localX < 0.0f) localX = 0.0f;
-	if (localX > viewportWidth) localX = viewportWidth;
-	if (localY < 0.0f) localY = 0.0f;
-	if (localY > viewportHeight) localY = viewportHeight;
-
-	scaledX = static_cast<int>(localX * static_cast<float>(internalWidth) / viewportWidth);
-	scaledY = static_cast<int>(localY * static_cast<float>(internalHeight) / viewportHeight);
+	const UiPixelSpace::Point point = UiPixelSpace::pointToRender(rawX, rawY, size, viewport,
+		static_cast<int>(TheDisplay->getWidth()), static_cast<int>(TheDisplay->getHeight()));
+	scaledX = point.x;
+	scaledY = point.y;
 }
 
 /**

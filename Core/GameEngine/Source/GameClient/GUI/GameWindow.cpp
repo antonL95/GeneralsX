@@ -62,6 +62,7 @@
 #include "GameClient/Mouse.h"
 #include "GameClient/SelectionXlat.h"
 #include "GameClient/GameWindowTransitions.h"
+#include "GameClient/UiRelayout.h"
 
 // DEFINES ////////////////////////////////////////////////////////////////////
 
@@ -119,6 +120,7 @@ GameWindow::GameWindow()
 
 	m_layoutRegion.lo.x = m_layoutRegion.lo.y = m_layoutRegion.hi.x = m_layoutRegion.hi.y = 0;
 	m_layoutResolution.x = m_layoutResolution.y = 0;
+	m_layoutRule = nullptr;
 
 }
 
@@ -133,8 +135,25 @@ GameWindow::~GameWindow()
 	delete m_editData;
 	m_editData = nullptr;
 
+	delete m_layoutRule;
+	m_layoutRule = nullptr;
+
 	unlinkFromTransitionWindows();
 
+}
+
+void GameWindow::winSetLayoutRule( const UiRelayout::WindowRule& rule )
+{
+	if( m_layoutRule )
+		*m_layoutRule = rule;
+	else
+		m_layoutRule = new UiRelayout::WindowRule( rule );
+}
+
+const UiRelayout::WindowRule& GameWindow::winGetLayoutRule() const
+{
+	static const UiRelayout::WindowRule fixedRule;
+	return m_layoutRule ? *m_layoutRule : fixedRule;
 }
 
 // GameWindow::linkTransitionWindow ============================================

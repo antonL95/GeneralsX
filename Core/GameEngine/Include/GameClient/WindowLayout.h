@@ -73,6 +73,7 @@ public:
 	void destroyWindows();										///< destroy all windows in this screen
 	GameWindow *getFirstWindow() const;				///< get first window in list for screen
 	const std::list<GameWindow *>& getTabList() const { return m_tabList; }
+	void removeTabWindow( GameWindow *window ) { m_tabList.remove( window ); }
 
 	// accessing layout callbacks  ------------------------------------------------------------------
 	void runInit( void *userData = nullptr );									///< run the init method if available

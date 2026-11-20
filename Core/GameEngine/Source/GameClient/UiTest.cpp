@@ -15,12 +15,14 @@
 #include "GameClient/Image.h"
 #include "GameClient/UiFrame.h"
 #include "GameClient/UiLayoutDump.h"
+#include "GameClient/UiResolution.h"
 #include "GameClient/UiScale.h"
 #include "GameClient/WindowLayout.h"
 
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -30,10 +32,12 @@ namespace
 	{
 		WaitingForShell,
 		Created,
+		Resized,
 		Done
 	};
 
 	constexpr Int CaptureFramesAfterCreation = 1;
+	constexpr Int MaxResizeWaitFrames = 120;
 
 	struct FrameSpecimen
 	{
@@ -52,6 +56,10 @@ namespace
 		UiScale::PixelRect frameCanvas = { 0, 0, 0, 0 };
 		std::vector<FrameSpecimen> frames;
 		std::vector<GameWindow*> tabOrder;
+		Int resizeWidth = 0;
+		Int resizeHeight = 0;
+		Bool resizeViaWindow = FALSE;
+		Int resizeWaitFrames = 0;
 	};
 
 	State& state()
@@ -335,13 +343,36 @@ namespace
 		}
 	}
 
+	void destroyNamedWindows(const char* spec, WindowLayout* layout)
+	{
+		const std::string names(spec);
+		std::size_t start = 0;
+		while (start < names.size())
+		{
+			const std::size_t end = std::min(names.find('|', start), names.size());
+			const std::string name = names.substr(start, end - start);
+			start = end + 1;
+			if (name.empty())
+				continue;
+			GameWindow* window = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey(name.c_str()));
+			if (window)
+				TheWindowManager->winDestroy(window);
+			std::fprintf(stderr, "UI test: destroy '%s': %s\n", name.c_str(), window ? "destroyed" : "window missing");
+		}
+		if (layout)
+			state().tabOrder.assign(layout->getTabList().begin(), layout->getTabList().end());
+		std::fprintf(stderr, "UI test: tab lists after destroy: layout %d, manager %d\n",
+			layout ? static_cast<Int>(layout->getTabList().size()) : 0, static_cast<Int>(TheWindowManager->getTabList().size()));
+	}
+
 	void createWindows()
 	{
 		TheWritableGlobalData->m_breakTheMovie = FALSE;
 		State& current = state();
+		WindowLayout* layout = nullptr;
 		if (!current.layout.empty())
 		{
-			WindowLayout* layout = TheWindowManager->winCreateLayout(current.layout.c_str());
+			layout = TheWindowManager->winCreateLayout(current.layout.c_str());
 			current.layoutLoaded = layout != nullptr;
 			if (layout)
 			{
@@ -359,12 +390,14 @@ namespace
 			attachWindowFrames(spec);
 		if (const char* spec = environment("GENERALSX_UITEST_WINDOW_TEXT"))
 			assignWindowTexts(spec);
+		if (const char* spec = environment("GENERALSX_UITEST_DESTROY"))
+			destroyNamedWindows(spec, layout);
 		std::fflush(stderr);
 	}
 
-	void writeDump()
+	void writeDump(const char* variable)
 	{
-		const char* path = environment("GENERALSX_UITEST_JSON");
+		const char* path = environment(variable);
 		if (!path)
 			return;
 
@@ -388,12 +421,65 @@ namespace
 		std::fclose(file);
 		std::fprintf(stderr, "UI test: wrote %s\n", path);
 	}
+
+	Bool atResizeTarget()
+	{
+		const State& current = state();
+		return static_cast<Int>(TheDisplay->getWidth()) == current.resizeWidth &&
+			static_cast<Int>(TheDisplay->getHeight()) == current.resizeHeight;
+	}
+
+	void reportCapture(const char* variable)
+	{
+		const State& current = state();
+		if (environment(variable) && !TheGlobalData->m_headless && !current.captured)
+			std::fprintf(stderr, "UI test: no frame was captured\n");
+	}
+
+	void finish(const char* jsonVariable, const char* pngVariable)
+	{
+		State& current = state();
+		writeDump(jsonVariable);
+		reportCapture(pngVariable);
+		if (!current.layout.empty() && !current.layoutLoaded)
+			std::fprintf(stderr, "UI test: requested layout was not loaded\n");
+		std::fflush(stderr);
+		current.stage = Stage::Done;
+		TheGameEngine->setQuitting(TRUE);
+	}
+
+	void startResize()
+	{
+		State& current = state();
+		current.stage = Stage::Resized;
+		current.captured = FALSE;
+		current.framesSinceCreation = 0;
+		current.resizeWaitFrames = 0;
+		const Bool requested = current.resizeViaWindow
+			? TheDisplay->resizeWindow(current.resizeWidth, current.resizeHeight)
+			: UiResolution::changeDisplayMode(current.resizeWidth, current.resizeHeight);
+		std::fprintf(stderr, "UI test: resize to %d x %d through the %s path %s\n", current.resizeWidth, current.resizeHeight,
+			current.resizeViaWindow ? "window" : "display mode", requested ? "requested" : "failed");
+		std::fflush(stderr);
+	}
 }
 
 void UiTest::enable(const char* layout)
 {
 	state().active = TRUE;
 	state().layout = layout ? layout : "";
+	if (const char* resize = environment("GENERALSX_UITEST_RESIZE"))
+	{
+		Int width = 0;
+		Int height = 0;
+		if (std::sscanf(resize, "%dx%d", &width, &height) == 2 && width > 0 && height > 0)
+		{
+			state().resizeWidth = width;
+			state().resizeHeight = height;
+		}
+	}
+	if (const char* via = environment("GENERALSX_UITEST_RESIZE_VIA"))
+		state().resizeViaWindow = std::strcmp(via, "window") == 0 ? TRUE : FALSE;
 }
 
 Bool UiTest::isActive()
@@ -416,35 +502,66 @@ void UiTest::update()
 	}
 	if (current.stage == Stage::Created)
 		++current.framesSinceCreation;
+	if (current.stage == Stage::Resized)
+	{
+		if (atResizeTarget())
+			++current.framesSinceCreation;
+		else
+			++current.resizeWaitFrames;
+	}
 }
 
 const char* UiTest::capturePath()
 {
 	const State& current = state();
-	if (!current.active || current.stage != Stage::Created || current.captured ||
-		current.framesSinceCreation < CaptureFramesAfterCreation || TheGlobalData->m_headless)
+	if (!current.active || current.captured || current.framesSinceCreation < CaptureFramesAfterCreation ||
+		TheGlobalData->m_headless)
 		return nullptr;
-	return environment("GENERALSX_UITEST_PNG");
+	if (current.stage == Stage::Created)
+		return environment("GENERALSX_UITEST_PNG");
+	if (current.stage == Stage::Resized && atResizeTarget())
+		return environment("GENERALSX_UITEST_RESIZE_PNG");
+	return nullptr;
 }
 
 void UiTest::markCaptured()
 {
-	state().captured = TRUE;
-	std::fprintf(stderr, "UI test: captured %s\n", environment("GENERALSX_UITEST_PNG"));
+	State& current = state();
+	current.captured = TRUE;
+	std::fprintf(stderr, "UI test: captured %s\n",
+		environment(current.stage == Stage::Resized ? "GENERALSX_UITEST_RESIZE_PNG" : "GENERALSX_UITEST_PNG"));
 }
 
 void UiTest::finishFrame()
 {
 	State& current = state();
-	if (!current.active || current.stage != Stage::Created || current.framesSinceCreation < CaptureFramesAfterCreation)
+	if (!current.active)
 		return;
 
-	writeDump();
-	if (environment("GENERALSX_UITEST_PNG") && !TheGlobalData->m_headless && !current.captured)
-		std::fprintf(stderr, "UI test: no frame was captured\n");
-	if (!current.layout.empty() && !current.layoutLoaded)
-		std::fprintf(stderr, "UI test: requested layout was not loaded\n");
-	std::fflush(stderr);
-	current.stage = Stage::Done;
-	TheGameEngine->setQuitting(TRUE);
+	if (current.stage == Stage::Resized && !atResizeTarget())
+	{
+		if (current.resizeWaitFrames < MaxResizeWaitFrames)
+			return;
+		std::fprintf(stderr, "UI test: display stayed at %u x %u instead of %d x %d\n", TheDisplay->getWidth(),
+			TheDisplay->getHeight(), current.resizeWidth, current.resizeHeight);
+		finish("GENERALSX_UITEST_RESIZE_JSON", "GENERALSX_UITEST_RESIZE_PNG");
+		return;
+	}
+
+	if ((current.stage != Stage::Created && current.stage != Stage::Resized) ||
+		current.framesSinceCreation < CaptureFramesAfterCreation)
+		return;
+
+	if (current.stage == Stage::Created && current.resizeWidth > 0)
+	{
+		writeDump("GENERALSX_UITEST_JSON");
+		reportCapture("GENERALSX_UITEST_PNG");
+		startResize();
+		return;
+	}
+
+	if (current.stage == Stage::Created)
+		finish("GENERALSX_UITEST_JSON", "GENERALSX_UITEST_PNG");
+	else
+		finish("GENERALSX_UITEST_RESIZE_JSON", "GENERALSX_UITEST_RESIZE_PNG");
 }

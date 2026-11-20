@@ -876,7 +876,7 @@ static void saveOptions()
 				prefString.format("%d %d", xres, yres );
 				(*pref)["Resolution"] = prefString;
 
-				TheShell->recreateWindowLayouts();
+				TheShell->onResolutionChanged();
 
 				TheInGameUI->recreateControlBar();
 				TheInGameUI->refreshCustomUiResources();

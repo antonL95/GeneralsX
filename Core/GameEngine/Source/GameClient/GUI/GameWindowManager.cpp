@@ -55,6 +55,11 @@
 #include "GameClient/GlobalLanguage.h"
 #include "GameClient/GameWindowTransitions.h"
 #include "Common/NameKeyGenerator.h"
+#include "GameClient/Display.h"
+#include "GameClient/GameFont.h"
+#include "GameClient/HeaderTemplate.h"
+#include "GameClient/UiAnchor.h"
+#include "GameClient/UiRelayout.h"
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 GameWindowManager *TheWindowManager = nullptr;
@@ -1421,6 +1426,13 @@ Int GameWindowManager::winDestroy( GameWindow *window )
 
 	if( m_grabWindow == window )
 		m_grabWindow = nullptr;
+
+	m_tabList.remove( window );
+	GameWindow *root = window;
+	while( root->m_parent )
+		root = root->m_parent;
+	if( root->m_layout )
+		root->m_layout->removeTabWindow( window );
 
 	for( child = window->m_child; child; child = next )
 	{
@@ -4046,6 +4058,104 @@ void GameWindowManager::registerTabList( GameWindowList tabList )
 void GameWindowManager::clearTabList()
 {
 	m_tabList.clear();
+}
+
+static UiScale::PixelRect screenRectOf( GameWindow *window )
+{
+	Int x = 0;
+	Int y = 0;
+	Int width = 0;
+	Int height = 0;
+	window->winGetScreenPosition( &x, &y );
+	window->winGetSize( &width, &height );
+	return { x, y, x + width, y + height };
+}
+
+static void relayoutFont( GameWindow *window, const UiRelayout::WindowRule& rule, Int width, Int height )
+{
+	GameFont *font = nullptr;
+	if( rule.rule == UiRelayout::Rule::Anchored && rule.hasFont() && TheFontLibrary )
+		font = TheFontLibrary->getUiFont( AsciiString( rule.fontName.c_str() ), rule.fontSize, rule.fontBold ? TRUE : FALSE,
+																			width, height );
+
+	const WinInstanceData *data = window->winGetInstanceData();
+	if( data && data->m_headerTemplateName.isNotEmpty() && TheHeaderTemplateManager )
+	{
+		if( GameFont *templateFont = TheHeaderTemplateManager->getFontFromTemplate( data->m_headerTemplateName ) )
+			font = templateFont;
+	}
+
+	if( font && font != window->winGetFont() )
+		window->winSetFont( font );
+}
+
+static void relayoutWindows( GameWindow *window, const UiScale::PixelRect *parentBefore, const UiScale::PixelRect *parentAfter,
+														 Int width, Int height )
+{
+	for( ; window; window = window->winGetNext() )
+	{
+		const UiScale::PixelRect before = screenRectOf( window );
+		const UiRelayout::WindowRule& rule = window->winGetLayoutRule();
+		if( rule.movable() )
+		{
+			const UiScale::PixelRect rect = UiRelayout::place( rule, before, parentBefore, parentAfter, width, height,
+																												 UiAnchor::activeSafeArea() );
+			const Int x = rect.x0 - ( parentAfter ? parentAfter->x0 : 0 );
+			const Int y = rect.y0 - ( parentAfter ? parentAfter->y0 : 0 );
+			Int currentX = 0;
+			Int currentY = 0;
+			window->winGetPosition( &currentX, &currentY );
+			if( currentX != x || currentY != y )
+				window->winSetPosition( x, y );
+			if( before.x1 - before.x0 != rect.x1 - rect.x0 || before.y1 - before.y0 != rect.y1 - rect.y0 )
+				window->winSetSize( rect.x1 - rect.x0, rect.y1 - rect.y0 );
+			relayoutFont( window, rule, width, height );
+		}
+		const UiScale::PixelRect after = screenRectOf( window );
+		relayoutWindows( window->winGetChild(), &before, &after, width, height );
+	}
+}
+
+static void collectWindowFonts( GameWindow *window, std::vector<const GameFont *>& fonts )
+{
+	for( ; window; window = window->winGetNext() )
+	{
+		if( GameFont *font = window->winGetFont() )
+			fonts.push_back( font );
+		collectWindowFonts( window->winGetChild(), fonts );
+	}
+}
+
+static Bool containsAnchoredWindow( GameWindow *window )
+{
+	for( ; window; window = window->winGetNext() )
+	{
+		if( window->winGetLayoutRule().rule == UiRelayout::Rule::Anchored || containsAnchoredWindow( window->winGetChild() ) )
+			return TRUE;
+	}
+	return FALSE;
+}
+
+Bool GameWindowManager::hasAnchoredWindows()
+{
+	return containsAnchoredWindow( m_windowList );
+}
+
+void GameWindowManager::relayout()
+{
+	if( TheDisplay == nullptr )
+		return;
+
+	relayoutWindows( m_windowList, nullptr, nullptr, TheDisplay->getWidth(), TheDisplay->getHeight() );
+
+	if( TheFontLibrary )
+	{
+		std::vector<const GameFont *> fonts;
+		collectWindowFonts( m_windowList, fonts );
+		if( TheDisplayStringManager )
+			TheDisplayStringManager->collectFonts( fonts );
+		TheFontLibrary->releaseUnusedPixelFonts( fonts );
+	}
 }
 
 

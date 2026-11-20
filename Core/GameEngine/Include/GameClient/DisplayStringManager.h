@@ -52,6 +52,8 @@ public:
 
 	virtual DisplayString *getGroupNumeralString( Int numeral ) = 0;
 	virtual DisplayString *getFormationLetterString() = 0;
+
+	void collectFonts( std::vector<const GameFont *>& fonts ) const;
 protected:
 
 	void link( DisplayString *string );  ///< link display string to list

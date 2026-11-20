@@ -219,6 +219,40 @@ TEST(UiNineSlice, RoundingSaturatesInsteadOfOverflowing)
 	EXPECT_EQ(axis.high.dest0, 100);
 }
 
+TEST(UiNineSlice, SmallestFactorSearchIsBounded)
+{
+	int calls = 0;
+	const auto never = [](double, const void* context) {
+		++*static_cast<int*>(const_cast<void*>(context));
+		return false;
+	};
+	EXPECT_TRUE(std::isfinite(UiNineSlice::smallestFactor(never, &calls)));
+	EXPECT_LE(calls, UiNineSlice::MaxFactorDoublings + 1);
+
+	const auto atLeast = [](double factor, const void* context) { return factor >= *static_cast<const double*>(context); };
+	const double one = 1.0;
+	const double thousand = 1000.0;
+	const double three = 3.0;
+	EXPECT_DOUBLE_EQ(UiNineSlice::smallestFactor(atLeast, &one), 1.0);
+	EXPECT_DOUBLE_EQ(UiNineSlice::smallestFactor(atLeast, &thousand), 1000.0);
+	EXPECT_DOUBLE_EQ(UiNineSlice::smallestFactor(atLeast, &three), 3.0);
+
+	struct Counted
+	{
+		double limit;
+		int* calls;
+	};
+	calls = 0;
+	const Counted large = { 1.0e15, &calls };
+	const auto counted = [](double factor, const void* context) {
+		const Counted* data = static_cast<const Counted*>(context);
+		++*data->calls;
+		return factor >= data->limit;
+	};
+	EXPECT_DOUBLE_EQ(UiNineSlice::smallestFactor(counted, &large), 1.0e15);
+	EXPECT_LE(calls, 2 * UiNineSlice::MaxFactorDoublings + 2);
+}
+
 TEST(UiNineSlice, CornerScaleIsClampedToASaneRange)
 {
 	EXPECT_DOUBLE_EQ(UiNineSlice::clampCornerScale(1.5), 1.5);

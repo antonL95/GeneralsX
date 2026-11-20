@@ -34,6 +34,8 @@
 #include "Common/GameMemory.h"
 #include "GameClient/FontSubstitution.h"
 
+#include <vector>
+
 //-------------------------------------------------------------------------------------------------
 /** A font for use in the device independent game */
 //-------------------------------------------------------------------------------------------------
@@ -73,6 +75,7 @@ public:
 	GameFont *getFontPixels( AsciiString name, Int pixelSize, Bool bold );
 	GameFont *getFontVariant( const GameFont *font, Bool bold );
 	GameFont *getUiFont( AsciiString name, Int designSize, Bool bold, Int screenWidth, Int screenHeight );
+	void releaseUnusedPixelFonts( const std::vector<const GameFont *>& inUse );
 
 	void setSubstitutions( const FontSubstitutionTable& table ) { m_substitutions = table; }
 	const FontSubstitutionTable& getSubstitutions() const { return m_substitutions; }
@@ -92,6 +95,7 @@ protected:
 	virtual Bool loadFontData( GameFont *font ) = 0;
 	/// release the font data pointer
 	virtual void releaseFontData( GameFont *font ) { };
+	virtual void releaseUnusedFontData() { }
 
 	GameFont *findOrLoadFont( const AsciiString& name, Int pointSize, Int pixelSize, Bool bold );
 

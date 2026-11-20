@@ -238,6 +238,9 @@ public:
 	virtual void clearTabList();	///< we's gotz ta clear the tab list yo!
 	const GameWindowList& getTabList() const { return m_tabList; }
 
+	void relayout();
+	Bool hasAnchoredWindows();
+
 	// --------------------------------------------------------------------------
 	/// process a single mouse event
 	virtual WinInputReturnCode winProcessMouseEvent( GameWindowMessage msg,
