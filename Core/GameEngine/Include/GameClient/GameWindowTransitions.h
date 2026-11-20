@@ -238,6 +238,7 @@ class ScreenFadeTransition : public Transition
 {
 public:
 	ScreenFadeTransition ();
+	ScreenFadeTransition( Int frames, Color color );
 	virtual ~ScreenFadeTransition() override;
 
 	virtual void init( GameWindow *win ) override;
@@ -256,6 +257,8 @@ protected:
 	ICoord2D m_size;
 	Real m_percent;
 	Int m_drawState;
+	Color m_color;
+	Bool m_useRetailTiming;
 
 };
 //-----------------------------------------------------------------------------
@@ -615,12 +618,19 @@ public:
 	AsciiString m_winName;
 	Int m_frameDelay;					// what frame number we start on
 	Int m_style;							// the style we'll be using
+	Int m_startFrame;
+	Int m_endFrame;
+	Color m_fadeColor;
 
 // standard vars
 	NameKeyType	m_winID;
 	GameWindow *m_win;
 	Transition *m_transition; // each window is allowed one transition
 	Int m_currentFrameDelay;	// this will change based on if we're going forward or backwards
+
+private:
+	Int m_duration;
+	Int m_lastStyleFrame;
 };
 
 //-----------------------------------------------------------------------------

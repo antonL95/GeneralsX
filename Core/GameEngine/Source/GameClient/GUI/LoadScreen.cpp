@@ -69,6 +69,8 @@
 #include "Common/RetailFileLayers.h"
 #include "GameClient/CampaignManager.h"
 #include "GameClient/Display.h"
+#include "GameClient/DisplayString.h"
+#include "GameClient/DisplayStringManager.h"
 #include "GameClient/GadgetProgressBar.h"
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/GameClient.h"
@@ -95,6 +97,7 @@
 #include "GameNetwork/GameSpy/PersistentStorageThread.h"
 #include "GameNetwork/NetworkInterface.h"
 #include "GameNetwork/RankPointValue.h"
+#include <algorithm>
 
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
@@ -1275,6 +1278,9 @@ MultiPlayerLoadScreen::MultiPlayerLoadScreen()
 
 MultiPlayerLoadScreen::~MultiPlayerLoadScreen()
 {
+	if (m_retailLabel)
+		TheDisplayStringManager->freeDisplayString(m_retailLabel);
+
 	if(m_mapPreview)
 	{
 		m_mapPreview->winSetUserData(nullptr);
@@ -1282,6 +1288,28 @@ MultiPlayerLoadScreen::~MultiPlayerLoadScreen()
 
 	TheAudio->removeAudioEvent( AHSV_StopTheMusicFade );
 //	TheAudio->stopAudio( AudioAffect_Music );
+}
+
+void MultiPlayerLoadScreen::drawRetailLoading( GameWindow *window, WinInstanceData * )
+{
+	const auto *screen = static_cast<const MultiPlayerLoadScreen *>(window->winGetUserData());
+	const Int width = TheDisplay->getWidth();
+	const Int height = TheDisplay->getHeight();
+	const Int barWidth = width / 3;
+	const Int barHeight = std::max(4, height / 90);
+	const Int x = (width - barWidth) / 2;
+	const Int y = height * 5 / 8;
+	TheDisplay->drawFillRect(0, 0, width, height, GameMakeColor(31, 38, 43, 255));
+	TheDisplay->drawFillRect(x, y, barWidth, barHeight, GameMakeColor(64, 69, 72, 255));
+	TheDisplay->drawFillRect(x, y, barWidth * screen->m_retailProgress / 100, barHeight,
+		GameMakeColor(204, 174, 119, 255));
+	if (DisplayString *label = screen->m_retailLabel)
+	{
+		Int labelWidth, labelHeight;
+		label->getSize(&labelWidth, &labelHeight);
+		label->draw((width - labelWidth) / 2, y - labelHeight - barHeight,
+			GameMakeColor(239, 226, 199, 255), GameMakeColor(0, 0, 0, 0));
+	}
 }
 
 void MultiPlayerLoadScreen::init( GameInfo *game )
@@ -1292,6 +1320,24 @@ void MultiPlayerLoadScreen::init( GameInfo *game )
 	{
 		INIAudit::recordWithContext("map-load-screen", "MultiPlayerLoadScreen::init", "missing window",
 			"Menus/MultiplayerLoadScreen.wnd", 0);
+		WinInstanceData data;
+		data.m_style = GWS_USER_WINDOW;
+		m_loadScreen = TheWindowManager->winCreate(nullptr, WIN_STATUS_ENABLED | WIN_STATUS_ABOVE, 0, 0,
+			TheDisplay->getWidth(), TheDisplay->getHeight(), nullptr, &data);
+		if (m_loadScreen)
+		{
+			m_retailProgress = 0;
+			m_loadScreen->winSetUserData(this);
+			m_loadScreen->winSetDrawFunc(drawRetailLoading);
+			if (GameFont *font = m_loadScreen->winGetFont())
+			{
+				m_retailLabel = TheDisplayStringManager->newDisplayString();
+				m_retailLabel->setFont(font);
+				UnicodeString title;
+				title.translate("Loading match");
+				m_retailLabel->setText(title);
+			}
+		}
 		TheGameLogic->initTimeOutValues();
 		return;
 	}
@@ -1477,6 +1523,12 @@ void MultiPlayerLoadScreen::init( GameInfo *game )
 
 void MultiPlayerLoadScreen::reset()
 {
+	m_retailProgress = -1;
+	if (m_retailLabel)
+	{
+		TheDisplayStringManager->freeDisplayString(m_retailLabel);
+		m_retailLabel = nullptr;
+	}
 	setLoadScreen(nullptr);
 	for(Int i = 0; i < MAX_SLOTS; ++i)
 	{
@@ -1488,6 +1540,9 @@ void MultiPlayerLoadScreen::reset()
 
 void MultiPlayerLoadScreen::update( Int percent )
 {
+	if (m_retailProgress >= 0)
+		m_retailProgress = std::clamp(percent, 0, 100);
+
 	if (TheNetwork)
 	{
 		if(percent <= 100)
@@ -1510,7 +1565,7 @@ void MultiPlayerLoadScreen::update( Int percent )
 
 void MultiPlayerLoadScreen::processProgress(Int playerId, Int percentage)
 {
-	if (!m_loadScreen && RetailFileLayers::enabled())
+	if (m_retailProgress >= 0 || (!m_loadScreen && RetailFileLayers::enabled()))
 		return;
 	if( percentage < 0 || percentage > 100 || playerId >= MAX_SLOTS || playerId < 0 || m_playerLookup[playerId] == -1)
 	{

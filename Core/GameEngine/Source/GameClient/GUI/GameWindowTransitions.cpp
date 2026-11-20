@@ -52,13 +52,21 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "GameLogic/GameLogic.h"
+#include "GameClient/ControlBar.h"
+#include "GameClient/Display.h"
 #include "GameClient/GameWindowTransitions.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
+#include "Common/AudioAffect.h"
 #include "Common/FramePacer.h"
+#include "Common/GameAudio.h"
 #include "Common/GlobalData.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#include <algorithm>
+#include <limits>
+#include <memory>
+#include <vector>
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -145,10 +153,187 @@ Transition *getTransitionForStyle( Int style )
 	return nullptr;
 }
 
+namespace
+{
+	constexpr Int SoundFadeStyle = MAX_TRANSITION_WINDOW_STYLES;
+	constexpr AudioAffect SoundFadeChannels[] = {
+		AudioAffect_Music, AudioAffect_Sound, AudioAffect_Sound3D, AudioAffect_Speech
+	};
+
+	class SoundFadeTransition final : public Transition
+	{
+	public:
+		explicit SoundFadeTransition( Int frames )
+		{
+			m_frameLength = frames;
+			m_win = nullptr;
+		}
+
+		~SoundFadeTransition() override
+		{
+			restore();
+		}
+
+		void init( GameWindow * ) override
+		{
+			m_isForward = TRUE;
+			m_isFinished = FALSE;
+			saveVolumes();
+		}
+
+		void update( Int frame ) override
+		{
+			m_isFinished = m_isForward ? frame == m_frameLength : frame == 0;
+			if (m_isFinished)
+			{
+				restore();
+				return;
+			}
+			if (m_audio && m_audio == TheAudio)
+			{
+				const Real gain = 1.0f - (Real)frame / m_frameLength;
+				for (size_t i = 0; i < ARRAY_SIZE(SoundFadeChannels); ++i)
+					m_audio->setVolume(m_originalVolumes[i] * gain, SoundFadeChannels[i]);
+			}
+		}
+
+		void reverse() override
+		{
+			m_isForward = FALSE;
+			m_isFinished = FALSE;
+			if (!m_audio)
+				saveVolumes();
+		}
+
+		void draw() override {}
+
+		void skip() override
+		{
+			restore();
+			m_isFinished = TRUE;
+		}
+
+	private:
+		void saveVolumes()
+		{
+			m_audio = TheAudio;
+			if (m_audio)
+				for (size_t i = 0; i < ARRAY_SIZE(SoundFadeChannels); ++i)
+					m_originalVolumes[i] = m_audio->getScriptVolume(SoundFadeChannels[i]);
+		}
+
+		void restore()
+		{
+			if (m_audio && m_audio == TheAudio)
+				for (size_t i = 0; i < ARRAY_SIZE(SoundFadeChannels); ++i)
+					m_audio->setVolume(m_originalVolumes[i], SoundFadeChannels[i]);
+			m_audio = nullptr;
+		}
+
+		AudioManager *m_audio = nullptr;
+		Real m_originalVolumes[ARRAY_SIZE(SoundFadeChannels)] = {};
+	};
+
+	Bool requiresWindow( Int style )
+	{
+		return style != SCREEN_FADE_TRANSITION && style != SoundFadeStyle &&
+			style != REVERSE_SOUND_TRANSITION && style != CONTROL_BAR_ARROW_TRANSITION;
+	}
+
+	AsciiString requiredCompanion( Int style, const AsciiString &name )
+	{
+		switch (style)
+		{
+		case MAINMENU_SCALE_UP_TRANSITION:
+			return "MainMenu.wnd:WinGrowMarker";
+		case CONTROL_BAR_ARROW_TRANSITION:
+			return "ControlBar.wnd:ButtonGeneral";
+		case MAINMENU_MEDIUM_SCALE_UP_TRANSITION:
+		case MAINMENU_SMALL_SCALE_DOWN_TRANSITION:
+		{
+			AsciiString companion = name;
+			companion.concat(style == MAINMENU_MEDIUM_SCALE_UP_TRANSITION ? "Medium" : "Small");
+			return companion;
+		}
+		default:
+			return AsciiString::TheEmptyString;
+		}
+	}
+
+	struct RetailTransitionSpec
+	{
+		Int style = -1;
+		Int startFrame = 0;
+		Int endFrame = -1;
+		Color fadeColor = 0;
+		AsciiString viewsToFade;
+		Bool leaveSilent = FALSE;
+	};
+
+	struct RetailTransitionWindow
+	{
+		AsciiString name;
+		Int frameDelay = 0;
+		Int legacyStyle = TRANSITION_FLASH;
+		Bool hasNested = FALSE;
+		std::vector<RetailTransitionSpec> transitions;
+	};
+
+	void parseRetailTransition( INI* ini, void *instance, void *, const void * )
+	{
+		auto &window = *static_cast<RetailTransitionWindow *>(instance);
+		window.hasNested = TRUE;
+		const char *styleName = ini->getNextToken();
+		RetailTransitionSpec spec;
+		if (stricmp(styleName, "SOUNDFADE") == 0)
+			spec.style = SoundFadeStyle;
+		else
+			for (const auto &style : TransitionStyleNames)
+				if (style.name && stricmp(style.name, styleName) == 0)
+				{
+					spec.style = style.value;
+					break;
+				}
+		if (spec.style < 0)
+		{
+			ini->recordSkipped("subblock", styleName);
+			ini->skipBlock("Transition");
+			return;
+		}
+
+		static const FieldParse fields[] = {
+			{ "StartFrame", INI::parseInt, nullptr, offsetof(RetailTransitionSpec, startFrame) },
+			{ "EndFrame", INI::parseInt, nullptr, offsetof(RetailTransitionSpec, endFrame) },
+			{ "FadeColor", INI::parseColorInt, nullptr, offsetof(RetailTransitionSpec, fadeColor) },
+			{ "ViewsToFade", INI::parseAsciiString, nullptr, offsetof(RetailTransitionSpec, viewsToFade) },
+			{ "LeaveSilent", INI::parseBool, nullptr, offsetof(RetailTransitionSpec, leaveSilent) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		ini->initFromINI(&spec, fields);
+		if (spec.viewsToFade.isNotEmpty() || spec.leaveSilent)
+		{
+			ini->recordSkipped("subblock", "SOUNDFADE with a view or a persistent mute");
+			return;
+		}
+		if (spec.startFrame < 0 || spec.endFrame < -1 ||
+			(spec.endFrame >= 0 && spec.endFrame < spec.startFrame))
+		{
+			ini->recordSkipped("field-error", "invalid transition frame range");
+			return;
+		}
+		window.transitions.push_back(spec);
+	}
+}
+
 TransitionWindow::TransitionWindow()
 {
 	m_currentFrameDelay = m_frameDelay = 0;
 	m_style = 0;
+	m_startFrame = 0;
+	m_endFrame = -1;
+	m_fadeColor = 0;
+	m_duration = 0;
+	m_lastStyleFrame = 0;
 
 	m_winID = NAMEKEY_INVALID;
 	m_win = nullptr;
@@ -172,23 +357,55 @@ Bool TransitionWindow::init()
 	if(retail && m_win)
 		m_win->unlinkTransitionWindow(this);
 
-	m_winID = TheNameKeyGenerator->nameToKey(m_winName);
-	m_win		= TheWindowManager->winGetWindowFromId(nullptr, m_winID);
-	m_currentFrameDelay = m_frameDelay;
+	m_winID = retail && m_winName.isEmpty() ? NAMEKEY_INVALID : TheNameKeyGenerator->nameToKey(m_winName);
+	m_win = retail && m_winID == NAMEKEY_INVALID ? nullptr : TheWindowManager->winGetWindowFromId(nullptr, m_winID);
 
 	delete m_transition;
 	m_transition = nullptr;
-	if(retail && !m_win && m_style != SCREEN_FADE_TRANSITION &&
-		m_style != REVERSE_SOUND_TRANSITION && m_style != CONTROL_BAR_ARROW_TRANSITION)
+	m_currentFrameDelay = m_frameDelay;
+	m_lastStyleFrame = 0;
+	if (retail)
 	{
-		if(INIAudit::isEnabled())
-			INIAudit::recordWithContext("window-transition", "TransitionWindow::init",
-				m_winName.isEmpty() ? "missing window name" : m_winName.str(), "", 0);
-		return FALSE;
+		const AsciiString companion = requiredCompanion(m_style, m_winName);
+		const char *missing = nullptr;
+		if (!m_win && requiresWindow(m_style))
+			missing = m_winName.isEmpty() ? "missing window name" : m_winName.str();
+		else if (!companion.isEmpty() && !TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey(companion)))
+			missing = companion.str();
+		else if (m_style == CONTROL_BAR_ARROW_TRANSITION && (!TheControlBar || !TheControlBar->getArrowImage()))
+			missing = "missing control bar arrow";
+		if (missing)
+		{
+			if (INIAudit::isEnabled())
+				INIAudit::recordWithContext("window-transition", "TransitionWindow::init", missing, "", 0);
+			m_win = nullptr;
+			return FALSE;
+		}
 	}
 
-	m_transition = getTransitionForStyle( m_style );
+	const Int explicitDuration = m_endFrame >= 0 ? std::max(1, m_endFrame - m_startFrame) : 0;
+	if (m_style == SCREEN_FADE_TRANSITION && explicitDuration)
+		m_transition = NEW ScreenFadeTransition(explicitDuration, m_fadeColor);
+	else if (m_style == SoundFadeStyle)
+		m_transition = NEW SoundFadeTransition(explicitDuration ? explicitDuration : 30);
+	else
+		m_transition = getTransitionForStyle(m_style);
+
+	const Int64 end = (Int64)m_frameDelay + m_startFrame +
+		std::max(explicitDuration, m_transition->getFrameLength());
+	if (retail && end >= std::numeric_limits<Int>::max())
+	{
+		if (INIAudit::isEnabled())
+			INIAudit::recordWithContext("window-transition", "TransitionWindow::init",
+				"transition exceeds the frame range", "", 0);
+		delete m_transition;
+		m_transition = nullptr;
+		m_win = nullptr;
+		return FALSE;
+	}
+	m_currentFrameDelay += m_startFrame;
 	m_transition->init(m_win);
+	m_duration = explicitDuration ? explicitDuration : m_transition->getFrameLength();
 
 	// TheSuperHackers @fix Mauller 15/05/2025 Link TransitionWindow to the GameWindow so the GameWindow can unlink itself when it is destroyed
 	if(m_win)
@@ -199,10 +416,27 @@ Bool TransitionWindow::init()
 
 void TransitionWindow::update( Int frame )
 {
-	if(!m_transition || frame < m_currentFrameDelay || frame > (m_currentFrameDelay + m_transition->getFrameLength()))
+	if (!m_transition)
 		return;
 
-	m_transition->update( frame - m_currentFrameDelay);
+	const Int styleLength = m_transition->getFrameLength();
+	const Int duration = m_endFrame < 0 ? styleLength : m_duration;
+	if (frame < m_currentFrameDelay || frame > m_currentFrameDelay + duration)
+		return;
+
+	const Int localFrame = frame - m_currentFrameDelay;
+	if (duration == styleLength)
+	{
+		m_transition->update(localFrame);
+		return;
+	}
+
+	const Int styleFrame = (Int)((Int64)localFrame * styleLength / duration);
+	while (m_lastStyleFrame != styleFrame)
+	{
+		m_lastStyleFrame += styleFrame > m_lastStyleFrame ? 1 : -1;
+		m_transition->update(m_lastStyleFrame);
+	}
 }
 
 Bool TransitionWindow::isFinished()
@@ -216,7 +450,10 @@ void TransitionWindow::reverse( Int totalFrames )
 {
 	//m_currentFrameDelay = totalFrames - (m_transition->getFrameLength() + m_frameDelay);
 	if(m_transition)
+	{
 		m_transition->reverse();
+		m_lastStyleFrame = m_transition->getFrameLength();
+	}
 }
 
 void TransitionWindow::skip()
@@ -238,13 +475,19 @@ void TransitionWindow::unlinkGameWindow(GameWindow* win)
 
 	m_transition->unlinkGameWindow(win);
 	m_win = nullptr;
+	if (RetailFileLayers::enabled() && requiresWindow(m_style))
+	{
+		delete m_transition;
+		m_transition = nullptr;
+	}
 }
 
 Int TransitionWindow::getTotalFrames()
 {
 	if(m_transition)
 	{
-		return m_frameDelay + m_transition->getFrameLength();
+		const Int duration = m_endFrame < 0 ? m_transition->getFrameLength() : m_duration;
+		return m_currentFrameDelay + duration;
 	}
 
 	return RetailFileLayers::enabled() ? 0 : m_frameDelay;
@@ -617,6 +860,43 @@ TransitionGroup *GameWindowTransitionsHandler::findGroup( AsciiString groupName 
 
 void GameWindowTransitionsHandler::parseWindow( INI* ini, void *instance, void *store, const void *userData )
 {
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		static const FieldParse fields[] = {
+			{ "WinName", INI::parseAsciiString, nullptr, offsetof(RetailTransitionWindow, name) },
+			{ "Style", INI::parseLookupList, TransitionStyleNames, offsetof(RetailTransitionWindow, legacyStyle) },
+			{ "FrameDelay", INI::parseInt, nullptr, offsetof(RetailTransitionWindow, frameDelay) },
+			{ "Transition", parseRetailTransition, nullptr, 0 },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		RetailTransitionWindow window;
+		ini->initFromINI(&window, fields);
+		if (window.hasNested && window.frameDelay < 0)
+		{
+			ini->recordSkipped("field-error", "negative transition frame delay");
+			return;
+		}
+		if (!window.hasNested)
+		{
+			RetailTransitionSpec spec;
+			spec.style = window.legacyStyle;
+			window.transitions.push_back(spec);
+		}
+		for (const auto &spec : window.transitions)
+		{
+			auto transition = std::make_unique<TransitionWindow>();
+			transition->m_winName = window.name;
+			transition->m_style = spec.style;
+			transition->m_frameDelay = window.frameDelay;
+			transition->m_startFrame = spec.startFrame;
+			transition->m_endFrame = spec.endFrame;
+			transition->m_fadeColor = spec.fadeColor;
+			static_cast<TransitionGroup *>(instance)->addWindow(transition.get());
+			transition.release();
+		}
+		return;
+	}
+
 	static const FieldParse myFieldParse[] =
 		{
 			{ "WinName",				INI::parseAsciiString,		nullptr,									offsetof( TransitionWindow, m_winName ) },

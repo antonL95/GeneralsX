@@ -1627,7 +1627,17 @@ ScreenFadeTransition::ScreenFadeTransition ()
 	m_win = nullptr;
 	m_drawState = -1;
 	m_isForward = TRUE;
+	m_color = 0;
+	m_useRetailTiming = FALSE;
 
+}
+
+ScreenFadeTransition::ScreenFadeTransition( Int frames, Color color )
+	: ScreenFadeTransition()
+{
+	m_frameLength = frames;
+	m_color = color & 0x00ffffff;
+	m_useRetailTiming = TRUE;
 }
 
 ScreenFadeTransition::~ScreenFadeTransition()
@@ -1643,7 +1653,7 @@ void ScreenFadeTransition::init( GameWindow *win )
 	m_isFinished = FALSE;
 	m_isForward = TRUE;
 
-	m_percent = 1.0f / (SCREENFADETRANSITION_END - 1);
+	m_percent = 1.0f / (m_useRetailTiming ? m_frameLength : SCREENFADETRANSITION_END - 1);
 
 	m_pos.y = m_pos.x = 0;
 	m_size.x = TheDisplay->getWidth();
@@ -1653,6 +1663,13 @@ void ScreenFadeTransition::init( GameWindow *win )
 
 void ScreenFadeTransition::update( Int frame )
 {
+	if (m_useRetailTiming)
+	{
+		m_drawState = frame;
+		m_isFinished = m_isForward ? frame == m_frameLength : frame == 0;
+		return;
+	}
+
 	m_drawState = -1;
 	if(frame < SCREENFADETRANSITION_START || frame > SCREENFADETRANSITION_END)
 	{
@@ -1684,13 +1701,14 @@ void ScreenFadeTransition::draw()
 	Int alpha = m_percent*255 *m_drawState;
 	if(alpha > 255)
 		alpha = 255;
-	TheDisplay->drawFillRect(m_pos.x, m_pos.y, m_size.x, m_size.y , GameMakeColor(0,0,0,alpha));
+	TheDisplay->drawFillRect(m_pos.x, m_pos.y, m_size.x, m_size.y,
+		m_color | GameMakeColor(0, 0, 0, alpha));
 
 }
 
 void ScreenFadeTransition::skip()
 {
-	update(SCREENFADETRANSITION_END);
+	update(m_frameLength);
 }
 
 

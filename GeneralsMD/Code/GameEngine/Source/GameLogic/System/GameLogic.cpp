@@ -2372,18 +2372,27 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	if(loadingSaveGame == FALSE && TheTransitionHandler != nullptr && m_loadScreen)
 	{
 		TheFramePacer->reset();
+		const Bool retailFade = RetailFileLayers::enabled();
+		if (retailFade)
+			TheTransitionHandler->reset();
 		TheTransitionHandler->setGroup("FadeWholeScreen");
 		while(!TheTransitionHandler->isFinished())
 		{
 			TheWindowManager->update();
-			if(!TheTransitionHandler->isFinished())
+			const Bool finished = TheTransitionHandler->isFinished();
+			if(!finished || retailFade)
 			{
+				if (retailFade && TheAudio)
+					TheAudio->update();
 				TheDisplay->draw();
 				setFPMode();
-				TheFramePacer->update();
+				if (!finished)
+					TheFramePacer->update();
 			}
 
 		}
+		if (retailFade)
+			TheTransitionHandler->reset();
 	}
 
 	if(m_loadScreen)

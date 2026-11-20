@@ -782,6 +782,18 @@ Real AudioManager::getVolume( AudioAffect whichToGet )
 	return m_speechVolume;
 }
 
+Real AudioManager::getScriptVolume( AudioAffect whichToGet ) const
+{
+	switch (whichToGet)
+	{
+	case AudioAffect_Music: return m_scriptMusicVolume;
+	case AudioAffect_Sound: return m_scriptSoundVolume;
+	case AudioAffect_Sound3D: return m_scriptSound3DVolume;
+	case AudioAffect_Speech: return m_scriptSpeechVolume;
+	default: return 1.0f;
+	}
+}
+
 //-------------------------------------------------------------------------------------------------
 void AudioManager::set3DVolumeAdjustment( Real volumeAdjustment )
 {

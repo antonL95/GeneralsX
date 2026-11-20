@@ -120,6 +120,9 @@
 #include "Common/version.h"
 #include <cstdio>
 #include <cstdlib>
+#if defined(__APPLE__)
+#include <SDL3/SDL.h>
+#endif
 
 
 //-------------------------------------------------------------------------------------------------
@@ -949,6 +952,25 @@ void GameEngine::init()
 		if (std::getenv("GENERALSX_NAMEKEY_DUMP"))
 			std::_Exit(0);
 		runCrcHarnessIfRequested();
+
+		if (RetailFileLayers::enabled() && !INIAudit::isEnabled() && !UiTest::isActive() &&
+			!TheGlobalData->m_buildMapCache && TheGlobalData->m_initialFile.isEmpty() &&
+			TheGlobalData->m_loadSaveGame.isEmpty() && TheGlobalData->m_loadReplayGame.isEmpty() &&
+			TheGlobalData->m_simulateReplays.empty() &&
+			(!TheFileSystem->doesFileExist("Window\\Menus\\MainMenu.wnd") ||
+			 !TheFileSystem->doesFileExist("Window\\Menus\\SkirmishGameOptionsMenu.wnd")))
+		{
+			constexpr const char* noShellMessage =
+				"This port cannot start without a map yet: the Rise of the Witch-king main menu and skirmish setup "
+				"are not implemented. To start High Pass directly, add -file \"maps/map mp high pass/map mp high pass.map\".";
+			std::fprintf(stderr, "Retail startup: %s\n", noShellMessage);
+			std::fflush(stderr);
+#if defined(__APPLE__)
+			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "No map selected", noShellMessage, nullptr);
+#endif
+			setQuitting(TRUE);
+			return;
+		}
 
 		// GeneralsX @bugfix Copilot 11/05/2026 Prevent uncapped render when FPS limiter is enabled but no valid limit value was loaded.
 		if (TheGlobalData->m_useFpsLimit && TheGlobalData->m_framesPerSecondLimit <= 0)

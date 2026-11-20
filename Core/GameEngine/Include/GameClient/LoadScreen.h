@@ -239,6 +239,9 @@ public:
 	virtual void processProgress(Int playerId, Int percentage) override;
 	virtual void setProgressRange( Int min, Int max ) override { }
 private:
+	static void drawRetailLoading( GameWindow *window, WinInstanceData *instance );
+	Int m_retailProgress = -1;
+	DisplayString *m_retailLabel = nullptr;
 	GameWindow *m_progressBars[MAX_SLOTS];	///< pointer array to all the progress bars on the window
 	GameWindow *m_playerNames[MAX_SLOTS];		///< pointer array to all the static text player names on the window
 	GameWindow *m_playerSide[MAX_SLOTS];		///< pointer array to all the static text player sides
