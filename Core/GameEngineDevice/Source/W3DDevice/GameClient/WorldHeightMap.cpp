@@ -57,6 +57,7 @@
 #include "Utility/stringex.h"
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -382,9 +383,11 @@ struct WorldHeightMap::BfmeLighting
 	GlobalData::TerrainLighting objects[TIME_OF_DAY_COUNT][MAX_GLOBAL_LIGHTS]{};
 	GlobalData::TerrainLighting infantry[TIME_OF_DAY_COUNT][MAX_GLOBAL_LIGHTS]{};
 	TimeOfDay timeOfDay;
+	Real overbright;
+	UnsignedInt filterEnabled;
+	RGBColor filterColors[3];
 	UnsignedInt shadowColor;
-	std::array<UnsignedByte, 44> opaque;
-	RGBColor noCloudFactor{};
+	RGBColor noCloudFactor{1.0f, 1.0f, 1.0f};
 };
 
 //
@@ -886,11 +889,16 @@ Bool WorldHeightMap::ParseWorldDictDataChunk(DataChunkInput &file, DataChunkInfo
 *	Input: DataChunkInput
 *
 */
+static RGBColor readMapColor(DataChunkInput &file)
+{
+	return {file.readReal(), file.readReal(), file.readReal()};
+}
+
 static GlobalData::TerrainLighting readMapLight(DataChunkInput &file)
 {
 	return {
-		{file.readReal(), file.readReal(), file.readReal()},
-		{file.readReal(), file.readReal(), file.readReal()},
+		readMapColor(file),
+		readMapColor(file),
 		{file.readReal(), file.readReal(), file.readReal()}
 	};
 }
@@ -900,8 +908,8 @@ void WorldHeightMap::readBfmeLighting(DataChunkInput &file, unsigned version)
 	auto lighting = std::make_unique<BfmeLighting>();
 	const Bool hasNoCloudFactor = version >= K_LIGHTING_VERSION_8;
 	constexpr unsigned days = TIME_OF_DAY_COUNT - TIME_OF_DAY_FIRST;
-	const unsigned expectedSize = sizeof(Int) * 2 + days * MAX_GLOBAL_LIGHTS * 3 * 9 * sizeof(Real)
-		+ lighting->opaque.size() + (hasNoCloudFactor ? 3 * sizeof(Real) : 0);
+	const unsigned expectedSize = 3 * sizeof(Int) + (days * MAX_GLOBAL_LIGHTS * 3 * 9 + 1 + 9) * sizeof(Real)
+		+ (hasNoCloudFactor ? 3 * sizeof(Real) : 0);
 	if (file.getChunkDataSizeLeft() != expectedSize)
 		throw ERROR_CORRUPT_FILE_FORMAT;
 
@@ -911,28 +919,40 @@ void WorldHeightMap::readBfmeLighting(DataChunkInput &file, unsigned version)
 	lighting->timeOfDay = static_cast<TimeOfDay>(timeOfDay);
 	for (Int day = TIME_OF_DAY_FIRST; day < TIME_OF_DAY_COUNT; ++day)
 	{
-		for (Int slot = 0; slot < MAX_GLOBAL_LIGHTS; ++slot)
-		{
+		lighting->terrain[day][0] = readMapLight(file);
+		for (auto &light : lighting->objects[day])
+			light = readMapLight(file);
+		for (Int slot = 1; slot < MAX_GLOBAL_LIGHTS; ++slot)
 			lighting->terrain[day][slot] = readMapLight(file);
-			lighting->objects[day][slot] = readMapLight(file);
-			lighting->infantry[day][slot] = readMapLight(file);
-		}
+		for (auto &light : lighting->infantry[day])
+			light = readMapLight(file);
 	}
+	lighting->overbright = file.readReal();
+	lighting->filterEnabled = file.readInt();
+	for (auto &color : lighting->filterColors)
+		color = readMapColor(file);
 	lighting->shadowColor = file.readInt();
-	file.readArrayOfBytes(reinterpret_cast<char *>(lighting->opaque.data()), lighting->opaque.size());
 	if (hasNoCloudFactor)
-		lighting->noCloudFactor = {file.readReal(), file.readReal(), file.readReal()};
+		lighting->noCloudFactor = readMapColor(file);
 	m_bfmeLighting = std::move(lighting);
+}
+
+static GlobalData::TerrainLighting scaleMapLight(GlobalData::TerrainLighting light, Real scale)
+{
+	light.ambient *= scale;
+	light.diffuse *= scale;
+	return light;
 }
 
 void WorldHeightMap::applyBfmeLighting() const
 {
+	const Real scale = m_bfmeLighting->overbright > 1.0f ? 2.0f : 1.0f;
 	for (Int day = TIME_OF_DAY_FIRST; day < TIME_OF_DAY_COUNT; ++day)
 	{
 		for (Int slot = 0; slot < MAX_GLOBAL_LIGHTS; ++slot)
 		{
-			TheWritableGlobalData->m_terrainLighting[day][slot] = m_bfmeLighting->terrain[day][slot];
-			TheWritableGlobalData->m_terrainObjectsLighting[day][slot] = m_bfmeLighting->objects[day][slot];
+			TheWritableGlobalData->m_terrainLighting[day][slot] = scaleMapLight(m_bfmeLighting->terrain[day][slot], scale);
+			TheWritableGlobalData->m_terrainObjectsLighting[day][slot] = scaleMapLight(m_bfmeLighting->objects[day][slot], scale);
 		}
 	}
 	TheWritableGlobalData->setTimeOfDay(m_bfmeLighting->timeOfDay);
@@ -940,17 +960,56 @@ void WorldHeightMap::applyBfmeLighting() const
 		TheW3DShadowManager->setShadowColor(m_bfmeLighting->shadowColor);
 }
 
-std::span<const UnsignedByte> WorldHeightMap::getOpaqueBfmeLighting() const
+std::vector<UnsignedInt> WorldHeightMap::getBfmeLightingAudit() const
 {
-	if (m_bfmeLighting)
-		return m_bfmeLighting->opaque;
-	return {};
+	if (!m_bfmeLighting)
+		return {};
+
+	const auto &lighting = *m_bfmeLighting;
+	std::vector<UnsignedInt> fields{
+		static_cast<UnsignedInt>(lighting.timeOfDay), std::bit_cast<UnsignedInt>(lighting.overbright),
+		lighting.filterEnabled
+	};
+	const auto appendColor = [&fields](const RGBColor &color)
+	{
+		for (Real channel : {color.red, color.green, color.blue})
+			fields.push_back(std::bit_cast<UnsignedInt>(channel));
+	};
+	for (const auto &color : lighting.filterColors)
+		appendColor(color);
+	fields.push_back(lighting.shadowColor);
+	appendColor(lighting.noCloudFactor);
+	for (Int day = TIME_OF_DAY_FIRST; day < TIME_OF_DAY_COUNT; ++day)
+	{
+		for (const auto *lights : {&lighting.terrain[day], &lighting.objects[day], &lighting.infantry[day]})
+		{
+			for (const auto &light : *lights)
+			{
+				appendColor(light.ambient);
+				appendColor(light.diffuse);
+				for (Real component : {light.lightPos.x, light.lightPos.y, light.lightPos.z})
+					fields.push_back(std::bit_cast<UnsignedInt>(component));
+			}
+		}
+	}
+	return fields;
 }
 
 Bool WorldHeightMap::ParseLogicalLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
 	if (info->version >= K_LIGHTING_VERSION_7)
-		static_cast<WorldHeightMap *>(userData)->readBfmeLighting(file, info->version);
+	{
+		try
+		{
+			static_cast<WorldHeightMap *>(userData)->readBfmeLighting(file, info->version);
+		}
+		catch (ErrorCode)
+		{
+			if (!INIAudit::isEnabled())
+				throw;
+			INIAudit::record("error", "Invalid BFME lighting map chunk", info->label.str(), 0);
+		}
+	}
 	else if (info->version > K_LIGHTING_VERSION_3)
 		file.skipUnsupportedRequiredChunk(*info);
 	return true;

@@ -672,18 +672,27 @@ bool probeMapSides(const std::string& name, const Entry& entry, const char *heig
 			if (map->getXExtent() > 0)
 				record("map-heights", name, std::to_string(map->getXExtent()), std::to_string(map->getYExtent()),
 					map->getXExtent() * map->getYExtent());
-			const auto opaque = map->getOpaqueBfmeLighting();
-			if (!opaque.empty())
+			const auto lighting = map->getBfmeLightingAudit();
+			if (!lighting.empty())
 			{
-				constexpr char digits[] = "0123456789abcdef";
-				std::string hex;
-				hex.reserve(2 * opaque.size());
-				for (UnsignedByte byte : opaque)
+				std::string trailer;
+				for (size_t field = 2; field < 13; ++field)
 				{
-					hex += digits[byte >> 4];
-					hex += digits[byte & 0xf];
+					for (unsigned shift = 0; shift < 32; shift += 8)
+						trailer += static_cast<char>(lighting[field] >> shift);
 				}
-				record("map-lighting-opaque", name, std::move(hex), "", opaque.size());
+				record("map-lighting-opaque", name, hexBytes(trailer), "", trailer.size());
+				if (std::getenv("GENERALSX_MAP_LIGHTING_DUMP"))
+				{
+					std::string values;
+					for (UnsignedInt field : lighting)
+					{
+						if (!values.empty())
+							values += ',';
+						values += std::to_string(field);
+					}
+					record("map-lighting", name, values, "", lighting.size());
+				}
 			}
 			if (heightDump && (map->getXExtent() == 0 || !writeMapHeights(heightDump, *map)))
 			{

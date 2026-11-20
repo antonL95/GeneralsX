@@ -39,7 +39,6 @@
 
 #include "Common/STLTypedefs.h"
 #include <memory>
-#include <span>
 typedef std::vector<ICoord2D> VecICoord2D;
 
 
@@ -276,7 +275,7 @@ public:  // height map info.
 	unsigned getHeightSampleBytes() const { return m_heightSampleBytes; }
 	Real getHeightScale() const { return m_heightScale; }
 	Real toWorldHeight(Real sample) const { return HeightMapSamples::toWorldHeight(sample, m_heightScale); }
-	std::span<const UnsignedByte> getOpaqueBfmeLighting() const;
+	std::vector<UnsignedInt> getBfmeLightingAudit() const;
 
 
 	Int getXExtent() const {return m_width;}	///<number of vertices in x
