@@ -236,6 +236,8 @@
 // body includes
 #include "GameLogic/Module/InactiveBody.h"
 #include "GameLogic/Module/ActiveBody.h"
+#include "GameLogic/Module/RespawnModules.h"
+#include "GameLogic/Module/RotWKBodyModules.h"
 #include "GameLogic/Module/HighlanderBody.h"
 #include "GameLogic/Module/ImmortalBody.h"
 #include "GameLogic/Module/StructureBody.h"
@@ -511,6 +513,14 @@ void ModuleFactory::init()
 	addModule( ImmortalBody );
 	addModule( StructureBody );
 	addModule( HiveStructureBody );
+	if (registersRotwkModules())
+	{
+		addModule( RespawnBody );
+		addModule( DelayedDeathBody );
+		addModule( PorcupineFormationBodyModule );
+		addModule( SymbioticStructuresBody );
+		addModule( DetachableRiderBody );
+	}
 
 	// contain modules
 	// (none)

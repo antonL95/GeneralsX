@@ -518,7 +518,7 @@ public:
 	virtual Bool allow(Object *objOther) override
 	{
 		// this is way fast (bit test) so do it first.
-		if (objOther->isEffectivelyDead())
+		if (objOther->isEffectivelyDead() || HordeContain::get(objOther))
 			return false;
 
 		// this is also way fast (bit test) so do it next.

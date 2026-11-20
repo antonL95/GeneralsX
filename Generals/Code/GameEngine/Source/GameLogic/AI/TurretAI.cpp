@@ -38,6 +38,7 @@
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
@@ -564,6 +565,14 @@ void TurretAI::removeSelfAsTargeter()
 //----------------------------------------------------------------------------------------------------------
 void TurretAI::setTurretTargetObject( Object *victim, Bool forceAttacking )
 {
+	if (victim)
+	{
+		if (const HordeContain* enemy = HordeContain::get(victim))
+		{
+			const CommandSourceType cmdSource = getOwner()->getAI() ? getOwner()->getAI()->getLastCommandSource() : CMD_FROM_AI;
+			victim = enemy->findAttackTarget(getOwner(), forceAttacking ? ATTACK_NEW_TARGET_FORCED : ATTACK_NEW_TARGET, cmdSource);
+		}
+	}
 	if (!victim ||
 				victim->isEffectivelyDead() ||
 				!isOwnersCurWeaponOnTurret())

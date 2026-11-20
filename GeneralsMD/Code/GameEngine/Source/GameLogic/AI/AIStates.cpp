@@ -38,6 +38,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
@@ -63,6 +64,7 @@
 #include "GameLogic/Weapon.h"
 
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/JetAIUpdate.h"
@@ -5399,6 +5401,7 @@ AIAttackState::AIAttackState( StateMachine *machine, Bool follow, Bool attacking
 	m_attackMachine(nullptr),
 	m_attackParameters(attackParameters),
 	m_lockedWeaponOnEnter(nullptr),
+	m_targetHordeID(INVALID_ID),
 	m_follow(follow),
 	m_isAttackingObject(attackingObject),
 	m_isForceAttacking(forceAttacking),
@@ -5433,15 +5436,13 @@ AIAttackState::~AIAttackState()
 // ------------------------------------------------------------------------------------------------
 void AIAttackState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferObjectID(&m_targetHordeID);
 }
 
-// ------------------------------------------------------------------------------------------------
-/** Xfer Method */
-// ------------------------------------------------------------------------------------------------
 void AIAttackState::xfer( Xfer *xfer )
 {
-  // version
-  XferVersion currentVersion = 1;
+  XferVersion currentVersion = 2;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -5451,18 +5452,15 @@ void AIAttackState::xfer( Xfer *xfer )
 	xfer->xferCoord3D(&m_originalVictimPos);
 
 	if (hasMachine && m_attackMachine==nullptr)	{
-		// create new state machine for attack behavior
 		m_attackMachine = newInstance(AttackStateMachine)(getMachineOwner(), this, "AIAttackMachine", m_follow, m_isAttackingObject, m_isForceAttacking  );
 	}
 	if (hasMachine) {
-		xfer->xferSnapshot(m_attackMachine);						///< state sub-machine for attack behavior
+		xfer->xferSnapshot(m_attackMachine);
 	}
-	/* Not saved or loaded - passed in on creation.
-	Bool										m_follow;
-	Bool										m_isAttackingObject;								// if false, attacking position
-	AttackExitConditionsInterface*	m_attackParameters;					///< these are not owned by this, and will not be deleted on destruction
-	Bool										m_isForceAttacking
-	*/
+	if (version >= 2)
+		xfer->xferObjectID(&m_targetHordeID);
+	else
+		m_targetHordeID = INVALID_ID;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -5570,10 +5568,24 @@ StateReturnType AIAttackState::onEnter()
 	if (m_isAttackingObject)
 	{
 		Object* victim = getMachineGoalObject();
+		m_targetHordeID = INVALID_ID;
+		if (victim && !victim->isEffectivelyDead())
+		{
+			if (const HordeContain* enemy = HordeContain::get(victim))
+			{
+				m_targetHordeID = victim->getID();
+				victim = enemy->findAttackTarget(source, m_isForceAttacking ? ATTACK_NEW_TARGET_FORCED : ATTACK_NEW_TARGET, ai->getLastCommandSource());
+				getMachine()->setGoalObject(victim);
+			}
+			else if (Object* anchor = HordeContain::getAnchor(victim))
+			{
+				m_targetHordeID = anchor->getID();
+			}
+		}
 		if (victim == nullptr || victim->isEffectivelyDead())
 		{
 			ai->notifyVictimIsDead();
-			return STATE_FAILURE;	// we have nothing to attack!
+			return STATE_FAILURE;
 		}
 		m_victimTeam = victim->getTeam();
 		m_attackMachine->setGoalObject( victim );
@@ -5640,8 +5652,29 @@ StateReturnType AIAttackState::update()
 
 		if (victim == nullptr || victim->isEffectivelyDead())
 		{
-			source->getAI()->notifyVictimIsDead();
-			return STATE_SUCCESS;	// my, that was easy
+			Object* next = nullptr;
+			if (m_targetHordeID != INVALID_ID)
+			{
+				Object* hordeObj = TheGameLogic->findObjectByID(m_targetHordeID);
+				if (hordeObj && !hordeObj->isEffectivelyDead())
+				{
+					if (const HordeContain* enemy = HordeContain::get(hordeObj))
+						next = enemy->findAttackTarget(source, m_isForceAttacking ? ATTACK_NEW_TARGET_FORCED : ATTACK_NEW_TARGET, source->getAI()->getLastCommandSource());
+				}
+			}
+			if (next)
+			{
+				victim = next;
+				getMachine()->setGoalObject(victim);
+				m_attackMachine->setGoalObject(victim);
+				m_victimTeam = victim->getTeam();
+				m_originalVictimPos = *victim->getPosition();
+			}
+			else
+			{
+				source->getAI()->notifyVictimIsDead();
+				return STATE_SUCCESS;
+			}
 		}
 
 		if (victim)

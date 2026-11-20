@@ -28,21 +28,48 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
-#include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "PreRTS.h"
 
+#define DEFINE_DEATH_NAMES
+#include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
 #include "GameLogic/Object.h"
 
+void LifetimeUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	UpdateModuleData::buildFieldParse(p);
+	static const FieldParse dataFieldParse[] =
+	{
+		{ "MinLifetime", INI::parseDurationUnsignedInt, nullptr, offsetof(LifetimeUpdateModuleData, m_minFrames) },
+		{ "MaxLifetime", INI::parseDurationUnsignedInt, nullptr, offsetof(LifetimeUpdateModuleData, m_maxFrames) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(dataFieldParse);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "WaitForWakeUp", INI::parseBool, nullptr, offsetof(LifetimeUpdateModuleData, m_waitForWakeUp) },
+			{ "ScoreKill", INI::parseBool, nullptr, offsetof(LifetimeUpdateModuleData, m_scoreKill) },
+			{ "DeathType", INI::parseIndexList, TheDeathNames, offsetof(LifetimeUpdateModuleData, m_deathType) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
+}
 
-//-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
 LifetimeUpdate::LifetimeUpdate( Thing *thing, const ModuleData* moduleData ) : UpdateModule( thing, moduleData )
 {
 	const LifetimeUpdateModuleData* d = getLifetimeUpdateModuleData();
 	m_dieFrame = 0;
+	if (d->m_waitForWakeUp)
+	{
+		setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
+		return;
+	}
 	UnsignedInt delay;
 	if( getObject()->isKindOf( KINDOF_HULK ) && TheGameLogic->getHulkMaxLifetimeOverride() != -1 )
 	{
@@ -84,8 +111,7 @@ UnsignedInt LifetimeUpdate::calcSleepDelay(UnsignedInt minFrames, UnsignedInt ma
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime LifetimeUpdate::update()
 {
-	// Kill (NOT destroy) if time is up
-	getObject()->kill();
+	getObject()->kill(DAMAGE_UNRESISTABLE, getLifetimeUpdateModuleData()->m_deathType);
 	return UPDATE_SLEEP_FOREVER;
 }
 

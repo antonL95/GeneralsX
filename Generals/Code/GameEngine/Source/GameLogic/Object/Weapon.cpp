@@ -61,6 +61,7 @@
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/LaserUpdate.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/SpecialPowerCompletionDie.h"
@@ -655,6 +656,9 @@ Bool WeaponTemplate::shouldProjectileCollideWith(
  	if (!projectile || !thingWeCollidedWith)
  		return false;
 
+	if (HordeContain::get(thingWeCollidedWith))
+		return false;
+
 	// if it's our intended victim, we want to collide with it, regardless of any other considerations.
 	if (intendedVictimID == thingWeCollidedWith->getID())
 		return true;
@@ -779,14 +783,19 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 
 	if (sourceObj == nullptr || (victimObj == nullptr && victimPos == nullptr))
 	{
-		//-extraLogging
-		#if defined(RTS_DEBUG)
-			if( TheGlobalData->m_extraLogging )
-				DEBUG_LOG( ("FAIL 1 (sourceObj %d == nullptr || (victimObj %d == nullptr && victimPos %d == nullptr)", sourceObj != 0, victimObj != 0, victimPos != 0) );
-		#endif
-		//end -extraLogging
-
 		return 0;
+	}
+
+	if (victimObj)
+	{
+		if (const HordeContain* enemy = HordeContain::get(victimObj))
+		{
+			victimObj = enemy->findAttackTarget(sourceObj, ATTACK_NEW_TARGET, CMD_FROM_AI, wslot);
+			if (!victimObj)
+				victimObj = enemy->findNearestLivingMember(*sourceObj->getPosition());
+			if (!victimObj)
+				return 0;
+		}
 	}
 
 	DEBUG_ASSERTCRASH((m_primaryDamage > 0)  ||  (victimObj == nullptr), ("You can't really shoot a zero damage weapon at an Object.") );
@@ -1290,8 +1299,16 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 
 //DEBUG_LOG(("WeaponTemplate::dealDamageInternal: dealing damage %s at frame %d",m_name.str(),TheGameLogic->getFrame()));
 
-	// if there's a specific victim, use it's pos (overriding the value passed in)
-	Object *primaryVictim = victimID ? TheGameLogic->findObjectByID(victimID) : nullptr;	// might be null...
+	Object *primaryVictim = victimID ? TheGameLogic->findObjectByID(victimID) : nullptr;
+	if (primaryVictim)
+	{
+		if (const HordeContain* enemy = HordeContain::get(primaryVictim))
+		{
+			const Coord3D* fromPos = source ? source->getPosition() : pos;
+			primaryVictim = fromPos ? enemy->findNearestLivingMember(*fromPos) : nullptr;
+			victimID = primaryVictim ? primaryVictim->getID() : INVALID_ID;
+		}
+	}
 	if (primaryVictim)
 	{
 		pos = primaryVictim->getPosition();
@@ -1334,6 +1351,8 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 
 		for (; curVictim != nullptr; curVictim = iter ? iter->nextWithNumeric(&curVictimDistSqr) : nullptr)
 		{
+			if (HordeContain::get(curVictim))
+				continue;
 			Bool killSelf = false;
 			if (source != nullptr)
 			{

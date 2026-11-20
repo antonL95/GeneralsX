@@ -87,7 +87,11 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "BezierProjectileBehavior", 512, 128 },
 	{ "W3DStreakDraw", 512, 128 },
 	{ "RespawnBody", 64, 32 },
-	{ "RespawnUpdate", 64, 32 }
+	{ "RespawnUpdate", 64, 32 },
+	{ "DelayedDeathBody", 64, 32 },
+	{ "PorcupineFormationBodyModule", 256, 64 },
+	{ "SymbioticStructuresBody", 16, 16 },
+	{ "DetachableRiderBody", 16, 16 }
 };
 
 //-----------------------------------------------------------------------------

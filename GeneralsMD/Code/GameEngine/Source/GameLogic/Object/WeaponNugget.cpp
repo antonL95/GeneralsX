@@ -13,6 +13,7 @@
 #include "Common/Upgrade.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -452,6 +453,15 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 	Object* source = TheGameLogic->findObjectByID(sourceID);
 	Object* primaryVictim = victimID ? TheGameLogic->findObjectByID(victimID) : nullptr;
 	if (primaryVictim)
+	{
+		if (const HordeContain* enemy = HordeContain::get(primaryVictim))
+		{
+			const Coord3D* fromPos = source ? source->getPosition() : pos;
+			primaryVictim = fromPos ? enemy->findNearestLivingMember(*fromPos) : nullptr;
+			victimID = primaryVictim ? primaryVictim->getID() : INVALID_ID;
+		}
+	}
+	if (primaryVictim)
 		pos = primaryVictim->getPosition();
 	if (!pos || (dotTick && (!primaryVictim || primaryVictim->isEffectivelyDead())))
 		return;
@@ -511,6 +521,8 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 
 	for (; curVictim != nullptr; curVictim = iter ? iter->nextWithNumeric(&curVictimDistSqr) : nullptr)
 	{
+		if (HordeContain::get(curVictim))
+			continue;
 		if (curVictim != primaryVictim && curVictim->isKindOf(KINDOF_PROJECTILE))
 			continue;
 		const RadiusDamageVerdict verdict = judgeRadiusDamageVictim(source, curVictim, primaryVictim, m_affectsMask);

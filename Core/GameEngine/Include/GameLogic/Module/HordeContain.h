@@ -131,6 +131,7 @@ public:
 	Bool rankCanAttack(const Object* member) const;
 	Object* findAttackTarget(const Object* attacker, AbleToAttackType attackType, CommandSourceType source,
 		WeaponSlotType slot = (WeaponSlotType)-1, CanAttackResult* attackResult = nullptr) const;
+	Object* findNearestLivingMember(const Coord3D& fromPos) const;
 	Coord3D getMemberPosition(ObjectID id, Bool followLeader) const;
 	static const HordeContain* get(const Object* object);
 	static Object* getAnchor(Object* member);

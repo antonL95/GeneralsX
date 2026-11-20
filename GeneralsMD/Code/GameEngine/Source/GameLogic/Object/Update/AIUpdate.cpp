@@ -64,6 +64,7 @@
 #include "GameLogic/Module/ProneUpdate.h"
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
 #include "GameLogic/Module/HackInternetAIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/HordeUpdate.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Object.h"
@@ -3474,8 +3475,17 @@ void AIUpdateInterface::privateAttackObject( Object *victim, Int maxShotsToFire,
 
 	if (!victim)
 	{
-		// Hard to kill em if they're already dead.  jba
 		return;
+	}
+
+	if (!HordeContain::get(getObject()))
+	{
+		if (const HordeContain* enemy = HordeContain::get(victim))
+		{
+			victim = enemy->findAttackTarget(getObject(), ATTACK_NEW_TARGET, cmdSource);
+			if (!victim)
+				return;
+		}
 	}
 
 	getStateMachine()->clear();
@@ -3483,17 +3493,25 @@ void AIUpdateInterface::privateAttackObject( Object *victim, Int maxShotsToFire,
 	setLastCommandSource( cmdSource );
 	getStateMachine()->setState( AI_ATTACK_OBJECT );
 
-	// do this after setting it as the current state, as the max-shots-to-fire is reset in AttackState::onEnter()
 	Weapon* weapon = getObject()->getCurrentWeapon();
 	if (weapon)
 		weapon->setMaxShotCount(maxShotsToFire);
 }
 
-//-----------------------------------------------------------------------------------------
 void AIUpdateInterface::privateForceAttackObject( Object *victim, Int maxShotsToFire, CommandSourceType cmdSource )
 {
 	if (!victim) {
 		return;
+	}
+
+	if (!HordeContain::get(getObject()))
+	{
+		if (const HordeContain* enemy = HordeContain::get(victim))
+		{
+			victim = enemy->findAttackTarget(getObject(), ATTACK_NEW_TARGET_FORCED, cmdSource);
+			if (!victim)
+				return;
+		}
 	}
 
 	getStateMachine()->clear();
@@ -3501,17 +3519,25 @@ void AIUpdateInterface::privateForceAttackObject( Object *victim, Int maxShotsTo
 	setLastCommandSource( cmdSource );
 	getStateMachine()->setState( AI_FORCE_ATTACK_OBJECT );
 
-	// do this after setting it as the current state, as the max-shots-to-fire is reset in AttackState::onEnter()
 	Weapon* weapon = getObject()->getCurrentWeapon();
 	if (weapon)
 		weapon->setMaxShotCount(maxShotsToFire);
 }
 
-//-----------------------------------------------------------------------------------------
 void AIUpdateInterface::privateGuardRetaliate( Object *victim, const Coord3D *pos, Int maxShotsToFire, CommandSourceType cmdSource )
 {
 	if (!victim) {
 		return;
+	}
+
+	if (!HordeContain::get(getObject()))
+	{
+		if (const HordeContain* enemy = HordeContain::get(victim))
+		{
+			victim = enemy->findAttackTarget(getObject(), ATTACK_NEW_TARGET, cmdSource);
+			if (!victim)
+				return;
+		}
 	}
 
 	getStateMachine()->clear();

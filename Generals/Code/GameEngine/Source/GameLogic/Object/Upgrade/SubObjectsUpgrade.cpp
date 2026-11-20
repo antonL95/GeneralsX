@@ -49,6 +49,7 @@
 #define DEFINE_OBJECT_STATUS_NAMES
 #include "Common/ModuleFactory.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/Object.h"
@@ -106,6 +107,26 @@ SubObjectsUpgrade::SubObjectsUpgrade( Thing *thing, const ModuleData* moduleData
 //-------------------------------------------------------------------------------------------------
 SubObjectsUpgrade::~SubObjectsUpgrade()
 {
+}
+
+void SubObjectsUpgrade::onDrawableBoundToObject()
+{
+	if (!RetailFileLayers::enabled())
+		return;
+	Drawable* draw = getObject()->getDrawable();
+	if (!draw)
+		return;
+	if (isAlreadyUpgraded())
+	{
+		upgradeImplementation();
+		return;
+	}
+	const SubObjectsUpgradeModuleData* data = getSubObjectsUpgradeModuleData();
+	if (data->m_showSubObjectNames.empty())
+		return;
+	for (const AsciiString& name : data->m_showSubObjectNames)
+		draw->showSubObject(name, FALSE);
+	draw->updateSubObjects();
 }
 
 //-------------------------------------------------------------------------------------------------

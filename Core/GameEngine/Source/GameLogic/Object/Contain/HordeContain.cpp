@@ -6,6 +6,7 @@
 #include "Common/Player.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
@@ -354,6 +355,17 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 	OpenContain::onContaining(rider, wasSelected);
 #endif
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained );
+	const UpgradeMaskType hordeUpgrades = getObject()->getObjectCompletedUpgradeMask();
+	if (hordeUpgrades.any() && TheUpgradeCenter)
+	{
+		for (const UpgradeTemplate* upgrade = TheUpgradeCenter->firstUpgradeTemplate(); upgrade; upgrade = upgrade->friend_getNext())
+		{
+			if (upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT &&
+				hordeUpgrades.testForAny(upgrade->getUpgradeMask()) &&
+				!rider->hasUpgrade(upgrade))
+				rider->giveUpgrade(upgrade);
+		}
+	}
 }
 
 void HordeContain::onRemoving( Object *rider )
@@ -469,6 +481,27 @@ Object* HordeContain::findAttackTarget(const Object* attacker, AbleToAttackType 
 			if (attackResult)
 				*attackResult = result;
 		}
+	}
+	return nearest;
+}
+
+Object* HordeContain::findNearestLivingMember(const Coord3D& fromPos) const
+{
+	Object* nearest = nullptr;
+	Real nearestDistance = 0.0f;
+	for (Object* candidate : *getContainedItemsList())
+	{
+		if (candidate->isEffectivelyDead() || get(candidate))
+			continue;
+		const Coord3D& targetPos = *candidate->getPosition();
+		const Real x = fromPos.x - targetPos.x;
+		const Real y = fromPos.y - targetPos.y;
+		const Real distance = x * x + y * y;
+		if (nearest && (distance > nearestDistance ||
+			(distance == nearestDistance && candidate->getID() >= nearest->getID())))
+			continue;
+		nearest = candidate;
+		nearestDistance = distance;
 	}
 	return nearest;
 }

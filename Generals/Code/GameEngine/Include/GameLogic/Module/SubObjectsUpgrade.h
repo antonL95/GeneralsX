@@ -87,6 +87,7 @@ class SubObjectsUpgrade : public UpgradeModule
 public:
 
 	SubObjectsUpgrade( Thing *thing, const ModuleData* moduleData );
+	void onDrawableBoundToObject() override;
 	Bool resetUpgrade(const UpgradeMaskType& keyMask) override;
 	const SubObjectsUpgradeModuleData* getActiveTextureUpgrade() const
 	{

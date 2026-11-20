@@ -1013,6 +1013,7 @@ private:
 	Team*														m_victimTeam;								///< recorded onEnter because if it changes during attack , it may no longer be a valid target.
 	Coord3D													m_originalVictimPos;				///< position of first obj/pos attacked... used for ContinueAttackRange.
 	const Weapon*						m_lockedWeaponOnEnter;
+	ObjectID							m_targetHordeID;
 	const Bool							m_follow;
 	const Bool							m_isAttackingObject;								// if false, attacking position
 	const Bool							m_isForceAttacking;

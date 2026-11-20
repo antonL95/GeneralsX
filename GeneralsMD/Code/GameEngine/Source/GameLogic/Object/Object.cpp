@@ -1600,6 +1600,12 @@ CanAttackResult Object::getAbleToAttackSpecificObject( AbleToAttackType t, const
 		}
 		return best;
 	}
+	if (const HordeContain* enemy = HordeContain::get(target))
+	{
+		CanAttackResult result = ATTACKRESULT_NOT_POSSIBLE;
+		enemy->findAttackTarget(this, t, commandSource, specificSlot, &result);
+		return result;
+	}
 	return m_weaponSet.getAbleToAttackSpecificObject( t, this, target, commandSource, specificSlot );
 }
 
@@ -4741,6 +4747,15 @@ void Object::giveUpgrade( const UpgradeTemplate *upgradeT )
 		// grant a new upgrade
 		//
 		updateUpgradeModules();
+
+		if (const HordeContain* horde = HordeContain::get(this))
+		{
+			for (Object* member : *horde->getContainedItemsList())
+			{
+				if (member && !member->isEffectivelyDead() && !HordeContain::get(member) && !member->hasUpgrade(upgradeT))
+					member->giveUpgrade(upgradeT);
+			}
+		}
 	}
 }
 
@@ -4759,6 +4774,14 @@ void Object::removeUpgrade( const UpgradeTemplate *upgradeT )
 		// Whoa, please note that while the function is called Object::RemoveUpgrade, it is not removing anything
 		// in the sense of undoing the effects.  It is just resetting the upgrade so it may be run again.
 		upgrade->resetUpgrade( upgradeT->getUpgradeMask() );
+	}
+	if (const HordeContain* horde = HordeContain::get(this))
+	{
+		for (Object* member : *horde->getContainedItemsList())
+		{
+			if (member && !member->isEffectivelyDead() && !HordeContain::get(member) && member->hasUpgrade(upgradeT))
+				member->removeUpgrade(upgradeT);
+		}
 	}
 }
 

@@ -30,32 +30,28 @@
 #pragma once
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
+#include "GameLogic/Damage.h"
 #include "GameLogic/Module/UpdateModule.h"
 
-//-------------------------------------------------------------------------------------------------
 class LifetimeUpdateModuleData : public UpdateModuleData
 {
 public:
 	UnsignedInt m_minFrames;
 	UnsignedInt m_maxFrames;
+	Bool m_waitForWakeUp;
+	Bool m_scoreKill;
+	DeathType m_deathType;
 
 	LifetimeUpdateModuleData()
 	{
-		m_minFrames = 0.0f;
-		m_maxFrames = 0.0f;
+		m_minFrames = 0;
+		m_maxFrames = 0;
+		m_waitForWakeUp = FALSE;
+		m_scoreKill = FALSE;
+		m_deathType = DEATH_NORMAL;
 	}
 
-	static void buildFieldParse(MultiIniFieldParse& p)
-	{
-    UpdateModuleData::buildFieldParse(p);
-		static const FieldParse dataFieldParse[] =
-		{
-			{ "MinLifetime",					INI::parseDurationUnsignedInt,		nullptr, offsetof( LifetimeUpdateModuleData, m_minFrames ) },
-			{ "MaxLifetime",					INI::parseDurationUnsignedInt,		nullptr, offsetof( LifetimeUpdateModuleData, m_maxFrames ) },
-			{ nullptr, nullptr, nullptr, 0 }
-		};
-    p.add(dataFieldParse);
-	}
+	static void buildFieldParse(MultiIniFieldParse& p);
 };
 
 //-------------------------------------------------------------------------------------------------
