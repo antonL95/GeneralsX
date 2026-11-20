@@ -8,6 +8,7 @@
 #include "Common/MapReaderWriterInfo.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/SidesList.h"
 #include "StdDevice/Common/StdLocalFileSystem.h"
 #include "W3DDevice/GameClient/W3DFileSystem.h"
@@ -452,6 +453,7 @@ const MapRule mapRules[] = {
 	{"", "WorldInfo", K_WORLDDICT_VERSION_1},
 	{"", "ObjectsList", K_OBJECTS_VERSION_3},
 	{"", "PolygonTriggers", K_TRIGGERS_VERSION_4},
+	{"", "TriggerAreas", 1},
 	{"", "SidesList", SidesList::MAX_MAP_SIDES_VERSION},
 	{"", "Teams", 1},
 	{"", "GlobalLighting", K_LIGHTING_VERSION_8},
@@ -611,6 +613,19 @@ bool writeMapHeights(const char *path, const WorldHeightMap &map)
 	return std::fclose(dump) == 0 && ok;
 }
 
+std::string hexBytes(std::string_view value)
+{
+	constexpr char digits[] = "0123456789abcdef";
+	std::string hex;
+	hex.reserve(2 * value.size());
+	for (unsigned char byte : value)
+	{
+		hex += digits[byte >> 4];
+		hex += digits[byte & 0xf];
+	}
+	return hex;
+}
+
 bool probeMapSides(const std::string& name, const Entry& entry, const char *heightDump = nullptr)
 {
 	CachedFileInputStream stream;
@@ -634,6 +649,17 @@ bool probeMapSides(const std::string& name, const Entry& entry, const char *heig
 			record("map-teams", name, "Teams", "", sides.getNumTeams());
 			record("map-side-flag", name, "SidesList", "", sides.getMapSideFlag());
 			record("map-standing-water", name, "StandingWaterAreas", "", map->getStandingWater().size());
+			record("map-trigger-areas", name, "TriggerAreas", "", map->getTriggerAreas().size());
+			if (std::getenv("GENERALSX_MAP_TRIGGER_DUMP"))
+			{
+				for (const auto &polygon : map->getTriggerAreas())
+					record("map-trigger-area", name, hexBytes(polygon->getTriggerName().str()),
+						hexBytes(polygon->getLayerName().str()) + ":" + std::to_string(polygon->getBfmeTriggerAreaId()) +
+							":" + std::to_string(polygon->getID()), polygon->getNumPoints());
+				for (const auto &polygon : map->getStandingWater())
+					record("map-standing-water-id", name, std::to_string(polygon->getStandingWater()->sourceId),
+						std::to_string(polygon->getID()));
+			}
 			if (const DataChunkInfo *unsupported = input.getUnsupportedRequiredChunk())
 				record("map-stop", name, unsupported->label.str(), std::to_string(unsupported->version));
 			if (map->getXExtent() > 0)

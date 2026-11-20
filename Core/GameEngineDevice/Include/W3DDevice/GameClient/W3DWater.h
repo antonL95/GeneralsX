@@ -249,7 +249,7 @@ protected:
 	Setting m_settings[ TIME_OF_DAY_COUNT ];	///< settings for each time of day
 	void drawRiverWater(PolygonTrigger *pTrig);
 	void drawStandingWater(const PolygonTrigger &polygon);
-	void drawTrapezoidWater(Vector3 points[4], TextureClass *texture = nullptr, Bool additive = false,
+	void drawTrapezoidWater(Vector3 points[4], Bool standingWater = false, Bool additive = false,
 		Real scroll = 0.0f);
 	void loadSetting ( Setting *skySetting, TimeOfDay timeOfDay );	///<init sky/water settings from GDF
 	void renderSky();	///<draw the sky layer (clouds, stars, etc.)

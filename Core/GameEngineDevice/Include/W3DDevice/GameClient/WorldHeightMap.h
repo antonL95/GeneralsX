@@ -233,18 +233,21 @@ protected:	 // file reader callbacks.
 	Bool ParseObjectData(DataChunkInput &file, DataChunkInfo *info, void *userData, Bool readDict);
 	static Bool ParseLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseLogicalLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	static Bool ParseTriggerAreas(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseStandingWaterAreas(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	void releaseMapData();
 
 private:
 	struct BfmeLighting;
 	std::unique_ptr<BfmeLighting> m_bfmeLighting;
-	struct WaterPolygonDeleter
+	struct MapPolygonDeleter
 	{
 		void operator()(PolygonTrigger *polygon) const;
 	};
-	using WaterPolygon = std::unique_ptr<PolygonTrigger, WaterPolygonDeleter>;
-	std::vector<WaterPolygon> m_standingWater;
+	using MapPolygon = std::unique_ptr<PolygonTrigger, MapPolygonDeleter>;
+	std::vector<MapPolygon> m_standingWater;
+	std::vector<MapPolygon> m_triggerAreas;
+	void finalizeImportedPolygons(Bool install);
 	Bool m_releaseAlphaTiles = true;
 	void readBfmeLighting(DataChunkInput &file, unsigned version);
 	void applyBfmeLighting() const;
@@ -258,6 +261,7 @@ public: // constructors/destructors
 	static RefCountPtr<WorldHeightMap> readAuditMap(DataChunkInput &file);
 	Bool writeBlendTileChecksums(const char *path) const;
 	const auto& getStandingWater() const { return m_standingWater; }
+	const auto& getTriggerAreas() const { return m_triggerAreas; }
 	virtual ~WorldHeightMap() override;			// destroy.
 
 public:  // Boundary info

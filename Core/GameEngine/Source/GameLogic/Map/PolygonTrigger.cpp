@@ -34,6 +34,7 @@
 #include "Common/Xfer.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/TerrainLogic.h"
+#include <set>
 
 /* ********* PolygonTrigger class ****************************/
 PolygonTrigger *PolygonTrigger::ThePolygonTriggerListPtr = nullptr;
@@ -317,6 +318,44 @@ void PolygonTrigger::setStandingWater(StandingWaterSettings settings)
 	setWaterArea(true);
 }
 
+void PolygonTrigger::setBfmeTriggerAreaId(UnsignedInt id)
+{
+	m_bfmeTriggerAreaId = id;
+	m_boundsNeedsUpdate = true;
+}
+
+void PolygonTrigger::assignImportedIDs(const std::vector<PolygonTrigger *> &polygons)
+{
+	std::set<Int> used;
+	for (const PolygonTrigger *polygon = getFirstPolygonTrigger(); polygon; polygon = polygon->getNext())
+		used.insert(polygon->getID());
+	std::set<Int> reserved = used;
+	for (const PolygonTrigger *polygon : polygons)
+		reserved.insert(polygon->getID());
+
+	Int next = 1;
+	for (PolygonTrigger *polygon : polygons)
+	{
+		if (used.insert(polygon->getID()).second)
+			continue;
+		while (reserved.count(next))
+			++next;
+		polygon->m_triggerID = next++;
+	}
+}
+
+void PolygonTrigger::installImportedPolygons(const std::vector<PolygonTrigger *> &polygons)
+{
+	for (auto it = polygons.rbegin(); it != polygons.rend(); ++it)
+	{
+		PolygonTrigger *polygon = *it;
+		polygon->m_nextPolygonTrigger = ThePolygonTriggerListPtr;
+		ThePolygonTriggerListPtr = polygon;
+		if (polygon->getID() >= s_currentID)
+			s_currentID = polygon->getID() + 1;
+	}
+}
+
 /**
  PolygonTrigger::removePolygonTrigger removes a trigger to the list of
 	triggers.  note - does NOT delete pTrigger.
@@ -492,7 +531,7 @@ Bool PolygonTrigger::pointInTrigger(ICoord3D &point) const
 		Int dy = pt2.y-pt1.y;
 		Int dx = pt2.x-pt1.x;
 
-		const Real numerator = m_standingWater ? static_cast<Real>(Int64(dx) * (point.y - pt1.y))
+		const Real numerator = (m_standingWater || m_bfmeTriggerAreaId) ? static_cast<Real>(Int64(dx) * (point.y - pt1.y))
 			: static_cast<Real>(dx * (point.y - pt1.y));
 		Real intersectionX = pt1.x + numerator / static_cast<Real>(dy);
 		if (intersectionX >= point.x) {

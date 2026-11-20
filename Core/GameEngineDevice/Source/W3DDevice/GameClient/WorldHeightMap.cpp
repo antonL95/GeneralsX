@@ -515,7 +515,7 @@ void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metada
 	file.registerVersionedParser("LibraryMapLists", root, nullptr, 1);
 	file.registerVersionedParser("PlayerScriptsList", root, nullptr, 6);
 	file.registerVersionedParser("BuildLists", root, nullptr, 1);
-	file.registerVersionedParser("TriggerAreas", root, nullptr, 1);
+	file.registerVersionedParser("TriggerAreas", root, ParseTriggerAreas, 1);
 	file.registerVersionedParser("StandingWaterAreas", root, ParseStandingWaterAreas, 2);
 	file.registerVersionedParser("RiverAreas", root, nullptr, 2);
 	file.registerVersionedParser("StandingWaveAreas", root, nullptr, 2);
@@ -534,7 +534,32 @@ RefCountPtr<WorldHeightMap> WorldHeightMap::readAuditMap(DataChunkInput &file)
 	RegisterLogicalMapParsers(file, true);
 	if (!file.parse(map.Peek()))
 		return {};
+	map->finalizeImportedPolygons(false);
 	return map;
+}
+
+void WorldHeightMap::finalizeImportedPolygons(Bool install)
+{
+	if (m_standingWater.empty() && m_triggerAreas.empty())
+		return;
+	std::vector<PolygonTrigger *> polygons;
+	polygons.reserve(m_standingWater.size() + m_triggerAreas.size());
+	for (const auto &polygon : m_standingWater)
+		polygons.push_back(polygon.get());
+	for (const auto &polygon : m_triggerAreas)
+		polygons.push_back(polygon.get());
+	PolygonTrigger::assignImportedIDs(polygons);
+	if (install)
+	{
+		std::rotate(polygons.begin(), polygons.begin() + m_standingWater.size(), polygons.end());
+		PolygonTrigger::installImportedPolygons(polygons);
+		for (auto &polygon : m_standingWater)
+			polygon.release();
+		for (auto &polygon : m_triggerAreas)
+			polygon.release();
+		m_standingWater.clear();
+		m_triggerAreas.clear();
+	}
 }
 /**
 * WorldHeightMap - read a height map from a file.
@@ -598,11 +623,7 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly, Bo
 		if (!logicalDataOnly && m_bfmeLighting)
 			applyBfmeLighting();
 		if (logicalDataOnly)
-		{
-			for (auto polygon = m_standingWater.rbegin(); polygon != m_standingWater.rend(); ++polygon)
-				PolygonTrigger::addPolygonTrigger(polygon->release());
-			m_standingWater.clear();
-		}
+			finalizeImportedPolygons(true);
 	}
 	catch (...)
 	{
@@ -1170,12 +1191,12 @@ Bool WorldHeightMap::ParseLogicalBlendTileDataChunk(DataChunkInput &file, DataCh
 
 namespace
 {
-class StandingWaterReader
+class BfmePolygonReader
 {
 	DataChunkInput &m_file;
 
 public:
-	explicit StandingWaterReader(DataChunkInput &file) : m_file(file) {}
+	explicit BfmePolygonReader(DataChunkInput &file) : m_file(file) {}
 
 	template<class T>
 	T read()
@@ -1200,6 +1221,16 @@ public:
 			bytes[size] = '\0';
 		}
 		return value;
+	}
+
+	ICoord3D readPoint()
+	{
+		const Real x = read<Real>();
+		const Real y = read<Real>();
+		const Real extent = MAX_MAP_DIMENSION * MAP_XY_FACTOR;
+		if (!(x >= -extent && x <= extent && y >= -extent && y <= extent))
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		return {static_cast<Int>(x), static_cast<Int>(y), 0};
 	}
 };
 
@@ -1285,9 +1316,65 @@ std::vector<std::array<Coord2D, 4>> tessellateStandingWater(const PolygonTrigger
 }
 }
 
-void WorldHeightMap::WaterPolygonDeleter::operator()(PolygonTrigger *polygon) const
+void WorldHeightMap::MapPolygonDeleter::operator()(PolygonTrigger *polygon) const
 {
 	deleteInstance(polygon);
+}
+
+Bool WorldHeightMap::ParseTriggerAreas(DataChunkInput &file, DataChunkInfo *info, void *userData)
+{
+	auto *map = static_cast<WorldHeightMap *>(userData);
+	if (map->getHeightSampleBytes() != 2 || info->version != 1)
+		return true;
+
+	std::vector<MapPolygon> polygons;
+	try
+	{
+		if (info->dataSize > std::numeric_limits<Int>::max())
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		BfmePolygonReader reader(file);
+		const UnsignedInt count = reader.read<UnsignedInt>();
+		constexpr UnsignedInt minAreaBytes = 3 * sizeof(UnsignedInt) + 2 * sizeof(UnsignedShort);
+		constexpr UnsignedInt maxAreas = 4096;
+		if (count > maxAreas || count > file.getChunkDataSizeLeft() / minAreaBytes)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		polygons.reserve(count);
+		for (UnsignedInt area = 0; area < count; ++area)
+		{
+			const AsciiString name = reader.readString();
+			const AsciiString layer = reader.readString();
+			const UnsignedInt id = reader.read<UnsignedInt>();
+			const UnsignedInt points = reader.read<UnsignedInt>();
+			constexpr UnsignedInt maxPoints = 4096;
+			const UnsignedInt remaining = file.getChunkDataSizeLeft();
+			const UnsignedInt footer = sizeof(UnsignedInt) + (count - area - 1) * minAreaBytes;
+			if (id >= std::numeric_limits<Int>::max() || points > maxPoints || remaining < footer ||
+				points > (remaining - footer) / (2 * sizeof(Real)))
+				throw ERROR_CORRUPT_FILE_FORMAT;
+
+			MapPolygon polygon(newInstance(PolygonTrigger)(points, id));
+			polygon->setTriggerName(name);
+			polygon->setLayerName(layer);
+			polygon->setBfmeTriggerAreaId(id);
+			for (UnsignedInt point = 0; point < points; ++point)
+				polygon->addPoint(reader.readPoint());
+			if (reader.read<UnsignedInt>() != 0)
+				throw ERROR_CORRUPT_FILE_FORMAT;
+			polygons.push_back(std::move(polygon));
+		}
+		if (file.getChunkDataSizeLeft() != 0)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+	}
+	catch (ErrorCode)
+	{
+		if (!INIAudit::isEnabled())
+			throw;
+		INIAudit::record("error", "Invalid trigger areas map chunk", info->label.str(), 0);
+		return true;
+	}
+	for (auto &polygon : polygons)
+		map->m_triggerAreas.push_back(std::move(polygon));
+	return true;
 }
 
 Bool WorldHeightMap::ParseStandingWaterAreas(DataChunkInput &file, DataChunkInfo *info, void *userData)
@@ -1296,12 +1383,12 @@ Bool WorldHeightMap::ParseStandingWaterAreas(DataChunkInput &file, DataChunkInfo
 	if (map->getHeightSampleBytes() != 2)
 		return true;
 
-	std::vector<WaterPolygon> polygons;
+	std::vector<MapPolygon> polygons;
 	try
 	{
 		if (info->dataSize > std::numeric_limits<Int>::max())
 			throw ERROR_CORRUPT_FILE_FORMAT;
-		StandingWaterReader reader(file);
+		BfmePolygonReader reader(file);
 		const UnsignedInt count = reader.read<UnsignedInt>();
 		constexpr UnsignedInt minAreaBytes = 4 * sizeof(UnsignedInt) + sizeof(UnsignedByte) +
 			6 * sizeof(UnsignedShort);
@@ -1313,6 +1400,7 @@ Bool WorldHeightMap::ParseStandingWaterAreas(DataChunkInput &file, DataChunkInfo
 			const AsciiString name = reader.readString();
 			const AsciiString layer = reader.readString();
 			PolygonTrigger::StandingWaterSettings settings;
+			settings.sourceId = id;
 			settings.uvScrollSpeed = reader.read<Real>();
 			const UnsignedByte additive = reader.read<UnsignedByte>();
 			settings.additive = additive != 0;
@@ -1324,18 +1412,11 @@ Bool WorldHeightMap::ParseStandingWaterAreas(DataChunkInput &file, DataChunkInfo
 				points > maxWaterPoints || points > file.getChunkDataSizeLeft() / (2 * sizeof(Real)))
 				throw ERROR_CORRUPT_FILE_FORMAT;
 
-			WaterPolygon polygon(newInstance(PolygonTrigger)(points, id));
+			MapPolygon polygon(newInstance(PolygonTrigger)(points, id));
 			polygon->setTriggerName(name);
 			polygon->setLayerName(layer);
 			for (UnsignedInt point = 0; point < points; ++point)
-			{
-				const Real x = reader.read<Real>();
-				const Real y = reader.read<Real>();
-				const Real extent = MAX_MAP_DIMENSION * MAP_XY_FACTOR;
-				if (!(x >= -extent && x <= extent && y >= -extent && y <= extent))
-					throw ERROR_CORRUPT_FILE_FORMAT;
-				polygon->addPoint({static_cast<Int>(x), static_cast<Int>(y), 0});
-			}
+				polygon->addPoint(reader.readPoint());
 			const UnsignedInt height = reader.read<UnsignedInt>();
 			if (height > std::numeric_limits<Int>::max())
 				throw ERROR_CORRUPT_FILE_FORMAT;

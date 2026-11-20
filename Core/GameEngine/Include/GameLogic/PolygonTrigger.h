@@ -38,6 +38,7 @@
 #include "Common/STLTypedefs.h"
 #include <array>
 #include <memory>
+#include <optional>
 
 class DataChunkInput;
 class DataChunkOutput;
@@ -71,6 +72,7 @@ class PolygonTrigger : public MemoryPoolObject,
 public:
 	struct StandingWaterSettings
 	{
+		UnsignedInt sourceId;
 		AsciiString bumpTexture;
 		AsciiString skyTexture;
 		AsciiString fxShader;
@@ -99,6 +101,7 @@ protected:
 	Bool				m_shouldRender;
 	Bool				m_selected;
 	std::unique_ptr<StandingWaterSettings> m_standingWater;
+	std::optional<UnsignedInt> m_bfmeTriggerAreaId;
 
 	static PolygonTrigger* ThePolygonTriggerListPtr;
 	static Int s_currentID; ///< Current id for new triggers.
@@ -126,8 +129,12 @@ public:
 
 public:
 	static void addPolygonTrigger(PolygonTrigger *pTrigger);
+	static void assignImportedIDs(const std::vector<PolygonTrigger *> &polygons);
+	static void installImportedPolygons(const std::vector<PolygonTrigger *> &polygons);
 	void setStandingWater(StandingWaterSettings settings);
 	const StandingWaterSettings *getStandingWater() const { return m_standingWater.get(); }
+	void setBfmeTriggerAreaId(UnsignedInt id);
+	UnsignedInt getBfmeTriggerAreaId() const { return m_bfmeTriggerAreaId.value(); }
 	static void removePolygonTrigger(PolygonTrigger *pTrigger);
 	void setNextPoly(PolygonTrigger *nextPoly) {m_nextPolygonTrigger = nextPoly;} ///< Link the next map object.
 	void addPoint(const ICoord3D &point);

@@ -3321,17 +3321,6 @@ void WaterRenderObjClass::setupFlatWaterShader(TextureClass *texture, Bool addit
 void WaterRenderObjClass::drawStandingWater(const PolygonTrigger &polygon)
 {
 	const auto &settings = *polygon.getStandingWater();
-	TextureClass *texture = nullptr;
-	if (settings.bumpTexture.isNotEmpty())
-	{
-		texture = WW3DAssetManager::Get_Instance()->Get_Texture(settings.bumpTexture.str());
-		if (texture)
-		{
-			texture->Init();
-			if (texture->Is_Missing_Texture())
-				REF_PTR_RELEASE(texture);
-		}
-	}
 	const Real scroll = static_cast<Real>(std::fmod(
 		static_cast<double>(m_riverVOrigin) * settings.uvScrollSpeed / 0.06, 1.0));
 	const Real height = polygon.getPoint(0)->z;
@@ -3340,19 +3329,14 @@ void WaterRenderObjClass::drawStandingWater(const PolygonTrigger &polygon)
 		Vector3 points[4];
 		for (Int vertex = 0; vertex < 4; ++vertex)
 			points[vertex].Set(patch[vertex].x, patch[vertex].y, height);
-		drawTrapezoidWater(points, texture ? texture : m_riverTexture, settings.additive, scroll);
+		drawTrapezoidWater(points, true, settings.additive, scroll);
 	}
-	REF_PTR_RELEASE(texture);
 }
 
-void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4], TextureClass *texture, Bool additive, Real scroll)
+void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4], Bool standingWater, Bool additive, Real scroll)
 {
-	const Bool standingWater = texture != nullptr;
 	if (!standingWater)
-	{
-		texture = m_riverTexture;
 		additive = TheWaterTransparency->m_additiveBlend;
-	}
 	Vector3 origin(points[0]);
 	Vector3 uVec1(points[1]);
 	Vector3 vVec1(points[3]);
@@ -3451,6 +3435,8 @@ void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4], TextureClass *te
 
 	//Keep diffuse from lighting calculations but substitute custom alpha
 	diffuse |= m_settings[m_tod].waterDiffuse & 0xff000000;	//copy alpha/opacity from ini setting
+	if (standingWater)
+		diffuse = m_settings[m_tod].waterDiffuse;
 
 	DynamicVBAccessClass vb_access(BUFFER_TYPE_DYNAMIC_DX8,dynamic_fvf_type,(rectangleCount+1)*2);
 
@@ -3583,7 +3569,7 @@ void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4], TextureClass *te
 	DX8Wrapper::Set_Index_Buffer(ib_access,0);
 	DX8Wrapper::Set_Vertex_Buffer(vb_access);
 
-	setupFlatWaterShader(texture, additive);
+	setupFlatWaterShader(m_riverTexture, additive);
 
 	//If video card supports it and it's enabled, feather the water edge using destination alpha
 	if (DX8Wrapper::getBackBufferFormat() == WW3D_FORMAT_A8R8G8B8 && TheGlobalData->m_showSoftWaterEdge && TheWaterTransparency->m_transparentWaterDepth !=0)
