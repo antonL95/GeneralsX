@@ -34,6 +34,7 @@
 #include "GameClient/DisplayStringManager.h"
 #include "GameClient/GameText.h"
 #include "GameClient/GlobalLanguage.h"
+#include "GameClient/Image.h"
 //#include "GameLogic/ScriptEngine.h"
 //#include "GameLogic/GameLogic.h"
 
@@ -345,4 +346,45 @@ void Display::flush()
 	{
 		onFlush();
 	}
+}
+
+void Display::drawImagePart( const Image *image, Int startX, Int startY, Int endX, Int endY,
+	const Region2D &, Color color, DrawImageMode mode )
+{
+	drawImage(image, startX, startY, endX, endY, color, mode);
+}
+
+void Display::drawImageNineSlice( const Image *image, const UiNineSlice::Insets &insets, Int startX, Int startY,
+	Int endX, Int endY, Real scale, UiNineSlice::Fill edges, UiNineSlice::Fill center, Color color, DrawImageMode mode )
+{
+	if (image == nullptr)
+		return;
+
+	const Int width = image->getImageWidth();
+	const Int height = image->getImageHeight();
+	if (width <= 0 || height <= 0)
+	{
+		drawImage(image, startX, startY, endX, endY, color, mode);
+		return;
+	}
+
+	const UiNineSlice::Rect dest = { startX, startY, endX, endY };
+	const std::vector<UiNineSlice::Piece> pieces = UiNineSlice::slice(width, height, insets, dest, scale, edges, center);
+	if (pieces.empty())
+		return;
+
+	const Bool ownBatch = !isBatching();
+	if (ownBatch)
+		beginBatch();
+	for (const UiNineSlice::Piece &piece : pieces)
+	{
+		Region2D part;
+		part.lo.x = static_cast<Real>(piece.source.x0 / width);
+		part.lo.y = static_cast<Real>(piece.source.y0 / height);
+		part.hi.x = static_cast<Real>(piece.source.x1 / width);
+		part.hi.y = static_cast<Real>(piece.source.y1 / height);
+		drawImagePart(image, piece.dest.x0, piece.dest.y0, piece.dest.x1, piece.dest.y1, part, color, mode);
+	}
+	if (ownBatch)
+		endBatch();
 }

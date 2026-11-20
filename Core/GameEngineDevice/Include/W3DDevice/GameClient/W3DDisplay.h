@@ -47,6 +47,7 @@ class RTS3DScene;
 class RTS2DScene;
 class RTS3DInterfaceScene;
 class TextureClass;
+class RectClass;
 
 
 //=============================================================================
@@ -116,6 +117,8 @@ public:
 	/// draw an image fit within the screen coordinates
 	virtual void drawImage( const Image *image, Int startX, Int startY,
 													Int endX, Int endY, Color color = 0xFFFFFFFF, DrawImageMode mode=DRAW_IMAGE_ALPHA) override;
+	virtual void drawImagePart( const Image *image, Int startX, Int startY, Int endX, Int endY,
+		const Region2D &part, Color color = 0xFFFFFFFF, DrawImageMode mode = DRAW_IMAGE_ALPHA ) override;
 
 	/// draw a video buffer fit within the screen coordinates
 	virtual void drawScaledVideoBuffer( VideoBuffer *buffer, VideoStreamInterface *stream ) override;
@@ -165,6 +168,8 @@ protected:
 	void renderLetterBox(UnsignedInt time);							///< draw letter box border
 	void updateAverageFPS();	///< calculate the average fps over the last 30 frames.
 	void setup2DRenderState(TextureClass *tex, DrawImageMode mode, Bool grayscale);
+	void drawImageUV( const Image *image, Int startX, Int startY, Int endX, Int endY,
+		const RectClass &uvRect, Color color, DrawImageMode mode );
 	virtual void onBeginBatch() override;
 	virtual void onEndBatch() override;
 	virtual void onFlush() override;

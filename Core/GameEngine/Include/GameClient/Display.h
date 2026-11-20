@@ -31,6 +31,7 @@
 #include "Common/SubsystemInterface.h"
 #include "GameClient/Color.h"
 #include "GameClient/GameFont.h"
+#include "GameClient/UiNineSlice.h"
 #include "GameClient/View.h"
 
 enum ScreenshotFormat
@@ -157,6 +158,12 @@ public:
 	/// draw an image fit within the screen coordinates
 	virtual void drawImage( const Image *image, Int startX, Int startY,
 													Int endX, Int endY, Color color = 0xFFFFFFFF, DrawImageMode mode=DRAW_IMAGE_ALPHA) = 0;
+
+	virtual void drawImagePart( const Image *image, Int startX, Int startY, Int endX, Int endY,
+		const Region2D &part, Color color = 0xFFFFFFFF, DrawImageMode mode = DRAW_IMAGE_ALPHA );
+	void drawImageNineSlice( const Image *image, const UiNineSlice::Insets &insets, Int startX, Int startY,
+		Int endX, Int endY, Real scale, UiNineSlice::Fill edges, UiNineSlice::Fill center,
+		Color color = 0xFFFFFFFF, DrawImageMode mode = DRAW_IMAGE_ALPHA );
 
 	/// draw a video buffer fit within the screen coordinates
 	virtual void drawScaledVideoBuffer( VideoBuffer *buffer, VideoStreamInterface *stream ) = 0;

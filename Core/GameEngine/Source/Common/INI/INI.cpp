@@ -256,6 +256,8 @@ INI::INI()
 	m_lineNum						= 0;
 	m_buffer[0]					= 0;
 	m_endOfFile					= FALSE;
+	m_extraBlockToken = nullptr;
+	m_extraBlockParse = nullptr;
 #ifdef DEBUG_CRASHING
 	m_curBlockStart[0]	= 0;
 #endif
@@ -432,9 +434,21 @@ void INI::prepFile( AsciiString filename, INILoadType loadType )
 
 	const Int size = file->size();
 	char* raw = file->readEntireAndClose();
-	INIPreprocessor& preprocessor = getPreprocessor();
-	const std::string expanded = preprocessor.process(filename.str(), std::string(raw, size));
+	const std::string text(raw, size);
 	delete[] raw;
+	prepText(filename, text, loadType);
+}
+
+void INI::prepText( AsciiString filename, const std::string& text, INILoadType loadType )
+{
+	if( m_readBuffer != nullptr )
+	{
+		DEBUG_CRASH(( "INI::load, cannot open file '%s', file already open", filename.str() ));
+		throw INI_FILE_ALREADY_OPEN;
+	}
+
+	INIPreprocessor& preprocessor = getPreprocessor();
+	const std::string expanded = preprocessor.process(filename.str(), text);
 	for (const std::string& warning : preprocessor.getWarnings())
 	{
 		fprintf(stderr, "[INI] %s\n", warning.c_str());
@@ -471,6 +485,8 @@ void INI::unPrepFile()
 	m_lineNum = 0;
 	m_endOfFile = FALSE;
 	s_xfer = nullptr;
+	m_extraBlockToken = nullptr;
+	m_extraBlockParse = nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -532,6 +548,23 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 	fprintf(stderr, "[INI] load - prepFile completed\n");
 	fflush(stderr);
 
+	return parsePreparedFile(filename);
+}
+
+UnsignedInt INI::loadText( AsciiString name, const char *text, INILoadType loadType,
+	const char *extraBlockToken, INIBlockParse extraBlockParse )
+{
+	setFPMode();
+
+	s_xfer = nullptr;
+	prepText(name, text ? std::string(text) : std::string(), loadType);
+	m_extraBlockToken = extraBlockToken;
+	m_extraBlockParse = extraBlockParse;
+	return parsePreparedFile(name);
+}
+
+UnsignedInt INI::parsePreparedFile( AsciiString filename )
+{
 	try
 	{
 
@@ -560,6 +593,8 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 			if( token )
 			{
 				INIBlockParse parse = findBlockParse(token);
+				if (parse == nullptr && m_extraBlockToken && strcmp(m_extraBlockToken, token) == 0)
+					parse = m_extraBlockParse;
 				if (resync)
 				{
 					if (parse == nullptr || !atLineStart)

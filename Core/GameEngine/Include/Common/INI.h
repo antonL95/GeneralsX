@@ -193,6 +193,9 @@ public:
 	// Throws if the INI file is not found or is not read correctly.
 	UnsignedInt load( AsciiString filename, INILoadType loadType, Xfer *pXfer );
 
+	UnsignedInt loadText( AsciiString name, const char *text, INILoadType loadType,
+		const char *extraBlockToken, INIBlockParse extraBlockParse );
+
 	static Bool isDeclarationOfType( AsciiString blockType, AsciiString blockName, char *bufferToCheck );
 	static Bool isEndOfBlock( char *bufferToCheck );
 
@@ -411,6 +414,8 @@ protected:
 	static Bool isValidINIFilename( const char *filename ); ///< is this a valid .ini filename
 
 	void prepFile( AsciiString filename, INILoadType loadType );
+	void prepText( AsciiString filename, const std::string& text, INILoadType loadType );
+	UnsignedInt parsePreparedFile( AsciiString filename );
 	void unPrepFile();
 
 	void readLine();
@@ -425,6 +430,8 @@ protected:
 	UnsignedInt m_lineNum;										///< current line number that's been read
 	char m_buffer[ INI_MAX_CHARS_PER_LINE+1 ];///< buffer to read file contents into
 	Bool m_endOfFile;													///< TRUE when we've hit EOF
+	const char *m_extraBlockToken;
+	INIBlockParse m_extraBlockParse;
 #ifdef DEBUG_CRASHING
 	char m_curBlockStart[ INI_MAX_CHARS_PER_LINE+1 ];	///< first line of cur block
 #endif

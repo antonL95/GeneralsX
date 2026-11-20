@@ -117,3 +117,16 @@ TEST(UiSpecimen, ParsesFontSizeAndText)
 	EXPECT_EQ(lines[1].font, "Omnia LT Std");
 	EXPECT_EQ(lines[2].text, "a;b");
 }
+
+TEST(UiFrameSpecimen, ParsesFrameNamesAndDesignRects)
+{
+	const auto frames = parseUiFrameSpecimen(" MenuButtonMed ; 24;-8 ;170;52|MapPreviewFrame;0;0;0;10|bad;1;2;3|x;1;2;3;4;5|y;a;1;1;1|PopupChainSide;40;381;42;200");
+	ASSERT_EQ(frames.size(), 2u);
+	EXPECT_EQ(frames[0].frame, "MenuButtonMed");
+	EXPECT_EQ(frames[0].x, 24);
+	EXPECT_EQ(frames[0].y, -8);
+	EXPECT_EQ(frames[0].width, 170);
+	EXPECT_EQ(frames[0].height, 52);
+	EXPECT_EQ(frames[1].frame, "PopupChainSide");
+	EXPECT_EQ(frames[1].height, 200);
+}

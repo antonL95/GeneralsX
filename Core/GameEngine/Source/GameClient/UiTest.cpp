@@ -10,6 +10,8 @@
 #include "GameClient/GameFont.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
+#include "GameClient/Image.h"
+#include "GameClient/UiFrame.h"
 #include "GameClient/UiLayoutDump.h"
 #include "GameClient/UiScale.h"
 #include "GameClient/WindowLayout.h"
@@ -30,6 +32,12 @@ namespace
 
 	constexpr Int CaptureFramesAfterCreation = 1;
 
+	struct FrameSpecimen
+	{
+		const UiFrame* frame;
+		UiScale::PixelRect rect;
+	};
+
 	struct State
 	{
 		Bool active = FALSE;
@@ -38,6 +46,8 @@ namespace
 		Int framesSinceCreation = 0;
 		Bool captured = FALSE;
 		Bool layoutLoaded = FALSE;
+		UiScale::PixelRect frameCanvas = { 0, 0, 0, 0 };
+		std::vector<FrameSpecimen> frames;
 	};
 
 	State& state()
@@ -196,6 +206,72 @@ namespace
 		}
 	}
 
+	void drawNothing(GameWindow*, WinInstanceData*)
+	{
+	}
+
+	void drawFrameSpecimen(GameWindow*, WinInstanceData*)
+	{
+		const State& current = state();
+		const UiScale::PixelRect& canvas = current.frameCanvas;
+		TheDisplay->drawFillRect(canvas.x0, canvas.y0, canvas.x1 - canvas.x0, canvas.y1 - canvas.y0, GameMakeColor(38, 42, 48, 255));
+		for (const FrameSpecimen& specimen : current.frames)
+		{
+			if (specimen.frame)
+				specimen.frame->draw(specimen.rect.x0, specimen.rect.y0, specimen.rect.x1, specimen.rect.y1);
+		}
+	}
+
+	void createFrameSpecimen(const char* spec)
+	{
+		const std::vector<UiFrameSpecimen> entries = parseUiFrameSpecimen(spec);
+		if (entries.empty())
+			return;
+
+		State& current = state();
+		const Int width = TheDisplay->getWidth();
+		const Int height = TheDisplay->getHeight();
+		const UiScale::PixelRect canvas = UiScale::canvasToScreen(0, 0, UiScale::DesignWidth, UiScale::DesignHeight, width, height);
+		current.frameCanvas = canvas;
+
+		WinInstanceData rootData;
+		rootData.m_style = GWS_USER_WINDOW;
+		rootData.m_decoratedNameString = "UiTest:Frames";
+		GameWindow* root = TheWindowManager->winCreate(nullptr, WIN_STATUS_ENABLED,
+			canvas.x0, canvas.y0, canvas.x1 - canvas.x0, canvas.y1 - canvas.y0, nullptr, &rootData);
+		if (root == nullptr)
+			return;
+		root->winSetDrawFunc(drawFrameSpecimen);
+		const ICoord2D design = { UiScale::DesignWidth, UiScale::DesignHeight };
+		const IRegion2D rootRegion = { { 0, 0 }, { UiScale::DesignWidth, UiScale::DesignHeight } };
+		root->winSetLayoutRegion(rootRegion, design);
+
+		Int index = 0;
+		for (const UiFrameSpecimen& entry : entries)
+		{
+			const UiFrame* frame = TheUiFrameCollection ? TheUiFrameCollection->find(entry.frame.c_str()) : nullptr;
+			const UiScale::PixelRect rect = UiScale::canvasToScreen(entry.x, entry.y, entry.x + entry.width, entry.y + entry.height, width, height);
+			current.frames.push_back({ frame, rect });
+
+			WinInstanceData data;
+			data.m_style = GWS_USER_WINDOW;
+			data.m_decoratedNameString.format("UiTest:Frame%d:%s", index, entry.frame.c_str());
+			GameWindow* window = TheWindowManager->winCreate(root, WIN_STATUS_ENABLED,
+				rect.x0 - canvas.x0, rect.y0 - canvas.y0, rect.x1 - rect.x0, rect.y1 - rect.y0, nullptr, &data);
+			if (window)
+			{
+				window->winSetDrawFunc(drawNothing);
+				const IRegion2D region = { { entry.x, entry.y }, { entry.x + entry.width, entry.y + entry.height } };
+				window->winSetLayoutRegion(region, design);
+			}
+
+			const Image* image = frame ? frame->getImage() : nullptr;
+			std::fprintf(stderr, "UI test: frame %d '%s' %s image %s, pixels %d,%d to %d,%d\n", index, entry.frame.c_str(),
+				frame ? "found" : "missing", image ? image->getFilename().str() : "(none)", rect.x0, rect.y0, rect.x1, rect.y1);
+			++index;
+		}
+	}
+
 	void createWindows()
 	{
 		TheWritableGlobalData->m_breakTheMovie = FALSE;
@@ -213,6 +289,8 @@ namespace
 		}
 		if (const char* spec = environment("GENERALSX_UITEST_SPECIMEN"))
 			createSpecimen(spec);
+		if (const char* spec = environment("GENERALSX_UITEST_FRAMES"))
+			createFrameSpecimen(spec);
 		std::fflush(stderr);
 	}
 

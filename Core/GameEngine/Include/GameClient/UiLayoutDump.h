@@ -39,6 +39,16 @@ struct UiSpecimenLine
 	std::string text;
 };
 
+struct UiFrameSpecimen
+{
+	std::string frame;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+};
+
 std::string formatUiLayoutJson(const UiLayoutSummary& summary, std::vector<UiWindowRecord> windows);
 std::vector<UiSpecimenLine> parseUiSpecimen(std::string_view spec);
+std::vector<UiFrameSpecimen> parseUiFrameSpecimen(std::string_view spec);
 std::string uiJsonEscape(std::string_view text);

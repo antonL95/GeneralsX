@@ -244,7 +244,9 @@ set(GAMEENGINE_SRC
     Include/GameClient/Statistics.h
     Include/GameClient/TerrainRoads.h
     Include/GameClient/TerrainVisual.h
+    Include/GameClient/UiFrame.h
     Include/GameClient/UiLayoutDump.h
+    Include/GameClient/UiNineSlice.h
     Include/GameClient/UiScale.h
     Include/GameClient/UiTest.h
     Include/GameClient/VideoPlayer.h
@@ -879,7 +881,9 @@ set(GAMEENGINE_SRC
     Source/GameClient/System/Smudge.cpp
     Source/GameClient/Terrain/TerrainRoads.cpp
     Source/GameClient/Terrain/TerrainVisual.cpp
+    Source/GameClient/UiFrame.cpp
     Source/GameClient/UiLayoutDump.cpp
+    Source/GameClient/UiNineSlice.cpp
     Source/GameClient/UiTest.cpp
     Source/GameClient/VideoPlayer.cpp
     Source/GameClient/VideoStream.cpp
@@ -1209,6 +1213,11 @@ add_library(corei_gameengine_private INTERFACE)
 add_library(corei_gameengine_public INTERFACE)
 
 target_sources(corei_gameengine_private INTERFACE ${GAMEENGINE_SRC})
+
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/Source/GameClient/UiFrames.ini" UI_FRAMES_INI_TEXT)
+configure_file(Source/GameClient/UiFramesIni.cpp.in "${CMAKE_CURRENT_BINARY_DIR}/UiFramesIni.cpp" @ONLY)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS Source/GameClient/UiFrames.ini)
+target_sources(corei_gameengine_private INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/UiFramesIni.cpp")
 
 target_include_directories(corei_gameengine_private INTERFACE
     Include/Precompiled

@@ -15,6 +15,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/BfmeAssetPathTest.cpp
     GameEngine/Common/FontSubstitutionTest.cpp
     GameEngine/Common/UiLayoutDumpTest.cpp
+    GameEngine/Common/UiNineSliceTest.cpp
     Libraries/Compression/CompressionManagerTest.cpp
     Libraries/WW3D2/W3dBfmeChunksTest.cpp
     Libraries/WW3D2/W3dFxMaterialTest.cpp

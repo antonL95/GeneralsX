@@ -3345,6 +3345,40 @@ void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 	if( image == nullptr )
 		return;
 
+	const Region2D *uv = image->getUV();
+	drawImageUV(image, startX, startY, endX, endY, RectClass(uv->lo.x, uv->lo.y, uv->hi.x, uv->hi.y), color, mode);
+}
+
+void W3DDisplay::drawImagePart( const Image *image, Int startX, Int startY, Int endX, Int endY,
+	const Region2D &part, Color color, DrawImageMode mode )
+{
+	if( image == nullptr )
+		return;
+
+	const Region2D *uv = image->getUV();
+	const Real width = uv->hi.x - uv->lo.x;
+	const Real height = uv->hi.y - uv->lo.y;
+	RectClass uvRect;
+	if( BitIsSet( image->getStatus(), IMAGE_STATUS_ROTATED_90_CLOCKWISE ) )
+	{
+		uvRect.Top = uv->lo.y + part.lo.x * height;
+		uvRect.Bottom = uv->lo.y + part.hi.x * height;
+		uvRect.Right = uv->hi.x - part.lo.y * width;
+		uvRect.Left = uv->hi.x - part.hi.y * width;
+	}
+	else
+	{
+		uvRect.Left = uv->lo.x + part.lo.x * width;
+		uvRect.Right = uv->lo.x + part.hi.x * width;
+		uvRect.Top = uv->lo.y + part.lo.y * height;
+		uvRect.Bottom = uv->lo.y + part.hi.y * height;
+	}
+	drawImageUV(image, startX, startY, endX, endY, uvRect, color, mode);
+}
+
+void W3DDisplay::drawImageUV( const Image *image, Int startX, Int startY, Int endX, Int endY,
+	const RectClass &uvRect, Color color, DrawImageMode mode )
+{
 	if (m_isClippedEnabled)
 	{
 		if (endX <= m_clipRegion.lo.x ||
@@ -3362,8 +3396,6 @@ void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 	// but it not derived on the W3DDisplay
 	// !!
 
-	const Region2D *uv = image->getUV();
-
 	TextureClass *tex = nullptr;
 	if (BitIsSet(image->getStatus(), IMAGE_STATUS_RAW_TEXTURE))
 		tex = (TextureClass *)(image->getRawTextureData());
@@ -3374,7 +3406,7 @@ void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 	setup2DRenderState(tex, mode, grayscale);
 
 	RectClass screen_rect(startX,startY,endX,endY);
-	RectClass uv_rect(uv->lo.x,uv->lo.y,uv->hi.x,uv->hi.y);
+	RectClass uv_rect = uvRect;
 
 	if (m_isClippedEnabled)
 	{

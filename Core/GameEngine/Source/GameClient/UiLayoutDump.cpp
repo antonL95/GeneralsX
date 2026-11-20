@@ -174,3 +174,41 @@ std::vector<UiSpecimenLine> parseUiSpecimen(std::string_view spec)
 	}
 	return lines;
 }
+
+std::vector<UiFrameSpecimen> parseUiFrameSpecimen(std::string_view spec)
+{
+	std::vector<UiFrameSpecimen> frames;
+	while (!spec.empty())
+	{
+		const std::size_t bar = spec.find('|');
+		std::string_view entry = spec.substr(0, bar);
+		spec.remove_prefix(bar == std::string_view::npos ? spec.size() : bar + 1);
+
+		std::vector<std::string_view> fields;
+		while (true)
+		{
+			const std::size_t semicolon = entry.find(';');
+			fields.push_back(trim(entry.substr(0, semicolon)));
+			if (semicolon == std::string_view::npos)
+				break;
+			entry.remove_prefix(semicolon + 1);
+		}
+		if (fields.size() != 5 || fields[0].empty())
+			continue;
+
+		UiFrameSpecimen frame;
+		frame.frame = std::string(fields[0]);
+		int* const values[] = { &frame.x, &frame.y, &frame.width, &frame.height };
+		bool valid = true;
+		for (std::size_t index = 0; index < 4 && valid; ++index)
+		{
+			const std::string_view field = fields[index + 1];
+			const auto parsed = std::from_chars(field.data(), field.data() + field.size(), *values[index]);
+			valid = !field.empty() && parsed.ec == std::errc() && parsed.ptr == field.data() + field.size();
+		}
+		if (!valid || frame.width <= 0 || frame.height <= 0)
+			continue;
+		frames.push_back(std::move(frame));
+	}
+	return frames;
+}

@@ -1,0 +1,3 @@
+#include "GameClient/UiFrame.h"
+
+const char* const UiFramesIniText = R"uiframes(@UI_FRAMES_INI_TEXT@)uiframes";
