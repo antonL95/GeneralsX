@@ -37,6 +37,7 @@
 #include "Common/PlayerTemplate.h"
 #include "Common/Team.h"
 #include "Common/PlayerList.h"
+#include "Common/Player.h"
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
 #include "Common/INI.h"
@@ -83,6 +84,7 @@
 #include "GameLogic/Weapon.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
+#include "GameLogic/Module/BattlePlanUpdate.h"
 #include "GameLogic/RankInfo.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/SidesList.h"
@@ -116,6 +118,7 @@
 #include "GameNetwork/GameSpy/GameResultsThread.h"
 
 #include "Common/version.h"
+#include <cstdio>
 #include <cstdlib>
 
 
@@ -162,6 +165,75 @@ GameEngine *TheGameEngine = nullptr;
 
 //-------------------------------------------------------------------------------------------------
 SubsystemInterfaceList* TheSubsystemList = nullptr;
+
+static UnsignedInt crcHarnessSnapshot(Snapshot* snapshot)
+{
+	XferCRC xfer;
+	xfer.open("crcHarness");
+	xfer.xferSnapshot(snapshot);
+	xfer.close();
+	return xfer.getCRC();
+}
+
+static UnsignedInt crcHarnessKindOf(KindOfMaskType mask, Bool fullWidth)
+{
+	XferCRC xfer;
+	xfer.open("crcHarness");
+	if (fullWidth)
+		xfer.xferUser(&mask, sizeof(mask));
+	else
+		mask.xfer(&xfer);
+	xfer.close();
+	return xfer.getCRC();
+}
+
+static void runCrcHarnessIfRequested()
+{
+	const char* path = std::getenv("GENERALSX_CRC_HARNESS");
+	if (path == nullptr || *path == '\0')
+		return;
+	FILE* file = std::fopen(path, "w");
+	if (file == nullptr)
+		std::_Exit(2);
+
+	std::fprintf(file, "info\tkindof_count\t%d\n", (Int)KINDOF_COUNT);
+	std::fprintf(file, "info\tkindof_bytes\t%d\n", (Int)sizeof(KindOfMaskType));
+	std::fprintf(file, "crc\tini\t%08X\n", TheGlobalData->m_iniCRC);
+
+	KindOfMaskType valid;
+	valid.set(KINDOF_INFANTRY);
+	valid.set(KINDOF_VEHICLE);
+	valid.set(KINDOF_NO_ATTACK_WARNING);
+	KindOfMaskType invalid;
+	invalid.set(KINDOF_STRUCTURE);
+	invalid.set(KINDOF_AIRCRAFT);
+	std::fprintf(file, "crc\tkindof_empty\t%08X\n", crcHarnessKindOf(KindOfMaskType(), FALSE));
+	std::fprintf(file, "crc\tkindof_valid\t%08X\n", crcHarnessKindOf(valid, FALSE));
+	std::fprintf(file, "crc\tkindof_invalid\t%08X\n", crcHarnessKindOf(invalid, FALSE));
+	std::fprintf(file, "info\tkindof_valid_whole_mask\t%08X\n", crcHarnessKindOf(valid, TRUE));
+
+	Player* player = ThePlayerList->getNeutralPlayer();
+	std::fprintf(file, "crc\tplayer_plain\t%08X\n", crcHarnessSnapshot(player));
+
+	BattlePlanBonusesData bombardment;
+	bombardment.m_armorScalar = 0.9f;
+	bombardment.m_sightRangeScalar = 1.25f;
+	bombardment.m_bombardment = 1;
+	bombardment.m_validKindOf = valid;
+	bombardment.m_invalidKindOf = invalid;
+	player->changeBattlePlan(PLANSTATUS_BOMBARDMENT, 1, &bombardment);
+	std::fprintf(file, "crc\tplayer_bombardment\t%08X\n", crcHarnessSnapshot(player));
+
+	BattlePlanBonusesData holdTheLine;
+	holdTheLine.m_armorScalar = 0.5f;
+	holdTheLine.m_holdTheLine = 1;
+	player->changeBattlePlan(PLANSTATUS_HOLDTHELINE, 1, &holdTheLine);
+	std::fprintf(file, "crc\tplayer_hold_the_line\t%08X\n", crcHarnessSnapshot(player));
+	std::fprintf(file, "crc\tplayer_list\t%08X\n", crcHarnessSnapshot(ThePlayerList));
+
+	std::fclose(file);
+	std::_Exit(0);
+}
 
 static Int findRetailSkirmishFaction(const char* name)
 {
@@ -876,6 +948,7 @@ void GameEngine::init()
 		}
 		if (std::getenv("GENERALSX_NAMEKEY_DUMP"))
 			std::_Exit(0);
+		runCrcHarnessIfRequested();
 
 		// GeneralsX @bugfix Copilot 11/05/2026 Prevent uncapped render when FPS limiter is enabled but no valid limit value was loaded.
 		if (TheGlobalData->m_useFpsLimit && TheGlobalData->m_framesPerSecondLimit <= 0)

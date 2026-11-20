@@ -10,6 +10,8 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/RetailFileLayersTest.cpp
     GameEngine/Common/INIMathTest.cpp
     GameEngine/Common/INIPreprocessorTest.cpp
+    GameEngine/Common/INILegacyLinesTest.cpp
+    GameEngine/Common/BitFlagsCrcTest.cpp
     GameEngine/Common/UpgradeMaskTest.cpp
     GameEngine/Common/MapPlayerRosterTest.cpp
     GameEngine/Common/BfmeAssetPathTest.cpp

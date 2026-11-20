@@ -217,7 +217,8 @@ void BitFlags<NUMBITS, TAG>::xfer(Xfer* xfer)
 #if RETAIL_COMPATIBLE_CRC
 		xfer->xferUser( this, sizeof( this ) );
 #else
-		xfer->xferUser( this, sizeof( *this ) );
+		static_assert(sizeof(BitFlags) == sizeof(std::bitset<NUMBITS>), "BitFlags must hold only its bitset");
+		xfer->xferUser( this, static_cast<Int>(BitFlagsCrc::byteCount<BitFlagsCrcPrefix<NUMBITS, TAG>::BITS>(m_bits)) );
 #endif
 
 	}

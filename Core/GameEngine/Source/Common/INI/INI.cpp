@@ -36,6 +36,7 @@
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/INIException.h"
+#include "Common/INILegacyLines.h"
 #include "Common/INIMath.h"
 #include "Common/INIPreprocessor.h"
 #include "Common/INIRetailTolerance.h"
@@ -148,6 +149,11 @@ bool isINIParseError()
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static Xfer *s_xfer = nullptr;
+
+static Bool hashesPreprocessedLines()
+{
+	return RetailFileLayers::enabled() || INIAudit::isEnabled();
+}
 
 //-------------------------------------------------------------------------------------------------
 /** This is the table of data types we can have in INI files.  To add a new data type
@@ -435,6 +441,12 @@ void INI::prepFile( AsciiString filename, INILoadType loadType )
 	const Int size = file->size();
 	char* raw = file->readEntireAndClose();
 	const std::string text(raw, size);
+	if (s_xfer != nullptr && !hashesPreprocessedLines())
+	{
+		INILegacyLines::forEach(std::string_view(text), [](std::string_view line) {
+			s_xfer->xferUser(const_cast<char*>(line.data()), static_cast<Int>(line.size()));
+		});
+	}
 	delete[] raw;
 	prepText(filename, text, loadType);
 }
@@ -840,7 +852,7 @@ void INI::readLine()
 		}
 	}
 
-	if (s_xfer)
+	if (s_xfer && hashesPreprocessedLines())
 	{
 		s_xfer->xferUser( m_buffer, sizeof( char ) * strlen( m_buffer ) );
 		//DEBUG_LOG(("Xfer val is now 0x%8.8X in %s, line %s", ((XferCRC *)s_xfer)->getCRC(), m_filename.str(), m_buffer));

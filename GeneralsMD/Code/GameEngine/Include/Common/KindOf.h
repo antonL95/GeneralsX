@@ -315,9 +315,16 @@ enum KindOfType CPP_11(: Int)
 
 	KINDOF_COUNT,										// total number of kindofs
 	KINDOF_FIRST = 0,
+	KINDOF_FIRST_ROTWK = KINDOF_CAVALRY,
 };
 
 typedef BitFlags<KINDOF_COUNT, struct KindOfMaskTypeTag>	KindOfMaskType;
+
+template <>
+struct BitFlagsCrcPrefix<KINDOF_COUNT, KindOfMaskTypeTag>
+{
+	static constexpr size_t BITS = KINDOF_FIRST_ROTWK;
+};
 
 #define MAKE_KINDOF_MASK(k) KindOfMaskType(KindOfMaskType::kInit, (k))
 

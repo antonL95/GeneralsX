@@ -31,10 +31,17 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/STLTypedefs.h"
+#include "Common/BitFlagsCrc.h"
 
 class INI;
 class Xfer;
 class AsciiString;
+
+template <size_t NUMBITS, typename TAG>
+struct BitFlagsCrcPrefix
+{
+	static constexpr size_t BITS = NUMBITS;
+};
 
 //-------------------------------------------------------------------------------------------------
 /*

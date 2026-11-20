@@ -71,8 +71,10 @@ set(GAMEENGINE_SRC
     Include/Common/INIRetailTolerance.h
     Include/Common/HordeFormation.h
     Include/Common/RetailFileLayers.h
+    Include/Common/INILegacyLines.h
     Include/Common/INIMath.h
     Include/Common/INIPreprocessor.h
+    Include/Common/BitFlagsCrc.h
     Include/Common/BfmeAssetPath.h
     Include/Common/ScriptedModelConditions.inc
 #    Include/Common/INIException.h
