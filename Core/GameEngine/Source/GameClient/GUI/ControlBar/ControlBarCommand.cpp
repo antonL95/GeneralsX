@@ -725,7 +725,8 @@ void ControlBar::updateContextCommand()
 	// the queue is visible we need to check to see if we should hide it and show the portrait,
 	// and if the queue is hidden, we need to check and see if it should become shown
 	//
-	if( m_contextParent[ CP_BUILD_QUEUE ]->winIsHidden() == TRUE )
+	GameWindow *queue = m_contextParent[CP_BUILD_QUEUE];
+	if (queue && queue->winIsHidden())
 	{
 
 		if( pu && pu->firstProduction() != nullptr )
@@ -741,7 +742,7 @@ void ControlBar::updateContextCommand()
 		}
 
 	}
-	else
+	else if (queue)
 	{
 
 		if( pu && pu->firstProduction() == nullptr )
@@ -758,7 +759,7 @@ void ControlBar::updateContextCommand()
 	}
 
 	// update a visible production queue
-	if( m_contextParent[ CP_BUILD_QUEUE ]->winIsHidden() == FALSE )
+	if (queue && !queue->winIsHidden())
 	{
 
 		// when the build queue is enabled, the selected portrait cannot be shown
@@ -841,7 +842,8 @@ void ControlBar::updateContextCommand()
 		}
 
 		// is the command available
-		CommandAvailability availability = getCommandAvailability( command, obj, win );
+		CommandAvailability availability = m_retailSelectionName && command->getCommandType() == GUI_COMMAND_NONE
+			? COMMAND_RESTRICTED : getCommandAvailability(command, obj, win);
 
 		// enable/disable the window control
 		switch( availability )

@@ -77,6 +77,7 @@
 #include "GameClient/Shadow.h"
 #include "GameClient/GlobalLanguage.h"
 #include "GameClient/UiTest.h"
+#include "Common/RetailFileLayers.h"
 
 #include "GameLogic/AIGuard.h"
 #include "GameLogic/Weapon.h"
@@ -4187,7 +4188,10 @@ void InGameUI::expireHint( HintType type, UnsignedInt hintIndex )
 void InGameUI::createControlBar()
 {
 
-	m_controlBarWindow = TheWindowManager->winCreateFromScript( "ControlBar.wnd" );
+	if (RetailFileLayers::enabled() && !UiTest::isActive() && !TheGlobalData->m_headless)
+		m_controlBarWindow = TheWindowManager->winCreateFromEmbeddedScript("RetailHud.wnd", RetailHudWndText);
+	else
+		m_controlBarWindow = TheWindowManager->winCreateFromScript("ControlBar.wnd");
 	HideControlBar();
 /*
 	// hide all windows created from this layout

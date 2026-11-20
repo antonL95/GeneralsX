@@ -30,10 +30,13 @@
 #include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/Radar.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "GameClient/GameWindow.h"
 #include "W3DDevice/GameClient/W3DGameWindow.h"
+#include "W3DDevice/GameClient/W3DDisplay.h"
+#include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/Display.h"
 #include "GameClient/ControlBar.h"
@@ -61,6 +64,31 @@ void W3DCameoMovieDraw( GameWindow *window, WinInstanceData *instData )
 //-------------------------------------------------------------------------------------------------
 void W3DLeftHUDDraw( GameWindow *window, WinInstanceData *instData )
 {
+	if (RetailFileLayers::enabled())
+	{
+		Int x, y, width, height;
+		window->winGetScreenPosition(&x, &y);
+		window->winGetSize(&width, &height);
+		const Image *backing = TheMappedImageCollection->findImageByName("UiRetailRadarBacking");
+		const Image *frame = TheMappedImageCollection->findImageByName("UiRetailRadarFrame");
+		if (TheDisplay->hasImageTexture(backing))
+			TheDisplay->drawImage(backing, x, y, x + width, y + height);
+
+		const Int inset = MAX(2, width / 15);
+		const Int radius = MIN(width, height) / 2 - inset;
+		if (radius > 0 && TheRadar->isRadarWindow(window))
+		{
+			W3DDisplay *display = static_cast<W3DDisplay *>(TheDisplay);
+			display->setCircularClip(x + width / 2, y + height / 2, radius);
+			TheRadar->draw(x + 1, y + 1, width - 2, height - 2);
+			display->setCircularClip(0, 0, 0);
+		}
+
+		if (TheDisplay->hasImageTexture(frame))
+			TheDisplay->drawImage(frame, x, y, x + width, y + height);
+		return;
+	}
+
 	// draw the default stuff
 	// draw video buffer
 	VideoBuffer *video = TheInGameUI->videoBuffer();

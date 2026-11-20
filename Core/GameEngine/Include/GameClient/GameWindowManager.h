@@ -47,6 +47,8 @@ class GameWindow;
 //-------------------------------------------------------------------------------------------------
 enum { MAX_LAYOUT_FUNC_LEN = 256 };
 
+class File;
+
 typedef std::list <GameWindow *> GameWindowList;
 
 class WindowLayoutInfo
@@ -199,6 +201,10 @@ public:
 	// Creating windows
 	/// create new window(s) from .wnd file ... see definition for what is returned
 	virtual GameWindow *winCreateFromScript( AsciiString filename, WindowLayoutInfo *info = nullptr );
+	GameWindow *winCreateFromEmbeddedScript(AsciiString name, const Char *text);
+private:
+	GameWindow *winParseScript(File *file, WindowLayoutInfo *info);
+public:
 
 	/// create new window(s) from .wnd file and wrap in a WindowLayout
 	virtual WindowLayout *winCreateLayout( AsciiString filename );

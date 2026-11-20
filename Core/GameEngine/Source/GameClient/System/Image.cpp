@@ -37,6 +37,7 @@
 #include "Common/Debug.h"
 #include "Common/INI.h"
 #include "Common/GlobalData.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/Image.h"
 #include "Common/NameKeyGenerator.h"
 
@@ -280,5 +281,9 @@ void ImageCollection::load( Int textureSize )
 
 	ini.loadDirectory("Data\\INI\\MappedImages\\HandCreated", INI_LOAD_OVERWRITE, nullptr );
 
-
+	if (RetailFileLayers::enabled())
+	{
+		ini.loadDirectory("Data\\INI\\MappedImages\\AptImages", INI_LOAD_OVERWRITE, nullptr,
+			INI::LoadFlags_SearchSubDirs);
+	}
 }

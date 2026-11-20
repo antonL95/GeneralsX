@@ -54,6 +54,7 @@ class Player;
 class PlayerTemplate;
 class AudioEventRTS;
 class ControlBarSchemeManager;
+extern const char* const RetailHudWndText;
 class UpgradeTemplate;
 class ControlBarResizer;
 class GameWindowTransitionsHandler;
@@ -896,6 +897,10 @@ protected:
 	ControlBarSchemeManager *m_controlBarSchemeManager;		///< The Scheme singleton
 
 	GameWindow *m_contextParent[ NUM_CONTEXT_PARENTS ];		///< "parent" window for buttons that are part of the context sensitive interface
+	GameWindow *m_retailSelectionName = nullptr;
+	GameWindow *m_retailPortrait = nullptr;
+
+	void initRetailHud();
 
 	Drawable *m_currentSelectedDrawable;					///< currently selected drawable for the context sensitive interface
 	ControlBarContext m_currContext;							///< our current displayed context

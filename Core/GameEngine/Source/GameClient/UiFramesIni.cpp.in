@@ -1,3 +1,4 @@
 #include "GameClient/UiFrame.h"
 
 const char* const UiFramesIniText = R"uiframes(@UI_FRAMES_INI_TEXT@)uiframes";
+extern const char* const RetailHudWndText = R"retailhud(@RETAIL_HUD_WND_TEXT@)retailhud";

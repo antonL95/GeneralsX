@@ -79,6 +79,7 @@ class RAMFile : public File
 	public:
 
 		RAMFile();
+		Bool openText(const Char *name, const Char *text);
 		//virtual				~RAMFile();
 
 

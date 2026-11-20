@@ -51,6 +51,7 @@
 
 #include "GameClient/Anim2D.h"
 #include "GameClient/ControlBar.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/DisplayStringManager.h"
 #include "GameClient/Diplomacy.h"
 #include "GameClient/GameText.h"
@@ -4060,7 +4061,10 @@ void InGameUI::expireHint( HintType type, UnsignedInt hintIndex )
 void InGameUI::createControlBar()
 {
 
-	m_controlBarWindow = TheWindowManager->winCreateFromScript( "ControlBar.wnd" );
+	if (RetailFileLayers::enabled() && !TheGlobalData->m_headless)
+		m_controlBarWindow = TheWindowManager->winCreateFromEmbeddedScript("RetailHud.wnd", RetailHudWndText);
+	else
+		m_controlBarWindow = TheWindowManager->winCreateFromScript("ControlBar.wnd");
 	HideControlBar();
 /*
 	// hide all windows created from this layout

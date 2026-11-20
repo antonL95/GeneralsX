@@ -121,6 +121,8 @@ public:
 													Int endX, Int endY, Color color = 0xFFFFFFFF, DrawImageMode mode=DRAW_IMAGE_ALPHA) override;
 	virtual void drawImagePart( const Image *image, Int startX, Int startY, Int endX, Int endY,
 		const Region2D &part, Color color = 0xFFFFFFFF, DrawImageMode mode = DRAW_IMAGE_ALPHA ) override;
+	Bool hasImageTexture(const Image *image) override;
+	void setCircularClip(Int x, Int y, Int radius);
 
 	/// draw a video buffer fit within the screen coordinates
 	virtual void drawScaledVideoBuffer( VideoBuffer *buffer, VideoStreamInterface *stream ) override;
@@ -182,6 +184,11 @@ protected:
 	Render2DClass *m_2DRender;								///< interface for common 2D functions
 	IRegion2D m_clipRegion;									///< the clipping region for images
 	Bool m_isClippedEnabled;	///<used by 2D drawing operations to define clip re
+	Int m_circleClipX = 0;
+	Int m_circleClipY = 0;
+	Int m_circleClipRadius = 0;
+	Bool clipLineToCircle(Int &x0, Int &y0, Int &x1, Int &y1, Real width) const;
+	void drawCircularClipQuad(const RectClass &rect, const RectClass &uv, Color color, Bool rotated);
 	Real m_averageFPS;		///<average fps over the last 30 frames.
 	Real m_currentFPS;		///<current fps value.
 

@@ -130,6 +130,18 @@ RAMFile::~RAMFile()
 	closeFile();
 }
 
+Bool RAMFile::openText(const Char *name, const Char *text)
+{
+	if (!File::open(name, READ))
+		return FALSE;
+
+	m_size = strlen(text);
+	m_data = MSGNEW("RAMFILE") Char[m_size];
+	memcpy(m_data, text, m_size);
+	m_pos = 0;
+	return TRUE;
+}
+
 //=================================================================
 // RAMFile::open
 //=================================================================

@@ -50,6 +50,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/LanguageFilter.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/CommandXlat.h"
 
 #include "GameLogic/GameLogic.h"
@@ -567,7 +568,7 @@ void HideControlBar( Bool immediate )
 #else
 		TheControlBar->setFullViewportHeight();
 #endif
-		if (immediate)
+		if (immediate || RetailFileLayers::enabled())
 		{
 			window->winHide(TRUE);
 		}

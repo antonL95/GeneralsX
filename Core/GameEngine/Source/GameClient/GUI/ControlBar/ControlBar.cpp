@@ -1069,6 +1069,60 @@ ControlBar::~ControlBar()
 }
 void ControlBarPopupDescriptionUpdateFunc( WindowLayout *layout, void *param );
 
+static void drawRetailPortrait(GameWindow *window, WinInstanceData *)
+{
+	Int x, y, width, height;
+	window->winGetScreenPosition(&x, &y);
+	window->winGetSize(&width, &height);
+	TheDisplay->drawFillRect(x, y, width, height, GameMakeColor(28, 24, 19, 232));
+	const Image *image = window->winGetEnabledImage(0);
+	if (TheDisplay->hasImageTexture(image))
+		TheDisplay->drawImage(image, x + 2, y + 2, x + width - 2, y + height - 2);
+	TheDisplay->drawOpenRect(x, y, width, height, 2, GameMakeColor(153, 121, 70, 255));
+}
+
+static void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
+{
+	Int x, y, width, height;
+	window->winGetScreenPosition(&x, &y);
+	window->winGetSize(&width, &height);
+	const Bool enabled = BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED);
+	const Bool highlight = enabled && BitIsSet(instance->getState(), WIN_STATE_HILITED);
+	const Int inset = BitIsSet(instance->getState(), WIN_STATE_SELECTED) ? 4 : 2;
+
+	TheDisplay->drawFillRect(x, y, width, height, GameMakeColor(29, 25, 18, 240));
+	const Image *image = window->winGetEnabledImage(0);
+	if (TheDisplay->hasImageTexture(image))
+		TheDisplay->drawImage(image, x + inset, y + inset, x + width - inset, y + height - inset,
+			0xffffffff, enabled ? Display::DRAW_IMAGE_ALPHA : Display::DRAW_IMAGE_GRAYSCALE);
+	TheDisplay->drawOpenRect(x, y, width, height, 2,
+		highlight ? GameMakeColor(243, 210, 137, 255) : GameMakeColor(140, 113, 72, 255));
+}
+
+void ControlBar::initRetailHud()
+{
+	GameWindow *master = m_contextParent[CP_MASTER];
+	m_contextParent[CP_COMMAND] = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:CommandWindow"));
+	m_retailPortrait = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:CameoWindow"));
+	m_retailSelectionName = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:SelectionName"));
+	if (!m_contextParent[CP_COMMAND] || !m_retailPortrait || !m_retailSelectionName)
+		throw INIException("RetailHud.wnd is missing a required window");
+
+	m_retailPortrait->winSetDrawFunc(drawRetailPortrait);
+	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
+	{
+		AsciiString name;
+		name.format("ControlBar.wnd:ButtonCommand%02d", i + 1);
+		GameWindow *button = TheWindowManager->winGetWindowFromId(m_contextParent[CP_COMMAND], TheNameKeyGenerator->nameToKey(name));
+		if (!button)
+			continue;
+		button->winSetOwner(master);
+		button->winSetDrawFunc(drawRetailCommand);
+		m_commandWindows[i] = button;
+	}
+	switchToContext(CB_CONTEXT_NONE, nullptr);
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Initialize the control bar, this is our interface to the context sensitive GUI */
 //-------------------------------------------------------------------------------------------------
@@ -1085,6 +1139,15 @@ void ControlBar::init()
 
 	// post process step after loading the command buttons and command sets
 	postProcessCommands();
+
+	if (TheWindowManager && RetailFileLayers::enabled() && !TheGlobalData->m_headless && !UiTest::isActive())
+	{
+		m_contextParent[CP_MASTER] = TheWindowManager->winGetWindowFromId(nullptr, NAMEKEY("ControlBar.wnd:ControlBarParent"));
+		if (!m_contextParent[CP_MASTER])
+			throw INIException("RetailHud.wnd is missing ControlBarParent");
+		initRetailHud();
+		return;
+	}
 
 	// Init the scheme manager, this will call its own INI init function.
 	m_controlBarSchemeManager = NEW ControlBarSchemeManager;
@@ -1456,7 +1519,7 @@ void ControlBar::update()
 
 
 
-	if( !m_buildToolTipLayout->isHidden())
+	if (m_buildToolTipLayout && !m_buildToolTipLayout->isHidden())
 	{
 		m_buildToolTipLayout->runUpdate();
 		m_showBuildToolTipLayout = FALSE;
@@ -1471,7 +1534,7 @@ void ControlBar::update()
 	// if we're an observer, don't do the complete update
 	if( m_isObserverCommandBar)
 	{
-		if((TheGameLogic->getFrame() % (LOGICFRAMES_PER_SECOND/2)) == 0)
+		if (m_contextParent[CP_OBSERVER_INFO] && (TheGameLogic->getFrame() % (LOGICFRAMES_PER_SECOND / 2)) == 0)
 			populateObserverInfoWindow();
 
 		Drawable *drawToEvaluateFor = nullptr;
@@ -1536,7 +1599,7 @@ void ControlBar::update()
 		}
 	}
 
-	if(!m_contextParent[ CP_PURCHASE_SCIENCE ]->winIsHidden())
+	if (m_contextParent[CP_PURCHASE_SCIENCE] && !m_contextParent[CP_PURCHASE_SCIENCE]->winIsHidden())
 		updateContextPurchaseScience();
 
 	//
@@ -1771,7 +1834,7 @@ void ControlBar::evaluateContextUI()
 	m_UIDirty = FALSE;
 
 	// if our purchase science window is up, we will want to update it by repopulating it.
-	if(!m_contextParent[ CP_PURCHASE_SCIENCE ]->winIsHidden())
+	if (m_contextParent[CP_PURCHASE_SCIENCE] && !m_contextParent[CP_PURCHASE_SCIENCE]->winIsHidden())
 		showPurchaseScience();
 
 	// erase any current state of the GUI by switching out to the empty context
@@ -2197,6 +2260,25 @@ void ControlBar::switchToContext( ControlBarContext context, Drawable *draw )
 		TheWindowManager->winSetFocus( nullptr );
 	}
 
+	if (m_retailSelectionName)
+	{
+		if (context != CB_CONTEXT_COMMAND && context != CB_CONTEXT_MULTI_SELECT && context != CB_CONTEXT_STRUCTURE_INVENTORY)
+			context = CB_CONTEXT_NONE;
+
+		m_currContext = context;
+		m_contextParent[CP_COMMAND]->winHide(context == CB_CONTEXT_NONE);
+		if (context == CB_CONTEXT_COMMAND)
+			populateCommand(obj);
+		else if (context == CB_CONTEXT_MULTI_SELECT)
+			populateMultiSelect();
+		else if (context == CB_CONTEXT_STRUCTURE_INVENTORY)
+			populateStructureInventory(obj);
+
+		const ExitInterface *exit = obj ? obj->getObjectExitInterface() : nullptr;
+		showRallyPoint(context == CB_CONTEXT_COMMAND && exit && obj->isLocallyControlled() ? exit->getRallyPoint() : nullptr);
+		return;
+	}
+
 	// hide/un-hide the appropriate windows for the context
 	switch( context )
 	{
@@ -2518,7 +2600,7 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 	// the states of these buttons we would add additional lines to the INI for a command
 	// button and store those additional images in the command button
 	//
-	if( commandButton->getButtonImage() )
+	if (m_retailSelectionName || commandButton->getButtonImage())
 		GadgetButtonSetEnabledImage( button, commandButton->getButtonImage() );
 
 	//if( commandButton->getDisabledImage() )
@@ -2535,7 +2617,7 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 	//}  // end if
 
 	// set the text
-	if( commandButton->getTextLabel().isEmpty() == FALSE || !commandButton->getScienceVec().empty())
+	if (!m_retailSelectionName && (commandButton->getTextLabel().isEmpty() == FALSE || !commandButton->getScienceVec().empty()))
 	{
 		button->winSetTooltipFunc(commandButtonTooltip);
 	}
@@ -2567,7 +2649,8 @@ void CommandButton::cacheButtonImage()
 	if( m_buttonImageName.isNotEmpty() )
 	{
 		m_buttonImage = TheMappedImageCollection->findImageByName( m_buttonImageName );
-		DEBUG_ASSERTCRASH( m_buttonImage, ("CommandButton: %s is looking for button image %s but can't find it. Skipping...", m_name.str(), m_buttonImageName.str() ) );
+		if (!RetailFileLayers::enabled())
+			DEBUG_ASSERTCRASH( m_buttonImage, ("CommandButton: %s is looking for button image %s but can't find it. Skipping...", m_name.str(), m_buttonImageName.str() ) );
 		m_buttonImageName.clear();	// we're done with this, so nuke it
 	}
 }
@@ -2645,6 +2728,31 @@ void ControlBar::setPortraitByImage( const Image *image )
 //-------------------------------------------------------------------------------------------------
 void ControlBar::setPortraitByObject( Object *obj )
 {
+	if (m_retailSelectionName)
+	{
+		const ThingTemplate *thing = nullptr;
+		if (obj && (!obj->isKindOf(KINDOF_SHOW_PORTRAIT_WHEN_CONTROLLED) || obj->isLocallyControlled()))
+		{
+			Drawable *draw = obj->getDrawable();
+			const Bool disguised = draw && draw->getStealthLook() == STEALTHLOOK_DISGUISED_ENEMY;
+			thing = disguised ? draw->getTemplate() : obj->getTemplate();
+			if (disguised && thing->isKindOf(KINDOF_SHOW_PORTRAIT_WHEN_CONTROLLED))
+				thing = nullptr;
+		}
+
+		m_retailPortrait->winHide(!thing);
+		m_retailSelectionName->winHide(!thing);
+		if (thing)
+		{
+			const Image *portrait = thing->getSelectedPortraitImage();
+			m_retailPortrait->winSetEnabledImage(0, portrait ? portrait : thing->getButtonImage());
+			UnicodeString name = thing->getDisplayName();
+			if (name.isEmpty() || name.compare(L"***FATAL*** String Manager failed to initialize properly") == 0)
+				name.translate(thing->getName());
+			GadgetStaticTextSetText(m_retailSelectionName, name);
+		}
+		return;
+	}
 
 	if( obj )
 	{
@@ -3042,6 +3150,8 @@ void ControlBar::hidePurchaseScience()
 
 void ControlBar::togglePurchaseScience()
 {
+	if (!m_contextParent[CP_PURCHASE_SCIENCE])
+		return;
 	if(m_contextParent[ CP_PURCHASE_SCIENCE ]->winIsHidden())
 		showPurchaseScience();
 	else
@@ -3063,6 +3173,13 @@ void ControlBar::switchControlBarStage( ControlBarStages stage )
 		return;
 	if(stage < CONTROL_BAR_STAGE_DEFAULT || stage >= MAX_CONTROL_BAR_STAGES)
 		return;
+	if (m_retailSelectionName)
+	{
+		m_currentControlBarStage = stage;
+		setFullViewportHeight();
+		m_contextParent[CP_MASTER]->winHide(stage != CONTROL_BAR_STAGE_DEFAULT);
+		return;
+	}
 	switch (stage) {
 	case CONTROL_BAR_STAGE_DEFAULT:
 		setDefaultControlBarConfig();
@@ -3280,6 +3397,8 @@ void ControlBar::updateRadarAttackGlow ()
 }
 void ControlBar::initSpecialPowershortcutBar( Player *player)
 {
+	if (m_retailSelectionName)
+		return;
 	Int i = 0;
 	for( ; i < MAX_SPECIAL_POWER_SHORTCUTS; ++i )
 	{

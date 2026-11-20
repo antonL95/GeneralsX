@@ -51,6 +51,7 @@
 #include "Common/Debug.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
+#include "Common/RAMFile.h"
 #include "Common/GameMemory.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/FunctionLexicon.h"
@@ -2924,21 +2925,8 @@ GameWindow *GameWindowManager::winCreateFromScript( AsciiString filenameString,
 																										WindowLayoutInfo *info )
 {
 	const char* filename = filenameString.str();
-	static char buffer[ WIN_BUFFER_LENGTH ]; 		// input buffer for reading
-	GameWindow *firstWindow = nullptr;
-  GameWindow *window;
   char filepath[ _MAX_PATH ] = "Window\\";
   File *inFile;
-	WindowLayoutInfo scriptInfo;
-	AsciiString asciibuf;
-
-	// zero info struct
-	//memset( &scriptInfo, 0, sizeof( WindowLayoutInfo ) ); // it's a class - use a constructor
-
-  // Reset the window stack
-  resetWindowStack();
-	resetWindowDefaults();
-	theTabEntries.clear();
 
 	//
 	// get the filename from the parameter, if it doesn't contain a '\' it is
@@ -2960,8 +2948,33 @@ GameWindow *GameWindowManager::winCreateFromScript( AsciiString filenameString,
 		return nullptr;
 	}
 
-  // read into memory
-  inFile=inFile->convertToRAMFile();
+	return winParseScript(inFile->convertToRAMFile(), info);
+}
+
+GameWindow *GameWindowManager::winCreateFromEmbeddedScript(AsciiString name, const Char *text)
+{
+	RAMFile *file = newInstance(RAMFile);
+	if (!file->openText(name.str(), text))
+	{
+		deleteInstance(file);
+		return nullptr;
+	}
+	file->deleteOnClose();
+	return winParseScript(file, nullptr);
+}
+
+GameWindow *GameWindowManager::winParseScript(File *inFile, WindowLayoutInfo *info)
+{
+	if (!inFile)
+		return nullptr;
+
+	static char buffer[WIN_BUFFER_LENGTH];
+	GameWindow *firstWindow = nullptr;
+	WindowLayoutInfo scriptInfo;
+	AsciiString asciibuf;
+	resetWindowStack();
+	resetWindowDefaults();
+	theTabEntries.clear();
 
 	// read the file version
 	Int version;
@@ -3086,7 +3099,7 @@ GameWindow *GameWindowManager::winCreateFromScript( AsciiString filenameString,
 		{
 
       // Parse window descriptions until the last END is read
-      window = parseWindow( inFile, buffer );
+      GameWindow *window = parseWindow( inFile, buffer );
 
 			// save first window created
 			if( firstWindow == nullptr )

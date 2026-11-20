@@ -30,6 +30,8 @@
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "GameClient/GameClient.h"
+#include "Common/RetailFileLayers.h"
+#include "GameClient/UiFrame.h"
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "Common/ActionManager.h"
@@ -220,6 +222,9 @@ GameClient::~GameClient()
 	delete TheAnim2DCollection;
 	TheAnim2DCollection = nullptr;
 
+	delete TheUiFrameCollection;
+	TheUiFrameCollection = nullptr;
+
 	delete TheMappedImageCollection;
 	TheMappedImageCollection = nullptr;
 
@@ -272,6 +277,11 @@ void GameClient::init()
 	// allocate and load image collection for the GUI and just load the 256x256 ones for now
 	TheMappedImageCollection = MSGNEW("GameClientSubsystem") ImageCollection;
 	TheMappedImageCollection->load( 512 );
+	if (RetailFileLayers::enabled())
+	{
+		TheUiFrameCollection = MSGNEW("GameClientSubsystem") UiFrameCollection;
+		TheUiFrameCollection->load();
+	}
 
 	// now that we have all the images loaded ... load any animation definitions from those images
 	TheAnim2DCollection = MSGNEW("GameClientSubsystem") Anim2DCollection;

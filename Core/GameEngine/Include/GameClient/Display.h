@@ -163,6 +163,7 @@ public:
 
 	virtual void drawImagePart( const Image *image, Int startX, Int startY, Int endX, Int endY,
 		const Region2D &part, Color color = 0xFFFFFFFF, DrawImageMode mode = DRAW_IMAGE_ALPHA );
+	virtual Bool hasImageTexture(const Image *image) { return image != nullptr; }
 	void drawImageNineSlice( const Image *image, const UiNineSlice::Insets &insets, Int startX, Int startY,
 		Int endX, Int endY, Real scale, UiNineSlice::Fill edges, UiNineSlice::Fill center,
 		Color color = 0xFFFFFFFF, DrawImageMode mode = DRAW_IMAGE_ALPHA );

@@ -19,6 +19,7 @@
 #include "PreRTS.h"
 
 #include "Common/GameUtility.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/PlayerList.h"
 #include "Common/Player.h"
 #include "Common/Radar.h"
@@ -61,7 +62,7 @@ bool localPlayerHasRadar()
 	if (TheRadar->isRadarForced(index))
 		return true;
 
-	if (!TheRadar->isRadarHidden(index) && player->hasRadar())
+	if (!TheRadar->isRadarHidden(index) && (RetailFileLayers::enabled() || player->hasRadar()))
 		return true;
 
 	return false;

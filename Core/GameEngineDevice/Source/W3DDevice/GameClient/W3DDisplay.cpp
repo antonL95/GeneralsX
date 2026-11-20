@@ -2975,11 +2975,51 @@ void W3DDisplay::setTimeOfDay( TimeOfDay tod )
 // W3DDisplay::drawLine =======================================================
 /** draw a line on the display in pixel coordinates with the specified color */
 //=============================================================================
+void W3DDisplay::setCircularClip(Int x, Int y, Int radius)
+{
+	m_circleClipX = x;
+	m_circleClipY = y;
+	m_circleClipRadius = radius;
+}
+
+Bool W3DDisplay::clipLineToCircle(Int &x0, Int &y0, Int &x1, Int &y1, Real width) const
+{
+	if (!m_circleClipRadius)
+		return TRUE;
+
+	const Real radius = m_circleClipRadius - width * 0.5f - 0.75f;
+	const Real x = x0 - m_circleClipX;
+	const Real y = y0 - m_circleClipY;
+	const Real dx = x1 - x0;
+	const Real dy = y1 - y0;
+	const Real lengthSq = dx * dx + dy * dy;
+	if (lengthSq == 0 || radius <= 0)
+		return FALSE;
+
+	const Real along = x * dx + y * dy;
+	const Real discriminant = along * along + lengthSq * (radius * radius - x * x - y * y);
+	if (discriminant <= 0)
+		return FALSE;
+	const Real reach = WWMath::Sqrt(discriminant);
+	const Real start = MAX(0.0f, (-along - reach) / lengthSq);
+	const Real end = MIN(1.0f, (-along + reach) / lengthSq);
+	if (start >= end)
+		return FALSE;
+
+	x1 = std::lround(x0 + dx * end);
+	y1 = std::lround(y0 + dy * end);
+	x0 = std::lround(x0 + dx * start);
+	y0 = std::lround(y0 + dy * start);
+	return x0 != x1 || y0 != y1;
+}
+
 void W3DDisplay::drawLine( Int startX, Int startY,
 													 Int endX, Int endY,
 													 Real lineWidth,
 													 UnsignedInt lineColor )
 {
+	if (!clipLineToCircle(startX, startY, endX, endY, lineWidth))
+		return;
 	setup2DRenderState(nullptr, DRAW_IMAGE_ALPHA, FALSE);
 
 	m_2DRender->Add_Line( Vector2( startX, startY ), Vector2( endX, endY ),
@@ -2999,6 +3039,8 @@ void W3DDisplay::drawLine( Int startX, Int startY,
 													 Real lineWidth,
 													 UnsignedInt lineColor1,UnsignedInt lineColor2 )
 {
+	if (!clipLineToCircle(startX, startY, endX, endY, lineWidth))
+		return;
 	setup2DRenderState(nullptr, DRAW_IMAGE_ALPHA, FALSE);
 
 	m_2DRender->Add_Line( Vector2( startX, startY ), Vector2( endX, endY ),
@@ -3017,6 +3059,16 @@ void W3DDisplay::drawLine( Int startX, Int startY,
 void W3DDisplay::drawOpenRect( Int startX, Int startY, Int width, Int height,
 															 Real lineWidth, UnsignedInt lineColor )
 {
+	if (m_circleClipRadius)
+	{
+		const Int endX = startX + width;
+		const Int endY = startY + height;
+		drawLine(startX, startY, endX, startY, lineWidth, lineColor);
+		drawLine(endX, startY, endX, endY, lineWidth, lineColor);
+		drawLine(endX, endY, startX, endY, lineWidth, lineColor);
+		drawLine(startX, endY, startX, startY, lineWidth, lineColor);
+		return;
+	}
 
 	if (m_isClippedEnabled)
 	{
@@ -3071,9 +3123,11 @@ void W3DDisplay::drawFillRect( Int startX, Int startY, Int width, Int height,
 {
 	setup2DRenderState(nullptr, DRAW_IMAGE_ALPHA, FALSE);
 
-	m_2DRender->Add_Rect( RectClass( startX, startY,
-																	 startX + width, startY + height ),
-												0, 0, color );
+	const RectClass rect(startX, startY, startX + width, startY + height);
+	if (m_circleClipRadius)
+		drawCircularClipQuad(rect, RectClass(0, 0, 1, 1), color, FALSE);
+	else
+		m_2DRender->Add_Rect(rect, 0, 0, color);
 
 	if (!m_isBatching)
 	{
@@ -3461,6 +3515,62 @@ void W3DDisplay::drawImagePart( const Image *image, Int startX, Int startY, Int 
 	drawImageUV(image, startX, startY, endX, endY, uvRect, color, mode);
 }
 
+Bool W3DDisplay::hasImageTexture(const Image *image)
+{
+	if (!image)
+		return FALSE;
+	if (BitIsSet(image->getStatus(), IMAGE_STATUS_RAW_TEXTURE))
+		return image->getRawTextureData() != nullptr;
+
+	TextureClass *texture = WW3DAssetManager::Get_Instance()->Get_Texture(image->getFilename().str(), MIP_LEVELS_1);
+	if (!texture)
+		return FALSE;
+	texture->Init();
+	const Bool available = texture->Is_Initialized() && !texture->Is_Missing_Texture();
+	texture->Release_Ref();
+	return available;
+}
+
+void W3DDisplay::drawCircularClipQuad(const RectClass &rect, const RectClass &uv, Color color, Bool rotated)
+{
+	if (rect.Width() <= 0 || rect.Height() <= 0)
+		return;
+
+	const Int first = MAX(static_cast<Int>(rect.Top), m_circleClipY - m_circleClipRadius);
+	const Int last = MIN(static_cast<Int>(rect.Bottom), m_circleClipY + m_circleClipRadius);
+	for (Int y = first; y < last; ++y)
+	{
+		const Real dy = y + 0.5f - m_circleClipY;
+		const Real reach = WWMath::Sqrt(m_circleClipRadius * m_circleClipRadius - dy * dy);
+		const Real left = MAX(rect.Left, m_circleClipX - reach);
+		const Real right = MIN(rect.Right, m_circleClipX + reach);
+		if (left >= right)
+			continue;
+
+		const Real fLeft = (left - rect.Left) / rect.Width();
+		const Real fRight = (right - rect.Left) / rect.Width();
+		const Real fTop = (y - rect.Top) / rect.Height();
+		const Real fBottom = (y + 1 - rect.Top) / rect.Height();
+		if (rotated)
+		{
+			const Real uTop = uv.Right - uv.Width() * fTop;
+			const Real uBottom = uv.Right - uv.Width() * fBottom;
+			const Real vLeft = uv.Top + uv.Height() * fLeft;
+			const Real vRight = uv.Top + uv.Height() * fRight;
+			m_2DRender->Add_Tri(Vector2(left, y), Vector2(left, y + 1), Vector2(right, y),
+				Vector2(uTop, vLeft), Vector2(uBottom, vLeft), Vector2(uTop, vRight), color);
+			m_2DRender->Add_Tri(Vector2(right, y + 1), Vector2(right, y), Vector2(left, y + 1),
+				Vector2(uBottom, vRight), Vector2(uTop, vRight), Vector2(uBottom, vLeft), color);
+		}
+		else
+		{
+			m_2DRender->Add_Quad(RectClass(left, y, right, y + 1),
+				RectClass(uv.Left + uv.Width() * fLeft, uv.Top + uv.Height() * fTop,
+					uv.Left + uv.Width() * fRight, uv.Top + uv.Height() * fBottom), color);
+		}
+	}
+}
+
 void W3DDisplay::drawImageUV( const Image *image, Int startX, Int startY, Int endX, Int endY,
 	const RectClass &uvRect, Color color, DrawImageMode mode )
 {
@@ -3570,8 +3680,11 @@ void W3DDisplay::drawImageUV( const Image *image, Int startX, Int startY, Int en
 		}
 	}
 
-	// if rotated 90 degrees clockwise we have to adjust the uv coords
-	if( BitIsSet( image->getStatus(), IMAGE_STATUS_ROTATED_90_CLOCKWISE ) )
+	if (m_circleClipRadius)
+	{
+		drawCircularClipQuad(screen_rect, uv_rect, color, BitIsSet(image->getStatus(), IMAGE_STATUS_ROTATED_90_CLOCKWISE));
+	}
+	else if (BitIsSet(image->getStatus(), IMAGE_STATUS_ROTATED_90_CLOCKWISE))
 	{
 
 		m_2DRender->Add_Tri( Vector2( screen_rect.Left, screen_rect.Top ),

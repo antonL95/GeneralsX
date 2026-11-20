@@ -1234,9 +1234,11 @@ add_library(corei_gameengine_public INTERFACE)
 target_sources(corei_gameengine_private INTERFACE ${GAMEENGINE_SRC})
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/Source/GameClient/UiFrames.ini" UI_FRAMES_INI_TEXT)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/Source/GameClient/RetailHud.wnd" RETAIL_HUD_WND_TEXT)
 configure_file(Source/GameClient/UiFramesIni.cpp.in "${CMAKE_CURRENT_BINARY_DIR}/UiFramesIni.cpp" @ONLY)
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS Source/GameClient/UiFrames.ini)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS Source/GameClient/UiFrames.ini Source/GameClient/RetailHud.wnd)
 target_sources(corei_gameengine_private INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/UiFramesIni.cpp")
+target_sources(corei_gameengine_private INTERFACE Source/GameClient/RetailHud.wnd)
 
 target_include_directories(corei_gameengine_private INTERFACE
     Include/Precompiled
