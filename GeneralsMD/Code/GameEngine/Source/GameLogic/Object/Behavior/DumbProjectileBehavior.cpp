@@ -473,6 +473,8 @@ Bool DumbProjectileBehavior::projectileHandleCollision( Object *other )
 
 	if (other != nullptr)
 	{
+		if (!m_detonationWeaponTmpl)
+			return true;
 		Object *projectileLauncher = TheGameLogic->findObjectByID( projectileGetLauncherID() );
 
 			// if it's not the specific thing we were targeting, see if we should incidentally collide...

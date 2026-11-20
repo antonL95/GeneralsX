@@ -37,8 +37,6 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
-#include "GameLogic/Module/AIUpdate.h"
-#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 
