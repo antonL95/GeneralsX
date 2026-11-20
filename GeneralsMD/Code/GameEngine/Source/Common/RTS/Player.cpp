@@ -358,6 +358,7 @@ void Player::init(const PlayerTemplate* pt)
 {
 
 	DEBUG_ASSERTCRASH(m_playerTeamPrototypes.empty(), ("Player::m_playerTeamPrototypes is not empty at game start!"));
+	m_commandPointUpgrades.clear();
 	m_skillPointsModifier = 1.0f;
 	m_attackedFrame = 0;
 
