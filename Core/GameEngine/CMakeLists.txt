@@ -727,6 +727,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailCreationUpgrades.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
     Source/GameLogic/System/RetailBuildingTestCommands.cpp
+    Source/GameLogic/System/RetailPlacementTestCommands.cpp
     Source/GameLogic/System/RetailBuildingEvents.cpp
     Source/GameLogic/System/RetailMordorTestCommands.cpp
     Source/GameLogic/System/RetailPowerTestCommands.cpp

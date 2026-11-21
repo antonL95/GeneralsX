@@ -166,6 +166,8 @@ struct RetailTeamBudgetFixture
 #endif
 
 void runRetailMordorTestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
+void runRetailPlacementTestCommand(Object* source, const char* name, const Coord3D* target, UnsignedInt frame);
+void logRetailPlacementTestObject(const Object* object, const char* name, UnsignedInt frame);
 
 namespace RetailTestCommands
 {
@@ -2614,10 +2616,22 @@ void execute(const Command& command, unsigned int frame)
 	}
 
 	Object* obj = findObject(command, command.action == "xpstate");
+	if (command.action == "placement-state")
+	{
+		logRetailPlacementTestObject(obj, command.structure.c_str(), frame);
+		return;
+	}
 	if (!obj)
 	{
 		std::fprintf(stderr, "TEST frame %u: no %s %d of %s\n", frame, command.target.c_str(), command.ordinal,
 			command.player.c_str());
+		return;
+	}
+
+	if (command.action == "placement-ocl")
+	{
+		const Coord3D target = command.hasLocation ? groundLocation(command) : Coord3D{};
+		runRetailPlacementTestCommand(obj, command.structure.c_str(), command.hasLocation ? &target : nullptr, frame);
 		return;
 	}
 

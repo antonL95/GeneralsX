@@ -59,6 +59,7 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
@@ -71,6 +72,7 @@
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/WeaponSet.h"
 
@@ -829,7 +831,14 @@ public:
 				//Vast majority of OCL's don't care about the angle, so if it comes in invalid, default the angle to 0.
 				angle = 0.0f;
 			}
-			return reallyCreate( primary, xfrm, angle, primaryObj, lifetimeFrames );
+			if (RetailFileLayers::enabled() && m_nameAreObjects && primaryObj)
+			{
+				if (m_offsetInLocalSpace)
+					xfrm = primaryObj->getTransformMatrix();
+				if (m_orientInPrimaryDirection)
+					angle = primaryObj->getOrientation() + m_orientationOffset;
+			}
+			return reallyCreate( primary, xfrm, angle, primaryObj, lifetimeFrames, secondary );
 		}
 		else
 		{
@@ -903,6 +912,14 @@ public:
 			{ "ClearRemovables", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_clearRemovables) },
 			{ "RequiredUpgrades", INI::parseAsciiStringVectorAppend, nullptr, offsetof(GenericObjectCreationNugget, m_requiredUpgrades) },
 			{ "ForbiddenUpgrades", INI::parseAsciiStringVectorAppend, nullptr, offsetof(GenericObjectCreationNugget, m_forbiddenUpgrades) },
+			{ "IgnoreAllObjects", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_ignoreAllObjects) },
+			{ "IssueMoveAfterCreation", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_issueMoveAfterCreation) },
+			{ "OffsetInLocalSpace", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_offsetInLocalSpace) },
+			{ "OrientationOffset", INI::parseAngleReal, nullptr, offsetof(GenericObjectCreationNugget, m_orientationOffset) },
+			{ "OrientInPrimaryDirection", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_orientInPrimaryDirection) },
+			{ "OrientInSecondaryDirection", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_orientInSecondaryDirection) },
+			{ "VelocityScale", INI::parseReal, nullptr, offsetof(GenericObjectCreationNugget, m_velocityScale) },
+			{ "WaypointSpawnPoints", INI::parseAsciiString, nullptr, offsetof(GenericObjectCreationNugget, m_waypointSpawnPoints) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 
@@ -1023,7 +1040,18 @@ protected:
 		chunkPos.y = pos->y + offset.y;
 		chunkPos.z = pos->z + offset.z;
 
-		if (RetailFileLayers::enabled() && BitIsSet(m_disposition, SPAWN_AROUND))
+		const Bool retail = RetailFileLayers::enabled();
+		const Bool retailObject = retail && m_nameAreObjects;
+		const Bool hasDispositionAngle = retail && BitIsSet(m_disposition, ABSOLUTE_ANGLE | RELATIVE_ANGLE);
+		const Bool applyObjectAngle = hasDispositionAngle && retailObject && !BitIsSet(m_disposition, LIKE_EXISTING);
+		if (applyObjectAngle)
+		{
+			orientation = m_dispositionAngle;
+			if (BitIsSet(m_disposition, RELATIVE_ANGLE) && sourceObj)
+				orientation += sourceObj->getOrientation();
+		}
+
+		if (retail && BitIsSet(m_disposition, SPAWN_AROUND))
 		{
 			if (m_dispositionIntensity != 0.0f)
 			{
@@ -1036,9 +1064,11 @@ protected:
 			obj->setOrientation(orientation);
 			obj->setPosition(&chunkPos);
 		}
-		else if (RetailFileLayers::enabled() && BitIsSet(m_disposition, ABSOLUTE_ANGLE | RELATIVE_ANGLE))
+		else if (hasDispositionAngle)
 		{
-			obj->setOrientation(BitIsSet(m_disposition, ABSOLUTE_ANGLE) ? m_dispositionAngle : orientation + m_dispositionAngle);
+			const Real angle = applyObjectAngle ? orientation :
+				(BitIsSet(m_disposition, ABSOLUTE_ANGLE) ? m_dispositionAngle : orientation + m_dispositionAngle);
+			obj->setOrientation(angle);
 			obj->setPosition(&chunkPos);
 		}
 
@@ -1106,9 +1136,44 @@ protected:
 			}
 		}
 
+		if (retailObject && BitIsSet(m_disposition, FORWARD_IMPACT | REVERSE_IMPACT | BUILDING_CHUNKS))
+		{
+			if (PhysicsBehavior* physics = obj->getPhysics())
+			{
+				Coord3D impulse = {0.0f, 0.0f, 0.0f};
+				if (sourceObj && sourceObj->getPhysics() && BitIsSet(m_disposition, FORWARD_IMPACT | REVERSE_IMPACT))
+				{
+					const AIUpdateInterface* ai = sourceObj->getAIUpdateInterface();
+					const Real speed = ai ? ai->getCurLocomotorSpeed() : 0.0f;
+					if (speed > 0.0f)
+					{
+						sourceObj->getUnitDirectionVector3D(impulse);
+						impulse.scale(speed * m_velocityScale *
+							(static_cast<Int>(BitIsSet(m_disposition, FORWARD_IMPACT)) -
+							 static_cast<Int>(BitIsSet(m_disposition, REVERSE_IMPACT))));
+					}
+				}
+				if (BitIsSet(m_disposition, BUILDING_CHUNKS))
+				{
+					const Real length = WWMath::SqrtfOrigin(offset.x * offset.x + offset.y * offset.y);
+					if (length > 0.0f)
+					{
+						const Real scale = m_dispositionIntensity * m_velocityScale / length;
+						impulse.x += offset.x * scale;
+						impulse.y += offset.y * scale;
+					}
+				}
+				if (impulse.x != 0.0f || impulse.y != 0.0f || impulse.z != 0.0f)
+				{
+					impulse.scale(physics->getMass());
+					physics->applyForce(&impulse);
+				}
+			}
+		}
+
 		if( BitIsSet( m_disposition, LIKE_EXISTING ) )
 		{
-			if (mtx)
+			if (mtx && !(retailObject && m_orientInPrimaryDirection && m_orientationOffset != 0.0f))
 				obj->setTransformMatrix(mtx);
 			else
 				obj->setOrientation(orientation);
@@ -1150,6 +1215,12 @@ protected:
 			PathfindLayerEnum layer = TheTerrainLogic->getHighestLayerForDestination(&chunkPos);
 			obj->setOrientation(GameLogicRandomValueReal(0.0f, 2 * PI));
 			chunkPos.z = TheTerrainLogic->getLayerHeight( chunkPos.x, chunkPos.y, layer );
+			if (retailObject && layer == LAYER_GROUND && BitIsSet(m_disposition, USE_WATER_SURFACE))
+			{
+				Real waterHeight = 0.0f;
+				if (TheTerrainLogic->isUnderwater(chunkPos.x, chunkPos.y, &waterHeight))
+					chunkPos.z = waterHeight;
+			}
 			// ensure we are slightly above the bridge, to account for fudge & sloppy art
 			if (layer != LAYER_GROUND)
 				chunkPos.z += 1.0f;
@@ -1305,6 +1376,9 @@ protected:
 
 		}
 
+		if (retailObject && m_clearRemovables && TheBuildAssistant && !obj->getContainedBy())
+			TheBuildAssistant->clearConstructionSite(obj);
+
 		if( m_containInsideSourceObject )
 		{
 			// The Obj has been totally made, so stuff it inside ourselves if desired.
@@ -1326,10 +1400,8 @@ protected:
 
 
 
-		if (RetailFileLayers::enabled() && m_nameAreObjects)
+		if (retailObject)
 		{
-			if (m_clearRemovables && TheBuildAssistant)
-				TheBuildAssistant->clearRemovableForConstruction(obj->getTemplate(), obj->getPosition(), obj->getOrientation(), obj);
 			if (m_useJustBuiltFlag)
 				obj->setPowerModelCondition(MODELCONDITION_JUST_BUILT, std::max<UnsignedInt>(1, m_justBuiltDuration));
 			if (m_startingBusyTime > 0)
@@ -1385,7 +1457,8 @@ protected:
 
 	}
 
-	Object* reallyCreate(const Coord3D *pos, const Matrix3D *mtx, Real orientation, const Object *sourceObj, UnsignedInt lifetimeFrames ) const
+	Object* reallyCreate(const Coord3D *pos, const Matrix3D *mtx, Real orientation, const Object *sourceObj,
+		UnsignedInt lifetimeFrames, const Coord3D* secondary = nullptr) const
 	{
 		static const ThingTemplate* debrisTemplate = TheThingFactory->findTemplate("GenericDebris");
 
@@ -1407,6 +1480,16 @@ protected:
 
 		if (m_requiresLivePlayer && (!sourceObj || !sourceObj->getControllingPlayer() || !sourceObj->getControllingPlayer()->isPlayerActive()))
 			return nullptr; // don't spawn useful objects for dead players.  Avoid the zombie units from Yuri's.
+
+		const Bool retailObject = RetailFileLayers::enabled() && m_nameAreObjects;
+		std::vector<const Waypoint*> spawnPoints;
+		if (retailObject && !m_waypointSpawnPoints.isEmpty())
+		{
+			for (const Waypoint* point = TheTerrainLogic->getFirstWaypoint(); point; point = point->getNext())
+				if (point->getName().startsWith(m_waypointSpawnPoints))
+					spawnPoints.push_back(point);
+		}
+		std::vector<Object*> orderedObjects;
 
 		// Object type debris might need this information to process visual UpgradeModules.
 		Team *debrisOwner = ThePlayerList->getNeutralPlayer() ? ThePlayerList->getNeutralPlayer()->getDefaultTeam() : nullptr;
@@ -1453,7 +1536,7 @@ protected:
 			if (!tmpl)
 				continue;
 
-			if (RetailFileLayers::enabled() && m_nameAreObjects && !m_ignoreCommandPointLimit)
+			if (retailObject && !m_ignoreCommandPointLimit)
 			{
 				const Player *ownerPlayer = debrisOwner ? debrisOwner->getControllingPlayer() : nullptr;
 				if (ownerPlayer && !ownerPlayer->hasEnoughCommandPoints(tmpl))
@@ -1481,38 +1564,40 @@ protected:
 			if (container != nullptr && container->getContain() != nullptr && container->getContain()->isValidContainerFor(debris, true))
 				container->getContain()->addToContain(debris);
 
-			// if we want the objects being created to appear in a spread formation
-			// PLEASE NOTE --> if/when the object placement logic is modified so that
-			// objects that are placed in the same location are no longer placed in a
-			// diagonal line but rather in random locations nearby, this logic will no
-			// longer be necessary and can be taken out -- amit
-			if (m_spreadFormation)
+			Coord3D spawnPosition = *pos;
+			if (!spawnPoints.empty())
+			{
+				const Waypoint* point = spawnPoints[GameLogicRandomValue(0, static_cast<Int>(spawnPoints.size()) - 1)];
+				spawnPosition = *point->getLocation();
+			}
+			else if (m_spreadFormation && (!retailObject || m_waypointSpawnPoints.isEmpty()))
 			{
 				FindPositionOptions fpOptions;
 				fpOptions.minRadius = GameLogicRandomValueReal(m_minDistanceAFormation, m_minDistanceBFormation);
 				fpOptions.maxRadius = m_maxDistanceFormation;
-				fpOptions.flags = FPF_USE_HIGHEST_LAYER;
-
-				// TheSuperHackers @bugfix Caball009 12/01/2026 Position variable needs to be initialized before use.
-				// The non-deterministic behavior for retail clients cannot be fixed, so this will remain a source of potential mismatches for unpatched clients.
-				// Fall back to the center position if no valid position was found, so that the behavior is deterministic for patched clients.
-				Coord3D resultPos = *pos;
-
-				if (!ThePartitionManager->findPositionAround(pos, &fpOptions, &resultPos))
+				Int flags = FPF_USE_HIGHEST_LAYER;
+				if (retailObject)
 				{
-					DEBUG_ASSERTCRASH(resultPos == *pos, ("Position should not have been changed"));
+					if (m_ignoreAllObjects)
+						flags |= FPF_IGNORE_ALL_OBJECTS;
+					if (BitIsSet(m_disposition, USE_WATER_SURFACE))
+						flags |= FPF_IGNORE_WATER;
+				}
+				fpOptions.flags = static_cast<FindPositionFlags>(flags);
+
+				if (!ThePartitionManager->findPositionAround(pos, &fpOptions, &spawnPosition))
+				{
+					DEBUG_ASSERTCRASH(spawnPosition == *pos, ("Position should not have been changed"));
 
 #if RETAIL_COMPATIBLE_CRC
 					DEBUG_CRASH(("A mismatch is likely to happen if this code path is used in a match with unpatched clients."));
 #endif
 				}
-				doStuffToObj( debris, m_names[pick], &resultPos, mtx, orientation, sourceObj, lifetimeFrames, nn );
 			}
-			else
-			{
-				// do stuff to contained objects too
-				doStuffToObj( debris, m_names[pick], pos, mtx, orientation, sourceObj, lifetimeFrames, nn );
-			}
+			doStuffToObj(debris, m_names[pick], &spawnPosition, mtx, orientation, sourceObj, lifetimeFrames, nn);
+
+			if (retailObject && secondary && (m_issueMoveAfterCreation || m_orientInSecondaryDirection))
+				orderedObjects.push_back(debris);
 
 			if (m_fadeIn)
 			{
@@ -1538,6 +1623,25 @@ protected:
 
 		if (container)
 			doStuffToObj( container, AsciiString::TheEmptyString, pos, mtx, orientation, sourceObj, lifetimeFrames );
+
+		for (Object* obj : orderedObjects)
+		{
+			if (obj->isDestroyed() || obj->isEffectivelyDead() || obj->getContainedBy())
+				continue;
+			if (m_issueMoveAfterCreation)
+			{
+				if (AIUpdateInterface* ai = obj->getAIUpdateInterface())
+					ai->aiMoveToPosition(secondary, CMD_FROM_PLAYER);
+			}
+			if (m_orientInSecondaryDirection)
+			{
+				const Coord3D* spawnedPosition = obj->getPosition();
+				const Real dx = secondary->x - spawnedPosition->x;
+				const Real dy = secondary->y - spawnedPosition->y;
+				const Real facing = dx != 0.0f || dy != 0.0f ? WWMath::Atan2Origin(dy, dx) : orientation;
+				obj->setOrientation(facing + m_orientationOffset);
+			}
+		}
 
 		return firstObject;
 	}
@@ -1616,6 +1720,14 @@ private:
 	UnsignedInt m_startingBusyTime = 0;
 	std::vector<AsciiString> m_requiredUpgrades;
 	std::vector<AsciiString> m_forbiddenUpgrades;
+	Bool m_ignoreAllObjects = FALSE;
+	Bool m_issueMoveAfterCreation = TRUE;
+	Bool m_offsetInLocalSpace = FALSE;
+	Real m_orientationOffset = 0.0f;
+	Bool m_orientInPrimaryDirection = FALSE;
+	Bool m_orientInSecondaryDirection = FALSE;
+	Real m_velocityScale = 1.0f;
+	AsciiString m_waypointSpawnPoints;
 
 };
 EMPTY_DTOR(GenericObjectCreationNugget)
