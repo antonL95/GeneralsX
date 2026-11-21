@@ -522,8 +522,15 @@ public:
 
 	virtual CommandSourceType getLastCommandSource() const { return m_lastCommandSource; }
 	Bool issueRetailPlannerAttack(Object* target);
+	Bool issueRetailPlannerAdvance(const Coord3D& position);
 	Bool canAcceptRetailPlannerOrder(Bool attackObject) const;
 	Bool hasRetailPlannerAttack(const Object* target) const;
+	Bool hasRetailPlannerAdvance() const { return m_retailPlannerOrderActive && m_retailPlannerAttackTarget == INVALID_ID; }
+	void noteBlockedRetailPlannerPath();
+	UnsignedInt blockedRetailPlannerRevision(UnsignedInt issuedFrame) const
+	{
+		return issuedFrame == m_retailPlannerIssuedFrame ? m_retailPlannerBlockedRevision : 0;
+	}
 
 	const AttackPriorityInfo *getAttackInfo() {return m_attackInfo;}
 	void setAttackInfo(const AttackPriorityInfo *info) {m_attackInfo = info;}
@@ -810,6 +817,10 @@ private:
 	UnsignedInt m_crushWarningUntil = 0;
 	Coord3D m_autoAttackOrigin{};
 	ObjectID m_retailPlannerAttackTarget = INVALID_ID;
+	Bool m_retailPlannerOrderActive = FALSE;
+	UnsignedInt m_retailPlannerIssuedFrame = 0;
+	UnsignedInt m_retailPlannerPathRevision = 0;
+	UnsignedInt m_retailPlannerBlockedRevision = 0;
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.
 	Bool				m_upgradedLocomotors;

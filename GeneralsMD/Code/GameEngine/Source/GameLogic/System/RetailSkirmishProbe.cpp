@@ -224,9 +224,11 @@ void runPlannerFixture(UnsignedInt frame, const char* unitName, const char* targ
 	}
 }
 
-void runPlannerGateFixture(UnsignedInt frame)
+void runPlannerGateFixture(UnsignedInt frame, Bool standalone)
 {
-	if (frame != 2 && frame != 4 && frame != 170 && frame != 360 && frame != 450 && frame != 900)
+	const UnsignedInt openFrame = standalone ? 1200 : 360;
+	if (frame != 2 && frame != 4 && frame != (standalone ? 1000u : 170u) &&
+		frame != openFrame && frame != openFrame + 90 && frame != openFrame + 540)
 		return;
 	Player* attacker = ThePlayerList->findPlayerWithName("Player_1");
 	Player* defender = ThePlayerList->findPlayerWithName("Player_2");
@@ -237,10 +239,10 @@ void runPlannerGateFixture(UnsignedInt frame)
 		const Waypoint* start = TheTerrainLogic->getWaypointByName("Player_1_Start");
 		const ThingTemplate* wall = TheThingFactory->findTemplate("MenWallSegmentSmall", FALSE);
 		const ThingTemplate* gate = TheThingFactory->findTemplate("MenWallGateSmall", FALSE);
-		const ThingTemplate* horde = TheThingFactory->findTemplate("DwarvenGuardianHorde", FALSE);
+		const ThingTemplate* troop = TheThingFactory->findTemplate(standalone ? "DwarfBatteringRam" : "DwarvenGuardianHorde", FALSE);
 		const ThingTemplate* farm = TheThingFactory->findTemplate("HaradwaithBazaar_ForAI", FALSE);
 		const ThingTemplate* spotter = TheThingFactory->findTemplate("DwarvenPorter", FALSE);
-		if (!start || !wall || !gate || !horde || !farm || !spotter)
+		if (!start || !wall || !gate || !troop || !farm || !spotter)
 			return;
 		attacker->setCanBuildBase(FALSE);
 		Team* neutral = ThePlayerList->getNeutralPlayer()->getDefaultTeam();
@@ -255,7 +257,7 @@ void runPlannerGateFixture(UnsignedInt frame)
 		if (frame == 4)
 		{
 			for (Real offset : {-34.0f, 0.0f, 34.0f})
-				plannerFixtureGuard = place(horde, attacker->getDefaultTeam(), 10.0f, offset)->getID();
+				plannerFixtureGuard = place(troop, attacker->getDefaultTeam(), 10.0f, offset)->getID();
 			std::fprintf(stderr, "SKIRMISH_GATE_FIXTURE\tsetup\t%u\t%u\t%u\n",
 				static_cast<UnsignedInt>(plannerFixtureGate), static_cast<UnsignedInt>(plannerFixtureTarget),
 				static_cast<UnsignedInt>(plannerFixtureGuard));
@@ -278,21 +280,25 @@ void runPlannerGateFixture(UnsignedInt frame)
 		plannerFixtureGate = gateObject->getID();
 		if (auto* behavior = GateOpenAndCloseBehavior::find(gateObject))
 			behavior->request(FALSE);
-		Object* target = place(farm, defender->getDefaultTeam(), 193.0f, 0.0f);
-		plannerFixtureTarget = target->getID();
-		place(spotter, attacker->getDefaultTeam(), 215.0f, 50.0f);
+		if (!standalone)
+		{
+			Object* target = place(farm, defender->getDefaultTeam(), 193.0f, 0.0f);
+			plannerFixtureTarget = target->getID();
+			place(spotter, attacker->getDefaultTeam(), 215.0f, 50.0f);
+		}
 		return;
 	}
 	Object* gate = TheGameLogic->findObjectByID(plannerFixtureGate);
 	Object* unit = TheGameLogic->findObjectByID(plannerFixtureGuard);
 	const auto* horde = unit ? static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate"))) : nullptr;
-	if (!gate || !horde)
+	if (!gate || !unit || !unit->getAI())
 		return;
 	std::fprintf(stderr, "SKIRMISH_GATE_FIXTURE\t%u\t%d\t%u\t%u\t%d\t%a\t%a\n", frame,
 		GateOpenAndCloseBehavior::canPass(gate, unit, FALSE), TheAI->pathfinder()->getRetailRouteRevision(),
-		horde->blockedPlannerRevision(63), horde->hasAttackOrder(),
+		horde ? horde->blockedPlannerRevision(63) : unit->getAI()->blockedRetailPlannerRevision(63),
+		horde ? horde->hasAttackOrder() : !unit->getAI()->isIdle(),
 		unit->getPosition()->x, gate->getPosition()->x);
-	if (frame == 360)
+	if (frame == openFrame)
 	{
 		gate->setTeam(attacker->getDefaultTeam());
 		if (auto* behavior = GateOpenAndCloseBehavior::find(gate))
@@ -304,9 +310,10 @@ void runFixture(UnsignedInt frame)
 {
 	if (!fixture)
 		return;
-	if (std::strcmp(fixture, "planner-gate") == 0)
+	const Bool standaloneGate = std::strcmp(fixture, "planner-gate-standalone") == 0;
+	if (standaloneGate || std::strcmp(fixture, "planner-gate") == 0)
 	{
-		runPlannerGateFixture(frame);
+		runPlannerGateFixture(frame, standaloneGate);
 		return;
 	}
 	if (std::strcmp(fixture, "planner-capture") == 0)
@@ -483,7 +490,7 @@ Bool configure(SkirmishGameInfo& game)
 	if (fixture && !humanLair && std::strcmp(fixture, "porter") != 0 &&
 		std::strcmp(fixture, "ensnare") != 0 && std::strcmp(fixture, "planner-capture") != 0 &&
 		std::strcmp(fixture, "planner-siege") != 0 && std::strcmp(fixture, "planner-harad") != 0 &&
-		std::strcmp(fixture, "planner-gate") != 0)
+		std::strcmp(fixture, "planner-gate") != 0 && std::strcmp(fixture, "planner-gate-standalone") != 0)
 		invalidConfig();
 	for (Int i = 0; i < 2; ++i)
 	{

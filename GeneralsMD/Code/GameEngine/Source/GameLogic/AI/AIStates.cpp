@@ -3698,10 +3698,16 @@ StateReturnType AIAttackMoveToState::update()
 
 	StateReturnType ret = AIMoveToState::update();
 	if (ret != STATE_CONTINUE) {
-		if (m_retryCount<1) return ret;
-		/* check for close enough. */
-		Real distSqr = sqr(owner->getPosition()->x - m_pathGoalPosition.x) + sqr(owner->getPosition()->y-m_pathGoalPosition.y);
-		if (distSqr < sqr(static_cast<float>(ATTACK_CLOSE_ENOUGH_CELLS)*PATHFIND_CELL_SIZE_F)) {
+		const Real distSqr = m_retryCount > 0 ? sqr(owner->getPosition()->x - m_pathGoalPosition.x) +
+			sqr(owner->getPosition()->y - m_pathGoalPosition.y) : 0.0f;
+		if (m_retryCount < 1 || distSqr < sqr(static_cast<float>(ATTACK_CLOSE_ENOUGH_CELLS) * PATHFIND_CELL_SIZE_F))
+		{
+			if (ai->hasRetailPlannerAdvance())
+			{
+				const Coord3D delta = *getMachineGoalPosition() - *owner->getPosition();
+				if (sqr(delta.x) + sqr(delta.y) > sqr(3 * PATHFIND_CELL_SIZE_F))
+					ai->noteBlockedRetailPlannerPath();
+			}
 			return ret;
 		}
 		DEBUG_LOG(("AIAttackMoveToState::update Distance from goal %f, retrying.", WWMath::SqrtOrigin(distSqr)));
@@ -5771,7 +5777,17 @@ StateReturnType AIAttackState::update()
 	 * Note the use of CONVERT_SLEEP_TO_CONTINUE; even if the sub-machine
 	 * sleeps, we still need to be called every frame.
 	 */
-	return CONVERT_SLEEP_TO_CONTINUE(m_attackMachine->updateStateMachine());
+	const StateReturnType result = CONVERT_SLEEP_TO_CONTINUE(m_attackMachine->updateStateMachine());
+	if (result == STATE_FAILURE)
+	{
+		const Object* target = getMachineGoalObject();
+		AIUpdateInterface* ai = source->getAI();
+		if (target && ai->hasRetailPlannerAttack(target) && ai->isDoingGroundMovement() &&
+			(!curWeapon->isWithinAttackRange(source, target) ||
+				TheAI->pathfinder()->isAttackViewBlockedByObstacle(source, *source->getPosition(), target, *target->getPosition())))
+			ai->noteBlockedRetailPlannerPath();
+	}
+	return result;
 }
 
 //----------------------------------------------------------------------------------------------------------

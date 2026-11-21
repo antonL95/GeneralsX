@@ -435,6 +435,8 @@ void AIUpdateInterface::doPathfind( PathfindServicesInterface *pathfinder )
 	}
 	//CRCDEBUG_LOG(("AIUpdateInterface::doPathfind() for object %d", getObject()->getID()));
 	m_waitingForPath = FALSE;
+	if (m_retailPlannerOrderActive && isDoingGroundMovement())
+		m_retailPlannerPathRevision = TheAI->pathfinder()->getRetailRouteRevision();
 	if (m_isSafePath) {
 		destroyPath();
 		Coord3D pos1, pos2;
@@ -2763,6 +2765,7 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
 	m_retailPlannerAttackTarget = INVALID_ID;
+	m_retailPlannerOrderActive = FALSE;
 
 #ifdef ALLOW_SURRENDER
 	// surrendered items have very limited options, and only via AI cmds
@@ -2787,6 +2790,14 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 	}
 #endif
 
+
+	if (parms->m_retailPlannerOrder)
+	{
+		m_retailPlannerOrderActive = TRUE;
+		m_retailPlannerIssuedFrame = TheGameLogic->getFrame();
+		m_retailPlannerPathRevision = 0;
+		m_retailPlannerBlockedRevision = 0;
+	}
 
 	switch (parms->m_cmd)
 	{
@@ -2837,7 +2848,7 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 			break;
 		}
 		case AICMD_ATTACK_OBJECT:
-			if (parms->m_retailPlannerAttack && parms->m_obj)
+			if (parms->m_retailPlannerOrder && parms->m_obj)
 				m_retailPlannerAttackTarget = parms->m_obj->getID();
 			privateAttackObject(parms->m_obj, parms->m_intValue, parms->m_cmdSource);
 			break;
@@ -5278,9 +5289,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 9 : 4;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 9 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5526,6 +5537,13 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	}
 	if (version >= 8)
 		xfer->xferObjectID(&m_retailPlannerAttackTarget);
+	if (version >= 9)
+	{
+		xfer->xferBool(&m_retailPlannerOrderActive);
+		xfer->xferUnsignedInt(&m_retailPlannerIssuedFrame);
+		xfer->xferUnsignedInt(&m_retailPlannerPathRevision);
+		xfer->xferUnsignedInt(&m_retailPlannerBlockedRevision);
+	}
 
 
 }
@@ -5578,12 +5596,39 @@ Bool AIUpdateInterface::issueRetailPlannerAttack(Object* target)
 	AICommandParms parms(AICMD_ATTACK_OBJECT, CMD_FROM_AI);
 	parms.m_obj = target;
 	parms.m_intValue = NO_MAX_SHOTS_LIMIT;
-	parms.m_retailPlannerAttack = TRUE;
+	parms.m_retailPlannerOrder = TRUE;
 	aiDoCommand(&parms);
 	const Bool accepted = hasRetailPlannerAttack(target) && isAttacking() && getGoalObject() == target;
 	if (!accepted && hasRetailPlannerAttack(target))
+	{
 		m_retailPlannerAttackTarget = INVALID_ID;
+		m_retailPlannerOrderActive = FALSE;
+	}
 	return accepted;
+}
+
+Bool AIUpdateInterface::issueRetailPlannerAdvance(const Coord3D& position)
+{
+	if (!canAcceptRetailPlannerOrder(FALSE))
+		return FALSE;
+	AICommandParms parms(AICMD_ATTACKMOVE_TO_POSITION, CMD_FROM_AI);
+	parms.m_pos = position;
+	parms.m_intValue = NO_MAX_SHOTS_LIMIT;
+	parms.m_retailPlannerOrder = TRUE;
+	aiDoCommand(&parms);
+	const Bool accepted = hasRetailPlannerAdvance() && getCurrentStateID() == AI_ATTACK_MOVE_TO;
+	if (!accepted && hasRetailPlannerAdvance())
+		m_retailPlannerOrderActive = FALSE;
+	return accepted;
+}
+
+void AIUpdateInterface::noteBlockedRetailPlannerPath()
+{
+	if (m_retailPlannerOrderActive && m_retailPlannerPathRevision)
+	{
+		m_retailPlannerBlockedRevision = m_retailPlannerPathRevision;
+		m_retailPlannerOrderActive = FALSE;
+	}
 }
 
 Bool AIUpdateInterface::canAcceptRetailPlannerOrder(Bool attackObject) const

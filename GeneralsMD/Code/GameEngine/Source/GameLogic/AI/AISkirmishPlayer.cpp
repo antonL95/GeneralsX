@@ -1521,8 +1521,12 @@ void AISkirmishPlayer::updateRetail()
 		}
 		auto& order = it->second;
 		if (order.issuedFrame && !order.blockedRevision)
+		{
 			if (const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate"))))
 				order.blockedRevision = horde->blockedPlannerRevision(order.issuedFrame);
+			else if (const auto* ai = unit->getAI())
+				order.blockedRevision = ai->blockedRetailPlannerRevision(order.issuedFrame);
+		}
 		if (order.blockedRevision && order.blockedRevision != routeRevision)
 			it = m_retailObjectives.erase(it);
 		else
@@ -1650,10 +1654,7 @@ void AISkirmishPlayer::updateRetail()
 		else if (target)
 			accepted = ai->issueRetailPlannerAttack(target);
 		else
-		{
-			ai->aiAttackMoveToPosition(destination, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
-			accepted = !ai->isIdle();
-		}
+			accepted = ai->issueRetailPlannerAdvance(*destination);
 		if (!accepted)
 			continue;
 		m_retailObjectives.emplace(std::make_tuple(unit->getID(), target ? target->getID() : INVALID_ID, objectiveOwner),
@@ -1960,12 +1961,11 @@ void AISkirmishPlayer::xferRetailObjectives(Xfer* xfer, Bool hasRouteHistory)
 			xfer->xferObjectID(&unit);
 			xfer->xferObjectID(&target);
 			xfer->xferUnsignedInt(&owner);
-			RetailObjective order{0, 1};
-			if (hasRouteHistory)
-			{
-				xfer->xferUnsignedInt(&order.issuedFrame);
-				xfer->xferUnsignedInt(&order.blockedRevision);
-			}
+			if (!hasRouteHistory)
+				continue;
+			RetailObjective order;
+			xfer->xferUnsignedInt(&order.issuedFrame);
+			xfer->xferUnsignedInt(&order.blockedRevision);
 			m_retailObjectives.emplace(std::make_tuple(unit, target, owner), order);
 		}
 	}
