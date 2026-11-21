@@ -49,6 +49,7 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/OpenContain.h"
+#include "Common/ModuleFactory.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
@@ -109,6 +110,15 @@ OpenContainModuleData::OpenContainModuleData()
 	};
   p.add(dataFieldParse);
 	p.add(DieMuxData::getFieldParse(), offsetof( OpenContainModuleData, m_dieMuxData ));
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "EjectPassengersOnDeath", INI::parseBool, nullptr, offsetof(OpenContainModuleData, m_ejectPassengersOnDeath) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 
 }
 
@@ -931,6 +941,14 @@ void OpenContain::onDie( const DamageInfo * damageInfo )
 {
 	if (!getOpenContainModuleData()->m_dieMuxData.isDieApplicable(getObject(), damageInfo))
 		return;
+
+	if (!getOpenContainModuleData()->m_ejectPassengersOnDeath)
+	{
+		const ContainedItemsList passengers = m_containList;
+		for (Object* passenger : passengers)
+			TheGameLogic->destroyObject(passenger);
+		return;
+	}
 
 #if !RETAIL_COMPATIBLE_CRC
 	killRidersWhoAreNotFreeToExit();

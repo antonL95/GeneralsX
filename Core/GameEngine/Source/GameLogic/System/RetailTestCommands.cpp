@@ -533,7 +533,7 @@ void logModifiedObject(const char* label, const Object* obj, unsigned int frame)
 	const StancesBehavior* stances = StancesBehavior::find(obj);
 	AsciiString lists;
 	AttributeModifiers::describe(obj, lists);
-	std::fprintf(stderr, "TEST mods %u %s id=%u(%s) stance=%s health=%.1f/%.1f armorSlash=%.3f armorMagic=%.3f damage=%.3f damageAdd=%.1f range=%.1f rof=%.3f speed=%.2f vision=%.1f shroud=%.1f xp=%.3f production=%.3f recharge=%.3f lists=[%s]\n",
+	std::fprintf(stderr, "TEST mods %u %s id=%u(%s) stance=%s health=%.1f/%.1f armorSlash=%.3f armorMagic=%.3f damage=%.3f damageAdd=%.1f range=%.1f rof=%.3f speed=%.2f vision=%.1f shroud=%.1f xp=%.3f production=%.3f recharge=%.3f armorPierce=%.3f lists=[%s]\n",
 		frame, label, static_cast<unsigned>(obj->getID()), obj->getTemplate()->getName().str(),
 		stances ? AttributeModifierRules::stanceNames()[stances->getStance()] : "-",
 		body ? body->getHealth() : 0.0f, body ? body->getMaxHealth() : 0.0f,
@@ -541,7 +541,7 @@ void logModifiedObject(const char* label, const Object* obj, unsigned int frame)
 		AttributeModifiers::damageDealtFactor(obj), AttributeModifiers::value(obj, AttributeModifierRules::DAMAGE_ADD), weapon ? weapon->getAttackRange(obj) : 0.0f, AttributeModifiers::rateOfFireFactor(obj),
 		locomotor ? locomotor->getMaxSpeedForCondition(BODY_PRISTINE, obj) : 0.0f, obj->getVisionRange(), obj->getShroudClearingRange(),
 		AttributeModifiers::experienceFactor(obj), AttributeModifiers::productionFactor(obj), AttributeModifiers::rechargeFactor(obj),
-		lists.str());
+		AttributeModifiers::damageTakenFactor(obj, DAMAGE_PIERCE), lists.str());
 }
 
 void logModifiers(Object* obj, unsigned int frame)

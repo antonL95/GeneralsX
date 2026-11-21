@@ -8,6 +8,10 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Object.h"
 
+#if !RTS_GENERALS
+#include "GameLogic/Module/AttributeModifierHelper.h"
+#endif
+
 void WeaponChangeSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& fields)
 {
 	SpecialPowerModuleData::buildFieldParse(fields);
@@ -58,6 +62,11 @@ void WeaponChangeSpecialPowerModule::applyPowerEffect(const Coord3D*)
 	const Bool enabling = turningOn.any();
 	const UnsignedInt sleep = enabling ? data->m_onSleepFrames : data->m_offSleepFrames;
 	const UnsignedInt stopUntil = TheGameLogic->getFrame() + sleep;
+#if !RTS_GENERALS
+	const auto modifierOwner = AttributeModifiers::ownerOf(caster, getModuleTagNameKey());
+	const AsciiString& previousModifier = enabling ? data->m_offModifier : data->m_onModifier;
+	const AsciiString& nextModifier = enabling ? data->m_onModifier : data->m_offModifier;
+#endif
 
 	const auto change = [&](Object* unit)
 	{
@@ -65,6 +74,12 @@ void WeaponChangeSpecialPowerModule::applyPowerEffect(const Coord3D*)
 			return;
 		unit->setWeaponSetFlags(turningOff, FALSE);
 		unit->setWeaponSetFlags(turningOn, TRUE);
+#if !RTS_GENERALS
+		if (!previousModifier.isEmpty())
+			AttributeModifiers::remove(unit, previousModifier, modifierOwner);
+		if (sleep != 0 && !nextModifier.isEmpty())
+			AttributeModifiers::apply(unit, nextModifier, sleep, 0, modifierOwner);
+#endif
 		if (enabling)
 			unit->setPowerModelCondition(MODELCONDITION_WEAPON_TOGGLING, sleep);
 		if (sleep != 0 && !unit->isDisabledByType(DISABLED_PARALYZED))

@@ -515,6 +515,18 @@ UpdateSleepTime TransportContain::update()
 {
 	const TransportContainModuleData *moduleData = getTransportContainModuleData();
 
+	if (moduleData->m_passengerTypeOne.any())
+	{
+		const auto& passengers = getContainList();
+		for (auto it = passengers.begin(); it != passengers.end(); )
+		{
+			Object* passenger = *it++;
+			if (passenger->isKindOf(KINDOF_CLUB) && passenger->isAnyKindOf(moduleData->m_passengerTypeOne)
+				&& passenger->isEffectivelyDead())
+				removeFromContain(passenger);
+		}
+	}
+
 	if (m_payloadCreated == FALSE)
 	{
 #if RETAIL_COMPATIBLE_CRC

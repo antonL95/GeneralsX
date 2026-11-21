@@ -54,6 +54,7 @@ class OpenContainModuleData : public UpdateModuleData
 
 public:
 	DieMuxData m_dieMuxData;
+	Bool m_ejectPassengersOnDeath = TRUE;
 	Int m_containMax;								///< how many things we can have inside (-1 = "I don't care")
 	AudioEventRTS m_enterSound;			///< sound to play on entering
 	AudioEventRTS m_exitSound;			///< sound to play on exiting
