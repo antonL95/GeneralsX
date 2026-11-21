@@ -58,6 +58,9 @@ Not ref counted.  Do not store pointers to this class.  */
 #define NUM_CLIFF_INFO 32384
 #define FLAG_VAL 0x7ADA0000
 
+constexpr Int ROTWK_TERRAIN_TILE_LIMIT = 4096;
+constexpr Int ROTWK_TERRAIN_CLASS_LIMIT = 512;
+
 // For backwards compatiblity.
 #define TEX_PATH_LEN 256
 
@@ -162,7 +165,7 @@ protected:
 	Int m_numBlendedTiles;	// Number of blended tiles created from bitmap tiles.
 
 	std::vector<TileData *> m_sourceTiles;
-	TileData			*m_edgeTiles[NUM_SOURCE_TILES];	///< Tiles for m_textureClasses
+	TileData *m_edgeTiles[ROTWK_TERRAIN_TILE_LIMIT]{};
 
 	std::vector<TBlendTileInfo> m_blendedTiles;
 
@@ -175,12 +178,12 @@ protected:
 	// A class may have more than one tile.  For example, if the grass bitmap is
 	// 128x128, it creates 4 64x64 tiles, so the grass texture class will have 4 tiles.
 	int m_numTextureClasses;
-	TXTextureClass m_textureClasses[NUM_TEXTURE_CLASSES];
+	TXTextureClass m_textureClasses[ROTWK_TERRAIN_CLASS_LIMIT];
 
 	// Edge Texture classes.  There is one texture class for each bitmap read in.
 	// An edge class will normally have 4 tiles.
 	int m_numEdgeTextureClasses;
-	TXTextureClass m_edgeTextureClasses[NUM_TEXTURE_CLASSES];
+	TXTextureClass m_edgeTextureClasses[ROTWK_TERRAIN_CLASS_LIMIT];
 
 	/** The actual texture used to render the 3d mesh.  Note that it is
 	 basically m_SourceTiles laid out in rows, so by itself it is not useful.
@@ -196,6 +199,7 @@ protected:
 
 	/** The texture that contains custom blend edge tiles. */
 	AlphaEdgeTextureClass *m_alphaEdgeTex = nullptr;
+	Int m_edgeTilePixelExtent = TILE_PIXEL_EXTENT;
 	Int	m_alphaEdgeHeight; /// Height of m_alphaEdgeTex allocated.
 
 	/// Drawing info - re the part of the map that is being drawn.
@@ -210,7 +214,7 @@ protected:
 
 protected:
 	TileData *getSourceTile(UnsignedInt ndx) { if (ndx < m_sourceTiles.size()) return(m_sourceTiles[ndx]); return(nullptr); };
-	TileData *getEdgeTile(UnsignedInt ndx) { if (ndx<NUM_SOURCE_TILES) return(m_edgeTiles[ndx]); return(nullptr); };
+	TileData *getEdgeTile(UnsignedInt ndx) { if (ndx < ROTWK_TERRAIN_TILE_LIMIT) return(m_edgeTiles[ndx]); return(nullptr); };
 	/// UV mapping data for a cell to map into the terrain texture.
 	void getUVForNdx(Int ndx, float *minU, float *minV, float *maxU, float*maxV);
 	Bool getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float V[4]);

@@ -38,6 +38,7 @@
 #include "Common/GlobalData.h"
 #include "Common/INIAudit.h"
 #include "Common/MapReaderWriterInfo.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/TerrainTypes.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -471,11 +472,6 @@ WorldHeightMap::WorldHeightMap(Bool initializeEditor):
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
 	m_releaseAlphaTiles(initializeEditor)
 {
-	Int i;
-	for (i=0; i<NUM_SOURCE_TILES; i++) {
-		m_edgeTiles[i] = nullptr;
-	}
-
 	if (initializeEditor)
 	{
 		m_sourceTiles.resize(NUM_SOURCE_TILES);
@@ -586,11 +582,6 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly, Bo
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1)
 {
 
-	int i;
-	for (i=0; i<NUM_SOURCE_TILES; i++) {
-		m_edgeTiles[i]=nullptr;
-	}
-
 	DataChunkInput file( pStrm );
 	const AsciiString& root = AsciiString::TheEmptyString;
 
@@ -642,7 +633,7 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly, Bo
 	}
 	// patch bad maps.
 	if (!logicalDataOnly) {
-		for(i=0; i<m_dataSize; i++) {
+		for (Int i = 0; i < m_dataSize; i++) {
 			if (m_cliffInfoNdxes[i]<0 || m_cliffInfoNdxes[i]>= m_numCliffInfo) {
 				m_cliffInfoNdxes[i] = 0;
 			}
@@ -1684,8 +1675,12 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 	if (info->version >= 15) readLayer(m_extraPassable, packedSize);
 	if (info->version >= 16) readLayer(m_flammability, m_dataSize);
 	if (info->version >= 17) readLayer(m_visibility, packedSize);
+	const Bool retail = RetailFileLayers::enabled();
+	const Int sourceTileLimit = retail ? ROTWK_TERRAIN_TILE_LIMIT : 16384;
+	const Int edgeTileLimit = retail ? ROTWK_TERRAIN_TILE_LIMIT : NUM_SOURCE_TILES;
+	const Int textureClassLimit = retail ? ROTWK_TERRAIN_CLASS_LIMIT : NUM_TEXTURE_CLASSES;
 	m_numBitmapTiles = file.readInt();
-	if (m_numBitmapTiles < 0 || m_numBitmapTiles > 16384)
+	if (m_numBitmapTiles < 0 || m_numBitmapTiles > sourceTileLimit)
 		throw ERROR_CORRUPT_FILE_FORMAT;
 	m_sourceTiles.resize(m_numBitmapTiles);
 	m_numBlendedTiles = file.readInt();
@@ -1700,7 +1695,7 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 		throw ERROR_CORRUPT_FILE_FORMAT;
 	m_numCliffInfo = std::max(1, m_numCliffInfo);
 	m_numTextureClasses	= file.readInt();
-	if (m_numTextureClasses < 0 || m_numTextureClasses > NUM_TEXTURE_CLASSES)
+	if (m_numTextureClasses < 0 || m_numTextureClasses > textureClassLimit)
 		throw ERROR_CORRUPT_FILE_FORMAT;
 	for (i=0; i<m_numTextureClasses; i++) {
 		m_textureClasses[i].globalTextureClass = -1;
@@ -1726,8 +1721,8 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 	if (info->version >= K_BLEND_TILE_VERSION_4) {
 		m_numEdgeTiles	= file.readInt();
 		m_numEdgeTextureClasses	= file.readInt();
-		if (m_numEdgeTiles < 0 || m_numEdgeTiles > NUM_SOURCE_TILES ||
-			m_numEdgeTextureClasses < 0 || m_numEdgeTextureClasses > NUM_TEXTURE_CLASSES)
+		if (m_numEdgeTiles < 0 || m_numEdgeTiles > edgeTileLimit ||
+			m_numEdgeTextureClasses < 0 || m_numEdgeTextureClasses > textureClassLimit)
 			throw ERROR_CORRUPT_FILE_FORMAT;
 		for (i=0; i<m_numEdgeTextureClasses; i++) {
 			m_edgeTextureClasses[i].globalTextureClass = -1;
@@ -1736,11 +1731,15 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 			m_edgeTextureClasses[i].width = file.readInt();
 			m_edgeTextureClasses[i].name = file.readAsciiString();
 			const auto &texture = m_edgeTextureClasses[i];
-			if (texture.firstTile < 0 || texture.numTiles < 0 || texture.firstTile > NUM_SOURCE_TILES ||
-				texture.numTiles > NUM_SOURCE_TILES - texture.firstTile)
+			if (texture.firstTile < 0 || texture.numTiles < 0 || texture.firstTile > edgeTileLimit ||
+				texture.numTiles > edgeTileLimit - texture.firstTile)
+				throw ERROR_CORRUPT_FILE_FORMAT;
+			if (retail && (texture.firstTile > m_numEdgeTiles ||
+				texture.numTiles > m_numEdgeTiles - texture.firstTile || texture.width < 0 ||
+				static_cast<long long>(texture.width) * texture.width > texture.numTiles))
 				throw ERROR_CORRUPT_FILE_FORMAT;
 			if (loadTextures && texture.numTiles)
-				readTexClass(&m_edgeTextureClasses[i], m_edgeTiles);
+				readTexClass(&m_edgeTextureClasses[i], m_edgeTiles, retail && info->version > K_BLEND_TILE_VERSION_8);
 		}
 	}
 	const unsigned blendBytes = 13 + (info->version >= K_BLEND_TILE_VERSION_3) +
@@ -2223,15 +2222,17 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 			break;
 	}
 
-	for (i = 0; i < NUM_SOURCE_TILES; i++) {
-		if (m_edgeTiles[i]) {
-			m_edgeTiles[i]->m_tileLocationInTexture.x = 0;
-			m_edgeTiles[i]->m_tileLocationInTexture.y = 0;
+	for (TileData *tile : m_edgeTiles) {
+		if (tile) {
+			tile->m_tileLocationInTexture.x = 0;
+			tile->m_tileLocationInTexture.y = 0;
 		}
 	}
 
 	Int maxEdgeHeight = 0;
-	const Int edgeTilesPerRow = TEXTURE_WIDTH / (TILE_PIXEL_EXTENT + TILE_OFFSET);
+	m_edgeTilePixelExtent = RetailFileLayers::enabled() ? TILE_PIXEL_EXTENT_MIP2 : TILE_PIXEL_EXTENT;
+	const Int edgeStride = m_edgeTilePixelExtent + TILE_OFFSET;
+	const Int edgeTilesPerRow = TEXTURE_WIDTH / edgeStride;
 	std::vector<UnsignedByte> edgeGrid(edgeTilesPerRow * edgeTilesPerRow, 1);
 	for (Int texClass = 0; texClass < m_numEdgeTextureClasses; texClass++) {
 		Int width = m_edgeTextureClasses[texClass].width;
@@ -2259,22 +2260,21 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 			continue;
 		}
 
-		Int xOrigin = TILE_OFFSET / 2 + column * (TILE_PIXEL_EXTENT + TILE_OFFSET);
-		Int yOrigin = TILE_OFFSET / 2 + row * (TILE_PIXEL_EXTENT + TILE_OFFSET);
+		Int xOrigin = TILE_OFFSET / 2 + column * edgeStride;
+		Int yOrigin = TILE_OFFSET / 2 + row * edgeStride;
 		m_edgeTextureClasses[texClass].positionInTexture.x = xOrigin;
 		m_edgeTextureClasses[texClass].positionInTexture.y = yOrigin;
-		Int classHeight = yOrigin + width * TILE_PIXEL_EXTENT + TILE_OFFSET / 2;
+		Int classHeight = yOrigin + width * m_edgeTilePixelExtent + TILE_OFFSET / 2;
 		if (maxEdgeHeight < classHeight) maxEdgeHeight = classHeight;
 
 		for (i = 0; i < width; i++) {
 			for (j = 0; j < width; j++) {
 				edgeGrid[(row + j) * edgeTilesPerRow + (column + i)] = 0;
 				Int baseNdx = m_edgeTextureClasses[texClass].firstTile + i + j * width;
-				if (baseNdx < 0 || baseNdx >= NUM_SOURCE_TILES || m_edgeTiles[baseNdx] == nullptr) continue;
-				Int x = xOrigin + i * TILE_PIXEL_EXTENT;
-				Int y = yOrigin + (width - j - 1) * TILE_PIXEL_EXTENT;
-				m_edgeTiles[baseNdx]->m_tileLocationInTexture.x = x;
-				m_edgeTiles[baseNdx]->m_tileLocationInTexture.y = y;
+				TileData *tile = getEdgeTile(baseNdx);
+				if (!tile) continue;
+				tile->m_tileLocationInTexture.x = xOrigin + i * m_edgeTilePixelExtent;
+				tile->m_tileLocationInTexture.y = yOrigin + (width - j - 1) * m_edgeTilePixelExtent;
 			}
 		}
 	}
@@ -2339,8 +2339,8 @@ void WorldHeightMap::getUVForBlend(Int edgeClass, Region2D *range)
 	Int width = m_edgeTextureClasses[edgeClass].width;
 	range->lo.x = (Real)pos.x/TEXTURE_WIDTH;
 	range->lo.y = (Real)pos.y/m_alphaEdgeHeight;
-	range->hi.x = ((Real)pos.x + width*TILE_PIXEL_EXTENT)/TEXTURE_WIDTH;
-	range->hi.y = ((Real)pos.y + width*TILE_PIXEL_EXTENT)/m_alphaEdgeHeight;
+	range->hi.x = ((Real)pos.x + width*m_edgeTilePixelExtent)/TEXTURE_WIDTH;
+	range->hi.y = ((Real)pos.y + width*m_edgeTilePixelExtent)/m_alphaEdgeHeight;
 }
 
 /// Get whether something is cliff indexed with the offset that HeightMapRenderObjClass uses built in.
