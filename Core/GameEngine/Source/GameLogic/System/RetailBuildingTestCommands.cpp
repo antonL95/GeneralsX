@@ -6,6 +6,7 @@
 #include "Common/Player.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/HotKey.h"
@@ -13,6 +14,9 @@
 #include "GameClient/View.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CostModifierUpgrade.h"
+#include "GameLogic/Module/FoundationAIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/RetailTestCommands.h"
@@ -25,6 +29,47 @@
 bool RetailTestCommands::runBuildingCommand(std::string_view action, Object* object, const char* target,
 	const Coord3D* location, unsigned int frame)
 {
+	if (action == "bparity-finish")
+	{
+		object->setStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
+		object->setConstructionPercent(100.0f);
+		FoundationAIUpdate::advanceConstruction(*object, nullptr);
+		return true;
+	}
+	if (action == "bparity-cancel-recruit")
+	{
+		auto* production = object->getProductionUpdateInterface();
+		auto* money = object->getControllingPlayer()->getMoney();
+		const auto* entry = production ? production->firstProduction() : nullptr;
+		const auto before = money->countMoney();
+		const Bool cancelled = entry && production->cancelUnitCreate(entry->getProductionID());
+		std::fprintf(stderr, "BPARITY refund %u cancelled=%d before=%u after=%u\n", frame,
+			cancelled, before, money->countMoney());
+		return true;
+	}
+	if (action == "bparity-upgrade")
+	{
+		const auto* upgrade = TheUpgradeCenter->findUpgrade(target);
+		std::fprintf(stderr, "BPARITY upgrade %u %s %s owned=%d\n", frame,
+			object->getTemplate()->getName().str(), target, upgrade && object->hasUpgrade(upgrade));
+		return true;
+	}
+	if (action == "bparity-horde-casualty")
+	{
+		if (const auto* horde = HordeContain::get(object))
+		{
+			Object* casualty = nullptr;
+			for (Object* member : *horde->getContainedItemsList())
+				if (!member->isEffectivelyDead() && !member->isKindOf(KINDOF_BANNER))
+				{
+					casualty = member;
+					break;
+				}
+			if (casualty)
+				casualty->kill();
+		}
+		return true;
+	}
 	if (action == "bparity-focus")
 	{
 		if (TheTacticalView)

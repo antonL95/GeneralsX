@@ -453,7 +453,12 @@ Bool ProductionUpdate::queueCreateUnit( const ThingTemplate *unitType, Productio
 		money->withdraw( costPaid );
 	}
 	else
-		money->withdraw( unitType->calcCostToBuild( player ) );
+	{
+		const Int cost = unitType->calcCostToBuild(player);
+		money->withdraw(cost);
+		if (RetailFileLayers::enabled())
+			costPaid = cost;
+	}
 
 	// allocate a new production entry
 	ProductionEntry *production = newInstance(ProductionEntry);

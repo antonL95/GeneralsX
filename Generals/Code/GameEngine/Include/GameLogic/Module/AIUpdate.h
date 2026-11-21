@@ -586,6 +586,7 @@ public:
 	void friend_setLastCommandSource( CommandSourceType source ) {m_lastCommandSource = source;}
 
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
+	const AsciiString& getRetailLuaEventsList() const { return getAIUpdateModuleData()->m_luaEventsList; }
 	Bool canAutoAcquireWhileStealthed() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle & AAS_Idle_Stealthed; }
 
 protected:

@@ -44,6 +44,7 @@
 #include "GameLogic/Module/CostModifierUpgrade.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/RetailGate.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
@@ -1142,6 +1143,7 @@ void ControlBar::collectRetailPlacements(const CommandSet *commandSet, Object *o
 				continue;
 		}
 		if (!command || command->getCommandType() == GUI_COMMAND_SET_STANCE ||
+			(command->getCommandType() == GUI_COMMAND_CANCEL_NEIGHBORHOOD && !WallHubBehavior::canCancelSpan(obj)) ||
 			(m_retailRadialMode && !command->isRadial() && !command->isInPalantir()))
 			continue;
 		Int slot = -1;
@@ -1269,6 +1271,8 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 {
 	switch (command->getCommandType())
 	{
+		case GUI_COMMAND_CANCEL_NEIGHBORHOOD:
+			return WallHubBehavior::canCancelSpan(obj) ? COMMAND_AVAILABLE : COMMAND_HIDDEN;
 		case GUI_COMMAND_CLOSE_GATE:
 		case GUI_COMMAND_OPEN_GATE:
 		case GUI_COMMAND_TOGGLE_GATE:
@@ -1318,6 +1322,11 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 {
 	switch (command->getCommandType())
 	{
+		case GUI_COMMAND_CANCEL_NEIGHBORHOOD:
+			if (!WallHubBehavior::canCancelSpan(obj))
+				return CBC_COMMAND_NOT_USED;
+			TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_CANCEL_WALL_SPAN)->appendObjectIDArgument(obj->getID());
+			return CBC_COMMAND_USED;
 		case GUI_COMMAND_CASTLE_UNPACK:
 			if (!CastleBehavior::find(obj))
 				return CBC_COMMAND_NOT_USED;

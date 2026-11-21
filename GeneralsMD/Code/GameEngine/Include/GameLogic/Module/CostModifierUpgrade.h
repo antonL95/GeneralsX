@@ -95,6 +95,7 @@ public:
 	AsciiString m_retailLabel;
 	std::vector<AsciiString> m_retailUpgrades;
 	Bool m_retailStartsActive = FALSE;
+	Bool m_retailSlaughter = FALSE;
 	Bool m_retailUpgradeDiscount = FALSE;
 
 	static void addRetailFields(MultiIniFieldParse& p);

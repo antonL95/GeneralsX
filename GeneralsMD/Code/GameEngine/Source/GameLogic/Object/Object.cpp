@@ -4741,6 +4741,14 @@ void Object::xfer( Xfer *xfer )
 			else
 			{
 
+				constexpr Int legacyBannerSnapshotSize = 5 * sizeof(XferVersion) + sizeof(UnsignedInt);
+				if (RetailFileLayers::enabled() && dataSize == legacyBannerSnapshotSize &&
+					module->getModuleNameKey() == NAMEKEY("BannerCarrierUpdate"))
+				{
+					XferVersion bannerVersion = 1;
+					xfer->xferVersion(&bannerVersion, 1);
+				}
+
 				// xfer the data into this module
 				xfer->xferSnapshot( module );
 

@@ -90,6 +90,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/RetailCreationUpgrades.h
     Include/GameLogic/WeaponNuggetRules.h
     Include/GameLogic/RetailTestCommands.h
+    Include/GameLogic/RetailBuildingEvents.h
     Include/GameLogic/Module/CastleBehavior.h
     Include/GameLogic/Module/CastleUpgrade.h
     Include/GameLogic/Module/ReplaceSelfUpgrade.h
@@ -724,6 +725,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailCreationUpgrades.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
     Source/GameLogic/System/RetailBuildingTestCommands.cpp
+    Source/GameLogic/System/RetailBuildingEvents.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
     Source/GameLogic/Object/Upgrade/ReplaceSelfUpgrade.cpp

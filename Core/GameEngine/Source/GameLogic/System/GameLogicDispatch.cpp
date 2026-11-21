@@ -830,6 +830,12 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 					msg->getArgument(3)->location, getMessagePlayer(msg));
 			break;
 		}
+		case GameMessage::MSG_RETAIL_CANCEL_WALL_SPAN:
+		{
+			if (RetailFileLayers::enabled() && msg->getArgumentCount() == 1)
+				WallHubBehavior::cancelSpan(findObjectByID(msg->getArgument(0)->objectID), getMessagePlayer(msg));
+			break;
+		}
 		case GameMessage::MSG_RETAIL_CASTLE_UNPACK:
 		{
 			if (RetailFileLayers::enabled() && msg->getArgumentCount() == 1)
@@ -2176,7 +2182,8 @@ bool GameLogic::onDozerCancelConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr
 	if( !building->testStatus(OBJECT_STATUS_RECONSTRUCTING))
 	{
 		Money *money = msgPlayer->getMoney();
-		UnsignedInt amount = building->getTemplate()->calcCostToBuild( msgPlayer );
+		UnsignedInt amount = RetailFileLayers::enabled() ? GettingBuiltBehavior::constructionRefund(*building, *msgPlayer) :
+			building->getTemplate()->calcCostToBuild(msgPlayer);
 		money->deposit( amount, TRUE, FALSE );
 	}
 

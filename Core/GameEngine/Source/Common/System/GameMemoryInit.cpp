@@ -112,6 +112,7 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "AttributeModifierHelper", 8192, 1024 },
 	{ "AttributeModifierAuraUpdate", 1024, 256 },
 	{ "PassiveAreaEffectBehavior", 128, 32 },
+	{ "BannerCarrierUpdate", 128, 32 },
 	{ "AttributeModifierUpgrade", 512, 128 },
 	{ "HordeDispatchSpecialPower", 64, 32 },
 	{ "SpecialPowerTimerRefreshSpecialPower", 32, 16 },

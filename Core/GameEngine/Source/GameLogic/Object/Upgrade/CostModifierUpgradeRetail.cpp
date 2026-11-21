@@ -80,6 +80,7 @@ void CostModifierUpgradeModuleData::addRetailFields(MultiIniFieldParse& p)
 
 	static const FieldParse fields[] = {
 		{ "StartsActive", INI::parseBool, nullptr, offsetof(CostModifierUpgradeModuleData, m_retailStartsActive) },
+		{ "Slaughter", INI::parseBool, nullptr, offsetof(CostModifierUpgradeModuleData, m_retailSlaughter) },
 		{ "ObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(CostModifierUpgradeModuleData, m_retailFilter) },
 		{ "LabelForPalantirString", INI::parseAsciiString, nullptr, offsetof(CostModifierUpgradeModuleData, m_retailLabel) },
 		{ "UpgradeDiscount", INI::parseBool, nullptr, offsetof(CostModifierUpgradeModuleData, m_retailUpgradeDiscount) },
@@ -99,16 +100,17 @@ void CostModifierUpgradeModuleData::parsePercentage(INI* ini, void* instance, vo
 
 Bool CostModifierUpgradeModuleData::usesRetailDiscount() const
 {
-	return RetailFileLayers::enabled() && !m_retailPercentages.empty() &&
+	return RetailFileLayers::enabled() && (m_retailSlaughter || (!m_retailPercentages.empty() &&
 		(m_retailStartsActive || m_retailUpgradeDiscount || m_retailFilter.m_rules ||
 		m_retailFilter.m_includeKinds.any() || m_retailFilter.m_excludeKinds.any() ||
-		!m_retailFilter.m_includeObjects.empty() || !m_retailFilter.m_excludeObjects.empty());
+		!m_retailFilter.m_includeObjects.empty() || !m_retailFilter.m_excludeObjects.empty())));
 }
 
 const CostModifierUpgradeModuleData* CostModifierUpgrade::activeRetailData() const
 {
 	const auto* data = getCostModifierUpgradeModuleData();
-	return data->usesRetailDiscount() && (data->m_retailStartsActive || isAlreadyUpgraded()) ? data : nullptr;
+	return !data->m_retailSlaughter && data->usesRetailDiscount() &&
+		(data->m_retailStartsActive || isAlreadyUpgraded()) ? data : nullptr;
 }
 
 Real CostModifierUpgrade::retailBuildFactor(const Player& player, const ThingTemplate& type)

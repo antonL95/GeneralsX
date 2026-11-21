@@ -20,7 +20,9 @@
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/Pathfinder/Path.h"
+#include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "Common/GameState.h"
 #include "Common/RetailFileLayers.h"
@@ -36,6 +38,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -796,8 +799,18 @@ void HordeContain::updateReplenishment()
 	}
 }
 
-Bool HordeContain::replenishMember(const BannerCarrierUpdateModuleData& banner)
+Object* HordeContain::replenishMember(const BannerCarrierUpdateModuleData& banner)
 {
+	Object* horde = getObject();
+	if (!m_payloadCreated || horde->isEffectivelyDead())
+		return nullptr;
+	const Int soldiers = std::count_if(getContainList().begin(), getContainList().end(), [this](const Object* member)
+	{
+		return !member->isEffectivelyDead() && !isBannerCarrier(member);
+	});
+	if (soldiers == 0 || soldiers >= getContainMax())
+		return nullptr;
+
 	const auto& layout = getActiveFormation()->m_layout;
 	for (const auto& entry : layout.initialMembers(getContainMax()))
 	{
@@ -806,7 +819,6 @@ Bool HordeContain::replenishMember(const BannerCarrierUpdateModuleData& banner)
 		const auto* type = TheThingFactory->findTemplate(layout.payloads()[entry.payload].name.c_str(), FALSE);
 		if (!type)
 			continue;
-		Object* horde = getObject();
 		Object* member = TheThingFactory->newObject(type, horde->getTeam());
 #if RTS_GENERALS
 		OpenContain::addToContain(member);
@@ -816,7 +828,7 @@ Bool HordeContain::replenishMember(const BannerCarrierUpdateModuleData& banner)
 		if (member->getContainedBy() != horde)
 		{
 			TheGameLogic->destroyObject(member);
-			return FALSE;
+			return nullptr;
 		}
 		const auto id = member->getID();
 		const Int assignedSlot = getMemberSlot(id);
@@ -835,9 +847,9 @@ Bool HordeContain::replenishMember(const BannerCarrierUpdateModuleData& banner)
 		member->setOrientation(horde->getOrientation());
 		if (TheFXListStore && banner.m_unitSpawnFX.isNotEmpty())
 			FXList::doFXObj(TheFXListStore->findFXList(banner.m_unitSpawnFX.str()), member);
-		return TRUE;
+		return member;
 	}
-	return FALSE;
+	return nullptr;
 }
 
 Object* HordeContain::findAttackTarget(const Object* attacker, AbleToAttackType attackType,
@@ -1513,9 +1525,44 @@ void BannerCarrierUpdate::applyMorph(const AsciiString& unitType)
 
 UpdateSleepTime BannerCarrierUpdate::update()
 {
-	if (const auto* horde = HordeContain::get(getObject()->getContainedBy()))
+	Object* source = getObject();
+	if (const auto* horde = HordeContain::get(source->getContainedBy()))
 		applyMorph(horde->getBannerUnitType());
-	return UPDATE_SLEEP_FOREVER;
+
+	const auto* data = getBannerCarrierUpdateModuleData();
+	if (!data->m_replenishNearbyHorde || !data->m_idleSpawnRate || source->isEffectivelyDead())
+		return UPDATE_SLEEP_FOREVER;
+	if (source->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || !bannerUpgradeComplete(source, *data))
+		return UPDATE_SLEEP(data->m_idleSpawnRate);
+
+	std::vector<ObjectID> eligible;
+	{
+		SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(source, data->m_scanHordeDistance, FROM_CENTER_2D);
+		MemoryPoolObjectHolder hold(iter);
+		const Player* owner = source->getControllingPlayer();
+		for (Object* horde = iter->first(); horde; horde = iter->next())
+			if (horde != source && HordeContain::get(horde) &&
+				(source->getRelationship(horde) == ALLIES || owner == horde->getControllingPlayer()))
+				eligible.push_back(horde->getID());
+	}
+	std::sort(eligible.begin(), eligible.end());
+
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	for (ObjectID id : eligible)
+	{
+		auto* horde = const_cast<HordeContain*>(HordeContain::get(TheGameLogic->findObjectByID(id)));
+		if (!horde || (horde->m_lastMeleeFrame && frame - horde->m_lastMeleeFrame < data->m_meleeFreeUnitSpawnTime))
+			continue;
+		if (Object* member = horde->replenishMember(*data))
+		{
+			if (RetailTestCommands::tracesCombat())
+				std::fprintf(stderr, "TEST replenish frame=%u source=%s horde=%u member=%u\n", frame,
+					source->getTemplate()->getName().str(), static_cast<unsigned>(id), static_cast<unsigned>(member->getID()));
+			if (!data->m_replenishAllNearbyHordes)
+				break;
+		}
+	}
+	return UPDATE_SLEEP(data->m_idleSpawnRate);
 }
 
 void BannerCarrierUpdate::playMorphFX(const Object* horde) const

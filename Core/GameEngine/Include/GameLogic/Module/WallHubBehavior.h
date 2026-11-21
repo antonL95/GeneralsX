@@ -36,6 +36,7 @@ public:
 		const ThingTemplate* type;
 		Coord3D position;
 		Real facing;
+		Int cost;
 	};
 
 	struct Span
@@ -50,6 +51,8 @@ public:
 	static WallHubBehavior* find(const Object* object, UnsignedInt options);
 	Span plan(const ThingTemplate* requested, const Coord3D& target) const;
 	Bool construct(const ThingTemplate* requested, const Coord3D& target, Player* player) const;
+	static Bool canCancelSpan(const Object* hub);
+	static Bool cancelSpan(const Object* hub, Player* player);
 	UpdateSleepTime update() override { return UPDATE_SLEEP_FOREVER; }
 
 private:
@@ -77,11 +80,16 @@ class GettingBuiltBehavior final : public UpdateModule
 
 public:
 	GettingBuiltBehavior(Thing* thing, const ModuleData* data);
+	static const GettingBuiltBehavior* find(const Object& structure);
 	static Object* start(const ThingTemplate& type, Object& builder, const Coord3D& position,
-		Real facing, UnsignedInt delay);
+		Real facing, UnsignedInt delay, Int cost, ObjectID span);
+	static UnsignedInt constructionRefund(const Object& structure, const Player& player);
+	ObjectID getSpan() const { return m_span; }
 	UpdateSleepTime update() override;
 
 private:
 	UnsignedInt m_startFrame = 0;
 	Bool m_running = FALSE;
+	Int m_paidCost = -1;
+	ObjectID m_span = INVALID_ID;
 };

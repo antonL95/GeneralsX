@@ -60,6 +60,7 @@
 #include "Common/PlayerTemplate.h"
 #include "Common/PlayerTemplateRules.h"
 #include "Common/CommandPointRules.h"
+#include "GameLogic/RetailBuildingEvents.h"
 #include "Common/RetailFileLayers.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailWorldUI.h"
@@ -1613,6 +1614,9 @@ void Player::onStructureCreated( Object *builder, Object *structure )
 //-------------------------------------------------------------------------------------------------
 void Player::onStructureConstructionComplete( Object *builder, Object *structure, Bool isRebuild )
 {
+	if (RetailFileLayers::enabled() && !isRebuild)
+		RetailBuildingEvents::complete(*structure);
+
 	if (RetailFileLayers::enabled() && !isRebuild)
 		RetailEva::queue(this, "GenericBuildingComplete-Builder", structure->getPosition(), RetailEva::Ping::Generic);
 

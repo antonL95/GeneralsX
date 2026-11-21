@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <set>
 
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
@@ -219,9 +220,9 @@ WallHubBehavior::Span WallHubBehavior::plan(const ThingTemplate* requested, cons
 		const LegalBuildCode legal = TheBuildAssistant->isLocationLegalToBuild(&ground, tile, wallAngle,
 			checks, hub, player, hub);
 		reject(legal);
-		span.pieces.push_back({tile, ground, wallAngle});
-		const UnsignedInt cost = static_cast<UnsignedInt>(std::max(0, tile->calcCostToBuild(player)));
-		span.cost += std::min(cost, std::numeric_limits<UnsignedInt>::max() - span.cost);
+		const Int cost = std::max(0, tile->calcCostToBuild(player));
+		span.pieces.push_back({tile, ground, wallAngle, cost});
+		span.cost += std::min(static_cast<UnsignedInt>(cost), std::numeric_limits<UnsignedInt>::max() - span.cost);
 	};
 
 	const Int maxSegments = maxPieces - (endHub == nullptr);
@@ -283,12 +284,94 @@ Bool WallHubBehavior::construct(const ThingTemplate* requested, const Coord3D& t
 
 	player->getMoney()->withdraw(span.cost);
 	const Int stagger = std::clamp(getWallHubBehaviorModuleData()->m_staggerFactor, 0, 300);
+	ObjectID spanID = INVALID_ID;
 	for (std::size_t i = 0; i < span.pieces.size(); ++i)
 	{
 		const Piece& piece = span.pieces[i];
-		GettingBuiltBehavior::start(*piece.type, *hub, piece.position, piece.facing,
-			static_cast<UnsignedInt>(stagger * i));
+		const Object* structure = GettingBuiltBehavior::start(*piece.type, *hub, piece.position, piece.facing,
+			static_cast<UnsignedInt>(stagger * i), piece.cost, spanID);
+		if (structure && spanID == INVALID_ID)
+			spanID = structure->getID();
 	}
+	if (TheControlBar)
+		TheControlBar->markUIDirty();
+	return TRUE;
+}
+
+namespace
+{
+ObjectID placedSpan(const Object& hub)
+{
+	const auto* source = GettingBuiltBehavior::find(hub);
+	return source ? source->getSpan() : INVALID_ID;
+}
+
+const GettingBuiltBehavior* spanPiece(const Object& piece, const Object& hub, ObjectID sourceSpan)
+{
+	if (piece.getControllingPlayer() != hub.getControllingPlayer() || piece.isDestroyed() || piece.isEffectivelyDead())
+		return nullptr;
+	const Bool builtFromHub = piece.getBuilderID() == hub.getID();
+	if (!builtFromHub && sourceSpan == INVALID_ID)
+		return nullptr;
+	const auto* behavior = GettingBuiltBehavior::find(piece);
+	return behavior && (builtFromHub || sourceSpan == behavior->getSpan()) ? behavior : nullptr;
+}
+}
+
+Bool WallHubBehavior::canCancelSpan(const Object* hub)
+{
+	if (!RetailFileLayers::enabled() || !hub || hub->isDestroyed() || hub->isEffectivelyDead() ||
+		!hub->isKindOf(KINDOF_WALL_HUB))
+		return FALSE;
+	const ObjectID sourceSpan = placedSpan(*hub);
+	for (const Object* piece = TheGameLogic->getFirstObject(); piece; piece = piece->getNextObject())
+		if (piece->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && spanPiece(*piece, *hub, sourceSpan))
+			return TRUE;
+	return FALSE;
+}
+
+Bool WallHubBehavior::cancelSpan(const Object* hub, Player* player)
+{
+	if (!player || !hub || hub->getControllingPlayer() != player || !canCancelSpan(hub) || !TheRetailCommandCatalog)
+		return FALSE;
+
+	const CommandSet* commands = TheRetailCommandCatalog->findCommandSet(hub->getCommandSetString());
+	if (!commands)
+		return FALSE;
+	Bool offered = FALSE;
+	for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+	{
+		const CommandButton* command = commands->getCommandButton(slot);
+		if (command && command->getCommandType() == GUI_COMMAND_CANCEL_NEIGHBORHOOD)
+		{
+			offered = TRUE;
+			break;
+		}
+	}
+	if (!offered)
+		return FALSE;
+
+	const ObjectID sourceSpan = placedSpan(*hub);
+	std::set<ObjectID> activeSpans;
+	for (const Object* piece = TheGameLogic->getFirstObject(); piece; piece = piece->getNextObject())
+		if (const auto* behavior = spanPiece(*piece, *hub, sourceSpan); behavior && piece->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+			activeSpans.insert(behavior->getSpan());
+	std::vector<Object*> pieces;
+	for (Object* piece = TheGameLogic->getFirstObject(); piece; piece = piece->getNextObject())
+		if (const auto* behavior = spanPiece(*piece, *hub, sourceSpan); behavior && activeSpans.contains(behavior->getSpan()) &&
+			(behavior->getSpan() != INVALID_ID || piece->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)))
+			pieces.push_back(piece);
+	std::sort(pieces.begin(), pieces.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
+	for (Object* piece : pieces)
+	{
+		player->getMoney()->deposit(GettingBuiltBehavior::constructionRefund(*piece, *player), TRUE, FALSE);
+		if (piece->getConstructionPercent() > 7.5f)
+			piece->kill();
+		else
+			TheGameLogic->destroyObject(piece);
+	}
+	if (TheControlBar)
+		TheControlBar->markUIDirty();
 	return TRUE;
 }
 
@@ -328,7 +411,7 @@ GettingBuiltBehavior::GettingBuiltBehavior(Thing* thing, const ModuleData* data)
 GettingBuiltBehavior::~GettingBuiltBehavior() = default;
 
 Object* GettingBuiltBehavior::start(const ThingTemplate& type, Object& builder, const Coord3D& position,
-	Real facing, UnsignedInt delay)
+	Real facing, UnsignedInt delay, Int cost, ObjectID span)
 {
 	Player* owner = builder.getControllingPlayer();
 	Object* structure = TheThingFactory->newObjectFromExactTemplate(&type, builder.getTeam(),
@@ -344,6 +427,8 @@ Object* GettingBuiltBehavior::start(const ThingTemplate& type, Object& builder, 
 	{
 		behavior->m_startFrame = TheGameLogic->getFrame() + delay;
 		behavior->m_running = TRUE;
+		behavior->m_paidCost = cost;
+		behavior->m_span = span == INVALID_ID ? structure->getID() : span;
 		BodyModuleInterface* body = structure->getBodyModule();
 		body->internalChangeHealth(1.0f - body->getHealth());
 		structure->setModelConditionState(MODELCONDITION_AWAITING_CONSTRUCTION);
@@ -355,6 +440,18 @@ Object* GettingBuiltBehavior::start(const ThingTemplate& type, Object& builder, 
 		FoundationAIUpdate::advanceConstruction(*structure, &builder);
 	}
 	return structure;
+}
+
+const GettingBuiltBehavior* GettingBuiltBehavior::find(const Object& structure)
+{
+	return static_cast<const GettingBuiltBehavior*>(structure.findUpdateModule(NAMEKEY("GettingBuiltBehavior")));
+}
+
+UnsignedInt GettingBuiltBehavior::constructionRefund(const Object& structure, const Player& player)
+{
+	const auto* behavior = find(structure);
+	const Int cost = behavior && behavior->m_paidCost >= 0 ? behavior->m_paidCost : structure.getTemplate()->calcCostToBuild(&player);
+	return static_cast<UnsignedInt>(std::max(0, cost));
 }
 
 UpdateSleepTime GettingBuiltBehavior::update()
@@ -384,15 +481,21 @@ void GettingBuiltBehavior::crc(Xfer* xfer)
 	UpdateModule::crc(xfer);
 	xfer->xferUnsignedInt(&m_startFrame);
 	xfer->xferBool(&m_running);
+	xfer->xferInt(&m_paidCost);
+	xfer->xferObjectID(&m_span);
 }
 
 void GettingBuiltBehavior::xfer(Xfer* xfer)
 {
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
+	XferVersion version = 3;
+	xfer->xferVersion(&version, 3);
 	UpdateModule::xfer(xfer);
 	xfer->xferUnsignedInt(&m_startFrame);
 	xfer->xferBool(&m_running);
+	if (version >= 2)
+		xfer->xferInt(&m_paidCost);
+	if (version >= 3)
+		xfer->xferObjectID(&m_span);
 }
 
 void GettingBuiltBehavior::loadPostProcess() { UpdateModule::loadPostProcess(); }
