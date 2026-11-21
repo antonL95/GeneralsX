@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "Common/GameCommon.h"
 #include "Common/GameType.h"
 #include "GameClient/Color.h"
@@ -49,9 +51,12 @@ public:
 	~WorldGroundDecal();
 	void clear();
 	void set(const AsciiString& texture, const Coord3D& position, Real width, Real height, Int opacity, Color color = 0xffffffff);
+	void setComposited(const Coord3D& position, Real extent, Int opacity, Color color,
+		std::vector<UnsignedInt>&& pixels, Int size);
 
 private:
 	AsciiString m_texture;
+	std::vector<UnsignedInt> m_pixels;
 	Shadow* m_shadow = nullptr;
 };
 

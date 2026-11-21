@@ -556,7 +556,8 @@ const SelectionDecal* findSelectionDecal(const Object& object)
 	if (found == s_levelsByTarget.end())
 		return nullptr;
 
-	const Int rank = static_cast<Int>(object.getVeterancyLevel()) + 1;
+	const ExperienceTracker* tracker = object.getExperienceTracker();
+	const Int rank = tracker ? tracker->getRank() : 1;
 	const Bool multiplayer = isMultiplayer();
 	const Level* best = nullptr;
 	for (std::size_t index : found->second)

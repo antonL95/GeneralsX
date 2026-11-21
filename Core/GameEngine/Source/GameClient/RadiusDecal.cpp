@@ -318,6 +318,7 @@ void WorldGroundDecal::clear()
 		m_shadow->release();
 	m_shadow = nullptr;
 	m_texture.clear();
+	m_pixels.clear();
 }
 
 void WorldGroundDecal::set(const AsciiString& texture, const Coord3D& position, Real width, Real height, Int opacity, Color color)
@@ -348,4 +349,37 @@ void WorldGroundDecal::set(const AsciiString& texture, const Coord3D& position, 
 		m_shadow->setColor(color);
 		m_shadow->setOpacity(opacity);
 	}
+}
+
+void WorldGroundDecal::setComposited(const Coord3D& position, Real extent, Int opacity, Color color,
+	std::vector<UnsignedInt>&& pixels, Int size)
+{
+	if (!TheProjectedShadowManager)
+		return;
+	if (!m_texture.isEmpty())
+		clear();
+	if (!m_shadow)
+	{
+		Shadow::ShadowTypeInfo info;
+		info.m_type = SHADOW_ALPHA_DECAL;
+		info.allowWorldAlign = TRUE;
+		info.m_sizeX = extent;
+		info.m_sizeY = extent;
+		m_shadow = TheProjectedShadowManager->addDecal(&info, size);
+	}
+	if (!m_shadow)
+		return;
+	if (m_pixels != pixels)
+	{
+		if (!m_shadow->updateDecalPixels(pixels.data(), size))
+		{
+			clear();
+			return;
+		}
+		m_pixels = std::move(pixels);
+	}
+	m_shadow->setSize(extent, extent);
+	m_shadow->setPosition(position.x, position.y, position.z);
+	m_shadow->setColor(color);
+	m_shadow->setOpacity(opacity);
 }

@@ -232,6 +232,7 @@ public:
 	std::map<std::string, Box> boxes;
 	std::map<std::string, Coord2D> positions;
 	std::vector<Art> art;
+	std::vector<std::vector<Art>> frames;
 	std::vector<Label> labels;
 	Int width = 0, height = 0;
 	size_t visits = 0;
@@ -446,7 +447,7 @@ public:
 	}
 
 	Box timeline(Movie &movie, size_t p, const Transform &m, const Tint &tint,
-		const std::string &path, Int depth, const char *target)
+		const std::string &path, Int depth, const char *target, size_t frameLimit = 0)
 	{
 		const Reader &r = movie.apt;
 		const auto [count, table] = r.list(p, 8);
@@ -454,7 +455,7 @@ public:
 		size_t endLabel = 0;
 		size_t rest = count ? 1 : 0;
 		std::map<uint32_t, Placement> placements;
-		for (size_t frame = 0; frame < count; ++frame)
+		for (size_t frame = 0; !frameLimit && frame < count; ++frame)
 		{
 			bool stop = false;
 			const auto [items, itemTable] = r.list(table + 8 * frame, 4);
@@ -487,7 +488,9 @@ public:
 					break;
 			}
 		}
-		if (target && target[0] == '#')
+		if (frameLimit)
+			rest = std::min(count, frameLimit);
+		else if (target && target[0] == '#')
 			rest = std::min(count, size_t(std::strtoul(target + 1, nullptr, 10)));
 		else if (target && opening == count)
 			rest = count;
@@ -572,6 +575,57 @@ AptScene::AptScene(const char *movie, const char *frame)
 
 AptScene::~AptScene() = default;
 
+AptScene::AptScene(const char *movie, AnimatedExport exported)
+{
+	try
+	{
+		auto data = std::make_unique<Data>();
+		Movie *root = data->load(movie);
+		if (!root)
+			return;
+		const auto entry = root->exports.find(exported.name);
+		if (entry == root->exports.end() || entry->second >= root->characters.size())
+			return;
+		const size_t character = root->characters[entry->second];
+		if (!character || root->apt.number(character) != 5 || root->apt.number(character + 4) != 0x09876543)
+			return;
+		const size_t count = root->apt.list(character + 8, 8).first;
+		if (!count || count > 120)
+			return;
+
+		Bool hasArt = FALSE;
+		for (size_t frame = 1; frame <= count; ++frame)
+		{
+			data->timeline(*root, character + 8, {}, {}, exported.name, 0, nullptr, frame);
+			hasArt = hasArt || !data->art.empty();
+			data->frames.emplace_back(std::move(data->art));
+			data->art.clear();
+		}
+		if (hasArt)
+		{
+			data->width = root->apt.number(root->root + 28);
+			data->height = root->apt.number(root->root + 32);
+			if (data->width > 0 && data->height > 0)
+				m_data = std::move(data);
+		}
+	}
+	catch (const std::runtime_error &)
+	{
+		m_data.reset();
+	}
+}
+
+Int AptScene::frameCount() const
+{
+	return m_data ? static_cast<Int>(m_data->frames.size()) : 0;
+}
+
+void AptScene::drawFrameAt(Int frame, Real x, Real y, Real sx, Real sy) const
+{
+	if (frame >= 0 && frame < frameCount())
+		drawArt({}, {}, x, y, sx, sy, 1.0f, frame);
+}
+
 Bool AptScene::Box::contains(Real x, Real y) const
 {
 	return x >= left && x < right && y >= top && y < bottom;
@@ -630,12 +684,13 @@ void AptScene::drawAt(const Visibility &visible, Real x, Real y, Real sx, Real s
 		drawArt(visible, {}, x, y, sx, sy, opacity);
 }
 
-void AptScene::drawArt(const Visibility &visible, const HorizontalScale &scale, Real x, Real y, Real sx, Real sy, Real opacity) const
+void AptScene::drawArt(const Visibility &visible, const HorizontalScale &scale, Real x, Real y, Real sx, Real sy, Real opacity, Int frame) const
 {
 	std::vector<Coord2D> points;
-	for (const auto &art : m_data->art)
+	const auto &parts = frame < 0 ? m_data->art : m_data->frames[frame];
+	for (const auto &art : parts)
 	{
-		if (!visible(art.path))
+		if (visible && !visible(art.path))
 			continue;
 
 		const Real stretch = scale ? scale(art.path) : 1.0f;

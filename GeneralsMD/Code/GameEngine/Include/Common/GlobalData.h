@@ -235,6 +235,9 @@ public:
 	Real m_cameraPitch;
 	SpecialPowerObjectFilter m_victoryStructureFilter;
 	Real m_terrainResourceCellSize = 20.0f;
+	Bool m_useSimpleHordeDecals = FALSE;
+	Bool m_useSimpleMergeDecals = FALSE;
+	Real m_opacityOfSimpleMergeDecals = 0.35f;
 	Real m_attributeModifierArmorMaxBonus = 0.75f;
 	CommandPointRules::Config m_commandPoints;
 	Real m_multiPlayBuildingXPMult[MAX_PLAYER_COUNT];

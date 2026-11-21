@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <set>
 #include <vector>
 
 #include "Common/GameUtility.h"
@@ -21,6 +22,7 @@
 #include "GameClient/Image.h"
 #include "GameClient/View.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -170,18 +172,132 @@ void drawMergedCircles(View& view, const std::vector<Circle>& circles, Int opaci
 	}
 }
 
-void drawHordeBoundary(View& view, const HordeContain& horde, const ExperienceLevelStore::SelectionDecal* decal)
+struct DecalMask
 {
+	std::vector<UnsignedByte> alpha;
+	Int width = 0;
+	Int height = 0;
+};
+
+const DecalMask& getDecalMask(const AsciiString& name)
+{
+	static std::map<std::string, DecalMask> masks;
+	auto [entry, inserted] = masks.try_emplace(name.str());
+	if (inserted && !name.isEmpty())
+	{
+		auto& mask = entry->second;
+		TheDisplay->readTextureAlpha(name, mask.alpha, mask.width, mask.height);
+	}
+	return entry->second;
+}
+
+void stampDecalMask(const DecalMask& source, std::vector<UnsignedByte>& combined, Int size,
+	Real x, Real y, Real radius)
+{
+	if (source.alpha.empty())
+		return;
+	const Int left = std::max(1, static_cast<Int>(std::ceil(x - radius)));
+	const Int right = std::min(size - 1, static_cast<Int>(std::floor(x + radius)) + 1);
+	const Int top = std::max(1, static_cast<Int>(std::ceil(y - radius)));
+	const Int bottom = std::min(size - 1, static_cast<Int>(std::floor(y + radius)) + 1);
+	const Real scale = 0.5f / radius;
+	for (Int row = top; row < bottom; ++row)
+	{
+		const Int v = std::min(source.height - 1, static_cast<Int>((0.5f + (row - y) * scale) * source.height));
+		for (Int column = left; column < right; ++column)
+		{
+			const Int u = std::min(source.width - 1, static_cast<Int>((0.5f + (column - x) * scale) * source.width));
+			UnsignedByte& alpha = combined[row * size + column];
+			alpha = std::max(alpha, source.alpha[v * source.width + u]);
+		}
+	}
+}
+
+Real selectionRadius(const ExperienceLevelStore::SelectionDecal& decal, Real radius)
+{
+	const Real minimum = std::max(0.0f, decal.minRadius);
+	const Real maximum = decal.maxRadius > 0.0f ? std::max(decal.maxRadius, minimum) : std::max(minimum, radius);
+	return std::clamp(radius, minimum, maximum);
+}
+
+Bool drawHordeBoundary(const HordeContain& horde, const ExperienceLevelStore::SelectionDecal& decal,
+	Bool selected, WorldGroundDecal& projection)
+{
+	const auto& rank = getDecalMask(decal.texture);
+	const auto& outline = getDecalMask(decal.texture2);
+	if (rank.alpha.empty() && outline.alpha.empty())
+		return FALSE;
+
 	std::vector<Circle> circles;
 	for (const Object* member : *horde.getContainedItemsList())
 	{
 		Drawable* draw = member->getDrawable();
 		if (isVisibleUnit(draw))
+		{
 			circles.push_back(unitCircle(*draw, TRUE));
+			if (decal.maxSelectedUnits > 0 && circles.size() >= static_cast<size_t>(decal.maxSelectedUnits))
+				break;
+		}
 	}
-	const Int opacity = decal && decal->opacityMax > 0.0f ?
-		static_cast<Int>(std::clamp(decal->opacityMax, 0.0f, 1.0f) * 255.0f) : 246;
-	drawMergedCircles(view, circles, opacity);
+	if (circles.empty())
+		return FALSE;
+
+	Coord3D center{};
+	for (const Circle& circle : circles)
+	{
+		center.x += circle.center.x;
+		center.y += circle.center.y;
+		center.z += circle.center.z;
+	}
+	center.x /= circles.size();
+	center.y /= circles.size();
+	center.z /= circles.size();
+	Real radius = 0.0f;
+	constexpr Real stampExtentScale = 1.4f;
+	const Real memberMinimum = decal.minRadius / std::sqrt(static_cast<Real>(circles.size()));
+	for (Circle& circle : circles)
+	{
+		circle.radius = std::max(circle.radius, memberMinimum);
+		radius = std::max(radius, std::max(std::abs(circle.center.x - center.x),
+			std::abs(circle.center.y - center.y)) + circle.radius * stampExtentScale);
+	}
+	radius = selectionRadius(decal, radius);
+
+	const Color tint = GameMakeColor(124, 255, 78, 255);
+	Real opacity = selected ? decal.opacityMax : decal.opacityMin;
+	if (TheGlobalData->m_useSimpleMergeDecals)
+		opacity *= TheGlobalData->m_opacityOfSimpleMergeDecals;
+	const Int alpha = static_cast<Int>(std::clamp(opacity, 0.0f, 1.0f) * 255);
+	if (TheGlobalData->m_useSimpleHordeDecals)
+	{
+		projection.set(decal.texture, center, radius * 2.0f, radius * 2.0f, alpha, tint);
+		return TRUE;
+	}
+
+	constexpr Int size = 128;
+	const Real pixelScale = (size - 4) / (radius * 2.0f);
+	std::vector<UnsignedByte> mask(size * size);
+	for (const Circle& circle : circles)
+	{
+		const Real x = (circle.center.x - center.x) * pixelScale + (size - 1) * 0.5f;
+		const Real y = (center.y - circle.center.y) * pixelScale + (size - 1) * 0.5f;
+		const Real stampRadius = circle.radius * stampExtentScale * pixelScale;
+		stampDecalMask(rank, mask, size, x, y, stampRadius);
+		stampDecalMask(outline, mask, size, x, y, stampRadius);
+	}
+
+	std::vector<UnsignedInt> pixels(size * size, 0xffffff);
+	const Int edge = TheGlobalData->m_useSimpleMergeDecals ? 2 : 1;
+	for (Int y = edge; y < size - edge; ++y)
+		for (Int x = edge; x < size - edge; ++x)
+		{
+			const Int i = y * size + x;
+			const auto inside = std::min({mask[i], mask[i - edge], mask[i + edge],
+				mask[i - edge * size], mask[i + edge * size]});
+			pixels[i] |= static_cast<UnsignedInt>(mask[i] - inside) << 24;
+		}
+	projection.setComposited(center, size / pixelScale, alpha, tint, std::move(pixels), size);
+	return TRUE;
 }
 
 Bool drawDragPreview(Drawable* draw, void* userData)
@@ -193,16 +309,6 @@ Bool drawDragPreview(Drawable* draw, void* userData)
 	return TRUE;
 }
 
-void drawRankStar(Int x, Int y)
-{
-	const Color white = GameMakeColor(255, 255, 250, 255);
-	const Color shadow = GameMakeColor(23, 24, 20, 245);
-	TheDisplay->drawLine(x - 3, y, x + 3, y, 3.0f, shadow);
-	TheDisplay->drawLine(x, y - 3, x, y + 2, 1.4f, white);
-	TheDisplay->drawLine(x - 3, y - 1, x + 3, y - 1, 1.4f, white);
-	TheDisplay->drawLine(x - 2, y + 2, x + 2, y - 2, 1.0f, white);
-	TheDisplay->drawLine(x + 2, y + 2, x - 2, y - 2, 1.0f, white);
-}
 }
 
 void RetailWorldUI::drawUnitStatus(Drawable& drawable)
@@ -221,8 +327,9 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 		HordeContain::getAnchor(hoveredDrawable->getObject()) == anchor;
 	const Bool showBar = TheGlobalData->m_showObjectHealth &&
 		(group->isSelected() || group->getID() == hover || drawable.getID() == hover || hoveredGroup);
-	const Int rank = obj->getVeterancyLevel();
-	const Bool showRank = rank > 0 && obj->getExperienceTracker() && !obj->isKindOf(KINDOF_STRUCTURE);
+	const ExperienceTracker* tracker = (anchor ? anchor : obj)->getExperienceTracker();
+	const Int rank = tracker ? tracker->getRank() : 1;
+	const Bool showRank = rank > 1 && isVisibleUnit(&drawable);
 	if (!showBar && !showRank)
 		return;
 
@@ -262,49 +369,70 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 			TheMappedImageCollection->findImageByName(evil ? "Evil_Vet" : "Good_Vet") : nullptr;
 		const Image* dot = TheMappedImageCollection ?
 			TheMappedImageCollection->findImageByName(evil ? "Evil_Vet_Dot" : "Good_Vet_Dot") : nullptr;
-		const Int x = screen.x + width / 2 - 4;
-		const Int y = screen.y - height - 4;
-		if (star)
-			TheDisplay->drawImage(star, x - 5, y - 5, x + 5, y + 5);
-		else
-			drawRankStar(x, y);
-		for (Int index = 1; dot && index < std::min(rank, 3); ++index)
-			TheDisplay->drawImage(dot, x + 1 + index * 4, y - 2, x + 5 + index * 4, y + 2);
+		if (!star)
+			return;
+		const Int starSize = std::max(1, static_cast<Int>(star->getImageWidth() * scale * 0.5f));
+		const Int dotSize = dot ? std::max(1, static_cast<Int>(dot->getImageWidth() * scale * 0.5f)) : 0;
+		const Int dots = dot ? std::min(rank, 10) - 2 : 0;
+		const Int x = screen.x - (starSize + dots * dotSize) / 2;
+		const Int y = screen.y - (showBar ? height / 2 + 1 : 0) - starSize;
+		TheDisplay->drawImage(star, x, y, x + starSize, y + starSize);
+		for (Int index = 0; index < dots; ++index)
+		{
+			const Int dotX = x + starSize + index * dotSize;
+			const Int dotY = y + (starSize - dotSize) / 2;
+			TheDisplay->drawImage(dot, dotX, dotY, dotX + dotSize, dotY + dotSize);
+		}
 	}
 }
 
 void RetailWorldUI::drawSelection(View& view, const IRegion2D* dragRegion,
 	std::map<DrawableID, WorldGroundDecal>& decals)
 {
-	for (auto item = decals.begin(); item != decals.end();)
+	std::set<DrawableID> active;
+	const auto displaySelection = [&](Drawable* draw, Bool selected)
 	{
-		Drawable* drawable = TheGameClient->findDrawableByID(item->first);
-		if (!isVisibleUnit(drawable) || !drawable->isSelected())
-			item = decals.erase(item);
-		else
-			++item;
-	}
-	for (Drawable* draw : *TheInGameUI->getAllSelectedDrawables())
-	{
-		const Object* object = draw->getObject();
+		Object* object = draw->getObject();
 		if (!object || object->isEffectivelyDead())
-			continue;
+			return;
+		Object* anchor = HordeContain::getAnchor(object);
+		if (anchor)
+		{
+			object = anchor;
+			draw = anchor->getDrawable();
+			if (!draw)
+				return;
+		}
+		const DrawableID id = draw->getID();
+		if (active.count(id))
+			return;
 		const auto* decal = ExperienceLevelStore::findSelectionDecal(*object);
 		if (const HordeContain* horde = HordeContain::get(object))
-			drawHordeBoundary(view, *horde, decal);
+		{
+			if (decal && decal->style.compareNoCase("SHADOW_MERGE_DECAL") == 0 &&
+				drawHordeBoundary(*horde, *decal, selected, decals[id]))
+				active.insert(id);
+		}
 		else if (isVisibleUnit(draw))
 		{
 			if (decal && decal->style.compareNoCase("SHADOW_ALPHA_DECAL") == 0)
 			{
-				const Real radius = unitCircle(*draw, FALSE).radius;
-				const Int opacity = static_cast<Int>(std::clamp(decal->opacityMax, 0.0f, 1.0f) * 255.0f);
-				decals[draw->getID()].set(decal->texture, *draw->getPosition(), radius * 2.0f, radius * 2.0f, opacity,
-					GameMakeColor(115, 255, 80, 255));
+				const Real radius = selectionRadius(*decal, unitCircle(*draw, FALSE).radius);
+				const Real opacity = selected ? decal->opacityMax : decal->opacityMin;
+				decals[id].set(decal->texture, *draw->getPosition(), radius * 2.0f, radius * 2.0f,
+					static_cast<Int>(std::clamp(opacity, 0.0f, 1.0f) * 255), GameMakeColor(115, 255, 80, 255));
+				active.insert(id);
 			}
-			else
+			else if (selected)
 				drawUnitCircle(view, *draw, FALSE);
 		}
-	}
+	};
+	for (Drawable* draw : *TheInGameUI->getAllSelectedDrawables())
+		displaySelection(draw, TRUE);
+	Drawable* hovered = TheGameClient->findDrawableByID(TheInGameUI->getMousedOverDrawableID());
+	if (hovered && !hovered->isSelected() && isVisibleUnit(hovered))
+		displaySelection(hovered, FALSE);
+	std::erase_if(decals, [&](const auto& item) { return !active.count(item.first); });
 	if (dragRegion)
 	{
 		IRegion2D region = *dragRegion;

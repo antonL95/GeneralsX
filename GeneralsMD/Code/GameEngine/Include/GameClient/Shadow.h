@@ -123,6 +123,7 @@ public:
 		Bool isRenderEnabled() {return m_isEnabled;}
 		Bool isInvisibleEnabled() {return m_isInvisibleEnabled;}
 		virtual void release()=0;	///<release this shadow from suitable manager.
+		virtual Bool updateDecalPixels(const UnsignedInt*, Int) { return FALSE; }
 		void setOpacity(Int value); ///<adjust opacity of decal/shadow
 		void setColor(Color value);///<adjust ARGB color of decal/shadow
 		void setAngle(Real angle);		///<adjust orientation around z-axis
@@ -238,7 +239,7 @@ class ProjectedShadowManager
 public:
 	virtual ~ProjectedShadowManager() { };
 	virtual Shadow	*addDecal(RenderObjClass *, Shadow::ShadowTypeInfo *shadowInfo)=0;	///<add a non-shadow decal
-	virtual Shadow	*addDecal(Shadow::ShadowTypeInfo *shadowInfo)=0;	///<add a non-shadow decal which does not follow an object.
+	virtual Shadow *addDecal(Shadow::ShadowTypeInfo *shadowInfo, Int textureSize = 0)=0;
 };
 
 extern ProjectedShadowManager *TheProjectedShadowManager;

@@ -31,17 +31,21 @@ public:
 	using HorizontalScale = std::function<Real(const std::string &)>;
 
 	explicit AptScene(const char *movie, const char *frame = nullptr);
+	struct AnimatedExport { const char *name; };
+	AptScene(const char *movie, AnimatedExport exported);
 	~AptScene();
 	Bool valid() const;
 	Box bounds(const std::string &path) const;
 	Coord2D position(const std::string &path, Coord2D fallback) const;
 	void draw(const Visibility &visible, const DrawText &text, const HorizontalScale &scale = {}) const;
 	void drawAt(const Visibility &visible, Real x, Real y, Real sx, Real sy, Real opacity) const;
+	Int frameCount() const;
+	void drawFrameAt(Int frame, Real x, Real y, Real sx, Real sy) const;
 	Real xScale() const;
 	Real yScale() const;
 
 private:
-	void drawArt(const Visibility &visible, const HorizontalScale &scale, Real x, Real y, Real sx, Real sy, Real opacity) const;
+	void drawArt(const Visibility &visible, const HorizontalScale &scale, Real x, Real y, Real sx, Real sy, Real opacity, Int frame = -1) const;
 	class Data;
 	std::unique_ptr<Data> m_data;
 };

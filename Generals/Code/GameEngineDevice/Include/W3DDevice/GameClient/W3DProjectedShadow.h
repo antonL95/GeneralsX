@@ -62,7 +62,7 @@ class W3DProjectedShadowManager	: public ProjectedShadowManager
 		void invalidateCachedLightPositions();	///<forces shadows to update regardless of last lightposition
 
 		virtual Shadow	*addDecal(RenderObjClass *robj, Shadow::ShadowTypeInfo *shadowInfo) override;	///<add a non-shadow decal
-		virtual Shadow	*addDecal(Shadow::ShadowTypeInfo *shadowInfo) override;	///<add a non-shadow decal which does not follow an object.
+		virtual Shadow *addDecal(Shadow::ShadowTypeInfo *shadowInfo, Int textureSize = 0) override;
 		W3DProjectedShadow	*addShadow( RenderObjClass *robj, Shadow::ShadowTypeInfo *shadowInfo, Drawable *draw);	///<add a new shadow with texture of given name or that of robj.
 		W3DProjectedShadow	*createDecalShadow( Shadow::ShadowTypeInfo *shadowInfo);	///<add a new shadow with texture of given name or that of robj.
 		void removeShadow (W3DProjectedShadow *shadow);
@@ -108,6 +108,7 @@ class W3DProjectedShadow	: public Shadow
 	public:
 		W3DProjectedShadow();
 		~W3DProjectedShadow();
+		Bool updateDecalPixels(const UnsignedInt* pixels, Int size) override;
 		void setRenderObject( RenderObjClass	*robj) {m_robj=robj;}
 		void setObjPosHistory(const Vector3 &pos)	{m_lastObjPosition=pos;}	///<position of object when projection matrix was updated.
 		void setTexture(Int lightIndex,W3DShadowTexture *texture)	{m_shadowTexture[lightIndex]=texture;}	///<textur with light's shadow

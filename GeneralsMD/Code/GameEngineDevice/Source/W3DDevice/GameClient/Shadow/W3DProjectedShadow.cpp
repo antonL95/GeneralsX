@@ -1628,7 +1628,7 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 
 /** Generic function which can be used to create arbitrary decals that don't have to be used for shadows.
 Some examples: Scorch marks, blood, stains, selection/status indicators, etc.*/
-Shadow* W3DProjectedShadowManager::addDecal(Shadow::ShadowTypeInfo *shadowInfo)
+Shadow* W3DProjectedShadowManager::addDecal(Shadow::ShadowTypeInfo *shadowInfo, Int textureSize)
 {
 	W3DShadowTexture *st=nullptr;
 	ShadowType shadowType=SHADOW_NONE;		/// type of projection
@@ -1650,7 +1650,19 @@ Shadow* W3DProjectedShadowManager::addDecal(Shadow::ShadowTypeInfo *shadowInfo)
 	strlcat(texture_name, ".tga", ARRAY_SIZE(texture_name));
 
 	//Check if we previously added a decal using this texture
-	st=m_W3DShadowTextureManager->getTexture(texture_name);
+	if (textureSize > 0)
+	{
+		auto *texture = NEW_REF(TextureClass, (textureSize, textureSize, WW3D_FORMAT_A8R8G8B8,
+			MIP_LEVELS_1, TextureClass::POOL_MANAGED, false, false));
+		texture->Get_Filter().Set_U_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_CLAMP);
+		texture->Get_Filter().Set_V_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_CLAMP);
+		st = NEW W3DShadowTexture;
+		SET_REF_OWNER(st);
+		st->Set_Name("");
+		st->setTexture(texture);
+	}
+	else
+		st = m_W3DShadowTextureManager->getTexture(texture_name);
 	if (st == nullptr)
 	{
 		//Adding a new decal texture
@@ -2275,6 +2287,23 @@ W3DProjectedShadow::~W3DProjectedShadow()
 	REF_PTR_RELEASE(m_shadowProjector);
 	for (Int i=0; i<MAX_SHADOW_LIGHTS; i++)
 		REF_PTR_RELEASE(m_shadowTexture[i]);
+}
+
+Bool W3DProjectedShadow::updateDecalPixels(const UnsignedInt* pixels, Int size)
+{
+	SurfaceClass *surface = m_shadowTexture[0]->getTexture()->Get_Surface_Level();
+	if (!surface)
+		return FALSE;
+	Int pitch;
+	auto *bits = static_cast<UnsignedByte*>(surface->Lock(&pitch));
+	if (bits)
+	{
+		for (Int y = 0; y < size; ++y)
+			memcpy(bits + y * pitch, pixels + y * size, size * sizeof(*pixels));
+		surface->Unlock();
+	}
+	surface->Release_Ref();
+	return bits != nullptr;
 }
 
 void W3DProjectedShadow::init()

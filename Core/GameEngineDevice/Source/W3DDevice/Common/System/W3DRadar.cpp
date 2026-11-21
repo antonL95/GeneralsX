@@ -44,6 +44,7 @@
 #include "GameLogic/Object.h"
 
 #include "GameClient/Color.h"
+#include "GameClient/AptScene.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Display.h"
 #include "GameClient/GameClient.h"
@@ -52,6 +53,7 @@
 #include "GameClient/Line2D.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/Water.h"
+#include "GameLogic/PartitionManager.h"
 #include "W3DDevice/Common/W3DRadar.h"
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
@@ -627,36 +629,49 @@ void W3DRadar::drawEvents( Int pixelX, Int pixelY, Int width, Int height )
 
 Bool W3DRadar::drawRetailAlert(Int pixelX, Int pixelY, Int width, Int height, const RadarEvent &event)
 {
-	if (!RetailFileLayers::enabled() || !TheMappedImageCollection)
+	if (!RetailFileLayers::enabled())
 		return FALSE;
 
-	const UnsignedInt elapsed = TheGameLogic->getFrame() - event.createFrame;
-	const UnsignedInt duration = std::max(1u, event.dieFrame - event.createFrame);
-	const UnsignedInt frame = std::min<UnsignedInt>(15, 16ull * elapsed / duration);
-	AsciiString name;
-	switch (event.type)
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (now < event.createFrame || now >= event.dieFrame)
+		return TRUE;
+
+	const Player *viewer = rts::getObservedOrLocalPlayer();
+	if (viewer && ThePartitionManager
+#if ENABLE_CONFIGURABLE_SHROUD
+		&& TheGlobalData->m_shroudOn
+#endif
+		&& ThePartitionManager->getShroudStatusForPlayer(viewer->getPlayerIndex(), &event.worldLoc) != CELLSHROUD_CLEAR)
+		return TRUE;
+
+	RadarEventType type = event.type;
+	const char *name;
+	switch (type)
 	{
-		case RADAR_EVENT_INFORMATION: name.format("RadarInfoAlert_%05u", frame); break;
-		case RADAR_EVENT_UNDER_ATTACK: name = "Aptred_ping"; break;
-		case RADAR_EVENT_UPGRADE: name = "Aptgreen_ping"; break;
-		case RADAR_EVENT_BEACON_PULSE: name = "AptPing02"; break;
-		case RADAR_EVENT_ONE_RING: name = "AptPing03"; break;
-		default: name = "Aptyellow_ping"; break;
+		case RADAR_EVENT_UNDER_ATTACK: name = "PingAttack"; break;
+		case RADAR_EVENT_INFORMATION: name = "PingInformation"; break;
+		case RADAR_EVENT_BEACON_PULSE: name = "PingBeacon"; break;
+		case RADAR_EVENT_UPGRADE: name = "PingUpgrade"; break;
+		case RADAR_EVENT_ONE_RING: name = "PingOneRing"; break;
+		default: name = "PingGeneric"; type = RADAR_EVENT_CONSTRUCTION; break;
 	}
-	const Image *image = TheMappedImageCollection->findImageByName(name);
-	if (!TheDisplay->hasImageTexture(image))
-		return FALSE;
 
+	auto &scene = m_retailAlerts[type];
+	if (!scene)
+		scene = std::make_unique<AptScene>("Palantir", AptScene::AnimatedExport{name});
+	const Int frames = scene->frameCount();
+	if (frames == 0)
+		return TRUE;
+
+	const UnsignedInt elapsed = now - event.createFrame;
+	const UnsignedInt duration = std::max(1u, event.dieFrame - event.createFrame);
+	const Int frame = static_cast<Int>(static_cast<uint64_t>(frames) * elapsed / duration);
+	ICoord2D radar;
+	worldToRadar(&event.worldLoc, &radar);
 	ICoord2D center;
-	radarToPixel(&event.radarLoc, &center, pixelX, pixelY, width, height);
-	const Real progress = std::min(1.0f, static_cast<Real>(elapsed) / duration);
-	const Real scale = event.type == RADAR_EVENT_INFORMATION ? 1.0f : 1.6f - 0.6f * progress;
-	const Int alpha = static_cast<Int>(255 * std::min(1.0f, 3.0f * (1.0f - progress)));
-	const Int w = static_cast<Int>(image->getImageWidth() * scale);
-	const Int h = static_cast<Int>(image->getImageHeight() * scale);
-	const Int left = center.x - w / 2;
-	const Int top = center.y - h / 2;
-	TheDisplay->drawImage(image, left, top, left + w, top + h, GameMakeColor(255, 255, 255, alpha));
+	radarToPixel(&radar, &center, pixelX, pixelY, width, height);
+	const Real scale = scene->yScale();
+	scene->drawFrameAt(frame, center.x, center.y, scale * (4.0f / 3.0f), scale);
 	return TRUE;
 }
 

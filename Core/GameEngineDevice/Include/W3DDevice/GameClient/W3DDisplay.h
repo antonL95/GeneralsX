@@ -125,6 +125,7 @@ public:
 	virtual void drawImagePart( const Image *image, Int startX, Int startY, Int endX, Int endY,
 		const Region2D &part, Color color = 0xFFFFFFFF, DrawImageMode mode = DRAW_IMAGE_ALPHA ) override;
 	Bool hasImageTexture(const Image *image) override;
+	Bool readTextureAlpha(const AsciiString& name, std::vector<UnsignedByte>& alpha, Int& width, Int& height) override;
 	void setCircularClip(Int x, Int y, Int radius) override;
 
 	/// draw a video buffer fit within the screen coordinates

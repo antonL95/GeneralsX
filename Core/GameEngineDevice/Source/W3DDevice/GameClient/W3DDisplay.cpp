@@ -36,6 +36,7 @@ static void drawFramerateBar();
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 #include <numeric>
 #include <cmath>
+#include <array>
 #include <string>
 #include "WW3D2/hanim.h"
 #include "WW3D2/htree.h"
@@ -59,6 +60,8 @@ static void drawFramerateBar();
 #include "Common/HordeFormation.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/BfmeAssetPath.h"
+#include "WW3D2/ddsfile.h"
 #include "Common/MapObject.h"
 #include "Common/MapReaderWriterInfo.h"
 #include "Common/PerfTimer.h"
@@ -3656,6 +3659,47 @@ Bool W3DDisplay::hasImageTexture(const Image *image)
 	return available;
 }
 
+Bool W3DDisplay::readTextureAlpha(const AsciiString& name, std::vector<UnsignedByte>& alpha, Int& width, Int& height)
+{
+	AsciiString filename = name;
+	if (!strchr(filename.str(), '.'))
+		filename.concat(".tga");
+	auto path = makeBfmeAssetPath("Art/CompiledTextures/", filename.str());
+	if (path.empty())
+		return FALSE;
+	path.replace(path.rfind('.') + 1, std::string::npos, "dds");
+	FileInfo info;
+	constexpr unsigned maxExtent = 512;
+	constexpr unsigned headerSize = 4 + sizeof(LegacyDDSURFACEDESC2);
+	if (!TheFileSystem->getFileInfo(path.c_str(), &info) ||
+		info.size() <= headerSize || info.size() > 2 * maxExtent * maxExtent)
+		return FALSE;
+
+	DDSFileClass dds(path.c_str(), 0);
+	if (!dds.Is_Available() || dds.Get_Type() != DDS_TEXTURE)
+		return FALSE;
+	const WW3DFormat format = dds.Get_Format();
+	if (format != WW3D_FORMAT_DXT1 && format != WW3D_FORMAT_DXT3 && format != WW3D_FORMAT_DXT5)
+		return FALSE;
+	const unsigned w = dds.Get_Width(0);
+	const unsigned h = dds.Get_Height(0);
+	if (!w || !h || w > maxExtent || h > maxExtent ||
+		dds.Get_Level_Size(0) > info.size() - headerSize || !dds.Load())
+		return FALSE;
+
+	const unsigned stride = (w + 3) & ~3u;
+	std::vector<UnsignedInt> pixels(stride * ((h + 3) & ~3u));
+	dds.Copy_Level_To_Surface(0, WW3D_FORMAT_A8R8G8B8, w, h,
+		reinterpret_cast<UnsignedByte*>(pixels.data()), stride * sizeof(pixels.front()));
+	alpha.resize(w * h);
+	width = w;
+	height = h;
+	for (unsigned y = 0; y < h; ++y)
+		for (unsigned x = 0; x < w; ++x)
+			alpha[y * w + x] = pixels[y * stride + x] >> 24;
+	return TRUE;
+}
+
 void W3DDisplay::drawCircularClipQuad(const RectClass &rect, const RectClass &uv, Color color, Bool rotated)
 {
 	if (rect.Width() <= 0 || rect.Height() <= 0)
@@ -4267,20 +4311,80 @@ void W3DDisplay::drawImageTriangles(const char *texture, const Coord2D *points, 
 	}
 
 	setup2DRenderState(tex, DRAW_IMAGE_ALPHA, FALSE);
+	struct Vertex
+	{
+		Coord2D point;
+		Coord2D uv;
+	};
+	const auto submit = [&](Vertex a, Vertex b, Vertex c)
+	{
+		const Real cross = (b.point.x - a.point.x) * (c.point.y - a.point.y) -
+			(b.point.y - a.point.y) * (c.point.x - a.point.x);
+		if (cross > 0)
+			std::swap(b, c);
+		m_2DRender->Flush_If_Needed(3);
+		m_2DRender->Add_Tri(Vector2(a.point.x, a.point.y), Vector2(b.point.x, b.point.y),
+			Vector2(c.point.x, c.point.y), Vector2(a.uv.x * uScale, a.uv.y * vScale),
+			Vector2(b.uv.x * uScale, b.uv.y * vScale), Vector2(c.uv.x * uScale, c.uv.y * vScale), color);
+	};
+	static const auto normals = []
+	{
+		std::array<Coord2D, 48> result;
+		for (size_t i = 0; i < result.size(); ++i)
+		{
+			const Real angle = WWMATH_TWO_PI * i / result.size();
+			result[i] = {std::cos(angle), std::sin(angle)};
+		}
+		return result;
+	}();
+	const Real apothem = m_circleClipRadius * std::cos(WWMATH_PI / normals.size());
+	const auto inside = [&](Coord2D point)
+	{
+		const Real x = point.x - m_circleClipX;
+		const Real y = point.y - m_circleClipY;
+		return x * x + y * y <= apothem * apothem;
+	};
+	std::vector<Vertex> polygon, clipped;
 	for (Int i = 0; i + 2 < count; i += 3)
 	{
-		const Coord2D &origin = points[i];
-		Int second = i + 1;
-		Int third = i + 2;
-		const Real cross = (points[second].x - origin.x) * (points[third].y - origin.y) -
-			(points[second].y - origin.y) * (points[third].x - origin.x);
-		if (cross > 0)
-			std::swap(second, third);
-		m_2DRender->Flush_If_Needed(3);
-		m_2DRender->Add_Tri(Vector2(origin.x, origin.y), Vector2(points[second].x, points[second].y),
-			Vector2(points[third].x, points[third].y), Vector2(uv[i].x * uScale, uv[i].y * vScale),
-			Vector2(uv[second].x * uScale, uv[second].y * vScale),
-			Vector2(uv[third].x * uScale, uv[third].y * vScale), color);
+		if (m_circleClipRadius <= 0 || (inside(points[i]) && inside(points[i + 1]) && inside(points[i + 2])))
+		{
+			submit({points[i], uv[i]}, {points[i + 1], uv[i + 1]}, {points[i + 2], uv[i + 2]});
+			continue;
+		}
+		polygon.assign({{points[i], uv[i]}, {points[i + 1], uv[i + 1]}, {points[i + 2], uv[i + 2]}});
+		for (Coord2D normal : normals)
+		{
+			if (polygon.empty())
+				break;
+			const auto distance = [&](Coord2D point)
+			{
+				return apothem - normal.x * (point.x - m_circleClipX) - normal.y * (point.y - m_circleClipY);
+			};
+			clipped.clear();
+			Vertex previous = polygon.back();
+			Real previousDistance = distance(previous.point);
+			for (Vertex next : polygon)
+			{
+				const Real nextDistance = distance(next.point);
+				if ((previousDistance < 0) != (nextDistance < 0))
+				{
+					const Real t = previousDistance / (previousDistance - nextDistance);
+					clipped.push_back({
+						{previous.point.x + (next.point.x - previous.point.x) * t,
+						 previous.point.y + (next.point.y - previous.point.y) * t},
+						{previous.uv.x + (next.uv.x - previous.uv.x) * t,
+						 previous.uv.y + (next.uv.y - previous.uv.y) * t}});
+				}
+				if (nextDistance >= 0)
+					clipped.push_back(next);
+				previous = next;
+				previousDistance = nextDistance;
+			}
+			polygon.swap(clipped);
+		}
+		for (size_t at = 2; at < polygon.size(); ++at)
+			submit(polygon.front(), polygon[at - 1], polygon[at]);
 	}
 	if (!m_isBatching)
 		m_2DRender->Render();
