@@ -55,6 +55,7 @@
 #include "GameClient/RetailHudExtras.h"
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/ExperienceLevelStore.h"
+#include "GameLogic/RetailCreationUpgrades.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/RandomValue.h"
@@ -880,6 +881,7 @@ void GameEngine::init()
 		TheNameKeyGenerator->dumpIfRequested("thingFactory");
 		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
 		ExperienceLevelStore::load();
+		RetailCreationUpgrades::load(&xferCRC);
 		if (RetailFileLayers::enabled() || INIAudit::isEnabled())
 		{
 			RetailEva::load();

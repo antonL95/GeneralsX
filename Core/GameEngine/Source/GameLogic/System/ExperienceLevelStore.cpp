@@ -418,7 +418,12 @@ static Real experienceScalar(const Object* object, Int currentRank, Int starting
 void applyLevel(Object* obj, int threshold, bool feedback)
 {
 	if (const Level* level = findLevel(obj, threshold, false))
+	{
 		apply(obj, *level, feedback);
+		if (level->informUpdateModule && level->rank > 1)
+			if (auto* horde = const_cast<HordeContain*>(HordeContain::get(obj)))
+				horde->onRankAdvanced(level->rank, feedback);
+	}
 }
 
 Object* recipientFor(Object* obj)

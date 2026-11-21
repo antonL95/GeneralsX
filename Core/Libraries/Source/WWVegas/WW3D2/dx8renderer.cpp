@@ -1695,6 +1695,14 @@ static void Render_With_Animation_Opacity(DX8PolygonRendererClass & renderer, Me
 	if (!(opacity > 0.0f))
 		return;
 
+	const bool particle = mesh.Get_Particle_Tint() != 0;
+	const bool additive = particle ? mesh.Is_Additive_Particle() : mesh.Is_Additive();
+	if (particle)
+	{
+		shader.Set_Src_Blend_Func(ShaderClass::SRCBLEND_SRC_ALPHA);
+		shader.Set_Dst_Blend_Func(additive ? ShaderClass::DSTBLEND_ONE : ShaderClass::DSTBLEND_ONE_MINUS_SRC_ALPHA);
+		shader.Set_Fog_Func(ShaderClass::FOG_DISABLE);
+	}
 	shader.Set_Depth_Mask(ShaderClass::DEPTH_WRITE_DISABLE);
 	DX8Wrapper::Set_Shader(shader);
 	DX8Wrapper::Apply_Render_State_Changes();
@@ -1702,29 +1710,38 @@ static void Render_With_Animation_Opacity(DX8PolygonRendererClass & renderer, Me
 	const unsigned alpha = opacity >= 1.0f ? 255 : static_cast<unsigned>(opacity * 255.0f + 0.5f);
 	const unsigned factor = DX8Wrapper::Get_DX8_Render_State(D3DRS_TEXTUREFACTOR);
 	const unsigned alphaRef = DX8Wrapper::Get_DX8_Render_State(D3DRS_ALPHAREF);
-	const bool additive = mesh.Is_Additive();
-	const unsigned stage = DX8Wrapper::Get_DX8_Texture_Stage_State(1, D3DTSS_COLOROP) == D3DTOP_DISABLE ? 1 : 2;
+	const bool textured = shader.Get_Texturing() == ShaderClass::TEXTURING_ENABLE;
+	const unsigned stage = particle ? 0 :
+		(DX8Wrapper::Get_DX8_Texture_Stage_State(1, D3DTSS_COLOROP) == D3DTOP_DISABLE ? 1 : 2);
 	const D3DTEXTURESTAGESTATETYPE states[] = {
 		D3DTSS_COLOROP, D3DTSS_COLORARG1, D3DTSS_COLORARG2,
 		D3DTSS_ALPHAOP, D3DTSS_ALPHAARG1, D3DTSS_ALPHAARG2
 	};
-	const unsigned values[] = {
-		additive ? D3DTOP_MODULATE : D3DTOP_SELECTARG1, D3DTA_CURRENT, D3DTA_TFACTOR,
-		D3DTOP_MODULATE, D3DTA_CURRENT, D3DTA_TFACTOR
-	};
+	const unsigned source = particle ? (textured ? D3DTA_TEXTURE : D3DTA_TFACTOR) : D3DTA_CURRENT;
+	const unsigned colorOp = particle ? (textured ? D3DTOP_MODULATE : D3DTOP_SELECTARG1) :
+		(additive ? D3DTOP_MODULATE : D3DTOP_SELECTARG1);
+	const unsigned values[] = {colorOp, source, D3DTA_TFACTOR,
+		particle ? colorOp : D3DTOP_MODULATE, source, D3DTA_TFACTOR};
 	unsigned previous[sizeof(states) / sizeof(states[0])];
 	for (unsigned i = 0; i < sizeof(states) / sizeof(states[0]); ++i) {
 		previous[i] = DX8Wrapper::Get_DX8_Texture_Stage_State(stage, states[i]);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, states[i], values[i]);
 	}
-	const unsigned color = additive ? alpha : 255;
-	const unsigned factorAlpha = additive && shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_SRC_ALPHA ? 255 : alpha;
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, D3DCOLOR_ARGB(factorAlpha, color, color, color));
+	const unsigned color = additive && !particle ? alpha : 255;
+	const unsigned factorAlpha = additive && !particle && shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_SRC_ALPHA ? 255 : alpha;
+	const unsigned tint = particle ? mesh.Get_Particle_Tint() : 0xFFFFFFFF;
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, D3DCOLOR_ARGB(factorAlpha,
+		((tint >> 16) & 255) * color / 255, ((tint >> 8) & 255) * color / 255, (tint & 255) * color / 255));
 	if (shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_ENABLE)
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAREF, static_cast<unsigned>(alphaRef * factorAlpha / 255));
+	const unsigned previousDetail = DX8Wrapper::Get_DX8_Texture_Stage_State(1, D3DTSS_COLOROP);
+	if (particle)
+		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
 
 	renderer.Render(mesh.Get_Base_Vertex_Offset());
 
+	if (particle)
+		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_COLOROP, previousDetail);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAREF, alphaRef);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, factor);
 	for (unsigned i = 0; i < sizeof(states) / sizeof(states[0]); ++i)
@@ -1925,12 +1942,13 @@ void DX8TextureCategoryClass::Render()
 		if (!DX8RendererDebugger::Is_Enabled() || !mesh->Is_Disabled_By_Debugger()) {
 
 		const float animationOpacity = mesh->Get_Animation_Opacity();
-		if (animationOpacity == 1.0f && mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled()) {
+		const bool particle = mesh->Get_Particle_Tint() != 0;
+		if (!particle && animationOpacity == 1.0f && mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled()) {
 			renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
 		} else {
 			//non-transparent mesh that will be rendered immediately.  Okay to adjust the shader/material
 			//if necessary
-			if (animationOpacity != 1.0f || mesh->Get_Alpha_Override() != 1.0f ||
+			if (particle || animationOpacity != 1.0f || mesh->Get_Alpha_Override() != 1.0f ||
 				(mesh->Get_User_Data() && *(int *)mesh->Get_User_Data() == RenderObjClass::USER_DATA_MATERIAL_OVERRIDE))
 			{
 				//mesh has material override of some kind
@@ -1951,9 +1969,12 @@ void DX8TextureCategoryClass::Render()
 				else
 					oldMapper=nullptr;
 
-				if (animationOpacity != 1.0f)
+				if (particle || animationOpacity != 1.0f)
 				{
-					Render_With_Animation_Opacity(*renderer, *mesh, mesh->Is_Additive() ? theShader : theAlphaShader,
+					ShaderClass shader = mesh->Is_Additive() ? theShader : theAlphaShader;
+					if (particle && Peek_Texture(0))
+						shader.Set_Texturing(ShaderClass::TEXTURING_ENABLE);
+					Render_With_Animation_Opacity(*renderer, *mesh, shader,
 						animationOpacity * mesh->Get_Alpha_Override());
 					DX8Wrapper::Set_Shader(theShader);
 				}

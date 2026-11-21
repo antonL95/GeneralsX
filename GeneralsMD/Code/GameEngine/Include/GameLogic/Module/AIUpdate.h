@@ -337,6 +337,7 @@ public:
 
 	virtual void joinTeam();			///< This unit just got added to a team & needs to catch up.
 
+	const AsciiString& getRetailLuaEventList() const { return getAIUpdateModuleData()->m_luaEventsList; }
 	Bool areTurretsLinked() const { return getAIUpdateModuleData()->m_turretsLinked; }
 
 	// this is present solely for some transports to override, so that they can land before

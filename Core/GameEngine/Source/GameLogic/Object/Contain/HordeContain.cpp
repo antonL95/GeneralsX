@@ -9,6 +9,7 @@
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameClient/FXList.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
@@ -34,6 +35,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -303,7 +305,7 @@ Bool HordeContain::isValidContainerFor( const Object* rider, Bool checkCapacity 
 		return FALSE;
 	if (!OpenContain::isValidContainerFor(rider, checkCapacity))
 		return FALSE;
-	if (checkCapacity && (Int)getContainCount() >= getContainMax())
+	if (checkCapacity && static_cast<Int>(getContainCount()) - (getBannerCarrier() ? 1 : 0) >= getContainMax())
 		return FALSE;
 
 	const SpecialPowerObjectFilter& filter = getHordeContainModuleData()->m_passengerFilter;
@@ -366,12 +368,14 @@ void HordeContain::createPayload()
 	enableLoadSounds( TRUE );
 
 	m_payloadCreated = TRUE;
+	if (RetailFileLayers::enabled())
+		onRankAdvanced(horde->getExperienceTracker()->getRank());
 }
 
 void HordeContain::addToContainList( Object *rider )
 {
 	TransportContain::addToContainList( rider );
-	if (getMemberSlot( rider->getID() ) >= 0)
+	if (isBannerCarrier(rider) || getMemberSlot( rider->getID() ) >= 0)
 		return;
 
 	const HordeContainModuleData* formation = getActiveFormation();
@@ -410,6 +414,9 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 		helper->refreshDerived();
 #endif
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained );
+	if (isBannerCarrier(rider))
+		if (auto* banner = BannerCarrierUpdate::find(rider))
+			banner->applyMorph(getBannerUnitType());
 	if (getHordeContainModuleData()->m_alternateFormation.isNotEmpty())
 		updateFormationModelConditions(rider);
 	WeaponSetFlags toggles;
@@ -434,6 +441,9 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 
 void HordeContain::onRemoving( Object *rider )
 {
+	if (isBannerCarrier(rider))
+		if (auto* banner = BannerCarrierUpdate::find(rider))
+			banner->applyMorph(AsciiString());
 	const auto slot = m_memberSlots.find(rider->getID());
 	if (slot != m_memberSlots.end())
 	{
@@ -519,6 +529,10 @@ void HordeContain::xfer( Xfer *xfer )
 void HordeContain::loadPostProcess()
 {
 	TransportContain::loadPostProcess();
+	for (Object* member : getContainList())
+		if (isBannerCarrier(member))
+			if (auto* banner = BannerCarrierUpdate::find(member))
+				banner->applyMorph(getBannerUnitType());
 #if !RTS_GENERALS
 	if (m_restoreBaseFormation)
 	{
@@ -573,29 +587,64 @@ Object* HordeContain::getAnchor(Object* member)
 Bool HordeContain::addCrateBanner(Object* anchor)
 {
 	auto* contain = const_cast<HordeContain*>(get(anchor));
-	if (!contain || anchor->isEffectivelyDead())
-		return FALSE;
-	for (const Object* member : contain->getContainList())
-	{
-		if (member->isKindOf(KINDOF_BANNER) && !member->isEffectivelyDead())
-			return FALSE;
-	}
+	return contain && contain->addBannerCarrier(TRUE);
+}
 
-	const auto* data = contain->getHordeContainModuleData();
+Bool HordeContain::isBannerCarrier(const Object* member) const
+{
+	if (!RetailFileLayers::enabled() || !member || !member->isKindOf(KINDOF_BANNER))
+		return FALSE;
+	const auto& carriers = getHordeContainModuleData()->m_bannerCarriersAllowed;
+	const AsciiString name = member->getTemplate()->getName();
+	return std::any_of(carriers.begin(), carriers.end(), [&name](const AsciiString& carrier) {
+		return carrier.compareNoCase(name) == 0;
+	});
+}
+
+const Object* HordeContain::getBannerCarrier() const
+{
+	for (const Object* member : getContainList())
+		if (isBannerCarrier(member) && !member->isEffectivelyDead())
+			return member;
+	return nullptr;
+}
+
+void HordeContain::onRankAdvanced(Int rank, Bool feedback)
+{
+	const auto* data = getHordeContainModuleData();
+	if (RetailFileLayers::enabled() && m_payloadCreated && getContainCount() > 0 &&
+		rank >= std::max<Int>(2, data->m_bannerCarrierMinLevel))
+		addBannerCarrier(feedback);
+}
+
+Bool HordeContain::addBannerCarrier(Bool feedback)
+{
+	Object* anchor = getObject();
+	if (!RetailFileLayers::enabled() || anchor->isEffectivelyDead() || getBannerCarrier())
+		return FALSE;
+	const auto* data = getHordeContainModuleData();
 	for (const AsciiString& name : data->m_bannerCarriersAllowed)
 	{
 		const ThingTemplate* type = TheThingFactory->findTemplate(name);
-		if (!type)
+		if (!type || !type->isKindOf(KINDOF_BANNER))
 			continue;
 		Object* banner = TheThingFactory->newObject(type, anchor->getTeam());
 #if RTS_GENERALS
-		contain->OpenContain::addToContain(banner);
+		OpenContain::addToContain(banner);
 #else
-		contain->OpenContain::addToContain(banner, FALSE);
+		OpenContain::addToContain(banner, FALSE);
 #endif
-		const Coord3D point = contain->getMemberPosition(banner->getID(), FALSE);
+		if (banner->getContainedBy() != anchor)
+		{
+			TheGameLogic->destroyObject(banner);
+			return FALSE;
+		}
+		const Coord3D point = getMemberPosition(banner->getID(), FALSE);
 		banner->setPosition(&point);
 		banner->setOrientation(anchor->getOrientation());
+		if (feedback)
+			if (const auto* update = BannerCarrierUpdate::find(banner))
+				update->playMorphFX(anchor);
 		return TRUE;
 	}
 	return FALSE;
@@ -668,10 +717,38 @@ Drawable* HordeContain::resolveSelection(Drawable* draw)
 
 Bool HordeContain::rankCanAttack(const Object* member) const
 {
+	if (isBannerCarrier(member))
+		return FALSE;
 	const Int slot = getMemberSlot(member->getID());
 	const auto* data = getActiveFormation();
 	const Int rank = slot >= 0 ? data->m_layout.slots()[slot].rank : 0;
 	return HordeLayout::rankCanAttack(rank, data->m_ranksToReleaseWhenAttacking, data->m_ranksToJustFreeWhenAttacking);
+}
+
+const HordeBannerCarrierPosition* HordeContain::getBannerFormationPosition() const
+{
+	const auto* formation = getActiveFormation();
+	const auto& positions = formation->m_bannerCarrierPositions.empty() ?
+		getHordeContainModuleData()->m_bannerCarrierPositions : formation->m_bannerCarrierPositions;
+	for (const auto& payload : formation->m_layout.payloads())
+		for (const auto& banner : positions)
+			if (stricmp(banner.unitType.c_str(), payload.name.c_str()) == 0)
+				return &banner;
+	return positions.empty() ? nullptr : &positions.front();
+}
+
+HordePoint HordeContain::getBannerOffset() const
+{
+	const auto* position = getBannerFormationPosition();
+	return position ? position->position : HordePoint{};
+}
+
+AsciiString HordeContain::getBannerUnitType() const
+{
+	if (const auto* position = getBannerFormationPosition())
+		return position->unitType.c_str();
+	const auto& payloads = getActiveFormation()->m_layout.payloads();
+	return payloads.empty() ? AsciiString() : AsciiString(payloads.front().name.c_str());
 }
 
 Coord3D HordeContain::getMemberPosition(ObjectID id, Bool followLeader) const
@@ -701,6 +778,17 @@ Coord3D HordeContain::getMemberPosition(ObjectID id, Bool followLeader) const
 		position.x += worldOffset.x;
 		position.y += worldOffset.y;
 	}
+	else if (RetailFileLayers::enabled())
+	{
+		const Object* member = TheGameLogic->findObjectByID(id);
+		if (member && member->getContainedBy() == horde && isBannerCarrier(member))
+		{
+			const Real angle = horde->getOrientation();
+			const HordePoint offset = HordeLayout::rotate(getBannerOffset(), Cos(angle), Sin(angle));
+			position.x += offset.x;
+			position.y += offset.y;
+		}
+	}
 	if (TheTerrainLogic)
 		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
 	return position;
@@ -720,7 +808,7 @@ constexpr Real FORMATION_STRAGGLER_WEIGHT = 0.5f;
 Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) const
 {
 	const Object* horde = getObject();
-	if (horde->isEffectivelyDead() || getMemberSlot(member->getID()) < 0)
+	if (horde->isEffectivelyDead() || (getMemberSlot(member->getID()) < 0 && !isBannerCarrier(member)))
 		return FALSE;
 
 	goal.slot = getMemberPosition(member->getID(), FALSE);
@@ -1042,7 +1130,7 @@ Bool HordeContain::canSetAlternateFormation(Bool alternate) const
 	if (alternate == isAlternateFormation())
 		return TRUE;
 	const auto living = std::count_if(getContainList().begin(), getContainList().end(),
-		[](const Object* member) { return !member->isEffectivelyDead(); });
+		[this](const Object* member) { return !member->isEffectivelyDead() && !isBannerCarrier(member); });
 	return other->m_thisFormationIsTheMainFormation != alternate && living >= other->m_minimumHordeSize &&
 		static_cast<std::size_t>(living) <= other->m_layout.slots().size();
 }
@@ -1086,7 +1174,7 @@ void HordeContain::setAlternateFormation(Bool alternate)
 	{
 		if (member->isEffectivelyDead())
 			continue;
-		const Int slot = layout.findSlot(member->getTemplate()->getName().str(), occupied);
+		const Int slot = isBannerCarrier(member) ? -1 : layout.findSlot(member->getTemplate()->getName().str(), occupied);
 		if (slot >= 0)
 		{
 			members[slot] = member->getID();
@@ -1096,6 +1184,9 @@ void HordeContain::setAlternateFormation(Bool alternate)
 				offsets[slot] = m_slotOffsets[previous];
 		}
 		updateFormationModelConditions(member);
+		if (isBannerCarrier(member))
+			if (auto* banner = BannerCarrierUpdate::find(member))
+				banner->applyMorph(getBannerUnitType());
 	}
 	m_slotMembers.swap(members);
 	m_slotOffsets.swap(offsets);
@@ -1141,4 +1232,123 @@ void HordeContain::clientVisibleContainedFlashAsSelected()
 		if (Drawable* draw = member->getDrawable())
 			draw->flashAsSelected();
 	}
+}
+
+void BannerCarrierUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] =
+	{
+		{ "MorphCondition", parseMorph, nullptr, offsetof(BannerCarrierUpdateModuleData, m_morphs) },
+		{ "BannerMorphFX", INI::parseAsciiString, nullptr, offsetof(BannerCarrierUpdateModuleData, m_morphFX) },
+		{ "UnitSpawnFX", INI::parseAsciiString, nullptr, offsetof(BannerCarrierUpdateModuleData, m_unitSpawnFX) },
+		{ "UpgradeRequired", INI::parseAsciiString, nullptr, offsetof(BannerCarrierUpdateModuleData, m_upgradeRequired) },
+		{ "IdleSpawnRate", INI::parseDurationUnsignedInt, nullptr, offsetof(BannerCarrierUpdateModuleData, m_idleSpawnRate) },
+		{ "MeleeFreeUnitSpawnTime", INI::parseDurationUnsignedInt, nullptr, offsetof(BannerCarrierUpdateModuleData, m_meleeFreeUnitSpawnTime) },
+		{ "DiedRespawnTime", INI::parseDurationUnsignedInt, nullptr, offsetof(BannerCarrierUpdateModuleData, m_diedRespawnTime) },
+		{ "MeleeFreeBannerReSpawnTime", INI::parseDurationUnsignedInt, nullptr, offsetof(BannerCarrierUpdateModuleData, m_meleeFreeBannerRespawnTime) },
+		{ "ScanHordeDistance", INI::parseReal, nullptr, offsetof(BannerCarrierUpdateModuleData, m_scanHordeDistance) },
+		{ "ReplenishNearbyHorde", INI::parseBool, nullptr, offsetof(BannerCarrierUpdateModuleData, m_replenishNearbyHorde) },
+		{ "ReplenishAllNearbyHordes", INI::parseBool, nullptr, offsetof(BannerCarrierUpdateModuleData, m_replenishAllNearbyHordes) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	UpdateModuleData::buildFieldParse(p);
+	p.add(fields);
+}
+
+void BannerCarrierUpdateModuleData::parseMorph(INI* ini, void*, void* store, const void*)
+{
+	Morph morph;
+	while (const char* field = ini->getNextTokenOrNull(INI::getSepsColon()))
+	{
+		if (stricmp(field, "UnitType") == 0)
+			morph.unitType = ini->getNextToken(INI::getSepsColon());
+		else if (stricmp(field, "Locomotor") == 0)
+			morph.locomotor = AIUpdateModuleData::findLocomotorSetType(ini->getNextToken(INI::getSepsColon()));
+		else if (stricmp(field, "ModelState") == 0)
+		{
+			std::istringstream conditions(ini->getNextQuotedAsciiString().str());
+			for (std::string name; conditions >> name; )
+				morph.conditions.set(static_cast<ModelConditionFlagType>(INI::scanIndexList(name.c_str(), ModelConditionFlags::getBitNames())));
+		}
+		else
+			throw INI_INVALID_DATA;
+	}
+	if (morph.unitType.isEmpty())
+		throw INI_INVALID_DATA;
+	static_cast<std::vector<Morph>*>(store)->push_back(std::move(morph));
+}
+
+BannerCarrierUpdate::BannerCarrierUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data)
+{
+}
+
+BannerCarrierUpdate::~BannerCarrierUpdate() = default;
+
+void BannerCarrierUpdate::crc(Xfer* xfer) { UpdateModule::crc(xfer); }
+void BannerCarrierUpdate::xfer(Xfer* xfer) { UpdateModule::xfer(xfer); }
+void BannerCarrierUpdate::loadPostProcess() { UpdateModule::loadPostProcess(); }
+
+BannerCarrierUpdate* BannerCarrierUpdate::find(Object* carrier)
+{
+	static const NameKeyType key = NAMEKEY("BannerCarrierUpdate");
+	return static_cast<BannerCarrierUpdate*>(carrier->findUpdateModule(key));
+}
+
+void BannerCarrierUpdate::applyMorph(const AsciiString& unitType)
+{
+	const auto& morphs = getBannerCarrierUpdateModuleData()->m_morphs;
+	const auto found = std::find_if(morphs.begin(), morphs.end(), [&unitType](const auto& morph) {
+		return morph.unitType.compareNoCase(unitType) == 0;
+	});
+	const auto* previous = m_morph;
+	m_morph = found == morphs.end() ? nullptr : &*found;
+	if (previous == m_morph)
+		return;
+	Object* carrier = getObject();
+	if (previous)
+		carrier->clearModelConditionFlags(previous->conditions);
+	if (m_morph)
+		carrier->setModelConditionFlags(m_morph->conditions);
+	const Int locomotor = m_morph ? m_morph->locomotor : LOCOMOTORSET_INVALID;
+	if (AIUpdateInterface* ai = carrier->getAI())
+	{
+		if (locomotor != LOCOMOTORSET_INVALID)
+			ai->chooseLocomotorSet(static_cast<LocomotorSetType>(locomotor));
+		else if (previous && previous->locomotor != LOCOMOTORSET_INVALID)
+			ai->chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+	}
+}
+
+UpdateSleepTime BannerCarrierUpdate::update()
+{
+	if (const auto* horde = HordeContain::get(getObject()->getContainedBy()))
+		applyMorph(horde->getBannerUnitType());
+	return UPDATE_SLEEP_FOREVER;
+}
+
+void BannerCarrierUpdate::playMorphFX(const Object* horde) const
+{
+	const auto& name = getBannerCarrierUpdateModuleData()->m_morphFX;
+	if (!TheFXListStore || name.isEmpty())
+		return;
+	const auto* fx = TheFXListStore->findFXList(name.str());
+	const auto* formation = HordeContain::get(horde);
+	Coord3D center = {};
+	Int count = 0;
+	if (formation)
+		for (const Object* member : *formation->getContainedItemsList())
+			if (!member->isEffectivelyDead() && !formation->isBannerCarrier(member))
+			{
+				center += *member->getPosition();
+				++count;
+			}
+	if (count == 0)
+	{
+		FXList::doFXObj(fx, horde);
+		return;
+	}
+	center.scale(1.0f / count);
+	Matrix3D transform = *horde->getTransformMatrix();
+	transform.Set_Translation(Vector3(center.x, center.y, center.z));
+	FXList::doFXPos(fx, &center, &transform);
 }

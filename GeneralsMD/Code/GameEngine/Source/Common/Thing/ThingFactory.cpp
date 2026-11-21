@@ -38,6 +38,7 @@
 #include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
 #include "GameLogic/ExperienceLevelStore.h"
+#include "GameLogic/RetailCreationUpgrades.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "Common/Player.h"
@@ -360,7 +361,10 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 
 	obj->initObject();
 	if (!TheGameState || !TheGameState->isInLoadGame())
+	{
 		ExperienceLevelStore::onObjectCreated(obj);
+		RetailCreationUpgrades::onObjectCreated(obj);
+	}
 
 	return obj;
 

@@ -149,6 +149,9 @@ public:
 	Real m_size;																///< size of the particle
 	Real m_sizeRate;														///< rate of change of size
 	Real m_sizeRateDamping;											///< damping of size change rate
+	Coord3D m_modelSize = {1.0f, 1.0f, 1.0f};
+	Coord3D m_modelSizeRate = {};
+	Coord3D m_modelSizeDamping = {1.0f, 1.0f, 1.0f};
 
 	Keyframe m_alphaKey[ MAX_KEYFRAMES ];
 	RGBColorKeyframe m_colorKey[ MAX_KEYFRAMES ];
@@ -193,6 +196,7 @@ public:
 
 	const Coord3D *getPosition() { return &m_pos; }
 	Real getSize() { return m_size; }
+	const Coord3D& getModelSize() const { return m_modelSize; }
 	Real getAngle() { return m_angleZ; }
 	Real getAlpha() { return m_alpha; }
 	const RGBColor *getColor() { return &m_color; }
@@ -653,6 +657,10 @@ protected:
 
 	Bool m_isRenderable;
 	Real m_windStrength;
+	GameClientRandomVariable m_modelStartSize[3];
+	GameClientRandomVariable m_modelSizeRate[3];
+	GameClientRandomVariable m_modelSizeDamping[3];
+	Bool m_modelHasAlpha = FALSE;
 	Real m_windFullStrengthDistance;
 	Real m_windZeroStrengthDistance;
 	Coord3D m_cylinderOffset;

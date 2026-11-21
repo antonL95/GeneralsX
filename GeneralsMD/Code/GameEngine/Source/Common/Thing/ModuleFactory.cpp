@@ -374,6 +374,7 @@ void ModuleFactory::init()
 	if (registersRotwkModules())
 	{
 		addModule( HordeContain );
+		addModule( BannerCarrierUpdate );
 		addModule( HorseHordeContain );
 		addModule( AODHordeContain );
 	}

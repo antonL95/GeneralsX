@@ -459,6 +459,13 @@ public:
 			Update_Animation_Opacity(opacity);
 	}
 	float Get_Animation_Opacity() const { return EffectiveAnimationOpacity; }
+	void Set_Particle_Tint(unsigned tint, bool additive)
+	{
+		ParticleTint = tint;
+		AdditiveParticle = additive;
+	}
+	unsigned Get_Particle_Tint() const { return ParticleTint; }
+	bool Is_Additive_Particle() const { return AdditiveParticle; }
 	virtual int						Is_Force_Visible() const												{ return Bits & IS_FORCE_VISIBLE; }
 	virtual void					Set_Force_Visible(int onoff)          									{ if (onoff) { Bits |= IS_FORCE_VISIBLE; } else { Bits &= ~IS_FORCE_VISIBLE; } }
 
@@ -535,6 +542,8 @@ protected:
 	mutable unsigned long		Bits;
 	float AnimationOpacity = 1.0f;
 	float EffectiveAnimationOpacity = 1.0f;
+	unsigned ParticleTint = 0;
+	bool AdditiveParticle = false;
 	void Update_Animation_Opacity(float opacity);
 	Matrix3D							Transform;
  	float						ObjectScale;					//user applied scaling factor inside Transform matrix.

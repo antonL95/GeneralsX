@@ -117,7 +117,7 @@ void ParticleInfo::xfer( Xfer *xfer )
 	Int i;
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -192,6 +192,12 @@ void ParticleInfo::xfer( Xfer *xfer )
 
 	// wind randomness
 	xfer->xferReal( &m_windRandomness );
+	if (version >= 2)
+	{
+		xfer->xferCoord3D(&m_modelSize);
+		xfer->xferCoord3D(&m_modelSizeRate);
+		xfer->xferCoord3D(&m_modelSizeDamping);
+	}
 
 }
 
@@ -334,6 +340,9 @@ Particle::Particle( ParticleSystem *system, const ParticleInfo *info )
 	m_size = info->m_size;
 	m_sizeRate = info->m_sizeRate;
 	m_sizeRateDamping = info->m_sizeRateDamping;
+	m_modelSize = info->m_modelSize;
+	m_modelSizeRate = info->m_modelSizeRate;
+	m_modelSizeDamping = info->m_modelSizeDamping;
 
 	// set up alpha
 	int i=0;
@@ -466,6 +475,13 @@ Bool Particle::update()
 	m_angularRateZ *= m_angularDamping;
 
 	m_sizeRate *= m_sizeRateDamping;
+	const Bool usesModel = RetailFileLayers::enabled() && m_system->isUsingDrawables();
+	if (usesModel)
+	{
+		m_modelSizeRate.x *= m_modelSizeDamping.x;
+		m_modelSizeRate.y *= m_modelSizeDamping.y;
+		m_modelSizeRate.z *= m_modelSizeDamping.z;
+	}
 
 	// TheSuperHackers @info A key frame is passed in the logic frame after its frame, because the render update after
 	// this logic update applies the next rate. This ends every key frame interval exactly on its key frame, so the alpha
@@ -475,7 +491,7 @@ Bool Particle::update()
 	//
 	// Update alpha (if used)
 	//
-	if (m_system->getShaderType() != ParticleSystemInfo::ADDITIVE)
+	if (usesModel || m_system->getShaderType() != ParticleSystemInfo::ADDITIVE)
 	{
 #if PRESERVE_RETAIL_PARTICLES
 		// The first key frame interval starts on the creation frame and therefore arrives at its key frame early.
@@ -561,11 +577,18 @@ void Particle::draw(Real timeScale)
 
 	// update size
 	m_size += m_sizeRate * timeScale;
+	const Bool usesModel = RetailFileLayers::enabled() && m_system->isUsingDrawables();
+	if (usesModel)
+	{
+		m_modelSize.x += m_modelSizeRate.x * timeScale;
+		m_modelSize.y += m_modelSizeRate.y * timeScale;
+		m_modelSize.z += m_modelSizeRate.z * timeScale;
+	}
 
 	//
 	// Update alpha (if used)
 	//
-	if (m_system->getShaderType() != ParticleSystemInfo::ADDITIVE)
+	if (usesModel || m_system->getShaderType() != ParticleSystemInfo::ADDITIVE)
 	{
 		m_alpha += m_alphaRate * timeScale;
 		m_alpha = clamp(0.0f, m_alpha, 1.0f);
@@ -2033,6 +2056,23 @@ const ParticleInfo *ParticleSystem::generateParticleInfo( Int particleNum, Int p
 		info.m_alphaKey[i].value = m_alphaKey[i].var.getValue();
 		info.m_alphaKey[i].frame = m_alphaKey[i].frame;
 		info.m_colorKey[i] = m_colorKey[i];
+	}
+	info.m_modelSize.set(1.0f, 1.0f, 1.0f);
+	info.m_modelSizeRate.set(0.0f, 0.0f, 0.0f);
+	info.m_modelSizeDamping.set(1.0f, 1.0f, 1.0f);
+	if (RetailFileLayers::enabled() && isUsingDrawables())
+	{
+		const Real scale = m_sizeCoeff * TheGlobalData->m_particleScale;
+		const auto* data = getTemplate();
+		info.m_modelSize.set(info.m_size + data->m_modelStartSize[0].getValue() * scale,
+			info.m_size + data->m_modelStartSize[1].getValue() * scale,
+			info.m_size + data->m_modelStartSize[2].getValue() * scale);
+		info.m_modelSizeRate.set(data->m_modelSizeRate[0].getValue() * scale,
+			data->m_modelSizeRate[1].getValue() * scale, data->m_modelSizeRate[2].getValue() * scale);
+		info.m_modelSizeDamping.set(data->m_modelSizeDamping[0].getValue(),
+			data->m_modelSizeDamping[1].getValue(), data->m_modelSizeDamping[2].getValue());
+		if (!data->m_modelHasAlpha)
+			info.m_alphaKey[0].value = 1.0f;
 	}
 
 /*

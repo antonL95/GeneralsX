@@ -27,6 +27,7 @@
 // Author: Michael S. Booth, November 2001
 
 #include "Common/GlobalData.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/Color.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
@@ -36,6 +37,76 @@
 #include "W3DDevice/GameClient/W3DSnow.h"
 #include "W3DDevice/GameClient/W3DTerrainParticles.h"
 #include "WW3D2/camera.h"
+#include "WW3D2/dx8renderer.h"
+#include "WW3D2/rendobj.h"
+
+#include <algorithm>
+#include <string>
+#include <vector>
+
+namespace
+{
+void setModelParticleTint(RenderObjClass& model, unsigned tint, bool additive)
+{
+	model.Set_Particle_Tint(tint, additive);
+	for (int i = 0; i < model.Get_Num_Sub_Objects(); ++i)
+	{
+		auto* child = model.Get_Sub_Object(i);
+		if (child)
+		{
+			setModelParticleTint(*child, tint, additive);
+			child->Release_Ref();
+		}
+	}
+}
+
+void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::ParticleSystemList& systems, const AABoxClass& bounds)
+{
+	if (!W3DDisplay::m_assetManager)
+		return;
+	std::vector<RenderObjClass*> drawn;
+	for (ParticleSystem* system : systems)
+	{
+		if (!system || !system->isUsingDrawables() || system->getParticleTypeName().isEmpty())
+			continue;
+		std::string modelName(system->getParticleTypeName().str());
+		if (modelName.size() > 4 && stricmp(modelName.c_str() + modelName.size() - 4, ".w3d") == 0)
+			modelName.resize(modelName.size() - 4);
+		for (Particle* particle = system->getFirstParticle(); particle; particle = particle->m_systemNext)
+		{
+			const auto& size = particle->getModelSize();
+			const Real opacity = particle->getAlpha();
+			if (!(size.x > 0.0f && size.y > 0.0f && size.z > 0.0f && opacity > 0.0f))
+				continue;
+			const auto* position = particle->getPosition();
+			const Real margin = std::max({size.x, size.y, size.z}) * 50.0f;
+			if (WWMath::Fabs(position->x - bounds.Center.X) > bounds.Extent.X + margin ||
+				WWMath::Fabs(position->y - bounds.Center.Y) > bounds.Extent.Y + margin ||
+				WWMath::Fabs(position->z - bounds.Center.Z) > bounds.Extent.Z + margin)
+				continue;
+			auto* model = W3DDisplay::m_assetManager->Create_Render_Obj(modelName.c_str(), 1.0f, 0);
+			if (!model)
+				break;
+			Matrix3D transform(true);
+			transform.Rotate_Z(particle->getAngle());
+			transform.Scale(size.x, size.y, size.z);
+			transform.Set_Translation(Vector3(position->x, position->y, position->z));
+			model->Set_Transform(transform);
+			model->Set_Animation_Opacity(opacity);
+			const auto* color = particle->getColor();
+			const auto channel = [](Real value) { return static_cast<unsigned>(std::clamp(value, 0.0f, 1.0f) * 255.0f); };
+			const unsigned tint = 0xFF000000 | channel(color->red) << 16 | channel(color->green) << 8 | channel(color->blue);
+			setModelParticleTint(*model, tint, system->getShaderType() == ParticleSystemInfo::ADDITIVE);
+			model->Render(info);
+			drawn.push_back(model);
+		}
+	}
+	if (!drawn.empty())
+		TheDX8MeshRenderer.Flush();
+	for (auto* model : drawn)
+		model->Release_Ref();
+}
+}
 
 
 //------------------------------------------------------------------------------ Performance Timers
@@ -158,6 +229,8 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	UnsignedInt pointCount = 0;
 
 	ParticleSystemManager::ParticleSystemList &particleSysList = TheParticleSystemManager->getAllParticleSystems();
+	if (RetailFileLayers::enabled())
+		renderModelParticles(rinfo, particleSysList, bbox);
 	for( ParticleSystemManager::ParticleSystemListIt it = particleSysList.begin(); it != particleSysList.end(); ++it)
 	{
 		ParticleSystem *sys = (*it);

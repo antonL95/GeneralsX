@@ -319,7 +319,7 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 		(group->isSelected() || drawable.getID() == hover);
 	const ExperienceTracker* tracker = (anchor ? anchor : obj)->getExperienceTracker();
 	const Int rank = tracker ? tracker->getRank() : 1;
-	const Bool showRank = rank > 1 && isVisibleUnit(&drawable);
+	const Bool showRank = rank > 1 && (!anchor || HordeContain::get(anchor)->isBannerCarrier(obj)) && isVisibleUnit(&drawable);
 	if (!showBar && !showRank)
 		return;
 
@@ -380,6 +380,20 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 			TheMappedImageCollection->findImageByName(evil ? "Evil_Vet" : "Good_Vet") : nullptr;
 		const Image* dot = TheMappedImageCollection ?
 			TheMappedImageCollection->findImageByName(evil ? "Evil_Vet_Dot" : "Good_Vet_Dot") : nullptr;
+		if (anchor && dot)
+		{
+			const Int pipSize = std::max(1, static_cast<Int>(dot->getImageWidth() * scale * 0.5f));
+			const Int pips = std::min(rank, 10);
+			const Int spacing = std::max(1, static_cast<Int>(2.0f * scale));
+			const Int x = screen.x - (pips * pipSize + (pips - 1) * spacing) / 2;
+			const Int y = screen.y - height / 2 - pipSize - spacing;
+			for (Int index = 0; index < pips; ++index)
+			{
+				const Int pipX = x + index * (pipSize + spacing);
+				TheDisplay->drawImage(dot, pipX, y, pipX + pipSize, y + pipSize);
+			}
+			return;
+		}
 		if (!star)
 			return;
 		const Int starSize = std::max(1, static_cast<Int>(star->getImageWidth() * scale * 0.5f));

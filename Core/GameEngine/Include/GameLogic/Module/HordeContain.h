@@ -106,6 +106,7 @@ private:
 class HordeContain : public TransportContain
 {
 	friend class HordeAIUpdate;
+	friend class BannerCarrierUpdate;
 	friend struct RetailHordeSnapshotFixture;
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( HordeContain, "HordeContain" )
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( HordeContain, HordeContainModuleData )
@@ -136,6 +137,8 @@ public:
 		WeaponSlotType slot = (WeaponSlotType)-1, CanAttackResult* attackResult = nullptr) const;
 	Object* findNearestLivingMember(const Coord3D& fromPos) const;
 	static Bool addCrateBanner(Object* anchor);
+	void onRankAdvanced(Int rank, Bool feedback = FALSE);
+	Bool isBannerCarrier(const Object* member) const;
 	struct FormationGoal
 	{
 		Coord3D slot;
@@ -170,6 +173,11 @@ protected:
 	void redeployOccupants() override {}
 
 private:
+	const Object* getBannerCarrier() const;
+	const HordeBannerCarrierPosition* getBannerFormationPosition() const;
+	HordePoint getBannerOffset() const;
+	AsciiString getBannerUnitType() const;
+	Bool addBannerCarrier(Bool feedback);
 	void rebuildMemberSlots();
 	const HordeContainModuleData* findAlternateFormation() const;
 	void updateFormationModelConditions(Object* object) const;
@@ -180,6 +188,48 @@ private:
 	Bool m_hadMembers = FALSE;
 	Bool m_restoreHadMembers = FALSE;
 	Bool m_restoreBaseFormation = FALSE;
+};
+
+class BannerCarrierUpdateModuleData : public UpdateModuleData
+{
+public:
+	struct Morph
+	{
+		AsciiString unitType;
+		ModelConditionFlags conditions;
+		Int locomotor = -1;
+	};
+	static void buildFieldParse(MultiIniFieldParse& p);
+	std::vector<Morph> m_morphs;
+	AsciiString m_morphFX;
+	AsciiString m_unitSpawnFX;
+	AsciiString m_upgradeRequired;
+	UnsignedInt m_idleSpawnRate = 0;
+	UnsignedInt m_meleeFreeUnitSpawnTime = 0;
+	UnsignedInt m_diedRespawnTime = 0;
+	UnsignedInt m_meleeFreeBannerRespawnTime = 0;
+	Real m_scanHordeDistance = 0.0f;
+	Bool m_replenishNearbyHorde = FALSE;
+	Bool m_replenishAllNearbyHordes = FALSE;
+
+private:
+	static void parseMorph(INI* ini, void* instance, void* store, const void* userData);
+};
+
+class BannerCarrierUpdate : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(BannerCarrierUpdate, "BannerCarrierUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(BannerCarrierUpdate, BannerCarrierUpdateModuleData)
+
+public:
+	BannerCarrierUpdate(Thing* thing, const ModuleData* data);
+	UpdateSleepTime update() override;
+	void applyMorph(const AsciiString& unitType);
+	void playMorphFX(const Object* horde) const;
+	static BannerCarrierUpdate* find(Object* carrier);
+
+private:
+	const BannerCarrierUpdateModuleData::Morph* m_morph = nullptr;
 };
 
 struct HorseHordeContainModuleData : public HordeContainModuleData

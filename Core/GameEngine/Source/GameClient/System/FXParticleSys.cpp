@@ -14,6 +14,7 @@ enum FXModuleEffect
 	FX_MODULE_VOLUME,
 	FX_MODULE_DRAW_PARTICLE,
 	FX_MODULE_DRAW_STREAK,
+	FX_MODULE_DRAW_MODEL,
 	FX_MODULE_UNRENDERED
 };
 
@@ -64,16 +65,16 @@ const FXNamedValue fxShaders[] =
 	{ "MULTIPLY",                ParticleSystemInfo::MULTIPLY,   TRUE },
 	{ "ADDITIVE_NO_DEPTH_TEST",  ParticleSystemInfo::ADDITIVE,   FALSE },
 	{ "ALPHA_NO_DEPTH_TEST",     ParticleSystemInfo::ALPHA,      FALSE },
-	{ "W3D_DIFFUSE",             ParticleSystemInfo::ALPHA,      FALSE },
-	{ "W3D_ALPHA",               ParticleSystemInfo::ALPHA,      FALSE },
-	{ "W3D_EMISSIVE",            ParticleSystemInfo::ADDITIVE,   FALSE },
+	{ "W3D_DIFFUSE",             ParticleSystemInfo::ALPHA,      TRUE },
+	{ "W3D_ALPHA",               ParticleSystemInfo::ALPHA,      TRUE },
+	{ "W3D_EMISSIVE",            ParticleSystemInfo::ADDITIVE,   TRUE },
 	{ nullptr,                   0,                              FALSE }
 };
 
 const FXNamedValue fxTypes[] =
 {
 	{ "PARTICLE",         ParticleSystemInfo::PARTICLE,        TRUE },
-	{ "DRAWABLE",         ParticleSystemInfo::DRAWABLE,        FALSE },
+	{ "DRAWABLE",         ParticleSystemInfo::DRAWABLE,        TRUE },
 	{ "STREAK",           ParticleSystemInfo::STREAK,          TRUE },
 	{ "VOLUME_PARTICLE",  ParticleSystemInfo::VOLUME_PARTICLE, TRUE },
 	{ "SMUDGE",           ParticleSystemInfo::SMUDGE,          TRUE },
@@ -131,6 +132,13 @@ void ParticleSystemTemplate::resetForFXDefinition()
 	memset(&m_emissionVolume, 0, sizeof(m_emissionVolume));
 	m_slaveTemplate = nullptr;
 	m_isRenderable = TRUE;
+	m_modelHasAlpha = FALSE;
+	for (Int axis = 0; axis < 3; ++axis)
+	{
+		setZero(m_modelStartSize[axis]);
+		setZero(m_modelSizeRate[axis]);
+		m_modelSizeDamping[axis].setRange(1.0f, 1.0f, GameClientRandomVariable::CONSTANT);
+	}
 	m_windStrength = DEFAULT_WIND_STRENGTH;
 	m_windFullStrengthDistance = DEFAULT_WIND_FULL_STRENGTH_DISTANCE;
 	m_windZeroStrengthDistance = DEFAULT_WIND_ZERO_STRENGTH_DISTANCE;
@@ -149,7 +157,7 @@ void ParticleSystemTemplate::parseFXModule( INI* ini, void *instance, void *, co
 		{ "Color",            "DefaultColor",                  m_fxColorFieldParseTable,               FX_MODULE_KEEP,          0 },
 		{ "Alpha",            "DefaultAlpha",                  m_fxAlphaFieldParseTable,               FX_MODULE_KEEP,          0 },
 		{ "Update",           "DefaultUpdate",                 m_fxDefaultUpdateFieldParseTable,       FX_MODULE_KEEP,          0 },
-		{ "Update",           "RenderObjectUpdate",            m_fxRenderObjectUpdateFieldParseTable,  FX_MODULE_UNRENDERED,    0 },
+		{ "Update",           "RenderObjectUpdate",            m_fxRenderObjectUpdateFieldParseTable,  FX_MODULE_KEEP,          0 },
 		{ "Physics",          "DefaultPhysics",                m_fxPhysicsFieldParseTable,             FX_MODULE_KEEP,          0 },
 		{ "Wind",             "DefaultWind",                   m_fxWindFieldParseTable,                FX_MODULE_KEEP,          0 },
 		{ "Event",            "TerrainCollision",              m_fxEventFieldParseTable,               FX_MODULE_KEEP,          0 },
@@ -168,7 +176,7 @@ void ParticleSystemTemplate::parseFXModule( INI* ini, void *instance, void *, co
 		{ "EmissionVolume",   "TerrainFireEmission",           m_fxTerrainFireVolumeFieldParseTable,   FX_MODULE_UNRENDERED,    0 },
 		{ "Draw",             "DefaultDraw",                   m_fxDefaultDrawFieldParseTable,         FX_MODULE_DRAW_PARTICLE, 0 },
 		{ "Draw",             "StreakDraw",                    m_fxDefaultDrawFieldParseTable,         FX_MODULE_DRAW_STREAK,   0 },
-		{ "Draw",             "RenderObjectDraw",              m_fxRenderObjectDrawFieldParseTable,    FX_MODULE_UNRENDERED,    0 },
+		{ "Draw",             "RenderObjectDraw",              m_fxRenderObjectDrawFieldParseTable,    FX_MODULE_DRAW_MODEL,    0 },
 		{ "Draw",             "GpuDraw",                       m_fxGpuDrawFieldParseTable,             FX_MODULE_UNRENDERED,    0 },
 		{ "Draw",             "LightningDraw",                 m_fxLightningDrawFieldParseTable,       FX_MODULE_UNRENDERED,    0 },
 		{ "Draw",             "ButterflyDraw",                 m_fxDefaultDrawFieldParseTable,         FX_MODULE_UNRENDERED,    0 },
@@ -190,6 +198,9 @@ void ParticleSystemTemplate::parseFXModule( INI* ini, void *instance, void *, co
 
 	switch (choice->effect)
 	{
+		case FX_MODULE_DRAW_MODEL:
+			self->m_particleType = DRAWABLE;
+			break;
 		case FX_MODULE_VELOCITY:
 			self->m_emissionVelocityType = static_cast<EmissionVelocityType>(choice->value);
 			break;
@@ -206,6 +217,8 @@ void ParticleSystemTemplate::parseFXModule( INI* ini, void *instance, void *, co
 		case FX_MODULE_KEEP:
 			break;
 	}
+	if (strcmp(section, "Alpha") == 0)
+		self->m_modelHasAlpha = TRUE;
 	ini->initFromINI( instance, choice->table );
 }
 
@@ -311,20 +324,20 @@ const FieldParse ParticleSystemTemplate::m_fxRenderObjectUpdateFieldParseTable[]
 {
 	{ "AngleX",         ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
 	{ "AngleY",         ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "AngleZ",         ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "AngleZ",         INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_angleZ) },
 	{ "AngularRateX",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
 	{ "AngularRateY",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "AngularRateZ",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "AngularDamping", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "StartSizeX",     ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "StartSizeY",     ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "StartSizeZ",     ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "SizeRateX",      ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "SizeRateY",      ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "SizeRateZ",      ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "SizeDampingX",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "SizeDampingY",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "SizeDampingZ",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "AngularRateZ",   INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_angularRateZ) },
+	{ "AngularDamping", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_angularDamping) },
+	{ "StartSizeX", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelStartSize[0]) },
+	{ "StartSizeY", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelStartSize[1]) },
+	{ "StartSizeZ", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelStartSize[2]) },
+	{ "SizeRateX", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelSizeRate[0]) },
+	{ "SizeRateY", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelSizeRate[1]) },
+	{ "SizeRateZ", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelSizeRate[2]) },
+	{ "SizeDampingX", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelSizeDamping[0]) },
+	{ "SizeDampingY", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelSizeDamping[1]) },
+	{ "SizeDampingZ", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelSizeDamping[2]) },
 	{ "Rotation",       ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
 	{ nullptr,          nullptr,                                   nullptr, 0 }
 };

@@ -296,6 +296,7 @@ protected:
 
 public:
 	AIUpdateInterface( Thing *thing, const ModuleData* moduleData );
+	const AsciiString& getRetailLuaEventList() const { return getAIUpdateModuleData()->m_luaEventsList; }
 	// virtual destructor prototype provided by memory pool declaration
 
 	virtual AIUpdateInterface* getAIUpdateInterface() override { return this; }

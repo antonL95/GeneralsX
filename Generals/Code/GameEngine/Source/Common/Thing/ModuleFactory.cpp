@@ -456,6 +456,7 @@ void ModuleFactory::init()
 		addModule( FakePathfindPortalBehaviour );
 		addModule( TerrainResourceBehavior );
 		addModule( HordeContain );
+		addModule( BannerCarrierUpdate );
 		addModule( HorseHordeContain );
 		addModule( AODHordeContain );
 		addModule( HordeAIUpdate );

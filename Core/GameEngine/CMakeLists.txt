@@ -87,6 +87,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/CastleTemplateStore.h
     Include/GameLogic/ExperienceLevelRules.h
     Include/GameLogic/ExperienceLevelStore.h
+    Include/GameLogic/RetailCreationUpgrades.h
     Include/GameLogic/WeaponNuggetRules.h
     Include/GameLogic/RetailTestCommands.h
     Include/GameLogic/Module/CastleBehavior.h
@@ -720,6 +721,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/HeroRoster.cpp
     Source/GameLogic/Map/CastleTemplateStore.cpp
     Source/GameLogic/System/ExperienceLevelStore.cpp
+    Source/GameLogic/System/RetailCreationUpgrades.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
