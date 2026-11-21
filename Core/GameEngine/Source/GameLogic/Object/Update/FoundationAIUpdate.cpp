@@ -106,12 +106,13 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player,
 	Money* money = player->getMoney();
 	if (money->countMoney() < cost)
 		return nullptr;
-	money->withdraw(cost);
+	const UnsignedInt paid = money->withdraw(cost);
 
 	Object* structure = TheThingFactory->newObject(what, player->getDefaultTeam(),
 		MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNDER_CONSTRUCTION));
 	structure->setProducer(foundation);
 	structure->setBuilder(foundation);
+	structure->setConstructionCostPaid(paid);
 
 	const Coord3D* at = foundation->getPosition();
 	const Coord3D ground = {at->x, at->y, TheTerrainLogic->getGroundHeight(at->x, at->y)};

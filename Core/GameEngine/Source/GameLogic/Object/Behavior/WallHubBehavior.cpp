@@ -449,6 +449,9 @@ const GettingBuiltBehavior* GettingBuiltBehavior::find(const Object& structure)
 
 UnsignedInt GettingBuiltBehavior::constructionRefund(const Object& structure, const Player& player)
 {
+	const Int paid = structure.getConstructionCostPaid();
+	if (paid >= 0)
+		return static_cast<UnsignedInt>(paid);
 	const auto* behavior = find(structure);
 	const Int cost = behavior && behavior->m_paidCost >= 0 ? behavior->m_paidCost : structure.getTemplate()->calcCostToBuild(&player);
 	return static_cast<UnsignedInt>(std::max(0, cost));

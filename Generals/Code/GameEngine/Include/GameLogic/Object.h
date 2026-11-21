@@ -381,6 +381,8 @@ public:
 	void calcNaturalRallyPoint(Coord2D *pt); ///< calc the "natural" starting rally point
   void setConstructionPercent( Real percent ) { m_constructionPercent = percent; }
 	Real getConstructionPercent() const { return m_constructionPercent; }
+	void setConstructionCostPaid(UnsignedInt cost) { m_constructionCostPaid = static_cast<Int>(cost); }
+	Int getConstructionCostPaid() const { return m_constructionCostPaid; }
 
   void setLayer( PathfindLayerEnum layer );
 	PathfindLayerEnum getLayer() const { return m_layer; }
@@ -738,6 +740,7 @@ private:
 	UnsignedInt										m_containedByFrame;	///< frame we were contained by m_containedBy
 
 	Real													m_constructionPercent;			///< for objects being built ... this is the amount completed (0.0 to 100.0)
+	Int m_constructionCostPaid = -1;
 	UpgradeMaskType								m_objectUpgradesCompleted;	///< Bit field of upgrades locally completed.
 
 	Team*													m_team;								///< team that is current owner of this guy

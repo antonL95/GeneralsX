@@ -4207,6 +4207,7 @@ void Object::crc( Xfer *xfer )
 		xferRotwkPowerState(xfer);
 		xferMountedTemplateState(xfer);
 		xferMountedCombatState(xfer);
+		xfer->xferInt(&m_constructionCostPaid);
 	}
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;
@@ -4358,8 +4359,9 @@ void Object::xfer( Xfer *xfer )
 #endif
 	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
 		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
-	const XferVersion maxVersion = RetailFileLayers::enabled() ? 14 : 10;
-	XferVersion version = maxVersion == 14 ? maxVersion : (extendedSlots ? 10 : legacyVersion);
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 15 : 10;
+	XferVersion version = maxVersion == 15 ? (m_constructionCostPaid >= 0 ? 15 : 14) :
+		(extendedSlots ? 10 : legacyVersion);
 	xfer->xferVersion(&version, maxVersion);
 
 	// object ID
@@ -4599,6 +4601,8 @@ void Object::xfer( Xfer *xfer )
 
 	// construction percent
 	xfer->xferReal( &m_constructionPercent );
+	if (version >= 15)
+		xfer->xferInt(&m_constructionCostPaid);
 
 	// upgrades completed
 	xfer->xferUpgradeMask( &m_objectUpgradesCompleted );

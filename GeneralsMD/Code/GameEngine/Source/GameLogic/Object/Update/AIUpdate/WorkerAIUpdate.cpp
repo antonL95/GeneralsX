@@ -405,7 +405,9 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 	{
 		Money *money = owningPlayer->getMoney();
 
-		money->withdraw( what->calcCostToBuild( owningPlayer ) );
+		const UnsignedInt paid = money->withdraw(what->calcCostToBuild(owningPlayer));
+		if (RetailFileLayers::enabled())
+			obj->setConstructionCostPaid(paid);
 
 	}
 

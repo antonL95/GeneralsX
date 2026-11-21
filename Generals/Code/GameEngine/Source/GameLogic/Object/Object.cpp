@@ -3580,7 +3580,10 @@ void Object::onDisabledEdge(Bool becomingDisabled)
 void Object::crc( Xfer *xfer )
 {
 	if (RetailFileLayers::enabled())
+	{
 		xferRotwkPowerState(xfer);
+		xfer->xferInt(&m_constructionCostPaid);
+	}
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;
 //	Bool g_logAllObjects = TRUE;
@@ -3748,7 +3751,10 @@ void Object::xfer( Xfer *xfer )
 #endif
 	if (RetailFileLayers::enabled() && m_rotwkPowerState)
 		version = 11;
-	xfer->xferVersion( &version, 11 );
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 12 : 11;
+	if (maxVersion == 12 && m_constructionCostPaid >= 0)
+		version = 12;
+	xfer->xferVersion(&version, maxVersion);
 
 	// object ID
 	ObjectID id = getID();
@@ -3978,6 +3984,8 @@ void Object::xfer( Xfer *xfer )
 
 	// construction percent
 	xfer->xferReal( &m_constructionPercent );
+	if (version >= 12)
+		xfer->xferInt(&m_constructionCostPaid);
 
 	// upgrades completed
 	xfer->xferUpgradeMask( &m_objectUpgradesCompleted );

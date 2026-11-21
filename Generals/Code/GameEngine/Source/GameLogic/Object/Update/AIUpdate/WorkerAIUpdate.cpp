@@ -39,6 +39,7 @@
 #include "Common/ThingFactory.h"
 #include "Common/Player.h"
 #include "Common/Money.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Radar.h"
 #include "Common/RandomValue.h"
 #include "Common/GlobalData.h"
@@ -402,7 +403,9 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 	{
 		Money *money = owningPlayer->getMoney();
 
-		money->withdraw( what->calcCostToBuild( owningPlayer ) );
+		const UnsignedInt paid = money->withdraw(what->calcCostToBuild(owningPlayer));
+		if (RetailFileLayers::enabled())
+			obj->setConstructionCostPaid(paid);
 
 	}
 

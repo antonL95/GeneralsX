@@ -54,6 +54,7 @@
 #include "GameLogic/Module/BridgeTowerBehavior.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/TerrainVisual.h"
 
@@ -318,7 +319,7 @@ static Bool claimConstructionSite( Object *dozer, Object *site )
 				BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP, dozer, nullptr, site ) != LBC_OK )
 	{
 		TheTerrainVisual->removeAllBibs();
-		owner->getMoney()->deposit( site->getTemplate()->calcCostToBuild( owner ), TRUE, FALSE );
+		owner->getMoney()->deposit(GettingBuiltBehavior::constructionRefund(*site, *owner), TRUE, FALSE);
 		TheGameLogic->destroyObject( site );
 		return FALSE;
 	}
@@ -1922,7 +1923,9 @@ Object *DozerAIUpdate::construct( const ThingTemplate *what,
 	{
 		Money *money = owningPlayer->getMoney();
 
-		money->withdraw( what->calcCostToBuild( owningPlayer ) );
+		const UnsignedInt paid = money->withdraw(what->calcCostToBuild(owningPlayer));
+		if (RetailFileLayers::enabled())
+			obj->setConstructionCostPaid(paid);
 
 	}
 

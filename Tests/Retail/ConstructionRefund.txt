@@ -1,0 +1,35 @@
+11 cash Player_1 - 0 50000
+12 power-reveal - - 0
+30 create Player_1 GondorStoneMaker 0 680,450,0
+50 bparity-state Player_1 MenPorter 0 GondorFarm
+51 construct Player_1 MenPorter 0 GondorFarm 1018 490
+53 bparity-state Player_1 GondorFarm 0
+55 snapshot-save - - 0 construction-refund.sav
+58 kill Player_1 GondorStoneMaker 0
+60 bparity-state Player_1 GondorFarm 0
+61 cancelbuild Player_1 GondorFarm 0
+63 bparity-state Player_1 MenPorter 0 GondorFarm
+65 bparity-state Player_1 GondorFarm 0
+66 xpcrc - - 0
+69 destroy Player_1 GondorStoneMaker 0
+70 create Player_1 GondorStoneMaker 0 680,450,0
+74 bparity-state Player_1 MenPorter 0 MenArrowTowerExpansion
+75 build Player_1 MenFortressExpansionPadCorner 0 MenArrowTowerExpansion
+77 bparity-state Player_1 MenArrowTowerExpansion 0
+80 kill Player_1 GondorStoneMaker 0
+82 bparity-state Player_1 MenArrowTowerExpansion 0
+83 cancelbuild Player_1 MenArrowTowerExpansion 0
+85 bparity-state Player_1 MenPorter 0 MenArrowTowerExpansion
+87 bparity-state Player_1 MenArrowTowerExpansion 0
+99 destroy Player_1 GondorStoneMaker 0
+100 create Player_1 GondorStoneMaker 0 680,450,0
+105 bparity-state Player_1 MenPorter 0 GondorFarm
+106 construct Player_1 MenPorter 0 GondorFarm 1080 725
+108 bparity-state Player_1 GondorFarm 0
+109 kill Player_1 GondorStoneMaker 0
+110 create Player_2 MenWallHubSmall 0 1097,725,0
+111 bparity-state Player_1 GondorFarm 0
+190 bparity-state Player_1 MenPorter 0 GondorFarm
+193 bparity-state Player_1 MenPorter 0 GondorFarm
+194 bparity-state Player_1 GondorFarm 0
+195 quit - - 0
