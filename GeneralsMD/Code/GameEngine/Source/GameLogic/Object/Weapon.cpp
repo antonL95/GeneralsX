@@ -1532,7 +1532,7 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 
 	if (hasNuggets())
 	{
-		dealNuggetsAtImpact(sourceID, victimID, pos, bonus);
+		dealNuggetsAtImpact(sourceID, victimID, pos, bonus, !isProjectileDetonation && isContactWeapon());
 		return;
 	}
 
@@ -1686,7 +1686,7 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 				}
 			}
 
-			curVictim->attemptDamage(&damageInfo);
+			HordeContain::applyWeaponDamage(curVictim, damageInfo, !isProjectileDetonation && isContactWeapon());
 			//DEBUG_ASSERTLOG(damageInfo.out.m_noEffect, ("WeaponTemplate::dealDamageInternal: dealt to %s %08lx: attempted %f, actual %f (%f)",
 			//	curVictim->getTemplate()->getName().str(),curVictim,
 			//	damageInfo.in.m_amount, damageInfo.out.m_actualDamageDealt, damageInfo.out.m_actualDamageClipped));
@@ -1825,7 +1825,8 @@ void WeaponStore::update()
 			// we never do projectile-detonation-damage via this code path.
 			const Bool isProjectileDetonation = false;
 			if (ddi->m_nuggetIndex >= 0)
-				ddi->m_delayedWeapon->dealNuggetDamage(ddi->m_nuggetIndex, ddi->m_delaySourceID, ddi->m_delayIntendedVictimID, &ddi->m_delayDamagePos, ddi->m_bonus, ddi->m_dotTick);
+				ddi->m_delayedWeapon->dealNuggetDamage(ddi->m_nuggetIndex, ddi->m_delaySourceID, ddi->m_delayIntendedVictimID,
+					&ddi->m_delayDamagePos, ddi->m_bonus, ddi->m_dotTick, ddi->m_contactHit);
 			else
 				ddi->m_delayedWeapon->dealDamageInternal(ddi->m_delaySourceID, ddi->m_delayIntendedVictimID, &ddi->m_delayDamagePos, ddi->m_bonus, isProjectileDetonation);
 			ddi = m_weaponDDI.erase(ddi);
@@ -1875,7 +1876,8 @@ void WeaponStore::reset()
 }
 
 //-------------------------------------------------------------------------------------------------
-void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID, const WeaponBonus& bonus, Int nuggetIndex, Bool dotTick)
+void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID,
+	const WeaponBonus& bonus, Int nuggetIndex, Bool dotTick, Bool contactHit)
 {
 	WeaponDelayedDamageInfo wi;
 	wi.m_delayedWeapon = weapon;
@@ -1886,6 +1888,7 @@ void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* 
 	wi.m_bonus = bonus;
 	wi.m_nuggetIndex = nuggetIndex;
 	wi.m_dotTick = dotTick;
+	wi.m_contactHit = contactHit;
 	m_weaponDDI.push_back(wi);
 }
 

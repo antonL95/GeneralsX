@@ -343,6 +343,7 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 	const Int edge = std::max(1, static_cast<Int>(scale + 0.25f));
 	const Int height = std::max(4 * edge + 3, static_cast<Int>(7 * scale + 0.5f));
 	const Int clearance = static_cast<Int>((structure ? 11.0f : 10.0f) * scale + 0.5f);
+	const Int barTop = screen.y - clearance - height / 2;
 	const BodyModuleInterface* body = obj->getBodyModule();
 	if (showBar && body && body->getHealth() > 0.0f && body->getMaxHealth() > 0.0f)
 	{
@@ -350,7 +351,7 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 		const Bool building = obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
 		const Real fraction = building ? std::clamp(obj->getConstructionPercent() * 0.01f, 0.0f, 1.0f) : health;
 		const Int x = screen.x - width / 2;
-		const Int y = screen.y - clearance - height / 2;
+		const Int y = barTop;
 		const Bool healthy = !building && health > TheGlobalData->m_unitDamagedThresh;
 		const Color fill = building ? GameMakeColor(97, 209, 244, 255) :
 			health > TheGlobalData->m_unitReallyDamagedThresh ? GameMakeColor(239, 196, 84, 255) : GameMakeColor(220, 76, 36, 255);
@@ -386,7 +387,7 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 			const Int pips = std::min(rank, 10);
 			const Int spacing = std::max(1, static_cast<Int>(2.0f * scale));
 			const Int x = screen.x - (pips * pipSize + (pips - 1) * spacing) / 2;
-			const Int y = screen.y - height / 2 - pipSize - spacing;
+			const Int y = barTop - edge - spacing - pipSize;
 			for (Int index = 0; index < pips; ++index)
 			{
 				const Int pipX = x + index * (pipSize + spacing);
@@ -400,7 +401,7 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 		const Int dotSize = dot ? std::max(1, static_cast<Int>(dot->getImageWidth() * scale * 0.5f)) : 0;
 		const Int dots = dot ? std::min(rank, 10) - 2 : 0;
 		const Int x = screen.x - (starSize + dots * dotSize) / 2;
-		const Int y = screen.y - (showBar ? clearance + height / 2 + edge : 6 * edge) - starSize;
+		const Int y = (showBar ? barTop - edge : screen.y - 6 * edge) - starSize;
 		TheDisplay->drawImage(star, x, y, x + starSize, y + starSize);
 		for (Int index = 0; index < dots; ++index)
 		{

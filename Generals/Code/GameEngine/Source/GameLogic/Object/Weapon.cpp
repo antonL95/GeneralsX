@@ -1457,7 +1457,7 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 				}
 			}
 
-			curVictim->attemptDamage(&damageInfo);
+			HordeContain::applyWeaponDamage(curVictim, damageInfo, !isProjectileDetonation && isContactWeapon());
 			//DEBUG_ASSERTLOG(damageInfo.out.m_noEffect, ("WeaponTemplate::dealDamageInternal: dealt to %s %08lx: attempted %f, actual %f (%f)",
 			//	curVictim->getTemplate()->getName().str(),curVictim,
 			//	damageInfo.in.m_amount, damageInfo.out.m_actualDamageDealt, damageInfo.out.m_actualDamageClipped));

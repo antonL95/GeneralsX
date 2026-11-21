@@ -166,6 +166,7 @@ public:
 	const HordeContainModuleData* getActiveFormation() const;
 	const std::vector<AsciiString>& getFormationModifiers() const { return getActiveFormation()->m_attributeModifiers; }
 	static Object* getAnchor(Object* member);
+	static void applyWeaponDamage(Object* victim, DamageInfo& damage, Bool contactHit);
 	static Drawable* resolveSelection(Drawable* draw);
 
 protected:

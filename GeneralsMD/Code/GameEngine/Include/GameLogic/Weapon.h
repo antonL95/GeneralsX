@@ -517,9 +517,10 @@ protected:
 	// actually deal out the damage.
 	void dealDamageInternal(ObjectID sourceID, ObjectID victimID, const Coord3D *pos, const WeaponBonus& bonus, Bool isProjectileDetonation) const;
 	static const Object* getNuggetAttacker(const Object* source);
-	void dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus) const;
+	void dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus, Bool contactHit) const;
 	void applyModifierNugget(const WeaponNugget& nugget, const Object* attacker, ObjectID victimID, const Coord3D* pos) const;
-	void dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus, Bool dotTick = FALSE) const;
+	void dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
+		Bool dotTick, Bool contactHit) const;
 	void launchNuggetProjectiles(const Object* sourceObj, WeaponSlotType wslot, Int specificBarrelToUse, Object* victimObj,
 		const Coord3D& destination, Weapon* firingWeapon, ObjectID* projectileID) const;
 	Real estimateNuggetDamage(const Object* sourceObj, const Object* victimObj, const WeaponBonus& bonus, Int depth) const;
@@ -934,7 +935,8 @@ protected:
 
 	void deleteAllDelayedDamage();
 	void resetWeaponTemplates();
-	void setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID, const WeaponBonus& bonus, Int nuggetIndex = -1, Bool dotTick = FALSE);
+	void setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID,
+		const WeaponBonus& bonus, Int nuggetIndex = -1, Bool dotTick = FALSE, Bool contactHit = FALSE);
 
 private:
 
@@ -955,6 +957,7 @@ private:
 		WeaponBonus m_bonus;												///< the weapon bonus to use
 		Int m_nuggetIndex;
 		Bool m_dotTick;
+		Bool m_contactHit;
 	};
 
 	std::vector<WeaponTemplate*> m_weaponTemplateVector;

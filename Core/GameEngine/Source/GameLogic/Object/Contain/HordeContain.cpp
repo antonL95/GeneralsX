@@ -68,18 +68,11 @@ const BannerCarrierUpdateModuleData* findBannerData(const ThingTemplate* type)
 	return nullptr;
 }
 
-UnsignedInt recentMeleeFrame(const Object* member, UnsignedInt frame)
+bool isAttackingMelee(const Object* member)
 {
 	const auto* weapon = member->getCurrentWeapon();
 	const auto* ai = member->getAI();
-	if (!member->isEffectivelyDead() && weapon && weapon->isContactWeapon() && ai && ai->isAttacking())
-		return frame;
-	const auto* body = member->getBodyModule();
-	const auto* damage = body ? body->getLastDamageInfo() : nullptr;
-	const auto* time = body ? body->getLastDamageTimestamp() : nullptr;
-	const auto* attacker = damage ? TheGameLogic->findObjectByID(damage->in.m_sourceID) : nullptr;
-	const auto* incoming = attacker ? attacker->getCurrentWeapon() : nullptr;
-	return incoming && incoming->isContactWeapon() && time ? *time : 0;
+	return !member->isEffectivelyDead() && weapon && weapon->isContactWeapon() && ai && ai->isAttacking();
 }
 
 bool bannerUpgradeComplete(const Object* source, const BannerCarrierUpdateModuleData& banner)
@@ -483,8 +476,6 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 
 void HordeContain::onRemoving( Object *rider )
 {
-	if (RetailFileLayers::enabled() && m_replenishmentBanner.isNotEmpty())
-		m_lastMeleeFrame = std::max(m_lastMeleeFrame, recentMeleeFrame(rider, TheGameLogic->getFrame()));
 	if (isBannerCarrier(rider))
 	{
 		const auto* data = findBannerData(rider->getTemplate());
@@ -667,6 +658,16 @@ Object* HordeContain::getAnchor(Object* member)
 	return get(anchor) ? anchor : nullptr;
 }
 
+void HordeContain::applyWeaponDamage(Object* victim, DamageInfo& damage, Bool contactHit)
+{
+	Object* anchor = contactHit && RetailFileLayers::enabled() ? getAnchor(victim) : nullptr;
+	const ObjectID anchorID = anchor ? anchor->getID() : INVALID_ID;
+	victim->attemptDamage(&damage);
+	if (anchorID != INVALID_ID && damage.out.m_actualDamageClipped > 0.0f)
+		if (auto* horde = const_cast<HordeContain*>(get(TheGameLogic->findObjectByID(anchorID))))
+			horde->m_lastMeleeFrame = TheGameLogic->getFrame();
+}
+
 Bool HordeContain::addCrateBanner(Object* anchor)
 {
 	auto* contain = const_cast<HordeContain*>(get(anchor));
@@ -764,8 +765,8 @@ void HordeContain::updateReplenishment()
 		return;
 
 	const auto frame = TheGameLogic->getFrame();
-	for (const Object* member : getContainList())
-		m_lastMeleeFrame = std::max(m_lastMeleeFrame, recentMeleeFrame(member, frame));
+	if (std::any_of(getContainList().begin(), getContainList().end(), isAttackingMelee))
+		m_lastMeleeFrame = frame;
 	const auto* banner = getBannerCarrier();
 	if (!banner)
 	{

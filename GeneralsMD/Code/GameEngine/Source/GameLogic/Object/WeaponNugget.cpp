@@ -442,7 +442,7 @@ const Object* WeaponTemplate::getNuggetAttacker(const Object* source)
 	return launcher ? launcher : source;
 }
 
-void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus) const
+void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus, Bool contactHit) const
 {
 	const Object* attacker = getNuggetAttacker(TheGameLogic->findObjectByID(sourceID));
 	const ObjectID nuggetSourceID = attacker ? attacker->getID() : sourceID;
@@ -463,15 +463,15 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 		if (!nugget.isImpactNugget() || !nugget.isEnabledFor(attacker))
 			continue;
 		if (nugget.m_delayFrames == 0)
-			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus);
+			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit);
 		else if (TheWeaponStore)
 			TheWeaponStore->setDelayedDamage(this, pos, TheGameLogic->getFrame() + nugget.m_delayFrames, nuggetSourceID, victimID,
-				bonus, static_cast<Int>(index));
+				bonus, static_cast<Int>(index), FALSE, contactHit);
 	}
 }
 
 void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
-	Bool dotTick) const
+	Bool dotTick, Bool contactHit) const
 {
 	const WeaponNugget& nugget = m_nuggets[nuggetIndex];
 	Object* source = TheGameLogic->findObjectByID(sourceID);
@@ -564,7 +564,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damageInfo.in.m_sourcePlayerMask = source && source->getControllingPlayer() ? source->getControllingPlayer()->getPlayerMask() : 0;
 		damageInfo.in.m_amount = amount;
 		const Real healthBefore = victim->getBodyModule() ? victim->getBodyModule()->getHealth() : 0.0f;
-		victim->attemptDamage(&damageInfo);
+		HordeContain::applyWeaponDamage(victim, damageInfo, contactHit);
 
 		if (RetailTestCommands::tracesCombat())
 			std::fprintf(stderr, "TEST damage frame=%u weapon=%s nugget=%d kind=%s type=%s death=%s source=%u victim=%u(%s) base=%.2f scalar=%.3f amount=%.2f dealt=%.2f health=%.2f->%.2f\n",
