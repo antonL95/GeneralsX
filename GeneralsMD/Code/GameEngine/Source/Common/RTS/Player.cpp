@@ -359,6 +359,7 @@ Player::Player( Int playerIndex )
 void Player::init(const PlayerTemplate* pt)
 {
 	m_retailSpellBookID = INVALID_ID;
+	m_powerProductionBonuses.clear();
 
 	DEBUG_ASSERTCRASH(m_playerTeamPrototypes.empty(), ("Player::m_playerTeamPrototypes is not empty at game start!"));
 	m_commandPointUpgrades.clear();
@@ -4218,7 +4219,10 @@ void Player::crc( Xfer *xfer )
 	xfer->xferInt( &m_skillPoints );
 	xfer->xferInt( &m_sciencePurchasePoints );
 	if (RetailFileLayers::enabled())
+	{
 		HeroRoster::xferPlayer(this, xfer);
+		xferPowerProductionBonuses(xfer);
+	}
 
 }
 
@@ -4239,7 +4243,7 @@ void Player::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 9 : 8;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 10 : 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4777,6 +4781,8 @@ void Player::xfer( Xfer *xfer )
 		HeroRoster::xferPlayer(this, xfer);
 	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
 		HeroRoster::reset(m_playerIndex);
+	if (version >= 10)
+		xferPowerProductionBonuses(xfer);
 
 }
 

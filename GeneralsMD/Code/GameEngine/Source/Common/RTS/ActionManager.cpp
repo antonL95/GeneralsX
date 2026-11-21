@@ -1748,6 +1748,9 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 		if (isObjectShroudedForAction(obj, target, commandSource))
 			return FALSE;
 
+		if (RetailFileLayers::enabled() && !mod->isValidPowerTarget(target))
+			return FALSE;
+
 		if( RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2 )
 		{
 			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;

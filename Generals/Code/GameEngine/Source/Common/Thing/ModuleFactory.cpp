@@ -239,6 +239,12 @@
 #include "GameLogic/Module/ActiveBody.h"
 #include "GameLogic/Module/RespawnModules.h"
 #include "GameLogic/Module/RotWKBodyModules.h"
+#include "GameLogic/Module/HordeDispatchSpecialPower.h"
+#include "GameLogic/Module/SpecialPowerTimerRefreshSpecialPower.h"
+#include "GameLogic/Module/ProductionSpeedBonus.h"
+#include "GameLogic/Module/InvisibilitySpecialPower.h"
+#include "GameLogic/Module/WeaponChangeSpecialPowerModule.h"
+#include "GameLogic/Module/GrabPassengerSpecialPower.h"
 #include "GameLogic/Module/HighlanderBody.h"
 #include "GameLogic/Module/ImmortalBody.h"
 #include "GameLogic/Module/StructureBody.h"
@@ -540,6 +546,12 @@ void ModuleFactory::init()
 	if (registersRotwkModules())
 	{
 		addModule( SpecialPowerModule );
+		addModule( HordeDispatchSpecialPower );
+		addModule( SpecialPowerTimerRefreshSpecialPower );
+		addModule( ProductionSpeedBonus );
+		addModule( InvisibilitySpecialPower );
+		addModule( WeaponChangeSpecialPowerModule );
+		addModule( GrabPassengerSpecialPower );
 		addModule( AISpecialPowerUpdate );
 	}
 	addModule( SpecialAbility );

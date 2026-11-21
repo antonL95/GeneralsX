@@ -39,6 +39,7 @@
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Object;
 class SpecialPowerTemplate;
+class Waypoint;
 struct FieldParse;
 
 
@@ -62,11 +63,13 @@ public:
 	virtual void setReadyFrame( UnsignedInt frame ) = 0;
 	virtual void pauseCountdown( Bool pause ) = 0;
 	virtual void doSpecialPower( UnsignedInt commandOptions ) = 0;
+	virtual Bool isValidPowerTarget(const Object*) const { return TRUE; }
 	virtual void doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions ) = 0;
 	virtual void doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions ) = 0;
 	virtual void doSpecialPowerUsingWaypoints( const Waypoint *way, UnsignedInt commandOptions ) = 0;
 	virtual void markSpecialPowerTriggered( const Coord3D *location ) = 0;
 	virtual void startPowerRecharge() = 0;
+	virtual void refreshPowerTimer() = 0;
 	virtual const AudioEventRTS& getInitiateSound() const = 0;
 	virtual Bool startsReady() const = 0;
 	virtual Bool isScriptOnly() const = 0;
@@ -203,7 +206,10 @@ public:
 	virtual const ThingTemplate* getReferenceThingTemplate() const override { return nullptr; }
 	const SpecialPowerModuleData* getPowerModuleData() const { return getSpecialPowerModuleData(); }
 
+	void refreshPowerTimer() override;
+
 protected:
+	virtual void applyPowerEffect(const Coord3D*) {}
 
 	Bool meetsRequiredRank() const;
 	Bool initiateIntentToDoSpecialPower( const Object *targetObj, const Coord3D *targetPos, const Waypoint *way, UnsignedInt commandOptions );

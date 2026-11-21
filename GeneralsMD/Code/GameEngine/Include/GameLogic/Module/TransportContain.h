@@ -31,6 +31,7 @@
 
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "GameLogic/Module/OpenContain.h"
+#include "Common/SpecialPowerINI.h"
 
 //-------------------------------------------------------------------------------------------------
 class TransportContainModuleData : public OpenContainModuleData
@@ -57,7 +58,12 @@ public:
 	Bool							m_destroyRidersWhoAreNotFreeToExit;
 	Bool							m_isDelayExitInAir;
 
+	SpecialPowerObjectFilter m_passengerFilter;
+	KindOfMaskType m_passengerTypeOne;
+	Bool m_hasPassengerFilter = FALSE;
+
 	TransportContainModuleData();
+	static void parsePassengerFilter(INI* ini, void* instance, void* store, const void* custom);
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 	static void parseInitialPayload( INI* ini, void *instance, void *store, const void* /*userData*/ );
@@ -77,6 +83,7 @@ public:
 	// virtual destructor prototype provided by memory pool declaration
 
 	virtual Bool isValidContainerFor( const Object* obj, Bool checkCapacity) const override;
+	Int getPassengerSlotCount(const Object* rider) const;
 
 	virtual void onCapture( Player *oldOwner, Player *newOwner ) override; // have to kick everyone out on capture.
 	virtual void onContaining( Object *obj, Bool wasSelected ) override;		///< object now contains 'obj'

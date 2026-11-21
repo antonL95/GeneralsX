@@ -4140,6 +4140,8 @@ void Object::onDisabledEdge(Bool becomingDisabled)
 //-------------------------------------------------------------------------------------------------
 void Object::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xferRotwkPowerState(xfer);
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;
 //	Bool g_logAllObjects = TRUE;
@@ -4290,8 +4292,8 @@ void Object::xfer( Xfer *xfer )
 #endif
 	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
 		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
-	const XferVersion maxVersion = RetailFileLayers::enabled() ? 11 : 10;
-	XferVersion version = maxVersion == 11 ? maxVersion : (extendedSlots ? 10 : legacyVersion);
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 12 : 10;
+	XferVersion version = maxVersion == 12 ? maxVersion : (extendedSlots ? 10 : legacyVersion);
 	xfer->xferVersion(&version, maxVersion);
 
 	// object ID
@@ -4744,6 +4746,8 @@ void Object::xfer( Xfer *xfer )
 
 	if (version >= 11)
 		m_logicModelConditions.xfer(xfer);
+	if (version >= 12)
+		xferRotwkPowerState(xfer);
 }
 
 //-------------------------------------------------------------------------------------------------

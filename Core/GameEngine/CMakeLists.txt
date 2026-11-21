@@ -68,6 +68,13 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/RotwkParseOnlyModules.h
     Include/GameLogic/Module/RespawnModules.h
     Include/GameLogic/Module/RotWKBodyModules.h
+    Include/GameLogic/Module/HordeDispatchSpecialPower.h
+    Include/GameLogic/Module/SpecialPowerTimerRefreshSpecialPower.h
+    Include/GameLogic/Module/ProductionSpeedBonus.h
+    Include/GameLogic/Module/RotwkPowerState.h
+    Include/GameLogic/Module/InvisibilitySpecialPower.h
+    Include/GameLogic/Module/WeaponChangeSpecialPowerModule.h
+    Include/GameLogic/Module/GrabPassengerSpecialPower.h
     Include/GameLogic/HeroRoster.h
     Include/Common/HeroRules.h
     Include/Common/AbilityRules.h
@@ -689,6 +696,13 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/AISpecialPowerUpdate.cpp
     Source/GameLogic/Object/Update/RotwkParseOnlyModules.cpp
     Source/GameLogic/Object/Body/RotWKBodyModules.cpp
+    Source/GameLogic/Object/SpecialPower/HordeDispatchSpecialPower.cpp
+    Source/GameLogic/Object/SpecialPower/SpecialPowerTimerRefreshSpecialPower.cpp
+    Source/GameLogic/Object/SpecialPower/ProductionSpeedBonus.cpp
+    Source/GameLogic/Object/SpecialPower/RotwkPowerState.cpp
+    Source/GameLogic/Object/SpecialPower/InvisibilitySpecialPower.cpp
+    Source/GameLogic/Object/SpecialPower/WeaponChangeSpecialPowerModule.cpp
+    Source/GameLogic/Object/SpecialPower/GrabPassengerSpecialPower.cpp
     Source/GameLogic/Object/Update/RespawnModules.cpp
     Source/GameLogic/System/HeroRoster.cpp
     Source/GameLogic/Map/CastleTemplateStore.cpp

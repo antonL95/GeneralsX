@@ -43,6 +43,7 @@
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/TransportContain.h"
+#include "Common/ModuleFactory.h"
 #include "GameLogic/Object.h"
 
 
@@ -86,6 +87,15 @@ void TransportContainModuleData::parseInitialPayload( INI* ini, void *instance, 
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+void TransportContainModuleData::parsePassengerFilter(INI* ini, void* instance, void* store, const void* custom)
+{
+	auto* data = static_cast<TransportContainModuleData*>(instance);
+	SpecialPowerObjectFilter::parse(ini, instance, store, custom);
+	data->m_hasPassengerFilter = TRUE;
+	data->m_allowInsideKindOf.clear();
+	data->m_allowInsideKindOf.flip();
+}
+
 void TransportContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
   OpenContainModuleData::buildFieldParse(p);
@@ -107,6 +117,17 @@ void TransportContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "PassengerFilter", parsePassengerFilter, nullptr, offsetof(TransportContainModuleData, m_passengerFilter) },
+			{ "TypeOneForWeaponSet", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeOne) },
+			{ "TypeOneForWeaponState", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeOne) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 }
 
 
@@ -146,6 +167,12 @@ TransportContain::~TransportContain()
 	can this container contain this kind of object?
 	and, if checkCapacity is TRUE, does this container have enough space left to hold the given unit?
 */
+Int TransportContain::getPassengerSlotCount(const Object* rider) const
+{
+	const Int slots = rider->getTransportSlotCount();
+	return slots == 0 && getTransportContainModuleData()->m_hasPassengerFilter ? 1 : slots;
+}
+
 Bool TransportContain::isValidContainerFor(const Object* rider, Bool checkCapacity) const
 {
 
@@ -182,10 +209,13 @@ Bool TransportContain::isValidContainerFor(const Object* rider, Bool checkCapaci
 //		return false;
 
 // no... actually, only OUR OWN units can be transported.
-	if (rider->getControllingPlayer() != getObject()->getControllingPlayer())
+	const auto* data = getTransportContainModuleData();
+	if (data->m_hasPassengerFilter && !data->m_passengerFilter.matchesTemplate(*rider->getTemplate()))
+		return false;
+	if (!data->m_hasPassengerFilter && rider->getControllingPlayer() != getObject()->getControllingPlayer())
 		return false;
 
-	Int transportSlotCount = rider->getTransportSlotCount();
+	Int transportSlotCount = getPassengerSlotCount(rider);
 
 	// if 0, this object isn't transportable.
 	if (transportSlotCount == 0)
@@ -206,11 +236,13 @@ Bool TransportContain::isValidContainerFor(const Object* rider, Bool checkCapaci
 void TransportContain::onContaining( Object *rider )
 {
 	OpenContain::onContaining(rider);
+	if (rider->isAnyKindOf(getTransportContainModuleData()->m_passengerTypeOne))
+		getObject()->setWeaponSetFlag(WEAPONSET_PASSENGER_TYPE_ONE);
 
 	// objects inside a transport are held
 	rider->setDisabled( DISABLED_HELD );
 
-	Int transportSlotCount = rider->getTransportSlotCount();
+	Int transportSlotCount = getPassengerSlotCount(rider);
 
 	DEBUG_ASSERTCRASH(transportSlotCount > 0, ("Hmm, this object isnt transportable"));
 	m_extraSlotsInUse += transportSlotCount - 1;
@@ -236,6 +268,20 @@ void TransportContain::onContaining( Object *rider )
 void TransportContain::onRemoving( Object *rider )
 {
 	OpenContain::onRemoving(rider);
+	if (rider->isAnyKindOf(getTransportContainModuleData()->m_passengerTypeOne))
+	{
+		Bool holdingTypeOne = FALSE;
+		for (const Object* other : getContainList())
+		{
+			if (other != rider && other->isAnyKindOf(getTransportContainModuleData()->m_passengerTypeOne))
+			{
+				holdingTypeOne = TRUE;
+				break;
+			}
+		}
+		if (!holdingTypeOne)
+			getObject()->clearWeaponSetFlag(WEAPONSET_PASSENGER_TYPE_ONE);
+	}
 
 	// object is no longer held inside a transport
 	rider->clearDisabled( DISABLED_HELD );
@@ -279,7 +325,7 @@ void TransportContain::onRemoving( Object *rider )
 		}
 	}
 
-	Int transportSlotCount = rider->getTransportSlotCount();
+	Int transportSlotCount = getPassengerSlotCount(rider);
 	DEBUG_ASSERTCRASH(transportSlotCount > 0, ("Hmm, this object isnt transportable"));
 	m_extraSlotsInUse -= transportSlotCount - 1;
 	DEBUG_ASSERTCRASH(m_extraSlotsInUse >= 0 && m_extraSlotsInUse + getContainCount() <= getContainMax(), ("Hmm, bad slot count"));

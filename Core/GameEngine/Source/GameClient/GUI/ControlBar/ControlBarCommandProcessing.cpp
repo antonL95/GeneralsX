@@ -35,6 +35,7 @@
 #include "Common/Money.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
@@ -595,6 +596,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 
 			ProductionUpdateInterface* pu = obj ? obj->getProductionUpdateInterface() : nullptr;
+			if (RetailFileLayers::enabled() && !pu)
+				break;
 			if (pu != nullptr)
 			{
 				CanMakeType cmt = pu->canQueueUpgrade(upgradeT);

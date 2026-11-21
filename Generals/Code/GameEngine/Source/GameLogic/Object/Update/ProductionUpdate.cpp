@@ -670,6 +670,8 @@ UpdateSleepTime ProductionUpdate::update()
 	}
 
 	production->m_framesUnderConstruction++;
+	if (RetailFileLayers::enabled() && production->m_type == PRODUCTION_UNIT)
+		production->m_powerBonusFrames += player->getPowerProductionSpeed(production->m_objectToProduce->getName()) - 1.0f;
 
 	// how many total logic frames does it take to produce this unit
 	Int totalProductionFrames;
@@ -679,7 +681,7 @@ UpdateSleepTime ProductionUpdate::update()
 		totalProductionFrames = production->m_upgradeToResearch->calcTimeToBuild( player );
 
 	// figure out our percent complete
-	production->m_percentComplete = INT_TO_REAL( production->m_framesUnderConstruction ) /
+	production->m_percentComplete = (INT_TO_REAL( production->m_framesUnderConstruction ) + production->m_powerBonusFrames) /
 																	INT_TO_REAL( totalProductionFrames ) *
 																	100.0f;
 
@@ -1260,6 +1262,11 @@ void ProductionUpdate::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
+	if (RetailFileLayers::enabled())
+	{
+		for (ProductionEntry* entry = m_productionQueue; entry; entry = entry->m_next)
+			xfer->xferReal(&entry->m_powerBonusFrames);
+	}
 
 }
 
@@ -1272,7 +1279,7 @@ void ProductionUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1313,6 +1320,8 @@ void ProductionUpdate::xfer( Xfer *xfer )
 
 			// frames under construction
 			xfer->xferInt( &production->m_framesUnderConstruction );
+			if (version >= 2)
+				xfer->xferReal(&production->m_powerBonusFrames);
 
 			// production quantity
 			xfer->xferInt( &production->m_productionQuantityTotal );
@@ -1402,6 +1411,8 @@ void ProductionUpdate::xfer( Xfer *xfer )
 
 			// frames under construction
 			xfer->xferInt( &production->m_framesUnderConstruction );
+			if (version >= 2)
+				xfer->xferReal(&production->m_powerBonusFrames);
 
 			// production quantity
 			xfer->xferInt( &production->m_productionQuantityTotal );

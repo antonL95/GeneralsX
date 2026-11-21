@@ -3565,6 +3565,8 @@ void Object::onDisabledEdge(Bool becomingDisabled)
 //-------------------------------------------------------------------------------------------------
 void Object::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xferRotwkPowerState(xfer);
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;
 //	Bool g_logAllObjects = TRUE;
@@ -3730,7 +3732,9 @@ void Object::xfer( Xfer *xfer )
 		}
 	}
 #endif
-	xfer->xferVersion( &version, 10 );
+	if (RetailFileLayers::enabled() && m_rotwkPowerState)
+		version = 11;
+	xfer->xferVersion( &version, 11 );
 
 	// object ID
 	ObjectID id = getID();
@@ -4170,6 +4174,9 @@ void Object::xfer( Xfer *xfer )
 	}
 	else
 		m_isReceivingDifficultyBonus = FALSE;
+
+	if (version >= 11)
+		xferRotwkPowerState(xfer);
 
 }
 

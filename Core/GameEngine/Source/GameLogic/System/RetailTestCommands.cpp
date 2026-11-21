@@ -2095,6 +2095,22 @@ void execute(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST frame %u: produce %s on object %u queued=%d\n", frame, command.structure.c_str(),
 			static_cast<unsigned>(obj->getID()), queued);
 	}
+	else if (command.action == "powerstate")
+	{
+		const auto* contain = obj->getContain();
+		const auto* passengers = contain ? contain->getContainedItemsList() : nullptr;
+		const auto* production = obj->getProductionUpdateInterface();
+		const auto* entry = production ? production->firstProduction() : nullptr;
+		const auto* weapon = obj->getWeaponInWeaponSlot(PRIMARY_WEAPON);
+		const auto* draw = obj->getDrawable();
+		std::fprintf(stderr, "TEST powerstate %u %s id=%u stealth=%d passenger=%s weapon=%s toggle=%d toggling=%d progress=%.3f speed=%.3f\n",
+			frame, command.target.c_str(), static_cast<unsigned>(obj->getID()), obj->testStatus(OBJECT_STATUS_STEALTHED),
+			passengers && !passengers->empty() ? passengers->front()->getTemplate()->getName().str() : "-",
+			weapon ? weapon->getName().str() : "-", obj->testWeaponSetFlag(WEAPONSET_TOGGLE_1),
+			draw && draw->getModelConditionFlags().test(MODELCONDITION_WEAPON_TOGGLING),
+			entry ? entry->getPercentComplete() : -1.0f,
+			obj->getControllingPlayer()->getPowerProductionSpeed(AsciiString(command.structure.c_str())));
+	}
 	else if (command.action == "powers")
 	{
 		for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)

@@ -3583,6 +3583,7 @@ void GameLogic::update()
 			{
 				obj->checkDisabledStatus();
 			}
+			obj->updateRotwkPowerState();
 		}
 	}
 

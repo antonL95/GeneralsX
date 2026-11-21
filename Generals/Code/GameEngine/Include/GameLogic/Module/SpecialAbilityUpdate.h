@@ -226,6 +226,8 @@ class SpecialAbilityUpdate : public UpdateModule, public SpecialPowerUpdateInter
 public:
 
 	SpecialAbilityUpdate( Thing *thing, const ModuleData* moduleData );
+	const SpecialPowerAnimation& getGrabPassengerAnimation() const { return getSpecialAbilityUpdateModuleData()->m_grabPassengerAnimAndDuration; }
+	Real getGrabPassengerHealFraction() const { return getSpecialAbilityUpdateModuleData()->m_grabPassengerHealGainPercent; }
 	// virtual destructor prototype provided by memory pool declaration
 
 	// SpecialPowerUpdateInterface

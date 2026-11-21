@@ -404,6 +404,8 @@ public:
 	/** Return bonus or penalty for construction of this thing.
 	*/
 	Real getProductionTimeChangePercent( AsciiString buildTemplateName ) const;
+	void setPowerProductionBonus(const std::vector<AsciiString>& types, Real speed, UnsignedInt duration);
+	Real getPowerProductionSpeed(const AsciiString& type) const;
 
 	/** Return starting veterancy level of a newly built thing of this type
 	*/
@@ -781,6 +783,15 @@ private:
 	BuildListInfo*							m_pBuildList;									///< linked list of buildings for PLAYER_COMPUTER.
 	Color												m_color;											///< color for our units
 	Color												m_nightColor;	///<tweaked version of regular color to make it easier to see on night maps.
+	struct PowerProductionBonus
+	{
+		AsciiString type;
+		Real speed = 1.0f;
+		UnsignedInt endFrame = 0;
+	};
+	std::vector<PowerProductionBonus> m_powerProductionBonuses;
+	void xferPowerProductionBonuses(Xfer* xfer);
+
 	ProductionChangeMap					m_productionCostChanges;			///< Map to keep track of Faction specific discounts or penalties on prices of units
 	ProductionChangeMap					m_productionTimeChanges;			///< Map to keep track of Faction specific discounts or penalties on build times of units
 	ProductionVeterancyMap			m_productionVeterancyLevels;	///< Map to keep track of starting level of produced units

@@ -590,6 +590,13 @@ Bool SpecialPowerModule::initiateIntentToDoSpecialPower( const Object *targetObj
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+void SpecialPowerModule::refreshPowerTimer()
+{
+	const SpecialPowerTemplate* power = getSpecialPowerTemplate();
+	if (power && !power->isSharedNSync() && m_pausedCount == 0 && m_availableOnFrame != 0xFFFFFFFF)
+		setReadyFrame(TheGameLogic->getFrame());
+}
+
 void SpecialPowerModule::triggerSpecialPower( const Coord3D *location )
 {
 	aboutToDoSpecialPower( location );	// do BEFORE recharge
@@ -597,6 +604,7 @@ void SpecialPowerModule::triggerSpecialPower( const Coord3D *location )
 	if( RetailFileLayers::enabled() )
 		applyRotwkTrigger( location );
 
+	applyPowerEffect(location);
 	createViewObject(location);
 
 	// we won't be able to use the power for X number of frames now

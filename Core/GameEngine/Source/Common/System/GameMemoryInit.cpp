@@ -103,7 +103,13 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "AttributeModifierHelper", 8192, 1024 },
 	{ "AttributeModifierAuraUpdate", 1024, 256 },
 	{ "PassiveAreaEffectBehavior", 128, 32 },
-	{ "AttributeModifierUpgrade", 512, 128 }
+	{ "AttributeModifierUpgrade", 512, 128 },
+	{ "HordeDispatchSpecialPower", 64, 32 },
+	{ "SpecialPowerTimerRefreshSpecialPower", 32, 16 },
+	{ "ProductionSpeedBonus", 32, 16 },
+	{ "InvisibilitySpecialPower", 32, 16 },
+	{ "WeaponChangeSpecialPowerModule", 64, 32 },
+	{ "GrabPassengerSpecialPower", 32, 16 }
 };
 
 //-----------------------------------------------------------------------------

@@ -1282,7 +1282,8 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			// no production update, can't possibly do this command
 			if( pu == nullptr )
 			{
-				DEBUG_CRASH(("Objects that have Object-Level Upgrades must also have ProductionUpdate. Just cuz."));
+				if (!RetailFileLayers::enabled())
+					DEBUG_CRASH(("Objects that have Object-Level Upgrades must also have ProductionUpdate. Just cuz."));
 				return COMMAND_RESTRICTED;
 			}
 

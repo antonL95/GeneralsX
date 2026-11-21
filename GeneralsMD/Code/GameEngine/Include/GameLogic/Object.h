@@ -28,7 +28,10 @@
 
 #pragma once
 
+#include <memory>
+
 #include "Lib/BaseType.h"
+#include "GameLogic/Module/RotwkPowerState.h"
 
 #include "Common/Geometry.h"
 #include "Common/Snapshot.h"
@@ -51,6 +54,7 @@
 //-----------------------------------------------------------------------------
 
 class AIGroup;
+struct SpecialPowerAnimation;
 class AIUpdateInterface;
 class Anim2DTemplate;
 class BehaviorModule;
@@ -603,6 +607,10 @@ public:
 
 	//Checks any timers and clears disabled statii that have expired.
 	void checkDisabledStatus();
+	void grantPowerInvisibility(UnsignedInt duration, Real range, const ModelConditionFlags& forbidden);
+	void setPowerModelCondition(Int condition, UnsignedInt duration);
+	void schedulePassengerConsumption(ObjectID passenger, const SpecialPowerAnimation& animation, Real healFraction);
+	void updateRotwkPowerState();
 
 	//When an AIAttackState is over, it needs to clean up any weapons that might be in leech range mode
 	//or else those weapons will have unlimited range!
@@ -758,6 +766,8 @@ private:
 	BehaviorModule**							m_behaviors;	// BehaviorModule, not BehaviorModuleInterface
 
 	// cache these, for convenience
+	std::unique_ptr<RotwkPowerState> m_rotwkPowerState;
+	void xferRotwkPowerState(Xfer* xfer);
 	ContainModuleInterface*				m_contain;
 	BodyModuleInterface*					m_body;
   StealthUpdate*                m_stealth;

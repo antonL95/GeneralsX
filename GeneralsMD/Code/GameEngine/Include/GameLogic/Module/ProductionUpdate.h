@@ -107,6 +107,7 @@ protected:
 	ExitDoorType m_exitDoor;
 	Int m_costPaid = -1;
 	Int m_framesOverride = -1;
+	Real m_powerBonusFrames = 0.0f;
 
 	ProductionEntry *m_next;													///< next in list
 	ProductionEntry *m_prev;													///< prev in list

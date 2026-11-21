@@ -1503,7 +1503,7 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 			return FALSE;
 
 		if (RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2)
-			return spTemplate->isValidRetailTarget(obj, target, nullptr, commandSource);
+			return spTemplate->isValidRetailTarget(obj, target, nullptr, commandSource) && mod->isValidPowerTarget(target);
 
 		switch( spTemplate->getSpecialPowerType() )
 		{
