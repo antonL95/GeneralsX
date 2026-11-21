@@ -39,6 +39,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/RespawnModules.h"
 
 namespace
@@ -234,15 +235,17 @@ void collectHero(Object *obj, void *userData)
 		return;
 	if (obj->isKindOf(KINDOF_DOZER))
 	{
+		AIUpdateInterface *ai = obj->getAI();
+		DozerAIInterface *dozer = ai ? ai->getDozerAIInterface() : nullptr;
+		if (!ai || !ai->isIdle() || (dozer && dozer->isAnyTaskPending()))
+			return;
 		HeroSlot& builders = *census.builders;
 		if (!builders.alive || obj->getID() < builders.id)
 		{
 			builders.appearance = obj->getTemplate();
 			builders.id = obj->getID();
 		}
-		const AIUpdateInterface* ai = obj->getAI();
-		if (ai && ai->isIdle())
-			++builders.idleBuilders;
+		++builders.idleBuilders;
 		builders.alive = TRUE;
 		builders.builder = TRUE;
 		const auto* draw = obj->getDrawable();
@@ -254,7 +257,7 @@ void collectHero(Object *obj, void *userData)
 	const ThingTemplate *identity = obj->getHeroIdentityTemplate();
 	const Int rosterIndex = HeroRoster::findIndex(census.player, identity);
 	const ThingTemplate *hero = rosterIndex >= 0 ? HeroRoster::heroAt(census.player, rosterIndex) : identity;
-	if (rosterIndex < 0 && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInSkirmishGame()))
+	if (!hero || (rosterIndex < 0 && !obj->isKindOf(KINDOF_SELECTABLE)))
 		return;
 	for (const HeroSlot &slot : *census.slots)
 		if (slot.hero == hero)

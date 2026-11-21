@@ -319,6 +319,8 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 					}
 
 					pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), placeMsg->getType() );
+					if (RetailFileLayers::enabled() && builderObj && builderObj->isKindOf(KINDOF_DOZER))
+						TheInGameUI->deselectAllDrawables();
 
 					// get out of pending placement mode, this will also clear the arrow anchor status
 					TheInGameUI->placeBuildAvailable( nullptr, nullptr );
