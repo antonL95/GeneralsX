@@ -5,7 +5,6 @@
 #include "Common/FileSystem.h"
 #include "Common/GameEngine.h"
 #include "Common/GlobalData.h"
-#include "Common/MessageStream.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
@@ -580,7 +579,10 @@ namespace
 	WindowMsgHandledType resultsSystem(GameWindow *window, UnsignedInt message, WindowMsgData, WindowMsgData)
 	{
 		if (message == GWM_DESTROY)
+		{
 			delete static_cast<ResultsScreen *>(window->winGetUserData());
+			window->winSetUserData(nullptr);
+		}
 		return MSG_IGNORED;
 	}
 
@@ -610,8 +612,8 @@ namespace
 
 		static void startRematch()
 		{
-			TheWritableGlobalData->m_pendingFile = TheSkirmishGameInfo->getMap();
-			TheMessageStream->appendMessage(GameMessage::MSG_NEW_GAME)->appendIntegerArgument(GAME_SKIRMISH);
+			TheSkirmishGameInfo->setSeed(GetTickCount());
+			TheSkirmishGameInfo->queueStart(TheGlobalData->m_framesPerSecondLimit);
 		}
 	};
 
@@ -637,7 +639,10 @@ namespace
 	WindowMsgHandledType menuSystem(GameWindow *window, UnsignedInt message, WindowMsgData, WindowMsgData)
 	{
 		if (message == GWM_DESTROY)
+		{
 			delete static_cast<ReturnMenu *>(window->winGetUserData());
+			window->winSetUserData(nullptr);
+		}
 		return MSG_IGNORED;
 	}
 
@@ -692,6 +697,10 @@ Bool createRetailReturnMenu(WindowLayout &layout)
 	layout.setInit([](WindowLayout *screen, void *) {
 		screen->hide(FALSE);
 		TheWindowManager->winSetFocus(screen->getFirstWindow());
+	});
+	layout.setShutdown([](WindowLayout *screen, void *) {
+		screen->hide(TRUE);
+		TheShell->shutdownComplete(screen);
 	});
 	return TRUE;
 }

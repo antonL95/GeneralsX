@@ -286,6 +286,7 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 	const Bool showScore = showEndScreen &&
 		(!retail || TheFileSystem->doesFileExist("Window\\Menus\\ScoreScreen.wnd"));
 	const Bool showRetailResults = showEndScreen && retail && !showScore &&
+		(isInSkirmishGame() || isInMultiplayerGame()) &&
 		TheGlobalData->m_initialFile.isEmpty() && !m_quitToDesktopAfterMatch;
 	RetailMatchResults retailResults;
 	if (showRetailResults)

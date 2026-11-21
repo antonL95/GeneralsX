@@ -1335,6 +1335,11 @@ void MultiPlayerLoadScreen::init( GameInfo *game )
 		{
 			m_retailProgress = 0;
 			m_loadScreen->winSetUserData(this);
+			m_loadScreen->winSetSystemFunc([](GameWindow *window, UnsignedInt message, WindowMsgData, WindowMsgData) {
+				if (message == GWM_DESTROY)
+					window->winSetUserData(nullptr);
+				return MSG_IGNORED;
+			});
 			m_loadScreen->winSetDrawFunc(drawRetailLoading);
 			if (game)
 			{

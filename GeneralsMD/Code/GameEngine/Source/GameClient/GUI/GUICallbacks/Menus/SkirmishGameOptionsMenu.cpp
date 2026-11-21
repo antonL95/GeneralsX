@@ -36,7 +36,6 @@
 #include "Common/GameEngine.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/QuotedPrintable.h"
-#include "Common/RandomValue.h"
 #include "Common/SkirmishBattleHonors.h"
 #include "Common/SkirmishPreferences.h"
 #include "Common/OptionPreferences.h"
@@ -457,40 +456,7 @@ void reallyDoStart()
 	if (maxFPS < 30)
 		maxFPS = 30;
 
-	// GeneralsX @feature felipebraz 17/09/2026 Read configured Skirmish simulation tick rate (#281)
-	SkirmishPreferences prefs;
-	TheWritableGlobalData->m_skirmishTickRate = prefs.getSkirmishTickRate();
-
-  TheWritableGlobalData->m_mapName = TheSkirmishGameInfo->getMap();
-  TheSkirmishGameInfo->startGame(0);
-
-		Bool isSkirmish = TRUE;
-	const MapMetaData *md = TheMapCache->findMap(TheSkirmishGameInfo->getMap());
-	if (md)
-	{
-		isSkirmish = md->m_isMultiplayer; // we can now select solo campaign maps in Skirmish.
-	}
-
-	if (isSkirmish)
-	{
-		InitRandom(TheSkirmishGameInfo->getSeed());
-
-		GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_NEW_GAME );
-		msg->appendIntegerArgument(GAME_SKIRMISH);
-		msg->appendIntegerArgument(DIFFICULTY_NORMAL);	// not really used; just specified so we can add the game speed last
-		msg->appendIntegerArgument(0);									// not really used; just specified so we can add the game speed last
-		msg->appendIntegerArgument(maxFPS);							// FPS limit
-	}
-	else
-	{
-		InitRandom(0);
-
-		GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_NEW_GAME );
-		msg->appendIntegerArgument(GAME_SINGLE_PLAYER);
-		msg->appendIntegerArgument(DIFFICULTY_NORMAL);	// not really used; just specified so we can add the game speed last
-		msg->appendIntegerArgument(0);									// not really used; just specified so we can add the game speed last
-		msg->appendIntegerArgument(maxFPS);							// FPS limit
-	}
+	TheSkirmishGameInfo->queueStart(maxFPS);
 }
 
 Bool sandboxOk = FALSE;

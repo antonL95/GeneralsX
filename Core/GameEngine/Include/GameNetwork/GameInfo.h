@@ -303,6 +303,7 @@ public:
 			setSlotPointer(i, &m_skirmishSlot[i]);
 	}
 	virtual ~SkirmishGameInfo() override {}
+	void queueStart(Int maxFPS);
 };
 
 extern SkirmishGameInfo *TheSkirmishGameInfo;

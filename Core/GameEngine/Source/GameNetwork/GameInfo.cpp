@@ -32,8 +32,13 @@
 #include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "Common/GameState.h"
+#include "Common/GlobalData.h"
+#include "Common/MessageStream.h"
+#include "Common/RandomValue.h"
+#include "Common/SkirmishPreferences.h"
 #include "GameClient/GameText.h"
 #include "GameClient/MapUtil.h"
+#include "GameLogic/GameMode.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/Xfer.h"
@@ -1734,6 +1739,25 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 //----------------------------------------------------------------------------------------------------------
 
 //------------------------- SkirmishGameInfo ---------------------------------------------------------------
+
+void SkirmishGameInfo::queueStart(Int maxFPS)
+{
+	SkirmishPreferences prefs;
+	TheWritableGlobalData->m_skirmishTickRate = prefs.getSkirmishTickRate();
+	TheWritableGlobalData->m_mapName = getMap();
+	if (!isGameInProgress())
+		startGame(0);
+
+	const MapMetaData *map = TheMapCache->findMap(getMap());
+	const Bool isSkirmish = !map || map->m_isMultiplayer;
+	InitRandom(isSkirmish ? getSeed() : 0);
+
+	GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_NEW_GAME);
+	msg->appendIntegerArgument(isSkirmish ? GAME_SKIRMISH : GAME_SINGLE_PLAYER);
+	msg->appendIntegerArgument(DIFFICULTY_NORMAL);
+	msg->appendIntegerArgument(0);
+	msg->appendIntegerArgument(maxFPS);
+}
 
 // ------------------------------------------------------------------------------------------------
 /** CRC */
