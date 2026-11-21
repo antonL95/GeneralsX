@@ -964,7 +964,10 @@ void DataChunkInput::readChunkBytes(void *data, Int size)
 	if (!m_chunkStack || size < 0)
 		throw ERROR_CORRUPT_FILE_FORMAT;
 	if (size > m_chunkStack->dataLeft)
-		throw ERROR_CORRUPT_FILE_FORMAT;
+	{
+		static std::once_flag reportedOverread;
+		reportChunkTolerance(reportedOverread, "Reading past the declared chunk end");
+	}
 	if (m_file->read(data, size) != size)
 		throw ERROR_CORRUPT_FILE_FORMAT;
 	decrementDataLeft(size);

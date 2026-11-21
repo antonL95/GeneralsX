@@ -885,18 +885,42 @@ Bool WorldHeightMap::ParseWorldDictDataChunk(DataChunkInput &file, DataChunkInfo
 *	Input: DataChunkInput
 *
 */
-Bool WorldHeightMap::ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo *info, void *userData)
+static void requireRetailChunkBytes(DataChunkInput &file, UnsignedInt size)
 {
-	if (!info || info->dataSize < 1)
-		return FALSE;
+	if (file.getChunkDataSizeLeft() < size)
+		throw ERROR_CORRUPT_FILE_FORMAT;
+}
+
+static AsciiString readRetailChunkString(DataChunkInput &file)
+{
+	UnsignedShort length;
+	requireRetailChunkBytes(file, sizeof(length));
+	file.readArrayOfBytes(reinterpret_cast<char *>(&length), sizeof(length));
+	requireRetailChunkBytes(file, length);
+	AsciiString value;
+	if (length > 0)
+	{
+		char *buffer = value.getBufferForRead(length);
+		file.readArrayOfBytes(buffer, length);
+		buffer[length] = '\0';
+	}
+	return value;
+}
+
+Bool WorldHeightMap::ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo *info, void *userData)
+try
+{
+	if (info->dataSize < 1)
+		return TRUE;
 	AsciiString lookupTexture;
 	Real lookupBlend = 0.0f;
 	const UnsignedByte count = file.readByte();
 	for (Int i = 0; i < count; ++i)
 	{
-		const AsciiString effect = file.readAsciiString();
+		const AsciiString effect = readRetailChunkString(file);
+		requireRetailChunkBytes(file, sizeof(Real));
 		const Real blend = file.readReal();
-		const AsciiString texture = file.readAsciiString();
+		const AsciiString texture = readRetailChunkString(file);
 		if (effect == "LookupTablePostEffect" && blend > 0.0f && !texture.isEmpty())
 		{
 			lookupTexture = texture;
@@ -904,32 +928,46 @@ Bool WorldHeightMap::ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo 
 		}
 	}
 	if (!file.atEndOfChunk())
-		return FALSE;
+		return TRUE;
 	auto &map = *static_cast<WorldHeightMap *>(userData);
 	map.m_retailLookupTexture = lookupTexture;
 	map.m_retailLookupBlend = lookupBlend;
 	return TRUE;
 }
+catch (ErrorCode error)
+{
+	if (error != ERROR_CORRUPT_FILE_FORMAT)
+		throw;
+	return TRUE;
+}
 
 Bool WorldHeightMap::ParseRetailEnvironment(DataChunkInput &file, DataChunkInfo *info, void *userData)
+try
 {
-	if (!info || info->dataSize < 2)
-		return FALSE;
+	const Int fixedSize = sizeof(Byte) + (info->version >= 3 ? 2 * sizeof(Real) : 0);
+	if (info->dataSize < fixedSize)
+		return TRUE;
 	if (info->version >= 3)
 	{
 		file.readReal();
 		file.readReal();
 	}
 	const Bool macroStretched = file.readByte() != 0;
-	const AsciiString macroTexture = file.readAsciiString();
-	const AsciiString cloudTexture = file.readAsciiString();
+	const AsciiString macroTexture = readRetailChunkString(file);
+	const AsciiString cloudTexture = readRetailChunkString(file);
 	if (!file.atEndOfChunk())
-		return FALSE;
+		return TRUE;
 	auto &map = *static_cast<WorldHeightMap *>(userData);
 	map.m_retailEnvironment = TRUE;
 	map.m_retailMacroStretched = macroStretched;
 	map.m_retailMacroTexture = macroTexture;
 	map.m_retailCloudTexture = cloudTexture;
+	return TRUE;
+}
+catch (ErrorCode error)
+{
+	if (error != ERROR_CORRUPT_FILE_FORMAT)
+		throw;
 	return TRUE;
 }
 

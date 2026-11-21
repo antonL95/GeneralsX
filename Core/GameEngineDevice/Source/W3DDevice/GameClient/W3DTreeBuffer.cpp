@@ -1714,11 +1714,7 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 	if (!m_isTerrainPass) {
 		return;
 	}
-	if (RetailFileLayers::enabled() && !TheGlobalData->m_useTrees)
-	{
-		m_isTerrainPass = false;
-		return;
-	}
+	const Bool showTrees = !RetailFileLayers::enabled() || TheGlobalData->m_useTrees;
 
 	// if breeze changes, always process the full update, even if not visible,
 	// so that things offscreen won't 'pop' when first viewed
@@ -1749,14 +1745,14 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 
 	m_isTerrainPass = false;
 
-	if (m_needToUpdateTexture) {
+	if (showTrees && m_needToUpdateTexture) {
 		m_needToUpdateTexture = false;
 		updateTexture();
 	}
-	const bool legacyShadows = TheW3DProjectedShadowManager &&
+	const bool legacyShadows = showTrees && TheW3DProjectedShadowManager &&
 		(TheGlobalData->m_useShadowDecals || TheGlobalData->m_useShadowVolumes) &&
 		(!TheRetailTerrainShadow || !TheRetailTerrainShadow->isReady());
-	if (m_treeTexture==nullptr) {
+	if (showTrees && m_treeTexture==nullptr) {
 		if (legacyShadows) {
 			Real stretchX, stretchY;
 			if (treeShadowStretch(stretchX, stretchY)) {
@@ -1833,6 +1829,9 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 			}
 		}
 	}
+
+	if (!showTrees)
+		return;
 
 	if (m_anythingChanged) {
 		loadTreesInVertexAndIndexBuffers(pDynamicLightsIterator);
