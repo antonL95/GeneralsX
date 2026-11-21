@@ -2281,6 +2281,9 @@ void logTracked(unsigned int frame)
 
 void execute(const Command& command, unsigned int frame)
 {
+	if (command.action.starts_with("pw-") && runPowerCommand(command.action, findPlayer(command),
+		command.action == "pw-rank" ? findObject(command) : nullptr, command.structure.c_str(), frame))
+		return;
 	if (command.action.starts_with("sweep-"))
 	{
 		sweepCommand(command, frame);
