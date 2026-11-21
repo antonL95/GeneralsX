@@ -445,11 +445,7 @@ void WeaponTemplate::orderNuggetHorde(const Object* source, Object* victim, cons
 			AIUpdateInterface* ai = member->getAI();
 			if (!ai || !weapon || weapon->getTemplate() == this || member == victim || member->isEffectivelyDead())
 				continue;
-			member->setWeaponLock(nugget.m_lockWeaponSlot, LOCKED_TEMPORARILY);
-			if (victim)
-				ai->aiForceAttackObject(victim, 1, CMD_FROM_AI);
-			else
-				ai->aiAttackPosition(position, 1, CMD_FROM_AI);
+			ai->aiAttackWithRetailHordeWeapon(victim, position, nugget.m_lockWeaponSlot);
 		}
 	}
 }

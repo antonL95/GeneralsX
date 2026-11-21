@@ -773,6 +773,7 @@ private:
 	std::unique_ptr<RotwkPowerState> m_rotwkPowerState;
 	void xferRotwkPowerState(Xfer* xfer);
 	friend class GameLogic;
+	friend class AIUpdateInterface;
 	friend class ThingFactory;
 	const ThingTemplate* m_mountedHeroIdentity = nullptr;
 	std::vector<std::pair<AsciiString, UnsignedInt>> m_mountedPowerTimers;

@@ -1628,7 +1628,7 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 		Real curDSqr = dx*dx+dy*dy;
 		if (!otherMoving && curDSqr < PATHFIND_CELL_SIZE_F*PATHFIND_CELL_SIZE_F*0.25f)
 		{
-			if (this->getCurrentStateID() == AI_BUSY) {
+			if (isBusy()) {
 				return false;
 			}
 			if (getObject()->testStatus(OBJECT_STATUS_IS_USING_ABILITY)) {
@@ -2864,6 +2864,10 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 		case AICMD_ATTACK_POSITION:
 			privateAttackPosition(&parms->m_pos, parms->m_intValue, parms->m_cmdSource);
 			break;
+		case AICMD_RETAIL_HORDE_ATTACK_OBJECT:
+		case AICMD_RETAIL_HORDE_ATTACK_POSITION:
+			privateRetailHordeAttack(*parms);
+			break;
 		case AICMD_ATTACKMOVE_TO_POSITION:
 			privateAttackMoveToPosition(&parms->m_pos, parms->m_intValue, parms->m_cmdSource);
 			break;
@@ -3270,6 +3274,8 @@ void AIUpdateInterface::privateIdle(CommandSourceType cmdSource)
 Bool AIUpdateInterface::isIdle() const
 {
 	const AIStateMachine *state = getStateMachine();
+	if (RetailFileLayers::enabled() && state->getTemporaryState() == AI_BUSY)
+		return FALSE;
 	if( state->getCurrentStateID() == AI_IDLE )
 	{
 		return TRUE;
@@ -3288,7 +3294,8 @@ Bool AIUpdateInterface::isAttacking() const
 //----------------------------------------------------------------------------------------
 Bool AIUpdateInterface::isBusy() const
 {
-	return getStateMachine()->isInBusyState();
+	const AIStateMachine *state = getStateMachine();
+	return state->isInBusyState() || (RetailFileLayers::enabled() && state->getTemporaryState() == AI_BUSY);
 }
 
 //----------------------------------------------------------------------------------------
@@ -3632,6 +3639,65 @@ void AIUpdateInterface::privateForceAttackObject( Object *victim, Int maxShotsTo
 	Weapon* weapon = getObject()->getCurrentWeapon();
 	if (weapon)
 		weapon->setMaxShotCount(maxShotsToFire);
+}
+
+void AIUpdateInterface::aiAttackWithRetailHordeWeapon(Object* victim, const Coord3D* position, WeaponSlotType slot)
+{
+	if (!victim && !position)
+		return;
+	AICommandParms parms(victim ? AICMD_RETAIL_HORDE_ATTACK_OBJECT : AICMD_RETAIL_HORDE_ATTACK_POSITION, CMD_FROM_AI);
+	parms.m_obj = victim;
+	if (position)
+		parms.m_pos = *position;
+	parms.m_intValue = slot;
+	aiDoCommand(&parms);
+}
+
+void AIUpdateInterface::privateRetailHordeAttack(const AICommandParms& parms)
+{
+	AIStateMachine* state = getStateMachine();
+	if (!RetailFileLayers::enabled() || state->isLocked() ||
+		parms.m_intValue < PRIMARY_WEAPON || parms.m_intValue >= WEAPONSLOT_COUNT)
+		return;
+	Object* source = getObject();
+	WeaponSet& weapons = source->m_weaponSet;
+	const auto slot = static_cast<WeaponSlotType>(parms.m_intValue);
+	const WeaponSlotType oldSlot = weapons.getCurWeaponSlot();
+	const WeaponLockType oldLock = weapons.getCurWeaponLockType();
+	if (!weapons.getWeaponInWeaponSlot(slot) || (oldLock == LOCKED_PERMANENTLY && slot != oldSlot))
+		return;
+
+	const Bool attackObject = parms.m_cmd == AICMD_RETAIL_HORDE_ATTACK_OBJECT;
+	Object* victim = parms.m_obj;
+	if (attackObject)
+	{
+		if (const HordeContain* enemy = HordeContain::get(victim))
+			victim = enemy->findAttackTarget(source, ATTACK_NEW_TARGET_FORCED, parms.m_cmdSource, slot);
+		if (!victim || victim->isEffectivelyDead())
+			return;
+	}
+
+	state->clear();
+	state->setGoalObject(victim);
+	if (!attackObject)
+	{
+		destroyPath();
+		setGoalPositionClipped(&parms.m_pos, parms.m_cmdSource);
+	}
+	setLastCommandSource(parms.m_cmdSource);
+	weapons.setWeaponLock(slot, LOCKED_TEMPORARILY);
+	const StateID attackState = attackObject ? AI_FORCE_ATTACK_OBJECT : AI_ATTACK_POSITION;
+	state->setState(attackState);
+	if (state->getCurrentStateID() == attackState)
+	{
+		if (Weapon* weapon = weapons.getCurWeapon())
+			weapon->setMaxShotCount(1);
+	}
+	else
+	{
+		weapons.restoreWeaponSelection(oldSlot, oldLock);
+		source->adjustModelConditionForWeaponStatus();
+	}
 }
 
 void AIUpdateInterface::privateGuardRetaliate( Object *victim, const Coord3D *pos, Int maxShotsToFire, CommandSourceType cmdSource )

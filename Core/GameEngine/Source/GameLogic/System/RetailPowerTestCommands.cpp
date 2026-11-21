@@ -70,6 +70,17 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 			frame, player->getCommandPointsUsed(), total, maximum);
 		return true;
 	}
+	if (action == "pw-override")
+	{
+		ScriptAction* script = newInstance(ScriptAction)(ScriptAction::OVERRIDE_PLAYER_COMMAND_POINTS);
+		script->setNextAction(nullptr);
+		script->getParameter(0)->friend_setString(!*argument || std::string_view(argument) == "-" ? LOCAL_PLAYER : argument);
+		script->getParameter(1)->friend_setInt(1234);
+		script->getParameter(2)->friend_setInt(2345);
+		TheScriptActions->executeAction(script);
+		deleteInstance(script);
+		return true;
+	}
 	if (action == "pw-counters")
 	{
 		for (const auto type : { ScriptAction::SET_PLAYER_COMMAND_POINTS_AVAILABLE_TO_COUNTER,
@@ -79,7 +90,7 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 				? "PwAvailableCommandPoints" : "PwTotalCommandPoints";
 			ScriptAction* script = newInstance(ScriptAction)(type);
 			script->setNextAction(nullptr);
-			script->getParameter(0)->friend_setString("<Local Player>");
+			script->getParameter(0)->friend_setString(!*argument || std::string_view(argument) == "-" ? LOCAL_PLAYER : argument);
 			script->getParameter(1)->friend_setString(name);
 			TheScriptActions->executeAction(script);
 			deleteInstance(script);
@@ -130,9 +141,10 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 				object->getTemplate()->getName() != argument)
 				continue;
 			const auto* drawable = object->getDrawable();
-			std::fprintf(stderr, "PW creation frame=%u name=%s built=%d ai=%s\n", frame, argument,
+			const auto* ai = object->getAI();
+			std::fprintf(stderr, "PW creation frame=%u name=%s built=%d busy=%d idle=%d\n", frame, argument,
 				drawable && drawable->getModelConditionFlags().test(MODELCONDITION_JUST_BUILT),
-				object->getAI() ? object->getAI()->getCurrentStateName().str() : "-");
+				ai && ai->isBusy(), ai && ai->isIdle());
 		}
 		return true;
 	}

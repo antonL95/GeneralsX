@@ -330,6 +330,12 @@ public:
 	Weapon* getCurWeapon() { return m_weapons[m_curWeapon]; }
 	const Weapon* getCurWeapon() const { return m_weapons[m_curWeapon]; }
 	WeaponSlotType getCurWeaponSlot() const { return m_curWeapon; }
+	WeaponLockType getCurWeaponLockType() const { return m_curWeaponLockedStatus; }
+	void restoreWeaponSelection(WeaponSlotType slot, WeaponLockType lockType)
+	{
+		m_curWeapon = slot;
+		m_curWeaponLockedStatus = lockType;
+	}
 	Weapon* findWaypointFollowingCapableWeapon();
 	const Weapon* findAmmoPipShowingWeapon() const;
 	void weaponSetOnWeaponBonusChange(const Object *source);
