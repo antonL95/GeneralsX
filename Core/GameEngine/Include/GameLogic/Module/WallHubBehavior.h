@@ -2,7 +2,6 @@
 
 #include "Common/BuildAssistant.h"
 #include "GameLogic/Module/UpdateModule.h"
-#include "GameLogic/Module/UpgradeModule.h"
 
 class WallHubBehaviorModuleData : public UpdateModuleData
 {
@@ -55,26 +54,6 @@ public:
 
 private:
 	Span plan(const ThingTemplate* requested, const Coord3D& target, UnsignedInt overlapChecks) const;
-};
-
-class ReplaceSelfUpgradeModuleData : public UpgradeModuleData
-{
-public:
-	static void buildFieldParse(MultiIniFieldParse& p);
-	AsciiString m_replacement;
-};
-
-class ReplaceSelfUpgrade final : public UpgradeModule
-{
-	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(ReplaceSelfUpgrade, "ReplaceSelfUpgrade")
-	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(ReplaceSelfUpgrade, ReplaceSelfUpgradeModuleData)
-
-public:
-	ReplaceSelfUpgrade(Thing* thing, const ModuleData* data);
-
-protected:
-	void upgradeImplementation() override;
-	Bool isSubObjectsUpgrade() override { return FALSE; }
 };
 
 class GettingBuiltBehaviorModuleData : public UpdateModuleData

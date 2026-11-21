@@ -13,7 +13,6 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
-#include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameClient/ControlBar.h"
@@ -22,7 +21,6 @@
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
-#include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Object.h"
@@ -304,64 +302,6 @@ void WallHubBehavior::xfer(Xfer* xfer)
 }
 
 void WallHubBehavior::loadPostProcess() { UpdateModule::loadPostProcess(); }
-
-void ReplaceSelfUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
-{
-	UpgradeModuleData::buildFieldParse(p);
-	static const FieldParse fields[] =
-	{
-		{ "ReplaceWith", INI::parseAsciiString, nullptr, offsetof(ReplaceSelfUpgradeModuleData, m_replacement) },
-		{ nullptr, nullptr, nullptr, 0 }
-	};
-	p.add(fields, 0);
-}
-
-ReplaceSelfUpgrade::ReplaceSelfUpgrade(Thing* thing, const ModuleData* data) : UpgradeModule(thing, data) {}
-ReplaceSelfUpgrade::~ReplaceSelfUpgrade() = default;
-
-void ReplaceSelfUpgrade::upgradeImplementation()
-{
-	Object* object = getObject();
-	const AsciiString& name = getReplaceSelfUpgradeModuleData()->m_replacement;
-	const ThingTemplate* definition = name.isEmpty() ? nullptr : TheThingFactory->findTemplate(name, FALSE);
-	const auto* type = definition ? static_cast<const ThingTemplate*>(definition->getFinalOverride()) : nullptr;
-	if (!type || type->isKindOf(KINDOF_DRAWABLE_ONLY) || object->isEffectivelyDead())
-		return;
-
-	const Matrix3D transform = *object->getTransformMatrix();
-	Player* owner = object->getControllingPlayer();
-	Team* team = object->getTeam();
-	const Bool structure = type->isKindOf(KINDOF_STRUCTURE);
-	const auto construction = MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNDER_CONSTRUCTION);
-	TheAI->pathfinder()->removeObjectFromPathfindMap(object);
-	TheGameLogic->destroyObject(object);
-	Object* replacement = TheThingFactory->newObjectFromExactTemplate(type, team,
-		structure ? construction : OBJECT_STATUS_MASK_NONE);
-	replacement->setTransformMatrix(&transform);
-	if (structure)
-		replacement->clearStatus(construction);
-	for (BehaviorModule** module = replacement->getBehaviorModules(); *module; ++module)
-	{
-		CreateModuleInterface* create = (*module)->getCreate();
-		if (create && create->shouldDoOnBuildComplete())
-			create->onBuildComplete();
-	}
-	if (owner && structure)
-		owner->onStructureConstructionComplete(nullptr, replacement, TRUE);
-	else
-		TheAI->pathfinder()->addObjectToPathfindMap(replacement);
-}
-
-void ReplaceSelfUpgrade::crc(Xfer* xfer) { UpgradeModule::crc(xfer); }
-
-void ReplaceSelfUpgrade::xfer(Xfer* xfer)
-{
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
-	UpgradeModule::xfer(xfer);
-}
-
-void ReplaceSelfUpgrade::loadPostProcess() { UpgradeModule::loadPostProcess(); }
 
 void GettingBuiltBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 {

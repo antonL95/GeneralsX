@@ -502,7 +502,6 @@ void ModuleFactory::init()
 		addModule( AIGateUpdate );
 		addModule( WallHubBehavior );
 		addModule( GettingBuiltBehavior );
-		addModule( ReplaceSelfUpgrade );
 		addModule( FakePathfindPortalBehaviour );
 		addModule( TerrainResourceBehavior );
 		addModule( BezierProjectileBehavior );

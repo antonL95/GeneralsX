@@ -5,6 +5,7 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "Common/Xfer.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
@@ -12,6 +13,15 @@
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+
+namespace
+{
+	Bool isWallPiece(const Object* object)
+	{
+		return object->isKindOf(KINDOF_WALL_SEGMENT) || object->isKindOf(KINDOF_WALL_GATE) ||
+			object->isKindOf(KINDOF_WALL_HUB) || object->isKindOf(KINDOF_DEFENSIVE_WALL);
+	}
+}
 
 void ReplaceSelfUpgradeModuleData::buildFieldParse(MultiIniFieldParse& fields)
 {
@@ -37,12 +47,16 @@ Bool ReplaceSelfUpgrade::findSites(std::vector<Site>& sites) const
 	Real offset = 0.0f;
 	for (const AsciiString& name : replacements)
 	{
-		const ThingTemplate* type = TheThingFactory->findTemplate(name, FALSE);
-		if (!type)
+		const ThingTemplate* definition = TheThingFactory->findTemplate(name, FALSE);
+		const auto* type = definition ? static_cast<const ThingTemplate*>(definition->getFinalOverride()) : nullptr;
+		if (!type || type->isKindOf(KINDOF_DRAWABLE_ONLY))
 			return FALSE;
 		sites.push_back({type, *source->getPosition()});
 		offset += type->getTemplateGeometryInfo().getMajorRadius();
 	}
+
+	if (sites.size() == 1 && isWallPiece(source))
+		return TRUE;
 
 	const Vector3 axis = source->getTransformMatrix()->Get_Y_Vector();
 	for (Site& site : sites)
@@ -112,25 +126,42 @@ void ReplaceSelfUpgrade::upgradeImplementation()
 
 	Object* source = getObject();
 	const AsciiString name = source->getName();
+	const Matrix3D transform = *source->getTransformMatrix();
 	const Real angle = source->getOrientation();
+	const Bool inPlace = sites.size() == 1 && isWallPiece(source);
 	Team* team = source->getTeam();
 	TheAI->pathfinder()->removeObjectFromPathfindMap(source);
 	TheGameLogic->destroyObject(source);
 
+	const auto construction = MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNDER_CONSTRUCTION);
 	for (const Site& site : sites)
 	{
-		Object* replacement = TheThingFactory->newObjectFromExactTemplate(site.type, team, OBJECT_STATUS_MASK_NONE);
-		replacement->setPosition(&site.position);
-		replacement->setOrientation(angle);
+		const Bool structure = site.type->isKindOf(KINDOF_STRUCTURE);
+		Object* replacement = TheThingFactory->newObjectFromExactTemplate(site.type, team,
+			inPlace && structure ? construction : OBJECT_STATUS_MASK_NONE);
+		if (inPlace)
+		{
+			replacement->setTransformMatrix(&transform);
+			if (structure)
+				replacement->clearStatus(construction);
+		}
+		else
+		{
+			replacement->setPosition(&site.position);
+			replacement->setOrientation(angle);
+		}
 		if (&site == &sites.front())
 			replacement->setName(name);
 		for (BehaviorModule** module = replacement->getBehaviorModules(); *module; ++module)
 		{
-			if (CreateModuleInterface* create = (*module)->getCreate())
+			CreateModuleInterface* create = (*module)->getCreate();
+			if (create && (!inPlace || create->shouldDoOnBuildComplete()))
 				create->onBuildComplete();
 		}
-		if (replacement->isKindOf(KINDOF_STRUCTURE) && replacement->getControllingPlayer())
+		if (structure && replacement->getControllingPlayer())
 			replacement->getControllingPlayer()->onStructureConstructionComplete(nullptr, replacement, TRUE);
+		else if (inPlace)
+			TheAI->pathfinder()->addObjectToPathfindMap(replacement);
 	}
 }
 
@@ -141,6 +172,11 @@ void ReplaceSelfUpgrade::crc(Xfer* xfer)
 
 void ReplaceSelfUpgrade::xfer(Xfer* xfer)
 {
+	if (isWallPiece(getObject()))
+	{
+		XferVersion version = 1;
+		xfer->xferVersion(&version, 1);
+	}
 	UpgradeModule::xfer(xfer);
 }
 
