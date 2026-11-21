@@ -35,7 +35,10 @@
 
 #define NO_DEBUG_CRC
 
+#include <algorithm>
+
 #include "Common/AudioEventRTS.h"
+#include "Common/BuildAssistant.h"
 #include "Common/DrawModule.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
@@ -46,6 +49,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
 #include "Common/GameLOD.h"
+#include "Common/Upgrade.h"
 
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
@@ -893,6 +897,12 @@ public:
 		{
 			{ "DispositionAngle", INI::parseAngleReal, nullptr, offsetof(GenericObjectCreationNugget, m_dispositionAngle) },
 			{ "IgnoreCommandPointLimit", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_ignoreCommandPointLimit) },
+			{ "UseJustBuiltFlag", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_useJustBuiltFlag) },
+			{ "JustBuiltDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(GenericObjectCreationNugget, m_justBuiltDuration) },
+			{ "StartingBusyTime", INI::parseDurationUnsignedInt, nullptr, offsetof(GenericObjectCreationNugget, m_startingBusyTime) },
+			{ "ClearRemovables", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_clearRemovables) },
+			{ "RequiredUpgrades", INI::parseAsciiStringVectorAppend, nullptr, offsetof(GenericObjectCreationNugget, m_requiredUpgrades) },
+			{ "ForbiddenUpgrades", INI::parseAsciiStringVectorAppend, nullptr, offsetof(GenericObjectCreationNugget, m_forbiddenUpgrades) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 
@@ -1024,6 +1034,11 @@ protected:
 					TheTerrainLogic->getGroundHeight(pos->x + offset.x, pos->y + offset.y);
 			}
 			obj->setOrientation(orientation);
+			obj->setPosition(&chunkPos);
+		}
+		else if (RetailFileLayers::enabled() && BitIsSet(m_disposition, ABSOLUTE_ANGLE | RELATIVE_ANGLE))
+		{
+			obj->setOrientation(BitIsSet(m_disposition, ABSOLUTE_ANGLE) ? m_dispositionAngle : orientation + m_dispositionAngle);
 			obj->setPosition(&chunkPos);
 		}
 
@@ -1311,6 +1326,17 @@ protected:
 
 
 
+		if (RetailFileLayers::enabled() && m_nameAreObjects)
+		{
+			if (m_clearRemovables && TheBuildAssistant)
+				TheBuildAssistant->clearRemovableForConstruction(obj->getTemplate(), obj->getPosition(), obj->getOrientation(), obj);
+			if (m_useJustBuiltFlag)
+				obj->setPowerModelCondition(MODELCONDITION_JUST_BUILT, std::max<UnsignedInt>(1, m_justBuiltDuration));
+			if (m_startingBusyTime > 0)
+				if (AIUpdateInterface *ai = obj->getAI())
+					ai->setRetailSpawnBusyTime(m_startingBusyTime);
+		}
+
     if ( m_diesOnBadLand && obj )
     {
 	    // if we land in the water, we die. alas.
@@ -1365,6 +1391,19 @@ protected:
 
 		if (m_names.size() <= 0)
 			return nullptr;
+
+		if (RetailFileLayers::enabled() && (!m_requiredUpgrades.empty() || !m_forbiddenUpgrades.empty()))
+		{
+			const Player *owner = sourceObj ? sourceObj->getControllingPlayer() : nullptr;
+			const auto hasUpgrade = [&](const AsciiString &name) {
+				const UpgradeTemplate *upgrade = TheUpgradeCenter->findUpgrade(name);
+				return upgrade && (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER
+					? owner && owner->hasUpgradeComplete(upgrade) : sourceObj && sourceObj->hasUpgrade(upgrade));
+			};
+			if (!std::all_of(m_requiredUpgrades.begin(), m_requiredUpgrades.end(), hasUpgrade) ||
+				std::any_of(m_forbiddenUpgrades.begin(), m_forbiddenUpgrades.end(), hasUpgrade))
+				return nullptr;
+		}
 
 		if (m_requiresLivePlayer && (!sourceObj || !sourceObj->getControllingPlayer() || !sourceObj->getControllingPlayer()->isPlayerActive()))
 			return nullptr; // don't spawn useful objects for dead players.  Avoid the zombie units from Yuri's.
@@ -1571,6 +1610,12 @@ private:
   Bool                      m_diesOnBadLand;
 	Bool											m_skipIfSignificantlyAirborne;
 	Bool											m_ignoreCommandPointLimit = FALSE;
+	Bool m_useJustBuiltFlag = FALSE;
+	Bool m_clearRemovables = FALSE;
+	UnsignedInt m_justBuiltDuration = 0;
+	UnsignedInt m_startingBusyTime = 0;
+	std::vector<AsciiString> m_requiredUpgrades;
+	std::vector<AsciiString> m_forbiddenUpgrades;
 
 };
 EMPTY_DTOR(GenericObjectCreationNugget)

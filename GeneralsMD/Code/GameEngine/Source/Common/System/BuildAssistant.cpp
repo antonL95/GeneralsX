@@ -1514,9 +1514,8 @@ Bool BuildAssistant::isRemovableForConstruction( Object *obj )
 /** Given that we are about to build 'whatToBuild' remove all the objects that are in the
 	* 'footprint' of where the build will take place that can be auto-removed for construction */
 // ------------------------------------------------------------------------------------------------
-void BuildAssistant::clearRemovableForConstruction( const ThingTemplate *whatToBuild,
-																										const Coord3D *pos,
-																										Real angle )
+void BuildAssistant::clearRemovableForConstruction(const ThingTemplate *whatToBuild, const Coord3D *pos,
+	Real angle, const Object *exclude)
 {
 	ObjectIterator *iter =
 			ThePartitionManager->iteratePotentialCollisions( pos,
@@ -1528,7 +1527,7 @@ void BuildAssistant::clearRemovableForConstruction( const ThingTemplate *whatToB
 
 		// UI feedback objects (always selectable) never get destroyed by construction, but also should never
 		// trip any of the other side effects of placing them in isRemovableForConstruction()
-		if( isRemovableForConstruction( them ) == TRUE && !them->isKindOf( KINDOF_ALWAYS_SELECTABLE ) )
+		if( them != exclude && isRemovableForConstruction( them ) == TRUE && !them->isKindOf( KINDOF_ALWAYS_SELECTABLE ) )
 			TheGameLogic->destroyObject( them );
 
 	}

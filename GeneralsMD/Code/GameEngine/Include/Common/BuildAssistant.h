@@ -198,15 +198,13 @@ public:
 	void xferTheSellList(Xfer *xfer );
 
 	void clearConstructionSite( const Object *site );
+	void clearRemovableForConstruction(const ThingTemplate *whatToBuild, const Coord3D *pos,
+		Real angle, const Object *exclude = nullptr);
 
 protected:
 
 	/// some objects will be "cleared" automatically when constructing
 	Bool isRemovableForConstruction( Object *obj );
-
-	/// clear the area of removable objects for construction
-	void clearRemovableForConstruction( const ThingTemplate *whatToBuild,
-																			const Coord3D *pos, Real angle );
 
 	/// will move objects that can move out of the way.
 	/// will return false if there are objects that cannot be moved out of the way.

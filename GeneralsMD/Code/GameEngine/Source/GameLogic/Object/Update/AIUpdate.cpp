@@ -4237,6 +4237,12 @@ void AIUpdateInterface::privateBusy( CommandSourceType cmdSource )
 	getStateMachine()->setState( AI_BUSY );
 }
 
+void AIUpdateInterface::setRetailSpawnBusyTime(UnsignedInt frames)
+{
+	getStateMachine()->setTemporaryState(AI_BUSY, static_cast<Int>(std::min<UnsignedInt>(frames, 60 * LOGICFRAMES_PER_SECOND)));
+	wakeUpNow();
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 /**

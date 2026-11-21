@@ -663,6 +663,7 @@ protected:
 public:
 
 	StateID getCurrentStateID() const { return getStateMachine()->getCurrentStateID(); }	///< return the id of the current state of the machine
+	void setRetailSpawnBusyTime(UnsignedInt frames);
 /// @ todo -- srj sez: JBA NUKE THIS CODE, IT IS EVIL
 	void friend_addToWaypointGoalPath( const Coord3D *pathPoint ) { getStateMachine()->addToGoalPath(pathPoint); }
 
