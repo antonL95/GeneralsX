@@ -6106,8 +6106,9 @@ void Pathfinder::updateGoal( Object *obj, const Coord3D *newGoalPos, PathfindLay
 		const ObjectID owner = cell->getGoalUnit();
 		if (RetailFileLayers::enabled() && owner != INVALID_ID && owner != obj->getID() &&
 			isSameHorde(obj, TheGameLogic->findObjectByID(owner)))
-			return;
-		cell->setGoalUnit(obj->getID(), index);
+			cell->shareGoalUnit(obj->getID());
+		else
+			cell->setGoalUnit(obj->getID(), index);
 	};
 	for (i=newCell.x-radius; i<newCell.x+numCellsAbove; i++) {
 		for (j=newCell.y-radius; j<newCell.y+numCellsAbove; j++) {
@@ -6206,34 +6207,22 @@ void Pathfinder::removeGoal( Object *obj)
 	if (newCell.x==goalCell.x && newCell.y == goalCell.y) {
 		return;
 	}
-	ICoord2D cellNdx;
 	ai->setPathfindGoalCell(newCell);
 	Int i,j;
 	if (goalCell.x>=0 && goalCell.y>=0) {
 		for (i=goalCell.x-radius; i<goalCell.x+numCellsAbove; i++) {
 			for (j=goalCell.y-radius; j<goalCell.y+numCellsAbove; j++) {
+				const ICoord2D cellNdx = {i, j};
 				PathfindCell	*cell = getCell(LAYER_GROUND, i, j);
 				if (cell) {
-					if (cell->getGoalUnit()==obj->getID()) {
-						cellNdx.x = i;
-						cellNdx.y = j;
-						cell->setGoalUnit(INVALID_ID, cellNdx);
-					}
-					if (cell->getGoalAircraft()==obj->getID()) {
-						cellNdx.x = i;
-						cellNdx.y = j;
+					cell->removeGoalUnit(obj->getID(), cellNdx);
+					if (cell->getGoalAircraft()==obj->getID())
 						cell->setGoalAircraft(INVALID_ID, cellNdx);
-					}
 				}
 				if (obj->getDestinationLayer()!=LAYER_GROUND) {
 					cell = getCell( obj->getDestinationLayer(), i, j);
-					if (cell) {
-						if (cell->getGoalUnit()==obj->getID()) {
-							cellNdx.x = i;
-							cellNdx.y = j;
-							cell->setGoalUnit(INVALID_ID, cellNdx);
-						}
-					}
+					if (cell)
+						cell->removeGoalUnit(obj->getID(), cellNdx);
 				}
 			}
 		}

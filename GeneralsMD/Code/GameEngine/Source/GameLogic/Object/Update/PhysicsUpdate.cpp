@@ -677,8 +677,10 @@ UpdateSleepTime PhysicsBehavior::update()
 		else
 		{
 			HordeContain::constrainGroundMovement(obj, m_vel);
-			mtx.Adjust_X_Translation(m_vel.x);
-			mtx.Adjust_Y_Translation(m_vel.y);
+			Coord3D movement = m_vel;
+			HordeContain::separateGroundMovement(obj, movement);
+			mtx.Adjust_X_Translation(movement.x);
+			mtx.Adjust_Y_Translation(movement.y);
 			mtx.Adjust_Z_Translation(m_vel.z);
 		}
 

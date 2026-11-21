@@ -253,6 +253,8 @@ void PathfindCell::releaseInfo()
  */
 void PathfindCell::setGoalUnit(ObjectID unitID, const ICoord2D &pos )
 {
+	if (m_info && unitID != m_info->m_goalUnitID)
+		m_info->m_sharedGoalUnits.clear();
 	if (unitID==INVALID_ID) {
 		// removing goal.
 		if (m_info) {
@@ -289,6 +291,35 @@ void PathfindCell::setGoalUnit(ObjectID unitID, const ICoord2D &pos )
 	}
 }
 
+void PathfindCell::shareGoalUnit(ObjectID unit)
+{
+	auto& goals = m_info->m_sharedGoalUnits;
+	if (std::find(goals.begin(), goals.end(), unit) == goals.end())
+		goals.push_back(unit);
+}
+
+void PathfindCell::removeGoalUnit(ObjectID unit, const ICoord2D& pos)
+{
+	if (!m_info)
+		return;
+	auto& goals = m_info->m_sharedGoalUnits;
+	if (m_info->m_goalUnitID == unit)
+	{
+		if (goals.empty())
+		{
+			setGoalUnit(INVALID_ID, pos);
+			return;
+		}
+		const ObjectID successor = goals.front();
+		goals.erase(goals.begin());
+		m_info->m_goalUnitID = successor;
+		setGoalUnit(successor, pos);
+	}
+	else if (const auto entry = std::find(goals.begin(), goals.end(), unit); entry != goals.end())
+	{
+		goals.erase(entry);
+	}
+}
 
 /**
  * Sets the goal aircraft into the info record for a cell.

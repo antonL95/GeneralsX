@@ -19,6 +19,7 @@
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Pathfinder/Path.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "Common/GameState.h"
 #include "Common/RetailFileLayers.h"
@@ -741,17 +742,32 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	}
 
 	const Coord3D& velocity = *physics->getVelocity();
-	const Real hordeSpeed = sqrtf(velocity.x * velocity.x + velocity.y * velocity.y);
-	goal.position.x += velocity.x * FORMATION_LEAD_FRAMES;
-	goal.position.y += velocity.y * FORMATION_LEAD_FRAMES;
+	const Real hordeSpeed = WWMath::SqrtfOrigin(velocity.x * velocity.x + velocity.y * velocity.y);
+	const Coord3D& anchor = *horde->getPosition();
+	const Coord3D& destination = *hordeAI->getGoalPosition();
+	const Real gx = destination.x - anchor.x;
+	const Real gy = destination.y - anchor.y;
+	Real remaining = WWMath::SqrtfOrigin(gx * gx + gy * gy);
+	Real leadX = velocity.x * FORMATION_LEAD_FRAMES;
+	Real leadY = velocity.y * FORMATION_LEAD_FRAMES;
+	const Path* path = hordeAI->getPath();
+	if (const ClosestPointOnPathInfo* point = path ? path->getCachedPointOnPath() : nullptr)
+	{
+		const Real pathX = point->posOnPath.x - anchor.x;
+		const Real pathY = point->posOnPath.y - anchor.y;
+		const Real length = WWMath::SqrtfOrigin(pathX * pathX + pathY * pathY);
+		const Real scale = length > 0.0f ? std::min(1.0f, hordeSpeed * FORMATION_LEAD_FRAMES / length) : 0.0f;
+		leadX = pathX * scale;
+		leadY = pathY * scale;
+		remaining = std::max(0.0f, point->distAlongPath);
+	}
+	goal.position.x += leadX;
+	goal.position.y += leadY;
 	if (TheTerrainLogic)
 		goal.position.z = TheTerrainLogic->getGroundHeight(goal.position.x, goal.position.y);
 	const Real behind = hordeSpeed > 0.0f ? (dx * velocity.x + dy * velocity.y) / hordeSpeed : goal.error;
 	goal.speed = std::max(0.0f, hordeSpeed + behind * FORMATION_CATCH_UP_PER_FRAME);
-	const Coord3D* hordeGoal = hordeAI->getGoalPosition();
-	const Real gx = hordeGoal->x - horde->getPosition()->x;
-	const Real gy = hordeGoal->y - horde->getPosition()->y;
-	goal.distance = std::max(0.0f, behind) + sqrtf(gx * gx + gy * gy);
+	goal.distance = std::max(0.0f, behind) + remaining;
 	return TRUE;
 }
 
@@ -796,6 +812,87 @@ void HordeContain::constrainGroundMovement(const Object* member, Coord3D& moveme
 		movement.y = 0.0f;
 	else
 		movement.x = movement.y = 0.0f;
+}
+
+void HordeContain::separateGroundMovement(const Object* member, Coord3D& movement)
+{
+	if (!RetailFileLayers::enabled() || member->isEffectivelyDead() ||
+		member->isSignificantlyAboveTerrain() || !std::isfinite(movement.x) || !std::isfinite(movement.y))
+		return;
+	const HordeContain* horde = get(member->getContainedBy());
+	if (!horde || horde->getMemberSlot(member->getID()) < 0)
+		return;
+	const AIUpdateInterface* ai = member->getAI();
+	const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+	if (!locomotor || !ai->isDoingGroundMovement())
+		return;
+
+	const Real radius = member->getGeometryInfo().getBoundingCircleRadius();
+	const Coord3D& origin = *member->getPosition();
+	const auto layer = member->getLayer();
+	Coord3D next = {origin.x + movement.x, origin.y + movement.y, origin.z};
+	const Coord3D planned = next;
+	constexpr Real CLEARANCE = 0.05f;
+	constexpr Real MAX_CORRECTION = 4.0f;
+	for (const Object* other : horde->getContainList())
+	{
+		if (other == member || other->isEffectivelyDead() || other->getLayer() != layer ||
+			other->isSignificantlyAboveTerrain() || horde->getMemberSlot(other->getID()) < 0)
+			continue;
+		const Coord3D& position = *other->getPosition();
+		const Real diameter = radius + other->getGeometryInfo().getBoundingCircleRadius() + CLEARANCE;
+		const Real dx = next.x - position.x;
+		const Real dy = next.y - position.y;
+		const Real distanceSquared = dx * dx + dy * dy;
+		if (distanceSquared >= diameter * diameter)
+			continue;
+
+		const Real oldX = origin.x - position.x;
+		const Real oldY = origin.y - position.y;
+		const Real oldDistance = WWMath::SqrtfOrigin(oldX * oldX + oldY * oldY);
+		Real axisX = oldX;
+		Real axisY = oldY;
+		if (oldDistance > 0.001f)
+		{
+			axisX /= oldDistance;
+			axisY /= oldDistance;
+		}
+		else
+		{
+			const Coord3D ourSlot = horde->getMemberPosition(member->getID(), FALSE);
+			const Coord3D otherSlot = horde->getMemberPosition(other->getID(), FALSE);
+			axisX = ourSlot.x - otherSlot.x;
+			axisY = ourSlot.y - otherSlot.y;
+			const Real length = WWMath::SqrtfOrigin(axisX * axisX + axisY * axisY);
+			if (length > 0.001f)
+			{
+				axisX /= length;
+				axisY /= length;
+			}
+			else
+			{
+				axisX = member->getID() < other->getID() ? -1.0f : 1.0f;
+				axisY = 0.0f;
+			}
+		}
+		const Real target = std::min(diameter, oldDistance + MAX_CORRECTION);
+		const Real correction = target - (dx * axisX + dy * axisY);
+		if (correction > 0.0f)
+		{
+			next.x += axisX * correction;
+			next.y += axisY * correction;
+		}
+	}
+	if (next.x == planned.x && next.y == planned.y)
+		return;
+
+	Pathfinder* pathfinder = TheAI->pathfinder();
+	if (pathfinder->validMovementTerrain(layer, locomotor, &next) &&
+		pathfinder->isLinePassable(member, locomotor->getLegalSurfaces(), layer, origin, next, FALSE, TRUE))
+	{
+		movement.x = next.x - origin.x;
+		movement.y = next.y - origin.y;
+	}
 }
 
 Real HordeContain::getFormationSpeedScale() const

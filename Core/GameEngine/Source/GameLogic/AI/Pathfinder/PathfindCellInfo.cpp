@@ -107,6 +107,7 @@ PathfindCellInfo *PathfindCellInfo::getACellInfo(PathfindCell *cell,const ICoord
  */
 void PathfindCellInfo::releaseACellInfo(PathfindCellInfo *theInfo)
 {
+	theInfo->m_sharedGoalUnits.clear();
 	DEBUG_ASSERTCRASH(!theInfo->m_isFree, ("Shouldn't be free."));
 	//@ todo -fix this assert on usa04.  jba.
 	//DEBUG_ASSERTCRASH(theInfo->m_obstacleID==0, ("Shouldn't be obstacle."));

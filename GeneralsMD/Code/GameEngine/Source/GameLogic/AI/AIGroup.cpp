@@ -1589,7 +1589,28 @@ void clampWaypointPosition( Coord3D &position, Int margin )
 /**
  * Move to given position(s)
  */
-Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType cmdSource )
+Real AIGroup::getRotwkMoveSpeed() const
+{
+	Real speed = FAST_AS_POSSIBLE;
+	Int movers = 0;
+	for (const Object* obj : m_memberList)
+	{
+		const AIUpdateInterface* ai = obj->getAI();
+		if (!ai || !ai->getCurLocomotor() || !obj->isMobile() || obj->isEffectivelyDead() ||
+			obj->isDisabledByType(DISABLED_HELD))
+			continue;
+		++movers;
+		if (IS_CONDITION_BETTER(obj->getBodyModule()->getDamageState(), TheGlobalData->m_movementPenaltyDamageState))
+		{
+			const Real maxSpeed = ai->getCurLocomotorSpeed();
+			if (maxSpeed > 0.0f)
+				speed = std::min(speed, maxSpeed);
+		}
+	}
+	return movers > 1 ? speed : FAST_AS_POSSIBLE;
+}
+
+Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType cmdSource, Real speed )
 {
 	const Real REARRANGE_ANGLE = PI / 4.0f;
 	const Real MAX_OFFSET_RADII = 6.0f;
@@ -1599,7 +1620,6 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 	center.zero();
 	Real facingX = 0.0f;
 	Real facingY = 0.0f;
-	Real speed = FAST_AS_POSSIBLE;
 	for (std::list<Object *>::iterator it = m_memberList.begin(); it != m_memberList.end(); ++it)
 	{
 		Object* obj = *it;
@@ -1611,9 +1631,6 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 		center.y += obj->getPosition()->y;
 		facingX += obj->getUnitDirectionVector2D()->x;
 		facingY += obj->getUnitDirectionVector2D()->y;
-		const Real maxSpeed = ai->getCurLocomotorSpeed();
-		if (maxSpeed > 0.0f && maxSpeed < speed)
-			speed = maxSpeed;
 	}
 	if (movers.size() < 2)
 		return FALSE;
@@ -1683,14 +1700,16 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
     isFormation = false;
   }
 
-	if (!addWaypoint && !isFormation && RetailFileLayers::enabled())
+	const Bool retailMove = !addWaypoint && !isFormation && RetailFileLayers::enabled();
+	const Real retailSpeed = retailMove ? getRotwkMoveSpeed() : FAST_AS_POSSIBLE;
+	if (retailMove)
 	{
 		clampWaypointPosition( position, STD_WAYPOINT_CLAMP_MARGIN );
-		didRotwkBlock = friend_moveRotwkBlockToPos(pos, cmdSource);
+		didRotwkBlock = friend_moveRotwkBlockToPos(pos, cmdSource, retailSpeed);
 	}
 
 
-	if (!addWaypoint && !isFormation && !didRotwkBlock) {
+	if (!addWaypoint && !isFormation && !retailMove) {
 		friend_computeGroundPath(pos, cmdSource);
 		didInfantry = friend_moveInfantryToPos(pos, cmdSource);
 		didVehicles = friend_moveVehicleToPos(pos, cmdSource);
@@ -1865,6 +1884,8 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		if( !addWaypoint )
 		{
 			ai->aiMoveToPosition( &dest, cmdSource );
+			if (retailMove)
+				ai->setDesiredSpeed(retailSpeed);
 		}
 		else
 		{

@@ -153,6 +153,8 @@ public:
 	zoneStorageType getZone() const {return m_zone;}
 	void setZone(zoneStorageType zone) {m_zone = zone;}
 	void setGoalUnit(ObjectID unit, const ICoord2D &pos );
+	void shareGoalUnit(ObjectID unit);
+	void removeGoalUnit(ObjectID unit, const ICoord2D& pos);
 	void setGoalAircraft(ObjectID unit, const ICoord2D &pos );
 	void setPosUnit(ObjectID unit, const ICoord2D &pos );
 	ObjectID getGoalUnit() const {ObjectID id = m_info?m_info->m_goalUnitID:INVALID_ID; return id;}

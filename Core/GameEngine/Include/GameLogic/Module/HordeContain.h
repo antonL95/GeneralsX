@@ -150,6 +150,7 @@ public:
 	Bool getFormationGoal(const Object* member, FormationGoal& goal) const;
 	static Bool canSteerToFormationGoal(const Object* member, const FormationGoal& goal);
 	static void constrainGroundMovement(const Object* member, Coord3D& movement);
+	static void separateGroundMovement(const Object* member, Coord3D& movement);
 	Real getFormationSpeedScale() const;
 	void reassignSlotsByPosition();
 	Bool canSetAlternateFormation(Bool alternate) const;

@@ -1430,6 +1430,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 				dy *= dist;
 				Coord3D movement = {dx * vel, dy * vel, 0.0f};
 				HordeContain::constrainGroundMovement(obj, movement);
+				HordeContain::separateGroundMovement(obj, movement);
 				pos.x += movement.x;
 				pos.y += movement.y;
 			}

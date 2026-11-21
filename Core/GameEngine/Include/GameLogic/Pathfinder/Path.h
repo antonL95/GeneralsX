@@ -58,6 +58,7 @@ public:
 
 	/// Given a location, return nearest location on path, and along-path dist to end as function result
 	void peekCachedPointOnPath( Coord3D& pos ) const {pos = m_cpopOut.posOnPath;}
+	const ClosestPointOnPathInfo* getCachedPointOnPath() const { return m_cpopValid ? &m_cpopOut : nullptr; }
 
 	/// Given a flight path, compute the distance to goal (0 if we are past it) & return the goal pos.
 	Real computeFlightDistToGoal( const Coord3D *pos, Coord3D& goalPos );

@@ -5,7 +5,10 @@
 #include <cctype>
 #include <cerrno>
 #include <climits>
+#include <cmath>
 #include <cstdlib>
+#include <map>
+#include <tuple>
 #include <utility>
 
 namespace
@@ -329,97 +332,107 @@ std::vector<int> HordeLayout::nearestSlots(const std::vector<int>& currentSlots,
 	const std::vector<bool>& reserved) const
 {
 	std::vector<int> result(currentSlots.size(), -1);
-	std::vector<std::size_t> members;
+	struct Rank
+	{
+		double x = 0.0;
+		int number = 0;
+		std::vector<std::size_t> slots;
+	};
+	struct Group
+	{
+		std::vector<std::size_t> members;
+		std::map<int, Rank> ranks;
+		std::size_t capacity = 0;
+	};
+	const auto typeKey = [](std::string type) {
+		for (char& letter : type)
+		{
+			if ('A' <= letter && letter <= 'Z')
+				letter += 'a' - 'A';
+		}
+		return type;
+	};
+	std::map<std::string, Group> groups;
 	for (std::size_t member = 0; member < currentSlots.size() && member < positions.size(); ++member)
 	{
-		if (currentSlots[member] >= 0 && static_cast<std::size_t>(currentSlots[member]) < m_slots.size())
-			members.push_back(member);
+		const int slot = currentSlots[member];
+		if (slot >= 0 && static_cast<std::size_t>(slot) < m_slots.size() &&
+			std::isfinite(positions[member].x) && std::isfinite(positions[member].y))
+			groups[typeKey(m_slots[slot].unitType)].members.push_back(member);
 	}
-	std::vector<std::size_t> available;
 	for (std::size_t slot = 0; slot < m_slots.size(); ++slot)
 	{
-		if (slot >= reserved.size() || !reserved[slot])
-			available.push_back(slot);
-	}
-	const std::size_t rows = members.size();
-	const std::size_t columns = available.size();
-	if (rows == 0 || rows > columns)
-		return result;
-
-	const double incompatible = 1.0e12;
-	const auto cost = [&](std::size_t row, std::size_t column)
-	{
-		const std::size_t member = members[row];
-		const auto& slot = m_slots[available[column]];
-		if (!sameName(slot.unitType, m_slots[currentSlots[member]].unitType))
-			return incompatible;
-		const double dx = static_cast<double>(slot.position.x) - positions[member].x;
-		const double dy = static_cast<double>(slot.position.y) - positions[member].y;
-		return dx * dx + dy * dy;
-	};
-
-	const double infinity = 1.0e30;
-	std::vector<double> rowPotential(rows + 1, 0.0);
-	std::vector<double> columnPotential(columns + 1, 0.0);
-	std::vector<std::size_t> columnRow(columns + 1, 0);
-	std::vector<std::size_t> way(columns + 1, 0);
-	for (std::size_t row = 1; row <= rows; ++row)
-	{
-		columnRow[0] = row;
-		std::size_t column = 0;
-		std::vector<double> minimum(columns + 1, infinity);
-		std::vector<bool> used(columns + 1, false);
-		do
-		{
-			used[column] = true;
-			const std::size_t currentRow = columnRow[column];
-			double delta = infinity;
-			std::size_t next = 0;
-			for (std::size_t candidate = 1; candidate <= columns; ++candidate)
-			{
-				if (used[candidate])
-					continue;
-				const double reduced = cost(currentRow - 1, candidate - 1) - rowPotential[currentRow] - columnPotential[candidate];
-				if (reduced < minimum[candidate])
-				{
-					minimum[candidate] = reduced;
-					way[candidate] = column;
-				}
-				if (minimum[candidate] < delta)
-				{
-					delta = minimum[candidate];
-					next = candidate;
-				}
-			}
-			for (std::size_t candidate = 0; candidate <= columns; ++candidate)
-			{
-				if (used[candidate])
-				{
-					rowPotential[columnRow[candidate]] += delta;
-					columnPotential[candidate] -= delta;
-				}
-				else
-					minimum[candidate] -= delta;
-			}
-			column = next;
-		} while (columnRow[column] != 0);
-		do
-		{
-			const std::size_t previous = way[column];
-			columnRow[column] = columnRow[previous];
-			column = previous;
-		} while (column != 0);
-	}
-
-	for (std::size_t column = 1; column <= columns; ++column)
-	{
-		if (columnRow[column] == 0)
+		if (slot < reserved.size() && reserved[slot])
 			continue;
-		const std::size_t member = members[columnRow[column] - 1];
-		if (cost(columnRow[column] - 1, column - 1) < incompatible)
-			result[member] = static_cast<int>(available[column - 1]);
-		else
-			result[member] = currentSlots[member];
+		const HordeSlot& point = m_slots[slot];
+		if (!std::isfinite(point.position.x) || !std::isfinite(point.position.y))
+			continue;
+		Group& group = groups[typeKey(point.unitType)];
+		Rank& rank = group.ranks[point.rank];
+		rank.number = point.rank;
+		rank.x += point.position.x;
+		rank.slots.push_back(slot);
+		++group.capacity;
+	}
+	for (auto& entry : groups)
+	{
+		Group& group = entry.second;
+		auto& members = group.members;
+		if (members.empty() || members.size() > group.capacity)
+			continue;
+		std::sort(members.begin(), members.end(), [&](std::size_t a, std::size_t b) {
+			return std::tie(positions[a].x, positions[a].y, currentSlots[a], a) <
+				std::tie(positions[b].x, positions[b].y, currentSlots[b], b);
+		});
+		std::vector<Rank*> ranks;
+		for (auto& item : group.ranks)
+		{
+			Rank& rank = item.second;
+			rank.x /= rank.slots.size();
+			ranks.push_back(&rank);
+		}
+		std::sort(ranks.begin(), ranks.end(), [](const Rank* a, const Rank* b) {
+			return std::tie(a->x, a->number) < std::tie(b->x, b->number);
+		});
+		auto first = members.begin();
+		std::size_t laterCapacity = group.capacity;
+		for (std::size_t row = 0; row < ranks.size() && first != members.end(); ++row)
+		{
+			auto& slots = ranks[row]->slots;
+			laterCapacity -= slots.size();
+			const std::size_t left = members.end() - first;
+			const std::size_t minimum = left > laterCapacity ? left - laterCapacity : 0;
+			const std::size_t maximum = std::min(left, slots.size());
+			auto last = first + maximum;
+			if (row + 1 < ranks.size() && minimum < maximum)
+			{
+				const float boundary = static_cast<float>(0.5 * (ranks[row]->x + ranks[row + 1]->x));
+				last = std::upper_bound(first + minimum, last, boundary, [&](float x, std::size_t member) {
+					return x < positions[member].x;
+				});
+			}
+			std::sort(first, last, [&](std::size_t a, std::size_t b) {
+				return std::tie(positions[a].y, positions[a].x, currentSlots[a], a) <
+					std::tie(positions[b].y, positions[b].x, currentSlots[b], b);
+			});
+			std::sort(slots.begin(), slots.end(), [&](std::size_t a, std::size_t b) {
+				return std::tie(m_slots[a].position.y, m_slots[a].position.x, a) <
+					std::tie(m_slots[b].position.y, m_slots[b].position.x, b);
+			});
+			auto slot = slots.begin();
+			for (; first != last; ++first)
+			{
+				const auto latest = slots.end() - (last - first);
+				const float y = positions[*first].y;
+				auto closest = std::lower_bound(slot, latest, y, [&](std::size_t index, float value) {
+					return m_slots[index].position.y < value;
+				});
+				if (closest != slot && y - m_slots[*(closest - 1)].position.y <= m_slots[*closest].position.y - y)
+					--closest;
+				result[*first] = static_cast<int>(*closest);
+				slot = closest + 1;
+			}
+		}
 	}
 	return result;
 }

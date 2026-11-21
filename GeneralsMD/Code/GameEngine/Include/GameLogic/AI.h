@@ -1018,7 +1018,8 @@ protected:
 
 	Bool friend_moveInfantryToPos( const Coord3D *pos, CommandSourceType cmdSource );
 	Bool friend_moveVehicleToPos( const Coord3D *pos, CommandSourceType cmdSource );
-	Bool friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType cmdSource );
+	Real getRotwkMoveSpeed() const;
+	Bool friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType cmdSource, Real speed );
 	void friend_moveFormationToPos( const Coord3D *pos, CommandSourceType cmdSource );
 	Bool friend_computeGroundPath( const Coord3D *pos, CommandSourceType cmdSource );
 

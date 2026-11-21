@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <vector>
+
 class PathfindCell;
 
 class PathfindCellInfo
@@ -49,6 +51,7 @@ protected:
 	ICoord2D m_pos;
 
 	ObjectID m_goalUnitID; ///< The objectID of the ground unit whose goal this is.
+	std::vector<ObjectID> m_sharedGoalUnits;
 	ObjectID m_posUnitID;  ///< The objectID of the ground unit that is occupying this cell.
 	ObjectID m_goalAircraftID; ///< The objectID of the aircraft whose goal this is.
 
