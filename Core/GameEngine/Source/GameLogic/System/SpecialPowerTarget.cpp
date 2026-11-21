@@ -10,6 +10,23 @@
 
 #include <cmath>
 
+Bool SpecialPowerTemplate::hasForbiddenRetailObjects(const Object* source, const Coord3D* position,
+	const Object* objectInWay) const
+{
+	constexpr UnsignedInt noForbiddenObjects = 1u << 4;
+	const SpecialPowerTemplate* power = getFO();
+	if (!((power->m_flags & noForbiddenObjects) && power->m_forbiddenObjectRange > 0.0f))
+		return FALSE;
+
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(position, power->m_forbiddenObjectRange, FROM_CENTER_2D);
+	MemoryPoolObjectHolder hold(nearby);
+	for (Object* object = nearby->first(); object; object = nearby->next())
+		if (object != source && object != objectInWay && !object->isEffectivelyDead() &&
+			power->m_forbiddenObjectFilter.matchesObject(source, object))
+			return TRUE;
+	return FALSE;
+}
+
 Bool SpecialPowerTemplate::isValidRetailTarget(const Object* source, const Object* target, const Coord3D* position,
 	CommandSourceType commandSource) const
 {
@@ -17,7 +34,6 @@ Bool SpecialPowerTemplate::isValidRetailTarget(const Object* source, const Objec
 	constexpr UnsignedInt waterOk = 1u << 1;
 	constexpr UnsignedInt needsObjectFilter = 1u << 2;
 	constexpr UnsignedInt limitDistance = 1u << 3;
-	constexpr UnsignedInt noForbiddenObjects = 1u << 4;
 	constexpr UnsignedInt pathableOnly = 1u << 6;
 	const SpecialPowerTemplate* power = getFO();
 	const UnsignedInt flags = power->m_flags;
@@ -59,14 +75,8 @@ Bool SpecialPowerTemplate::isValidRetailTarget(const Object* source, const Objec
 		if (dx * dx + dy * dy > power->m_maxCastRange * power->m_maxCastRange)
 			return FALSE;
 	}
-	if ((flags & noForbiddenObjects) && power->m_forbiddenObjectRange > 0.0f)
-	{
-		SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(position, power->m_forbiddenObjectRange, FROM_CENTER_2D);
-		MemoryPoolObjectHolder hold(nearby);
-		for (Object* object = nearby->first(); object; object = nearby->next())
-			if (object != source && !object->isEffectivelyDead() && power->m_forbiddenObjectFilter.matchesObject(source, object))
-				return FALSE;
-	}
+	if (hasForbiddenRetailObjects(source, position))
+		return FALSE;
 	if (!(flags & needsObjectFilter))
 		return TRUE;
 	if (target)

@@ -109,14 +109,11 @@ public:
 		RETAIL_WATER_OK = 1 << 1,
 		RETAIL_NEEDS_OBJECT_FILTER = 1 << 2,
 		RETAIL_LIMIT_DISTANCE = 1 << 3,
-		RETAIL_NO_FORBIDDEN_OBJECTS = 1 << 4,
 		RETAIL_PATHABLE_ONLY = 1 << 6,
 	};
 
 	Bool hasRetailFlag(RetailFlag flag) const { return (getFO()->m_flags & flag) != 0; }
 	const SpecialPowerObjectFilter& getObjectFilter() const { return getFO()->m_objectFilter; }
-	const SpecialPowerObjectFilter& getForbiddenObjectFilter() const { return getFO()->m_forbiddenObjectFilter; }
-	Real getForbiddenObjectRange() const { return getFO()->m_forbiddenObjectRange; }
 	Real getMaxCastRange() const { return getFO()->m_maxCastRange; }
 	// virtual destructor prototype provided by MemoryPoolObject
 
@@ -135,6 +132,7 @@ public:
 	Int getRequiredRank() const { return getFO()->m_requiredRank; }
 	ScienceType getRequiredScience() const { return getFO()->m_requiredScience; }
 	Bool isUnlockedFor(const Player* player, ScienceType excluded = SCIENCE_INVALID) const;
+	Bool hasForbiddenRetailObjects(const Object* source, const Coord3D* position, const Object* objectInWay = nullptr) const;
 	Bool isValidRetailTarget(const Object* source, const Object* target, const Coord3D* position,
 		CommandSourceType commandSource) const;
 	const AudioEventRTS *getInitiateSound() const { return &getFO()->m_initiateSound; }

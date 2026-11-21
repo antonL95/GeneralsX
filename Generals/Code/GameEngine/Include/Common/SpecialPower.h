@@ -119,6 +119,7 @@ public:
 	Int getRequiredRank() const { return getFO()->m_requiredRank; }
 	ScienceType getRequiredScience() const { return getFO()->m_requiredScience; }
 	Bool isUnlockedFor(const Player* player, ScienceType excluded = SCIENCE_INVALID) const;
+	Bool hasForbiddenRetailObjects(const Object* source, const Coord3D* position, const Object* objectInWay = nullptr) const;
 	Bool isValidRetailTarget(const Object* source, const Object* target, const Coord3D* position,
 		CommandSourceType commandSource) const;
 	const AudioEventRTS *getInitiateSound() const { return &getFO()->m_initiateSound; }
