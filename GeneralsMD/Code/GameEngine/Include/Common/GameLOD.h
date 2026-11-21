@@ -100,6 +100,19 @@ enum ChipsetType CPP_11(: Int)
 struct StaticGameLODInfo
 {
 	StaticGameLODInfo();
+	Bool m_useShadowMapping = FALSE;
+	Int m_shadowQuality = 0;
+	Int m_modelQuality = 0;
+	Int m_effectQuality = 0;
+	Int m_animationDetail = 0;
+	Int m_shaderQuality = 0;
+	Int m_waterQuality = 0;
+	Int m_decalQuality = 0;
+	Bool m_shaderMaterialReplacement = FALSE;
+	Bool m_useTerrainNormalMap = FALSE;
+	Bool m_useDistanceDependantTerrainTextures = FALSE;
+	ParticlePriorityType m_minParticlePriority;
+	ParticlePriorityType m_minParticleSkipPriority;
 	//Static LOD constants
 	Int m_minFPS;	///< minimum fps in order to recommend this LOD.
 	Int m_minProcessorFPS;	///< minimum CPU time (in ms) to recommend this LOD.
@@ -170,6 +183,10 @@ public:
 	StaticGameLODLevel getRecommendedStaticLODLevel();	///< calculate the optimal static LOD level for this system.
 	Bool setStaticLODLevel(StaticGameLODLevel level);	///< set the current static LOD level.
 	StaticGameLODLevel getStaticLODLevel() { return m_currentStaticLOD;}
+	const StaticGameLODInfo *getStaticRenderSettings() const
+	{
+		return m_currentStaticLOD == STATIC_GAME_LOD_UNKNOWN ? nullptr : &m_staticGameLODInfo[m_currentStaticLOD];
+	}
 	DynamicGameLODLevel findDynamicLODLevel(Real averageFPS);	///<given an average fps, return the optimal dynamic LOD.
 	Bool setDynamicLODLevel(DynamicGameLODLevel level);	///< set the current dynamic LOD level.
 	DynamicGameLODLevel getDynamicLODLevel() { return m_currentDynamicLOD;}
@@ -179,8 +196,8 @@ public:
 	inline Bool isParticleSkipped();
 	inline Bool isDebrisSkipped();
 	inline Real getSlowDeathScale();
-	inline ParticlePriorityType getMinDynamicParticlePriority();		///<priority at which particles will still render at current FPS.
-	inline ParticlePriorityType	getMinDynamicParticleSkipPriority();	///<priority at which particles will never be skipped at any FPS.
+	ParticlePriorityType getMinDynamicParticlePriority();
+	ParticlePriorityType getMinDynamicParticleSkipPriority();
 	Int getRecommendedTextureReduction();	///<return the optimal texture reduction for the system.
 	Int getLevelTextureReduction(StaticGameLODLevel level);	///<return texture reduction specified in INI for this game detail.
 	LODPresetInfo *newLODPreset(StaticGameLODLevel index);
@@ -191,7 +208,7 @@ public:
 
 	StaticGameLODInfo m_staticGameLODInfo[STATIC_GAME_LOD_COUNT];
 	DynamicGameLODInfo m_dynamicGameLODInfo[DYNAMIC_GAME_LOD_COUNT];
-	LODPresetInfo m_lodPresets[STATIC_GAME_LOD_CUSTOM][MAX_LOD_PRESETS_PER_LEVEL];
+	LODPresetInfo m_lodPresets[STATIC_GAME_LOD_COUNT][MAX_LOD_PRESETS_PER_LEVEL];
 	BenchProfile m_benchProfiles[MAX_BENCH_PROFILES];
 
 protected:
@@ -214,7 +231,7 @@ protected:
 	Bool m_videoPassed;
 	Bool m_cpuPassed;
 	Bool m_memPassed;
-	Int m_numLevelPresets[STATIC_GAME_LOD_CUSTOM];
+	Int m_numLevelPresets[STATIC_GAME_LOD_COUNT];
 	Int m_numBenchProfiles;
 	StaticGameLODLevel m_idealDetailLevel;
 	ChipsetType m_videoChipType;
@@ -241,16 +258,6 @@ Bool GameLODManager::isDebrisSkipped()
 Real GameLODManager::getSlowDeathScale()
 {
 	return m_slowDeathScale;
-}
-
-ParticlePriorityType GameLODManager::getMinDynamicParticlePriority()
-{
-	return m_minDynamicParticlePriority;
-}
-
-ParticlePriorityType GameLODManager::getMinDynamicParticleSkipPriority()
-{
-	return m_minDynamicParticleSkipPriority;
 }
 
 extern GameLODManager *TheGameLODManager;

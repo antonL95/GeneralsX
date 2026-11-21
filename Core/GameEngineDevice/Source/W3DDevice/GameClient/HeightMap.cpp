@@ -46,6 +46,7 @@
 //         Includes
 //-----------------------------------------------------------------------------
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "W3DDevice/GameClient/RetailTerrainShadow.h"
 
 #ifndef USE_FLAT_HEIGHT_MAP // Flat height map uses flattened textures. jba. [3/20/2003]
 
@@ -186,6 +187,7 @@ UnsignedInt HeightMapRenderObjClass::doTheDynamicLight(VERTEX_FORMAT *vb, VERTEX
 	shadeB = (diffuse&0x00FF) * oo255;
 
 	Int alpha = (diffuse>>24)&0x00FF;
+	const Real encodingScale = m_map && m_map->usesRetailOverbright() ? 0.5f : 1.0f;
 	Int k;
 	for (k=0; k<numLights; k++) {
 		W3DDynamicLight *pLight = pLights[k];
@@ -244,12 +246,12 @@ UnsignedInt HeightMapRenderObjClass::doTheDynamicLight(VERTEX_FORMAT *vb, VERTEX
 		pLight->Get_Ambient(&ambient);
 		if (shade > 1.0) shade = 1.0;
 		if(shade < 0.0f) shade = 0.0f;
-		shadeR += shade*diffuse.X;
-		shadeG += shade*diffuse.Y;
-		shadeB += shade*diffuse.Z;
-		shadeR += factor*ambient.X;
-		shadeG += factor*ambient.Y;
-		shadeB += factor*ambient.Z;
+		shadeR += shade*diffuse.X * encodingScale;
+		shadeG += shade*diffuse.Y * encodingScale;
+		shadeB += shade*diffuse.Z * encodingScale;
+		shadeR += factor*ambient.X * encodingScale;
+		shadeG += factor*ambient.Y * encodingScale;
+		shadeB += factor*ambient.Z * encodingScale;
 
 	}
 	if (shadeR > 1.0) shadeR = 1.0;
@@ -341,6 +343,7 @@ Int HeightMapRenderObjClass::updateVB(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *
 		DX8VertexBufferClass::WriteLockClass lockVtxBuffer(pVB);
 		VERTEX_FORMAT *vbHardware = (VERTEX_FORMAT*)lockVtxBuffer.Get_Vertex_Array();
 		VERTEX_FORMAT *vBase = data;
+		const Real encodingScale = pMap->usesRetailOverbright() ? 0.5f : 1.0f;
 		// Note that we are building the vertex buffer data in the memory buffer, data.
 		// At the bottom, we will copy the final vertex data for one cell into the
 		// hardware vertex buffer.
@@ -399,7 +402,7 @@ Int HeightMapRenderObjClass::updateVB(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *
 				vb->v1=V[0];
 				vb->u2=UA[0];
 				vb->v2=VA[0];
-				doTheLight(vb, lightRay, &normalAtTexel, pLightsIterator, alpha[0]);
+				doTheLight(vb, lightRay, &normalAtTexel, pLightsIterator, alpha[0], encodingScale);
 				vb++;
 
 				//top-right sample
@@ -421,7 +424,7 @@ Int HeightMapRenderObjClass::updateVB(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *
 				vb->v1=V[1];
 				vb->u2=UA[1];
 				vb->v2=VA[1];
-				doTheLight(vb, lightRay, &normalAtTexel, pLightsIterator, alpha[1]);
+				doTheLight(vb, lightRay, &normalAtTexel, pLightsIterator, alpha[1], encodingScale);
 				vb++;
 
 				//bottom-right sample
@@ -447,7 +450,7 @@ Int HeightMapRenderObjClass::updateVB(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *
 				vb->v1=V[2];
 				vb->u2=UA[2];
 				vb->v2=VA[2];
-				doTheLight(vb, lightRay, &normalAtTexel, pLightsIterator, alpha[2]);
+				doTheLight(vb, lightRay, &normalAtTexel, pLightsIterator, alpha[2], encodingScale);
 				vb++;
 
 				//bottom-left sample
@@ -478,7 +481,7 @@ Int HeightMapRenderObjClass::updateVB(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *
 				vb->v1=V[3];
 				vb->u2=UA[3];
 				vb->v2=VA[3];
-				doTheLight(vb, lightRay, &normalAtTexel, pLightsIterator, alpha[3]);
+				doTheLight(vb, lightRay, &normalAtTexel, pLightsIterator, alpha[3], encodingScale);
 				vb++;
 
 				VERTEX_FORMAT *pCurVertices = vb-4;
@@ -1995,11 +1998,11 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
  		if (!ShaderClass::Is_Backface_Culling_Inverted())
  		{
  			//not reflection pass
- 			if (TheGlobalData->m_useLightMap && doCloud)
+			if (useMacroTexture() && doCloud)
  			{	st=W3DShaderManager::ST_TERRAIN_BASE_NOISE12;
  			}
  			else
- 			if (TheGlobalData->m_useLightMap)
+			if (useMacroTexture())
  			{
  				//lightmap only
  				st=W3DShaderManager::ST_TERRAIN_BASE_NOISE2;
@@ -2090,6 +2093,11 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 			//Do additional pass over any tiles that have 3 textures blended together.
 			if (TheGlobalData->m_use3WayTerrainBlends)
 				renderExtraBlendTiles();
+			if (TheRetailTerrainShadow && TheRetailTerrainShadow->beginTerrainPass())
+			{
+				renderTerrainPass(&rinfo.Camera);
+				TheRetailTerrainShadow->endTerrainPass();
+			}
 		}
 
 		Int yCoordMin = m_map->getDrawOrgY();
@@ -2107,7 +2115,7 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 			if (Scene) {
 				RTS3DScene *pMyScene = (RTS3DScene *)Scene;
 				RefRenderObjListIterator pDynamicLightsIterator(pMyScene->getDynamicLights());
-				m_roadBuffer->drawRoads(&rinfo.Camera, doCloud?m_stageTwoTexture:nullptr, TheGlobalData->m_useLightMap?m_stageThreeTexture:nullptr,
+				m_roadBuffer->drawRoads(&rinfo.Camera, doCloud?m_stageTwoTexture:nullptr, useMacroTexture()?m_stageThreeTexture:nullptr,
 					m_disableTextures,xCoordMin-m_map->getBorderSizeInline(), xCoordMax-m_map->getBorderSizeInline(), yCoordMin-m_map->getBorderSizeInline(), yCoordMax-m_map->getBorderSizeInline(), &pDynamicLightsIterator);
 			}
 		}
@@ -2387,11 +2395,11 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 
 			const Bool doCloud = useCloud();
 
-			if (TheGlobalData->m_useLightMap && doCloud)
+			if (useMacroTexture() && doCloud)
  			{
 				st = W3DShaderManager::ST_ROAD_BASE_NOISE12;
  			}
- 			else if (TheGlobalData->m_useLightMap)
+			else if (useMacroTexture())
  			{
  				//lightmap only
  				st = W3DShaderManager::ST_ROAD_BASE_NOISE2;

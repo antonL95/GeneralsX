@@ -65,6 +65,7 @@
 //-----------------------------------------------------------------------------
 class MeshClass;
 class W3DTreeBuffer;
+class RetailTerrainShadow;
 class TileData;
 class W3DTreeDrawModuleData;
 struct BreezeInfo;
@@ -228,6 +229,7 @@ public:
 	void allocateTreeBuffers();							 ///< Allocates the buffers.
 	void freeTreeBuffers();									 ///< Frees the index and vertex buffers.
 	void releaseModelShadows();
+	void castRetailShadows(RetailTerrainShadow &shadow);
 
 private:
 	enum { MAX_TREE_VERTEX=30000,

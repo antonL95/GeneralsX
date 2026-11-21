@@ -1294,6 +1294,12 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	};
 	static const FieldParse retailFields[] =
 	{
+		{ "DefaultCameraPitchAngle", INI::parseReal, nullptr, offsetof(GlobalData, m_cameraPitch) },
+		{ "DefaultCameraYawAngle", INI::parseReal, nullptr, offsetof(GlobalData, m_cameraYaw) },
+		{ "DefaultCameraMinHeight", INI::parseReal, nullptr, offsetof(GlobalData, m_minCameraHeight) },
+		{ "DefaultCameraMaxHeight", INI::parseReal, nullptr, offsetof(GlobalData, m_maxCameraHeight) },
+		{ "UseShadowMapping", INI::parseBool, nullptr, offsetof(GlobalData, m_retailShadowMapping) },
+		{ "ShadowMapSize", INI::parseInt, nullptr, offsetof(GlobalData, m_retailShadowMapSize) },
 		{ "MultiPlayBuildingXPMult", parseMultiplayerXP, nullptr, offsetof(GlobalData, m_multiPlayBuildingXPMult) },
 		{ "MultiPlayUnitXPMult", parseMultiplayerXP, nullptr, offsetof(GlobalData, m_multiPlayUnitXPMult) },
 		{ "TerrainResourceCellSize", INI::parseReal, nullptr, offsetof(GlobalData, m_terrainResourceCellSize) },

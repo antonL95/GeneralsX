@@ -502,11 +502,11 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
  	st=W3DShaderManager::ST_FLAT_TERRAIN_BASE; //set default shader
 
  	//set correct shader based on current settings
- 	if (TheGlobalData->m_useLightMap && doCloud)
+	if (useMacroTexture() && doCloud)
  	{	st=W3DShaderManager::ST_FLAT_TERRAIN_BASE_NOISE12;
  	}
  	else
- 	if (TheGlobalData->m_useLightMap)
+	if (useMacroTexture())
  	{
  		//lightmap only
  		st=W3DShaderManager::ST_FLAT_TERRAIN_BASE_NOISE2;
@@ -604,7 +604,7 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 		if (Scene) {
 			RTS3DScene *pMyScene = (RTS3DScene *)Scene;
 			RefRenderObjListIterator pDynamicLightsIterator(pMyScene->getDynamicLights());
-			m_roadBuffer->drawRoads(&rinfo.Camera, doCloud?m_stageTwoTexture:nullptr, TheGlobalData->m_useLightMap?m_stageThreeTexture:nullptr,
+			m_roadBuffer->drawRoads(&rinfo.Camera, doCloud?m_stageTwoTexture:nullptr, useMacroTexture()?m_stageThreeTexture:nullptr,
 				m_disableTextures,xCoordMin-m_map->getBorderSizeInline(), xCoordMax-m_map->getBorderSizeInline(), yCoordMin-m_map->getBorderSizeInline(), yCoordMax-m_map->getBorderSizeInline(), &pDynamicLightsIterator);
 		}
 	}

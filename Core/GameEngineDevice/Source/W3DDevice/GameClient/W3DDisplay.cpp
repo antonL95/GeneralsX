@@ -64,6 +64,7 @@ static void drawFramerateBar();
 #include "WW3D2/ddsfile.h"
 #include "Common/MapObject.h"
 #include "Common/MapReaderWriterInfo.h"
+#include "Common/OptionPreferences.h"
 #include "Common/PerfTimer.h"
 #include "Common/FileSystem.h"
 #include "Common/LocalFileSystem.h"
@@ -105,6 +106,7 @@ static void drawFramerateBar();
 #include "W3DDevice/GameClient/W3DVideoBuffer.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DPostProcess.h"
+#include "W3DDevice/GameClient/RetailTerrainShadow.h"
 #include "W3DDevice/GameClient/W3DDebugDisplay.h"
 #include "W3DDevice/GameClient/W3DProjectedShadow.h"
 #include "W3DDevice/GameClient/W3DScreenshot.h"
@@ -387,6 +389,16 @@ StatDumpClass TheStatDump("StatisticsDump.txt");
 
 //=============================================================================
 RTS3DScene *W3DDisplay::m_3DScene = nullptr;
+static StaticGameLODLevel retailAutomaticLOD = STATIC_GAME_LOD_UNKNOWN;
+static Bool retailAutomaticVolumeShadows = FALSE;
+
+Bool W3DDisplay::useVolumeShadows()
+{
+	if (RetailFileLayers::enabled() && retailAutomaticLOD != STATIC_GAME_LOD_UNKNOWN &&
+		TheGameLODManager && TheGameLODManager->getStaticLODLevel() == retailAutomaticLOD)
+		return retailAutomaticVolumeShadows;
+	return TheGlobalData->m_useShadowVolumes;
+}
 RTS2DScene *W3DDisplay::m_2DScene = nullptr;
 RTS3DInterfaceScene *W3DDisplay::m_3DInterfaceScene = nullptr;
 W3DAssetManager *W3DDisplay::m_assetManager = nullptr;
@@ -514,6 +526,8 @@ W3DDisplay::~W3DDisplay()
 			delete TheW3DPostProcess;
 			TheW3DPostProcess = nullptr;
 		}
+		delete TheRetailTerrainShadow;
+		TheRetailTerrainShadow = nullptr;
 		W3DShaderManager::shutdown();
 	}
 	m_assetManager->Free_Assets();
@@ -1188,8 +1202,15 @@ void W3DDisplay::init()
 		#endif
 
 		//Check if level was never set and default to setting most suitable for system.
+		retailAutomaticLOD = STATIC_GAME_LOD_UNKNOWN;
 		if (TheGameLODManager->getStaticLODLevel() == STATIC_GAME_LOD_UNKNOWN)
 		{
+			if (RetailFileLayers::enabled())
+			{
+				OptionPreferences preferences;
+				retailAutomaticVolumeShadows = preferences.get3DShadowsEnabled();
+				retailAutomaticLOD = TheGameLODManager->getRecommendedStaticLODLevel();
+			}
 			TheGameLODManager->setStaticLODLevel(TheGameLODManager->getRecommendedStaticLODLevel());
 		}
 		else
@@ -2745,6 +2766,20 @@ AGAIN:
 					Debug_Statistics::Record_DX8_Polys_And_Vertices(numRenderTargetPolygons,numRenderTargetVertices,ShaderClass::_PresetOpaqueShader);
 
 				// GeneralsX @feature fbraz3 08/10/2026 Redirect 3D world rendering to post-processing pipeline
+				if (RetailFileLayers::enabled() && TheGlobalData->m_retailShadowMapping &&
+					TheTerrainRenderObject && TheTerrainRenderObject->getMap() && m_3DScene && TheTacticalView)
+				{
+					if (!TheRetailTerrainShadow)
+						TheRetailTerrainShadow = NEW RetailTerrainShadow;
+					const auto position = TheTacticalView->getPosition();
+					TheRetailTerrainShadow->render(*m_3DScene, Vector3(position.x, position.y, position.z),
+						TheGlobalData->m_retailShadowMapSize > 0 ? TheGlobalData->m_retailShadowMapSize : 2048);
+				}
+				else if (TheRetailTerrainShadow)
+				{
+					delete TheRetailTerrainShadow;
+					TheRetailTerrainShadow = nullptr;
+				}
 				if (TheW3DPostProcess)
 				{
 					TheW3DPostProcess->beginScene();

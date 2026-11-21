@@ -38,6 +38,7 @@
 
 #define MAX_ENABLED_DYNAMIC_LIGHTS 20
 class W3DTreeBuffer;
+class RetailTerrainShadow;
 class W3DBibBuffer;
 class W3DRoadBuffer;
 class W3DBridgeBuffer;
@@ -147,9 +148,10 @@ public:
 	/// Update the macro texture (pass 3).
 	void setTextureLOD(Int lod);	///<change the maximum mip-level sent to the hardware.
 	void updateMacroTexture(AsciiString textureName);
+	void castRetailTreeShadows(RetailTerrainShadow &shadow);
 	void doTextures(Bool flag) {m_disableTextures = !flag;};
 	/// Update the diffuse value from static light info for one vertex.
-	void doTheLight(VERTEX_FORMAT *vb, const Vector3*light, Vector3*normal, RefRenderObjListIterator *pLightsIterator, UnsignedByte alpha);
+	void doTheLight(VERTEX_FORMAT *vb, const Vector3*light, Vector3*normal, RefRenderObjListIterator *pLightsIterator, UnsignedByte alpha, Real encodingScale = 1.0f);
 	void addScorch(Vector3 location, Real radius, Scorches type);
 	void addStaticScorch(Vector3 location, Real radius, Scorches type);
 	Bool addTree(DrawableID id, Coord3D location, Real scale, Real angle,
@@ -309,7 +311,8 @@ protected:
 	void renderShoreLines(CameraClass *pCamera);	///<re-render parts of terrain that need custom blending into water edge
 	void renderShoreLinesSorted(CameraClass *pCamera);	///<optimized version for game usage.
 
-	static Bool useCloud();
+	Bool useCloud() const;
+	Bool useMacroTexture() const;
 };
 
 extern BaseHeightMapRenderObjClass *TheTerrainRenderObject;

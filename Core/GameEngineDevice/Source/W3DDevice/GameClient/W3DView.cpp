@@ -2274,6 +2274,9 @@ void W3DView::setCameraHeightAboveGroundLimitsToDefault(Real heightScale)
 		aspectRatioScale = fabs(( 1 - ( baseAspectRatio - currentAspectRatio) ));
 	}
 
+	if (RetailFileLayers::enabled())
+		aspectRatioScale = 1.0f;
+
 	m_maxHeightAboveGround = TheGlobalData->m_maxCameraHeight * aspectRatioScale * heightScale;
 	m_minHeightAboveGround = TheGlobalData->m_minCameraHeight * aspectRatioScale;
 

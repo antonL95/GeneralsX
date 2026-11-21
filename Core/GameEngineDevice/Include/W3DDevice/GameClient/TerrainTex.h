@@ -135,7 +135,7 @@ protected:
 
 public:
 		// Create texture from a height map.
-		CloudMapTerrainTextureClass( MipCountType mipLevelCount = MIP_LEVELS_ALL );
+		CloudMapTerrainTextureClass(AsciiString name = AsciiString::TheEmptyString, MipCountType mipLevelCount = MIP_LEVELS_ALL);
 
 		// just use default destructor. ~TerrainTextureClass();
 

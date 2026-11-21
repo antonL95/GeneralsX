@@ -46,6 +46,7 @@
 #include "W3DDevice/GameClient/W3DVolumetricShadow.h"
 #include "W3DDevice/GameClient/W3DProjectedShadow.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
+#include "W3DDevice/GameClient/RetailTerrainShadow.h"
 #include "WW3D2/statistics.h"
 #include "Common/Debug.h"
 #include "Common/PerfTimer.h"
@@ -119,7 +120,8 @@ void DoShadows(RenderInfoClass & rinfo, Bool stencilPass)
 
 			//This function gets called many times by the W3D renderer
 			//so we use this flag to make sure shadows rendered only once per frame.
-			if (TheW3DShadowManager->isShadowScene())
+			if (TheW3DShadowManager->isShadowScene() &&
+				(!TheRetailTerrainShadow || !TheRetailTerrainShadow->isReady()))
 				TheW3DVolumetricShadowManager->renderShadows(projectionCount);
 	}
 	if (TheW3DShadowManager && stencilPass)	//reset so no more shadow processing this frame.

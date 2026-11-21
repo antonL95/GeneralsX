@@ -583,6 +583,7 @@ class ParticleSystemTemplate : public MemoryPoolObject, protected ParticleSystem
 
 public:
 	ParticleSystemTemplate( const AsciiString &name );
+	static void parseFXPriority( INI* ini, void *instance, void *store, const void* userData );
 
 	void validate();
 
@@ -644,7 +645,6 @@ protected:
 
 	static void parseFXSystem( INI* ini, void *instance, void *store, const void* userData );
 	static void parseFXModule( INI* ini, void *instance, void *store, const void* userData );
-	static void parseFXPriority( INI* ini, void *instance, void *store, const void* userData );
 	static void parseFXShader( INI* ini, void *instance, void *store, const void* userData );
 	static void parseFXType( INI* ini, void *instance, void *store, const void* userData );
 	static void parseFXUnrendered( INI* ini, void *instance, void *store, const void* userData );

@@ -56,6 +56,7 @@ enum
 //-----------------------------------------------------------------------------
 
 #include "W3DDevice/GameClient/W3DTreeBuffer.h"
+#include "W3DDevice/GameClient/RetailTerrainShadow.h"
 
 #include <algorithm>
 #include <cstring>
@@ -749,6 +750,35 @@ void W3DTreeBuffer::updateTexture()
 version always remains at full resolution.  Someone should probably optimize this at
 some point since it wastes a lot of system memory on low-end systems. -MW
 */
+void W3DTreeBuffer::castRetailShadows(RetailTerrainShadow &shadow)
+{
+	for (Int i = 0; i < m_numTrees; ++i)
+	{
+		const auto &tree = m_trees[i];
+		if (tree.treeType < 0 || tree.treeType >= m_numTreeTypes ||
+			!shadow.contains(tree.bounds.Center, tree.bounds.Radius))
+			continue;
+		const auto &type = m_treeTypes[tree.treeType];
+		if (!type.m_mesh || (!type.m_doShadow && !TheGlobalData->m_shadowsForProps))
+			continue;
+		const Real c = tree.cos * tree.scale;
+		const Real s = tree.sin * tree.scale;
+		Matrix3D transform;
+		transform.Set(Vector3(c, s, 0), Vector3(-s, c, 0), Vector3(0, 0, tree.scale),
+			Vector3(c * type.m_offset.X - s * type.m_offset.Y,
+				s * type.m_offset.X + c * type.m_offset.Y, type.m_offset.Z));
+		if (tree.m_toppleState != TOPPLE_UPRIGHT)
+		{
+			Matrix3D toppled;
+			Matrix3D::Multiply(tree.m_mtx, transform, &toppled);
+			transform = toppled;
+		}
+		else
+			transform.Set_Translation(transform.Get_Translation() + tree.location);
+		shadow.castMesh(*type.m_mesh, transform, TRUE);
+	}
+}
+
 void W3DTreeBuffer::setTextureLOD(Int lod)
 {
 	if (m_treeTexture)
@@ -1716,8 +1746,11 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 		m_needToUpdateTexture = false;
 		updateTexture();
 	}
+	const bool legacyShadows = TheW3DProjectedShadowManager &&
+		(TheGlobalData->m_useShadowDecals || TheGlobalData->m_useShadowVolumes) &&
+		(!TheRetailTerrainShadow || !TheRetailTerrainShadow->isReady());
 	if (m_treeTexture==nullptr) {
-		if (TheW3DProjectedShadowManager && (TheGlobalData->m_useShadowDecals || TheGlobalData->m_useShadowVolumes)) {
+		if (legacyShadows) {
 			Real stretchX, stretchY;
 			if (treeShadowStretch(stretchX, stretchY)) {
 				drawModelShadows(camera, stretchX, stretchY);
@@ -1732,7 +1765,7 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 	Int curTree;
 	// Draw tree shadows.
 	// GeneralsX @feature Olcay Seygan / Ilyas Akin 08/10/2026 Trees use decal shadows even when volumetric shadows are enabled
-	if (m_shadow && TheW3DProjectedShadowManager && (TheGlobalData->m_useShadowDecals || TheGlobalData->m_useShadowVolumes)) {
+	if (m_shadow && legacyShadows) {
 		for (curTree=0; curTree<m_numTrees; curTree++) {
 			Int type = m_trees[curTree].treeType;
 			// GeneralsX @bugfix fbraz3 01/10/2026 Issue #347: Bounds check type
@@ -1965,7 +1998,7 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 	DX8Wrapper::Invalidate_Cached_Render_States();	//code above mucks around with W3D states so make sure we reset
 
 	// GeneralsX @feature Olcay Seygan / Ilyas Akin 08/10/2026 Draw object-tree model shadows
-	if (TheW3DProjectedShadowManager && (TheGlobalData->m_useShadowDecals || TheGlobalData->m_useShadowVolumes)) {
+	if (legacyShadows) {
 		Real stretchX, stretchY;
 		if (treeShadowStretch(stretchX, stretchY)) {
 			drawModelShadows(camera, stretchX, stretchY);

@@ -60,6 +60,7 @@ class W3DDisplay : public Display
 public:
 	W3DDisplay();
 	virtual ~W3DDisplay() override;
+	static Bool useVolumeShadows();
 
 	virtual void init() override;  ///< initialize or re-initialize the system
  	virtual void reset() override;																///< Reset system

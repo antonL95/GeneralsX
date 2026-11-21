@@ -22,16 +22,25 @@
 
 #include "W3DDevice/GameClient/W3DPostProcess.h"
 #include "W3DDevice/GameClient/W3DPostProcessShaders.h"
+#include "W3DDevice/GameClient/BaseHeightMap.h"
+#include "W3DDevice/GameClient/WorldHeightMap.h"
+#include "Common/BfmeAssetPath.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/GlobalData.h"
 #include "GameClient/Display.h"
 #include "GameClient/Water.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/ww3d.h"
+#include "WWLib/TARGA.h"
 
 #include <algorithm>
 #include <stdio.h>
 
 W3DPostProcess *TheW3DPostProcess = nullptr;
+
+static constexpr Int RetailLookupSize = 32;
+static constexpr Int RetailLookupSliceWidth = RetailLookupSize + 2;
+static constexpr Int RetailLookupAtlasWidth = (RetailLookupSize + 2) * RetailLookupSliceWidth;
 
 struct PostQuadVertex1 {
 	float x, y, z, rhw;
@@ -84,6 +93,8 @@ W3DPostProcess::~W3DPostProcess()
 {
 	DX8Wrapper::RemoveCleanupHook(this);
 	releaseResources();
+	if (m_retailLookup)
+		m_retailLookup->Release();
 
 	LPDIRECT3DDEVICE8 pDev = DX8Wrapper::_Get_D3D_Device8();
 	if (pDev)
@@ -95,6 +106,7 @@ W3DPostProcess::~W3DPostProcess()
 		if (m_psBloomCompositeHDR) pDev->DeletePixelShader(m_psBloomCompositeHDR);
 		if (m_psToneMapOnly) pDev->DeletePixelShader(m_psToneMapOnly);
 		if (m_psFXAA) pDev->DeletePixelShader(m_psFXAA);
+		if (m_psRetailLookup) pDev->DeletePixelShader(m_psRetailLookup);
 	}
 
 	m_psCopy = 0;
@@ -275,9 +287,83 @@ bool W3DPostProcess::reacquireResources()
 	return true;
 }
 
+bool W3DPostProcess::prepareRetailLookup()
+{
+	m_retailLookupBlend = 0.0f;
+	const auto *map = TheTerrainRenderObject ? TheTerrainRenderObject->getMap() : nullptr;
+	if (!RetailFileLayers::enabled() || !map || map->getRetailLookupTexture().isEmpty())
+		return false;
+
+	auto *device = DX8Wrapper::_Get_D3D_Device8();
+	const auto &name = map->getRetailLookupTexture();
+	if (name != m_retailLookupName)
+	{
+		m_retailLookupName = name;
+		if (m_retailLookup)
+		{
+			m_retailLookup->Release();
+			m_retailLookup = nullptr;
+		}
+
+		const auto path = makeBfmeAssetPath("Art/CompiledTextures/", name.str());
+		Targa image;
+		constexpr Int size = RetailLookupSize;
+		if (path.empty() || image.Open(path.c_str(), TGA_READMODE) != 0)
+			return false;
+		const auto &header = image.Header;
+		if (header.Width != size * size || header.Height != size || header.ColorMapType ||
+			header.ImageType != TGA_TRUECOLOR || (header.PixelDepth != 24 && header.PixelDepth != 32))
+			return false;
+		const Int pixelSize = header.PixelDepth / 8;
+		const Bool topOrigin = (header.ImageDescriptor & TGAIDF_YORIGIN) != 0;
+		if (image.Load(path.c_str(), TGAF_IMAGE, false) != 0 || !image.GetImage())
+			return false;
+		if (!m_psRetailLookup &&
+			FAILED(device->CreatePixelShader(W3DPostProcessShaders::ColorLookupAtlas, &m_psRetailLookup)))
+			return false;
+		if (FAILED(device->CreateTexture(RetailLookupAtlasWidth, size, 1, 0, D3DFMT_X8R8G8B8,
+			D3DPOOL_MANAGED, &m_retailLookup)))
+			return false;
+
+		D3DLOCKED_RECT rect;
+		if (FAILED(m_retailLookup->LockRect(0, &rect, nullptr, 0)))
+		{
+			m_retailLookup->Release();
+			m_retailLookup = nullptr;
+			return false;
+		}
+		const auto *pixels = reinterpret_cast<const UnsignedByte *>(image.GetImage());
+		auto *atlas = static_cast<UnsignedByte *>(rect.pBits);
+		for (Int green = 0; green < size; ++green)
+		{
+			const Int row = topOrigin ? green : size - 1 - green;
+			auto *target = atlas + green * rect.Pitch;
+			for (Int blue = -1; blue <= size; ++blue)
+			{
+				const auto *slice = pixels + (row * size * size + std::clamp(blue, 0, size - 1) * size) * pixelSize;
+				for (Int column = 0; column < RetailLookupSliceWidth; ++column)
+				{
+					const auto *source = slice + std::clamp(column - 1, 0, size - 1) * pixelSize;
+					target[0] = source[0];
+					target[1] = source[1];
+					target[2] = source[2];
+					target[3] = 255;
+					target += 4;
+				}
+			}
+		}
+		m_retailLookup->UnlockRect(0);
+	}
+
+	if (!m_retailLookup)
+		return false;
+	m_retailLookupBlend = map->getRetailLookupBlend();
+	return true;
+}
+
 bool W3DPostProcess::beginScene()
 {
-	if (!TheGlobalData || !TheGlobalData->isEnablePostProcessing())
+	if (!TheGlobalData || (!RetailFileLayers::enabled() && !TheGlobalData->isEnablePostProcessing()))
 		return false;
 
 	if (!TheDisplay || !TheDisplay->getFirstView())
@@ -285,6 +371,8 @@ bool W3DPostProcess::beginScene()
 
 	LPDIRECT3DDEVICE8 pDev = DX8Wrapper::_Get_D3D_Device8();
 	if (!pDev || pDev->TestCooperativeLevel() != D3D_OK)
+		return false;
+	if (!prepareRetailLookup() && !TheGlobalData->isEnablePostProcessing())
 		return false;
 
 	int curWidth = TheDisplay ? TheDisplay->getWidth() : 0;
@@ -413,6 +501,33 @@ bool W3DPostProcess::endSceneAndApply()
 	bool doBloom = TheGlobalData ? TheGlobalData->isPostProcessBloom() : false;
 	bool doHDR = TheGlobalData ? TheGlobalData->isPostProcessHDR() : false;
 	bool doFXAA = TheGlobalData ? TheGlobalData->isPostProcessFXAA() : false;
+	bool lookupApplied = false;
+	if (m_retailLookupBlend > 0.0f)
+	{
+		D3DVIEWPORT8 viewport = {0, 0, (DWORD)m_sceneWidth, (DWORD)m_sceneHeight, 0.0f, 1.0f};
+		const float lookupConstants[3][4] = {
+			{1.0f, -0.5f / RetailLookupSize, 0.0f, 1.0f},
+			{Real(RetailLookupSize) / RetailLookupAtlasWidth, Real(RetailLookupSliceWidth + 1) / RetailLookupAtlasWidth, 0.0f, 0.0f},
+			{Real(RetailLookupSliceWidth) / RetailLookupAtlasWidth, 0.0f, 0.0f, m_retailLookupBlend}
+		};
+		if (SUCCEEDED(pDev->SetRenderTarget(m_compositeSurface, nullptr)) &&
+			SUCCEEDED(pDev->SetViewport(&viewport)) &&
+			SUCCEEDED(pDev->SetPixelShaderConstant(0, lookupConstants, 3)))
+		{
+			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+			pDev->SetTexture(2, m_retailLookup);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			renderQuad(m_sceneTexture, m_psRetailLookup, m_sceneWidth, m_sceneHeight, m_retailLookup);
+			pDev->SetTexture(2, nullptr);
+			std::swap(m_sceneTexture, m_compositeTexture);
+			std::swap(m_sceneSurface, m_compositeSurface);
+			lookupApplied = true;
+		}
+	}
 
 	// 1. Pass: Bloom Extraction & Blur
 	if (doBloom && m_bloomSurface[0] && m_bloomSurface[1] && m_psBloomExtract && m_psBloomBlur4Tap)
@@ -483,6 +598,12 @@ bool W3DPostProcess::endSceneAndApply()
 		pDev->SetRenderTarget(m_savedRenderTarget, nullptr);
 		pDev->SetViewport(&vpScene);
 		renderQuad(m_sceneTexture, m_psCopy, m_sceneWidth, m_sceneHeight);
+	}
+
+	if (lookupApplied)
+	{
+		std::swap(m_sceneTexture, m_compositeTexture);
+		std::swap(m_sceneSurface, m_compositeSurface);
 	}
 
 	// 4. Restore original render target, depth buffer, and viewport for 2D UI rendering

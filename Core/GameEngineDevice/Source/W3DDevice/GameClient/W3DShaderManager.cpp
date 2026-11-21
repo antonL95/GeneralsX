@@ -62,6 +62,9 @@
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "W3DDevice/GameClient/WorldHeightMap.h"
+#include "GameClient/Snow.h"
+#include "Common/RetailFileLayers.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 #include "W3DDevice/GameClient/W3DSmudge.h"
 #include "GameClient/View.h"
@@ -1510,6 +1513,8 @@ public:
 	float m_ySlidePerSecond ;	 ///< How far the clouds move per second.
 	float m_xOffset;
 	float m_yOffset;
+	DWORD m_previousCloudFactor = 0;
+	bool m_retailCloudFactorApplied = false;
 
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual Int init() override;			///<perform any one time initialization and validation
@@ -1609,6 +1614,11 @@ Int TerrainShader2Stage::init()
 void TerrainShader2Stage::reset()
 {
 	ShaderClass::Invalidate();
+	if (m_retailCloudFactorApplied)
+	{
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, m_previousCloudFactor);
+		m_retailCloudFactorApplied = false;
+	}
 
 	//Free references to textures
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(0, nullptr);
@@ -1624,8 +1634,13 @@ void TerrainShader2Stage::reset()
 void TerrainShader2Stage::updateCloud()
 {
 	const float frame_time = WW3D::Get_Logic_Frame_Time_Seconds();
-	m_xOffset += m_xSlidePerSecond * frame_time;
-	m_yOffset += m_ySlidePerSecond * frame_time;
+	const auto *map = TheTerrainRenderObject ? TheTerrainRenderObject->getMap() : nullptr;
+	const auto *weather = map && map->hasRetailEnvironment() && TheWeatherSetting
+		? TheWeatherSetting.operator->() : nullptr;
+	const auto speed = weather && weather->m_cloudTextureSize.x > 0 && weather->m_cloudTextureSize.y > 0
+		? weather->m_cloudOffsetPerSecond : Coord2D{m_xSlidePerSecond, m_ySlidePerSecond};
+	m_xOffset += speed.x * frame_time;
+	m_yOffset += speed.y * frame_time;
 
 	// This moves offsets towards zero when smaller -1.0 or larger 1.0
 	m_xOffset -= (Int)m_xOffset;
@@ -1637,8 +1652,12 @@ void TerrainShader2Stage::updateNoise1(D3DXMATRIX *destMatrix,D3DXMATRIX *curVie
 	#define STRETCH_FACTOR ((float)(1/(63.0*MAP_XY_FACTOR/2))) /* covers 63/2 tiles */
 
 	D3DXMATRIX scale;
-
-	D3DXMatrixScaling(&scale, STRETCH_FACTOR, STRETCH_FACTOR,1);
+	const auto *map = TheTerrainRenderObject ? TheTerrainRenderObject->getMap() : nullptr;
+	const auto *weather = map && map->hasRetailEnvironment() && TheWeatherSetting
+		? TheWeatherSetting.operator->() : nullptr;
+	const Real x = weather && weather->m_cloudTextureSize.x > 0 ? 1 / weather->m_cloudTextureSize.x : STRETCH_FACTOR;
+	const Real y = weather && weather->m_cloudTextureSize.y > 0 ? 1 / weather->m_cloudTextureSize.y : STRETCH_FACTOR;
+	D3DXMatrixScaling(&scale, x, y, 1);
 	*destMatrix = *curViewInverse * scale;
 
 	D3DXMATRIX offset;
@@ -1648,15 +1667,30 @@ void TerrainShader2Stage::updateNoise1(D3DXMATRIX *destMatrix,D3DXMATRIX *curVie
 
 void TerrainShader2Stage::updateNoise2(D3DXMATRIX *destMatrix,D3DXMATRIX *curViewInverse, Bool doUpdate)
 {
-
 	D3DXMATRIX scale;
+	const auto *map = TheTerrainRenderObject ? TheTerrainRenderObject->getMap() : nullptr;
+	if (map && map->isRetailMacroStretched())
+	{
+		const Int border = 2 * map->getBorderSizeInline();
+		const Real width = (map->getXExtent() - border - 1) * MAP_XY_FACTOR;
+		const Real height = (map->getYExtent() - border - 1) * MAP_XY_FACTOR;
+		if (width > 0.0f && height > 0.0f)
+		{
+			D3DXMatrixScaling(&scale, 1.0f / width, 1.0f / height, 1.0f);
+			*destMatrix = *curViewInverse * scale;
+			return;
+		}
+	}
 
-	D3DXMatrixScaling(&scale, STRETCH_FACTOR, STRETCH_FACTOR,1);
+	const Real repeat = map && map->hasRetailEnvironment() ? 1.0f / 660.0f : STRETCH_FACTOR;
+	D3DXMatrixScaling(&scale, repeat, repeat, 1);
 	*destMatrix = *curViewInverse * scale;
 }
 
 Int TerrainShader2Stage::set(Int pass)
 {
+	const auto *terrainMap = TheTerrainRenderObject ? TheTerrainRenderObject->getMap() : nullptr;
+	const auto lightModulate = terrainMap && terrainMap->usesRetailOverbright() ? D3DTOP_MODULATE2X : D3DTOP_MODULATE;
 	//force WW3D2 system to set it's states so it won't later overwrite our custom settings.
 	DX8Wrapper::Apply_Render_State_Changes();
 
@@ -1689,7 +1723,7 @@ Int TerrainShader2Stage::set(Int pass)
 			// Modulate the diffuse color with the texture as lighting comes from diffuse.
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG2, D3DTA_DIFFUSE );
-			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLOROP,   D3DTOP_MODULATE );
+			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLOROP, lightModulate);
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_ALPHAOP,   D3DTOP_DISABLE );
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_COLOROP,   D3DTOP_DISABLE );
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_ALPHAOP,   D3DTOP_DISABLE );
@@ -1704,7 +1738,7 @@ Int TerrainShader2Stage::set(Int pass)
 			// Modulate the diffuse color with the texture as lighting comes from diffuse.
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG2, D3DTA_DIFFUSE );
-			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLOROP,   D3DTOP_MODULATE );
+			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLOROP, lightModulate);
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_ALPHAOP,   D3DTOP_MODULATE );
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_TEXCOORDINDEX, 1 );
 			// Blend the result using the alpha. (came from diffuse mod texture)
@@ -1740,6 +1774,20 @@ Int TerrainShader2Stage::set(Int pass)
 			D3DXMATRIX inv;
 			float det;
 			D3DXMatrixInverse(&inv, &det, (D3DXMATRIX*)&curView);
+
+			const auto *map = TheTerrainRenderObject ? TheTerrainRenderObject->getMap() : nullptr;
+			if (map && map->hasRetailEnvironment() &&
+				W3DShaderManager::getCurrentShader() != W3DShaderManager::ST_TERRAIN_BASE_NOISE2)
+			{
+				const RGBColor factor = map->getRetailNoCloudFactor();
+				const DWORD color = D3DCOLOR_COLORVALUE(std::clamp(factor.red, 0.0f, 1.0f),
+					std::clamp(factor.green, 0.0f, 1.0f), std::clamp(factor.blue, 0.0f, 1.0f), 1.0f);
+				DX8Wrapper::_Get_D3D_Device8()->GetRenderState(D3DRS_TEXTUREFACTOR, &m_previousCloudFactor);
+				DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, color);
+				DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
+				DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLOROP, D3DTOP_ADDSMOOTH);
+				m_retailCloudFactorApplied = true;
+			}
 
 			if (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_TERRAIN_BASE_NOISE12)
 			{
@@ -2721,6 +2769,11 @@ void W3DShaderManager::init()
 	for (i=0; MasterShaderList[i] != nullptr; i++)
 	{
 		shaders=MasterShaderList[i];
+		if (RetailFileLayers::enabled() && shaders == TerrainShaderList)
+		{
+			terrainShader2Stage.init();
+			continue;
+		}
 		for (j=0; shaders[j] != nullptr; j++)
 		{
 			if (shaders[j]->init())

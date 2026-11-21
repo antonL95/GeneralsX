@@ -48,6 +48,7 @@
 #include "WW3D2/meshmdl.h"
 #include "Lib/BaseType.h"
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "W3DDevice/GameClient/W3DDisplay.h"
 #include "d3dx8math.h"
 #include "Common/GlobalData.h"
 #include "Common/DrawModule.h"
@@ -1389,7 +1390,7 @@ void W3DVolumetricShadow::getRenderCost(RenderCost & rc) const
 {
 	Int drawCount = 0;
 
-	if (m_geometry && m_isEnabled && !m_isInvisibleEnabled && TheGlobalData->m_useShadowVolumes)
+	if (m_geometry && m_isEnabled && !m_isInvisibleEnabled && W3DDisplay::useVolumeShadows())
 	{
 		Int i,j;
 
@@ -3779,7 +3780,7 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
  	beY = bbox.Extent.Y;
  	beZ = bbox.Extent.Z;
 
-	if (m_shadowList && TheGlobalData->m_useShadowVolumes)
+	if (m_shadowList && W3DDisplay::useVolumeShadows())
 	{
 
 		LPDIRECT3DDEVICE8 m_pDev=DX8Wrapper::_Get_D3D_Device8();
@@ -4188,8 +4189,8 @@ void W3DVolumetricShadowManager::reset()
 // ============================================================================
 W3DVolumetricShadow* W3DVolumetricShadowManager::addShadow(RenderObjClass *robj, Shadow::ShadowTypeInfo *shadowInfo, Drawable *draw)
 {
-	if (!DX8Wrapper::Has_Stencil() || !robj || !TheGlobalData->m_useShadowVolumes)
-		return nullptr;	//right now we require a stencil buffer
+	if (!DX8Wrapper::Has_Stencil() || !robj || !W3DDisplay::useVolumeShadows())
+		return nullptr;
 
 	W3DShadowGeometry *sg=nullptr;
 	if (!robj)

@@ -505,7 +505,7 @@ static lights into account as well.  It is possible to just use the normal in th
 vertex and let D3D do the lighting, but it is slower to render, and can only
 handle 4 lights at this point. */
 //=============================================================================
-void BaseHeightMapRenderObjClass::doTheLight(VERTEX_FORMAT *vb, const Vector3*light, Vector3*normal, RefRenderObjListIterator *pLightsIterator, UnsignedByte alpha)
+void BaseHeightMapRenderObjClass::doTheLight(VERTEX_FORMAT *vb, const Vector3*light, Vector3*normal, RefRenderObjListIterator *pLightsIterator, UnsignedByte alpha, Real encodingScale)
 {
 #ifdef USE_NORMALS
 	vb->nx = normal->X;
@@ -589,6 +589,9 @@ void BaseHeightMapRenderObjClass::doTheLight(VERTEX_FORMAT *vb, const Vector3*li
 		shadeB += shade*terrainDiffuse->blue;
 	}
 
+	shadeR *= encodingScale;
+	shadeG *= encodingScale;
+	shadeB *= encodingScale;
 	if (shadeR > 1.0) shadeR = 1.0;
 	if(shadeR < 0.0f) shadeR = 0.0f;
 	if (shadeG > 1.0) shadeG = 1.0;
@@ -625,6 +628,12 @@ void BaseHeightMapRenderObjClass::updateMacroTexture(AsciiString textureName)
 	REF_PTR_RELEASE(m_stageThreeTexture);
 	// Reallocate texture.
 	m_stageThreeTexture=NEW LightMapTerrainTextureClass(m_macroTextureName);
+}
+
+void BaseHeightMapRenderObjClass::castRetailTreeShadows(RetailTerrainShadow &shadow)
+{
+	if (m_treeBuffer)
+		m_treeBuffer->castRetailShadows(shadow);
 }
 
 //=============================================================================
@@ -1861,8 +1870,9 @@ Int BaseHeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pM
 		//allocate a new one.
 		freeMapResources();	//free old data and ib/vb
 		REF_PTR_SET(m_map,pMap);	//update our heightmap pointer in case it changed since last call.
-		m_stageTwoTexture=NEW CloudMapTerrainTextureClass;
-		m_stageThreeTexture=NEW LightMapTerrainTextureClass(m_macroTextureName);
+		m_stageTwoTexture=NEW CloudMapTerrainTextureClass(pMap->getRetailCloudTexture());
+		m_stageThreeTexture=NEW LightMapTerrainTextureClass(
+			pMap->hasRetailEnvironment() ? pMap->getRetailMacroTexture() : m_macroTextureName);
 		m_destAlphaTexture=MSGNEW("TextureClass") TextureClass(256,1,WW3D_FORMAT_A8R8G8B8,MIP_LEVELS_1);
 		initDestAlphaLUT();
 		m_scorches->allocateBuffers();
@@ -1871,6 +1881,22 @@ Int BaseHeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pM
 		m_vertexMaterialClass=VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
 
 		m_shaderClass = detailOpaqueShader;	//		ShaderClass::_PresetOpaqueShader;
+	}
+
+	if (pMap && m_stageTwoTexture && m_stageThreeTexture)
+	{
+		const auto &cloud = pMap->getRetailCloudTexture();
+		const auto &macro = pMap->hasRetailEnvironment() ? pMap->getRetailMacroTexture() : m_macroTextureName;
+		if (std::strcmp(m_stageTwoTexture->Get_Texture_Name(), cloud.isEmpty() ? "TSCloudMed.tga" : cloud.str()) != 0)
+		{
+			REF_PTR_RELEASE(m_stageTwoTexture);
+			m_stageTwoTexture = NEW CloudMapTerrainTextureClass(cloud);
+		}
+		if (std::strcmp(m_stageThreeTexture->Get_Texture_Name(), macro.isEmpty() ? "TSNoiseUrb.tga" : macro.str()) != 0)
+		{
+			REF_PTR_RELEASE(m_stageThreeTexture);
+			m_stageThreeTexture = NEW LightMapTerrainTextureClass(macro);
+		}
 	}
 
 	return 0;
@@ -2882,7 +2908,14 @@ void BaseHeightMapRenderObjClass::loadPostProcess()
 }
 
 //=============================================================================
-Bool BaseHeightMapRenderObjClass::useCloud()
+Bool BaseHeightMapRenderObjClass::useCloud() const
 {
-	return TheGlobalData->m_useCloudMap && TheGlobalData->m_timeOfDay != TIME_OF_DAY_NIGHT;
+	return TheGlobalData->m_useCloudMap && TheGlobalData->m_timeOfDay != TIME_OF_DAY_NIGHT &&
+		(!m_map || !m_map->hasRetailEnvironment() || !m_map->getRetailCloudTexture().isEmpty());
+}
+
+Bool BaseHeightMapRenderObjClass::useMacroTexture() const
+{
+	return TheGlobalData->m_useLightMap &&
+		(!m_map || !m_map->hasRetailEnvironment() || !m_map->getRetailMacroTexture().isEmpty());
 }

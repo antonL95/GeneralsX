@@ -26,6 +26,7 @@
 #pragma once
 
 #include "Common/SubsystemInterface.h"
+#include "Common/AsciiString.h"
 #include "WW3D2/dx8wrapper.h"
 
 class W3DPostProcess : public SubsystemInterface, public DX8_CleanupHook
@@ -55,6 +56,7 @@ public:
 
 private:
 	bool initShaders();
+	bool prepareRetailLookup();
 	void renderQuad(IDirect3DTexture8 *tex0, DWORD pixelShader, int width, int height,
 	                IDirect3DTexture8 *tex1 = nullptr);
 	void renderQuad4Tap(IDirect3DTexture8 *tex, DWORD pixelShader, int width, int height,
@@ -89,6 +91,10 @@ private:
 	DWORD m_psBloomCompositeHDR;
 	DWORD m_psToneMapOnly;
 	DWORD m_psFXAA;
+	DWORD m_psRetailLookup = 0;
+	IDirect3DTexture8 *m_retailLookup = nullptr;
+	AsciiString m_retailLookupName;
+	Real m_retailLookupBlend = 0.0f;
 };
 
 extern W3DPostProcess *TheW3DPostProcess;

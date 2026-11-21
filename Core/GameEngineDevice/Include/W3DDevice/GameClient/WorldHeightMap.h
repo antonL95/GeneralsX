@@ -244,6 +244,14 @@ protected:	 // file reader callbacks.
 private:
 	struct BfmeLighting;
 	std::unique_ptr<BfmeLighting> m_bfmeLighting;
+	AsciiString m_retailLookupTexture;
+	Real m_retailLookupBlend = 0.0f;
+	AsciiString m_retailMacroTexture;
+	AsciiString m_retailCloudTexture;
+	Bool m_retailEnvironment = FALSE;
+	Bool m_retailMacroStretched = FALSE;
+	static Bool ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	static Bool ParseRetailEnvironment(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	struct MapPolygonDeleter
 	{
 		void operator()(PolygonTrigger *polygon) const;
@@ -261,6 +269,14 @@ protected:
 
 public: // constructors/destructors
 	WorldHeightMap(ChunkInputStream *pFile, Bool bHMapOnly=false, Bool legacyBlendOnly=false);
+	const AsciiString &getRetailLookupTexture() const { return m_retailLookupTexture; }
+	Real getRetailLookupBlend() const { return m_retailLookupBlend; }
+	Bool hasRetailEnvironment() const { return m_retailEnvironment; }
+	Bool usesRetailOverbright() const;
+	const AsciiString &getRetailMacroTexture() const { return m_retailMacroTexture; }
+	const AsciiString &getRetailCloudTexture() const { return m_retailCloudTexture; }
+	Bool isRetailMacroStretched() const { return m_retailMacroStretched; }
+	RGBColor getRetailNoCloudFactor() const;
 	static void RegisterLogicalMapParsers(DataChunkInput &file, Bool metadataOnly);
 	static RefCountPtr<WorldHeightMap> readAuditMap(DataChunkInput &file);
 	Bool writeBlendTileChecksums(const char *path) const;

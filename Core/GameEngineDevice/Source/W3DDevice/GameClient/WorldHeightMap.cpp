@@ -598,6 +598,11 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly, Bo
 		file.registerVersionedParser("FUNKY_TILING", root, ParseFunkyTilingDataChunk, 1);
 #endif
 		file.registerVersionedParser("GlobalLighting", root, ParseLightingDataChunk, K_LIGHTING_VERSION_8, true);
+		if (!legacyBlendOnly && RetailFileLayers::enabled())
+		{
+			file.registerVersionedParser("PostEffectsChunk", root, ParseRetailPostEffects, 1);
+			file.registerVersionedParser("EnvironmentData", root, ParseRetailEnvironment, 3);
+		}
 		if (!legacyBlendOnly && std::getenv("GENERALSX_ASSET_SMOKE_TERRAIN"))
 			file.registerVersionedParser("StandingWaterAreas", root, ParseStandingWaterAreas, 2);
 	}
@@ -880,6 +885,39 @@ Bool WorldHeightMap::ParseWorldDictDataChunk(DataChunkInput &file, DataChunkInfo
 *	Input: DataChunkInput
 *
 */
+Bool WorldHeightMap::ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo *, void *userData)
+{
+	auto &map = *static_cast<WorldHeightMap *>(userData);
+	const UnsignedByte count = file.readByte();
+	for (Int i = 0; i < count; ++i)
+	{
+		const AsciiString effect = file.readAsciiString();
+		const Real blend = file.readReal();
+		const AsciiString texture = file.readAsciiString();
+		if (effect == "LookupTablePostEffect" && blend > 0.0f && !texture.isEmpty())
+		{
+			map.m_retailLookupTexture = texture;
+			map.m_retailLookupBlend = MIN(blend, 1.0f);
+		}
+	}
+	return TRUE;
+}
+
+Bool WorldHeightMap::ParseRetailEnvironment(DataChunkInput &file, DataChunkInfo *info, void *userData)
+{
+	auto &map = *static_cast<WorldHeightMap *>(userData);
+	if (info->version >= 3)
+	{
+		file.readReal();
+		file.readReal();
+	}
+	map.m_retailEnvironment = TRUE;
+	map.m_retailMacroStretched = file.readByte() != 0;
+	map.m_retailMacroTexture = file.readAsciiString();
+	map.m_retailCloudTexture = file.readAsciiString();
+	return TRUE;
+}
+
 static RGBColor readMapColor(DataChunkInput &file)
 {
 	return {file.readReal(), file.readReal(), file.readReal()};
@@ -933,6 +971,16 @@ static GlobalData::TerrainLighting scaleMapLight(GlobalData::TerrainLighting lig
 	light.ambient *= scale;
 	light.diffuse *= scale;
 	return light;
+}
+
+RGBColor WorldHeightMap::getRetailNoCloudFactor() const
+{
+	return m_bfmeLighting ? m_bfmeLighting->noCloudFactor : RGBColor{0.0f, 0.0f, 0.0f};
+}
+
+Bool WorldHeightMap::usesRetailOverbright() const
+{
+	return RetailFileLayers::enabled() && m_bfmeLighting && m_bfmeLighting->overbright > 1.0f;
 }
 
 void WorldHeightMap::applyBfmeLighting() const

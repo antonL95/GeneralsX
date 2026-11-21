@@ -913,8 +913,8 @@ void AlphaEdgeTextureClass::Apply(unsigned int stage)
 up the "sliding" parameters for the clouds to slide over the terrain. */
 //=============================================================================
 //@todo - Allow adjustment of the cloud slide rate, and lose the hard coded "cloudmap.tga"
-CloudMapTerrainTextureClass::CloudMapTerrainTextureClass(MipCountType mipLevelCount) :
-	TextureClass("TSCloudMed.tga","TSCloudMed.tga", mipLevelCount )
+CloudMapTerrainTextureClass::CloudMapTerrainTextureClass(AsciiString name, MipCountType mipLevelCount) :
+	TextureClass(name.isEmpty() ? "TSCloudMed.tga" : name.str(), name.isEmpty() ? "TSCloudMed.tga" : name.str(), mipLevelCount)
 {
 	Get_Filter().Set_Mip_Mapping( TextureFilterClass::FILTER_TYPE_FAST );
 	m_xSlidePerSecond = -0.02f;
