@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/FireWeaponUpdate.h"
@@ -146,15 +147,19 @@ void FireWeaponUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 2;
-	XferVersion version = currentVersion;
+	constexpr XferVersion weaponVersion = 2;
+	constexpr XferVersion emptyVersion = 3;
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion currentVersion = retail ? emptyVersion : weaponVersion;
+	XferVersion version = retail && !m_weapon ? emptyVersion : weaponVersion;
 	xfer->xferVersion( &version, currentVersion );
 
 	// extend base class
 	UpdateModule::xfer( xfer );
 
 	// weapon
-	xfer->xferSnapshot( m_weapon );
+	if (version < emptyVersion)
+		xfer->xferSnapshot(m_weapon);
 
   if ( version >= 2 )
     xfer->xferUnsignedInt( &m_initialDelayFrame );

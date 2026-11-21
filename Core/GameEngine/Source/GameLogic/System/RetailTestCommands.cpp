@@ -20,6 +20,7 @@
 #include "Common/DrawModule.h"
 #include "Common/FramePacer.h"
 #include "Common/GameEngine.h"
+#include "Common/GameState.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/MessageStream.h"
@@ -1704,6 +1705,42 @@ void execute(const Command& command, unsigned int frame)
 			std::fprintf(stderr, "TEST powerstate %u %s rank=%d skill=%d points=%d book=%s zoom=%.3f\n", frame,
 				command.player.c_str(), player->getRankLevel(), player->getSkillPoints(), player->getSciencePurchasePoints(),
 				book ? book->getTemplate()->getName().str() : "-", TheTacticalView ? TheTacticalView->getZoom() : 0.0f);
+		}
+		return;
+	}
+	if (command.action == "power-cast" || command.action == "power-rank" || command.action == "power-reveal" ||
+		command.action == "power-book-drop" || command.action == "power-save")
+	{
+		Player* player = ThePlayerList->getLocalPlayer();
+		if (!player)
+			return;
+		if (command.action == "power-cast")
+		{
+			GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPELLBOOK_SPECIAL_POWER);
+			message->appendIntegerArgument(command.ordinal - 1);
+			message->appendLocationArgument(groundLocation(command));
+			message->appendObjectIDArgument(INVALID_ID);
+		}
+		else if (command.action == "power-rank")
+		{
+			TheGameLogic->setRankLevelLimit(command.ordinal);
+			player->addSkillPoints(std::atoi(command.structure.c_str()));
+			std::fprintf(stderr, "TEST power-rank %u cap=%d rank=%d skill=%d next=%d points=%d\n", frame,
+				command.ordinal, player->getRankLevel(), player->getSkillPoints(), player->getSkillPointsLevelUp(),
+				player->getSciencePurchasePoints());
+		}
+		else if (command.action == "power-reveal")
+			ThePartitionManager->revealMapForPlayerPermanently(player->getPlayerIndex());
+		else if (command.action == "power-book-drop")
+		{
+			if (Object* book = player->getRetailSpellBook())
+				TheGameLogic->destroyObject(book);
+		}
+		else
+		{
+			const SaveResult result = TheGameState->saveGame(AsciiString(command.structure.c_str()),
+				UnicodeString(L"Spellbook snapshot fixture"), SAVE_FILE_TYPE_NORMAL);
+			std::fprintf(stderr, "TEST power-save %u %s result=%d\n", frame, result.filename.str(), result.saveCode);
 		}
 		return;
 	}

@@ -25,43 +25,8 @@
 
 namespace
 {
-constexpr UnsignedInt FILTER_SELF = 1u << 0;
-constexpr UnsignedInt FILTER_ALLIES = 1u << 1;
-constexpr UnsignedInt FILTER_ENEMIES = 1u << 2;
-constexpr UnsignedInt FILTER_NEUTRALS = 1u << 3;
 constexpr UnsignedInt FILTER_ALL = 1u << 10;
-constexpr UnsignedInt FILTER_SAME_PLAYER = 1u << 13;
 constexpr Int MAX_WARHEAD_DEPTH = 2;
-
-Bool filterMatches(const SpecialPowerObjectFilter& filter, const Object* attacker, const Object* victim)
-{
-	const AsciiString& name = victim->getTemplate()->getName();
-	const auto named = [&name](const AsciiString& other)
-	{
-		return stricmp(name.str(), other.str()) == 0;
-	};
-	const Relationship relationship = attacker ? attacker->getRelationship(victim) : NEUTRAL;
-	WeaponNuggetRules::FilterFacts facts{};
-	facts.ruleAll = (filter.m_rules & FILTER_ALL) != 0;
-	facts.ruleNone = (filter.m_rules & SpecialPowerObjectFilter::RULE_NONE) != 0;
-	facts.wantsSelf = (filter.m_rules & FILTER_SELF) != 0;
-	facts.wantsAllies = (filter.m_rules & FILTER_ALLIES) != 0;
-	facts.wantsEnemies = (filter.m_rules & FILTER_ENEMIES) != 0;
-	facts.wantsNeutrals = (filter.m_rules & FILTER_NEUTRALS) != 0;
-	facts.wantsSamePlayer = (filter.m_rules & FILTER_SAME_PLAYER) != 0;
-	facts.isSelf = attacker == victim;
-	facts.isAlly = relationship == ALLIES;
-	facts.isEnemy = relationship == ENEMIES;
-	facts.isNeutral = relationship == NEUTRAL;
-	facts.isSamePlayer = attacker && attacker->getControllingPlayer() == victim->getControllingPlayer();
-	facts.includedByName = std::any_of(filter.m_includeObjects.begin(), filter.m_includeObjects.end(), named);
-	facts.excludedByName = std::any_of(filter.m_excludeObjects.begin(), filter.m_excludeObjects.end(), named);
-	facts.hasIncludedKinds = filter.m_includeKinds.any();
-	facts.includedByKind = victim->isAnyKindOf(filter.m_includeKinds);
-	facts.excludedByKind = victim->isAnyKindOf(filter.m_excludeKinds);
-	facts.hasIncludedNames = !filter.m_includeObjects.empty();
-	return WeaponNuggetRules::filterMatches(facts);
-}
 
 Bool hasUpgrade(const Object* obj, const UpgradeTemplate* upgrade)
 {
@@ -259,7 +224,7 @@ Real nuggetDamage(const WeaponNugget& nugget, Real scalar, const WeaponBonus& bo
 
 Bool objectFilterMatches(const SpecialPowerObjectFilter& filter, const Object* source, const Object* target)
 {
-	return filterMatches(filter, source, target);
+	return filter.matchesObject(source, target);
 }
 
 void WeaponNugget::parseDamageNugget(INI* ini, void*, void* store, const void*)
@@ -326,7 +291,7 @@ Bool WeaponNugget::isEnabledFor(const Object* attacker) const
 
 Bool WeaponNugget::affects(const Object* attacker, const Object* victim) const
 {
-	return !m_hasSpecialObjectFilter || filterMatches(m_specialObjectFilter, attacker, victim);
+	return !m_hasSpecialObjectFilter || m_specialObjectFilter.matchesObject(attacker, victim);
 }
 
 Real WeaponNugget::scalarFor(const Object* attacker, const Object* victim) const
@@ -334,7 +299,7 @@ Real WeaponNugget::scalarFor(const Object* attacker, const Object* victim) const
 	std::vector<WeaponNuggetRules::Scalar> scalars;
 	scalars.reserve(m_damageScalars.size());
 	for (const WeaponNuggetScalar& scalar : m_damageScalars)
-		scalars.push_back({scalar.m_scalar, filterMatches(scalar.m_filter, attacker, victim)});
+		scalars.push_back({scalar.m_scalar, scalar.m_filter.matchesObject(attacker, victim)});
 	return WeaponNuggetRules::scalarProduct(scalars);
 }
 

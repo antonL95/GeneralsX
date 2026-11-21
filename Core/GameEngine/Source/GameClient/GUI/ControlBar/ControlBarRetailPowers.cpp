@@ -1,6 +1,5 @@
 #include "PreRTS.h"
 
-#include "Common/ActionManager.h"
 #include "Common/FileSystem.h"
 #include "Common/MessageStream.h"
 #include "Common/Player.h"
@@ -21,6 +20,12 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+
+#include <bit>
+#include <cmath>
+#include <map>
+#include <string>
+#include <string_view>
 
 namespace
 {
@@ -47,20 +52,68 @@ struct Rect
 	}
 };
 
+struct AptPoint
+{
+	Real x;
+	Real y;
+};
+
+struct AptHitRegion
+{
+	std::vector<std::array<AptPoint, 3>> triangles;
+	Real left = 0, top = 0, right = 0, bottom = 0;
+
+	Bool contains(AptPoint point) const
+	{
+		if (point.x < left || point.x > right || point.y < top || point.y > bottom)
+			return FALSE;
+		for (const auto& triangle : triangles)
+		{
+			const auto side = [&point](AptPoint a, AptPoint b)
+			{
+				return (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x);
+			};
+			const Real a = side(triangle[0], triangle[1]);
+			const Real b = side(triangle[1], triangle[2]);
+			const Real c = side(triangle[2], triangle[0]);
+			if ((a >= 0 && b >= 0 && c >= 0) || (a <= 0 && b <= 0 && c <= 0))
+				return TRUE;
+		}
+		return FALSE;
+	}
+};
+
+struct StoreMovieLayout
+{
+	UnsignedInt fadeTime = 198;
+	std::array<AptHitRegion, StoreSlots> nodes;
+	AptHitRegion reset, accept;
+};
+
+StoreMovieLayout storeMovieLayout;
+
 struct Layout
 {
 	Real scale;
 	Int x;
 	Int y;
 
-	Rect at(Int left, Int top, Int width, Int height) const
+	Rect at(Real left, Real top, Real width, Real height) const
 	{
 		return { x + static_cast<Int>(left * scale), y + static_cast<Int>(top * scale),
 			std::max(1, static_cast<Int>(width * scale)), std::max(1, static_cast<Int>(height * scale)) };
 	}
 
+	Rect bounds(const AptHitRegion& region) const
+	{
+		return at(region.left, region.top, region.right - region.left, region.bottom - region.top);
+	}
+
 	Rect node(Int slot) const
 	{
+		const AptHitRegion& region = storeMovieLayout.nodes[slot];
+		if (!region.triangles.empty())
+			return bounds(region);
 		static constexpr Int rowStart[] = { 0, 3, 7, 10 };
 		static constexpr Int rowWidth[] = { 3, 4, 3, 2 };
 		Int row = 0;
@@ -68,6 +121,27 @@ struct Layout
 			++row;
 		const Int center = PanelWidth / 2 + (2 * (slot - rowStart[row]) - rowWidth[row] + 1) * 56;
 		return at(center - NodeSize / 2, 90 + row * 95, NodeSize, NodeSize);
+	}
+
+	Bool hits(const AptHitRegion& region, Rect fallback, Int px, Int py) const
+	{
+		return region.triangles.empty() ? fallback.contains(px, py) :
+			region.contains({ (px - x + 0.5f) / scale, (py - y + 0.5f) / scale });
+	}
+
+	Rect reset() const
+	{
+		return storeMovieLayout.reset.triangles.empty() ? at(139, 504, 134, 38) : bounds(storeMovieLayout.reset);
+	}
+
+	Rect accept() const
+	{
+		return storeMovieLayout.accept.triangles.empty() ? at(287, 504, 134, 38) : bounds(storeMovieLayout.accept);
+	}
+
+	Int actionSplit(const Rect& resetButton, const Rect& acceptButton) const
+	{
+		return (resetButton.x + resetButton.w / 2 + acceptButton.x + acceptButton.w / 2) / 2;
 	}
 };
 
@@ -77,32 +151,286 @@ UnsignedInt readLittleWord(const UnsignedByte* data)
 		static_cast<UnsignedInt>(data[2]) << 16 | static_cast<UnsignedInt>(data[3]) << 24;
 }
 
-UnsignedInt spellStoreFadeTime()
+struct AptTransform
 {
-	constexpr UnsignedInt defaultFade = 198;
+	Real a = 1, b = 0, c = 0, d = 1;
+	AptPoint origin = {};
+
+	AptPoint apply(AptPoint point) const
+	{
+		return { a * point.x + c * point.y + origin.x, b * point.x + d * point.y + origin.y };
+	}
+
+	AptTransform compose(const AptTransform& child) const
+	{
+		return { a * child.a + c * child.b, b * child.a + d * child.b,
+			a * child.c + c * child.d, b * child.c + d * child.d, apply(child.origin) };
+	}
+};
+
+struct InvalidStoreMovie {};
+
+class StoreMovie
+{
+	struct Placement
+	{
+		size_t character = 0;
+		std::string_view name;
+		AptTransform transform;
+	};
+
+	using Placements = std::map<UnsignedInt, Placement>;
+
+public:
+	explicit StoreMovie(const std::vector<UnsignedByte>& bytes) : m_bytes(bytes) {}
+
+	StoreMovieLayout read(size_t movie)
+	{
+		enum { Movie = 9, Sprite = 5 };
+		if (characterType(movie) != Movie)
+			throw InvalidStoreMovie{};
+		m_characterCount = word(movie + 20);
+		m_characters = word(movie + 24);
+		checkTable(m_characters, m_characterCount, 4);
+		const UnsignedInt width = word(movie + 28);
+		const UnsignedInt height = word(movie + 32);
+		if (width == 0 || height == 0 || width > 8192 || height > 8192)
+			throw InvalidStoreMovie{};
+
+		StoreMovieLayout layout;
+		const UnsignedInt frameTime = word(movie + 36);
+		if (frameTime >= 10 && frameTime <= 100)
+			layout.fadeTime = frameTime * 6;
+
+		const Placement store = named(displayList(movie), "SpellStore");
+		if (characterType(store.character) != Sprite)
+			return layout;
+		const Placement buttons = named(displayList(store.character, "_multiplayer"), "Buttons");
+		if (characterType(buttons.character) != Sprite)
+			return layout;
+		const Real scale = static_cast<Real>(PanelHeight) / height;
+		const AptTransform panel{ scale, 0, 0, scale, { (PanelWidth - width * scale) / 2, 0 } };
+		const AptTransform transform = panel.compose(store.transform).compose(buttons.transform);
+		const Placements placements = displayList(buttons.character);
+		for (Int slot = 0; slot < StoreSlots; ++slot)
+			layout.nodes[slot] = hitRegion(named(placements, "Spell" + std::to_string(slot + 1)), transform, "_active_stopped");
+
+		const Placement controls = named(displayList(buttons.character, {}, TRUE), "ButtonsMain");
+		if (characterType(controls.character) == Sprite)
+		{
+			const Placements actions = displayList(controls.character);
+			const AptTransform parent = transform.compose(controls.transform);
+			layout.reset = hitRegion(named(actions, "Reset"), parent, "_up");
+			layout.accept = hitRegion(named(actions, "Accept"), parent, "_up");
+		}
+		return layout;
+	}
+
+private:
+	const std::vector<UnsignedByte>& m_bytes;
+	size_t m_characters = 0;
+	size_t m_characterCount = 0;
+
+	void checkTable(size_t offset, size_t count, size_t stride) const
+	{
+		if (offset > m_bytes.size() || count > (m_bytes.size() - offset) / stride)
+			throw InvalidStoreMovie{};
+	}
+
+	UnsignedInt word(size_t offset) const
+	{
+		checkTable(offset, 1, 4);
+		return readLittleWord(m_bytes.data() + offset);
+	}
+
+	Real number(size_t offset) const
+	{
+		const Real value = std::bit_cast<Real>(word(offset));
+		if (!std::isfinite(value) || value < -16384.0f || value > 16384.0f)
+			throw InvalidStoreMovie{};
+		return value;
+	}
+
+	std::string_view string(size_t offset) const
+	{
+		if (!offset)
+			return {};
+		checkTable(offset, 1, 1);
+		const auto* start = reinterpret_cast<const char*>(m_bytes.data() + offset);
+		const auto* end = static_cast<const char*>(memchr(start, 0, std::min<size_t>(128, m_bytes.size() - offset)));
+		if (!end)
+			throw InvalidStoreMovie{};
+		return { start, static_cast<size_t>(end - start) };
+	}
+
+	UnsignedInt characterType(size_t offset) const
+	{
+		if (offset == 0)
+			return 0;
+		if (word(offset + 4) != 0x09876543)
+			throw InvalidStoreMovie{};
+		return word(offset);
+	}
+
+	AptTransform transformAt(size_t offset) const
+	{
+		return { number(offset), number(offset + 4), number(offset + 8), number(offset + 12),
+			{ number(offset + 16), number(offset + 20) } };
+	}
+
+	Placements displayList(size_t character, std::string_view label = {}, Bool finalFrame = FALSE) const
+	{
+		enum { FrameLabel = 2, PlaceObject = 3, RemoveObject = 4 };
+		enum { Move = 1, HasCharacter = 2, HasMatrix = 4, HasName = 32 };
+		const size_t frames = word(character + 12);
+		const size_t frameCount = word(character + 8);
+		if (frameCount > 512)
+			throw InvalidStoreMovie{};
+		checkTable(frames, frameCount, 8);
+		Placements placements;
+		for (size_t frame = frames; frame < frames + frameCount * 8; frame += 8)
+		{
+			Bool stop = label.empty();
+			const size_t items = word(frame + 4);
+			const size_t itemCount = word(frame);
+			if (itemCount > 4096)
+				throw InvalidStoreMovie{};
+			checkTable(items, itemCount, 4);
+			for (size_t item = items; item < items + itemCount * 4; item += 4)
+			{
+				const size_t offset = word(item);
+				switch (word(offset))
+				{
+					case FrameLabel:
+						stop |= string(word(offset + 4)) == label;
+						break;
+					case PlaceObject:
+					{
+						const UnsignedInt flags = word(offset + 4);
+						Placement& placement = placements[word(offset + 8)];
+						if (!(flags & Move))
+							placement = {};
+						if (flags & HasCharacter)
+						{
+							const size_t id = word(offset + 12);
+							if (id >= m_characterCount)
+								throw InvalidStoreMovie{};
+							placement.character = word(m_characters + id * 4);
+						}
+						if (flags & HasMatrix)
+							placement.transform = transformAt(offset + 16);
+						if (flags & HasName)
+							placement.name = string(word(offset + 52));
+						break;
+					}
+					case RemoveObject:
+						placements.erase(word(offset + 4));
+						break;
+				}
+			}
+			if (stop && !finalFrame)
+				return placements;
+		}
+		return finalFrame ? placements : Placements{};
+	}
+
+	static Placement named(const Placements& placements, std::string_view name)
+	{
+		for (const auto& [depth, placement] : placements)
+			if (placement.name == name)
+				return placement;
+		return {};
+	}
+
+	AptHitRegion hitRegion(const Placement& clip, const AptTransform& parent, std::string_view label = {}) const
+	{
+		enum { Button = 4, Sprite = 5 };
+		const AptTransform transform = parent.compose(clip.transform);
+		if (characterType(clip.character) == Button)
+			return buttonRegion(clip.character, transform);
+		if (characterType(clip.character) == Sprite)
+			for (const auto& [depth, placed] : displayList(clip.character, label))
+				if (characterType(placed.character) == Button)
+					return buttonRegion(placed.character, transform.compose(placed.transform));
+		return {};
+	}
+
+	AptHitRegion buttonRegion(size_t button, const AptTransform& transform) const
+	{
+		const size_t triangleCount = word(button + 28);
+		const size_t vertexCount = word(button + 32);
+		const size_t vertices = word(button + 36);
+		const size_t triangles = word(button + 40);
+		if (vertexCount > 1024 || triangleCount > 2048)
+			throw InvalidStoreMovie{};
+		checkTable(vertices, vertexCount, 8);
+		checkTable(triangles, triangleCount, 6);
+		AptHitRegion region;
+		for (size_t offset = triangles; offset < triangles + triangleCount * 6; offset += 6)
+		{
+			std::array<AptPoint, 3> points;
+			for (size_t i = 0; i < points.size(); ++i)
+			{
+				const UnsignedByte* index = m_bytes.data() + offset + i * 2;
+				const size_t vertex = index[0] | static_cast<size_t>(index[1]) << 8;
+				if (vertex >= vertexCount)
+					throw InvalidStoreMovie{};
+				points[i] = transform.apply({ number(vertices + vertex * 8), number(vertices + vertex * 8 + 4) });
+				if (points[i].x < -PanelWidth || points[i].x > 2 * PanelWidth ||
+					points[i].y < -PanelHeight || points[i].y > 2 * PanelHeight)
+					throw InvalidStoreMovie{};
+			}
+			const auto& [a, b, c] = points;
+			if ((b.x - a.x) * (c.y - a.y) == (b.y - a.y) * (c.x - a.x))
+				continue;
+			if (region.triangles.empty())
+			{
+				region.left = region.right = a.x;
+				region.top = region.bottom = a.y;
+			}
+			for (const AptPoint& point : points)
+			{
+				region.left = std::min(region.left, point.x);
+				region.top = std::min(region.top, point.y);
+				region.right = std::max(region.right, point.x);
+				region.bottom = std::max(region.bottom, point.y);
+			}
+			region.triangles.push_back(points);
+		}
+		return region;
+	}
+};
+
+StoreMovieLayout readSpellStore()
+{
 	File* constants = TheFileSystem->openFile("SpellStore.const", File::READ | File::BINARY);
 	if (!constants)
-		return defaultFade;
+		return {};
 	UnsignedByte header[24];
 	const Int headerBytes = constants->read(header, sizeof(header));
 	constants->close();
 	if (headerBytes != sizeof(header) || memcmp(header, "Apt constant file", 17) != 0)
-		return defaultFade;
-	const UnsignedInt offset = readLittleWord(header + 20);
-	if (offset < 12 || offset > 8 * 1024 * 1024)
-		return defaultFade;
+		return {};
+
 	File* movie = TheFileSystem->openFile("SpellStore.apt", File::READ | File::BINARY);
 	if (!movie)
-		return defaultFade;
-	UnsignedByte character[40];
-	const Int movieBytes = movie->seek(offset, File::START) == static_cast<Int>(offset) ?
-		movie->read(character, sizeof(character)) : 0;
+		return {};
+	const Int size = movie->size();
+	std::vector<UnsignedByte> bytes;
+	if (size >= 12 && size <= 8 * 1024 * 1024)
+		bytes.resize(size);
+	const Int read = bytes.empty() ? 0 : movie->read(bytes.data(), size);
 	movie->close();
-	if (movieBytes != sizeof(character) || readLittleWord(character) != 9 ||
-		readLittleWord(character + 4) != 0x09876543)
-		return defaultFade;
-	const UnsignedInt frameTime = readLittleWord(character + 36);
-	return frameTime >= 10 && frameTime <= 100 ? frameTime * 6 : defaultFade;
+	if (read < 12 || read != size || memcmp(bytes.data(), "Apt Data:", 9) != 0)
+		return {};
+	try
+	{
+		return StoreMovie(bytes).read(readLittleWord(header + 20));
+	}
+	catch (const InvalidStoreMovie&)
+	{
+		return {};
+	}
 }
 
 Layout screenLayout()
@@ -252,7 +580,8 @@ void drawSpell(GameWindow* window, WinInstanceData*) { TheControlBar->drawRetail
 
 void ControlBar::initRetailPowers(GameWindow* master, GameWindow* palantir)
 {
-	m_retailPowersFadeTime = spellStoreFadeTime();
+	storeMovieLayout = readSpellStore();
+	m_retailPowersFadeTime = storeMovieLayout.fadeTime;
 	m_retailPowersScreen = TheWindowManager->winCreate(nullptr, WIN_STATUS_ENABLED | WIN_STATUS_ABOVE | WIN_STATUS_HIDDEN,
 		0, 0, TheDisplay->getWidth(), TheDisplay->getHeight(), nullptr, nullptr);
 	m_retailPowersScreen->winSetInputFunc(overlayInput);
@@ -424,15 +753,7 @@ Bool ControlBar::targetRetailSpell(const CommandButton* button, Object* target, 
 		++slot;
 	if (!set || slot == CommandButtonRules::RETAIL_COMMANDS_PER_SET)
 		return FALSE;
-	const SpecialPowerTemplate* power = button->getSpecialPowerTemplate();
-	const UnsignedInt options = button->getOptions();
-	Bool valid;
-	if (BitIsSet(options, COMMAND_OPTION_NEED_OBJECT_TARGET))
-		valid = target && TheActionManager->canDoSpecialPowerAtObject(book, target, CMD_FROM_PLAYER, power, options);
-	else if (BitIsSet(options, NEED_TARGET_POS))
-		valid = position && TheActionManager->canDoSpecialPowerAtLocation(book, position, CMD_FROM_PLAYER, power, target, options);
-	else
-		valid = TheActionManager->canDoSpecialPower(book, power, CMD_FROM_PLAYER, options);
+	const Bool valid = button->canCastRetailSpell(book, target, position);
 	if (valid && submit)
 	{
 		GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPELLBOOK_SPECIAL_POWER);
@@ -518,8 +839,16 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 	}
 	if (!m_retailPendingSciences.empty())
 	{
-		const Rect reset = layout.at(139, 504, 134, 38);
-		const Rect accept = layout.at(287, 504, 134, 38);
+		Rect reset = layout.reset();
+		Rect accept = layout.accept();
+		if (reset.x < accept.x && reset.x + reset.w > accept.x)
+		{
+			const Int split = layout.actionSplit(reset, accept);
+			const Int acceptRight = accept.x + accept.w;
+			reset.w = split - 2 - reset.x;
+			accept.x = split + 2;
+			accept.w = acceptRight - accept.x;
+		}
 		fill(reset, 0xFF253948);
 		fill(accept, 0xFF27586B);
 		frame(reset, PanelLine);
@@ -537,7 +866,7 @@ void ControlBar::inputRetailPowers(Int x, Int y, Bool click)
 	const Layout layout = screenLayout();
 	m_retailHoveredPower = -1;
 	for (Int i = 0; i < StoreSlots; ++i)
-		if (layout.node(i).contains(x, y))
+		if (layout.hits(storeMovieLayout.nodes[i], layout.node(i), x, y))
 		{
 			m_retailHoveredPower = i;
 			const ScienceType science = storeScience(player, i);
@@ -554,9 +883,13 @@ void ControlBar::inputRetailPowers(Int x, Int y, Bool click)
 	}
 	if (m_retailPendingSciences.empty())
 		return;
-	if (layout.at(139, 504, 134, 38).contains(x, y))
+	const Rect reset = layout.reset();
+	const Rect accept = layout.accept();
+	const Bool hitReset = layout.hits(storeMovieLayout.reset, reset, x, y);
+	const Bool hitAccept = layout.hits(storeMovieLayout.accept, accept, x, y);
+	if (hitReset && (!hitAccept || x < layout.actionSplit(reset, accept)))
 		m_retailPendingSciences.clear();
-	if (layout.at(287, 504, 134, 38).contains(x, y))
+	else if (hitAccept)
 	{
 		for (ScienceType science : m_retailPendingSciences)
 		{

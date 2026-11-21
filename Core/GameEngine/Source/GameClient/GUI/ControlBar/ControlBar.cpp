@@ -30,6 +30,8 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+
+#include <cmath>
 #define DEFINE_GUI_COMMAND_NAMES
 #define DEFINE_COMMAND_OPTION_NAMES
 #define DEFINE_WEAPONSLOTTYPE_NAMES
@@ -786,6 +788,22 @@ Bool CommandButton::isValidToUseOn(const Object *sourceObj, const Object *target
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool CommandButton::canCastRetailSpell(const Object* book, const Object* target, const Coord3D* position) const
+{
+	if (!book || m_command != GUI_COMMAND_SPELL_BOOK || !m_specialPower ||
+		!m_specialPower->isUnlockedFor(book->getControllingPlayer()))
+		return FALSE;
+	const SpecialPowerModuleInterface* module = book->getSpecialPowerModule(m_specialPower);
+	if (!module || module->getPercentReady() < 1.0f)
+		return FALSE;
+	if (BitIsSet(m_options, COMMAND_OPTION_NEED_OBJECT_TARGET) && !isValidObjectTarget(book, target))
+		return FALSE;
+	if (BitIsSet(m_options, NEED_TARGET_POS) && (!position || !std::isfinite(position->x) ||
+		!std::isfinite(position->y) || !std::isfinite(position->z)))
+		return FALSE;
+	return isValidToUseOn(book, target, position, CMD_FROM_PLAYER);
+}
+
 Bool CommandButton::isReady(const Object *sourceObj) const
 {
 	SpecialPowerModuleInterface *mod = sourceObj->getSpecialPowerModule( m_specialPower );

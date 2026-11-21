@@ -1228,6 +1228,7 @@ set(GAMEENGINE_SRC
 #    Source/GameLogic/System/GameLogic.cpp
     Source/GameLogic/System/GameLogicDispatch.cpp
     Source/GameLogic/System/RankInfo.cpp
+    Source/GameLogic/System/SpecialPowerTarget.cpp
     Source/GameNetwork/Connection.cpp
     Source/GameNetwork/ConnectionManager.cpp
     Source/GameNetwork/DisconnectManager.cpp

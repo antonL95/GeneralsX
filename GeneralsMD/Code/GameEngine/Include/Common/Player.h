@@ -697,6 +697,7 @@ public:
 	Bool usesRetailMultiplayerPowers() const;
 	Int getSciencePurchaseCost(ScienceType science) const;
 	Object* getRetailSpellBook() const;
+	void ensureRetailSpellBook(Bool restoringSave);
 	const CommandSet* getRetailSpellStore() const;
 	Int getSciencePurchasePoints() const	{ return m_sciencePurchasePoints; }
 	Int getRankLevel() const							{ return m_rankLevel; }

@@ -1396,6 +1396,9 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 			}
 		}
 
+		if (RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2)
+			return spTemplate->isValidRetailTarget(obj, nullptr, loc, commandSource);
+
 		// First check terrain type, if it is cared about.  Don't return a true, since there are more checks.
 		switch( spTemplate->getSpecialPowerType() )
 		{
@@ -1498,6 +1501,9 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 		// if the target is in the shroud, we can't do anything
 		if (isObjectShroudedForAction(obj, target, commandSource))
 			return FALSE;
+
+		if (RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2)
+			return spTemplate->isValidRetailTarget(obj, target, nullptr, commandSource);
 
 		switch( spTemplate->getSpecialPowerType() )
 		{
@@ -1707,6 +1713,9 @@ Bool ActionManager::canDoSpecialPower( const Object *obj, const SpecialPowerTemp
 				return false;
 			}
 		}
+
+		if (RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2)
+			return spTemplate->isValidRetailTarget(obj, nullptr, nullptr, commandSource);
 
 		switch( spTemplate->getSpecialPowerType() )
 		{

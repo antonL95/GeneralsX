@@ -6,6 +6,7 @@
 #include "Common/KindOf.h"
 
 class INI;
+class Object;
 class ThingTemplate;
 
 struct SpecialPowerObjectFilter
@@ -19,6 +20,7 @@ struct SpecialPowerObjectFilter
 	std::vector<AsciiString> m_excludeObjects;
 
 	Bool matchesTemplate(const ThingTemplate& thing) const;
+	Bool matchesObject(const Object* source, const Object* target) const;
 	static void parse(INI* ini, void* instance, void* store, const void* userData);
 	void addTokens(INI* ini, const char* token);
 };

@@ -541,29 +541,18 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			Object* book = msgPlayer->getRetailSpellBook();
 			const CommandSet* set = book ? TheControlBar->findCommandSet(book->getCommandSetString()) : nullptr;
 			const CommandButton* button = set ? set->getCommandButton(slot) : nullptr;
-			if (!button || button->getCommandType() != GUI_COMMAND_SPELL_BOOK)
-				break;
-			const SpecialPowerTemplate* power = button->getSpecialPowerTemplate();
-			if (!power || !power->isUnlockedFor(msgPlayer))
-				break;
-			const UnsignedInt options = button->getOptions();
 			Object* target = findObjectByID(msg->getArgument(2)->objectID);
 			const Coord3D& location = msg->getArgument(1)->location;
+			if (!button || !button->canCastRetailSpell(book, target, &location))
+				break;
+			const SpecialPowerTemplate* power = button->getSpecialPowerTemplate();
+			const UnsignedInt options = button->getOptions();
 			if (BitIsSet(options, COMMAND_OPTION_NEED_OBJECT_TARGET))
-			{
-				if (target && TheActionManager->canDoSpecialPowerAtObject(book, target, CMD_FROM_PLAYER, power, options))
-					book->doSpecialPowerAtObject(power, target, options);
-			}
+				book->doSpecialPowerAtObject(power, target, options);
 			else if (BitIsSet(options, NEED_TARGET_POS))
-			{
-				if (std::isfinite(location.x) && std::isfinite(location.y) && std::isfinite(location.z) &&
-					TheActionManager->canDoSpecialPowerAtLocation(book, &location, CMD_FROM_PLAYER, power, target, options))
-					book->doSpecialPowerAtLocation(power, &location, INVALID_ANGLE, options);
-			}
-			else if (TheActionManager->canDoSpecialPower(book, power, CMD_FROM_PLAYER, options))
-			{
+				book->doSpecialPowerAtLocation(power, &location, INVALID_ANGLE, options);
+			else
 				book->doSpecialPower(power, options);
-			}
 			break;
 		}
 		case GameMessage::MSG_RETAIL_HORDE_COMMAND:

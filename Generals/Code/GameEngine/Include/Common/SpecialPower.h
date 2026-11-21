@@ -45,6 +45,8 @@
 class ObjectCreationList;
 class Object;
 class Player;
+struct Coord3D;
+enum CommandSourceType CPP_11(: Int);
 struct FieldParse;
 enum AcademyClassificationType CPP_11(: Int);
 
@@ -117,6 +119,8 @@ public:
 	Int getRequiredRank() const { return getFO()->m_requiredRank; }
 	ScienceType getRequiredScience() const { return getFO()->m_requiredScience; }
 	Bool isUnlockedFor(const Player* player, ScienceType excluded = SCIENCE_INVALID) const;
+	Bool isValidRetailTarget(const Object* source, const Object* target, const Coord3D* position,
+		CommandSourceType commandSource) const;
 	const AudioEventRTS *getInitiateSound() const { return &getFO()->m_initiateSound; }
 	const AudioEventRTS *getInitiateAtTargetSound() const { return &getFO()->m_initiateAtLocationSound; }
 	Bool hasPublicTimer() const { return getFO()->m_publicTimer; }

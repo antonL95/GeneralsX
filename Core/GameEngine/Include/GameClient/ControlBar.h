@@ -362,6 +362,7 @@ public:
 	Bool isValidObjectTarget(const Player* sourcePlayer, const Object* targetObj) const;
 	Bool isValidObjectTarget(const Object* sourceObj, const Object* targetObj) const;
 	Bool isValidObjectTarget(const Drawable* source, const Drawable* target) const;
+	Bool canCastRetailSpell(const Object* book, const Object* target, const Coord3D* position) const;
 
 	// Note: It is perfectly valid for either (or both!) of targetObj and targetLocation to be nullptr.
 	// This is a convenience function to make several calls to other functions.
@@ -1011,7 +1012,7 @@ protected:
 	mutable Int m_retailLabelRank = 0;
 	GameWindow *m_retailPowersScreen = nullptr;
 	GameWindow *m_retailPowersCounter = nullptr;
-	std::array<GameWindow*, 16> m_retailSpellButtons = {};
+	std::array<GameWindow*, CommandButtonRules::RETAIL_COMMANDS_PER_SET> m_retailSpellButtons = {};
 	ScienceVec m_retailPendingSciences;
 	Int m_retailHoveredPower = -1;
 	UnsignedInt m_retailPowersOpenedAt = 0;

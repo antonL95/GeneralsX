@@ -35,9 +35,51 @@
 #include "Common/SpecialPower.h"
 #include "Common/SpecialPowerINI.h"
 #include "Common/ThingTemplate.h"
+#include "GameLogic/Object.h"
+#include "GameLogic/WeaponNuggetRules.h"
 
 #include <algorithm>
 #include <string_view>
+
+namespace
+{
+constexpr UnsignedInt FILTER_SELF = 1u << 0;
+constexpr UnsignedInt FILTER_ALLIES = 1u << 1;
+constexpr UnsignedInt FILTER_ENEMIES = 1u << 2;
+constexpr UnsignedInt FILTER_NEUTRALS = 1u << 3;
+constexpr UnsignedInt FILTER_ALL = 1u << 10;
+constexpr UnsignedInt FILTER_SAME_PLAYER = 1u << 13;
+}
+
+Bool SpecialPowerObjectFilter::matchesObject(const Object* source, const Object* target) const
+{
+	const AsciiString& name = target->getTemplate()->getName();
+	const auto named = [&name](const AsciiString& other)
+	{
+		return stricmp(name.str(), other.str()) == 0;
+	};
+	const Relationship relationship = source ? source->getRelationship(target) : NEUTRAL;
+	WeaponNuggetRules::FilterFacts facts{};
+	facts.ruleAll = (m_rules & FILTER_ALL) != 0;
+	facts.ruleNone = (m_rules & SpecialPowerObjectFilter::RULE_NONE) != 0;
+	facts.wantsSelf = (m_rules & FILTER_SELF) != 0;
+	facts.wantsAllies = (m_rules & FILTER_ALLIES) != 0;
+	facts.wantsEnemies = (m_rules & FILTER_ENEMIES) != 0;
+	facts.wantsNeutrals = (m_rules & FILTER_NEUTRALS) != 0;
+	facts.wantsSamePlayer = (m_rules & FILTER_SAME_PLAYER) != 0;
+	facts.isSelf = source == target;
+	facts.isAlly = relationship == ALLIES;
+	facts.isEnemy = relationship == ENEMIES;
+	facts.isNeutral = relationship == NEUTRAL;
+	facts.isSamePlayer = source && source->getControllingPlayer() == target->getControllingPlayer();
+	facts.includedByName = std::any_of(m_includeObjects.begin(), m_includeObjects.end(), named);
+	facts.excludedByName = std::any_of(m_excludeObjects.begin(), m_excludeObjects.end(), named);
+	facts.hasIncludedKinds = m_includeKinds.any();
+	facts.includedByKind = target->isAnyKindOf(m_includeKinds);
+	facts.excludedByKind = target->isAnyKindOf(m_excludeKinds);
+	facts.hasIncludedNames = !m_includeObjects.empty();
+	return WeaponNuggetRules::filterMatches(facts);
+}
 
 Bool SpecialPowerObjectFilter::matchesTemplate(const ThingTemplate& thing) const
 {

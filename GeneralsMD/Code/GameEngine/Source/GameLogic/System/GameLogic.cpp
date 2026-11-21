@@ -5757,6 +5757,9 @@ void GameLogic::loadPostProcess()
 	// re-sort the priority queue all at once now that all modules are on it
 	remakeSleepyUpdate();
 
+	if (RetailFileLayers::enabled())
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+			ThePlayerList->getNthPlayer(i)->ensureRetailSpellBook(TRUE);
 }
 
 #if DEEP_CRC_TO_MEMORY

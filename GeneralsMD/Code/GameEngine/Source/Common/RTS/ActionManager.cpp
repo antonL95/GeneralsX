@@ -1597,7 +1597,8 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
 			const UnsignedInt options = button ? button->getOptions() : commandOptions;
 			return (!button || (button->isMountStateAllowed(obj) && (options & NEED_TARGET_POS))) &&
-				retailPowerLocationAllowed(obj, loc, spTemplate, commandSource == CMD_FROM_AI ? objectInWay : nullptr);
+				retailPowerLocationAllowed(obj, loc, spTemplate, commandSource == CMD_FROM_AI ? objectInWay : nullptr) &&
+				(commandSource == CMD_FROM_AI || spTemplate->isValidRetailTarget(obj, nullptr, loc, commandSource));
 		}
 
 		switch( spTemplate->getSpecialPowerType() )
@@ -1763,7 +1764,8 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 		{
 			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
 			return (!button || button->isMountStateAllowed(obj)) &&
-				retailPowerObjectAllowed(obj, target, spTemplate, button, button ? button->getOptions() : commandOptions);
+				retailPowerObjectAllowed(obj, target, spTemplate, button, button ? button->getOptions() : commandOptions) &&
+				(commandSource == CMD_FROM_AI || spTemplate->isValidRetailTarget(obj, target, nullptr, commandSource));
 		}
 
 		switch( spTemplate->getSpecialPowerType() )
@@ -2022,7 +2024,8 @@ Bool ActionManager::canDoSpecialPower( const Object *obj, const SpecialPowerTemp
 			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
 			const UnsignedInt options = button ? button->getOptions() : commandOptions;
 			return (!button || button->isMountStateAllowed(obj)) && !(options & (COMMAND_OPTION_NEED_OBJECT_TARGET | NEED_TARGET_POS)) &&
-				!spTemplate->hasRetailFlag(SpecialPowerTemplate::RETAIL_NEEDS_TARGET);
+				!spTemplate->hasRetailFlag(SpecialPowerTemplate::RETAIL_NEEDS_TARGET) &&
+				spTemplate->isValidRetailTarget(obj, nullptr, nullptr, commandSource);
 		}
 
 		switch( spTemplate->getSpecialPowerType() )

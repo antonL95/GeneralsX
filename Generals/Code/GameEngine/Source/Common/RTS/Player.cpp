@@ -716,17 +716,7 @@ void Player::update()
 //=============================================================================
 void Player::newMap()
 {
-	if (RetailFileLayers::enabled() && isPlayableSide() && m_defaultTeam && getPlayerTemplate() && !getRetailSpellBook())
-	{
-		const AsciiString name = getPlayerTemplate()->getSpellBook(usesRetailMultiplayerPowers());
-		if (name.isNotEmpty())
-			if (const ThingTemplate* book = TheThingFactory->findTemplate(name, false))
-			{
-				Object* object = TheThingFactory->newObject(book, m_defaultTeam);
-				m_retailSpellBookID = object->getID();
-				object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
-			}
-	}
+	ensureRetailSpellBook(FALSE);
 	if (m_ai)
 		m_ai->newMap();
 }
@@ -2477,6 +2467,25 @@ const CommandSet* Player::getRetailSpellStore() const
 		TheControlBar->findCommandSet(getPlayerTemplate()->getPurchaseScienceCommandSet(usesRetailMultiplayerPowers())) : nullptr;
 }
 
+void Player::ensureRetailSpellBook(Bool restoringSave)
+{
+	if (!RetailFileLayers::enabled() || !isPlayableSide() || !m_defaultTeam || getRetailSpellBook())
+		return;
+	const AsciiString name = getPlayerTemplate()->getSpellBook(usesRetailMultiplayerPowers());
+	const ThingTemplate* book = name.isNotEmpty() ? TheThingFactory->findTemplate(name, FALSE) : nullptr;
+	if (!book)
+		return;
+
+	Object* object = TheThingFactory->newObject(book, m_defaultTeam);
+	m_retailSpellBookID = object->getID();
+	object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+	if (restoringSave)
+		for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+			if (SpecialPowerModuleInterface* power = (*module)->getSpecialPower())
+				if (power->getSpecialPowerTemplate()->isUnlockedFor(this))
+					power->setReadyFrame(TheGameLogic->getFrame());
+}
+
 static Bool usesCampaignRankThreshold()
 {
 	return RetailFileLayers::enabled() && TheGameLogic && !TheGameInfo &&
@@ -2489,7 +2498,7 @@ static Int getRankCap(const Player* player)
 	if (TheGameLogic)
 		cap = min(TheGameLogic->getRankLevelLimit(), cap);
 	const PlayerTemplate* faction = player->getPlayerTemplate();
-	if (RetailFileLayers::enabled() && faction)
+	if (faction)
 	{
 		const Int factionCap = faction->getMaxLevel(player->usesRetailMultiplayerPowers());
 		if (factionCap > 0)
@@ -2502,48 +2511,47 @@ static Int getRankCap(const Player* player)
 /// returns TRUE if the player gained/lost levels as a result.
 Bool Player::addSkillPoints(Int delta)
 {
-	const Real adjusted = m_skillPointsModifier * INT_TO_REAL(delta);
-	return addAdjustedSkillPoints(RetailFileLayers::enabled() ? static_cast<Int>(adjusted) : REAL_TO_INT_CEIL(adjusted));
-}
-
-Bool Player::addAdjustedSkillPoints(Int delta)
-{
-	if( delta == 0 )
-		return false;
-
-	const Int levelCap = getRankCap(this);
-	const RankInfo* cap = TheRankInfoStore->getRankInfo(levelCap);
-	if (!cap)
-		return FALSE;
-	const Bool campaign = usesCampaignRankThreshold();
-	const Int pointCap = cap->getSkillPointsNeeded(campaign);
-
 	if (RetailFileLayers::enabled())
-	{
-		const auto points = static_cast<std::int64_t>(m_skillPoints) + delta;
-		m_skillPoints = static_cast<Int>(std::clamp<std::int64_t>(points, 0, std::max(0, pointCap)));
-		Int level = m_rankLevel;
-		while (level < levelCap)
-		{
-			const RankInfo* next = TheRankInfoStore->getRankInfo(level + 1);
-			if (!next || m_skillPoints < next->getSkillPointsNeeded(campaign))
-				break;
-			++level;
-		}
-		return level > m_rankLevel && setRankLevel(level);
-	}
+		return addAdjustedSkillPoints(static_cast<Int>(m_skillPointsModifier * INT_TO_REAL(delta)));
 
+	delta = REAL_TO_INT_CEIL(m_skillPointsModifier * INT_TO_REAL(delta));
+	if (delta == 0)
+		return FALSE;
+	const Int levelCap = min(TheGameLogic->getRankLevelLimit(), TheRankInfoStore->getRankLevelCount());
+	const Int pointCap = TheRankInfoStore->getRankInfo(levelCap)->m_skillPointsNeeded;
 	Bool levelGained = FALSE;
 	m_skillPoints = min( pointCap, (m_skillPoints + delta) );
-	while( m_skillPoints >= m_levelUp && m_rankLevel < levelCap )
+	while( m_skillPoints >= m_levelUp )
 	{
-		// LevelUp gets increased as a side effect of setRankLevel, and this won't infinitely loop,
-		// because when there are no more levels to be gained, m_levelUp is set to INT_MAX.
 		setRankLevel( m_rankLevel + 1 );
 		levelGained = TRUE;
 	}
 
 	return levelGained;
+}
+
+Bool Player::addAdjustedSkillPoints(Int delta)
+{
+	const Int levelCap = getRankCap(this);
+	if (delta == 0 || (delta > 0 && m_rankLevel >= levelCap))
+		return FALSE;
+	const RankInfo* cap = TheRankInfoStore->getRankInfo(levelCap);
+	if (!cap)
+		return FALSE;
+	const Bool campaign = usesCampaignRankThreshold();
+	const Int pointCap = cap->getSkillPointsNeeded(campaign);
+	const auto points = static_cast<std::int64_t>(m_skillPoints) + delta;
+	m_skillPoints = static_cast<Int>(std::clamp<std::int64_t>(points, 0, std::max(0, pointCap)));
+
+	Int level = m_rankLevel;
+	while (level < levelCap)
+	{
+		const RankInfo* next = TheRankInfoStore->getRankInfo(level + 1);
+		if (!next || m_skillPoints < next->getSkillPointsNeeded(campaign))
+			break;
+		++level;
+	}
+	return level > m_rankLevel && setRankLevel(level);
 }
 
 void Player::addRetailSkillPointsForDamage(const Object* source, const Object* victim, Real fraction)
@@ -2747,7 +2755,8 @@ void Player::resetRank()
 	m_rankLevel = 1;
 	m_skillPoints = 0;
 	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(m_rankLevel+1);
-	m_levelUp = nextRank && getRankCap(this) >= 2 ? nextRank->getSkillPointsNeeded(usesCampaignRankThreshold()) : INT_MAX;
+	m_levelUp = !nextRank ? INT_MAX : RetailFileLayers::enabled() ?
+		nextRank->getSkillPointsNeeded(usesCampaignRankThreshold()) : nextRank->m_skillPointsNeeded;
 	m_levelDown = 0;
 	m_sciences.clear();
 	m_sciencePurchasePoints = getPlayerTemplate() ? getPlayerTemplate()->getIntrinsicSciencePurchasePoints() : 0;
@@ -2761,14 +2770,20 @@ void Player::resetRank()
 /// returns TRUE if rank level really changed.
 Bool Player::setRankLevel(Int newLevel)
 {
+	const Bool retail = RetailFileLayers::enabled();
 	if (newLevel < 1)
 		newLevel = 1;
 	else if (newLevel > TheRankInfoStore->getRankLevelCount())
 		newLevel = TheRankInfoStore->getRankLevelCount();
 
-	newLevel = min(newLevel, getRankCap(this));
-	if (newLevel < 1)
-		return FALSE;
+	if (retail)
+	{
+		newLevel = min(newLevel, getRankCap(this));
+		if (newLevel < 1)
+			return FALSE;
+	}
+	else if (newLevel > TheGameLogic->getRankLevelLimit())
+		newLevel = TheGameLogic->getRankLevelLimit();
 
 	if (newLevel == m_rankLevel)
 		return false;
@@ -2795,7 +2810,7 @@ Bool Player::setRankLevel(Int newLevel)
 			if (m_sciencePurchasePoints < 0)
 				m_sciencePurchasePoints = 0;
 
-			const Int threshold = rank->getSkillPointsNeeded(usesCampaignRankThreshold());
+			const Int threshold = retail ? rank->getSkillPointsNeeded(usesCampaignRankThreshold()) : rank->m_skillPointsNeeded;
 			if (m_skillPoints < threshold)
 				m_skillPoints = threshold;
 
@@ -2809,10 +2824,11 @@ Bool Player::setRankLevel(Int newLevel)
 	}
 
 	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(newLevel + 1);
-	m_levelUp = nextRank && newLevel < getRankCap(this) ? nextRank->getSkillPointsNeeded(usesCampaignRankThreshold()) : INT_MAX;
+	m_levelUp = !nextRank ? INT_MAX : retail ? nextRank->getSkillPointsNeeded(usesCampaignRankThreshold()) : nextRank->m_skillPointsNeeded;
 	m_rankLevel = newLevel;
 
-	DEBUG_ASSERTCRASH(m_skillPoints >= m_levelDown && (m_levelUp == INT_MAX || m_skillPoints < m_levelUp), ("hmm, wrong"));
+	DEBUG_ASSERTCRASH(m_skillPoints >= m_levelDown &&
+		((retail && m_levelUp == INT_MAX) || m_skillPoints < m_levelUp), ("hmm, wrong"));
 	//DEBUG_LOG(("Rank %d, Skill %d, down %d, up %d",m_rankLevel,m_skillPoints, m_levelDown, m_levelUp));
 
 	if (TheControlBar != nullptr)
@@ -4586,7 +4602,12 @@ void Player::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void Player::loadPostProcess()
 {
-
+	if (RetailFileLayers::enabled())
+	{
+		const RankInfo* next = m_rankLevel < TheRankInfoStore->getRankLevelCount() ?
+			TheRankInfoStore->getRankInfo(m_rankLevel + 1) : nullptr;
+		m_levelUp = next ? next->getSkillPointsNeeded(usesCampaignRankThreshold()) : INT_MAX;
+	}
 }
 
 void Player::addCommandPointUpgradeBonus(const void *source, Int amount, const SpecialPowerObjectFilter &requiredObject)
