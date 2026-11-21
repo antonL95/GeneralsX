@@ -683,15 +683,18 @@ Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, UnsignedIn
 {
 	const AutoAbilityBehaviorModuleData* data = getAutoAbilityBehaviorModuleData();
 	Object* self = getObject();
+	const SpecialPowerTemplate* power = getSpecialAbility();
 	const Bool needsObject = (options & COMMAND_OPTION_NEED_OBJECT_TARGET) != 0;
 	const Bool needsPosition = (options & NEED_TARGET_POS) != 0;
+	const Bool checkQueryTargetPlacement = needsPosition &&
+		power->getName().compareNoCase("SpecialAbilityCallFromTheDeep") != 0;
 	const auto eligible = [&](Object* candidate) -> Bool
 	{
 		if (needsObject)
-			return TheActionManager->canDoSpecialPowerAtObject(self, candidate, CMD_FROM_AI, getSpecialAbility(), options);
-		if (needsPosition)
+			return TheActionManager->canDoSpecialPowerAtObject(self, candidate, CMD_FROM_AI, power, options);
+		if (checkQueryTargetPlacement)
 			return TheActionManager->canDoSpecialPowerAtLocation(self, candidate->getPosition(), CMD_FROM_AI,
-				getSpecialAbility(), candidate, options);
+				power, candidate, options);
 		return TRUE;
 	};
 	Int count = 0;
@@ -705,7 +708,7 @@ Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, UnsignedIn
 	if (count >= query.m_count)
 	{
 		if (!first && needsPosition && !needsObject &&
-			TheActionManager->canDoSpecialPowerAtLocation(self, self->getPosition(), CMD_FROM_AI, getSpecialAbility(), nullptr, options))
+			TheActionManager->canDoSpecialPowerAtLocation(self, self->getPosition(), CMD_FROM_AI, power, nullptr, options))
 			first = self;
 		if (first || (!needsObject && !needsPosition))
 		{
