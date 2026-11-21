@@ -504,8 +504,9 @@ void HordeContain::xfer( Xfer *xfer )
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		m_formationOverride = switched ? findAlternateFormation() : nullptr;
+		m_restoreBaseFormation = switched && !m_formationOverride;
 		const auto slotCount = getActiveFormation()->m_layout.slots().size();
-		if ((switched && !m_formationOverride) || (!m_slotMembers.empty() && m_slotMembers.size() != slotCount))
+		if (m_restoreBaseFormation || (!m_slotMembers.empty() && m_slotMembers.size() != slotCount))
 		{
 			m_slotMembers.assign(slotCount, INVALID_ID);
 			m_slotOffsets.assign(slotCount, Coord2D{0.0f, 0.0f});
@@ -517,12 +518,38 @@ void HordeContain::xfer( Xfer *xfer )
 void HordeContain::loadPostProcess()
 {
 	TransportContain::loadPostProcess();
-	if (getHordeContainModuleData()->m_alternateFormation.isNotEmpty())
+#if !RTS_GENERALS
+	if (m_restoreBaseFormation)
+	{
+		Object* horde = getObject();
+		if (AttributeModifierHelper* helper = horde->getAttributeModifierHelper())
+		{
+			const auto owner = AttributeModifiers::ownerOf(horde, getModuleTagNameKey());
+			std::vector<Int> formationLists;
+			for (const AsciiString& name : getFormationModifiers())
+				formationLists.push_back(AttributeModifiers::findList(name));
+
+			std::vector<Int> staleLists;
+			for (const auto& active : helper->getStack().active())
+			{
+				if (std::find(formationLists.begin(), formationLists.end(), active.list) == formationLists.end() &&
+					std::any_of(active.holds.begin(), active.holds.end(),
+						[owner](const auto& hold) { return hold.owner == owner; }))
+					staleLists.push_back(active.list);
+			}
+			for (Int list : staleLists)
+				helper->remove(list, owner);
+			RotwkModifierModules::applyHordeFormationModifiers(horde);
+		}
+	}
+#endif
+	if (m_restoreBaseFormation || getHordeContainModuleData()->m_alternateFormation.isNotEmpty())
 	{
 		updateFormationModelConditions(getObject());
 		for (Object* member : getContainList())
 			updateFormationModelConditions(member);
 	}
+	m_restoreBaseFormation = FALSE;
 	if (m_restoreHadMembers)
 	{
 		m_hadMembers = getContainCount() != 0;

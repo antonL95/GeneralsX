@@ -41,9 +41,11 @@
 70 select Player_1 GondorKnightHorde 1
 74 button Player_1 GondorKnightHorde 1 2
 76 hordelog Player_1 GondorKnightHorde 1
+76 mods Player_1 GondorKnightHorde 1
 78 hordespawn Player_1 NhKnightMissing 0 - 1850 1070 0
 78 nhload Player_1 NhKnightMissing 0 Player_1:GondorKnightHorde:1
 80 hordelog Player_1 NhKnightMissing 0
+80 mods Player_1 NhKnightMissing 0
 84 hordespawn Player_1 NhKnightLine 0 - 1600 820 0
 88 select Player_1 NhKnightLine 0
 92 button Player_1 NhKnightLine 0 2
@@ -65,6 +67,10 @@
 131 create PlyrCreeps GuldurBarrowWight_Slaved 0 1960,1380,0
 131 nhenslave PlyrCreeps GuldurBarrowWight_Slaved 0 PlyrCreeps:MenPorter:0
 131 nhattack PlyrCreeps GuldurBarrowWight_Slaved 0 Player_1:GondorBoromir:1
+132 builderscriptmove PlyrCreeps GuldurBarrowWight_Slaved 0 - 2180 1380
+133 nhstate PlyrCreeps GuldurBarrowWight_Slaved 0
+143 nhstate PlyrCreeps GuldurBarrowWight_Slaved 0
+149 neutralstate PlyrCreeps GuldurBarrowWight_Slaved 0
 150 kill PlyrCreeps MenPorter 0
 160 nhstate PlyrCreeps GiantSpider_Slaved 0
 160 nhstate PlyrCreeps BarrowWight_Slaved 0

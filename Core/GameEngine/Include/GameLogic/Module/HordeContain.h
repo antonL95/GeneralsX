@@ -178,6 +178,7 @@ private:
 	const HordeContainModuleData* m_formationOverride = nullptr;
 	Bool m_hadMembers = FALSE;
 	Bool m_restoreHadMembers = FALSE;
+	Bool m_restoreBaseFormation = FALSE;
 };
 
 struct HorseHordeContainModuleData : public HordeContainModuleData

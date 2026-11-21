@@ -903,6 +903,15 @@ void loadHordeFixture(Object* destination, Object* source, unsigned int frame)
 	file.format("%s/horde-fixture", directory);
 	XferSave save;
 	save.open(file);
+#if !RTS_GENERALS
+	AttributeModifierHelper* modifier = contain ? destination->getAttributeModifierHelper() : nullptr;
+	if (modifier)
+	{
+		const auto owner = AttributeModifiers::ownerOf(destination, restored->getModuleTagNameKey());
+		for (const AsciiString& name : contain->getFormationModifiers())
+			AttributeModifiers::apply(destination, name, 0, 0, owner);
+	}
+#endif
 	if (contain)
 		save.xferSnapshot(contain);
 	else
@@ -913,6 +922,10 @@ void loadHordeFixture(Object* destination, Object* source, unsigned int frame)
 			save.xferVersion(&version, 1);
 		}
 	}
+#if !RTS_GENERALS
+	if (modifier)
+		save.xferSnapshot(modifier);
+#endif
 	save.close();
 
 	if (contain)
@@ -921,10 +934,22 @@ void loadHordeFixture(Object* destination, Object* source, unsigned int frame)
 
 	const Int updateIndex = restored->friend_getIndexInLogic();
 	const UnsignedInt wakeFrame = restored->friend_getNextCallFrame();
+#if !RTS_GENERALS
+	const Int modifierIndex = modifier ? modifier->friend_getIndexInLogic() : -1;
+	const UnsignedInt modifierWake = modifier ? modifier->friend_getNextCallFrame() : FOREVER;
+#endif
 	XferLoad load;
 	load.setOptions(XO_NO_POST_PROCESSING);
 	load.open(file);
 	load.xferSnapshot(restored);
+#if !RTS_GENERALS
+	if (modifier)
+	{
+		modifier->clearAll();
+		load.xferSnapshot(modifier);
+	}
+	const Real savedArmor = AttributeModifiers::damageTakenFactor(destination, DAMAGE_SLASH);
+#endif
 	load.close();
 	restored->friend_setIndexInLogic(updateIndex);
 	restored->friend_setNextCallFrame(wakeFrame);
@@ -932,6 +957,17 @@ void loadHordeFixture(Object* destination, Object* source, unsigned int frame)
 	std::remove(file.str());
 	std::fprintf(stderr, "TEST nh-load frame=%u legacy=%d members=%u alternate=%d\n",
 		frame, contain == nullptr, restored->getContainCount(), restored->isAlternateFormation());
+#if !RTS_GENERALS
+	if (modifier)
+	{
+		const UnsignedInt restoredWake = modifier->friend_getNextCallFrame();
+		modifier->friend_setIndexInLogic(modifierIndex);
+		modifier->friend_setNextCallFrame(modifierWake);
+		modifier->sleepUntil(restoredWake);
+		std::fprintf(stderr, "TEST nh-load-armor frame=%u saved=%.3f recovered=%.3f\n", frame, savedArmor,
+			AttributeModifiers::damageTakenFactor(destination, DAMAGE_SLASH));
+	}
+#endif
 }
 
 void roundTripHeroRoster(const Player* player, unsigned int frame)
@@ -2217,6 +2253,7 @@ void execute(const Command& command, unsigned int frame)
 		const auto* draw = obj->getDrawable();
 		const auto* slave = static_cast<const SlavedUpdate*>(obj->findUpdateModule(NAMEKEY("SlavedUpdate")));
 		const auto* horde = HordeContain::get(obj);
+		const auto* ai = obj->getAI();
 		Bool alternateArmor = FALSE;
 #if !RTS_GENERALS
 		auto* body = obj->getBodyModule();
@@ -2226,8 +2263,15 @@ void execute(const Command& command, unsigned int frame)
 			frame, obj->getTemplate()->getName().str(), static_cast<unsigned>(obj->getID()), obj->testWeaponSetFlag(WEAPONSET_TOGGLE_1),
 			draw && draw->getModelConditionFlags().test(MODELCONDITION_ALTERNATE_FORMATION),
 			alternateArmor, horde ? horde->getContainCount() : 0u,
-			slave ? static_cast<unsigned>(slave->getSlaverID()) : 0u, obj->isDisabledByType(DISABLED_UNMANNED),
-			obj->getAI() && obj->getAI()->isMoving());
+			slave ? static_cast<unsigned>(slave->getSlaverID()) : 0u, obj->isDisabledByType(DISABLED_UNMANNED), ai && ai->isMoving());
+		if (slave && ai && ai->getGoalPosition())
+		{
+			const Coord3D* goal = ai->getGoalPosition();
+			const Object* victim = ai->getCurrentVictim();
+			std::fprintf(stderr, "TEST nh-slave-goal frame=%u id=%u x=%.1f y=%.1f victim=%u returning=%d\n",
+				frame, static_cast<unsigned>(obj->getID()), goal->x, goal->y, victim ? static_cast<unsigned>(victim->getID()) : 0u,
+				obj->testStatus(OBJECT_STATUS_LEASHED_RETURNING));
+		}
 #if !RTS_GENERALS
 		const auto* mode = static_cast<const WeaponModeSpecialPowerUpdate*>(
 			obj->findUpdateModule(NAMEKEY("WeaponModeSpecialPowerUpdate")));

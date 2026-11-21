@@ -212,11 +212,12 @@ UpdateSleepTime SlavedUpdate::update()
 		const Object* victim = myAI->getCurrentVictim();
 		const Bool outsideLeash = leash > 0.0f && distance > leash * leash;
 		const Bool outsideGuard = guard > 0.0f && distance > guard * guard;
-		const Bool returnToRally = victim ? outsideLeash || outsideGuard :
-			myAI->isIdle() && (outsideLeash || outsideGuard || m_creepNeedsReturn);
+		const Bool returnToRally = outsideLeash || (victim ? outsideGuard :
+			myAI->isIdle() && (outsideGuard || m_creepNeedsReturn));
+		const Bool leashReturning = me->testStatus(OBJECT_STATUS_LEASHED_RETURNING);
 		if (victim || returnToRally)
 			m_creepNeedsReturn = !returnToRally;
-		if (!returnToRally)
+		if (!returnToRally && !leashReturning)
 			return UPDATE_SLEEP_NONE;
 		Coord3D rally = *master->getPosition();
 		if (const ExitInterface* exit = master->getObjectExitInterface())
@@ -227,9 +228,17 @@ UpdateSleepTime SlavedUpdate::update()
 		}
 		const Real wander = MAX(CLOSE_ENOUGH, data->m_guardWanderRange);
 		const Real distanceToRally = ThePartitionManager->getDistanceSquared(me, &rally, FROM_CENTER_2D);
-		if (victim || distanceToRally > wander * wander)
+		if (outsideLeash)
+			me->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_LEASHED_RETURNING));
+		else if (leashReturning && distanceToRally <= wander * wander)
+			me->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_LEASHED_RETURNING));
+		if (returnToRally && (outsideLeash || victim || distanceToRally > wander * wander))
 		{
-			if (victim)
+			const Coord3D* goal = myAI->getGoalPosition();
+			if (outsideLeash && leashReturning && !victim && myAI->isMoving() &&
+				goal && goal->x == rally.x && goal->y == rally.y)
+				return UPDATE_SLEEP_NONE;
+			if (victim || (outsideLeash && !myAI->isIdle()))
 			{
 				myAI->aiIdle(CMD_FROM_AI);
 				myAI->setCurrentVictim(nullptr);
@@ -807,6 +816,7 @@ void SlavedUpdate::startSlavedEffects( const Object *slaver )
 void SlavedUpdate::stopSlavedEffects()
 {
 	m_creepNeedsReturn = FALSE;
+	getObject()->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_LEASHED_RETURNING));
 	m_slaver = INVALID_ID;
 	m_guardPointOffset.zero();
 

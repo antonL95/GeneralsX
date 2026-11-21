@@ -313,6 +313,9 @@ void AttributeModifierHelper::refreshDerived()
 
 void AttributeModifierHelper::scheduleWake()
 {
+	if (getObject()->testStatus(OBJECT_STATUS_DESTROYED))
+		return;
+
 	UnsignedInt next = m_stack.nextExpiry();
 	for (const PendingUpgrade& pending : m_pendingUpgrades)
 	{
@@ -320,10 +323,11 @@ void AttributeModifierHelper::scheduleWake()
 			next = pending.frame;
 	}
 	const UnsignedInt now = TheGameLogic->getFrame();
-	if (next == 0)
-		sleepUntil(FOREVER);
+	const UnsignedInt wake = next == 0 ? FOREVER : std::max(next, now + 1);
+	if (friend_getIndexInLogic() == -1)
+		friend_setNextCallFrame(wake);
 	else
-		sleepUntil(next > now ? next : now + 1);
+		sleepUntil(wake);
 }
 
 UpdateSleepTime AttributeModifierHelper::update()
