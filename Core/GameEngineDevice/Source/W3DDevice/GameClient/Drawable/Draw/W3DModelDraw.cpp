@@ -2527,6 +2527,9 @@ Real W3DModelDraw::getCurAnimDistanceCovered() const
 */
 static void doHideShowBoneSubObjs(Bool state, Int numSubObjects, Int boneIdx, RenderObjClass *fullObject, const HTreeClass *htree)
 {
+	if (boneIdx == 0 && RetailFileLayers::enabled())
+		return;
+
 #if 1	//(gth) fixed and tested this version
 	for (Int i=0; i < numSubObjects; i++)
 	{
