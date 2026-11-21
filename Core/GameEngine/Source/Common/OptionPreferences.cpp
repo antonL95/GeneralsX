@@ -811,7 +811,7 @@ Int OptionPreferences::getRenderFpsFontSize()
 {
 	OptionPreferences::const_iterator it = find("RenderFpsFontSize");
 	if (it == end())
-		return 8;
+		return RetailFileLayers::enabled() ? 0 : 8;
 
 	Int fontSize = atoi(it->second.str());
 	if (fontSize < 0)
@@ -825,7 +825,7 @@ Int OptionPreferences::getSystemTimeFontSize()
 {
 	OptionPreferences::const_iterator it = find("SystemTimeFontSize");
 	if (it == end())
-		return 8;
+		return RetailFileLayers::enabled() ? 0 : 8;
 
 	Int fontSize = atoi(it->second.str());
 	if (fontSize < 0)
@@ -839,7 +839,7 @@ Int OptionPreferences::getGameTimeFontSize()
 {
 	OptionPreferences::const_iterator it = find("GameTimeFontSize");
 	if (it == end())
-		return 8;
+		return RetailFileLayers::enabled() ? 0 : 8;
 
 	Int fontSize = atoi(it->second.str());
 	if (fontSize < 0)

@@ -46,6 +46,7 @@
 #include "Common/GameEngine.h"
 #include "Common/GameMemory.h"
 #include "Common/Debug.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/version.h"  // GeneralsX @bugfix BenderAI 14/02/2026 Version class + TheVersion extern
 #include "SDL3GameEngine.h"
 
@@ -318,8 +319,11 @@ int main(int argc, char* argv[])
 		// (SDL_GetWindowSizeInPixels), and the density-aware pillarbox/mouse mapping in DX8Wrapper.
 		windowFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
 #endif
+		const char *title = RetailFileLayers::enabled()
+			? "The Lord of the Rings(tm), The Battle for Middle-earth(tm) II, The Rise of the Witch-king(tm)"
+			: "Command & Conquer Generals: Zero Hour";
 		TheSDL3Window = SDL_CreateWindow(
-			"Command & Conquer Generals: Zero Hour",
+			title,
 			1024, 768,  // Default resolution
 			windowFlags
 		);
