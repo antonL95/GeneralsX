@@ -186,6 +186,9 @@ Bool CanSelectDrawable( const Drawable *draw, Bool dragSelecting )
 	if (const Object* horde = obj->getContainedBy(); HordeContain::get(horde))
 		obj = horde;
 
+	if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_TREE) && obj->isKindOf(KINDOF_SHRUBBERY))
+		return FALSE;
+
 	// You cannot select something that has a logic override of unselectability or masked
 	if( obj->getStatusBits().testForAny( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_MASKED ) ) )
 	{

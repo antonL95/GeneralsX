@@ -69,6 +69,7 @@ public:
 
 	void setLifetimeRange( UnsignedInt minFrames, UnsignedInt maxFrames );
 	UnsignedInt getDieFrame() const { return m_dieFrame; }
+	UnsignedInt getLifetimeFrames() const { return m_lifetimeFrames; }
 
 	virtual UpdateSleepTime update() override;
 
@@ -77,4 +78,5 @@ private:
 	UnsignedInt calcSleepDelay(UnsignedInt minFrames, UnsignedInt maxFrames);
 
 	UnsignedInt m_dieFrame;
+	UnsignedInt m_lifetimeFrames = 0;
 };

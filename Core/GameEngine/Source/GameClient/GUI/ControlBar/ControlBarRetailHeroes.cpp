@@ -25,6 +25,7 @@
 #include "GameClient/HotKey.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/RetailWorldUI.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/RetailHudExtras.h"
 #include "GameClient/RetailHudSettings.h"
@@ -80,6 +81,7 @@ struct HeroSlot
 	Real rankProgress = 0.0f;
 	Real health = 1.0f;
 	Real maxHealth = 0.0f;
+	Real lifetime = 0.0f;
 };
 
 struct HeroMemory
@@ -267,6 +269,7 @@ void collectHero(Object *obj, void *userData)
 	slot.appearance = obj->getTemplate();
 	slot.id = obj->getID();
 	slot.alive = TRUE;
+	slot.lifetime = RetailWorldUI::remainingLifetime(*obj);
 	if (const ExperienceTracker *tracker = obj->getExperienceTracker())
 	{
 		slot.level = tracker->getRank();
@@ -673,6 +676,11 @@ void drawHero(const HeroSlot &slot, Int index, const ICoord2D &origin, Real scal
 			part.hi.y = 1.0f;
 			TheDisplay->drawImagePart(arcImage, full.x0, full.y0, right, full.y1, part);
 		}
+	}
+	if (slot.lifetime > 0.0f)
+	{
+		const PixelBox bar = heroBox(origin, scale, index, 12.0f, 58.0f, 46.0f, 3.0f);
+		RetailWorldUI::drawLifetimeBar(bar.x0, bar.y0, bar.width(), std::max(1, bar.height()), slot.lifetime);
 	}
 	const PixelBox badge = heroBox(origin, scale, index, -5.69f, 37.86f, 21.08f, 21.08f);
 	fillCircle(badge, GameMakeColor(10, 18, 48, 255));

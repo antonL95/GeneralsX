@@ -27,10 +27,13 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <deque>
+
 #define DEFINE_SHADOW_NAMES
 
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/Display.h"
@@ -48,6 +51,68 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 #include "WWMath/wwmath.h"
+
+namespace
+{
+struct NamedCursor
+{
+	AsciiString name;
+	RadiusDecalTemplate decal;
+};
+
+std::deque<NamedCursor>& namedCursors()
+{
+	static std::deque<NamedCursor> cursors;
+	return cursors;
+}
+
+Int namedCursorIndex(const char* name)
+{
+	auto& cursors = namedCursors();
+	for (size_t index = 0; index < cursors.size(); ++index)
+		if (cursors[index].name.compareNoCase(name) == 0)
+			return static_cast<Int>(index);
+	cursors.push_back({name, RadiusDecalTemplate()});
+	return static_cast<Int>(cursors.size() - 1);
+}
+}
+
+void RadiusDecalTemplate::parseCursorType(INI* ini, void *instance, void *store, const void *userData)
+{
+	if (!RetailFileLayers::enabled())
+	{
+		INI::parseIndexList(ini, instance, store, userData);
+		return;
+	}
+
+	const char* name = ini->getNextToken();
+	const auto names = static_cast<ConstCharPtrArray>(userData);
+	for (Int index = 0; names[index]; ++index)
+	{
+		if (stricmp(name, names[index]) == 0)
+		{
+			*static_cast<RadiusCursorType*>(store) = static_cast<RadiusCursorType>(index);
+			return;
+		}
+	}
+	*static_cast<RadiusCursorType*>(store) = static_cast<RadiusCursorType>(RADIUSCURSOR_COUNT + namedCursorIndex(name));
+}
+
+void RadiusDecalTemplate::parseNamedCursor(INI* ini, void *instance, void *, const void *)
+{
+	const Int index = namedCursorIndex(ini->getNextToken());
+	RadiusDecalTemplate decal;
+	parseRadiusDecalTemplate(ini, instance, &decal, nullptr);
+	namedCursors()[index].decal = decal;
+}
+
+const RadiusDecalTemplate* RadiusDecalTemplate::findNamedCursor(Int cursorType)
+{
+	const Int index = cursorType - RADIUSCURSOR_COUNT;
+	const auto& cursors = namedCursors();
+	return index >= 0 && static_cast<size_t>(index) < cursors.size() && cursors[index].decal.valid()
+		? &cursors[index].decal : nullptr;
+}
 
 void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, const Drawable* selected,
 	DisplayString*& label, WorldGroundDecal& decal)

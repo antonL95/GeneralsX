@@ -29,6 +29,7 @@
 #include "GameClient/HotKey.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/RetailWorldUI.h"
 #include "GameClient/HotKey.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/RetailHudExtras.h"
@@ -192,6 +193,14 @@ void drawRetailPortrait(GameWindow *window, WinInstanceData *)
 	TheDisplay->setCircularClip(x + width / 2, y + height / 2, MIN(width, height) / 2);
 	TheDisplay->drawImage(image, x, y, x + width, y + height);
 	TheDisplay->setCircularClip(0, 0, 0);
+	const Drawable* selection = TheInGameUI->getFirstSelectedDrawable();
+	const Object* object = selection ? selection->getObject() : nullptr;
+	if (object && object->isLocallyControlled())
+	{
+		const Real remaining = RetailWorldUI::remainingLifetime(*object);
+		if (remaining > 0.0f)
+			RetailWorldUI::drawLifetimeBar(x + width / 5, y + height * 4 / 5, width * 3 / 5, std::max(2, height / 30), remaining);
+	}
 }
 
 void drawShadowedText(DisplayString *text, Int x, Int y, Int width, Int height, Int align, Color color)

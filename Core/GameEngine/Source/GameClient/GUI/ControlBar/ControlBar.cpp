@@ -139,7 +139,7 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 	{ "CursorName",						INI::parseAsciiString,			 nullptr, offsetof( CommandButton, m_cursorName ) },
 	{ "InvalidCursorName",		INI::parseAsciiString,       nullptr, offsetof( CommandButton, m_invalidCursorName ) },
 	{ "ButtonBorderType",			INI::parseLookupList,				 CommandButtonMappedBorderTypeNames, offsetof( CommandButton, m_commandButtonBorder ) },
-	{ "RadiusCursorType",			INI::parseIndexList,				 TheRadiusCursorNames, offsetof( CommandButton, m_radiusCursor ) },
+	{ "RadiusCursorType",			RadiusDecalTemplate::parseCursorType, TheRadiusCursorNames, offsetof( CommandButton, m_radiusCursor ) },
 	{ "UnitSpecificSound",		INI::parseAudioEventRTS,		 nullptr, offsetof( CommandButton, m_unitSpecificSound ) },
 	{ "InPalantir", INI::parseBool, nullptr, offsetof(CommandButton, m_inPalantir) },
 	{ "Radial", INI::parseBool, nullptr, offsetof(CommandButton, m_radial) },

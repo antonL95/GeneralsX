@@ -114,4 +114,7 @@ public:
 	void createRadiusDecal(const Coord3D& pos, Real radius, const Player* owningPlayer, RadiusDecal& result) const;
 
 	static void parseRadiusDecalTemplate(INI* ini, void *instance, void * store, const void* /*userData*/);
+	static void parseCursorType(INI* ini, void *instance, void *store, const void *userData);
+	static void parseNamedCursor(INI* ini, void *instance, void *store, const void *userData);
+	static const RadiusDecalTemplate* findNamedCursor(Int cursorType);
 };

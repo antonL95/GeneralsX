@@ -12,6 +12,7 @@
 #include "Common/GlobalData.h"
 #include "Common/MessageStream.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/Display.h"
@@ -25,6 +26,9 @@
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/LifetimeUpdate.h"
+#endif
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
@@ -307,6 +311,31 @@ Bool drawDragPreview(Drawable* draw, void* userData)
 
 }
 
+Real RetailWorldUI::remainingLifetime(const Object& object)
+{
+#if !RTS_GENERALS
+	if (RetailFileLayers::enabled() && object.isSelectable())
+	{
+		static const NameKeyType lifetimeKey = NAMEKEY("LifetimeUpdate");
+		const auto* lifetime = static_cast<const LifetimeUpdate*>(object.findUpdateModule(lifetimeKey));
+		const UnsignedInt now = TheGameLogic->getFrame();
+		if (lifetime && lifetime->getLifetimeFrames() > 0 && lifetime->getDieFrame() > now)
+			return std::min(1.0f, static_cast<Real>(lifetime->getDieFrame() - now) / lifetime->getLifetimeFrames());
+	}
+#else
+	(void)object;
+#endif
+	return 0.0f;
+}
+
+void RetailWorldUI::drawLifetimeBar(Int x, Int y, Int width, Int height, Real remaining)
+{
+	TheDisplay->drawFillRect(x - 1, y - 1, width + 2, height + 2, GameMakeColor(0, 0, 0, 230));
+	const Int filled = static_cast<Int>(width * remaining);
+	if (filled > 0)
+		TheDisplay->drawFillRect(x, y, filled, height, GameMakeColor(120, 192, 245, 255));
+}
+
 void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 {
 	Object* obj = drawable.getObject();
@@ -325,7 +354,9 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 	const ExperienceTracker* tracker = (anchor ? anchor : obj)->getExperienceTracker();
 	const Int rank = tracker ? tracker->getRank() : 1;
 	const Bool showRank = rank > 1 && (!anchor || HordeContain::get(anchor)->isBannerCarrier(obj)) && isVisibleUnit(&drawable);
-	if (!showBar && !showRank)
+	const Real lifetime = (group->isSelected() || drawable.getID() == hover) && obj->isLocallyControlled()
+		? remainingLifetime(anchor ? *anchor : *obj) : 0.0f;
+	if (!showBar && !showRank && lifetime <= 0.0f)
 		return;
 
 	Coord3D position = *obj->getPosition();
@@ -378,6 +409,8 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 		else if (fillWidth > 0)
 			TheDisplay->drawFillRect(fillX, fillY, fillWidth, fillHeight, fill);
 	}
+	if (lifetime > 0.0f)
+		drawLifetimeBar(screen.x - width / 2, barTop + height + 3 * edge, width, 2 * edge, lifetime);
 	if (showRank)
 	{
 		const Player* owner = obj->getControllingPlayer();

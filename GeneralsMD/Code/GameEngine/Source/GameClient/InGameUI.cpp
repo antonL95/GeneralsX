@@ -950,6 +950,15 @@ void InGameUI::buildFieldParse( MultiIniFieldParse &fields ) const
 {
 	fields.add( getFieldParse() );
 	fields.add( RetailHudSettings::getFieldParse(), offsetof( InGameUI, m_retailHudSettings ) );
+	if (RetailFileLayers::enabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "RadiusCursorTemplate", RadiusDecalTemplate::parseNamedCursor, nullptr, 0 },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		fields.add(retailFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1441,7 +1450,13 @@ void InGameUI::setRadiusCursor(RadiusCursorType cursorType, const SpecialPowerTe
 		return;
 
 	Object* obj = nullptr;
-	if( m_pendingGUICommand && m_pendingGUICommand->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT )
+	if (RetailFileLayers::enabled() && m_pendingGUICommand &&
+		m_pendingGUICommand->getCommandType() == GUI_COMMAND_SPELL_BOOK)
+	{
+		Player* player = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
+		obj = player ? player->getRetailSpellBook() : nullptr;
+	}
+	else if( m_pendingGUICommand && m_pendingGUICommand->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT )
 	{
 		if( ThePlayerList && ThePlayerList->getLocalPlayer() && specPowTempl != nullptr )
 		{
@@ -1466,6 +1481,19 @@ void InGameUI::setRadiusCursor(RadiusCursorType cursorType, const SpecialPowerTe
 	Player* controller = obj->getControllingPlayer();
 	if (controller == nullptr)
 		return;
+
+	if (RetailFileLayers::enabled() && cursorType >= RADIUSCURSOR_COUNT)
+	{
+		const RadiusDecalTemplate* decal = RadiusDecalTemplate::findNamedCursor(cursorType);
+		if (decal && specPowTempl && specPowTempl->getRadiusCursorRadius() > 0.0f)
+		{
+			const Coord3D position{};
+			decal->createRadiusDecal(position, specPowTempl->getRadiusCursorRadius(), controller, m_curRadiusCursor);
+			m_curRcType = cursorType;
+			handleRadiusCursor();
+		}
+		return;
+	}
 
 	Real radius = 0.0f;
 	const Weapon* w = nullptr;
@@ -3340,6 +3368,9 @@ void InGameUI::setGUICommand( const CommandButton *command )
 	{
 		m_mouseMode = MOUSEMODE_DEFAULT;
 	}
+
+	if (RetailFileLayers::enabled() && command != m_pendingGUICommand)
+		setRadiusCursorNone();
 
 	// set the command
 	m_pendingGUICommand = command;

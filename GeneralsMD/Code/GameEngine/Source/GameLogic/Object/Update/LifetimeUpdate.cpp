@@ -33,6 +33,7 @@
 #define DEFINE_DEATH_NAMES
 #include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
@@ -104,6 +105,8 @@ UnsignedInt LifetimeUpdate::calcSleepDelay(UnsignedInt minFrames, UnsignedInt ma
 	UnsignedInt delay = GameLogicRandomValue( minFrames, maxFrames );
 	if (delay < 1) delay = 1;
 	m_dieFrame = TheGameLogic->getFrame() + delay;
+	if (RetailFileLayers::enabled())
+		m_lifetimeFrames = maxFrames > 0 ? delay : 0;
 	return delay;
 }
 
@@ -135,7 +138,7 @@ void LifetimeUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -144,6 +147,10 @@ void LifetimeUpdate::xfer( Xfer *xfer )
 
 	// die frame
 	xfer->xferUnsignedInt( &m_dieFrame );
+	if (version >= 2)
+		xfer->xferUnsignedInt(&m_lifetimeFrames);
+	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
+		m_lifetimeFrames = getLifetimeUpdateModuleData()->m_maxFrames;
 
 }
 

@@ -15,6 +15,8 @@ class WorldGroundDecal;
 namespace RetailWorldUI
 {
 void drawUnitStatus(Drawable& drawable);
+Real remainingLifetime(const Object& object);
+void drawLifetimeBar(Int x, Int y, Int width, Int height, Real remaining);
 void showPayout(const Object& source, Int amount, Bool bounty);
 void drawSelection(View& view, const IRegion2D* dragRegion,
 	std::map<DrawableID, WorldGroundDecal>& decals);
