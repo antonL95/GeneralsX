@@ -40,8 +40,23 @@ class Drawable;
 class ThingTemplate;
 class View;
 
+class WorldGroundDecal
+{
+public:
+	WorldGroundDecal() = default;
+	WorldGroundDecal(const WorldGroundDecal&) = delete;
+	WorldGroundDecal& operator=(const WorldGroundDecal&) = delete;
+	~WorldGroundDecal();
+	void clear();
+	void set(const AsciiString& texture, const Coord3D& position, Real width, Real height, Int opacity, Color color = 0xffffffff);
+
+private:
+	AsciiString m_texture;
+	Shadow* m_shadow = nullptr;
+};
+
 void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, const Drawable* selected,
-	DisplayString*& label);
+	DisplayString*& label, WorldGroundDecal& decal);
 
 // ------------------------------------------------------------------------------------------------
 class RadiusDecal

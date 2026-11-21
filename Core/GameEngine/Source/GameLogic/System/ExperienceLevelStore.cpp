@@ -32,17 +32,7 @@
 
 namespace
 {
-struct SelectionDecal
-{
-	AsciiString texture;
-	AsciiString texture2;
-	AsciiString style;
-	Real opacityMin = 0.0f;
-	Real opacityMax = 0.0f;
-	Real minRadius = 0.0f;
-	Real maxRadius = 0.0f;
-	Int maxSelectedUnits = 0;
-};
+using ExperienceLevelStore::SelectionDecal;
 
 struct Level
 {
@@ -464,6 +454,27 @@ void update()
 void reset()
 {
 	s_pending.clear();
+}
+
+const SelectionDecal* findSelectionDecal(const Object& object)
+{
+	const auto found = s_levelsByTarget.find(object.getTemplate()->getName().str());
+	if (found == s_levelsByTarget.end())
+		return nullptr;
+
+	const Int rank = static_cast<Int>(object.getVeterancyLevel()) + 1;
+	const Bool multiplayer = isMultiplayer();
+	const Level* best = nullptr;
+	for (std::size_t index : found->second)
+	{
+		const Level& level = s_levels[index];
+		if (level.selectionDecal.texture.isEmpty() || level.rank > rank ||
+			(multiplayer ? level.singlePlayerOnly : level.multiPlayerOnly))
+			continue;
+		if (!best || level.rank > best->rank)
+			best = &level;
+	}
+	return best ? &best->selectionDecal : nullptr;
 }
 }
 Int ExperienceTracker::getRank() const

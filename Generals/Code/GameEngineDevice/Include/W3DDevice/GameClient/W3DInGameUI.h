@@ -33,6 +33,8 @@
 
 #pragma once
 
+#include <map>
+
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
@@ -87,5 +89,10 @@ protected:
 	RenderObjClass *m_buildingPlacementAnchor;
 	RenderObjClass *m_buildingPlacementArrow;
 	DisplayString *m_terrainResourceLabel = nullptr;
+	WorldGroundDecal m_terrainResourceDecal;
+	WorldGroundDecal m_placementDecal;
+	std::map<DrawableID, WorldGroundDecal> m_selectionDecals;
+	DrawableID m_retailMoveModels[MAX_MOVE_HINTS]{};
+	DrawableID m_retailAttackModel = INVALID_DRAWABLE_ID;
 
 };

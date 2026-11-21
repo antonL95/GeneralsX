@@ -37,8 +37,10 @@
 #include "GameClient/DisplayStringManager.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Image.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/RadiusDecal.h"
+#include "GameClient/RetailWorldUI.h"
 #include "GameClient/Shadow.h"
 #include "GameClient/View.h"
 #include "GameLogic/GameLogic.h"
@@ -48,7 +50,7 @@
 #include "WWMath/wwmath.h"
 
 void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, const Drawable* selected,
-	DisplayString*& label)
+	DisplayString*& label, WorldGroundDecal& decal)
 {
 	const Player* player = ThePlayerList->getLocalPlayer();
 	const Object* object = nullptr;
@@ -63,43 +65,35 @@ void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, co
 			TheInGameUI->getPlacementPoints(&cursor, &end);
 		}
 		if (!view.screenToTerrain(&cursor, &position))
+		{
+			decal.clear();
 			return;
+		}
 	}
 	else
 	{
 		object = selected ? selected->getObject() : nullptr;
 		if (!object || object->getControllingPlayer() != player || !object->isLogicallyVisible())
+		{
+			decal.clear();
 			return;
+		}
 		type = object->getTemplate();
 		position = *object->getPosition();
 	}
 
 	Real radius, efficiency;
 	if (!player || !TerrainResourceBehavior::getDisplayInfo(*type, position, *player, object, radius, efficiency))
-		return;
-
-	const Color accent = efficiency >= 0.75f ? GameMakeColor(151, 230, 188, 240) :
-		GameMakeColor(255, 192, 109, 240);
-	const Color shadow = GameMakeColor(19, 29, 32, 218);
-	constexpr Int segments = 64;
-	ICoord2D previous{};
-	Bool previousValid = FALSE;
-	for (Int i = 0; i <= segments; ++i)
 	{
-		const Real angle = i * (WWMATH_TWO_PI / segments);
-		Coord3D point = {position.x + radius * WWMath::Cos(angle), position.y + radius * WWMath::Sin(angle), 0.0f};
-		point.z = TheTerrainLogic->getGroundHeight(point.x, point.y) + 1.0f;
-		ICoord2D screen;
-		const Bool valid = view.worldToScreenTriReturn(&point, &screen) != View::WTS_INVALID;
-		if (previousValid && valid)
-		{
-			TheDisplay->drawLine(previous.x, previous.y, screen.x, screen.y, 4.0f, shadow);
-			TheDisplay->drawLine(previous.x, previous.y, screen.x, screen.y, 2.0f, accent);
-		}
-		if (valid)
-			previous = screen;
-		previousValid = valid;
+		decal.clear();
+		return;
 	}
+
+	AsciiString texture = TheInGameUI->getTerrainClaimDecal(placement != nullptr);
+	if (const Image* image = TheMappedImageCollection ? TheMappedImageCollection->findImageByName(texture) : nullptr)
+		texture = image->getFilename();
+	decal.set(texture, position, radius * 2.0f, radius * 2.0f, 108);
+	RetailWorldUI::drawTerrainClaims(view, *player);
 
 	if (object)
 		position.z += object->getGeometryInfo().getMaxHeightAbovePosition();
@@ -109,7 +103,7 @@ void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, co
 
 	if (!label)
 		label = TheDisplayStringManager->newDisplayString();
-	label->setFont(TheFontLibrary->getFont("Arial", std::max(9u, TheDisplay->getHeight() / 60), TRUE));
+	label->setFont(TheFontLibrary->getFont("Albertus MT", std::max(9u, TheDisplay->getHeight() / 60), FALSE));
 	UnicodeString text;
 	text.format(L"%.0f%%", std::max(0.0f, efficiency * 100.0f));
 	if (label->getText().compare(text) != 0)
@@ -118,8 +112,7 @@ void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, co
 	label->getSize(&width, &height);
 	const Int x = center.x - width / 2;
 	const Int y = object ? center.y + 8 : center.y - height - 28;
-	TheDisplay->drawFillRect(x - 6, y - 2, width + 12, height + 4, shadow);
-	label->draw(x, y, accent, shadow);
+	label->draw(x, y, GameMakeColor(131, 255, 94, 255), GameMakeColor(13, 25, 12, 240));
 }
 
 
@@ -311,5 +304,48 @@ void RadiusDecal::setPosition(const Coord3D& pos)
 	if (m_decal)
 	{
 		m_decal->setPosition(pos.x, pos.y, pos.z);	//world space position of center of decal
+	}
+}
+
+WorldGroundDecal::~WorldGroundDecal()
+{
+	clear();
+}
+
+void WorldGroundDecal::clear()
+{
+	if (m_shadow)
+		m_shadow->release();
+	m_shadow = nullptr;
+	m_texture.clear();
+}
+
+void WorldGroundDecal::set(const AsciiString& texture, const Coord3D& position, Real width, Real height, Int opacity, Color color)
+{
+	if (!TheProjectedShadowManager || texture.isEmpty() || width <= 0.0f || height <= 0.0f)
+	{
+		clear();
+		return;
+	}
+	if (m_texture != texture)
+	{
+		clear();
+		m_texture = texture;
+		Shadow::ShadowTypeInfo info;
+		info.m_type = SHADOW_ALPHA_DECAL;
+		info.allowWorldAlign = TRUE;
+		info.m_sizeX = width;
+		info.m_sizeY = height;
+		strlcpy(info.m_ShadowName, texture.str(), ARRAY_SIZE(info.m_ShadowName));
+		if (char* extension = strrchr(info.m_ShadowName, '.'))
+			*extension = '\0';
+		m_shadow = TheProjectedShadowManager->addDecal(&info);
+	}
+	if (m_shadow)
+	{
+		m_shadow->setSize(width, height);
+		m_shadow->setPosition(position.x, position.y, position.z);
+		m_shadow->setColor(color);
+		m_shadow->setOpacity(opacity);
 	}
 }

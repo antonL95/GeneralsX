@@ -51,6 +51,8 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/RetailFileLayers.h"
+#include "GameClient/RetailWorldUI.h"
 
 #include "Common/BuildAssistant.h"
 #include "Common/Thing.h"
@@ -163,7 +165,9 @@ UpdateSleepTime AutoDepositUpdate::update()
 		getObject()->getControllingPlayer()->getScoreKeeper()->addMoneyEarned( getAutoDepositUpdateModuleData()->m_depositAmount);
 
 		//Display cash income floating over the blacklotus
-		if(getAutoDepositUpdateModuleData()->m_depositAmount > 0)
+		if (RetailFileLayers::enabled())
+			RetailWorldUI::showPayout(*getObject(), getAutoDepositUpdateModuleData()->m_depositAmount, FALSE);
+		else if (getAutoDepositUpdateModuleData()->m_depositAmount > 0)
 		{
 			UnicodeString moneyString;
 			moneyString.format( TheGameText->fetch( "GUI:AddCash" ), getAutoDepositUpdateModuleData()->m_depositAmount );

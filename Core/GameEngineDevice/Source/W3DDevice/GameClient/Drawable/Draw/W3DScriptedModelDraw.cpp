@@ -9,6 +9,8 @@
 #include "Common/INIAudit.h"
 #include "Common/RetailConditionMatch.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/Drawable.h"
+#include "GameClient/RadiusDecal.h"
 #include "GameClient/ParticleSys.h"
 #include "GameLogic/WeaponSet.h"
 
@@ -480,4 +482,42 @@ void W3DScriptedModelDraw::xfer(Xfer* xfer)
 void W3DScriptedModelDraw::loadPostProcess()
 {
 	W3DModelDraw::loadPostProcess();
+}
+
+const W3DScriptedModelDrawModuleData::ModelState* W3DScriptedModelDrawModuleData::findPlacementDecal(
+	const ModelConditionFlags& flags) const
+{
+	const ModelConditionInfo* model = W3DModelDrawModuleData::findBestInfo(flags);
+	if (!model || m_shadowForceDisable)
+		return nullptr;
+
+	const auto found = m_modelStates.find(model - m_conditionStates.data());
+	if (found == m_modelStates.end())
+		return nullptr;
+	const ModelState& state = found->second;
+	return state.shadow.compareNoCase("SHADOW_ALPHA_DECAL") == 0 && state.shadowTexture.isNotEmpty() ?
+		&state : nullptr;
+}
+
+void W3DScriptedModelDraw::updatePlacementDecal(const Drawable* ghost, WorldGroundDecal& decal)
+{
+	if (ghost)
+	{
+		static const NameKeyType scriptedDrawKey = NAMEKEY("W3DScriptedModelDraw");
+		for (const DrawModule* const* module = ghost->getDrawModules(); *module; ++module)
+		{
+			if ((*module)->getModuleNameKey() != scriptedDrawKey)
+				continue;
+			const auto* draw = static_cast<const W3DScriptedModelDraw*>(*module);
+			const auto* data = static_cast<const W3DScriptedModelDrawModuleData*>(draw->getModuleData());
+			const auto* state = data->findPlacementDecal(ghost->getModelConditionFlags());
+			if (state)
+			{
+				decal.set(state->shadowTexture, *ghost->getPosition(),
+					state->shadowSizeX, state->shadowSizeY, 255);
+				return;
+			}
+		}
+	}
+	decal.clear();
 }

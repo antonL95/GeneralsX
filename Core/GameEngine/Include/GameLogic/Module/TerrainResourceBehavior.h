@@ -34,6 +34,7 @@ public:
 
 	static Bool getDisplayInfo(const ThingTemplate& type, const Coord3D& position, const Player& player,
 		const Object* object, Real& radius, Real& efficiency);
+	static Real getActiveClaimRadius(const Object& object);
 
 private:
 	struct ClaimYield

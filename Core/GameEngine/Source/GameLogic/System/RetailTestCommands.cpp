@@ -1390,6 +1390,16 @@ void execute(const Command& command, unsigned int frame)
 	}
 	else if (command.action == "attack")
 		attackObject(command, obj, frame);
+	else if (command.action == "orderattack")
+	{
+		if (const Object* target = findTarget(command))
+		{
+			selectObject(obj);
+			GameMessage* attack = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACK_OBJECT);
+			attack->appendObjectIDArgument(target->getID());
+			std::fprintf(stderr, "TEST frame %u: queued attack on object %u\n", frame, static_cast<unsigned>(target->getID()));
+		}
+	}
 	else if (command.action == "moveobject")
 	{
 		if (const Object* target = findTarget(command); target && obj->getAI())

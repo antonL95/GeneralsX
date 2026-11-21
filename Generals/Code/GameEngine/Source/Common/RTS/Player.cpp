@@ -61,6 +61,7 @@
 #include "Common/PlayerTemplateRules.h"
 #include "Common/CommandPointRules.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailWorldUI.h"
 #include "GameLogic/HeroRoster.h"
 #include "Common/ProductionPrerequisite.h"
 #include "Common/Radar.h"
@@ -2397,6 +2398,12 @@ void Player::doBountyForKill(const Object* killer, const Object* victim)
 
 		getMoney()->deposit( bounty );
 		m_scoreKeeper.addMoneyEarned( bounty );
+
+		if (RetailFileLayers::enabled())
+		{
+			RetailWorldUI::showPayout(*victim, bounty, TRUE);
+			return;
+		}
 
 		//Display cash income floating over the recipient.
 		UnicodeString moneyString;

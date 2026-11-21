@@ -51,6 +51,8 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/RetailFileLayers.h"
+#include "GameClient/RetailWorldUI.h"
 
 #include "Common/BuildAssistant.h"
 #include "Common/Thing.h"
@@ -169,7 +171,9 @@ UpdateSleepTime AutoDepositUpdate::update()
 			getObject()->getControllingPlayer()->getScoreKeeper()->addMoneyEarned( modData->m_depositAmount);
 		}
 
-		if (moneyAmount > 0 && getObject()->isLogicallyVisible())
+		if (RetailFileLayers::enabled() && modData->m_isActualMoney)
+			RetailWorldUI::showPayout(*getObject(), moneyAmount, FALSE);
+		else if (moneyAmount > 0 && getObject()->isLogicallyVisible())
 		{
 
       const Object *owner = getObject();
@@ -181,7 +185,7 @@ UpdateSleepTime AutoDepositUpdate::update()
 			  moneyString.format( TheGameText->fetch( "GUI:AddCash" ), moneyAmount );
 			  Coord3D pos;
 			  pos.set( *getObject()->getPosition() );
-			  pos.z += 10.0f; //add a little z to make it show up above the unit.
+			  pos.z += 10.0f;
 
         if ( owner->isKindOf( KINDOF_STRUCTURE ) )
         {

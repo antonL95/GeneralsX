@@ -388,6 +388,10 @@ public:  // ********************************************************************
 	virtual void endAreaSelectHint( const GameMessage *msg );		///< Used by HintSpy. An area selection had occurred, finish graphical "hint"
 	virtual void createMoveHint( const GameMessage *msg );			///< A move command has occurred, start graphical "hint"
 	virtual void createAttackHint( const GameMessage *msg );		///< An attack command has occurred, start graphical "hint"
+	const AsciiString& getTerrainClaimDecal(Bool placement) const
+	{
+		return placement ? m_placementClaimDecal : m_terrainClaimDecal;
+	}
 	virtual void createForceAttackHint( const GameMessage *msg );		///< A force attack command has occurred, start graphical "hint"
 
 	virtual void createMouseoverHint( const GameMessage *msg );	///< An object is mouse hovered over, start hint if any
@@ -729,6 +733,12 @@ protected:
 	Bool												m_displayedMaxWarning;                        ///< keeps the warning from being shown over and over
 	MoveHintStruct							m_moveHint[ MAX_MOVE_HINTS ];
 	Int													m_nextMoveHint;
+	Coord3D m_retailAttackPosition{};
+	UnsignedInt m_retailAttackFrame = 0;
+	Bool m_retailAttackActive = FALSE;
+	Bool m_retailPlacementValid = FALSE;
+	AsciiString m_terrainClaimDecal;
+	AsciiString m_placementClaimDecal;
 	const CommandButton *				m_pendingGUICommand;										///< GUI command that needs additional interaction from the user
 	BuildProgress								m_buildProgress[ MAX_BUILD_PROGRESS ];	///< progress for building units
 	const ThingTemplate *				m_pendingPlaceType;											///< type of built thing we're trying to place

@@ -180,7 +180,7 @@ SDL3Mouse::~SDL3Mouse(void)
  * Load cursor from ANI file (fighter19 pattern with RIFF parsing)
  * GeneralsX @bugfix BenderAI 22/02/2026 Port fighter19 cursor loading
  */
-AnimatedCursor* SDL3Mouse::loadCursorFromFile(const char* filepath)
+AnimatedCursor* SDL3Mouse::loadCursorFromFile(const char* filepath, Bool goldAttack)
 {
 	File* file = TheFileSystem->openFile(filepath, File::READ | File::BINARY);
 	if (!file)
@@ -328,7 +328,27 @@ AnimatedCursor* SDL3Mouse::loadCursorFromFile(const char* filepath)
 				}
 
 				// GeneralsX @bugfix felipebraz 28/04/2026 Use SDL native animated cursor to ensure frame playback.
-				cursor->m_cursor = SDL_CreateAnimatedCursor(frame_infos, frame_index, hot_spot_x, hot_spot_y);
+				if (goldAttack && first_surface)
+				{
+					SDL_Surface* tinted = SDL_ConvertSurface(first_surface, SDL_PIXELFORMAT_RGBA32);
+					if (tinted && SDL_LockSurface(tinted))
+					{
+						for (Int y = 0; y < tinted->h; ++y)
+						{
+							auto* pixel = static_cast<Uint8*>(tinted->pixels) + y * tinted->pitch;
+							for (Int x = 0; x < tinted->w; ++x, pixel += 4)
+							{
+								pixel[1] = std::max(pixel[1], static_cast<Uint8>(pixel[0] * 4 / 5));
+								pixel[2] = std::max(pixel[2], static_cast<Uint8>(pixel[0] * 3 / 8));
+							}
+						}
+						SDL_UnlockSurface(tinted);
+						cursor->m_cursor = SDL_CreateColorCursor(tinted, hot_spot_x, hot_spot_y);
+					}
+					SDL_DestroySurface(tinted);
+				}
+				else
+					cursor->m_cursor = SDL_CreateAnimatedCursor(frame_infos, frame_index, hot_spot_x, hot_spot_y);
 				if (!cursor->m_cursor)
 				{
 					DEBUG_LOG(("SDL3Mouse::loadCursorFromFile: SDL_CreateAnimatedCursor failed [%s]", SDL_GetError()));
@@ -462,7 +482,9 @@ void SDL3Mouse::initCursorResources(void)
 				std::string resourcePath = directory + name + extension;
 				if (!explicitExtension && !TheFileSystem->doesFileExist(resourcePath.c_str()))
 					resourcePath.replace(resourcePath.size() - 4, 4, ".cur");
-				cursorResources[cursor][direction] = loadCursorFromFile(resourcePath.c_str());
+				const Bool goldAttack = RetailFileLayers::enabled() &&
+					(cursor == ATTACK_OBJECT || cursor == FORCE_ATTACK_OBJECT || cursor == FORCE_ATTACK_GROUND || cursor == OUTRANGE);
+				cursorResources[cursor][direction] = loadCursorFromFile(resourcePath.c_str(), goldAttack);
 				DEBUG_ASSERTCRASH(cursorResources[cursor][direction], ("MissingCursor %s\n", resourcePath.c_str()));
 			}
 		}
@@ -510,7 +532,15 @@ void SDL3Mouse::setCursor(MouseCursor cursor)
 	}
 	else
 	{
-		AnimatedCursor* currentCursor = cursorResources[cursor][m_directionFrame];
+		MouseCursor resourceCursor = cursor;
+		if (RetailFileLayers::enabled() && !cursorResources[cursor][m_directionFrame])
+		{
+			if (cursor == BUILD_PLACEMENT)
+				resourceCursor = MOVETO;
+			else if (cursor == INVALID_BUILD_PLACEMENT)
+				resourceCursor = GENERIC_INVALID;
+		}
+		AnimatedCursor* currentCursor = cursorResources[resourceCursor][m_directionFrame];
 		if (currentCursor && currentCursor->m_cursor)
 		{
 			SDL_SetCursor(currentCursor->m_cursor);
@@ -542,7 +572,7 @@ void SDL3Mouse::setCursor(MouseCursor cursor)
 void SDL3Mouse::draw(void)
 {
 	setCursor(m_currentCursor);
-	if (m_retailCommandTooltip && m_visible)
+	if ((m_retailCommandTooltip || m_retailWorldTooltip) && m_visible)
 		drawTooltip();
 }
 

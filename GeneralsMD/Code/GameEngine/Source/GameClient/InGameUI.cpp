@@ -80,6 +80,7 @@
 #include "GameClient/GlobalLanguage.h"
 #include "GameClient/UiTest.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailWorldUI.h"
 
 #include "GameLogic/AIGuard.h"
 #include "GameLogic/Weapon.h"
@@ -544,6 +545,17 @@ void InGameUI::setMouseCursor(Mouse::MouseCursor c)
 	if (!TheMouse)
 		return;
 
+	if (RetailFileLayers::enabled() && m_mouseMode == MOUSEMODE_DEFAULT &&
+		(c == Mouse::SELECTING || c == Mouse::ARROW || c == Mouse::MOVETO) &&
+		m_mousedOverDrawableID != INVALID_DRAWABLE_ID && TheGameClient)
+	{
+		const Drawable* hovered = TheGameClient->findDrawableByID(m_mousedOverDrawableID);
+		const Object* target = hovered ? hovered->getObject() : nullptr;
+		const Player* viewer = rts::getObservedOrLocalPlayer();
+		if (target && viewer && !target->isEffectivelyDead() && viewer->getRelationship(target->getTeam()) == ENEMIES)
+			c = Mouse::ATTACK_OBJECT;
+	}
+
 	TheMouse->setCursor(c);
 
 	if (m_mouseMode == MOUSEMODE_GUI_COMMAND && c != Mouse::ARROW && c != Mouse::SCROLL)
@@ -828,6 +840,8 @@ const FieldParse InGameUI::s_fieldParseTable[] =
 	{ "NamedTimerCountdownReadyPointSize",		INI::parseInt,					nullptr,		offsetof( InGameUI, m_namedTimerReadyPointSize ) },
 	{ "NamedTimerCountdownReadyBold",					INI::parseBool,					nullptr,		offsetof( InGameUI, m_namedTimerReadyBold ) },
 	{ "NamedTimerCountdownReadyColor",				INI::parseColorInt,			nullptr,		offsetof( InGameUI, m_namedTimerReadyColor ) },
+	{ "TerrainResourceClaimDecal", INI::parseAsciiString, nullptr, offsetof(InGameUI, m_terrainClaimDecal) },
+	{ "PlaceTerrainResourceClaimantDecal", INI::parseAsciiString, nullptr, offsetof(InGameUI, m_placementClaimDecal) },
 
 	{ "FloatingTextTimeOut",									INI::parseEngineDurationUnsignedInt,	nullptr,	offsetof( InGameUI, m_floatingTextTimeOut ) },
 	{ "FloatingTextMoveUpSpeed",							INI::parseVelocityReal,	nullptr,		offsetof( InGameUI, m_floatingTextMoveUpSpeed ) },
@@ -1723,7 +1737,16 @@ void InGameUI::handleBuildPlacements()
 																												 builderObject,
 																												 nullptr );
 
-				if( lbc != LBC_OK )
+				if (RetailFileLayers::enabled())
+				{
+					static const RGBColor invalidTint = {1.0f, -1.0f, -1.0f};
+					m_retailPlacementValid = lbc == LBC_OK;
+					m_placeIcon[0]->colorTint(m_retailPlacementValid ? nullptr : &invalidTint);
+					m_placeIcon[0]->setDrawableOpacity(m_retailPlacementValid ?
+						TheGlobalData->m_objectPlacementOpacity : 0.82f);
+					setMouseCursor(m_retailPlacementValid ? Mouse::BUILD_PLACEMENT : Mouse::INVALID_BUILD_PLACEMENT);
+				}
+				else if( lbc != LBC_OK )
 					m_placeIcon[ 0 ]->colorTint( &IllegalBuildColor );
 				else
 					m_placeIcon[ 0 ]->colorTint( nullptr );
@@ -2260,6 +2283,8 @@ void InGameUI::unregisterWindowLayout( WindowLayout *layout )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::reset()
 {
+	m_retailAttackActive = FALSE;
+	m_retailPlacementValid = FALSE;
 	m_isQuitMenuVisible = FALSE;
 	m_inputEnabled = true;
 	// reset the command bar
@@ -2554,6 +2579,9 @@ void InGameUI::endAreaSelectHint( const GameMessage *msg )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::createMoveHint( const GameMessage *msg )
 {
+	if (RetailFileLayers::enabled() && (msg->getArgumentCount() == 0 ||
+		msg->getArgumentDataType(0) != ARGUMENTDATATYPE_LOCATION))
+		return;
 	Int i;
 
 	// first, remove any existing move hint for this source if present
@@ -2589,7 +2617,10 @@ void InGameUI::createMoveHint( const GameMessage *msg )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::createAttackHint( const GameMessage *msg )
 {
-
+	if (!RetailFileLayers::enabled() || !RetailWorldUI::getOrderPosition(*msg, m_retailAttackPosition))
+		return;
+	m_retailAttackFrame = TheGameClient->getFrame();
+	m_retailAttackActive = TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2597,7 +2628,7 @@ void InGameUI::createAttackHint( const GameMessage *msg )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::createForceAttackHint( const GameMessage *msg )
 {
-
+	createAttackHint(msg);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2657,6 +2688,8 @@ void InGameUI::createMouseoverHint( const GameMessage *msg )
 	}
 	if (underWindow)
 	{
+		if (RetailFileLayers::enabled())
+			m_mousedOverDrawableID = INVALID_DRAWABLE_ID;
 		setMouseCursor(Mouse::ARROW); // regardless of m_mouseMode
 		return;
 	}
@@ -2853,7 +2886,9 @@ void InGameUI::createMouseoverHint( const GameMessage *msg )
 
 					//Object:Prop is a blank string... but we don't want to show
 					//any popup box at all if that is the case!
-					if( displayName.compare( TheGameText->fetch( "OBJECT:Prop" ) ) )
+					if (RetailFileLayers::enabled() && player->getRelationship(rts::getObservedOrLocalPlayer()->getDefaultTeam()) == ENEMIES)
+						TheMouse->setRetailWorldTooltip(str);
+					else if( displayName.compare( TheGameText->fetch( "OBJECT:Prop" ) ) )
 					{
 	  				TheMouse->setCursorTooltip(tooltip, -1, &rgb );
 					}
@@ -3031,7 +3066,7 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 						setMouseCursor( Mouse::ATTACK_OBJECT );
 						break;
 					case GameMessage::MSG_DO_ATTACK_OBJECT_AFTER_MOVING_HINT:
-						setMouseCursor( Mouse::OUTRANGE );
+						setMouseCursor(RetailFileLayers::enabled() ? Mouse::ATTACK_OBJECT : Mouse::OUTRANGE);
 						break;
 					case GameMessage::MSG_DO_FORCE_ATTACK_OBJECT_HINT:
 						setMouseCursor( Mouse::FORCE_ATTACK_OBJECT );
@@ -3109,7 +3144,7 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 					case GameMessage::MSG_DO_MOVETO_HINT:
 					case GameMessage::MSG_DO_ATTACKMOVETO_HINT:
 					case GameMessage::MSG_ADD_WAYPOINT:
-						setMouseCursor(Mouse::BUILD_PLACEMENT);
+						setMouseCursor(RetailFileLayers::enabled() && !m_retailPlacementValid ? Mouse::INVALID_BUILD_PLACEMENT : Mouse::BUILD_PLACEMENT);
 						break;
 					case GameMessage::MSG_DO_ATTACK_OBJECT_HINT:
 					case GameMessage::MSG_DO_ATTACK_OBJECT_AFTER_MOVING_HINT:
@@ -3386,6 +3421,7 @@ void InGameUI::placeBuildAvailable( const ThingTemplate *build, Drawable *buildD
 	// place something, it is overwritten
 	//
 	m_pendingPlaceType = build;
+	m_retailPlacementValid = FALSE;
 
 	//Keep the prev pending place for left click deselection prevention in alternate mouse mode.
 	//We want to keep our dozer selected after initiating construction.
@@ -3448,6 +3484,8 @@ void InGameUI::placeBuildAvailable( const ThingTemplate *build, Drawable *buildD
 
 			// set the build icon attached to the cursor to be "see-thru"
 			draw->setDrawableOpacity( TheGlobalData->m_objectPlacementOpacity );
+			if (RetailFileLayers::enabled())
+				draw->setModelConditionState(MODELCONDITION_BUILD_PLACEMENT_CURSOR);
 
 			// set the "icon" in the icon array at the first index
 			DEBUG_ASSERTCRASH( m_placeIcon[ 0 ] == nullptr, ("placeBuildAvailable, build icon array is not empty!") );

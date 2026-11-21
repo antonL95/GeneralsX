@@ -36,6 +36,7 @@
 #include "Common/MiscAudio.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 
 #include "GameLogic/Damage.h"
@@ -699,7 +700,9 @@ GameMessageDisposition SelectionTranslator::onMouseoverDrawableHint(MAYBE_UNUSED
 		return KEEP_MESSAGE;
 	}
 
-	TheInGameUI->createMouseoverHint(msg); // this sets the cursor
+	TheInGameUI->createMouseoverHint(msg);
+	if (RetailFileLayers::enabled())
+		return DESTROY_MESSAGE;
 	const CommandButton *command = TheInGameUI->getGUICommand();
 
 	Bool ignoreCommand = FALSE;

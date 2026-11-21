@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Common/AsciiString.h"
+
 class INI;
 class Object;
 class SpecialPowerTemplate;
@@ -7,6 +9,18 @@ class AsciiString;
 
 namespace ExperienceLevelStore
 {
+struct SelectionDecal
+{
+	AsciiString texture;
+	AsciiString texture2;
+	AsciiString style;
+	Real opacityMin = 0.0f;
+	Real opacityMax = 0.0f;
+	Real minRadius = 0.0f;
+	Real maxRadius = 0.0f;
+	Int maxSelectedUnits = 0;
+};
+
 void load();
 void parseDefinition(INI* ini);
 void parseScalarTable(INI* ini);
@@ -22,4 +36,5 @@ void scoreKill(Object* killer, const Object* victim);
 void onObjectCreated(const Object* obj);
 void update();
 void reset();
+const SelectionDecal* findSelectionDecal(const Object& object);
 }

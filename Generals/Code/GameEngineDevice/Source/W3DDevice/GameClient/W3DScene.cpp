@@ -36,6 +36,8 @@
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "Common/GameUtility.h"
+#include "Common/RetailFileLayers.h"
+#include "GameClient/InGameUI.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
@@ -681,6 +683,14 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 
 		tintColor			 = draw->getTintColor();
 		selectionColor = draw->getSelectionColor();
+		if (RetailFileLayers::enabled() && obj && obj->isLocallyControlled() &&
+			obj->isKindOf(KINDOF_STRUCTURE) && !obj->isEffectivelyDead() && TheInGameUI &&
+			!TheInGameUI->getPendingPlaceType() &&
+			TheInGameUI->getMousedOverDrawableID() == draw->getID())
+		{
+			static const Vector3 hoverTint(-0.24f, 0.52f, -0.24f);
+			selectionColor = &hoverTint;
+		}
 
 		if ( tintColor || selectionColor )
 		{

@@ -88,7 +88,7 @@ private:
 
 	// Load cursor from ANI file (fighter19 pattern)
 	// GeneralsX @bugfix BenderAI 22/02/2026 Port fighter19 cursor loading
-	AnimatedCursor* loadCursorFromFile(const char* filepath);
+	AnimatedCursor* loadCursorFromFile(const char* filepath, Bool goldAttack);
 
 	// Legacy translation methods (kept for compatibility)
 	void translateMotionEvent(const SDL_MouseMotionEvent& event, MouseIO *result);

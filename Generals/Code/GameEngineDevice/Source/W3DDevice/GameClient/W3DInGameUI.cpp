@@ -43,6 +43,8 @@
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GadgetSlider.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailWorldUI.h"
+#include "W3DDevice/GameClient/Module/W3DScriptedModelDraw.h"
 #include "GameClient/ControlBar.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DGUICallbacks.h"
@@ -382,6 +384,12 @@ void W3DInGameUI::update()
 //-------------------------------------------------------------------------------------------------
 void W3DInGameUI::reset()
 {
+	for (DrawableID& model : m_retailMoveModels)
+		RetailWorldUI::clearOrderModel(model);
+	RetailWorldUI::clearOrderModel(m_retailAttackModel);
+	m_terrainResourceDecal.clear();
+	m_placementDecal.clear();
+	m_selectionDecals.clear();
 
 	// call base
 	InGameUI::reset();
@@ -420,8 +428,18 @@ void W3DInGameUI::draw()
 			// draw placement angle selection if needed
 			drawPlaceAngle( view );
 			if (view == TheTacticalView && RetailFileLayers::enabled())
+			{
+				if (TheGameLogic->getDrawIconUI())
+					RetailWorldUI::drawSelection(*view, m_isDragSelecting ? &m_dragSelectRegion : nullptr, m_selectionDecals);
+				else
+					m_selectionDecals.clear();
+				if (m_pendingPlaceType && m_placeIcon[0])
+					RetailWorldUI::drawPlacement(*view, *m_placeIcon[0], m_retailPlacementValid);
+				W3DScriptedModelDraw::updatePlacementDecal(m_pendingPlaceType ? m_placeIcon[0] : nullptr, m_placementDecal);
 				drawTerrainResourceIndicator(*view, m_pendingPlaceType,
-					getSelectCount() == 1 ? getFirstSelectedDrawable() : nullptr, m_terrainResourceLabel);
+					getSelectCount() == 1 ? getFirstSelectedDrawable() : nullptr, m_terrainResourceLabel,
+					m_terrainResourceDecal);
+			}
 
 		}
 
@@ -458,8 +476,8 @@ void W3DInGameUI::draw()
 //-------------------------------------------------------------------------------------------------
 void W3DInGameUI::drawSelectionRegion()
 {
-	Real width = 2.0f;
-	UnsignedInt color = 0x9933FF33;  //0xAARRGGBB
+	const Real width = RetailFileLayers::enabled() ? 1.0f : 2.0f;
+	const Color color = RetailFileLayers::enabled() ? GameMakeColor(204, 178, 87, 180) : 0x9933FF33;
 
 	TheDisplay->drawOpenRect( m_dragSelectRegion.lo.x,
 														m_dragSelectRegion.lo.y,
@@ -476,6 +494,22 @@ void W3DInGameUI::drawSelectionRegion()
 //-------------------------------------------------------------------------------------------------
 void W3DInGameUI::drawMoveHints( View *view )
 {
+	if (RetailFileLayers::enabled())
+	{
+		const UnsignedInt now = TheGameClient->getFrame();
+		for (Int i = 0; i < MAX_MOVE_HINTS; ++i)
+		{
+			const auto& hint = m_moveHint[i];
+			const UnsignedInt age = now - hint.frame;
+			if (hint.frame == 0 || age < 12 || age > 40)
+				RetailWorldUI::clearOrderModel(m_retailMoveModels[i]);
+			if (hint.frame != 0 && age <= 40 &&
+				(age < 12 || !RetailWorldUI::setOrderModel(m_retailMoveModels[i], hint.pos, FALSE, age)))
+				RetailWorldUI::drawOrder(*view, hint.pos, FALSE, age);
+		}
+		return;
+	}
+
 	Int i;
 //	Real width = 1.0f;
 //	UnsignedInt color = 0x9933FF33;  //0xAARRGGBB
@@ -598,7 +632,13 @@ void W3DInGameUI::drawMoveHints( View *view )
 //-------------------------------------------------------------------------------------------------
 void W3DInGameUI::drawAttackHints( View *view )
 {
-
+	if (!RetailFileLayers::enabled() || !m_retailAttackActive)
+		return;
+	const UnsignedInt age = TheGameClient->getFrame() - m_retailAttackFrame;
+	if (age > 32)
+		RetailWorldUI::clearOrderModel(m_retailAttackModel);
+	else if (!RetailWorldUI::setOrderModel(m_retailAttackModel, m_retailAttackPosition, TRUE, age))
+		RetailWorldUI::drawOrder(*view, m_retailAttackPosition, TRUE, age);
 }
 
 //-------------------------------------------------------------------------------------------------

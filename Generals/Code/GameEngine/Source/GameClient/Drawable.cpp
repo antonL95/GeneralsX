@@ -42,6 +42,9 @@
 #include "Common/GameLOD.h"
 #include "Common/GameState.h"
 #include "Common/GameUtility.h"
+#include "Common/RetailFileLayers.h"
+#include "GameClient/RetailWorldUI.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "Common/GlobalData.h"
 #include "Common/ModuleFactory.h"
 #include "Common/PerfTimer.h"
@@ -2734,7 +2737,14 @@ void Drawable::drawIconUI()
 			return;
 
 		//Icons that can be drawn on dead things
-		drawHealthBar( healthBarRegion );
+		if (RetailFileLayers::enabled())
+		{
+			if (HordeContain::get(obj))
+				return;
+			RetailWorldUI::drawUnitStatus(*this);
+		}
+		else
+			drawHealthBar( healthBarRegion );
 		drawEmoticon( healthBarRegion );
 
 		drawCaption( healthBarRegion );
@@ -2763,7 +2773,8 @@ void Drawable::drawIconUI()
 		drawContained( healthBarRegion );
 
 		//Moved this to last so that it shows up over contained and ammo icons.
-		drawVeterancy( healthBarRegion );
+		if (!RetailFileLayers::enabled())
+			drawVeterancy( healthBarRegion );
 	}
 }
 

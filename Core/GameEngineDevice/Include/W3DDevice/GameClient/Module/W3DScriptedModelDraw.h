@@ -4,6 +4,8 @@
 
 #include <string>
 
+class WorldGroundDecal;
+
 class W3DScriptedModelDrawModuleData : public W3DModelDrawModuleData
 {
 public:
@@ -104,6 +106,7 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 	void finishParsing();
 	const ModelConditionInfo* findBestInfo(const ModelConditionFlags& flags) const override;
+	const ModelState* findPlacementDecal(const ModelConditionFlags& flags) const;
 
 	const std::multimap<NameKeyType, AnimationState>& getNamedTransitions() const { return m_namedTransitions; }
 
@@ -164,5 +167,6 @@ class W3DScriptedModelDraw : public W3DModelDraw
 
 public:
 	W3DScriptedModelDraw(Thing* thing, const ModuleData* data);
+	static void updatePlacementDecal(const Drawable* ghost, WorldGroundDecal& decal);
 	static ModuleData* friend_newModuleData(INI* ini);
 };

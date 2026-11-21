@@ -262,6 +262,7 @@ set(GAMEENGINE_SRC
     Include/GameClient/PlaceEventTranslator.h
     Include/GameClient/ProcessAnimateWindow.h
     Include/GameClient/RadiusDecal.h
+    Include/GameClient/RetailWorldUI.h
     Include/GameClient/RayEffect.h
     Include/GameClient/SaveLoadFeedback.h
     Include/GameClient/SelectionInfo.h
@@ -928,6 +929,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/MessageStream/WindowXlat.cpp
     Source/GameClient/ParabolicEase.cpp
     Source/GameClient/RadiusDecal.cpp
+    Source/GameClient/RetailWorldUI.cpp
     Source/GameClient/SelectionInfo.cpp
     Source/GameClient/Snow.cpp
     Source/GameClient/Statistics.cpp

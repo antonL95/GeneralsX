@@ -308,6 +308,7 @@ public:
 		UnicodeString body;
 	};
 	void setRetailTooltip(const RetailTooltip &tooltip);
+	void setRetailWorldTooltip(const UnicodeString& tooltip);
 	void setMouseText( UnicodeString text, const RGBAColorInt *color, const RGBAColorInt *dropColor );					///< set the cursor text, *NOT* the tooltip text
 	virtual void setMouseLimits();					///< update the limit extents the mouse can move in
 	MouseCursor getMouseCursor() { return m_currentCursor; }	///< get the current mouse cursor image type
@@ -415,6 +416,7 @@ protected:
 													set to TRUE indicating it's Ok to fire off a tooltip */
 	Bool m_isTooltipEmpty;
 	Bool m_retailCommandTooltip = FALSE;
+	Bool m_retailWorldTooltip = FALSE;
 	Bool drawRetailCommandTooltip();
 	void layoutRetailTooltip(Real scale);
 	void freeRetailTooltip();

@@ -9,6 +9,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailWorldUI.h"
 #include "Common/ScoreKeeper.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
@@ -118,14 +119,7 @@ UpdateSleepTime TerrainResourceBehavior::update()
 		{
 			player->getMoney()->deposit(amount);
 			player->getScoreKeeper()->addMoneyEarned(amount);
-			if (TheInGameUI && object->isLogicallyVisible())
-			{
-				Coord3D pos = *object->getPosition();
-				pos.z += object->getGeometryInfo().getMaxHeightAbovePosition();
-				UnicodeString text;
-				text.format(L"+%u", amount);
-				TheInGameUI->addFloatingText(text, &pos, player->getPlayerColor() | GameMakeColor(0, 0, 0, 230));
-			}
+			RetailWorldUI::showPayout(*object, static_cast<Int>(amount), FALSE);
 		}
 	}
 	return static_cast<UpdateSleepTime>(std::clamp<UnsignedInt>(data->m_interval, 1, UPDATE_SLEEP_FOREVER));
@@ -283,4 +277,22 @@ void TerrainResourceBehavior::xfer(Xfer* xfer)
 void TerrainResourceBehavior::loadPostProcess()
 {
 	UpdateModule::loadPostProcess();
+}
+
+Real TerrainResourceBehavior::getActiveClaimRadius(const Object& object)
+{
+	if (!isComplete(object) || !object.isLogicallyVisible())
+		return 0.0f;
+
+	static const NameKeyType moduleKey = NAMEKEY("TerrainResourceBehavior");
+	for (BehaviorModule** module = object.getBehaviorModules(); module && *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != moduleKey)
+			continue;
+		const auto* resource = static_cast<const TerrainResourceBehavior*>(*module);
+		const auto* data = resource->getTerrainResourceBehaviorModuleData();
+		return resource->m_claiming && data->m_visible && std::isfinite(data->m_radius) ?
+			data->m_radius : 0.0f;
+	}
+	return 0.0f;
 }

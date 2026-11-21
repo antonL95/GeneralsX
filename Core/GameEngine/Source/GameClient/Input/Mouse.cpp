@@ -880,6 +880,7 @@ void Mouse::setCursorTooltip( UnicodeString tooltip, Int delay, const RGBColor *
 
 	m_isTooltipEmpty = tooltip.isEmpty();
 	m_retailCommandTooltip = FALSE;
+	m_retailWorldTooltip = FALSE;
   m_tooltipDelay = delay;
 
 	Bool forceRecalc = FALSE;
@@ -946,6 +947,12 @@ void Mouse::setCursorTooltip( UnicodeString tooltip, Int delay, const RGBColor *
 		m_tooltipBackColor = m_tooltipColorBackground;
 	}
 
+}
+
+void Mouse::setRetailWorldTooltip(const UnicodeString& tooltip)
+{
+	setCursorTooltip(tooltip, 0, nullptr, 0.42f);
+	m_retailWorldTooltip = TRUE;
 }
 
 void Mouse::setRetailTooltip(const RetailTooltip &tooltip)
@@ -1467,6 +1474,16 @@ void Mouse::drawTooltip()
 		{
 			//yPos = m_maxY - height;
 			yPos -= /*40 +*/ height;
+		}
+
+		if (m_retailWorldTooltip)
+		{
+			TheDisplay->drawFillRect(xPos, yPos, width + 4, height + 2, GameMakeColor(10, 16, 19, 224));
+			TheDisplay->drawOpenRect(xPos, yPos, width + 4, height + 2, 1.0f, GameMakeColor(118, 150, 165, 255));
+			IRegion2D clip = {{xPos, yPos}, {xPos + width + 4, yPos + height + 2}};
+			m_tooltipDisplayString->setClipRegion(&clip);
+			m_tooltipDisplayString->draw(xPos + 2, yPos + 1, GameMakeColor(255, 255, 245, 255), 0);
+			return;
 		}
 
 		Int boxWidth = (m_tooltipAnimateBackground)?(min(width, m_highlightPos)):width;
