@@ -248,10 +248,11 @@ const char* nuggetTypeName(WeaponNuggetType type)
 	return "Nugget";
 }
 
-Real nuggetBaseDamage(const WeaponNugget& nugget, const Object* source, Real scalar)
+Real nuggetDamage(const WeaponNugget& nugget, Real scalar, const WeaponBonus& bonus)
 {
-	return AttributeModifierRules::baseDamageWithAdd(nugget.m_damage * scalar, nugget.m_acceptDamageAdd,
-		AttributeModifiers::value(source, AttributeModifierRules::DAMAGE_ADD));
+	const Real base = AttributeModifierRules::baseDamageWithAdd(nugget.m_damage * scalar, nugget.m_acceptDamageAdd,
+		bonus.getNuggetDamageAdd());
+	return base * bonus.getNuggetDamageMultiplier(nugget.m_damageType) * bonus.getField(WeaponBonus::DAMAGE);
 }
 
 }
@@ -378,7 +379,7 @@ Real WeaponTemplate::estimateNuggetDamage(const Object* sourceObj, const Object*
 			continue;
 		if (!victimObj)
 		{
-			total += nuggetBaseDamage(nugget, sourceObj, 1.0f) * bonus.getField(WeaponBonus::DAMAGE);
+			total += nuggetDamage(nugget, 1.0f, bonus);
 			continue;
 		}
 		if (!nugget.affects(sourceObj, victimObj))
@@ -387,7 +388,7 @@ Real WeaponTemplate::estimateNuggetDamage(const Object* sourceObj, const Object*
 		damageInfo.m_damageType = nugget.m_damageType;
 		damageInfo.m_deathType = nugget.m_deathType;
 		damageInfo.m_sourceID = sourceObj->getID();
-		damageInfo.m_amount = nuggetBaseDamage(nugget, sourceObj, nugget.scalarFor(sourceObj, victimObj)) * bonus.getField(WeaponBonus::DAMAGE);
+		damageInfo.m_amount = nuggetDamage(nugget, nugget.scalarFor(sourceObj, victimObj), bonus);
 		total += victimObj->estimateDamage(damageInfo);
 	}
 	return total;
@@ -468,13 +469,17 @@ void WeaponTemplate::applyModifierNugget(const WeaponNugget& nugget, const Objec
 	}
 }
 
-void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus) const
+const Object* WeaponTemplate::getNuggetAttacker(const Object* source)
 {
-	const Object* source = TheGameLogic->findObjectByID(sourceID);
 	const ObjectID launcherID = launcherOf(source);
 	const Object* launcher = launcherID != INVALID_ID ? TheGameLogic->findObjectByID(launcherID) : nullptr;
-	const Object* attacker = launcher ? launcher : source;
-	const ObjectID nuggetSourceID = launcher ? launcherID : sourceID;
+	return launcher ? launcher : source;
+}
+
+void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus) const
+{
+	const Object* attacker = getNuggetAttacker(TheGameLogic->findObjectByID(sourceID));
+	const ObjectID nuggetSourceID = attacker ? attacker->getID() : sourceID;
 	if (RetailTestCommands::tracesCombat())
 		std::fprintf(stderr, "TEST impact frame=%u weapon=%s source=%u victim=%u pos=%.1f,%.1f bonus=%.2f,%.2f\n", TheGameLogic->getFrame(),
 			m_name.str(), static_cast<unsigned>(nuggetSourceID), static_cast<unsigned>(victimID), pos->x, pos->y,
@@ -529,7 +534,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 	const auto damage = [&](Object* victim, Bool killSelf)
 	{
 		const Real scalar = nugget.scalarFor(source, victim);
-		const Real amount = killSelf ? HUGE_DAMAGE_AMOUNT : nuggetBaseDamage(nugget, source, scalar) * bonus.getField(WeaponBonus::DAMAGE);
+		const Real amount = killSelf ? HUGE_DAMAGE_AMOUNT : nuggetDamage(nugget, scalar, bonus);
 		if (amount <= 0.0f)
 			return;
 

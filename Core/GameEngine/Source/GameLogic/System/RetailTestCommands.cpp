@@ -9,6 +9,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <map>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -1621,6 +1623,24 @@ void execute(const Command& command, unsigned int frame)
 		return;
 	}
 
+#if !RTS_GENERALS
+	if (command.action == "combatini")
+	{
+		std::ifstream file(command.structure);
+		if (!file)
+		{
+			std::fprintf(stderr, "TEST frame %u: cannot load combat INI %s\n", frame, command.structure.c_str());
+			return;
+		}
+		std::ostringstream text;
+		text << file.rdbuf();
+		INI ini;
+		ini.loadText(command.structure.c_str(), text.str().c_str(), INI_LOAD_OVERWRITE, nullptr, nullptr);
+		std::fprintf(stderr, "TEST frame %u: loaded combat INI\n", frame);
+		return;
+	}
+#endif
+
 	if (command.action == "hordeweapon")
 	{
 		AsciiString weapon;
@@ -1877,6 +1897,22 @@ void execute(const Command& command, unsigned int frame)
 	else if (command.action == "power")
 		pressPowerButton(command, obj, frame);
 #if !RTS_GENERALS
+	else if (command.action == "firetestweapon")
+	{
+		const size_t separator = command.structure.find(',');
+		if (separator == std::string::npos)
+			return;
+		Command targetCommand = command;
+		targetCommand.structure = command.structure.substr(separator + 1);
+		Object* target = findTarget(targetCommand, true);
+		const WeaponTemplate* weapon = TheWeaponStore->findWeaponTemplate(command.structure.substr(0, separator).c_str());
+		if (weapon && target)
+		{
+			std::fprintf(stderr, "TEST frame %u: fire test weapon %s source=%u victim=%u\n", frame, weapon->getName().str(),
+				static_cast<unsigned>(obj->getID()), static_cast<unsigned>(target->getID()));
+			TheWeaponStore->createAndFireTempWeapon(weapon, obj, target);
+		}
+	}
 	else if (command.action == "mods")
 		logModifiers(obj, frame);
 	else if (command.action == "stance")

@@ -2052,11 +2052,25 @@ void Weapon::computeBonus(const Object *source, WeaponBonusConditionFlags extraB
 	if (extra)
 		extra->appendBonuses(flags, bonus);
 
-	if (const AttributeModifierRules::Totals* modifiers = AttributeModifiers::totalsOf(source))
+	const Bool hasNuggets = m_template->hasNuggets();
+	const AttributeModifierRules::Totals* modifiers = AttributeModifiers::totalsOf(source);
+	if (modifiers)
 	{
-		bonus.setField(WeaponBonus::DAMAGE, bonus.getField(WeaponBonus::DAMAGE) * modifiers->damageDealtFactor());
+		if (!hasNuggets)
+			bonus.setField(WeaponBonus::DAMAGE, bonus.getField(WeaponBonus::DAMAGE) * modifiers->damageDealtFactor());
 		bonus.setField(WeaponBonus::RANGE, bonus.getField(WeaponBonus::RANGE) * modifiers->rangeFactor());
 		bonus.setField(WeaponBonus::RATE_OF_FIRE, bonus.getField(WeaponBonus::RATE_OF_FIRE) * modifiers->value[AttributeModifierRules::RATE_OF_FIRE]);
+	}
+
+	if (hasNuggets)
+	{
+		const Object* attacker = WeaponTemplate::getNuggetAttacker(source);
+		const AttributeModifierRules::Totals* damageModifiers = attacker == source ? modifiers : AttributeModifiers::totalsOf(attacker);
+		if (damageModifiers)
+		{
+			bonus.setNuggetDamageModifiers(damageModifiers->value[AttributeModifierRules::DAMAGE_ADD],
+				damageModifiers->damageDealtFactor(), damageModifiers->value[AttributeModifierRules::SPELL_DAMAGE]);
+		}
 	}
 }
 

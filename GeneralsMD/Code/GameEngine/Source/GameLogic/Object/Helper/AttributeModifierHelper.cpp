@@ -394,6 +394,8 @@ void AttributeModifierHelper::xfer( Xfer *xfer )
 	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
+	if (version != currentVersion)
+		throw XFER_INVALID_VERSION;
 	ObjectHelper::xfer( xfer );
 
 	UnsignedShort count = static_cast<UnsignedShort>(m_stack.active().size());
@@ -413,10 +415,7 @@ void AttributeModifierHelper::xfer( Xfer *xfer )
 		xfer->xferAsciiString( &name );
 		xfer->xferUnsignedInt( &active.endFrame );
 		xfer->xferUnsignedInt( &active.antiMask );
-		if (version >= 2)
-			xferHolds( xfer, active.holds );
-		else
-			active.holds.assign(1, Hold{ANONYMOUS_OWNER, active.endFrame});
+		xferHolds( xfer, active.holds );
 		if (xfer->getXferMode() == XFER_LOAD)
 		{
 			active.list = TheAttributeModifierStore ? TheAttributeModifierStore->findIndex(name) : -1;

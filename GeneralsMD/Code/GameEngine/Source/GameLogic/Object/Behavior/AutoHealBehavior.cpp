@@ -30,6 +30,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/AttributeModifierRules.h"
 #include "Common/Thing.h"
 #include "Common/ThingTemplate.h"
 #include "Common/INI.h"
@@ -286,7 +287,13 @@ void AutoHealBehavior::pulseHealObject( Object *obj )
 		return;
 
 	const AutoHealBehaviorModuleData *data = getAutoHealBehaviorModuleData();
-
+	if ( data->m_nonStackable )
+	{
+		const BodyModuleInterface *body = obj->getBodyModule();
+		const UnsignedInt *lastHeal = body ? body->getLastHealingTimestamp() : nullptr;
+		if ( lastHeal && AttributeModifierRules::healedWithin(TheGameLogic->getFrame(), *lastHeal, data->m_healingDelay) )
+			return;
+	}
 
 	if ( data->m_radius == 0.0f )
 		obj->attemptHealing(data->m_healingAmount, getObject());

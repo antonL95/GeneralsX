@@ -289,15 +289,32 @@ public:
 	{
 		for (int i = 0; i < FIELD_COUNT; ++i)
 			m_field[i] = 1.0f;
+		setNuggetDamageModifiers(0.0f, 1.0f, 1.0f);
 	}
 
 	Real getField(Field f) const { return m_field[f]; }
 	void setField(Field f, Real v) { m_field[f] = v; }
 
+	void setNuggetDamageModifiers(Real damageAdd, Real damageMultiplier, Real spellMultiplier)
+	{
+		m_nuggetDamageAdd = damageAdd;
+		m_nuggetDamageMultiplier = damageMultiplier;
+		m_nuggetSpellMultiplier = spellMultiplier;
+	}
+
+	Real getNuggetDamageAdd() const { return m_nuggetDamageAdd; }
+	Real getNuggetDamageMultiplier(DamageType damageType) const
+	{
+		return damageType == DAMAGE_MAGIC ? m_nuggetSpellMultiplier : m_nuggetDamageMultiplier;
+	}
+
 	void appendBonuses(WeaponBonus& bonus) const;
 
 private:
 	Real m_field[FIELD_COUNT];
+	Real m_nuggetDamageAdd;
+	Real m_nuggetDamageMultiplier;
+	Real m_nuggetSpellMultiplier;
 
 };
 
@@ -351,6 +368,7 @@ typedef std::list<HistoricWeaponDamageInfo> HistoricWeaponDamageList;
 class WeaponTemplate : public MemoryPoolObject
 {
 	friend class WeaponStore;
+	friend class Weapon;
 
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( WeaponTemplate, "WeaponTemplate" )
 
@@ -496,6 +514,7 @@ protected:
 
 	// actually deal out the damage.
 	void dealDamageInternal(ObjectID sourceID, ObjectID victimID, const Coord3D *pos, const WeaponBonus& bonus, Bool isProjectileDetonation) const;
+	static const Object* getNuggetAttacker(const Object* source);
 	void dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus) const;
 	void applyModifierNugget(const WeaponNugget& nugget, const Object* attacker, ObjectID victimID, const Coord3D* pos) const;
 	void dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus, Bool dotTick = FALSE) const;
