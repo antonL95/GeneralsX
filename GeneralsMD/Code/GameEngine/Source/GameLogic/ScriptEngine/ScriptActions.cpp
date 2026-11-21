@@ -6770,7 +6770,7 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			return;
 		case ScriptAction::OVERRIDE_PLAYER_COMMAND_POINTS:
 			if (RetailFileLayers::enabled())
-				if (Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString()))
+				if (Player* player = TheScriptEngine->getRetailSynchronizedScriptPlayer(pAction->getParameter(0)->getString()))
 					player->overrideCommandPoints(pAction->getParameter(1)->getInt(), pAction->getParameter(2)->getInt());
 			return;
 		case ScriptAction::SET_PLAYER_COMMAND_POINTS_AVAILABLE_TO_COUNTER:
@@ -6778,7 +6778,7 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		{
 			if (!RetailFileLayers::enabled())
 				return;
-			const Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString());
+			const Player* player = TheScriptEngine->getRetailSynchronizedScriptPlayer(pAction->getParameter(0)->getString());
 			if (!player)
 				return;
 			Int value = player->getCommandPointsTotal();

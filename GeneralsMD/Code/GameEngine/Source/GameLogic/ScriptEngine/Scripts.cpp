@@ -2494,7 +2494,9 @@ ScriptAction *ScriptAction::ParseAction(DataChunkInput &file, DataChunkInfo *inf
 
 	pScriptAction->m_actionType = (enum ScriptActionType)file.readInt();
 
-	const ActionTemplate* at = TheScriptEngine->getActionTemplate(pScriptAction->m_actionType);
+	const Int actionCount = ScriptEngine::getActionTemplateCount();
+	const ActionTemplate* at = pScriptAction->m_actionType >= 0 && pScriptAction->m_actionType < actionCount
+		? TheScriptEngine->getActionTemplate(pScriptAction->m_actionType) : nullptr;
 	if (info->version >= K_SCRIPT_ACTION_VERSION_2) {
 		NameKeyType key = file.readNameKey();
 		Bool match = false;
@@ -2504,7 +2506,7 @@ ScriptAction *ScriptAction::ParseAction(DataChunkInput &file, DataChunkInfo *inf
 		if (!match) {
 			//  name and id don't match.  Find the name [3/20/2003]
 			Int i;
-			for (i=0; i<ScriptAction::NUM_ITEMS; i++) {
+			for (i=0; i<actionCount; i++) {
 				at = TheScriptEngine->getActionTemplate(i);
 				if (key == at->m_internalNameKey) {
 					match = true;
@@ -2520,6 +2522,10 @@ ScriptAction *ScriptAction::ParseAction(DataChunkInput &file, DataChunkInfo *inf
 				pScriptAction->m_numParms = 0;
 			}
 		}
+	}
+	else if (!at)
+	{
+		pScriptAction->m_actionType = ScriptAction::NO_OP;
 	}
 #ifdef DEBUG_CRASHING
 	Script *pScript = (Script *)userData;

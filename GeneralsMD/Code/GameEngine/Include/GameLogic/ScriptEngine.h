@@ -239,6 +239,7 @@ public:
 
 	virtual void newMap(  );	///< reset script engine for new map
 	virtual const ActionTemplate *getActionTemplate( Int ndx); ///< Get the template for a script action.
+	static Int getActionTemplateCount();
 	virtual const ConditionTemplate *getConditionTemplate( Int ndx); ///< Get the template for a script Condition.
 	static Bool isRotwkImplemented(Bool condition, Int type);
 	static Int findRotwkActionByRetailIndex(Int retailIndex);
@@ -255,6 +256,7 @@ public:
 	virtual Player *getCurrentPlayer(); ///<  Gets the player that owns the current script.  May be null.
 	virtual Player *getPlayerFromAsciiString(const AsciiString& skirmishPlayerString);
 	PlayerMaskType getRetailScriptPlayers(const AsciiString& name);
+	Player* getRetailSynchronizedScriptPlayer(const AsciiString& name);
 
 	void setObjectsShouldReceiveDifficultyBonus(Bool receive) { m_objectsShouldReceiveDifficultyBonus = receive; }
 	Bool getObjectsShouldReceiveDifficultyBonus() const { return m_objectsShouldReceiveDifficultyBonus; }

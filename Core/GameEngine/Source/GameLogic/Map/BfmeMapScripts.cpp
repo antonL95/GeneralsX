@@ -288,10 +288,15 @@ Int BfmeMapScripts::readOpcode(DataChunkInput &file, BfmeScriptOpcode &opcode, P
 	opcode.supported = false;
 	if (TheScriptEngine)
 	{
-		const Int limit = condition ? static_cast<Int>(Condition::NUM_ITEMS) : static_cast<Int>(ScriptAction::NUM_ITEMS);
+#if RTS_GENERALS
+		const Int actionCount = ScriptAction::NUM_ITEMS;
+#else
+		const Int actionCount = ScriptEngine::getActionTemplateCount();
+#endif
+		const Int limit = condition ? static_cast<Int>(Condition::NUM_ITEMS) : actionCount;
 #if !RTS_GENERALS
 		Int mappedType = authoredType;
-		if (!named && !condition && authoredType >= ScriptAction::FIRST_ROTWK)
+		if (RetailFileLayers::enabled() && !named && !condition && authoredType >= ScriptAction::FIRST_ROTWK)
 			mappedType = ScriptEngine::findRotwkActionByRetailIndex(authoredType);
 #endif
 		for (Int i = 0; i < limit; ++i)

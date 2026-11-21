@@ -387,7 +387,8 @@ initialized value in ScriptEngine::init() is used. jba*/
 void ScriptEngine::addActionTemplateInfo( Template *actionTemplate)
 {
 	Int i;
-	for (i=0; i<ScriptAction::NUM_ITEMS; i++) {
+	const Int actionCount = getActionTemplateCount();
+	for (i=0; i<actionCount; i++) {
 		if (m_actionTemplates[i].m_internalName == actionTemplate->m_internalName) {
 			m_actionTemplates[i].m_uiName = actionTemplate->m_uiName;
 			m_actionTemplates[i].m_uiName2 = actionTemplate->m_uiName2;
@@ -503,7 +504,8 @@ ScriptEngine::~ScriptEngine()
 	reset(); // just in case.
 #ifdef COUNT_SCRIPT_USAGE
 	Int i;
-	for (i=0; i<ScriptAction::NUM_ITEMS; i++) {
+	const Int actionCount = getActionTemplateCount();
+	for (i=0; i<actionCount; i++) {
 		DEBUG_LOG(("ScriptAction%d, %4d, %s, %s, %s", i, m_actionTemplates[i].m_numTimesUsed,
 			m_actionTemplates[i].m_internalName.str(), m_actionTemplates[i].m_firstMapUsed.str(),
 			m_actionTemplates[i].m_uiName.str()));
@@ -5251,7 +5253,8 @@ void ScriptEngine::init()
 		m_conditionTemplates[i].m_internalNameKey = NAMEKEY(m_conditionTemplates[i].m_internalName);
 	}
 
-	for (i=0; i<ScriptAction::NUM_ITEMS; i++) {
+	const Int actionCount = getActionTemplateCount();
+	for (i=0; i<actionCount; i++) {
 		AsciiString str;
 		str.format("[%d]", i);
 		m_actionTemplates[i].m_uiName.concat(str);
@@ -5864,6 +5867,24 @@ Player *ScriptEngine::getPlayerFromAsciiString(const AsciiString& playerString)
 	AppendDebugMessage("***Invalid Player name:***", false);
 
 	return nullptr;
+}
+
+Player* ScriptEngine::getRetailSynchronizedScriptPlayer(const AsciiString& name)
+{
+	if (name != LOCAL_PLAYER || (TheGameLogic && TheGameLogic->isInSinglePlayerGame()))
+		return getPlayerFromAsciiString(name);
+
+	Player* human = nullptr;
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		Player* player = ThePlayerList->getNthPlayer(i);
+		if (!player || player->getPlayerType() != PLAYER_HUMAN || player->isPlayerObserver())
+			continue;
+		if (human)
+			return nullptr;
+		human = player;
+	}
+	return human;
 }
 
 PlayerMaskType ScriptEngine::getRetailScriptPlayers(const AsciiString& name)
@@ -7850,7 +7871,8 @@ void ScriptEngine::executeScripts( Script *pScriptHead )
 const ActionTemplate * ScriptEngine::getActionTemplate( Int ndx )
 {
 	DEBUG_ASSERTCRASH(ndx >= 0 && ndx < ScriptAction::NUM_ITEMS, ("Out of range."));
-	if (ndx <0 || ndx >= ScriptAction::NUM_ITEMS) ndx = 0;
+	if (ndx < 0 || ndx >= getActionTemplateCount())
+		ndx = ScriptAction::NO_OP;
 	DEBUG_ASSERTCRASH (!m_actionTemplates[ndx].getName().isEmpty(), ("Need to initialize action enum=%d.", ndx));
 
 	return &m_actionTemplates[ndx];

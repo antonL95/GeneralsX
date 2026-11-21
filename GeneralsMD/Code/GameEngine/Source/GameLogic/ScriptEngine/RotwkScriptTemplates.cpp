@@ -1,5 +1,6 @@
 #include "PreRTS.h"
 
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ScriptEngine.h"
 
@@ -90,6 +91,8 @@ const RotwkTemplate s_conditions[] = {
 
 const RotwkTemplate *findRotwk(Bool condition, Int type)
 {
+	if (!condition && type >= ScriptEngine::getActionTemplateCount())
+		return nullptr;
 	const RotwkTemplate *first = condition ? s_conditions : s_actions;
 	const size_t count = condition ? ARRAY_SIZE(s_conditions) : ARRAY_SIZE(s_actions);
 	for (size_t i = 0; i < count; ++i)
@@ -147,10 +150,17 @@ void writeTemplates(FILE *file, Bool condition, const Template *templates, Int c
 
 void ScriptEngine::initRotwkTemplates()
 {
+	const Int actionCount = getActionTemplateCount();
 	for (const RotwkTemplate &entry : s_actions)
-		fillTemplate(m_actionTemplates[entry.type], entry);
+		if (entry.type < actionCount)
+			fillTemplate(m_actionTemplates[entry.type], entry);
 	for (const RotwkTemplate &entry : s_conditions)
 		fillTemplate(m_conditionTemplates[entry.type], entry);
+}
+
+Int ScriptEngine::getActionTemplateCount()
+{
+	return RetailFileLayers::enabled() ? ScriptAction::NUM_ITEMS : ScriptAction::SET_PLAYER_COMMAND_POINTS_AVAILABLE_TO_COUNTER;
 }
 
 Bool ScriptEngine::isRotwkImplemented(Bool condition, Int type)
@@ -161,6 +171,8 @@ Bool ScriptEngine::isRotwkImplemented(Bool condition, Int type)
 
 Int ScriptEngine::findRotwkActionByRetailIndex(Int retailIndex)
 {
+	if (!RetailFileLayers::enabled())
+		return -1;
 	for (const RotwkTemplate &entry : s_actions)
 		if (entry.retailIndex == retailIndex)
 			return entry.type;
@@ -204,7 +216,7 @@ void ScriptEngine::dumpTemplates()
 	FILE *file = fopen(path, "w");
 	if (!file)
 		return;
-	writeTemplates(file, FALSE, m_actionTemplates, ScriptAction::NUM_ITEMS);
+	writeTemplates(file, FALSE, m_actionTemplates, getActionTemplateCount());
 	writeTemplates(file, TRUE, m_conditionTemplates, Condition::NUM_ITEMS);
 	fclose(file);
 }
