@@ -169,6 +169,7 @@ public:
 	/////////////////////////////////////////////////////////////////////////////////////
 	void							Set_Pass_Count(int passes)														{ CurMatDesc->Set_Pass_Count(passes); }
 	bool Has_Fx_Materials() const { return FxMaterials != nullptr; }
+	const W3dFx::Mesh *Peek_Fx_Materials() const { return FxMaterials.get(); }
 	VertexMaterialClass * Peek_Polygon_Material(unsigned polygon, unsigned pass);
 	int							Get_Pass_Count() const														{ return CurMatDesc->Get_Pass_Count(); }
 

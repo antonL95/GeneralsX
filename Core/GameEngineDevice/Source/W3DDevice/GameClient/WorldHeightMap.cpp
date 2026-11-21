@@ -949,10 +949,12 @@ try
 	const Int fixedSize = sizeof(Byte) + (info->version >= 3 ? 2 * sizeof(Real) : 0);
 	if (info->dataSize < fixedSize)
 		return TRUE;
+	Real waterMaxAlphaDepth = -1.0f;
+	Real deepWaterAlpha = -1.0f;
 	if (info->version >= 3)
 	{
-		file.readReal();
-		file.readReal();
+		waterMaxAlphaDepth = file.readReal();
+		deepWaterAlpha = file.readReal();
 	}
 	const Bool macroStretched = file.readByte() != 0;
 	const AsciiString macroTexture = readRetailChunkString(file);
@@ -964,6 +966,10 @@ try
 	map.m_retailMacroStretched = macroStretched;
 	map.m_retailMacroTexture = macroTexture;
 	map.m_retailCloudTexture = cloudTexture;
+	if (std::isfinite(waterMaxAlphaDepth) && waterMaxAlphaDepth >= 0.0f)
+		map.m_retailWaterMaxAlphaDepth = waterMaxAlphaDepth;
+	if (std::isfinite(deepWaterAlpha) && deepWaterAlpha >= 0.0f && deepWaterAlpha <= 1.0f)
+		map.m_retailDeepWaterAlpha = deepWaterAlpha;
 	return TRUE;
 }
 catch (ErrorCode error)

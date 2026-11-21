@@ -1,4 +1,5 @@
 #include "retailfx.h"
+#include "retailfxprogram.h"
 
 #include <gtest/gtest.h>
 
@@ -116,6 +117,41 @@ TEST(RetailFxTest, RejectsResourcePointingOutsidePassStates)
 	std::string error;
 	EXPECT_FALSE(RetailFX::parse(bytes, error));
 	EXPECT_FALSE(error.empty());
+}
+
+TEST(RetailFxTest, ReadsShaderConstantTableAndRequiresBoundedTokens)
+{
+	const uint32_t words[] = {
+		0xfffe0200, 0x000efffe, 0x42415443,
+		28, 0, 0xfffe0200, 1, 28, 0, 0,
+		48, 0x00030002, 1, 0, 0, 'T',
+		0x0000ffff
+	};
+	const auto bytes = encodeWords(words);
+	const auto program = RetailFX::readProgram(bytes, true);
+	ASSERT_TRUE(program);
+	ASSERT_EQ(program->bindings.size(), 1u);
+	EXPECT_EQ(program->bindings[0].name, "T");
+	EXPECT_EQ(program->bindings[0].first, 3u);
+	EXPECT_FALSE(RetailFX::readProgram(bytes, false));
+	EXPECT_FALSE(RetailFX::readProgram(std::span(bytes).first(bytes.size() - 4), true));
+	auto bad = bytes;
+	bad.insert(bad.end() - 4, {0x1f, 0, 0, 0});
+	EXPECT_FALSE(RetailFX::readProgram(bad, true));
+}
+
+TEST(RetailFxTest, RunsScalarPreshaderOperandAcrossOutputComponents)
+{
+	RetailFX::Program program;
+	program.inputs.push_back({"Time", 2, 0, 1, {}});
+	program.literals = {3.0, 5.0};
+	program.instructions.push_back({0x205, 2, true, {{{2, 0}, {1, 0}}}, {4, 12}});
+	RetailFX::Registers output;
+	const auto bind = [](const auto &, auto floats, auto) { floats[0][0] = 2.0f; };
+	ASSERT_TRUE(RetailFX::fillRegisters(program, bind, output));
+	EXPECT_EQ(output.floats[3], (RetailFX::Register{6.0f, 10.0f, 0.0f, 0.0f}));
+	program.instructions[0].output.offset = 1023;
+	EXPECT_FALSE(RetailFX::fillRegisters(program, bind, output));
 }
 
 }

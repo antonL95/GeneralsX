@@ -36,6 +36,7 @@
 #include "WW3D2/light.h"
 #include "Common/GameType.h"
 #include "Common/Snapshot.h"
+#include <memory>
 
 #define INVALID_WATER_HEIGHT 0.0f	///water height guaranteed to be below all terrain.
 
@@ -48,6 +49,7 @@
 #define CV_PATCH_SCALE_OFFSET 10
 
 class PolygonTrigger;
+class RetailStandingWater;
 class WaterTracksRenderSystem;
 class Xfer;
 class ZTextureClass;
@@ -249,6 +251,8 @@ protected:
 	Setting m_settings[ TIME_OF_DAY_COUNT ];	///< settings for each time of day
 	void drawRiverWater(PolygonTrigger *pTrig);
 	void drawStandingWater(const PolygonTrigger &polygon);
+	bool drawRetailStandingWater(const PolygonTrigger &polygon);
+	std::shared_ptr<RetailStandingWater> m_retailStandingWater;
 	void drawTrapezoidWater(Vector3 points[4], Bool standingWater = false, Bool additive = false,
 		Real scroll = 0.0f);
 	void loadSetting ( Setting *skySetting, TimeOfDay timeOfDay );	///<init sky/water settings from GDF

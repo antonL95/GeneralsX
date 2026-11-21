@@ -250,6 +250,8 @@ private:
 	AsciiString m_retailCloudTexture;
 	Bool m_retailEnvironment = FALSE;
 	Bool m_retailMacroStretched = FALSE;
+	Real m_retailWaterMaxAlphaDepth = -1.0f;
+	Real m_retailDeepWaterAlpha = -1.0f;
 	static Bool ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseRetailEnvironment(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	struct MapPolygonDeleter
@@ -272,6 +274,8 @@ public: // constructors/destructors
 	const AsciiString &getRetailLookupTexture() const { return m_retailLookupTexture; }
 	Real getRetailLookupBlend() const { return m_retailLookupBlend; }
 	Bool hasRetailEnvironment() const { return m_retailEnvironment; }
+	Real getRetailWaterMaxAlphaDepth() const { return m_retailWaterMaxAlphaDepth; }
+	Real getRetailDeepWaterAlpha() const { return m_retailDeepWaterAlpha; }
 	Bool usesRetailOverbright() const;
 	const AsciiString &getRetailMacroTexture() const { return m_retailMacroTexture; }
 	const AsciiString &getRetailCloudTexture() const { return m_retailCloudTexture; }

@@ -834,6 +834,7 @@ HRESULT WaterRenderObjClass::generateIndexBuffer(Int sizeX, Int sizeY)
 //-------------------------------------------------------------------------------------------------
 void WaterRenderObjClass::ReleaseResources()
 {
+	m_retailStandingWater.reset();
 
 	REF_PTR_RELEASE(m_indexBuffer);
 
@@ -1008,6 +1009,7 @@ void WaterRenderObjClass::ReAcquireResources()
 
 void WaterRenderObjClass::load()
 {
+	m_retailStandingWater.reset();
 	if (m_waterTrackSystem)
 		m_waterTrackSystem->loadTracks();
 }
@@ -3326,6 +3328,8 @@ void WaterRenderObjClass::setupFlatWaterShader(TextureClass *texture, Bool addit
 
 void WaterRenderObjClass::drawStandingWater(const PolygonTrigger &polygon)
 {
+	if (drawRetailStandingWater(polygon))
+		return;
 	const auto &settings = *polygon.getStandingWater();
 	const Real scroll = static_cast<Real>(std::fmod(
 		static_cast<double>(m_riverVOrigin) * settings.uvScrollSpeed / 0.06, 1.0));

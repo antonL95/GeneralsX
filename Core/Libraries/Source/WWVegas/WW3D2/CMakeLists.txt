@@ -67,6 +67,8 @@ set(WW3D2_SRC
     dx8wrapper.h
     retailfx.cpp
     retailfx.h
+    retailfxprogram.cpp
+    retailfxprogram.h
     dynamesh.cpp
     dynamesh.h
     font3d.cpp
