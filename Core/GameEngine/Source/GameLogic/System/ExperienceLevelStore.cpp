@@ -375,8 +375,14 @@ int rankForPower(const Object* obj, const SpecialPowerTemplate* power)
 		if (upgrade->m_specialPower != power)
 			continue;
 		const auto& triggers = upgrade->m_upgradeMuxData;
+#if RTS_GENERALS
+		const auto& names = triggers.m_activationUpgradeNames;
+#else
+		const auto& names = triggers.m_triggerUpgradeNames.empty()
+			? triggers.m_activationUpgradeNames : triggers.m_triggerUpgradeNames;
+#endif
 		Int fromUpgrades = 0;
-		for (const AsciiString& name : triggers.m_activationUpgradeNames)
+		for (const AsciiString& name : names)
 		{
 			const Int rank = rankForUpgrade(obj, name);
 			if (triggers.m_requiresAllTriggers)

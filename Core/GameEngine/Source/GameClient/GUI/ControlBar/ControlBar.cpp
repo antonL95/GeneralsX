@@ -791,7 +791,7 @@ Bool CommandButton::isValidToUseOn(const Object *sourceObj, const Object *target
 Bool CommandButton::canCastRetailSpell(const Object* book, const Object* target, const Coord3D* position) const
 {
 	if (!book || m_command != GUI_COMMAND_SPELL_BOOK || !m_specialPower ||
-		hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE) ||
+		isRetailPassive() ||
 		!m_specialPower->isUnlockedFor(book->getControllingPlayer()))
 		return FALSE;
 	const SpecialPowerModuleInterface* module = book->getSpecialPowerModule(m_specialPower);
@@ -803,6 +803,20 @@ Bool CommandButton::canCastRetailSpell(const Object* book, const Object* target,
 		!std::isfinite(position->y) || !std::isfinite(position->z)))
 		return FALSE;
 	return isValidToUseOn(book, target, position, CMD_FROM_PLAYER);
+}
+
+Bool CommandButton::isRetailPassive() const
+{
+	if (!RetailFileLayers::enabled())
+		return FALSE;
+	if (m_command == GUI_COMMAND_NONE || hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE))
+		return TRUE;
+	if (m_specialPower && m_specialPower->getSpecialPowerType() == SPECIAL_FAKE_LEADERSHIP_BUTTON)
+		return TRUE;
+	return !m_specialPower && (m_command == GUI_COMMAND_SPECIAL_POWER ||
+		m_command == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT ||
+		m_command == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
+		m_command == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT);
 }
 
 Bool CommandButton::isReady(const Object *sourceObj) const
@@ -4038,6 +4052,7 @@ void ControlBar::updateSpecialPowerShortcut()
 				win->winHide( TRUE );
 				break;
 			case COMMAND_RESTRICTED:
+			case COMMAND_PASSIVE:
 				win->winEnable( FALSE );
 				break;
 			case COMMAND_NOT_READY:

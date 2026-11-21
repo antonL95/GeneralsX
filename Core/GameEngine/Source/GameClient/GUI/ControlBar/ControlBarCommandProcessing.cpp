@@ -122,6 +122,10 @@ CBCommandStatus ControlBar::processCommandTransitionUI( GameWindow *control, Gad
 CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 																							GadgetGameMessage gadgetMessage )
 {
+	const CommandButton *commandButton = control ? static_cast<const CommandButton *>(GadgetButtonGetData(control)) : nullptr;
+	if (commandButton && commandButton->isRetailPassive())
+		return CBC_COMMAND_USED;
+
 	if (m_retailSelectionName && control && getRetailSlot(control) >= 0)
 	{
 		if (control->winIsHidden() || TheInGameUI->getSelectCount() == 0)
@@ -138,7 +142,6 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 	}
 
 	// get the command pointer from the control user data we put in the button
-	const CommandButton *commandButton = (const CommandButton *)GadgetButtonGetData(control);
 	if( !commandButton )
 	{
 		DEBUG_CRASH( ("ControlBar::processCommandUI() -- Button activated has no data. Ignoring...") );

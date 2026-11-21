@@ -338,7 +338,7 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	const CommandAvailability availability = TheControlBar->getRetailButtonAvailability(window);
 	const Bool enabled = availability == COMMAND_AVAILABLE || availability == COMMAND_ACTIVE;
 	const Bool highlight = enabled && BitIsSet(instance->getState(), WIN_STATE_HILITED);
-	const Bool pressed = BitIsSet(instance->getState(), WIN_STATE_SELECTED);
+	const Bool pressed = enabled && BitIsSet(instance->getState(), WIN_STATE_SELECTED);
 	const Int slot = TheControlBar->getRetailSlot(window);
 	const Bool radial = TheControlBar->isRetailRadialButton(window);
 	const Bool side = !radial && slot >= RetailRingSlots && slot < MAX_COMMANDS_PER_SET;
@@ -347,7 +347,7 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	TheControlBar->getRetailProduction(window, count, progress);
 	const auto *command = static_cast<const CommandButton *>(GadgetButtonGetData(window));
 	const Bool queued = count > 0 && command && command->getCommandType() != GUI_COMMAND_DOZER_CONSTRUCT_CANCEL;
-	const Bool colored = enabled || count > 0;
+	const Bool colored = enabled || availability == COMMAND_PASSIVE || count > 0;
 
 	if (side)
 	{
@@ -672,7 +672,8 @@ AutoAbilityBehavior* retailAutoAbility(const GameWindow* window, Drawable* selec
 {
 	Object* object = selected ? selected->getObject() : nullptr;
 	const CommandButton* button = static_cast<const CommandButton*>(GadgetButtonGetData(const_cast<GameWindow*>(window)));
-	if (!object || !object->isLocallyControlled() || !button || !button->isAutoAbility() || !button->getSpecialPowerTemplate())
+	if (!object || !object->isLocallyControlled() || !button || button->isRetailPassive() ||
+		!button->isAutoAbility() || !button->getSpecialPowerTemplate())
 		return nullptr;
 	return AutoAbilityBehavior::find(object, button->getSpecialPowerTemplate());
 }
@@ -807,7 +808,7 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 	hotKey.toUpper();
 	Mouse::RetailTooltip tooltip;
 	tooltip.title = text;
-	if (!hero)
+	if (!hero && !command->isRetailPassive())
 		tooltip.shortcut.translate(hotKey);
 	tooltip.body = TheGameText->fetchOrSubstitute(command->getRetailChoiceDescription(getRetailTrayChoice(window)).str(), L"");
 	tooltip.cost = getRetailCommandCost(command, window);
@@ -1229,8 +1230,9 @@ void ControlBar::assignRetailSlots(const CommandSet *commandSet, Object *obj, In
 		setControlCommand(target, placement.command);
 		const GUICommandType type = placement.command->getCommandType();
 		setRetailRightClick(target, type == GUI_COMMAND_UNIT_BUILD || type == GUI_COMMAND_REVIVE || hasRetailAutoAbility(target));
-		const Bool enabled = placement.entry >= MAX_COMMANDS_PER_SET
-			|| BitIsSet(m_retailHolders[placement.entry]->winGetStatus(), WIN_STATUS_ENABLED);
+		const Bool passive = placement.command->isRetailPassive();
+		const Bool enabled = !passive && (placement.entry >= MAX_COMMANDS_PER_SET
+			|| BitIsSet(m_retailHolders[placement.entry]->winGetStatus(), WIN_STATUS_ENABLED));
 		target->winEnable(enabled);
 		m_retailAvailability[placement.slot] = enabled ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		target->winHide(FALSE);
@@ -1603,7 +1605,8 @@ const Image* ControlBar::getRetailButtonImage(GameWindow *window) const
 Real ControlBar::getRetailRecharge(const GameWindow *window) const
 {
 	const CommandButton *command = static_cast<const CommandButton *>(GadgetButtonGetData(const_cast<GameWindow *>(window)));
-	if (!command || !m_currentSelectedDrawable || command->getCommandType() != GUI_COMMAND_SPECIAL_POWER || !command->getSpecialPowerTemplate())
+	if (!command || command->isRetailPassive() || !m_currentSelectedDrawable ||
+		command->getCommandType() != GUI_COMMAND_SPECIAL_POWER || !command->getSpecialPowerTemplate())
 		return -1.0f;
 	Object *obj = m_currentSelectedDrawable->getObject();
 	SpecialPowerModuleInterface *power = obj ? obj->getSpecialPowerModule(command->getSpecialPowerTemplate()) : nullptr;

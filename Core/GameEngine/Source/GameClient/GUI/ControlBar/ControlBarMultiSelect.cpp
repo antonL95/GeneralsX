@@ -366,6 +366,7 @@ void ControlBar::updateContextMultiSelect()
 					win->winHide( TRUE );
 					break;
 				case COMMAND_RESTRICTED:
+				case COMMAND_PASSIVE:
 					win->winEnable( FALSE );
 					break;
 				case COMMAND_NOT_READY:

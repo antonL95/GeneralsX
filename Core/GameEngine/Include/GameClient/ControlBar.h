@@ -400,6 +400,7 @@ public:
 	Int getCommandRangeStart() const { return m_commandRangeStart; }
 	Int getCommandRangeCount() const { return m_commandRangeCount; }
 	Bool isAutoAbility() const { return m_autoAbility; }
+	Bool isRetailPassive() const;
 	Bool isMountStateAllowed(const Object* source) const;
 	Real getPresetRange() const { return m_presetRange; }
 	const WeaponSetFlags& getFlagsUsedForToggle() const { return m_flagsUsedForToggle; }
@@ -721,6 +722,7 @@ enum CommandAvailability CPP_11(: Int)
   COMMAND_HIDDEN,
 	COMMAND_NOT_READY,
 	COMMAND_CANT_AFFORD,
+	COMMAND_PASSIVE,
 };
 
 enum ControlBarStages CPP_11(: Int)

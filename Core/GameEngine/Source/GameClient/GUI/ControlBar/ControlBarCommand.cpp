@@ -41,6 +41,7 @@
 #include "Common/Upgrade.h"
 #include "Common/BuildAssistant.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/BattlePlanUpdate.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
@@ -846,8 +847,7 @@ void ControlBar::updateContextCommand()
 		}
 
 		// is the command available
-		CommandAvailability availability = m_retailSelectionName && command->getCommandType() == GUI_COMMAND_NONE
-			? COMMAND_RESTRICTED : getCommandAvailability(command, obj, win);
+		CommandAvailability availability = getCommandAvailability(command, obj, win);
 		const Int retailSlot = m_retailSelectionName ? getRetailSlot(win) : -1;
 		if (retailSlot >= 0)
 			m_retailAvailability[retailSlot] = availability;
@@ -859,6 +859,7 @@ void ControlBar::updateContextCommand()
 				win->winHide( TRUE );
 				break;
 			case COMMAND_RESTRICTED:
+			case COMMAND_PASSIVE:
 				win->winEnable( FALSE );
 				break;
 			case COMMAND_NOT_READY:
@@ -1035,8 +1036,9 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 																												GameWindow *applyToWin,
 																												Bool forceDisabledEvaluation ) const
 {
-	if(	command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
-			command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT )
+	const Bool passive = command->isRetailPassive();
+	if (!passive && (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
+			command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT))
 	{
 		if (ThePlayerList && ThePlayerList->getLocalPlayer())
 			obj = ThePlayerList->getLocalPlayer()->findMostReadyShortcutSpecialPowerOfType( command->getSpecialPowerTemplate()->getSpecialPowerType() );
@@ -1140,6 +1142,10 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			}
 		}
 	}
+
+	if (passive)
+		return ExperienceLevelStore::rankForPower(obj, command->getSpecialPowerTemplate()) >
+			obj->getExperienceTracker()->getRank() ? COMMAND_RESTRICTED : COMMAND_PASSIVE;
 
 	ProductionUpdateInterface *pu = obj->getProductionUpdateInterface();
 	if( pu && pu->firstProduction() && BitIsSet( command->getOptions(), NOT_QUEUEABLE ) )
