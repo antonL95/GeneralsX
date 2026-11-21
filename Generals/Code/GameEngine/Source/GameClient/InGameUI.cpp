@@ -523,7 +523,7 @@ void InGameUI::setMouseCursor(Mouse::MouseCursor c)
 
 	if (RetailFileLayers::enabled() && m_mouseMode == MOUSEMODE_DEFAULT &&
 		(c == Mouse::SELECTING || c == Mouse::ARROW || c == Mouse::MOVETO) &&
-		m_mousedOverDrawableID != INVALID_DRAWABLE_ID && TheGameClient)
+		m_mousedOverDrawableID != INVALID_DRAWABLE_ID && TheGameClient && TheControlBar && ThePlayerList)
 	{
 		const Drawable* hovered = TheGameClient->findDrawableByID(m_mousedOverDrawableID);
 		const Object* target = hovered ? hovered->getObject() : nullptr;
