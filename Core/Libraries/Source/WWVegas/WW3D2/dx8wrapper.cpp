@@ -472,6 +472,27 @@ typedef IDirect3D8* (WINAPI *Direct3DCreate8Type) (UINT SDKVersion);
 Direct3DCreate8Type	Direct3DCreate8Ptr = nullptr;
 HINSTANCE D3D8Lib = nullptr;
 
+void *DX8Wrapper::Get_Effect_Device9()
+{
+	using GetDevice = void *(WINAPI *)(IDirect3DDevice8 *);
+	if (!D3D8Lib || !D3DDevice)
+		return nullptr;
+	const auto getDevice = reinterpret_cast<GetDevice>(GetProcAddress(D3D8Lib, "DXVKGetD3D9EffectDevice"));
+	if (!getDevice)
+		return nullptr;
+	Apply_Render_State_Changes();
+	return getDevice(D3DDevice);
+}
+
+void *DX8Wrapper::Get_Effect_Texture9(IDirect3DBaseTexture8 *texture)
+{
+	using GetTexture = void *(WINAPI *)(IDirect3DBaseTexture8 *);
+	if (!D3D8Lib || !texture)
+		return nullptr;
+	const auto getTexture = reinterpret_cast<GetTexture>(GetProcAddress(D3D8Lib, "DXVKGetD3D9EffectTexture"));
+	return getTexture ? getTexture(texture) : nullptr;
+}
+
 DX8_CleanupHook	 *DX8Wrapper::m_pCleanupHook=nullptr;
 static std::vector<DX8_CleanupHook*> s_cleanupHooks;
 

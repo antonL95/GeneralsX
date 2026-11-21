@@ -1,0 +1,54 @@
+diff --git a/src/d3d8/d3d8_main.cpp b/src/d3d8/d3d8_main.cpp
+--- a/src/d3d8/d3d8_main.cpp
++++ b/src/d3d8/d3d8_main.cpp
+@@ -1,4 +1,5 @@
+ #include "d3d8_interface.h"
++#include "d3d8_device.h"
+
+ namespace dxvk {
+
+@@ -113,4 +114,32 @@ extern "C" {
+     return pDirect3D;
+   }
+
++  DLLEXPORT void* __stdcall DXVKGetD3D9EffectDevice(IDirect3DDevice8* device8) {
++    if (!device8)
++      return nullptr;
++
++    auto* device = static_cast<dxvk::D3D8Device*>(device8);
++    auto lock = device->LockDevice();
++    if (device->ShouldRecord())
++      return nullptr;
++    device->StateChange();
++    return device->GetD3D9();
++  }
++
++  DLLEXPORT void* __stdcall DXVKGetD3D9EffectTexture(IDirect3DBaseTexture8* texture8) {
++    if (!texture8)
++      return nullptr;
++
++    switch (texture8->GetType()) {
++      case D3DRTYPE_TEXTURE:
++        return static_cast<d3d9::IDirect3DBaseTexture9*>(
++          static_cast<dxvk::D3D8Texture2D*>(texture8)->GetD3D9());
++      case D3DRTYPE_CUBETEXTURE:
++        return static_cast<d3d9::IDirect3DBaseTexture9*>(
++          static_cast<dxvk::D3D8TextureCube*>(texture8)->GetD3D9());
++      default:
++        return nullptr;
++    }
++  }
++
+ }
+diff --git a/src/d3d8/d3d8.sym b/src/d3d8/d3d8.sym
+--- a/src/d3d8/d3d8.sym
++++ b/src/d3d8/d3d8.sym
+@@ -4,6 +4,8 @@
+     ValidateVertexShader;
+     DebugSetMute;
+     Direct3DCreate8;
++    DXVKGetD3D9EffectDevice;
++    DXVKGetD3D9EffectTexture;
+
+   local:
+     *;
