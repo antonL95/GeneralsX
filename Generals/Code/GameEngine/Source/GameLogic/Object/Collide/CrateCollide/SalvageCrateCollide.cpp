@@ -129,87 +129,62 @@ Bool SalvageCrateCollide::executeCrateBehavior( Object *other )
 
 // ------------------------------------------------------------------------------------------------
 
-static Bool rollRetailCrateChance(Real chance)
-{
-	return chance >= 1.0f || (chance > 0.0f && GameLogicRandomValueReal(0.0f, 1.0f) < chance);
-}
-
 Bool SalvageCrateCollide::executeRetailPickup(Object* other)
 {
 	const auto* data = getSalvageCrateCollideModuleData();
 	Player* player = other->getControllingPlayer();
-	Object* anchor = HordeContain::getAnchor(other);
-	if (!anchor)
-		anchor = other;
 	Int money = 0;
 	Int levels = 0;
 	const char* reward = nullptr;
 
-	if (HordeContain::get(anchor) && rollRetailCrateChance(data->m_bannerChance) && HordeContain::addCrateBanner(anchor))
-		reward = "banner";
-	else if (rollRetailCrateChance(data->m_porterChance) && player->getPlayerTemplate())
+	if (GameLogicRandomValueReal(0.0f, 1.0f) < data->m_levelUpChance)
 	{
-		const auto* porter = TheThingFactory->findTemplate(player->getPlayerTemplate()->getStartingUnit(0));
-		if (porter && porter->isKindOf(KINDOF_DOZER))
+		Object* anchor = HordeContain::getAnchor(other);
+		std::vector<ObjectID> units{anchor ? anchor->getID() : other->getID()};
+		if (data->m_levelUpRadius > 0.0f)
 		{
-			Object* unit = TheThingFactory->newObject(porter, player->getDefaultTeam());
-			unit->setPosition(getObject()->getPosition());
-			unit->setOrientation(other->getOrientation());
-			reward = "porter";
+			PartitionFilterSamePlayer filter(player);
+			PartitionFilter* filters[] = { &filter, nullptr };
+			ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(other->getPosition(),
+				data->m_levelUpRadius, FROM_CENTER_2D, filters, ITER_FASTEST);
+			MemoryPoolObjectHolder hold(iter);
+			for (Object* unit = iter->first(); unit; unit = iter->next())
+			{
+				if (unit->isEffectivelyDead())
+					continue;
+				Object* horde = HordeContain::getAnchor(unit);
+				units.push_back(horde ? horde->getID() : unit->getID());
+			}
+		}
+		std::sort(units.begin(), units.end());
+		units.erase(std::unique(units.begin(), units.end()), units.end());
+		for (ObjectID id : units)
+		{
+			Object* unit = TheGameLogic->findObjectByID(id);
+			if (unit && !unit->isEffectivelyDead() && unit->getControllingPlayer() == player)
+			{
+				if (ExperienceTracker* tracker = unit->getExperienceTracker())
+					levels += tracker->gainRetailLevels(1);
+			}
+		}
+		reward = "experience";
+	}
+	else if (data->m_pickupUpgrade.isNotEmpty())
+	{
+		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(data->m_pickupUpgrade);
+		if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+		{
+			player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+			reward = "upgrade";
 		}
 	}
-	if (!reward)
+	else
 	{
-		if (rollRetailCrateChance(data->m_resourceChance))
-		{
-			const Int low = std::min(data->m_minResource, data->m_maxResource);
-			const Int high = std::max(data->m_minResource, data->m_maxResource);
-			money = low < high ? GameLogicRandomValue(low, high) : low;
-			doMoney(other, money);
-			reward = "resources";
-		}
-		else if (rollRetailCrateChance(data->m_levelUpChance))
-		{
-			const auto levelUp = [&levels](Object* unit)
-			{
-				ExperienceTracker* tracker = unit->getExperienceTracker();
-				if (!unit->isEffectivelyDead() && tracker)
-					levels += tracker->gainRetailLevels(1);
-			};
-			if (data->m_levelUpRadius > 0.0f)
-			{
-				PartitionFilterSamePlayer filter(player);
-				PartitionFilter* filters[] = { &filter, nullptr };
-				ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(other->getPosition(),
-					data->m_levelUpRadius, FROM_CENTER_2D, filters, ITER_FASTEST);
-				MemoryPoolObjectHolder hold(iter);
-				std::vector<ObjectID> units;
-				for (Object* unit = iter->first(); unit; unit = iter->next())
-				{
-					Object* horde = HordeContain::getAnchor(unit);
-					units.push_back(horde ? horde->getID() : unit->getID());
-				}
-				std::sort(units.begin(), units.end());
-				units.erase(std::unique(units.begin(), units.end()), units.end());
-				for (ObjectID id : units)
-					if (Object* unit = TheGameLogic->findObjectByID(id))
-						levelUp(unit);
-			}
-			else
-			{
-				levelUp(anchor);
-			}
-			reward = "experience";
-		}
-		else if (data->m_pickupUpgrade.isNotEmpty())
-		{
-			const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(data->m_pickupUpgrade);
-			if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
-			{
-				player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
-				reward = "upgrade";
-			}
-		}
+		const Int low = std::min(data->m_minResource, data->m_maxResource);
+		const Int high = std::max(data->m_minResource, data->m_maxResource);
+		money = low < high ? GameLogicRandomValue(low, high) : low;
+		doMoney(other, money);
+		reward = "resources";
 	}
 
 	if (std::getenv("GENERALSX_TEST_COMMANDS"))

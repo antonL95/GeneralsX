@@ -153,7 +153,7 @@ public:
 	virtual SlavedUpdateInterface* getSlavedUpdateInterface() override { return this; }
 
 	virtual ObjectID getSlaverID() const override { return m_slaver; }
-	static Bool targetWithinCreepLeash(const Object* creep, const Object* target);
+	Bool isWithinCreepLeash() const;
 	virtual void onEnslave( const Object *slaver ) override;
 	virtual void onSlaverDie( const DamageInfo *info ) override;
 	virtual void onSlaverDamage( const DamageInfo *info ) override;
@@ -173,7 +173,7 @@ public:
 	virtual UpdateSleepTime update() override;	///< Deciding whether or not to make new guys
 
 private:
-	Real creepLeashRange() const;
+	Bool isMapCreep() const;
 	void startSlavedEffects( const Object *slaver );	///< We have been marked as Slaved, so we can't be selected or move too far or other stuff
 	void stopSlavedEffects();		///< We are no longer slaved.
 

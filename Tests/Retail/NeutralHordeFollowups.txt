@@ -1,0 +1,75 @@
+5 xptestini - - 0 /app/engine/GeneralsX-slot5/Tests/Retail/NeutralHordeFollowups.ini
+10 create Player_1 GondorFaramir 0 1230,1130,0
+11 create Player_1 GondorBoromir 0 1280,1130,0
+12 create Player_1 GondorFaramir 1 1490,1130,0
+14 create PlyrCreeps TreasureChest 0 1800,900,0
+14 nhpickup PlyrCreeps TreasureChest 0 Player_1:GondorFaramir:0
+15 xpstate Player_1 GondorFaramir 0
+15 xpstate Player_1 GondorBoromir 0
+15 xpstate Player_1 GondorFaramir 1
+17 create PlyrCreeps TreasureChest1 0 1800,900,0
+17 nhpickup PlyrCreeps TreasureChest1 0 Player_1:GondorFaramir:0
+18 create PlyrCreeps NhUpgradeChest 0 1800,900,0
+18 nhpickup PlyrCreeps NhUpgradeChest 0 Player_1:GondorFaramir:0
+20 hordespawn Player_1 GondorFighterHorde 0 - 1450 900 0
+25 create PlyrCreeps TreasureChest 0 1830,900,0
+25 nhpickup PlyrCreeps TreasureChest 0 Player_1:GondorFighter:0
+26 xpstate Player_1 GondorFighterHorde 0
+26 xpstate Player_1 GondorFighter 0
+30 create Player_1 NhUnknownGate 0 1690,1180,0
+31 create Player_1 LorienStalker 0 1180,930,0
+31 create Player_1 MoriaHobgoblinPlunderer 0 1100,930,0
+32 objupgrade Player_1 LorienStalker 0 Upgrade_ObjectLevel2
+32 objupgrade Player_1 MoriaHobgoblinPlunderer 0 Upgrade_ObjectLevel2
+33 select Player_1 LorienStalker 0
+35 button Player_1 LorienStalker 0 3
+37 nhstate Player_1 LorienStalker 0
+40 nhmode Player_1 LorienStalker 0 SpecialAbilityPathstalkerShadowstrike1
+42 nhstate Player_1 LorienStalker 0
+43 select Player_1 MoriaHobgoblinPlunderer 0
+47 nhmode Player_1 MoriaHobgoblinPlunderer 0 SpecialAbilityGoblinFighterPoisonedBlades
+49 nhstate Player_1 MoriaHobgoblinPlunderer 0
+52 button Player_1 MoriaHobgoblinPlunderer 0 2
+54 nhstate Player_1 MoriaHobgoblinPlunderer 0
+60 hordespawn Player_1 GondorKnightHorde 0 - 1750 850 0
+60 nhload Player_1 GondorKnightHorde 0 -
+60 hordespawn Player_1 GondorKnightHordeWedgeFormation 0 - 1750 970 0
+60 nhstate Player_1 GondorKnightHordeWedgeFormation 0
+65 nhstate Player_1 GondorKnightHorde 0
+65 nhstate Player_1 GondorKnightHordeWedgeFormation 0
+66 hordespawn Player_1 GondorKnightHorde 0 - 1850 1050 0
+70 select Player_1 GondorKnightHorde 1
+74 button Player_1 GondorKnightHorde 1 2
+76 hordelog Player_1 GondorKnightHorde 1
+78 hordespawn Player_1 NhKnightMissing 0 - 1850 1070 0
+78 nhload Player_1 NhKnightMissing 0 Player_1:GondorKnightHorde:1
+80 hordelog Player_1 NhKnightMissing 0
+84 hordespawn Player_1 NhKnightLine 0 - 1600 820 0
+88 select Player_1 NhKnightLine 0
+92 button Player_1 NhKnightLine 0 2
+95 hordelog Player_1 NhKnightLine 0
+100 create PlyrCreeps MenPorter 0 1650,1360,0
+102 create PlyrCreeps GiantSpider_Slaved 0 1690,1360,0
+102 nhenslave PlyrCreeps GiantSpider_Slaved 0 PlyrCreeps:MenPorter:0
+103 create Player_1 GondorBoromir 0 1785,1360,0
+105 nhattack PlyrCreeps GiantSpider_Slaved 0 Player_1:GondorBoromir:1
+107 create PlyrCreeps BarrowWight_Slaved 0 1670,1400,0
+107 nhenslave PlyrCreeps BarrowWight_Slaved 0 PlyrCreeps:MenPorter:0
+110 nhattack PlyrCreeps BarrowWight_Slaved 0 Player_1:GondorBoromir:1
+112 create Player_1 MenPorter 0 1100,1190,0
+113 create Player_1 GiantSpider_Slaved 0 1410,1190,0
+113 nhenslave Player_1 GiantSpider_Slaved 0 Player_1:MenPorter:2
+128 nhstate Player_1 GiantSpider_Slaved 0
+130 create PlyrCreeps GiantSpider_Slaved 1 1810,1360,0
+130 nhenslave PlyrCreeps GiantSpider_Slaved 1 PlyrCreeps:MenPorter:0
+131 create PlyrCreeps GuldurBarrowWight_Slaved 0 1960,1380,0
+131 nhenslave PlyrCreeps GuldurBarrowWight_Slaved 0 PlyrCreeps:MenPorter:0
+131 nhattack PlyrCreeps GuldurBarrowWight_Slaved 0 Player_1:GondorBoromir:1
+150 kill PlyrCreeps MenPorter 0
+160 nhstate PlyrCreeps GiantSpider_Slaved 0
+160 nhstate PlyrCreeps BarrowWight_Slaved 0
+180 logall - - 0
+655 nhstate Player_1 LorienStalker 0
+655 nhstate Player_1 MoriaHobgoblinPlunderer 0
+660 xpcrc - - 0
+665 quit - - 0

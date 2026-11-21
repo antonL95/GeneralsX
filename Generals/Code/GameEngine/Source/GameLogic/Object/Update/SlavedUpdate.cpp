@@ -49,6 +49,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/Player.h"
 
 #include <cstdlib>
 #include "GameLogic/Weapon.h"
@@ -101,19 +102,20 @@ void SlavedUpdate::onSlaverDie( const DamageInfo *info )
 		getObject()->kill();
 }
 
-Real SlavedUpdate::creepLeashRange() const
+Bool SlavedUpdate::isMapCreep() const
 {
-	const auto* data = getSlavedUpdateModuleData();
-	return data->m_leashRange > 0.0f ? data->m_leashRange : data->m_guardMaxRange;
+	const Object* creep = getObject();
+	static const NameKeyType creepsPlayer = NAMEKEY("PlyrCreeps");
+	return creep->getControllingPlayer()->getPlayerNameKey() == creepsPlayer;
 }
 
-Bool SlavedUpdate::targetWithinCreepLeash(const Object* creep, const Object* target)
+Bool SlavedUpdate::isWithinCreepLeash() const
 {
-	const auto* slave = static_cast<const SlavedUpdate*>(creep->findUpdateModule(NAMEKEY("SlavedUpdate")));
-	const Object* home = slave ? TheGameLogic->findObjectByID(slave->getSlaverID()) : nullptr;
-	const Real leash = home ? slave->creepLeashRange() : 0.0f;
-	return leash <= 0.0f || (ThePartitionManager->getDistanceSquared(creep, home, FROM_CENTER_2D) <= leash * leash &&
-		ThePartitionManager->getDistanceSquared(target, home, FROM_CENTER_2D) <= leash * leash);
+	const Real leash = getSlavedUpdateModuleData()->m_leashRange;
+	if (leash <= 0.0f || m_slaver == INVALID_ID || !isMapCreep())
+		return TRUE;
+	const Object* home = TheGameLogic->findObjectByID(m_slaver);
+	return !home || ThePartitionManager->getDistanceSquared(getObject(), home, FROM_CENTER_2D) <= leash * leash;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -166,6 +168,11 @@ UpdateSleepTime SlavedUpdate::update()
 	Object *master = TheGameLogic->findObjectByID( m_slaver );
 	if( !master || master->isEffectivelyDead() || master->isDisabledByType( DISABLED_UNMANNED ) )
 	{
+		if (RetailFileLayers::enabled())
+		{
+			onSlaverDie(nullptr);
+			return UPDATE_SLEEP_NONE;
+		}
 		stopSlavedEffects();
 
 		//Killing is lame.
@@ -192,12 +199,16 @@ UpdateSleepTime SlavedUpdate::update()
 	if (data->m_stayOnSameLayerAsMaster)
 		me->setLayer(master->getLayer());
 
-	if (RetailFileLayers::enabled() && me->isKindOf(KINDOF_CREEP) && creepLeashRange() > 0.0f)
+	if (RetailFileLayers::enabled() && isMapCreep() && (data->m_leashRange > 0.0f || data->m_guardMaxRange > 0))
 	{
-		const Real leash = creepLeashRange();
+		const Real leash = data->m_leashRange;
+		const Real guard = static_cast<Real>(data->m_guardMaxRange);
+		const Real distance = ThePartitionManager->getDistanceSquared(me, master, FROM_CENTER_2D);
 		const Object* victim = myAI->getCurrentVictim();
-		const Bool returnToRally = victim ? !targetWithinCreepLeash(me, victim) :
-			m_creepNeedsReturn && myAI->isIdle();
+		const Bool outsideLeash = leash > 0.0f && distance > leash * leash;
+		const Bool outsideGuard = guard > 0.0f && distance > guard * guard;
+		const Bool returnToRally = victim ? outsideLeash || outsideGuard :
+			myAI->isIdle() && (outsideLeash || outsideGuard || m_creepNeedsReturn);
 		if (victim || returnToRally)
 			m_creepNeedsReturn = !returnToRally;
 		if (!returnToRally)
@@ -222,7 +233,7 @@ UpdateSleepTime SlavedUpdate::update()
 			if (std::getenv("GENERALSX_TEST_COMMANDS"))
 				fprintf(stderr, "TEST creep return frame=%u creep=%u lair=%u distanceSq=%.2f leash=%.2f victim=%u victimDistanceSq=%.2f\n",
 					TheGameLogic->getFrame(), static_cast<unsigned>(me->getID()), static_cast<unsigned>(master->getID()),
-					ThePartitionManager->getDistanceSquared(me, master, FROM_CENTER_2D), leash, victim ? static_cast<unsigned>(victim->getID()) : 0,
+					distance, leash, victim ? static_cast<unsigned>(victim->getID()) : 0,
 					victim ? ThePartitionManager->getDistanceSquared(victim, master, FROM_CENTER_2D) : 0.0f);
 		}
 		return UPDATE_SLEEP_NONE;
@@ -276,7 +287,7 @@ UpdateSleepTime SlavedUpdate::update()
 		}
 	}
 
-	if( data->m_scoutRange )
+	if( data->m_scoutRange && masterAI )
 	{
 		//3RD PRIORITY: Hover above master's current move destination (as close as wander distance
 		//allows).

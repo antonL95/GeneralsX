@@ -106,6 +106,7 @@ private:
 class HordeContain : public TransportContain
 {
 	friend class HordeAIUpdate;
+	friend struct RetailHordeSnapshotFixture;
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( HordeContain, "HordeContain" )
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( HordeContain, HordeContainModuleData )
 
@@ -162,6 +163,8 @@ public:
 	static Drawable* resolveSelection(Drawable* draw);
 
 protected:
+	void onObjectCreated() override;
+	void onDrawableBoundToObject() override;
 	virtual void createPayload() override;
 	void redeployOccupants() override {}
 

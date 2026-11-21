@@ -769,6 +769,7 @@ private:
 	std::unique_ptr<RotwkPowerState> m_rotwkPowerState;
 	void xferRotwkPowerState(Xfer* xfer);
 	ContainModuleInterface*				m_contain;
+	class SlavedUpdate* m_slavedUpdate = nullptr;
 	BodyModuleInterface*					m_body;
   StealthUpdate*                m_stealth;
 

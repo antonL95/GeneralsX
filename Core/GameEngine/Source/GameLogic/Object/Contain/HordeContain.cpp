@@ -276,9 +276,8 @@ void HorseHordeContain::xfer(Xfer* xfer)
 void HorseHordeContain::loadPostProcess()
 {
 	if (m_legacySnapshot)
-		BehaviorModule::loadPostProcess();
-	else
-		HordeContain::loadPostProcess();
+		m_payloadCreated = TRUE;
+	HordeContain::loadPostProcess();
 }
 
 AODHordeContain::~AODHordeContain() = default;
@@ -288,6 +287,7 @@ void AODHordeContain::loadPostProcess() { BehaviorModule::loadPostProcess(); }
 
 HordeContain::HordeContain( Thing *thing, const ModuleData *moduleData ) : TransportContain( thing, moduleData )
 {
+	m_payloadCreated = FALSE;
 }
 
 HordeContain::~HordeContain()
@@ -317,6 +317,19 @@ Bool HordeContain::isValidContainerFor( const Object* rider, Bool checkCapacity 
 		return rider->isAnyKindOf(filter.m_includeKinds) ||
 			std::any_of(filter.m_includeObjects.begin(), filter.m_includeObjects.end(), matchesRider);
 	return (filter.m_rules & SpecialPowerObjectFilter::RULE_NONE) == 0;
+}
+
+void HordeContain::onObjectCreated()
+{
+	TransportContain::onObjectCreated();
+	if (getHordeContainModuleData()->m_alternateFormation.isNotEmpty())
+		updateFormationModelConditions(getObject());
+}
+
+void HordeContain::onDrawableBoundToObject()
+{
+	if (getObject()->getDrawable() && getHordeContainModuleData()->m_alternateFormation.isNotEmpty())
+		updateFormationModelConditions(getObject());
 }
 
 void HordeContain::createPayload()
@@ -373,9 +386,12 @@ void HordeContain::addToContainList( Object *rider )
 	{
 		m_slotMembers[slot] = rider->getID();
 		m_memberSlots.emplace(rider->getID(), slot);
-		const Coord2D& extent = formation->m_randomOffset;
-		m_slotOffsets[slot].x = extent.x > 0.0f ? GameLogicRandomValueReal(-extent.x, extent.x) : 0.0f;
-		m_slotOffsets[slot].y = extent.y > 0.0f ? GameLogicRandomValueReal(-extent.y, extent.y) : 0.0f;
+		if (!TheGameState || !TheGameState->isInLoadGame())
+		{
+			const Coord2D& extent = formation->m_randomOffset;
+			m_slotOffsets[slot].x = extent.x > 0.0f ? GameLogicRandomValueReal(-extent.x, extent.x) : 0.0f;
+			m_slotOffsets[slot].y = extent.y > 0.0f ? GameLogicRandomValueReal(-extent.y, extent.y) : 0.0f;
+		}
 	}
 }
 
@@ -473,8 +489,6 @@ void HordeContain::xfer( Xfer *xfer )
 	TransportContain::xfer( xfer );
 
 	xfer->xferSTLObjectIDVector( &m_slotMembers );
-	if (xfer->getXferMode() == XFER_LOAD)
-		rebuildMemberSlots();
 	m_slotOffsets.resize(m_slotMembers.size(), Coord2D{0.0f, 0.0f});
 	if (version >= 2)
 	{
@@ -484,19 +498,26 @@ void HordeContain::xfer( Xfer *xfer )
 	}
 	else
 		m_restoreHadMembers = TRUE;
+	Bool switched = m_formationOverride != nullptr;
 	if (version >= 3)
-	{
-		Bool switched = m_formationOverride != nullptr;
 		xfer->xferBool(&switched);
-		if (xfer->getXferMode() == XFER_LOAD)
-			m_formationOverride = switched ? findAlternateFormation() : nullptr;
+	if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_formationOverride = switched ? findAlternateFormation() : nullptr;
+		const auto slotCount = getActiveFormation()->m_layout.slots().size();
+		if ((switched && !m_formationOverride) || (!m_slotMembers.empty() && m_slotMembers.size() != slotCount))
+		{
+			m_slotMembers.assign(slotCount, INVALID_ID);
+			m_slotOffsets.assign(slotCount, Coord2D{0.0f, 0.0f});
+		}
+		rebuildMemberSlots();
 	}
 }
 
 void HordeContain::loadPostProcess()
 {
 	TransportContain::loadPostProcess();
-	if (m_formationOverride)
+	if (getHordeContainModuleData()->m_alternateFormation.isNotEmpty())
 	{
 		updateFormationModelConditions(getObject());
 		for (Object* member : getContainList())
@@ -869,8 +890,12 @@ Bool HordeContain::canSetAlternateFormation(Bool alternate) const
 	const auto* other = m_formationOverride ? getHordeContainModuleData() : findAlternateFormation();
 	if (!other || getContainCount() == 0)
 		return FALSE;
-	return alternate == isAlternateFormation() ||
-		(other->m_thisFormationIsTheMainFormation != alternate && getContainCount() >= other->m_minimumHordeSize);
+	if (alternate == isAlternateFormation())
+		return TRUE;
+	const auto living = std::count_if(getContainList().begin(), getContainList().end(),
+		[](const Object* member) { return !member->isEffectivelyDead(); });
+	return other->m_thisFormationIsTheMainFormation != alternate && living >= other->m_minimumHordeSize &&
+		static_cast<std::size_t>(living) <= other->m_layout.slots().size();
 }
 
 void HordeContain::updateFormationModelConditions(Object* object) const

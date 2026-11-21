@@ -499,6 +499,10 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 		BehaviorModule* newMod = (BehaviorModule*)TheModuleFactory->newModule(this, modName, mi.getNthData(modIdx), MODULETYPE_BEHAVIOR);
 		*curB++ = newMod;
 
+		static const NameKeyType slavedUpdateKey = NAMEKEY("SlavedUpdate");
+		if (newMod->getModuleNameKey() == slavedUpdateKey)
+			m_slavedUpdate = static_cast<SlavedUpdate*>(newMod);
+
 		BodyModuleInterface* body = newMod->getBody();
 		if (body)
 		{
@@ -1609,8 +1613,8 @@ Bool Object::getAmmoPipShowingInfo(Int& numTotal, Int& numFull) const
 */
 CanAttackResult Object::getAbleToAttackSpecificObject( AbleToAttackType t, const Object* target, CommandSourceType commandSource, WeaponSlotType specificSlot ) const
 {
-	if (target && RetailFileLayers::enabled() && commandSource == CMD_FROM_AI && isKindOf(KINDOF_CREEP) &&
-		!SlavedUpdate::targetWithinCreepLeash(this, target))
+	if (target && m_slavedUpdate && RetailFileLayers::enabled() && commandSource == CMD_FROM_AI &&
+		!m_slavedUpdate->isWithinCreepLeash())
 		return ATTACKRESULT_NOT_POSSIBLE;
 
 	// NO! BAD! WRONG!

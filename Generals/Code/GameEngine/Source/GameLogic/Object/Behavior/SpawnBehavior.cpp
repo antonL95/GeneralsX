@@ -34,6 +34,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/INIAudit.h"
 #include "GameClient/Drawable.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
@@ -825,8 +826,18 @@ Bool SpawnBehavior::shouldTryToSpawn()
 	if (RetailFileLayers::enabled() && (!modData->m_spawnUpgradeGate.m_activationUpgradeNames.empty() ||
 		modData->m_spawnUpgradeGate.m_activationMask.any()))
 	{
+		const auto& gate = modData->m_spawnUpgradeGate;
+		for (const auto* names : {&gate.m_activationUpgradeNames, &gate.m_conflictingUpgradeNames})
+			for (const AsciiString& name : *names)
+				if (!TheUpgradeCenter->findUpgrade(name))
+				{
+					if (INIAudit::isEnabled())
+						INIAudit::recordWithContext("field-error", getObject()->getTemplate()->getName().str(),
+							std::string("SpawnBehavior references unknown upgrade ") + name.str(), "", 0);
+					return FALSE;
+				}
 		UpgradeMaskType required, conflicts;
-		modData->m_spawnUpgradeGate.getUpgradeActivationMasks(required, conflicts);
+		gate.getUpgradeActivationMasks(required, conflicts);
 		const auto* object = getObject();
 		UpgradeMaskType upgrades = object->getObjectCompletedUpgradeMask();
 		upgrades.set(object->getControllingPlayer()->getCompletedUpgradeMask());

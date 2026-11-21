@@ -66,6 +66,8 @@
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/CrateCollide.h"
+#include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #if !RTS_GENERALS
 #include "Common/GameState.h"
@@ -83,6 +85,11 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
+
+struct RetailHordeSnapshotFixture
+{
+	static void loadPostProcess(HordeContain* contain) { contain->loadPostProcess(); }
+};
 
 namespace RetailTestCommands
 {
@@ -882,6 +889,49 @@ void roundTripExperience(Object* obj, unsigned int frame)
 		tracker->getRetailStartingRank() == restored->getRetailStartingRank() && tracker->getRank() == restored->getRank();
 	std::fprintf(stderr, "TEST xp-snapshot frame=%u rank=%d xp=%.3f exact=%d\n", frame, restored->getRank(),
 		restored->getRetailExperience(), same);
+}
+
+void loadHordeFixture(Object* destination, Object* source, unsigned int frame)
+{
+	const char* directory = std::getenv("XDG_RUNTIME_DIR");
+	auto* restored = const_cast<HordeContain*>(HordeContain::get(destination));
+	auto* contain = const_cast<HordeContain*>(HordeContain::get(source));
+	if (!directory || !restored || restored->getContainCount() || (source && (!contain || contain == restored)))
+		return;
+
+	AsciiString file;
+	file.format("%s/horde-fixture", directory);
+	XferSave save;
+	save.open(file);
+	if (contain)
+		save.xferSnapshot(contain);
+	else
+	{
+		for (Int i = 0; i < 3; ++i)
+		{
+			XferVersion version = 1;
+			save.xferVersion(&version, 1);
+		}
+	}
+	save.close();
+
+	if (contain)
+		while (!contain->getContainedItemsList()->empty())
+			contain->removeFromContain(contain->getContainedItemsList()->front());
+
+	const Int updateIndex = restored->friend_getIndexInLogic();
+	const UnsignedInt wakeFrame = restored->friend_getNextCallFrame();
+	XferLoad load;
+	load.setOptions(XO_NO_POST_PROCESSING);
+	load.open(file);
+	load.xferSnapshot(restored);
+	load.close();
+	restored->friend_setIndexInLogic(updateIndex);
+	restored->friend_setNextCallFrame(wakeFrame);
+	RetailHordeSnapshotFixture::loadPostProcess(restored);
+	std::remove(file.str());
+	std::fprintf(stderr, "TEST nh-load frame=%u legacy=%d members=%u alternate=%d\n",
+		frame, contain == nullptr, restored->getContainCount(), restored->isAlternateFormation());
 }
 
 void roundTripHeroRoster(const Player* player, unsigned int frame)
@@ -2155,6 +2205,69 @@ void execute(const Command& command, unsigned int frame)
 			static_cast<unsigned>(obj->getID()), obj->getTemplate()->getName().str(), tracker->getRank(),
 			ExperienceLevelStore::maximumRank(obj), tracker->getRetailExperience(), tracker->getLevelProgress(),
 			tracker->getRetailStartingRank());
+	}
+	else if (command.action == "nhload")
+	{
+		Object* source = command.structure == "-" ? nullptr : findTarget(command);
+		if (source || command.structure == "-")
+			loadHordeFixture(obj, source, frame);
+	}
+	else if (command.action == "nhstate")
+	{
+		const auto* draw = obj->getDrawable();
+		const auto* slave = static_cast<const SlavedUpdate*>(obj->findUpdateModule(NAMEKEY("SlavedUpdate")));
+		const auto* horde = HordeContain::get(obj);
+		Bool alternateArmor = FALSE;
+#if !RTS_GENERALS
+		auto* body = obj->getBodyModule();
+		alternateArmor = body && body->testArmorSetFlag(ARMORSET_ALTERNATE_FORMATION);
+#endif
+		std::fprintf(stderr, "TEST nh-state frame=%u %s id=%u toggle=%d alternateModel=%d alternateArmor=%d members=%u slaver=%u unmanned=%d moving=%d\n",
+			frame, obj->getTemplate()->getName().str(), static_cast<unsigned>(obj->getID()), obj->testWeaponSetFlag(WEAPONSET_TOGGLE_1),
+			draw && draw->getModelConditionFlags().test(MODELCONDITION_ALTERNATE_FORMATION),
+			alternateArmor, horde ? horde->getContainCount() : 0u,
+			slave ? static_cast<unsigned>(slave->getSlaverID()) : 0u, obj->isDisabledByType(DISABLED_UNMANNED),
+			obj->getAI() && obj->getAI()->isMoving());
+#if !RTS_GENERALS
+		const auto* mode = static_cast<const WeaponModeSpecialPowerUpdate*>(
+			obj->findUpdateModule(NAMEKEY("WeaponModeSpecialPowerUpdate")));
+		if (mode)
+			std::fprintf(stderr, "TEST nh-mode frame=%u %s active=%d\n", frame, obj->getTemplate()->getName().str(), mode->isActive());
+#endif
+	}
+	else if (command.action == "nhenslave")
+	{
+		auto* slave = static_cast<SlavedUpdate*>(obj->findUpdateModule(NAMEKEY("SlavedUpdate")));
+		if (const Object* master = findTarget(command); slave && master)
+			slave->onEnslave(master);
+	}
+#if !RTS_GENERALS
+	else if (command.action == "nhmode")
+	{
+		auto* mode = static_cast<WeaponModeSpecialPowerUpdate*>(obj->findUpdateModule(NAMEKEY("WeaponModeSpecialPowerUpdate")));
+		const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate(command.structure.c_str());
+		if (mode && power)
+			std::fprintf(stderr, "TEST nh-mode-start frame=%u %s accepted=%d\n", frame, obj->getTemplate()->getName().str(),
+				mode->initiateIntentToDoSpecialPower(power, nullptr, nullptr, nullptr, 0));
+	}
+#endif
+	else if (command.action == "nhattack")
+	{
+		Object* target = findTarget(command);
+		if (target && obj->getAI())
+		{
+			const auto result = obj->getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, target, CMD_FROM_AI);
+			std::fprintf(stderr, "TEST nh-attack frame=%u %s eligible=%d\n", frame, obj->getTemplate()->getName().str(),
+				result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING);
+			obj->getAI()->aiAttackObject(target, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
+		}
+	}
+	else if (command.action == "nhpickup")
+	{
+		if (Object* collector = findTarget(command))
+			for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+				if (CollideModuleInterface* collide = (*module)->getCollide())
+					collide->onCollide(collector, nullptr, nullptr);
 	}
 	else if (command.action == "xpsnapshot")
 		roundTripExperience(obj, frame);
