@@ -2662,6 +2662,14 @@ void execute(const Command& command, unsigned int frame)
 	{
 		logObject(obj, frame);
 	}
+	else if (command.action == "flight")
+	{
+		const AIUpdateInterface* ai = obj->getAI();
+		const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+		std::fprintf(stderr, "TEST flight frame=%u id=%u height=%.2f cutoff=%.2f airborne=%d\n", frame,
+			static_cast<unsigned>(obj->getID()), obj->getHeightAboveTerrain(),
+			locomotor ? locomotor->getAirborneTargetingHeight() : 0.0f, obj->isAirborneTarget() ? 1 : 0);
+	}
 	else if (command.action == "ability")
 		dumpAbilities(command, obj, frame);
 	else if (command.action == "aim")

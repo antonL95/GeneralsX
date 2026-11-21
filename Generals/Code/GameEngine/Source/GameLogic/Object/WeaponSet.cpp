@@ -39,6 +39,7 @@
 #include "Common/INI.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/BitFlagsIO.h"
@@ -47,6 +48,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/SpawnBehavior.h"
 
@@ -566,6 +568,10 @@ static Int getVictimAntiMask(const Object* victim)
 		{
 			return WEAPON_ANTI_PARACHUTE;
 		}
+		else if (RetailFileLayers::enabled() && victim->isKindOf(KINDOF_MONSTER))
+		{
+			return WEAPON_ANTI_AIRBORNE_MONSTER;
+		}
 		else if( !victim->isKindOf( KINDOF_UNATTACKABLE ) )
 		{
 			DEBUG_CRASH( ("Object %s is being targeted as airborne, but is not infantry, nor vehicle. Is this legit? -- tell Kris", victim->getTemplate()->getName().str() ) );
@@ -961,6 +967,9 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 	WeaponSlotType currentDecision = PRIMARY_WEAPON;
 	WeaponSlotType currentDecisionBackup = PRIMARY_WEAPON;
 
+	const Bool targetingHorde = RetailFileLayers::enabled() && obj->isKindOf(KINDOF_GIANT_BIRD) &&
+		HordeContain::get(victim->getContainedBy());
+
 	// go backwards, so that in the event of ties, the primary weapon is preferred
 	for (Int i = WEAPONSLOT_COUNT - 1; i >= PRIMARY_WEAPON ; --i)
 	{
@@ -1021,12 +1030,13 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 			the weapon "ready" in a more liberal manner.
 		*/
 		const KindOfMaskType& preferredAgainst = m_curWeaponTemplateSet->getNthPreferredAgainstMask((WeaponSlotType)i);
-		if (KINDOFMASK_ANY_SET(preferredAgainst) && victim->isKindOfMulti(preferredAgainst, KINDOFMASK_NONE))
+		const Bool prefersHorde = targetingHorde && preferredAgainst.test(KINDOF_HORDE);
+		if (KINDOFMASK_ANY_SET(preferredAgainst) &&
+			(victim->isKindOfMulti(preferredAgainst, KINDOFMASK_NONE) || prefersHorde))
 		{
-			const Real HUGE_DAMAGE = 1e10;		// wow, that's a lot of damage.
-			const Real HUGE_RANGE = 1e10;
-			damage = HUGE_DAMAGE;
-			attackRange = HUGE_RANGE;
+			const Real preferenceScore = prefersHorde ? 2e10f : 1e10f;
+			damage = preferenceScore;
+			attackRange = preferenceScore;
 			// preferred weapons are also kept if they are merely reloading. (if out of ammo, we can punt.)
 			weaponIsReady = (weapon->getStatus() != OUT_OF_AMMO);
 		}

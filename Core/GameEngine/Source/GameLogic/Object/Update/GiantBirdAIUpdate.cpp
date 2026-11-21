@@ -10,6 +10,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #include "WWMath/wwmath.h"
@@ -160,6 +161,7 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 				const Real speed = getCurLocomotorSpeed();
 				Bool blocked = FALSE;
 				locomotor->locoUpdate_moveTowardsPosition(bird, m_followThroughGoal, WWMath::Sqrt(remaining), speed, &blocked);
+				updateAirborneTargetStatus();
 				return UPDATE_SLEEP_NONE;
 			}
 		}
@@ -167,11 +169,15 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 	}
 
 	const Object* victim = isAttacking() ? getCurrentVictim() : nullptr;
+	if (victim && victim->isEffectivelyDead())
+		victim = nullptr;
 	const Weapon* weapon = bird->getCurrentWeapon();
-	const Coord3D* strike = victim && !victim->isEffectivelyDead() ? victim->getPosition() : getCurrentVictimPos();
+	const Coord3D* strike = victim ? victim->getPosition() : getCurrentVictimPos();
 	const Real range = weapon ? weapon->getAttackRange(bird) : 0.0f;
 	const Real approach = range + std::max(40.0f, locomotor->getPreferredAttackHeight());
-	const Bool swooping = strike && weapon && planarDistanceSquared(at, *strike) <= approach * approach;
+	const Bool swooping = strike && weapon && (victim
+		? ThePartitionManager->getDistanceSquared(bird, victim, FROM_BOUNDINGSPHERE_2D)
+		: ThePartitionManager->getDistanceSquared(bird, strike, FROM_BOUNDINGSPHERE_2D)) <= approach * approach;
 	setSwooping(swooping);
 	if (swooping)
 	{

@@ -108,6 +108,7 @@ enum WeaponAntiMaskType CPP_11(: Int)
 	WEAPON_ANTI_AIRBORNE_INFANTRY	= 0x20, // When set, anti-air weapons will not target infantry paratroopers.
 	WEAPON_ANTI_BALLISTIC_MISSILE	= 0x40, // Specifically large missiles that are vulnerable to base defenses
 	WEAPON_ANTI_PARACHUTE					= 0x80, // Parachutes can be targeted directly
+	WEAPON_ANTI_AIRBORNE_MONSTER = 0x100,
 };
 
 //-------------------------------------------------------------------------------------------------

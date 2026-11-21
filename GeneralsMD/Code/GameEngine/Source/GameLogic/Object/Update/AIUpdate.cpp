@@ -2406,11 +2406,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 			m_blockedFrames = 1;
 		}
 
-		// After our movement for the frame, update our AirborneTarget flag.
-		if(getObject()->getHeightAboveTerrain() > m_curLocomotor->getAirborneTargetingHeight() )
-			getObject()->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_AIRBORNE_TARGET ) );
-		else
-			getObject()->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_AIRBORNE_TARGET ) );
+		updateAirborneTargetStatus();
 
 		m_curMaxBlockedSpeed = FAST_AS_POSSIBLE;
 	}
@@ -2428,6 +2424,15 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 		return UPDATE_SLEEP_NONE;
 	}
 
+}
+
+void AIUpdateInterface::updateAirborneTargetStatus()
+{
+	Object* object = getObject();
+	if (object->getHeightAboveTerrain() > m_curLocomotor->getAirborneTargetingHeight())
+		object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_AIRBORNE_TARGET));
+	else
+		object->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_AIRBORNE_TARGET));
 }
 
 //-------------------------------------------------------------------------------------------------
