@@ -33,6 +33,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/HordeContain.h"
 
 namespace
 {
@@ -406,6 +407,13 @@ Bool WeaponModeSpecialPowerUpdate::isModuleForPower(const SpecialPowerTemplate* 
 	return power && power == getWeaponModeSpecialPowerUpdateModuleData()->m_power.m_specialPowerTemplate;
 }
 
+void WeaponModeSpecialPowerUpdate::onDelete()
+{
+	if (!m_lockedMembers.empty())
+		endMode();
+	SpecialPowerUpdateModule::onDelete();
+}
+
 Bool WeaponModeSpecialPowerUpdate::initiateIntentToDoSpecialPower(const SpecialPowerTemplate* specialPowerTemplate, const Object*,
 	const Coord3D*, const Waypoint*, UnsignedInt)
 {
@@ -416,13 +424,22 @@ Bool WeaponModeSpecialPowerUpdate::initiateIntentToDoSpecialPower(const SpecialP
 	if (m_endFrame != 0)
 		endMode();
 
-	for (Int i = 0; i < data->m_weaponSetFlags.size(); ++i)
+	self->setWeaponSetFlags(data->m_weaponSetFlags, TRUE);
+	const WeaponSlotType slot = data->m_lockWeaponSlot;
+	if (slot >= PRIMARY_WEAPON && slot < WEAPONSLOT_COUNT)
 	{
-		if (data->m_weaponSetFlags.test(i))
-			self->setWeaponSetFlag((WeaponSetType)i);
+		if (self->getWeaponInWeaponSlot(slot))
+			self->setWeaponLock(slot, LOCKED_PERMANENTLY);
+		else if (const HordeContain* horde = HordeContain::get(self))
+		{
+			for (Object* member : *horde->getContainedItemsList())
+			{
+				if (!member->isEffectivelyDead() && member->getWeaponInWeaponSlot(slot) &&
+					member->setWeaponLock(slot, LOCKED_PERMANENTLY))
+					m_lockedMembers.push_back(member->getID());
+			}
+		}
 	}
-	if (data->m_lockWeaponSlot >= PRIMARY_WEAPON && data->m_lockWeaponSlot < WEAPONSLOT_COUNT)
-		self->setWeaponLock(data->m_lockWeaponSlot, LOCKED_PERMANENTLY);
 
 	AudioEventRTS sound = data->m_initiateSound;
 	sound.setObjectID(self->getID());
@@ -432,7 +449,7 @@ Bool WeaponModeSpecialPowerUpdate::initiateIntentToDoSpecialPower(const SpecialP
 	m_endFrame = now + std::max<UnsignedInt>(1, data->m_duration);
 	if (data->m_attributeModifier.isNotEmpty())
 		AttributeModifiers::apply(self, data->m_attributeModifier,
-			data->m_duration > 0 ? data->m_duration : AttributeModifierHelper::USE_LIST_DURATION, 0, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));
+			data->m_duration > 0 ? data->m_duration : AttributeModifierHelper::USE_LIST_DURATION, 0, AttributeModifiers::ownerOf(self, getModuleTagNameKey()));
 
 	SpecialPowerModule* power = powerModuleOf(self, specialPowerTemplate);
 	if (power)
@@ -460,13 +477,17 @@ void WeaponModeSpecialPowerUpdate::endMode()
 	Object* self = getObject();
 	if (data->m_attributeModifier.isNotEmpty())
 		AttributeModifiers::remove(self, data->m_attributeModifier, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));
-	for (Int i = 0; i < data->m_weaponSetFlags.size(); ++i)
+	const auto releaseSlot = [slot = data->m_lockWeaponSlot](Object* object)
 	{
-		if (data->m_weaponSetFlags.test(i))
-			self->clearWeaponSetFlag((WeaponSetType)i);
-	}
-	if (data->m_lockWeaponSlot >= PRIMARY_WEAPON && data->m_lockWeaponSlot < WEAPONSLOT_COUNT)
-		self->releaseWeaponLock(LOCKED_PERMANENTLY);
+		WeaponSlotType currentSlot = WEAPONSLOT_COUNT;
+		if (object && object->getCurrentWeapon(&currentSlot) && currentSlot == slot)
+			object->releaseWeaponLock(LOCKED_PERMANENTLY);
+	};
+	releaseSlot(self);
+	for (ObjectID id : m_lockedMembers)
+		releaseSlot(TheGameLogic->findObjectByID(id));
+	m_lockedMembers.clear();
+	self->setWeaponSetFlags(data->m_weaponSetFlags, FALSE);
 	m_endFrame = 0;
 }
 
@@ -489,18 +510,21 @@ void WeaponModeSpecialPowerUpdate::crc(Xfer* xfer)
 	xfer->xferUnsignedInt(&m_endFrame);
 	xfer->xferInt(&m_condition);
 	xfer->xferUnsignedInt(&m_conditionEndFrame);
+	xfer->xferSTLObjectIDVector(&m_lockedMembers);
 }
 
 void WeaponModeSpecialPowerUpdate::xfer(Xfer* xfer)
 {
-	XferVersion version = 2;
-	xfer->xferVersion(&version, 2);
+	XferVersion version = 3;
+	xfer->xferVersion(&version, 3);
 	SpecialPowerUpdateModule::xfer(xfer);
 	xfer->xferUnsignedInt(&m_endFrame);
 	xfer->xferInt(&m_condition);
 	xfer->xferUnsignedInt(&m_conditionEndFrame);
 	if (version >= 2 && m_power)
 		xfer->xferSnapshot(m_power);
+	if (version >= 3)
+		xfer->xferSTLObjectIDVector(&m_lockedMembers);
 }
 
 void WeaponModeSpecialPowerUpdate::loadPostProcess()
@@ -657,8 +681,14 @@ void UntamedAllegianceSpecialPower::applyPowerEffect(const Coord3D* position)
 	}
 	std::sort(targets.begin(), targets.end());
 	for (ObjectID id : targets)
-		if (Object* target = TheGameLogic->findObjectByID(id); isValidPowerTarget(target))
-			target->defect(team, 0);
+	{
+		Object* target = TheGameLogic->findObjectByID(id);
+		if (!isValidPowerTarget(target))
+			continue;
+		target->defect(team, 0);
+		if (target->getControllingPlayer() == team->getControllingPlayer())
+			target->updateUpgradeModules();
+	}
 }
 
 void MonitorConditionUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)

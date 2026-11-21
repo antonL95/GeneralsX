@@ -465,6 +465,8 @@ void GameLogic::init()
 //-------------------------------------------------------------------------------------------------
 void GameLogic::reset()
 {
+	m_retailWeather = WEATHER_NONE;
+	m_retailWeatherEndFrame = 0;
 	CastleTemplates::reset();
 	ExperienceLevelStore::reset();
 	m_thingTemplateBuildableOverrides.clear();
@@ -3963,6 +3965,22 @@ extern __int64 Total_Create_Render_Obj_Time;
 extern __int64 Total_Load_3D_Assets;
 #endif
 
+void GameLogic::changeRetailWeather(Int weather, UnsignedInt duration)
+{
+	m_retailWeather = weather;
+	m_retailWeatherEndFrame = duration ? m_frame + duration : 0;
+}
+
+Int GameLogic::getRetailWeather() const
+{
+	return !m_retailWeatherEndFrame || m_frame < m_retailWeatherEndFrame ? m_retailWeather : WEATHER_NONE;
+}
+
+UnsignedInt GameLogic::getRetailWeatherEndFrame() const
+{
+	return getRetailWeather() != WEATHER_NONE ? m_retailWeatherEndFrame : 0;
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Update all objects in the world by invoking their update() methods. */
 // ------------------------------------------------------------------------------------------------
@@ -4522,7 +4540,13 @@ UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 	xferCRC->xferAsciiString(&marker);
 	xferCRC->xferSnapshot( ThePlayerList );
 	if (RetailFileLayers::enabled())
+	{
 		ExperienceLevelStore::xferPendingLevels(xferCRC);
+		Int weather = getRetailWeather();
+		UnsignedInt weatherEndFrame = getRetailWeatherEndFrame();
+		xferCRC->xferInt(&weather);
+		xferCRC->xferUnsignedInt(&weatherEndFrame);
+	}
 	if (isInGameLogicUpdate())
 	{
 		CRCGEN_LOG(("CRC after PlayerList for frame %d is 0x%8.8X", m_frame, xferCRC->getCRC()));
@@ -5328,9 +5352,9 @@ void GameLogic::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 10;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 14 : 10;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 11;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 14 : 11;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -5678,6 +5702,24 @@ void GameLogic::xfer( Xfer *xfer )
 		ExperienceLevelStore::xferPendingLevels(xfer);
 	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
 		ExperienceLevelStore::reset();
+
+	if (version >= 14)
+	{
+		Int weather = getRetailWeather();
+		UnsignedInt weatherEndFrame = getRetailWeatherEndFrame();
+		xfer->xferInt(&weather);
+		xfer->xferUnsignedInt(&weatherEndFrame);
+		if (xfer->getXferMode() == XFER_LOAD)
+		{
+			m_retailWeather = weather;
+			m_retailWeatherEndFrame = weatherEndFrame;
+		}
+	}
+	else if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_retailWeather = WEATHER_NONE;
+		m_retailWeatherEndFrame = 0;
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

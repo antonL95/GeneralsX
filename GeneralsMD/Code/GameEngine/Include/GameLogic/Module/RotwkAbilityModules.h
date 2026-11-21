@@ -154,8 +154,10 @@ public:
 
 	static Int getInterfaceMask() { return MODULEINTERFACE_UPDATE | MODULEINTERFACE_SPECIAL_POWER; }
 	void resolveCastOwner();
+	void onDelete() override;
 	SpecialPowerModuleInterface* getSpecialPower() override { return m_power; }
 	Bool isModuleForPower(const SpecialPowerTemplate* power) const;
+	WeaponSlotType getModeWeaponSlot() const { return getWeaponModeSpecialPowerUpdateModuleData()->m_lockWeaponSlot; }
 	virtual SpecialPowerUpdateInterface* getSpecialPowerUpdateInterface() override { return this; }
 	virtual Bool initiateIntentToDoSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, const Object *targetObj, const Coord3D *targetPos, const Waypoint *way, UnsignedInt commandOptions ) override;
 	virtual Bool isSpecialAbility() const override { return FALSE; }
@@ -175,6 +177,7 @@ private:
 	UnsignedInt m_endFrame = 0;
 	Int m_condition = -1;
 	UnsignedInt m_conditionEndFrame = 0;
+	std::vector<ObjectID> m_lockedMembers;
 };
 
 class PlayerUpgradeSpecialPowerModuleData : public SpecialPowerModuleData

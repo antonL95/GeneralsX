@@ -23,6 +23,7 @@ DISPOSITIONS = {
     "passive_display": ("passive", "nonpressable_display"),
     "passive_upgrade_granted": ("ok", "science_granted_player_upgrade"),
     "passive_upgrade_missing": ("broken", "player_upgrade_missing_after_science"),
+    "passive_upgrade_unbound": ("broken", "player_upgrade_module_missing"),
     "capture_unbound": ("blocked", "capture_requires_authored_module"),
     "not_a_spellbook_cast": ("blocked", "command_is_outside_spellbook_dispatch"),
     "power_not_ready": ("blocked", "bound_power_was_not_ready"),
@@ -32,6 +33,14 @@ DISPOSITIONS = {
 def read_tsv(path):
     with path.open(encoding="utf-8", newline="") as source:
         return list(csv.DictReader(source, delimiter="\t"))
+
+def classify_start(row, start):
+    reason = start["reason"]
+    upgrades = start.get("upgrades", "-")
+    if row["category"] == "spell":
+        if reason == "passive_display" or (reason == "passive_upgrade_granted" and upgrades == "-"):
+            return "broken", "player_upgrade_evidence_missing"
+    return DISPOSITIONS.get(reason)
 
 
 def main():
@@ -69,7 +78,7 @@ def main():
         for row in read_tsv(args.output / f"{side}.inventory.tsv"):
             trace = traces.get(row["id"], {})
             starts = trace.get("start", [])
-            disposition = DISPOSITIONS.get(starts[-1][2]["reason"]) if starts else None
+            disposition = classify_start(row, starts[-1][2]) if starts else None
             if disposition:
                 result, reason = disposition
                 evidence = starts[-1:]

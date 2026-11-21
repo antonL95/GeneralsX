@@ -59,6 +59,7 @@ Utilities for large-scale code refactoring and fixes:
 ### `qa/` - Quality Assurance & Testing
 
 - `sweep_power_cases.py` prepares an attributed High Pass power replay and classifies its logs. Run it in the BFME tools container from the BFME project root with `prepare BASELINE OUTPUT` before the replay and `report BASELINE OUTPUT` after collecting the logs.
+- After generating fresh power sweep commands, run `verify_power_fixes.py prepare OUTPUT` in the BFME tools container. Replay the augmented sessions, run `WildAllegiance.commands` with the Wild faction, and repeat the Dwarves session with its log saved as `Dwarves-repeat.log`. Run `verify_power_fixes.py verify OUTPUT` to check recruitment, both Mahud weapons, the weather timer, passive upgrade evidence, and repeat-run determinism.
 
 - `test-rotwk-modifiers-zh.sh` runs the contained and radius healing, innate damage, and modifier snapshot checks on High Pass. Pass a session label, the devbox build directory, and the BFME High Pass runner path.
 

@@ -126,6 +126,10 @@ public:
 	Bool isInGameLogicUpdate() const { return m_isInUpdate; }
 	Bool hasUpdated() const { return m_hasUpdated; } ///< Returns true if the logic frame has advanced in the current client/render update
 	UnsignedInt getFrame();										///< Returns the current simulation frame number
+	enum RetailWeather { WEATHER_NONE, WEATHER_CLOUDY, WEATHER_RAINY, WEATHER_CLOUDYRAINY, WEATHER_SUNNY };
+	void changeRetailWeather(Int weather, UnsignedInt duration);
+	Int getRetailWeather() const;
+	UnsignedInt getRetailWeatherEndFrame() const;
 	UnsignedInt getCRC( Int mode = CRC_CACHED, AsciiString deepCRCFileName = AsciiString::TheEmptyString );		///< Returns the CRC
 
 	void setObjectIDCounter( ObjectID nextObjID ) { m_nextObjID = nextObjID; }
@@ -373,6 +377,8 @@ private:
 
 	Real m_width, m_height;																	///< Dimensions of the world
 	UnsignedInt m_frame;																		///< Simulation frame number
+	Int m_retailWeather = WEATHER_NONE;
+	UnsignedInt m_retailWeatherEndFrame = 0;
 
 	// CRC cache system -----------------------------------------------------------------------------
 	UnsignedInt	m_CRC;																			///< Cache of previous CRC value

@@ -32,6 +32,9 @@
 #include "GameClient/View.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#if !RTS_GENERALS
+#include "GameLogic/GameLogic.h"
+#endif
 #include <cmath>
 #include <limits>
 
@@ -106,6 +109,10 @@ void SnowManager::updateIniSettings()
 
 Bool SnowManager::isPrecipitationEnabled() const
 {
+#if !RTS_GENERALS
+	if (m_retailWeather && TheGameLogic && TheGameLogic->getRetailWeather() == GameLogic::WEATHER_SUNNY)
+		return FALSE;
+#endif
 	return TheWeatherSetting->m_snowEnabled && (!m_retailWeather || TheWeatherSetting->m_isSnowing);
 }
 

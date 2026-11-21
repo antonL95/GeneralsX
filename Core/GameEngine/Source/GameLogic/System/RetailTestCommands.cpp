@@ -1581,6 +1581,43 @@ Bool sweepPlace(Object* builder, const ThingTemplate* thing, Coord3D& point)
 	return FALSE;
 }
 
+#if !RTS_GENERALS
+const WeaponModeSpecialPowerUpdate* sweepWeaponMode(Object* source, const SpecialPowerTemplate* power)
+{
+	for (BehaviorModule** module = source->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != NAMEKEY("WeaponModeSpecialPowerUpdate"))
+			continue;
+		const auto* mode = static_cast<const WeaponModeSpecialPowerUpdate*>(*module);
+		if (mode->isModuleForPower(power))
+			return mode;
+	}
+	return nullptr;
+}
+
+const char* sweepPassiveSpell(Object* source, const CommandButton* button, const Player* player, std::string& evidence)
+{
+	const auto* module = static_cast<const SpecialPowerModule*>(source->getSpecialPowerModule(button->getSpecialPowerTemplate()));
+	if (!module || module->getModuleNameKey() != NAMEKEY("PlayerUpgradeSpecialPower"))
+		return "passive_upgrade_unbound";
+	const auto& names = static_cast<const PlayerUpgradeSpecialPower*>(module)->getGrantedUpgradeNames();
+	Bool granted = !names.empty();
+	for (const AsciiString& name : names)
+	{
+		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(name);
+		if (!upgrade || !player->hasUpgradeComplete(upgrade))
+			granted = FALSE;
+		else
+		{
+			if (!evidence.empty())
+				evidence += ',';
+			evidence += name.str();
+		}
+	}
+	return granted ? "passive_upgrade_granted" : "passive_upgrade_missing";
+}
+#endif
+
 Bool sweepCast(Object* source, const CommandButton* button, const Command& command, Bool spell, SweepCase& test)
 {
 	const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
@@ -1676,7 +1713,7 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 	{
 		const Bool powerCase = command.action == "sweep-power" || spell;
 		const CommandButton* catalogButton = powerCase && TheControlBar ? TheControlBar->findCommandButton(command.structure.c_str()) : nullptr;
-		const Bool passive = catalogButton && catalogButton->hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE);
+		const Bool passive = !spell && catalogButton && catalogButton->hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE);
 		std::fprintf(stderr, "SWEEP %d start frame=%u reason=%s set=%s\n", id, frame,
 			passive ? "passive_display" : "no_button", source->getCommandSetString().str());
 		return;
@@ -1689,24 +1726,36 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 	{
 		if (button->hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE))
 		{
-			const char* disposition = "passive_display";
+			const char* disposition = spell ? "passive_upgrade_unbound" : "passive_display";
+			std::string upgrades;
 #if !RTS_GENERALS
-			const auto* module = static_cast<const SpecialPowerModule*>(source->getSpecialPowerModule(button->getSpecialPowerTemplate()));
-			if (module && module->getModuleNameKey() == NAMEKEY("PlayerUpgradeSpecialPower"))
-			{
-				const auto& names = static_cast<const PlayerUpgradeSpecialPower*>(module)->getGrantedUpgradeNames();
-				const Bool granted = !names.empty() && std::all_of(names.begin(), names.end(), [player](const AsciiString& name)
-				{
-					const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(name);
-					return upgrade && player->hasUpgradeComplete(upgrade);
-				});
-				disposition = granted ? "passive_upgrade_granted" : "passive_upgrade_missing";
-			}
+			if (spell)
+				disposition = sweepPassiveSpell(source, button, player, upgrades);
 #endif
-			std::fprintf(stderr, "SWEEP %d start frame=%u reason=%s set=%s\n",
-				id, frame, disposition, source->getCommandSetString().str());
+			std::fprintf(stderr, "SWEEP %d start frame=%u reason=%s set=%s upgrades=%s\n",
+				id, frame, disposition, source->getCommandSetString().str(), upgrades.empty() ? "-" : upgrades.c_str());
 			return;
 		}
+#if !RTS_GENERALS
+		const auto* mode = sweepWeaponMode(source, button->getSpecialPowerTemplate());
+		const WeaponSlotType slot = mode ? mode->getModeWeaponSlot() : WEAPONSLOT_COUNT;
+		const Bool checksSlot = slot >= PRIMARY_WEAPON && slot < WEAPONSLOT_COUNT;
+		std::vector<std::pair<ObjectID, WeaponSlotType>> beforeWeapons;
+		if (checksSlot)
+		{
+			auto recordWeapon = [&](const Object* object)
+			{
+				WeaponSlotType before = WEAPONSLOT_COUNT;
+				object->getCurrentWeapon(&before);
+				beforeWeapons.emplace_back(object->getID(), before);
+			};
+			recordWeapon(source);
+			if (const HordeContain* horde = HordeContain::get(source))
+				for (const Object* member : *horde->getContainedItemsList())
+					if (!member->isEffectivelyDead())
+						recordWeapon(member);
+		}
+#endif
 		issued = sweepCast(source, button, command, spell, test);
 		if (issued)
 		{
@@ -1719,13 +1768,37 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 					(target->getBodyModule() && target->getBodyModule()->getHealth() != test.health[i]);
 			}
 #if !RTS_GENERALS
-			for (BehaviorModule** module = source->getBehaviorModules(); !test.synchronousEffect && *module; ++module)
+			if (checksSlot)
 			{
-				if ((*module)->getModuleNameKey() != NAMEKEY("WeaponModeSpecialPowerUpdate"))
-					continue;
-				const auto* mode = static_cast<const WeaponModeSpecialPowerUpdate*>(*module);
-				test.synchronousEffect = mode->isModuleForPower(test.power) && mode->isActive();
+				Int eligible = 0, selected = 0, switched = 0;
+				const char* weaponName = "-";
+				const Bool sourceHasSlot = source->getWeaponInWeaponSlot(slot) != nullptr;
+				for (const auto& [objectID, before] : beforeWeapons)
+				{
+					const Object* object = TheGameLogic->findObjectByID(objectID);
+					if (!object || (sourceHasSlot && object != source) || !object->getWeaponInWeaponSlot(slot))
+						continue;
+					++eligible;
+					WeaponSlotType current = WEAPONSLOT_COUNT;
+					const Weapon* weapon = object->getCurrentWeapon(&current);
+					if (weapon && current == slot && object->isCurWeaponLocked())
+					{
+						++selected;
+						switched += before != current;
+						weaponName = weapon->getName().str();
+					}
+				}
+				std::fprintf(stderr, "SWEEP %d weapon frame=%u slot=%d eligible=%d selected=%d switched=%d weapon=%s\n",
+					id, frame, static_cast<Int>(slot), eligible, selected, switched, weaponName);
+				test.synchronousEffect = switched > 0 && selected == eligible;
+				if (!test.synchronousEffect)
+				{
+					issued = FALSE;
+					reason = "weapon_mode_not_switched";
+				}
 			}
+			else if (mode && mode->isActive())
+				test.synchronousEffect = TRUE;
 #endif
 		}
 		if (!test.power)
@@ -1740,7 +1813,7 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 		}
 		else if (!issued && spell && button->getCommandType() != GUI_COMMAND_SPELL_BOOK)
 			reason = "not_a_spellbook_cast";
-		else if (!issued && !source->getSpecialPowerModule(test.power)->isReady())
+		else if (!issued && reason == std::string_view("rejected") && !source->getSpecialPowerModule(test.power)->isReady())
 			reason = "power_not_ready";
 	}
 	else if (command.action == "sweep-upgrade")
@@ -2135,6 +2208,14 @@ void execute(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST powercrc %u %08X\n", frame, TheGameLogic->getCRC(CRC_RECALC));
 		return;
 	}
+#if !RTS_GENERALS
+	if (command.action == "weatherstate")
+	{
+		std::fprintf(stderr, "TEST weather frame=%u state=%d end=%u\n", frame,
+			TheGameLogic->getRetailWeather(), TheGameLogic->getRetailWeatherEndFrame());
+		return;
+	}
+#endif
 	if (command.action == "heroes")
 	{
 		dumpHeroes(command, frame);
@@ -2485,9 +2566,9 @@ void execute(const Command& command, unsigned int frame)
 			{
 				const Weapon* weapon = member->getCurrentWeapon();
 				const Coord3D slot = horde->getMemberPosition(member->getID(), FALSE);
-				std::fprintf(stderr, "TEST horde mode %u %u toggle=%d weapon=%s slot=%.3f,%.3f\n", frame,
+				std::fprintf(stderr, "TEST horde mode %u %u toggle=%d weapon=%s slot=%.3f,%.3f locked=%d\n", frame,
 					static_cast<unsigned>(member->getID()), member->testWeaponSetFlag(WEAPONSET_TOGGLE_1),
-					weapon ? weapon->getName().str() : "-", slot.x, slot.y);
+					weapon ? weapon->getName().str() : "-", slot.x, slot.y, member->isCurWeaponLocked());
 			}
 			if (command.action == "hordekill")
 				member->kill();
@@ -2911,13 +2992,13 @@ void execute(const Command& command, unsigned int frame)
 	{
 		const Drawable* draw = obj->getDrawable();
 		const Object* target = obj->getAI() ? obj->getAI()->getCurrentVictim() : nullptr;
-		std::fprintf(stderr, "TEST neutralstate frame=%u object=%s id=%u owner=%d target=%u capture=%d captured=%d vision=%.1f shroud=%.1f x=%.1f y=%.1f level=%d money=%u\n",
+		std::fprintf(stderr, "TEST neutralstate frame=%u object=%s id=%u owner=%d target=%u capture=%d captured=%d vision=%.1f shroud=%.1f x=%.1f y=%.1f level=%d money=%u cmdset=%s\n",
 			frame, obj->getTemplate()->getName().str(), static_cast<unsigned>(obj->getID()),
 			obj->getControllingPlayer()->getPlayerIndex(), target ? static_cast<unsigned>(target->getID()) : 0,
 			draw && draw->getModelConditionFlags().test(MODELCONDITION_START_CAPTURE),
 			draw && draw->getModelConditionFlags().test(MODELCONDITION_CAPTURED), obj->getVisionRange(), obj->getShroudClearingRange(),
 			obj->getPosition()->x, obj->getPosition()->y, static_cast<Int>(obj->getVeterancyLevel()),
-			obj->getControllingPlayer()->getMoney()->countMoney());
+			obj->getControllingPlayer()->getMoney()->countMoney(), obj->getCommandSetString().str());
 	}
 	else if (command.action == "health")
 		printHealth(command, obj, frame);

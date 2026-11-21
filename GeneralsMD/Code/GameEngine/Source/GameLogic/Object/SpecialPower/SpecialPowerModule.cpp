@@ -1018,6 +1018,8 @@ void SpecialPowerModule::applyRotwkTrigger( const Coord3D *location )
 {
 	const SpecialPowerModuleData *data = getSpecialPowerModuleData();
 	Object *self = getObject();
+	if (data->m_changeWeather != GameLogic::WEATHER_NONE)
+		TheGameLogic->changeRetailWeather(data->m_changeWeather, data->m_weatherDuration);
 	if( data->m_triggerFX.isNotEmpty() && TheFXListStore )
 	{
 		const FXList *fx = TheFXListStore->findFXList( data->m_triggerFX.str() );
