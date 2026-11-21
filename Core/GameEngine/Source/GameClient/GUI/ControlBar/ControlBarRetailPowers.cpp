@@ -539,11 +539,13 @@ void icon(const CommandButton* button, const Rect& rect, Color tint)
 		TheDisplay->drawImage(image, rect.x, rect.y, rect.x + rect.w, rect.y + rect.h, tint);
 }
 
-void drawStoreArt(const char* name, const Rect& rect, Color tint = 0xFFFFFFFF)
+Bool drawStoreArt(const char* name, const Rect& rect, Color tint = 0xFFFFFFFF)
 {
 	const Image* image = TheMappedImageCollection ? TheMappedImageCollection->findImageByName(name) : nullptr;
-	if (TheDisplay->hasImageTexture(image))
-		TheDisplay->drawImage(image, rect.x, rect.y, rect.x + rect.w, rect.y + rect.h, tint);
+	if (!TheDisplay->hasImageTexture(image))
+		return FALSE;
+	TheDisplay->drawImage(image, rect.x, rect.y, rect.x + rect.w, rect.y + rect.h, tint);
+	return TRUE;
 }
 
 std::vector<std::string> prerequisiteClips(const Player* player)
@@ -715,11 +717,23 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 	fill(windowRect(window), GameMakeColor(0, 7, 10, shade));
 	const Layout layout = screenLayout();
 	const Bool authored = storeArt && storeArt->valid();
+	const Real movieYScale = PanelHeight * layout.scale / storeMovieLayout.stageHeight;
+	Rect titleRect = layout.at(0, 6, PanelWidth, 29);
+	GameFont* titleFont = nullptr;
 	if (authored)
 	{
-		const Real sy = PanelHeight * layout.scale / storeMovieLayout.stageHeight;
+		const Real sy = movieYScale;
 		const Real sx = sy * 4.0f / 3.0f;
 		const Real artX = layout.x + (PanelWidth * layout.scale - sx * storeMovieLayout.stageWidth) / 2.0f;
+		const AptScene::Box globe = storeArt->bounds("_root.SpellStore.@1");
+		if (globe.valid())
+		{
+			const Int width = static_cast<Int>((globe.right - globe.left) * sx * 1.49f);
+			const Int height = static_cast<Int>((globe.bottom - globe.top) * sy * 1.49f);
+			const Int x = static_cast<Int>(artX + (globe.left + globe.right) * sx * 0.5f);
+			const Int y = static_cast<Int>(layout.y + (globe.top + globe.bottom) * sy * 0.5f);
+			drawStoreArt("UiRetailPowersAura", {x - width / 2, y - height / 2, width, height}, 0xFF63D3FF);
+		}
 		disc(layout.at(70, 68, 420, 420), 0xA0041019);
 		const auto clips = prerequisiteClips(player);
 		storeArt->drawAt([&clips](const std::string& path) {
@@ -729,17 +743,26 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 				clip = clip.substr(0, clip.find('.'));
 				return std::find(clips.begin(), clips.end(), clip) != clips.end();
 			}
+			if (path.starts_with("_root.SpellStore.Buttons.ButtonsMain."))
+				return path == "_root.SpellStore.Buttons.ButtonsMain.@2";
 			return path.starts_with("_root.SpellStore.") &&
-				!path.starts_with("_root.SpellStore.Buttons.Spell") &&
-				!path.starts_with("_root.SpellStore.Buttons.ButtonsMain.");
+				!path.starts_with("_root.SpellStore.Buttons.Spell");
 		}, artX, layout.y, sx, sy, 1.0f);
 		storeArt->drawAt([](const std::string& path) { return path.starts_with("_root.Title."); },
 			0, 0, storeArt->xScale(), sy, 1.0f);
+		const AptScene::Box title = storeArt->bounds("_root.Title.Title_Text.Text");
+		if (title.valid())
+		{
+			const Real titleXScale = storeArt->xScale();
+			titleRect = {static_cast<Int>(title.left * titleXScale), static_cast<Int>(title.top * sy),
+				static_cast<Int>((title.right - title.left) * titleXScale), static_cast<Int>((title.bottom - title.top) * sy)};
+		}
+		titleFont = TheFontLibrary->getFontPixels("Omnia LT Std", std::max(10, static_cast<Int>(32.0f * sy)), FALSE);
 	}
 	else
 		disc(layout.at(0, 64, PanelWidth, PanelWidth - 98), 0xFF152A39);
 	GameFont* font = powersFont(16);
-	label(powersFont(26, TRUE), layout.at(0, 6, PanelWidth, 29), UnicodeString(L"Powers"), Cyan);
+	label(titleFont ? titleFont : powersFont(26, TRUE), titleRect, UnicodeString(L"POWERS"), 0xFFC2E6EE);
 	UnicodeString points;
 	points.format(L"%d", player->getSciencePurchasePoints() - pendingCost(player, m_retailPendingSciences));
 	label(font, layout.at(0, 92, PanelWidth, 28),
@@ -748,7 +771,9 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 	const Rect close = layout.at(515, 8, 35, 29);
 	label(font, close, UnicodeString(L"×"), Ink);
 
-	const Int diameter = std::max(2, static_cast<Int>(72 * PanelHeight * layout.scale / storeMovieLayout.stageHeight));
+	const Int diameter = std::max(2, static_cast<Int>(72 * movieYScale));
+	const Int badgeSize = std::max(12, static_cast<Int>(26 * movieYScale + 0.5f));
+	GameFont* costFont = TheFontLibrary->getFontPixels("Albertus MT", std::max(10, static_cast<Int>(13 * movieYScale + 0.5f)), FALSE);
 	for (Int i = 0; i < StoreSlots; ++i)
 	{
 		const ScienceType science = storeScience(player, i);
@@ -766,13 +791,16 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 		icon(storeButton(player, i), inset, owned || available || pending ? 0xFFFFFFFF : 0xFF626C75);
 		TheDisplay->setCircularClip(0, 0, 0);
 		drawStoreArt("UiRetailPowersNode", portrait, owned || pending ? Cyan : available ? 0xFFFFFFFF : 0xAA8699A6);
-		const Int badgeSize = std::max(12, diameter / 3);
-		const Rect badge = {portrait.x + (diameter - badgeSize) / 2, portrait.y + diameter - badgeSize * 2 / 3, badgeSize, badgeSize};
-		disc(badge, available || owned || pending ? 0xFF8CAABD : PanelLine);
-		disc({badge.x + 1, badge.y + 1, badge.w - 2, badge.h - 2}, 0xFF142A38);
+		const Rect badge = {tile.x + (tile.w - badgeSize) / 2,
+			tile.y + (tile.h - badgeSize) / 2 + static_cast<Int>(35.05f * movieYScale), badgeSize, badgeSize};
+		if (!drawStoreArt("UiRetailPowersCost", badge))
+		{
+			disc(badge, available || owned || pending ? 0xFF8CAABD : PanelLine);
+			disc({badge.x + 1, badge.y + 1, badge.w - 2, badge.h - 2}, 0xFF142A38);
+		}
 		UnicodeString cost;
 		cost.format(L"%d", player->getSciencePurchaseCost(science));
-		label(font, badge, cost, owned ? Owned : Ink);
+		label(costFont, badge, cost, owned ? Owned : Ink);
 	}
 	if (const CommandButton* button = m_retailHoveredPower >= 0 ? storeButton(player, m_retailHoveredPower) : nullptr)
 	{
@@ -782,17 +810,11 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 	const Bool canCommit = !m_retailPendingSciences.empty();
 	const Rect reset = layout.action(storeMovieLayout.reset, FALSE);
 	const Rect accept = layout.action(storeMovieLayout.accept, TRUE);
-	const Color actionTint = canCommit ? 0xFFFFFFFF : 0xAA8699A6;
-	if (authored)
-	{
-		drawStoreArt("UiRetailPowersAction", reset, actionTint);
-		drawStoreArt("UiRetailPowersAction", accept, actionTint);
-	}
-	else
-	{
+	const char* plate = canCommit ? "UiRetailPowersActionActive" : "UiRetailPowersAction";
+	if (!drawStoreArt(plate, reset))
 		frame(reset, PanelLine);
+	if (!drawStoreArt(plate, accept))
 		frame(accept, canCommit ? Cyan : PanelLine);
-	}
 	label(font, reset, UnicodeString(L"Reset"), canCommit ? Ink : Cyan);
 	label(font, accept, UnicodeString(L"Accept"), canCommit ? Ink : Cyan);
 }
