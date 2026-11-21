@@ -51,6 +51,7 @@
 #include "WWDebug/wwprofile.h"
 #include "WWDebug/wwmemlog.h"
 #include "assetmgr.h"
+#include <limits>
 
 RectClass							Render2DClass::ScreenResolution( 0,0,0,0 );
 
@@ -524,6 +525,15 @@ void	Render2DClass::Add_Outline( const RectClass & rect, float width, const Rect
 	Add_Line (Vector2 (rect.Left, rect.Top + 1),		Vector2 (rect.Right - 1, rect.Top + 1),			width, color);
 	Add_Line (Vector2 (rect.Right, rect.Top),		Vector2 (rect.Right, rect.Bottom - 1),		width, color);
 	Add_Line (Vector2 (rect.Right, rect.Bottom),	Vector2 (rect.Left + 1, rect.Bottom),	width, color);
+}
+
+void Render2DClass::Flush_If_Needed(int required_indices)
+{
+	if (Indices.Count() > std::numeric_limits<unsigned short>::max() - required_indices)
+	{
+		Render();
+		Render2DClass::Reset();
+	}
 }
 
 void Render2DClass::Render()

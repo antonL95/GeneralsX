@@ -13,7 +13,6 @@
 #include "Common/Player.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/ThingTemplate.h"
-#include "Common/ThingFactory.h"
 #include "GameClient/Display.h"
 #include "GameClient/RadiusDecal.h"
 #include "GameClient/Drawable.h"
@@ -54,7 +53,15 @@ void groundLine(View& view, Coord3D start, Coord3D end, Real width, Color color)
 	if (view.worldToScreenTriReturn(&start, &a) != View::WTS_INVALID &&
 		view.worldToScreenTriReturn(&end, &b) != View::WTS_INVALID &&
 		(a.x != b.x || a.y != b.y))
+	{
+		Int x, y;
+		view.getOrigin(&x, &y);
+		const Int margin = static_cast<Int>(std::ceil(width));
+		if (std::max(a.x, b.x) < x - margin || std::min(a.x, b.x) >= x + view.getWidth() + margin ||
+			std::max(a.y, b.y) < y - margin || std::min(a.y, b.y) >= y + view.getHeight() + margin)
+			return;
 		TheDisplay->drawLine(a.x, a.y, b.x, b.y, width, color);
+	}
 }
 
 Coord3D onCircle(const Circle& circle, Real angle, Real offset = 0.0f)
@@ -395,43 +402,6 @@ void RetailWorldUI::showPayout(const Object& source, Int amount, Bool bounty)
 	text.format(L"+%d", amount);
 	const Color color = bounty ? GameMakeColor(255, 255, 255, 255) : GameMakeColor(131, 255, 94, 255);
 	TheInGameUI->addFloatingText(text, &position, color);
-}
-
-Bool RetailWorldUI::setOrderModel(DrawableID& id, const Coord3D& position, Bool attack, UnsignedInt age)
-{
-	const Real terrainHeight = TheTerrainLogic->getGroundHeight(position.x, position.y);
-	if (attack && position.z > terrainHeight + 2.0f)
-	{
-		clearOrderModel(id);
-		return FALSE;
-	}
-
-	Drawable* drawable = TheGameClient->findDrawableByID(id);
-	if (!drawable)
-	{
-		const ThingTemplate* type = TheThingFactory->findTemplate(attack ? "AttackHint" : "MoveHint", FALSE);
-		if (!type || !type->isKindOf(KINDOF_DRAWABLE_ONLY))
-			return FALSE;
-		drawable = TheThingFactory->newDrawable(type, DRAWABLE_STATUS_NO_STATE_PARTICLES);
-		if (!drawable)
-			return FALSE;
-		id = drawable->getID();
-	}
-	Coord3D ground = position;
-	ground.z = terrainHeight + 1.0f;
-	drawable->setPosition(&ground);
-	drawable->setDrawableOpacity(1.0f - static_cast<Real>(age) * 0.012f);
-	return TRUE;
-}
-
-void RetailWorldUI::clearOrderModel(DrawableID& id)
-{
-	if (id != INVALID_DRAWABLE_ID)
-	{
-		if (Drawable* drawable = TheGameClient->findDrawableByID(id))
-			TheGameClient->destroyDrawable(drawable);
-		id = INVALID_DRAWABLE_ID;
-	}
 }
 
 void RetailWorldUI::drawTerrainClaims(View& view, const Player& player)

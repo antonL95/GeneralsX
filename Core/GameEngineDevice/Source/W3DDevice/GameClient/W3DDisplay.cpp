@@ -858,6 +858,7 @@ void W3DDisplay::setup2DRenderState(TextureClass *tex, DrawImageMode mode, Bool 
 	{
 		if (!m_batchNeedsInit && m_batchTexture == tex && m_batchMode == mode && m_batchGrayscale == grayscale)
 		{
+			m_2DRender->Flush_If_Needed(300);
 			return;
 		}
 
@@ -3675,6 +3676,7 @@ void W3DDisplay::drawCircularClipQuad(const RectClass &rect, const RectClass &uv
 		const Real fRight = (right - rect.Left) / rect.Width();
 		const Real fTop = (y - rect.Top) / rect.Height();
 		const Real fBottom = (y + 1 - rect.Top) / rect.Height();
+		m_2DRender->Flush_If_Needed(6);
 		if (rotated)
 		{
 			const Real uTop = uv.Right - uv.Width() * fTop;

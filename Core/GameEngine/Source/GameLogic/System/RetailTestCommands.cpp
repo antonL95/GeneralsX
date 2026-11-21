@@ -427,6 +427,8 @@ void orderToPoint(const Command& command, Object* obj, unsigned int frame)
 		order = TheMessageStream->appendMessage(GameMessage::MSG_ADD_WAYPOINT);
 	else if (command.action == "attackmove")
 		order = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACKMOVETO);
+	else if (command.action == "forceattackground")
+		order = TheMessageStream->appendMessage(GameMessage::MSG_DO_FORCE_ATTACK_GROUND);
 	else if (command.action == "guard")
 		order = TheMessageStream->appendMessage(GameMessage::MSG_DO_GUARD_POSITION);
 	else if (command.action == "rally")

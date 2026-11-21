@@ -268,6 +268,45 @@ void DebugHintObject::Render(RenderInfoClass & rinfo)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+namespace
+{
+RenderObjClass* createRetailOrderModel(const char* templateName)
+{
+	const ThingTemplate* type = TheThingFactory->findTemplate(templateName, FALSE);
+	if (!type || !type->isKindOf(KINDOF_DRAWABLE_ONLY))
+		return nullptr;
+	const ModuleInfo& modules = type->getDrawModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		const auto* data = modules.getNthData(i)->getAsW3DModelDrawModuleData();
+		const auto* state = data ? data->findBestInfo(ModelConditionFlags()) : nullptr;
+		if (state && !state->m_modelName.isEmpty())
+		{
+			RenderObjClass* model = W3DDisplay::m_assetManager->Create_Render_Obj(state->m_modelName.str());
+			if (model && model->Class_ID() != RenderObjClass::CLASSID_NULL)
+				return model;
+			REF_PTR_RELEASE(model);
+		}
+	}
+	return nullptr;
+}
+
+void showRetailOrderModel(RenderObjClass& model, Coord3D position)
+{
+	position.z = TheTerrainLogic->getGroundHeight(position.x, position.y) + 1.0f;
+	model.Set_Position(Vector3(position.x, position.y, position.z));
+	if (!model.Peek_Scene())
+		model.Add(W3DDisplay::m_3DScene);
+}
+
+void releaseRetailOrderModel(RenderObjClass*& model)
+{
+	if (model)
+		model->Remove();
+	REF_PTR_RELEASE(model);
+}
+}
+
 W3DInGameUI::W3DInGameUI()
 {
 	Int i;
@@ -294,11 +333,13 @@ W3DInGameUI::~W3DInGameUI()
 	if (m_terrainResourceLabel)
 		TheDisplayStringManager->freeDisplayString(m_terrainResourceLabel);
 
+	releaseRetailOrderModel(m_retailAttackModel);
+
 	// remove render objects for hints
 	for( i = 0; i < MAX_MOVE_HINTS; i++ )
 	{
 
-		REF_PTR_RELEASE( m_moveHintRenderObj[ i ] );
+		releaseRetailOrderModel(m_moveHintRenderObj[i]);
 		REF_PTR_RELEASE( m_moveHintAnim[ i ] );
 
 	}
@@ -384,9 +425,11 @@ void W3DInGameUI::update()
 //-------------------------------------------------------------------------------------------------
 void W3DInGameUI::reset()
 {
-	for (DrawableID& model : m_retailMoveModels)
-		RetailWorldUI::clearOrderModel(model);
-	RetailWorldUI::clearOrderModel(m_retailAttackModel);
+	if (RetailFileLayers::enabled())
+		for (RenderObjClass*& model : m_moveHintRenderObj)
+			releaseRetailOrderModel(model);
+	releaseRetailOrderModel(m_retailAttackModel);
+	m_retailAttackModelChecked = FALSE;
 	m_terrainResourceDecal.clear();
 	m_placementDecal.clear();
 	m_selectionDecals.clear();
@@ -501,10 +544,23 @@ void W3DInGameUI::drawMoveHints( View *view )
 		{
 			const auto& hint = m_moveHint[i];
 			const UnsignedInt age = now - hint.frame;
+			RenderObjClass*& model = m_moveHintRenderObj[i];
 			if (hint.frame == 0 || age < 12 || age > 40)
-				RetailWorldUI::clearOrderModel(m_retailMoveModels[i]);
-			if (hint.frame != 0 && age <= 40 &&
-				(age < 12 || !RetailWorldUI::setOrderModel(m_retailMoveModels[i], hint.pos, FALSE, age)))
+			{
+				if (model)
+					model->Remove();
+			}
+			else
+			{
+				if (!model)
+					model = createRetailOrderModel("MoveHint");
+				if (model)
+				{
+					showRetailOrderModel(*model, hint.pos);
+					continue;
+				}
+			}
+			if (hint.frame != 0 && age <= 40)
 				RetailWorldUI::drawOrder(*view, hint.pos, FALSE, age);
 		}
 		return;
@@ -635,9 +691,25 @@ void W3DInGameUI::drawAttackHints( View *view )
 	if (!RetailFileLayers::enabled() || !m_retailAttackActive)
 		return;
 	const UnsignedInt age = TheGameClient->getFrame() - m_retailAttackFrame;
-	if (age > 32)
-		RetailWorldUI::clearOrderModel(m_retailAttackModel);
-	else if (!RetailWorldUI::setOrderModel(m_retailAttackModel, m_retailAttackPosition, TRUE, age))
+	const auto& position = m_retailAttackPosition;
+	const Bool ground = age <= 32 &&
+		position.z <= TheTerrainLogic->getGroundHeight(position.x, position.y) + 2.0f;
+	if (ground)
+	{
+		if (!m_retailAttackModelChecked)
+		{
+			m_retailAttackModel = createRetailOrderModel("AttackHint");
+			m_retailAttackModelChecked = TRUE;
+		}
+		if (m_retailAttackModel)
+		{
+			showRetailOrderModel(*m_retailAttackModel, position);
+			return;
+		}
+	}
+	if (m_retailAttackModel)
+		m_retailAttackModel->Remove();
+	if (age <= 32)
 		RetailWorldUI::drawOrder(*view, m_retailAttackPosition, TRUE, age);
 }
 

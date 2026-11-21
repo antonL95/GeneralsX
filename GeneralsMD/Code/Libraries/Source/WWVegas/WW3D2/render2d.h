@@ -100,6 +100,7 @@ public:
 
 	virtual	void	Reset();
 	void	Render();
+	void	Flush_If_Needed(int required_indices);
 
 	void	Set_Coordinate_Range( const RectClass & range );
 

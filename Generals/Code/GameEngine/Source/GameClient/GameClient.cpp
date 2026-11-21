@@ -1484,6 +1484,13 @@ void GameClient::xfer( Xfer *xfer )
 
 			}
 
+			if (RetailFileLayers::enabled() && thingTemplate->isKindOf(KINDOF_DRAWABLE_ONLY) &&
+				(tocEntry->name.compareNoCase("MoveHint") == 0 || tocEntry->name.compareNoCase("AttackHint") == 0))
+			{
+				xfer->skip(dataSize);
+				continue;
+			}
+
 			// read the object ID this drawable is attached to (if any)
 			xfer->xferObjectID( &objectID );
 

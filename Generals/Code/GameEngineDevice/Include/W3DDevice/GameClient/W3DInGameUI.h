@@ -92,7 +92,7 @@ protected:
 	WorldGroundDecal m_terrainResourceDecal;
 	WorldGroundDecal m_placementDecal;
 	std::map<DrawableID, WorldGroundDecal> m_selectionDecals;
-	DrawableID m_retailMoveModels[MAX_MOVE_HINTS]{};
-	DrawableID m_retailAttackModel = INVALID_DRAWABLE_ID;
+	RenderObjClass *m_retailAttackModel = nullptr;
+	Bool m_retailAttackModelChecked = FALSE;
 
 };
