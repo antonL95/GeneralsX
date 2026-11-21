@@ -1990,7 +1990,7 @@ void Drawable::calcPhysicsXformWheels( const Locomotor *locomotor, PhysicsXformI
 	Real curSpeed = physics->getVelocityMagnitude();
 #if 1
 	Real maxSpeed = ai->getCurLocomotorSpeed();
-	if (!airborne && curSpeed > maxSpeed/10)
+	if (!airborne && (!RetailFileLayers::enabled() || maxSpeed > 0.0f) && curSpeed > maxSpeed/10)
 	{
 		Real factor = curSpeed/maxSpeed;
 		if (fabs(m_locoInfo->m_pitchRate)<factor*BOUNCE_ANGLE_KICK/4 && fabs(m_locoInfo->m_rollRate)<factor*BOUNCE_ANGLE_KICK/8)
@@ -5213,6 +5213,13 @@ void Drawable::xfer( Xfer *xfer )
 		xfer->xferReal( &m_locoInfo->m_wheelInfo.m_wheelAngle );
 		xfer->xferInt( &m_locoInfo->m_wheelInfo.m_framesAirborneCounter );
 		xfer->xferInt( &m_locoInfo->m_wheelInfo.m_framesAirborne );
+		if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD &&
+			(!WWMath::Is_Valid_Float(m_locoInfo->m_pitch) || !WWMath::Is_Valid_Float(m_locoInfo->m_pitchRate) ||
+			 !WWMath::Is_Valid_Float(m_locoInfo->m_roll) || !WWMath::Is_Valid_Float(m_locoInfo->m_rollRate)))
+		{
+			deleteInstance(m_locoInfo);
+			m_locoInfo = nullptr;
+		}
 	}
 
 	// modules
