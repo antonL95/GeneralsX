@@ -74,6 +74,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
@@ -1987,6 +1988,17 @@ void PartitionData::addPossibleCollisions(PartitionContactList *ctList)
 }
 
 //-----------------------------------------------------------------------------
+static Bool collideParts(const CollideInfo& first, const CollideInfo& second, CollideLocAndNormal* contact)
+{
+	if (first.position.z + first.geom.getMaxHeightAbovePosition() < second.position.z - second.geom.getMaxHeightBelowPosition() ||
+		second.position.z + second.geom.getMaxHeightAbovePosition() < first.position.z - first.geom.getMaxHeightBelowPosition())
+		return FALSE;
+	const GeometryType firstType = first.geom.getGeomType();
+	const GeometryType secondType = second.geom.getGeomType();
+	const CollideTestProc test = theCollideTestProcs[(firstType - GEOMETRY_FIRST) * GEOMETRY_NUM_TYPES + secondType - GEOMETRY_FIRST];
+	return test(&first, &second, contact);
+}
+
 Bool PartitionData::collidesWith(const PartitionData *that, CollideLocAndNormal *cinfo) const
 {
 	const Object *thisObj = this->getObject();
@@ -1997,6 +2009,26 @@ Bool PartitionData::collidesWith(const PartitionData *that, CollideLocAndNormal 
 
 	CollideInfo thisInfo(thisObj->getPosition(), thisObj->getGeometryInfo(), thisObj->getOrientation());
 	CollideInfo thatInfo(thatObj->getPosition(), thatObj->getGeometryInfo(), thatObj->getOrientation());
+
+	if (RetailFileLayers::enabled())
+	{
+		std::vector<GeometryUpgrade::CollisionPart> thisParts, thatParts;
+		const Bool thisUpgraded = GeometryUpgrade::collectCollisionParts(*thisObj, thisParts);
+		const Bool thatUpgraded = GeometryUpgrade::collectCollisionParts(*thatObj, thatParts);
+		if (thisUpgraded || thatUpgraded)
+		{
+			if (!thisUpgraded)
+				thisParts.push_back({&thisInfo.geom, thisInfo.position});
+			if (!thatUpgraded)
+				thatParts.push_back({&thatInfo.geom, thatInfo.position});
+			for (const auto& first : thisParts)
+				for (const auto& second : thatParts)
+					if (collideParts(CollideInfo(&first.position, *first.shape, thisInfo.angle),
+						CollideInfo(&second.position, *second.shape, thatInfo.angle), cinfo))
+						return TRUE;
+			return FALSE;
+		}
+	}
 
 	// invariant for all geometries: first do z collision check.
 	Real thisTop = thisInfo.position.z + thisInfo.geom.getMaxHeightAbovePosition();
@@ -5309,6 +5341,20 @@ Bool PartitionFilterWouldCollide::allow(Object *objOther)
 {
 	CollideInfo thisInfo(&m_position, m_geom, m_angle);
 	CollideInfo thatInfo(objOther->getPosition(), objOther->getGeometryInfo(), objOther->getOrientation());
+
+	if (RetailFileLayers::enabled())
+	{
+		std::vector<GeometryUpgrade::CollisionPart> parts;
+		if (GeometryUpgrade::collectCollisionParts(*objOther, parts))
+		{
+			CollideLocAndNormal contact;
+			const Bool collides = std::any_of(parts.begin(), parts.end(), [&](const auto& part)
+			{
+				return collideParts(thisInfo, CollideInfo(&part.position, *part.shape, thatInfo.angle), &contact);
+			});
+			return collides == m_desiredCollisionResult;
+		}
+	}
 
   Bool doesCollide;
 

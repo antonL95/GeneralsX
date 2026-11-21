@@ -20,6 +20,24 @@ Bool containsGeometry(const std::vector<AsciiString>& list, const AsciiString& n
 	});
 }
 
+Bool affectsGeometry(const GeometryUpgradeModuleData& upgrade, const AsciiString& name)
+{
+	return containsGeometry(upgrade.m_showGeometry, name) || containsGeometry(upgrade.m_hideGeometry, name);
+}
+
+Bool isActive(const ThingTemplate::GeometryDetails& details, const std::vector<const GeometryUpgradeModuleData*>& upgrades)
+{
+	Bool active = details.active;
+	for (const auto* upgrade : upgrades)
+	{
+		if (containsGeometry(upgrade->m_showGeometry, details.name))
+			active = TRUE;
+		if (containsGeometry(upgrade->m_hideGeometry, details.name))
+			active = FALSE;
+	}
+	return active;
+}
+
 struct GeometryBounds
 {
 	Real major = 0.0f;
@@ -120,45 +138,84 @@ void GeometryUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 
 GeometryUpgrade::~GeometryUpgrade() = default;
 
+std::vector<const GeometryUpgradeModuleData*> GeometryUpgrade::activeUpgrades(const Object& object, const GeometryUpgrade* applying)
+{
+	static const NameKeyType key = NAMEKEY("GeometryUpgrade");
+	std::vector<const GeometryUpgradeModuleData*> upgrades;
+	for (BehaviorModule** module = object.getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != key)
+			continue;
+		const auto* upgrade = static_cast<const GeometryUpgrade*>(*module);
+		if (upgrade == applying || upgrade->isAlreadyUpgraded())
+			upgrades.push_back(upgrade->getGeometryUpgradeModuleData());
+	}
+	return upgrades;
+}
+
+Bool GeometryUpgrade::collectCollisionParts(const Object& object, std::vector<CollisionPart>& parts)
+{
+	const ThingTemplate* definition = object.getTemplate();
+	const auto& data = definition->getRotWKObjectData();
+	if (data.additionalGeometries.empty() && data.primaryGeometry.name.isEmpty())
+		return FALSE;
+
+	const auto upgrades = activeUpgrades(object, nullptr);
+	if (upgrades.empty())
+		return FALSE;
+
+	const auto hasUpgrade = [&](const ThingTemplate::GeometryDetails& details)
+	{
+		return std::any_of(upgrades.begin(), upgrades.end(),
+			[&](const auto* upgrade) { return affectsGeometry(*upgrade, details.name); });
+	};
+	if (!hasUpgrade(data.primaryGeometry) && std::none_of(data.additionalGeometries.begin(), data.additionalGeometries.end(),
+		[&](const auto& geometry) { return hasUpgrade(geometry.details); }))
+		return FALSE;
+
+	const Coord3D& position = *object.getPosition();
+	const Real angle = object.getOrientation();
+	const Real cosAngle = WWMath::CosTrig(angle);
+	const Real sinAngle = WWMath::SinTrig(angle);
+	const auto addPart = [&](const GeometryInfo& shape, const ThingTemplate::GeometryDetails& details)
+	{
+		if (!isActive(details, upgrades))
+			return;
+		const Coord3D center = {
+			position.x + details.offset.x * cosAngle - details.offset.y * sinAngle,
+			position.y + details.offset.x * sinAngle + details.offset.y * cosAngle,
+			position.z + details.offset.z
+		};
+		parts.push_back({&shape, center});
+	};
+	addPart(definition->getTemplateGeometryInfo(), data.primaryGeometry);
+	for (const auto& geometry : data.additionalGeometries)
+		addPart(geometry.shape, geometry.details);
+	return TRUE;
+}
+
 void GeometryUpgrade::upgradeImplementation()
 {
 	Object* object = getObject();
 	const ThingTemplate* definition = object->getTemplate();
 	const auto& retail = definition->getRotWKObjectData();
 	const auto* data = getGeometryUpgradeModuleData();
-	const NameKeyType key = getModuleNameKey();
-	std::vector<const GeometryUpgradeModuleData*> activeUpgrades;
-	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
-	{
-		if ((*module)->getModuleNameKey() != key)
-			continue;
-		const auto* upgrade = static_cast<const GeometryUpgrade*>(*module);
-		if (upgrade == this || upgrade->isAlreadyUpgraded())
-			activeUpgrades.push_back(upgrade->getGeometryUpgradeModuleData());
-	}
+	const auto upgrades = activeUpgrades(*object, this);
 
-	Bool affectsGeometry = FALSE;
+	Bool affectsBounds = FALSE;
 	GeometryBounds bounds;
 	const auto addGeometry = [&](const GeometryInfo& shape, const ThingTemplate::GeometryDetails& details)
 	{
-		Bool visible = details.active;
-		for (const auto* upgrade : activeUpgrades)
-		{
-			if (containsGeometry(upgrade->m_showGeometry, details.name))
-				visible = TRUE;
-			if (containsGeometry(upgrade->m_hideGeometry, details.name))
-				visible = FALSE;
-		}
-		if (containsGeometry(data->m_showGeometry, details.name) || containsGeometry(data->m_hideGeometry, details.name))
-			affectsGeometry = TRUE;
-		if (visible)
+		if (affectsGeometry(*data, details.name))
+			affectsBounds = TRUE;
+		if (isActive(details, upgrades))
 			bounds.include(shape, details.offset);
 	};
 	const GeometryInfo& primary = definition->getTemplateGeometryInfo();
 	addGeometry(primary, retail.primaryGeometry);
 	for (const auto& geometry : retail.additionalGeometries)
 		addGeometry(geometry.shape, geometry.details);
-	if (!affectsGeometry)
+	if (!affectsBounds)
 		return;
 
 	const GeometryInfo& current = object->getGeometryInfo();

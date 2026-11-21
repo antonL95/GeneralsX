@@ -1446,7 +1446,13 @@ CanMakeType BuildAssistant::canMakeUnit( Object *builder, const ThingTemplate *w
 
 	// make sure we have enough money to build this
 	Money *money = player->getMoney();
-	if( rosterHero )
+	HeroRules::Price price;
+	if (pu && pu->getUnitPriceOverride(whatToBuild, price))
+	{
+		if (static_cast<UnsignedInt>(price.cost) > money->countMoney())
+			return CANMAKE_NO_MONEY;
+	}
+	else if( rosterHero )
 	{
 		if( HeroRoster::price( player, whatToBuild ).cost > static_cast<Int>( money->countMoney() ) )
 			return CANMAKE_NO_MONEY;

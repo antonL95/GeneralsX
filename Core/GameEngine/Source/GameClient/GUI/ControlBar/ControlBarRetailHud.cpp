@@ -723,6 +723,16 @@ Int ControlBar::getRetailCommandCost(const CommandButton *command, const GameWin
 	switch (command->getCommandType())
 	{
 		case GUI_COMMAND_UNIT_BUILD:
+#if !RTS_GENERALS
+			if (const ThingTemplate* unit = command->getThingTemplate())
+			{
+				const auto* production = obj->getProductionUpdateInterface();
+				HeroRules::Price price;
+				if (production && production->getUnitPriceOverride(unit, price))
+					return price.cost;
+			}
+#endif
+			[[fallthrough]];
 		case GUI_COMMAND_DOZER_CONSTRUCT:
 			return command->getThingTemplate() ? command->getThingTemplate()->calcCostToBuild(player) : -1;
 		case GUI_COMMAND_PLAYER_UPGRADE:
@@ -731,6 +741,12 @@ Int ControlBar::getRetailCommandCost(const CommandButton *command, const GameWin
 		case GUI_COMMAND_REVIVE:
 		{
 			const ThingTemplate *hero = getRetailHero(window);
+#if !RTS_GENERALS
+			const auto* production = obj->getProductionUpdateInterface();
+			HeroRules::Price price;
+			if (hero && production && production->getUnitPriceOverride(hero, price))
+				return price.cost;
+#endif
 			return hero ? HeroRoster::price(player, hero).cost : -1;
 		}
 		default:

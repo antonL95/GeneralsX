@@ -38,6 +38,8 @@
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include <algorithm>
+#include <limits>
+#include "Common/ModuleFactory.h"
 #include "Common/Radar.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -113,6 +115,33 @@ ProductionUpdateModuleData::ProductionUpdateModuleData()
 	m_disabledTypesToProcess = MAKE_DISABLED_MASK(DISABLED_HELD);
 }
 
+namespace
+{
+void parseRetailProductionModifier(INI* ini, void*, void* store, const void*)
+{
+	auto& modifier = static_cast<std::vector<RetailProductionModifier>*>(store)->emplace_back();
+	static const FieldParse fields[] =
+	{
+		{ "RequiredUpgrade", INI::parseAsciiString, nullptr, offsetof(RetailProductionModifier, m_requiredUpgrade) },
+		{ "ModifierFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(RetailProductionModifier, m_filter) },
+		{ "CostMultiplier", INI::parseReal, nullptr, offsetof(RetailProductionModifier, m_costMultiplier) },
+		{ "TimeMultiplier", INI::parseReal, nullptr, offsetof(RetailProductionModifier, m_timeMultiplier) },
+		{ "HeroPurchase", INI::parseBool, nullptr, offsetof(RetailProductionModifier, m_heroPurchase) },
+		{ "HeroRevive", INI::parseBool, nullptr, offsetof(RetailProductionModifier, m_heroRevive) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(&modifier, fields);
+}
+
+Int scaleProductionValue(Int value, Real multiplier)
+{
+	const Real scaled = static_cast<Real>(value) * multiplier;
+	if (scaled >= static_cast<Real>(std::numeric_limits<Int>::max()))
+		return std::numeric_limits<Int>::max();
+	return scaled > 0.0f ? static_cast<Int>(scaled) : 0;
+}
+}
+
 //-------------------------------------------------------------------------------------------------
 /*static*/ void ProductionUpdateModuleData::parseAppendQuantityModifier( INI* ini, void *instance, void *store, const void* /*userData*/ )
 {
@@ -147,7 +176,15 @@ ProductionUpdateModuleData::ProductionUpdateModuleData()
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
-
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "ProductionModifier", parseRetailProductionModifier, nullptr, offsetof(ProductionUpdateModuleData, m_retailModifiers) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -405,9 +442,9 @@ Bool ProductionUpdate::queueCreateUnit( const ThingTemplate *unitType, Productio
 	Money *money = player->getMoney();
 	Int costPaid = -1;
 	Int framesOverride = -1;
-	if( RetailFileLayers::enabled() && HeroRoster::findIndex( player, unitType ) >= 0 )
+	HeroRules::Price price;
+	if (getUnitPriceOverride(unitType, price))
 	{
-		const HeroRules::Price price = HeroRoster::price( player, unitType );
 		costPaid = price.cost;
 		framesOverride = static_cast<Int>( price.frames );
 		money->withdraw( costPaid );
@@ -447,6 +484,45 @@ Bool ProductionUpdate::queueCreateUnit( const ThingTemplate *unitType, Productio
 
 	return TRUE;  // unit queued
 
+}
+
+Bool ProductionUpdate::getUnitPriceOverride(const ThingTemplate* unit, HeroRules::Price& price) const
+{
+	if (!RetailFileLayers::enabled())
+		return FALSE;
+
+	const Object* producer = getObject();
+	const Player* player = producer->getControllingPlayer();
+	const Int hero = HeroRoster::findIndex(player, unit);
+	const Bool reviving = hero >= 0 && HeroRoster::stateAt(player, hero) == HeroRules::State::Revivable;
+	Real costMultiplier = 1.0f;
+	Real timeMultiplier = 1.0f;
+	for (const auto& modifier : getProductionUpdateModuleData()->m_retailModifiers)
+	{
+		if (modifier.m_requiredUpgrade.isNotEmpty())
+		{
+			const auto* required = TheUpgradeCenter->findUpgrade(modifier.m_requiredUpgrade);
+			if (!required || !(required->getUpgradeType() == UPGRADE_TYPE_PLAYER
+				? player->hasUpgradeComplete(required) : producer->hasUpgrade(required)))
+				continue;
+		}
+
+		const Bool applies = modifier.m_heroPurchase || modifier.m_heroRevive
+			? hero >= 0 && (reviving ? modifier.m_heroRevive : modifier.m_heroPurchase)
+			: modifier.m_filter.matchesTemplate(*unit);
+		if (applies)
+		{
+			costMultiplier *= modifier.m_costMultiplier;
+			timeMultiplier *= modifier.m_timeMultiplier;
+		}
+	}
+	if (hero < 0 && costMultiplier == 1.0f && timeMultiplier == 1.0f)
+		return FALSE;
+
+	price = HeroRoster::price(player, unit);
+	price.cost = scaleProductionValue(price.cost, costMultiplier);
+	price.frames = std::max(1, scaleProductionValue(static_cast<Int>(price.frames), timeMultiplier));
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------

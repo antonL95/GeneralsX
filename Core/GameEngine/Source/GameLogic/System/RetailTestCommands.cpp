@@ -3178,6 +3178,18 @@ void execute(const Command& command, unsigned int frame)
 				draw->getModelConditionFlags().test(MODELCONDITION_UPGRADE_IVORY_TOWER),
 				draw->getModelConditionFlags().test(MODELCONDITION_UPGRADE_NUMENOR_STONEWORK));
 	}
+	else if (command.action == "fortress-collision")
+	{
+		const Coord3D position = *obj->getPosition();
+		const GeometryInfo probe(GEOMETRY_SPHERE, TRUE, 2.0f, 2.0f, 2.0f);
+		const Coord3D tower = {position.x, position.y, position.z + 100.0f};
+		const Coord3D edge = {position.x + 30.0f, position.y, tower.z};
+		PartitionFilterWouldCollide towerQuery(tower, probe, 0.0f, TRUE);
+		PartitionFilterWouldCollide edgeQuery(edge, probe, 0.0f, TRUE);
+		std::fprintf(stderr, "TEST fortress-collision %u %s center=%d edge=%d height=%.1f\n",
+			frame, command.target.c_str(), towerQuery.allow(obj), edgeQuery.allow(obj),
+			obj->getGeometryInfo().getMaxHeightAbovePosition());
+	}
 	else if (command.action == "shroudmap")
 	{
 		if (ThePartitionManager && obj->getControllingPlayer())

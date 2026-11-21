@@ -31,6 +31,8 @@
 
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "Common/ModelState.h"
+#include "Common/HeroRules.h"
+#include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/DieModule.h"
 #include "GameLogic/Module/UpdateModule.h"
 
@@ -121,6 +123,16 @@ struct QuantityModifier
 	Int					m_quantity;
 };
 
+struct RetailProductionModifier
+{
+	AsciiString m_requiredUpgrade;
+	SpecialPowerObjectFilter m_filter;
+	Real m_costMultiplier = 1.0f;
+	Real m_timeMultiplier = 1.0f;
+	Bool m_heroPurchase = FALSE;
+	Bool m_heroRevive = FALSE;
+};
+
 //-------------------------------------------------------------------------------------------------
 class ProductionUpdateModuleData : public UpdateModuleData
 {
@@ -136,6 +148,7 @@ public:
 	DisabledMaskType							m_disabledTypesToProcess;
 
 	Bool m_giveNoXP = FALSE;
+	std::vector<RetailProductionModifier> m_retailModifiers;
 
 	ProductionUpdateModuleData();
 	static void buildFieldParse(MultiIniFieldParse& p);
@@ -179,6 +192,7 @@ public:
 	//This was added for the sneak attack building functionality.
 	virtual const CommandButton* getSpecialPowerConstructionCommandButton() const = 0;
 	virtual void setSpecialPowerConstructionCommandButton( const CommandButton *commandButton ) = 0;
+	virtual Bool getUnitPriceOverride(const ThingTemplate* unit, HeroRules::Price& price) const = 0;
 
 };
 
@@ -207,6 +221,7 @@ public:
 
 	virtual CanMakeType canQueueCreateUnit( const ThingTemplate *unitType ) const override;
 	virtual CanMakeType canQueueUpgrade( const UpgradeTemplate *upgrade ) const override;
+	Bool getUnitPriceOverride(const ThingTemplate* unit, HeroRules::Price& price) const override;
 
 	/** this method is used to request a unique ID to assign to the production of a single
 	unit.  It is unique to all units that can be created from this source object, but is
