@@ -1357,12 +1357,20 @@ Bool Object::canCrushOrSquish(Object *otherObj, CrushSquishTestType testType ) c
 //-------------------------------------------------------------------------------------------------
 UnsignedByte Object::getCrusherLevel() const
 {
+	const Int mountedLevel = getTemplate()->getRotWKObjectData().mountedCrusherLevel;
+	if (RetailFileLayers::enabled() && mountedLevel >= 0 && mountedLevel < 0xff &&
+		ToggleMountedSpecialAbilityUpdate::isMounted(this))
+		return static_cast<UnsignedByte>(mountedLevel);
 	return getTemplate()->getCrusherLevel();
 }
 
 //-------------------------------------------------------------------------------------------------
 UnsignedByte Object::getCrushableLevel() const
 {
+	const Int mountedLevel = getTemplate()->getRotWKObjectData().mountedCrushableLevel;
+	if (RetailFileLayers::enabled() && mountedLevel >= 0 && mountedLevel < 0xff &&
+		ToggleMountedSpecialAbilityUpdate::isMounted(this))
+		return static_cast<UnsignedByte>(mountedLevel);
 	return getTemplate()->getCrushableLevel();
 }
 

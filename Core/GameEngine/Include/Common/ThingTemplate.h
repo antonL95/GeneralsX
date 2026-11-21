@@ -554,8 +554,8 @@ public:
 		std::vector<AsciiString> equivalentTo;
 		std::vector<AsciiString> buildFadeInOnCreateList;
 		std::vector<AsciiString> browser;
-		Int mountedCrusherLevel = 0;
-		Int mountedCrushableLevel = 0;
+		Int mountedCrusherLevel = -1;
+		Int mountedCrushableLevel = -1;
 		Coord3D liveCameraOffset{};
 		Coord2D geometryRotationAnchorOffset{};
 		Real geometryFrontAngle = 0;

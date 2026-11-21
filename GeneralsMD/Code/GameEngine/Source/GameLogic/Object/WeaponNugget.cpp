@@ -517,7 +517,8 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 			if (!physics || HordeContain::get(victim) || victim->isKindOf(KINDOF_PROJECTILE) ||
 				(victim->isEffectivelyDead() && (!nugget.m_onlyWhenJustDied || victim != primaryVictim)) ||
 				(nugget.m_onlyWhenJustDied && !victim->isEffectivelyDead()) ||
-				judgeRadiusDamageVictim(source, victim, primaryVictim, m_affectsMask) != RADIUS_DAMAGE_AFFECT)
+				judgeRadiusDamageVictim(source, victim, primaryVictim, m_affectsMask) != RADIUS_DAMAGE_AFFECT ||
+				!nugget.affects(source, victim))
 				continue;
 
 			const Coord3D& targetPos = *victim->getPosition();

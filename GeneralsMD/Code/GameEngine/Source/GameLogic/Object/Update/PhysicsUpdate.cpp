@@ -1575,10 +1575,19 @@ Bool PhysicsBehavior::checkRetailCrushCollision(Object* victim)
 	const Real deceleration = data.crushDecelerationPercent * AttributeModifiers::value(crusher, AttributeModifierRules::CRUSH_DECELERATE);
 	const Real victimDeceleration = AttributeModifiers::value(victim, AttributeModifierRules::CRUSHED_DECELERATE);
 	scrubVelocity2D(speed * std::clamp(1.0f - deceleration * victimDeceleration, 0.0f, 1.0f));
-	TheWeaponStore->createAndFireTempWeapon(porcupine && porcupine->m_crushDamageWeaponTemplate ?
-		porcupine->m_crushDamageWeaponTemplate : revenge, victim, crusher, TRUE);
 	if (weapon)
 		TheWeaponStore->createAndFireTempWeapon(weapon, crusher, victim, TRUE);
+	else
+	{
+		DamageInfo damage;
+		damage.in.m_sourceID = crusher->getID();
+		damage.in.m_damageType = DAMAGE_CRUSH;
+		damage.in.m_deathType = DEATH_CRUSHED;
+		damage.in.m_amount = HUGE_DAMAGE_AMOUNT;
+		victim->attemptDamage(&damage);
+	}
+	TheWeaponStore->createAndFireTempWeapon(porcupine && porcupine->m_crushDamageWeaponTemplate ?
+		porcupine->m_crushDamageWeaponTemplate : revenge, victim, crusher, TRUE);
 	return TRUE;
 }
 

@@ -3621,6 +3621,8 @@ void AIUpdateInterface::privateGuardRetaliate( Object *victim, const Coord3D *po
 	getStateMachine()->setGoalObject( victim );
 	setGoalPositionClipped( pos, cmdSource );
 	setLastCommandSource( cmdSource );
+	if (RetailFileLayers::enabled() && cmdSource == CMD_FROM_AI)
+		m_autoAttackOrigin = *getGoalPosition();
 	getStateMachine()->setState( AI_GUARD_RETALIATE );
 
 	// do this after setting it as the current state, as the max-shots-to-fire is reset in AttackState::onEnter()
