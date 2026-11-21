@@ -192,6 +192,7 @@ RenderObjClass::RenderObjClass() :
  *=============================================================================================*/
 RenderObjClass::RenderObjClass(const RenderObjClass & src) :
 	Bits(src.Bits),
+	AnimationOpacity(src.AnimationOpacity),
 	Transform(src.Transform),
 	NativeScreenSize(src.NativeScreenSize),
 	Scene(nullptr),
@@ -229,6 +230,7 @@ RenderObjClass & RenderObjClass::operator = (const RenderObjClass & that)
 	if (this != &that) {
 		Set_Hidden(that.Is_Hidden());
 		Set_Animation_Hidden(that.Is_Animation_Hidden());
+		AnimationOpacity = that.AnimationOpacity;
 		Set_Force_Visible(that.Is_Force_Visible());
 		Set_Collision_Type(that.Get_Collision_Type());
 		Set_Native_Screen_Size(that.Get_Native_Screen_Size());
@@ -373,6 +375,19 @@ SceneClass * RenderObjClass::Get_Scene()
  * HISTORY:                                                                                    *
  *   3/4/99     GTH : Created.                                                                 *
  *=============================================================================================*/
+float RenderObjClass::Get_Animation_Opacity() const
+{
+	float opacity = 1.0f;
+	for (auto *object = this; object; object = object->Get_Container()) {
+		const float value = object->AnimationOpacity;
+		if (value <= 0.0f)
+			return 0.0f;
+		if (value < 1.0f)
+			opacity *= value;
+	}
+	return opacity;
+}
+
 void RenderObjClass::Set_Container(RenderObjClass * con)
 {
 	// Either we arent currently in a container or we are clearing our container, otherwise

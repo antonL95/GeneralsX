@@ -57,6 +57,7 @@ struct NodeMotionStruct
 	MotionChannelClass *		ZR;
 	MotionChannelClass *		Q;
 
+	MotionChannelClass *Opacity;
 	BitChannelClass *			Vis;
 };
 
@@ -96,6 +97,7 @@ public:
 	virtual void							Get_Orientation(Quaternion& orientation, int pividx,float frame) const override;
 	virtual void							Get_Transform(Matrix3D& transform, int pividx,float frame) const override;
 	virtual bool							Get_Visibility(int pividx,float frame) override;
+	float Get_Opacity(int pividx, float frame) override;
 
 	virtual bool							Is_Node_Motion_Present(int pividx) override;
 	virtual int							Get_Num_Pivots() const override { return NumNodes; }

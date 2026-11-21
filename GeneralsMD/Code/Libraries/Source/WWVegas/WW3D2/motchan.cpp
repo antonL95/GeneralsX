@@ -180,6 +180,9 @@ bool MotionChannelClass::Load_W3D(ChunkLoadClass & cload)
 	VectorLen  = chan.VectorLen;
 	Type 			 = chan.Flags;
 	PivotIdx   = chan.Pivot;
+	if (Type == ANIM_CHANNEL_OPACITY && (VectorLen != 1 || LastFrame < FirstFrame ||
+		static_cast<unsigned>(LastFrame - FirstFrame) > saved_datasize / sizeof(float)))
+		return false;
 
 	unsigned int num_floats = LastFrame-FirstFrame+1;//(datasize / sizeof(float32)) + 1;
 	num_floats*=VectorLen;
@@ -402,6 +405,8 @@ bool TimeCodedMotionChannelClass::Load_W3D(ChunkLoadClass & cload)
 	VectorLen    = chan.VectorLen;
 	Type 		    = chan.Flags;
 	PivotIdx     = chan.Pivot;
+	if (Type == ANIM_CHANNEL_OPACITY && (VectorLen != 1 || NumTimeCodes == 0 || NumTimeCodes > numInts / 2))
+		return false;
 	PacketSize   = VectorLen+1;
 	CachedIdx	 = 0;
 	LastTimeCodeIdx = (NumTimeCodes-1) * PacketSize;
@@ -413,10 +418,17 @@ bool TimeCodedMotionChannelClass::Load_W3D(ChunkLoadClass & cload)
 		Free();
 		return false;
 	}
+	if (Type == ANIM_CHANNEL_OPACITY) {
+		for (uint32 index = 2; index <= LastTimeCodeIdx; index += 2) {
+			if ((Data[index] & ~W3D_TIMECODED_BINARY_MOVEMENT_FLAG) <=
+				(Data[index - 2] & ~W3D_TIMECODED_BINARY_MOVEMENT_FLAG))
+				return false;
+		}
+	}
 	return true;
 }
 
-bool TimeCodedMotionChannelClass::Load_BFME_Motion(ChunkLoadClass & cload, unsigned frames, bool & unknownScalar)
+bool TimeCodedMotionChannelClass::Load_BFME_Motion(ChunkLoadClass & cload, unsigned frames)
 {
 	static_assert(W3dBfme::SteppedMovement == W3D_TIMECODED_BINARY_MOVEMENT_FLAG);
 	const unsigned length = cload.Cur_Chunk_Length();
@@ -430,9 +442,8 @@ bool TimeCodedMotionChannelClass::Load_BFME_Motion(ChunkLoadClass & cload, unsig
 	initialize_filter_table();
 	W3dBfme::Motion motion;
 	const auto result = W3dBfme::DecodeMotion(bytes, frames, filtertable, motion);
-	unknownScalar = result == W3dBfme::MotionResult::UnknownScalar;
 	if (result != W3dBfme::MotionResult::Decoded)
-		return unknownScalar;
+		return false;
 
 	Free();
 	Type = motion.Type;
@@ -463,6 +474,11 @@ bool TimeCodedMotionChannelClass::Load_BFME_Motion(ChunkLoadClass & cload, unsig
  *=============================================================================================*/
 void	TimeCodedMotionChannelClass::Get_Vector(float32 frame,float * setvec)
 {
+	if (Type == ANIM_CHANNEL_OPACITY) {
+		const float firstFrame = static_cast<float>(Data[0] & ~W3D_TIMECODED_BINARY_MOVEMENT_FLAG);
+		if (frame < firstFrame)
+			frame = firstFrame;
+	}
 
   uint32	tc0;
 
@@ -952,6 +968,8 @@ void AdaptiveDeltaMotionChannelClass::Free()
  * HISTORY:                                                                                    *
  *   02/18/2000 JGA : Created.                                                                 *
  *=============================================================================================*/
+#define PACKET_SIZE (9)
+
 bool AdaptiveDeltaMotionChannelClass::Load_W3D(ChunkLoadClass & cload)
 {
 	int size = cload.Cur_Chunk_Length();
@@ -966,12 +984,15 @@ bool AdaptiveDeltaMotionChannelClass::Load_W3D(ChunkLoadClass & cload)
 	VectorLen   = chan.VectorLen;
 	Type 		   = chan.Flags;
 	PivotIdx    = chan.Pivot;
+	if (Type == ANIM_CHANNEL_OPACITY && (VectorLen != 1 || !chan.NumFrames ||
+		(static_cast<uint64_t>(chan.NumFrames) + 14) / 16 * PACKET_SIZE > datasize))
+		return false;
 	NumFrames	= chan.NumFrames;
 	Scale			= chan.Scale;
 	CacheFrame	= 0x7FFFFFFF;	// a big number, so we know its not valid
 	CacheData   = MSGW3DNEWARRAY("AdaptiveDeltaMotionChannelClass::CacheData") float[VectorLen * 2]; // cacheframe & cachedframe+1 by VectorLen
 
-	Data = MSGW3DNEWARRAY("AdaptiveDeltaMotionChannelClass::Data") uint32[numInts];
+	Data = MSGW3DNEWARRAY("AdaptiveDeltaMotionChannelClass::Data") uint32[numInts + (Type == ANIM_CHANNEL_OPACITY && datasize % sizeof(uint32) != 0)];
 	Data[0] = chan.Data[0];
 
 	if (cload.Read(&(Data[1]), datasize) != datasize) {
@@ -995,7 +1016,6 @@ bool AdaptiveDeltaMotionChannelClass::Load_W3D(ChunkLoadClass & cload)
  * HISTORY:                                                                                    *
  *   02/23/2000 JGA  : Created.                                                                *
  *=============================================================================================*/
-#define PACKET_SIZE (9)
 void AdaptiveDeltaMotionChannelClass::decompress(uint32 frame_idx, float *outdata)
 {
 	// Start Over from the beginning

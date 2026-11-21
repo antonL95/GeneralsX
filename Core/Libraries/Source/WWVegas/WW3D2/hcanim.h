@@ -85,12 +85,12 @@ public:
 	virtual float							Get_Frame_Rate() override { return FrameRate; }
 	virtual float							Get_Total_Time() override { return (float)NumFrames / FrameRate; }
 	int							Get_Flavor() { return Flavor; }
-	unsigned Get_Unknown_Motion_Channels() const { return UnknownMotionChannels; }
 
 	virtual void							Get_Translation(Vector3& translation, int pividx,float frame) const override;
 	virtual void							Get_Orientation(Quaternion& orientation, int pividx,float frame) const override;
 	virtual void							Get_Transform(Matrix3D& transform, int pividx,float frame) const override;
 	virtual bool							Get_Visibility(int pividx,float frame) override;
+	float Get_Opacity(int pividx, float frame) override;
 
 	virtual bool							Is_Node_Motion_Present(int pividx) override;
 	virtual int							Get_Num_Pivots()	const override { return NumNodes; }
@@ -110,7 +110,6 @@ private:
 	int							NumFrames;
 	int							NumNodes;
 	int							Flavor;
-	unsigned UnknownMotionChannels = 0;
 	float							FrameRate;
 
 	NodeCompressedMotionStruct *		NodeMotion;

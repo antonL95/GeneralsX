@@ -2551,6 +2551,7 @@ int HLodClass::Add_Sub_Object_To_Bone(RenderObjClass * subobj,int boneindex)
 	newnode.Model->Add_Ref();
 	newnode.Model->Set_Container(this);
 	newnode.Model->Set_Animation_Hidden(HTree->Get_Visibility (boneindex) == false);
+	newnode.Model->Set_Animation_Opacity(HTree->Get_Opacity(boneindex));
 	newnode.BoneIndex = boneindex;
 
 	int result = AdditionalModels.Add(newnode);
@@ -3349,6 +3350,7 @@ void HLodClass::Update_Sub_Object_Transforms()
 
 			robj->Set_Transform(HTree->Get_Transform(bone));
 			robj->Set_Animation_Hidden(!HTree->Get_Visibility(bone));
+			robj->Set_Animation_Opacity(HTree->Get_Opacity(bone));
 			robj->Update_Sub_Object_Transforms();
 		}
 	}
@@ -3360,6 +3362,7 @@ void HLodClass::Update_Sub_Object_Transforms()
 
 		robj->Set_Transform(HTree->Get_Transform(bone));
 		robj->Set_Animation_Hidden(!HTree->Get_Visibility(bone));
+		robj->Set_Animation_Opacity(HTree->Get_Opacity(bone));
 		robj->Update_Sub_Object_Transforms();
 	}
 

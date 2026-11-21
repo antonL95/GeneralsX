@@ -52,6 +52,8 @@
 
 
 #include "htree.h"
+
+#include <cmath>
 #include "Common/RetailFileLayers.h"
 #include "hanim.h"
 #include "hcanim.h"
@@ -95,6 +97,7 @@ void HTreeClass::Init_Default()
 	Pivot[0].BaseTransform.Make_Identity();
 	Pivot[0].Transform.Make_Identity();
 	Pivot[0].IsVisible = true;
+	Pivot[0].Opacity = 1.0f;
 	strcpy(Pivot[0].Name,"RootTransform");
 	//::strcpy (Name, "Default");
 	Name[0] = 0;
@@ -279,6 +282,7 @@ bool HTreeClass::read_pivots(ChunkLoadClass & cload,bool pre30)
 		Pivot[0].BaseTransform.Make_Identity();
 		Pivot[0].Transform.Make_Identity();
 		Pivot[0].IsVisible = true;
+		Pivot[0].Opacity = 1.0f;
 		strcpy(Pivot[0].Name,"RootTransform");
 		first_piv++;
 	}
@@ -344,6 +348,7 @@ bool HTreeClass::read_pivots(ChunkLoadClass & cload,bool pre30)
 
 	Pivot[0].Transform.Make_Identity();
 	Pivot[0].IsVisible = true;
+	Pivot[0].Opacity = 1.0f;
 
 	return true;
 }
@@ -538,10 +543,12 @@ void HTreeClass::Base_Update(const Matrix3D & root)
 
 	Pivot[0].Transform = root;
 	Pivot[0].IsVisible = true;
+	Pivot[0].Opacity = 1.0f;
 
 	for (int piv_idx=1; piv_idx < NumPivots; piv_idx++) {
 
 		pivot = &Pivot[piv_idx];
+		pivot->Opacity = 1.0f;
 
 		assert(pivot->Parent != nullptr);
 		Matrix3D::Multiply(pivot->Parent->Transform, pivot->BaseTransform, &(pivot->Transform));
@@ -570,11 +577,13 @@ void HTreeClass::Anim_Update(const Matrix3D & root,HAnimClass * motion,float fra
 
 	Pivot[0].Transform = root;
 	Pivot[0].IsVisible = true;
+	Pivot[0].Opacity = 1.0f;
 
 	int num_anim_pivots = motion->Get_Num_Pivots ();
 
 	for (int piv_idx=1; piv_idx < NumPivots; piv_idx++) {
 		pivot = &Pivot[piv_idx];
+		pivot->Opacity = 1.0f;
 
 		// base pose
 		assert(pivot->Parent != nullptr);
@@ -600,6 +609,7 @@ void HTreeClass::Anim_Update(const Matrix3D & root,HAnimClass * motion,float fra
 
 			// visibility
 			pivot->IsVisible = motion->Get_Visibility(piv_idx,frame);
+			pivot->Opacity = motion->Get_Opacity(piv_idx, frame);
 		}
 
 		if (pivot->Is_Captured())
@@ -626,6 +636,7 @@ void HTreeClass::Anim_Update_Without_Interpolation(const Matrix3D & root,HRawAni
 
 	Pivot[0].Transform = root;
 	Pivot[0].IsVisible = true;
+	Pivot[0].Opacity = 1.0f;
 
 	int num_anim_pivots = motion->Get_Num_Pivots ();
 
@@ -646,6 +657,7 @@ void HTreeClass::Anim_Update_Without_Interpolation(const Matrix3D & root,HRawAni
 	lastAnimPivot = &Pivot[num_anim_pivots];
 
 	for (; pivot < endpivot; pivot++,nodeMotion++) {
+		pivot->Opacity = 1.0f;
 
 		// base pose
 		assert(pivot->Parent != nullptr);
@@ -685,6 +697,8 @@ void HTreeClass::Anim_Update_Without_Interpolation(const Matrix3D & root,HRawAni
 				pivot->IsVisible=(nodeMotion->Vis->Get_Bit(iframe) == 1);
 			else
 				pivot->IsVisible=1;
+			if (nodeMotion->Opacity)
+				pivot->Opacity = motion->Get_Opacity(static_cast<int>(pivot - Pivot), frame);
 		}
 
 		if (pivot->Is_Captured())
@@ -723,12 +737,14 @@ void HTreeClass::Blend_Update
 
 	Pivot[0].Transform = root;
 	Pivot[0].IsVisible = true;
+	Pivot[0].Opacity = 1.0f;
 
 	int num_anim_pivots = MIN( motion0->Get_Num_Pivots (), motion1->Get_Num_Pivots () );
 
 	for (int piv_idx=1; piv_idx < NumPivots; piv_idx++) {
 
 		pivot = &Pivot[piv_idx];
+		pivot->Opacity = 1.0f;
 
 		assert(pivot->Parent != nullptr);
 		Matrix3D::Multiply(pivot->Parent->Transform,pivot->BaseTransform,&(pivot->Transform));
@@ -756,6 +772,8 @@ void HTreeClass::Blend_Update
 #endif
 
 			pivot->IsVisible = (motion0->Get_Visibility(piv_idx,frame0) || motion1->Get_Visibility(piv_idx,frame1));
+			pivot->Opacity = std::lerp(motion0->Get_Opacity(piv_idx, frame0),
+				motion1->Get_Opacity(piv_idx, frame1), percentage);
 		}
 
 		if (pivot->Is_Captured())
@@ -791,6 +809,7 @@ void HTreeClass::Combo_Update
 
 	Pivot[0].Transform = root;
 	Pivot[0].IsVisible = true;
+	Pivot[0].Opacity = 1.0f;
 
 	int num_anim_pivots = 100000;
 	for ( int anim_num = 0; anim_num < anim->Get_Num_Anims(); anim_num++ ) {
@@ -803,6 +822,7 @@ void HTreeClass::Combo_Update
 	for (int piv_idx=1; piv_idx < NumPivots; piv_idx++) {
 
 		pivot = &Pivot[piv_idx];
+		pivot->Opacity = 1.0f;
 		assert(pivot->Parent != nullptr);
 		Matrix3D::Multiply(pivot->Parent->Transform,pivot->BaseTransform,&(pivot->Transform));
 
@@ -817,6 +837,7 @@ void HTreeClass::Combo_Update
 			float	last_weight = 0;
 #endif
 			float	weight_total = 0;
+			float opacity = 0.0f;
 			int wcount = 0;
 
 			int anim_num = 0;
@@ -848,6 +869,7 @@ void HTreeClass::Combo_Update
 						motion->Get_Translation( temp_trans, piv_idx, frame_num );
 						trans += weight * ScaleFactor * temp_trans;
 						weight_total += weight;
+						opacity += weight * motion->Get_Opacity(piv_idx, frame_num);
 
 #ifdef ASSUME_NORMALIZED_ANIM_COMBO_WEIGHTS
 						motion->Get_Orientation(q1,piv_idx, frame_num );
@@ -897,6 +919,8 @@ void HTreeClass::Combo_Update
 #endif
 
 			pivot->IsVisible = false;
+			if (weight_total != 0.0f)
+				pivot->Opacity = opacity / weight_total;
 
 			for ( anim_num = 0; (anim_num < anim->Get_Num_Anims()) && (!pivot->IsVisible); anim_num++ ) {
 				HAnimClass *motion = anim->Get_Motion( anim_num );

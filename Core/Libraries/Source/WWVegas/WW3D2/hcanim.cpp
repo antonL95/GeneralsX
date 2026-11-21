@@ -74,6 +74,7 @@ struct NodeCompressedMotionStruct
 			TimeCodedMotionChannelClass *		Y;
 			TimeCodedMotionChannelClass *		Z;
 			TimeCodedMotionChannelClass *		Q;
+			TimeCodedMotionChannelClass *Opacity;
 		} tc;
 
 		struct {
@@ -81,6 +82,7 @@ struct NodeCompressedMotionStruct
 			AdaptiveDeltaMotionChannelClass *		Y;
 			AdaptiveDeltaMotionChannelClass *		Z;
 			AdaptiveDeltaMotionChannelClass *		Q;
+			AdaptiveDeltaMotionChannelClass *Opacity;
 
 		} ad;
 
@@ -89,6 +91,7 @@ struct NodeCompressedMotionStruct
 			 void * Y;
 			 void * Z;
 			 void * Q;
+			 void *Opacity;
 		} vd;
 	};
 
@@ -114,6 +117,7 @@ NodeCompressedMotionStruct::NodeCompressedMotionStruct() :
 		vd.Y = nullptr;
 		vd.Z = nullptr;
 		vd.Q = nullptr;
+		vd.Opacity = nullptr;
 }
 
 
@@ -140,12 +144,14 @@ NodeCompressedMotionStruct::~NodeCompressedMotionStruct()
 			delete tc.Y;
 			delete tc.Z;
 			delete tc.Q;
+			delete tc.Opacity;
 			break;
 		case ANIM_FLAVOR_ADAPTIVE_DELTA:
 			delete ad.X;
 			delete ad.Y;
 			delete ad.Z;
 			delete ad.Q;
+			delete ad.Opacity;
 			break;
 		default:
 			WWASSERT(0);	// unknown flavor
@@ -237,7 +243,6 @@ int HCompressedAnimClass::Load_W3D(ChunkLoadClass & cload)
 	** First make sure we release any memory in use
 	*/
 	Free();
-	UnknownMotionChannels = 0;
 
 	/*
 	**	Open the first chunk, it should be the animation header
@@ -348,14 +353,11 @@ int HCompressedAnimClass::Load_W3D(ChunkLoadClass & cload)
 				if (Flavor != ANIM_FLAVOR_TIMECODED)
 					break;
 				auto* channel = W3DNEW TimeCodedMotionChannelClass;
-				bool unknownScalar = false;
-				if (!channel->Load_BFME_Motion(cload, NumFrames, unknownScalar)) {
+				if (!channel->Load_BFME_Motion(cload, NumFrames)) {
 					delete channel;
 					goto Error;
 				}
-				if (unknownScalar)
-					++UnknownMotionChannels;
-				if (unknownScalar || channel->Get_Pivot() >= NumNodes)
+				if (channel->Get_Pivot() >= NumNodes)
 					delete channel;
 				else
 					add_channel(channel);
@@ -473,6 +475,18 @@ void HCompressedAnimClass::add_channel(TimeCodedMotionChannelClass * newchan)
 		case ANIM_CHANNEL_Q:
 			NodeMotion[idx].tc.Q = newchan;
 			break;
+
+		case ANIM_CHANNEL_OPACITY:
+			if (NodeMotion[idx].tc.Opacity) {
+				delete newchan;
+			} else {
+				NodeMotion[idx].tc.Opacity = newchan;
+			}
+			break;
+
+		default:
+			delete newchan;
+			break;
 	}
 
 }
@@ -497,6 +511,18 @@ void HCompressedAnimClass::add_channel(AdaptiveDeltaMotionChannelClass * newchan
 
 		case ANIM_CHANNEL_Q:
 			NodeMotion[idx].ad.Q = newchan;
+			break;
+
+		case ANIM_CHANNEL_OPACITY:
+			if (NodeMotion[idx].ad.Opacity) {
+				delete newchan;
+			} else {
+				NodeMotion[idx].ad.Opacity = newchan;
+			}
+			break;
+
+		default:
+			delete newchan;
 			break;
 	}
 
@@ -679,6 +705,17 @@ void HCompressedAnimClass::Get_Transform( Matrix3D& mtx, int pividx, float frame
  * HISTORY:                                                                                    *
  *   1/19/98    GTH : Created.                                                                 *
  *=============================================================================================*/
+float HCompressedAnimClass::Get_Opacity(int pividx, float frame)
+{
+	float opacity = 1.0f;
+	const auto &motion = NodeMotion[pividx];
+	if (Flavor == ANIM_FLAVOR_TIMECODED && motion.tc.Opacity)
+		motion.tc.Opacity->Get_Vector(frame, &opacity);
+	else if (Flavor == ANIM_FLAVOR_ADAPTIVE_DELTA && motion.ad.Opacity)
+		motion.ad.Opacity->Get_Vector(frame, &opacity);
+	return opacity;
+}
+
 bool HCompressedAnimClass::Get_Visibility(int pividx,float frame)
 {
 
@@ -714,6 +751,7 @@ bool HCompressedAnimClass::Is_Node_Motion_Present(int pividx)
 	if (NodeMotion[pividx].vd.Z != nullptr)	return true;
 	if (NodeMotion[pividx].vd.Q  != nullptr)	return true;
 	if (NodeMotion[pividx].Vis != nullptr)		return true;
+	if (NodeMotion[pividx].vd.Opacity != nullptr) return true;
 
 	return false;
 }

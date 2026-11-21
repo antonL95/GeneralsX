@@ -48,7 +48,7 @@ bool ReadVectorStream(std::span<const Byte> data, unsigned count, StoreVector st
 	return true;
 }
 
-enum class MotionResult { Invalid, Decoded, UnknownScalar };
+enum class MotionResult { Invalid, Decoded };
 
 struct Motion
 {
@@ -80,9 +80,6 @@ inline MotionResult DecodeMotion(std::span<const Byte> data, unsigned animationF
 		: 4 + vectorLength * (4 + ((count + 15) / 16) * deltaPacketBytes);
 	if (data.size() != 8 + bodySize)
 		return MotionResult::Invalid;
-
-	if (type == 15)
-		return MotionResult::UnknownScalar;
 
 	motion.Pivot = ReadWord(data.data() + 6);
 	motion.Type = type;

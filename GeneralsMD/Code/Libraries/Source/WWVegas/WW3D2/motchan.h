@@ -105,6 +105,8 @@ WWINLINE void MotionChannelClass::set_identity(float * setvec) const
 		setvec[2] = 0.0f;
 		setvec[3] = 1.0f;
 
+	} else if (Type == ANIM_CHANNEL_OPACITY) {
+		setvec[0] = 1.0f;
 	} else {
 
 		setvec[0] = 0.0f;
@@ -218,7 +220,7 @@ public:
 	~TimeCodedMotionChannelClass();
 
 	bool	Load_W3D(ChunkLoadClass & cload);
-	bool Load_BFME_Motion(ChunkLoadClass & cload, unsigned frames, bool & unknownScalar);
+	bool Load_BFME_Motion(ChunkLoadClass & cload, unsigned frames);
 	int	Get_Type() { return Type; }
 	int	Get_Pivot() { return PivotIdx; }
 	void	Get_Vector(float32 frame, float * setvec);

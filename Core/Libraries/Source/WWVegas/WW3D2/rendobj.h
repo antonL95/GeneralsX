@@ -453,6 +453,8 @@ public:
 	virtual void					Set_Hidden(int onoff)														{ if (onoff) { Bits &= ~IS_NOT_HIDDEN; } else { Bits |= IS_NOT_HIDDEN; } }
 	virtual int						Is_Animation_Hidden() const											{ return !(Bits & IS_NOT_ANIMATION_HIDDEN); }
 	virtual void					Set_Animation_Hidden(int onoff)											{ if (onoff) { Bits &= ~IS_NOT_ANIMATION_HIDDEN; } else { Bits |= IS_NOT_ANIMATION_HIDDEN; } }
+	void Set_Animation_Opacity(float opacity) { AnimationOpacity = opacity; }
+	float Get_Animation_Opacity() const;
 	virtual int						Is_Force_Visible() const												{ return Bits & IS_FORCE_VISIBLE; }
 	virtual void					Set_Force_Visible(int onoff)          									{ if (onoff) { Bits |= IS_FORCE_VISIBLE; } else { Bits &= ~IS_FORCE_VISIBLE; } }
 
@@ -527,6 +529,7 @@ protected:
 	};
 
 	mutable unsigned long		Bits;
+	float AnimationOpacity = 1.0f;
 	Matrix3D							Transform;
  	float						ObjectScale;					//user applied scaling factor inside Transform matrix.
 	unsigned int				ObjectColor;					//user applied coloring to the asset/prototype used to make this robj. - For Generals -MW

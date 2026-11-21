@@ -1689,6 +1689,47 @@ unsigned DX8TextureCategoryClass::Add_Mesh(
 
 // ----------------------------------------------------------------------------
 
+static void Render_With_Animation_Opacity(DX8PolygonRendererClass & renderer, MeshClass & mesh,
+	const ShaderClass & shader, float opacity)
+{
+	if (!(opacity > 0.0f))
+		return;
+
+	DX8Wrapper::Set_Shader(shader);
+	DX8Wrapper::Apply_Render_State_Changes();
+
+	const unsigned alpha = opacity >= 1.0f ? 255 : static_cast<unsigned>(opacity * 255.0f + 0.5f);
+	const unsigned factor = DX8Wrapper::Get_DX8_Render_State(D3DRS_TEXTUREFACTOR);
+	const unsigned alphaRef = DX8Wrapper::Get_DX8_Render_State(D3DRS_ALPHAREF);
+	const bool additive = mesh.Is_Additive();
+	const unsigned stage = DX8Wrapper::Get_DX8_Texture_Stage_State(1, D3DTSS_COLOROP) == D3DTOP_DISABLE ? 1 : 2;
+	const D3DTEXTURESTAGESTATETYPE states[] = {
+		D3DTSS_COLOROP, D3DTSS_COLORARG1, D3DTSS_COLORARG2,
+		D3DTSS_ALPHAOP, D3DTSS_ALPHAARG1, D3DTSS_ALPHAARG2
+	};
+	const unsigned values[] = {
+		additive ? D3DTOP_MODULATE : D3DTOP_SELECTARG1, D3DTA_CURRENT, D3DTA_TFACTOR,
+		D3DTOP_MODULATE, D3DTA_CURRENT, D3DTA_TFACTOR
+	};
+	unsigned previous[sizeof(states) / sizeof(states[0])];
+	for (unsigned i = 0; i < sizeof(states) / sizeof(states[0]); ++i) {
+		previous[i] = DX8Wrapper::Get_DX8_Texture_Stage_State(stage, states[i]);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, states[i], values[i]);
+	}
+	const unsigned color = additive ? alpha : 255;
+	const unsigned factorAlpha = additive && shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_SRC_ALPHA ? 255 : alpha;
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, D3DCOLOR_ARGB(factorAlpha, color, color, color));
+	if (shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_ENABLE)
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAREF, static_cast<unsigned>(alphaRef * factorAlpha / 255));
+
+	renderer.Render(mesh.Get_Base_Vertex_Offset());
+
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAREF, alphaRef);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, factor);
+	for (unsigned i = 0; i < sizeof(states) / sizeof(states[0]); ++i)
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, states[i], previous[i]);
+}
+
 void DX8TextureCategoryClass::Render()
 {
 	#ifdef WWDEBUG
@@ -1882,12 +1923,14 @@ void DX8TextureCategoryClass::Render()
 		//(gth) this if statement's contents are not tabbed to avoid perforce merge problems...
 		if (!DX8RendererDebugger::Is_Enabled() || !mesh->Is_Disabled_By_Debugger()) {
 
-		if ((!!mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT)) && WW3D::Is_Sorting_Enabled()) {
+		const float animationOpacity = mesh->Get_Animation_Opacity();
+		if (animationOpacity == 1.0f && mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled()) {
 			renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
 		} else {
 			//non-transparent mesh that will be rendered immediately.  Okay to adjust the shader/material
 			//if necessary
-			if (mesh->Get_Alpha_Override() != 1.0 || (mesh->Get_User_Data() && *(int *)mesh->Get_User_Data() == RenderObjClass::USER_DATA_MATERIAL_OVERRIDE))
+			if (animationOpacity != 1.0f || mesh->Get_Alpha_Override() != 1.0f ||
+				(mesh->Get_User_Data() && *(int *)mesh->Get_User_Data() == RenderObjClass::USER_DATA_MATERIAL_OVERRIDE))
 			{
 				//mesh has material override of some kind
 				//adjust the opacity of this model
@@ -1907,7 +1950,13 @@ void DX8TextureCategoryClass::Render()
 				else
 					oldMapper=nullptr;
 
-				if (mesh->Get_Alpha_Override() != 1.0)
+				if (animationOpacity != 1.0f)
+				{
+					Render_With_Animation_Opacity(*renderer, *mesh, mesh->Is_Additive() ? theShader : theAlphaShader,
+						animationOpacity * mesh->Get_Alpha_Override());
+					DX8Wrapper::Set_Shader(theShader);
+				}
+				else if (mesh->Get_Alpha_Override() != 1.0)
 				{
 					if (mesh->Is_Additive())
 					{

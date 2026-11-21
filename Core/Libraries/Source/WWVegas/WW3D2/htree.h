@@ -109,6 +109,7 @@ public:
 
 	WWINLINE const Matrix3D	&	Get_Transform(int pivot) const;
 	WWINLINE bool					Get_Visibility(int pivot) const;
+	float Get_Opacity(int pivot) const { return Pivot[pivot].Opacity; }
 
 	WWINLINE const Matrix3D &	Get_Root_Transform() const;
 

@@ -91,11 +91,13 @@ public:
 	DynamicMatrix3D*	CapTransformPtr;
 	short							Index;
 	bool							IsVisible;				// result of the visibility channel
+	float Opacity = 1.0f;
 	bool							WorldSpaceTranslation;
 #else
 	Matrix3D					CapTransform;
 	int								Index;
 	bool							IsVisible;				// result of the visibility channel
+	float Opacity = 1.0f;
 	bool							WorldSpaceTranslation;
 	bool							IsCaptured;
 	bool							Unused;						// padding

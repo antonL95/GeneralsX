@@ -62,13 +62,18 @@ TEST(W3dBfmeChunks, MotionHoldsDelayedFirstKeyFromFrameZero)
 	EXPECT_EQ(motion.Packets, (std::vector<uint32_t>{0, 0x3f800000, 0x80000003, 0x3f800000}));
 }
 
-TEST(W3dBfmeChunks, UnknownScalarIsSkipped)
+TEST(W3dBfmeChunks, OpacityMotionPreservesFadeKeys)
 {
-	const uint8_t bytes[] = {0, 0, 1, 15, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63};
+	const uint8_t bytes[] = {
+		0, 0, 1, 15, 2, 0, 3, 0, 0, 0, 8, 0,
+		0, 0, 0, 0, 0, 0, 128, 63
+	};
 	const float filters[256] = {};
 	W3dBfme::Motion motion;
-	EXPECT_EQ(W3dBfme::DecodeMotion(bytes, 1, filters, motion), W3dBfme::MotionResult::UnknownScalar);
-	EXPECT_TRUE(motion.Packets.empty());
+	ASSERT_EQ(W3dBfme::DecodeMotion(bytes, 9, filters, motion), W3dBfme::MotionResult::Decoded);
+	EXPECT_EQ(motion.Type, 15);
+	EXPECT_EQ(motion.Pivot, 3);
+	EXPECT_EQ(motion.Packets, (std::vector<uint32_t>{0, 0, 8, 0x3f800000}));
 }
 
 TEST(W3dBfmeChunks, BoromirIdleMatchesInventoryVectors)

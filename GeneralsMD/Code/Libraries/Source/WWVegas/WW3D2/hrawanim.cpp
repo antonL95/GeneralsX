@@ -75,6 +75,7 @@ NodeMotionStruct::NodeMotionStruct() :
 	YR(nullptr),
 	ZR(nullptr),
 	Q(nullptr),
+	Opacity(nullptr),
 	Vis(nullptr)
 {
 }
@@ -101,6 +102,7 @@ NodeMotionStruct::~NodeMotionStruct()
 	delete YR;
 	delete ZR;
 	delete Q;
+	delete Opacity;
 	delete Vis;
 }
 
@@ -369,6 +371,18 @@ void HRawAnimClass::add_channel(MotionChannelClass * newchan)
 
 		case ANIM_CHANNEL_Q:
 			NodeMotion[idx].Q = newchan;
+			break;
+
+		case ANIM_CHANNEL_OPACITY:
+			if (NodeMotion[idx].Opacity) {
+				delete newchan;
+			} else {
+				NodeMotion[idx].Opacity = newchan;
+			}
+			break;
+
+		default:
+			delete newchan;
 			break;
 	}
 
@@ -661,6 +675,24 @@ void HRawAnimClass::Get_Transform(Matrix3D& mtx, int pividx, float frame ) const
  * HISTORY:                                                                                    *
  *   1/19/98    GTH : Created.                                                                 *
  *=============================================================================================*/
+float HRawAnimClass::Get_Opacity(int pividx, float frame)
+{
+	const auto *channel = NodeMotion[pividx].Opacity;
+	if (!channel)
+		return 1.0f;
+
+	const int frame0 = static_cast<int>(frame);
+	float first;
+	channel->Get_Vector(frame0, &first);
+	const float fraction = frame - frame0;
+	if (fraction == 0.0f)
+		return first;
+
+	float second;
+	channel->Get_Vector(frame0 + 1 < NumFrames ? frame0 + 1 : 0, &second);
+	return (1.0f - fraction) * first + fraction * second;
+}
+
 bool HRawAnimClass::Get_Visibility(int pividx,float frame)
 {
 	if (NodeMotion[pividx].Vis != nullptr) {
@@ -696,6 +728,7 @@ bool HRawAnimClass::Is_Node_Motion_Present(int pividx)
 	if (NodeMotion[pividx].ZR != nullptr) return true;
 	if (NodeMotion[pividx].Q  != nullptr) return true;
 	if (NodeMotion[pividx].Vis != nullptr) return true;
+	if (NodeMotion[pividx].Opacity != nullptr) return true;
 
 	return false;
 }

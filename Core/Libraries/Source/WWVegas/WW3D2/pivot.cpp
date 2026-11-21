@@ -83,11 +83,13 @@ PivotClass::PivotClass(const PivotClass& that) :
 	CapTransformPtr(nullptr),
 	Index(that.Index),
 	IsVisible(that.IsVisible),
+	Opacity(that.Opacity),
 	WorldSpaceTranslation(that.WorldSpaceTranslation)
 #else
 	CapTransform(that.CapTransform),
 	Index(that.Index),
 	IsVisible(that.IsVisible),
+	Opacity(that.Opacity),
 	WorldSpaceTranslation(that.WorldSpaceTranslation),
 	IsCaptured(that.IsCaptured),
 	Unused(that.Unused)
@@ -115,6 +117,7 @@ PivotClass& PivotClass::operator=(const PivotClass& that)
 		CapTransformPtr = nullptr;
 		Index = that.Index;
 		IsVisible = that.IsVisible;
+		Opacity = that.Opacity;
 		WorldSpaceTranslation = that.WorldSpaceTranslation;
 		if (that.CapTransformPtr != nullptr)
 		{
@@ -125,6 +128,7 @@ PivotClass& PivotClass::operator=(const PivotClass& that)
 		CapTransform = that.CapTransform;
 		Index = that.Index;
 		IsVisible = that.IsVisible;
+		Opacity = that.Opacity;
 		WorldSpaceTranslation = that.WorldSpaceTranslation;
 		IsCaptured = that.IsCaptured;
 		Unused = that.Unused;

@@ -92,6 +92,7 @@ public:
 	virtual void				Get_Orientation(Quaternion& orientation, int pividx,float frame) const = 0;
 	virtual void				Get_Transform(Matrix3D&, int pividx, float frame) const = 0;
 	virtual bool				Get_Visibility(int pividx,float frame) = 0;
+	virtual float Get_Opacity(int, float) { return 1.0f; }
 
 	virtual int					Get_Num_Pivots() const = 0;
 	virtual bool				Is_Node_Motion_Present(int pividx) = 0;

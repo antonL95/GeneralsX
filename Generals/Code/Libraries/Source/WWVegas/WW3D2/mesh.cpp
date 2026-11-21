@@ -657,7 +657,7 @@ int MeshClass::Get_Num_Polys() const
 void MeshClass::Render(RenderInfoClass & rinfo)
 {
 	WWPROFILE("Mesh::Render");
-	if (Is_Not_Hidden_At_All() == false) {
+	if (!Is_Not_Hidden_At_All() || Get_Animation_Opacity() == 0.0f) {
 		return;
 	}
 
@@ -988,6 +988,8 @@ void MeshClass::Render_Material_Pass(MaterialPassClass * pass,IndexBufferClass *
  *=============================================================================================*/
 void MeshClass::Special_Render(SpecialRenderInfoClass & rinfo)
 {
+	if (Get_Animation_Opacity() == 0.0f)
+		return;
 	if ((Is_Not_Hidden_At_All() == false) && (rinfo.RenderType != SpecialRenderInfoClass::RENDER_SHADOW)) {
 		return;
 	}
