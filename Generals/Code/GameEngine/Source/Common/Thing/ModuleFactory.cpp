@@ -169,6 +169,8 @@
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/AnimalAIUpdate.h"
+#include "GameLogic/Module/GiantBirdAIUpdate.h"
 #include "GameLogic/Module/CommandPointsUpgrade.h"
 #include "GameLogic/Module/MissileLauncherBuildingUpdate.h"
 #include "GameLogic/Module/StealthDetectorUpdate.h"
@@ -456,6 +458,9 @@ void ModuleFactory::init()
 		addModule( HorseHordeContain );
 		addModule( AODHordeContain );
 		addModule( HordeAIUpdate );
+		addModule( AnimalAIUpdate );
+		addModule( CritterEmitterUpdate );
+		addModule( GiantBirdAIUpdate );
 		addModule( CommandPointsUpgrade );
 	}
 	addModule( MissileLauncherBuildingUpdate );

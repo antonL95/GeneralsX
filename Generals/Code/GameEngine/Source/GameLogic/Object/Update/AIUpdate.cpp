@@ -207,6 +207,16 @@ const LocomotorTemplateVector* AIUpdateModuleData::findLocomotorTemplateVector(L
 	}
 }
 
+Int AIUpdateModuleData::findLocomotorSetType(const AsciiString& name)
+{
+	for (Int i = 0; TheLocomotorSetNames[i]; ++i)
+	{
+		if (name.compareNoCase(TheLocomotorSetNames[i]) == 0)
+			return i;
+	}
+	return LOCOMOTORSET_INVALID;
+}
+
 //-------------------------------------------------------------------------------------------------
 // subclasses may want to override this, to use a subclass of AIStateMachine.
 AIStateMachine* AIUpdateInterface::makeStateMachine()

@@ -107,6 +107,8 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/HordeContain.h
     Include/GameLogic/Module/ExperienceModules.h
     Include/GameLogic/Module/HordeAIUpdate.h
+    Include/GameLogic/Module/AnimalAIUpdate.h
+    Include/GameLogic/Module/GiantBirdAIUpdate.h
     Include/Common/RetailFileLayers.h
     Include/Common/INILegacyLines.h
     Include/Common/INIMath.h
@@ -673,6 +675,8 @@ set(GAMEENGINE_SRC
     Source/Common/HordeFormation.cpp
     Source/GameLogic/Object/Contain/HordeContain.cpp
     Source/GameLogic/Object/Update/HordeAIUpdate.cpp
+    Source/GameLogic/Object/Update/AnimalAIUpdate.cpp
+    Source/GameLogic/Object/Update/GiantBirdAIUpdate.cpp
 #    Source/Common/GlobalData.cpp
     Source/Common/INI/INI.cpp
     Source/Common/INI/INIAudit.cpp

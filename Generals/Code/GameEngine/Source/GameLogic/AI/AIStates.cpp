@@ -63,6 +63,7 @@
 #include "GameLogic/Weapon.h"
 
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/GiantBirdAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -5088,6 +5089,10 @@ StateReturnType AIAttackFireWeaponState::update()
 	{
 		return STATE_FAILURE;
 	}
+
+	const Coord3D* strike = victim ? victim->getPosition() : getMachineGoalPosition();
+	if (strike && !GiantBirdAIUpdate::canStrike(*obj, *strike))
+		return STATE_CONTINUE;
 
 	WeaponStatus status = weapon->getStatus();
 	if (status == PRE_ATTACK)

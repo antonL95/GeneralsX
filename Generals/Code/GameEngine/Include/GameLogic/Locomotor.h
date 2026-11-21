@@ -193,6 +193,7 @@ private:
 	Real											m_speedScale;						///< factor that turns an authored speed into its compensated speed
 #endif
 	Real											m_preferredHeight;			///< our preferred height (if flying)
+	Real m_preferredAttackHeight = 5.0f;
 	Real											m_preferredHeightDamping;		///< how aggressively to adjust to preferred height: 1.0 = very much so, 0.1 = gradually, etc
 	Real											m_circlingRadius;				///< for flying things, the radius at which they circle their "maintain" destination. (pos = cw, neg = ccw, 0 = smallest possible)
 	Real											m_speedLimitZ;					///< try to avoid going up or down at more than this speed, if possible
@@ -279,6 +280,7 @@ public:
 	Real getMaxLift(BodyDamageType condition) const;  ///< get acceleration given condition
 	Real getBraking() const;  ///< get braking given condition
 
+	Real getPreferredAttackHeight() const { return m_template->m_preferredAttackHeight; }
 	Real getPreferredHeight() const { return m_preferredHeight;} ///< Just return preferredheight, no damage consideration
 	void restorePreferredHeightFromTemplate() { m_preferredHeight = m_template->m_preferredHeight; };
 	Real getPreferredHeightDamping() const { return m_preferredHeightDamping;}

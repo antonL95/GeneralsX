@@ -183,6 +183,8 @@
 #include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/AnimalAIUpdate.h"
+#include "GameLogic/Module/GiantBirdAIUpdate.h"
 #include "GameLogic/Module/CommandPointsUpgrade.h"
 #include "GameLogic/Module/MissileLauncherBuildingUpdate.h"
 #include "GameLogic/Module/StealthDetectorUpdate.h"
@@ -509,6 +511,9 @@ void ModuleFactory::init()
 		addModule( BezierProjectileBehavior );
 		addModule( RespawnUpdate );
 		addModule( HordeAIUpdate );
+		addModule( AnimalAIUpdate );
+		addModule( CritterEmitterUpdate );
+		addModule( GiantBirdAIUpdate );
 		addModule( CommandPointsUpgrade );
 		addModule( WeaponFireSpecialAbilityUpdate );
 		addModule( ToggleMountedSpecialAbilityUpdate );

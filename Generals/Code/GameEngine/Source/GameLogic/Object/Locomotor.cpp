@@ -37,6 +37,7 @@
 #define DEFINE_LOCO_APPEARANCE_NAMES
 
 #include "Common/INI.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Locomotor.h"
@@ -536,6 +537,7 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "MinSpeed", INI::parseVelocityReal, nullptr, offsetof(LocomotorTemplate, m_minSpeed) },
 		{ "MinTurnSpeed", INI::parseVelocityReal, nullptr, offsetof(LocomotorTemplate, m_minTurnSpeed) },
 		{ "PreferredHeight", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredHeight) },
+		{ "PreferredAttackHeight", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredAttackHeight) },
 		{ "PreferredHeightDamping", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredHeightDamping) },
 		{ "CirclingRadius", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_circlingRadius) },
 		{ "Extra2DFriction", parseFrictionPerSec, nullptr, offsetof(LocomotorTemplate, m_extra2DFriction) },
@@ -2152,6 +2154,14 @@ Real Locomotor::calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real cu
 	*/
 	BodyDamageType bdt = obj->getBodyModule()->getDamageState();
 	Real maxGrossLift = getMaxLift(bdt);
+	if (RetailFileLayers::enabled() && (getAppearance() == LOCO_WINGS || getAppearance() == LOCO_GIANT_BIRD) &&
+		maxGrossLift > 0.0f && !obj->isEffectivelyDead())
+	{
+		const Real maxVerticalSpeed = min(m_template->m_speedLimitZ, maxGrossLift);
+		const Real desiredVerticalSpeed = clamp(-maxVerticalSpeed, (preferredHeight - curZ) * 0.25f, maxVerticalSpeed);
+		const Real correction = clamp(-maxGrossLift, desiredVerticalSpeed - physics->getVelocity()->z, maxGrossLift);
+		return correction - TheGlobalData->m_gravity;
+	}
 	Real maxNetLift = maxGrossLift + TheGlobalData->m_gravity;	// note that gravity is always negative.
 	if (maxNetLift < 0)
 		maxNetLift = 0;
@@ -2490,6 +2500,8 @@ void Locomotor::moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, 
 	{
 		PhysicsTurningType rotating = rotateTowardsPosition(obj, goalPos);
 		physics->setTurning(rotating);
+		if (RetailFileLayers::enabled() && (getAppearance() == LOCO_WINGS || getAppearance() == LOCO_GIANT_BIRD))
+			dirToApplyForce = *obj->getUnitDirectionVector2D();
 	}
 
 	if (!getFlag(NO_SLOW_DOWN_AS_APPROACHING_DEST))
@@ -2616,7 +2628,9 @@ void Locomotor::maintainCurrentPositionWings(Object* obj, PhysicsBehavior *physi
 {
 	DEBUG_ASSERTCRASH(getFlag(MAINTAIN_POS_IS_VALID), ("invalid maintain pos"));
 	physics->setTurning(TURN_NONE);
-	if (physics->isMotive() && obj->isAboveTerrain())	// no need to stop something that isn't moving (or is just sitting on the ground)
+	const Bool ambientFlight = RetailFileLayers::enabled() && obj->isKindOf(KINDOF_INERT) &&
+		!obj->isEffectivelyDead() && getMinSpeed() > 0.0f && getPreferredHeight() > 0.0f;
+	if (ambientFlight || (physics->isMotive() && obj->isAboveTerrain()))
 	{
 
 			// aim for the spot on the opposite side of the circle.
