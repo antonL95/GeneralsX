@@ -39,6 +39,7 @@
 #include "Common/ThingFactory.h"
 #include "Common/PlayerList.h"
 #include "Common/BuildAssistant.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "Common/WellKnownKeys.h"
@@ -1409,6 +1410,14 @@ Int AIPlayer::getPlayerSuperweaponValue(Coord3D *center, Int playerNdx, Real rad
 	}
 	return cash;
 }
+static UnsignedInt factoryUnitCost(Object* factory, const ThingTemplate* thing)
+{
+	HeroRules::Price price;
+	if (factory->getProductionUpdateInterface()->getUnitPriceOverride(thing, price))
+		return price.cost;
+	return thing->calcCostToBuild(factory->getControllingPlayer());
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Search the computer player's buildings for one that can build the given request
 	* and start training the unit.
@@ -1417,7 +1426,7 @@ Int AIPlayer::getPlayerSuperweaponValue(Coord3D *center, Int playerNdx, Real rad
 // ------------------------------------------------------------------------------------------------
 Bool AIPlayer::startTraining( WorkOrder *order, Bool busyOK, AsciiString teamName)
 {
-	Object *factory = findFactory(order->m_thing, busyOK);
+	Object *factory = findFactory(order->m_thing, busyOK, RetailFileLayers::enabled());
 	if( factory )
 	{
 		ProductionUpdateInterface *pu = factory->getProductionUpdateInterface();
@@ -1443,7 +1452,7 @@ Bool AIPlayer::startTraining( WorkOrder *order, Bool busyOK, AsciiString teamNam
 	* If busyOK is true, it will return a busy factory if there are no idle ones.  This is
 	* used for script invoked teams "push" to the front of the queue. */
 // ------------------------------------------------------------------------------------------------
-Object *AIPlayer::findFactory(const ThingTemplate *thing, Bool busyOK)
+Object *AIPlayer::findFactory(const ThingTemplate *thing, Bool busyOK, Bool affordableOnly)
 {
 	Object *busyFactory = nullptr; // We prefer a factory that isn't busy.
 	for( BuildListInfo *info = m_player->getBuildList(); info; info = info->getNext() )
@@ -1466,6 +1475,8 @@ Object *AIPlayer::findFactory(const ThingTemplate *thing, Bool busyOK)
 			if (!pu) continue;
 			// if we can't create the unit do nothing
 			if( TheBuildAssistant->isPossibleToMakeUnit( factory, thing ) == FALSE )
+				continue;
+			if (affordableOnly && factoryUnitCost(factory, thing) > m_player->getMoney()->countMoney())
 				continue;
 			// If the factory is not busy, return it.
 			Bool busy = pu->getProductionCount()>0;
@@ -1493,16 +1504,14 @@ Bool AIPlayer::isPossibleToBuildTeam( TeamPrototype *proto, Bool requireIdleFact
 		const TCreateUnitsInfo *unitInfo = &proto->getTemplateInfo()->m_unitsInfo[0];
 		const ThingTemplate *thing = TheThingFactory->findTemplate( unitInfo[i].unitThingName );
 		if (thing) {
-			Int thingCost = thing->calcCostToBuild(m_player);
-			if (nullptr == findFactory(thing, true)) {
-				// Couldn't find a factory.
+			Object* factory = RetailFileLayers::enabled() ? findFactory(thing, true, TRUE) : nullptr;
+			if (!factory)
+				factory = findFactory(thing, true);
+			if (!factory)
 				return false;
-			}
-			if (nullptr != findFactory(thing, false)) {
-				// Found an idle factory.
+			if (factory->getProductionUpdateInterface()->getProductionCount() == 0)
 				anyIdle = true;
-			}
-			cost += thingCost * ((unitInfo[i].maxUnits+unitInfo[i].minUnits)/2.0f);
+			cost += factoryUnitCost(factory, thing) * ((unitInfo[i].maxUnits+unitInfo[i].minUnits)/2.0f);
 		}
 	}
 	cost *= TheAI->getAiData()->m_teamResourcesToBuild;

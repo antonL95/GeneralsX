@@ -149,6 +149,8 @@ class AIPlayer : public MemoryPoolObject,
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( AIPlayer, "AIPlayer"  )
 
+	friend struct RetailTeamBudgetFixture;
+
 public:
 
 	AIPlayer( Player *p );							///< constructor
@@ -244,7 +246,7 @@ protected:
 	Object *buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildListInfo *info );		///< Build a base buiding.
 	void clearTeamsInQueue();			///< Delete all teams in the build queue.
 	void computeCenterAndRadiusOfBase(Coord3D *center, Real *radius);
-	Object *findFactory(const ThingTemplate *thing, Bool busyOK); ///< Find a factory to build a unit.  If force is true, may return a busy factory.
+	Object *findFactory(const ThingTemplate *thing, Bool busyOK, Bool affordableOnly = FALSE);
 	void queueUnits();						///< Check the team build list, & queue up units at any idle factories.
 	void checkForSupplyCenter( BuildListInfo *info, Object *bldg);
  	void queueSupplyTruck();

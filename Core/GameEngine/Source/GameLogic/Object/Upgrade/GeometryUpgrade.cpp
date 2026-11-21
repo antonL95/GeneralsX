@@ -43,11 +43,16 @@ struct GeometryBounds
 	Real major = 0.0f;
 	Real minor = 0.0f;
 	Real height = 0.0f;
+	Bool isSmall = TRUE;
+	Int partCount = 0;
 
 	void include(const GeometryInfo& shape, const Coord3D& offset)
 	{
+		++partCount;
+		isSmall = partCount == 1 && shape.getIsSmall() && offset.x == 0.0f && offset.y == 0.0f;
+		const Real halfDepth = shape.getGeomType() == GEOMETRY_BOX ? shape.getMinorRadius() : shape.getMajorRadius();
 		major = std::max(major, std::max(offset.x, -offset.x) + shape.getMajorRadius());
-		minor = std::max(minor, std::max(offset.y, -offset.y) + shape.getMinorRadius());
+		minor = std::max(minor, std::max(offset.y, -offset.y) + halfDepth);
 		height = std::max(height, offset.z + shape.getMaxHeightAbovePosition());
 	}
 };
@@ -218,18 +223,18 @@ void GeometryUpgrade::upgradeImplementation()
 	if (!affectsBounds)
 		return;
 
-	const GeometryInfo& current = object->getGeometryInfo();
-	if (bounds.major == current.getMajorRadius() && bounds.minor == current.getMinorRadius() &&
-		current.getGeomType() != GEOMETRY_SPHERE)
-	{
-		object->setGeometryInfoZ(bounds.height);
-		return;
-	}
-
 	Pathfinder* pathfinder = TheAI ? TheAI->pathfinder() : nullptr;
 	if (pathfinder)
 		pathfinder->removeObjectFromPathfindMap(object);
-	object->setGeometryInfo(GeometryInfo(GEOMETRY_BOX, current.getIsSmall(), bounds.height, bounds.major, bounds.minor));
+
+	const GeometryInfo& current = object->getGeometryInfo();
+	if (bounds.major == current.getMajorRadius() && bounds.minor == current.getMinorRadius() &&
+		bounds.isSmall == current.getIsSmall() && current.getGeomType() != GEOMETRY_SPHERE)
+		object->setGeometryInfoZ(bounds.height);
+	else
+		object->setGeometryInfo(GeometryInfo(GEOMETRY_BOX, bounds.isSmall, bounds.height, bounds.major, bounds.minor));
+
+	setUpgradeExecuted(TRUE);
 	if (pathfinder)
 		pathfinder->addObjectToPathfindMap(object);
 }

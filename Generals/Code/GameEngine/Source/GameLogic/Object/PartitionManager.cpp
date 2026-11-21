@@ -2042,8 +2042,7 @@ Bool PartitionManager::geomCollidesWithGeom(const Coord3D* pos1,
 		// order in which they appear in the enum list
 		//
 		CollideTestProc collideProc = theCollideTestProcs[ (thisGeom - GEOMETRY_FIRST) * GEOMETRY_NUM_TYPES + (thatGeom - GEOMETRY_FIRST) ];
-		CollideLocAndNormal cloc;
-		return (*collideProc)(&thisInfo, &thatInfo, &cloc);
+		return (*collideProc)(&thisInfo, &thatInfo, nullptr);
 	}
 	else
 	{
@@ -5314,8 +5313,7 @@ Bool PartitionFilterWouldCollide::allow(Object *objOther)
 		// order in which they appear in the enum list
 		//
 		CollideTestProc collideProc = theCollideTestProcs[ (thisGeom - GEOMETRY_FIRST) * GEOMETRY_NUM_TYPES + (thatGeom - GEOMETRY_FIRST) ];
-		CollideLocAndNormal cinfo;
-		doesCollide = (*collideProc)(&thisInfo, &thatInfo, &cinfo);
+		doesCollide = (*collideProc)(&thisInfo, &thatInfo, nullptr);
 	}
 	else
 	{

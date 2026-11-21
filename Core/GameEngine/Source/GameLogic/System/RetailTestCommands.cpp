@@ -74,10 +74,15 @@
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #if !RTS_GENERALS
+#include "Common/Dict.h"
 #include "Common/GameState.h"
+#include "Common/Team.h"
+#include "Common/WellKnownKeys.h"
+#include "GameLogic/AIPlayer.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
+#include "GameLogic/SidesList.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -91,11 +96,73 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
+#include "WWMath/wwmath.h"
 
 struct RetailHordeSnapshotFixture
 {
 	static void loadPostProcess(HordeContain* contain) { contain->loadPostProcess(); }
 };
+
+#if !RTS_GENERALS
+struct RetailTeamBudgetFixture
+{
+	static void check(Object* producer, const ThingTemplate* unit, unsigned int frame, Bool train)
+	{
+		Player* player = producer->getControllingPlayer();
+		Bool listed = FALSE;
+		for (const BuildListInfo* info = player->getBuildList(); info; info = info->getNext())
+			listed |= info->getObjectID() == producer->getID();
+		if (!listed)
+			player->addToBuildList(producer);
+
+		Dict teamData;
+		teamData.setAsciiString(TheKey_teamUnitType1, unit->getName());
+		teamData.setInt(TheKey_teamUnitMinCount1, 10);
+		teamData.setInt(TheKey_teamUnitMaxCount1, 10);
+		TeamPrototype* team = newInstance(TeamPrototype)(nullptr, "FortressBudgetFixture", player, FALSE, &teamData, 0);
+		const Bool wasAllowedToBuild = player->getCanBuildUnits();
+		AIPlayer* ai = newInstance(AIPlayer)(player);
+		player->setCanBuildUnits(TRUE);
+		Money* money = player->getMoney();
+		const UnsignedInt original = money->countMoney();
+		const auto* production = producer->getProductionUpdateInterface();
+		HeroRules::Price price;
+		const Bool override = production && production->getUnitPriceOverride(unit, price);
+		std::fprintf(stderr, "TEST fortress-budget %u fixture=%u template=%u actual=%u status=%d,%d ready=%d queue=%u\n",
+			frame, static_cast<unsigned>(producer->getID()), unit->calcCostToBuild(player),
+			override ? static_cast<unsigned>(price.cost) : unit->calcCostToBuild(player),
+			producer->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION), producer->testStatus(OBJECT_STATUS_SOLD),
+			TheBuildAssistant->isPossibleToMakeUnit(producer, unit), production ? production->getProductionCount() : 0);
+		money->withdraw(original, FALSE);
+		for (UnsignedInt funds : {399u, 400u, 499u, 500u})
+		{
+			money->deposit(funds, FALSE, FALSE);
+			Bool needsMoney = FALSE;
+			const Bool allowed = ai->isPossibleToBuildTeam(team, TRUE, needsMoney);
+			const Object* selected = ai->findFactory(unit, FALSE, TRUE);
+			std::fprintf(stderr, "TEST fortress-budget %u funds=%u allowed=%d needsMoney=%d producer=%u fraction=%.2f\n",
+				frame, funds, allowed, needsMoney, selected ? static_cast<unsigned>(selected->getID()) : 0,
+				TheAI->getAiData()->m_teamResourcesToBuild);
+			money->withdraw(funds, FALSE);
+		}
+		if (train)
+		{
+			money->deposit(400, FALSE, FALSE);
+			WorkOrder* order = newInstance(WorkOrder);
+			order->m_thing = unit;
+			const Bool queued = ai->startTraining(order, FALSE, team->getName());
+			std::fprintf(stderr, "TEST fortress-budget %u queued=%d producer=%u spent=%u\n", frame,
+				queued, static_cast<unsigned>(order->m_factoryID), 400 - money->countMoney());
+			deleteInstance(order);
+			money->withdraw(money->countMoney(), FALSE);
+		}
+		money->deposit(original, FALSE, FALSE);
+		player->setCanBuildUnits(wasAllowedToBuild);
+		deleteInstance(ai);
+		deleteInstance(team);
+	}
+};
+#endif
 
 namespace RetailTestCommands
 {
@@ -147,6 +214,7 @@ const MetaKey s_metaKeys[] = {
 
 std::vector<Command> s_commands;
 std::vector<ObjectID> s_tracked;
+ObjectID s_fortressWalker = INVALID_ID;
 bool s_loaded = false;
 
 void load()
@@ -511,6 +579,49 @@ void spawnObject(const Command& command, unsigned int frame)
 	obj->setPosition(&point);
 	std::fprintf(stderr, "TEST frame %u: spawn %s id=%u for %s commandSet=%s\n", frame, command.target.c_str(),
 		static_cast<unsigned>(obj->getID()), command.player.c_str(), obj->getCommandSetString().str());
+}
+
+void fortressGround(const Command& command, Object* keep, unsigned int frame)
+{
+	const Coord3D& origin = *keep->getPosition();
+	const Real c = WWMath::CosTrig(keep->getOrientation());
+	const Real s = WWMath::SinTrig(keep->getOrientation());
+	Coord3D point = {origin.x + command.x * c - command.y * s, origin.y + command.x * s + command.y * c, 0.0f};
+	point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+	if (command.action == "fortress-walker")
+	{
+		if (const ThingTemplate* unit = TheThingFactory->findTemplate(command.structure.c_str(), FALSE))
+		{
+			Object* walker = TheThingFactory->newObject(unit, keep->getTeam());
+			walker->setPosition(&point);
+			s_fortressWalker = walker->getID();
+		}
+		return;
+	}
+	Object* walker = TheGameLogic->findObjectByID(s_fortressWalker);
+	if (command.action == "fortress-walk")
+	{
+		if (walker && walker->getAI())
+			walker->getAI()->aiMoveToPosition(&point, CMD_FROM_SCRIPT);
+		return;
+	}
+	const PathfindCell* cell = TheAI->pathfinder()->getCell(LAYER_GROUND, &point);
+	const GeometryInfo probe(GEOMETRY_SPHERE, TRUE, 1.0f, 1.0f, 1.0f);
+	PartitionFilterWouldCollide query(point, probe, 0.0f, TRUE);
+	std::fprintf(stderr, "TEST fortress-ground %u local=%.1f,%.1f obstacle=%d hit=%d height=%.1f",
+		frame, command.x, command.y, cell && cell->getType() == PathfindCell::CELL_OBSTACLE, query.allow(keep),
+		keep->getGeometryInfo().getMaxHeightAbovePosition());
+	if (walker)
+	{
+		const Real dx = walker->getPosition()->x - origin.x;
+		const Real dy = walker->getPosition()->y - origin.y;
+		PartitionFilterWouldCollide unitQuery(*walker->getPosition(), walker->getGeometryInfo(), walker->getOrientation(), TRUE);
+		std::fprintf(stderr, " walker=%.2f,%.2f moving=%d overlaps=%d", dx * c + dy * s, dy * c - dx * s,
+			walker->getAI() && walker->getAI()->isMoving(), unitQuery.allow(keep));
+	}
+	std::fprintf(stderr, " cell=%d small=%d structure=%d mobile=%d altitude=%.2f world=%.2f,%.2f\n",
+		cell ? static_cast<Int>(cell->getType()) : -1, keep->getGeometryInfo().getIsSmall(),
+		keep->isKindOf(KINDOF_STRUCTURE), keep->isMobile(), keep->getHeightAboveTerrain(), point.x, point.y);
 }
 
 void clickButton(const Command& command, unsigned int frame)
@@ -3190,6 +3301,16 @@ void execute(const Command& command, unsigned int frame)
 			frame, command.target.c_str(), towerQuery.allow(obj), edgeQuery.allow(obj),
 			obj->getGeometryInfo().getMaxHeightAbovePosition());
 	}
+	else if (command.hasLocation && (command.action == "fortress-ground" ||
+		command.action == "fortress-walker" || command.action == "fortress-walk"))
+		fortressGround(command, obj, frame);
+#if !RTS_GENERALS
+	else if (command.action == "fortress-budget")
+	{
+		if (const ThingTemplate* unit = TheThingFactory->findTemplate(command.structure.c_str(), FALSE))
+			RetailTeamBudgetFixture::check(obj, unit, frame, command.hasLocation);
+	}
+#endif
 	else if (command.action == "shroudmap")
 	{
 		if (ThePartitionManager && obj->getControllingPlayer())

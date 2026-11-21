@@ -2078,8 +2078,7 @@ Bool PartitionManager::geomCollidesWithGeom(const Coord3D* pos1,
 		// order in which they appear in the enum list
 		//
 		CollideTestProc collideProc = theCollideTestProcs[ (thisGeom - GEOMETRY_FIRST) * GEOMETRY_NUM_TYPES + (thatGeom - GEOMETRY_FIRST) ];
-		CollideLocAndNormal cloc;
-		return (*collideProc)(&thisInfo, &thatInfo, &cloc);
+		return (*collideProc)(&thisInfo, &thatInfo, nullptr);
 	}
 	else
 	{
@@ -5347,10 +5346,9 @@ Bool PartitionFilterWouldCollide::allow(Object *objOther)
 		std::vector<GeometryUpgrade::CollisionPart> parts;
 		if (GeometryUpgrade::collectCollisionParts(*objOther, parts))
 		{
-			CollideLocAndNormal contact;
 			const Bool collides = std::any_of(parts.begin(), parts.end(), [&](const auto& part)
 			{
-				return collideParts(thisInfo, CollideInfo(&part.position, *part.shape, thatInfo.angle), &contact);
+				return collideParts(thisInfo, CollideInfo(&part.position, *part.shape, thatInfo.angle), nullptr);
 			});
 			return collides == m_desiredCollisionResult;
 		}
@@ -5370,8 +5368,7 @@ Bool PartitionFilterWouldCollide::allow(Object *objOther)
 		// order in which they appear in the enum list
 		//
 		CollideTestProc collideProc = theCollideTestProcs[ (thisGeom - GEOMETRY_FIRST) * GEOMETRY_NUM_TYPES + (thatGeom - GEOMETRY_FIRST) ];
-		CollideLocAndNormal cinfo;
-		doesCollide = (*collideProc)(&thisInfo, &thatInfo, &cinfo);
+		doesCollide = (*collideProc)(&thisInfo, &thatInfo, nullptr);
 	}
 	else
 	{

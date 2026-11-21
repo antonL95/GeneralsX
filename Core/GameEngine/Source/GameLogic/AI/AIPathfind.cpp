@@ -45,6 +45,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "Common/RetailFileLayers.h"
 
@@ -552,6 +553,22 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 	internal_classifyObjectFootprint(obj, insert);
 }
 
+static Bool shapeOverlapsPathfindCell(const GeometryInfo& shape, Real dx, Real dy, Real c, Real s)
+{
+	const Real halfCell = PATHFIND_CELL_SIZE_F * 0.5f;
+	const Real major = shape.getMajorRadius();
+	if (shape.getGeomType() != GEOMETRY_BOX)
+	{
+		const Real nearX = std::max(0.0f, std::abs(dx) - halfCell);
+		const Real nearY = std::max(0.0f, std::abs(dy) - halfCell);
+		return nearX * nearX + nearY * nearY < major * major;
+	}
+
+	const Real cellProjection = halfCell * (std::abs(c) + std::abs(s));
+	return std::abs(dx * c + dy * s) < major + cellProjection &&
+		std::abs(dy * c - dx * s) < shape.getMinorRadius() + cellProjection;
+}
+
 void Pathfinder::internal_classifyObjectFootprint( Object *obj, Bool insert )
 {
 	if (m_map == nullptr)
@@ -565,7 +582,53 @@ void Pathfinder::internal_classifyObjectFootprint( Object *obj, Bool insert )
 	cellBounds.hi = cellBounds.lo;
 #endif
 
-	switch(obj->getGeometryInfo().getGeomType())
+	std::vector<GeometryUpgrade::CollisionPart> parts;
+	if (RetailFileLayers::enabled() && GeometryUpgrade::collectCollisionParts(*obj, parts))
+	{
+		m_zoneManager.markZonesDirty();
+		const Real angle = obj->getOrientation();
+		const Real c = WWMath::CosTrig(angle);
+		const Real s = WWMath::SinTrig(angle);
+		for (const auto& part : parts)
+		{
+			if (part.position.z - part.shape->getMaxHeightBelowPosition() - pos->z +
+				obj->getHeightAboveTerrain() > PATHFIND_CELL_SIZE_F)
+				continue;
+
+			Region2D bounds;
+			part.shape->get2DBounds(part.position, angle, bounds);
+			IRegion2D cells;
+			cells.lo.x = REAL_TO_INT_FLOOR(bounds.lo.x / PATHFIND_CELL_SIZE_F);
+			cells.lo.y = REAL_TO_INT_FLOOR(bounds.lo.y / PATHFIND_CELL_SIZE_F);
+			cells.hi.x = REAL_TO_INT_CEIL(bounds.hi.x / PATHFIND_CELL_SIZE_F) - 1;
+			cells.hi.y = REAL_TO_INT_CEIL(bounds.hi.y / PATHFIND_CELL_SIZE_F) - 1;
+			cells.intersectWith(m_extent);
+			for (Int y = cells.lo.y; y <= cells.hi.y; ++y)
+			{
+				for (Int x = cells.lo.x; x <= cells.hi.x; ++x)
+				{
+					const Real dx = (x + 0.5f) * PATHFIND_CELL_SIZE_F - part.position.x;
+					const Real dy = (y + 0.5f) * PATHFIND_CELL_SIZE_F - part.position.y;
+					if (!shapeOverlapsPathfindCell(*part.shape, dx, dy, c, s))
+						continue;
+
+					PathfindCell& cell = m_map[x][y];
+					const Bool changed = insert ? cell.setTypeAsObstacle(obj, FALSE, {x, y}) : cell.removeObstacle(obj);
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING)
+					if (changed)
+						cell.setZone(PathfindZoneManager::UNINITIALIZED_ZONE);
+					cellBounds.lo.x = std::min(cellBounds.lo.x, x);
+					cellBounds.lo.y = std::min(cellBounds.lo.y, y);
+					cellBounds.hi.x = std::max(cellBounds.hi.x, x);
+					cellBounds.hi.y = std::max(cellBounds.hi.y, y);
+#else
+					(void)changed;
+#endif
+				}
+			}
+		}
+	}
+	else switch(obj->getGeometryInfo().getGeomType())
 	{
 		case GEOMETRY_BOX:
 		{
