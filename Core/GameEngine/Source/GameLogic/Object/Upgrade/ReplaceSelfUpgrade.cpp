@@ -4,6 +4,7 @@
 #include "Common/Player.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
@@ -75,6 +76,32 @@ Bool ReplaceSelfUpgrade::wouldUpgrade(const UpgradeMaskType& mask) const
 		return FALSE;
 	std::vector<Site> sites;
 	return findSites(sites);
+}
+
+Bool ReplaceSelfUpgrade::blocks(const UpgradeMaskType& mask, const UpgradeMaskType& upgrade) const
+{
+	UpgradeMaskType activation, conflicting;
+	getUpgradeActivationMasks(activation, conflicting);
+	if (!activation.testForAny(upgrade) || !UpgradeModule::wouldUpgrade(mask))
+		return FALSE;
+	std::vector<Site> sites;
+	return !findSites(sites);
+}
+
+Bool ReplaceSelfUpgrade::isBlocked(const Object* obj, const UpgradeTemplate* upgrade)
+{
+	static const NameKeyType key = NAMEKEY("ReplaceSelfUpgrade");
+	if (!obj || !upgrade || upgrade->getUpgradeType() != UPGRADE_TYPE_OBJECT)
+		return FALSE;
+	UpgradeMaskType mask = obj->getControllingPlayer()->getCompletedUpgradeMask();
+	mask.set(obj->getObjectCompletedUpgradeMask());
+	mask.set(upgrade->getUpgradeMask());
+	for (BehaviorModule** module = const_cast<Object*>(obj)->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() == key && static_cast<const ReplaceSelfUpgrade*>(*module)->blocks(mask, upgrade->getUpgradeMask()))
+			return TRUE;
+	}
+	return FALSE;
 }
 
 void ReplaceSelfUpgrade::upgradeImplementation()

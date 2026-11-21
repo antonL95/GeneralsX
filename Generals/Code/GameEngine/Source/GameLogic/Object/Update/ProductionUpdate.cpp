@@ -55,6 +55,7 @@
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
+#include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
@@ -865,6 +866,11 @@ UpdateSleepTime ProductionUpdate::update()
 		else if( production->m_type == PRODUCTION_UPGRADE )
 		{
 			const UpgradeTemplate *upgrade = production->m_upgradeToResearch;
+			if (RetailFileLayers::enabled() && ReplaceSelfUpgrade::isBlocked(us, upgrade))
+			{
+				cancelUpgrade(production);
+				return UPDATE_SLEEP_NONE;
+			}
 			if (RetailFileLayers::enabled() && !getProductionUpdateModuleData()->m_giveNoXP)
 				ExperienceLevelStore::awardProductionExperience(us, upgrade->calcCostToBuild(nullptr));
 

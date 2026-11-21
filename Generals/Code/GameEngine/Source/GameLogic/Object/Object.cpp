@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/RetailTestCommands.h"
 #include <cmath>	// For isnan() on Linux
@@ -4217,6 +4218,9 @@ Bool Object::hasUpgrade( const UpgradeTemplate *upgradeT ) const
 //-------------------------------------------------------------------------------------------------
 Bool Object::affectedByUpgrade( const UpgradeTemplate *upgradeT ) const
 {
+	if (RetailFileLayers::enabled() && ReplaceSelfUpgrade::isBlocked(this, upgradeT))
+		return FALSE;
+
 	const UpgradeMaskType& objectMask = getObjectCompletedUpgradeMask();
 	const UpgradeMaskType& playerMask = getControllingPlayer()->getCompletedUpgradeMask();
 	UpgradeMaskType maskToCheck = playerMask;

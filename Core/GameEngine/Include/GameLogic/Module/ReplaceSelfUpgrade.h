@@ -19,6 +19,7 @@ public:
 	ReplaceSelfUpgrade(Thing* thing, const ModuleData* data) : UpgradeModule(thing, data) {}
 	Bool isSubObjectsUpgrade() override { return FALSE; }
 	Bool wouldUpgrade(const UpgradeMaskType& mask) const override;
+	static Bool isBlocked(const Object* obj, const UpgradeTemplate* upgrade);
 
 protected:
 	void upgradeImplementation() override;
@@ -31,4 +32,5 @@ private:
 	};
 
 	Bool findSites(std::vector<Site>& sites) const;
+	Bool blocks(const UpgradeMaskType& mask, const UpgradeMaskType& upgrade) const;
 };
