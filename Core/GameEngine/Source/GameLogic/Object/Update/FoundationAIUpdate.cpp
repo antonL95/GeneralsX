@@ -18,6 +18,7 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/CastleRules.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/HeroRoster.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -40,9 +41,14 @@ Bool commandSetOffers(const Object& foundation, const ThingTemplate& what)
 	for (Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
 	{
 		const CommandButton* button = commands->getCommandButton(i);
-		if (button && button->getCommandType() == GUI_COMMAND_FOUNDATION_CONSTRUCT &&
-			button->getThingTemplate() && button->getThingTemplate()->isEquivalentTo(&what))
-			return TRUE;
+		if (!button || button->getCommandType() != GUI_COMMAND_FOUNDATION_CONSTRUCT ||
+			!button->getThingTemplate() || !button->getThingTemplate()->isEquivalentTo(&what))
+			continue;
+#if RTS_ZEROHOUR
+		if (!HeroRoster::buttonUpgradesMet(button, foundation.getControllingPlayer(), &foundation))
+			continue;
+#endif
+		return TRUE;
 	}
 	return FALSE;
 }

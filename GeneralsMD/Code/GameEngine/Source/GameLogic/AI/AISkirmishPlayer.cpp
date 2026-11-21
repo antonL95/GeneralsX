@@ -31,8 +31,10 @@
 
 #include "Common/GameMemory.h"
 #include "Common/GlobalData.h"
+#include "Common/INI.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
 #include "Common/BuildAssistant.h"
@@ -43,19 +45,185 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/AISkirmishPlayer.h"
+#include "GameLogic/HeroRoster.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
+#include "GameLogic/Module/FoundationAIUpdate.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/RebuildHoleBehavior.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameClient/TerrainVisual.h"
+#include "GameClient/ControlBar.h"
 
+namespace
+{
+struct RetailArmyMember
+{
+	AsciiString type;
+	Real share[3] = {};
+};
+
+struct RetailArmy
+{
+	AsciiString side;
+	AsciiString farm;
+	std::vector<RetailArmyMember> members;
+	std::vector<AsciiString> heroes;
+	Real rushSeconds = 0.0f;
+	Real midgameSeconds = 0.0f;
+	Int minimumFarms = 0;
+};
+
+struct RetailDifficulty
+{
+	AsciiString name;
+	Int farmLimit = 0;
+};
+
+struct RetailAITuning
+{
+	std::vector<RetailDifficulty> difficulties;
+	Bool disableBaseBuilding = FALSE;
+	Bool disableEconomyBuilding = FALSE;
+	Bool disableUnitBuilding = FALSE;
+	Bool disableUnitUpgrading = FALSE;
+	Bool disableTacticalAI = FALSE;
+};
+
+std::vector<RetailArmy> retailArmies;
+RetailAITuning retailTuning;
+
+void skipRetailAISection(INI* ini, void*, void*, const void* section)
+{
+	ini->recordSkipped("subblock", static_cast<const char*>(section));
+	ini->readRawBlock(INI::getEndToken());
+}
+
+void parseArmyMember(INI* ini, void* instance, void*, const void*)
+{
+	ini->getNextToken();
+	auto& army = *static_cast<RetailArmy*>(instance);
+	RetailArmyMember member;
+	static const FieldParse fields[] = {
+		{ "Unit", INI::parseAsciiString, nullptr, offsetof(RetailArmyMember, type) },
+		{ "PercentageOfArmyPhase1", INI::parseReal, nullptr, offsetof(RetailArmyMember, share) },
+		{ "PercentageOfArmyPhase2", INI::parseReal, nullptr, offsetof(RetailArmyMember, share) + sizeof(Real) },
+		{ "PercentageOfArmyPhase3", INI::parseReal, nullptr, offsetof(RetailArmyMember, share) + 2 * sizeof(Real) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(&member, fields);
+	if (member.type.isNotEmpty())
+		army.members.push_back(member);
+}
+
+void parseFarmAssignment(INI* ini, void*, void* store, const void*)
+{
+	ini->getNextToken();
+	static const FieldParse fields[] = {
+		{ "TemplateName", INI::parseAsciiString, nullptr, 0 },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(store, fields);
+}
+
+void parseDifficultyTuning(INI* ini, void* instance, void*, const void*)
+{
+	ini->getNextToken();
+	auto& tuning = *static_cast<RetailAITuning*>(instance);
+	RetailDifficulty difficulty;
+	static const FieldParse fields[] = {
+		{ "Difficulty", INI::parseAsciiString, nullptr, offsetof(RetailDifficulty, name) },
+		{ "EconomyMaxFarms", INI::parseInt, nullptr, offsetof(RetailDifficulty, farmLimit) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(&difficulty, fields);
+	if (difficulty.name.isNotEmpty())
+		tuning.difficulties.push_back(difficulty);
+}
+
+const CommandSet* retailCommands(const Object& object)
+{
+	return TheRetailCommandCatalog->findCommandSet(object.getCommandSetString());
+}
+
+Bool placeRetailBuilding(Object& builder, const ThingTemplate& type, const Coord3D& center)
+{
+	DozerAIInterface* dozer = builder.getAI()->getDozerAIInterface();
+	Player* player = builder.getControllingPlayer();
+	const Real angle = type.getPlacementViewAngle();
+	const UnsignedInt flags = BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP |
+		BuildAssistant::CLEAR_PATH | BuildAssistant::USE_QUICK_PATHFIND | BuildAssistant::SUPPRESS_BUILD_BIBS;
+	static const Coord2D directions[] = {
+		{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}
+	};
+	for (Real distance = 100.0f; distance <= 700.0f; distance += 25.0f)
+	{
+		for (const Coord2D& direction : directions)
+		{
+			Coord3D point = {center.x + direction.x * distance, center.y + direction.y * distance, 0.0f};
+			if (TheBuildAssistant->isLocationLegalToBuild(&point, &type, angle, flags, &builder, player) != LBC_OK)
+				continue;
+			point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+			if (dozer->construct(&type, &point, angle, player, FALSE))
+				return TRUE;
+		}
+	}
+	return FALSE;
+}
+}
+
+void AISkirmishPlayer::loadRetailData()
+{
+	retailArmies.clear();
+	retailTuning = {};
+	INI ini;
+	ini.load("Data\\INI\\Default\\SkirmishAIData.ini", INI_LOAD_OVERWRITE, nullptr);
+}
+
+void AISkirmishPlayer::parseRetailArmy(INI* ini)
+{
+	ini->getNextToken();
+	RetailArmy army;
+	static const FieldParse fields[] = {
+		{ "Side", INI::parseAsciiString, nullptr, offsetof(RetailArmy, side) },
+		{ "AIEconomyAssigment", parseFarmAssignment, nullptr, offsetof(RetailArmy, farm) },
+		{ "AIWallNodeAssignment", skipRetailAISection, "AIWallNodeAssignment", 0 },
+		{ "ArmyMemberDefinition", parseArmyMember, nullptr, 0 },
+		{ "HeroBuildOrder", INI::parseAsciiStringVector, nullptr, offsetof(RetailArmy, heroes) },
+		{ "PhaseDuration_Rush", INI::parseReal, nullptr, offsetof(RetailArmy, rushSeconds) },
+		{ "PhaseDuration_MidGame", INI::parseReal, nullptr, offsetof(RetailArmy, midgameSeconds) },
+		{ "EconomyBuilderMinFarmsOwned", INI::parseInt, nullptr, offsetof(RetailArmy, minimumFarms) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(&army, fields);
+	if (army.side.isNotEmpty())
+		retailArmies.push_back(std::move(army));
+}
+
+void AISkirmishPlayer::parseRetailTuning(INI* ini)
+{
+	ini->getNextToken();
+	static const FieldParse fields[] = {
+		{ "DifficultyTuning", parseDifficultyTuning, nullptr, 0 },
+		{ "CombatChainDefinition", skipRetailAISection, "CombatChainDefinition", 0 },
+		{ "BrutalDifficultyCheats", skipRetailAISection, "BrutalDifficultyCheats", 0 },
+		{ "DisableBaseBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableBaseBuilding) },
+		{ "DisableEconomyBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableEconomyBuilding) },
+		{ "DisableUnitBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableUnitBuilding) },
+		{ "DisableUnitUpgrading", INI::parseBool, nullptr, offsetof(RetailAITuning, disableUnitUpgrading) },
+		{ "DisableTacticalAI", INI::parseBool, nullptr, offsetof(RetailAITuning, disableTacticalAI) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(&retailTuning, fields);
+}
 
 #define USE_DOZER 1
 
@@ -954,7 +1122,217 @@ void AISkirmishPlayer::doTeamBuilding()
  */
 void AISkirmishPlayer::update()
 {
+	if (RetailFileLayers::enabled())
+	{
+		updateRetail();
+		return;
+	}
 	AIPlayer::update();
+}
+
+void AISkirmishPlayer::updateRetail()
+{
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	if (!TheRetailCommandCatalog || !m_player->isPlayableSide() || !m_player->isPlayerActive() || frame == 0 ||
+		frame % (2 * LOGICFRAMES_PER_SECOND) != static_cast<UnsignedInt>(m_player->getPlayerIndex()))
+		return;
+	const auto rules = std::find_if(retailArmies.begin(), retailArmies.end(), [this](const RetailArmy& army) {
+		return army.side.compareNoCase(m_player->getSide().str()) == 0;
+	});
+	if (rules == retailArmies.end())
+		return;
+
+	const Real elapsed = INT_TO_REAL(frame) / LOGICFRAMES_PER_SECOND;
+	const Int phase = elapsed < rules->rushSeconds ? 0 : elapsed < rules->rushSeconds + rules->midgameSeconds ? 1 : 2;
+	const ThingTemplate* farm = TheThingFactory->findTemplate(rules->farm, FALSE);
+	Int farms = 0;
+	Int farmLimit = rules->minimumFarms;
+	const GameDifficulty difficulty = m_player->getPlayerDifficulty();
+	const char* const names[] = { "EASY", "NORMAL", "HARD" };
+	if (difficulty >= DIFFICULTY_EASY && difficulty <= DIFFICULTY_HARD)
+		for (const RetailDifficulty& tuning : retailTuning.difficulties)
+			if (tuning.name == names[difficulty])
+				farmLimit = tuning.farmLimit;
+
+	Object* keep = nullptr;
+	std::vector<Object*> builders;
+	std::vector<Object*> plots;
+	std::vector<Object*> producers;
+	std::vector<Object*> soldiers;
+	std::vector<Object*> owned;
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if (object->getControllingPlayer() != m_player || object->isEffectivelyDead())
+			continue;
+		owned.push_back(object);
+		if (farm && object->getTemplate()->isEquivalentTo(farm))
+			++farms;
+		if (object->isDisabled() || object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || object->getContainedBy())
+			continue;
+		if (!keep && object->isKindOf(KINDOF_COMMANDCENTER))
+			keep = object;
+		if (auto* foundation = FoundationAIUpdate::find(*object); foundation && foundation->canBuildOn(m_player))
+			plots.push_back(object);
+		if (object->getProductionUpdateInterface())
+			producers.push_back(object);
+		if (AIUpdateInterface* ai = object->getAI())
+		{
+			if (DozerAIInterface* dozer = ai->getDozerAIInterface())
+			{
+				if (!dozer->isAnyTaskPending() && ai->isIdle())
+					builders.push_back(object);
+			}
+			else if (!object->isKindOf(KINDOF_IMMOBILE) && !object->isKindOf(KINDOF_INERT) &&
+				(object->isKindOf(KINDOF_HORDE) || object->isKindOf(KINDOF_CAN_ATTACK)))
+				soldiers.push_back(object);
+		}
+	}
+
+	const auto countType = [&](const ThingTemplate* type) {
+		return static_cast<Int>(std::count_if(owned.begin(), owned.end(), [type](const Object* object) {
+			return object->getTemplate()->isEquivalentTo(type);
+		}));
+	};
+	const auto producesArmy = [&](const ThingTemplate& building) {
+		const CommandSet* set = TheRetailCommandCatalog->findCommandSet(building.friend_getCommandSetString());
+		if (!set)
+			return FALSE;
+		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+		{
+			const CommandButton* button = set->getCommandButton(slot);
+			const ThingTemplate* unit = button ? static_cast<const ThingTemplate*>(button->getThingTemplate()) : nullptr;
+			if (!unit || button->getCommandType() != GUI_COMMAND_UNIT_BUILD)
+				continue;
+			for (const RetailArmyMember& member : rules->members)
+				if (member.share[phase] > 0.0f && unit->isEquivalentTo(TheThingFactory->findTemplate(member.type, FALSE)))
+					return TRUE;
+		}
+		return FALSE;
+	};
+
+	if (!retailTuning.disableBaseBuilding && m_player->getCanBuildBase())
+	{
+		const auto buildFrom = [&](Object& builder, FoundationAIUpdate* plot) -> Bool {
+			const CommandSet* set = retailCommands(builder);
+			if (!set)
+				return FALSE;
+			const ThingTemplate* selected = nullptr;
+			Int priority = 0;
+			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			{
+				const CommandButton* button = set->getCommandButton(slot);
+				if (!button || button->getCommandType() != (plot ? GUI_COMMAND_FOUNDATION_CONSTRUCT : GUI_COMMAND_DOZER_CONSTRUCT))
+					continue;
+				const ThingTemplate* type = button->getThingTemplate();
+				if (!type || !m_player->canBuild(type) || !m_player->canAffordBuild(type))
+					continue;
+				const Bool economy = (farm && type->isEquivalentTo(farm)) || type->isKindOf(KINDOF_ECONOMY_STRUCTURE);
+				Int score = 0;
+				if (economy && !retailTuning.disableEconomyBuilding && farms < farmLimit)
+					score = farms < 2 ? 3 : 1;
+				else if (!economy && countType(type) == 0 && producesArmy(*type))
+					score = 2;
+				else if (plot && farms >= 2 && soldiers.size() >= 2 &&
+					type->isKindOf(KINDOF_FS_BASE_DEFENSE) && countType(type) == 0)
+					score = 1;
+				if (score > priority)
+				{
+					priority = score;
+					selected = type;
+				}
+			}
+			if (!selected)
+				return FALSE;
+			if (plot)
+				return plot->construct(selected, m_player) != nullptr;
+			return placeRetailBuilding(builder, *selected, keep ? *keep->getPosition() : *builder.getPosition());
+		};
+		for (Object* plot : plots)
+			if (buildFrom(*plot, FoundationAIUpdate::find(*plot)))
+				break;
+		for (Object* builder : builders)
+			if (buildFrom(*builder, nullptr))
+				break;
+	}
+
+	for (Object* producer : producers)
+	{
+		ProductionUpdateInterface* production = producer->getProductionUpdateInterface();
+		const CommandSet* set = retailCommands(*producer);
+		if (!set || production->getProductionCount() != 0)
+			continue;
+		const auto train = [&](const ThingTemplate* unit) {
+			return unit && TheBuildAssistant->canMakeUnit(producer, unit) == CANMAKE_OK &&
+				production->queueCreateUnit(unit, production->requestUniqueUnitID());
+		};
+		if (!retailTuning.disableUnitUpgrading && soldiers.size() >= 2 && farms >= 2)
+		{
+			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			{
+				const CommandButton* button = set->getCommandButton(slot);
+				const UpgradeTemplate* upgrade = button ? button->getUpgradeTemplate() : nullptr;
+				if (!upgrade || (button->getCommandType() != GUI_COMMAND_PLAYER_UPGRADE &&
+					button->getCommandType() != GUI_COMMAND_OBJECT_UPGRADE))
+					continue;
+				if (m_player->getMoney()->countMoney() >= static_cast<UnsignedInt>(std::max(0, upgrade->calcCostToBuild(m_player))) &&
+					HeroRoster::buttonUpgradesMet(button, m_player, producer) && production->queueUpgrade(upgrade))
+					break;
+			}
+		}
+		if (retailTuning.disableUnitBuilding || !m_player->getCanBuildUnits() || production->getProductionCount() != 0)
+			continue;
+		if (soldiers.size() >= 2)
+			for (const AsciiString& name : rules->heroes)
+			{
+				const ThingTemplate* hero = TheThingFactory->findTemplate(name, FALSE);
+				if (hero && !HeroRoster::isAlive(m_player, hero) && train(hero))
+					break;
+			}
+		if (production->getProductionCount() != 0)
+			continue;
+		const ThingTemplate* selected = nullptr;
+		Real priority = 0.0f;
+		for (const RetailArmyMember& member : rules->members)
+		{
+			const ThingTemplate* unit = TheThingFactory->findTemplate(member.type, FALSE);
+			if (member.share[phase] <= 0.0f || !unit || TheBuildAssistant->canMakeUnit(producer, unit) != CANMAKE_OK)
+				continue;
+			const Real score = member.share[phase] / INT_TO_REAL(1 + countType(unit));
+			if (score > priority)
+			{
+				priority = score;
+				selected = unit;
+			}
+		}
+		train(selected);
+	}
+
+	if (retailTuning.disableTacticalAI || soldiers.size() < 2)
+		return;
+	Object* target = nullptr;
+	Real distance = 0.0f;
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		const Player* owner = object->getControllingPlayer();
+		if (!owner || !owner->isPlayableSide() || !object->isKindOf(KINDOF_STRUCTURE) ||
+			object->isEffectivelyDead() || object->isKindOf(KINDOF_INERT) || object->isKindOf(KINDOF_UNATTACKABLE) ||
+			object->isKindOf(KINDOF_BASE_FOUNDATION) ||
+			m_player->getRelationship(object->getTeam()) != ENEMIES)
+			continue;
+		const Real candidateDistance = ThePartitionManager->getDistanceSquared(soldiers.front(), object, FROM_CENTER_2D);
+		if (!target || candidateDistance < distance || (candidateDistance == distance && object->getID() < target->getID()))
+		{
+			target = object;
+			distance = candidateDistance;
+		}
+	}
+	if (target)
+		for (Object* unit : soldiers)
+		{
+			const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
+			if (unit->getAI()->isIdle() && (!horde || !horde->hasAttackOrder()))
+				unit->getAI()->aiAttackMoveToPosition(target->getPosition(), NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
+		}
 }
 
 //----------------------------------------------------------------------------------------------------------

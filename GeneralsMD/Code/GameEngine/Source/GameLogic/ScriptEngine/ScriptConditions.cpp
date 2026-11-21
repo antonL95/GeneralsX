@@ -32,6 +32,7 @@
 #include "Common/GameEngine.h"
 #include "Common/MapObject.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Player.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
@@ -47,6 +48,7 @@
 #include "GameNetwork/GameInfo.h"
 
 #include "GameLogic/BfmeScriptRules.h"
+#include "GameLogic/Damage.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/RankInfo.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -1575,6 +1577,18 @@ Bool ScriptConditions::evaluateUpgradeFromUnitComplete(Parameter *pPlayerParm, P
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateScienceAcquired(Parameter *pPlayerParm, Parameter *pScienceParm)
 {
+	if (RetailFileLayers::enabled())
+	{
+		const ScienceType science = TheScienceStore->getScienceFromInternalName(pScienceParm->getString());
+		if (science == SCIENCE_INVALID)
+			return FALSE;
+		const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pPlayerParm->getString());
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+			if (const Player* player = ThePlayerList->getNthPlayer(i); player &&
+				(players & player->getPlayerMask()) && player->hasScience(science))
+				return TRUE;
+		return FALSE;
+	}
 	Player *pPlayer = playerFromParam(pPlayerParm);
 	if (pPlayer)
 	{
@@ -1788,6 +1802,27 @@ Bool ScriptConditions::evaluateMultiplayerPlayerDefeat()
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluatePlayerUnitCondition(Condition *pCondition, Parameter *pPlayerParm, Parameter *pComparisonParm, Parameter *pCountParm, Parameter *pUnitTypeParm)
 {
+	if (RetailFileLayers::enabled())
+	{
+		ObjectTypesTemp types;
+		objectTypesFromParam(pUnitTypeParm, types.m_types);
+		std::vector<Int> counts;
+		std::vector<const ThingTemplate*> templates;
+		const Int typeCount = types.m_types->prepForPlayerCounting(templates, counts);
+		const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pPlayerParm->getString());
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+		{
+			Player* player = ThePlayerList->getNthPlayer(i);
+			if (!player || !(players & player->getPlayerMask()))
+				continue;
+			std::fill(counts.begin(), counts.end(), 0);
+			if (typeCount > 0)
+				player->countObjectsByThingTemplate(typeCount, templates.data(), FALSE, counts.data());
+			if (BfmeScriptRules::compare(pComparisonParm->getInt(), rts::sum(counts), pCountParm->getInt()))
+				return TRUE;
+		}
+		return FALSE;
+	}
 	if (pCondition->getCustomData()!=0)
 	{
 		// We have a cached value.
@@ -2770,6 +2805,40 @@ Bool evaluateDistanceBetween(Condition *condition)
 //-------------------------------------------------------------------------------------------------
 /** Evaluate a condition */
 //-------------------------------------------------------------------------------------------------
+Real ScriptConditions::getRetailTeamThreat(Team* team, Real radius)
+{
+	if (!team || !team->getControllingPlayer() || !std::isfinite(radius) || radius < 0.0f)
+		return 0.0f;
+	Coord3D center = {};
+	Int count = 0;
+	for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+	{
+		const Object* unit = member.cur();
+		if (unit->isEffectivelyDead())
+			continue;
+		center.x += unit->getPosition()->x;
+		center.y += unit->getPosition()->y;
+		center.z += unit->getPosition()->z;
+		++count;
+	}
+	if (!count)
+		return 0.0f;
+	center.x /= INT_TO_REAL(count);
+	center.y /= INT_TO_REAL(count);
+	center.z /= INT_TO_REAL(count);
+	const Player* player = team->getControllingPlayer();
+	PartitionFilterAlive alive;
+	PartitionFilter* filters[] = { &alive, nullptr };
+	SimpleObjectIterator* objects = ThePartitionManager->iterateObjectsInRange(&center, radius, FROM_CENTER_2D, filters);
+	MemoryPoolObjectHolder holder(objects);
+	Real threat = 0.0f;
+	for (const Object* object = objects->first(); object; object = objects->next())
+		if (object->getTeam() && player->getRelationship(object->getTeam()) == ENEMIES &&
+			!object->getContainedBy() && !object->isKindOf(KINDOF_INERT))
+			threat += object->getTemplate()->getThreatValue();
+	return threat;
+}
+
 Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 {
 	switch (pCondition->getConditionType()) {
@@ -2787,6 +2856,104 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 			const Object* plot = TheScriptEngine->getUnitNamed(pCondition->getParameter(1)->getString());
 			const auto* foundation = plot ? FoundationAIUpdate::find(*plot) : nullptr;
 			return foundation && foundation->canBuildOn(player);
+		}
+		case Condition::TEAM_HAS_CUSTOM_STATE:
+		{
+			const Team* team = TheScriptEngine->getTeamNamed(pCondition->getParameter(0)->getString());
+			return team && team->hasCustomState(pCondition->getParameter(1)->getString());
+		}
+		case Condition::TEAM_THREAT_LEVEL:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pCondition->getParameter(0)->getString());
+			return team && BfmeScriptRules::compare(pCondition->getParameter(1)->getInt(),
+				getRetailTeamThreat(team, pCondition->getParameter(3)->getReal()), pCondition->getParameter(2)->getReal());
+		}
+		case Condition::ENEMY_SIGHTED_BY_TEAM:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pCondition->getParameter(0)->getString());
+			if (!team)
+				return FALSE;
+			const Int relation = pCondition->getParameter(1)->getInt();
+			const Int allowed = relation == Parameter::REL_ENEMY ? PartitionFilterRelationship::ALLOW_ENEMIES :
+				relation == Parameter::REL_FRIEND ? PartitionFilterRelationship::ALLOW_ALLIES :
+				PartitionFilterRelationship::ALLOW_NEUTRAL;
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pCondition->getParameter(2)->getString());
+			PartitionFilterAlive alive;
+			PartitionFilterRejectByObjectStatus stealth(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_STEALTHED),
+				MAKE_OBJECT_STATUS_MASK2(OBJECT_STATUS_DETECTED, OBJECT_STATUS_DISGUISED));
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+			{
+				const Object* observer = member.cur();
+				if (observer->isEffectivelyDead() || observer->getContainedBy())
+					continue;
+				PartitionFilterRelationship relationship(observer, allowed);
+				PartitionFilterSameMapStatus onMap(observer);
+				PartitionFilter* filters[] = { &relationship, &alive, &stealth, &onMap, nullptr };
+				SimpleObjectIterator* objects = ThePartitionManager->iterateObjectsInRange(observer,
+					observer->getVisionRange(), FROM_CENTER_2D, filters);
+				MemoryPoolObjectHolder holder(objects);
+				for (const Object* object = objects->first(); object; object = objects->next())
+				{
+					const Player* owner = object->getControllingPlayer();
+					if (object != observer && owner && (players & owner->getPlayerMask()))
+						return TRUE;
+				}
+			}
+			return FALSE;
+		}
+		case Condition::TEAM_IS_ATTACKED_AND_CANNOT_RETALIATE_ANY:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pCondition->getParameter(0)->getString());
+			if (!team)
+				return FALSE;
+			const UnsignedInt now = TheGameLogic->getFrame();
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+			{
+				const Object* unit = member.cur();
+				const BodyModuleInterface* body = unit->getBodyModule();
+				const UnsignedInt* lastDamage = body->getLastDamageTimestamp();
+				const DamageInfo* damage = body->getLastDamageInfo();
+				if (!lastDamage || !damage || unit->isEffectivelyDead() ||
+					now - *lastDamage > 5 * LOGICFRAMES_PER_SECOND)
+					continue;
+				const Object* attacker = TheGameLogic->findObjectByID(damage->in.m_sourceID);
+				if (attacker && !attacker->isEffectivelyDead() && unit->getRelationship(attacker) == ENEMIES &&
+					!unit->hasAnyWeapon())
+					return TRUE;
+			}
+			return FALSE;
+		}
+		case Condition::UNIT_HAS_PASSENGER:
+		{
+			const Object* unit = TheScriptEngine->getUnitNamed(pCondition->getParameter(0)->getString());
+			const ContainModuleInterface* contain = unit ? unit->getContain() : nullptr;
+			return contain && contain->getContainCount() != 0;
+		}
+		case Condition::TEAM_HAS_FEWER_THAN_X_UNITS_WITH_KINDOF:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pCondition->getParameter(0)->getString());
+			if (!team)
+				return FALSE;
+			Int count = 0;
+			const Int kind = pCondition->getParameter(2)->getInt();
+			if (kind < 0 || kind >= KINDOF_COUNT)
+				return FALSE;
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+				if (!member.cur()->isEffectivelyDead() && member.cur()->isKindOf(static_cast<KindOfType>(kind)))
+					++count;
+			return count < pCondition->getParameter(1)->getInt();
+		}
+		case Condition::PLAYER_HAS_NUM_UNITS_WITH_UPGRADE:
+		{
+			const Player* player = playerFromParam(pCondition->getParameter(0));
+			const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(pCondition->getParameter(2)->getString());
+			if (!player || !upgrade)
+				return FALSE;
+			Int remaining = pCondition->getParameter(1)->getInt();
+			for (const Object* object = TheGameLogic->getFirstObject(); remaining > 0 && object; object = object->getNextObject())
+				if (object->getControllingPlayer() == player && !object->isEffectivelyDead() && object->hasUpgrade(upgrade))
+					--remaining;
+			return remaining <= 0;
 		}
 		case Condition::PLAYER_HAS_N_OR_FEWER_BASES:
 		{

@@ -195,6 +195,7 @@ private:
 	MAKE_DLINK(Team, TeamInstanceList)				///< the instances of our prototype
 
 	AsciiString		m_state;						///< Name of the current AI state.
+	std::vector<AsciiString> m_customStates;
 
 	Bool					m_enteredOrExited;  ///< True if a team member entered or exited a trigger area this frame.
 	Bool					m_active;						///< True if a team is complete.  False while members are being added.
@@ -267,6 +268,8 @@ public:
 		Get the team's state
 	*/
 	const AsciiString& getState() const {return m_state;}
+	Bool hasCustomState(const AsciiString& state) const;
+	void setCustomState(const AsciiString& state, Bool enabled);
 
 	/**
 		fill pAIGroup (which must be NONNULL) with the members of this team as a Group.

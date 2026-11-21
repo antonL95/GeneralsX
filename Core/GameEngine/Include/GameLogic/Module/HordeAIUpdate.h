@@ -21,6 +21,8 @@ public:
 	UpdateSleepTime update() override;
 	void aiDoCommand(const AICommandParms* parms) override;
 	static void retaliate(Object* victim, Object* attacker);
+	Bool hasAttackOrder() const { return m_attackTarget != INVALID_ID || m_order == AICMD_ATTACKMOVE_TO_POSITION; }
+	Bool isEngaging() const { return m_engaging; }
 
 private:
 	static constexpr AICommandType NO_ORDER = (AICommandType)-1;

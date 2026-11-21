@@ -633,6 +633,8 @@ void Object::initObject()
 		m_lastWeaponCondition[i] = WSF_INVALID;
 
 	// If I have a valid team assigned, I can run through my Upgrade modules with his flags
+	if (RetailFileLayers::enabled())
+		refreshRetailAIDifficultyUpgrade(nullptr);
 	updateUpgradeModules();
 
 	//If the player has battle plans (America Strategy Center), then apply those bonuses
@@ -4875,6 +4877,43 @@ void Object::loadPostProcess()
 //-------------------------------------------------------------------------------------------------
 /** Does this object have this upgrade */
 //-------------------------------------------------------------------------------------------------
+void Object::refreshRetailAIDifficultyUpgrade(const Player* previousOwner)
+{
+	const Player* owner = getControllingPlayer();
+	if (!TheUpgradeCenter || !TheGameLogic || owner == previousOwner)
+		return;
+
+	const Bool multiplayer = TheGameLogic->isInSkirmishGame() || TheGameLogic->isInMultiplayerGame();
+	const char* const difficulty[] = { "Easy", "Medium", "Hard" };
+	const auto computerFaction = [](const Player* player) {
+		return player && player->getPlayerType() == PLAYER_COMPUTER && player->isPlayableSide();
+	};
+	const auto findDifficultyUpgrade = [&](const Player* player) -> const UpgradeTemplate* {
+		if (!computerFaction(player))
+			return nullptr;
+		const GameDifficulty level = player->getPlayerDifficulty();
+		if (level < DIFFICULTY_EASY || level > DIFFICULTY_HARD)
+			return nullptr;
+		AsciiString name;
+		name.format("Upgrade_%sAI%sPlayer", difficulty[level], multiplayer ? "Multi" : "Single");
+		return TheUpgradeCenter->findUpgrade(name);
+	};
+	if (const UpgradeTemplate* upgrade = findDifficultyUpgrade(previousOwner))
+		removeUpgrade(upgrade);
+	if (const UpgradeTemplate* upgrade = findDifficultyUpgrade(owner))
+		m_objectUpgradesCompleted.set(upgrade->getUpgradeMask());
+	if (computerFaction(previousOwner) != computerFaction(owner))
+	{
+		if (const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade("Upgrade_ObjectUnderAIControl"))
+		{
+			if (computerFaction(owner))
+				m_objectUpgradesCompleted.set(upgrade->getUpgradeMask());
+			else
+				removeUpgrade(upgrade);
+		}
+	}
+}
+
 Bool Object::hasUpgrade( const UpgradeTemplate *upgradeT ) const
 {
 	if( m_objectUpgradesCompleted.testForAll( upgradeT->getUpgradeMask() ) )
@@ -4994,6 +5033,8 @@ void Object::removeUpgrade( const UpgradeTemplate *upgradeT )
 //-------------------------------------------------------------------------------------------------
 void Object::onCapture( Player *oldOwner, Player *newOwner )
 {
+	if (RetailFileLayers::enabled())
+		refreshRetailAIDifficultyUpgrade(oldOwner);
 	if (m_attributeModifierHelper && oldOwner != newOwner)
 		m_attributeModifierHelper->removeTimed();
 
@@ -5023,6 +5064,8 @@ void Object::onCapture( Player *oldOwner, Player *newOwner )
 	// rip through the behavior modules and call the onCapture for any modules that care
 	for( BehaviorModule **module = m_behaviors; *module; ++module )
 		(*module)->onCapture( oldOwner, newOwner );
+	if (RetailFileLayers::enabled() && oldOwner != newOwner)
+		updateUpgradeModules();
 
 	//
 	// We have to undo our look for the old team and redo it for the new.
@@ -5037,9 +5080,10 @@ void Object::onCapture( Player *oldOwner, Player *newOwner )
 	clearScriptStatus(OBJECT_STATUS_SCRIPT_UNSELLABLE);
 
 	// mark the command bar to redraw
-	TheControlBar->markUIDirty();
+	if (TheControlBar)
+		TheControlBar->markUIDirty();
 
-	if (oldOwner!=newOwner && newOwner->isSkirmishAIPlayer()) {
+	if (!RetailFileLayers::enabled() && oldOwner!=newOwner && newOwner->isSkirmishAIPlayer()) {
 		// The skirmish ai doesn't know what to do with captured faction buildings except sell them.
 		if (isFactionStructure()) {
 			TheBuildAssistant->sellObject( this );

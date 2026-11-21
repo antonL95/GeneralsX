@@ -36,6 +36,7 @@
 #include "Common/Radar.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/Team.h"
+#include "GameLogic/AISkirmishPlayer.h"
 #include "Common/PlayerList.h"
 #include "Common/Player.h"
 #include "Common/GameAudio.h"
@@ -896,6 +897,8 @@ void GameEngine::init()
 
 
 		initSubsystem(TheAI,"TheAI", MSGNEW("GameEngineSubsystem") AI(), &xferCRC,  "Data\\INI\\Default\\AIData", "Data\\INI\\AIData");
+		if (RetailFileLayers::enabled())
+			AISkirmishPlayer::loadRetailData();
 		initSubsystem(TheGameLogic,"TheGameLogic", createGameLogic(), nullptr);
 		initSubsystem(TheTeamFactory,"TheTeamFactory", MSGNEW("GameEngineSubsystem") TeamFactory(), nullptr);
 		initSubsystem(TheCrateSystem,"TheCrateSystem", MSGNEW("GameEngineSubsystem") CrateSystem(), &xferCRC, "Data\\INI\\Default\\Crate", "Data\\INI\\Crate");

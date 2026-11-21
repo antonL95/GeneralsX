@@ -5865,6 +5865,39 @@ Player *ScriptEngine::getPlayerFromAsciiString(const AsciiString& playerString)
 	return nullptr;
 }
 
+PlayerMaskType ScriptEngine::getRetailScriptPlayers(const AsciiString& name)
+{
+	const std::string_view text(name.str());
+	Player* reference = nullptr;
+	if (text.starts_with("<This Player's "))
+		reference = m_currentPlayer;
+	else if (text.starts_with("<Local Player's "))
+		reference = ThePlayerList->getLocalPlayer();
+	const Bool everyone = text == "<All Players>";
+	const Bool enemies = text.ends_with(" Enemies>");
+	const Bool allies = text.ends_with(" Allies>");
+	const Bool alliesWithSelf = text.ends_with(" Allies incl Self>");
+	if (!everyone && !enemies && !allies && !alliesWithSelf)
+	{
+		const Player* single = getPlayerFromAsciiString(name);
+		return single ? single->getPlayerMask() : 0;
+	}
+	if (!everyone && !reference)
+		return 0;
+
+	PlayerMaskType result = 0;
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		Player* player = ThePlayerList->getNthPlayer(i);
+		if (!player || !player->getDefaultTeam() || player->isPlayerObserver())
+			continue;
+		if (everyone || (player == reference ? alliesWithSelf :
+			reference->getRelationship(player->getDefaultTeam()) == (enemies ? ENEMIES : ALLIES)))
+			result |= player->getPlayerMask();
+	}
+	return result;
+}
+
 //-------------------------------------------------------------------------------------------------
 /** getObjectTypeList */
 //-------------------------------------------------------------------------------------------------

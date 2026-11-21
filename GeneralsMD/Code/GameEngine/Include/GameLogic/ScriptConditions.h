@@ -33,6 +33,7 @@ class Condition;
 class ObjectTypes;
 class Parameter;
 class Player;
+class Team;
 //-----------------------------------------------------------------------------
 // ScriptConditionsInterface
 //-----------------------------------------------------------------------------
@@ -73,6 +74,7 @@ public:
 	virtual void update() override;	///< Update
 
 	virtual Bool evaluateCondition( Condition *pCondition ) override;
+	static Real getRetailTeamThreat(Team* team, Real radius);
 
 protected:
 	Player *playerFromParam(Parameter *pSideParm);			// Gets a player from a parameter.

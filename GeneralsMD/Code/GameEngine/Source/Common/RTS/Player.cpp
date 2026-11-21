@@ -410,6 +410,7 @@ void Player::init(const PlayerTemplate* pt)
 
 	m_canBuildBase = true;
 	m_canBuildUnits = true;
+	m_forbiddenBuildings.clear();
 	m_observer = false;
 	m_cashBountyPercent = 0.0f;
 	m_listInScoreScreen = TRUE;
@@ -2400,6 +2401,10 @@ void Player::sellEverythingUnderTheSun()
 //=============================================================================
 Bool Player::allowedToBuild(const ThingTemplate *tmplate) const
 {
+	for (const AsciiString& name : m_forbiddenBuildings)
+		if (name == tmplate->getName())
+			return FALSE;
+
 	if (!m_canBuildBase && tmplate->isKindOf(KINDOF_STRUCTURE)) {
 		return false;
 	}
@@ -2409,6 +2414,17 @@ Bool Player::allowedToBuild(const ThingTemplate *tmplate) const
 	}
 
 	return true;
+}
+
+void Player::setBuildingAllowed(const ThingTemplate* type, Bool allowed)
+{
+	if (!type || !type->isKindOf(KINDOF_STRUCTURE))
+		return;
+	const auto entry = std::find(m_forbiddenBuildings.begin(), m_forbiddenBuildings.end(), type->getName());
+	if (allowed && entry != m_forbiddenBuildings.end())
+		m_forbiddenBuildings.erase(entry);
+	else if (!allowed && entry == m_forbiddenBuildings.end())
+		m_forbiddenBuildings.push_back(type->getName());
 }
 
 //=============================================================================
@@ -4249,7 +4265,7 @@ void Player::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 10 : 8;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 11 : 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4789,6 +4805,17 @@ void Player::xfer( Xfer *xfer )
 		HeroRoster::reset(m_playerIndex);
 	if (version >= 10)
 		xferPowerProductionBonuses(xfer);
+	if (xfer->getXferMode() == XFER_LOAD)
+		m_forbiddenBuildings.clear();
+	if (version >= 11)
+	{
+		UnsignedInt count = static_cast<UnsignedInt>(m_forbiddenBuildings.size());
+		xfer->xferUnsignedInt(&count);
+		if (xfer->getXferMode() == XFER_LOAD)
+			m_forbiddenBuildings.resize(count);
+		for (AsciiString& name : m_forbiddenBuildings)
+			xfer->xferAsciiString(&name);
+	}
 
 }
 

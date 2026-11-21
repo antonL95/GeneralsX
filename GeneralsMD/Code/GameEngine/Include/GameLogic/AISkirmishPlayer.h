@@ -45,6 +45,9 @@ class AISkirmishPlayer : public AIPlayer
 public:	 // AISkirmish specific methods.
 
 	AISkirmishPlayer( Player *p );							///< constructor
+	static void loadRetailData();
+	static void parseRetailArmy(INI* ini);
+	static void parseRetailTuning(INI* ini);
 	virtual Bool computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord3D *pos, Int playerNdx, Real weaponRadius) override; ///< Calculates best pos for weapon given radius.
 
 public:	// AIPlayer interface methods.
@@ -98,6 +101,7 @@ protected:
 
 protected:
 	void adjustBuildList(BuildListInfo *list);
+	void updateRetail();
 	Int getMyEnemyPlayerIndex();
 	void acquireEnemy();
 

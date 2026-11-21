@@ -41,6 +41,9 @@
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #if !RTS_GENERALS
+#include "Common/Team.h"
+#include "GameLogic/TerrainLogic.h"
+#include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/AttributeModifierStore.h"
 #endif
 #include "Common/RotwkDuration.h"
@@ -531,6 +534,18 @@ static INIBlockParse findBlockParse(const char* token)
 #if !RTS_GENERALS
 	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "ModifierList") == 0)
 		return AttributeModifierStore::parseModifierListDefinition;
+	if (RetailFileLayers::enabled() && strcmp(token, "ArmyDefinition") == 0)
+		return AISkirmishPlayer::parseRetailArmy;
+	if (RetailFileLayers::enabled() && strcmp(token, "SkirmishAIData") == 0)
+		return AISkirmishPlayer::parseRetailTuning;
+	if (RetailFileLayers::enabled() && (strcmp(token, "AIBase") == 0 || strcmp(token, "AIDozerAssignment") == 0))
+		return [](INI* ini) {
+			const std::string line = ini->currentRawLine();
+			INIBlockStructure::LineHead head{};
+			INIBlockStructure::parseLineHead(line, head);
+			ini->recordSkipped("block", std::string(head.keyword).c_str());
+			ini->readRawBlock(INI::getEndToken());
+		};
 	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "StanceTemplate") == 0)
 		return AttributeModifierStore::parseStanceTemplateDefinition;
 #endif

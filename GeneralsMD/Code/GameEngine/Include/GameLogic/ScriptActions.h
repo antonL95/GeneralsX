@@ -124,7 +124,7 @@ protected:
 	void doMoveToWaypoint(const AsciiString& team, const AsciiString& waypoint);
 	void doNamedMoveToWaypoint(const AsciiString& unit, const AsciiString& waypoint);
 	void doSetTeamState(const AsciiString& team, const AsciiString& state);
-	void doCreateReinforcements(const AsciiString& team, const AsciiString& waypoint);
+	void doCreateReinforcements(const AsciiString& team, const AsciiString& waypoint, const Coord3D* at = nullptr);
 	void doModCameraLookToward(const AsciiString& waypoint);
 	void doModCameraFinalLookToward(const AsciiString& waypoint);
 	void doCreateObject(const AsciiString& objectName, const AsciiString& thingName, const AsciiString& team, Coord3D *pos, Real angle);

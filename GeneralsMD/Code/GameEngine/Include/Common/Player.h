@@ -266,6 +266,7 @@ public:
 	/// a convenience function to test the ThingTemplate against the players canBuild flags
 	/// called by canBuild
 	Bool allowedToBuild(const ThingTemplate *tmplate) const;
+	void setBuildingAllowed(const ThingTemplate* type, Bool allowed);
 
 	/// true if we have the prereqs for this item
 	Bool canBuild(const ThingTemplate *tmplate) const;
@@ -790,6 +791,7 @@ private:
 		UnsignedInt endFrame = 0;
 	};
 	std::vector<PowerProductionBonus> m_powerProductionBonuses;
+	std::vector<AsciiString> m_forbiddenBuildings;
 	void xferPowerProductionBonuses(Xfer* xfer);
 
 	ProductionChangeMap					m_productionCostChanges;			///< Map to keep track of Faction specific discounts or penalties on prices of units

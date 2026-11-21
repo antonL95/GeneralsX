@@ -2,6 +2,21 @@
 
 #include "GameLogic/Module/AISpecialPowerUpdate.h"
 
+#include "Common/ActionManager.h"
+#include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/SpecialPower.h"
+#include "Common/ThingTemplate.h"
+#include "GameClient/ControlBar.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
+#include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
+
 namespace
 {
 const char* const specialPowerAITypes[] =
@@ -94,6 +109,125 @@ AISpecialPowerUpdate::AISpecialPowerUpdate(Thing* thing, const ModuleData* data)
 }
 
 AISpecialPowerUpdate::~AISpecialPowerUpdate() = default;
+
+UpdateSleepTime AISpecialPowerUpdate::update()
+{
+#if RTS_ZEROHOUR
+	if (!RetailFileLayers::enabled())
+		return UPDATE_SLEEP_FOREVER;
+	Object* source = getObject();
+	const UpdateSleepTime checkAgain = UPDATE_SLEEP(LOGICFRAMES_PER_SECOND * 2);
+	Player* player = source->getControllingPlayer();
+	if (!player || !player->isSkirmishAIPlayer() || !player->isPlayerActive() || !TheRetailCommandCatalog ||
+		source->isDestroyed() || source->isDisabled() ||
+		source->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || source->testStatus(OBJECT_STATUS_IS_USING_ABILITY))
+		return checkAgain;
+	const Bool book = source->isKindOf(KINDOF_SPELL_BOOK) && source == player->getRetailSpellBook();
+	if (source->isEffectivelyDead() && !book)
+		return checkAgain;
+
+	const auto* data = getAISpecialPowerUpdateModuleData();
+	const CommandButton* button = TheRetailCommandCatalog->findCommandButton(data->m_commandButtonName);
+	const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
+	if (!power || data->m_specialPowerAIType < 0 ||
+		TheRetailCommandCatalog->findPowerButton(source, power) != button)
+		return checkAgain;
+	const auto* module = source->getSpecialPowerModule(power);
+	if (!module || !module->isReady() || !TheSpecialPowerStore->canUseSpecialPower(source, power))
+		return checkAgain;
+
+	const std::string_view policy(specialPowerAITypes[data->m_specialPowerAIType]);
+	const Bool always = policy == "AI_SPELLBOOK_ALWAYS_FIRE";
+	const Bool allyBattle = policy == "AI_SPELLBOOK_ASSIST_BATTLE_BUFF" ||
+		policy == "AI_SPELLBOOK_BUFFTERRAIN" || policy == "AI_SPECIAL_POWER_GIVEXP_AOE";
+	const Bool repair = policy == "AI_SPELLBOOK_REBUILD";
+	const Bool heal = policy == "AI_SPELLBOOK_HEAL" || policy == "AI_SPECIAL_POWER_HEAL_AOE";
+	const Bool allyEconomy = policy == "AI_SPELLBOOK_BUFFECONOMYBUILDING";
+	const Bool enemyStructure = policy == "AI_SPELLBOOK_STRUCTURE_BREAKER" ||
+		policy == "AI_SPELLBOOK_STRUCTURE_BREAKER_PREF_WALLS" || policy == "AI_SPELLBOOK_STRUCTURE_BASEKILL" ||
+		policy == "AI_SPELLBOOK_DEBUFFECONOMYBUILDING" || policy == "AI_SPELLBOOK_DEBUFFPRODUCTIONBUILDING" ||
+		policy == "AI_SPECIAL_POWER_ENEMY_TYPE_KILLER_STRUCTURES";
+	const Bool enemyArmy = policy == "AI_SPELLBOOK_ASSIST_BATTLE_DEBUFF" || policy == "AI_SPELLBOOK_ARMY_BREAKER" ||
+		policy == "AI_SPECIAL_POWER_RANGED_AOE_ATTACK" || policy == "AI_SPECIAL_POWER_RANGED_AOE_ATTACK_UNITS" ||
+		policy == "AI_SPECIAL_POWER_ENEMY_TYPE_KILLER" || policy == "AI_SPECIAL_POWER_ENEMY_TYPE_KILLER_RANGED";
+	const Bool reveal = policy == "AI_SPELLBOOK_SHROUD_REVEAL";
+	const Bool selfBattle = policy == "AI_SPECIAL_POWER_BASIC_SELF_BUFF" || policy == "AI_SPECIAL_POWER_BASIC_SELF_DEBUFF";
+	if (!(always || allyBattle || repair || heal || allyEconomy || enemyStructure || enemyArmy || reveal || selfBattle))
+		return checkAgain;
+
+	const UnsignedInt options = button->getOptions();
+	const Bool objectTarget = (options & COMMAND_OPTION_NEED_OBJECT_TARGET) != 0;
+	const Bool positionTarget = (options & NEED_TARGET_POS) != 0;
+	if (!objectTarget && !positionTarget && (always ||
+		(selfBattle && source->getAI() && source->getAI()->isAttacking())))
+	{
+		if (button->isValidToUseOn(source, nullptr, nullptr, CMD_FROM_AI))
+			source->doSpecialPower(power, options);
+		return checkAgain;
+	}
+
+	const Real range = data->m_specialPowerRange > 0.0f ? data->m_specialPowerRange : data->m_specialPowerRadius;
+	Object* best = nullptr;
+	Real bestScore = 0.0f;
+	for (Object* target = TheGameLogic->getFirstObject(); target; target = target->getNextObject())
+	{
+		if (target->isEffectivelyDead() || target->isKindOf(KINDOF_INERT) ||
+			(target->getContainedBy() && !(heal && HordeContain::get(target->getContainedBy()))))
+			continue;
+		const Relationship relationship = source->getRelationship(target);
+		const Bool building = target->isKindOf(KINDOF_STRUCTURE);
+		AIUpdateInterface* ai = target->getAI();
+		Real score = 0.0f;
+		if (relationship == ALLIES)
+		{
+			if ((heal && !building) || (repair && building))
+			{
+				const auto* body = target->getBodyModule();
+				if (body->getMaxHealth() > 0.0f)
+					score = 1.0f - body->getHealth() / body->getMaxHealth() - 0.25f;
+			}
+			else if (allyBattle && !building && ai)
+			{
+				const auto* horde = static_cast<const HordeAIUpdate*>(target->findUpdateModule(NAMEKEY("HordeAIUpdate")));
+				if (ai->isAttacking() || (horde && horde->isEngaging()))
+					score = 1.0f + target->getTemplate()->getThreatValue();
+			}
+			else if (allyEconomy && target->isKindOf(KINDOF_ECONOMY_STRUCTURE))
+				score = 1.0f;
+		}
+		else if (relationship == ENEMIES &&
+			((building && (enemyStructure || reveal)) || (!building && enemyArmy)))
+		{
+			score = 1.0f + target->getTemplate()->getThreatValue();
+		}
+		if (score <= 0.0f || (!book && range > 0.0f && target != source &&
+			ThePartitionManager->getDistanceSquared(source, target, FROM_CENTER_2D) > range * range))
+			continue;
+		if (best && (score < bestScore || (score == bestScore && target->getID() > best->getID())))
+			continue;
+		const Coord3D* location = positionTarget ? target->getPosition() : nullptr;
+		if (!button->isValidToUseOn(source, objectTarget ? target : nullptr, location, CMD_FROM_AI) ||
+			!power->isValidRetailTarget(source, objectTarget ? target : nullptr, location, CMD_FROM_AI))
+			continue;
+		if (data->m_spellMakesAStructure && positionTarget && target->isKindOf(KINDOF_IMMOBILE))
+			continue;
+		best = target;
+		bestScore = score;
+	}
+	if (best)
+	{
+		if (objectTarget)
+			source->doSpecialPowerAtObject(power, best, options);
+		else if (positionTarget)
+			source->doSpecialPowerAtLocation(power, best->getPosition(), INVALID_ANGLE, options);
+		else
+			source->doSpecialPower(power, options);
+	}
+	return checkAgain;
+#else
+	return UPDATE_SLEEP_FOREVER;
+#endif
+}
 
 void AISpecialPowerUpdate::crc(Xfer* xfer)
 {

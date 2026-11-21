@@ -36,6 +36,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
@@ -2577,11 +2578,25 @@ void Team::crc( Xfer *xfer )
 	* Version Info:
 	* 1: Initial version */
 // ------------------------------------------------------------------------------------------------
+Bool Team::hasCustomState(const AsciiString& state) const
+{
+	return std::find(m_customStates.begin(), m_customStates.end(), state) != m_customStates.end();
+}
+
+void Team::setCustomState(const AsciiString& state, Bool enabled)
+{
+	const auto entry = std::find(m_customStates.begin(), m_customStates.end(), state);
+	if (enabled && entry == m_customStates.end())
+		m_customStates.push_back(state);
+	else if (!enabled && entry != m_customStates.end())
+		m_customStates.erase(entry);
+}
+
 void Team::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2704,6 +2719,17 @@ void Team::xfer( Xfer *xfer )
 	// player relations
 	xfer->xferSnapshot( m_playerRelations );
 
+	if (xfer->getXferMode() == XFER_LOAD)
+		m_customStates.clear();
+	if (version >= 2)
+	{
+		UnsignedInt count = static_cast<UnsignedInt>(m_customStates.size());
+		xfer->xferUnsignedInt(&count);
+		if (xfer->getXferMode() == XFER_LOAD)
+			m_customStates.resize(count);
+		for (AsciiString& state : m_customStates)
+			xfer->xferAsciiString(&state);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

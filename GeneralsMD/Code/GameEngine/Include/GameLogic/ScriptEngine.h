@@ -253,6 +253,7 @@ public:
 	virtual Player *getSkirmishEnemyPlayer(); ///< Gets the ai's enemy Human player. May be null.
 	virtual Player *getCurrentPlayer(); ///<  Gets the player that owns the current script.  May be null.
 	virtual Player *getPlayerFromAsciiString(const AsciiString& skirmishPlayerString);
+	PlayerMaskType getRetailScriptPlayers(const AsciiString& name);
 
 	void setObjectsShouldReceiveDifficultyBonus(Bool receive) { m_objectsShouldReceiveDifficultyBonus = receive; }
 	Bool getObjectsShouldReceiveDifficultyBonus() const { return m_objectsShouldReceiveDifficultyBonus; }

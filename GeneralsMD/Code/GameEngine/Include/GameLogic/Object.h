@@ -347,6 +347,7 @@ public:
 	void setStatus( ObjectStatusMaskType objectStatus, Bool set = true );
 	inline void clearStatus( ObjectStatusMaskType objectStatus ) { setStatus( objectStatus, false ); }
 	void updateUpgradeModules();	///< We need to go through our Upgrade Modules and see which should be activated
+	void refreshRetailAIDifficultyUpgrade(const Player* previousOwner);
 	const UpgradeMaskType& getObjectCompletedUpgradeMask() const { return m_objectUpgradesCompleted; } ///< Upgrades I complete locally
 
 	//This function sucks.

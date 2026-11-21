@@ -21,5 +21,5 @@ class AISpecialPowerUpdate final : public UpdateModule
 
 public:
 	AISpecialPowerUpdate(Thing* thing, const ModuleData* data);
-	UpdateSleepTime update() override { return UPDATE_SLEEP_FOREVER; }
+	UpdateSleepTime update() override;
 };

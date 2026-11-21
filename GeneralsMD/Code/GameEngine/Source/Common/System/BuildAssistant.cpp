@@ -1370,7 +1370,8 @@ Bool BuildAssistant::isPossibleToMakeUnit( Object *builder, const ThingTemplate 
 		commandButton = commandSet->getCommandButton(i);
 		if( commandButton &&
 				(commandButton->getCommandType() == GUI_COMMAND_UNIT_BUILD || commandButton->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT) &&
-				commandButton->getThingTemplate() && commandButton->getThingTemplate()->isEquivalentTo(whatToBuild) )
+				commandButton->getThingTemplate() && commandButton->getThingTemplate()->isEquivalentTo(whatToBuild) &&
+				(!RetailFileLayers::enabled() || HeroRoster::buttonUpgradesMet(commandButton, builder->getControllingPlayer(), builder)) )
 			foundCommand = commandButton;
 
 	}
@@ -1383,7 +1384,8 @@ Bool BuildAssistant::isPossibleToMakeUnit( Object *builder, const ThingTemplate 
 
 	// make sure that the player can actually make this unit by checking prereqs and such
 	Player *player = builder->getControllingPlayer();
-	if( player->canBuild( foundCommand->getThingTemplate() ) == FALSE )
+	const ThingTemplate* commandTemplate = foundCommand->getThingTemplate();
+	if( player->canBuild( RetailFileLayers::enabled() ? whatToBuild : commandTemplate ) == FALSE )
 		return FALSE;
 
 	// all is well

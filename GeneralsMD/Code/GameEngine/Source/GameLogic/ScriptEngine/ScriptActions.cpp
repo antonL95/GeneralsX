@@ -48,6 +48,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Team.h"
 #include "Common/Upgrade.h"
+#include "Common/AttributeModifierRules.h"
 
 #include "GameClient/Anim2D.h"
 #include "GameClient/CampaignManager.h"
@@ -76,16 +77,19 @@
 #include "GameLogic/Module/CommandButtonHuntUpdate.h"
 #include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
 #include "GameLogic/Module/TransportContain.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/MobNexusContain.h"
 #include "GameLogic/Module/RailroadGuideAIUpdate.h"
 #include "GameLogic/Module/StickyBombUpdate.h"
 #include "GameLogic/ObjectTypes.h"
+#include "GameLogic/ScriptConditions.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptActions.h"
@@ -514,28 +518,27 @@ void ScriptActions::doSetTeamState(const AsciiString& team, const AsciiString& s
 
 /** doCreateReinforcements */
 //-------------------------------------------------------------------------------------------------
-void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiString& waypoint)
+void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiString& waypoint, const Coord3D* at)
 {
 	TeamPrototype *theTeamProto = TheTeamFactory->findTeamPrototype( team );
 	Coord3D destination;
 
 
 	Bool needToMoveToDestination = false;
-	//Validate the waypoint
-	Waypoint *way = TheTerrainLogic->getWaypointByName(waypoint);
-	if (way==nullptr)
+	Waypoint *way = at ? nullptr : TheTerrainLogic->getWaypointByName(waypoint);
+	if (!at && !way)
 	{
 		return;
 	}
 
-	destination = *way->getLocation();
+	destination = at ? *at : *way->getLocation();
 	if (!theTeamProto) {
 		DEBUG_LOG(("***WARNING - Team %s not found.", team.str()));
 		return;
 	}
 	const TeamTemplateInfo *pInfo = theTeamProto->getTemplateInfo();
 	Coord3D origin = destination;
-	way = TheTerrainLogic->getWaypointByName(pInfo->m_startReinforceWaypoint);
+	way = at ? nullptr : TheTerrainLogic->getWaypointByName(pInfo->m_startReinforceWaypoint);
 	if (way) {
 		origin = *way->getLocation();
 		if (origin.x != destination.x || origin.y != destination.y) {
@@ -6644,6 +6647,62 @@ void ScriptActions::doNamedSetTrainHeld( const AsciiString &locoName, const Bool
 //-------------------------------------------------------------------------------------------------
 /** Execute an action */
 //-------------------------------------------------------------------------------------------------
+namespace
+{
+Bool matchesRetailScriptType(const Object& object, const AsciiString& type, const ObjectTypes* list)
+{
+	return list ? list->isInSet(object.getTemplate()) : object.getTemplate()->getName().compareNoCase(type.str()) == 0;
+}
+
+Object* findRetailScriptTarget(Team& team, PlayerMaskType players,
+	const AsciiString& type, Int kind, Bool unnamed)
+{
+	if (!team.getFirstItemIn_TeamMemberList() || kind >= KINDOF_COUNT)
+		return nullptr;
+	AIGroupPtr group = TheAI->createGroup();
+#if RETAIL_COMPATIBLE_AIGROUP
+	team.getTeamAsAIGroup(group);
+#else
+	team.getTeamAsAIGroup(group.Peek());
+#endif
+	Coord3D center;
+	group->getCenter(&center);
+	const ObjectTypes* list = type.isEmpty() ? nullptr : TheScriptEngine->getObjectTypes(type);
+	Object* nearest = nullptr;
+	Real distance = 0.0f;
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		const Player* owner = object->getControllingPlayer();
+		if (!owner || !(owner->getPlayerMask() & players) || object->isEffectivelyDead() ||
+			(unnamed && object->getName().isNotEmpty()))
+			continue;
+		if (kind >= 0 ? !object->isKindOf(static_cast<KindOfType>(kind)) : !matchesRetailScriptType(*object, type, list))
+			continue;
+		const Real candidate = ThePartitionManager->getDistanceSquared(object, &center, FROM_CENTER_2D);
+		if (!nearest || candidate < distance || (candidate == distance && object->getID() < nearest->getID()))
+		{
+			distance = candidate;
+			nearest = object;
+		}
+	}
+	return nearest;
+}
+
+void orderRetailTeam(Team& team, const Coord3D& position, Bool attack)
+{
+	AIGroupPtr group = TheAI->createGroup();
+#if RETAIL_COMPATIBLE_AIGROUP
+	team.getTeamAsAIGroup(group);
+#else
+	team.getTeamAsAIGroup(group.Peek());
+#endif
+	if (attack)
+		group->groupAttackMoveToPosition(&position, NO_MAX_SHOTS_LIMIT, CMD_FROM_SCRIPT);
+	else
+		group->groupMoveToPosition(&position, FALSE, CMD_FROM_SCRIPT);
+}
+}
+
 void ScriptActions::executeAction( ScriptAction *pAction )
 {
 	switch (pAction->getActionType()) {
@@ -6667,7 +6726,7 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			Object* plot = TheScriptEngine->getUnitNamed(pAction->getParameter(1)->getString());
 			const ThingTemplate* type = TheThingFactory->findTemplate(pAction->getParameter(0)->getString(), FALSE);
 			if (auto* foundation = plot ? FoundationAIUpdate::find(*plot) : nullptr)
-				foundation->construct(type, plot->getControllingPlayer());
+				foundation->construct(type, TheScriptEngine->getCurrentPlayer());
 			return;
 		}
 		case ScriptAction::NAMED_BASE_UNPACK_FREE:
@@ -6684,6 +6743,207 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			TheScriptEngine->setRetailUnitReference(pAction->getParameter(0)->getString(),
 				TheScriptEngine->getUnitNamed(pAction->getParameter(1)->getString()));
 			return;
+		case ScriptAction::CREATE_REINFORCEMENT_TEAM_AT_UNIT_POSITION:
+			if (const Object* anchor = TheScriptEngine->getUnitNamed(pAction->getParameter(1)->getString()))
+				doCreateReinforcements(pAction->getParameter(0)->getString(), AsciiString::TheEmptyString, anchor->getPosition());
+			return;
+		case ScriptAction::ALLOW_DISALLOW_ONE_BUILDING:
+			if (Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString()))
+				player->setBuildingAllowed(TheThingFactory->findTemplate(pAction->getParameter(1)->getString(), FALSE),
+					pAction->getParameter(2)->getInt() != 0);
+			return;
+		case ScriptAction::GIVE_PLAYER_UPGRADE:
+			if (Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString()))
+				if (const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(pAction->getParameter(1)->getString()))
+					if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER && !player->hasUpgradeComplete(upgrade))
+						player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+			return;
+		case ScriptAction::TEAM_UPGRADE:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(pAction->getParameter(1)->getString());
+			if (team && upgrade)
+			{
+				std::vector<ObjectID> members;
+				for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+					members.push_back(member.cur()->getID());
+				for (ObjectID id : members)
+					if (Object* object = TheGameLogic->findObjectByID(id))
+						object->giveUpgrade(upgrade);
+			}
+			return;
+		}
+		case ScriptAction::SET_REF_TO_NEREST_TEAM_OF_TYPE_OWNED_BY_PLAYER:
+		case ScriptAction::SET_REF_TO_NEREST_TEAM_OF_UNNAMED_TYPE_OWNED_BY_PLAYER:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(2)->getString());
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pAction->getParameter(1)->getString());
+			Object* target = team ? findRetailScriptTarget(*team, players,
+				pAction->getParameter(0)->getString(), -1,
+				pAction->getActionType() == ScriptAction::SET_REF_TO_NEREST_TEAM_OF_UNNAMED_TYPE_OWNED_BY_PLAYER) : nullptr;
+			TheScriptEngine->setRetailUnitReference(pAction->getParameter(3)->getString(), target);
+			return;
+		}
+		case ScriptAction::ATTACK_MOVE_TEAM_TO_NEAREST_OBJECT_OF_TYPE_OF_PLAYER:
+		case ScriptAction::TEAM_MOVE_TO_NEAREST_OBJECT_OF_TYPE_OWNED_BY_PLAYER:
+		case ScriptAction::TEAM_MOVE_TO_NEAREST_OBJECT_OF_KINDOF_OWNED_BY_PLAYER:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			if (!team)
+				return;
+			const Bool kindOf = pAction->getActionType() == ScriptAction::TEAM_MOVE_TO_NEAREST_OBJECT_OF_KINDOF_OWNED_BY_PLAYER;
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pAction->getParameter(2)->getString());
+			const Object* target = findRetailScriptTarget(*team, players,
+				kindOf ? AsciiString::TheEmptyString : pAction->getParameter(1)->getString(),
+				kindOf ? pAction->getParameter(1)->getInt() : -1, FALSE);
+			if (target)
+				orderRetailTeam(*team, *target->getPosition(),
+					pAction->getActionType() == ScriptAction::ATTACK_MOVE_TEAM_TO_NEAREST_OBJECT_OF_TYPE_OF_PLAYER);
+			return;
+		}
+		case ScriptAction::ATTACK_MOVE_TEAM_TO_NAMED_OBJECT:
+			if (Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString()))
+				if (const Object* object = TheScriptEngine->getUnitNamed(pAction->getParameter(1)->getString()))
+					orderRetailTeam(*team, *object->getPosition(), TRUE);
+			return;
+		case ScriptAction::TEAM_SET_CUSTOM_STATE:
+			if (Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString()))
+				team->setCustomState(pAction->getParameter(1)->getString(), pAction->getParameter(2)->getInt() != 0);
+			return;
+		case ScriptAction::TEAM_STAND_GROUND:
+			if (Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString()))
+				for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+					if (StancesBehavior* stances = StancesBehavior::find(member.cur()))
+						stances->setStance(pAction->getParameter(1)->getInt() ?
+							AttributeModifierRules::STANCE_HOLD_GROUND : AttributeModifierRules::STANCE_BATTLE);
+			return;
+		case ScriptAction::MOVE_TEAM_HOME:
+			if (Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString()))
+			{
+				const TeamTemplateInfo* info = team->getPrototype()->getTemplateInfo();
+				if (info->m_hasHomeLocation)
+					orderRetailTeam(*team, info->m_homeLocation, FALSE);
+			}
+			return;
+		case ScriptAction::UNIT_SET_TEAM:
+			if (Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(1)->getString()))
+				if (Object* object = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString()))
+					object->setTeam(team);
+			return;
+		case ScriptAction::TEAM_RECRUIT_UNITS:
+		case ScriptAction::TEAM_RECRUIT_UNITS_FROM_TEAM:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			Int remaining = pAction->getParameter(1)->getInt();
+			if (!team || remaining <= 0)
+				return;
+			const AsciiString& type = pAction->getParameter(2)->getString();
+			const ObjectTypes* list = TheScriptEngine->getObjectTypes(type);
+			if (pAction->getActionType() == ScriptAction::TEAM_RECRUIT_UNITS_FROM_TEAM)
+			{
+				Team* source = TheScriptEngine->getTeamNamed(pAction->getParameter(3)->getString());
+				if (!source || source == team || source->getControllingPlayer() != team->getControllingPlayer())
+					return;
+				std::vector<Object*> recruits;
+				for (auto member = source->iterate_TeamMemberList(); !member.done() && remaining > 0; member.advance())
+				{
+					Object* unit = member.cur();
+					if (!unit->isEffectivelyDead() && matchesRetailScriptType(*unit, type, list))
+					{
+						recruits.push_back(unit);
+						--remaining;
+					}
+				}
+				for (Object* recruit : recruits)
+					recruit->setTeam(team);
+				return;
+			}
+
+			const TeamTemplateInfo* info = team->getPrototype()->getTemplateInfo();
+			const Object* first = team->getFirstItemIn_TeamMemberList();
+			if (!first && !info->m_hasHomeLocation)
+				return;
+			const Coord3D position = first ? *first->getPosition() : info->m_homeLocation;
+			const Int criteria = list ? static_cast<Int>(list->getListSize()) : 1;
+			for (Int i = 0; i < criteria && remaining > 0; ++i)
+			{
+				const ThingTemplate* filter = TheThingFactory->findTemplate(list ? list->getNthInList(i) : type, FALSE);
+				if (!filter)
+					continue;
+				while (remaining > 0)
+				{
+					Object* recruit = team->tryToRecruit(filter, &position, 99999.0f);
+					if (!recruit || recruit->getTeam() == team || recruit->isEffectivelyDead())
+						break;
+					recruit->setTeam(team);
+					--remaining;
+				}
+			}
+			return;
+		}
+		case ScriptAction::TEAM_CHANGE_OBJECT_STATUS:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			const Int status = ObjectStatusMaskType::getSingleBitFromName(pAction->getParameter(1)->getString().str());
+			if (!team || status < 0 || status >= OBJECT_STATUS_COUNT)
+				return;
+			const auto mask = MAKE_OBJECT_STATUS_MASK(static_cast<ObjectStatusTypes>(status));
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+			{
+				if (pAction->getParameter(2)->getInt() != 0)
+					member.cur()->setStatus(mask);
+				else
+					member.cur()->clearStatus(mask);
+			}
+			return;
+		}
+		case ScriptAction::SET_COUNTER_TO_TEAM_THREAT:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(1)->getString());
+			if (!team)
+				return;
+			const Real threat = ScriptConditions::getRetailTeamThreat(team, pAction->getParameter(2)->getReal());
+			ScriptAction* set = newInstance(ScriptAction)(ScriptAction::SET_COUNTER);
+			MemoryPoolObjectHolder holder(set);
+			set->getParameter(0)->friend_setString(pAction->getParameter(0)->getString());
+			set->getParameter(1)->friend_setInt(threat >= static_cast<Real>(INT_MAX) ? INT_MAX : static_cast<Int>(threat));
+			TheScriptEngine->friend_executeAction(set, team);
+			return;
+		}
+		case ScriptAction::UNIT_SET_MODELCONDITION_FOR_DURATION:
+		{
+			Object* object = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			const Int condition = ModelConditionFlags::getSingleBitFromName(pAction->getParameter(1)->getString().str());
+			const Real seconds = pAction->getParameter(2)->getReal();
+			if (!object || condition < 0 || condition >= MODELCONDITION_COUNT ||
+				!std::isfinite(seconds) || seconds < 0.0f)
+				return;
+			const Real duration = seconds * LOGICFRAMES_PER_SECOND;
+			if (duration >= static_cast<Real>(INT_MAX))
+				return;
+			const auto applyCondition = [&](Object* unit) {
+				if (seconds == 0.0f)
+					unit->setModelConditionState(static_cast<ModelConditionFlagType>(condition));
+				else
+					unit->setPowerModelCondition(condition, std::max<UnsignedInt>(1, static_cast<UnsignedInt>(duration)));
+			};
+			applyCondition(object);
+			const HordeContain* horde = HordeContain::get(object);
+			const Real fraction = std::clamp(pAction->getParameter(3)->getReal(), 0.0f, 1.0f);
+			if (horde && fraction > 0.0f)
+			{
+				const auto& members = *horde->getContainedItemsList();
+				UnsignedInt count = static_cast<UnsignedInt>(members.size() * fraction);
+				for (Object* unit : members)
+				{
+					if (!count)
+						break;
+					applyCondition(unit);
+					--count;
+				}
+			}
+			return;
+		}
 		case ScriptAction::FIND_HOME_BASE_OF_PLAYER:
 		{
 			const Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString());
