@@ -788,7 +788,8 @@ void HordeContain::constrainGroundMovement(const Object* member, Coord3D& moveme
 {
 	if (!RetailFileLayers::enabled() || (movement.x == 0.0f && movement.y == 0.0f) ||
 		!std::isfinite(movement.x) || !std::isfinite(movement.y) ||
-		!get(member->getContainedBy()) || member->isEffectivelyDead() || member->isSignificantlyAboveTerrain())
+		member->isEffectivelyDead() || member->isSignificantlyAboveTerrain() ||
+		(!get(member->getContainedBy()) && !get(member)))
 		return;
 
 	const AIUpdateInterface* ai = member->getAI();
@@ -799,11 +800,14 @@ void HordeContain::constrainGroundMovement(const Object* member, Coord3D& moveme
 	const Coord3D& position = *member->getPosition();
 	const auto layer = member->getLayer();
 	Pathfinder* pathfinder = TheAI->pathfinder();
+	const auto surfaces = locomotor->getLegalSurfaces();
+	if (!pathfinder->validMovementTerrain(layer, locomotor, &position))
+		return;
 	const auto passable = [&](Real dx, Real dy) {
 		const Coord3D next = {position.x + dx, position.y + dy, position.z};
-		return pathfinder->validMovementTerrain(layer, locomotor, &next);
+		return pathfinder->isMovementSegmentPassable(member, surfaces, layer, position, next, TRUE);
 	};
-	if (passable(movement.x, movement.y) || !passable(0.0f, 0.0f))
+	if (passable(movement.x, movement.y))
 		return;
 
 	if (movement.y != 0.0f && passable(0.0f, movement.y))
@@ -834,17 +838,20 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 	const Coord3D planned = next;
 	constexpr Real CLEARANCE = 0.05f;
 	constexpr Real MAX_CORRECTION = 4.0f;
+	const auto eligibleNeighbor = [&](const Object* other) {
+		return other != member && !other->isEffectivelyDead() && other->getLayer() == layer &&
+			!other->isSignificantlyAboveTerrain();
+	};
 	for (const Object* other : horde->getContainList())
 	{
-		if (other == member || other->isEffectivelyDead() || other->getLayer() != layer ||
-			other->isSignificantlyAboveTerrain() || horde->getMemberSlot(other->getID()) < 0)
+		if (!eligibleNeighbor(other))
 			continue;
 		const Coord3D& position = *other->getPosition();
 		const Real diameter = radius + other->getGeometryInfo().getBoundingCircleRadius() + CLEARANCE;
 		const Real dx = next.x - position.x;
 		const Real dy = next.y - position.y;
 		const Real distanceSquared = dx * dx + dy * dy;
-		if (distanceSquared >= diameter * diameter)
+		if (distanceSquared >= diameter * diameter || horde->getMemberSlot(other->getID()) < 0)
 			continue;
 
 		const Real oldX = origin.x - position.x;
@@ -887,12 +894,30 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 		return;
 
 	Pathfinder* pathfinder = TheAI->pathfinder();
-	if (pathfinder->validMovementTerrain(layer, locomotor, &next) &&
-		pathfinder->isLinePassable(member, locomotor->getLegalSurfaces(), layer, origin, next, FALSE, TRUE))
+	const auto surfaces = locomotor->getLegalSurfaces();
+	if (!pathfinder->isMovementSegmentPassable(member, surfaces, layer, origin, next, FALSE) ||
+		!pathfinder->isLinePassable(member, surfaces, layer, origin, next, FALSE, TRUE))
+		return;
+
+	for (const Object* other : horde->getContainList())
 	{
-		movement.x = next.x - origin.x;
-		movement.y = next.y - origin.y;
+		if (!eligibleNeighbor(other))
+			continue;
+		const Coord3D& position = *other->getPosition();
+		const Real pileRadius = (radius + other->getGeometryInfo().getBoundingCircleRadius()) * 0.5f;
+		const Real dx = next.x - position.x;
+		const Real dy = next.y - position.y;
+		if (dx * dx + dy * dy >= pileRadius * pileRadius)
+			continue;
+		const Real plannedX = planned.x - position.x;
+		const Real plannedY = planned.y - position.y;
+		if (plannedX * plannedX + plannedY * plannedY >= pileRadius * pileRadius &&
+			horde->getMemberSlot(other->getID()) >= 0)
+			return;
 	}
+
+	movement.x = next.x - origin.x;
+	movement.y = next.y - origin.y;
 }
 
 Real HordeContain::getFormationSpeedScale() const

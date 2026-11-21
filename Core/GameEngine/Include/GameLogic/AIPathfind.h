@@ -206,6 +206,9 @@ public:
 		PathfindLayerEnum layer, const Coord3D& startWorld, const Coord3D& endWorld,
 		Bool blocked, Bool allowPinched );	///< Return true if the straight line between the given points is passable
 
+	Bool isMovementSegmentPassable( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfaces,
+		PathfindLayerEnum layer, const Coord3D& startWorld, const Coord3D& endWorld, Bool terrainOnly );
+
 	void moveAlliesAwayFromDestination( Object *obj,const Coord3D& destination);
 
 	Bool isGroundPathPassable( Bool isCrusher, const Coord3D& startWorld, PathfindLayerEnum startLayer,
@@ -342,6 +345,7 @@ protected:
 
 	void debugShowSearch( Bool pathFound );				///< Show all cells touched in the last search
 	static LocomotorSurfaceTypeMask validLocomotorSurfacesForCellType(PathfindCell::CellType t);
+	static Bool validMovementTerrainCell(const PathfindCell* cell, LocomotorSurfaceTypeMask acceptableSurfaces);
 
 	void checkChangeLayers(PathfindCell *parentCell);
 

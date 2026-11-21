@@ -1098,27 +1098,23 @@ Locomotor* Pathfinder::chooseBestLocomotorForPosition(PathfindLayerEnum layer, L
 //
 // Return true if we can move onto this position
 //
+Bool Pathfinder::validMovementTerrainCell( const PathfindCell* cell, LocomotorSurfaceTypeMask acceptableSurfaces )
+{
+	if (!cell)
+		return false;
+	const auto type = cell->getType();
+	if (type == PathfindCell::CELL_OBSTACLE || type == PathfindCell::CELL_IMPASSABLE)
+		return true;
+	if (cell->getLayer() == LAYER_INVALID)
+		return true;
+	return (validLocomotorSurfacesForCellType(type) & acceptableSurfaces) != 0;
+}
+
 Bool Pathfinder::validMovementTerrain( PathfindLayerEnum layer, const Locomotor* locomotor, const Coord3D *pos)
 {
-	Int x = REAL_TO_INT_FLOOR(pos->x/PATHFIND_CELL_SIZE);
-	Int y = REAL_TO_INT_FLOOR(pos->y/PATHFIND_CELL_SIZE);
-
-	PathfindCell *toCell = nullptr;
-	toCell = getCell( layer, x, y );
-
-	if (toCell == nullptr)
-		return false;
-	// Only do terrain, not obstacle cells.  jba.
-	if (toCell->getType()==PathfindCell::CELL_OBSTACLE) return true;
-	if (toCell->getType()==PathfindCell::CELL_IMPASSABLE) return true;
-	if (toCell->getLayer()!=LAYER_GROUND && toCell->getLayer() == PathfindCell::CELL_CLEAR) {
-		return true;
-	}
-	// check validity of destination cell
-	LocomotorSurfaceTypeMask acceptableSurfaces = validLocomotorSurfacesForCellType(toCell->getType());
-	if ((locomotor->getLegalSurfaces() & acceptableSurfaces) == 0)
-		return false;
-	return true;
+	const Int x = REAL_TO_INT_FLOOR(pos->x / PATHFIND_CELL_SIZE);
+	const Int y = REAL_TO_INT_FLOOR(pos->y / PATHFIND_CELL_SIZE);
+	return validMovementTerrainCell(getCell(layer, x, y), locomotor->getLegalSurfaces());
 }
 
 //
@@ -5974,6 +5970,43 @@ Bool Pathfinder::isLinePassable( const Object *obj, LocomotorSurfaceTypeMask acc
 
 	Int ret = iterateCellsAlongLine(startWorld, endWorld, layer, linePassableCallback, (void*)&info);
 	return ret == 0;
+}
+
+Bool Pathfinder::isMovementSegmentPassable( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfaces,
+	PathfindLayerEnum layer, const Coord3D& startWorld, const Coord3D& endWorld, Bool terrainOnly )
+{
+	ICoord2D current, end;
+	if (worldToCell(&startWorld, &current) || worldToCell(&endWorld, &end))
+		return false;
+
+	const Bool isCrusher = obj->getCrusherLevel() > 0;
+	const Int stepX = endWorld.x >= startWorld.x ? 1 : -1;
+	const Int stepY = endWorld.y >= startWorld.y ? 1 : -1;
+	const double lengthX = (static_cast<double>(endWorld.x) - startWorld.x) * stepX;
+	const double lengthY = (static_cast<double>(endWorld.y) - startWorld.y) * stepY;
+	PathfindCell* from = nullptr;
+	for (;;)
+	{
+		PathfindCell* to = getCell(layer, current.x, current.y);
+		if (!validMovementTerrainCell(to, acceptableSurfaces))
+			return false;
+		if (!terrainOnly && !validMovementPosition(isCrusher, acceptableSurfaces, to, from, obj))
+			return false;
+		if (current.x == end.x && current.y == end.y)
+			return true;
+		from = to;
+
+		const double boundaryX = (current.x + (stepX > 0)) * static_cast<double>(PATHFIND_CELL_SIZE);
+		const double boundaryY = (current.y + (stepY > 0)) * static_cast<double>(PATHFIND_CELL_SIZE);
+		const double crossX = (boundaryX - startWorld.x) * stepX * lengthY;
+		const double crossY = (boundaryY - startWorld.y) * stepY * lengthX;
+		const Bool advanceX = current.x != end.x && (current.y == end.y || crossX <= crossY);
+		const Bool advanceY = current.y != end.y && (current.x == end.x || crossY <= crossX);
+		if (advanceX)
+			current.x += stepX;
+		if (advanceY)
+			current.y += stepY;
+	}
 }
 
 //-----------------------------------------------------------------------------

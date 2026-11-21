@@ -1980,7 +1980,7 @@ void logTrackedObject(const Object* obj, const Object* anchor, unsigned int fram
 	Coord3D slot = *pos;
 	if (const HordeContain* horde = anchor ? HordeContain::get(anchor) : nullptr)
 		slot = horde->getMemberPosition(obj->getID(), FALSE);
-	std::fprintf(stderr, "TEST pos %u %u %u %.3f %.3f %.4f %.4f %d %.3f %.3f %.2f\n", frame,
+	std::fprintf(stderr, "TEST pos %u %u %u %.9g %.9g %.4f %.4f %d %.3f %.3f %.2f\n", frame,
 		static_cast<unsigned>(obj->getID()), static_cast<unsigned>(anchor ? anchor->getID() : INVALID_ID),
 		pos->x, pos->y, obj->getOrientation(), physics ? physics->getVelocityMagnitude() : 0.0f,
 		ai && ai->isMoving() ? 1 : 0, slot.x, slot.y, obj->getGeometryInfo().getBoundingCircleRadius());
