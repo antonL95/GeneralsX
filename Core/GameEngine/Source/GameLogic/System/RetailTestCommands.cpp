@@ -1255,6 +1255,72 @@ struct SweepCase
 
 std::map<Int, SweepCase> s_sweepCases;
 
+void sweepButtonRequirements(Int id, const CommandButton* button, Object* source)
+{
+	if (!button)
+		return;
+	const Player* player = source->getControllingPlayer();
+	std::fprintf(stderr, "ORDERS %d button=%s type=%d rank=%d requiredRank=%d disabled=%d neededAny=%d neededMet=%d\n",
+		id, button->getName().str(), static_cast<Int>(button->getCommandType()), source->getExperienceTracker()->getRank(),
+		button->getRequiredRank(), source->isDisabled(), button->isNeededUpgradeAny(),
+		HeroRoster::buttonUpgradesMet(button, player, source));
+	for (const UpgradeTemplate* upgrade : button->getNeededUpgrades())
+	{
+		const Bool playerUpgrade = upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER;
+		const Bool owned = playerUpgrade ? player->hasUpgradeComplete(upgrade) : source->hasUpgrade(upgrade);
+		std::fprintf(stderr, "ORDERS %d needed=%s scope=%s owned=%d\n", id,
+			upgrade->getUpgradeName().str(), playerUpgrade ? "player" : "object", owned);
+	}
+	for (ScienceType science : button->getScienceVec())
+		std::fprintf(stderr, "ORDERS %d science=%s owned=%d\n", id,
+			TheScienceStore->getInternalNameForScience(science).str(), player->hasScience(science));
+}
+
+void sweepUpgradeRejection(Int id, Object* source, ProductionUpdateInterface* production,
+	const UpgradeTemplate* upgrade, const CommandButton* button)
+{
+	Player* player = source->getControllingPlayer();
+	const Bool playerUpgrade = upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER;
+	const Bool affordable = TheUpgradeCenter->canAffordUpgrade(player, upgrade);
+	const Bool owned = source->hasUpgrade(upgrade);
+	const Bool affected = playerUpgrade || source->affectedByUpgrade(upgrade);
+	const Bool queuedHere = production->isUpgradeInQueue(upgrade);
+	const Bool offered = source->canProduceUpgrade(upgrade);
+	const char* reason = playerUpgrade && !affordable ? "money"
+		: !playerUpgrade && owned ? "object_complete"
+		: !affected ? "no_upgrade_effect"
+		: queuedHere ? "duplicate_queue"
+		: !offered ? "upgrade_offer"
+		: playerUpgrade && player->hasUpgradeComplete(upgrade) ? "player_complete"
+		: playerUpgrade && player->hasUpgradeInProduction(upgrade) ? "player_in_production"
+		: production->canQueueUpgrade(upgrade) == CANMAKE_QUEUE_FULL ? "queue_full" : "unexplained";
+	std::fprintf(stderr, "ORDERS %d reject=%s affected=%d offered=%d affordable=%d\n", id, reason, affected, offered, affordable);
+	sweepButtonRequirements(id, button, source);
+}
+
+void sweepUnitRejection(Int id, Object* source, const ThingTemplate* thing, const CommandButton* button)
+{
+	const Player* player = source->getControllingPlayer();
+	const Int heroIndex = HeroRoster::findIndex(player, thing);
+	const CommandSet* set = TheControlBar->findCommandSet(source->getCommandSetString());
+	const Bool reviveOffer = HeroRoster::isReviveTemplateInSet(set, player, source, thing);
+	std::fprintf(stderr, "ORDERS %d make=%d allowed=%d buildable=%d canBuild=%d limit=%d points=%d hero=%d heroAlive=%d heroQueued=%d heroState=%d reviveOffer=%d\n",
+		id, static_cast<Int>(TheBuildAssistant->canMakeUnit(source, thing)), player->allowedToBuild(thing),
+		static_cast<Int>(thing->getBuildable()), player->canBuild(thing), thing->getMaxSimultaneousOfType(),
+		player->hasEnoughCommandPoints(thing), heroIndex, heroIndex >= 0 && HeroRoster::isAlive(player, thing),
+		heroIndex >= 0 && HeroRoster::isQueued(player, thing),
+		heroIndex >= 0 ? static_cast<Int>(HeroRoster::stateAt(player, heroIndex)) : -1, reviveOffer);
+	for (Int i = 0; set && heroIndex >= 0 && i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
+	{
+		if (HeroRoster::reviveSlotForEntry(set, i) == heroIndex)
+		{
+			button = set->getCommandButton(i);
+			break;
+		}
+	}
+	sweepButtonRequirements(id, button, source);
+}
+
 ObjectID newestObject()
 {
 	ObjectID newest = INVALID_ID;
@@ -1265,11 +1331,13 @@ ObjectID newestObject()
 
 void sweepUpgradeCandidates(SweepCase& test, Object* source, const Player* player)
 {
+	const bool horde = HordeContain::get(source) != nullptr;
 	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 	{
 		if (object->getControllingPlayer() != player || object->isEffectivelyDead())
 			continue;
-		if (test.upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && object != source)
+		if (test.upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && object != source &&
+			(!horde || object->getContainedBy() != source))
 			continue;
 		UpgradeMaskType current = object->getObjectCompletedUpgradeMask();
 		current.set(player->getCompletedUpgradeMask());
@@ -1493,6 +1561,8 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 			sweepUpgradeCandidates(test, source, player);
 			eligibility = production->canQueueUpgrade(test.upgrade);
 			issued = production->queueUpgrade(test.upgrade);
+			if (!issued && std::getenv("GENERALSX_ORDER_DIAGNOSTICS"))
+				sweepUpgradeRejection(id, source, production, test.upgrade, button);
 			if (!issued && (source->hasUpgrade(test.upgrade) || player->hasUpgradeComplete(test.upgrade)))
 				reason = "already_complete";
 		}
@@ -1532,6 +1602,8 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 		{
 			eligibility = production->canQueueCreateUnit(test.thing);
 			issued = production->queueCreateUnit(test.thing, production->requestUniqueUnitID());
+			if (!issued && std::getenv("GENERALSX_ORDER_DIAGNOSTICS"))
+				sweepUnitRejection(id, source, test.thing, button);
 		}
 		else
 			reason = "no_production";
@@ -1633,6 +1705,25 @@ void sweepObserve(const Command& command, Player* player, unsigned int frame)
 			std::fprintf(stderr, "SWEEP %d upgrade frame=%u complete=%d modules=%d candidates=%zu\n", id, frame,
 				(source && source->hasUpgrade(test.upgrade)) || player->hasUpgradeComplete(test.upgrade),
 				sweepActivatedUpgrades(test), test.pendingUpgrades.size());
+			if (source && command.structure == "mount-command")
+			{
+				const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate("SpecialAbilityToggleMountedTwo");
+				const auto* module = power ? source->getSpecialPowerModule(power) : nullptr;
+				std::fprintf(stderr, "ORDERS %d mountCommandReady=%u mounted=%d frame=%u\n", id,
+					module ? module->getReadyFrame() : 0, source->testWeaponSetFlag(WEAPONSET_MOUNTED), frame);
+			}
+			else if (command.structure != "-")
+			{
+				for (const Object* replacement = TheGameLogic->getFirstObject(); replacement; replacement = replacement->getNextObject())
+				{
+					if (replacement->getID() <= test.previousObject || replacement->getControllingPlayer() != player ||
+						stricmp(replacement->getTemplate()->getName().str(), command.structure.c_str()) != 0)
+						continue;
+					std::fprintf(stderr, "ORDERS %d replacement=%s oldPresent=%d frame=%u\n", id,
+						command.structure.c_str(), source && !source->isDestroyed(), frame);
+					break;
+				}
+			}
 		}
 		else if (result)
 		{
@@ -1694,6 +1785,25 @@ void sweepCommand(const Command& command, unsigned int frame)
 	{
 		if (Object* object = sweepSource(command, player, FALSE))
 			object->getExperienceTracker()->setMinRetailRank(10);
+	}
+	else if (command.action == "sweep-order-grant")
+	{
+		Object* object = sweepSource(command, player, FALSE);
+		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(command.structure.c_str());
+		if (object && upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && !object->hasUpgrade(upgrade))
+		{
+			object->giveUpgrade(upgrade);
+			std::fprintf(stderr, "ORDERS fixture object=%s upgrade=%s frame=%u\n",
+				command.target.c_str(), command.structure.c_str(), frame);
+		}
+	}
+	else if (command.action == "sweep-order-remove")
+	{
+		if (Object* object = sweepSource(command, player, FALSE))
+		{
+			std::fprintf(stderr, "ORDERS fixture removed=%s frame=%u\n", command.target.c_str(), frame);
+			TheGameLogic->destroyObject(object);
+		}
 	}
 	else if (command.action == "sweep-check" || command.action == "sweep-move" ||
 		command.action == "sweep-kill" || command.action == "sweep-death")

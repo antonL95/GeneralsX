@@ -4238,6 +4238,18 @@ Bool Object::affectedByUpgrade( const UpgradeTemplate *upgradeT ) const
 			return TRUE;
 		}
 	}
+	if (RetailFileLayers::enabled())
+	{
+		if (const HordeContain* horde = HordeContain::get(this))
+		{
+			for (const Object* member : *horde->getContainedItemsList())
+			{
+				if (member && !member->isEffectivelyDead() && !member->isDestroyed() && !HordeContain::get(member) &&
+					!member->hasUpgrade(upgradeT) && member->affectedByUpgrade(upgradeT))
+					return TRUE;
+			}
+		}
+	}
 	return FALSE;
 
 }

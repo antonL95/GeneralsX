@@ -90,6 +90,8 @@ set(GAMEENGINE_SRC
     Include/GameLogic/RetailTestCommands.h
     Include/GameLogic/Module/CastleBehavior.h
     Include/GameLogic/Module/CastleUpgrade.h
+    Include/GameLogic/Module/ReplaceSelfUpgrade.h
+    Include/GameLogic/Module/DoCommandUpgrade.h
     Include/GameLogic/Module/GeometryUpgrade.h
     Include/GameLogic/Module/FoundationAIUpdate.h
     Include/GameLogic/Module/TerrainResourceBehavior.h
@@ -711,6 +713,8 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailTestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
+    Source/GameLogic/Object/Upgrade/ReplaceSelfUpgrade.cpp
+    Source/GameLogic/Object/Upgrade/DoCommandUpgrade.cpp
     Source/GameLogic/Object/Upgrade/GeometryUpgrade.cpp
     Source/GameLogic/Object/Update/FoundationAIUpdate.cpp
     Source/GameLogic/Object/Update/TerrainResourceBehavior.cpp

@@ -159,6 +159,8 @@
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/CastleUpgrade.h"
+#include "GameLogic/Module/ReplaceSelfUpgrade.h"
+#include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
@@ -438,6 +440,8 @@ void ModuleFactory::init()
 		addModule( CastleMemberBehavior );
 		addModule( CastleBehavior );
 		addModule( CastleUpgrade );
+		addModule( ReplaceSelfUpgrade );
+		addModule( DoCommandUpgrade );
 		addModule( GeometryUpgrade );
 		addModule( FoundationAIUpdate );
 		addModule( TerrainResourceBehavior );
