@@ -868,7 +868,7 @@ void PlayerHealSpecialPower::doSpecialPowerAtObject(Object* obj, UnsignedInt com
 
 void PlayerHealSpecialPower::doSpecialPowerAtLocation(const Coord3D* loc, Real angle, UnsignedInt commandOptions)
 {
-	if (!loc || m_pausedCount > 0 || getObject()->isDisabled())
+	if (!loc || m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank())
 		return;
 	const Coord3D center = *loc;
 	m_pendingCenter = center;

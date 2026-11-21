@@ -101,7 +101,7 @@ void DefectorSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real an
 // ------------------------------------------------------------------------------------------------
 void DefectorSpecialPower::doSpecialPowerAtObject( Object *objectToMakeDefector, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (getObject()->isDisabled() || !meetsRequiredRank())
 		return;
 
 	// sanity check

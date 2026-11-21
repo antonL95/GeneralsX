@@ -128,7 +128,7 @@ Int CashHackSpecialPower::findAmountToSteal() const
 // ------------------------------------------------------------------------------------------------
 void CashHackSpecialPower::doSpecialPowerAtObject( Object *victim, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (getObject()->isDisabled() || !meetsRequiredRank())
 		return;
 
 	// sanity

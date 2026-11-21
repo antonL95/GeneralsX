@@ -1,0 +1,19 @@
+10 create Player_1 GondorFaramir 0 1300,900,0
+43 create Player_1 GondorBarracks 0 1450,950,0
+43 create Player_2 GondorBarracks 0 2980,2910,0
+44 xpsavetrim - - 0
+45 xpsave - - 0 experience-fix.sav
+45 logall - - 0
+46 logall - - 0
+46 xpcrc - - 0
+140 xpcrc - - 0
+140 logall - - 0
+245 xpcrc - - 0
+315 xpcrc - - 0
+315 logall - - 0
+320 xptestini - - 0 /app/engine/GeneralsX-slot1/Tests/Retail/ExperienceFix.ini
+321 create Player_1 GondorFaramir 0 1290,900,0
+323 xpwaypoint Player_1 GondorFaramir 1 SpecialExperienceWaypointFixture
+324 veterancy Player_1 GondorFaramir 1 2
+325 xpwaypoint Player_1 GondorFaramir 1 SpecialExperienceWaypointFixture
+326 quit - - 0

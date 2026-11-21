@@ -67,6 +67,10 @@
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #if !RTS_GENERALS
+#include "Common/GameState.h"
+#include "GameLogic/ScriptActions.h"
+#include "GameLogic/ScriptEngine.h"
+#include "GameLogic/Scripts.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -1661,6 +1665,24 @@ void execute(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST xp-crc frame=%u crc=%08X\n", frame, TheGameLogic->getCRC(CRC_RECALC));
 		return;
 	}
+#if !RTS_GENERALS
+	if (command.action == "xpsavetrim")
+	{
+		const NameKeyType module = TheNameKeyGenerator->nameToKey("FireWeaponUpdate");
+		for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+		{
+			if (obj->findUpdateModule(module))
+				TheGameLogic->destroyObject(obj);
+		}
+		return;
+	}
+	if (command.action == "xpsave")
+	{
+		const SaveResult result = TheGameState->saveGame(command.structure.c_str(), UnicodeString(), SAVE_FILE_TYPE_NORMAL);
+		std::fprintf(stderr, "TEST xp-save frame=%u code=%d\n", frame, result.saveCode);
+		return;
+	}
+#endif
 	if (command.action == "hud")
 	{
 		dumpHud(frame);
@@ -2044,6 +2066,28 @@ void execute(const Command& command, unsigned int frame)
 	else if (command.action == "power")
 		pressPowerButton(command, obj, frame);
 #if !RTS_GENERALS
+	else if (command.action == "xpwaypoint")
+	{
+		const Waypoint* waypoint = TheTerrainLogic->getFirstWaypoint();
+		if (!waypoint)
+			return;
+		if (obj->getName().isEmpty())
+		{
+			AsciiString name;
+			name.format("ExperienceFixture%u", static_cast<UnsignedInt>(obj->getID()));
+			obj->setName(name);
+			TheScriptEngine->addObjectToCache(obj);
+		}
+		ScriptAction* action = newInstance(ScriptAction)(ScriptAction::NAMED_FIRE_SPECIAL_POWER_AT_WAYPOINT);
+		action->getParameter(0)->friend_setString(obj->getName());
+		action->getParameter(1)->friend_setString(command.structure.c_str());
+		action->getParameter(2)->friend_setString(waypoint->getName());
+		const UnsignedInt before = TheGameLogic->getObjectCount();
+		TheScriptActions->executeAction(action);
+		deleteInstance(action);
+		std::fprintf(stderr, "TEST xp-waypoint frame=%u rank=%d spawned=%d\n",
+			frame, obj->getExperienceTracker()->getRank(), static_cast<Int>(TheGameLogic->getObjectCount() - before));
+	}
 	else if (command.action == "testcontain")
 	{
 		Object* passenger = findTarget(command, true);

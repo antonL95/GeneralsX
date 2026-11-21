@@ -5327,12 +5327,13 @@ void GameLogic::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 10;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 10;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 11;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 11;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
+	const Bool reverseObjectOrder = version >= 11 && (version != 12 || !RETAIL_COMPATIBLE_XFER_SAVE);
 
 	// logic frame number
 	xfer->xferUnsignedInt( &m_frame );
@@ -5363,17 +5364,13 @@ void GameLogic::xfer( Xfer *xfer )
 	ObjectTOCEntry *tocEntry;
 	if( xfer->getXferMode() == XFER_SAVE )
 	{
-#if !RETAIL_COMPATIBLE_XFER_SAVE
-		// TheSuperHackers @fix bobtista 07/03/2026 Save objects in reverse order (newest first)
-		// so they load in the correct order (oldest objects at head of list).
-		Object *lastObj = nullptr;
-		for( obj = getFirstObject(); obj; obj = obj->getNextObject() )
-			lastObj = obj;
-
-		for( obj = lastObj; obj; obj = obj->getPrevObject() )
-#else
-		for( obj = getFirstObject(); obj; obj = obj->getNextObject() )
-#endif
+		Object *firstObj = getFirstObject();
+		if (reverseObjectOrder)
+		{
+			while (firstObj && firstObj->getNextObject())
+				firstObj = firstObj->getNextObject();
+		}
+		for (obj = firstObj; obj; obj = reverseObjectOrder ? obj->getPrevObject() : obj->getNextObject())
 		{
 
 			// get the object TOC entry for this template
@@ -5456,10 +5453,7 @@ void GameLogic::xfer( Xfer *xfer )
 
 		}
 
-		// TheSuperHackers @fix bobtista 07/03/2026 Reverse object list after load.
-		// Objects are prepended during creation, which reverses the saved order.
-		// Version 11+ saves in reverse order so they load in the correct order.
-		if ( version <= 10 )
+		if (!reverseObjectOrder)
 		{
 			Object *prev = nullptr;
 			Object *current = m_objList;
