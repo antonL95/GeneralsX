@@ -493,6 +493,19 @@ void *DX8Wrapper::Get_Effect_Texture9(IDirect3DBaseTexture8 *texture)
 	return getTexture ? getTexture(texture) : nullptr;
 }
 
+void *DX8Wrapper::Create_Effect_Shader9(bool vertex, const uint32_t *tokens)
+{
+	using CreateShader = HRESULT (WINAPI *)(IDirect3DDevice8 *, BOOL, const DWORD *, void **);
+	if (!D3D8Lib || !D3DDevice)
+		return nullptr;
+	const auto createShader = reinterpret_cast<CreateShader>(GetProcAddress(D3D8Lib, "DXVKCreateD3D9EffectShader"));
+	void *shader = nullptr;
+	if (!createShader || FAILED(createShader(D3DDevice, vertex ? TRUE : FALSE,
+		reinterpret_cast<const DWORD *>(tokens), &shader)))
+		return nullptr;
+	return shader;
+}
+
 DX8_CleanupHook	 *DX8Wrapper::m_pCleanupHook=nullptr;
 static std::vector<DX8_CleanupHook*> s_cleanupHooks;
 

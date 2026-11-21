@@ -568,6 +568,7 @@ public:
 	static IDirect3DDevice8* _Get_D3D_Device8() { return D3DDevice; }
 	static void *Get_Effect_Device9();
 	static void *Get_Effect_Texture9(IDirect3DBaseTexture8 *texture);
+	static void *Create_Effect_Shader9(bool vertex, const uint32_t *tokens);
 	static IDirect3D8* _Get_D3D8() { return D3DInterface; }
 	/// Returns the display format - added by TR for video playback - not part of W3D
 	static WW3DFormat	getBackBufferFormat();

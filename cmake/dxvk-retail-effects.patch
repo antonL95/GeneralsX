@@ -7,7 +7,7 @@ diff --git a/src/d3d8/d3d8_main.cpp b/src/d3d8/d3d8_main.cpp
 
  namespace dxvk {
 
-@@ -113,4 +114,32 @@ extern "C" {
+@@ -121,4 +122,48 @@
      return pDirect3D;
    }
 
@@ -39,16 +39,183 @@ diff --git a/src/d3d8/d3d8_main.cpp b/src/d3d8/d3d8_main.cpp
 +    }
 +  }
 +
++  DLLEXPORT HRESULT __stdcall DXVKCreateD3D9EffectShader(
++      IDirect3DDevice8* device8, BOOL vertex, const DWORD* function, void** shader) {
++    if (!device8 || !function || !shader)
++      return D3DERR_INVALIDCALL;
++    *shader = nullptr;
++    auto* device = static_cast<dxvk::D3D8Device*>(device8);
++    auto lock = device->LockDevice();
++    if (device->ShouldRecord())
++      return D3DERR_INVALIDCALL;
++    dxvk::Com<IDxvkD3D8EffectBridge> bridge;
++    if (FAILED(device->GetD3D9()->QueryInterface(__uuidof(IDxvkD3D8EffectBridge),
++        reinterpret_cast<void**>(&bridge))))
++      return D3DERR_INVALIDCALL;
++    return bridge->CreateEffectShader(vertex, function, shader);
++  }
++
  }
 diff --git a/src/d3d8/d3d8.sym b/src/d3d8/d3d8.sym
 --- a/src/d3d8/d3d8.sym
 +++ b/src/d3d8/d3d8.sym
-@@ -4,6 +4,8 @@
+@@ -4,6 +4,9 @@
      ValidateVertexShader;
      DebugSetMute;
      Direct3DCreate8;
 +    DXVKGetD3D9EffectDevice;
 +    DXVKGetD3D9EffectTexture;
++    DXVKCreateD3D9EffectShader;
 
    local:
      *;
+diff --git a/src/d3d9/d3d9_bridge.h b/src/d3d9/d3d9_bridge.h
+--- a/src/d3d9/d3d9_bridge.h
++++ b/src/d3d9/d3d9_bridge.h
+@@ -39,6 +39,11 @@
+ /**
+  * \brief D3D9 instance interface for D3D8 interop
+  */
++MIDL_INTERFACE("3AB6D33D-5572-4F66-B007-215B584B7754")
++IDxvkD3D8EffectBridge : public IUnknown {
++  virtual HRESULT CreateEffectShader(BOOL vertex, const DWORD* function, void** shader) = 0;
++};
++
+ MIDL_INTERFACE("D3D9D3D8-A407-773E-18E9-CAFEBEEF3000")
+ IDxvkD3D8InterfaceBridge : public IUnknown {
+   /**
+@@ -55,6 +60,7 @@
+ };
+
+ #ifndef _MSC_VER
++__CRT_UUID_DECL(IDxvkD3D8EffectBridge, 0x3AB6D33D, 0x5572, 0x4F66, 0xB0, 0x07, 0x21, 0x5B, 0x58, 0x4B, 0x77, 0x54);
+ __CRT_UUID_DECL(IDxvkD3D8Bridge, 0xD3D9D3D8, 0x42A9, 0x4C1E, 0xAA, 0x97, 0xBE, 0xEF, 0xCA, 0xFE, 0x20, 0x00);
+ __CRT_UUID_DECL(IDxvkD3D8InterfaceBridge, 0xD3D9D3D8, 0xA407, 0x773E, 0x18, 0xE9, 0xCA, 0xFE, 0xBE, 0xEF, 0x30, 0x00);
+ #endif
+@@ -64,7 +70,7 @@
+   class D3D9DeviceEx;
+   class D3D9InterfaceEx;
+
+-  class DxvkD3D8Bridge : public IDxvkD3D8Bridge {
++  class DxvkD3D8Bridge : public IDxvkD3D8Bridge, public IDxvkD3D8EffectBridge {
+
+   public:
+
+@@ -83,6 +89,8 @@
+         IDirect3DSurface9*        pSrcSurface,
+         const RECT*               pSrcRect,
+         const POINT*              pDestPoint);
++
++    HRESULT CreateEffectShader(BOOL vertex, const DWORD* function, void** shader) override;
+
+   private:
+
+diff --git a/src/d3d9/d3d9_bridge.cpp b/src/d3d9/d3d9_bridge.cpp
+--- a/src/d3d9/d3d9_bridge.cpp
++++ b/src/d3d9/d3d9_bridge.cpp
+@@ -88,6 +88,20 @@
+     return D3D_OK;
+   }
+
++  HRESULT DxvkD3D8Bridge::CreateEffectShader(BOOL vertex, const DWORD* function, void** shader) {
++    if (vertex) {
++      IDirect3DVertexShader9* result = nullptr;
++      HRESULT status = m_device->CreateVertexShaderInternal(function, &result, true);
++      *shader = result;
++      return status;
++    }
++
++    IDirect3DPixelShader9* result = nullptr;
++    HRESULT status = m_device->CreatePixelShaderInternal(function, &result, true);
++    *shader = result;
++    return status;
++  }
++
+   DxvkD3D8InterfaceBridge::DxvkD3D8InterfaceBridge(D3D9InterfaceEx* pObject)
+     : m_interface(pObject) {
+   }
+diff --git a/src/d3d9/d3d9_device.h b/src/d3d9/d3d9_device.h
+--- a/src/d3d9/d3d9_device.h
++++ b/src/d3d9/d3d9_device.h
+@@ -458,6 +458,9 @@
+     HRESULT STDMETHODCALLTYPE SetFVF(DWORD FVF);
+
+     HRESULT STDMETHODCALLTYPE GetFVF(DWORD* pFVF);
++
++    HRESULT CreateVertexShaderInternal(const DWORD* function, IDirect3DVertexShader9** shader, bool effect);
++    HRESULT CreatePixelShaderInternal(const DWORD* function, IDirect3DPixelShader9** shader, bool effect);
+
+     HRESULT STDMETHODCALLTYPE CreateVertexShader(
+       const DWORD*                   pFunction,
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -234,7 +234,12 @@
+     }
+
+     if (riid == __uuidof(IDxvkD3D8Bridge)) {
+-      *ppvObject = ref(&m_d3d8Bridge);
++      *ppvObject = ref(static_cast<IDxvkD3D8Bridge*>(&m_d3d8Bridge));
++      return S_OK;
++    }
++
++    if (riid == __uuidof(IDxvkD3D8EffectBridge)) {
++      *ppvObject = ref(static_cast<IDxvkD3D8EffectBridge*>(&m_d3d8Bridge));
+       return S_OK;
+     }
+
+@@ -3314,6 +3319,13 @@
+   HRESULT STDMETHODCALLTYPE D3D9DeviceEx::CreateVertexShader(
+     const DWORD*                   pFunction,
+           IDirect3DVertexShader9** ppShader) {
++    return CreateVertexShaderInternal(pFunction, ppShader, false);
++  }
++
++  HRESULT D3D9DeviceEx::CreateVertexShaderInternal(
++    const DWORD*                   pFunction,
++          IDirect3DVertexShader9** ppShader,
++          bool                     effect) {
+     // CreateVertexShader does not init the
+     // return ptr unlike CreatePixelShader
+
+@@ -3324,7 +3336,7 @@
+     const uint32_t minorVersion = D3DSHADER_VERSION_MINOR(pFunction[0]);
+
+     // Late fixed-function capable hardware exposed support for VS 1.1
+-    const uint32_t shaderModelVS = m_isD3D8Compatible ? 1u : std::max(1u, m_d3d9Options.shaderModel);
++    const uint32_t shaderModelVS = m_isD3D8Compatible && !effect ? 1u : std::max(1u, m_d3d9Options.shaderModel);
+
+     if (unlikely(majorVersion > shaderModelVS
+              || (majorVersion == 1 && minorVersion > 1)
+@@ -3348,7 +3360,7 @@
+       return D3DERR_INVALIDCALL;
+
+
+-    if (m_isD3D8Compatible && !m_isSWVP) {
++    if (m_isD3D8Compatible && !effect && !m_isSWVP) {
+       const uint32_t maxVSConstantIndex = module.GetMaxDefinedConstant();
+       // D3D8 enforces the value advertised in pCaps->MaxVertexShaderConst for HWVP
+       if (unlikely(maxVSConstantIndex > caps::MaxFloatConstantsVS - 1)) {
+@@ -3703,6 +3715,13 @@
+   HRESULT STDMETHODCALLTYPE D3D9DeviceEx::CreatePixelShader(
+     const DWORD*                  pFunction,
+           IDirect3DPixelShader9** ppShader) {
++    return CreatePixelShaderInternal(pFunction, ppShader, false);
++  }
++
++  HRESULT D3D9DeviceEx::CreatePixelShaderInternal(
++    const DWORD*                  pFunction,
++          IDirect3DPixelShader9** ppShader,
++          bool                    effect) {
+     InitReturnPtr(ppShader);
+
+     if (unlikely(ppShader == nullptr))
+@@ -3711,7 +3730,7 @@
+     const uint32_t majorVersion = D3DSHADER_VERSION_MAJOR(pFunction[0]);
+     const uint32_t minorVersion = D3DSHADER_VERSION_MINOR(pFunction[0]);
+
+-    const uint32_t shaderModelPS = m_isD3D8Compatible ? std::min(1u, m_d3d9Options.shaderModel) : m_d3d9Options.shaderModel;
++    const uint32_t shaderModelPS = m_isD3D8Compatible && !effect ? std::min(1u, m_d3d9Options.shaderModel) : m_d3d9Options.shaderModel;
+
+     if (unlikely(majorVersion > shaderModelPS
+              || (majorVersion == 1 && minorVersion > 4)
