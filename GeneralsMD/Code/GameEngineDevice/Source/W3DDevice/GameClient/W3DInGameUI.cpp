@@ -543,22 +543,17 @@ void W3DInGameUI::drawMoveHints( View *view )
 			const auto& hint = m_moveHint[i];
 			const UnsignedInt age = now - hint.frame;
 			RenderObjClass*& model = m_moveHintRenderObj[i];
-			if (hint.frame == 0 || age < 12 || age > 40)
+			if (hint.frame == 0 || age > 40)
 			{
 				if (model)
 					model->Remove();
+				continue;
 			}
+			if (!model)
+				model = createRetailOrderModel("MoveHint");
+			if (model)
+				showRetailOrderModel(*model, hint.pos);
 			else
-			{
-				if (!model)
-					model = createRetailOrderModel("MoveHint");
-				if (model)
-				{
-					showRetailOrderModel(*model, hint.pos);
-					continue;
-				}
-			}
-			if (hint.frame != 0 && age <= 40)
 				RetailWorldUI::drawOrder(*view, hint.pos, FALSE, age);
 		}
 		return;

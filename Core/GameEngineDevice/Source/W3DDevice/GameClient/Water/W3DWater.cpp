@@ -56,6 +56,7 @@
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "Common/GameLOD.h"
 
@@ -3205,7 +3206,8 @@ void WaterRenderObjClass::drawReflection(Int triangleCount, Int vertexCount)
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT3 | D3DTTFF_PROJECTED);
 
-	Vector4 strength(WATER_REFLECTION_STRENGTH, WATER_REFLECTION_STRENGTH, WATER_REFLECTION_STRENGTH, WATER_REFLECTION_STRENGTH);
+	const Real darkening = RetailFileLayers::enabled() ? WATER_REFLECTION_STRENGTH * 0.25f : WATER_REFLECTION_STRENGTH;
+	Vector4 strength(darkening, darkening, darkening, WATER_REFLECTION_STRENGTH);
 	DX8Wrapper::_Get_D3D_Device8()->SetPixelShaderConstant(0, &strength.X, 1);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, REAL_TO_INT(WATER_REFLECTION_STRENGTH * 255.0f) << 24);
 	DX8Wrapper::_Get_D3D_Device8()->SetPixelShader(m_reflectionPixelShader);
