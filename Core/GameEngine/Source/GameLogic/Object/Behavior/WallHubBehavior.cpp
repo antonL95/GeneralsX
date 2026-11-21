@@ -116,6 +116,12 @@ WallHubBehavior* WallHubBehavior::find(const Object* object, UnsignedInt options
 
 WallHubBehavior::Span WallHubBehavior::plan(const ThingTemplate* requested, const Coord3D& target) const
 {
+	return plan(requested, target, BuildAssistant::IGNORE_HIDDEN_OBJECTS | BuildAssistant::BLOCK_REMEMBERED_OBJECTS);
+}
+
+WallHubBehavior::Span WallHubBehavior::plan(const ThingTemplate* requested, const Coord3D& target,
+	UnsignedInt overlapChecks) const
+{
 	Span span;
 	const Object* hub = getObject();
 	Player* player = hub->getControllingPlayer();
@@ -211,8 +217,7 @@ WallHubBehavior::Span WallHubBehavior::plan(const ThingTemplate* requested, cons
 		const Coord3D pos = {origin.x + dx * offset / distance, origin.y + dy * offset / distance, 0.0f};
 		Coord3D ground = pos;
 		ground.z = TheTerrainLogic->getGroundHeight(pos.x, pos.y);
-		const UnsignedInt checks = BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP |
-			BuildAssistant::IGNORE_HIDDEN_OBJECTS | BuildAssistant::BLOCK_REMEMBERED_OBJECTS;
+		const UnsignedInt checks = BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP | overlapChecks;
 		const LegalBuildCode legal = TheBuildAssistant->isLocationLegalToBuild(&ground, tile, wallAngle,
 			checks, hub, player, hub);
 		reject(legal);
@@ -274,7 +279,7 @@ Bool WallHubBehavior::construct(const ThingTemplate* requested, const Coord3D& t
 	if (!spanCommand)
 		return FALSE;
 
-	const Span span = plan(requested, target);
+	const Span span = plan(requested, target, BuildAssistant::SUPPRESS_BUILD_BIBS);
 	if (span.pieces.empty() || span.legal != LBC_OK || !span.affordable)
 		return FALSE;
 

@@ -746,7 +746,8 @@ Bool BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos,
 
 		// an immobile object may obstruct our building depending on flags.
 		if( them->isKindOf( KINDOF_IMMOBILE ) )	{
-			TheTerrainVisual->addFactionBib(them, true);
+			if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+				TheTerrainVisual->addFactionBib(them, true);
 			return false;
 		}
 
@@ -755,7 +756,8 @@ Bool BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos,
 		// that will be constructed) we can't build here
 		//
 		if( builderObject && builderObject->getRelationship( them ) == ENEMIES ) {
-			TheTerrainVisual->addFactionBib(them, true);
+			if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+				TheTerrainVisual->addFactionBib(them, true);
 			return false;
 		}
 
@@ -848,7 +850,8 @@ Bool BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos,
 		}
 		if (ThePartitionManager->geomCollidesWithGeom(them->getPosition(), hisBounds, them->getOrientation(),
 			worldPos, myBounds, angle)) {
-			TheTerrainVisual->addFactionBib(them, true);
+			if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+				TheTerrainVisual->addFactionBib(them, true);
 			return false;
 		}
 		if (!checkMyExit && !checkHisExit && !hisExtraWidth && !myExtraWidth)
@@ -862,21 +865,21 @@ Bool BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos,
 			/* Check for overlap of my exit rectangle to his geom info. */
 			if (checkMyExit && ThePartitionManager->geomCollidesWithGeom(them->getPosition(), hisBounds, them->getOrientation(),
 				&myExitPos, myGeom, angle)) {
-				if (!shrouded)
+				if (!shrouded && !BitIsSet( options, SUPPRESS_BUILD_BIBS ))
 					TheTerrainVisual->addFactionBib(them, true);
 				return false;
 			}
 			// Check for overlap of his exit rectangle with my geom info
 			if (checkHisExit && ThePartitionManager->geomCollidesWithGeom(&hisExitPos, hisGeom, them->getOrientation(),
 					worldPos, myBounds, angle)) {
-				if (!shrouded)
+				if (!shrouded && !BitIsSet( options, SUPPRESS_BUILD_BIBS ))
 					TheTerrainVisual->addFactionBib(them, true);
 				return false;
 			}
 			// Check both exit rectangles together.
 			if (checkMyExit&&checkHisExit&&ThePartitionManager->geomCollidesWithGeom(&hisExitPos, hisGeom, them->getOrientation(),
 					&myExitPos, myGeom, angle)) {
-				if (!shrouded)
+				if (!shrouded && !BitIsSet( options, SUPPRESS_BUILD_BIBS ))
 					TheTerrainVisual->addFactionBib(them, true);
 				return false;
 			}
@@ -933,7 +936,7 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 	if( BitIsSet( options, NO_OBJECT_OVERLAP ) )
 	{
 		if (!isLocationClearOfObjects(worldPos, build, angle, builderObject,
-			NO_OBJECT_OVERLAP | ( options & ( IGNORE_HIDDEN_OBJECTS | BLOCK_REMEMBERED_OBJECTS ) ), player, constructionSite))
+			NO_OBJECT_OVERLAP | ( options & ( IGNORE_HIDDEN_OBJECTS | BLOCK_REMEMBERED_OBJECTS | SUPPRESS_BUILD_BIBS ) ), player, constructionSite))
 		{
 			return LBC_OBJECTS_IN_THE_WAY;
 		}
@@ -974,7 +977,8 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 						tooCloseGeom,
 						tooClose->getOrientation()))
 			{
-				TheTerrainVisual->addFactionBib(tooClose, true, TheGlobalData->m_SupplyBuildBorder);
+				if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+					TheTerrainVisual->addFactionBib(tooClose, true, TheGlobalData->m_SupplyBuildBorder);
 				return LBC_TOO_CLOSE_TO_SUPPLIES;
 			}
 		}

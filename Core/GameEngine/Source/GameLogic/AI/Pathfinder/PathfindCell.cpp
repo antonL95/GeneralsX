@@ -17,6 +17,9 @@
 */
 
 #include "GameLogic/Object.h"
+#include "Common/RetailFileLayers.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
 #include "GameLogic/Pathfinder/PathfindCellInfo.h"
 #include "GameLogic/Pathfinder/PathfindCellList.h"
@@ -24,10 +27,30 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "WWMath/wwmath.h"
 
+#include <algorithm>
+#include <unordered_map>
+#include <vector>
+
+namespace
+{
+struct CellObstacle
+{
+	ObjectID id;
+	Bool fence;
+	Bool transparent;
+};
+
+auto& sharedObstacles()
+{
+	static std::unordered_map<const PathfindCell*, std::vector<CellObstacle>> cells;
+	return cells;
+}
+}
+
 /**
  * Constructor
  */
-PathfindCell::PathfindCell() :m_info(nullptr)
+PathfindCell::PathfindCell() : m_info(nullptr), m_hasSharedObstacles(false)
 {
 	reset();
 }
@@ -37,6 +60,7 @@ PathfindCell::PathfindCell() :m_info(nullptr)
  */
 PathfindCell::~PathfindCell()
 {
+	clearSharedObstacles();
 	if (m_info) PathfindCellInfo::releaseACellInfo(m_info);
 	m_info = nullptr;
 	static Bool warn = true;
@@ -51,6 +75,7 @@ PathfindCell::~PathfindCell()
  */
 void PathfindCell::reset()
 {
+	clearSharedObstacles();
 	m_type = CELL_CLEAR;
 	m_flags = NO_UNITS;
 	m_zone = 0;
@@ -357,6 +382,39 @@ ObjectID PathfindCell::getObstacleID() const
 #endif
 }
 
+void PathfindCell::clearSharedObstacles()
+{
+	if (m_hasSharedObstacles)
+	{
+		sharedObstacles().erase(this);
+		m_hasSharedObstacles = false;
+	}
+}
+
+void PathfindCell::setObstacleOwner(ObjectID id, Bool fence, Bool transparent)
+{
+	m_obstacleID = id;
+	m_obstacleIsFence = fence;
+	m_obstacleIsTransparent = transparent;
+#if RETAIL_COMPATIBLE_PATHFINDING_ALLOCATION
+	if (!s_useFixedPathfinding && m_info)
+	{
+		m_info->m_obstacleID = id;
+		m_info->m_obstacleIsFence = fence;
+		m_info->m_obstacleIsTransparent = transparent;
+	}
+#endif
+}
+
+#if RETAIL_COMPATIBLE_PATHFINDING_ALLOCATION
+void PathfindCell::clearObstruction()
+{
+	clearSharedObstacles();
+	m_type = CELL_CLEAR;
+	setObstacleOwner(INVALID_ID, false, false);
+}
+#endif
+
 
 /**
  * Flag this cell as an obstacle, from the given one.
@@ -365,6 +423,26 @@ ObjectID PathfindCell::getObstacleID() const
 Bool PathfindCell::setTypeAsObstacle( Object *obstacle, Bool isFence, const ICoord2D &pos )
 {
 	if (m_type!=CELL_CLEAR && m_type != CELL_IMPASSABLE) {
+		if (m_type == CELL_OBSTACLE && m_obstacleID != INVALID_ID && m_obstacleID != obstacle->getID() &&
+			RetailFileLayers::enabled() &&
+			(!obstacle->getBodyModule() || obstacle->getBodyModule()->getDamageState() != BODY_RUBBLE))
+		{
+			auto& others = sharedObstacles()[this];
+			CellObstacle added{obstacle->getID(), isFence, obstacle->isKindOf(KINDOF_CAN_SEE_THROUGH_STRUCTURE)};
+			if (added.id < m_obstacleID)
+			{
+				const CellObstacle previous{m_obstacleID, m_obstacleIsFence != 0, m_obstacleIsTransparent != 0};
+				setObstacleOwner(added.id, added.fence, added.transparent);
+				added = previous;
+			}
+			const auto at = std::lower_bound(others.begin(), others.end(), added.id,
+				[](const CellObstacle& entry, ObjectID id) { return entry.id < id; });
+			if (at != others.end() && at->id == added.id)
+				return false;
+			others.insert(at, added);
+			m_hasSharedObstacles = true;
+			return true;
+		}
 		return false;
 	}
 
@@ -452,6 +530,28 @@ void PathfindCell::setType( CellType type )
  */
 Bool PathfindCell::removeObstacle( Object *obstacle )
 {
+	if (m_hasSharedObstacles)
+	{
+		auto& others = sharedObstacles().find(this)->second;
+		const ObjectID id = obstacle->getID();
+		if (id == m_obstacleID)
+		{
+			const auto& next = others.front();
+			setObstacleOwner(next.id, next.fence, next.transparent);
+			others.erase(others.begin());
+		}
+		else
+		{
+			const auto at = std::lower_bound(others.begin(), others.end(), id,
+				[](const CellObstacle& entry, ObjectID value) { return entry.id < value; });
+			if (at == others.end() || at->id != id)
+				return false;
+			others.erase(at);
+		}
+		if (others.empty())
+			clearSharedObstacles();
+		return true;
+	}
 	if (m_type == CELL_RUBBLE) {
 		m_type = CELL_CLEAR;
 	}
@@ -800,12 +900,9 @@ void PathfindCell::removeFromClosedList( PathfindCellList &list )
 
 }
 
-/**
- * Return true if the given object ID is registered as an obstacle in this cell
- */
-Bool PathfindCell::isObstaclePresent(ObjectID objID) const
+Bool PathfindCell::isSoleObstacle(ObjectID objID) const
 {
-	if (objID != INVALID_ID && (getType() == CELL_OBSTACLE))
+	if (!m_hasSharedObstacles && objID != INVALID_ID && getType() == CELL_OBSTACLE)
 	{
 #if RETAIL_COMPATIBLE_PATHFINDING_ALLOCATION
 		if (s_useFixedPathfinding) {
@@ -822,12 +919,32 @@ Bool PathfindCell::isObstaclePresent(ObjectID objID) const
 	return false;
 }
 
+Bool PathfindCell::isPassableGate(const Object* unit) const
+{
+	const auto canPass = [unit](ObjectID id)
+	{
+		return GateOpenAndCloseBehavior::canPass(TheGameLogic->findObjectByID(id), unit, TRUE);
+	};
+	if (!unit || getType() != CELL_OBSTACLE || !RetailFileLayers::enabled() || !canPass(getObstacleID()))
+		return false;
+	if (!m_hasSharedObstacles)
+		return true;
+	const auto& others = sharedObstacles().find(this)->second;
+	return std::all_of(others.begin(), others.end(), [&canPass](const CellObstacle& entry) { return canPass(entry.id); });
+}
+
 
 /**
  * return true if the obstacle in the cell is KINDOF_CAN_SEE_THROUGHT_STRUCTURE
  */
 Bool PathfindCell::isObstacleTransparent() const
 {
+	if (m_hasSharedObstacles)
+	{
+		const auto& others = sharedObstacles().find(this)->second;
+		return m_obstacleIsTransparent &&
+			std::all_of(others.begin(), others.end(), [](const CellObstacle& entry) { return entry.transparent; });
+	}
 #if RETAIL_COMPATIBLE_PATHFINDING_ALLOCATION
 	if (s_useFixedPathfinding) {
 		return m_obstacleIsTransparent;
@@ -844,6 +961,12 @@ Bool PathfindCell::isObstacleTransparent() const
  */
 Bool PathfindCell::isObstacleFence() const
 {
+	if (m_hasSharedObstacles)
+	{
+		const auto& others = sharedObstacles().find(this)->second;
+		return m_obstacleIsFence &&
+			std::all_of(others.begin(), others.end(), [](const CellObstacle& entry) { return entry.fence; });
+	}
 #if RETAIL_COMPATIBLE_PATHFINDING_ALLOCATION
 	if (s_useFixedPathfinding) {
 		return m_obstacleIsFence;

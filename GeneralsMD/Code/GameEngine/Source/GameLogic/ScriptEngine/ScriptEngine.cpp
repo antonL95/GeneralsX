@@ -5401,6 +5401,8 @@ void ScriptEngine::reset()
 
 	// Clear the named objects list.
  	m_namedObjects.clear();
+	for (auto& references : m_retailUnitReferences)
+		references.clear();
 
 	m_completedVideo.clear();
 	m_testingSpeech.clear();
@@ -6021,6 +6023,9 @@ Object * ScriptEngine::getUnitNamed(const AsciiString& unitName)
 		return m_conditionObject;
 	}
 
+	if (const auto* reference = findRetailUnitReference(unitName))
+		return reference->second;
+
 	for (VecNamedRequestsIt it = m_namedObjects.begin(); it != m_namedObjects.end(); ++it) {
 		if (unitName == (it->first)) {
 			return it->second;
@@ -6032,11 +6037,31 @@ Object * ScriptEngine::getUnitNamed(const AsciiString& unitName)
 //-------------------------------------------------------------------------------------------------
 /** didUnitExist */
 //-------------------------------------------------------------------------------------------------
+Int ScriptEngine::getRetailUnitReferenceScope() const
+{
+	return m_currentPlayer ? m_currentPlayer->getPlayerIndex() : MAX_PLAYER_COUNT;
+}
+
+const NamedRequest* ScriptEngine::findRetailUnitReference(const AsciiString& name) const
+{
+	if (!RetailFileLayers::enabled())
+		return nullptr;
+	const auto& references = m_retailUnitReferences[getRetailUnitReferenceScope()];
+	for (const auto& entry : references)
+	{
+		if (entry.first == name)
+			return &entry;
+	}
+	return nullptr;
+}
+
 void ScriptEngine::setRetailUnitReference(const AsciiString& name, Object* object)
 {
-	if (name.isEmpty())
+	if (!RetailFileLayers::enabled() || name.isEmpty())
 		return;
-	for (auto& entry : m_namedObjects)
+
+	auto& references = m_retailUnitReferences[getRetailUnitReferenceScope()];
+	for (auto& entry : references)
 	{
 		if (entry.first == name)
 		{
@@ -6044,11 +6069,14 @@ void ScriptEngine::setRetailUnitReference(const AsciiString& name, Object* objec
 			return;
 		}
 	}
-	m_namedObjects.emplace_back(name, object);
+	references.emplace_back(name, object);
 }
 
 Bool ScriptEngine::didUnitExist(const AsciiString& unitName)
 {
+	if (const auto* reference = findRetailUnitReference(unitName))
+		return reference->second == nullptr;
+
 	for (VecNamedRequestsIt it = m_namedObjects.begin(); it != m_namedObjects.end(); ++it) {
 		if (unitName == (it->first)) {
 			return (it->second == nullptr);
@@ -6075,7 +6103,7 @@ void ScriptEngine::runScript(const AsciiString& scriptName, Team *pThisTeam)
 	LatchRestore<Team *> latch(m_callingTeam, pThisTeam);
 
 	m_conditionTeam = nullptr;
-	m_currentPlayer = nullptr;
+	m_currentPlayer = RetailFileLayers::enabled() ? savPlayer : nullptr;
 	if (m_callingTeam) {
 		m_currentPlayer = m_callingTeam->getControllingPlayer();
 	}
@@ -7134,7 +7162,7 @@ void ScriptEngine::friend_executeAction( ScriptAction *pActionHead, Team *pThisT
 	Team *pSavCallingTeam = m_callingTeam;
 	Player *pSavPlayer = m_currentPlayer;
 	m_callingTeam = pThisTeam;
-	m_currentPlayer = nullptr;
+	m_currentPlayer = RetailFileLayers::enabled() ? pSavPlayer : nullptr;
 	if (pThisTeam) {
 		m_currentPlayer = pThisTeam->getControllingPlayer();
 	}
@@ -7256,6 +7284,17 @@ void ScriptEngine::transferObjectName( const AsciiString& unitName, Object *pNew
 //-------------------------------------------------------------------------------------------------
 void ScriptEngine::notifyOfObjectDestruction( Object *pDeadObject )
 {
+	if (RetailFileLayers::enabled())
+	{
+		for (auto& references : m_retailUnitReferences)
+		{
+			for (auto& entry : references)
+			{
+				if (entry.second == pDeadObject)
+					entry.second = nullptr;
+			}
+		}
+	}
 	if (RetailFileLayers::enabled() || !pDeadObject->getName().isEmpty())
 	{
 		removeObjectFromCache(pDeadObject);
@@ -8013,7 +8052,7 @@ void ScriptEngine::evaluateAndProgressAllSequentialScripts()
 		} else if (team) {
 			m_currentPlayer = team->getControllingPlayer();
 		}
-		if (m_currentPlayer && !m_currentPlayer->isSkirmishAIPlayer()) {
+		if (m_currentPlayer && !m_currentPlayer->isSkirmishAIPlayer() && !RetailFileLayers::enabled()) {
 			m_currentPlayer = nullptr;
 		}
 
@@ -8642,7 +8681,30 @@ void ScriptEngine::AdjustDebugVariableData(const AsciiString& variableName, Int 
 // ------------------------------------------------------------------------------------------------
 void ScriptEngine::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xferRetailUnitReferences(xfer);
+}
 
+void ScriptEngine::xferRetailUnitReferences(Xfer* xfer)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	for (auto& references : m_retailUnitReferences)
+	{
+		UnsignedInt count = references.size();
+		xfer->xferUnsignedInt(&count);
+		if (loading)
+			references.clear();
+		for (UnsignedInt i = 0; i < count; ++i)
+		{
+			AsciiString name = loading ? AsciiString() : references[i].first;
+			Object* object = loading ? nullptr : references[i].second;
+			ObjectID id = object ? object->getID() : INVALID_ID;
+			xfer->xferAsciiString(&name);
+			xfer->xferObjectID(&id);
+			if (loading)
+				references.emplace_back(name, TheGameLogic->findObjectByID(id));
+		}
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -8958,10 +9020,11 @@ void ScriptEngine::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = 5;
+	const XferVersion stockVersion = 5;
 #else
-	const XferVersion currentVersion = 6;
+	const XferVersion stockVersion = 6;
 #endif
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : stockVersion;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -9430,6 +9493,14 @@ void ScriptEngine::xfer( Xfer *xfer )
 		{
 			m_letterBoxActive = FALSE;
 		}
+	}
+
+	if (version >= 7)
+		xferRetailUnitReferences(xfer);
+	else if (xfer->getXferMode() == XFER_LOAD)
+	{
+		for (auto& references : m_retailUnitReferences)
+			references.clear();
 	}
 
 	if( xfer->getXferMode() == XFER_LOAD ) {

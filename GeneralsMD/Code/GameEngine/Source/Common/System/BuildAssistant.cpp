@@ -782,7 +782,8 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 		{
 			if( feedbackWithFailure )
 			{
-				TheTerrainVisual->addFactionBib( them, TRUE );
+				if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+					TheTerrainVisual->addFactionBib( them, TRUE );
 				return LBC_OBJECTS_IN_THE_WAY;
 			}
 			return LBC_GENERIC_FAILURE;
@@ -793,7 +794,8 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 			//Kris: If object is disabled, it can't move out of the way, thus you can't build there.
 			if( feedbackWithFailure )
 			{
-				TheTerrainVisual->addFactionBib( them, TRUE );
+				if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+					TheTerrainVisual->addFactionBib( them, TRUE );
 				return LBC_OBJECTS_IN_THE_WAY;
 			}
 			return LBC_GENERIC_FAILURE;
@@ -807,7 +809,8 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 		{
 			if( feedbackWithFailure )
 			{
-				TheTerrainVisual->addFactionBib( them, TRUE );
+				if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+					TheTerrainVisual->addFactionBib( them, TRUE );
 				return LBC_OBJECTS_IN_THE_WAY;
 			}
 			return LBC_GENERIC_FAILURE;
@@ -916,7 +919,8 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 		}
 		if (ThePartitionManager->geomCollidesWithGeom(them->getPosition(), hisBounds, them->getOrientation(),
 			worldPos, myBounds, angle)) {
-			TheTerrainVisual->addFactionBib(them, true);
+			if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+				TheTerrainVisual->addFactionBib(them, true);
 			return LBC_OBJECTS_IN_THE_WAY;
 		}
 		if (!checkMyExit && !checkHisExit && !hisExtraWidth && !myExtraWidth)
@@ -933,7 +937,8 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 				if (shrouded)
 					return LBC_SHROUD;
 				
-				TheTerrainVisual->addFactionBib(them, true);
+				if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+					TheTerrainVisual->addFactionBib(them, true);
 				return LBC_OBJECTS_IN_THE_WAY;
 			}
 			// Check for overlap of his exit rectangle with my geom info
@@ -942,7 +947,8 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 				if (shrouded)
 					return LBC_SHROUD;
 				
-				TheTerrainVisual->addFactionBib(them, true);
+				if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+					TheTerrainVisual->addFactionBib(them, true);
 				return LBC_OBJECTS_IN_THE_WAY;
 			}
 			// Check both exit rectangles together.
@@ -951,7 +957,8 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 				if (shrouded)
 					return LBC_SHROUD;
 				
-				TheTerrainVisual->addFactionBib(them, true);
+				if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+					TheTerrainVisual->addFactionBib(them, true);
 				return LBC_OBJECTS_IN_THE_WAY;
 			}
 		}
@@ -1048,7 +1055,8 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 						tooCloseGeom,
 						tooClose->getOrientation()))
 			{
-				TheTerrainVisual->addFactionBib(tooClose, true, TheGlobalData->m_SupplyBuildBorder);
+				if( !BitIsSet( options, SUPPRESS_BUILD_BIBS ) )
+					TheTerrainVisual->addFactionBib(tooClose, true, TheGlobalData->m_SupplyBuildBorder);
 				return LBC_TOO_CLOSE_TO_SUPPLIES;
 			}
 		}

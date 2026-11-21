@@ -1164,8 +1164,7 @@ void Pathfinder::cleanOpenAndClosedLists() {
 //
 static Bool isPassableGateCell(const PathfindCell* cell, const Object* unit)
 {
-	return unit && cell && cell->getType() == PathfindCell::CELL_OBSTACLE && RetailFileLayers::enabled() &&
-		GateOpenAndCloseBehavior::canPass(TheGameLogic->findObjectByID(cell->getObstacleID()), unit, TRUE);
+	return cell && cell->isPassableGate(unit);
 }
 
 Bool Pathfinder::validMovementPosition( Bool isCrusher, LocomotorSurfaceTypeMask acceptableSurfaces,
@@ -1176,7 +1175,7 @@ Bool Pathfinder::validMovementPosition( Bool isCrusher, LocomotorSurfaceTypeMask
 
 	// check if the destination cell is classified as an obstacle,
 	// and we happen to be ignoring it
-	if (toCell->isObstaclePresent( m_ignoreObstacleID ) ||
+	if (toCell->isSoleObstacle( m_ignoreObstacleID ) ||
 		((acceptableSurfaces & LOCOMOTORSURFACE_GROUND) && isPassableGateCell(toCell, unit)))
 		return true;
 
@@ -1229,7 +1228,7 @@ Bool Pathfinder::checkDestination(const Object *obj, Int cellX, Int cellY, Pathf
 			}
 
 			if (cell->getType()==PathfindCell::CELL_OBSTACLE) {
-				if (cell->isObstaclePresent( ignoreId ))
+				if (cell->isSoleObstacle( ignoreId ))
 					continue;
 				if (!isPassableGateCell(cell, obj))
 					return false;
@@ -2520,7 +2519,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			Bool dozerHack = false;
 			if (!movementValid && obj->isKindOf(KINDOF_DOZER) && newCell->getType() == PathfindCell::CELL_OBSTACLE) {
 				Object* obstacle = TheGameLogic->findObjectByID(newCell->getObstacleID());
-				if (obstacle && !(obj->getRelationship(obstacle) == ENEMIES)) {
+				if (obstacle && newCell->isSoleObstacle(obstacle->getID()) && obj->getRelationship(obstacle) != ENEMIES) {
 					movementValid = true;
 					dozerHack = true;
 				}
@@ -2793,7 +2792,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 		return nullptr;
 	}
 
-	if (goalCell->isObstaclePresent(m_ignoreObstacleID) || m_isTunneling ||
+	if (goalCell->isSoleObstacle(m_ignoreObstacleID) || m_isTunneling ||
 		(zone1 != zone2 && layer == LAYER_GROUND && destinationLayer == LAYER_GROUND && GateOpenAndCloseBehavior::couldConnect(obj))) {
 		// Use terrain zones instead of building zones, since we are moving into or out of a building.
 		zone2 = m_zoneManager.getEffectiveTerrainZone(zone2);
@@ -5575,25 +5574,25 @@ struct ViewBlockedStruct
 	{
 
 		// we never block our own view!
-		if (to->isObstaclePresent(d->obj->getID()))
+		if (to->isSoleObstacle(d->obj->getID()))
 			return 0;
 
 		// nor does the object we're trying to see!
-		if (to->isObstaclePresent(d->objOther->getID()))
+		if (to->isSoleObstacle(d->objOther->getID()))
 			return 0;
 
 		// if the obstacle is our container, ignore it as an obstacle.
-		if (to->isObstaclePresent(getContainerID(d->obj)))
+		if (to->isSoleObstacle(getContainerID(d->obj)))
 			return 0;
 
 		// @todo: if the obstacle is objOther's container, AND it's a "visible" container, ignore it.
 
 		// if the obstacle is the item to which we are slaved, ignore it as an obstacle.
-		if (to->isObstaclePresent(getSlaverID(d->obj)))
+		if (to->isSoleObstacle(getSlaverID(d->obj)))
 			return 0;
 
 		// if the obstacle is the item to which objOther is slaved, ignore it as an obstacle.
-		if (to->isObstaclePresent(getSlaverID(d->objOther)))
+		if (to->isSoleObstacle(getSlaverID(d->objOther)))
 			return 0;
 
 		// if the obstacle is transparent, ignore it, since this callback is only used for line-of-sight. (srj)
@@ -5625,26 +5624,26 @@ struct ViewAttackBlockedStruct
 	if (to != nullptr && (to->getType() == PathfindCell::CELL_OBSTACLE))
 	{
 		// we never block our own view!
-		if (to->isObstaclePresent(d->obj->getID()))
+		if (to->isSoleObstacle(d->obj->getID()))
 			return 0;
 
 		if (d->victim) {
 			// nor does the object we're trying to attack!
-			if (to->isObstaclePresent(d->victim->getID()))
+			if (to->isSoleObstacle(d->victim->getID()))
 				return 0;
 			// if the obstacle is the item to which objOther is slaved, ignore it as an obstacle.
-			if (to->isObstaclePresent(getSlaverID(d->victim)))
+			if (to->isSoleObstacle(getSlaverID(d->victim)))
 				return 0;
 		}
 
 		// if the obstacle is our container, ignore it as an obstacle.
-		if (to->isObstaclePresent(getContainerID(d->obj)))
+		if (to->isSoleObstacle(getContainerID(d->obj)))
 			return 0;
 
 		// @todo: if the obstacle is objOther's container, AND it's a "visible" container, ignore it.
 
 		// if the obstacle is the item to which we are slaved, ignore it as an obstacle.
-		if (to->isObstaclePresent(getSlaverID(d->obj)))
+		if (to->isSoleObstacle(getSlaverID(d->obj)))
 			return 0;
 
 		if (to->isObstacleTransparent())
@@ -5652,7 +5651,7 @@ struct ViewAttackBlockedStruct
 		//Kris: Added the check for victimCell because in China01 -- after the intro, NW of your
 		//base is a cream colored building that lies in a negative coord. When you order units to
 		//force attack it, it crashes.
-		if( d->victimCell && to->isObstaclePresent( d->victimCell->getObstacleID() ) )
+		if( d->victimCell && to->isSoleObstacle( d->victimCell->getObstacleID() ) )
 		{
 			// Victim is inside the bounds of another object.  We don't let this block us,
 			// as usually it is on the edge and it looks like we should be able to shoot it. jba.

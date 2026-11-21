@@ -218,6 +218,134 @@ Bool readPoint(const Command& command, const Object* obj, Coord3D& point)
 	return TRUE;
 }
 
+Object* findTarget(const Command& command, bool livingOnly);
+
+void checkWallClaim(const Command& command, Object* source, UnsignedInt frame)
+{
+	const auto* hub = WallHubBehavior::find(source, OPTION_ONE);
+	const auto* cap = TheThingFactory->findTemplate("MenWallHubSmall", FALSE);
+	Player* player = source->getControllingPlayer();
+	if (!hub || !cap || !player)
+		return;
+
+	const auto preview = hub->plan(cap, command.location);
+	Int remembered = 0;
+	for (const auto& piece : preview.pieces)
+	{
+		if (TheGhostObjectManager->collidesWithOrphanedGhost(&piece.position, piece.type->getTemplateGeometryInfo(),
+			piece.facing, player->getPlayerIndex()))
+			++remembered;
+	}
+	const Int money = player->getMoney()->countMoney();
+	const Int objects = TheGameLogic->getObjectCount();
+	const Bool built = hub->construct(cap, command.location, player);
+	std::fprintf(stderr, "TEST wallclaim %u %s preview=%d ghosts=%d built=%d spent=%d pieces=%d\n",
+		frame, command.structure.c_str(), preview.legal == LBC_OK, remembered, built,
+		money - static_cast<Int>(player->getMoney()->countMoney()), static_cast<Int>(TheGameLogic->getObjectCount()) - objects);
+}
+
+void checkGateCells(const Command& command, Object* gate, UnsignedInt frame)
+{
+	Object* wall = findTarget(command, true);
+	Command unitCommand = command;
+	unitCommand.target = "GondorFighter";
+	unitCommand.ordinal = 0;
+	const Object* unit = findObject(unitCommand, true);
+	if (!wall || !unit || !GateOpenAndCloseBehavior::find(gate))
+		return;
+
+	for (Bool gateFirst : {FALSE, TRUE})
+	{
+		PathfindCell cell;
+		const ICoord2D location = {0, 0};
+		Object* first = gateFirst ? gate : wall;
+		Object* second = gateFirst ? wall : gate;
+		cell.setTypeAsObstacle(first, FALSE, location);
+		cell.setTypeAsObstacle(second, FALSE, location);
+		cell.setTypeAsObstacle(second, FALSE, location);
+		const Bool blocksWhileShared = !cell.isPassableGate(unit);
+		cell.removeObstacle(first);
+		const Bool surviving = cell.getType() == PathfindCell::CELL_OBSTACLE && cell.getObstacleID() == second->getID();
+		const Bool friendlyPass = cell.isPassableGate(unit);
+		cell.removeObstacle(second);
+		std::fprintf(stderr, "TEST wallcells %u gateFirst=%d sharedBlocks=%d surviving=%d friendlyPass=%d clear=%d\n",
+			frame, gateFirst, blocksWhileShared, surviving, friendlyPass, cell.getType() == PathfindCell::CELL_CLEAR);
+	}
+}
+
+void checkGateFootprint(const Command& command, Object* gate, UnsignedInt frame)
+{
+	static std::vector<ICoord2D> wallCells;
+	auto* pathfinder = TheAI->pathfinder();
+	const Object* wall = findTarget(command, true);
+	if (command.action == "wallgridbefore" && wall)
+	{
+		wallCells.clear();
+		ICoord2D center;
+		if (pathfinder->worldToCell(wall->getPosition(), &center))
+			return;
+		const Int radius = static_cast<Int>(wall->getGeometryInfo().getBoundingCircleRadius() / PATHFIND_CELL_SIZE_F) + 2;
+		for (Int x = center.x - radius; x <= center.x + radius; ++x)
+		{
+			for (Int y = center.y - radius; y <= center.y + radius; ++y)
+			{
+				const auto* cell = pathfinder->getCell(LAYER_GROUND, x, y);
+				if (cell && cell->getObstacleID() == wall->getID())
+					wallCells.push_back({x, y});
+			}
+		}
+		return;
+	}
+
+	Int retained = 0;
+	for (const auto& position : wallCells)
+	{
+		const auto* cell = pathfinder->getCell(LAYER_GROUND, position.x, position.y);
+		if (cell && cell->getType() == PathfindCell::CELL_OBSTACLE && cell->getObstacleID() == gate->getID())
+			++retained;
+	}
+	std::fprintf(stderr, "TEST wallgrid %u wallCells=%zu retainedByGate=%d\n", frame, wallCells.size(), retained);
+	wallCells.clear();
+}
+
+#if !RTS_GENERALS
+void checkWallScriptAliases(const Command& command, Object* first, UnsignedInt frame)
+{
+	Object* second = findTarget(command, true);
+	if (!second || !first->getBodyModule() || !second->getBodyModule())
+		return;
+
+	auto* assign = newInstance(ScriptAction)(ScriptAction::SET_UNIT_REFERENCE);
+	assign->setNextAction(nullptr);
+	assign->getParameter(0)->friend_setString("START_SPAWN");
+	for (Object* target : {first, second})
+	{
+		AsciiString name;
+		name.format("WallAliasFixture%u", static_cast<UnsignedInt>(target->getID()));
+		target->setName(name);
+		TheScriptEngine->addObjectToCache(target);
+		assign->getParameter(1)->friend_setString(name);
+		TheScriptEngine->friend_executeAction(assign, target->getTeam());
+	}
+	deleteInstance(assign);
+
+	auto* damage = newInstance(ScriptAction)(ScriptAction::NAMED_DAMAGE);
+	damage->setNextAction(nullptr);
+	damage->getParameter(0)->friend_setString("START_SPAWN");
+	damage->getParameter(1)->friend_setInt(1);
+	for (Object* target : {first, second})
+	{
+		const Real firstHealth = first->getBodyModule()->getHealth();
+		const Real secondHealth = second->getBodyModule()->getHealth();
+		TheScriptEngine->friend_executeAction(damage, target->getTeam());
+		std::fprintf(stderr, "TEST wallalias %u player=%d first=%d second=%d\n", frame,
+			target->getControllingPlayer()->getPlayerIndex(), first->getBodyModule()->getHealth() < firstHealth,
+			second->getBodyModule()->getHealth() < secondHealth);
+	}
+	deleteInstance(damage);
+}
+#endif
+
 void selectGroup(Object* obj)
 {
 	GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
@@ -2182,7 +2310,27 @@ void execute(const Command& command, unsigned int frame)
 	}
 
 	const Bool placeAtPoint = command.action == "place" && command.hasPlacementPoint;
-	if ((command.action == "wallspan" || command.action == "wallpreview") && command.hasLocation)
+	if (command.action == "wallblind")
+	{
+		const Player* player = obj->getControllingPlayer();
+		for (Object* source = TheGameLogic->getFirstObject(); source; source = source->getNextObject())
+		{
+			if (source->getControllingPlayer() == player)
+				source->setShroudClearingRange(0.0f);
+		}
+		ThePartitionManager->shroudMapForPlayer(player->getPlayerIndex());
+	}
+	else if (command.action == "wallclaim" && command.hasLocation)
+		checkWallClaim(command, obj, frame);
+	else if (command.action == "wallcells")
+		checkGateCells(command, obj, frame);
+	else if (command.action == "wallgridbefore" || command.action == "wallgridafter")
+		checkGateFootprint(command, obj, frame);
+#if !RTS_GENERALS
+	else if (command.action == "wallalias")
+		checkWallScriptAliases(command, obj, frame);
+#endif
+	else if ((command.action == "wallspan" || command.action == "wallpreview") && command.hasLocation)
 	{
 		const ThingTemplate* cap = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
 		WallHubBehavior* hub = WallHubBehavior::find(obj, OPTION_ONE);

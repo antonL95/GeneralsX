@@ -451,6 +451,10 @@ protected:
 	Team							*m_conditionTeam;				///< Team that is being used to evaluate conditions, used for THIS_TEAM
 	Object						*m_conditionObject;				///< Unit that is being used to evaluate conditions, used for THIS_OBJECT
 	VecNamedRequests	m_namedObjects;
+	VecNamedRequests	m_retailUnitReferences[MAX_PLAYER_COUNT + 1];
+	Int getRetailUnitReferenceScope() const;
+	const NamedRequest* findRetailUnitReference(const AsciiString& name) const;
+	void xferRetailUnitReferences(Xfer* xfer);
 	Bool							m_firstUpdate;
 	Player						*m_currentPlayer;
 	Player						*m_skirmishHumanPlayer;

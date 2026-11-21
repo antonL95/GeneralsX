@@ -52,6 +52,9 @@ public:
 	Span plan(const ThingTemplate* requested, const Coord3D& target) const;
 	Bool construct(const ThingTemplate* requested, const Coord3D& target, Player* player) const;
 	UpdateSleepTime update() override { return UPDATE_SLEEP_FOREVER; }
+
+private:
+	Span plan(const ThingTemplate* requested, const Coord3D& target, UnsignedInt overlapChecks) const;
 };
 
 class ReplaceSelfUpgradeModuleData : public UpgradeModuleData
