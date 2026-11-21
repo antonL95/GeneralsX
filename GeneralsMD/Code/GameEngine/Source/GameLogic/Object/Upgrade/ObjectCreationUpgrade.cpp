@@ -316,6 +316,16 @@ Bool RetailObjectCreationUpgrade::getSpawnDeckHeight(ObjectID child, Real& heigh
 	return TRUE;
 }
 
+Object* RetailObjectCreationUpgrade::getSlavedSpawn() const
+{
+	Object* child = TheGameLogic->findObjectByID(m_spawned);
+	if (!child || child->isDestroyed() || child->isEffectivelyDead() ||
+		child->getControllingPlayer() != getObject()->getControllingPlayer())
+		return nullptr;
+	const auto* slaved = directSpawnSlavedUpdate(child);
+	return slaved && slaved->getSlaverID() == getObject()->getID() ? child : nullptr;
+}
+
 void RetailObjectCreationUpgrade::onCapture(Player*, Player* newOwner)
 {
 	if (newOwner && m_spawned != INVALID_ID)

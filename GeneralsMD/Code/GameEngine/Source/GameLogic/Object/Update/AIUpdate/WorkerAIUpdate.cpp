@@ -1507,7 +1507,7 @@ void WorkerAIUpdate::crc( Xfer *xfer )
 	if (RetailFileLayers::enabled() && getWorkerAIUpdateModuleData()->m_harvestTrees)
 	{
 		xfer->xferInt(&m_numberBoxes);
-		xferRetailHarvest(xfer);
+		xferRetailHarvest(xfer, TRUE);
 	}
 }
 
@@ -1526,7 +1526,7 @@ void WorkerAIUpdate::xfer( Xfer *xfer )
 	XferVersion currentVersion = 2;
 #endif
 	if (RetailFileLayers::enabled() && getWorkerAIUpdateModuleData()->m_harvestTrees)
-		currentVersion = 3;
+		currentVersion = 4;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -1580,7 +1580,7 @@ void WorkerAIUpdate::xfer( Xfer *xfer )
 	//-------------------------- xfer Worker info
 	xfer->xferSnapshot(m_workerMachine);
 	if (version >= 3)
-		xferRetailHarvest(xfer);
+		xferRetailHarvest(xfer, version >= 4);
 
 }
 

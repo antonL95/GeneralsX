@@ -258,6 +258,7 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "MetaImpactNugget", WeaponNugget::parseMetaImpactNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "WeaponOCLNugget", WeaponNugget::parseWeaponOCLNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "AttributeModifierNugget", WeaponNugget::parseAttributeModifierNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "SlaveAttackNugget", WeaponNugget::parseSlaveAttackNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "FiringDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_firingDuration) },
 	{ "HitPercentage", WeaponTemplate::parseHitPercentage, nullptr, offsetof(WeaponTemplate, m_hitPercentage) },
 	{ "MaxWeaponSpeed", INI::parseVelocityReal, nullptr, offsetof(WeaponTemplate, m_maxWeaponSpeed) },
@@ -1085,6 +1086,9 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		if( oclToUse )
 			ObjectCreationList::create( oclToUse, sourceObj, nullptr );
 	}
+
+	if (!isProjectileDetonation && inflictDamage && hasNuggets())
+		orderNuggetSlaves(sourceObj, victimObj, victimPos);
 
 	Coord3D projectileDestination = *victimPos; //Need to copy this, as we have a pointer to their actual position
 	Real scatterRadius = 0.0f;

@@ -21,6 +21,7 @@ enum WeaponNuggetType CPP_11(: Int)
 	WEAPON_NUGGET_META_IMPACT,
 	WEAPON_NUGGET_OCL,
 	WEAPON_NUGGET_ATTRIBUTE_MODIFIER,
+	WEAPON_NUGGET_SLAVE_ATTACK,
 };
 
 struct WeaponNuggetScalar
@@ -46,6 +47,7 @@ struct WeaponNugget
 	static void parseMetaImpactNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseWeaponOCLNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseAttributeModifierNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseSlaveAttackNugget(INI* ini, void* instance, void* store, const void* userData);
 
 	WeaponNuggetType m_type;
 	std::vector<AsciiString> m_requiredUpgradeNames;

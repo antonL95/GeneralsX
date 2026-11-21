@@ -12,10 +12,13 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
+#include "GameLogic/Module/ObjectCreationUpgrade.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/SpawnBehavior.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -193,7 +196,8 @@ void parseNugget(INI* ini, void* store, WeaponNuggetType type, const FieldParse*
 	WeaponNugget nugget(type);
 	MultiIniFieldParse parse;
 	parse.add(s_commonFields);
-	parse.add(fields);
+	if (fields)
+		parse.add(fields);
 	if (extraFields)
 		parse.add(extraFields);
 	ini->initFromINIMulti(&nugget, parse);
@@ -210,6 +214,7 @@ const char* nuggetTypeName(WeaponNuggetType type)
 		case WEAPON_NUGGET_META_IMPACT: return "MetaImpactNugget";
 		case WEAPON_NUGGET_OCL: return "WeaponOCLNugget";
 		case WEAPON_NUGGET_ATTRIBUTE_MODIFIER: return "AttributeModifierNugget";
+		case WEAPON_NUGGET_SLAVE_ATTACK: return "SlaveAttackNugget";
 	}
 	return "Nugget";
 }
@@ -256,6 +261,11 @@ void WeaponNugget::parseWeaponOCLNugget(INI* ini, void*, void* store, const void
 void WeaponNugget::parseAttributeModifierNugget(INI* ini, void*, void* store, const void*)
 {
 	parseNugget(ini, store, WEAPON_NUGGET_ATTRIBUTE_MODIFIER, s_attributeModifierFields);
+}
+
+void WeaponNugget::parseSlaveAttackNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_SLAVE_ATTACK, nullptr);
 }
 
 void WeaponNugget::postProcessLoad()
@@ -319,7 +329,7 @@ Bool WeaponTemplate::nuggetsCanDamage(Int depth) const
 {
 	for (const WeaponNugget& nugget : m_nuggets)
 	{
-		if (nugget.dealsDamage() && nugget.m_damage > 0.0f)
+		if (nugget.m_type == WEAPON_NUGGET_SLAVE_ATTACK || (nugget.dealsDamage() && nugget.m_damage > 0.0f))
 			return TRUE;
 		if (nugget.m_type == WEAPON_NUGGET_PROJECTILE && nugget.m_warheadTemplate && depth < MAX_WARHEAD_DEPTH &&
 			nugget.m_warheadTemplate->nuggetsCanDamage(depth + 1))
@@ -335,6 +345,11 @@ Real WeaponTemplate::estimateNuggetDamage(const Object* sourceObj, const Object*
 	{
 		if (!nugget.isEnabledFor(sourceObj))
 			continue;
+		if (nugget.m_type == WEAPON_NUGGET_SLAVE_ATTACK && nugget.affects(sourceObj, victimObj))
+		{
+			total += 1.0f;
+			continue;
+		}
 		if (nugget.m_type == WEAPON_NUGGET_PROJECTILE)
 		{
 			if (nugget.m_warheadTemplate && depth < MAX_WARHEAD_DEPTH)
@@ -358,6 +373,46 @@ Real WeaponTemplate::estimateNuggetDamage(const Object* sourceObj, const Object*
 		total += victimObj->estimateDamage(damageInfo);
 	}
 	return total;
+}
+
+void WeaponTemplate::orderNuggetSlaves(const Object* source, Object* victim, const Coord3D* position) const
+{
+	if (std::none_of(m_nuggets.begin(), m_nuggets.end(), [&](const WeaponNugget& nugget)
+		{
+			return nugget.m_type == WEAPON_NUGGET_SLAVE_ATTACK && nugget.isEnabledFor(source) && nugget.affects(source, victim);
+		}))
+		return;
+
+	if (auto* spawn = source->getSpawnBehaviorInterface())
+	{
+		if (victim)
+			spawn->orderSlavesToAttackTarget(victim, 1, CMD_FROM_AI);
+		else
+			spawn->orderSlavesToAttackPosition(position, 1, CMD_FROM_AI);
+	}
+
+	static const NameKeyType creation = NAMEKEY("RetailObjectCreationUpgrade");
+	for (BehaviorModule** module = source->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != creation)
+			continue;
+		Object* child = static_cast<const RetailObjectCreationUpgrade*>(*module)->getSlavedSpawn();
+		AIUpdateInterface* controller = child ? child->getAI() : nullptr;
+		if (!controller || child == victim)
+			continue;
+		if (victim)
+		{
+			if (!controller->isAttacking() || controller->getGoalObject() != victim)
+				controller->aiForceAttackObject(victim, 1, CMD_FROM_AI);
+		}
+		else
+		{
+			const Coord3D* goal = controller->getGoalPosition();
+			if (!controller->isAttacking() || controller->getGoalObject() || !goal ||
+				goal->x != position->x || goal->y != position->y || goal->z != position->z)
+				controller->aiAttackPosition(position, 1, CMD_FROM_AI);
+		}
+	}
 }
 
 void WeaponTemplate::launchNuggetProjectiles(const Object* sourceObj, WeaponSlotType wslot, Int specificBarrelToUse,

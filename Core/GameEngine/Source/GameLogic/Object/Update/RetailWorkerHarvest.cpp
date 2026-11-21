@@ -32,6 +32,13 @@ const SupplyCenterProductionExitUpdate* harvestDepot(const Object* depot, const 
 	return static_cast<const SupplyCenterProductionExitUpdate*>(
 		depot->findUpdateModule(NAMEKEY("SupplyCenterProductionExitUpdate")));
 }
+
+Bool harvestDropPoint(const Object* depot, const Player* player, const std::vector<ObjectID>& excluded, Coord3D& point)
+{
+	const auto* exit = harvestDepot(depot, player);
+	return exit && std::find(excluded.begin(), excluded.end(), depot->getID()) == excluded.end() &&
+		exit->getNaturalRallyPoint(point);
+}
 }
 
 void WorkerAIUpdateModuleData::addRetailHarvestFields(MultiIniFieldParse& p)
@@ -72,6 +79,8 @@ void WorkerAIUpdate::stopRetailHarvest()
 	m_harvestActive = FALSE;
 	m_harvestState = HARVEST_IDLE;
 	m_harvestDeadline = 0;
+	m_failedHarvestTrees.clear();
+	m_failedHarvestDepots.clear();
 }
 
 Bool WorkerAIUpdate::updateRetailHarvest()
@@ -102,40 +111,43 @@ Bool WorkerAIUpdate::updateRetailHarvest()
 			if (m_numberBoxes > 0)
 			{
 				const Object* depot = TheGameLogic->findObjectByID(worker->getProducerID());
-				const auto* exit = harvestDepot(depot, player);
-				if (!exit)
+				if (!harvestDropPoint(depot, player, m_failedHarvestDepots, m_harvestDropPoint))
 				{
+					depot = nullptr;
 					Real best = 0.0f;
 					for (const Object* candidate = TheGameLogic->getFirstObject(); candidate; candidate = candidate->getNextObject())
 					{
-						const auto* candidateExit = harvestDepot(candidate, player);
-						if (!candidateExit)
+						Coord3D point;
+						if (!harvestDropPoint(candidate, player, m_failedHarvestDepots, point))
 							continue;
 						const Real distance = distanceSquared(position, *candidate->getPosition());
-						if (!exit || distance < best || (distance == best && candidate->getID() < depot->getID()))
+						if (!depot || distance < best || (distance == best && candidate->getID() < depot->getID()))
 						{
 							depot = candidate;
-							exit = candidateExit;
+							m_harvestDropPoint = point;
 							best = distance;
 						}
 					}
 				}
-				if (exit && exit->getNaturalRallyPoint(m_harvestDropPoint))
+				if (depot)
 				{
 					m_harvestDepot = depot->getID();
 					m_harvestState = HARVEST_RETURN;
 					aiMoveToPosition(&m_harvestDropPoint, CMD_FROM_AI);
 					break;
 				}
+				m_failedHarvestDepots.clear();
 			}
 			else if (data->m_maxBoxesData > 0 && data->m_warehouseScanDistance > 0 &&
 				TheTerrainLogic->findNearestHarvestTree(m_harvestHasOrigin ? m_harvestOrigin : position,
-					data->m_warehouseScanDistance, m_harvestTree))
+					data->m_warehouseScanDistance, m_failedHarvestTrees, m_harvestTree))
 			{
 				m_harvestState = HARVEST_APPROACH;
 				aiMoveToPosition(&m_harvestTree, CMD_FROM_AI);
 				break;
 			}
+			else
+				m_failedHarvestTrees.clear();
 			m_harvestDeadline = frame + LOGICFRAMES_PER_SECOND;
 			break;
 
@@ -149,8 +161,8 @@ Bool WorkerAIUpdate::updateRetailHarvest()
 			}
 			else if (isIdle())
 			{
+				m_failedHarvestTrees.push_back(m_harvestTree);
 				m_harvestState = HARVEST_IDLE;
-				m_harvestDeadline = frame + LOGICFRAMES_PER_SECOND;
 			}
 			break;
 
@@ -186,8 +198,8 @@ Bool WorkerAIUpdate::updateRetailHarvest()
 			}
 			else
 			{
+				m_failedHarvestDepots.push_back(m_harvestDepot);
 				m_harvestState = HARVEST_IDLE;
-				m_harvestDeadline = frame + LOGICFRAMES_PER_SECOND;
 			}
 			break;
 
@@ -211,7 +223,7 @@ Bool WorkerAIUpdate::updateRetailHarvest()
 	return TRUE;
 }
 
-void WorkerAIUpdate::xferRetailHarvest(Xfer* xfer)
+void WorkerAIUpdate::xferRetailHarvest(Xfer* xfer, Bool includeFailedDestinations)
 {
 	xfer->xferBool(&m_harvestActive);
 	xfer->xferBool(&m_harvestHasOrigin);
@@ -221,4 +233,14 @@ void WorkerAIUpdate::xferRetailHarvest(Xfer* xfer)
 	xfer->xferCoord3D(&m_harvestOrigin);
 	xfer->xferCoord3D(&m_harvestTree);
 	xfer->xferCoord3D(&m_harvestDropPoint);
+	if (includeFailedDestinations)
+	{
+		auto treeCount = static_cast<UnsignedInt>(m_failedHarvestTrees.size());
+		xfer->xferUnsignedInt(&treeCount);
+		if (xfer->getXferMode() == XFER_LOAD)
+			m_failedHarvestTrees.resize(treeCount);
+		for (Coord3D& tree : m_failedHarvestTrees)
+			xfer->xferCoord3D(&tree);
+		xfer->xferSTLObjectIDVector(&m_failedHarvestDepots);
+	}
 }

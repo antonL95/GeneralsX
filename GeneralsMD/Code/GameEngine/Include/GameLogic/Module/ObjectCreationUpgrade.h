@@ -72,6 +72,7 @@ public:
 	void onDelete() override;
 	void onCapture(Player* oldOwner, Player* newOwner) override;
 	Bool getSpawnDeckHeight(ObjectID child, Real& height) const;
+	Object* getSlavedSpawn() const;
 
 private:
 	void upgradeImplementation() override;

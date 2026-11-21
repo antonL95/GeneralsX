@@ -2934,14 +2934,18 @@ void TerrainLogic::clearMapTreesForConstruction(const Coord3D& pos, const Geomet
 	});
 }
 
-Bool TerrainLogic::findNearestHarvestTree(const Coord3D& origin, Real radius, Coord3D& position) const
+Bool TerrainLogic::findNearestHarvestTree(const Coord3D& origin, Real radius, const std::vector<Coord3D>& excluded,
+	Coord3D& position) const
 {
 	Real best = sqr(radius);
 	Bool found = FALSE;
 	for (const auto& tree : m_harvestableTrees)
 	{
 		const Real distance = sqr(tree.position.x - origin.x) + sqr(tree.position.y - origin.y);
-		if (distance < best)
+		if (distance < best && std::none_of(excluded.begin(), excluded.end(), [&](const Coord3D& point)
+			{
+				return point.x == tree.position.x && point.y == tree.position.y && point.z == tree.position.z;
+			}))
 		{
 			best = distance;
 			position = tree.position;

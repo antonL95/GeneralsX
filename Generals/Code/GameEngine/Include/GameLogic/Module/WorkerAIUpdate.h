@@ -222,7 +222,7 @@ private:
 	enum HarvestState { HARVEST_IDLE, HARVEST_APPROACH, HARVEST_PREPARE, HARVEST_GATHER, HARVEST_RETURN, HARVEST_DEPOSIT };
 	Bool updateRetailHarvest();
 	void stopRetailHarvest();
-	void xferRetailHarvest(Xfer* xfer);
+	void xferRetailHarvest(Xfer* xfer, Bool includeFailedDestinations);
 
 	Bool m_harvestActive = FALSE;
 	Bool m_harvestHasOrigin = FALSE;
@@ -232,6 +232,8 @@ private:
 	Coord3D m_harvestOrigin{0, 0, 0};
 	Coord3D m_harvestTree{0, 0, 0};
 	Coord3D m_harvestDropPoint{0, 0, 0};
+	std::vector<Coord3D> m_failedHarvestTrees;
+	std::vector<ObjectID> m_failedHarvestDepots;
 
 protected:
 

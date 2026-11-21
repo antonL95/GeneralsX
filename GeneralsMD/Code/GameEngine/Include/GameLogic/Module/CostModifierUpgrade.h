@@ -118,6 +118,7 @@ public:
 	const CostModifierUpgradeModuleData* activeRetailData() const;
 	static Real retailBuildFactor(const Player& player, const ThingTemplate& type);
 	static Real retailUpgradeFactor(const Player& player, const UpgradeTemplate& upgrade);
+	static Real retailSlaughterFactor(const Player& player);
 	static Bool retailLabel(const Object& object, AsciiString& label, Real& discount);
 	// virtual destructor prototype defined by MemoryPoolObject
 

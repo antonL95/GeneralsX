@@ -109,7 +109,7 @@ Bool CostModifierUpgradeModuleData::usesRetailDiscount() const
 const CostModifierUpgradeModuleData* CostModifierUpgrade::activeRetailData() const
 {
 	const auto* data = getCostModifierUpgradeModuleData();
-	return !data->m_retailSlaughter && data->usesRetailDiscount() &&
+	return !data->m_retailPercentages.empty() && data->usesRetailDiscount() &&
 		(data->m_retailStartsActive || isAlreadyUpgraded()) ? data : nullptr;
 }
 
@@ -117,7 +117,7 @@ Real CostModifierUpgrade::retailBuildFactor(const Player& player, const ThingTem
 {
 	return costFactor(collectDiscounts(player, [&](const CostModifierUpgradeModuleData& data)
 	{
-		return !data.m_retailUpgradeDiscount && data.m_retailFilter.matchesTemplate(type);
+		return !data.m_retailSlaughter && !data.m_retailUpgradeDiscount && data.m_retailFilter.matchesTemplate(type);
 	}));
 }
 
@@ -125,11 +125,19 @@ Real CostModifierUpgrade::retailUpgradeFactor(const Player& player, const Upgrad
 {
 	return costFactor(collectDiscounts(player, [&](const CostModifierUpgradeModuleData& data)
 	{
-		return data.m_retailUpgradeDiscount && (data.m_retailUpgrades.empty() ||
+		return !data.m_retailSlaughter && data.m_retailUpgradeDiscount && (data.m_retailUpgrades.empty() ||
 			std::any_of(data.m_retailUpgrades.begin(), data.m_retailUpgrades.end(), [&](const AsciiString& name)
 			{
 				return name.compareNoCase(upgrade.getUpgradeName()) == 0;
 			}));
+	}));
+}
+
+Real CostModifierUpgrade::retailSlaughterFactor(const Player& player)
+{
+	return costFactor(collectDiscounts(player, [](const CostModifierUpgradeModuleData& data)
+	{
+		return data.m_retailSlaughter;
 	}));
 }
 
@@ -141,7 +149,7 @@ Bool CostModifierUpgrade::retailLabel(const Object& object, AsciiString& label, 
 	for (BehaviorModule** module = object.getBehaviorModules(); *module; ++module)
 	{
 		const auto* data = activeRetailModifier(*module);
-		if (!data || data->m_retailLabel.isEmpty() || data->m_retailLabel.compareNoCase("GUI:Blank") == 0)
+		if (!data || data->m_retailSlaughter || data->m_retailLabel.isEmpty() || data->m_retailLabel.compareNoCase("GUI:Blank") == 0)
 			continue;
 		const auto discounts = collectDiscounts(*player, [data](const CostModifierUpgradeModuleData& other)
 		{

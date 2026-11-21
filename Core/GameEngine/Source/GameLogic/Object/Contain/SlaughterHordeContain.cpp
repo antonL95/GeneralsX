@@ -10,6 +10,7 @@
 #include "GameClient/RetailWorldUI.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/CostModifierUpgrade.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Object.h"
@@ -66,11 +67,13 @@ void SlaughterHordeContain::slaughter(Object* passenger)
 {
 	const auto* data = getSlaughterHordeContainModuleData();
 	const Int bounty = passenger->getTemplate()->getRotWKObjectData().bountyValue;
-	const Real refund = WWMath::Ceil(static_cast<Real>(bounty) * data->m_cashBack);
+	Player* player = passenger->getControllingPlayer();
+	const Real baseRefund = WWMath::Ceil(static_cast<Real>(bounty) * data->m_cashBack);
+	const Real refund = baseRefund > 0.0f ?
+		WWMath::Ceil(baseRefund * CostModifierUpgrade::retailSlaughterFactor(*player)) : 0.0f;
 	if (refund > 0.0f)
 	{
 		const auto amount = static_cast<UnsignedInt>(refund);
-		Player* player = passenger->getControllingPlayer();
 		player->getMoney()->deposit(amount);
 		player->getScoreKeeper()->addMoneyEarned(amount);
 		RetailWorldUI::showPayout(*passenger, amount, FALSE);
