@@ -25,6 +25,7 @@
 #include "Common/GameState.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/Weapon.h"
 #include "GameLogic/WeaponSet.h"
 #include "GameLogic/WeaponSetFlags.h"
 #include "Lib/trig.h"
@@ -54,6 +55,42 @@ Int weaponConditionIndex(const std::string& name)
 	if (name.empty())
 		return -1;
 	return INI::scanIndexList(name.c_str(), WeaponSetFlags::getBitNames());
+}
+
+const BannerCarrierUpdateModuleData* findBannerData(const ThingTemplate* type)
+{
+	if (!type)
+		return nullptr;
+	const auto& modules = type->getBehaviorModuleInfo();
+	for (Int index = 0; index < modules.getCount(); ++index)
+		if (modules.getNthName(index).compareNoCase("BannerCarrierUpdate") == 0)
+			return static_cast<const BannerCarrierUpdateModuleData*>(modules.getNthData(index));
+	return nullptr;
+}
+
+UnsignedInt recentMeleeFrame(const Object* member, UnsignedInt frame)
+{
+	const auto* weapon = member->getCurrentWeapon();
+	const auto* ai = member->getAI();
+	if (!member->isEffectivelyDead() && weapon && weapon->isContactWeapon() && ai && ai->isAttacking())
+		return frame;
+	const auto* body = member->getBodyModule();
+	const auto* damage = body ? body->getLastDamageInfo() : nullptr;
+	const auto* time = body ? body->getLastDamageTimestamp() : nullptr;
+	const auto* attacker = damage ? TheGameLogic->findObjectByID(damage->in.m_sourceID) : nullptr;
+	const auto* incoming = attacker ? attacker->getCurrentWeapon() : nullptr;
+	return incoming && incoming->isContactWeapon() && time ? *time : 0;
+}
+
+bool bannerUpgradeComplete(const Object* source, const BannerCarrierUpdateModuleData& banner)
+{
+	if (banner.m_upgradeRequired.isEmpty())
+		return true;
+	const auto* upgrade = TheUpgradeCenter ? TheUpgradeCenter->findUpgrade(banner.m_upgradeRequired) : nullptr;
+	if (!upgrade)
+		return false;
+	const auto* owner = source->getControllingPlayer();
+	return upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER ? owner && owner->hasUpgradeComplete(upgrade) : source->hasUpgrade(upgrade);
 }
 }
 
@@ -415,8 +452,13 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 #endif
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained );
 	if (isBannerCarrier(rider))
+	{
+		m_replenishmentBanner = rider->getTemplate()->getName();
+		m_bannerRespawnFrame = 0;
+		m_unitSpawnFrame = 0;
 		if (auto* banner = BannerCarrierUpdate::find(rider))
 			banner->applyMorph(getBannerUnitType());
+	}
 	if (getHordeContainModuleData()->m_alternateFormation.isNotEmpty())
 		updateFormationModelConditions(rider);
 	WeaponSetFlags toggles;
@@ -441,9 +483,25 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 
 void HordeContain::onRemoving( Object *rider )
 {
+	if (RetailFileLayers::enabled() && m_replenishmentBanner.isNotEmpty())
+		m_lastMeleeFrame = std::max(m_lastMeleeFrame, recentMeleeFrame(rider, TheGameLogic->getFrame()));
 	if (isBannerCarrier(rider))
+	{
+		const auto* data = findBannerData(rider->getTemplate());
+		const auto* formation = getHordeContainModuleData();
+		if (rider->isEffectivelyDead() && formation->m_bannerCarrierDestroyHordeOnDeath)
+			m_bannerRespawnFrame = TheGameLogic->getFrame();
+		else if (rider->isEffectivelyDead() && data && data->m_diedRespawnTime)
+			m_bannerRespawnFrame = TheGameLogic->getFrame() + data->m_diedRespawnTime;
+		else
+		{
+			m_replenishmentBanner.clear();
+			m_bannerRespawnFrame = 0;
+		}
+		m_unitSpawnFrame = 0;
 		if (auto* banner = BannerCarrierUpdate::find(rider))
 			banner->applyMorph(AsciiString());
+	}
 	const auto slot = m_memberSlots.find(rider->getID());
 	if (slot != m_memberSlots.end())
 	{
@@ -489,11 +547,18 @@ void HordeContain::crc( Xfer *xfer )
 		xfer->xferObjectID(&m_slotMembers[index]);
 		xfer->xferCoord2D(&m_slotOffsets[index]);
 	}
+	if (RetailFileLayers::enabled())
+	{
+		xfer->xferAsciiString(&m_replenishmentBanner);
+		xfer->xferUnsignedInt(&m_bannerRespawnFrame);
+		xfer->xferUnsignedInt(&m_unitSpawnFrame);
+		xfer->xferUnsignedInt(&m_lastMeleeFrame);
+	}
 }
 
 void HordeContain::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = 3;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -512,6 +577,20 @@ void HordeContain::xfer( Xfer *xfer )
 	Bool switched = m_formationOverride != nullptr;
 	if (version >= 3)
 		xfer->xferBool(&switched);
+	if (version >= 4)
+	{
+		xfer->xferAsciiString(&m_replenishmentBanner);
+		xfer->xferUnsignedInt(&m_bannerRespawnFrame);
+		xfer->xferUnsignedInt(&m_unitSpawnFrame);
+		xfer->xferUnsignedInt(&m_lastMeleeFrame);
+	}
+	else if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_replenishmentBanner.clear();
+		m_bannerRespawnFrame = 0;
+		m_unitSpawnFrame = 0;
+		m_lastMeleeFrame = 0;
+	}
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		m_formationOverride = switched ? findAlternateFormation() : nullptr;
@@ -531,8 +610,12 @@ void HordeContain::loadPostProcess()
 	TransportContain::loadPostProcess();
 	for (Object* member : getContainList())
 		if (isBannerCarrier(member))
+		{
+			if (m_replenishmentBanner.isEmpty() && !member->isEffectivelyDead())
+				m_replenishmentBanner = member->getTemplate()->getName();
 			if (auto* banner = BannerCarrierUpdate::find(member))
 				banner->applyMorph(getBannerUnitType());
+		}
 #if !RTS_GENERALS
 	if (m_restoreBaseFormation)
 	{
@@ -612,7 +695,7 @@ const Object* HordeContain::getBannerCarrier() const
 void HordeContain::onRankAdvanced(Int rank, Bool feedback)
 {
 	const auto* data = getHordeContainModuleData();
-	if (RetailFileLayers::enabled() && m_payloadCreated && getContainCount() > 0 &&
+	if (RetailFileLayers::enabled() && m_payloadCreated && getContainCount() > 0 && !m_bannerRespawnFrame &&
 		rank >= std::max<Int>(2, data->m_bannerCarrierMinLevel))
 		addBannerCarrier(feedback);
 }
@@ -625,6 +708,8 @@ Bool HordeContain::addBannerCarrier(Bool feedback)
 	const auto* data = getHordeContainModuleData();
 	for (const AsciiString& name : data->m_bannerCarriersAllowed)
 	{
+		if (m_bannerRespawnFrame && name.compareNoCase(m_replenishmentBanner) != 0)
+			continue;
 		const ThingTemplate* type = TheThingFactory->findTemplate(name);
 		if (!type || !type->isKindOf(KINDOF_BANNER))
 			continue;
@@ -645,6 +730,110 @@ Bool HordeContain::addBannerCarrier(Bool feedback)
 		if (feedback)
 			if (const auto* update = BannerCarrierUpdate::find(banner))
 				update->playMorphFX(anchor);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+void HordeContain::updateReplenishment()
+{
+	if (m_replenishmentBanner.isEmpty() || !m_payloadCreated || getContainCount() == 0)
+		return;
+	const auto* formation = getHordeContainModuleData();
+	if (m_bannerRespawnFrame && formation->m_bannerCarrierDestroyHordeOnDeath)
+	{
+		m_bannerRespawnFrame = 0;
+		DamageInfo damage;
+		damage.in.m_damageType = DAMAGE_UNRESISTABLE;
+		damage.in.m_kill = TRUE;
+		for (Int index = DEATH_CRUSHED; index < DEATH_NUM_TYPES; ++index)
+			if (getDeathTypeFlag(formation->m_bannerCarrierHordeDeathType, static_cast<DeathType>(index)))
+			{
+				damage.in.m_deathType = static_cast<DeathType>(index);
+				break;
+			}
+		const ContainedItemsList survivors = getContainList();
+		for (Object* member : survivors)
+			if (!member->isEffectivelyDead())
+				member->attemptDamage(&damage);
+		return;
+	}
+	const auto* type = TheThingFactory->findTemplate(m_replenishmentBanner, FALSE);
+	const auto* data = findBannerData(type);
+	if (!data)
+		return;
+
+	const auto frame = TheGameLogic->getFrame();
+	for (const Object* member : getContainList())
+		m_lastMeleeFrame = std::max(m_lastMeleeFrame, recentMeleeFrame(member, frame));
+	const auto* banner = getBannerCarrier();
+	if (!banner)
+	{
+		if (m_bannerRespawnFrame && frame >= m_bannerRespawnFrame &&
+			(!m_lastMeleeFrame || frame - m_lastMeleeFrame >= data->m_meleeFreeBannerRespawnTime))
+			addBannerCarrier(TRUE);
+		return;
+	}
+
+	const auto& layout = getActiveFormation()->m_layout;
+	Int payloadCount = 0;
+	for (const auto& payload : layout.payloads())
+		payloadCount += payload.count;
+	if (!data->m_idleSpawnRate || !bannerUpgradeComplete(banner, *data) ||
+		static_cast<Int>(getContainCount()) - 1 >= std::min(getContainMax(), payloadCount))
+	{
+		m_unitSpawnFrame = 0;
+		return;
+	}
+	if (!m_unitSpawnFrame)
+		m_unitSpawnFrame = frame + data->m_idleSpawnRate;
+	if (frame >= m_unitSpawnFrame &&
+		(!m_lastMeleeFrame || frame - m_lastMeleeFrame >= data->m_meleeFreeUnitSpawnTime))
+	{
+		replenishMember(*data);
+		m_unitSpawnFrame = frame + data->m_idleSpawnRate;
+	}
+}
+
+Bool HordeContain::replenishMember(const BannerCarrierUpdateModuleData& banner)
+{
+	const auto& layout = getActiveFormation()->m_layout;
+	for (const auto& entry : layout.initialMembers(getContainMax()))
+	{
+		if (entry.slot < 0 || static_cast<size_t>(entry.slot) >= m_slotMembers.size() || m_slotMembers[entry.slot] != INVALID_ID)
+			continue;
+		const auto* type = TheThingFactory->findTemplate(layout.payloads()[entry.payload].name.c_str(), FALSE);
+		if (!type)
+			continue;
+		Object* horde = getObject();
+		Object* member = TheThingFactory->newObject(type, horde->getTeam());
+#if RTS_GENERALS
+		OpenContain::addToContain(member);
+#else
+		OpenContain::addToContain(member, FALSE);
+#endif
+		if (member->getContainedBy() != horde)
+		{
+			TheGameLogic->destroyObject(member);
+			return FALSE;
+		}
+		const auto id = member->getID();
+		const Int assignedSlot = getMemberSlot(id);
+		if (assignedSlot != entry.slot)
+		{
+			if (assignedSlot >= 0)
+			{
+				m_slotMembers[assignedSlot] = INVALID_ID;
+				m_slotOffsets[entry.slot] = m_slotOffsets[assignedSlot];
+			}
+			m_slotMembers[entry.slot] = id;
+			m_memberSlots.insert_or_assign(id, entry.slot);
+		}
+		const auto position = getMemberPosition(id, FALSE);
+		member->setPosition(&position);
+		member->setOrientation(horde->getOrientation());
+		if (TheFXListStore && banner.m_unitSpawnFX.isNotEmpty())
+			FXList::doFXObj(TheFXListStore->findFXList(banner.m_unitSpawnFX.str()), member);
 		return TRUE;
 	}
 	return FALSE;
@@ -1222,6 +1411,8 @@ UpdateSleepTime HordeContain::update()
 		horde->onDie(&damage);
 		TheGameLogic->destroyObject(horde);
 	}
+	else if (RetailFileLayers::enabled())
+		updateReplenishment();
 	return sleep;
 }
 

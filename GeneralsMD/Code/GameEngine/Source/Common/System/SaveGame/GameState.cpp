@@ -1715,8 +1715,8 @@ void GameState::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() && m_gameInfo.saveFileType != SAVE_FILE_TYPE_MISSION ? 3 : 2;
-	const XferVersion maxVersion = RetailFileLayers::enabled() ? 3 : 2;
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 4 : 2;
+	const XferVersion currentVersion = m_gameInfo.saveFileType == SAVE_FILE_TYPE_MISSION ? 2 : maxVersion;
 	XferVersion version = currentVersion;
 	xfer->xferVersion(&version, maxVersion);
 

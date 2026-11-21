@@ -103,6 +103,8 @@ private:
 	static void parseMeleeBehavior(INI* ini, void* instance, void* store, const void* userData);
 };
 
+class BannerCarrierUpdateModuleData;
+
 class HordeContain : public TransportContain
 {
 	friend class HordeAIUpdate;
@@ -178,6 +180,8 @@ private:
 	HordePoint getBannerOffset() const;
 	AsciiString getBannerUnitType() const;
 	Bool addBannerCarrier(Bool feedback);
+	void updateReplenishment();
+	Bool replenishMember(const BannerCarrierUpdateModuleData& banner);
 	void rebuildMemberSlots();
 	const HordeContainModuleData* findAlternateFormation() const;
 	void updateFormationModelConditions(Object* object) const;
@@ -188,6 +192,10 @@ private:
 	Bool m_hadMembers = FALSE;
 	Bool m_restoreHadMembers = FALSE;
 	Bool m_restoreBaseFormation = FALSE;
+	AsciiString m_replenishmentBanner;
+	UnsignedInt m_bannerRespawnFrame = 0;
+	UnsignedInt m_unitSpawnFrame = 0;
+	UnsignedInt m_lastMeleeFrame = 0;
 };
 
 class BannerCarrierUpdateModuleData : public UpdateModuleData

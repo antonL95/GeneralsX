@@ -7,7 +7,6 @@
 #include <string_view>
 #include <vector>
 
-#include "Common/File.h"
 #include "Common/FileSystem.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
