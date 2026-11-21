@@ -18,7 +18,31 @@
 set(DXVK_VERSION "v2.6")
 option(SAGE_DXVK_LINUX_SOURCE "Build Linux DXVK with the retail effect bridge instead of using the prebuilt x86 package" OFF)
 set(SAGE_DXVK_GIT_REPOSITORY "https://github.com/generalsx-project/dxvk.git" CACHE STRING "DXVK source repository")
-set(DXVK_RETAIL_REVISION 6e8511a1de3373e58c14dc40bc240a23daac81d3)
+set(DXVK_RETAIL_REVISION f66da559fd48cd55ddfebca38ed0f708c0f76a24)
+
+function(fetch_retail_dxvk output)
+  set(patch "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/patches/dxvk-retail-effects.patch")
+  set(fetch "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/fetch-dxvk-retail.cmake")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${patch}" "${fetch}")
+  file(SHA256 "${patch}" patch_hash)
+  file(SHA256 "${fetch}" fetch_hash)
+  string(SHA256 source_id "${SAGE_DXVK_GIT_REPOSITORY}:${DXVK_RETAIL_REVISION}:${patch_hash}:${fetch_hash}")
+  string(SUBSTRING "${source_id}" 0 16 source_id)
+
+  FetchContent_Declare(dxvk_retail_source
+    SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/dxvk-retail-${source_id}-src"
+    DOWNLOAD_COMMAND "${CMAKE_COMMAND}"
+      "-Dsource=<SOURCE_DIR>"
+      "-Drepository=${SAGE_DXVK_GIT_REPOSITORY}"
+      "-Drevision=${DXVK_RETAIL_REVISION}"
+      "-Dpatch=${patch}"
+      -P "${fetch}"
+    UPDATE_COMMAND ""
+    PATCH_COMMAND ""
+  )
+  FetchContent_MakeAvailable(dxvk_retail_source)
+  set("${output}" "${dxvk_retail_source_SOURCE_DIR}" PARENT_SCOPE)
+endfunction()
 
 if(SAGE_USE_DX8)
   # Windows: Fetch min-dx8-sdk for native DirectX 8
@@ -79,10 +103,12 @@ elseif(APPLE AND SAGE_USE_MOLTENVK)
     set(DXVK_SOURCE_DIR "${DXVK_LOCAL_FORK_DIR}")
     message(STATUS "DXVK macOS build: using local fork source at ${DXVK_SOURCE_DIR}")
   else()
-    set(DXVK_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/dxvk-src-generalsx")
-    message(STATUS "DXVK macOS build: using GitHub source clone at ${DXVK_SOURCE_DIR}")
+    fetch_retail_dxvk(DXVK_SOURCE_DIR)
+    message(STATUS "DXVK macOS build: using managed source at ${DXVK_SOURCE_DIR}")
   endif()
-  set(DXVK_BUILD_DIR  "${CMAKE_BINARY_DIR}/_deps/dxvk-build-macos")
+  string(SHA256 dxvk_build_id "${DXVK_SOURCE_DIR}")
+  string(SUBSTRING "${dxvk_build_id}" 0 16 dxvk_build_id)
+  set(DXVK_BUILD_DIR  "${CMAKE_BINARY_DIR}/_deps/dxvk-build-macos-${dxvk_build_id}")
   set(DXVK_D3D8_LIB  "${DXVK_BUILD_DIR}/src/d3d8/libdxvk_d3d8.0.dylib")
   set(DXVK_D3D9_LIB  "${DXVK_BUILD_DIR}/src/d3d9/libdxvk_d3d9.0.dylib")
 
@@ -132,42 +158,17 @@ elseif(APPLE AND SAGE_USE_MOLTENVK)
     set(VULKAN_SDK_ENV_VAR "")
   endif()
 
-  if(SAGE_DXVK_USE_LOCAL_FORK AND EXISTS "${DXVK_LOCAL_FORK_DIR}/.git")
-    ExternalProject_Add(dxvk_macos_build
-      # GeneralsX @build BenderAI 13/03/2026 Build from local fbraz3 fork to avoid stale remote hash pins.
-      SOURCE_DIR        ${DXVK_SOURCE_DIR}
-      BINARY_DIR        ${DXVK_BUILD_DIR}
-      DOWNLOAD_COMMAND  ""
-      UPDATE_COMMAND    ""
-      PATCH_COMMAND     ""
-      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=clang CXX=clang++ "CFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "CXXFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "LDFLAGS=-arch ${DXVK_HOST_ARCH}" ${VULKAN_SDK_ENV_VAR} ${MESON_EXECUTABLE} setup ${DXVK_BUILD_DIR} ${DXVK_SOURCE_DIR} --native-file ${CMAKE_SOURCE_DIR}/cmake/meson-arm64-native.ini -Ddxvk_native_wsi=sdl3 --buildtype=release --reconfigure
-      BUILD_COMMAND     ${NINJA_EXECUTABLE} -C ${DXVK_BUILD_DIR} src/d3d9/libdxvk_d3d9.0.dylib src/d3d8/libdxvk_d3d8.0.dylib
-      BUILD_BYPRODUCTS  "${DXVK_D3D8_LIB}" "${DXVK_D3D9_LIB}"
-      INSTALL_COMMAND   ""
-      UPDATE_DISCONNECTED TRUE
-    )
-  else()
-    # GeneralsX @build copilot 01/04/2026 Pin remote DXVK to immutable commit produced by fix/macos-size_t-cstddef.
-    # GeneralsX @build 12/07/2026 Bumped to the merged commit that includes the macOS HiDPI WSI fix upstream.
-    # GeneralsX @build BenderAI 11/09/2026 Bump DXVK commit to fix libc++ try_key_extraction on modern macOS
-    set(DXVK_REMOTE_REF ${DXVK_RETAIL_REVISION})
-    ExternalProject_Add(dxvk_macos_build
-      # GeneralsX @build BenderAI 08/04/2026 Consume pre-patched source from pinned fork commit.
-      # GeneralsX @build 17/09/2026 Migrate DXVK remote repository to generalsx-project org.
-      GIT_REPOSITORY    "${SAGE_DXVK_GIT_REPOSITORY}"
-      GIT_TAG           ${DXVK_REMOTE_REF}
-      # GeneralsX @build copilot 01/04/2026 Keep pinned commit fetch reliable across clean CI builds.
-      GIT_SHALLOW       FALSE
-      SOURCE_DIR        ${DXVK_SOURCE_DIR}
-      BINARY_DIR        ${DXVK_BUILD_DIR}
-      PATCH_COMMAND     ""
-      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=clang CXX=clang++ "CFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "CXXFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "LDFLAGS=-arch ${DXVK_HOST_ARCH}" ${VULKAN_SDK_ENV_VAR} ${MESON_EXECUTABLE} setup ${DXVK_BUILD_DIR} ${DXVK_SOURCE_DIR} --native-file ${CMAKE_SOURCE_DIR}/cmake/meson-arm64-native.ini -Ddxvk_native_wsi=sdl3 --buildtype=release --reconfigure
-      BUILD_COMMAND     ${NINJA_EXECUTABLE} -C ${DXVK_BUILD_DIR} src/d3d9/libdxvk_d3d9.0.dylib src/d3d8/libdxvk_d3d8.0.dylib
-      BUILD_BYPRODUCTS  "${DXVK_D3D8_LIB}" "${DXVK_D3D9_LIB}"
-      INSTALL_COMMAND   ""
-      UPDATE_DISCONNECTED FALSE
-    )
-  endif()
+  ExternalProject_Add(dxvk_macos_build
+    SOURCE_DIR        "${DXVK_SOURCE_DIR}"
+    BINARY_DIR        "${DXVK_BUILD_DIR}"
+    DOWNLOAD_COMMAND  ""
+    UPDATE_COMMAND    ""
+    PATCH_COMMAND     ""
+    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=clang CXX=clang++ "CFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "CXXFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "LDFLAGS=-arch ${DXVK_HOST_ARCH}" ${VULKAN_SDK_ENV_VAR} ${MESON_EXECUTABLE} setup ${DXVK_BUILD_DIR} ${DXVK_SOURCE_DIR} --native-file ${CMAKE_SOURCE_DIR}/cmake/meson-arm64-native.ini -Ddxvk_native_wsi=sdl3 --buildtype=release --reconfigure
+    BUILD_COMMAND     ${NINJA_EXECUTABLE} -C ${DXVK_BUILD_DIR} src/d3d9/libdxvk_d3d9.0.dylib src/d3d8/libdxvk_d3d8.0.dylib
+    BUILD_BYPRODUCTS  "${DXVK_D3D8_LIB}" "${DXVK_D3D9_LIB}"
+    INSTALL_COMMAND   ""
+  )
 
   # Copy libdxvk_d3d9 + libdxvk_d3d8 to build dir and create unversioned symlinks.
   # d3d8 links against d3d9 via @rpath, so both must be present at runtime.
@@ -191,10 +192,10 @@ elseif(APPLE AND SAGE_USE_MOLTENVK)
   )
 
   # Export path so other cmake files know where the headers are
-  set(DXVK_INCLUDE_DIR "${DXVK_SOURCE_DIR}/include/native" CACHE PATH "DXVK native headers")
+  set(DXVK_INCLUDE_DIR "${DXVK_SOURCE_DIR}/include/native" CACHE PATH "DXVK native headers" FORCE)
   # GeneralsX @build felipebraz 10/06/2025 Mirror lowercase dxvk_SOURCE_DIR that FetchContent sets on Linux
   # so CompatLib/CMakeLists.txt check works on macOS as well (CACHE PATH survives auto-regeneration)
-  set(dxvk_SOURCE_DIR "${DXVK_SOURCE_DIR}" CACHE PATH "DXVK source directory (macOS)")
+  set(dxvk_SOURCE_DIR "${DXVK_SOURCE_DIR}" CACHE PATH "DXVK source directory (macOS)" FORCE)
   message(STATUS "DXVK source directory: ${DXVK_SOURCE_DIR}")
   message(STATUS "DXVK d3d8 library:     ${DXVK_D3D8_LIB}")
 
@@ -205,17 +206,14 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
   find_program(DXVK_GLSLANG NAMES glslang glslangValidator REQUIRED)
   set(DXVK_LINUX_SOURCE TRUE)
 
-  FetchContent_Declare(dxvk_linux_arm64
-    GIT_REPOSITORY "${SAGE_DXVK_GIT_REPOSITORY}"
-    GIT_TAG ${DXVK_RETAIL_REVISION}
-  )
-  FetchContent_MakeAvailable(dxvk_linux_arm64)
-  set(dxvk_SOURCE_DIR "${dxvk_linux_arm64_SOURCE_DIR}")
+  fetch_retail_dxvk(dxvk_SOURCE_DIR)
   set(DXVK_INCLUDE_DIR "${dxvk_SOURCE_DIR}/include/native")
 
   function(configure_dxvk_linux_arm64)
     include(ExternalProject)
-    set(build_dir "${CMAKE_BINARY_DIR}/_deps/dxvk-build-linux-arm64")
+    string(SHA256 dxvk_build_id "${dxvk_SOURCE_DIR}")
+    string(SUBSTRING "${dxvk_build_id}" 0 16 dxvk_build_id)
+    set(build_dir "${CMAKE_BINARY_DIR}/_deps/dxvk-build-linux-arm64-${dxvk_build_id}")
     set(pkg_path "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
     if(TARGET SDL3-shared)
       set(pc_dir "${CMAKE_CURRENT_BINARY_DIR}/dxvk-pkgconfig")
