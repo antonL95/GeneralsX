@@ -351,6 +351,7 @@ Bool GameLogic::isInSinglePlayerGame() const
 //-------------------------------------------------------------------------------------------------
 void GameLogic::destroyAllObjectsImmediate()
 {
+	m_mountedTemplateSwaps.clear();
 	Object *obj;
 	Object *nextObj;
 
@@ -4227,8 +4228,7 @@ void GameLogic::update()
 	// End of frame clean-up
 	//
 
-	// destroy all pending objects
-	processDestroyList();
+	processMountedTemplateSwaps();
 
 	// reset the command list, destroying all messages
 	TheCommandList->reset();
@@ -4393,11 +4393,11 @@ void GameLogic::registerObject( Object *obj )
 	* GameLogic/Client for those purposes, or we could put the allocation pools
 	* in the GameLogic and GameClient themselves */
 // ------------------------------------------------------------------------------------------------
-Object *GameLogic::friend_createObject( const ThingTemplate *thing, const ObjectStatusMaskType &statusBits, Team *team )
+Object *GameLogic::friend_createObject( const ThingTemplate *thing, const ObjectStatusMaskType &statusBits, Team *team, ObjectID id )
 {
 	Object *obj;
 
-	obj = newInstance(Object)( thing, statusBits, team );
+	obj = newInstance(Object)( thing, statusBits, team, id );
 
 	return obj;
 }

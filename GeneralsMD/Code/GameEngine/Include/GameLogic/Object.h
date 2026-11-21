@@ -168,7 +168,7 @@ class Object : public Thing, public Snapshot
 public:
 
 	/// Object constructor automatically attaches all objects to "TheGameLogic"
-	Object(const ThingTemplate *thing, const ObjectStatusMaskType &objectStatusMask, Team *team);
+	Object(const ThingTemplate *thing, const ObjectStatusMaskType &objectStatusMask, Team *team, ObjectID id = INVALID_ID);
 
 	void initObject();
 
@@ -243,6 +243,7 @@ public:
 	AttributeModifierHelper* getAttributeModifierHelper() const { return m_attributeModifierHelper; }
 	void refreshModifiedShroudClearing();
 	VeterancyLevel getVeterancyLevel() const;
+	const ThingTemplate* getHeroIdentityTemplate() const { return m_mountedHeroIdentity ? m_mountedHeroIdentity : getTemplate(); }
 
 	inline const AsciiString& getName() const { return m_name; }
 	inline void setName( const AsciiString& newName ) { m_name = newName; }
@@ -768,6 +769,10 @@ private:
 	// cache these, for convenience
 	std::unique_ptr<RotwkPowerState> m_rotwkPowerState;
 	void xferRotwkPowerState(Xfer* xfer);
+	friend class GameLogic;
+	const ThingTemplate* m_mountedHeroIdentity = nullptr;
+	std::vector<std::pair<AsciiString, UnsignedInt>> m_mountedPowerTimers;
+	void xferMountedTemplateState(Xfer* xfer);
 	ContainModuleInterface*				m_contain;
 	class SlavedUpdate* m_slavedUpdate = nullptr;
 	BodyModuleInterface*					m_body;

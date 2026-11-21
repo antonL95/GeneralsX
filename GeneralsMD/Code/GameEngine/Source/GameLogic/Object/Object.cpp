@@ -258,7 +258,7 @@ AsciiString DebugDescribeObject(const Object *obj)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatusMask, Team *team ) :
+Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatusMask, Team *team, ObjectID id ) :
 	Thing(tt),
 	m_indicatorColor(0),
 	m_ai(nullptr),
@@ -375,7 +375,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	m_singleUseCommandUsed = false;
 
 	// assign unique object id
-	setID( TheGameLogic->allocateObjectID() );
+	setID(id == INVALID_ID ? TheGameLogic->allocateObjectID() : id);
 
 	//
 	// allocate any modules we need to, we should keep
@@ -4197,7 +4197,10 @@ void Object::onDisabledEdge(Bool becomingDisabled)
 void Object::crc( Xfer *xfer )
 {
 	if (RetailFileLayers::enabled())
+	{
 		xferRotwkPowerState(xfer);
+		xferMountedTemplateState(xfer);
+	}
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;
 //	Bool g_logAllObjects = TRUE;
@@ -4348,8 +4351,8 @@ void Object::xfer( Xfer *xfer )
 #endif
 	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
 		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
-	const XferVersion maxVersion = RetailFileLayers::enabled() ? 12 : 10;
-	XferVersion version = maxVersion == 12 ? maxVersion : (extendedSlots ? 10 : legacyVersion);
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 13 : 10;
+	XferVersion version = maxVersion == 13 ? maxVersion : (extendedSlots ? 10 : legacyVersion);
 	xfer->xferVersion(&version, maxVersion);
 
 	// object ID
@@ -4804,6 +4807,26 @@ void Object::xfer( Xfer *xfer )
 		m_logicModelConditions.xfer(xfer);
 	if (version >= 12)
 		xferRotwkPowerState(xfer);
+	if (version >= 13)
+		xferMountedTemplateState(xfer);
+}
+
+void Object::xferMountedTemplateState(Xfer* xfer)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	AsciiString identity = m_mountedHeroIdentity ? m_mountedHeroIdentity->getName() : AsciiString::TheEmptyString;
+	xfer->xferAsciiString(&identity);
+	if (loading)
+		m_mountedHeroIdentity = identity.isEmpty() ? nullptr : TheThingFactory->findTemplate(identity, FALSE);
+	UnsignedInt count = static_cast<UnsignedInt>(m_mountedPowerTimers.size());
+	xfer->xferUnsignedInt(&count);
+	if (loading)
+		m_mountedPowerTimers.resize(count);
+	for (auto& [power, readyFrame] : m_mountedPowerTimers)
+	{
+		xfer->xferAsciiString(&power);
+		xfer->xferUnsignedInt(&readyFrame);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------

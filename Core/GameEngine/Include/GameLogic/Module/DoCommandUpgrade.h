@@ -19,6 +19,8 @@ public:
 	DoCommandUpgrade(Thing* thing, const ModuleData* data) : UpgradeModule(thing, data) {}
 	Bool isSubObjectsUpgrade() override { return FALSE; }
 	Bool resetUpgrade(const UpgradeMaskType& mask) override;
+	void inheritExecution() { setUpgradeExecuted(TRUE); }
+	const DoCommandUpgradeModuleData* getCommandDefinition() const { return getDoCommandUpgradeModuleData(); }
 
 protected:
 	void upgradeImplementation() override;

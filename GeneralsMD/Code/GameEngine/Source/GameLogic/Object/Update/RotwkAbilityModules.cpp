@@ -23,16 +23,21 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
+#include "GameClient/InGameUI.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/AI.h"
 #include "GameLogic/AIStateMachine.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/ScriptEngine.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/HordeContain.h"
 
 namespace
@@ -218,9 +223,152 @@ void ToggleMountedSpecialAbilityUpdate::onObjectCreated()
 void ToggleMountedSpecialAbilityUpdate::triggerAbilityEffect()
 {
 	SpecialAbilityUpdate::triggerAbilityEffect();
-	if (getToggleMountedSpecialAbilityUpdateModuleData()->m_mountedTemplate.isNotEmpty())
-		return;
-	setMounted(getObject(), !isMounted(getObject()));
+	const ToggleMountedSpecialAbilityUpdateModuleData* data = getToggleMountedSpecialAbilityUpdateModuleData();
+	if (data->m_mountedTemplate.isEmpty())
+		setMounted(getObject(), !isMounted(getObject()));
+	else if (usesRotwkRules())
+		TheGameLogic->queueMountedTemplateSwap(getObject()->getID(), data,
+			hasAbilityTargetPos() ? std::optional<Coord3D>(getAbilityTargetPos()) : std::nullopt);
+}
+
+void GameLogic::queueMountedTemplateSwap(ObjectID id, const ToggleMountedSpecialAbilityUpdateModuleData* data,
+	std::optional<Coord3D> landingPosition)
+{
+	const auto match = [id](const MountedTemplateSwap& pending) { return pending.id == id; };
+	if (std::none_of(m_mountedTemplateSwaps.begin(), m_mountedTemplateSwaps.end(), match))
+		m_mountedTemplateSwaps.push_back({id, data, landingPosition});
+}
+
+void GameLogic::processMountedTemplateSwaps()
+{
+	struct Swap
+	{
+		ObjectID id;
+		ObjectID producer;
+		ObjectID builder;
+		const ThingTemplate* target;
+		const ThingTemplate* identity;
+		Team* team;
+		AsciiString originalTeamName;
+		Matrix3D transform;
+		AsciiString name;
+		UpgradeMaskType upgrades;
+		Real healthRatio;
+		Real experience;
+		Int rank;
+		Int startingRank;
+		Bool selected;
+		Color indicatorColor;
+		std::vector<std::pair<AsciiString, UnsignedInt>> timers;
+		std::vector<const DoCommandUpgradeModuleData*> executedCommands;
+#if !RETAIL_COMPATIBLE_AIGROUP
+		AIGroupPtr group;
+#endif
+	};
+
+	decltype(m_mountedTemplateSwaps) pending;
+	pending.swap(m_mountedTemplateSwaps);
+	std::vector<Swap> swaps;
+	static const NameKeyType commandUpgradeKey = NAMEKEY("DoCommandUpgrade");
+	for (const auto& [id, data, landingPosition] : pending)
+	{
+		Object* source = findObjectByID(id);
+		if (!source || source->isDestroyed() || source->isEffectivelyDead() || source->getContainedBy())
+			continue;
+		const ThingTemplate* definition = TheThingFactory->findTemplate(data->m_mountedTemplate, FALSE);
+		const auto* target = definition ? static_cast<const ThingTemplate*>(definition->getFinalOverride()) : nullptr;
+		if (!target || target == source->getTemplate() || target->isKindOf(KINDOF_DRAWABLE_ONLY))
+			continue;
+
+		const BodyModuleInterface* body = source->getBodyModule();
+		const Real healthRatio = body && body->getMaxHealth() > 0.0f ? body->getHealth() / body->getMaxHealth() : 1.0f;
+		const ExperienceTracker* tracker = source->getExperienceTracker();
+		const Drawable* draw = source->getDrawable();
+		Matrix3D transform = *source->getTransformMatrix();
+		if (!target->isKindOf(KINDOF_GIANT_BIRD) && source->isKindOf(KINDOF_GIANT_BIRD))
+		{
+			Vector3 position = transform.Get_Translation();
+			if (landingPosition)
+			{
+				position.X = landingPosition->x;
+				position.Y = landingPosition->y;
+			}
+			position.Z = TheTerrainLogic->getGroundHeight(position.X, position.Y);
+			transform = Matrix3D(Vector3(0.0f, 0.0f, 1.0f), source->getOrientation());
+			transform.Set_Translation(position);
+		}
+		Swap& swap = swaps.emplace_back(Swap{id, source->m_producerID, source->m_builderID, target,
+			source->getHeroIdentityTemplate(), source->getTeam(), source->m_originalTeamName, transform, source->getName(),
+			source->getObjectCompletedUpgradeMask(), healthRatio, tracker->getRetailExperience(), tracker->getRank(),
+			tracker->getRetailStartingRank(), draw && draw->isSelected(), source->m_indicatorColor,
+			std::move(source->m_mountedPowerTimers), {}
+#if !RETAIL_COMPATIBLE_AIGROUP
+			, source->m_group
+#endif
+		});
+		for (BehaviorModule** module = source->getBehaviorModules(); *module; ++module)
+			if ((*module)->getModuleNameKey() == commandUpgradeKey && (*module)->getUpgrade()->isAlreadyUpgraded())
+				swap.executedCommands.push_back(static_cast<const DoCommandUpgrade*>(*module)->getCommandDefinition());
+		for (const AsciiString& name : data->m_synchronizeTimerOnSpecialPower)
+		{
+			const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate(name);
+			const auto* module = source->getSpecialPowerModule(power);
+			if (!module)
+				continue;
+			const auto match = [&name](const auto& timer) { return timer.first == name; };
+			const auto existing = std::find_if(swap.timers.begin(), swap.timers.end(), match);
+			if (existing == swap.timers.end())
+				swap.timers.emplace_back(name, module->getReadyFrame());
+			else
+				existing->second = module->getReadyFrame();
+		}
+		destroyObject(source);
+	}
+	processDestroyList();
+
+	for (Swap& swap : swaps)
+	{
+		Object* replacement = TheThingFactory->newObjectFromExactTemplate(swap.target, swap.team, OBJECT_STATUS_MASK_NONE, swap.id);
+		replacement->m_mountedHeroIdentity = swap.identity;
+		replacement->m_producerID = swap.producer;
+		replacement->m_builderID = swap.builder;
+		replacement->m_originalTeamName = swap.originalTeamName;
+		TheScriptEngine->transferObjectName(swap.name, replacement);
+		if (swap.indicatorColor)
+			replacement->setCustomIndicatorColor(swap.indicatorColor);
+
+		replacement->setTransformMatrix(&swap.transform);
+		for (BehaviorModule** module = replacement->getBehaviorModules(); *module; ++module)
+		{
+			if ((*module)->getModuleNameKey() != commandUpgradeKey)
+				continue;
+			auto* upgrade = static_cast<DoCommandUpgrade*>(*module);
+			if (std::find(swap.executedCommands.begin(), swap.executedCommands.end(), upgrade->getCommandDefinition()) != swap.executedCommands.end())
+				upgrade->inheritExecution();
+		}
+		replacement->m_objectUpgradesCompleted.set(swap.upgrades);
+		replacement->updateUpgradeModules();
+		ExperienceTracker* tracker = replacement->getExperienceTracker();
+		tracker->advanceRetailLevel(swap.experience, FALSE);
+		tracker->setMinRetailRank(swap.rank);
+		tracker->setRetailStartingRank(swap.startingRank);
+		if (BodyModuleInterface* body = replacement->getBodyModule())
+			body->internalChangeHealth(body->getMaxHealth() * swap.healthRatio - body->getHealth());
+
+		replacement->m_mountedPowerTimers = std::move(swap.timers);
+		for (const auto& [name, readyFrame] : replacement->m_mountedPowerTimers)
+		{
+			const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate(name);
+			if (auto* module = replacement->getSpecialPowerModule(power))
+				module->setReadyFrame(readyFrame);
+		}
+#if !RETAIL_COMPATIBLE_AIGROUP
+		if (swap.group)
+			swap.group->add(replacement);
+#endif
+		if (swap.selected && TheInGameUI && replacement->getDrawable())
+			TheInGameUI->selectDrawable(replacement->getDrawable());
+	}
 }
 
 void ToggleMountedSpecialAbilityUpdate::crc(Xfer* xfer)

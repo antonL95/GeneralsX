@@ -891,6 +891,7 @@ public:
 
 		static const FieldParse retailFieldParse[] =
 		{
+			{ "DispositionAngle", INI::parseAngleReal, nullptr, offsetof(GenericObjectCreationNugget, m_dispositionAngle) },
 			{ "IgnoreCommandPointLimit", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_ignoreCommandPointLimit) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
@@ -963,7 +964,8 @@ protected:
 		const Matrix3D *mtx,
 		Real orientation,
 		const Object *sourceObj,
-		UnsignedInt lifetimeFrames
+		UnsignedInt lifetimeFrames,
+		Int spawnIndex = 0
 	) const
 	{
 		obj->setProducer(sourceObj);
@@ -1010,6 +1012,20 @@ protected:
 		chunkPos.x = pos->x + offset.x;
 		chunkPos.y = pos->y + offset.y;
 		chunkPos.z = pos->z + offset.z;
+
+		if (RetailFileLayers::enabled() && BitIsSet(m_disposition, SPAWN_AROUND))
+		{
+			if (m_dispositionIntensity != 0.0f)
+			{
+				const Real angle = orientation + static_cast<Real>(spawnIndex) * m_dispositionAngle;
+				chunkPos.x += WWMath::CosTrig(angle) * m_dispositionIntensity;
+				chunkPos.y += WWMath::SinTrig(angle) * m_dispositionIntensity;
+				chunkPos.z += TheTerrainLogic->getGroundHeight(chunkPos.x, chunkPos.y) -
+					TheTerrainLogic->getGroundHeight(pos->x + offset.x, pos->y + offset.y);
+			}
+			obj->setOrientation(orientation);
+			obj->setPosition(&chunkPos);
+		}
 
 		if (!m_particleSysName.isEmpty())
 		{
@@ -1451,12 +1467,12 @@ protected:
 					DEBUG_CRASH(("A mismatch is likely to happen if this code path is used in a match with unpatched clients."));
 #endif
 				}
-				doStuffToObj( debris, m_names[pick], &resultPos, mtx, orientation, sourceObj, lifetimeFrames );
+				doStuffToObj( debris, m_names[pick], &resultPos, mtx, orientation, sourceObj, lifetimeFrames, nn );
 			}
 			else
 			{
 				// do stuff to contained objects too
-				doStuffToObj( debris, m_names[pick], pos, mtx, orientation, sourceObj, lifetimeFrames );
+				doStuffToObj( debris, m_names[pick], pos, mtx, orientation, sourceObj, lifetimeFrames, nn );
 			}
 
 			if (m_fadeIn)
@@ -1521,6 +1537,7 @@ private:
 	Coord3D										m_offset;
 	DebrisDisposition					m_disposition;
 	Real											m_dispositionIntensity;
+	Real m_dispositionAngle = 0.0f;
 	Real											m_spinRate;
 	Real											m_yawRate;
 	Real											m_rollRate;

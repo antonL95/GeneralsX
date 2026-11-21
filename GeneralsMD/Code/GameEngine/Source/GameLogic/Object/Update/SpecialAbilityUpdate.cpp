@@ -960,6 +960,8 @@ Bool SpecialAbilityUpdate::isWithinStartAbilityRange() const
 
     if( data->m_approachRequiresLOS )
     {
+      if( usesRotwkRules() && hasAbilityTargetPos() )
+        return ThePartitionManager->isClearLineOfSightTerrain( self, *self->getPosition(), nullptr, m_targetPos );
       //Make sure we can see the target!
       PartitionFilterLineOfSight  filterLOS( self );
       PartitionFilter *filters[] = { &filterLOS, nullptr };

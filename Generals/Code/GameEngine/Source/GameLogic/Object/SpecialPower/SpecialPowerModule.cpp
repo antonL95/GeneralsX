@@ -556,6 +556,9 @@ void SpecialPowerModule::triggerSpecialPower( const Coord3D *location )
 //-------------------------------------------------------------------------------------------------
 void SpecialPowerModule::createViewObject( const Coord3D *location )
 {
+	if (!location)
+		return;
+
 	const SpecialPowerModuleData *modData = getSpecialPowerModuleData();
 	const SpecialPowerTemplate *powerTemplate = modData->m_specialPowerTemplate;
 

@@ -86,7 +86,7 @@ struct Census
 void countHero(Object *obj, void *userData)
 {
 	Census &census = *static_cast<Census *>(userData);
-	if (!obj->isEffectivelyDead() && census.hero->isEquivalentTo(obj->getTemplate()))
+	if (!obj->isEffectivelyDead() && !obj->isDestroyed() && census.hero->isEquivalentTo(obj->getHeroIdentityTemplate()))
 		++census.alive;
 	ProductionUpdateInterface *production = obj->getProductionUpdateInterface();
 	if (production)
@@ -260,7 +260,7 @@ void recordDeath(Object *hero, HeroRules::State outcome)
 	if (!hero)
 		return;
 	const Player *player = hero->getControllingPlayer();
-	Entry *entry = entryOf(player, findIndex(player, hero->getTemplate()));
+	Entry *entry = entryOf(player, findIndex(player, hero->getHeroIdentityTemplate()));
 	if (!entry)
 		return;
 	entry->state = outcome;

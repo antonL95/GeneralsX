@@ -327,7 +327,7 @@ Object *ThingFactory::newObject( const ThingTemplate *tmplate, Team *team, Objec
 	return newObjectFromExactTemplate(tmplate, team, statusBits);
 }
 
-Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, Team *team, ObjectStatusMaskType statusBits )
+Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, Team *team, ObjectStatusMaskType statusBits, ObjectID id )
 {
 	if (tmplate == nullptr)
 		throw ERROR_BAD_ARG;
@@ -338,7 +338,7 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 	// (this will throw an exception on failure.)
 	//Added ability to pass in optional statusBits. This is needed to be set prior to
 	//the onCreate() calls... in the case of constructing.
-	Object *obj = TheGameLogic->friend_createObject( tmplate, statusBits, team );
+	Object *obj = TheGameLogic->friend_createObject( tmplate, statusBits, team, id );
 
 	// run the create function for the thing
 	for (BehaviorModule** m = obj->getBehaviorModules(); *m; ++m)

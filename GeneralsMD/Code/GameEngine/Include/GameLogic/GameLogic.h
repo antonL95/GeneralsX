@@ -39,6 +39,8 @@
 #include "GameLogic/GameMode.h"
 #include "GameLogic/Module/UpdateModule.h"	// needed for DIRECT_UPDATEMODULE_ACCESS
 
+#include <optional>
+
 /*
 	At one time, we distinguished between sleepy and nonsleepy
 	update modules, and kept a separate list for each. however,
@@ -64,6 +66,7 @@ class WindowLayout;
 class TerrainLogic;
 class GhostObjectManager;
 class CommandButton;
+class ToggleMountedSpecialAbilityUpdateModuleData;
 enum BuildableStatus CPP_11(: Int);
 
 
@@ -144,7 +147,9 @@ public:
 
 	//-----------------------------------------------------------------------------------------------
 	/// create an object given the thing template. (Only for use by ThingFactory.)
-	Object *friend_createObject( const ThingTemplate *thing, const ObjectStatusMaskType &objectStatusMask, Team *team );
+	Object *friend_createObject( const ThingTemplate *thing, const ObjectStatusMaskType &objectStatusMask, Team *team, ObjectID id = INVALID_ID );
+	void queueMountedTemplateSwap(ObjectID id, const ToggleMountedSpecialAbilityUpdateModuleData* data,
+		std::optional<Coord3D> landingPosition);
 	void destroyObject( Object *obj );							///< Mark object as destroyed for later deletion
 	Object *findObjectByID( ObjectID id );								///< Given an ObjectID, return a pointer to the object.
  	Object *getFirstObject();									///< Returns the "first" object in the world. When used with the object method "getNextObject()", all objects in the world can be iterated.
@@ -433,6 +438,14 @@ public:
 	UpdateModulePtr					 m_curUpdateModule;
 
 	ObjectPointerList m_objectsToDestroy;										///< List of things that need to be destroyed at end of frame
+	struct MountedTemplateSwap
+	{
+		ObjectID id;
+		const ToggleMountedSpecialAbilityUpdateModuleData* data;
+		std::optional<Coord3D> landingPosition;
+	};
+	std::vector<MountedTemplateSwap> m_mountedTemplateSwaps;
+	void processMountedTemplateSwaps();
 
 	ObjectID m_nextObjID;																		///< For allocating object id's
 

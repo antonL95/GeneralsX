@@ -1680,9 +1680,36 @@ Bool sweepCast(Object* source, const CommandButton* button, const Command& comma
 			point.x += 30.0f;
 			point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
 		}
-		if (!(spell ? button->canCastRetailSpell(source, nullptr, &point) :
-			TheActionManager->canDoSpecialPowerAtLocation(source, &point, CMD_FROM_PLAYER, power, nullptr, options)))
-			return FALSE;
+		const auto canCastAt = [&](const Coord3D& destination) {
+			return spell ? button->canCastRetailSpell(source, nullptr, &destination) :
+				TheActionManager->canDoSpecialPowerAtLocation(source, &destination, CMD_FROM_PLAYER, power, nullptr, options);
+		};
+		if (!canCastAt(point))
+		{
+			if (spell || command.hasLocation || !power->hasForbiddenRetailObjects(source, &point))
+				return FALSE;
+			constexpr Int directions[][2] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}, {1, 1}, {-1, 1}, {-1, -1}, {1, -1}};
+			Bool found = FALSE;
+			for (Int offset = 30; offset <= 120 && !found; offset += 30)
+			{
+				for (const auto& direction : directions)
+				{
+					Coord3D candidate = origin;
+					candidate.x += static_cast<Real>(offset * direction[0]);
+					candidate.y += static_cast<Real>(offset * direction[1]);
+					candidate.z = TheTerrainLogic->getGroundHeight(candidate.x, candidate.y);
+					if (!canCastAt(candidate))
+						continue;
+					point = candidate;
+					found = TRUE;
+					break;
+				}
+			}
+			if (!found)
+				return FALSE;
+			std::fprintf(stderr, "SWEEP retarget %d frame=%u x=%.1f y=%.1f\n",
+				command.ordinal, TheGameLogic->getFrame(), point.x, point.y);
+		}
 		source->doSpecialPowerAtLocation(power, &point, INVALID_ANGLE, options);
 	}
 	else

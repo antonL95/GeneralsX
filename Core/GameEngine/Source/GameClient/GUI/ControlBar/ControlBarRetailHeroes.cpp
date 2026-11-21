@@ -228,8 +228,9 @@ void collectHero(Object *obj, void *userData)
 	Census &census = *static_cast<Census *>(userData);
 	if (!obj->isKindOf(KINDOF_HERO) || obj->isEffectivelyDead() || obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
 		return;
-	const Int rosterIndex = HeroRoster::findIndex(census.player, obj->getTemplate());
-	const ThingTemplate *hero = rosterIndex >= 0 ? HeroRoster::heroAt(census.player, rosterIndex) : obj->getTemplate();
+	const ThingTemplate *identity = obj->getHeroIdentityTemplate();
+	const Int rosterIndex = HeroRoster::findIndex(census.player, identity);
+	const ThingTemplate *hero = rosterIndex >= 0 ? HeroRoster::heroAt(census.player, rosterIndex) : identity;
 	if (rosterIndex < 0 && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInSkirmishGame()))
 		return;
 	for (const HeroSlot &slot : *census.slots)
