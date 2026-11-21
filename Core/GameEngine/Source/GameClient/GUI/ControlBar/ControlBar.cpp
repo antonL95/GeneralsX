@@ -1861,8 +1861,13 @@ void ControlBar::evaluateContextUI()
 	if (m_contextParent[CP_PURCHASE_SCIENCE] && !m_contextParent[CP_PURCHASE_SCIENCE]->winIsHidden())
 		showPurchaseScience();
 
-	// erase any current state of the GUI by switching out to the empty context
-	switchToContext( CB_CONTEXT_NONE, nullptr );
+	const Drawable *radialSelection = m_retailRadialMode && TheInGameUI->getSelectCount() == 1
+		? TheInGameUI->getFirstSelectedDrawable() : nullptr;
+	const Object *radialObject = radialSelection && radialSelection == m_currentSelectedDrawable
+		? radialSelection->getObject() : nullptr;
+	if (!radialObject || radialObject->testStatus(OBJECT_STATUS_SOLD) ||
+		radialObject->getCommandSetString().isEmpty() || !TheInGameUI->areSelectedObjectsControllable())
+		switchToContext( CB_CONTEXT_NONE, nullptr );
 
 	// sanity, nothing selected
 	if( TheInGameUI->getSelectCount() == 0 )
@@ -2376,6 +2381,25 @@ void ControlBar::switchToContext( ControlBarContext context, Drawable *draw )
 		if (context != CB_CONTEXT_COMMAND && context != CB_CONTEXT_MULTI_SELECT && context != CB_CONTEXT_UNDER_CONSTRUCTION)
 			context = CB_CONTEXT_NONE;
 
+		Int pressedSlot = -1;
+		Int pressedEntry = -1;
+		Int pressedHero = -1;
+		const void *pressedCommand = nullptr;
+		if (context == CB_CONTEXT_COMMAND && m_retailRadialMode && obj &&
+			m_retailRangeObject == static_cast<UnsignedInt>(obj->getID()))
+		{
+			for (Int i = 0; i < RETAIL_RADIAL_BUTTONS; ++i)
+			{
+				GameWindow *button = m_retailRadial[i];
+				if (button->winIsHidden() || !BitIsSet(button->winGetInstanceData()->getState(), WIN_STATE_SELECTED))
+					continue;
+				pressedSlot = i;
+				pressedEntry = m_retailRadialEntry[i];
+				pressedHero = getRetailHeroIndex(button);
+				pressedCommand = GadgetButtonGetData(button);
+				break;
+			}
+		}
 		m_currContext = context;
 		resetRetailCommandWindows();
 		if (TheInGameUI->getSelectCount() == 0)
@@ -2388,6 +2412,14 @@ void ControlBar::switchToContext( ControlBarContext context, Drawable *draw )
 			populateCommand(obj);
 			const CommandSet *commandSet = findCommandSet(obj->getCommandSetString());
 			assignRetailSlots(commandSet, obj, commandSet ? commandSet->getInitialVisible() : 0);
+			if (pressedCommand && m_retailRadialMode)
+			{
+				GameWindow *button = m_retailRadial[pressedSlot];
+				if (!button->winIsHidden() && BitIsSet(button->winGetStatus(), WIN_STATUS_ENABLED) &&
+					m_retailRadialEntry[pressedSlot] == pressedEntry && getRetailHeroIndex(button) == pressedHero &&
+					GadgetButtonGetData(button) == pressedCommand)
+					BitSet(button->winGetInstanceData()->m_state, WIN_STATE_SELECTED);
+			}
 		}
 		else if (context == CB_CONTEXT_MULTI_SELECT)
 		{

@@ -34,6 +34,7 @@ constexpr Int StoreSlots = 12;
 constexpr Int PanelWidth = 560;
 constexpr Int PanelHeight = 558;
 constexpr Int NodeSize = 64;
+constexpr std::string_view ConnectorPath = "_root.SpellStore.Buttons.Connectors.";
 constexpr Color PanelLine = 0xFF536A75;
 constexpr Color Ink = 0xFFF5F1DF;
 constexpr Color Gold = 0xFFE8BE72;
@@ -545,8 +546,9 @@ void drawStoreArt(const char* name, const Rect& rect, Color tint = 0xFFFFFFFF)
 		TheDisplay->drawImage(image, rect.x, rect.y, rect.x + rect.w, rect.y + rect.h, tint);
 }
 
-void drawPrerequisites(const Player* player, const Layout& layout, Int diameter)
+std::vector<std::string> prerequisiteClips(const Player* player)
 {
+	std::vector<std::string> clips;
 	for (Int slot = 0; slot < StoreSlots; ++slot)
 	{
 		const ScienceType science = storeScience(player, slot);
@@ -555,13 +557,8 @@ void drawPrerequisites(const Player* player, const Layout& layout, Int diameter)
 		const auto* alternatives = TheScienceStore->getPrerequisiteAlternatives(science);
 		if (!alternatives)
 			continue;
-		const Rect child = layout.node(slot);
 		for (Int candidate = 0; candidate < slot; ++candidate)
 		{
-			const Rect parent = layout.node(candidate);
-			const Int separation = child.y - parent.y;
-			if (separation < diameter || separation > diameter * 2)
-				continue;
 			const ScienceType prerequisite = storeScience(player, candidate);
 			if (prerequisite == SCIENCE_INVALID ||
 				!std::any_of(alternatives->begin(), alternatives->end(), [player, prerequisite](const ScienceVec& group)
@@ -575,17 +572,10 @@ void drawPrerequisites(const Player* player, const Layout& layout, Int diameter)
 				}))
 				continue;
 
-			const Real parentX = parent.x + parent.w * 0.5f;
-			const Real childX = child.x + child.w * 0.5f;
-			const Real x1 = parentX + (childX - parentX) * 0.35f;
-			const Real x2 = childX - (childX - parentX) * 0.31f;
-			const Real y1 = parent.y + parent.h * 0.5f + diameter * 0.57f;
-			const Real y2 = child.y + child.h * 0.5f - diameter * 0.48f;
-			const Real width = std::max(1.0f, 1.65f * layout.scale);
-			TheDisplay->drawLine(x1, y1, x2, y2, width + 2.0f, 0xE009121C);
-			TheDisplay->drawLine(x1, y1, x2, y2, width, 0xFF90ABB8);
+			clips.push_back("c" + std::to_string(candidate + 1) + "_" + std::to_string(slot + 1));
 		}
 	}
+	return clips;
 }
 
 WindowMsgHandledType overlayInput(GameWindow*, UnsignedInt msg, WindowMsgData point, WindowMsgData)
@@ -613,7 +603,7 @@ void ControlBar::initRetailPowers(GameWindow* palantir)
 	storeArt = std::make_unique<AptScene>("SpellStore", nullptr,
 		std::initializer_list<std::pair<const char*, const char*>>{
 			{"_root.SpellStore", "_multiplayer"},
-			{"_root.SpellStore.Buttons", "#15"}
+			{"_root.SpellStore.Buttons", "#45"}
 		});
 	m_retailPowersFadeTime = storeMovieLayout.fadeTime;
 	m_retailPowersScreen = TheWindowManager->winCreate(nullptr, WIN_STATUS_ENABLED | WIN_STATUS_ABOVE | WIN_STATUS_HIDDEN,
@@ -731,10 +721,16 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 		const Real sx = sy * 4.0f / 3.0f;
 		const Real artX = layout.x + (PanelWidth * layout.scale - sx * storeMovieLayout.stageWidth) / 2.0f;
 		disc(layout.at(70, 68, 420, 420), 0xA0041019);
-		storeArt->drawAt([](const std::string& path) {
+		const auto clips = prerequisiteClips(player);
+		storeArt->drawAt([&clips](const std::string& path) {
+			if (path.starts_with(ConnectorPath))
+			{
+				auto clip = std::string_view(path).substr(ConnectorPath.size());
+				clip = clip.substr(0, clip.find('.'));
+				return std::find(clips.begin(), clips.end(), clip) != clips.end();
+			}
 			return path.starts_with("_root.SpellStore.") &&
 				!path.starts_with("_root.SpellStore.Buttons.Spell") &&
-				!path.starts_with("_root.SpellStore.Buttons.Connectors.") &&
 				!path.starts_with("_root.SpellStore.Buttons.ButtonsMain.");
 		}, artX, layout.y, sx, sy, 1.0f);
 		storeArt->drawAt([](const std::string& path) { return path.starts_with("_root.Title."); },
@@ -753,7 +749,6 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 	label(font, close, UnicodeString(L"×"), Ink);
 
 	const Int diameter = std::max(2, static_cast<Int>(72 * PanelHeight * layout.scale / storeMovieLayout.stageHeight));
-	drawPrerequisites(player, layout, diameter);
 	for (Int i = 0; i < StoreSlots; ++i)
 	{
 		const ScienceType science = storeScience(player, i);

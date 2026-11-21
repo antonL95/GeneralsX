@@ -337,13 +337,12 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 
 	const Real scale = TheDisplay->getHeight() / 720.0f;
 	const Bool structure = obj->isKindOf(KINDOF_STRUCTURE);
-	const Real relativeWidth = structure ? std::clamp(obj->getGeometryInfo().getMajorRadius() * 3.5f, 55.0f, 180.0f) :
-		(anchor ? 33.0f : 36.0f);
+	const Real relativeWidth = structure ? std::clamp(obj->getGeometryInfo().getMajorRadius() * 4.1f, 60.0f, 216.0f) :
+		(anchor ? 42.0f : 43.0f);
 	const Int width = std::max(6, static_cast<Int>(relativeWidth * scale * std::clamp(data.healthBoxScale, 0.25f, 4.0f)));
-	const Int edge = std::max(1, static_cast<Int>(scale + 0.5f));
-	const Int height = 7 * edge;
-	if (!structure)
-		screen.y -= static_cast<Int>(6.0f * scale + 0.5f);
+	const Int edge = std::max(1, static_cast<Int>(scale + 0.25f));
+	const Int height = std::max(4 * edge + 3, static_cast<Int>(7 * scale + 0.5f));
+	const Int clearance = static_cast<Int>((structure ? 11.0f : 10.0f) * scale + 0.5f);
 	const BodyModuleInterface* body = obj->getBodyModule();
 	if (showBar && body && body->getHealth() > 0.0f && body->getMaxHealth() > 0.0f)
 	{
@@ -351,7 +350,7 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 		const Bool building = obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
 		const Real fraction = building ? std::clamp(obj->getConstructionPercent() * 0.01f, 0.0f, 1.0f) : health;
 		const Int x = screen.x - width / 2;
-		const Int y = screen.y - height / 2;
+		const Int y = screen.y - clearance - height / 2;
 		const Bool healthy = !building && health > TheGlobalData->m_unitDamagedThresh;
 		const Color fill = building ? GameMakeColor(97, 209, 244, 255) :
 			health > TheGlobalData->m_unitReallyDamagedThresh ? GameMakeColor(239, 196, 84, 255) : GameMakeColor(220, 76, 36, 255);
@@ -361,14 +360,16 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 		const Int fillWidth = static_cast<Int>(std::max(0, width - 4 * edge) * fraction);
 		const Int fillX = x + 2 * edge;
 		const Int fillY = y + 2 * edge;
+		const Int fillHeight = height - 4 * edge;
+		const Int shadeHeight = fillHeight / 3;
 		if (fillWidth > 0 && healthy)
 		{
-			TheDisplay->drawFillRect(fillX, fillY, fillWidth, edge, GameMakeColor(12, 156, 36, 255));
-			TheDisplay->drawFillRect(fillX, fillY + edge, fillWidth, edge, GameMakeColor(221, 245, 142, 255));
-			TheDisplay->drawFillRect(fillX, fillY + 2 * edge, fillWidth, edge, GameMakeColor(5, 113, 22, 255));
+			TheDisplay->drawFillRect(fillX, fillY, fillWidth, shadeHeight, GameMakeColor(12, 156, 36, 255));
+			TheDisplay->drawFillRect(fillX, fillY + shadeHeight, fillWidth, fillHeight - 2 * shadeHeight, GameMakeColor(221, 245, 142, 255));
+			TheDisplay->drawFillRect(fillX, fillY + fillHeight - shadeHeight, fillWidth, shadeHeight, GameMakeColor(5, 113, 22, 255));
 		}
 		else if (fillWidth > 0)
-			TheDisplay->drawFillRect(fillX, fillY, fillWidth, 3 * edge, fill);
+			TheDisplay->drawFillRect(fillX, fillY, fillWidth, fillHeight, fill);
 	}
 	if (showRank)
 	{
@@ -385,7 +386,7 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 		const Int dotSize = dot ? std::max(1, static_cast<Int>(dot->getImageWidth() * scale * 0.5f)) : 0;
 		const Int dots = dot ? std::min(rank, 10) - 2 : 0;
 		const Int x = screen.x - (starSize + dots * dotSize) / 2;
-		const Int y = screen.y - (showBar ? height / 2 + 1 : 0) - starSize;
+		const Int y = screen.y - (showBar ? clearance + height / 2 + edge : 6 * edge) - starSize;
 		TheDisplay->drawImage(star, x, y, x + starSize, y + starSize);
 		for (Int index = 0; index < dots; ++index)
 		{

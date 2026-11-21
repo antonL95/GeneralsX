@@ -9,6 +9,7 @@
 #include "Common/NameKeyGenerator.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/PlayerTemplate.h"
 #include "Common/Money.h"
 #include "Common/Science.h"
 #include "Common/ThingTemplate.h"
@@ -108,10 +109,8 @@ Bool usesToggleTray(const CommandButton* command)
 
 Bool playerIsEvil(const Player *player)
 {
-	if (!player || !TheScienceStore)
-		return FALSE;
-	const ScienceType evil = TheScienceStore->getScienceFromInternalName("SCIENCE_EVIL");
-	return evil != SCIENCE_INVALID && player->hasScience(evil);
+	const PlayerTemplate *faction = player ? player->getPlayerTemplate() : nullptr;
+	return faction && faction->isEvil();
 }
 
 void drawDesignImage(const char *name, const DesignRect &rect, Int originX, Int originY, Real scale,
