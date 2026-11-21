@@ -4,6 +4,7 @@
 
 #include "Common/ActionManager.h"
 #include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
@@ -11,6 +12,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
@@ -84,6 +86,89 @@ void parseSpecialPowerAIType(INI* ini, void*, void* store, const void*)
 		token = "AI_SPECIAL_POWER_SELFAOEHEALHEROS";
 	*static_cast<Int*>(store) = INI::scanIndexList(token, specialPowerAITypes);
 }
+
+#if RTS_ZEROHOUR
+void scoutWithPower(Object& source, const CommandButton& button, const SpecialPowerTemplate& power, Real range)
+{
+	constexpr Int samplesPerAxis = 16;
+	Player* player = source.getControllingPlayer();
+	const Coord3D& origin = *source.getPosition();
+	const Real castRange = power.getMaxCastRange();
+	if (power.hasRetailFlag(SpecialPowerTemplate::RETAIL_LIMIT_DISTANCE) && castRange > 0.0f)
+		range = range > 0.0f ? std::min(range, castRange) : castRange;
+
+	Region3D search;
+	TheTerrainLogic->getExtent(&search);
+	if (range > 0.0f)
+	{
+		search.lo.x = std::max(search.lo.x, origin.x - range);
+		search.lo.y = std::max(search.lo.y, origin.y - range);
+		search.hi.x = std::min(search.hi.x, origin.x + range);
+		search.hi.y = std::min(search.hi.y, origin.y + range);
+	}
+	if (search.width() <= 0.0f || search.height() <= 0.0f)
+		return;
+
+	const auto startFor = [](Player& slot) -> const Waypoint* {
+		const Int index = slot.getMpStartIndex();
+		if (index < 0 || index >= MAX_PLAYER_COUNT)
+			return nullptr;
+		AsciiString name;
+		name.format("Player_%d_Start", index + 1);
+		return TheTerrainLogic->getWaypointByName(name);
+	};
+	const Waypoint* ownStart = startFor(*player);
+	const Coord3D& from = ownStart && range <= 0.0f ? *ownStart->getLocation() : origin;
+
+	for (const auto desired : {CELLSHROUD_SHROUDED, CELLSHROUD_FOGGED})
+	{
+		const auto tryPosition = [&](Coord3D position) {
+			if (!search.containsWithin(position.asCoord2D()) ||
+				(range > 0.0f && ThePartitionManager->getDistanceSquared(&source, &position, FROM_CENTER_2D) > range * range) ||
+				ThePartitionManager->getShroudStatusForPlayer(player->getPlayerIndex(), &position) != desired)
+				return FALSE;
+			position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+			if (!button.isValidToUseOn(&source, nullptr, &position, CMD_FROM_AI) ||
+				!power.isValidRetailTarget(&source, nullptr, &position, CMD_FROM_AI))
+				return FALSE;
+
+			static const Bool trace = std::getenv("GENERALSX_SKIRMISH_AI_TRACE") != nullptr;
+			if (trace)
+			{
+				std::fprintf(stderr, "AI_SCOUT\t%u\t%d\t%s\t%a\t%a\t%d\n", TheGameLogic->getFrame(),
+					player->getPlayerIndex(), power.getName().str(), position.x, position.y, desired);
+				std::fflush(stderr);
+			}
+			source.doSpecialPowerAtLocation(&power, &position, INVALID_ANGLE, button.getOptions());
+			return TRUE;
+		};
+
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+		{
+			Player* opponent = ThePlayerList->getNthPlayer(i);
+			if (!opponent || !opponent->isPlayableSide() || !opponent->isPlayerActive() ||
+				player->getRelationship(opponent->getDefaultTeam()) != ENEMIES)
+				continue;
+			const Waypoint* start = startFor(*opponent);
+			if (!start)
+				continue;
+			const Coord3D direction = *start->getLocation() - from;
+			for (Int step = samplesPerAxis; step > 0; --step)
+			{
+				const Real fraction = INT_TO_REAL(step) / samplesPerAxis;
+				if (tryPosition({from.x + direction.x * fraction, from.y + direction.y * fraction, 0.0f}))
+					return;
+			}
+		}
+
+		for (Int y = 0; y < samplesPerAxis; ++y)
+			for (Int x = 0; x < samplesPerAxis; ++x)
+				if (tryPosition({search.lo.x + search.width() * (INT_TO_REAL(x) + 0.5f) / samplesPerAxis,
+					search.lo.y + search.height() * (INT_TO_REAL(y) + 0.5f) / samplesPerAxis, 0.0f}))
+					return;
+	}
+}
+#endif
 }
 
 void AISpecialPowerUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -167,6 +252,12 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 	}
 
 	const Real range = data->m_specialPowerRange > 0.0f ? data->m_specialPowerRange : data->m_specialPowerRadius;
+	if (reveal && positionTarget && !objectTarget)
+	{
+		scoutWithPower(*source, *button, *power, book ? 0.0f : range);
+		return checkAgain;
+	}
+
 	Object* best = nullptr;
 	ObjectShroudStatus bestShroud = OBJECTSHROUD_INVALID;
 	Real bestScore = 0.0f;
