@@ -640,11 +640,10 @@ void ControlBar::showRetailLevelTooltip() const
 	const Int maximum = ExperienceLevelStore::maximumRank(object);
 	if (!TheMouse || maximum <= 0)
 		return;
-	UnicodeString tooltip = object->getTemplate()->getDisplayName();
-	UnicodeString levels;
-	levels.format(L"\nLevel: %d\nMaximum Level: %d", object->getExperienceTracker()->getRank(), maximum);
-	tooltip.concat(levels);
-	TheMouse->setRetailCommandTooltip(tooltip);
+	Mouse::RetailTooltip tooltip;
+	tooltip.title = object->getTemplate()->getDisplayName();
+	tooltip.body.format(L"Level: %d\nMaximum Level: %d", object->getExperienceTracker()->getRank(), maximum);
+	TheMouse->setRetailTooltip(tooltip);
 }
 
 Int ControlBar::getRetailCommandCost(const CommandButton *command, const GameWindow *window) const
