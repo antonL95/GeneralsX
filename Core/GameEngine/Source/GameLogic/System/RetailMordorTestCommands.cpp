@@ -7,6 +7,7 @@
 #include "Common/Player.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/HotKey.h"
@@ -16,7 +17,7 @@
 
 void runRetailMordorTestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame)
 {
-	const auto* owner = source->getControllingPlayer();
+	auto* owner = source->getControllingPlayer();
 	if (action == "mparity-focus" && TheTacticalView)
 		TheTacticalView->lookAt(source->getPosition());
 	else if (action == "mparity-enter")
@@ -42,6 +43,12 @@ void runRetailMordorTestCommand(std::string_view action, Object* source, Object*
 		if (const auto* thing = TheThingFactory->findTemplate(argument, FALSE))
 			std::fprintf(stderr, "MPARITY price frame=%u %s base=%d price=%d frames=%d\n", frame, argument,
 				thing->friend_getBuildCost(), thing->calcCostToBuild(owner), thing->calcTimeToBuild(owner));
+	}
+	else if (action == "mparity-upgrade-price")
+	{
+		if (const auto* upgrade = TheUpgradeCenter->findUpgrade(argument))
+			std::fprintf(stderr, "MPARITY upgrade-price frame=%u %s price=%d frames=%d\n", frame, argument,
+				upgrade->calcCostToBuild(owner), upgrade->calcTimeToBuild(owner));
 	}
 	else if (action == "mparity-hotkeys" && TheControlBar && TheHotKeyManager)
 	{

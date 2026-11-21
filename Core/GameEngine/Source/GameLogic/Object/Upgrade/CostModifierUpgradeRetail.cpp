@@ -33,35 +33,38 @@ struct Discount
 	}
 };
 
-template<typename Matches>
-std::vector<Discount> collectDiscounts(const Player& player, Matches matches)
+template<typename Visit>
+void visitActiveRetailModifiers(const Player& player, Visit visit)
 {
-	struct Query
-	{
-		Matches matches;
-		std::vector<Discount> discounts;
-	} query{matches, {}};
-
 	player.iterateObjects([](Object* object, void* context)
 	{
 		if (object->isDestroyed() || object->isEffectivelyDead() ||
 			object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || object->testStatus(OBJECT_STATUS_SOLD))
 			return;
-		auto& query = *static_cast<Query*>(context);
 		for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
 		{
-			const auto* data = activeRetailModifier(*module);
-			if (!data || !query.matches(*data))
-				continue;
-			const auto found = std::find_if(query.discounts.begin(), query.discounts.end(),
-				[data](const Discount& entry) { return entry.data == data; });
-			if (found == query.discounts.end())
-				query.discounts.push_back({data, 1});
-			else
-				++found->count;
+			if (const auto* data = activeRetailModifier(*module))
+				(*static_cast<Visit*>(context))(*data);
 		}
-	}, &query);
-	return query.discounts;
+	}, &visit);
+}
+
+template<typename Matches>
+std::vector<Discount> collectDiscounts(const Player& player, Matches matches)
+{
+	std::vector<Discount> discounts;
+	visitActiveRetailModifiers(player, [&](const CostModifierUpgradeModuleData& data)
+	{
+		if (!matches(data))
+			return;
+		const auto found = std::find_if(discounts.begin(), discounts.end(),
+			[&data](const Discount& entry) { return entry.data == &data; });
+		if (found == discounts.end())
+			discounts.push_back({&data, 1});
+		else
+			++found->count;
+	});
+	return discounts;
 }
 
 Real costFactor(const std::vector<Discount>& discounts)
@@ -135,10 +138,17 @@ Real CostModifierUpgrade::retailUpgradeFactor(const Player& player, const Upgrad
 
 Real CostModifierUpgrade::retailSlaughterFactor(const Player& player)
 {
-	return costFactor(collectDiscounts(player, [](const CostModifierUpgradeModuleData& data)
+	std::size_t index = 0;
+	Real change = 0.0f;
+	visitActiveRetailModifiers(player, [&](const CostModifierUpgradeModuleData& data)
 	{
-		return data.m_retailSlaughter;
-	}));
+		if (!data.m_retailSlaughter)
+			return;
+		if (index < data.m_retailPercentages.size())
+			change = data.m_retailPercentages[index];
+		++index;
+	});
+	return std::max(0.0f, 1.0f + change);
 }
 
 Bool CostModifierUpgrade::retailLabel(const Object& object, AsciiString& label, Real& discount)

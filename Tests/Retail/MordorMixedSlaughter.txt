@@ -1,0 +1,17 @@
+5 sweep-setup Player_1 - 0
+20 create Player_1 MordorSlaughterHouse 0 860,440,0
+25 mparity-price Player_1 MordorSlaughterHouse 0 MordorOrcPit
+25 mparity-upgrade-price Player_1 MordorSlaughterHouse 0 Upgrade_MordorOrcPitLevel2
+40 create Player_1 MenGarrisonTowerExpansion 0 650,375,0
+42 create Player_1 RivendellGarrisonTowerExpansion 0 670,680,0
+52 log Player_1 MenGarrisonTowerExpansion 0
+52 log Player_1 RivendellGarrisonTowerExpansion 0
+58 mparity-price Player_1 MordorSlaughterHouse 0 MordorOrcPit
+58 mparity-upgrade-price Player_1 MordorSlaughterHouse 0 Upgrade_MordorOrcPitLevel2
+58 mparity-economy Player_1 MordorSlaughterHouse 0
+58 xpstate Player_1 MordorSlaughterHouse 0
+59 create Player_1 MordorOrcIthilienScout 0 860,440,0
+59 mparity-enter Player_1 MordorOrcIthilienScout 0 Player_1:MordorSlaughterHouse:0
+105 mparity-economy Player_1 MordorSlaughterHouse 0
+105 xpstate Player_1 MordorSlaughterHouse 0
+108 quit - - 0
