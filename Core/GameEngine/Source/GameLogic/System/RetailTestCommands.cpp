@@ -1450,16 +1450,23 @@ Bool sweepPlace(Object* builder, const ThingTemplate* thing, Coord3D& point)
 	return FALSE;
 }
 
-Bool sweepCast(Object* source, const SpecialPowerTemplate* power, UnsignedInt options, SweepCase& test)
+Bool sweepCast(Object* source, const CommandButton* button, const Command& command, Bool spell, SweepCase& test)
 {
+	const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
 	if (!power || !source->getSpecialPowerModule(power))
 		return FALSE;
+	const UnsignedInt options = button->getOptions();
 	test.power = power;
 	test.readyFrame = source->getSpecialPowerModule(power)->getReadyFrame();
 	test.particles = TheParticleSystemManager ? TheParticleSystemManager->getParticleSystemCount() : 0;
 	Object* target = nullptr;
 	Real best = 0.0f;
-	const Coord3D origin = *source->getPosition();
+	Coord3D origin = *source->getPosition();
+	if (spell)
+	{
+		origin = command.hasLocation ? command.location : Coord3D{1140.0f, 580.0f, 0.0f};
+		origin.z = TheTerrainLogic->getGroundHeight(origin.x, origin.y);
+	}
 	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 	{
 		if (object->isEffectivelyDead() || !object->getBodyModule() ||
@@ -1479,7 +1486,8 @@ Bool sweepCast(Object* source, const SpecialPowerTemplate* power, UnsignedInt op
 			((source->getRelationship(object) == ENEMIES && BitIsSet(options, NEED_TARGET_ENEMY_OBJECT)) ||
 			 (source->getRelationship(object) == ALLIES && BitIsSet(options, NEED_TARGET_ALLY_OBJECT)) ||
 			 (source->getRelationship(object) == NEUTRAL && BitIsSet(options, NEED_TARGET_NEUTRAL_OBJECT))) &&
-			TheActionManager->canDoSpecialPowerAtObject(source, object, CMD_FROM_PLAYER, power, options))
+			(spell ? button->canCastRetailSpell(source, object, &point) :
+				TheActionManager->canDoSpecialPowerAtObject(source, object, CMD_FROM_PLAYER, power, options)))
 		{
 			target = object;
 			best = distance;
@@ -1494,15 +1502,20 @@ Bool sweepCast(Object* source, const SpecialPowerTemplate* power, UnsignedInt op
 	else if (BitIsSet(options, NEED_TARGET_POS))
 	{
 		Coord3D point = origin;
-		point.x += 30.0f;
-		point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
-		if (!TheActionManager->canDoSpecialPowerAtLocation(source, &point, CMD_FROM_PLAYER, power, nullptr, options))
+		if (!spell)
+		{
+			point.x += 30.0f;
+			point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+		}
+		if (!(spell ? button->canCastRetailSpell(source, nullptr, &point) :
+			TheActionManager->canDoSpecialPowerAtLocation(source, &point, CMD_FROM_PLAYER, power, nullptr, options)))
 			return FALSE;
 		source->doSpecialPowerAtLocation(power, &point, INVALID_ANGLE, options);
 	}
 	else
 	{
-		if (!TheActionManager->canDoSpecialPower(source, power, CMD_FROM_PLAYER, options))
+		if (!(spell ? button->canCastRetailSpell(source, nullptr, &origin) :
+			TheActionManager->canDoSpecialPower(source, power, CMD_FROM_PLAYER, options)))
 			return FALSE;
 		source->doSpecialPower(power, options);
 	}
@@ -1515,17 +1528,16 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 	SweepCase& test = s_sweepCases[id];
 	const bool hero = command.action == "sweep-hero";
 	const bool spell = command.action == "sweep-spell";
-	const bool buttonRequired = !hero && !spell;
-	Object* source = sweepSource(command, player, buttonRequired);
-	if (!source)
+	const bool buttonRequired = !hero;
+	Object* source = spell ? player->getRetailSpellBook() : sweepSource(command, player, buttonRequired);
+	if (!source || (spell && stricmp(source->getTemplate()->getName().str(), command.target.c_str()) != 0))
 	{
 		std::fprintf(stderr, "SWEEP %d start frame=%u reason=no_source\n", id, frame);
 		return;
 	}
 	test.source = source->getID();
 	test.previousObject = newestObject();
-	const CommandButton* button = spell ? TheControlBar->findCommandButton(command.structure.c_str())
-		: buttonRequired ? sweepButton(source, command.structure.c_str()) : nullptr;
+	const CommandButton* button = buttonRequired ? sweepButton(source, command.structure.c_str()) : nullptr;
 	if (buttonRequired && !button)
 	{
 		std::fprintf(stderr, "SWEEP %d start frame=%u reason=no_button set=%s\n", id, frame, source->getCommandSetString().str());
@@ -1537,8 +1549,7 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 	Int eligibility = -1;
 	if (command.action == "sweep-power" || spell)
 	{
-		const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
-		issued = sweepCast(source, power, button ? button->getOptions() : 0, test);
+		issued = sweepCast(source, button, command, spell, test);
 		if (issued)
 		{
 			test.synchronousEffect = newestObject() > test.previousObject ||
