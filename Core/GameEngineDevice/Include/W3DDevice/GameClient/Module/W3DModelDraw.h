@@ -247,6 +247,8 @@ struct ModelConditionInfo
 
 	Int m_pristineBoneFrame;
 	const FXList* m_enteringStateFX = nullptr;
+	const ModelConditionInfo* m_animationState = nullptr;
+	const ModelConditionInfo* m_modelState = nullptr;
 
 	enum
 	{
@@ -337,6 +339,7 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
  	AsciiString getBestModelNameForWB(const ModelConditionFlags& c) const;
 	virtual const ModelConditionInfo* findBestInfo(const ModelConditionFlags& c) const;
+	virtual const ModelConditionInfo* findNamedTransition(const ModelConditionInfo*, const ModelConditionInfo*) const { return nullptr; }
 	void preloadAssets( TimeOfDay timeOfDay, Real scale ) const;
 #ifdef CACHE_ATTACH_BONE
 	const Vector3* getAttachToDrawableBoneOffset(const Drawable* draw) const;
@@ -526,6 +529,7 @@ private:
 
 
 	const ModelConditionInfo*			m_curState;
+	const ModelConditionInfo*			m_enteredAnimationState = nullptr;
 	std::vector<const SubObjectsUpgradeModuleData*> m_textureUpgrades;
 	const ModelConditionInfo*			m_nextState;
 	UnsignedInt										m_nextStateAnimLoopDuration;

@@ -45,7 +45,7 @@ const FXNamedValue *findNamedValue(const FXNamedValue *values, const char *token
 
 const FXNamedValue fxPriorities[] =
 {
-	{ "NONE",              INVALID_PRIORITY, TRUE },
+	{ "NONE",              PARTICLE_PRIORITY_LOWEST, TRUE },
 	{ "ULTRA_HIGH_ONLY",   WEAPON_EXPLOSION, TRUE },
 	{ "HIGH_OR_ABOVE",     BUILDUP,          TRUE },
 	{ "MEDIUM_OR_ABOVE",   UNIT_DAMAGE_FX,   TRUE },

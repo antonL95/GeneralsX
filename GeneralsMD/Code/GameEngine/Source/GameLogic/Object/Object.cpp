@@ -4950,16 +4950,21 @@ void Object::onDie( DamageInfo *damageInfo )
 		m_attributeModifierHelper->clearAll();
 
 	// FIRST, call our die modules.
+	Bool keepRadar = FALSE;
 	for (BehaviorModule** d = m_behaviors; *d; ++d)
 	{
 		DieModuleInterface* die = (*d)->getDie();
 		if (die)
+		{
+			keepRadar |= die->keepsRadarOnDeath(damageInfo);
 			die->onDie(damageInfo);
+		}
 	}
 
-	// When objects die we remove from the radar as they're really not interesting anymore
-	if( m_radarData )
+	if (m_radarData && !keepRadar)
 		TheRadar->removeObject( this );
+	else if (!m_radarData && keepRadar && !isDestroyed())
+		TheRadar->addObject(this);
 
 	// Just in case I have been sporting one of those fancy Terrain Decals,
 	//I naturally lose it now, because I'm dead.

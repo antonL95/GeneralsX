@@ -247,7 +247,10 @@ UpdateSleepTime StructureCollapseUpdate::update()
 			m_burstFrame += GameLogicRandomValue(d->m_minBurstDelay, d->m_maxBurstDelay);
 		}
 
-		const Real collapseHeight = d->m_collapseHeight >= 0.0f ? d->m_collapseHeight : building->getTemplate()->getTemplateGeometryInfo().getMaxHeightAbovePosition();
+		const Real geometryHeight = building->getTemplate()->getTemplateGeometryInfo().getMaxHeightAbovePosition();
+		const Real collapseHeight = d->m_destroyObjectWhenDone || d->m_collapseHeight < 0.0f
+			? max(d->m_collapseHeight, geometryHeight)
+			: d->m_collapseHeight;
 		if ((m_currentHeight + collapseHeight) <= 0)
 		{
 			m_collapseState = COLLAPSESTATE_DONE;

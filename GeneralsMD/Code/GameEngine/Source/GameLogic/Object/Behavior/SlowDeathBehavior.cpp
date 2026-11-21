@@ -459,6 +459,9 @@ UpdateSleepTime SlowDeathBehavior::update()
 		m_sinkFrame = (Real)m_sinkFrame * timeScale;
 		m_midpointFrame = (Real)m_midpointFrame * timeScale;
 		m_destructionFrame = (Real)m_destructionFrame * timeScale;
+		const UnsignedInt frame = TheGameLogic->getFrame();
+		if (d->m_fadeTime > 0 && m_fadeFrame > frame && (m_flags & (1<<FADE_STARTED)) == 0)
+			m_fadeFrame = frame + (m_fadeFrame - frame) * timeScale;
 		m_acceleratedTimeScale = timeScale;
 	};
 
@@ -472,6 +475,8 @@ UpdateSleepTime SlowDeathBehavior::update()
 			++m_sinkFrame;
 			++m_midpointFrame;
 			++m_destructionFrame;
+			if (d->m_fadeTime > 0 && (m_flags & (1<<FADE_STARTED)) == 0)
+				++m_fadeFrame;
 			if (!obj->isAboveTerrain())
 			{
 				obj->clearAndSetModelConditionFlags(MAKE_MODELCONDITION_MASK(MODELCONDITION_EXPLODED_FLAILING),

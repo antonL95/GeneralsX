@@ -109,7 +109,18 @@ static BodyDamageType calcDamageState(Real health, Real maxHealth, const ActiveB
 	if (!TheGlobalData)
 		return BODY_PRISTINE;
 
-	Real ratio = health / maxHealth;
+	if (RetailFileLayers::enabled())
+	{
+		if (health <= 0.0f)
+			return BODY_RUBBLE;
+		if (health >= maxHealth)
+			return BODY_PRISTINE;
+		if (health <= maxHealth * data->getReallyDamagedRatio())
+			return BODY_REALLYDAMAGED;
+		return health <= maxHealth * data->getDamagedRatio() ? BODY_DAMAGED : BODY_PRISTINE;
+	}
+
+	Real ratio = maxHealth > 0.0f ? health / maxHealth : 0.0f;
 
 	if (ratio > data->getDamagedRatio())
 	{

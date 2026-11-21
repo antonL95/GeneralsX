@@ -34,9 +34,27 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/Xfer.h"
+#include "Common/ModuleFactory.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/KeepObjectDie.h"
+#include "GameLogic/Object.h"
+
+void KeepObjectDieModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	DieModuleData::buildFieldParse(p);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse fields[] =
+		{
+			{ "CollapsingTime", INI::parseDurationUnsignedInt, nullptr, offsetof(KeepObjectDieModuleData, m_collapsingTime) },
+			{ "StayOnRadar", INI::parseBool, nullptr, offsetof(KeepObjectDieModuleData, m_stayOnRadar) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(fields);
+	}
+}
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -55,10 +73,13 @@ KeepObjectDie::~KeepObjectDie()
 //-------------------------------------------------------------------------------------------------
 void KeepObjectDie::onDie( const DamageInfo *damageInfo )
 {
-	if( !isDieApplicable(damageInfo) )
-	{
-		return;
-	}
+	if (RetailFileLayers::enabled() && isDieApplicable(damageInfo))
+		getObject()->setPowerModelCondition(MODELCONDITION_COLLAPSING, getKeepObjectDieModuleData()->m_collapsingTime);
+}
+
+Bool KeepObjectDie::keepsRadarOnDeath(const DamageInfo* damageInfo) const
+{
+	return RetailFileLayers::enabled() && getKeepObjectDieModuleData()->m_stayOnRadar && isDieApplicable(damageInfo);
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -39,10 +39,19 @@
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Thing;
 
+class KeepObjectDieModuleData : public DieModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	UnsignedInt m_collapsingTime = 0;
+	Bool m_stayOnRadar = FALSE;
+};
+
 class KeepObjectDie : public DieModule
 {
 
-	MAKE_STANDARD_MODULE_MACRO( KeepObjectDie );
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( KeepObjectDie, KeepObjectDieModuleData );
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( KeepObjectDie, "KeepObjectDie" )
 
 public:
@@ -51,5 +60,6 @@ public:
 	// virtual destructor prototype provided by memory pool declaration
 
 	virtual void onDie( const DamageInfo *damageInfo ) override;
+	Bool keepsRadarOnDeath(const DamageInfo* damageInfo) const override;
 
 };

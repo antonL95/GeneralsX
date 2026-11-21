@@ -106,12 +106,18 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 	void finishParsing();
 	const ModelConditionInfo* findBestInfo(const ModelConditionFlags& flags) const override;
+	const ModelConditionInfo* findNamedTransition(const ModelConditionInfo* previous, const ModelConditionInfo* destination) const override;
 	const ModelState* findPlacementDecal(const ModelConditionFlags& flags) const;
-
-	const std::multimap<NameKeyType, AnimationState>& getNamedTransitions() const { return m_namedTransitions; }
 
 private:
 	enum class StateType { DefaultModel, Model, Idle, Animation, Transition };
+
+	struct TransitionRequest
+	{
+		NameKeyType target = NAMEKEY_INVALID;
+		std::vector<NameKeyType> previousStates;
+		Bool excludePreviousStates = FALSE;
+	};
 
 	static void parseModelState(INI*, void*, void*, const void*);
 	static void parseAnimationState(INI*, void*, void*, const void*);
@@ -125,12 +131,16 @@ private:
 	static void parseScript(INI*, void*, void*, const void*);
 	static void parseRandomTexture(INI*, void*, void*, const void*);
 	static void parseAnimationRange(INI*, void*, void*, const void*);
+	static TransitionRequest readTransitionRequest(const std::string& script);
+
+	const ModelConditionInfo* combineState(const ModelConditionInfo* model, const AnimationState& animation) const;
 
 	ModelState m_defaultModel;
 	std::map<std::size_t, ModelState> m_modelStates;
 	std::vector<AnimationState> m_animationStates;
 	std::multimap<NameKeyType, AnimationState> m_namedTransitions;
-	mutable std::map<std::pair<std::size_t, std::size_t>, ModelConditionInfo> m_combinedStates;
+	std::map<const ModelConditionInfo*, TransitionRequest> m_transitionRequests;
+	mutable std::map<std::pair<std::size_t, const ModelConditionInfo*>, ModelConditionInfo> m_combinedStates;
 
 	std::vector<RandomTexture> m_randomTextures;
 	ModelConditionFlags m_dependencySharedModelFlags;

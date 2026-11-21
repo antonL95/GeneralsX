@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <regex>
 #include <utility>
 
 namespace
@@ -224,7 +225,11 @@ void W3DScriptedModelDrawModuleData::parseAnimationState(INI* ini, void* instanc
 		state.draw.m_animations.back().setUseWeaponTiming(animation.useWeaponTiming);
 	}
 	if (type == StateType::Transition)
-		self->m_namedTransitions.emplace(stateKey(transition), std::move(state));
+	{
+		const NameKeyType key = stateKey(transition);
+		state.draw.m_transitionSig = buildTransitionSig(key, key);
+		self->m_namedTransitions.emplace(key, std::move(state));
+	}
 	else if (state.idle && RetailFileLayers::enabled())
 		self->m_animationStates.insert(self->m_animationStates.begin(), std::move(state));
 	else
@@ -384,8 +389,56 @@ void W3DScriptedModelDrawModuleData::parseRandomTexture(INI* ini, void*, void* s
 	static_cast<std::vector<RandomTexture>*>(store)->push_back(std::move(texture));
 }
 
+auto W3DScriptedModelDrawModuleData::readTransitionRequest(const std::string& script) -> TransitionRequest
+{
+	if (script.find("CurDrawableSetTransitionAnimState") == std::string::npos)
+		return {};
+
+	static const std::string call = R"fx(CurDrawableSetTransitionAnimState\s*\(\s*"([^"]+)"\s*\))fx";
+	static const std::regex direct("\\s*" + call + "\\s*");
+	static const std::string prefix = R"fx(\s*([A-Za-z_][A-Za-z_0-9]*)\s*=\s*CurDrawablePrevAnimationState\s*\(\s*\)\s*if\s+()fx";
+	static const std::string suffix = ")\\s*then\\s+" + call + "\\s*end\\s*";
+	static const auto conditionsPattern = [](const char* comparison, const char* join)
+	{
+		const std::string test = std::string(R"fx([A-Za-z_][A-Za-z_0-9]*\s*)fx") + comparison + R"fx(\s*"[^"]+")fx";
+		return prefix + test + "(?:\\s*" + join + "\\s+" + test + ")*" + suffix;
+	};
+	static const std::regex allow(conditionsPattern("==", "or"));
+	static const std::regex exclude(conditionsPattern("~=", "and"));
+	static const std::regex comparison(R"fx(([A-Za-z_][A-Za-z_0-9]*)\s*(?:==|~=)\s*"([^"]+)")fx");
+
+	std::smatch match;
+	if (std::regex_match(script, match, direct))
+		return {stateKey(match[1].str().c_str()), {}, FALSE};
+	const Bool excluded = std::regex_match(script, match, exclude);
+	if (!excluded && !std::regex_match(script, match, allow))
+		return {};
+
+	const std::string variable = match[1].str();
+	const std::string conditions = match[2].str();
+	TransitionRequest request{stateKey(match[3].str().c_str()), {}, excluded};
+	for (auto it = std::sregex_iterator(conditions.begin(), conditions.end(), comparison); it != std::sregex_iterator(); ++it)
+	{
+		const NameKeyType previous = stateKey((*it)[2].str().c_str());
+		if ((*it)[1].str() != variable || previous == NAMEKEY_INVALID)
+			return {};
+		request.previousStates.push_back(previous);
+	}
+	return request;
+}
+
 void W3DScriptedModelDrawModuleData::finishParsing()
 {
+	if (RetailFileLayers::enabled() && !m_namedTransitions.empty())
+	{
+		for (const AnimationState& state : m_animationStates)
+		{
+			auto request = readTransitionRequest(state.script);
+			if (request.target != NAMEKEY_INVALID)
+				m_transitionRequests.emplace(&state.draw, std::move(request));
+		}
+	}
+
 	for (const ModelConditionInfo& model : m_conditionStates)
 	{
 		for (const ModelConditionFlags& flags : model.m_conditionsYesVec)
@@ -436,21 +489,45 @@ const ModelConditionInfo* W3DScriptedModelDrawModuleData::findBestInfo(const Mod
 	if (!best)
 		return model;
 
-	const auto key = std::make_pair(model - m_conditionStates.data(), best - m_animationStates.data());
+	return combineState(model, *best);
+}
+
+const ModelConditionInfo* W3DScriptedModelDrawModuleData::combineState(const ModelConditionInfo* model, const AnimationState& animation) const
+{
+	const auto key = std::make_pair(model - m_conditionStates.data(), &animation.draw);
 	auto [entry, inserted] = m_combinedStates.try_emplace(key, *model);
 	if (inserted)
 	{
 		ModelConditionInfo& combined = entry->second;
-		combined.m_animations = best->draw.m_animations;
-		combined.m_flags = best->draw.m_flags;
-		combined.m_transitionKey = best->draw.m_transitionKey;
-		combined.m_pristineBoneFrame = best->draw.m_pristineBoneFrame;
-		combined.m_enteringStateFX = best->enteringStateFX.isEmpty() || TheFXListStore == nullptr ? nullptr : TheFXListStore->findFXList(best->enteringStateFX.str());
+		combined.m_animations = animation.draw.m_animations;
+		combined.m_flags = animation.draw.m_flags;
+		combined.m_transitionKey = animation.draw.m_transitionKey;
+		combined.m_transitionSig = animation.draw.m_transitionSig;
+		combined.m_pristineBoneFrame = animation.draw.m_pristineBoneFrame;
+		combined.m_animationState = &animation.draw;
+		combined.m_modelState = model;
+		combined.m_enteringStateFX = animation.enteringStateFX.isEmpty() || TheFXListStore == nullptr ? nullptr : TheFXListStore->findFXList(animation.enteringStateFX.str());
 		combined.m_validStuff &= ModelConditionInfo::HAS_PROJECTILE_BONES | ModelConditionInfo::PUBLIC_BONES_VALID;
 		combined.m_particleSysBones.insert(combined.m_particleSysBones.end(),
-			best->draw.m_particleSysBones.begin(), best->draw.m_particleSysBones.end());
+			animation.draw.m_particleSysBones.begin(), animation.draw.m_particleSysBones.end());
 	}
 	return &entry->second;
+}
+
+const ModelConditionInfo* W3DScriptedModelDrawModuleData::findNamedTransition(
+	const ModelConditionInfo* previous, const ModelConditionInfo* destination) const
+{
+	const auto entry = m_transitionRequests.find(destination->m_animationState);
+	if (entry == m_transitionRequests.end() || previous->m_animationState == destination->m_animationState)
+		return nullptr;
+
+	const TransitionRequest& request = entry->second;
+	const auto& states = request.previousStates;
+	if (!states.empty() && (std::find(states.begin(), states.end(), previous->m_transitionKey) != states.end()) == request.excludePreviousStates)
+		return nullptr;
+
+	const auto transition = m_namedTransitions.find(request.target);
+	return transition != m_namedTransitions.end() ? combineState(destination->m_modelState, transition->second) : nullptr;
 }
 
 W3DScriptedModelDraw::W3DScriptedModelDraw(Thing* thing, const ModuleData* data)

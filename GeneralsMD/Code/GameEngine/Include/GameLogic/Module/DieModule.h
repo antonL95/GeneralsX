@@ -44,6 +44,7 @@ class DieModuleInterface
 {
 public:
 	virtual void onDie( const DamageInfo *damageInfo ) = 0;
+	virtual Bool keepsRadarOnDeath(const DamageInfo*) const { return FALSE; }
 };
 
 //-------------------------------------------------------------------------------------------------

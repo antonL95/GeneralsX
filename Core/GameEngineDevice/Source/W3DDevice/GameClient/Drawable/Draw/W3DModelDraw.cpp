@@ -2297,7 +2297,8 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 			m_renderObject->Set_ObjectScale(getDrawable()->getInstanceScale());
 	}
 
-	if (isAnimationComplete(m_renderObject))
+	if ((m_curState && m_curState->m_transitionSig != NO_TRANSITION && m_whichAnimInCurState < 0) ||
+		isAnimationComplete(m_renderObject))
 	{
 		if (m_curState != nullptr && m_nextState != nullptr)
 		{
@@ -3515,12 +3516,13 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 			return;
 		}
 		// check for a normal->normal state transition
-		else if (newState != m_curState &&
-					m_curState->m_transitionKey != NAMEKEY_INVALID &&
-					newState->m_transitionKey != NAMEKEY_INVALID)
+		else if (newState != m_curState && m_curState->m_transitionSig == NO_TRANSITION)
 		{
-			TransitionSig sig = buildTransitionSig(m_curState->m_transitionKey, newState->m_transitionKey);
-			const ModelConditionInfo* transState = findTransitionForSig(sig);
+			const ModelConditionInfo* transState = nullptr;
+			if (!(TheGameState && TheGameState->isInLoadGame()))
+				transState = getW3DModelDrawModuleData()->findNamedTransition(m_curState, newState);
+			if (!transState && m_curState->m_transitionKey != NAMEKEY_INVALID && newState->m_transitionKey != NAMEKEY_INVALID)
+				transState = findTransitionForSig(buildTransitionSig(m_curState->m_transitionKey, newState->m_transitionKey));
 			if (transState != nullptr)
 			{
 #ifdef DEBUG_OBJECT_ID_EXISTS
@@ -3737,7 +3739,11 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 	m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
 	adjustAnimation(prevState, prevAnimFraction);
 
-	if (newState->m_enteringStateFX != nullptr && prevState != newState)
+	if (newState->m_animationState == m_enteredAnimationState)
+		return;
+	m_enteredAnimationState = newState->m_animationState;
+
+	if (newState->m_enteringStateFX != nullptr && !(TheGameState && TheGameState->isInLoadGame()))
 	{
 		const Drawable* drawable = getDrawable();
 		if (drawable->getObject() != nullptr)

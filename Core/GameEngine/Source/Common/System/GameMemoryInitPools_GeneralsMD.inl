@@ -51,7 +51,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "Drawable", 4096, 32 },
 	{ "Image", 2048, 32 },
 	{ "ParticlePool", 1400, 1024 },
-	{ "ParticleSystemTemplatePool", 1100, 32 },
+	{ "ParticleSystemTemplatePool", 4500, 64 },
 	{ "ParticleSystemPool", 1024, 32 },
 	{ "TerrainRoadType", 100, 32 },
 	{ "WindowLayoutPool", 32, 32 },
