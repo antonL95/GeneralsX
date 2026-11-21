@@ -22,6 +22,7 @@
 #include <bit>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <memory>
 
@@ -231,7 +232,7 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 				const auto &color = TheGlobalData->m_terrainDiffuse[i];
 				const auto &direction = TheGlobalData->m_terrainLightPos[i];
 				values[i * 2] = {color.red, color.green, color.blue, 0.0f};
-				values[i * 2 + 1] = {direction.x, direction.y, direction.z, 0.0f};
+				values[i * 2 + 1] = {-direction.x, -direction.y, -direction.z, 0.0f};
 			}
 		}
 		else if (name == "Time")
@@ -274,6 +275,18 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 	if (drawn && !runtime.drew)
 	{
 		std::fprintf(stderr, "[RetailFX] Drew WaterShader BumpSpecular_M (%s)\n", settings.fxShader.str());
+		if (std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS"))
+		{
+			const auto color = water.material.get<W3dFx::Float4>("MaterialColorDiffuse", {0.15f, 0.3f, 0.35f, 0.5f});
+			const auto &light = TheGlobalData->m_terrainLightPos[0];
+			std::fprintf(stderr,
+				"[RetailFX] Water bump=%s environment=%s wave=%s diffuse=(%g,%g,%g,%g) legacyDiffuse=%08x "
+				"maxAlphaDepth=%g deepAlpha=%g softEdge=%d lightToSurface=(%g,%g,%g)\n",
+				water.bump->Get_Texture_Name().str(), water.environment->Get_Texture_Name().str(),
+				water.wave->Get_Texture_Name().str(), color[0], color[1], color[2], color[3],
+				static_cast<unsigned>(m_settings[m_tod].waterDiffuse), maxDepth, authoredAlpha,
+				TheGlobalData->m_showSoftWaterEdge && maxDepth > 0.0f, light.x, light.y, light.z);
+		}
 		runtime.drew = true;
 	}
 	if (!drawn && !runtime.failed)
