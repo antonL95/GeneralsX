@@ -61,6 +61,7 @@
 #include "Common/PlayerTemplateRules.h"
 #include "Common/CommandPointRules.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailEva.h"
 #include "GameClient/RetailWorldUI.h"
 #include "GameLogic/HeroRoster.h"
 #include "Common/ProductionPrerequisite.h"
@@ -1612,6 +1613,9 @@ void Player::onStructureCreated( Object *builder, Object *structure )
 //-------------------------------------------------------------------------------------------------
 void Player::onStructureConstructionComplete( Object *builder, Object *structure, Bool isRebuild )
 {
+	if (RetailFileLayers::enabled() && !isRebuild)
+		RetailEva::queue(this, "GenericBuildingComplete-Builder", structure->getPosition(), RetailEva::Ping::Generic);
+
 	// When a a structure is completed, it becomes "real" as far as scripting is
 	// concerned. jba.
 	TheScriptEngine->notifyOfObjectCreationOrDestruction();

@@ -45,6 +45,7 @@
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailEva.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "Common/SpecialPower.h"
@@ -2103,10 +2104,13 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 			damageInfo->in.m_damageType != DAMAGE_HEALING &&
 			getControllingPlayer() &&
 			!BitIsSet(damageInfo->in.m_sourcePlayerMask, getControllingPlayer()->getPlayerMask()) &&
-			m_radarData != nullptr &&
-			isLocallyControlled() &&
 			!isKindOf( KINDOF_NO_ATTACK_WARNING ) )
-		TheRadar->tryUnderAttackEvent( this );
+	{
+		if (RetailFileLayers::enabled() && !isKindOf(KINDOF_INERT))
+			RetailEva::underAttack(*this);
+		else if (m_radarData && isLocallyControlled())
+			TheRadar->tryUnderAttackEvent(this);
+	}
 
 }
 
@@ -5003,7 +5007,9 @@ void Object::onDie( DamageInfo *damageInfo )
 	TheAudio->addAudioEvent(&deathSound);
 #endif
 
-	if (isLocallyViewed() && !selfInflicted) // wasLocallyViewed? :-)
+	if (RetailFileLayers::enabled() && !selfInflicted && !isKindOf(KINDOF_INERT))
+		RetailEva::destroyed(*this);
+	else if (!RetailFileLayers::enabled() && isLocallyViewed() && !selfInflicted)
 	{
 		if (isKindOf(KINDOF_STRUCTURE) && isKindOf(KINDOF_MP_COUNT_FOR_VICTORY))
 		{

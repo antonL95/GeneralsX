@@ -34,6 +34,8 @@
 #include "Common/FramePacer.h"
 #include "Common/GameAudio.h"
 #include "Common/GameUtility.h"
+#include "Common/RetailFileLayers.h"
+#include "GameClient/RetailHudExtras.h"
 #include "Common/MapObject.h"							// For MAP_XY_FACTOR
 #include "Common/PartitionSolver.h"
 #include "Common/Player.h"
@@ -212,7 +214,12 @@ void ScriptActions::doVictory()
 	closeWindows(FALSE);
 	TheGameLogic->closeWindows();
 	doDisableInput();
-	if (!m_suppressNewWindows)
+	if (RetailFileLayers::enabled())
+	{
+		if (!m_suppressNewWindows && !TheVictoryConditions->amIObserver())
+			RetailNotification::showType("Generic", TheGameText->fetch("GUI:Victory"));
+	}
+	else if (!m_suppressNewWindows)
 	{
 		const Player *localPlayer = ThePlayerList->getLocalPlayer();
 		Bool showObserverWindow = localPlayer->isPlayerObserver() || TheScriptEngine->hasShownMPLocalDefeatWindow();
@@ -236,7 +243,12 @@ void ScriptActions::doDefeat()
 	closeWindows(FALSE);
 	TheGameLogic->closeWindows();
 	doDisableInput();
-	if (!m_suppressNewWindows)
+	if (RetailFileLayers::enabled())
+	{
+		if (!m_suppressNewWindows && !TheVictoryConditions->amIObserver())
+			RetailNotification::showType("Generic", TheGameText->fetch("GUI:Defeat"));
+	}
+	else if (!m_suppressNewWindows)
 	{
 		const Player *localPlayer = ThePlayerList->getLocalPlayer();
 		Bool showObserverWindow = localPlayer->isPlayerObserver() || TheScriptEngine->hasShownMPLocalDefeatWindow();

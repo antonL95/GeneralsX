@@ -29,6 +29,7 @@
 
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "GameClient/RetailEva.h"
 
 #include "GameLogic/ExperienceTracker.h"
 #include "Common/RetailFileLayers.h"
@@ -494,6 +495,7 @@ void SpecialPowerModule::startPowerRecharge()
 		// set the frame we will be 100% available on now
 		m_availableOnFrame = TheGameLogic->getFrame() + getSpecialPowerTemplate()->getReloadTime();
 	}
+	RetailEva::watchRecharge(*obj, *modData->m_specialPowerTemplate);
 }
 
 //-------------------------------------------------------------------------------------------------

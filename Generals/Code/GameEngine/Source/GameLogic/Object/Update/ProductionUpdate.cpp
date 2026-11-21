@@ -46,6 +46,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/Eva.h"
+#include "GameClient/RetailEva.h"
 #include "GameClient/GameText.h"
 #include "GameClient/InGameUI.h"
 
@@ -876,8 +877,13 @@ UpdateSleepTime ProductionUpdate::update()
 				upgrade->getUpgradeName(),
 				us->getID());
 
-			// print a message to the local player
-			if( us->isLocallyViewed() )
+			if (RetailFileLayers::enabled())
+			{
+				const AsciiString &name = upgrade->getResearchCompleteEvaEvent();
+				RetailEva::queue(us->getControllingPlayer(), name.isEmpty() ? AsciiString("GenericBuildingUpgraded") : name,
+					us->getPosition(), RetailEva::Ping::Upgrade);
+			}
+			else if (us->isLocallyViewed())
 			{
 				UnicodeString msg;
 				UnicodeString format = TheGameText->fetch( "UPGRADE:UpgradeComplete" );

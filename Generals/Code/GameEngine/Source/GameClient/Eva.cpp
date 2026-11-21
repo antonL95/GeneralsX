@@ -29,6 +29,8 @@
 #include "GameClient/Eva.h"
 
 #include "Common/GameUtility.h"
+#include "Common/RetailFileLayers.h"
+#include "GameClient/RetailEva.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "GameLogic/GameLogic.h"
@@ -180,6 +182,9 @@ Eva::~Eva()
 //-------------------------------------------------------------------------------------------------
 void Eva::init()
 {
+	if (RetailFileLayers::enabled())
+		return;
+
 	// parse the INI here, etc.
 	INI ini;
 	ini.loadFileDirectory( "Data\\INI\\Eva", INI_LOAD_OVERWRITE, nullptr);
@@ -188,6 +193,9 @@ void Eva::init()
 //-------------------------------------------------------------------------------------------------
 void Eva::reset()
 {
+	if (RetailFileLayers::enabled())
+		RetailEva::reset();
+
 	m_previousUnitCount = 0;
 	m_previousBuildingCount = 0;
 
@@ -209,6 +217,13 @@ void Eva::reset()
 //-------------------------------------------------------------------------------------------------
 void Eva::update()
 {
+	if (RetailFileLayers::enabled())
+	{
+		if (m_enabled)
+			RetailEva::update();
+		return;
+	}
+
 	if (!m_enabled) {
 		return;
 	}
@@ -299,6 +314,13 @@ const EvaCheckInfo *Eva::getEvaCheckInfo(AsciiString name)
 //-------------------------------------------------------------------------------------------------
 void Eva::setShouldPlay(EvaMessage messageToPlay)
 {
+	if (RetailFileLayers::enabled())
+	{
+		if (m_enabled && messageToPlay == EVA_InsufficientFunds)
+			RetailEva::queue(rts::getObservedOrLocalPlayer_Safe(), "CannotBuildDueToFunds");
+		return;
+	}
+
 	m_shouldPlay[messageToPlay] = TRUE;
 }
 

@@ -51,6 +51,8 @@
 #include "Common/StatsCollector.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/FileSystem.h"
+#include "GameClient/RetailEva.h"
 
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
@@ -276,7 +278,8 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 	TheScriptActions->closeWindows(FALSE); // Close victory or defeat windows.
 
 	Bool shellGame = FALSE;
-	if ((!isInShellGame() || !isInGame()) && showScoreScreen && !TheGlobalData->m_headless)
+	if ((!isInShellGame() || !isInGame()) && showScoreScreen && !TheGlobalData->m_headless &&
+		(!RetailFileLayers::enabled() || TheFileSystem->doesFileExist("Data\\Window\\Menus\\ScoreScreen.wnd")))
 	{
 		shellGame = TRUE;
 #ifdef ALLOW_DEBUG_UTILS
@@ -2291,11 +2294,14 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 			aSound.setPosition(&pos);
 			TheAudio->addAudioEvent(&aSound);
 
-			// beacons are a rare event; play a nifty radar event thingy
-			TheRadar->createEvent( object->getPosition(), RADAR_EVENT_INFORMATION );
-
-			if (ThePlayerList->getLocalPlayer()->getRelationship(msgPlayer->getDefaultTeam()) == ALLIES)
-				TheEva->setShouldPlay(EVA_BeaconDetected);
+			if (RetailFileLayers::enabled())
+				RetailEva::queue(ThePlayerList->getLocalPlayer(), "BeaconDetected", object->getPosition(), RetailEva::Ping::Beacon);
+			else
+			{
+				TheRadar->createEvent(object->getPosition(), RADAR_EVENT_INFORMATION);
+				if (ThePlayerList->getLocalPlayer()->getRelationship(msgPlayer->getDefaultTeam()) == ALLIES)
+					TheEva->setShouldPlay(EVA_BeaconDetected);
+			}
 
 			TheControlBar->markUIDirty(); // check if we should grey out the button
 		}

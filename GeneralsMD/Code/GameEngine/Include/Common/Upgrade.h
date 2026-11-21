@@ -180,6 +180,7 @@ public:
 	const UpgradeMaskType& getUpgradeMask() const { return m_upgradeMask; }
 	UpgradeType getUpgradeType() const { return m_type; }
 	const AudioEventRTS* getResearchCompleteSound() const { return &m_researchSound; }
+	const AsciiString &getResearchCompleteEvaEvent() const { return m_researchCompleteEvaEvent; }
 	const AudioEventRTS* getUnitSpecificSound() const { return &m_unitSpecificSound; }
 	AcademyClassificationType getAcademyClassificationType() const { return m_academyClassificationType; }
 

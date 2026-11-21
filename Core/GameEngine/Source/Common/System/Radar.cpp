@@ -880,13 +880,14 @@ static RadarColorLookup radarColorLookupTable[] =
 	{ RADAR_EVENT_STEALTH_DISCOVERED,		{   0, 255,   0, 255 },	 {    0, 128,   0, 255 } },
 	{ RADAR_EVENT_STEALTH_NEUTRALIZED,	{   0, 255,   0, 255 },	 {    0, 128,   0, 255 } },
 	{ RADAR_EVENT_FAKE,									{   0,	 0,   0,	 0 },	 {    0,	 0,   0,   0 } },
+	{ RADAR_EVENT_ONE_RING, { 255, 204, 0, 255 }, { 255, 255, 128, 255 } },
 	{ RADAR_EVENT_INVALID,							{   0,   0,   0,   0 },  {    0,   0,   0,   0 } }
 };
 
 //-------------------------------------------------------------------------------------------------
 /** Create a new radar event */
 //-------------------------------------------------------------------------------------------------
-void Radar::createEvent( const Coord3D *world, RadarEventType type, Real secondsToLive )
+void Radar::createEvent( const Coord3D *world, RadarEventType type, Real secondsToLive, Bool jumpTo )
 {
 
 	// sanity
@@ -923,7 +924,7 @@ void Radar::createEvent( const Coord3D *world, RadarEventType type, Real seconds
 	}
 
 	// call the internal method to create the event with these colors
-	internalCreateEvent( world, type, secondsToLive, &color[ 0 ], &color[ 1 ] );
+	internalCreateEvent( world, type, secondsToLive, &color[ 0 ], &color[ 1 ], jumpTo );
 
 }
 
@@ -973,7 +974,7 @@ void Radar::createPlayerEvent( Player *player, const Coord3D *world,
 /** Create a new radar event */
 //-------------------------------------------------------------------------------------------------
 void Radar::internalCreateEvent( const Coord3D *world, RadarEventType type, Real secondsToLive,
-																 const RGBAColorInt *color1, const RGBAColorInt *color2 )
+																 const RGBAColorInt *color1, const RGBAColorInt *color2, Bool jumpTo )
 {
 	static Real secondsBeforeDieToFade = 0.5f;  ///< this many seconds before we hit the die frame we start to fade away
 
@@ -998,8 +999,10 @@ void Radar::internalCreateEvent( const Coord3D *world, RadarEventType type, Real
 	m_event[ m_nextFreeRadarEvent ].soundPlayed = FALSE;
 
 	// record the index of this, our "last" radar event.
-	if ( type != RADAR_EVENT_BEACON_PULSE )
+	if (jumpTo && type != RADAR_EVENT_BEACON_PULSE)
 		m_lastRadarEvent = m_nextFreeRadarEvent;
+	else if (!jumpTo && m_lastRadarEvent == m_nextFreeRadarEvent)
+		m_lastRadarEvent = -1;
 
 	//
 	// increment the next radar event index, wrapping to the beginning.  If we ever have so many
@@ -1162,7 +1165,7 @@ void Radar::tryInfiltrationEvent( const Object *obj )
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-Bool Radar::tryEvent( RadarEventType event, const Coord3D *pos )
+Bool Radar::tryEvent( RadarEventType event, const Coord3D *pos, Bool jumpTo )
 {
 
 	// sanity
@@ -1209,7 +1212,7 @@ Bool Radar::tryEvent( RadarEventType event, const Coord3D *pos )
 	}
 
 	// if we got here then we want to create a new event
-	createEvent( pos, event );
+	createEvent(pos, event, 4.0f, jumpTo);
 
 	// return TRUE for successfully created event
 	return TRUE;

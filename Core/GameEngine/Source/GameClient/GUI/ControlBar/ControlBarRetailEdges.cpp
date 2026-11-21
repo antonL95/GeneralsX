@@ -2,12 +2,15 @@
 
 #include <array>
 #include <cmath>
+#include <map>
 #include <string>
 #include <vector>
 
 #include "Common/AudioEventRTS.h"
 #include "Common/GameAudio.h"
 #include "Common/GameCommon.h"
+#include "Common/INI.h"
+#include "Lib/RGBColor.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -122,9 +125,28 @@ struct EdgeState
 	Real fontScale = 0.0f;
 };
 
+struct NoteType
+{
+	AsciiString title;
+	AsciiString icon;
+};
+
+struct NoteSettings
+{
+	AsciiString font = "Albertus MT";
+	Int size = 16;
+	Bool bold = FALSE;
+	RGBColor color = {1.0f, 0.8f, 0.0f};
+	AsciiString audio = "Gui_DaveBox";
+	std::map<AsciiString, NoteType> types;
+};
+
+NoteSettings s_noteSettings;
+
 struct NoteState
 {
 	GameWindow *window = nullptr;
+	DisplayString *title = nullptr;
 	DisplayString *text = nullptr;
 	const Image *portrait = nullptr;
 	UnsignedInt start = 0;
@@ -442,8 +464,19 @@ void drawNotification(GameWindow *, WinInstanceData *)
 		const Box area = noteBox(scale, NoteTextX, NoteTextY, NoteTextWidth, NoteTextHeight);
 		Int width, height;
 		s_note.text->getSize(&width, &height);
-		s_note.text->draw(area.x0 + (area.width() - width) / 2, area.y0 + (area.height() - height) / 2,
-			alphaColor(255, 204, 0, alpha), alphaColor(0, 0, 0, alpha), 1, 1);
+		const RGBColor &rgb = s_noteSettings.color;
+		const Color color = alphaColor(static_cast<Int>(rgb.red * 255), static_cast<Int>(rgb.green * 255), static_cast<Int>(rgb.blue * 255), alpha);
+		const Color shadow = alphaColor(0, 0, 0, alpha);
+		Int top = area.y0 + (area.height() - height) / 2;
+		if (s_note.title && s_note.title->getTextLength() > 0)
+		{
+			Int titleWidth, titleHeight;
+			s_note.title->getSize(&titleWidth, &titleHeight);
+			top -= titleHeight / 2;
+			s_note.title->draw(area.x0 + (area.width() - titleWidth) / 2, top, color, shadow, 1, 1);
+			top += titleHeight;
+		}
+		s_note.text->draw(area.x0 + (area.width() - width) / 2, top, color, shadow, 1, 1);
 	}
 }
 
@@ -594,6 +627,47 @@ Bool showTooltip(Int x, Int y)
 
 namespace RetailNotification
 {
+void load()
+{
+	INI ini;
+	ini.loadFileDirectory("Data\\INI\\InGameNotificationBox", INI_LOAD_OVERWRITE, nullptr, 0);
+}
+
+static void parseFont(INI *ini, void *instance, void *, const void *)
+{
+	auto &settings = *static_cast<NoteSettings *>(instance);
+	settings.font = ini->getNextQuotedAsciiString();
+	settings.size = INI::scanInt(ini->getNextToken());
+	settings.bold = INI::scanBool(ini->getNextToken());
+}
+
+static void parseType(INI *ini, void *instance, void *, const void *)
+{
+	static const FieldParse fields[] = {
+		{ "Title", INI::parseAsciiString, nullptr, offsetof(NoteType, title) },
+		{ "Icon", INI::parseAsciiString, nullptr, offsetof(NoteType, icon) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	AsciiString name = ini->getNextToken();
+	name.toLower();
+	NoteType type;
+	ini->initFromINI(&type, fields);
+	static_cast<NoteSettings *>(instance)->types[name] = type;
+}
+
+void parse(INI *ini)
+{
+	static const FieldParse fields[] = {
+		{ "Font", parseFont, nullptr, 0 },
+		{ "DefaultMessageFont", parseFont, nullptr, 0 },
+		{ "DefaultMessageColor", INI::parseRGBColor, nullptr, offsetof(NoteSettings, color) },
+		{ "DefaultOpenAudio", INI::parseAsciiString, nullptr, offsetof(NoteSettings, audio) },
+		{ "NotificationType", parseType, nullptr, 0 },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(&s_noteSettings, fields);
+}
+
 void init(GameWindow *master)
 {
 	s_note.window = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:Notification"));
@@ -612,26 +686,48 @@ void reset()
 		s_note.window->winHide(TRUE);
 }
 
-void show(const UnicodeString &message, const Image *portrait, Real seconds)
+static void showNote(const UnicodeString &title, const UnicodeString &message, const Image *portrait, Real seconds)
 {
 	if (!s_note.window || message.isEmpty())
 		return;
-	GameFont *font = TheFontLibrary ? TheFontLibrary->getUiFont(AsciiString("Albertus MT"), 16, FALSE, TheDisplay->getWidth(), TheDisplay->getHeight()) : nullptr;
+	GameFont *font = TheFontLibrary ? TheFontLibrary->getUiFont(s_noteSettings.font, s_noteSettings.size, s_noteSettings.bold, TheDisplay->getWidth(), TheDisplay->getHeight()) : nullptr;
 	DisplayString *text = ensureString(s_note.text, font);
 	if (!text)
 		return;
 	text->setText(message);
+	if (DisplayString *heading = ensureString(s_note.title, font))
+		heading->setText(title);
 	s_note.portrait = portrait;
 	s_note.start = timeGetTime();
 	s_note.holdMs = static_cast<UnsignedInt>(MAX(0.0f, seconds) * 1000.0f + 0.5f);
 	s_note.open = TRUE;
 	s_note.pressed = FALSE;
 	s_note.window->winHide(FALSE);
-	if (TheAudio)
+	if (TheAudio && !s_noteSettings.audio.isEmpty())
 	{
-		AudioEventRTS open("Gui_DaveBox");
+		AudioEventRTS open(s_noteSettings.audio);
 		TheAudio->addAudioEvent(&open);
 	}
+}
+
+void show(const UnicodeString &message, const Image *portrait, Real seconds)
+{
+	showNote(UnicodeString(), message, portrait, seconds);
+}
+
+void showType(const AsciiString &type, const UnicodeString &message, Real seconds)
+{
+	AsciiString key = type;
+	key.toLower();
+	const auto entry = s_noteSettings.types.find(key);
+	if (entry == s_noteSettings.types.end())
+	{
+		show(message, nullptr, seconds);
+		return;
+	}
+	const NoteType &style = entry->second;
+	const UnicodeString title = !style.title.isEmpty() && TheGameText ? TheGameText->fetch(style.title.str()) : UnicodeString();
+	showNote(title, message, style.icon.isEmpty() ? nullptr : findImage(style.icon.str()), seconds);
 }
 
 void update()

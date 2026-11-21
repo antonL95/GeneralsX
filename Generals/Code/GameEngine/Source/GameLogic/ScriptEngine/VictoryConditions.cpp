@@ -54,6 +54,8 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptActions.h"
+#include "GameLogic/ScriptEngine.h"
+#include "GameClient/RetailEva.h"
 #include "GameLogic/VictoryConditions.h"
 #include "GameNetwork/GameInfo.h"
 #include "GameNetwork/NetworkDefs.h"
@@ -258,9 +260,17 @@ void VictoryConditions::update()
 				ThePartitionManager->revealMapForPlayerPermanently( p->getPlayerIndex() );
 
 				TheInGameUI->message("GUI:PlayerHasBeenDefeated", p->getPlayerDisplayName().str() );
-				// People are boneheads. Also play a sound
-				static AudioEventRTS leftGameSound("GUIMessageReceived");
-				TheAudio->addAudioEvent(&leftGameSound);
+				if (RetailFileLayers::enabled())
+				{
+					Player *viewer = rts::getObservedOrLocalPlayer_Safe();
+					if (viewer && viewer != p)
+						RetailEva::queue(viewer, areAllies(viewer, p) ? "AllyDefeated" : "EnemyDefeated");
+				}
+				else
+				{
+					static AudioEventRTS leftGameSound("GUIMessageReceived");
+					TheAudio->addAudioEvent(&leftGameSound);
+				}
 			}
 
 			if (TheGameInfo)
@@ -279,6 +289,17 @@ void VictoryConditions::update()
 			p->killPlayer();
 			PopulateInGameDiplomacyPopup();
 		}
+	}
+
+	if (RetailFileLayers::enabled() && rts::isSkirmishGame(TheGameLogic->getGameMode()) &&
+		m_singleAllianceRemaining && m_endFrame == TheGameLogic->getFrame())
+	{
+		if (TheGlobalData->m_headless)
+			TheScriptEngine->startEndGameTimer();
+		else if (m_isObserver || isLocalAlliedVictory())
+			TheScriptActions->doVictory();
+		else
+			TheScriptActions->doDefeat();
 	}
 
 	// Check if the local player has been eliminated

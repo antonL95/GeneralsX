@@ -602,7 +602,7 @@ void W3DRadar::drawEvents( Int pixelX, Int pixelY, Int width, Int height )
 		{
 
 			// if we haven't played the sound for this event, do it now that we can see it
-			if( m_event[ i ].soundPlayed == FALSE && m_event[i].type != RADAR_EVENT_BEACON_PULSE )
+			if( !RetailFileLayers::enabled() && m_event[ i ].soundPlayed == FALSE && m_event[i].type != RADAR_EVENT_BEACON_PULSE )
 			{
 				static AudioEventRTS eventSound("RadarEvent");
 				TheAudio->addAudioEvent( &eventSound );
@@ -611,10 +611,12 @@ void W3DRadar::drawEvents( Int pixelX, Int pixelY, Int width, Int height )
 
 			m_event[ i ].soundPlayed = TRUE;
 
-			if ( m_event[ i ].type == RADAR_EVENT_BEACON_PULSE )
-				drawSingleBeaconEvent( pixelX, pixelY, width, height, i );
-			else if (!drawInformationAlert(pixelX, pixelY, width, height, m_event[i]))
-				drawSingleGenericEvent( pixelX, pixelY, width, height, i );
+			if (drawRetailAlert(pixelX, pixelY, width, height, m_event[i]))
+				continue;
+			if (m_event[i].type == RADAR_EVENT_BEACON_PULSE)
+				drawSingleBeaconEvent(pixelX, pixelY, width, height, i);
+			else
+				drawSingleGenericEvent(pixelX, pixelY, width, height, i);
 
 		}
 
@@ -623,25 +625,38 @@ void W3DRadar::drawEvents( Int pixelX, Int pixelY, Int width, Int height )
 }
 
 
-Bool W3DRadar::drawInformationAlert(Int pixelX, Int pixelY, Int width, Int height, const RadarEvent &event)
+Bool W3DRadar::drawRetailAlert(Int pixelX, Int pixelY, Int width, Int height, const RadarEvent &event)
 {
-	if (!RetailFileLayers::enabled() || event.type != RADAR_EVENT_INFORMATION || !TheMappedImageCollection)
+	if (!RetailFileLayers::enabled() || !TheMappedImageCollection)
 		return FALSE;
 
 	const UnsignedInt elapsed = TheGameLogic->getFrame() - event.createFrame;
 	const UnsignedInt duration = std::max(1u, event.dieFrame - event.createFrame);
 	const UnsignedInt frame = std::min<UnsignedInt>(15, 16ull * elapsed / duration);
 	AsciiString name;
-	name.format("RadarInfoAlert_%05u", frame);
+	switch (event.type)
+	{
+		case RADAR_EVENT_INFORMATION: name.format("RadarInfoAlert_%05u", frame); break;
+		case RADAR_EVENT_UNDER_ATTACK: name = "Aptred_ping"; break;
+		case RADAR_EVENT_UPGRADE: name = "Aptgreen_ping"; break;
+		case RADAR_EVENT_BEACON_PULSE: name = "AptPing02"; break;
+		case RADAR_EVENT_ONE_RING: name = "AptPing03"; break;
+		default: name = "Aptyellow_ping"; break;
+	}
 	const Image *image = TheMappedImageCollection->findImageByName(name);
 	if (!TheDisplay->hasImageTexture(image))
 		return FALSE;
 
 	ICoord2D center;
 	radarToPixel(&event.radarLoc, &center, pixelX, pixelY, width, height);
-	const Int left = center.x - image->getImageWidth() / 2;
-	const Int top = center.y - image->getImageHeight() / 2;
-	TheDisplay->drawImage(image, left, top, left + image->getImageWidth(), top + image->getImageHeight());
+	const Real progress = std::min(1.0f, static_cast<Real>(elapsed) / duration);
+	const Real scale = event.type == RADAR_EVENT_INFORMATION ? 1.0f : 1.6f - 0.6f * progress;
+	const Int alpha = static_cast<Int>(255 * std::min(1.0f, 3.0f * (1.0f - progress)));
+	const Int w = static_cast<Int>(image->getImageWidth() * scale);
+	const Int h = static_cast<Int>(image->getImageHeight() * scale);
+	const Int left = center.x - w / 2;
+	const Int top = center.y - h / 2;
+	TheDisplay->drawImage(image, left, top, left + w, top + h, GameMakeColor(255, 255, 255, alpha));
 	return TRUE;
 }
 

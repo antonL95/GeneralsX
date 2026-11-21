@@ -50,6 +50,8 @@ public:
 
 	virtual void executeAction( ScriptAction *pAction ) = 0; ///< execute a script action.
 	virtual void closeWindows( Bool suppressNewWindows ) = 0;
+	virtual void doVictory() = 0;
+	virtual void doDefeat() = 0;
 
 	// Called by the script engine in postProcessLoad()
 	virtual void doEnableOrDisableObjectDifficultyBonuses(Bool enableBonuses) = 0;
@@ -76,6 +78,8 @@ public:
 
 	virtual void executeAction( ScriptAction *pAction ) override;
 	virtual void closeWindows( Bool suppressNewWindows ) override;
+	void doVictory() override;
+	void doDefeat() override;
 
 	virtual void doEnableOrDisableObjectDifficultyBonuses(Bool enableBonuses) override;
 
@@ -112,12 +116,10 @@ protected:
 	void doOversizeTheTerrain(Int amount);
 	void doMoveCameraAlongWaypointPath(const AsciiString& waypoint, Real sec, Real cameraStutterSec);
 	void doPlaySoundEffectAt(const AsciiString& sound, const AsciiString& waypoint);
-	void doVictory();
 	void doQuickVictory();
 	void doSetInfantryLightingOverride(Real setting);
 	void doDamageTeamMembers(const AsciiString& team, Real amount);
 	void doModCameraMoveToSelection();
-	void doDefeat();
 	void doLocalDefeat();
 	void doMoveToWaypoint(const AsciiString& team, const AsciiString& waypoint);
 	void doNamedMoveToWaypoint(const AsciiString& unit, const AsciiString& waypoint);

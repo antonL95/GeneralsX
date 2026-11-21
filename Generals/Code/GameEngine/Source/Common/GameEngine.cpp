@@ -48,6 +48,9 @@
 #include "Common/ArchiveFileSystem.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/INIAudit.h"
+#include "GameClient/RetailEva.h"
+#include "GameClient/RetailHudExtras.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
@@ -605,6 +608,11 @@ void GameEngine::init()
 
 		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
 		ExperienceLevelStore::load();
+		if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+		{
+			RetailEva::load();
+			RetailNotification::load();
+		}
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), nullptr);
 		initSubsystem(TheAI,"TheAI", MSGNEW("GameEngineSubsystem") AI(), &xferCRC,  "Data\\INI\\Default\\AIData", "Data\\INI\\AIData");
 		initSubsystem(TheGameLogic,"TheGameLogic", createGameLogic(), nullptr);

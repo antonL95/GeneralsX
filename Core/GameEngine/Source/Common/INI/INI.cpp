@@ -33,6 +33,8 @@
 
 #include "WWMath/wwmath.h"
 #include "Common/INI.h"
+#include "GameClient/RetailEva.h"
+#include "GameClient/RetailHudExtras.h"
 #include "GameLogic/BfmeMapScripts.h"
 #include "Common/INIAudit.h"
 #include "Common/INIBlockStructure.h"
@@ -511,6 +513,15 @@ void INI::unPrepFile()
 //-------------------------------------------------------------------------------------------------
 static INIBlockParse findBlockParse(const char* token)
 {
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		if (strcmp(token, "NewEvaEvent") == 0 || strcmp(token, "PredefinedEvaEvent") == 0)
+			return RetailEva::parseEvent;
+		if (strcmp(token, "MiscEvaData") == 0)
+			return RetailEva::parseSettings;
+		if (strcmp(token, "InGameNotificationBox") == 0)
+			return RetailNotification::parse;
+	}
 	if (RetailFileLayers::enabled() && strcmp(token, "ExperienceScalarTable") == 0)
 		return ExperienceLevelStore::parseScalarTable;
 	if (!INIAudit::isEnabled() && RetailFileLayers::enabled() && strcmp(token, "PlayerAIType") == 0)

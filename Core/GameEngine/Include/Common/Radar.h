@@ -73,6 +73,7 @@ enum RadarEventType CPP_11(: Int)
 	RADAR_EVENT_FAKE,					//Internally creates a radar event, but doesn't notify the player (unit lost
 														//for example, so we can use the spacebar to jump to the event).
 
+	RADAR_EVENT_ONE_RING,
 	RADAR_EVENT_NUM_EVENTS
 
 };
@@ -179,13 +180,13 @@ public:
 	static Bool isPriorityVisible( RadarPriorityType priority );		///< is the priority passed in a "visible" one on the radar
 
 	// radar events
-	void createEvent( const Coord3D *world, RadarEventType type, Real secondsToLive = 4.0f );	///< create radar event at location in world
+	void createEvent( const Coord3D *world, RadarEventType type, Real secondsToLive = 4.0f, Bool jumpTo = TRUE );
 	void createPlayerEvent( Player *player, const Coord3D *world, RadarEventType type, Real secondsToLive = 4.0f );  ///< create radar event using player colors
 
 	Bool getLastEventLoc( Coord3D *eventPos );							///< get last event loc (if any)
 	void tryUnderAttackEvent( const Object *obj );					///< try to make an "under attack" event if it's the proper time
 	void tryInfiltrationEvent( const Object *obj );					///< try to make an "infiltration" event if it's the proper time
- 	Bool tryEvent( RadarEventType event, const Coord3D *pos );	///< try to make a "stealth" event
+	Bool tryEvent( RadarEventType event, const Coord3D *pos, Bool jumpTo = TRUE );
 
 	// adding and removing objects from the radar
 	virtual Bool addObject( Object *obj ); ///< add object to radar
@@ -234,7 +235,7 @@ protected:
 
 	/// internal method for creating a radar event with specific colors
 	void internalCreateEvent( const Coord3D *world, RadarEventType type, Real secondsToLive,
-														const RGBAColorInt *color1, const RGBAColorInt *color2 );
+														const RGBAColorInt *color1, const RGBAColorInt *color2, Bool jumpTo = TRUE );
 
 	void deleteList( RadarObject **list );
 	void deleteListResources();			///< delete list radar resources used

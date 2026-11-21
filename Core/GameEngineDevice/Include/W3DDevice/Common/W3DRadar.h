@@ -77,7 +77,7 @@ protected:
 
 	void drawSingleBeaconEvent( Int pixelX, Int pixelY, Int width, Int height, Int index );
 	void drawSingleGenericEvent( Int pixelX, Int pixelY, Int width, Int height, Int index );
-	Bool drawInformationAlert(Int pixelX, Int pixelY, Int width, Int height, const RadarEvent &event);
+	Bool drawRetailAlert(Int pixelX, Int pixelY, Int width, Int height, const RadarEvent &event);
 	void loadMapRadarImage();
 
 	void initializeTextureFormats();				///< find format to use for the radar texture

@@ -290,6 +290,7 @@ set(GAMEENGINE_SRC
     Include/GameClient/UiNineSlice.h
     Include/GameClient/UiPixelSpace.h
     Include/GameClient/UiRadialRing.h
+    Include/GameClient/RetailEva.h
     Include/GameClient/RetailHudExtras.h
     Include/GameClient/RetailHudSettings.h
     Include/GameClient/UiHudRules.h
@@ -842,6 +843,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/ControlBar/ControlBarStructureInventory.cpp
     Source/GameClient/GUI/ControlBar/ControlBarUnderConstruction.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailHud.cpp
+    Source/GameClient/RetailEva.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailEdges.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailHeroes.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailPowers.cpp
