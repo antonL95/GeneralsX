@@ -1007,6 +1007,8 @@ protected:
 	GameWindow *m_retailPortrait = nullptr;
 	GameWindow *m_retailResources = nullptr;
 	GameWindow *m_retailCommandPoints = nullptr;
+	mutable DisplayString *m_retailLevelLabel = nullptr;
+	mutable Int m_retailLabelRank = 0;
 	GameWindow *m_retailHolders[MAX_COMMANDS_PER_SET] = {};
 	GameWindow *m_retailVisible[MAX_COMMANDS_PER_SET] = {};
 	std::array<GameWindow*, 3> m_retailTrayButtons = {};

@@ -7,6 +7,7 @@ class CommandSet;
 class Object;
 class Player;
 class ThingTemplate;
+class Xfer;
 
 namespace HeroRoster
 {
@@ -26,6 +27,7 @@ HeroRules::Price revivePrice(const ThingTemplate *hero, Int level);
 
 void recordDeath(Object *hero, HeroRules::State outcome);
 Bool onHeroProduced(Object *hero);
+void xferPlayer(const Player *player, Xfer *xfer);
 
 Int reviveSlotForEntry(const CommandSet *commandSet, Int entry);
 Bool buttonUpgradesMet(const CommandButton *button, const Player *player, const Object *producer);

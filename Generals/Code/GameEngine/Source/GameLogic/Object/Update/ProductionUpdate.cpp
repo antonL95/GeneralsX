@@ -49,7 +49,9 @@
 #include "GameClient/GameText.h"
 #include "GameClient/InGameUI.h"
 
+#include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/HeroRoster.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
 #include "GameLogic/Module/ProductionUpdate.h"
@@ -128,6 +130,7 @@ ProductionUpdateModuleData::ProductionUpdateModuleData()
 
 	static const FieldParse dataFieldParse[] =
 	{
+		{ "GiveNoXP", INI::parseBool, nullptr, offsetof(ProductionUpdateModuleData, m_giveNoXP) },
 		{ "MaxQueueEntries",	INI::parseInt, nullptr, offsetof( ProductionUpdateModuleData, m_maxQueueEntries ) },
 		{ "NumDoorAnimations",	INI::parseInt, nullptr, offsetof( ProductionUpdateModuleData, m_numDoorAnimations ) },
 		{ "DoorOpeningTime", INI::parseDurationUnsignedInt, nullptr, offsetof( ProductionUpdateModuleData, m_doorOpeningTime ) },
@@ -780,6 +783,8 @@ UpdateSleepTime ProductionUpdate::update()
 																	creationBuilding->getControllingPlayer()->getDefaultTeam() );
 
 							newObj->setProducer(creationBuilding);
+							if (RetailFileLayers::enabled())
+								HeroRoster::onHeroProduced(newObj);
 
 							// call the exit interface to do the rally point and position stuff
 							exitInterface->exitObjectViaDoor( newObj, exitDoor );
@@ -813,6 +818,9 @@ UpdateSleepTime ProductionUpdate::update()
 								sound.setObjectID( newObj->getID() );
 								TheAudio->addAudioEvent( &sound );
 							}
+
+							if (RetailFileLayers::enabled() && !d->m_giveNoXP)
+								ExperienceLevelStore::awardProductionExperience(creationBuilding, newObj->getTemplate()->friend_getBuildCost());
 
 							//We created one guy, but we may want to do more so we should stay in this node of production.
 							// This is last so the voice check can easily check for "first" guy
@@ -854,6 +862,8 @@ UpdateSleepTime ProductionUpdate::update()
 		else if( production->m_type == PRODUCTION_UPGRADE )
 		{
 			const UpgradeTemplate *upgrade = production->m_upgradeToResearch;
+			if (RetailFileLayers::enabled() && !getProductionUpdateModuleData()->m_giveNoXP)
+				ExperienceLevelStore::awardProductionExperience(us, upgrade->calcCostToBuild(nullptr));
 
 			// we finished an upgrade, lets add that money spent on it to the scorekeeper
 			player->getScoreKeeper()->addMoneySpent(upgrade->calcCostToBuild(player));

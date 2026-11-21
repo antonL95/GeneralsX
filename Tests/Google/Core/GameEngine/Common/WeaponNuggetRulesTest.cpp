@@ -151,3 +151,16 @@ TEST(WeaponNuggetRulesTest, HitPercentageRolls)
 		hits += WeaponNuggetRules::rollHits(roll, 77.0f) ? 1 : 0;
 	EXPECT_EQ(hits, 77);
 }
+
+TEST(WeaponNuggetRulesTest, NoneWithMarketplaceNameMatchesOnlyTheMarketplace)
+{
+	auto marketplace = facts();
+	marketplace.ruleNone = true;
+	marketplace.hasIncludedNames = true;
+	marketplace.includedByName = true;
+	EXPECT_TRUE(WeaponNuggetRules::filterMatches(marketplace));
+
+	auto otherStructure = marketplace;
+	otherStructure.includedByName = false;
+	EXPECT_FALSE(WeaponNuggetRules::filterMatches(otherStructure));
+}

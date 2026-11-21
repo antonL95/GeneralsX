@@ -528,13 +528,20 @@ void ControlBar::drawRetailTexts() const
 			if (fill > 0)
 				TheDisplay->drawFillRect(left + 1, top + 1, fill, barHeight - 2, GameMakeColor(232, 183, 51, 255));
 			TheDisplay->drawOpenRect(left, top, barWidth, barHeight, 1.0f, GameMakeColor(199, 164, 94, 255));
-			UnicodeString level;
-			level.format(L"Level: %d", tracker->getRank());
-			DisplayString* label = TheDisplayStringManager->newDisplayString();
-			label->setFont(m_retailSelectionName->winGetFont());
-			label->setText(level);
-			drawShadowedText(label, x, top - height / 5, width, height / 5, 2, text);
-			TheDisplayStringManager->freeDisplayString(label);
+			if (!m_retailLevelLabel)
+				m_retailLevelLabel = TheDisplayStringManager->newDisplayString();
+			GameFont* font = m_retailSelectionName->winGetFont();
+			if (m_retailLevelLabel->getFont() != font)
+				m_retailLevelLabel->setFont(font);
+			const Int rank = tracker->getRank();
+			if (m_retailLabelRank != rank)
+			{
+				UnicodeString level;
+				level.format(TheGameText->fetchOrSubstitute("APT:RankLabel", L"Level: %d"), rank);
+				m_retailLevelLabel->setText(level);
+				m_retailLabelRank = rank;
+			}
+			drawShadowedText(m_retailLevelLabel, x, top - height / 5, width, height / 5, 2, text);
 		}
 		else
 			drawTextWindow(m_retailSelectionName, 2, GameMakeColor(255, 255, 255, 255));
@@ -700,7 +707,8 @@ void ControlBar::showRetailLevelTooltip() const
 		return;
 	Mouse::RetailTooltip tooltip;
 	tooltip.title = object->getTemplate()->getDisplayName();
-	tooltip.body.format(L"Level: %d\nMaximum Level: %d", object->getExperienceTracker()->getRank(), maximum);
+	tooltip.body.format(TheGameText->fetchOrSubstitute("TOOLTIP:Rank", L"Level: %d / Maximum Level: %d"),
+		object->getExperienceTracker()->getRank(), maximum);
 	TheMouse->setRetailTooltip(tooltip);
 }
 

@@ -205,6 +205,7 @@ public:
 
 protected:
 
+	Bool meetsRequiredRank() const;
 	Bool initiateIntentToDoSpecialPower( const Object *targetObj, const Coord3D *targetPos, const Waypoint *way, UnsignedInt commandOptions );
 	void triggerSpecialPower( const Coord3D *location );
 	void createViewObject( const Coord3D *location );

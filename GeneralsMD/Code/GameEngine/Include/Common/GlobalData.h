@@ -237,6 +237,8 @@ public:
 	Real m_terrainResourceCellSize = 20.0f;
 	Real m_attributeModifierArmorMaxBonus = 0.75f;
 	CommandPointRules::Config m_commandPoints;
+	Real m_multiPlayBuildingXPMult[MAX_PLAYER_COUNT];
+	Real m_multiPlayUnitXPMult[MAX_PLAYER_COUNT];
 	SpecialPowerObjectFilter m_victoryUnitFilter;
 	Real m_cameraYaw;
 #if PRESERVE_RETAIL_SCRIPTED_CAMERA

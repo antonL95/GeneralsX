@@ -1,0 +1,44 @@
+5 cash Player_1 - 0 20000
+6 create Player_1 GondorBarracks 0 1460,920,0
+7 xptestini - - 0 /app/engine/GeneralsX-slot1/Tests/Retail/ExperienceBarracks.ini
+7 combatini - - 0 /app/engine/GeneralsX-slot1/Tests/Retail/ExperienceFollowups.ini
+8 create Player_1 GondorBarracks 0 1610,920,0
+10 produce Player_1 GondorBarracks 0 LamedonClansmenHorde
+10 produce Player_1 GondorBarracks 1 LamedonClansmenHorde
+20 create Player_1 GondorFaramir 0 1300,900,0
+25 xpstate Player_1 GondorFaramir 0
+26 hordespawn Player_1 GondorFighterHorde 0 - 1350 1070 0
+30 xpstate Player_1 GondorFighterHorde 0
+30 xpstate Player_1 GondorFighter 0
+31 create PlyrCreeps GondorBoromir 0 1950,1050,0
+32 killby Player_1 GondorFaramir 0 PlyrCreeps:GondorBoromir:0
+33 xpstate Player_1 GondorFighterHorde 0
+33 xpstate Player_1 GondorFighter 0
+33 xpstate Player_1 GondorFaramir 0
+35 xpstate Player_1 GondorBarracks 0
+35 xpstate Player_1 GondorBarracks 1
+36 select Player_1 GondorBarracks 1
+37 camera Player_1 GondorBarracks 1 - 1610 920 0.85
+40 veterancy Player_1 GondorFaramir 0 2
+41 xpstate Player_1 GondorFaramir 0
+42 kill Player_1 GondorFaramir 0
+50 heroes Player_1 - 0
+51 create Player_1 RohanFrodo 0 1380,1040,0
+51 xprostersnapshot Player_1 - 0
+52 xpstate Player_1 RohanFrodo 0
+52 heroes Player_1 - 0
+53 produce Player_1 MenFortressCitadel 0 GondorFaramir
+54 heroes Player_1 - 0
+180 xpstate Player_1 GondorFaramir 0
+181 heroes Player_1 - 0
+92 objupgrade Player_1 GondorBarracks 1 Upgrade_GondorBarracksLevel3
+93 xpstate Player_1 GondorBarracks 1
+94 create Player_1 GoodSpellBook 0 1300,900,0
+95 objupgrade Player_1 GoodSpellBook 0 Upgrade_MarketplaceUpgradeGrandHarvest
+96 xpcp Player_1 - 0
+97 create Player_1 GondorMarketPlace 0 1260,920,0
+100 xpcp Player_1 - 0
+101 destroy Player_1 GondorMarketPlace 0
+104 xpcp Player_1 - 0
+185 xpcrc - - 0
+186 quit - - 0

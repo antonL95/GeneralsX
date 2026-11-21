@@ -4520,6 +4520,8 @@ UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 	marker = "MARKER:ThePlayerList";
 	xferCRC->xferAsciiString(&marker);
 	xferCRC->xferSnapshot( ThePlayerList );
+	if (RetailFileLayers::enabled())
+		ExperienceLevelStore::xferPendingLevels(xferCRC);
 	if (isInGameLogicUpdate())
 	{
 		CRCGEN_LOG(("CRC after PlayerList for frame %d is 0x%8.8X", m_frame, xferCRC->getCRC()));
@@ -5325,9 +5327,9 @@ void GameLogic::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = 10;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 10;
 #else
-	const XferVersion currentVersion = 11;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 11;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -5677,6 +5679,10 @@ void GameLogic::xfer( Xfer *xfer )
   {
     m_superweaponRestriction = 0;
   }
+	if (version >= 12)
+		ExperienceLevelStore::xferPendingLevels(xfer);
+	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
+		ExperienceLevelStore::reset();
 }
 
 // ------------------------------------------------------------------------------------------------

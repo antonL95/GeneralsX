@@ -11,7 +11,9 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "Common/Xfer.h"
 #include "GameClient/ControlBar.h"
+#include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/RespawnModules.h"
@@ -117,6 +119,19 @@ Bool countsAsRevive(const CommandButton *button)
 {
 	return button && button->getCommandType() == GUI_COMMAND_REVIVE && !BitIsSet(button->getOptions(), SCRIPT_ONLY);
 }
+
+void xferEntry(Xfer *xfer, Entry &entry)
+{
+	Int state = static_cast<Int>(entry.state);
+	xfer->xferInt(&state);
+	if (state < static_cast<Int>(HeroRules::State::Recruitable) || state > static_cast<Int>(HeroRules::State::Lost))
+		throw XFER_INVALID_PARAMETERS;
+	entry.state = static_cast<HeroRules::State>(state);
+	xfer->xferInt(&entry.level);
+	xfer->xferInt(&entry.startingLevel);
+	xfer->xferReal(&entry.experience);
+	xfer->xferUpgradeMask(&entry.upgrades);
+}
 }
 
 void reset(Int playerIndex)
@@ -129,6 +144,47 @@ void resetAll()
 {
 	for (Int i = 0; i < MAX_PLAYER_COUNT; ++i)
 		reset(i);
+}
+
+void xferPlayer(const Player *player, Xfer *xfer)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	if (loading)
+		reset(player->getPlayerIndex());
+	Roster *roster = rosterOf(player);
+	UnsignedInt count = 0;
+	if (!loading && roster)
+		for (const Entry &entry : roster->entries)
+			if (entry.hero && entry.state != HeroRules::State::Recruitable)
+				++count;
+	xfer->xferUnsignedInt(&count);
+	if (loading)
+	{
+		for (UnsignedInt i = 0; i < count; ++i)
+		{
+			AsciiString name;
+			Entry loaded;
+			xfer->xferAsciiString(&name);
+			xferEntry(xfer, loaded);
+			loaded.hero = TheThingFactory->findTemplate(name, FALSE);
+			if (Entry *entry = entryOf(player, findIndex(player, loaded.hero)))
+			{
+				loaded.hero = entry->hero;
+				*entry = loaded;
+			}
+		}
+	}
+	else if (roster)
+	{
+		for (Entry &entry : roster->entries)
+		{
+			if (!entry.hero || entry.state == HeroRules::State::Recruitable)
+				continue;
+			AsciiString name = entry.hero->getName();
+			xfer->xferAsciiString(&name);
+			xferEntry(xfer, entry);
+		}
+	}
 }
 
 Int count(const Player *player)
@@ -227,6 +283,7 @@ Bool onHeroProduced(Object *hero)
 		return FALSE;
 	entry->state = HeroRules::State::Recruitable;
 
+	ExperienceLevelStore::applyPendingLevels(hero);
 	ExperienceTracker *tracker = hero->getExperienceTracker();
 	if (tracker)
 	{

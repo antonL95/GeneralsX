@@ -878,6 +878,31 @@ void roundTripExperience(Object* obj, unsigned int frame)
 		restored->getRetailExperience(), same);
 }
 
+void roundTripHeroRoster(const Player* player, unsigned int frame)
+{
+	const char* directory = std::getenv("XDG_RUNTIME_DIR");
+	if (!directory)
+		return;
+
+	AsciiString file;
+	file.format("%s/hero-roster-snapshot", directory);
+	XferSave save;
+	save.open(file);
+	HeroRoster::xferPlayer(player, &save);
+	ExperienceLevelStore::xferPendingLevels(&save);
+	save.close();
+
+	HeroRoster::reset(player->getPlayerIndex());
+	ExperienceLevelStore::reset();
+	XferLoad load;
+	load.open(file);
+	HeroRoster::xferPlayer(player, &load);
+	ExperienceLevelStore::xferPendingLevels(&load);
+	load.close();
+	std::remove(file.str());
+	std::fprintf(stderr, "TEST xp-roster-snapshot frame=%u\n", frame);
+}
+
 #if !RTS_GENERALS
 void roundTripModifiers(Object* obj, Object* destination, const AsciiString& name, unsigned int frame)
 {
@@ -1619,6 +1644,23 @@ void execute(const Command& command, unsigned int frame)
 		dumpHud(frame);
 		return;
 	}
+	if (command.action == "xprostersnapshot")
+	{
+		if (const Player* player = findPlayer(command))
+			roundTripHeroRoster(player, frame);
+		return;
+	}
+	if (command.action == "xpcp")
+	{
+		if (const Player* player = findPlayer(command))
+			std::fprintf(stderr, "TEST xp-command-points frame=%u total=%d\n", frame, player->getCommandPointsTotal());
+		return;
+	}
+	if (command.action == "xpcrc")
+	{
+		std::fprintf(stderr, "TEST xp-crc frame=%u crc=%08X\n", frame, TheGameLogic->getCRC(CRC_RECALC));
+		return;
+	}
 	if (command.action == "hud")
 	{
 		dumpHud(frame);
@@ -1727,7 +1769,7 @@ void execute(const Command& command, unsigned int frame)
 	}
 
 #if !RTS_GENERALS
-	if (command.action == "combatini")
+	if (command.action == "combatini" || command.action == "xptestini")
 	{
 		std::ifstream file(command.structure);
 		if (!file)
@@ -1738,7 +1780,8 @@ void execute(const Command& command, unsigned int frame)
 		std::ostringstream text;
 		text << file.rdbuf();
 		INI ini;
-		ini.loadText(command.structure.c_str(), text.str().c_str(), INI_LOAD_OVERWRITE, nullptr, nullptr);
+		const INILoadType mode = command.action == "xptestini" ? INI_LOAD_CREATE_OVERRIDES : INI_LOAD_OVERWRITE;
+		ini.loadText(command.structure.c_str(), text.str().c_str(), mode, nullptr, nullptr);
 		std::fprintf(stderr, "TEST frame %u: loaded combat INI\n", frame);
 		return;
 	}
@@ -1779,7 +1822,7 @@ void execute(const Command& command, unsigned int frame)
 		return;
 	}
 
-	Object* obj = findObject(command);
+	Object* obj = findObject(command, command.action == "xpstate");
 	if (!obj)
 	{
 		std::fprintf(stderr, "TEST frame %u: no %s %d of %s\n", frame, command.target.c_str(), command.ordinal,
@@ -1950,9 +1993,10 @@ void execute(const Command& command, unsigned int frame)
 	else if (command.action == "xpstate")
 	{
 		const auto* tracker = obj->getExperienceTracker();
-		std::fprintf(stderr, "TEST xp-state frame=%u object=%u %s rank=%d max=%d xp=%.3f progress=%.3f\n", frame,
+		std::fprintf(stderr, "TEST xp-state frame=%u object=%u %s rank=%d max=%d xp=%.3f progress=%.3f start=%d\n", frame,
 			static_cast<unsigned>(obj->getID()), obj->getTemplate()->getName().str(), tracker->getRank(),
-			ExperienceLevelStore::maximumRank(obj), tracker->getRetailExperience(), tracker->getLevelProgress());
+			ExperienceLevelStore::maximumRank(obj), tracker->getRetailExperience(), tracker->getLevelProgress(),
+			tracker->getRetailStartingRank());
 	}
 	else if (command.action == "xpsnapshot")
 		roundTripExperience(obj, frame);

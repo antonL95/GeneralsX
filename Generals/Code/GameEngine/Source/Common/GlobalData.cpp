@@ -588,6 +588,8 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 //-------------------------------------------------------------------------------------------------
 GlobalData::GlobalData()
 {
+	std::fill_n(m_multiPlayBuildingXPMult, MAX_PLAYER_COUNT, 1.0f);
+	std::fill_n(m_multiPlayUnitXPMult, MAX_PLAYER_COUNT, 1.0f);
 	Int i, j;
 
 	//
@@ -1246,6 +1248,19 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	}
 	// If we're multifile, then continue loading stuff into the Global Data as normal.
 
+	auto parseMultiplayerXP = [](INI* ini, void*, void* store, const void*)
+	{
+		auto* factors = static_cast<Real*>(store);
+		while (const char* token = ini->getNextTokenOrNull(ini->getSepsColon()))
+		{
+			if (strnicmp(token, "MP", 2) != 0 || token[2] < '1' || token[2] > '9')
+				throw INI_INVALID_DATA;
+			const Int players = INI::scanInt(token + 2);
+			if (players < 1 || players > MAX_PLAYER_COUNT)
+				throw INI_INVALID_DATA;
+			factors[players - 1] = INI::scanReal(ini->getNextToken(ini->getSepsColon()));
+		}
+	};
 	auto parseCommandPointPair = [](INI* ini, void* instance, void* store, const void* userData)
 	{
 		auto* pair = static_cast<CommandPointRules::Pair*>(store);
@@ -1255,6 +1270,8 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	};
 	static const FieldParse retailFields[] =
 	{
+		{ "MultiPlayBuildingXPMult", parseMultiplayerXP, nullptr, offsetof(GlobalData, m_multiPlayBuildingXPMult) },
+		{ "MultiPlayUnitXPMult", parseMultiplayerXP, nullptr, offsetof(GlobalData, m_multiPlayUnitXPMult) },
 		{ "TerrainResourceCellSize", INI::parseReal, nullptr, offsetof(GlobalData, m_terrainResourceCellSize) },
 		{ "GoodCommandPointLimit", INI::parseInt, nullptr, offsetof(GlobalData, m_commandPoints.goodLimit) },
 		{ "EvilCommandPointLimit", INI::parseInt, nullptr, offsetof(GlobalData, m_commandPoints.evilLimit) },

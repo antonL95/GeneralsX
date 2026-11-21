@@ -1105,6 +1105,8 @@ ControlBar::ControlBar()
 //-------------------------------------------------------------------------------------------------
 ControlBar::~ControlBar()
 {
+	if (m_retailLevelLabel && TheDisplayStringManager)
+		TheDisplayStringManager->freeDisplayString(m_retailLevelLabel);
 
 	if(m_scienceLayout)
 	{

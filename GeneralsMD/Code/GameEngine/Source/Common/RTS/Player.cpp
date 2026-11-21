@@ -4078,6 +4078,8 @@ void Player::crc( Xfer *xfer )
 
 	xfer->xferInt( &m_skillPoints );
 	xfer->xferInt( &m_sciencePurchasePoints );
+	if (RetailFileLayers::enabled())
+		HeroRoster::xferPlayer(this, xfer);
 
 }
 
@@ -4098,7 +4100,7 @@ void Player::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = 8;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 9 : 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4631,6 +4633,11 @@ void Player::xfer( Xfer *xfer )
 	}
 	else
 		m_unitsShouldHunt = FALSE;
+
+	if (version >= 9)
+		HeroRoster::xferPlayer(this, xfer);
+	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
+		HeroRoster::reset(m_playerIndex);
 
 }
 

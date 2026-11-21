@@ -6,6 +6,7 @@ class INI;
 class Object;
 class SpecialPowerTemplate;
 class AsciiString;
+class Xfer;
 
 namespace ExperienceLevelStore
 {
@@ -33,8 +34,11 @@ int award(const Object* obj, int threshold);
 void applyLevel(Object* obj, int threshold, bool feedback);
 Object* recipientFor(Object* obj);
 void scoreKill(Object* killer, const Object* victim);
+void awardProductionExperience(Object* producer, Int cost);
 void onObjectCreated(const Object* obj);
+void applyPendingLevels(Object* obj);
 void update();
 void reset();
+void xferPendingLevels(Xfer* xfer);
 const SelectionDecal* findSelectionDecal(const Object& object);
 }

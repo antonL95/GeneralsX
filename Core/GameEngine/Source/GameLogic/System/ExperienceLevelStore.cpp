@@ -13,10 +13,15 @@
 
 #include "Common/INI.h"
 #include "Common/GameState.h"
+#include "Common/GlobalData.h"
+#include "Common/LatchRestore.h"
 #include "Common/ModelState.h"
+#include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "Common/Xfer.h"
 #include "GameClient/FXList.h"
 #include "GameLogic/ExperienceLevelRules.h"
 #include "GameLogic/ExperienceTracker.h"
@@ -73,6 +78,7 @@ struct PendingLevel
 
 std::vector<PendingLevel> s_pending;
 Bool s_indexed = FALSE;
+const Object* s_grantingLevelUpgrades = nullptr;
 
 void parseSelectionDecal(INI* ini, void*, void* store, const void*)
 {
@@ -138,6 +144,34 @@ Bool isMultiplayer()
 	return TheGameLogic && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInSkirmishGame());
 }
 
+Real multiplayerExperienceMultiplier(const Object* obj)
+{
+	if (!isMultiplayer() || !ThePlayerList || !TheGlobalData)
+		return 1.0f;
+
+	Int count = 0;
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		const Player* player = ThePlayerList->getNthPlayer(i);
+		if (player && player->isPlayableSide())
+			++count;
+	}
+	if (count <= 0 || count > MAX_PLAYER_COUNT)
+		return 1.0f;
+
+	return obj->isKindOf(KINDOF_STRUCTURE)
+		? TheGlobalData->m_multiPlayBuildingXPMult[count - 1]
+		: TheGlobalData->m_multiPlayUnitXPMult[count - 1];
+}
+
+void applyPendingLevel(Object* obj, const PendingLevel& pending)
+{
+	auto* tracker = obj->getExperienceTracker();
+	tracker->setMinRetailRank(pending.rank);
+	if (pending.setStartingRank)
+		tracker->setRetailStartingRank(tracker->getRank());
+}
+
 const std::vector<std::size_t>* levelsFor(const Object* obj)
 {
 	if (!RetailFileLayers::enabled() || !obj)
@@ -184,7 +218,10 @@ void apply(Object* obj, const Level& level, bool feedback)
 		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(name);
 		if (upgrade == nullptr || obj->hasUpgrade(upgrade))
 			continue;
-		obj->giveUpgrade(upgrade);
+		{
+			const LatchRestore<const Object*> grant(s_grantingLevelUpgrades, obj);
+			obj->giveUpgrade(upgrade);
+		}
 		if (!granted.empty())
 			granted += ',';
 		granted += name.str();
@@ -412,6 +449,11 @@ void scoreKill(Object* killer, const Object* victim)
 		collect(recipient);
 		if (killer != recipient && !killer->isKindOf(KINDOF_PROJECTILE))
 			collect(killer);
+		for (SharedExperience& share : shared)
+		{
+			Object* ally = recipientFor(TheGameLogic->findObjectByID(share.object));
+			share.object = ally && ally != recipient ? ally->getID() : INVALID_ID;
+		}
 		std::sort(shared.begin(), shared.end(), [](const SharedExperience& a, const SharedExperience& b)
 		{
 			return a.object == b.object ? a.fraction > b.fraction : a.object < b.object;
@@ -423,16 +465,35 @@ void scoreKill(Object* killer, const Object* victim)
 				continue;
 			previous = share.object;
 			Object* ally = TheGameLogic->findObjectByID(share.object);
-			if (ally && ally != recipient && !ally->isEffectivelyDead())
+			if (ally && !ally->isEffectivelyDead())
 				ally->getExperienceTracker()->addRetailExperience(points * share.fraction);
 		}
 	}
+}
+
+void awardProductionExperience(Object* producer, Int cost)
+{
+	if (cost <= 0)
+		return;
+	if (Object* recipient = recipientFor(producer))
+		recipient->getExperienceTracker()->addRetailExperience(static_cast<Real>(cost));
 }
 
 void onObjectCreated(const Object* obj)
 {
 	if (nextThreshold(obj, 0))
 		s_pending.push_back({obj->getID(), 1, FALSE});
+}
+
+void applyPendingLevels(Object* obj)
+{
+	std::vector<PendingLevel> pending;
+	for (const PendingLevel& entry : s_pending)
+		if (entry.object == obj->getID())
+			pending.push_back(entry);
+	std::erase_if(s_pending, [obj](const PendingLevel& entry) { return entry.object == obj->getID(); });
+	for (const PendingLevel& entry : pending)
+		applyPendingLevel(obj, entry);
 }
 
 void update()
@@ -443,10 +504,7 @@ void update()
 		Object* obj = TheGameLogic->findObjectByID(pending.object);
 		if (obj == nullptr || obj->isDestroyed())
 			continue;
-		auto* tracker = obj->getExperienceTracker();
-		tracker->setMinRetailRank(pending.rank);
-		if (pending.setStartingRank)
-			tracker->setRetailStartingRank(tracker->getRank());
+		applyPendingLevel(obj, pending);
 	}
 	s_pending.clear();
 }
@@ -454,6 +512,33 @@ void update()
 void reset()
 {
 	s_pending.clear();
+}
+
+void xferPendingLevels(Xfer* xfer)
+{
+	UnsignedInt count = static_cast<UnsignedInt>(s_pending.size());
+	xfer->xferUnsignedInt(&count);
+	if (xfer->getXferMode() == XFER_LOAD)
+	{
+		s_pending.clear();
+		for (UnsignedInt i = 0; i < count; ++i)
+		{
+			PendingLevel entry{};
+			xfer->xferObjectID(&entry.object);
+			xfer->xferInt(&entry.rank);
+			xfer->xferBool(&entry.setStartingRank);
+			s_pending.push_back(entry);
+		}
+	}
+	else
+	{
+		for (PendingLevel& entry : s_pending)
+		{
+			xfer->xferObjectID(&entry.object);
+			xfer->xferInt(&entry.rank);
+			xfer->xferBool(&entry.setStartingRank);
+		}
+	}
 }
 
 const SelectionDecal* findSelectionDecal(const Object& object)
@@ -526,7 +611,10 @@ void ExperienceTracker::addRetailExperience(Real points, Bool scale)
 		return;
 	initializeRetailLevel();
 	if (scale)
-		points *= m_experienceScalar * ExperienceLevelStore::experienceScalar(m_parent, getRank(), m_retailStartingRank);
+	{
+		points = m_experienceScalar * points * multiplayerExperienceMultiplier(m_parent);
+		points *= ExperienceLevelStore::experienceScalar(m_parent, getRank(), m_retailStartingRank);
+	}
 	advanceRetailLevel(m_retailExperience + points, TRUE);
 }
 
@@ -609,6 +697,8 @@ void LevelUpUpgrade::upgradeImplementation()
 	if (isAlreadyUpgraded() || !RetailFileLayers::enabled() || (TheGameState && TheGameState->isInLoadGame()))
 		return;
 	setUpgradeExecuted(TRUE);
+	if (s_grantingLevelUpgrades == getObject())
+		return;
 	const auto* data = getLevelUpUpgradeModuleData();
 	getObject()->getExperienceTracker()->gainRetailLevels(data->m_levelsToGain, data->m_levelCap, FALSE);
 }
@@ -645,7 +735,7 @@ void ShareExperienceBehavior::collectRecipients(std::vector<SharedExperience>& r
 	for (Object* candidate = iter->first(); candidate; candidate = iter->next())
 	{
 		if (candidate == origin || candidate->isEffectivelyDead() ||
-			!data->m_filter.matchesTemplate(*candidate->getTemplate()) || !candidate->getExperienceTracker()->isTrainable())
+			!data->m_filter.matchesTemplate(*candidate->getTemplate()))
 			continue;
 		Real fraction = 1.0f;
 		if (data->m_dropOff == 1.0f)

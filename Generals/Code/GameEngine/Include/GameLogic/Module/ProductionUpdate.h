@@ -132,6 +132,8 @@ public:
   Int														m_maxQueueEntries;							///< max things that can be queued at once.
 	DisabledMaskType							m_disabledTypesToProcess;
 
+	Bool m_giveNoXP = FALSE;
+
 	ProductionUpdateModuleData();
 	static void buildFieldParse(MultiIniFieldParse& p);
 	static void parseAppendQuantityModifier( INI* ini, void *instance, void *store, const void *userData );
