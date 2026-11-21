@@ -163,6 +163,8 @@
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
+#include "GameLogic/Module/RetailGate.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/ExperienceModules.h"
@@ -444,6 +446,12 @@ void ModuleFactory::init()
 		addModule( DoCommandUpgrade );
 		addModule( GeometryUpgrade );
 		addModule( FoundationAIUpdate );
+		addModule( GateOpenAndCloseBehavior );
+		addModule( AIGateUpdate );
+		addModule( WallHubBehavior );
+		addModule( GettingBuiltBehavior );
+		addModule( ReplaceSelfUpgrade );
+		addModule( FakePathfindPortalBehaviour );
 		addModule( TerrainResourceBehavior );
 		addModule( HordeContain );
 		addModule( HorseHordeContain );

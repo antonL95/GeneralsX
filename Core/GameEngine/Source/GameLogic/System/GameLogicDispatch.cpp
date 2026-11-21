@@ -64,6 +64,9 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
+#include "GameLogic/Module/RetailGate.h"
+#include "GameLogic/Module/CastleBehavior.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
@@ -808,6 +811,41 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onDozerConstruct(msg, currentlySelectedGroup);
 			break;
 		}
+		case GameMessage::MSG_RETAIL_WALL_SPAN:
+		{
+			if (!RetailFileLayers::enabled() || msg->getArgumentCount() != 4)
+				break;
+			Object* source = findObjectByID(msg->getArgument(0)->objectID);
+			const WallHubBehavior* hub = WallHubBehavior::find(source, msg->getArgument(2)->integer);
+			if (hub)
+				hub->construct(TheThingFactory->findByTemplateID(msg->getArgument(1)->integer),
+					msg->getArgument(3)->location, getMessagePlayer(msg));
+			break;
+		}
+		case GameMessage::MSG_RETAIL_CASTLE_UNPACK:
+		{
+			if (RetailFileLayers::enabled() && msg->getArgumentCount() == 1)
+			{
+				if (auto* castle = CastleBehavior::find(findObjectByID(msg->getArgument(0)->objectID)))
+					castle->orderUnpack(getMessagePlayer(msg));
+			}
+			break;
+		}
+
+		case GameMessage::MSG_RETAIL_GATE:
+		{
+			if (!RetailFileLayers::enabled() || msg->getArgumentCount() != 2)
+				break;
+			Object* source = findObjectByID(msg->getArgument(0)->objectID);
+			GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::find(source);
+			if (!gate || source->getControllingPlayer() != getMessagePlayer(msg))
+				break;
+			const Int type = msg->getArgument(1)->integer;
+			if (type == GUI_COMMAND_OPEN_GATE || type == GUI_COMMAND_CLOSE_GATE || type == GUI_COMMAND_TOGGLE_GATE)
+				gate->request(type == GUI_COMMAND_OPEN_GATE || (type == GUI_COMMAND_TOGGLE_GATE && !gate->wantsOpen()));
+			break;
+		}
+
 		case GameMessage::MSG_FOUNDATION_CONSTRUCT:
 		{
 			onFoundationConstruct(msg, currentlySelectedGroup);

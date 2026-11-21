@@ -55,6 +55,8 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/CastleBehavior.h"
+#include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/ObjectTypes.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
@@ -2779,6 +2781,30 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 			}
 			DEBUG_CRASH(("Unknown ScriptCondition type %d", pCondition->getConditionType()));
 			return false;
+		case Condition::CAN_BUILD_AT_BASE:
+		{
+			const Player* player = playerFromParam(pCondition->getParameter(0));
+			const Object* plot = TheScriptEngine->getUnitNamed(pCondition->getParameter(1)->getString());
+			const auto* foundation = plot ? FoundationAIUpdate::find(*plot) : nullptr;
+			return foundation && foundation->canBuildOn(player);
+		}
+		case Condition::PLAYER_HAS_N_OR_FEWER_BASES:
+		{
+			const Player* player = playerFromParam(pCondition->getParameter(0));
+			if (!player)
+				return FALSE;
+			Int count = 0;
+			for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+			{
+				if (object->getControllingPlayer() != player)
+					continue;
+				const CastleBehavior* castle = CastleBehavior::find(object);
+				if (castle && castle->isUnpacked() && castle->getKeep())
+					++count;
+			}
+			return count <= pCondition->getParameter(1)->getInt();
+		}
+
 		case Condition::IS_GAME_IN_SKIRMISH_OR_MULTIPLAYER:
 			return BfmeScriptRules::skirmishOrMultiplayerIs(TheGameLogic->isInSkirmishGame(),
 				TheGameLogic->isInMultiplayerGame(), pCondition->getParameter(0)->getInt() != 0);

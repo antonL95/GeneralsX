@@ -278,6 +278,7 @@ public:
 	virtual void friend_executeAction( ScriptAction *pActionHead, Team *pThisTeam = nullptr);	///< Use this at yer peril.
 
 	virtual Object *getUnitNamed(const AsciiString& unitName); ///< Gets the named unit. May be null.
+	void setRetailUnitReference(const AsciiString& name, Object* object);
 	virtual Bool didUnitExist(const AsciiString& unitName);
 	virtual void addObjectToCache( Object* pNewObject );
 	virtual void removeObjectFromCache( Object* pDeadObject );

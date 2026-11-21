@@ -2,6 +2,8 @@
 
 #include "GameLogic/Module/FoundationAIUpdate.h"
 
+#include <algorithm>
+
 #include "Common/BuildAssistant.h"
 #include "Common/INI.h"
 #include "Common/Money.h"
@@ -28,14 +30,14 @@ constexpr UnsignedInt STRUCTURE_CHECK_FRAMES = LOGICFRAMES_PER_SECOND / 2;
 
 Bool commandSetOffers(const Object& foundation, const ThingTemplate& what)
 {
-	if (!TheControlBar)
-		return TRUE;
-
-	const CommandSet* commands = TheControlBar->findCommandSet(foundation.getCommandSetString());
+	CommandCatalog* catalog = TheRetailCommandCatalog;
+	if (!catalog)
+		return FALSE;
+	const CommandSet* commands = catalog->findCommandSet(foundation.getCommandSetString());
 	if (!commands)
 		return FALSE;
 
-	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
+	for (Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
 	{
 		const CommandButton* button = commands->getCommandButton(i);
 		if (button && button->getCommandType() == GUI_COMMAND_FOUNDATION_CONSTRUCT &&
@@ -75,15 +77,24 @@ Object* FoundationAIUpdate::getStructure() const
 	return m_structure == INVALID_ID ? nullptr : TheGameLogic->findObjectByID(m_structure);
 }
 
-Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player)
+Bool FoundationAIUpdate::canBuildOn(const Player* player) const
+{
+	const Object* foundation = getObject();
+	return player && foundation->getControllingPlayer() == player && !foundation->isEffectivelyDead() && !getStructure();
+}
+
+Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player, Bool prebuilt)
 {
 	Object* foundation = getObject();
-	if (!what || !player || foundation->getControllingPlayer() != player || foundation->isEffectivelyDead())
+	if (!what || !canBuildOn(player) || !what->isKindOf(KINDOF_STRUCTURE) ||
+		(!prebuilt && !player->canBuild(what)) || !commandSetOffers(*foundation, *what))
 		return nullptr;
-	if (getStructure() || !what->isKindOf(KINDOF_STRUCTURE) || !commandSetOffers(*foundation, *what))
+#if RTS_ZEROHOUR
+	if (!prebuilt && !player->canBuildMoreOfType(what))
 		return nullptr;
+#endif
 
-	const UnsignedInt cost = static_cast<UnsignedInt>(what->calcCostToBuild(player));
+	const UnsignedInt cost = prebuilt ? 0 : static_cast<UnsignedInt>(std::max(0, what->calcCostToBuild(player)));
 	Money* money = player->getMoney();
 	if (money->countMoney() < cost)
 		return nullptr;
@@ -118,6 +129,12 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player)
 	if (const CastleBehavior* castle = CastleBehavior::findForMember(*foundation))
 		castle->applyKeepUpgrades(*structure);
 	showFoundation(FALSE);
+	if (prebuilt)
+	{
+		structure->setConstructionPercent(100.0f);
+		body->internalChangeHealth(body->getMaxHealth() - body->getHealth());
+		advanceConstruction(*structure, foundation);
+	}
 	setWakeFrame(foundation, UPDATE_SLEEP_NONE);
 	return structure;
 }
@@ -133,7 +150,7 @@ void FoundationAIUpdate::showFoundation(Bool show)
 		drawable->setDrawableHidden(!show);
 }
 
-void FoundationAIUpdate::advanceConstruction(Object& structure)
+void FoundationAIUpdate::advanceConstruction(Object& structure, Object* builder)
 {
 	Player* player = structure.getControllingPlayer();
 	const Int frames = structure.getTemplate()->calcTimeToBuild(player);
@@ -152,7 +169,7 @@ void FoundationAIUpdate::advanceConstruction(Object& structure)
 
 	if (player)
 	{
-		player->onStructureConstructionComplete(getObject(), &structure, FALSE);
+		player->onStructureConstructionComplete(builder, &structure, FALSE);
 		for (BehaviorModule** module = structure.getBehaviorModules(); *module; ++module)
 		{
 			CreateModuleInterface* create = (*module)->getCreate();
@@ -180,7 +197,7 @@ UpdateSleepTime FoundationAIUpdate::update()
 
 	if (structure->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && !structure->isEffectivelyDead())
 	{
-		advanceConstruction(*structure);
+		advanceConstruction(*structure, getObject());
 		return UPDATE_SLEEP_NONE;
 	}
 	return UPDATE_SLEEP(STRUCTURE_CHECK_FRAMES);

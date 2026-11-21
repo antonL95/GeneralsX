@@ -36,6 +36,7 @@
 #include "Common/GameUtility.h"
 #include "Common/LatchRestore.h"
 #include "Common/MessageStream.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -6031,6 +6032,21 @@ Object * ScriptEngine::getUnitNamed(const AsciiString& unitName)
 //-------------------------------------------------------------------------------------------------
 /** didUnitExist */
 //-------------------------------------------------------------------------------------------------
+void ScriptEngine::setRetailUnitReference(const AsciiString& name, Object* object)
+{
+	if (name.isEmpty())
+		return;
+	for (auto& entry : m_namedObjects)
+	{
+		if (entry.first == name)
+		{
+			entry.second = object;
+			return;
+		}
+	}
+	m_namedObjects.emplace_back(name, object);
+}
+
 Bool ScriptEngine::didUnitExist(const AsciiString& unitName)
 {
 	for (VecNamedRequestsIt it = m_namedObjects.begin(); it != m_namedObjects.end(); ++it) {
@@ -7180,8 +7196,9 @@ void ScriptEngine::removeObjectFromCache( Object* pDeadObject )
 {
 	for (VecNamedRequestsIt it = m_namedObjects.begin(); it != m_namedObjects.end(); ++it) {
 		if (pDeadObject == (it->second)) {
-			it->second = nullptr;	// Don't remove it, cause we want to check whether we ever knew a name later
-			break;
+			it->second = nullptr;
+			if (!RetailFileLayers::enabled())
+				break;
 		}
 	}
 }
@@ -7239,7 +7256,7 @@ void ScriptEngine::transferObjectName( const AsciiString& unitName, Object *pNew
 //-------------------------------------------------------------------------------------------------
 void ScriptEngine::notifyOfObjectDestruction( Object *pDeadObject )
 {
-	if (!pDeadObject->getName().isEmpty())
+	if (RetailFileLayers::enabled() || !pDeadObject->getName().isEmpty())
 	{
 		removeObjectFromCache(pDeadObject);
 	}

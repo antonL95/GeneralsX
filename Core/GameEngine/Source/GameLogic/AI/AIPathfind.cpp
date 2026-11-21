@@ -54,6 +54,7 @@ static Bool isSameHorde(const Object* obj, const Object* unit);
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
@@ -459,6 +460,10 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 		if (castle && castle->isUnpacked())
 			return;
 	}
+	if (insert && RetailFileLayers::enabled() && obj->isEffectivelyDead() &&
+		(obj->isKindOf(KINDOF_WALL_SEGMENT) || obj->isKindOf(KINDOF_WALL_GATE) ||
+		 obj->isKindOf(KINDOF_WALL_HUB) || obj->isKindOf(KINDOF_DEFENSIVE_WALL)))
+		return;
 	if (obj->isKindOf(KINDOF_MINE)) {
 		return;  // don't pathfind around mines.
 	}
@@ -1157,15 +1162,22 @@ void Pathfinder::cleanOpenAndClosedLists() {
 //
 // Return true if we can move onto this position
 //
+static Bool isPassableGateCell(const PathfindCell* cell, const Object* unit)
+{
+	return unit && cell && cell->getType() == PathfindCell::CELL_OBSTACLE && RetailFileLayers::enabled() &&
+		GateOpenAndCloseBehavior::canPass(TheGameLogic->findObjectByID(cell->getObstacleID()), unit, TRUE);
+}
+
 Bool Pathfinder::validMovementPosition( Bool isCrusher, LocomotorSurfaceTypeMask acceptableSurfaces,
-																			 PathfindCell *toCell, PathfindCell *fromCell )
+																			 PathfindCell *toCell, PathfindCell *fromCell, const Object *unit )
 {
 	if (toCell == nullptr)
 		return false;
 
 	// check if the destination cell is classified as an obstacle,
 	// and we happen to be ignoring it
-	if (toCell->isObstaclePresent( m_ignoreObstacleID ))
+	if (toCell->isObstaclePresent( m_ignoreObstacleID ) ||
+		((acceptableSurfaces & LOCOMOTORSURFACE_GROUND) && isPassableGateCell(toCell, unit)))
 		return true;
 
 	if (isCrusher && toCell->isObstacleFence()) {
@@ -1219,7 +1231,8 @@ Bool Pathfinder::checkDestination(const Object *obj, Int cellX, Int cellY, Pathf
 			if (cell->getType()==PathfindCell::CELL_OBSTACLE) {
 				if (cell->isObstaclePresent( ignoreId ))
 					continue;
-				return false;
+				if (!isPassableGateCell(cell, obj))
+					return false;
 			}
 
 #if !(RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING)
@@ -2317,7 +2330,7 @@ struct ExamineCellsStruct
 	ExamineCellsStruct* d = (ExamineCellsStruct*)userData;
 	if (d->thePathfinder->m_isTunneling) return 1; // abort.
 	if (from && to) {
-			if (!d->thePathfinder->validMovementPosition( d->isCrusher, d->theLoco->getValidSurfaces(), to, from )) {
+			if (!d->thePathfinder->validMovementPosition( d->isCrusher, d->theLoco->getValidSurfaces(), to, from, d->obj )) {
 				return 1;
 			}
 			if ( (to->getLayer() == LAYER_GROUND) && !d->thePathfinder->m_zoneManager.isPassable(to_x, to_y) ) {
@@ -2503,7 +2516,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 					continue;
 			}
 
-			Bool movementValid = validMovementPosition(isCrusher, locomotorSet.getValidSurfaces(), newCell, parentCell);
+			Bool movementValid = validMovementPosition(isCrusher, locomotorSet.getValidSurfaces(), newCell, parentCell, obj);
 			Bool dozerHack = false;
 			if (!movementValid && obj->isKindOf(KINDOF_DOZER) && newCell->getType() == PathfindCell::CELL_OBSTACLE) {
 				Object* obstacle = TheGameLogic->findObjectByID(newCell->getObstacleID());
@@ -2608,12 +2621,12 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 				newCostSoFar += 100*COST_ORTHOGONAL;
 			}
 
-			if (newCell->getType()==PathfindCell::CELL_OBSTACLE) {
+			if (newCell->getType()==PathfindCell::CELL_OBSTACLE && !isPassableGateCell(newCell, obj)) {
 				newCostSoFar += 100*COST_ORTHOGONAL;
 			}
 
 			if (m_isTunneling) {
-				if (!validMovementPosition( isCrusher, locomotorSet.getValidSurfaces(), newCell, parentCell )) {
+				if (!validMovementPosition( isCrusher, locomotorSet.getValidSurfaces(), newCell, parentCell, obj )) {
 					newCostSoFar += 10*COST_ORTHOGONAL;
 				}
 			}
@@ -2648,7 +2661,8 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 Path *Pathfinder::findPath( Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 													 const Coord3D *rawTo)
 {
-	if (!clientSafeQuickDoesPathExist(locomotorSet, from, rawTo)) {
+	if (!clientSafeQuickDoesPathExist(locomotorSet, from, rawTo) &&
+		!GateOpenAndCloseBehavior::couldConnect(obj)) {
 		return nullptr;
 	}
 	Bool isHuman = true;
@@ -2761,7 +2775,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 	// to ignore obstacle cells until it reaches a cell that is no longer
 	// classified as an obstacle.  At that point, the pathfind behaves normally.
 	//
-	m_isTunneling = parentCell->getType() == PathfindCell::CELL_OBSTACLE;
+	m_isTunneling = parentCell->getType() == PathfindCell::CELL_OBSTACLE && !isPassableGateCell(parentCell, obj);
 
 	Int zone1, zone2;
 	Bool isCrusher = obj ? obj->getCrusherLevel() > 0 : false;
@@ -2779,7 +2793,8 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 		return nullptr;
 	}
 
-	if (goalCell->isObstaclePresent(m_ignoreObstacleID) || m_isTunneling) {
+	if (goalCell->isObstaclePresent(m_ignoreObstacleID) || m_isTunneling ||
+		(zone1 != zone2 && layer == LAYER_GROUND && destinationLayer == LAYER_GROUND && GateOpenAndCloseBehavior::couldConnect(obj))) {
 		// Use terrain zones instead of building zones, since we are moving into or out of a building.
 		zone2 = m_zoneManager.getEffectiveTerrainZone(zone2);
 		zone2 =  m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), isCrusher, zone2);
@@ -2797,7 +2812,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 	}
 
 	// sanity check - if destination is invalid, can't path there
-	if (!validMovementPosition( isCrusher, destinationLayer, locomotorSet, to ))	{
+	if (!validMovementPosition( isCrusher, destinationLayer, locomotorSet, to ) && !isPassableGateCell(goalCell, obj))	{
 		m_isTunneling = false;
 		goalCell->releaseInfo();
 		parentCell->releaseInfo();
@@ -2805,7 +2820,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 	}
 
 	// sanity check - if source is invalid, we have to cheat
-	if (!validMovementPosition( isCrusher, layer, locomotorSet, from ))	{
+	if (!validMovementPosition( isCrusher, layer, locomotorSet, from ) && !isPassableGateCell(parentCell, obj))	{
 		// somehow we got to an impassable location.
 		m_isTunneling = true;
 	}
@@ -5909,7 +5924,7 @@ struct LinePassableStruct
 		}
 	}
 
-	if (pathfinder->validMovementPosition( isCrusher, d->acceptableSurfaces, to, from ) == false)
+	if (pathfinder->validMovementPosition( isCrusher, d->acceptableSurfaces, to, from, d->obj ) == false)
 	{
 		return 1;	// bail out
 	}

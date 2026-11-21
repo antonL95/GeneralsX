@@ -82,6 +82,8 @@
 #endif
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/RetailGate.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
@@ -2180,7 +2182,46 @@ void execute(const Command& command, unsigned int frame)
 	}
 
 	const Bool placeAtPoint = command.action == "place" && command.hasPlacementPoint;
-	if (command.action == "hordequeue")
+	if ((command.action == "wallspan" || command.action == "wallpreview") && command.hasLocation)
+	{
+		const ThingTemplate* cap = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
+		WallHubBehavior* hub = WallHubBehavior::find(obj, OPTION_ONE);
+		if (!cap || !hub)
+		{
+			std::fprintf(stderr, "TEST wall %u source or cap unavailable\n", frame);
+			return;
+		}
+		const Coord3D target = groundLocation(command);
+		const auto plan = hub->plan(cap, target);
+		std::fprintf(stderr, "TEST wall %u tiles=%zu cost=%u legal=%d affordable=%d\n", frame,
+			plan.pieces.size(), plan.cost, plan.legal, plan.affordable);
+		if (command.action == "wallpreview" && TheTacticalView && TheInGameUI && obj->getDrawable())
+		{
+			selectObject(obj);
+			TheInGameUI->placeWallSpanAvailable(cap, obj->getDrawable(), OPTION_ONE);
+			ICoord2D pixel;
+			TheTacticalView->worldToScreen(&target, &pixel);
+			TheInGameUI->setPlacementStart(&pixel);
+			TheInGameUI->setPlacementEnd(&pixel);
+		}
+		else
+		{
+			GameMessage* wall = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_WALL_SPAN);
+			wall->appendObjectIDArgument(obj->getID());
+			wall->appendIntegerArgument(cap->getTemplateID());
+			wall->appendIntegerArgument(OPTION_ONE);
+			wall->appendLocationArgument(target);
+		}
+	}
+	else if (command.action == "gatecheck")
+	{
+		const Object* unit = findTarget(command, true);
+		const auto* gate = GateOpenAndCloseBehavior::find(obj);
+		std::fprintf(stderr, "TEST gate %u unit=%s exists=%d wantsOpen=%d planning=%d passable=%d\n", frame, command.structure.c_str(),
+			gate != nullptr, gate && gate->wantsOpen(), GateOpenAndCloseBehavior::canPass(obj, unit, TRUE),
+			GateOpenAndCloseBehavior::canPass(obj, unit, FALSE));
+	}
+	else if (command.action == "hordequeue")
 	{
 		ProductionUpdateInterface* production = obj->getProductionUpdateInterface();
 		const ThingTemplate* type = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);

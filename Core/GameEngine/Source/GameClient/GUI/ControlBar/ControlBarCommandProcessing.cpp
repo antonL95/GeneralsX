@@ -55,6 +55,7 @@
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 
 
@@ -264,6 +265,11 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			//Make sure we have enough CASH to build it WHEN we click the button to build it,
 			//before actually previewing the purchase, otherwise, cancel altogether.
 			const ThingTemplate *whatToBuild = commandButton->getThingTemplate();
+			if (whatToBuild && WallHubBehavior::find(obj, commandButton->getOptions()))
+			{
+				TheInGameUI->placeWallSpanAvailable(whatToBuild, m_currentSelectedDrawable, commandButton->getOptions());
+				break;
+			}
 			CanMakeType cmt = TheBuildAssistant->canMakeUnit( obj, whatToBuild );
 			if (cmt == CANMAKE_NO_MONEY)
 			{

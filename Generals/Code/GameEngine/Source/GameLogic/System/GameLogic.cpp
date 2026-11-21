@@ -533,7 +533,7 @@ void GameLogic::reset()
 }
 
 static Object * placeObjectAtPosition(Int slotNum, AsciiString objectTemplateName, Coord3D& pos, Player *pPlayer,
-																	const PlayerTemplate *pTemplate)
+																	const PlayerTemplate *pTemplate, Bool adjust = TRUE)
 {
 	const ThingTemplate* btt = TheThingFactory->findTemplate(objectTemplateName);
 	Object *obj = TheThingFactory->newObject( btt, pPlayer->getDefaultTeam() );
@@ -565,7 +565,7 @@ static Object * placeObjectAtPosition(Int slotNum, AsciiString objectTemplateNam
 		if (team)
 			team->setActive();
 		TheAI->pathfinder()->addObjectToPathfindMap(obj);
-		if (obj->getAIUpdateInterface() && !obj->isKindOf(KINDOF_IMMOBILE)) {
+		if (adjust && obj->getAIUpdateInterface() && !obj->isKindOf(KINDOF_IMMOBILE)) {
 			CRCDEBUG_LOG(("Not immobile - adjusting dest"));
 			if (TheAI->pathfinder()->adjustDestination(obj, obj->getAIUpdateInterface()->getLocomotorSet(), &pos)) {
 				DUMPCOORD3D(&pos);
@@ -650,12 +650,13 @@ static void placeNetworkBuildingsForPlayer(Int slotNum, const GameSlot *pSlot, P
 			ThePartitionManager->update();
 			const Coord3D offset = pTemplate->getStartingUnitOffset(i);
 			Bool foundPos;
-			if (retailStart && !CastleRules::isZeroOffset(offset.x, offset.y, offset.z))
+			const Bool authoredOffset = retailStart && !CastleRules::isZeroOffset(offset.x, offset.y, offset.z);
+			if (authoredOffset)
 			{
 				const CastleRules::Offset placed = CastleRules::startingUnitOffset(offset.x, offset.y, offset.z);
 				objPos.x = buildingPos.x + placed.x;
 				objPos.y = buildingPos.y + placed.y;
-				objPos.z = TheTerrainLogic->getGroundHeight(objPos.x, objPos.y);
+				objPos.z = buildingPos.z;
 				foundPos = TRUE;
 			}
 			else
@@ -664,7 +665,7 @@ static void placeNetworkBuildingsForPlayer(Int slotNum, const GameSlot *pSlot, P
 			}
 			if (foundPos)
 			{
-				Object *unit = placeObjectAtPosition(slotNum, objName, objPos, pPlayer, pTemplate);
+				Object *unit = placeObjectAtPosition(slotNum, objName, objPos, pPlayer, pTemplate, !authoredOffset);
 				if (unit) {
 					pPlayer->onUnitCreated(nullptr, unit);
 				}

@@ -78,20 +78,29 @@ public:
 	Bool shouldDoOnBuildComplete() const override { return !m_buildComplete; }
 	UpdateSleepTime update() override;
 	Bool isUnpacked() const { return m_unpacked; }
+	static CastleBehavior* find(const Object* object);
+	Object* getKeep() const;
+	Bool unpackFree();
+	Bool orderUnpack(Player* player);
 	Real getMaxCastleRadius() const { return getCastleBehaviorModuleData()->m_maxCastleRadius; }
 	static CastleBehavior* findForMember(const Object& member);
 	void grantMemberUpgrade(const Object& source, const UpgradeTemplate& upgrade);
 	void applyKeepUpgrades(Object& member) const;
 
 private:
-	void unpack();
+	void unpack(Bool charge = FALSE);
 	void checkKeep();
 	void killEverything();
+	void repack();
+	void scanForCapture();
+	const CastleBehaviorModuleData::CampEntry* findCamp(const Player& player) const;
 
 	Bool m_buildComplete = FALSE;
 	Bool m_pendingUnpack = FALSE;
 	Bool m_unpacked = FALSE;
 	Bool m_keepLost = FALSE;
+	Bool m_orderedUnpack = FALSE;
+	UnsignedInt m_unpackFrame = 0;
 	ObjectID m_keep = INVALID_ID;
 	std::vector<ObjectID> m_members;
 };

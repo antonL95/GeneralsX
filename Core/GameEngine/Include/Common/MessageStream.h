@@ -609,6 +609,9 @@ public:
 		MSG_RETAIL_HORDE_COMMAND = 1890,
 		MSG_RETAIL_AUTO_ABILITY = 1891,
 		MSG_DO_SPELLBOOK_SPECIAL_POWER = 1892,
+		MSG_RETAIL_WALL_SPAN = 1893,
+		MSG_RETAIL_GATE = 1894,
+		MSG_RETAIL_CASTLE_UNPACK = 1895,
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 

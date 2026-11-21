@@ -442,6 +442,8 @@ public:  // ********************************************************************
 
 	// build interface
 	virtual void placeBuildAvailable( const ThingTemplate *build, Drawable *buildDrawable );
+	void placeWallSpanAvailable(const ThingTemplate* build, Drawable* builder, UnsignedInt options);
+	UnsignedInt getPendingWallOptions() const { return m_pendingWallOptions; }
 	UnsignedInt getPlannedBuildGhostCount() const { return static_cast<UnsignedInt>(m_plannedBuildGhosts.size()); }
 	virtual const ThingTemplate *getPendingPlaceType();					///< get item we're trying to place
 	virtual ObjectID getPendingPlaceSourceObjectID();			///< get producing object
@@ -698,6 +700,7 @@ protected:
 
 	void destroyPlacementIcons();
 	void handleBuildPlacements();
+	void drawWallSpanPreview();
 	void updatePlannedBuildGhosts();
 	void destroyPlannedBuildGhosts();
 	void handleRadiusCursor();																	///< handle updating of "radius cursors" that follow the mouse pos
@@ -759,6 +762,7 @@ protected:
 	const CommandButton *				m_pendingGUICommand;										///< GUI command that needs additional interaction from the user
 	BuildProgress								m_buildProgress[ MAX_BUILD_PROGRESS ];	///< progress for building units
 	const ThingTemplate *				m_pendingPlaceType;											///< type of built thing we're trying to place
+	UnsignedInt m_pendingWallOptions = 0;
 	ObjectID										m_pendingPlaceSourceObjectID;						///< source object of the thing constructing the item
 	Bool										m_preventLeftClickDeselectionInAlternateMouseModeForOneClick;
 	Drawable **									m_placeIcon;														///< array for drawables to appear at the cursor when building in the world

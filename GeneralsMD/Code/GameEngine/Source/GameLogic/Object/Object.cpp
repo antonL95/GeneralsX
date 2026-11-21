@@ -71,6 +71,7 @@
 
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/FiringTracker.h"
 #include "GameLogic/GameLogic.h"
@@ -2618,6 +2619,10 @@ void Object::updateTriggerAreaFlags()
 //-------------------------------------------------------------------------------------------------
 void Object::onCollide( Object *other, const Coord3D *loc, const Coord3D *normal )
 {
+	if (other && (GateOpenAndCloseBehavior::canPass(other, this, FALSE) ||
+		GateOpenAndCloseBehavior::canPass(this, other, FALSE)))
+		return;
+
 	for (BehaviorModule** m = m_behaviors; *m; ++m)
 	{
 		CollideModuleInterface* collide = (*m)->getCollide();
@@ -4951,6 +4956,13 @@ void Object::onCapture( Player *oldOwner, Player *newOwner )
 /// Object level events that need to happen upon game death
 void Object::onDie( DamageInfo *damageInfo )
 {
+	if (RetailFileLayers::enabled() &&
+		(isKindOf(KINDOF_WALL_SEGMENT) || isKindOf(KINDOF_WALL_GATE) || isKindOf(KINDOF_WALL_HUB) || isKindOf(KINDOF_DEFENSIVE_WALL)))
+	{
+		TheAI->pathfinder()->removeObjectFromPathfindMap(this);
+		setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_COLLISIONS));
+	}
+
 	RetailTestCommands::logHordeDeath(this, damageInfo);
 
 	checkAndDetonateBoobyTrap(nullptr);// Already dying, so no need to handle death case of explosion

@@ -61,6 +61,7 @@
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GadgetPushButton.h"
 #include "GameLogic/HeroRoster.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
@@ -1166,6 +1167,10 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 				if (bStatus == BSTATUS_NO || (bStatus == BSTATUS_ONLY_BY_AI && obj->getControllingPlayer()->getPlayerType() != PLAYER_COMPUTER))
 					return COMMAND_HIDDEN;
 			}
+
+			if (WallHubBehavior::find(obj, command->getOptions()))
+				return !obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && player->canBuild(whatToBuild)
+					? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 
 			// sanity, non dozer object
 			if( obj->isKindOf( KINDOF_DOZER ) == FALSE )

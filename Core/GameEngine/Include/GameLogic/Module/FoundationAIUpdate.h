@@ -24,12 +24,13 @@ public:
 	static FoundationAIUpdate* find(const Object& object);
 
 	UpdateSleepTime update() override;
-	Object* construct(const ThingTemplate* what, Player* player);
+	Object* construct(const ThingTemplate* what, Player* player, Bool prebuilt = FALSE);
+	Bool canBuildOn(const Player* player) const;
+	static void advanceConstruction(Object& structure, Object* builder);
 	Object* getStructure() const;
 
 private:
 	void showFoundation(Bool show);
-	void advanceConstruction(Object& structure);
 
 	ObjectID m_structure = INVALID_ID;
 };

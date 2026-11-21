@@ -94,6 +94,8 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/DoCommandUpgrade.h
     Include/GameLogic/Module/GeometryUpgrade.h
     Include/GameLogic/Module/FoundationAIUpdate.h
+    Include/GameLogic/Module/RetailGate.h
+    Include/GameLogic/Module/WallHubBehavior.h
     Include/GameLogic/Module/TerrainResourceBehavior.h
     Include/GameLogic/Module/CommandPointsUpgrade.h
     Include/Common/CommandPointRules.h
@@ -717,6 +719,8 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Upgrade/DoCommandUpgrade.cpp
     Source/GameLogic/Object/Upgrade/GeometryUpgrade.cpp
     Source/GameLogic/Object/Update/FoundationAIUpdate.cpp
+    Source/GameLogic/Object/Behavior/RetailGate.cpp
+    Source/GameLogic/Object/Behavior/WallHubBehavior.cpp
     Source/GameLogic/Object/Update/TerrainResourceBehavior.cpp
     Source/GameLogic/Object/Upgrade/CommandPointsUpgrade.cpp
     Source/Common/INI/INITerrain.cpp

@@ -74,6 +74,9 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/CaveContain.h"
 #include "GameLogic/Module/CommandButtonHuntUpdate.h"
+#include "GameLogic/Module/CastleBehavior.h"
+#include "GameLogic/Module/FoundationAIUpdate.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
@@ -6651,6 +6654,53 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				return;
 			}
 			DEBUG_CRASH(("Unknown ScriptAction type %d", pAction->getActionType())); return;
+		case ScriptAction::GATE_OPEN:
+		case ScriptAction::GATE_CLOSE:
+		{
+			Object* object = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			if (auto* gate = GateOpenAndCloseBehavior::find(object))
+				gate->request(pAction->getActionType() == ScriptAction::GATE_OPEN);
+			return;
+		}
+		case ScriptAction::BUILD_BUILDING_ON_FOUNDATION:
+		{
+			Object* plot = TheScriptEngine->getUnitNamed(pAction->getParameter(1)->getString());
+			const ThingTemplate* type = TheThingFactory->findTemplate(pAction->getParameter(0)->getString(), FALSE);
+			if (auto* foundation = plot ? FoundationAIUpdate::find(*plot) : nullptr)
+				foundation->construct(type, plot->getControllingPlayer());
+			return;
+		}
+		case ScriptAction::NAMED_BASE_UNPACK_FREE:
+		{
+			Object* object = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			CastleBehavior* castle = CastleBehavior::find(object);
+			if (!castle && object)
+				castle = CastleBehavior::findForMember(*object);
+			if (castle && castle->unpackFree())
+				TheScriptEngine->setRetailUnitReference(pAction->getParameter(1)->getString(), castle->getKeep());
+			return;
+		}
+		case ScriptAction::SET_UNIT_REFERENCE:
+			TheScriptEngine->setRetailUnitReference(pAction->getParameter(0)->getString(),
+				TheScriptEngine->getUnitNamed(pAction->getParameter(1)->getString()));
+			return;
+		case ScriptAction::FIND_HOME_BASE_OF_PLAYER:
+		{
+			const Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString());
+			Object* home = nullptr;
+			for (Object* object = TheGameLogic->getFirstObject(); player && object; object = object->getNextObject())
+			{
+				if (object->getControllingPlayer() != player)
+					continue;
+				const CastleBehavior* castle = CastleBehavior::find(object);
+				Object* keep = castle ? castle->getKeep() : nullptr;
+				if (keep && (!home || keep->getID() < home->getID()))
+					home = keep;
+			}
+			TheScriptEngine->setRetailUnitReference(pAction->getParameter(1)->getString(), home);
+			return;
+		}
+
 		case ScriptAction::DEBUG_MESSAGE_BOX:
 			doDebugMessage(pAction->getParameter(0)->getString(), true);
 			return;

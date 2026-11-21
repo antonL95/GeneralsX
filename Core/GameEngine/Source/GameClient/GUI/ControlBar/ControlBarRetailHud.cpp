@@ -39,6 +39,8 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/CastleBehavior.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/RespawnModules.h"
@@ -1274,6 +1276,14 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 {
 	switch (command->getCommandType())
 	{
+		case GUI_COMMAND_CLOSE_GATE:
+		case GUI_COMMAND_OPEN_GATE:
+		case GUI_COMMAND_TOGGLE_GATE:
+			return GateOpenAndCloseBehavior::find(obj) && !obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)
+				? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
+		case GUI_COMMAND_CASTLE_UNPACK:
+			return CastleBehavior::find(obj) && !obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)
+				? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		case GUI_COMMAND_PUSH_VISIBLE_COMMAND_RANGE:
 		case GUI_COMMAND_POP_VISIBLE_COMMAND_RANGE:
 			return COMMAND_AVAILABLE;
@@ -1315,6 +1325,22 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 {
 	switch (command->getCommandType())
 	{
+		case GUI_COMMAND_CASTLE_UNPACK:
+			if (!CastleBehavior::find(obj))
+				return CBC_COMMAND_NOT_USED;
+			TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_CASTLE_UNPACK)->appendObjectIDArgument(obj->getID());
+			return CBC_COMMAND_USED;
+		case GUI_COMMAND_CLOSE_GATE:
+		case GUI_COMMAND_OPEN_GATE:
+		case GUI_COMMAND_TOGGLE_GATE:
+		{
+			if (!GateOpenAndCloseBehavior::find(obj))
+				return CBC_COMMAND_NOT_USED;
+			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_GATE);
+			msg->appendObjectIDArgument(obj->getID());
+			msg->appendIntegerArgument(command->getCommandType());
+			return CBC_COMMAND_USED;
+		}
 		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
 		case GUI_COMMAND_TOGGLE_WEAPONSET:
 		{

@@ -81,6 +81,7 @@
 #include "GameLogic/AIGuard.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptEngine.h"
@@ -1589,6 +1590,12 @@ void InGameUI::evaluateSoloNexus( Drawable *newlyAddedDrawable )
 
 void InGameUI::handleBuildPlacements()
 {
+	if (m_pendingWallOptions)
+	{
+		drawWallSpanPreview();
+		return;
+	}
+
 
 	//
 	// if we're in the process of placing something we need up update one or more drawables
@@ -3360,6 +3367,7 @@ void InGameUI::placeBuildAvailable( const ThingTemplate *build, Drawable *buildD
 	// place something, it is overwritten
 	//
 	m_pendingPlaceType = build;
+	m_pendingWallOptions = 0;
 	m_retailPlacementValid = FALSE;
 
 	//Keep the prev pending place for left click deselection prevention in alternate mouse mode.
@@ -6409,4 +6417,54 @@ void InGameUI::drawPlayerInfoList()
 
 		drawY += lineH;
 	}
+}
+
+void InGameUI::placeWallSpanAvailable(const ThingTemplate* build, Drawable* builder, UnsignedInt options)
+{
+	placeBuildAvailable(build, builder);
+	m_pendingWallOptions = options;
+}
+
+void InGameUI::drawWallSpanPreview()
+{
+	const Object* source = TheGameLogic->findObjectByID(m_pendingPlaceSourceObjectID);
+	const WallHubBehavior* hub = WallHubBehavior::find(source, m_pendingWallOptions);
+	if (!hub)
+	{
+		placeBuildAvailable(nullptr, nullptr);
+		return;
+	}
+	ICoord2D pixel = TheMouse->getMouseStatus()->pos;
+	if (isPlacementAnchored())
+		getPlacementPoints(nullptr, &pixel);
+	Coord3D target;
+	WallHubBehavior::Span span;
+	if (TheTacticalView->screenToTerrain(&pixel, &target))
+		span = hub->plan(m_pendingPlaceType, target);
+
+	const Bool legal = !span.pieces.empty() && span.legal == LBC_OK && span.affordable;
+	static const RGBColor invalidTint = {1.0f, -1.0f, -1.0f};
+	for (Int i = 0; i < TheGlobalData->m_maxLineBuildObjects; ++i)
+	{
+		const WallHubBehavior::Piece* piece = i < static_cast<Int>(span.pieces.size()) ? &span.pieces[i] : nullptr;
+		Drawable*& ghost = m_placeIcon[i];
+		if (ghost && (!piece || ghost->getTemplate() != piece->type))
+		{
+			TheGameClient->destroyDrawable(ghost);
+			ghost = nullptr;
+		}
+		if (!piece)
+			continue;
+		if (!ghost)
+		{
+			ghost = TheThingFactory->newDrawable(piece->type, DRAWABLE_STATUS_NO_STATE_PARTICLES);
+			ghost->setModelConditionState(MODELCONDITION_BUILD_PLACEMENT_CURSOR);
+			ghost->setDrawableOpacity(TheGlobalData->m_objectPlacementOpacity);
+			ghost->setIndicatorColor(source->getControllingPlayer()->getPlayerColor());
+		}
+		ghost->setPosition(&piece->position);
+		ghost->setOrientation(piece->facing);
+		ghost->colorTint(legal ? nullptr : &invalidTint);
+	}
+	setMouseCursor(legal ? Mouse::BUILD_PLACEMENT : Mouse::INVALID_BUILD_PLACEMENT);
 }

@@ -43,6 +43,7 @@
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 
 #include "GameLogic/Module/ProductionUpdate.h"
 
@@ -172,6 +173,34 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 				Real angle;
 				ICoord2D anchorStart, anchorEnd;
 				Bool isLineBuild = TheBuildAssistant->isLineBuildTemplate( build );
+
+				if (const UnsignedInt wallOptions = TheInGameUI->getPendingWallOptions())
+				{
+					TheInGameUI->getPlacementPoints(&anchorStart, &anchorEnd);
+					const ObjectID source = TheInGameUI->getPendingPlaceSourceObjectID();
+					const WallHubBehavior* hub = WallHubBehavior::find(TheGameLogic->findObjectByID(source), wallOptions);
+					if (hub && TheTacticalView->screenToTerrain(&anchorEnd, &worldEnd))
+					{
+						const auto span = hub->plan(build, worldEnd);
+						if (span.legal != LBC_OK || span.pieces.empty())
+							TheInGameUI->displayCantBuildMessage(span.legal);
+						else if (!span.affordable)
+							TheInGameUI->message("GUI:NotEnoughMoneyToBuild");
+						else
+						{
+							GameMessage* wall = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_WALL_SPAN);
+							wall->appendObjectIDArgument(source);
+							wall->appendIntegerArgument(build->getTemplateID());
+							wall->appendIntegerArgument(wallOptions);
+							wall->appendLocationArgument(worldEnd);
+							TheInGameUI->placeBuildAvailable(nullptr, nullptr);
+						}
+					}
+					TheInGameUI->setPlacementStart(nullptr);
+					m_frameOfUpButton = TheGameLogic->getFrame();
+					disp = DESTROY_MESSAGE;
+					break;
+				}
 
 				// get the angle of the drawable at the cursor to use as the initial angle
 				angle = TheInGameUI->getPlacementAngle();

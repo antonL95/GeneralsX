@@ -3,10 +3,12 @@
 #include "GameLogic/Module/CastleBehavior.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 #include "Common/Errors.h"
 #include "Common/INI.h"
+#include "Common/Money.h"
 #include "Common/INIAudit.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -21,6 +23,10 @@
 #include "GameLogic/CastleTemplateStore.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/ScriptEngine.h"
+#include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/ObjectIter.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/CastleUpgrade.h"
@@ -115,25 +121,46 @@ void CastleBehavior::onBuildComplete()
 		return;
 
 	m_buildComplete = TRUE;
-	if (getCastleBehaviorModuleData()->m_instantUnpack)
-	{
-		m_pendingUnpack = TRUE;
+	const auto* data = getCastleBehaviorModuleData();
+	m_pendingUnpack = data->m_instantUnpack || data->m_preBuiltPlayer.isNotEmpty();
+	if (m_pendingUnpack || data->m_scanDistance > 0.0f)
 		setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
-	}
 }
 
 UpdateSleepTime CastleBehavior::update()
 {
 	if (m_pendingUnpack)
 	{
+		const UnsignedInt frame = TheGameLogic->getFrame();
+		if (m_orderedUnpack && frame < m_unpackFrame)
+			return UPDATE_SLEEP(m_unpackFrame - frame);
 		m_pendingUnpack = FALSE;
-		unpack();
+		unpack(m_orderedUnpack);
+		m_orderedUnpack = FALSE;
 	}
-	if (!m_unpacked || m_keepLost || m_keep == INVALID_ID)
+	if (!m_unpacked)
+	{
+		const auto* data = getCastleBehaviorModuleData();
+		if (!m_buildComplete || data->m_instantUnpack || data->m_scanDistance <= 0.0f || getObject()->isEffectivelyDead())
+			return UPDATE_SLEEP_FOREVER;
+		scanForCapture();
+		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
+	}
+	if (m_keep == INVALID_ID)
 		return UPDATE_SLEEP_FOREVER;
+	if (m_keepLost)
+	{
+		if (getCastleBehaviorModuleData()->m_keepDeathKillsEverything)
+			return UPDATE_SLEEP_FOREVER;
+		const UnsignedInt frame = TheGameLogic->getFrame();
+		if (frame < m_unpackFrame)
+			return UPDATE_SLEEP(m_unpackFrame - frame);
+		repack();
+		return UPDATE_SLEEP_NONE;
+	}
 
 	checkKeep();
-	return m_keepLost ? UPDATE_SLEEP_FOREVER : UPDATE_SLEEP_NONE;
+	return UPDATE_SLEEP_NONE;
 }
 
 void CastleBehavior::checkKeep()
@@ -145,13 +172,42 @@ void CastleBehavior::checkKeep()
 	case CastleRules::KeepAction::None:
 		return;
 	case CastleRules::KeepAction::Lost:
+	{
 		m_keepLost = TRUE;
+		const Real time = getCastleBehaviorModuleData()->m_fadeTime;
+		const Real delay = std::isfinite(time) ? std::clamp(time, 0.0f, 300.0f) : 0.0f;
+		m_unpackFrame = TheGameLogic->getFrame() + static_cast<UnsignedInt>(delay * LOGICFRAMES_PER_SECOND);
 		return;
+	}
 	case CastleRules::KeepAction::KillEverything:
 		m_keepLost = TRUE;
 		killEverything();
 		return;
 	}
+}
+
+CastleBehavior* CastleBehavior::find(const Object* object)
+{
+	return object ? static_cast<CastleBehavior*>(object->findUpdateModule(NAMEKEY("CastleBehavior"))) : nullptr;
+}
+
+Object* CastleBehavior::getKeep() const
+{
+	Object* keep = m_keep == INVALID_ID ? nullptr : TheGameLogic->findObjectByID(m_keep);
+	return keep && !keep->isEffectivelyDead() ? keep : nullptr;
+}
+
+Bool CastleBehavior::unpackFree()
+{
+	if (!m_unpacked && !getObject()->isEffectivelyDead())
+	{
+		m_pendingUnpack = FALSE;
+		m_orderedUnpack = FALSE;
+		unpack();
+		if (m_unpacked)
+			setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
+	}
+	return m_unpacked;
 }
 
 CastleBehavior* CastleBehavior::findForMember(const Object& member)
@@ -240,18 +296,67 @@ void CastleBehavior::killEverything()
 	}
 }
 
-void CastleBehavior::unpack()
+void CastleBehavior::repack()
 {
 	Object* packed = getObject();
-	Player* player = packed->getControllingPlayer();
-	const AsciiString side = player->getSide();
+	const Object* keep = TheGameLogic->findObjectByID(m_keep);
+	if (keep && keep->getName().isNotEmpty())
+		TheScriptEngine->transferObjectName(keep->getName(), packed);
+
+	for (ObjectID id : m_members)
+	{
+		Object* member = TheGameLogic->findObjectByID(id);
+		if (!member || id == m_keep)
+			continue;
+		if (const auto* plot = FoundationAIUpdate::find(*member))
+		{
+			if (Object* structure = plot->getStructure())
+				TheGameLogic->destroyObject(structure);
+		}
+		TheGameLogic->destroyObject(member);
+	}
+
+	m_members.clear();
+	m_keep = INVALID_ID;
+	m_unpacked = FALSE;
+	m_keepLost = FALSE;
+	packed->clearStatus(MAKE_OBJECT_STATUS_MASK3(OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_NO_COLLISIONS, OBJECT_STATUS_MASKED));
+	Player* neutral = ThePlayerList->findPlayerWithNameKey(NAMEKEY("PlyrCivilian"));
+	if (!neutral)
+		neutral = ThePlayerList->getNeutralPlayer();
+	packed->setTeam(neutral->getDefaultTeam());
+	if (Drawable* drawable = packed->getDrawable())
+		drawable->setDrawableHidden(FALSE);
+	TheAI->pathfinder()->addObjectToPathfindMap(packed);
+}
+
+const CastleBehaviorModuleData::CampEntry* CastleBehavior::findCamp(const Player& player) const
+{
+	const AsciiString side = player.getSide();
 	const auto* data = getCastleBehaviorModuleData();
 	const auto faction = std::find_if(data->m_castles.begin(), data->m_castles.end(),
 		[&side](const CastleBehaviorModuleData::CampEntry& entry)
 		{
 			return stricmp(entry.faction.str(), side.str()) == 0;
 		});
-	if (faction == data->m_castles.end())
+	return faction == data->m_castles.end() ? nullptr : &*faction;
+}
+
+void CastleBehavior::unpack(Bool charge)
+{
+	Object* packed = getObject();
+	Player* player = packed->getControllingPlayer();
+	const auto* data = getCastleBehaviorModuleData();
+	if (!charge && data->m_preBuiltPlayer.isNotEmpty())
+	{
+		if (Player* prebuilt = TheScriptEngine->getPlayerFromAsciiString(data->m_preBuiltPlayer))
+			player = prebuilt;
+	}
+	const auto* faction = player ? findCamp(*player) : nullptr;
+	if (!faction || packed->isEffectivelyDead())
+		return;
+	const UnsignedInt cost = charge ? faction->cost : 0;
+	if (player->getMoney()->countMoney() < cost)
 		return;
 
 	const CastleTemplates::Members* members = nullptr;
@@ -285,6 +390,13 @@ void CastleBehavior::unpack()
 		}
 		templates.push_back(definition);
 	}
+
+	if (std::none_of(templates.begin(), templates.end(), [](const ThingTemplate* type) { return type != nullptr; }))
+		return;
+	if (cost)
+		player->getMoney()->withdraw(cost);
+	if (player != packed->getControllingPlayer())
+		packed->setTeam(player->getDefaultTeam());
 
 	const Matrix3D transform = *packed->getTransformMatrix();
 	const Real orientation = packed->getOrientation();
@@ -338,6 +450,59 @@ void CastleBehavior::unpack()
 		if (piece->isKindOf(KINDOF_CASTLE_KEEP))
 			m_keep = piece->getID();
 	}
+
+	if (data->m_maxCastleRadius > 0.0f)
+	{
+		std::vector<ObjectID> tainted;
+		SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(packed, data->m_maxCastleRadius, FROM_CENTER_2D);
+		for (Object* object = iter->first(); object; object = iter->next())
+		{
+			if (object->isKindOf(KINDOF_TAINT))
+				tainted.push_back(object->getID());
+		}
+		deleteInstance(iter);
+		std::sort(tainted.begin(), tainted.end());
+		for (ObjectID id : tainted)
+		{
+			if (Object* object = TheGameLogic->findObjectByID(id))
+				TheGameLogic->destroyObject(object);
+		}
+	}
+
+	if (Object* keep = getKeep())
+	{
+		if (data->m_transferFoundationHealth)
+		{
+			const BodyModuleInterface* oldBody = packed->getBodyModule();
+			BodyModuleInterface* body = keep->getBodyModule();
+			if (oldBody->getMaxHealth() > 0.0f)
+				body->internalChangeHealth(body->getMaxHealth() * oldBody->getHealth() / oldBody->getMaxHealth() - body->getHealth());
+		}
+		if (packed->getName().isNotEmpty())
+		{
+			TheScriptEngine->transferObjectName(packed->getName(), keep);
+			packed->setName(AsciiString::TheEmptyString);
+		}
+	}
+	if (!charge)
+	{
+		for (const auto& entry : data->m_preBuiltList)
+		{
+			if (entry.count <= 0)
+				continue;
+			const ThingTemplate* type = TheThingFactory->findTemplate(entry.name, FALSE);
+			if (!type)
+				continue;
+			Int remaining = entry.count;
+			for (ObjectID id : m_members)
+			{
+				Object* member = TheGameLogic->findObjectByID(id);
+				FoundationAIUpdate* plot = member ? FoundationAIUpdate::find(*member) : nullptr;
+				if (plot && plot->construct(type, player, TRUE) && --remaining == 0)
+					break;
+			}
+		}
+	}
 }
 
 void CastleBehavior::crc(Xfer* xfer)
@@ -347,8 +512,8 @@ void CastleBehavior::crc(Xfer* xfer)
 
 void CastleBehavior::xfer(Xfer* xfer)
 {
-	XferVersion version = 2;
-	xfer->xferVersion(&version, 2);
+	XferVersion version = 3;
+	xfer->xferVersion(&version, 3);
 	UpdateModule::xfer(xfer);
 	xfer->xferBool(&m_buildComplete);
 	xfer->xferBool(&m_pendingUnpack);
@@ -356,6 +521,11 @@ void CastleBehavior::xfer(Xfer* xfer)
 	xfer->xferObjectID(&m_keep);
 	if (version >= 2)
 		xfer->xferBool(&m_keepLost);
+	if (version >= 3)
+	{
+		xfer->xferBool(&m_orderedUnpack);
+		xfer->xferUnsignedInt(&m_unpackFrame);
+	}
 
 	UnsignedInt count = static_cast<UnsignedInt>(m_members.size());
 	xfer->xferUnsignedInt(&count);
@@ -377,4 +547,49 @@ void CastleBehavior::loadPostProcess()
 		if (Drawable* drawable = getObject()->getDrawable())
 			drawable->setDrawableHidden(TRUE);
 	}
+}
+
+Bool CastleBehavior::orderUnpack(Player* player)
+{
+	Object* packed = getObject();
+	const auto* camp = player ? findCamp(*player) : nullptr;
+	if (!camp || player != packed->getControllingPlayer() || m_pendingUnpack || m_unpacked ||
+		!m_buildComplete || packed->isEffectivelyDead() || player->getMoney()->countMoney() < camp->cost)
+		return FALSE;
+
+	const Real seconds = getCastleBehaviorModuleData()->m_unpackDelayTime;
+	const Real delay = std::isfinite(seconds) ? std::clamp(seconds, 0.0f, 300.0f) : 0.0f;
+	m_orderedUnpack = TRUE;
+	m_pendingUnpack = TRUE;
+	m_unpackFrame = TheGameLogic->getFrame() + static_cast<UnsignedInt>(delay * LOGICFRAMES_PER_SECOND);
+	setWakeFrame(packed, UPDATE_SLEEP_NONE);
+	return TRUE;
+}
+
+void CastleBehavior::scanForCapture()
+{
+	Object* packed = getObject();
+	Player* neutral = ThePlayerList->findPlayerWithNameKey(NAMEKEY("PlyrCivilian"));
+	if (!neutral)
+		neutral = ThePlayerList->getNeutralPlayer();
+
+	Object* candidate = nullptr;
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(packed,
+		getCastleBehaviorModuleData()->m_scanDistance, FROM_CENTER_2D);
+	for (Object* unit = iter->first(); unit; unit = iter->next())
+	{
+		if (unit == packed || unit->isEffectivelyDead() || !unit->isMobile() || !unit->getAIUpdateInterface() ||
+			unit->isKindOf(KINDOF_NO_BASE_CAPTURE) || unit->isKindOf(KINDOF_PROJECTILE) ||
+			unit->getContainedBy() || unit->isSignificantlyAboveTerrain())
+			continue;
+		const Player* owner = unit->getControllingPlayer();
+		if (owner && owner != neutral && owner->isPlayerActive() && findCamp(*owner) &&
+			(!candidate || unit->getID() < candidate->getID()))
+			candidate = unit;
+	}
+	deleteInstance(iter);
+
+	Player* owner = candidate ? candidate->getControllingPlayer() : neutral;
+	if (owner != packed->getControllingPlayer())
+		packed->setTeam(owner->getDefaultTeam());
 }
