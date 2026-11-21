@@ -2846,6 +2846,21 @@ void execute(const Command& command, unsigned int frame)
 				member->kill();
 		}
 	}
+	else if (command.action == "rearm-sleep")
+	{
+		if (BannerCarrierUpdate* banner = BannerCarrierUpdate::find(obj))
+		{
+			banner->friend_setNextCallFrame(UPDATE_SLEEP_FOREVER);
+			std::fprintf(stderr, "TEST rearm-sleep %u %s wake=%u\n", frame,
+				obj->getTemplate()->getName().str(), banner->friend_getNextCallFrame());
+		}
+	}
+	else if (command.action == "banner-wake")
+	{
+		if (BannerCarrierUpdate* banner = BannerCarrierUpdate::find(obj))
+			std::fprintf(stderr, "TEST banner-wake %u %s wake=%u frame=%u\n", frame,
+				obj->getTemplate()->getName().str(), banner->friend_getNextCallFrame(), TheGameLogic->getFrame());
+	}
 	else if (command.action == "build" || placeAtPoint || command.action == "queue")
 	{
 		const ThingTemplate* what = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);

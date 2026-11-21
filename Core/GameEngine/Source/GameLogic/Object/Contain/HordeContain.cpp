@@ -1490,7 +1490,14 @@ BannerCarrierUpdate::~BannerCarrierUpdate() = default;
 
 void BannerCarrierUpdate::crc(Xfer* xfer) { UpdateModule::crc(xfer); }
 void BannerCarrierUpdate::xfer(Xfer* xfer) { UpdateModule::xfer(xfer); }
-void BannerCarrierUpdate::loadPostProcess() { UpdateModule::loadPostProcess(); }
+void BannerCarrierUpdate::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
+	const auto* data = getBannerCarrierUpdateModuleData();
+	if (RetailFileLayers::enabled() && data->m_replenishNearbyHorde && data->m_idleSpawnRate &&
+		!getObject()->isEffectivelyDead() && friend_getNextCallFrame() == UPDATE_SLEEP_FOREVER)
+		friend_setNextCallFrame(TheGameLogic->getFrame());
+}
 
 BannerCarrierUpdate* BannerCarrierUpdate::find(Object* carrier)
 {
