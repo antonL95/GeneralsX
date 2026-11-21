@@ -44,6 +44,7 @@
 #include "Common/Xfer.h"
 #include "GameNetwork/FileTransfer.h"
 #include "GameNetwork/GameInfo.h"
+#include "Common/RetailFileLayers.h"
 #include "GameNetwork/GameSpy/ThreadUtils.h"
 #include "GameNetwork/GameSpy/StagingRoomGameInfo.h"
 #include "GameNetwork/LANAPI.h"						// for testing packet size
@@ -334,6 +335,7 @@ void GameInfo::reset()
 	m_mapSize = 0;
   m_superweaponRestriction = 0;
   m_startingCash = TheGlobalData->m_defaultStartingCash;
+	m_retailSkirmishRules = {};
 
 	for (Int i=0; i<MAX_SLOTS; ++i)
 	{
@@ -1013,6 +1015,17 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 		game.getStartingCash().countMoney(), game.oldFactionsOnly() ? 'Y' : 'N' );
 #endif
 
+	if (RetailFileLayers::enabled())
+	{
+		const auto &rules = game.getRetailSkirmishRules();
+		if (rules.commandPointFactor > 0)
+		{
+			AsciiString options;
+			options.format("RF=%d;RR=%d;RH=%d;", rules.commandPointFactor, Int(rules.ringHeroes), Int(rules.customHeroes));
+			optionsString.concat(options);
+		}
+	}
+
 	//add player info for each slot
 	optionsString.concat(slotListID);
 	optionsString.concat('=');
@@ -1187,6 +1200,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
   Bool oldFactionsOnly = FALSE;
 	Int useStats = TRUE;
   Money startingCash = TheGlobalData->m_defaultStartingCash;
+	RetailSkirmishRules retailRules;
   UnsignedShort restriction = 0; // Always the default
 
 	Bool sawMap = FALSE;
@@ -1323,6 +1337,16 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
       oldFactionsOnly = ( val.compareNoCase( "Y" ) == 0 );
       sawOldFactions = TRUE;
     }
+		else if (RetailFileLayers::enabled() && key == "RF")
+		{
+			const long factor = std::strtol(val.str(), nullptr, 10);
+			if (factor >= 1 && factor <= 10000)
+				retailRules.commandPointFactor = Int(factor);
+		}
+		else if (RetailFileLayers::enabled() && key == "RR")
+			retailRules.ringHeroes = val == "1";
+		else if (RetailFileLayers::enabled() && key == "RH")
+			retailRules.customHeroes = val == "1";
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
 			sawSlotlist = true;
@@ -1725,6 +1749,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		game->setUseStats(useStats);
 		game->setSuperweaponRestriction(restriction);
 		game->setStartingCash(startingCash);
+		game->setRetailSkirmishRules(retailRules);
 		game->setOldFactionsOnly(oldFactionsOnly);
 
 		return true;
@@ -1774,7 +1799,7 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 #if RTS_GENERALS
 	const XferVersion currentVersion = 2;
 #else
-	const XferVersion currentVersion = 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 5 : 4;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -1872,6 +1897,15 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
     m_superweaponRestriction = 0;
     m_startingCash = TheGlobalData->m_defaultStartingCash;
   }
+
+	if (version >= 5)
+	{
+		xfer->xferInt(&m_retailSkirmishRules.commandPointFactor);
+		xfer->xferBool(&m_retailSkirmishRules.ringHeroes);
+		xfer->xferBool(&m_retailSkirmishRules.customHeroes);
+	}
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_retailSkirmishRules = {};
 
 }
 

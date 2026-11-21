@@ -444,7 +444,10 @@ void Player::init(const PlayerTemplate* pt)
 
 		m_handicap = *pt->getHandicap();
 
-		if( m_money.countMoney() == 0 )
+		if (RetailFileLayers::enabled() && TheGameInfo && pt->isPlayableSide() &&
+			TheGameInfo->getRetailSkirmishRules().commandPointFactor > 0)
+			m_money.setStartingCash(TheGameInfo->getStartingCash().countMoney());
+		else if( m_money.countMoney() == 0 )
 		{
 			// TheSuperHackers @bugfix Now correctly deposits the money and fixes its audio and academy issues.
 			// Note that copying the entire Money class instead would also copy the player index inside of it.
@@ -4893,12 +4896,16 @@ Int Player::getCommandPointsUsed() const
 	return used;
 }
 
-Int Player::getCommandPointsTotal() const
+Int Player::getCommandPointsTotal(Int *maximum) const
 {
+	if (maximum)
+		*maximum = 0;
 	if (!RetailFileLayers::enabled() || !TheGlobalData)
 		return 0;
 	const GameMode mode = TheGameLogic ? TheGameLogic->getGameMode() : GAME_NONE;
-	const bool isSkirmishOrMP = (mode == GAME_SKIRMISH || mode == GAME_LAN || mode == GAME_INTERNET);
+	const Int factor = TheGameInfo && (mode == GAME_SKIRMISH || mode == GAME_REPLAY) ?
+		TheGameInfo->getRetailSkirmishRules().commandPointFactor : 0;
+	const bool isSkirmishOrMP = mode == GAME_SKIRMISH || mode == GAME_LAN || mode == GAME_INTERNET || factor > 0;
 	Int activePlayers = 0;
 	if (ThePlayerList)
 	{
@@ -4913,7 +4920,9 @@ Int Player::getCommandPointsTotal() const
 	const bool isEvil = (m_playerTemplate && m_playerTemplate->isEvil());
 	const bool isAI = (m_playerType == PLAYER_COMPUTER);
 	const CommandPointRules::Pair baseAndCap = CommandPointRules::resolveBaseAndCap(
-		TheGlobalData->m_commandPoints, isSkirmishOrMP, activePlayers, isEvil, isAI, 100);
+		TheGlobalData->m_commandPoints, isSkirmishOrMP, activePlayers, isEvil, isAI, factor);
+	if (maximum)
+		*maximum = baseAndCap.maximum;
 
 	Int buildingBonus = 0;
 	if (TheGameLogic)

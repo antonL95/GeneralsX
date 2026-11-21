@@ -282,6 +282,28 @@ void retailPalantirTooltip(GameWindow *, WinInstanceData *, UnsignedInt mouse)
 {
 	const Int x = mouse & 0xFFFF;
 	const Int y = mouse >> 16;
+#if !RTS_GENERALS
+	const GameWindow *counter = TheWindowManager->winGetWindowFromId(nullptr, NAMEKEY("ControlBar.wnd:CommandPoints"));
+	const Player *player = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
+	if (counter && player)
+	{
+		Int left, top, width, height;
+		windowRect(counter, left, top, width, height);
+		if (x >= left && x < left + width && y >= top && y < top + height)
+		{
+			Int cap;
+			player->getCommandPointsTotal(&cap);
+			if (cap > 0)
+			{
+				Mouse::RetailTooltip tooltip;
+				tooltip.title = TheGameText->fetchOrSubstitute("APT:CommandPointLimit", L"Command Point Limit");
+				tooltip.body.format(L"%d", cap);
+				TheMouse->setRetailTooltip(tooltip);
+				return;
+			}
+		}
+	}
+#endif
 	if (!RetailHeroBar::showTooltip(x, y))
 		RetailEdges::showTooltip(x, y);
 }

@@ -277,7 +277,7 @@ public:
   // Check MaxSimultaneousOfType
   Bool canBuildMoreOfType( const ThingTemplate *whatToBuild ) const;
 	Int getCommandPointsUsed() const;
-	Int getCommandPointsTotal() const;
+	Int getCommandPointsTotal(Int *maximum = nullptr) const;
 	Bool hasEnoughCommandPoints( const ThingTemplate *whatToBuild ) const;
 	void addCommandPointUpgradeBonus( const void *source, Int amount, const SpecialPowerObjectFilter &requiredObject );
 	void removeCommandPointUpgradeBonus( const void *source );

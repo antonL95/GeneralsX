@@ -73,6 +73,7 @@
 #include "Common/ThingFactory.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "GameClient/Water.h"
 #include "GameClient/Snow.h"
 #include "Common/RetailFileLayers.h"
@@ -1385,7 +1386,8 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	checkForDuplicateColors( TheGameInfo );
 
-	Bool isSkirmishOrSkirmishReplay = RetailFileLayers::enabled() && m_gameMode == GAME_SKIRMISH;
+	Bool isSkirmishOrSkirmishReplay = RetailFileLayers::enabled() && (m_gameMode == GAME_SKIRMISH ||
+		(m_gameMode == GAME_REPLAY && TheGameInfo && TheGameInfo->getRetailSkirmishRules().commandPointFactor > 0));
 	if (TheGameInfo)
 	{
 		for (Int i=0; i<MAX_SLOTS; ++i)
@@ -1849,6 +1851,20 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	updateLoadProgress(LOAD_PROGRESS_POST_VICTORY_CONDITION_SETUP);
 
 	Player *localPlayer = ThePlayerList->getLocalPlayer();
+	if (!loadingSaveGame && RetailFileLayers::enabled() && isSkirmishOrSkirmishReplay && TheGameInfo &&
+		TheGameInfo->getRetailSkirmishRules().customHeroes && TheUpgradeCenter)
+	{
+		Player *player = ThePlayerList->getPlayerFromSlotIndex(0);
+		const auto *faction = player ? player->getPlayerTemplate() : nullptr;
+		if (faction)
+		{
+			const auto &heroes = faction->getBuildableHeroesMP();
+			const auto hero = std::find(heroes.begin(), heroes.end(), AsciiString("CreateAHero"));
+			const auto *upgrade = TheUpgradeCenter->findUpgrade("Upgrade_AllowBuildCreateAHero");
+			if (hero != heroes.end() && upgrade && TheThingFactory->findTemplate(*hero, FALSE))
+				player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+		}
+	}
 
 	// set the radar as on a new map
 	TheRadar->newMap( TheTerrainLogic );
@@ -4573,6 +4589,13 @@ UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 		UnsignedInt weatherEndFrame = getRetailWeatherEndFrame();
 		xferCRC->xferInt(&weather);
 		xferCRC->xferUnsignedInt(&weatherEndFrame);
+		if (TheGameInfo && TheGameInfo->getRetailSkirmishRules().commandPointFactor > 0)
+		{
+			auto rules = TheGameInfo->getRetailSkirmishRules();
+			xferCRC->xferInt(&rules.commandPointFactor);
+			xferCRC->xferBool(&rules.ringHeroes);
+			xferCRC->xferBool(&rules.customHeroes);
+		}
 	}
 	if (isInGameLogicUpdate())
 	{

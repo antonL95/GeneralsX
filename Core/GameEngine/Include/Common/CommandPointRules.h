@@ -1,5 +1,9 @@
 #pragma once
 
+#include <algorithm>
+#include <cstdint>
+#include <limits>
+
 namespace CommandPointRules
 {
 
@@ -36,7 +40,11 @@ inline Pair resolveBaseAndCap(const Config& config, bool isSkirmishOrMP, int act
 			index = 6;
 		result = isEvil ? config.evilMP[index] : config.goodMP[index];
 		if (factorPercent > 0 && factorPercent != 100)
-			result.maximum = (result.maximum * factorPercent) / 100;
+		{
+			const auto scaled = (static_cast<std::int64_t>(result.maximum) * factorPercent) / 100;
+			result.maximum = static_cast<int>(std::clamp<std::int64_t>(scaled,
+				std::numeric_limits<int>::min(), std::numeric_limits<int>::max()));
+		}
 	}
 	else if (isAI)
 	{

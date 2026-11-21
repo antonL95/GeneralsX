@@ -151,6 +151,13 @@ protected:
   * GameInfo class - maintains information about the game setup and
 	* the contents of its slot list throughout the game.
 	*/
+struct RetailSkirmishRules
+{
+	Int commandPointFactor = 0;
+	Bool ringHeroes = FALSE;
+	Bool customHeroes = FALSE;
+};
+
 class GameInfo
 {
 public:
@@ -201,6 +208,8 @@ public:
   void setSuperweaponRestriction( UnsignedShort restriction ); ///< Set the optional limits on superweapons
   inline const Money & getStartingCash() const;
   void setStartingCash( const Money & startingCash );
+	const RetailSkirmishRules &getRetailSkirmishRules() const { return m_retailSkirmishRules; }
+	void setRetailSkirmishRules(const RetailSkirmishRules &rules) { m_retailSkirmishRules = rules; }
 
 	void setSlotPointer( Int index, GameSlot *slot );	///< Set the slot info pointer
 
@@ -252,6 +261,7 @@ protected:
 	Int m_seed;
 	Int m_useStats;
   Money         m_startingCash;
+	RetailSkirmishRules m_retailSkirmishRules;
   UnsignedShort m_superweaponRestriction;
   Bool m_oldFactionsOnly; // Only USA, China, GLA -- not USA Air Force General, GLA Toxic General, et al
 };

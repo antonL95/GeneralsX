@@ -2975,8 +2975,11 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 		case Condition::IS_GAME_IN_SKIRMISH_OR_MULTIPLAYER:
 			return BfmeScriptRules::skirmishOrMultiplayerIs(TheGameLogic->isInSkirmishGame(),
 				TheGameLogic->isInMultiplayerGame(), pCondition->getParameter(0)->getInt() != 0);
-		case Condition::REGION_CAMPS_SHOULD_UNPACK:
 		case Condition::IS_GAME_MODE_ACTIVE:
+			return RetailFileLayers::enabled() && TheGameInfo &&
+				TheGameInfo->getRetailSkirmishRules().commandPointFactor > 0 && TheGameInfo->getRetailSkirmishRules().ringHeroes &&
+				pCondition->getParameter(0)->getString().compareNoCase("ringheroes") == 0;
+		case Condition::REGION_CAMPS_SHOULD_UNPACK:
 			return false;
 		case Condition::COMPARE_NUM_PLAYERS_IN_GAME:
 			return BfmeScriptRules::compare(pCondition->getParameter(0)->getInt(), countPlayersInGame(),
