@@ -1136,6 +1136,7 @@ void HeightMapRenderObjClass::adjustTerrainLOD(Int adj)
 //=============================================================================
 void HeightMapRenderObjClass::ReleaseResources()
 {
+	m_retailTerrainRuntime.reset();
 	BaseHeightMapRenderObjClass::ReleaseResources();
 }
 
@@ -2037,8 +2038,10 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	}
 
 	Int pass;
+	const bool compiledTerrain = !doMultiPassWireFrame && !m_disableTextures && !Is_Hidden() &&
+		!ShaderClass::Is_Backface_Culling_Inverted() && doCloud && useMacroTexture() && drawRetailTerrain(rinfo.Camera);
 	// GeneralsX @bugfix fbraz3 08/10/2026 A water mirror leaves the ground out (Reforged pattern)
- 	for (pass=0; pass<devicePasses && !ShaderClass::Is_Backface_Culling_Inverted(); pass++) {
+	for (pass = 0; !compiledTerrain && pass < devicePasses && !ShaderClass::Is_Backface_Culling_Inverted(); ++pass) {
 #ifdef TIMING_TESTS
 #endif
 		if (!doMultiPassWireFrame)	//multi-pass wireframe doesn't use regular shaders.

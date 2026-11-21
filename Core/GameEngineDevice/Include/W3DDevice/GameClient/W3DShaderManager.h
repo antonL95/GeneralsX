@@ -43,6 +43,7 @@ enum CpuType CPP_11(: Int);
 enum GraphicsVenderID CPP_11(: Int);
 
 class TextureClass;	///forward reference
+#include <array>
 /** System for managing complex rendering settings which are either not handled by
 	WW3D2 or need custom paths depending on the video card.  This system will determine
 	the proper shader given video card limitations and also allow the app to query the
@@ -79,6 +80,7 @@ public:
 	static void init();	///<determine optimal shaders for current device.
 	static void shutdown();	///<release resources used by shaders
 	static void updateCloud();	///<update the cloud position once every render frame.
+	static std::array<float, 4> getRetailCloudUV();
 	static ChipsetType getChipset();	///<return current device chipset.
 	static GraphicsVenderID getCurrentVendor() {return m_currentVendor;}	///<return current card vendor.
 	// GeneralsX @bugfix BenderAI 13/02/2026 Use Int64 instead of __int64 for cross-platform builds

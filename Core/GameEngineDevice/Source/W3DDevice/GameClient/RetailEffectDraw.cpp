@@ -5,6 +5,7 @@
 #endif
 
 #include <algorithm>
+#include <bit>
 #include <cstdio>
 #include <utility>
 
@@ -29,6 +30,7 @@ struct Sampler
 	unsigned slot;
 	std::string texture;
 	std::vector<std::pair<D3DSAMPLERSTATETYPE, DWORD>> states;
+	bool white = false;
 };
 
 std::optional<D3DRENDERSTATETYPE> renderState(uint32_t operation)
@@ -42,6 +44,8 @@ std::optional<D3DRENDERSTATETYPE> renderState(uint32_t operation)
 		case 7: return D3DRS_DESTBLEND;
 		case 8: return D3DRS_CULLMODE;
 		case 9: return D3DRS_ZFUNC;
+		case 10: return D3DRS_ALPHAREF;
+		case 11: return D3DRS_ALPHAFUNC;
 		case 13: return D3DRS_ALPHABLENDENABLE;
 		case 14: return D3DRS_FOGENABLE;
 		case 73: return D3DRS_COLORWRITEENABLE;
@@ -77,17 +81,40 @@ struct NativePass::Data
 	Com<IDirect3DVertexShader9> vertex;
 	Com<IDirect3DPixelShader9> pixel;
 	Com<IDirect3DVertexDeclaration9> declaration;
+	Com<IDirect3DTexture9> white;
 	std::vector<std::pair<D3DRENDERSTATETYPE, DWORD>> states;
 	std::vector<Sampler> samplers;
 	Program vs;
 	Program ps;
+
+	bool draw(IDirect3DDevice9 *device, const SetBinding &setBinding,
+		const std::function<void *(std::string_view)> &getTexture,
+		const std::function<bool()> &issueDraw);
 };
 
 std::unique_ptr<NativePass> NativePass::makeWater(void *handle, const Effect &effect, CreateShader createShader)
 {
+	return make(handle, effect, createShader, Kind::Water);
+}
+
+std::unique_ptr<NativePass> NativePass::makeTerrain(void *handle, const Effect &effect, CreateShader createShader)
+{
+	return make(handle, effect, createShader, Kind::Terrain);
+}
+
+std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *handle, const Effect &effect, CreateShader createShader)
+{
+	return make(handle, effect, createShader, Kind::NormalMapped);
+}
+
+std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect, CreateShader createShader, Kind kind)
+{
 	auto *device = static_cast<IDirect3DDevice9 *>(handle);
+	const bool terrain = kind == Kind::Terrain;
+	const bool model = kind == Kind::NormalMapped;
+	const std::string_view techniqueName = terrain ? "Default" : model ? "Default_M" : "BumpSpecular_M";
 	const auto technique = std::find_if(effect.techniques.begin(), effect.techniques.end(),
-		[](const auto &item) { return item.name == "BumpSpecular_M"; });
+		[&](const auto &item) { return item.name == techniqueName; });
 	if (!device || technique == effect.techniques.end() || technique->passes.size() != 1)
 		return nullptr;
 	auto data = std::make_unique<Data>();
@@ -97,12 +124,32 @@ std::unique_ptr<NativePass> NativePass::makeWater(void *handle, const Effect &ef
 		{
 			const bool vertex = state.operation == 146;
 			const auto type = vertex ? ValueType::VertexShader : ValueType::PixelShader;
-			if (state.value.type != type || state.resourceUsage != ResourceUsage::Program)
+			if (state.value.type != type)
 				return nullptr;
-			auto shader = readProgram(state.resource, vertex);
+			const std::vector<uint8_t> *bytes = &state.resource;
+			if (state.resourceUsage == ResourceUsage::ArraySelector)
+			{
+				const std::string_view array = terrain && !vertex ? "PSDefault_Array" :
+					model ? (vertex ? "VS_M_Array" : "PS_M_Array") : "";
+				const unsigned variant = terrain ? 4 : vertex ? 0 : 1;
+				if (array.empty() || state.parameterReference != array)
+					return nullptr;
+				const auto parameter = std::find_if(effect.parameters.begin(), effect.parameters.end(),
+					[&](const auto &item) { return item.value.name == state.parameterReference; });
+				if (parameter == effect.parameters.end() || parameter->value.elements.size() <= variant)
+					return nullptr;
+				const auto object = parameter->value.elements[variant].object;
+				if (!object || *object >= effect.objects.size())
+					return nullptr;
+				bytes = &effect.objects[*object];
+			}
+			else if (state.resourceUsage != ResourceUsage::Program)
+				return nullptr;
+			auto shader = readProgram(*bytes, vertex);
 			if (!shader)
 			{
-				std::fprintf(stderr, "[RetailFX] Unsupported WaterShader %s bytecode\n", vertex ? "vertex" : "pixel");
+				std::fprintf(stderr, "[RetailFX] Unsupported %s %s bytecode\n",
+					terrain ? "Terrain" : model ? "NormalMapped" : "WaterShader", vertex ? "vertex" : "pixel");
 				return nullptr;
 			}
 			(vertex ? data->vs : data->ps) = std::move(*shader);
@@ -110,6 +157,10 @@ std::unique_ptr<NativePass> NativePass::makeWater(void *handle, const Effect &ef
 		else
 		{
 			const auto native = renderState(state.operation);
+			if (state.resourceUsage == ResourceUsage::Program &&
+				((terrain && (state.operation == 3 || state.operation == 13)) ||
+				 (model && (state.operation == 4 || state.operation == 13 || state.operation == 14 || state.operation == 16))))
+				continue;
 			if (!native || state.index || state.resourceUsage || state.value.words.size() != 1)
 			{
 				std::fprintf(stderr, "[RetailFX] Unsupported WaterShader state %u\n", state.operation);
@@ -130,7 +181,21 @@ std::unique_ptr<NativePass> NativePass::makeWater(void *handle, const Effect &ef
 			std::fprintf(stderr, "[RetailFX] Unsupported WaterShader sampler %s\n", binding.name.c_str());
 			return nullptr;
 		}
+		sampler->white = terrain && sampler->texture == "ShroudTexture";
 		data->samplers.push_back(std::move(*sampler));
+	}
+	if (terrain)
+	{
+		IDirect3DTexture9 *texture = nullptr;
+		if (FAILED(device->CreateTexture(1, 1, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &texture, nullptr)))
+			return nullptr;
+		data->white.reset(texture);
+		D3DLOCKED_RECT texels{};
+		if (FAILED(texture->LockRect(0, &texels, nullptr, 0)))
+			return nullptr;
+		*static_cast<uint32_t *>(texels.pBits) = 0xffffffffu;
+		if (FAILED(texture->UnlockRect(0)))
+			return nullptr;
 	}
 
 	const D3DVERTEXELEMENT9 declaration[] = {
@@ -138,8 +203,23 @@ std::unique_ptr<NativePass> NativePass::makeWater(void *handle, const Effect &ef
 		{0, static_cast<WORD>(offsetof(WaterVertex, terrain)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
 		D3DDECL_END()
 	};
+	const D3DVERTEXELEMENT9 terrainDeclaration[] = {
+		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+		{0, static_cast<WORD>(offsetof(TerrainVertex, normal)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+		{0, static_cast<WORD>(offsetof(TerrainVertex, diffuse)), D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+		{0, static_cast<WORD>(offsetof(TerrainVertex, uv)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		D3DDECL_END()
+	};
+	const D3DVERTEXELEMENT9 modelDeclaration[] = {
+		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+		{0, static_cast<WORD>(offsetof(NormalMappedVertex, normal)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+		{0, static_cast<WORD>(offsetof(NormalMappedVertex, tangent)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT, 0},
+		{0, static_cast<WORD>(offsetof(NormalMappedVertex, bitangent)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BINORMAL, 0},
+		{0, static_cast<WORD>(offsetof(NormalMappedVertex, uv)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		D3DDECL_END()
+	};
 	IDirect3DVertexDeclaration9 *decl = nullptr;
-	if (FAILED(device->CreateVertexDeclaration(declaration, &decl)))
+	if (FAILED(device->CreateVertexDeclaration(terrain ? terrainDeclaration : model ? modelDeclaration : declaration, &decl)))
 		return nullptr;
 	data->declaration.reset(decl);
 	data->vertex.reset(static_cast<IDirect3DVertexShader9 *>(createShader(true, data->vs.tokens.data())));
@@ -156,15 +236,53 @@ bool NativePass::drawWater(void *handle, std::span<const WaterVertex> vertices, 
 	const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture, bool additive)
 {
 	auto *device = static_cast<IDirect3DDevice9 *>(handle);
-	Registers vs, ps;
-	if (!device || vertices.empty() || indices.empty() || !fillRegisters(m_data->vs, setBinding, vs) ||
-		!fillRegisters(m_data->ps, setBinding, ps))
+	if (vertices.empty() || indices.empty())
+		return false;
+	return m_data->draw(device, setBinding, getTexture, [&] {
+		if (FAILED(device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE)) ||
+			(additive && FAILED(device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE))))
+			return false;
+		return SUCCEEDED(device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, static_cast<UINT>(vertices.size()),
+			static_cast<UINT>(indices.size() / 3), indices.data(), D3DFMT_INDEX16, vertices.data(), sizeof(WaterVertex)));
+	});
+}
+
+bool NativePass::drawTerrain(void *handle, std::span<const TerrainVertex> base, std::span<const uint32_t> baseIndices,
+	std::span<const TerrainVertex> blend, std::span<const uint32_t> blendIndices,
+	const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture)
+{
+	auto *device = static_cast<IDirect3DDevice9 *>(handle);
+	if (base.empty() || baseIndices.empty())
+		return false;
+	return m_data->draw(device, setBinding, getTexture, [&] {
+		const auto draw = [&](auto vertices, auto indices) {
+			return SUCCEEDED(device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, static_cast<UINT>(vertices.size()),
+				static_cast<UINT>(indices.size() / 3), indices.data(), D3DFMT_INDEX32, vertices.data(), sizeof(TerrainVertex)));
+		};
+		if (FAILED(device->SetRenderState(D3DRS_COLORWRITEENABLE, 7u)) ||
+			FAILED(device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE)) ||
+			FAILED(device->SetRenderState(D3DRS_DEPTHBIAS, std::bit_cast<uint32_t>(-0.000001f))) ||
+			FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE)) || !draw(base, baseIndices))
+			return false;
+		if (!blendIndices.empty() &&
+			(FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE)) ||
+			 !draw(blend, blendIndices)))
+			return false;
+		return true;
+	});
+}
+
+bool NativePass::Data::draw(IDirect3DDevice9 *device, const SetBinding &setBinding,
+	const std::function<void *(std::string_view)> &getTexture, const std::function<bool()> &issueDraw)
+{
+	Registers vertexRegs, pixelRegs;
+	if (!device || !fillRegisters(vs, setBinding, vertexRegs) || !fillRegisters(ps, setBinding, pixelRegs))
 		return false;
 
 	std::array<IDirect3DBaseTexture9 *, 16> textures{};
-	for (const auto &sampler : m_data->samplers)
+	for (const auto &sampler : samplers)
 	{
-		auto *texture = static_cast<IDirect3DBaseTexture9 *>(getTexture(sampler.texture));
+		auto *texture = sampler.white ? white.get() : static_cast<IDirect3DBaseTexture9 *>(getTexture(sampler.texture));
 		if (!texture)
 			return false;
 		textures[sampler.slot] = texture;
@@ -175,14 +293,10 @@ bool NativePass::drawWater(void *handle, std::span<const WaterVertex> vertices, 
 		return false;
 	const Com<IDirect3DStateBlock9> saved(block);
 	const bool ready = [&] {
-		for (const auto &[state, value] : m_data->states)
+		for (const auto &[state, value] : states)
 			if (FAILED(device->SetRenderState(state, value)))
 				return false;
-		if (FAILED(device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE)))
-			return false;
-		if (additive && FAILED(device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE)))
-			return false;
-		for (const auto &sampler : m_data->samplers)
+		for (const auto &sampler : samplers)
 		{
 			if (FAILED(device->SetTexture(sampler.slot, textures[sampler.slot])))
 				return false;
@@ -191,20 +305,34 @@ bool NativePass::drawWater(void *handle, std::span<const WaterVertex> vertices, 
 					return false;
 		}
 		std::array<BOOL, 16> booleans{};
-		std::copy(vs.booleans.begin(), vs.booleans.end(), booleans.begin());
-		return SUCCEEDED(device->SetVertexDeclaration(m_data->declaration.get())) &&
-			SUCCEEDED(device->SetVertexShader(m_data->vertex.get())) &&
-			SUCCEEDED(device->SetPixelShader(m_data->pixel.get())) &&
-			SUCCEEDED(device->SetVertexShaderConstantF(0, vs.floats[0].data(), 256)) &&
+		std::copy(vertexRegs.booleans.begin(), vertexRegs.booleans.end(), booleans.begin());
+		return SUCCEEDED(device->SetVertexDeclaration(declaration.get())) &&
+			SUCCEEDED(device->SetVertexShader(vertex.get())) &&
+			SUCCEEDED(device->SetPixelShader(pixel.get())) &&
+			SUCCEEDED(device->SetVertexShaderConstantF(0, vertexRegs.floats[0].data(), 256)) &&
 			SUCCEEDED(device->SetVertexShaderConstantB(0, booleans.data(), 16)) &&
-			SUCCEEDED(device->SetPixelShaderConstantF(0, ps.floats[0].data(), 32));
+			SUCCEEDED(device->SetPixelShaderConstantF(0, pixelRegs.floats[0].data(), 32));
 	}();
-	bool drawn = false;
-	if (ready)
-		drawn = SUCCEEDED(device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, static_cast<UINT>(vertices.size()),
-			static_cast<UINT>(indices.size() / 3), indices.data(), D3DFMT_INDEX16, vertices.data(), sizeof(WaterVertex)));
+	const bool drawn = ready && issueDraw();
 	const bool restored = SUCCEEDED(saved->Apply());
 	return drawn && restored;
+}
+
+bool NativePass::drawNormalMapped(void *handle, std::span<const NormalMappedVertex> vertices, std::span<const uint32_t> indices,
+	const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture, bool alphaTest, bool twoSided)
+{
+	auto *device = static_cast<IDirect3DDevice9 *>(handle);
+	if (vertices.empty() || indices.empty())
+		return false;
+	return m_data->draw(device, setBinding, getTexture, [&] {
+		if (FAILED(device->SetRenderState(D3DRS_ALPHATESTENABLE, alphaTest ? TRUE : FALSE)) ||
+			FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE)) ||
+			FAILED(device->SetRenderState(D3DRS_FOGENABLE, FALSE)) ||
+			(twoSided && FAILED(device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE))))
+			return false;
+		return SUCCEEDED(device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, static_cast<UINT>(vertices.size()),
+			static_cast<UINT>(indices.size() / 3), indices.data(), D3DFMT_INDEX32, vertices.data(), sizeof(NormalMappedVertex)));
+	});
 }
 
 #else
@@ -212,9 +340,18 @@ bool NativePass::drawWater(void *handle, std::span<const WaterVertex> vertices, 
 struct NativePass::Data {};
 
 std::unique_ptr<NativePass> NativePass::makeWater(void *, const Effect &, CreateShader) { return nullptr; }
+std::unique_ptr<NativePass> NativePass::makeTerrain(void *, const Effect &, CreateShader) { return nullptr; }
+std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *, const Effect &, CreateShader) { return nullptr; }
 
 bool NativePass::drawWater(void *, std::span<const WaterVertex>, std::span<const uint16_t>,
 	const SetBinding &, const std::function<void *(std::string_view)> &, bool) { return false; }
+
+bool NativePass::drawTerrain(void *, std::span<const TerrainVertex>, std::span<const uint32_t>,
+	std::span<const TerrainVertex>, std::span<const uint32_t>, const SetBinding &,
+	const std::function<void *(std::string_view)> &) { return false; }
+
+bool NativePass::drawNormalMapped(void *, std::span<const NormalMappedVertex>, std::span<const uint32_t>,
+	const SetBinding &, const std::function<void *(std::string_view)> &, bool, bool) { return false; }
 
 #endif
 

@@ -94,6 +94,8 @@ public:
 	void									Add_Render_Task(DX8PolygonRendererClass * p_renderer,MeshClass * p_mesh);
 
 	void									Render();
+	using EffectDraw = bool (*)(MeshClass &, TextureClass *);
+	static void Set_Effect_Draw(EffectDraw draw);
 	bool									Anything_To_Render() { return (render_task_head != nullptr); }
 	void									Clear_Render_List();
 

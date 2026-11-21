@@ -40,7 +40,7 @@ struct Instruction
 	unsigned operation;
 	unsigned components;
 	bool scalar;
-	std::array<Operand, 2> inputs;
+	std::array<Operand, 3> inputs;
 	Operand output;
 };
 

@@ -74,29 +74,30 @@ Words takeComment(Words &words)
 	return chunk;
 }
 
-bool validShaderInstruction(Words words)
+size_t shaderOperands(uint32_t opcode)
+{
+	switch (opcode)
+	{
+		case 0x00: case 0x2a: case 0x2b: return 0;
+		case 0x28: return 1;
+		case 0x01: case 0x06: case 0x07: case 0x0e: case 0x0f: case 0x10:
+		case 0x13: case 0x1f: case 0x24: return 2;
+		case 0x02: case 0x03: case 0x05: case 0x08: case 0x09: case 0x0a:
+		case 0x0b: case 0x0c: case 0x0d: case 0x11: case 0x20: case 0x42:
+			return 3;
+		case 0x04: case 0x12: case 0x58: return 4;
+		case 0x51: return 5;
+		default: return 16;
+	}
+}
+
+bool validShaderInstruction(Words words, bool legacy, size_t &length)
 {
 	const auto token = words.front();
 	const auto opcode = token & 0xffffu;
-	const size_t length = (token >> 24) & 0xf;
-	if (length >= words.size() || (token & 0xf0000000u))
-		return false;
-	size_t expected;
-	switch (opcode)
-	{
-		case 0x00: case 0x2a: case 0x2b: expected = 0; break;
-		case 0x28: expected = 1; break;
-		case 0x01: case 0x06: case 0x07: case 0x0e: case 0x0f: case 0x10:
-		case 0x13: case 0x1f: case 0x24: expected = 2; break;
-		case 0x02: case 0x03: case 0x05: case 0x08: case 0x09: case 0x0a:
-		case 0x0b: case 0x0c: case 0x0d: case 0x11: case 0x20: case 0x42:
-			expected = 3;
-			break;
-		case 0x04: case 0x12: case 0x58: expected = 4; break;
-		case 0x51: expected = 5; break;
-		default: return false;
-	}
-	if (length != expected)
+	length = shaderOperands(opcode);
+	if (length >= 16 || length >= words.size() - 1 || (token & 0xf0000000u) ||
+		((token >> 24) & 0xfu) != (legacy ? 0 : length))
 		return false;
 	const size_t registers = opcode == 0x51 ? 1 : length;
 	for (size_t i = opcode == 0x1f ? 2 : 1; i <= registers; ++i)
@@ -113,6 +114,8 @@ unsigned inputCount(unsigned operation)
 			return 1;
 		case 0x204: case 0x205: case 0x500:
 			return 2;
+		case 0x300:
+			return 3;
 		default:
 			return 0;
 	}
@@ -211,7 +214,7 @@ void applyBindings(const std::vector<Binding> &bindings, const SetBinding &setBi
 	}
 }
 
-double evaluate(unsigned operation, double a, double b)
+double evaluate(unsigned operation, double a, double b, double c)
 {
 	switch (operation)
 	{
@@ -224,6 +227,7 @@ double evaluate(unsigned operation, double a, double b)
 		case 0x109: return std::cos(a);
 		case 0x204: return a + b;
 		case 0x205: return a * b;
+		case 0x300: return a >= 0.0 ? b : c;
 	}
 	return 0.0;
 }
@@ -238,7 +242,8 @@ std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 	for (; !bytes.empty(); bytes = bytes.subspan(4))
 		program.tokens.push_back(readWord(bytes));
 	auto words = Words(program.tokens);
-	if (words.front() != (vertex ? 0xfffe0200u : 0xffff0200u))
+	const bool legacy = vertex && words.front() == 0xfffe0101u;
+	if (!legacy && words.front() != (vertex ? 0xfffe0200u : 0xffff0200u))
 		return std::nullopt;
 	words = words.subspan(1);
 	while (words.size() > 1)
@@ -256,8 +261,8 @@ std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 		}
 		else
 		{
-			const size_t operands = (words.front() >> 24) & 0xf;
-			if (operands >= words.size() - 1 || !validShaderInstruction(words))
+			size_t operands;
+			if (!validShaderInstruction(words, legacy, operands))
 				return std::nullopt;
 			words = words.subspan(1 + operands);
 		}
@@ -277,7 +282,8 @@ bool fillRegisters(const Program &program, const SetBinding &setBinding, Registe
 	{
 		const auto count = inputCount(ins.operation);
 		const auto dot = ins.operation == 0x500;
-		std::array<double, 4> a{}, b{}, values{};
+		std::array<std::array<double, 4>, 3> inputsByComponent{};
+		std::array<double, 4> values{};
 		for (unsigned j = 0; j < count; ++j)
 		{
 			const auto [bank, offset] = ins.inputs[j];
@@ -291,15 +297,15 @@ bool fillRegisters(const Program &program, const SetBinding &setBinding, Registe
 				const double value = bank == 1 ? program.literals[index] :
 					bank == 2 ? inputs.floats[index / 4][index % 4] :
 					bank == 4 ? registers.floats[index / 4][index % 4] : temps[index];
-				(j == 0 ? a : b)[c] = value;
+				inputsByComponent[j][c] = value;
 			}
 		}
 		for (unsigned c = 0; c < ins.components; ++c)
 		{
 			if (dot)
-				values[0] += a[c] * b[c];
+				values[0] += inputsByComponent[0][c] * inputsByComponent[1][c];
 			else
-				values[c] = evaluate(ins.operation, a[c], b[c]);
+				values[c] = evaluate(ins.operation, inputsByComponent[0][c], inputsByComponent[1][c], inputsByComponent[2][c]);
 		}
 		const auto [bank, offset] = ins.output;
 		const auto components = dot ? 1 : ins.components;

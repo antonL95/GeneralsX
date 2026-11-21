@@ -154,4 +154,14 @@ TEST(RetailFxTest, RunsScalarPreshaderOperandAcrossOutputComponents)
 	EXPECT_FALSE(RetailFX::fillRegisters(program, bind, output));
 }
 
+TEST(RetailFxTest, SelectsTheNegativeAndNonnegativePreshaderInputs)
+{
+	RetailFX::Program program;
+	program.literals = {-1.0, 0.0, 3.0, 4.0, 5.0, 6.0};
+	program.instructions.push_back({0x300, 2, false, {{{1, 0}, {1, 2}, {1, 4}}}, {4, 0}});
+	RetailFX::Registers output;
+	ASSERT_TRUE(RetailFX::fillRegisters(program, [](const auto &, auto, auto) {}, output));
+	EXPECT_EQ(output.floats[0], (RetailFX::Register{5.0f, 4.0f, 0.0f, 0.0f}));
+}
+
 }

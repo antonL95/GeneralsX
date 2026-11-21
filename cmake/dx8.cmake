@@ -12,7 +12,6 @@
 # macOS DXVK build (Session 61, 24/02/2026):
 #   DXVK 2.6 builds natively on macOS arm64 via its "native" build mode.
 #   macOS fixes are maintained in the DXVK fork history consumed by this build.
-#   This project no longer applies local patch scripts during configure/build.
 #
 # Reference: docs/WORKDIR/lessons/2026-02-LESSONS.md (historical patch rationale)
 

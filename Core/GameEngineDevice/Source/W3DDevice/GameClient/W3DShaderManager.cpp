@@ -60,6 +60,7 @@
 #include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
+#include "W3DDevice/GameClient/RetailEffectDraw.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
@@ -2712,6 +2713,8 @@ W3DShaderManager::W3DShaderManager()
 //=============================================================================
 void W3DShaderManager::init()
 {
+	if (RetailFileLayers::enabled())
+		RetailFX::installNormalMappedDraw();
 	int i,j;
 
 	D3DSURFACE_DESC desc;
@@ -2800,6 +2803,7 @@ void W3DShaderManager::init()
 //=============================================================================
 void W3DShaderManager::shutdown()
 {
+	RetailFX::removeNormalMappedDraw();
 	SAFE_RELEASE(m_newRenderSurface);
 	SAFE_RELEASE(m_renderTexture);
 	SAFE_RELEASE(m_oldRenderSurface);
@@ -2827,6 +2831,14 @@ void W3DShaderManager::shutdown()
 void W3DShaderManager::updateCloud()
 {
 	terrainShader2Stage.updateCloud();
+}
+
+std::array<float, 4> W3DShaderManager::getRetailCloudUV()
+{
+	D3DXMATRIX identity, uv;
+	D3DXMatrixIdentity(&identity);
+	terrainShader2Stage.updateNoise1(&uv, &identity, false);
+	return {uv._11, uv._22, uv._41, uv._42};
 }
 
 // W3DShaderManager::getShaderPasses =======================================================

@@ -1,7 +1,5 @@
 #include "W3DDevice/GameClient/W3DWater.h"
 
-#include "Common/File.h"
-#include "Common/FileSystem.h"
 #include "Common/GlobalData.h"
 #include "Common/RetailFileLayers.h"
 #include "GameClient/Water.h"
@@ -9,7 +7,7 @@
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/TerrainLogic.h"
 #include "W3DDevice/GameClient/HeightMap.h"
-#include "W3DDevice/GameClient/RetailEffectDraw.h"
+#include "W3DDevice/GameClient/RetailEffectInput.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "WW3D2/assetmgr.h"
@@ -46,29 +44,6 @@ struct WaterMaterial
 	Reference<TextureClass> environment;
 	Reference<TextureClass> wave;
 };
-
-std::optional<RetailFX::Effect> loadEffect()
-{
-	auto file = std::unique_ptr<File, void (*)(File *)>(
-		TheFileSystem->openFile("shaders/compiled/watershader.fxo", File::READ | File::BINARY),
-		[](File *value) { value->close(); });
-	if (!file)
-	{
-		std::fprintf(stderr, "[RetailFX] watershader.fxo is absent from the file layers\n");
-		return {};
-	}
-	const Int size = file->size();
-	if (size <= 0 || size > 16 * 1024 * 1024)
-		return {};
-	std::vector<uint8_t> bytes(static_cast<size_t>(size));
-	if (file->read(bytes.data(), size) != size)
-		return {};
-	std::string error;
-	auto effect = RetailFX::parse(bytes, error);
-	if (!effect)
-		std::fprintf(stderr, "[RetailFX] Invalid watershader.fxo: %s\n", error.c_str());
-	return effect;
-}
 
 const W3dFx::Material *findMaterial(RenderObjClass &object)
 {
@@ -116,23 +91,6 @@ std::optional<WaterMaterial> loadMaterial(const PolygonTrigger::StandingWaterSet
 	if (!result.bump || !result.environment || !result.wave)
 		return {};
 	return result;
-}
-
-void *nativeTexture(TextureClass *texture)
-{
-	if (!texture)
-		return nullptr;
-	if (!texture->Is_Initialized())
-		texture->Init();
-	if (texture->Is_Missing_Texture())
-		return nullptr;
-	return DX8Wrapper::Get_Effect_Texture9(texture->Peek_D3D_Base_Texture());
-}
-
-void writeMatrix(std::span<RetailFX::Register> values, const D3DXMATRIX &matrix)
-{
-	for (unsigned i = 0; i < values.size() && i < 4; ++i)
-		values[i] = {matrix.m[0][i], matrix.m[1][i], matrix.m[2][i], matrix.m[3][i]};
 }
 
 bool makeGeometry(const PolygonTrigger &polygon, std::vector<RetailFX::WaterVertex> &vertices, std::vector<uint16_t> &indices)
@@ -196,7 +154,7 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 	if (!m_retailStandingWater)
 	{
 		m_retailStandingWater = std::make_shared<RetailStandingWater>();
-		if (const auto effect = loadEffect())
+		if (const auto effect = RetailFX::loadEffectFile("shaders/compiled/watershader.fxo"))
 			m_retailStandingWater->pass = RetailFX::NativePass::makeWater(device, *effect, DX8Wrapper::Create_Effect_Shader9);
 		if (!m_retailStandingWater->pass)
 			std::fprintf(stderr, "[RetailFX] Could not load WaterShader BumpSpecular_M\n");
@@ -235,20 +193,7 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 	D3DXMatrixMultiply(&viewProjection, &view, &projection);
 	D3DXMatrixIdentity(&world);
 
-	DWORD fogEnabled = 0, fogColor = 0, fogStart = 0, fogEnd = 0;
-	m_pDev->GetRenderState(D3DRS_FOGENABLE, &fogEnabled);
-	m_pDev->GetRenderState(D3DRS_FOGCOLOR, &fogColor);
-	m_pDev->GetRenderState(D3DRS_FOGSTART, &fogStart);
-	m_pDev->GetRenderState(D3DRS_FOGEND, &fogEnd);
-	const auto fogStartValue = std::bit_cast<float>(static_cast<uint32_t>(fogStart));
-	const auto fogEndValue = std::max(std::bit_cast<float>(static_cast<uint32_t>(fogEnd)), fogStartValue + 1.0f);
-	const auto channel = [&](unsigned shift) { return static_cast<float>((fogColor >> shift) & 255) / 255.0f; };
-	const std::array<RetailFX::Register, 4> fog{{
-		{fogEnabled ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f},
-		{channel(16), channel(8), channel(0), 1.0f},
-		{fogStartValue, 0.0f, 0.0f, 0.0f},
-		{fogEndValue, 0.0f, 0.0f, 0.0f}
-	}};
+	const auto fog = RetailFX::fogBindings(m_pDev);
 
 	const auto *map = TheTerrainRenderObject->getMap();
 	const float authoredDepth = map ? map->getRetailWaterMaxAlphaDepth() : -1.0f;
@@ -267,11 +212,11 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 		if (values.empty())
 			return;
 		if (name == "WorldViewProjection")
-			writeMatrix(values, viewProjection);
+			RetailFX::writeMatrix(values, viewProjection);
 		else if (name == "World")
-			writeMatrix(values, world);
+			RetailFX::writeMatrix(values, world);
 		else if (name == "ViewI")
-			writeMatrix(values, inverse);
+			RetailFX::writeMatrix(values, inverse);
 		else if (name == "Shroud")
 			values[0] = shroudUV;
 		else if (name == "Fog")
@@ -311,13 +256,13 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 	};
 	const auto getTexture = [&](std::string_view name) -> void * {
 		if (name == "WaterBumpTexture")
-			return nativeTexture(water.bump.get());
+			return RetailFX::nativeTexture(water.bump.get());
 		if (name == "WaterEnvTexture")
-			return nativeTexture(water.environment.get());
+			return RetailFX::nativeTexture(water.environment.get());
 		if (name == "WaveTexture")
-			return nativeTexture(water.wave.get());
+			return RetailFX::nativeTexture(water.wave.get());
 		if (name == "ShroudTexture")
-			return nativeTexture(shroud->getShroudTexture());
+			return RetailFX::nativeTexture(shroud->getShroudTexture());
 		return nullptr;
 	};
 

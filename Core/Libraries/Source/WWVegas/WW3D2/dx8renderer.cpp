@@ -1748,6 +1748,13 @@ static void Render_With_Animation_Opacity(DX8PolygonRendererClass & renderer, Me
 		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, states[i], previous[i]);
 }
 
+static DX8TextureCategoryClass::EffectDraw meshEffectDraw = nullptr;
+
+void DX8TextureCategoryClass::Set_Effect_Draw(EffectDraw draw)
+{
+	meshEffectDraw = draw;
+}
+
 void DX8TextureCategoryClass::Render()
 {
 	#ifdef WWDEBUG
@@ -2009,7 +2016,9 @@ void DX8TextureCategoryClass::Render()
 				DX8Wrapper::Set_Material(nullptr);	//force a reset of vertex material since we secretly changed opacity
 				DX8Wrapper::Set_Material(vmaterial);	//restore previous material.
 			}
-			else
+			else if (!meshEffectDraw || pass != 0 || m_gForceMultiply ||
+				renderer->Get_Index_Count() != static_cast<unsigned>(mesh->Peek_Model()->Get_Polygon_Count()) * 3 ||
+				!meshEffectDraw(*mesh, Peek_Texture(0)))
 				renderer->Render(mesh->Get_Base_Vertex_Offset());
 		}
 //--------------------------------------------------------------------
