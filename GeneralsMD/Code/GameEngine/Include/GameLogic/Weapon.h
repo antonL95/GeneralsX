@@ -917,7 +917,7 @@ public:
 	}
 
 	void createAndFireTempWeapon(const WeaponTemplate* w, const Object *source, const Coord3D* pos);
-	void createAndFireTempWeapon(const WeaponTemplate* w, const Object *source, Object *target);
+	void createAndFireTempWeapon(const WeaponTemplate* w, const Object *source, Object *target, Bool ignoreRanges = FALSE);
 
 	void handleProjectileDetonation( const WeaponTemplate* w, const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage = TRUE, ObjectID detonationVictimID = INVALID_ID );
 

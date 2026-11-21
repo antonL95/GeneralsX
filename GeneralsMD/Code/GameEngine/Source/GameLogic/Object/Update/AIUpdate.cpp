@@ -66,6 +66,8 @@
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
 #include "GameLogic/Module/HackInternetAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "Common/AttributeModifierRules.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/HordeUpdate.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Object.h"
@@ -1059,6 +1061,24 @@ UpdateSleepTime AIUpdateInterface::update()
 
 	// assume we can sleep forever, unless the state machine (or turret, etc) demand otherwise
 	UpdateSleepTime subMachineSleep = UPDATE_SLEEP_FOREVER;
+	if (m_fearUntil || m_crushWarningUntil)
+	{
+		const UnsignedInt now = TheGameLogic->getFrame();
+		if (m_fearUntil && now >= m_fearUntil)
+		{
+			m_fearUntil = 0;
+			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_AFRAID);
+			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_TERROR);
+			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID);
+		}
+		if (m_crushWarningUntil && now >= m_crushWarningUntil)
+		{
+			m_crushWarningUntil = 0;
+			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_BRACE_FOR_BEING_CRUSHED);
+		}
+		if (m_fearUntil || m_crushWarningUntil)
+			subMachineSleep = UPDATE_SLEEP_NONE;
+	}
 
 	StateReturnType stRet = getStateMachine()->updateStateMachine();
 
@@ -2685,6 +2705,9 @@ void AIUpdateInterface::joinTeam()
 //-------------------------------------------------------------------------------------------------
 Bool AIUpdateInterface::isAllowedToRespondToAiCommands(const AICommandParms* parms) const
 {
+	if (m_fearUntil > TheGameLogic->getFrame())
+		return FALSE;
+
 	// the dead don't listen very well
 	// (unless they are seeking to feed on the brains of the living)
 	// [urrr, need brains]
@@ -3543,6 +3566,8 @@ void AIUpdateInterface::privateAttackObject( Object *victim, Int maxShotsToFire,
 	getStateMachine()->clear();
 	getStateMachine()->setGoalObject( victim );
 	setLastCommandSource( cmdSource );
+	if (RetailFileLayers::enabled() && cmdSource == CMD_FROM_AI)
+		m_autoAttackOrigin = *getObject()->getPosition();
 	getStateMachine()->setState( AI_ATTACK_OBJECT );
 
 	Weapon* weapon = getObject()->getCurrentWeapon();
@@ -4644,6 +4669,9 @@ Bool AIUpdateInterface::canAutoAcquireWhileStealthed() const
  */
 Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuringIdle )
 {
+	if (m_fearUntil > TheGameLogic->getFrame())
+		return nullptr;
+
 	Object *obj = getObject();
 	const Object* horde = obj->getContainedBy();
 	if (horde && horde->getContain()->isHordeContain())
@@ -4784,7 +4812,9 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 	// if we're called by AI, and are human controlled, then our AI will not
 	// allow us to pursue the target. therefore, we should ensure that we only
 	// look for targets that are already within attack range (as opposed to vision range).
-	if (calledByAI && obj->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN)
+	const auto* stances = RetailFileLayers::enabled() ? StancesBehavior::findForUnit(obj) : nullptr;
+	if ((stances && StancesBehavior::holdsGround(stances->getStance())) ||
+		(!stances && calledByAI && obj->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN))
 	{
 		flags |= AI::WITHIN_ATTACK_RANGE;
 	}
@@ -5224,9 +5254,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 4;
 #else
-	const XferVersion currentVersion = 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5448,6 +5478,12 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	}
 
 	xfer->xferObjectID(&m_crateCreated);
+	if (version >= 6)
+	{
+		xfer->xferUnsignedInt(&m_fearUntil);
+		xfer->xferUnsignedInt(&m_crushWarningUntil);
+		xfer->xferCoord3D(&m_autoAttackOrigin);
+	}
 	if (version < 3)
 	{
 		Int repulsorCountdown = 0;
@@ -5455,6 +5491,67 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	}
 
 
+}
+
+Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition)
+{
+	Object* self = getObject();
+	if (!self->isMobile() || self->isEffectivelyDead() || duration == 0)
+		return FALSE;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (m_fearUntil > now)
+		return FALSE;
+
+	Coord3D goal = *self->getPosition();
+	Real dx = goal.x - source->getPosition()->x;
+	Real dy = goal.y - source->getPosition()->y;
+	const Real distance = WWMath::SqrtfOrigin(dx * dx + dy * dy);
+	if (distance > 0.0f)
+	{
+		dx /= distance;
+		dy /= distance;
+	}
+	else
+	{
+		dx = self->getUnitDirectionVector2D()->x;
+		dy = self->getUnitDirectionVector2D()->y;
+	}
+	const Real travel = std::max(12.0f, getCurLocomotorSpeed() * duration);
+	goal.x += dx * travel;
+	goal.y += dy * travel;
+	aiMoveToPositionEvenIfSleeping(&goal, CMD_FROM_SCRIPT);
+	m_fearUntil = now + duration;
+	self->setModelConditionState(condition);
+	wakeUpNow();
+	return TRUE;
+}
+
+void AIUpdateInterface::braceForCrush(UnsignedInt deadline)
+{
+	m_crushWarningUntil = deadline;
+	getObject()->setModelConditionState(MODELCONDITION_EMOTION_BRACE_FOR_BEING_CRUSHED);
+	wakeUpNow();
+}
+
+Bool AIUpdateInterface::stanceAllowsChase(const Object* target) const
+{
+	if (!RetailFileLayers::enabled() || getLastCommandSource() != CMD_FROM_AI)
+		return TRUE;
+	const auto* stances = StancesBehavior::findForUnit(getObject());
+	if (!stances)
+		return TRUE;
+	if (StancesBehavior::holdsGround(stances->getStance()))
+		return FALSE;
+	if (stances->getStance() == AttributeModifierRules::STANCE_BATTLE && !HordeContain::get(getObject()->getContainedBy()))
+	{
+		const Real authored = getAIUpdateModuleData()->m_stopChaseDistance;
+		const Real limit = authored > 0.0f ? authored : getObject()->getVisionRange();
+		const Coord3D& point = *target->getPosition();
+		const Real dx = point.x - m_autoAttackOrigin.x;
+		const Real dy = point.y - m_autoAttackOrigin.y;
+		return dx * dx + dy * dy <= limit * limit;
+	}
+	return TRUE;
 }
 
 // ------------------------------------------------------------------------------------------------

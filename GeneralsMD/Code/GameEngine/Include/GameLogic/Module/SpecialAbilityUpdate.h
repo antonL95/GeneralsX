@@ -244,6 +244,7 @@ public:
 	virtual Bool isSpecialAbility() const override { return true; }
 	virtual Bool isSpecialPower() const override { return false; }
 	virtual Bool isActive() const override { return m_active; }
+	Bool isChargeAttack() const { return m_active && getSpecialAbilityUpdateModuleData()->m_chargeAttackSpeedBoost; }
 	virtual Bool doesSpecialPowerHaveOverridableDestinationActive() const override { return false; } //Is it active now?
 	virtual Bool doesSpecialPowerHaveOverridableDestination() const override { return false; }	//Does it have it, even if it's not active?
 	virtual void setSpecialPowerOverridableDestination( const Coord3D *loc ) override {}

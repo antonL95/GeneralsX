@@ -3,10 +3,12 @@
 #include "GameLogic/Module/HordeAIUpdate.h"
 
 #include "Common/Xfer.h"
+#include "Common/AttributeModifierRules.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
@@ -127,6 +129,7 @@ void HordeAIUpdate::respondToAttack(Object* attacker, Int maxShots, CommandSourc
 	m_attackTarget = target->getID();
 	if (m_order == NO_ORDER)
 	{
+		m_orderPosition = *getObject()->getPosition();
 		m_attackSource = source;
 		m_maxShots = maxShots;
 		m_forceAttack = FALSE;
@@ -167,6 +170,7 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 		if (!m_updatingAnchor || m_order == NO_ORDER)
 		{
 			m_order = NO_ORDER;
+			m_orderPosition = *getObject()->getPosition();
 			m_attackSource = parms->m_cmdSource;
 			m_maxShots = parms->m_intValue;
 			m_forceAttack = command == AICMD_FORCE_ATTACK_OBJECT;
@@ -303,10 +307,37 @@ UpdateSleepTime HordeAIUpdate::update()
 
 	const Bool refresh = (TheGameLogic->getFrame() + horde->getID()) % 8 == 0;
 	target = updateOrder(horde, target, refresh);
+	const auto* stances = StancesBehavior::find(horde);
+	const Bool autonomous = stances && m_order == NO_ORDER && m_attackSource == CMD_FROM_AI;
+	const Bool hold = autonomous && StancesBehavior::holdsGround(stances->getStance());
+	const Bool defend = autonomous && stances->getStance() == AttributeModifierRules::STANCE_BATTLE;
+	if (target && defend)
+	{
+		const Real authored = getHordeAIUpdateModuleData()->m_stopChaseDistance;
+		const Real meleeLeash = contain->getActiveFormation()->m_meleeAttackLeashDistance;
+		const Real radius = authored > 0.0f ? authored : (meleeLeash > 0.0f ? meleeLeash : horde->getVisionRange());
+		if (radius > 0.0f && distanceSquared(m_orderPosition, *target->getPosition()) > radius * radius)
+		{
+			const Coord3D origin = m_orderPosition;
+			m_attackTarget = INVALID_ID;
+			m_engaging = FALSE;
+			if (distanceSquared(*horde->getPosition(), origin) > 16.0f)
+				privateMoveToPosition(&origin, CMD_FROM_AI);
+			else if (isMoving())
+				privateIdle(CMD_FROM_AI);
+			target = nullptr;
+		}
+	}
 	const Bool attackGround = m_order == AICMD_ATTACK_POSITION;
 	const Bool wasEngaging = m_engaging;
 	const auto& members = *contain->getContainedItemsList();
-	if ((target || attackGround) && !m_engaging && (refresh || isIdle()))
+	if (target && hold)
+	{
+		m_engaging = TRUE;
+		if (isMoving())
+			privateIdle(m_attackSource);
+	}
+	else if ((target || attackGround) && (!m_engaging || autonomous) && (refresh || isIdle()))
 	{
 		Real approachRange = 0.0f;
 		for (const Object* member : members)
@@ -352,7 +383,7 @@ UpdateSleepTime HordeAIUpdate::update()
 						victim = enemy->findAttackTarget(member, attackType, m_attackSource, (WeaponSlotType)-1, &result);
 					else
 						result = member->getAbleToAttackSpecificObject(attackType, target, m_attackSource);
-					if (result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING)
+					if (result == ATTACKRESULT_POSSIBLE || (!hold && result == ATTACKRESULT_POSSIBLE_AFTER_MOVING))
 					{
 						if (m_forceAttack)
 							ai->aiForceAttackObject(victim, m_maxShots, m_attackSource);

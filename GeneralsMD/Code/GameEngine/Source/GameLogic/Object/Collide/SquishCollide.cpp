@@ -31,6 +31,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/ThingFactory.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/Object.h"
@@ -61,6 +62,9 @@ SquishCollide::~SquishCollide()
 //-------------------------------------------------------------------------------------------------
 void SquishCollide::onCollide( Object *other, const Coord3D *loc, const Coord3D *normal )
 {
+	if (RetailFileLayers::enabled())
+		return;
+
 	// Note that other == null means "collide with ground"
 	if (other == nullptr)
 		return;

@@ -1269,6 +1269,32 @@ Bool Object::canCrushOrSquish(Object *otherObj, CrushSquishTestType testType ) c
 
 	UnsignedByte crusherLevel = getCrusherLevel();
 
+	if (RetailFileLayers::enabled())
+	{
+		const auto& data = getTemplate()->getRotWKObjectData();
+		if (isEffectivelyDead() || otherObj->isEffectivelyDead() || isAirborneTarget() ||
+			otherObj->isAirborneTarget() || isKindOf(KINDOF_HORDE) || otherObj->isKindOf(KINDOF_HORDE) ||
+			(!data.crushAllies && getRelationship(otherObj) == ALLIES))
+			return FALSE;
+
+		const Real level = crusherLevel + AttributeModifiers::value(this, AttributeModifierRules::CRUSHER_LEVEL);
+		const Real resistance = otherObj->getCrushableLevel() +
+			AttributeModifiers::value(otherObj, AttributeModifierRules::CRUSHABLE_LEVEL);
+		if (level <= 0.0f || level <= resistance)
+			return FALSE;
+
+		if (!data.crushOnlyWhileCharging)
+			return TRUE;
+
+		for (BehaviorModule** module = m_behaviors; *module; ++module)
+		{
+			auto* special = (*module)->getSpecialPowerUpdateInterface();
+			if (special && special->isSpecialAbility() && static_cast<SpecialAbilityUpdate*>(special)->isChargeAttack())
+				return TRUE;
+		}
+		return FALSE;
+	}
+
 	// order matters: we want to know if I consider it to be an ally, not vice versa
 	if( getRelationship( otherObj ) == ALLIES )
 	{

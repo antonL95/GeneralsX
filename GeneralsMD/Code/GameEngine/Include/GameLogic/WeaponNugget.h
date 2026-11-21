@@ -36,7 +36,7 @@ struct WeaponNugget
 	Bool isEnabledFor(const Object* attacker) const;
 	Bool affects(const Object* attacker, const Object* victim) const;
 	Real scalarFor(const Object* attacker, const Object* victim) const;
-	Bool isImpactNugget() const { return dealsDamage() || m_type == WEAPON_NUGGET_OCL; }
+	Bool isImpactNugget() const { return dealsDamage() || m_type == WEAPON_NUGGET_OCL || m_type == WEAPON_NUGGET_META_IMPACT; }
 	Bool dealsDamage() const { return m_type == WEAPON_NUGGET_DAMAGE || m_type == WEAPON_NUGGET_DOT; }
 	void postProcessLoad();
 

@@ -1737,14 +1737,13 @@ void WeaponStore::createAndFireTempWeapon(const WeaponTemplate* wt, const Object
 }
 
 //-------------------------------------------------------------------------------------------------
-void WeaponStore::createAndFireTempWeapon(const WeaponTemplate* wt, const Object *source, Object *target)
+void WeaponStore::createAndFireTempWeapon(const WeaponTemplate* wt, const Object *source, Object *target, Bool ignoreRanges)
 {
-	//CRCDEBUG_LOG(("WeaponStore::createAndFireTempWeapon() for %s", DescribeObject(source)));
 	if (wt == nullptr)
 		return;
 	Weapon* w = allocateNewWeapon(wt, PRIMARY_WEAPON);
 	w->loadAmmoNow(source);
-	w->fireWeapon(source, target);
+	w->privateFireWeapon(source, target, nullptr, FALSE, ignoreRanges, 0, nullptr, TRUE);
 	deleteInstance(w);
 }
 

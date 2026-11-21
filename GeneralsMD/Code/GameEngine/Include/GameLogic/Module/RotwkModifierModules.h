@@ -83,6 +83,31 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 };
 
+struct RadiateFearUpdateModuleData : public UpdateModuleData
+{
+	UpgradeMuxData m_upgrades;
+	SpecialPowerObjectFilter m_victimFilter;
+	Bool m_initiallyActive = FALSE;
+	Bool m_generateFear = FALSE;
+	Bool m_generateTerror = FALSE;
+	Bool m_generateUncontrollableFear = FALSE;
+	Int m_whichSpecialPower = 0;
+	Real m_pulseRadius = 0.0f;
+	UnsignedInt m_pulseInterval = 0;
+
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
+class RadiateFearUpdate final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(RadiateFearUpdate, "RadiateFearUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(RadiateFearUpdate, RadiateFearUpdateModuleData)
+
+public:
+	RadiateFearUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	UpdateSleepTime update() override;
+};
+
 class PassiveAreaEffectBehavior : public UpdateModule
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( PassiveAreaEffectBehavior, "PassiveAreaEffectBehavior" )

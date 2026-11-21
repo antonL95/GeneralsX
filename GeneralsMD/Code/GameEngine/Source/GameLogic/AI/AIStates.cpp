@@ -65,6 +65,7 @@
 
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/JetAIUpdate.h"
@@ -2622,11 +2623,14 @@ StateReturnType AIAttackApproachTargetState::onEnter()
 		// Check here:  If we are a player, and we got to this state via an ai command (ie we auto-acquired),
 		// we don't want to chase the unit. isAllowedToChase is set when we are in a deploy and attack state (troop crawler).
 		// Kris (July 2003): If we are retaliating... don't fail out!
+		const auto* stances = ai->getLastCommandSource() == CMD_FROM_AI ? StancesBehavior::findForUnit(source) : nullptr;
+		if (!ai->stanceAllowsChase(victim))
+			return STATE_FAILURE;
 		if( ai->getCurrentStateID() != AI_GUARD_RETALIATE )
 		{
 			if (source->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN)
 			{
-				if (ai->getLastCommandSource() == CMD_FROM_AI && !ai->isAllowedToChase() )
+				if (ai->getLastCommandSource() == CMD_FROM_AI && !ai->isAllowedToChase() && !stances)
 				{
 					if (!weapon->isContactWeapon())
 					{
@@ -2694,6 +2698,8 @@ StateReturnType AIAttackApproachTargetState::updateInternal()
 	Object *victim = getMachineGoalObject();
 	if (victim)
 	{
+		if ((!weapon || !weapon->isWithinAttackRange(source, victim)) && !ai->stanceAllowsChase(victim))
+			return STATE_FAILURE;
  		if (source->getControllingPlayer()->getPlayerType() == PLAYER_COMPUTER)
 		{
 			Bool hunt = ai->getCurrentStateID() == AI_HUNT;

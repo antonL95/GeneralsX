@@ -33,16 +33,20 @@
 
 #include <Utility/intrin_compat.h>	// For _isnan compatibility
 #include "Common/PerfTimer.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/CrushDie.h"		// for CrushEnum
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/RotWKBodyModules.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
@@ -822,6 +826,11 @@ UpdateSleepTime PhysicsBehavior::update()
 	// clear overlap object, which will be set by PhysicsCollide later
 	m_previousOverlap = m_currentOverlap;
 	m_currentOverlap = INVALID_ID;
+	if (RetailFileLayers::enabled())
+	{
+		m_previousCrushContacts.swap(m_crushContacts);
+		m_crushContacts.clear();
+	}
 
 	if (gotBounceForce && getFlag(ALLOW_BOUNCE))
 	{
@@ -1087,6 +1096,55 @@ void PhysicsBehavior::addVelocityTo( const Coord3D *vel)
 		m_vel.add( *vel );
 }
 
+void PhysicsBehavior::launchFromImpact(const Coord3D& direction, Real amount, Real zFactor)
+{
+	Object* victim = getObject();
+	amount *= std::clamp(1.0f - AttributeModifiers::value(victim, AttributeModifierRules::RESIST_KNOCKBACK), 0.0f, 2.0f);
+	if (amount <= 0.0f || victim->isKindOf(KINDOF_IMMOBILE) || victim->isAirborneTarget())
+		return;
+
+	const Real gravity = std::abs(TheGlobalData->m_gravity);
+	const Real speed = WWMath::SqrtfOrigin(gravity * amount * 0.5f);
+	m_vel.x = direction.x * speed;
+	m_vel.y = direction.y * speed;
+	m_vel.z = speed * zFactor;
+	m_velMag = INVALID_VEL_MAG;
+	setAllowToFall(TRUE);
+	setStunned(TRUE);
+	victim->setModelConditionState(MODELCONDITION_STUNNED);
+	setWakeFrame(victim, UPDATE_SLEEP_NONE);
+	if (RetailTestCommands::tracesCombat())
+	{
+		std::fprintf(stderr, "TEST launch frame=%u victim=%u velocity=%.3f,%.3f,%.3f\n",
+			TheGameLogic->getFrame(), unsigned(victim->getID()), m_vel.x, m_vel.y, m_vel.z);
+		std::fflush(stderr);
+	}
+}
+
+static const PorcupineFormationBodyModuleData* getPorcupineBody(const Object* victim)
+{
+	const HordeContain* horde = HordeContain::get(victim->getContainedBy());
+	if (!horde || !horde->getActiveFormation()->m_isPorcupineFormation)
+		return nullptr;
+	static const NameKeyType key = NAMEKEY("PorcupineFormationBodyModule");
+	for (auto module = victim->getBehaviorModules(); module && *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() == key)
+			return static_cast<const PorcupineFormationBodyModule*>(*module)->getFormationBodyData();
+	}
+	return nullptr;
+}
+
+static Bool reachesCrushSpeed(const Object* crusher, const PhysicsBehavior* physics, Real speed)
+{
+	const auto& data = crusher->getTemplate()->getRotWKObjectData();
+	const auto* ai = crusher->getAI();
+	const Real fraction = data.minCrushVelocityPercent *
+		AttributeModifiers::value(crusher, AttributeModifierRules::MINIMUM_CRUSH_VELOCITY);
+	return speed > 0.0f && physics && !physics->getIsStunned() &&
+		(!ai || speed >= fraction * ai->getCurLocomotorSpeed());
+}
+
 //-------------------------------------------------------------------------------------------------
 void PhysicsBehavior::setAngles( Real yaw, Real pitch, Real roll )
 {
@@ -1273,7 +1331,7 @@ void PhysicsBehavior::onCollide( Object *other, const Coord3D *loc, const Coord3
 	}
 
 
-	if (checkForOverlapCollision(other))
+	if (RetailFileLayers::enabled() ? checkRetailCrushCollision(other) : checkForOverlapCollision(other))
 	{
 		// we should overlap them, rather than bounce them, so punt here.
 		// (note that we do this prior to checking for Physics update,
@@ -1454,6 +1512,76 @@ static Bool perpsLogicallyEqual( Real perpOne, Real perpTwo )
  * Return true if we want to skip having physics push us apart // LORENZEN
  */
 //-------------------------------------------------------------------------------------------------
+Bool PhysicsBehavior::checkRetailCrushCollision(Object* victim)
+{
+	Object* crusher = getObject();
+	if (!crusher->canCrushOrSquish(victim))
+		return FALSE;
+
+	const Coord3D& from = *crusher->getPosition();
+	const Coord3D& to = *victim->getPosition();
+	const Real speed = WWMath::SqrtfOrigin(m_vel.x * m_vel.x + m_vel.y * m_vel.y);
+	const ObjectID victimID = victim->getID();
+	const auto* porcupine = getPorcupineBody(victim);
+	const Real level = crusher->getCrusherLevel() + AttributeModifiers::value(crusher, AttributeModifierRules::CRUSHER_LEVEL);
+	const Bool braced = porcupine && level <= porcupine->m_crusherLevelResisted;
+	const Bool sameContact = std::find(m_crushContacts.begin(), m_crushContacts.end(), victimID) != m_crushContacts.end();
+	if (sameContact)
+		return !braced;
+	const Bool previousContact = std::find(m_previousCrushContacts.begin(), m_previousCrushContacts.end(), victimID) != m_previousCrushContacts.end();
+	if (previousContact)
+	{
+		m_crushContacts.push_back(victimID);
+		return !braced;
+	}
+	if (!reachesCrushSpeed(crusher, this, speed) ||
+		(to.x - from.x) * m_vel.x + (to.y - from.y) * m_vel.y < 0.0f)
+		return FALSE;
+
+	const auto& data = crusher->getTemplate()->getRotWKObjectData();
+	const auto& victimData = victim->getTemplate()->getRotWKObjectData();
+	const auto* weapon = data.crushWeapon.isNotEmpty() ? TheWeaponStore->findWeaponTemplate(data.crushWeapon) : nullptr;
+	const auto* revenge = victimData.crushRevengeWeapon.isNotEmpty() ? TheWeaponStore->findWeaponTemplate(victimData.crushRevengeWeapon) : nullptr;
+	m_crushContacts.push_back(victimID);
+
+	if (RetailTestCommands::tracesCombat())
+	{
+		std::fprintf(stderr, "TEST crush frame=%u source=%u(%s) victim=%u(%s) speed=%.3f braced=%d knockback=%.2f\n",
+			TheGameLogic->getFrame(), unsigned(crusher->getID()), crusher->getTemplate()->getName().str(),
+			unsigned(victimID), victim->getTemplate()->getName().str(), speed, braced, braced ? 0.0f : data.crushKnockback);
+		std::fflush(stderr);
+	}
+
+	if (braced)
+	{
+		scrubVelocity2D(0.0f);
+		if (Object* anchor = HordeContain::getAnchor(crusher))
+		{
+			if (auto* ai = anchor->getAI())
+				ai->aiIdle(CMD_FROM_SCRIPT);
+		}
+		const auto* braceWeapon = porcupine->m_crushDamageWeaponTemplate ? porcupine->m_crushDamageWeaponTemplate :
+			porcupine->m_damageWeaponTemplate;
+		TheWeaponStore->createAndFireTempWeapon(braceWeapon, victim, crusher, TRUE);
+		return FALSE;
+	}
+
+	if (auto* physics = victim->getPhysics())
+	{
+		const Coord3D direction = { m_vel.x / speed, m_vel.y / speed, 0.0f };
+		physics->launchFromImpact(direction, data.crushKnockback, data.crushZFactor);
+	}
+
+	const Real deceleration = data.crushDecelerationPercent * AttributeModifiers::value(crusher, AttributeModifierRules::CRUSH_DECELERATE);
+	const Real victimDeceleration = AttributeModifiers::value(victim, AttributeModifierRules::CRUSHED_DECELERATE);
+	scrubVelocity2D(speed * std::clamp(1.0f - deceleration * victimDeceleration, 0.0f, 1.0f));
+	TheWeaponStore->createAndFireTempWeapon(porcupine && porcupine->m_crushDamageWeaponTemplate ?
+		porcupine->m_crushDamageWeaponTemplate : revenge, victim, crusher, TRUE);
+	if (weapon)
+		TheWeaponStore->createAndFireTempWeapon(weapon, crusher, victim, TRUE);
+	return TRUE;
+}
+
 Bool PhysicsBehavior::checkForOverlapCollision(Object *other)
 {
 	//This is the most Supreme Truth... that unless I am moving right now, I may not crush anything!
@@ -1834,6 +1962,11 @@ void PhysicsBehavior::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
+	if (RetailFileLayers::enabled())
+	{
+		xfer->xferSTLObjectIDVector(&m_crushContacts);
+		xfer->xferSTLObjectIDVector(&m_previousCrushContacts);
+	}
 
 }
 
@@ -1846,7 +1979,7 @@ void PhysicsBehavior::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = 2;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1914,6 +2047,11 @@ void PhysicsBehavior::xfer( Xfer *xfer )
 
 	// mag of current vel
 	xfer->xferReal( &m_velMag );
+	if (version >= 3)
+	{
+		xfer->xferSTLObjectIDVector(&m_crushContacts);
+		xfer->xferSTLObjectIDVector(&m_previousCrushContacts);
+	}
 
 }
 

@@ -46,6 +46,7 @@ class PorcupineFormationBodyModule : public ActiveBody
 
 public:
 	PorcupineFormationBodyModule(Thing* thing, const ModuleData* moduleData);
+	const PorcupineFormationBodyModuleData* getFormationBodyData() const { return getPorcupineFormationBodyModuleData(); }
 };
 
 class SymbioticStructuresBodyModuleData : public StructureBodyModuleData

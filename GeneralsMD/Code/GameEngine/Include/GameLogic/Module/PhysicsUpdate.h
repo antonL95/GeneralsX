@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "Common/AudioEventRTS.h"
 #include "Common/GameAudio.h"
 #include "GameLogic/Module/BehaviorModule.h"
@@ -109,6 +111,7 @@ public:
 
 	void applyForce( const Coord3D *force );		///< apply a force at the object's CG
 	void applyShock( const Coord3D *force );					///< apply a shockwave force against the object's CG
+	void launchFromImpact(const Coord3D& direction, Real amount, Real zFactor);
 	void applyRandomRotation();											  ///< apply a random rotation at the object's CG
 	void addVelocityTo(const Coord3D* vel) ;
 
@@ -248,6 +251,7 @@ protected:
 	void doBounceSound(const Coord3D& prevPos);
 
 	Bool checkForOverlapCollision(Object *other);
+	Bool checkRetailCrushCollision(Object* victim);
 
 	void testStunnedUnitForDestruction();
 
@@ -288,6 +292,8 @@ private:
 	Real												m_mass;
 	ObjectID										m_currentOverlap;					///< object(s) being overlapped, if any
 	ObjectID										m_previousOverlap;				///< last frame's object(s) being overlapped
+	std::vector<ObjectID> m_crushContacts;
+	std::vector<ObjectID> m_previousCrushContacts;
 	ObjectID										m_lastCollidee;						///< ID of the last object I collided with, can be quite old.
 	UnsignedInt									m_motiveForceExpires;			///< frames at which "recent" applyMotiveForce is no longer considered
 	Real												m_extraBounciness;				///< modifier to ground stiffness

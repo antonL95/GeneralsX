@@ -16,6 +16,7 @@
 #include "GameLogic/Damage.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -24,6 +25,8 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/WeaponNugget.h"
+
+#include <algorithm>
 
 namespace
 {
@@ -151,6 +154,95 @@ void AttributeModifierAuraUpdate::onObjectCreated()
 Bool AttributeModifierAuraUpdate::isAuraActive() const
 {
 	return getAttributeModifierAuraUpdateModuleData()->m_startsActive || isAlreadyUpgraded();
+}
+
+void RadiateFearUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] =
+	{
+		{ "InitiallyActive", INI::parseBool, nullptr, offsetof(RadiateFearUpdateModuleData, m_initiallyActive) },
+		{ "GenerateFear", INI::parseBool, nullptr, offsetof(RadiateFearUpdateModuleData, m_generateFear) },
+		{ "GenerateTerror", INI::parseBool, nullptr, offsetof(RadiateFearUpdateModuleData, m_generateTerror) },
+		{ "GenerateUncontrollableFear", INI::parseBool, nullptr, offsetof(RadiateFearUpdateModuleData, m_generateUncontrollableFear) },
+		{ "WhichSpecialPower", INI::parseInt, nullptr, offsetof(RadiateFearUpdateModuleData, m_whichSpecialPower) },
+		{ "EmotionPulseRadius", INI::parseReal, nullptr, offsetof(RadiateFearUpdateModuleData, m_pulseRadius) },
+		{ "EmotionPulseInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(RadiateFearUpdateModuleData, m_pulseInterval) },
+		{ "VictimFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(RadiateFearUpdateModuleData, m_victimFilter) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	UpdateModuleData::buildFieldParse(p);
+	p.add(fields);
+	p.add(UpgradeMuxData::getFieldParse(), offsetof(RadiateFearUpdateModuleData, m_upgrades));
+}
+
+UpdateSleepTime RadiateFearUpdate::update()
+{
+	const auto* data = getRadiateFearUpdateModuleData();
+	Object* self = getObject();
+	if (self->isEffectivelyDead() || data->m_pulseRadius <= 0.0f ||
+		!(data->m_generateFear || data->m_generateTerror || data->m_generateUncontrollableFear))
+		return UPDATE_SLEEP_FOREVER;
+
+	UpgradeMaskType activation, conflicting;
+	data->m_upgrades.getUpgradeActivationMasks(activation, conflicting);
+	UpgradeMaskType upgrades = self->getObjectCompletedUpgradeMask();
+	if (const Player* player = self->getControllingPlayer())
+		upgrades.set(player->getCompletedUpgradeMask());
+	const Bool activated = activation.any() && (data->m_upgrades.m_requiresAllTriggers ?
+		upgrades.testForAll(activation) : upgrades.testForAny(activation));
+	if ((!data->m_initiallyActive && !activated) || upgrades.testForAny(conflicting) || self->isDisabled())
+		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
+
+	const auto condition = data->m_generateTerror ? MODELCONDITION_EMOTION_TERROR :
+		(data->m_generateUncontrollableFear ? MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID : MODELCONDITION_EMOTION_AFRAID);
+	const Int kind = data->m_generateTerror ? AttributeModifierRules::RESIST_TERROR : AttributeModifierRules::RESIST_FEAR;
+	const UnsignedInt interval = data->m_pulseInterval ? data->m_pulseInterval : LOGICFRAMES_PER_SECOND;
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_pulseRadius, FROM_CENTER_2D);
+	MemoryPoolObjectHolder holder(iter);
+	std::vector<Object*> targets;
+	for (Object* victim = iter->first(); victim; victim = iter->next())
+	{
+		if (self->getRelationship(victim) != ENEMIES || !data->m_victimFilter.matchesObject(self, victim))
+			continue;
+		if (Object* anchor = HordeContain::getAnchor(victim))
+			victim = anchor;
+		targets.push_back(victim);
+	}
+	std::sort(targets.begin(), targets.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
+	targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
+	for (Object* victim : targets)
+	{
+		const Real resistance = std::clamp(AttributeModifiers::value(victim, kind), -1.0f, 1.0f);
+		const UnsignedInt duration = static_cast<UnsignedInt>(std::max(interval, UnsignedInt(LOGICFRAMES_PER_SECOND)) * (1.0f - resistance));
+		auto* ai = victim->getAI();
+		if (ai && ai->fleeFromFear(self, duration, condition) && RetailTestCommands::tracesCombat())
+		{
+			std::fprintf(stderr, "TEST fear frame=%u source=%u(%s) victim=%u(%s) duration=%u terror=%d\n",
+				TheGameLogic->getFrame(), unsigned(self->getID()), self->getTemplate()->getName().str(),
+				unsigned(victim->getID()), victim->getTemplate()->getName().str(), duration, data->m_generateTerror);
+			std::fflush(stderr);
+		}
+	}
+	return UPDATE_SLEEP(interval + self->getID() % 5);
+}
+
+RadiateFearUpdate::~RadiateFearUpdate() = default;
+
+void RadiateFearUpdate::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+}
+
+void RadiateFearUpdate::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	UpdateModule::xfer(xfer);
+}
+
+void RadiateFearUpdate::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
 }
 
 Bool AttributeModifierAuraUpdate::resetUpgrade( const UpgradeMaskType& keyMask )

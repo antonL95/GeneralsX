@@ -489,6 +489,9 @@ public:
 	Bool computeQuickPath(const Coord3D *destination); ///< Computes a quick path to the destination.
 
 	Bool isMoving() const;
+	Bool fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition);
+	void braceForCrush(UnsignedInt deadline);
+	Bool stanceAllowsChase(const Object* target) const;
 	Bool isMovingAwayFrom(Object *obj) const;
 
 	// the following routines should only be called by the AIInternalMoveToState.
@@ -798,6 +801,9 @@ private:
 	Bool				m_isSafePath;								///< True if we are just approaching to tighten.
 	Bool				m_movementComplete;					///< True if we finished an AIInternalMoveToState.
 	Bool				m_isMoving;									///< True if we are in an AIInternalMoveToState.
+	UnsignedInt m_fearUntil = 0;
+	UnsignedInt m_crushWarningUntil = 0;
+	Coord3D m_autoAttackOrigin{};
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.
 	Bool				m_upgradedLocomotors;

@@ -480,6 +480,8 @@ void ModuleFactory::init()
 	if (registersRotwkModules())
 	{
 		addModule( StancesBehavior );
+		addModule( HordeNotifyTargetsOfImminentProbableCrushingUpdate );
+		addModule( RadiateFearUpdate );
 		addModule( AttributeModifierAuraUpdate );
 		addModule( PassiveAreaEffectBehavior );
 		addModule( AttributeModifierUpgrade );
