@@ -1108,7 +1108,7 @@ namespace
 	{
 		const auto *definition = TheMultiplayerSettings->getColor(i);
 		return {i, definition ? localize(definition->getTooltipName().str(), "") : UnicodeString(),
-			definition ? definition->getColor() | 0xFF000000 : 0};
+			definition ? static_cast<Color>(definition->getColor() | 0xFF000000) : 0};
 	}
 
 	UnicodeString randomLabel()
