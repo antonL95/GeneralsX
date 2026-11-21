@@ -885,9 +885,12 @@ Bool WorldHeightMap::ParseWorldDictDataChunk(DataChunkInput &file, DataChunkInfo
 *	Input: DataChunkInput
 *
 */
-Bool WorldHeightMap::ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo *, void *userData)
+Bool WorldHeightMap::ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
-	auto &map = *static_cast<WorldHeightMap *>(userData);
+	if (!info || info->dataSize < 1)
+		return FALSE;
+	AsciiString lookupTexture;
+	Real lookupBlend = 0.0f;
 	const UnsignedByte count = file.readByte();
 	for (Int i = 0; i < count; ++i)
 	{
@@ -896,25 +899,37 @@ Bool WorldHeightMap::ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo 
 		const AsciiString texture = file.readAsciiString();
 		if (effect == "LookupTablePostEffect" && blend > 0.0f && !texture.isEmpty())
 		{
-			map.m_retailLookupTexture = texture;
-			map.m_retailLookupBlend = MIN(blend, 1.0f);
+			lookupTexture = texture;
+			lookupBlend = MIN(blend, 1.0f);
 		}
 	}
+	if (!file.atEndOfChunk())
+		return FALSE;
+	auto &map = *static_cast<WorldHeightMap *>(userData);
+	map.m_retailLookupTexture = lookupTexture;
+	map.m_retailLookupBlend = lookupBlend;
 	return TRUE;
 }
 
 Bool WorldHeightMap::ParseRetailEnvironment(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
-	auto &map = *static_cast<WorldHeightMap *>(userData);
+	if (!info || info->dataSize < 2)
+		return FALSE;
 	if (info->version >= 3)
 	{
 		file.readReal();
 		file.readReal();
 	}
+	const Bool macroStretched = file.readByte() != 0;
+	const AsciiString macroTexture = file.readAsciiString();
+	const AsciiString cloudTexture = file.readAsciiString();
+	if (!file.atEndOfChunk())
+		return FALSE;
+	auto &map = *static_cast<WorldHeightMap *>(userData);
 	map.m_retailEnvironment = TRUE;
-	map.m_retailMacroStretched = file.readByte() != 0;
-	map.m_retailMacroTexture = file.readAsciiString();
-	map.m_retailCloudTexture = file.readAsciiString();
+	map.m_retailMacroStretched = macroStretched;
+	map.m_retailMacroTexture = macroTexture;
+	map.m_retailCloudTexture = cloudTexture;
 	return TRUE;
 }
 

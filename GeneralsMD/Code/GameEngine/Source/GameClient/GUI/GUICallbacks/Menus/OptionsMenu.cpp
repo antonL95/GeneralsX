@@ -40,6 +40,7 @@
 #include "Common/GameLOD.h"
 #include "Common/Recorder.h"
 #include "Common/Registry.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/version.h"
 
 #include "GameClient/ClientInstance.h"
@@ -474,7 +475,8 @@ static void saveOptions()
 		const Bool levelChanged = TheGameLODManager->setStaticLODLevel((StaticGameLODLevel)index);
 
 		if (levelChanged)
-			(*pref)["StaticGameLOD"] = TheGameLODManager->getStaticGameLODLevelName(TheGameLODManager->getStaticLODLevel());
+			(*pref)[RetailFileLayers::enabled() ? "RetailStaticGameLOD" : "StaticGameLOD"] =
+				TheGameLODManager->getStaticGameLODLevelName(TheGameLODManager->getStaticLODLevel());
 	}
 
 	//-------------------------------------------------------------------------------------------------

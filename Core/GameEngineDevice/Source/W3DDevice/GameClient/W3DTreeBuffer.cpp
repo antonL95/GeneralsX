@@ -752,6 +752,8 @@ some point since it wastes a lot of system memory on low-end systems. -MW
 */
 void W3DTreeBuffer::castRetailShadows(RetailTerrainShadow &shadow)
 {
+	if (!TheGlobalData->m_useTrees)
+		return;
 	for (Int i = 0; i < m_numTrees; ++i)
 	{
 		const auto &tree = m_trees[i];
@@ -1710,6 +1712,11 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 {
 	USE_PERF_TIMER(Tree_Render)
 	if (!m_isTerrainPass) {
+		return;
+	}
+	if (RetailFileLayers::enabled() && !TheGlobalData->m_useTrees)
+	{
+		m_isTerrainPass = false;
 		return;
 	}
 

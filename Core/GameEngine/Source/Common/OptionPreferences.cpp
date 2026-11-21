@@ -36,6 +36,7 @@
 #include "Common/GameLOD.h"
 #include "Common/GlobalData.h"
 #include "Common/OptionPreferences.h"
+#include "Common/RetailFileLayers.h"
 
 #include "GameClient/ClientInstance.h"
 #include "GameClient/Display.h"
@@ -435,7 +436,7 @@ Bool OptionPreferences::getPlayerObserverEnabled() const
 
 Int OptionPreferences::getIdealStaticGameDetail()
 {
-	OptionPreferences::const_iterator it = find("IdealStaticGameLOD");
+	OptionPreferences::const_iterator it = find(RetailFileLayers::enabled() ? "RetailIdealStaticGameLOD" : "IdealStaticGameLOD");
 	if (it == end())
 		return STATIC_GAME_LOD_UNKNOWN;
 
@@ -444,7 +445,7 @@ Int OptionPreferences::getIdealStaticGameDetail()
 
 Int OptionPreferences::getStaticGameDetail()
 {
-	OptionPreferences::const_iterator it = find("StaticGameLOD");
+	OptionPreferences::const_iterator it = find(RetailFileLayers::enabled() ? "RetailStaticGameLOD" : "StaticGameLOD");
 	if (it == end())
 		return TheGameLODManager->getStaticLODLevel();
 

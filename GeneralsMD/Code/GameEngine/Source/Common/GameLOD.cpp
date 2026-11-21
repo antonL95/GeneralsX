@@ -637,7 +637,7 @@ StaticGameLODLevel GameLODManager::getRecommendedStaticLODLevel()
 		}
 		//Save ideal detail level for future usage
 		OptionPreferences optionPref;
-		optionPref["IdealStaticGameLOD"] = getStaticGameLODLevelName(m_idealDetailLevel);
+		optionPref[RetailFileLayers::enabled() ? "RetailIdealStaticGameLOD" : "IdealStaticGameLOD"] = getStaticGameLODLevelName(m_idealDetailLevel);
 		if (getStaticLODLevel() == STATIC_GAME_LOD_UNKNOWN && !RetailFileLayers::enabled())
 			optionPref["StaticGameLOD"] = getStaticGameLODLevelName(m_idealDetailLevel);
 		optionPref.write();
@@ -706,11 +706,20 @@ void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level)
 		TheWritableGlobalData->m_maxParticleCount=lodInfo->m_maxParticleCount;
 		TheWritableGlobalData->m_useShadowVolumes=lodInfo->m_useShadowVolumes;
 		TheWritableGlobalData->m_useShadowDecals=lodInfo->m_useShadowDecals;
-		if (RetailFileLayers::enabled() && level != STATIC_GAME_LOD_CUSTOM)
+		if (RetailFileLayers::enabled())
 		{
-			TheWritableGlobalData->m_retailShadowMapping = lodInfo->m_useShadowMapping;
-			TheWritableGlobalData->m_retailShadowMapSize = lodInfo->m_useShadowMapping
-				? (1 << (7 + std::clamp(lodInfo->m_shadowQuality, 0, 4))) : 0;
+			const Bool useRetailShadowMapping = level == STATIC_GAME_LOD_CUSTOM
+				? lodInfo->m_useShadowVolumes : lodInfo->m_useShadowMapping;
+			TheWritableGlobalData->m_retailShadowMapping = useRetailShadowMapping;
+			if (level != STATIC_GAME_LOD_CUSTOM)
+			{
+				TheWritableGlobalData->m_retailShadowMapSize = useRetailShadowMapping
+					? (1 << (7 + std::clamp(lodInfo->m_shadowQuality, 0, 4))) : 0;
+			}
+			else if (!useRetailShadowMapping)
+			{
+				TheWritableGlobalData->m_retailShadowMapSize = 0;
+			}
 		}
 
 		TheWritableGlobalData->m_textureReductionFactor = requestedTextureReduction;
