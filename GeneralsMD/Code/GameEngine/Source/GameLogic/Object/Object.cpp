@@ -563,6 +563,14 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	// allocate experience tracker
 	m_experienceTracker = newInstance(ExperienceTracker)(this);
 
+	if (RetailFileLayers::enabled())
+	{
+		static const NameKeyType weaponModeKey = NAMEKEY("WeaponModeSpecialPowerUpdate");
+		for (BehaviorModule** module = m_behaviors; *module; ++module)
+			if ((*module)->getModuleNameKey() == weaponModeKey)
+				static_cast<WeaponModeSpecialPowerUpdate*>(*module)->resolveCastOwner();
+	}
+
 	// If a valid team has been assigned me, then I have a Player I can ask about my starting level
 	const Player* controller = getControllingPlayer();
 	m_experienceTracker->setVeterancyLevel( controller->getProductionVeterancyLevel( getTemplate()->getName() ) );

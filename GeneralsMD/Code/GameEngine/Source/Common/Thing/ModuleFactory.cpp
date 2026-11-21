@@ -641,6 +641,10 @@ void ModuleFactory::init()
 		addModule( ProductionSpeedBonus );
 		addModule( InvisibilitySpecialPower );
 		addModule( WeaponChangeSpecialPowerModule );
+		addModule( PlayerUpgradeSpecialPower );
+		addModule( CloudBreakSpecialPower );
+		addModule( TaintSpecialPower );
+		addModule( UntamedAllegianceSpecialPower );
 		addModule( GrabPassengerSpecialPower );
 		addModule( AISpecialPowerUpdate );
 		addModule( PlayerHealSpecialPower );

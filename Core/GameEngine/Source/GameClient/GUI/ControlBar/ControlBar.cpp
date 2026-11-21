@@ -791,6 +791,7 @@ Bool CommandButton::isValidToUseOn(const Object *sourceObj, const Object *target
 Bool CommandButton::canCastRetailSpell(const Object* book, const Object* target, const Coord3D* position) const
 {
 	if (!book || m_command != GUI_COMMAND_SPELL_BOOK || !m_specialPower ||
+		hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE) ||
 		!m_specialPower->isUnlockedFor(book->getControllingPlayer()))
 		return FALSE;
 	const SpecialPowerModuleInterface* module = book->getSpecialPowerModule(m_specialPower);

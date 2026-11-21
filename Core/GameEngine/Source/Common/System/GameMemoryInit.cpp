@@ -118,6 +118,10 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "ProductionSpeedBonus", 32, 16 },
 	{ "InvisibilitySpecialPower", 32, 16 },
 	{ "WeaponChangeSpecialPowerModule", 64, 32 },
+	{ "PlayerUpgradeSpecialPower", 32, 16 },
+	{ "CloudBreakSpecialPower", 32, 16 },
+	{ "TaintSpecialPower", 32, 16 },
+	{ "UntamedAllegianceSpecialPower", 32, 16 },
 	{ "GrabPassengerSpecialPower", 32, 16 }
 };
 

@@ -1371,6 +1371,7 @@ struct SweepCase
 	ObjectID previousObject = INVALID_ID;
 	std::vector<ObjectID> castTargets;
 	std::vector<Real> health;
+	std::vector<PlayerIndex> castOwners;
 	const ThingTemplate* thing = nullptr;
 	const UpgradeTemplate* upgrade = nullptr;
 	const SpecialPowerTemplate* power = nullptr;
@@ -1592,7 +1593,7 @@ Bool sweepCast(Object* source, const CommandButton* button, const Command& comma
 	Object* target = nullptr;
 	Real best = 0.0f;
 	Coord3D origin = *source->getPosition();
-	if (spell)
+	if (spell || command.hasLocation)
 	{
 		origin = command.hasLocation ? command.location : Coord3D{1140.0f, 580.0f, 0.0f};
 		origin.z = TheTerrainLogic->getGroundHeight(origin.x, origin.y);
@@ -1610,6 +1611,7 @@ Bool sweepCast(Object* source, const CommandButton* button, const Command& comma
 		{
 			test.castTargets.push_back(object->getID());
 			test.health.push_back(object->getBodyModule()->getHealth());
+			test.castOwners.push_back(object->getControllingPlayer()->getPlayerIndex());
 		}
 		if (BitIsSet(options, COMMAND_OPTION_NEED_OBJECT_TARGET) &&
 			distance <= 450.0f * 450.0f && (!target || distance < best) &&
@@ -1632,7 +1634,7 @@ Bool sweepCast(Object* source, const CommandButton* button, const Command& comma
 	else if (BitIsSet(options, NEED_TARGET_POS))
 	{
 		Coord3D point = origin;
-		if (!spell)
+		if (!spell && !command.hasLocation)
 		{
 			point.x += 30.0f;
 			point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
@@ -1660,7 +1662,9 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 	const bool spell = command.action == "sweep-spell";
 	const bool buttonRequired = !hero;
 	Object* source = spell ? player->getRetailSpellBook() : sweepSource(command, player, buttonRequired);
-	if (!source || (spell && stricmp(source->getTemplate()->getName().str(), command.target.c_str()) != 0))
+	if (!source && command.action == "sweep-power" && command.hasLocation)
+		source = player->getRetailSpellBook();
+	if (!source || stricmp(source->getTemplate()->getName().str(), command.target.c_str()) != 0)
 	{
 		std::fprintf(stderr, "SWEEP %d start frame=%u reason=no_source\n", id, frame);
 		return;
@@ -1670,7 +1674,11 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 	const CommandButton* button = buttonRequired ? sweepButton(source, command.structure.c_str()) : nullptr;
 	if (buttonRequired && !button)
 	{
-		std::fprintf(stderr, "SWEEP %d start frame=%u reason=no_button set=%s\n", id, frame, source->getCommandSetString().str());
+		const Bool powerCase = command.action == "sweep-power" || spell;
+		const CommandButton* catalogButton = powerCase && TheControlBar ? TheControlBar->findCommandButton(command.structure.c_str()) : nullptr;
+		const Bool passive = catalogButton && catalogButton->hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE);
+		std::fprintf(stderr, "SWEEP %d start frame=%u reason=%s set=%s\n", id, frame,
+			passive ? "passive_display" : "no_button", source->getCommandSetString().str());
 		return;
 	}
 	ProductionUpdateInterface* production = source->getProductionUpdateInterface();
@@ -1679,6 +1687,26 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 	Int eligibility = -1;
 	if (command.action == "sweep-power" || spell)
 	{
+		if (button->hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE))
+		{
+			const char* disposition = "passive_display";
+#if !RTS_GENERALS
+			const auto* module = static_cast<const SpecialPowerModule*>(source->getSpecialPowerModule(button->getSpecialPowerTemplate()));
+			if (module && module->getModuleNameKey() == NAMEKEY("PlayerUpgradeSpecialPower"))
+			{
+				const auto& names = static_cast<const PlayerUpgradeSpecialPower*>(module)->getGrantedUpgradeNames();
+				const Bool granted = !names.empty() && std::all_of(names.begin(), names.end(), [player](const AsciiString& name)
+				{
+					const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(name);
+					return upgrade && player->hasUpgradeComplete(upgrade);
+				});
+				disposition = granted ? "passive_upgrade_granted" : "passive_upgrade_missing";
+			}
+#endif
+			std::fprintf(stderr, "SWEEP %d start frame=%u reason=%s set=%s\n",
+				id, frame, disposition, source->getCommandSetString().str());
+			return;
+		}
 		issued = sweepCast(source, button, command, spell, test);
 		if (issued)
 		{
@@ -1687,12 +1715,33 @@ void sweepStart(const Command& command, Player* player, unsigned int frame)
 			for (std::size_t i = 0; !test.synchronousEffect && i < test.castTargets.size(); ++i)
 			{
 				const Object* target = TheGameLogic->findObjectByID(test.castTargets[i]);
-				test.synchronousEffect = !target || (target->getBodyModule() &&
-					target->getBodyModule()->getHealth() != test.health[i]);
+				test.synchronousEffect = !target || target->getControllingPlayer()->getPlayerIndex() != test.castOwners[i] ||
+					(target->getBodyModule() && target->getBodyModule()->getHealth() != test.health[i]);
 			}
+#if !RTS_GENERALS
+			for (BehaviorModule** module = source->getBehaviorModules(); !test.synchronousEffect && *module; ++module)
+			{
+				if ((*module)->getModuleNameKey() != NAMEKEY("WeaponModeSpecialPowerUpdate"))
+					continue;
+				const auto* mode = static_cast<const WeaponModeSpecialPowerUpdate*>(*module);
+				test.synchronousEffect = mode->isModuleForPower(test.power) && mode->isActive();
+			}
+#endif
 		}
 		if (!test.power)
-			reason = "no_power_module";
+		{
+			const SpecialPowerTemplate* power = button->getSpecialPowerTemplate();
+			if (power && power->getSpecialPowerType() == SPECIAL_INFANTRY_CAPTURE_BUILDING)
+				reason = "capture_unbound";
+			else if (spell && button->getCommandType() != GUI_COMMAND_SPELL_BOOK)
+				reason = "not_a_spellbook_cast";
+			else
+				reason = "no_power_module";
+		}
+		else if (!issued && spell && button->getCommandType() != GUI_COMMAND_SPELL_BOOK)
+			reason = "not_a_spellbook_cast";
+		else if (!issued && !source->getSpecialPowerModule(test.power)->isReady())
+			reason = "power_not_ready";
 	}
 	else if (command.action == "sweep-upgrade")
 	{

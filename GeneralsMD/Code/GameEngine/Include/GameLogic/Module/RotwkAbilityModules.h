@@ -134,12 +134,11 @@ protected:
 class WeaponModeSpecialPowerUpdateModuleData : public UpdateModuleData
 {
 public:
-	const SpecialPowerTemplate *m_specialPowerTemplate = nullptr;
+	SpecialPowerModuleData m_power;
 	AsciiString m_attributeModifier;
 	UnsignedInt m_duration = 0;
 	WeaponSlotType m_lockWeaponSlot = (WeaponSlotType)-1;
 	WeaponSetFlags m_weaponSetFlags;
-	Bool m_startsPaused = FALSE;
 	AudioEventRTS m_initiateSound;
 
 	static void buildFieldParse(MultiIniFieldParse& p);
@@ -153,6 +152,10 @@ class WeaponModeSpecialPowerUpdate : public SpecialPowerUpdateModule
 public:
 	WeaponModeSpecialPowerUpdate( Thing *thing, const ModuleData *moduleData );
 
+	static Int getInterfaceMask() { return MODULEINTERFACE_UPDATE | MODULEINTERFACE_SPECIAL_POWER; }
+	void resolveCastOwner();
+	SpecialPowerModuleInterface* getSpecialPower() override { return m_power; }
+	Bool isModuleForPower(const SpecialPowerTemplate* power) const;
 	virtual SpecialPowerUpdateInterface* getSpecialPowerUpdateInterface() override { return this; }
 	virtual Bool initiateIntentToDoSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, const Object *targetObj, const Coord3D *targetPos, const Waypoint *way, UnsignedInt commandOptions ) override;
 	virtual Bool isSpecialAbility() const override { return FALSE; }
@@ -168,9 +171,93 @@ public:
 private:
 	void endMode();
 
+	SpecialPowerModule* m_power = nullptr;
 	UnsignedInt m_endFrame = 0;
 	Int m_condition = -1;
 	UnsignedInt m_conditionEndFrame = 0;
+};
+
+class PlayerUpgradeSpecialPowerModuleData : public SpecialPowerModuleData
+{
+public:
+	std::vector<AsciiString> m_upgrades;
+
+	static void buildFieldParse(MultiIniFieldParse& fields);
+};
+
+class PlayerUpgradeSpecialPower : public SpecialPowerModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( PlayerUpgradeSpecialPower, "PlayerUpgradeSpecialPower" )
+	MAKE_STANDARD_MODULE_MACRO( PlayerUpgradeSpecialPower )
+
+public:
+	using SpecialPowerModule::SpecialPowerModule;
+	static ModuleData* friend_newModuleData(INI* ini);
+	void onScienceUnlocked() override;
+	const std::vector<AsciiString>& getGrantedUpgradeNames() const;
+
+protected:
+	void applyPowerEffect(const Coord3D* position) override;
+};
+
+class CloudBreakSpecialPowerModuleData : public SpecialPowerModuleData
+{
+public:
+	AsciiString m_sunbeam;
+	Int m_spacing = 0;
+	const FXList* m_antiFX = nullptr;
+
+	static void buildFieldParse(MultiIniFieldParse& fields);
+};
+
+class CloudBreakSpecialPower : public SpecialPowerModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( CloudBreakSpecialPower, "CloudBreakSpecialPower" )
+	MAKE_STANDARD_MODULE_MACRO( CloudBreakSpecialPower )
+
+public:
+	using SpecialPowerModule::SpecialPowerModule;
+	static ModuleData* friend_newModuleData(INI* ini);
+
+protected:
+	void applyPowerEffect(const Coord3D* position) override;
+};
+
+class TaintSpecialPowerModuleData : public SpecialPowerModuleData
+{
+public:
+	AsciiString m_land;
+	Real m_radius = 0.0f;
+	const FXList* m_fx = nullptr;
+	const ObjectCreationList* m_ocl = nullptr;
+
+	static void buildFieldParse(MultiIniFieldParse& fields);
+};
+
+class TaintSpecialPower : public SpecialPowerModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( TaintSpecialPower, "TaintSpecialPower" )
+	MAKE_STANDARD_MODULE_MACRO( TaintSpecialPower )
+
+public:
+	using SpecialPowerModule::SpecialPowerModule;
+	static ModuleData* friend_newModuleData(INI* ini);
+
+protected:
+	void applyPowerEffect(const Coord3D* position) override;
+};
+
+class UntamedAllegianceSpecialPower : public SpecialPowerModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( UntamedAllegianceSpecialPower, "UntamedAllegianceSpecialPower" )
+	MAKE_STANDARD_MODULE_MACRO( UntamedAllegianceSpecialPower )
+
+public:
+	using SpecialPowerModule::SpecialPowerModule;
+	Bool isValidPowerTarget(const Object* target) const override;
+
+protected:
+	void applyPowerEffect(const Coord3D* position) override;
 };
 
 class MonitorConditionUpdateModuleData : public UpdateModuleData

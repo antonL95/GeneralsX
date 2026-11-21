@@ -58,6 +58,8 @@ Utilities for large-scale code refactoring and fixes:
 
 ### `qa/` - Quality Assurance & Testing
 
+- `sweep_power_cases.py` prepares an attributed High Pass power replay and classifies its logs. Run it in the BFME tools container from the BFME project root with `prepare BASELINE OUTPUT` before the replay and `report BASELINE OUTPUT` after collecting the logs.
+
 - `test-rotwk-modifiers-zh.sh` runs the contained and radius healing, innate damage, and modifier snapshot checks on High Pass. Pass a session label, the devbox build directory, and the BFME High Pass runner path.
 
 #### `qa/smoke/` - Smoke Tests

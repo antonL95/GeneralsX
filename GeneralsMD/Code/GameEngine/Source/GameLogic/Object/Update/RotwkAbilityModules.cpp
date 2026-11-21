@@ -5,16 +5,20 @@
 #include "GameLogic/Module/RotwkAbilityModules.h"
 
 #include <algorithm>
+#include <memory>
 #include <string>
 
 #include "Common/AbilityRules.h"
 #include "Common/ActionManager.h"
 #include "Common/GameAudio.h"
 #include "Common/INIAudit.h"
+#include "Common/INIException.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
+#include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
@@ -24,6 +28,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
@@ -58,6 +63,19 @@ Bool namedIn(const std::vector<AsciiString>& names, const Object* obj)
 SpecialPowerModule* powerModuleOf(Object* obj, const SpecialPowerTemplate* power)
 {
 	return power ? static_cast<SpecialPowerModule*>(obj->getSpecialPowerModule(power)) : nullptr;
+}
+
+template<class Data>
+ModuleData* parsePowerData(INI* ini, const char* missingTemplate)
+{
+	auto data = std::unique_ptr<Data>(MSGNEW("AllModuleData") Data);
+	if (ini)
+	{
+		ini->initFromINIMultiProc(data.get(), Data::buildFieldParse);
+		if (!data->m_specialPowerTemplate)
+			throw INIException(missingTemplate);
+	}
+	return data.release();
 }
 
 }
@@ -358,12 +376,12 @@ void WeaponModeSpecialPowerUpdateModuleData::buildFieldParse(MultiIniFieldParse&
 	UpdateModuleData::buildFieldParse(p);
 	static const FieldParse fields[] =
 	{
-		{ "SpecialPowerTemplate", INI::parseSpecialPowerTemplate, nullptr, offsetof(WeaponModeSpecialPowerUpdateModuleData, m_specialPowerTemplate) },
+		{ "SpecialPowerTemplate", INI::parseSpecialPowerTemplate, nullptr, offsetof(WeaponModeSpecialPowerUpdateModuleData, m_power) + offsetof(SpecialPowerModuleData, m_specialPowerTemplate) },
 		{ "AttributeModifier", INI::parseAsciiString, nullptr, offsetof(WeaponModeSpecialPowerUpdateModuleData, m_attributeModifier) },
 		{ "Duration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponModeSpecialPowerUpdateModuleData, m_duration) },
 		{ "LockWeaponSlot", INI::parseLookupList, TheWeaponSlotTypeNamesLookupList, offsetof(WeaponModeSpecialPowerUpdateModuleData, m_lockWeaponSlot) },
 		{ "WeaponSetFlags", WeaponSetFlags::parseFromINI, nullptr, offsetof(WeaponModeSpecialPowerUpdateModuleData, m_weaponSetFlags) },
-		{ "StartsPaused", INI::parseBool, nullptr, offsetof(WeaponModeSpecialPowerUpdateModuleData, m_startsPaused) },
+		{ "StartsPaused", INI::parseBool, nullptr, offsetof(WeaponModeSpecialPowerUpdateModuleData, m_power) + offsetof(SpecialPowerModuleData, m_startsPaused) },
 		{ "InitiateSound", INI::parseAudioEventRTS, nullptr, offsetof(WeaponModeSpecialPowerUpdateModuleData, m_initiateSound) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -376,11 +394,23 @@ WeaponModeSpecialPowerUpdate::WeaponModeSpecialPowerUpdate(Thing* thing, const M
 	setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
 }
 
+void WeaponModeSpecialPowerUpdate::resolveCastOwner()
+{
+	const auto& power = getWeaponModeSpecialPowerUpdateModuleData()->m_power;
+	if (power.m_specialPowerTemplate && !getObject()->getSpecialPowerModule(power.m_specialPowerTemplate))
+		m_power = newInstance(SpecialPowerModule)(getObject(), &power);
+}
+
+Bool WeaponModeSpecialPowerUpdate::isModuleForPower(const SpecialPowerTemplate* power) const
+{
+	return power && power == getWeaponModeSpecialPowerUpdateModuleData()->m_power.m_specialPowerTemplate;
+}
+
 Bool WeaponModeSpecialPowerUpdate::initiateIntentToDoSpecialPower(const SpecialPowerTemplate* specialPowerTemplate, const Object*,
 	const Coord3D*, const Waypoint*, UnsignedInt)
 {
 	const WeaponModeSpecialPowerUpdateModuleData* data = getWeaponModeSpecialPowerUpdateModuleData();
-	if (specialPowerTemplate != data->m_specialPowerTemplate)
+	if (!isModuleForPower(specialPowerTemplate))
 		return FALSE;
 	Object* self = getObject();
 	if (m_endFrame != 0)
@@ -404,7 +434,7 @@ Bool WeaponModeSpecialPowerUpdate::initiateIntentToDoSpecialPower(const SpecialP
 		AttributeModifiers::apply(self, data->m_attributeModifier,
 			data->m_duration > 0 ? data->m_duration : AttributeModifierHelper::USE_LIST_DURATION, 0, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));
 
-	SpecialPowerModule* power = powerModuleOf(self, data->m_specialPowerTemplate);
+	SpecialPowerModule* power = powerModuleOf(self, specialPowerTemplate);
 	if (power)
 	{
 		const SpecialPowerModuleData* powerData = power->getPowerModuleData();
@@ -456,21 +486,179 @@ UpdateSleepTime WeaponModeSpecialPowerUpdate::update()
 void WeaponModeSpecialPowerUpdate::crc(Xfer* xfer)
 {
 	SpecialPowerUpdateModule::crc(xfer);
-}
-
-void WeaponModeSpecialPowerUpdate::xfer(Xfer* xfer)
-{
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
-	SpecialPowerUpdateModule::xfer(xfer);
 	xfer->xferUnsignedInt(&m_endFrame);
 	xfer->xferInt(&m_condition);
 	xfer->xferUnsignedInt(&m_conditionEndFrame);
 }
 
+void WeaponModeSpecialPowerUpdate::xfer(Xfer* xfer)
+{
+	XferVersion version = 2;
+	xfer->xferVersion(&version, 2);
+	SpecialPowerUpdateModule::xfer(xfer);
+	xfer->xferUnsignedInt(&m_endFrame);
+	xfer->xferInt(&m_condition);
+	xfer->xferUnsignedInt(&m_conditionEndFrame);
+	if (version >= 2 && m_power)
+		xfer->xferSnapshot(m_power);
+}
+
 void WeaponModeSpecialPowerUpdate::loadPostProcess()
 {
 	SpecialPowerUpdateModule::loadPostProcess();
+	if (m_power)
+		m_power->loadPostProcess();
+}
+
+void PlayerUpgradeSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& fields)
+{
+	SpecialPowerModuleData::buildFieldParse(fields);
+	static const FieldParse table[] =
+	{
+		{ "UpgradeName", INI::parseAsciiStringVector, nullptr, offsetof(PlayerUpgradeSpecialPowerModuleData, m_upgrades) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	fields.add(table);
+}
+
+ModuleData* PlayerUpgradeSpecialPower::friend_newModuleData(INI* ini)
+{
+	return parsePowerData<PlayerUpgradeSpecialPowerModuleData>(ini, "PlayerUpgradeSpecialPower requires a defined SpecialPowerTemplate");
+}
+
+void PlayerUpgradeSpecialPower::onScienceUnlocked()
+{
+	if (getObject() == getObject()->getControllingPlayer()->getRetailSpellBook())
+		doSpecialPower(0);
+}
+
+const std::vector<AsciiString>& PlayerUpgradeSpecialPower::getGrantedUpgradeNames() const
+{
+	return static_cast<const PlayerUpgradeSpecialPowerModuleData*>(getModuleData())->m_upgrades;
+}
+
+void PlayerUpgradeSpecialPower::applyPowerEffect(const Coord3D*)
+{
+	Player* player = getObject()->getControllingPlayer();
+	for (const AsciiString& name : getGrantedUpgradeNames())
+	{
+		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(name);
+		if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER && !player->hasUpgradeComplete(upgrade))
+			player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+	}
+}
+
+void CloudBreakSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& fields)
+{
+	SpecialPowerModuleData::buildFieldParse(fields);
+	static const FieldParse table[] =
+	{
+		{ "SunbeamObject", INI::parseAsciiString, nullptr, offsetof(CloudBreakSpecialPowerModuleData, m_sunbeam) },
+		{ "ObjectSpacing", INI::parseInt, nullptr, offsetof(CloudBreakSpecialPowerModuleData, m_spacing) },
+		{ "AntiFX", INI::parseFXList, nullptr, offsetof(CloudBreakSpecialPowerModuleData, m_antiFX) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	fields.add(table);
+}
+
+ModuleData* CloudBreakSpecialPower::friend_newModuleData(INI* ini)
+{
+	return parsePowerData<CloudBreakSpecialPowerModuleData>(ini, "CloudBreakSpecialPower requires a defined SpecialPowerTemplate");
+}
+
+void CloudBreakSpecialPower::applyPowerEffect(const Coord3D*)
+{
+	const auto* data = static_cast<const CloudBreakSpecialPowerModuleData*>(getModuleData());
+	Region3D bounds;
+	TheTerrainLogic->getExtent(&bounds);
+	if (data->m_antiFX)
+	{
+		Coord3D center{(bounds.lo.x + bounds.hi.x) * 0.5f, (bounds.lo.y + bounds.hi.y) * 0.5f, 0.0f};
+		center.z = TheTerrainLogic->getGroundHeight(center.x, center.y);
+		FXList::doFXPos(data->m_antiFX, &center);
+	}
+
+	const ThingTemplate* sunbeam = data->m_sunbeam.isNotEmpty() ? TheThingFactory->findTemplate(data->m_sunbeam, FALSE) : nullptr;
+	if (!sunbeam || data->m_spacing <= 0)
+		return;
+
+	const Int spacing = data->m_spacing;
+	for (Int y = static_cast<Int>(bounds.lo.y + spacing); y < bounds.hi.y - spacing; y += spacing)
+	{
+		for (Int x = static_cast<Int>(bounds.lo.x + spacing); x < bounds.hi.x - spacing; x += spacing)
+		{
+			Coord3D point{static_cast<Real>(x), static_cast<Real>(y), 0.0f};
+			point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+			if (Object* beam = TheThingFactory->newObject(sunbeam, getObject()->getTeam()))
+				beam->setPosition(&point);
+		}
+	}
+}
+
+void TaintSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& fields)
+{
+	SpecialPowerModuleData::buildFieldParse(fields);
+	static const FieldParse table[] =
+	{
+		{ "TaintObject", INI::parseAsciiString, nullptr, offsetof(TaintSpecialPowerModuleData, m_land) },
+		{ "TaintRadius", INI::parseReal, nullptr, offsetof(TaintSpecialPowerModuleData, m_radius) },
+		{ "TaintFX", INI::parseFXList, nullptr, offsetof(TaintSpecialPowerModuleData, m_fx) },
+		{ "TaintOCL", INI::parseObjectCreationList, nullptr, offsetof(TaintSpecialPowerModuleData, m_ocl) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	fields.add(table);
+}
+
+ModuleData* TaintSpecialPower::friend_newModuleData(INI* ini)
+{
+	return parsePowerData<TaintSpecialPowerModuleData>(ini, "TaintSpecialPower requires a defined SpecialPowerTemplate");
+}
+
+void TaintSpecialPower::applyPowerEffect(const Coord3D* position)
+{
+	const auto* data = static_cast<const TaintSpecialPowerModuleData*>(getModuleData());
+	if (!position || data->m_land.isEmpty() || data->m_radius < 0.0f)
+		return;
+
+	const ThingTemplate* land = TheThingFactory->findTemplate(data->m_land, FALSE);
+	if (!land)
+		return;
+
+	const Coord3D point = *position;
+	if (data->m_fx)
+		FXList::doFXPos(data->m_fx, &point);
+	ObjectCreationList::create(data->m_ocl, getObject(), &point, &point, INVALID_ANGLE);
+	if (Object* patch = TheThingFactory->newObject(land, getObject()->getControllingPlayer()->getDefaultTeam()))
+		patch->setPosition(&point);
+}
+
+Bool UntamedAllegianceSpecialPower::isValidPowerTarget(const Object* target) const
+{
+	const Object* caster = getObject();
+	const auto& filter = getPowerModuleData()->m_attributeModifierAffects;
+	return target && target != caster && !target->isEffectivelyDead() && !target->isDestroyed() &&
+		target->getControllingPlayer() != caster->getControllingPlayer() && filter.matchesObject(caster, target);
+}
+
+void UntamedAllegianceSpecialPower::applyPowerEffect(const Coord3D* position)
+{
+	if (!position)
+		return;
+	Object* caster = getObject();
+	Team* team = caster->getControllingPlayer()->getDefaultTeam();
+	const Real radius = getPowerModuleData()->m_attributeModifierRange;
+	std::vector<ObjectID> targets;
+	{
+		SimpleObjectIterator* objects = ThePartitionManager->iterateObjectsInRange(position, radius, FROM_CENTER_2D);
+		MemoryPoolObjectHolder hold(objects);
+		for (Object* target = objects->first(); target; target = objects->next())
+			if (isValidPowerTarget(target))
+				targets.push_back(target->getID());
+	}
+	std::sort(targets.begin(), targets.end());
+	for (ObjectID id : targets)
+		if (Object* target = TheGameLogic->findObjectByID(id); isValidPowerTarget(target))
+			target->defect(team, 0);
 }
 
 void MonitorConditionUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -966,7 +1154,29 @@ HeroModeSpecialAbilityUpdate::~HeroModeSpecialAbilityUpdate()
 
 WeaponModeSpecialPowerUpdate::~WeaponModeSpecialPowerUpdate()
 {
+	deleteInstance(m_power);
 }
+
+PlayerUpgradeSpecialPower::~PlayerUpgradeSpecialPower() = default;
+CloudBreakSpecialPower::~CloudBreakSpecialPower() = default;
+TaintSpecialPower::~TaintSpecialPower() = default;
+UntamedAllegianceSpecialPower::~UntamedAllegianceSpecialPower() = default;
+
+void PlayerUpgradeSpecialPower::crc(Xfer* xfer) { SpecialPowerModule::crc(xfer); }
+void PlayerUpgradeSpecialPower::xfer(Xfer* xfer) { SpecialPowerModule::xfer(xfer); }
+void PlayerUpgradeSpecialPower::loadPostProcess() { SpecialPowerModule::loadPostProcess(); }
+
+void CloudBreakSpecialPower::crc(Xfer* xfer) { SpecialPowerModule::crc(xfer); }
+void CloudBreakSpecialPower::xfer(Xfer* xfer) { SpecialPowerModule::xfer(xfer); }
+void CloudBreakSpecialPower::loadPostProcess() { SpecialPowerModule::loadPostProcess(); }
+
+void TaintSpecialPower::crc(Xfer* xfer) { SpecialPowerModule::crc(xfer); }
+void TaintSpecialPower::xfer(Xfer* xfer) { SpecialPowerModule::xfer(xfer); }
+void TaintSpecialPower::loadPostProcess() { SpecialPowerModule::loadPostProcess(); }
+
+void UntamedAllegianceSpecialPower::crc(Xfer* xfer) { SpecialPowerModule::crc(xfer); }
+void UntamedAllegianceSpecialPower::xfer(Xfer* xfer) { SpecialPowerModule::xfer(xfer); }
+void UntamedAllegianceSpecialPower::loadPostProcess() { SpecialPowerModule::loadPostProcess(); }
 
 MonitorConditionUpdate::~MonitorConditionUpdate()
 {

@@ -2763,6 +2763,8 @@ Bool Player::addScience(ScienceType science)
 				{
 					power->onSpecialPowerCreation();
 					power->setReadyFrame(TheGameLogic->getFrame());
+					if (RetailFileLayers::enabled())
+						power->onScienceUnlocked();
 				}
 			}
 	};

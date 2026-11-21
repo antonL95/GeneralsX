@@ -60,6 +60,7 @@ public:
 	virtual const SpecialPowerTemplate* getSpecialPowerTemplate() const = 0;
 	virtual ScienceType getRequiredScience() const = 0;
 	virtual void onSpecialPowerCreation() = 0;
+	virtual void onScienceUnlocked() {}
 	virtual void setReadyFrame( UnsignedInt frame ) = 0;
 	virtual void pauseCountdown( Bool pause ) = 0;
 	virtual void doSpecialPower( UnsignedInt commandOptions ) = 0;
@@ -129,6 +130,7 @@ public:
 class SpecialPowerModule : public BehaviorModule,
 													 public SpecialPowerModuleInterface
 {
+	friend class WeaponModeSpecialPowerUpdate;
 
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( SpecialPowerModule, "SpecialPowerModule" )
 	MAKE_STANDARD_MODULE_MACRO( SpecialPowerModule )
