@@ -150,6 +150,8 @@ public:
 	Bool queueForPath(ObjectID id);	 ///< The object wants to request a pathfind, so put it on the list to process.
 	void processPathfindQueue(); ///< Process some or all of the queued pathfinds.
 	Bool hasLoadedReservations() const { return m_hasLoadedReservations; }
+	UnsignedInt getRetailRouteRevision() const { return m_retailRouteRevision; }
+	void noteRetailRouteOpening() { ++m_retailRouteRevision; }
 	void forceMapRecalculation();	///< Force pathfind map recomputation. If region is given, only that area is recomputed
 
 	/** Returns an aircraft path to the goal.  */
@@ -369,6 +371,7 @@ private:
 	Bool m_isMapReady;														///< True if all cells of map have been classified
 	Bool m_hasLoadedReservations = FALSE;
 	UnsignedInt m_savedZoneUpdateFrame = 0;
+	UnsignedInt m_retailRouteRevision = 1;
 	Bool m_isTunneling;														///< True if path started in an obstacle
 
 	Int m_frameToShowObstacles;										///< Time to redraw obstacles.  For debug output.

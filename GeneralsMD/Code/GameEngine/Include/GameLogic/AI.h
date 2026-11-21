@@ -426,6 +426,7 @@ struct AICommandParms
   DamageInfo							m_damage;
 	const CommandButton*		m_commandButton;
 	Path*										m_path;
+	Bool m_retailPlannerAttack = FALSE;
 
 	AICommandParms(AICommandType cmd, CommandSourceType cmdSource);
 };

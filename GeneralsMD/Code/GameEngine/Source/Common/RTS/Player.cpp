@@ -4247,6 +4247,10 @@ void Player::crc( Xfer *xfer )
 	{
 		HeroRoster::xferPlayer(this, xfer);
 		xferPowerProductionBonuses(xfer);
+		Bool hasPlanner = m_ai && m_ai->isSkirmishAI();
+		xfer->xferBool(&hasPlanner);
+		if (hasPlanner)
+			xfer->xferSnapshot(m_ai);
 	}
 
 }

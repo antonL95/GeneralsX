@@ -221,10 +221,13 @@ Bool HordeAIUpdate::issuePlannerOrder(Object* target, const Coord3D& position)
 	parms.m_obj = target;
 	parms.m_pos = position;
 	parms.m_intValue = NO_MAX_SHOTS_LIMIT;
-	if (!isAllowedToRespondToAiCommands(&parms))
+	if ((target && (target->isEffectivelyDead() || getObject()->getRelationship(target) != ENEMIES)) ||
+		!isAllowedToRespondToAiCommands(&parms))
 		return FALSE;
 	aiDoCommand(&parms);
 	m_plannerOrder = TRUE;
+	m_plannerOrderFrame = TheGameLogic->getFrame();
+	m_blockedPlannerRevision = 0;
 	return TRUE;
 }
 
@@ -308,10 +311,15 @@ void HordeAIUpdate::advance(const Coord3D& position)
 	if (m_order == AICMD_ATTACKMOVE_TO_POSITION || m_plannerOrder)
 	{
 		const Coord3D& origin = *getObject()->getPosition();
-		if (m_advanceAttempts && distanceSquared(m_advanceOrigin, origin) > sqr(FORMATION_REPATH_DISTANCE))
+		const UnsignedInt revision = TheAI->pathfinder()->getRetailRouteRevision();
+		if (m_advanceRouteRevision != revision ||
+			(m_advanceAttempts && distanceSquared(m_advanceOrigin, origin) > sqr(FORMATION_REPATH_DISTANCE) &&
+				distanceSquared(origin, position) < distanceSquared(m_advanceOrigin, position)))
 			m_advanceAttempts = 0;
 		if (m_advanceAttempts >= MAX_ADVANCE_ATTEMPTS)
 		{
+			if (m_plannerOrder)
+				m_blockedPlannerRevision = m_advanceRouteRevision;
 			m_order = NO_ORDER;
 			m_attackTarget = INVALID_ID;
 			m_engaging = FALSE;
@@ -321,6 +329,7 @@ void HordeAIUpdate::advance(const Coord3D& position)
 		}
 		if (!m_advanceAttempts)
 			m_advanceOrigin = origin;
+		m_advanceRouteRevision = revision;
 		++m_advanceAttempts;
 	}
 	privateMoveToPosition(&position, m_attackSource);
@@ -362,7 +371,12 @@ UpdateSleepTime HordeAIUpdate::update()
 	AIUpdateInterface::update();
 	m_updatingAnchor = FALSE;
 	if (reachingOrderEnd && isIdle() && m_attackTarget == INVALID_ID)
+	{
+		if (m_plannerOrder && distanceSquared(*horde->getPosition(), m_orderPosition) >
+			sqr(std::max(FORMATION_REPATH_DISTANCE, horde->getGeometryInfo().getBoundingCircleRadius())))
+			m_blockedPlannerRevision = m_advanceRouteRevision;
 		m_order = NO_ORDER;
+	}
 
 	const HordeContain* contain = HordeContain::get(horde);
 	if (!contain || horde->isEffectivelyDead())
@@ -539,12 +553,15 @@ void HordeAIUpdate::crc(Xfer* xfer)
 	xfer->xferBool(&m_plannerOrder);
 	xfer->xferInt(&m_advanceAttempts);
 	xfer->xferCoord3D(&m_advanceOrigin);
+	xfer->xferUnsignedInt(&m_advanceRouteRevision);
+	xfer->xferUnsignedInt(&m_plannerOrderFrame);
+	xfer->xferUnsignedInt(&m_blockedPlannerRevision);
 }
 
 void HordeAIUpdate::xfer(Xfer* xfer)
 {
-	XferVersion version = 4;
-	xfer->xferVersion(&version, 4);
+	XferVersion version = 5;
+	xfer->xferVersion(&version, 5);
 	AIUpdateInterface::xfer(xfer);
 	xfer->xferObjectID(&m_attackTarget);
 	xfer->xferUser(&m_attackSource, sizeof(m_attackSource));
@@ -560,6 +577,12 @@ void HordeAIUpdate::xfer(Xfer* xfer)
 		xfer->xferBool(&m_plannerOrder);
 		xfer->xferInt(&m_advanceAttempts);
 		xfer->xferCoord3D(&m_advanceOrigin);
+	}
+	if (version >= 5)
+	{
+		xfer->xferUnsignedInt(&m_advanceRouteRevision);
+		xfer->xferUnsignedInt(&m_plannerOrderFrame);
+		xfer->xferUnsignedInt(&m_blockedPlannerRevision);
 	}
 }
 

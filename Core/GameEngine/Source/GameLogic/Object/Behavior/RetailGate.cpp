@@ -180,8 +180,12 @@ UpdateSleepTime GateOpenAndCloseBehavior::update()
 		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND / 4);
 	const UnsignedInt frame = TheGameLogic->getFrame();
 	const auto* data = getGateOpenAndCloseBehaviorModuleData();
-	if (frame >= m_pathFrame)
+	if (frame >= m_pathFrame && m_passable != m_wantsOpen)
+	{
 		m_passable = m_wantsOpen;
+		if (m_passable && RetailFileLayers::enabled())
+			TheAI->pathfinder()->noteRetailRouteOpening();
+	}
 	if (m_soundPending && frame >= m_soundFrame)
 	{
 		playSound(m_wantsOpen ? data->m_openedSound : data->m_closedSound);

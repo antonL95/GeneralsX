@@ -198,6 +198,7 @@ void Pathfinder::reset()
 	// pathfind grid cells have not been classified yet
 	m_isMapReady = false;
 	m_hasLoadedReservations = FALSE;
+	m_retailRouteRevision = 1;
 	m_cumulativeCellsAllocated = 0;
 
 	debugPathPos.x = 0.0f;
@@ -551,6 +552,8 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 	}
 #endif
 	internal_classifyObjectFootprint(obj, insert);
+	if (!insert && obj->isEffectivelyDead() && RetailFileLayers::enabled())
+		noteRetailRouteOpening();
 }
 
 static Bool shapeOverlapsPathfindCell(const GeometryInfo& shape, Real dx, Real dy, Real c, Real s)
@@ -6101,6 +6104,8 @@ void Pathfinder::changeBridgeState( PathfindLayerEnum layer, Bool repaired)
 	if (m_layers[layer].isUnused()) return;
 	if (m_layers[layer].setDestroyed(!repaired)) {
 		m_zoneManager.markZonesDirty();
+		if (repaired && RetailFileLayers::enabled())
+			noteRetailRouteOpening();
 	}
 }
 
@@ -7606,6 +7611,8 @@ void Pathfinder::crc( Xfer *xfer )
 	CRCDEBUG_LOG(("m_wallHeight: %8.8X", ((XferCRC *)xfer)->getCRC()));
 	xfer->xferInt(&m_cumulativeCellsAllocated);
 	CRCDEBUG_LOG(("m_cumulativeCellsAllocated: %8.8X", ((XferCRC *)xfer)->getCRC()));
+	if (RetailFileLayers::enabled())
+		xfer->xferUnsignedInt(&m_retailRouteRevision);
 
 }
 
@@ -7614,7 +7621,7 @@ void Pathfinder::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -7707,6 +7714,8 @@ void Pathfinder::xfer( Xfer *xfer )
 		if (loading)
 			m_savedZoneUpdateFrame = zoneUpdateFrame;
 	}
+	if (version >= 4)
+		xfer->xferUnsignedInt(&m_retailRouteRevision);
 }
 
 //-----------------------------------------------------------------------------

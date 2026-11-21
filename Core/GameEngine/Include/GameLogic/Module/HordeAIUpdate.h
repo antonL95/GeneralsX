@@ -24,6 +24,10 @@ public:
 	static void retaliate(Object* victim, Object* attacker);
 	Bool hasAttackOrder() const { return m_attackTarget != INVALID_ID || m_order == AICMD_ATTACKMOVE_TO_POSITION; }
 	Bool isOnPlannerAdvance() const { return m_plannerOrder && m_order == AICMD_ATTACKMOVE_TO_POSITION; }
+	UnsignedInt blockedPlannerRevision(UnsignedInt issuedFrame) const
+	{
+		return issuedFrame == m_plannerOrderFrame ? m_blockedPlannerRevision : 0;
+	}
 	Bool isEngaging() const { return m_engaging; }
 
 private:
@@ -49,4 +53,7 @@ private:
 	Bool m_plannerOrder = FALSE;
 	Int m_advanceAttempts = 0;
 	Coord3D m_advanceOrigin{};
+	UnsignedInt m_advanceRouteRevision = 0;
+	UnsignedInt m_plannerOrderFrame = 0;
+	UnsignedInt m_blockedPlannerRevision = 0;
 };

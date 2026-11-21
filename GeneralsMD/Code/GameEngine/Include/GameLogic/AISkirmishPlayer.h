@@ -31,7 +31,7 @@
 #include "Common/GameMemory.h"
 #include "GameLogic/AIPlayer.h"
 
-#include <set>
+#include <map>
 #include <tuple>
 
 class BuildListInfo;
@@ -105,7 +105,7 @@ protected:
 protected:
 	void adjustBuildList(BuildListInfo *list);
 	void updateRetail();
-	void xferRetailObjectives(Xfer* xfer);
+	void xferRetailObjectives(Xfer* xfer, Bool hasRouteHistory);
 	Int getMyEnemyPlayerIndex();
 	void acquireEnemy();
 
@@ -121,6 +121,11 @@ protected:
 
 	UnsignedInt m_frameToCheckEnemy;
 	Player			*m_currentEnemy;
-	std::set<std::tuple<ObjectID, ObjectID, UnsignedInt>> m_retailObjectives;
+	struct RetailObjective
+	{
+		UnsignedInt issuedFrame = 0;
+		UnsignedInt blockedRevision = 0;
+	};
+	std::map<std::tuple<ObjectID, ObjectID, UnsignedInt>, RetailObjective> m_retailObjectives;
 
 };

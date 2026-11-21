@@ -2837,6 +2837,8 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 			break;
 		}
 		case AICMD_ATTACK_OBJECT:
+			if (parms->m_retailPlannerAttack && parms->m_obj)
+				m_retailPlannerAttackTarget = parms->m_obj->getID();
 			privateAttackObject(parms->m_obj, parms->m_intValue, parms->m_cmdSource);
 			break;
 		case AICMD_FORCE_ATTACK_OBJECT:
@@ -5570,13 +5572,18 @@ void AIUpdateInterface::braceForCrush(UnsignedInt deadline)
 
 Bool AIUpdateInterface::issueRetailPlannerAttack(Object* target)
 {
-	if (!target || getObject()->getRelationship(target) != ENEMIES || !canAcceptRetailPlannerOrder(TRUE))
+	if (!target || target->isEffectivelyDead() || getObject()->getRelationship(target) != ENEMIES ||
+		!canAcceptRetailPlannerOrder(TRUE))
 		return FALSE;
-	aiAttackObject(target, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
-	if (!isAttacking() || getGoalObject() != target)
-		return FALSE;
-	m_retailPlannerAttackTarget = target->getID();
-	return TRUE;
+	AICommandParms parms(AICMD_ATTACK_OBJECT, CMD_FROM_AI);
+	parms.m_obj = target;
+	parms.m_intValue = NO_MAX_SHOTS_LIMIT;
+	parms.m_retailPlannerAttack = TRUE;
+	aiDoCommand(&parms);
+	const Bool accepted = hasRetailPlannerAttack(target) && isAttacking() && getGoalObject() == target;
+	if (!accepted && hasRetailPlannerAttack(target))
+		m_retailPlannerAttackTarget = INVALID_ID;
+	return accepted;
 }
 
 Bool AIUpdateInterface::canAcceptRetailPlannerOrder(Bool attackObject) const

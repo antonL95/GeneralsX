@@ -1506,14 +1506,24 @@ void AISkirmishPlayer::updateRetail()
 
 	if (retailTuning.disableTacticalAI)
 		return;
+	const UnsignedInt routeRevision = TheAI->pathfinder()->getRetailRouteRevision();
 	for (auto it = m_retailObjectives.begin(); it != m_retailObjectives.end();)
 	{
-		const auto [unitID, targetID, owner] = *it;
+		const auto [unitID, targetID, owner] = it->first;
 		const Object* unit = TheGameLogic->findObjectByID(unitID);
 		const Object* target = TheGameLogic->findObjectByID(targetID);
 		if (!unit || unit->isEffectivelyDead() || unit->getControllingPlayer() != m_player ||
 			(targetID != INVALID_ID && (!target || target->isEffectivelyDead() ||
 				target->getTeam()->getID() != owner || m_player->getRelationship(target->getTeam()) != ENEMIES)))
+		{
+			it = m_retailObjectives.erase(it);
+			continue;
+		}
+		auto& order = it->second;
+		if (order.issuedFrame && !order.blockedRevision)
+			if (const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate"))))
+				order.blockedRevision = horde->blockedPlannerRevision(order.issuedFrame);
+		if (order.blockedRevision && order.blockedRevision != routeRevision)
 			it = m_retailObjectives.erase(it);
 		else
 			++it;
@@ -1530,8 +1540,8 @@ void AISkirmishPlayer::updateRetail()
 		if (!horde && ai->getCurrentStateID() == AI_ATTACK_MOVE_TO && ai->getLastCommandSource() == CMD_FROM_AI)
 		{
 			const auto former = m_retailObjectives.lower_bound({unit->getID(), INVALID_ID, 0});
-			scouting = former != m_retailObjectives.end() && std::get<0>(*former) == unit->getID() &&
-				std::get<1>(*former) == INVALID_ID;
+			scouting = former != m_retailObjectives.end() && std::get<0>(former->first) == unit->getID() &&
+				std::get<1>(former->first) == INVALID_ID;
 		}
 		if (ready || scouting)
 			wave.emplace_back(unit, ready);
@@ -1644,9 +1654,10 @@ void AISkirmishPlayer::updateRetail()
 			ai->aiAttackMoveToPosition(destination, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
 			accepted = !ai->isIdle();
 		}
-		m_retailObjectives.emplace(unit->getID(), target ? target->getID() : INVALID_ID, objectiveOwner);
 		if (!accepted)
 			continue;
+		m_retailObjectives.emplace(std::make_tuple(unit->getID(), target ? target->getID() : INVALID_ID, objectiveOwner),
+			RetailObjective{frame, 0});
 		++committed;
 		if (trace)
 			std::fprintf(stderr, "AI_TARGET\t%u\t%d\t%s\t%d\t%d\t%d\n", frame, playerIndex,
@@ -1887,7 +1898,7 @@ Bool AISkirmishPlayer::computeSuperweaponTarget(const SpecialPowerTemplate *powe
 void AISkirmishPlayer::crc( Xfer *xfer )
 {
 	if (RetailFileLayers::enabled())
-		xferRetailObjectives(xfer);
+		xferRetailObjectives(xfer, TRUE);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1899,7 +1910,7 @@ void AISkirmishPlayer::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1931,10 +1942,10 @@ void AISkirmishPlayer::xfer( Xfer *xfer )
 	xfer->xferReal( &m_curRightFlankRightDefenseAngle );
 
 	if (version >= 2)
-		xferRetailObjectives(xfer);
+		xferRetailObjectives(xfer, version >= 3);
 }
 
-void AISkirmishPlayer::xferRetailObjectives(Xfer* xfer)
+void AISkirmishPlayer::xferRetailObjectives(Xfer* xfer, Bool hasRouteHistory)
 {
 	UnsignedInt count = static_cast<UnsignedInt>(m_retailObjectives.size());
 	xfer->xferUnsignedInt(&count);
@@ -1949,15 +1960,25 @@ void AISkirmishPlayer::xferRetailObjectives(Xfer* xfer)
 			xfer->xferObjectID(&unit);
 			xfer->xferObjectID(&target);
 			xfer->xferUnsignedInt(&owner);
-			m_retailObjectives.emplace(unit, target, owner);
+			RetailObjective order{0, 1};
+			if (hasRouteHistory)
+			{
+				xfer->xferUnsignedInt(&order.issuedFrame);
+				xfer->xferUnsignedInt(&order.blockedRevision);
+			}
+			m_retailObjectives.emplace(std::make_tuple(unit, target, owner), order);
 		}
 	}
 	else
-		for (auto [unit, target, owner] : m_retailObjectives)
+		for (const auto& [key, history] : m_retailObjectives)
 		{
+			auto [unit, target, owner] = key;
+			auto order = history;
 			xfer->xferObjectID(&unit);
 			xfer->xferObjectID(&target);
 			xfer->xferUnsignedInt(&owner);
+			xfer->xferUnsignedInt(&order.issuedFrame);
+			xfer->xferUnsignedInt(&order.blockedRevision);
 		}
 }
 
