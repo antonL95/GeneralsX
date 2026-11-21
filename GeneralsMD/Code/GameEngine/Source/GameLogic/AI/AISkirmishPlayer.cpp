@@ -40,9 +40,11 @@
 #include "Common/BuildAssistant.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/HeroRoster.h"
@@ -52,10 +54,13 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
+#include "GameLogic/Module/GrantUpgradeCreate.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/RebuildHoleBehavior.h"
+#include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptEngine.h"
@@ -152,6 +157,86 @@ void parseDifficultyTuning(INI* ini, void* instance, void*, const void*)
 const CommandSet* retailCommands(const Object& object)
 {
 	return TheRetailCommandCatalog->findCommandSet(object.getCommandSetString());
+}
+
+Bool matchesArmyType(const ThingTemplate& actual, const ThingTemplate& planned)
+{
+	const auto names = [](const ThingTemplate& type, const AsciiString& name) {
+		const auto& equivalents = type.getRotWKObjectData().equivalentTo;
+		return std::any_of(equivalents.begin(), equivalents.end(), [&](const AsciiString& equivalent) {
+			return equivalent.compareNoCase(name) == 0;
+		});
+	};
+	return actual.isEquivalentTo(&planned) || names(actual, planned.getName()) || names(planned, actual.getName());
+}
+
+const ThingTemplate* automaticReplacement(const ThingTemplate& building)
+{
+	const auto triggerNames = [](const UpgradeModuleData& data) -> const std::vector<AsciiString>& {
+		const auto& mux = data.m_upgradeMuxData;
+		return mux.m_activationUpgradeNames.empty() ? mux.m_triggerUpgradeNames : mux.m_activationUpgradeNames;
+	};
+	const ModuleInfo& modules = building.getBehaviorModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		if (modules.getNthName(i) != "DoCommandUpgrade")
+			continue;
+		const auto* command = static_cast<const DoCommandUpgradeModuleData*>(modules.getNthData(i));
+		const CommandButton* button = TheRetailCommandCatalog->findCommandButton(command->m_grantCommand);
+		const UpgradeTemplate* upgrade = button ? button->getUpgradeTemplate() : nullptr;
+		const auto& triggers = triggerNames(*command);
+		if (!upgrade || button->getCommandType() != GUI_COMMAND_OBJECT_UPGRADE || triggers.size() != 1)
+			continue;
+		Bool automatic = FALSE;
+		for (Int j = 0; j < modules.getCount(); ++j)
+		{
+			if (modules.getNthName(j) == "GrantUpgradeCreate" &&
+				static_cast<const GrantUpgradeCreateModuleData*>(modules.getNthData(j))->m_upgradeName == triggers.front())
+				automatic = TRUE;
+		}
+		if (!automatic)
+			continue;
+		for (Int j = 0; j < modules.getCount(); ++j)
+		{
+			if (modules.getNthName(j) != "ReplaceSelfUpgrade")
+				continue;
+			const auto* replacement = static_cast<const ReplaceSelfUpgradeModuleData*>(modules.getNthData(j));
+			const auto& activators = triggerNames(*replacement);
+			if (activators.size() == 1 && activators.front() == upgrade->getUpgradeName() && !replacement->m_replacements.empty())
+				return TheThingFactory->findTemplate(replacement->m_replacements.front(), FALSE);
+		}
+	}
+	return nullptr;
+}
+
+void chooseRetailDwarvenEra(Player& player, Object& keep)
+{
+	const UpgradeTemplate* lotr = TheUpgradeCenter->findUpgrade("Upgrade_LotRErebor");
+	const UpgradeTemplate* hobbit = TheUpgradeCenter->findUpgrade("Upgrade_HobbitErebor");
+	const UpgradeTemplate* lotrAI = TheUpgradeCenter->findUpgrade("Upgrade_LotREreborAI");
+	const UpgradeTemplate* hobbitAI = TheUpgradeCenter->findUpgrade("Upgrade_HobbitEreborAI");
+	if (!lotr || !hobbit || !lotrAI || !hobbitAI ||
+		player.hasUpgradeComplete(lotrAI) || player.hasUpgradeComplete(hobbitAI))
+		return;
+	if (player.hasUpgradeComplete(lotr))
+		player.addUpgrade(lotrAI, UPGRADE_STATUS_COMPLETE);
+	else if (player.hasUpgradeComplete(hobbit))
+		player.addUpgrade(hobbitAI, UPGRADE_STATUS_COMPLETE);
+	else if (!player.hasUpgradeInProduction(lotr) && !player.hasUpgradeInProduction(hobbit))
+	{
+		const CommandSet* set = retailCommands(keep);
+		ProductionUpdateInterface* production = keep.getProductionUpdateInterface();
+		if (!set || !production || production->getProductionCount() != 0)
+			return;
+		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+		{
+			const CommandButton* button = set->getCommandButton(slot);
+			const UpgradeTemplate* upgrade = button ? button->getUpgradeTemplate() : nullptr;
+			if (upgrade && (upgrade == lotr || upgrade == hobbit) && button->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE &&
+				HeroRoster::buttonUpgradesMet(button, &player, &keep) && production->queueUpgrade(upgrade))
+				break;
+		}
+	}
 }
 
 Bool placeRetailBuilding(Object& builder, const ThingTemplate& type, const Coord3D& center)
@@ -1145,6 +1230,11 @@ void AISkirmishPlayer::updateRetail()
 	const Real elapsed = INT_TO_REAL(frame) / LOGICFRAMES_PER_SECOND;
 	const Int phase = elapsed < rules->rushSeconds ? 0 : elapsed < rules->rushSeconds + rules->midgameSeconds ? 1 : 2;
 	const ThingTemplate* farm = TheThingFactory->findTemplate(rules->farm, FALSE);
+	const auto isFarm = [farm](const ThingTemplate& type) {
+		return type.isKindOf(KINDOF_ECONOMY_STRUCTURE) || (farm && type.isEquivalentTo(farm));
+	};
+	static const Bool trace = std::getenv("GENERALSX_SKIRMISH_AI_TRACE") != nullptr;
+	const Int playerIndex = m_player->getPlayerIndex();
 	Int farms = 0;
 	Int farmLimit = rules->minimumFarms;
 	const GameDifficulty difficulty = m_player->getPlayerDifficulty();
@@ -1165,7 +1255,7 @@ void AISkirmishPlayer::updateRetail()
 		if (object->getControllingPlayer() != m_player || object->isEffectivelyDead())
 			continue;
 		owned.push_back(object);
-		if (farm && object->getTemplate()->isEquivalentTo(farm))
+		if (isFarm(*object->getTemplate()))
 			++farms;
 		if (object->isDisabled() || object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || object->getContainedBy())
 			continue;
@@ -1188,10 +1278,26 @@ void AISkirmishPlayer::updateRetail()
 		}
 	}
 
+	if (keep && m_player->getSide() == "Dwarves" && !retailTuning.disableUnitUpgrading)
+		chooseRetailDwarvenEra(*m_player, *keep);
+
 	const auto countType = [&](const ThingTemplate* type) {
 		return static_cast<Int>(std::count_if(owned.begin(), owned.end(), [type](const Object* object) {
 			return object->getTemplate()->isEquivalentTo(type);
 		}));
+	};
+	std::vector<std::pair<const ThingTemplate*, const RetailArmyMember*>> army;
+	for (const RetailArmyMember& member : rules->members)
+		if (const ThingTemplate* unit = TheThingFactory->findTemplate(member.type, FALSE))
+			army.emplace_back(unit, &member);
+	const auto armyWeight = [&](const ThingTemplate& unit, Bool anyPhase) {
+		Real weight = 0.0f;
+		for (const auto& [planned, member] : army)
+		{
+			if (matchesArmyType(unit, *planned))
+				weight = std::max(weight, anyPhase ? std::max({member->share[0], member->share[1], member->share[2]}) : member->share[phase]);
+		}
+		return weight;
 	};
 	const auto producesArmy = [&](const ThingTemplate& building) {
 		const CommandSet* set = TheRetailCommandCatalog->findCommandSet(building.friend_getCommandSetString());
@@ -1201,11 +1307,8 @@ void AISkirmishPlayer::updateRetail()
 		{
 			const CommandButton* button = set->getCommandButton(slot);
 			const ThingTemplate* unit = button ? static_cast<const ThingTemplate*>(button->getThingTemplate()) : nullptr;
-			if (!unit || button->getCommandType() != GUI_COMMAND_UNIT_BUILD)
-				continue;
-			for (const RetailArmyMember& member : rules->members)
-				if (member.share[phase] > 0.0f && unit->isEquivalentTo(TheThingFactory->findTemplate(member.type, FALSE)))
-					return TRUE;
+			if (unit && button->getCommandType() == GUI_COMMAND_UNIT_BUILD && armyWeight(*unit, FALSE) > 0.0f)
+				return TRUE;
 		}
 		return FALSE;
 	};
@@ -1216,7 +1319,7 @@ void AISkirmishPlayer::updateRetail()
 			const CommandSet* set = retailCommands(builder);
 			if (!set)
 				return FALSE;
-			const ThingTemplate* selected = nullptr;
+			const CommandButton* selected = nullptr;
 			Int priority = 0;
 			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 			{
@@ -1224,28 +1327,51 @@ void AISkirmishPlayer::updateRetail()
 				if (!button || button->getCommandType() != (plot ? GUI_COMMAND_FOUNDATION_CONSTRUCT : GUI_COMMAND_DOZER_CONSTRUCT))
 					continue;
 				const ThingTemplate* type = button->getThingTemplate();
-				if (!type || !m_player->canBuild(type) || !m_player->canAffordBuild(type))
+				if (!type || button->getRequiredRank() > builder.getExperienceTracker()->getRank() ||
+					!HeroRoster::buttonUpgradesMet(button, m_player, &builder))
 					continue;
-				const Bool economy = (farm && type->isEquivalentTo(farm)) || type->isKindOf(KINDOF_ECONOMY_STRUCTURE);
+				if (plot ? (!m_player->canBuild(type) || !m_player->canAffordBuild(type))
+					: TheBuildAssistant->canMakeUnit(&builder, type) != CANMAKE_OK)
+					continue;
+				const Bool economy = isFarm(*type);
 				Int score = 0;
-				if (economy && !retailTuning.disableEconomyBuilding && farms < farmLimit)
-					score = farms < 2 ? 3 : 1;
-				else if (!economy && countType(type) == 0 && producesArmy(*type))
-					score = 2;
-				else if (plot && farms >= 2 && soldiers.size() >= 2 &&
-					type->isKindOf(KINDOF_FS_BASE_DEFENSE) && countType(type) == 0)
-					score = 1;
+				if (economy)
+				{
+					if (!retailTuning.disableEconomyBuilding && farms < farmLimit)
+						score = farms < 2 ? 3 : 1;
+				}
+				else if (countType(type) == 0)
+				{
+					const ThingTemplate* replacement = automaticReplacement(*type);
+					if (producesArmy(*type) || (replacement && countType(replacement) == 0 && producesArmy(*replacement)))
+						score = 2;
+					else if (plot && farms >= 2 && soldiers.size() >= 2 && type->isKindOf(KINDOF_FS_BASE_DEFENSE))
+						score = 1;
+				}
 				if (score > priority)
 				{
 					priority = score;
-					selected = type;
+					selected = button;
 				}
 			}
 			if (!selected)
 				return FALSE;
-			if (plot)
-				return plot->construct(selected, m_player) != nullptr;
-			return placeRetailBuilding(builder, *selected, keep ? *keep->getPosition() : *builder.getPosition());
+			const ThingTemplate* type = selected->getThingTemplate();
+			const Bool built = plot ? plot->construct(type, m_player) != nullptr
+				: placeRetailBuilding(builder, *type, keep ? *keep->getPosition() : *builder.getPosition());
+			if (built)
+			{
+				if (isFarm(*type))
+					++farms;
+				if (trace)
+				{
+					std::fprintf(stderr, "AI_BUILD\t%u\t%d\t%s\t%s\t%d\t%d\t%d\n", frame, playerIndex,
+						selected->getName().str(), type->getName().str(),
+						HeroRoster::buttonUpgradesMet(selected, m_player, &builder), farms, farmLimit);
+					std::fflush(stderr);
+				}
+			}
+			return built;
 		};
 		for (Object* plot : plots)
 			if (buildFrom(*plot, FoundationAIUpdate::find(*plot)))
@@ -1261,11 +1387,34 @@ void AISkirmishPlayer::updateRetail()
 		const CommandSet* set = retailCommands(*producer);
 		if (!set || production->getProductionCount() != 0)
 			continue;
-		const auto train = [&](const ThingTemplate* unit) {
-			return unit && TheBuildAssistant->canMakeUnit(producer, unit) == CANMAKE_OK &&
-				production->queueCreateUnit(unit, production->requestUniqueUnitID());
+		const auto train = [&](const ThingTemplate* unit, const CommandButton* button) {
+			if (!unit || TheBuildAssistant->canMakeUnit(producer, unit) != CANMAKE_OK ||
+				!production->queueCreateUnit(unit, production->requestUniqueUnitID()))
+				return FALSE;
+			if (trace)
+			{
+				std::fprintf(stderr, "AI_TRAIN\t%u\t%d\t%s\t%s\t%d\n", frame, playerIndex,
+					button ? button->getName().str() : "hero-roster", unit->getName().str(),
+					button ? HeroRoster::buttonUpgradesMet(button, m_player, producer) : TRUE);
+				std::fflush(stderr);
+			}
+			return TRUE;
 		};
-		if (!retailTuning.disableUnitUpgrading && soldiers.size() >= 2 && farms >= 2)
+		const auto unlocksArmy = [&](const UpgradeTemplate* upgrade) {
+			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			{
+				const CommandButton* button = set->getCommandButton(slot);
+				const ThingTemplate* unit = button ? button->getThingTemplate() : nullptr;
+				if (!unit || button->getCommandType() != GUI_COMMAND_UNIT_BUILD || armyWeight(*unit, TRUE) <= 0.0f)
+					continue;
+				const auto& needed = button->getNeededUpgrades();
+				if (std::find(needed.begin(), needed.end(), upgrade) != needed.end() &&
+					!HeroRoster::buttonUpgradesMet(button, m_player, producer))
+					return TRUE;
+			}
+			return FALSE;
+		};
+		if (!retailTuning.disableUnitUpgrading && farms >= 2)
 		{
 			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 			{
@@ -1274,7 +1423,10 @@ void AISkirmishPlayer::updateRetail()
 				if (!upgrade || (button->getCommandType() != GUI_COMMAND_PLAYER_UPGRADE &&
 					button->getCommandType() != GUI_COMMAND_OBJECT_UPGRADE))
 					continue;
+				if (soldiers.size() < 2 && !unlocksArmy(upgrade))
+					continue;
 				if (m_player->getMoney()->countMoney() >= static_cast<UnsignedInt>(std::max(0, upgrade->calcCostToBuild(m_player))) &&
+					button->getRequiredRank() <= producer->getExperienceTracker()->getRank() &&
 					HeroRoster::buttonUpgradesMet(button, m_player, producer) && production->queueUpgrade(upgrade))
 					break;
 			}
@@ -1285,31 +1437,38 @@ void AISkirmishPlayer::updateRetail()
 			for (const AsciiString& name : rules->heroes)
 			{
 				const ThingTemplate* hero = TheThingFactory->findTemplate(name, FALSE);
-				if (hero && !HeroRoster::isAlive(m_player, hero) && train(hero))
+				if (hero && !HeroRoster::isAlive(m_player, hero) && train(hero, nullptr))
 					break;
 			}
 		if (production->getProductionCount() != 0)
 			continue;
-		const ThingTemplate* selected = nullptr;
+		const CommandButton* selected = nullptr;
 		Real priority = 0.0f;
-		for (const RetailArmyMember& member : rules->members)
+		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 		{
-			const ThingTemplate* unit = TheThingFactory->findTemplate(member.type, FALSE);
-			if (member.share[phase] <= 0.0f || !unit || TheBuildAssistant->canMakeUnit(producer, unit) != CANMAKE_OK)
+			const CommandButton* button = set->getCommandButton(slot);
+			const ThingTemplate* unit = button ? button->getThingTemplate() : nullptr;
+			if (!unit || button->getCommandType() != GUI_COMMAND_UNIT_BUILD)
 				continue;
-			const Real score = member.share[phase] / INT_TO_REAL(1 + countType(unit));
-			if (score > priority)
+			const Real weight = armyWeight(*unit, FALSE);
+			if (weight <= 0.0f)
+				continue;
+			const Real score = weight / INT_TO_REAL(1 + countType(unit));
+			if (score > priority && button->getRequiredRank() <= producer->getExperienceTracker()->getRank() &&
+				HeroRoster::buttonUpgradesMet(button, m_player, producer) && TheBuildAssistant->canMakeUnit(producer, unit) == CANMAKE_OK)
 			{
 				priority = score;
-				selected = unit;
+				selected = button;
 			}
 		}
-		train(selected);
+		if (selected)
+			train(selected->getThingTemplate(), selected);
 	}
 
 	if (retailTuning.disableTacticalAI || soldiers.size() < 2)
 		return;
 	Object* target = nullptr;
+	ObjectShroudStatus targetShroud = OBJECTSHROUD_INVALID;
 	Real distance = 0.0f;
 	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 	{
@@ -1319,20 +1478,54 @@ void AISkirmishPlayer::updateRetail()
 			object->isKindOf(KINDOF_BASE_FOUNDATION) ||
 			m_player->getRelationship(object->getTeam()) != ENEMIES)
 			continue;
+		const ObjectShroudStatus shroud = object->getShroudedStatus(playerIndex);
+		if (shroud != OBJECTSHROUD_CLEAR && shroud != OBJECTSHROUD_PARTIAL_CLEAR)
+			continue;
+		if (object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED))
+			continue;
 		const Real candidateDistance = ThePartitionManager->getDistanceSquared(soldiers.front(), object, FROM_CENTER_2D);
 		if (!target || candidateDistance < distance || (candidateDistance == distance && object->getID() < target->getID()))
 		{
 			target = object;
+			targetShroud = shroud;
 			distance = candidateDistance;
 		}
 	}
-	if (target)
-		for (Object* unit : soldiers)
+	const Coord3D* destination = target ? target->getPosition() : nullptr;
+	if (!destination)
+	{
+		for (Int i = 1; i <= MAX_PLAYER_COUNT; ++i)
 		{
-			const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
-			if (unit->getAI()->isIdle() && (!horde || !horde->hasAttackOrder()))
-				unit->getAI()->aiAttackMoveToPosition(target->getPosition(), NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
+			AsciiString name;
+			name.format("Player_%d_Start", i);
+			const Waypoint* start = TheTerrainLogic->getWaypointByName(name);
+			if (!start || ThePartitionManager->getShroudStatusForPlayer(playerIndex, start->getLocation()) == CELLSHROUD_CLEAR)
+				continue;
+			const Coord3D delta = *start->getLocation() - *soldiers.front()->getPosition();
+			const Real candidateDistance = delta.x * delta.x + delta.y * delta.y;
+			if (!destination || candidateDistance < distance)
+			{
+				destination = start->getLocation();
+				distance = candidateDistance;
+			}
 		}
+	}
+	if (!destination)
+		return;
+	for (Object* unit : soldiers)
+	{
+		const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
+		if (unit->getAI()->isIdle() && (!horde || !horde->hasAttackOrder()))
+		{
+			if (trace && target)
+			{
+				std::fprintf(stderr, "AI_TARGET\t%u\t%d\tattack\t%d\t%d\t%d\n", frame, playerIndex,
+					unit->getID(), target->getID(), targetShroud);
+				std::fflush(stderr);
+			}
+			unit->getAI()->aiAttackMoveToPosition(destination, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
+		}
+	}
 }
 
 //----------------------------------------------------------------------------------------------------------

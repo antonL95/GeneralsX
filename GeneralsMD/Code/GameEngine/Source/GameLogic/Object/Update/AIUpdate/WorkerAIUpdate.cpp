@@ -43,6 +43,7 @@
 #include "Common/RandomValue.h"
 #include "Common/GlobalData.h"
 #include "Common/ResourceGatheringManager.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Upgrade.h"
 
 #include "GameClient/Drawable.h"
@@ -353,6 +354,8 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 		Bool dozerIsAI = owningPlayer->getPlayerType() == PLAYER_COMPUTER;
 		if( dozerIsAI )
 		{
+			if (RetailFileLayers::enabled() && TheBuildAssistant->canMakeUnit(getObject(), what) != CANMAKE_OK)
+				return nullptr;
 
 			// validate the the position to build at is valid
 			if( TheBuildAssistant->isLocationLegalToBuild( pos, what, angle,

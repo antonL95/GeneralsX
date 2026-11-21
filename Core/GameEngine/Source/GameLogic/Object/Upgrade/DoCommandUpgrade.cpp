@@ -1,6 +1,7 @@
 #include "PreRTS.h"
 
 #include "Common/NameKeyGenerator.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/ControlBar.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Object.h"
@@ -28,11 +29,13 @@ AsciiString DoCommandUpgrade::getExecutionKey() const
 
 void DoCommandUpgrade::issueCommand(const AsciiString& name)
 {
-	if (TheControlBar && name.isNotEmpty() && !getObject()->isDestroyed())
-	{
-		if (const CommandButton* button = TheControlBar->findCommandButton(name))
-			getObject()->doCommandButton(button, CMD_FROM_SCRIPT);
-	}
+	if (name.isEmpty() || getObject()->isDestroyed())
+		return;
+	const CommandButton* button = RetailFileLayers::enabled() && TheRetailCommandCatalog
+		? TheRetailCommandCatalog->findCommandButton(name)
+		: (TheControlBar ? TheControlBar->findCommandButton(name) : nullptr);
+	if (button)
+		getObject()->doCommandButton(button, CMD_FROM_SCRIPT);
 }
 
 void DoCommandUpgrade::upgradeImplementation()

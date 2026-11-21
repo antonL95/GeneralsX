@@ -58,6 +58,7 @@
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
 #include "GameLogic/HeroRoster.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "Common/RetailFileLayers.h"
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
@@ -1340,7 +1341,10 @@ Bool BuildAssistant::isPossibleToMakeUnit( Object *builder, const ThingTemplate 
 		return FALSE;
 
 	// get the command set for the producer object
-	const CommandSet *commandSet = TheControlBar->findCommandSet( builder->getCommandSetString() );
+	const Bool retail = RetailFileLayers::enabled();
+	const CommandSet *commandSet = retail
+		? (TheRetailCommandCatalog ? TheRetailCommandCatalog->findCommandSet(builder->getCommandSetString()) : nullptr)
+		: TheControlBar->findCommandSet(builder->getCommandSetString());
 
 	// if no command set we cannot build anything
 	if( commandSet == nullptr )
@@ -1361,7 +1365,7 @@ Bool BuildAssistant::isPossibleToMakeUnit( Object *builder, const ThingTemplate 
 	//
 	const CommandButton *commandButton;
 	const CommandButton *foundCommand = nullptr;
-	const Int commandCount = RetailFileLayers::enabled() ? (Int)CommandButtonRules::RETAIL_COMMANDS_PER_SET : (Int)MAX_COMMANDS_PER_SET;
+	const Int commandCount = retail ? (Int)CommandButtonRules::RETAIL_COMMANDS_PER_SET : (Int)MAX_COMMANDS_PER_SET;
 	Int i;
 	for( i = 0; i < commandCount; i++ )
 	{
@@ -1371,11 +1375,12 @@ Bool BuildAssistant::isPossibleToMakeUnit( Object *builder, const ThingTemplate 
 		if( commandButton &&
 				(commandButton->getCommandType() == GUI_COMMAND_UNIT_BUILD || commandButton->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT) &&
 				commandButton->getThingTemplate() && commandButton->getThingTemplate()->isEquivalentTo(whatToBuild) &&
-				(!RetailFileLayers::enabled() || HeroRoster::buttonUpgradesMet(commandButton, builder->getControllingPlayer(), builder)) )
+				(!retail || (commandButton->getRequiredRank() <= builder->getExperienceTracker()->getRank() &&
+					HeroRoster::buttonUpgradesMet(commandButton, builder->getControllingPlayer(), builder))) )
 			foundCommand = commandButton;
 
 	}
-	if( foundCommand == nullptr && RetailFileLayers::enabled() &&
+	if( foundCommand == nullptr && retail &&
 			HeroRoster::isReviveTemplateInSet( commandSet, builder->getControllingPlayer(), builder, whatToBuild ) )
 		return builder->getControllingPlayer()->canBuild( whatToBuild );
 
@@ -1385,7 +1390,7 @@ Bool BuildAssistant::isPossibleToMakeUnit( Object *builder, const ThingTemplate 
 	// make sure that the player can actually make this unit by checking prereqs and such
 	Player *player = builder->getControllingPlayer();
 	const ThingTemplate* commandTemplate = foundCommand->getThingTemplate();
-	if( player->canBuild( RetailFileLayers::enabled() ? whatToBuild : commandTemplate ) == FALSE )
+	if( player->canBuild( retail ? whatToBuild : commandTemplate ) == FALSE )
 		return FALSE;
 
 	// all is well

@@ -168,6 +168,7 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 
 	const Real range = data->m_specialPowerRange > 0.0f ? data->m_specialPowerRange : data->m_specialPowerRadius;
 	Object* best = nullptr;
+	ObjectShroudStatus bestShroud = OBJECTSHROUD_INVALID;
 	Real bestScore = 0.0f;
 	for (Object* target = TheGameLogic->getFirstObject(); target; target = target->getNextObject())
 	{
@@ -175,6 +176,11 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 			(target->getContainedBy() && !(heal && HordeContain::get(target->getContainedBy()))))
 			continue;
 		const Relationship relationship = source->getRelationship(target);
+		const auto shroud = target->getShroudedStatus(player->getPlayerIndex());
+		if (shroud != OBJECTSHROUD_CLEAR && shroud != OBJECTSHROUD_PARTIAL_CLEAR)
+			continue;
+		if (relationship == ENEMIES && target->testStatus(OBJECT_STATUS_STEALTHED) && !target->testStatus(OBJECT_STATUS_DETECTED))
+			continue;
 		const Bool building = target->isKindOf(KINDOF_STRUCTURE);
 		AIUpdateInterface* ai = target->getAI();
 		Real score = 0.0f;
@@ -212,10 +218,18 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		if (data->m_spellMakesAStructure && positionTarget && target->isKindOf(KINDOF_IMMOBILE))
 			continue;
 		best = target;
+		bestShroud = shroud;
 		bestScore = score;
 	}
 	if (best)
 	{
+		static const Bool trace = std::getenv("GENERALSX_SKIRMISH_AI_TRACE") != nullptr;
+		if (trace && (objectTarget || positionTarget))
+		{
+			std::fprintf(stderr, "AI_TARGET\t%u\t%d\t%s\t%d\t%d\t%d\n", TheGameLogic->getFrame(),
+				player->getPlayerIndex(), power->getName().str(), source->getID(), best->getID(), bestShroud);
+			std::fflush(stderr);
+		}
 		if (objectTarget)
 			source->doSpecialPowerAtObject(power, best, options);
 		else if (positionTarget)

@@ -18,6 +18,7 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/CastleRules.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
@@ -45,7 +46,8 @@ Bool commandSetOffers(const Object& foundation, const ThingTemplate& what)
 			!button->getThingTemplate() || !button->getThingTemplate()->isEquivalentTo(&what))
 			continue;
 #if RTS_ZEROHOUR
-		if (!HeroRoster::buttonUpgradesMet(button, foundation.getControllingPlayer(), &foundation))
+		if (button->getRequiredRank() > foundation.getExperienceTracker()->getRank() ||
+			!HeroRoster::buttonUpgradesMet(button, foundation.getControllingPlayer(), &foundation))
 			continue;
 #endif
 		return TRUE;

@@ -1745,8 +1745,15 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 		}
 
 		// if the target is in the shroud, we can't do anything
+		const Bool retailAI = RetailFileLayers::enabled() && commandSource == CMD_FROM_AI;
 		if (isObjectShroudedForAction(obj, target, commandSource))
 			return FALSE;
+		if (retailAI)
+		{
+			const auto shroud = target->getShroudedStatus(obj->getControllingPlayer()->getPlayerIndex());
+			if (shroud != OBJECTSHROUD_CLEAR && shroud != OBJECTSHROUD_PARTIAL_CLEAR)
+				return FALSE;
+		}
 
 		if (RetailFileLayers::enabled() && !mod->isValidPowerTarget(target))
 			return FALSE;

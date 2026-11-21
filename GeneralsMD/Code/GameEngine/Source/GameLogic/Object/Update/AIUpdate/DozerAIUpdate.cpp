@@ -1878,9 +1878,8 @@ Object *DozerAIUpdate::construct( const ThingTemplate *what,
 		Bool dozerIsAI = owningPlayer->getPlayerType() == PLAYER_COMPUTER;
 		if( dozerIsAI )
 		{
-
-			// Just build it.  The ai will validate, or cheat.  jba.
-
+			if (RetailFileLayers::enabled() && TheBuildAssistant->canMakeUnit(getObject(), what) != CANMAKE_OK)
+				return nullptr;
 		}
 		else
 		{

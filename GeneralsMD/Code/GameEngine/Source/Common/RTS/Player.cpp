@@ -2418,7 +2418,7 @@ Bool Player::allowedToBuild(const ThingTemplate *tmplate) const
 
 void Player::setBuildingAllowed(const ThingTemplate* type, Bool allowed)
 {
-	if (!type || !type->isKindOf(KINDOF_STRUCTURE))
+	if (!type)
 		return;
 	const auto entry = std::find(m_forbiddenBuildings.begin(), m_forbiddenBuildings.end(), type->getName());
 	if (allowed && entry != m_forbiddenBuildings.end())
