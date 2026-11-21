@@ -88,6 +88,9 @@
 #include "GameNetwork/NetworkInterface.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/RotwkAbilityModules.h"
+#endif
 
 
 
@@ -500,6 +503,29 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onDoSwitchWeapons(msg, currentlySelectedGroup);
 			break;
 		}
+#if !RTS_GENERALS
+		case GameMessage::MSG_RETAIL_AUTO_ABILITY:
+		{
+			if (!TheRetailCommandCatalog || msg->getArgumentCount() != 2 ||
+				msg->getArgumentDataType(0) != ARGUMENTDATATYPE_OBJECTID ||
+				msg->getArgumentDataType(1) != ARGUMENTDATATYPE_INTEGER)
+				break;
+			Object* source = findObjectByID(msg->getArgument(0)->objectID);
+			if (!source || source->getControllingPlayer() != msgPlayer || source->isEffectivelyDead())
+				break;
+			const Int slot = msg->getArgument(1)->integer;
+			if (slot < 0 || slot >= CommandButtonRules::RETAIL_COMMANDS_PER_SET)
+				break;
+			const CommandSet* set = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
+			const CommandButton* button = set ? set->getCommandButton(slot) : nullptr;
+			if (button && button->isAutoAbility() && button->getSpecialPowerTemplate())
+			{
+				if (AutoAbilityBehavior* behavior = AutoAbilityBehavior::find(source, button->getSpecialPowerTemplate()))
+					behavior->setToggledState(behavior->isAutoActive() ? -1 : 1);
+			}
+			break;
+		}
+#endif
 		case GameMessage::MSG_RETAIL_HORDE_COMMAND:
 		{
 			if (!RetailFileLayers::enabled() || !currentlySelectedGroup || !TheControlBar ||

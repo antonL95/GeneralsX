@@ -99,6 +99,22 @@ class SpecialPowerTemplate : public Overridable
 public:
 
   SpecialPowerTemplate();
+
+	enum RetailFlag
+	{
+		RETAIL_NEEDS_TARGET = 1 << 0,
+		RETAIL_WATER_OK = 1 << 1,
+		RETAIL_NEEDS_OBJECT_FILTER = 1 << 2,
+		RETAIL_LIMIT_DISTANCE = 1 << 3,
+		RETAIL_NO_FORBIDDEN_OBJECTS = 1 << 4,
+		RETAIL_PATHABLE_ONLY = 1 << 6,
+	};
+
+	Bool hasRetailFlag(RetailFlag flag) const { return (getFO()->m_flags & flag) != 0; }
+	const SpecialPowerObjectFilter& getObjectFilter() const { return getFO()->m_objectFilter; }
+	const SpecialPowerObjectFilter& getForbiddenObjectFilter() const { return getFO()->m_forbiddenObjectFilter; }
+	Real getForbiddenObjectRange() const { return getFO()->m_forbiddenObjectRange; }
+	Real getMaxCastRange() const { return getFO()->m_maxCastRange; }
 	// virtual destructor prototype provided by MemoryPoolObject
 
 	static const FieldParse* getFieldParse() { return m_specialPowerFieldParse; }

@@ -50,15 +50,16 @@ void ControlBar::parseCommandButtonDefinition( INI *ini )
 {
 	// read the name
 	AsciiString name = ini->getNextToken();
-	if (ini->skipBlockWithoutOwner(TheControlBar, "CommandButton"))
+	CommandCatalog* catalog = CommandCatalog::forINI();
+	if (ini->skipBlockWithoutOwner(catalog, "CommandButton"))
 		return;
 
 	// find existing item if present
-	CommandButton *button = TheControlBar->findNonConstCommandButton( name );
+	CommandButton *button = catalog->findNonConstCommandButton( name );
 	if( button == nullptr )
 	{
 		// allocate a new item
-		button = TheControlBar->newCommandButton( name );
+		button = catalog->newCommandButton( name );
 		if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
 		{
 			button->markAsOverride();
@@ -70,7 +71,7 @@ void ControlBar::parseCommandButtonDefinition( INI *ini )
 	}
 	else
 	{
-		button = TheControlBar->newCommandButtonOverride( button );
+		button = catalog->newCommandButtonOverride( button );
 	}
 
 	// parse the ini definition

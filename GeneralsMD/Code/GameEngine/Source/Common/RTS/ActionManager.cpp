@@ -1488,6 +1488,81 @@ inline Bool isPointOnMap( const Coord3D  *testPos )
 
 }
 
+static Bool retailPowerLocationAllowed(const Object* source, const Coord3D* location, const SpecialPowerTemplate* power)
+{
+	if (!location || !isPointOnMap(location))
+		return FALSE;
+	if (!power->hasRetailFlag(SpecialPowerTemplate::RETAIL_WATER_OK) && TheTerrainLogic->isUnderwater(location->x, location->y))
+		return FALSE;
+	if (power->hasRetailFlag(SpecialPowerTemplate::RETAIL_PATHABLE_ONLY) && TheTerrainLogic->isCliffCell(location->x, location->y))
+		return FALSE;
+	const Real maxRange = power->getMaxCastRange();
+	if (power->hasRetailFlag(SpecialPowerTemplate::RETAIL_LIMIT_DISTANCE) && maxRange > 0 &&
+		ThePartitionManager->getDistanceSquared(source, location, FROM_CENTER_2D) > maxRange * maxRange)
+		return FALSE;
+	const Real forbiddenRange = power->getForbiddenObjectRange();
+	if (power->hasRetailFlag(SpecialPowerTemplate::RETAIL_NO_FORBIDDEN_OBJECTS) && forbiddenRange > 0)
+	{
+		SimpleObjectIterator* objects = ThePartitionManager->iterateObjectsInRange(location, forbiddenRange, FROM_CENTER_2D);
+		MemoryPoolObjectHolder holder(objects);
+		for (const Object* candidate = objects->first(); candidate; candidate = objects->next())
+		{
+			if (!candidate->isEffectivelyDead() && power->getForbiddenObjectFilter().matchesTemplate(*candidate->getTemplate()))
+				return FALSE;
+		}
+	}
+	switch (power->getSpecialPowerType())
+	{
+		case SPECIAL_REVEAL_MAP_AREA:
+		case SPECIAL_SPELL_BOOK_EYE_OF_SAURON:
+		case SPECIAL_SPELL_BOOK_PALANTIR_VISION:
+			return TRUE;
+		default:
+			break;
+	}
+	const Player* player = source->getControllingPlayer();
+	return player && ThePartitionManager->getShroudStatusForPlayer(player->getPlayerIndex(), location) != CELLSHROUD_SHROUDED;
+}
+
+static Bool retailPowerObjectAllowed(const Object* source, const Object* target,
+	const SpecialPowerTemplate* power, const CommandButton* button, UnsignedInt options)
+{
+	const Relationship relationship = source->getRelationship(target);
+	const UnsignedInt relationshipOption = relationship == ENEMIES ? NEED_TARGET_ENEMY_OBJECT :
+		relationship == ALLIES ? NEED_TARGET_ALLY_OBJECT : NEED_TARGET_NEUTRAL_OBJECT;
+	if ((options & COMMAND_OPTION_NEED_OBJECT_TARGET) && !(options & relationshipOption))
+		return FALSE;
+	if (button && !(options & COMMAND_OPTION_NEED_OBJECT_TARGET))
+		return FALSE;
+	if (target->isKindOf(KINDOF_SHRUBBERY) && !(options & ALLOW_SHRUBBERY_TARGET))
+		return FALSE;
+	if (target->isKindOf(KINDOF_ROCK) &&
+		(!button || !button->hasRotwkOption(CommandButtonRules::ROTWK_ALLOW_ROCK_TARGET)))
+		return FALSE;
+	if (relationship != ALLIES && target->testStatus(OBJECT_STATUS_STEALTHED) &&
+		!target->testStatus(OBJECT_STATUS_DETECTED) && !target->testStatus(OBJECT_STATUS_DISGUISED))
+		return FALSE;
+	if (power->hasRetailFlag(SpecialPowerTemplate::RETAIL_NEEDS_OBJECT_FILTER) &&
+		!power->getObjectFilter().matchesTemplate(*target->getTemplate()))
+		return FALSE;
+	const Real maxRange = power->getMaxCastRange();
+	if (power->hasRetailFlag(SpecialPowerTemplate::RETAIL_LIMIT_DISTANCE) && maxRange > 0 &&
+		ThePartitionManager->getDistanceSquared(source, target, FROM_CENTER_2D) > maxRange * maxRange)
+		return FALSE;
+	switch (power->getSpecialPowerType())
+	{
+		case SPECIAL_AT_VISIBLE_GROUNDED_OBJECT:
+			return !target->isAirborneTarget();
+		case SPECIAL_REPAIR_STRUCTURE:
+			return relationship == ALLIES && target->isKindOf(KINDOF_STRUCTURE);
+		case SPECIAL_DOMINATE_ENEMY:
+		case SPECIAL_CURSE_ENEMY:
+			return relationship == ENEMIES;
+		default:
+			return TRUE;
+	}
+}
+
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
@@ -1514,9 +1589,13 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 			}
 		}
 
-		// First check terrain type, if it is cared about.  Don't return a true, since there are more checks.
 		if( RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2 )
-			return TRUE;
+		{
+			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
+			const UnsignedInt options = button ? button->getOptions() : commandOptions;
+			return (!button || (button->isMountStateAllowed(obj) && (options & NEED_TARGET_POS))) &&
+				retailPowerLocationAllowed(obj, loc, spTemplate);
+		}
 
 		switch( spTemplate->getSpecialPowerType() )
 		{
@@ -1678,7 +1757,11 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 			return FALSE;
 
 		if( RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2 )
-			return TRUE;
+		{
+			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
+			return (!button || button->isMountStateAllowed(obj)) &&
+				retailPowerObjectAllowed(obj, target, spTemplate, button, button ? button->getOptions() : commandOptions);
+		}
 
 		switch( spTemplate->getSpecialPowerType() )
 		{
@@ -1932,7 +2015,12 @@ Bool ActionManager::canDoSpecialPower( const Object *obj, const SpecialPowerTemp
 		}
 
 		if( RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2 )
-			return TRUE;
+		{
+			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
+			const UnsignedInt options = button ? button->getOptions() : commandOptions;
+			return (!button || button->isMountStateAllowed(obj)) && !(options & (COMMAND_OPTION_NEED_OBJECT_TARGET | NEED_TARGET_POS)) &&
+				!spTemplate->hasRetailFlag(SpecialPowerTemplate::RETAIL_NEEDS_TARGET);
+		}
 
 		switch( spTemplate->getSpecialPowerType() )
 		{

@@ -193,10 +193,10 @@ public:
 	MonitorConditionUpdate( Thing *thing, const ModuleData *moduleData );
 
 	virtual UpdateSleepTime update() override;
+	const AsciiString& getActiveCommandSet() const;
 
 private:
-	Bool watch( Bool conditionMet, const AsciiString &toggleSet, AsciiString &savedSet );
-
+	AsciiString m_lastCommandSet;
 	AsciiString m_savedWeaponSet;
 	AsciiString m_savedModelSet;
 };
@@ -244,9 +244,9 @@ public:
 	static AutoAbilityBehavior *find( Object *obj, const SpecialPowerTemplate *power );
 
 private:
-	Bool queryMatches( const AutoAbilityQuery &query, Object *&target );
+	Bool queryMatches( const AutoAbilityQuery &query, const CommandButton *button, Object *&target );
 	Bool objectMatches( const SpecialPowerObjectFilter &filter, const Object *other ) const;
-	void cast( SpecialPowerModuleInterface *power, Object *target );
+	Bool cast( const CommandButton *button, Object *target );
 
 	Int m_toggledState = 0;
 	UnsignedInt m_idleSinceFrame = 0;

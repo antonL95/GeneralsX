@@ -92,6 +92,7 @@
 #include "GameLogic/SidesList.h"
 
 #include "GameClient/ClientInstance.h"
+#include "GameClient/ControlBar.h"
 #include "GameClient/Display.h"
 #include "GameClient/FXList.h"
 #include "GameClient/GameClient.h"
@@ -865,6 +866,8 @@ void GameEngine::init()
 		TheNameKeyGenerator->dumpIfRequested("thingFactory");
 		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
 		ExperienceLevelStore::load();
+		if (RetailFileLayers::enabled())
+			initSubsystem(TheRetailCommandCatalog, "TheRetailCommandCatalog", NEW CommandCatalog, nullptr);
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), nullptr);
 		TheNameKeyGenerator->dumpIfRequested("gameClient");
 

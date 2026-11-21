@@ -8,9 +8,11 @@
 #include <string>
 
 #include "Common/AbilityRules.h"
+#include "Common/ActionManager.h"
 #include "Common/GameAudio.h"
 #include "Common/INIAudit.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -18,6 +20,7 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/AIStateMachine.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
@@ -57,21 +60,6 @@ SpecialPowerModule* powerModuleOf(Object* obj, const SpecialPowerTemplate* power
 	return power ? static_cast<SpecialPowerModule*>(obj->getSpecialPowerModule(power)) : nullptr;
 }
 
-const CommandButton* buttonFor(const Object* obj, const SpecialPowerTemplate* power)
-{
-	if (!TheControlBar)
-		return nullptr;
-	const CommandSet* set = TheControlBar->findCommandSet(obj->getCommandSetString());
-	if (!set)
-		return nullptr;
-	for (Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
-	{
-		const CommandButton* button = set->getCommandButton(i);
-		if (button && button->getSpecialPowerTemplate() == power)
-			return button;
-	}
-	return nullptr;
-}
 }
 
 void WeaponFireSpecialAbilityUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -504,37 +492,34 @@ MonitorConditionUpdate::MonitorConditionUpdate(Thing* thing, const ModuleData* m
 {
 }
 
-Bool MonitorConditionUpdate::watch(Bool conditionMet, const AsciiString& toggleSet, AsciiString& savedSet)
+const AsciiString& MonitorConditionUpdate::getActiveCommandSet() const
 {
-	Object* self = getObject();
-	const Bool usingToggle = self->getCommandSetString() == toggleSet;
-	switch (AbilityRules::monitorCommandSet(conditionMet, usingToggle))
-	{
-		case AbilityRules::CommandSetChoice::UseToggle:
-			savedSet = self->getCommandSetString();
-			self->setCommandSetStringOverride(toggleSet);
-			return TRUE;
-		case AbilityRules::CommandSetChoice::Restore:
-			self->setCommandSetStringOverride(savedSet);
-			return TRUE;
-		default:
-			return FALSE;
-	}
+	const MonitorConditionUpdateModuleData* data = getMonitorConditionUpdateModuleData();
+	const Object* self = getObject();
+	ModelConditionFlags conditions = self->getLogicModelConditions();
+	const AIUpdateInterface* ai = self->getAI();
+	if (ai && ai->getAIStateType() == AI_ATTACK_POSITION)
+		conditions.set(MODELCONDITION_ATTACKING_POSITION);
+	if (data->m_modelConditionCommandSet.isNotEmpty() && data->m_modelConditionFlags.any() &&
+		conditions.testForAll(data->m_modelConditionFlags))
+		return data->m_modelConditionCommandSet;
+	if (data->m_weaponToggleCommandSet.isNotEmpty() && data->m_weaponSetFlags.any() &&
+		self->getWeaponSetFlags().testForAll(data->m_weaponSetFlags))
+		return data->m_weaponToggleCommandSet;
+	return AsciiString::TheEmptyString;
 }
 
 UpdateSleepTime MonitorConditionUpdate::update()
 {
-	const MonitorConditionUpdateModuleData* data = getMonitorConditionUpdateModuleData();
-	Object* self = getObject();
-	Bool changed = FALSE;
-	if (data->m_weaponToggleCommandSet.isNotEmpty() && data->m_weaponSetFlags.any())
-		changed |= watch(self->getWeaponSetFlags().testForAll(data->m_weaponSetFlags), data->m_weaponToggleCommandSet, m_savedWeaponSet);
-	const Drawable* draw = self->getDrawable();
-	if (draw && data->m_modelConditionCommandSet.isNotEmpty() && data->m_modelConditionFlags.any())
-		changed |= watch(draw->getModelConditionFlags().testForAll(data->m_modelConditionFlags), data->m_modelConditionCommandSet, m_savedModelSet);
-	if (changed && TheControlBar && self->getDrawable() && self->getDrawable()->isSelected())
-		TheControlBar->markUIDirty();
-	return UPDATE_SLEEP_NONE;
+	const AsciiString& current = getObject()->getCommandSetString();
+	if (current != m_lastCommandSet)
+	{
+		m_lastCommandSet = current;
+		const Drawable* draw = getObject()->getDrawable();
+		if (TheControlBar && draw && draw->isSelected())
+			TheControlBar->markUIDirty();
+	}
+	return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND / 5);
 }
 
 void MonitorConditionUpdate::crc(Xfer* xfer)
@@ -544,16 +529,25 @@ void MonitorConditionUpdate::crc(Xfer* xfer)
 
 void MonitorConditionUpdate::xfer(Xfer* xfer)
 {
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
+	XferVersion version = 2;
+	xfer->xferVersion(&version, 2);
 	UpdateModule::xfer(xfer);
-	xfer->xferAsciiString(&m_savedWeaponSet);
-	xfer->xferAsciiString(&m_savedModelSet);
+	if (version == 1)
+	{
+		xfer->xferAsciiString(&m_savedWeaponSet);
+		xfer->xferAsciiString(&m_savedModelSet);
+	}
 }
 
 void MonitorConditionUpdate::loadPostProcess()
 {
 	UpdateModule::loadPostProcess();
+	Object* self = getObject();
+	const MonitorConditionUpdateModuleData* data = getMonitorConditionUpdateModuleData();
+	if (m_savedModelSet.isNotEmpty() && self->getBaseCommandSetString() == data->m_modelConditionCommandSet)
+		self->setCommandSetStringOverride(m_savedModelSet);
+	if (m_savedWeaponSet.isNotEmpty() && self->getBaseCommandSetString() == data->m_weaponToggleCommandSet)
+		self->setCommandSetStringOverride(m_savedWeaponSet);
 }
 
 void AutoAbilityBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -639,6 +633,13 @@ Bool AutoAbilityBehavior::objectMatches(const SpecialPowerObjectFilter& filter, 
 	const Object* self = getObject();
 	if (other->isEffectivelyDead() || other->isDestroyed())
 		return FALSE;
+	const Player* player = self->getControllingPlayer();
+	if (!player || other->getShroudedStatus(player->getPlayerIndex()) >= OBJECTSHROUD_FOGGED)
+		return FALSE;
+	if (self->getRelationship(other) != ALLIES &&
+		other->testStatus(OBJECT_STATUS_STEALTHED) && !other->testStatus(OBJECT_STATUS_DETECTED) &&
+		!other->testStatus(OBJECT_STATUS_DISGUISED))
+		return FALSE;
 
 	AbilityRules::RelationFilter relations;
 	relations.self = hasRule(filter, RULE_SELF);
@@ -678,18 +679,25 @@ Bool AutoAbilityBehavior::objectMatches(const SpecialPowerObjectFilter& filter, 
 	return AbilityRules::queryIncludes(mode, candidate);
 }
 
-Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, Object*& target)
+Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, const CommandButton* button, Object*& target)
 {
 	const AutoAbilityBehaviorModuleData* data = getAutoAbilityBehaviorModuleData();
 	Object* self = getObject();
+	const UnsignedInt options = button->getOptions();
+	const Bool needsObject = (options & COMMAND_OPTION_NEED_OBJECT_TARGET) != 0;
+	const auto eligible = [&](Object* candidate)
+	{
+		return !needsObject || TheActionManager->canDoSpecialPowerAtObject(self, candidate, CMD_FROM_AI, getSpecialAbility(), options);
+	};
 	Int count = 0;
 	Object* first = nullptr;
 	if (data->m_allowSelf && objectMatches(query.m_filter, self))
 	{
-		first = self;
+		if (eligible(self))
+			first = self;
 		++count;
 	}
-	if (count >= query.m_count)
+	if (count >= query.m_count && (first || !needsObject))
 	{
 		target = first;
 		return TRUE;
@@ -706,9 +714,9 @@ Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, Object*& t
 			continue;
 		if (!objectMatches(query.m_filter, other))
 			continue;
-		if (!first)
+		if (!first && eligible(other))
 			first = other;
-		if (++count >= query.m_count)
+		if (++count >= query.m_count && first)
 		{
 			target = first;
 			return TRUE;
@@ -717,20 +725,29 @@ Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, Object*& t
 	return FALSE;
 }
 
-void AutoAbilityBehavior::cast(SpecialPowerModuleInterface* power, Object* target)
+Bool AutoAbilityBehavior::cast(const CommandButton* button, Object* target)
 {
 	Object* self = getObject();
-	const CommandButton* button = buttonFor(self, getSpecialAbility());
-	const UnsignedInt options = button ? button->getOptions() : 0;
-	if ((options & (NEED_TARGET_ENEMY_OBJECT | NEED_TARGET_NEUTRAL_OBJECT | NEED_TARGET_ALLY_OBJECT)) && target)
-		power->doSpecialPowerAtObject(target, 0);
+	const SpecialPowerTemplate* power = getSpecialAbility();
+	const UnsignedInt options = button->getOptions();
+	if (options & COMMAND_OPTION_NEED_OBJECT_TARGET)
+	{
+		self->doSpecialPowerAtObject(power, target, options);
+	}
 	else if (options & NEED_TARGET_POS)
 	{
 		const Coord3D position = target ? *target->getPosition() : *self->getPosition();
-		power->doSpecialPowerAtLocation(&position, INVALID_ANGLE, 0);
+		if (!TheActionManager->canDoSpecialPowerAtLocation(self, &position, CMD_FROM_AI, power, nullptr, options))
+			return FALSE;
+		self->doSpecialPowerAtLocation(power, &position, INVALID_ANGLE, options);
 	}
 	else
-		power->doSpecialPower(0);
+	{
+		if (!TheActionManager->canDoSpecialPower(self, power, CMD_FROM_AI, options))
+			return FALSE;
+		self->doSpecialPower(power, options);
+	}
+	return TRUE;
 }
 
 UpdateSleepTime AutoAbilityBehavior::update()
@@ -745,6 +762,9 @@ UpdateSleepTime AutoAbilityBehavior::update()
 		return scan;
 	SpecialPowerModuleInterface* power = self->getSpecialPowerModule(data->m_specialAbility);
 	if (!power || !power->isReady())
+		return scan;
+	const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(self, data->m_specialAbility) : nullptr;
+	if (!button || !TheSpecialPowerStore->canUseSpecialPower(self, data->m_specialAbility))
 		return scan;
 	for (BehaviorModule** module = self->getBehaviorModules(); *module; ++module)
 	{
@@ -774,11 +794,8 @@ UpdateSleepTime AutoAbilityBehavior::update()
 	for (const AutoAbilityQuery& query : data->m_queries)
 	{
 		Object* target = nullptr;
-		if (queryMatches(query, target))
-		{
-			cast(power, target);
+		if (queryMatches(query, button, target) && cast(button, target))
 			break;
-		}
 	}
 	return scan;
 }
@@ -786,6 +803,8 @@ UpdateSleepTime AutoAbilityBehavior::update()
 void AutoAbilityBehavior::crc(Xfer* xfer)
 {
 	UpdateModule::crc(xfer);
+	xfer->xferInt(&m_toggledState);
+	xfer->xferUnsignedInt(&m_idleSinceFrame);
 }
 
 void AutoAbilityBehavior::xfer(Xfer* xfer)
@@ -901,9 +920,15 @@ void PlayerHealSpecialPower::crc(Xfer* xfer)
 
 void PlayerHealSpecialPower::xfer(Xfer* xfer)
 {
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
 	SpecialPowerModule::xfer(xfer);
+	if (version >= 2)
+	{
+		xfer->xferBool(&m_hasPendingCenter);
+		xfer->xferCoord3D(&m_pendingCenter);
+	}
 }
 
 void PlayerHealSpecialPower::loadPostProcess()

@@ -34,6 +34,7 @@
 #include "Common/Player.h"
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
+#include "GameClient/ControlBar.h"
 #include "GameLogic/Object.h"
 #include "Common/BitFlagsIO.h"
 
@@ -480,6 +481,12 @@ Bool SpecialPowerStore::canUseSpecialPower( Object *obj, const SpecialPowerTempl
 	// as a first sanity check, the object must have a module capable of executing the power
 	if( obj->getSpecialPowerModule( specialPowerTemplate ) == nullptr )
 		return FALSE;
+	if (TheRetailCommandCatalog)
+	{
+		const CommandButton* button = TheRetailCommandCatalog->findPowerButton(obj, specialPowerTemplate);
+		if (button && !button->isMountStateAllowed(obj))
+			return FALSE;
+	}
 
 	//
 	// in order to execute the special powers we have attached special power modules to the objects

@@ -44,6 +44,9 @@
 #include "GameLogic/Module/RespawnModules.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "Common/AttributeModifierRules.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/RotwkAbilityModules.h"
+#endif
 
 namespace
 {
@@ -367,7 +370,7 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 		if (!side && colored)
 			drawDesignImage(highlight ? "RadialOver" : "RadialBorder", whole, x, y, 1.0f);
 	}
-	if (count > 0)
+	if (count > 0 || TheControlBar->isRetailAutoAbilityOn(window))
 		drawProductionRing(x, y, width, height);
 
 	if (availability == COMMAND_RESTRICTED)
@@ -634,6 +637,59 @@ CommandAvailability ControlBar::getRetailButtonAvailability(GameWindow *window) 
 	if (slot < 0 || slot >= MAX_COMMANDS_PER_SET || m_currContext == CB_CONTEXT_MULTI_SELECT)
 		return BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 	return m_retailAvailability[slot];
+}
+
+namespace
+{
+#if !RTS_GENERALS
+AutoAbilityBehavior* retailAutoAbility(const GameWindow* window, Drawable* selected)
+{
+	Object* object = selected ? selected->getObject() : nullptr;
+	const CommandButton* button = static_cast<const CommandButton*>(GadgetButtonGetData(const_cast<GameWindow*>(window)));
+	if (!object || !object->isLocallyControlled() || !button || !button->isAutoAbility() || !button->getSpecialPowerTemplate())
+		return nullptr;
+	return AutoAbilityBehavior::find(object, button->getSpecialPowerTemplate());
+}
+#endif
+}
+
+Bool ControlBar::hasRetailAutoAbility(const GameWindow* window) const
+{
+#if !RTS_GENERALS
+	return retailAutoAbility(window, m_currentSelectedDrawable) != nullptr;
+#else
+	return FALSE;
+#endif
+}
+
+Bool ControlBar::isRetailAutoAbilityOn(const GameWindow* window) const
+{
+#if !RTS_GENERALS
+	if (const AutoAbilityBehavior* behavior = retailAutoAbility(window, m_currentSelectedDrawable))
+		return behavior->isAutoActive();
+#endif
+	return FALSE;
+}
+
+Bool ControlBar::toggleRetailAutoAbility(const GameWindow* window)
+{
+#if !RTS_GENERALS
+	if (!retailAutoAbility(window, m_currentSelectedDrawable))
+		return FALSE;
+	const Object* source = m_currentSelectedDrawable->getObject();
+	const CommandSet* set = findCommandSet(source->getCommandSetString());
+	const CommandButton* command = static_cast<const CommandButton*>(GadgetButtonGetData(const_cast<GameWindow*>(window)));
+	for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+	{
+		if (set->getCommandButton(slot) != command)
+			continue;
+		GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_AUTO_ABILITY);
+		msg->appendObjectIDArgument(source->getID());
+		msg->appendIntegerArgument(slot);
+		return TRUE;
+	}
+#endif
+	return FALSE;
 }
 
 void ControlBar::showRetailLevelTooltip() const
@@ -1080,7 +1136,7 @@ void ControlBar::collectRetailPlacements(const CommandSet *commandSet, Object *o
 		if (i < RetailRingSlots && command->isInPalantir())
 			slot = i;
 		else if (command->getCommandType() != GUI_COMMAND_NONE
-			&& (command->isRadial() || !command->isInPalantir())
+			&& (command->isRadial() || !command->isInPalantir() || (i >= RetailRingSlots && i < 11))
 			&& CommandButtonRules::inSideColumn(i, commandSet ? m_retailRange : CommandButtonRules::VisibleRange(), initialVisible) && side < MAX_COMMANDS_PER_SET
 			&& retailEntryShown(commandSet, i, command, obj, hero))
 			slot = side++;
@@ -1126,7 +1182,7 @@ void ControlBar::assignRetailSlots(const CommandSet *commandSet, Object *obj, In
 		GameWindow *target = m_retailVisible[placement.slot];
 		setControlCommand(target, placement.command);
 		const GUICommandType type = placement.command->getCommandType();
-		setRetailRightClick(target, type == GUI_COMMAND_UNIT_BUILD || type == GUI_COMMAND_REVIVE);
+		setRetailRightClick(target, type == GUI_COMMAND_UNIT_BUILD || type == GUI_COMMAND_REVIVE || hasRetailAutoAbility(target));
 		const Bool enabled = placement.entry >= MAX_COMMANDS_PER_SET
 			|| BitIsSet(m_retailHolders[placement.entry]->winGetStatus(), WIN_STATUS_ENABLED);
 		target->winEnable(enabled);

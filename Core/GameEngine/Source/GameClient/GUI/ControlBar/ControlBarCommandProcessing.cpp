@@ -125,7 +125,11 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		if (control->winIsHidden() || TheInGameUI->getSelectCount() == 0)
 			return CBC_COMMAND_NOT_USED;
 		if (gadgetMessage == GBM_SELECTED_RIGHT)
+		{
+			if (toggleRetailAutoAbility(control))
+				return CBC_COMMAND_USED;
 			return cancelRetailProduction(control);
+		}
 		const CommandAvailability availability = getRetailButtonAvailability(control);
 		if (availability != COMMAND_AVAILABLE && availability != COMMAND_ACTIVE)
 			return CBC_COMMAND_USED;

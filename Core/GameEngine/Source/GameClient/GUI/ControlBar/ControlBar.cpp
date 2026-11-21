@@ -36,6 +36,7 @@
 #define DEFINE_RADIUSCURSOR_NAMES
 
 #include "Common/ActionManager.h"
+#include "Common/AbilityRules.h"
 #include "Common/FileSystem.h"
 #include "Common/FramePacer.h"
 #include "Common/INIException.h"
@@ -97,6 +98,7 @@
 
 // PUBLIC /////////////////////////////////////////////////////////////////////////////////////////
 ControlBar *TheControlBar = nullptr;
+CommandCatalog* TheRetailCommandCatalog = nullptr;
 
 const Image* ControlBar::m_rankVeteranIcon	= nullptr;
 const Image* ControlBar::m_rankEliteIcon		= nullptr;
@@ -696,6 +698,12 @@ Bool CommandButton::isValidRelationshipTarget(Relationship r) const
 	return (m_options & mask) != 0;
 }
 
+Bool CommandButton::isMountStateAllowed(const Object* source) const
+{
+	return AbilityRules::mountButtonAllowed(hasRotwkOption(CommandButtonRules::ROTWK_MOUNTED_ONLY),
+		hasRotwkOption(CommandButtonRules::ROTWK_UNMOUNTED_ONLY), source->testWeaponSetFlag(WEAPONSET_MOUNTED));
+}
+
 //-------------------------------------------------------------------------------------------------
 Bool CommandButton::isValidObjectTarget(const Player* sourcePlayer, const Object* targetObj) const
 {
@@ -921,7 +929,7 @@ void CommandSet::parseCommandButton( INI* ini, void *instance, void *store, cons
 	const char *token = ini->getNextToken();
 
 	// get find the command button from this name
-	const CommandButton *commandButton = TheControlBar->findCommandButton( AsciiString( token ) );
+	const CommandButton *commandButton = CommandCatalog::forINI()->findCommandButton( AsciiString( token ) );
 	if( commandButton == nullptr )
 	{
 
@@ -993,8 +1001,6 @@ CommandSet::~CommandSet()
 ControlBar::ControlBar()
 {
 	Int i;
-	m_commandButtons = nullptr;
-	m_commandSets = nullptr;
 	m_controlBarSchemeManager = nullptr;
 	m_isObserverCommandBar = FALSE;
 	m_observerLookAtPlayer = nullptr;
@@ -1126,25 +1132,6 @@ ControlBar::~ControlBar()
 //	delete m_controlBarResizer;
 //	m_controlBarResizer = nullptr;
 
-	// destroy all the command set definitions
-	CommandSet *set;
-	while( m_commandSets )
-	{
-		set = m_commandSets->friend_getNext();
-		deleteInstance(m_commandSets);
-		m_commandSets = set;
-
-	}
-
-	// destroy all our command button definitions
-	CommandButton *button;
-	while( m_commandButtons )
-	{
-		button = m_commandButtons->friend_getNext();
-		deleteInstance(m_commandButtons);
-		m_commandButtons = button;
-
-	}
 	if(m_buildToolTipLayout)
 	{
 		m_buildToolTipLayout->destroyWindows();
@@ -1174,17 +1161,10 @@ void ControlBarPopupDescriptionUpdateFunc( WindowLayout *layout, void *param );
 //-------------------------------------------------------------------------------------------------
 void ControlBar::init()
 {
-	INI ini;
 	m_sideSelectAnimateDown = FALSE;
-	// load the command buttons
-	ini.loadFileDirectory( "Data\\INI\\Default\\CommandButton", INI_LOAD_OVERWRITE, nullptr );
-	ini.loadFileDirectory( "Data\\INI\\CommandButton", INI_LOAD_OVERWRITE, nullptr );
-
-	// load the command sets
-	ini.loadFileDirectory( "Data\\INI\\CommandSet", INI_LOAD_OVERWRITE, nullptr );
-
-	// post process step after loading the command buttons and command sets
-	postProcessCommands();
+	if (!TheRetailCommandCatalog)
+		m_commandCatalog.init();
+	getCommandCatalog().cacheImages();
 
 	if (TheWindowManager && RetailFileLayers::enabled() && !TheGlobalData->m_headless && !UiTest::isActive())
 	{
@@ -1478,41 +1458,8 @@ void ControlBar::reset()
 		m_animateDownWindow = nullptr;
 	}
 
-	// Remove any overridden sets.
-	CommandSet *set, *nextSet;
-	set = m_commandSets;
-	while (set) {
-		Bool possibleAdjustment = FALSE;
-		nextSet = set->friend_getNext();
-		if (set == m_commandSets) {
-			possibleAdjustment = TRUE;
-		}
-
-		Overridable *stillValid = set->deleteOverrides();
-		if (stillValid == nullptr && possibleAdjustment) {
-			m_commandSets = nextSet;
-		}
-
-		set = nextSet;
-	}
-
-	// Remove any overridden command buttons.
-	CommandButton *button, *nextButton;
-	button = m_commandButtons;
-	while (button) {
-		Bool possibleAdjustment = FALSE;
-		nextButton = button->friend_getNext();
-		if (button == m_commandButtons) {
-			possibleAdjustment = TRUE;
-		}
-
-		Overridable *stillValid = button->deleteOverrides();
-		if (stillValid == nullptr && possibleAdjustment) {
-			m_commandButtons = nextButton;
-		}
-
-		button = nextButton;
-	}
+	if (!TheRetailCommandCatalog)
+		m_commandCatalog.reset();
 	if(TheTransitionHandler)
 		TheTransitionHandler->remove("ControlBarArrow");
 	m_genArrow = nullptr;
@@ -2082,7 +2029,7 @@ void ControlBar::evaluateContextUI()
 //-------------------------------------------------------------------------------------------------
 /** Find a command button of the given name if present */
 //-------------------------------------------------------------------------------------------------
-CommandButton *ControlBar::findNonConstCommandButton( const AsciiString& name )
+CommandButton *CommandCatalog::findNonConstCommandButton( const AsciiString& name )
 {
 
 	for( const CommandButton *command = m_commandButtons; command; command = command->getNext() )
@@ -2093,10 +2040,94 @@ CommandButton *ControlBar::findNonConstCommandButton( const AsciiString& name )
 
 }
 
+CommandCatalog* CommandCatalog::forINI()
+{
+	if (TheRetailCommandCatalog)
+		return TheRetailCommandCatalog;
+	return TheControlBar ? &TheControlBar->getCommandCatalog() : nullptr;
+}
+
+void CommandCatalog::init()
+{
+	INI ini;
+	ini.loadFileDirectory("Data\\INI\\Default\\CommandButton", INI_LOAD_OVERWRITE, nullptr);
+	ini.loadFileDirectory("Data\\INI\\CommandButton", INI_LOAD_OVERWRITE, nullptr);
+	ini.loadFileDirectory("Data\\INI\\CommandSet", INI_LOAD_OVERWRITE, nullptr);
+}
+
+CommandCatalog::~CommandCatalog()
+{
+	while (m_commandSets)
+	{
+		CommandSet* next = m_commandSets->friend_getNext();
+		deleteInstance(m_commandSets);
+		m_commandSets = next;
+	}
+	while (m_commandButtons)
+	{
+		CommandButton* next = m_commandButtons->friend_getNext();
+		deleteInstance(m_commandButtons);
+		m_commandButtons = next;
+	}
+	if (TheRetailCommandCatalog == this)
+		TheRetailCommandCatalog = nullptr;
+}
+
+void CommandCatalog::reset()
+{
+	for (CommandSet* set = m_commandSets; set;)
+	{
+		CommandSet* next = set->friend_getNext();
+		const Bool isHead = set == m_commandSets;
+		if (!set->deleteOverrides() && isHead)
+			m_commandSets = next;
+		set = next;
+	}
+	for (CommandButton* button = m_commandButtons; button;)
+	{
+		CommandButton* next = button->friend_getNext();
+		const Bool isHead = button == m_commandButtons;
+		if (!button->deleteOverrides() && isHead)
+			m_commandButtons = next;
+		button = next;
+	}
+}
+
+const CommandButton* CommandCatalog::findPowerButton(const Object* object, const SpecialPowerTemplate* power)
+{
+	const AsciiString& active = object->getCommandSetString();
+	const AsciiString& original = object->getTemplate()->friend_getCommandSetString();
+	const AsciiString* names[] = { &active, &original };
+	const Int setCount = active == original ? 1 : 2;
+	for (Int index = 0; index < setCount; ++index)
+	{
+		const CommandSet* set = findCommandSet(*names[index]);
+		if (!set)
+			continue;
+		for (Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
+		{
+			const CommandButton* button = set->getCommandButton(i);
+			if (button && button->getSpecialPowerTemplate() == power)
+				return button;
+		}
+	}
+	return nullptr;
+}
+
+const CommandButton* ControlBar::findCommandButton(const AsciiString& name)
+{
+	return getCommandCatalog().findCommandButton(name);
+}
+
+const CommandSet* ControlBar::findCommandSet(const AsciiString& name)
+{
+	return getCommandCatalog().findCommandSet(name);
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Allocate a new command button, assign name, and tie to list */
 //-------------------------------------------------------------------------------------------------
-CommandButton *ControlBar::newCommandButton( const AsciiString& name )
+CommandButton *CommandCatalog::newCommandButton( const AsciiString& name )
 {
 	CommandButton *newButton;
 
@@ -2116,7 +2147,7 @@ CommandButton *ControlBar::newCommandButton( const AsciiString& name )
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-CommandButton *ControlBar::newCommandButtonOverride( CommandButton *buttonToOverride )
+CommandButton *CommandCatalog::newCommandButtonOverride( CommandButton *buttonToOverride )
 {
 	if (!buttonToOverride) {
 		return nullptr;
@@ -2146,16 +2177,17 @@ CommandButton *ControlBar::newCommandButtonOverride( CommandButton *buttonToOver
 	// read the name
 	const char* c = ini->getNextToken();
 	name.set( c );
-	if (ini->skipBlockWithoutOwner(TheControlBar, "CommandSet"))
+	CommandCatalog* catalog = CommandCatalog::forINI();
+	if (ini->skipBlockWithoutOwner(catalog, "CommandSet"))
 		return;
 
 	// find existing item if present
-	commandSet = TheControlBar->findNonConstCommandSet( name );
+	commandSet = catalog->findNonConstCommandSet( name );
 	if( commandSet == nullptr )
 	{
 
 		// allocate a new item
-		commandSet = TheControlBar->newCommandSet( name );
+		commandSet = catalog->newCommandSet( name );
 		if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES) {
 			commandSet->markAsOverride();
 		}
@@ -2173,7 +2205,7 @@ CommandButton *ControlBar::newCommandButtonOverride( CommandButton *buttonToOver
 
 		//@todo SUPPORT OVERRIDES -- JM
 	} else {
-		commandSet = TheControlBar->newCommandSetOverride(commandSet);
+		commandSet = catalog->newCommandSetOverride(commandSet);
 	}
 
 	// sanity
@@ -2187,7 +2219,7 @@ CommandButton *ControlBar::newCommandButtonOverride( CommandButton *buttonToOver
 //-------------------------------------------------------------------------------------------------
 /** Find existing command set by name */
 //-------------------------------------------------------------------------------------------------
-CommandSet* ControlBar::findNonConstCommandSet( const AsciiString& name )
+CommandSet* CommandCatalog::findNonConstCommandSet( const AsciiString& name )
 {
 	CommandSet* set;
 
@@ -2201,7 +2233,7 @@ CommandSet* ControlBar::findNonConstCommandSet( const AsciiString& name )
 //-------------------------------------------------------------------------------------------------
 /** find existing command button if present	*/
 //-------------------------------------------------------------------------------------------------
-const CommandButton *ControlBar::findCommandButton( const AsciiString& name )
+const CommandButton *CommandCatalog::findCommandButton( const AsciiString& name )
 {
 	CommandButton *btn =  findNonConstCommandButton(name);
 	if( btn )
@@ -2214,7 +2246,7 @@ const CommandButton *ControlBar::findCommandButton( const AsciiString& name )
 //-------------------------------------------------------------------------------------------------
 /** Find existing command set by name */
 //-------------------------------------------------------------------------------------------------
-const CommandSet *ControlBar::findCommandSet( const AsciiString& name )
+const CommandSet *CommandCatalog::findCommandSet( const AsciiString& name )
 {
 	CommandSet *set = findNonConstCommandSet(name);
 	if (set)
@@ -2225,7 +2257,7 @@ const CommandSet *ControlBar::findCommandSet( const AsciiString& name )
 //-------------------------------------------------------------------------------------------------
 /** Allocate a new command set, link to list, initialize to default, and return it */
 //-------------------------------------------------------------------------------------------------
-CommandSet *ControlBar::newCommandSet( const AsciiString& name )
+CommandSet *CommandCatalog::newCommandSet( const AsciiString& name )
 {
 	// allocate a new set
 	CommandSet* set = newInstance(CommandSet)(name);
@@ -2239,7 +2271,7 @@ CommandSet *ControlBar::newCommandSet( const AsciiString& name )
 //-------------------------------------------------------------------------------------------------
 /** Create an overridden command set. */
 //-------------------------------------------------------------------------------------------------
-CommandSet *ControlBar::newCommandSetOverride( CommandSet *setToOverride )
+CommandSet *CommandCatalog::newCommandSetOverride( CommandSet *setToOverride )
 {
 	if (!setToOverride) {
 		return nullptr;
@@ -2731,7 +2763,7 @@ void CommandButton::cacheButtonImage()
 //-------------------------------------------------------------------------------------------------
 /** post process step, after all commands and command sets are loaded */
 //-------------------------------------------------------------------------------------------------
-void ControlBar::postProcessCommands()
+void CommandCatalog::cacheImages()
 {
 	for ( CommandButton *button = m_commandButtons; button; button = button->friend_getNext() )
 	{
@@ -3363,19 +3395,19 @@ void ControlBar::updateSlotExitImage( const Image *image )
 	//for neutral buildings which can have a different empty inventory icon based
 	//on the faction player.
 
-	CommandButton *cmdButton = findNonConstCommandButton( "Command_StructureExit" );
+	CommandButton *cmdButton = getCommandCatalog().findNonConstCommandButton( "Command_StructureExit" );
 	if(cmdButton)
 		cmdButton->setButtonImage(image);
 
-	cmdButton = findNonConstCommandButton( "Command_TransportExit" );
+	cmdButton = getCommandCatalog().findNonConstCommandButton( "Command_TransportExit" );
 	if(cmdButton)
 		cmdButton->setButtonImage(image);
 
-	cmdButton = findNonConstCommandButton( "Command_BunkerExit" );
+	cmdButton = getCommandCatalog().findNonConstCommandButton( "Command_BunkerExit" );
 	if(cmdButton)
 		cmdButton->setButtonImage(image);
 
-	cmdButton = findNonConstCommandButton( "Command_FireBaseExit" );
+	cmdButton = getCommandCatalog().findNonConstCommandButton( "Command_FireBaseExit" );
 	if(cmdButton)
 		cmdButton->setButtonImage(image);
 

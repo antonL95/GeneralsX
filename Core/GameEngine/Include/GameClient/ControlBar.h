@@ -399,6 +399,7 @@ public:
 	Int getCommandRangeStart() const { return m_commandRangeStart; }
 	Int getCommandRangeCount() const { return m_commandRangeCount; }
 	Bool isAutoAbility() const { return m_autoAbility; }
+	Bool isMountStateAllowed(const Object* source) const;
 	Real getPresetRange() const { return m_presetRange; }
 	const WeaponSetFlags& getFlagsUsedForToggle() const { return m_flagsUsedForToggle; }
 	Bool canUseRetailToggle(const Object* object, Int state) const;
@@ -733,6 +734,33 @@ enum ControlBarStages CPP_11(: Int)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+class CommandCatalog : public SubsystemInterface
+{
+public:
+	~CommandCatalog() override;
+	void init() override;
+	void reset() override;
+	void update() override {}
+	void cacheImages();
+	static CommandCatalog* forINI();
+	const CommandButton* findCommandButton(const AsciiString& name);
+	const CommandSet* findCommandSet(const AsciiString& name);
+	const CommandButton* findPowerButton(const Object* object, const SpecialPowerTemplate* power);
+	CommandButton* findNonConstCommandButton(const AsciiString& name);
+	CommandSet* findNonConstCommandSet(const AsciiString& name);
+	CommandButton* newCommandButton(const AsciiString& name);
+	CommandButton* newCommandButtonOverride(CommandButton* buttonToOverride);
+	CommandSet* newCommandSet(const AsciiString& name);
+	CommandSet* newCommandSetOverride(CommandSet* setToOverride);
+	const CommandButton* getCommandButtons() const { return m_commandButtons; }
+
+private:
+	CommandButton* m_commandButtons = nullptr;
+	CommandSet* m_commandSets = nullptr;
+};
+
+extern CommandCatalog* TheRetailCommandCatalog;
+
 class ControlBar : public SubsystemInterface
 {
 
@@ -881,15 +909,10 @@ protected:
 	void setHiddenControlBar();
 
 	/// find existing command button if present
-	CommandButton* findNonConstCommandButton( const AsciiString& name );
 
 	/// allocate a new command button, link to list, initialize to default, and return
-	CommandButton *newCommandButton( const AsciiString& name );
-	CommandButton *newCommandButtonOverride( CommandButton *buttonToOverride );
 
 	/// allocate a new command set, link to list, initialize to default, and return it
-	CommandSet *newCommandSet( const AsciiString& name );
-	CommandSet *newCommandSetOverride( CommandSet *setToOverride );
 
 
 	/// evaluate what the user should see based on what selected drawables we have in our UI
@@ -915,7 +938,6 @@ protected:
 	void showRallyPoint( const Coord3D *loc );
 
 	/// post process step, after all commands and command sets are loaded
-	void postProcessCommands();
 
 	// the following methods are for resetting data for various contexts
 	void resetCommonCommandData();	/// reset shared command data
@@ -967,7 +989,8 @@ public:
 	void setFlash( Bool b ) { m_flash = b; }
 
 	// get method for list of commandbuttons
-	const CommandButton *getCommandButtons() { return m_commandButtons; }
+	const CommandButton *getCommandButtons() { return getCommandCatalog().getCommandButtons(); }
+	CommandCatalog& getCommandCatalog() { return TheRetailCommandCatalog ? *TheRetailCommandCatalog : m_commandCatalog; }
 
 protected:
 
@@ -976,8 +999,7 @@ protected:
 
 	Bool m_UIDirty;																///< the context UI must be re-evaluated
 
-	CommandButton *m_commandButtons;							///< list of possible commands to have
-	CommandSet *m_commandSets;										///< list of all command sets defined
+	CommandCatalog m_commandCatalog;
 	ControlBarSchemeManager *m_controlBarSchemeManager;		///< The Scheme singleton
 
 	GameWindow *m_contextParent[ NUM_CONTEXT_PARENTS ];		///< "parent" window for buttons that are part of the context sensitive interface
@@ -1057,6 +1079,9 @@ public:
 	CommandAvailability getRetailButtonAvailability(GameWindow *window) const;
 	const Image* getRetailButtonImage(GameWindow *window) const;
 	Real getRetailRecharge(const GameWindow *window) const;
+	Bool hasRetailAutoAbility(const GameWindow* window) const;
+	Bool isRetailAutoAbilityOn(const GameWindow* window) const;
+	Bool toggleRetailAutoAbility(const GameWindow* window);
 	void showRetailCommandTooltip(GameWindow *window) const;
 	Bool closeRetailTray();
 	Bool isOverRetailTray(Int x, Int y) const;
@@ -1175,7 +1200,6 @@ public:
 private:
 
 	/// find existing command set
-	CommandSet *findNonConstCommandSet( const AsciiString& name );
 
 	const Image *m_genStarOn;
 	const Image *m_genStarOff;

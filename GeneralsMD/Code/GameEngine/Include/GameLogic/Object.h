@@ -471,6 +471,8 @@ public:
 		 For Object specific dynamic command sets.  Different from the Science specific ones handled in ThingTemplate
 	*/
 	const AsciiString& getCommandSetString() const;
+	const AsciiString& getBaseCommandSetString() const;
+	const ModelConditionFlags& getLogicModelConditions() const { return m_logicModelConditions; }
 	void setCommandSetStringOverride( AsciiString newCommandSetString ) { m_commandSetStringOverride = newCommandSetString; }
 
 	/// People are faking their commandsets, and, Surprise!, they are authoritative.  Challenge everything.
@@ -811,6 +813,7 @@ private:
 	Coord2D												m_formationOffset;
 
 	AsciiString										m_commandSetStringOverride;///< To allow specific object to switch command sets
+	ModelConditionFlags m_logicModelConditions;
 
 	UnsignedInt										m_safeOcclusionFrame;	///<flag used by occlusion renderer so it knows when objects have exited their production building.
 

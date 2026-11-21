@@ -45,6 +45,7 @@
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
@@ -1442,6 +1443,8 @@ void Object::setFiringConditionForCurrentWeapon() const
 //=============================================================================
 void Object::setModelConditionState( ModelConditionFlagType a )
 {
+	if (RetailFileLayers::enabled() && a != MODELCONDITION_INVALID)
+		m_logicModelConditions.set(a);
 	if (m_drawable)
 	{
 		m_drawable->setModelConditionState(a);
@@ -1451,6 +1454,8 @@ void Object::setModelConditionState( ModelConditionFlagType a )
 //=============================================================================
 void Object::clearModelConditionState( ModelConditionFlagType a )
 {
+	if (RetailFileLayers::enabled() && a != MODELCONDITION_INVALID)
+		m_logicModelConditions.set(a, FALSE);
 	if (m_drawable)
 	{
 		m_drawable->clearModelConditionState(a);
@@ -1460,6 +1465,13 @@ void Object::clearModelConditionState( ModelConditionFlagType a )
 //=============================================================================
 void Object::clearAndSetModelConditionState( ModelConditionFlagType clr, ModelConditionFlagType set )
 {
+	if (RetailFileLayers::enabled())
+	{
+		if (clr != MODELCONDITION_INVALID)
+			m_logicModelConditions.set(clr, FALSE);
+		if (set != MODELCONDITION_INVALID)
+			m_logicModelConditions.set(set);
+	}
 	if (m_drawable)
 	{
 		m_drawable->clearAndSetModelConditionState(clr, set);
@@ -1469,6 +1481,8 @@ void Object::clearAndSetModelConditionState( ModelConditionFlagType clr, ModelCo
 //=============================================================================
 void Object::clearModelConditionFlags( const ModelConditionFlags& clr )
 {
+	if (RetailFileLayers::enabled())
+		m_logicModelConditions.clear(clr);
 	if (m_drawable)
 	{
 		m_drawable->clearModelConditionFlags(clr);
@@ -1478,6 +1492,8 @@ void Object::clearModelConditionFlags( const ModelConditionFlags& clr )
 //=============================================================================
 void Object::setModelConditionFlags( const ModelConditionFlags& set )
 {
+	if (RetailFileLayers::enabled())
+		m_logicModelConditions.set(set);
 	if (m_drawable)
 	{
 		m_drawable->setModelConditionFlags(set);
@@ -1487,6 +1503,8 @@ void Object::setModelConditionFlags( const ModelConditionFlags& set )
 //=============================================================================
 void Object::clearAndSetModelConditionFlags( const ModelConditionFlags& clr, const ModelConditionFlags& set )
 {
+	if (RetailFileLayers::enabled())
+		m_logicModelConditions.clearAndSet(clr, set);
 	if (m_drawable)
 	{
 		m_drawable->clearAndSetModelConditionFlags(clr, set);
@@ -4271,8 +4289,9 @@ void Object::xfer( Xfer *xfer )
 #endif
 	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
 		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
-	XferVersion version = extendedSlots ? 10 : legacyVersion;
-	xfer->xferVersion( &version, 10 );
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 11 : 10;
+	XferVersion version = maxVersion == 11 ? maxVersion : (extendedSlots ? 10 : legacyVersion);
+	xfer->xferVersion(&version, maxVersion);
 
 	// object ID
 	ObjectID id = getID();
@@ -4722,6 +4741,8 @@ void Object::xfer( Xfer *xfer )
 	else
 		m_isReceivingDifficultyBonus = FALSE;
 
+	if (version >= 11)
+		m_logicModelConditions.xfer(xfer);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -6514,6 +6535,24 @@ Int Object::getMultiLogicalBonePosition(const char* boneNamePrefix, Int maxBones
 
 //=============================================================================
 const AsciiString& Object::getCommandSetString() const
+{
+	if (RetailFileLayers::enabled() && areModulesReady())
+	{
+		static const NameKeyType monitorKey = NAMEKEY("MonitorConditionUpdate");
+		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
+		{
+			if ((*module)->getModuleNameKey() == monitorKey)
+			{
+				const AsciiString& toggle = static_cast<const MonitorConditionUpdate*>(*module)->getActiveCommandSet();
+				if (toggle.isNotEmpty())
+					return toggle;
+			}
+		}
+	}
+	return getBaseCommandSetString();
+}
+
+const AsciiString& Object::getBaseCommandSetString() const
 {
 	if (m_commandSetStringOverride.isNotEmpty())
 		return m_commandSetStringOverride;

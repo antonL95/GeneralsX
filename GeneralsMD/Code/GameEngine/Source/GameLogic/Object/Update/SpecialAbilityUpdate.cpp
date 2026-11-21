@@ -29,6 +29,7 @@
 
 #include "PreRTS.h" // This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/BitFlagsIO.h"
 #include "Common/GameAudio.h"
 #include "Common/GlobalData.h"
 #include "Common/Player.h"
@@ -2163,8 +2164,7 @@ void SpecialAbilityUpdate::crc( Xfer *xfer )
 void SpecialAbilityUpdate::xfer( Xfer *xfer )
 {
 
-	// version
-	XferVersion currentVersion = 1;
+	const XferVersion currentVersion = usesRotwkRules() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2216,6 +2216,14 @@ void SpecialAbilityUpdate::xfer( Xfer *xfer )
   // capture flash phase
   xfer->xferReal( &m_captureFlashPhase );
 
+	if (version >= 2)
+	{
+		m_rotwkConditions.xfer(xfer);
+		xfer->xferInt(&m_rotwkTriggers);
+		xfer->xferUnsignedInt(&m_holdFrames);
+		xfer->xferInt(&m_timedCondition);
+		xfer->xferUnsignedInt(&m_timedConditionEndFrame);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

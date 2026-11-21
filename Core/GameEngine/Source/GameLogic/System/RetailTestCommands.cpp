@@ -936,6 +936,49 @@ void roundTripModifiers(Object* obj, Object* destination, const AsciiString& nam
 	std::fprintf(stderr, "TEST modifier-snapshot frame=%u exact=%d holds=%d wake=%u maxBonus=%.1f damage=%.3f\n",
 		frame, exact, holdsRestored, wake, restored->getTotals().value[HEALTH], restored->getTotals().damageDealtFactor());
 }
+
+void roundTripAbility(Object* obj, const SpecialPowerTemplate* power, unsigned int frame)
+{
+	const char* directory = std::getenv("XDG_RUNTIME_DIR");
+	if (!directory || !power)
+		return;
+	SpecialAbilityUpdate* ability = obj->findSpecialAbilityUpdate(power->getSpecialPowerType());
+	if (!ability)
+		return;
+	AsciiString file;
+	file.format("%s/ability-snapshot", directory);
+	XferSave save;
+	save.open(file);
+	save.xferSnapshot(ability);
+	save.close();
+	const Bool active = ability->isActive();
+	XferLoad load;
+	load.setOptions(XO_NO_POST_PROCESSING);
+	load.open(file);
+	load.xferSnapshot(ability);
+	load.close();
+	std::remove(file.str());
+	std::fprintf(stderr, "TEST ability snapshot frame=%u power=%s active=%d restored=%d\n",
+		frame, power->getName().str(), active, ability->isActive());
+}
+
+void checkMountPower(Object* obj, const SpecialPowerTemplate* power, unsigned int frame)
+{
+	if (!power)
+		return;
+	SpecialPowerModuleInterface* module = obj->getSpecialPowerModule(power);
+	if (!module)
+		return;
+	const Bool allowed = TheActionManager->canDoSpecialPower(obj, power, CMD_FROM_PLAYER, 0);
+	const Bool mount = obj->testWeaponSetFlag(WEAPONSET_MOUNTED);
+	const Bool ready = module->isReady();
+	const UnsignedInt readyFrame = module->getReadyFrame();
+	if (!allowed)
+		obj->doSpecialPower(power, 0, FALSE);
+	std::fprintf(stderr, "TEST mount gate frame=%u power=%s mounted=%d ready=%d update=%d allowed=%d unchanged=%d\n",
+		frame, power->getName().str(), mount, ready, obj->findSpecialAbilityUpdate(power->getSpecialPowerType()) != nullptr,
+		allowed, readyFrame == module->getReadyFrame());
+}
 #endif
 
 void logAllObjects(unsigned int frame)
@@ -2043,6 +2086,10 @@ void execute(const Command& command, unsigned int frame)
 			command.structure.c_str(), upgrade ? "given" : "missing");
 	}
 #if !RTS_GENERALS
+	else if (command.action == "abilitysnapshot")
+		roundTripAbility(obj, TheSpecialPowerStore->findSpecialPowerTemplate(command.structure.c_str()), frame);
+	else if (command.action == "mountpower")
+		checkMountPower(obj, TheSpecialPowerStore->findSpecialPowerTemplate(command.structure.c_str()), frame);
 	else if (command.action == "autoability")
 	{
 		const Int state = command.structure == "on" ? 1 : (command.structure == "off" ? -1 : 0);
