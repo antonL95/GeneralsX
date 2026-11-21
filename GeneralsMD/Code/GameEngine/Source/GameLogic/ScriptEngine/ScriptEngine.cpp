@@ -6456,12 +6456,16 @@ Bool ScriptEngine::evaluateCounter( Condition *pCondition )
 void ScriptEngine::setCounter( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 2, ("Not enough parameters."));
-	Int counterNdx = pAction->getParameter(0)->getInt();
+	setCounterValue(*pAction->getParameter(0), pAction->getParameter(1)->getInt());
+}
+
+void ScriptEngine::setCounterValue(Parameter &counter, Int value)
+{
+	Int counterNdx = counter.getInt();
 	if (counterNdx == 0) {
-		counterNdx = allocateCounter(pAction->getParameter(0)->getString());
-		pAction->getParameter(0)->friend_setInt(counterNdx);
+		counterNdx = allocateCounter(counter.getString());
+		counter.friend_setInt(counterNdx);
 	}
-	Int value = pAction->getParameter(1)->getInt();
 	m_counters[counterNdx].value = value;
 }
 

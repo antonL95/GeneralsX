@@ -6768,6 +6768,28 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 					if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER && !player->hasUpgradeComplete(upgrade))
 						player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
 			return;
+		case ScriptAction::OVERRIDE_PLAYER_COMMAND_POINTS:
+			if (RetailFileLayers::enabled())
+				if (Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString()))
+					player->overrideCommandPoints(pAction->getParameter(1)->getInt(), pAction->getParameter(2)->getInt());
+			return;
+		case ScriptAction::SET_PLAYER_COMMAND_POINTS_AVAILABLE_TO_COUNTER:
+		case ScriptAction::SET_PLAYER_COMMAND_POINTS_TOTAL_TO_COUNTER:
+		{
+			if (!RetailFileLayers::enabled())
+				return;
+			const Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString());
+			if (!player)
+				return;
+			Int value = player->getCommandPointsTotal();
+			if (pAction->getActionType() == ScriptAction::SET_PLAYER_COMMAND_POINTS_AVAILABLE_TO_COUNTER)
+			{
+				const Int used = player->getCommandPointsUsed();
+				value = value > used ? value - used : 0;
+			}
+			TheScriptEngine->setCounterValue(*pAction->getParameter(1), value);
+			return;
+		}
 		case ScriptAction::TEAM_UPGRADE:
 		{
 			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());

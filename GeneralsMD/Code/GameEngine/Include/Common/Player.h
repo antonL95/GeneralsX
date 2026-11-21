@@ -278,6 +278,7 @@ public:
   Bool canBuildMoreOfType( const ThingTemplate *whatToBuild ) const;
 	Int getCommandPointsUsed() const;
 	Int getCommandPointsTotal(Int *maximum = nullptr) const;
+	void overrideCommandPoints(Int total, Int maximum);
 	Bool hasEnoughCommandPoints( const ThingTemplate *whatToBuild ) const;
 	void addCommandPointUpgradeBonus( const void *source, Int amount, const SpecialPowerObjectFilter &requiredObject );
 	void removeCommandPointUpgradeBonus( const void *source );
@@ -867,4 +868,7 @@ private:
 		SpecialPowerObjectFilter requiredObject;
 	};
 	std::vector<CommandPointUpgradeBonus> m_commandPointUpgrades;
+	Bool m_hasCommandPointOverride = FALSE;
+	Int m_commandPointOverrideTotal = 0;
+	Int m_commandPointOverrideMaximum = 0;
 };

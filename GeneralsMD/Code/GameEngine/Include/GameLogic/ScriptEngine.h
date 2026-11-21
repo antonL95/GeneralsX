@@ -241,6 +241,7 @@ public:
 	virtual const ActionTemplate *getActionTemplate( Int ndx); ///< Get the template for a script action.
 	virtual const ConditionTemplate *getConditionTemplate( Int ndx); ///< Get the template for a script Condition.
 	static Bool isRotwkImplemented(Bool condition, Int type);
+	static Int findRotwkActionByRetailIndex(Int retailIndex);
 	static void reportRotwkUnimplemented(Bool condition, Int type);
 	static void traceRotwk(Bool condition, Int type, Int value);
 	virtual void startEndGameTimer(); ///< Starts the end game timer after a mission is won or lost.
@@ -342,6 +343,7 @@ public:
 	const AttackPriorityInfo *getAttackInfo(const AsciiString& name);
 
 	const TCounter *getCounter(const AsciiString& counterName);
+	void setCounterValue(Parameter &counter, Int value);
 
 	void createNamedMapReveal(const AsciiString& revealName, const AsciiString& waypointName, Real radiusToReveal, const AsciiString& playerName);
 	void doNamedMapReveal(const AsciiString& revealName);

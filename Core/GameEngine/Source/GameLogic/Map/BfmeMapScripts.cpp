@@ -289,6 +289,11 @@ Int BfmeMapScripts::readOpcode(DataChunkInput &file, BfmeScriptOpcode &opcode, P
 	if (TheScriptEngine)
 	{
 		const Int limit = condition ? static_cast<Int>(Condition::NUM_ITEMS) : static_cast<Int>(ScriptAction::NUM_ITEMS);
+#if !RTS_GENERALS
+		Int mappedType = authoredType;
+		if (!named && !condition && authoredType >= ScriptAction::FIRST_ROTWK)
+			mappedType = ScriptEngine::findRotwkActionByRetailIndex(authoredType);
+#endif
 		for (Int i = 0; i < limit; ++i)
 		{
 			const Template *definition = condition
@@ -297,7 +302,7 @@ Int BfmeMapScripts::readOpcode(DataChunkInput &file, BfmeScriptOpcode &opcode, P
 #if RTS_GENERALS
 			if (named || i != authoredType)
 #else
-			if (named ? definition->m_internalNameKey != key : i != authoredType)
+			if (named ? definition->m_internalNameKey != key : i != mappedType)
 #endif
 				continue;
 
@@ -327,7 +332,7 @@ Int BfmeMapScripts::readOpcode(DataChunkInput &file, BfmeScriptOpcode &opcode, P
 #if !RTS_GENERALS
 				const Int firstRotwk = condition ? static_cast<Int>(Condition::FIRST_ROTWK) : static_cast<Int>(ScriptAction::FIRST_ROTWK);
 				if (i >= firstRotwk && !ScriptEngine::isRotwkImplemented(condition, i))
-					reportOnce("unimplemented", condition, opcode.name);
+					reportOnce("unimplemented", condition, definition->m_internalName);
 #endif
 				return i;
 			}

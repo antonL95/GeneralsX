@@ -367,6 +367,9 @@ void Player::init(const PlayerTemplate* pt)
 
 	DEBUG_ASSERTCRASH(m_playerTeamPrototypes.empty(), ("Player::m_playerTeamPrototypes is not empty at game start!"));
 	m_commandPointUpgrades.clear();
+	m_hasCommandPointOverride = FALSE;
+	m_commandPointOverrideTotal = 0;
+	m_commandPointOverrideMaximum = 0;
 	m_skillPointsModifier = 1.0f;
 	m_attackedFrame = 0;
 
@@ -4255,6 +4258,9 @@ void Player::crc( Xfer *xfer )
 	{
 		HeroRoster::xferPlayer(this, xfer);
 		xferPowerProductionBonuses(xfer);
+		xfer->xferBool(&m_hasCommandPointOverride);
+		xfer->xferInt(&m_commandPointOverrideTotal);
+		xfer->xferInt(&m_commandPointOverrideMaximum);
 		Bool hasPlanner = m_ai && m_ai->isSkirmishAI();
 		xfer->xferBool(&hasPlanner);
 		if (hasPlanner)
@@ -4280,7 +4286,7 @@ void Player::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 11 : 8;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4831,6 +4837,18 @@ void Player::xfer( Xfer *xfer )
 		for (AsciiString& name : m_forbiddenBuildings)
 			xfer->xferAsciiString(&name);
 	}
+	if (version >= 12)
+	{
+		xfer->xferBool(&m_hasCommandPointOverride);
+		xfer->xferInt(&m_commandPointOverrideTotal);
+		xfer->xferInt(&m_commandPointOverrideMaximum);
+	}
+	else if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_hasCommandPointOverride = FALSE;
+		m_commandPointOverrideTotal = 0;
+		m_commandPointOverrideMaximum = 0;
+	}
 
 }
 
@@ -4896,11 +4914,26 @@ Int Player::getCommandPointsUsed() const
 	return used;
 }
 
+void Player::overrideCommandPoints(Int total, Int maximum)
+{
+	m_hasCommandPointOverride = TRUE;
+	m_commandPointOverrideTotal = total;
+	m_commandPointOverrideMaximum = maximum;
+}
+
 Int Player::getCommandPointsTotal(Int *maximum) const
 {
 	if (maximum)
 		*maximum = 0;
-	if (!RetailFileLayers::enabled() || !TheGlobalData)
+	if (!RetailFileLayers::enabled())
+		return 0;
+	if (m_hasCommandPointOverride)
+	{
+		if (maximum)
+			*maximum = m_commandPointOverrideMaximum;
+		return m_commandPointOverrideTotal;
+	}
+	if (!TheGlobalData)
 		return 0;
 	const GameMode mode = TheGameLogic ? TheGameLogic->getGameMode() : GAME_NONE;
 	const Int factor = TheGameInfo && (mode == GAME_SKIRMISH || mode == GAME_REPLAY) ?

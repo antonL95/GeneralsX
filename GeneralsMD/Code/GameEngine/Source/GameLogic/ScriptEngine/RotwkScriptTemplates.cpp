@@ -34,6 +34,8 @@ const RotwkTemplate s_actions[] = {
 	{ ScriptAction::TEAM_RECRUIT_UNITS, 397, "TEAM_RECRUIT_UNITS", "RotWK/TEAM_RECRUIT_UNITS", "<3> <0> <61>", 3, { 3, 0, 61 }, FALSE },
 	{ ScriptAction::TEAM_RECRUIT_UNITS_FROM_TEAM, 398, "TEAM_RECRUIT_UNITS_FROM_TEAM", "RotWK/TEAM_RECRUIT_UNITS_FROM_TEAM", "<3> <0> <61> <3>", 4, { 3, 0, 61, 3 }, FALSE },
 	{ ScriptAction::TEAM_UPGRADE, 403, "TEAM_UPGRADE", "RotWK/TEAM_UPGRADE", "<3> <33>", 2, { 3, 33 }, FALSE },
+	{ ScriptAction::SET_PLAYER_COMMAND_POINTS_AVAILABLE_TO_COUNTER, 408, "SET_PLAYER_COMMAND_POINTS_AVAILABLE_TO_COUNTER", "RotWK/SET_PLAYER_COMMAND_POINTS_AVAILABLE_TO_COUNTER", "<11> <4>", 2, { 11, 4 }, TRUE },
+	{ ScriptAction::SET_PLAYER_COMMAND_POINTS_TOTAL_TO_COUNTER, 409, "SET_PLAYER_COMMAND_POINTS_TOTAL_TO_COUNTER", "RotWK/SET_PLAYER_COMMAND_POINTS_TOTAL_TO_COUNTER", "<11> <4>", 2, { 11, 4 }, TRUE },
 	{ ScriptAction::TEAM_IDLE_FOR_SECONDS, 414, "TEAM_IDLE_FOR_SECONDS", "RotWK/TEAM_IDLE_FOR_SECONDS", "<3> <0>", 2, { 3, 0 }, TRUE },
 	{ ScriptAction::SET_COUNTER_IN_SECONDS, 415, "SET_COUNTER_IN_SECONDS", "RotWK/SET_COUNTER_IN_SECONDS", "<4> <1>", 2, { 4, 1 }, TRUE },
 	{ ScriptAction::GIVE_PLAYER_UPGRADE, 419, "GIVE_PLAYER_UPGRADE", "RotWK/GIVE_PLAYER_UPGRADE", "<11> <33>", 2, { 11, 33 }, FALSE },
@@ -57,6 +59,7 @@ const RotwkTemplate s_actions[] = {
 	{ ScriptAction::NAMED_BASE_UNPACK_FREE, 493, "NAMED_BASE_UNPACK_FREE", "RotWK/NAMED_BASE_UNPACK_FREE", "<14> <54>", 2, { 14, 54 }, FALSE },
 	{ ScriptAction::UNIT_SET_TEAM, 499, "UNIT_SET_TEAM", "RotWK/UNIT_SET_TEAM", "<14> <3>", 2, { 14, 3 }, FALSE },
 	{ ScriptAction::TEAM_STAND_GROUND, 501, "TEAM_STAND_GROUND", "RotWK/TEAM_STAND_GROUND", "<3> <8>", 2, { 3, 8 }, FALSE },
+	{ ScriptAction::OVERRIDE_PLAYER_COMMAND_POINTS, 504, "OVERRIDE_PLAYER_COMMAND_POINTS", "RotWK/OVERRIDE_PLAYER_COMMAND_POINTS", "<11> <0> <0>", 3, { 11, 0, 0 }, TRUE },
 	{ ScriptAction::SET_COUNTER_TO_CLIENT_RANDOM_VALUE, 508, "SET_COUNTER_TO_CLIENT_RANDOM_VALUE", "RotWK/SET_COUNTER_TO_CLIENT_RANDOM_VALUE", "<4> <0> <0>", 3, { 4, 0, 0 }, TRUE },
 	{ ScriptAction::TEAM_CHANGE_OBJECT_STATUS, 537, "TEAM_CHANGE_OBJECT_STATUS", "RotWK/TEAM_CHANGE_OBJECT_STATUS", "<3> <41> <8>", 3, { 3, 41, 8 }, FALSE },
 	{ ScriptAction::ATTACK_MOVE_TEAM_TO_NAMED_OBJECT, 564, "ATTACK_MOVE_TEAM_TO_NAMED_OBJECT", "RotWK/ATTACK_MOVE_TEAM_TO_NAMED_OBJECT", "<3> <14>", 2, { 3, 14 }, FALSE },
@@ -154,6 +157,14 @@ Bool ScriptEngine::isRotwkImplemented(Bool condition, Int type)
 {
 	const RotwkTemplate *entry = findRotwk(condition, type);
 	return entry && entry->implemented;
+}
+
+Int ScriptEngine::findRotwkActionByRetailIndex(Int retailIndex)
+{
+	for (const RotwkTemplate &entry : s_actions)
+		if (entry.retailIndex == retailIndex)
+			return entry.type;
+	return -1;
 }
 
 void ScriptEngine::reportRotwkUnimplemented(Bool condition, Int type)
