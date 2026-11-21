@@ -1690,11 +1690,12 @@ unsigned DX8TextureCategoryClass::Add_Mesh(
 // ----------------------------------------------------------------------------
 
 static void Render_With_Animation_Opacity(DX8PolygonRendererClass & renderer, MeshClass & mesh,
-	const ShaderClass & shader, float opacity)
+	ShaderClass shader, float opacity)
 {
 	if (!(opacity > 0.0f))
 		return;
 
+	shader.Set_Depth_Mask(ShaderClass::DEPTH_WRITE_DISABLE);
 	DX8Wrapper::Set_Shader(shader);
 	DX8Wrapper::Apply_Render_State_Changes();
 

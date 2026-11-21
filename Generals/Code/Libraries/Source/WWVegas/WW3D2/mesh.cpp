@@ -105,6 +105,7 @@
 #include "meshmdl.h"
 #include "meshgeometry.h"
 #include "ww3d.h"
+#include "static_sort_list.h"
 #include "camera.h"
 #include "texture.h"
 #include "rinfo.h"
@@ -657,13 +658,18 @@ int MeshClass::Get_Num_Polys() const
 void MeshClass::Render(RenderInfoClass & rinfo)
 {
 	WWPROFILE("Mesh::Render");
-	if (!Is_Not_Hidden_At_All() || Get_Animation_Opacity() == 0.0f) {
+	const float animationOpacity = Get_Animation_Opacity();
+	if (!Is_Not_Hidden_At_All() || animationOpacity == 0.0f) {
 		return;
 	}
 
 	// If static sort lists are enabled and this mesh has a sort level, put it on the list instead
 	// of rendering it.
 	unsigned int sort_level = (unsigned int)Model->Get_Sort_Level();
+	if (animationOpacity < 1.0f && sort_level == SORT_LEVEL_NONE &&
+		(WW3D::Are_Static_Sort_Lists_Enabled() || StaticSortListClass::Is_Rendering()) &&
+		rinfo.Current_Override_Flags() == 0 && rinfo.Additional_Pass_Count() == 0)
+		sort_level = SORT_LEVEL_BIN2;
 
 	if (WW3D::Are_Static_Sort_Lists_Enabled() && sort_level != SORT_LEVEL_NONE) {
 

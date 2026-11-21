@@ -18,6 +18,17 @@ TEST(W3dBfmeChunks, InfluenceUsesFourLittleEndianWords)
 	EXPECT_EQ(influence.Weight1, 25);
 }
 
+TEST(W3dBfmeChunks, ClassicOpacityRejectsTrailingPartialWord)
+{
+	const uint8_t packets[] = {0, 0, 0, 0, 0, 0, 128, 63, 0};
+	EXPECT_TRUE(W3dBfme::ValidClassicOpacityPackets(1, 1, sizeof(packets) - 1));
+	EXPECT_FALSE(W3dBfme::ValidClassicOpacityPackets(1, 1, sizeof(packets)));
+	EXPECT_FALSE(W3dBfme::ValidClassicOpacityPackets(1, 1, sizeof(packets) - 2));
+	EXPECT_FALSE(W3dBfme::ValidClassicOpacityPackets(1, 1, sizeof(packets) + 3));
+	EXPECT_FALSE(W3dBfme::ValidClassicOpacityPackets(0, 1, 0));
+	EXPECT_FALSE(W3dBfme::ValidClassicOpacityPackets(1, 2, 8));
+}
+
 TEST(W3dBfmeChunks, SecondStreamRequiresOneVectorPerVertex)
 {
 	const uint8_t bytes[] = {0, 0, 128, 63, 0, 0, 0, 192, 0, 0, 0, 63};

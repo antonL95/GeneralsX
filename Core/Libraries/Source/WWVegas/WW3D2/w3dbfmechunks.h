@@ -11,6 +11,13 @@ namespace W3dBfme
 using Byte = uint8_t;
 inline constexpr uint32_t SteppedMovement = 0x80000000u;
 
+inline bool ValidClassicOpacityPackets(uint32_t keyCount, unsigned vectorLength, std::size_t packetBytes)
+{
+	constexpr std::size_t keyBytes = 2 * sizeof(uint32_t);
+	return vectorLength == 1 && keyCount != 0 &&
+		packetBytes % keyBytes == 0 && packetBytes / keyBytes == keyCount;
+}
+
 inline uint16_t ReadWord(const Byte* data)
 {
 	return uint16_t(data[0]) | (uint16_t(data[1]) << 8);

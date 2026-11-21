@@ -193,6 +193,7 @@ RenderObjClass::RenderObjClass() :
 RenderObjClass::RenderObjClass(const RenderObjClass & src) :
 	Bits(src.Bits),
 	AnimationOpacity(src.AnimationOpacity),
+	EffectiveAnimationOpacity(src.AnimationOpacity),
 	Transform(src.Transform),
 	NativeScreenSize(src.NativeScreenSize),
 	Scene(nullptr),
@@ -230,7 +231,7 @@ RenderObjClass & RenderObjClass::operator = (const RenderObjClass & that)
 	if (this != &that) {
 		Set_Hidden(that.Is_Hidden());
 		Set_Animation_Hidden(that.Is_Animation_Hidden());
-		AnimationOpacity = that.AnimationOpacity;
+		Set_Animation_Opacity(that.AnimationOpacity);
 		Set_Force_Visible(that.Is_Force_Visible());
 		Set_Collision_Type(that.Get_Collision_Type());
 		Set_Native_Screen_Size(that.Get_Native_Screen_Size());
@@ -375,17 +376,21 @@ SceneClass * RenderObjClass::Get_Scene()
  * HISTORY:                                                                                    *
  *   3/4/99     GTH : Created.                                                                 *
  *=============================================================================================*/
-float RenderObjClass::Get_Animation_Opacity() const
+void RenderObjClass::Update_Animation_Opacity(float opacity)
 {
-	float opacity = 1.0f;
-	for (auto *object = this; object; object = object->Get_Container()) {
-		const float value = object->AnimationOpacity;
-		if (value <= 0.0f)
-			return 0.0f;
-		if (value < 1.0f)
-			opacity *= value;
+	AnimationOpacity = opacity <= 0.0f ? 0.0f : opacity < 1.0f ? opacity : 1.0f;
+	const float effective = Container ? Container->Get_Animation_Opacity() * AnimationOpacity : AnimationOpacity;
+	if (effective == EffectiveAnimationOpacity)
+		return;
+
+	EffectiveAnimationOpacity = effective;
+	const int count = Get_Num_Sub_Objects();
+	for (int i = 0; i < count; ++i) {
+		RenderObjClass *child = Get_Sub_Object(i);
+		if (child && child->Get_Container() == this)
+			child->Update_Animation_Opacity(child->AnimationOpacity);
+		REF_PTR_RELEASE(child);
 	}
-	return opacity;
 }
 
 void RenderObjClass::Set_Container(RenderObjClass * con)
@@ -394,6 +399,8 @@ void RenderObjClass::Set_Container(RenderObjClass * con)
 	// Houston, there is a problem!
 	WWASSERT((con == nullptr) || (Container == nullptr));
 	Container = con;
+	if (AnimationOpacity != EffectiveAnimationOpacity || (con && con->Get_Animation_Opacity() != 1.0f))
+		Update_Animation_Opacity(AnimationOpacity);
 }
 
 #ifdef GET_CONTAINER_INLINE

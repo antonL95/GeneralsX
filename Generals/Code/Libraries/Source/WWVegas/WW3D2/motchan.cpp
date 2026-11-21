@@ -376,9 +376,13 @@ void TimeCodedMotionChannelClass::Free()
  *=============================================================================================*/
 bool TimeCodedMotionChannelClass::Load_W3D(ChunkLoadClass & cload)
 {
-	int size = cload.Cur_Chunk_Length();
-	unsigned int datasize = size - sizeof(W3dTimeCodedAnimChannelStruct);
-	unsigned int numInts  = (datasize / sizeof(uint32)) + 1;
+	const unsigned size = cload.Cur_Chunk_Length();
+	if (size < sizeof(W3dTimeCodedAnimChannelStruct))
+		return false;
+	const unsigned datasize = size - sizeof(W3dTimeCodedAnimChannelStruct);
+	if (datasize % sizeof(uint32) != 0)
+		return false;
+	const unsigned numInts = (datasize / sizeof(uint32)) + 1;
 
 	W3dTimeCodedAnimChannelStruct chan;
 	if (cload.Read(&chan,sizeof(W3dTimeCodedAnimChannelStruct)) != sizeof(W3dTimeCodedAnimChannelStruct)) {
@@ -389,7 +393,8 @@ bool TimeCodedMotionChannelClass::Load_W3D(ChunkLoadClass & cload)
 	VectorLen    = chan.VectorLen;
 	Type 		    = chan.Flags;
 	PivotIdx     = chan.Pivot;
-	if (Type == ANIM_CHANNEL_OPACITY && (VectorLen != 1 || NumTimeCodes == 0 || NumTimeCodes > numInts / 2))
+	if (Type == ANIM_CHANNEL_OPACITY &&
+		!W3dBfme::ValidClassicOpacityPackets(NumTimeCodes, VectorLen, size - offsetof(W3dTimeCodedAnimChannelStruct, Data)))
 		return false;
 	PacketSize   = VectorLen+1;
 	CachedIdx	 = 0;

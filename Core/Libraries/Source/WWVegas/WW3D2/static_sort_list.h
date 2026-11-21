@@ -46,7 +46,11 @@ class RenderInfoClass;
 // Just defines the interface for the class as used by WW3D..
 class StaticSortListClass
 {
+	friend class WW3D;
+	inline static bool Rendering = false;
+
 	public:
+		static bool Is_Rendering() { return Rendering; }
 		///////////////////////////////////////////////////////////////////////////////////
 		// Construction.
 		StaticSortListClass() {}

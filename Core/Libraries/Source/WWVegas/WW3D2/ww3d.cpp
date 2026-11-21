@@ -2096,7 +2096,10 @@ void WW3D::Render_And_Clear_Static_Sort_Lists(RenderInfoClass & rinfo)
 	// Render() function will just dump the objects right back on the same lists.
 	bool old_enable = AreStaticSortListsEnabled;
 	AreStaticSortListsEnabled = false;
+	const bool was_rendering = StaticSortListClass::Rendering;
+	StaticSortListClass::Rendering = true;
 	CurrentStaticSortLists->Render_And_Clear(rinfo);
+	StaticSortListClass::Rendering = was_rendering;
 	AreStaticSortListsEnabled = old_enable;
 }
 
