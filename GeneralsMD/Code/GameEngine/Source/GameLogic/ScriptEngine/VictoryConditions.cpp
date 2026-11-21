@@ -440,24 +440,19 @@ void VictoryConditions::cachePlayerPtrs()
 		return;
 
 	m_retailSandbox = false;
-	if (RetailFileLayers::enabled() && TheGameInfo)
+	if (RetailFileLayers::enabled() && TheGameLogic->getGameMode() == GAME_SKIRMISH &&
+		TheGameInfo && TheGameInfo == TheSkirmishGameInfo)
 	{
-		const GameSlot *first = nullptr;
-		Bool opposingAlliance = FALSE;
+		const Int localSlot = TheGameInfo->getLocalSlotNum();
+		Bool solo = localSlot >= 0 && localSlot < MAX_SLOTS;
 		for (Int i = 0; i < MAX_SLOTS; ++i)
 		{
 			const GameSlot *slot = TheGameInfo->getConstSlot(i);
-			if (!slot || !slot->isOccupied() || slot->getPlayerTemplate() == PLAYERTEMPLATE_OBSERVER)
-				continue;
-			if (!first)
-				first = slot;
-			else if (slot->getTeamNumber() < 0 || slot->getTeamNumber() != first->getTeamNumber())
-			{
-				opposingAlliance = TRUE;
-				break;
-			}
+			solo = solo && slot && (i == localSlot ?
+				slot->isHuman() && slot->getPlayerTemplate() != PLAYERTEMPLATE_OBSERVER :
+				slot->getState() == SLOT_CLOSED);
 		}
-		m_retailSandbox = first && !opposingAlliance;
+		m_retailSandbox = solo;
 	}
 
 	Int playerCount = 0;

@@ -9,11 +9,13 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <locale>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
@@ -173,6 +175,7 @@ namespace
 		uint32_t character = UINT32_MAX;
 		Transform transform;
 		uint32_t rgba = UINT32_MAX, extra = 0, clipDepth = 0;
+		std::optional<uint32_t> rgb;
 		std::string name;
 	};
 
@@ -187,7 +190,7 @@ namespace
 
 	struct Movie
 	{
-		Reader apt;
+		Reader apt, constants;
 		std::string name, prefix;
 		size_t root = 0;
 		std::vector<size_t> characters;
@@ -195,7 +198,140 @@ namespace
 		std::map<std::string, uint32_t> exports;
 		std::map<Int, Int> atlasPages;
 		std::map<uint32_t, std::vector<Geometry>> geometry;
+
+		std::string poolString(size_t pool, uint32_t index) const
+		{
+			const auto [count, table] = apt.list(pool, 4);
+			if (index >= count)
+				return {};
+			const uint32_t entry = apt.number(table + 4 * index);
+			if (entry >= constants.number(24))
+				return {};
+			const size_t offset = 32 + size_t(entry) * 8;
+			return constants.number(offset) == 1 ? constants.string(offset + 4) : std::string{};
+		}
 	};
+
+	using FrameColors = std::map<std::string, uint32_t>;
+
+	std::optional<uint32_t> parseRgb(std::string_view text)
+	{
+		if (text.starts_with("0x") || text.starts_with("0X"))
+			text.remove_prefix(2);
+		if (text.size() != 6)
+			return {};
+		uint32_t rgb = 0;
+		const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), rgb, 16);
+		if (error != std::errc{} || end != text.data() + text.size())
+			return {};
+		return ((rgb >> 16) & 255) | (rgb & 0xFF00) | ((rgb & 255) << 16);
+	}
+
+	FrameColors readFrameColors(const Movie &movie) try
+	{
+		const Reader &r = movie.apt;
+		const auto [count, frames] = r.list(movie.root + 8, 8);
+		if (!count)
+			return {};
+		const auto [items, table] = r.list(frames, 4);
+		for (size_t i = 0; i < items; ++i)
+		{
+			const size_t item = r.number(table + 4 * i);
+			if (!item || r.number(item) != 1)
+				continue;
+			const size_t start = r.number(item + 4);
+			if (start >= r.bytes.size() || r.bytes[start] != 0x88)
+				continue;
+			const size_t pool = (start + 4) & ~size_t(3);
+			size_t body = pool + 8;
+			while (body < r.bytes.size() && r.bytes[body] == 0x9B)
+			{
+				const size_t header = (body + 4) & ~size_t(3);
+				const size_t length = r.number(header + 12);
+				body = header + 24;
+				r.check(body, length);
+				body += length;
+			}
+
+			const size_t limit = std::min(r.bytes.size(), body + 16384);
+			FrameColors colors;
+			for (size_t at = body; at < limit; )
+			{
+				const auto opcode = r.bytes[at];
+				if (limit - at >= 5 && opcode == 0xA2 && r.bytes[at + 4] == 0x1D)
+				{
+					const auto variable = movie.poolString(pool, r.bytes[at + 1]);
+					const auto value = movie.poolString(pool, r.bytes[at + 3]);
+					if (r.bytes[at + 2] == 0xA2)
+					{
+						if (const auto rgb = parseRgb(value))
+							colors[variable] = *rgb;
+						at += 5;
+						continue;
+					}
+					if (r.bytes[at + 2] == 0xAE)
+					{
+						if (const auto source = colors.find(value); source != colors.end())
+							colors[variable] = source->second;
+						at += 5;
+						continue;
+					}
+				}
+				switch (opcode)
+				{
+					case 0xA2: case 0xAE: case 0xAF: case 0xB2: at += 2; break;
+					case 0x1D: case 0x47: case 0x4F: case 0x5A: ++at; break;
+					default: return colors;
+				}
+			}
+			return colors;
+		}
+		return {};
+	}
+	catch (const std::runtime_error &)
+	{
+		return {};
+	}
+
+	std::optional<uint32_t> readClipRgb(const Movie &movie, size_t events, const FrameColors &colors) try
+	{
+		if (!events || colors.empty())
+			return {};
+		const Reader &r = movie.apt;
+		const auto [count, table] = r.list(events, 12);
+		if (count > 32)
+			return {};
+		for (size_t i = 0; i < count; ++i)
+		{
+			const size_t event = table + 12 * i;
+			if ((r.number(event) & 0xFFFFFF) != 1)
+				continue;
+			const size_t start = r.number(event + 8);
+			if (start >= r.bytes.size() || r.bytes[start] != 0x88)
+				continue;
+			const size_t pool = (start + 4) & ~size_t(3);
+			const size_t body = pool + 8;
+			constexpr std::array<int, 21> pattern{
+				0xA2, -1, 0x70, 0x5A, 0xA2, -1, 0x40, 0x1D, 0xA2, -1, 0xAE, -1, 0xAF, -1,
+				0x47, 0x5A, 0xAE, -1, 0xB2, -1, 0x00
+			};
+			if (body > r.bytes.size() || pattern.size() > r.bytes.size() - body ||
+				!std::equal(pattern.begin(), pattern.end(), r.bytes.begin() + body,
+					[](int expected, unsigned char actual) { return expected < 0 || expected == actual; }))
+				continue;
+			auto name = [&](size_t offset) { return movie.poolString(pool, r.bytes[body + offset]); };
+			if (name(1) != name(17) || name(5) != "Color" || name(9) != "0x" ||
+				name(11) != "_root" || name(19) != "setRGB")
+				continue;
+			if (const auto rgb = colors.find(name(13)); rgb != colors.end())
+				return rgb->second;
+		}
+		return {};
+	}
+	catch (const std::runtime_error &)
+	{
+		return {};
+	}
 
 	bool safeMovieName(const std::string &name)
 	{
@@ -232,6 +368,7 @@ public:
 	std::map<std::string, Box> boxes;
 	std::map<std::string, Coord2D> positions;
 	std::map<std::string, std::string> nestedFrames;
+	FrameColors frameColors;
 	std::vector<Art> art;
 	std::vector<std::vector<Art>> frames;
 	std::vector<Label> labels;
@@ -256,13 +393,13 @@ public:
 			movie.apt.bytes = readAsset(base + ".apt");
 			if (movie.apt.bytes.empty())
 				continue;
-			const Reader constants{readAsset(base + ".const")};
+			movie.constants.bytes = readAsset(base + ".const");
 			const std::string_view aptHeader(reinterpret_cast<const char *>(movie.apt.bytes.data()), movie.apt.bytes.size());
-			if (!aptHeader.starts_with("Apt Data:") || constants.bytes.size() < 32)
+			if (!aptHeader.starts_with("Apt Data:") || movie.constants.bytes.size() < 32)
 				return nullptr;
 
 			const Reader &r = movie.apt;
-			const size_t root = constants.number(20);
+			const size_t root = movie.constants.number(20);
 			if (r.number(root) != 9 || r.number(root + 4) != 0x09876543)
 				return nullptr;
 			movie.prefix = prefix;
@@ -532,6 +669,8 @@ public:
 							placement.name = r.string(q + 52);
 						if (flags & 64)
 							placement.clipDepth = r.number(q + 56);
+						if ((flags & 128) && !frameColors.empty())
+							placement.rgb = readClipRgb(movie, r.number(q + 60), frameColors);
 						break;
 					}
 					case 4:
@@ -547,8 +686,11 @@ public:
 			if (placement.clipDepth)
 				continue;
 			const std::string name = placement.name.empty() ? "@" + std::to_string(layer) : placement.name;
+			const Tint color = placement.rgb ?
+				tint.compose(placement.rgba & 0xFF000000, (placement.extra & 0xFF000000) | *placement.rgb) :
+				tint.compose(placement.rgba, placement.extra);
 			include(result, emit(movie, placement.character, m.compose(placement.transform),
-				tint.compose(placement.rgba, placement.extra), path + "." + name, depth + 1));
+				color, path + "." + name, depth + 1));
 		}
 		return result;
 	}
@@ -571,6 +713,7 @@ AptScene::AptScene(const char *movie, const char *frame,
 		if (data->width <= 0 || data->width > 8192 || data->height <= 0 || data->height > 8192)
 			return;
 
+		data->frameColors = readFrameColors(*root);
 		data->timeline(*root, root->root + 8, {}, {}, "_root", 0, frame);
 		if (!data->art.empty())
 			m_data = std::move(data);

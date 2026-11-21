@@ -45,6 +45,8 @@
 #include "Common/GameUtility.h"
 #include "Common/RetailFileLayers.h"
 #include "GameClient/RetailWorldUI.h"
+#include "GameClient/UiRadialRing.h"
+#include "GameClient/UiScale.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "Common/GlobalData.h"
 #include "Common/ModuleFactory.h"
@@ -3731,7 +3733,13 @@ void Drawable::drawConstructPercent( const IRegion2D *healthBarRegion )
 	// get center position in drawable
 	ICoord2D screen;
 	Coord3D pos;
-	getDrawableGeometryInfo().getCenterPosition(*getPosition(), pos);
+	if (retail)
+	{
+		pos = *obj->getPosition();
+		pos.z += obj->getGeometryInfo().getMaxHeightAbovePosition() * 0.5f;
+	}
+	else
+		getDrawableGeometryInfo().getCenterPosition(*getPosition(), pos);
 
 	// convert drawable center position to screen coords
 	const Bool visible = TheTacticalView->worldToScreen(&pos, &screen);
@@ -3745,7 +3753,14 @@ void Drawable::drawConstructPercent( const IRegion2D *healthBarRegion )
 	Int tw = m_constructDisplayString->getWidth();
 	screen.x -= (tw / 2);
 	if (retail)
-		screen.y -= static_cast<Int>(TheDisplay->getHeight() * (28.0f / 720.0f) + 0.5f);
+	{
+		const double scale = UiScale::scale(TheDisplay->getWidth(), TheDisplay->getHeight());
+		const double buttonSize = UiRadialRing::ButtonDesignSize * scale;
+		const double buttonTop = UiRadialRing::radius(1, buttonSize) + buttonSize * 0.5;
+		Int height = 0;
+		m_constructDisplayString->getSize(nullptr, &height);
+		screen.y -= static_cast<Int>(std::ceil(buttonTop + 4.0 * scale)) + height;
+	}
 	m_constructDisplayString->draw( screen.x, screen.y, color, dropColor );
 
 }
