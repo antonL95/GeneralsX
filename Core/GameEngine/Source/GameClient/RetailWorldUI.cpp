@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include "Common/GameUtility.h"
@@ -314,13 +315,23 @@ Bool drawDragPreview(Drawable* draw, void* userData)
 Real RetailWorldUI::remainingLifetime(const Object& object)
 {
 #if !RTS_GENERALS
-	if (RetailFileLayers::enabled() && object.isSelectable())
+	if (RetailFileLayers::enabled() && object.isSelectable() &&
+		!object.isKindOf(KINDOF_MINE) && !object.isKindOf(KINDOF_DEPLOYED_MINE))
 	{
 		static const NameKeyType lifetimeKey = NAMEKEY("LifetimeUpdate");
 		const auto* lifetime = static_cast<const LifetimeUpdate*>(object.findUpdateModule(lifetimeKey));
 		const UnsignedInt now = TheGameLogic->getFrame();
 		if (lifetime && lifetime->getLifetimeFrames() > 0 && lifetime->getDieFrame() > now)
+		{
+			if (!object.isKindOf(KINDOF_SUMMONED))
+			{
+				AsciiString name = object.getTemplate()->getName();
+				name.toLower();
+				if (std::string_view(name.str()).find("summoned") == std::string_view::npos)
+					return 0.0f;
+			}
 			return std::min(1.0f, static_cast<Real>(lifetime->getDieFrame() - now) / lifetime->getLifetimeFrames());
+		}
 	}
 #else
 	(void)object;

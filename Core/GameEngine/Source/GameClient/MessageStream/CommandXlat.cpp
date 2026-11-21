@@ -61,6 +61,7 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GameText.h"
+#include "GameClient/Keyboard.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/Shell.h"
@@ -1862,6 +1863,22 @@ GameMessage::Type CommandTranslator::handleResumeConstructionCommand( Object *ob
 
 			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_RESUME_CONSTRUCTION );
 
+			if (RetailFileLayers::enabled() && !TheKeyboard->isShift() && !TheInGameUI->isInWaypointMode())
+			{
+				const DrawableList* selected = TheInGameUI->getAllSelectedDrawables();
+				GameMessage* deselect = nullptr;
+				for (auto it = selected->begin(); it != selected->end(); )
+				{
+					Drawable* draw = *it++;
+					Object* builder = draw->getObject();
+					if (!TheActionManager->canResumeConstructionOf(builder, obj, CMD_FROM_PLAYER))
+						continue;
+					if (!deselect)
+						deselect = TheMessageStream->appendMessage(GameMessage::MSG_REMOVE_FROM_SELECTED_GROUP);
+					deselect->appendObjectIDArgument(builder->getID());
+					TheInGameUI->deselectDrawable(draw);
+				}
+			}
 		}
 
 	}
@@ -2418,6 +2435,12 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 		return valid ? GameMessage::MSG_DO_SPELLBOOK_SPECIAL_POWER : GameMessage::MSG_INVALID;
 	}
 
+	if (RetailFileLayers::enabled() && !spell && draw &&
+		(TheKeyboard->isShift() || TheInGameUI->isInWaypointMode()) &&
+		!TheInGameUI->isInForceAttackMode() && TheInGameUI->areSelectedObjectsControllable() &&
+		TheInGameUI->canSelectedObjectsDoAction(InGameUI::ACTIONTYPE_RESUME_CONSTRUCTION, obj, InGameUI::SELECTION_ANY))
+		return handleResumeConstructionCommand(obj, type);
+
 	// Then we should determine if the game currently prefers selection events. If it does, then return
 	// the invalid message.
 	if( obj && obj->isLocallyControlled() && TheInGameUI->isInPreferSelectionMode() )
@@ -2674,33 +2697,7 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 		else if( draw && !TheInGameUI->isInForceAttackMode() &&
 						 TheInGameUI->canSelectedObjectsDoAction( InGameUI::ACTIONTYPE_RESUME_CONSTRUCTION, obj, InGameUI::SELECTION_ANY ) )
 		{
-
-			if( type == DO_COMMAND || type == EVALUATE_ONLY )
-			{
-
-				// do the command
-				msgType = GameMessage::MSG_RESUME_CONSTRUCTION;
-				if( type == DO_COMMAND )
-				{
-					GameMessage *resumeMsg = TheMessageStream->appendMessage( msgType );
-
-					resumeMsg->appendObjectIDArgument( obj->getID() );
-
-					pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_RESUME_CONSTRUCTION );
-
-				}
-
-			}
-			else
-			{
-
-				// generate a hint message
-				msgType = GameMessage::MSG_RESUME_CONSTRUCTION_HINT;
-				hintMessage = TheMessageStream->appendMessage( msgType );
-				hintMessage->appendObjectIDArgument( obj->getID() );
-
-			}
-
+			msgType = handleResumeConstructionCommand(obj, type);
 		}
 		// ********************************************************************************************
 		else if( draw && !TheInGameUI->isInForceAttackMode() &&

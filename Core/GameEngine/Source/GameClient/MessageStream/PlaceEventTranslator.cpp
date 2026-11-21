@@ -39,6 +39,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/Eva.h"
+#include "GameClient/KeyDefs.h"
 #include "GameClient/PlaceEventTranslator.h"
 
 #include "GameLogic/GameLogic.h"
@@ -319,11 +320,22 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 					}
 
 					pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), placeMsg->getType() );
-					if (RetailFileLayers::enabled() && builderObj && builderObj->isKindOf(KINDOF_DOZER))
-						TheInGameUI->deselectAllDrawables();
-
-					// get out of pending placement mode, this will also clear the arrow anchor status
-					TheInGameUI->placeBuildAvailable( nullptr, nullptr );
+					const Bool retailBuilder = RetailFileLayers::enabled() && builderObj && builderObj->isKindOf(KINDOF_DOZER);
+					if (retailBuilder && (msg->getArgument(1)->integer & KEY_STATE_SHIFT))
+					{
+						TheInGameUI->setPlacementStart(nullptr);
+					}
+					else
+					{
+						TheInGameUI->placeBuildAvailable(nullptr, nullptr);
+						Drawable* builder = retailBuilder ? builderObj->getDrawable() : nullptr;
+						if (builder && builder->isSelected())
+						{
+							TheMessageStream->appendMessage(GameMessage::MSG_REMOVE_FROM_SELECTED_GROUP)
+								->appendObjectIDArgument(builderObj->getID());
+							TheInGameUI->deselectDrawable(builder);
+						}
+					}
 
 				}
 				else
