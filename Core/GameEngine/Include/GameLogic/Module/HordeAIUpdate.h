@@ -36,6 +36,7 @@ private:
 	Bool m_engaging = FALSE;
 	AICommandType m_order = NO_ORDER;
 	Coord3D m_orderPosition{};
+	Real m_retaliationStartDistanceSquared = 0.0f;
 	ObjectID m_guardObject = INVALID_ID;
 	Int m_guardArea = -1;
 	GuardMode m_guardMode = GUARDMODE_NORMAL;
