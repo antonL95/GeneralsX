@@ -34,6 +34,7 @@
 #include "Common/Upgrade.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/CostModifierUpgrade.h"
 #include "Common/SpecialPowerINI.h"
 #include "Common/Player.h"
 #include "Common/Xfer.h"
@@ -221,6 +222,8 @@ Int UpgradeTemplate::calcTimeToBuild( Player *player ) const
 //-------------------------------------------------------------------------------------------------
 Int UpgradeTemplate::calcCostToBuild( Player *player ) const
 {
+	if (RetailFileLayers::enabled() && player)
+		return static_cast<Int>(m_cost * CostModifierUpgrade::retailUpgradeFactor(*player, *this));
 
 	///@todo modify this by any player handicaps
 	return m_cost;

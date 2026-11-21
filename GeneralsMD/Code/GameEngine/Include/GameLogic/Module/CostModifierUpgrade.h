@@ -54,11 +54,14 @@
 //-----------------------------------------------------------------------------
 #include "GameLogic/Module/UpgradeModule.h"
 #include "Common/KindOf.h"
+#include "Common/SpecialPowerINI.h"
 //-----------------------------------------------------------------------------
 // FORWARD REFERENCES /////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 class Thing;
 class Player;
+class UpgradeTemplate;
+class ThingTemplate;
 
 //-----------------------------------------------------------------------------
 // TYPE DEFINES ///////////////////////////////////////////////////////////////
@@ -87,6 +90,16 @@ public:
 
 	Real m_percentage;
 	KindOfMaskType m_kindOf;
+	std::vector<Real> m_retailPercentages;
+	SpecialPowerObjectFilter m_retailFilter;
+	AsciiString m_retailLabel;
+	std::vector<AsciiString> m_retailUpgrades;
+	Bool m_retailStartsActive = FALSE;
+	Bool m_retailUpgradeDiscount = FALSE;
+
+	static void addRetailFields(MultiIniFieldParse& p);
+	static void parsePercentage(INI* ini, void* instance, void* store, const void* userData);
+	Bool usesRetailDiscount() const;
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -101,6 +114,10 @@ class CostModifierUpgrade : public UpgradeModule
 public:
 
 	CostModifierUpgrade( Thing *thing, const ModuleData* moduleData );
+	const CostModifierUpgradeModuleData* activeRetailData() const;
+	static Real retailBuildFactor(const Player& player, const ThingTemplate& type);
+	static Real retailUpgradeFactor(const Player& player, const UpgradeTemplate& upgrade);
+	static Bool retailLabel(const Object& object, AsciiString& label, Real& discount);
 	// virtual destructor prototype defined by MemoryPoolObject
 
 	virtual void onDelete() override;																///< we have some work to do when this module goes away

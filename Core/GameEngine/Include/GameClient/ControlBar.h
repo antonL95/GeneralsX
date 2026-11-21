@@ -1009,6 +1009,7 @@ protected:
 	GameWindow *m_retailResources = nullptr;
 	GameWindow *m_retailCommandPoints = nullptr;
 	mutable DisplayString *m_retailLevelLabel = nullptr;
+	mutable DisplayString *m_retailBuildingDetails = nullptr;
 	mutable Int m_retailLabelRank = 0;
 	GameWindow *m_retailPowersScreen = nullptr;
 	GameWindow *m_retailPowersCounter = nullptr;

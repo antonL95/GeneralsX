@@ -89,10 +89,11 @@ CostModifierUpgradeModuleData::CostModifierUpgradeModuleData()
 	static const FieldParse dataFieldParse[] =
 	{
 		{ "EffectKindOf",		KindOfMaskType::parseFromINI, nullptr, offsetof( CostModifierUpgradeModuleData, m_kindOf ) },
-		{ "Percentage",			INI::parsePercentToReal, nullptr, offsetof( CostModifierUpgradeModuleData, m_percentage ) },
+		{ "Percentage", parsePercentage, nullptr, 0 },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
+	addRetailFields(p);
 
 }
 
@@ -119,6 +120,8 @@ CostModifierUpgrade::~CostModifierUpgrade()
 //-------------------------------------------------------------------------------------------------
 void CostModifierUpgrade::onDelete()
 {
+	if (getCostModifierUpgradeModuleData()->usesRetailDiscount())
+		return;
 
 	// if we haven't been upgraded there is nothing to clean up
 	if( isAlreadyUpgraded() == FALSE )
@@ -138,6 +141,8 @@ void CostModifierUpgrade::onDelete()
 //-------------------------------------------------------------------------------------------------
 void CostModifierUpgrade::onCapture( Player *oldOwner, Player *newOwner )
 {
+	if (getCostModifierUpgradeModuleData()->usesRetailDiscount())
+		return;
 
 	// do nothing if we haven't upgraded yet
 	if( isAlreadyUpgraded() == FALSE )
@@ -165,6 +170,8 @@ void CostModifierUpgrade::onCapture( Player *oldOwner, Player *newOwner )
 //-------------------------------------------------------------------------------------------------
 void CostModifierUpgrade::upgradeImplementation()
 {
+	if (getCostModifierUpgradeModuleData()->usesRetailDiscount())
+		return;
 	Player *player = getObject()->getControllingPlayer();
 
 	// update the player with another TypeOfProductionCostChange

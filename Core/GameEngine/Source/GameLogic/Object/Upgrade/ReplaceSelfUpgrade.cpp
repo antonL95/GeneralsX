@@ -2,6 +2,7 @@
 
 #include "Common/BuildAssistant.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
@@ -10,6 +11,7 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/CreateModule.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -20,6 +22,25 @@ namespace
 	{
 		return object->isKindOf(KINDOF_WALL_SEGMENT) || object->isKindOf(KINDOF_WALL_GATE) ||
 			object->isKindOf(KINDOF_WALL_HUB) || object->isKindOf(KINDOF_DEFENSIVE_WALL);
+	}
+
+	Bool fitsWallGate(const Object& source, const ThingTemplate& gate)
+	{
+		const Coord3D& center = *source.getPosition();
+		const Real angle = source.getOrientation();
+		const auto& data = gate.getRotWKObjectData();
+		const auto& offset = data.primaryGeometry.offset;
+		const Bool extended = !data.additionalGeometries.empty() || offset.x != 0.0f || offset.y != 0.0f || offset.z != 0.0f;
+		PartitionFilterWouldCollide primary(center, gate.getTemplateGeometryInfo(), angle, TRUE);
+		for (Object* other = TheGameLogic->getFirstObject(); other; other = other->getNextObject())
+		{
+			if (other == &source || !other->isKindOf(KINDOF_STRUCTURE) || other->isKindOf(KINDOF_NO_COLLIDE) ||
+				other->isDestroyed() || other->isEffectivelyDead())
+				continue;
+			if (extended ? GeometryUpgrade::constructionFootprintsOverlap(gate, center, angle, *other) : primary.allow(other))
+				return FALSE;
+		}
+		return TRUE;
 	}
 }
 
@@ -56,7 +77,7 @@ Bool ReplaceSelfUpgrade::findSites(std::vector<Site>& sites) const
 	}
 
 	if (sites.size() == 1 && isWallPiece(source))
-		return TRUE;
+		return !RetailFileLayers::enabled() || !sites.front().type->isKindOf(KINDOF_BLOCKING_GATE) || fitsWallGate(*source, *sites.front().type);
 
 	const Vector3 axis = source->getTransformMatrix()->Get_Y_Vector();
 	for (Site& site : sites)

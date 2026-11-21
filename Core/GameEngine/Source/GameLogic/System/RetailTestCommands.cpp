@@ -2616,6 +2616,9 @@ void execute(const Command& command, unsigned int frame)
 	}
 
 	const Bool placeAtPoint = command.action == "place" && command.hasPlacementPoint;
+	if (command.action.starts_with("bparity-") &&
+		runBuildingCommand(command.action, obj, command.structure.c_str(), command.hasLocation ? &command.location : nullptr, frame))
+		return;
 	if (command.action == "snapshot-devastation")
 	{
 		const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate("SpellBookDevastation");

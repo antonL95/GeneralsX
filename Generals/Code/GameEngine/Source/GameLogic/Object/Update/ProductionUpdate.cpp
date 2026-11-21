@@ -271,7 +271,7 @@ Bool ProductionUpdate::queueUpgrade( const UpgradeTemplate *upgrade )
 	Player *player = getObject()->getControllingPlayer();
 
 	// sanity check to make sure we can build this upgrade
-	if( upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER &&
+	if( (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER || RetailFileLayers::enabled()) &&
 			TheUpgradeCenter->canAffordUpgrade( player, upgrade ) == FALSE )
 		return FALSE;
 	else if( upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT &&
@@ -303,7 +303,8 @@ Bool ProductionUpdate::queueUpgrade( const UpgradeTemplate *upgrade )
 
 	// take the cost for the build away from the player
 	Money *money = player->getMoney();
-	money->withdraw( upgrade->calcCostToBuild( player ) );
+	const Int cost = upgrade->calcCostToBuild(player);
+	money->withdraw(cost);
 
 	// allocate a new production entry
 	ProductionEntry *production = newInstance(ProductionEntry);
@@ -311,6 +312,8 @@ Bool ProductionUpdate::queueUpgrade( const UpgradeTemplate *upgrade )
 	// assign production entry data
 	production->m_type = PRODUCTION_UPGRADE;
 	production->m_upgradeToResearch = upgrade;
+	if (RetailFileLayers::enabled())
+		production->m_costPaid = cost;
 	production->m_productionID = PRODUCTIONID_INVALID;  // not needed for upgrades, you can only have one of
 																	 // this type in the queue
 
@@ -400,10 +403,13 @@ Bool ProductionUpdate::queueCreateUnit( const ThingTemplate *unitType, Productio
 	// take the cost for the build away from the player
 	Player *player = getObject()->getControllingPlayer();
 	Money *money = player->getMoney();
-	money->withdraw( unitType->calcCostToBuild( player ) );
+	const Int cost = unitType->calcCostToBuild(player);
+	money->withdraw(cost);
 
 	// allocate a new production entry
 	ProductionEntry *production = newInstance(ProductionEntry);
+	if (RetailFileLayers::enabled())
+		production->m_costPaid = cost;
 
 	// Check to see if there is a quantity modifier entry. What this means is if we are building a particular unit
 	// and it has a modifier, we build that number of objects instead of just one. A good example is the Chinese
@@ -875,7 +881,7 @@ UpdateSleepTime ProductionUpdate::update()
 				ExperienceLevelStore::awardProductionExperience(us, upgrade->calcCostToBuild(nullptr));
 
 			// we finished an upgrade, lets add that money spent on it to the scorekeeper
-			player->getScoreKeeper()->addMoneySpent(upgrade->calcCostToBuild(player));
+			player->getScoreKeeper()->addMoneySpent(production->m_costPaid >= 0 ? production->m_costPaid : upgrade->calcCostToBuild(player));
 
 			// notify the script engine
 			TheScriptEngine->notifyOfCompletedUpgrade(
@@ -1087,7 +1093,7 @@ Bool ProductionUpdate::cancelUpgrade( ProductionEntry *production )
 
 	// refund money back to the player
 	Money *money = player->getMoney();
-	money->deposit( production->m_upgradeToResearch->calcCostToBuild( player ), TRUE, FALSE );
+	money->deposit(production->m_costPaid >= 0 ? production->m_costPaid : upgrade->calcCostToBuild(player), TRUE, FALSE);
 
 	// remove this production from the queue
 	removeFromProductionQueue( production );
@@ -1121,7 +1127,7 @@ Bool ProductionUpdate::cancelUnitCreate( ProductionEntry *production )
 
 	// give the player the cost of the object back
 	Money *money = player->getMoney();
-	money->deposit( production->m_objectToProduce->calcCostToBuild( player ), TRUE, FALSE );
+	money->deposit(production->m_costPaid >= 0 ? production->m_costPaid : production->m_objectToProduce->calcCostToBuild(player), TRUE, FALSE);
 
 	// remove from queue list
 	removeFromProductionQueue( production );
@@ -1277,7 +1283,10 @@ void ProductionUpdate::crc( Xfer *xfer )
 	if (RetailFileLayers::enabled())
 	{
 		for (ProductionEntry* entry = m_productionQueue; entry; entry = entry->m_next)
+		{
 			xfer->xferReal(&entry->m_powerBonusFrames);
+			xfer->xferInt(&entry->m_costPaid);
+		}
 	}
 
 }
@@ -1291,7 +1300,7 @@ void ProductionUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1334,6 +1343,8 @@ void ProductionUpdate::xfer( Xfer *xfer )
 			xfer->xferInt( &production->m_framesUnderConstruction );
 			if (version >= 2)
 				xfer->xferReal(&production->m_powerBonusFrames);
+			if (version >= 3)
+				xfer->xferInt(&production->m_costPaid);
 
 			// production quantity
 			xfer->xferInt( &production->m_productionQuantityTotal );
@@ -1425,6 +1436,8 @@ void ProductionUpdate::xfer( Xfer *xfer )
 			xfer->xferInt( &production->m_framesUnderConstruction );
 			if (version >= 2)
 				xfer->xferReal(&production->m_powerBonusFrames);
+			if (version >= 3)
+				xfer->xferInt(&production->m_costPaid);
 
 			// production quantity
 			xfer->xferInt( &production->m_productionQuantityTotal );

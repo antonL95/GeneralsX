@@ -41,6 +41,8 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/CastleBehavior.h"
+#include "GameLogic/Module/CostModifierUpgrade.h"
+#include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ProductionUpdate.h"
@@ -500,6 +502,40 @@ void ControlBar::drawRetailTexts() const
 		}
 		else
 			drawTextWindow(m_retailSelectionName, 2, GameMakeColor(255, 255, 255, 255));
+
+		if (object && object->isKindOf(KINDOF_STRUCTURE) && object->isLocallyControlled() &&
+			!object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+		{
+			UnicodeString details;
+			AsciiString label;
+			Real discount;
+			if (CostModifierUpgrade::retailLabel(*object, label, discount))
+				details.format(TheGameText->fetchOrSubstitute(label.str(), L"Discount %d%%"), REAL_TO_INT_FLOOR(discount * 100.0f + 0.5f));
+
+			Real radius, efficiency;
+			if (TerrainResourceBehavior::getDisplayInfo(*object->getTemplate(), *object->getPosition(),
+				*object->getControllingPlayer(), object, radius, efficiency))
+			{
+				UnicodeString percentage;
+				percentage.format(TheGameText->fetchOrSubstitute("GUI:TerrainResourcePercentageClaimable", L"%d%%"),
+					REAL_TO_INT_FLOOR(efficiency * 100.0f + 0.5f));
+				if (!details.isEmpty())
+					details.concat(L'\n');
+				details.concat(percentage);
+			}
+
+			if (!details.isEmpty())
+			{
+				if (!m_retailBuildingDetails)
+					m_retailBuildingDetails = TheDisplayStringManager->newDisplayString();
+				m_retailBuildingDetails->setFont(m_retailSelectionName->winGetFont());
+				if (m_retailBuildingDetails->getText().compare(details) != 0)
+					m_retailBuildingDetails->setText(details);
+				Int x, y, width, height;
+				windowRect(m_retailPortrait, x, y, width, height);
+				drawShadowedText(m_retailBuildingDetails, x, y + height / 3, width, height / 5, 2, text);
+			}
+		}
 	}
 }
 
@@ -1105,7 +1141,8 @@ void ControlBar::collectRetailPlacements(const CommandSet *commandSet, Object *o
 			if (!retailExtraEntryUsable(command, obj))
 				continue;
 		}
-		if (!command || command->getCommandType() == GUI_COMMAND_SET_STANCE)
+		if (!command || command->getCommandType() == GUI_COMMAND_SET_STANCE ||
+			(m_retailRadialMode && !command->isRadial() && !command->isInPalantir()))
 			continue;
 		Int slot = -1;
 		Int hero = -1;

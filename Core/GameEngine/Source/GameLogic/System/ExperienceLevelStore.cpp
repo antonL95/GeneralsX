@@ -26,6 +26,9 @@
 #include "GameLogic/ExperienceLevelRules.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/AttributeModifierHelper.h"
+#endif
 #include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
@@ -226,6 +229,12 @@ void apply(Object* obj, const Level& level, bool feedback)
 			granted += ',';
 		granted += name.str();
 	}
+#if !RTS_GENERALS
+	static const NameKeyType levelSource = NAMEKEY("ExperienceLevel");
+	const auto owner = AttributeModifiers::ownerOf(obj, levelSource);
+	for (const AsciiString& modifier : level.attributeModifiers)
+		AttributeModifiers::apply(obj, modifier, AttributeModifierHelper::USE_LIST_DURATION, 0, owner);
+#endif
 	if (level.conditions.any())
 		obj->setModelConditionFlags(level.conditions);
 	if (feedback && TheGameLogic->getFrame() >= 10 && TheFXListStore && level.levelUpFx.isNotEmpty())

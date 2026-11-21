@@ -1124,8 +1124,13 @@ ControlBar::ControlBar()
 //-------------------------------------------------------------------------------------------------
 ControlBar::~ControlBar()
 {
-	if (m_retailLevelLabel && TheDisplayStringManager)
-		TheDisplayStringManager->freeDisplayString(m_retailLevelLabel);
+	if (TheDisplayStringManager)
+	{
+		if (m_retailLevelLabel)
+			TheDisplayStringManager->freeDisplayString(m_retailLevelLabel);
+		if (m_retailBuildingDetails)
+			TheDisplayStringManager->freeDisplayString(m_retailBuildingDetails);
+	}
 	destroyRetailPowers();
 
 	if(m_scienceLayout)

@@ -38,12 +38,17 @@ struct Circle
 	Real radius;
 };
 
-Bool isVisibleUnit(Drawable* draw)
+Bool isVisibleSelectionDrawable(Drawable* draw)
 {
 	const Object* object = draw ? draw->getObject() : nullptr;
 	return object && !object->isEffectivelyDead() && object->isLogicallyVisible() &&
 		!draw->isDrawableEffectivelyHidden() &&
-		!draw->getFullyObscuredByShroud() && !object->isKindOf(KINDOF_STRUCTURE);
+		!draw->getFullyObscuredByShroud();
+}
+
+Bool isVisibleUnit(Drawable* draw)
+{
+	return isVisibleSelectionDrawable(draw) && !draw->getObject()->isKindOf(KINDOF_STRUCTURE);
 }
 
 void groundLine(View& view, Coord3D start, Coord3D end, Real width, Color color)
@@ -454,7 +459,8 @@ void RetailWorldUI::drawSelection(View& view, const IRegion2D* dragRegion,
 			if (drawMergedSelection(circles, *decal, horde != nullptr, selectionTint(*object), decals[id]))
 				active.insert(id);
 		}
-		else if (isVisibleUnit(draw) && decal && decal->style.compareNoCase("SHADOW_ALPHA_DECAL") == 0)
+		else if (decal && decal->style.compareNoCase("SHADOW_ALPHA_DECAL") == 0 &&
+			isVisibleSelectionDrawable(draw) && !object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 		{
 			const Real radius = selectionRadius(*decal, unitCircle(*draw, FALSE).radius);
 			decals[id].set(decal->texture, *draw->getPosition(), radius * 2.0f, radius * 2.0f,

@@ -23,6 +23,11 @@
 #include "GameLogic/TerrainResourceRules.h"
 #include "WWMath/wwmath.h"
 
+#if !RTS_GENERALS
+#include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
+#endif
+
 #include <cmath>
 #include <limits>
 
@@ -113,13 +118,20 @@ UpdateSleepTime TerrainResourceBehavior::update()
 	{
 		const auto claim = calculateClaim(*data, *object->getTemplate(), *object->getPosition(), *player,
 			object, m_claimFrame, static_cast<UnsignedInt>(object->getID()));
+		Real productionScale = 1.0f;
+#if !RTS_GENERALS
+		productionScale = AttributeModifiers::productionFactor(object);
+#endif
 		const UnsignedInt amount = TerrainResourceRules::income(data->m_maxIncome, claim.available,
-			claim.total, claim.upgradeScale, 1.0f, claim.playerScale);
+			claim.total, claim.upgradeScale, productionScale, claim.playerScale);
 		if (amount)
 		{
 			player->getMoney()->deposit(amount);
 			player->getScoreKeeper()->addMoneyEarned(amount);
 			RetailWorldUI::showPayout(*object, static_cast<Int>(amount), FALSE);
+#if !RTS_GENERALS
+			object->getExperienceTracker()->addRetailExperience(static_cast<Real>(amount));
+#endif
 		}
 	}
 	return static_cast<UpdateSleepTime>(std::clamp<UnsignedInt>(data->m_interval, 1, UPDATE_SLEEP_FOREVER));

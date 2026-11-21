@@ -45,6 +45,7 @@
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/CostModifierUpgrade.h"
 #include "Common/LatchRestore.h"
 #include "Common/MessageStream.h"
 #include "Common/Module.h"
@@ -2024,6 +2025,8 @@ Int ThingTemplate::calcCostToBuild( const Player* player) const
 	// changePercent format is "-.2 equals 20% cheaper"
 	Real factionModifier = 1 + player->getProductionCostChangePercent( getName() );
 	factionModifier *= player->getProductionCostChangeBasedOnKindOf( m_kindof );
+	if (RetailFileLayers::enabled())
+		factionModifier *= CostModifierUpgrade::retailBuildFactor(*player, *this);
 	return getBuildCost() * factionModifier * player->getHandicap()->getHandicap(Handicap::BUILDCOST, this);
 }
 

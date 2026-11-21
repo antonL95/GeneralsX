@@ -311,7 +311,7 @@ Bool ProductionUpdate::queueUpgrade( const UpgradeTemplate *upgrade )
 	Player *player = getObject()->getControllingPlayer();
 
 	// sanity check to make sure we can build this upgrade
-	if( upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER &&
+	if( (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER || RetailFileLayers::enabled()) &&
 			TheUpgradeCenter->canAffordUpgrade( player, upgrade ) == FALSE )
 		return FALSE;
 	else if( upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT &&
@@ -343,7 +343,8 @@ Bool ProductionUpdate::queueUpgrade( const UpgradeTemplate *upgrade )
 
 	// take the cost for the build away from the player
 	Money *money = player->getMoney();
-	money->withdraw( upgrade->calcCostToBuild( player ) );
+	const Int cost = upgrade->calcCostToBuild(player);
+	money->withdraw(cost);
 
 	// allocate a new production entry
 	ProductionEntry *production = newInstance(ProductionEntry);
@@ -351,6 +352,8 @@ Bool ProductionUpdate::queueUpgrade( const UpgradeTemplate *upgrade )
 	// assign production entry data
 	production->m_type = PRODUCTION_UPGRADE;
 	production->m_upgradeToResearch = upgrade;
+	if (RetailFileLayers::enabled())
+		production->m_costPaid = cost;
 	production->m_productionID = PRODUCTIONID_INVALID;  // not needed for upgrades, you can only have one of
 																	 // this type in the queue
 
@@ -1016,7 +1019,7 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 			ExperienceLevelStore::awardProductionExperience(us, upgrade->calcCostToBuild(nullptr));
 
 		// we finished an upgrade, lets add that money spent on it to the scorekeeper
-		player->getScoreKeeper()->addMoneySpent(upgrade->calcCostToBuild(player));
+		player->getScoreKeeper()->addMoneySpent(production->m_costPaid >= 0 ? production->m_costPaid : upgrade->calcCostToBuild(player));
 
 		// notify the script engine
 		TheScriptEngine->notifyOfCompletedUpgrade(
@@ -1226,7 +1229,7 @@ Bool ProductionUpdate::cancelUpgrade( ProductionEntry *production )
 
 	// refund money back to the player
 	Money *money = player->getMoney();
-	money->deposit( production->m_upgradeToResearch->calcCostToBuild( player ), TRUE, FALSE );
+	money->deposit(production->m_costPaid >= 0 ? production->m_costPaid : upgrade->calcCostToBuild(player), TRUE, FALSE);
 
 	// remove this production from the queue
 	removeFromProductionQueue( production );

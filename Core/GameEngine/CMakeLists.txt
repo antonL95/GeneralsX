@@ -723,6 +723,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/ExperienceLevelStore.cpp
     Source/GameLogic/System/RetailCreationUpgrades.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
+    Source/GameLogic/System/RetailBuildingTestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
     Source/GameLogic/Object/Upgrade/ReplaceSelfUpgrade.cpp
@@ -1234,6 +1235,7 @@ set(GAMEENGINE_SRC
 #    Source/GameLogic/Object/Upgrade/ArmorUpgrade.cpp
 #    Source/GameLogic/Object/Upgrade/CommandSetUpgrade.cpp
 #    Source/GameLogic/Object/Upgrade/CostModifierUpgrade.cpp
+    Source/GameLogic/Object/Upgrade/CostModifierUpgradeRetail.cpp
 #    Source/GameLogic/Object/Upgrade/ExperienceScalarUpgrade.cpp
 #    Source/GameLogic/Object/Upgrade/GrantScienceUpgrade.cpp
 #    Source/GameLogic/Object/Upgrade/LocomotorSetUpgrade.cpp

@@ -60,6 +60,7 @@
 #include "Common/PlayerTemplate.h"
 #include "Common/PlayerTemplateRules.h"
 #include "Common/CommandPointRules.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/RetailSkirmishProbe.h"
 #include "GameClient/RetailEva.h"
@@ -4922,9 +4923,9 @@ Int Player::getCommandPointsTotal() const
 			const ThingTemplate *tmpl = obj->getTemplate();
 			if (!tmpl)
 				continue;
-			const Int bonus = tmpl->getRotWKObjectData().commandPointBonus;
-			if (bonus > 0)
-				buildingBonus += bonus;
+			const Int bonus = tmpl->getRotWKObjectData().commandPointBonus +
+				static_cast<Int>(AttributeModifiers::value(obj, AttributeModifierRules::COMMAND_POINT_BONUS));
+			buildingBonus += std::max(0, bonus);
 		}
 	}
 
