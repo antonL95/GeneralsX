@@ -46,6 +46,7 @@
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 
 
 static const Real DONUT_TIME_DELAY_SECONDS=2.5f;
@@ -1249,8 +1250,10 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 				dist = 1.0f / dist;
 				dx *= dist;
 				dy *= dist;
-				pos.x += dx * vel;
-				pos.y += dy * vel;
+				Coord3D movement = {dx * vel, dy * vel, 0.0f};
+				HordeContain::constrainGroundMovement(obj, movement);
+				pos.x += movement.x;
+				pos.y += movement.y;
 			}
 		}
 		obj->setPosition(&pos);

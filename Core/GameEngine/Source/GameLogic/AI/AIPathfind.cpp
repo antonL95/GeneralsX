@@ -1253,7 +1253,7 @@ Bool Pathfinder::checkDestination(const Object *obj, Int cellX, Int cellY, Pathf
 				continue;
 			}
 			if (isSameHorde(obj, unit)) {
-				continue;
+				return false;
 			}
 
 			// order matters: we want to know if I consider it to be an ally, not vice versa
@@ -6086,34 +6086,23 @@ void Pathfinder::updateGoal( Object *obj, const Coord3D *newGoalPos, PathfindLay
 	Int i,j;
 	ICoord2D cellNdx;
 
-	Bool warn = true;
+	const auto reserveCell = [&](PathfindCell* cell, const ICoord2D& index) {
+		if (!cell)
+			return;
+		const ObjectID owner = cell->getGoalUnit();
+		if (RetailFileLayers::enabled() && owner != INVALID_ID && owner != obj->getID() &&
+			isSameHorde(obj, TheGameLogic->findObjectByID(owner)))
+			return;
+		cell->setGoalUnit(obj->getID(), index);
+	};
 	for (i=newCell.x-radius; i<newCell.x+numCellsAbove; i++) {
 		for (j=newCell.y-radius; j<newCell.y+numCellsAbove; j++) {
-			PathfindCell	*cell;
-			if (doLayer) {
-				cell = getCell(layer, i, j);
-				if (cell) {
-					if (warn && cell->getGoalUnit()!=INVALID_ID && cell->getGoalUnit() != obj->getID()) {
-						warn = false;
-						//Units got stuck close to each other.  jba
-					}
-					cellNdx.x = i;
-					cellNdx.y = j;
-					cell->setGoalUnit(obj->getID(), cellNdx);
-				}
-			}
-			if (doGround) {
-				cell = getCell(LAYER_GROUND, i, j);
-				if (cell) {
-					if (warn && cell->getGoalUnit()!=INVALID_ID && cell->getGoalUnit() != obj->getID()) {
-						warn = false;
-						//Units got stuck close to each other.  jba
-					}
-					cellNdx.x = i;
-					cellNdx.y = j;
-					cell->setGoalUnit(obj->getID(), cellNdx);
-				}
-			}
+			cellNdx.x = i;
+			cellNdx.y = j;
+			if (doLayer)
+				reserveCell(getCell(layer, i, j), cellNdx);
+			if (doGround)
+				reserveCell(getCell(LAYER_GROUND, i, j), cellNdx);
 		}
 	}
 

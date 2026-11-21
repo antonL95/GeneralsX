@@ -49,6 +49,7 @@
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 
 
 static const Real DONUT_TIME_DELAY_SECONDS=2.5f;
@@ -536,6 +537,15 @@ static void skipNonRotwkField(INI* ini)
 	ini->getNextTokenOrNull();
 }
 
+template <INIFieldParseProc parse>
+static void parseRotwkField(INI* ini, void* instance, void* store, const void* userData)
+{
+	if (usesRotwkLocomotorFields())
+		parse(ini, instance, store, userData);
+	else
+		skipNonRotwkField(ini);
+}
+
 static UnsignedInt scanRotwkDurationFrames(INI* ini)
 {
 	UnsignedInt frames;
@@ -717,9 +727,9 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "RudderCorrectionRate",			 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionRate) }, // Added in Zero Hour
 		{ "ElevatorCorrectionDegree",	 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_elevatorCorrectionDegree) }, // Added in Zero Hour
 		{ "ElevatorCorrectionRate",		 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_elevatorCorrectionRate) }, // Added in Zero Hour
-		{ "WaitForFormation", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_waitForFormation) },
-		{ "MaxTurnWithoutReform", INI::parseAngleReal, nullptr, offsetof(LocomotorTemplate, m_maxTurnWithoutReform) },
-		{ "TurnWhileMoving", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_turnWhileMoving) },
+		{ "WaitForFormation", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_waitForFormation) },
+		{ "MaxTurnWithoutReform", parseRotwkField<INI::parseAngleReal>, nullptr, offsetof(LocomotorTemplate, m_maxTurnWithoutReform) },
+		{ "TurnWhileMoving", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_turnWhileMoving) },
 		{ nullptr, nullptr, nullptr, 0 }
 
 	};
@@ -1332,7 +1342,11 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	physics->setTurning(TURN_NONE);
 	if (getAllowMotiveForceWhileAirborne() || !treatAsAirborne)
 	{
-		switch (m_template->m_appearance)
+		LocomotorAppearance appearance = m_template->m_appearance;
+		if ((appearance == LOCO_HORDE || appearance == LOCO_FOUR_LEGS_HUGE || appearance == LOCO_HUGE_TWO_LEGS) &&
+			!RetailFileLayers::enabled())
+			appearance = LOCO_OTHER;
+		switch (appearance)
 		{
 			case LOCO_LEGS_TWO:
 			case LOCO_FOUR_LEGS_HUGE:
@@ -1414,8 +1428,10 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 				dist = 1.0f / dist;
 				dx *= dist;
 				dy *= dist;
-				pos.x += dx * vel;
-				pos.y += dy * vel;
+				Coord3D movement = {dx * vel, dy * vel, 0.0f};
+				HordeContain::constrainGroundMovement(obj, movement);
+				pos.x += movement.x;
+				pos.y += movement.y;
 			}
 		}
 		obj->setPosition(&pos);

@@ -2112,7 +2112,7 @@ Bool AIUpdateInterface::steerInFormation()
 	Object* obj = getObject();
 	const HordeContain* horde = HordeContain::get(obj->getContainedBy());
 	HordeContain::FormationGoal goal;
-	if (!horde || !horde->getFormationGoal(obj, goal))
+	if (!horde || !horde->getFormationGoal(obj, goal) || !HordeContain::canSteerToFormationGoal(obj, goal))
 		return FALSE;
 
 	const Real ARRIVED_DISTANCE = 2.0f;

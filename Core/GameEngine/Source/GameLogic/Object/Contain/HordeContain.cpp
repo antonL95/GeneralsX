@@ -9,7 +9,10 @@
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -29,6 +32,7 @@
 #endif
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <utility>
 
@@ -368,6 +372,7 @@ void HordeContain::addToContainList( Object *rider )
 	if (slot >= 0)
 	{
 		m_slotMembers[slot] = rider->getID();
+		m_memberSlots.emplace(rider->getID(), slot);
 		const Coord2D& extent = formation->m_randomOffset;
 		m_slotOffsets[slot].x = extent.x > 0.0f ? GameLogicRandomValueReal(-extent.x, extent.x) : 0.0f;
 		m_slotOffsets[slot].y = extent.y > 0.0f ? GameLogicRandomValueReal(-extent.y, extent.y) : 0.0f;
@@ -412,10 +417,11 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 
 void HordeContain::onRemoving( Object *rider )
 {
-	for (ObjectID& member : m_slotMembers)
+	const auto slot = m_memberSlots.find(rider->getID());
+	if (slot != m_memberSlots.end())
 	{
-		if (member == rider->getID())
-			member = INVALID_ID;
+		m_slotMembers[slot->second] = INVALID_ID;
+		m_memberSlots.erase(slot);
 	}
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained, false );
 	OpenContain::onRemoving( rider );
@@ -431,12 +437,18 @@ void HordeContain::onCapture( Player *oldOwner, Player *newOwner )
 
 Int HordeContain::getMemberSlot( ObjectID id ) const
 {
-	for (size_t index = 0; index < m_slotMembers.size(); ++index)
+	const auto slot = m_memberSlots.find(id);
+	return slot == m_memberSlots.end() ? -1 : slot->second;
+}
+
+void HordeContain::rebuildMemberSlots()
+{
+	m_memberSlots.clear();
+	for (std::size_t slot = 0; slot < m_slotMembers.size(); ++slot)
 	{
-		if (m_slotMembers[index] == id)
-			return (Int)index;
+		if (m_slotMembers[slot] != INVALID_ID)
+			m_memberSlots.emplace(m_slotMembers[slot], static_cast<Int>(slot));
 	}
-	return -1;
 }
 
 void HordeContain::crc( Xfer *xfer )
@@ -461,6 +473,8 @@ void HordeContain::xfer( Xfer *xfer )
 	TransportContain::xfer( xfer );
 
 	xfer->xferSTLObjectIDVector( &m_slotMembers );
+	if (xfer->getXferMode() == XFER_LOAD)
+		rebuildMemberSlots();
 	m_slotOffsets.resize(m_slotMembers.size(), Coord2D{0.0f, 0.0f});
 	if (version >= 2)
 	{
@@ -660,13 +674,13 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	if (horde->isEffectivelyDead() || getMemberSlot(member->getID()) < 0)
 		return FALSE;
 
-	const Coord3D slot = getMemberPosition(member->getID(), FALSE);
+	goal.slot = getMemberPosition(member->getID(), FALSE);
 	const Coord3D& position = *member->getPosition();
-	const Real dx = slot.x - position.x;
-	const Real dy = slot.y - position.y;
+	const Real dx = goal.slot.x - position.x;
+	const Real dy = goal.slot.y - position.y;
 	goal.error = sqrtf(dx * dx + dy * dy);
 	goal.facing = horde->getOrientation();
-	goal.position = slot;
+	goal.position = goal.slot;
 
 	const AIUpdateInterface* hordeAI = horde->getAI();
 	const PhysicsBehavior* physics = horde->getPhysics();
@@ -691,6 +705,49 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	const Real gy = hordeGoal->y - horde->getPosition()->y;
 	goal.distance = std::max(0.0f, behind) + sqrtf(gx * gx + gy * gy);
 	return TRUE;
+}
+
+Bool HordeContain::canSteerToFormationGoal(const Object* member, const FormationGoal& goal)
+{
+	const Locomotor* locomotor = member->getAI()->getCurLocomotor();
+	if (!locomotor)
+		return FALSE;
+	const auto surfaces = locomotor->getLegalSurfaces();
+	const auto layer = member->getLayer();
+	const Coord3D& position = *member->getPosition();
+	Pathfinder* pathfinder = TheAI->pathfinder();
+	return pathfinder->validMovementTerrain(layer, locomotor, &goal.position) &&
+		pathfinder->isLinePassable(member, surfaces, layer, position, goal.position, FALSE, TRUE);
+}
+
+void HordeContain::constrainGroundMovement(const Object* member, Coord3D& movement)
+{
+	if (!RetailFileLayers::enabled() || (movement.x == 0.0f && movement.y == 0.0f) ||
+		!std::isfinite(movement.x) || !std::isfinite(movement.y) ||
+		!get(member->getContainedBy()) || member->isEffectivelyDead() || member->isSignificantlyAboveTerrain())
+		return;
+
+	const AIUpdateInterface* ai = member->getAI();
+	const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+	if (!locomotor || !ai->isDoingGroundMovement())
+		return;
+
+	const Coord3D& position = *member->getPosition();
+	const auto layer = member->getLayer();
+	Pathfinder* pathfinder = TheAI->pathfinder();
+	const auto passable = [&](Real dx, Real dy) {
+		const Coord3D next = {position.x + dx, position.y + dy, position.z};
+		return pathfinder->validMovementTerrain(layer, locomotor, &next);
+	};
+	if (passable(movement.x, movement.y) || !passable(0.0f, 0.0f))
+		return;
+
+	if (movement.y != 0.0f && passable(0.0f, movement.y))
+		movement.x = 0.0f;
+	else if (movement.x != 0.0f && passable(movement.x, 0.0f))
+		movement.y = 0.0f;
+	else
+		movement.x = movement.y = 0.0f;
 }
 
 Real HordeContain::getFormationSpeedScale() const
@@ -731,6 +788,9 @@ void HordeContain::reassignSlotsByPosition()
 	std::vector<ObjectID> ids;
 	std::vector<int> current;
 	std::vector<HordePoint> positions;
+	std::vector<bool> reserved(m_slotMembers.size(), false);
+	for (std::size_t slot = 0; slot < m_slotMembers.size(); ++slot)
+		reserved[slot] = m_slotMembers[slot] != INVALID_ID;
 	for (const Object* member : getContainList())
 	{
 		const Int slot = getMemberSlot(member->getID());
@@ -745,14 +805,15 @@ void HordeContain::reassignSlotsByPosition()
 		ids.push_back(member->getID());
 		current.push_back(slot);
 		positions.push_back(local);
+		reserved[slot] = false;
 	}
 
-	const std::vector<int> slots = layout.nearestSlots(current, positions);
+	const std::vector<int> slots = layout.nearestSlots(current, positions, reserved);
 	std::vector<ObjectID> members(m_slotMembers.size(), INVALID_ID);
 	std::vector<Coord2D> offsets(m_slotOffsets.size(), Coord2D{0.0f, 0.0f});
 	for (std::size_t index = 0; index < m_slotMembers.size(); ++index)
 	{
-		if (m_slotMembers[index] != INVALID_ID && std::find(ids.begin(), ids.end(), m_slotMembers[index]) == ids.end())
+		if (reserved[index])
 		{
 			members[index] = m_slotMembers[index];
 			offsets[index] = m_slotOffsets[index];
@@ -760,12 +821,15 @@ void HordeContain::reassignSlotsByPosition()
 	}
 	for (std::size_t index = 0; index < ids.size(); ++index)
 	{
-		const Int slot = slots[index] >= 0 && members[slots[index]] == INVALID_ID ? slots[index] : current[index];
+		const Int slot = slots[index];
+		if (slot < 0 || members[slot] != INVALID_ID)
+			return;
 		members[slot] = ids[index];
 		offsets[slot] = m_slotOffsets[current[index]];
 	}
 	m_slotMembers.swap(members);
 	m_slotOffsets.swap(offsets);
+	rebuildMemberSlots();
 }
 
 const HordeContainModuleData* HordeContain::findAlternateFormation() const
@@ -861,6 +925,7 @@ void HordeContain::setAlternateFormation(Bool alternate)
 	}
 	m_slotMembers.swap(members);
 	m_slotOffsets.swap(offsets);
+	rebuildMemberSlots();
 }
 
 void HordeContain::toggleWeaponSet(const WeaponSetFlags& flags, Bool enabled)

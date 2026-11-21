@@ -325,7 +325,8 @@ bool HordeLayout::rankCanAttack(int rank, const std::vector<int>& released, cons
 		std::find(free.begin(), free.end(), rank) != free.end();
 }
 
-std::vector<int> HordeLayout::nearestSlots(const std::vector<int>& currentSlots, const std::vector<HordePoint>& positions) const
+std::vector<int> HordeLayout::nearestSlots(const std::vector<int>& currentSlots, const std::vector<HordePoint>& positions,
+	const std::vector<bool>& reserved) const
 {
 	std::vector<int> result(currentSlots.size(), -1);
 	std::vector<std::size_t> members;
@@ -334,8 +335,14 @@ std::vector<int> HordeLayout::nearestSlots(const std::vector<int>& currentSlots,
 		if (currentSlots[member] >= 0 && static_cast<std::size_t>(currentSlots[member]) < m_slots.size())
 			members.push_back(member);
 	}
+	std::vector<std::size_t> available;
+	for (std::size_t slot = 0; slot < m_slots.size(); ++slot)
+	{
+		if (slot >= reserved.size() || !reserved[slot])
+			available.push_back(slot);
+	}
 	const std::size_t rows = members.size();
-	const std::size_t columns = m_slots.size();
+	const std::size_t columns = available.size();
 	if (rows == 0 || rows > columns)
 		return result;
 
@@ -343,10 +350,11 @@ std::vector<int> HordeLayout::nearestSlots(const std::vector<int>& currentSlots,
 	const auto cost = [&](std::size_t row, std::size_t column)
 	{
 		const std::size_t member = members[row];
-		if (!sameName(m_slots[column].unitType, m_slots[currentSlots[member]].unitType))
+		const auto& slot = m_slots[available[column]];
+		if (!sameName(slot.unitType, m_slots[currentSlots[member]].unitType))
 			return incompatible;
-		const double dx = static_cast<double>(m_slots[column].position.x) - positions[member].x;
-		const double dy = static_cast<double>(m_slots[column].position.y) - positions[member].y;
+		const double dx = static_cast<double>(slot.position.x) - positions[member].x;
+		const double dy = static_cast<double>(slot.position.y) - positions[member].y;
 		return dx * dx + dy * dy;
 	};
 
@@ -409,7 +417,7 @@ std::vector<int> HordeLayout::nearestSlots(const std::vector<int>& currentSlots,
 			continue;
 		const std::size_t member = members[columnRow[column] - 1];
 		if (cost(columnRow[column] - 1, column - 1) < incompatible)
-			result[member] = static_cast<int>(column - 1);
+			result[member] = static_cast<int>(available[column - 1]);
 		else
 			result[member] = currentSlots[member];
 	}

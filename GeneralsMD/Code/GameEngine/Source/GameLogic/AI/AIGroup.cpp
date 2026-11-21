@@ -1612,8 +1612,7 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 		facingX += obj->getUnitDirectionVector2D()->x;
 		facingY += obj->getUnitDirectionVector2D()->y;
 		const Real maxSpeed = ai->getCurLocomotorSpeed();
-		if (maxSpeed > 0.0f && maxSpeed < speed &&
-			IS_CONDITION_BETTER(obj->getBodyModule()->getDamageState(), TheGlobalData->m_movementPenaltyDamageState))
+		if (maxSpeed > 0.0f && maxSpeed < speed)
 			speed = maxSpeed;
 	}
 	if (movers.size() < 2)
@@ -1670,6 +1669,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 
 	Bool didInfantry = false;
 	Bool didVehicles = false;
+	Bool didRotwkBlock = false;
 	// compute current centroid of the team
 	Coord3D center;
 	Coord2D min;
@@ -1686,12 +1686,11 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 	if (!addWaypoint && !isFormation && RetailFileLayers::enabled())
 	{
 		clampWaypointPosition( position, STD_WAYPOINT_CLAMP_MARGIN );
-		if (friend_moveRotwkBlockToPos(pos, cmdSource))
-			return;
+		didRotwkBlock = friend_moveRotwkBlockToPos(pos, cmdSource);
 	}
 
 
-	if (!addWaypoint && !isFormation) {
+	if (!addWaypoint && !isFormation && !didRotwkBlock) {
 		friend_computeGroundPath(pos, cmdSource);
 		didInfantry = friend_moveInfantryToPos(pos, cmdSource);
 		didVehicles = friend_moveVehicleToPos(pos, cmdSource);
@@ -1700,7 +1699,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		recompute();
 
 	std::list<Object *>::iterator i;
-	if( !isFormation && cmdSource == CMD_FROM_PLAYER && TheGlobalData->m_groupMoveClickToGatherFactor > 0.0f )
+	if( !isFormation && !didRotwkBlock && cmdSource == CMD_FROM_PLAYER && TheGlobalData->m_groupMoveClickToGatherFactor > 0.0f )
 	{
 		ScaleRect2D( &min, &max, TheGlobalData->m_groupMoveClickToGatherFactor );
 
@@ -1778,6 +1777,8 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		{
 			continue;
 		}
+		if (didRotwkBlock && (*i)->getAI()->isDoingGroundMovement())
+			continue;
 		if ((*i)->isKindOf(KINDOF_INFANTRY) && didInfantry) {
 			continue;
 		}

@@ -8,6 +8,7 @@
 #include "GameLogic/Module/TransportContain.h"
 #include "GameLogic/WeaponSetFlags.h"
 
+#include <map>
 #include <vector>
 
 enum CanAttackResult CPP_11(: Int);
@@ -136,6 +137,7 @@ public:
 	static Bool addCrateBanner(Object* anchor);
 	struct FormationGoal
 	{
+		Coord3D slot;
 		Coord3D position;
 		Real speed;
 		Real distance;
@@ -145,6 +147,8 @@ public:
 	};
 	Coord3D getMemberPosition(ObjectID id, Bool followLeader) const;
 	Bool getFormationGoal(const Object* member, FormationGoal& goal) const;
+	static Bool canSteerToFormationGoal(const Object* member, const FormationGoal& goal);
+	static void constrainGroundMovement(const Object* member, Coord3D& movement);
 	Real getFormationSpeedScale() const;
 	void reassignSlotsByPosition();
 	Bool canSetAlternateFormation(Bool alternate) const;
@@ -162,9 +166,11 @@ protected:
 	void redeployOccupants() override {}
 
 private:
+	void rebuildMemberSlots();
 	const HordeContainModuleData* findAlternateFormation() const;
 	void updateFormationModelConditions(Object* object) const;
 	std::vector<ObjectID> m_slotMembers;
+	std::map<ObjectID, Int> m_memberSlots;
 	std::vector<Coord2D> m_slotOffsets;
 	const HordeContainModuleData* m_formationOverride = nullptr;
 	Bool m_hadMembers = FALSE;

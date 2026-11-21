@@ -22,7 +22,6 @@ namespace
 {
 constexpr Real FORMATION_PATHFIND_DISTANCE = 120.0f;
 constexpr Real FORMATION_REPATH_DISTANCE = 30.0f;
-constexpr Real FORMATION_STEER_DISTANCE = 15.0f;
 constexpr Real FORMATION_REFORM_ANGLE = PI / 6.0f;
 
 Real distanceSquared(const Coord3D& a, const Coord3D& b)
@@ -377,20 +376,18 @@ UpdateSleepTime HordeAIUpdate::update()
 			}
 		}
 
-		const Coord3D slot = contain->getMemberPosition(member->getID(), FALSE);
-		const Real error = distanceSquared(*member->getPosition(), slot);
-		const Bool lineClear = error <= FORMATION_STEER_DISTANCE * FORMATION_STEER_DISTANCE ||
-			TheAI->pathfinder()->isLinePassable(member, ai->getLocomotorSet().getValidSurfaces(), member->getLayer(),
-				*member->getPosition(), slot, FALSE, TRUE);
-		if (error > FORMATION_PATHFIND_DISTANCE * FORMATION_PATHFIND_DISTANCE || !lineClear)
+		HordeContain::FormationGoal goal;
+		if (!contain->getFormationGoal(member, goal))
+			continue;
+		if (goal.error > FORMATION_PATHFIND_DISTANCE || !HordeContain::canSteerToFormationGoal(member, goal))
 		{
-			if (ai->isAttacking() || ((refresh || ai->isIdle()) &&
-				distanceSquared(*ai->getGoalPosition(), slot) > FORMATION_REPATH_DISTANCE * FORMATION_REPATH_DISTANCE))
-				ai->aiMoveToPositionEvenIfSleeping(&slot, CMD_FROM_SCRIPT);
+			if (ai->isAttacking() || (refresh && (ai->isIdle() ||
+				distanceSquared(*ai->getGoalPosition(), goal.slot) > FORMATION_REPATH_DISTANCE * FORMATION_REPATH_DISTANCE)))
+				ai->aiMoveToPositionEvenIfSleeping(&goal.slot, CMD_FROM_SCRIPT);
 		}
 		else if (!ai->isIdle())
 			ai->aiIdle(CMD_FROM_SCRIPT);
-		else if (error > 1.0f || isMoving())
+		else if (goal.error > 1.0f || goal.hordeMoving)
 			ai->wakeForFormation();
 	}
 

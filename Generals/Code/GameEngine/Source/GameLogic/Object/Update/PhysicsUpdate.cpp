@@ -39,6 +39,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/CrushDie.h"		// for CrushEnum
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
@@ -587,6 +588,7 @@ UpdateSleepTime PhysicsBehavior::update()
 		}
 		else
 		{
+			HordeContain::constrainGroundMovement(obj, m_vel);
 			mtx.Adjust_X_Translation(m_vel.x);
 			mtx.Adjust_Y_Translation(m_vel.y);
 			mtx.Adjust_Z_Translation(m_vel.z);

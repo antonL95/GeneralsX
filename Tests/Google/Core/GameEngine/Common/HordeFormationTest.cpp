@@ -214,3 +214,12 @@ TEST(HordeFormation, NearestSlotsAvoidCrossingWhenTheBlockShifts)
 	EXPECT_EQ(slots[1], 1);
 	EXPECT_EQ(slots[2], 0);
 }
+
+TEST(HordeFormation, NearestSlotsKeepCasualtyReservations)
+{
+	HordeLayout layout;
+	layout.addRank(rank("RankNumber:1 UnitType:Soldier Position:X:0 Y:0 Position:X:10 Y:0 Position:X:20 Y:0"));
+	const std::vector<int> current = {0, 1};
+	const std::vector<HordePoint> positions = {{20.0f, 0.0f}, {0.0f, 0.0f}};
+	EXPECT_EQ(layout.nearestSlots(current, positions, {false, false, true}), (std::vector<int>{1, 0}));
+}
