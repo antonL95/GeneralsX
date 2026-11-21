@@ -376,9 +376,25 @@ const Image *selectHeroesImage()
 	return findImage(name.str());
 }
 
+Bool isAvailableHero(const Object* obj)
+{
+	const Drawable* draw = obj ? obj->getDrawable() : nullptr;
+	return draw && obj->isKindOf(KINDOF_HERO) && obj->isMassSelectable() && !obj->isEffectivelyDead() &&
+		obj->isLogicallyVisible() && !draw->isDrawableEffectivelyHidden();
+}
+
 Bool hasAvailableHeroes()
 {
-	return std::any_of(s_bar.slots.begin(), s_bar.slots.end(), [](const HeroSlot& slot) { return slot.alive && !slot.builder; });
+	const Player* player = localPlayer();
+	if (!player)
+		return FALSE;
+	Bool available = FALSE;
+	player->iterateObjects([](Object* obj, void* data)
+	{
+		Bool& found = *static_cast<Bool*>(data);
+		found = found || isAvailableHero(obj);
+	}, &available);
+	return available;
 }
 
 Int hitTest(Int px, Int py)
@@ -461,9 +477,7 @@ void activate(Int button, Bool center)
 		std::vector<Object*> heroes;
 		player->iterateObjects([](Object* obj, void* data)
 		{
-			Drawable* draw = obj->getDrawable();
-			if (obj->isKindOf(KINDOF_HERO) && !obj->isEffectivelyDead() && draw &&
-				obj->isLogicallyVisible() && !draw->isDrawableEffectivelyHidden())
+			if (isAvailableHero(obj))
 				static_cast<std::vector<Object*>*>(data)->push_back(obj);
 		}, &heroes);
 		if (heroes.empty())

@@ -237,20 +237,12 @@ Bool hasSciences(const Player *player, const SpecialPowerTemplate *power)
 	return player && power->isUnlockedFor(player);
 }
 
-const CommandSet *spellBookCommandSet(const Player *player)
-{
-	const PlayerTemplate *side = player ? player->getPlayerTemplate() : nullptr;
-	if (!side || !TheThingFactory || !TheControlBar)
-		return nullptr;
-	const ThingTemplate *book = TheThingFactory->findTemplate(side->getSpellBook(TRUE), FALSE);
-	return book ? TheControlBar->findCommandSet(book->friend_getCommandSetString()) : nullptr;
-}
-
 void collectSpells()
 {
 	s_edges.spells.clear();
 	const Player *player = localPlayer();
-	const CommandSet *set = spellBookCommandSet(player);
+	const Object *book = player ? player->getRetailSpellBook() : nullptr;
+	const CommandSet *set = book ? TheControlBar->findCommandSet(book->getCommandSetString()) : nullptr;
 	for (Int i = 0; set && i < CommandButtonRules::RETAIL_COMMANDS_PER_SET && static_cast<Int>(s_edges.spells.size()) < SpellSlots; ++i)
 	{
 		const CommandButton *command = set->getCommandButton(i);

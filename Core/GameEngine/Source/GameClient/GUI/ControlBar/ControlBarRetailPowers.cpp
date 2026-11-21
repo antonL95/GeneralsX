@@ -133,19 +133,13 @@ struct Layout
 			region.contains({ (px - x + 0.5f) / scale, (py - y + 0.5f) / scale });
 	}
 
-	Rect reset() const
+	Rect action(const AptHitRegion& region, Bool accept) const
 	{
-		return storeMovieLayout.reset.triangles.empty() ? at(139, 504, 134, 38) : bounds(storeMovieLayout.reset);
-	}
-
-	Rect accept() const
-	{
-		return storeMovieLayout.accept.triangles.empty() ? at(287, 504, 134, 38) : bounds(storeMovieLayout.accept);
-	}
-
-	Int actionSplit(const Rect& resetButton, const Rect& acceptButton) const
-	{
-		return (resetButton.x + resetButton.w / 2 + acceptButton.x + acceptButton.w / 2) / 2;
+		if (region.triangles.empty())
+			return at(accept ? 287 : 139, 504, 134, 38);
+		const Real center = (region.left + region.right) * 0.5f;
+		const Real halfWidth = (region.right - region.left) * (70.5f / (2.0f * 93.3f));
+		return at(center - halfWidth, region.top, halfWidth * 2, region.bottom - region.top);
 	}
 };
 
@@ -551,6 +545,44 @@ void drawStoreArt(const char* name, const Rect& rect, Color tint = 0xFFFFFFFF)
 		TheDisplay->drawImage(image, rect.x, rect.y, rect.x + rect.w, rect.y + rect.h, tint);
 }
 
+void drawPrerequisites(const Player* player, const Layout& layout, Int diameter)
+{
+	for (Int slot = 0; slot < StoreSlots; ++slot)
+	{
+		const ScienceType science = storeScience(player, slot);
+		if (science == SCIENCE_INVALID)
+			continue;
+		const auto* alternatives = TheScienceStore->getPrerequisiteAlternatives(science);
+		if (!alternatives)
+			continue;
+		const Rect child = layout.node(slot);
+		for (Int candidate = 0; candidate < slot; ++candidate)
+		{
+			const Rect parent = layout.node(candidate);
+			const Int separation = child.y - parent.y;
+			if (separation < diameter || separation > diameter * 2)
+				continue;
+			const ScienceType prerequisite = storeScience(player, candidate);
+			if (prerequisite == SCIENCE_INVALID ||
+				!std::any_of(alternatives->begin(), alternatives->end(), [prerequisite](const ScienceVec& group)
+				{
+					return containsScience(group, prerequisite);
+				}))
+				continue;
+
+			const Real parentX = parent.x + parent.w * 0.5f;
+			const Real childX = child.x + child.w * 0.5f;
+			const Real x1 = parentX + (childX - parentX) * 0.35f;
+			const Real x2 = childX - (childX - parentX) * 0.31f;
+			const Real y1 = parent.y + parent.h * 0.5f + diameter * 0.57f;
+			const Real y2 = child.y + child.h * 0.5f - diameter * 0.48f;
+			const Real width = std::max(1.0f, 1.65f * layout.scale);
+			TheDisplay->drawLine(x1, y1, x2, y2, width + 2.0f, 0xE009121C);
+			TheDisplay->drawLine(x1, y1, x2, y2, width, 0xFF90ABB8);
+		}
+	}
+}
+
 WindowMsgHandledType overlayInput(GameWindow*, UnsignedInt msg, WindowMsgData point, WindowMsgData)
 {
 	if (msg == GWM_CHAR && point == KEY_ESC)
@@ -697,6 +729,7 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 		storeArt->drawAt([](const std::string& path) {
 			return path.starts_with("_root.SpellStore.") &&
 				!path.starts_with("_root.SpellStore.Buttons.Spell") &&
+				!path.starts_with("_root.SpellStore.Buttons.Connectors.") &&
 				!path.starts_with("_root.SpellStore.Buttons.ButtonsMain.");
 		}, artX, layout.y, sx, sy, 1.0f);
 		storeArt->drawAt([](const std::string& path) { return path.starts_with("_root.Title."); },
@@ -714,6 +747,8 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 	const Rect close = layout.at(515, 8, 35, 29);
 	label(font, close, UnicodeString(L"×"), Ink);
 
+	const Int diameter = std::max(2, static_cast<Int>(72 * PanelHeight * layout.scale / storeMovieLayout.stageHeight));
+	drawPrerequisites(player, layout, diameter);
 	for (Int i = 0; i < StoreSlots; ++i)
 	{
 		const ScienceType science = storeScience(player, i);
@@ -723,7 +758,6 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 		const Bool owned = player->hasScience(science);
 		const Bool available = canQueueScience(player, science, m_retailPendingSciences);
 		const Rect tile = layout.node(i);
-		const Int diameter = std::max(2, static_cast<Int>(72 * PanelHeight * layout.scale / storeMovieLayout.stageHeight));
 		const Rect portrait = {tile.x + (tile.w - diameter) / 2, tile.y + (tile.h - diameter) / 2, diameter, diameter};
 		const Int border = std::max(2, diameter / 16);
 		disc(portrait, 0xFF0A1720);
@@ -746,19 +780,14 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 		label(font, layout.at(0, 464, PanelWidth, 25), title, Ink);
 	}
 	const Bool canCommit = !m_retailPendingSciences.empty();
-	Rect reset = layout.reset();
-	Rect accept = layout.accept();
-	if (reset.x < accept.x && reset.x + reset.w > accept.x)
-	{
-		const Int split = layout.actionSplit(reset, accept);
-		const Int acceptRight = accept.x + accept.w;
-		reset.w = split - 2 - reset.x;
-		accept.x = split + 2;
-		accept.w = acceptRight - accept.x;
-	}
+	const Rect reset = layout.action(storeMovieLayout.reset, FALSE);
+	const Rect accept = layout.action(storeMovieLayout.accept, TRUE);
+	const Color actionTint = canCommit ? 0xFFFFFFFF : 0xAA8699A6;
 	if (authored)
-		drawStoreArt("UiRetailPowersActions", {reset.x, reset.y, accept.x + accept.w - reset.x, std::max(reset.h, accept.h)},
-			canCommit ? 0xFFFFFFFF : 0xAA8699A6);
+	{
+		drawStoreArt("UiRetailPowersAction", reset, actionTint);
+		drawStoreArt("UiRetailPowersAction", accept, actionTint);
+	}
 	else
 	{
 		frame(reset, PanelLine);
@@ -793,13 +822,11 @@ void ControlBar::inputRetailPowers(Int x, Int y, Bool click)
 	}
 	if (m_retailPendingSciences.empty())
 		return;
-	const Rect reset = layout.reset();
-	const Rect accept = layout.accept();
-	const Bool hitReset = layout.hits(storeMovieLayout.reset, reset, x, y);
-	const Bool hitAccept = layout.hits(storeMovieLayout.accept, accept, x, y);
-	if (hitReset && (!hitAccept || x < layout.actionSplit(reset, accept)))
+	const Rect reset = layout.action(storeMovieLayout.reset, FALSE);
+	const Rect accept = layout.action(storeMovieLayout.accept, TRUE);
+	if (reset.contains(x, y))
 		m_retailPendingSciences.clear();
-	else if (hitAccept)
+	else if (accept.contains(x, y))
 	{
 		for (ScienceType science : m_retailPendingSciences)
 		{

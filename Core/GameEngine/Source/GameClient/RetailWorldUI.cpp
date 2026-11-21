@@ -255,12 +255,12 @@ Bool drawMergedSelection(std::vector<Circle>& circles, const ExperienceLevelStor
 	if (horde)
 		radius = selectionRadius(decal, radius);
 
-	Real opacity = decal.opacityMax;
-	if (TheGlobalData->m_useSimpleMergeDecals)
-		opacity *= TheGlobalData->m_opacityOfSimpleMergeDecals;
-	const Int alpha = static_cast<Int>(std::clamp(opacity, 0.0f, 1.0f) * 255);
+	const Real opacity = std::clamp(decal.opacityMax, 0.0f, 1.0f);
 	if (TheGlobalData->m_useSimpleHordeDecals)
 	{
+		const Real simpleOpacity = TheGlobalData->m_useSimpleMergeDecals ?
+			opacity * TheGlobalData->m_opacityOfSimpleMergeDecals : opacity;
+		const Int alpha = static_cast<Int>(std::clamp(simpleOpacity, 0.0f, 1.0f) * 255);
 		projection.set(decal.texture, center, radius * 2.0f, radius * 2.0f, alpha, tint);
 		return TRUE;
 	}
@@ -287,7 +287,7 @@ Bool drawMergedSelection(std::vector<Circle>& circles, const ExperienceLevelStor
 				mask[i - edge * size], mask[i + edge * size]});
 			pixels[i] |= static_cast<UnsignedInt>(mask[i] - inside) << 24;
 		}
-	projection.setComposited(center, size / pixelScale, alpha, tint, std::move(pixels), size);
+	projection.setComposited(center, size / pixelScale, static_cast<Int>(opacity * 255), tint, std::move(pixels), size);
 	return TRUE;
 }
 
@@ -338,9 +338,12 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 	const Real scale = TheDisplay->getHeight() / 720.0f;
 	const Bool structure = obj->isKindOf(KINDOF_STRUCTURE);
 	const Real relativeWidth = structure ? std::clamp(obj->getGeometryInfo().getMajorRadius() * 3.5f, 55.0f, 180.0f) :
-		(anchor ? 27.0f : 34.0f);
+		(anchor ? 33.0f : 36.0f);
 	const Int width = std::max(6, static_cast<Int>(relativeWidth * scale * std::clamp(data.healthBoxScale, 0.25f, 4.0f)));
-	const Int height = std::max(4, static_cast<Int>(5.0f * scale));
+	const Int edge = std::max(1, static_cast<Int>(scale + 0.5f));
+	const Int height = 7 * edge;
+	if (!structure)
+		screen.y -= static_cast<Int>(6.0f * scale + 0.5f);
 	const BodyModuleInterface* body = obj->getBodyModule();
 	if (showBar && body && body->getHealth() > 0.0f && body->getMaxHealth() > 0.0f)
 	{
@@ -349,14 +352,23 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 		const Real fraction = building ? std::clamp(obj->getConstructionPercent() * 0.01f, 0.0f, 1.0f) : health;
 		const Int x = screen.x - width / 2;
 		const Int y = screen.y - height / 2;
+		const Bool healthy = !building && health > TheGlobalData->m_unitDamagedThresh;
 		const Color fill = building ? GameMakeColor(97, 209, 244, 255) :
-			health > TheGlobalData->m_unitDamagedThresh ? GameMakeColor(136, 226, 59, 255) :
 			health > TheGlobalData->m_unitReallyDamagedThresh ? GameMakeColor(239, 196, 84, 255) : GameMakeColor(220, 76, 36, 255);
-		TheDisplay->drawFillRect(x - 1, y - 1, width + 2, height + 2, GameMakeColor(0, 0, 0, 255));
-		TheDisplay->drawOpenRect(x, y, width, height, 1.0f, GameMakeColor(199, 178, 131, 255));
-		const Int fillWidth = static_cast<Int>((width - 2) * fraction);
-		if (fillWidth > 0)
-			TheDisplay->drawFillRect(x + 1, y + 1, fillWidth, height - 2, fill);
+		TheDisplay->drawFillRect(x - edge, y - edge, width + 2 * edge, height + 2 * edge, GameMakeColor(0, 0, 0, 128));
+		TheDisplay->drawFillRect(x, y, width, height, GameMakeColor(186, 146, 82, 255));
+		TheDisplay->drawFillRect(x + edge, y + edge, width - 2 * edge, height - 2 * edge, GameMakeColor(0, 0, 0, 255));
+		const Int fillWidth = static_cast<Int>(std::max(0, width - 4 * edge) * fraction);
+		const Int fillX = x + 2 * edge;
+		const Int fillY = y + 2 * edge;
+		if (fillWidth > 0 && healthy)
+		{
+			TheDisplay->drawFillRect(fillX, fillY, fillWidth, edge, GameMakeColor(12, 156, 36, 255));
+			TheDisplay->drawFillRect(fillX, fillY + edge, fillWidth, edge, GameMakeColor(221, 245, 142, 255));
+			TheDisplay->drawFillRect(fillX, fillY + 2 * edge, fillWidth, edge, GameMakeColor(5, 113, 22, 255));
+		}
+		else if (fillWidth > 0)
+			TheDisplay->drawFillRect(fillX, fillY, fillWidth, 3 * edge, fill);
 	}
 	if (showRank)
 	{
