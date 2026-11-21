@@ -42,6 +42,7 @@ set(COREI_GOOGLETEST_SRC
     Libraries/Compression/CompressionManagerTest.cpp
     Libraries/WW3D2/W3dBfmeChunksTest.cpp
     Libraries/WW3D2/W3dFxMaterialTest.cpp
+    Libraries/WW3D2/RetailFxTest.cpp
     Libraries/WW3D2/FontNamesTest.cpp
 )
 
