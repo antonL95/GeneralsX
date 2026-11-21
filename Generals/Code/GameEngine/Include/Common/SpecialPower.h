@@ -116,7 +116,6 @@ public:
 	UnsignedInt getReloadTime() const { return getFO()->m_reloadTime; }
 	Int getRequiredRank() const { return getFO()->m_requiredRank; }
 	ScienceType getRequiredScience() const { return getFO()->m_requiredScience; }
-	const std::vector<AsciiString>& getRequiredSciences() const { return getFO()->m_requiredSciences; }
 	Bool isUnlockedFor(const Player* player, ScienceType excluded = SCIENCE_INVALID) const;
 	const AudioEventRTS *getInitiateSound() const { return &getFO()->m_initiateSound; }
 	const AudioEventRTS *getInitiateAtTargetSound() const { return &getFO()->m_initiateAtLocationSound; }

@@ -208,18 +208,7 @@ void refreshFonts(Real scale)
 
 Bool hasSciences(const Player *player, const SpecialPowerTemplate *power)
 {
-	if (!TheScienceStore)
-		return FALSE;
-	const ScienceType single = power->getRequiredScience();
-	if (single != SCIENCE_INVALID && !player->hasScience(single))
-		return FALSE;
-	for (const AsciiString &name : power->getRequiredSciences())
-	{
-		const ScienceType science = TheScienceStore->getScienceFromInternalName(name);
-		if (science == SCIENCE_INVALID || !player->hasScience(science))
-			return FALSE;
-	}
-	return TRUE;
+	return player && power->isUnlockedFor(player);
 }
 
 const CommandSet *spellBookCommandSet(const Player *player)

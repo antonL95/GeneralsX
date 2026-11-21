@@ -405,14 +405,10 @@ void ControlBar::showRetailSpellTooltip(GameWindow* window) const
 	const auto slot = std::find(m_retailSpellButtons.begin(), m_retailSpellButtons.end(), window) - m_retailSpellButtons.begin();
 	if (const CommandButton* button = spellButton(localPlayer(), slot))
 	{
-		UnicodeString text = TheGameText->fetchOrSubstitute(button->getTextLabel().str(), L"");
-		const UnicodeString description = TheGameText->fetchOrSubstitute(button->getDescriptionLabel().str(), L"");
-		if (!description.isEmpty())
-		{
-			text.concat(L"\n");
-			text.concat(description);
-		}
-		TheMouse->setRetailCommandTooltip(text);
+		Mouse::RetailTooltip tooltip;
+		tooltip.title = TheGameText->fetchOrSubstitute(button->getTextLabel().str(), L"");
+		tooltip.body = TheGameText->fetchOrSubstitute(button->getDescriptionLabel().str(), L"");
+		TheMouse->setRetailTooltip(tooltip);
 	}
 }
 
