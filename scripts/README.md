@@ -58,6 +58,8 @@ Utilities for large-scale code refactoring and fixes:
 
 ### `qa/` - Quality Assurance & Testing
 
+- `test-rotwk-modifiers-zh.sh` runs the contained and radius healing, innate damage, and modifier snapshot checks on High Pass. Pass a session label, the devbox build directory, and the BFME High Pass runner path.
+
 #### `qa/smoke/` - Smoke Tests
 - `docker-smoke-test-zh.sh` - Quick startup validation (expects crash, checks init output)
 - `run-bundled-game.sh` - Test bundled binary after deployment

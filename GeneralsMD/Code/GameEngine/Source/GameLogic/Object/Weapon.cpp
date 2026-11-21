@@ -265,6 +265,7 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "HitStoredTarget", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_hitStoredTarget) },
 	{ "BombardType", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_bombardType) },
 	{ "NoVictimNeeded", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_noVictimNeeded) },
+	{ "UseInnateAttributes", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_useInnateAttributes) },
 	{ "AntiAirborneMonster", INI::parseBitInInt32, (void*)WEAPON_ANTI_AIRBORNE_MONSTER, offsetof(WeaponTemplate, m_antiMask) },
 	{ nullptr, nullptr, nullptr, 0 }
 };
@@ -359,6 +360,7 @@ WeaponTemplate::WeaponTemplate() : m_nextTemplate(nullptr)
 	m_hitStoredTarget = FALSE;
 	m_bombardType = FALSE;
 	m_noVictimNeeded = FALSE;
+	m_useInnateAttributes = FALSE;
 
 	m_historicDamageTriggerId = 0;
 }
@@ -2053,11 +2055,12 @@ void Weapon::computeBonus(const Object *source, WeaponBonusConditionFlags extraB
 		extra->appendBonuses(flags, bonus);
 
 	const Bool hasNuggets = m_template->hasNuggets();
+	const Bool useInnate = m_template->usesInnateAttributes();
 	const AttributeModifierRules::Totals* modifiers = AttributeModifiers::totalsOf(source);
 	if (modifiers)
 	{
 		if (!hasNuggets)
-			bonus.setField(WeaponBonus::DAMAGE, bonus.getField(WeaponBonus::DAMAGE) * modifiers->damageDealtFactor());
+			bonus.setField(WeaponBonus::DAMAGE, bonus.getField(WeaponBonus::DAMAGE) * modifiers->damageDealtFactor(useInnate));
 		bonus.setField(WeaponBonus::RANGE, bonus.getField(WeaponBonus::RANGE) * modifiers->rangeFactor());
 		bonus.setField(WeaponBonus::RATE_OF_FIRE, bonus.getField(WeaponBonus::RATE_OF_FIRE) * modifiers->value[AttributeModifierRules::RATE_OF_FIRE]);
 	}
@@ -2069,7 +2072,7 @@ void Weapon::computeBonus(const Object *source, WeaponBonusConditionFlags extraB
 		if (damageModifiers)
 		{
 			bonus.setNuggetDamageModifiers(damageModifiers->value[AttributeModifierRules::DAMAGE_ADD],
-				damageModifiers->damageDealtFactor(), damageModifiers->value[AttributeModifierRules::SPELL_DAMAGE]);
+				damageModifiers->damageDealtFactor(useInnate), damageModifiers->value[AttributeModifierRules::SPELL_DAMAGE]);
 		}
 	}
 }

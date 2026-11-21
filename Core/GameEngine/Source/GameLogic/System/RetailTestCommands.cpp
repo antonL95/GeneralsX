@@ -878,6 +878,66 @@ void roundTripExperience(Object* obj, unsigned int frame)
 		restored->getRetailExperience(), same);
 }
 
+#if !RTS_GENERALS
+void roundTripModifiers(Object* obj, Object* destination, const AsciiString& name, unsigned int frame)
+{
+	const char* directory = std::getenv("XDG_RUNTIME_DIR");
+	auto* helper = obj->getAttributeModifierHelper();
+	auto* restored = destination ? destination->getAttributeModifierHelper() : nullptr;
+	const Int list = AttributeModifiers::findList(name);
+	if (!directory || !helper || !restored || helper == restored || list < 0)
+		return;
+
+	using namespace AttributeModifierRules;
+	const Owner first = AttributeModifiers::ownerOf(obj, TheNameKeyGenerator->nameToKey("ModuleTag_TestFirst"));
+	const Owner second = AttributeModifiers::ownerOf(obj, TheNameKeyGenerator->nameToKey("ModuleTag_TestSecond"));
+	const UnsignedInt mask = categoryBit(LEADERSHIP);
+	helper->apply(list, 80, mask, first);
+	helper->apply(list, 100, 0, second);
+
+	AsciiString originalFile, restoredFile;
+	originalFile.format("%s/modifier-snapshot", directory);
+	restoredFile.format("%s/modifier-snapshot-restored", directory);
+	XferSave save;
+	save.open(originalFile);
+	save.xferSnapshot(helper);
+	save.close();
+
+	const Int updateIndex = restored->friend_getIndexInLogic();
+	const UnsignedInt oldWake = restored->friend_getNextCallFrame();
+	XferLoad load;
+	load.setOptions(XO_NO_POST_PROCESSING);
+	load.open(originalFile);
+	load.xferSnapshot(restored);
+	load.close();
+
+	save.open(restoredFile);
+	save.xferSnapshot(restored);
+	save.close();
+	std::ifstream original(originalFile.str(), std::ios::binary);
+	std::ifstream copy(restoredFile.str(), std::ios::binary);
+	std::ostringstream originalBytes, restoredBytes;
+	originalBytes << original.rdbuf();
+	restoredBytes << copy.rdbuf();
+	const bool exact = originalBytes.tellp() > 0 && originalBytes.str() == restoredBytes.str();
+	std::remove(originalFile.str());
+	std::remove(restoredFile.str());
+	const UnsignedInt wake = restored->friend_getNextCallFrame();
+	restored->friend_setIndexInLogic(updateIndex);
+	restored->friend_setNextCallFrame(oldWake);
+	restored->sleepUntil(wake);
+	destination->getBodyModule()->setMaxHealth(obj->getBodyModule()->getMaxHealth(), SAME_CURRENTHEALTH);
+
+	const auto& active = restored->getStack().active();
+	const bool holdsRestored = active.size() == 1 && active.front().list == list &&
+		active.front().endFrame == frame + 100 && active.front().antiMask == mask && active.front().holds.size() == 2 &&
+		active.front().holds[0].owner == first && active.front().holds[0].endFrame == frame + 80 &&
+		active.front().holds[1].owner == second && active.front().holds[1].endFrame == frame + 100;
+	std::fprintf(stderr, "TEST modifier-snapshot frame=%u exact=%d holds=%d wake=%u maxBonus=%.1f damage=%.3f\n",
+		frame, exact, holdsRestored, wake, restored->getTotals().value[HEALTH], restored->getTotals().damageDealtFactor());
+}
+#endif
+
 void logAllObjects(unsigned int frame)
 {
 	for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
@@ -1897,6 +1957,37 @@ void execute(const Command& command, unsigned int frame)
 	else if (command.action == "power")
 		pressPowerButton(command, obj, frame);
 #if !RTS_GENERALS
+	else if (command.action == "testcontain")
+	{
+		Object* passenger = findTarget(command, true);
+		ContainModuleInterface* contain = obj->getContain();
+		if (passenger && contain && contain->isValidContainerFor(passenger, TRUE))
+		{
+			contain->addToContain(passenger);
+			std::fprintf(stderr, "TEST containment frame=%u admitted=%d\n", frame, passenger->getContainedBy() == obj);
+		}
+	}
+	else if (command.action == "modsnapshot")
+	{
+		const size_t separator = command.structure.find(',');
+		if (separator != std::string::npos)
+		{
+			Command targetCommand = command;
+			targetCommand.structure = command.structure.substr(separator + 1);
+			roundTripModifiers(obj, findTarget(targetCommand, true), AsciiString(command.structure.substr(0, separator).c_str()), frame);
+		}
+	}
+	else if (command.action == "healsource")
+	{
+		const Object* source = TheGameLogic->findObjectByID(obj->getSoleHealingBenefactor());
+		std::fprintf(stderr, "TEST heal-source frame=%u target=%d source=%s\n", frame, command.ordinal,
+			source ? source->getTemplate()->getName().str() : "none");
+	}
+	else if (command.action == "checkobjupgrade")
+	{
+		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(command.structure.c_str());
+		std::fprintf(stderr, "TEST check-upgrade frame=%u found=%d\n", frame, upgrade && obj->hasUpgrade(upgrade));
+	}
 	else if (command.action == "firetestweapon")
 	{
 		const size_t separator = command.structure.find(',');

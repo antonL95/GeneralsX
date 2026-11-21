@@ -493,6 +493,7 @@ public:
 	Bool isPlayFXWhenStealthed() const { return m_playFXWhenStealthed; }
 	Bool getDieOnDetonate() const { return m_dieOnDetonate; }
 	Bool hasNuggets() const { return !m_nuggets.empty(); }
+	Bool usesInnateAttributes() const { return m_useInnateAttributes; }
 	Bool hasProjectileNuggets() const;
 	Bool hasImpactNuggets() const;
 	Bool nuggetsCanDamage(Int depth = 0) const;
@@ -626,6 +627,7 @@ private:
 	Bool m_hitStoredTarget;
 	Bool m_bombardType;
 	Bool m_noVictimNeeded;
+	Bool m_useInnateAttributes;
 
 	mutable HistoricWeaponDamageList m_historicDamage;
 	mutable UnsignedInt m_historicDamageTriggerId;

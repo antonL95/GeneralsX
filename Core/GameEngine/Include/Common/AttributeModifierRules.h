@@ -153,6 +153,11 @@ inline unsigned categoryBit(int category)
 	return category > CATEGORY_NONE && category < CATEGORY_COUNT ? 1u << category : 0u;
 }
 
+inline bool isInnateCategory(int category)
+{
+	return category >= INNATE_ARMOR && category <= INNATE_HEALTH;
+}
+
 struct Entry
 {
 	int kind = KIND_NONE;
@@ -396,6 +401,7 @@ struct TypedArmor
 struct Totals
 {
 	float value[KIND_COUNT];
+	float damageMultWithoutInnate = 1.0f;
 	std::vector<TypedArmor> typedArmor;
 	std::vector<int> invulnerableTypes;
 	int lists = 0;
@@ -439,6 +445,8 @@ struct Totals
 				value[entry.kind] *= entry.value;
 			else
 				value[entry.kind] += entry.value;
+			if (entry.kind == DAMAGE_MULT && !isInnateCategory(def.category))
+				damageMultWithoutInnate *= entry.value;
 		}
 	}
 
@@ -461,7 +469,7 @@ struct Totals
 		return std::max(0.0f, 1.0f - armor);
 	}
 
-	float damageDealtFactor() const { return value[DAMAGE_MULT]; }
+	float damageDealtFactor(bool useInnate = true) const { return useInnate ? value[DAMAGE_MULT] : damageMultWithoutInnate; }
 
 	float rangeFactor() const { return std::max(0.0f, 1.0f + value[RANGE]); }
 	float visionFactor() const { return std::max(0.0f, 1.0f + value[VISION]); }

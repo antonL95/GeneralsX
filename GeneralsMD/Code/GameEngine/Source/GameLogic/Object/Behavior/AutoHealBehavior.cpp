@@ -41,6 +41,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -211,6 +212,26 @@ UpdateSleepTime AutoHealBehavior::update()
 		}
 		return UPDATE_SLEEP(d->m_healingDelay);
 	}
+	else if( d->m_affectsContained )
+	{
+		ContainModuleInterface* contain = obj->getContain();
+		if( !contain && obj->getContainedBy() )
+			contain = obj->getContainedBy()->getContain();
+		const ContainedItemsList* passengers = contain ? contain->getContainedItemsList() : nullptr;
+		if( passengers )
+		{
+			for( Object* passenger : *passengers )
+			{
+				if( passenger->isEffectivelyDead() || (d->m_skipSelfForHealing && passenger == obj) ||
+					!passenger->isAnyKindOf(d->m_kindOf) || passenger->isAnyKindOf(d->m_forbiddenKindOf) )
+					continue;
+				const BodyModuleInterface* body = passenger->getBodyModule();
+				if( body && body->getHealth() < body->getMaxHealth() )
+					pulseHealObject(passenger, TRUE);
+			}
+		}
+		return UPDATE_SLEEP(d->m_singleBurst ? UPDATE_SLEEP_FOREVER : d->m_healingDelay);
+	}
 	else if( d->m_radius == 0.0f )
 	{
 		//ORIGINAL SYSTEM -- JUST HEAL SELF!
@@ -281,7 +302,7 @@ UpdateSleepTime AutoHealBehavior::update()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-void AutoHealBehavior::pulseHealObject( Object *obj )
+void AutoHealBehavior::pulseHealObject( Object *obj, Bool contained )
 {
 	if (m_stopped)
 		return;
@@ -295,7 +316,7 @@ void AutoHealBehavior::pulseHealObject( Object *obj )
 			return;
 	}
 
-	if ( data->m_radius == 0.0f )
+	if ( !contained && data->m_radius == 0.0f )
 		obj->attemptHealing(data->m_healingAmount, getObject());
 	else
 		obj->attemptHealingFromSoleBenefactor( data->m_healingAmount, getObject(), data->m_healingDelay );

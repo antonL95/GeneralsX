@@ -58,6 +58,7 @@ public:
 	Bool									m_affectsWholePlayer; ///< I have more than a range, I try to affect everything the player owns
 	Bool									m_skipSelfForHealing; ///< Don't heal myself.
 	Bool									m_nonStackable;
+	Bool									m_affectsContained;
 	KindOfMaskType				m_kindOf;	//Only these types can heal -- defaults to everything.
 	KindOfMaskType				m_forbiddenKindOf;	//Only these types can heal -- defaults to everything.
 	const ParticleSystemTemplate*				m_radiusParticleSystemTmpl;					//Optional particle system meant to apply to entire effect for entire duration.
@@ -76,6 +77,7 @@ public:
 		m_affectsWholePlayer = FALSE;
 		m_skipSelfForHealing = FALSE;
 		m_nonStackable = FALSE;
+		m_affectsContained = FALSE;
 		SET_ALL_KINDOFMASK_BITS( m_kindOf );
 		m_forbiddenKindOf.clear();
 	}
@@ -97,6 +99,7 @@ public:
 			{ "AffectsWholePlayer",			INI::parseBool,												nullptr, offsetof( AutoHealBehaviorModuleData, m_affectsWholePlayer ) },
 			{ "SkipSelfForHealing",			INI::parseBool,												nullptr, offsetof( AutoHealBehaviorModuleData, m_skipSelfForHealing ) },
 			{ "NonStackable",				INI::parseBool,												nullptr, offsetof( AutoHealBehaviorModuleData, m_nonStackable ) },
+			{ "AffectsContained", INI::parseBool, nullptr, offsetof( AutoHealBehaviorModuleData, m_affectsContained ) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 
@@ -176,7 +179,7 @@ protected:
 
 private:
 
-	void pulseHealObject( Object *obj );
+	void pulseHealObject( Object *obj, Bool contained = FALSE );
 	void createEmitters();
 
 	ParticleSystemID m_radiusParticleSystemID;
