@@ -32,6 +32,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/BfmeScriptRulesTest.cpp
     GameEngine/Common/FontSubstitutionTest.cpp
     GameEngine/Common/UiAnchorTest.cpp
+    GameEngine/Common/UiHudRulesTest.cpp
     GameEngine/Common/UiLayoutDumpTest.cpp
     GameEngine/Common/UiNineSliceTest.cpp
     GameEngine/Common/UiPixelSpaceTest.cpp

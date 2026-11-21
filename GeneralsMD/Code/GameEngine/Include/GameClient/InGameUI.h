@@ -42,6 +42,7 @@
 #include "GameClient/DisplayString.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/RadiusDecal.h"
+#include "GameClient/RetailHudSettings.h"
 #include "GameClient/View.h"
 
 // FORWARD DECLARATIONS ///////////////////////////////////////////////////////////////////////////
@@ -57,6 +58,7 @@ class WindowLayout;
 class Anim2DTemplate;
 class Anim2D;
 class Shadow;
+class MultiIniFieldParse;
 enum LegalBuildCode CPP_11(: Int);
 enum KindOfType CPP_11(: Int);
 enum ShadowType CPP_11(: Int);
@@ -495,6 +497,7 @@ public:  // ********************************************************************
 
 	// INI file parsing
 	virtual const FieldParse* getFieldParse() const { return s_fieldParseTable; }
+	void buildFieldParse( MultiIniFieldParse &fields ) const;
 
 
 	//Provides a global way to determine whether or not we can issue orders to what we have selected.
@@ -968,6 +971,7 @@ protected:
 
 	Bool												m_drawRMBScrollAnchor;
 	Bool												m_moveRMBScrollAnchor;
+	RetailHudSettings								m_retailHudSettings;
 	Bool												m_clientQuiet;         ///< When the user clicks exit,restart, etc. this is set true
 																												///< to skip some client sounds/fx during shutdown
 

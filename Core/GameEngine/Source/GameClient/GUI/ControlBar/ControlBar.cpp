@@ -68,6 +68,7 @@
 
 #include "GameClient/AnimateWindowManager.h"
 #include "GameClient/ControlBar.h"
+#include "GameClient/RetailHudExtras.h"
 #include "GameClient/ControlBarScheme.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/Display.h"
@@ -1516,6 +1517,12 @@ void ControlBar::reset()
 
 	m_lastFlashedAtPointValue = -1;
 	m_genStarFlash = TRUE;
+	if (m_retailSelectionName)
+	{
+		RetailHeroBar::reset();
+		RetailEdges::reset();
+		RetailNotification::reset();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------

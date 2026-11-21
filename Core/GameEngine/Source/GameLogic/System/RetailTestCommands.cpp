@@ -1065,6 +1065,15 @@ void execute(const Command& command, unsigned int frame)
 		}
 		return;
 	}
+	if (command.action == "science")
+	{
+		Player* player = findPlayer(command);
+		const ScienceType science = TheScienceStore ? TheScienceStore->getScienceFromInternalName(command.structure.c_str()) : SCIENCE_INVALID;
+		if (player && science != SCIENCE_INVALID)
+			std::fprintf(stderr, "TEST frame %u: science %s %s granted=%d\n", frame, command.player.c_str(), command.structure.c_str(),
+				player->grantScience(science) ? 1 : 0);
+		return;
+	}
 	if (command.action == "spawn")
 	{
 		spawnObject(command, frame);

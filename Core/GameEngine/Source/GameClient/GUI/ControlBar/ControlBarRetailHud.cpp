@@ -30,6 +30,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/HotKey.h"
 #include "GameClient/Mouse.h"
+#include "GameClient/RetailHudExtras.h"
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ExperienceLevelStore.h"
@@ -169,6 +170,7 @@ void drawRetailPalantirFrame(GameWindow *window, WinInstanceData *)
 	drawDesignImage("UiRetailTopPlate", TopPlate, x, y, scale);
 	drawDesignImage("UiRetailOptionsKey", OptionsKey, x, y, scale);
 	drawDesignImage("UiRetailObjectives", Objectives, x, y, scale);
+	RetailEdges::drawPalantirTop(window->winGetParent());
 	TheControlBar->drawRetailTexts();
 }
 
@@ -241,7 +243,9 @@ WindowMsgHandledType retailPalantirInput(GameWindow *window, UnsignedInt msg, Wi
 		|| insideCircle(px, py, x, y, scale, 285.7f, 191.4f, 92.0f)
 		|| insideRect(px, py, x, y, scale, PlaqueArea) || insideRect(px, py, x, y, scale, TopPlate)
 		|| TheControlBar->isOverRetailSocket(px, py);
-	return inside ? MSG_HANDLED : MSG_IGNORED;
+	if (inside)
+		return MSG_HANDLED;
+	return RetailHeroBar::handleInput(msg, px, py) || RetailEdges::handleInput(msg, px, py) ? MSG_HANDLED : MSG_IGNORED;
 }
 
 WindowMsgHandledType retailPortraitInput(GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2)
@@ -264,6 +268,14 @@ void retailCommandTooltip(GameWindow *window, WinInstanceData *, UnsignedInt)
 void retailLevelTooltip(GameWindow *, WinInstanceData *, UnsignedInt)
 {
 	TheControlBar->showRetailLevelTooltip();
+}
+
+void retailPalantirTooltip(GameWindow *, WinInstanceData *, UnsignedInt mouse)
+{
+	const Int x = mouse & 0xFFFF;
+	const Int y = mouse >> 16;
+	if (!RetailHeroBar::showTooltip(x, y))
+		RetailEdges::showTooltip(x, y);
 }
 
 void setRetailRightClick(GameWindow *window, Bool enabled)
@@ -693,28 +705,12 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 
 	AsciiString hotKey = TheHotKeyManager ? TheHotKeyManager->searchHotKey(command->getTextLabel()) : AsciiString::TheEmptyString;
 	hotKey.toUpper();
-	if (!hero && hotKey.isNotEmpty())
-	{
-		UnicodeString shortcut;
-		UnicodeString key;
-		key.translate(hotKey);
-		shortcut.format(L"\nShortcut: %ls", key.str());
-		text.concat(shortcut);
-	}
-	UnicodeString description = TheGameText->fetchOrSubstitute(command->getRetailChoiceDescription(getRetailTrayChoice(window)).str(), L"");
-	if (!description.isEmpty())
-	{
-		text.concat(L"\n");
-		text.concat(description);
-	}
-	const Int cost = getRetailCommandCost(command, window);
-	if (cost >= 0)
-	{
-		UnicodeString price;
-		price.format(TheGameText->fetchOrSubstitute("TOOLTIP:UnitCost", L"Cost: %d"), cost);
-		text.concat(L"\n");
-		text.concat(price);
-	}
+	Mouse::RetailTooltip tooltip;
+	tooltip.title = text;
+	if (!hero)
+		tooltip.shortcut.translate(hotKey);
+	tooltip.body = TheGameText->fetchOrSubstitute(command->getRetailChoiceDescription(getRetailTrayChoice(window)).str(), L"");
+	tooltip.cost = getRetailCommandCost(command, window);
 	const CommandAvailability availability = getRetailButtonAvailability(window);
 	UnicodeString reason;
 	const Object* selected = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
@@ -771,10 +767,10 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 	}
 	if (!reason.isEmpty())
 	{
-		text.concat(L"\n");
-		text.concat(reason);
+		tooltip.body.concat(L"\n");
+		tooltip.body.concat(reason);
 	}
-	TheMouse->setRetailCommandTooltip(text);
+	TheMouse->setRetailTooltip(tooltip);
 }
 
 void ControlBar::initRetailHud()
@@ -839,6 +835,13 @@ void ControlBar::initRetailHud()
 		m_retailRadial[i]->winSetDrawFunc(drawRetailCommand);
 		m_retailRadial[i]->winSetTooltipFunc(retailCommandTooltip);
 	}
+	palantir->winSetTooltipFunc(retailPalantirTooltip);
+	for (GameWindow *child = palantir->winGetChild(); child; child = child->winGetNext())
+		if (!child->winGetTooltipFunc())
+			child->winSetTooltipFunc(retailPalantirTooltip);
+	RetailHeroBar::init(master);
+	RetailEdges::init(master);
+	RetailNotification::init(master);
 	m_contextParent[CP_COMMAND]->winHide(TRUE);
 	switchToContext(CB_CONTEXT_NONE, nullptr);
 }
@@ -1423,6 +1426,9 @@ void ControlBar::updateRetailHud()
 	}
 	updateRetailCounters();
 	updateRetailRadial();
+	RetailHeroBar::update();
+	RetailEdges::update();
+	RetailNotification::update();
 }
 
 const Image* ControlBar::getRetailButtonImage(GameWindow *window) const

@@ -281,6 +281,9 @@ set(GAMEENGINE_SRC
     Include/GameClient/UiNineSlice.h
     Include/GameClient/UiPixelSpace.h
     Include/GameClient/UiRadialRing.h
+    Include/GameClient/RetailHudExtras.h
+    Include/GameClient/RetailHudSettings.h
+    Include/GameClient/UiHudRules.h
     Include/GameClient/UiRelayout.h
     Include/GameClient/UiResolution.h
     Include/GameClient/UiScale.h
@@ -823,6 +826,8 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/ControlBar/ControlBarStructureInventory.cpp
     Source/GameClient/GUI/ControlBar/ControlBarUnderConstruction.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailHud.cpp
+    Source/GameClient/GUI/ControlBar/ControlBarRetailEdges.cpp
+    Source/GameClient/GUI/ControlBar/ControlBarRetailHeroes.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailRadial.cpp
 #    Source/GameClient/GUI/DisconnectMenu/DisconnectMenu.cpp
     Source/GameClient/GUI/EstablishConnectionsMenu/EstablishConnectionsMenu.cpp
@@ -937,6 +942,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/System/Smudge.cpp
     Source/GameClient/Terrain/TerrainRoads.cpp
     Source/GameClient/Terrain/TerrainVisual.cpp
+    Source/GameClient/RetailHudSettings.cpp
     Source/GameClient/UiAnchor.cpp
     Source/GameClient/UiFrame.cpp
     Source/GameClient/UiLayoutDump.cpp

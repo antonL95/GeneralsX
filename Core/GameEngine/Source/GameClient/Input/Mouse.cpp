@@ -29,6 +29,9 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <cmath>
+#include <string>
+
 #include "Common/Debug.h"
 #include "Common/MessageStream.h"
 #include "Common/GameEngine.h"
@@ -46,6 +49,10 @@
 #include "GameClient/Keyboard.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/GlobalLanguage.h"
+#include "GameClient/GameFont.h"
+#include "GameClient/RetailHudSettings.h"
+#include "GameClient/UiHudRules.h"
+#include "GameClient/UiScale.h"
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ScriptEngine.h"
@@ -563,9 +570,7 @@ Mouse::~Mouse()
 	if(m_tooltipDisplayString)
 		TheDisplayStringManager->freeDisplayString(m_tooltipDisplayString);
 	m_tooltipDisplayString = nullptr;
-	if (m_retailTooltipTitle)
-		TheDisplayStringManager->freeDisplayString(m_retailTooltipTitle);
-	m_retailTooltipTitle = nullptr;
+	freeRetailTooltip();
 
 	if( m_cursorTextDisplayString )
 		TheDisplayStringManager->freeDisplayString( m_cursorTextDisplayString );
@@ -624,9 +629,7 @@ void Mouse::onResolutionChanged()
 	if(m_tooltipDisplayString)
 		TheDisplayStringManager->freeDisplayString(m_tooltipDisplayString);
 	m_tooltipDisplayString = nullptr;
-	if (m_retailTooltipTitle)
-		TheDisplayStringManager->freeDisplayString(m_retailTooltipTitle);
-	m_retailTooltipTitle = nullptr;
+	freeRetailTooltip();
 
 	m_tooltipDisplayString = TheDisplayStringManager->newDisplayString();
 
@@ -945,40 +948,37 @@ void Mouse::setCursorTooltip( UnicodeString tooltip, Int delay, const RGBColor *
 
 }
 
-void Mouse::setRetailCommandTooltip(UnicodeString tooltip)
+void Mouse::setRetailTooltip(const RetailTooltip &tooltip)
 {
-	UnicodeString title = tooltip;
-	UnicodeString body;
-	const WideChar *text = tooltip.str();
-	const WideChar *newline = text ? wcschr(text, L'\n') : nullptr;
-	if (newline && newline[1])
+	if (tooltip.title.compare(m_retailTooltip.title) != 0 || tooltip.shortcut.compare(m_retailTooltip.shortcut) != 0
+		|| tooltip.cost != m_retailTooltip.cost || tooltip.body.compare(m_retailTooltip.body) != 0)
 	{
-		title.clear();
-		for (const WideChar *ch = text; ch < newline; ++ch)
-			title.concat(*ch);
-		Bool lineStart = TRUE;
-		for (const WideChar *ch = newline + 1; *ch; ++ch)
-		{
-			if (lineStart && (*ch == L'\n' || *ch == L' '))
-				continue;
-			body.concat(*ch);
-			lineStart = *ch == L'\n';
-		}
+		m_retailTooltip = tooltip;
+		m_retailLayoutDirty = TRUE;
 	}
-	if (!m_retailTooltipTitle && TheDisplayStringManager)
-		m_retailTooltipTitle = TheDisplayStringManager->newDisplayString();
-	if (!m_retailTooltipTitle)
-		return;
-	if (m_tooltipDisplayString && m_retailTooltipTitle->getFont() != m_tooltipDisplayString->getFont())
-		m_retailTooltipTitle->setFont(m_tooltipDisplayString->getFont());
-	const UnicodeString &shownTitle = body.isEmpty() ? UnicodeString::TheEmptyString : title;
-	if (shownTitle.compare(m_retailTooltipTitle->getText()) != 0)
-		m_retailTooltipTitle->setText(shownTitle);
-
-	const Real scale = TheDisplay->getHeight() / 768.0f;
-	const Real defaultWidth = TheDisplay->getWidth() * m_tooltipWidth;
-	setCursorTooltip(body.isEmpty() ? title : body, -1, nullptr, defaultWidth > 0.0f ? 342.0f * scale / defaultWidth : 1.0f);
+	setCursorTooltip(tooltip.title, -1, nullptr, 1.0f);
 	m_retailCommandTooltip = TRUE;
+}
+
+void Mouse::freeRetailTooltip()
+{
+	if (!TheDisplayStringManager)
+		return;
+	for (DisplayString *&line : m_retailLines)
+	{
+		if (line)
+			TheDisplayStringManager->freeDisplayString(line);
+		line = nullptr;
+	}
+	if (m_retailCost)
+		TheDisplayStringManager->freeDisplayString(m_retailCost);
+	if (m_retailShortcut)
+		TheDisplayStringManager->freeDisplayString(m_retailShortcut);
+	m_retailCost = nullptr;
+	m_retailShortcut = nullptr;
+	m_retailLineCount = 0;
+	m_retailTitleLines = 0;
+	m_retailLayoutDirty = TRUE;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1206,6 +1206,134 @@ void Mouse::resetTooltipDelay()
 	m_displayTooltip = FALSE;
 }
 
+namespace
+{
+constexpr Real RetailHelpBoxScale = 0.6935f;
+constexpr Real RetailHelpWidth = 405.0f;
+constexpr Real RetailHelpContentWidth = 342.0f;
+constexpr Real RetailHelpTop = 35.0f;
+constexpr Real RetailHelpBottom = 27.0f;
+constexpr Real RetailHelpLeft = 34.0f;
+constexpr Real RetailHelpRight = 30.0f;
+constexpr Real RetailHelpTextTop = 28.0f;
+constexpr Real RetailHelpTextBottom = 22.0f;
+constexpr Real RetailHelpBottomGap = 112.0f;
+constexpr UnsignedInt RetailHelpFrameMs = 120;
+constexpr UnsignedInt RetailHelpTextMs = 100;
+
+RetailHudSettings::TextStyle retailStyle(const RetailHudSettings::TextStyle RetailHudSettings::*member)
+{
+	if (TheRetailHudSettings)
+		return TheRetailHudSettings->*member;
+	return RetailHudSettings::TextStyle{ AsciiString("Albertus MT"), 14, FALSE, GameMakeColor(255, 204, 0, 255) };
+}
+
+GameFont *retailFont(const RetailHudSettings::TextStyle &style, Real scale)
+{
+	if (!TheFontLibrary)
+		return nullptr;
+	const Int pixels = MAX(6, static_cast<Int>(std::floor(style.pointSize * scale + 0.5f)));
+	return TheFontLibrary->getFontPixels(style.font, pixels, style.bold);
+}
+
+UnicodeString replaceToken(const UnicodeString &format, const UnicodeString &value)
+{
+	UnicodeString text;
+	Bool replaced = FALSE;
+	for (const WideChar *ch = format.str(); ch && *ch; ++ch)
+	{
+		if (!replaced && ch[0] == L'%' && (ch[1] == L's' || ch[1] == L'd' || (ch[1] == L'l' && ch[2] == L's')))
+		{
+			text.concat(value);
+			ch += ch[1] == L'l' ? 2 : 1;
+			replaced = TRUE;
+			continue;
+		}
+		text.concat(*ch);
+	}
+	return text;
+}
+
+Int lineHeight(DisplayString *text)
+{
+	if (!text)
+		return 0;
+	Int width, height;
+	text->getSize(&width, &height);
+	const GameFont *font = text->getFont();
+	return MAX(height, font ? font->height : 0);
+}
+
+Color alphaOf(Color color, Real alpha)
+{
+	const UnsignedByte a = static_cast<UnsignedByte>(((color >> 24) & 0xFF) * std::clamp(alpha, 0.0f, 1.0f) + 0.5f);
+	return (color & 0x00FFFFFF) | (static_cast<Color>(a) << 24);
+}
+}
+
+void Mouse::layoutRetailTooltip(Real scale)
+{
+	if (!m_retailLayoutDirty && m_retailLayoutScale == scale)
+		return;
+	freeRetailTooltip();
+	m_retailLayoutDirty = FALSE;
+	m_retailLayoutScale = scale;
+	if (!TheDisplayStringManager)
+		return;
+	const Int contentWidth = static_cast<Int>(RetailHelpContentWidth * scale);
+	DisplayString *measure = TheDisplayStringManager->newDisplayString();
+	if (!measure)
+		return;
+	auto addLines = [&](const UnicodeString &text, GameFont *font)
+	{
+		measure->setFont(font);
+		const std::wstring source = text.str() ? text.str() : L"";
+		for (const std::wstring &line : UiHudRules::tooltipLines(source))
+		{
+			const auto width = [&](const std::wstring &candidate)
+			{
+				measure->setText(UnicodeString(candidate.c_str()));
+				return measure->getWidth();
+			};
+			for (const std::wstring &wrapped : UiHudRules::wrapLine(line, contentWidth, width))
+			{
+				if (m_retailLineCount >= RETAIL_TOOLTIP_LINES)
+					return;
+				DisplayString *string = TheDisplayStringManager->newDisplayString();
+				if (!string)
+					return;
+				string->setFont(font);
+				string->setText(UnicodeString(wrapped.c_str()));
+				m_retailLines[m_retailLineCount++] = string;
+			}
+		}
+	};
+	addLines(m_retailTooltip.title, retailFont(retailStyle(&RetailHudSettings::helpBoxName), scale));
+	m_retailTitleLines = m_retailLineCount;
+	if (m_retailTooltip.cost >= 0)
+	{
+		m_retailCost = TheDisplayStringManager->newDisplayString();
+		if (m_retailCost)
+		{
+			UnicodeString value;
+			value.format(L"%d", m_retailTooltip.cost);
+			m_retailCost->setFont(retailFont(retailStyle(&RetailHudSettings::helpBoxCost), scale));
+			m_retailCost->setText(replaceToken(TheGameText->fetchOrSubstitute("TOOLTIP:Cost", L"Cost: %d"), value));
+		}
+	}
+	if (!m_retailTooltip.shortcut.isEmpty())
+	{
+		m_retailShortcut = TheDisplayStringManager->newDisplayString();
+		if (m_retailShortcut)
+		{
+			m_retailShortcut->setFont(retailFont(retailStyle(&RetailHudSettings::helpBoxShortcut), scale));
+			m_retailShortcut->setText(replaceToken(TheGameText->fetchOrSubstitute("TOOLTIP:Shortcut", L"Shortcut: %s"), m_retailTooltip.shortcut));
+		}
+	}
+	addLines(m_retailTooltip.body, retailFont(retailStyle(&RetailHudSettings::helpBoxDescription), scale));
+	TheDisplayStringManager->freeDisplayString(measure);
+}
+
 Bool Mouse::drawRetailCommandTooltip()
 {
 	if (!TheMappedImageCollection)
@@ -1218,48 +1346,95 @@ Bool Mouse::drawRetailCommandTooltip()
 		|| !TheDisplay->hasImageTexture(right) || !TheDisplay->hasImageTexture(bottom))
 		return FALSE;
 
-	const Real scale = TheDisplay->getHeight() / 768.0f;
-	const Int topHeight = MAX(1, static_cast<Int>(35 * scale));
-	const Int bottomHeight = MAX(1, static_cast<Int>(27 * scale));
-	const Int bodyPadding = MAX(1, static_cast<Int>(5 * scale));
-	const Int leftWidth = MAX(1, static_cast<Int>(34 * scale));
-	const Int rightWidth = MAX(1, static_cast<Int>(30 * scale));
-	Int textWidth, textHeight;
-	m_tooltipDisplayString->getSize(&textWidth, &textHeight);
-	Int titleWidth = 0;
-	Int titleHeight = 0;
-	if (m_retailTooltipTitle && m_retailTooltipTitle->getTextLength() > 0)
-		m_retailTooltipTitle->getSize(&titleWidth, &titleHeight);
-	const Int width = MAX(MAX(textWidth, titleWidth) + leftWidth + rightWidth, static_cast<Int>(405 * scale));
-	const Int height = titleHeight + textHeight + topHeight + bottomHeight + 2 * bodyPadding;
-	const Int x = MAX(0, (m_maxX - width) / 2);
-	constexpr UnsignedInt entryTime = 140;
-	const UnsignedInt elapsed = std::min<UnsignedInt>(timeGetTime() - m_highlightUpdateStart, entryTime);
-	const Real remaining = 1.0f - static_cast<Real>(elapsed) / entryTime;
-	const Int entryOffset = static_cast<Int>(8.0f * scale * remaining * remaining);
-	const Int bottomGap = static_cast<Int>(112 * scale);
-	const Int y = MAX(0, m_maxY - height - bottomGap + entryOffset);
+	const Real uiScale = static_cast<Real>(UiScale::scale(TheDisplay->getWidth(), TheDisplay->getHeight()));
+	const Real scale = uiScale * RetailHelpBoxScale;
+	layoutRetailTooltip(scale);
+
+	Int textHeight = 0;
+	for (Int i = 0; i < m_retailLineCount; ++i)
+	{
+		textHeight += lineHeight(m_retailLines[i]);
+		if (i + 1 == m_retailTitleLines && (m_retailCost || m_retailShortcut))
+			textHeight += MAX(lineHeight(m_retailCost), lineHeight(m_retailShortcut));
+	}
+
+	const Int width = static_cast<Int>(RetailHelpWidth * scale + 0.5f);
+	const Int topHeight = MAX(1, static_cast<Int>(RetailHelpTop * scale + 0.5f));
+	const Int bottomHeight = MAX(1, static_cast<Int>(RetailHelpBottom * scale + 0.5f));
+	const Int leftWidth = MAX(1, static_cast<Int>(RetailHelpLeft * scale + 0.5f));
+	const Int rightWidth = MAX(1, static_cast<Int>(RetailHelpRight * scale + 0.5f));
+	const Int textTop = static_cast<Int>(RetailHelpTextTop * scale + 0.5f);
+	const Int textBottom = static_cast<Int>(RetailHelpTextBottom * scale + 0.5f);
+	const Int height = MAX(topHeight + bottomHeight, textTop + textHeight + textBottom);
+	const Int x = MAX(0, (static_cast<Int>(TheDisplay->getWidth()) - width) / 2);
+	const Int y = MAX(0, static_cast<Int>(TheDisplay->getHeight()) - static_cast<Int>(RetailHelpBottomGap * uiScale + 0.5f) - height);
 	const Int middleY = y + topHeight;
-	const Int bottomY = y + height - bottomHeight;
-	TheDisplay->drawFillRect(x + leftWidth / 2, middleY, width - (leftWidth + rightWidth) / 2,
-		bottomY - middleY, GameMakeColor(18, 16, 13, 232));
-	TheDisplay->drawImage(top, x, y, x + width, middleY);
-	TheDisplay->drawImage(left, x, middleY, x + leftWidth, bottomY);
-	TheDisplay->drawImage(right, x + width - rightWidth, middleY, x + width, bottomY);
-	TheDisplay->drawImage(bottom, x, bottomY, x + width, y + height);
+	const Int bottomY = MAX(middleY, y + height - bottomHeight);
+
+	const UnsignedInt elapsed = timeGetTime() - m_highlightUpdateStart;
+	const Real frameAlpha = MIN(1.0f, static_cast<Real>(elapsed) / RetailHelpFrameMs);
+	const Real textAlpha = elapsed <= RetailHelpFrameMs ? 0.0f : MIN(1.0f, static_cast<Real>(elapsed - RetailHelpFrameMs) / RetailHelpTextMs);
+	const Color art = alphaOf(GameMakeColor(255, 255, 255, 255), frameAlpha);
+	TheDisplay->drawFillRect(x + leftWidth / 2, y + topHeight / 2, width - (leftWidth + rightWidth) / 2,
+		height - (topHeight + bottomHeight) / 2, alphaOf(GameMakeColor(0, 0, 0, 200), frameAlpha));
+	TheDisplay->drawImage(left, x, middleY, x + leftWidth, bottomY, art);
+	TheDisplay->drawImage(right, x + width - rightWidth, middleY, x + width, bottomY, art);
+	TheDisplay->drawImage(top, x, y, x + width, middleY, art);
+	TheDisplay->drawImage(bottom, x, bottomY, x + width, y + height, art);
+	if (textAlpha <= 0.0f)
+		return TRUE;
+
 	ICoord2D lo = { 0, 0 };
 	ICoord2D hi = { static_cast<Int>(TheDisplay->getWidth()), static_cast<Int>(TheDisplay->getHeight()) };
 	IRegion2D clipRegion = { lo, hi };
 	const Int centerX = x + width / 2;
-	if (titleHeight > 0)
+	const Color shadow = alphaOf(GameMakeColor(0, 0, 0, 255), textAlpha);
+	const Color nameColor = alphaOf(retailStyle(&RetailHudSettings::helpBoxName).color | 0xFF000000, textAlpha);
+	const Color costColor = alphaOf(retailStyle(&RetailHudSettings::helpBoxCost).color | 0xFF000000, textAlpha);
+	const Color shortcutColor = alphaOf(retailStyle(&RetailHudSettings::helpBoxShortcut).color | 0xFF000000, textAlpha);
+	const Color bodyColor = alphaOf(retailStyle(&RetailHudSettings::helpBoxDescription).color | 0xFF000000, textAlpha);
+	Int lineY = y + textTop;
+	auto drawRow = [&]()
 	{
-		m_retailTooltipTitle->setClipRegion(&clipRegion);
-		m_retailTooltipTitle->draw(centerX - titleWidth / 2, middleY + bodyPadding,
-			GameMakeColor(255, 255, 255, 255), GameMakeColor(0, 0, 0, 255));
+		Int costWidth = 0, shortcutWidth = 0, unused = 0;
+		if (m_retailCost)
+			m_retailCost->getSize(&costWidth, &unused);
+		if (m_retailShortcut)
+			m_retailShortcut->getSize(&shortcutWidth, &unused);
+		const Int rowHeight = MAX(lineHeight(m_retailCost), lineHeight(m_retailShortcut));
+		const Int half = static_cast<Int>(RetailHelpContentWidth * scale * 0.25f);
+		const Image *coin = TheMappedImageCollection->findImageByName("Resource_Icon");
+		const Int coinSize = TheDisplay->hasImageTexture(coin) ? lineHeight(m_retailCost) : 0;
+		if (m_retailCost)
+		{
+			const Int groupWidth = coinSize + costWidth;
+			const Int costCenter = m_retailShortcut ? centerX - half : centerX;
+			const Int left = costCenter - groupWidth / 2;
+			if (coinSize > 0)
+				TheDisplay->drawImage(coin, left, lineY, left + coinSize * 19 / 21, lineY + coinSize, alphaOf(GameMakeColor(255, 255, 255, 255), textAlpha));
+			m_retailCost->setClipRegion(&clipRegion);
+			m_retailCost->draw(left + coinSize, lineY, costColor, shadow);
+		}
+		if (m_retailShortcut)
+		{
+			const Int shortcutCenter = m_retailCost ? centerX + half : centerX;
+			m_retailShortcut->setClipRegion(&clipRegion);
+			m_retailShortcut->draw(shortcutCenter - shortcutWidth / 2, lineY, shortcutColor, shadow);
+		}
+		lineY += rowHeight;
+	};
+	if (m_retailTitleLines == 0 && (m_retailCost || m_retailShortcut))
+		drawRow();
+	for (Int i = 0; i < m_retailLineCount; ++i)
+	{
+		Int lineWidth, extentHeight;
+		m_retailLines[i]->getSize(&lineWidth, &extentHeight);
+		m_retailLines[i]->setClipRegion(&clipRegion);
+		m_retailLines[i]->draw(centerX - lineWidth / 2, lineY, i < m_retailTitleLines ? nameColor : bodyColor, shadow);
+		lineY += lineHeight(m_retailLines[i]);
+		if (i + 1 == m_retailTitleLines && (m_retailCost || m_retailShortcut))
+			drawRow();
 	}
-	m_tooltipDisplayString->setClipRegion(&clipRegion);
-	m_tooltipDisplayString->draw(centerX - textWidth / 2, middleY + bodyPadding + titleHeight,
-		titleHeight > 0 ? GameMakeColor(255, 210, 60, 255) : GameMakeColor(255, 255, 255, 255), GameMakeColor(0, 0, 0, 255));
 	return TRUE;
 }
 

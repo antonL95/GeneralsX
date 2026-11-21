@@ -300,7 +300,14 @@ public:
   void setCursorTooltipDelay(Int delay) { m_tooltipDelay = delay; }
 
 	void setCursorTooltip( UnicodeString tooltip, Int tooltipDelay = -1, const RGBColor *color = nullptr, Real width = 1.0f );		///< set tooltip string at cursor
-	void setRetailCommandTooltip(UnicodeString tooltip);
+	struct RetailTooltip
+	{
+		UnicodeString title;
+		UnicodeString shortcut;
+		Int cost = -1;
+		UnicodeString body;
+	};
+	void setRetailTooltip(const RetailTooltip &tooltip);
 	void setMouseText( UnicodeString text, const RGBAColorInt *color, const RGBAColorInt *dropColor );					///< set the cursor text, *NOT* the tooltip text
 	virtual void setMouseLimits();					///< update the limit extents the mouse can move in
 	MouseCursor getMouseCursor() { return m_currentCursor; }	///< get the current mouse cursor image type
@@ -395,12 +402,22 @@ protected:
 
 	UnicodeString m_tooltipString;	///< tooltip text
 	DisplayString *m_tooltipDisplayString; ///< tooltipDisplayString
-	DisplayString *m_retailTooltipTitle = nullptr;
+	enum { RETAIL_TOOLTIP_LINES = 24 };
+	RetailTooltip m_retailTooltip;
+	DisplayString *m_retailLines[RETAIL_TOOLTIP_LINES] = {};
+	Int m_retailLineCount = 0;
+	Int m_retailTitleLines = 0;
+	DisplayString *m_retailCost = nullptr;
+	DisplayString *m_retailShortcut = nullptr;
+	Real m_retailLayoutScale = 0.0f;
+	Bool m_retailLayoutDirty = TRUE;
 	Bool m_displayTooltip;  /**< when the mouse has been still long enough this will be
 													set to TRUE indicating it's Ok to fire off a tooltip */
 	Bool m_isTooltipEmpty;
 	Bool m_retailCommandTooltip = FALSE;
 	Bool drawRetailCommandTooltip();
+	void layoutRetailTooltip(Real scale);
+	void freeRetailTooltip();
 
 	enum { NUM_MOUSE_EVENTS = 256 };
 	MouseIO m_mouseEvents[ NUM_MOUSE_EVENTS ];  ///< for event list

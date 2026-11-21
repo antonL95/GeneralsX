@@ -51,6 +51,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "GameClient/HotKey.h"
+#include "GameClient/RetailHudExtras.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/KeyDefs.h"
 #include "GameClient/MetaEvent.h"
@@ -170,7 +171,7 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 		return TRUE;
 	HotKeyMap::iterator it = m_hotKeyMap.find(key);
 	if( it == m_hotKeyMap.end() )
-		return FALSE;
+		return TheControlBar && TheControlBar->isRetailHud() && RetailHeroBar::executeHotKey(key);
 	GameWindow *win = it->second.m_win;
 	if( !win )
 		return FALSE;

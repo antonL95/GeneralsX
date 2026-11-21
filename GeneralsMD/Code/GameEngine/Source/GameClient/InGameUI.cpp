@@ -924,9 +924,17 @@ void INI::parseInGameUIDefinition( INI* ini )
 	if( TheInGameUI )
 	{
 		// parse the ini weapon definition
-		ini->initFromINI( TheInGameUI, TheInGameUI->getFieldParse() );
+		MultiIniFieldParse fields;
+		TheInGameUI->buildFieldParse( fields );
+		ini->initFromINIMulti( TheInGameUI, fields );
 		TheInGameUI->validate();
 	}
+}
+
+void InGameUI::buildFieldParse( MultiIniFieldParse &fields ) const
+{
+	fields.add( getFieldParse() );
+	fields.add( RetailHudSettings::getFieldParse(), offsetof( InGameUI, m_retailHudSettings ) );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1035,6 +1043,7 @@ InGameUI::PlayerInfoList::LastValues::LastValues()
 InGameUI::InGameUI()
 {
 	Int i;
+	TheRetailHudSettings = &m_retailHudSettings;
 
 
   m_inputEnabled = true;
@@ -1259,6 +1268,8 @@ InGameUI::InGameUI()
 //-------------------------------------------------------------------------------------------------
 InGameUI::~InGameUI()
 {
+	if (TheRetailHudSettings == &m_retailHudSettings)
+		TheRetailHudSettings = nullptr;
 	delete TheControlBar;
 	TheControlBar = nullptr;
 
