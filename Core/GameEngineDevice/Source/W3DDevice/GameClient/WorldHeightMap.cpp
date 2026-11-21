@@ -896,6 +896,8 @@ static AsciiString readRetailChunkString(DataChunkInput &file)
 	UnsignedShort length;
 	requireRetailChunkBytes(file, sizeof(length));
 	file.readArrayOfBytes(reinterpret_cast<char *>(&length), sizeof(length));
+	if (length >= AsciiString::MAX_LEN)
+		throw ERROR_CORRUPT_FILE_FORMAT;
 	requireRetailChunkBytes(file, length);
 	AsciiString value;
 	if (length > 0)
