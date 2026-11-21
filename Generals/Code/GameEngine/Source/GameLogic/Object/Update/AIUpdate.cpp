@@ -4938,9 +4938,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 4;
 #else
-	const XferVersion currentVersion = 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5167,6 +5167,17 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		Int repulsorCountdown = 0;
 		xfer->xferInt(&repulsorCountdown);
 	}
+	if (version >= 7)
+	{
+		xfer->xferUnsignedInt(&m_pathTimestamp);
+		xfer->xferInt(&m_blockedFrames);
+		xfer->xferReal(&m_curMaxBlockedSpeed);
+		xfer->xferReal(&m_bumpSpeedLimit);
+		xfer->xferBool(&m_isMoving);
+		xfer->xferBool(&m_isBlocked);
+		xfer->xferBool(&m_isBlockedAndStuck);
+		xfer->xferBool(&m_retryPath);
+	}
 
 }
 
@@ -5186,6 +5197,9 @@ void AIUpdateInterface::loadPostProcess()
 		m_curLocomotorSet = LOCOMOTORSET_INVALID;
 		chooseLocomotorSet(lst);
 	}
+
+	if (TheAI->pathfinder()->hasLoadedReservations())
+		return;
 
 	if (!isMoving()) {
 		m_pathfindGoalCell.x = -1;

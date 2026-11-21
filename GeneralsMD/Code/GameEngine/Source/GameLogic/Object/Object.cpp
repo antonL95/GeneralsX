@@ -5278,7 +5278,13 @@ Bool Object::hasGhostObject() const
 /// We have moved a 'significant' amount, so do maintenance that can be considered 'cell-based'
 void Object::onPartitionCellChange()
 {
-	handlePartitionCellMaintenance();
+	if (RetailFileLayers::enabled() && TheGameState && TheGameState->isInLoadGame())
+	{
+		handleValueMap();
+		handleThreatMap();
+	}
+	else
+		handlePartitionCellMaintenance();
 }
 
 //-------------------------------------------------------------------------------------------------

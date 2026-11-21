@@ -49,10 +49,13 @@
 //-----------------------------------------------------------------------------
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <algorithm>
+
 #include "Common/ActionManager.h"
 #include "Common/DiscreteCircle.h"
 #include "Common/GameEngine.h"
 #include "Common/GameState.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/GameUtility.h"
 #include "Common/MessageStream.h"
 #include "Common/NameKeyGenerator.h"
@@ -2409,6 +2412,11 @@ void PartitionContactList::addToContactList( PartitionData *obj, PartitionData *
 	Object* other_obj = other->getObject();
 	if (obj_obj == nullptr || other_obj == nullptr)
 		return;
+	if (RetailFileLayers::enabled() && obj_obj->getID() > other_obj->getID())
+	{
+		std::swap(obj, other);
+		std::swap(obj_obj, other_obj);
+	}
 
 	// compute hash index based on object's ids.
 	UnsignedInt hashValue = hash2ints(obj_obj->getID(), other_obj->getID());
@@ -2519,6 +2527,25 @@ void PartitionContactList::resetContactList()
 //-----------------------------------------------------------------------------
 void PartitionContactList::processContactList()
 {
+	if (RetailFileLayers::enabled() && m_contactList && m_contactList->m_next)
+	{
+		std::vector<PartitionContactListNode*> contacts;
+		for (PartitionContactListNode* contact = m_contactList; contact; contact = contact->m_next)
+			contacts.push_back(contact);
+		std::sort(contacts.begin(), contacts.end(), [](const PartitionContactListNode* a, const PartitionContactListNode* b) {
+			if (!a->m_obj || !b->m_obj)
+				return a->m_obj != nullptr;
+			const ObjectID first = a->m_obj->getObject()->getID();
+			const ObjectID second = b->m_obj->getObject()->getID();
+			if (first != second)
+				return first < second;
+			return a->m_other->getObject()->getID() < b->m_other->getObject()->getID();
+		});
+		m_contactList = contacts.front();
+		for (size_t i = 1; i < contacts.size(); ++i)
+			contacts[i - 1]->m_next = contacts[i];
+		contacts.back()->m_next = nullptr;
+	}
 	for (PartitionContactListNode* cd = m_contactList; cd; cd = cd->m_next)
 	{
 		if (cd->m_obj == nullptr || cd->m_other == nullptr)
@@ -2758,6 +2785,7 @@ void PartitionManager::shutdown()
 //DECLARE_PERF_TIMER(PartitionManager_update)
 void PartitionManager::update()
 {
+	const Bool restoring = RetailFileLayers::enabled() && TheGameState && TheGameState->isInLoadGame();
 	//USE_PERF_TIMER(PartitionManager_update)
 	{
 #ifdef INTENSE_DEBUG
@@ -2794,7 +2822,7 @@ void PartitionManager::update()
 				dirty->friend_updateCellsTouched();
 			}
 
-			if (collideEm && !dirty->getObject()->isKindOf(KINDOF_IMMOBILE))
+			if (!restoring && collideEm && !dirty->getObject()->isKindOf(KINDOF_IMMOBILE))
 			{
 				dirty->addPossibleCollisions(&ctList);
 			}
@@ -2806,7 +2834,8 @@ void PartitionManager::update()
 #endif
 		TheContactList = nullptr;
 
-		processPendingUndoShroudRevealQueue();
+		if (!restoring)
+			processPendingUndoShroudRevealQueue();
 	}
 
 #if defined(RTS_DEBUG)
@@ -4709,6 +4738,8 @@ void PartitionManager::xfer( Xfer *xfer )
 //			DEBUG_ASSERTCRASH(m_pendingUndoShroudReveals.empty(), ("At load, we appear to not be in a reset state.") );
 
 			// I have to split this up though, since on Load I need to make new instances.
+			if (RetailFileLayers::enabled())
+				resetPendingUndoShroudRevealQueue();
 			for( Int infoIndex = 0; infoIndex < queueSize; infoIndex++ )
 			{
 				SightingInfo *newInfo = newInstance(SightingInfo);

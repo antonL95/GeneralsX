@@ -43,6 +43,7 @@
 #include "Common/MapObject.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Radar.h"
 #include "Common/Team.h"
 #include "Common/WellKnownKeys.h"
@@ -364,6 +365,7 @@ void GameState::init()
 // ------------------------------------------------------------------------------------------------a
 void GameState::reset()
 {
+	m_loadedRandomState.reset();
 
 	// clear the post process snapshot list
 	m_snapshotPostProcessList.clear();
@@ -719,6 +721,11 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	{
 		// do the post-process from a save game load
 		gameStatePostProcessLoad();
+		if (m_loadedRandomState)
+		{
+			setGameLogicRandomState(*m_loadedRandomState);
+			m_loadedRandomState.reset();
+		}
 	}
 	catch (...)
 	{
@@ -1708,9 +1715,10 @@ void GameState::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 2;
+	const XferVersion currentVersion = RetailFileLayers::enabled() && m_gameInfo.saveFileType != SAVE_FILE_TYPE_MISSION ? 3 : 2;
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 3 : 2;
 	XferVersion version = currentVersion;
-	xfer->xferVersion( &version, currentVersion );
+	xfer->xferVersion(&version, maxVersion);
 
 	// get structure for our current game info
 	SaveGameInfo *saveGameInfo = getSaveGameInfo();
@@ -1801,4 +1809,11 @@ void GameState::xfer( Xfer *xfer )
 
 	}
 
+	if (version >= 3)
+	{
+		GameLogicRandomState state = getGameLogicRandomState();
+		state.xfer(xfer);
+		if (xfer->getXferMode() == XFER_LOAD)
+			m_loadedRandomState = state;
+	}
 }

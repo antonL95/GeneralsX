@@ -28,6 +28,19 @@
 
 #pragma once
 
+class Xfer;
+
+struct GameLogicRandomState
+{
+	UnsignedInt baseSeed;
+	UnsignedInt words[6];
+
+	void xfer(Xfer* xfer);
+};
+
+GameLogicRandomState getGameLogicRandomState();
+void setGameLogicRandomState(const GameLogicRandomState& state);
+
 extern void InitRandom();
 extern void InitRandom( UnsignedInt seed );
 extern UnsignedInt GetGameLogicRandomSeed();   ///< Get the seed (used for replays)

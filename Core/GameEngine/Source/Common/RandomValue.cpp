@@ -31,6 +31,7 @@
 #include "Common/RandomValue.h"
 #include "Common/crc.h"
 #include "Common/Debug.h"
+#include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 
 #undef DEBUG_RANDOM_AUDIO
@@ -62,6 +63,27 @@ static UnsignedInt theGameLogicSeed[6] =
 };
 
 static UnsignedInt theGameLogicBaseSeed = 0;
+
+GameLogicRandomState getGameLogicRandomState()
+{
+	GameLogicRandomState state;
+	state.baseSeed = theGameLogicBaseSeed;
+	memcpy(state.words, theGameLogicSeed, sizeof(theGameLogicSeed));
+	return state;
+}
+
+void setGameLogicRandomState(const GameLogicRandomState& state)
+{
+	theGameLogicBaseSeed = state.baseSeed;
+	memcpy(theGameLogicSeed, state.words, sizeof(theGameLogicSeed));
+}
+
+void GameLogicRandomState::xfer(Xfer* xfer)
+{
+	xfer->xferUnsignedInt(&baseSeed);
+	for (UnsignedInt& word : words)
+		xfer->xferUnsignedInt(&word);
+}
 
 UnsignedInt GetGameLogicRandomSeed()
 {

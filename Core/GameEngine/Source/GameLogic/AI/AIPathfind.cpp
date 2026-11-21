@@ -196,6 +196,7 @@ void Pathfinder::reset()
 
 	// pathfind grid cells have not been classified yet
 	m_isMapReady = false;
+	m_hasLoadedReservations = FALSE;
 	m_cumulativeCellsAllocated = 0;
 
 	debugPathPos.x = 0.0f;
@@ -7550,14 +7551,102 @@ void Pathfinder::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
+	if (version >= 2)
+	{
+		for (ObjectID& id : m_queuedPathfindRequests)
+			xfer->xferObjectID(&id);
+		xfer->xferInt(&m_queuePRHead);
+		xfer->xferInt(&m_queuePRTail);
+		if (m_queuePRHead < 0 || m_queuePRHead >= PATHFIND_QUEUE_LEN ||
+			m_queuePRTail < 0 || m_queuePRTail >= PATHFIND_QUEUE_LEN)
+			throw XFER_INVALID_PARAMETERS;
+		xfer->xferInt(&m_cumulativeCellsAllocated);
+		UnsignedInt zoneUpdateFrame = m_zoneManager.getZoneUpdateFrame();
+		xfer->xferUnsignedInt(&zoneUpdateFrame);
+
+		struct Reservation
+		{
+			Int layer;
+			ICoord2D position;
+			ObjectID positionOwner;
+			ObjectID goalOwner;
+			ObjectID aircraftGoalOwner;
+		};
+		const Bool loading = xfer->getXferMode() == XFER_LOAD;
+		auto findCell = [&](Int layer, Int x, Int y) -> PathfindCell* {
+			if (layer == LAYER_GROUND)
+				return getCell(LAYER_GROUND, x, y);
+			return m_layers[layer].getCell(x, y);
+		};
+		std::vector<Reservation> reservations;
+		for (Int layer = LAYER_GROUND; m_map && layer <= LAYER_LAST; ++layer)
+		{
+			if (layer != LAYER_GROUND && m_layers[layer].isUnused())
+				continue;
+			for (Int x = m_extent.lo.x; x <= m_extent.hi.x; ++x)
+			{
+				for (Int y = m_extent.lo.y; y <= m_extent.hi.y; ++y)
+				{
+					PathfindCell* cell = findCell(layer, x, y);
+					if (!cell || !cell->hasInfo())
+						continue;
+					const Reservation entry{layer, {x, y}, cell->getPosUnit(), cell->getGoalUnit(), cell->getGoalAircraft()};
+					if (entry.positionOwner == INVALID_ID && entry.goalOwner == INVALID_ID && entry.aircraftGoalOwner == INVALID_ID)
+						continue;
+					if (!loading)
+						reservations.push_back(entry);
+					else
+					{
+						if (entry.positionOwner != INVALID_ID)
+							cell->setPosUnit(INVALID_ID, entry.position);
+						if (entry.goalOwner != INVALID_ID)
+							cell->setGoalUnit(INVALID_ID, entry.position);
+						if (entry.aircraftGoalOwner != INVALID_ID)
+							cell->setGoalAircraft(INVALID_ID, entry.position);
+					}
+				}
+			}
+		}
+		UnsignedInt count = static_cast<UnsignedInt>(reservations.size());
+		xfer->xferUnsignedInt(&count);
+		for (UnsignedInt i = 0; i < count; ++i)
+		{
+			Reservation entry{};
+			if (!loading)
+				entry = reservations[i];
+			xfer->xferInt(&entry.layer);
+			xfer->xferICoord2D(&entry.position);
+			xfer->xferObjectID(&entry.positionOwner);
+			xfer->xferObjectID(&entry.goalOwner);
+			xfer->xferObjectID(&entry.aircraftGoalOwner);
+			if (loading)
+			{
+				if (!m_map || entry.layer < LAYER_GROUND || entry.layer > LAYER_LAST)
+					throw XFER_INVALID_PARAMETERS;
+				PathfindCell* cell = findCell(entry.layer, entry.position.x, entry.position.y);
+				if (!cell)
+					throw XFER_INVALID_PARAMETERS;
+				if (entry.positionOwner != INVALID_ID)
+					cell->setPosUnit(entry.positionOwner, entry.position);
+				if (entry.goalOwner != INVALID_ID)
+					cell->setGoalUnit(entry.goalOwner, entry.position);
+				if (entry.aircraftGoalOwner != INVALID_ID)
+					cell->setGoalAircraft(entry.aircraftGoalOwner, entry.position);
+			}
+		}
+		m_hasLoadedReservations = loading;
+		if (loading)
+			m_savedZoneUpdateFrame = zoneUpdateFrame;
+	}
 }
 
 //-----------------------------------------------------------------------------
 void Pathfinder::loadPostProcess()
 {
-
+	if (m_hasLoadedReservations)
+		m_zoneManager.setZoneUpdateFrame(m_savedZoneUpdateFrame);
 }

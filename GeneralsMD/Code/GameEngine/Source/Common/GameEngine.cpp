@@ -87,6 +87,7 @@
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/BattlePlanUpdate.h"
 #include "GameLogic/RankInfo.h"
@@ -1286,6 +1287,7 @@ void GameEngine::update()
 		// TheSuperHackers @info Ignores frozen time because the script engine needs updating in the logic update regardless.
 		if (canUpdateGameLogic(FramePacer::IgnoreFrozenTime))
 		{
+			RetailTestCommands::saveCheckpoint(TheGameLogic->getFrame());
 			TheGameLogic->UPDATE();
 
 			if (!TheFramePacer->isTimeFrozen())

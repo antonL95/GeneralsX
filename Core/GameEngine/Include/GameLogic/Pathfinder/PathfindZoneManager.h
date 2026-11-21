@@ -49,6 +49,8 @@ public:
 
 	Bool needToCalculateZones() const {return m_nextFrameToCalculateZones <= TheGameLogic->getFrame() ;} ///< Returns true if the zones need to be recalculated.
 	void markZonesDirty() ; ///< Called when the zones need to be recalculated.
+	UnsignedInt getZoneUpdateFrame() const { return m_nextFrameToCalculateZones; }
+	void setZoneUpdateFrame(UnsignedInt frame) { m_nextFrameToCalculateZones = frame; }
 	void updateZonesForModify( PathfindCell **map,  PathfindLayer layers[], const IRegion2D &structureBounds, const IRegion2D &globalBounds ) ; ///< Called to recalculate an area when a structure has been removed.
 	void calculateZones(	PathfindCell **map, PathfindLayer layers[], const IRegion2D &bounds);	///< Does zone calculations.
 	zoneStorageType getEffectiveZone(LocomotorSurfaceTypeMask acceptableSurfaces, Bool crusher, zoneStorageType zone) const;

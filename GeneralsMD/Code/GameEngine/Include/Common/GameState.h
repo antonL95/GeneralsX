@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <optional>
+#include "Common/RandomValue.h"
+
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/STLTypedefs.h"
 #include "Common/Snapshot.h"
@@ -237,6 +240,7 @@ private:
 
 	SnapshotBlockList m_snapshotBlockList[SNAPSHOT_MAX];	///< list of snapshot blocks of save file data
 	SaveGameInfo m_gameInfo;						///< save game info struct
+	std::optional<GameLogicRandomState> m_loadedRandomState;
 
 	typedef std::list< Snapshot * > SnapshotList;
 	typedef SnapshotList::iterator SnapshotListIterator;

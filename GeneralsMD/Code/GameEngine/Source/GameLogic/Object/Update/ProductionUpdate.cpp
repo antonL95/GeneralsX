@@ -1304,7 +1304,12 @@ void ProductionUpdate::crc( Xfer *xfer )
 	if (RetailFileLayers::enabled())
 	{
 		for (ProductionEntry* entry = m_productionQueue; entry; entry = entry->m_next)
+		{
 			xfer->xferReal(&entry->m_powerBonusFrames);
+			xfer->xferInt(&entry->m_costPaid);
+			xfer->xferInt(&entry->m_framesOverride);
+			xfer->xferInt(&entry->m_framesUnderConstruction);
+		}
 	}
 
 }
@@ -1318,7 +1323,7 @@ void ProductionUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1361,6 +1366,12 @@ void ProductionUpdate::xfer( Xfer *xfer )
 			xfer->xferInt( &production->m_framesUnderConstruction );
 			if (version >= 2)
 				xfer->xferReal(&production->m_powerBonusFrames);
+			if (version >= 3)
+			{
+				xfer->xferInt(&production->m_costPaid);
+				xfer->xferInt(&production->m_framesOverride);
+			}
+
 
 			// production quantity
 			xfer->xferInt( &production->m_productionQuantityTotal );
@@ -1452,6 +1463,12 @@ void ProductionUpdate::xfer( Xfer *xfer )
 			xfer->xferInt( &production->m_framesUnderConstruction );
 			if (version >= 2)
 				xfer->xferReal(&production->m_powerBonusFrames);
+			if (version >= 3)
+			{
+				xfer->xferInt(&production->m_costPaid);
+				xfer->xferInt(&production->m_framesOverride);
+			}
+
 
 			// production quantity
 			xfer->xferInt( &production->m_productionQuantityTotal );

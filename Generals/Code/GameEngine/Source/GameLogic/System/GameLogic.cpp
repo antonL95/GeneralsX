@@ -2770,6 +2770,15 @@ inline Bool isLowerPriority(const UpdateModulePtr a, const UpdateModulePtr b)
 	DEBUG_ASSERTCRASH(a && b, ("these may no longer be null"));
 	UnsignedInt f1 = a->friend_getPriority();
 	UnsignedInt f2 = b->friend_getPriority();
+	if (f1 == f2 && RetailFileLayers::enabled())
+	{
+		const ObjectID id1 = a->friend_getObject()->getID();
+		const ObjectID id2 = b->friend_getObject()->getID();
+		if (id1 != id2)
+			return id1 > id2;
+		return static_cast<const UpdateModule*>(a)->getModuleTagNameKey() >
+			static_cast<const UpdateModule*>(b)->getModuleTagNameKey();
+	}
 	return f1 > f2;
 }
 
@@ -3631,6 +3640,11 @@ Object *GameLogic::getFirstObject()
 // ------------------------------------------------------------------------------------------------
 ObjectID GameLogic::allocateObjectID()
 {
+	if (RetailFileLayers::enabled() && TheGameState && TheGameState->isInLoadGame())
+	{
+		while (findObjectByID(m_nextObjID))
+			m_nextObjID = static_cast<ObjectID>(static_cast<UnsignedInt>(m_nextObjID) + 1);
+	}
 	/// @todo Find unused value in current object set
 	ObjectID ret = m_nextObjID;
 	m_nextObjID = (ObjectID)((UnsignedInt)m_nextObjID + 1);
@@ -4684,9 +4698,9 @@ void GameLogic::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 9;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 14 : 9;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 10;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 14 : 10;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -4796,7 +4810,9 @@ void GameLogic::xfer( Xfer *xfer )
 			}
 
 			// create new object
-			obj = TheThingFactory->newObject( thingTemplate, defaultTeam );
+			obj = RetailFileLayers::enabled()
+				? TheThingFactory->newObjectFromExactTemplate(thingTemplate, defaultTeam, OBJECT_STATUS_MASK_NONE)
+				: TheThingFactory->newObject(thingTemplate, defaultTeam);
 
 			// xfer the rest of the object data
 			xfer->xferSnapshot( obj );
@@ -5026,6 +5042,13 @@ void GameLogic::xfer( Xfer *xfer )
 		ExperienceLevelStore::xferPendingLevels(xfer);
 	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
 		ExperienceLevelStore::reset();
+	if (version >= 14)
+	{
+		xfer->xferObjectID(&m_nextObjID);
+		xfer->xferSnapshot(TheAI->pathfinder());
+	}
+	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
+		m_nextObjID = static_cast<ObjectID>(1);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -5042,7 +5065,8 @@ void GameLogic::loadPostProcess()
 	// m_nextObjID from getting un-necessarily high we will set it to the next available
 	// id from the objects that are now in the world and actually in use
 	//
-	m_nextObjID = INVALID_ID;
+	if (!RetailFileLayers::enabled())
+		m_nextObjID = INVALID_ID;
 	Object *obj;
 	for( obj = getFirstObject(); obj; obj = obj->getNextObject() )
 		if( obj->getID() >= m_nextObjID )

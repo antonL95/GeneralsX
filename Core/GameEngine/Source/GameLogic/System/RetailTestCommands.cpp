@@ -29,12 +29,14 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
+#include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "Common/XferCRC.h"
 #include "Common/XferLoad.h"
 #include "Common/XferSave.h"
 #include "GameClient/ControlBar.h"
@@ -2240,6 +2242,34 @@ void execute(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST xp-crc frame=%u crc=%08X\n", frame, TheGameLogic->getCRC(CRC_RECALC));
 		return;
 	}
+	if (command.action == "snapshot-crc")
+	{
+		auto crc = [](Snapshot* snapshot) {
+			XferCRC xfer;
+			xfer.open("SaveLoad");
+			xfer.xferSnapshot(snapshot);
+			const UnsignedInt result = xfer.getCRC();
+			xfer.close();
+			return result;
+		};
+		std::fprintf(stderr, "TEST snapshot frame=%u random=%08X partition=%08X players=%08X ai=%08X pathfinder=%08X\n",
+			frame, GetGameLogicRandomSeedCRC(), crc(ThePartitionManager), crc(ThePlayerList), crc(TheAI), crc(TheAI->pathfinder()));
+		for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+		{
+			std::fprintf(stderr, "TEST snapshot object frame=%u id=%u %s crc=%08X lookup=%d\n",
+				frame, static_cast<unsigned>(obj->getID()), obj->getTemplate()->getName().str(),
+				crc(obj), TheGameLogic->findObjectByID(obj->getID()) == obj);
+			if (const ProductionUpdateInterface* production = obj->getProductionUpdateInterface();
+				production && production->firstProduction())
+			{
+				static const NameKeyType key = NAMEKEY("ProductionUpdate");
+				if (UpdateModule* update = obj->findUpdateModule(key))
+					std::fprintf(stderr, "TEST snapshot queue frame=%u id=%u crc=%08X\n",
+						frame, static_cast<unsigned>(obj->getID()), crc(update));
+			}
+		}
+		return;
+	}
 #if !RTS_GENERALS
 	if (command.action == "xpsavetrim")
 	{
@@ -3193,5 +3223,19 @@ void runFrame(unsigned int frame)
 	}
 	if (!s_tracked.empty())
 		logTracked(frame);
+}
+
+void saveCheckpoint(unsigned int frame)
+{
+	if (!RetailFileLayers::enabled() || !s_loaded || s_commands.empty())
+		return;
+	for (const Command& command : s_commands)
+	{
+		if (command.frame == frame && command.action == "snapshot-save")
+		{
+			const SaveResult result = TheGameState->saveGame(command.structure.c_str(), UnicodeString(), SAVE_FILE_TYPE_NORMAL);
+			std::fprintf(stderr, "TEST snapshot-save frame=%u code=%d\n", frame, result.saveCode);
+		}
+	}
 }
 }
