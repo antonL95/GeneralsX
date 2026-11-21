@@ -2783,20 +2783,18 @@ void GameLogic::processDestroyList()
 			of the objects in the world every frame, we come out well ahead this way.)
 		*/
 
-		const Int MAX_SUO = 256;
-		UpdateModulePtr sleepyUpdatesForThisObject[MAX_SUO];
-		Int numSUO = 0;
+		std::vector<UpdateModulePtr> sleepyUpdatesForThisObject;
 
 		for (std::vector<UpdateModulePtr>::iterator it2 = m_sleepyUpdates.begin(); it2 != m_sleepyUpdates.end(); ++it2)
 		{
 			UpdateModulePtr u = *it2;
-			if (u->friend_getObject() == currentObject && numSUO < MAX_SUO)
+			if (u->friend_getObject() == currentObject)
 			{
-				sleepyUpdatesForThisObject[numSUO++] = u;
+				sleepyUpdatesForThisObject.push_back(u);
 			}
 		}
 
-		for (--numSUO; numSUO >= 0; --numSUO)
+		for (Int numSUO = (Int)sleepyUpdatesForThisObject.size() - 1; numSUO >= 0; --numSUO)
 		{
 			// have to re-get idx each time since each call to erase might change others.
 			Int idx = sleepyUpdatesForThisObject[numSUO]->friend_getIndexInLogic();
