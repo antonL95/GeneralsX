@@ -44,6 +44,7 @@
 
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -1588,6 +1589,79 @@ void clampWaypointPosition( Coord3D &position, Int margin )
 /**
  * Move to given position(s)
  */
+Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType cmdSource )
+{
+	const Real REARRANGE_ANGLE = PI / 4.0f;
+	const Real MAX_OFFSET_RADII = 6.0f;
+
+	std::vector<Object*> movers;
+	Coord3D center;
+	center.zero();
+	Real facingX = 0.0f;
+	Real facingY = 0.0f;
+	Real speed = FAST_AS_POSSIBLE;
+	for (std::list<Object *>::iterator it = m_memberList.begin(); it != m_memberList.end(); ++it)
+	{
+		Object* obj = *it;
+		AIUpdateInterface* ai = obj->getAIUpdateInterface();
+		if (!ai || obj->isKindOf(KINDOF_IMMOBILE) || obj->isDisabledByType(DISABLED_HELD) || !ai->isDoingGroundMovement())
+			continue;
+		movers.push_back(obj);
+		center.x += obj->getPosition()->x;
+		center.y += obj->getPosition()->y;
+		facingX += obj->getUnitDirectionVector2D()->x;
+		facingY += obj->getUnitDirectionVector2D()->y;
+		const Real maxSpeed = ai->getCurLocomotorSpeed();
+		if (maxSpeed > 0.0f && maxSpeed < speed &&
+			IS_CONDITION_BETTER(obj->getBodyModule()->getDamageState(), TheGlobalData->m_movementPenaltyDamageState))
+			speed = maxSpeed;
+	}
+	if (movers.size() < 2)
+		return FALSE;
+
+	center.x /= movers.size();
+	center.y /= movers.size();
+	Real rotation = 0.0f;
+	const Real travelX = pos->x - center.x;
+	const Real travelY = pos->y - center.y;
+	if (travelX * travelX + travelY * travelY > PATHFIND_CELL_SIZE_F * PATHFIND_CELL_SIZE_F &&
+		facingX * facingX + facingY * facingY > 0.0f)
+	{
+		const Real turn = stdAngleDiff(WWMath::Atan2Origin(travelY, travelX), WWMath::Atan2Origin(facingY, facingX));
+		if (fabs(turn) > REARRANGE_ANGLE)
+			rotation = turn;
+	}
+	const Real cosRotation = Cos(rotation);
+	const Real sinRotation = Sin(rotation);
+
+	for (Object* obj : movers)
+	{
+		AIUpdateInterface* ai = obj->getAIUpdateInterface();
+		Real offsetX = obj->getPosition()->x - center.x;
+		Real offsetY = obj->getPosition()->y - center.y;
+		const Real length = sqrtf(offsetX * offsetX + offsetY * offsetY);
+		const Real maxLength = MAX_OFFSET_RADII * obj->getGeometryInfo().getBoundingCircleRadius();
+		if (length > maxLength && length > 0.0f)
+		{
+			offsetX *= maxLength / length;
+			offsetY *= maxLength / length;
+		}
+		Coord3D dest;
+		dest.x = pos->x + offsetX * cosRotation - offsetY * sinRotation;
+		dest.y = pos->y + offsetX * sinRotation + offsetY * cosRotation;
+		const PathfindLayerEnum layer = TheTerrainLogic->getLayerForDestination(pos);
+		dest.z = TheTerrainLogic->getLayerHeight(dest.x, dest.y, layer);
+		TheAI->pathfinder()->removeGoal(obj);
+		TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), &dest, nullptr);
+		TheAI->pathfinder()->updateGoal(obj, &dest, layer);
+		obj->setFormationID(NO_FORMATION_ID);
+		ai->aiMoveToPosition(&dest, cmdSource);
+		if (speed < FAST_AS_POSSIBLE)
+			ai->setDesiredSpeed(speed);
+	}
+	return TRUE;
+}
+
 void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, CommandSourceType cmdSource )
 {
 
@@ -1608,6 +1682,13 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
   {
     isFormation = false;
   }
+
+	if (!addWaypoint && !isFormation && RetailFileLayers::enabled())
+	{
+		clampWaypointPosition( position, STD_WAYPOINT_CLAMP_MARGIN );
+		if (friend_moveRotwkBlockToPos(pos, cmdSource))
+			return;
+	}
 
 
 	if (!addWaypoint && !isFormation) {

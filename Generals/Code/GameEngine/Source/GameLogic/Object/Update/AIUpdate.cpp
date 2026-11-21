@@ -2105,6 +2105,44 @@ DECLARE_PERF_TIMER(doLocomotor)
 /**
  * Compute drive forces
  */
+Bool AIUpdateInterface::steerInFormation()
+{
+	if (!RetailFileLayers::enabled() || !isIdle())
+		return FALSE;
+	Object* obj = getObject();
+	const HordeContain* horde = HordeContain::get(obj->getContainedBy());
+	HordeContain::FormationGoal goal;
+	if (!horde || !horde->getFormationGoal(obj, goal))
+		return FALSE;
+
+	const Real ARRIVED_DISTANCE = 2.0f;
+	const Real FACING_TOLERANCE = 0.05f;
+	if (!goal.hordeMoving && goal.error < ARRIVED_DISTANCE)
+	{
+		obj->clearModelConditionState(MODELCONDITION_MOVING);
+		if (fabs(stdAngleDiff(goal.facing, obj->getOrientation())) > FACING_TOLERANCE)
+			m_curLocomotor->locoUpdate_moveTowardsAngle(obj, goal.facing);
+		else
+			m_curLocomotor->locoUpdate_maintainCurrentPosition(obj);
+		return TRUE;
+	}
+
+	obj->setModelConditionState(MODELCONDITION_MOVING);
+	const Real maxSpeed = m_curLocomotor->getMaxSpeedForCondition(obj->getBodyModule()->getDamageState());
+	const Real speed = goal.speed < maxSpeed ? goal.speed : maxSpeed;
+	Bool blocked = FALSE;
+	m_curLocomotor->locoUpdate_moveTowardsPosition(obj, goal.position, goal.distance, speed, &blocked);
+	return TRUE;
+}
+
+Real AIUpdateInterface::hordeFormationSpeedScale() const
+{
+	if (!RetailFileLayers::enabled())
+		return 1.0f;
+	const HordeContain* horde = HordeContain::get(getObject());
+	return horde ? horde->getFormationSpeedScale() : 1.0f;
+}
+
 UpdateSleepTime AIUpdateInterface::doLocomotor()
 {
 	USE_PERF_TIMER(doLocomotor)
@@ -2194,6 +2232,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 						Real myMaxSpeed = m_curLocomotor->getMaxSpeedForCondition(getObject()->getBodyModule()->getDamageState());
 						if( speed == FAST_AS_POSSIBLE || speed > myMaxSpeed )
 							speed = myMaxSpeed;
+						speed *= hordeFormationSpeedScale();
 
 						if (blocked && speed>m_curMaxBlockedSpeed)
 						{
@@ -2234,6 +2273,8 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 
 				case NONE:
 					{
+						if (!m_doFinalPosition && steerInFormation())
+							break;
 						if (m_doFinalPosition)
 						{
 							Coord3D pos = *getObject()->getPosition();

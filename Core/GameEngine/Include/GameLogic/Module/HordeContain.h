@@ -134,7 +134,19 @@ public:
 		WeaponSlotType slot = (WeaponSlotType)-1, CanAttackResult* attackResult = nullptr) const;
 	Object* findNearestLivingMember(const Coord3D& fromPos) const;
 	static Bool addCrateBanner(Object* anchor);
+	struct FormationGoal
+	{
+		Coord3D position;
+		Real speed;
+		Real distance;
+		Real error;
+		Real facing;
+		Bool hordeMoving;
+	};
 	Coord3D getMemberPosition(ObjectID id, Bool followLeader) const;
+	Bool getFormationGoal(const Object* member, FormationGoal& goal) const;
+	Real getFormationSpeedScale() const;
+	void reassignSlotsByPosition();
 	Bool canSetAlternateFormation(Bool alternate) const;
 	Bool isAlternateFormation() const;
 	void setAlternateFormation(Bool alternate);

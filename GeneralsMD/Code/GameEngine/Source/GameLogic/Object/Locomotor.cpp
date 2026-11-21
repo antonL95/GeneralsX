@@ -393,6 +393,9 @@ LocomotorTemplate::LocomotorTemplate()
 	m_elevatorCorrectionRate    = 0.0f;
 
 	m_rotwk = RotwkLocomotorRules::Authored();
+	m_waitForFormation = FALSE;
+	m_maxTurnWithoutReform = 2.0f * PI;
+	m_turnWhileMoving = TRUE;
 
 }
 
@@ -714,6 +717,9 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "RudderCorrectionRate",			 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionRate) }, // Added in Zero Hour
 		{ "ElevatorCorrectionDegree",	 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_elevatorCorrectionDegree) }, // Added in Zero Hour
 		{ "ElevatorCorrectionRate",		 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_elevatorCorrectionRate) }, // Added in Zero Hour
+		{ "WaitForFormation", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_waitForFormation) },
+		{ "MaxTurnWithoutReform", INI::parseAngleReal, nullptr, offsetof(LocomotorTemplate, m_maxTurnWithoutReform) },
+		{ "TurnWhileMoving", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_turnWhileMoving) },
 		{ nullptr, nullptr, nullptr, 0 }
 
 	};
@@ -1329,6 +1335,8 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		switch (m_template->m_appearance)
 		{
 			case LOCO_LEGS_TWO:
+			case LOCO_FOUR_LEGS_HUGE:
+			case LOCO_HUGE_TWO_LEGS:
 					moveTowardsPositionLegs(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
 			case LOCO_CLIMBER:
@@ -1349,6 +1357,9 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 					break;
 			case LOCO_THRUST:
 					moveTowardsPositionThrust(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
+					break;
+			case LOCO_HORDE:
+					moveTowardsPositionHorde(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
 			case LOCO_OTHER:
 			default:
@@ -1862,6 +1873,22 @@ Real Locomotor::calcMinTurnRadius(BodyDamageType condition, Real* timeToTravelTh
 }
 
 
+Real Locomotor::rotwkLegsTurnSlowdown(const Object* obj, const Coord3D& goalPos, Real angleCoeff, Real maxSpeed) const
+{
+	const Real HUGE_LEGS_MAX_SLOWDOWN = 0.9f;
+	if (m_template->m_appearance == LOCO_FOUR_LEGS_HUGE || m_template->m_appearance == LOCO_HUGE_TWO_LEGS)
+		return angleCoeff < HUGE_LEGS_MAX_SLOWDOWN ? angleCoeff : HUGE_LEGS_MAX_SLOWDOWN;
+
+	const Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
+	if (turnRate <= 0.0f)
+		return angleCoeff;
+	const Real turnRadius = maxSpeed / turnRate;
+	const Real dx = goalPos.x - obj->getPosition()->x;
+	const Real dy = goalPos.y - obj->getPosition()->y;
+	const Real orbitDistance = 2.0f * turnRadius;
+	return dx * dx + dy * dy < orbitDistance * orbitDistance ? angleCoeff : 0.0f;
+}
+
 //-------------------------------------------------------------------------------------------------
 void Locomotor::moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed)
 {
@@ -1914,6 +1941,8 @@ void Locomotor::moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, c
 	Real angleCoeff = (Real)fabs( relAngle ) / (QUARTERPI);
 	if (angleCoeff > 1.0f)
 		angleCoeff = 1.0;
+	if (RetailFileLayers::enabled())
+		angleCoeff = rotwkLegsTurnSlowdown(obj, goalPos, angleCoeff, maxSpeed);
 
 	Real goalSpeed = (1.0f - angleCoeff) * desiredSpeed;
 
@@ -2680,6 +2709,112 @@ void Locomotor::moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, 
 
 }
 
+
+void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed)
+{
+	const Real REFORM_MIN_DISTANCE = 20.0f;
+	const Real SLIDE_IN_PLACE_DISTANCE = 0.1f;
+
+	BodyDamageType bdt = obj->getBodyModule()->getDamageState();
+	Real maxSpeed = getMaxSpeedForCondition(bdt);
+	if (desiredSpeed > maxSpeed)
+		desiredSpeed = maxSpeed;
+
+	const Coord3D* pos = obj->getPosition();
+	Coord3D dirToApplyForce;
+	dirToApplyForce.x = goalPos.x - pos->x;
+	dirToApplyForce.y = goalPos.y - pos->y;
+	dirToApplyForce.z = 0.0f;
+	const Real distToGoal = dirToApplyForce.length();
+	if (distToGoal < SLIDE_IN_PLACE_DISTANCE)
+		dirToApplyForce = *obj->getUnitDirectionVector2D();
+	else
+	{
+		dirToApplyForce.x /= distToGoal;
+		dirToApplyForce.y /= distToGoal;
+		const Real desiredAngle = WWMath::Atan2Origin(dirToApplyForce.y, dirToApplyForce.x);
+		const Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
+		if (fabs(relAngle) > m_template->m_maxTurnWithoutReform && onPathDistToGoal > REFORM_MIN_DISTANCE)
+		{
+			obj->setOrientation(desiredAngle);
+			physics->setTurning(TURN_NONE);
+		}
+		else if (m_template->m_turnWhileMoving)
+			physics->setTurning(rotateTowardsPosition(obj, goalPos));
+	}
+
+	steerVelocity(obj, physics, dirToApplyForce, onPathDistToGoal, desiredSpeed);
+}
+
+void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed)
+{
+	const Real SLIDE_IN_PLACE_DISTANCE = 0.1f;
+	PhysicsBehavior* physics = obj->getPhysics();
+	if (!physics)
+		return;
+	Real maxSpeed = getMaxSpeedForCondition(obj->getBodyModule()->getDamageState());
+	if (desiredSpeed > maxSpeed)
+		desiredSpeed = maxSpeed;
+	Coord3D dir;
+	dir.x = goalPos.x - obj->getPosition()->x;
+	dir.y = goalPos.y - obj->getPosition()->y;
+	dir.z = 0.0f;
+	const Real distToGoal = dir.length();
+	if (distToGoal < SLIDE_IN_PLACE_DISTANCE)
+	{
+		dir = *obj->getUnitDirectionVector2D();
+		physics->setTurning(TURN_NONE);
+	}
+	else
+	{
+		dir.x /= distToGoal;
+		dir.y /= distToGoal;
+		physics->setTurning(rotateTowardsPosition(obj, goalPos));
+		const Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
+		if (turnRate > 0.0f && distToGoal < 2.0f * maxSpeed / turnRate)
+		{
+			const Coord3D* facing = obj->getUnitDirectionVector2D();
+			const Real alignment = facing->x * dir.x + facing->y * dir.y;
+			desiredSpeed *= alignment > 0.0f ? alignment : 0.0f;
+		}
+	}
+	steerVelocity(obj, physics, dir, onPathDistToGoal, desiredSpeed);
+}
+
+void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord3D& dirToApplyForce, Real onPathDistToGoal, Real goalSpeed)
+{
+	const BodyDamageType bdt = obj->getBodyModule()->getDamageState();
+	const Coord3D* velocity = physics->getVelocity();
+	const Real actualSpeed = sqrtf(velocity->x * velocity->x + velocity->y * velocity->y);
+
+	if (!getFlag(NO_SLOW_DOWN_AS_APPROACHING_DEST))
+	{
+		Real slowDownDist = calcSlowDownDist(actualSpeed, getMinSpeed(), getBraking());
+		if (onPathDistToGoal < slowDownDist)
+			goalSpeed = getMinSpeed();
+		const Real arrivalSpeed = sqrtf(2.0f * getBraking() * onPathDistToGoal);
+		if (goalSpeed > arrivalSpeed)
+			goalSpeed = arrivalSpeed > getMinSpeed() ? arrivalSpeed : getMinSpeed();
+	}
+
+	Coord3D velocityDelta;
+	velocityDelta.x = dirToApplyForce.x * goalSpeed - velocity->x;
+	velocityDelta.y = dirToApplyForce.y * goalSpeed - velocity->y;
+	velocityDelta.z = 0.0f;
+	const Real deltaLength = velocityDelta.length();
+	if (deltaLength > 0.0f)
+	{
+		const Real limit = goalSpeed > actualSpeed ? getMaxAcceleration(bdt) : getBraking();
+		Real scale = physics->getMass();
+		if (deltaLength > limit)
+			scale *= limit / deltaLength;
+		Coord3D force;
+		force.x = velocityDelta.x * scale;
+		force.y = velocityDelta.y * scale;
+		force.z = 0.0f;
+		physics->applyMotiveForce(&force);
+	}
+}
 
 //-------------------------------------------------------------------------------------------------
 /*

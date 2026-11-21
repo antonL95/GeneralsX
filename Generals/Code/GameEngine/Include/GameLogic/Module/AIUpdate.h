@@ -403,6 +403,7 @@ public:
 
 	Real getDesiredSpeed() const { return m_desiredSpeed; }
 	void setDesiredSpeed( Real speed ) { m_desiredSpeed = speed; }	///< how fast we want to go
+	void wakeForFormation() { wakeUpNow(); }
 
 	// these are virtual because subclasses might need to override them. (srj)
 	virtual void setLocomotorGoalPositionOnPath();
@@ -609,6 +610,8 @@ protected:
 	Real calculateMaxBlockedSpeed(Object *other) const;
 
 	virtual UpdateSleepTime doLocomotor();	// virtual so subclasses can override
+	Bool steerInFormation();
+	Real hordeFormationSpeedScale() const;
 	void chooseGoodLocomotorFromCurrentSet();
 
 	void setLastCommandSource( CommandSourceType source );

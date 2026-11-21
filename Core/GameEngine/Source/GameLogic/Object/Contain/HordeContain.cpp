@@ -13,6 +13,7 @@
 #include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ExperienceTracker.h"
@@ -640,6 +641,131 @@ Coord3D HordeContain::getMemberPosition(ObjectID id, Bool followLeader) const
 	if (TheTerrainLogic)
 		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
 	return position;
+}
+
+namespace
+{
+constexpr Real FORMATION_LEAD_FRAMES = 8.0f;
+constexpr Real FORMATION_CATCH_UP_PER_FRAME = 0.1f;
+constexpr Real FORMATION_SLOW_ERROR = 25.0f;
+constexpr Real FORMATION_STOP_ERROR = 65.0f;
+constexpr Real FORMATION_MIN_SPEED_SCALE = 0.25f;
+constexpr Real FORMATION_STRAGGLER_LIMIT = 120.0f;
+constexpr Real FORMATION_STRAGGLER_WEIGHT = 0.5f;
+}
+
+Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) const
+{
+	const Object* horde = getObject();
+	if (horde->isEffectivelyDead() || getMemberSlot(member->getID()) < 0)
+		return FALSE;
+
+	const Coord3D slot = getMemberPosition(member->getID(), FALSE);
+	const Coord3D& position = *member->getPosition();
+	const Real dx = slot.x - position.x;
+	const Real dy = slot.y - position.y;
+	goal.error = sqrtf(dx * dx + dy * dy);
+	goal.facing = horde->getOrientation();
+	goal.position = slot;
+
+	const AIUpdateInterface* hordeAI = horde->getAI();
+	const PhysicsBehavior* physics = horde->getPhysics();
+	goal.hordeMoving = hordeAI && hordeAI->isMoving() && physics;
+	if (!goal.hordeMoving)
+	{
+		goal.speed = FAST_AS_POSSIBLE;
+		goal.distance = goal.error;
+		return TRUE;
+	}
+
+	const Coord3D& velocity = *physics->getVelocity();
+	const Real hordeSpeed = sqrtf(velocity.x * velocity.x + velocity.y * velocity.y);
+	goal.position.x += velocity.x * FORMATION_LEAD_FRAMES;
+	goal.position.y += velocity.y * FORMATION_LEAD_FRAMES;
+	if (TheTerrainLogic)
+		goal.position.z = TheTerrainLogic->getGroundHeight(goal.position.x, goal.position.y);
+	const Real behind = hordeSpeed > 0.0f ? (dx * velocity.x + dy * velocity.y) / hordeSpeed : goal.error;
+	goal.speed = std::max(0.0f, hordeSpeed + behind * FORMATION_CATCH_UP_PER_FRAME);
+	const Coord3D* hordeGoal = hordeAI->getGoalPosition();
+	const Real gx = hordeGoal->x - horde->getPosition()->x;
+	const Real gy = hordeGoal->y - horde->getPosition()->y;
+	goal.distance = std::max(0.0f, behind) + sqrtf(gx * gx + gy * gy);
+	return TRUE;
+}
+
+Real HordeContain::getFormationSpeedScale() const
+{
+	Real total = 0.0f;
+	Real worst = 0.0f;
+	Int count = 0;
+	for (const Object* member : getContainList())
+	{
+		const AIUpdateInterface* ai = member->getAI();
+		if (member->isEffectivelyDead() || getMemberSlot(member->getID()) < 0 || (ai && ai->isAttacking()))
+			continue;
+		const Coord3D slot = getMemberPosition(member->getID(), FALSE);
+		const Real dx = slot.x - member->getPosition()->x;
+		const Real dy = slot.y - member->getPosition()->y;
+		const Real error = sqrtf(dx * dx + dy * dy);
+		total += error;
+		++count;
+		if (error < FORMATION_STRAGGLER_LIMIT)
+			worst = std::max(worst, error);
+	}
+	if (count == 0)
+		return 1.0f;
+	const Real lag = std::max(total / count, worst * FORMATION_STRAGGLER_WEIGHT);
+	if (lag <= FORMATION_SLOW_ERROR)
+		return 1.0f;
+	const Real scale = 1.0f - (lag - FORMATION_SLOW_ERROR) / (FORMATION_STOP_ERROR - FORMATION_SLOW_ERROR);
+	return std::max(FORMATION_MIN_SPEED_SCALE, scale);
+}
+
+void HordeContain::reassignSlotsByPosition()
+{
+	const Object* horde = getObject();
+	const HordeLayout& layout = getActiveFormation()->m_layout;
+	const Real angle = horde->getOrientation();
+	const Real cosAngle = Cos(-angle);
+	const Real sinAngle = Sin(-angle);
+	std::vector<ObjectID> ids;
+	std::vector<int> current;
+	std::vector<HordePoint> positions;
+	for (const Object* member : getContainList())
+	{
+		const Int slot = getMemberSlot(member->getID());
+		if (member->isEffectivelyDead() || slot < 0)
+			continue;
+		HordePoint offset;
+		offset.x = member->getPosition()->x - horde->getPosition()->x;
+		offset.y = member->getPosition()->y - horde->getPosition()->y;
+		HordePoint local = HordeLayout::rotate(offset, cosAngle, sinAngle);
+		local.x -= m_slotOffsets[slot].x;
+		local.y -= m_slotOffsets[slot].y;
+		ids.push_back(member->getID());
+		current.push_back(slot);
+		positions.push_back(local);
+	}
+
+	const std::vector<int> slots = layout.nearestSlots(current, positions);
+	std::vector<ObjectID> members(m_slotMembers.size(), INVALID_ID);
+	std::vector<Coord2D> offsets(m_slotOffsets.size(), Coord2D{0.0f, 0.0f});
+	for (std::size_t index = 0; index < m_slotMembers.size(); ++index)
+	{
+		if (m_slotMembers[index] != INVALID_ID && std::find(ids.begin(), ids.end(), m_slotMembers[index]) == ids.end())
+		{
+			members[index] = m_slotMembers[index];
+			offsets[index] = m_slotOffsets[index];
+		}
+	}
+	for (std::size_t index = 0; index < ids.size(); ++index)
+	{
+		const Int slot = slots[index] >= 0 && members[slots[index]] == INVALID_ID ? slots[index] : current[index];
+		members[slot] = ids[index];
+		offsets[slot] = m_slotOffsets[current[index]];
+	}
+	m_slotMembers.swap(members);
+	m_slotOffsets.swap(offsets);
 }
 
 const HordeContainModuleData* HordeContain::findAlternateFormation() const

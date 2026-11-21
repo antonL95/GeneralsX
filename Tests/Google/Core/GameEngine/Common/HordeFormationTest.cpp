@@ -168,3 +168,49 @@ TEST(HordeFormation, AttackRankPolicyUsesAuthoredLists)
 	EXPECT_FALSE(HordeLayout::rankCanAttack(4, {1, 2}, {3}));
 	EXPECT_TRUE(HordeLayout::rankCanAttack(4, {}, {}));
 }
+
+TEST(HordeFormation, NearestSlotsKeepMembersInPlaceAfterAnAboutFace)
+{
+	HordeLayout layout;
+	layout.addRank(rank("RankNumber:1 UnitType:Soldier Position:X:50 Y:0 Position:X:50 Y:20"));
+	layout.addRank(rank("RankNumber:2 UnitType:Soldier Position:X:30 Y:0 Leader 1 0 Position:X:30 Y:20 Leader 1 1"));
+	layout.addRank(rank("RankNumber:3 UnitType:Banner Position:X:10 Y:0"));
+	const std::vector<int> current = { 0, 1, 2, 3, 4 };
+	const std::vector<HordePoint> mirrored = { { 30.0f, 20.0f }, { 30.0f, 0.0f }, { 50.0f, 20.0f }, { 50.0f, 0.0f }, { 10.0f, 0.0f } };
+	const std::vector<int> slots = layout.nearestSlots(current, mirrored);
+	ASSERT_EQ(slots.size(), 5u);
+	EXPECT_EQ(slots[0], 3);
+	EXPECT_EQ(slots[1], 2);
+	EXPECT_EQ(slots[2], 1);
+	EXPECT_EQ(slots[3], 0);
+	EXPECT_EQ(slots[4], 4);
+}
+
+TEST(HordeFormation, NearestSlotsKeepUnitTypesAndSkipMembersWithoutSlots)
+{
+	HordeLayout layout;
+	layout.addRank(rank("RankNumber:1 UnitType:Soldier Position:X:0 Y:0 Position:X:0 Y:20"));
+	layout.addRank(rank("RankNumber:2 UnitType:Banner Position:X:0 Y:40"));
+	const std::vector<int> current = { 0, 2, -1 };
+	const std::vector<HordePoint> positions = { { 0.0f, 40.0f }, { 0.0f, 0.0f }, { 0.0f, 20.0f } };
+	const std::vector<int> slots = layout.nearestSlots(current, positions);
+	ASSERT_EQ(slots.size(), 3u);
+	EXPECT_EQ(slots[0], 1);
+	EXPECT_EQ(slots[1], 2);
+	EXPECT_EQ(slots[2], -1);
+}
+
+TEST(HordeFormation, NearestSlotsAvoidCrossingWhenTheBlockShifts)
+{
+	HordeLayout layout;
+	layout.addRank(rank("RankNumber:1 UnitType:Soldier Position:X:50 Y:0"));
+	layout.addRank(rank("RankNumber:2 UnitType:Soldier Position:X:30 Y:0"));
+	layout.addRank(rank("RankNumber:3 UnitType:Soldier Position:X:10 Y:0"));
+	const std::vector<int> current = { 0, 1, 2 };
+	const std::vector<HordePoint> behind = { { -38.0f, 0.0f }, { -18.0f, 0.0f }, { 2.0f, 0.0f } };
+	const std::vector<int> slots = layout.nearestSlots(current, behind);
+	ASSERT_EQ(slots.size(), 3u);
+	EXPECT_EQ(slots[0], 2);
+	EXPECT_EQ(slots[1], 1);
+	EXPECT_EQ(slots[2], 0);
+}

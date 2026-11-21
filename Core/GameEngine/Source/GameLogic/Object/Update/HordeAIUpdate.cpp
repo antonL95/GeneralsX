@@ -3,6 +3,8 @@
 #include "GameLogic/Module/HordeAIUpdate.h"
 
 #include "Common/Xfer.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
@@ -18,6 +20,11 @@
 
 namespace
 {
+constexpr Real FORMATION_PATHFIND_DISTANCE = 120.0f;
+constexpr Real FORMATION_REPATH_DISTANCE = 30.0f;
+constexpr Real FORMATION_STEER_DISTANCE = 15.0f;
+constexpr Real FORMATION_REFORM_ANGLE = PI / 6.0f;
+
 Real distanceSquared(const Coord3D& a, const Coord3D& b)
 {
 	const Real x = a.x - b.x;
@@ -275,14 +282,17 @@ void HordeAIUpdate::approach(const Coord3D& position, Real range)
 
 UpdateSleepTime HordeAIUpdate::update()
 {
+	Object* horde = getObject();
+	const Real facingBefore = horde->getOrientation();
 	m_updatingAnchor = TRUE;
 	AIUpdateInterface::update();
 	m_updatingAnchor = FALSE;
 
-	Object* horde = getObject();
 	const HordeContain* contain = HordeContain::get(horde);
 	if (!contain || horde->isEffectivelyDead())
 		return UPDATE_SLEEP_NONE;
+	if (fabs(stdAngleDiff(horde->getOrientation(), facingBefore)) > FORMATION_REFORM_ANGLE)
+		const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
 
 	Object* target = liveTarget(m_attackTarget);
 	if (!target && m_attackTarget != INVALID_ID)
@@ -367,16 +377,21 @@ UpdateSleepTime HordeAIUpdate::update()
 			}
 		}
 
-		const Coord3D slot = contain->getMemberPosition(member->getID(), isMoving() && !m_engaging);
-		const Bool wasAttacking = ai->isAttacking();
-		if (distanceSquared(*member->getPosition(), slot) > 16.0f)
+		const Coord3D slot = contain->getMemberPosition(member->getID(), FALSE);
+		const Real error = distanceSquared(*member->getPosition(), slot);
+		const Bool lineClear = error <= FORMATION_STEER_DISTANCE * FORMATION_STEER_DISTANCE ||
+			TheAI->pathfinder()->isLinePassable(member, ai->getLocomotorSet().getValidSurfaces(), member->getLayer(),
+				*member->getPosition(), slot, FALSE, TRUE);
+		if (error > FORMATION_PATHFIND_DISTANCE * FORMATION_PATHFIND_DISTANCE || !lineClear)
 		{
-			if (wasAttacking || ((refresh || ai->isIdle()) &&
-				distanceSquared(*ai->getGoalPosition(), slot) > 16.0f))
+			if (ai->isAttacking() || ((refresh || ai->isIdle()) &&
+				distanceSquared(*ai->getGoalPosition(), slot) > FORMATION_REPATH_DISTANCE * FORMATION_REPATH_DISTANCE))
 				ai->aiMoveToPositionEvenIfSleeping(&slot, CMD_FROM_SCRIPT);
 		}
-		else if (wasAttacking)
+		else if (!ai->isIdle())
 			ai->aiIdle(CMD_FROM_SCRIPT);
+		else if (error > 1.0f || isMoving())
+			ai->wakeForFormation();
 	}
 
 	if (attackGround && m_engaging && !groundAttackInProgress)

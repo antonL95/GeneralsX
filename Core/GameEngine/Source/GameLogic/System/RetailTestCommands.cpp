@@ -132,6 +132,7 @@ const MetaKey s_metaKeys[] = {
 };
 
 std::vector<Command> s_commands;
+std::vector<ObjectID> s_tracked;
 bool s_loaded = false;
 
 void load()
@@ -1614,6 +1615,59 @@ void sweepCommand(const Command& command, unsigned int frame)
 		sweepStart(command, player, frame);
 }
 
+void dumpPassability(unsigned int frame)
+{
+	if (!TheAI || !TheAI->pathfinder())
+		return;
+	const ICoord2D* extent = TheAI->pathfinder()->getExtent();
+	std::fprintf(stderr, "TEST passmap %u %d %d %.1f\n", frame, extent->x + 1, extent->y + 1, static_cast<Real>(PATHFIND_CELL_SIZE));
+	std::string row;
+	for (Int y = extent->y; y >= 0; --y)
+	{
+		row.clear();
+		for (Int x = 0; x <= extent->x; ++x)
+		{
+			const PathfindCell* cell = TheAI->pathfinder()->getCell(LAYER_GROUND, x, y);
+			row.push_back(cell ? static_cast<char>('0' + static_cast<int>(cell->getType())) : '?');
+		}
+		std::fprintf(stderr, "TEST passrow %d %s\n", y, row.c_str());
+	}
+}
+
+void logTrackedObject(const Object* obj, const Object* anchor, unsigned int frame)
+{
+	const Coord3D* pos = obj->getPosition();
+	const PhysicsBehavior* physics = obj->getPhysics();
+	const AIUpdateInterface* ai = obj->getAI();
+	Coord3D slot = *pos;
+	if (const HordeContain* horde = anchor ? HordeContain::get(anchor) : nullptr)
+		slot = horde->getMemberPosition(obj->getID(), FALSE);
+	std::fprintf(stderr, "TEST pos %u %u %u %.3f %.3f %.4f %.4f %d %.3f %.3f %.2f\n", frame,
+		static_cast<unsigned>(obj->getID()), static_cast<unsigned>(anchor ? anchor->getID() : INVALID_ID),
+		pos->x, pos->y, obj->getOrientation(), physics ? physics->getVelocityMagnitude() : 0.0f,
+		ai && ai->isMoving() ? 1 : 0, slot.x, slot.y, obj->getGeometryInfo().getBoundingCircleRadius());
+}
+
+void logTracked(unsigned int frame)
+{
+	for (ObjectID id : s_tracked)
+	{
+		const Object* obj = TheGameLogic->findObjectByID(id);
+		if (!obj || obj->isEffectivelyDead())
+			continue;
+		logTrackedObject(obj, nullptr, frame);
+		if (const HordeContain* horde = HordeContain::get(obj))
+		{
+			for (const Object* member : *horde->getContainedItemsList())
+			{
+				if (!member->isEffectivelyDead())
+					logTrackedObject(member, obj, frame);
+			}
+		}
+	}
+	std::fflush(stderr);
+}
+
 void execute(const Command& command, unsigned int frame)
 {
 	if (command.action.starts_with("sweep-"))
@@ -1761,6 +1815,18 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action == "spawn")
 	{
 		spawnObject(command, frame);
+		return;
+	}
+	if (command.action == "movesel" && command.hasLocation)
+	{
+		GameMessage* move = TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO);
+		move->appendLocationArgument(groundLocation(command));
+		std::fprintf(stderr, "TEST frame %u: movesel to %.1f %.1f\n", frame, command.location.x, command.location.y);
+		return;
+	}
+	if (command.action == "passmap")
+	{
+		dumpPassability(frame);
 		return;
 	}
 	if (command.action == "quit")
@@ -2196,6 +2262,22 @@ void execute(const Command& command, unsigned int frame)
 		std::fprintf(stderr, "TEST frame %u: select object %u (%s)\n", frame, static_cast<unsigned>(obj->getID()),
 			command.target.c_str());
 	}
+	else if (command.action == "selectadd")
+	{
+		if (TheInGameUI && obj->getDrawable())
+			TheInGameUI->selectDrawable(obj->getDrawable());
+		GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+		select->appendBooleanArgument(FALSE);
+		select->appendObjectIDArgument(obj->getID());
+		std::fprintf(stderr, "TEST frame %u: selectadd object %u (%s)\n", frame, static_cast<unsigned>(obj->getID()),
+			command.target.c_str());
+	}
+	else if (command.action == "track")
+	{
+		if (std::find(s_tracked.begin(), s_tracked.end(), obj->getID()) == s_tracked.end())
+			s_tracked.push_back(obj->getID());
+		std::fprintf(stderr, "TEST track %u %u %s\n", frame, static_cast<unsigned>(obj->getID()), command.target.c_str());
+	}
 	else if (command.action == "attack")
 		attackObject(command, obj, frame);
 	else if (command.action == "orderattack")
@@ -2434,5 +2516,7 @@ void runFrame(unsigned int frame)
 		if (command.frame == frame)
 			execute(command, frame);
 	}
+	if (!s_tracked.empty())
+		logTracked(frame);
 }
 }

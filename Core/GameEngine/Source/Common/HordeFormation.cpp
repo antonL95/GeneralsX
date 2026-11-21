@@ -324,3 +324,94 @@ bool HordeLayout::rankCanAttack(int rank, const std::vector<int>& released, cons
 		std::find(released.begin(), released.end(), rank) != released.end() ||
 		std::find(free.begin(), free.end(), rank) != free.end();
 }
+
+std::vector<int> HordeLayout::nearestSlots(const std::vector<int>& currentSlots, const std::vector<HordePoint>& positions) const
+{
+	std::vector<int> result(currentSlots.size(), -1);
+	std::vector<std::size_t> members;
+	for (std::size_t member = 0; member < currentSlots.size() && member < positions.size(); ++member)
+	{
+		if (currentSlots[member] >= 0 && static_cast<std::size_t>(currentSlots[member]) < m_slots.size())
+			members.push_back(member);
+	}
+	const std::size_t rows = members.size();
+	const std::size_t columns = m_slots.size();
+	if (rows == 0 || rows > columns)
+		return result;
+
+	const double incompatible = 1.0e12;
+	const auto cost = [&](std::size_t row, std::size_t column)
+	{
+		const std::size_t member = members[row];
+		if (!sameName(m_slots[column].unitType, m_slots[currentSlots[member]].unitType))
+			return incompatible;
+		const double dx = static_cast<double>(m_slots[column].position.x) - positions[member].x;
+		const double dy = static_cast<double>(m_slots[column].position.y) - positions[member].y;
+		return dx * dx + dy * dy;
+	};
+
+	const double infinity = 1.0e30;
+	std::vector<double> rowPotential(rows + 1, 0.0);
+	std::vector<double> columnPotential(columns + 1, 0.0);
+	std::vector<std::size_t> columnRow(columns + 1, 0);
+	std::vector<std::size_t> way(columns + 1, 0);
+	for (std::size_t row = 1; row <= rows; ++row)
+	{
+		columnRow[0] = row;
+		std::size_t column = 0;
+		std::vector<double> minimum(columns + 1, infinity);
+		std::vector<bool> used(columns + 1, false);
+		do
+		{
+			used[column] = true;
+			const std::size_t currentRow = columnRow[column];
+			double delta = infinity;
+			std::size_t next = 0;
+			for (std::size_t candidate = 1; candidate <= columns; ++candidate)
+			{
+				if (used[candidate])
+					continue;
+				const double reduced = cost(currentRow - 1, candidate - 1) - rowPotential[currentRow] - columnPotential[candidate];
+				if (reduced < minimum[candidate])
+				{
+					minimum[candidate] = reduced;
+					way[candidate] = column;
+				}
+				if (minimum[candidate] < delta)
+				{
+					delta = minimum[candidate];
+					next = candidate;
+				}
+			}
+			for (std::size_t candidate = 0; candidate <= columns; ++candidate)
+			{
+				if (used[candidate])
+				{
+					rowPotential[columnRow[candidate]] += delta;
+					columnPotential[candidate] -= delta;
+				}
+				else
+					minimum[candidate] -= delta;
+			}
+			column = next;
+		} while (columnRow[column] != 0);
+		do
+		{
+			const std::size_t previous = way[column];
+			columnRow[column] = columnRow[previous];
+			column = previous;
+		} while (column != 0);
+	}
+
+	for (std::size_t column = 1; column <= columns; ++column)
+	{
+		if (columnRow[column] == 0)
+			continue;
+		const std::size_t member = members[columnRow[column] - 1];
+		if (cost(columnRow[column] - 1, column - 1) < incompatible)
+			result[member] = static_cast<int>(column - 1);
+		else
+			result[member] = currentSlots[member];
+	}
+	return result;
+}

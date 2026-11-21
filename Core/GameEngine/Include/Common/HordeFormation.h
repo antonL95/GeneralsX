@@ -93,6 +93,7 @@ public:
 	static bool rankCanAttack(int rank, const std::vector<int>& released, const std::vector<int>& free);
 	int findSlot(const std::string& unitType, const std::vector<bool>& occupied) const;
 	std::vector<HordeMemberSlot> initialMembers(int capacity) const;
+	std::vector<int> nearestSlots(const std::vector<int>& currentSlots, const std::vector<HordePoint>& positions) const;
 
 	static HordePoint rotate(HordePoint offset, float cosAngle, float sinAngle);
 

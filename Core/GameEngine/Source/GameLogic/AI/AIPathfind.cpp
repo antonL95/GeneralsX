@@ -45,6 +45,10 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "Common/RetailFileLayers.h"
+
+static Bool isSameHorde(const Object* obj, const Object* unit);
 #include "GameLogic/Module/CastleBehavior.h"
 #include "Common/ModuleFactory.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -1248,6 +1252,9 @@ Bool Pathfinder::checkDestination(const Object *obj, Int cellX, Int cellY, Pathf
 			if (!unit) {
 				continue;
 			}
+			if (isSameHorde(obj, unit)) {
+				continue;
+			}
 
 			// order matters: we want to know if I consider it to be an ally, not vice versa
 			if (obj->getRelationship(unit) == ALLIES) {
@@ -1262,6 +1269,14 @@ Bool Pathfinder::checkDestination(const Object *obj, Int cellX, Int cellY, Pathf
 		}
 	}
 	return true;
+}
+
+static Bool isSameHorde(const Object* obj, const Object* unit)
+{
+	if (!obj || !unit || !RetailFileLayers::enabled())
+		return FALSE;
+	const Object* horde = HordeContain::get(obj) ? obj : obj->getContainedBy();
+	return horde && HordeContain::get(horde) && (unit == horde || unit->getContainedBy() == horde);
 }
 
 /**
@@ -1339,6 +1354,9 @@ Bool Pathfinder::checkForMovement(const Object *obj, TCheckMovementInfo &info)
 				}
 			}
 			if (!check || !unit) {
+				continue;
+			}
+			if (isSameHorde(obj, unit)) {
 				continue;
 			}
 
@@ -3148,6 +3166,7 @@ struct MADStruct
 		}
 		Object *otherObj = TheGameLogic->findObjectByID(to->getPosUnit());
 		if (otherObj==nullptr) return 0;
+		if (isSameHorde(d->obj, otherObj)) return 0;
 		if (d->obj->getRelationship(otherObj)!=ALLIES) {
 			return 0;  // Only move allies.
 		}

@@ -261,6 +261,9 @@ private:
 	Real											m_elevatorCorrectionRate;
 
 	RotwkLocomotorRules::Authored	m_rotwk;
+	Bool											m_waitForFormation;
+	Real											m_maxTurnWithoutReform;
+	Bool											m_turnWhileMoving;
 };
 
 typedef OVERRIDE<LocomotorTemplate> LocomotorTemplateOverride;
@@ -276,6 +279,7 @@ public:
 
 	void setPhysicsOptions(Object* obj);
 
+	void locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalPos,
 		Real onPathDistToGoal, Real desiredSpeed, Bool *blocked);
 	void locoUpdate_moveTowardsAngle(Object* obj, Real angle);
@@ -332,6 +336,7 @@ public:
 	Bool isCloseEnoughDist3D() const { return getFlag(IS_CLOSE_ENOUGH_DIST_3D); }
 	Bool hasSuspension() const {return m_template->m_hasSuspension;}
 	Bool canMoveBackwards() const {return m_template->m_canMoveBackward;}
+	Bool getWaitForFormation() const { return m_template->m_waitForFormation; }
 	Real getMaxWheelExtension() const {return m_template->m_maximumWheelExtension;}
 	Real getMaxWheelCompression() const {return m_template->m_maximumWheelCompression;}
 	Real getWheelTurnAngle() const {return m_template->m_wheelTurnAngle;}
@@ -419,6 +424,9 @@ protected:
 	void moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
+	void moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
+	void steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord3D& dirToApplyForce, Real onPathDistToGoal, Real goalSpeed);
+	Real rotwkLegsTurnSlowdown(const Object* obj, const Coord3D& goalPos, Real angleCoeff, Real maxSpeed) const;
 	void moveTowardsPositionHover(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionWings(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
