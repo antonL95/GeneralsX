@@ -34,6 +34,7 @@
 #include "Common/Player.h"
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/Object.h"
 #include "Common/BitFlagsIO.h"
 
@@ -296,6 +297,17 @@ const char* const specialPowerFlags[] =
 };
 }
 
+static void parseRequiredSciences( INI *ini, void *instance, void *store, const void *userData )
+{
+	if( RetailFileLayers::enabled() )
+	{
+		INI::parseScienceVector( ini, instance, store, userData );
+		return;
+	}
+	while( ini->getNextTokenOrNull() )
+		;
+}
+
 /* static */ const FieldParse SpecialPowerTemplate::m_specialPowerFieldParse[] =
 {
 	{ "Flags", INI::parseBitString32, specialPowerFlags, offsetof( SpecialPowerTemplate, m_flags ) },
@@ -303,7 +315,7 @@ const char* const specialPowerFlags[] =
 	{ "MaxCastRange", INI::parseReal, nullptr, offsetof( SpecialPowerTemplate, m_maxCastRange ) },
 	{ "ForbiddenObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( SpecialPowerTemplate, m_forbiddenObjectFilter ) },
 	{ "ForbiddenObjectRange", INI::parseReal, nullptr, offsetof( SpecialPowerTemplate, m_forbiddenObjectRange ) },
-	{ "RequiredSciences", INI::parseScienceVector, nullptr, offsetof( SpecialPowerTemplate, m_requiredSciences ) },
+	{ "RequiredSciences", parseRequiredSciences, nullptr, offsetof( SpecialPowerTemplate, m_requiredSciences ) },
 	{ "UnitCost", INI::parseInt, nullptr, offsetof( SpecialPowerTemplate, m_unitCost ) },
 	{ "UnitCostDeathType", INI::parseInt, nullptr, offsetof( SpecialPowerTemplate, m_unitCostDeathType ) },
 	{ "PreventActivationConditions", ObjectStatusMaskType::parseFromINI, nullptr, offsetof( SpecialPowerTemplate, m_preventActivationConditions ) },
