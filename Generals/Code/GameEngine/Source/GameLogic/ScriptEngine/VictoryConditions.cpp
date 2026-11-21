@@ -291,7 +291,7 @@ void VictoryConditions::update()
 		}
 	}
 
-	if (RetailFileLayers::enabled() && rts::isSkirmishGame(TheGameLogic->getGameMode()) &&
+	if (RetailFileLayers::enabled() && !TheScriptEngine->isGameEnding() &&
 		m_singleAllianceRemaining && m_endFrame == TheGameLogic->getFrame())
 	{
 		if (TheGlobalData->m_headless)

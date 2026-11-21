@@ -22,6 +22,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 
 namespace
 {
@@ -51,7 +52,6 @@ struct Pending
 	UnsignedInt frame;
 	Coord3D position;
 	Bool positioned;
-	RetailEva::Ping ping;
 };
 
 struct Settings
@@ -195,12 +195,13 @@ void queue(const Player *recipient, const AsciiString &name, const Coord3D *posi
 		return;
 	const auto key = eventKey(name);
 	const auto it = s_events.find(key);
-	if (it == s_events.end())
+	if (position && TheRadar && ping != Ping::None && (it != s_events.end() || name.isEmpty()))
 	{
-		if (name.isEmpty() && position && TheRadar && ping != Ping::None)
-			TheRadar->tryEvent(radarType(ping), position);
-		return;
+		const Bool jumpTo = it == s_events.end() || it->second.jumpTo;
+		TheRadar->tryEvent(radarType(ping), position, jumpTo);
 	}
+	if (it == s_events.end())
+		return;
 
 	const auto frame = TheGameLogic->getFrame();
 	const Event &event = it->second;
@@ -209,7 +210,7 @@ void queue(const Player *recipient, const AsciiString &name, const Coord3D *posi
 		return;
 	if (std::any_of(s_pending.begin(), s_pending.end(), [&event](const Pending &pending) { return pending.event == &event; }))
 		return;
-	s_pending.push_back({&event, name, frame, position ? *position : Coord3D{}, position != nullptr, ping});
+	s_pending.push_back({&event, name, frame, position ? *position : Coord3D{}, position != nullptr});
 }
 
 void watchRecharge(const Object &object, const SpecialPowerTemplate &power)
@@ -293,9 +294,6 @@ void update()
 		std::erase_if(s_pending, [&blocked](const Pending &other) { return other.event == &blocked->second; });
 	}
 
-	if (pending.positioned && TheRadar && pending.ping != Ping::None)
-		TheRadar->tryEvent(radarType(pending.ping), &pending.position, event.jumpTo);
-
 	const SideSound *side = findSound(event, *player);
 	if (!side || side->sounds.empty())
 		return;
@@ -342,6 +340,13 @@ void destroyed(const Object &object)
 	else
 	{
 		const Relationship relationship = viewer->getRelationship(object.getTeam());
+		const Int playerIndex = viewer->getPlayerIndex();
+		if (object.getShroudedStatus(playerIndex) > OBJECTSHROUD_PARTIAL_CLEAR ||
+			ThePartitionManager->getShroudStatusForPlayer(playerIndex, object.getPosition()) != CELLSHROUD_CLEAR ||
+			(relationship == ENEMIES && object.testStatus(OBJECT_STATUS_STEALTHED) &&
+			 !object.testStatus(OBJECT_STATUS_DETECTED) && !object.testStatus(OBJECT_STATUS_DISGUISED)))
+			return;
+
 		if (relationship == ALLIES)
 			queue(viewer, data.evaEventDieAlly, object.getPosition(), Ping::Information);
 		else if (relationship == ENEMIES)

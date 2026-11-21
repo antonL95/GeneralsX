@@ -277,11 +277,12 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 
 	TheScriptActions->closeWindows(FALSE); // Close victory or defeat windows.
 
-	Bool shellGame = FALSE;
-	if ((!isInShellGame() || !isInGame()) && showScoreScreen && !TheGlobalData->m_headless &&
-		(!RetailFileLayers::enabled() || TheFileSystem->doesFileExist("Data\\Window\\Menus\\ScoreScreen.wnd")))
+	const Bool showEndScreen = !isInShellGame() && showScoreScreen && !TheGlobalData->m_headless;
+	const Bool retail = RetailFileLayers::enabled();
+	const Bool showScore = showEndScreen &&
+		(!retail || TheFileSystem->doesFileExist("Window\\Menus\\ScoreScreen.wnd"));
+	if (showScore)
 	{
-		shellGame = TRUE;
 #ifdef ALLOW_DEBUG_UTILS
 		// GeneralsX @bugfix Copilot 22/03/2026 Emit runtime diagnostics when ScoreScreen is pushed after game end.
 		fprintf(stderr, "[SKIRMISH_DIAG] clearGameData showScoreScreen=%d isInShellGame=%d isInGame=%d headless=%d -> pushing ScoreScreen\n",
@@ -337,6 +338,8 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 
 	setClearingGameData( FALSE );
 
+	if (showEndScreen && retail && !showScore && !TheGameEngine->getQuitting())
+		TheShell->showShell(TRUE);
 }
 
 // ------------------------------------------------------------------------------------------------

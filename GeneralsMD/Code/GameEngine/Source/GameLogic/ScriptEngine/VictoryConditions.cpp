@@ -293,7 +293,7 @@ void VictoryConditions::update()
 		}
 	}
 
-	if (RetailFileLayers::enabled() && TheGameLogic->isInSkirmishGame() &&
+	if (RetailFileLayers::enabled() && !TheScriptEngine->isGameEnding() &&
 		m_singleAllianceRemaining && m_endFrame == TheGameLogic->getFrame())
 	{
 		if (TheGlobalData->m_headless)
