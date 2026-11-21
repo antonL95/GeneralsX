@@ -11,6 +11,7 @@ class UnicodeString;
 
 namespace RetailHeroBar
 {
+const Image *reviveImage(const ThingTemplate *hero);
 void init(GameWindow *master);
 void reset();
 void update();

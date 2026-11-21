@@ -39,6 +39,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/RespawnModules.h"
 
 namespace
 {
@@ -356,11 +357,9 @@ void trackEvents(const std::vector<HeroSlot> &slots)
 const Image *heroImage(const HeroSlot &slot)
 {
 	const Image *image = slot.appearance->getButtonImage();
-	if (!slot.alive && image)
+	if (!slot.alive)
 	{
-		AsciiString revive;
-		revive.format("%s_res", image->getName().str());
-		if (const Image *dead = findImage(revive.str()))
+		if (const Image *dead = RetailHeroBar::reviveImage(slot.hero))
 			return dead;
 	}
 	return image;
@@ -730,6 +729,28 @@ void heroBarTooltip(GameWindow *, WinInstanceData *, UnsignedInt mouse)
 
 namespace RetailHeroBar
 {
+const Image *reviveImage(const ThingTemplate *hero)
+{
+	const ModuleInfo &modules = hero->getBehaviorModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		if (modules.getNthName(i).compareNoCase("RespawnUpdate") != 0)
+			continue;
+		const auto *data = static_cast<const RespawnUpdateModuleData *>(modules.getNthData(i));
+		if (!data->m_buttonImage.isEmpty())
+			if (const Image *image = findImage(data->m_buttonImage.str()))
+				return image;
+		break;
+	}
+	if (const Image *image = hero->getButtonImage())
+	{
+		AsciiString name;
+		name.format("%s_res", image->getName().str());
+		return findImage(name.str());
+	}
+	return nullptr;
+}
+
 void init(GameWindow *master)
 {
 	s_bar.bar = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:HeroBar"));

@@ -3679,6 +3679,11 @@ void Drawable::drawConstructPercent( const IRegion2D *healthBarRegion )
 		return;
 	}
 
+	const Bool retail = RetailFileLayers::enabled();
+	if (retail && (obj->isEffectivelyDead() || !obj->isLogicallyVisible() ||
+		isDrawableEffectivelyHidden() || getFullyObscuredByShroud() || obj->getConstructionPercent() < 0.0f))
+		return;
+
 	//if( obj->isEffectivelyDead() )
 	//{
 		//Don't render icons for dead things.
@@ -3689,10 +3694,22 @@ void Drawable::drawConstructPercent( const IRegion2D *healthBarRegion )
 	if( m_constructDisplayString == nullptr )
 	{
 		m_constructDisplayString = TheDisplayStringManager->newDisplayString();
-		if (m_constructDisplayString)
-		{
+		if (m_constructDisplayString && !retail)
 			m_constructDisplayString->setFont(ResolveDrawableCaptionFont());
-		}
+	}
+	if (!m_constructDisplayString)
+		return;
+
+	if (retail)
+	{
+		const AsciiString fontName = TheInGameUI->getDrawableCaptionFontName();
+		const Int pixels = MAX(1, static_cast<Int>(TheDisplay->getHeight() *
+			(TheInGameUI->getDrawableCaptionPointSize() / 720.0f) + 0.5f));
+		GameFont *font = TheFontLibrary->getFontPixels(fontName.str(), pixels, TheInGameUI->isDrawableCaptionBold());
+		if (!font)
+			font = ResolveDrawableCaptionFont();
+		if (font && font != m_constructDisplayString->getFont())
+			m_constructDisplayString->setFont(font);
 	}
 
 	// set the string if the value has changed
@@ -3700,7 +3717,11 @@ void Drawable::drawConstructPercent( const IRegion2D *healthBarRegion )
 	{
 		UnicodeString buffer;
 
-		buffer.format( TheGameText->fetch("CONTROLBAR:UnderConstructionDesc"), obj->getConstructionPercent());
+		if (retail)
+			buffer.format(TheGameText->fetchOrSubstitute("CONTROLBAR:UnderConstructionDesc", L"Building: %.0f%%"),
+				static_cast<double>(static_cast<Int>(obj->getConstructionPercent())));
+		else
+			buffer.format(TheGameText->fetch("CONTROLBAR:UnderConstructionDesc"), obj->getConstructionPercent());
 		m_constructDisplayString->setText( buffer );
 
 		// record this percent as our last displayed so we don't un-necessarily rebuild the string
@@ -3713,9 +3734,9 @@ void Drawable::drawConstructPercent( const IRegion2D *healthBarRegion )
 	getDrawableGeometryInfo().getCenterPosition(*getPosition(), pos);
 
 	// convert drawable center position to screen coords
-	TheTacticalView->worldToScreen( &pos, &screen );
+	const Bool visible = TheTacticalView->worldToScreen(&pos, &screen);
 
-	if ( screen.x < 1 )
+	if ((retail && !visible) || screen.x < 1)
 		return;
 
 	// draw the text
@@ -3723,6 +3744,8 @@ void Drawable::drawConstructPercent( const IRegion2D *healthBarRegion )
 	Color dropColor = GameMakeColor( 0, 0, 0, 255 );
 	Int tw = m_constructDisplayString->getWidth();
 	screen.x -= (tw / 2);
+	if (retail)
+		screen.y -= static_cast<Int>(TheDisplay->getHeight() * (28.0f / 720.0f) + 0.5f);
 	m_constructDisplayString->draw( screen.x, screen.y, color, dropColor );
 
 }

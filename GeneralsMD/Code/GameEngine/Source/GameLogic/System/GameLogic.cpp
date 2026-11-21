@@ -1385,7 +1385,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	checkForDuplicateColors( TheGameInfo );
 
-	Bool isSkirmishOrSkirmishReplay = FALSE;
+	Bool isSkirmishOrSkirmishReplay = RetailFileLayers::enabled() && m_gameMode == GAME_SKIRMISH;
 	if (TheGameInfo)
 	{
 		for (Int i=0; i<MAX_SLOTS; ++i)

@@ -159,6 +159,7 @@ private:
 	Bool					m_localPlayerDefeated;												///< prevents condition from being signaled each frame
 	Bool					m_singleAllianceRemaining;										///< prevents condition from being signaled each frame
 	Bool					m_isObserver;
+	Bool					m_retailSandbox;
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -194,6 +195,7 @@ void VictoryConditions::reset()
 	m_localPlayerDefeated = false;
 	m_singleAllianceRemaining = false;
 	m_isObserver = false;
+	m_retailSandbox = false;
 	m_endFrame = 0;
 
 	m_victoryConditions = VICTORY_NOBUILDINGS | VICTORY_NOUNITS;
@@ -231,7 +233,7 @@ Bool VictoryConditions::multipleAlliancesExist()
 //-------------------------------------------------------------------------------------------------
 void VictoryConditions::update()
 {
-	if (!TheRecorder->isMultiplayer() || (m_localSlotNum < 0 && !m_isObserver))
+	if (m_retailSandbox || !TheRecorder->isMultiplayer() || (m_localSlotNum < 0 && !m_isObserver))
 		return;
 
 	// Check for a single winning alliance
@@ -436,6 +438,27 @@ void VictoryConditions::cachePlayerPtrs()
 {
 	if (!TheRecorder->isMultiplayer())
 		return;
+
+	m_retailSandbox = false;
+	if (RetailFileLayers::enabled() && TheGameInfo)
+	{
+		const GameSlot *first = nullptr;
+		Bool opposingAlliance = FALSE;
+		for (Int i = 0; i < MAX_SLOTS; ++i)
+		{
+			const GameSlot *slot = TheGameInfo->getConstSlot(i);
+			if (!slot || !slot->isOccupied() || slot->getPlayerTemplate() == PLAYERTEMPLATE_OBSERVER)
+				continue;
+			if (!first)
+				first = slot;
+			else if (slot->getTeamNumber() < 0 || slot->getTeamNumber() != first->getTeamNumber())
+			{
+				opposingAlliance = TRUE;
+				break;
+			}
+		}
+		m_retailSandbox = first && !opposingAlliance;
+	}
 
 	Int playerCount = 0;
 	const PlayerTemplate *civTemplate = ThePlayerTemplateStore->findPlayerTemplate( NAMEKEY("FactionCivilian") );

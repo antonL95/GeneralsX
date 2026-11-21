@@ -337,7 +337,9 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 
 	const Real scale = TheDisplay->getHeight() / 720.0f;
 	const Bool structure = obj->isKindOf(KINDOF_STRUCTURE);
-	const Real relativeWidth = structure ? std::clamp(obj->getGeometryInfo().getMajorRadius() * 4.1f, 60.0f, 216.0f) :
+	const Bool building = obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
+	const Real structureScale = building ? 3.2f : 4.1f;
+	const Real relativeWidth = structure ? std::clamp(obj->getGeometryInfo().getMajorRadius() * structureScale, 60.0f, 216.0f) :
 		(anchor ? 42.0f : 43.0f);
 	const Int width = std::max(6, static_cast<Int>(relativeWidth * scale * std::clamp(data.healthBoxScale, 0.25f, 4.0f)));
 	const Int edge = std::max(1, static_cast<Int>(scale + 0.25f));
@@ -348,7 +350,6 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 	if (showBar && body && body->getHealth() > 0.0f && body->getMaxHealth() > 0.0f)
 	{
 		const Real health = std::clamp(body->getHealth() / body->getMaxHealth(), 0.0f, 1.0f);
-		const Bool building = obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
 		const Real fraction = building ? std::clamp(obj->getConstructionPercent() * 0.01f, 0.0f, 1.0f) : health;
 		const Int x = screen.x - width / 2;
 		const Int y = barTop;
@@ -551,7 +552,7 @@ void RetailWorldUI::showPayout(const Object& source, Int amount, Bool bounty)
 	TheInGameUI->addFloatingText(text, &position, color);
 }
 
-void RetailWorldUI::drawTerrainClaims(View& view, const Player& player)
+void RetailWorldUI::drawTerrainClaims(View& view, const Player& player, const Object* site, Real siteRadius)
 {
 	std::vector<Circle> circles;
 	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
@@ -562,5 +563,7 @@ void RetailWorldUI::drawTerrainClaims(View& view, const Player& player)
 		if (radius > 0.0f)
 			circles.push_back({*object->getPosition(), radius});
 	}
+	if (site && siteRadius > 0.0f)
+		circles.push_back({*site->getPosition(), siteRadius});
 	drawMergedCircles(view, circles, player.getPlayerColor(), 130);
 }

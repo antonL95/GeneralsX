@@ -5,6 +5,7 @@
 #include "Common/FileSystem.h"
 #include "Common/GameEngine.h"
 #include "Common/GlobalData.h"
+#include "Common/MultiplayerSettings.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
@@ -18,12 +19,14 @@
 #include "GameClient/Image.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/MapUtil.h"
+#include "GameClient/Mouse.h"
 #include "GameClient/Shell.h"
 #include "GameClient/WindowLayout.h"
 #include "GameNetwork/GameInfo.h"
 #include "GameLogic/GameLogic.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <string_view>
 
@@ -211,6 +214,7 @@ public:
 	OwnedImage landscape;
 	OwnedImage previewFile;
 	const Image *preview = nullptr;
+	const Image *parchment = nullptr;
 	const Image *startMarker = nullptr;
 	UnicodeString mapName, description;
 	std::vector<Row> rows;
@@ -275,6 +279,7 @@ public:
 			preview = previewFile ? previewFile.get() : getMapPreviewImage(path);
 		}
 		startMarker = TheMappedImageCollection->findImageByName("AptPlayerStart");
+		parchment = TheMappedImageCollection->findImageByName("UiRetailGlobe");
 
 		for (Int i = 0; i < MAX_SLOTS; ++i)
 		{
@@ -290,7 +295,8 @@ public:
 			if (row.name.isEmpty() && row.ai)
 				row.name = localize(aiLabel(*slot), "Computer");
 			row.team = slot->getTeamNumber() < 0 ? translated("-") : number(slot->getTeamNumber() + 1);
-			row.color = i == game.getLocalSlotNum() ? GameMakeColor(133, 230, 87, 255) : white;
+			const auto *house = TheMultiplayerSettings->getColor(slot->getColor());
+			row.color = house ? house->getColor() | 0xFF000000 : white;
 			row.faction = slot->getApparentPlayerTemplateDisplayName();
 			const Int faction = slot->getApparentPlayerTemplate();
 			const PlayerTemplate *player = faction >= 0 && faction < ThePlayerTemplateStore->getPlayerTemplateCount() ?
@@ -344,6 +350,12 @@ public:
 		});
 
 		painter.picture(landscape.get(), landscapeBox);
+		if (previewFile && parchment && previewBox.valid())
+		{
+			const Region2D paper{{0.16f, 0.16f}, {0.84f, 0.84f}};
+			TheDisplay->drawImagePart(parchment, Int(previewBox.left * painter.sx), Int(previewBox.top * painter.sy),
+				Int(previewBox.right * painter.sx), Int(previewBox.bottom * painter.sy), paper);
+		}
 		painter.picture(preview, previewBox);
 		for (size_t i = 0; i < starts.size(); ++i)
 		{
@@ -361,7 +373,7 @@ public:
 		descriptionBox.left += 13;
 		descriptionBox.top += 5;
 		descriptionBox.right -= 13;
-		painter.text(description, descriptionBox, 16, white, "Albertus MT", FALSE, TRUE);
+		painter.text(description, descriptionBox, 18, white, "Albertus MT", FALSE, TRUE);
 
 		const char *columns[] = {"PlayerName", "Level", "TeamNumber", "ArmyName"};
 		for (size_t i = 0; i < rows.size(); ++i)
@@ -604,6 +616,112 @@ namespace
 	public:
 		AptScene scene{"LoadScreen", "#11"};
 		OwnedImage background = menuBackground();
+		Bool setup = FALSE;
+		Bool sandboxConfirmed = FALSE;
+		std::vector<AsciiString> maps;
+		std::vector<Int> factions;
+		std::array<SlotState, MAX_SLOTS> slots{};
+		Int mapIndex = 0;
+		Int factionIndex = 0;
+
+		void openSetup()
+		{
+			setup = TRUE;
+			sandboxConfirmed = FALSE;
+			maps.clear();
+			factions.clear();
+			TheMapCache->updateCache();
+			for (const auto &[path, map] : *TheMapCache)
+				if (map.m_doesExist && map.m_isMultiplayer && map.m_numPlayers > 0)
+					maps.push_back(path);
+			std::stable_partition(maps.begin(), maps.end(), [](const AsciiString &path) {
+				return !TheMapCache->at(path).m_isOfficial;
+			});
+			factionIndex = 0;
+			for (Int i = 0; i < ThePlayerTemplateStore->getPlayerTemplateCount(); ++i)
+			{
+				const auto *faction = ThePlayerTemplateStore->getNthPlayerTemplate(i);
+				if (!faction->isPlayableSide())
+					continue;
+				if (faction->getName() == "FactionMen")
+					factionIndex = Int(factions.size());
+				factions.push_back(i);
+			}
+			mapIndex = 0;
+			slots.fill(SLOT_CLOSED);
+		}
+
+		const MapMetaData *currentMap() const
+		{
+			return maps.empty() ? nullptr : TheMapCache->findMap(maps[mapIndex]);
+		}
+
+		void play()
+		{
+			const MapMetaData *map = currentMap();
+			if (!map || factions.empty())
+				return;
+			const Int count = std::min(map->m_numPlayers, MAX_SLOTS);
+			const Bool solo = std::all_of(slots.begin() + 1, slots.begin() + count,
+				[](SlotState slot) { return slot == SLOT_CLOSED; });
+			if (solo && !sandboxConfirmed)
+			{
+				sandboxConfirmed = TRUE;
+				return;
+			}
+
+			if (!TheSkirmishGameInfo)
+				TheSkirmishGameInfo = NEW SkirmishGameInfo;
+			else if (TheSkirmishGameInfo->isInGame())
+			{
+				if (TheSkirmishGameInfo->isGameInProgress())
+					TheSkirmishGameInfo->endGame();
+				else
+					TheSkirmishGameInfo->leaveGame();
+			}
+			TheSkirmishGameInfo->enterGame();
+			TheSkirmishGameInfo->clearSlotList();
+			GameSlot human;
+			human.setState(SLOT_PLAYER, localize("GUI:Player", "Player"));
+			human.setStartPos(0);
+			human.setColor(0);
+			human.setPlayerTemplate(factions[factionIndex]);
+			TheSkirmishGameInfo->setSlot(0, human);
+			TheSkirmishGameInfo->setLocalIP(human.getIP());
+			for (Int i = 1; i < count; ++i)
+			{
+				if (slots[i] == SLOT_CLOSED)
+					continue;
+				GameSlot ai;
+				ai.setState(slots[i]);
+				ai.setStartPos(i);
+				TheSkirmishGameInfo->setSlot(i, ai);
+			}
+			TheSkirmishGameInfo->setMap(map->m_fileName);
+			TheSkirmishGameInfo->setMapCRC(map->m_CRC);
+			TheSkirmishGameInfo->setMapSize(map->m_filesize);
+			startRematch();
+		}
+
+		void changeMap(Int step)
+		{
+			if (maps.empty())
+				return;
+			mapIndex = (mapIndex + step + Int(maps.size())) % Int(maps.size());
+			sandboxConfirmed = FALSE;
+		}
+
+		void cycleSlot(Int index)
+		{
+			switch (slots[index])
+			{
+				case SLOT_CLOSED: slots[index] = SLOT_EASY_AI; break;
+				case SLOT_EASY_AI: slots[index] = SLOT_MED_AI; break;
+				case SLOT_MED_AI: slots[index] = SLOT_BRUTAL_AI; break;
+				default: slots[index] = SLOT_CLOSED; break;
+			}
+			sandboxConfirmed = FALSE;
+		}
 
 		static Bool canRematch()
 		{
@@ -617,8 +735,55 @@ namespace
 		}
 	};
 
+	constexpr Box skirmishButton{412, 272, 612, 320};
 	constexpr Box rematchButton{412, 328, 612, 376};
 	constexpr Box exitButton{412, 384, 612, 432};
+	constexpr Box previousMap{230, 165, 310, 208};
+	constexpr Box mapNameBox{310, 165, 714, 208};
+	constexpr Box nextMap{714, 165, 794, 208};
+	constexpr Box factionBox{310, 224, 714, 265};
+	constexpr Box setupBack{255, 645, 462, 695};
+	constexpr Box setupPlay{562, 645, 769, 695};
+
+	Box slotBox(Int index)
+	{
+		const Real y = 271.0f + 37.0f * (index - 1);
+		return {310, y, 714, y + 35.0f};
+	}
+
+	void drawSetup(const ReturnMenu &menu, const Painter &painter)
+	{
+		const auto *map = menu.currentMap();
+		painter.text(map ? map->m_displayName : localize("GUI:CantFindMap", "No skirmish maps"), mapNameBox, 24);
+		if (menu.maps.size() > 1)
+		{
+			painter.text(translated("<"), previousMap, 25);
+			painter.text(translated(">"), nextMap, 25);
+		}
+		if (!menu.factions.empty())
+		{
+			const auto *faction = ThePlayerTemplateStore->getNthPlayerTemplate(menu.factions[menu.factionIndex]);
+			painter.text(faction->getDisplayName(), factionBox, 20);
+		}
+		if (map)
+		{
+			for (Int i = 1; i < std::min(map->m_numPlayers, MAX_SLOTS); ++i)
+			{
+				GameSlot slot;
+				slot.setState(menu.slots[i]);
+				UnicodeString label = number(i + 1);
+				label.concat(L"   ");
+				label.concat(slot.isAI() ? localize(aiLabel(slot), "Computer") : localize("GUI:Closed", "Closed"));
+				painter.text(label, slotBox(i), 18);
+			}
+		}
+		if (menu.sandboxConfirmed)
+			painter.text(localize("GUI:SandboxWarning", "Play again to start without opponents."),
+				{212, 550, 812, 625}, 18, muted, "Albertus MT", TRUE, TRUE);
+		painter.text(localize("APT:Back", "Back"), setupBack, 22);
+		if (map && !menu.factions.empty())
+			painter.text(localize("APT:Play", "Play"), setupPlay, 22);
+	}
 
 	void drawReturnMenu(GameWindow *window, WinInstanceData *)
 	{
@@ -629,8 +794,15 @@ namespace
 			return childOf(path, "_root.Title") || childOf(path, "_root.patternShell");
 		}, [&](const std::string &, const AptScene::Text &label) {
 			if (label.value == "$PAGETITLE")
-				painter.label(localize("APT:MainMenu", "Main Menu"), label, muted);
+				painter.label(menu.setup ? localize("APT:Skirmish", "Skirmish") :
+					localize("APT:MainMenu", "Main Menu"), label, muted);
 		});
+		if (menu.setup)
+		{
+			drawSetup(menu, painter);
+			return;
+		}
+		painter.text(localize("APT:Skirmish", "Skirmish"), skirmishButton, 22);
 		if (menu.canRematch())
 			painter.text(localize("GUI:PlayAgain", "Play Again"), rematchButton, 22);
 		painter.text(localize("APT:ExitGame", "Exit Game"), exitButton, 22);
@@ -648,13 +820,39 @@ namespace
 
 	WindowMsgHandledType menuInput(GameWindow *window, UnsignedInt message, WindowMsgData point, WindowMsgData state)
 	{
-		const auto &menu = *static_cast<ReturnMenu *>(window->winGetUserData());
+		auto &menu = *static_cast<ReturnMenu *>(window->winGetUserData());
 		const Real x = (point & 0xFFFF) / menu.scene.xScale();
 		const Real y = (point >> 16) / menu.scene.yScale();
 		const Bool key = message == GWM_CHAR && (state & KEY_STATE_DOWN);
 		const Bool click = message == GWM_LEFT_UP;
+		if (menu.setup)
+		{
+			if ((key && point == KEY_ESC) || (click && setupBack.contains(x, y)))
+				menu.setup = FALSE;
+			else if ((key && point == KEY_ENTER) || (click && setupPlay.contains(x, y)))
+				menu.play();
+			else if ((key && point == KEY_LEFT) || (click && previousMap.contains(x, y)))
+				menu.changeMap(-1);
+			else if ((key && point == KEY_RIGHT) || (click && nextMap.contains(x, y)))
+				menu.changeMap(1);
+			else if (click && factionBox.contains(x, y) && !menu.factions.empty())
+			{
+				menu.factionIndex = (menu.factionIndex + 1) % Int(menu.factions.size());
+				menu.sandboxConfirmed = FALSE;
+			}
+			else if (click)
+			{
+				if (const auto *map = menu.currentMap())
+					for (Int i = 1; i < std::min(map->m_numPlayers, MAX_SLOTS); ++i)
+						if (slotBox(i).contains(x, y))
+							menu.cycleSlot(i);
+			}
+			return MSG_HANDLED;
+		}
 		if ((key && point == KEY_ESC) || (click && exitButton.contains(x, y)))
 			TheGameEngine->setQuitting(TRUE);
+		else if (click && skirmishButton.contains(x, y))
+			menu.openSetup();
 		else if (menu.canRematch() && ((key && point == KEY_ENTER) || (click && rematchButton.contains(x, y))))
 			menu.startRematch();
 		return MSG_HANDLED;
@@ -695,6 +893,8 @@ Bool createRetailReturnMenu(WindowLayout &layout)
 	window->winSetInputFunc(menuInput);
 	layout.addWindow(window);
 	layout.setInit([](WindowLayout *screen, void *) {
+		TheWritableGlobalData->m_breakTheMovie = FALSE;
+		TheMouse->setVisibility(TRUE);
 		screen->hide(FALSE);
 		TheWindowManager->winSetFocus(screen->getFirstWindow());
 	});

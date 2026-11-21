@@ -44,7 +44,6 @@
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ProductionUpdate.h"
-#include "GameLogic/Module/RespawnModules.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "Common/AttributeModifierRules.h"
 #if !RTS_GENERALS
@@ -1222,17 +1221,8 @@ void ControlBar::applyRetailHeroImage(GameWindow *window, Int hero) const
 	const Image *image = heroTemplate->getButtonImage();
 	if (HeroRoster::stateAt(player, hero) == HeroRules::State::Revivable)
 	{
-		const ModuleInfo &modules = heroTemplate->getBehaviorModuleInfo();
-		for (Int i = 0; i < modules.getCount(); ++i)
-		{
-			if (modules.getNthName(i).compareNoCase("RespawnUpdate") != 0)
-				continue;
-			const RespawnUpdateModuleData *data = static_cast<const RespawnUpdateModuleData *>(modules.getNthData(i));
-			const Image *revive = data->m_buttonImage.isEmpty() ? nullptr : findImage(data->m_buttonImage.str());
-			if (revive)
-				image = revive;
-			break;
-		}
+		if (const Image *revive = RetailHeroBar::reviveImage(heroTemplate))
+			image = revive;
 	}
 	if (image)
 		window->winSetEnabledImage(0, image);
@@ -1477,9 +1467,7 @@ void ControlBar::updateRetailHud()
 		getRetailProduction(window, count, progress);
 		const CommandButton *command = static_cast<const CommandButton *>(GadgetButtonGetData(window));
 		UnicodeString text;
-		if (count > 0 && m_currContext == CB_CONTEXT_UNDER_CONSTRUCTION)
-			text.format(L"%d%%", static_cast<Int>(progress * 100.0f));
-		else if (count > 0 && command && command->showsProductionCount())
+		if (count > 0 && m_currContext != CB_CONTEXT_UNDER_CONSTRUCTION && command && command->showsProductionCount())
 			text.format(L"%d", count);
 		WinInstanceData *instance = window->winGetInstanceData();
 		if (instance->getText().compare(text) != 0)

@@ -129,9 +129,6 @@
 #include "Common/version.h"
 #include <cstdio>
 #include <cstdlib>
-#if defined(__APPLE__)
-#include <SDL3/SDL.h>
-#endif
 
 
 //-------------------------------------------------------------------------------------------------
@@ -287,12 +284,16 @@ static void startRetailFileSkirmish(const MapMetaData& map)
 	TheSkirmishGameInfo->setSlot(0, human);
 	TheSkirmishGameInfo->setLocalIP(human.getIP());
 
-	GameSlot ai;
-	ai.setState(SLOT_EASY_AI);
-	ai.setStartPos(1);
-	ai.setColor(1);
-	ai.setPlayerTemplate(findRetailSkirmishFaction("FactionMordor"));
-	TheSkirmishGameInfo->setSlot(1, ai);
+	const char *opponent = std::getenv("GENERALSX_RETAIL_SKIRMISH_AI");
+	if (opponent && std::strcmp(opponent, "1") == 0)
+	{
+		GameSlot ai;
+		ai.setState(SLOT_EASY_AI);
+		ai.setStartPos(1);
+		ai.setColor(1);
+		ai.setPlayerTemplate(findRetailSkirmishFaction("FactionMordor"));
+		TheSkirmishGameInfo->setSlot(1, ai);
+	}
 	TheSkirmishGameInfo->setMap(map.m_fileName);
 	TheSkirmishGameInfo->setMapCRC(map.m_CRC);
 	TheSkirmishGameInfo->setMapSize(map.m_filesize);
@@ -993,21 +994,12 @@ void GameEngine::init()
 			std::_Exit(0);
 		runCrcHarnessIfRequested();
 
-		if (RetailFileLayers::enabled() && !INIAudit::isEnabled() && !UiTest::isActive() &&
+		if (RetailFileLayers::enabled() && TheGlobalData->m_headless && !INIAudit::isEnabled() && !UiTest::isActive() &&
 			!TheGlobalData->m_buildMapCache && TheGlobalData->m_initialFile.isEmpty() &&
 			TheGlobalData->m_loadSaveGame.isEmpty() && TheGlobalData->m_loadReplayGame.isEmpty() &&
-			TheGlobalData->m_simulateReplays.empty() &&
-			(!TheFileSystem->doesFileExist("Window\\Menus\\MainMenu.wnd") ||
-			 !TheFileSystem->doesFileExist("Window\\Menus\\SkirmishGameOptionsMenu.wnd")))
+			TheGlobalData->m_simulateReplays.empty())
 		{
-			constexpr const char* noShellMessage =
-				"This port cannot start without a map yet: the Rise of the Witch-king main menu and skirmish setup "
-				"are not implemented. To start High Pass directly, add -file \"maps/map mp high pass/map mp high pass.map\".";
-			std::fprintf(stderr, "Retail startup: %s\n", noShellMessage);
-			std::fflush(stderr);
-#if defined(__APPLE__)
-			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "No map selected", noShellMessage, nullptr);
-#endif
+			std::fputs("Retail headless startup requires a map, save, or replay.\n", stderr);
 			setQuitting(TRUE);
 			return;
 		}

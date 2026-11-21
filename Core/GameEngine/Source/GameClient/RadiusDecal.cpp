@@ -89,6 +89,13 @@ void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, co
 		return;
 	}
 
+	if (object && object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+	{
+		decal.clear();
+		RetailWorldUI::drawTerrainClaims(view, *player, object, radius);
+		return;
+	}
+
 	AsciiString texture = TheInGameUI->getTerrainClaimDecal(placement != nullptr);
 	if (const Image* image = TheMappedImageCollection ? TheMappedImageCollection->findImageByName(texture) : nullptr)
 		texture = image->getFilename();
