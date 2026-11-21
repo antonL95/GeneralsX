@@ -564,9 +564,14 @@ void drawPrerequisites(const Player* player, const Layout& layout, Int diameter)
 				continue;
 			const ScienceType prerequisite = storeScience(player, candidate);
 			if (prerequisite == SCIENCE_INVALID ||
-				!std::any_of(alternatives->begin(), alternatives->end(), [prerequisite](const ScienceVec& group)
+				!std::any_of(alternatives->begin(), alternatives->end(), [player, prerequisite](const ScienceVec& group)
 				{
-					return containsScience(group, prerequisite);
+					return containsScience(group, prerequisite) &&
+						std::none_of(group.begin(), group.end(), [player](ScienceType required)
+						{
+							return player->getSciencePurchaseCost(required) == 0 &&
+								!TheScienceStore->isScienceGrantable(required) && !player->hasScience(required);
+						});
 				}))
 				continue;
 
