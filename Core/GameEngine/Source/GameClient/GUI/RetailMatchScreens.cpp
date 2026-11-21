@@ -23,6 +23,7 @@
 #include "GameClient/MapUtil.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/Shell.h"
+#include "GameClient/UiFrame.h"
 #include "GameClient/WindowLayout.h"
 #include "GameNetwork/GameInfo.h"
 #include "GameLogic/GameLogic.h"
@@ -647,7 +648,7 @@ namespace
 		{400, "VALUE:4X", "4x"}, {800, "VALUE:8X", "8x"}, {10000, "VALUE:100X", "100x"}
 	};
 
-	enum class MenuChoice { None, Resources, Factor, Slot, Faction, Team, Color, Start, Profile, SelectProfile, DeleteProfile };
+	enum class MenuChoice { None, Resources, Factor, Slot, Faction, Team, Color, StartAt, Profile, SelectProfile, DeleteProfile };
 	enum class ProfilePage { None, Create, Stats };
 
 	struct Choice
@@ -691,6 +692,8 @@ namespace
 	{
 	public:
 		AptScene scene{"LoadScreen", "#11"};
+		AptScene skirmishArt{"Skirmish", "#14"};
+		AptScene setupArt{"SkirmishOpenPlay", "#20"};
 		OwnedImage background = menuBackground();
 		OwnedImage previewFile;
 		const Image *preview = nullptr;
@@ -891,6 +894,8 @@ namespace
 			for (Int i = 0; i < count; ++i)
 			{
 				const auto &selection = slots[i];
+				if (!selection.occupied())
+					continue;
 				GameSlot slot;
 				slot.setState(selection.state, i == 0 ? profileName() : UnicodeString());
 				slot.setPlayerTemplate(selection.faction);
@@ -940,7 +945,14 @@ namespace
 				case MenuChoice::Faction: slot.faction = value; break;
 				case MenuChoice::Team: slot.team = value; break;
 				case MenuChoice::Color: assignUnique(&SetupSlot::color, choiceRow, value); break;
-				case MenuChoice::Start: assignUnique(&SetupSlot::start, choiceRow, value); break;
+				case MenuChoice::StartAt:
+					if (value >= 0)
+						assignUnique(&SetupSlot::start, value, choiceRow);
+					else
+						for (auto &entry : slots)
+							if (entry.start == choiceRow)
+								entry.start = -1;
+					break;
 				case MenuChoice::Profile:
 					if (value == 1)
 					{
@@ -1001,7 +1013,7 @@ namespace
 	constexpr Box profilePanel{310, 264, 714, 460};
 	constexpr Box profileCancel{337, 405, 475, 442};
 	constexpr Box profileAccept{550, 405, 688, 442};
-	constexpr Real slotEdges[] = {104, 314, 525, 612, 734, 920};
+	constexpr Real slotEdges[] = {104, 276, 463, 610, 696, 808, 920};
 	constexpr Real choiceHeight = 25;
 
 	Box slotCell(Int row, Int column)
@@ -1029,15 +1041,59 @@ namespace
 			Int((box.right - box.left) * p.sx), Int((box.bottom - box.top) * p.sy), color);
 	}
 
+	Bool moviePart(const Painter &p, const AptScene &scene, const std::string &path, const Box &box, Real opacity = 1.0f)
+	{
+		const Box source = scene.bounds(path);
+		if (!source.valid())
+			return FALSE;
+		const Real sx = p.sx * (box.right - box.left) / (source.right - source.left);
+		const Real sy = p.sy * (box.bottom - box.top) / (source.bottom - source.top);
+		scene.drawAt([&](const std::string &part) { return childOf(part, path); },
+			box.left * p.sx - source.left * sx, box.top * p.sy - source.top * sy, sx, sy, opacity);
+		return TRUE;
+	}
+
+	void frame(const Painter &p, const Box &box, const char *name)
+	{
+		const auto *art = TheUiFrameCollection ? TheUiFrameCollection->find(name) : nullptr;
+		if (art)
+			art->draw(Int(box.left * p.sx), Int(box.top * p.sy), Int(box.right * p.sx), Int(box.bottom * p.sy));
+	}
+
+	void button(const Painter &p, const Box &box, UnicodeString label)
+	{
+		fill(p, inset(box, 6, 6), 0xE6172F3C);
+		frame(p, box, "MenuButtonMed");
+		p.text(label, box, 16);
+	}
+
+	void checkbox(const Painter &p, const Box &box, Bool checked)
+	{
+		const auto *art = TheMappedImageCollection->findImageByName(checked ? "AptCheckboxCheckedEnabled" : "AptCheckboxUncheckedEnabled");
+		if (art)
+			p.picture(art, box);
+		else
+			p.text(translated(checked ? "[X]" : "[ ]"), box, 16);
+	}
+
 	void control(const Painter &p, const Box &box, UnicodeString label, Bool selected = FALSE,
 		Bool dropdown = FALSE, Color color = 0)
 	{
-		fill(p, box, selected ? 0xFF355765 : 0xFF182830);
+		fill(p, box, selected ? 0xFF294A59 : 0xE90A141B);
+		if (selected)
+			p.picture(TheMappedImageCollection->findImageByName("AptListBoxHiliteSelectedItem"), box);
 		if (color)
 			fill(p, {box.left + 9, box.top + 5, box.left + 31, box.bottom - 5}, color);
 		p.text(label, inset(box, color ? 38 : 9, dropdown ? 22 : 6), 16, white, "Albertus MT", !dropdown);
 		if (dropdown)
-			p.text(translated("v"), {box.right - 22, box.top, box.right, box.bottom}, 14, muted);
+		{
+			const auto *arrow = TheMappedImageCollection->findImageByName("AptVSliderDownButtonEnabled");
+			const Box arrowBox{box.right - 22, box.top, box.right, box.bottom};
+			if (arrow)
+				p.picture(arrow, arrowBox);
+			else
+				p.text(translated("v"), arrowBox, 14, muted);
+		}
 	}
 
 	const Factor &selectedFactor(Int percent)
@@ -1093,7 +1149,7 @@ namespace
 				break;
 			case MenuChoice::Team:
 				options.push_back({-1, localize("GUI:NoTeam", "None")});
-				for (Int i = 0; i < MAX_SLOTS; ++i)
+				for (Int i = 0; i < MAX_SLOTS / 2; ++i)
 					options.push_back({i, number(i + 1)});
 				break;
 			case MenuChoice::Color:
@@ -1101,10 +1157,18 @@ namespace
 				for (Int i = 0, count = TheMultiplayerSettings->getNumColors(); i < count; ++i)
 					options.push_back(colorChoice(i));
 				break;
-			case MenuChoice::Start:
-				options.push_back({-1, randomLabel()});
+			case MenuChoice::StartAt:
+				options.push_back({-1, localize("GUI:Open", "Open")});
 				for (Int i = 0; i < menu.slotCount(); ++i)
-					options.push_back({i, number(i + 1)});
+				{
+					const auto &slot = menu.slots[i];
+					if (!slot.occupied())
+						continue;
+					UnicodeString label = number(i + 1);
+					label.concat(L". ");
+					label.concat(i == 0 ? menu.profileName() : slotName(slot.state));
+					options.push_back({i, label});
+				}
 				break;
 			case MenuChoice::Profile:
 				options.push_back({0, localize("APT:ChangeProfile", "Change profile")});
@@ -1126,6 +1190,22 @@ namespace
 		menu.choiceBox = {left, top, std::max(anchor.right, left + 150), top + height};
 	}
 
+	Box startMarker(const MapMetaData &map, Int index)
+	{
+		const Real width = map.m_extent.hi.x - map.m_extent.lo.x;
+		const Real height = map.m_extent.hi.y - map.m_extent.lo.y;
+		AsciiString key;
+		key.format("Player_%d_Start", index + 1);
+		const auto point = map.m_waypoints.find(key);
+		if (point == map.m_waypoints.end() || width <= 0 || height <= 0)
+			return {};
+		const Real x = previewBox.left + (previewBox.right - previewBox.left) *
+			std::clamp((point->second.x - map.m_extent.lo.x) / width, 0.0f, 1.0f);
+		const Real y = previewBox.top + (previewBox.bottom - previewBox.top) *
+			std::clamp((map.m_extent.hi.y - point->second.y) / height, 0.0f, 1.0f);
+		return {x - 10, y - 10, x + 10, y + 10};
+	}
+
 	void drawMap(const ReturnMenu &menu, const Painter &p)
 	{
 		const auto *map = menu.currentMap();
@@ -1139,8 +1219,9 @@ namespace
 			const Int index = menu.mapScroll + row;
 			control(p, mapLine(row), menu.maps[index].name, index == menu.mapIndex);
 		}
-		control(p, mapUp, translated("^"));
-		control(p, mapDown, translated("v"));
+		p.picture(TheMappedImageCollection->findImageByName("AptVSliderUpButtonEnabled"), mapUp);
+		p.picture(TheMappedImageCollection->findImageByName("AptVSliderDownButtonEnabled"), mapDown);
+		frame(p, {previewBox.left - 4, previewBox.top - 4, previewBox.right + 4, previewBox.bottom + 4}, "MapPreviewFrame");
 		if (menu.previewFile)
 		{
 			const auto *parchment = TheMappedImageCollection->findImageByName("UiRetailGlobe");
@@ -1152,25 +1233,17 @@ namespace
 			}
 		}
 		p.picture(menu.preview, previewBox);
-		const Real width = map->m_extent.hi.x - map->m_extent.lo.x;
-		const Real height = map->m_extent.hi.y - map->m_extent.lo.y;
-		if (width > 0 && height > 0)
+		for (Int i = 0, count = menu.slotCount(); i < count; ++i)
 		{
-			for (Int i = 0, count = menu.slotCount(); i < count; ++i)
-			{
-				AsciiString key;
-				key.format("Player_%d_Start", i + 1);
-				const auto point = map->m_waypoints.find(key);
-				if (point == map->m_waypoints.end())
-					continue;
-				const Real x = previewBox.left + (previewBox.right - previewBox.left) *
-					std::clamp((point->second.x - map->m_extent.lo.x) / width, 0.0f, 1.0f);
-				const Real y = previewBox.top + (previewBox.bottom - previewBox.top) *
-					std::clamp((map->m_extent.hi.y - point->second.y) / height, 0.0f, 1.0f);
-				const Box marker{x - 9, y - 10, x + 9, y + 10};
-				p.picture(TheMappedImageCollection->findImageByName("AptPlayerStart"), marker);
-				p.text(number(i + 1), marker, 13);
-			}
+			const Box marker = startMarker(*map, i);
+			if (!marker.valid())
+				continue;
+			const auto owner = std::find_if(menu.slots.begin(), menu.slots.begin() + count,
+				[i](const SetupSlot &slot) { return slot.occupied() && slot.start == i; });
+			const Bool assigned = owner != menu.slots.begin() + count;
+			const Color color = assigned ? colorChoice(owner->color).color : muted;
+			p.picture(TheMappedImageCollection->findImageByName("AptPlayerStart"), marker);
+			p.text(number(i + 1), marker, 13, assigned && color ? color : white);
 		}
 		p.text(menu.maps[menu.mapIndex].name, {707, 199, 908, 225}, 17, white, "Albertus MT", FALSE);
 		p.text(menu.description, {707, 232, 908, 381}, 15, muted, "Albertus MT", FALSE, TRUE);
@@ -1183,29 +1256,42 @@ namespace
 		control(p, resourcesBox, number(menu.resources), FALSE, TRUE);
 		const auto &factor = selectedFactor(menu.rules.commandPointFactor);
 		control(p, factorBox, localize(factor.key, factor.label), FALSE, TRUE);
-		control(p, {customBox.left, customBox.top, customBox.left + 29, customBox.bottom}, translated(menu.rules.customHeroes ? "X" : ""));
-		control(p, {ringBox.left, ringBox.top, ringBox.left + 29, ringBox.bottom}, translated(menu.rules.ringHeroes ? "X" : ""));
+		checkbox(p, {customBox.left, customBox.top, customBox.left + 29, customBox.bottom}, menu.rules.customHeroes);
+		checkbox(p, {ringBox.left, ringBox.top, ringBox.left + 29, ringBox.bottom}, menu.rules.ringHeroes);
 		p.text(localize("RULE:AllowCustomHeroes", "Allow custom heroes"), inset(customBox, 40), 18, muted, "Albertus MT", FALSE);
 		p.text(localize("RULE:AllowRingHeroes", "Allow ring heroes"), inset(ringBox, 40), 18, muted, "Albertus MT", FALSE);
-		control(p, resetBox, localize("APT:Reset", "Reset"));
+		button(p, resetBox, localize("APT:Reset", "Reset"));
 	}
 
 	void drawSetup(const ReturnMenu &menu, const Painter &p)
 	{
-		control(p, mapTab, localize("APT:Map", "Map"), !menu.rulesTab);
-		control(p, rulesTab, localize("APT:Rules", "Rules"), menu.rulesTab);
+		p.text(localize("APT:GameSetup", "Game Setup"), {328, 100, 696, 133}, 23);
+		const std::string settings = "_root.MpMapAndSettings.";
+		const auto tab = [&](const Box &box, UnicodeString label, Bool selected) {
+			fill(p, box, 0xE90A141B);
+			if (moviePart(p, menu.setupArt, settings + "TabMap.@2", box, selected ? 1.0f : 0.45f))
+				p.text(label, box, 17, selected ? white : muted);
+			else
+				control(p, box, label, selected);
+		};
+		tab(mapTab, localize("APT:Map", "Map"), !menu.rulesTab);
+		tab(rulesTab, localize("APT:Rules", "Rules"), menu.rulesTab);
 		fill(p, mapPanel, 0xEC10191C);
+		moviePart(p, menu.setupArt, settings + "@51", mapPanel, 0.8f);
 		if (menu.rulesTab)
 			drawRules(menu, p);
 		else
 			drawMap(menu, p);
 
 		constexpr const char *headers[][2] = {{"APT:Player", "Player"}, {"APT:Army", "Army"},
-			{"APT:Team", "Team"}, {"APT:Color", "Color"}, {"GUI:StartPosition", "Start position"}};
-		for (Int column = 0; column < 5; ++column)
+			{"APT:HeaderHero", "Captain"}, {"APT:Team", "Team"}, {"APT:Color", "Color"}, {"APT:HdrHandicap", "Handicap"}};
+		const Box table{slotEdges[0], 403, slotEdges[6], 624};
+		fill(p, table, 0xE908151D);
+		moviePart(p, menu.setupArt, settings + "@51.@2", {table.left, table.top, table.right, 430});
+		for (Int column = 0; column < 6; ++column)
 		{
 			const Box header{slotEdges[column], 403, slotEdges[column + 1] - 3, 430};
-			control(p, header, localize(headers[column][0], headers[column][1]), TRUE);
+			p.text(localize(headers[column][0], headers[column][1]), header, 17, muted);
 		}
 		for (Int row = 0; row < MAX_SLOTS; ++row)
 		{
@@ -1215,22 +1301,24 @@ namespace
 				FALSE, available && row > 0);
 			if (!available || !slot.occupied())
 			{
-				for (Int column = 1; column < 5; ++column)
-					control(p, slotCell(row, column), translated("-"));
+				for (Int column = 1; column < 6; ++column)
+					control(p, slotCell(row, column), translated(column == 5 ? "0%" : "-"));
 				continue;
 			}
 			control(p, slotCell(row, 1), factionName(slot.faction), FALSE, TRUE);
-			control(p, slotCell(row, 2), slot.team < 0 ? translated("-") : number(slot.team + 1), FALSE, TRUE);
+			control(p, slotCell(row, 2), translated("-"));
+			control(p, slotCell(row, 3), slot.team < 0 ? translated("-") : number(slot.team + 1), FALSE, TRUE);
 			const auto color = colorChoice(slot.color);
-			control(p, slotCell(row, 3), slot.color < 0 ? randomLabel() : color.text, FALSE, TRUE, color.color);
-			control(p, slotCell(row, 4), slot.start < 0 ? randomLabel() : number(slot.start + 1), FALSE, TRUE);
+			control(p, slotCell(row, 4), slot.color < 0 ? translated("?") : UnicodeString(), FALSE, TRUE, color.color);
+			control(p, slotCell(row, 5), translated("0%"));
 		}
 		if (menu.sandboxConfirmed)
 			p.text(localize("GUI:SandboxWarning", "Play again to start without opponents."),
 				{104, 627, 920, 661}, 16, muted, "Albertus MT", TRUE, TRUE);
-		control(p, setupBack, localize("APT:Back", "Back"));
-		control(p, profileBox, localize("APT:Profile", "Profile"));
-		control(p, setupPlay, localize("APT:Play", "Play"), menu.currentMap() && !menu.factions.empty());
+		button(p, setupBack, localize("APT:MainMenu", "Main Menu"));
+		button(p, profileBox, localize("APT:Profile", "Profile"));
+		if (menu.currentMap() && !menu.factions.empty())
+			button(p, setupPlay, localize("APT:Play", "Play"));
 		if (menu.profilePage != ProfilePage::None)
 		{
 			fill(p, {0, 0, 1024, 768}, 0xA0000000);
@@ -1250,9 +1338,9 @@ namespace
 					menu.profilePrefs.getInt(profileStatKey(FALSE, name), 0));
 				p.text(counts, {337, 352, 688, 384}, 16);
 			}
-			control(p, profileCancel, localize("APT:Cancel", "Cancel"));
+			button(p, profileCancel, localize("APT:Cancel", "Cancel"));
 			if (create)
-				control(p, profileAccept, localize("APT:Accept", "Accept"));
+				button(p, profileAccept, localize("APT:Accept", "Accept"));
 		}
 		p.text(menu.profileFeedback, {315, 370, 708, 399}, 15, muted);
 		if (menu.choice != MenuChoice::None)
@@ -1351,14 +1439,27 @@ namespace
 				}
 			}
 			else
+			{
 				for (Int i = 0; i < ReturnMenu::visibleMaps; ++i)
 					if (mapLine(i).contains(x, y))
 						menu.selectMap(menu.mapScroll + i);
+				if (const auto *map = menu.currentMap())
+					for (Int i = 0, count = menu.slotCount(); i < count; ++i)
+					{
+						const Box marker = startMarker(*map, i);
+						if (marker.contains(x, y))
+						{
+							openChoices(menu, MenuChoice::StartAt, marker, i);
+							return;
+						}
+					}
+			}
 
-			constexpr MenuChoice columns[] = {MenuChoice::Slot, MenuChoice::Faction, MenuChoice::Team, MenuChoice::Color, MenuChoice::Start};
+			constexpr MenuChoice columns[] = {MenuChoice::Slot, MenuChoice::Faction, MenuChoice::None,
+				MenuChoice::Team, MenuChoice::Color};
 			for (Int i = 0, count = menu.slotCount(); i < count; ++i)
-				for (Int col = 0; col < 5; ++col)
-					if ((col == 0 ? i != 0 : menu.slots[i].occupied()) && slotCell(i, col).contains(x, y))
+				for (Int col = 0; col < Int(std::size(columns)); ++col)
+					if (columns[col] != MenuChoice::None && (col == 0 ? i != 0 : menu.slots[i].occupied()) && slotCell(i, col).contains(x, y))
 						openChoices(menu, columns[col], slotCell(i, col), i);
 		}
 	}
@@ -1368,7 +1469,8 @@ namespace
 		const auto &menu = *static_cast<ReturnMenu *>(window->winGetUserData());
 		const Painter painter(menu.scene);
 		painter.background(menu.background.get());
-		menu.scene.draw([](const std::string &path) {
+		const auto &shellArt = menu.setup && menu.skirmishArt.bounds("_root.Title").valid() ? menu.skirmishArt : menu.scene;
+		shellArt.draw([](const std::string &path) {
 			return childOf(path, "_root.Title") || childOf(path, "_root.patternShell");
 		}, [&](const std::string &, const AptScene::Text &label) {
 			if (label.value == "$PAGETITLE")
