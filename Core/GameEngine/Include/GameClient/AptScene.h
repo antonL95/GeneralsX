@@ -1,0 +1,43 @@
+#pragma once
+
+#include "Lib/BaseType.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+
+class AptScene
+{
+public:
+	struct Box
+	{
+		Real left = 0, top = 0, right = 0, bottom = 0;
+		Bool contains(Real x, Real y) const;
+		Bool valid() const;
+	};
+
+	struct Text
+	{
+		Box box;
+		std::string value;
+		std::string font;
+		Real size;
+		Int alignment;
+	};
+
+	using Visibility = std::function<Bool(const std::string &)>;
+	using DrawText = std::function<void(const std::string &, const Text &)>;
+	using HorizontalScale = std::function<Real(const std::string &)>;
+
+	explicit AptScene(const char *movie, const char *frame = nullptr);
+	~AptScene();
+	Bool valid() const;
+	Box bounds(const std::string &path) const;
+	void draw(const Visibility &visible, const DrawText &text, const HorizontalScale &scale = {}) const;
+	Real xScale() const;
+	Real yScale() const;
+
+private:
+	class Data;
+	std::unique_ptr<Data> m_data;
+};

@@ -79,6 +79,7 @@
 #include "GameClient/GameWindowTransitions.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/LoadScreen.h"
+#include "GameClient/RetailMatchScreens.h"
 #include "GameClient/MapUtil.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/Shell.h"
@@ -1278,6 +1279,7 @@ MultiPlayerLoadScreen::MultiPlayerLoadScreen()
 
 MultiPlayerLoadScreen::~MultiPlayerLoadScreen()
 {
+	delete m_retailLoading;
 	if (m_retailLabel)
 		TheDisplayStringManager->freeDisplayString(m_retailLabel);
 
@@ -1293,6 +1295,11 @@ MultiPlayerLoadScreen::~MultiPlayerLoadScreen()
 void MultiPlayerLoadScreen::drawRetailLoading( GameWindow *window, WinInstanceData * )
 {
 	const auto *screen = static_cast<const MultiPlayerLoadScreen *>(window->winGetUserData());
+	if (screen->m_retailLoading)
+	{
+		screen->m_retailLoading->draw();
+		return;
+	}
 	const Int width = TheDisplay->getWidth();
 	const Int height = TheDisplay->getHeight();
 	const Int barWidth = width / 3;
@@ -1329,10 +1336,16 @@ void MultiPlayerLoadScreen::init( GameInfo *game )
 			m_retailProgress = 0;
 			m_loadScreen->winSetUserData(this);
 			m_loadScreen->winSetDrawFunc(drawRetailLoading);
-			if (GameFont *font = m_loadScreen->winGetFont())
+			if (game)
+			{
+				auto loading = std::make_unique<RetailLoadingScreen>(*game);
+				if (loading->valid())
+					m_retailLoading = loading.release();
+			}
+			if (!m_retailLoading && m_loadScreen->winGetFont())
 			{
 				m_retailLabel = TheDisplayStringManager->newDisplayString();
-				m_retailLabel->setFont(font);
+				m_retailLabel->setFont(m_loadScreen->winGetFont());
 				UnicodeString title;
 				title.translate("Loading match");
 				m_retailLabel->setText(title);
@@ -1523,6 +1536,8 @@ void MultiPlayerLoadScreen::init( GameInfo *game )
 
 void MultiPlayerLoadScreen::reset()
 {
+	delete m_retailLoading;
+	m_retailLoading = nullptr;
 	m_retailProgress = -1;
 	if (m_retailLabel)
 	{
@@ -1540,6 +1555,8 @@ void MultiPlayerLoadScreen::reset()
 
 void MultiPlayerLoadScreen::update( Int percent )
 {
+	if (m_retailLoading && TheGameInfo)
+		m_retailLoading->update(TheGameInfo->getLocalSlotNum(), percent);
 	if (m_retailProgress >= 0)
 		m_retailProgress = std::clamp(percent, 0, 100);
 
@@ -1565,6 +1582,8 @@ void MultiPlayerLoadScreen::update( Int percent )
 
 void MultiPlayerLoadScreen::processProgress(Int playerId, Int percentage)
 {
+	if (m_retailLoading && percentage >= 0 && percentage <= 100)
+		m_retailLoading->update(playerId, percentage);
 	if (m_retailProgress >= 0 || (!m_loadScreen && RetailFileLayers::enabled()))
 		return;
 	if( percentage < 0 || percentage > 100 || playerId >= MAX_SLOTS || playerId < 0 || m_playerLookup[playerId] == -1)

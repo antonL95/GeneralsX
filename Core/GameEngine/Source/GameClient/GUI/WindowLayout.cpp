@@ -32,6 +32,7 @@
 
 #include "Common/RetailFileLayers.h"
 #include "GameClient/WindowLayout.h"
+#include "GameClient/RetailMatchScreens.h"
 #include "GameClient/Shell.h"
 #include "GameClient/GameWindowManager.h"
 
@@ -214,6 +215,11 @@ Bool WindowLayout::load( AsciiString filename )
 	target = TheWindowManager->winCreateFromScript( filename, &info );
 	if( target == nullptr )
 	{
+		if (RetailFileLayers::enabled() && filename == "Menus/MainMenu.wnd" && createRetailReturnMenu(*this))
+		{
+			m_filenameString = filename;
+			return TRUE;
+		}
 
 		if (!RetailFileLayers::enabled())
 			DEBUG_ASSERTCRASH( target, ("WindowLayout::load - Failed to load layout") );

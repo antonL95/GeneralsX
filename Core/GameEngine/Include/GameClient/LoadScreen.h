@@ -223,6 +223,9 @@ private:
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // class MultiPlayerLoadScreen is to be used for multiplayer communication on the loadscreens
 ////	///////////////////////////////////////////////////////////////////////////////////////////////
+class RetailLoadingScreen;
+
+
 class MultiPlayerLoadScreen : public LoadScreen
 {
 public:
@@ -241,6 +244,7 @@ public:
 private:
 	static void drawRetailLoading( GameWindow *window, WinInstanceData *instance );
 	Int m_retailProgress = -1;
+	RetailLoadingScreen *m_retailLoading = nullptr;
 	DisplayString *m_retailLabel = nullptr;
 	GameWindow *m_progressBars[MAX_SLOTS];	///< pointer array to all the progress bars on the window
 	GameWindow *m_playerNames[MAX_SLOTS];		///< pointer array to all the static text player names on the window

@@ -263,6 +263,8 @@ set(GAMEENGINE_SRC
     Include/GameClient/LanguageFilter.h
     Include/GameClient/Line2D.h
     Include/GameClient/LoadScreen.h
+    Include/GameClient/AptScene.h
+    Include/GameClient/RetailMatchScreens.h
     Include/GameClient/LookAtXlat.h
     Include/GameClient/MapUtil.h
     Include/GameClient/MessageBox.h
@@ -935,6 +937,8 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/HeaderTemplate.cpp
     Source/GameClient/GUI/IMEManager.cpp
     Source/GameClient/GUI/LoadScreen.cpp
+    Source/GameClient/GUI/AptScene.cpp
+    Source/GameClient/GUI/RetailMatchScreens.cpp
     Source/GameClient/GUI/ProcessAnimateWindow.cpp
     Source/GameClient/GUI/Shell/Shell.cpp
     Source/GameClient/GUI/Shell/ShellMenuScheme.cpp

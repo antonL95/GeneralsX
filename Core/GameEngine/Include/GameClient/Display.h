@@ -162,6 +162,7 @@ public:
 	virtual void drawImage( const Image *image, Int startX, Int startY,
 													Int endX, Int endY, Color color = 0xFFFFFFFF, DrawImageMode mode=DRAW_IMAGE_ALPHA) = 0;
 
+	virtual void drawImageTriangles(const char *texture, const Coord2D *points, const Coord2D *uv, Int count, Color color) {}
 	virtual void drawImagePart( const Image *image, Int startX, Int startY, Int endX, Int endY,
 		const Region2D &part, Color color = 0xFFFFFFFF, DrawImageMode mode = DRAW_IMAGE_ALPHA );
 	virtual void drawTexturedLine(const Image *image, ICoord2D start, ICoord2D end, Real width);

@@ -121,6 +121,7 @@ public:
 	/// draw an image fit within the screen coordinates
 	virtual void drawImage( const Image *image, Int startX, Int startY,
 													Int endX, Int endY, Color color = 0xFFFFFFFF, DrawImageMode mode=DRAW_IMAGE_ALPHA) override;
+	void drawImageTriangles(const char *texture, const Coord2D *points, const Coord2D *uv, Int count, Color color) override;
 	virtual void drawImagePart( const Image *image, Int startX, Int startY, Int endX, Int endY,
 		const Region2D &part, Color color = 0xFFFFFFFF, DrawImageMode mode = DRAW_IMAGE_ALPHA ) override;
 	Bool hasImageTexture(const Image *image) override;

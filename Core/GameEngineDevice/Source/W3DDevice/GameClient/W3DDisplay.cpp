@@ -4241,3 +4241,49 @@ static void drawFramerateBar()
 	TheDisplay->drawFillRect(1, 1, width, 15, colorToUse);
 	prevTime = now;
 }
+
+void W3DDisplay::drawImageTriangles(const char *texture, const Coord2D *points, const Coord2D *uv, Int count, Color color)
+{
+	if (!m_2DRender || count < 3)
+		return;
+
+	TextureClass *tex = nullptr;
+	Real uScale = 1.0f;
+	Real vScale = 1.0f;
+	if (texture)
+	{
+		tex = WW3DAssetManager::Get_Instance()->Get_Texture(texture, MIP_LEVELS_1);
+		if (!tex)
+			return;
+
+		tex->Init();
+		if (tex->Is_Missing_Texture() || tex->Get_Width() == 0 || tex->Get_Height() == 0)
+		{
+			tex->Release_Ref();
+			return;
+		}
+		uScale /= tex->Get_Width();
+		vScale /= tex->Get_Height();
+	}
+
+	setup2DRenderState(tex, DRAW_IMAGE_ALPHA, FALSE);
+	for (Int i = 0; i + 2 < count; i += 3)
+	{
+		const Coord2D &origin = points[i];
+		Int second = i + 1;
+		Int third = i + 2;
+		const Real cross = (points[second].x - origin.x) * (points[third].y - origin.y) -
+			(points[second].y - origin.y) * (points[third].x - origin.x);
+		if (cross > 0)
+			std::swap(second, third);
+		m_2DRender->Flush_If_Needed(3);
+		m_2DRender->Add_Tri(Vector2(origin.x, origin.y), Vector2(points[second].x, points[second].y),
+			Vector2(points[third].x, points[third].y), Vector2(uv[i].x * uScale, uv[i].y * vScale),
+			Vector2(uv[second].x * uScale, uv[second].y * vScale),
+			Vector2(uv[third].x * uScale, uv[third].y * vScale), color);
+	}
+	if (!m_isBatching)
+		m_2DRender->Render();
+	if (tex)
+		tex->Release_Ref();
+}

@@ -88,6 +88,7 @@
 #include "GameClient/Mouse.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/Shell.h"
+#include "GameClient/RetailMatchScreens.h"
 #include "GameClient/Module/BeaconClientUpdate.h"
 #include "GameClient/LookAtXlat.h"
 
@@ -284,6 +285,11 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 	const Bool retail = RetailFileLayers::enabled();
 	const Bool showScore = showEndScreen &&
 		(!retail || TheFileSystem->doesFileExist("Window\\Menus\\ScoreScreen.wnd"));
+	const Bool showRetailResults = showEndScreen && retail && !showScore &&
+		TheGlobalData->m_initialFile.isEmpty() && !m_quitToDesktopAfterMatch;
+	RetailMatchResults retailResults;
+	if (showRetailResults)
+		retailResults = collectRetailMatchResults();
 	if (showScore)
 	{
 #ifdef ALLOW_DEBUG_UTILS
@@ -341,7 +347,8 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 
 	setClearingGameData( FALSE );
 
-	if (showEndScreen && retail && !showScore && !TheGameEngine->getQuitting())
+	if (showEndScreen && retail && !showScore && !TheGameEngine->getQuitting() &&
+		(!showRetailResults || !showRetailMatchResults(std::move(retailResults))))
 		TheShell->showShell(TRUE);
 }
 
