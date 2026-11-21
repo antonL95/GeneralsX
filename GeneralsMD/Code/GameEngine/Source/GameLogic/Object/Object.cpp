@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/ObjectCreationUpgrade.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/RetailTestCommands.h"
@@ -7017,6 +7018,18 @@ Real Object::getCarrierDeckHeight() const
 	Object *producer = TheGameLogic->findObjectByID( getProducerID() );
 	if( producer )
 	{
+		if (RetailFileLayers::enabled() && testStatus(OBJECT_STATUS_DECK_HEIGHT_OFFSET))
+		{
+			static const NameKeyType creation = NAMEKEY("RetailObjectCreationUpgrade");
+			for (BehaviorModule** module = producer->getBehaviorModules(); *module; ++module)
+			{
+				if ((*module)->getModuleNameKey() != creation)
+					continue;
+				Real height = 0.0f;
+				if (static_cast<const RetailObjectCreationUpgrade*>(*module)->getSpawnDeckHeight(getID(), height))
+					return height;
+			}
+		}
 		// Find a parking place behavior.
 		for( BehaviorModule** i = producer->getBehaviorModules(); *i; ++i )
 		{

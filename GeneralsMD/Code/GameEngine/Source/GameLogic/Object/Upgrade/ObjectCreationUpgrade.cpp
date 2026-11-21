@@ -37,7 +37,10 @@
 #include "GameLogic/Module/ObjectCreationUpgrade.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/ThingFactory.h"
 #include "Common/Upgrade.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -69,6 +72,9 @@ ObjectCreationUpgradeModuleData::ObjectCreationUpgradeModuleData()
 		{
 			{ "GrantUpgrade", INI::parseAsciiString, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_grantUpgrade) },
 			{ "Delay", INI::parseDurationUnsignedInt, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_delay) },
+			{ "ThingToSpawn", INI::parseAsciiString, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_spawnTemplate) },
+			{ "Offset", INI::parseCoord3D, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_spawnOffset) },
+			{ "DestroyWhenSold", INI::parseBool, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_destroyWhenSold) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(retailFields);
@@ -152,6 +158,26 @@ void ObjectCreationUpgrade::loadPostProcess()
 
 }
 
+namespace
+{
+SlavedUpdateInterface* directSpawnSlavedUpdate(Object* object)
+{
+	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+		if (auto* slaved = (*module)->getSlavedUpdateInterface())
+			return slaved;
+	return nullptr;
+}
+
+SlaveWatcherBehavior* directSpawnWatcher(Object* producer)
+{
+	static const NameKeyType name = NAMEKEY("SlaveWatcherBehavior");
+	for (BehaviorModule** module = producer->getBehaviorModules(); *module; ++module)
+		if ((*module)->getModuleNameKey() == name)
+			return static_cast<SlaveWatcherBehavior*>(*module);
+	return nullptr;
+}
+}
+
 RetailObjectCreationUpgrade::RetailObjectCreationUpgrade(Thing* thing, const ModuleData* data)
 	: UpdateModule(thing, data)
 {
@@ -182,7 +208,7 @@ Bool RetailObjectCreationUpgrade::requiresAllActivationUpgrades() const
 void RetailObjectCreationUpgrade::upgradeImplementation()
 {
 	const auto* data = getObjectCreationUpgradeModuleData();
-	if (!data->m_ocl && data->m_grantUpgrade.isEmpty())
+	if (!data->m_ocl && data->m_grantUpgrade.isEmpty() && data->m_spawnTemplate.isEmpty())
 		return;
 	setUpgradeExecuted(TRUE);
 	m_pending = TRUE;
@@ -202,12 +228,29 @@ Bool RetailObjectCreationUpgrade::resetUpgrade(const UpgradeMaskType& mask)
 
 UpdateSleepTime RetailObjectCreationUpgrade::update()
 {
-	if (!m_pending)
-		return UPDATE_SLEEP_FOREVER;
-	m_pending = FALSE;
 	Object* object = getObject();
+	if (object->isEffectivelyDead() || object->testStatus(OBJECT_STATUS_SOLD))
+	{
+		onDelete();
+		return UPDATE_SLEEP_FOREVER;
+	}
+	if (m_spawned != INVALID_ID)
+	{
+		Object* spawned = TheGameLogic->findObjectByID(m_spawned);
+		if (!spawned || spawned->isDestroyed() || spawned->isEffectivelyDead())
+		{
+			m_spawned = INVALID_ID;
+			if (auto* watcher = directSpawnWatcher(object))
+				watcher->onSpawnGone();
+		}
+		else if (auto* watcher = directSpawnWatcher(object))
+			watcher->shareUpgrades(*spawned);
+	}
+	if (!m_pending)
+		return m_spawned != INVALID_ID ? UPDATE_SLEEP(15) : UPDATE_SLEEP_FOREVER;
+	m_pending = FALSE;
 	const Player* player = object->getControllingPlayer();
-	if (!player || object->isEffectivelyDead())
+	if (!player)
 		return UPDATE_SLEEP_FOREVER;
 	UpgradeMaskType upgrades = player->getCompletedUpgradeMask();
 	upgrades.set(object->getObjectCompletedUpgradeMask());
@@ -217,13 +260,67 @@ UpdateSleepTime RetailObjectCreationUpgrade::update()
 	const auto* data = getObjectCreationUpgradeModuleData();
 	if (data->m_ocl)
 		ObjectCreationList::create(data->m_ocl, object, nullptr);
+	if (m_spawned == INVALID_ID && data->m_spawnTemplate.isNotEmpty())
+	{
+		if (const auto* type = TheThingFactory->findTemplate(data->m_spawnTemplate, FALSE))
+		{
+			Object* spawned = TheThingFactory->newObject(type, object->getTeam());
+			m_spawned = spawned->getID();
+			spawned->setProducer(object);
+			const auto& offset = data->m_spawnOffset;
+			Vector3 world;
+			Matrix3D::Transform_Vector(*object->getTransformMatrix(), Vector3(offset.x, offset.y, offset.z), &world);
+			const Coord3D position{world.X, world.Y, world.Z};
+			spawned->setPosition(&position);
+			spawned->setOrientation(object->getOrientation());
+			if (auto* slaved = directSpawnSlavedUpdate(spawned))
+			{
+				slaved->onEnslave(object);
+				if (object->isKindOf(KINDOF_IMMOBILE) && offset.z > 0.0f)
+					spawned->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_DECK_HEIGHT_OFFSET));
+			}
+			if (auto* watcher = directSpawnWatcher(object))
+				watcher->shareUpgrades(*spawned);
+			setWakeFrame(object, UPDATE_SLEEP(15));
+		}
+	}
 	if (data->m_grantUpgrade.isNotEmpty())
 	{
 		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(data->m_grantUpgrade);
 		if (upgrade && !object->hasUpgrade(upgrade))
 			object->giveUpgrade(upgrade);
 	}
-	return UPDATE_SLEEP_FOREVER;
+	return m_spawned != INVALID_ID ? UPDATE_SLEEP(15) : UPDATE_SLEEP_FOREVER;
+}
+
+void RetailObjectCreationUpgrade::onDelete()
+{
+	if (m_spawned == INVALID_ID || !TheGameLogic)
+		return;
+	Object* spawned = TheGameLogic->findObjectByID(m_spawned);
+	m_spawned = INVALID_ID;
+	if (!spawned || spawned->isDestroyed() || spawned->isEffectivelyDead())
+		return;
+	if (getObjectCreationUpgradeModuleData()->m_destroyWhenSold && getObject()->testStatus(OBJECT_STATUS_SOLD))
+		spawned->kill();
+	else if (auto* slaved = directSpawnSlavedUpdate(spawned))
+		slaved->onSlaverDie(nullptr);
+	spawned->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_DECK_HEIGHT_OFFSET));
+}
+
+Bool RetailObjectCreationUpgrade::getSpawnDeckHeight(ObjectID child, Real& height) const
+{
+	if (m_spawned != child)
+		return FALSE;
+	height = getObjectCreationUpgradeModuleData()->m_spawnOffset.z;
+	return TRUE;
+}
+
+void RetailObjectCreationUpgrade::onCapture(Player*, Player* newOwner)
+{
+	if (newOwner && m_spawned != INVALID_ID)
+		if (Object* spawned = TheGameLogic->findObjectByID(m_spawned); spawned && directSpawnSlavedUpdate(spawned))
+			spawned->setTeam(newOwner->getDefaultTeam());
 }
 
 void RetailObjectCreationUpgrade::crc(Xfer* xfer)
@@ -231,12 +328,15 @@ void RetailObjectCreationUpgrade::crc(Xfer* xfer)
 	UpdateModule::crc(xfer);
 	upgradeMuxCRC(xfer);
 	xfer->xferBool(&m_pending);
+	if (getObjectCreationUpgradeModuleData()->m_spawnTemplate.isNotEmpty())
+		xfer->xferObjectID(&m_spawned);
 }
 
 void RetailObjectCreationUpgrade::xfer(Xfer* xfer)
 {
-	XferVersion version = 2;
-	xfer->xferVersion(&version, 2);
+	const XferVersion currentVersion = getObjectCreationUpgradeModuleData()->m_spawnTemplate.isNotEmpty() ? 3 : 2;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
 	if (version >= 2)
 	{
 		UpdateModule::xfer(xfer);
@@ -249,10 +349,69 @@ void RetailObjectCreationUpgrade::xfer(Xfer* xfer)
 		BehaviorModule::xfer(xfer);
 	}
 	upgradeMuxXfer(xfer);
+	if (version >= 3)
+		xfer->xferObjectID(&m_spawned);
 }
 
 void RetailObjectCreationUpgrade::loadPostProcess()
 {
 	UpdateModule::loadPostProcess();
 	upgradeMuxLoadPostProcess();
+}
+
+void SlaveWatcherBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	BehaviorModuleData::buildFieldParse(p);
+	static const FieldParse fields[] = {
+		{ "RemoveUpgrade", INI::parseAsciiString, nullptr, offsetof(SlaveWatcherBehaviorModuleData, m_removeUpgrade) },
+		{ "GrantUpgrade", INI::parseAsciiString, nullptr, offsetof(SlaveWatcherBehaviorModuleData, m_grantUpgrade) },
+		{ "ShareUpgrades", INI::parseBool, nullptr, offsetof(SlaveWatcherBehaviorModuleData, m_shareUpgrades) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+SlaveWatcherBehavior::SlaveWatcherBehavior(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data)
+{
+}
+
+SlaveWatcherBehavior::~SlaveWatcherBehavior() = default;
+
+void SlaveWatcherBehavior::onSpawnGone()
+{
+	Object* producer = getObject();
+	const auto* data = getSlaveWatcherBehaviorModuleData();
+	if (const auto* upgrade = TheUpgradeCenter->findUpgrade(data->m_removeUpgrade); upgrade && producer->hasUpgrade(upgrade))
+		producer->removeUpgrade(upgrade);
+	if (const auto* upgrade = TheUpgradeCenter->findUpgrade(data->m_grantUpgrade); upgrade && !producer->hasUpgrade(upgrade))
+		producer->giveUpgrade(upgrade);
+	else
+		producer->updateUpgradeModules();
+}
+
+void SlaveWatcherBehavior::shareUpgrades(Object& child) const
+{
+	if (!getSlaveWatcherBehaviorModuleData()->m_shareUpgrades)
+		return;
+	const auto& upgrades = getObject()->getObjectCompletedUpgradeMask();
+	if (child.getObjectCompletedUpgradeMask().testForAll(upgrades))
+		return;
+	for (auto* upgrade = TheUpgradeCenter->firstUpgradeTemplate(); upgrade; upgrade = upgrade->friend_getNext())
+		if (upgrades.testForAny(upgrade->getUpgradeMask()) && !child.hasUpgrade(upgrade))
+			child.giveUpgrade(upgrade);
+}
+
+void SlaveWatcherBehavior::crc(Xfer* xfer)
+{
+	BehaviorModule::crc(xfer);
+}
+
+void SlaveWatcherBehavior::xfer(Xfer* xfer)
+{
+	BehaviorModule::xfer(xfer);
+}
+
+void SlaveWatcherBehavior::loadPostProcess()
+{
+	BehaviorModule::loadPostProcess();
 }

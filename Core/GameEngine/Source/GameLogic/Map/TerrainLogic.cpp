@@ -2934,6 +2934,44 @@ void TerrainLogic::clearMapTreesForConstruction(const Coord3D& pos, const Geomet
 	});
 }
 
+Bool TerrainLogic::findNearestHarvestTree(const Coord3D& origin, Real radius, Coord3D& position) const
+{
+	Real best = sqr(radius);
+	Bool found = FALSE;
+	for (const auto& tree : m_harvestableTrees)
+	{
+		const Real distance = sqr(tree.position.x - origin.x) + sqr(tree.position.y - origin.y);
+		if (distance < best)
+		{
+			best = distance;
+			position = tree.position;
+			found = TRUE;
+		}
+	}
+	return found;
+}
+
+Int TerrainLogic::takeMapTreeBoxes(const Coord3D& position, Int capacity)
+{
+	if (capacity <= 0)
+		return 0;
+	for (auto it = m_harvestableTrees.begin(); it != m_harvestableTrees.end(); ++it)
+	{
+		if (it->position.x != position.x || it->position.y != position.y || it->position.z != position.z)
+			continue;
+		const Int taken = std::min(capacity, it->boxes);
+		it->boxes -= taken;
+		if (it->boxes == 0)
+		{
+			if (TheTerrainVisual)
+				TheTerrainVisual->removeMapTree(it->position);
+			m_harvestableTrees.erase(it);
+		}
+		return taken;
+	}
+	return 0;
+}
+
 std::uint64_t TerrainLogic::harvestMapTrees(const Coord3D& origin, Real radius, const FXList* fx)
 {
 	std::uint64_t boxes = 0;

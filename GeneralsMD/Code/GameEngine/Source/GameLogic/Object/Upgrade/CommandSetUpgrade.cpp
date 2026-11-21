@@ -30,6 +30,7 @@
 
 #include "Common/Xfer.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/ControlBar.h"
 #include "GameLogic/Module/CommandSetUpgrade.h"
 #include "GameLogic/Object.h"
@@ -64,6 +65,20 @@ CommandSetUpgrade::~CommandSetUpgrade()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+Bool CommandSetUpgrade::resetUpgrade(const UpgradeMaskType& mask)
+{
+	if (UpgradeModule::resetUpgrade(mask))
+		return TRUE;
+	if (!RetailFileLayers::enabled() || !isAlreadyUpgraded())
+		return FALSE;
+	UpgradeMaskType activation, conflicting;
+	getUpgradeActivationMasks(activation, conflicting);
+	if (!mask.testForAny(conflicting))
+		return FALSE;
+	setUpgradeExecuted(FALSE);
+	return TRUE;
+}
+
 void CommandSetUpgrade::upgradeImplementation()
 {
 	Object *obj = getObject();

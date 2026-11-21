@@ -14,6 +14,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <string_view>
 #include <vector>
 
 #include "Common/ActionManager.h"
@@ -163,6 +164,8 @@ struct RetailTeamBudgetFixture
 	}
 };
 #endif
+
+void runRetailMordorTestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
 
 namespace RetailTestCommands
 {
@@ -2612,6 +2615,12 @@ void execute(const Command& command, unsigned int frame)
 	{
 		std::fprintf(stderr, "TEST frame %u: no %s %d of %s\n", frame, command.target.c_str(), command.ordinal,
 			command.player.c_str());
+		return;
+	}
+
+	if (command.action.starts_with("mparity-"))
+	{
+		runRetailMordorTestCommand(command.action, obj, findTarget(command), command.structure.c_str(), frame);
 		return;
 	}
 

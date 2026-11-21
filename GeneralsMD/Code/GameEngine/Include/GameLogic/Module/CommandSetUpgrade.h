@@ -59,6 +59,7 @@ class CommandSetUpgrade : public UpgradeModule
 public:
 
 	CommandSetUpgrade( Thing *thing, const ModuleData* moduleData );
+	Bool resetUpgrade(const UpgradeMaskType& mask) override;
 	// virtual destructor prototype defined by MemoryPoolObject
 
 protected:

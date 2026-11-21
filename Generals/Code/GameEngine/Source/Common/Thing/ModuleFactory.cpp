@@ -167,6 +167,7 @@
 #include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/AnimalAIUpdate.h"
@@ -456,6 +457,7 @@ void ModuleFactory::init()
 		addModule( FakePathfindPortalBehaviour );
 		addModule( TerrainResourceBehavior );
 		addModule( HordeContain );
+		addModule( SlaughterHordeContain );
 		addModule( BannerCarrierUpdate );
 		addModule( HorseHordeContain );
 		addModule( AODHordeContain );

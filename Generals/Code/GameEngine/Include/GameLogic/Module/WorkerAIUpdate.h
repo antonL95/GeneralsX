@@ -63,6 +63,12 @@ class WorkerAIUpdateModuleData : public AIUpdateModuleData
 
 public:
 
+	Bool m_harvestTrees = FALSE;
+	Real m_harvestRange = 0.0f;
+	UnsignedInt m_harvestPreparation = 0;
+	UnsignedInt m_harvestAction = 0;
+	static void addRetailHarvestFields(MultiIniFieldParse& p);
+
 	// !!!
 	// !!! NOTE: If you edit module data you must do it in both the Dozer *AND* the Worker !!!
 	// !!!
@@ -103,6 +109,7 @@ public:
 			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
+		addRetailHarvestFields(p);
 	}
 };
 
@@ -125,6 +132,8 @@ public:
 
 	virtual DozerAIInterface* getDozerAIInterface() override {return this;}
 	virtual const DozerAIInterface* getDozerAIInterface() const override {return this;}
+	void startRetailHarvest(const Coord3D* location);
+
 	virtual SupplyTruckAIInterface* getSupplyTruckAIInterface() override {return this;}
 	virtual const SupplyTruckAIInterface* getSupplyTruckAIInterface() const override {return this;}
 	virtual WorkerAIInterface* getWorkerAIInterface() override { return this; }
@@ -208,6 +217,21 @@ public:
 
 	virtual void startBuildingSound( const AudioEventRTS *sound, ObjectID constructionSiteID ) override;
 	virtual void finishBuildingSound() override;
+
+private:
+	enum HarvestState { HARVEST_IDLE, HARVEST_APPROACH, HARVEST_PREPARE, HARVEST_GATHER, HARVEST_RETURN, HARVEST_DEPOSIT };
+	Bool updateRetailHarvest();
+	void stopRetailHarvest();
+	void xferRetailHarvest(Xfer* xfer);
+
+	Bool m_harvestActive = FALSE;
+	Bool m_harvestHasOrigin = FALSE;
+	Int m_harvestState = HARVEST_IDLE;
+	UnsignedInt m_harvestDeadline = 0;
+	ObjectID m_harvestDepot = INVALID_ID;
+	Coord3D m_harvestOrigin{0, 0, 0};
+	Coord3D m_harvestTree{0, 0, 0};
+	Coord3D m_harvestDropPoint{0, 0, 0};
 
 protected:
 

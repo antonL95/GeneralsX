@@ -56,6 +56,7 @@
 #include "GameLogic/Module/DeletionUpdate.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/WorkerAIUpdate.h"
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/ScriptEngine.h"
 
@@ -601,6 +602,14 @@ void SpecialPowerModule::refreshPowerTimer()
 
 void SpecialPowerModule::triggerSpecialPower( const Coord3D *location )
 {
+	if (RetailFileLayers::enabled() && getSpecialPowerModuleData()->m_specialPowerTemplate->getSpecialPowerType() == SPECIAL_HARVEST)
+	{
+		Object* object = getObject();
+		auto* worker = static_cast<WorkerAIUpdate*>(object->findUpdateModule(NAMEKEY("WorkerAIUpdate")));
+		if (worker)
+			worker->startRetailHarvest(location);
+	}
+
 	aboutToDoSpecialPower( location );	// do BEFORE recharge
 
 	if( RetailFileLayers::enabled() )

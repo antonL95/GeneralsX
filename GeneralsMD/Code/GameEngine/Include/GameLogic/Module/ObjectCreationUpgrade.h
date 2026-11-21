@@ -52,6 +52,9 @@ public:
 	const ObjectCreationList *m_ocl;			///< the object creation list to make
 	AsciiString m_grantUpgrade;
 	UnsignedInt m_delay = 0;
+	AsciiString m_spawnTemplate;
+	Coord3D m_spawnOffset{0, 0, 0};
+	Bool m_destroyWhenSold = FALSE;
 
 };
 
@@ -66,6 +69,9 @@ public:
 	UpgradeModuleInterface* getUpgrade() override { return this; }
 	UpdateSleepTime update() override;
 	Bool resetUpgrade(const UpgradeMaskType& mask) override;
+	void onDelete() override;
+	void onCapture(Player* oldOwner, Player* newOwner) override;
+	Bool getSpawnDeckHeight(ObjectID child, Real& height) const;
 
 private:
 	void upgradeImplementation() override;
@@ -76,6 +82,29 @@ private:
 	Bool isSubObjectsUpgrade() override { return FALSE; }
 
 	Bool m_pending = FALSE;
+	ObjectID m_spawned = INVALID_ID;
+};
+
+class SlaveWatcherBehaviorModuleData final : public BehaviorModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	AsciiString m_removeUpgrade;
+	AsciiString m_grantUpgrade;
+	Bool m_shareUpgrades = FALSE;
+};
+
+class SlaveWatcherBehavior final : public BehaviorModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(SlaveWatcherBehavior, "SlaveWatcherBehavior")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(SlaveWatcherBehavior, SlaveWatcherBehaviorModuleData)
+
+public:
+	SlaveWatcherBehavior(Thing* thing, const ModuleData* data);
+	static Int getInterfaceMask() { return 0; }
+	void onSpawnGone();
+	void shareUpgrades(Object& child) const;
 };
 
 //-------------------------------------------------------------------------------------------------

@@ -318,6 +318,8 @@ public:
 
 	void registerMapTree(const ThingTemplate& thing, const Coord3D& pos);
 	void clearMapTreesForConstruction(const Coord3D& pos, const GeometryInfo& geometry, Real angle);
+	Bool findNearestHarvestTree(const Coord3D& origin, Real radius, Coord3D& position) const;
+	Int takeMapTreeBoxes(const Coord3D& position, Int capacity);
 	std::uint64_t harvestMapTrees(const Coord3D& origin, Real radius, const FXList* fx);
 
 protected:

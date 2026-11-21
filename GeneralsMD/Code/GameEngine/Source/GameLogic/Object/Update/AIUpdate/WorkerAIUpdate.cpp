@@ -257,6 +257,9 @@ UpdateSleepTime WorkerAIUpdate::update()
 	// extend the normal AI system
 	AIUpdateInterface::update();
 
+	if (RetailFileLayers::enabled() && getWorkerAIUpdateModuleData()->m_harvestTrees && updateRetailHarvest())
+		return UPDATE_SLEEP_NONE;
+
 	// do nothing if we're dead
 	///@todo shouldn't this be at a higher level?
 	if( getObject()->isEffectivelyDead() )
@@ -1054,6 +1057,9 @@ void WorkerAIUpdate::aiDoCommand(const AICommandParms* parms)
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
 
+	if (RetailFileLayers::enabled() && getWorkerAIUpdateModuleData()->m_harvestTrees && parms->m_cmdSource == CMD_FROM_PLAYER)
+		stopRetailHarvest();
+
 	// create our machines if they don't yet exist
 	createMachines();
 
@@ -1498,6 +1504,11 @@ void WorkerAIUpdate::crc( Xfer *xfer )
 {
 	// extend base class
 	AIUpdateInterface::crc(xfer);
+	if (RetailFileLayers::enabled() && getWorkerAIUpdateModuleData()->m_harvestTrees)
+	{
+		xfer->xferInt(&m_numberBoxes);
+		xferRetailHarvest(xfer);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1514,6 +1525,8 @@ void WorkerAIUpdate::xfer( Xfer *xfer )
 #else
 	XferVersion currentVersion = 2;
 #endif
+	if (RetailFileLayers::enabled() && getWorkerAIUpdateModuleData()->m_harvestTrees)
+		currentVersion = 3;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -1566,6 +1579,8 @@ void WorkerAIUpdate::xfer( Xfer *xfer )
 
 	//-------------------------- xfer Worker info
 	xfer->xferSnapshot(m_workerMachine);
+	if (version >= 3)
+		xferRetailHarvest(xfer);
 
 }
 

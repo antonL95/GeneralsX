@@ -665,6 +665,9 @@ Bool ActionManager::canEnterObject( const Object *obj, const Object *objectToEnt
 		return FALSE;
 	}
 
+	if (RetailFileLayers::enabled() && objectToEnter->findUpdateModule(NAMEKEY("SlaughterHordeContain")))
+		return mode != COMBATDROP_INTO && contain->isValidContainerFor(obj, mode == CHECK_CAPACITY);
+
 	if( contain->isHealContain() )
 	{
 		BodyModuleInterface *body = obj->getBodyModule();

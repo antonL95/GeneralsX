@@ -65,6 +65,7 @@
 #include "GameLogic/Module/GarrisonContain.h"
 #include "GameLogic/Module/InternetHackContain.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/RailedTransportContain.h"
 #include "GameLogic/Module/RiderChangeContain.h"
@@ -374,6 +375,8 @@ void ModuleFactory::init()
 	if (registersRotwkModules())
 	{
 		addModule( HordeContain );
+		addModule( SlaughterHordeContain );
+		addModule( SlaveWatcherBehavior );
 		addModule( BannerCarrierUpdate );
 		addModule( HorseHordeContain );
 		addModule( AODHordeContain );

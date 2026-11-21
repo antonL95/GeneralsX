@@ -108,6 +108,7 @@ set(GAMEENGINE_SRC
     Include/Common/INIRetailTolerance.h
     Include/Common/HordeFormation.h
     Include/GameLogic/Module/HordeContain.h
+    Include/GameLogic/Module/SlaughterHordeContain.h
     Include/GameLogic/Module/ExperienceModules.h
     Include/GameLogic/Module/HordeAIUpdate.h
     Include/GameLogic/Module/AnimalAIUpdate.h
@@ -679,6 +680,7 @@ set(GAMEENGINE_SRC
     Source/Common/GameUtility.cpp
     Source/Common/HordeFormation.cpp
     Source/GameLogic/Object/Contain/HordeContain.cpp
+    Source/GameLogic/Object/Contain/SlaughterHordeContain.cpp
     Source/GameLogic/Object/Update/HordeAIUpdate.cpp
     Source/GameLogic/Object/Update/AnimalAIUpdate.cpp
     Source/GameLogic/Object/Update/GiantBirdAIUpdate.cpp
@@ -726,6 +728,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailTestCommands.cpp
     Source/GameLogic/System/RetailBuildingTestCommands.cpp
     Source/GameLogic/System/RetailBuildingEvents.cpp
+    Source/GameLogic/System/RetailMordorTestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
     Source/GameLogic/Object/Upgrade/ReplaceSelfUpgrade.cpp
@@ -735,6 +738,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Behavior/RetailGate.cpp
     Source/GameLogic/Object/Behavior/WallHubBehavior.cpp
     Source/GameLogic/Object/Update/TerrainResourceBehavior.cpp
+    Source/GameLogic/Object/Update/RetailWorkerHarvest.cpp
     Source/GameLogic/Object/Upgrade/CommandPointsUpgrade.cpp
     Source/Common/INI/INITerrain.cpp
     Source/Common/INI/INITerrainBridge.cpp
