@@ -147,12 +147,7 @@ void FoundationAIUpdate::advanceConstruction(Object& structure)
 	structure.clearModelConditionFlags(MAKE_MODELCONDITION_MASK3(MODELCONDITION_AWAITING_CONSTRUCTION,
 		MODELCONDITION_PARTIALLY_CONSTRUCTED, MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED));
 	structure.setConstructionPercent(CONSTRUCTION_COMPLETE);
-	if (RetailFileLayers::enabled())
-	{
-		if (Drawable* draw = structure.getDrawable())
-			draw->reactToBodyDamageStateChange(body->getDamageState());
-	}
-	else
+	if (!RetailFileLayers::enabled())
 		body->evaluateVisualCondition();
 
 	if (player)

@@ -113,8 +113,6 @@ static BodyDamageType calcDamageState(Real health, Real maxHealth, const ActiveB
 	{
 		if (health <= 0.0f)
 			return BODY_RUBBLE;
-		if (health >= maxHealth)
-			return BODY_PRISTINE;
 		if (health <= maxHealth * data->getReallyDamagedRatio())
 			return BODY_REALLYDAMAGED;
 		return health <= maxHealth * data->getDamagedRatio() ? BODY_DAMAGED : BODY_PRISTINE;

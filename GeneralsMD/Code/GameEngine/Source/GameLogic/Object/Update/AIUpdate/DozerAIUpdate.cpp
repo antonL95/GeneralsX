@@ -748,12 +748,7 @@ StateReturnType DozerActionDoActionState::update()
 					// set the construction at the 100% enum value
 					goalObject->setConstructionPercent( CONSTRUCTION_COMPLETE );
 
-					if( RetailFileLayers::enabled() )
-					{
-						if( Drawable *draw = goalObject->getDrawable() )
-							draw->reactToBodyDamageStateChange( body->getDamageState() );
-					}
-					else
+					if( !RetailFileLayers::enabled() )
 						body->evaluateVisualCondition();
 
 					// this object now has energy influence in the player

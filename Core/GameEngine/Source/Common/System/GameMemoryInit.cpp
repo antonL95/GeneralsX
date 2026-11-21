@@ -68,6 +68,9 @@ struct PoolSizeRec
 
 static const PoolSizeRec RetailPoolSizes[] =
 {
+#if RTS_ZEROHOUR
+	{ "ParticleSystemTemplatePool", 4500, 64 },
+#endif
 	{ "W3DScriptedModelDraw", 12288, 1024 },
 	{ "SpecialPowerModule", 768, 128 },
 	{ "AISpecialPowerUpdate", 1024, 128 },
@@ -125,6 +128,19 @@ void userMemoryAdjustPoolSize(const char *poolName, Int& initialAllocationCount,
 	if (initialAllocationCount > 0)
 		return;
 
+	if (RetailFileLayers::enabled())
+	{
+		for (const PoolSizeRec& pool : RetailPoolSizes)
+		{
+			if (strcmp(pool.name, poolName) == 0)
+			{
+				initialAllocationCount = pool.initial;
+				overflowAllocationCount = pool.overflow;
+				return;
+			}
+		}
+	}
+
 	for (const PoolSizeRec* p = PoolSizes; p->name != nullptr; ++p)
 	{
 		if (strcmp(p->name, poolName) == 0)
@@ -137,16 +153,6 @@ void userMemoryAdjustPoolSize(const char *poolName, Int& initialAllocationCount,
 
 	if (RetailFileLayers::enabled())
 	{
-		for (const PoolSizeRec& pool : RetailPoolSizes)
-		{
-			if (strcmp(pool.name, poolName) == 0)
-			{
-				initialAllocationCount = pool.initial;
-				overflowAllocationCount = pool.overflow;
-				return;
-			}
-		}
-
 		initialAllocationCount = 32;
 		overflowAllocationCount = 16;
 		fprintf(stderr, "[MemoryPool] %s has no retail size entry. Using %d initial and %d overflow blocks.\n",
