@@ -16,6 +16,34 @@ constexpr uint32_t preshaderChunk = 0x53455250;
 constexpr uint32_t literalTable = 0x54494c43;
 constexpr uint32_t expressionList = 0x434c5846;
 constexpr uint32_t preshaderInfo = 0x49535250;
+constexpr size_t maxDecodedProgramBytes = 512 * 1024;
+
+enum class ShaderStage { Vertex11, Vertex20, Pixel20 };
+
+enum class RegisterClass : uint32_t
+{
+	Temporary, Input, Constant, Texture, RasterOutput, AttributeOutput, TexcoordOutput,
+	ColorOutput = 8, DepthOutput, Sampler, Boolean = 14
+};
+
+bool spend(size_t &remaining, size_t bytes)
+{
+	if (bytes > remaining)
+		return false;
+	remaining -= bytes;
+	return true;
+}
+
+unsigned floatRegisterCount(ShaderStage stage)
+{
+	switch (stage)
+	{
+		case ShaderStage::Vertex11: return 96;
+		case ShaderStage::Vertex20: return 256;
+		case ShaderStage::Pixel20: return 32;
+	}
+	return 0;
+}
 
 uint32_t readWord(std::span<const uint8_t> bytes)
 {
@@ -35,27 +63,34 @@ std::string readName(Words table, size_t offset)
 	return {};
 }
 
-bool readBindings(Words table, std::vector<Binding> &bindings)
+bool readBindings(Words table, std::vector<Binding> &bindings, size_t &remaining,
+	std::optional<ShaderStage> stage = {})
 {
 	if (table.size() < 7 || table[0] != 28 || table[4] % 4)
 		return false;
 	const size_t start = table[4] / 4;
 	const size_t count = table[3];
-	if (start > table.size() || count > (table.size() - start) / 5 || count > 256)
+	if (start > table.size() || count > (table.size() - start) / 5 || count > 256 ||
+		!spend(remaining, count * sizeof(Binding)))
 		return false;
+	bindings.reserve(count);
 	for (size_t i = 0; i < count; ++i)
 	{
 		const auto entry = table.subspan(start + i * 5, 5);
 		Binding binding{readName(table, entry[0]), entry[1] & 0xffffu, entry[1] >> 16, entry[2] & 0xffffu, {}};
-		const unsigned limit = binding.bank == 2 ? 256 : 16;
+		const unsigned limit = binding.bank == 2 ? (stage ? floatRegisterCount(*stage) : 256) : 16;
 		if (binding.name.empty() || binding.bank > 3 || !binding.count ||
-			binding.first + binding.count > limit || binding.bank == 1)
+			binding.first + binding.count > limit || binding.bank == 1 ||
+			(stage == ShaderStage::Pixel20 && binding.bank == 0) ||
+			(stage && stage != ShaderStage::Pixel20 && binding.bank == 3) ||
+			!spend(remaining, binding.name.capacity() + 1))
 			return false;
 		if (entry[4] && binding.bank != 3)
 		{
 			const size_t offset = entry[4] / 4;
 			const size_t defaults = binding.count * (binding.bank == 2 ? 4u : 1u);
-			if (entry[4] % 4 || offset > table.size() || defaults > table.size() - offset)
+			if (entry[4] % 4 || offset > table.size() || defaults > table.size() - offset ||
+				!spend(remaining, defaults * sizeof(uint32_t)))
 				return false;
 			binding.defaults.assign(table.begin() + offset, table.begin() + offset + defaults);
 		}
@@ -91,19 +126,103 @@ size_t shaderOperands(uint32_t opcode)
 	}
 }
 
-bool validShaderInstruction(Words words, bool legacy, size_t &length)
+RegisterClass registerClass(uint32_t token)
+{
+	return static_cast<RegisterClass>(((token >> 28) & 7u) | ((token >> 8) & 24u));
+}
+
+unsigned registerIndex(uint32_t token)
+{
+	return token & 0x7ffu;
+}
+
+bool validSource(uint32_t token, ShaderStage stage)
+{
+	const auto index = registerIndex(token);
+	const bool pixel = stage == ShaderStage::Pixel20;
+	const unsigned modifier = (token >> 24) & 0xfu;
+	if (modifier > (pixel ? 12u : 1u))
+		return false;
+	switch (registerClass(token))
+	{
+		case RegisterClass::Temporary: return index < 12;
+		case RegisterClass::Input: return index < (pixel ? 2u : 16u);
+		case RegisterClass::Constant: return index < floatRegisterCount(stage);
+		case RegisterClass::Texture: return pixel && index < 8;
+		default: return false;
+	}
+}
+
+bool validDestination(uint32_t token, ShaderStage stage)
+{
+	if (!(token & 0x000f0000u))
+		return false;
+	const auto index = registerIndex(token);
+	const bool pixel = stage == ShaderStage::Pixel20;
+	switch (registerClass(token))
+	{
+		case RegisterClass::Temporary: return index < 12;
+		case RegisterClass::RasterOutput: return !pixel && index < 3;
+		case RegisterClass::AttributeOutput: return !pixel && index < 2;
+		case RegisterClass::TexcoordOutput: return !pixel && index < 8;
+		case RegisterClass::ColorOutput: return pixel && index < 4;
+		case RegisterClass::DepthOutput: return pixel && index == 0;
+		default: return false;
+	}
+}
+
+bool validDeclaration(uint32_t declaration, uint32_t token, ShaderStage stage)
+{
+	const auto index = registerIndex(token);
+	if (!(declaration & 0x80000000u) || !(token & 0x000f0000u))
+		return false;
+	if (stage != ShaderStage::Pixel20)
+		return registerClass(token) == RegisterClass::Input && index < 16 &&
+			(declaration & 0xfu) <= 13;
+	switch (registerClass(token))
+	{
+		case RegisterClass::Input: return index < 2;
+		case RegisterClass::Texture: return index < 8;
+		case RegisterClass::Sampler:
+		{
+			const unsigned type = (declaration >> 27) & 0xfu;
+			return index < 16 && type >= 2 && type <= 4;
+		}
+		default: return false;
+	}
+}
+
+bool validShaderInstruction(Words words, ShaderStage stage, size_t &length)
 {
 	const auto token = words.front();
 	const auto opcode = token & 0xffffu;
+	const bool legacy = stage == ShaderStage::Vertex11;
+	const unsigned control = (token >> 16) & 0xffu;
 	length = shaderOperands(opcode);
 	if (length >= 16 || length >= words.size() - 1 || (token & 0xf0000000u) ||
-		((token >> 24) & 0xfu) != (legacy ? 0 : length))
+		((token >> 24) & 0xfu) != (legacy ? 0 : length) || control > (opcode == 0x42 ? 2u : 0u))
 		return false;
 	const size_t registers = opcode == 0x51 ? 1 : length;
 	for (size_t i = opcode == 0x1f ? 2 : 1; i <= registers; ++i)
 		if ((words[i] & 0x80002000u) != 0x80000000u)
 			return false;
-	return true;
+	switch (opcode)
+	{
+		case 0x00: return true;
+		case 0x1f: return validDeclaration(words[1], words[2], stage);
+		case 0x28: return stage == ShaderStage::Vertex20 &&
+			registerClass(words[1]) == RegisterClass::Boolean && registerIndex(words[1]) < 16;
+		case 0x2a: case 0x2b: return stage == ShaderStage::Vertex20;
+		case 0x42: return stage == ShaderStage::Pixel20 &&
+			registerClass(words[1]) == RegisterClass::Temporary && validDestination(words[1], stage) &&
+			validSource(words[2], stage) && registerClass(words[3]) == RegisterClass::Sampler &&
+			registerIndex(words[3]) < 16;
+		case 0x51: return registerClass(words[1]) == RegisterClass::Constant &&
+			registerIndex(words[1]) < floatRegisterCount(stage);
+		default: return validDestination(words[1], stage) &&
+			std::all_of(words.begin() + 2, words.begin() + 1 + length,
+				[stage](uint32_t source) { return validSource(source, stage); });
+	}
 }
 
 unsigned inputCount(unsigned operation)
@@ -121,11 +240,14 @@ unsigned inputCount(unsigned operation)
 	}
 }
 
-bool readInstructions(Words words, Program &program)
+bool readInstructions(Words words, Program &program, size_t &remaining)
 {
 	if (words.empty() || words[0] > 512)
 		return false;
 	const auto count = words.front();
+	if (!spend(remaining, count * sizeof(Instruction)))
+		return false;
+	program.instructions.reserve(count);
 	words = words.subspan(1);
 	for (unsigned i = 0; i < count; ++i)
 	{
@@ -154,13 +276,14 @@ bool readInstructions(Words words, Program &program)
 	return true;
 }
 
-bool readPreshader(Words words, Program &program)
+bool readPreshader(Words words, Program &program, size_t &remaining)
 {
 	if (words.empty())
 		return true;
 	if ((words[0] & 0xffff0000u) != 0x46580000u)
 		return false;
 	words = words.subspan(1);
+	bool constantsSeen = false, literalsSeen = false, expressionsSeen = false, infoSeen = false;
 	while (!words.empty() && (words.front() & 0xffffu) == 0xfffeu)
 	{
 		const auto chunk = takeComment(words);
@@ -169,20 +292,28 @@ bool readPreshader(Words words, Program &program)
 		switch (chunk.front())
 		{
 			case constantTable:
-				if (!readBindings(chunk.subspan(1), program.inputs))
+				if (constantsSeen || !readBindings(chunk.subspan(1), program.inputs, remaining))
 					return false;
+				constantsSeen = true;
 				break;
 			case literalTable:
-				if (chunk.size() < 2 || chunk[1] > (chunk.size() - 2) / 2)
+				if (literalsSeen || chunk.size() < 2 || chunk[1] > (chunk.size() - 2) / 2 ||
+					!spend(remaining, chunk[1] * sizeof(double)))
 					return false;
+				literalsSeen = true;
+				program.literals.reserve(chunk[1]);
 				for (size_t i = 0; i < chunk[1]; ++i)
 					program.literals.push_back(std::bit_cast<double>(uint64_t(chunk[2 + i * 2]) | (uint64_t(chunk[3 + i * 2]) << 32)));
 				break;
 			case expressionList:
-				if (!readInstructions(chunk.subspan(1), program))
+				if (expressionsSeen || !readInstructions(chunk.subspan(1), program, remaining))
 					return false;
+				expressionsSeen = true;
 				break;
 			case preshaderInfo:
+				if (infoSeen)
+					return false;
+				infoSeen = true;
 				break;
 			default:
 				return false;
@@ -236,16 +367,22 @@ double evaluate(unsigned operation, double a, double b, double c)
 
 std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 {
-	if (bytes.size() < 8 || bytes.size() % 4)
+	size_t remaining = maxDecodedProgramBytes;
+	if (bytes.size() < 8 || bytes.size() % 4 || !spend(remaining, bytes.size()))
 		return std::nullopt;
 	Program program;
+	program.tokens.reserve(bytes.size() / 4);
 	for (; !bytes.empty(); bytes = bytes.subspan(4))
 		program.tokens.push_back(readWord(bytes));
 	auto words = Words(program.tokens);
 	const bool legacy = vertex && words.front() == 0xfffe0101u;
 	if (!legacy && words.front() != (vertex ? 0xfffe0200u : 0xffff0200u))
 		return std::nullopt;
+	const auto stage = legacy ? ShaderStage::Vertex11 : vertex ? ShaderStage::Vertex20 : ShaderStage::Pixel20;
 	words = words.subspan(1);
+	bool constantsSeen = false, preshaderSeen = false;
+	std::array<bool, 24> elseSeen{};
+	size_t nesting = 0;
 	while (words.size() > 1)
 	{
 		const auto opcode = words.front() & 0xffffu;
@@ -254,20 +391,46 @@ std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 			const auto chunk = takeComment(words);
 			if (chunk.empty())
 				return std::nullopt;
-			if (chunk.front() == constantTable && !readBindings(chunk.subspan(1), program.bindings))
-				return std::nullopt;
-			if (chunk.front() == preshaderChunk && !readPreshader(chunk.subspan(1), program))
-				return std::nullopt;
+			if (chunk.front() == constantTable)
+			{
+				if (constantsSeen || !readBindings(chunk.subspan(1), program.bindings, remaining, stage))
+					return std::nullopt;
+				constantsSeen = true;
+			}
+			if (chunk.front() == preshaderChunk)
+			{
+				if (preshaderSeen || !readPreshader(chunk.subspan(1), program, remaining))
+					return std::nullopt;
+				preshaderSeen = true;
+			}
 		}
 		else
 		{
 			size_t operands;
-			if (!validShaderInstruction(words, legacy, operands))
+			if (!validShaderInstruction(words, stage, operands))
 				return std::nullopt;
+			if (opcode == 0x28)
+			{
+				if (nesting == elseSeen.size())
+					return std::nullopt;
+				elseSeen[nesting++] = false;
+			}
+			else if (opcode == 0x2a)
+			{
+				if (!nesting || elseSeen[nesting - 1])
+					return std::nullopt;
+				elseSeen[nesting - 1] = true;
+			}
+			else if (opcode == 0x2b)
+			{
+				if (!nesting)
+					return std::nullopt;
+				--nesting;
+			}
 			words = words.subspan(1 + operands);
 		}
 	}
-	if (words.size() != 1 || words.front() != 0x0000ffffu || program.bindings.empty())
+	if (words.size() != 1 || words.front() != 0x0000ffffu || program.bindings.empty() || nesting)
 		return std::nullopt;
 	return program;
 }

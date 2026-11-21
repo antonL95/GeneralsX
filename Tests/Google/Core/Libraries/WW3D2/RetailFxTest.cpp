@@ -6,10 +6,10 @@
 namespace
 {
 
-template<size_t Size>
-std::vector<uint8_t> encodeWords(const uint32_t (&words)[Size])
+std::vector<uint8_t> encodeWords(std::span<const uint32_t> words)
 {
 	std::vector<uint8_t> bytes;
+	bytes.reserve(words.size_bytes());
 	for (const auto word : words)
 		for (unsigned shift = 0; shift < 32; shift += 8)
 			bytes.push_back(static_cast<uint8_t>(word >> shift));
@@ -138,6 +138,95 @@ TEST(RetailFxTest, ReadsShaderConstantTableAndRequiresBoundedTokens)
 	auto bad = bytes;
 	bad.insert(bad.end() - 4, {0x1f, 0, 0, 0});
 	EXPECT_FALSE(RetailFX::readProgram(bad, true));
+}
+
+TEST(RetailFxTest, ValidatesShaderOperandRolesAndRegisterLimits)
+{
+	const auto accepts = [](bool vertex, std::initializer_list<uint32_t> instruction) {
+		std::vector<uint32_t> words = {
+			vertex ? 0xfffe0200u : 0xffff0200u, 0x000efffe, 0x42415443,
+			28, 0, 0, 1, 28, 0, 0,
+			48, 0x00030002, 1, 0, 0, 'T'
+		};
+		words.insert(words.end(), instruction);
+		words.push_back(0x0000ffff);
+		return RetailFX::readProgram(encodeWords(words), vertex).has_value();
+	};
+
+	EXPECT_TRUE(accepts(false, {0x02000001, 0x800f0803, 0x80e40000}));
+	EXPECT_FALSE(accepts(false, {0x02000001, 0x800f0804, 0x80e40000}));
+	EXPECT_FALSE(accepts(true, {0x02000001, 0x800f0800, 0x80e40000}));
+	EXPECT_FALSE(accepts(false, {0x02000001, 0x800f0000, 0xa0e40020}));
+	EXPECT_FALSE(accepts(true, {0x02000001, 0x800f0000, 0x90e40010}));
+	EXPECT_TRUE(accepts(false, {0x03000042, 0x800f0000, 0xb0e40000, 0xa0e4080f}));
+	EXPECT_FALSE(accepts(false, {0x03000042, 0x800f0000, 0xb0e40000, 0xa0e40810}));
+	EXPECT_FALSE(accepts(false, {0x03000042, 0x800f0000, 0xb0e40000, 0x80e40000}));
+	EXPECT_FALSE(accepts(false, {0x0200001f, 0x90000000, 0xa00f0810}));
+}
+
+TEST(RetailFxTest, AcceptsTheLegacyTerrainVertexDeclarations)
+{
+	const uint32_t words[] = {
+		0xfffe0101, 0x000efffe, 0x42415443, 28, 0, 0xfffe0101, 1, 28, 0, 0,
+		48, 0x00030002, 1, 0, 0, 'T',
+		0x0000001f, 0x80000003, 0x900f0001,
+		0x00000001, 0xc00f0000, 0x90e40001,
+		0x0000ffff
+	};
+	EXPECT_TRUE(RetailFX::readProgram(encodeWords(words), true));
+}
+
+TEST(RetailFxTest, RejectsRepeatedShaderAndPreshaderMetadata)
+{
+	const uint32_t table[] = {
+		0x000efffe, 0x42415443, 28, 0, 0xfffe0200, 1, 28, 0, 0,
+		48, 0x00030002, 1, 0, 0, 'T'
+	};
+	const uint32_t preshader[] = {
+		0x000ffffe, 0x53455250, 0x46580201,
+		0x0001fffe, 0x49535250,
+		0x000afffe, 0x434c5846, 1, 0x10000001, 1, 0, 1, 0, 0, 4, 0
+	};
+	std::vector<uint32_t> words = {0xfffe0200};
+	words.insert(words.end(), std::begin(table), std::end(table));
+	const auto tableEnd = words.size();
+	words.insert(words.end(), std::begin(preshader), std::end(preshader));
+	words.push_back(0x0000ffff);
+	ASSERT_TRUE(RetailFX::readProgram(encodeWords(words), true));
+
+	auto duplicate = words;
+	duplicate.insert(duplicate.begin() + tableEnd, std::begin(table), std::end(table));
+	EXPECT_FALSE(RetailFX::readProgram(encodeWords(duplicate), true));
+
+	duplicate = words;
+	duplicate.insert(duplicate.end() - 1, std::begin(preshader), std::end(preshader));
+	EXPECT_FALSE(RetailFX::readProgram(encodeWords(duplicate), true));
+
+	duplicate = words;
+	duplicate[tableEnd] += 2u << 16;
+	duplicate.insert(duplicate.end() - 1, {0x0001fffe, 0x49535250});
+	EXPECT_FALSE(RetailFX::readProgram(encodeWords(duplicate), true));
+}
+
+TEST(RetailFxTest, BoundsAggregateDecodedRegisterDefaults)
+{
+	constexpr uint32_t count = 256;
+	constexpr uint32_t nameOffset = (7 + count * 5) * 4;
+	constexpr uint32_t defaultsOffset = nameOffset + 4;
+	constexpr uint32_t defaults = 256 * 4;
+	constexpr uint32_t wordsInComment = 1 + defaultsOffset / 4 + defaults;
+	std::vector<uint32_t> words = {
+		0xfffe0200, (wordsInComment << 16) | 0xfffe, 0x42415443,
+		28, 0, 0xfffe0200, count, 28, 0, 0
+	};
+	for (uint32_t i = 0; i < count; ++i)
+		words.insert(words.end(), {nameOffset, 2, 256, 0, defaultsOffset});
+	words.push_back('T');
+	words.resize(words.size() + defaults);
+	words.push_back(0x0000ffff);
+	EXPECT_FALSE(RetailFX::readProgram(encodeWords(words), true));
+	words[6] = 8;
+	EXPECT_TRUE(RetailFX::readProgram(encodeWords(words), true));
 }
 
 TEST(RetailFxTest, RunsScalarPreshaderOperandAcrossOutputComponents)
