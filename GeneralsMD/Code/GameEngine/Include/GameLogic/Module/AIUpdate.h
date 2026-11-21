@@ -520,6 +520,9 @@ public:
 	virtual Bool chooseLocomotorSet(LocomotorSetType wst);
 
 	virtual CommandSourceType getLastCommandSource() const { return m_lastCommandSource; }
+	Bool issueRetailPlannerAttack(Object* target);
+	Bool canAcceptRetailPlannerOrder(Bool attackObject) const;
+	Bool hasRetailPlannerAttack(const Object* target) const;
 
 	const AttackPriorityInfo *getAttackInfo() {return m_attackInfo;}
 	void setAttackInfo(const AttackPriorityInfo *info) {m_attackInfo = info;}
@@ -805,6 +808,7 @@ private:
 	UnsignedInt m_fearUntil = 0;
 	UnsignedInt m_crushWarningUntil = 0;
 	Coord3D m_autoAttackOrigin{};
+	ObjectID m_retailPlannerAttackTarget = INVALID_ID;
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.
 	Bool				m_upgradedLocomotors;

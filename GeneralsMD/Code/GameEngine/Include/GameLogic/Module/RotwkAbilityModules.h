@@ -74,6 +74,15 @@ protected:
 	virtual void triggerAbilityEffect() override;
 };
 
+class SummonReplacementSpecialAbilityUpdate final : public ToggleMountedSpecialAbilityUpdate
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(SummonReplacementSpecialAbilityUpdate, "SummonReplacementSpecialAbilityUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(SummonReplacementSpecialAbilityUpdate, ToggleMountedSpecialAbilityUpdateModuleData)
+
+public:
+	SummonReplacementSpecialAbilityUpdate(Thing* thing, const ModuleData* data);
+};
+
 struct ActivateModuleEntry
 {
 	enum Position

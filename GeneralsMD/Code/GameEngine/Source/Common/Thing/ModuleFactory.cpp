@@ -518,6 +518,7 @@ void ModuleFactory::init()
 		addModule( CommandPointsUpgrade );
 		addModule( WeaponFireSpecialAbilityUpdate );
 		addModule( ToggleMountedSpecialAbilityUpdate );
+		addModule( SummonReplacementSpecialAbilityUpdate );
 		addModule( ActivateModuleSpecialPower );
 		addModule( HeroModeSpecialAbilityUpdate );
 		addModule( WeaponModeSpecialPowerUpdate );
@@ -563,7 +564,11 @@ void ModuleFactory::init()
 	addModule( RadarUpgrade );
 	addModule( PowerPlantUpgrade );
 	addModule( LocomotorSetUpgrade );
-	addModule( ObjectCreationUpgrade );
+	if (RetailFileLayers::enabled())
+		addModuleInternal(RetailObjectCreationUpgrade::friend_newModuleInstance, RetailObjectCreationUpgrade::friend_newModuleData,
+			RetailObjectCreationUpgrade::getModuleType(), "ObjectCreationUpgrade", RetailObjectCreationUpgrade::getInterfaceMask());
+	else
+		addModule( ObjectCreationUpgrade );
 	addModule( ReplaceObjectUpgrade );
 	addModule( ModelConditionUpgrade );
 	addModule( UnpauseSpecialPowerUpgrade );

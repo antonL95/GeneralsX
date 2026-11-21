@@ -35,6 +35,10 @@
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/Module/ObjectCreationUpgrade.h"
+#include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/Upgrade.h"
+#include "GameLogic/Object.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 
@@ -59,6 +63,16 @@ ObjectCreationUpgradeModuleData::ObjectCreationUpgradeModuleData()
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
+	if (RetailFileLayers::enabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "GrantUpgrade", INI::parseAsciiString, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_grantUpgrade) },
+			{ "Delay", INI::parseDurationUnsignedInt, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_delay) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 
 }
 
@@ -136,4 +150,109 @@ void ObjectCreationUpgrade::loadPostProcess()
 	// extend base class
 	UpgradeModule::loadPostProcess();
 
+}
+
+RetailObjectCreationUpgrade::RetailObjectCreationUpgrade(Thing* thing, const ModuleData* data)
+	: UpdateModule(thing, data)
+{
+}
+
+RetailObjectCreationUpgrade::~RetailObjectCreationUpgrade() = default;
+
+void RetailObjectCreationUpgrade::getUpgradeActivationMasks(UpgradeMaskType& activation, UpgradeMaskType& conflicting) const
+{
+	getObjectCreationUpgradeModuleData()->m_upgradeMuxData.getUpgradeActivationMasks(activation, conflicting);
+}
+
+void RetailObjectCreationUpgrade::performUpgradeFX()
+{
+	getObjectCreationUpgradeModuleData()->m_upgradeMuxData.performUpgradeFX(getObject());
+}
+
+void RetailObjectCreationUpgrade::processUpgradeRemoval()
+{
+	getObjectCreationUpgradeModuleData()->m_upgradeMuxData.muxDataProcessUpgradeRemoval(getObject());
+}
+
+Bool RetailObjectCreationUpgrade::requiresAllActivationUpgrades() const
+{
+	return getObjectCreationUpgradeModuleData()->m_upgradeMuxData.m_requiresAllTriggers;
+}
+
+void RetailObjectCreationUpgrade::upgradeImplementation()
+{
+	const auto* data = getObjectCreationUpgradeModuleData();
+	if (!data->m_ocl && data->m_grantUpgrade.isEmpty())
+		return;
+	setUpgradeExecuted(TRUE);
+	m_pending = TRUE;
+	if (data->m_delay)
+		setWakeFrame(getObject(), UPDATE_SLEEP(data->m_delay));
+	else
+		update();
+}
+
+Bool RetailObjectCreationUpgrade::resetUpgrade(const UpgradeMaskType& mask)
+{
+	if (!UpgradeMux::resetUpgrade(mask))
+		return FALSE;
+	m_pending = FALSE;
+	return TRUE;
+}
+
+UpdateSleepTime RetailObjectCreationUpgrade::update()
+{
+	if (!m_pending)
+		return UPDATE_SLEEP_FOREVER;
+	m_pending = FALSE;
+	Object* object = getObject();
+	const Player* player = object->getControllingPlayer();
+	if (!player || object->isEffectivelyDead())
+		return UPDATE_SLEEP_FOREVER;
+	UpgradeMaskType upgrades = player->getCompletedUpgradeMask();
+	upgrades.set(object->getObjectCompletedUpgradeMask());
+	if (!testUpgradeConditions(upgrades))
+		return UPDATE_SLEEP_FOREVER;
+
+	const auto* data = getObjectCreationUpgradeModuleData();
+	if (data->m_ocl)
+		ObjectCreationList::create(data->m_ocl, object, nullptr);
+	if (data->m_grantUpgrade.isNotEmpty())
+	{
+		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(data->m_grantUpgrade);
+		if (upgrade && !object->hasUpgrade(upgrade))
+			object->giveUpgrade(upgrade);
+	}
+	return UPDATE_SLEEP_FOREVER;
+}
+
+void RetailObjectCreationUpgrade::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	upgradeMuxCRC(xfer);
+	xfer->xferBool(&m_pending);
+}
+
+void RetailObjectCreationUpgrade::xfer(Xfer* xfer)
+{
+	XferVersion version = 2;
+	xfer->xferVersion(&version, 2);
+	if (version >= 2)
+	{
+		UpdateModule::xfer(xfer);
+		xfer->xferBool(&m_pending);
+	}
+	else
+	{
+		XferVersion upgradeVersion = 1;
+		xfer->xferVersion(&upgradeVersion, 1);
+		BehaviorModule::xfer(xfer);
+	}
+	upgradeMuxXfer(xfer);
+}
+
+void RetailObjectCreationUpgrade::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
+	upgradeMuxLoadPostProcess();
 }

@@ -441,7 +441,13 @@ void WeaponSet::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void WeaponSet::loadPostProcess()
 {
-
+	if (RetailFileLayers::enabled())
+	{
+		m_totalAntiMask = 0;
+		for (const Weapon* weapon : m_weapons)
+			if (weapon)
+				m_totalAntiMask |= weapon->getAntiMask();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -620,7 +626,8 @@ static Int getVictimAntiMask(const Object* victim)
 	}
 	else
 	{
-		return WEAPON_ANTI_GROUND;
+		return RetailFileLayers::enabled() && victim->isKindOf(KINDOF_STRUCTURE)
+			? WEAPON_ANTI_STRUCTURE : WEAPON_ANTI_GROUND;
 	}
 }
 

@@ -20,8 +20,10 @@ public:
 	HordeAIUpdate(Thing* thing, const ModuleData* data);
 	UpdateSleepTime update() override;
 	void aiDoCommand(const AICommandParms* parms) override;
+	Bool issuePlannerOrder(Object* target, const Coord3D& position);
 	static void retaliate(Object* victim, Object* attacker);
 	Bool hasAttackOrder() const { return m_attackTarget != INVALID_ID || m_order == AICMD_ATTACKMOVE_TO_POSITION; }
+	Bool isOnPlannerAdvance() const { return m_plannerOrder && m_order == AICMD_ATTACKMOVE_TO_POSITION; }
 	Bool isEngaging() const { return m_engaging; }
 
 private:
@@ -29,6 +31,7 @@ private:
 	void respondToAttack(Object* attacker, Int maxShots, CommandSourceType source);
 	Object* updateOrder(Object* anchor, Object* target, Bool refresh);
 	void approach(const Coord3D& position, Real range);
+	void advance(const Coord3D& position);
 	void xferOrder(Xfer* xfer);
 
 	ObjectID m_attackTarget = INVALID_ID;
@@ -43,4 +46,7 @@ private:
 	Int m_guardArea = -1;
 	GuardMode m_guardMode = GUARDMODE_NORMAL;
 	Bool m_updatingAnchor = FALSE;
+	Bool m_plannerOrder = FALSE;
+	Int m_advanceAttempts = 0;
+	Coord3D m_advanceOrigin{};
 };

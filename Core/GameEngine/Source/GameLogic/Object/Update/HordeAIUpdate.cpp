@@ -28,6 +28,7 @@ namespace
 constexpr Real FORMATION_PATHFIND_DISTANCE = 120.0f;
 constexpr Real FORMATION_REPATH_DISTANCE = 30.0f;
 constexpr Real FORMATION_REFORM_ANGLE = PI / 6.0f;
+constexpr Int MAX_ADVANCE_ATTEMPTS = 2;
 
 Real distanceSquared(const Coord3D& a, const Coord3D& b)
 {
@@ -154,6 +155,8 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 		return;
 
 	const auto command = parms->m_cmd;
+	if (m_updatingAnchor && m_order != NO_ORDER && command == AICMD_ATTACKMOVE_TO_POSITION)
+		return;
 #if RTS_ZEROHOUR
 	if (command == AICMD_GUARD_RETALIATE)
 	{
@@ -173,6 +176,8 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 		Object* target = m_updatingAnchor ? enemyHordeOrUnit(parms->m_obj) : parms->m_obj;
 		if (!m_updatingAnchor || m_order == NO_ORDER)
 		{
+			m_plannerOrder = FALSE;
+			m_advanceAttempts = 0;
 			m_order = m_updatingAnchor ? NO_ORDER : command;
 			m_orderPosition = *getObject()->getPosition();
 			m_retaliationStartDistanceSquared = 0.0f;
@@ -186,6 +191,8 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 		return;
 	}
 
+	m_plannerOrder = FALSE;
+	m_advanceAttempts = 0;
 	m_order = NO_ORDER;
 	m_attackTarget = INVALID_ID;
 	m_retaliationStartDistanceSquared = 0.0f;
@@ -206,6 +213,19 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 	}
 
 	AIUpdateInterface::aiDoCommand(parms);
+}
+
+Bool HordeAIUpdate::issuePlannerOrder(Object* target, const Coord3D& position)
+{
+	AICommandParms parms(target ? AICMD_ATTACK_OBJECT : AICMD_ATTACKMOVE_TO_POSITION, CMD_FROM_AI);
+	parms.m_obj = target;
+	parms.m_pos = position;
+	parms.m_intValue = NO_MAX_SHOTS_LIMIT;
+	if (!isAllowedToRespondToAiCommands(&parms))
+		return FALSE;
+	aiDoCommand(&parms);
+	m_plannerOrder = TRUE;
+	return TRUE;
 }
 
 Object* HordeAIUpdate::updateOrder(Object* anchor, Object* target, Bool refresh)
@@ -273,12 +293,37 @@ Object* HordeAIUpdate::updateOrder(Object* anchor, Object* target, Bool refresh)
 		if (distanceSquared(*anchor->getPosition(), position) > 16.0f)
 		{
 			if (isIdle() || distanceSquared(*getGoalPosition(), position) > 16.0f)
-				privateMoveToPosition(&position, m_attackSource);
+				advance(position);
 		}
 		else if (m_order == AICMD_ATTACKMOVE_TO_POSITION)
 			m_order = NO_ORDER;
 	}
 	return nullptr;
+}
+
+void HordeAIUpdate::advance(const Coord3D& position)
+{
+	if (isWaitingForPath())
+		return;
+	if (m_order == AICMD_ATTACKMOVE_TO_POSITION || m_plannerOrder)
+	{
+		const Coord3D& origin = *getObject()->getPosition();
+		if (m_advanceAttempts && distanceSquared(m_advanceOrigin, origin) > sqr(FORMATION_REPATH_DISTANCE))
+			m_advanceAttempts = 0;
+		if (m_advanceAttempts >= MAX_ADVANCE_ATTEMPTS)
+		{
+			m_order = NO_ORDER;
+			m_attackTarget = INVALID_ID;
+			m_engaging = FALSE;
+			m_plannerOrder = FALSE;
+			privateIdle(m_attackSource);
+			return;
+		}
+		if (!m_advanceAttempts)
+			m_advanceOrigin = origin;
+		++m_advanceAttempts;
+	}
+	privateMoveToPosition(&position, m_attackSource);
 }
 
 void HordeAIUpdate::approach(const Coord3D& position, Real range)
@@ -287,12 +332,25 @@ void HordeAIUpdate::approach(const Coord3D& position, Real range)
 	if (m_engaging && isMoving())
 		privateIdle(m_attackSource);
 	else if (!m_engaging && (isIdle() || distanceSquared(*getGoalPosition(), position) > 100.0f))
-		privateMoveToPosition(&position, m_attackSource);
+		advance(position);
 }
 
 UpdateSleepTime HordeAIUpdate::update()
 {
 	Object* horde = getObject();
+	Object* target = liveTarget(m_attackTarget);
+	if (m_plannerOrder && target && horde->getRelationship(target) != ENEMIES)
+	{
+		if (m_order == AICMD_ATTACK_OBJECT)
+		{
+			m_order = NO_ORDER;
+			m_plannerOrder = FALSE;
+		}
+		m_attackTarget = INVALID_ID;
+		m_engaging = FALSE;
+		privateIdle(m_attackSource);
+		target = nullptr;
+	}
 	const Real facingBefore = horde->getOrientation();
 	Path* path = getPath();
 	const PathNode* end = path ? path->getLastNode() : nullptr;
@@ -312,7 +370,7 @@ UpdateSleepTime HordeAIUpdate::update()
 	if (fabs(stdAngleDiff(horde->getOrientation(), facingBefore)) > FORMATION_REFORM_ANGLE)
 		const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
 
-	Object* target = liveTarget(m_attackTarget);
+	target = liveTarget(m_attackTarget);
 	if (!target && m_attackTarget != INVALID_ID)
 	{
 		m_attackTarget = INVALID_ID;
@@ -325,6 +383,8 @@ UpdateSleepTime HordeAIUpdate::update()
 
 	const Bool refresh = (TheGameLogic->getFrame() + horde->getID()) % 8 == 0;
 	target = updateOrder(horde, target, refresh);
+	if (m_order == NO_ORDER)
+		m_plannerOrder = FALSE;
 	const auto* stances = StancesBehavior::find(horde);
 	const Bool autonomous = stances && m_order == NO_ORDER && m_attackSource == CMD_FROM_AI;
 	const Bool hold = autonomous && StancesBehavior::holdsGround(stances->getStance());
@@ -374,6 +434,8 @@ UpdateSleepTime HordeAIUpdate::update()
 		const Real contactDistance = std::max(8.0f, std::max(data->m_meleeAttackLeashDistance, data->m_meleeBehavior.innerRange));
 		const Real targetRadius = target ? target->getGeometryInfo().getBoundingCircleRadius() : 0.0f;
 		approach(target ? *target->getPosition() : m_orderPosition, std::max(approachRange, contactDistance) + targetRadius);
+		if (target && m_attackTarget == INVALID_ID)
+			target = nullptr;
 	}
 
 	const HordeContain* enemy = HordeContain::get(target);
@@ -408,6 +470,10 @@ UpdateSleepTime HordeAIUpdate::update()
 					{
 						if (m_forceAttack)
 							ai->aiForceAttackObject(victim, m_maxShots, m_attackSource);
+#if RTS_ZEROHOUR
+						else if (m_plannerOrder && m_order == AICMD_ATTACK_OBJECT)
+							ai->issueRetailPlannerAttack(victim);
+#endif
 						else
 							ai->aiAttackObject(victim, m_maxShots, m_attackSource);
 					}
@@ -470,12 +536,15 @@ void HordeAIUpdate::crc(Xfer* xfer)
 	xfer->xferBool(&m_engaging);
 	xferOrder(xfer);
 	xfer->xferReal(&m_retaliationStartDistanceSquared);
+	xfer->xferBool(&m_plannerOrder);
+	xfer->xferInt(&m_advanceAttempts);
+	xfer->xferCoord3D(&m_advanceOrigin);
 }
 
 void HordeAIUpdate::xfer(Xfer* xfer)
 {
-	XferVersion version = 3;
-	xfer->xferVersion(&version, 3);
+	XferVersion version = 4;
+	xfer->xferVersion(&version, 4);
 	AIUpdateInterface::xfer(xfer);
 	xfer->xferObjectID(&m_attackTarget);
 	xfer->xferUser(&m_attackSource, sizeof(m_attackSource));
@@ -486,6 +555,12 @@ void HordeAIUpdate::xfer(Xfer* xfer)
 		xferOrder(xfer);
 	if (version >= 3)
 		xfer->xferReal(&m_retaliationStartDistanceSquared);
+	if (version >= 4)
+	{
+		xfer->xferBool(&m_plannerOrder);
+		xfer->xferInt(&m_advanceAttempts);
+		xfer->xferCoord3D(&m_advanceOrigin);
+	}
 }
 
 void HordeAIUpdate::loadPostProcess()

@@ -2762,6 +2762,7 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
+	m_retailPlannerAttackTarget = INVALID_ID;
 
 #ifdef ALLOW_SURRENDER
 	// surrendered items have very limited options, and only via AI cmds
@@ -5275,9 +5276,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 4;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5521,6 +5522,8 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferBool(&m_isBlockedAndStuck);
 		xfer->xferBool(&m_retryPath);
 	}
+	if (version >= 8)
+		xfer->xferObjectID(&m_retailPlannerAttackTarget);
 
 
 }
@@ -5565,9 +5568,31 @@ void AIUpdateInterface::braceForCrush(UnsignedInt deadline)
 	wakeUpNow();
 }
 
+Bool AIUpdateInterface::issueRetailPlannerAttack(Object* target)
+{
+	if (!target || getObject()->getRelationship(target) != ENEMIES || !canAcceptRetailPlannerOrder(TRUE))
+		return FALSE;
+	aiAttackObject(target, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
+	if (!isAttacking() || getGoalObject() != target)
+		return FALSE;
+	m_retailPlannerAttackTarget = target->getID();
+	return TRUE;
+}
+
+Bool AIUpdateInterface::canAcceptRetailPlannerOrder(Bool attackObject) const
+{
+	const AICommandParms parms(attackObject ? AICMD_ATTACK_OBJECT : AICMD_ATTACKMOVE_TO_POSITION, CMD_FROM_AI);
+	return isAllowedToRespondToAiCommands(&parms);
+}
+
+Bool AIUpdateInterface::hasRetailPlannerAttack(const Object* target) const
+{
+	return m_retailPlannerAttackTarget != INVALID_ID && m_retailPlannerAttackTarget == target->getID();
+}
+
 Bool AIUpdateInterface::stanceAllowsChase(const Object* target) const
 {
-	if (!RetailFileLayers::enabled() || getLastCommandSource() != CMD_FROM_AI)
+	if (!RetailFileLayers::enabled() || getLastCommandSource() != CMD_FROM_AI || hasRetailPlannerAttack(target))
 		return TRUE;
 	const auto* stances = StancesBehavior::findForUnit(getObject());
 	if (!stances)

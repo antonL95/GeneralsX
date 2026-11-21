@@ -14,10 +14,12 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "GameClient/ControlBar.h"
+#include "GameLogic/Damage.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Pathfinder/Path.h"
@@ -45,6 +47,8 @@ namespace
 UnsignedInt frameLimit = 0;
 const char* fixture = nullptr;
 Bool ensnareObserved = FALSE;
+ObjectID plannerFixtureHorde = INVALID_ID;
+ObjectID plannerFixtureTarget = INVALID_ID;
 
 Int findFaction(const char* name)
 {
@@ -161,10 +165,79 @@ void observeEnsnare(UnsignedInt frame)
 	}
 }
 
+void runPlannerFixture(UnsignedInt frame, const char* unitName, const char* targetName, Bool capture)
+{
+	if (frame != 2 && (!capture || (frame != 60 && frame != 62)))
+		return;
+	Player* attacker = ThePlayerList->findPlayerWithName("Player_1");
+	Player* defender = ThePlayerList->findPlayerWithName("Player_2");
+	if (!isCompetitor(attacker) || !isCompetitor(defender))
+		return;
+	if (frame == 2)
+	{
+		const ThingTemplate* squad = TheThingFactory->findTemplate(unitName, FALSE);
+		const ThingTemplate* farm = TheThingFactory->findTemplate(targetName, FALSE);
+		const Waypoint* start = TheTerrainLogic->getWaypointByName("Player_1_Start");
+		if (!squad || !farm || !start)
+			return;
+		Coord3D position = *start->getLocation();
+		position.x += capture ? 260.0f : 420.0f;
+		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+		Object* target = TheThingFactory->newObject(farm, defender->getDefaultTeam());
+		target->setPosition(&position);
+		plannerFixtureTarget = target->getID();
+		position.y += 150.0f;
+		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+		Object* squadObject = TheThingFactory->newObject(squad, attacker->getDefaultTeam());
+		squadObject->setPosition(&position);
+		plannerFixtureHorde = squadObject->getID();
+		auto* horde = static_cast<HordeAIUpdate*>(squadObject->findUpdateModule(NAMEKEY("HordeAIUpdate")));
+		const Bool accepted = horde ? horde->issuePlannerOrder(target, *target->getPosition())
+			: squadObject->getAI()->issueRetailPlannerAttack(target);
+		std::fprintf(stderr, "SKIRMISH_PLANNER_FIXTURE\tissue\t%u\t%u\t%d\n",
+			static_cast<unsigned>(plannerFixtureHorde), static_cast<unsigned>(plannerFixtureTarget), accepted);
+	}
+	else if (frame == 60 || frame == 62)
+	{
+		Object* target = TheGameLogic->findObjectByID(plannerFixtureTarget);
+		Object* squad = TheGameLogic->findObjectByID(plannerFixtureHorde);
+		if (!target || !squad)
+			return;
+		const auto* horde = static_cast<const HordeAIUpdate*>(squad->findUpdateModule(NAMEKEY("HordeAIUpdate")));
+		const auto* contain = HordeContain::get(squad);
+		if (!horde || !contain)
+			return;
+		Int attackers = 0;
+		for (Object* member : *contain->getContainedItemsList())
+			if (member->getAI() && member->getAI()->getGoalObject() == target)
+				++attackers;
+		std::fprintf(stderr, "SKIRMISH_PLANNER_FIXTURE\t%s\t%u\t%d\t%d\t%d\n",
+			frame == 60 ? "before" : "after", frame, target->getControllingPlayer()->getPlayerIndex(),
+			horde->hasAttackOrder(), attackers);
+		if (frame == 60)
+			target->setTeam(attacker->getDefaultTeam());
+	}
+}
+
 void runFixture(UnsignedInt frame)
 {
 	if (!fixture)
 		return;
+	if (std::strcmp(fixture, "planner-capture") == 0)
+	{
+		runPlannerFixture(frame, "RohanArcherNewHorde", "MordorSlaughterHouse_ForAI", TRUE);
+		return;
+	}
+	if (std::strcmp(fixture, "planner-siege") == 0)
+	{
+		runPlannerFixture(frame, "RohanBatteringRam", "MordorSlaughterHouse_ForAI", FALSE);
+		return;
+	}
+	if (std::strcmp(fixture, "planner-harad") == 0)
+	{
+		runPlannerFixture(frame, "HaradTribalAxemenHorde_AI", "DwarvenMineShaft_ForAI", FALSE);
+		return;
+	}
 	if (std::strcmp(fixture, "human-lair") == 0)
 	{
 		if (frame != 2)
@@ -321,7 +394,9 @@ Bool configure(SkirmishGameInfo& game)
 		invalidConfig();
 	fixture = std::getenv("GENERALSX_SKIRMISH_PROBE_FIXTURE");
 	const Bool humanLair = fixture && std::strcmp(fixture, "human-lair") == 0;
-	if (fixture && !humanLair && std::strcmp(fixture, "porter") != 0 && std::strcmp(fixture, "ensnare") != 0)
+	if (fixture && !humanLair && std::strcmp(fixture, "porter") != 0 &&
+		std::strcmp(fixture, "ensnare") != 0 && std::strcmp(fixture, "planner-capture") != 0 &&
+		std::strcmp(fixture, "planner-siege") != 0 && std::strcmp(fixture, "planner-harad") != 0)
 		invalidConfig();
 	for (Int i = 0; i < 2; ++i)
 	{
@@ -403,6 +478,20 @@ void death(const Object& object, ObjectID source)
 		std::fprintf(stderr, "SKIRMISH_STRUCTURE_KILL\t%u\t%d\t%d\t%u\t%s\n", TheGameLogic->getFrame(),
 			killer->getPlayerIndex(), player->getPlayerIndex(), static_cast<unsigned>(object.getID()),
 			object.getTemplate()->getName().str());
+}
+
+void structureDamage(const Object& object, const DamageInfo& damage)
+{
+	const Player* owner = object.getControllingPlayer();
+	const Object* source = TheGameLogic->findObjectByID(damage.in.m_sourceID);
+	const Player* attacker = source ? source->getControllingPlayer() : nullptr;
+	if (damage.in.m_amount <= 0.0f || !isCompetitor(owner) || !isCompetitor(attacker) ||
+		attacker->getRelationship(object.getTeam()) != ENEMIES)
+		return;
+	std::fprintf(stderr, "SKIRMISH_STRUCTURE_DAMAGE\t%u\t%d\t%d\t%u\t%s\t%s\t%d\t%a\t%a\n",
+		TheGameLogic->getFrame(), attacker->getPlayerIndex(), owner->getPlayerIndex(),
+		static_cast<unsigned>(object.getID()), object.getTemplate()->getName().str(),
+		source->getTemplate()->getName().str(), damage.in.m_damageType, damage.in.m_amount, damage.out.m_actualDamageDealt);
 }
 
 void cast(Int player, const AsciiString& power, ObjectID source)

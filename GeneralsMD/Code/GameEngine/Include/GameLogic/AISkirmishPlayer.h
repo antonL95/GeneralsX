@@ -31,6 +31,9 @@
 #include "Common/GameMemory.h"
 #include "GameLogic/AIPlayer.h"
 
+#include <set>
+#include <tuple>
+
 class BuildListInfo;
 class SpecialPowerTemplate;
 
@@ -102,6 +105,7 @@ protected:
 protected:
 	void adjustBuildList(BuildListInfo *list);
 	void updateRetail();
+	void xferRetailObjectives(Xfer* xfer);
 	Int getMyEnemyPlayerIndex();
 	void acquireEnemy();
 
@@ -117,5 +121,6 @@ protected:
 
 	UnsignedInt m_frameToCheckEnemy;
 	Player			*m_currentEnemy;
+	std::set<std::tuple<ObjectID, ObjectID, UnsignedInt>> m_retailObjectives;
 
 };

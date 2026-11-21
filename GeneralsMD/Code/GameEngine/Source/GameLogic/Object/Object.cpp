@@ -2099,6 +2099,8 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 	BodyModuleInterface* body = getBodyModule();
 	if (body)
 		body->attemptDamage( damageInfo );
+	if (RetailSkirmishProbe::enabled() && body && isKindOf(KINDOF_STRUCTURE))
+		RetailSkirmishProbe::structureDamage(*this, *damageInfo);
 
 	// Process any shockwave forces that might affect this object due to the incurred damage
 	if (damageInfo->in.m_shockWaveAmount > 0.0f && damageInfo->in.m_shockWaveRadius > 0.0f)

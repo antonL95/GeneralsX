@@ -31,6 +31,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "GameLogic/Module/UpgradeModule.h"
+#include "GameLogic/Module/UpdateModule.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Thing;
@@ -49,7 +50,32 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 
 	const ObjectCreationList *m_ocl;			///< the object creation list to make
+	AsciiString m_grantUpgrade;
+	UnsignedInt m_delay = 0;
 
+};
+
+class RetailObjectCreationUpgrade final : public UpdateModule, public UpgradeMux
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(RetailObjectCreationUpgrade, "RetailObjectCreationUpgrade")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(RetailObjectCreationUpgrade, ObjectCreationUpgradeModuleData)
+
+public:
+	RetailObjectCreationUpgrade(Thing* thing, const ModuleData* data);
+	static Int getInterfaceMask() { return MODULEINTERFACE_UPGRADE | MODULEINTERFACE_UPDATE; }
+	UpgradeModuleInterface* getUpgrade() override { return this; }
+	UpdateSleepTime update() override;
+	Bool resetUpgrade(const UpgradeMaskType& mask) override;
+
+private:
+	void upgradeImplementation() override;
+	void getUpgradeActivationMasks(UpgradeMaskType& activation, UpgradeMaskType& conflicting) const override;
+	void performUpgradeFX() override;
+	void processUpgradeRemoval() override;
+	Bool requiresAllActivationUpgrades() const override;
+	Bool isSubObjectsUpgrade() override { return FALSE; }
+
+	Bool m_pending = FALSE;
 };
 
 //-------------------------------------------------------------------------------------------------

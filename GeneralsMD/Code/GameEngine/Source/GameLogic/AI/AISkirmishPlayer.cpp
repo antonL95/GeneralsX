@@ -76,7 +76,8 @@ struct RetailArmyMember
 	Real share[3] = {};
 };
 
-constexpr Int RETAIL_ATTACK_WAVE_MIN_UNITS = 2;
+constexpr Int RETAIL_ATTACK_WAVE_MIN_UNITS = 3;
+constexpr Real RETAIL_DEFENDED_TARGET_DISTANCE = 350.0f;
 
 struct RetailArmy
 {
@@ -1285,7 +1286,7 @@ void AISkirmishPlayer::updateRetail()
 
 	const auto countType = [&](const ThingTemplate* type) {
 		return static_cast<Int>(std::count_if(owned.begin(), owned.end(), [type](const Object* object) {
-			return object->getTemplate()->isEquivalentTo(type);
+			return object->getTemplate()->isEquivalentTo(type) || object->getHeroIdentityTemplate()->isEquivalentTo(type);
 		}));
 	};
 	std::vector<std::pair<const ThingTemplate*, const RetailArmyMember*>> army;
@@ -1316,7 +1317,8 @@ void AISkirmishPlayer::updateRetail()
 	};
 
 	const Int armySize = std::count_if(soldiers.begin(), soldiers.end(), [&](const Object* unit) {
-		return armyWeight(*unit->getTemplate(), TRUE) > 0.0f;
+		return armyWeight(*unit->getTemplate(), TRUE) > 0.0f ||
+			armyWeight(*unit->getHeroIdentityTemplate(), TRUE) > 0.0f;
 	});
 	const Bool needsArmy = armySize < RETAIL_ATTACK_WAVE_MIN_UNITS;
 	UnsignedInt openingUnitReserve = 0;
@@ -1504,25 +1506,75 @@ void AISkirmishPlayer::updateRetail()
 
 	if (retailTuning.disableTacticalAI)
 		return;
-	std::vector<Object*> wave;
+	for (auto it = m_retailObjectives.begin(); it != m_retailObjectives.end();)
+	{
+		const auto [unitID, targetID, owner] = *it;
+		const Object* unit = TheGameLogic->findObjectByID(unitID);
+		const Object* target = TheGameLogic->findObjectByID(targetID);
+		if (!unit || unit->isEffectivelyDead() || unit->getControllingPlayer() != m_player ||
+			(targetID != INVALID_ID && (!target || target->isEffectivelyDead() ||
+				target->getTeam()->getID() != owner || m_player->getRelationship(target->getTeam()) != ENEMIES)))
+			it = m_retailObjectives.erase(it);
+		else
+			++it;
+	}
+	std::vector<std::pair<Object*, Bool>> wave;
 	for (Object* unit : soldiers)
 	{
+		if (unit->getTeam() != m_player->getDefaultTeam() || !unit->isMobile() || !unit->isAbleToAttack())
+			continue;
 		const AIUpdateInterface* ai = unit->getAI();
 		const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
-		if (unit->getTeam() == m_player->getDefaultTeam() && unit->isMobile() &&
-			ai->isIdle() && (!horde || !horde->hasAttackOrder()))
-			wave.push_back(unit);
+		const Bool ready = ai->isIdle() && (!horde || !horde->hasAttackOrder());
+		Bool scouting = horde && horde->isOnPlannerAdvance() && !horde->isEngaging();
+		if (!horde && ai->getCurrentStateID() == AI_ATTACK_MOVE_TO && ai->getLastCommandSource() == CMD_FROM_AI)
+		{
+			const auto former = m_retailObjectives.lower_bound({unit->getID(), INVALID_ID, 0});
+			scouting = former != m_retailObjectives.end() && std::get<0>(*former) == unit->getID() &&
+				std::get<1>(*former) == INVALID_ID;
+		}
+		if (ready || scouting)
+			wave.emplace_back(unit, ready);
 	}
 	if (wave.size() < RETAIL_ATTACK_WAVE_MIN_UNITS)
 		return;
-	Object* lead = wave.front();
+	const auto eligible = [&](const Object& unit, const Object* objective, UnsignedInt owner, const Coord3D& point) -> Bool {
+		if (!unit.getAI()->canAcceptRetailPlannerOrder(objective != nullptr) ||
+			m_retailObjectives.contains({unit.getID(), objective ? objective->getID() : INVALID_ID, owner}))
+			return FALSE;
+		if (objective)
+		{
+			const CanAttackResult result = unit.getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, objective, CMD_FROM_AI);
+			return result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING;
+		}
+		const Coord3D delta = point - *unit.getPosition();
+		return delta.x * delta.x + delta.y * delta.y > sqr(unit.getGeometryInfo().getBoundingCircleRadius());
+	};
+	const auto objectiveDistance = [&](const Object* objective, UnsignedInt owner, const Coord3D& point, Real& result) {
+		Int count = 0;
+		Real total = 0.0f;
+		for (const auto& [unit, ready] : wave)
+		{
+			if ((!ready && !objective) || !eligible(*unit, objective, owner, point))
+				continue;
+			const Coord3D delta = point - *unit->getPosition();
+			total += delta.x * delta.x + delta.y * delta.y;
+			++count;
+		}
+		if (count < RETAIL_ATTACK_WAVE_MIN_UNITS)
+			return FALSE;
+		result = total / INT_TO_REAL(count);
+		return TRUE;
+	};
 	Object* target = nullptr;
 	ObjectShroudStatus targetShroud = OBJECTSHROUD_INVALID;
+	UnsignedInt objectiveOwner = 0;
 	Real distance = 0.0f;
 	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 	{
 		const Player* owner = object->getControllingPlayer();
 		if (!owner || !owner->isPlayableSide() || !owner->isPlayerActive() || !object->isKindOf(KINDOF_STRUCTURE) ||
+			!object->isKindOf(KINDOF_IMMOBILE) ||
 			object->isEffectivelyDead() || object->isKindOf(KINDOF_INERT) || object->isKindOf(KINDOF_UNATTACKABLE) ||
 			object->isKindOf(KINDOF_BASE_FOUNDATION) ||
 			m_player->getRelationship(object->getTeam()) != ENEMIES)
@@ -1532,11 +1584,17 @@ void AISkirmishPlayer::updateRetail()
 			continue;
 		if (object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED))
 			continue;
-		const Real candidateDistance = ThePartitionManager->getDistanceSquared(lead, object, FROM_CENTER_2D);
+		Real candidateDistance;
+		const UnsignedInt team = object->getTeam()->getID();
+		if (!objectiveDistance(object, team, *object->getPosition(), candidateDistance))
+			continue;
+		if (object->isKindOf(KINDOF_COMMANDCENTER) || object->isKindOf(KINDOF_FS_BASE_DEFENSE))
+			candidateDistance += sqr(RETAIL_DEFENDED_TARGET_DISTANCE);
 		if (!target || candidateDistance < distance || (candidateDistance == distance && object->getID() < target->getID()))
 		{
 			target = object;
 			targetShroud = shroud;
+			objectiveOwner = team;
 			distance = candidateDistance;
 		}
 	}
@@ -1557,13 +1615,13 @@ void AISkirmishPlayer::updateRetail()
 			const Waypoint* start = TheTerrainLogic->getWaypointByName(name);
 			if (!start)
 				continue;
-			const Coord3D delta = *start->getLocation() - *lead->getPosition();
-			const Real candidateDistance = delta.x * delta.x + delta.y * delta.y;
-			if (candidateDistance <= sqr(lead->getGeometryInfo().getBoundingCircleRadius()))
+			Real candidateDistance;
+			if (!objectiveDistance(nullptr, i, *start->getLocation(), candidateDistance))
 				continue;
 			if (!destination || candidateDistance < distance)
 			{
 				destination = start->getLocation();
+				objectiveOwner = i;
 				distance = candidateDistance;
 			}
 		}
@@ -1571,15 +1629,23 @@ void AISkirmishPlayer::updateRetail()
 	if (!destination)
 		return;
 	Int committed = 0;
-	for (Object* unit : wave)
+	for (const auto& [unit, ready] : wave)
 	{
+		if ((!ready && !target) || !eligible(*unit, target, objectiveOwner, *destination))
+			continue;
 		AIUpdateInterface* ai = unit->getAI();
-		if (target && target->isKindOf(KINDOF_IMMOBILE))
-			ai->aiAttackObject(target, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
+		Bool accepted;
+		if (auto* horde = static_cast<HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate"))))
+			accepted = horde->issuePlannerOrder(target, *destination);
+		else if (target)
+			accepted = ai->issueRetailPlannerAttack(target);
 		else
+		{
 			ai->aiAttackMoveToPosition(destination, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
-		const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
-		if (ai->isIdle() && (!horde || !horde->hasAttackOrder()))
+			accepted = !ai->isIdle();
+		}
+		m_retailObjectives.emplace(unit->getID(), target ? target->getID() : INVALID_ID, objectiveOwner);
+		if (!accepted)
 			continue;
 		++committed;
 		if (trace)
@@ -1710,6 +1776,7 @@ void AISkirmishPlayer::adjustBuildList(BuildListInfo *list)
  */
 void AISkirmishPlayer::newMap()
 {
+	m_retailObjectives.clear();
 
 	/* Get our proper build list. */
 	AsciiString mySide = m_player->getSide();
@@ -1819,7 +1886,8 @@ Bool AISkirmishPlayer::computeSuperweaponTarget(const SpecialPowerTemplate *powe
 // ------------------------------------------------------------------------------------------------
 void AISkirmishPlayer::crc( Xfer *xfer )
 {
-
+	if (RetailFileLayers::enabled())
+		xferRetailObjectives(xfer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1831,7 +1899,7 @@ void AISkirmishPlayer::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1862,6 +1930,35 @@ void AISkirmishPlayer::xfer( Xfer *xfer )
 	// right flank right defense angle
 	xfer->xferReal( &m_curRightFlankRightDefenseAngle );
 
+	if (version >= 2)
+		xferRetailObjectives(xfer);
+}
+
+void AISkirmishPlayer::xferRetailObjectives(Xfer* xfer)
+{
+	UnsignedInt count = static_cast<UnsignedInt>(m_retailObjectives.size());
+	xfer->xferUnsignedInt(&count);
+	if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_retailObjectives.clear();
+		for (UnsignedInt i = 0; i < count; ++i)
+		{
+			ObjectID unit = INVALID_ID;
+			ObjectID target = INVALID_ID;
+			UnsignedInt owner = 0;
+			xfer->xferObjectID(&unit);
+			xfer->xferObjectID(&target);
+			xfer->xferUnsignedInt(&owner);
+			m_retailObjectives.emplace(unit, target, owner);
+		}
+	}
+	else
+		for (auto [unit, target, owner] : m_retailObjectives)
+		{
+			xfer->xferObjectID(&unit);
+			xfer->xferObjectID(&target);
+			xfer->xferUnsignedInt(&owner);
+		}
 }
 
 // ------------------------------------------------------------------------------------------------

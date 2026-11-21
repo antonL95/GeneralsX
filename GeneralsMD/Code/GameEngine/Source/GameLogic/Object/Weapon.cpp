@@ -267,6 +267,9 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "NoVictimNeeded", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_noVictimNeeded) },
 	{ "UseInnateAttributes", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_useInnateAttributes) },
 	{ "AntiAirborneMonster", INI::parseBitInInt32, (void*)WEAPON_ANTI_AIRBORNE_MONSTER, offsetof(WeaponTemplate, m_antiMask) },
+	{ "AntiStructure", [](INI* ini, void*, void* store, const void*) {
+		*static_cast<Int*>(store) = INI::scanBool(ini->getNextToken());
+	}, nullptr, offsetof(WeaponTemplate, m_antiStructure) },
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
@@ -1932,7 +1935,8 @@ void WeaponStore::postProcessLoad()
 		weapon = TheWeaponStore->newWeaponTemplate(name);
 	}
 
-	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	const Bool retail = RetailFileLayers::enabled();
+	if (retail || INIAudit::isEnabled())
 	{
 		MultiIniFieldParse fields;
 		fields.add(weapon->getFieldParse());
@@ -1941,6 +1945,15 @@ void WeaponStore::postProcessLoad()
 	}
 	else
 		ini->initFromINI(weapon, weapon->getFieldParse());
+
+	if (retail)
+	{
+		const Bool antiStructure = weapon->m_antiStructure < 0
+			? (weapon->m_antiMask & WEAPON_ANTI_GROUND) != 0 : weapon->m_antiStructure;
+		weapon->m_antiMask &= ~WEAPON_ANTI_STRUCTURE;
+		if (antiStructure)
+			weapon->m_antiMask |= WEAPON_ANTI_STRUCTURE;
+	}
 
 	if (weapon->m_projectileName.isNone())
 		weapon->m_projectileName.clear();

@@ -5693,7 +5693,8 @@ StateReturnType AIAttackState::update()
 			source->getAI()->setCurrentVictim(victim);
 		}
 
-		if( victim->getTeam() != m_victimTeam )
+		if (victim->getTeam() != m_victimTeam ||
+			(source->getAI()->hasRetailPlannerAttack(victim) && source->getRelationship(victim) != ENEMIES))
 		{
 			// If, while I have been attacking my victim, it has lost its ability to attack
 			//(a recently de-garrisoned building) I should bail here...

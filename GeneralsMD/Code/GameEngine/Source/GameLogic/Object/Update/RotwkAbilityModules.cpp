@@ -411,6 +411,28 @@ void ToggleMountedSpecialAbilityUpdate::loadPostProcess()
 	SpecialAbilityUpdate::loadPostProcess();
 }
 
+SummonReplacementSpecialAbilityUpdate::SummonReplacementSpecialAbilityUpdate(Thing* thing, const ModuleData* data)
+	: ToggleMountedSpecialAbilityUpdate(thing, data)
+{
+}
+
+SummonReplacementSpecialAbilityUpdate::~SummonReplacementSpecialAbilityUpdate() = default;
+
+void SummonReplacementSpecialAbilityUpdate::crc(Xfer* xfer)
+{
+	ToggleMountedSpecialAbilityUpdate::crc(xfer);
+}
+
+void SummonReplacementSpecialAbilityUpdate::xfer(Xfer* xfer)
+{
+	ToggleMountedSpecialAbilityUpdate::xfer(xfer);
+}
+
+void SummonReplacementSpecialAbilityUpdate::loadPostProcess()
+{
+	ToggleMountedSpecialAbilityUpdate::loadPostProcess();
+}
+
 void ActivateModuleSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
 	SpecialAbilityUpdateModuleData::buildFieldParse(p);
