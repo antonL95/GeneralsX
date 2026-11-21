@@ -16,7 +16,7 @@
 # Reference: docs/WORKDIR/lessons/2026-02-LESSONS.md (historical patch rationale)
 
 set(DXVK_VERSION "v2.6")
-option(SAGE_DXVK_LINUX_SOURCE "Build Linux DXVK with the retail effect bridge instead of using the prebuilt x86 package" OFF)
+option(SAGE_DXVK_LINUX_SOURCE "Build Linux DXVK with retail effects (OFF selects the prebuilt backend on x86)" ON)
 set(SAGE_DXVK_GIT_REPOSITORY "https://github.com/generalsx-project/dxvk.git" CACHE STRING "DXVK source repository")
 set(DXVK_RETAIL_REVISION f66da559fd48cd55ddfebca38ed0f708c0f76a24)
 

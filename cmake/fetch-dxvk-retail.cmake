@@ -1,6 +1,17 @@
 cmake_minimum_required(VERSION 3.28)
 find_package(Git REQUIRED)
 
+execute_process(
+  COMMAND "${GIT_EXECUTABLE}" rev-parse --local-env-vars
+  OUTPUT_VARIABLE local_env
+  COMMAND_ERROR_IS_FATAL ANY
+)
+string(REGEX MATCHALL "GIT_[A-Z0-9_]+" local_git_vars "${local_env}")
+foreach(variable IN LISTS local_git_vars ITEMS
+    GIT_NAMESPACE GIT_QUARANTINE_PATH GIT_DEFAULT_HASH GIT_DEFAULT_REF_FORMAT)
+  unset(ENV{${variable}})
+endforeach()
+
 file(GLOB existing LIST_DIRECTORIES TRUE "${source}/*")
 if(existing OR EXISTS "${source}/.git")
   message(FATAL_ERROR "Refusing to patch existing DXVK source at ${source}. Configure in a fresh build directory.")
