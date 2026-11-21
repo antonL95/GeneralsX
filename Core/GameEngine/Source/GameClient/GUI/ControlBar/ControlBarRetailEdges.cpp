@@ -2,6 +2,8 @@
 
 #include <array>
 #include <cmath>
+#include <deque>
+#include <limits>
 #include <map>
 #include <string>
 #include <vector>
@@ -21,6 +23,7 @@
 #include "Common/ThingTemplate.h"
 
 #include "GameClient/ControlBar.h"
+#include "GameClient/AptScene.h"
 #include "GameClient/Display.h"
 #include "GameClient/DisplayString.h"
 #include "GameClient/DisplayStringManager.h"
@@ -32,6 +35,7 @@
 #include "GameClient/Image.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/RetailHudExtras.h"
+#include "GameClient/RetailHudSettings.h"
 #include "GameClient/UiHudRules.h"
 #include "GameClient/UiScale.h"
 
@@ -80,27 +84,7 @@ constexpr Int PowerTextSize = 26;
 constexpr Real ClockCharSpacing = 8.0f;
 constexpr Real ClockTextY = 19.0f;
 
-constexpr Real NoteTopY = 15.0f;
-constexpr Real NoteArtX = 9.3f;
-constexpr Real NoteArtWidth = 540.0f;
-constexpr Real NoteMiddleY = 52.0f;
-constexpr Real NoteMiddleHeight = 83.0f;
-constexpr Real NoteBottomY = 137.0f;
-constexpr Real NoteLeftWidth = 45.3f;
-constexpr Real NoteRightWidth = 40.0f;
-constexpr Real NoteBodyX = 45.3f;
-constexpr Real NoteBodyY = 42.0f;
-constexpr Real NoteBodyWidth = 482.7f;
-constexpr Real NoteBodyHeight = 100.0f;
-constexpr Real NoteTextX = 56.0f;
-constexpr Real NoteTextY = 52.0f;
-constexpr Real NoteTextWidth = 456.0f;
-constexpr Real NoteTextHeight = 83.0f;
-constexpr Real NoteIconSize = 83.0f;
-constexpr Real NoteCloseX = 500.0f;
-constexpr Real NoteCloseY = 35.0f;
-constexpr Real NoteCloseWidth = 48.0f;
-constexpr Real NoteCloseHeight = 15.0f;
+constexpr Real NoteAspect = 4.0f / 3.0f;
 constexpr UnsignedInt NoteOpenMs = 200;
 constexpr UnsignedInt NoteFadeMs = 500;
 
@@ -143,11 +127,29 @@ struct NoteSettings
 
 NoteSettings s_noteSettings;
 
+struct NoteMessage
+{
+	UnicodeString title;
+	UnicodeString body;
+	const Image *portrait;
+	UnsignedInt holdMs;
+};
+
 struct NoteState
 {
 	GameWindow *window = nullptr;
+	std::unique_ptr<AptScene> scene;
+	AptScene::Box artBounds;
+	AptScene::Box topBounds;
+	AptScene::Box bottomBounds;
+	AptScene::Box bodyBounds;
+	AptScene::Box iconBounds;
+	AptScene::Box headingBounds;
+	AptScene::Box messageBounds;
+	AptScene::Box closeBounds;
 	DisplayString *title = nullptr;
 	DisplayString *text = nullptr;
+	std::deque<NoteMessage> pending;
 	const Image *portrait = nullptr;
 	UnsignedInt start = 0;
 	UnsignedInt holdMs = 0;
@@ -402,9 +404,10 @@ void drawClock(GameWindow *window, WinInstanceData *)
 	}
 }
 
-Box noteBox(Real scale, Real x, Real y, Real width, Real height)
+Box noteBox(Real scale, const AptScene::Box &box)
 {
-	return windowBox(s_note.window, scale, x, y, width, height);
+	return windowBox(s_note.window, scale, (box.left - s_note.artBounds.left) * NoteAspect,
+		box.top - s_note.artBounds.top, (box.right - box.left) * NoteAspect, box.bottom - box.top);
 }
 
 Real noteAlpha(UnsignedInt now)
@@ -414,15 +417,39 @@ Real noteAlpha(UnsignedInt now)
 	return opening * static_cast<Real>(UiHudRules::fadeAlpha(elapsed, s_note.holdMs, NoteFadeMs));
 }
 
-void drawCloseGlyph(const Box &pill, Real alpha)
+void drawNoteArt(const AptScene::Visibility &visible, Real scale, Real alpha)
 {
-	const Color gold = alphaColor(241, 187, 1, alpha);
-	const Real size = pill.height() * 0.6f;
-	const Real cx = (pill.x0 + pill.x1) * 0.5f;
-	const Real cy = (pill.y0 + pill.y1) * 0.5f;
-	const Real width = MAX(1.0f, pill.height() * 0.15f);
-	TheDisplay->drawLine(roundPixel(cx - size * 0.5f), roundPixel(cy - size * 0.5f), roundPixel(cx + size * 0.5f), roundPixel(cy + size * 0.5f), width, gold);
-	TheDisplay->drawLine(roundPixel(cx - size * 0.5f), roundPixel(cy + size * 0.5f), roundPixel(cx + size * 0.5f), roundPixel(cy - size * 0.5f), width, gold);
+	Int left, top;
+	s_note.window->winGetScreenPosition(&left, &top);
+	s_note.scene->drawAt(visible, left - s_note.artBounds.left * scale * NoteAspect,
+		top - s_note.artBounds.top * scale, scale * NoteAspect, scale, alpha);
+}
+
+void drawNoteText(DisplayString *text, const Box &area, Color color, Color shadow)
+{
+	if (!text || text->getTextLength() == 0 || area.width() <= 0 || area.height() <= 0)
+		return;
+	text->setWordWrap(area.width());
+	text->setWordWrapCentered(TRUE);
+	Int width, height;
+	text->getSize(&width, &height);
+	text->draw(area.x0 + (area.width() - width) / 2, area.y0 + (area.height() - height) / 2, color, shadow, 1, 1);
+}
+
+void drawNoteFrame(Real scale, Real alpha)
+{
+	const Color art = alphaColor(255, 255, 255, alpha);
+	const Box body = noteBox(scale, s_note.bodyBounds);
+	TheDisplay->drawFillRect(body.x0, body.y0, body.width(), body.height(), alphaColor(0, 0, 0, 0.75f * alpha));
+	drawBox(findImage("UiRetailHelpTop"), noteBox(scale, s_note.topBounds), art);
+	drawBox(findImage("UiRetailHelpBottom"), noteBox(scale, s_note.bottomBounds), art);
+	const Image *left = findImage("UiRetailHelpLeft");
+	const Image *right = findImage("UiRetailHelpRight");
+	const AptScene::Box middle = {s_note.topBounds.left, s_note.topBounds.bottom, s_note.topBounds.right, s_note.bottomBounds.top};
+	if (left)
+		drawBox(left, noteBox(scale, {middle.left, middle.top, middle.left + left->getImageWidth(), middle.bottom}), art);
+	if (right)
+		drawBox(right, noteBox(scale, {middle.right - right->getImageWidth(), middle.top, middle.right, middle.bottom}), art);
 }
 
 void drawNotification(GameWindow *, WinInstanceData *)
@@ -435,49 +462,33 @@ void drawNotification(GameWindow *, WinInstanceData *)
 		return;
 	const Real scale = uiScale();
 	const Color art = alphaColor(255, 255, 255, alpha);
-	const Box body = noteBox(scale, NoteBodyX, NoteBodyY, NoteBodyWidth, NoteBodyHeight);
-	TheDisplay->drawFillRect(body.x0, body.y0, body.width(), body.height(), alphaColor(0, 0, 0, 0.75f * alpha));
-	drawBox(findImage("UiRetailHelpTop"), noteBox(scale, NoteArtX, NoteTopY, NoteArtWidth, NoteMiddleY - NoteTopY), art);
-	drawBox(findImage("UiRetailHelpLeft"), noteBox(scale, NoteArtX, NoteMiddleY, NoteLeftWidth, NoteMiddleHeight), art);
-	drawBox(findImage("UiRetailHelpRight"), noteBox(scale, NoteArtX + NoteArtWidth - NoteRightWidth, NoteMiddleY, NoteRightWidth, NoteMiddleHeight), art);
-	drawBox(findImage("UiRetailHelpBottom"), noteBox(scale, NoteArtX, NoteBottomY, NoteArtWidth, 27.0f), art);
+	drawNoteFrame(scale, alpha);
 
-	const Box icon = noteBox(scale, 0.0f, 0.0f, NoteIconSize, NoteIconSize);
-	const Box portrait = noteBox(scale, 6.7f, 9.0f, 64.0f, 64.0f);
 	if (TheDisplay->hasImageTexture(s_note.portrait))
 	{
-		const Int radius = portrait.width() / 2;
-		TheDisplay->setCircularClip(portrait.x0 + radius, portrait.y0 + radius, radius);
+		const Box portrait = noteBox(scale, s_note.iconBounds);
+		const Int radius = MIN(portrait.width(), portrait.height()) / 2;
+		TheDisplay->setCircularClip((portrait.x0 + portrait.x1) / 2, (portrait.y0 + portrait.y1) / 2, radius);
 		TheDisplay->drawImage(s_note.portrait, portrait.x0, portrait.y0, portrait.x1, portrait.y1, art);
 		TheDisplay->setCircularClip(0, 0, 0);
+		drawNoteArt([](const std::string &path) { return path.starts_with("_root.box.IconClip.@5."); }, scale, alpha);
 	}
-	drawBox(findImage("UiRetailNotifyIconFrame"), icon, art);
 
 	const ICoord2D mouse = TheMouse->getMouseStatus()->pos;
-	const Box pill = noteBox(scale, NoteCloseX, NoteCloseY, NoteCloseWidth, NoteCloseHeight);
+	const Box pill = noteBox(scale, s_note.closeBounds);
 	const char *pillImage = s_note.pressed ? "UiRetailNotifyCloseDown" : pill.contains(mouse.x, mouse.y) ? "UiRetailNotifyCloseOver" : "UiRetailNotifyCloseUp";
 	drawBox(findImage(pillImage), pill, art);
-	drawCloseGlyph(pill, alpha);
+	drawNoteArt([](const std::string &path) { return path.starts_with("_root.box.closeButton.@9."); }, scale, alpha);
 
-	if (s_note.text && s_note.text->getTextLength() > 0)
-	{
-		const Box area = noteBox(scale, NoteTextX, NoteTextY, NoteTextWidth, NoteTextHeight);
-		Int width, height;
-		s_note.text->getSize(&width, &height);
-		const RGBColor &rgb = s_noteSettings.color;
-		const Color color = alphaColor(static_cast<Int>(rgb.red * 255), static_cast<Int>(rgb.green * 255), static_cast<Int>(rgb.blue * 255), alpha);
-		const Color shadow = alphaColor(0, 0, 0, alpha);
-		Int top = area.y0 + (area.height() - height) / 2;
-		if (s_note.title && s_note.title->getTextLength() > 0)
-		{
-			Int titleWidth, titleHeight;
-			s_note.title->getSize(&titleWidth, &titleHeight);
-			top -= titleHeight / 2;
-			s_note.title->draw(area.x0 + (area.width() - titleWidth) / 2, top, color, shadow, 1, 1);
-			top += titleHeight;
-		}
-		s_note.text->draw(area.x0 + (area.width() - width) / 2, top, color, shadow, 1, 1);
-	}
+	const RGBColor &rgb = s_noteSettings.color;
+	const Color color = alphaColor(static_cast<Int>(rgb.red * 255), static_cast<Int>(rgb.green * 255), static_cast<Int>(rgb.blue * 255), alpha);
+	const Color shadow = alphaColor(0, 0, 0, alpha);
+	AptScene::Box message = s_note.messageBounds;
+	if (s_note.title && s_note.title->getTextLength() > 0)
+		drawNoteText(s_note.title, noteBox(scale, s_note.headingBounds), color, shadow);
+	else
+		message.top = s_note.headingBounds.top;
+	drawNoteText(s_note.text, noteBox(scale, message), color, shadow);
 }
 
 WindowMsgHandledType notificationInput(GameWindow *, UnsignedInt msg, WindowMsgData mData1, WindowMsgData)
@@ -673,11 +684,20 @@ void init(GameWindow *master)
 	s_note.window = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:Notification"));
 	if (!s_note.window)
 		return;
+	s_note.scene = std::make_unique<AptScene>("InGameNotificationBox");
+	s_note.artBounds = s_note.scene->bounds("_root.box");
+	s_note.topBounds = s_note.scene->bounds("_root.box.top");
+	s_note.bottomBounds = s_note.scene->bounds("_root.box.bottom");
+	s_note.bodyBounds = s_note.scene->bounds("_root.box.screen");
+	s_note.iconBounds = s_note.scene->bounds("_root.box.IconClip.icon");
+	s_note.headingBounds = s_note.scene->bounds("_root.box.@26");
+	s_note.messageBounds = s_note.scene->bounds("_root.box.content");
+	s_note.closeBounds = s_note.scene->bounds("_root.box.closeButton.@7");
 	s_note.window->winSetDrawFunc(drawNotification);
 	s_note.window->winSetInputFunc(notificationInput);
 }
 
-void reset()
+static void dismiss()
 {
 	s_note.open = FALSE;
 	s_note.pressed = FALSE;
@@ -686,20 +706,28 @@ void reset()
 		s_note.window->winHide(TRUE);
 }
 
-static void showNote(const UnicodeString &title, const UnicodeString &message, const Image *portrait, Real seconds)
+void reset()
 {
-	if (!s_note.window || message.isEmpty())
+	s_note.pending.clear();
+	dismiss();
+}
+
+static void openNext()
+{
+	if (s_note.open || s_note.pending.empty())
 		return;
+	const NoteMessage note = std::move(s_note.pending.front());
+	s_note.pending.pop_front();
 	GameFont *font = TheFontLibrary ? TheFontLibrary->getUiFont(s_noteSettings.font, s_noteSettings.size, s_noteSettings.bold, TheDisplay->getWidth(), TheDisplay->getHeight()) : nullptr;
 	DisplayString *text = ensureString(s_note.text, font);
 	if (!text)
 		return;
-	text->setText(message);
+	text->setText(note.body);
 	if (DisplayString *heading = ensureString(s_note.title, font))
-		heading->setText(title);
-	s_note.portrait = portrait;
+		heading->setText(note.title);
+	s_note.portrait = note.portrait;
 	s_note.start = timeGetTime();
-	s_note.holdMs = static_cast<UnsignedInt>(MAX(0.0f, seconds) * 1000.0f + 0.5f);
+	s_note.holdMs = note.holdMs;
 	s_note.open = TRUE;
 	s_note.pressed = FALSE;
 	s_note.window->winHide(FALSE);
@@ -710,39 +738,87 @@ static void showNote(const UnicodeString &title, const UnicodeString &message, c
 	}
 }
 
-void show(const UnicodeString &message, const Image *portrait, Real seconds)
+static void enqueue(const AsciiString &type, const UnicodeString &message, Real seconds, const Image *portrait)
 {
-	showNote(UnicodeString(), message, portrait, seconds);
+	if (!s_note.window || !s_note.artBounds.valid() || message.isEmpty() || !std::isfinite(seconds) || seconds < 0.0f)
+		return;
+	AsciiString name = type;
+	name.toLower();
+	const auto entry = s_noteSettings.types.find(name);
+	UnicodeString title;
+	if (entry != s_noteSettings.types.end())
+	{
+		const NoteType &style = entry->second;
+		if (!style.title.isEmpty() && TheGameText)
+			title = TheGameText->fetchOrSubstitute(style.title.str(), L"");
+		if (!style.icon.isEmpty())
+			if (const Image *icon = findImage(style.icon.str()))
+				portrait = icon;
+	}
+	const double millis = std::min(seconds * 1000.0 + 0.5, double(std::numeric_limits<UnsignedInt>::max() - NoteFadeMs));
+	s_note.pending.push_back({title, message, portrait, static_cast<UnsignedInt>(millis)});
+	openNext();
 }
 
 void showType(const AsciiString &type, const UnicodeString &message, Real seconds)
 {
-	AsciiString key = type;
-	key.toLower();
-	const auto entry = s_noteSettings.types.find(key);
-	if (entry == s_noteSettings.types.end())
-	{
-		show(message, nullptr, seconds);
+	if (message.isEmpty())
 		return;
+	reset();
+	enqueue(type, message, seconds, nullptr);
+}
+
+void showHero(HeroEvent event, const ThingTemplate *hero, const UnicodeString *award, const Image *awardIcon)
+{
+	if (!TheRetailHudSettings || !TheGameText || !hero)
+		return;
+	const RetailHudSettings &settings = *TheRetailHudSettings;
+	const RetailHudSettings::Notification *notification = nullptr;
+	const char *type = nullptr;
+	switch (event)
+	{
+		case HeroEvent::InitialSpawn: notification = &settings.heroInitialSpawn; type = "HeroInitialSpawn"; break;
+		case HeroEvent::Respawn: notification = &settings.heroRespawn; type = "HeroRespawn"; break;
+		case HeroEvent::Death: notification = &settings.heroDeath; type = "HeroDeath"; break;
+		case HeroEvent::EarnedAward: notification = &settings.heroEarnedAward; type = "HeroEarnedAward"; break;
 	}
-	const NoteType &style = entry->second;
-	const UnicodeString title = !style.title.isEmpty() && TheGameText ? TheGameText->fetch(style.title.str()) : UnicodeString();
-	showNote(title, message, style.icon.isEmpty() ? nullptr : findImage(style.icon.str()), seconds);
+	if (!notification || notification->message.isEmpty() ||
+		(event == HeroEvent::EarnedAward && (!award || award->isEmpty())))
+		return;
+
+	const UnicodeString format = TheGameText->fetchOrSubstitute(notification->message.str(), L"");
+	const UnicodeString heroName = hero->getDisplayName();
+	const UnicodeString *replacement = &heroName;
+	UnicodeString message;
+	for (const WideChar *ch = format.str(); *ch; ++ch)
+	{
+		if (replacement && ch[0] == L'%' && (ch[1] == L's' || (ch[1] == L'l' && ch[2] == L's')))
+		{
+			message.concat(*replacement);
+			replacement = replacement == &heroName && event == HeroEvent::EarnedAward ? award : nullptr;
+			ch += ch[1] == L'l' ? 2 : 1;
+		}
+		else
+			message.concat(*ch);
+	}
+	enqueue(type, message, notification->timeout, awardIcon ? awardIcon : hero->getButtonImage());
 }
 
 void update()
 {
-	if (!s_note.window || !s_note.open)
+	if (!s_note.window)
 		return;
-	if (timeGetTime() - s_note.start >= s_note.holdMs + NoteFadeMs)
-		reset();
+	if (s_note.open && timeGetTime() - s_note.start >= s_note.holdMs + NoteFadeMs)
+		dismiss();
+	if (!s_note.open && !s_note.pending.empty())
+		openNext();
 }
 
 Bool handleInput(UnsignedInt msg, Int x, Int y)
 {
 	if (!s_note.open)
 		return FALSE;
-	const Bool over = noteBox(uiScale(), NoteCloseX, NoteCloseY, NoteCloseWidth, NoteCloseHeight).contains(x, y);
+	const Bool over = noteBox(uiScale(), s_note.closeBounds).contains(x, y);
 	if (msg == GWM_LEFT_DOWN && over)
 	{
 		s_note.pressed = TRUE;
@@ -754,7 +830,7 @@ Bool handleInput(UnsignedInt msg, Int x, Int y)
 		const Bool used = s_note.pressed || over;
 		s_note.pressed = FALSE;
 		if (close)
-			reset();
+			dismiss();
 		return used;
 	}
 	return over && (msg == GWM_MOUSE_POS || msg == GWM_LEFT_DRAG || msg == GWM_LEFT_DOUBLE_CLICK);

@@ -230,6 +230,7 @@ public:
 
 	std::map<std::string, Movie> movies;
 	std::map<std::string, Box> boxes;
+	std::map<std::string, Coord2D> positions;
 	std::vector<Art> art;
 	std::vector<Label> labels;
 	Int width = 0, height = 0;
@@ -370,6 +371,7 @@ public:
 		if (depth > 18 || ++visits > 16000 || index >= movie.characters.size())
 			return {};
 		const Reader &r = movie.apt;
+		positions.emplace(path, Coord2D{m.x, m.y});
 		const size_t p = movie.characters[index];
 		if (!p)
 		{
@@ -593,6 +595,14 @@ AptScene::Box AptScene::bounds(const std::string &path) const
 	return entry == m_data->boxes.end() ? Box{} : entry->second;
 }
 
+Coord2D AptScene::position(const std::string &path, Coord2D fallback) const
+{
+	if (!m_data)
+		return fallback;
+	const auto entry = m_data->positions.find(path);
+	return entry == m_data->positions.end() ? fallback : entry->second;
+}
+
 Real AptScene::xScale() const
 {
 	return m_data ? Real(TheDisplay->getWidth()) / m_data->width : 1.0f;
@@ -608,7 +618,20 @@ void AptScene::draw(const Visibility &visible, const DrawText &text, const Horiz
 	if (!m_data)
 		return;
 
-	const Real sx = xScale(), sy = yScale();
+	drawArt(visible, scale, 0, 0, xScale(), yScale(), 1.0f);
+	for (const auto &label : m_data->labels)
+		if (visible(label.path))
+			text(label.path, label.text);
+}
+
+void AptScene::drawAt(const Visibility &visible, Real x, Real y, Real sx, Real sy, Real opacity) const
+{
+	if (m_data)
+		drawArt(visible, {}, x, y, sx, sy, opacity);
+}
+
+void AptScene::drawArt(const Visibility &visible, const HorizontalScale &scale, Real x, Real y, Real sx, Real sy, Real opacity) const
+{
 	std::vector<Coord2D> points;
 	for (const auto &art : m_data->art)
 	{
@@ -622,11 +645,10 @@ void AptScene::draw(const Visibility &visible, const DrawText &text, const Horiz
 		points.clear();
 		const Real origin = stretch != 1.0f ? bounds(art.path).left : 0;
 		for (const Coord2D &point : art.points)
-			points.push_back({(origin + (point.x - origin) * stretch) * sx, point.y * sy});
+			points.push_back({x + (origin + (point.x - origin) * stretch) * sx, y + point.y * sy});
+		const Color color = (art.color & 0x00FFFFFF) |
+			(static_cast<UnsignedInt>(((art.color >> 24) & 255) * opacity) << 24);
 		TheDisplay->drawImageTriangles(art.texture.empty() ? nullptr : art.texture.c_str(), points.data(),
-			art.uv.data(), static_cast<Int>(points.size()), art.color);
+			art.uv.data(), static_cast<Int>(points.size()), color);
 	}
-	for (const auto &label : m_data->labels)
-		if (visible(label.path))
-			text(label.path, label.text);
 }

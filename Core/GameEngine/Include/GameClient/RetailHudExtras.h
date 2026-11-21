@@ -6,6 +6,7 @@ class AsciiString;
 class GameWindow;
 class INI;
 class Image;
+class ThingTemplate;
 class UnicodeString;
 
 namespace RetailHeroBar
@@ -31,12 +32,14 @@ Bool showTooltip(Int x, Int y);
 
 namespace RetailNotification
 {
+enum class HeroEvent { InitialSpawn, Respawn, Death, EarnedAward };
+
 void load();
 void parse(INI *ini);
 void init(GameWindow *master);
 void reset();
 void update();
-void show(const UnicodeString &message, const Image *portrait, Real seconds);
 void showType(const AsciiString &type, const UnicodeString &message, Real seconds = 5.0f);
+void showHero(HeroEvent event, const ThingTemplate *hero, const UnicodeString *award = nullptr, const Image *awardIcon = nullptr);
 Bool handleInput(UnsignedInt msg, Int x, Int y);
 }

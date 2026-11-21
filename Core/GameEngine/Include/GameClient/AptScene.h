@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Lib/BaseType.h"
+#include "Lib/Coord2D.h"
 
 #include <functional>
 #include <memory>
@@ -33,11 +34,14 @@ public:
 	~AptScene();
 	Bool valid() const;
 	Box bounds(const std::string &path) const;
+	Coord2D position(const std::string &path, Coord2D fallback) const;
 	void draw(const Visibility &visible, const DrawText &text, const HorizontalScale &scale = {}) const;
+	void drawAt(const Visibility &visible, Real x, Real y, Real sx, Real sy, Real opacity) const;
 	Real xScale() const;
 	Real yScale() const;
 
 private:
+	void drawArt(const Visibility &visible, const HorizontalScale &scale, Real x, Real y, Real sx, Real sy, Real opacity) const;
 	class Data;
 	std::unique_ptr<Data> m_data;
 };
