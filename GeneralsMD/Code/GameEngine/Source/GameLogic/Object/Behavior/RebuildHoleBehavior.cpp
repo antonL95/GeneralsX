@@ -29,11 +29,15 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/BuildAssistant.h"
 #include "Common/GameState.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
@@ -41,6 +45,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/RebuildHoleBehavior.h"
 #include "GameLogic/Module/StickyBombUpdate.h"
+#include "GameLogic/RetailSkirmishProbe.h"
 
 
 //-------------------------------------------------------------------------------------------------
@@ -226,6 +231,30 @@ UpdateSleepTime RebuildHoleBehavior::update()
 		// decrement counter and respawn if it's time
 		if( --m_workerWaitCounter == 0 )
 		{
+			if (RetailFileLayers::enabled() && modData->m_workerTemplateName.isEmpty() && m_rebuildTemplate)
+			{
+				TheAI->pathfinder()->removeObjectFromPathfindMap(hole);
+				Object* replacement = TheBuildAssistant->buildObjectNow(nullptr, m_rebuildTemplate, hole->getPosition(),
+					hole->getOrientation(), hole->getControllingPlayer());
+				if (!replacement)
+				{
+					TheAI->pathfinder()->addObjectToPathfindMap(hole);
+					m_workerWaitCounter = 1;
+					return UPDATE_SLEEP_NONE;
+				}
+				if (replacement->getTeam() != hole->getTeam())
+					replacement->setTeam(hole->getTeam());
+				TheScriptEngine->transferObjectName(hole->getName(), replacement);
+				for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+				{
+					if (AIUpdateInterface* ai = object->getAI())
+						ai->transferAttack(hole->getID(), replacement->getID());
+				}
+				transferBombs(replacement);
+				RetailSkirmishProbe::rebuild(*hole, *replacement);
+				TheGameLogic->destroyObject(hole);
+				return UPDATE_SLEEP_NONE;
+			}
 
 			// resolve the worker template pointer if necessary
 			if( m_workerTemplate == nullptr )

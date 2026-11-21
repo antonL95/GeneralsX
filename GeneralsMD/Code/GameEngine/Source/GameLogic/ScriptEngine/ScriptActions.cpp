@@ -35,6 +35,7 @@
 #include "Common/GameAudio.h"
 #include "Common/GameUtility.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/RetailSkirmishProbe.h"
 #include "GameClient/RetailHudExtras.h"
 #include "Common/MapObject.h"							// For MAP_XY_FACTOR
 #include "Common/PartitionSolver.h"
@@ -6748,10 +6749,16 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				doCreateReinforcements(pAction->getParameter(0)->getString(), AsciiString::TheEmptyString, anchor->getPosition());
 			return;
 		case ScriptAction::ALLOW_DISALLOW_ONE_BUILDING:
-			if (Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString()))
-				player->setBuildingAllowed(TheThingFactory->findTemplate(pAction->getParameter(1)->getString(), FALSE),
-					pAction->getParameter(2)->getInt() != 0);
+		{
+			Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString());
+			const AsciiString& name = pAction->getParameter(1)->getString();
+			const ThingTemplate* what = player ? TheThingFactory->findTemplate(name, FALSE) : nullptr;
+			const Bool allowed = pAction->getParameter(2)->getInt() != 0;
+			if (player)
+				player->setBuildingAllowed(what, allowed);
+			RetailSkirmishProbe::buildPermission(player, name, what != nullptr, allowed);
 			return;
+		}
 		case ScriptAction::GIVE_PLAYER_UPGRADE:
 			if (Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString()))
 				if (const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(pAction->getParameter(1)->getString()))

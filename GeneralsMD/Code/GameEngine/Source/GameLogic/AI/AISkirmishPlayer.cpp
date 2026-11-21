@@ -1313,6 +1313,35 @@ void AISkirmishPlayer::updateRetail()
 		return FALSE;
 	};
 
+	const Bool hasArmy = std::any_of(soldiers.begin(), soldiers.end(), [&](const Object* unit) {
+		return armyWeight(*unit->getTemplate(), TRUE) > 0.0f;
+	});
+	UnsignedInt openingUnitReserve = 0;
+	if (!hasArmy && farms >= 2 && farmLimit > farms &&
+		!retailTuning.disableUnitBuilding && m_player->getCanBuildUnits())
+	{
+		for (Object* producer : producers)
+		{
+			const CommandSet* set = retailCommands(*producer);
+			if (!set || producer->getProductionUpdateInterface()->getProductionCount() != 0)
+				continue;
+			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			{
+				const CommandButton* button = set->getCommandButton(slot);
+				const ThingTemplate* unit = button ? button->getThingTemplate() : nullptr;
+				if (!unit || button->getCommandType() != GUI_COMMAND_UNIT_BUILD || armyWeight(*unit, FALSE) <= 0.0f ||
+					button->getRequiredRank() > producer->getExperienceTracker()->getRank() ||
+					!HeroRoster::buttonUpgradesMet(button, m_player, producer) || !m_player->hasEnoughCommandPoints(unit))
+					continue;
+				const CanMakeType result = TheBuildAssistant->canMakeUnit(producer, unit);
+				const Int cost = unit->calcCostToBuild(m_player);
+				if (cost > 0 && (result == CANMAKE_OK || result == CANMAKE_NO_MONEY) &&
+					(openingUnitReserve == 0 || static_cast<UnsignedInt>(cost) < openingUnitReserve))
+					openingUnitReserve = static_cast<UnsignedInt>(cost);
+			}
+		}
+	}
+
 	if (!retailTuning.disableBaseBuilding && m_player->getCanBuildBase())
 	{
 		const auto buildFrom = [&](Object& builder, FoundationAIUpdate* plot) -> Bool {
@@ -1337,7 +1366,10 @@ void AISkirmishPlayer::updateRetail()
 				Int score = 0;
 				if (economy)
 				{
-					if (!retailTuning.disableEconomyBuilding && farms < farmLimit)
+					const auto money = m_player->getMoney()->countMoney();
+					const auto cost = static_cast<UnsignedInt>(std::max(0, type->calcCostToBuild(m_player)));
+					if (!retailTuning.disableEconomyBuilding && farms < farmLimit &&
+						(farms < 2 || (money >= cost && money - cost >= openingUnitReserve)))
 						score = farms < 2 ? 3 : 1;
 				}
 				else if (countType(type) == 0)
@@ -1517,10 +1549,10 @@ void AISkirmishPlayer::updateRetail()
 		const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
 		if (unit->getAI()->isIdle() && (!horde || !horde->hasAttackOrder()))
 		{
-			if (trace && target)
+			if (trace)
 			{
-				std::fprintf(stderr, "AI_TARGET\t%u\t%d\tattack\t%d\t%d\t%d\n", frame, playerIndex,
-					unit->getID(), target->getID(), targetShroud);
+				std::fprintf(stderr, "AI_TARGET\t%u\t%d\t%s\t%d\t%d\t%d\n", frame, playerIndex,
+					target ? "attack" : "scout", unit->getID(), target ? target->getID() : 0, targetShroud);
 				std::fflush(stderr);
 			}
 			unit->getAI()->aiAttackMoveToPosition(destination, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);

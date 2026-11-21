@@ -89,6 +89,7 @@
 #include "GameLogic/Weapon.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/RetailTestCommands.h"
+#include "GameLogic/RetailSkirmishProbe.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/BattlePlanUpdate.h"
 #include "GameLogic/RankInfo.h"
@@ -267,6 +268,15 @@ static void startRetailFileSkirmish(const MapMetaData& map)
 	TheSkirmishGameInfo = NEW SkirmishGameInfo;
 	TheSkirmishGameInfo->enterGame();
 	TheSkirmishGameInfo->setSeed(0);
+
+	if (RetailSkirmishProbe::configure(*TheSkirmishGameInfo))
+	{
+		TheSkirmishGameInfo->setMap(map.m_fileName);
+		TheSkirmishGameInfo->setMapCRC(map.m_CRC);
+		TheSkirmishGameInfo->setMapSize(map.m_filesize);
+		TheSkirmishGameInfo->startGame(0);
+		return;
+	}
 
 	GameSlot human;
 	human.setState(SLOT_PLAYER, UnicodeString(L"Player"));

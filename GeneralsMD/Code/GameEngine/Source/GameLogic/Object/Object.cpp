@@ -33,6 +33,7 @@
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/RetailTestCommands.h"
+#include "GameLogic/RetailSkirmishProbe.h"
 #include <cmath>	// For isnan() on Linux
 #define DEFINE_WEAPONCONDITIONMAP
 #include "Common/BitFlagsIO.h"
@@ -5104,6 +5105,7 @@ void Object::onDie( DamageInfo *damageInfo )
 	}
 
 	RetailTestCommands::logHordeDeath(this, damageInfo);
+	RetailSkirmishProbe::death(*this, damageInfo->in.m_sourceID);
 
 	checkAndDetonateBoobyTrap(nullptr);// Already dying, so no need to handle death case of explosion
 

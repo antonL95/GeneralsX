@@ -245,6 +245,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/FiringTracker.h
     Include/GameLogic/FPUControl.h
     Include/GameLogic/GameLogic.h
+    Include/GameLogic/RetailSkirmishProbe.h
     Include/GameLogic/GhostObject.h
     Include/GameLogic/AttributeModifierStore.h
     Include/GameLogic/Locomotor.h
@@ -1092,6 +1093,7 @@ set(GAMEENGINE_SRC
 #    Source/GameLogic/System/CrateSystem.cpp
 #    Source/GameLogic/System/Damage.cpp
     Source/GameLogic/System/GameLogic.cpp
+    Source/GameLogic/System/RetailSkirmishProbe.cpp
 #    Source/GameLogic/System/GameLogicDispatch.cpp
 #    Source/GameLogic/System/RankInfo.cpp
 #    Source/GameNetwork/Connection.cpp

@@ -102,6 +102,7 @@
 #include "GameLogic/CastleRules.h"
 #include "GameLogic/CastleTemplateStore.h"
 #include "GameLogic/RetailTestCommands.h"
+#include "GameLogic/RetailSkirmishProbe.h"
 #include "GameLogic/CaveSystem.h"
 #include "GameLogic/CrateSystem.h"
 #include "GameLogic/FPUControl.h"
@@ -4086,6 +4087,7 @@ void GameLogic::update()
 	if (generateForSolo || generateForMP)
 	{
 		m_CRC = getCRC( CRC_RECALC );
+		RetailSkirmishProbe::crc(m_frame, m_CRC);
 		bool isPlayback = (TheRecorder && TheRecorder->isPlaybackMode());
 
 		GameMessage *msg = newInstance(GameMessage)(GameMessage::MSG_LOGIC_CRC);
@@ -4236,6 +4238,8 @@ void GameLogic::update()
 	TheWeaponStore->UPDATE();
 	TheLocomotorStore->UPDATE();
 	TheVictoryConditions->UPDATE();
+	if (getGameMode() == GAME_SKIRMISH)
+		RetailSkirmishProbe::update(m_frame);
 
 	{
 		//Handle disabled statii (and re-enable objects once frame matches)

@@ -37,6 +37,7 @@
 #include "Common/LatchRestore.h"
 #include "Common/MessageStream.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/RetailSkirmishProbe.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -7356,6 +7357,7 @@ void ScriptEngine::notifyOfCompletedVideo( const AsciiString& completedVideo )
 void ScriptEngine::notifyOfTriggeredSpecialPower( Int playerIndex, const AsciiString& completedPower, ObjectID sourceObj )
 {
 	m_triggeredSpecialPowers[playerIndex].push_back(AsciiStringObjectIDPair(completedPower, sourceObj));
+	RetailSkirmishProbe::cast(playerIndex, completedPower, sourceObj);
 }
 
 //-------------------------------------------------------------------------------------------------

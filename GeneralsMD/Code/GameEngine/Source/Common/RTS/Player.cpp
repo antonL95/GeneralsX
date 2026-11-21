@@ -61,6 +61,7 @@
 #include "Common/PlayerTemplateRules.h"
 #include "Common/CommandPointRules.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/RetailSkirmishProbe.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailWorldUI.h"
 #include "GameLogic/HeroRoster.h"
@@ -2843,6 +2844,8 @@ Bool Player::attemptToPurchaseScience(ScienceType science)
 	Int cost = getSciencePurchaseCost(science);
 	addSciencePurchasePoints(-cost);
 	addScience(science);
+	if (RetailSkirmishProbe::enabled())
+		RetailSkirmishProbe::purchase(*this, TheScienceStore->getInternalNameForScience(science));
 
 	getAcademyStats()->recordGeneralsPointsSpent( cost );
 
