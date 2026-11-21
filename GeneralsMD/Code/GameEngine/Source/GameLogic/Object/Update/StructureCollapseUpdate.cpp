@@ -34,6 +34,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/INI.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/GlobalData.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
@@ -220,6 +221,7 @@ UpdateSleepTime StructureCollapseUpdate::update()
 	{
 		Object *building = getObject();
 		UnsignedInt now = TheGameLogic->getFrame();
+		const Real previousHeight = m_currentHeight;
 		m_currentHeight -= m_collapseVelocity;
 		m_collapseVelocity -= TheGlobalData->m_gravity * (1.0 - d->m_collapseDamping);
 
@@ -284,6 +286,13 @@ UpdateSleepTime StructureCollapseUpdate::update()
 			building->getDrawable()->setInstanceMatrix(&newInstMatrix);
 
 			return UPDATE_SLEEP_FOREVER;
+		}
+
+		if (RetailFileLayers::enabled() && previousHeight + collapseHeight * 0.7f > 0.0f &&
+			m_currentHeight + collapseHeight * 0.7f <= 0.0f)
+		{
+			doPhaseStuff(SCPHASE_ALMOST_FINAL, currentPosition);
+			building->getBodyModule()->updateBodyParticleSystems();
 		}
 	}
 
