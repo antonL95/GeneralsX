@@ -35,6 +35,7 @@
 
 #include "Common/Debug.h"
 #include "Common/Language.h"
+#include "GameClient/ControlBar.h"
 #include "GameClient/Display.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GameWindow.h"
@@ -920,6 +921,16 @@ WinInputReturnCode GameWindowManager::winProcessMouseEvent( GameWindowMessage ms
 					break;
 
 				}
+
+				case GWM_RIGHT_DOWN:
+				case GWM_RIGHT_UP:
+					if (TheControlBar && TheControlBar->isRetailRadialButton(m_grabWindow))
+					{
+						const UnsignedInt radialMsg = m_grabWindow->winPointInWindow(mousePos->x, mousePos->y)
+							? msg : static_cast<UnsignedInt>(GWM_MOUSE_LEAVING);
+						winSendInputMsg(m_grabWindow, radialMsg, packedMouseCoords, 0);
+					}
+					break;
 
 				// --------------------------------------------------------------------
 				case MOUSE_EVENT_NONE:

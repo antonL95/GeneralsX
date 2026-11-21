@@ -96,9 +96,8 @@ Bool ControlBar::filterRetailRadialPress(GameWindow *window, UnsignedInt msg)
 		else
 		{
 			if (press && press != button)
-				return TRUE;
-			if (left || BitIsSet(window->winGetInstanceData()->getStatus(), WIN_STATUS_RIGHT_CLICK))
-				press = button;
+				BitClear(window->winGetInstanceData()->m_state, WIN_STATE_SELECTED);
+			press = left || BitIsSet(window->winGetInstanceData()->getStatus(), WIN_STATUS_RIGHT_CLICK) ? button : 0;
 		}
 		return FALSE;
 	}
