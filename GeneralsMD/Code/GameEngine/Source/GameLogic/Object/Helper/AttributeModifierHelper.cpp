@@ -97,6 +97,20 @@ AttributeModifierHelper::~AttributeModifierHelper()
 {
 }
 
+AttributeModifierHelper::TransferState AttributeModifierHelper::getTransferState() const
+{
+	return {m_stack, m_pendingUpgrades};
+}
+
+void AttributeModifierHelper::inheritTransferState(TransferState state)
+{
+	m_stack = std::move(state.stack);
+	m_pendingUpgrades = std::move(state.pendingUpgrades);
+	++m_version;
+	refreshDerived();
+	scheduleWake();
+}
+
 const AttributeModifierHelper* AttributeModifierHelper::hordeHelper() const
 {
 	const Object* container = getObject()->getContainedBy();

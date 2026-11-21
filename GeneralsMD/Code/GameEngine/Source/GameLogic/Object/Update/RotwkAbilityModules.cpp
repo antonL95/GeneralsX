@@ -39,6 +39,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 
 namespace
 {
@@ -260,7 +261,11 @@ void GameLogic::processMountedTemplateSwaps()
 		Bool selected;
 		Color indicatorColor;
 		std::vector<std::pair<AsciiString, UnsignedInt>> timers;
-		std::vector<const DoCommandUpgradeModuleData*> executedCommands;
+		std::vector<AsciiString> executedCommands;
+		Int stance;
+		AsciiString stanceModifier;
+		NameKeyType stanceTag;
+		AttributeModifierHelper::TransferState modifiers;
 #if !RETAIL_COMPATIBLE_AIGROUP
 		AIGroupPtr group;
 #endif
@@ -297,18 +302,33 @@ void GameLogic::processMountedTemplateSwaps()
 			transform = Matrix3D(Vector3(0.0f, 0.0f, 1.0f), source->getOrientation());
 			transform.Set_Translation(position);
 		}
+		const StancesBehavior* stances = StancesBehavior::find(source);
+		const AttributeModifierHelper* modifiers = source->getAttributeModifierHelper();
 		Swap& swap = swaps.emplace_back(Swap{id, source->m_producerID, source->m_builderID, target,
 			source->getHeroIdentityTemplate(), source->getTeam(), source->m_originalTeamName, transform, source->getName(),
 			source->getObjectCompletedUpgradeMask(), healthRatio, tracker->getRetailExperience(), tracker->getRank(),
 			tracker->getRetailStartingRank(), draw && draw->isSelected(), source->m_indicatorColor,
-			std::move(source->m_mountedPowerTimers), {}
+			std::move(source->m_mountedPowerTimers), std::move(source->m_mountedExecutedCommands),
+			stances ? stances->getStance() : source->m_mountedStance,
+			stances ? stances->getAppliedModifier() : AsciiString::TheEmptyString,
+			stances ? stances->getModuleTagNameKey() : NAMEKEY_INVALID,
+			modifiers ? modifiers->getTransferState() : AttributeModifierHelper::TransferState{}
 #if !RETAIL_COMPATIBLE_AIGROUP
 			, source->m_group
 #endif
 		});
 		for (BehaviorModule** module = source->getBehaviorModules(); *module; ++module)
-			if ((*module)->getModuleNameKey() == commandUpgradeKey && (*module)->getUpgrade()->isAlreadyUpgraded())
-				swap.executedCommands.push_back(static_cast<const DoCommandUpgrade*>(*module)->getCommandDefinition());
+		{
+			if ((*module)->getModuleNameKey() != commandUpgradeKey)
+				continue;
+			const auto* upgrade = static_cast<const DoCommandUpgrade*>(*module);
+			const AsciiString key = upgrade->getExecutionKey();
+			const auto existing = std::find(swap.executedCommands.begin(), swap.executedCommands.end(), key);
+			if (upgrade->isAlreadyUpgraded() && existing == swap.executedCommands.end())
+				swap.executedCommands.push_back(key);
+			else if (!upgrade->isAlreadyUpgraded() && existing != swap.executedCommands.end())
+				swap.executedCommands.erase(existing);
+		}
 		for (const AsciiString& name : data->m_synchronizeTimerOnSpecialPower)
 		{
 			const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate(name);
@@ -328,7 +348,8 @@ void GameLogic::processMountedTemplateSwaps()
 
 	for (Swap& swap : swaps)
 	{
-		Object* replacement = TheThingFactory->newObjectFromExactTemplate(swap.target, swap.team, OBJECT_STATUS_MASK_NONE, swap.id);
+		Object* replacement = TheThingFactory->newObjectFromExactTemplate(swap.target, swap.team, OBJECT_STATUS_MASK_NONE, swap.id,
+			std::move(swap.executedCommands));
 		replacement->m_mountedHeroIdentity = swap.identity;
 		replacement->m_producerID = swap.producer;
 		replacement->m_builderID = swap.builder;
@@ -338,20 +359,22 @@ void GameLogic::processMountedTemplateSwaps()
 			replacement->setCustomIndicatorColor(swap.indicatorColor);
 
 		replacement->setTransformMatrix(&swap.transform);
-		for (BehaviorModule** module = replacement->getBehaviorModules(); *module; ++module)
-		{
-			if ((*module)->getModuleNameKey() != commandUpgradeKey)
-				continue;
-			auto* upgrade = static_cast<DoCommandUpgrade*>(*module);
-			if (std::find(swap.executedCommands.begin(), swap.executedCommands.end(), upgrade->getCommandDefinition()) != swap.executedCommands.end())
-				upgrade->inheritExecution();
-		}
 		replacement->m_objectUpgradesCompleted.set(swap.upgrades);
 		replacement->updateUpgradeModules();
 		ExperienceTracker* tracker = replacement->getExperienceTracker();
 		tracker->advanceRetailLevel(swap.experience, FALSE);
 		tracker->setMinRetailRank(swap.rank);
 		tracker->setRetailStartingRank(swap.startingRank);
+		if (AttributeModifierHelper* modifiers = replacement->getAttributeModifierHelper())
+			modifiers->inheritTransferState(std::move(swap.modifiers));
+		replacement->m_mountedStance = swap.stance;
+		if (StancesBehavior* stances = StancesBehavior::find(replacement))
+		{
+			const Int stance = swap.stance == AttributeModifierRules::STANCE_UNINITIALIZED ? stances->getStance() : swap.stance;
+			stances->inheritStance(stance, swap.stanceModifier, swap.stanceTag);
+		}
+		else if (swap.stanceModifier.isNotEmpty())
+			AttributeModifiers::remove(replacement, swap.stanceModifier, AttributeModifiers::ownerOf(replacement, swap.stanceTag));
 		if (BodyModuleInterface* body = replacement->getBodyModule())
 			body->internalChangeHealth(body->getMaxHealth() * swap.healthRatio - body->getHealth());
 

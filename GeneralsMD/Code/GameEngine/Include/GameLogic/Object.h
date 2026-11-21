@@ -770,9 +770,14 @@ private:
 	std::unique_ptr<RotwkPowerState> m_rotwkPowerState;
 	void xferRotwkPowerState(Xfer* xfer);
 	friend class GameLogic;
+	friend class ThingFactory;
 	const ThingTemplate* m_mountedHeroIdentity = nullptr;
 	std::vector<std::pair<AsciiString, UnsignedInt>> m_mountedPowerTimers;
+	std::vector<AsciiString> m_mountedExecutedCommands;
+	Int m_mountedStance = 0;
+	void inheritMountedUpgradeCommands(std::vector<AsciiString> commands);
 	void xferMountedTemplateState(Xfer* xfer);
+	void xferMountedCombatState(Xfer* xfer);
 	ContainModuleInterface*				m_contain;
 	class SlavedUpdate* m_slavedUpdate = nullptr;
 	BodyModuleInterface*					m_body;

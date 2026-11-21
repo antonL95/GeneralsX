@@ -84,7 +84,8 @@ public:
 		this will throw an exception on failure; it will never return null.
 	*/
 	Object *newObject( const ThingTemplate *tmplate, Team *team, ObjectStatusMaskType statusMask = OBJECT_STATUS_MASK_NONE );
-	Object *newObjectFromExactTemplate( const ThingTemplate *tmplate, Team *team, ObjectStatusMaskType statusMask, ObjectID id = INVALID_ID );
+	Object *newObjectFromExactTemplate( const ThingTemplate *tmplate, Team *team, ObjectStatusMaskType statusMask, ObjectID id = INVALID_ID,
+		std::vector<AsciiString> executedCommands = {} );
 
 	/** request a new drawable using the given template.
 		this will throw an exception on failure; it will never return null.

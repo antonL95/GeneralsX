@@ -214,6 +214,19 @@ void StancesBehavior::setStance(Int stance)
 #endif
 }
 
+void StancesBehavior::inheritStance(Int stance, const AsciiString& modifier, NameKeyType moduleTag)
+{
+	m_appliedModifier = modifier;
+#if !RTS_GENERALS
+	if (moduleTag != getModuleTagNameKey() && m_appliedModifier.isNotEmpty())
+	{
+		AttributeModifiers::remove(getObject(), m_appliedModifier, AttributeModifiers::ownerOf(getObject(), moduleTag));
+		m_appliedModifier.clear();
+	}
+#endif
+	setStance(stance);
+}
+
 void StancesBehavior::crc(Xfer* xfer)
 {
 	BehaviorModule::crc(xfer);

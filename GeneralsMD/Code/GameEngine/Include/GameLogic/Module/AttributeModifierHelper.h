@@ -18,7 +18,19 @@ class AttributeModifierHelper : public ObjectHelper
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( AttributeModifierHelper, AttributeModifierHelperModuleData )
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( AttributeModifierHelper, "AttributeModifierHelper" )
 
+	struct PendingUpgrade
+	{
+		Int list;
+		UnsignedInt frame;
+	};
+
 public:
+	struct TransferState
+	{
+		AttributeModifierRules::Stack stack;
+		std::vector<PendingUpgrade> pendingUpgrades;
+	};
+
 	static constexpr UnsignedInt USE_LIST_DURATION = 0xFFFFFFFFu;
 
 	AttributeModifierHelper( Thing *thing, const ModuleData *modData );
@@ -36,6 +48,8 @@ public:
 	Bool hasAnyModifier() const;
 	UnsignedInt getVersion() const { return m_version; }
 	void refreshDerived();
+	TransferState getTransferState() const;
+	void inheritTransferState(TransferState state);
 
 private:
 	void changed( const std::vector<Int>& added, const std::vector<Int>& removed );
@@ -44,12 +58,6 @@ private:
 	void revokeUpgrades( Int list );
 	const AttributeModifierHelper* hordeHelper() const;
 	void refreshMembers();
-
-	struct PendingUpgrade
-	{
-		Int list;
-		UnsignedInt frame;
-	};
 
 	AttributeModifierRules::Stack m_stack;
 	std::vector<PendingUpgrade> m_pendingUpgrades;

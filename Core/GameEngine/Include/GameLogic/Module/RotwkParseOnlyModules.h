@@ -20,9 +20,11 @@ public:
 
 	virtual void onObjectCreated() override;
 	Int getStance() const { return m_stance; }
+	const AsciiString& getAppliedModifier() const { return m_appliedModifier; }
 	static Bool holdsGround(Int stance);
 	static const StancesBehavior* findForUnit(const Object* obj);
 	void setStance(Int stance);
+	void inheritStance(Int stance, const AsciiString& modifier, NameKeyType moduleTag);
 	static StancesBehavior* find(const Object* obj);
 
 private:

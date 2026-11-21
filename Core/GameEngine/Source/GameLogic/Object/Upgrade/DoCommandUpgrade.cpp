@@ -1,5 +1,6 @@
 #include "PreRTS.h"
 
+#include "Common/NameKeyGenerator.h"
 #include "GameClient/ControlBar.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Object.h"
@@ -17,6 +18,13 @@ void DoCommandUpgradeModuleData::buildFieldParse(MultiIniFieldParse& fields)
 }
 
 DoCommandUpgrade::~DoCommandUpgrade() = default;
+
+AsciiString DoCommandUpgrade::getExecutionKey() const
+{
+	AsciiString key;
+	key.format("%s %s", KEYNAME(getModuleTagNameKey()).str(), getDoCommandUpgradeModuleData()->m_grantCommand.str());
+	return key;
+}
 
 void DoCommandUpgrade::issueCommand(const AsciiString& name)
 {

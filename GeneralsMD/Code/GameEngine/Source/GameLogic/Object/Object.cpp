@@ -93,6 +93,7 @@
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
+#include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/ObjectDefectionHelper.h"
 #include "GameLogic/Module/ObjectRepulsorHelper.h"
 #include "GameLogic/Module/ObjectSMCHelper.h"
@@ -4200,6 +4201,7 @@ void Object::crc( Xfer *xfer )
 	{
 		xferRotwkPowerState(xfer);
 		xferMountedTemplateState(xfer);
+		xferMountedCombatState(xfer);
 	}
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;
@@ -4351,8 +4353,8 @@ void Object::xfer( Xfer *xfer )
 #endif
 	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
 		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
-	const XferVersion maxVersion = RetailFileLayers::enabled() ? 13 : 10;
-	XferVersion version = maxVersion == 13 ? maxVersion : (extendedSlots ? 10 : legacyVersion);
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 14 : 10;
+	XferVersion version = maxVersion == 14 ? maxVersion : (extendedSlots ? 10 : legacyVersion);
 	xfer->xferVersion(&version, maxVersion);
 
 	// object ID
@@ -4809,6 +4811,35 @@ void Object::xfer( Xfer *xfer )
 		xferRotwkPowerState(xfer);
 	if (version >= 13)
 		xferMountedTemplateState(xfer);
+	if (version >= 14)
+		xferMountedCombatState(xfer);
+}
+
+void Object::inheritMountedUpgradeCommands(std::vector<AsciiString> commands)
+{
+	if (commands.empty())
+		return;
+	m_mountedExecutedCommands = std::move(commands);
+	static const NameKeyType commandUpgradeKey = NAMEKEY("DoCommandUpgrade");
+	for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != commandUpgradeKey)
+			continue;
+		auto* upgrade = static_cast<DoCommandUpgrade*>(*module);
+		if (std::find(m_mountedExecutedCommands.begin(), m_mountedExecutedCommands.end(), upgrade->getExecutionKey()) != m_mountedExecutedCommands.end())
+			upgrade->inheritExecution();
+	}
+}
+
+void Object::xferMountedCombatState(Xfer* xfer)
+{
+	xfer->xferInt(&m_mountedStance);
+	UnsignedInt count = static_cast<UnsignedInt>(m_mountedExecutedCommands.size());
+	xfer->xferUnsignedInt(&count);
+	if (xfer->getXferMode() == XFER_LOAD)
+		m_mountedExecutedCommands.resize(count);
+	for (AsciiString& key : m_mountedExecutedCommands)
+		xfer->xferAsciiString(&key);
 }
 
 void Object::xferMountedTemplateState(Xfer* xfer)

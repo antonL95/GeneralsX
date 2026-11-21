@@ -20,7 +20,7 @@ public:
 	Bool isSubObjectsUpgrade() override { return FALSE; }
 	Bool resetUpgrade(const UpgradeMaskType& mask) override;
 	void inheritExecution() { setUpgradeExecuted(TRUE); }
-	const DoCommandUpgradeModuleData* getCommandDefinition() const { return getDoCommandUpgradeModuleData(); }
+	AsciiString getExecutionKey() const;
 
 protected:
 	void upgradeImplementation() override;
