@@ -27,9 +27,7 @@
 106 construct Player_1 MenPorter 0 GondorFarm 1080 725
 108 bparity-state Player_1 GondorFarm 0
 109 kill Player_1 GondorStoneMaker 0
-110 create Player_2 MenWallHubSmall 0 1097,725,0
+110 create Player_1 MenWallHubSmall 0 1097,725,0
 111 bparity-state Player_1 GondorFarm 0
-190 bparity-state Player_1 MenPorter 0 GondorFarm
-193 bparity-state Player_1 MenPorter 0 GondorFarm
-194 bparity-state Player_1 GondorFarm 0
-195 quit - - 0
+360 bparity-state Player_1 GondorFarm 0
+361 quit - - 0

@@ -282,14 +282,16 @@ Bool WallHubBehavior::construct(const ThingTemplate* requested, const Coord3D& t
 	if (span.pieces.empty() || span.legal != LBC_OK || !span.affordable)
 		return FALSE;
 
-	player->getMoney()->withdraw(span.cost);
+	UnsignedInt paid = player->getMoney()->withdraw(span.cost);
 	const Int stagger = std::clamp(getWallHubBehaviorModuleData()->m_staggerFactor, 0, 300);
 	ObjectID spanID = INVALID_ID;
 	for (std::size_t i = 0; i < span.pieces.size(); ++i)
 	{
 		const Piece& piece = span.pieces[i];
+		const UnsignedInt piecePaid = std::min(paid, static_cast<UnsignedInt>(piece.cost));
+		paid -= piecePaid;
 		const Object* structure = GettingBuiltBehavior::start(*piece.type, *hub, piece.position, piece.facing,
-			static_cast<UnsignedInt>(stagger * i), piece.cost, spanID);
+			static_cast<UnsignedInt>(stagger * i), static_cast<Int>(piecePaid), spanID);
 		if (structure && spanID == INVALID_ID)
 			spanID = structure->getID();
 	}
