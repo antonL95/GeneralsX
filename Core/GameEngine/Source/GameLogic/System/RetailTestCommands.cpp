@@ -451,6 +451,8 @@ GameWindow* retailSlotWindow(int slot)
 	AsciiString name;
 	if (slot < 6)
 		name.format("ControlBar.wnd:RingButton%d", slot + 1);
+	else if (slot >= MAX_COMMANDS_PER_SET + 3)
+		name.format("ControlBar.wnd:RadialButton%02d", slot - MAX_COMMANDS_PER_SET - 2);
 	else if (slot >= MAX_COMMANDS_PER_SET)
 		name.format("ControlBar.wnd:TrayButton%d", slot - MAX_COMMANDS_PER_SET + 1);
 	else
@@ -521,7 +523,7 @@ void dumpProduction(const Command& command, unsigned int frame)
 
 void dumpHud(unsigned int frame)
 {
-	for (int slot = 0; slot < MAX_COMMANDS_PER_SET + 3; ++slot)
+	for (int slot = 0; slot < MAX_COMMANDS_PER_SET + 3 + 12; ++slot)
 	{
 		GameWindow* window = retailSlotWindow(slot);
 		const CommandButton* button = window ? static_cast<const CommandButton*>(GadgetButtonGetData(window)) : nullptr;
@@ -534,6 +536,10 @@ void dumpHud(unsigned int frame)
 			hero ? hero->getName().str() : "-", image ? image->getName().str() : "-");
 		if (hero)
 		{
+			Int count;
+			Real progress;
+			TheControlBar->getRetailProduction(window, count, progress);
+			std::fprintf(stderr, "TEST hud_production %u %s count=%d progress=%.3f\n", frame, hero->getName().str(), count, progress);
 			Drawable* selected = TheInGameUI->getFirstSelectedDrawable();
 			if (selected)
 				std::fprintf(stderr, "TEST hud_make %u slot=%d %s reason=%d\n", frame, slot, hero->getName().str(),

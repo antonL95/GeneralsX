@@ -592,7 +592,6 @@ const ProductionEntry *ControlBar::getRetailProductionEntries(const GameWindow *
 	if (!production)
 		return nullptr;
 
-	Bool first = TRUE;
 	const ProductionEntry *lastMatch = nullptr;
 	const ThingTemplate *unit = command->getThingTemplate();
 	if (command->getCommandType() == GUI_COMMAND_REVIVE)
@@ -607,11 +606,10 @@ const ProductionEntry *ControlBar::getRetailProductionEntries(const GameWindow *
 		if (matches)
 		{
 			if (count == 0)
-				progress = first ? entry->getPercentComplete() / 100.0f : 0.0f;
+				progress = entry->getPercentComplete() / 100.0f;
 			++count;
 			lastMatch = entry;
 		}
-		first = FALSE;
 	}
 	return lastMatch;
 }

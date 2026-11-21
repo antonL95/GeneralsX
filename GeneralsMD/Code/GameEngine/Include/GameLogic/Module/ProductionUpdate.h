@@ -265,6 +265,9 @@ protected:
 	Bool cancelUpgrade( ProductionEntry *production );
 	Bool cancelUnitCreate( ProductionEntry *production );
 
+	Bool advanceProduction(ProductionEntry *production, Player *player);
+	void finishProduction(ProductionEntry *production, Player *player, UnsignedInt now);
+
 	void updateDoors();														///< update the door behavior
 
 	struct DoorInfo

@@ -739,6 +739,43 @@ UpdateSleepTime ProductionUpdate::update()
 
 	}
 
+	if (!RetailFileLayers::enabled() || !us->isKindOf(KINDOF_CASTLE_KEEP))
+	{
+		if (advanceProduction(production, player))
+			finishProduction(production, player, now);
+		return UPDATE_SLEEP_NONE;
+	}
+
+	Bool advancedSerial = FALSE;
+	ProductionEntry *ready = nullptr;
+	Bool readyHasReservedDoor = FALSE;
+	for (ProductionEntry *entry = production; entry; )
+	{
+		ProductionEntry *next = entry->m_next;
+		const Bool hero = entry->m_type == PRODUCTION_UNIT && HeroRoster::findIndex(player, entry->m_objectToProduce) >= 0;
+		if (hero || !advancedSerial)
+		{
+			advancedSerial |= !hero;
+			if (advanceProduction(entry, player))
+			{
+				const Bool hasReservedDoor = entry->m_type == PRODUCTION_UNIT && entry->m_exitDoor != DOOR_NONE_AVAILABLE;
+				if (!ready || (hasReservedDoor && !readyHasReservedDoor))
+				{
+					ready = entry;
+					readyHasReservedDoor = hasReservedDoor;
+				}
+			}
+		}
+		entry = next;
+	}
+
+	if (ready)
+		finishProduction(ready, player, now);
+	return UPDATE_SLEEP_NONE;
+}
+
+Bool ProductionUpdate::advanceProduction(ProductionEntry *production, Player *player)
+{
 	//
 	// you can disallow types of units on the fly in scripts, so if there is something
 	// in the queue that suddenly can't be build then get rid of it
@@ -751,15 +788,15 @@ UpdateSleepTime ProductionUpdate::update()
 		if (!production->getProductionObject()->isKindOf(KINDOF_DOZER))
 		{
 			if( cancelUnitCreate(production) )
-				return UPDATE_SLEEP_NONE;
+				return FALSE;
 		}
 
 	}
 
-	if (RetailFileLayers::enabled() && production->m_type == PRODUCTION_UNIT && player &&
+	if (RetailFileLayers::enabled() && production->m_type == PRODUCTION_UNIT &&
 		!player->hasEnoughCommandPoints(production->m_objectToProduce))
 	{
-		return UPDATE_SLEEP_NONE;
+		return FALSE;
 	}
 
 	production->m_framesUnderConstruction++;
@@ -786,275 +823,179 @@ UpdateSleepTime ProductionUpdate::update()
 																	INT_TO_REAL( totalProductionFrames ) *
 																	100.0f;
 
-	// if we've reached 100% or more we're done, tada!
-	if( production->m_percentComplete >= 100.0f )
+	return production->m_percentComplete >= 100.0f;
+}
+
+void ProductionUpdate::finishProduction(ProductionEntry *production, Player *player, UnsignedInt now)
+{
+	Object *us = getObject();
+
+	// handle unit production items
+	if( production->m_type == PRODUCTION_UNIT )
 	{
+		Object *creationBuilding = us;
 
-		// handle unit production items
-		if( production->m_type == PRODUCTION_UNIT )
+		// create this unit
+
+		//if I've got a ExitModule
+		ExitInterface *exitInterface = creationBuilding->getObjectExitInterface();
+		if( exitInterface )
 		{
-			Object *creationBuilding = us;
 
-			// create this unit
-
-			//if I've got a ExitModule
-			ExitInterface *exitInterface = creationBuilding->getObjectExitInterface();
-			if( exitInterface )
+			//
+			// only exit if the exit interface will let us ... if we can't we'll just keep this
+			// unit in the production and keep "overbuilding" it, every frame we will check to see
+			// if we can exit and then move onto production of the next one
+			//
+			Int numberToTry = production->getProductionQuantityRemaining();// this will change midloop, so it can't be the For clause
+			for( int i = 0; i < numberToTry; i++ )
 			{
-
-				//
-				// only exit if the exit interface will let us ... if we can't we'll just keep this
-				// unit in the production and keep "overbuilding" it, every frame we will check to see
-				// if we can exit and then move onto production of the next one
-				//
-				Int numberToTry = production->getProductionQuantityRemaining();// this will change midloop, so it can't be the For clause
-				for( int i = 0; i < numberToTry; i++ )
+				ExitDoorType exitDoor = production->getExitDoor();
+				if (exitDoor == DOOR_NONE_AVAILABLE)
 				{
-					ExitDoorType exitDoor = production->getExitDoor();
-					if (exitDoor == DOOR_NONE_AVAILABLE)
-					{
-						exitDoor = exitInterface->reserveDoorForExit(production->m_objectToProduce, nullptr);
-						production->setExitDoor(exitDoor);
-					}
+					exitDoor = exitInterface->reserveDoorForExit(production->m_objectToProduce, nullptr);
+					production->setExitDoor(exitDoor);
+				}
 
-					if (exitDoor != DOOR_NONE_AVAILABLE)
-					{
-						// note, could be DOOR_NONE_NEEDED! so door could be null. (srj)
-						DoorInfo* door = (exitDoor >= 0 && exitDoor < DOOR_COUNT_MAX) ? &m_doors[exitDoor] : nullptr;
+				if (exitDoor != DOOR_NONE_AVAILABLE)
+				{
+					// note, could be DOOR_NONE_NEEDED! so door could be null. (srj)
+					DoorInfo* door = (exitDoor >= 0 && exitDoor < DOOR_COUNT_MAX) ? &m_doors[exitDoor] : nullptr;
 
-						//
-						// if the producing structure has a door opening animation we will set the condition
-						// bits to open the door (note that we must also take care to remove any condition
-						// that had us previously closing a door)
-						//
-						const ProductionUpdateModuleData *d = getProductionUpdateModuleData();
-						if( d->m_numDoorAnimations > 0 && door != nullptr )
+					//
+					// if the producing structure has a door opening animation we will set the condition
+					// bits to open the door (note that we must also take care to remove any condition
+					// that had us previously closing a door)
+					//
+					const ProductionUpdateModuleData *d = getProductionUpdateModuleData();
+					if( d->m_numDoorAnimations > 0 && door != nullptr )
+					{
+
+						// if the door is closed, open it
+						if( door->m_doorOpenedFrame == 0 && door->m_doorWaitOpenFrame == 0 && door->m_doorClosedFrame == 0 )
 						{
 
-							// if the door is closed, open it
-							if( door->m_doorOpenedFrame == 0 && door->m_doorWaitOpenFrame == 0 && door->m_doorClosedFrame == 0 )
-							{
-
-								door->m_doorOpenedFrame = now;
-								m_setFlags.set( theOpeningFlags[exitDoor] );
-								m_flagsDirty = TRUE;
-
-							}
-							// if the door is waiting-open, keep it there
-							else if( door->m_doorWaitOpenFrame != 0 )
-							{
-
-								door->m_doorWaitOpenFrame = now;
-
-							}
-							// if the door is closing, for now, pop it to waiting open
-							else if( door->m_doorClosedFrame != 0 )
-							{
-
-								door->m_doorWaitOpenFrame = now;
-
-								m_clearFlags.set( theOpeningFlags[exitDoor], true );
-								m_clearFlags.set( theClosingFlags[exitDoor], true );
-								m_setFlags.set( theOpeningFlags[exitDoor], false );
-								m_setFlags.set( theClosingFlags[exitDoor], false );
-
-								m_setFlags.set( theWaitingOpenFlags[exitDoor] );
-								m_flagsDirty = TRUE;
-
-							}
+							door->m_doorOpenedFrame = now;
+							m_setFlags.set( theOpeningFlags[exitDoor] );
+							m_flagsDirty = TRUE;
 
 						}
-
-						// we now go into the construction complete condition for a while
-						if( m_constructionCompleteFrame == 0 )
+						// if the door is waiting-open, keep it there
+						else if( door->m_doorWaitOpenFrame != 0 )
 						{
 
-							m_constructionCompleteFrame = now;
-							m_setFlags.set( MODELCONDITION_CONSTRUCTION_COMPLETE );
+							door->m_doorWaitOpenFrame = now;
+
+						}
+						// if the door is closing, for now, pop it to waiting open
+						else if( door->m_doorClosedFrame != 0 )
+						{
+
+							door->m_doorWaitOpenFrame = now;
+
+							m_clearFlags.set( theOpeningFlags[exitDoor], true );
+							m_clearFlags.set( theClosingFlags[exitDoor], true );
+							m_setFlags.set( theOpeningFlags[exitDoor], false );
+							m_setFlags.set( theClosingFlags[exitDoor], false );
+
+							m_setFlags.set( theWaitingOpenFlags[exitDoor] );
 							m_flagsDirty = TRUE;
 
 						}
 
-						//
-						// make a new object, note that for production buildings that have door
-						// animations we will not make the object until the door has been totally
-						// opened
-						//
-						if( d->m_numDoorAnimations == 0 || door == nullptr || door->m_doorWaitOpenFrame != 0 )
+					}
+
+					// we now go into the construction complete condition for a while
+					if( m_constructionCompleteFrame == 0 )
+					{
+
+						m_constructionCompleteFrame = now;
+						m_setFlags.set( MODELCONDITION_CONSTRUCTION_COMPLETE );
+						m_flagsDirty = TRUE;
+
+					}
+
+					//
+					// make a new object, note that for production buildings that have door
+					// animations we will not make the object until the door has been totally
+					// opened
+					//
+					if( d->m_numDoorAnimations == 0 || door == nullptr || door->m_doorWaitOpenFrame != 0 )
+					{
+						Object *newObj = TheThingFactory->newObject( production->m_objectToProduce,
+																creationBuilding->getControllingPlayer()->getDefaultTeam() );
+
+						newObj->setProducer(creationBuilding);
+						if (RetailFileLayers::enabled())
+							HeroRoster::onHeroProduced(newObj);
+
+						// call the exit interface to do the rally point and position stuff
+						exitInterface->exitObjectViaDoor( newObj, exitDoor );
+
+						// since we successfully exited via this door, we should NOT call unreserveDoorForExit
+						// when we toss this production entry. so set it back to an innocuous value.
+						production->setExitDoor(DOOR_NONE_AVAILABLE);
+
+						// Now, play the sound associated with the new object's production.
+						AudioEventRTS voiceCreate = *newObj->getTemplate()->getVoiceCreated();
+						voiceCreate.setObjectID(newObj->getID());
+						TheAudio->addAudioEvent(&voiceCreate);
+
+						// call the onUnitCreated for the player
+						creationBuilding->getControllingPlayer()->onUnitCreated( creationBuilding, newObj );
+
+						// onCreates have been called on newObj, and after that the owner was set,
+						// so now is the time to call the game side of CreateModules
+						for (BehaviorModule** m = newObj->getBehaviorModules(); *m; ++m)
 						{
-							Object *newObj = TheThingFactory->newObject( production->m_objectToProduce,
-																	creationBuilding->getControllingPlayer()->getDefaultTeam() );
-
-							newObj->setProducer(creationBuilding);
-							if (RetailFileLayers::enabled())
-								HeroRoster::onHeroProduced(newObj);
-
-							// call the exit interface to do the rally point and position stuff
-							exitInterface->exitObjectViaDoor( newObj, exitDoor );
-
-							// since we successfully exited via this door, we should NOT call unreserveDoorForExit
-							// when we toss this production entry. so set it back to an innocuous value.
-							production->setExitDoor(DOOR_NONE_AVAILABLE);
-
-							// Now, play the sound associated with the new object's production.
-							AudioEventRTS voiceCreate = *newObj->getTemplate()->getVoiceCreated();
-							voiceCreate.setObjectID(newObj->getID());
-							TheAudio->addAudioEvent(&voiceCreate);
-
-							// call the onUnitCreated for the player
-							creationBuilding->getControllingPlayer()->onUnitCreated( creationBuilding, newObj );
-
-							// onCreates have been called on newObj, and after that the owner was set,
-							// so now is the time to call the game side of CreateModules
-							for (BehaviorModule** m = newObj->getBehaviorModules(); *m; ++m)
-							{
-								CreateModuleInterface* create = (*m)->getCreate();
-								if (!create)
-									continue;
-								create->onBuildComplete();
-							}
-
-							if( production->getProductionQuantity() == production->getProductionQuantityRemaining() )
-							{
-								//Call the voice created for the 1st object -- because it's possible to create multiple objects like redguards!
-								AudioEventRTS sound = *newObj->getTemplate()->getPerUnitSound( "VoiceCreate" );
-								sound.setObjectID( newObj->getID() );
-								TheAudio->addAudioEvent( &sound );
-							}
-
-							if (RetailFileLayers::enabled() && !d->m_giveNoXP)
-								ExperienceLevelStore::awardProductionExperience(creationBuilding, newObj->getTemplate()->friend_getBuildCost());
-
-							creationBuilding->getControllingPlayer()->getAcademyStats()->recordProduction( newObj, creationBuilding );
-
-							//We created one guy, but we may want to do more so we should stay in this node of production.
-							// This is last so the voice check can easily check for "first" guy
-							production->oneProductionSuccessful();
-
+							CreateModuleInterface* create = (*m)->getCreate();
+							if (!create)
+								continue;
+							create->onBuildComplete();
 						}
+
+						if( production->getProductionQuantity() == production->getProductionQuantityRemaining() )
+						{
+							//Call the voice created for the 1st object -- because it's possible to create multiple objects like redguards!
+							AudioEventRTS sound = *newObj->getTemplate()->getPerUnitSound( "VoiceCreate" );
+							sound.setObjectID( newObj->getID() );
+							TheAudio->addAudioEvent( &sound );
+						}
+
+						if (RetailFileLayers::enabled() && !d->m_giveNoXP)
+							ExperienceLevelStore::awardProductionExperience(creationBuilding, newObj->getTemplate()->friend_getBuildCost());
+
+						creationBuilding->getControllingPlayer()->getAcademyStats()->recordProduction( newObj, creationBuilding );
+
+						//We created one guy, but we may want to do more so we should stay in this node of production.
+						// This is last so the voice check can easily check for "first" guy
+						production->oneProductionSuccessful();
 
 					}
 
 				}
 
-				if( production->getProductionQuantityRemaining() == 0 )
-				{
-					// remove this production entry so we can go on to the next if we are totally finished
-					removeFromProductionQueue( production );
-
-					// delete the production entry
-					deleteInstance(production);
-				}
-
 			}
-			else
+
+			if( production->getProductionQuantityRemaining() == 0 )
 			{
-
-				// there is no exit interface, this is an error
-				DEBUG_CRASH( ("Cannot create '%s', there is no ExitUpdate interface defined for producer object '%s'",
-															production->m_objectToProduce->getName().str(),
-															creationBuilding->getTemplate()->getName().str()) );
-
-				// remove this item from the production queue
+				// remove this production entry so we can go on to the next if we are totally finished
 				removeFromProductionQueue( production );
 
 				// delete the production entry
 				deleteInstance(production);
-
 			}
 
 		}
-		else if( production->m_type == PRODUCTION_UPGRADE )
+		else
 		{
-			const UpgradeTemplate *upgrade = production->m_upgradeToResearch;
-			if (RetailFileLayers::enabled() && ReplaceSelfUpgrade::isBlocked(us, upgrade))
-			{
-				cancelUpgrade(production);
-				return UPDATE_SLEEP_NONE;
-			}
-			if (RetailFileLayers::enabled() && !getProductionUpdateModuleData()->m_giveNoXP)
-				ExperienceLevelStore::awardProductionExperience(us, upgrade->calcCostToBuild(nullptr));
 
-			// we finished an upgrade, lets add that money spent on it to the scorekeeper
-			player->getScoreKeeper()->addMoneySpent(upgrade->calcCostToBuild(player));
+			// there is no exit interface, this is an error
+			DEBUG_CRASH( ("Cannot create '%s', there is no ExitUpdate interface defined for producer object '%s'",
+														production->m_objectToProduce->getName().str(),
+														creationBuilding->getTemplate()->getName().str()) );
 
-			// notify the script engine
-			TheScriptEngine->notifyOfCompletedUpgrade(
-				us->getControllingPlayer()->getPlayerIndex(),
-				upgrade->getUpgradeName(),
-				us->getID());
-
-			if (RetailFileLayers::enabled())
-			{
-				const AsciiString &name = upgrade->getResearchCompleteEvaEvent();
-				RetailEva::queue(us->getControllingPlayer(), name.isEmpty() ? AsciiString("GenericBuildingUpgraded") : name,
-					us->getPosition(), RetailEva::Ping::Upgrade);
-			}
-			else if( us->isLocallyViewed() && !upgrade->getDisplayNameLabel().isEmpty() )
-			{
-				UnicodeString msg;
-				UnicodeString format = TheGameText->fetch( "UPGRADE:UpgradeComplete" );
-				UnicodeString upgradeName = TheGameText->fetch( upgrade->getDisplayNameLabel().str() );
-
-				msg.format( format.str(), upgradeName.str() );
-				TheInGameUI->message( msg );
-
-				// upgrades are a more rare event, play a nifty radar event thingy
-				TheRadar->createEvent( us->getPosition(), RADAR_EVENT_UPGRADE );
-
-				//Play the sound for the upgrade, because we just built it!
-				AudioEventRTS sound = *upgrade->getResearchCompleteSound();
-				if( TheAudio->isValidAudioEvent( &sound ) )
-				{
-					//We have a custom upgrade complete sound.
-					sound.setObjectID( us->getID() );
-					TheAudio->addAudioEvent( &sound );
-				}
-				else
-				{
-					//Use a generic EVA event.
-					TheEva->setShouldPlay(EVA_UpgradeComplete);
-				}
-
-				//Play any available unit specific sound for upgrade.
-				sound = *upgrade->getUnitSpecificSound();
-				sound.setObjectID( us->getID() );
-				TheAudio->addAudioEvent( &sound );
-
-			}
-
-			// update the upgrade status in the player or give the upgrade to the object
-			if( upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER )
-			{
-				player->addUpgrade( upgrade, UPGRADE_STATUS_COMPLETE );
-			}
-			else
-			{
-				us->giveUpgrade( upgrade );
-			}
-
-			player->getAcademyStats()->recordUpgrade( upgrade, FALSE );
-
-			//Also mark the UI dirty -- incase object with upgrade cameo is selected.
-			Drawable *draw = TheInGameUI->getFirstSelectedDrawable();
-			Object *selectedObject = draw ? draw->getObject() : nullptr;
-			if( selectedObject )
-			{
-				const ThingTemplate *thing = selectedObject->getTemplate();
-				for( Int i = 0; i < MAX_UPGRADE_CAMEO_UPGRADES; i++ )
-				{
-					AsciiString upgradeName = thing->getUpgradeCameoName( i );
-					const UpgradeTemplate *testUpgrade = TheUpgradeCenter->findUpgrade( upgradeName );
-					if( testUpgrade == upgrade )
-					{
-						//Our selected object has the upgrade
-						TheControlBar->markUIDirty();
-						break;
-					}
-				}
-			}
-
-			// remove this production entry so we can go on to the next
+			// remove this item from the production queue
 			removeFromProductionQueue( production );
 
 			// delete the production entry
@@ -1063,8 +1004,103 @@ UpdateSleepTime ProductionUpdate::update()
 		}
 
 	}
+	else if( production->m_type == PRODUCTION_UPGRADE )
+	{
+		const UpgradeTemplate *upgrade = production->m_upgradeToResearch;
+		if (RetailFileLayers::enabled() && ReplaceSelfUpgrade::isBlocked(us, upgrade))
+		{
+			cancelUpgrade(production);
+			return;
+		}
+		if (RetailFileLayers::enabled() && !getProductionUpdateModuleData()->m_giveNoXP)
+			ExperienceLevelStore::awardProductionExperience(us, upgrade->calcCostToBuild(nullptr));
 
-	return UPDATE_SLEEP_NONE;
+		// we finished an upgrade, lets add that money spent on it to the scorekeeper
+		player->getScoreKeeper()->addMoneySpent(upgrade->calcCostToBuild(player));
+
+		// notify the script engine
+		TheScriptEngine->notifyOfCompletedUpgrade(
+			us->getControllingPlayer()->getPlayerIndex(),
+			upgrade->getUpgradeName(),
+			us->getID());
+
+		if (RetailFileLayers::enabled())
+		{
+			const AsciiString &name = upgrade->getResearchCompleteEvaEvent();
+			RetailEva::queue(us->getControllingPlayer(), name.isEmpty() ? AsciiString("GenericBuildingUpgraded") : name,
+				us->getPosition(), RetailEva::Ping::Upgrade);
+		}
+		else if( us->isLocallyViewed() && !upgrade->getDisplayNameLabel().isEmpty() )
+		{
+			UnicodeString msg;
+			UnicodeString format = TheGameText->fetch( "UPGRADE:UpgradeComplete" );
+			UnicodeString upgradeName = TheGameText->fetch( upgrade->getDisplayNameLabel().str() );
+
+			msg.format( format.str(), upgradeName.str() );
+			TheInGameUI->message( msg );
+
+			// upgrades are a more rare event, play a nifty radar event thingy
+			TheRadar->createEvent( us->getPosition(), RADAR_EVENT_UPGRADE );
+
+			//Play the sound for the upgrade, because we just built it!
+			AudioEventRTS sound = *upgrade->getResearchCompleteSound();
+			if( TheAudio->isValidAudioEvent( &sound ) )
+			{
+				//We have a custom upgrade complete sound.
+				sound.setObjectID( us->getID() );
+				TheAudio->addAudioEvent( &sound );
+			}
+			else
+			{
+				//Use a generic EVA event.
+				TheEva->setShouldPlay(EVA_UpgradeComplete);
+			}
+
+			//Play any available unit specific sound for upgrade.
+			sound = *upgrade->getUnitSpecificSound();
+			sound.setObjectID( us->getID() );
+			TheAudio->addAudioEvent( &sound );
+
+		}
+
+		// update the upgrade status in the player or give the upgrade to the object
+		if( upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER )
+		{
+			player->addUpgrade( upgrade, UPGRADE_STATUS_COMPLETE );
+		}
+		else
+		{
+			us->giveUpgrade( upgrade );
+		}
+
+		player->getAcademyStats()->recordUpgrade( upgrade, FALSE );
+
+		//Also mark the UI dirty -- incase object with upgrade cameo is selected.
+		Drawable *draw = TheInGameUI->getFirstSelectedDrawable();
+		Object *selectedObject = draw ? draw->getObject() : nullptr;
+		if( selectedObject )
+		{
+			const ThingTemplate *thing = selectedObject->getTemplate();
+			for( Int i = 0; i < MAX_UPGRADE_CAMEO_UPGRADES; i++ )
+			{
+				AsciiString upgradeName = thing->getUpgradeCameoName( i );
+				const UpgradeTemplate *testUpgrade = TheUpgradeCenter->findUpgrade( upgradeName );
+				if( testUpgrade == upgrade )
+				{
+					//Our selected object has the upgrade
+					TheControlBar->markUIDirty();
+					break;
+				}
+			}
+		}
+
+		// remove this production entry so we can go on to the next
+		removeFromProductionQueue( production );
+
+		// delete the production entry
+		deleteInstance(production);
+
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
