@@ -7551,7 +7551,7 @@ void Pathfinder::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -7623,13 +7623,13 @@ void Pathfinder::xfer( Xfer *xfer )
 			xfer->xferObjectID(&entry.positionOwner);
 			xfer->xferObjectID(&entry.goalOwner);
 			xfer->xferObjectID(&entry.aircraftGoalOwner);
+			if (!m_map || entry.layer < LAYER_GROUND || entry.layer > LAYER_LAST)
+				throw XFER_INVALID_PARAMETERS;
+			PathfindCell* cell = findCell(entry.layer, entry.position.x, entry.position.y);
+			if (!cell)
+				throw XFER_INVALID_PARAMETERS;
 			if (loading)
 			{
-				if (!m_map || entry.layer < LAYER_GROUND || entry.layer > LAYER_LAST)
-					throw XFER_INVALID_PARAMETERS;
-				PathfindCell* cell = findCell(entry.layer, entry.position.x, entry.position.y);
-				if (!cell)
-					throw XFER_INVALID_PARAMETERS;
 				if (entry.positionOwner != INVALID_ID)
 					cell->setPosUnit(entry.positionOwner, entry.position);
 				if (entry.goalOwner != INVALID_ID)
@@ -7637,6 +7637,8 @@ void Pathfinder::xfer( Xfer *xfer )
 				if (entry.aircraftGoalOwner != INVALID_ID)
 					cell->setGoalAircraft(entry.aircraftGoalOwner, entry.position);
 			}
+			if (version >= 3 && entry.goalOwner != INVALID_ID)
+				cell->xferSharedGoalUnits(xfer);
 		}
 		m_hasLoadedReservations = loading;
 		if (loading)

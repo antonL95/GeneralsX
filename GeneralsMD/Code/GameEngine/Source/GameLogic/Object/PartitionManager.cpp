@@ -2758,6 +2758,7 @@ void PartitionManager::shutdown()
 {
 	m_updatedSinceLastReset = false;
 	removeAllDirtyModules();
+	m_loadedCollisionChecks.clear();
 
 #ifdef RTS_DEBUG
 	// the above *should* remove all the touched cells (via unRegisterObject), but let's check:
@@ -2793,6 +2794,16 @@ void PartitionManager::shutdown()
 void PartitionManager::update()
 {
 	const Bool restoring = RetailFileLayers::enabled() && TheGameState && TheGameState->isInLoadGame();
+	if (!restoring && !m_loadedCollisionChecks.empty())
+	{
+		for (ObjectID id : m_loadedCollisionChecks)
+		{
+			Object* obj = TheGameLogic->findObjectByID(id);
+			if (obj && obj->friend_getPartitionData())
+				obj->friend_getPartitionData()->makeDirty(FALSE);
+		}
+		m_loadedCollisionChecks.clear();
+	}
 	//USE_PERF_TIMER(PartitionManager_update)
 	{
 #ifdef INTENSE_DEBUG
@@ -4673,7 +4684,7 @@ void PartitionManager::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 2;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4774,6 +4785,38 @@ void PartitionManager::xfer( Xfer *xfer )
 	else
 	{
 		// Version 1 save games will just not have any SightingInfos in the queue to be undone.
+	}
+
+	if (version >= 3)
+	{
+		if (xfer->getXferMode() == XFER_LOAD)
+		{
+			m_loadedCollisionChecks.clear();
+			UnsignedInt count = 0;
+			xfer->xferUnsignedInt(&count);
+			for (UnsignedInt i = 0; i < count; ++i)
+			{
+				ObjectID id;
+				xfer->xferObjectID(&id);
+				m_loadedCollisionChecks.push_back(id);
+			}
+		}
+		else
+		{
+			std::vector<ObjectID> checks = m_loadedCollisionChecks;
+			for (PartitionData* data = m_moduleList; data; data = data->getNext())
+			{
+				const Object* obj = data->getObject();
+				if (obj && !obj->isKindOf(KINDOF_IMMOBILE) && data->isInNeedOfCollisionCheck())
+					checks.push_back(obj->getID());
+			}
+			std::sort(checks.begin(), checks.end());
+			checks.erase(std::unique(checks.begin(), checks.end()), checks.end());
+			UnsignedInt count = static_cast<UnsignedInt>(checks.size());
+			xfer->xferUnsignedInt(&count);
+			for (ObjectID id : checks)
+				xfer->xferObjectID(&id);
+		}
 	}
 
 }

@@ -6,6 +6,7 @@
 #include "GameLogic/RetailTestCommands.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -23,6 +24,7 @@
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
+#include "Common/MapObject.h"
 #include "Common/MessageStream.h"
 #include "Common/Money.h"
 #include "Common/NameKeyGenerator.h"
@@ -2252,8 +2254,8 @@ void execute(const Command& command, unsigned int frame)
 			xfer.close();
 			return result;
 		};
-		std::fprintf(stderr, "TEST snapshot frame=%u random=%08X partition=%08X players=%08X ai=%08X pathfinder=%08X\n",
-			frame, GetGameLogicRandomSeedCRC(), crc(ThePartitionManager), crc(ThePlayerList), crc(TheAI), crc(TheAI->pathfinder()));
+		std::fprintf(stderr, "TEST snapshot frame=%u random=%08X partition=%08X players=%08X ai=%08X pathfinder=%08X terrain=%08X\n",
+			frame, GetGameLogicRandomSeedCRC(), crc(ThePartitionManager), crc(ThePlayerList), crc(TheAI), crc(TheAI->pathfinder()), crc(TheTerrainLogic));
 		for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
 		{
 			std::fprintf(stderr, "TEST snapshot object frame=%u id=%u %s crc=%08X lookup=%d\n",
@@ -2470,7 +2472,91 @@ void execute(const Command& command, unsigned int frame)
 	}
 
 	const Bool placeAtPoint = command.action == "place" && command.hasPlacementPoint;
-	if (command.action == "wallblind")
+	if (command.action == "snapshot-devastation")
+	{
+		const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate("SpellBookDevastation");
+		auto* module = power ? obj->getSpecialPowerModule(power) : nullptr;
+		if (!module)
+			return;
+		Coord3D point = groundLocation(command);
+		if (!command.hasLocation)
+		{
+			const MapObject* tree = nullptr;
+			for (const MapObject* candidate = MapObject::getFirstMapObject(); candidate; candidate = candidate->getNext())
+			{
+				const ThingTemplate* type = candidate->getThingTemplate();
+				if (type && type->isKindOf(KINDOF_TREE) && type->getRotWKObjectData().isHarvestable &&
+					(!tree || candidate->getLocation()->x < tree->getLocation()->x))
+					tree = candidate;
+			}
+			if (!tree)
+				return;
+			point = *tree->getLocation();
+			point.z += TheTerrainLogic->getGroundHeight(point.x, point.y);
+		}
+		auto* money = obj->getControllingPlayer()->getMoney();
+		const auto before = money->countMoney();
+		if (command.structure == "recharge")
+			module->setReadyFrame(frame);
+		if (module->isReady())
+			obj->doSpecialPowerAtLocation(power, &point, INVALID_ANGLE, 0);
+		std::fprintf(stderr, "TEST snapshot devastation frame=%u payout=%u ready=%d\n",
+			frame, money->countMoney() - before, module->isReady());
+	}
+	else if (command.action == "snapshot-share" || command.action == "snapshot-handoff")
+	{
+		const auto* horde = HordeContain::get(obj);
+		if (!horde)
+			return;
+		std::array<Object*, 3> members{};
+		for (Object* member = TheGameLogic->getFirstObject(); member; member = member->getNextObject())
+		{
+			const Int slot = horde->getMemberSlot(member->getID());
+			if (slot >= 0 && slot < static_cast<Int>(members.size()))
+				members[slot] = member;
+		}
+		if (!members[0] || !members[1] || !members[2] || !members[0]->getAIUpdateInterface())
+			return;
+		auto* pathfinder = TheAI->pathfinder();
+		if (command.action == "snapshot-share")
+		{
+			const Coord3D point = groundLocation(command);
+			for (Object* member : members)
+				pathfinder->updateGoal(member, &point, LAYER_GROUND);
+		}
+		else
+		{
+			const auto goal = *members[0]->getAIUpdateInterface()->getPathfindGoalCell();
+			auto* cell = pathfinder->getCell(LAYER_GROUND, goal.x, goal.y);
+			if (!cell)
+				return;
+			const Bool primary = cell->getGoalUnit() == members[0]->getID();
+			pathfinder->removeGoal(members[0]);
+			const Bool first = cell->getGoalUnit() == members[1]->getID();
+			pathfinder->removeGoal(members[1]);
+			const Bool second = cell->getGoalUnit() == members[2]->getID();
+			std::fprintf(stderr, "TEST snapshot handoff frame=%u primary=%d first=%d second=%d\n", frame, primary, first, second);
+		}
+	}
+	else if (command.action == "snapshot-overlap" && command.hasLocation)
+	{
+		const Coord3D point = groundLocation(command);
+		obj->setPosition(&point);
+	}
+	else if (command.action == "snapshot-emitter")
+	{
+		for (auto module = obj->getBehaviorModules(); *module; ++module)
+		{
+			if ((*module)->getModuleNameKey() != NAMEKEY("CritterEmitterUpdate"))
+				continue;
+			XferCRC xfer;
+			xfer.open("SaveLoadEmitter");
+			xfer.xferSnapshot(*module);
+			std::fprintf(stderr, "TEST snapshot emitter frame=%u crc=%08X\n", frame, xfer.getCRC());
+			xfer.close();
+		}
+	}
+	else if (command.action == "wallblind")
 	{
 		const Player* player = obj->getControllingPlayer();
 		for (Object* source = TheGameLogic->getFirstObject(); source; source = source->getNextObject())
@@ -3218,7 +3304,7 @@ void runFrame(unsigned int frame)
 		load();
 	for (const Command& command : s_commands)
 	{
-		if (command.frame == frame)
+		if (command.frame == frame && command.action != "snapshot-share" && command.action != "snapshot-overlap")
 			execute(command, frame);
 	}
 	if (!s_tracked.empty())
@@ -3231,6 +3317,8 @@ void saveCheckpoint(unsigned int frame)
 		return;
 	for (const Command& command : s_commands)
 	{
+		if (command.frame == frame && (command.action == "snapshot-share" || command.action == "snapshot-overlap"))
+			execute(command, frame);
 		if (command.frame == frame && command.action == "snapshot-save")
 		{
 			const SaveResult result = TheGameState->saveGame(command.structure.c_str(), UnicodeString(), SAVE_FILE_TYPE_NORMAL);

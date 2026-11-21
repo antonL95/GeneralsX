@@ -22,6 +22,7 @@
 
 class Object;
 class PathfindCellList;
+class Xfer;
 
 typedef UnsignedShort zoneStorageType;
 
@@ -155,6 +156,7 @@ public:
 	void setGoalUnit(ObjectID unit, const ICoord2D &pos );
 	void shareGoalUnit(ObjectID unit);
 	void removeGoalUnit(ObjectID unit, const ICoord2D& pos);
+	void xferSharedGoalUnits(Xfer* xfer);
 	void setGoalAircraft(ObjectID unit, const ICoord2D &pos );
 	void setPosUnit(ObjectID unit, const ICoord2D &pos );
 	ObjectID getGoalUnit() const {ObjectID id = m_info?m_info->m_goalUnitID:INVALID_ID; return id;}

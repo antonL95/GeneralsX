@@ -18,6 +18,7 @@
 
 #include "GameLogic/Object.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
@@ -296,6 +297,13 @@ void PathfindCell::shareGoalUnit(ObjectID unit)
 	auto& goals = m_info->m_sharedGoalUnits;
 	if (std::find(goals.begin(), goals.end(), unit) == goals.end())
 		goals.push_back(unit);
+}
+
+void PathfindCell::xferSharedGoalUnits(Xfer* xfer)
+{
+	if (!m_info || m_info->m_goalUnitID == INVALID_ID)
+		throw XFER_INVALID_PARAMETERS;
+	xfer->xferSTLObjectIDVector(&m_info->m_sharedGoalUnits);
 }
 
 void PathfindCell::removeGoalUnit(ObjectID unit, const ICoord2D& pos)
