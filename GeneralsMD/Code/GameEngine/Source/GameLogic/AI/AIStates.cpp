@@ -3702,10 +3702,10 @@ StateReturnType AIAttackMoveToState::update()
 			sqr(owner->getPosition()->y - m_pathGoalPosition.y) : 0.0f;
 		if (m_retryCount < 1 || distSqr < sqr(static_cast<float>(ATTACK_CLOSE_ENOUGH_CELLS) * PATHFIND_CELL_SIZE_F))
 		{
-			if (ai->hasRetailPlannerAdvance())
+			if (RetailFileLayers::enabled() && ai->hasRetailPlannerAdvance())
 			{
 				const Coord3D delta = *getMachineGoalPosition() - *owner->getPosition();
-				if (sqr(delta.x) + sqr(delta.y) > sqr(3 * PATHFIND_CELL_SIZE_F))
+				if (ret == STATE_FAILURE || sqr(delta.x) + sqr(delta.y) > sqr(3 * PATHFIND_CELL_SIZE_F))
 					ai->noteBlockedRetailPlannerPath();
 			}
 			return ret;
