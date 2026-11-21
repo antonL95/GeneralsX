@@ -2794,7 +2794,8 @@ void Object::scoreTheKill( const Object *victim )
 	if (controller)
 	{
 		controller->getScoreKeeper()->addObjectDestroyed(victim);
-		controller->addSkillPointsForKill(this, victim);
+		if (!RetailFileLayers::enabled())
+			controller->addSkillPointsForKill(this, victim);
 		controller->doBountyForKill(this, victim);
 	}
 

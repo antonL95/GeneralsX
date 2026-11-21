@@ -86,6 +86,7 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Scripts.h"
@@ -357,6 +358,7 @@ Player::Player( Int playerIndex )
 //=============================================================================
 void Player::init(const PlayerTemplate* pt)
 {
+	m_retailSpellBookID = INVALID_ID;
 
 	DEBUG_ASSERTCRASH(m_playerTeamPrototypes.empty(), ("Player::m_playerTeamPrototypes is not empty at game start!"));
 	m_commandPointUpgrades.clear();
@@ -749,6 +751,17 @@ void Player::update()
 //=============================================================================
 void Player::newMap()
 {
+	if (RetailFileLayers::enabled() && isPlayableSide() && m_defaultTeam && getPlayerTemplate() && !getRetailSpellBook())
+	{
+		const AsciiString name = getPlayerTemplate()->getSpellBook(usesRetailMultiplayerPowers());
+		if (name.isNotEmpty())
+			if (const ThingTemplate* book = TheThingFactory->findTemplate(name, false))
+			{
+				Object* object = TheThingFactory->newObject(book, m_defaultTeam);
+				m_retailSpellBookID = object->getID();
+				object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+			}
+	}
 	if (m_ai)
 		m_ai->newMap();
 }
@@ -2541,21 +2554,107 @@ Bool Player::hasPrereqsForScience(ScienceType t) const
 	return TheScienceStore->playerHasPrereqsForScience(this, t);
 }
 
+Bool Player::usesRetailMultiplayerPowers() const
+{
+	return RetailFileLayers::enabled() && (TheGameInfo ||
+		(TheGameLogic && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInSkirmishGame())));
+}
+
+Int Player::getSciencePurchaseCost(ScienceType science) const
+{
+	return TheScienceStore->getSciencePurchaseCost(science, usesRetailMultiplayerPowers());
+}
+
+Object* Player::getRetailSpellBook() const
+{
+	if (!RetailFileLayers::enabled() || !TheGameLogic || !getPlayerTemplate())
+		return nullptr;
+	const AsciiString name = getPlayerTemplate()->getSpellBook(usesRetailMultiplayerPowers());
+	if (name.isEmpty())
+		return nullptr;
+	const auto matches = [this, &name](const Object* object)
+	{
+		return object && object->getControllingPlayer() == this && !object->isDestroyed() &&
+			object->getTemplate()->getName() == name;
+	};
+	if (Object* book = TheGameLogic->findObjectByID(m_retailSpellBookID); matches(book))
+		return book;
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if (matches(object))
+		{
+			m_retailSpellBookID = object->getID();
+			return object;
+		}
+	}
+	return nullptr;
+}
+
+const CommandSet* Player::getRetailSpellStore() const
+{
+	return RetailFileLayers::enabled() && TheControlBar && getPlayerTemplate() ?
+		TheControlBar->findCommandSet(getPlayerTemplate()->getPurchaseScienceCommandSet(usesRetailMultiplayerPowers())) : nullptr;
+}
+
+static Bool usesCampaignRankThreshold()
+{
+	return RetailFileLayers::enabled() && TheGameLogic && !TheGameInfo &&
+		TheGameLogic->getGameMode() == GAME_SINGLE_PLAYER;
+}
+
+static Int getRankCap(const Player* player)
+{
+	Int cap = TheRankInfoStore->getRankLevelCount();
+	if (TheGameLogic)
+		cap = min(TheGameLogic->getRankLevelLimit(), cap);
+	const PlayerTemplate* faction = player->getPlayerTemplate();
+	if (RetailFileLayers::enabled() && faction)
+	{
+		const Int factionCap = faction->getMaxLevel(player->usesRetailMultiplayerPowers());
+		if (factionCap > 0)
+			cap = min(cap, factionCap);
+	}
+	return cap;
+}
+
 //=============================================================================
 /// returns TRUE if the player gained/lost levels as a result.
 Bool Player::addSkillPoints(Int delta)
 {
-	delta = REAL_TO_INT_CEIL(m_skillPointsModifier * INT_TO_REAL(delta));
+	const Real adjusted = m_skillPointsModifier * INT_TO_REAL(delta);
+	return addAdjustedSkillPoints(RetailFileLayers::enabled() ? static_cast<Int>(adjusted) : REAL_TO_INT_CEIL(adjusted));
+}
 
+Bool Player::addAdjustedSkillPoints(Int delta)
+{
 	if( delta == 0 )
 		return false;
 
-	Int levelCap = min( TheGameLogic->getRankLevelLimit(), TheRankInfoStore->getRankLevelCount() );
-	Int pointCap = TheRankInfoStore->getRankInfo(levelCap)->m_skillPointsNeeded; // Cap at lowest point of cap level, not highest.
+	const Int levelCap = getRankCap(this);
+	const RankInfo* cap = TheRankInfoStore->getRankInfo(levelCap);
+	if (!cap)
+		return FALSE;
+	const Bool campaign = usesCampaignRankThreshold();
+	const Int pointCap = cap->getSkillPointsNeeded(campaign);
+
+	if (RetailFileLayers::enabled())
+	{
+		const auto points = static_cast<std::int64_t>(m_skillPoints) + delta;
+		m_skillPoints = static_cast<Int>(std::clamp<std::int64_t>(points, 0, std::max(0, pointCap)));
+		Int level = m_rankLevel;
+		while (level < levelCap)
+		{
+			const RankInfo* next = TheRankInfoStore->getRankInfo(level + 1);
+			if (!next || m_skillPoints < next->getSkillPointsNeeded(campaign))
+				break;
+			++level;
+		}
+		return level > m_rankLevel && setRankLevel(level);
+	}
 
 	Bool levelGained = FALSE;
 	m_skillPoints = min( pointCap, (m_skillPoints + delta) );
-	while( m_skillPoints >= m_levelUp )
+	while( m_skillPoints >= m_levelUp && m_rankLevel < levelCap )
 	{
 		// LevelUp gets increased as a side effect of setRankLevel, and this won't infinitely loop,
 		// because when there are no more levels to be gained, m_levelUp is set to INT_MAX.
@@ -2564,6 +2663,26 @@ Bool Player::addSkillPoints(Int delta)
 	}
 
 	return levelGained;
+}
+
+void Player::addRetailSkillPointsForDamage(const Object* source, const Object* victim, Real fraction)
+{
+	if (!isPlayableSide() || victim->getControllingPlayer() == this || fraction <= 0.0f ||
+		victim->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+		return;
+	const Object* container = victim->getContainedBy();
+	const Bool combatant = (victim->isKindOf(KINDOF_CAN_ATTACK) || victim->isKindOf(KINDOF_SUPPORT)) &&
+		!victim->isKindOf(KINDOF_STRUCTURE) &&
+		!(victim->isKindOf(KINDOF_MONSTER) && victim->isKindOf(KINDOF_SUMMONED));
+	if (!combatant && !victim->isKindOf(KINDOF_HERO) &&
+		(!container || (!container->isKindOf(KINDOF_CAN_ATTACK) && !container->isKindOf(KINDOF_SUPPORT))))
+		return;
+	Real points = static_cast<Real>(victim->getExperienceTracker()->getExperienceValue(source)) * fraction;
+	points *= m_skillPointsModifier;
+	if (!usesCampaignRankThreshold())
+		points *= ExperienceLevelStore::playerSkillPointsScalar(m_rankLevel);
+	if (points >= 1.0f && std::isfinite(points))
+		addAdjustedSkillPoints(points >= static_cast<Real>(INT_MAX) ? INT_MAX : static_cast<Int>(points));
 }
 
 //=============================================================================
@@ -2590,10 +2709,7 @@ void Player::resetSciences()
 
 	if (getPlayerTemplate())
 	{
-		const Bool isMpOrSkirmish = TheGameInfo != nullptr ||
-			(TheGameLogic && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInSkirmishGame()));
-		const Bool useMp = PlayerTemplateRules::usesMpVariant(RetailFileLayers::enabled(), isMpOrSkirmish);
-		m_sciences = getPlayerTemplate()->getIntrinsicSciences(useMp);
+		m_sciences = getPlayerTemplate()->getIntrinsicSciences(usesRetailMultiplayerPowers());
 	}
 
 	for (Int i = 1; i <= m_rankLevel; ++i)
@@ -2623,6 +2739,23 @@ Bool Player::addScience(ScienceType science)
 
 	m_sciences.push_back(science);
 
+	Object* const book = getRetailSpellBook();
+	const auto enablePower = [this, science](Object* object)
+	{
+		for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+			if (SpecialPowerModuleInterface* power = (*module)->getSpecialPower())
+			{
+				const SpecialPowerTemplate* definition = power->getSpecialPowerTemplate();
+				if (definition && definition->isUnlockedFor(this) && !definition->isUnlockedFor(this, science))
+				{
+					power->onSpecialPowerCreation();
+					power->setReadyFrame(TheGameLogic->getFrame());
+				}
+			}
+	};
+	if (book)
+		enablePower(book);
+
 	// 'wake up' any special powers controlled by, well, stuff
 	for (PlayerTeamList::iterator it = m_playerTeamPrototypes.begin();
 			 it != m_playerTeamPrototypes.end(); ++it)
@@ -2636,26 +2769,14 @@ Bool Player::addScience(ScienceType science)
 			for (DLINK_ITERATOR<Object> iterObj = team->iterate_TeamMemberList(); !iterObj.done(); iterObj.advance())
 			{
 				Object *obj = iterObj.cur();
-				if (!obj)
+				if (!obj || obj == book)
 					continue;
-
-				for (BehaviorModule** m = obj->getBehaviorModules(); *m; ++m)
-				{
-					SpecialPowerModuleInterface* sp = (*m)->getSpecialPower();
-					if (!sp)
-						continue;
-
-					if (sp->getRequiredScience() == science)
-					{
-						// Turn on the power, and set it to be instantly ready, because that is cool.
-						sp->onSpecialPowerCreation();
-						sp->setReadyFrame( TheGameLogic->getFrame() );
-					}
-				}
+				enablePower(obj);
 			}
 		}
 
-		TheControlBar->markUIDirty();// Refresh the UI to show new cameos, etc
+		if (TheControlBar)
+			TheControlBar->markUIDirty();
 
 	}
 
@@ -2688,7 +2809,7 @@ Bool Player::attemptToPurchaseScience(ScienceType science)
 		return false;
 	}
 
-	Int cost = TheScienceStore->getSciencePurchaseCost(science);
+	Int cost = getSciencePurchaseCost(science);
 	addSciencePurchasePoints(-cost);
 	addScience(science);
 
@@ -2737,9 +2858,9 @@ Bool Player::isCapableOfPurchasingScience(ScienceType science) const
 		return false;
 	}
 
-	Int cost = TheScienceStore->getSciencePurchaseCost(science);
+	Int cost = getSciencePurchaseCost(science);
 	// purchase cost of zero means "not purchasable!"
-	if (cost == 0 || cost > getSciencePurchasePoints())
+	if (cost <= 0 || cost > getSciencePurchasePoints())
 	{
 		return false;
 	}
@@ -2753,7 +2874,7 @@ void Player::resetRank()
 	m_rankLevel = 1;
 	m_skillPoints = 0;
 	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(m_rankLevel+1);
-	m_levelUp = nextRank ? nextRank->m_skillPointsNeeded : INT_MAX;
+	m_levelUp = nextRank && getRankCap(this) >= 2 ? nextRank->getSkillPointsNeeded(usesCampaignRankThreshold()) : INT_MAX;
 	m_levelDown = 0;
 	m_sciences.clear();
 	m_sciencePurchasePoints = getPlayerTemplate() ? getPlayerTemplate()->getIntrinsicSciencePurchasePoints() : 0;
@@ -2772,8 +2893,9 @@ Bool Player::setRankLevel(Int newLevel)
 	else if (newLevel > TheRankInfoStore->getRankLevelCount())
 		newLevel = TheRankInfoStore->getRankLevelCount();
 
-	if (newLevel > TheGameLogic->getRankLevelLimit())
-		newLevel = TheGameLogic->getRankLevelLimit();
+	newLevel = min(newLevel, getRankCap(this));
+	if (newLevel < 1)
+		return FALSE;
 
 	if (newLevel == m_rankLevel)
 		return false;
@@ -2800,23 +2922,24 @@ Bool Player::setRankLevel(Int newLevel)
 			if (m_sciencePurchasePoints < 0)
 				m_sciencePurchasePoints = 0;
 
-			if (m_skillPoints < rank->m_skillPointsNeeded)
-				m_skillPoints = rank->m_skillPointsNeeded;
+			const Int threshold = rank->getSkillPointsNeeded(usesCampaignRankThreshold());
+			if (m_skillPoints < threshold)
+				m_skillPoints = threshold;
 
 			for (ScienceVec::const_iterator it = rank->m_sciencesGranted.begin(); it != rank->m_sciencesGranted.end(); ++it)
 			{
 				addScience(*it);
 			}
 
-			m_levelDown = rank->m_skillPointsNeeded;
+			m_levelDown = threshold;
 		}
 	}
 
 	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(newLevel + 1);
-	m_levelUp = nextRank ? nextRank->m_skillPointsNeeded : INT_MAX;
+	m_levelUp = nextRank && newLevel < getRankCap(this) ? nextRank->getSkillPointsNeeded(usesCampaignRankThreshold()) : INT_MAX;
 	m_rankLevel = newLevel;
 
-	DEBUG_ASSERTCRASH(m_skillPoints >= m_levelDown && m_skillPoints < m_levelUp, ("hmm, wrong"));
+	DEBUG_ASSERTCRASH(m_skillPoints >= m_levelDown && (m_levelUp == INT_MAX || m_skillPoints < m_levelUp), ("hmm, wrong"));
 	//DEBUG_LOG(("Rank %d, Skill %d, down %d, up %d",m_rankLevel,m_skillPoints, m_levelDown, m_levelUp));
 
 	if (TheControlBar != nullptr)

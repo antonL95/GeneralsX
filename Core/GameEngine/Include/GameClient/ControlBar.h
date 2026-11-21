@@ -1009,6 +1009,13 @@ protected:
 	GameWindow *m_retailCommandPoints = nullptr;
 	mutable DisplayString *m_retailLevelLabel = nullptr;
 	mutable Int m_retailLabelRank = 0;
+	GameWindow *m_retailPowersScreen = nullptr;
+	GameWindow *m_retailPowersCounter = nullptr;
+	std::array<GameWindow*, 16> m_retailSpellButtons = {};
+	ScienceVec m_retailPendingSciences;
+	Int m_retailHoveredPower = -1;
+	UnsignedInt m_retailPowersOpenedAt = 0;
+	UnsignedInt m_retailPowersFadeTime = 198;
 	GameWindow *m_retailHolders[MAX_COMMANDS_PER_SET] = {};
 	GameWindow *m_retailVisible[MAX_COMMANDS_PER_SET] = {};
 	std::array<GameWindow*, 3> m_retailTrayButtons = {};
@@ -1069,6 +1076,17 @@ protected:
 
 public:
 	Bool isRetailHud() const { return m_retailSelectionName != nullptr; }
+	void initRetailPowers(GameWindow* master, GameWindow* palantir);
+	void destroyRetailPowers();
+	void updateRetailPowers();
+	void showRetailPowers(Bool show);
+	void drawRetailPowers(GameWindow* window) const;
+	void drawRetailPowerCounter(GameWindow* window) const;
+	void drawRetailSpellButton(GameWindow* window) const;
+	void inputRetailPowers(Int x, Int y, Bool click);
+	void clickRetailSpellButton(GameWindow* window);
+	void showRetailSpellTooltip(GameWindow* window) const;
+	Bool targetRetailSpell(const CommandButton* button, Object* target, const Coord3D* position, Bool submit);
 	Int getRetailSlot(const GameWindow *window) const;
 	Int getRetailHeroIndex(const GameWindow *window) const;
 	const ThingTemplate *getRetailHero(const GameWindow *window) const;

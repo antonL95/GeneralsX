@@ -30,11 +30,36 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Science.h"
 
 ScienceStore* TheScienceStore = nullptr;
 
+void ScienceStore::parsePrerequisites(INI* ini, void*, void* store, const void*)
+{
+	auto& alternatives = *static_cast<std::vector<ScienceVec>*>(store);
+	std::vector<ScienceVec> parsed(1);
+	while (const char* token = ini->getNextTokenOrNull())
+	{
+		if (stricmp(token, "None") == 0 && parsed.size() == 1 && parsed.back().empty())
+			break;
+		if (stricmp(token, "OR") == 0)
+		{
+			if (parsed.back().empty())
+				throw INI_INVALID_DATA;
+			parsed.emplace_back();
+		}
+		else
+		{
+			parsed.back().push_back(INI::scanScience(token));
+		}
+	}
+	if (parsed.size() > 1 && parsed.back().empty())
+		throw INI_INVALID_DATA;
+	alternatives.swap(parsed);
+}
 
 //-----------------------------------------------------------------------------
 void ScienceStore::init()
@@ -170,6 +195,13 @@ const ScienceInfo* ScienceStore::findScienceInfo(ScienceType st) const
 			{ "Description", INI::parseAndTranslateLabel, nullptr, offsetof( ScienceInfo, m_description) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
+		static const FieldParse retailFieldParse[] =
+		{
+			{ "PrerequisiteSciences", parsePrerequisites, nullptr, offsetof(ScienceInfo, m_prereqAlternatives) },
+			{ "SciencePurchasePointCostMP", INI::parseInt, nullptr, offsetof(ScienceInfo, m_sciencePurchasePointCostMP) },
+			myFieldParse[1], myFieldParse[2], myFieldParse[3], myFieldParse[4], myFieldParse[5]
+		};
+		const Bool retail = RetailFileLayers::enabled() || INIAudit::isEnabled();
 
 		ScienceInfo* info = nullptr;
 
@@ -220,18 +252,20 @@ const ScienceInfo* ScienceStore::findScienceInfo(ScienceType st) const
 			TheScienceStore->m_sciences.push_back(info);
 		}
 
-		ini->initFromINI(info, myFieldParse);
+		ini->initFromINI(info, retail ? retailFieldParse : myFieldParse);
 		info->m_science = st;
 		info->addRootSciences(info->m_rootSciences);
 	}
 }
 
 //-----------------------------------------------------------------------------
-Int ScienceStore::getSciencePurchaseCost(ScienceType st) const
+Int ScienceStore::getSciencePurchaseCost(ScienceType st, Bool multiplayer) const
 {
 	const ScienceInfo* si = findScienceInfo(st);
 	if (si)
 	{
+		if (multiplayer && si->m_sciencePurchasePointCostMP >= 0)
+			return si->m_sciencePurchasePointCostMP;
 		return si->m_sciencePurchasePointCost;
 	}
 	else
@@ -273,17 +307,32 @@ Bool ScienceStore::getNameAndDescription(ScienceType st, UnicodeString& name, Un
 //-----------------------------------------------------------------------------
 Bool ScienceStore::playerHasPrereqsForScience(const Player* player, ScienceType st) const
 {
+	return playerHasPrereqsForScience(player, st, ScienceVec());
+}
+
+const std::vector<ScienceVec>* ScienceStore::getPrerequisiteAlternatives(ScienceType st) const
+{
+	const ScienceInfo* info = findScienceInfo(st);
+	return info ? &info->m_prereqAlternatives : nullptr;
+}
+
+Bool ScienceStore::playerHasPrereqsForScience(const Player* player, ScienceType st, const ScienceVec& pending) const
+{
 	const ScienceInfo* si = findScienceInfo(st);
 	if (si)
 	{
-		for (ScienceVec::const_iterator it2 = si->m_prereqSciences.begin(); it2 != si->m_prereqSciences.end(); ++it2)
+		const auto hasGroup = [player, &pending](const ScienceVec& group)
 		{
-			if (!player->hasScience(*it2))
+			for (ScienceType prerequisite : group)
 			{
-				return false;
+				if (!player->hasScience(prerequisite) &&
+					std::find(pending.begin(), pending.end(), prerequisite) == pending.end())
+					return false;
 			}
-		}
-		return true;
+			return true;
+		};
+		return si->m_prereqAlternatives.empty() ? hasGroup(si->m_prereqSciences) :
+			std::any_of(si->m_prereqAlternatives.begin(), si->m_prereqAlternatives.end(), hasGroup);
 	}
 	else
 	{

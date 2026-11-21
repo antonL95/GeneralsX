@@ -1107,6 +1107,7 @@ ControlBar::~ControlBar()
 {
 	if (m_retailLevelLabel && TheDisplayStringManager)
 		TheDisplayStringManager->freeDisplayString(m_retailLevelLabel);
+	destroyRetailPowers();
 
 	if(m_scienceLayout)
 	{
@@ -1419,6 +1420,7 @@ void ControlBar::init()
 //-------------------------------------------------------------------------------------------------
 void ControlBar::reset()
 {
+	showRetailPowers(FALSE);
 	hideSpecialPowerShortcut();
 	// do not destroy the rally drawable, it will get destroyed with everything else during a reset
 	m_rallyPointDrawableID = INVALID_DRAWABLE_ID;
@@ -3216,6 +3218,11 @@ void ControlBar::updatePurchaseScience()
 
 void ControlBar::showPurchaseScience()
 {
+	if (isRetailHud())
+	{
+		showRetailPowers(TRUE);
+		return;
+	}
 
 	if(TheScriptEngine->isGameEnding())
 		return;
@@ -3233,6 +3240,11 @@ void ControlBar::showPurchaseScience()
 
 void ControlBar::hidePurchaseScience()
 {
+	if (isRetailHud())
+	{
+		showRetailPowers(FALSE);
+		return;
+	}
 	if(!m_contextParent[ CP_PURCHASE_SCIENCE ] || m_contextParent[ CP_PURCHASE_SCIENCE ]->winIsHidden())
 		return;
 
@@ -3286,6 +3298,8 @@ void ControlBar::switchControlBarStage( ControlBarStages stage )
 		m_currentControlBarStage = stage;
 		setFullViewportHeight();
 		m_contextParent[CP_MASTER]->winHide(stage != CONTROL_BAR_STAGE_DEFAULT);
+		if (stage != CONTROL_BAR_STAGE_DEFAULT)
+			showRetailPowers(FALSE);
 		return;
 	}
 	switch (stage) {

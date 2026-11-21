@@ -830,6 +830,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/ControlBar/ControlBarRetailHud.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailEdges.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailHeroes.cpp
+    Source/GameClient/GUI/ControlBar/ControlBarRetailPowers.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailRadial.cpp
 #    Source/GameClient/GUI/DisconnectMenu/DisconnectMenu.cpp
     Source/GameClient/GUI/EstablishConnectionsMenu/EstablishConnectionsMenu.cpp

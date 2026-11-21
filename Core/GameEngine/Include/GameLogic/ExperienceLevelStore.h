@@ -31,6 +31,7 @@ int maximumRank(const Object* obj);
 int rankForUpgrade(const Object* obj, const AsciiString& upgrade);
 int rankForPower(const Object* obj, const SpecialPowerTemplate* power);
 int award(const Object* obj, int threshold);
+float playerSkillPointsScalar(int rank);
 void applyLevel(Object* obj, int threshold, bool feedback);
 Object* recipientFor(Object* obj);
 void scoreKill(Object* killer, const Object* victim);

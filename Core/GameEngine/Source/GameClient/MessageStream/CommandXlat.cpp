@@ -2403,6 +2403,21 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 	Drawable *drawableInWay = draw;
 	resolveContextTarget( draw, obj, drawableInWay );
 
+	const CommandButton* spell = TheInGameUI->getGUICommand();
+	if (spell && spell->getCommandType() == GUI_COMMAND_SPELL_BOOK)
+	{
+		const Bool valid = TheControlBar && TheControlBar->targetRetailSpell(spell, obj, pos, type == DO_COMMAND);
+		if (type == DO_COMMAND && valid)
+			TheInGameUI->setGUICommand(nullptr);
+		if (type == DO_HINT)
+		{
+			const GameMessage::Type hint = valid ? GameMessage::MSG_VALID_GUICOMMAND_HINT : GameMessage::MSG_INVALID_GUICOMMAND_HINT;
+			TheMessageStream->appendMessage(hint)->appendObjectIDArgument(obj ? obj->getID() : INVALID_ID);
+			return hint;
+		}
+		return valid ? GameMessage::MSG_DO_SPELLBOOK_SPECIAL_POWER : GameMessage::MSG_INVALID;
+	}
+
 	// Then we should determine if the game currently prefers selection events. If it does, then return
 	// the invalid message.
 	if( obj && obj->isLocallyControlled() && TheInGameUI->isInPreferSelectionMode() )
@@ -4761,7 +4776,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		{
 			const CommandButton *command = TheInGameUI->getGUICommand();
 			if( TheInGameUI->getSelectCount() > 0 ||
-					(command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT) ) // If something is selected
+					(command && (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
+						command->getCommandType() == GUI_COMMAND_SPELL_BOOK)) )
 			{
 				/// @todo This as well as the one in GameMessage::MSG_DRAWABLE_PICKED below should possibly have a generalized CanAttack instead of simply checking isEnemyOf
 				Drawable *draw = TheGameClient->findDrawableByID( msg->getArgument( 0 )->drawableID );
@@ -4961,6 +4977,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			const CommandButton *command = TheInGameUI->getGUICommand();
 			// maintain this as the list of GUI button initiated commands that fire with left click in alt mouse mode
   			Bool isFiringGUICommand = (command	&& (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER ||
+												command->getCommandType() == GUI_COMMAND_SPELL_BOOK ||
   												command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
  												command->getCommandType() == GUI_COMMAND_FIRE_WEAPON ||
 												command->getCommandType() == GUI_COMMAND_COMBATDROP ||
@@ -4973,7 +4990,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 			Bool isPoint = (msg->getArgument(0)->pixelRegion.height() == 0 && msg->getArgument(0)->pixelRegion.width() == 0);
 			Bool controllable = TheInGameUI->areSelectedObjectsControllable() ||
-													(command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT);
+				(command && (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
+					command->getCommandType() == GUI_COMMAND_SPELL_BOOK));
 			if (isPoint && controllable)
 			{
 				UnsignedInt pickType = getPickTypesForContext( TheInGameUI->isInForceAttackMode() );

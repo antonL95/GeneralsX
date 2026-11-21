@@ -38,6 +38,7 @@
 #include "Common/PartitionSolver.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/Radar.h"									// For TheRadar
 #include "Common/SpecialPower.h"
@@ -5586,6 +5587,15 @@ void ScriptActions::doMapSetRankLevelLimit(Int level)
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerGrantScience(const AsciiString& playerName, const AsciiString& scienceName)
 {
+	if (RetailFileLayers::enabled() && playerName.compareNoCase("<All Players>") == 0)
+	{
+		const ScienceType science = TheScienceStore->getScienceFromInternalName(scienceName);
+		if (TheScienceStore->isScienceGrantable(science))
+			for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+				if (Player* player = ThePlayerList->getNthPlayer(i); player && player->isPlayableSide())
+					player->grantScience(science);
+		return;
+	}
 	Player* pPlayer = TheScriptEngine->getPlayerFromAsciiString(playerName);
 	if (!pPlayer)
 		return;
@@ -5610,6 +5620,19 @@ void ScriptActions::doPlayerPurchaseScience(const AsciiString& playerName, const
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerSetScienceAvailability( const AsciiString& playerName, const AsciiString& scienceName, const AsciiString& scienceAvailability )
 {
+	if (RetailFileLayers::enabled() && playerName.compareNoCase("<All Players>") == 0)
+	{
+		const ScienceType science = TheScienceStore->getScienceFromInternalName(scienceName);
+		if (TheScienceStore->isValidScience(science))
+			for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+				if (Player* player = ThePlayerList->getNthPlayer(i); player && player->isPlayableSide())
+				{
+					const ScienceAvailabilityType availability = player->getScienceAvailabilityTypeFromString(scienceAvailability);
+					if (availability != SCIENCE_AVAILABILITY_INVALID)
+						player->setScienceAvailability(science, availability);
+				}
+		return;
+	}
 	Player* player = TheScriptEngine->getPlayerFromAsciiString(playerName);
 	if( player )
 	{

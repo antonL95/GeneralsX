@@ -393,6 +393,15 @@ int award(const Object* obj, int threshold)
 	return current ? current->experienceAward : 0;
 }
 
+float playerSkillPointsScalar(int rank)
+{
+	const auto found = s_scalars.find("PlayerSkillPointsScalarTable");
+	if (found == s_scalars.end() || found->second.empty())
+		return 1.0f;
+	const auto index = static_cast<std::size_t>(std::max(1, rank) - 1);
+	return found->second[std::min(index, found->second.size() - 1)];
+}
+
 static Real experienceScalar(const Object* object, Int currentRank, Int startingRank)
 {
 	if (object->isKindOf(KINDOF_STRUCTURE))

@@ -333,7 +333,7 @@ const char* const specialPowerFlags[] =
 	{ "MaxCastRange", INI::parseReal, nullptr, offsetof( SpecialPowerTemplate, m_maxCastRange ) },
 	{ "ForbiddenObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( SpecialPowerTemplate, m_forbiddenObjectFilter ) },
 	{ "ForbiddenObjectRange", INI::parseReal, nullptr, offsetof( SpecialPowerTemplate, m_forbiddenObjectRange ) },
-	{ "RequiredSciences", INI::parseAsciiStringVector, nullptr, offsetof( SpecialPowerTemplate, m_requiredSciences ) },
+	{ "RequiredSciences", INI::parseScienceVector, nullptr, offsetof( SpecialPowerTemplate, m_requiredSciences ) },
 	{ "UnitCost", INI::parseInt, nullptr, offsetof( SpecialPowerTemplate, m_unitCost ) },
 	{ "UnitCostDeathType", INI::parseInt, nullptr, offsetof( SpecialPowerTemplate, m_unitCostDeathType ) },
 	{ "PreventActivationConditions", ObjectStatusMaskType::parseFromINI, nullptr, offsetof( SpecialPowerTemplate, m_preventActivationConditions ) },
@@ -471,6 +471,17 @@ Int SpecialPowerStore::getNumSpecialPowers()
 //-------------------------------------------------------------------------------------------------
 /** does the object (and therefore the player) meet all the requirements to use this power */
 //-------------------------------------------------------------------------------------------------
+Bool SpecialPowerTemplate::isUnlockedFor(const Player* player, ScienceType excluded) const
+{
+	const SpecialPowerTemplate* data = getFO();
+	const auto owns = [player, excluded](ScienceType science)
+	{
+		return player && science != excluded && player->hasScience(science);
+	};
+	return (data->m_requiredScience == SCIENCE_INVALID || owns(data->m_requiredScience)) &&
+		(data->m_requiredSciences.empty() || std::any_of(data->m_requiredSciences.begin(), data->m_requiredSciences.end(), owns));
+}
+
 Bool SpecialPowerStore::canUseSpecialPower( Object *obj, const SpecialPowerTemplate *specialPowerTemplate )
 {
 
@@ -497,15 +508,8 @@ Bool SpecialPowerStore::canUseSpecialPower( Object *obj, const SpecialPowerTempl
 	//
 
 	// check for required science
-	ScienceType requiredScience = specialPowerTemplate->getRequiredScience();
-	if( requiredScience != SCIENCE_INVALID )
-	{
-		Player *player = obj->getControllingPlayer();
-
-		if( player->hasScience( requiredScience ) == FALSE )
-			return FALSE;
-
-	}
+	if (!specialPowerTemplate->isUnlockedFor(obj->getControllingPlayer()))
+		return FALSE;
 
 
 	// I THINK THIS IS WHERE WE BAIL OUT IF A DIFFERENT CONYARD IS ALREADY CHARGING THIS SPECIAL RIGHT NOW //LORENZEN

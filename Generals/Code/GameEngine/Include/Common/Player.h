@@ -80,6 +80,7 @@ class TunnelTracker;
 class Upgrade;
 class UpgradeTemplate;
 class SpecialPowerModule;
+class CommandSet;
 
 struct BattlePlanBonusesData;
 class BattlePlanBonuses;
@@ -685,6 +686,11 @@ private:
 
 public:
 	Int getSkillPoints() const						{ return m_skillPoints; }
+	void addRetailSkillPointsForDamage(const Object* source, const Object* victim, Real fraction);
+	Bool usesRetailMultiplayerPowers() const;
+	Int getSciencePurchaseCost(ScienceType science) const;
+	Object* getRetailSpellBook() const;
+	const CommandSet* getRetailSpellStore() const;
 	Int getSciencePurchasePoints() const	{ return m_sciencePurchasePoints; }
 	Int getRankLevel() const							{ return m_rankLevel; }
 	Int getSkillPointsLevelUp() const			{ return m_levelUp;	}
@@ -738,6 +744,8 @@ protected:
 	void deleteUpgradeList();															///< delete all our upgrades
 
 private:
+	Bool addAdjustedSkillPoints(Int delta);
+	mutable ObjectID m_retailSpellBookID = INVALID_ID;
 
 	const PlayerTemplate*				m_playerTemplate;			///< Pointer back to the Player Template
 

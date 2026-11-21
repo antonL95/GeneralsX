@@ -862,6 +862,7 @@ void ControlBar::initRetailHud()
 	m_retailPortrait->winSetDrawFunc(drawRetailPortrait);
 	m_retailPortrait->winSetInputFunc(retailPortraitInput);
 	m_retailPortrait->winSetTooltipFunc(retailLevelTooltip);
+	initRetailPowers(master, palantir);
 
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
 	{
@@ -1471,6 +1472,7 @@ void ControlBar::updateRetailCounters()
 
 void ControlBar::updateRetailHud()
 {
+	updateRetailPowers();
 	checkRetailPlacements();
 	updateRetailTray();
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)

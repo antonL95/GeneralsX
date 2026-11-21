@@ -260,7 +260,7 @@ public:
 	Real m_healRadius = 0.0f;
 	const FXList *m_healFX = nullptr;
 	const ObjectCreationList *m_healOCL = nullptr;
-	Bool m_healAsPercent = FALSE;
+	Bool m_healAsPercent = TRUE;
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 };

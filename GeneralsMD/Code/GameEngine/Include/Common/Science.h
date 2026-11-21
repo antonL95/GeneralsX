@@ -58,7 +58,9 @@ private:
 	UnicodeString					m_description;
 	ScienceVec						m_rootSciences;			// this is calced at runtime, NOT read from INI
 	ScienceVec						m_prereqSciences;
+	std::vector<ScienceVec>			m_prereqAlternatives;
 	Int										m_sciencePurchasePointCost;
+	Int										m_sciencePurchasePointCostMP = -1;
 	Bool									m_grantable;
 
 	ScienceInfo() :
@@ -91,6 +93,8 @@ public:
 	Bool getNameAndDescription(ScienceType st, UnicodeString& name, UnicodeString& description) const;
 
 	Bool playerHasPrereqsForScience(const Player* player, ScienceType st) const;
+	Bool playerHasPrereqsForScience(const Player* player, ScienceType st, const ScienceVec& pending) const;
+	const std::vector<ScienceVec>* getPrerequisiteAlternatives(ScienceType st) const;
 
 	/**
 		this is a subtle call, and should ALMOST NEVER be called by external code...
@@ -101,7 +105,7 @@ public:
 	*/
 	Bool playerHasRootPrereqsForScience(const Player* player, ScienceType st) const;
 
-	Int getSciencePurchaseCost(ScienceType science) const;
+	Int getSciencePurchaseCost(ScienceType science, Bool multiplayer = FALSE) const;
 
 	ScienceType getScienceFromInternalName(const AsciiString& name) const;
 	AsciiString getInternalNameForScience(ScienceType science) const;
@@ -125,6 +129,7 @@ public:
 private:
 
 	const ScienceInfo* findScienceInfo(ScienceType st) const;
+	static void parsePrerequisites(INI* ini, void* instance, void* store, const void* userData);
 
 	typedef std::vector<ScienceInfo*> ScienceInfoVec;
 	ScienceInfoVec m_sciences;

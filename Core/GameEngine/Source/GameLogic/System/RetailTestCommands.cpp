@@ -1695,6 +1695,23 @@ void execute(const Command& command, unsigned int frame)
 		dumpPlayer(command, frame);
 		return;
 	}
+	if (command.action == "powerstate")
+	{
+		Player* player = ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey(command.player.c_str()));
+		if (player)
+		{
+			const Object* book = player->getRetailSpellBook();
+			std::fprintf(stderr, "TEST powerstate %u %s rank=%d skill=%d points=%d book=%s zoom=%.3f\n", frame,
+				command.player.c_str(), player->getRankLevel(), player->getSkillPoints(), player->getSciencePurchasePoints(),
+				book ? book->getTemplate()->getName().str() : "-", TheTacticalView ? TheTacticalView->getZoom() : 0.0f);
+		}
+		return;
+	}
+	if (command.action == "powercrc")
+	{
+		std::fprintf(stderr, "TEST powercrc %u %08X\n", frame, TheGameLogic->getCRC(CRC_RECALC));
+		return;
+	}
 	if (command.action == "heroes")
 	{
 		dumpHeroes(command, frame);

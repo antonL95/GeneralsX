@@ -30,7 +30,9 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/RankInfo.h"
 
 RankInfoStore* TheRankInfoStore = nullptr;
@@ -121,8 +123,15 @@ void RankInfoStore::friend_parseRankDefinition( INI* ini )
 			{ "SkillPointsNeeded", INI::parseInt, nullptr, offsetof( RankInfo, m_skillPointsNeeded ) },
 			{ "SciencesGranted", INI::parseScienceVector, nullptr, offsetof( RankInfo, m_sciencesGranted ) },
 			{ "SciencePurchasePointsGranted", INI::parseUnsignedInt, nullptr, offsetof( RankInfo, m_sciencePurchasePointsGranted ) },
+			{ "SkillPointsNeededDefault", INI::parseInt, nullptr, offsetof(RankInfo, m_skillPointsNeededDefault) },
+			{ "SkillPointsNeededCampaign", INI::parseInt, nullptr, offsetof(RankInfo, m_skillPointsNeededCampaign) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
+		static const FieldParse legacyFieldParse[] =
+		{
+			myFieldParse[0], myFieldParse[1], myFieldParse[2], myFieldParse[3], myFieldParse[6]
+		};
+		const FieldParse* fields = RetailFileLayers::enabled() || INIAudit::isEnabled() ? myFieldParse : legacyFieldParse;
 
 		if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
 		{
@@ -149,7 +158,7 @@ void RankInfoStore::friend_parseRankDefinition( INI* ini )
 			info->setNextOverride(newInfo);
 			newInfo->markAsOverride();	// must do AFTER the copy
 
-			ini->initFromINI(newInfo, myFieldParse);
+			ini->initFromINI(newInfo, fields);
 			//TheRankInfoStore->m_rankInfos.push_back(newInfo);	// NO, BAD, WRONG -- don't add in this case.
 
 		}
@@ -161,7 +170,7 @@ void RankInfoStore::friend_parseRankDefinition( INI* ini )
 				throw INI_INVALID_DATA;
 			}
 			RankInfo* info = newInstance(RankInfo);
-			ini->initFromINI(info, myFieldParse);
+			ini->initFromINI(info, fields);
 			TheRankInfoStore->m_rankInfos.push_back(info);
 		}
 	}

@@ -42,9 +42,18 @@ class RankInfo : public Overridable
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( RankInfo, "RankInfo" );
 public:
 	UnicodeString		m_rankName;
-	Int							m_skillPointsNeeded;
+	Int							m_skillPointsNeeded = 0;
+	Int							m_skillPointsNeededDefault = -1;
+	Int							m_skillPointsNeededCampaign = -1;
 	Int							m_sciencePurchasePointsGranted;
 	ScienceVec			m_sciencesGranted;
+
+	Int getSkillPointsNeeded(Bool campaign) const
+	{
+		const Int retail = campaign && m_skillPointsNeededCampaign >= 0 ?
+			m_skillPointsNeededCampaign : m_skillPointsNeededDefault;
+		return retail >= 0 ? retail : m_skillPointsNeeded;
+	}
 };
 //EMPTY_DTOR(RankInfo)
 

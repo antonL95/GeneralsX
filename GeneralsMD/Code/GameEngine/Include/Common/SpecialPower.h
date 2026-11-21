@@ -39,11 +39,12 @@
 #include "Common/Overridable.h"
 #include "Common/Override.h"
 #include "Common/ObjectStatusTypes.h"
+#include "Common/Science.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class ObjectCreationList;
 class Object;
-enum ScienceType CPP_11(: Int);
+class Player;
 struct FieldParse;
 enum AcademyClassificationType CPP_11(: Int);
 
@@ -132,6 +133,7 @@ public:
 	Int getRequiredRank() const { return getFO()->m_requiredRank; }
 	ScienceType getRequiredScience() const { return getFO()->m_requiredScience; }
 	const std::vector<AsciiString>& getRequiredSciences() const { return getFO()->m_requiredSciences; }
+	Bool isUnlockedFor(const Player* player, ScienceType excluded = SCIENCE_INVALID) const;
 	const AudioEventRTS *getInitiateSound() const { return &getFO()->m_initiateSound; }
 	const AudioEventRTS *getInitiateAtTargetSound() const { return &getFO()->m_initiateAtLocationSound; }
 	Bool hasPublicTimer() const { return getFO()->m_publicTimer; }
@@ -170,7 +172,7 @@ private:
 	Real m_maxCastRange = 0;
 	SpecialPowerObjectFilter m_forbiddenObjectFilter;
 	Real m_forbiddenObjectRange = 0;
-	std::vector<AsciiString> m_requiredSciences;
+	ScienceVec m_requiredSciences;
 	Int m_unitCost = 0;
 	Int m_unitCostDeathType = 0;
 	ObjectStatusMaskType m_preventActivationConditions;

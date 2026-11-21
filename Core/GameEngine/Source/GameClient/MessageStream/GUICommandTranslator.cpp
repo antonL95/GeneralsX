@@ -456,6 +456,7 @@ GameMessageDisposition GUICommandTranslator::translateGameMessage(const GameMess
 					//---------------------------------------------------------------------------------------
 					case GUI_COMMAND_SPECIAL_POWER:
 					case GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT:
+					case GUI_COMMAND_SPELL_BOOK:
 					{
 						return KEEP_MESSAGE;
 						break;

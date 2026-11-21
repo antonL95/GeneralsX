@@ -440,6 +440,14 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 		damageInfo->out.m_actualDamageDealt = amount;
 		damageInfo->out.m_actualDamageClipped = m_prevHealth - m_currentHealth;
 
+		if (RetailFileLayers::enabled() && m_maxHealth > 0.0f && damageInfo->out.m_actualDamageClipped > 0.0f)
+		{
+			const Object* source = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID);
+			if (source)
+				if (Player* player = source->getControllingPlayer())
+					player->addRetailSkillPointsForDamage(source, obj, std::min(1.0f, damageInfo->out.m_actualDamageClipped / m_maxHealth));
+		}
+
 		// then copy the whole DamageInfo struct for easy lookup
 		// (object pointer loses scope as soon as atteptdamage's caller ends)
 		// m_lastDamageTimestamp is initialized to FFFFFFFFFF, so doing a < compare is problematic.
