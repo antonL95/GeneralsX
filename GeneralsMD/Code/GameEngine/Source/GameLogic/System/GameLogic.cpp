@@ -2783,7 +2783,8 @@ void GameLogic::processDestroyList()
 			of the objects in the world every frame, we come out well ahead this way.)
 		*/
 
-		std::vector<UpdateModulePtr> sleepyUpdatesForThisObject;
+		static std::vector<UpdateModulePtr> sleepyUpdatesForThisObject;
+		sleepyUpdatesForThisObject.clear();
 
 		for (std::vector<UpdateModulePtr>::iterator it2 = m_sleepyUpdates.begin(); it2 != m_sleepyUpdates.end(); ++it2)
 		{
