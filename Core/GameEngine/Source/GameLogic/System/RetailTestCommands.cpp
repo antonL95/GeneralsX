@@ -8,13 +8,17 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "Common/ActionManager.h"
 #include "Common/BuildAssistant.h"
+#include "Common/DrawModule.h"
+#include "Common/FramePacer.h"
 #include "Common/GameEngine.h"
+#include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/MessageStream.h"
 #include "Common/Money.h"
@@ -38,6 +42,7 @@
 #include "GameClient/KeyDefs.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/ParticleSys.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
 #include "GameLogic/AI.h"
@@ -972,8 +977,481 @@ void pressPowerButton(const Command& command, Object* obj, unsigned int frame)
 	msg->appendObjectIDArgument(INVALID_ID);
 }
 
+struct SweepCase
+{
+	ObjectID source = INVALID_ID;
+	ObjectID result = INVALID_ID;
+	ObjectID previousObject = INVALID_ID;
+	std::vector<ObjectID> castTargets;
+	std::vector<Real> health;
+	const ThingTemplate* thing = nullptr;
+	const UpgradeTemplate* upgrade = nullptr;
+	const SpecialPowerTemplate* power = nullptr;
+	UnsignedInt readyFrame = 0;
+	UnsignedInt particles = 0;
+	Bool plot = FALSE;
+	Bool synchronousEffect = FALSE;
+	Coord3D beforeMove = {};
+	Bool moved = FALSE;
+	std::vector<std::pair<ObjectID, NameKeyType>> pendingUpgrades;
+};
+
+std::map<Int, SweepCase> s_sweepCases;
+
+ObjectID newestObject()
+{
+	ObjectID newest = INVALID_ID;
+	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		newest = std::max(newest, object->getID());
+	return newest;
+}
+
+void sweepUpgradeCandidates(SweepCase& test, Object* source, const Player* player)
+{
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if (object->getControllingPlayer() != player || object->isEffectivelyDead())
+			continue;
+		if (test.upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && object != source)
+			continue;
+		UpgradeMaskType current = object->getObjectCompletedUpgradeMask();
+		current.set(player->getCompletedUpgradeMask());
+		UpgradeMaskType predicted = current;
+		predicted.set(test.upgrade->getUpgradeMask());
+		for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+		{
+			const UpgradeModuleInterface* upgrade = (*module)->getUpgrade();
+			if (upgrade && !upgrade->wouldUpgrade(current) && upgrade->wouldUpgrade(predicted))
+				test.pendingUpgrades.emplace_back(object->getID(), (*module)->getModuleTagNameKey());
+		}
+	}
+}
+
+Int sweepActivatedUpgrades(const SweepCase& test)
+{
+	Int count = 0;
+	for (const auto& [id, tag] : test.pendingUpgrades)
+	{
+		Object* object = TheGameLogic->findObjectByID(id);
+		for (BehaviorModule** module = object ? object->getBehaviorModules() : nullptr; module && *module; ++module)
+		{
+			const UpgradeModuleInterface* upgrade = (*module)->getUpgrade();
+			if ((*module)->getModuleTagNameKey() == tag && upgrade && upgrade->isAlreadyUpgraded())
+				++count;
+		}
+	}
+	return count;
+}
+
+Bool hasSweepModel(Object* object)
+{
+	const Drawable* draw = object->getDrawable();
+	if (!draw || draw->isDrawableEffectivelyHidden())
+		return FALSE;
+	Coord3D position;
+	Real radius;
+	Matrix3D transform;
+	for (const DrawModule** module = draw->getDrawModules(); module && *module; ++module)
+	{
+		const ObjectDrawInterface* drawInterface = (*module)->getObjectDrawInterface();
+		if (drawInterface && drawInterface->clientOnly_getRenderObjInfo(&position, &radius, &transform) && radius > 0.0f)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+const CommandButton* sweepButton(Object* source, const char* name)
+{
+	if (!TheControlBar || !source)
+		return nullptr;
+	const CommandSet* set = TheControlBar->findCommandSet(source->getCommandSetString());
+	for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+	{
+		const CommandButton* button = set->getCommandButton(slot);
+		if (button && stricmp(button->getName().str(), name) == 0)
+			return button;
+	}
+	return nullptr;
+}
+
+Object* sweepSource(const Command& command, const Player* player, Bool needButton)
+{
+	Object* fallback = nullptr;
+	Object* matching = nullptr;
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if (object->getControllingPlayer() != player || object->isEffectivelyDead() ||
+			object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) ||
+			stricmp(object->getTemplate()->getName().str(), command.target.c_str()) != 0)
+			continue;
+		if (!fallback || object->getID() < fallback->getID())
+			fallback = object;
+		if (!needButton || !sweepButton(object, command.structure.c_str()))
+			continue;
+		if (object->getDrawable() && object->getDrawable()->isDrawableEffectivelyHidden())
+			continue;
+		if (!matching || object->getID() < matching->getID())
+			matching = object;
+	}
+	return matching ? matching : fallback;
+}
+
+Bool sweepPlace(Object* builder, const ThingTemplate* thing, Coord3D& point)
+{
+	const Coord3D origin = *builder->getPosition();
+	const UnsignedInt flags = BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::CLEAR_PATH |
+		BuildAssistant::NO_OBJECT_OVERLAP | BuildAssistant::SHROUD_REVEALED | BuildAssistant::IGNORE_HIDDEN_OBJECTS;
+	Region3D extent;
+	TheTerrainLogic->getExtent(&extent);
+	for (Int range = 120; range <= 600; range += 120)
+	{
+		for (Int x = -range; x <= range; x += 120)
+		{
+			for (Int y = -range; y <= range; y += 120)
+			{
+				if (std::abs(x) != range && std::abs(y) != range)
+					continue;
+				point.x = origin.x + x;
+				point.y = origin.y + y;
+				if (point.x < extent.lo.x + 80 || point.y < extent.lo.y + 80 ||
+					point.x > extent.hi.x - 80 || point.y > extent.hi.y - 80)
+					continue;
+				point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+				if (TheBuildAssistant->isLocationLegalToBuild(&point, thing, 0, flags, builder, nullptr) == LBC_OK)
+					return TRUE;
+			}
+		}
+	}
+	return FALSE;
+}
+
+Bool sweepCast(Object* source, const SpecialPowerTemplate* power, UnsignedInt options, SweepCase& test)
+{
+	if (!power || !source->getSpecialPowerModule(power))
+		return FALSE;
+	test.power = power;
+	test.readyFrame = source->getSpecialPowerModule(power)->getReadyFrame();
+	test.particles = TheParticleSystemManager ? TheParticleSystemManager->getParticleSystemCount() : 0;
+	Object* target = nullptr;
+	Real best = 0.0f;
+	const Coord3D origin = *source->getPosition();
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if (object->isEffectivelyDead() || !object->getBodyModule() ||
+			object->getBodyModule()->getMaxHealth() <= 0.0f)
+			continue;
+		const Coord3D point = *object->getPosition();
+		const Real dx = point.x - origin.x;
+		const Real dy = point.y - origin.y;
+		const Real distance = dx * dx + dy * dy;
+		if (distance <= 400.0f * 400.0f)
+		{
+			test.castTargets.push_back(object->getID());
+			test.health.push_back(object->getBodyModule()->getHealth());
+		}
+		if (BitIsSet(options, COMMAND_OPTION_NEED_OBJECT_TARGET) &&
+			distance <= 450.0f * 450.0f && (!target || distance < best) &&
+			((source->getRelationship(object) == ENEMIES && BitIsSet(options, NEED_TARGET_ENEMY_OBJECT)) ||
+			 (source->getRelationship(object) == ALLIES && BitIsSet(options, NEED_TARGET_ALLY_OBJECT)) ||
+			 (source->getRelationship(object) == NEUTRAL && BitIsSet(options, NEED_TARGET_NEUTRAL_OBJECT))) &&
+			TheActionManager->canDoSpecialPowerAtObject(source, object, CMD_FROM_PLAYER, power, options))
+		{
+			target = object;
+			best = distance;
+		}
+	}
+	if (BitIsSet(options, COMMAND_OPTION_NEED_OBJECT_TARGET))
+	{
+		if (!target)
+			return FALSE;
+		source->doSpecialPowerAtObject(power, target, options);
+	}
+	else if (BitIsSet(options, NEED_TARGET_POS))
+	{
+		Coord3D point = origin;
+		point.x += 30.0f;
+		point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+		if (!TheActionManager->canDoSpecialPowerAtLocation(source, &point, CMD_FROM_PLAYER, power, nullptr, options))
+			return FALSE;
+		source->doSpecialPowerAtLocation(power, &point, INVALID_ANGLE, options);
+	}
+	else
+	{
+		if (!TheActionManager->canDoSpecialPower(source, power, CMD_FROM_PLAYER, options))
+			return FALSE;
+		source->doSpecialPower(power, options);
+	}
+	return TRUE;
+}
+
+void sweepStart(const Command& command, Player* player, unsigned int frame)
+{
+	const Int id = command.ordinal;
+	SweepCase& test = s_sweepCases[id];
+	const bool hero = command.action == "sweep-hero";
+	const bool spell = command.action == "sweep-spell";
+	const bool buttonRequired = !hero && !spell;
+	Object* source = sweepSource(command, player, buttonRequired);
+	if (!source)
+	{
+		std::fprintf(stderr, "SWEEP %d start frame=%u reason=no_source\n", id, frame);
+		return;
+	}
+	test.source = source->getID();
+	test.previousObject = newestObject();
+	const CommandButton* button = spell ? TheControlBar->findCommandButton(command.structure.c_str())
+		: buttonRequired ? sweepButton(source, command.structure.c_str()) : nullptr;
+	if (buttonRequired && !button)
+	{
+		std::fprintf(stderr, "SWEEP %d start frame=%u reason=no_button set=%s\n", id, frame, source->getCommandSetString().str());
+		return;
+	}
+	ProductionUpdateInterface* production = source->getProductionUpdateInterface();
+	Bool issued = FALSE;
+	const char* reason = "rejected";
+	Int eligibility = -1;
+	if (command.action == "sweep-power" || spell)
+	{
+		const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
+		issued = sweepCast(source, power, button ? button->getOptions() : 0, test);
+		if (issued)
+		{
+			test.synchronousEffect = newestObject() > test.previousObject ||
+				(TheParticleSystemManager && TheParticleSystemManager->getParticleSystemCount() > test.particles);
+			for (std::size_t i = 0; !test.synchronousEffect && i < test.castTargets.size(); ++i)
+			{
+				const Object* target = TheGameLogic->findObjectByID(test.castTargets[i]);
+				test.synchronousEffect = !target || (target->getBodyModule() &&
+					target->getBodyModule()->getHealth() != test.health[i]);
+			}
+		}
+		if (!test.power)
+			reason = "no_power_module";
+	}
+	else if (command.action == "sweep-upgrade")
+	{
+		test.upgrade = button->getUpgradeTemplate();
+		if (test.upgrade && production)
+		{
+			sweepUpgradeCandidates(test, source, player);
+			eligibility = production->canQueueUpgrade(test.upgrade);
+			issued = production->queueUpgrade(test.upgrade);
+			if (!issued && (source->hasUpgrade(test.upgrade) || player->hasUpgradeComplete(test.upgrade)))
+				reason = "already_complete";
+		}
+		else
+			reason = test.upgrade ? "no_production" : "no_upgrade_template";
+	}
+	else
+	{
+		test.thing = hero ? TheThingFactory->findTemplate(command.structure.c_str(), FALSE) : static_cast<const ThingTemplate*>(button->getThingTemplate());
+		if (!test.thing)
+			reason = "no_object_template";
+		else if (command.action == "sweep-plot")
+		{
+			test.plot = TRUE;
+			selectGroup(source);
+			TheMessageStream->appendMessage(GameMessage::MSG_FOUNDATION_CONSTRUCT)->appendIntegerArgument(test.thing->getTemplateID());
+			issued = TRUE;
+		}
+		else if (command.action == "sweep-build")
+		{
+			eligibility = TheBuildAssistant->canMakeUnit(source, test.thing);
+			Coord3D point;
+			if (sweepPlace(source, test.thing, point))
+			{
+				selectGroup(source);
+				GameMessage* order = TheMessageStream->appendMessage(GameMessage::MSG_DOZER_CONSTRUCT);
+				order->appendIntegerArgument(test.thing->getTemplateID());
+				order->appendLocationArgument(point);
+				order->appendRealArgument(0.0f);
+				std::fprintf(stderr, "SWEEP site %d frame=%u x=%.1f y=%.1f\n", id, frame, point.x, point.y);
+				issued = TRUE;
+			}
+			else
+				reason = "no_legal_site";
+		}
+		else if (production)
+		{
+			eligibility = production->canQueueCreateUnit(test.thing);
+			issued = production->queueCreateUnit(test.thing, production->requestUniqueUnitID());
+		}
+		else
+			reason = "no_production";
+	}
+	std::fprintf(stderr, "SWEEP %d start frame=%u reason=%s eligibility=%d source=%u set=%s\n", id, frame,
+		issued ? "issued" : reason, eligibility, static_cast<unsigned>(test.source), source->getCommandSetString().str());
+}
+
+void sweepObserve(const Command& command, Player* player, unsigned int frame)
+{
+	const Int id = command.ordinal;
+	auto found = s_sweepCases.find(id);
+	if (found == s_sweepCases.end())
+		return;
+	SweepCase& test = found->second;
+	Object* source = TheGameLogic->findObjectByID(test.source);
+	Object* result = TheGameLogic->findObjectByID(test.result);
+	if (test.result == INVALID_ID && test.thing)
+	{
+		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		{
+			if (object->getControllingPlayer() == player && object->getID() > test.previousObject &&
+				object->getTemplate() == test.thing && (!result || object->getID() < result->getID()))
+				result = object;
+		}
+		if (result)
+			test.result = result->getID();
+	}
+	if (command.action == "sweep-move" && result && !result->isKindOf(KINDOF_STRUCTURE))
+	{
+		const AIUpdateInterface* ai = result->getAI();
+		test.beforeMove = *result->getPosition();
+		test.moved = ai && ai->getCurLocomotor();
+		if (test.moved)
+		{
+			Coord3D point = test.beforeMove;
+			point.x += 45.0f;
+			point.y += 25.0f;
+			point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+			selectGroup(result);
+			TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO)->appendLocationArgument(point);
+		}
+	}
+	else if (command.action == "sweep-kill" && result)
+	{
+		if (const HordeContain* horde = HordeContain::get(result))
+		{
+			std::vector<ObjectID> members;
+			for (const Object* member : *horde->getContainedItemsList())
+				members.push_back(member->getID());
+			Int dead = 0;
+			for (ObjectID member : members)
+			{
+				if (Object* object = TheGameLogic->findObjectByID(member))
+				{
+					if (object->getBodyModule())
+						object->kill();
+				}
+				const Object* object = TheGameLogic->findObjectByID(member);
+				if (!object || object->isEffectivelyDead())
+					++dead;
+			}
+			std::fprintf(stderr, "SWEEP %d horde_kill frame=%u members=%zu dead_members=%d\n", id, frame, members.size(), dead);
+		}
+		else if (result->getBodyModule())
+			result->kill();
+		const Object* object = TheGameLogic->findObjectByID(test.result);
+		const Bool dead = !object || object->isEffectivelyDead() || object->isDestroyed();
+		std::fprintf(stderr, "SWEEP %d death frame=%u dead=%d\n", id, frame, dead);
+	}
+	else if (command.action == "sweep-death" && test.result != INVALID_ID)
+	{
+		const Bool dead = !result || result->isEffectivelyDead() || result->isDestroyed();
+		std::fprintf(stderr, "SWEEP %d death frame=%u dead=%d\n", id, frame, dead);
+	}
+	else if (command.action == "sweep-check")
+	{
+		if (test.power && source)
+		{
+			auto* module = source->getSpecialPowerModule(test.power);
+			Int damage = 0;
+			Int healing = 0;
+			for (std::size_t i = 0; i < test.castTargets.size(); ++i)
+			{
+				const Object* object = TheGameLogic->findObjectByID(test.castTargets[i]);
+				if (!object || !object->getBodyModule() || object->getBodyModule()->getHealth() < test.health[i])
+					++damage;
+				else if (object->getBodyModule()->getHealth() > test.health[i])
+					++healing;
+			}
+			const Int effects = TheParticleSystemManager ? static_cast<Int>(TheParticleSystemManager->getParticleSystemCount()) -
+				static_cast<Int>(test.particles) : 0;
+			std::fprintf(stderr, "SWEEP %d power frame=%u recharge=%d damage=%d healing=%d particles=%d newObjects=%d synchronousEffect=%d\n", id, frame,
+				module && module->getReadyFrame() > test.readyFrame, damage, healing, effects,
+				newestObject() > test.previousObject, test.synchronousEffect);
+		}
+		else if (test.upgrade)
+		{
+			std::fprintf(stderr, "SWEEP %d upgrade frame=%u complete=%d modules=%d candidates=%zu\n", id, frame,
+				(source && source->hasUpgrade(test.upgrade)) || player->hasUpgradeComplete(test.upgrade),
+				sweepActivatedUpgrades(test), test.pendingUpgrades.size());
+		}
+		else if (result)
+		{
+			const HordeContain* horde = HordeContain::get(result);
+			Bool model = hasSweepModel(result);
+			Int count = -1;
+			if (horde)
+			{
+				count = horde->getContainCount();
+				model = count > 0;
+				for (Object* member : *horde->getContainedItemsList())
+					model = model && hasSweepModel(member);
+			}
+			const Coord3D& point = *result->getPosition();
+			const Bool travelled = test.moved && (std::abs(point.x - test.beforeMove.x) > 2.0f ||
+				std::abs(point.y - test.beforeMove.y) > 2.0f);
+			const AIUpdateInterface* ai = result->getAI();
+			const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+			const AsciiString set = result->getCommandSetString();
+			std::fprintf(stderr, "SWEEP %d object frame=%u id=%u complete=%d model=%d set=%s setLoaded=%d members=%d locomotor=%s moved=%d\n",
+				id, frame, static_cast<unsigned>(result->getID()), !result->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION),
+				model, set.isEmpty() ? "-" : set.str(), TheControlBar && TheControlBar->findCommandSet(set), count,
+				locomotor ? locomotor->getTemplateName().str() : "-", travelled);
+			if (test.plot && !result->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+				TheGameLogic->destroyObject(result);
+		}
+		else if (test.thing)
+		{
+			const auto* production = source ? source->getProductionUpdateInterface() : nullptr;
+			std::fprintf(stderr, "SWEEP %d missing frame=%u queued=%u\n", id, frame,
+				production ? production->countUnitTypeInQueue(test.thing) : 0);
+		}
+	}
+}
+
+void sweepCommand(const Command& command, unsigned int frame)
+{
+	Player* player = findPlayer(command);
+	if (!player)
+		return;
+	if (command.action == "sweep-setup")
+	{
+		player->getMoney()->deposit(2000000, FALSE, FALSE);
+		TheWritableGlobalData->m_commandPoints.goodMP[0] = {100000, 100000};
+		TheWritableGlobalData->m_commandPoints.evilMP[0] = {100000, 100000};
+		TheFramePacer->enableFramesPerSecondLimit(FALSE);
+		TheFramePacer->enableLogicTimeScale(FALSE);
+		ThePartitionManager->revealMapForPlayerPermanently(player->getPlayerIndex());
+	}
+	else if (command.action == "sweep-fixture")
+	{
+		if (!sweepSource(command, player, FALSE))
+		{
+			createObject(command, frame);
+			std::fprintf(stderr, "SWEEP fixture %s frame=%u\n", command.target.c_str(), frame);
+		}
+	}
+	else if (command.action == "sweep-rank")
+	{
+		if (Object* object = sweepSource(command, player, FALSE))
+			object->getExperienceTracker()->setMinRetailRank(10);
+	}
+	else if (command.action == "sweep-check" || command.action == "sweep-move" ||
+		command.action == "sweep-kill" || command.action == "sweep-death")
+		sweepObserve(command, player, frame);
+	else
+		sweepStart(command, player, frame);
+}
+
 void execute(const Command& command, unsigned int frame)
 {
+	if (command.action.starts_with("sweep-"))
+	{
+		sweepCommand(command, frame);
+		return;
+	}
 	if (command.action == "logall")
 	{
 		logAllObjects(frame);
