@@ -56,6 +56,55 @@ struct RingEntry
 };
 }
 
+Bool ControlBar::filterRetailRadialPress(GameWindow *window, UnsignedInt msg)
+{
+	const Bool left = msg == GWM_LEFT_DOWN || msg == GWM_LEFT_DOUBLE_CLICK || msg == GWM_LEFT_UP;
+	const Bool right = msg == GWM_RIGHT_DOWN || msg == GWM_RIGHT_UP;
+	if (!m_retailRadialGroup || (!left && !right && msg != GWM_MOUSE_LEAVING))
+		return FALSE;
+
+	for (Int i = 0; i < RETAIL_RADIAL_BUTTONS; ++i)
+	{
+		if (m_retailRadial[i] != window)
+			continue;
+
+		UnsignedInt& press = m_retailRadialPress[i];
+		if (msg == GWM_MOUSE_LEAVING)
+		{
+			press = 0;
+			return FALSE;
+		}
+
+		const Drawable *selected = TheInGameUI->getFirstSelectedDrawable();
+		const Object *obj = selected && selected == m_currentSelectedDrawable ? selected->getObject() : nullptr;
+		if (!obj || !selected->isSelected() || obj->isEffectivelyDead() ||
+			TheInGameUI->getSelectCount() != 1 || !obj->isLocallyControlled() ||
+			!m_retailRadialMode || window->winIsHidden() || !window->winGetEnabled())
+		{
+			press = 0;
+			BitClear(window->winGetInstanceData()->m_state, WIN_STATE_SELECTED);
+			return TRUE;
+		}
+
+		const UnsignedInt button = left ? GWM_LEFT_DOWN : GWM_RIGHT_DOWN;
+		if (msg == GWM_LEFT_UP || msg == GWM_RIGHT_UP)
+		{
+			if (press != button)
+				return TRUE;
+			press = 0;
+		}
+		else
+		{
+			if (press && press != button)
+				return TRUE;
+			if (left || BitIsSet(window->winGetInstanceData()->getStatus(), WIN_STATUS_RIGHT_CLICK))
+				press = button;
+		}
+		return FALSE;
+	}
+	return FALSE;
+}
+
 void ControlBar::initRetailRadial(GameWindow *master)
 {
 	m_retailRadialGroup = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:RadialMenu"));
@@ -88,6 +137,7 @@ void ControlBar::resetRetailRadial()
 		GadgetButtonSetData(button, nullptr);
 		m_retailRadialSource[i] = nullptr;
 		m_retailRadialEntry[i] = -1;
+		m_retailRadialPress[i] = 0;
 		m_retailVisible[RETAIL_RADIAL_FIRST_SLOT + i] = m_retailSideButtons[i];
 	}
 	m_retailRadialGroup->winHide(TRUE);

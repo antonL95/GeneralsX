@@ -1037,6 +1037,7 @@ protected:
 	GameWindow *m_retailSideButtons[RETAIL_RADIAL_BUTTONS] = {};
 	GameWindow *m_retailRadialSource[RETAIL_RADIAL_BUTTONS] = {};
 	Int m_retailRadialEntry[RETAIL_RADIAL_BUTTONS] = {};
+	UnsignedInt m_retailRadialPress[RETAIL_RADIAL_BUTTONS] = {};
 	Bool m_retailRadialMode = FALSE;
 
 	void initRetailHud();
@@ -1092,6 +1093,7 @@ public:
 	Bool isOverRetailSocket(Int px, Int py) const;
 	Bool isOverRetailRadial(Int px, Int py) const;
 	Bool isRetailRadialButton(const GameWindow *window) const;
+	Bool filterRetailRadialPress(GameWindow *window, UnsignedInt msg);
 	void getRetailProduction(const GameWindow *window, Int &count, Real &progress) const;
 	CommandAvailability getRetailButtonAvailability(GameWindow *window) const;
 	const Image* getRetailButtonImage(GameWindow *window) const;

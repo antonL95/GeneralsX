@@ -1752,6 +1752,8 @@ void ControlBar::onDrawableSelected( Drawable *draw )
 //-------------------------------------------------------------------------------------------------
 void ControlBar::onDrawableDeselected( Drawable *draw )
 {
+	if (m_retailRadialMode && draw == m_currentSelectedDrawable)
+		std::fill(std::begin(m_retailRadialPress), std::end(m_retailRadialPress), 0);
 
 	// set a dirty flag so next time we update we can reconstruct the UI
 	markUIDirty();
@@ -2385,18 +2387,22 @@ void ControlBar::switchToContext( ControlBarContext context, Drawable *draw )
 		Int pressedEntry = -1;
 		Int pressedHero = -1;
 		const void *pressedCommand = nullptr;
-		if (context == CB_CONTEXT_COMMAND && m_retailRadialMode && obj &&
+		UnsignedInt pressedButton = 0;
+		if (context == CB_CONTEXT_COMMAND && m_retailRadialMode && obj && !obj->isEffectivelyDead() &&
+			draw->isSelected() && TheInGameUI->getSelectCount() == 1 &&
 			m_retailRangeObject == static_cast<UnsignedInt>(obj->getID()))
 		{
 			for (Int i = 0; i < RETAIL_RADIAL_BUTTONS; ++i)
 			{
 				GameWindow *button = m_retailRadial[i];
-				if (button->winIsHidden() || !BitIsSet(button->winGetInstanceData()->getState(), WIN_STATE_SELECTED))
+				if (!m_retailRadialPress[i] || button->winIsHidden() ||
+					!BitIsSet(button->winGetInstanceData()->getState(), WIN_STATE_SELECTED))
 					continue;
 				pressedSlot = i;
 				pressedEntry = m_retailRadialEntry[i];
 				pressedHero = getRetailHeroIndex(button);
 				pressedCommand = GadgetButtonGetData(button);
+				pressedButton = m_retailRadialPress[i];
 				break;
 			}
 		}
@@ -2417,8 +2423,12 @@ void ControlBar::switchToContext( ControlBarContext context, Drawable *draw )
 				GameWindow *button = m_retailRadial[pressedSlot];
 				if (!button->winIsHidden() && BitIsSet(button->winGetStatus(), WIN_STATUS_ENABLED) &&
 					m_retailRadialEntry[pressedSlot] == pressedEntry && getRetailHeroIndex(button) == pressedHero &&
-					GadgetButtonGetData(button) == pressedCommand)
+					GadgetButtonGetData(button) == pressedCommand &&
+					(pressedButton == GWM_LEFT_DOWN || BitIsSet(button->winGetInstanceData()->getStatus(), WIN_STATUS_RIGHT_CLICK)))
+				{
+					m_retailRadialPress[pressedSlot] = pressedButton;
 					BitSet(button->winGetInstanceData()->m_state, WIN_STATE_SELECTED);
+				}
 			}
 		}
 		else if (context == CB_CONTEXT_MULTI_SELECT)

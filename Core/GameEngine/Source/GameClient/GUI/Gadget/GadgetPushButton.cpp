@@ -51,6 +51,7 @@
 #include "Common/Language.h"
 #include "Common/GameAudio.h"
 #include "GameClient/Gadget.h"
+#include "GameClient/ControlBar.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/InGameUI.h"
 
@@ -86,6 +87,9 @@ WindowMsgHandledType GadgetPushButtonInput( GameWindow *window,
 																						WindowMsgData mData1,
 																						WindowMsgData mData2 )
 {
+	if (TheControlBar && TheControlBar->filterRetailRadialPress(window, msg))
+		return MSG_HANDLED;
+
 	WinInstanceData *instData = window->winGetInstanceData();
 
 	switch( msg )
