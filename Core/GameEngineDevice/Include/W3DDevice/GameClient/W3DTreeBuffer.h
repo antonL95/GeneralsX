@@ -196,6 +196,7 @@ public:
 		const Coord3D *pusherDirection, ObjectID pusherID );
 	/// Remove a tree.
 	void removeTree(DrawableID id);
+	void removeTreeAt(const Coord3D& pos);
 	/// Remove trees that would be under a building.
 	void removeTreesForConstruction(
 		const Coord3D* pos,

@@ -386,6 +386,7 @@ public:
 	Short m_firewallPortAllocationDelta; ///< the port allocation delta last detected.
 
 	Int m_baseValuePerSupplyBox;
+	Int m_supplyBoxesPerTree;
 	Real m_BuildSpeed;
 	Real m_builderMoveFromNewStructureDistance;
 	Real m_MinDistFromEdgeOfMapForBuild;

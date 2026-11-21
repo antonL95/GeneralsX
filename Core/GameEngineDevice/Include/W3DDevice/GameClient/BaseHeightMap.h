@@ -165,6 +165,7 @@ public:
 
 	void unitMoved( Object *unit );
 	void notifyShroudChanged();
+	void removeMapTree(const Coord3D& pos);
 	void removeTreesAndPropsForConstruction(
 		const Coord3D* pos,
 		const GeometryInfo& geom,

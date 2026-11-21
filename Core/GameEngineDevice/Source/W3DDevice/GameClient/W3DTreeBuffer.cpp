@@ -1417,6 +1417,20 @@ void W3DTreeBuffer::removeTree(DrawableID id)
 	}
 }
 
+void W3DTreeBuffer::removeTreeAt(const Coord3D& pos)
+{
+	for (Int i = 0; i < m_numTrees; ++i)
+	{
+		TTree& tree = m_trees[i];
+		if (tree.treeType >= 0 && tree.location.X == pos.x && tree.location.Y == pos.y && tree.location.Z == pos.z)
+		{
+			tree.treeType = DELETED_TREE_TYPE;
+			m_anythingChanged = true;
+			return;
+		}
+	}
+}
+
 //=============================================================================
 // W3DTreeBuffer::removeTree
 //=============================================================================

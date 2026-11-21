@@ -22,6 +22,8 @@ class GeometryUpgrade final : public UpgradeModule
 public:
 	GeometryUpgrade(Thing* thing, const ModuleData* data) : UpgradeModule(thing, data) {}
 
+	static Bool constructionFootprintsOverlap(const ThingTemplate& build, const Coord3D& position, Real angle, const Object& obstacle);
+
 	Bool isSubObjectsUpgrade() override { return FALSE; }
 
 protected:

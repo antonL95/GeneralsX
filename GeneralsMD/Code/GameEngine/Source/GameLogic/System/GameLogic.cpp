@@ -2017,7 +2017,8 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			if( thingTemplate == nullptr )
 				continue;
 			// don't create trees and shrubs if this is one and we have that option off
-			if( thingTemplate->isKindOf( KINDOF_SHRUBBERY ) && !useTrees )
+			if( thingTemplate->isKindOf( KINDOF_SHRUBBERY ) && !useTrees &&
+				!( RetailFileLayers::enabled() && thingTemplate->getRotWKObjectData().isHarvestable ) )
 				continue;
 
 			Coord3D pos = *pMapObj->getLocation();
@@ -2064,7 +2065,8 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 				continue; // bridges have to be added earlier.
 
 			// don't create trees and shrubs if this is one and we have that option off
-			if( thingTemplate->isKindOf( KINDOF_SHRUBBERY ) && !useTrees )
+			if( thingTemplate->isKindOf( KINDOF_SHRUBBERY ) && !useTrees &&
+				!( RetailFileLayers::enabled() && thingTemplate->getRotWKObjectData().isHarvestable ) )
 				continue;
 
 			Coord3D pos = *pMapObj->getLocation();
@@ -2073,7 +2075,10 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 			if (RetailFileLayers::enabled() &&
 				TheTerrainVisual->placeMapVegetation(*thingTemplate, *pMapObj->getProperties(), pos, angle))
+			{
+				TheTerrainLogic->registerMapTree(*thingTemplate, pos);
 				continue;
+			}
 
 			if (thingTemplate->isKindOf(KINDOF_OPTIMIZED_TREE)) {
 				createOptimizedTree(thingTemplate, &pos, angle);
@@ -4517,6 +4522,8 @@ UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 	marker = "MARKER:ThePartitionManager";
 	xferCRC->xferAsciiString(&marker);
 	xferCRC->xferSnapshot( ThePartitionManager );
+	if (RetailFileLayers::enabled())
+		xferCRC->xferSnapshot(TheTerrainLogic);
 	if (isInGameLogicUpdate())
 	{
 		CRCGEN_LOG(("CRC after partition manager for frame %d is 0x%8.8X", m_frame, xferCRC->getCRC()));

@@ -2019,6 +2019,12 @@ void BaseHeightMapRenderObjClass::removeTreesAndPropsForConstruction(const Coord
 	}
 }
 
+void BaseHeightMapRenderObjClass::removeMapTree(const Coord3D& pos)
+{
+	if (m_treeBuffer)
+		m_treeBuffer->removeTreeAt(pos);
+}
+
 //=============================================================================
 // BaseHeightMapRenderObjClass::addTree
 //=============================================================================

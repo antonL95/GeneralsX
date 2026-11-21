@@ -48,6 +48,8 @@ class Drawable;
 class Matrix3D;
 class WaterHandle;
 class Xfer;
+class FXList;
+class GeometryInfo;
 
 enum WaypointID CPP_11(: Int)
 {
@@ -314,12 +316,18 @@ public:
   void flattenTerrain(Object *obj);  ///< Flatten the terrain under a building.
   void createCraterInTerrain(Object *obj);  ///< Flatten the terrain under a building.
 
+	void registerMapTree(const ThingTemplate& thing, const Coord3D& pos);
+	void clearMapTreesForConstruction(const Coord3D& pos, const GeometryInfo& geometry, Real angle);
+	std::uint64_t harvestMapTrees(const Coord3D& origin, Real radius, const FXList* fx);
+
 protected:
 
 	// snapshot methods
 	virtual void crc( Xfer *xfer ) override;
 	virtual void xfer( Xfer *xfer ) override;
 	virtual void loadPostProcess() override;
+
+	void xferMapTrees(Xfer* xfer);
 
 	/// Chunk parser callback.
  	static Bool parseWaypointDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
@@ -343,6 +351,13 @@ protected:
 
 	VecICoord2D m_boundaries;
 	Int m_activeBoundary;
+
+	struct HarvestableTree
+	{
+		Coord3D position;
+		Int boxes;
+	};
+	std::vector<HarvestableTree> m_harvestableTrees;
 
 	Waypoint *m_waypointListHead;
 	Bridge *m_bridgeListHead;

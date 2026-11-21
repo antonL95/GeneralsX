@@ -28,10 +28,11 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
-
+#include <algorithm>
 
 #include "Common/DataChunk.h"
 #include "Common/GameState.h"
+#include "Common/GlobalData.h"
 #include "Common/MapObject.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
@@ -40,6 +41,7 @@
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
 
+#include "GameClient/FXList.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
 
@@ -971,6 +973,7 @@ void TerrainLogic::init()
 //-------------------------------------------------------------------------------------------------
 void TerrainLogic::reset()
 {
+	m_harvestableTrees.clear();
 
 	deleteWaypoints();
 	deleteBridges();
@@ -1083,6 +1086,7 @@ void TerrainLogic::update()
 //-------------------------------------------------------------------------------------------------
 void TerrainLogic::newMap( Bool saveGame )
 {
+	m_harvestableTrees.clear();
 
 	// Set waypoint's z value, now that the height map is loaded.
 	for( Waypoint *way = m_waypointListHead; way; way = way->getNext() )
@@ -2911,12 +2915,64 @@ void TerrainLogic::createCraterInTerrain(Object *obj)
 
 }
 
-// ------------------------------------------------------------------------------------------------
-/** CRC */
-// ------------------------------------------------------------------------------------------------
+void TerrainLogic::registerMapTree(const ThingTemplate& thing, const Coord3D& pos)
+{
+	const auto& tree = thing.getRotWKObjectData();
+	if (!thing.isKindOf(KINDOF_TREE) || !tree.isHarvestable)
+		return;
+
+	const Int boxes = tree.supplyOverride > 0 ? tree.supplyOverride : TheGlobalData->m_supplyBoxesPerTree;
+	if (boxes > 0)
+		m_harvestableTrees.push_back({pos, boxes});
+}
+
+void TerrainLogic::clearMapTreesForConstruction(const Coord3D& pos, const GeometryInfo& geometry, Real angle)
+{
+	const GeometryInfo treeGeometry(GEOMETRY_CYLINDER, FALSE, 35.0f, 14.0f, 14.0f);
+	std::erase_if(m_harvestableTrees, [&](const HarvestableTree& tree) {
+		return ThePartitionManager->geomCollidesWithGeom(&pos, geometry, angle, &tree.position, treeGeometry, 0.0f);
+	});
+}
+
+std::uint64_t TerrainLogic::harvestMapTrees(const Coord3D& origin, Real radius, const FXList* fx)
+{
+	std::uint64_t boxes = 0;
+	const Real treeRadius = 7.0f;
+	const Real radiusSquared = sqr(radius + treeRadius);
+	std::erase_if(m_harvestableTrees, [&](const HarvestableTree& tree) {
+		const Real dx = tree.position.x - origin.x;
+		const Real dy = tree.position.y - origin.y;
+		const Real dz = tree.position.z - origin.z;
+		if (dx * dx + dy * dy + dz * dz >= radiusSquared)
+			return false;
+
+		boxes += tree.boxes;
+		if (TheTerrainVisual)
+			TheTerrainVisual->removeMapTree(tree.position);
+		if (fx)
+			FXList::doFXPos(fx, &tree.position);
+		return true;
+	});
+	return boxes;
+}
+
 void TerrainLogic::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xferMapTrees(xfer);
+}
 
+void TerrainLogic::xferMapTrees(Xfer* xfer)
+{
+	UnsignedInt count = m_harvestableTrees.size();
+	xfer->xferUnsignedInt(&count);
+	if (xfer->getXferMode() == XFER_LOAD)
+		m_harvestableTrees.resize(count);
+	for (auto& tree : m_harvestableTrees)
+	{
+		xfer->xferCoord3D(&tree.position);
+		xfer->xferInt(&tree.boxes);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2930,7 +2986,7 @@ void TerrainLogic::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = 2;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -3010,6 +3066,10 @@ void TerrainLogic::xfer( Xfer *xfer )
 
 	}
 
+	if (version >= 3)
+		xferMapTrees(xfer);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_harvestableTrees.clear();
 }
 
 // ------------------------------------------------------------------------------------------------

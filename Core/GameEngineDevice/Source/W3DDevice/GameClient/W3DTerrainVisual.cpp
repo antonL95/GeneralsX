@@ -1081,6 +1081,12 @@ Bool W3DTerrainVisual::placeMapVegetation(const ThingTemplate& thing, const Dict
 	return W3DTreeDraw::placeMapVegetation(thing, properties, pos, angle);
 }
 
+void W3DTerrainVisual::removeMapTree(const Coord3D& pos)
+{
+	if (m_terrainRenderObject)
+		m_terrainRenderObject->removeMapTree(pos);
+}
+
 void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *pos, Real angle)
 {
 	ModelConditionFlags state;

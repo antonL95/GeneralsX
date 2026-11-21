@@ -71,6 +71,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/HordeDispatchSpecialPower.h
     Include/GameLogic/Module/SpecialPowerTimerRefreshSpecialPower.h
     Include/GameLogic/Module/ProductionSpeedBonus.h
+    Include/GameLogic/Module/DevastateSpecialPower.h
     Include/GameLogic/Module/RotwkPowerState.h
     Include/GameLogic/Module/InvisibilitySpecialPower.h
     Include/GameLogic/Module/WeaponChangeSpecialPowerModule.h
@@ -710,6 +711,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/SpecialPower/HordeDispatchSpecialPower.cpp
     Source/GameLogic/Object/SpecialPower/SpecialPowerTimerRefreshSpecialPower.cpp
     Source/GameLogic/Object/SpecialPower/ProductionSpeedBonus.cpp
+    Source/GameLogic/Object/SpecialPower/DevastateSpecialPower.cpp
     Source/GameLogic/Object/SpecialPower/RotwkPowerState.cpp
     Source/GameLogic/Object/SpecialPower/InvisibilitySpecialPower.cpp
     Source/GameLogic/Object/SpecialPower/WeaponChangeSpecialPowerModule.cpp

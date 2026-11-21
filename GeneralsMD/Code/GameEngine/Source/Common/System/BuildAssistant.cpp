@@ -54,6 +54,7 @@
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/CreateModule.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
 #include "GameLogic/HeroRoster.h"
@@ -709,6 +710,25 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 			TheGhostObjectManager->collidesWithOrphanedGhost( worldPos, build->getTemplateGeometryInfo(), angle,
 				builderObject->getControllingPlayer()->getPlayerIndex() ) )
 		return LBC_OBJECTS_IN_THE_WAY;
+
+	if (RetailFileLayers::enabled() && BitIsSet(options, NO_OBJECT_OVERLAP) &&
+		(!constructionSite || constructionSite->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)))
+	{
+		for (Object* obstacle = TheGameLogic->getFirstObject(); obstacle; obstacle = obstacle->getNextObject())
+		{
+			if (!obstacle->isKindOf(KINDOF_IMMOBILE) || obstacle->isKindOf(KINDOF_INERT) ||
+				obstacle->isKindOf(KINDOF_NO_COLLIDE) || isPartOfConstructionSite(obstacle, constructionSite) ||
+				isRemovableForConstruction(obstacle))
+				continue;
+			const Relationship relationship = builderObject ? builderObject->getRelationship(obstacle) : NEUTRAL;
+			if (isHiddenFromBuilder(obstacle, builderObject, relationship, options) ||
+				!GeometryUpgrade::constructionFootprintsOverlap(*build, *worldPos, angle, *obstacle))
+				continue;
+			if (!BitIsSet(options, SUPPRESS_BUILD_BIBS))
+				TheTerrainVisual->addFactionBib(obstacle, TRUE);
+			return LBC_OBJECTS_IN_THE_WAY;
+		}
+	}
 
 	ObjectIterator *iter =
 			ThePartitionManager->iteratePotentialCollisions( worldPos,
@@ -1498,6 +1518,8 @@ void BuildAssistant::clearRemovableForConstruction( const ThingTemplate *whatToB
 			TheGameLogic->destroyObject( them );
 
 	}
+	if (RetailFileLayers::enabled())
+		TheTerrainLogic->clearMapTreesForConstruction(*pos, whatToBuild->getTemplateGeometryInfo(), angle);
 	TheTerrainVisual->removeTreesAndPropsForConstruction(pos, whatToBuild->getTemplateGeometryInfo(), angle);
 
 }

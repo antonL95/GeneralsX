@@ -248,6 +248,7 @@
 #include "GameLogic/Module/HordeDispatchSpecialPower.h"
 #include "GameLogic/Module/SpecialPowerTimerRefreshSpecialPower.h"
 #include "GameLogic/Module/ProductionSpeedBonus.h"
+#include "GameLogic/Module/DevastateSpecialPower.h"
 #include "GameLogic/Module/InvisibilitySpecialPower.h"
 #include "GameLogic/Module/WeaponChangeSpecialPowerModule.h"
 #include "GameLogic/Module/GrabPassengerSpecialPower.h"
@@ -565,6 +566,7 @@ void ModuleFactory::init()
 		addModule( HordeDispatchSpecialPower );
 		addModule( SpecialPowerTimerRefreshSpecialPower );
 		addModule( ProductionSpeedBonus );
+		addModule( DevastateSpecialPower );
 		addModule( InvisibilitySpecialPower );
 		addModule( WeaponChangeSpecialPowerModule );
 		addModule( GrabPassengerSpecialPower );

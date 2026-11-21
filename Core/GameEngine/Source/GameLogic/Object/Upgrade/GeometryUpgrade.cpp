@@ -7,6 +7,8 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/GeometryUpgrade.h"
+#include "GameLogic/PartitionManager.h"
+#include "WWMath/wwmath.h"
 
 namespace
 {
@@ -31,6 +33,74 @@ struct GeometryBounds
 		height = std::max(height, offset.z + shape.getMaxHeightAbovePosition());
 	}
 };
+
+Bool canOccupyConstructionFootprint(const ThingTemplate& definition, const ThingTemplate::GeometryDetails& details)
+{
+	if (details.active)
+		return TRUE;
+	if (details.name.isEmpty())
+		return FALSE;
+
+	const ModuleInfo& modules = definition.getBehaviorModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		if (modules.getNthName(i).compareNoCase("GeometryUpgrade") != 0)
+			continue;
+		const auto* data = static_cast<const GeometryUpgradeModuleData*>(modules.getNthData(i));
+		if (data && containsGeometry(data->m_showGeometry, details.name))
+			return TRUE;
+	}
+	return FALSE;
+}
+
+template<typename Predicate>
+Bool anyConstructionGeometry(const ThingTemplate& definition, const Coord3D& position, Real angle, const Predicate& overlaps)
+{
+	const auto& data = definition.getRotWKObjectData();
+	const Real cosAngle = WWMath::CosTrig(angle);
+	const Real sinAngle = WWMath::SinTrig(angle);
+	const auto test = [&](const GeometryInfo& geometry, const ThingTemplate::GeometryDetails& details) -> Bool
+	{
+		if (!canOccupyConstructionFootprint(definition, details))
+			return FALSE;
+		const Coord3D center = {
+			position.x + details.offset.x * cosAngle - details.offset.y * sinAngle,
+			position.y + details.offset.x * sinAngle + details.offset.y * cosAngle,
+			position.z + details.offset.z
+		};
+		return overlaps(geometry, center);
+	};
+
+	if (test(definition.getTemplateGeometryInfo(), data.primaryGeometry))
+		return TRUE;
+	return std::any_of(data.additionalGeometries.begin(), data.additionalGeometries.end(),
+		[&](const auto& geometry) { return test(geometry.shape, geometry.details); });
+}
+}
+
+Bool GeometryUpgrade::constructionFootprintsOverlap(const ThingTemplate& build, const Coord3D& position, Real angle,
+	const Object& obstacle)
+{
+	const ThingTemplate& existing = *obstacle.getTemplate();
+	const auto& buildData = build.getRotWKObjectData();
+	const auto& existingData = existing.getRotWKObjectData();
+	const auto hasExtendedFootprint = [](const auto& data)
+	{
+		return !data.additionalGeometries.empty() || data.primaryGeometry.offset.x != 0.0f ||
+			data.primaryGeometry.offset.y != 0.0f || data.primaryGeometry.offset.z != 0.0f;
+	};
+	if (!hasExtendedFootprint(buildData) && !hasExtendedFootprint(existingData))
+		return FALSE;
+
+	const Real obstacleAngle = obstacle.getOrientation();
+	return anyConstructionGeometry(build, position, angle, [&](const GeometryInfo& shape, const Coord3D& center)
+	{
+		return anyConstructionGeometry(existing, *obstacle.getPosition(), obstacleAngle,
+			[&](const GeometryInfo& obstacleShape, const Coord3D& obstacleCenter)
+			{
+				return ThePartitionManager->geomCollidesWithGeom(&center, shape, angle, &obstacleCenter, obstacleShape, obstacleAngle);
+			});
+	});
 }
 
 void GeometryUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)

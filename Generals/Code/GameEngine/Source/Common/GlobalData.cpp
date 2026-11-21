@@ -360,6 +360,7 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "MaxRoadTypes",								INI::parseInt,				nullptr,			offsetof( GlobalData, m_maxRoadTypes ) },
 
 	{ "ValuePerSupplyBox",					INI::parseInt,				nullptr,			offsetof( GlobalData, m_baseValuePerSupplyBox ) },
+	{ "SupplyBoxesPerTree", INI::parseInt, nullptr, offsetof( GlobalData, m_supplyBoxesPerTree ) },
 
 	{ "AudioOn",										INI::parseBool,				nullptr,			offsetof( GlobalData, m_audioOn ) },
 	{ "MusicOn",										INI::parseBool,				nullptr,			offsetof( GlobalData, m_musicOn ) },
@@ -843,6 +844,7 @@ GlobalData::GlobalData()
 	m_maxRoadTypes = 0;
 
 	m_baseValuePerSupplyBox = 100;
+	m_supplyBoxesPerTree = 90;
 
 	m_audioOn = TRUE;
 	m_musicOn = TRUE;

@@ -1783,7 +1783,8 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 				useTrees = TRUE; // Always use trees in multiplayer, cause we want it to sync properly. jba.
 			}
 			// don't create trees and shrubs if this is one and we have that option off
-			if( thingTemplate->isKindOf( KINDOF_SHRUBBERY ) && !useTrees )
+			if( thingTemplate->isKindOf( KINDOF_SHRUBBERY ) && !useTrees &&
+				!( RetailFileLayers::enabled() && thingTemplate->getRotWKObjectData().isHarvestable ) )
 				continue;
 
 			if (RetailFileLayers::enabled())
@@ -1791,7 +1792,13 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 				Coord3D pos = *pMapObj->getLocation();
 				pos.z += TheTerrainLogic->getGroundHeight(pos.x, pos.y);
 				if (TheTerrainVisual->placeMapVegetation(*thingTemplate, *pMapObj->getProperties(), pos,
-					normalizeAngle(pMapObj->getAngle())) || loadingSaveGame)
+					normalizeAngle(pMapObj->getAngle())))
+				{
+					if (!loadingSaveGame)
+						TheTerrainLogic->registerMapTree(*thingTemplate, pos);
+					continue;
+				}
+				if (loadingSaveGame)
 					continue;
 			}
 
@@ -3855,6 +3862,8 @@ UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 	marker = "MARKER:ThePartitionManager";
 	xferCRC->xferAsciiString(&marker);
 	xferCRC->xferSnapshot( ThePartitionManager );
+	if (RetailFileLayers::enabled())
+		xferCRC->xferSnapshot(TheTerrainLogic);
 	if (isInGameLogicUpdate())
 	{
 		CRCGEN_LOG(("CRC after partition manager for frame %d is 0x%8.8X", m_frame, xferCRC->getCRC()));

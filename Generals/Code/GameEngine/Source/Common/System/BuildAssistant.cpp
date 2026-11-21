@@ -54,6 +54,7 @@
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/CreateModule.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
 
@@ -708,6 +709,22 @@ Bool BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos,
 			TheGhostObjectManager->collidesWithOrphanedGhost( worldPos, build->getTemplateGeometryInfo(), angle,
 				builderObject->getControllingPlayer()->getPlayerIndex() ) )
 		return false;
+
+	if (RetailFileLayers::enabled() && BitIsSet(options, NO_OBJECT_OVERLAP) &&
+		(!constructionSite || constructionSite->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)))
+	{
+		for (Object* obstacle = TheGameLogic->getFirstObject(); obstacle; obstacle = obstacle->getNextObject())
+		{
+			if (!obstacle->isKindOf(KINDOF_IMMOBILE) || obstacle->isKindOf(KINDOF_INERT) ||
+				obstacle->isKindOf(KINDOF_NO_COLLIDE) || isPartOfConstructionSite(obstacle, constructionSite) ||
+				isRemovableForConstruction(obstacle) || isHiddenFromBuilder(obstacle, builderObject, options) ||
+				!GeometryUpgrade::constructionFootprintsOverlap(*build, *worldPos, angle, *obstacle))
+				continue;
+			if (!BitIsSet(options, SUPPRESS_BUILD_BIBS))
+				TheTerrainVisual->addFactionBib(obstacle, TRUE);
+			return false;
+		}
+	}
 
 	ObjectIterator *iter =
 			ThePartitionManager->iteratePotentialCollisions( worldPos,
@@ -1438,6 +1455,11 @@ void BuildAssistant::clearRemovableForConstruction( const ThingTemplate *whatToB
 
 	}
 
+	if (RetailFileLayers::enabled())
+	{
+		TheTerrainLogic->clearMapTreesForConstruction(*pos, whatToBuild->getTemplateGeometryInfo(), angle);
+		TheTerrainVisual->removeTreesAndPropsForConstruction(pos, whatToBuild->getTemplateGeometryInfo(), angle);
+	}
 }
 
 void BuildAssistant::clearConstructionSite( const Object *site )
