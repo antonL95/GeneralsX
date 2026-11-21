@@ -1488,7 +1488,8 @@ inline Bool isPointOnMap( const Coord3D  *testPos )
 
 }
 
-static Bool retailPowerLocationAllowed(const Object* source, const Coord3D* location, const SpecialPowerTemplate* power)
+static Bool retailPowerLocationAllowed(const Object* source, const Coord3D* location, const SpecialPowerTemplate* power,
+	const Object* autoAbilityTarget)
 {
 	if (!location || !isPointOnMap(location))
 		return FALSE;
@@ -1507,7 +1508,8 @@ static Bool retailPowerLocationAllowed(const Object* source, const Coord3D* loca
 		MemoryPoolObjectHolder holder(objects);
 		for (const Object* candidate = objects->first(); candidate; candidate = objects->next())
 		{
-			if (!candidate->isEffectivelyDead() && power->getForbiddenObjectFilter().matchesTemplate(*candidate->getTemplate()))
+			if (candidate != autoAbilityTarget && !candidate->isEffectivelyDead() &&
+				power->getForbiddenObjectFilter().matchesTemplate(*candidate->getTemplate()))
 				return FALSE;
 		}
 	}
@@ -1542,7 +1544,8 @@ static Bool retailPowerObjectAllowed(const Object* source, const Object* target,
 	if (relationship != ALLIES && target->testStatus(OBJECT_STATUS_STEALTHED) &&
 		!target->testStatus(OBJECT_STATUS_DETECTED) && !target->testStatus(OBJECT_STATUS_DISGUISED))
 		return FALSE;
-	if (power->hasRetailFlag(SpecialPowerTemplate::RETAIL_NEEDS_OBJECT_FILTER) &&
+	if ((power->getSpecialPowerType() == SPECIAL_AT_VISIBLE_GROUNDED_OBJECT ||
+		power->hasRetailFlag(SpecialPowerTemplate::RETAIL_NEEDS_OBJECT_FILTER)) &&
 		!power->getObjectFilter().matchesTemplate(*target->getTemplate()))
 		return FALSE;
 	const Real maxRange = power->getMaxCastRange();
@@ -1594,7 +1597,7 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
 			const UnsignedInt options = button ? button->getOptions() : commandOptions;
 			return (!button || (button->isMountStateAllowed(obj) && (options & NEED_TARGET_POS))) &&
-				retailPowerLocationAllowed(obj, loc, spTemplate);
+				retailPowerLocationAllowed(obj, loc, spTemplate, commandSource == CMD_FROM_AI ? objectInWay : nullptr);
 		}
 
 		switch( spTemplate->getSpecialPowerType() )

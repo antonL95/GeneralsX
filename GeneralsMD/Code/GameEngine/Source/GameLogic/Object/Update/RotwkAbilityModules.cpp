@@ -679,15 +679,20 @@ Bool AutoAbilityBehavior::objectMatches(const SpecialPowerObjectFilter& filter, 
 	return AbilityRules::queryIncludes(mode, candidate);
 }
 
-Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, const CommandButton* button, Object*& target)
+Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, UnsignedInt options, Object*& target)
 {
 	const AutoAbilityBehaviorModuleData* data = getAutoAbilityBehaviorModuleData();
 	Object* self = getObject();
-	const UnsignedInt options = button->getOptions();
 	const Bool needsObject = (options & COMMAND_OPTION_NEED_OBJECT_TARGET) != 0;
-	const auto eligible = [&](Object* candidate)
+	const Bool needsPosition = (options & NEED_TARGET_POS) != 0;
+	const auto eligible = [&](Object* candidate) -> Bool
 	{
-		return !needsObject || TheActionManager->canDoSpecialPowerAtObject(self, candidate, CMD_FROM_AI, getSpecialAbility(), options);
+		if (needsObject)
+			return TheActionManager->canDoSpecialPowerAtObject(self, candidate, CMD_FROM_AI, getSpecialAbility(), options);
+		if (needsPosition)
+			return TheActionManager->canDoSpecialPowerAtLocation(self, candidate->getPosition(), CMD_FROM_AI,
+				getSpecialAbility(), candidate, options);
+		return TRUE;
 	};
 	Int count = 0;
 	Object* first = nullptr;
@@ -697,10 +702,16 @@ Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, const Comm
 			first = self;
 		++count;
 	}
-	if (count >= query.m_count && (first || !needsObject))
+	if (count >= query.m_count)
 	{
-		target = first;
-		return TRUE;
+		if (!first && needsPosition && !needsObject &&
+			TheActionManager->canDoSpecialPowerAtLocation(self, self->getPosition(), CMD_FROM_AI, getSpecialAbility(), nullptr, options))
+			first = self;
+		if (first || (!needsObject && !needsPosition))
+		{
+			target = first;
+			return TRUE;
+		}
 	}
 	const Real minSquared = data->m_minScanRange * data->m_minScanRange;
 	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self, data->m_maxScanRange, FROM_BOUNDINGSPHERE_2D,
@@ -725,20 +736,17 @@ Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, const Comm
 	return FALSE;
 }
 
-Bool AutoAbilityBehavior::cast(const CommandButton* button, Object* target)
+Bool AutoAbilityBehavior::cast(UnsignedInt options, Object* target)
 {
 	Object* self = getObject();
 	const SpecialPowerTemplate* power = getSpecialAbility();
-	const UnsignedInt options = button->getOptions();
 	if (options & COMMAND_OPTION_NEED_OBJECT_TARGET)
 	{
 		self->doSpecialPowerAtObject(power, target, options);
 	}
 	else if (options & NEED_TARGET_POS)
 	{
-		const Coord3D position = target ? *target->getPosition() : *self->getPosition();
-		if (!TheActionManager->canDoSpecialPowerAtLocation(self, &position, CMD_FROM_AI, power, nullptr, options))
-			return FALSE;
+		const Coord3D position = *target->getPosition();
 		self->doSpecialPowerAtLocation(power, &position, INVALID_ANGLE, options);
 	}
 	else
@@ -764,8 +772,9 @@ UpdateSleepTime AutoAbilityBehavior::update()
 	if (!power || !power->isReady())
 		return scan;
 	const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(self, data->m_specialAbility) : nullptr;
-	if (!button || !TheSpecialPowerStore->canUseSpecialPower(self, data->m_specialAbility))
+	if (!TheSpecialPowerStore->canUseSpecialPower(self, data->m_specialAbility))
 		return scan;
+	const UnsignedInt options = button ? button->getOptions() : 0;
 	for (BehaviorModule** module = self->getBehaviorModules(); *module; ++module)
 	{
 		SpecialPowerUpdateInterface* update = (*module)->getSpecialPowerUpdateInterface();
@@ -794,7 +803,7 @@ UpdateSleepTime AutoAbilityBehavior::update()
 	for (const AutoAbilityQuery& query : data->m_queries)
 	{
 		Object* target = nullptr;
-		if (queryMatches(query, button, target) && cast(button, target))
+		if (queryMatches(query, options, target) && cast(options, target))
 			break;
 	}
 	return scan;

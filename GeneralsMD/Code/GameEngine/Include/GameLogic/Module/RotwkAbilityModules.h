@@ -244,9 +244,9 @@ public:
 	static AutoAbilityBehavior *find( Object *obj, const SpecialPowerTemplate *power );
 
 private:
-	Bool queryMatches( const AutoAbilityQuery &query, const CommandButton *button, Object *&target );
+	Bool queryMatches( const AutoAbilityQuery &query, UnsignedInt options, Object *&target );
 	Bool objectMatches( const SpecialPowerObjectFilter &filter, const Object *other ) const;
-	Bool cast( const CommandButton *button, Object *target );
+	Bool cast( UnsignedInt options, Object *target );
 
 	Int m_toggledState = 0;
 	UnsignedInt m_idleSinceFrame = 0;
