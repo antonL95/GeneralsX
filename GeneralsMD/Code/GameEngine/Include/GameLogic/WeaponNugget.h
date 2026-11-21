@@ -5,6 +5,7 @@
 #include "Common/AsciiString.h"
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Damage.h"
+#include "GameLogic/WeaponSetType.h"
 
 class INI;
 class Object;
@@ -22,6 +23,7 @@ enum WeaponNuggetType CPP_11(: Int)
 	WEAPON_NUGGET_OCL,
 	WEAPON_NUGGET_ATTRIBUTE_MODIFIER,
 	WEAPON_NUGGET_SLAVE_ATTACK,
+	WEAPON_NUGGET_HORDE_ATTACK,
 };
 
 struct WeaponNuggetScalar
@@ -48,6 +50,7 @@ struct WeaponNugget
 	static void parseWeaponOCLNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseAttributeModifierNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseSlaveAttackNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseHordeAttackNugget(INI* ini, void* instance, void* store, const void* userData);
 
 	WeaponNuggetType m_type;
 	std::vector<AsciiString> m_requiredUpgradeNames;
@@ -114,6 +117,7 @@ struct WeaponNugget
 	AsciiString m_attributeModifier;
 	std::vector<AsciiString> m_antiCategories;
 	Bool m_affectHordeMembers = FALSE;
+	WeaponSlotType m_lockWeaponSlot = PRIMARY_WEAPON;
 };
 
 Bool objectFilterMatches(const SpecialPowerObjectFilter& filter, const Object* source, const Object* target);

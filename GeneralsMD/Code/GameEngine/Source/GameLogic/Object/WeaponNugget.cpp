@@ -1,6 +1,7 @@
 #include "PreRTS.h"
 
 #define DEFINE_DEATH_NAMES
+#define DEFINE_WEAPONSLOTTYPE_NAMES
 #include "GameLogic/WeaponNugget.h"
 
 #include <algorithm>
@@ -191,6 +192,12 @@ const FieldParse s_attributeModifierFields[] =
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
+const FieldParse s_hordeAttackFields[] =
+{
+	{ "LockWeaponSlot", INI::parseLookupList, TheWeaponSlotTypeNamesLookupList, offsetof(WeaponNugget, m_lockWeaponSlot) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
 void parseNugget(INI* ini, void* store, WeaponNuggetType type, const FieldParse* fields, const FieldParse* extraFields = nullptr)
 {
 	WeaponNugget nugget(type);
@@ -215,6 +222,7 @@ const char* nuggetTypeName(WeaponNuggetType type)
 		case WEAPON_NUGGET_OCL: return "WeaponOCLNugget";
 		case WEAPON_NUGGET_ATTRIBUTE_MODIFIER: return "AttributeModifierNugget";
 		case WEAPON_NUGGET_SLAVE_ATTACK: return "SlaveAttackNugget";
+		case WEAPON_NUGGET_HORDE_ATTACK: return "HordeAttackNugget";
 	}
 	return "Nugget";
 }
@@ -266,6 +274,11 @@ void WeaponNugget::parseAttributeModifierNugget(INI* ini, void*, void* store, co
 void WeaponNugget::parseSlaveAttackNugget(INI* ini, void*, void* store, const void*)
 {
 	parseNugget(ini, store, WEAPON_NUGGET_SLAVE_ATTACK, nullptr);
+}
+
+void WeaponNugget::parseHordeAttackNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_HORDE_ATTACK, s_hordeAttackFields);
 }
 
 void WeaponNugget::postProcessLoad()
@@ -329,7 +342,8 @@ Bool WeaponTemplate::nuggetsCanDamage(Int depth) const
 {
 	for (const WeaponNugget& nugget : m_nuggets)
 	{
-		if (nugget.m_type == WEAPON_NUGGET_SLAVE_ATTACK || (nugget.dealsDamage() && nugget.m_damage > 0.0f))
+		if (nugget.m_type == WEAPON_NUGGET_SLAVE_ATTACK || nugget.m_type == WEAPON_NUGGET_HORDE_ATTACK ||
+			(nugget.dealsDamage() && nugget.m_damage > 0.0f))
 			return TRUE;
 		if (nugget.m_type == WEAPON_NUGGET_PROJECTILE && nugget.m_warheadTemplate && depth < MAX_WARHEAD_DEPTH &&
 			nugget.m_warheadTemplate->nuggetsCanDamage(depth + 1))
@@ -345,7 +359,8 @@ Real WeaponTemplate::estimateNuggetDamage(const Object* sourceObj, const Object*
 	{
 		if (!nugget.isEnabledFor(sourceObj))
 			continue;
-		if (nugget.m_type == WEAPON_NUGGET_SLAVE_ATTACK && nugget.affects(sourceObj, victimObj))
+		if ((nugget.m_type == WEAPON_NUGGET_SLAVE_ATTACK || nugget.m_type == WEAPON_NUGGET_HORDE_ATTACK) &&
+			nugget.affects(sourceObj, victimObj))
 		{
 			total += 1.0f;
 			continue;
@@ -411,6 +426,30 @@ void WeaponTemplate::orderNuggetSlaves(const Object* source, Object* victim, con
 			if (!controller->isAttacking() || controller->getGoalObject() || !goal ||
 				goal->x != position->x || goal->y != position->y || goal->z != position->z)
 				controller->aiAttackPosition(position, 1, CMD_FROM_AI);
+		}
+	}
+}
+
+void WeaponTemplate::orderNuggetHorde(const Object* source, Object* victim, const Coord3D* position) const
+{
+	const HordeContain* horde = HordeContain::get(source);
+	if (!horde || (!victim && !position))
+		return;
+	for (const WeaponNugget& nugget : m_nuggets)
+	{
+		if (nugget.m_type != WEAPON_NUGGET_HORDE_ATTACK || !nugget.isEnabledFor(source) || !nugget.affects(source, victim))
+			continue;
+		for (Object* member : *horde->getContainedItemsList())
+		{
+			const Weapon* weapon = member->getWeaponInWeaponSlot(nugget.m_lockWeaponSlot);
+			AIUpdateInterface* ai = member->getAI();
+			if (!ai || !weapon || weapon->getTemplate() == this || member == victim || member->isEffectivelyDead())
+				continue;
+			member->setWeaponLock(nugget.m_lockWeaponSlot, LOCKED_TEMPORARILY);
+			if (victim)
+				ai->aiForceAttackObject(victim, 1, CMD_FROM_AI);
+			else
+				ai->aiAttackPosition(position, 1, CMD_FROM_AI);
 		}
 	}
 }
