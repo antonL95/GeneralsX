@@ -231,6 +231,7 @@ public:
 	std::map<std::string, Movie> movies;
 	std::map<std::string, Box> boxes;
 	std::map<std::string, Coord2D> positions;
+	std::map<std::string, std::string> nestedFrames;
 	std::vector<Art> art;
 	std::vector<std::vector<Art>> frames;
 	std::vector<Label> labels;
@@ -434,8 +435,12 @@ public:
 				break;
 			}
 			case 5:
-				box = timeline(movie, p + 8, m, tint, path, depth, nullptr);
+			{
+				const auto target = nestedFrames.find(path);
+				box = timeline(movie, p + 8, m, tint, path, depth,
+					target == nestedFrames.end() ? nullptr : target->second.c_str());
 				break;
+			}
 			case 10:
 				box = transformBox(r, p + 8, m);
 				break;
@@ -549,11 +554,14 @@ public:
 	}
 };
 
-AptScene::AptScene(const char *movie, const char *frame)
+AptScene::AptScene(const char *movie, const char *frame,
+	std::initializer_list<std::pair<const char*, const char*>> nestedFrames)
 {
 	try
 	{
 		auto data = std::make_unique<Data>();
+		for (const auto& [path, target] : nestedFrames)
+			data->nestedFrames.emplace(path, target);
 		Movie *root = data->load(movie);
 		if (!root)
 			return;

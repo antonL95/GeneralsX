@@ -53,14 +53,14 @@ constexpr Real SecondRowX = 99.0f;
 constexpr Real SecondRowY = -70.0f;
 constexpr Real HaloSize = 86.0f;
 constexpr Real BurstSize = 112.0f;
-constexpr Real BuilderX = -15.0f;
-constexpr Real BuilderY = 30.0f;
-constexpr Real BuilderSize = 32.5f;
+constexpr Real SelectHeroesX = -15.0f;
+constexpr Real SelectHeroesY = 30.0f;
+constexpr Real SelectHeroesSize = 32.5f;
 constexpr UnsignedInt AttackedFrames = LOGICFRAMES_PER_SECOND * 2;
 constexpr UnsignedInt LevelUpMs = 1200;
 constexpr UnsignedInt FlickerMs = 400;
 constexpr Int ButtonNone = -2;
-constexpr Int ButtonBuilder = -1;
+constexpr Int ButtonSelectHeroes = -1;
 
 struct HeroSlot
 {
@@ -71,6 +71,8 @@ struct HeroSlot
 	Bool reviving = FALSE;
 	Bool selected = FALSE;
 	Bool attacked = FALSE;
+	Bool builder = FALSE;
+	Int idleBuilders = 0;
 	Int level = 1;
 	Int maxLevel = 1;
 	Real rankProgress = 0.0f;
@@ -93,7 +95,7 @@ struct BarState
 {
 	GameWindow *bar = nullptr;
 	std::array<Coord2D, MaxHeroes> positions = {};
-	AptScene::Box builderBox;
+	AptScene::Box selectHeroesBox;
 	std::vector<const ThingTemplate *> order;
 	std::vector<HeroSlot> slots;
 	std::vector<HeroMemory> memory;
@@ -155,9 +157,9 @@ Coord2D heroOffset(Int index)
 	return s_bar.positions[index];
 }
 
-PixelBox builderBox(const ICoord2D &origin, Real scale)
+PixelBox selectHeroesBox(const ICoord2D &origin, Real scale)
 {
-	const AptScene::Box &box = s_bar.builderBox;
+	const AptScene::Box &box = s_bar.selectHeroesBox;
 	return designBox(origin, scale, box.left, box.top, box.right - box.left, box.bottom - box.top);
 }
 
@@ -221,12 +223,32 @@ struct Census
 {
 	const Player *player;
 	std::vector<HeroSlot> *slots;
+	HeroSlot *builders;
 };
 
 void collectHero(Object *obj, void *userData)
 {
 	Census &census = *static_cast<Census *>(userData);
-	if (!obj->isKindOf(KINDOF_HERO) || obj->isEffectivelyDead() || obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
+	if (obj->isEffectivelyDead() || obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+		return;
+	if (obj->isKindOf(KINDOF_DOZER))
+	{
+		HeroSlot& builders = *census.builders;
+		if (!builders.alive || obj->getID() < builders.id)
+		{
+			builders.appearance = obj->getTemplate();
+			builders.id = obj->getID();
+		}
+		const AIUpdateInterface* ai = obj->getAI();
+		if (ai && ai->isIdle())
+			++builders.idleBuilders;
+		builders.alive = TRUE;
+		builders.builder = TRUE;
+		const auto* draw = obj->getDrawable();
+		builders.selected = builders.selected || (draw && draw->isSelected());
+		return;
+	}
+	if (!obj->isKindOf(KINDOF_HERO))
 		return;
 	const ThingTemplate *identity = obj->getHeroIdentityTemplate();
 	const Int rosterIndex = HeroRoster::findIndex(census.player, identity);
@@ -262,10 +284,10 @@ void collectHero(Object *obj, void *userData)
 	census.slots->push_back(slot);
 }
 
-std::vector<HeroSlot> collectHeroes(const Player *player)
+std::vector<HeroSlot> collectHeroes(const Player *player, HeroSlot& builders)
 {
 	std::vector<HeroSlot> slots;
-	Census census{ player, &slots };
+	Census census{ player, &slots, &builders };
 	player->iterateObjects(collectHero, &census);
 	const Int count = HeroRoster::count(player);
 	for (Int i = 0; i < count; ++i)
@@ -344,7 +366,7 @@ const Image *heroImage(const HeroSlot &slot)
 	return image;
 }
 
-const Image *builderImage()
+const Image *selectHeroesImage()
 {
 	const Player *player = localPlayer();
 	if (!player)
@@ -354,14 +376,19 @@ const Image *builderImage()
 	return findImage(name.str());
 }
 
+Bool hasAvailableHeroes()
+{
+	return std::any_of(s_bar.slots.begin(), s_bar.slots.end(), [](const HeroSlot& slot) { return slot.alive && !slot.builder; });
+}
+
 Int hitTest(Int px, Int py)
 {
 	if (!s_bar.bar || s_bar.bar->winIsHidden())
 		return ButtonNone;
 	const Real scale = uiScale();
 	const ICoord2D origin = barOrigin(scale);
-	if (insideCircle(px, py, builderBox(origin, scale)))
-		return ButtonBuilder;
+	if (hasAvailableHeroes() && insideCircle(px, py, selectHeroesBox(origin, scale)))
+		return ButtonSelectHeroes;
 	for (Int i = 0; i < static_cast<Int>(s_bar.slots.size()); ++i)
 		if (insideCircle(px, py, heroBox(origin, scale, i)))
 			return i;
@@ -426,13 +453,38 @@ void selectNearestBuilder()
 
 void activate(Int button, Bool center)
 {
-	if (button == ButtonBuilder)
+	if (button == ButtonSelectHeroes)
 	{
-		selectNearestBuilder();
+		Player* player = localPlayer();
+		if (!player || !TheInGameUI)
+			return;
+		std::vector<Object*> heroes;
+		player->iterateObjects([](Object* obj, void* data)
+		{
+			Drawable* draw = obj->getDrawable();
+			if (obj->isKindOf(KINDOF_HERO) && !obj->isEffectivelyDead() && draw &&
+				obj->isLogicallyVisible() && !draw->isDrawableEffectivelyHidden())
+				static_cast<std::vector<Object*>*>(data)->push_back(obj);
+		}, &heroes);
+		if (heroes.empty())
+			return;
+		TheInGameUI->deselectAllDrawables();
+		GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+		select->appendBooleanArgument(TRUE);
+		for (Object* hero : heroes)
+		{
+			TheInGameUI->selectDrawable(hero->getDrawable());
+			select->appendObjectIDArgument(hero->getID());
+		}
 		return;
 	}
 	if (button < 0 || button >= static_cast<Int>(s_bar.slots.size()) || !s_bar.slots[button].alive || !TheGameLogic)
 		return;
+	if (s_bar.slots[button].builder)
+	{
+		selectNearestBuilder();
+		return;
+	}
 	selectObject(TheGameLogic->findObjectByID(s_bar.slots[button].id), center);
 }
 
@@ -458,13 +510,14 @@ UnicodeString stripAccelerator(const UnicodeString &label)
 void showTooltipFor(Int button)
 {
 	Mouse::RetailTooltip tooltip;
-	if (button == ButtonBuilder)
+	if (button == ButtonSelectHeroes || s_bar.slots[button].builder)
 	{
-		tooltip.title = stripAccelerator(TheGameText->fetchOrSubstitute("CONTROLBAR:SelectNearestBuilder", L""));
-		AsciiString key = builderHotKey();
-		key.toUpper();
-		tooltip.shortcut.translate(key);
-		tooltip.body = TheGameText->fetchOrSubstitute("CONTROLBAR:SelectNearestBuilderDescription", L"");
+		const CommandButton* command = TheControlBar->findCommandButton(
+			button == ButtonSelectHeroes ? "NonCommand_SelectAllHeroes" : "NonCommand_SelectNearestBuilder");
+		if (!command)
+			return;
+		tooltip.title = stripAccelerator(TheGameText->fetchOrSubstitute(command->getTextLabel().str(), L""));
+		tooltip.body = TheGameText->fetchOrSubstitute(command->getDescriptionLabel().str(), L"");
 	}
 	else
 	{
@@ -490,7 +543,10 @@ void ensureLevelText(Int index, Int level)
 	if (!TheDisplayStringManager)
 		return;
 	if (!s_bar.levelText[index])
+	{
 		s_bar.levelText[index] = TheDisplayStringManager->newDisplayString();
+		s_bar.shownLevel[index] = -1;
+	}
 	DisplayString *text = s_bar.levelText[index];
 	if (!text)
 		return;
@@ -537,7 +593,6 @@ void drawRankProgress(const Image *image, const PixelBox &badge, Real progress)
 void drawHero(const HeroSlot &slot, Int index, const ICoord2D &origin, Real scale, UnsignedInt now, Bool hovered)
 {
 	const PixelBox portrait = heroBox(origin, scale, index);
-	const HeroMemory &memory = memoryFor(slot.hero);
 
 	if (slot.selected)
 		drawImageBox(findImage("UiRetailHeroHalo"), centeredHeroBox(origin, scale, index, HaloSize));
@@ -569,11 +624,15 @@ void drawHero(const HeroSlot &slot, Int index, const ICoord2D &origin, Real scal
 		drawImageBox(findImage("UiRetailHeroFireRing"), centeredHeroBox(origin, scale, index, HaloSize),
 			withAlpha(255, 255, 255, 0.35f + 0.65f * static_cast<Real>(UiHudRules::pulse(now, FlickerMs))));
 
-	if (memory.levelUp && now - memory.levelUpStart < LevelUpMs)
+	if (!slot.builder)
 	{
-		const Real t = static_cast<Real>(now - memory.levelUpStart) / LevelUpMs;
-		drawImageBox(findImage("UiRetailHeroLevelBurst"), centeredHeroBox(origin, scale, index, BurstSize * (0.6f + 0.4f * t)),
-			withAlpha(255, 255, 255, 1.0f - t));
+		const HeroMemory &memory = memoryFor(slot.hero);
+		if (memory.levelUp && now - memory.levelUpStart < LevelUpMs)
+		{
+			const Real t = static_cast<Real>(now - memory.levelUpStart) / LevelUpMs;
+			drawImageBox(findImage("UiRetailHeroLevelBurst"), centeredHeroBox(origin, scale, index, BurstSize * (0.6f + 0.4f * t)),
+				withAlpha(255, 255, 255, 1.0f - t));
+		}
 	}
 
 	drawImageBox(findImage("UiRetailHeroTrough"), heroBox(origin, scale, index, -13.15f, 32.85f, 77.0f, 34.0f));
@@ -602,7 +661,7 @@ void drawHero(const HeroSlot &slot, Int index, const ICoord2D &origin, Real scal
 	const PixelBox badge = heroBox(origin, scale, index, -5.69f, 37.86f, 21.08f, 21.08f);
 	fillCircle(badge, GameMakeColor(10, 18, 48, 255));
 	drawRankProgress(findImage("UiRetailHeroBadge"), badge, slot.rankProgress);
-	ensureLevelText(index, slot.level);
+	ensureLevelText(index, slot.builder ? slot.idleBuilders : slot.level);
 	if (DisplayString *text = s_bar.levelText[index])
 	{
 		Int width, height;
@@ -611,11 +670,11 @@ void drawHero(const HeroSlot &slot, Int index, const ICoord2D &origin, Real scal
 	}
 }
 
-void drawBuilder(const ICoord2D &origin, Real scale, Bool hovered, Bool pressed)
+void drawSelectHeroes(const ICoord2D &origin, Real scale, Bool hovered, Bool pressed)
 {
-	const PixelBox box = builderBox(origin, scale);
+	const PixelBox box = selectHeroesBox(origin, scale);
 	fillCircle(box, GameMakeColor(12, 74, 80, 255));
-	const Image *icon = builderImage();
+	const Image *icon = selectHeroesImage();
 	if (TheDisplay->hasImageTexture(icon))
 	{
 		const Int inset = MAX(1, box.width() / 5) + (pressed ? 1 : 0);
@@ -638,7 +697,8 @@ void drawHeroBar(GameWindow *, WinInstanceData *)
 		s_bar.fontScale = scale;
 		s_bar.font = TheFontLibrary->getUiFont(AsciiString("Albertus MT"), 12, FALSE, TheDisplay->getWidth(), TheDisplay->getHeight());
 	}
-	drawBuilder(origin, scale, hovered == ButtonBuilder, s_bar.pressed == ButtonBuilder);
+	if (hasAvailableHeroes())
+		drawSelectHeroes(origin, scale, hovered == ButtonSelectHeroes, s_bar.pressed == ButtonSelectHeroes);
 	for (Int i = 0; i < static_cast<Int>(s_bar.slots.size()); ++i)
 		drawHero(s_bar.slots[i], i, origin, scale, now, hovered == i);
 }
@@ -668,9 +728,9 @@ void init(GameWindow *master)
 			Coord2D{SecondRowX + HeroSpacing * (i - HeroesPerRow), SecondRowY};
 		s_bar.positions[i] = movie.position("_root.Hero" + std::to_string(i + 1), fallback);
 	}
-	s_bar.builderBox = movie.bounds("_root.SelectAllHeroesBttn.up");
-	if (!s_bar.builderBox.valid())
-		s_bar.builderBox = {BuilderX, BuilderY, BuilderX + BuilderSize, BuilderY + BuilderSize};
+	s_bar.selectHeroesBox = movie.bounds("_root.SelectAllHeroesBttn.up");
+	if (!s_bar.selectHeroesBox.valid())
+		s_bar.selectHeroesBox = {SelectHeroesX, SelectHeroesY, SelectHeroesX + SelectHeroesSize, SelectHeroesY + SelectHeroesSize};
 	s_bar.bar->winSetDrawFunc(drawHeroBar);
 	s_bar.bar->winSetInputFunc(heroBarInput);
 	s_bar.bar->winSetTooltipFunc(heroBarTooltip);
@@ -686,7 +746,7 @@ void reset()
 	s_bar.pressedHero = INVALID_ID;
 	s_bar.builder = INVALID_ID;
 	s_bar.builderTime = 0;
-	s_bar.shownLevel.fill(0);
+	s_bar.shownLevel.fill(-1);
 	s_bar.font = nullptr;
 }
 
@@ -700,18 +760,19 @@ void update()
 		s_bar.slots.clear();
 		return;
 	}
-	std::vector<HeroSlot> present = collectHeroes(player);
+	HeroSlot builders;
+	std::vector<HeroSlot> present = collectHeroes(player, builders);
 	trackEvents(present);
 	std::vector<const ThingTemplate *> keys;
 	for (const HeroSlot &slot : present)
 		keys.push_back(slot.hero);
 	UiHudRules::reflow(s_bar.order, keys);
-	if (s_bar.order.size() > static_cast<std::size_t>(MaxHeroes))
-		s_bar.order.resize(MaxHeroes);
 	s_bar.slots.clear();
+	if (builders.alive)
+		s_bar.slots.push_back(builders);
 	for (const ThingTemplate *hero : s_bar.order)
 		for (const HeroSlot &slot : present)
-			if (slot.hero == hero)
+			if (slot.hero == hero && s_bar.slots.size() < MaxHeroes)
 				s_bar.slots.push_back(slot);
 }
 
@@ -730,7 +791,7 @@ Bool handleInput(UnsignedInt msg, Int x, Int y)
 			const ObjectID pressedHero = s_bar.pressedHero;
 			s_bar.pressed = ButtonNone;
 			s_bar.pressedHero = INVALID_ID;
-			if (button == pressed && (button == ButtonBuilder || (button >= 0 && s_bar.slots[button].id == pressedHero)))
+			if (button == pressed && (button == ButtonSelectHeroes || (button >= 0 && s_bar.slots[button].id == pressedHero)))
 				activate(button, FALSE);
 			return button != ButtonNone || pressed != ButtonNone;
 		}

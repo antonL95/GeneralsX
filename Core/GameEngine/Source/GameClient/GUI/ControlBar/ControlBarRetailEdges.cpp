@@ -40,10 +40,12 @@
 #include "GameClient/UiScale.h"
 
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Object.h"
 
 namespace
 {
-constexpr Int SpellSlots = 11;
+constexpr Int SpellSlots = 24;
 constexpr Real SpellButtonX = 12.0f;
 constexpr Real SpellButtonY = 462.0f;
 constexpr Real SpellButtonSize = 42.0f;
@@ -58,7 +60,7 @@ struct VinePiece
 	Real height;
 };
 
-constexpr VinePiece SpellVine[SpellSlots] = {
+constexpr VinePiece SpellVine[] = {
 	{ "UiRetailSpellVine1", 448.0f, 46.0f, 117.0f },
 	{ "UiRetailSpellVine2", 387.0f, 57.0f, 74.0f },
 	{ "UiRetailSpellVine3", 350.0f, 29.0f, 62.0f },
@@ -253,14 +255,17 @@ void collectSpells()
 	{
 		const CommandButton *command = set->getCommandButton(i);
 		const SpecialPowerTemplate *power = command ? command->getSpecialPowerTemplate() : nullptr;
-		if (power && hasSciences(player, power))
-			s_edges.spells.push_back(SpellEntry{ command });
+		if (power && command->getCommandType() == GUI_COMMAND_SPELL_BOOK &&
+			hasSciences(player, power) && TheDisplay->hasImageTexture(command->getButtonImage()))
+			s_edges.spells.push_back(SpellEntry{command});
 	}
 }
 
 Box spellButton(Real scale, Int slot)
 {
-	return windowBox(s_edges.spellBook, scale, SpellButtonX, SpellButtonY - SpellSpacing * slot, SpellButtonSize, SpellButtonSize);
+	const Real spacing = std::min(SpellSpacing, SpellButtonY / std::max(1, static_cast<Int>(s_edges.spells.size()) - 1));
+	const Real size = std::min(SpellButtonSize, spacing - 4.0f);
+	return windowBox(s_edges.spellBook, scale, SpellButtonX, SpellButtonY - spacing * slot, size, size);
 }
 
 Int spellAt(Int x, Int y)
@@ -280,14 +285,19 @@ Int spellAt(Int x, Int y)
 	return -1;
 }
 
-void drawRoundButton(const Box &box, const Image *image, Bool hovered)
+void drawRoundButton(const Box &box, const Image *image, Bool hovered, Real ready)
 {
+	const Int rim = std::max(1, box.width() / 21);
+	drawBox(findImage("UiRetailSideFrame"), Box{box.x0 - rim, box.y0 - rim, box.x1 + rim, box.y1 + rim});
 	const Int radius = box.width() / 2;
 	TheDisplay->setCircularClip(box.x0 + radius, box.y0 + radius, radius);
 	TheDisplay->drawFillRect(box.x0, box.y0, box.width(), box.height(), GameMakeColor(6, 6, 6, 255));
 	if (TheDisplay->hasImageTexture(image))
-		TheDisplay->drawImage(image, box.x0, box.y0, box.x1, box.y1);
-	if (hovered)
+		TheDisplay->drawImage(image, box.x0, box.y0, box.x1, box.y1, ready >= 1.0f ? 0xFFFFFFFF : 0xFF737E87);
+	if (ready < 1.0f)
+		TheDisplay->drawRemainingRectClock(box.x0, box.y0, box.width(), box.height(),
+			static_cast<Int>(ready * 100.0f), GameMakeColor(19, 48, 73, 175));
+	if (hovered && ready >= 1.0f)
 		TheDisplay->drawFillRect(box.x0, box.y0, box.width(), box.height(), GameMakeColor(255, 236, 170, 48));
 	TheDisplay->setCircularClip(0, 0, 0);
 	drawBox(findImage("UiRetailGlass"), box, hovered ? 0xFFFFFFFF : 0xD0FFFFFF);
@@ -299,20 +309,28 @@ void drawSpellBook(GameWindow *window, WinInstanceData *)
 	if (count == 0)
 		return;
 	const Real scale = uiScale();
-	for (Int i = 0; i < count; ++i)
+	const Int vineCount = std::min(count, static_cast<Int>(std::size(SpellVine)));
+	for (Int i = 0; i < vineCount; ++i)
 	{
 		const VinePiece &piece = SpellVine[i];
 		drawBox(findImage(piece.image), windowBox(window, scale, 0.0f, piece.y, piece.width, piece.height));
 	}
-	if (count < SpellSlots)
+	if (vineCount < static_cast<Int>(std::size(SpellVine)))
 	{
 		const Real capY = SpellVine[count - 1].y - SpellCapOffset;
 		drawBox(findImage(SpellVineCap.image), windowBox(window, scale, 0.0f, capY, SpellVineCap.width, SpellVineCap.height));
 	}
 	const ICoord2D mouse = TheMouse->getMouseStatus()->pos;
 	const Int hovered = spellAt(mouse.x, mouse.y);
+	const Player* player = localPlayer();
+	const Object* book = player ? player->getRetailSpellBook() : nullptr;
 	for (Int i = 0; i < count; ++i)
-		drawRoundButton(spellButton(scale, i), s_edges.spells[i].command->getButtonImage(), hovered == i);
+	{
+		const SpellEntry& entry = s_edges.spells[i];
+		const auto* power = book ? book->getSpecialPowerModule(entry.command->getSpecialPowerTemplate()) : nullptr;
+		const Real ready = power && !power->isReady() ? std::clamp(power->getPercentReady(), 0.0f, 1.0f) : 1.0f;
+		drawRoundButton(spellButton(scale, i), entry.command->getButtonImage(), hovered == i, ready);
+	}
 }
 
 WindowMsgHandledType spellBookInput(GameWindow *, UnsignedInt msg, WindowMsgData mData1, WindowMsgData)
@@ -578,8 +596,13 @@ void drawPalantirTop(GameWindow *palantir)
 	palantir->winGetSize(&width, &height);
 	const Real scale = width / PalantirDesignWidth;
 	refreshFonts(uiScale());
-	drawBox(findImage("UiRetailPowerDisc"), Box{ x + roundPixel(PowerDiscX * scale), y + roundPixel(PowerDiscY * scale),
-		x + roundPixel((PowerDiscX + PowerDiscSize) * scale), y + roundPixel((PowerDiscY + PowerDiscSize) * scale) });
+	const Box disc{ x + roundPixel(PowerDiscX * scale), y + roundPixel(PowerDiscY * scale),
+		x + roundPixel((PowerDiscX + PowerDiscSize) * scale), y + roundPixel((PowerDiscY + PowerDiscSize) * scale) };
+	TheDisplay->setCircularClip((disc.x0 + disc.x1) / 2, (disc.y0 + disc.y1) / 2, disc.width() / 2);
+	drawBox(findImage("UiRetailPowerDisc"), disc);
+	drawBox(findImage("UiRetailPowerGlyph"), Box{ x + roundPixel(110.0f * scale), y + roundPixel(66.1f * scale),
+		x + roundPixel(147.0f * scale), y + roundPixel(103.1f * scale) });
+	TheDisplay->setCircularClip(0, 0, 0);
 	DisplayString *text = ensureString(s_edges.powerText, s_edges.powerFont);
 	const Int points = player->getSciencePurchasePoints();
 	if (text && points != s_edges.powerShown)
@@ -603,6 +626,8 @@ Bool handleInput(UnsignedInt msg, Int x, Int y)
 		case GWM_LEFT_UP:
 		{
 			const Bool used = spell >= 0 || s_edges.pressed >= 0;
+			if (spell >= 0 && spell == s_edges.pressed)
+				TheControlBar->clickRetailSpellButton(s_edges.spells[spell].command);
 			s_edges.pressed = -1;
 			return used;
 		}

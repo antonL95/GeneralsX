@@ -313,6 +313,8 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	Int count = 0;
 	Real progress = 0.0f;
 	TheControlBar->getRetailProduction(window, count, progress);
+	const auto *command = static_cast<const CommandButton *>(GadgetButtonGetData(window));
+	const Bool queued = count > 0 && command && command->getCommandType() != GUI_COMMAND_DOZER_CONSTRUCT_CANCEL;
 	const Bool colored = enabled || count > 0;
 
 	if (side)
@@ -348,7 +350,11 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	if (count > 0)
 	{
 		const Int percent = static_cast<Int>(progress * 100.0f + 0.5f);
-		TheDisplay->drawRemainingRectClock(x, y, width, height, percent, GameMakeColor(235, 235, 235, 170));
+		const Color shade = queued ? GameMakeColor(0, 0, 0, 160) : GameMakeColor(235, 235, 235, 170);
+		TheDisplay->drawRemainingRectClock(x, y, width, height, percent, shade);
+		if (queued)
+			drawDesignImage("UiRetailProductionRing", {static_cast<Real>(border), static_cast<Real>(border),
+				static_cast<Real>(width - 2 * border), static_cast<Real>(height - 2 * border)}, x, y, 1.0f);
 	}
 	else
 	{
@@ -369,10 +375,8 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	else
 	{
 		drawDesignImage("UiRetailGlass", whole, x, y, 1.0f, highlight ? 0xFFFFFFFF : 0xD0FFFFFF);
-		if (!side && colored)
-			drawDesignImage(highlight ? "RadialOver" : "RadialBorder", whole, x, y, 1.0f);
 	}
-	if (count > 0 || TheControlBar->isRetailAutoAbilityOn(window))
+	if (!queued && TheControlBar->isRetailAutoAbilityOn(window))
 		drawProductionRing(x, y, width, height);
 
 	if (availability == COMMAND_RESTRICTED)
@@ -453,61 +457,6 @@ void ControlBar::drawRetailSocketFills() const
 	}
 }
 
-namespace
-{
-void drawRetailCitadelQueue(Object *citadel, const GameWindow *palantir)
-{
-	if (!citadel || !citadel->isKindOf(KINDOF_CASTLE_KEEP))
-		return;
-	const ProductionUpdateInterface *production = citadel->getProductionUpdateInterface();
-	if (!production || !production->firstProduction())
-		return;
-
-	const CommandSet *commands = TheControlBar->findCommandSet(citadel->getCommandSetString());
-	Int x, y, width, height;
-	windowRect(palantir, x, y, width, height);
-	const Real scale = width / PalantirDesignWidth;
-	const Int size = MAX(3, static_cast<Int>(32.0f * scale));
-	const Int gap = MAX(1, static_cast<Int>(10.0f * scale));
-	const Int columns = MAX(1, static_cast<Int>(PalantirDesignWidth * scale) / (size + gap));
-	const Int left = x + gap;
-	const Int bottom = y + static_cast<Int>(42.0f * scale);
-	Int index = 0;
-	for (const ProductionEntry *entry = production->firstProduction(); entry; entry = production->nextProduction(entry), ++index)
-	{
-		const Int iconX = left + (index % columns) * (size + gap);
-		const Int iconY = bottom - size - (index / columns) * (size + gap);
-		const Image *image = nullptr;
-		if (entry->getProductionType() == PRODUCTION_UNIT)
-			image = entry->getProductionObject()->getButtonImage();
-		else if (entry->getProductionType() == PRODUCTION_UPGRADE)
-		{
-			const UpgradeTemplate *upgrade = entry->getProductionUpgrade();
-			for (Int i = 0; commands && !image && i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
-			{
-				const CommandButton *button = commands->getCommandButton(i);
-				if (button && (button->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE || button->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE)
-					&& button->getUpgradeTemplate() == upgrade)
-					image = button->getButtonImage();
-			}
-			if (!TheDisplay->hasImageTexture(image))
-				image = upgrade->getButtonImage();
-		}
-		drawFilledCircle(iconX, iconY, size, size, GameMakeColor(6, 6, 6, 240));
-		TheDisplay->setCircularClip(iconX + size / 2, iconY + size / 2, size / 2);
-		if (TheDisplay->hasImageTexture(image))
-			TheDisplay->drawImage(image, iconX, iconY, iconX + size, iconY + size);
-		if (index == 0)
-		{
-			const Real progress = std::clamp(entry->getPercentComplete(), 0.0f, 100.0f);
-			TheDisplay->drawRemainingRectClock(iconX, iconY, size, size, static_cast<Int>(progress), GameMakeColor(235, 235, 235, 170));
-		}
-		TheDisplay->setCircularClip(0, 0, 0);
-		drawProductionRing(iconX, iconY, size, size);
-	}
-}
-}
-
 void ControlBar::drawRetailTexts() const
 {
 	const Color text = GameMakeColor(236, 228, 206, 255);
@@ -516,9 +465,11 @@ void ControlBar::drawRetailTexts() const
 	if (!m_retailPortrait->winIsHidden())
 	{
 		const Object* object = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
-		if (ExperienceLevelStore::maximumRank(object) > 0)
+		const Int maximumRank = ExperienceLevelStore::maximumRank(object);
+		if (maximumRank > 1)
 		{
 			const auto* tracker = object->getExperienceTracker();
+			const Int rank = tracker->getRank();
 			Int x, y, width, height;
 			windowRect(m_retailPortrait, x, y, width, height);
 			const Int barWidth = std::max(8, width / 2);
@@ -526,16 +477,20 @@ void ControlBar::drawRetailTexts() const
 			const Int left = x + (width - barWidth) / 2;
 			const Int top = y + height * 4 / 5;
 			const Int fill = static_cast<Int>((barWidth - 2) * tracker->getLevelProgress());
-			TheDisplay->drawFillRect(left, top, barWidth, barHeight, GameMakeColor(29, 21, 10, 240));
-			if (fill > 0)
-				TheDisplay->drawFillRect(left + 1, top + 1, fill, barHeight - 2, GameMakeColor(232, 183, 51, 255));
-			TheDisplay->drawOpenRect(left, top, barWidth, barHeight, 1.0f, GameMakeColor(199, 164, 94, 255));
+			if (rank < maximumRank)
+			{
+				TheDisplay->setCircularClip(x + width / 2, y + height / 2, MIN(width, height) / 2);
+				TheDisplay->drawFillRect(left, top, barWidth, barHeight, GameMakeColor(29, 21, 10, 240));
+				if (fill > 0)
+					TheDisplay->drawFillRect(left + 1, top + 1, fill, barHeight - 2, GameMakeColor(232, 183, 51, 255));
+				TheDisplay->drawOpenRect(left, top, barWidth, barHeight, 1.0f, GameMakeColor(199, 164, 94, 255));
+				TheDisplay->setCircularClip(0, 0, 0);
+			}
 			if (!m_retailLevelLabel)
 				m_retailLevelLabel = TheDisplayStringManager->newDisplayString();
 			GameFont* font = m_retailSelectionName->winGetFont();
 			if (m_retailLevelLabel->getFont() != font)
 				m_retailLevelLabel->setFont(font);
-			const Int rank = tracker->getRank();
 			if (m_retailLabelRank != rank)
 			{
 				UnicodeString level;
@@ -548,8 +503,6 @@ void ControlBar::drawRetailTexts() const
 		else
 			drawTextWindow(m_retailSelectionName, 2, GameMakeColor(255, 255, 255, 255));
 	}
-	if (m_currContext == CB_CONTEXT_COMMAND && m_currentSelectedDrawable)
-		drawRetailCitadelQueue(m_currentSelectedDrawable->getObject(), m_retailResources->winGetParent());
 }
 
 Int ControlBar::getRetailSlot(const GameWindow *window) const
@@ -606,7 +559,7 @@ const ProductionEntry *ControlBar::getRetailProductionEntries(const GameWindow *
 		if (matches)
 		{
 			if (count == 0)
-				progress = entry->getPercentComplete() / 100.0f;
+				progress = std::clamp(entry->getPercentComplete() / 100.0f, 0.0f, 1.0f);
 			++count;
 			lastMatch = entry;
 		}
@@ -703,7 +656,7 @@ void ControlBar::showRetailLevelTooltip() const
 {
 	const Object* object = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
 	const Int maximum = ExperienceLevelStore::maximumRank(object);
-	if (!TheMouse || maximum <= 0)
+	if (!TheMouse || maximum <= 1)
 		return;
 	Mouse::RetailTooltip tooltip;
 	tooltip.title = object->getTemplate()->getDisplayName();
@@ -878,7 +831,7 @@ void ControlBar::initRetailHud()
 	m_retailPortrait->winSetDrawFunc(drawRetailPortrait);
 	m_retailPortrait->winSetInputFunc(retailPortraitInput);
 	m_retailPortrait->winSetTooltipFunc(retailLevelTooltip);
-	initRetailPowers(master, palantir);
+	initRetailPowers(palantir);
 
 	for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
 	{
@@ -1158,7 +1111,7 @@ void ControlBar::collectRetailPlacements(const CommandSet *commandSet, Object *o
 			continue;
 		Int slot = -1;
 		Int hero = -1;
-		if (i < RetailRingSlots && command->isInPalantir())
+		if (i < RetailRingSlots && command->isInPalantir() && !m_retailRange.active())
 			slot = i;
 		else if (command->getCommandType() != GUI_COMMAND_NONE
 			&& (command->isRadial() || !command->isInPalantir() || (i >= RetailRingSlots && i < 11))

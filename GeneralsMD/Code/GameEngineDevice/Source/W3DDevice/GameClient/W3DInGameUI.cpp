@@ -476,8 +476,6 @@ void W3DInGameUI::draw()
 					RetailWorldUI::drawSelection(*view, m_isDragSelecting ? &m_dragSelectRegion : nullptr, m_selectionDecals);
 				else
 					m_selectionDecals.clear();
-				if (m_pendingPlaceType && m_placeIcon[0])
-					RetailWorldUI::drawPlacement(*view, *m_placeIcon[0], m_retailPlacementValid);
 				W3DScriptedModelDraw::updatePlacementDecal(m_pendingPlaceType ? m_placeIcon[0] : nullptr, m_placementDecal);
 				drawTerrainResourceIndicator(*view, m_pendingPlaceType,
 					getSelectCount() == 1 ? getFirstSelectedDrawable() : nullptr, m_terrainResourceLabel,

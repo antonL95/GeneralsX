@@ -17,7 +17,6 @@
 #include "GameClient/Display.h"
 #include "GameClient/RadiusDecal.h"
 #include "GameClient/Drawable.h"
-#include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/Image.h"
 #include "GameClient/View.h"
@@ -94,10 +93,10 @@ void drawUnitCircle(View& view, const Drawable& draw, Bool preview)
 	}
 }
 
-void drawMergedCircles(View& view, const std::vector<Circle>& circles, Int opacity)
+void drawMergedCircles(View& view, const std::vector<Circle>& circles, Color houseColor, Int opacity)
 {
-	const Color green = GameMakeColor(105, 255, 56, opacity);
-	const Color glow = GameMakeColor(50, 239, 20, opacity / 3);
+	const Color stroke = (houseColor & 0x00FFFFFF) | (opacity << 24);
+	const Color glow = (houseColor & 0x00FFFFFF) | ((opacity / 3) << 24);
 	std::vector<Real> cuts;
 	for (size_t index = 0; index < circles.size(); ++index)
 	{
@@ -164,9 +163,9 @@ void drawMergedCircles(View& view, const std::vector<Circle>& circles, Int opaci
 				const Coord3D first = onCircle(circle, a);
 				const Coord3D last = onCircle(circle, b);
 				groundLine(view, first, last, 3.0f, glow);
-				groundLine(view, first, last, 1.3f, green);
+				groundLine(view, first, last, 1.3f, stroke);
 				if (step % 4 == 1)
-					groundLine(view, first, onCircle(circle, a + (b - a) * 0.55f, 3.0f), 1.0f, green);
+					groundLine(view, first, onCircle(circle, a + (b - a) * 0.55f, 3.0f), 1.0f, stroke);
 			}
 		}
 	}
@@ -220,26 +219,18 @@ Real selectionRadius(const ExperienceLevelStore::SelectionDecal& decal, Real rad
 	return std::clamp(radius, minimum, maximum);
 }
 
-Bool drawHordeBoundary(const HordeContain& horde, const ExperienceLevelStore::SelectionDecal& decal,
-	Bool selected, WorldGroundDecal& projection)
+Color selectionTint(const Object& object)
+{
+	const Player* owner = object.getControllingPlayer();
+	return owner ? owner->getPlayerColor() | 0xFF000000 : 0xFFFFFFFF;
+}
+
+Bool drawMergedSelection(std::vector<Circle>& circles, const ExperienceLevelStore::SelectionDecal& decal,
+	Bool horde, Color tint, WorldGroundDecal& projection)
 {
 	const auto& rank = getDecalMask(decal.texture);
 	const auto& outline = getDecalMask(decal.texture2);
-	if (rank.alpha.empty() && outline.alpha.empty())
-		return FALSE;
-
-	std::vector<Circle> circles;
-	for (const Object* member : *horde.getContainedItemsList())
-	{
-		Drawable* draw = member->getDrawable();
-		if (isVisibleUnit(draw))
-		{
-			circles.push_back(unitCircle(*draw, TRUE));
-			if (decal.maxSelectedUnits > 0 && circles.size() >= static_cast<size_t>(decal.maxSelectedUnits))
-				break;
-		}
-	}
-	if (circles.empty())
+	if (circles.empty() || (rank.alpha.empty() && outline.alpha.empty()))
 		return FALSE;
 
 	Coord3D center{};
@@ -254,17 +245,17 @@ Bool drawHordeBoundary(const HordeContain& horde, const ExperienceLevelStore::Se
 	center.z /= circles.size();
 	Real radius = 0.0f;
 	constexpr Real stampExtentScale = 1.4f;
-	const Real memberMinimum = decal.minRadius / std::sqrt(static_cast<Real>(circles.size()));
+	const Real memberMinimum = horde ? decal.minRadius / std::sqrt(static_cast<Real>(circles.size())) : 0.0f;
 	for (Circle& circle : circles)
 	{
 		circle.radius = std::max(circle.radius, memberMinimum);
 		radius = std::max(radius, std::max(std::abs(circle.center.x - center.x),
 			std::abs(circle.center.y - center.y)) + circle.radius * stampExtentScale);
 	}
-	radius = selectionRadius(decal, radius);
+	if (horde)
+		radius = selectionRadius(decal, radius);
 
-	const Color tint = GameMakeColor(124, 255, 78, 255);
-	Real opacity = selected ? decal.opacityMax : decal.opacityMin;
+	Real opacity = decal.opacityMax;
 	if (TheGlobalData->m_useSimpleMergeDecals)
 		opacity *= TheGlobalData->m_opacityOfSimpleMergeDecals;
 	const Int alpha = static_cast<Int>(std::clamp(opacity, 0.0f, 1.0f) * 255);
@@ -314,7 +305,9 @@ Bool drawDragPreview(Drawable* draw, void* userData)
 void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 {
 	Object* obj = drawable.getObject();
-	if (!obj || obj->isEffectivelyDead())
+	if (!obj || obj->isEffectivelyDead() || !obj->isLogicallyVisible() ||
+		drawable.isDrawableEffectivelyHidden() || drawable.getFullyObscuredByShroud() ||
+		obj->isKindOf(KINDOF_IGNORED_IN_GUI) || obj->isKindOf(KINDOF_EXPANSION_PAD))
 		return;
 
 	const Object* anchor = HordeContain::getAnchor(obj);
@@ -322,43 +315,48 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 	if (!group)
 		return;
 	const DrawableID hover = TheInGameUI->getMousedOverDrawableID();
-	Drawable* hoveredDrawable = anchor ? TheGameClient->findDrawableByID(hover) : nullptr;
-	const Bool hoveredGroup = anchor && hoveredDrawable && hoveredDrawable->getObject() &&
-		HordeContain::getAnchor(hoveredDrawable->getObject()) == anchor;
 	const Bool showBar = TheGlobalData->m_showObjectHealth &&
-		(group->isSelected() || group->getID() == hover || drawable.getID() == hover || hoveredGroup);
+		(group->isSelected() || drawable.getID() == hover);
 	const ExperienceTracker* tracker = (anchor ? anchor : obj)->getExperienceTracker();
 	const Int rank = tracker ? tracker->getRank() : 1;
 	const Bool showRank = rank > 1 && isVisibleUnit(&drawable);
 	if (!showBar && !showRank)
 		return;
 
-	Coord3D position;
-	obj->getHealthBoxPosition(position);
+	Coord3D position = *obj->getPosition();
 	const auto& data = obj->getTemplate()->getRotWKObjectData();
-	position.z += data.healthBoxHeightOffset;
+	Real top = data.primaryGeometry.usedForHealthBox ?
+		data.primaryGeometry.offset.z + obj->getGeometryInfo().getMaxHeightAbovePosition() : 0.0f;
+	for (const auto& geometry : data.additionalGeometries)
+		if (geometry.details.active && geometry.details.usedForHealthBox)
+			top = std::max(top, geometry.details.offset.z + geometry.shape.getMaxHeightAbovePosition());
+	position.z += top + data.healthBoxHeightOffset;
 	ICoord2D screen;
 	if (!TheTacticalView->worldToScreen(&position, &screen))
 		return;
 
 	const Real scale = TheDisplay->getHeight() / 720.0f;
 	const Bool structure = obj->isKindOf(KINDOF_STRUCTURE);
-	const Real relativeWidth = structure ? std::clamp(obj->getGeometryInfo().getMajorRadius() * 2.1f, 55.0f, 150.0f) :
-		(anchor ? 24.0f : 28.0f);
+	const Real relativeWidth = structure ? std::clamp(obj->getGeometryInfo().getMajorRadius() * 3.5f, 55.0f, 180.0f) :
+		(anchor ? 27.0f : 34.0f);
 	const Int width = std::max(6, static_cast<Int>(relativeWidth * scale * std::clamp(data.healthBoxScale, 0.25f, 4.0f)));
-	const Int height = std::max(3, static_cast<Int>((structure ? 5.0f : 4.0f) * scale));
+	const Int height = std::max(4, static_cast<Int>(5.0f * scale));
 	const BodyModuleInterface* body = obj->getBodyModule();
 	if (showBar && body && body->getHealth() > 0.0f && body->getMaxHealth() > 0.0f)
 	{
 		const Real health = std::clamp(body->getHealth() / body->getMaxHealth(), 0.0f, 1.0f);
+		const Bool building = obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
+		const Real fraction = building ? std::clamp(obj->getConstructionPercent() * 0.01f, 0.0f, 1.0f) : health;
 		const Int x = screen.x - width / 2;
 		const Int y = screen.y - height / 2;
-		const Int red = static_cast<Int>(255.0f * std::min(1.0f, (1.0f - health) * 2.0f));
-		const Int green = static_cast<Int>(225.0f * std::min(1.0f, health * 2.0f));
-		TheDisplay->drawFillRect(x, y, width, height, GameMakeColor(18, 19, 13, 250));
-		TheDisplay->drawOpenRect(x, y, width, height, 1.0f, GameMakeColor(36, 34, 27, 255));
-		TheDisplay->drawFillRect(x + 1, y + 1, std::max(1, static_cast<Int>((width - 2) * health)),
-			height - 2, GameMakeColor(red + (255 - red) / 6, green, 38, 255));
+		const Color fill = building ? GameMakeColor(97, 209, 244, 255) :
+			health > TheGlobalData->m_unitDamagedThresh ? GameMakeColor(136, 226, 59, 255) :
+			health > TheGlobalData->m_unitReallyDamagedThresh ? GameMakeColor(239, 196, 84, 255) : GameMakeColor(220, 76, 36, 255);
+		TheDisplay->drawFillRect(x - 1, y - 1, width + 2, height + 2, GameMakeColor(0, 0, 0, 255));
+		TheDisplay->drawOpenRect(x, y, width, height, 1.0f, GameMakeColor(199, 178, 131, 255));
+		const Int fillWidth = static_cast<Int>((width - 2) * fraction);
+		if (fillWidth > 0)
+			TheDisplay->drawFillRect(x + 1, y + 1, fillWidth, height - 2, fill);
 	}
 	if (showRank)
 	{
@@ -390,7 +388,7 @@ void RetailWorldUI::drawSelection(View& view, const IRegion2D* dragRegion,
 	std::map<DrawableID, WorldGroundDecal>& decals)
 {
 	std::set<DrawableID> active;
-	const auto displaySelection = [&](Drawable* draw, Bool selected)
+	const auto displaySelection = [&](Drawable* draw)
 	{
 		Object* object = draw->getObject();
 		if (!object || object->isEffectivelyDead())
@@ -407,49 +405,41 @@ void RetailWorldUI::drawSelection(View& view, const IRegion2D* dragRegion,
 		if (active.count(id))
 			return;
 		const auto* decal = ExperienceLevelStore::findSelectionDecal(*object);
-		if (const HordeContain* horde = HordeContain::get(object))
+		if (decal && decal->style.compareNoCase("SHADOW_MERGE_DECAL") == 0)
 		{
-			if (decal && decal->style.compareNoCase("SHADOW_MERGE_DECAL") == 0 &&
-				drawHordeBoundary(*horde, *decal, selected, decals[id]))
+			std::vector<Circle> circles;
+			const HordeContain* horde = HordeContain::get(object);
+			if (horde)
+			{
+				for (const Object* member : *horde->getContainedItemsList())
+				{
+					Drawable* memberDraw = member->getDrawable();
+					if (isVisibleUnit(memberDraw))
+						circles.push_back(unitCircle(*memberDraw, TRUE));
+					if (decal->maxSelectedUnits > 0 && circles.size() >= static_cast<size_t>(decal->maxSelectedUnits))
+						break;
+				}
+			}
+			else if (isVisibleUnit(draw))
+				circles.push_back(unitCircle(*draw, FALSE));
+			if (drawMergedSelection(circles, *decal, horde != nullptr, selectionTint(*object), decals[id]))
 				active.insert(id);
 		}
-		else if (isVisibleUnit(draw))
+		else if (isVisibleUnit(draw) && decal && decal->style.compareNoCase("SHADOW_ALPHA_DECAL") == 0)
 		{
-			if (decal && decal->style.compareNoCase("SHADOW_ALPHA_DECAL") == 0)
-			{
-				const Real radius = selectionRadius(*decal, unitCircle(*draw, FALSE).radius);
-				const Real opacity = selected ? decal->opacityMax : decal->opacityMin;
-				decals[id].set(decal->texture, *draw->getPosition(), radius * 2.0f, radius * 2.0f,
-					static_cast<Int>(std::clamp(opacity, 0.0f, 1.0f) * 255), GameMakeColor(115, 255, 80, 255));
-				active.insert(id);
-			}
-			else if (selected)
-				drawUnitCircle(view, *draw, FALSE);
+			const Real radius = selectionRadius(*decal, unitCircle(*draw, FALSE).radius);
+			decals[id].set(decal->texture, *draw->getPosition(), radius * 2.0f, radius * 2.0f,
+				static_cast<Int>(std::clamp(decal->opacityMax, 0.0f, 1.0f) * 255), selectionTint(*object));
+			active.insert(id);
 		}
 	};
 	for (Drawable* draw : *TheInGameUI->getAllSelectedDrawables())
-		displaySelection(draw, TRUE);
-	Drawable* hovered = TheGameClient->findDrawableByID(TheInGameUI->getMousedOverDrawableID());
-	if (hovered && !hovered->isSelected() && isVisibleUnit(hovered))
-		displaySelection(hovered, FALSE);
+		displaySelection(draw);
 	std::erase_if(decals, [&](const auto& item) { return !active.count(item.first); });
 	if (dragRegion)
 	{
 		IRegion2D region = *dragRegion;
 		view.iterateDrawablesInRegion(&region, drawDragPreview, &view);
-	}
-}
-
-void RetailWorldUI::drawPlacement(View& view, const Drawable& ghost, Bool valid)
-{
-	const Circle circle = {*ghost.getPosition(), ghost.getDrawableGeometryInfo().getMajorRadius() + 5.0f};
-	const Color color = valid ? GameMakeColor(136, 255, 76, 245) : GameMakeColor(255, 66, 55, 245);
-	for (Int i = 0; i < 4; ++i)
-	{
-		const Real angle = ghost.getOrientation() + (i + 0.5f) * WWMATH_PI * 0.5f;
-		const Coord3D point = onCircle(circle, angle, -3.0f);
-		groundLine(view, onCircle(circle, angle - 0.15f, 5.0f), point, 2.0f, color);
-		groundLine(view, onCircle(circle, angle + 0.15f, 5.0f), point, 2.0f, color);
 	}
 }
 
@@ -528,7 +518,8 @@ void RetailWorldUI::showPayout(const Object& source, Int amount, Bool bounty)
 	position.z += source.getGeometryInfo().getMaxHeightAbovePosition();
 	UnicodeString text;
 	text.format(L"+%d", amount);
-	const Color color = bounty ? GameMakeColor(255, 255, 255, 255) : GameMakeColor(131, 255, 94, 255);
+	const Player* owner = source.getControllingPlayer();
+	const Color color = bounty || !owner ? GameMakeColor(255, 255, 255, 255) : owner->getPlayerColor() | 0xFF000000;
 	TheInGameUI->addFloatingText(text, &position, color);
 }
 
@@ -543,5 +534,5 @@ void RetailWorldUI::drawTerrainClaims(View& view, const Player& player)
 		if (radius > 0.0f)
 			circles.push_back({*object->getPosition(), radius});
 	}
-	drawMergedCircles(view, circles, 130);
+	drawMergedCircles(view, circles, player.getPlayerColor(), 130);
 }

@@ -23,14 +23,14 @@ namespace UiRadialRing
 		return (std::sqrt(count + 0.75) - 1.0) * buttonSize * SpacingFactor;
 	}
 
-	inline std::vector<PixelButton> layout(int count, int centerX, int centerY, double scale)
+	inline std::vector<PixelButton> layout(int count, int centerX, int centerY, double scale, bool compact = false)
 	{
 		std::vector<PixelButton> buttons;
 		if (count <= 0 || scale <= 0.0)
 			return buttons;
 		const double size = ButtonDesignSize * scale;
 		const int pixels = static_cast<int>(std::floor(size + 0.5));
-		const double ring = radius(count, size);
+		const double ring = compact && count > 1 ? size * 1.06 / (2.0 * std::sin(TwoPi / (2.0 * count))) : radius(count, size);
 		buttons.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{

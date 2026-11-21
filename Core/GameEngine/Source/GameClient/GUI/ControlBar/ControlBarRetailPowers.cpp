@@ -6,6 +6,7 @@
 #include "Common/PlayerList.h"
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
+#include "GameClient/AptScene.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Display.h"
 #include "GameClient/DisplayStringManager.h"
@@ -86,11 +87,14 @@ struct AptHitRegion
 struct StoreMovieLayout
 {
 	UnsignedInt fadeTime = 198;
+	Real stageWidth = 1024;
+	Real stageHeight = 768;
 	std::array<AptHitRegion, StoreSlots> nodes;
 	AptHitRegion reset, accept;
 };
 
 StoreMovieLayout storeMovieLayout;
+std::unique_ptr<AptScene> storeArt;
 
 struct Layout
 {
@@ -198,6 +202,8 @@ public:
 			throw InvalidStoreMovie{};
 
 		StoreMovieLayout layout;
+		layout.stageWidth = width;
+		layout.stageHeight = height;
 		const UnsignedInt frameTime = word(movie + 36);
 		if (frameTime >= 10 && frameTime <= 100)
 			layout.fadeTime = frameTime * 6;
@@ -209,7 +215,8 @@ public:
 		if (characterType(buttons.character) != Sprite)
 			return layout;
 		const Real scale = static_cast<Real>(PanelHeight) / height;
-		const AptTransform panel{ scale, 0, 0, scale, { (PanelWidth - width * scale) / 2, 0 } };
+		const Real wideScale = scale * 4.0f / 3.0f;
+		const AptTransform panel{ wideScale, 0, 0, scale, { (PanelWidth - width * wideScale) / 2, 0 } };
 		const AptTransform transform = panel.compose(store.transform).compose(buttons.transform);
 		const Placements placements = displayList(buttons.character);
 		for (Int slot = 0; slot < StoreSlots; ++slot)
@@ -437,7 +444,7 @@ Layout screenLayout()
 {
 	const Int w = TheDisplay->getWidth();
 	const Int h = TheDisplay->getHeight();
-	const Real scale = std::min(w / 650.0f, h / 640.0f);
+	const Real scale = std::min(w / 650.0f, h / static_cast<Real>(PanelHeight));
 	return { scale, (w - static_cast<Int>(PanelWidth * scale)) / 2, (h - static_cast<Int>(PanelHeight * scale)) / 2 };
 }
 
@@ -452,14 +459,6 @@ Rect windowRect(GameWindow* window)
 Player* localPlayer()
 {
 	return ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
-}
-
-const CommandButton* spellButton(Player* player, Int slot)
-{
-	Object* book = player ? player->getRetailSpellBook() : nullptr;
-	const CommandSet* set = book ? TheControlBar->findCommandSet(book->getCommandSetString()) : nullptr;
-	const CommandButton* button = set ? set->getCommandButton(slot) : nullptr;
-	return button && button->getCommandType() == GUI_COMMAND_SPELL_BOOK ? button : nullptr;
 }
 
 const CommandButton* storeButton(const Player* player, Int slot)
@@ -545,6 +544,13 @@ void icon(const CommandButton* button, const Rect& rect, Color tint)
 		TheDisplay->drawImage(image, rect.x, rect.y, rect.x + rect.w, rect.y + rect.h, tint);
 }
 
+void drawStoreArt(const char* name, const Rect& rect, Color tint = 0xFFFFFFFF)
+{
+	const Image* image = TheMappedImageCollection ? TheMappedImageCollection->findImageByName(name) : nullptr;
+	if (TheDisplay->hasImageTexture(image))
+		TheDisplay->drawImage(image, rect.x, rect.y, rect.x + rect.w, rect.y + rect.h, tint);
+}
+
 WindowMsgHandledType overlayInput(GameWindow*, UnsignedInt msg, WindowMsgData point, WindowMsgData)
 {
 	if (msg == GWM_CHAR && point == KEY_ESC)
@@ -561,26 +567,17 @@ WindowMsgHandledType counterInput(GameWindow*, UnsignedInt msg, WindowMsgData, W
 	return MSG_HANDLED;
 }
 
-WindowMsgHandledType spellInput(GameWindow* window, UnsignedInt msg, WindowMsgData, WindowMsgData)
-{
-	if (msg == GWM_LEFT_UP)
-		TheControlBar->clickRetailSpellButton(window);
-	return MSG_HANDLED;
-}
-
-void spellTooltip(GameWindow* window, WinInstanceData*, UnsignedInt)
-{
-	TheControlBar->showRetailSpellTooltip(window);
-}
-
 void drawScreen(GameWindow* window, WinInstanceData*) { TheControlBar->drawRetailPowers(window); }
-void drawCounter(GameWindow* window, WinInstanceData*) { TheControlBar->drawRetailPowerCounter(window); }
-void drawSpell(GameWindow* window, WinInstanceData*) { TheControlBar->drawRetailSpellButton(window); }
 }
 
-void ControlBar::initRetailPowers(GameWindow* master, GameWindow* palantir)
+void ControlBar::initRetailPowers(GameWindow* palantir)
 {
 	storeMovieLayout = readSpellStore();
+	storeArt = std::make_unique<AptScene>("SpellStore", nullptr,
+		std::initializer_list<std::pair<const char*, const char*>>{
+			{"_root.SpellStore", "_multiplayer"},
+			{"_root.SpellStore.Buttons", "#15"}
+		});
 	m_retailPowersFadeTime = storeMovieLayout.fadeTime;
 	m_retailPowersScreen = TheWindowManager->winCreate(nullptr, WIN_STATUS_ENABLED | WIN_STATUS_ABOVE | WIN_STATUS_HIDDEN,
 		0, 0, TheDisplay->getWidth(), TheDisplay->getHeight(), nullptr, nullptr);
@@ -589,14 +586,6 @@ void ControlBar::initRetailPowers(GameWindow* master, GameWindow* palantir)
 	m_retailPowersCounter = TheWindowManager->winCreate(palantir, WIN_STATUS_ENABLED | WIN_STATUS_HIDDEN,
 		0, 0, 1, 1, nullptr, nullptr);
 	m_retailPowersCounter->winSetInputFunc(counterInput);
-	m_retailPowersCounter->winSetDrawFunc(drawCounter);
-	for (GameWindow*& window : m_retailSpellButtons)
-	{
-		window = TheWindowManager->winCreate(master, WIN_STATUS_ENABLED | WIN_STATUS_HIDDEN, 0, 0, 1, 1, nullptr, nullptr);
-		window->winSetInputFunc(spellInput);
-		window->winSetDrawFunc(drawSpell);
-		window->winSetTooltipFunc(spellTooltip);
-	}
 }
 
 void ControlBar::destroyRetailPowers()
@@ -604,6 +593,7 @@ void ControlBar::destroyRetailPowers()
 	if (TheWindowManager && m_retailPowersScreen)
 		TheWindowManager->winDestroy(m_retailPowersScreen);
 	m_retailPowersScreen = nullptr;
+	storeArt.reset();
 }
 
 void ControlBar::showRetailPowers(Bool show)
@@ -647,75 +637,11 @@ void ControlBar::updateRetailPowers()
 	m_retailPowersCounter->winSetPosition(static_cast<Int>(104 * scale), static_cast<Int>(61 * scale));
 	if (!m_retailPowersScreen->winIsHidden())
 		m_retailPowersScreen->winSetSize(TheDisplay->getWidth(), TheDisplay->getHeight());
-
-	Int count = 0;
-	for (Int slot = 0; slot < static_cast<Int>(m_retailSpellButtons.size()); ++slot)
-		if (usable && isOfferedSpell(player, spellButton(player, slot)))
-			++count;
-	const Int bottom = palantir.y + static_cast<Int>(54 * scale);
-	const Int pitch = std::clamp(bottom / std::max(1, count), 1, std::max(1, static_cast<Int>(46 * scale)));
-	const Int size = std::max(1, pitch - 3);
-	Int visible = 0;
-	for (Int slot = 0; slot < static_cast<Int>(m_retailSpellButtons.size()); ++slot)
-	{
-		GameWindow* window = m_retailSpellButtons[slot];
-		const Bool show = usable && isOfferedSpell(player, spellButton(player, slot));
-		window->winHide(!show);
-		if (show)
-		{
-			window->winSetPosition(8, bottom - (++visible) * pitch);
-			window->winSetSize(size, size);
-		}
-	}
 }
 
-void ControlBar::drawRetailPowerCounter(GameWindow* window) const
+void ControlBar::clickRetailSpellButton(const CommandButton* button)
 {
 	Player* player = localPlayer();
-	if (!player)
-		return;
-	const Rect rect = windowRect(window);
-	const Int points = player->getSciencePurchasePoints();
-	if (points > 0)
-	{
-		const UnsignedInt phase = TheGameLogic ? TheGameLogic->getFrame() % 48 : 0;
-		const Int expansion = 2 + (phase <= 24 ? phase : 48 - phase) / 6;
-		disc({ rect.x - expansion, rect.y - expansion, rect.w + expansion * 2, rect.h + expansion * 2 },
-			GameMakeColor(93, 195, 238, 122 - expansion * 13));
-		disc(rect, Cyan);
-	}
-	disc({ rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 6 }, points > 0 ? 0xFF245572 : 0xFF202E3B);
-	UnicodeString text;
-	text.format(L"%d", points);
-	label(powersFont(18, TRUE), rect, text, Ink);
-}
-
-void ControlBar::drawRetailSpellButton(GameWindow* window) const
-{
-	Player* player = localPlayer();
-	const auto slot = std::find(m_retailSpellButtons.begin(), m_retailSpellButtons.end(), window) - m_retailSpellButtons.begin();
-	const CommandButton* button = spellButton(player, slot);
-	Object* book = player ? player->getRetailSpellBook() : nullptr;
-	if (!book || !isOfferedSpell(player, button))
-		return;
-	const Rect rect = windowRect(window);
-	SpecialPowerModuleInterface* power = book->getSpecialPowerModule(button->getSpecialPowerTemplate());
-	const Bool ready = power && power->isReady();
-	fill(rect, 0xFF141E28);
-	icon(button, { rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4 }, ready ? 0xFFFFFFFF : 0xFF737E87);
-	if (power && !ready)
-	{
-		const Int width = static_cast<Int>((rect.w - 4) * std::clamp(power->getPercentReady(), 0.0f, 1.0f));
-		fill({ rect.x + 2, rect.y + rect.h - 4, width, 2 }, Cyan);
-	}
-	frame(rect, ready ? Gold : PanelLine);
-}
-
-void ControlBar::clickRetailSpellButton(GameWindow* window)
-{
-	const auto slot = std::find(m_retailSpellButtons.begin(), m_retailSpellButtons.end(), window) - m_retailSpellButtons.begin();
-	Player* player = localPlayer();
-	const CommandButton* button = spellButton(player, slot);
 	if (!isOfferedSpell(player, button))
 		return;
 	Object* book = player->getRetailSpellBook();
@@ -727,18 +653,6 @@ void ControlBar::clickRetailSpellButton(GameWindow* window)
 		TheInGameUI->setGUICommand(button);
 	else
 		targetRetailSpell(button, nullptr, nullptr, TRUE);
-}
-
-void ControlBar::showRetailSpellTooltip(GameWindow* window) const
-{
-	const auto slot = std::find(m_retailSpellButtons.begin(), m_retailSpellButtons.end(), window) - m_retailSpellButtons.begin();
-	if (const CommandButton* button = spellButton(localPlayer(), slot))
-	{
-		Mouse::RetailTooltip tooltip;
-		tooltip.title = TheGameText->fetchOrSubstitute(button->getTextLabel().str(), L"");
-		tooltip.body = TheGameText->fetchOrSubstitute(button->getDescriptionLabel().str(), L"");
-		TheMouse->setRetailTooltip(tooltip);
-	}
 }
 
 Bool ControlBar::targetRetailSpell(const CommandButton* button, Object* target, const Coord3D* position, Bool submit)
@@ -771,45 +685,34 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 		return;
 	const UnsignedInt elapsed = timeGetTime() - m_retailPowersOpenedAt;
 	const Int shade = 168 * std::min(elapsed, m_retailPowersFadeTime) / m_retailPowersFadeTime;
-	fill(windowRect(window), GameMakeColor(0, 10, 18, shade));
+	fill(windowRect(window), GameMakeColor(0, 7, 10, shade));
 	const Layout layout = screenLayout();
-	const Rect panel = layout.at(0, 0, PanelWidth, PanelHeight);
-	fill(panel, 0xFF10212E);
-	frame(panel, PanelLine);
-	disc(layout.at(69, 45, 422, 422), 0xFF294D60);
-	disc(layout.at(73, 49, 414, 414), 0xFF152A39);
-	const Image* orb = TheMappedImageCollection ? TheMappedImageCollection->findImageByName("UiRetailPowersOrb") : nullptr;
-	if (TheDisplay->hasImageTexture(orb))
+	const Bool authored = storeArt && storeArt->valid();
+	if (authored)
 	{
-		const Rect ring = layout.at(69, 45, 422, 422);
-		TheDisplay->drawImage(orb, ring.x, ring.y, ring.x + ring.w, ring.y + ring.h, 0x664B9DA8);
+		const Real sy = PanelHeight * layout.scale / storeMovieLayout.stageHeight;
+		const Real sx = sy * 4.0f / 3.0f;
+		const Real artX = layout.x + (PanelWidth * layout.scale - sx * storeMovieLayout.stageWidth) / 2.0f;
+		disc(layout.at(70, 68, 420, 420), 0xA0041019);
+		storeArt->drawAt([](const std::string& path) {
+			return path.starts_with("_root.SpellStore.") &&
+				!path.starts_with("_root.SpellStore.Buttons.Spell") &&
+				!path.starts_with("_root.SpellStore.Buttons.ButtonsMain.");
+		}, artX, layout.y, sx, sy, 1.0f);
+		storeArt->drawAt([](const std::string& path) { return path.starts_with("_root.Title."); },
+			0, 0, storeArt->xScale(), sy, 1.0f);
 	}
+	else
+		disc(layout.at(0, 64, PanelWidth, PanelWidth - 98), 0xFF152A39);
 	GameFont* font = powersFont(16);
-	label(powersFont(26, TRUE), layout.at(0, 6, PanelWidth, 29), UnicodeString(L"Powers"), Ink);
+	label(powersFont(26, TRUE), layout.at(0, 6, PanelWidth, 29), UnicodeString(L"Powers"), Cyan);
 	UnicodeString points;
-	points.format(L"Power points to spend  %d", player->getSciencePurchasePoints() - pendingCost(player, m_retailPendingSciences));
-	label(font, layout.at(0, 36, PanelWidth, 28), points, Cyan);
+	points.format(L"%d", player->getSciencePurchasePoints() - pendingCost(player, m_retailPendingSciences));
+	label(font, layout.at(0, 92, PanelWidth, 28),
+		TheGameText->fetchOrSubstitute("APT:SpellStoreSpellPointsLabel", L"Power points to spend:"), Ink);
+	label(font, layout.at(0, 116, PanelWidth, 24), points, Ink);
 	const Rect close = layout.at(515, 8, 35, 29);
-	frame(close, PanelLine);
 	label(font, close, UnicodeString(L"×"), Ink);
-
-	for (Int from = 0; from < StoreSlots; ++from)
-	{
-		const ScienceType science = storeScience(player, from);
-		const auto* groups = TheScienceStore->getPrerequisiteAlternatives(science);
-		if (!groups)
-			continue;
-		const Rect a = layout.node(from);
-		for (Int to = 0; to < from; ++to)
-		{
-			const ScienceType prerequisite = storeScience(player, to);
-			if (prerequisite == SCIENCE_INVALID || !std::any_of(groups->begin(), groups->end(),
-				[prerequisite](const ScienceVec& group) { return containsScience(group, prerequisite); }))
-				continue;
-			const Rect b = layout.node(to);
-			TheDisplay->drawLine(a.x + a.w / 2, a.y, b.x + b.w / 2, b.y + b.h, 2.0f, PanelLine);
-		}
-	}
 
 	for (Int i = 0; i < StoreSlots; ++i)
 	{
@@ -819,15 +722,20 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 		const Bool pending = containsScience(m_retailPendingSciences, science);
 		const Bool owned = player->hasScience(science);
 		const Bool available = canQueueScience(player, science, m_retailPendingSciences);
-		const Color edge = pending ? Cyan : owned ? Owned : available ? Gold : PanelLine;
 		const Rect tile = layout.node(i);
-		fill(tile, pending ? 0xFF326A79 : 0xFF17212B);
-		icon(storeButton(player, i), { tile.x + 3, tile.y + 3, tile.w - 6, tile.h - 6 },
-			owned || available || pending ? 0xFFFFFFFF : 0xFF777F87);
-		frame(tile, edge);
-		Rect badge = { tile.x + tile.w / 4, tile.y + tile.h - tile.h / 5, tile.w / 2, tile.h / 3 };
-		fill(badge, 0xFF17212B);
-		frame(badge, edge);
+		const Int diameter = std::max(2, static_cast<Int>(72 * PanelHeight * layout.scale / storeMovieLayout.stageHeight));
+		const Rect portrait = {tile.x + (tile.w - diameter) / 2, tile.y + (tile.h - diameter) / 2, diameter, diameter};
+		const Int border = std::max(2, diameter / 16);
+		disc(portrait, 0xFF0A1720);
+		const Rect inset = {portrait.x + border, portrait.y + border, diameter - border * 2, diameter - border * 2};
+		TheDisplay->setCircularClip(inset.x + inset.w / 2, inset.y + inset.h / 2, inset.w / 2);
+		icon(storeButton(player, i), inset, owned || available || pending ? 0xFFFFFFFF : 0xFF626C75);
+		TheDisplay->setCircularClip(0, 0, 0);
+		drawStoreArt("UiRetailPowersNode", portrait, owned || pending ? Cyan : available ? 0xFFFFFFFF : 0xAA8699A6);
+		const Int badgeSize = std::max(12, diameter / 3);
+		const Rect badge = {portrait.x + (diameter - badgeSize) / 2, portrait.y + diameter - badgeSize * 2 / 3, badgeSize, badgeSize};
+		disc(badge, available || owned || pending ? 0xFF8CAABD : PanelLine);
+		disc({badge.x + 1, badge.y + 1, badge.w - 2, badge.h - 2}, 0xFF142A38);
 		UnicodeString cost;
 		cost.format(L"%d", player->getSciencePurchaseCost(science));
 		label(font, badge, cost, owned ? Owned : Ink);
@@ -837,25 +745,27 @@ void ControlBar::drawRetailPowers(GameWindow* window) const
 		UnicodeString title = TheGameText->fetchOrSubstitute(button->getTextLabel().str(), L"");
 		label(font, layout.at(0, 464, PanelWidth, 25), title, Ink);
 	}
-	if (!m_retailPendingSciences.empty())
+	const Bool canCommit = !m_retailPendingSciences.empty();
+	Rect reset = layout.reset();
+	Rect accept = layout.accept();
+	if (reset.x < accept.x && reset.x + reset.w > accept.x)
 	{
-		Rect reset = layout.reset();
-		Rect accept = layout.accept();
-		if (reset.x < accept.x && reset.x + reset.w > accept.x)
-		{
-			const Int split = layout.actionSplit(reset, accept);
-			const Int acceptRight = accept.x + accept.w;
-			reset.w = split - 2 - reset.x;
-			accept.x = split + 2;
-			accept.w = acceptRight - accept.x;
-		}
-		fill(reset, 0xFF253948);
-		fill(accept, 0xFF27586B);
-		frame(reset, PanelLine);
-		frame(accept, Cyan);
-		label(font, reset, UnicodeString(L"Reset"), Ink);
-		label(font, accept, UnicodeString(L"Accept"), Ink);
+		const Int split = layout.actionSplit(reset, accept);
+		const Int acceptRight = accept.x + accept.w;
+		reset.w = split - 2 - reset.x;
+		accept.x = split + 2;
+		accept.w = acceptRight - accept.x;
 	}
+	if (authored)
+		drawStoreArt("UiRetailPowersActions", {reset.x, reset.y, accept.x + accept.w - reset.x, std::max(reset.h, accept.h)},
+			canCommit ? 0xFFFFFFFF : 0xAA8699A6);
+	else
+	{
+		frame(reset, PanelLine);
+		frame(accept, canCommit ? Cyan : PanelLine);
+	}
+	label(font, reset, UnicodeString(L"Reset"), canCommit ? Ink : Cyan);
+	label(font, accept, UnicodeString(L"Accept"), canCommit ? Ink : Cyan);
 }
 
 void ControlBar::inputRetailPowers(Int x, Int y, Bool click)

@@ -4,8 +4,10 @@
 #include "Lib/Coord2D.h"
 
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <string>
+#include <utility>
 
 class AptScene
 {
@@ -30,7 +32,8 @@ public:
 	using DrawText = std::function<void(const std::string &, const Text &)>;
 	using HorizontalScale = std::function<Real(const std::string &)>;
 
-	explicit AptScene(const char *movie, const char *frame = nullptr);
+	explicit AptScene(const char *movie, const char *frame = nullptr,
+		std::initializer_list<std::pair<const char*, const char*>> nestedFrames = {});
 	struct AnimatedExport { const char *name; };
 	AptScene(const char *movie, AnimatedExport exported);
 	~AptScene();
