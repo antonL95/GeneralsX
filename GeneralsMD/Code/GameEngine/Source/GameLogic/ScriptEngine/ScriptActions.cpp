@@ -6751,12 +6751,15 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::ALLOW_DISALLOW_ONE_BUILDING:
 		{
 			Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString());
+			if (!player && !RetailSkirmishProbe::enabled())
+				return;
 			const AsciiString& name = pAction->getParameter(1)->getString();
 			const ThingTemplate* what = player ? TheThingFactory->findTemplate(name, FALSE) : nullptr;
 			const Bool allowed = pAction->getParameter(2)->getInt() != 0;
 			if (player)
 				player->setBuildingAllowed(what, allowed);
-			RetailSkirmishProbe::buildPermission(player, name, what != nullptr, allowed);
+			if (RetailSkirmishProbe::enabled())
+				RetailSkirmishProbe::buildPermission(player, name, what != nullptr, allowed);
 			return;
 		}
 		case ScriptAction::GIVE_PLAYER_UPGRADE:

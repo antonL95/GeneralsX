@@ -4087,7 +4087,8 @@ void GameLogic::update()
 	if (generateForSolo || generateForMP)
 	{
 		m_CRC = getCRC( CRC_RECALC );
-		RetailSkirmishProbe::crc(m_frame, m_CRC);
+		if (RetailSkirmishProbe::enabled())
+			RetailSkirmishProbe::crc(m_frame, m_CRC);
 		bool isPlayback = (TheRecorder && TheRecorder->isPlaybackMode());
 
 		GameMessage *msg = newInstance(GameMessage)(GameMessage::MSG_LOGIC_CRC);
@@ -4238,7 +4239,7 @@ void GameLogic::update()
 	TheWeaponStore->UPDATE();
 	TheLocomotorStore->UPDATE();
 	TheVictoryConditions->UPDATE();
-	if (getGameMode() == GAME_SKIRMISH)
+	if (RetailSkirmishProbe::enabled() && getGameMode() == GAME_SKIRMISH)
 		RetailSkirmishProbe::update(m_frame);
 
 	{

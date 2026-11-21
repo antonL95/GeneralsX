@@ -6,8 +6,9 @@ class Player;
 
 namespace RetailSkirmishProbe
 {
+	extern Bool active;
+	inline Bool enabled() { return active; }
 	Bool configure(SkirmishGameInfo& game);
-	Bool enabled();
 	void crc(UnsignedInt frame, UnsignedInt value);
 	void update(UnsignedInt frame);
 	void death(const Object& object, ObjectID source);

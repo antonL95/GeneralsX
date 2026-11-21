@@ -7,10 +7,13 @@
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/Pathfinder/Path.h"
+#include "GameLogic/Pathfinder/PathNode.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/Weapon.h"
@@ -170,7 +173,7 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 		Object* target = m_updatingAnchor ? enemyHordeOrUnit(parms->m_obj) : parms->m_obj;
 		if (!m_updatingAnchor || m_order == NO_ORDER)
 		{
-			m_order = NO_ORDER;
+			m_order = m_updatingAnchor ? NO_ORDER : command;
 			m_orderPosition = *getObject()->getPosition();
 			m_retaliationStartDistanceSquared = 0.0f;
 			m_attackSource = parms->m_cmdSource;
@@ -207,7 +210,8 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 
 Object* HordeAIUpdate::updateOrder(Object* anchor, Object* target, Bool refresh)
 {
-	if (m_order == NO_ORDER || m_order == AICMD_ATTACK_POSITION)
+	if (m_order == NO_ORDER || m_order == AICMD_ATTACK_POSITION ||
+		m_order == AICMD_ATTACK_OBJECT || m_order == AICMD_FORCE_ATTACK_OBJECT)
 		return target;
 
 	Coord3D position = m_orderPosition;
@@ -290,9 +294,17 @@ UpdateSleepTime HordeAIUpdate::update()
 {
 	Object* horde = getObject();
 	const Real facingBefore = horde->getOrientation();
+	Path* path = getPath();
+	const PathNode* end = path ? path->getLastNode() : nullptr;
+	const Locomotor* locomotor = getCurLocomotor();
+	const Bool reachingOrderEnd = m_order == AICMD_ATTACKMOVE_TO_POSITION && m_attackTarget == INVALID_ID &&
+		end && locomotor && distanceSquared(*getGoalPosition(), m_orderPosition) <= 16.0f &&
+		distanceSquared(*horde->getPosition(), *end->getPosition()) < sqr(locomotor->getCloseEnoughDist());
 	m_updatingAnchor = TRUE;
 	AIUpdateInterface::update();
 	m_updatingAnchor = FALSE;
+	if (reachingOrderEnd && isIdle() && m_attackTarget == INVALID_ID)
+		m_order = NO_ORDER;
 
 	const HordeContain* contain = HordeContain::get(horde);
 	if (!contain || horde->isEffectivelyDead())
@@ -304,6 +316,8 @@ UpdateSleepTime HordeAIUpdate::update()
 	if (!target && m_attackTarget != INVALID_ID)
 	{
 		m_attackTarget = INVALID_ID;
+		if (m_order == AICMD_ATTACK_OBJECT || m_order == AICMD_FORCE_ATTACK_OBJECT)
+			m_order = NO_ORDER;
 		m_retaliationStartDistanceSquared = 0.0f;
 		m_engaging = FALSE;
 		privateIdle(m_attackSource);

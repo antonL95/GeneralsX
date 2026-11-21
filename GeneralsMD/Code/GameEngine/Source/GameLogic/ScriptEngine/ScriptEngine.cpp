@@ -7357,7 +7357,8 @@ void ScriptEngine::notifyOfCompletedVideo( const AsciiString& completedVideo )
 void ScriptEngine::notifyOfTriggeredSpecialPower( Int playerIndex, const AsciiString& completedPower, ObjectID sourceObj )
 {
 	m_triggeredSpecialPowers[playerIndex].push_back(AsciiStringObjectIDPair(completedPower, sourceObj));
-	RetailSkirmishProbe::cast(playerIndex, completedPower, sourceObj);
+	if (RetailSkirmishProbe::enabled())
+		RetailSkirmishProbe::cast(playerIndex, completedPower, sourceObj);
 }
 
 //-------------------------------------------------------------------------------------------------

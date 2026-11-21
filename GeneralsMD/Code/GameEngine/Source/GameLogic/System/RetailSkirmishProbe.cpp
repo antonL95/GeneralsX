@@ -17,8 +17,11 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Pathfinder/Path.h"
+#include "GameLogic/Pathfinder/PathNode.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
 #include "GameLogic/SidesList.h"
@@ -35,6 +38,8 @@
 
 namespace RetailSkirmishProbe
 {
+Bool active = FALSE;
+
 namespace
 {
 UnsignedInt frameLimit = 0;
@@ -160,6 +165,25 @@ void runFixture(UnsignedInt frame)
 {
 	if (!fixture)
 		return;
+	if (std::strcmp(fixture, "human-lair") == 0)
+	{
+		if (frame != 2)
+			return;
+		Player* human = ThePlayerList->getLocalPlayer();
+		if (!human || human->getPlayerType() != PLAYER_HUMAN || !human->isPlayableSide())
+			return;
+		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		{
+			if (object->getTemplate()->getName() != "MoriarGoblinLair")
+				continue;
+			object->setTeam(human->getDefaultTeam());
+			std::fprintf(stderr, "SKIRMISH_HUMAN_LAIR\t%u\t%d\t%u\n", frame,
+				human->getPlayerIndex(), static_cast<unsigned>(object->getID()));
+			object->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
+			break;
+		}
+		return;
+	}
 	if (frame == 2)
 	{
 		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
@@ -239,12 +263,23 @@ void snapshot(const Player& player, UnsignedInt frame)
 		}
 		if (object->isKindOf(KINDOF_FS_FACTORY))
 			logProductionOptions(*object, player, frame);
-		const AIUpdateInterface* ai = object->getAIUpdateInterface();
+		AIUpdateInterface* ai = object->getAIUpdateInterface();
 		if (ai && !object->isKindOf(KINDOF_STRUCTURE))
 		{
 			const Coord3D& pos = *object->getPosition();
 			std::fprintf(stderr, "SKIRMISH_POSITION\t%u\t%d\t%u\t%s\t%a\t%a\t%d\t%d\n", frame,
 				playerIndex, static_cast<unsigned>(object->getID()), name, pos.x, pos.y, ai->isIdle(), ai->isMoving());
+			if (object->isKindOf(KINDOF_HORDE) && ai->getModuleNameKey() == NAMEKEY("HordeAIUpdate"))
+			{
+				const auto* horde = static_cast<const HordeAIUpdate*>(ai);
+				const Coord3D& goal = *ai->getGoalPosition();
+				Path* path = ai->getPath();
+				const Coord3D* end = path && path->getLastNode() ? path->getLastNode()->getPosition() : nullptr;
+				std::fprintf(stderr, "SKIRMISH_PATH\t%u\t%d\t%u\t%d\t%d\t%d\t%d\t%a\t%a\t%d\t%a\t%a\n",
+					frame, playerIndex, static_cast<unsigned>(object->getID()), ai->getCurrentStateID(),
+					ai->isWaitingForPath(), ai->isBlockedAndStuck(), horde->hasAttackOrder(), goal.x, goal.y,
+					end != nullptr, end ? end->x : 0.0f, end ? end->y : 0.0f);
+			}
 		}
 	}
 	std::fprintf(stderr, "SKIRMISH_PLAYER\t%u\t%d\t%s\t%u\t%d\n", frame, playerIndex,
@@ -284,26 +319,37 @@ Bool configure(SkirmishGameInfo& game)
 	const Int factions[] = {findFaction(factionA), findFaction(factionB)};
 	if (factions[0] < 0 || factions[1] < 0)
 		invalidConfig();
+	fixture = std::getenv("GENERALSX_SKIRMISH_PROBE_FIXTURE");
+	const Bool humanLair = fixture && std::strcmp(fixture, "human-lair") == 0;
+	if (fixture && !humanLair && std::strcmp(fixture, "porter") != 0 && std::strcmp(fixture, "ensnare") != 0)
+		invalidConfig();
 	for (Int i = 0; i < 2; ++i)
 	{
-		GameSlot ai;
-		ai.setState(state);
-		ai.setStartPos(i);
-		ai.setColor(i);
-		ai.setPlayerTemplate(factions[i]);
-		game.setSlot(i, ai);
+		GameSlot slot;
+		if (humanLair && i == 0)
+		{
+			slot.setState(SLOT_PLAYER, UnicodeString(L"Player"));
+			game.setLocalIP(slot.getIP());
+		}
+		else
+			slot.setState(state);
+		slot.setStartPos(i);
+		slot.setColor(i);
+		slot.setPlayerTemplate(factions[i]);
+		game.setSlot(i, slot);
 	}
-	GameSlot observer;
-	observer.setState(SLOT_PLAYER, UnicodeString(L"Observer"));
-	observer.setColor(2);
-	observer.setPlayerTemplate(PLAYERTEMPLATE_OBSERVER);
-	game.setSlot(2, observer);
-	game.setLocalIP(observer.getIP());
+	if (!humanLair)
+	{
+		GameSlot observer;
+		observer.setState(SLOT_PLAYER, UnicodeString(L"Observer"));
+		observer.setColor(2);
+		observer.setPlayerTemplate(PLAYERTEMPLATE_OBSERVER);
+		game.setSlot(2, observer);
+		game.setLocalIP(observer.getIP());
+	}
 
 	frameLimit = static_cast<UnsignedInt>(limit);
-	fixture = std::getenv("GENERALSX_SKIRMISH_PROBE_FIXTURE");
-	if (fixture && std::strcmp(fixture, "porter") != 0 && std::strcmp(fixture, "ensnare") != 0)
-		invalidConfig();
+	active = TRUE;
 	TheFramePacer->enableLogicTimeScale(FALSE);
 	TheFramePacer->enableFramesPerSecondLimit(FALSE);
 	std::fprintf(stderr, "SKIRMISH_SETUP\t%s\t%s\t%s\t%u\n", factionA, factionB, difficulty, frameLimit);
@@ -311,21 +357,13 @@ Bool configure(SkirmishGameInfo& game)
 	return TRUE;
 }
 
-Bool enabled()
-{
-	return frameLimit != 0;
-}
-
 void crc(UnsignedInt frame, UnsignedInt value)
 {
-	if (enabled())
-		std::fprintf(stderr, "SKIRMISH_CRC\t%u\t%08x\n", frame, value);
+	std::fprintf(stderr, "SKIRMISH_CRC\t%u\t%08x\n", frame, value);
 }
 
 void update(UnsignedInt frame)
 {
-	if (!enabled())
-		return;
 	runFixture(frame);
 	const Bool ended = TheVictoryConditions->getEndFrame() != 0;
 	if (!ended && frame < frameLimit && frame % 1800 != 0)
@@ -351,41 +389,47 @@ void update(UnsignedInt frame)
 
 void death(const Object& object, ObjectID source)
 {
-	if (!enabled())
-		return;
 	const Player* player = object.getControllingPlayer();
 	if (isCompetitor(player))
 		std::fprintf(stderr, "SKIRMISH_DEATH\t%u\t%d\t%u\t%s\t%u\n", TheGameLogic->getFrame(),
 			player->getPlayerIndex(), static_cast<unsigned>(object.getID()), object.getTemplate()->getName().str(),
 			static_cast<unsigned>(source));
+	if (!isCompetitor(player) || !object.isKindOf(KINDOF_STRUCTURE) || object.isKindOf(KINDOF_BASE_FOUNDATION) ||
+		object.isKindOf(KINDOF_INERT))
+		return;
+	const Object* attacker = TheGameLogic->findObjectByID(source);
+	const Player* killer = attacker ? attacker->getControllingPlayer() : nullptr;
+	if (isCompetitor(killer) && killer->getRelationship(object.getTeam()) == ENEMIES)
+		std::fprintf(stderr, "SKIRMISH_STRUCTURE_KILL\t%u\t%d\t%d\t%u\t%s\n", TheGameLogic->getFrame(),
+			killer->getPlayerIndex(), player->getPlayerIndex(), static_cast<unsigned>(object.getID()),
+			object.getTemplate()->getName().str());
 }
 
 void cast(Int player, const AsciiString& power, ObjectID source)
 {
-	if (enabled() && isCompetitor(ThePlayerList->getNthPlayer(player)))
+	if (isCompetitor(ThePlayerList->getNthPlayer(player)))
 		std::fprintf(stderr, "SKIRMISH_CAST\t%u\t%d\t%s\t%u\n", TheGameLogic->getFrame(),
 			player, power.str(), static_cast<unsigned>(source));
 }
 
 void purchase(const Player& player, const AsciiString& science)
 {
-	if (enabled() && isCompetitor(&player))
+	if (isCompetitor(&player))
 		std::fprintf(stderr, "SKIRMISH_PURCHASE\t%u\t%d\t%s\n", TheGameLogic->getFrame(),
 			player.getPlayerIndex(), science.str());
 }
 
 void buildPermission(const Player* player, const AsciiString& name, Bool found, Bool allowed)
 {
-	if (enabled())
-		std::fprintf(stderr, "SKIRMISH_PERMISSION\t%u\t%d\t%s\t%d\t%d\n", TheGameLogic->getFrame(),
-			player ? player->getPlayerIndex() : -1, name.str(), found, allowed);
+	std::fprintf(stderr, "SKIRMISH_PERMISSION\t%u\t%d\t%s\t%d\t%d\n", TheGameLogic->getFrame(),
+		player ? player->getPlayerIndex() : -1, name.str(), found, allowed);
 }
 
 void rebuild(const Object& hole, const Object& replacement)
 {
-	if (enabled())
-		std::fprintf(stderr, "SKIRMISH_REBUILD\t%u\t%u\t%s\t%u\t%s\n", TheGameLogic->getFrame(),
-			static_cast<unsigned>(hole.getID()), hole.getTemplate()->getName().str(),
-			static_cast<unsigned>(replacement.getID()), replacement.getTemplate()->getName().str());
+	std::fprintf(stderr, "SKIRMISH_REBUILD\t%u\t%u\t%s\t%u\t%s\t%d\n", TheGameLogic->getFrame(),
+		static_cast<unsigned>(hole.getID()), hole.getTemplate()->getName().str(),
+		static_cast<unsigned>(replacement.getID()), replacement.getTemplate()->getName().str(),
+		replacement.getControllingPlayer()->getPlayerIndex());
 }
 }

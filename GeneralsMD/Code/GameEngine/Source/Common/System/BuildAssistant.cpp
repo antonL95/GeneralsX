@@ -335,7 +335,8 @@ static Bool clearsSiteOnArrival( Object *constructorObject, const ThingTemplate 
 /** Nice little method to wrap up creating an object from a build */
 //-------------------------------------------------------------------------------------------------
 Object *BuildAssistant::buildObjectNow( Object *constructorObject, const ThingTemplate *what,
-																			  const Coord3D *pos, Real angle, Player *owningPlayer )
+																			  const Coord3D *pos, Real angle, Player *owningPlayer,
+																			  const Object* replacedSite )
 {
 
 	// sanity
@@ -364,7 +365,7 @@ Object *BuildAssistant::buildObjectNow( Object *constructorObject, const ThingTe
 	if( !clearOnArrival )
 		clearRemovableForConstruction( what, pos, angle );
 
-	if ( !clearOnArrival && moveObjectsForConstruction( what, pos, angle, owningPlayer ) == FALSE )
+	if ( !clearOnArrival && moveObjectsForConstruction( what, pos, angle, owningPlayer, replacedSite ) == FALSE )
 	{
 		// totally bogus. We tried to move our units out of the way, but they wouldn't.
 		// Chode-boys.

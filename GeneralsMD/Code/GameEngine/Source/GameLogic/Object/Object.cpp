@@ -5105,7 +5105,8 @@ void Object::onDie( DamageInfo *damageInfo )
 	}
 
 	RetailTestCommands::logHordeDeath(this, damageInfo);
-	RetailSkirmishProbe::death(*this, damageInfo->in.m_sourceID);
+	if (RetailSkirmishProbe::enabled())
+		RetailSkirmishProbe::death(*this, damageInfo->in.m_sourceID);
 
 	checkAndDetonateBoobyTrap(nullptr);// Already dying, so no need to handle death case of explosion
 

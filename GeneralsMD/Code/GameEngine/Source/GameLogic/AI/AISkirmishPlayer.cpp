@@ -76,6 +76,8 @@ struct RetailArmyMember
 	Real share[3] = {};
 };
 
+constexpr Int RETAIL_ATTACK_WAVE_MIN_UNITS = 2;
+
 struct RetailArmy
 {
 	AsciiString side;
@@ -1313,17 +1315,19 @@ void AISkirmishPlayer::updateRetail()
 		return FALSE;
 	};
 
-	const Bool hasArmy = std::any_of(soldiers.begin(), soldiers.end(), [&](const Object* unit) {
+	const Int armySize = std::count_if(soldiers.begin(), soldiers.end(), [&](const Object* unit) {
 		return armyWeight(*unit->getTemplate(), TRUE) > 0.0f;
 	});
+	const Bool needsArmy = armySize < RETAIL_ATTACK_WAVE_MIN_UNITS;
 	UnsignedInt openingUnitReserve = 0;
-	if (!hasArmy && farms >= 2 && farmLimit > farms &&
+	if (needsArmy && farms >= 2 && farmLimit > farms &&
 		!retailTuning.disableUnitBuilding && m_player->getCanBuildUnits())
 	{
 		for (Object* producer : producers)
 		{
 			const CommandSet* set = retailCommands(*producer);
-			if (!set || producer->getProductionUpdateInterface()->getProductionCount() != 0)
+			const auto* production = producer->getProductionUpdateInterface();
+			if (!set || production->getProductionCount() != 0)
 				continue;
 			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 			{
@@ -1334,7 +1338,8 @@ void AISkirmishPlayer::updateRetail()
 					!HeroRoster::buttonUpgradesMet(button, m_player, producer) || !m_player->hasEnoughCommandPoints(unit))
 					continue;
 				const CanMakeType result = TheBuildAssistant->canMakeUnit(producer, unit);
-				const Int cost = unit->calcCostToBuild(m_player);
+				HeroRules::Price price;
+				const Int cost = production->getUnitPriceOverride(unit, price) ? price.cost : unit->calcCostToBuild(m_player);
 				if (cost > 0 && (result == CANMAKE_OK || result == CANMAKE_NO_MONEY) &&
 					(openingUnitReserve == 0 || static_cast<UnsignedInt>(cost) < openingUnitReserve))
 					openingUnitReserve = static_cast<UnsignedInt>(cost);
@@ -1455,7 +1460,7 @@ void AISkirmishPlayer::updateRetail()
 				if (!upgrade || (button->getCommandType() != GUI_COMMAND_PLAYER_UPGRADE &&
 					button->getCommandType() != GUI_COMMAND_OBJECT_UPGRADE))
 					continue;
-				if (soldiers.size() < 2 && !unlocksArmy(upgrade))
+				if (needsArmy && !unlocksArmy(upgrade))
 					continue;
 				if (m_player->getMoney()->countMoney() >= static_cast<UnsignedInt>(std::max(0, upgrade->calcCostToBuild(m_player))) &&
 					button->getRequiredRank() <= producer->getExperienceTracker()->getRank() &&
@@ -1465,7 +1470,7 @@ void AISkirmishPlayer::updateRetail()
 		}
 		if (retailTuning.disableUnitBuilding || !m_player->getCanBuildUnits() || production->getProductionCount() != 0)
 			continue;
-		if (soldiers.size() >= 2)
+		if (!needsArmy)
 			for (const AsciiString& name : rules->heroes)
 			{
 				const ThingTemplate* hero = TheThingFactory->findTemplate(name, FALSE);
@@ -1497,15 +1502,27 @@ void AISkirmishPlayer::updateRetail()
 			train(selected->getThingTemplate(), selected);
 	}
 
-	if (retailTuning.disableTacticalAI || soldiers.size() < 2)
+	if (retailTuning.disableTacticalAI)
 		return;
+	std::vector<Object*> wave;
+	for (Object* unit : soldiers)
+	{
+		const AIUpdateInterface* ai = unit->getAI();
+		const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
+		if (unit->getTeam() == m_player->getDefaultTeam() && unit->isMobile() &&
+			ai->isIdle() && (!horde || !horde->hasAttackOrder()))
+			wave.push_back(unit);
+	}
+	if (wave.size() < RETAIL_ATTACK_WAVE_MIN_UNITS)
+		return;
+	Object* lead = wave.front();
 	Object* target = nullptr;
 	ObjectShroudStatus targetShroud = OBJECTSHROUD_INVALID;
 	Real distance = 0.0f;
 	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 	{
 		const Player* owner = object->getControllingPlayer();
-		if (!owner || !owner->isPlayableSide() || !object->isKindOf(KINDOF_STRUCTURE) ||
+		if (!owner || !owner->isPlayableSide() || !owner->isPlayerActive() || !object->isKindOf(KINDOF_STRUCTURE) ||
 			object->isEffectivelyDead() || object->isKindOf(KINDOF_INERT) || object->isKindOf(KINDOF_UNATTACKABLE) ||
 			object->isKindOf(KINDOF_BASE_FOUNDATION) ||
 			m_player->getRelationship(object->getTeam()) != ENEMIES)
@@ -1515,7 +1532,7 @@ void AISkirmishPlayer::updateRetail()
 			continue;
 		if (object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED))
 			continue;
-		const Real candidateDistance = ThePartitionManager->getDistanceSquared(soldiers.front(), object, FROM_CENTER_2D);
+		const Real candidateDistance = ThePartitionManager->getDistanceSquared(lead, object, FROM_CENTER_2D);
 		if (!target || candidateDistance < distance || (candidateDistance == distance && object->getID() < target->getID()))
 		{
 			target = object;
@@ -1526,15 +1543,24 @@ void AISkirmishPlayer::updateRetail()
 	const Coord3D* destination = target ? target->getPosition() : nullptr;
 	if (!destination)
 	{
-		for (Int i = 1; i <= MAX_PLAYER_COUNT; ++i)
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 		{
-			AsciiString name;
-			name.format("Player_%d_Start", i);
-			const Waypoint* start = TheTerrainLogic->getWaypointByName(name);
-			if (!start || ThePartitionManager->getShroudStatusForPlayer(playerIndex, start->getLocation()) == CELLSHROUD_CLEAR)
+			Player* opponent = ThePlayerList->getNthPlayer(i);
+			if (!opponent || !opponent->isPlayableSide() || !opponent->isPlayerActive() ||
+				m_player->getRelationship(opponent->getDefaultTeam()) != ENEMIES)
 				continue;
-			const Coord3D delta = *start->getLocation() - *soldiers.front()->getPosition();
+			const Int index = opponent->getMpStartIndex();
+			if (index < 0 || index >= MAX_PLAYER_COUNT)
+				continue;
+			AsciiString name;
+			name.format("Player_%d_Start", index + 1);
+			const Waypoint* start = TheTerrainLogic->getWaypointByName(name);
+			if (!start)
+				continue;
+			const Coord3D delta = *start->getLocation() - *lead->getPosition();
 			const Real candidateDistance = delta.x * delta.x + delta.y * delta.y;
+			if (candidateDistance <= sqr(lead->getGeometryInfo().getBoundingCircleRadius()))
+				continue;
 			if (!destination || candidateDistance < distance)
 			{
 				destination = start->getLocation();
@@ -1544,19 +1570,27 @@ void AISkirmishPlayer::updateRetail()
 	}
 	if (!destination)
 		return;
-	for (Object* unit : soldiers)
+	Int committed = 0;
+	for (Object* unit : wave)
 	{
+		AIUpdateInterface* ai = unit->getAI();
+		if (target && target->isKindOf(KINDOF_IMMOBILE))
+			ai->aiAttackObject(target, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
+		else
+			ai->aiAttackMoveToPosition(destination, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
 		const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
-		if (unit->getAI()->isIdle() && (!horde || !horde->hasAttackOrder()))
-		{
-			if (trace)
-			{
-				std::fprintf(stderr, "AI_TARGET\t%u\t%d\t%s\t%d\t%d\t%d\n", frame, playerIndex,
-					target ? "attack" : "scout", unit->getID(), target ? target->getID() : 0, targetShroud);
-				std::fflush(stderr);
-			}
-			unit->getAI()->aiAttackMoveToPosition(destination, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
-		}
+		if (ai->isIdle() && (!horde || !horde->hasAttackOrder()))
+			continue;
+		++committed;
+		if (trace)
+			std::fprintf(stderr, "AI_TARGET\t%u\t%d\t%s\t%d\t%d\t%d\n", frame, playerIndex,
+				target ? "attack" : "scout", unit->getID(), target ? target->getID() : 0, targetShroud);
+	}
+	if (trace && committed >= RETAIL_ATTACK_WAVE_MIN_UNITS)
+	{
+		std::fprintf(stderr, "AI_WAVE\t%u\t%d\t%s\t%d\t%d\t%a\t%a\n", frame, playerIndex,
+			target ? "structure" : "enemy-start", committed, target ? target->getID() : 0, destination->x, destination->y);
+		std::fflush(stderr);
 	}
 }
 

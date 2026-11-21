@@ -235,7 +235,7 @@ UpdateSleepTime RebuildHoleBehavior::update()
 			{
 				TheAI->pathfinder()->removeObjectFromPathfindMap(hole);
 				Object* replacement = TheBuildAssistant->buildObjectNow(nullptr, m_rebuildTemplate, hole->getPosition(),
-					hole->getOrientation(), hole->getControllingPlayer());
+					hole->getOrientation(), hole->getControllingPlayer(), hole);
 				if (!replacement)
 				{
 					TheAI->pathfinder()->addObjectToPathfindMap(hole);
@@ -251,7 +251,8 @@ UpdateSleepTime RebuildHoleBehavior::update()
 						ai->transferAttack(hole->getID(), replacement->getID());
 				}
 				transferBombs(replacement);
-				RetailSkirmishProbe::rebuild(*hole, *replacement);
+				if (RetailSkirmishProbe::enabled())
+					RetailSkirmishProbe::rebuild(*hole, *replacement);
 				TheGameLogic->destroyObject(hole);
 				return UPDATE_SLEEP_NONE;
 			}

@@ -57,6 +57,7 @@
 
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/RetailSkirmishProbe.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -2316,6 +2317,19 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							getPath()->computePointOnPath(getObject(), m_locomotorSet, *getObject()->getPosition(), info);
 							onPathDistToGoal = info.distAlongPath;
 							goalPos = info.posOnPath;
+							if (RetailFileLayers::enabled() && getObject()->isKindOf(KINDOF_HORDE))
+							{
+								const Coord3D delta = goalPos - *getObject()->getPosition();
+								const Real steeringDistanceSquared = sqr(delta.x) + sqr(delta.y);
+								if (sqr(onPathDistToGoal) < steeringDistanceSquared)
+								{
+									const Real steeringDistance = WWMath::SqrtfOrigin(steeringDistanceSquared);
+									if (RetailSkirmishProbe::enabled() && TheGameLogic->getFrame() % 60 == 0)
+										std::fprintf(stderr, "SKIRMISH_STEER\t%u\t%u\t%a\t%a\n", TheGameLogic->getFrame(),
+											static_cast<unsigned>(getObject()->getID()), onPathDistToGoal, steeringDistance);
+									onPathDistToGoal = steeringDistance;
+								}
+							}
 							// layer is a possible bridge in the path.  Check & set the layer if applicable.
 							TheAI->pathfinder()->updateLayer(getObject(), info.layer);
 						}
