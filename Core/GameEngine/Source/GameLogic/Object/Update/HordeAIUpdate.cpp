@@ -9,6 +9,7 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Object.h"
@@ -107,6 +108,18 @@ HordeAIUpdate::HordeAIUpdate(Thing* thing, const ModuleData* data) : AIUpdateInt
 
 HordeAIUpdate::~HordeAIUpdate() = default;
 
+Bool HordeAIUpdate::isReforming(const AIUpdateInterface* ai)
+{
+	static const NameKeyType hordeKey = NAMEKEY("HordeAIUpdate");
+	return RetailFileLayers::enabled() && ai && ai->getModuleNameKey() == hordeKey &&
+		static_cast<const HordeAIUpdate*>(ai)->m_reformUntil > TheGameLogic->getFrame();
+}
+
+void HordeAIUpdate::crcReformState(Xfer* xfer)
+{
+	xfer->xferUnsignedInt(&m_reformUntil);
+}
+
 void HordeAIUpdate::memberCollided(Object* member, Object* target)
 {
 	Object* anchor = HordeContain::getAnchor(member);
@@ -182,6 +195,8 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 	const auto command = parms->m_cmd;
 	if (m_updatingAnchor && m_order != NO_ORDER && command == AICMD_ATTACKMOVE_TO_POSITION)
 		return;
+	if (!m_updatingAnchor)
+		m_reformUntil = 0;
 #if RTS_ZEROHOUR
 	if (command == AICMD_GUARD_RETALIATE)
 	{
@@ -435,7 +450,22 @@ UpdateSleepTime HordeAIUpdate::update()
 		}
 	}
 	else if (fabs(turn) > FORMATION_REFORM_ANGLE)
+	{
 		const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
+#if RTS_ZEROHOUR
+		if (RetailFileLayers::enabled() && isMoving() && locomotor && locomotor->getAppearance() == LOCO_HORDE &&
+			locomotor->getWaitForFormation() && fabs(turn) > locomotor->getMaxTurnWithoutReform() &&
+			horde->isKindOf(KINDOF_INFANTRY) && !horde->isKindOf(KINDOF_CAVALRY) &&
+			!isReforming(this))
+		{
+			const Real turnRate = locomotor->getMaxTurnRate(horde->getBodyModule()->getDamageState());
+			if (turnRate > 0.0f)
+				m_reformUntil = TheGameLogic->getFrame() + static_cast<UnsignedInt>(WWMath::Ceil(fabs(turn) / turnRate));
+		}
+#endif
+	}
+	if (m_reformUntil && (!isMoving() || m_reformUntil <= TheGameLogic->getFrame()))
+		m_reformUntil = 0;
 
 	target = liveTarget(m_attackTarget);
 	if (!target && m_attackTarget != INVALID_ID)
@@ -665,12 +695,13 @@ void HordeAIUpdate::crc(Xfer* xfer)
 			xfer->xferReal(&m_cavalryTurn);
 			xfer->xferReal(&m_cavalryTurnSinceReform);
 		}
+		crcReformState(xfer);
 	}
 }
 
 void HordeAIUpdate::xfer(Xfer* xfer)
 {
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 5;
 	XferVersion version = currentVersion;
 	xfer->xferVersion(&version, currentVersion);
 	AIUpdateInterface::xfer(xfer);
@@ -705,6 +736,10 @@ void HordeAIUpdate::xfer(Xfer* xfer)
 		xfer->xferReal(&m_cavalryTurn);
 		xfer->xferReal(&m_cavalryTurnSinceReform);
 	}
+	if (version >= 8)
+		xfer->xferUnsignedInt(&m_reformUntil);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_reformUntil = 0;
 }
 
 void HordeAIUpdate::loadPostProcess()

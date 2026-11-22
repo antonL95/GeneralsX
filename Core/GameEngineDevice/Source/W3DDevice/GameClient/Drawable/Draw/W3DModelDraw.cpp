@@ -2203,6 +2203,12 @@ void W3DModelDraw::adjustAnimSpeedToMovementSpeed()
 	// if the cur animation has a "distance covered" number, try to throttle
 	// the animation rate to match our actual speed.
 	Real dist = getCurAnimDistanceCovered();
+	if (RetailFileLayers::enabled())
+	{
+		if (dist > 0.0f)
+			adjustRetailDistanceAnimation(dist);
+		return;
+	}
 	if (dist > 0.0f)
 	{
 		const Object *obj = getDrawable()->getObject();
@@ -2222,6 +2228,37 @@ void W3DModelDraw::adjustAnimSpeedToMovementSpeed()
 			}
 		}
 	}
+}
+
+void W3DModelDraw::adjustRetailDistanceAnimation(Real distance)
+{
+	const Object* object = getDrawable()->getObject();
+	const PhysicsBehavior* physics = object ? object->getPhysics() : nullptr;
+	if (!physics || !TheGameLogic || !m_renderObject || m_renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD)
+		return;
+
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	if (frame != m_distanceSampleFrame)
+	{
+		const Coord3D& velocity = *physics->getVelocity();
+		const Coord3D& position = *object->getPosition();
+		Real distanceSquared = velocity.x * velocity.x + velocity.y * velocity.y;
+		if (m_distanceSampleFrame != FOREVER && frame == m_distanceSampleFrame + 1)
+		{
+			const Real dx = position.x - m_distanceSamplePosition.x;
+			const Real dy = position.y - m_distanceSamplePosition.y;
+			distanceSquared = dx * dx + dy * dy;
+		}
+		m_distanceSampleFrame = frame;
+		m_distanceSamplePosition = {position.x, position.y};
+		m_distancePerFrame = WWMath::SqrtfOrigin(distanceSquared);
+	}
+
+	constexpr Real RETAIL_MIN_DISTANCE_SPEED = 0.05f;
+	if (m_authoredAnimationSpeed > 0.0f && m_distancePerFrame * LOGICFRAMES_PER_SECOND > RETAIL_MIN_DISTANCE_SPEED)
+		setCurAnimDurationInMsec(distance / m_distancePerFrame * MSEC_PER_LOGICFRAME_REAL / m_authoredAnimationSpeed);
+	else
+		static_cast<HLodClass*>(m_renderObject)->Set_Animation_Frame_Rate_Multiplier(m_authoredAnimationSpeed);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2498,6 +2535,7 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 					HLodClass *hlod = (HLodClass*)m_renderObject;
 					Real factor = GameClientRandomValueReal(animInfo.getMinSpeed(m_curState->m_animMinSpeedFactor),
 						animInfo.getMaxSpeed(m_curState->m_animMaxSpeedFactor));
+					m_authoredAnimationSpeed = factor;
 					hlod->Set_Animation_Frame_Rate_Multiplier( factor );
 				}
 				applyWeaponTiming();

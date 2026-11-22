@@ -572,6 +572,10 @@ private:
 	UnsignedInt										m_weaponTimingEnd = 0;
 	Real m_previousAnimationFXFrame = 0.0f;
 	Bool m_animationFXFirstSample = TRUE;
+	UnsignedInt m_distanceSampleFrame = FOREVER;
+	Coord2D m_distanceSamplePosition{};
+	Real m_distancePerFrame = 0.0f;
+	Real m_authoredAnimationSpeed = 1.0f;
 
 	void adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction);
 	void dispatchAnimationFXEvents();
@@ -585,6 +589,7 @@ private:
 	void nukeCurrentRender(Matrix3D* xform);
 	void doStartOrStopParticleSys();
 	void adjustAnimSpeedToMovementSpeed();
+	void adjustRetailDistanceAnimation(Real distance);
 	void driveBuildUpAnimation();
 	static void hideAllMuzzleFlashes(const ModelConditionInfo* state, RenderObjClass* renderObject);
 	void hideAllHeadlights(Bool hide);

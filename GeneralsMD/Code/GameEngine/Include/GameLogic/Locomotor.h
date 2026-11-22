@@ -342,6 +342,7 @@ public:
 	Bool hasSuspension() const {return m_template->m_hasSuspension;}
 	Bool canMoveBackwards() const {return m_template->m_canMoveBackward;}
 	Bool getWaitForFormation() const { return m_template->m_waitForFormation; }
+	Real getMaxTurnWithoutReform() const { return m_template->m_maxTurnWithoutReform; }
 	Real getMaxWheelExtension() const {return m_template->m_maximumWheelExtension;}
 	Real getMaxWheelCompression() const {return m_template->m_maximumWheelCompression;}
 	Real getWheelTurnAngle() const {return m_template->m_wheelTurnAngle;}

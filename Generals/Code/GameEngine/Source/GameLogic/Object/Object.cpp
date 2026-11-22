@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/RetailTestCommands.h"
@@ -3656,7 +3657,11 @@ void Object::crc( Xfer *xfer )
 		if (m_firingTracker)
 			m_firingTracker->crcRetailState(xfer);
 		if (auto* horde = const_cast<HordeContain*>(HordeContain::get(this)))
+		{
 			horde->xferRetailFormationCombat(xfer);
+			if (auto* ai = dynamic_cast<HordeAIUpdate*>(getAIUpdateInterface()))
+				ai->crcReformState(xfer);
+		}
 		static const NameKeyType dualWeaponKey = NAMEKEY("DualWeaponBehavior");
 		static const NameKeyType deathWeaponKey = NAMEKEY("FireWeaponWhenDeadBehavior");
 		static const NameKeyType clickReactionKey = NAMEKEY("ClickReactionBehavior");

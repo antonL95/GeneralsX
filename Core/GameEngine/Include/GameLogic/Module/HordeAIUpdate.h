@@ -33,6 +33,8 @@ public:
 	Bool isEngaging() const { return m_engaging; }
 	Bool isApproachingAttackTarget() const { return m_attackTarget != INVALID_ID && !m_engaging && isMoving(); }
 	Real getCavalryTurn() const { return m_cavalryTurn; }
+	static Bool isReforming(const AIUpdateInterface* ai);
+	void crcReformState(Xfer* xfer);
 
 private:
 	static constexpr AICommandType NO_ORDER = (AICommandType)-1;
@@ -47,6 +49,7 @@ private:
 	UnsignedInt m_contactUntil = 0;
 	Real m_cavalryTurn = 0.0f;
 	Real m_cavalryTurnSinceReform = 0.0f;
+	UnsignedInt m_reformUntil = 0;
 	CommandSourceType m_attackSource = CMD_FROM_AI;
 	Int m_maxShots = 0;
 	Bool m_forceAttack = FALSE;

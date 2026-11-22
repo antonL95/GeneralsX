@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/ObjectCreationUpgrade.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/SlavedUpdate.h"
@@ -4476,6 +4477,8 @@ void Object::crc( Xfer *xfer )
 			UnsignedInt memberDamageFrame = horde->getLastMemberDamageFrame();
 			xfer->xferUnsignedInt(&memberDamageFrame);
 			horde->xferRetailFormationCombat(xfer);
+			if (auto* ai = dynamic_cast<HordeAIUpdate*>(getAIUpdateInterface()))
+				ai->crcReformState(xfer);
 		}
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{

@@ -17,6 +17,7 @@
 #include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -1338,7 +1339,7 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 
 	const AIUpdateInterface* hordeAI = horde->getAI();
 	const PhysicsBehavior* physics = horde->getPhysics();
-	goal.hordeMoving = hordeAI && hordeAI->isMoving() && physics;
+	goal.hordeMoving = hordeAI && hordeAI->isMoving() && physics && !HordeAIUpdate::isReforming(hordeAI);
 	if (!goal.hordeMoving)
 	{
 		goal.speed = FAST_AS_POSSIBLE;
@@ -1539,6 +1540,20 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 	if (next.x == planned.x && next.y == planned.y)
 		return;
 
+	if (locomotor->getAppearance() == LOCO_LEGS_TWO)
+	{
+		const Real stepSquared = movement.x * movement.x + movement.y * movement.y;
+		const Real dx = next.x - origin.x;
+		const Real dy = next.y - origin.y;
+		const Real correctedSquared = dx * dx + dy * dy;
+		if (correctedSquared > stepSquared)
+		{
+			const Real scale = WWMath::SqrtfOrigin(stepSquared / correctedSquared);
+			next.x = origin.x + dx * scale;
+			next.y = origin.y + dy * scale;
+		}
+	}
+
 	Pathfinder* pathfinder = TheAI->pathfinder();
 	const auto surfaces = locomotor->getLegalSurfaces();
 	if (!pathfinder->isMovementSegmentPassable(member, surfaces, layer, origin, next, FALSE) ||
@@ -1567,6 +1582,9 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 
 Real HordeContain::getFormationSpeedScale() const
 {
+	if (HordeAIUpdate::isReforming(getObject()->getAI()))
+		return 0.0f;
+
 	Real total = 0.0f;
 	Real worst = 0.0f;
 	Int count = 0;
