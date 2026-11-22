@@ -1,5 +1,5 @@
 210 create Player_1 MenFortress 0 1200,1200,0
-210 create Player_1 DolAmrothBattleTower 0 1400,1200,0
+210 create Player_1 Pkg26StandaloneTower 0 1400,1200,0
 212 create Player_1 MenWallPosternGate 0 1100,1400,0
 212 create Player_1 Pkg26Fighter 0 1060,1400,0
 212 create Player_1 Pkg26Trebuchet 0 1060,1430,0
@@ -12,9 +12,9 @@
 216 create Player_1 Pkg26RubbleControl 0 1420,1450,0
 217 create Player_1 Pkg26SupportWall 0 1350,1580,0
 218 create Player_1 TDHEreborSecretGate 0 1350,1580,0
-218 create Player_1 MenWallSegmentSmall 0 1420,1580,0
+218 create Player_1 Pkg26PlainWall 0 1420,1580,0
 
-219 pkg26-place-footprint Player_1 DolAmrothBattleTower 0
+219 pkg26-place-footprint Player_1 Pkg26StandaloneTower 0
 219 pkg26-place-footprint Player_1 MenWallPosternGate 0
 219 pkg26-place-footprint Player_1 Pkg26DoorProxy 0
 219 pkg26-place-footprint Player_1 Pkg26DoorProxy 1
@@ -22,17 +22,17 @@
 219 pkg26-place-footprint Player_1 Pkg26RubbleControl 0
 219 pkg26-place-footprint Player_1 Pkg26SupportWall 0
 219 pkg26-place-footprint Player_1 TDHEreborSecretGate 0
-219 pkg26-place-footprint Player_1 MenWallSegmentSmall 0
+219 pkg26-place-footprint Player_1 Pkg26PlainWall 0
 220 pkg26-castle-member Player_1 MenFortressCitadel 0
 220 pkg26-castle-member Player_1 MenFortressExpansionPadSide 0
-220 pkg26-castle-member Player_1 DolAmrothBattleTower 0
+220 pkg26-castle-member Player_1 Pkg26StandaloneTower 0
 220 pkg26-portal-state Player_1 MenWallPosternGate 0 Player_1:Pkg26Fighter:0
 220 pkg26-portal-state Player_1 MenWallPosternGate 0 Player_1:Pkg26Trebuchet:0
 220 pkg26-portal-state Player_1 MenWallPosternGate 0 PlyrCreeps:Pkg26Fighter:0
 220 pkg26-gate-state Player_1 Pkg26DoorProxy 0 Player_1:Pkg26Fighter:0
 220 pkg26-gate-state Player_1 Pkg26DoorProxy 1 Player_1:Pkg26Fighter:0
 220 pkg26-wall-upgrade-state Player_1 TDHEreborSecretGate 0
-220 pkg26-wall-upgrade-state Player_1 MenWallSegmentSmall 0
+220 pkg26-wall-upgrade-state Player_1 Pkg26PlainWall 0
 222 pkg26-gate-msg Player_1 Pkg26DoorProxy 0 open
 224 pkg26-rebuild-kill Player_1 Pkg26RubbleWall 0
 224 pkg26-rebuild-kill Player_1 Pkg26RubbleControl 0
@@ -43,7 +43,7 @@
 250 pkg26-castle-transfer Player_1 MenFortressCitadel 0 PlyrCreeps
 252 pkg26-castle-member PlyrCreeps MenFortressCitadel 0
 252 pkg26-castle-member PlyrCreeps MenFortressExpansionPadSide 0
-252 pkg26-castle-member Player_1 DolAmrothBattleTower 0
+252 pkg26-castle-member Player_1 Pkg26StandaloneTower 0
 253 pkg26-rebuild-msg Player_1 Pkg26SupportWall 0
 253 pkg26-rebuild-msg Player_1 Pkg26RubbleWall 0
 253 pkg26-rebuild-msg Player_1 Pkg26RubbleControl 0
@@ -58,7 +58,7 @@
 295 pkg26-rebuild-state Player_1 Pkg26RubbleControl 0
 315 pkg26-rebuild-kill PlyrCreeps MenFortressCitadel 0
 325 pkg26-castle-member PlyrCreeps MenFortressExpansionPadSide 0
-325 pkg26-castle-member Player_1 DolAmrothBattleTower 0
+325 pkg26-castle-member Player_1 Pkg26StandaloneTower 0
 365 pkg26-rebuild-state Player_1 Pkg26RubbleWall 0
 365 pkg26-rebuild-state Player_1 Pkg26RubbleControl 0
 365 pkg26-wall-upgrade-state Player_1 TDHEreborSecretGate 0
@@ -69,6 +69,20 @@
 431 track PlyrCreeps Pkg26Fighter 0
 431 pkg26-move PlyrCreeps Pkg26Fighter 0 - 1060 1400
 455 log PlyrCreeps Pkg26Fighter 0
+
+456 destroy Player_1 Pkg26Fighter 0
+456 destroy PlyrCreeps Pkg26Fighter 0
+456 destroy Player_1 Pkg26Trebuchet 0
+456 destroy Player_1 Pkg26StandaloneTower 0
+456 destroy Player_1 MenWallPosternGate 0
+456 destroy Player_1 Pkg26ProxyDoor 0
+456 destroy Player_1 Pkg26DoorProxy 1
+456 destroy Player_1 Pkg26DoorProxy 0
+456 destroy Player_1 TDHEreborSecretGate 0
+456 destroy Player_1 Pkg26SupportWall 0
+456 destroy Player_1 Pkg26PlainWall 0
+456 destroy Player_1 Pkg26RubbleWall 0
+456 destroy Player_1 Pkg26RubbleControl 0
 506 create Player_1 Pkg26Hub 0 1100,1750,0
 506 cash Player_1 - 0 5000
 507 pkg26-place-footprint Player_1 Pkg26Hub 0
@@ -76,3 +90,8 @@
 520 log Player_1 Pkg26UpgradeSegment 0
 650 pkg26-order-upgrade Player_1 Pkg26UpgradeSegment 0 Upgrade_MenWallPosternGate
 1170 pkg26-wall-upgrade-state Player_1 MenWallPosternGateSmall 0
+1171 destroy Player_1 MenWallPosternGateSmall 0
+1171 destroy Player_1 Pkg26UpgradeSegment 1
+1171 destroy Player_1 Pkg26UpgradeSegment 0
+1171 destroy Player_1 Pkg26Hub 1
+1171 destroy Player_1 Pkg26Hub 0

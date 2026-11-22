@@ -2,14 +2,14 @@ check() {
     if covers 220; then
         expect 'TEST pkg26 castle-member frame=220 object=MenFortressCitadel owner=Player_1 hasModule=1 linked=1 isKeep=1 owned=1 storedPrice=0'
         expect 'TEST pkg26 castle-member frame=220 object=MenFortressExpansionPadSide owner=Player_1 hasModule=1 linked=1 isKeep=0 owned=1 storedPrice=0'
-        expect 'TEST pkg26 castle-member frame=220 object=DolAmrothBattleTower owner=Player_1 hasModule=1 linked=0 isKeep=0 owned=0 storedPrice=0'
+        expect 'TEST pkg26 castle-member frame=220 object=Pkg26StandaloneTower owner=Player_1 hasModule=1 linked=0 isKeep=0 owned=0 storedPrice=0'
         expect 'TEST pkg26 portal frame=220 object=MenWallPosternGate target=Pkg26Fighter active=1 canPassTarget=1 canPassPlan=1'
         expect 'TEST pkg26 portal frame=220 object=MenWallPosternGate target=Pkg26Trebuchet active=1 canPassTarget=0 canPassPlan=0'
         expect 'TEST pkg26 portal frame=220 object=MenWallPosternGate target=Pkg26Fighter active=1 canPassTarget=0 canPassPlan=0'
         expect 'TEST pkg26 gate frame=220 object=Pkg26DoorProxy resolved=Pkg26ProxyDoor wantsOpen=0 canPassTarget=0 canPassPlan=0'
         expect 'TEST pkg26 gate frame=220 object=Pkg26DoorProxy resolved=Pkg26DoorProxy wantsOpen=0 canPassTarget=0 canPassPlan=0'
         expect 'TEST pkg26 wall-upgrade frame=220 object=TDHEreborSecretGate hasModule=1 hasWall=1 waiting=0 storedPrice=0'
-        expect 'TEST pkg26 wall-upgrade frame=220 object=MenWallSegmentSmall hasModule=0 hasWall=0 waiting=0 storedPrice=0'
+        expect 'TEST pkg26 wall-upgrade frame=220 object=Pkg26PlainWall hasModule=0 hasWall=0 waiting=0 storedPrice=0'
     fi
     if covers 230; then
         expect 'TEST pkg26 rebuild frame=230 object=Pkg26RubbleWall dead=1 underConst=0 rebuildFrames=60 waiting=0 rebuilding=0'
@@ -19,7 +19,7 @@ check() {
     if covers 252; then
         expect 'TEST pkg26 castle-member frame=252 object=MenFortressCitadel owner=PlyrCreeps hasModule=1 linked=1 isKeep=1 owned=1 storedPrice=0'
         expect 'TEST pkg26 castle-member frame=252 object=MenFortressExpansionPadSide owner=PlyrCreeps hasModule=1 linked=1 isKeep=0 owned=1 storedPrice=0'
-        expect 'TEST pkg26 castle-member frame=252 object=DolAmrothBattleTower owner=Player_1 hasModule=1 linked=0 isKeep=0 owned=0 storedPrice=0'
+        expect 'TEST pkg26 castle-member frame=252 object=Pkg26StandaloneTower owner=Player_1 hasModule=1 linked=0 isKeep=0 owned=0 storedPrice=0'
     fi
     if covers 255; then
         expect 'TEST pkg26 gate frame=255 object=Pkg26DoorProxy resolved=Pkg26ProxyDoor wantsOpen=1 canPassTarget=1 canPassPlan=1'
@@ -34,7 +34,7 @@ check() {
     fi
     if covers 325; then
         expect 'TEST frame 325: no MenFortressExpansionPadSide 0 of PlyrCreeps'
-        expect 'TEST pkg26 castle-member frame=325 object=DolAmrothBattleTower owner=Player_1 hasModule=1 linked=0 isKeep=0 owned=0 storedPrice=0'
+        expect 'TEST pkg26 castle-member frame=325 object=Pkg26StandaloneTower owner=Player_1 hasModule=1 linked=0 isKeep=0 owned=0 storedPrice=0'
     fi
     if covers 365; then
         expect 'TEST pkg26 rebuild frame=365 object=Pkg26RubbleWall dead=0 underConst=0 rebuildFrames=60 waiting=0 rebuilding=0'
