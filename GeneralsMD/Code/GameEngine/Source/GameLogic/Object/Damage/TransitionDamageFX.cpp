@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
@@ -37,6 +38,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/Module/TransitionDamageFX.h"
+#include "WWMath/wwmath.h"
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -372,7 +374,24 @@ void TransitionDamageFX::onBodyDamageStateChange( const DamageInfo* damageInfo,
 
 					pos = getLocalEffectPos( &modData->m_OCL[ newState ][ i ].locInfo, draw );
 					getObject()->convertBonePosToWorldPos( &pos, nullptr, &pos, nullptr );
-					ObjectCreationList::create( modData->m_OCL[ newState ][ i ].ocl,
+					if (RetailFileLayers::enabled())
+					{
+						Coord3D velocity = damageInfo->impactVelocity;
+						const auto& hit = damageInfo->in;
+						if (velocity.lengthSqr() == 0.0f && hit.m_shockWaveAmount > 0.0f)
+						{
+							const Real length = WWMath::SqrtfOrigin(hit.m_shockWaveVector.lengthSqr());
+							if (length > 0.0f)
+							{
+								velocity = hit.m_shockWaveVector;
+								velocity.scale(hit.m_shockWaveAmount / length);
+							}
+						}
+						ObjectCreationList::createFromImpact(modData->m_OCL[newState][i].ocl, getObject(),
+							&pos, damageSource->getPosition(), velocity);
+					}
+					else
+						ObjectCreationList::create( modData->m_OCL[ newState ][ i ].ocl,
 																			getObject(), &pos, damageSource->getPosition(), INVALID_ANGLE );
 
 				}

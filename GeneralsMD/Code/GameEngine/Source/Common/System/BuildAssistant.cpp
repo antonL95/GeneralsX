@@ -31,6 +31,8 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <set>
+
 #include "Common/BuildAssistant.h"
 #include "Common/GlobalData.h"
 #include "Common/Player.h"
@@ -1510,31 +1512,64 @@ Bool BuildAssistant::isRemovableForConstruction( Object *obj )
 
 }
 
-// ------------------------------------------------------------------------------------------------
-/** Given that we are about to build 'whatToBuild' remove all the objects that are in the
-	* 'footprint' of where the build will take place that can be auto-removed for construction */
-// ------------------------------------------------------------------------------------------------
-void BuildAssistant::clearRemovableForConstruction(const ThingTemplate *whatToBuild, const Coord3D *pos,
-	Real angle, const Object *exclude)
+template<typename Visit>
+static void visitClearanceGeometry(const ThingTemplate& definition, const Coord3D& position, Real angle,
+	const Object* site, const GeometryInfo& legacyShape, const Visit& visit)
 {
-	ObjectIterator *iter =
-			ThePartitionManager->iteratePotentialCollisions( pos,
-																											 whatToBuild->getTemplateGeometryInfo(),
-																											 angle );
-	MemoryPoolObjectHolder hold( iter );
-	for( Object *them = iter->first(); them; them = iter->next() )
+	if (!RetailFileLayers::enabled())
 	{
-
-		// UI feedback objects (always selectable) never get destroyed by construction, but also should never
-		// trip any of the other side effects of placing them in isRemovableForConstruction()
-		if( them != exclude && isRemovableForConstruction( them ) == TRUE && !them->isKindOf( KINDOF_ALWAYS_SELECTABLE ) )
-			TheGameLogic->destroyObject( them );
-
+		visit(position, legacyShape);
+		return;
 	}
-	if (RetailFileLayers::enabled())
-		TheTerrainLogic->clearMapTreesForConstruction(*pos, whatToBuild->getTemplateGeometryInfo(), angle);
-	TheTerrainVisual->removeTreesAndPropsForConstruction(pos, whatToBuild->getTemplateGeometryInfo(), angle);
 
+	std::vector<GeometryUpgrade::CollisionPart> parts;
+	if (site && GeometryUpgrade::collectCollisionParts(*site, parts))
+	{
+		for (const auto& part : parts)
+			visit(part.position, *part.shape);
+		return;
+	}
+
+	const auto& geometry = definition.getRotWKObjectData();
+	const Real cosine = WWMath::CosTrig(angle);
+	const Real sine = WWMath::SinTrig(angle);
+	const auto visitPart = [&](const GeometryInfo& shape, const ThingTemplate::GeometryDetails& details)
+	{
+		if (details.active)
+		{
+			const Coord3D center{
+				position.x + details.offset.x * cosine - details.offset.y * sine,
+				position.y + details.offset.x * sine + details.offset.y * cosine,
+				position.z + details.offset.z
+			};
+			visit(center, shape);
+		}
+	};
+	visitPart(definition.getTemplateGeometryInfo(), geometry.primaryGeometry);
+	for (const auto& part : geometry.additionalGeometries)
+		visitPart(part.shape, part.details);
+}
+
+void BuildAssistant::clearRemovableForConstruction( const ThingTemplate *whatToBuild,
+	const Coord3D *pos, Real angle, const Object* constructionSite )
+{
+	const Bool retail = RetailFileLayers::enabled();
+	visitClearanceGeometry(*whatToBuild, *pos, angle, constructionSite, whatToBuild->getTemplateGeometryInfo(),
+		[&](const Coord3D& center, const GeometryInfo& shape)
+	{
+		ObjectIterator* iter = ThePartitionManager->iteratePotentialCollisions(&center, shape, angle);
+		MemoryPoolObjectHolder hold(iter);
+		for (Object* them = iter->first(); them; them = iter->next())
+		{
+			if (them == constructionSite || (retail && (them->isDestroyed() || them->isKindOf(KINDOF_INERT) || isPartOfConstructionSite(them, constructionSite))))
+				continue;
+			if (isRemovableForConstruction(them) && !them->isKindOf(KINDOF_ALWAYS_SELECTABLE))
+				TheGameLogic->destroyObject(them);
+		}
+		if (retail)
+			TheTerrainLogic->clearMapTreesForConstruction(center, shape, angle);
+		TheTerrainVisual->removeTreesAndPropsForConstruction(&center, shape, angle);
+	});
 }
 
 void BuildAssistant::clearConstructionSite( const Object *site )
@@ -1542,7 +1577,7 @@ void BuildAssistant::clearConstructionSite( const Object *site )
 	if( site == nullptr || site->getControllingPlayer() == nullptr )
 		return;
 
-	clearRemovableForConstruction( site->getTemplate(), site->getPosition(), site->getOrientation() );
+	clearRemovableForConstruction(site->getTemplate(), site->getPosition(), site->getOrientation(), site);
 	moveObjectsForConstruction( site->getTemplate(), site->getPosition(), site->getOrientation(),
 															site->getControllingPlayer(), site );
 }
@@ -1563,17 +1598,28 @@ Bool BuildAssistant::moveObjectsForConstruction( const ThingTemplate *whatToBuil
 	if (whatToBuild->getTemplateGeometryInfo().getGeomType()==GEOMETRY_BOX) {
 		gi = whatToBuild->getTemplateGeometryInfo();
 	}
-	ObjectIterator *iter =
-			ThePartitionManager->iteratePotentialCollisions( pos,
-																											 gi,
-																											 angle );
 	Bool anyUnmovables = false;
-	MemoryPoolObjectHolder hold( iter );
+	const Bool retail = RetailFileLayers::enabled();
+	Real radius = retail ? 0.0f :
+		WWMath::SqrtOrigin(WWMath::PowOrigin(gi.getMajorRadius(), 2) + WWMath::PowOrigin(gi.getMinorRadius(), 2)) * 1.4f;
+	std::vector<Object*> obstacles;
+	std::set<ObjectID> seen;
+	visitClearanceGeometry(*whatToBuild, *pos, angle, constructionSite, gi, [&](const Coord3D& center, const GeometryInfo& shape)
+	{
+		if (retail)
+		{
+			const Real dx = center.x - pos->x;
+			const Real dy = center.y - pos->y;
+			radius = std::max(radius, WWMath::SqrtfOrigin(dx * dx + dy * dy) + shape.getBoundingCircleRadius());
+		}
+		ObjectIterator* iter = ThePartitionManager->iteratePotentialCollisions(&center, shape, angle);
+		MemoryPoolObjectHolder hold(iter);
+		for (Object* them = iter->first(); them; them = iter->next())
+			if (!retail || seen.insert(them->getID()).second)
+				obstacles.push_back(them);
+	});
 
-	Real radius = WWMath::SqrtOrigin(WWMath::PowOrigin(gi.getMajorRadius(), 2) + WWMath::PowOrigin(gi.getMinorRadius(), 2));
-	radius *= 1.4f;	// Fudge the distance,
-
-	for( Object *them = iter->first(); them; them = iter->next() )
+	for (Object* them : obstacles)
 	{
 		//ignore land mines, cluster mines and demo traps, since you can build on them
 		// doing so will damage them during construction, by the way
@@ -1604,7 +1650,9 @@ Bool BuildAssistant::moveObjectsForConstruction( const ThingTemplate *whatToBuil
 				{
 					// Vary the distance to move between one half the diameter of the building (roughly)
 					// and 1.5 times the diameter of the building
-					Real variedRadius = GameLogicRandomValueReal(0.5, 1.5) * radius;
+					Real variedRadius = retail
+						? GameLogicRandomValueReal(1.0f, 1.5f) * radius + them->getGeometryInfo().getBoundingCircleRadius()
+						: GameLogicRandomValueReal(0.5f, 1.5f) * radius;
 
 					Coord3D destPos;
 					Real dir = GameLogicRandomValueReal(-PI, PI);

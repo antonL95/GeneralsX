@@ -563,7 +563,10 @@ const Object* WeaponTemplate::getNuggetAttacker(const Object* source)
 
 void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus, Bool contactHit) const
 {
-	const Object* attacker = getNuggetAttacker(TheGameLogic->findObjectByID(sourceID));
+	const Object* impactSource = TheGameLogic->findObjectByID(sourceID);
+	const Object* attacker = getNuggetAttacker(impactSource);
+	const PhysicsBehavior* physics = impactSource ? impactSource->getPhysics() : nullptr;
+	const Coord3D velocity = physics ? *physics->getVelocity() : Coord3D{};
 	const ObjectID nuggetSourceID = attacker ? attacker->getID() : sourceID;
 	if (RetailTestCommands::tracesCombat())
 		std::fprintf(stderr, "TEST impact frame=%u weapon=%s source=%u victim=%u pos=%.1f,%.1f bonus=%.2f,%.2f\n", TheGameLogic->getFrame(),
@@ -582,7 +585,7 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 		if (!nugget.isImpactNugget() || !nugget.isEnabledFor(attacker))
 			continue;
 		if (nugget.m_delayFrames == 0)
-			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit);
+			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit, &velocity);
 		else if (TheWeaponStore)
 			TheWeaponStore->setDelayedDamage(this, pos, TheGameLogic->getFrame() + nugget.m_delayFrames, nuggetSourceID, victimID,
 				bonus, static_cast<Int>(index), FALSE, contactHit);
@@ -590,7 +593,7 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 }
 
 void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
-	Bool dotTick, Bool contactHit) const
+	Bool dotTick, Bool contactHit, const Coord3D* impactVelocity) const
 {
 	const WeaponNugget& nugget = m_nuggets[nuggetIndex];
 	Object* source = TheGameLogic->findObjectByID(sourceID);
@@ -714,6 +717,10 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damageInfo.in.m_sourceID = sourceID;
 		damageInfo.in.m_sourcePlayerMask = source && source->getControllingPlayer() ? source->getControllingPlayer()->getPlayerMask() : 0;
 		damageInfo.in.m_amount = amount;
+		if (impactVelocity)
+			damageInfo.impactVelocity = *impactVelocity;
+		else if (source && source->getPhysics())
+			damageInfo.impactVelocity = *source->getPhysics()->getVelocity();
 		const Real healthBefore = victim->getBodyModule() ? victim->getBodyModule()->getHealth() : 0.0f;
 		HordeContain::applyWeaponDamage(victim, damageInfo, contactHit);
 

@@ -199,7 +199,7 @@ public:
 
 	void clearConstructionSite( const Object *site );
 	void clearRemovableForConstruction(const ThingTemplate *whatToBuild, const Coord3D *pos,
-		Real angle, const Object *exclude = nullptr);
+		Real angle, const Object* constructionSite = nullptr);
 
 protected:
 

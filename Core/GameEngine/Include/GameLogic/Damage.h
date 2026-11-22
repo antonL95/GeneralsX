@@ -425,6 +425,7 @@ public:
 
 	DamageInfoInput		in;					///< inputs for the damage info
 	DamageInfoOutput	out;				///< results for the damage occurrence
+	Coord3D impactVelocity{};
 
 protected:
 

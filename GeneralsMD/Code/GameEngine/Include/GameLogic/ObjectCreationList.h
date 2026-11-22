@@ -82,6 +82,8 @@ public:
 		Bool useOwner determines whether we are creating the the master object or not (for deliverpayload)
 	*/
 	virtual Object* create( const Object* primaryObj, const Coord3D *primary, const Coord3D* secondary, Real angle, UnsignedInt lifetimeFrames = 0 ) const = 0;
+	virtual Object* createFromImpact(const Object* source, const Coord3D* position, const Coord3D* attackerPosition,
+		const Coord3D& velocity) const;
 
 	/**
 		the object-based version... by default, just call the location-based implementation.
@@ -160,6 +162,9 @@ public:
 			return ocl->createInternal( primary, secondary, lifetimeFrames );
 		return nullptr;
 	}
+
+	static void createFromImpact(const ObjectCreationList* ocl, const Object* source, const Coord3D* position,
+		const Coord3D* attackerPosition, const Coord3D& velocity);
 
 protected:
 

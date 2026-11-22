@@ -522,7 +522,7 @@ protected:
 	void orderNuggetSlaves(const Object* source, Object* victim, const Coord3D* position) const;
 	void orderNuggetHorde(const Object* source, Object* victim, const Coord3D* position) const;
 	void dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
-		Bool dotTick, Bool contactHit) const;
+		Bool dotTick, Bool contactHit, const Coord3D* impactVelocity = nullptr) const;
 	void launchNuggetProjectiles(const Object* sourceObj, WeaponSlotType wslot, Int specificBarrelToUse, Object* victimObj,
 		const Coord3D& destination, Weapon* firingWeapon, ObjectID* projectileID) const;
 	Real estimateNuggetDamage(const Object* sourceObj, const Object* victimObj, const WeaponBonus& bonus, Int depth) const;

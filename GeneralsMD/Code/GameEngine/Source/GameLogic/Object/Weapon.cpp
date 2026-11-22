@@ -1548,6 +1548,8 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 	DamageType damageType = getDamageType();
 	DeathType deathType = getDeathType();
 	ObjectStatusTypes damageStatusType = getDamageStatusType();
+	const PhysicsBehavior* impactPhysics = RetailFileLayers::enabled() && source ? source->getPhysics() : nullptr;
+	const Coord3D impactVelocity = impactPhysics ? *impactPhysics->getVelocity() : Coord3D{};
 	if (getProjectileTemplate() == nullptr || isProjectileDetonation)
 	{
 		SimpleObjectIterator *iter;
@@ -1679,6 +1681,8 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 				//	damageInfo.in.m_amount = __max( damageInfo.in.m_amount, curVictimHealth );
 				//}
 			}
+
+			damageInfo.impactVelocity = impactVelocity;
 
 			// if the damage-dealer is a projectile, designate the damage as done by its launcher, not the projectile.
 			// this is much more useful for the AI...

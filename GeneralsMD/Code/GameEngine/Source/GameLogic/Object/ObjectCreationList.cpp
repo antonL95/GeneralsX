@@ -114,6 +114,12 @@ Object* ObjectCreationNugget::create( const Object* primary, const Object* secon
 	return create( primary, primary ? primary->getPosition() : nullptr, secondary ? secondary->getPosition() : nullptr, INVALID_ANGLE, lifetimeFrames );
 }
 
+Object* ObjectCreationNugget::createFromImpact(const Object* source, const Coord3D* position,
+	const Coord3D* attackerPosition, const Coord3D&) const
+{
+	return create(source, position, attackerPosition, INVALID_ANGLE);
+}
+
 //-------------------------------------------------------------------------------------------------
 //void ObjectCreationNugget::create( const Object* primaryObj, const Coord3D *primary, const Coord3D *secondary, Real angle, UnsignedInt lifetimeFrames ) const
 //{
@@ -823,6 +829,19 @@ public:
 
 	virtual Object* create(const Object* primaryObj, const Coord3D *primary, const Coord3D* secondary, Real angle, UnsignedInt lifetimeFrames = 0 ) const override
 	{
+		return createAt(primaryObj, primary, secondary, angle, lifetimeFrames, nullptr);
+	}
+
+	Object* createFromImpact(const Object* source, const Coord3D* position, const Coord3D* attackerPosition,
+		const Coord3D& velocity) const override
+	{
+		return createAt(source, position, attackerPosition, INVALID_ANGLE, 0, &velocity);
+	}
+
+private:
+	Object* createAt(const Object* primaryObj, const Coord3D* primary, const Coord3D* secondary, Real angle,
+		UnsignedInt lifetimeFrames, const Coord3D* impactVelocity) const
+	{
 		if (primary)
 		{
 			const Matrix3D *xfrm = nullptr;
@@ -838,7 +857,7 @@ public:
 				if (m_orientInPrimaryDirection)
 					angle = primaryObj->getOrientation() + m_orientationOffset;
 			}
-			return reallyCreate( primary, xfrm, angle, primaryObj, lifetimeFrames, secondary );
+			return reallyCreate(primary, xfrm, angle, primaryObj, lifetimeFrames, secondary, impactVelocity);
 		}
 		else
 		{
@@ -847,6 +866,7 @@ public:
 		return nullptr;
 	}
 
+public:
 	static const FieldParse* getCommonFieldParse()
 	{
 		static const FieldParse commonFieldParse[] =
@@ -992,7 +1012,8 @@ protected:
 		Real orientation,
 		const Object *sourceObj,
 		UnsignedInt lifetimeFrames,
-		Int spawnIndex = 0
+		Int spawnIndex,
+		const Coord3D* impactVelocity
 	) const
 	{
 		obj->setProducer(sourceObj);
@@ -1141,14 +1162,14 @@ protected:
 			if (PhysicsBehavior* physics = obj->getPhysics())
 			{
 				Coord3D impulse = {0.0f, 0.0f, 0.0f};
-				if (sourceObj && sourceObj->getPhysics() && BitIsSet(m_disposition, FORWARD_IMPACT | REVERSE_IMPACT))
+				if (BitIsSet(m_disposition, FORWARD_IMPACT | REVERSE_IMPACT))
 				{
-					const AIUpdateInterface* ai = sourceObj->getAIUpdateInterface();
-					const Real speed = ai ? ai->getCurLocomotorSpeed() : 0.0f;
-					if (speed > 0.0f)
+					const PhysicsBehavior* sourcePhysics = sourceObj ? sourceObj->getPhysics() : nullptr;
+					const Coord3D* velocity = impactVelocity ? impactVelocity : (sourcePhysics ? sourcePhysics->getVelocity() : nullptr);
+					if (velocity)
 					{
-						sourceObj->getUnitDirectionVector3D(impulse);
-						impulse.scale(speed * m_velocityScale *
+						impulse = *velocity;
+						impulse.scale(m_velocityScale *
 							(static_cast<Int>(BitIsSet(m_disposition, FORWARD_IMPACT)) -
 							 static_cast<Int>(BitIsSet(m_disposition, REVERSE_IMPACT))));
 					}
@@ -1400,14 +1421,8 @@ protected:
 
 
 
-		if (retailObject)
-		{
-			if (m_useJustBuiltFlag)
-				obj->setPowerModelCondition(MODELCONDITION_JUST_BUILT, std::max<UnsignedInt>(1, m_justBuiltDuration));
-			if (m_startingBusyTime > 0)
-				if (AIUpdateInterface *ai = obj->getAI())
-					ai->setRetailSpawnBusyTime(m_startingBusyTime);
-		}
+		if (retailObject && m_useJustBuiltFlag)
+			obj->setPowerModelCondition(MODELCONDITION_JUST_BUILT, std::max<UnsignedInt>(1, m_justBuiltDuration));
 
     if ( m_diesOnBadLand && obj )
     {
@@ -1458,7 +1473,7 @@ protected:
 	}
 
 	Object* reallyCreate(const Coord3D *pos, const Matrix3D *mtx, Real orientation, const Object *sourceObj,
-		UnsignedInt lifetimeFrames, const Coord3D* secondary = nullptr) const
+		UnsignedInt lifetimeFrames, const Coord3D* secondary = nullptr, const Coord3D* impactVelocity = nullptr) const
 	{
 		static const ThingTemplate* debrisTemplate = TheThingFactory->findTemplate("GenericDebris");
 
@@ -1489,7 +1504,9 @@ protected:
 				if (point->getName().startsWith(m_waypointSpawnPoints))
 					spawnPoints.push_back(point);
 		}
-		std::vector<Object*> orderedObjects;
+		const Bool hasSpawnOrders = retailObject && secondary && (m_issueMoveAfterCreation || m_orientInSecondaryDirection);
+		const Bool hasSpawnBusyTime = retailObject && m_startingBusyTime > 0;
+		std::vector<Object*> pendingObjects;
 
 		// Object type debris might need this information to process visual UpgradeModules.
 		Team *debrisOwner = ThePlayerList->getNeutralPlayer() ? ThePlayerList->getNeutralPlayer()->getDefaultTeam() : nullptr;
@@ -1594,10 +1611,12 @@ protected:
 #endif
 				}
 			}
-			doStuffToObj(debris, m_names[pick], &spawnPosition, mtx, orientation, sourceObj, lifetimeFrames, nn);
+			doStuffToObj(debris, m_names[pick], &spawnPosition, mtx, orientation, sourceObj, lifetimeFrames, nn, impactVelocity);
 
-			if (retailObject && secondary && (m_issueMoveAfterCreation || m_orientInSecondaryDirection))
-				orderedObjects.push_back(debris);
+			if (hasSpawnOrders || hasSpawnBusyTime)
+				pendingObjects.push_back(debris);
+			if (!hasSpawnOrders && retailObject && m_orientInSecondaryDirection && mtx && sourceObj)
+				debris->setOrientation(sourceObj->getOrientation() + m_orientationOffset);
 
 			if (m_fadeIn)
 			{
@@ -1622,25 +1641,35 @@ protected:
 #endif
 
 		if (container)
-			doStuffToObj( container, AsciiString::TheEmptyString, pos, mtx, orientation, sourceObj, lifetimeFrames );
-
-		for (Object* obj : orderedObjects)
 		{
-			if (obj->isDestroyed() || obj->isEffectivelyDead() || obj->getContainedBy())
+			doStuffToObj(container, AsciiString::TheEmptyString, pos, mtx, orientation, sourceObj, lifetimeFrames, 0, impactVelocity);
+			if (hasSpawnBusyTime)
+				pendingObjects.push_back(container);
+		}
+
+		for (Object* obj : pendingObjects)
+		{
+			if (obj->isDestroyed() || obj->isEffectivelyDead())
 				continue;
-			if (m_issueMoveAfterCreation)
+			if (hasSpawnOrders && obj != container && !obj->getContainedBy())
 			{
-				if (AIUpdateInterface* ai = obj->getAIUpdateInterface())
-					ai->aiMoveToPosition(secondary, CMD_FROM_PLAYER);
+				if (m_issueMoveAfterCreation)
+				{
+					if (AIUpdateInterface* ai = obj->getAIUpdateInterface())
+						ai->aiMoveToPosition(secondary, CMD_FROM_PLAYER);
+				}
+				if (m_orientInSecondaryDirection)
+				{
+					const Coord3D* spawnedPosition = obj->getPosition();
+					const Real dx = secondary->x - spawnedPosition->x;
+					const Real dy = secondary->y - spawnedPosition->y;
+					const Real facing = dx != 0.0f || dy != 0.0f ? WWMath::Atan2Origin(dy, dx) : orientation;
+					obj->setOrientation(facing + m_orientationOffset);
+				}
 			}
-			if (m_orientInSecondaryDirection)
-			{
-				const Coord3D* spawnedPosition = obj->getPosition();
-				const Real dx = secondary->x - spawnedPosition->x;
-				const Real dy = secondary->y - spawnedPosition->y;
-				const Real facing = dx != 0.0f || dy != 0.0f ? WWMath::Atan2Origin(dy, dx) : orientation;
-				obj->setOrientation(facing + m_orientationOffset);
-			}
+			if (hasSpawnBusyTime)
+				if (AIUpdateInterface* ai = obj->getAI())
+					ai->setRetailSpawnBusyTime(m_startingBusyTime);
 		}
 
 		return firstObject;
@@ -1794,6 +1823,14 @@ Object* ObjectCreationList::createInternal( const Object* primaryObj, const Coor
 }
 
 //-------------------------------------------------------------------------------------------------
+void ObjectCreationList::createFromImpact(const ObjectCreationList* ocl, const Object* source,
+	const Coord3D* position, const Coord3D* attackerPosition, const Coord3D& velocity)
+{
+	if (ocl)
+		for (const ObjectCreationNugget* nugget : ocl->m_nuggets)
+			nugget->createFromImpact(source, position, attackerPosition, velocity);
+}
+
 Object* ObjectCreationList::createInternal( const Object* primary, const Object* secondary, UnsignedInt lifetimeFrames ) const
 {
 	DEBUG_ASSERTCRASH(primary != nullptr, ("You should always call OCLs with a non-null primary Obj, even for positional calls, to get team ownership right"));
