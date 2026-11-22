@@ -55,6 +55,7 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <vector>
 
 #include "Common/LocalFile.h"
 #include "Common/RAMFile.h"
@@ -421,13 +422,26 @@ Int LocalFile::write( const void *buffer, Int bytes )
 Int LocalFile::writeFormat( const Char* format, ... )
 {
 	char buffer[1024];
-
 	va_list args;
 	va_start(args, format);
-	Int length = vsnprintf(buffer, sizeof(buffer), format, args);
+	va_list measure;
+	va_copy(measure, args);
+	const Int length = vsnprintf(buffer, sizeof(buffer), format, measure);
+	va_end(measure);
+	if (length < 0)
+	{
+		va_end(args);
+		return -1;
+	}
+	if (static_cast<size_t>(length) < sizeof(buffer))
+	{
+		va_end(args);
+		return write(buffer, length);
+	}
+	std::vector<char> formatted(static_cast<size_t>(length) + 1);
+	const Int actualLength = vsnprintf(formatted.data(), formatted.size(), format, args);
 	va_end(args);
-
-	return write( buffer, length );
+	return actualLength == length ? write(formatted.data(), length) : -1;
 }
 
 //=================================================================

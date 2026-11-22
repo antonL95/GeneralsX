@@ -17,6 +17,7 @@
 #include "GameLogic/CreateAHeroRules.h"
 #include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/GameMode.h"
 #include "GameLogic/Object.h"
 #include "GameNetwork/GameInfo.h"
 #include "GameNetwork/LANAPICallbacks.h"
@@ -101,33 +102,32 @@ bool checkPackage18LobbyDetails(const AsciiString& selection)
 
 static Bool checkReplaySetup(const AsciiString& setup)
 {
-	const AsciiString directory = RecorderClass::getReplayDir();
-	TheFileSystem->createDirectory(directory);
-	AsciiString path = directory;
-	path.concat("pkg18-setup.rep");
-	File* file = TheFileSystem->openFile(path.str(), File::WRITE | File::BINARY);
-	if (!file)
-		return FALSE;
-	const uint32_t timesAndFrames[3] = {};
-	const Bool flags[MAX_SLOTS + 2] = {};
-	const uint16_t name[] = { 'C', 'H', 0 };
-	const SYSTEMTIME time = {};
-	const uint16_t versionText[2] = {};
-	const uint32_t versionNumbers[3] = {};
-	const Bool written = file->write("GENREP", 6) == 6 &&
-		file->write(timesAndFrames, sizeof(timesAndFrames)) == sizeof(timesAndFrames) &&
-		file->write(flags, sizeof(flags)) == sizeof(flags) &&
-		file->write(name, sizeof(name)) == sizeof(name) &&
-		file->write(&time, sizeof(time)) == sizeof(time) &&
-		file->write(versionText, sizeof(versionText)) == sizeof(versionText) &&
-		file->write(versionNumbers, sizeof(versionNumbers)) == sizeof(versionNumbers) &&
-		file->write(setup.str(), setup.getLength() + 1) == setup.getLength() + 1 &&
-		file->write("7", 2) == 2;
-	file->close();
-	RecorderClass recorder;
-	RecorderClass::ReplayHeader header;
-	return written && recorder.readReplayHeader(header, path, FALSE) &&
-		header.gameOptions == setup && header.localPlayerIndex == 7;
+	class SetupRecorder : public RecorderClass
+	{
+	public:
+		Bool check(const AsciiString& options)
+		{
+			AsciiString path = getReplayDir();
+			TheFileSystem->createDirectory(path);
+			path.concat("pkg18-setup.rep");
+			m_file = TheFileSystem->openFile(path.str(), File::WRITE | File::BINARY);
+			if (!m_file)
+				return FALSE;
+			const AsciiString oversized(std::string(kRetailLanSetupBudget + 1, 'x').c_str());
+			const Bool written = !writeReplayHeader(oversized, 7, DIFFICULTY_NORMAL, GAME_LAN, 0, 0) &&
+				m_file->size() == 0 && writeReplayHeader(options, 7, DIFFICULTY_NORMAL, GAME_LAN, 0, 0);
+			reset();
+			ReplayHeader header;
+			if (!written || !readReplayHeader(header, path, TRUE))
+				return FALSE;
+			Bool allHeroes = TRUE;
+			for (Int i = 0; i < MAX_SLOTS; ++i)
+				allHeroes &= getGameInfo()->getConstSlot(i)->getCreateAHeroConfig().isNotEmpty();
+			reset();
+			return allHeroes && header.gameOptions == options && header.localPlayerIndex == 7;
+		}
+	} recorder;
+	return recorder.check(setup);
 }
 
 bool RetailTestCommands::configurePackage18Match(GameInfo& game)

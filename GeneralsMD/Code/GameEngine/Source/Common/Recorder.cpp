@@ -531,56 +531,7 @@ void RecorderClass::startRecording(GameDifficulty diff, GameMode originalGameMod
 		DEBUG_ASSERTCRASH(m_file != nullptr, ("Failed to create replay file"));
 		return;
 	}
-	// TheSuperHackers @info the null terminator needs to be ignored to maintain retail replay file layout
-	m_file->writeFormat("%s", s_genrep);
 
-	//
-	// save space for stats to be filled in.
-	//
-	// **** if this changes, change the LAN code above ****
-	//
-	replay_time_t time = 0;
-	m_file->write(&time, sizeof(time));	// reserve space for start time
-	m_file->write(&time, sizeof(time));	// reserve space for end time
-
-	UnsignedInt frames = 0;
-	m_file->write(&frames, sizeof(frames));	// reserve space for duration in frames
-
-	Bool flag = FALSE;
-	m_file->write(&flag, sizeof(flag));	// reserve space for flag (true if we desync)
-	m_file->write(&flag, sizeof(flag));	// reserve space for flag (true if we quit early)
-	for (Int i=0; i<MAX_SLOTS; ++i)
-	{
-		m_file->write(&flag, sizeof(flag));	// reserve space for flag (true if player i disconnects)
-	}
-
-	// Print out the name of the replay.
-	UnicodeString replayName;
-	replayName = TheGameText->fetch("GUI:LastReplay");
-	writeReplayUnicodeString(replayName);
-
-	// Date and Time
-	SYSTEMTIME systemTime;
-	GetLocalTime( &systemTime );
-	m_file->write(&systemTime, sizeof(systemTime));
-
-	// write out version info
-	UnicodeString versionString = TheVersion->getUnicodeVersion();
-	UnicodeString versionTimeString = TheVersion->getUnicodeBuildTime();
-	UnsignedInt versionNumber = TheVersion->getVersionNumber();
-	writeReplayUnicodeString(versionString);
-	writeReplayUnicodeString(versionTimeString);
-	m_file->write(&versionNumber, sizeof(versionNumber));
-	m_file->write(&(TheGlobalData->m_exeCRC), sizeof(TheGlobalData->m_exeCRC));
-	m_file->write(&(TheGlobalData->m_iniCRC), sizeof(TheGlobalData->m_iniCRC));
-
-	// Number of players
-	/*
-	Int numPlayers = ThePlayerList->getPlayerCount();
-	fwrite(&numPlayers, sizeof(numPlayers), 1, m_file);
-	*/
-
-	// Write the slot list.
 	AsciiString theSlotList;
 	Int localIndex = -1;
 	if (TheNetwork)
@@ -622,59 +573,44 @@ void RecorderClass::startRecording(GameDifficulty diff, GameMode originalGameMod
 		  theSlotList = GameInfoToAsciiString(&m_gameInfo, RetailFileLayers::enabled() ? replaySetupLimit() : 0);
     }
 	}
-	logGameStart(theSlotList);
-	DEBUG_LOG(("RecorderClass::startRecording - theSlotList = %s", theSlotList.str()));
-
-	// write slot list (starting spots, color, alliances, etc
-	m_file->writeFormat("%s", theSlotList.str());
-	m_file->writeChar("\0");
-
-	m_file->writeFormat("%d", localIndex);
-	m_file->writeChar("\0");
-
-	/*
-	/// @todo fix this to use starting spots and player alliances when those are put in the game.
-	for (Int i = 0; i < numPlayers; ++i) {
-		Player *player = ThePlayerList->getNthPlayer(i);
-		if (player == nullptr) {
-			continue;
-		}
-		UnicodeString name = player->getPlayerDisplayName();
-		fwprintf(m_file, L"%s", name.str());
-		fputwc(0, m_file);
-		UnicodeString faction = player->getFaction()->getFactionDisplayName();
-		fwprintf(m_file, L"%s", faction.str());
-		fputwc(0, m_file);
-		Int color = player->getColor()->getAsInt();
-		fwrite(&color, sizeof(color), 1, m_file);
-		Int team = 0;
-		Int startingSpot = 0;
-		fwrite(&startingSpot, sizeof(Int), 1, m_file);
-		fwrite(&team, sizeof(Int), 1, m_file);
+	if (!writeReplayHeader(theSlotList, localIndex, diff, originalGameMode, rankPoints, maxFPS))
+	{
+		reset();
+		return;
 	}
-	*/
+	logGameStart(theSlotList);
+}
 
-	// Write the game difficulty.
-	m_file->write(&diff, sizeof(diff));
+Bool RecorderClass::writeReplayHeader(const AsciiString& setup, Int localIndex, GameDifficulty difficulty,
+	GameMode gameMode, Int rankPoints, Int maxFPS)
+{
+	const Int setupLength = setup.getLength();
+	if (!m_file || setupLength <= 0 || setupLength > replaySetupLimit() || localIndex < -1 || localIndex >= MAX_SLOTS)
+		return FALSE;
 
-	// Write original game mode
-	m_file->write(&originalGameMode, sizeof(originalGameMode));
+	const replay_time_t time = 0;
+	const UnsignedInt frames = 0;
+	const Bool flags[MAX_SLOTS + 2] = {};
+	SYSTEMTIME systemTime;
+	GetLocalTime(&systemTime);
+	const UnsignedInt version = TheVersion->getVersionNumber();
+	AsciiString localSlot;
+	localSlot.format("%d", localIndex);
 
-	// Write rank points to add at game start
-	m_file->write(&rankPoints, sizeof(rankPoints));
-
-	// Write maxFPS chosen
-	m_file->write(&maxFPS, sizeof(maxFPS));
-
-	DEBUG_LOG(("RecorderClass::startRecording() - diff=%d, mode=%d, FPS=%d", diff, (Int)originalGameMode, maxFPS));
-
-	/*
-	// Write the map name.
-	fprintf(m_file, "%s", (TheGlobalData->m_mapName).str());
-	fputc(0, m_file);
-	*/
-
-	/// @todo Need to write game options when there are some to be written.
+	const auto write = [this](const void* data, Int bytes) { return m_file->write(data, bytes) == bytes; };
+	return write(s_genrep, sizeof(s_genrep) - 1) &&
+		write(&time, sizeof(time)) && write(&time, sizeof(time)) &&
+		write(&frames, sizeof(frames)) && write(flags, sizeof(flags)) &&
+		writeReplayUnicodeString(TheGameText->fetch("GUI:LastReplay")) &&
+		write(&systemTime, sizeof(systemTime)) &&
+		writeReplayUnicodeString(TheVersion->getUnicodeVersion()) &&
+		writeReplayUnicodeString(TheVersion->getUnicodeBuildTime()) &&
+		write(&version, sizeof(version)) &&
+		write(&TheGlobalData->m_exeCRC, sizeof(TheGlobalData->m_exeCRC)) &&
+		write(&TheGlobalData->m_iniCRC, sizeof(TheGlobalData->m_iniCRC)) &&
+		write(setup.str(), setupLength + 1) && write(localSlot.str(), localSlot.getLength() + 1) &&
+		write(&difficulty, sizeof(difficulty)) && write(&gameMode, sizeof(gameMode)) &&
+		write(&rankPoints, sizeof(rankPoints)) && write(&maxFPS, sizeof(maxFPS));
 }
 
 /**
@@ -1407,19 +1343,20 @@ Int RecorderClass::readReplayWideChar()
 	return static_cast<Int>(value);
 }
 
-void RecorderClass::writeReplayUnicodeString(const UnicodeString& value)
+Bool RecorderClass::writeReplayUnicodeString(const UnicodeString& value)
 {
 	const WideChar* character = value.str();
 	while (*character != L'\0') {
-		writeReplayWideChar(*character++);
+		if (!writeReplayWideChar(*character++))
+			return FALSE;
 	}
-	writeReplayWideChar(L'\0');
+	return writeReplayWideChar(0);
 }
 
-void RecorderClass::writeReplayWideChar(WideChar value)
+Bool RecorderClass::writeReplayWideChar(WideChar value)
 {
 	const replay_wide_char_t character = static_cast<replay_wide_char_t>(value);
-	m_file->write(&character, sizeof(character));
+	return m_file->write(&character, sizeof(character)) == sizeof(character);
 }
 
 /**

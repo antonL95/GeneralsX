@@ -171,8 +171,10 @@ protected:
 	Bool readAsciiString(AsciiString& value, Int limit);
 	UnicodeString readUnicodeString();								///< Read the next string from m_file using unicode characters.
 	Int readReplayWideChar();											///< Read a replay wide character using the detected on-disk width.
-	void writeReplayUnicodeString(const UnicodeString& value);
-	void writeReplayWideChar(WideChar value);
+	Bool writeReplayHeader(const AsciiString& setup, Int localIndex, GameDifficulty difficulty,
+		GameMode gameMode, Int rankPoints, Int maxFPS);
+	Bool writeReplayUnicodeString(const UnicodeString& value);
+	Bool writeReplayWideChar(WideChar value);
 	void readNextFrame();															///< Read the next frame number to execute a command on.
 	void appendNextCommand();													///< Read the next GameMessage and append it to TheCommandList.
 	void writeArgument(GameMessageArgumentDataType type, const GameMessageArgumentType arg);

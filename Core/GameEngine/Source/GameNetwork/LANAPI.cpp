@@ -954,11 +954,12 @@ void LANAPI::RequestGameStart()
 				slot->setCreateAHeroConfig(CreateAHeroSystem::validateSetupSelection(slot->getCreateAHeroConfig().str(), *slot));
 		}
 		const AsciiString options = GameInfoToAsciiString(m_currentGame, kRetailLanSetupBudget);
-		if (options.isEmpty())
+		const Int length = options.getLength();
+		if (length <= 0 || length > kRetailLanSetupBudget)
 			return;
 		RetailLanGameStart packet{};
 		packet.type = LANMessage::MSG_RETAIL_GAME_START;
-		memcpy(packet.options, options.str(), options.getLength());
+		memcpy(packet.options, options.str(), length);
 		for (Int i = 0; i < MAX_SLOTS; ++i)
 		{
 			const GameSlot* slot = m_currentGame->getConstSlot(i);
@@ -1007,7 +1008,7 @@ void LANAPI::RequestGameOptions( AsciiString gameOptions, Bool isPublic, Unsigne
 {
 	DEBUG_ASSERTCRASH(gameOptions.getLength() <= m_lanMaxOptionsLength, ("Game options string is too long!"));
 
-	if (!m_currentGame || gameOptions.isEmpty())
+	if (!m_currentGame || gameOptions.isEmpty() || gameOptions.getLength() > m_lanMaxOptionsLength)
 	{
 		return;
 	}
