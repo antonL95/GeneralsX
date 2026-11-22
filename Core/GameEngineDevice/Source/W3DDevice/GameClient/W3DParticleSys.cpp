@@ -75,6 +75,7 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 	{
 		if (!system || !system->isUsingDrawables() || system->getParticleTypeName().isEmpty())
 			continue;
+		const bool opacityOnly = system->getTemplate() && system->getTemplate()->usesModelOpacityOnly();
 		std::string modelName(system->getParticleTypeName().str());
 		if (modelName.size() > 4 && stricmp(modelName.c_str() + modelName.size() - 4, ".w3d") == 0)
 			modelName.resize(modelName.size() - 4);
@@ -101,9 +102,13 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 			transform.Set_Translation(Vector3(position->x, position->y, position->z));
 			model->Set_Transform(transform);
 			model->Set_Animation_Opacity(opacity);
-			const auto* color = particle->getColor();
-			const auto channel = [](Real value) { return static_cast<unsigned>(std::clamp(value, 0.0f, 1.0f) * 255.0f); };
-			const unsigned tint = 0xFF000000 | channel(color->red) << 16 | channel(color->green) << 8 | channel(color->blue);
+			unsigned tint = 0xFFFFFFFF;
+			if (!opacityOnly)
+			{
+				const auto* color = particle->getColor();
+				const auto channel = [](Real value) { return static_cast<unsigned>(std::clamp(value, 0.0f, 1.0f) * 255.0f); };
+				tint = 0xFF000000 | channel(color->red) << 16 | channel(color->green) << 8 | channel(color->blue);
+			}
 			setModelParticleTint(*model, tint, system->getShaderType() == ParticleSystemInfo::ADDITIVE);
 			model->Render(info);
 			drawn.push_back(model);

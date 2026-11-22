@@ -136,6 +136,7 @@ void ParticleSystemTemplate::resetForFXDefinition()
 	m_slaveTemplate = nullptr;
 	m_isRenderable = TRUE;
 	m_modelHasAlpha = FALSE;
+	m_modelOpacityOnly = FALSE;
 	m_isGpuParticle = FALSE;
 	m_hasGpuDraw = FALSE;
 	m_gpuFramesPerRow = 1;
@@ -245,10 +246,13 @@ void ParticleSystemTemplate::parseFXPriority( INI* ini, void *, void *store, con
 
 void ParticleSystemTemplate::parseFXShader( INI* ini, void *instance, void *store, const void* )
 {
-	const FXNamedValue *value = findNamedValue(fxShaders, ini->getNextToken());
+	const char *token = ini->getNextToken();
+	const FXNamedValue *value = findNamedValue(fxShaders, token);
 	*static_cast<ParticleShaderType *>(store) = static_cast<ParticleShaderType>(value->value);
+	auto *self = static_cast<ParticleSystemTemplate *>(instance);
+	self->m_modelOpacityOnly = stricmp(token, "W3D_ALPHA") == 0;
 	if (!value->renderable)
-		static_cast<ParticleSystemTemplate *>(instance)->m_isRenderable = FALSE;
+		self->m_isRenderable = FALSE;
 }
 
 void ParticleSystemTemplate::parseFXType( INI* ini, void *instance, void *store, const void* )

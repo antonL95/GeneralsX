@@ -62,6 +62,8 @@ Utilities for large-scale code refactoring and fixes:
 - After generating fresh power sweep commands, run `verify_power_fixes.py prepare OUTPUT` in the BFME tools container. Replay the augmented sessions, run `WildAllegiance.commands` with the Wild faction, and repeat the Dwarves session with its log saved as `Dwarves-repeat.log`. Run `verify_power_fixes.py verify OUTPUT` to check recruitment, both Mahud weapons, the weather timer, passive upgrade evidence, and repeat-run determinism.
 
 - `test-rotwk-modifiers-zh.sh` runs the contained and radius healing, innate damage, and modifier snapshot checks on High Pass. Pass a session label, the devbox build directory, and the BFME High Pass runner path.
+- `playtest/shadow-casters` casts Rohan Allies on Training Grounds and checks the stage 1 state of each shadow caster draw. From the BFME project root, run `tools/playtest.sh WORKTREE BUILD_DIR shadow-casters`.
+- `playtest/drawable-particles` captures the authored Dunedain grass and Army of the Dead light shafts through their FX lists.
 
 #### `qa/smoke/` - Smoke Tests
 - `docker-smoke-test-zh.sh` - Quick startup validation (expects crash, checks init output)

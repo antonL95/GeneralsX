@@ -612,6 +612,7 @@ public:
 	static const FieldParse *getFXFieldParse() { return m_fxFieldParseTable; }
 	void resetForFXDefinition();
 	Bool isRenderable() const { return m_isRenderable; }
+	Bool usesModelOpacityOnly() const { return m_modelOpacityOnly; }
 	Bool usesGpuDraw() const { return m_hasGpuDraw || m_isGpuParticle; }
 	Bool canDrawGpuParticles() const;
 	UnsignedInt getGpuFramesPerRow() const { return m_gpuFramesPerRow; }
@@ -685,6 +686,7 @@ protected:
 	GameClientRandomVariable m_modelSizeRate[3];
 	GameClientRandomVariable m_modelSizeDamping[3];
 	Bool m_modelHasAlpha = FALSE;
+	Bool m_modelOpacityOnly = FALSE;
 	Bool m_isGpuParticle = FALSE;
 	Bool m_hasGpuDraw = FALSE;
 	UnsignedInt m_gpuFramesPerRow = 1;

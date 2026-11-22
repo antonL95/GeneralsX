@@ -1,0 +1,7 @@
+20 create Player_1 GondorGandalf 0 2520,1010,0
+21 reveal Player_1 GondorGandalf 0
+30 particle-fx Player_1 - 0 FX_AODDeath 2480 970 0
+30 particle-fx Player_1 - 0 FX_DunedainSummon 2560 1050 0
+45 particle-systems Player_1 - 0 AODLightShafts
+120 particle-systems Player_1 - 0 DunedainSummonGrass01
+120 particle-systems Player_1 - 0 ElvenAlliesGrassB
