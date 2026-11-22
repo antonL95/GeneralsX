@@ -4429,9 +4429,18 @@ void Object::xfer( Xfer *xfer )
 #endif
 	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
 		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
-	const XferVersion maxVersion = RetailFileLayers::enabled() ? 17 : 10;
-	XferVersion version = maxVersion == 16 ? (m_invulnerableUntil != NEVER ? 16 : (m_constructionCostPaid >= 0 ? 15 : 14)) :
-		(extendedSlots ? 10 : legacyVersion);
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion maxVersion = retail ? 17 : 10;
+	XferVersion version = extendedSlots ? 10 : legacyVersion;
+	if (retail)
+	{
+		if (m_rotwkPowerState)
+			version = 17;
+		else if (m_invulnerableUntil != NEVER)
+			version = 16;
+		else
+			version = m_constructionCostPaid >= 0 ? 15 : 14;
+	}
 	xfer->xferVersion(&version, maxVersion);
 
 	// object ID
