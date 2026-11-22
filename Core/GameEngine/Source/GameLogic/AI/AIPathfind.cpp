@@ -7727,7 +7727,8 @@ void Pathfinder::crc( Xfer *xfer )
 
 	xfer->xferReal(&m_wallHeight);
 	CRCDEBUG_LOG(("m_wallHeight: %8.8X", ((XferCRC *)xfer)->getCRC()));
-	xfer->xferInt(&m_cumulativeCellsAllocated);
+	Int cellsAllocated = RetailFileLayers::enabled() ? 0 : m_cumulativeCellsAllocated;
+	xfer->xferInt(&cellsAllocated);
 	CRCDEBUG_LOG(("m_cumulativeCellsAllocated: %8.8X", ((XferCRC *)xfer)->getCRC()));
 	if (RetailFileLayers::enabled())
 	{
