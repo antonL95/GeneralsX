@@ -195,6 +195,7 @@ void runRetailPackage13TestCommand(std::string_view action, Object* source, Obje
 void runRetailPackage16TestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 void runRetailPackage19TestCommand(std::string_view action, Object* source, UnsignedInt frame);
 void runRetailPackage18TestCommand(std::string_view action, Player* player, Object* source, const char* argument, UnsignedInt frame);
+void runRetailPackage25TestCommand(std::string_view action, Object* source, Object* target, const Coord3D* position, UnsignedInt frame);
 
 void runRetailPackage08TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D* position, UnsignedInt frame);
 void runRetailPackage11TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D& inputs, UnsignedInt frame);
@@ -2825,6 +2826,13 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action.starts_with("pkg18-"))
 	{
 		runRetailPackage18TestCommand(command.action, findPlayer(command.player), obj, command.structure.c_str(), frame);
+		return;
+	}
+	if (command.action.starts_with("pkg25-"))
+	{
+		const Coord3D position = command.hasLocation ? groundLocation(command) : Coord3D{};
+		runRetailPackage25TestCommand(command.action, obj, findTarget(command, true),
+			command.hasLocation ? &position : nullptr, frame);
 		return;
 	}
 	if (command.action.starts_with("pkg09-"))
