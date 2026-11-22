@@ -33,6 +33,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -809,7 +810,8 @@ void StateMachine::internalSetGoalPosition( const Coord3D *pos )
 // ------------------------------------------------------------------------------------------------
 void StateMachine::crc( Xfer *xfer )
 {
-
+	if (RetailFileLayers::enabled() && m_currentState && m_currentState->isAttack())
+		xfer->xferSnapshot(m_currentState);
 }
 
 // ------------------------------------------------------------------------------------------------

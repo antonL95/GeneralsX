@@ -5449,6 +5449,11 @@ void AIUpdateInterface::crc( Xfer *x )
 
 }
 
+void AIUpdateInterface::crcRetailAttackState(Xfer* xfer)
+{
+	xfer->xferSnapshot(m_stateMachine);
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Xfer method
 	* Version Info:

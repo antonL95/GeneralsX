@@ -167,6 +167,12 @@ for phase in continue resume; do
         expect "$phase" 'TEST save-load wall-occupant frame=126 name=WallGateOccupant layer=1 walkable=0'
         grep '^TEST list 126 Player_1 MenWallGate 0 ' "$out/$phase.log"
     fi
+    if [ "$mode" = training ] && [ "$end" -ge 244 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 244 ]; }; then
+        grep -E '^TEST pkg19 frame=244 template=Pkg19SaveShooter weapon=Pkg19SaveWindup locked=1 .*draw=272 ' "$out/$phase.log"
+    fi
+    if [ "$mode" = training ] && [ "$end" -ge 250 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 250 ]; }; then
+        grep -E '^TEST damage frame=250 weapon=Pkg19SaveSecondary .*victim=[0-9]+\(Pkg19SaveTarget\) ' "$out/$phase.log"
+    fi
     if [ "$mode" = training ] && [ "$end" -ge 285 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 285 ]; }; then
         expect "$phase" 'TEST frame 285: builderscriptmove object 182 to 1933.7 1774.0'
     fi

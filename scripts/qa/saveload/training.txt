@@ -9,19 +9,15 @@
 29 pkg08-queue-state Player_1 DolAmrothPorter 0
 30 cancelbuild Player_1 DolAmrothFarm 0
 32 pkg08-queue-state Player_1 DolAmrothPorter 0
-220 pkg08-queue-state Player_1 DolAmrothPorter 0
-600 pkg08-queue-state Player_1 DolAmrothPorter 0
-1000 pkg08-queue-state Player_1 DolAmrothPorter 0
-1300 pkg08-queue-state Player_1 DolAmrothPorter 0
-1600 pkg08-queue-state Player_1 DolAmrothPorter 0
-2050 pkg08-queue-state Player_1 DolAmrothPorter 0
-2600 pkg08-queue-state Player_1 DolAmrothPorter 0
-3100 pkg08-queue-state Player_1 DolAmrothPorter 0
+33 create Player_1 Pkg08PorterControl 0 2390,840,0
 34 pkg08-contact Player_1 DolAmrothPorter 0 Player_1:DolAmrothGuardhouse:0
 34 pkg08-contact Player_1 Pkg08PorterControl 0 Player_1:DolAmrothGuardhouse:0
 40 pkg08-rider-state Player_1 DolAmrothPorter 0
+40 pkg08-rider-state Player_1 Pkg08PorterControl 0
 41 pkg08-mount Player_1 DolAmrothPorter 0 on
+41 pkg08-mount Player_1 Pkg08PorterControl 0 on
 44 pkg08-rider-state Player_1 DolAmrothPorter 0
+44 pkg08-rider-state Player_1 Pkg08PorterControl 0
 45 pkg08-mount Player_1 DolAmrothPorter 0 off
 48 pkg08-rider-state Player_1 DolAmrothPorter 0
 80 create Player_1 MordorBase 0 2830,990,90
@@ -39,25 +35,6 @@
 92 create Player_1 GondorFighter 0 2770,1260,0
 96 pkg08-enter Player_1 IthilienPathfinder 0 Player_1:GondorCastleKeep:0
 97 pkg08-enter Player_1 GondorFighter 0 Player_1:GondorCastleKeep:0
-320 pkg08-fire-state Player_1 IthilienPathfinder 0
-321 pkg08-fire-state Player_1 GondorFighter 0
-2950 pkg08-windows Player_1 DolAmrothBattleTower 0
-2951 pkg08-night Player_1 DolAmrothBattleTower 0 on
-2953 pkg08-windows Player_1 DolAmrothBattleTower 0
-2954 pkg08-flame Player_1 DolAmrothBattleTower 0 on
-2956 pkg08-windows Player_1 DolAmrothBattleTower 0
-2957 pkg08-flame Player_1 DolAmrothBattleTower 0 off
-2959 pkg08-windows Player_1 DolAmrothBattleTower 0
-2960 pkg08-night Player_1 DolAmrothBattleTower 0 off
-2962 pkg08-windows Player_1 DolAmrothBattleTower 0
-2720 damage Player_1 DolAmrothGuardhouse 0 500
-2721 pkg08-queue-state Player_1 DolAmrothPorter 0
-2722 repair Player_1 DolAmrothPorter 0 DolAmrothGuardhouse
-2890 pkg08-queue-state Player_1 DolAmrothPorter 0
-33 create Player_1 Pkg08PorterControl 0 2390,840,0
-40 pkg08-rider-state Player_1 Pkg08PorterControl 0
-41 pkg08-mount Player_1 Pkg08PorterControl 0 on
-44 pkg08-rider-state Player_1 Pkg08PorterControl 0
 100 create Player_1 IthilienPathfinder 1 2790,1050,0
 101 create PlyrCreeps MordorPorter 0 2890,1050,0
 102 create PlyrCreeps MordorPorter 1 3440,1050,0
@@ -82,6 +59,34 @@
 126 snapshot-wall-occupant Player_1 - 0 WallDeleteOccupant
 126 snapshot-wall-occupant Player_1 - 0 WallGateOccupant
 126 list Player_1 - 0
+220 pkg08-queue-state Player_1 DolAmrothPorter 0
+239 create Player_1 Pkg19SaveShooter 0 2150,1710,0
+239 create PlyrCreeps Pkg19SaveTarget 0 2250,1710,180
 240 create Player_1 GuldurEntwife 0 2120,660,90
+240 orderattack Player_1 Pkg19SaveShooter 0 PlyrCreeps:Pkg19SaveTarget:0
 243 pkg14-fatal Player_1 GuldurEntwife 0
+244 pkg19-state Player_1 Pkg19SaveShooter 0
+250 pkg19-secondary Player_1 Pkg19SaveShooter 0
 285 builderscriptmove * Wolf 8 - 1933.749145508 1773.990844727
+320 pkg08-fire-state Player_1 IthilienPathfinder 0
+321 pkg08-fire-state Player_1 GondorFighter 0
+600 pkg08-queue-state Player_1 DolAmrothPorter 0
+1000 pkg08-queue-state Player_1 DolAmrothPorter 0
+1300 pkg08-queue-state Player_1 DolAmrothPorter 0
+1600 pkg08-queue-state Player_1 DolAmrothPorter 0
+2050 pkg08-queue-state Player_1 DolAmrothPorter 0
+2600 pkg08-queue-state Player_1 DolAmrothPorter 0
+2720 damage Player_1 DolAmrothGuardhouse 0 500
+2721 pkg08-queue-state Player_1 DolAmrothPorter 0
+2722 repair Player_1 DolAmrothPorter 0 DolAmrothGuardhouse
+2890 pkg08-queue-state Player_1 DolAmrothPorter 0
+2950 pkg08-windows Player_1 DolAmrothBattleTower 0
+2951 pkg08-night Player_1 DolAmrothBattleTower 0 on
+2953 pkg08-windows Player_1 DolAmrothBattleTower 0
+2954 pkg08-flame Player_1 DolAmrothBattleTower 0 on
+2956 pkg08-windows Player_1 DolAmrothBattleTower 0
+2957 pkg08-flame Player_1 DolAmrothBattleTower 0 off
+2959 pkg08-windows Player_1 DolAmrothBattleTower 0
+2960 pkg08-night Player_1 DolAmrothBattleTower 0 off
+2962 pkg08-windows Player_1 DolAmrothBattleTower 0
+3100 pkg08-queue-state Player_1 DolAmrothPorter 0

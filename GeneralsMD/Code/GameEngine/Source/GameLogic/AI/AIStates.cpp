@@ -3569,6 +3569,8 @@ AIAttackMoveToState::~AIAttackMoveToState()
 // ------------------------------------------------------------------------------------------------
 void AIAttackMoveToState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferSnapshot(m_attackMoveMachine);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -4443,6 +4445,8 @@ AIAttackFollowWaypointPathState::~AIAttackFollowWaypointPathState()
 // ------------------------------------------------------------------------------------------------
 void AIAttackFollowWaypointPathState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferSnapshot(m_attackFollowMachine);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -5466,12 +5470,30 @@ AIAttackState::~AIAttackState()
 void AIAttackState::crc( Xfer *xfer )
 {
 	if (RetailFileLayers::enabled())
+	{
 		xfer->xferObjectID(&m_targetHordeID);
+		Int slot = getEntryWeaponLockSlot();
+		xfer->xferInt(&slot);
+	}
+}
+
+Int AIAttackState::getEntryWeaponLockSlot() const
+{
+	if (!m_lockedWeaponOnEnter)
+		return m_loadedEntryWeaponLock == ENTRY_LOCK_REMOVED ? ENTRY_LOCK_REMOVED : ENTRY_LOCK_NONE;
+
+	const Object* source = getMachineOwner();
+	for (Int slot = PRIMARY_WEAPON; slot < WEAPONSLOT_COUNT; ++slot)
+	{
+		if (source->getWeaponInWeaponSlot(static_cast<WeaponSlotType>(slot)) == m_lockedWeaponOnEnter)
+			return slot;
+	}
+	return ENTRY_LOCK_REMOVED;
 }
 
 void AIAttackState::xfer( Xfer *xfer )
 {
-  XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+  XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -5490,6 +5512,18 @@ void AIAttackState::xfer( Xfer *xfer )
 		xfer->xferObjectID(&m_targetHordeID);
 	else
 		m_targetHordeID = INVALID_ID;
+
+	if (version >= 3)
+	{
+		Int slot = getEntryWeaponLockSlot();
+		xfer->xferInt(&slot);
+		if (xfer->getXferMode() == XFER_LOAD)
+			m_loadedEntryWeaponLock = slot;
+	}
+	else if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_loadedEntryWeaponLock = ENTRY_LOCK_UNSAVED;
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -5503,7 +5537,20 @@ void AIAttackState::loadPostProcess()
 		m_victimTeam = victim->getTeam();
 	}
 	Object* source = getMachineOwner();
-	m_lockedWeaponOnEnter = source->isCurWeaponLocked() ? source->getCurrentWeapon() : nullptr;
+	if (m_loadedEntryWeaponLock == ENTRY_LOCK_UNSAVED)
+	{
+		m_lockedWeaponOnEnter = source->isCurWeaponLocked() ? source->getCurrentWeapon() : nullptr;
+	}
+	else
+	{
+		m_lockedWeaponOnEnter = nullptr;
+		if (m_loadedEntryWeaponLock >= PRIMARY_WEAPON && m_loadedEntryWeaponLock < WEAPONSLOT_COUNT)
+		{
+			m_lockedWeaponOnEnter = source->getWeaponInWeaponSlot(static_cast<WeaponSlotType>(m_loadedEntryWeaponLock));
+			if (!m_lockedWeaponOnEnter)
+				m_loadedEntryWeaponLock = ENTRY_LOCK_REMOVED;
+		}
+	}
 }
 
 #ifdef STATE_MACHINE_DEBUG
@@ -5642,6 +5689,7 @@ StateReturnType AIAttackState::onEnter()
 	}
 
 	m_lockedWeaponOnEnter = source->isCurWeaponLocked() ? curWeapon : nullptr;
+	m_loadedEntryWeaponLock = ENTRY_LOCK_NONE;
 
 	StateReturnType retType = m_attackMachine->initDefaultState();
 	if( retType == STATE_CONTINUE )
@@ -5786,7 +5834,8 @@ StateReturnType AIAttackState::update()
 	// if we entered with a locked weapon (ie, a special weapon), then we will
 	// only keep attacking as long as that weapon remains the cur weapon...
 	// if anything ever changes that weapon, we exit attack mode immediately.
-	if (m_lockedWeaponOnEnter != nullptr && m_lockedWeaponOnEnter != curWeapon)
+	if (m_loadedEntryWeaponLock == ENTRY_LOCK_REMOVED ||
+		(m_lockedWeaponOnEnter != nullptr && m_lockedWeaponOnEnter != curWeapon))
 		return STATE_FAILURE;
 
 	// we've shot as many times as we are allowed to
@@ -5930,6 +5979,8 @@ AIAttackSquadState::~AIAttackSquadState()
 // ------------------------------------------------------------------------------------------------
 void AIAttackSquadState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferSnapshot(m_attackSquadMachine);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -7199,6 +7250,8 @@ AIHuntState::~AIHuntState()
 // ------------------------------------------------------------------------------------------------
 void AIHuntState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferSnapshot(m_huntMachine);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -7406,6 +7459,8 @@ AIAttackAreaState::~AIAttackAreaState()
 // ------------------------------------------------------------------------------------------------
 void AIAttackAreaState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferSnapshot(m_attackMachine);
 }
 
 // ------------------------------------------------------------------------------------------------

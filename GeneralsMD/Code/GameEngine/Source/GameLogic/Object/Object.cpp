@@ -4480,6 +4480,7 @@ void Object::crc( Xfer *xfer )
 			static const NameKeyType deployKey = NAMEKEY("DeployStyleAIUpdate");
 			if (auto* deploy = static_cast<DeployStyleAIUpdate*>(findUpdateModule(deployKey)))
 				deploy->crcRetailState(xfer);
+			ai->crcRetailAttackState(xfer);
 			UnsignedInt burningDeathUntil = ai->getRetailBurningDeathDeadline();
 			xfer->xferUnsignedInt(&burningDeathUntil);
 			UnsignedInt fearUntil = ai->getRetailFearDeadline();

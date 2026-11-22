@@ -1007,12 +1007,18 @@ protected:
 private:
 
 	Bool chooseWeapon();
+	Int getEntryWeaponLockSlot() const;
+
+	static constexpr Int ENTRY_LOCK_UNSAVED = -2;
+	static constexpr Int ENTRY_LOCK_NONE = -1;
+	static constexpr Int ENTRY_LOCK_REMOVED = -3;
 
 	AttackStateMachine*							m_attackMachine;						///< state sub-machine for attack behavior
 	AttackExitConditionsInterface*	m_attackParameters;					///< these are not owned by this, and will not be deleted on destruction
 	Team*														m_victimTeam;								///< recorded onEnter because if it changes during attack , it may no longer be a valid target.
 	Coord3D													m_originalVictimPos;				///< position of first obj/pos attacked... used for ContinueAttackRange.
 	const Weapon*						m_lockedWeaponOnEnter;
+	Int								m_loadedEntryWeaponLock = ENTRY_LOCK_UNSAVED;
 	ObjectID							m_targetHordeID;
 	const Bool							m_follow;
 	const Bool							m_isAttackingObject;								// if false, attacking position
