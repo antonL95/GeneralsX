@@ -65,6 +65,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
 #include "GameLogic/Module/FloatUpdate.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/GrantUpgradeCreate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/SpecialPowerCompletionDie.h"
@@ -1067,6 +1068,9 @@ protected:
 
 		const Bool retail = RetailFileLayers::enabled();
 		const Bool retailObject = retail && m_nameAreObjects;
+		const Bool deferFootprint = retailObject &&
+			(obj->isKindOf(KINDOF_STRUCTURE) || obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL));
+		const GeometryUpgrade::ScopedPathfindDeferral placementFootprint(deferFootprint ? obj : nullptr);
 		const Bool hasDispositionAngle = retail && BitIsSet(m_disposition, ABSOLUTE_ANGLE | RELATIVE_ANGLE);
 		const Bool applyObjectAngle = hasDispositionAngle && retailObject && !BitIsSet(m_disposition, LIKE_EXISTING);
 		if (applyObjectAngle)

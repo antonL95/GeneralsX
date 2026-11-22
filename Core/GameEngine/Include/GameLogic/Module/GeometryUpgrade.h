@@ -34,6 +34,22 @@ public:
 		Coord3D position;
 	};
 
+	class ScopedPathfindDeferral
+	{
+	public:
+		explicit ScopedPathfindDeferral(const Object* object);
+		~ScopedPathfindDeferral();
+		ScopedPathfindDeferral(const ScopedPathfindDeferral&) = delete;
+		ScopedPathfindDeferral& operator=(const ScopedPathfindDeferral&) = delete;
+
+	private:
+		friend class GeometryUpgrade;
+		static Bool contains(const Object* object);
+		static thread_local const ScopedPathfindDeferral* s_current;
+		const Object* m_object;
+		const ScopedPathfindDeferral* m_previous;
+	};
+
 	static Bool constructionFootprintsOverlap(const ThingTemplate& build, const Coord3D& position, Real angle, const Object& obstacle);
 	static Bool collectCollisionParts(const Object& object, std::vector<CollisionPart>& parts);
 

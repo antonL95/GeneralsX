@@ -96,6 +96,12 @@ diag=${PKGS1_DIAGNOSTICS:-"$save_frame,$((save_frame + 1))"}
         printf '%s snapshot-wall-state Player_1 GondorCastleWallSegment 0\n' "$save_frame"
         printf '%s snapshot-wall-occupant Player_1 - 0 WallTrebuchetOccupant\n' "$save_frame"
     fi
+    if [ "$mode" = training ] && [ "$save_frame" -gt 230 ]; then
+        printf '%s snapshot-obstacle-count Player_1 SaveLoadStampOnComplete 0\n' "$save_frame"
+        if [ "$end" -gt "$save_frame" ]; then
+            printf '%s snapshot-obstacle-count Player_1 SaveLoadStampOnComplete 0\n' "$((save_frame + 1))"
+        fi
+    fi
     printf '%s\n' "$diag" | tr ',' '\n' | awk -v end="$end" '/^[0-9]+$/ && $1 <= end {print $1, "snapshot-crc - - 0"; print $1, "logall - - 0"}'
     seq "${PKGS1_CRC_START_FRAME:-$save_frame}" "$end" | awk '{ print $1, "xpcrc - - 0" }'
     printf '%s quit - - 0\n' "$end"
@@ -218,6 +224,19 @@ for phase in continue resume; do
 done
 if [ "$mode" = training ] && [ "$save_frame" -le 244 ] && [ "$end" -ge 244 ]; then
     cmp "$out/continue.cells" "$out/resume.cells"
+fi
+if [ "$mode" = training ] && [ "$save_frame" -gt 230 ]; then
+    for phase in continue resume; do
+        grep -E '^TEST save-load obstacle-count frame=[0-9]+ template=SaveLoadStampOnComplete cells=[1-9][0-9]*$' \
+            "$out/$phase.log" > "$out/$phase.obstacles"
+    done
+    expected=1
+    if [ "$end" -gt "$save_frame" ]; then
+        expected=2
+    fi
+    test "$(wc -l < "$out/continue.obstacles")" -eq "$expected"
+    diff -u "$out/continue.obstacles" "$out/resume.obstacles"
+    cat "$out/continue.obstacles"
 fi
 if [ -n "$path_unit" ]; then
     expect save "TEST save-load path-queue frame=$save_frame queued=1"

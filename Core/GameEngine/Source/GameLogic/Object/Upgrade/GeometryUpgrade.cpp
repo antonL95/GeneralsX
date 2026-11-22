@@ -200,6 +200,27 @@ Bool GeometryUpgrade::collectCollisionParts(const Object& object, std::vector<Co
 	return TRUE;
 }
 
+thread_local const GeometryUpgrade::ScopedPathfindDeferral* GeometryUpgrade::ScopedPathfindDeferral::s_current = nullptr;
+
+GeometryUpgrade::ScopedPathfindDeferral::ScopedPathfindDeferral(const Object* object) :
+	m_object(object), m_previous(s_current)
+{
+	s_current = this;
+}
+
+GeometryUpgrade::ScopedPathfindDeferral::~ScopedPathfindDeferral()
+{
+	s_current = m_previous;
+}
+
+Bool GeometryUpgrade::ScopedPathfindDeferral::contains(const Object* object)
+{
+	for (const auto* scope = s_current; scope; scope = scope->m_previous)
+		if (scope->m_object == object)
+			return TRUE;
+	return FALSE;
+}
+
 void GeometryUpgrade::upgradeImplementation()
 {
 	Object* object = getObject();
@@ -227,7 +248,7 @@ void GeometryUpgrade::upgradeImplementation()
 	if (!affectsBounds)
 		return;
 
-	Pathfinder* pathfinder = TheAI ? TheAI->pathfinder() : nullptr;
+	Pathfinder* pathfinder = TheAI && !ScopedPathfindDeferral::contains(object) ? TheAI->pathfinder() : nullptr;
 	if (pathfinder)
 		pathfinder->removeObjectFromPathfindMap(object);
 

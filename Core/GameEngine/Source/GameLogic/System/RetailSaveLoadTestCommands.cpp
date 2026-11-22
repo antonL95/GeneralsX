@@ -116,6 +116,23 @@ void runRetailSaveLoadWallTestCommand(std::string_view action, Player* player, O
 
 void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, UnsignedInt frame)
 {
+	if (action == "snapshot-obstacle-count")
+	{
+		Int count = 0;
+		if (object)
+		{
+			Pathfinder* pathfinder = TheAI->pathfinder();
+			const ICoord2D& extent = *pathfinder->getExtent();
+			for (Int y = 0; y <= extent.y; ++y)
+				for (Int x = 0; x <= extent.x; ++x)
+					if (const PathfindCell* cell = pathfinder->getCell(LAYER_GROUND, x, y);
+						cell && cell->getType() == PathfindCell::CELL_OBSTACLE && cell->getObstacleID() == object->getID())
+						++count;
+		}
+		std::fprintf(stderr, "TEST save-load obstacle-count frame=%u template=%s cells=%d\n", frame,
+			object ? object->getTemplate()->getName().str() : "-", count);
+		return;
+	}
 	if (action == "snapshot-obstacle-owner")
 	{
 		Bool ownsCell = FALSE;

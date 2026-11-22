@@ -2361,6 +2361,7 @@ void execute(const Command& command, unsigned int frame)
 	}
 	if (command.action == "snapshot-path-state" || command.action == "snapshot-register-footprint" ||
 		command.action == "snapshot-obstacle-owner" ||
+		command.action == "snapshot-obstacle-count" ||
 		command.action == "snapshot-wall-state")
 	{
 		runRetailSaveLoadPathTestCommand(command.action, findObject(command, true), frame);
