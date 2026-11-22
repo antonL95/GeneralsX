@@ -7,11 +7,14 @@
 #include <string_view>
 
 #include "Common/MessageStream.h"
+#include "Common/Money.h"
 #include "Common/Player.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "GameClient/CommandButtonRules.h"
 #include "GameClient/ControlBar.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/ClickReactionBehavior.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
@@ -28,6 +31,7 @@ void runRetailPackage16TestCommand(std::string_view action, Object* source, cons
 			? TheControlBar->queryRetailCommandAvailability(btn, source)
 			: COMMAND_HIDDEN;
 		const ThingTemplate* targetObj = btn ? btn->getThingTemplate() : nullptr;
+		const ThingTemplate* resolvedObj = btn ? btn->resolveUpgradeTargetTemplate(source) : nullptr;
 		std::string triggersJoined;
 		if (btn)
 		{
@@ -40,7 +44,7 @@ void runRetailPackage16TestCommand(std::string_view action, Object* source, cons
 		}
 		const CommandButton* resolvedToggle = (btn && source) ? btn->resolveRetailToggleButton(source) : btn;
 		std::fprintf(stderr,
-			"TEST pkg16 button frame=%u name=%s found=%d clickable=%d show=%d passive=%d doubleClick=%d triggerReady=%d autoDelay=%.2f triggerCount=%zu trigger=%s toggle=%s resolvedToggle=%s obj=%s objName=%s avail=%d\n",
+			"TEST pkg16 button frame=%u name=%s found=%d clickable=%d show=%d passive=%d doubleClick=%d triggerReady=%d autoDelay=%.2f triggerCount=%zu trigger=%s toggle=%s resolvedToggle=%s obj=%s resolvedObj=%s objName=%s avail=%d\n",
 			frame,
 			argument ? argument : "-",
 			btn ? 1 : 0,
@@ -55,6 +59,7 @@ void runRetailPackage16TestCommand(std::string_view action, Object* source, cons
 			btn && !btn->getToggleButtonName().isEmpty() ? btn->getToggleButtonName().str() : "-",
 			resolvedToggle ? resolvedToggle->getName().str() : "-",
 			targetObj ? targetObj->getName().str() : "-",
+			resolvedObj ? resolvedObj->getName().str() : "-",
 			btn && !btn->getThingTemplateName().isEmpty() ? btn->getThingTemplateName().str() : "-",
 			static_cast<int>(avail));
 		return;
@@ -86,6 +91,50 @@ void runRetailPackage16TestCommand(std::string_view action, Object* source, cons
 		GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_AUTO_ABILITY);
 		msg->appendObjectIDArgument(source->getID());
 		msg->appendIntegerArgument(slot);
+		return;
+	}
+
+	if (action == "pkg16-queue-upgrade")
+	{
+		if (!TheUpgradeCenter || !argument || !*argument)
+			return;
+		const UpgradeTemplate* upg = TheUpgradeCenter->findUpgrade(argument);
+		if (!upg)
+			return;
+		if (Player* p = source->getControllingPlayer())
+		{
+			if (p->getMoney()->countMoney() < 5000)
+				p->getMoney()->deposit(5000, FALSE, FALSE);
+		}
+		GameMessage* selMsg = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+		selMsg->appendBooleanArgument(TRUE);
+		selMsg->appendObjectIDArgument(source->getID());
+		GameMessage* upgMsg = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UPGRADE);
+		upgMsg->appendObjectIDArgument(source->getID());
+		upgMsg->appendIntegerArgument(upg->getUpgradeNameKey());
+		return;
+	}
+
+	if (action == "pkg16-count-template")
+	{
+		if (!argument || !*argument || !TheGameLogic)
+			return;
+		const Player* owner = source->getControllingPlayer();
+		Int count = 0;
+		for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+		{
+			if (obj->isDestroyed() || obj->isEffectivelyDead() || !obj->getTemplate())
+				continue;
+			if (owner && obj->getControllingPlayer() != owner)
+				continue;
+			if (obj->getTemplate()->getName().compareNoCase(argument) == 0)
+				++count;
+		}
+		std::fprintf(stderr,
+			"TEST pkg16 count frame=%u template=%s count=%d\n",
+			frame,
+			argument,
+			count);
 		return;
 	}
 
