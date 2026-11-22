@@ -95,6 +95,7 @@ public:
 	virtual void setFramesTillCountermeasureDiversionOccurs( UnsignedInt frames ) override {}
 	virtual void projectileNowJammed() override {}
 	virtual void projectileSetLaunchWeapon(const WeaponTemplate* launchWeapon) override { m_launchWeaponTmpl = launchWeapon; }
+	virtual const WeaponTemplate* projectileGetLaunchWeapon() const override { return m_launchWeaponTmpl; }
 
 protected:
 

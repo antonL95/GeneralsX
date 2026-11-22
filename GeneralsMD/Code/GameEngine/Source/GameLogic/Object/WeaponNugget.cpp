@@ -48,26 +48,22 @@ Bool hasUpgrade(const Object* obj, const UpgradeTemplate* upgrade)
 	return player && player->hasUpgradeComplete(upgrade);
 }
 
-ObjectID launcherOf(const Object* source)
+ProjectileUpdateInterface* projectileInterface(const Object* obj)
 {
-	if (!source || !source->isKindOf(KINDOF_PROJECTILE))
-		return INVALID_ID;
-	for (BehaviorModule** module = source->getBehaviorModules(); *module; ++module)
-	{
-		if (ProjectileUpdateInterface* projectile = (*module)->getProjectileUpdateInterface())
-			return projectile->projectileGetLauncherID();
-	}
-	return INVALID_ID;
-}
-
-ProjectileUpdateInterface* projectileInterface(Object* obj)
-{
+	if (!obj)
+		return nullptr;
 	for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
 	{
 		if (ProjectileUpdateInterface* projectile = (*module)->getProjectileUpdateInterface())
 			return projectile;
 	}
 	return nullptr;
+}
+
+ObjectID launcherOf(const Object* source)
+{
+	const ProjectileUpdateInterface* projectile = source && source->isKindOf(KINDOF_PROJECTILE) ? projectileInterface(source) : nullptr;
+	return projectile ? projectile->projectileGetLauncherID() : INVALID_ID;
 }
 
 void parseUpgradeNames(INI* ini, void*, void* store, const void*)
@@ -565,6 +561,9 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 {
 	const Object* impactSource = TheGameLogic->findObjectByID(sourceID);
 	const Object* attacker = getNuggetAttacker(impactSource);
+	const ProjectileUpdateInterface* projectile = projectileInterface(impactSource);
+	const WeaponTemplate* launchWeapon = projectile ? projectile->projectileGetLaunchWeapon() : nullptr;
+	const RetailDamageFXTrigger launchTrigger = launchWeapon ? launchWeapon->m_retailFXTrigger : RETAIL_DAMAGE_FX_NONE;
 	const PhysicsBehavior* physics = impactSource ? impactSource->getPhysics() : nullptr;
 	const Coord3D velocity = physics ? *physics->getVelocity() : Coord3D{};
 	const ObjectID nuggetSourceID = attacker ? attacker->getID() : sourceID;
@@ -585,15 +584,15 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 		if (!nugget.isImpactNugget() || !nugget.isEnabledFor(attacker))
 			continue;
 		if (nugget.m_delayFrames == 0)
-			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit, &velocity);
+			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit, &velocity, launchTrigger);
 		else if (TheWeaponStore)
 			TheWeaponStore->setDelayedDamage(this, pos, TheGameLogic->getFrame() + nugget.m_delayFrames, nuggetSourceID, victimID,
-				bonus, static_cast<Int>(index), FALSE, contactHit);
+				bonus, static_cast<Int>(index), FALSE, contactHit, launchTrigger);
 	}
 }
 
 void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
-	Bool dotTick, Bool contactHit, const Coord3D* impactVelocity) const
+	Bool dotTick, Bool contactHit, const Coord3D* impactVelocity, RetailDamageFXTrigger launchTrigger) const
 {
 	const WeaponNugget& nugget = m_nuggets[nuggetIndex];
 	Object* source = TheGameLogic->findObjectByID(sourceID);
@@ -717,6 +716,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damageInfo.in.m_sourceID = sourceID;
 		damageInfo.in.m_sourcePlayerMask = source && source->getControllingPlayer() ? source->getControllingPlayer()->getPlayerMask() : 0;
 		damageInfo.in.m_amount = amount;
+		damageInfo.retailFXTrigger = m_retailFXTrigger != RETAIL_DAMAGE_FX_NONE ? m_retailFXTrigger : launchTrigger;
 		if (impactVelocity)
 			damageInfo.impactVelocity = *impactVelocity;
 		else if (source && source->getPhysics())
@@ -776,6 +776,6 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damage(curVictim, verdict == RADIUS_DAMAGE_KILL_SELF);
 		for (size_t tick = 1; tick < dotTicks.size() && TheWeaponStore; ++tick)
 			TheWeaponStore->setDelayedDamage(this, curVictim->getPosition(), TheGameLogic->getFrame() + dotTicks[tick], sourceID,
-				curVictim->getID(), bonus, nuggetIndex, TRUE);
+				curVictim->getID(), bonus, nuggetIndex, TRUE, FALSE, launchTrigger);
 	}
 }

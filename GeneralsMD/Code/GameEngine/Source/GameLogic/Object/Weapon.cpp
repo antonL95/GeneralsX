@@ -76,6 +76,7 @@
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/WeaponNuggetRules.h"
+#include "GameLogic/Module/ActiveBody.h"
 
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AssistedTargetingUpdate.h"
@@ -252,6 +253,8 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 
 const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 {
+	{ "FXTrigger", INI::parseIndexList, RetailDamageFXTriggerNames, offsetof(WeaponTemplate, m_retailFXTrigger) },
+	{ "CanBeDodged", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canBeDodged) },
 	{ "DamageNugget", WeaponNugget::parseDamageNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DOTNugget", WeaponNugget::parseDOTNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "ProjectileNugget", WeaponNugget::parseProjectileNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
@@ -1160,7 +1163,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		orderNuggetHorde(sourceObj, victimObj, victimPos);
 	}
 
-	const Bool nuggetHit = hasNuggets() && (isProjectileDetonation || !WeaponNuggetRules::needsHitRoll(m_hitPercentage) ||
+	Bool nuggetHit = hasNuggets() && (isProjectileDetonation || !WeaponNuggetRules::needsHitRoll(m_hitPercentage) ||
 		WeaponNuggetRules::rollHits(GameLogicRandomValue(0, 99), m_hitPercentage));
 	if (!isProjectileDetonation && inflictDamage && victimObj && m_hitPassengerPercentage > 0.0f && (!hasNuggets() || nuggetHit))
 	{
@@ -1170,6 +1173,13 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 			victimID = passenger->getID();
 			victimPos = passenger->getPosition();
 		}
+	}
+	if (hasNuggets() && !isProjectileDetonation && m_canBeDodged && victimObj && RetailFileLayers::enabled())
+	{
+		const auto* body = dynamic_cast<const ActiveBody*>(victimObj->getBodyModule());
+		const Real dodge = body ? body->getRetailBodyData()->m_dodgePercent : 0.0f;
+		if (dodge > 0.0f && GameLogicRandomValueReal(0.0f, 1.0f) <= dodge)
+			nuggetHit = FALSE;
 	}
 	Coord3D projectileDestination = *victimPos;
 	Real scatterRadius = 0.0f;
@@ -1913,7 +1923,7 @@ void WeaponStore::update()
 			const Bool isProjectileDetonation = false;
 			if (ddi->m_nuggetIndex >= 0)
 				ddi->m_delayedWeapon->dealNuggetDamage(ddi->m_nuggetIndex, ddi->m_delaySourceID, ddi->m_delayIntendedVictimID,
-					&ddi->m_delayDamagePos, ddi->m_bonus, ddi->m_dotTick, ddi->m_contactHit);
+					&ddi->m_delayDamagePos, ddi->m_bonus, ddi->m_dotTick, ddi->m_contactHit, nullptr, ddi->m_launchTrigger);
 			else
 				ddi->m_delayedWeapon->dealDamageInternal(ddi->m_delaySourceID, ddi->m_delayIntendedVictimID, &ddi->m_delayDamagePos, ddi->m_bonus, isProjectileDetonation);
 			ddi = m_weaponDDI.erase(ddi);
@@ -1964,7 +1974,7 @@ void WeaponStore::reset()
 
 //-------------------------------------------------------------------------------------------------
 void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID,
-	const WeaponBonus& bonus, Int nuggetIndex, Bool dotTick, Bool contactHit)
+	const WeaponBonus& bonus, Int nuggetIndex, Bool dotTick, Bool contactHit, RetailDamageFXTrigger launchTrigger)
 {
 	WeaponDelayedDamageInfo wi;
 	wi.m_delayedWeapon = weapon;
@@ -1976,6 +1986,7 @@ void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* 
 	wi.m_nuggetIndex = nuggetIndex;
 	wi.m_dotTick = dotTick;
 	wi.m_contactHit = contactHit;
+	wi.m_launchTrigger = launchTrigger;
 	m_weaponDDI.push_back(wi);
 }
 

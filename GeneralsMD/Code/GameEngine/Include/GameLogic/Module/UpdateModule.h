@@ -264,6 +264,7 @@ public:
 	virtual void setFramesTillCountermeasureDiversionOccurs( UnsignedInt frames ) = 0; ///< Number of frames till missile diverts to countermeasures.
 	virtual void projectileNowJammed() = 0;
 	virtual void projectileSetLaunchWeapon(const WeaponTemplate*) {}
+	virtual const WeaponTemplate* projectileGetLaunchWeapon() const { return nullptr; }
 };
 
 //-------------------------------------------------------------------------------------------------

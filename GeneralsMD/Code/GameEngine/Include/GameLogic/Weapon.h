@@ -530,7 +530,8 @@ protected:
 	void orderNuggetSlaves(const Object* source, Object* victim, const Coord3D* position) const;
 	void orderNuggetHorde(const Object* source, Object* victim, const Coord3D* position) const;
 	void dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
-		Bool dotTick, Bool contactHit, const Coord3D* impactVelocity = nullptr) const;
+		Bool dotTick, Bool contactHit, const Coord3D* impactVelocity = nullptr,
+		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE) const;
 	void launchNuggetProjectiles(const Object* sourceObj, WeaponSlotType wslot, Int specificBarrelToUse, Object* victimObj,
 		const Coord3D& destination, Weapon* firingWeapon, ObjectID* projectileID) const;
 	Real estimateNuggetDamage(const Object* sourceObj, const Object* victimObj, const WeaponBonus& bonus, Int depth) const;
@@ -651,6 +652,8 @@ private:
 	Bool m_meleeWeapon;
 	Bool m_hitStoredTarget;
 	Bool m_bombardType;
+	RetailDamageFXTrigger m_retailFXTrigger = RETAIL_DAMAGE_FX_NONE;
+	Bool m_canBeDodged = FALSE;
 	Bool m_noVictimNeeded;
 	Bool m_useInnateAttributes;
 
@@ -963,7 +966,8 @@ protected:
 	void deleteAllDelayedDamage();
 	void resetWeaponTemplates();
 	void setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID,
-		const WeaponBonus& bonus, Int nuggetIndex = -1, Bool dotTick = FALSE, Bool contactHit = FALSE);
+		const WeaponBonus& bonus, Int nuggetIndex = -1, Bool dotTick = FALSE, Bool contactHit = FALSE,
+		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE);
 
 private:
 
@@ -985,6 +989,7 @@ private:
 		Int m_nuggetIndex;
 		Bool m_dotTick;
 		Bool m_contactHit;
+		RetailDamageFXTrigger m_launchTrigger;
 	};
 
 	std::vector<WeaponTemplate*> m_weaponTemplateVector;

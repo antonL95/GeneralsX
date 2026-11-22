@@ -418,6 +418,15 @@ protected:
 	*					will be filled with the results of the damage occurrence
 	*/
 //-------------------------------------------------------------------------------------------------
+enum RetailDamageFXTrigger : Int
+{
+	RETAIL_DAMAGE_FX_NONE,
+	RETAIL_DAMAGE_FX_CATAPULT_ROCK,
+	RETAIL_DAMAGE_FX_TREBUCHET_ROCK
+};
+
+inline const char* const RetailDamageFXTriggerNames[] = { "NONE", "CATAPULT_ROCK", "TREBUCHET_ROCK", nullptr };
+
 class DamageInfo : public Snapshot
 {
 
@@ -426,6 +435,7 @@ public:
 	DamageInfoInput		in;					///< inputs for the damage info
 	DamageInfoOutput	out;				///< results for the damage occurrence
 	Coord3D impactVelocity{};
+	RetailDamageFXTrigger retailFXTrigger = RETAIL_DAMAGE_FX_NONE;
 
 protected:
 

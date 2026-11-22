@@ -86,6 +86,7 @@
 #include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/ActiveBody.h"
 #include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/CountermeasuresBehavior.h"
@@ -4354,6 +4355,11 @@ void Object::crc( Xfer *xfer )
 			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey)
 				xfer->xferSnapshot(*module);
 		}
+#if !RTS_GENERALS
+		if (auto* body = dynamic_cast<ActiveBody*>(getBodyModule()))
+			if (!body->getRetailBodyData()->m_damageCreationLists.empty())
+				body->xferRetailSideDamage(xfer);
+#endif
 		if (AIUpdateInterface* ai = getAIUpdateInterface())
 		{
 			UnsignedInt burningDeathUntil = ai->getRetailBurningDeathDeadline();

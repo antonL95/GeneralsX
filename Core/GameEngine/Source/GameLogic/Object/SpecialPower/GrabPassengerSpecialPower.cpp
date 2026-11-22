@@ -4,6 +4,7 @@
 
 #include "Common/INI.h"
 #include "Common/INIException.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
@@ -12,6 +13,11 @@
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#if !RTS_GENERALS
+#include "Common/ThingFactory.h"
+#include "GameLogic/Damage.h"
+#include "GameLogic/Module/ActiveBody.h"
+#endif
 
 void GrabPassengerSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& fields)
 {
@@ -39,6 +45,16 @@ ModuleData* GrabPassengerSpecialPower::friend_newModuleData(INI* ini)
 
 GrabPassengerSpecialPower::~GrabPassengerSpecialPower() = default;
 
+#if !RTS_GENERALS
+static const ActiveBodyModuleData* chunkVendorData(const Object* target)
+{
+	if (!target->isKindOf(KINDOF_CHUNK_VENDOR))
+		return nullptr;
+	const auto* body = dynamic_cast<const ActiveBody*>(target->getBodyModule());
+	return body ? body->getRetailBodyData() : nullptr;
+}
+#endif
+
 Bool GrabPassengerSpecialPower::canGrab(const Object* target) const
 {
 	const Object* caster = getObject();
@@ -46,6 +62,16 @@ Bool GrabPassengerSpecialPower::canGrab(const Object* target) const
 	const ContainModuleInterface* contain = caster->getContain();
 	if (!target || target == caster || target->isEffectivelyDead() || !contain)
 		return FALSE;
+#if !RTS_GENERALS
+	if (RetailFileLayers::enabled() && getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_CHUNK)
+	{
+		const auto* vendor = chunkVendorData(target);
+		const Int capacity = contain->getContainMax();
+		return vendor && !vendor->m_grabObject.isEmpty() &&
+			TheThingFactory->findTemplate(vendor->m_grabObject, FALSE) &&
+			(capacity < 0 || contain->getContainCount() < static_cast<UnsignedInt>(capacity));
+	}
+#endif
 	if (target->isContained() && !target->getContainedBy()->isKindOf(KINDOF_HORDE))
 		return FALSE;
 	if (!data->m_allowTree && (target->isKindOf(KINDOF_TREE) || target->isKindOf(KINDOF_SHRUBBERY)))
@@ -143,6 +169,38 @@ void GrabPassengerSpecialPower::applyPowerEffect(const Coord3D*)
 	m_target = INVALID_ID;
 	if (!canGrab(target))
 		return;
+
+#if !RTS_GENERALS
+	if (RetailFileLayers::enabled() && getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_CHUNK)
+	{
+		const auto* vendor = chunkVendorData(target);
+		const ThingTemplate* chunkTemplate = TheThingFactory->findTemplate(vendor->m_grabObject, FALSE);
+		Object* chunk = TheThingFactory->newObject(chunkTemplate, target->getTeam());
+		if (!chunk)
+			return;
+		chunk->setProducer(caster);
+		const Coord2D& offset = vendor->m_grabOffset;
+		Vector3 world;
+		Matrix3D::Transform_Vector(*caster->getTransformMatrix(), Vector3(offset.x, offset.y, 0.0f), &world);
+		const Coord3D position{world.X, world.Y, world.Z};
+		chunk->setPosition(&position);
+		ContainModuleInterface* contain = caster->getContain();
+		if (contain->isValidContainerFor(chunk, TRUE))
+			contain->addToContain(chunk);
+		if (chunk->getContainedBy() != caster)
+		{
+			TheGameLogic->destroyObject(chunk);
+			return;
+		}
+		DamageInfo damage;
+		damage.in.m_sourceID = caster->getID();
+		damage.in.m_damageType = DAMAGE_STRUCTURAL;
+		damage.in.m_amount = vendor->m_grabDamage;
+		target->attemptDamage(&damage);
+		FXList::doFXPos(vendor->m_grabFX, &position);
+		return;
+	}
+#endif
 
 	if (Object* horde = target->getContainedBy())
 		horde->getContain()->removeFromContain(target);

@@ -46,12 +46,39 @@ class ParticleSystemTemplate;
 
 //-------------------------------------------------------------------------------------------------
 class FXList;
+class ObjectCreationList;
+
+enum RetailDestroyedSide : Int
+{
+	RETAIL_SIDE_NONE,
+	RETAIL_SIDE_FRONT,
+	RETAIL_SIDE_RIGHT,
+	RETAIL_SIDE_BACK,
+	RETAIL_SIDE_LEFT,
+	RETAIL_SIDE_COUNT
+};
+
+struct RetailDamageCreation
+{
+	const ObjectCreationList* list = nullptr;
+	RetailDamageFXTrigger trigger = RETAIL_DAMAGE_FX_NONE;
+	RetailDestroyedSide side = RETAIL_SIDE_NONE;
+};
 
 class ActiveBodyModuleData : public BodyModuleData
 {
 public:
 	Bool m_burningDeathBehavior = FALSE;
 	const FXList* m_burningDeathFX = nullptr;
+	Real m_cheerRadius = 0.0f;
+	Real m_dodgePercent = 0.0f;
+	AsciiString m_grabObject;
+	const FXList* m_grabFX = nullptr;
+	Real m_grabDamage = 0.0f;
+	Coord2D m_grabOffset{};
+	const FXList* m_healingBuffFX = nullptr;
+	UnsignedInt m_recoveryTime = 0;
+	std::vector<RetailDamageCreation> m_damageCreationLists;
 	Real m_maxHealth;
 	Real m_initialHealth;
 	Bool m_initialHealthSet;
@@ -84,6 +111,8 @@ public:
 	// virtual destructor prototype provided by memory pool declaration
 
 	virtual void onDelete() override;
+	const ActiveBodyModuleData* getRetailBodyData() const { return getActiveBodyModuleData(); }
+	void xferRetailSideDamage(Xfer* xfer);
 
 	virtual void attemptDamage( DamageInfo *damageInfo ) override;		///< try to damage this object
 	virtual Real estimateDamage( DamageInfoInput& damageInfo ) const override;
@@ -153,6 +182,12 @@ protected:
 	virtual void internalAddSubdualDamage( Real delta );								///< change health
 
 private:
+	void cheerEnemiesInRange() const;
+	void distributeSiegeDamage(Real amount, const Coord3D* origin);
+	void updateDestroyedSide(BodyDamageType oldState);
+	void createDamageDebris(RetailDamageFXTrigger trigger, RetailDestroyedSide side) const;
+	Real m_sideDamage[RETAIL_SIDE_COUNT - 1]{};
+	UnsignedInt m_destroyedSides = 0;
 
 	Real									m_currentHealth;				///< health of the object
 	Real									m_prevHealth;						///< previous health value before current health change op

@@ -53,6 +53,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Damage.h"
+#include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
@@ -65,6 +66,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DamageModule.h"
 #include "GameLogic/Module/DieModule.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 
 
 
@@ -173,6 +175,18 @@ static void parseInitialHealth(INI* ini, void* instance, void* store, const void
 	static_cast<ActiveBodyModuleData*>(instance)->m_initialHealthSet = TRUE;
 }
 
+static void parseDamageCreationList(INI* ini, void* instance, void*, const void*)
+{
+	static const char* const sides[] = { "NONE", "FRONT_DESTROYED", "RIGHT_DESTROYED", "BACK_DESTROYED", "LEFT_DESTROYED", nullptr };
+	RetailDamageCreation entry;
+	INI::parseObjectCreationList(ini, nullptr, &entry.list, nullptr);
+	if (const char* token = ini->getNextTokenOrNull())
+		entry.trigger = static_cast<RetailDamageFXTrigger>(INI::scanIndexList(token, RetailDamageFXTriggerNames));
+	if (const char* token = ini->getNextTokenOrNull())
+		entry.side = static_cast<RetailDestroyedSide>(INI::scanIndexList(token, sides));
+	static_cast<ActiveBodyModuleData*>(instance)->m_damageCreationLists.push_back(entry);
+}
+
 Real ActiveBodyModuleData::getStartingHealth() const
 {
 	if (RetailFileLayers::enabled() && !m_initialHealthSet)
@@ -203,6 +217,15 @@ void ActiveBodyModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{
 			{ "BurningDeathBehavior", INI::parseBool, nullptr, offsetof(ActiveBodyModuleData, m_burningDeathBehavior) },
 			{ "BurningDeathFX", INI::parseFXList, nullptr, offsetof(ActiveBodyModuleData, m_burningDeathFX) },
+			{ "CheerRadius", INI::parseReal, nullptr, offsetof(ActiveBodyModuleData, m_cheerRadius) },
+			{ "DamageCreationList", parseDamageCreationList, nullptr, 0 },
+			{ "DodgePercent", INI::parsePercentToReal, nullptr, offsetof(ActiveBodyModuleData, m_dodgePercent) },
+			{ "GrabObject", INI::parseAsciiString, nullptr, offsetof(ActiveBodyModuleData, m_grabObject) },
+			{ "GrabFX", INI::parseFXList, nullptr, offsetof(ActiveBodyModuleData, m_grabFX) },
+			{ "GrabDamage", INI::parseReal, nullptr, offsetof(ActiveBodyModuleData, m_grabDamage) },
+			{ "GrabOffset", INI::parseCoord2D, nullptr, offsetof(ActiveBodyModuleData, m_grabOffset) },
+			{ "HealingBuffFx", INI::parseFXList, nullptr, offsetof(ActiveBodyModuleData, m_healingBuffFX) },
+			{ "RecoveryTime", INI::parseDurationUnsignedInt, nullptr, offsetof(ActiveBodyModuleData, m_recoveryTime) },
 			{ "MaxHealthDamaged",				INI::parseReal,	nullptr,	offsetof( ActiveBodyModuleData, m_maxHealthDamaged ) },
 			{ "MaxHealthReallyDamaged",	INI::parseReal,	nullptr,	offsetof( ActiveBodyModuleData, m_maxHealthReallyDamaged ) },
 			{ nullptr, nullptr, nullptr, 0 }
@@ -610,8 +633,12 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 
 		if (!alreadyHandled)
 		{
-			// do the damage simplistic damage subtraction
+			if (RetailFileLayers::enabled() && damageInfo->in.m_damageType == DAMAGE_SIEGE && damager &&
+				!getActiveBodyModuleData()->m_damageCreationLists.empty())
+				distributeSiegeDamage(amount, damager->getPosition());
 			internalChangeHealth( -amount );
+			if (RetailFileLayers::enabled() && !getActiveBodyModuleData()->m_damageCreationLists.empty())
+				updateDestroyedSide(oldState);
 		}
 
 #ifdef ALLOW_SURRENDER
@@ -766,11 +793,17 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 				FXList::doFXObj(data->m_burningDeathFX, obj);
 			}
 			else
+			{
+				if (RetailFileLayers::enabled() && damager)
+					cheerEnemiesInRange();
 				obj->onDie(damageInfo);
+			}
 		}
 	}
 
 	doDamageFX(damageInfo);
+	if (RetailFileLayers::enabled())
+		createDamageDebris(damageInfo->retailFXTrigger, RETAIL_SIDE_NONE);
 
 	// Damaged repulsable civilians scare (repulse) other civs.	jba.
 	if( TheAI->getAiData()->m_enableRepulsors )
@@ -891,6 +924,85 @@ Bool ActiveBody::shouldRetaliate(Object *obj)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+void ActiveBody::distributeSiegeDamage(Real amount, const Coord3D* origin)
+{
+	const Object* object = getObject();
+	const Coord3D* position = object->getPosition();
+	const Vector3 direction(origin->x - position->x, origin->y - position->y, origin->z - position->z);
+	const Matrix3D* transform = object->getTransformMatrix();
+	const Real front = Vector3::Dot_Product(direction, transform->Get_X_Vector());
+	const Real right = -Vector3::Dot_Product(direction, transform->Get_Y_Vector());
+	const Real alignment[] = {front, right, -front, -right};
+	Int sides[] = {0, 1, 2, 3};
+	std::stable_sort(std::begin(sides), std::end(sides), [&](Int first, Int second) {
+		return alignment[first] > alignment[second];
+	});
+	const Real sideLimit = m_maxHealth * 0.1875f;
+	for (Int side : sides)
+	{
+		const Real damage = std::clamp(sideLimit - m_sideDamage[side], 0.0f, amount);
+		m_sideDamage[side] += damage;
+		amount -= damage;
+	}
+}
+
+void ActiveBody::updateDestroyedSide(BodyDamageType oldState)
+{
+	static const ModelConditionFlagType conditions[] = {
+		MODELCONDITION_DESTROYED_FRONT, MODELCONDITION_DESTROYED_RIGHT,
+		MODELCONDITION_DESTROYED_BACK, MODELCONDITION_DESTROYED_LEFT
+	};
+	Object* object = getObject();
+	const Real sideLimit = m_maxHealth * 0.1875f;
+	if (m_curDamageState != oldState)
+	{
+		for (ModelConditionFlagType condition : conditions)
+			object->clearModelConditionState(condition);
+		return;
+	}
+	if (sideLimit <= 0.0f || !object->isKindOf(KINDOF_STRUCTURE))
+		return;
+	for (Int side = 0; side < RETAIL_SIDE_COUNT - 1; ++side)
+	{
+		const UnsignedInt bit = 1u << side;
+		if (m_sideDamage[side] < sideLimit || (m_destroyedSides & bit) != 0)
+			continue;
+		m_destroyedSides |= bit;
+		for (ModelConditionFlagType condition : conditions)
+			object->clearModelConditionState(condition);
+		object->setModelConditionState(conditions[side]);
+		createDamageDebris(RETAIL_DAMAGE_FX_NONE, static_cast<RetailDestroyedSide>(side + 1));
+		break;
+	}
+}
+
+void ActiveBody::createDamageDebris(RetailDamageFXTrigger trigger, RetailDestroyedSide side) const
+{
+	for (const RetailDamageCreation& entry : getActiveBodyModuleData()->m_damageCreationLists)
+		if (entry.side == side && (side != RETAIL_SIDE_NONE || entry.trigger == trigger))
+			ObjectCreationList::create(entry.list, getObject(), nullptr);
+}
+
+void ActiveBody::cheerEnemiesInRange() const
+{
+	const Object* victim = getObject();
+	const Real radius = getActiveBodyModuleData()->m_cheerRadius;
+	const Object* host = victim->getContainedBy();
+	if (radius <= 0.0f || victim->isKindOf(KINDOF_PROJECTILE) || victim->isKindOf(KINDOF_INERT) ||
+		(host && host->getContain() && host->getContain()->getContainCount() > 1))
+		return;
+
+	PartitionFilterRelationship enemies(victim, PartitionFilterRelationship::ALLOW_ENEMIES);
+	PartitionFilterAlive alive;
+	PartitionFilterSameMapStatus mapStatus(victim);
+	PartitionFilter* filters[] = { &enemies, &alive, &mapStatus, nullptr };
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(victim->getPosition(), radius,
+		FROM_CENTER_2D, filters, ITER_SORTED_NEAR_TO_FAR);
+	MemoryPoolObjectHolder hold(nearby);
+	for (Object* enemy = nearby->first(); enemy; enemy = nearby->next())
+		EmotionTrackerUpdate::signal(enemy, EMOTION_CHEER, victim);
+}
+
 void ActiveBody::attemptHealing( DamageInfo *damageInfo )
 {
 	validateArmorAndDamageFX();
@@ -929,6 +1041,17 @@ void ActiveBody::attemptHealing( DamageInfo *damageInfo )
 
 		// do the damage simplistic damage ADDITION
 		internalChangeHealth( amount );
+		if (RetailFileLayers::enabled() && !getActiveBodyModuleData()->m_damageCreationLists.empty())
+		{
+			for (Int side = 0; side < RETAIL_SIDE_COUNT - 1; ++side)
+			{
+				m_sideDamage[side] = std::max(0.0f, m_sideDamage[side] - (m_currentHealth - m_prevHealth) * 0.1875f);
+				if (m_sideDamage[side] < m_maxHealth * 0.1875f)
+					m_destroyedSides &= ~(1u << side);
+			}
+			if (m_curDamageState != oldState)
+				updateDestroyedSide(oldState);
+		}
 
 		// record the actual damage done from this, and when it happened
 		damageInfo->out.m_actualDamageDealt = amount;
@@ -954,6 +1077,8 @@ void ActiveBody::attemptHealing( DamageInfo *damageInfo )
 
 				d->onHealing( damageInfo );
 			}
+			if (RetailFileLayers::enabled() && !obj->getEnclosingContainedBy() && !obj->isKindOf(KINDOF_STRUCTURE))
+				FXList::doFXObj(getActiveBodyModuleData()->m_healingBuffFX, obj);
 		}
 
 		if (m_curDamageState != oldState)
@@ -1670,11 +1795,18 @@ void ActiveBody::crc( Xfer *xfer )
 	* Version Info:
 	* 1: Initial version */
 // ------------------------------------------------------------------------------------------------
+void ActiveBody::xferRetailSideDamage(Xfer* xfer)
+{
+	for (Real& damage : m_sideDamage)
+		xfer->xferReal(&damage);
+	xfer->xferUnsignedInt(&m_destroyedSides);
+}
+
 void ActiveBody::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1779,6 +1911,8 @@ void ActiveBody::xfer( Xfer *xfer )
 
 	// armor set flags
 	m_curArmorSetFlags.xfer( xfer );
+	if (RetailFileLayers::enabled() && version >= 2)
+		xferRetailSideDamage(xfer);
 
 }
 

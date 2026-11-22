@@ -785,9 +785,9 @@ void DumbProjectileBehavior::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
 #else
-	XferVersion currentVersion = 2;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -842,6 +842,15 @@ void DumbProjectileBehavior::xfer( Xfer *xfer )
 	if( version >= 2 )
 	{
 		xfer->xferInt( &m_currentFlightPathStep );
+	}
+	if (RetailFileLayers::enabled() && version >= 3)
+	{
+		AsciiString launchName;
+		if (m_launchWeaponTmpl)
+			launchName = m_launchWeaponTmpl->getName();
+		xfer->xferAsciiString(&launchName);
+		if (xfer->getXferMode() == XFER_LOAD)
+			m_launchWeaponTmpl = launchName.isEmpty() ? nullptr : TheWeaponStore->findWeaponTemplate(launchName);
 	}
 
 }
