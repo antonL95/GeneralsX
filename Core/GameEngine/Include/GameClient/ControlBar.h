@@ -411,6 +411,10 @@ public:
 	const ModelConditionFlags& getAutoAbilityDisallowedOnModelCondition() const { return m_autoAbilityDisallowedOnModelCondition; }
 	const std::vector<AsciiString>& getCommandTriggers() const { return m_commandTriggers; }
 	const AsciiString& getToggleButtonName() const { return m_toggleButtonName; }
+	const std::vector<AsciiString>& getCreateAHeroUIAllowableUpgrades() const { return m_createAHeroUIAllowableUpgrades; }
+	Int getCreateAHeroUIMinimumLevel() const { return m_createAHeroUIMinimumLevel; }
+	const AsciiString& getCreateAHeroUIPrerequisiteButtonName() const { return m_createAHeroUIPrerequisiteButtonName; }
+	Int getCreateAHeroUICostIfSelected() const { return m_createAHeroUICostIfSelected; }
 	const CommandButton* resolveRetailToggleButton(const Object* obj) const;
 	static const FieldParse* getRetailFieldParse() { return s_rotwkCommandButtonFieldParseTable; }
 	Bool isRetailPassive() const;
@@ -510,6 +514,10 @@ private:
 	ModelConditionFlags m_autoAbilityDisallowedOnModelCondition;
 	std::vector<AsciiString> m_commandTriggers;
 	AsciiString m_toggleButtonName;
+	std::vector<AsciiString> m_createAHeroUIAllowableUpgrades;
+	Int m_createAHeroUIMinimumLevel = 0;
+	AsciiString m_createAHeroUIPrerequisiteButtonName;
+	Int m_createAHeroUICostIfSelected = 0;
 
 	static const FieldParse s_rotwkCommandButtonFieldParseTable[];
 

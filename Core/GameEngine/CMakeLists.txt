@@ -729,6 +729,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/SpecialPower/GrabPassengerSpecialPower.cpp
     Source/GameLogic/Object/Update/AutoPickUpUpdate.cpp
     Source/GameLogic/Object/Update/RespawnModules.cpp
+    Source/GameLogic/System/CreateAHeroSystem.cpp
     Source/GameLogic/System/HeroRoster.cpp
     Source/GameLogic/Map/CastleTemplateStore.cpp
     Source/GameLogic/System/ExperienceLevelStore.cpp
@@ -756,6 +757,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailPackage13TestCommands.cpp
     Source/GameLogic/System/RetailPackage16TestCommands.cpp
     Source/GameLogic/System/RetailPackage19TestCommands.cpp
+    Source/GameLogic/System/RetailPackage18TestCommands.cpp
 
     Source/GameLogic/System/RetailPackage08TestCommands.cpp
     Source/GameLogic/System/RetailPackage11TestCommands.cpp

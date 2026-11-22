@@ -51,6 +51,7 @@
 #include "Common/INIAudit.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailHudExtras.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/RetailCreationUpgrades.h"
 #include "Common/GlobalData.h"
@@ -614,6 +615,7 @@ void GameEngine::init()
 		{
 			RetailEva::load();
 			RetailNotification::load();
+			CreateAHeroSystem::load();
 		}
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), nullptr);
 		initSubsystem(TheAI,"TheAI", MSGNEW("GameEngineSubsystem") AI(), &xferCRC,  "Data\\INI\\Default\\AIData", "Data\\INI\\AIData");

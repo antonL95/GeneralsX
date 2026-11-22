@@ -169,6 +169,10 @@ const FieldParse CommandButton::s_rotwkCommandButtonFieldParseTable[] =
 	{ "AutoAbilityDisallowedOnModelCondition", ModelConditionFlags::parseFromINI, nullptr, offsetof(CommandButton, m_autoAbilityDisallowedOnModelCondition) },
 	{ "CommandTrigger", INI::parseAsciiStringVector, nullptr, offsetof(CommandButton, m_commandTriggers) },
 	{ "ToggleButtonName", INI::parseAsciiString, nullptr, offsetof(CommandButton, m_toggleButtonName) },
+	{ "CreateAHeroUIAllowableUpgrades", INI::parseAsciiStringVector, nullptr, offsetof(CommandButton, m_createAHeroUIAllowableUpgrades) },
+	{ "CreateAHeroUIMinimumLevel", INI::parseInt, nullptr, offsetof(CommandButton, m_createAHeroUIMinimumLevel) },
+	{ "CreateAHeroUIPrerequisiteButtonName", INI::parseAsciiString, nullptr, offsetof(CommandButton, m_createAHeroUIPrerequisiteButtonName) },
+	{ "CreateAHeroUICostIfSelected", INI::parseInt, nullptr, offsetof(CommandButton, m_createAHeroUICostIfSelected) },
 	{ nullptr, nullptr, nullptr, 0 }
 };
 static void commandButtonTooltip(GameWindow *window,
