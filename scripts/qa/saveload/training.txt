@@ -25,6 +25,7 @@
 45 pkg08-mount Player_1 DolAmrothPorter 0 off
 48 pkg08-rider-state Player_1 DolAmrothPorter 0
 80 create Player_1 MordorBase 0 2830,990,90
+80 snapshot-register-footprint Player_1 MordorBase 0
 83 pkg08-base-state Player_1 MordorBase 0
 84 objupgrade Player_1 MordorBase 0 Upgrade_TestBuilding
 85 pkg08-base-state Player_1 MordorBase 0
@@ -33,6 +34,7 @@
 88 objupgrade Player_1 MordorBase 0 Upgrade_TestBuilding
 89 pkg08-base-state Player_1 MordorBase 0
 90 create Player_1 GondorCastleKeep 0 2770,1310,0
+90 snapshot-register-footprint Player_1 GondorCastleKeep 0
 91 create Player_1 IthilienPathfinder 0 2780,1280,0
 92 create Player_1 GondorFighter 0 2770,1260,0
 96 pkg08-enter Player_1 IthilienPathfinder 0 Player_1:GondorCastleKeep:0

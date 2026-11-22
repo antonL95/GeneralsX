@@ -2,7 +2,7 @@
 set -eu
 
 if [ "$#" -ne 4 ]; then
-    printf '%s\n' "Usage: $0 BUILD_DIR {training|high-pass|zero-hour} SAVE_FRAME FRAME_COUNT" >&2
+    printf '%s\n' "Usage: $0 BUILD_DIR {training|high-pass|spellbook|zero-hour} SAVE_FRAME FRAME_COUNT" >&2
     exit 2
 fi
 
@@ -26,8 +26,9 @@ work=${PKGS1_ROTWK_DATA:-/game-install/rotwk}
 aotr=${PKGS1_AOTR_DATA:-/game-install/aotr}
 bfme2=${PKGS1_BFME2_DATA:-/game-install/bfme2}
 engine="$build/GeneralsMD/GeneralsXZH"
+path_unit=
 case "$mode" in
-    training)
+    training|spellbook)
         scenario="$fixtures/training.txt"
         package="$aotr/UserData/Maps/AotR Training Grounds"
         mapdir="$XDG_DATA_HOME/GeneralsX/GeneralsZH/Maps/aotr training grounds"
@@ -39,10 +40,16 @@ case "$mode" in
         cat "$fixtures/training.ini" >> "$mapdir/map.ini"
         cat "$fixtures/training.gdb" > "$out/start.gdb"
         sed '/^break ScriptEngine::startEndGameTimer/,$!d' "$fixtures/training.gdb" > "$out/resume.gdb"
+        if [ "$mode" = spellbook ]; then
+            cat "$fixtures/drop-book.gdb" >> "$out/start.gdb"
+        else
+            path_unit='Player_1 IthilienPathfinder 1'
+        fi
         ;;
     high-pass)
         scenario="$fixtures/high-pass.txt"
         map='maps/map mp high pass/map mp high pass.map'
+        path_unit='Player_1 GondorFighter 0'
         touch "$out/start.gdb" "$out/resume.gdb"
         ;;
     zero-hour)
@@ -57,14 +64,22 @@ esac
 diag=${PKGS1_DIAGNOSTICS:-"$save_frame,$((save_frame + 1))"}
 {
     awk -v end="$end" '$1 <= end && $2 != "quit" && $2 != "xpcrc"' "$scenario"
+    if [ -n "$path_unit" ]; then
+        printf '%s snapshot-path-queue %s\n' "$save_frame" "$path_unit"
+        printf '%s snapshot-path-state %s\n' "$save_frame" "$path_unit"
+        printf '%s snapshot-path-state %s\n' "$((save_frame + 1))" "$path_unit"
+    fi
     printf '%s\n' "$diag" | tr ',' '\n' | awk -v end="$end" '/^[0-9]+$/ && $1 <= end {print $1, "snapshot-crc - - 0"; print $1, "logall - - 0"}'
     seq "$save_frame" "$end" | awk '{ print $1, "xpcrc - - 0" }'
     printf '%s quit - - 0\n' "$end"
 } | sort -sn > "$out/continue.txt"
 
-awk -v frame="$save_frame" '$1 >= frame' "$out/continue.txt" > "$out/resume.txt"
+awk -v frame="$save_frame" '$1 >= frame && $2 != "snapshot-path-queue"' "$out/continue.txt" > "$out/resume.txt"
 {
     awk -v frame="$save_frame" '$1 < frame && $2 != "xpcrc" && $2 != "snapshot-crc" && $2 != "logall" && $2 != "quit"' "$out/continue.txt"
+    if [ -n "$path_unit" ]; then
+        printf '%s snapshot-path-queue %s\n' "$save_frame" "$path_unit"
+    fi
     printf '%s snapshot-save - - 0 parity.sav\n' "$save_frame"
     printf '%s quit - - 0\n' "$((save_frame + 1))"
 } > "$out/save.txt"
@@ -93,11 +108,34 @@ expect() {
 }
 run save start -file "$map"
 expect save "TEST snapshot-save frame=$save_frame code=0"
+if [ "$mode" = spellbook ]; then
+    grep '^TEST save-load removed spellbook id=[0-9][0-9]* next=[0-9][0-9]*$' "$out/save.log"
+    {
+        printf '%s snapshot-book-repair Player_1 GondorFighter 0\n' "$save_frame"
+        printf '%s quit - - 0\n' "$end"
+    } > "$out/resume.txt"
+    run resume resume -loadsave parity.sav
+    expect resume "TEST frame $end: quit"
+    grep '^TEST save-load repaired spellbook ' "$out/resume.log"
+    awk '
+        /^TEST save-load removed spellbook / { split($6, counter, "="); saved = counter[2] }
+        /^TEST save-load repaired spellbook / {
+            split($5, book, "="); split($6, unit, "=")
+            ok = saved && book[2] == saved && unit[2] > book[2] && $7 == "lookup=1"
+        }
+        END { exit !ok }
+    ' "$out/save.log" "$out/resume.log"
+    exit
+fi
 run continue start -file "$map"
 expect continue "TEST frame $end: quit"
 run resume resume -loadsave parity.sav
 expect resume "TEST frame $end: quit"
 for phase in continue resume; do
+    if [ -n "$path_unit" ]; then
+        expect "$phase" "TEST save-load path-state frame=$save_frame waiting=1"
+        expect "$phase" "TEST save-load path-state frame=$((save_frame + 1)) waiting=0"
+    fi
     awk -v first="$save_frame" -v last="$end" '
         /^TEST xp-crc frame=[0-9]+ crc=[0-9A-F]+$/ {
             split($3, f, "=")
@@ -107,6 +145,10 @@ for phase in continue resume; do
         END {if (count != last - first + 1) exit 1}
     ' "$out/$phase.log" > "$out/$phase.crc"
 done
+if [ -n "$path_unit" ]; then
+    expect save "TEST save-load path-queue frame=$save_frame queued=1"
+    expect continue "TEST save-load path-queue frame=$save_frame queued=1"
+fi
 paste "$out/continue.crc" "$out/resume.crc" | awk '
     $1 != $3 || $2 != $4 { if (!different++) print "First mismatch", $0 }
     END { print "Compared " NR " frames. Differences " different + 0; exit (different > 0) }

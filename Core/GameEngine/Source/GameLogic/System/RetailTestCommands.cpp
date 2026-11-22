@@ -170,6 +170,8 @@ void runRetailParticleTestCommand(std::string_view action, const Object* source,
 	const Coord3D* location, const char* argument, UnsignedInt frame);
 void runRetailPlacementTestCommand(Object* source, const char* name, const Coord3D* target, UnsignedInt frame);
 void logRetailPlacementTestObject(const Object* object, const char* name, UnsignedInt frame);
+void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, UnsignedInt frame);
+void runRetailSaveLoadBookTestCommand(Player* player, const char* templateName);
 #if !RTS_GENERALS
 void runRetailPackage05TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage07TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
@@ -2306,6 +2308,14 @@ void execute(const Command& command, unsigned int frame)
 		const std::string name = command.structure.substr(0, separator);
 		runRetailParticleTestCommand(command.action, command.target != "-" ? findObject(command) : nullptr,
 			target, command.hasLocation ? &location : nullptr, name.c_str(), frame);
+	if (command.action == "snapshot-path-state" || command.action == "snapshot-register-footprint")
+	{
+		runRetailSaveLoadPathTestCommand(command.action, findObject(command, true), frame);
+		return;
+	}
+	if (command.action == "snapshot-book-repair")
+	{
+		runRetailSaveLoadBookTestCommand(findPlayer(command), command.target.c_str());
 		return;
 	}
 	if (command.action.starts_with("pw-") && runPowerCommand(command.action, findPlayer(command),
@@ -3568,7 +3578,8 @@ void runFrame(unsigned int frame)
 			continue;
 		if (retail)
 		{
-			if (command.action != "snapshot-share" && command.action != "snapshot-overlap")
+			if (command.action != "snapshot-share" && command.action != "snapshot-overlap" &&
+				command.action != "snapshot-path-queue")
 				execute(command, frame);
 		}
 		else if (command.action == "xpcrc" || command.action == "snapshot-crc" ||
@@ -3594,6 +3605,8 @@ void saveCheckpoint(unsigned int frame)
 		}
 		else if (RetailFileLayers::enabled() && (command.action == "snapshot-share" || command.action == "snapshot-overlap"))
 			execute(command, frame);
+		else if (RetailFileLayers::enabled() && command.action == "snapshot-path-queue")
+			runRetailSaveLoadPathTestCommand(command.action, findObject(command, true), frame);
 	}
 }
 }
