@@ -3006,7 +3006,10 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 //#endif
 
 
-	setRadiusCursorNone();
+	const Bool retailTargetingHint = RetailFileLayers::enabled() && m_mouseMode == MOUSEMODE_GUI_COMMAND &&
+		m_pendingGUICommand && (t == GameMessage::MSG_VALID_GUICOMMAND_HINT || t == GameMessage::MSG_INVALID_GUICOMMAND_HINT);
+	if (!retailTargetingHint)
+		setRadiusCursorNone();
   if ( TheGlobalData->m_doubleClickAttackMove )
   {
     if ( --m_duringDoubleClickAttackMoveGuardHintTimer > 0 )
@@ -3192,6 +3195,8 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 			{
 				if (underWindow)
 				{
+					if (retailTargetingHint)
+						setRadiusCursorNone();
 					setMouseCursor(Mouse::ARROW);
 					return;
 				}
@@ -3200,12 +3205,22 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 				{
 					if( m_pendingGUICommand->isContextCommand() ||
 							m_pendingGUICommand->getCommandType() == GUI_COMMAND_SPECIAL_POWER ||
-							m_pendingGUICommand->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT )
+							m_pendingGUICommand->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
+							(retailTargetingHint && m_pendingGUICommand->getCommandType() == GUI_COMMAND_SPELL_BOOK) )
 					{
 						//Here is the hook for when we are in a context sensitive command mode. We can
 						//either do the specified command mode command or nothing! Whether or not the
 						//command is valid or not was determined in evaluateContextCommand which is
 						//called first, and posts the appropriate message.
+						if (retailTargetingHint && m_pendingGUICommand->getRadiusCursorType() != RADIUSCURSOR_NONE)
+						{
+							setRadiusCursor(m_pendingGUICommand->getRadiusCursorType(),
+								m_pendingGUICommand->getSpecialPowerTemplate(), m_pendingGUICommand->getWeaponSlot());
+							m_curRadiusCursor.setTargetingValidity(t == GameMessage::MSG_VALID_GUICOMMAND_HINT);
+							setMouseCursor(Mouse::NONE);
+							break;
+						}
+
 						AsciiString cursorName;	// empty by default
 						switch( t )
 						{
@@ -3227,9 +3242,9 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 						{
 							setMouseCursor( Mouse::CROSS );
 						}
-						setRadiusCursor(m_pendingGUICommand->getRadiusCursorType(), //*****************************************************************
-														m_pendingGUICommand->getSpecialPowerTemplate(),
-														m_pendingGUICommand->getWeaponSlot());
+						if (!retailTargetingHint)
+							setRadiusCursor(m_pendingGUICommand->getRadiusCursorType(),
+								m_pendingGUICommand->getSpecialPowerTemplate(), m_pendingGUICommand->getWeaponSlot());
 					}
 					else if( BitIsSet( m_pendingGUICommand->getOptions(), COMMAND_OPTION_NEED_TARGET ) )
 					{

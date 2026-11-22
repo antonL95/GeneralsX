@@ -28,6 +28,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/RetailFileLayers.h"
+#include "GameClient/Mouse.h"
 #include "GameClient/RetailClientAudio.h"
 #if !RTS_GENERALS
 #include "GameLogic/Module/RotwkModifierModules.h"
@@ -4871,6 +4872,19 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 					//
 					if (TheInGameUI->isInForceAttackMode()) {
 						evaluateForceAttack(draw, draw->getPosition(), DO_HINT );
+					} else if (RetailFileLayers::enabled() && command && command->getSpecialPowerTemplate() &&
+						BitIsSet(command->getOptions(), COMMAND_OPTION_NEED_TARGET)) {
+						const ICoord2D& pixel = TheMouse->getMouseStatus()->pos;
+						Coord3D position;
+						if (TheTacticalView->screenToTerrain(&pixel, &position))
+						{
+							const auto pick = static_cast<PickType>(getPickTypesForContext(FALSE));
+							Drawable* orderTarget = TheTacticalView->pickDrawable(&pixel, FALSE, pick);
+							const Object* object = orderTarget ? orderTarget->getObject() : nullptr;
+							if (!object || (object->isEffectivelyDead() && !object->isKindOf(KINDOF_ALWAYS_SELECTABLE)))
+								orderTarget = nullptr;
+							evaluateContextCommand(orderTarget, &position, DO_HINT);
+						}
 					} else {
 						evaluateContextCommand( draw, draw->getPosition(), DO_HINT );
 					}

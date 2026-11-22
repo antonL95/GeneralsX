@@ -232,7 +232,8 @@ void RadiusDecalTemplate::createRadiusDecal(const Coord3D& pos, Real radius, con
 		if (result.m_decal)
 		{
 			result.m_decal->setAngle(0.0f);
-			result.m_decal->setColor(m_color == 0 ? owningPlayer->getPlayerColor() : m_color);
+			result.m_baseColor = m_color == 0 ? owningPlayer->getPlayerColor() : m_color;
+			result.m_decal->setColor(result.m_baseColor);
 			result.m_decal->setPosition(pos.x, pos.y, pos.z);
 			result.m_template = this;
 		}
@@ -368,6 +369,13 @@ void RadiusDecal::setOpacity( Real o )
 	{
 		m_decal->setOpacity(REAL_TO_INT(255.0f * o));
 	}
+}
+
+void RadiusDecal::setTargetingValidity(Bool valid)
+{
+	constexpr Color retailInvalidTargetColor = 0xff1414;
+	if (m_decal)
+		m_decal->setColor(valid ? m_baseColor : retailInvalidTargetColor);
 }
 
 // ------------------------------------------------------------------------------------------------

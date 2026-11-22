@@ -681,6 +681,11 @@ GameMessageDisposition SelectionTranslator::onMouseLeftDoubleClick(MAYBE_UNUSED 
 
 GameMessageDisposition SelectionTranslator::onMouseoverDrawableHint(MAYBE_UNUSED const GameMessage *msg)
 {
+	const CommandButton *command = TheInGameUI->getGUICommand();
+	if (RetailFileLayers::enabled() && command && command->getSpecialPowerTemplate() &&
+		BitIsSet(command->getOptions(), COMMAND_OPTION_NEED_TARGET))
+		return KEEP_MESSAGE;
+
 	if (TheInGameUI->isScrolling())
 	{
 		// dont show this now.
@@ -703,8 +708,6 @@ GameMessageDisposition SelectionTranslator::onMouseoverDrawableHint(MAYBE_UNUSED
 	TheInGameUI->createMouseoverHint(msg);
 	if (RetailFileLayers::enabled())
 		return DESTROY_MESSAGE;
-	const CommandButton *command = TheInGameUI->getGUICommand();
-
 	Bool ignoreCommand = FALSE;
 	if( command )
 	{
@@ -1118,6 +1121,9 @@ GameMessageDisposition SelectionTranslator::onRawMouseRightButtonUp(MAYBE_UNUSED
 			//Cancel GUI command mode... don't deselect units.
 			TheInGameUI->setGUICommand( nullptr );
 			TheInGameUI->setScrolling( FALSE );
+
+			if (RetailFileLayers::enabled())
+				return KEEP_MESSAGE;
 
 			//With a GUI command cancel, we want no other behavior.
 			return DESTROY_MESSAGE;

@@ -72,6 +72,7 @@ class RadiusDecal
 private:
 	const RadiusDecalTemplate*	m_template;
 	Shadow*											m_decal;
+	Color											m_baseColor = 0;
 	Bool												m_empty;
 public:
 	RadiusDecal();
@@ -89,6 +90,7 @@ public:
 	void update();
 	void setPosition(const Coord3D& pos);
 	void setOpacity( const Real o );
+	void setTargetingValidity(Bool valid);
 };
 
 // ------------------------------------------------------------------------------------------------
