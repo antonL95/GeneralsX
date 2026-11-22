@@ -1,0 +1,48 @@
+5 cash Player_1 - 0 25000
+5 power-reveal - - 0
+10 create Player_1 GondorFighterHorde 0 1070,650,0
+10 create Player_2 MordorFighterHorde 0 1270,650,180
+10 create Player_1 GondorFaramir 0 1300,900,0
+10 create Player_1 GondorForlong 0 2580,1332,0
+10 create Player_1 MenWallGateSmall 0 1110,1150,0
+10 hordespawn Player_1 GondorBarracks 0 at 1460 1130 0
+10 create Player_1 GondorKnightHorde 0 1850,1050,0
+10 create Player_1 RohanRohirrimHorde 0 1530,1630,0
+10 create Player_2 MordorArcherHorde 0 1740,1630,180
+10 create Player_1 BirdEmitter 0 730,1440,0
+10 create Player_2 DeerMale 0 770,1970,0
+11 create Player_1 GondorFighter 0 1010,1150,0
+11 stance Player_2 MordorArcherHorde 0 HoldGround
+11 create Player_1 Crow 0 860,560,0
+12 objupgrade Player_1 GondorBarracks 0 Upgrade_GondorBarracksLevel2
+13 power Player_1 GondorForlong 0 SpecialAbilityCaptureBuilding
+14 aim Player_1 GondorForlong 0 *:CaptureFlag:0
+15 create PlyrCreeps TreasureChestLevelUpMoriaAotR 0 1320,900,0
+16 move Player_1 GondorFaramir 0 at 1320 900
+20 attack Player_1 GondorFighterHorde 0 Player_2:MordorFighterHorde:0
+20 attack Player_2 MordorFighterHorde 0 Player_1:GondorFighterHorde:0
+20 stance Player_1 GondorFighterHorde 0 Aggressive
+22 select Player_1 GondorKnightHorde 0
+24 button Player_1 GondorKnightHorde 0 2
+40 capture PlyrCreeps MoriarGoblinLair 0 Player_1
+46 move Player_1 GondorFighter 0 at 1200 1150
+50 move Player_1 RohanRohirrimHorde 0 at 1950 1630
+52 science Player_1 - 0 SCIENCE_SpawnTrebuchet
+55 xpstate Player_1 GondorFaramir 0
+56 veterancy Player_1 GondorFaramir 0 2
+57 kill Player_1 GondorFaramir 0
+
+62 power-cast - - 6 at 1450 900
+68 create Player_1 GondorGandalf 0 1250,930,0
+69 autoability Player_1 GondorGandalf 0 on
+72 xpcp Player_1 - 0
+
+75 xpstate Player_1 GondorBarracks 0
+75 gatecheck Player_1 MenWallGateSmall 0 Player_1:GondorFighter:0
+76 neutralstate * CaptureFlag 0
+76 neutralstate Player_1 MoriarGoblinLair 0
+77 powers Player_1 MenSpellBook 0
+78 mods Player_1 GondorFighterHorde 0
+79 produce Player_1 MenFortressCitadel 0 GondorFaramir
+
+79 heroes Player_1 - 0

@@ -3559,13 +3559,20 @@ void logHordeDeath(const Object* object, const DamageInfo* damage)
 
 void runFrame(unsigned int frame)
 {
-	if (!RetailFileLayers::enabled())
-		return;
 	if (!s_loaded)
 		load();
+	const bool retail = RetailFileLayers::enabled();
 	for (const Command& command : s_commands)
 	{
-		if (command.frame == frame && command.action != "snapshot-share" && command.action != "snapshot-overlap")
+		if (command.frame != frame)
+			continue;
+		if (retail)
+		{
+			if (command.action != "snapshot-share" && command.action != "snapshot-overlap")
+				execute(command, frame);
+		}
+		else if (command.action == "xpcrc" || command.action == "snapshot-crc" ||
+			command.action == "logall" || command.action == "quit")
 			execute(command, frame);
 	}
 	if (!s_tracked.empty())
@@ -3574,17 +3581,19 @@ void runFrame(unsigned int frame)
 
 void saveCheckpoint(unsigned int frame)
 {
-	if (!RetailFileLayers::enabled() || !s_loaded || s_commands.empty())
+	if (!s_loaded || s_commands.empty())
 		return;
 	for (const Command& command : s_commands)
 	{
-		if (command.frame == frame && (command.action == "snapshot-share" || command.action == "snapshot-overlap"))
-			execute(command, frame);
-		if (command.frame == frame && command.action == "snapshot-save")
+		if (command.frame != frame)
+			continue;
+		if (command.action == "snapshot-save")
 		{
 			const SaveResult result = TheGameState->saveGame(command.structure.c_str(), UnicodeString(), SAVE_FILE_TYPE_NORMAL);
 			std::fprintf(stderr, "TEST snapshot-save frame=%u code=%d\n", frame, result.saveCode);
 		}
+		else if (RetailFileLayers::enabled() && (command.action == "snapshot-share" || command.action == "snapshot-overlap"))
+			execute(command, frame);
 	}
 }
 }

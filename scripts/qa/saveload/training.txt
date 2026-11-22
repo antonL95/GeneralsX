@@ -1,0 +1,64 @@
+8 create Player_1 DolAmrothPorter 0 2390,840,0
+10 fund Player_1 DolAmrothPorter 0
+11 shroudmap Player_1 DolAmrothPorter 0
+14 placecheck Player_1 DolAmrothPorter 0 DolAmrothGuardhouse 2450 1040 0
+15 pkg08-queue-state Player_1 DolAmrothPorter 0
+20 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothGuardhouse 2450 1040
+23 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothFarm 2440 520
+26 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothBattleTower 2400 620
+29 pkg08-queue-state Player_1 DolAmrothPorter 0
+30 cancelbuild Player_1 DolAmrothFarm 0
+32 pkg08-queue-state Player_1 DolAmrothPorter 0
+220 pkg08-queue-state Player_1 DolAmrothPorter 0
+600 pkg08-queue-state Player_1 DolAmrothPorter 0
+1000 pkg08-queue-state Player_1 DolAmrothPorter 0
+1300 pkg08-queue-state Player_1 DolAmrothPorter 0
+1600 pkg08-queue-state Player_1 DolAmrothPorter 0
+2050 pkg08-queue-state Player_1 DolAmrothPorter 0
+2600 pkg08-queue-state Player_1 DolAmrothPorter 0
+3100 pkg08-queue-state Player_1 DolAmrothPorter 0
+34 pkg08-contact Player_1 DolAmrothPorter 0 Player_1:DolAmrothGuardhouse:0
+34 pkg08-contact Player_1 Pkg08PorterControl 0 Player_1:DolAmrothGuardhouse:0
+40 pkg08-rider-state Player_1 DolAmrothPorter 0
+41 pkg08-mount Player_1 DolAmrothPorter 0 on
+44 pkg08-rider-state Player_1 DolAmrothPorter 0
+45 pkg08-mount Player_1 DolAmrothPorter 0 off
+48 pkg08-rider-state Player_1 DolAmrothPorter 0
+80 create Player_1 MordorBase 0 2830,990,90
+83 pkg08-base-state Player_1 MordorBase 0
+84 objupgrade Player_1 MordorBase 0 Upgrade_TestBuilding
+85 pkg08-base-state Player_1 MordorBase 0
+86 objupgrade Player_1 MordorBase 0 Upgrade_TestBuilding_2
+87 pkg08-base-state Player_1 MordorBase 0
+88 objupgrade Player_1 MordorBase 0 Upgrade_TestBuilding
+89 pkg08-base-state Player_1 MordorBase 0
+90 create Player_1 GondorCastleKeep 0 2770,1310,0
+91 create Player_1 IthilienPathfinder 0 2780,1280,0
+92 create Player_1 GondorFighter 0 2770,1260,0
+96 pkg08-enter Player_1 IthilienPathfinder 0 Player_1:GondorCastleKeep:0
+97 pkg08-enter Player_1 GondorFighter 0 Player_1:GondorCastleKeep:0
+320 pkg08-fire-state Player_1 IthilienPathfinder 0
+321 pkg08-fire-state Player_1 GondorFighter 0
+2950 pkg08-windows Player_1 DolAmrothBattleTower 0
+2951 pkg08-night Player_1 DolAmrothBattleTower 0 on
+2953 pkg08-windows Player_1 DolAmrothBattleTower 0
+2954 pkg08-flame Player_1 DolAmrothBattleTower 0 on
+2956 pkg08-windows Player_1 DolAmrothBattleTower 0
+2957 pkg08-flame Player_1 DolAmrothBattleTower 0 off
+2959 pkg08-windows Player_1 DolAmrothBattleTower 0
+2960 pkg08-night Player_1 DolAmrothBattleTower 0 off
+2962 pkg08-windows Player_1 DolAmrothBattleTower 0
+2720 damage Player_1 DolAmrothGuardhouse 0 500
+2721 pkg08-queue-state Player_1 DolAmrothPorter 0
+2722 repair Player_1 DolAmrothPorter 0 DolAmrothGuardhouse
+2890 pkg08-queue-state Player_1 DolAmrothPorter 0
+33 create Player_1 Pkg08PorterControl 0 2390,840,0
+40 pkg08-rider-state Player_1 Pkg08PorterControl 0
+41 pkg08-mount Player_1 Pkg08PorterControl 0 on
+44 pkg08-rider-state Player_1 Pkg08PorterControl 0
+100 create Player_1 IthilienPathfinder 1 2790,1050,0
+101 create PlyrCreeps MordorPorter 0 2890,1050,0
+102 create PlyrCreeps MordorPorter 1 3440,1050,0
+110 pkg08-chase-order Player_1 IthilienPathfinder 1 PlyrCreeps:MordorPorter:0
+111 pkg08-chase Player_1 IthilienPathfinder 1 PlyrCreeps:MordorPorter:0
+112 pkg08-chase Player_1 IthilienPathfinder 1 PlyrCreeps:MordorPorter:1
