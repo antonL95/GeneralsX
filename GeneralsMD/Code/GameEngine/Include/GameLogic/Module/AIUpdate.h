@@ -631,7 +631,6 @@ public:
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
 	const AsciiString& getRetailLuaEventsList() const { return getAIUpdateModuleData()->m_luaEventsList; }
 	void enterRetailRampage();
-	void onIgnited();
 	Bool isWithinHoldGroundCloseRange(const Object* target) const;
 	Bool canAttackFromGarrison() const { return getAIUpdateModuleData()->m_canAttackWhileContained; }
 

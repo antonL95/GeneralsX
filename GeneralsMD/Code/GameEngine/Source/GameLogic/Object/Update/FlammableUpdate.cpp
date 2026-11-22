@@ -32,12 +32,10 @@
 
 #include "Common/AudioEventRTS.h"
 #include "Common/GameAudio.h"
-#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
-#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/FlammableUpdate.h"
 #include "GameLogic/Module/FireSpreadUpdate.h"
@@ -104,10 +102,7 @@ void FlammableUpdate::onDamage( DamageInfo *damageInfo )
 	if( damageInfo->in.m_damageType == DAMAGE_FLAME || damageInfo->in.m_damageType == DAMAGE_PARTICLE_BEAM )
 	{
 		UnsignedInt now = TheGameLogic->getFrame();
-		const UnsignedInt expiration = getFlammableUpdateModuleData()->m_flameDamageExpirationDelay;
-		const Bool expired = RetailFileLayers::enabled() ? now - m_lastFlameDamageDealt > expiration :
-			now - expiration > m_lastFlameDamageDealt;
-		if (expired)
+		if( now - getFlammableUpdateModuleData()->m_flameDamageExpirationDelay > m_lastFlameDamageDealt )
 		{
 			// If it has been a long time since our last flame damage, reset the threshold
 			m_flameDamageLimit = getFlammableUpdateModuleData()->m_flameDamageLimitData;
@@ -227,8 +222,6 @@ void FlammableUpdate::tryToIgnite()
 		m_damageEndFrame = data->m_aflameDamageDelay ? now + data->m_aflameDamageDelay : 0;
 
 		setWakeFrame(getObject(), calcSleepTime());
-		if (auto* ai = me->getAIUpdateInterface())
-			ai->onIgnited();
 	}
 }
 

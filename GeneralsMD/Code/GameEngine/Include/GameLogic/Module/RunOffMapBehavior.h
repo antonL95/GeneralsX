@@ -20,7 +20,6 @@ public:
 	RunOffMapBehavior(Thing* thing, const ModuleData* data);
 	static RunOffMapBehavior* find(const Object* object);
 	void trigger();
-	Bool isWaitingForTrigger() const { return m_phase == Phase::Waiting; }
 	Bool isRunning() const { return m_phase == Phase::Running; }
 	UpdateSleepTime update() override;
 	void crcRetailState(Xfer* xfer);

@@ -5765,14 +5765,6 @@ Bool AIUpdateInterface::enterRetailBurningDeath()
 	return TRUE;
 }
 
-void AIUpdateInterface::onIgnited()
-{
-	if (!RetailFileLayers::enabled() || !getAIUpdateModuleData()->m_rampageRequiresAflame)
-		return;
-	if (const auto* runOff = RunOffMapBehavior::find(getObject()); runOff && runOff->isWaitingForTrigger())
-		enterRetailRampage();
-}
-
 void AIUpdateInterface::enterRetailRampage()
 {
 	Object* object = getObject();
