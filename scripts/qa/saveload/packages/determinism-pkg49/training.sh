@@ -57,6 +57,12 @@ TrollVoxFindTastyOrc'
 
     citadel=$(find_id 229 DolAmrothFortressCitadel Player_1)
     construction=BuildingConstructionLoop
+    if covers 241; then
+        expect "TEST save-load obstacle frame=241 template=DolAmrothFortressCitadel ownsCell=1"
+    fi
+    if covers 245; then
+        expect "TEST save-load obstacle frame=245 template=DolAmrothFortressCitadel ownsCell=1"
+    fi
     expect_request start 239 "$citadel" "$construction"
     expect_request stop 388 "$citadel" "$construction"
     reject_line "RETAIL AUDIO start frame=230 owner=$citadel sound=$construction"
