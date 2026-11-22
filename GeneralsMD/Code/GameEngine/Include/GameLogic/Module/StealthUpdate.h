@@ -171,6 +171,7 @@ public:
   void receiveGrant( Bool active = TRUE, UnsignedInt frames = 0 );
 	Bool canToggleRing() const;
 	void toggleRing();
+	void cancelOneRingEffect();
 	void suppressRing(UnsignedInt until);
 
   Bool isGrantedBySpecialPower() { return getStealthUpdateModuleData()->m_grantedBySpecialPower; }

@@ -76,6 +76,7 @@ void StealthDetectorUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "ExtraForbiddenKindOf",				KindOfMaskType::parseFromINI,				nullptr, offsetof( StealthDetectorUpdateModuleData, m_extraDetectKindofNot ) },
 		{ "CanDetectWhileGarrisoned",		INI::parseBool,											nullptr, offsetof( StealthDetectorUpdateModuleData, m_canDetectWhileGarrisoned ) },
 		{ "CanDetectWhileContained",		INI::parseBool,											nullptr, offsetof( StealthDetectorUpdateModuleData, m_canDetectWhileTransported ) },
+		{ "CancelOneRingEffect",			INI::parseBool,											nullptr, offsetof( StealthDetectorUpdateModuleData, m_cancelOneRingEffect ) },
 
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -309,6 +310,11 @@ UpdateSleepTime StealthDetectorUpdate::update()
 
 			// updateRate PLUS 1 is necessary to ensure it stays detected 'till we are called again...
 			stealth->markAsDetected(data->m_updateRate + 1);
+			if (RetailFileLayers::enabled() && data->m_cancelOneRingEffect &&
+				them->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE))
+			{
+				stealth->cancelOneRingEffect();
+			}
 
 			/** @todo srj -- evil hack here... this whole heat-vision thing is fucked.
 				don't want it on mines but no good way to do that. hack for now. */

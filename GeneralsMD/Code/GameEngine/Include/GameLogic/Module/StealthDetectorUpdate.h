@@ -53,6 +53,7 @@ public:
 	KindOfMaskType									m_extraDetectKindofNot;		///< units must NOT match any kindof bits set here, in order to be detected
 	Bool														m_canDetectWhileGarrisoned;
 	Bool														m_canDetectWhileTransported;
+	Bool														m_cancelOneRingEffect;
 
 	StealthDetectorUpdateModuleData()
 	{
@@ -67,6 +68,7 @@ public:
 		m_extraDetectKindofNot.clear();
 		m_canDetectWhileGarrisoned = false;
 		m_canDetectWhileTransported = false;
+		m_cancelOneRingEffect = false;
 	}
 
 	static void buildFieldParse(MultiIniFieldParse& p);

@@ -695,6 +695,35 @@ void StealthUpdate::setRingWorn(Bool worn)
 		FXList::doFXObj(fx, self);
 }
 
+void StealthUpdate::cancelOneRingEffect()
+{
+	Object* self = getObject();
+	if (!RetailFileLayers::enabled() || !self || self->isEffectivelyDead())
+		return;
+	if (!self->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE))
+		return;
+	if (m_ringToggleFrame && !m_ringToggleOn)
+		return;
+	const auto* data = getStealthUpdateModuleData();
+	if (data->m_ringDelayOff || data->m_ringAnimOff)
+	{
+		const UnsignedInt now = TheGameLogic->getFrame();
+		m_ringToggleOn = FALSE;
+		m_ringToggleFrame = now + std::max(1u, data->m_ringDelayOff);
+		m_ringAnimEnd = std::max(m_ringToggleFrame, now + data->m_ringAnimOff);
+		self->clearModelConditionState(MODELCONDITION_PUTTING_ON_RING);
+		self->setModelConditionState(MODELCONDITION_TAKING_OFF_RING);
+		setWakeFrame(self, UPDATE_SLEEP_NONE);
+	}
+	else
+	{
+		m_ringToggleFrame = 0;
+		m_ringAnimEnd = 0;
+		self->clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_PUTTING_ON_RING, MODELCONDITION_TAKING_OFF_RING));
+		setRingWorn(FALSE);
+	}
+}
+
 void StealthUpdate::suppressRing(UnsignedInt until)
 {
 	m_ringToggleFrame = 0;
