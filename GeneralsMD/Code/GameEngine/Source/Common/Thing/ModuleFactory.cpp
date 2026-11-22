@@ -184,6 +184,7 @@
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/GeometryUpgrade.h"
+#include "GameLogic/Module/TooltipUpgrade.h"
 #include "GameLogic/Module/RespawnModules.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/RetailGate.h"
@@ -326,6 +327,7 @@
 #include "GameClient/Module/SwayClientUpdate.h"
 #include "GameClient/Module/BeaconClientUpdate.h"
 #include "GameClient/Module/EvaAnnounceClientCreate.h"
+#include "GameClient/Module/RadarMarkerClientUpdate.h"
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 ModuleFactory *TheModuleFactory = nullptr;  ///< the module factory singleton
@@ -556,6 +558,7 @@ void ModuleFactory::init()
 		addModule( ReplaceSelfUpgrade );
 		addModule( DoCommandUpgrade );
 		addModule( GeometryUpgrade );
+		addModule( TooltipUpgrade );
 		addModule( InheritUpgradeCreate );
 		addModule( BuildableHeroListUpgrade );
 		addModule( AudioLoopUpgrade );
@@ -745,7 +748,10 @@ void ModuleFactory::init()
 	addModule( SwayClientUpdate );
 	addModule( BeaconClientUpdate );
 	if (RetailFileLayers::enabled())
+	{
 		addModule( EvaAnnounceClientCreate );
+		addModule( RadarMarkerClientUpdate );
+	}
 
 }
 

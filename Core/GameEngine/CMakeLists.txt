@@ -101,6 +101,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/ReplaceSelfUpgrade.h
     Include/GameLogic/Module/DoCommandUpgrade.h
     Include/GameLogic/Module/GeometryUpgrade.h
+    Include/GameLogic/Module/TooltipUpgrade.h
     Include/GameLogic/Module/FoundationAIUpdate.h
     Include/GameLogic/Module/RetailGate.h
     Include/GameLogic/Module/RetailSlowDeath.h
@@ -289,6 +290,7 @@ set(GAMEENGINE_SRC
     Include/GameClient/Module/AnimatedParticleSysBoneClientUpdate.h
     Include/GameClient/Module/BeaconClientUpdate.h
     Include/GameClient/Module/EvaAnnounceClientCreate.h
+    Include/GameClient/Module/RadarMarkerClientUpdate.h
     Include/GameClient/Module/SwayClientUpdate.h
     Include/GameClient/Mouse.h
     Include/GameClient/ParabolicEase.h
@@ -752,6 +754,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Upgrade/ReplaceSelfUpgrade.cpp
     Source/GameLogic/Object/Upgrade/DoCommandUpgrade.cpp
     Source/GameLogic/Object/Upgrade/GeometryUpgrade.cpp
+    Source/GameLogic/Object/Upgrade/TooltipUpgrade.cpp
     Source/GameLogic/Object/Update/FoundationAIUpdate.cpp
     Source/GameLogic/Object/Behavior/RetailGate.cpp
     Source/GameLogic/Object/Behavior/RetailSlowDeath.cpp
@@ -865,6 +868,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/Drawable/Update/AnimatedParticleSysBoneClientUpdate.cpp
     Source/GameClient/Drawable/Update/BeaconClientUpdate.cpp
     Source/GameClient/Drawable/Update/EvaAnnounceClientCreate.cpp
+    Source/GameClient/Drawable/Update/RadarMarkerClientUpdate.cpp
     Source/GameClient/Drawable/Update/SwayClientUpdate.cpp
     Source/GameClient/DrawGroupInfo.cpp
 #    Source/GameClient/Eva.cpp

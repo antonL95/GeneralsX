@@ -45,6 +45,7 @@
 
 #include "GameClient/Color.h"
 #include "GameClient/AptScene.h"
+#include "GameClient/Module/RadarMarkerClientUpdate.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Display.h"
 #include "GameClient/GameClient.h"
@@ -641,35 +642,40 @@ Bool W3DRadar::drawRetailAlert(Int pixelX, Int pixelY, Int width, Int height, co
 		&& ThePartitionManager->getShroudStatusForPlayer(viewer->getPlayerIndex(), &event.worldLoc) != CELLSHROUD_CLEAR)
 		return TRUE;
 
-	RadarEventType type = event.type;
 	const char *name;
-	switch (type)
+	switch (event.type)
 	{
 		case RADAR_EVENT_UNDER_ATTACK: name = "PingAttack"; break;
 		case RADAR_EVENT_INFORMATION: name = "PingInformation"; break;
 		case RADAR_EVENT_BEACON_PULSE: name = "PingBeacon"; break;
 		case RADAR_EVENT_UPGRADE: name = "PingUpgrade"; break;
 		case RADAR_EVENT_ONE_RING: name = "PingOneRing"; break;
-		default: name = "PingGeneric"; type = RADAR_EVENT_CONSTRUCTION; break;
+		default: name = "PingGeneric"; break;
 	}
 
-	auto &scene = m_retailAlerts[type];
+	drawRetailPing(pixelX, pixelY, width, height, event.worldLoc, name, now - event.createFrame,
+		event.dieFrame - event.createFrame);
+	return TRUE;
+}
+
+void W3DRadar::drawRetailPing(Int pixelX, Int pixelY, Int width, Int height, const Coord3D& position,
+	const char* name, UnsignedInt elapsed, UnsignedInt duration)
+{
+	auto &scene = m_retailPings[name];
 	if (!scene)
 		scene = std::make_unique<AptScene>("Palantir", AptScene::AnimatedExport{name});
 	const Int frames = scene->frameCount();
 	if (frames == 0)
-		return TRUE;
+		return;
 
-	const UnsignedInt elapsed = now - event.createFrame;
-	const UnsignedInt duration = std::max(1u, event.dieFrame - event.createFrame);
-	const Int frame = static_cast<Int>(static_cast<uint64_t>(frames) * elapsed / duration);
+	const Int frame = duration ? static_cast<Int>(static_cast<uint64_t>(frames) * elapsed / duration) : elapsed % frames;
 	ICoord2D radar;
-	worldToRadar(&event.worldLoc, &radar);
+	if (!worldToRadar(&position, &radar))
+		return;
 	ICoord2D center;
 	radarToPixel(&radar, &center, pixelX, pixelY, width, height);
 	const Real scale = scene->yScale();
 	scene->drawFrameAt(frame, center.x, center.y, scale * (4.0f / 3.0f), scale);
-	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1646,6 +1652,18 @@ void W3DRadar::draw( Int pixelX, Int pixelY, Int width, Int height )
 
 	// draw any radar events
 	drawEvents( ul.x, ul.y, scaledWidth, scaledHeight );
+
+	if (RetailFileLayers::enabled())
+	{
+		const UnsignedInt now = TheGameLogic->getFrame();
+		for (const auto* marker : RadarMarkerClientUpdate::activeMarkers())
+		{
+			const Coord3D* position = marker->getMarkerPosition();
+			if (position && now >= marker->getStartFrame())
+				drawRetailPing(ul.x, ul.y, scaledWidth, scaledHeight, *position, marker->getMarkerType().str(),
+					now - marker->getStartFrame(), 0);
+		}
+	}
 
 	if( m_reconstructViewBox )
 	{

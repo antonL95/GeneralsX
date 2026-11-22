@@ -78,7 +78,9 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/Eva.h"
 #include "GameClient/GameClient.h"
+#include "GameClient/GameText.h"
 #include "GameClient/InGameUI.h"
+#include "GameLogic/Module/TooltipUpgrade.h"
 
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
@@ -7363,6 +7365,10 @@ Int Object::getMultiLogicalBonePosition(const char* boneNamePrefix, Int maxBones
 //=============================================================================
 UnicodeString Object::getDisplayName() const
 {
+	if (const auto* labels = TooltipUpgrade::activeLabels(*this);
+		labels && labels->displayName.isNotEmpty() && TheGameText)
+		return TheGameText->fetch(labels->displayName);
+
 	if (m_createAHeroDisplayName.isEmpty())
 		return getTemplate()->getDisplayName();
 	UnicodeString name;

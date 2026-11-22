@@ -34,7 +34,9 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/Radar.h"
 #include "WW3D2/ww3dformat.h"
+#include <map>
 #include <memory>
+#include <string>
 
 class AptScene;
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
@@ -80,7 +82,9 @@ protected:
 	void drawSingleBeaconEvent( Int pixelX, Int pixelY, Int width, Int height, Int index );
 	void drawSingleGenericEvent( Int pixelX, Int pixelY, Int width, Int height, Int index );
 	Bool drawRetailAlert(Int pixelX, Int pixelY, Int width, Int height, const RadarEvent &event);
-	std::unique_ptr<AptScene> m_retailAlerts[RADAR_EVENT_NUM_EVENTS];
+	void drawRetailPing(Int pixelX, Int pixelY, Int width, Int height, const Coord3D& position,
+		const char* name, UnsignedInt elapsed, UnsignedInt duration);
+	std::map<std::string, std::unique_ptr<AptScene>> m_retailPings;
 	void loadMapRadarImage();
 
 	void initializeTextureFormats();				///< find format to use for the radar texture

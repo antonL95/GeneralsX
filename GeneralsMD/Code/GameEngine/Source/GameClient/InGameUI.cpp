@@ -59,6 +59,7 @@
 #include "GameClient/Diplomacy.h"
 #include "GameClient/Eva.h"
 #include "GameClient/GameText.h"
+#include "GameLogic/Module/TooltipUpgrade.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GadgetPushButton.h"
@@ -2813,6 +2814,12 @@ void InGameUI::createMouseoverHint( const GameMessage *msg )
 
 			UnicodeString str = thingTemplate->getDisplayName();
 			UnicodeString displayName = thingTemplate->getDisplayName();
+			const TooltipUpgradeModuleData* tooltipLabels = disguised ? nullptr : TooltipUpgrade::activeLabels(*obj);
+			if (tooltipLabels && tooltipLabels->displayName.isNotEmpty())
+			{
+				displayName = TheGameText->fetch(tooltipLabels->displayName);
+				str = displayName;
+			}
 			if( str.isEmpty() )
 			{
 				AsciiString txtTemp;
@@ -2877,6 +2884,16 @@ void InGameUI::createMouseoverHint( const GameMessage *msg )
 				Int value = boxes * TheGlobalData->m_baseValuePerSupplyBox;
 				warehouseFeedback.format(TheGameText->fetch("TOOLTIP:SupplyWarehouse"), value);
 				str.concat(warehouseFeedback);
+			}
+
+			if (tooltipLabels && tooltipLabels->description.isNotEmpty())
+			{
+				const UnicodeString description = TheGameText->fetch(tooltipLabels->description);
+				if (!description.isEmpty())
+				{
+					str.concat(L"\n");
+					str.concat(description);
+				}
 			}
 
       if (player)
