@@ -173,6 +173,7 @@ public:
 	void toggleRing();
 	void cancelOneRingEffect();
 	void suppressRing(UnsignedInt until);
+	void crcRingState(Xfer* xfer);
 	UnsignedInt getRingToggleFrame() const { return m_ringToggleFrame; }
 	UnsignedInt getRingAnimEndFrame() const { return m_ringAnimEnd; }
 	UnsignedInt getRingBlockedUntilFrame() const { return m_ringBlockedUntil; }

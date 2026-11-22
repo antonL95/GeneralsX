@@ -1451,6 +1451,12 @@ void StealthUpdate::xfer( Xfer *xfer )
 
 }
 
+void StealthUpdate::crcRingState(Xfer* xfer)
+{
+	xferRingState(xfer);
+	xfer->xferBool(&m_ringAnimOn);
+}
+
 void StealthUpdate::xferRingState(Xfer* xfer)
 {
 	xfer->xferUnsignedInt(&m_ringToggleFrame);

@@ -56,4 +56,16 @@ TEST(RingStealthTiming, RecoveryBlocksRewearingUntilExpiry)
 	EXPECT_TRUE(RingStealthTiming::canToggle(cfg, state, 100, true));
 }
 
+TEST(RingStealthTiming, RemovalOnlyConfigIsRejected)
+{
+	RingStealthTiming::Config cfg;
+	cfg.delayOff = 30;
+	cfg.animOff = 15;
+	cfg.hasOffFX = true;
+
+	RingStealthTiming::State state;
+	EXPECT_FALSE(RingStealthTiming::hasRingConfig(cfg));
+	EXPECT_FALSE(RingStealthTiming::canToggle(cfg, state, 50, false));
+}
+
 }

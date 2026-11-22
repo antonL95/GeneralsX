@@ -1324,10 +1324,10 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 #if !RTS_GENERALS
 		case GUI_COMMAND_BLOODTHIRSTY:
 			return BloodthirstyUpdate::find(obj) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
+#endif
 		case GUI_COMMAND_ONE_RING:
 			return obj && obj->getStealth() && obj->getStealth()->canToggleRing() ?
 				COMMAND_AVAILABLE : COMMAND_RESTRICTED;
-#endif
 		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
 		case GUI_COMMAND_TOGGLE_WEAPONSET:
 			return (usesToggleTray(command)
@@ -1366,7 +1366,6 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 {
 	switch (command->getCommandType())
 	{
-#if !RTS_GENERALS
 		case GUI_COMMAND_ONE_RING:
 		{
 			const Int slot = getRetailSlot(control);
@@ -1378,6 +1377,7 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 			msg->appendIntegerArgument(-1);
 			return CBC_COMMAND_USED;
 		}
+#if !RTS_GENERALS
 		case GUI_COMMAND_BLOODTHIRSTY:
 			if (!BloodthirstyUpdate::find(obj) || !TheInGameUI)
 				return CBC_COMMAND_NOT_USED;

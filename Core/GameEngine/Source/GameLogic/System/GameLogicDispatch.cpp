@@ -95,11 +95,11 @@
 #include "GameNetwork/NetworkInterface.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
+#include "GameLogic/Module/StealthUpdate.h"
+#include "GameLogic/HeroRoster.h"
 #if !RTS_GENERALS
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
-#include "GameLogic/Module/StealthUpdate.h"
-#include "GameLogic/HeroRoster.h"
 #endif
 
 
@@ -621,7 +621,6 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			if (!button)
 				break;
 
-#if !RTS_GENERALS
 			if (button->getCommandType() == GUI_COMMAND_ONE_RING)
 			{
 				if (source->getControllingPlayer() == msgPlayer && HeroRoster::buttonUpgradesMet(button, msgPlayer, source))
@@ -629,7 +628,6 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 						stealth->toggleRing();
 				break;
 			}
-#endif
 
 			for (const ObjectID id : currentlySelectedGroup->getAllIDs())
 			{

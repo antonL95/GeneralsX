@@ -102,6 +102,7 @@
 #include "GameLogic/Module/SpawnBehavior.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
+#include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/ToppleUpdate.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/UpgradeModule.h"
@@ -3631,6 +3632,8 @@ void Object::crc( Xfer *xfer )
 	{
 		xferRotwkPowerState(xfer);
 		xfer->xferInt(&m_constructionCostPaid);
+		if (StealthUpdate* stealth = getStealth())
+			stealth->crcRingState(xfer);
 	}
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;

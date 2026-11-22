@@ -27,8 +27,7 @@ struct State
 
 inline bool hasRingConfig(const Config& config)
 {
-	return config.delayOn || config.delayOff || config.animOn || config.animOff ||
-		config.delayAfterRemoving || config.hasOnFX || config.hasOffFX;
+	return config.animOn != 0 || config.delayAfterRemoving != 0;
 }
 
 inline bool canToggle(const Config& config, const State& state, uint32_t now, bool currentlyWorn)

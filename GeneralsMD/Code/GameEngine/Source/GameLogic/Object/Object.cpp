@@ -111,6 +111,7 @@
 #include "GameLogic/Module/SpawnBehavior.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
+#include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/StatusDamageHelper.h"
 #include "GameLogic/Module/StickyBombUpdate.h"
 #include "GameLogic/Module/SubdualDamageHelper.h"
@@ -4338,6 +4339,8 @@ void Object::crc( Xfer *xfer )
 		xferMountedCombatState(xfer);
 		xfer->xferInt(&m_constructionCostPaid);
 		xfer->xferUnsignedInt(&m_invulnerableUntil);
+		if (StealthUpdate* stealth = getStealth())
+			stealth->crcRingState(xfer);
 		if (AIUpdateInterface* ai = getAIUpdateInterface())
 		{
 			UnsignedInt burningDeathUntil = ai->getRetailBurningDeathDeadline();
