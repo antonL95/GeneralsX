@@ -481,6 +481,8 @@ void DualWeaponBehavior::crc(Xfer* xfer)
 	UpdateModule::crc(xfer);
 	xfer->xferBool(&m_forceCloseRange);
 	xfer->xferUnsignedInt(&m_lastSwitchFrame);
+	UnsignedInt wakeDelay = static_cast<UnsignedInt>(getWakeFrame());
+	xfer->xferUnsignedInt(&wakeDelay);
 }
 
 void DualWeaponBehavior::xfer(Xfer* xfer)
