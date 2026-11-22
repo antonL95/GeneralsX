@@ -176,6 +176,7 @@ void runRetailSaveLoadBookTestCommand(Player* player, const char* templateName);
 void runRetailPackage05TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage07TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage09TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
+void runRetailPackage10TestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 
 void runRetailPackage08TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D* position, UnsignedInt frame);
 #endif
@@ -2695,6 +2696,11 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action.starts_with("pkg07-"))
 	{
 		runRetailPackage07TestCommand(command.action, obj, findTarget(command, true), frame);
+		return;
+	}
+	if (command.action.starts_with("pkg10-"))
+	{
+		runRetailPackage10TestCommand(command.action, obj, command.structure.c_str(), frame);
 		return;
 	}
 	if (command.action.starts_with("pkg09-"))
