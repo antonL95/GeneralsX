@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
 #include <cstdio>
@@ -81,3 +82,18 @@ void runRetailPackage14TestCommand(std::string_view action, Object* object, cons
 	}
 }
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailPackage14TestCommands()
+{
+#if !RTS_GENERALS
+	registerPrefix("pkg14-", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		runRetailPackage14TestCommand(ctx.action, source, ctx.target, ctx.argument, ctx.frame);
+	});
+#endif
+}
+}

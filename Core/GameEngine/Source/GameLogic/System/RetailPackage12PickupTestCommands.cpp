@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
 #include <cstdio>
@@ -52,3 +53,18 @@ void runRetailPackage12PickupTestCommand(std::string_view action, Object* source
 	}
 }
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailPackage12PickupTestCommands()
+{
+#if !RTS_GENERALS
+	registerPrefix("pkg12-pickup-", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		runRetailPackage12PickupTestCommand(ctx.action, source, ctx.argument, ctx.frame);
+	});
+#endif
+}
+}

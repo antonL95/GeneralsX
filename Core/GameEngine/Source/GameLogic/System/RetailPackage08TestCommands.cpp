@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
 #include <cstdio>
@@ -197,3 +198,20 @@ void runRetailPackage08TestCommand(std::string_view action, Object* source, Obje
 	}
 }
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailPackage08TestCommands()
+{
+#if !RTS_GENERALS
+	registerPrefix("pkg08-", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		const Coord3D position = ctx.hasPosition ? ctx.groundLocation() : Coord3D{};
+		runRetailPackage08TestCommand(ctx.action, source, ctx.target, ctx.argument,
+			ctx.hasPosition ? &position : nullptr, ctx.frame);
+	});
+#endif
+}
+}

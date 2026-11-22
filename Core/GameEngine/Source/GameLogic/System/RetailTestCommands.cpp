@@ -169,27 +169,15 @@ struct RetailTeamBudgetFixture
 void runRetailPackage23TestCommand(std::string_view action, Player* player, Object* object, Object* target,
 	const char* name, const Coord3D& point, UnsignedInt frame);
 #if !RTS_GENERALS
-void runRetailPackage05TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage41TestCommand(std::string_view action, Object* source, UnsignedInt frame);
-void runRetailPackage07TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage17TestCommand(std::string_view action, Object* source, Object* target);
-void runRetailPackage09TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
-void runRetailPackage10TestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 void runRetailPackage50TestCommand(std::string_view action, Object* source, Object* target, const char* name, const char* argument, UnsignedInt frame);
-void runRetailPackage12TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
-void runRetailPackage12PickupTestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
-void runRetailPackage15TestCommand(std::string_view action, Object* source, UnsignedInt frame);
 void runRetailPackage21TestCommand(std::string_view action, Object* source, const char* argument, const Coord3D* position, UnsignedInt frame);
-void runRetailPackage13TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
-void runRetailPackage16TestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 void runRetailPackage19TestCommand(std::string_view action, Object* source, UnsignedInt frame);
 void runRetailPackage18TestCommand(std::string_view action, Player* player, Object* source, const char* argument, UnsignedInt frame);
 void runRetailPackage25TestCommand(std::string_view action, Object* source, Object* target, const Coord3D* position, UnsignedInt frame);
 void runRetailPackage24TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
 
-void runRetailPackage08TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D* position, UnsignedInt frame);
-void runRetailPackage11TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D& inputs, UnsignedInt frame);
-void runRetailPackage14TestCommand(std::string_view action, Object* object, const Object* killer, const char* argument, UnsignedInt frame);
 void runRetailPackage20TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D& inputs, UnsignedInt frame);
 void runRetailPackage22TestCommand(std::string_view action, Object* source, Object* target, const Coord3D& inputs, UnsignedInt frame);
 void runRetailPackage53TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
@@ -2692,64 +2680,15 @@ void execute(const Command& command, unsigned int frame)
 	}
 
 #if !RTS_GENERALS
-	if (command.action.starts_with("pkg08-"))
-	{
-		const Coord3D position = command.hasLocation ? groundLocation(command) : Coord3D{};
-		runRetailPackage08TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(),
-			command.hasLocation ? &position : nullptr, frame);
-		return;
-	}
-	if (command.action.starts_with("pkg05-"))
-	{
-		if (command.action == "pkg05-wear-ring")
-			selectObject(obj);
-		runRetailPackage05TestCommand(command.action, obj, findTarget(command, true), frame);
-		return;
-	}
-	if (command.action.starts_with("pkg07-"))
-	{
-		runRetailPackage07TestCommand(command.action, obj, findTarget(command, true), frame);
-		return;
-	}
 	if (command.action.starts_with("pkg17-"))
 	{
 		runRetailPackage17TestCommand(command.action, obj, findTarget(command, true));
-		return;
-	}
-	if (command.action.starts_with("pkg10-"))
-	{
-		runRetailPackage10TestCommand(command.action, obj, command.structure.c_str(), frame);
-		return;
-	}
-	if (command.action.starts_with("pkg12-ai-"))
-	{
-		runRetailPackage12TestCommand(command.action, obj, findTarget(command, true), frame);
-		return;
-	}
-	if (command.action.starts_with("pkg12-pickup-"))
-	{
-		runRetailPackage12PickupTestCommand(command.action, obj, command.structure.c_str(), frame);
-		return;
-	}
-	if (command.action.starts_with("pkg15-"))
-	{
-		runRetailPackage15TestCommand(command.action, obj, frame);
 		return;
 	}
 	if (command.action.starts_with("pkg21-"))
 	{
 		const Coord3D position = command.hasLocation ? groundLocation(command) : Coord3D{};
 		runRetailPackage21TestCommand(command.action, obj, command.structure.c_str(), command.hasLocation ? &position : nullptr, frame);
-		return;
-	}
-	if (command.action.starts_with("pkg13-"))
-	{
-		runRetailPackage13TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(), frame);
-		return;
-	}
-	if (command.action.starts_with("pkg16-"))
-	{
-		runRetailPackage16TestCommand(command.action, obj, command.structure.c_str(), frame);
 		return;
 	}
 	if (command.action.starts_with("pkg24-"))
@@ -2774,24 +2713,9 @@ void execute(const Command& command, unsigned int frame)
 			command.hasLocation ? &position : nullptr, frame);
 		return;
 	}
-	if (command.action.starts_with("pkg09-"))
-	{
-		runRetailPackage09TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(), frame);
-		return;
-	}
 	if (command.action.starts_with("pkg41-"))
 	{
 		runRetailPackage41TestCommand(command.action, obj, frame);
-		return;
-	}
-	if (command.action.starts_with("pkg11-"))
-	{
-		runRetailPackage11TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(), command.location, frame);
-		return;
-	}
-	if (command.action.starts_with("pkg14-"))
-	{
-		runRetailPackage14TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(), frame);
 		return;
 	}
 	if (command.action.starts_with("pkg20-"))
@@ -3748,6 +3672,18 @@ void registerRetailParticleTestCommands();
 void registerRetailPlacementTestCommands();
 void registerRetailPowerTestCommands();
 void registerRetailSaveLoadTestCommands();
+void registerRetailPackage05TestCommands();
+void registerRetailPackage07TestCommands();
+void registerRetailPackage08TestCommands();
+void registerRetailPackage09TestCommands();
+void registerRetailPackage10TestCommands();
+void registerRetailPackage11TestCommands();
+void registerRetailPackage12TestCommands();
+void registerRetailPackage12PickupTestCommands();
+void registerRetailPackage13TestCommands();
+void registerRetailPackage14TestCommands();
+void registerRetailPackage15TestCommands();
+void registerRetailPackage16TestCommands();
 
 void registerAllCommands()
 {
@@ -3764,6 +3700,18 @@ void registerAllCommands()
 	registerRetailPlacementTestCommands();
 	registerRetailPowerTestCommands();
 	registerRetailSaveLoadTestCommands();
+	registerRetailPackage05TestCommands();
+	registerRetailPackage07TestCommands();
+	registerRetailPackage08TestCommands();
+	registerRetailPackage09TestCommands();
+	registerRetailPackage10TestCommands();
+	registerRetailPackage11TestCommands();
+	registerRetailPackage12TestCommands();
+	registerRetailPackage12PickupTestCommands();
+	registerRetailPackage13TestCommands();
+	registerRetailPackage14TestCommands();
+	registerRetailPackage15TestCommands();
+	registerRetailPackage16TestCommands();
 }
 
 bool tracesCombat()

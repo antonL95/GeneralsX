@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
 #include <cstdio>
@@ -43,3 +44,18 @@ void runRetailPackage15TestCommand(std::string_view action, Object* object, Unsi
 		object->testStatus(OBJECT_STATUS_DEPLOYED), runOff && runOff->isRunning(), draw ? draw->getEffectiveOpacity() : -1.0f);
 }
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailPackage15TestCommands()
+{
+#if !RTS_GENERALS
+	registerPrefix("pkg15-", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		runRetailPackage15TestCommand(ctx.action, source, ctx.frame);
+	});
+#endif
+}
+}
