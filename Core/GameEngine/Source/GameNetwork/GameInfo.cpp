@@ -45,6 +45,7 @@
 #include "GameNetwork/FileTransfer.h"
 #include "GameNetwork/GameInfo.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/CreateAHeroRules.h"
 #include "GameNetwork/GameSpy/ThreadUtils.h"
 #include "GameNetwork/GameSpy/StagingRoomGameInfo.h"
 #include "GameNetwork/LANAPI.h"						// for testing packet size
@@ -1213,6 +1214,8 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
   Money startingCash = TheGlobalData->m_defaultStartingCash;
 	RetailSkirmishRules retailRules;
 	AsciiString createAHeroConfigs[MAX_SLOTS];
+	Bool sawHeroSlot[MAX_SLOTS] = {};
+	Bool invalidHeroSlot[MAX_SLOTS] = {};
   UnsignedShort restriction = 0; // Always the default
 
 	Bool sawMap = FALSE;
@@ -1364,7 +1367,16 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 			key.str()[2] >= '0' && key.str()[2] < '0' + MAX_SLOTS)
 		{
 			const Int heroSlot = key.str()[2] - '0';
-			createAHeroConfigs[heroSlot] = val;
+			if (sawHeroSlot[heroSlot] || static_cast<size_t>(val.getLength()) > CreateAHeroRules::MAX_ENCODED_LENGTH)
+			{
+				invalidHeroSlot[heroSlot] = TRUE;
+				createAHeroConfigs[heroSlot].clear();
+			}
+			else
+			{
+				sawHeroSlot[heroSlot] = TRUE;
+				createAHeroConfigs[heroSlot] = val;
+			}
 		}
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
@@ -1758,8 +1770,10 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 
 		for(Int i = 0; i<MAX_SLOTS; i++)
 		{
-			if (!createAHeroConfigs[i].isEmpty())
+			if (!invalidHeroSlot[i] && !createAHeroConfigs[i].isEmpty())
 				newSlot[i].setCreateAHeroConfig(createAHeroConfigs[i]);
+			else
+				newSlot[i].setCreateAHeroConfig(AsciiString::TheEmptyString);
 			game->setSlot(i,newSlot[i]);
 		}
 
@@ -1820,7 +1834,7 @@ void SkirmishGameInfo::crc( Xfer *xfer )
 void SkirmishGameInfo::xfer( Xfer *xfer )
 {
 #if RTS_GENERALS
-	const XferVersion currentVersion = 2;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 2;
 #else
 	const XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 4;
 #endif
@@ -1938,7 +1952,7 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 			{
 				UnsignedInt len = 0;
 				xfer->xferUnsignedInt(&len);
-				if (len > 0 && len <= 4096)
+				if (len > 0 && len <= CreateAHeroRules::MAX_ENCODED_LENGTH)
 				{
 					std::string buf(len, '\0');
 					xfer->xferUser(buf.data(), static_cast<Int>(len));
@@ -1946,6 +1960,14 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 				}
 				else
 				{
+					UnsignedInt remaining = len;
+					char scratch[256];
+					while (remaining > 0)
+					{
+						const UnsignedInt chunk = remaining > sizeof(scratch) ? static_cast<UnsignedInt>(sizeof(scratch)) : remaining;
+						xfer->xferUser(scratch, static_cast<Int>(chunk));
+						remaining -= chunk;
+					}
 					m_skirmishSlot[i].setCreateAHeroConfig(AsciiString::TheEmptyString);
 				}
 			}
@@ -1953,6 +1975,8 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 			{
 				const AsciiString& cfg = m_skirmishSlot[i].getCreateAHeroConfig();
 				UnsignedInt len = static_cast<UnsignedInt>(cfg.getLength());
+				if (len > CreateAHeroRules::MAX_ENCODED_LENGTH)
+					len = 0;
 				xfer->xferUnsignedInt(&len);
 				if (len > 0)
 					xfer->xferUser(const_cast<char*>(cfg.str()), static_cast<Int>(len));

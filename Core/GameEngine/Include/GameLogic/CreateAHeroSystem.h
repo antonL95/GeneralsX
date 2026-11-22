@@ -12,6 +12,7 @@ class Object;
 class Player;
 class Xfer;
 class CommandButton;
+class GameInfo;
 
 struct CreateAHeroBlingDef
 {
@@ -124,11 +125,16 @@ namespace CreateAHeroSystem
 	Bool isPowerButtonLegalForSelection(const CommandButton* button, const CreateAHeroRules::SelectionData& sel, Int selectedLevel, const std::vector<std::string>& chosenBefore);
 	Int effectivePowerCost(const CommandButton* button, Int selectedLevel);
 
+	AsciiString encodeSelectionCompact(const CreateAHeroRules::SelectionData& sel);
+	Bool decodeSelectionCompact(const AsciiString& encoded, CreateAHeroRules::SelectionData& out);
+
 	void setPlayerSelection(Int playerIndex, const CreateAHeroRules::SelectionData& sel);
 	Bool setPlayerSelectionEncoded(Int playerIndex, const AsciiString& encoded, const AsciiString& factionName);
 	const CreateAHeroRules::SelectionData* getPlayerSelection(Int playerIndex);
 	AsciiString getPlayerSelectionEncoded(Int playerIndex);
+	void ingestGameInfo(const GameInfo* gameInfo);
 
 	Bool applyToHero(Object* hero);
+	const std::vector<std::string>* getAppliedPowerButtons(const Object* hero);
 	void xferPlayer(const Player* player, Xfer* xfer);
 }

@@ -45,16 +45,6 @@ void runRetailPackage18TestCommand(std::string_view action, Player* player, Obje
 		const CommandButton* btn = (TheRetailCommandCatalog && argument && *argument)
 			? TheRetailCommandCatalog->findCommandButton(argument)
 			: nullptr;
-		std::string allowJoined;
-		if (btn)
-		{
-			for (const AsciiString& u : btn->getCreateAHeroUIAllowableUpgrades())
-			{
-				if (!allowJoined.empty())
-					allowJoined.push_back(',');
-				allowJoined.append(u.str());
-			}
-		}
 		CreateAHeroRules::SelectionData dwarfSel;
 		CreateAHeroSystem::buildDefaultSelection("Upgrade_CreateAHero_ClassDwarf", "Upgrade_CreateAHero_SubClass_0", dwarfSel);
 		CreateAHeroRules::SelectionData wraithSel;
@@ -89,9 +79,11 @@ void runRetailPackage18TestCommand(std::string_view action, Player* player, Obje
 		if (ok)
 			ok = CreateAHeroSystem::validateSelection(decoded, faction, normalized);
 		Bool wireOk = FALSE;
+		Int compactLen = 0;
 		if (ok)
 		{
-			const AsciiString encoded(CreateAHeroRules::encodeSelection(normalized).c_str());
+			const AsciiString compact = CreateAHeroSystem::encodeSelectionCompact(normalized);
+			compactLen = compact.getLength();
 			SkirmishGameInfo srcInfo;
 			srcInfo.init();
 			srcInfo.setMap("Maps/Training/Training.map");
@@ -100,7 +92,7 @@ void runRetailPackage18TestCommand(std::string_view action, Player* player, Obje
 			srcInfo.setSeed(1);
 			GameSlot slot0;
 			slot0.setState(SLOT_PLAYER, UnicodeString(L"P1"), 0x01020304);
-			slot0.setCreateAHeroConfig(encoded);
+			slot0.setCreateAHeroConfig(compact);
 			srcInfo.setSlot(0, slot0);
 			const AsciiString wire = GameInfoToAsciiString(&srcInfo);
 			SkirmishGameInfo dstInfo;
@@ -108,18 +100,22 @@ void runRetailPackage18TestCommand(std::string_view action, Player* player, Obje
 			if (ParseAsciiStringToGameInfo(&dstInfo, wire))
 			{
 				const GameSlot* dstSlot = dstInfo.getConstSlot(0);
-				if (dstSlot && dstSlot->getCreateAHeroConfig() == encoded)
+				if (dstSlot && dstSlot->getCreateAHeroConfig() == compact)
 				{
-					wireOk = CreateAHeroSystem::setPlayerSelectionEncoded(player->getPlayerIndex(), dstSlot->getCreateAHeroConfig(), faction);
+					CreateAHeroSystem::ingestGameInfo(&dstInfo);
+					wireOk = CreateAHeroSystem::getPlayerSelection(player->getPlayerIndex()) != nullptr
+						? TRUE
+						: CreateAHeroSystem::setPlayerSelectionEncoded(player->getPlayerIndex(), dstSlot->getCreateAHeroConfig(), faction);
 				}
 			}
 		}
 		std::fprintf(stderr,
-			"TEST pkg18 select frame=%u player=%d accepted=%d wireOk=%d class=%s subclass=%s blings=%zu attrs=%zu powers=%zu\n",
+			"TEST pkg18 select frame=%u player=%d accepted=%d wireOk=%d compactLen=%d class=%s subclass=%s blings=%zu attrs=%zu powers=%zu\n",
 			frame,
 			player->getPlayerIndex(),
 			ok ? 1 : 0,
 			wireOk ? 1 : 0,
+			compactLen,
 			ok ? normalized.classUpgrade.c_str() : "-",
 			ok ? normalized.subClassUpgrade.c_str() : "-",
 			ok ? normalized.blingUpgrades.size() : 0u,
@@ -140,16 +136,21 @@ void runRetailPackage18TestCommand(std::string_view action, Player* player, Obje
 			return (upg && source->hasUpgrade(upg)) ? 1 : 0;
 		};
 		const ExperienceTracker* tracker = source->getExperienceTracker();
+		const std::vector<std::string>* powers = CreateAHeroSystem::getAppliedPowerButtons(source);
+		const char* firstPower = (powers && !powers->empty()) ? powers->front().c_str() : "-";
 		std::fprintf(stderr,
-			"TEST pkg18 hero frame=%u object=%u hasGameMode=%d hasDwarf=%d hasSub0=%d hasSub1=%d hasCheck=%d checkName=%s rank=%d xp=%d\n",
+			"TEST pkg18 hero frame=%u object=%u name=%s hasGameMode=%d hasDwarf=%d hasSub0=%d hasSub1=%d hasCheck=%d checkName=%s powerCount=%zu firstPower=%s rank=%d xp=%d\n",
 			frame,
 			static_cast<unsigned>(source->getID()),
+			!source->getName().isEmpty() ? source->getName().str() : "-",
 			hasNamed(CreateAHeroSystem::getGameModeUpgradeName().str()),
 			hasNamed("Upgrade_CreateAHero_ClassDwarf"),
 			hasNamed("Upgrade_CreateAHero_SubClass_0"),
 			hasNamed("Upgrade_CreateAHero_SubClass_1"),
 			hasNamed(argument),
 			(argument && *argument) ? argument : "-",
+			powers ? powers->size() : 0u,
+			firstPower,
 			tracker ? tracker->getRank() : 0,
 			tracker ? static_cast<Int>(tracker->getRetailExperience()) : 0);
 		return;

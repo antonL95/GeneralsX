@@ -26,6 +26,7 @@ TEST(CreateAHeroRulesTest, ValidatesFactionAndPowerEligibility)
 	const std::vector<std::string> allowable = { "Upgrade_CreateAHero_ClassDwarf", "Upgrade_CreateAHero_ClassHeroOfTheWest" };
 	EXPECT_TRUE(CreateAHeroRules::isPowerAllowedForUpgrades(allowable, { "Upgrade_CreateAHero_ClassDwarf" }));
 	EXPECT_FALSE(CreateAHeroRules::isPowerAllowedForUpgrades(allowable, { "Upgrade_CreateAHero_ClassWraith" }));
+	EXPECT_FALSE(CreateAHeroRules::isPowerAllowedForUpgrades({}, { "Upgrade_CreateAHero_ClassDwarf" }));
 
 	EXPECT_TRUE(CreateAHeroRules::isPowerEligibleAtLevel(1, 1, "None", {}));
 	EXPECT_FALSE(CreateAHeroRules::isPowerEligibleAtLevel(3, 2, "None", {}));
@@ -82,9 +83,71 @@ TEST(CreateAHeroRulesTest, RoundTripsEncodedSelection)
 	EXPECT_EQ(decoded.primaryColor[0], 120);
 	EXPECT_EQ(decoded.primaryColor[1], 140);
 	EXPECT_EQ(decoded.primaryColor[2], 160);
+}
 
-	CreateAHeroRules::SelectionData bad;
-	EXPECT_FALSE(CreateAHeroRules::decodeSelection("invalid|data", bad));
+TEST(CreateAHeroRulesTest, CompactEncodingFitsAllEightLanSlots)
+{
+	CreateAHeroRules::CompactSelection compact;
+	compact.classIndex = 3;
+	compact.subClassIndex = 0;
+	compact.blingIndices = { 8, 2, 3, 0, 3, 7, 1 };
+	compact.attributeIndices = { 17, 15, 13, 6, 1 };
+	compact.powerIndices = { 12, 24 };
+	compact.primaryColor[0] = 120;
+	compact.primaryColor[1] = 140;
+	compact.primaryColor[2] = 160;
+	compact.heroName = "Dain";
+
+	const std::string wire = CreateAHeroRules::encodeCompact(compact);
+	EXPECT_LE(wire.size(), 45u);
+	EXPECT_LE((wire.size() + 5) * 8, 404u);
+
+	CreateAHeroRules::CompactSelection decoded;
+	ASSERT_TRUE(CreateAHeroRules::decodeCompact(wire, decoded));
+	EXPECT_EQ(decoded.classIndex, 3);
+	EXPECT_EQ(decoded.subClassIndex, 0);
+	EXPECT_EQ(decoded.blingIndices, compact.blingIndices);
+	EXPECT_EQ(decoded.attributeIndices, compact.attributeIndices);
+	EXPECT_EQ(decoded.powerIndices, compact.powerIndices);
+	EXPECT_EQ(decoded.primaryColor[0], 120);
+	EXPECT_EQ(decoded.primaryColor[1], 140);
+	EXPECT_EQ(decoded.primaryColor[2], 160);
+	EXPECT_EQ(decoded.heroName, "Dain");
+}
+
+TEST(CreateAHeroRulesTest, RejectsHostileAndMalformedInputs)
+{
+	CreateAHeroRules::SelectionData sel;
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("invalid|data", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection(std::string(CreateAHeroRules::MAX_ENCODED_LENGTH + 1, 'A'), sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|Name|A,,B|||1,2,3,4,5,6,7,8,9", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|Name||||256,0,0,0,0,0,0,0,0", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|Name||||-1,0,0,0,0,0,0,0,0", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|Name||||12x,0,0,0,0,0,0,0,0", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|Name|||| 10,0,0,0,0,0,0,0,0", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|Name||||1,2,3,4,5,6,7,8", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|" + std::string(40, 'N') + "||||1,2,3,4,5,6,7,8,9", sel));
+
+	std::string tooManyPowers = "C|S|N|||";
+	for (size_t i = 0; i <= CreateAHeroRules::MAX_POWER_COUNT; ++i)
+	{
+		if (i > 0)
+			tooManyPowers.push_back(',');
+		tooManyPowers.append("P" + std::to_string(i));
+	}
+	tooManyPowers.append("|1,2,3,4,5,6,7,8,9");
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection(tooManyPowers, sel));
+
+	CreateAHeroRules::CompactSelection compact;
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact("", compact));
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact("3.0.1.1.1.a0a0a0a0a0a0a0a0a0.N", compact));
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact("~" + std::string(CreateAHeroRules::MAX_COMPACT_LENGTH + 1, '0'), compact));
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact("~3.0.1.1.1.zzzzzzzzzzzzzzzzzz.N", compact));
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact("~-1.0.1.1.1.a0a0a0a0a0a0a0a0a0.N", compact));
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact("~3.0.9999.1.1.a0a0a0a0a0a0a0a0a0.N", compact));
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact("~3.0.1x.1.1.a0a0a0a0a0a0a0a0a0.N", compact));
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact("~3.0.1.1.1.a0a0a0.N", compact));
 }
 
 }

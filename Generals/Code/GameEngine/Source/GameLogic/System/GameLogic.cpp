@@ -101,6 +101,7 @@
 #include "GameLogic/CaveSystem.h"
 #include "GameLogic/CrateSystem.h"
 #include "GameLogic/FPUControl.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
@@ -1479,6 +1480,9 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_SCRIPT_ENGINE_NEW_MAP);
+
+	if (!loadingSaveGame && RetailFileLayers::enabled())
+		CreateAHeroSystem::ingestGameInfo(TheGameInfo);
 
 	if (TheGameEngine->isMultiplayerSession() || isSkirmishOrSkirmishReplay)
 	{

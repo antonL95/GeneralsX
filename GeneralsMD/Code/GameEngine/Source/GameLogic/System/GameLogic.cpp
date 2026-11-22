@@ -1853,22 +1853,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	Player *localPlayer = ThePlayerList->getLocalPlayer();
 	if (!loadingSaveGame && RetailFileLayers::enabled())
-	{
-		CreateAHeroSystem::resetAllPlayers();
-		if (TheGameInfo)
-		{
-			for (Int slotIdx = 0; slotIdx < MAX_SLOTS; ++slotIdx)
-			{
-				const GameSlot *slot = TheGameInfo->getConstSlot(slotIdx);
-				if (!slot || slot->getCreateAHeroConfig().isEmpty())
-					continue;
-				Player *player = ThePlayerList->getPlayerFromSlotIndex(slotIdx);
-				const auto *faction = player ? player->getPlayerTemplate() : nullptr;
-				if (player && faction)
-					CreateAHeroSystem::setPlayerSelectionEncoded(player->getPlayerIndex(), slot->getCreateAHeroConfig(), faction->getSide());
-			}
-		}
-	}
+		CreateAHeroSystem::ingestGameInfo(TheGameInfo);
 	if (!loadingSaveGame && RetailFileLayers::enabled() && isSkirmishOrSkirmishReplay && TheGameInfo &&
 		TheGameInfo->getRetailSkirmishRules().customHeroes && TheUpgradeCenter)
 	{
