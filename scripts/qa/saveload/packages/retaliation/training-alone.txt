@@ -1,0 +1,2 @@
+235 create Player_1 PartitionScaleHorde 0 2880,2000,0
+237 snapshot-partition-scale Player_1 PartitionScaleHorde 0 4

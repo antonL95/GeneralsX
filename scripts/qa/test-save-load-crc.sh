@@ -1,20 +1,89 @@
 #!/bin/sh
 set -eu
+export LC_ALL=C
 
-if [ "$#" -ne 4 ]; then
-    printf '%s\n' "Usage: $0 BUILD_DIR {training|high-pass|spellbook|marsh-training|marsh-stock|zero-hour} SAVE_FRAME FRAME_COUNT" >&2
+usage() {
+    printf '%s\n' "Usage: $0 [--only PACKAGE] BUILD_DIR {training|high-pass|spellbook|marsh-training|marsh-stock|zero-hour} SAVE_FRAME FRAME_COUNT" >&2
     exit 2
+}
+
+only=
+if [ "${1:-}" = --only ]; then
+    [ "$#" -eq 6 ] || usage
+    only=$2
+    [ -n "$only" ] || usage
+    shift 2
+elif [ "$#" -eq 6 ] && [ "$5" = --only ]; then
+    only=$6
+    [ -n "$only" ] || usage
+    set -- "$1" "$2" "$3" "$4"
 fi
+[ "$#" -eq 4 ] || usage
+case "$only" in *[!a-z0-9-]*) usage ;; esac
 
 build=$(cd "$1" && pwd)
 mode=$2
 save_frame=$3
 count=$4
 for number in "$save_frame" "$count"; do
-    case "$number" in ''|0*|*[!0-9]*) exit 2 ;; esac
+    case "$number" in ''|0*|*[!0-9]*) usage ;; esac
 done
 end=$((save_frame + count))
+runner=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
 fixtures=$(cd "$(dirname "$0")/saveload" && pwd)
+registry=$fixtures
+if [ ! -d "$registry/packages" ] && [ -f "$build/CMakeCache.txt" ]; then
+    source_dir=$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$build/CMakeCache.txt")
+    registry=$source_dir/scripts/qa/saveload
+fi
+
+case "$mode" in
+    training|high-pass|spellbook|zero-hour) fixture_mode=$mode ;;
+    marsh-training|marsh-stock) fixture_mode=marsh ;;
+    *) usage ;;
+esac
+
+packages=
+set --
+for directory in "$registry"/packages/*; do
+    [ -d "$directory" ] || continue
+    name=${directory##*/}
+    if [ -n "$only" ] && [ "$only" != "$name" ]; then
+        continue
+    fi
+    if [ "$mode" = spellbook ] && [ -z "$only" ]; then
+        for file in "$directory"/training.ini "$directory"/training.txt "$directory"/training.cash; do
+            [ ! -f "$file" ] || set -- "$@" "$file"
+        done
+    fi
+    found=
+    for extension in txt ini cash sh gdb; do
+        file=$directory/$fixture_mode.$extension
+        if [ -f "$file" ]; then
+            found=1
+            case "$extension" in txt|ini|cash) set -- "$@" "$file" ;; esac
+        fi
+    done
+    if [ -n "$found" ]; then
+        case "$name" in
+            *[!a-z0-9-]*) printf 'Invalid fixture package directory: %s\n' "$directory" >&2; exit 2 ;;
+        esac
+        packages="${packages:+$packages }$name"
+        if [ -n "$only" ]; then
+            for file in "$directory"/"$fixture_mode"-alone.txt "$directory"/"$fixture_mode"-alone.ini; do
+                [ ! -f "$file" ] || set -- "$@" "$file"
+            done
+        fi
+    fi
+done
+if [ -z "$packages" ] && { [ "$mode" != zero-hour ] || [ -n "$only" ]; }; then
+    printf 'No fixture package %s for %s\n' "${only:-registered}" "$mode" >&2
+    exit 2
+fi
+if [ "$#" -gt 0 ]; then
+    awk -f "$registry/validate-packages.awk" "$@"
+fi
+
 out=${PKGS1_STATE_DIR:-}
 if [ -n "$out" ]; then
     mkdir -p "$out"
@@ -32,119 +101,116 @@ work=${PKGS1_ROTWK_DATA:-/game-install/rotwk}
 aotr=${PKGS1_AOTR_DATA:-/game-install/aotr}
 bfme2=${PKGS1_BFME2_DATA:-/game-install/bfme2}
 engine="$build/GeneralsMD/GeneralsXZH"
-path_unit=
-wall=
+
+copy_map() {
+    map_name=$1
+    package=$2
+    folder=$(printf '%s' "$map_name" | tr '[:upper:]' '[:lower:]')
+    mapdir="$XDG_DATA_HOME/GeneralsX/GeneralsZH/Maps/$folder"
+    mkdir -p "$mapdir"
+    map="$mapdir/$folder.map"
+    cp "$package/$map_name.map" "$map"
+    cp "$package/map.ini" "$mapdir/"
+    if [ -f "$package/map.str" ]; then
+        cp "$package/map.str" "$mapdir/"
+    fi
+}
+
+mapdir=
+: > "$out/start.gdb"
+: > "$out/resume.gdb"
 case "$mode" in
-    training|spellbook)
-        scenario="$fixtures/training.txt"
-        package="$aotr/UserData/Maps/AotR Training Grounds"
-        mapdir="$XDG_DATA_HOME/GeneralsX/GeneralsZH/Maps/aotr training grounds"
-        mkdir -p "$mapdir"
-        map="$mapdir/aotr training grounds.map"
-        cp "$package/AotR Training Grounds.map" "$map"
-        cp "$package/map.ini" "$package/map.str" "$mapdir/"
-        printf '\n' >> "$mapdir/map.ini"
-        cat "$fixtures/training.ini" >> "$mapdir/map.ini"
-        if [ "$mode" = training ] && [ -n "${PKGS1_TRAINING_EXTRA_INI:-}" ]; then
-            printf '\n' >> "$mapdir/map.ini"
-            cat "$PKGS1_TRAINING_EXTRA_INI" >> "$mapdir/map.ini"
-        fi
-        cat "$fixtures/training.gdb" > "$out/start.gdb"
-        sed '/^break ScriptEngine::startEndGameTimer/,$!d' "$fixtures/training.gdb" > "$out/resume.gdb"
-        if [ "$mode" = training ] && [ -n "${PKGS1_TRAINING_EXTRA_GDB:-}" ]; then
-            cat "$PKGS1_TRAINING_EXTRA_GDB" >> "$out/start.gdb"
-        fi
-        if [ "$mode" = spellbook ]; then
-            cat "$fixtures/drop-book.gdb" >> "$out/start.gdb"
-        else
-            path_unit='Player_1 IthilienPathfinder 1'
-            if [ "$save_frame" -ge 118 ]; then
-                wall='Player_1 GondorCastleWallTrebuchet 0'
-            fi
-        fi
+    training|spellbook|marsh-training)
+        copy_map 'AotR Training Grounds' "$aotr/UserData/Maps/AotR Training Grounds"
         ;;
     high-pass)
-        scenario="$fixtures/high-pass.txt"
         map='maps/map mp high pass/map mp high pass.map'
-        path_unit='Player_1 GondorFighter 0'
-        : > "$out/start.gdb"
-        : > "$out/resume.gdb"
+        for file do
+            case "$file" in
+                *.ini) copy_map 'map mp high pass' "$aotr/maps/map mp high pass"; break ;;
+            esac
+        done
         ;;
-    marsh-training|marsh-stock)
-        scenario="$fixtures/marsh.txt"
-        if [ "$mode" = marsh-training ]; then
-            map_name='AotR Training Grounds'
-            package="$aotr/UserData/Maps/$map_name"
-        else
-            map_name='map mp druwaith iaur'
-            package=${PKGS1_DRUWAITH_DATA:-"$aotr/maps/$map_name"}
-        fi
-        folder=$(printf '%s' "$map_name" | tr '[:upper:]' '[:lower:]')
-        mapdir="$XDG_DATA_HOME/GeneralsX/GeneralsZH/Maps/$folder"
-        mkdir -p "$mapdir"
-        map="$mapdir/$folder.map"
-        cp "$package/$map_name.map" "$map"
-        cp "$package/map.ini" "$mapdir/"
-        if [ -f "$package/map.str" ]; then
-            cp "$package/map.str" "$mapdir/"
-        fi
-        cp "$fixtures/training.gdb" "$out/start.gdb"
-        sed '/^break ScriptEngine::startEndGameTimer/,$!d' "$fixtures/training.gdb" > "$out/resume.gdb"
+    marsh-stock)
+        copy_map 'map mp druwaith iaur' "${PKGS1_DRUWAITH_DATA:-"$aotr/maps/map mp druwaith iaur"}"
         ;;
     zero-hour)
         work=${PKGS1_ZERO_HOUR_DATA:?Zero Hour game directory required}
         map=${PKGS1_ZERO_HOUR_MAP:?Zero Hour map required}
-        scenario=/dev/null
-        : > "$out/start.gdb"
-        : > "$out/resume.gdb"
         ;;
-    *) exit 2 ;;
 esac
+
+case "$mode" in
+    training|spellbook|marsh-*)
+        cat "$fixtures/training.gdb" > "$out/start.gdb"
+        sed '/^break ScriptEngine::startEndGameTimer/,$!d' "$fixtures/training.gdb" > "$out/resume.gdb"
+        ;;
+esac
+
+append_ini() {
+    if [ -z "$mapdir" ]; then
+        printf 'Map INI overlays are unavailable for %s\n' "$mode" >&2
+        return 1
+    fi
+    printf '\n' >> "$mapdir/map.ini"
+    cat "$1" >> "$mapdir/map.ini"
+}
+
+append_commands() {
+    awk -v end="$end" 'NF && $1 <= end && $2 != "quit" && $2 != "xpcrc"' "$1" >> "$out/commands.txt"
+}
+
+: > "$out/commands.txt"
+for file do
+    case "$file" in
+        *.ini) append_ini "$file" ;;
+        *.txt) append_commands "$file" ;;
+    esac
+done
+
+if [ "$mode" = training ] && [ -z "$only" ]; then
+    [ ! -f "$fixtures/training.ini" ] || append_ini "$fixtures/training.ini"
+    [ ! -f "$fixtures/training.txt" ] || append_commands "$fixtures/training.txt"
+    [ -z "${PKGS1_TRAINING_EXTRA_INI:-}" ] || append_ini "$PKGS1_TRAINING_EXTRA_INI"
+    [ -z "${PKGS1_TRAINING_EXTRA_COMMANDS:-}" ] || append_commands "$PKGS1_TRAINING_EXTRA_COMMANDS"
+    if [ -n "${PKGS1_TRAINING_EXTRA_GDB:-}" ]; then
+        cat "$PKGS1_TRAINING_EXTRA_GDB" >> "$out/start.gdb"
+    fi
+fi
+
+package_step() {
+    script=$registry/packages/$1/$fixture_mode.sh
+    shift
+    if [ -f "$script" ]; then
+        sh "$registry/package-step.sh" "$script" "$1" "$out" "$save_frame" "$end" "${2:-continue}"
+    fi
+}
+
+for name in $packages; do
+    prefix=$registry/packages/$name/$fixture_mode
+    if [ -f "$prefix.gdb" ]; then
+        cat "$prefix.gdb" >> "$out/start.gdb"
+    fi
+    if [ -f "$prefix-resume.gdb" ]; then
+        cat "$prefix-resume.gdb" >> "$out/resume.gdb"
+    fi
+    package_step "$name" prepare >> "$out/commands.txt"
+done
 
 diag=${PKGS1_DIAGNOSTICS:-"$save_frame,$((save_frame + 1))"}
 {
-    awk -v end="$end" '$1 <= end && $2 != "quit" && $2 != "xpcrc"' "$scenario"
-    if [ "$mode" = training ] && [ -n "${PKGS1_TRAINING_EXTRA_COMMANDS:-}" ]; then
-        awk -v end="$end" '$1 <= end && $2 != "quit" && $2 != "xpcrc"' "$PKGS1_TRAINING_EXTRA_COMMANDS"
-    fi
-    if [ -n "$path_unit" ]; then
-        printf '%s snapshot-path-queue %s\n' "$save_frame" "$path_unit"
-        printf '%s snapshot-path-state %s\n' "$save_frame" "$path_unit"
-        printf '%s snapshot-path-state %s\n' "$((save_frame + 1))" "$path_unit"
-    fi
-    if [ -n "$wall" ]; then
-        printf '%s snapshot-wall-state %s\n' "$save_frame" "$wall"
-        printf '%s snapshot-wall-state Player_1 GondorCastleWallSegment 0\n' "$save_frame"
-        printf '%s snapshot-wall-occupant Player_1 - 0 WallTrebuchetOccupant\n' "$save_frame"
-    fi
-    if [ "$mode" = training ] && [ "$save_frame" -gt 230 ]; then
-        printf '%s snapshot-obstacle-count Player_1 SaveLoadStampOnComplete 0\n' "$save_frame"
-        if [ "$end" -gt "$save_frame" ]; then
-            printf '%s snapshot-obstacle-count Player_1 SaveLoadStampOnComplete 0\n' "$((save_frame + 1))"
-        fi
-    fi
-    case "$mode" in
-        marsh-*)
-            printf '%s passmap - - 0\n' "$save_frame"
-            if [ "$save_frame" -ge 25 ]; then
-                printf '%s marsh-route Player_1 GondorFaramir 0 - 1405 1075\n' "$save_frame"
-            fi
-            if [ "$end" -gt "$save_frame" ]; then
-                printf '%s passmap - - 0\n' "$((save_frame + 1))"
-            fi
-            ;;
-    esac
     printf '%s\n' "$diag" | tr ',' '\n' | awk -v end="$end" '/^[0-9]+$/ && $1 <= end {print $1, "snapshot-crc - - 0"; print $1, "logall - - 0"}'
     seq "${PKGS1_CRC_START_FRAME:-$save_frame}" "$end" | awk '{ print $1, "xpcrc - - 0" }'
     printf '%s quit - - 0\n' "$end"
-} | sort -sn > "$out/continue.txt"
+} >> "$out/commands.txt"
+sort -sn "$out/commands.txt" > "$out/continue.txt"
 
 awk -v frame="$save_frame" '$1 >= frame && $2 != "snapshot-path-queue"' "$out/continue.txt" > "$out/resume.txt"
 {
-    awk -v frame="$save_frame" '$1 < frame && $2 != "xpcrc" && $2 != "snapshot-crc" && $2 != "logall" && $2 != "quit"' "$out/continue.txt"
-    if [ -n "$path_unit" ]; then
-        printf '%s snapshot-path-queue %s\n' "$save_frame" "$path_unit"
-    fi
+    awk -v frame="$save_frame" '
+        $1 < frame && $2 != "xpcrc" && $2 != "snapshot-crc" && $2 != "logall" && $2 != "quit"
+        $1 == frame && $2 == "snapshot-path-queue"
+    ' "$out/continue.txt"
     printf '%s snapshot-save - - 0 parity.sav\n' "$save_frame"
     printf '%s quit - - 0\n' "$((save_frame + 1))"
 } > "$out/save.txt"
@@ -174,83 +240,40 @@ expect() {
 run save start -file "$map"
 expect save "TEST snapshot-save frame=$save_frame code=0"
 if [ "$mode" = spellbook ]; then
-    grep '^TEST save-load removed spellbook id=[0-9][0-9]* next=[0-9][0-9]*$' "$out/save.log"
-    {
-        printf '%s snapshot-book-repair Player_1 GondorFighter 0\n' "$save_frame"
-        printf '%s quit - - 0\n' "$end"
-    } > "$out/resume.txt"
+    package_step spellbook after_save
     run resume resume -loadsave parity.sav
     expect resume "TEST frame $end: quit"
-    grep '^TEST save-load repaired spellbook ' "$out/resume.log"
-    awk '
-        /^TEST save-load removed spellbook / { split($6, counter, "="); saved = counter[2] }
-        /^TEST save-load repaired spellbook / {
-            split($5, book, "="); split($6, unit, "=")
-            ok = saved && book[2] == saved && unit[2] > book[2] && $7 == "lookup=1"
-        }
-        END { exit !ok }
-    ' "$out/save.log" "$out/resume.log"
+    package_step spellbook compare
     exit
 fi
 run continue start -file "$map"
 expect continue "TEST frame $end: quit"
 run resume resume -loadsave parity.sav
 expect resume "TEST frame $end: quit"
-for phase in continue resume; do
-    if [ "$mode" = training ]; then
-        first=0
-        if [ "$phase" = resume ]; then
-            first=$save_frame
-        fi
-        awk -v first="$first" -v last="$end" -f "$fixtures/economy.awk" "$out/$phase.log"
+
+failed=
+for name in $packages; do
+    if ! package_step "$name" check continue || ! package_step "$name" check resume || ! package_step "$name" compare; then
+        failed="${failed:+$failed }$name"
     fi
-    if [ -n "$path_unit" ]; then
-        expect "$phase" "TEST save-load path-state frame=$save_frame waiting=1"
-        expect "$phase" "TEST save-load path-state frame=$((save_frame + 1)) waiting=0"
-    fi
-    if [ -n "$wall" ]; then
-        expect "$phase" "TEST save-load wall-state frame=$save_frame template=GondorCastleWallTrebuchet walkable=1"
-        expect "$phase" "TEST save-load wall-state frame=$save_frame template=GondorCastleWallSegment walkable=1"
-        expect "$phase" "TEST save-load wall-occupant frame=$save_frame name=WallTrebuchetOccupant layer=15 walkable=1"
-    fi
-    if [ "$mode" = training ] && [ "$end" -ge 126 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 124 ]; }; then
-        expect "$phase" 'TEST save-load wall-occupant frame=124 name=WallDeleteOccupant layer=15 walkable=1'
-        expect "$phase" 'TEST save-load wall-occupant frame=124 name=WallGateOccupant layer=15 walkable=1'
-        expect "$phase" 'TEST save-load wall-occupant frame=126 name=WallDeleteOccupant layer=1 walkable=0'
-        expect "$phase" 'TEST save-load wall-occupant frame=126 name=WallGateOccupant layer=1 walkable=0'
-        grep '^TEST list 126 Player_1 MenWallGate 0 ' "$out/$phase.log"
-    fi
-    if [ "$mode" = training ] && [ "$end" -ge 244 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 244 ]; }; then
-        grep -E '^TEST pkg19 frame=244 template=Pkg19SaveShooter weapon=Pkg19SaveWindup locked=1 .*draw=272 ' "$out/$phase.log"
-        grep -E '^TEST save-load partition frame=244 .* count=[1-9][0-9]*$' "$out/$phase.log" > "$out/$phase.cells"
-        test "$(wc -l < "$out/$phase.cells")" -eq 6
-        grep -E 'template=MenWallGate .* count=12$' "$out/$phase.cells"
-        grep -E 'template=PartitionUpgradeBuilding major=100\.00 ' "$out/$phase.cells"
-        grep -E 'template=PartitionScaleFighter major=96\.00 ' "$out/$phase.cells"
-        grep -E 'template=PartitionScaleHorde major=120\.00 ' "$out/$phase.cells"
-    fi
-    if [ "$mode" = training ] && [ "$end" -ge 250 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 250 ]; }; then
-        grep -E '^TEST damage frame=250 weapon=Pkg19SaveSecondary .*victim=[0-9]+\(Pkg19SaveTarget\) ' "$out/$phase.log"
-    fi
-    for obstacle_frame in 262 286; do
-        if [ "$mode" = training ] && [ "$end" -ge "$obstacle_frame" ] && { [ "$phase" = continue ] || [ "$save_frame" -le "$obstacle_frame" ]; }; then
-            expect "$phase" "TEST save-load obstacle frame=$obstacle_frame template=CaHRestlessDeadBarrow ownsCell=1"
+done
+if [ -n "$failed" ]; then
+    for name in $failed; do
+        if [ -z "$only" ]; then
+            isolated=$(mktemp -d "$out/only-$name.XXXXXX")
+            if PKGS1_STATE_DIR="$isolated" sh "$runner" --only "$name" "$build" "$mode" "$save_frame" "$count" > "$isolated/result.log" 2>&1; then
+                printf 'Fixture interference: %s passes alone and fails combined (%s)\n' "$name" "$isolated" >&2
+                continue
+            fi
+            printf 'Fixture failed both alone and combined: %s (%s)\n' "$name" "$isolated" >&2
+        else
+            printf 'Fixture failed: %s (%s)\n' "$name" "$out" >&2
         fi
     done
-    if [ "$mode" = training ] && [ "$end" -ge 254 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 254 ]; }; then
-        horde=$(sed -n 's/^TEST frame 235: create PartitionScaleHorde for Player_1 id=\([0-9]*\) .*/\1/p' "$out/continue.log")
-        bulwark=$(sed -n 's/^TEST frame 230: create RetaliationSaveBulwark for PlyrCreeps id=\([0-9]*\) .*/\1/p' "$out/continue.log")
-        test -n "$horde" && test -n "$bulwark"
-        grep -E "^TEST damage frame=254 weapon=FortressArrowTowerBowWarhead .*source=$bulwark victim=[0-9]+\(RetaliationSaveCottage\) .*dealt=30\.00 " "$out/$phase.log"
-        expect "$phase" "TEST horde retaliate 254 $horde $bulwark"
-    fi
-    if [ "$mode" = training ] && [ "$end" -ge 285 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 285 ]; }; then
-        expect "$phase" 'TEST frame 285: builderscriptmove object 182 to 1933.7 1774.0'
-    fi
-    if [ "$mode" = training ] && [ "$end" -ge 450 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 450 ]; }; then
-        grep -E '^TEST damage frame=450 weapon=MordorCatapultRockWarhead .*victim=[0-9]+\(MenWallGate\) .*dealt=4\.00 ' "$out/$phase.log"
-        grep -E '^TEST health 450 Player_1 MenWallGate 0 id=[0-9]+ health=1495\.99 ' "$out/$phase.log"
-    fi
+    exit 1
+fi
+
+for phase in continue resume; do
     awk -v first="$save_frame" -v last="$end" '
         /^TEST xp-crc frame=[0-9]+ crc=[0-9A-F]+$/ {
             split($3, f, "=")
@@ -261,69 +284,6 @@ for phase in continue resume; do
         END {if (count != last - first + 1) exit 1}
     ' "$out/$phase.log" > "$out/$phase.crc"
 done
-if [ "$mode" = training ] && [ "$save_frame" -le 244 ] && [ "$end" -ge 244 ]; then
-    cmp "$out/continue.cells" "$out/resume.cells"
-fi
-if [ "$mode" = training ] && [ "$save_frame" -gt 230 ]; then
-    for phase in continue resume; do
-        grep -E '^TEST save-load obstacle-count frame=[0-9]+ template=SaveLoadStampOnComplete cells=[1-9][0-9]*$' \
-            "$out/$phase.log" > "$out/$phase.obstacles"
-    done
-    expected=1
-    if [ "$end" -gt "$save_frame" ]; then
-        expected=2
-    fi
-    test "$(wc -l < "$out/continue.obstacles")" -eq "$expected"
-    diff -u "$out/continue.obstacles" "$out/resume.obstacles"
-    cat "$out/continue.obstacles"
-fi
-case "$mode" in
-    marsh-*)
-        for phase in continue resume; do
-            awk '
-                /^TEST passmap / { frame=$3 }
-                /^TEST passrow 62 / {
-                    print frame, substr($4, 204, 1), substr($4, 195, 1), substr($4, 185, 1), substr($4, 176, 1)
-                }
-            ' "$out/$phase.log" > "$out/$phase.water"
-            for probe in 30 41 91 "$save_frame" "$((save_frame + 1))"; do
-                if [ "$probe" -gt "$end" ] || { [ "$phase" = resume ] && [ "$probe" -lt "$save_frame" ]; }; then
-                    continue
-                fi
-                if [ "$probe" -ge 40 ] && [ "$probe" -lt 90 ]; then
-                    grep -Fx "$probe 1 1 1 2" "$out/$phase.water"
-                else
-                    grep -Fx "$probe 0 0 1 2" "$out/$phase.water"
-                fi
-            done
-            for probe in 30 41 91 "$save_frame"; do
-                if [ "$probe" -lt 25 ] || [ "$probe" -gt "$end" ] ||
-                    { [ "$phase" = resume ] && [ "$probe" -lt "$save_frame" ]; }; then
-                    continue
-                fi
-                if [ "$probe" -ge 40 ] && [ "$probe" -lt 90 ]; then
-                    expect "$phase" "TEST marsh route frame=$probe connected=0"
-                else
-                    expect "$phase" "TEST marsh route frame=$probe connected=1"
-                fi
-            done
-            awk -v checkpoint="$save_frame" '
-                /^TEST passmap / { frame=$3 }
-                /^TEST passrow / && frame >= checkpoint { print frame, $3, $4 }
-            ' "$out/$phase.log" > "$out/$phase.marsh"
-            if [ "$end" -ge 800 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 800 ]; }; then
-                grep -E '^TEST health 800 Player_1 GondorFaramir 0 .* dead=0 pos=' "$out/$phase.log" |
-                    awk '{ split($11, p, "[=,]"); x=p[2]-1405; y=p[3]-1075; arrived=(x*x+y*y<=400); print }
-                        END { exit !arrived }'
-            fi
-        done
-        cmp "$out/continue.marsh" "$out/resume.marsh"
-        ;;
-esac
-if [ -n "$path_unit" ]; then
-    expect save "TEST save-load path-queue frame=$save_frame queued=1"
-    expect continue "TEST save-load path-queue frame=$save_frame queued=1"
-fi
 paste "$out/continue.crc" "$out/resume.crc" | awk '
     $1 != $3 || $2 != $4 { if (!different++) print "First mismatch", $0 }
     END { print "Compared " NR " frames. Differences " different + 0; exit (different > 0) }

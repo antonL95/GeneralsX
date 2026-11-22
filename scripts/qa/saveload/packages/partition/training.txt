@@ -1,0 +1,16 @@
+235 create Player_1 PartitionUpgradeBuilding 0 2640,1580,35
+235 create Player_1 PartitionScaleFighter 0 2590,1820,20
+235 create Player_1 PartitionScaleHorde 0 2880,2000,0
+236 objupgrade Player_1 PartitionUpgradeBuilding 0 Upgrade_TestBuilding
+237 snapshot-partition-scale Player_1 PartitionScaleFighter 0 12
+237 snapshot-partition-scale Player_1 PartitionScaleHorde 0 4
+244 snapshot-partition-cells Player_1 GondorCastleWallSegment 0
+244 snapshot-partition-cells Player_1 GondorCastleWallTrebuchet 0
+244 snapshot-partition-cells Player_1 MenWallGate 0
+244 snapshot-partition-cells Player_1 PartitionUpgradeBuilding 0
+244 snapshot-partition-cells Player_1 PartitionScaleFighter 0
+244 snapshot-partition-cells Player_1 PartitionScaleHorde 0
+450 create Player_1 PartitionSplashSource 0 2540,1240,0
+450 create PlyrCreeps PartitionSplashTarget 0 2540,1240,180
+450 firetestweapon Player_1 PartitionSplashSource 0 MordorCatapultRockWarhead,PlyrCreeps:PartitionSplashTarget:0
+450 health Player_1 MenWallGate 0

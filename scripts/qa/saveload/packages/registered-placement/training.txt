@@ -1,0 +1,6 @@
+228 create Player_1 SaveLoadStampCaster 0 1900,1620,0
+230 placement-ocl Player_1 SaveLoadStampCaster 0 SaveLoadPlacementStamp 2030 1620
+260 create Player_1 SaveLoadBarrowCaster 0 1750,1060,0
+261 placement-ocl Player_1 SaveLoadBarrowCaster 0 OCL_RestlessDead
+262 snapshot-obstacle-owner Player_1 CaHRestlessDeadBarrow 0
+286 snapshot-obstacle-owner Player_1 CaHRestlessDeadBarrow 0

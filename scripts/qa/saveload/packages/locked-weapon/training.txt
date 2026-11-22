@@ -1,0 +1,5 @@
+239 create Player_1 Pkg19SaveShooter 0 2150,1710,0
+239 create PlyrCreeps Pkg19SaveTarget 0 2250,1710,180
+240 orderattack Player_1 Pkg19SaveShooter 0 PlyrCreeps:Pkg19SaveTarget:0
+244 pkg19-state Player_1 Pkg19SaveShooter 0
+250 pkg19-secondary Player_1 Pkg19SaveShooter 0

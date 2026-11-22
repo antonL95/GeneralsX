@@ -1,0 +1,82 @@
+13 pkg23-display Player_1 - 0 DolAmrothFarm 2440 520
+13 pkg23-display Player_1 - 0 DaleShoremansCottageFoundation 2440 520
+13 pkg23-display Player_1 - 0 Pkg23FarmWithoutIndicator 2440 520
+22 pkg23-cash Player_1 - 0 before-build
+28 pkg23-display Player_1 DolAmrothFarm 0 -
+29 pkg23-cash Player_1 - 0 before-cancel
+32 pkg23-cash Player_1 - 0 after-cancel
+200 create Player_1 Pkg23SaleDiscount 0 2020,2760,0
+202 create Player_1 Pkg23DiscountedFarm 0 2250,2790,0
+203 pkg23-pay Player_1 Pkg23DiscountedFarm 0 quote
+204 pkg23-kill Player_1 Pkg23SaleDiscount 0
+205 create Player_1 Pkg23SmallerSaleDiscount 0 2020,2740,0
+206 pkg23-quote Player_1 Pkg23DiscountedFarm 0
+207 pkg23-sell Player_1 Pkg23DiscountedFarm 0
+220 create Player_1 DaleShoremansCottageFoundation 0 1870,2530,0
+221 objupgrade Player_1 DaleShoremansCottageFoundation 0 Upgrade_ObjectUnderAIControl
+221 create Player_1 Pkg23TributeCartProducer 0 1530,2860,0
+222 pkg23-display Player_1 DaleShoremansCottageFoundation 0 -
+230 create Player_1 RowdyTubDwarf 0 2000,2500,0
+230 create PlyrCreeps MordorPorter 0 3020,1850,0
+230 create PlyrCreeps Pkg23PillageTarget 0 3060,1900,0
+230 create Player_1 DaleShoremansCottageFoundation 0 1690,2490,0
+231 pkg23-set-cash PlyrCreeps - 0 100
+232 pkg23-cash Player_1 - 0 cart-before
+232 queuebutton Player_1 Pkg23TributeCartProducer 0 Command_BuildHaradTributeCart
+235 pkg23-cash Player_1 - 0 cart-after
+240 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 0 0
+242 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
+245 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:MordorPorter:2 1 0
+247 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
+248 pkg23-set-cash PlyrCreeps - 0 0
+249 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
+250 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
+254 pkg23-set-cash PlyrCreeps - 0 100
+255 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
+256 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
+260 pkg23-kill Player_1 Pkg23SmallerSaleDiscount 0
+261 pkg23-quote Player_1 Pkg23DiscountedFarm 0
+274 create Player_1 Pkg23FarmWithoutIndicator 0 2040,2850,0
+275 pkg23-display Player_1 Pkg23FarmWithoutIndicator 0 -
+276 pkg23-kill Player_1 Pkg23FarmWithoutIndicator 0 -
+290 create Player_1 DolAmrothGondorBulwark 0 2240,2710,0
+291 pkg23-pay Player_1 DolAmrothGondorBulwark 0 101
+292 create Player_1 GondorMarketPlace 0 2100,2630,0
+294 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
+300 grant Player_1 - 0 Upgrade_MarketplaceUpgradeDefiance
+300 create Player_1 DolAmrothGondorBulwark 0 2280,2700,0
+301 pkg23-pay Player_1 DolAmrothGondorBulwark 0 101
+303 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
+306 create Player_1 DolAmrothGondorBulwark 0 2240,2720,0
+308 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
+320 create Player_1 DolAmrothGondorBulwark 0 2250,2730,0
+321 destroy Player_1 GondorMarketPlace 0
+321 pkg23-pay Player_1 DolAmrothGondorBulwark 0 101
+323 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
+334 create Player_1 GondorMarketPlace 0 2100,2630,0
+335 create Player_1 DolAmrothGondorBulwark 0 2410,2830,0
+336 pkg23-pay Player_1 DolAmrothGondorBulwark 0 101
+337 pkg23-sell Player_1 DolAmrothGondorBulwark 0 -
+338 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
+340 create Player_1 DolAmrothFarm 0 2250,2790,0
+341 pkg23-pay Player_1 DolAmrothFarm 0 300
+342 pkg23-sell Player_1 DolAmrothFarm 0 -
+386 pkg23-cash Player_1 - 0 discount-sale-before
+387 pkg23-cash Player_1 - 0 discount-sale-after
+400 pkg23-cash Player_1 - 0 basic-deposit-before
+401 pkg23-cash Player_1 - 0 basic-deposit-after
+403 grant Player_1 - 0 Upgrade_ObjectUnderAIControl
+410 pkg23-cash Player_1 - 0 upgraded-deposit-before
+411 pkg23-cash Player_1 - 0 upgraded-deposit-after
+521 pkg23-cash Player_1 - 0 sale-before
+522 pkg23-cash Player_1 - 0 sale-after
+555 pkg23-quote Player_1 HaradTributeCart 0
+556 pkg23-kill Player_1 HaradTributeCart 0
+900 create Player_1 Pkg23LargeDeposit 0 1870,2850,0
+930 pkg23-cash Player_1 - 0 large-deposit-before
+931 pkg23-cash Player_1 - 0 large-deposit-after
+932 pkg23-kill Player_1 Pkg23LargeDeposit 0
+940 pkg23-set-cash Player_1 - 0 20000000
+941 create Player_1 HaradTributeCart 0 1580,2700,0
+942 pkg23-pay Player_1 HaradTributeCart 0 16777217
+943 pkg23-kill Player_1 HaradTributeCart 0

@@ -1,0 +1,1 @@
+92 create Player_1 GondorFighter 0 2770,1260,0

@@ -1,0 +1,2 @@
+240 create Player_1 GuldurEntwife 0 2120,660,90
+243 pkg14-fatal Player_1 GuldurEntwife 0

@@ -1,0 +1,13 @@
+8 create Player_1 DolAmrothPorter 0 2390,840,0
+10 fund Player_1 DolAmrothPorter 0
+11 shroudmap Player_1 DolAmrothPorter 0
+14 placecheck Player_1 DolAmrothPorter 0 DolAmrothGuardhouse 2450 1040 0
+15 pkg08-queue-state Player_1 DolAmrothPorter 0
+20 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothGuardhouse 2450 1040
+23 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothFarm 2440 520
+26 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothBattleTower 2400 620
+29 pkg08-queue-state Player_1 DolAmrothPorter 0
+30 cancelbuild Player_1 DolAmrothFarm 0
+32 pkg08-queue-state Player_1 DolAmrothPorter 0
+101 create PlyrCreeps MordorPorter 0 2890,1050,0
+102 create PlyrCreeps MordorPorter 1 3440,1050,0
