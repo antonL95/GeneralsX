@@ -83,6 +83,7 @@
 #include "GameLogic/Locomotor.h"
 
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/RetailSiegeDocking.h"
 #include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -370,10 +371,11 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	// behaviors are always done first, so they get into the publicModule arrays
 	// before anything else.
 	const ModuleInfo& mi = tt->getBehaviorModuleInfo();
+	const Bool hasSiegeAI = RetailFileLayers::enabled() && SiegeAIUpdate::hasSpecializedAI(mi);
 	for (modIdx = 0; modIdx < mi.getCount(); ++modIdx)
 	{
 		modName = mi.getNthName(modIdx);
-		if (modName.isEmpty())
+		if (modName.isEmpty() || (hasSiegeAI && modName == "AIUpdateInterface"))
 			continue;
 
 		BehaviorModule* newMod = (BehaviorModule*)TheModuleFactory->newModule(this, modName, mi.getNthData(modIdx), MODULETYPE_BEHAVIOR);

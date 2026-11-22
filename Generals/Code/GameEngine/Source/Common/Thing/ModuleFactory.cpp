@@ -171,6 +171,9 @@
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RetailHordeTransport.h"
+#include "GameLogic/Module/RetailSiegeContain.h"
+#include "GameLogic/Module/RetailSiegeDocking.h"
+#include "GameLogic/Module/RetailToggleDeploy.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
@@ -475,6 +478,15 @@ void ModuleFactory::init()
 		addModule( RefundDie );
 		addModule( HordeContain );
 		addModule( HordeTransportContain );
+		addModule( SiegeEngineContain );
+		addModule( HordeSiegeEngineContain );
+		addModule( ToggleDeploySpecialAbilityUpdate );
+		addModule( SiegeDockingBehavior );
+		addModule( SiegeAIUpdate );
+		addModule( SiegeDeploySpecialPower );
+		addModule( StopSpecialPower );
+		addModule( SiegeDeployHordeSpecialPower );
+		addModule( ManTheWallsSpecialPower );
 		addModule( HordeGarrisonContain );
 		addModule( EvacuateDamage );
 		addModule( HordeTransportContainDamage );

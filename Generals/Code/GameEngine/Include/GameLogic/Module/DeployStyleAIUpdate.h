@@ -100,6 +100,7 @@ public:
 	UnsignedInt getPackTime()						const { return getDeployStyleAIUpdateModuleData()->m_packTime; }
 	Bool doTurretsFunctionOnlyWhenDeployed() const { return getDeployStyleAIUpdateModuleData()->m_turretsFunctionOnlyWhenDeployed; }
 	Bool doTurretsHaveToCenterBeforePacking() const { return getDeployStyleAIUpdateModuleData()->m_turretsMustCenterBeforePacking; }
+	Bool isDeployingOrPacking() const { return m_state == DEPLOY || m_state == UNDEPLOY; }
 	void setMyState( DeployStateTypes StateID );
 	void reset();
 

@@ -120,6 +120,9 @@ set(GAMEENGINE_SRC
     Include/GameLogic/ShroudGeometry.h
     Include/GameLogic/Module/HordeContain.h
     Include/GameLogic/Module/RetailHordeTransport.h
+    Include/GameLogic/Module/RetailSiegeContain.h
+    Include/GameLogic/Module/RetailSiegeDocking.h
+    Include/GameLogic/Module/RetailToggleDeploy.h
     Include/GameLogic/Module/SlaughterHordeContain.h
     Include/GameLogic/Module/ExperienceModules.h
     Include/GameLogic/Module/HordeAIUpdate.h
@@ -699,6 +702,9 @@ set(GAMEENGINE_SRC
     Source/Common/HordeFormation.cpp
     Source/GameLogic/Object/Contain/HordeContain.cpp
     Source/GameLogic/Object/Contain/RetailHordeTransport.cpp
+    Source/GameLogic/Object/Contain/RetailSiegeContain.cpp
+    Source/GameLogic/Object/Behavior/RetailSiegeDocking.cpp
+    Source/GameLogic/Object/Update/RetailToggleDeploy.cpp
     Source/GameLogic/Object/Contain/SlaughterHordeContain.cpp
     Source/GameLogic/Object/Update/HordeAIUpdate.cpp
     Source/GameLogic/Object/Update/AnimalAIUpdate.cpp

@@ -253,6 +253,7 @@ public:
 	void removeWallPiece(Object *wallPiece);  // Removes a wall piece.
 	void dropUnsupportedWallOccupants(const Object& wall);
 	Real getWallHeight() {return m_wallHeight;}
+	Real getWallHeightAt(const Coord3D& position);
 	Bool isPointOnWall(const Coord3D *pos);
 
 	void updateLayer(Object *obj, PathfindLayerEnum layer); ///< Updates object's layer.

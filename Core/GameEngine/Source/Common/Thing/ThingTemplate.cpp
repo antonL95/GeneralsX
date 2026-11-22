@@ -73,6 +73,7 @@
 #include "GameLogic/Armor.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/RetailSiegeDocking.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Powers.h"
@@ -1053,7 +1054,9 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 
 	ModuleData* data = TheModuleFactory->newModuleDataFromINI(ini, tokenStr, type, moduleTagStr);
 
-	if (data->isAiModuleData())
+	const Bool supplementalSiegeAI = RetailFileLayers::enabled() &&
+		tokenStr == "AIUpdateInterface" && SiegeAIUpdate::hasSpecializedAI(*mi);
+	if (data->isAiModuleData() && !supplementalSiegeAI)
 	{
 		Bool replaced = mi->clearAiModuleInfo();
 		if (replaced)

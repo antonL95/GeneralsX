@@ -297,7 +297,7 @@ protected:
 
 public:
 	AIUpdateInterface( Thing *thing, const ModuleData* moduleData );
-	const AsciiString& getRetailLuaEventList() const { return getAIUpdateModuleData()->m_luaEventsList; }
+	virtual const AsciiString& getRetailLuaEventList() const { return getAIUpdateModuleData()->m_luaEventsList; }
 	// virtual destructor prototype provided by memory pool declaration
 
 	virtual AIUpdateInterface* getAIUpdateInterface() override { return this; }
@@ -587,7 +587,7 @@ public:
 	void friend_setLastCommandSource( CommandSourceType source ) {m_lastCommandSource = source;}
 
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
-	const AsciiString& getRetailLuaEventsList() const { return getAIUpdateModuleData()->m_luaEventsList; }
+	const AsciiString& getRetailLuaEventsList() const { return getRetailLuaEventList(); }
 	Bool canAutoAcquireWhileStealthed() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle & AAS_Idle_Stealthed; }
 
 protected:

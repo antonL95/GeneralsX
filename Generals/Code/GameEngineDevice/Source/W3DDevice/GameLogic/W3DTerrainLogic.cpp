@@ -311,7 +311,7 @@ Real W3DTerrainLogic::getLayerHeight( Real x, Real y, PathfindLayerEnum layer, C
 		{
 			if (!clip || TheAI->pathfinder()->isPointOnWall(&loc))
 			{
-				return TheAI->pathfinder()->getWallHeight();
+				return TheAI->pathfinder()->getWallHeightAt(loc);
 			}
 			else
 			{

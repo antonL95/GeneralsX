@@ -618,6 +618,26 @@ Bool DynamicPortalBehaviour::permits(const Object& unit) const
 	return TRUE;
 }
 
+Bool DynamicPortalBehaviour::getAboveWallPosition(Coord3D& position) const
+{
+	const auto* data = getDynamicPortalBehaviourModuleData();
+	if (data->m_aboveWall < 0 || data->m_aboveWall >= data->m_numberOfBones || data->m_bonePrefix.isEmpty())
+		return FALSE;
+	std::vector<Coord3D> points(data->m_aboveWall + 1);
+	const Int count = getObject()->getMultiLogicalBonePosition(data->m_bonePrefix.str(),
+		static_cast<Int>(points.size()), points.data(), nullptr);
+	if (count <= data->m_aboveWall)
+		return FALSE;
+	position = points[data->m_aboveWall];
+	return TRUE;
+}
+
+Bool DynamicPortalBehaviour::allowsClimber(const Object& unit) const
+{
+	const auto* data = getDynamicPortalBehaviourModuleData();
+	return data->m_numberOfBones > 0 && data->m_objectFilter.matchesObject(getObject(), &unit);
+}
+
 void DynamicPortalBehaviour::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present,

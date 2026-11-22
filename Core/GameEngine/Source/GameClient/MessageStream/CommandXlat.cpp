@@ -3381,6 +3381,31 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 		return handleWaypointModeCommand( pos, draw, type );
 	}
 
+	if (RetailFileLayers::enabled() && !command && obj && TheRetailCommandCatalog &&
+		obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL) && !TheInGameUI->isInForceAttackMode())
+	{
+		Bool issued = FALSE;
+		const DrawableList* selected = TheInGameUI->getAllSelectedDrawables();
+		for (Drawable* selectedDraw : *selected)
+		{
+			Object* source = selectedDraw->getObject();
+			auto* power = source ? source->findSpecialPowerModuleInterface(SPECIAL_SIEGEDEPLOY) : nullptr;
+			if (!power || !power->isReady() || !power->isRetailCastAllowed() || !power->isValidPowerTarget(obj))
+				continue;
+			const auto* button = TheRetailCommandCatalog->findPowerButton(source, power->getSpecialPowerTemplate());
+			if (!button || !button->isValidObjectTarget(source, obj))
+				continue;
+			if (type == DO_HINT)
+			{
+				TheMessageStream->appendMessage(GameMessage::MSG_VALID_GUICOMMAND_HINT)->appendObjectIDArgument(obj->getID());
+				return GameMessage::MSG_VALID_GUICOMMAND_HINT;
+			}
+			issued |= issueSpecialPowerCommand(button, type, draw, pos, source) != GameMessage::MSG_INVALID;
+		}
+		if (issued)
+			return GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT;
+	}
+
 	CanAttackResult result = ATTACKRESULT_NOT_POSSIBLE;
 
 	if(command &&

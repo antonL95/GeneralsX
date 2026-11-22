@@ -168,6 +168,8 @@ public:
 	static DynamicPortalBehaviour* find(const Object* object);
 	Bool isActive() const { return m_active; }
 	Bool permits(const Object& unit) const;
+	Bool getAboveWallPosition(Coord3D& position) const;
+	Bool allowsClimber(const Object& unit) const;
 	UpdateSleepTime update() override;
 
 private:

@@ -53,6 +53,7 @@
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
+#include "GameLogic/Module/RetailSiegeContain.h"
 
 
 static const Real DONUT_TIME_DELAY_SECONDS=2.5f;
@@ -1096,6 +1097,10 @@ Real Locomotor::getMaxSpeedForCondition(BodyDamageType condition, const Object* 
 
 	if (obj && obj->getAttributeModifierHelper())
 		speed *= AttributeModifiers::speedFactor(obj);
+
+	if (RetailFileLayers::enabled() && obj)
+		if (const auto* siege = SiegeEngineContain::find(obj))
+			speed *= siege->crewSpeedScale();
 
 	Real maxSpeed = getMaxSpeedOverride();
 	if (speed > maxSpeed)

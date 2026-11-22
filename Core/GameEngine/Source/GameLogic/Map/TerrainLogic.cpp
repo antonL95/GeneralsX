@@ -1669,7 +1669,7 @@ PathfindLayerEnum TerrainLogic::getLayerForDestination(const Coord3D *pos)
 	if (bestDistance > TheAI->pathfinder()->getWallHeight()/2) {
 		// check wall.
 		if (TheAI->pathfinder()->isPointOnWall(pos)) {
-			Real delta = fabs(pos->z-TheAI->pathfinder()->getWallHeight());
+			Real delta = fabs(pos->z-TheAI->pathfinder()->getWallHeightAt(*pos));
 			if (delta<bestDistance) {
 				bestLayer = (PathfindLayerEnum)LAYER_WALL;
 				bestDistance = delta;
@@ -1701,7 +1701,7 @@ PathfindLayerEnum TerrainLogic::getHighestLayerForDestination(const Coord3D *pos
 	if (bestDistance > TheAI->pathfinder()->getWallHeight()/2) {
 		// check wall.
 		if (TheAI->pathfinder()->isPointOnWall(pos)) {
-			Real delta = pos->z - TheAI->pathfinder()->getWallHeight();
+			Real delta = pos->z - TheAI->pathfinder()->getWallHeightAt(*pos);
 			// must be ABOVE (or on) the wall for this call. (srj)
 			if (delta >= 0 && fabs(delta) < fabs(bestDistance)) {
 				bestLayer = (PathfindLayerEnum)LAYER_WALL;

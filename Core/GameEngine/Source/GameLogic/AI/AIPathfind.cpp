@@ -55,6 +55,7 @@ static Bool isSameHorde(const Object* obj, const Object* unit);
 #include "GameLogic/Module/CastleBehavior.h"
 #include "Common/ModuleFactory.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/RetailSiegeDocking.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/RetailGate.h"
@@ -348,6 +349,26 @@ void Pathfinder::dropUnsupportedWallOccupants(const Object& wall)
 		ground.z = TheTerrainLogic->getGroundHeight(ground.x, ground.y);
 		unit->setPosition(&ground);
 	}
+}
+
+Real Pathfinder::getWallHeightAt(const Coord3D& position)
+{
+	Bool found = FALSE;
+	Real height = m_wallHeight;
+	if (RetailFileLayers::enabled())
+	{
+		for (ObjectID id : m_retailWallPieces)
+		{
+			const Object* wall = TheGameLogic->findObjectByID(id);
+			if (!SiegeDockingBehavior::find(wall) || !m_layers[LAYER_WALL].isPointOnWall(&id, 1, &position))
+				continue;
+			const Real top = wall->getPosition()->z + wall->getGeometryInfo().getMaxHeightAbovePosition();
+			if (!found || top > height)
+				height = top;
+			found = TRUE;
+		}
+	}
+	return height;
 }
 
 Bool Pathfinder::isPointOnWall(const Coord3D *pos)

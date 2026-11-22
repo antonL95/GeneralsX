@@ -93,6 +93,7 @@
 #include "GameLogic/RetailBuildingEvents.h"
 
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/RetailSiegeDocking.h"
 #include "GameLogic/Module/AutoPickUpUpdate.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Module/AutoHealBehavior.h"
@@ -415,6 +416,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	m_behaviors = MSGNEW("ModulePtrs") BehaviorModule*[totalModules + 1];
 	BehaviorModule** curB = m_behaviors;
 	const ModuleInfo& mi = tt->getBehaviorModuleInfo();
+	const Bool hasSiegeAI = RetailFileLayers::enabled() && SiegeAIUpdate::hasSpecializedAI(mi);
 
 	// set m_team to null before the first call, to avoid naughtiness...
 	// If no team is specified in the constructor, then assign the object
@@ -522,7 +524,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	for (modIdx = 0; modIdx < mi.getCount(); ++modIdx)
 	{
 		modName = mi.getNthName(modIdx);
-		if (modName.isEmpty())
+		if (modName.isEmpty() || (hasSiegeAI && modName == "AIUpdateInterface"))
 			continue;
 
 		BehaviorModule* newMod = (BehaviorModule*)TheModuleFactory->newModule(this, modName, mi.getNthData(modIdx), MODULETYPE_BEHAVIOR);

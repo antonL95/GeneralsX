@@ -3802,7 +3802,7 @@ void AIFollowWaypointPathState::computeGoal(Bool useGroupOffsets)
 
 	if (TheAI->pathfinder()->isPointOnWall(&dest)) {
 		// except when they're on the wall.  jba.
-		dest.z = TheAI->pathfinder()->getWallHeight();
+		dest.z = TheAI->pathfinder()->getWallHeightAt(dest);
 		m_goalLayer = LAYER_WALL;
 	}
 

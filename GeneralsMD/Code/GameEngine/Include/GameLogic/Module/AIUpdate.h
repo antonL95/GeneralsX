@@ -349,7 +349,7 @@ public:
 
 	virtual void joinTeam();			///< This unit just got added to a team & needs to catch up.
 
-	const AsciiString& getRetailLuaEventList() const { return getAIUpdateModuleData()->m_luaEventsList; }
+	virtual const AsciiString& getRetailLuaEventList() const { return getAIUpdateModuleData()->m_luaEventsList; }
 	Bool areTurretsLinked() const { return getAIUpdateModuleData()->m_turretsLinked; }
 
 	// this is present solely for some transports to override, so that they can land before
@@ -639,7 +639,7 @@ public:
 	void friend_setLastCommandSource( CommandSourceType source ) {m_lastCommandSource = source;}
 
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
-	const AsciiString& getRetailLuaEventsList() const { return getAIUpdateModuleData()->m_luaEventsList; }
+	const AsciiString& getRetailLuaEventsList() const { return getRetailLuaEventList(); }
 	void enterRetailRampage();
 	Bool isWithinHoldGroundCloseRange(const Object* target) const;
 	Bool canAttackFromGarrison() const { return getAIUpdateModuleData()->m_canAttackWhileContained; }
