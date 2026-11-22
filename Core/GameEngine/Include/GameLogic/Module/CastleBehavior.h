@@ -80,7 +80,7 @@ public:
 	Bool isUnpacked() const { return m_unpacked; }
 	static CastleBehavior* find(const Object* object);
 	Object* getKeep() const;
-	ObjectID getCastleObjectID() const { return getObject()->getID(); }
+	ObjectID getCastleObjectID() const;
 	Bool unpackFree();
 	Bool orderUnpack(Player* player);
 	Real getMaxCastleRadius() const { return getCastleBehaviorModuleData()->m_maxCastleRadius; }

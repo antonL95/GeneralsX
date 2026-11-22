@@ -198,6 +198,11 @@ Object* CastleBehavior::getKeep() const
 	return keep && !keep->isEffectivelyDead() ? keep : nullptr;
 }
 
+ObjectID CastleBehavior::getCastleObjectID() const
+{
+	return getObject()->getID();
+}
+
 Bool CastleBehavior::unpackFree()
 {
 	if (!m_unpacked && !getObject()->isEffectivelyDead())

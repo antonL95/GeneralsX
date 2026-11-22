@@ -561,6 +561,7 @@ void ModuleFactory::init()
 		addModule( GateProxyBehavior );
 		addModule( AIGateUpdate );
 		addModule( WallHubBehavior );
+		addModule( WallUpgradeUpdate );
 		addModule( GettingBuiltBehavior );
 		addModule( FakePathfindPortalBehaviour );
 		addModule( DynamicPortalBehaviour );

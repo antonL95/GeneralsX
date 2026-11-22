@@ -89,6 +89,7 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "GateProxyBehavior", 16, 16 },
 	{ "AIGateUpdate", 32, 16 },
 	{ "WallHubBehavior", 64, 32 },
+	{ "WallUpgradeUpdate", 32, 16 },
 	{ "GettingBuiltBehavior", 256, 64 },
 	{ "ReplaceSelfUpgrade", 64, 32 },
 	{ "FakePathfindPortalBehaviour", 32, 16 },

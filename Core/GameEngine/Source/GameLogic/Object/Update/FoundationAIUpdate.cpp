@@ -176,10 +176,10 @@ void FoundationAIUpdate::showFoundation(Bool show)
 		drawable->setDrawableHidden(!show);
 }
 
-void FoundationAIUpdate::advanceConstruction(Object& structure, Object* builder)
+void FoundationAIUpdate::advanceConstruction(Object& structure, Object* builder, Int overrideFrames)
 {
 	Player* player = structure.getControllingPlayer();
-	const Int frames = structure.getTemplate()->calcTimeToBuild(player);
+	const Int frames = overrideFrames > 0 ? overrideFrames : structure.getTemplate()->calcTimeToBuild(player);
 	structure.setConstructionPercent(structure.getConstructionPercent() + CastleRules::constructionStep(frames));
 	BodyModuleInterface* body = structure.getBodyModule();
 	body->internalChangeHealth(body->getMaxHealth() / INT_TO_REAL(frames > 0 ? frames : 1));

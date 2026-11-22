@@ -590,12 +590,12 @@ Bool DynamicPortalBehaviour::shouldActivate() const
 		return FALSE;
 	const auto* data = getDynamicPortalBehaviourModuleData();
 	const Player* owner = self->getControllingPlayer();
-	const auto hasUpgradeNamed = [self, owner](const AsciiString& name)
+	const auto hasUpgradeNamed = [self, owner](const AsciiString& name) -> Bool
 	{
 		const UpgradeTemplate* tmpl = TheUpgradeCenter ? TheUpgradeCenter->findUpgrade(name) : nullptr;
 		if (!tmpl)
 			return FALSE;
-		return self->hasUpgrade(tmpl) || (owner && owner->hasUpgradeComplete(tmpl));
+		return (self->hasUpgrade(tmpl) || (owner && owner->hasUpgradeComplete(tmpl))) ? TRUE : FALSE;
 	};
 	for (const AsciiString& conflict : data->m_conflictsWith)
 	{

@@ -26,7 +26,7 @@ public:
 	UpdateSleepTime update() override;
 	Object* construct(const ThingTemplate* what, Player* player, Bool prebuilt = FALSE);
 	Bool canBuildOn(const Player* player) const;
-	static void advanceConstruction(Object& structure, Object* builder);
+	static void advanceConstruction(Object& structure, Object* builder, Int overrideFrames = 0);
 	Object* getStructure() const;
 
 private:

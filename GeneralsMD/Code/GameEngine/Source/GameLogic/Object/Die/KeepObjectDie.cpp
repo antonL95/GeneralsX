@@ -39,6 +39,7 @@
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/KeepObjectDie.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/Object.h"
 
 void KeepObjectDieModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -74,7 +75,10 @@ KeepObjectDie::~KeepObjectDie()
 void KeepObjectDie::onDie( const DamageInfo *damageInfo )
 {
 	if (RetailFileLayers::enabled() && isDieApplicable(damageInfo))
+	{
 		getObject()->setPowerModelCondition(MODELCONDITION_COLLAPSING, getKeepObjectDieModuleData()->m_collapsingTime);
+		GettingBuiltBehavior::onRubbleEntered(*getObject());
+	}
 }
 
 Bool KeepObjectDie::keepsRadarOnDeath(const DamageInfo* damageInfo) const

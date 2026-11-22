@@ -12,6 +12,7 @@
 #include "Common/Money.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -394,12 +395,17 @@ void GettingBuiltBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 	static const FieldParse fields[] =
 	{
 		{ "WorkerName", INI::parseAsciiString, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_worker) },
+		{ "EvilWorkerName", INI::parseAsciiString, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_evilWorker) },
 		{ "SelfBuildingLoop", INI::parseAsciiString, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_buildLoop) },
 		{ "SelfRepairFromDamageLoop", INI::parseAsciiString, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_repairLoop) },
 		{ "SelfRepairFromRubbleLoop", INI::parseAsciiString, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_rebuildLoop) },
 		{ "SpawnTimer", INI::parseDurationUnsignedInt, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_spawnTimer) },
 		{ "RebuildTimeSeconds", INI::parseReal, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_rebuildTime) },
 		{ "UseSpawnTimerWithoutWorker", INI::parseBool, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_timerWithoutWorker) },
+		{ "RebuildWhenDead", INI::parseBool, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_rebuildWhenDead) },
+		{ "TestFaction", INI::parseBool, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_testFaction) },
+		{ "DisallowRebuildRange", INI::parseReal, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_disallowRebuildRange) },
+		{ "DisallowRebuildFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(GettingBuiltBehaviorModuleData, m_disallowRebuildFilter) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(fields, 0);
@@ -449,6 +455,91 @@ const GettingBuiltBehavior* GettingBuiltBehavior::find(const Object& structure)
 	return static_cast<const GettingBuiltBehavior*>(structure.findUpdateModule(NAMEKEY("GettingBuiltBehavior")));
 }
 
+GettingBuiltBehavior* GettingBuiltBehavior::findMutable(Object& structure)
+{
+	return static_cast<GettingBuiltBehavior*>(structure.findUpdateModule(NAMEKEY("GettingBuiltBehavior")));
+}
+
+UnsignedInt GettingBuiltBehavior::getRebuildFrames() const
+{
+	const Real seconds = getGettingBuiltBehaviorModuleData()->m_rebuildTime;
+	if (!std::isfinite(seconds) || seconds <= 0.0f)
+		return 0;
+	return std::max(1u, static_cast<UnsignedInt>(seconds * LOGICFRAMES_PER_SECOND));
+}
+
+Bool GettingBuiltBehavior::canRebuildNow() const
+{
+	const auto* data = getGettingBuiltBehaviorModuleData();
+	if (!(data->m_disallowRebuildRange > 0.0f))
+		return TRUE;
+	const Object* self = getObject();
+	const auto& filter = data->m_disallowRebuildFilter;
+	const Bool hasFilter = filter.m_rules != 0 || filter.m_includeKinds.any() || filter.m_excludeKinds.any() ||
+		!filter.m_includeObjects.empty() || !filter.m_excludeObjects.empty();
+	if (!hasFilter)
+		return TRUE;
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(),
+		data->m_disallowRebuildRange, FROM_CENTER_2D);
+	MemoryPoolObjectHolder holder(iter);
+	for (Object* other = iter->first(); other; other = iter->next())
+	{
+		if (other == self || other->isDestroyed() || other->isEffectivelyDead())
+			continue;
+		if (filter.matchesObject(self, other))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+void GettingBuiltBehavior::onRubbleEntered(Object& structure)
+{
+	if (!RetailFileLayers::enabled())
+		return;
+	GettingBuiltBehavior* behavior = findMutable(structure);
+	if (!behavior)
+		return;
+	const auto* data = behavior->getGettingBuiltBehaviorModuleData();
+	if (!data->m_rebuildWhenDead)
+		return;
+	const UnsignedInt rebuildFrames = behavior->getRebuildFrames();
+	const UnsignedInt delay = rebuildFrames > 0 ? rebuildFrames :
+		(data->m_spawnTimer > 0 ? data->m_spawnTimer : LOGICFRAMES_PER_SECOND);
+	behavior->m_waitingToRebuild = TRUE;
+	behavior->m_rebuildReadyFrame = TheGameLogic->getFrame() + delay;
+	behavior->setWakeFrame(&structure, UPDATE_SLEEP(delay));
+}
+
+Bool GettingBuiltBehavior::startRebuild(Object& structure)
+{
+	if (!RetailFileLayers::enabled() || structure.isDestroyed() || !structure.isEffectivelyDead())
+		return FALSE;
+	GettingBuiltBehavior* behavior = findMutable(structure);
+	if (!behavior || !behavior->canRebuildNow())
+		return FALSE;
+
+	structure.setEffectivelyDead(FALSE);
+	structure.setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNDER_CONSTRUCTION));
+	structure.clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+	structure.clearAndSetModelConditionFlags(
+		MAKE_MODELCONDITION_MASK4(MODELCONDITION_RUBBLE, MODELCONDITION_COLLAPSING,
+			MODELCONDITION_POST_RUBBLE, MODELCONDITION_POST_COLLAPSE),
+		MAKE_MODELCONDITION_MASK2(MODELCONDITION_PARTIALLY_CONSTRUCTED, MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED));
+	structure.clearModelConditionState(MODELCONDITION_DYING);
+	structure.setConstructionPercent(0.0f);
+	if (BodyModuleInterface* body = structure.getBodyModule())
+		body->internalChangeHealth(1.0f - body->getHealth());
+	TheAI->pathfinder()->addObjectToPathfindMap(&structure);
+
+	behavior->m_startFrame = TheGameLogic->getFrame();
+	behavior->m_running = TRUE;
+	behavior->m_rebuildingFromRubble = TRUE;
+	behavior->m_waitingToRebuild = FALSE;
+	behavior->m_rebuildReadyFrame = 0;
+	behavior->setWakeFrame(&structure, UPDATE_SLEEP_NONE);
+	return TRUE;
+}
+
 UnsignedInt GettingBuiltBehavior::constructionRefund(const Object& structure, const Player& player)
 {
 	const Int paid = structure.getConstructionCostPaid();
@@ -462,23 +553,53 @@ UnsignedInt GettingBuiltBehavior::constructionRefund(const Object& structure, co
 UpdateSleepTime GettingBuiltBehavior::update()
 {
 	Object* structure = getObject();
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	if (RetailFileLayers::enabled() && m_waitingToRebuild && structure->isEffectivelyDead())
+	{
+		if (frame < m_rebuildReadyFrame)
+			return UPDATE_SLEEP(m_rebuildReadyFrame - frame);
+		if (!canRebuildNow())
+			return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
+		if (!startRebuild(*structure))
+			return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
+		return UPDATE_SLEEP_NONE;
+	}
 	if (!m_running || structure->isEffectivelyDead() || !structure->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 		return UPDATE_SLEEP_FOREVER;
 
-	const UnsignedInt frame = TheGameLogic->getFrame();
 	if (frame < m_startFrame)
 		return UPDATE_SLEEP(m_startFrame - frame);
 	structure->clearAndSetModelConditionFlags(
 		MAKE_MODELCONDITION_MASK(MODELCONDITION_AWAITING_CONSTRUCTION),
 		MAKE_MODELCONDITION_MASK2(MODELCONDITION_PARTIALLY_CONSTRUCTED, MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED));
 	Object* builder = TheGameLogic->findObjectByID(structure->getBuilderID());
-	FoundationAIUpdate::advanceConstruction(*structure, builder);
+	const Int overrideFrames = m_rebuildingFromRubble ? static_cast<Int>(getRebuildFrames()) : 0;
+	FoundationAIUpdate::advanceConstruction(*structure, builder, overrideFrames);
 	if (!structure->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 	{
 		m_running = FALSE;
+		m_rebuildingFromRubble = FALSE;
 		return UPDATE_SLEEP_FOREVER;
 	}
 	return UPDATE_SLEEP_NONE;
+}
+
+void GettingBuiltBehavior::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present,
+	{
+		{ "rebuild-clock", [this](Xfer* x)
+		{
+			x->xferBool(&m_rebuildingFromRubble);
+			x->xferBool(&m_waitingToRebuild);
+			x->xferUnsignedInt(&m_rebuildReadyFrame);
+		}, [this]
+		{
+			m_rebuildingFromRubble = FALSE;
+			m_waitingToRebuild = FALSE;
+			m_rebuildReadyFrame = 0;
+		} }
+	});
 }
 
 void GettingBuiltBehavior::crc(Xfer* xfer)
@@ -488,12 +609,14 @@ void GettingBuiltBehavior::crc(Xfer* xfer)
 	xfer->xferBool(&m_running);
 	xfer->xferInt(&m_paidCost);
 	xfer->xferObjectID(&m_span);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 }
 
 void GettingBuiltBehavior::xfer(Xfer* xfer)
 {
-	XferVersion version = 3;
-	xfer->xferVersion(&version, 3);
+	XferVersion version = 4;
+	xfer->xferVersion(&version, 4);
 	UpdateModule::xfer(xfer);
 	xfer->xferUnsignedInt(&m_startFrame);
 	xfer->xferBool(&m_running);
@@ -501,6 +624,74 @@ void GettingBuiltBehavior::xfer(Xfer* xfer)
 		xfer->xferInt(&m_paidCost);
 	if (version >= 3)
 		xfer->xferObjectID(&m_span);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 4);
 }
 
 void GettingBuiltBehavior::loadPostProcess() { UpdateModule::loadPostProcess(); }
+
+void WallUpgradeUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	UpdateModuleData::buildFieldParse(p);
+}
+
+WallUpgradeUpdate::WallUpgradeUpdate(Thing* thing, const ModuleData* data)
+	: UpdateModule(thing, data)
+{
+}
+
+WallUpgradeUpdate::~WallUpgradeUpdate() = default;
+
+WallUpgradeUpdate* WallUpgradeUpdate::find(const Object* object)
+{
+	if (!object || !RetailFileLayers::enabled() || !object->areModulesReady())
+		return nullptr;
+	return static_cast<WallUpgradeUpdate*>(object->findUpdateModule(NAMEKEY("WallUpgradeUpdate")));
+}
+
+UpdateSleepTime WallUpgradeUpdate::update()
+{
+	if (!RetailFileLayers::enabled())
+		return UPDATE_SLEEP_FOREVER;
+	const Object* self = getObject();
+	if (self->isEffectivelyDead())
+		return UPDATE_SLEEP_FOREVER;
+	if (!m_upgraded && self->getObjectCompletedUpgradeMask().any())
+		m_upgraded = TRUE;
+	return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND / 4);
+}
+
+void WallUpgradeUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present,
+	{
+		{ "wall-upgrade", [this](Xfer* x)
+		{
+			x->xferBool(&m_upgraded);
+		}, [this]
+		{
+			m_upgraded = FALSE;
+		} }
+	});
+}
+
+void WallUpgradeUpdate::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
+}
+
+void WallUpgradeUpdate::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	UpdateModule::xfer(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 1);
+}
+
+void WallUpgradeUpdate::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
+}

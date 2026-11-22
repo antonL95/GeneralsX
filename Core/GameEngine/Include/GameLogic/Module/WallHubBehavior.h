@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common/BuildAssistant.h"
+#include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/UpdateModule.h"
 
 class WallHubBehaviorModuleData : public UpdateModuleData
@@ -65,12 +66,17 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 
 	AsciiString m_worker;
+	AsciiString m_evilWorker;
 	AsciiString m_buildLoop;
 	AsciiString m_repairLoop;
 	AsciiString m_rebuildLoop;
 	UnsignedInt m_spawnTimer = 0;
 	Real m_rebuildTime = 0.0f;
 	Bool m_timerWithoutWorker = FALSE;
+	Bool m_rebuildWhenDead = FALSE;
+	Bool m_testFaction = FALSE;
+	Real m_disallowRebuildRange = 0.0f;
+	SpecialPowerObjectFilter m_disallowRebuildFilter;
 };
 
 class GettingBuiltBehavior final : public UpdateModule
@@ -81,15 +87,51 @@ class GettingBuiltBehavior final : public UpdateModule
 public:
 	GettingBuiltBehavior(Thing* thing, const ModuleData* data);
 	static const GettingBuiltBehavior* find(const Object& structure);
+	static GettingBuiltBehavior* findMutable(Object& structure);
 	static Object* start(const ThingTemplate& type, Object& builder, const Coord3D& position,
 		Real facing, UnsignedInt delay, Int cost, ObjectID span);
+	static Bool startRebuild(Object& structure);
+	static void onRubbleEntered(Object& structure);
 	static UnsignedInt constructionRefund(const Object& structure, const Player& player);
 	ObjectID getSpan() const { return m_span; }
+	UnsignedInt getRebuildFrames() const;
+	Bool isRebuildingFromRubble() const { return m_rebuildingFromRubble; }
+	Bool isWaitingToRebuild() const { return m_waitingToRebuild; }
+	UnsignedInt getRebuildReadyFrame() const { return m_rebuildReadyFrame; }
 	UpdateSleepTime update() override;
 
 private:
+	Bool canRebuildNow() const;
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+
 	UnsignedInt m_startFrame = 0;
 	Bool m_running = FALSE;
 	Int m_paidCost = -1;
 	ObjectID m_span = INVALID_ID;
+	Bool m_rebuildingFromRubble = FALSE;
+	Bool m_waitingToRebuild = FALSE;
+	UnsignedInt m_rebuildReadyFrame = 0;
+};
+
+class WallUpgradeUpdateModuleData : public UpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
+class WallUpgradeUpdate final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(WallUpgradeUpdate, "WallUpgradeUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(WallUpgradeUpdate, WallUpgradeUpdateModuleData)
+
+public:
+	WallUpgradeUpdate(Thing* thing, const ModuleData* data);
+	static WallUpgradeUpdate* find(const Object* object);
+	Bool isUpgraded() const { return m_upgraded; }
+	UpdateSleepTime update() override;
+
+private:
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+
+	Bool m_upgraded = FALSE;
 };
