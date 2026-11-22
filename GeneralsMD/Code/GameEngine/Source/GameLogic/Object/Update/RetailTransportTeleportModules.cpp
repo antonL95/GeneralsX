@@ -8,6 +8,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
 #include "Common/Xfer.h"
@@ -29,7 +30,9 @@
 namespace
 {
 constexpr UnsignedInt MAX_SERIALIZED_ENTRIES = 256;
-constexpr UnsignedInt DEFECTION_RECHECK_FRAMES = 10;
+constexpr UnsignedInt DEFECTION_RECHECK_RETAIL_FRAMES = 10;
+constexpr UnsignedInt DEFECTION_RECHECK_FRAMES =
+	RotwkDuration::engineFrames(DEFECTION_RECHECK_RETAIL_FRAMES, LOGICFRAMES_PER_SECOND);
 
 void teleportObjectWithMembers(Object* unit, const Coord3D& dest)
 {
