@@ -710,8 +710,11 @@ Module *ModuleFactory::newModule( Thing *thing, const AsciiString& name, const M
 			DEBUG_ASSERTCRASH(
 				((mt->m_whichInterfaces & (MODULEINTERFACE_SPECIAL_POWER)) != 0) == (bm->getSpecialPower() != nullptr),
 				("getInterfaceMask bad for MODULE_SPECIAL_POWER (%s)",name.str()));
+			const Bool expectsUpdate = mt->m_createProc == FireWeaponWhenDeadBehavior::friend_newModuleInstance
+				? FireWeaponWhenDeadBehavior::hasDelayedFire(moduleData)
+				: (mt->m_whichInterfaces & MODULEINTERFACE_UPDATE) != 0;
 			DEBUG_ASSERTCRASH(
-				((mt->m_whichInterfaces & (MODULEINTERFACE_UPDATE)) != 0) == (bm->getUpdate() != nullptr),
+				expectsUpdate == (bm->getUpdate() != nullptr),
 				("getInterfaceMask bad for MODULE_UPDATE (%s)",name.str()));
 			DEBUG_ASSERTCRASH(
 				((mt->m_whichInterfaces & (MODULEINTERFACE_UPGRADE)) != 0) == (bm->getUpgrade() != nullptr),

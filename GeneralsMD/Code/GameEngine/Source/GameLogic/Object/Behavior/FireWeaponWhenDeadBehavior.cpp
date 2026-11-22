@@ -93,7 +93,13 @@ void FireWeaponWhenDeadBehavior::onDie( const DamageInfo *damageInfo )
 
 UpdateModuleInterface* FireWeaponWhenDeadBehavior::getUpdate()
 {
-	return RetailFileLayers::enabled() && getFireWeaponWhenDeadBehaviorModuleData()->m_delay ? this : nullptr;
+	return hasDelayedFire(getModuleData()) ? this : nullptr;
+}
+
+Bool FireWeaponWhenDeadBehavior::hasDelayedFire(const ModuleData* data)
+{
+	return RetailFileLayers::enabled() &&
+		static_cast<const FireWeaponWhenDeadBehaviorModuleData*>(data)->m_delay != 0;
 }
 
 UpdateSleepTime FireWeaponWhenDeadBehavior::update()

@@ -31,6 +31,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/ModuleFactory.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/Module/DieModule.h"
@@ -102,8 +103,9 @@ public:
 	static Int getInterfaceMask()
 	{
 		return MODULEINTERFACE_UPGRADE | MODULEINTERFACE_DIE |
-			(ModuleFactory::registersRotwkModules() ? MODULEINTERFACE_UPDATE : 0);
+			(RetailFileLayers::enabled() ? MODULEINTERFACE_UPDATE : 0);
 	}
+	static Bool hasDelayedFire(const ModuleData* data);
 
 	// BehaviorModule
 	virtual UpgradeModuleInterface* getUpgrade() override { return this; }
