@@ -976,52 +976,25 @@ void OpenContain::onDie( const DamageInfo * damageInfo )
 // ------------------------------------------------------------------------------------------------
 Bool OpenContain::isValidContainerFor(const Object* obj, Bool checkCapacity) const
 {
-	const Object *us = getObject();
-	const OpenContainModuleData *modData = getOpenContainModuleData();
+	return allowsPassenger(*obj->getTemplate(), obj->getRelationship(getObject()));
+}
 
-	// if we have any kind of masks set then we must make that check
-	if (obj->isAnyKindOf( modData->m_allowInsideKindOf ) == FALSE ||
-			obj->isAnyKindOf( modData->m_forbidInsideKindOf ) == TRUE)
+Bool OpenContain::allowsPassenger(const ThingTemplate& passenger, Relationship relationship) const
+{
+	const auto* data = getOpenContainModuleData();
+	if (!passenger.isAnyKindOf(data->m_allowInsideKindOf) || passenger.isAnyKindOf(data->m_forbidInsideKindOf))
+		return FALSE;
+
+	switch (relationship)
 	{
-		return false;
+		case ALLIES: return data->m_allowAlliesInside;
+		case ENEMIES: return data->m_allowEnemiesInside;
+		case NEUTRAL: return data->m_allowNeutralInside;
+		default:
+			DEBUG_CRASH(("isValidContainerFor: Undefined relationship (%d) between '%s' and '%s'",
+				(int)relationship, getObject()->getTemplate()->getName().str(), passenger.getName().str()));
+			return FALSE;
 	}
-
- 	//
- 	// check relationship, note that this behavior is defined as the relation between
- 	// 'obj' and the container 'us', and not the reverse
- 	//
- 	Bool relationshipRestricted = FALSE;
- 	Relationship r = obj->getRelationship( us );
- 	switch( r )
- 	{
- 		case ALLIES:
- 			if( modData->m_allowAlliesInside == FALSE )
- 				relationshipRestricted = TRUE;
- 			break;
-
- 		case ENEMIES:
- 			if( modData->m_allowEnemiesInside == FALSE )
- 				relationshipRestricted = TRUE;
- 			break;
-
- 		case NEUTRAL:
- 			if( modData->m_allowNeutralInside == FALSE )
- 				relationshipRestricted = TRUE;
- 			break;
-
- 		default:
- 			DEBUG_CRASH(( "isValidContainerFor: Undefined relationship (%d) between '%s' and '%s'",
- 										r, getObject()->getTemplate()->getName().str(),
- 										obj->getTemplate()->getName().str() ));
- 			return FALSE;
-
- 	}
- 	if( relationshipRestricted == TRUE )
- 		return FALSE;
-
-	// all is well
-	return true;
-
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -97,7 +97,7 @@ Bool AutoPickUpUpdate::canUseButton(const Object* object, const CommandButton* b
 Bool AutoPickUpUpdate::canScanFromButton(const Object* object, const CommandButton* button)
 {
 	auto* pickup = findButtonModule(object, button);
-	return pickup && pickup->findEligibleGrab();
+	return pickup && pickup->canScan() && GrabPassengerSpecialPower::findUsable(pickup->getObject());
 }
 
 Bool AutoPickUpUpdate::hasEatingButton(const Object* object)
@@ -121,40 +121,38 @@ UpdateSleepTime AutoPickUpUpdate::update()
 	return data->m_runFromButton ? UPDATE_SLEEP_FOREVER : UPDATE_SLEEP(std::max(1u, data->m_delay));
 }
 
-GrabPassengerSpecialPower* AutoPickUpUpdate::findEligibleGrab()
+Bool AutoPickUpUpdate::canScan() const
 {
-	Object* self = getObject();
+	const Object* self = getObject();
 	const auto* data = getAutoPickUpUpdateModuleData();
 	const AIUpdateInterface* ai = self->getAI();
 	if (!ai || self->isDestroyed() || self->isEffectivelyDead() || self->isDisabled() || self->getEnclosingContainedBy() ||
 		self->testWeaponSetFlag(WEAPONSET_TOGGLE_1) || data->m_range <= 0.0f ||
 		!self->getContain() || self->getContain()->getContainCount() > 0 ||
 		ai->isBusy() || (!data->m_scanWhileBusy && (ai->isMoving() || ai->isAttacking())))
-		return nullptr;
-
-	auto* grab = GrabPassengerSpecialPower::find(self);
-	return grab && TheSpecialPowerStore->canUseSpecialPower(self, grab->getSpecialPowerTemplate()) ? grab : nullptr;
+		return FALSE;
+	return TRUE;
 }
 
 void AutoPickUpUpdate::scan()
 {
-	auto* grab = findEligibleGrab();
-	if (!grab)
+	Object* self = getObject();
+	if (!canScan() || !GrabPassengerSpecialPower::findUsable(self))
 		return;
 
-	Object* self = getObject();
 	const auto* data = getAutoPickUpUpdateModuleData();
 	SimpleObjectIterator* objects = ThePartitionManager->iterateObjectsInRange(self, data->m_range, FROM_CENTER_2D);
 	MemoryPoolObjectHolder hold(objects);
 	Real best = sqr(data->m_range);
 	Object* target = nullptr;
+	GrabPassengerSpecialPower* grab = nullptr;
 	const Bool checksPickUpFilter = data->m_pickUpFilter.m_includeKinds.any() ||
 		!data->m_pickUpFilter.m_includeObjects.empty() || data->m_pickUpFilter.m_rules != 0;
 	const Real health = self->getBodyModule()->getHealth();
 	const Real maxHealth = self->getBodyModule()->getMaxHealth();
 	for (Object* candidate = objects->first(); candidate; candidate = objects->next())
 	{
-		if (candidate == self || candidate->isKindOf(KINDOF_HORDE) || !grab->isValidPowerTarget(candidate) ||
+		if (candidate == self || candidate->isKindOf(KINDOF_HORDE) ||
 			(candidate->isKindOf(KINDOF_TREE) && !candidate->getTemplate()->getRotWKObjectData().isGrabbable))
 			continue;
 		const Real distance = ThePartitionManager->getDistanceSquared(self, candidate, FROM_CENTER_2D);
@@ -171,8 +169,12 @@ void AutoPickUpUpdate::scan()
 			});
 		if (!shouldEat && !(checksPickUpFilter && data->m_pickUpFilter.matchesObject(self, candidate)))
 			continue;
+		auto* candidateGrab = GrabPassengerSpecialPower::findUsable(self, candidate);
+		if (!candidateGrab)
+			continue;
 		best = distance;
 		target = candidate;
+		grab = candidateGrab;
 	}
 
 	Coord3D treePosition;
@@ -187,12 +189,15 @@ void AutoPickUpUpdate::scan()
 			return;
 		materialized->setPosition(&treePosition);
 		materialized->setOrientation(treeAngle);
-		if (grab->requestGrab(materialized, 0))
+		auto* treeGrab = GrabPassengerSpecialPower::findUsable(self, materialized);
+		if (treeGrab && treeGrab->requestGrab(materialized, 0))
+		{
 			TheTerrainLogic->removeMapTreeAt(treePosition);
-		else
-			TheGameLogic->destroyObject(materialized);
+			return;
+		}
+		TheGameLogic->destroyObject(materialized);
 	}
-	else if (target)
+	if (grab)
 	{
 		grab->requestGrab(target, 0);
 	}

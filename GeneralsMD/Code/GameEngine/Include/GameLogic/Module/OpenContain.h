@@ -236,6 +236,7 @@ public:
   virtual void setEvacDisposition( EvacDisposition disp ) override {};
 protected:
 
+	Bool allowsPassenger(const ThingTemplate& passenger, Relationship relationship) const;
 	void addToContain(Object* rider, Bool validateAdmission);
 
 	virtual void monitorConditionChanges();				///< check to see if we need to update our occupant positions from a model change or anything else

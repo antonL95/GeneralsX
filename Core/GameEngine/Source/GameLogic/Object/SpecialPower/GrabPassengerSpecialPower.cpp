@@ -14,9 +14,12 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #if !RTS_GENERALS
+#include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/ThingFactory.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/Module/ActiveBody.h"
+#include "GameLogic/Module/TransportContain.h"
 #endif
 
 void GrabPassengerSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& fields)
@@ -60,11 +63,18 @@ static const ActiveBodyModuleData* grabVendorData(const Object* target)
 }
 #endif
 
-GrabPassengerSpecialPower* GrabPassengerSpecialPower::find(Object* object)
+GrabPassengerSpecialPower* GrabPassengerSpecialPower::findUsable(Object* object, const Object* target)
 {
 	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+	{
 		if ((*module)->getModuleNameKey() == NAMEKEY("GrabPassengerSpecialPower"))
-			return static_cast<GrabPassengerSpecialPower*>(*module);
+		{
+			auto* grab = static_cast<GrabPassengerSpecialPower*>(*module);
+			if ((!target || grab->isValidPowerTarget(target)) &&
+				TheSpecialPowerStore->canUseSpecialPower(object, grab->getSpecialPowerTemplate()))
+				return grab;
+		}
+	}
 	return nullptr;
 }
 
@@ -79,10 +89,11 @@ Bool GrabPassengerSpecialPower::canGrab(const Object* target) const
 	if (isGrabVendor(target, getSpecialPowerTemplate()->getSpecialPowerType()))
 	{
 		const auto* vendor = grabVendorData(target);
-		const Int capacity = contain->getContainMax();
-		return vendor && !vendor->m_grabObject.isEmpty() &&
-			TheThingFactory->findTemplate(vendor->m_grabObject, FALSE) &&
-			(capacity < 0 || contain->getContainCount() < static_cast<UnsignedInt>(capacity));
+		const auto* transport = dynamic_cast<const TransportContain*>(contain);
+		if (!vendor || vendor->m_grabObject.isEmpty() || !transport || contain->isHordeContain())
+			return FALSE;
+		const ThingTemplate* product = TheThingFactory->findTemplate(vendor->m_grabObject, FALSE);
+		return product && transport->canCarryNewPassenger(*product, *ThePlayerList->getNeutralPlayer()->getDefaultTeam());
 	}
 #endif
 	if (target->isContained() && !target->getContainedBy()->isKindOf(KINDOF_HORDE))
@@ -194,7 +205,7 @@ void GrabPassengerSpecialPower::applyPowerEffect(const Coord3D*)
 	{
 		const auto* vendor = grabVendorData(target);
 		const ThingTemplate* chunkTemplate = TheThingFactory->findTemplate(vendor->m_grabObject, FALSE);
-		Object* chunk = TheThingFactory->newObject(chunkTemplate, target->getTeam());
+		Object* chunk = TheThingFactory->newObject(chunkTemplate, ThePlayerList->getNeutralPlayer()->getDefaultTeam());
 		if (!chunk)
 			return;
 		chunk->setProducer(caster);

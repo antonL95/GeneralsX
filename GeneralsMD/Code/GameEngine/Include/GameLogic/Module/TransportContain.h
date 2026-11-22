@@ -84,6 +84,7 @@ public:
 
 	virtual Bool isValidContainerFor( const Object* obj, Bool checkCapacity) const override;
 	Int getPassengerSlotCount(const Object* rider) const;
+	Bool canCarryNewPassenger(const ThingTemplate& passenger, const Team& team) const;
 
 	virtual void onCapture( Player *oldOwner, Player *newOwner ) override; // have to kick everyone out on capture.
 	virtual void onContaining( Object *obj, Bool wasSelected ) override;		///< object now contains 'obj'
@@ -116,6 +117,7 @@ protected:
 
 private:
 
+	Bool fitsPassenger(const ThingTemplate& passenger, const Player* owner, Int slots, Bool checkCapacity) const;
 	Int m_extraSlotsInUse;
 	UnsignedInt m_frameExitNotBusy;
 

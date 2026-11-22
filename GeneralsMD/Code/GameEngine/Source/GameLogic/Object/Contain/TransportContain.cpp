@@ -31,6 +31,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/Player.h"
+#include "Common/Team.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
 #include "Common/Xfer.h"
@@ -215,30 +216,26 @@ Bool TransportContain::isValidContainerFor(const Object* rider, Bool checkCapaci
 //		return false;
 
 // no... actually, only OUR OWN units can be transported.
+	return fitsPassenger(*rider->getTemplate(), rider->getControllingPlayer(), getPassengerSlotCount(rider), checkCapacity);
+}
+
+Bool TransportContain::canCarryNewPassenger(const ThingTemplate& passenger, const Team& team) const
+{
+	const Object* carrier = getObject();
+	const Relationship relationship = carrier->getIsUndetectedDefector() ? ALLIES : team.getRelationship(carrier->getTeam());
+	const Int rawSlots = passenger.getRawTransportSlotCount();
+	const Int slots = rawSlots == 0 && getTransportContainModuleData()->m_hasPassengerFilter ? 1 : rawSlots;
+	return allowsPassenger(passenger, relationship) && fitsPassenger(passenger, team.getControllingPlayer(), slots, TRUE);
+}
+
+Bool TransportContain::fitsPassenger(const ThingTemplate& passenger, const Player* owner, Int slots, Bool checkCapacity) const
+{
 	const auto* data = getTransportContainModuleData();
-	if (data->m_hasPassengerFilter && !data->m_passengerFilter.matchesTemplate(*rider->getTemplate()))
-		return false;
-	if (!data->m_hasPassengerFilter && rider->getControllingPlayer() != getObject()->getControllingPlayer())
-		return false;
+	if (data->m_hasPassengerFilter ? !data->m_passengerFilter.matchesTemplate(passenger) :
+		owner != getObject()->getControllingPlayer())
+		return FALSE;
 
-	Int transportSlotCount = getPassengerSlotCount(rider);
-
-	// if 0, this object isn't transportable.
-	if (transportSlotCount == 0)
-		return false;
-
-	if (checkCapacity)
-	{
-    Int containMax = getContainMax();
-    Int containCount = getContainCount();
-
-		return (m_extraSlotsInUse + containCount + transportSlotCount <= containMax);
-
-	}
-	else
-	{
-		return true;
-	}
+	return slots != 0 && (!checkCapacity || m_extraSlotsInUse + static_cast<Int>(getContainCount()) + slots <= getContainMax());
 }
 
 

@@ -21,7 +21,7 @@ public:
 
 	static ModuleData* friend_newModuleData(INI* ini);
 	ObjectID getPendingTarget() const { return m_target; }
-	static GrabPassengerSpecialPower* find(Object* object);
+	static GrabPassengerSpecialPower* findUsable(Object* object, const Object* target = nullptr);
 
 	void doSpecialPower(UnsignedInt commandOptions) override;
 	Bool isValidPowerTarget(const Object* target) const override;
