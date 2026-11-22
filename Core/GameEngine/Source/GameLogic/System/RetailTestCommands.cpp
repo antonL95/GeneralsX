@@ -188,6 +188,7 @@ void runRetailPackage17TestCommand(std::string_view action, Object* source, Obje
 void runRetailPackage09TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
 void runRetailPackage10TestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 void runRetailPackage50TestCommand(std::string_view action, Object* source, Object* target, const char* name, const char* argument, UnsignedInt frame);
+void runRetailAbilityTimingTestCommand(Player* player, const char* hero, const char* power, const Coord3D& location, Int targetMode, UnsignedInt frame);
 void runRetailPackage12TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage12AttachTestCommand(std::string_view action, Object* source, UnsignedInt frame);
 void runRetailPackage12PickupTestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
@@ -2397,6 +2398,12 @@ void execute(const Command& command, unsigned int frame)
 		command.action == "pw-rank" ? findObject(command) : nullptr, command.structure.c_str(), frame))
 		return;
 #if !RTS_GENERALS
+	if (command.action == "abilitytiming-cast")
+	{
+		runRetailAbilityTimingTestCommand(findPlayer(command), command.target.c_str(), command.structure.c_str(),
+			command.location, static_cast<Int>(command.angle), frame);
+		return;
+	}
 	if (command.action.starts_with("pkg50-"))
 	{
 		runRetailPackage50TestCommand(command.action, findObject(command), command.action == "pkg50-bored" ? findTarget(command) : nullptr,

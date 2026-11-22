@@ -1,0 +1,6 @@
+20 create Player_1 GondorGandalf 0 2520,1010,0
+21 shroudmap Player_1 GondorGandalf 0
+22 objupgrade Player_1 GondorGandalf 0 Upgrade_ObjectLevel10
+22 objupgrade Player_1 GondorGandalf 0 Upgrade_GandalfWhite
+24 camera Player_1 GondorGandalf 0 - 2520 1010 0.70
+220 power Player_1 GondorGandalf 0 SpecialAbilityWordOfPower

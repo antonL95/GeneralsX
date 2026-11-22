@@ -71,6 +71,17 @@
 
 
 //-------------------------------------------------------------------------------------------------
+static void traceRetailWeaponAbility(const SpecialAbilityUpdate& ability, const Object* caster,
+	const SpecialPowerTemplate* power, const char* phase, UnsignedInt duration)
+{
+	static const Bool enabled = RetailFileLayers::enabled() && std::getenv("GENERALSX_TRACE_ABILITY_TIMING") != nullptr;
+	if (!enabled || ability.getModuleNameKey() != NAMEKEY("WeaponFireSpecialAbilityUpdate"))
+		return;
+	std::fprintf(stderr, "TEST ability-phase frame=%u id=%u hero=%s power=%s phase=%s duration=%u\n",
+		TheGameLogic->getFrame(), static_cast<UnsignedInt>(caster->getID()), caster->getTemplate()->getName().str(),
+		power->getName().str(), phase, duration);
+}
+
 SpecialAbilityUpdate::SpecialAbilityUpdate( Thing *thing, const ModuleData* moduleData ) : SpecialPowerUpdateModule( thing, moduleData )
 {
   m_captureFlashPhase = 0.0f;
@@ -587,6 +598,7 @@ Bool SpecialAbilityUpdate::initiateIntentToDoSpecialPower( const SpecialPowerTem
 
   setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
 
+  traceRetailWeaponAbility(*this, getObject(), spTemplate, "intent", 0);
   return TRUE;
 }
 
@@ -665,6 +677,8 @@ static void showRetailCaptureFlag(Object* flag, const Player* player)
 
 void SpecialAbilityUpdate::onExit( Bool cleanup )
 {
+	if (m_active)
+		traceRetailWeaponAbility(*this, getObject(), getTemplate(), "exit", 0);
 	if (m_active && RetailFileLayers::enabled() &&
 		getSpecialAbilityUpdateModuleData()->m_specialPowerTemplate->getSpecialPowerType() == SPECIAL_INFANTRY_CAPTURE_BUILDING)
 	{
@@ -828,6 +842,7 @@ void SpecialAbilityUpdate::startPacking(Bool success)
   m_packingState = STATE_PACKING;
   Real variation = GameLogicRandomValueReal( 1.0f - data->m_packUnpackVariationFactor, 1.0f + data->m_packUnpackVariationFactor );
   m_animFrames = data->m_packTime * variation;
+  traceRetailWeaponAbility(*this, getObject(), data->m_specialPowerTemplate, "pack", m_animFrames);
 
   //Set the animation state
   getObject()->clearAndSetModelConditionFlags(
@@ -881,6 +896,7 @@ void SpecialAbilityUpdate::startUnpacking()
   m_packingState = STATE_UNPACKING;
   Real variation = GameLogicRandomValueReal( 1.0f - data->m_packUnpackVariationFactor, 1.0f + data->m_packUnpackVariationFactor );
   m_animFrames = data->m_unpackTime * variation;
+  traceRetailWeaponAbility(*this, getObject(), data->m_specialPowerTemplate, "unpack", m_animFrames);
 
   //Set the animation state
   getObject()->clearAndSetModelConditionFlags(
@@ -1080,6 +1096,7 @@ void SpecialAbilityUpdate::startPreparation()
 
   //Set the preparation timer
   m_prepFrames = data->m_preparationFrames;
+  traceRetailWeaponAbility(*this, getObject(), spTemplate, "prepare", m_prepFrames);
 
   switch( spTemplate->getSpecialPowerType() )
   {
@@ -1394,6 +1411,7 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
   const SpecialPowerTemplate *spTemplate = data->m_specialPowerTemplate;
   Object *object = getObject();
 
+  traceRetailWeaponAbility(*this, object, spTemplate, "trigger", 0);
   if( usesRotwkRules() )
     applyRotwkTrigger();
 
@@ -2351,6 +2369,7 @@ Bool SpecialAbilityUpdate::beginHold()
 	if( !usesRotwkRules() )
 		return FALSE;
 	m_holdFrames = holdFramesAfterTrigger();
+	traceRetailWeaponAbility(*this, getObject(), getTemplate(), "hold", m_holdFrames);
 	if( m_holdFrames == 0 )
 		return FALSE;
 	AIUpdateInterface *ai = getObject()->getAI();

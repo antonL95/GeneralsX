@@ -747,6 +747,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Behavior/RetailConstruction.cpp
     Source/GameLogic/System/RetailMordorTestCommands.cpp
     Source/GameLogic/System/RetailPowerTestCommands.cpp
+    Source/GameLogic/System/RetailAbilityTimingTestCommands.cpp
     Source/GameLogic/System/RetailPackage05TestCommands.cpp
     Source/GameLogic/System/RetailPackage41TestCommands.cpp
     Source/GameLogic/System/RetailPackage07TestCommands.cpp
