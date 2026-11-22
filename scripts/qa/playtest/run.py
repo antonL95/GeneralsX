@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -50,7 +51,7 @@ def read_scenario(name):
     return map_path, frames, int(frame), end_frame, commands, render_from
 
 
-def render(build, output, state, map_path, frames, camera_frame, end_frame, commands, render_from):
+def render(build, output, state, map_path, frames, camera_frame, end_frame, commands, render_from, checks):
     configured = build / "CMakeCache.txt"
     source = ROOT.parents[2]
     if f"CMAKE_HOME_DIRECTORY:INTERNAL={source}" not in configured.read_text().splitlines():
@@ -92,6 +93,7 @@ def render(build, output, state, map_path, frames, camera_frame, end_frame, comm
         PLAYTEST_FRAMES=" ".join(map(str, frames)),
         PLAYTEST_RENDER_FROM=str(render_from),
     )
+    env.update(checks.get("render_env", {}))
     for frame in frames:
         env[f"PLAYTEST_PNG_{frame}"] = str(output / f"frame-{frame:04d}.png")
     argv = [
@@ -114,6 +116,8 @@ def render(build, output, state, map_path, frames, camera_frame, end_frame, comm
         raise RuntimeError(f"Engine session failed (exit {status}, expected quit frame {end_frame})")
     if f"TEST frame {camera_frame}: camera at " not in log_text:
         raise RuntimeError(f"Camera command did not run at frame {camera_frame}")
+    if "check" in checks:
+        checks["check"](log_text)
 
 
 def make_media(output, frames):
@@ -141,11 +145,13 @@ def make_media(output, frames):
 def main():
     build = Path(sys.argv[1])
     map_path, frames, camera_frame, end_frame, commands, render_from = read_scenario(sys.argv[2])
+    check_path = ROOT / sys.argv[2] / "check.py"
+    checks = runpy.run_path(str(check_path)) if check_path.is_file() else {}
     with tempfile.TemporaryDirectory(prefix="playtest-", dir=build) as temp:
         state = Path(temp)
         output = state / "results"
         output.mkdir()
-        render(build, output, state, map_path, frames, camera_frame, end_frame, commands, render_from)
+        render(build, output, state, map_path, frames, camera_frame, end_frame, commands, render_from, checks)
         make_media(output, frames)
         (output / "frames.txt").write_text("\n".join(map(str, frames)) + "\n")
         (output / "frame-count.txt").write_text(f"{end_frame}\n")

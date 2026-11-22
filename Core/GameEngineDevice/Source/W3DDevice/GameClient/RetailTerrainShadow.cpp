@@ -33,6 +33,7 @@ struct ShadowTrace
 	unsigned trees = 0;
 	unsigned treeCutouts = 0;
 	unsigned failures = 0;
+	unsigned casterStage1Mismatches = 0;
 	uint32_t treeHash = 2166136261u;
 };
 
@@ -274,6 +275,20 @@ void RetailTerrainShadow::castMesh(MeshClass &mesh, const Matrix3D &transform, B
 	device->SetTexture(1, cutout);
 	device->SetPixelShader(cutout ? m_cutoutShader : m_depthShader);
 	device->SetRenderState(D3DRS_ALPHATESTENABLE, cutout != nullptr);
+	if (tracingShadows())
+	{
+		DWORD coordIndex = 0, transformFlags = 0;
+		const HRESULT coordResult = device->GetTextureStageState(1, D3DTSS_TEXCOORDINDEX, &coordIndex);
+		const HRESULT transformResult = device->GetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, &transformFlags);
+		if (FAILED(coordResult) || FAILED(transformResult) || coordIndex != 1 || transformFlags != D3DTTFF_DISABLE)
+		{
+			++shadowTrace.casterStage1Mismatches;
+			if (shadowTrace.casterStage1Mismatches == 1)
+				std::fprintf(stderr, "[Retail Shadow] bad caster stage 1 pass=%u game=%u coord=%u texTransform=%u\n",
+					shadowTrace.sequence, TheGameLogic->getFrame(), static_cast<unsigned>(coordIndex),
+					static_cast<unsigned>(transformFlags));
+		}
+	}
 	const HRESULT result = device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, vertices, triangles,
 		model->Get_Polygon_Array(), sizeof(TriIndex) == 6 ? D3DFMT_INDEX16 : D3DFMT_INDEX32,
 		m_vertices.data(), sizeof(CasterVertex));
@@ -404,11 +419,11 @@ void RetailTerrainShadow::render(SceneClass &scene, const Vector3 &centre, Int s
 	}
 	if (tracingShadows())
 		std::fprintf(stderr,
-			"[Retail Shadow] pass=%u game=%u center=(%.3f,%.3f,%.3f) size=%d float=%d target=%08x clear=%08x props=%u trees=%u cutouts=%u hash=%08x failures=%u coord=%u texTransform=%u zBias=%u\n",
+			"[Retail Shadow] pass=%u game=%u center=(%.3f,%.3f,%.3f) size=%d float=%d target=%08x clear=%08x props=%u trees=%u cutouts=%u hash=%08x failures=%u coord=%u texTransform=%u zBias=%u casterStage1Mismatches=%u\n",
 			shadowTrace.sequence, TheGameLogic->getFrame(), centre.X, centre.Y, centre.Z, m_size, m_floatDepth,
 			static_cast<unsigned>(targetResult), static_cast<unsigned>(clearResult), shadowTrace.props, shadowTrace.trees,
 			shadowTrace.treeCutouts, shadowTrace.treeHash, shadowTrace.failures, static_cast<unsigned>(coordIndex),
-			static_cast<unsigned>(texTransform), static_cast<unsigned>(zBias));
+			static_cast<unsigned>(texTransform), static_cast<unsigned>(zBias), shadowTrace.casterStage1Mismatches);
 	if (target) target->Release();
 	if (depth) depth->Release();
 }
