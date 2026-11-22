@@ -400,6 +400,7 @@ public:
 	Bool hasUpgrade( const UpgradeTemplate *upgradeT ) const ;			///< does this object already have this upgrade
 	Bool affectedByUpgrade( const UpgradeTemplate *upgradeT ) const ; ///< can the object even "have" this upgrade, will it do something?
 	void giveUpgrade( const UpgradeTemplate *upgradeT );		///< give upgrade to this object
+	void giveUpgradeMask(const UpgradeMaskType& mask);
 	void removeUpgrade( const UpgradeTemplate *upgradeT );	///< remove upgrade from this object
 
 	Bool hasCountermeasures() const;
@@ -551,6 +552,8 @@ public:
 	//have one at a time.
 	void setSpecialModelConditionState( ModelConditionFlagType set, UnsignedInt frames = 0 );
 	void clearSpecialModelConditionStates();
+	void setTempInvulnerable(UnsignedInt frames);
+	UpdateSleepTime updateSpecialModelConditions();
 
 	// set and/or clear multiple modelcondition flags
 	void clearModelConditionFlags( const ModelConditionFlags& clr );
@@ -754,6 +757,8 @@ private:
 	UnsignedInt				m_disabledTillFrame[ DISABLED_COUNT ];
 
 	UnsignedInt		m_smcUntil;
+	UnsignedInt		m_invulnerableUntil;
+	void scheduleSMCHelper();
 
 	enum { NUM_SLEEP_HELPERS = 9 };
 	ObjectRepulsorHelper*					m_repulsorHelper;

@@ -150,7 +150,7 @@ public:
 	Bool m_giveNoXP = FALSE;
 	Bool m_setBonusModelConditionOnSpeedBonus = FALSE;
 	UnsignedInt m_unitInvulnerableTime = 0;
-	std::vector<AsciiString> m_bonusForTypes;
+	AsciiString m_bonusForType;
 	std::vector<RetailProductionModifier> m_retailModifiers;
 
 	ProductionUpdateModuleData();

@@ -44,11 +44,7 @@ ObjectSMCHelper::~ObjectSMCHelper()
 // ------------------------------------------------------------------------------------------------
 UpdateSleepTime ObjectSMCHelper::update()
 {
-	// if we ever get here, stop this.
-	getObject()->clearSpecialModelConditionStates();
-
-	// then go back to sleep until we are forcibly awakened.
-	return UPDATE_SLEEP_FOREVER;
+	return getObject()->updateSpecialModelConditions();
 }
 
 // ------------------------------------------------------------------------------------------------

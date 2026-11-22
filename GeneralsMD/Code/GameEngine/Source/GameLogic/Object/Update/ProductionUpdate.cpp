@@ -182,7 +182,7 @@ Int scaleProductionValue(Int value, Real multiplier)
 		{
 			{ "ProductionModifier", parseRetailProductionModifier, nullptr, offsetof(ProductionUpdateModuleData, m_retailModifiers) },
 			{ "SetBonusModelConditionOnSpeedBonus", INI::parseBool, nullptr, offsetof(ProductionUpdateModuleData, m_setBonusModelConditionOnSpeedBonus) },
-			{ "BonusForType", INI::parseAsciiStringVector, nullptr, offsetof(ProductionUpdateModuleData, m_bonusForTypes) },
+			{ "BonusForType", INI::parseAsciiString, nullptr, offsetof(ProductionUpdateModuleData, m_bonusForType) },
 			{ "UnitInvulnerableTime", INI::parseDurationUnsignedInt, nullptr, offsetof(ProductionUpdateModuleData, m_unitInvulnerableTime) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
@@ -681,16 +681,10 @@ UpdateSleepTime ProductionUpdate::update()
 	if (RetailFileLayers::enabled() && d->m_setBonusModelConditionOnSpeedBonus)
 	{
 		Bool hasBonus = FALSE;
-		if (Player* owner = us->getControllingPlayer())
+		if (d->m_bonusForType.isNotEmpty())
 		{
-			for (const AsciiString& type : d->m_bonusForTypes)
-			{
-				if (owner->getPowerProductionSpeed(type) > 1.0f)
-				{
-					hasBonus = TRUE;
-					break;
-				}
-			}
+			if (Player* owner = us->getControllingPlayer())
+				hasBonus = owner->getPowerProductionSpeed(d->m_bonusForType) > 1.0f;
 		}
 		const Bool hadBonus = us->getLogicModelConditions().test(MODELCONDITION_UPGRADE_ECONOMY_BONUS);
 		if (hasBonus && !hadBonus)
@@ -960,7 +954,7 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 						if (RetailFileLayers::enabled())
 						{
 							if (d->m_unitInvulnerableTime > 0)
-								newObj->setSpecialModelConditionState(MODELCONDITION_INVULNERABLE, d->m_unitInvulnerableTime);
+								newObj->setTempInvulnerable(d->m_unitInvulnerableTime);
 							HeroRoster::onHeroProduced(newObj);
 						}
 

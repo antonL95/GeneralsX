@@ -296,6 +296,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	m_partitionLastThreat(nullptr),
 	m_partitionLastValue(nullptr),
 	m_smcUntil(NEVER),
+	m_invulnerableUntil(NEVER),
 	m_privateStatus(0),
 	m_formationID(NO_FORMATION_ID),
 	m_isReceivingDifficultyBonus(FALSE),
@@ -1571,6 +1572,16 @@ void Object::clearAndSetModelConditionFlags( const ModelConditionFlags& clr, con
 // animations. Setting a special state will automatically clear any other
 // special states that may be turned on so you can only have one at a time.
 //=============================================================================
+void Object::scheduleSMCHelper()
+{
+	UnsignedInt nextFrame = m_smcUntil;
+	if (RetailFileLayers::enabled() && m_invulnerableUntil != NEVER &&
+		(nextFrame == NEVER || m_invulnerableUntil < nextFrame))
+		nextFrame = m_invulnerableUntil;
+	if (m_smcHelper)
+		m_smcHelper->sleepUntil(nextFrame);
+}
+
 void Object::setSpecialModelConditionState( ModelConditionFlagType set, UnsignedInt frames )
 {
 	clearSpecialModelConditionStates();
@@ -1583,17 +1594,54 @@ void Object::setSpecialModelConditionState( ModelConditionFlagType set, Unsigned
 	}
 
 	m_smcUntil = TheGameLogic->getFrame() + frames;
-	m_smcHelper->sleepUntil(m_smcUntil);
+	scheduleSMCHelper();
 }
 
-//=============================================================================
 void Object::clearSpecialModelConditionStates()
 {
-	if (RetailFileLayers::enabled())
-		clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_SPECIAL_CHEERING, MODELCONDITION_INVULNERABLE));
-	else
-		clearModelConditionFlags(MAKE_MODELCONDITION_MASK(MODELCONDITION_SPECIAL_CHEERING));
+	clearModelConditionFlags(MAKE_MODELCONDITION_MASK(MODELCONDITION_SPECIAL_CHEERING));
 	m_smcUntil = NEVER;
+	if (RetailFileLayers::enabled())
+		scheduleSMCHelper();
+}
+
+void Object::setTempInvulnerable(UnsignedInt frames)
+{
+	if (!RetailFileLayers::enabled())
+		return;
+	if (frames == 0)
+		frames = 1;
+	const UnsignedInt expiry = TheGameLogic->getFrame() + frames;
+	if (m_invulnerableUntil == NEVER || expiry > m_invulnerableUntil)
+		m_invulnerableUntil = expiry;
+	setModelConditionState(MODELCONDITION_INVULNERABLE);
+	scheduleSMCHelper();
+}
+
+UpdateSleepTime Object::updateSpecialModelConditions()
+{
+	if (!RetailFileLayers::enabled())
+	{
+		clearSpecialModelConditionStates();
+		return UPDATE_SLEEP_FOREVER;
+	}
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (m_smcUntil != NEVER && now >= m_smcUntil)
+	{
+		clearModelConditionFlags(MAKE_MODELCONDITION_MASK(MODELCONDITION_SPECIAL_CHEERING));
+		m_smcUntil = NEVER;
+	}
+	if (m_invulnerableUntil != NEVER && now >= m_invulnerableUntil)
+	{
+		clearModelConditionFlags(MAKE_MODELCONDITION_MASK(MODELCONDITION_INVULNERABLE));
+		m_invulnerableUntil = NEVER;
+	}
+	UnsignedInt nextFrame = m_smcUntil;
+	if (m_invulnerableUntil != NEVER && (nextFrame == NEVER || m_invulnerableUntil < nextFrame))
+		nextFrame = m_invulnerableUntil;
+	if (nextFrame == NEVER)
+		return UPDATE_SLEEP_FOREVER;
+	return UPDATE_SLEEP(nextFrame - now);
 }
 
 // Lorenzen has some interest in this, ask before deleting
@@ -4212,6 +4260,7 @@ void Object::crc( Xfer *xfer )
 		xferMountedTemplateState(xfer);
 		xferMountedCombatState(xfer);
 		xfer->xferInt(&m_constructionCostPaid);
+		xfer->xferUnsignedInt(&m_invulnerableUntil);
 	}
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;
@@ -4363,8 +4412,8 @@ void Object::xfer( Xfer *xfer )
 #endif
 	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
 		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
-	const XferVersion maxVersion = RetailFileLayers::enabled() ? 15 : 10;
-	XferVersion version = maxVersion == 15 ? (m_constructionCostPaid >= 0 ? 15 : 14) :
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 16 : 10;
+	XferVersion version = maxVersion == 16 ? (m_invulnerableUntil != NEVER ? 16 : (m_constructionCostPaid >= 0 ? 15 : 14)) :
 		(extendedSlots ? 10 : legacyVersion);
 	xfer->xferVersion(&version, maxVersion);
 
@@ -4834,6 +4883,10 @@ void Object::xfer( Xfer *xfer )
 		xferMountedTemplateState(xfer);
 	if (version >= 14)
 		xferMountedCombatState(xfer);
+	if (version >= 16)
+		xfer->xferUnsignedInt(&m_invulnerableUntil);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_invulnerableUntil = NEVER;
 }
 
 void Object::inheritMountedUpgradeCommands(std::vector<AsciiString> commands)
@@ -4890,7 +4943,8 @@ void Object::loadPostProcess()
 		m_containedBy = TheGameLogic->findObjectByID(m_xferContainedByID);
 	else
 		m_containedBy = nullptr;
-
+	if (RetailFileLayers::enabled() && (m_smcUntil != NEVER || m_invulnerableUntil != NEVER))
+		scheduleSMCHelper();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -5020,6 +5074,26 @@ void Object::giveUpgrade( const UpgradeTemplate *upgradeT )
 //-------------------------------------------------------------------------------------------------
 /** Remove this upgrade from this object */
 //-------------------------------------------------------------------------------------------------
+void Object::giveUpgradeMask(const UpgradeMaskType& mask)
+{
+	if (!mask.any() || m_objectUpgradesCompleted.testForAll(mask))
+		return;
+	m_objectUpgradesCompleted.set(mask);
+	updateUpgradeModules();
+	if (const HordeContain* horde = HordeContain::get(this))
+	{
+		std::vector<ObjectID> memberIDs;
+		for (const Object* member : *horde->getContainedItemsList())
+			memberIDs.push_back(member->getID());
+		for (ObjectID memberID : memberIDs)
+		{
+			Object* member = TheGameLogic->findObjectByID(memberID);
+			if (member && !member->isEffectivelyDead() && !HordeContain::get(member))
+				member->giveUpgradeMask(mask);
+		}
+	}
+}
+
 void Object::removeUpgrade( const UpgradeTemplate *upgradeT )
 {
 	m_objectUpgradesCompleted.clear( upgradeT->getUpgradeMask() );
