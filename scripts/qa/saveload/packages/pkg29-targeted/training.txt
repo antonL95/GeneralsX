@@ -15,8 +15,6 @@
 212 pkg29-cast Player_1 Pkg29Porter 0 Player_1:Pkg29RepairFarm:0
 214 pkg29-state Player_1 Pkg29Porter 0 Player_1:Pkg29RepairFarm:0
 244 pkg29-state Player_1 Pkg29Porter 0 Player_1:Pkg29RepairFarm:0
-245 create Player_1 Pkg29CompetingPorter 0 2150,1510,0
-247 pkg29-probe Player_1 Pkg29CompetingPorter 0 Player_1:Pkg29RepairFarm:0
 320 pkg29-state Player_1 Pkg29Porter 0 Player_1:Pkg29RepairFarm:0
 330 damage Player_1 Pkg29RepairFarm 0 15
 331 pkg29-script Player_1 Pkg29Porter 0 Player_1:Pkg29RepairFarm:0
@@ -24,6 +22,9 @@
 425 damage Player_1 Pkg29RepairFarm 0 15
 426 pkg29-ai Player_1 Pkg29Porter 0 Player_1:Pkg29RepairFarm:0
 427 pkg29-state Player_1 Pkg29Porter 0 Player_1:Pkg29RepairFarm:0
+438 create Player_1 Pkg29CompetingPorter 0 2150,1510,0
+440 pkg29-state Player_1 Pkg29Porter 0 Player_1:Pkg29RepairFarm:0
+440 pkg29-probe Player_1 Pkg29CompetingPorter 0 Player_1:Pkg29RepairFarm:0
 490 create Player_1 ArnorPeasantAdult 0 2170,1500,0
 490 create Player_1 Pkg29WorkerFarm 0 2235,1510,0
 490 create Player_1 ArnorBreelandPeasantHorde 0 2120,1840,0

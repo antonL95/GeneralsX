@@ -10,9 +10,6 @@ check() {
 	if covers 244; then
 		grep -E '^TEST pkg29 repair frame=244 .* task=1 repairing=1 ' "$log"
 	fi
-	if covers 247; then
-		expect 'TEST pkg29 cursor frame=247 valid=0 cursor=GenericInvalid generic=0'
-	fi
 	if covers 320; then
 		grep -E '^TEST pkg29 repair frame=320 module=1 ready=1 .* task=0 repairing=0 health=2000.000$' "$log"
 	fi
@@ -21,6 +18,10 @@ check() {
 	fi
 	if covers 427; then
 		grep '^TEST pkg29 repair frame=427 module=1 ready=1 accepted=1 task=1 ' "$log"
+	fi
+	if covers 440; then
+		grep '^TEST pkg29 repair frame=440 module=1 ready=1 accepted=1 task=1 repairing=1 ' "$log"
+		expect 'TEST pkg29 cursor frame=440 valid=0 cursor=GenericInvalid generic=0'
 	fi
 	if covers 521; then
 		expect 'TEST pkg29 cursor frame=521 valid=1 cursor=DoRepair generic=0'
