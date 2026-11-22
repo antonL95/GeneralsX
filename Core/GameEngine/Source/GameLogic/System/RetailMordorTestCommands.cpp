@@ -14,7 +14,10 @@
 #include "GameClient/View.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/RetailTestCommands.h"
 
+namespace
+{
 void runRetailMordorTestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame)
 {
 	auto* owner = source->getControllingPlayer();
@@ -66,4 +69,18 @@ void runRetailMordorTestCommand(std::string_view action, Object* source, Object*
 			}
 		}
 	}
+}
+}
+
+namespace RetailTestCommands
+{
+void registerRetailMordorTestCommands()
+{
+	registerPrefix("mparity-", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		runRetailMordorTestCommand(ctx.action, source, ctx.findTarget(false), ctx.argument, ctx.frame);
+	});
+}
 }

@@ -6,8 +6,11 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/TerrainLogic.h"
 
+namespace
+{
 void runRetailMarshWaterTestCommand(const Coord3D& position, Real height, UnsignedInt frame)
 {
 	const auto* water = TheTerrainLogic->getWaterHandle(position.x, position.y);
@@ -27,4 +30,20 @@ void runRetailMarshRouteTestCommand(const Object* object, const Coord3D& destina
 	const Bool connected = TheAI->pathfinder()->clientSafeQuickDoesPathExist(
 		ai->getLocomotorSet(), object->getPosition(), &destination);
 	std::fprintf(stderr, "TEST marsh route frame=%u connected=%d\n", frame, connected);
+}
+}
+
+namespace RetailTestCommands
+{
+void registerRetailMarshTestCommands()
+{
+	registerAction("marsh-water", [](const Context& ctx) {
+		if (ctx.hasPosition)
+			runRetailMarshWaterTestCommand(ctx.position, ctx.angle, ctx.frame);
+	});
+	registerAction("marsh-route", [](const Context& ctx) {
+		if (ctx.hasPosition)
+			runRetailMarshRouteTestCommand(ctx.findObject(true), ctx.groundLocation(), ctx.frame);
+	});
+}
 }

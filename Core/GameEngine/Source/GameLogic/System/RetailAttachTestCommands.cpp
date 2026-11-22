@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
 #include <cstdio>
@@ -8,6 +9,8 @@
 #include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Object.h"
 
+namespace
+{
 void runRetailPackage12AttachTestCommand(std::string_view action, Object* source, UnsignedInt frame)
 {
 	if (action != "pkg12-attach")
@@ -31,4 +34,20 @@ void runRetailPackage12AttachTestCommand(std::string_view action, Object* source
 		source->testStatus(OBJECT_STATUS_ATTACHED), source->isEffectivelyDead(), position->x, position->y, position->z,
 		parent ? parent->getPosition()->z + parent->getGeometryInfo().getMaxHeightAbovePosition() : 0.0f);
 }
+}
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailAttachTestCommands()
+{
+#if !RTS_GENERALS
+	registerAction("pkg12-attach", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		runRetailPackage12AttachTestCommand(ctx.action, source, ctx.frame);
+	});
+#endif
+}
+}

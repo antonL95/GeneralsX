@@ -9,9 +9,12 @@
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
+#include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/TerrainLogic.h"
 #include "WWMath/matrix3d.h"
 
+namespace
+{
 void logRetailPlacementTestObject(const Object* spawned, const char* name, UnsignedInt frame)
 {
 	if (!spawned)
@@ -82,4 +85,28 @@ void logRetailSpawnPoints(const Object* producer, const char* prefix, UnsignedIn
 	}
 	std::fprintf(stderr, "TEST spawn-points frame=%u prefix=%s bones=%d raised=%d occupants=%d matched=%d\n",
 		frame, prefix, count, raised, occupants, matched);
+}
+}
+
+namespace RetailTestCommands
+{
+void registerRetailPlacementTestCommands()
+{
+	registerAction("placement-state", [](const Context& ctx) {
+		logRetailPlacementTestObject(ctx.source, ctx.argument, ctx.frame);
+	});
+	registerAction("placement-ocl", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		const Coord3D target = ctx.hasPosition ? ctx.groundLocation() : Coord3D{};
+		runRetailPlacementTestCommand(source, ctx.argument, ctx.hasPosition ? &target : nullptr, ctx.frame);
+	});
+	registerAction("placement-spawn-points", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		logRetailSpawnPoints(source, ctx.argument, ctx.frame);
+	});
+}
 }

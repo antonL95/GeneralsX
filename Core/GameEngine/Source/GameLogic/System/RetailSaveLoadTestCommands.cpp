@@ -15,11 +15,14 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
+#include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
 #include "GameLogic/TerrainLogic.h"
 
+namespace
+{
 void runRetailSaveLoadPartitionTestCommand(std::string_view action, Object* object, const char* argument, UnsignedInt frame)
 {
 	if (!object)
@@ -195,4 +198,40 @@ void runRetailSaveLoadBookTestCommand(Player* player, const char* templateName)
 		TheGameLogic->findObjectByID(unitID) == unit;
 	std::fprintf(stderr, "TEST save-load repaired spellbook id=%u unit=%u lookup=%d\n",
 		static_cast<UnsignedInt>(bookID), static_cast<UnsignedInt>(unitID), lookup);
+}
+}
+
+namespace RetailTestCommands
+{
+void registerRetailSaveLoadTestCommands()
+{
+	const auto partition = [](const Context& ctx) {
+		runRetailSaveLoadPartitionTestCommand(ctx.action, ctx.findObject(true), ctx.argument, ctx.frame);
+	};
+	registerAction("snapshot-partition-cells", partition);
+	registerAction("snapshot-partition-scale", partition);
+
+	const auto path = [](const Context& ctx) {
+		runRetailSaveLoadPathTestCommand(ctx.action, ctx.findObject(true), ctx.frame);
+	};
+	registerAction("snapshot-path-state", path);
+	registerAction("snapshot-path-queue", path);
+	registerAction("snapshot-register-footprint", path);
+	registerAction("snapshot-obstacle-owner", path);
+	registerAction("snapshot-obstacle-count", path);
+	registerAction("snapshot-wall-state", path);
+
+	const auto wall = [](const Context& ctx) {
+		const Coord3D position = ctx.hasPosition ? ctx.groundLocation() : Coord3D{};
+		runRetailSaveLoadWallTestCommand(ctx.action, ctx.player, ctx.findObject(true), ctx.argument, position, ctx.frame);
+	};
+	registerAction("snapshot-wall-reinforce", wall);
+	registerAction("snapshot-wall-occupy", wall);
+	registerAction("snapshot-wall-occupant", wall);
+	registerAction("snapshot-wall-delete", wall);
+
+	registerAction("snapshot-book-repair", [](const Context& ctx) {
+		runRetailSaveLoadBookTestCommand(ctx.player, ctx.targetName);
+	});
+}
 }

@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
 #include <cstdio>
@@ -12,6 +13,8 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 
+namespace
+{
 void runRetailAbilityTimingTestCommand(Player* player, const char* hero, const char* powerName,
 	const Coord3D& location, Int targetMode, UnsignedInt frame)
 {
@@ -62,4 +65,18 @@ void runRetailAbilityTimingTestCommand(Player* player, const char* hero, const c
 	std::fprintf(stderr, "TEST ability-probe frame=%u hero=%s power=%s id=%u accepted=%d\n",
 		frame, hero, powerName, static_cast<UnsignedInt>(caster->getID()), accepted);
 }
+}
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailAbilityTimingTestCommands()
+{
+#if !RTS_GENERALS
+	registerAction("abilitytiming-cast", [](const Context& ctx) {
+		runRetailAbilityTimingTestCommand(ctx.player, ctx.targetName, ctx.argument,
+			ctx.position, static_cast<Int>(ctx.angle), ctx.frame);
+	});
+#endif
+}
+}

@@ -25,11 +25,13 @@
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
 
-bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player, Object* object, const char* argument, unsigned int frame)
-{
 #if !RTS_GENERALS
+namespace
+{
+void runPowerCommand(std::string_view action, Player* player, Object* object, const char* argument, unsigned int frame)
+{
 	if (!player)
-		return true;
+		return;
 	if (action == "pw-button")
 	{
 		GameWindow* window = TheWindowManager->winGetWindowFromId(nullptr, NAMEKEY(argument));
@@ -42,7 +44,7 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 				button->getTextLabel().str(), button->getDescriptionLabel().str(),
 				BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED));
 		}
-		return true;
+		return;
 	}
 	if (action == "pw-rank")
 	{
@@ -53,14 +55,14 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 			std::fprintf(stderr, "PW rank frame=%u object=%s rank=%d\n",
 				frame, object->getTemplate()->getName().str(), tracker->getRank());
 		}
-		return true;
+		return;
 	}
 	if (action == "pw-purchase")
 	{
 		const ScienceType science = TheScienceStore->getScienceFromInternalName(argument);
 		if (science != SCIENCE_INVALID && player == ThePlayerList->getLocalPlayer())
 			TheMessageStream->appendMessage(GameMessage::MSG_PURCHASE_SCIENCE)->appendIntegerArgument(science);
-		return true;
+		return;
 	}
 	if (action == "pw-cp")
 	{
@@ -68,7 +70,7 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 		const Int total = player->getCommandPointsTotal(&maximum);
 		std::fprintf(stderr, "PW cp frame=%u used=%d total=%d maximum=%d\n",
 			frame, player->getCommandPointsUsed(), total, maximum);
-		return true;
+		return;
 	}
 	if (action == "pw-override")
 	{
@@ -79,7 +81,7 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 		script->getParameter(2)->friend_setInt(2345);
 		TheScriptActions->executeAction(script);
 		deleteInstance(script);
-		return true;
+		return;
 	}
 	if (action == "pw-counters")
 	{
@@ -97,7 +99,7 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 			if (const auto* counter = TheScriptEngine->getCounter(name))
 				std::fprintf(stderr, "PW counter frame=%u name=%s value=%d\n", frame, name.str(), counter->value);
 		}
-		return true;
+		return;
 	}
 	if (action == "pw-book")
 	{
@@ -116,7 +118,7 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 				module && module->isReady(), module ? module->getReadyFrame() : 0, power->getReloadTime(), power->getRadiusCursorRadius(),
 				cursor, RadiusDecalTemplate::findNamedCursor(cursor) != nullptr);
 		}
-		return true;
+		return;
 	}
 	if (action == "pw-summons")
 	{
@@ -131,7 +133,7 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 				object->isKindOf(KINDOF_HERO), object->isKindOf(KINDOF_SUMMONED), object->isSelectable(),
 				lifetime ? lifetime->getLifetimeFrames() : 0);
 		}
-		return true;
+		return;
 	}
 	if (action == "pw-created")
 	{
@@ -146,8 +148,20 @@ bool RetailTestCommands::runPowerCommand(std::string_view action, Player* player
 				drawable && drawable->getModelConditionFlags().test(MODELCONDITION_JUST_BUILT),
 				ai && ai->isBusy(), ai && ai->isIdle());
 		}
-		return true;
+		return;
 	}
+}
+}
 #endif
-	return false;
+
+namespace RetailTestCommands
+{
+void registerRetailPowerTestCommands()
+{
+#if !RTS_GENERALS
+	registerPrefix("pw-", [](const Context& ctx) {
+		runPowerCommand(ctx.action, ctx.player, ctx.action == "pw-rank" ? ctx.source : nullptr, ctx.argument, ctx.frame);
+	});
+#endif
+}
 }

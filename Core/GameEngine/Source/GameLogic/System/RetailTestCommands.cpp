@@ -166,21 +166,8 @@ struct RetailTeamBudgetFixture
 };
 #endif
 
-void runRetailMordorTestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
-void runRetailParticleTestCommand(std::string_view action, const Object* source, const Object* target,
-	const Coord3D* location, const char* argument, UnsignedInt frame);
-void runRetailPlacementTestCommand(Object* source, const char* name, const Coord3D* target, UnsignedInt frame);
-void logRetailPlacementTestObject(const Object* object, const char* name, UnsignedInt frame);
-void logRetailSpawnPoints(const Object* object, const char* prefix, UnsignedInt frame);
-void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, UnsignedInt frame);
-void runRetailMarshWaterTestCommand(const Coord3D& position, Real height, UnsignedInt frame);
-void runRetailMarshRouteTestCommand(const Object* object, const Coord3D& destination, UnsignedInt frame);
-void runRetailSaveLoadPartitionTestCommand(std::string_view action, Object* object, const char* argument, UnsignedInt frame);
 void runRetailPackage23TestCommand(std::string_view action, Player* player, Object* object, Object* target,
 	const char* name, const Coord3D& point, UnsignedInt frame);
-void runRetailSaveLoadWallTestCommand(std::string_view action, Player* player, Object* wall,
-	const char* name, const Coord3D& position, UnsignedInt frame);
-void runRetailSaveLoadBookTestCommand(Player* player, const char* templateName);
 #if !RTS_GENERALS
 void runRetailPackage05TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage41TestCommand(std::string_view action, Object* source, UnsignedInt frame);
@@ -189,9 +176,7 @@ void runRetailPackage17TestCommand(std::string_view action, Object* source, Obje
 void runRetailPackage09TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
 void runRetailPackage10TestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 void runRetailPackage50TestCommand(std::string_view action, Object* source, Object* target, const char* name, const char* argument, UnsignedInt frame);
-void runRetailAbilityTimingTestCommand(Player* player, const char* hero, const char* power, const Coord3D& location, Int targetMode, UnsignedInt frame);
 void runRetailPackage12TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
-void runRetailPackage12AttachTestCommand(std::string_view action, Object* source, UnsignedInt frame);
 void runRetailPackage12PickupTestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 void runRetailPackage15TestCommand(std::string_view action, Object* source, UnsignedInt frame);
 void runRetailPackage21TestCommand(std::string_view action, Object* source, const char* argument, const Coord3D* position, UnsignedInt frame);
@@ -2355,88 +2340,13 @@ void execute(const Command& command, unsigned int frame)
 		handler(context);
 		return;
 	}
-	if (command.action == "marsh-water" && command.hasLocation)
-	{
-		runRetailMarshWaterTestCommand(command.location, command.angle, frame);
-		return;
-	}
-	if (command.action == "marsh-route" && command.hasLocation)
-	{
-		runRetailMarshRouteTestCommand(findObject(command, true), groundLocation(command), frame);
-		return;
-	}
-	if (command.action == "particle-fx" || command.action == "particle-systems" || command.action == "particle-water-fx" ||
-		command.action == "particle-weather" || command.action == "particle-bone-sample")
-	{
-		const Coord3D location = command.hasLocation ? groundLocation(command) : Coord3D{};
-		const auto separator = command.structure.find(',');
-		const Object* target = nullptr;
-		if (separator != std::string::npos)
-		{
-			Command targetCommand;
-			targetCommand.structure = command.structure.substr(separator + 1);
-			target = findTarget(targetCommand);
-		}
-		const std::string name = command.structure.substr(0, separator);
-		runRetailParticleTestCommand(command.action, command.target != "-" ? findObject(command) : nullptr,
-			target, command.hasLocation ? &location : nullptr, name.c_str(), frame);
-		return;
-	}
-#if !RTS_GENERALS
-	if (command.action == "particle-condition")
-	{
-		if (Object* object = findObject(command))
-		{
-			if (command.structure == "ring")
-				object->setModelConditionState(MODELCONDITION_ONE_RING);
-			else if (command.structure == "hero")
-				object->setModelConditionState(MODELCONDITION_CREATE_A_HERO_02);
-		}
-		return;
-	}
-#endif
-	if (command.action == "snapshot-partition-cells" || command.action == "snapshot-partition-scale")
-	{
-		runRetailSaveLoadPartitionTestCommand(command.action, findObject(command, true), command.structure.c_str(), frame);
-		return;
-	}
 	if (command.action.starts_with("pkg23-"))
 	{
 		runRetailPackage23TestCommand(command.action, findPlayer(command), findObject(command, true),
 			findTarget(command, true), command.structure.c_str(), command.location, frame);
 		return;
 	}
-	if (command.action == "snapshot-path-state" || command.action == "snapshot-register-footprint" ||
-		command.action == "snapshot-obstacle-owner" ||
-		command.action == "snapshot-obstacle-count" ||
-		command.action == "snapshot-wall-state")
-	{
-		runRetailSaveLoadPathTestCommand(command.action, findObject(command, true), frame);
-		return;
-	}
-	if (command.action == "snapshot-wall-reinforce" || command.action == "snapshot-wall-occupy" ||
-		command.action == "snapshot-wall-occupant" || command.action == "snapshot-wall-delete")
-	{
-		const Coord3D position = command.hasLocation ? groundLocation(command) : Coord3D{};
-		runRetailSaveLoadWallTestCommand(command.action, findPlayer(command), findObject(command, true),
-			command.structure.c_str(), position, frame);
-		return;
-	}
-	if (command.action == "snapshot-book-repair")
-	{
-		runRetailSaveLoadBookTestCommand(findPlayer(command), command.target.c_str());
-		return;
-	}
-	if (command.action.starts_with("pw-") && runPowerCommand(command.action, findPlayer(command),
-		command.action == "pw-rank" ? findObject(command) : nullptr, command.structure.c_str(), frame))
-		return;
 #if !RTS_GENERALS
-	if (command.action == "abilitytiming-cast")
-	{
-		runRetailAbilityTimingTestCommand(findPlayer(command), command.target.c_str(), command.structure.c_str(),
-			command.location, static_cast<Int>(command.angle), frame);
-		return;
-	}
 	if (command.action.starts_with("pkg50-"))
 	{
 		runRetailPackage50TestCommand(command.action, findObject(command), command.action == "pkg50-bored" ? findTarget(command) : nullptr,
@@ -2774,11 +2684,6 @@ void execute(const Command& command, unsigned int frame)
 	}
 
 	Object* obj = findObject(command, command.action == "xpstate");
-	if (command.action == "placement-state")
-	{
-		logRetailPlacementTestObject(obj, command.structure.c_str(), frame);
-		return;
-	}
 	if (!obj)
 	{
 		std::fprintf(stderr, "TEST frame %u: no %s %d of %s\n", frame, command.target.c_str(), command.ordinal,
@@ -2786,24 +2691,6 @@ void execute(const Command& command, unsigned int frame)
 		return;
 	}
 
-	if (command.action == "placement-ocl")
-	{
-		const Coord3D target = command.hasLocation ? groundLocation(command) : Coord3D{};
-		runRetailPlacementTestCommand(obj, command.structure.c_str(), command.hasLocation ? &target : nullptr, frame);
-		return;
-	}
-
-	if (command.action == "placement-spawn-points")
-	{
-		logRetailSpawnPoints(obj, command.structure.c_str(), frame);
-		return;
-	}
-
-	if (command.action.starts_with("mparity-"))
-	{
-		runRetailMordorTestCommand(command.action, obj, findTarget(command), command.structure.c_str(), frame);
-		return;
-	}
 #if !RTS_GENERALS
 	if (command.action.starts_with("pkg08-"))
 	{
@@ -2837,11 +2724,6 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action.starts_with("pkg12-ai-"))
 	{
 		runRetailPackage12TestCommand(command.action, obj, findTarget(command, true), frame);
-		return;
-	}
-	if (command.action == "pkg12-attach")
-	{
-		runRetailPackage12AttachTestCommand(command.action, obj, frame);
 		return;
 	}
 	if (command.action.starts_with("pkg12-pickup-"))
@@ -2930,9 +2812,6 @@ void execute(const Command& command, unsigned int frame)
 #endif
 
 	const Bool placeAtPoint = command.action == "place" && command.hasPlacementPoint;
-	if (command.action.starts_with("bparity-") &&
-		runBuildingCommand(command.action, obj, command.structure.c_str(), command.hasLocation ? &command.location : nullptr, frame))
-		return;
 	if (command.action == "snapshot-devastation")
 	{
 		const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate("SpellBookDevastation");
@@ -3860,12 +3739,31 @@ void registerPrefix(std::string_view prefix, Handler handler)
 	}
 }
 
+void registerRetailAbilityTimingTestCommands();
+void registerRetailAttachTestCommands();
+void registerRetailBuildingTestCommands();
+void registerRetailMarshTestCommands();
+void registerRetailMordorTestCommands();
+void registerRetailParticleTestCommands();
+void registerRetailPlacementTestCommands();
+void registerRetailPowerTestCommands();
+void registerRetailSaveLoadTestCommands();
+
 void registerAllCommands()
 {
 	static bool registered = false;
 	if (registered)
 		return;
 	registered = true;
+	registerRetailAbilityTimingTestCommands();
+	registerRetailAttachTestCommands();
+	registerRetailBuildingTestCommands();
+	registerRetailMarshTestCommands();
+	registerRetailMordorTestCommands();
+	registerRetailParticleTestCommands();
+	registerRetailPlacementTestCommands();
+	registerRetailPowerTestCommands();
+	registerRetailSaveLoadTestCommands();
 }
 
 bool tracesCombat()
@@ -3928,10 +3826,9 @@ void saveCheckpoint(unsigned int frame)
 			const SaveResult result = TheGameState->saveGame(command.structure.c_str(), UnicodeString(), SAVE_FILE_TYPE_NORMAL);
 			std::fprintf(stderr, "TEST snapshot-save frame=%u code=%d\n", frame, result.saveCode);
 		}
-		else if (RetailFileLayers::enabled() && (command.action == "snapshot-share" || command.action == "snapshot-overlap"))
+		else if (RetailFileLayers::enabled() && (command.action == "snapshot-share" || command.action == "snapshot-overlap" ||
+			command.action == "snapshot-path-queue"))
 			execute(command, frame);
-		else if (RetailFileLayers::enabled() && command.action == "snapshot-path-queue")
-			runRetailSaveLoadPathTestCommand(command.action, findObject(command, true), frame);
 	}
 }
 }

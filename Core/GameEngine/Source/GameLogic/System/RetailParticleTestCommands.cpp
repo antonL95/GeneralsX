@@ -3,10 +3,14 @@
 #include "GameClient/FXList.h"
 #include "GameClient/ParticleSys.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/TerrainLogic.h"
 #include <cstdio>
+#include <string>
 #include <string_view>
 
+namespace
+{
 void runRetailParticleTestCommand(std::string_view action, const Object* source, const Object* target, const Coord3D* location,
 	const char* argument, UnsignedInt frame)
 {
@@ -88,4 +92,39 @@ void runRetailParticleTestCommand(std::string_view action, const Object* source,
 		std::fprintf(stderr, "TEST particle-systems frame=%u name=%s systems=%u particles=%u targeted=%u gpu-total=%u\n",
 			frame, argument, systems, particles, targeted, TheParticleSystemManager->getGpuParticleCount());
 	}
+}
+
+void dispatchParticleCommand(const RetailTestCommands::Context& ctx)
+{
+	const Coord3D location = ctx.hasPosition ? ctx.groundLocation() : Coord3D{};
+	const std::string_view argument(ctx.argument);
+	const auto separator = argument.find(',');
+	const Object* target = separator != std::string_view::npos ? ctx.findTarget(argument.substr(separator + 1), false) : nullptr;
+	const std::string name(argument.substr(0, separator));
+	const Object* source = std::string_view(ctx.targetName) != "-" ? ctx.source : nullptr;
+	runRetailParticleTestCommand(ctx.action, source, target, ctx.hasPosition ? &location : nullptr, name.c_str(), ctx.frame);
+}
+}
+
+namespace RetailTestCommands
+{
+void registerRetailParticleTestCommands()
+{
+	registerAction("particle-fx", dispatchParticleCommand);
+	registerAction("particle-systems", dispatchParticleCommand);
+	registerAction("particle-water-fx", dispatchParticleCommand);
+	registerAction("particle-weather", dispatchParticleCommand);
+	registerAction("particle-bone-sample", dispatchParticleCommand);
+#if !RTS_GENERALS
+	registerAction("particle-condition", [](const Context& ctx) {
+		if (Object* object = ctx.source)
+		{
+			if (std::string_view(ctx.argument) == "ring")
+				object->setModelConditionState(MODELCONDITION_ONE_RING);
+			else if (std::string_view(ctx.argument) == "hero")
+				object->setModelConditionState(MODELCONDITION_CREATE_A_HERO_02);
+		}
+	});
+#endif
+}
 }

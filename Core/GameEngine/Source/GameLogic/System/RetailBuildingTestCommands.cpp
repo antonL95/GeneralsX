@@ -26,7 +26,9 @@
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #endif
 
-bool RetailTestCommands::runBuildingCommand(std::string_view action, Object* object, const char* target,
+namespace
+{
+void runBuildingCommand(std::string_view action, Object* object, const char* target,
 	const Coord3D* location, unsigned int frame)
 {
 	if (action == "bparity-finish")
@@ -34,7 +36,7 @@ bool RetailTestCommands::runBuildingCommand(std::string_view action, Object* obj
 		object->setStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
 		object->setConstructionPercent(100.0f);
 		FoundationAIUpdate::advanceConstruction(*object, nullptr);
-		return true;
+		return;
 	}
 	if (action == "bparity-cancel-recruit")
 	{
@@ -45,14 +47,14 @@ bool RetailTestCommands::runBuildingCommand(std::string_view action, Object* obj
 		const Bool cancelled = entry && production->cancelUnitCreate(entry->getProductionID());
 		std::fprintf(stderr, "BPARITY refund %u cancelled=%d before=%u after=%u\n", frame,
 			cancelled, before, money->countMoney());
-		return true;
+		return;
 	}
 	if (action == "bparity-upgrade")
 	{
 		const auto* upgrade = TheUpgradeCenter->findUpgrade(target);
 		std::fprintf(stderr, "BPARITY upgrade %u %s %s owned=%d\n", frame,
 			object->getTemplate()->getName().str(), target, upgrade && object->hasUpgrade(upgrade));
-		return true;
+		return;
 	}
 	if (action == "bparity-horde-casualty")
 	{
@@ -68,13 +70,13 @@ bool RetailTestCommands::runBuildingCommand(std::string_view action, Object* obj
 			if (casualty)
 				casualty->kill();
 		}
-		return true;
+		return;
 	}
 	if (action == "bparity-focus")
 	{
 		if (TheTacticalView)
 			TheTacticalView->lookAt(object->getPosition());
-		return true;
+		return;
 	}
 	if (action == "bparity-preview")
 	{
@@ -90,7 +92,7 @@ bool RetailTestCommands::runBuildingCommand(std::string_view action, Object* obj
 			TheInGameUI->setPlacementStart(&pixel);
 			TheInGameUI->setPlacementEnd(&pixel);
 		}
-		return true;
+		return;
 	}
 	if (action == "bparity-commands")
 	{
@@ -108,17 +110,17 @@ bool RetailTestCommands::runBuildingCommand(std::string_view action, Object* obj
 					key.isEmpty() ? "-" : key.str(), button->isRadial(), button->isInPalantir());
 			}
 		}
-		return true;
+		return;
 	}
 	if (action != "bparity-state")
-		return false;
+		return;
 
 	const Player* player = object->getControllingPlayer();
 	if (!player)
-		return true;
+		return;
 	const ThingTemplate* type = *target ? TheThingFactory->findTemplate(target, FALSE) : object->getTemplate();
 	if (!type)
-		return true;
+		return;
 	AsciiString label;
 	Real radius = 0.0f;
 	Real efficiency = 0.0f;
@@ -146,5 +148,18 @@ bool RetailTestCommands::runBuildingCommand(std::string_view action, Object* obj
 		drawable && drawable->getModelConditionFlags().test(MODELCONDITION_UPGRADE_NUMENOR_STONEWORK),
 		drawable && drawable->getModelConditionFlags().test(MODELCONDITION_UPGRADE_IVORY_TOWER),
 		drawable && drawable->getModelConditionFlags().test(MODELCONDITION_USER_12));
-	return true;
+}
+}
+
+namespace RetailTestCommands
+{
+void registerRetailBuildingTestCommands()
+{
+	registerPrefix("bparity-", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		runBuildingCommand(ctx.action, source, ctx.argument, ctx.hasPosition ? &ctx.position : nullptr, ctx.frame);
+	});
+}
 }
