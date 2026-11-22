@@ -32,6 +32,8 @@
 
 #define DEFINE_OBJECT_STATUS_NAMES
 #include "Common/Player.h"
+#include "Common/GameState.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Module/GrantUpgradeCreate.h"
@@ -57,6 +59,15 @@ void GrantUpgradeCreateModuleData::buildFieldParse(MultiIniFieldParse& p)
 	};
 
   p.add(dataFieldParse);
+	if (RetailFileLayers::enabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "GiveOnBuildComplete", INI::parseBool, nullptr, offsetof(GrantUpgradeCreateModuleData, m_giveOnBuildComplete) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,6 +92,15 @@ GrantUpgradeCreate::~GrantUpgradeCreate()
 //-------------------------------------------------------------------------------------------------
 void GrantUpgradeCreate::onCreate()
 {
+	if (RetailFileLayers::enabled())
+	{
+		const auto* data = getGrantUpgradeCreateModuleData();
+		if ((!TheGameState || !TheGameState->isInLoadGame()) && !data->m_giveOnBuildComplete &&
+			data->m_exemptStatus.test(OBJECT_STATUS_UNDER_CONSTRUCTION) &&
+			!getObject()->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+			grantRetailUpgrade(TRUE);
+		return;
+	}
 
 	ObjectStatusMaskType exemptStatus = getGrantUpgradeCreateModuleData()->m_exemptStatus;
 	ObjectStatusMaskType currentStatus = getObject()->getStatusBits();
@@ -121,6 +141,12 @@ void GrantUpgradeCreate::onBuildComplete()
 
 	CreateModule::onBuildComplete(); // extend
 
+	if (RetailFileLayers::enabled())
+	{
+		grantRetailUpgrade(FALSE);
+		return;
+	}
+
 	const UpgradeTemplate *upgradeTemplate = TheUpgradeCenter->findUpgrade( getGrantUpgradeCreateModuleData()->m_upgradeName );
 	if( !upgradeTemplate )
 	{
@@ -138,6 +164,36 @@ void GrantUpgradeCreate::onBuildComplete()
 	{
 		getObject()->giveUpgrade( upgradeTemplate );
 	}
+}
+
+void GrantUpgradeCreate::onRetailOCLComplete()
+{
+	if (getGrantUpgradeCreateModuleData()->m_giveOnBuildComplete)
+		onBuildComplete();
+}
+
+void GrantUpgradeCreate::grantRetailUpgrade(Bool record)
+{
+	Object* object = getObject();
+	const auto* upgrade = TheUpgradeCenter->findUpgrade(getGrantUpgradeCreateModuleData()->m_upgradeName);
+	Player* player = object->getControllingPlayer();
+	if (!upgrade || !player)
+		return;
+
+	if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+	{
+		if (player->hasUpgradeComplete(upgrade))
+			return;
+		player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+	}
+	else
+	{
+		if (object->hasUpgrade(upgrade))
+			return;
+		object->giveUpgrade(upgrade);
+	}
+	if (record)
+		player->getAcademyStats()->recordUpgrade(upgrade, TRUE);
 }
 
 // ------------------------------------------------------------------------------------------------

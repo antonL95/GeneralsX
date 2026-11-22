@@ -65,6 +65,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
 #include "GameLogic/Module/FloatUpdate.h"
+#include "GameLogic/Module/GrantUpgradeCreate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/SpecialPowerCompletionDie.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
@@ -1432,7 +1433,13 @@ protected:
 				obj->getExperienceTracker()->gainRetailLevels(m_veterancyLevel);
 			}
 			if (m_useJustBuiltFlag)
+			{
 				obj->setPowerModelCondition(MODELCONDITION_JUST_BUILT, std::max<UnsignedInt>(1, m_justBuiltDuration));
+				static const NameKeyType grantKey = NAMEKEY("GrantUpgradeCreate");
+				for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+					if ((*module)->getModuleNameKey() == grantKey)
+						static_cast<GrantUpgradeCreate*>(*module)->onRetailOCLComplete();
+			}
 		}
 
     if ( m_diesOnBadLand && obj )

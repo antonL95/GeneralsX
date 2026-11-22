@@ -48,6 +48,7 @@ class GrantUpgradeCreateModuleData : public CreateModuleData
 public:
 	AsciiString		m_upgradeName;			///< name of the upgrade to be granted.
 	ObjectStatusMaskType m_exemptStatus; ///< do not execute if this status is set in the object
+	Bool m_giveOnBuildComplete = FALSE;
 
 	GrantUpgradeCreateModuleData();
 	static void buildFieldParse(MultiIniFieldParse& p);
@@ -70,7 +71,10 @@ public:
 	/// the create method
 	virtual void onCreate() override;
 	virtual void onBuildComplete() override;	///< This is called when you are a finished game object
+	void onRetailOCLComplete();
 
 protected:
+
+	void grantRetailUpgrade(Bool record);
 
 };

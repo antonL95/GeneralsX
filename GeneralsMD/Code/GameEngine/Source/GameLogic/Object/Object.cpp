@@ -4418,6 +4418,7 @@ void Object::crc( Xfer *xfer )
 		static const NameKeyType autoAbilityKey = NAMEKEY("AutoAbilityBehavior");
 		static const NameKeyType pickupKey = NAMEKEY("PickupStuffUpdate");
 		static const NameKeyType runOffKey = NAMEKEY("RunOffMapBehavior");
+		static const NameKeyType grantUpgradeKey = NAMEKEY("GrantUpgradeCreate");
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
 			const NameKeyType key = (*module)->getModuleNameKey();
@@ -4428,6 +4429,11 @@ void Object::crc( Xfer *xfer )
 				static_cast<PickupStuffUpdate*>(*module)->crcRetailState(xfer);
 			if (key == runOffKey)
 				static_cast<RunOffMapBehavior*>(*module)->crcRetailState(xfer);
+			if (key == grantUpgradeKey)
+			{
+				Bool pending = (*module)->getCreate()->shouldDoOnBuildComplete();
+				xfer->xferBool(&pending);
+			}
 		}
 #if !RTS_GENERALS
 		if (auto* body = dynamic_cast<ActiveBody*>(getBodyModule()))
