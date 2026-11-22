@@ -1,3 +1,4 @@
+import math
 import os
 from pathlib import Path
 import re
@@ -33,25 +34,38 @@ def read_scenario(name):
     if render_from_file.exists() and not 28 <= render_from <= frames[0]:
         raise ValueError("render-from.txt must be between frame 28 and the first capture")
     end_frame = frames[-1] + 2
-    commands = (fixture / "commands.txt").read_text().splitlines()
-    commands = [line for line in commands if line.strip()]
-    camera = (fixture / "camera.txt").read_text().split()
-    if len(camera) != 6:
-        raise ValueError("Expected FRAME PLAYER OBJECT X Y ZOOM in camera.txt")
-    frame, player, actor, x, y, zoom = camera
-    if not 0 < int(frame) < frames[0] or float(zoom) <= 0:
-        raise ValueError("The camera requires positive zoom and must be set before the first capture")
+    commands = [line for line in (fixture / "commands.txt").read_text().splitlines() if line.strip()]
     for line in commands:
         command_frame, action, *_ = line.split()
         if not 0 < int(command_frame) < end_frame or action in ("quit", "camera"):
             raise ValueError(f"Invalid scenario command: {line}")
-    commands.append(f"{frame} camera {player} {actor} 0 - {x} {y} {zoom}")
+    camera_lines = [line for line in (fixture / "camera.txt").read_text().splitlines() if line.strip()]
+    if not camera_lines:
+        raise ValueError("Expected at least one FRAME PLAYER OBJECT X Y ZOOM line in camera.txt")
+    camera_frames = []
+    for line in camera_lines:
+        camera = line.split()
+        if len(camera) != 6:
+            raise ValueError("Expected FRAME PLAYER OBJECT X Y ZOOM in camera.txt")
+        frame, player, actor = camera[:3]
+        x, y, zoom = map(float, camera[3:])
+        frame_number = int(frame)
+        if not all(map(math.isfinite, (x, y, zoom))) or zoom <= 0:
+            raise ValueError(f"Camera requires finite X, Y and positive finite ZOOM: {line}")
+        if not 0 < frame_number < end_frame:
+            raise ValueError(f"Camera frame must be positive and before quit: {line}")
+        if camera_frames and frame_number <= camera_frames[-1]:
+            raise ValueError("Camera frames must be strictly increasing")
+        camera_frames.append(frame_number)
+        commands.append(f"{frame_number} camera {player} {actor} 0 - {x} {y} {zoom}")
+    if camera_frames[0] >= frames[0]:
+        raise ValueError("The first camera command must run before the first capture")
     commands.sort(key=lambda line: int(line.split()[0]))
     commands.append(f"{end_frame} quit - - 0")
-    return map_path, frames, int(frame), end_frame, commands, render_from
+    return map_path, frames, camera_frames, end_frame, commands, render_from
 
 
-def render(build, output, state, map_path, frames, camera_frame, end_frame, commands, render_from, checks):
+def render(build, output, state, map_path, frames, camera_frames, end_frame, commands, render_from, checks):
     configured = build / "CMakeCache.txt"
     source = ROOT.parents[2]
     if f"CMAKE_HOME_DIRECTORY:INTERNAL={source}" not in configured.read_text().splitlines():
@@ -114,8 +128,9 @@ def render(build, output, state, map_path, frames, camera_frame, end_frame, comm
             or "Python Exception" in log_text or "Traceback (most recent call last)" in log_text):
         print("\n".join(log_text.splitlines()[-40:]), file=sys.stderr)
         raise RuntimeError(f"Engine session failed (exit {status}, expected quit frame {end_frame})")
-    if f"TEST frame {camera_frame}: camera at " not in log_text:
-        raise RuntimeError(f"Camera command did not run at frame {camera_frame}")
+    for camera_frame in camera_frames:
+        if f"TEST frame {camera_frame}: camera at " not in log_text:
+            raise RuntimeError(f"Camera command did not run at frame {camera_frame}")
     if "check" in checks:
         checks["check"](log_text)
 
@@ -144,14 +159,14 @@ def make_media(output, frames):
 
 def main():
     build = Path(sys.argv[1])
-    map_path, frames, camera_frame, end_frame, commands, render_from = read_scenario(sys.argv[2])
+    map_path, frames, camera_frames, end_frame, commands, render_from = read_scenario(sys.argv[2])
     check_path = ROOT / sys.argv[2] / "check.py"
     checks = runpy.run_path(str(check_path)) if check_path.is_file() else {}
     with tempfile.TemporaryDirectory(prefix="playtest-", dir=build) as temp:
         state = Path(temp)
         output = state / "results"
         output.mkdir()
-        render(build, output, state, map_path, frames, camera_frame, end_frame, commands, render_from, checks)
+        render(build, output, state, map_path, frames, camera_frames, end_frame, commands, render_from, checks)
         make_media(output, frames)
         (output / "frames.txt").write_text("\n".join(map(str, frames)) + "\n")
         (output / "frame-count.txt").write_text(f"{end_frame}\n")
