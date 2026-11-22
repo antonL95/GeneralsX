@@ -546,11 +546,15 @@ class PartitionFilterWithinAttackRange : public PartitionFilter
 {
 private:
 	const Object* m_obj;
+	const Bool m_allowHoldGroundApproach;
 public:
-	PartitionFilterWithinAttackRange(const Object* obj) : m_obj(obj) { }
+	PartitionFilterWithinAttackRange(const Object* obj, Bool allowHoldGroundApproach) :
+		m_obj(obj), m_allowHoldGroundApproach(allowHoldGroundApproach) {}
 
 	virtual Bool allow(Object* objOther) override
 	{
+		if (m_allowHoldGroundApproach && m_obj->getAI() && m_obj->getAI()->isWithinHoldGroundCloseRange(objOther))
+			return TRUE;
 		if (HordeContain::get(m_obj))
 			return m_obj->getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, objOther, CMD_FROM_AI) == ATTACKRESULT_POSSIBLE;
 		for (Int i = 0; i < WEAPONSLOT_COUNT;	i++ )
@@ -613,7 +617,7 @@ Object *AI::findClosestEnemy( const Object *me, Real range, UnsignedInt qualifie
 	// combine several canned ones, in the name of speed (srj)
 	PartitionFilterLiveMapEnemies filterObvious(me);
 
-	PartitionFilterWithinAttackRange filterWithinAttackRange(me);
+	PartitionFilterWithinAttackRange filterWithinAttackRange(me, (qualifiers & HOLD_GROUND_CLOSE_RANGE) != 0);
 
 	// never target buildings (unless they can attack)
 	PartitionFilterRejectBuildings filterBldgs(me);

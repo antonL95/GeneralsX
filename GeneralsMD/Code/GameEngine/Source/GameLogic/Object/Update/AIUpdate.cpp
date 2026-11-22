@@ -160,6 +160,8 @@ const LocomotorTemplateVector* AIUpdateModuleData::findLocomotorTemplateVector(L
 			{ "MinCowerTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_minCowerTime) },
 			{ "MaxCowerTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_maxCowerTime) },
 			{ "BurningDeathTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_burningDeathTime) },
+			{ "RampageTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_rampageTime) },
+			{ "HoldGroundCloseRangeDistance", INI::parseReal, nullptr, offsetof(AIUpdateModuleData, m_holdGroundCloseRangeDistance) },
 			{ "StopChaseDistance", INI::parseReal, nullptr, offsetof(AIUpdateModuleData, m_stopChaseDistance) },
 			{ "FadeOnPortals", INI::parseBool, nullptr, offsetof(AIUpdateModuleData, m_fadeOnPortals) },
 			{ "CanAttackWhileContained", INI::parseBool, nullptr, offsetof(AIUpdateModuleData, m_canAttackWhileContained) },
@@ -1114,6 +1116,23 @@ UpdateSleepTime AIUpdateInterface::update()
 			return UPDATE_SLEEP_NONE;
 		}
 		subMachineSleep = UPDATE_SLEEP_NONE;
+	}
+	if (m_rampageUntil)
+	{
+		Object* object = getObject();
+		if (m_burningDeathUntil || object->isEffectivelyDead() || TheGameLogic->getFrame() >= m_rampageUntil)
+		{
+			m_rampageUntil = 0;
+			object->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_RAMPAGING));
+			WeaponSetFlags flags;
+			flags.set(WEAPONSET_RAMPAGE);
+			object->setWeaponSetFlags(flags, FALSE);
+		}
+		else
+		{
+			object->fireCurrentWeapon(object->getPosition());
+			subMachineSleep = UPDATE_SLEEP_NONE;
+		}
 	}
 	if (m_fearUntil || m_crushWarningUntil)
 	{
@@ -2789,6 +2808,8 @@ Bool AIUpdateInterface::isAllowedToRespondToAiCommands(const AICommandParms* par
 		EmotionTrackerUpdate::blocksPlayerCommands(getObject()))
 		return FALSE;
 	if (m_fearUntil > TheGameLogic->getFrame())
+		return FALSE;
+	if (m_rampageUntil)
 		return FALSE;
 
 	// the dead don't listen very well
@@ -4843,7 +4864,7 @@ Bool AIUpdateInterface::canAutoAcquireWhileStealthed() const
  */
 Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuringIdle )
 {
-	if (m_fearUntil > TheGameLogic->getFrame())
+	if (m_rampageUntil || m_fearUntil > TheGameLogic->getFrame())
 		return nullptr;
 
 	Object *obj = getObject();
@@ -4987,7 +5008,8 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 	// allow us to pursue the target. therefore, we should ensure that we only
 	// look for targets that are already within attack range (as opposed to vision range).
 	const auto* stances = RetailFileLayers::enabled() ? StancesBehavior::findForUnit(obj) : nullptr;
-	if ((stances && StancesBehavior::holdsGround(stances->getStance())) ||
+	const Bool holdsGround = stances && StancesBehavior::holdsGround(stances->getStance());
+	if (holdsGround ||
 		(!stances && calledByAI && obj->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN))
 	{
 		flags |= AI::WITHIN_ATTACK_RANGE;
@@ -5003,6 +5025,8 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 		flags |= AI::UNFOGGED;
 	}
 
+	if (holdsGround)
+		flags |= AI::HOLD_GROUND_CLOSE_RANGE;
 	Object *newVictim = TheAI->findClosestEnemy(obj, rangeToFindWithin, flags, getAttackInfo());
 
 /*
@@ -5428,9 +5452,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 14 : 4;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 14 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5700,6 +5724,10 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferBool(&m_fadedInPortal);
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_fadedInPortal = FALSE;
+	if (version >= 14)
+		xfer->xferUnsignedInt(&m_rampageUntil);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_rampageUntil = 0;
 
 
 }
@@ -5724,6 +5752,27 @@ Bool AIUpdateInterface::enterRetailBurningDeath()
 	privateWanderInPlace(CMD_FROM_AI);
 	wakeUpNow();
 	return TRUE;
+}
+
+void AIUpdateInterface::enterRetailRampage()
+{
+	Object* object = getObject();
+	const UnsignedInt duration = getAIUpdateModuleData()->m_rampageTime;
+	if (!RetailFileLayers::enabled() || !duration || m_rampageUntil ||
+		object->isEffectivelyDead() || object->getEnclosingContainedBy())
+		return;
+
+	WeaponSetFlags flags;
+	flags.set(WEAPONSET_RAMPAGE);
+	const auto* weapons = object->getTemplate()->findWeaponTemplateSet(flags);
+	if (!weapons || !weapons->friend_getWeaponSetFlags().test(WEAPONSET_RAMPAGE))
+		return;
+
+	privateIdle(CMD_FROM_AI);
+	m_rampageUntil = TheGameLogic->getFrame() + duration;
+	object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_RAMPAGING));
+	object->setWeaponSetFlags(flags, TRUE);
+	wakeUpNow();
 }
 
 Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition, Real durationScale)
@@ -5843,6 +5892,13 @@ Bool AIUpdateInterface::hasRetailPlannerAttack(const Object* target) const
 	return m_retailPlannerAttackTarget != INVALID_ID && m_retailPlannerAttackTarget == target->getID();
 }
 
+Bool AIUpdateInterface::isWithinHoldGroundCloseRange(const Object* target) const
+{
+	const Real distance = getAIUpdateModuleData()->m_holdGroundCloseRangeDistance;
+	return RetailFileLayers::enabled() && distance > 0.0f &&
+		ThePartitionManager->getDistanceSquared(getObject(), target, FROM_CENTER_3D) <= distance * distance;
+}
+
 Bool AIUpdateInterface::stanceAllowsChase(const Object* target) const
 {
 	if (!RetailFileLayers::enabled() || getLastCommandSource() != CMD_FROM_AI || hasRetailPlannerAttack(target))
@@ -5851,7 +5907,16 @@ Bool AIUpdateInterface::stanceAllowsChase(const Object* target) const
 	if (!stances)
 		return TRUE;
 	if (StancesBehavior::holdsGround(stances->getStance()))
-		return FALSE;
+	{
+		if (!isWithinHoldGroundCloseRange(target))
+			return FALSE;
+		const Coord3D& point = *target->getPosition();
+		const Real distance = getAIUpdateModuleData()->m_holdGroundCloseRangeDistance;
+		const Real dx = point.x - m_autoAttackOrigin.x;
+		const Real dy = point.y - m_autoAttackOrigin.y;
+		const Real dz = point.z - m_autoAttackOrigin.z;
+		return dx * dx + dy * dy + dz * dz <= distance * distance;
+	}
 	if (stances->getStance() == AttributeModifierRules::STANCE_BATTLE && !HordeContain::get(getObject()->getContainedBy()))
 	{
 		const Real authored = getAIUpdateModuleData()->m_stopChaseDistance;

@@ -55,6 +55,7 @@
 #include "GameLogic/Damage.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -751,6 +752,8 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 			}
 			else if (m_curDamageState == BODY_REALLYDAMAGED)
 			{
+				if (RetailFileLayers::enabled())
+					RetailBuildingEvents::reallyDamaged(*obj);
 				AudioEventRTS reallyDamaged = *obj->getTemplate()->getSoundOnReallyDamaged();
 				reallyDamaged.setObjectID(obj->getID());
 				TheAudio->addAudioEvent(&reallyDamaged);

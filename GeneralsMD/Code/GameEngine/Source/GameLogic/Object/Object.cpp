@@ -4396,6 +4396,8 @@ void Object::crc( Xfer *xfer )
 			xfer->xferUnsignedInt(&burningDeathUntil);
 			UnsignedInt fearUntil = ai->getRetailFearDeadline();
 			xfer->xferUnsignedInt(&fearUntil);
+			UnsignedInt rampageUntil = ai->getRetailRampageDeadline();
+			xfer->xferUnsignedInt(&rampageUntil);
 			if (ai->getDozerAIInterface() && !ai->getWorkerAIInterface())
 			{
 				static const NameKeyType dozerKey = NAMEKEY("DozerAIUpdate");

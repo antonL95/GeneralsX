@@ -261,7 +261,8 @@ public:
 		ATTACK_BUILDINGS									= 1 << 3,
 		WITHIN_ATTACK_RANGE								= 1 << 4,
 		UNFOGGED													= 1 << 5,
-		USE_HORDE_VISION = 1 << 6
+		USE_HORDE_VISION = 1 << 6,
+		HOLD_GROUND_CLOSE_RANGE = 1 << 7
 	};
 	Object *findClosestEnemy( const Object *me, Real range, UnsignedInt qualifiers,
 		const AttackPriorityInfo *info=nullptr, PartitionFilter *optionalFilter=nullptr);

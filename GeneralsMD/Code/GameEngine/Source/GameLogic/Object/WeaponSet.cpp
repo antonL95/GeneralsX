@@ -393,10 +393,20 @@ void WeaponSet::xfer( Xfer *xfer )
 	}
 
 	const Int slotCount = version >= 4 ? WEAPONSLOT_COUNT : QUATERNARY_WEAPON;
-	for (Int i = 0; i < slotCount; ++i)
+	const Bool retailLoad = xfer->getXferMode() == XFER_LOAD && RetailFileLayers::enabled();
+	const Int slotsToVisit = retailLoad ? WEAPONSLOT_COUNT : slotCount;
+	for (Int i = 0; i < slotsToVisit; ++i)
 	{
 		Bool hasWeaponInSlot = (m_weapons[i] != nullptr);
-		xfer->xferBool(&hasWeaponInSlot);
+		if (i < slotCount)
+			xfer->xferBool(&hasWeaponInSlot);
+		else
+			hasWeaponInSlot = FALSE;
+		if (!hasWeaponInSlot && retailLoad)
+		{
+			deleteInstance(m_weapons[i]);
+			m_weapons[i] = nullptr;
+		}
 		if (hasWeaponInSlot)
 		{
 			if (xfer->getXferMode() == XFER_LOAD && m_weapons[i] == nullptr)

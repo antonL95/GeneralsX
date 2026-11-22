@@ -532,7 +532,12 @@ UpdateSleepTime HordeAIUpdate::update()
 						victim = enemy->findAttackTarget(member, attackType, m_attackSource, (WeaponSlotType)-1, &result);
 					else
 						result = member->getAbleToAttackSpecificObject(attackType, target, m_attackSource);
-					if (result == ATTACKRESULT_POSSIBLE || (!hold && result == ATTACKRESULT_POSSIBLE_AFTER_MOVING))
+					Bool mayApproach = !hold;
+#if !RTS_GENERALS
+					if (!mayApproach && !formation->m_isPorcupineFormation && victim)
+						mayApproach = ai->isWithinHoldGroundCloseRange(victim);
+#endif
+					if (result == ATTACKRESULT_POSSIBLE || (mayApproach && result == ATTACKRESULT_POSSIBLE_AFTER_MOVING))
 					{
 						if (m_forceAttack)
 							ai->aiForceAttackObject(victim, m_maxShots, m_attackSource);

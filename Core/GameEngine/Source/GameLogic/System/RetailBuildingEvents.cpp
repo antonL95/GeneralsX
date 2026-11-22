@@ -50,7 +50,7 @@ struct EventList
 {
 	std::string parent;
 	std::map<std::string, std::string> handlers;
-	std::map<std::string, std::string> enrageHandlers;
+	std::map<std::string, std::string> stateHandlers;
 };
 
 std::string readData(const char* path)
@@ -119,11 +119,13 @@ std::map<std::string, EventList> readEventLists(std::string xml)
 				continue;
 			const std::string fields = xml.substr(fieldsStart, fieldsEnd - fieldsStart);
 			const auto event = attribute(fields, "EventName");
-			if (event == "OnBuildingComplete" || event == "Rider8IsActive" || event == "Rider8IsNotActive")
+			if (event == "OnCreated" || event == "OnBuildingComplete" ||
+				event == "Rider8IsActive" || event == "Rider8IsNotActive" ||
+				event == "UserSixIsActive" || event == "UserSixIsNotActive")
 				entry.handlers[event] = attribute(fields, "ScriptFunctionName");
-			else if (event == "OnAflame" || event == "OnQuenched" ||
+			else if (event == "OnAflame" || event == "OnQuenched" || event == "ReallyDamaged" ||
 				event == "User45IsActive" || event == "User45IsNotActive")
-				entry.enrageHandlers[event] = attribute(fields, "ScriptFunctionName");
+				entry.stateHandlers[event] = attribute(fields, "ScriptFunctionName");
 		}
 		start = listEnd + 12;
 	}
@@ -211,10 +213,15 @@ struct BuildingEvents
 	BuildingEvents() : lists(readEventLists(readData("Data\\Scripts\\ScriptEvents.xml")))
 	{
 		std::map<std::string, std::vector<std::string>> bodies;
+		std::map<std::string, bool> establishedHandlers;
 		for (const auto& [name, list] : lists)
 			for (const auto& [event, handler] : list.handlers)
 				if (!handler.empty())
+				{
 					bodies.try_emplace(handler);
+					if (event != "OnCreated")
+						establishedHandlers[handler] = true;
+				}
 
 		std::istringstream lua(readData("Data\\Scripts\\Scripts.lua"));
 		const std::regex definition(R"(^\s*function\s+(\w+)\s*\(([^)]*)\).*)");
@@ -245,7 +252,7 @@ struct BuildingEvents
 			Program program;
 			if (compile(lines, program))
 				programs.emplace(name, std::move(program));
-			else
+			else if (establishedHandlers.contains(name))
 				std::fprintf(stderr, "Retail events: unsupported callback %s\n", name.c_str());
 		}
 		if (std::getenv("GENERALSX_TEST_COMMANDS"))
@@ -273,11 +280,20 @@ void dispatch(Object& object, const char* event)
 		const auto found = events.programs.find(handler->second);
 		if (found == events.programs.end())
 			return;
-		if (std::string_view(event) == "OnBuildingComplete" && std::getenv("GENERALSX_TEST_COMMANDS"))
+		const std::string_view eventName(event);
+		const bool creation = eventName == "OnCreated";
+		if (creation && !std::all_of(found->second.begin(), found->second.end(), [](const Operation& operation)
+		{
+			return operation.action == Action::Visibility || operation.action == Action::Roll;
+		}))
+			return;
+		if (eventName == "OnBuildingComplete" && std::getenv("GENERALSX_TEST_COMMANDS"))
 			std::fprintf(stderr, "BPARITY complete %u %s %s %zu\n", TheGameLogic->getFrame(),
 				object.getTemplate()->getName().str(), handler->second.c_str(), found->second.size());
 
 		std::vector<double> rolls;
+		UnsignedInt hidden = 0;
+		UnsignedInt shown = 0;
 		for (const Operation& operation : found->second)
 		{
 			if (!std::all_of(operation.conditions.begin(), operation.conditions.end(), [&](const Condition& condition)
@@ -303,6 +319,10 @@ void dispatch(Object& object, const char* event)
 					object.doSpecialPower(power, 0, TRUE);
 				break;
 			case Action::Visibility:
+				if (operation.hide)
+					++hidden;
+				else
+					++shown;
 				if (auto* draw = object.getDrawable())
 				{
 					draw->showSubObject(operation.name.c_str(), !operation.hide);
@@ -313,9 +333,19 @@ void dispatch(Object& object, const char* event)
 			if (object.isDestroyed() || object.isEffectivelyDead())
 				return;
 		}
+		static const bool traceCreation = std::getenv("GENERALSX_TEST_CREATION_VISIBILITY") != nullptr;
+		if (creation && traceCreation && (hidden || shown))
+			std::fprintf(stderr, "TEST pkg12 created frame=%u source=%s callback=%s rolls=%zu hidden=%u shown=%u\n",
+				TheGameLogic->getFrame(), object.getTemplate()->getName().str(), handler->second.c_str(),
+				rolls.size(), hidden, shown);
 		return;
 	}
 }
+}
+
+void RetailBuildingEvents::created(Object& object)
+{
+	dispatch(object, "OnCreated");
 }
 
 void RetailBuildingEvents::complete(Object& object)
@@ -328,17 +358,27 @@ void RetailBuildingEvents::riderChanged(Object& object, bool mounted)
 	dispatch(object, mounted ? "Rider8IsActive" : "Rider8IsNotActive");
 }
 
-int RetailBuildingEvents::enrageAction(const Object& object, const char* event)
+void RetailBuildingEvents::trollEatingChanged(Object& object, bool enabled)
+{
+	dispatch(object, enabled ? "UserSixIsActive" : "UserSixIsNotActive");
+}
+
+namespace
+{
+enum class StateAction { None, EndEnrage, StartEnrage, StartRampage };
+
+StateAction findStateAction(const Object& object, const char* event)
 {
 	if (!RetailFileLayers::enabled() || !object.getAIUpdateInterface())
-		return -1;
+		return StateAction::None;
 	static const auto lists = readEventLists(readData("Data\\Scripts\\ScriptEvents.xml"));
 	static const auto actions = []
 	{
-		std::map<std::string, int> result;
+		std::map<std::string, StateAction> result;
 		std::istringstream lua(readData("Data\\Scripts\\Scripts.lua"));
 		const std::regex definition(R"(^\s*function\s+(\w+)\s*\(self\)\s*$)");
 		const std::regex enrage(R"(^\s*ObjectSetEnragedState\(\s*self\s*,\s*(true|false)\s*\)\s*$)");
+		const std::regex rampage(R"(^\s*ObjectEnterRampageState\(\s*self\s*\)\s*$)");
 		std::string function;
 		for (std::string line; std::getline(lua, line);)
 		{
@@ -352,7 +392,9 @@ int RetailBuildingEvents::enrageAction(const Object& object, const char* event)
 			if (std::regex_match(line, match, definition))
 				function = match[1].str();
 			else if (!function.empty() && std::regex_match(line, match, enrage))
-				result[function] = match[1] == "true" ? 1 : 0;
+				result[function] = match[1] == "true" ? StateAction::StartEnrage : StateAction::EndEnrage;
+			else if (!function.empty() && std::regex_match(line, rampage))
+				result[function] = StateAction::StartRampage;
 			else if (line.find_first_not_of(" \t\r") != std::string::npos &&
 				line.find("ObjectGrantUpgrade") == std::string::npos && line.find("ObjectRemoveUpgrade") == std::string::npos)
 				function.clear();
@@ -363,13 +405,32 @@ int RetailBuildingEvents::enrageAction(const Object& object, const char* event)
 	auto list = lists.find(object.getAIUpdateInterface()->getRetailLuaEventsList().str());
 	for (std::size_t depth = 0; list != lists.end() && depth < lists.size(); ++depth)
 	{
-		const auto handler = list->second.enrageHandlers.find(event);
-		if (handler != list->second.enrageHandlers.end())
+		const auto handler = list->second.stateHandlers.find(event);
+		if (handler != list->second.stateHandlers.end())
 		{
 			const auto action = actions.find(handler->second);
-			return action == actions.end() ? -1 : action->second;
+			return action == actions.end() ? StateAction::None : action->second;
 		}
 		list = lists.find(list->second.parent);
 	}
-	return -1;
+	return StateAction::None;
+}
+}
+
+#if !RTS_GENERALS
+void RetailBuildingEvents::reallyDamaged(Object& object)
+{
+	if (findStateAction(object, "ReallyDamaged") == StateAction::StartRampage)
+		object.getAIUpdateInterface()->enterRetailRampage();
+}
+#endif
+
+int RetailBuildingEvents::enrageAction(const Object& object, const char* event)
+{
+	switch (findStateAction(object, event))
+	{
+		case StateAction::EndEnrage: return 0;
+		case StateAction::StartEnrage: return 1;
+		default: return -1;
+	}
 }

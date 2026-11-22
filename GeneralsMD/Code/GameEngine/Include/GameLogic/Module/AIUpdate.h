@@ -205,8 +205,10 @@ public:
 	UnsignedInt m_minCowerTime = 0;
 	UnsignedInt m_maxCowerTime = 0;
 	UnsignedInt m_burningDeathTime = 0;
+	UnsignedInt m_rampageTime = 0;
 	Real m_stopChaseDistance = 0.0f;
 	Bool m_fadeOnPortals = FALSE;
+	Real m_holdGroundCloseRangeDistance = 0.0f;
 	Bool m_canAttackWhileContained = FALSE;
 #ifdef ALLOW_SURRENDER
  	UnsignedInt						m_surrenderDuration;					///< when we surrender, how long we stay surrendered.
@@ -501,6 +503,7 @@ public:
 	UnsignedInt getRetailFearDeadline() const { return m_fearUntil; }
 	Bool enterRetailBurningDeath();
 	UnsignedInt getRetailBurningDeathDeadline() const { return m_burningDeathUntil; }
+	UnsignedInt getRetailRampageDeadline() const { return m_rampageUntil; }
 	void braceForCrush(UnsignedInt deadline);
 	void clearCrushBrace();
 	Bool stanceAllowsChase(const Object* target) const;
@@ -625,6 +628,8 @@ public:
 
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
 	const AsciiString& getRetailLuaEventsList() const { return getAIUpdateModuleData()->m_luaEventsList; }
+	void enterRetailRampage();
+	Bool isWithinHoldGroundCloseRange(const Object* target) const;
 	Bool canAttackFromGarrison() const { return getAIUpdateModuleData()->m_canAttackWhileContained; }
 
   Bool canAutoAcquireWhileStealthed() const ;
@@ -838,6 +843,7 @@ private:
 	UnsignedInt m_retailPlannerBlockedRevision = 0;
 	UnsignedInt m_weaponMovementHoldUntil = 0;
 	Bool m_fadedInPortal = FALSE;
+	UnsignedInt m_rampageUntil = 0;
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.
 	Bool				m_upgradedLocomotors;

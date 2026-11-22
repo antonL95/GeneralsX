@@ -39,6 +39,7 @@
 #include "Common/RandomValue.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/RetailCreationUpgrades.h"
+#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "Common/Player.h"
@@ -364,6 +365,7 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 	{
 		ExperienceLevelStore::onObjectCreated(obj);
 		RetailCreationUpgrades::onObjectCreated(obj);
+		RetailBuildingEvents::created(*obj);
 	}
 
 	return obj;
