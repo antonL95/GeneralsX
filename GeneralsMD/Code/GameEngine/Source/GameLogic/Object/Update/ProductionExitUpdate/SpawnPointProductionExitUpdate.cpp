@@ -30,6 +30,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/AI.h"
@@ -89,8 +90,8 @@ void SpawnPointProductionExitUpdate::exitObjectViaDoor( Object *newObj, ExitDoor
 		// Get the location from our bone array
 		createPoint = m_worldCoordSpawnPoints[positionIndex];
 
-		// make sure the point is on the terrain
-		createPoint.z = TheTerrainLogic ? TheTerrainLogic->getLayerHeight( createPoint.x, createPoint.y, creationObject->getLayer()) : 0.0f;
+		const Real ground = TheTerrainLogic ? TheTerrainLogic->getLayerHeight(createPoint.x, createPoint.y, creationObject->getLayer()) : 0.0f;
+		createPoint.z = RetailFileLayers::enabled() ? MAX(createPoint.z, ground) : ground;
 
 		// get the angle
 		createAngle = m_worldAngleSpawnPoints[positionIndex];
@@ -116,6 +117,9 @@ void SpawnPointProductionExitUpdate::exitObjectViaDoor( Object *newObj, ExitDoor
 //-------------------------------------------------------------------------------------------------
 ExitDoorType SpawnPointProductionExitUpdate::reserveDoorForExit( const ThingTemplate* objType, Object *specificObject )
 {
+	if (RetailFileLayers::enabled() && getObject()->getLogicModelConditions().test(MODELCONDITION_JUST_BUILT))
+		return DOOR_NONE_AVAILABLE;
+
 	if( !m_bonesInitialized )
 		initializeBonePositions();
 
@@ -156,7 +160,9 @@ void SpawnPointProductionExitUpdate::initializeBonePositions()
 
 	// Get all the bones of the right name
 	const SpawnPointProductionExitUpdateModuleData* md = getSpawnPointProductionExitUpdateModuleData();
-	m_spawnPointCount = myDrawable->getPristineBonePositions( md->m_spawnPointBoneNameData.str(), 1, nullptr, boneTransforms, MAX_SPAWN_POINTS );
+	const Bool retail = RetailFileLayers::enabled();
+	const Int capacity = retail ? MAX_SPAWN_POINTS : STOCK_SPAWN_POINTS;
+	m_spawnPointCount = myDrawable->getPristineBonePositions(md->m_spawnPointBoneNameData.str(), 1, nullptr, boneTransforms, capacity);
 
 	for( matrixIndex = 0; matrixIndex < m_spawnPointCount; matrixIndex++ )
 	{
@@ -167,12 +173,12 @@ void SpawnPointProductionExitUpdate::initializeBonePositions()
 		// Then save the world coord and angle
 		m_worldCoordSpawnPoints[matrixIndex].x = currentTransform->Get_X_Translation();
 		m_worldCoordSpawnPoints[matrixIndex].y = currentTransform->Get_Y_Translation();
-		m_worldCoordSpawnPoints[matrixIndex].z = 0; //set at creation time
+		m_worldCoordSpawnPoints[matrixIndex].z = currentTransform->Get_Z_Translation();
 
 		m_worldAngleSpawnPoints[matrixIndex] = currentTransform->Get_Z_Rotation();
 	}
 
-	m_bonesInitialized = TRUE;
+	m_bonesInitialized = !retail || m_spawnPointCount != 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -196,6 +202,9 @@ void SpawnPointProductionExitUpdate::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
+	if (RetailFileLayers::enabled())
+		for (ObjectID& occupier : m_spawnPointOccupier)
+			xfer->xferObjectID(&occupier);
 
 }
 
@@ -208,7 +217,7 @@ void SpawnPointProductionExitUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -225,7 +234,14 @@ void SpawnPointProductionExitUpdate::xfer( Xfer *xfer )
 	//	Real m_worldAngleSpawnPoints[MAX_SPAWN_POINTS];		///< And what direction they should face
 
 	// spawn point occupants
-	xfer->xferUser( &m_spawnPointOccupier, sizeof( ObjectID ) * MAX_SPAWN_POINTS );
+	xfer->xferUser(m_spawnPointOccupier, sizeof(ObjectID) * STOCK_SPAWN_POINTS);
+	if (version >= 2)
+		xfer->xferUser(m_spawnPointOccupier + STOCK_SPAWN_POINTS, sizeof(ObjectID) * (MAX_SPAWN_POINTS - STOCK_SPAWN_POINTS));
+	else if (xfer->getXferMode() == XFER_LOAD)
+		std::fill(m_spawnPointOccupier + STOCK_SPAWN_POINTS, m_spawnPointOccupier + MAX_SPAWN_POINTS, INVALID_ID);
+
+	if (xfer->getXferMode() == XFER_LOAD)
+		m_bonesInitialized = FALSE;
 
 }
 

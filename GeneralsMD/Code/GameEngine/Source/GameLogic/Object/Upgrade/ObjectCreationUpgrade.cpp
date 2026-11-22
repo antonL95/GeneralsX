@@ -214,6 +214,8 @@ void RetailObjectCreationUpgrade::upgradeImplementation()
 	m_pending = TRUE;
 	if (data->m_delay)
 		setWakeFrame(getObject(), UPDATE_SLEEP(data->m_delay));
+	else if (data->m_spawnTemplate.isNotEmpty())
+		setWakeFrame(getObject(), UPDATE_SLEEP(1));
 	else
 		update();
 }

@@ -170,6 +170,7 @@ void runRetailParticleTestCommand(std::string_view action, const Object* source,
 	const Coord3D* location, const char* argument, UnsignedInt frame);
 void runRetailPlacementTestCommand(Object* source, const char* name, const Coord3D* target, UnsignedInt frame);
 void logRetailPlacementTestObject(const Object* object, const char* name, UnsignedInt frame);
+void logRetailSpawnPoints(const Object* object, const char* prefix, UnsignedInt frame);
 void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, UnsignedInt frame);
 void runRetailSaveLoadPartitionTestCommand(std::string_view action, Object* object, const char* argument, UnsignedInt frame);
 void runRetailSaveLoadWallTestCommand(std::string_view action, Player* player, Object* wall,
@@ -2724,6 +2725,12 @@ void execute(const Command& command, unsigned int frame)
 	{
 		const Coord3D target = command.hasLocation ? groundLocation(command) : Coord3D{};
 		runRetailPlacementTestCommand(obj, command.structure.c_str(), command.hasLocation ? &target : nullptr, frame);
+		return;
+	}
+
+	if (command.action == "placement-spawn-points")
+	{
+		logRetailSpawnPoints(obj, command.structure.c_str(), frame);
 		return;
 	}
 

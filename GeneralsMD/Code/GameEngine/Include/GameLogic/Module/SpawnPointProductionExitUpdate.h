@@ -38,7 +38,8 @@ class Object;
 
 enum
 {
-	MAX_SPAWN_POINTS = 10	///< Size the array that holds the bone positions
+	STOCK_SPAWN_POINTS = 10,
+	MAX_SPAWN_POINTS = 16
 };
 
 //-------------------------------------------------------------------------------------------------
