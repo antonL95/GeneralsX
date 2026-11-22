@@ -145,19 +145,16 @@ UpdateSleepTime HitReactionBehavior::update()
 	const ModelConditionFlagType levels[] = {MODELCONDITION_HIT_LEVEL_1, MODELCONDITION_HIT_LEVEL_2, MODELCONDITION_HIT_LEVEL_3};
 	for (Int index = 2; index >= 0; --index)
 	{
-		if (damage < thresholds[index])
+		if (durations[index] == 0 || damage < thresholds[index])
 			continue;
-		if (durations[index])
-		{
-			if (m_remaining)
-				object->clearModelConditionState(static_cast<ModelConditionFlagType>(m_level));
-			m_level = levels[index];
-			m_remaining = durations[index];
-			object->setModelConditionState(MODELCONDITION_HIT_REACTION);
-			object->setModelConditionState(levels[index]);
-			if (data->m_hitsParalyze)
-				object->setDisabledUntil(DISABLED_PARALYZED, TheGameLogic->getFrame() + m_remaining);
-		}
+		if (m_remaining)
+			object->clearModelConditionState(static_cast<ModelConditionFlagType>(m_level));
+		m_level = levels[index];
+		m_remaining = durations[index];
+		object->setModelConditionState(MODELCONDITION_HIT_REACTION);
+		object->setModelConditionState(levels[index]);
+		if (data->m_hitsParalyze)
+			object->setDisabledUntil(DISABLED_PARALYZED, TheGameLogic->getFrame() + m_remaining);
 		break;
 	}
 	return UPDATE_SLEEP_NONE;
