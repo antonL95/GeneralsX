@@ -1,0 +1,13 @@
+20 create Player_1 GondorGandalf 0 3165,790,0
+21 reveal Player_1 GondorGandalf 0
+30 science Player_1 - 0 SCIENCE_RohanAllies
+32 power-cast Player_1 - 8 at 3165 790
+96 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 0 hatch 3165 790
+96 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 1 hatch 3165 790
+96 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 2 hatch 3165 790
+145 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 0 fade 3165 790
+145 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 1 fade 3165 790
+145 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 2 fade 3165 790
+250 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 0 settled 3165 790
+250 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 1 settled 3165 790
+250 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 2 settled 3165 790
