@@ -1,6 +1,7 @@
 #include "PreRTS.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <string_view>
 
 #include "Common/BuildAssistant.h"
@@ -23,7 +24,7 @@ void runRetailPackage23TestCommand(std::string_view action, Player* player, Obje
 	}
 	else if (action == "pkg23-set-cash")
 	{
-		money->setStartingCash(static_cast<UnsignedInt>(point.x));
+		money->setStartingCash(static_cast<UnsignedInt>(std::strtoul(name, nullptr, 10)));
 	}
 	else if (action == "pkg23-display")
 	{
@@ -54,10 +55,18 @@ void runRetailPackage23TestCommand(std::string_view action, Player* player, Obje
 	}
 	else if (action == "pkg23-pay" && object)
 	{
-		const UnsignedInt charge = money->withdraw(static_cast<UnsignedInt>(point.x), FALSE);
+		const UnsignedInt quote = std::string_view(name) == "quote" ? object->getTemplate()->calcCostToBuild(player) :
+			static_cast<UnsignedInt>(std::strtoul(name, nullptr, 10));
+		const UnsignedInt charge = money->withdraw(quote, FALSE);
 		object->setConstructionCostPaid(charge);
 		std::fprintf(stderr, "TEST pkg23 paid frame=%u type=%s charge=%u money=%u\n", frame,
 			object->getTemplate()->getName().str(), charge, money->countMoney());
+	}
+	else if (action == "pkg23-quote" && object)
+	{
+		std::fprintf(stderr, "TEST pkg23 quote frame=%u type=%s price=%d receipt=%d\n", frame,
+			object->getTemplate()->getName().str(), object->getTemplate()->calcCostToBuild(player),
+			object->getConstructionCostPaid());
 	}
 	else if (action == "pkg23-sell" && object)
 	{

@@ -3086,13 +3086,30 @@ void execute(const Command& command, unsigned int frame)
 			std::fprintf(stderr, "TEST banner-wake %u %s wake=%u frame=%u\n", frame,
 				obj->getTemplate()->getName().str(), banner->friend_getNextCallFrame(), TheGameLogic->getFrame());
 	}
-	else if (command.action == "build" || placeAtPoint || command.action == "queue")
+	else if (command.action == "build" || placeAtPoint || command.action == "queue" || command.action == "queuebutton")
 	{
-		const ThingTemplate* what = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
+		const bool queue = command.action == "queue" || command.action == "queuebutton";
+		const ThingTemplate* what = nullptr;
+		if (command.action == "queuebutton")
+		{
+			const CommandSet* set = TheControlBar ? TheControlBar->findCommandSet(obj->getCommandSetString()) : nullptr;
+			for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			{
+				const CommandButton* button = set->getCommandButton(slot);
+				if (button && button->getCommandType() == GUI_COMMAND_UNIT_BUILD &&
+					button->getName().compareNoCase(command.structure.c_str()) == 0)
+				{
+					what = button->getThingTemplate();
+					break;
+				}
+			}
+		}
+		else
+			what = TheThingFactory->findTemplate(command.structure.c_str(), FALSE);
 		if (!what)
 			return;
 		ProductionUpdateInterface* production = obj->getProductionUpdateInterface();
-		if (command.action == "queue" && !production)
+		if (queue && !production)
 			return;
 		GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
 		select->appendBooleanArgument(TRUE);
@@ -3100,7 +3117,7 @@ void execute(const Command& command, unsigned int frame)
 		GameMessage::Type type = GameMessage::MSG_FOUNDATION_CONSTRUCT;
 		if (placeAtPoint)
 			type = GameMessage::MSG_DOZER_CONSTRUCT;
-		else if (command.action == "queue")
+		else if (queue)
 			type = GameMessage::MSG_QUEUE_UNIT_CREATE;
 		GameMessage* build = TheMessageStream->appendMessage(type);
 		build->appendIntegerArgument(what->getTemplateID());
@@ -3110,7 +3127,7 @@ void execute(const Command& command, unsigned int frame)
 			build->appendLocationArgument(target);
 			build->appendRealArgument(0.0f);
 		}
-		else if (command.action == "queue")
+		else if (queue)
 		{
 			build->appendIntegerArgument(production->requestUniqueUnitID());
 		}

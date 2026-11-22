@@ -33,6 +33,10 @@ function hit(frame, target, damage, amount) {
     observed[29, "DolAmrothFarm recorded a charge of 300"] = 1
 }
 
+/^TEST frame 232: queuebutton Command_BuildHaradTributeCart on object / {
+    observed[232, "authored Tribute Cart button selected"] = 1
+}
+
 END {
     expect(13, "type=DolAmrothFarm mode=placement indicator=1 radius=300.0 efficiency=0.791")
     expect(13, "type=DaleShoremansCottageFoundation mode=placement indicator=0 radius=0.0 efficiency=0.000")
@@ -42,6 +46,8 @@ END {
     expect(29, "DolAmrothFarm recorded a charge of 300")
     difference(22, "before-build", 29, "before-cancel", -550)
     difference(29, "before-cancel", 32, "after-cancel", 300)
+    expect(232, "authored Tribute Cart button selected")
+    difference(231, "cart-before", 235, "cart-after", -500)
     hit(240, "Pkg23PillageTarget", "0.0", 0)
     hit(242, "Pkg23PillageTarget", "10.0", 0)
     hit(245, "MordorPorter", "1.0", 0)
@@ -58,5 +64,12 @@ END {
     difference(400, "basic-deposit-before", 401, "basic-deposit-after", 5)
     difference(410, "upgraded-deposit-before", 411, "upgraded-deposit-after", 125)
     difference(521, "sale-before", 522, "sale-after", 150)
+    expect(555, "type=HaradTributeCart price=500 receipt=500")
+    expect(556, "name=HaradTributeCart refund=500")
+    expect(206, "type=Pkg23DiscountedFarm price=240 receipt=180")
+    expect(261, "type=Pkg23DiscountedFarm price=300 receipt=180")
+    difference(386, "discount-sale-before", 387, "discount-sale-after", 90)
+    difference(930, "large-deposit-before", 931, "large-deposit-after", 16777217)
+    expect(943, "name=HaradTributeCart refund=16777217")
     exit failed
 }
