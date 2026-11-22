@@ -3,6 +3,7 @@
 #define DEFINE_DEATH_NAMES
 #include "GameLogic/Damage.h"
 
+#include "GameLogic/RetailTestCommandRegistry.h"
 #include "GameLogic/RetailTestCommands.h"
 
 #include <algorithm>
@@ -261,6 +262,19 @@ std::vector<Command> s_commands;
 std::vector<ObjectID> s_tracked;
 ObjectID s_fortressWalker = INVALID_ID;
 bool s_loaded = false;
+
+Registry<Handler>& commandRegistry()
+{
+	static Registry<Handler> instance;
+	return instance;
+}
+
+struct RegistryInitializer
+{
+	RegistryInitializer() { registerAllCommands(); }
+};
+
+const RegistryInitializer s_registryInitializer;
 
 void load()
 {
@@ -2323,6 +2337,24 @@ void logTracked(unsigned int frame)
 
 void execute(const Command& command, unsigned int frame)
 {
+	if (const Handler handler = commandRegistry().find(command.action))
+	{
+		Context context;
+		context.action = command.action;
+		context.player = findPlayer(command);
+		context.source = findObject(command, false);
+		context.target = findTarget(command, true);
+		context.playerName = command.player;
+		context.targetName = command.target.c_str();
+		context.ordinal = command.ordinal;
+		context.argument = command.structure.c_str();
+		context.position = command.location;
+		context.hasPosition = command.hasLocation;
+		context.angle = command.angle;
+		context.frame = frame;
+		handler(context);
+		return;
+	}
 	if (command.action == "marsh-water" && command.hasLocation)
 	{
 		runRetailMarshWaterTestCommand(command.location, command.angle, frame);
@@ -3753,6 +3785,87 @@ void execute(const Command& command, unsigned int frame)
 	else
 		orderToPoint(command, obj, frame);
 }
+}
+
+Player* Context::findPlayer(std::string_view name) const
+{
+	if (!ThePlayerList)
+		return nullptr;
+	const std::string lookup(name.empty() ? playerName : name);
+	return ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey(lookup.c_str()));
+}
+
+Object* Context::findObject(bool livingOnly) const
+{
+	Command command;
+	command.player = std::string(playerName);
+	command.target = targetName;
+	command.ordinal = ordinal;
+	return RetailTestCommands::findObject(command, livingOnly);
+}
+
+Object* Context::requireObject(bool livingOnly) const
+{
+	Object* object = findObject(livingOnly);
+	if (!object)
+		std::fprintf(stderr, "TEST frame %u: no %s %d of %.*s\n", frame, targetName, ordinal,
+			static_cast<int>(playerName.size()), playerName.data());
+	return object;
+}
+
+Object* Context::findTarget(bool livingOnly) const
+{
+	return findTarget(argument, livingOnly);
+}
+
+Object* Context::findTarget(std::string_view spec, bool livingOnly) const
+{
+	Command command;
+	command.structure = std::string(spec);
+	return RetailTestCommands::findTarget(command, livingOnly);
+}
+
+Coord3D Context::groundLocation() const
+{
+	Coord3D location = position;
+	location.z = TheTerrainLogic->getGroundHeight(location.x, location.y);
+	return location;
+}
+
+void Context::selectObject(Object* object) const
+{
+	if (object)
+		RetailTestCommands::selectObject(object);
+}
+
+void registerAction(std::string_view action, Handler handler)
+{
+	if (!commandRegistry().registerAction(action, handler))
+	{
+		std::fprintf(stderr, "FATAL: duplicate or invalid test command action: %.*s\n",
+			static_cast<int>(action.size()), action.data());
+		std::fflush(stderr);
+		std::abort();
+	}
+}
+
+void registerPrefix(std::string_view prefix, Handler handler)
+{
+	if (!commandRegistry().registerPrefix(prefix, handler))
+	{
+		std::fprintf(stderr, "FATAL: duplicate or invalid test command prefix: %.*s\n",
+			static_cast<int>(prefix.size()), prefix.data());
+		std::fflush(stderr);
+		std::abort();
+	}
+}
+
+void registerAllCommands()
+{
+	static bool registered = false;
+	if (registered)
+		return;
+	registered = true;
 }
 
 bool tracesCombat()

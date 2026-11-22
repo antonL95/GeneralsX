@@ -25,6 +25,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/WeaponSlotSelectionRulesTest.cpp
     GameEngine/Common/RetailFileLayersTest.cpp
     GameEngine/Common/RetailGameTextTest.cpp
+    GameEngine/Common/RetailTestCommandRegistryTest.cpp
     GameEngine/Common/INIMathTest.cpp
     GameEngine/Common/INIPreprocessorTest.cpp
     GameEngine/Common/INILegacyLinesTest.cpp
