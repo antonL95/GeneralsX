@@ -197,7 +197,6 @@ private:
 	Bool m_playEvenIfShrouded = FALSE;
 	UnsignedInt m_cullingFrames = 0;
 	Int m_startCullingAbove = 0;
-	Int m_cullAllAbove = 0;
 	mutable std::deque<UnsignedInt> m_recentPlays;
 
 };

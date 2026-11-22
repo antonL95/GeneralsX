@@ -1624,7 +1624,6 @@ void FXList::clear()
 	m_playEvenIfShrouded = FALSE;
 	m_cullingFrames = 0;
 	m_startCullingAbove = 0;
-	m_cullAllAbove = 0;
 	resetCulling();
 }
 
@@ -1639,7 +1638,6 @@ void FXList::parseCullingInfo(INI* ini, void* instance, void*, const void*)
 		return;
 	fx.m_cullingFrames = std::max(1u, static_cast<UnsignedInt>(static_cast<double>(seconds) * LOGICFRAMES_PER_SECOND));
 	fx.m_startCullingAbove = start;
-	fx.m_cullAllAbove = stop;
 }
 
 void FXList::resetCulling()
@@ -1654,16 +1652,13 @@ Bool FXList::allowRetailPlayback() const
 	const UnsignedInt frame = TheGameLogic->getFrame();
 	if (!m_recentPlays.empty() && frame < m_recentPlays.back())
 		m_recentPlays.clear();
-	while (!m_recentPlays.empty() && frame - m_recentPlays.front() >= m_cullingFrames)
+	while (!m_recentPlays.empty() && frame - m_recentPlays.front() > m_cullingFrames)
 		m_recentPlays.pop_front();
 	const Int count = static_cast<Int>(m_recentPlays.size());
-	if (count >= m_cullAllAbove)
+	if (count > m_startCullingAbove)
 		return FALSE;
 	m_recentPlays.push_back(frame);
-	if (count <= m_startCullingAbove)
-		return TRUE;
-	const ScopedVisualRandom random(TRUE);
-	return GameClientRandomValue(m_startCullingAbove, m_cullAllAbove - 1) >= count;
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------

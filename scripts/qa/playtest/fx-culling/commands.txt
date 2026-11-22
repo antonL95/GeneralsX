@@ -1,0 +1,24 @@
+4 reveal Player_1 MenPorter 0
+5 create Player_1 RohanOathbreaker1 0 3000,646,0
+5 create Player_1 RohanOathbreaker1 1 3015,646,0
+5 create Player_1 RohanOathbreaker1 2 3030,646,0
+5 create Player_1 RohanOathbreaker1 3 3045,646,0
+5 create Player_1 RohanOathbreaker1 4 3000,664,0
+5 create Player_1 RohanOathbreaker1 5 3015,664,0
+30 pkg50-kill Player_1 RohanOathbreaker1 5
+30 pkg50-kill Player_1 RohanOathbreaker1 4
+30 pkg50-kill Player_1 RohanOathbreaker1 3
+30 pkg50-kill Player_1 RohanOathbreaker1 2
+30 pkg50-kill Player_1 RohanOathbreaker1 1
+30 pkg50-kill Player_1 RohanOathbreaker1 0
+30 particle-fx - - 0 FX_MoMDeath 3030 680 60
+30 particle-fx - - 0 FX_MoMDeath 3030 680 60
+30 particle-fx - - 0 FX_MoMDeath 3030 680 60
+30 particle-fx - - 0 FX_MoMDeath 3030 680 60
+30 particle-fx - - 0 FX_MoMDeath 3030 680 60
+32 particle-systems - - 0 AODLightShafts
+32 particle-systems - - 0 MoMLightShafts
+180 particle-fx - - 0 FX_MoMDeath 3030 680 60
+180 particle-systems - - 0 MoMLightShafts
+181 particle-fx - - 0 FX_MoMDeath 3030 680 60
+181 particle-systems - - 0 MoMLightShafts
