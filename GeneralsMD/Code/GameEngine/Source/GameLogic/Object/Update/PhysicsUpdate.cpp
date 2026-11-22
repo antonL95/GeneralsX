@@ -1210,8 +1210,7 @@ void PhysicsBehavior::finishImpactFlight()
 	const UnsignedInt low = std::min(data->m_shockStunnedTimeLow, data->m_shockStunnedTimeHigh);
 	const UnsignedInt high = std::max(data->m_shockStunnedTimeLow, data->m_shockStunnedTimeHigh);
 	constexpr UnsignedInt framesPerRetailTick = LOGICFRAMES_PER_SECOND / RotwkDuration::FRAMES_PER_SECOND;
-	const UnsignedInt stun = low == high ? low :
-		GameLogicRandomValue(low / framesPerRetailTick, high / framesPerRetailTick) * framesPerRetailTick;
+	const UnsignedInt stun = GameLogicRandomValue(low / framesPerRetailTick, high / framesPerRetailTick) * framesPerRetailTick;
 	m_impactStandFrame = now + stun;
 	m_impactEndFrame = m_impactStandFrame + data->m_shockStandingTime;
 	victim->setModelConditionState(MODELCONDITION_STUNNED);
