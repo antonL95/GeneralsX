@@ -370,6 +370,11 @@ void RetailTerrainShadow::render(SceneClass &scene, const Vector3 &centre, Int s
 		const float encode[4] = {1.0f, 255.0f / 256.0f, m_floatDepth ? 0.0f : -1.0f / 255.0f, 0.0f};
 		device->SetPixelShaderConstant(0, encode, 1);
 		setStage(1, D3DTADDRESS_WRAP, D3DTEXF_LINEAR);
+		for (DWORD stage = 0; stage < 2; ++stage)
+		{
+			device->SetTextureStageState(stage, D3DTSS_TEXCOORDINDEX, stage);
+			device->SetTextureStageState(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+		}
 
 		SceneIterator *it = scene.Create_Iterator();
 		for (it->First(); !it->Is_Done(); it->Next())
