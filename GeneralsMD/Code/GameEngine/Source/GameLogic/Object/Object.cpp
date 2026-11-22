@@ -4434,12 +4434,19 @@ void Object::crc( Xfer *xfer )
 		static const NameKeyType giveUpgradeKey = NAMEKEY("GiveUpgradeUpdate");
 		static const NameKeyType grantUpgradeKey = NAMEKEY("GrantUpgradeCreate");
 		static const NameKeyType heroListKey = NAMEKEY("BuildableHeroListUpgrade");
+		static const NameKeyType dominateKey = NAMEKEY("DominateEnemySpecialPower");
+		static const NameKeyType flingKey = NAMEKEY("FlingPassengerSpecialAbilityUpdate");
+		static const NameKeyType storeKey = NAMEKEY("StoreObjectsSpecialPower");
+		static const NameKeyType teleportKey = NAMEKEY("TeleportSpecialAbilityUpdate");
+		static const NameKeyType teleportToCasterKey = NAMEKEY("TeleportToCasterSpecialPower");
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
 			const NameKeyType key = (*module)->getModuleNameKey();
 			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey ||
 				key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || key == pillageKey || key == autoAbilityKey ||
-				key == inheritUpgradeKey || key == heroListKey || (*module)->getSlowDeathBehaviorInterface())
+				key == inheritUpgradeKey || key == heroListKey || key == dominateKey || key == flingKey ||
+				key == storeKey || key == teleportKey || key == teleportToCasterKey ||
+				(*module)->getSlowDeathBehaviorInterface())
 				xfer->xferSnapshot(*module);
 			if (key == pickupKey)
 				static_cast<PickupStuffUpdate*>(*module)->crcRetailState(xfer);

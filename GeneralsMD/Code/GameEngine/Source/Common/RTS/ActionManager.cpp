@@ -1550,6 +1550,7 @@ static Bool retailPowerObjectAllowed(const Object* source, const Object* target,
 		case SPECIAL_REPAIR_STRUCTURE:
 			return relationship == ALLIES && target->isKindOf(KINDOF_STRUCTURE);
 		case SPECIAL_DOMINATE_ENEMY:
+			return relationship != ALLIES;
 		case SPECIAL_CURSE_ENEMY:
 			return relationship == ENEMIES;
 		default:
