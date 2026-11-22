@@ -181,6 +181,9 @@ Int scaleProductionValue(Int value, Real multiplier)
 		static const FieldParse retailFields[] =
 		{
 			{ "ProductionModifier", parseRetailProductionModifier, nullptr, offsetof(ProductionUpdateModuleData, m_retailModifiers) },
+			{ "SetBonusModelConditionOnSpeedBonus", INI::parseBool, nullptr, offsetof(ProductionUpdateModuleData, m_setBonusModelConditionOnSpeedBonus) },
+			{ "BonusForType", INI::parseAsciiStringVector, nullptr, offsetof(ProductionUpdateModuleData, m_bonusForTypes) },
+			{ "UnitInvulnerableTime", INI::parseDurationUnsignedInt, nullptr, offsetof(ProductionUpdateModuleData, m_unitInvulnerableTime) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(retailFields);
@@ -675,7 +678,27 @@ UpdateSleepTime ProductionUpdate::update()
 	UnsignedInt now = TheGameLogic->getFrame();
 	Object *us = getObject();
 
-	// update the door behaviors
+	if (RetailFileLayers::enabled() && d->m_setBonusModelConditionOnSpeedBonus)
+	{
+		Bool hasBonus = FALSE;
+		if (Player* owner = us->getControllingPlayer())
+		{
+			for (const AsciiString& type : d->m_bonusForTypes)
+			{
+				if (owner->getPowerProductionSpeed(type) > 1.0f)
+				{
+					hasBonus = TRUE;
+					break;
+				}
+			}
+		}
+		const Bool hadBonus = us->getLogicModelConditions().test(MODELCONDITION_UPGRADE_ECONOMY_BONUS);
+		if (hasBonus && !hadBonus)
+			us->setModelConditionState(MODELCONDITION_UPGRADE_ECONOMY_BONUS);
+		else if (!hasBonus && hadBonus)
+			us->clearModelConditionState(MODELCONDITION_UPGRADE_ECONOMY_BONUS);
+	}
+
 	if( d->m_numDoorAnimations > 0 )
 		updateDoors();
 
@@ -935,7 +958,11 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 
 						newObj->setProducer(creationBuilding);
 						if (RetailFileLayers::enabled())
+						{
+							if (d->m_unitInvulnerableTime > 0)
+								newObj->setSpecialModelConditionState(MODELCONDITION_INVULNERABLE, d->m_unitInvulnerableTime);
 							HeroRoster::onHeroProduced(newObj);
+						}
 
 						// call the exit interface to do the rally point and position stuff
 						exitInterface->exitObjectViaDoor( newObj, exitDoor );

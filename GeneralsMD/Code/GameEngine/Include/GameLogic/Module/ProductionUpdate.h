@@ -148,6 +148,9 @@ public:
 	DisabledMaskType							m_disabledTypesToProcess;
 
 	Bool m_giveNoXP = FALSE;
+	Bool m_setBonusModelConditionOnSpeedBonus = FALSE;
+	UnsignedInt m_unitInvulnerableTime = 0;
+	std::vector<AsciiString> m_bonusForTypes;
 	std::vector<RetailProductionModifier> m_retailModifiers;
 
 	ProductionUpdateModuleData();

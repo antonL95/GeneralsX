@@ -1589,7 +1589,10 @@ void Object::setSpecialModelConditionState( ModelConditionFlagType set, Unsigned
 //=============================================================================
 void Object::clearSpecialModelConditionStates()
 {
-	clearModelConditionFlags( MAKE_MODELCONDITION_MASK( MODELCONDITION_SPECIAL_CHEERING ) );
+	if (RetailFileLayers::enabled())
+		clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_SPECIAL_CHEERING, MODELCONDITION_INVULNERABLE));
+	else
+		clearModelConditionFlags(MAKE_MODELCONDITION_MASK(MODELCONDITION_SPECIAL_CHEERING));
 	m_smcUntil = NEVER;
 }
 

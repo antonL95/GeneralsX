@@ -363,6 +363,11 @@ Real ActiveBody::estimateDamage( DamageInfoInput& damageInfo ) const
 		}
 	}
 
+	if (RetailFileLayers::enabled() && damageInfo.m_damageType != DAMAGE_HEALING &&
+		damageInfo.m_damageType != DAMAGE_UNRESISTABLE &&
+		getObject()->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE))
+		return 0.0f;
+
 	Real amount = m_curArmor.adjustDamage(damageInfo.m_damageType, damageInfo.m_amount);
 	if (getObject()->getAttributeModifierHelper() && damageInfo.m_damageType != DAMAGE_HEALING && damageInfo.m_damageType != DAMAGE_UNRESISTABLE)
 		amount *= AttributeModifiers::damageTakenFactor(getObject(), damageInfo.m_damageType);
@@ -414,6 +419,11 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 	// we cannot damage again objects that are already dead
 	Object* obj = getObject();
 	if( obj->isEffectivelyDead() )
+		return;
+
+	if (RetailFileLayers::enabled() && damageInfo->in.m_damageType != DAMAGE_HEALING &&
+		damageInfo->in.m_damageType != DAMAGE_UNRESISTABLE &&
+		obj->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE))
 		return;
 
 	Object *damager = TheGameLogic->findObjectByID( damageInfo->in.m_sourceID );
