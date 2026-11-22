@@ -1267,7 +1267,8 @@ void Locomotor::setPhysicsOptions(Object* obj)
 //-------------------------------------------------------------------------------------------------
 void Locomotor::clearRetailGait(Object* object)
 {
-	if (!RetailFileLayers::enabled() || m_template->m_rotwk.walkDistance <= 0.0f)
+	if (!RetailFileLayers::enabled() ||
+		(m_template->m_rotwk.walkDistance <= 0.0f && m_template->m_rotwk.accelDecelTrigger < 0.0f))
 		return;
 	m_retailWasRunning = FALSE;
 	object->clearModelConditionState(MODELCONDITION_WALKING);
@@ -1278,12 +1279,13 @@ void Locomotor::clearRetailGait(Object* object)
 void Locomotor::updateRetailGait(Object* object, Real distance, Real speed, Bool braking)
 {
 	const auto& data = m_template->m_rotwk;
-	if (!RetailFileLayers::enabled() || data.walkDistance <= 0.0f)
+	if (!RetailFileLayers::enabled() || (data.walkDistance <= 0.0f && data.accelDecelTrigger < 0.0f))
 		return;
 
-	const Real threshold = getMaxSpeedForCondition(object->getBodyModule()->getDamageState(), object) * data.accelDecelTrigger;
+	const Real threshold = getMaxSpeedForCondition(object->getBodyModule()->getDamageState(), object) *
+		(data.accelDecelTrigger >= 0.0f ? data.accelDecelTrigger : 0.5f);
 	const Bool decelerating = m_retailWasRunning && braking;
-	const Bool walking = !m_retailWasRunning && distance < data.walkDistance && !braking;
+	const Bool walking = !m_retailWasRunning && data.walkDistance > 0.0f && distance < data.walkDistance && !braking;
 	const Bool accelerating = !walking && !braking && !m_retailWasRunning && speed < threshold;
 	if (!walking && !accelerating && !braking)
 		m_retailWasRunning = TRUE;
@@ -1471,7 +1473,9 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		}
 	}
 
-	updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), getFlag(IS_BRAKING));
+	if (m_template->m_appearance != LOCO_HORDE && m_template->m_appearance != LOCO_WHEELS_FOUR &&
+		m_template->m_appearance != LOCO_MOTORCYCLE)
+		updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), getFlag(IS_BRAKING));
 	handleBehaviorZ(obj, physics, goalPos);
 	// Objects that are braking don't follow the normal physics, so they end up at their destination exactly.
 	obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ), getFlag(IS_BRAKING) );
@@ -1848,6 +1852,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 	//
 	// Maintain goal speed
 	//
+	updateRetailGait(obj, onPathDistToGoal, actualSpeed, getFlag(IS_BRAKING) || goalSpeed + 0.001f < actualSpeed);
 	Real speedDelta = goalSpeed - actualSpeed;
 	if (moveBackwards) {
 		speedDelta = -goalSpeed+actualSpeed;
@@ -2914,7 +2919,6 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 			}
 		}
 	}
-	updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), backing || getFlag(IS_BRAKING));
 	steerVelocity(obj, physics, dir, onPathDistToGoal, desiredSpeed, backing);
 }
 
@@ -2936,6 +2940,8 @@ void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord
 		if (goalSpeed > arrivalSpeed)
 			goalSpeed = arrivalSpeed > getMinSpeed() ? arrivalSpeed : getMinSpeed();
 	}
+
+	updateRetailGait(obj, onPathDistToGoal, actualSpeed, backing || goalSpeed + 0.001f < actualSpeed);
 
 	Coord3D velocityDelta;
 	velocityDelta.x = dirToApplyForce.x * goalSpeed - velocity->x;
@@ -2964,7 +2970,6 @@ void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord
 */
 Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 {
-	clearRetailGait(obj);
 	if (!getFlag(MAINTAIN_POS_IS_VALID))
 	{
 		m_maintainPos = *obj->getPosition();
@@ -2983,6 +2988,19 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 #ifdef DEBUG_OBJECT_ID_EXISTS
 //	DEBUG_ASSERTLOG(obj->getID() != TheObjectIDToDebug, ("locoUpdate_maintainCurrentPosition %f %f %f, speed %f (%f)",m_maintainPos.x,m_maintainPos.y,m_maintainPos.z,physics->getSpeed(),physics->getForwardSpeed2D()));
 #endif
+
+	const Bool stopping = RetailFileLayers::enabled() && m_retailWasRunning && physics->getVelocityMagnitude() > 0.001f;
+	if (stopping)
+	{
+		updateRetailGait(obj, 0.0f, physics->getVelocityMagnitude(), TRUE);
+		obj->setModelConditionState(MODELCONDITION_MOVING);
+	}
+	else
+	{
+		if (m_retailWasRunning && obj->getLogicModelConditions().test(MODELCONDITION_DECELERATE))
+			obj->clearModelConditionState(MODELCONDITION_MOVING);
+		clearRetailGait(obj);
+	}
 
 	Bool requiresConstantCalling = TRUE;	// assume the worst.
 	switch (m_template->m_appearance)
@@ -3027,7 +3045,7 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 	if (handleBehaviorZ(obj, physics, m_maintainPos))
 		requiresConstantCalling = TRUE;
 
-	return requiresConstantCalling;
+	return requiresConstantCalling || stopping;
 }
 
 //-------------------------------------------------------------------------------------------------

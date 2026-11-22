@@ -14,7 +14,7 @@ struct Authored
 	float burningDeathRadius = 0.0f;
 	float chargeSpeedFraction = 1.0f;
 	float walkDistance = 0.0f;
-	float accelDecelTrigger = 0.5f;
+	float accelDecelTrigger = -1.0f;
 	bool burningDeathIsCavalry = false;
 	bool chargeAvailable = false;
 	bool chargeIgnoresCondition = false;
