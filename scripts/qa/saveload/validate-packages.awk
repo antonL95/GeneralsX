@@ -63,6 +63,6 @@ END {
         for (j = 1; j <= windows; j++)
             if (changeOwner[i] != cashOwner[j] && changePlayer[i] == cashPlayer[j] &&
                 changeFrame[i] >= cashBegin[j] && changeFrame[i] <= cashEnd[j])
-                reject(changeOwner[i] " changes " changePlayer[i] " cash at frame " changeFrame[i] +                    " in a window reserved by " cashOwner[j])
+                reject(changeOwner[i] " changes " changePlayer[i] " cash at frame " changeFrame[i] " in a window reserved by " cashOwner[j])
     exit failed
 }
