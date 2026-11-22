@@ -986,13 +986,24 @@ void Pathfinder::classifyMapCell( Int i, Int j , PathfindCell *cell)
 		type = PathfindCell::CELL_CLIFF;
 	}
 
-	//
-	// If any corners are underwater, this is a water cell
-	//
-	if (TheTerrainLogic->isUnderwater( topLeftCorner.x, topLeftCorner.y ) ) type = PathfindCell::CELL_WATER;
-	if (TheTerrainLogic->isUnderwater( topLeftCorner.x, bottomRightCorner.y) ) type = PathfindCell::CELL_WATER;
-	if (TheTerrainLogic->isUnderwater( bottomRightCorner.x, bottomRightCorner.y ) ) type = PathfindCell::CELL_WATER;
-	if (TheTerrainLogic->isUnderwater( bottomRightCorner.x, topLeftCorner.y ) ) type = PathfindCell::CELL_WATER;
+	const Bool retail = RetailFileLayers::enabled();
+	if (!retail || type == PathfindCell::CELL_CLEAR)
+	{
+		const Real wadeDepth = retail ? TheAI->getAiData()->m_wadeWaterDepth : 0.0f;
+		const auto blocksGround = [retail, wadeDepth](Real x, Real y)
+		{
+			if (!retail)
+				return TheTerrainLogic->isUnderwater(x, y);
+			Real waterHeight, terrainHeight;
+			return TheTerrainLogic->isUnderwater(x, y, &waterHeight, &terrainHeight) &&
+				waterHeight - terrainHeight > wadeDepth;
+		};
+		if (blocksGround(topLeftCorner.x, topLeftCorner.y) ||
+			blocksGround(topLeftCorner.x, bottomRightCorner.y) ||
+			blocksGround(bottomRightCorner.x, bottomRightCorner.y) ||
+			blocksGround(bottomRightCorner.x, topLeftCorner.y))
+			type = PathfindCell::CELL_WATER;
+	}
 
 	if (hasObstacle) {
 		type =  PathfindCell::CELL_OBSTACLE;
@@ -1072,12 +1083,16 @@ void Pathfinder::classifyMap()
 {
 
 	Int i, j;
+	const Bool retail = RetailFileLayers::enabled();
 	// for now, sample cell corners and classify cell accordingly
 	for( j=m_extent.lo.y; j<=m_extent.hi.y; j++ )
 	{
 		for( i=m_extent.lo.x; i<=m_extent.hi.x; i++ )
 		{
-			classifyMapCell( i, j, &m_map[i][j]);
+			PathfindCell& cell = m_map[i][j];
+			if (retail && cell.getType() == PathfindCell::CELL_OBSTACLE)
+				cell.clearObstruction();
+			classifyMapCell(i, j, &cell);
 		}
 	}
 #if 1
@@ -1139,7 +1154,7 @@ void Pathfinder::classifyMap()
 			m_layers[i].classifyCells();
 		}
 	}
-	if (!RetailFileLayers::enabled() && !m_layers[LAYER_WALL].isUnused()) {
+	if (!retail && !m_layers[LAYER_WALL].isUnused()) {
 		m_layers[LAYER_WALL].classifyWallCells(m_wallPieces, m_numWallPieces);
 	}
 	m_zoneManager.calculateZones(m_map, m_layers, m_extent);
@@ -1152,6 +1167,12 @@ void Pathfinder::classifyMap()
 void Pathfinder::forceMapRecalculation()
 {
 	classifyMap();
+	if (RetailFileLayers::enabled())
+	{
+		for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+			classifyObjectFootprint(obj, TRUE);
+		m_zoneManager.calculateZones(m_map, m_layers, m_extent);
+	}
 }
 
 /**
@@ -7711,6 +7732,8 @@ void Pathfinder::crc( Xfer *xfer )
 	{
 		xfer->xferUnsignedInt(&m_retailRouteRevision);
 		xfer->xferIRegion2D(&m_logicalExtent);
+		Real wadeDepth = TheAI->getAiData()->m_wadeWaterDepth;
+		xfer->xferReal(&wadeDepth);
 	}
 
 }
@@ -7720,7 +7743,7 @@ void Pathfinder::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -7824,6 +7847,11 @@ void Pathfinder::xfer( Xfer *xfer )
 			if (!m_isMapReady)
 				throw XFER_INVALID_PARAMETERS;
 			m_zoneManager.xferConnectivity(xfer, m_map, m_layers, m_extent);
+			if (version < 8 && xfer->getXferMode() == XFER_LOAD)
+			{
+				m_zoneManager.calculateZones(m_map, m_layers, m_extent);
+				m_savedZoneUpdateFrame = m_zoneManager.getZoneUpdateFrame();
+			}
 		}
 	}
 	if (version >= 6)

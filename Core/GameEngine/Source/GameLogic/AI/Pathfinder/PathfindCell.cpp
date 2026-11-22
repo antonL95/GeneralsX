@@ -459,14 +459,12 @@ void PathfindCell::setObstacleOwner(ObjectID id, Bool fence, Bool transparent)
 #endif
 }
 
-#if RETAIL_COMPATIBLE_PATHFINDING_ALLOCATION
 void PathfindCell::clearObstruction()
 {
 	clearSharedObstacles();
 	m_type = CELL_CLEAR;
 	setObstacleOwner(INVALID_ID, false, false);
 }
-#endif
 
 
 /**

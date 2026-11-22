@@ -75,10 +75,9 @@ public:
 
 	Bool isSoleObstacle( ObjectID objID ) const;
 #if RETAIL_COMPATIBLE_PATHFINDING_ALLOCATION
-	// TheSuperHackers @info isObstructionInvalid() and clearObstruction() only used during retail compatible pathfinding failover cleanup
 	Bool isObstructionInvalid() const { return m_obstacleID != INVALID_ID && m_info == nullptr && (m_type == CELL_OBSTACLE || m_type == CELL_IMPASSABLE); }
-	void clearObstruction();
 #endif
+	void clearObstruction();
 
 	Bool isObstacleTransparent() const;
 	Bool isObstacleFence() const;
