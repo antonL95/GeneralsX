@@ -639,10 +639,11 @@ Bool MapCache::addMap(
 	const AsciiString &fname,
 	const AsciiString &lowerFname,
 	FileInfo &fileInfo,
-	Bool isOfficial)
+	Bool isOfficial,
+	Bool refresh)
 {
 	MapCache::iterator it = find(lowerFname);
-	if (it != end())
+	if (!refresh && it != end())
 	{
 		// Found the map in our cache. Check to see if it has changed.
 		const MapMetaData& md = it->second;
@@ -1165,15 +1166,24 @@ Bool isOfficialMap( AsciiString mapName )
 
 const MapMetaData *MapCache::ensureMap(const AsciiString &mapName)
 {
-	if (const MapMetaData *existing = findMap(mapName))
-		return existing;
+	AsciiString fileName = mapName;
 	FileInfo fileInfo;
-	if (!TheFileSystem->getFileInfo(mapName, &fileInfo))
+	if (!TheFileSystem->getFileInfo(fileName, &fileInfo))
+	{
+		const MapMetaData *alias = findMap(mapName);
+		if (!alias || !TheFileSystem->getFileInfo(alias->m_fileName, &fileInfo))
+			return nullptr;
+		fileName = alias->m_fileName;
+	}
+	AsciiString key = fileName;
+	key.toLower();
+	const auto existing = find(key);
+	const Bool isOfficial = existing != end() && existing->second.m_isOfficial;
+	if (!addMap(getMapDir(), fileName, key, fileInfo, isOfficial, TRUE))
 		return nullptr;
-	AsciiString lowerName = mapName;
-	lowerName.toLower();
-	addMap(getMapDir(), mapName, lowerName, fileInfo, TRUE);
-	return findMap(lowerName);
+	auto &map = find(key)->second;
+	map.m_fileName = fileName;
+	return &map;
 }
 
 const MapMetaData *MapCache::findMap(AsciiString mapName)
