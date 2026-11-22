@@ -821,7 +821,7 @@ UpdateSleepTime PhysicsBehavior::update()
 			setFlag(ALLOW_TO_FALL, false);
 
 			// When a stunned object hits the ground the first time, change it's model state from stunned flailing to just stunned.
-			if (getFlag(IS_STUNNED))
+			if (getFlag(IS_STUNNED) && !impactFlight && m_impactEndFrame == 0)
 			{
 				obj->clearModelConditionState(MODELCONDITION_STUNNED_FLAILING);
 				obj->setModelConditionState(MODELCONDITION_STUNNED);
@@ -1230,7 +1230,8 @@ void PhysicsBehavior::updateImpactRecovery()
 		m_impactStandFrame = 0;
 		m_impactEndFrame = 0;
 	}
-	else if (m_impactStandFrame != 0 && now >= m_impactStandFrame)
+	else if (now >= m_impactStandFrame &&
+		(m_impactStandFrame != 0 || victim->getLogicModelConditions().test(MODELCONDITION_STUNNED)))
 	{
 		victim->clearModelConditionState(MODELCONDITION_STUNNED);
 		victim->setModelConditionState(MODELCONDITION_STUNNED_STANDING_UP);

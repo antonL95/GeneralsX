@@ -877,6 +877,13 @@ Bool EmotionTrackerUpdate::blocksPlayerCommands(const Object* object)
 	return nugget && nugget->m_preventCommands;
 }
 
+Bool EmotionTrackerUpdate::ownsCrushBraceCondition(const Object* object)
+{
+	const auto* tracker = static_cast<const EmotionTrackerUpdate*>(object->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
+	return tracker && tracker->m_activeEntry >= 0 && TheGameLogic->getFrame() < tracker->m_endFrame &&
+		tracker->m_appliedConditions.test(MODELCONDITION_EMOTION_BRACE_FOR_BEING_CRUSHED);
+}
+
 static Int emotionPriority(Int type)
 {
 	switch (type)
@@ -908,6 +915,8 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 		const auto* current = findEmotionNugget(active.m_name);
 		const Int activeType = active.m_type >= 0 && active.m_type != EMOTION_OVERRIDE ?
 			active.m_type : (current ? current->m_type : -1);
+		if (type == EMOTION_BRACE && activeType == EMOTION_BRACE)
+			return TRUE;
 		if (emotionPriority(type) <= emotionPriority(activeType))
 			return FALSE;
 	}
@@ -966,6 +975,8 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 
 		if (m_activeEntry >= 0)
 			finishEmotion();
+		if (type == EMOTION_BRACE && self->getAI())
+			self->getAI()->clearCrushBrace();
 		m_activeEntry = index;
 		m_endFrame = now + duration;
 		m_recheckFrame = m_endFrame + std::max({interval, nugget->m_inactive, nugget->m_inactiveSameObject, nugget->m_inactiveSameType});

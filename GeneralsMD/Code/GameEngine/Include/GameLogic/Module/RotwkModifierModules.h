@@ -171,6 +171,7 @@ public:
 	static void parseEmotionNugget(INI* ini);
 	static void clearEmotionNuggets();
 	static Bool signal(Object* victim, EmotionType type, const Object* source);
+	static Bool ownsCrushBraceCondition(const Object* object);
 	static Bool blocksPlayerCommands(const Object* object);
 	UpdateSleepTime update() override;
 

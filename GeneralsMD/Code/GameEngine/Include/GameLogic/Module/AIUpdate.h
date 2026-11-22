@@ -495,6 +495,7 @@ public:
 	Bool isMoving() const;
 	Bool fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition);
 	void braceForCrush(UnsignedInt deadline);
+	void clearCrushBrace();
 	Bool stanceAllowsChase(const Object* target) const;
 	Bool isMovingAwayFrom(Object *obj) const;
 

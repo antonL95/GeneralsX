@@ -1086,10 +1086,7 @@ UpdateSleepTime AIUpdateInterface::update()
 			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID);
 		}
 		if (m_crushWarningUntil && now >= m_crushWarningUntil)
-		{
-			m_crushWarningUntil = 0;
-			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_BRACE_FOR_BEING_CRUSHED);
-		}
+			clearCrushBrace();
 		if (m_fearUntil || m_crushWarningUntil)
 			subMachineSleep = UPDATE_SLEEP_NONE;
 	}
@@ -5672,6 +5669,15 @@ void AIUpdateInterface::braceForCrush(UnsignedInt deadline)
 	m_crushWarningUntil = deadline;
 	getObject()->setModelConditionState(MODELCONDITION_EMOTION_BRACE_FOR_BEING_CRUSHED);
 	wakeUpNow();
+}
+
+void AIUpdateInterface::clearCrushBrace()
+{
+	if (!m_crushWarningUntil)
+		return;
+	m_crushWarningUntil = 0;
+	if (!EmotionTrackerUpdate::ownsCrushBraceCondition(getObject()))
+		getObject()->clearModelConditionState(MODELCONDITION_EMOTION_BRACE_FOR_BEING_CRUSHED);
 }
 
 Bool AIUpdateInterface::issueRetailPlannerAttack(Object* target)
