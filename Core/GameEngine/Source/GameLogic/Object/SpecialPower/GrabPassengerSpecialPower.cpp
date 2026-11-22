@@ -48,8 +48,6 @@ GrabPassengerSpecialPower::~GrabPassengerSpecialPower() = default;
 #if !RTS_GENERALS
 static const ActiveBodyModuleData* chunkVendorData(const Object* target)
 {
-	if (!target->isKindOf(KINDOF_CHUNK_VENDOR))
-		return nullptr;
 	const auto* body = dynamic_cast<const ActiveBody*>(target->getBodyModule());
 	return body ? body->getRetailBodyData() : nullptr;
 }
@@ -63,7 +61,8 @@ Bool GrabPassengerSpecialPower::canGrab(const Object* target) const
 	if (!target || target == caster || target->isEffectivelyDead() || !contain)
 		return FALSE;
 #if !RTS_GENERALS
-	if (RetailFileLayers::enabled() && getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_CHUNK)
+	if (RetailFileLayers::enabled() && getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_CHUNK &&
+		target->isKindOf(KINDOF_CHUNK_VENDOR))
 	{
 		const auto* vendor = chunkVendorData(target);
 		const Int capacity = contain->getContainMax();
@@ -171,7 +170,8 @@ void GrabPassengerSpecialPower::applyPowerEffect(const Coord3D*)
 		return;
 
 #if !RTS_GENERALS
-	if (RetailFileLayers::enabled() && getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_CHUNK)
+	if (RetailFileLayers::enabled() && getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_CHUNK &&
+		target->isKindOf(KINDOF_CHUNK_VENDOR))
 	{
 		const auto* vendor = chunkVendorData(target);
 		const ThingTemplate* chunkTemplate = TheThingFactory->findTemplate(vendor->m_grabObject, FALSE);
