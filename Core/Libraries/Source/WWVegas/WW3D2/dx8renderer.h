@@ -95,7 +95,7 @@ public:
 
 	void									Render();
 	using EffectDraw = bool (*)(MeshClass &, TextureClass *, TextureClass *, VertexMaterialClass *, const ShaderClass &,
-		const Matrix4x4 &);
+		const Matrix4x4 &, DX8PolygonRendererClass &);
 	static void Set_Effect_Draw(EffectDraw draw);
 	bool									Anything_To_Render() { return (render_task_head != nullptr); }
 	void									Clear_Render_List();

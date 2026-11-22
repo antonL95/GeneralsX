@@ -45,6 +45,10 @@
 #include "WW3D2/mesh.h"
 #include "dx8wrapper.h"
 
+#include <memory>
+
+namespace RetailFX { struct PackedMesh; }
+
 class DX8PolygonRendererClass;
 class DX8TextureCategoryClass;
 
@@ -65,6 +69,7 @@ class DX8PolygonRendererClass : public MultiListObjectClass
 	unsigned							vertex_index_range;		// range to the last vertex our polys reference
 	bool								strip;						// is this a strip?
 	unsigned							pass;					// rendering pass
+	std::shared_ptr<RetailFX::PackedMesh> effect_mesh;
 
 public:
 	DX8PolygonRendererClass(
@@ -86,6 +91,7 @@ public:
 	unsigned							Get_Index_Offset()	{ return index_offset; }
 	unsigned							Get_Index_Count() const { return index_count; }
 	unsigned						Get_Pass()	{ return pass; }
+	std::shared_ptr<RetailFX::PackedMesh>& Effect_Mesh() { return effect_mesh; }
 
 	MeshModelClass*				Get_Mesh_Model_Class() { return mmc; }
 	DX8TextureCategoryClass*	Get_Texture_Category() { return texture_category; }

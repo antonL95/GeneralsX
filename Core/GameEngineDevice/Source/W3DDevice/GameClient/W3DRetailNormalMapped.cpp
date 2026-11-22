@@ -6,6 +6,7 @@
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "WW3D2/assetmgr.h"
+#include "WW3D2/dx8polygonrenderer.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/lightenvironment.h"
 #include "WW3D2/mesh.h"
@@ -19,6 +20,26 @@
 
 namespace RetailFX
 {
+
+struct PackedMesh
+{
+	struct Source
+	{
+		const W3dFx::Mesh *fx = nullptr;
+		const Vector3 *position = nullptr;
+		const Vector3 *normal = nullptr;
+		const Vector2 *uv = nullptr;
+		const unsigned *color = nullptr;
+		const TriIndex *polygons = nullptr;
+		Int vertexCount = 0;
+		Int polygonCount = 0;
+
+		bool operator==(const Source &) const = default;
+	} source;
+	std::vector<NormalMappedVertex> vertices;
+	std::vector<uint32_t> indices;
+};
+
 namespace
 {
 
@@ -41,8 +62,6 @@ public:
 	void ReAcquireResources() override {}
 
 	std::array<std::unique_ptr<NativePass>, 2> passes;
-	std::vector<NormalMappedVertex> vertices;
-	std::vector<uint32_t> indices;
 	std::set<std::string, std::less<>> traced;
 	std::array<bool, 2> initialized{};
 	std::array<bool, 2> reportedFailure{};
@@ -50,7 +69,7 @@ public:
 
 std::unique_ptr<NormalMappedRuntime> runtime;
 
-bool fillMesh(MeshModelClass &model, const W3dFx::Mesh *fx, NormalMappedRuntime &renderer)
+bool fillMesh(MeshModelClass &model, const W3dFx::Mesh *fx, PackedMesh &geometry)
 {
 	const Int vertexCount = model.Get_Vertex_Count();
 	const Int polygonCount = model.Get_Polygon_Count();
@@ -64,18 +83,24 @@ bool fillMesh(MeshModelClass &model, const W3dFx::Mesh *fx, NormalMappedRuntime 
 	const auto *polys = model.MeshGeometryClass::Get_Polygon_Array();
 	if (!uv || !position || !normal || !polys)
 		return false;
-	renderer.vertices.clear();
+	const PackedMesh::Source source{fx, position, normal, uv, color, polys, vertexCount, polygonCount};
+	if (source == geometry.source)
+		return true;
+	geometry.source = {};
+	geometry.vertices.clear();
+	geometry.vertices.reserve(vertexCount);
 	for (Int i = 0; i < vertexCount; ++i)
 	{
 		const auto t = fx ? fx->tangents[i] : W3dFx::Float3{};
 		const auto b = fx ? fx->bitangents[i] : W3dFx::Float3{};
-		renderer.vertices.push_back({
+		geometry.vertices.push_back({
 			{position[i].X, position[i].Y, position[i].Z}, {normal[i].X, normal[i].Y, normal[i].Z},
 			{t[0], t[1], t[2]}, {b[0], b[1], b[2]}, {uv[i].U, uv[i].V},
 			{uv[i].U, uv[i].V}, color ? static_cast<uint32_t>(color[i]) : 0xffffffffu
 		});
 	}
-	renderer.indices.clear();
+	geometry.indices.clear();
+	geometry.indices.reserve(static_cast<size_t>(polygonCount) * 3);
 	for (Int i = 0; i < polygonCount; ++i)
 	{
 		for (Int corner = 0; corner < 3; ++corner)
@@ -83,9 +108,10 @@ bool fillMesh(MeshModelClass &model, const W3dFx::Mesh *fx, NormalMappedRuntime 
 			const auto index = static_cast<uint32_t>(polys[i][corner]);
 			if (index >= static_cast<uint32_t>(vertexCount))
 				return false;
-			renderer.indices.push_back(index);
+			geometry.indices.push_back(index);
 		}
 	}
+	geometry.source = source;
 	return true;
 }
 
@@ -95,7 +121,7 @@ Register fromVector(const Vector3 &value)
 }
 
 bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *secondary,
-	VertexMaterialClass *vertexMaterial, const ShaderClass &shader, const Matrix4x4 &world)
+	VertexMaterialClass *vertexMaterial, const ShaderClass &shader, const Matrix4x4 &world, DX8PolygonRendererClass &renderer)
 {
 	if (!RetailFileLayers::enabled() || !TheTerrainRenderObject || !diffuse ||
 		ShaderClass::Is_Backface_Culling_Inverted())
@@ -151,7 +177,15 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	auto *base = nativeTexture(diffuse);
 	auto *mask = nativeTexture(shroud->getShroudTexture());
 	const auto cloud = normalMapped ? nullptr : nativeTexture(TheTerrainRenderObject->peekCloudTexture());
-	if ((normalMapped && !normal) || !base || !mask || !fillMesh(model, normalMapped ? fx : nullptr, *runtime))
+	if ((normalMapped && !normal) || !base || !mask)
+		return false;
+	PackedMesh temporary;
+	auto &stored = renderer.Effect_Mesh();
+	const bool cacheable = mesh.Class_ID() == RenderObjClass::CLASSID_MESH;
+	if (cacheable && !stored)
+		stored = std::make_shared<PackedMesh>();
+	auto &geometry = cacheable ? *stored : temporary;
+	if (!fillMesh(model, normalMapped ? fx : nullptr, geometry))
 		return false;
 
 	const float scaleU = 1.0f / (shroud->getCellWidth() * static_cast<float>(shroud->getTextureWidth()));
@@ -265,7 +299,7 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	};
 	const bool alphaTest = normalMapped ? material.get<bool>("AlphaTestEnable", false) :
 		shader.Get_Alpha_Test() != ShaderClass::ALPHATEST_DISABLE;
-	const bool drawn = pass->drawNormalMapped(device, runtime->vertices, runtime->indices, setBinding, getTexture,
+	const bool drawn = pass->drawNormalMapped(device, geometry.vertices, geometry.indices, setBinding, getTexture,
 		alphaTest, shader.Get_Depth_Mask() == ShaderClass::DEPTH_WRITE_ENABLE,
 		model.Get_Flag(MeshGeometryClass::TWO_SIDED) || shader.Get_Cull_Mode() == ShaderClass::CULL_MODE_DISABLE);
 	if (drawn && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS") && runtime->traced.insert(mesh.Get_Name()).second)

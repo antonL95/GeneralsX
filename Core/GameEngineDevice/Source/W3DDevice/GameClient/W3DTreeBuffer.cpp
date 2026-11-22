@@ -1090,6 +1090,7 @@ void W3DTreeBuffer::updateVertexBuffer()
 	if (!m_indexTree[0] || !m_vertexTree[0] || !m_initialized) {
 		return;
 	}
+	const bool retail = RetailFileLayers::enabled();
 	Int bNdx;
 	for	(bNdx = 0; bNdx<MAX_BUFFERS; bNdx++) {
 		if (m_curNumTreeIndices[bNdx]==0) {
@@ -1135,7 +1136,8 @@ void W3DTreeBuffer::updateVertexBuffer()
 			Int i;
 			Int numVertex = m_treeTypes[type].m_mesh->Peek_Model()->Get_Vertex_Count();
 			Vector3 *pVert = m_treeTypes[type].m_mesh->Peek_Model()->Get_Vertex_Array();
-			const Vector3 *normals = m_treeTypes[type].m_mesh->Peek_Model()->Get_Vertex_Normal_Array();
+			const bool toppled = m_trees[curTree].m_toppleState != TOPPLE_UPRIGHT;
+			const Vector3 *normals = retail && toppled ? m_treeTypes[type].m_mesh->Peek_Model()->Get_Vertex_Normal_Array() : nullptr;
 
 			for (i=0; i<numVertex; i++) {
 				Real x = pVert[i].X;
@@ -1150,7 +1152,7 @@ void W3DTreeBuffer::updateVertexBuffer()
 				vLoc.Z = pVert[i].Z*scale;
 				vLoc.Z += m_treeTypes[type].m_offset.Z;
 
-				if (m_trees[curTree].m_toppleState != TOPPLE_UPRIGHT) {
+				if (toppled) {
 					m_trees[curTree].m_mtx.Transform_Vector(m_trees[curTree].m_mtx, vLoc, &vLoc);
 				} else {
 					if (m_trees[curTree].pushAside>0.0f) {
@@ -1166,21 +1168,23 @@ void W3DTreeBuffer::updateVertexBuffer()
 				curVb->y = vLoc.Y;
 				curVb->z = vLoc.Z;
 				curVb->ny = 1.0f - m_treeTypes[type].m_data->m_darkening*m_trees[curTree].pushAside;
-				auto &retailVertices = m_retailVertices[bNdx];
-				const auto index = static_cast<size_t>(startVertex + i);
-				if (index < retailVertices.size()) {
-					auto &vertex = retailVertices[index];
-					vertex.position[0] = vLoc.X;
-					vertex.position[1] = vLoc.Y;
-					vertex.position[2] = vLoc.Z;
-					if (m_trees[curTree].m_toppleState != TOPPLE_UPRIGHT) {
-						vertex.sway[0] = 0.0f;
-						if (normals) {
-							Vector3 normal;
-							Matrix3D::Rotate_Vector(m_trees[curTree].m_mtx, normals[i], &normal);
-							vertex.normal[0] = normal.X;
-							vertex.normal[1] = normal.Y;
-							vertex.normal[2] = normal.Z;
+				if (retail) {
+					auto &retailVertices = m_retailVertices[bNdx];
+					const auto index = static_cast<size_t>(startVertex + i);
+					if (index < retailVertices.size()) {
+						auto &vertex = retailVertices[index];
+						vertex.position[0] = vLoc.X;
+						vertex.position[1] = vLoc.Y;
+						vertex.position[2] = vLoc.Z;
+						if (toppled) {
+							vertex.sway[0] = 0.0f;
+							if (normals) {
+								Vector3 normal;
+								Matrix3D::Rotate_Vector(m_trees[curTree].m_mtx, normals[i], &normal);
+								vertex.normal[0] = normal.X;
+								vertex.normal[1] = normal.Y;
+								vertex.normal[2] = normal.Z;
+							}
 						}
 					}
 				}

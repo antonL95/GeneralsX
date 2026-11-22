@@ -2024,7 +2024,7 @@ void DX8TextureCategoryClass::Render()
 				{
 					Matrix4x4 queuedWorld;
 					DX8Wrapper::Get_Transform(D3DTS_WORLD, queuedWorld);
-					drawn = meshEffectDraw(*mesh, Peek_Texture(0), Peek_Texture(1), vmaterial, theShader, queuedWorld);
+					drawn = meshEffectDraw(*mesh, Peek_Texture(0), Peek_Texture(1), vmaterial, theShader, queuedWorld, *renderer);
 				}
 				if (!drawn)
 					renderer->Render(mesh->Get_Base_Vertex_Offset());

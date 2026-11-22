@@ -82,6 +82,7 @@ struct NativePass::Data
 	Com<IDirect3DPixelShader9> pixel;
 	Com<IDirect3DVertexDeclaration9> declaration;
 	Com<IDirect3DTexture9> white;
+	Com<IDirect3DStateBlock9> meshState;
 	std::vector<std::pair<D3DRENDERSTATETYPE, DWORD>> states;
 	std::vector<Sampler> samplers;
 	Program vs;
@@ -90,7 +91,7 @@ struct NativePass::Data
 
 	bool draw(IDirect3DDevice9 *device, const SetBinding &setBinding,
 		const std::function<void *(std::string_view)> &getTexture,
-		const std::function<bool()> &issueDraw);
+		const std::function<bool()> &issueDraw, bool reuseState = false);
 };
 
 std::unique_ptr<NativePass> NativePass::makeWater(void *handle, const Effect &effect, CreateShader createShader)
@@ -342,7 +343,7 @@ bool NativePass::drawVegetation(void *handle, std::span<const VegetationVertex> 
 }
 
 bool NativePass::Data::draw(IDirect3DDevice9 *device, const SetBinding &setBinding,
-	const std::function<void *(std::string_view)> &getTexture, const std::function<bool()> &issueDraw)
+	const std::function<void *(std::string_view)> &getTexture, const std::function<bool()> &issueDraw, bool reuseState)
 {
 	Registers vertexRegs, pixelRegs;
 	if (!device || !fillRegisters(vs, setBinding, vertexRegs) || !fillRegisters(ps, setBinding, pixelRegs))
@@ -359,10 +360,17 @@ bool NativePass::Data::draw(IDirect3DDevice9 *device, const SetBinding &setBindi
 		textures[sampler.slot] = texture;
 	}
 
-	IDirect3DStateBlock9 *block = nullptr;
-	if (FAILED(device->CreateStateBlock(D3DSBT_ALL, &block)))
+	Com<IDirect3DStateBlock9> localState;
+	auto &saved = reuseState ? meshState : localState;
+	if (!saved)
+	{
+		IDirect3DStateBlock9 *block = nullptr;
+		if (FAILED(device->CreateStateBlock(D3DSBT_ALL, &block)))
+			return false;
+		saved.reset(block);
+	}
+	else if (FAILED(saved->Capture()))
 		return false;
-	const Com<IDirect3DStateBlock9> saved(block);
 	const bool ready = [&] {
 		for (const auto &[state, value] : states)
 			if (FAILED(device->SetRenderState(state, value)))
@@ -406,7 +414,7 @@ bool NativePass::drawNormalMapped(void *handle, std::span<const NormalMappedVert
 			return false;
 		return SUCCEEDED(device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, static_cast<UINT>(vertices.size()),
 			static_cast<UINT>(indices.size() / 3), indices.data(), D3DFMT_INDEX32, vertices.data(), sizeof(NormalMappedVertex)));
-	});
+	}, true);
 }
 
 #else
