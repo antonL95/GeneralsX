@@ -174,6 +174,7 @@ void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, U
 void runRetailSaveLoadBookTestCommand(Player* player, const char* templateName);
 #if !RTS_GENERALS
 void runRetailPackage05TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
+void runRetailPackage41TestCommand(std::string_view action, Object* source, UnsignedInt frame);
 void runRetailPackage07TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage09TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
 void runRetailPackage10TestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
@@ -2706,6 +2707,11 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action.starts_with("pkg09-"))
 	{
 		runRetailPackage09TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(), frame);
+		return;
+	}
+	if (command.action.starts_with("pkg41-"))
+	{
+		runRetailPackage41TestCommand(command.action, obj, frame);
 		return;
 	}
 #endif

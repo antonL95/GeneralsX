@@ -108,6 +108,7 @@ set(GAMEENGINE_SRC
     Include/Common/ZeroHourUpgradeMaskLayout.h
     Include/Common/INIRetailTolerance.h
     Include/Common/HordeFormation.h
+    Include/GameLogic/RingStealthTiming.h
     Include/GameLogic/ShroudGeometry.h
     Include/GameLogic/Module/HordeContain.h
     Include/GameLogic/Module/SlaughterHordeContain.h
@@ -737,6 +738,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailMordorTestCommands.cpp
     Source/GameLogic/System/RetailPowerTestCommands.cpp
     Source/GameLogic/System/RetailPackage05TestCommands.cpp
+    Source/GameLogic/System/RetailPackage41TestCommands.cpp
     Source/GameLogic/System/RetailPackage07TestCommands.cpp
     Source/GameLogic/System/RetailPackage09TestCommands.cpp
     Source/GameLogic/System/RetailPackage10TestCommands.cpp
