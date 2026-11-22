@@ -67,13 +67,15 @@ case "$mode" in
         scenario="$fixtures/high-pass.txt"
         map='maps/map mp high pass/map mp high pass.map'
         path_unit='Player_1 GondorFighter 0'
-        touch "$out/start.gdb" "$out/resume.gdb"
+        : > "$out/start.gdb"
+        : > "$out/resume.gdb"
         ;;
     zero-hour)
         work=${PKGS1_ZERO_HOUR_DATA:?Zero Hour game directory required}
         map=${PKGS1_ZERO_HOUR_MAP:?Zero Hour map required}
         scenario=/dev/null
-        touch "$out/start.gdb" "$out/resume.gdb"
+        : > "$out/start.gdb"
+        : > "$out/resume.gdb"
         ;;
     *) exit 2 ;;
 esac
@@ -95,7 +97,7 @@ diag=${PKGS1_DIAGNOSTICS:-"$save_frame,$((save_frame + 1))"}
         printf '%s snapshot-wall-occupant Player_1 - 0 WallTrebuchetOccupant\n' "$save_frame"
     fi
     printf '%s\n' "$diag" | tr ',' '\n' | awk -v end="$end" '/^[0-9]+$/ && $1 <= end {print $1, "snapshot-crc - - 0"; print $1, "logall - - 0"}'
-    seq "$save_frame" "$end" | awk '{ print $1, "xpcrc - - 0" }'
+    seq "${PKGS1_CRC_START_FRAME:-$save_frame}" "$end" | awk '{ print $1, "xpcrc - - 0" }'
     printf '%s quit - - 0\n' "$end"
 } | sort -sn > "$out/continue.txt"
 
@@ -202,6 +204,7 @@ for phase in continue resume; do
     awk -v first="$save_frame" -v last="$end" '
         /^TEST xp-crc frame=[0-9]+ crc=[0-9A-F]+$/ {
             split($3, f, "=")
+            if (f[2] < first) next
             if (f[2] != first + count++ || length($4) != 12) exit 1
             print f[2], $4
         }

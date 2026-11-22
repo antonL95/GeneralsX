@@ -767,6 +767,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailPackage14TestCommands.cpp
     Source/GameLogic/System/RetailPackage20TestCommands.cpp
     Source/GameLogic/System/RetailPackage23TestCommands.cpp
+    Source/GameLogic/System/RetailPackage22TestCommands.cpp
     Source/GameLogic/System/RetailPackage53TestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp

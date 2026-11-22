@@ -1,0 +1,61 @@
+20 create Player_1 Pkg22Tosser 0 2900,625,0
+155 create Player_1 Pkg22Reach 0 2900,540,0
+155 create Player_1 Pkg22ReachControl 0 2900,540,0
+155 create PlyrCreeps Pkg22Static 0 2975,540,0
+156 pkg22-place Player_1 Pkg22Reach 0 PlyrCreeps:Pkg22Static:0 29 0
+156 pkg22-choose Player_1 Pkg22Reach 0 PlyrCreeps:Pkg22Static:0
+156 pkg22-fire Player_1 Pkg22Reach 0 PlyrCreeps:Pkg22Static:0
+157 pkg22-place Player_1 Pkg22Reach 0 PlyrCreeps:Pkg22Static:0 30 0
+157 pkg22-choose Player_1 Pkg22Reach 0 PlyrCreeps:Pkg22Static:0
+158 pkg22-place Player_1 Pkg22Reach 0 PlyrCreeps:Pkg22Static:0 64 0
+158 pkg22-choose Player_1 Pkg22Reach 0 PlyrCreeps:Pkg22Static:0
+158 pkg22-fire Player_1 Pkg22Reach 0 PlyrCreeps:Pkg22Static:0
+158 pkg22-place Player_1 Pkg22ReachControl 0 PlyrCreeps:Pkg22Static:0 64 0
+158 pkg22-range Player_1 Pkg22ReachControl 0 PlyrCreeps:Pkg22Static:0
+158 pkg22-fire Player_1 Pkg22ReachControl 0 PlyrCreeps:Pkg22Static:0
+159 create PlyrCreeps Pkg22DodgeTarget 0 2975,570,0
+159 create Player_1 Pkg22DodgeShot 0 2900,570,0
+160 pkg22-fire Player_1 Pkg22DodgeShot 0 PlyrCreeps:Pkg22DodgeTarget:0
+161 pkg22-fire Player_1 Pkg22DodgeShot 0 PlyrCreeps:Pkg22Static:0
+162 create Player_1 Pkg22WallShot 0 2900,540,0
+162 pkg22-fire Player_1 Pkg22WallShot 0 PlyrCreeps:Pkg22Static:0
+163 pkg22-place PlyrCreeps Pkg22Static 0 - 20 1
+163 pkg22-fire Player_1 Pkg22WallShot 0 PlyrCreeps:Pkg22Static:0
+164 create Player_1 Pkg22SharedShot 0 2900,520,0
+164 create Player_1 Pkg22IndependentShot 0 2900,520,0
+164 pkg22-fire Player_1 Pkg22SharedShot 0 PlyrCreeps:Pkg22Static:0
+164 pkg22-fire Player_1 Pkg22IndependentShot 0 PlyrCreeps:Pkg22Static:0
+170 create PlyrCreeps WildMammoth 0 3160,900,0
+170 create Player_1 Pkg22BoneShot 0 2930,900,0
+170 create Player_1 Pkg22MissingBoneShot 0 2930,900,0
+171 pkg22-fire Player_1 Pkg22BoneShot 0 PlyrCreeps:WildMammoth:0
+171 pkg22-fire Player_1 Pkg22MissingBoneShot 0 PlyrCreeps:WildMammoth:0
+178 create PlyrCreeps Pkg22Static 1 2975,580,0
+178 create Player_1 Pkg22ClawBird 0 3010,580,0
+178 create Player_1 Pkg22LevelBird 0 3010,580,0
+180 orderattack Player_1 Pkg22ClawBird 0 PlyrCreeps:Pkg22Static:1
+180 orderattack Player_1 Pkg22LevelBird 0 PlyrCreeps:Pkg22Static:1
+183 pkg22-swoop Player_1 Pkg22ClawBird 0
+183 pkg22-swoop Player_1 Pkg22LevelBird 0
+189 pkg22-swoop Player_1 Pkg22ClawBird 0
+189 pkg22-swoop Player_1 Pkg22LevelBird 0
+190 create Player_1 DwarvenGimli 0 2890,630,0
+190 create Player_1 Pkg22Static 0 2890,620,0
+191 testcontain Player_1 Pkg22Tosser 0 Player_1:Pkg22Static:0
+192 pkg22-fire Player_1 Pkg22Tosser 0 PlyrCreeps:Pkg22Static:0
+215 create Player_1 Pkg22Rampage 0 2900,650,90
+215 create Player_1 Pkg22RampageControl 0 2900,720,90
+215 pkg22-fire Player_1 Pkg22Rampage 0
+215 pkg22-fire Player_1 Pkg22RampageControl 0
+240 pkg22-fire Player_1 Pkg22Rampage 0
+241 testcontain Player_1 Pkg22Tosser 0 Player_1:DwarvenGimli:0
+241 pkg22-fire Player_1 Pkg22Tosser 0 PlyrCreeps:Pkg22Static:0
+244 pkg22-flight Player_1 DwarvenGimli 0
+245 pkg22-fire Player_1 Pkg22Rampage 0
+245 pkg22-fire Player_1 Pkg22RampageControl 0
+269 pkg22-fire Player_1 Pkg22Rampage 0
+270 pkg22-fire Player_1 Pkg22Rampage 0
+294 pkg22-fire Player_1 Pkg22Rampage 0
+300 pkg22-flight Player_1 DwarvenGimli 0
+324 pkg22-fire Player_1 Pkg22Rampage 0
+354 pkg22-fire Player_1 Pkg22Rampage 0
