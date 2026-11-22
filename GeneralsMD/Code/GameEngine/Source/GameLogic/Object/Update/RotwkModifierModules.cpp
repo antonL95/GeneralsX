@@ -970,7 +970,7 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 				ai->fleeFromFear(source, movementDuration,
 					type == EMOTION_TERROR ? MODELCONDITION_EMOTION_TERROR :
 					(type == EMOTION_UNCONTROLLABLE_FEAR ? MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID : MODELCONDITION_EMOTION_AFRAID),
-					scale);
+					scale, nugget->m_ai == EMOTION_AI_BACK_AWAY);
 		}
 		if (ai && !anchor && nugget->m_ai == EMOTION_AI_IDLE)
 			ai->aiIdle(CMD_FROM_AI);

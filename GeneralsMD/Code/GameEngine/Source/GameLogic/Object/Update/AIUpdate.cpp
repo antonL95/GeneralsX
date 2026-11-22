@@ -2292,7 +2292,9 @@ Bool AIUpdateInterface::steerInFormation()
 	obj->setModelConditionState(MODELCONDITION_MOVING);
 	const Real maxSpeed = m_curLocomotor->getMaxSpeedForCondition(obj->getBodyModule()->getDamageState());
 	const Real speed = goal.speed < maxSpeed ? goal.speed : maxSpeed;
-	if (m_curLocomotor->getAppearance() == LOCO_LEGS_TWO)
+	if (goal.backing)
+		m_curLocomotor->locoUpdate_moveTowardsFormationSlot(obj, goal.position, goal.distance, speed, TRUE);
+	else if (m_curLocomotor->getAppearance() == LOCO_LEGS_TWO)
 	{
 		Bool blocked = FALSE;
 		m_curLocomotor->locoUpdate_moveTowardsPosition(obj, goal.position, goal.distance, speed, &blocked);
@@ -5799,10 +5801,11 @@ void AIUpdateInterface::enterRetailRampage()
 	wakeUpNow();
 }
 
-Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition, Real durationScale)
+Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition,
+	Real durationScale, Bool backAway)
 {
 	Object* self = getObject();
-	if (!self->isMobile() || self->isEffectivelyDead() || duration == 0 || durationScale <= 0.0f)
+	if (!source || !self->isMobile() || self->isEffectivelyDead() || duration == 0 || durationScale <= 0.0f)
 		return FALSE;
 	const UnsignedInt now = TheGameLogic->getFrame();
 	if (m_fearUntil > now)
@@ -5821,6 +5824,19 @@ Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration,
 	duration = static_cast<UnsignedInt>(duration * durationScale);
 	if (!duration)
 		return FALSE;
+
+	if (RetailFileLayers::enabled() && backAway)
+	{
+		auto* horde = const_cast<HordeContain*>(HordeContain::get(self));
+		if (horde && horde->beginBacking(source, condition == MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID))
+		{
+			privateIdle(CMD_FROM_SCRIPT);
+			m_fearUntil = now + duration;
+			self->setModelConditionState(condition);
+			wakeUpNow();
+			return TRUE;
+		}
+	}
 
 	Coord3D goal = *self->getPosition();
 	Real dx = goal.x - source->getPosition()->x;

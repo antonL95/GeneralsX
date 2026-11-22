@@ -8,6 +8,7 @@
 #include "GameLogic/Module/TransportContain.h"
 #include "GameLogic/WeaponSetFlags.h"
 
+#include <deque>
 #include <map>
 #include <vector>
 
@@ -154,6 +155,7 @@ public:
 		Real error;
 		Real facing;
 		Bool hordeMoving;
+		Bool backing;
 	};
 	Coord3D getMemberPosition(ObjectID id, Bool followLeader) const;
 	Bool getFormationGoal(const Object* member, FormationGoal& goal) const;
@@ -176,6 +178,10 @@ public:
 	const HordeContainModuleData* getActiveFormation() const;
 	const std::vector<AsciiString>& getFormationModifiers() const { return getActiveFormation()->m_attributeModifiers; }
 	static Object* getAnchor(Object* member);
+	static Bool isFlanked(const Object* victim, const Object* attacker, Bool record = TRUE);
+	Bool beginBacking(const Object* source, Bool uncontrollable);
+	Bool updateBacking();
+	void xferRetailFormationCombat(Xfer* xfer);
 	static void applyWeaponDamage(Object* victim, DamageInfo& damage, Bool contactHit);
 	static Drawable* resolveSelection(Drawable* draw);
 
@@ -192,6 +198,7 @@ private:
 	AsciiString getBannerUnitType() const;
 	Bool addBannerCarrier(Bool feedback);
 	void updateReplenishment();
+	void updateFlankState();
 	Object* replenishMember(const BannerCarrierUpdateModuleData& banner);
 	void rebuildMemberSlots();
 	const HordeContainModuleData* findAlternateFormation() const;
@@ -209,6 +216,15 @@ private:
 	UnsignedInt m_unitSpawnFrame = 0;
 	UnsignedInt m_lastMeleeFrame = 0;
 	UnsignedInt m_lastMemberDamageFrame = 0;
+	std::deque<Real> m_flankHeadings;
+	std::map<ObjectID, UnsignedInt> m_flankedUntil;
+	struct BackingMove
+	{
+		Coord3D goal;
+		UnsignedInt start;
+		UnsignedInt deadline;
+	};
+	std::map<ObjectID, BackingMove> m_backingMoves;
 };
 
 class BannerCarrierUpdateModuleData : public UpdateModuleData

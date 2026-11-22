@@ -67,14 +67,17 @@ void ArmorTemplate::clear()
 }
 
 //-------------------------------------------------------------------------------------------------
-Real ArmorTemplate::adjustDamage(DamageType t, Real damage) const
+Real ArmorTemplate::adjustDamage(DamageType t, Real damage, Bool flanked) const
 {
 	if (t == DAMAGE_UNRESISTABLE)
 		return damage;
 	if (t == DAMAGE_SUBDUAL_UNRESISTABLE)
 		return damage;
 
-	damage *= m_damageCoefficient[t];
+	const Real coefficient = m_damageCoefficient[t];
+	damage *= flanked && m_flankedPenalty != 0.0f
+		? 1.0f - (1.0f - coefficient) * (1.0f - m_flankedPenalty)
+		: coefficient;
 
 	if (damage < 0.0f)
 		damage = 0.0f;

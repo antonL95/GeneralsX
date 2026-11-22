@@ -113,7 +113,7 @@ HordeContainModuleData::HordeContainModuleData()
 	m_randomOffset.y = 0.0f;
 	m_leaderPosition.zero();
 	m_bannerCarrierHordeDeathType = DEATH_TYPE_FLAGS_NONE;
-	m_frontAngle = 0.0f;
+	m_frontAngle = 360.0f;
 	m_meleeAttackLeashDistance = 0.0f;
 	m_backUpMinDistance = 0.0f;
 	m_backUpMaxDistance = 0.0f;
@@ -124,7 +124,7 @@ HordeContainModuleData::HordeContainModuleData()
 	m_backUpMinDelayTime = 0;
 	m_backUpMaxDelayTime = 0;
 	m_flankedDelay = 0;
-	m_flankedDuration = 0;
+	m_flankedDuration = 5 * LOGICFRAMES_PER_SECOND;
 	m_minimumHordeSize = 0;
 	m_leaderRank = 0;
 	m_splitHordeNumber = 0;
@@ -519,6 +519,8 @@ void HordeContain::onRemoving( Object *rider )
 		m_slotMembers[slot->second] = INVALID_ID;
 		m_memberSlots.erase(slot);
 	}
+	if (m_backingMoves.erase(rider->getID()))
+		rider->clearModelConditionState(MODELCONDITION_BACKING_UP);
 	updateRankWeaponConditions(rider);
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained, false );
 	OpenContain::onRemoving( rider );
@@ -566,12 +568,76 @@ void HordeContain::crc( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_unitSpawnFrame);
 		xfer->xferUnsignedInt(&m_lastMeleeFrame);
 		xfer->xferUnsignedInt(&m_lastMemberDamageFrame);
+		xferRetailFormationCombat(xfer);
+	}
+}
+
+void HordeContain::xferRetailFormationCombat(Xfer* xfer)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	UnsignedInt count = static_cast<UnsignedInt>(m_flankHeadings.size());
+	xfer->xferUnsignedInt(&count);
+	if (loading)
+		m_flankHeadings.resize(count);
+	for (Real& heading : m_flankHeadings)
+		xfer->xferReal(&heading);
+
+	count = static_cast<UnsignedInt>(m_flankedUntil.size());
+	xfer->xferUnsignedInt(&count);
+	if (loading)
+	{
+		m_flankedUntil.clear();
+		for (UnsignedInt index = 0; index < count; ++index)
+		{
+			ObjectID attacker = INVALID_ID;
+			UnsignedInt until = 0;
+			xfer->xferObjectID(&attacker);
+			xfer->xferUnsignedInt(&until);
+			m_flankedUntil.emplace(attacker, until);
+		}
+	}
+	else
+	{
+		for (auto [attacker, until] : m_flankedUntil)
+		{
+			ObjectID id = attacker;
+			xfer->xferObjectID(&id);
+			xfer->xferUnsignedInt(&until);
+		}
+	}
+
+	count = static_cast<UnsignedInt>(m_backingMoves.size());
+	xfer->xferUnsignedInt(&count);
+	if (loading)
+	{
+		m_backingMoves.clear();
+		for (UnsignedInt index = 0; index < count; ++index)
+		{
+			ObjectID member = INVALID_ID;
+			BackingMove move{};
+			xfer->xferObjectID(&member);
+			xfer->xferCoord3D(&move.goal);
+			xfer->xferUnsignedInt(&move.start);
+			xfer->xferUnsignedInt(&move.deadline);
+			m_backingMoves.emplace(member, move);
+		}
+	}
+	else
+	{
+		for (auto [member, move] : m_backingMoves)
+		{
+			ObjectID id = member;
+			xfer->xferObjectID(&id);
+			xfer->xferCoord3D(&move.goal);
+			xfer->xferUnsignedInt(&move.start);
+			xfer->xferUnsignedInt(&move.deadline);
+		}
 	}
 }
 
 void HordeContain::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 5 : 3;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -608,6 +674,8 @@ void HordeContain::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_lastMemberDamageFrame);
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_lastMemberDamageFrame = 0;
+	if (version >= 6)
+		xferRetailFormationCombat(xfer);
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		m_formationOverride = switched ? findAlternateFormation() : nullptr;
@@ -684,6 +752,140 @@ Object* HordeContain::getAnchor(Object* member)
 {
 	Object* anchor = member ? member->getContainedBy() : nullptr;
 	return get(anchor) ? anchor : nullptr;
+}
+
+Bool HordeContain::isFlanked(const Object* victim, const Object* attacker, Bool record)
+{
+	if (!RetailFileLayers::enabled() || !victim || !attacker)
+		return FALSE;
+	const Object* defender = get(victim) ? victim : victim->getContainedBy();
+	const Object* source = get(attacker) ? attacker : attacker->getContainedBy();
+	auto* contain = const_cast<HordeContain*>(get(defender));
+	if (!contain || !get(source) || defender->getRelationship(source) != ENEMIES)
+		return FALSE;
+
+	const auto& data = *contain->getActiveFormation();
+	if (data.m_frontAngle >= 360.0f)
+		return FALSE;
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	const ObjectID id = source->getID();
+	const auto active = contain->m_flankedUntil.find(id);
+	if (active != contain->m_flankedUntil.end() && frame < active->second)
+		return TRUE;
+
+	const Coord3D& origin = *defender->getPosition();
+	const Coord3D& from = *source->getPosition();
+	const Real dx = from.x - origin.x;
+	const Real dy = from.y - origin.y;
+	const Real length = WWMath::SqrtfOrigin(dx * dx + dy * dy);
+	if (length <= 0.0f)
+		return FALSE;
+	const Real limit = length * Cos(std::max(0.0f, data.m_frontAngle) * PI / 360.0f);
+	const auto outsideFront = [&](Real facing) {
+		return dx * Cos(facing) + dy * Sin(facing) < limit;
+	};
+	const Bool flanked = outsideFront(defender->getOrientation()) ||
+		std::any_of(contain->m_flankHeadings.begin(), contain->m_flankHeadings.end(), outsideFront);
+	if (flanked && record && data.m_flankedDuration > 0)
+		contain->m_flankedUntil[id] = frame + data.m_flankedDuration;
+	return flanked;
+}
+
+void HordeContain::updateFlankState()
+{
+	const auto& data = *getActiveFormation();
+	if (data.m_frontAngle >= 360.0f)
+	{
+		m_flankHeadings.clear();
+		m_flankedUntil.clear();
+		return;
+	}
+	if (data.m_flankedDelay > 0)
+		m_flankHeadings.push_back(getObject()->getOrientation());
+	while (m_flankHeadings.size() > data.m_flankedDelay)
+		m_flankHeadings.pop_front();
+
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	for (auto it = m_flankedUntil.begin(); it != m_flankedUntil.end(); )
+	{
+		if (frame >= it->second)
+			it = m_flankedUntil.erase(it);
+		else
+			++it;
+	}
+}
+
+Bool HordeContain::beginBacking(const Object* source, Bool uncontrollable)
+{
+	const auto& data = *getActiveFormation();
+	const Real minDistance = std::max(0.0f, data.m_backUpMinDistance);
+	const Real maxDistance = std::max(minDistance, data.m_backUpMaxDistance);
+	if (maxDistance == 0.0f || !source)
+		return FALSE;
+	if (!m_backingMoves.empty())
+		return TRUE;
+
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	const UnsignedInt minDelay = data.m_backUpMinDelayTime;
+	const UnsignedInt maxDelay = std::max(minDelay, data.m_backUpMaxDelayTime);
+	for (Object* member : getContainList())
+	{
+		AIUpdateInterface* ai = member->getAI();
+		if (!ai || !member->isMobile() || member->isEffectivelyDead() || !ai->isDoingGroundMovement())
+			continue;
+		const Bool guaranteed = uncontrollable || member->testStatus(OBJECT_STATUS_UNCONTROLLABLY_SCARED) ||
+			getObject()->testStatus(OBJECT_STATUS_UNCONTROLLABLY_SCARED) || data.m_cowerRadius > 0.0f;
+		if (!guaranteed && (data.m_backupPercentage <= 0.0f ||
+			(data.m_backupPercentage < 1.0f && GameLogicRandomValueReal(0.0f, 1.0f) > data.m_backupPercentage)))
+			continue;
+
+		const Real distance = PATHFIND_CELL_SIZE_F * (minDistance == maxDistance ? minDistance :
+			GameLogicRandomValueReal(minDistance, maxDistance));
+		const UnsignedInt delay = minDelay == maxDelay ? minDelay : GameLogicRandomValue(minDelay, maxDelay);
+		const Coord3D& position = *member->getPosition();
+		const Coord3D& threat = *source->getPosition();
+		const Real dx = position.x - threat.x;
+		const Real dy = position.y - threat.y;
+		const Real length = WWMath::SqrtfOrigin(dx * dx + dy * dy);
+		if (length <= 0.0f || distance <= 0.0f)
+			continue;
+		const Real scale = distance / length;
+		Coord3D goal{position.x + dx * scale, position.y + dy * scale, position.z};
+		goal.z = TheTerrainLogic->getLayerHeight(goal.x, goal.y, member->getLayer());
+		const UnsignedInt start = frame + delay;
+		const Real speed = std::max(0.1f, ai->getCurLocomotorSpeed());
+		const UnsignedInt travel = static_cast<UnsignedInt>(distance / speed) + LOGICFRAMES_PER_SECOND;
+		m_backingMoves.emplace(member->getID(), BackingMove{goal, start, start + travel});
+	}
+	return TRUE;
+}
+
+Bool HordeContain::updateBacking()
+{
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	for (auto it = m_backingMoves.begin(); it != m_backingMoves.end(); )
+	{
+		Object* member = TheGameLogic->findObjectByID(it->first);
+		const BackingMove& move = it->second;
+		FormationGoal goal;
+		AIUpdateInterface* ai = member && member->getContainedBy() == getObject() && !member->isEffectivelyDead()
+			? member->getAI() : nullptr;
+		if (!ai || frame >= move.deadline || (frame >= move.start &&
+			(!getFormationGoal(member, goal) || goal.error < 2.0f || !canSteerToFormationGoal(member, goal))))
+		{
+			if (member)
+				member->clearModelConditionState(MODELCONDITION_BACKING_UP);
+			it = m_backingMoves.erase(it);
+			continue;
+		}
+		if (!ai->isIdle())
+			ai->aiIdle(CMD_FROM_SCRIPT);
+		if (frame >= move.start)
+			member->setModelConditionState(MODELCONDITION_BACKING_UP);
+		ai->wakeForFormation();
+		++it;
+	}
+	return !m_backingMoves.empty();
 }
 
 void HordeContain::applyWeaponDamage(Object* victim, DamageInfo& damage, Bool contactHit)
@@ -1101,8 +1303,23 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	if (horde->isEffectivelyDead() || (getMemberSlot(member->getID()) < 0 && !isBannerCarrier(member)))
 		return FALSE;
 
-	goal.slot = getMemberPosition(member->getID(), FALSE);
 	const Coord3D& position = *member->getPosition();
+	if (const auto move = m_backingMoves.find(member->getID()); move != m_backingMoves.end())
+	{
+		goal.backing = TheGameLogic->getFrame() >= move->second.start;
+		goal.position = goal.slot = goal.backing ? move->second.goal : position;
+		const Real dx = goal.position.x - position.x;
+		const Real dy = goal.position.y - position.y;
+		goal.error = WWMath::SqrtfOrigin(dx * dx + dy * dy);
+		goal.distance = goal.error;
+		goal.facing = member->getOrientation();
+		goal.speed = FAST_AS_POSSIBLE;
+		goal.hordeMoving = FALSE;
+		return TRUE;
+	}
+
+	goal.backing = FALSE;
+	goal.slot = getMemberPosition(member->getID(), FALSE);
 	const Real dx = goal.slot.x - position.x;
 	const Real dy = goal.slot.y - position.y;
 	goal.error = sqrtf(dx * dx + dy * dy);
@@ -1756,7 +1973,10 @@ UpdateSleepTime HordeContain::update()
 		TheGameLogic->destroyObject(horde);
 	}
 	else if (RetailFileLayers::enabled())
+	{
+		updateFlankState();
 		updateReplenishment();
+	}
 	return sleep;
 }
 

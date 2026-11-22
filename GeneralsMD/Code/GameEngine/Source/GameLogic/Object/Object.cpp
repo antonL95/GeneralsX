@@ -4436,10 +4436,11 @@ void Object::crc( Xfer *xfer )
 		}
 		xfer->xferObjectID(&m_soleHealingBenefactorID);
 		xfer->xferUnsignedInt(&m_soleHealingBenefactorExpirationFrame);
-		if (const auto* horde = HordeContain::get(this))
+		if (auto* horde = const_cast<HordeContain*>(HordeContain::get(this)))
 		{
 			UnsignedInt memberDamageFrame = horde->getLastMemberDamageFrame();
 			xfer->xferUnsignedInt(&memberDamageFrame);
+			horde->xferRetailFormationCombat(xfer);
 		}
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{

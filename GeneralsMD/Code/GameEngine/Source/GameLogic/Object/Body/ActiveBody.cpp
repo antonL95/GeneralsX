@@ -395,7 +395,10 @@ Real ActiveBody::estimateDamage( DamageInfoInput& damageInfo ) const
 		getObject()->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE))
 		return 0.0f;
 
-	Real amount = m_curArmor.adjustDamage(damageInfo.m_damageType, damageInfo.m_amount);
+	const Bool flanked = RetailFileLayers::enabled() && damageInfo.m_damageType != DAMAGE_HEALING &&
+		damageInfo.m_damageType != DAMAGE_UNRESISTABLE &&
+		HordeContain::isFlanked(getObject(), TheGameLogic->findObjectByID(damageInfo.m_sourceID), FALSE);
+	Real amount = m_curArmor.adjustDamage(damageInfo.m_damageType, damageInfo.m_amount, flanked);
 	if (getObject()->getAttributeModifierHelper() && damageInfo.m_damageType != DAMAGE_HEALING && damageInfo.m_damageType != DAMAGE_UNRESISTABLE)
 		amount *= AttributeModifiers::damageTakenFactor(getObject(), damageInfo.m_damageType);
 
@@ -463,7 +466,9 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 
 	Bool alreadyHandled = FALSE;
 	Bool allowModifier = TRUE;
-	Real amount = m_curArmor.adjustDamage(damageInfo->in.m_damageType, damageInfo->in.m_amount);
+	const Bool flanked = RetailFileLayers::enabled() && damageInfo->in.m_damageType != DAMAGE_HEALING &&
+		damageInfo->in.m_damageType != DAMAGE_UNRESISTABLE && HordeContain::isFlanked(obj, damager);
+	Real amount = m_curArmor.adjustDamage(damageInfo->in.m_damageType, damageInfo->in.m_amount, flanked);
 	if (obj->getAttributeModifierHelper() && damageInfo->in.m_damageType != DAMAGE_HEALING && damageInfo->in.m_damageType != DAMAGE_UNRESISTABLE)
 		amount *= AttributeModifiers::damageTakenFactor(obj, damageInfo->in.m_damageType);
 

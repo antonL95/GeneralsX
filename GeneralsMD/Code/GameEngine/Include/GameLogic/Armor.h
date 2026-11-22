@@ -55,7 +55,7 @@ public:
 		This is the real "meat" of the class: given a damage type and amount, adjust the damage
 		and return the amount that should be dealt.
 	*/
-	Real adjustDamage(DamageType t, Real damage) const;
+	Real adjustDamage(DamageType t, Real damage, Bool flanked = FALSE) const;
 
 	static void parseArmorCoefficients( INI* ini, void *instance, void* /* store */, const void* userData );
 
@@ -77,9 +77,9 @@ public:
 	{
 	}
 
-	inline Real adjustDamage(DamageType t, Real damage) const
+	inline Real adjustDamage(DamageType t, Real damage, Bool flanked = FALSE) const
 	{
-		return m_template ? m_template->adjustDamage(t, damage) : damage;
+		return m_template ? m_template->adjustDamage(t, damage, flanked) : damage;
 	}
 
 	inline void clear()

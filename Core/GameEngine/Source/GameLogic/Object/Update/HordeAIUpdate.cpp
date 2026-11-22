@@ -411,6 +411,11 @@ UpdateSleepTime HordeAIUpdate::update()
 	const HordeContain* contain = HordeContain::get(horde);
 	if (!contain || horde->isEffectivelyDead())
 		return UPDATE_SLEEP_NONE;
+	if (RetailFileLayers::enabled() && const_cast<HordeContain*>(contain)->updateBacking())
+	{
+		m_engaging = FALSE;
+		return UPDATE_SLEEP_NONE;
+	}
 	if (fabs(stdAngleDiff(horde->getOrientation(), facingBefore)) > FORMATION_REFORM_ANGLE)
 		const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
 

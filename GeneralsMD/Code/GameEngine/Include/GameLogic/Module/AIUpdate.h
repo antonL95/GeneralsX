@@ -500,7 +500,8 @@ public:
 
 	Bool isMoving() const;
 	void holdForWeaponUntil(UnsignedInt frame);
-	Bool fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition, Real durationScale = 1.0f);
+	Bool fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition, Real durationScale = 1.0f,
+		Bool backAway = TRUE);
 	UnsignedInt getRetailFearDeadline() const { return m_fearUntil; }
 	Bool enterRetailBurningDeath();
 	UnsignedInt getRetailBurningDeathDeadline() const { return m_burningDeathUntil; }

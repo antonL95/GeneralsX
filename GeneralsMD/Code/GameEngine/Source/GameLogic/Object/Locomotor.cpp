@@ -2775,7 +2775,8 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 	steerVelocity(obj, physics, dirToApplyForce, onPathDistToGoal, desiredSpeed);
 }
 
-void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed)
+void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& goalPos, Real onPathDistToGoal,
+	Real desiredSpeed, Bool backing)
 {
 	const Real SLIDE_IN_PLACE_DISTANCE = 0.1f;
 	PhysicsBehavior* physics = obj->getPhysics();
@@ -2798,12 +2799,16 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 	{
 		dir.x /= distToGoal;
 		dir.y /= distToGoal;
-		physics->setTurning(rotateTowardsPosition(obj, goalPos));
+		if (backing)
+			locoUpdate_moveTowardsAngle(obj, WWMath::Atan2Origin(-dir.y, -dir.x));
+		else
+			physics->setTurning(rotateTowardsPosition(obj, goalPos));
 		const Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
 		if (turnRate > 0.0f && distToGoal < 2.0f * maxSpeed / turnRate)
 		{
 			const Coord3D* facing = obj->getUnitDirectionVector2D();
-			const Real alignment = facing->x * dir.x + facing->y * dir.y;
+			const Real forward = facing->x * dir.x + facing->y * dir.y;
+			const Real alignment = backing ? -forward : forward;
 			desiredSpeed *= alignment > 0.0f ? alignment : 0.0f;
 		}
 	}

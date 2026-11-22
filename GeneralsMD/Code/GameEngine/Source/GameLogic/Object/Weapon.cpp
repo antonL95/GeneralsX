@@ -899,22 +899,6 @@ Bool WeaponTemplate::shouldProjectileCollideWith(
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool isRetailFlankShot(const Object* source, const Object* victim)
-{
-	const Object* sourceHorde = source->getContainedBy();
-	const Object* victimHorde = victim->getContainedBy();
-	if (!HordeContain::get(sourceHorde) || !HordeContain::get(victimHorde))
-		return FALSE;
-
-	const Coord3D& facing = *victimHorde->getUnitDirectionVector2D();
-	const Coord3D& targetPosition = *victimHorde->getPosition();
-	const Coord3D& sourcePosition = *sourceHorde->getPosition();
-	const Real dx = sourcePosition.x - targetPosition.x;
-	const Real dy = sourcePosition.y - targetPosition.y;
-	const Real dot = facing.x * dx + facing.y * dy;
-	return dot <= 0.0f || 2.0f * dot * dot < dx * dx + dy * dy;
-}
-
 static Object* selectWeaponPassenger(Object* victim, Real chance)
 {
 	const auto* contain = victim->getContain();
@@ -1094,7 +1078,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	if (!isProjectileDetonation && m_holdAfterFiringDelay)
 		sourceObj->holdForWeaponUntil(TheGameLogic->getFrame() + m_holdAfterFiringDelay);
 
-	const Bool flank = !isProjectileDetonation && m_fireFlankFX && victimObj && isRetailFlankShot(sourceObj, victimObj);
+	const Bool flank = !isProjectileDetonation && m_fireFlankFX && HordeContain::isFlanked(victimObj, sourceObj);
 	// call this even if FXList is null, because this also handles stuff like Gun Barrel Recoil
 	if (sourceObj && sourceObj->getDrawable())
 	{

@@ -3651,6 +3651,8 @@ void Object::crc( Xfer *xfer )
 		weaponConditions.xfer(xfer);
 		if (m_firingTracker)
 			m_firingTracker->crcRetailState(xfer);
+		if (auto* horde = const_cast<HordeContain*>(HordeContain::get(this)))
+			horde->xferRetailFormationCombat(xfer);
 		static const NameKeyType dualWeaponKey = NAMEKEY("DualWeaponBehavior");
 		static const NameKeyType deathWeaponKey = NAMEKEY("FireWeaponWhenDeadBehavior");
 		static const NameKeyType clickReactionKey = NAMEKEY("ClickReactionBehavior");
