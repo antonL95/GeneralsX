@@ -45,5 +45,24 @@ void runRetailPackage17TestCommand(std::string_view action, Object* source, Obje
 			TheGameLogic->getFrame(), static_cast<unsigned>(source->getID()), source->getTemplate()->getName().str(),
 			living, backing, attacking, source->getPosition()->x, source->getPosition()->y, source->getOrientation());
 	}
+	else if (action == "pkg17-members")
+	{
+		for (Object* member : *horde->getContainedItemsList())
+		{
+			if (member->isEffectivelyDead())
+				continue;
+			auto* ai = member->getAI();
+			const Object* victim = ai ? ai->getGoalObject() : nullptr;
+			HordeContain::FormationGoal goal{};
+			horde->getFormationGoal(member, goal);
+			const Coord3D& position = *member->getPosition();
+			std::fprintf(stderr,
+				"TEST pkg17 member frame=%u horde=%u id=%u backing=%d attacking=%d target=%u facingX=%.3f retreatX=%.3f x=%.3f fearX=%.1f\n",
+				TheGameLogic->getFrame(), static_cast<unsigned>(source->getID()), static_cast<unsigned>(member->getID()),
+				member->getLogicModelConditions().test(MODELCONDITION_BACKING_UP), ai && ai->isAttacking(),
+				victim ? static_cast<unsigned>(victim->getID()) : 0, member->getUnitDirectionVector2D()->x,
+				goal.backing ? goal.position.x - position.x : 0.0f, position.x, target ? target->getPosition()->x : -1.0f);
+		}
+	}
 }
 #endif

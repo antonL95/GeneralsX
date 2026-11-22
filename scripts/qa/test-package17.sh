@@ -24,25 +24,79 @@ done
 
 grep -E '^TEST pkg07 horde frame=190 name=AmrothianGuardsmenHorde members=15 .* facing=0\.000 stance=1 ' "$log"
 grep -E '^TEST pkg07 horde frame=190 name=AmrothianGuardsmenHorde members=15 .* facing=0\.000 stance=3 ' "$log"
+grep -E '^TEST frame 291: kill object [0-9]+ \(MordorWorker\)$' "$log"
 for phase in continue resume; do
-    grep '^TEST pkg17 formation ' "$session/$phase.log" > "$session/formation-$phase.txt"
+    grep -E '^TEST pkg17 (formation|member) ' "$session/$phase.log" |
+        awk '{ split($4, frame, "="); if (frame[2] >= 244) print }' > "$session/formation-$phase.txt"
 done
 diff -u "$session/formation-continue.txt" "$session/formation-resume.txt"
-cat "$session/formation-continue.txt"
+grep '^TEST pkg17 formation ' "$session/formation-continue.txt"
 awk '
-    /^TEST pkg17 formation / {
-        split($4, frame, "=")
-        split($5, id, "=")
-        split($8, backing, "=")
-        split($9, attacking, "=")
-        if (frame[2] == 244) {
-            anchor[id[2]] = $10
-            savedBacking += backing[2]
-        }
-        if (frame[2] == 275 && backing[2] > 0 && anchor[id[2]] == $10)
-            ++backingHordes
-        if (frame[2] == 349 && backing[2] == 0 && attacking[2] > 0 && anchor[id[2]] == $10)
-            ++reengaged
+    function value(field) {
+        sub(/^[^=]*=/, "", field)
+        return field
     }
-    END { exit !(savedBacking > 0 && backingHordes == 3 && reengaged > 0) }
-' "$session/formation-continue.txt"
+    /^TEST horde spawn 174 AmrothianGuardsmenHorde / {
+        if (++guards == 2)
+            holdGround = $6
+    }
+    /^TEST horde spawn 174 DolAmrothSquiresHorde / { squires = $6 }
+    /^TEST pkg17 formation / {
+        frame = value($4) + 0
+        if (frame == 244)
+            savedBacking += value($8)
+        if (value($5) != holdGround)
+            next
+        if (frame == 244)
+            heldPosition = $10 " " $11
+        if (frame >= 275 && heldPosition == ($10 " " $11) && value($8) + 0 == 0 && value($9) + 0 > 0)
+            reengaged = 1
+    }
+    /^TEST pkg17 member / {
+        frame = value($4) + 0
+        id = value($6)
+        backing = value($7) + 0
+        attacking = value($8) + 0
+        target = value($9) + 0
+        if (value($5) == holdGround) {
+            if (frame == 230 && attacking && target)
+                initialTarget[id] = target
+            if (backing) {
+                if (!firstBacking[id])
+                    firstBacking[id] = frame
+                backingAt[frame] = 1
+            } else if (attacking && target) {
+                if (frame > 230 && initialTarget[id] == target && !firstBacking[id])
+                    keptTarget[frame, id] = 1
+                if (firstBacking[id] && !recoveredAt[id])
+                    recoveredAt[id] = frame
+            }
+        }
+        if (value($5) == squires) {
+            x = value($12) + 0
+            fearX = value($13) + 0
+            if (frame == 235 && !backing && fearX > x)
+                beforeCrossing[id] = x
+            if (backing && value($11) + 0 < -0.1 && (id in beforeCrossing)) {
+                if (fearX >= 0 && fearX < x && value($10) + 0 < -0.5 && x < beforeCrossing[id] - 1)
+                    facedMovingSource = 1
+                if (fearX < 0 && value($10) + 0 > 0.5)
+                    facedFallback = 1
+            }
+        }
+    }
+    END {
+        for (sample in keptTarget) {
+            split(sample, member, SUBSEP)
+            if ((member[1] in backingAt) && !firstBacking[member[2]])
+                fightingDuringBacking = 1
+        }
+        for (id in recoveredAt)
+            for (later in firstBacking)
+                if (firstBacking[later] > recoveredAt[id])
+                    recoveredBeforeLaterBackup = 1
+        printf "Backing at save %d, kept target %d, recovered before later backstep %d, reengaged %d, tracked scarer %d, fallback %d\n",
+            savedBacking, fightingDuringBacking, recoveredBeforeLaterBackup, reengaged, facedMovingSource, facedFallback
+        exit !(savedBacking && fightingDuringBacking && recoveredBeforeLaterBackup && reengaged && facedMovingSource && facedFallback)
+    }
+' "$log"

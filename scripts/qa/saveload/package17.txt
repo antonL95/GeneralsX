@@ -20,31 +20,59 @@
 223 pkg07-state Player_1 AmrothianGuardsmenHorde 1
 223 pkg07-state Player_1 DolAmrothSquiresHorde 0
 225 pkg17-fire PlyrCreeps AmrothianGuardsmenHorde 0 Player_1:DolAmrothPikemenHorde:0
+226 create PlyrCreeps MordorWorker 0 3150,720,0
 229 pkg10-position Player_1 DolAmrothPikemenHorde 0 2500,1430,-90
 230 pkg07-state Player_1 AmrothianGuardsmenHorde 0
 230 pkg07-state Player_1 AmrothianGuardsmenHorde 1
 230 pkg07-state Player_1 DolAmrothSquiresHorde 0
 230 pkg12-ai-cower Player_1 AmrothianGuardsmenHorde 0 PlyrCreeps:MordorBlackOrcHorde:0
 230 pkg12-ai-cower Player_1 AmrothianGuardsmenHorde 1 PlyrCreeps:MordorBlackOrcHorde:1
-230 pkg12-ai-cower Player_1 DolAmrothSquiresHorde 0 PlyrCreeps:MordorBlackOrcHorde:2
+230 pkg12-ai-cower Player_1 DolAmrothSquiresHorde 0 PlyrCreeps:MordorWorker:0
+230 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+230 pkg17-members Player_1 DolAmrothSquiresHorde 0 PlyrCreeps:MordorWorker:0
 234 pkg17-fire PlyrCreeps AmrothianGuardsmenHorde 0 Player_1:DolAmrothPikemenHorde:0
+235 pkg17-members Player_1 DolAmrothSquiresHorde 0 PlyrCreeps:MordorWorker:0
+236 pkg10-position PlyrCreeps MordorWorker 0 2750,720,0
 240 pkg10-position Player_1 DolAmrothPikemenHorde 0 2500,1430,90
 244 pkg17-state Player_1 AmrothianGuardsmenHorde 0
 244 pkg17-state Player_1 AmrothianGuardsmenHorde 1
 244 pkg17-state Player_1 DolAmrothSquiresHorde 0
+244 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+244 pkg17-members Player_1 DolAmrothSquiresHorde 0 PlyrCreeps:MordorWorker:0
 245 pkg17-fire PlyrCreeps DolAmrothSquiresHorde 0 Player_1:DolAmrothPikemenHorde:0
+250 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+255 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+260 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+260 pkg17-members Player_1 DolAmrothSquiresHorde 0 PlyrCreeps:MordorWorker:0
+265 pkg17-members Player_1 AmrothianGuardsmenHorde 1
 269 pkg07-state Player_1 AmrothianGuardsmenHorde 0
 269 pkg07-state Player_1 AmrothianGuardsmenHorde 1
 269 pkg07-state Player_1 DolAmrothSquiresHorde 0
+270 pkg17-members Player_1 AmrothianGuardsmenHorde 1
 275 pkg17-state Player_1 AmrothianGuardsmenHorde 0
 275 pkg17-state Player_1 AmrothianGuardsmenHorde 1
 275 pkg17-state Player_1 DolAmrothSquiresHorde 0
 275 pkg07-state Player_1 AmrothianGuardsmenHorde 0
 275 pkg07-state Player_1 AmrothianGuardsmenHorde 1
 275 pkg07-state Player_1 DolAmrothSquiresHorde 0
+275 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+275 pkg17-members Player_1 DolAmrothSquiresHorde 0 PlyrCreeps:MordorWorker:0
+280 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+285 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+290 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+291 kill PlyrCreeps MordorWorker 0
+295 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+300 pkg17-members Player_1 AmrothianGuardsmenHorde 1
 302 pkg17-state Player_1 AmrothianGuardsmenHorde 0
 302 pkg17-state Player_1 AmrothianGuardsmenHorde 1
 302 pkg17-state Player_1 DolAmrothSquiresHorde 0
+302 pkg17-members Player_1 DolAmrothSquiresHorde 0
+305 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+310 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+310 pkg17-members Player_1 DolAmrothSquiresHorde 0
+315 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+320 pkg17-members Player_1 AmrothianGuardsmenHorde 1
+320 pkg17-members Player_1 DolAmrothSquiresHorde 0
 330 pkg07-state Player_1 AmrothianGuardsmenHorde 0
 330 pkg07-state Player_1 AmrothianGuardsmenHorde 1
 330 pkg07-state Player_1 DolAmrothSquiresHorde 0
