@@ -7,8 +7,11 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 
 
@@ -59,6 +62,44 @@ void runRetailPackage25TestCommand(std::string_view action, Object* object, Obje
 		object->getContainedBy()->getContain()->removeFromContain(object);
 	else if (action == "pkg25-attack" && target)
 		ai->aiAttackObject(target, NO_MAX_SHOTS_LIMIT, CMD_FROM_PLAYER);
+	else if ((action == "pkg25-fear" || action == "pkg25-back") && target)
+		ai->fleeFromFear(target, LOGICFRAMES_PER_SECOND, MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID, 1.0f, action == "pkg25-back");
+	else if (action == "pkg25-charge-follow")
+	{
+		const auto* horde = HordeContain::get(object->getContainedBy());
+		HordeContain::FormationGoal goal;
+		if (!horde || !horde->getFormationGoal(object, goal))
+			return;
+		ai->aiIdle(CMD_FROM_SCRIPT);
+		Coord3D point = goal.slot;
+		point.x -= 85.0f;
+		point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+		object->setPosition(&point);
+		object->setOrientation(0.0f);
+		if (auto* physics = object->getPhysics())
+			physics->resetDynamicPhysics();
+
+		object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_IS_ATTACKING));
+		ai->wakeForFormation();
+	}
+	else if (action == "pkg25-slow")
+		AttributeModifiers::apply(object, AsciiString("SarumanCrushEffect"), 180);
+	else if (action == "pkg25-member")
+	{
+		const auto* horde = HordeContain::get(object->getContainedBy());
+		const auto* physics = object->getPhysics();
+		const auto* locomotor = ai->getCurLocomotor();
+		HordeContain::FormationGoal goal;
+		if (!horde || !physics || !locomotor || !horde->getFormationGoal(object, goal))
+			return;
+		const auto damage = object->getBodyModule()->getDamageState();
+		const auto& flags = object->getLogicModelConditions();
+		std::fprintf(stderr, "TEST pkg25 member frame=%u object=%s loco=%s velocity=%.4f base=%.4f adjusted=%.4f requested=%.4f backing=%d walk=%d accel=%d decel=%d idle=%d clear=%d error=%.2f\n",
+			frame, object->getTemplate()->getName().str(), locomotor->getTemplateName().str(),
+			physics->getVelocityMagnitude(), locomotor->getMaxSpeedForCondition(damage), locomotor->getMaxSpeedForCondition(damage, object),
+			goal.speed, goal.backing, flags.test(MODELCONDITION_WALKING), flags.test(MODELCONDITION_ACCELERATE),
+			flags.test(MODELCONDITION_DECELERATE), ai->isIdle(), HordeContain::canSteerToFormationGoal(object, goal), goal.error);
+	}
 
 	const Locomotor* locomotor = ai->getCurLocomotor();
 	if (!locomotor)
