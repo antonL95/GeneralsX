@@ -180,6 +180,7 @@ struct LANMessage
 		MSG_INACTIVE,						///< I've alt-tabbed out.  Unaccept me cause I'm a poo-flinging monkey.
 
 		MSG_REQUEST_GAME_INFO,	///< For direct connect, get the game info from a specific IP Address
+		MSG_RETAIL_GAME_START,
 	} messageType;
 
 	WideCharWindows name[g_lanPlayerNameLength+1]; ///< My name, for convenience
@@ -277,7 +278,16 @@ struct LANMessage
 
 	};
 };
+
+struct RetailLanGameStart
+{
+	LANMessage::Type type;
+	char options[MAX_RETAIL_LAN_SETUP_PACKET_SIZE - sizeof(LANMessage::Type)];
+};
 #pragma pack(pop)
+
+static constexpr Int kRetailLanSetupBudget = sizeof(RetailLanGameStart::options) - 1;
+static_assert(sizeof(RetailLanGameStart) == MAX_RETAIL_LAN_SETUP_PACKET_SIZE);
 
 static_assert(sizeof(LANMessage) <= MAX_LANAPI_PACKET_SIZE, "LANMessage struct cannot be larger than the max packet size");
 
@@ -396,6 +406,7 @@ protected:
 	Bool								m_isActive;			///< is the game currently active?
 
 protected:
+	void handleRetailGameStart(const RetailLanGameStart& packet, UnsignedInt senderIP);
 	void sendMessage(LANMessage *msg, UnsignedInt ip = 0); // Convenience function
 	void removePlayer(LANPlayer *player);
 	void removeGame(LANGameInfo *game);

@@ -67,7 +67,9 @@ static inline void decryptBuf( unsigned char *buf, Int len )
 
 //--------------------------------------------------------------------------
 
-Transport::Transport()
+Transport::Transport(Bool allowRetailLanSetup) :
+	m_sendLimit(allowRetailLanSetup ? MAX_RETAIL_LAN_SETUP_PACKET_SIZE : MAX_PACKET_SIZE),
+	m_receiveLimit(allowRetailLanSetup ? MAX_RETAIL_LAN_SETUP_PACKET_SIZE + sizeof(TransportMessageHeader) : MAX_NETWORK_MESSAGE_LEN)
 {
 	m_winsockInit = false;
 	m_udpsock = nullptr;
@@ -310,10 +312,10 @@ Bool Transport::doRecv()
 	// Therefore, when receiving data we use the max udp payload size to receive the game packet payload and network header
 	TransportMessage incomingMessage;
 	unsigned char *buf = (unsigned char *)&incomingMessage;
-	int len = MAX_NETWORK_MESSAGE_LEN;
+	int len = m_receiveLimit;
 	size_t bufferIndex = 0;
 //	DEBUG_LOG(("Transport::doRecv - checking"));
-	while ( (len=m_udpsock->Read(buf, MAX_NETWORK_MESSAGE_LEN, &from)) > 0 )
+	while ( (len=m_udpsock->Read(buf, m_receiveLimit, &from)) > 0 )
 	{
 #if defined(RTS_DEBUG)
 		// Packet loss simulation
@@ -410,7 +412,7 @@ Bool Transport::doRecv()
 Bool Transport::queueSend(UnsignedInt addr, UnsignedShort port, const UnsignedByte *buf, Int len /*,
 						  NetMessageFlags flags, Int id */)
 {
-	if (len < 1 || len > MAX_PACKET_SIZE)
+	if (len < 1 || len > m_sendLimit)
 	{
 		DEBUG_LOG(("Transport::queueSend - Invalid Packet size"));
 		return false;
@@ -451,7 +453,7 @@ Bool Transport::isGeneralsPacket( TransportMessage *msg )
 	if (!msg)
 		return false;
 
-	if (msg->length < 0 || msg->length > MAX_NETWORK_MESSAGE_LEN)
+	if (msg->length < 0 || msg->length > m_receiveLimit - static_cast<Int>(sizeof(TransportMessageHeader)))
 		return false;
 
 	CRC crc;

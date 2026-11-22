@@ -34,6 +34,7 @@
 #include "Common/GameState.h"
 #include "Common/Registry.h"
 #include "Common/GlobalData.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/QuotedPrintable.h"
 #include "Common/UserPreferences.h"
 #include "GameNetwork/LANAPI.h"
@@ -254,7 +255,7 @@ void LANAPI::handleRequestGameInfo( LANMessage *msg, UnsignedInt senderIP )
 	{
 		if (AmIHost() || (m_currentGame->isGameInProgress() && TheNetwork && TheNetwork->isPacketRouter())) // if we're in game we should reply if we're the packet router
 		{
-			AsciiString gameOpts = GameInfoToAsciiString(m_currentGame);
+			AsciiString gameOpts = GameInfoToAsciiString(m_currentGame, m_lanMaxOptionsLength, FALSE);
 			if (gameOpts.isEmpty())
 			{
 				return;
@@ -554,7 +555,7 @@ void LANAPI::handleJoinAccept( LANMessage *msg, UnsignedInt senderIP )
 			else
 			{
 				m_inLobby = false;
-				AsciiString options = GameInfoToAsciiString(m_currentGame);
+				AsciiString options = GameInfoToAsciiString(m_currentGame, m_lanMaxOptionsLength, FALSE);
 				m_currentGame->enterGame();
 				ParseAsciiStringToGameInfo(m_currentGame, options);
 
@@ -783,9 +784,18 @@ void LANAPI::handleChat( LANMessage *msg, UnsignedInt senderIP )
 	}
 }
 
-void LANAPI::handleGameStart( LANMessage *msg, UnsignedInt senderIP )
+void LANAPI::handleRetailGameStart(const RetailLanGameStart& packet, UnsignedInt senderIP)
 {
-	if (!m_inLobby && m_currentGame && m_currentGame->getIP(0) == senderIP && !m_currentGame->isGameInProgress())
+	if (packet.type == LANMessage::MSG_RETAIL_GAME_START && !m_inLobby && m_currentGame &&
+		m_currentGame->getIP(0) == senderIP && !m_currentGame->isGameInProgress() &&
+		memchr(packet.options, 0, sizeof(packet.options)) &&
+		ParseGameOptionsString(m_currentGame, AsciiString(packet.options)))
+		OnGameStart();
+}
+
+void LANAPI::handleGameStart(LANMessage*, UnsignedInt senderIP)
+{
+	if (!RetailFileLayers::enabled() && !m_inLobby && m_currentGame && m_currentGame->getIP(0) == senderIP && !m_currentGame->isGameInProgress())
 	{
 		OnGameStart();
 	}

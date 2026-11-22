@@ -27,6 +27,8 @@
 #include "Common/crc.h"
 #include "Common/GameState.h"
 #include "Common/Registry.h"
+#include "Common/RetailFileLayers.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameNetwork/LANAPI.h"
 #include "GameNetwork/networkutil.h"
 #include "Common/GlobalData.h"
@@ -86,7 +88,7 @@ LANAPI::LANAPI() : m_transport(nullptr)
 	m_directConnectRemoteIP = 0;
 	m_actionTimeout = 5000; // ms
 	m_lastUpdate = 0;
-	m_transport = new Transport;
+	m_transport = new Transport(RetailFileLayers::enabled());
 	m_isActive = TRUE;
 }
 
@@ -436,7 +438,23 @@ void LANAPI::update()
 				continue;
 			}
 
-			LANMessage *msg = (LANMessage *)(m_transport->m_inBuffer[i].data);
+			auto& received = m_transport->m_inBuffer[i];
+			if (received.length != sizeof(LANMessage))
+			{
+				if (RetailFileLayers::enabled() && received.length == sizeof(RetailLanGameStart))
+				{
+					RetailLanGameStart packet;
+					memcpy(&packet, received.data, sizeof(packet));
+					handleRetailGameStart(packet, senderIP);
+				}
+				received.length = 0;
+				continue;
+			}
+			LANMessage *msg = reinterpret_cast<LANMessage*>(received.data);
+			if (msg->messageType == LANMessage::MSG_GAME_ANNOUNCE)
+				msg->GameInfo.options[m_lanMaxOptionsLength] = 0;
+			else if (msg->messageType == LANMessage::MSG_GAME_OPTIONS)
+				msg->GameOptions.options[m_lanMaxOptionsLength] = 0;
 			/* 			fprintf(stderr, "[LAN86] recv type=%s (%u) len=%d from %d.%d.%d.%d local=%d.%d.%d.%d\n",
 				GetMessageTypeString(msg->messageType).str(), msg->messageType, m_transport->m_inBuffer[i].length,
 				PRINTF_IP_AS_4_INTS(senderIP), PRINTF_IP_AS_4_INTS(m_localIP));
@@ -829,7 +847,7 @@ void LANAPI::RequestGameAnnounce()
 	{
 		if (AmIHost() || (m_currentGame->isGameInProgress() && TheNetwork && TheNetwork->isPacketRouter())) // if we're in game we should reply if we're the packet router
 		{
-			AsciiString gameOpts = GameInfoToAsciiString(m_currentGame);
+			AsciiString gameOpts = GameInfoToAsciiString(m_currentGame, m_lanMaxOptionsLength, FALSE);
 			if (gameOpts.isEmpty())
 			{
 				return;
@@ -927,10 +945,34 @@ void LANAPI::RequestGameStart()
 	if (m_inLobby || !AmIHost())
 		return;
 
-	LANMessage msg;
-	msg.messageType = LANMessage::MSG_GAME_START;
-	fillInLANMessage( &msg );
-	sendMessage(&msg);
+	if (RetailFileLayers::enabled())
+	{
+		for (Int i = 0; i < MAX_SLOTS; ++i)
+		{
+			GameSlot* slot = m_currentGame->getSlot(i);
+			if (slot && !slot->getCreateAHeroConfig().isEmpty())
+				slot->setCreateAHeroConfig(CreateAHeroSystem::validateSetupSelection(slot->getCreateAHeroConfig().str(), *slot));
+		}
+		const AsciiString options = GameInfoToAsciiString(m_currentGame, kRetailLanSetupBudget);
+		if (options.isEmpty())
+			return;
+		RetailLanGameStart packet{};
+		packet.type = LANMessage::MSG_RETAIL_GAME_START;
+		memcpy(packet.options, options.str(), options.getLength());
+		for (Int i = 0; i < MAX_SLOTS; ++i)
+		{
+			const GameSlot* slot = m_currentGame->getConstSlot(i);
+			if (i != m_currentGame->getLocalSlotNum() && slot && slot->isHuman())
+				m_transport->queueSend(slot->getIP(), lobbyPort, reinterpret_cast<const UnsignedByte*>(&packet), sizeof(packet));
+		}
+	}
+	else
+	{
+		LANMessage msg;
+		msg.messageType = LANMessage::MSG_GAME_START;
+		fillInLANMessage(&msg);
+		sendMessage(&msg);
+	}
 	m_transport->update(); // force a send
 
 	OnGameStart();

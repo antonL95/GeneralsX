@@ -12,7 +12,10 @@ class Object;
 class Player;
 class Xfer;
 class CommandButton;
+class CommandCatalog;
+class CommandSet;
 class GameInfo;
+class GameSlot;
 
 struct CreateAHeroBlingDef
 {
@@ -128,6 +131,7 @@ namespace CreateAHeroSystem
 	AsciiString encodeSelectionCompact(const CreateAHeroRules::SelectionData& sel);
 	Bool decodeSelectionCompact(const AsciiString& encoded, CreateAHeroRules::SelectionData& out);
 
+	AsciiString validateSetupSelection(std::string_view encoded, const GameSlot& slot);
 	void setPlayerSelection(Int playerIndex, const CreateAHeroRules::SelectionData& sel);
 	Bool setPlayerSelectionEncoded(Int playerIndex, const AsciiString& encoded, const AsciiString& factionName);
 	const CreateAHeroRules::SelectionData* getPlayerSelection(Int playerIndex);

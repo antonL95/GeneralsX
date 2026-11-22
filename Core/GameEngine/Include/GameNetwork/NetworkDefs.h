@@ -67,6 +67,7 @@ static constexpr const Int RETAIL_GAME_PACKET_SIZE = 476;
 
 // TheSuperHackers @info The legacy lanapi cannot use a larger packet size without breaking the gameinfo command
 static constexpr const Int MAX_LANAPI_PACKET_SIZE = RETAIL_GAME_PACKET_SIZE;
+static constexpr Int MAX_RETAIL_LAN_SETUP_PACKET_SIZE = 1305;
 
 // TheSuperHackers @bugfix Mauller 08/02/2026 Allow larger ethernet UDP payload to be used for game messages, this fixes connection issues and eliminates disconnection bugs
 #if RETAIL_COMPATIBLE_NETWORKING
@@ -104,14 +105,7 @@ struct CommandPacket
 struct TransportMessage
 {
 	TransportMessageHeader header;
-#if RETAIL_COMPATIBLE_NETWORKING
-	// TheSuperHackers @info This value is not the correct one that should be used here, it should have been max packet size
-	// The non retail max network message len takes the extra bytes of the network message header into account when handling UDP payload data
-	// In retail this only works since no data larger than the retail game packet size is put into a network message
-	UnsignedByte data[MAX_NETWORK_MESSAGE_LEN];
-#else
-	UnsignedByte data[MAX_PACKET_SIZE];
-#endif
+	UnsignedByte data[MAX_RETAIL_LAN_SETUP_PACKET_SIZE];
 	Int length;
 	UnsignedInt addr;
 	UnsignedShort port;

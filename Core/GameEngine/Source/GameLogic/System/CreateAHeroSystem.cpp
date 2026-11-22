@@ -724,18 +724,37 @@ void setPlayerSelection(Int playerIndex, const CreateAHeroRules::SelectionData& 
 	s_playerHasSelection[playerIndex] = TRUE;
 }
 
+static Bool decodeValidatedSelection(std::string_view encoded, const AsciiString& faction, CreateAHeroRules::SelectionData& normalized)
+{
+	if (encoded.empty() || encoded.size() > CreateAHeroRules::MAX_ENCODED_LENGTH ||
+		encoded.find('\0') != std::string_view::npos)
+		return FALSE;
+	CreateAHeroRules::SelectionData decoded;
+	const Bool parsed = encoded.front() == '~'
+		? encoded.size() <= CreateAHeroRules::MAX_COMPACT_LENGTH && decodeSelectionCompact(AsciiString(std::string(encoded).c_str()), decoded)
+		: CreateAHeroRules::decodeSelection(encoded, decoded);
+	return parsed && validateSelection(decoded, faction, normalized);
+}
+
+AsciiString validateSetupSelection(std::string_view encoded, const GameSlot& slot)
+{
+	const Int side = slot.getPlayerTemplate();
+	if (!RetailFileLayers::enabled() || !slot.isOccupied() || side < PLAYERTEMPLATE_RANDOM ||
+		!ThePlayerTemplateStore || side >= ThePlayerTemplateStore->getPlayerTemplateCount())
+		return AsciiString::TheEmptyString;
+	const PlayerTemplate* faction = side >= 0 ? ThePlayerTemplateStore->getNthPlayerTemplate(side) : nullptr;
+	CreateAHeroRules::SelectionData normalized;
+	if (!decodeValidatedSelection(encoded, faction ? faction->getSide() : AsciiString::TheEmptyString, normalized))
+		return AsciiString::TheEmptyString;
+	return encodeSelectionCompact(normalized);
+}
+
 Bool setPlayerSelectionEncoded(Int playerIndex, const AsciiString& encoded, const AsciiString& factionName)
 {
 	if (playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT)
 		return FALSE;
-	CreateAHeroRules::SelectionData decoded;
-	Bool parsed = FALSE;
-	if (!encoded.isEmpty() && encoded.str()[0] == '~')
-		parsed = decodeSelectionCompact(encoded, decoded);
-	else
-		parsed = CreateAHeroRules::decodeSelection(encoded.str(), decoded) ? TRUE : FALSE;
 	CreateAHeroRules::SelectionData normalized;
-	if (!parsed || !validateSelection(decoded, factionName, normalized))
+	if (!decodeValidatedSelection(encoded.str(), factionName, normalized))
 	{
 		resetPlayer(playerIndex);
 		return FALSE;

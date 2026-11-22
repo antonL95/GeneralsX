@@ -42,7 +42,7 @@ class Transport //: public MemoryPoolObject
 	//MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(Transport, "Transport")
 public:
 
-	Transport();
+	explicit Transport(Bool allowRetailLanSetup = FALSE);
 	virtual ~Transport();
 
 	virtual Bool init( AsciiString ip, UnsignedShort port );
@@ -96,5 +96,7 @@ protected:
 	Int m_statisticsSlot;
 	UnsignedInt m_lastSecond;
 
+	const Int m_sendLimit;
+	const Int m_receiveLimit;
 	Bool isGeneralsPacket( TransportMessage *msg );
 };

@@ -289,8 +289,8 @@ UnsignedShort GameInfo::getSuperweaponRestriction() const { return m_superweapon
 Bool        GameInfo::oldFactionsOnly() const           { return m_oldFactionsOnly; }
 void        GameInfo::setOldFactionsOnly( Bool oldFactionsOnly ) { m_oldFactionsOnly = oldFactionsOnly; }
 
-AsciiString GameInfoToAsciiString( const GameInfo *game );
-Bool ParseAsciiStringToGameInfo( GameInfo *game, AsciiString options );
+AsciiString GameInfoToAsciiString(const GameInfo* game, Int budget = 0, Bool includeHeroes = TRUE);
+Bool ParseAsciiStringToGameInfo(GameInfo* game, const AsciiString& options);
 
 
 /**

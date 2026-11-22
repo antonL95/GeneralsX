@@ -11,7 +11,7 @@ namespace CreateAHeroRules
 {
 
 constexpr size_t MAX_ENCODED_LENGTH = 512;
-constexpr size_t MAX_COMPACT_LENGTH = 96;
+constexpr size_t MAX_COMPACT_LENGTH = 98;
 constexpr size_t MAX_HERO_NAME_LENGTH = 32;
 constexpr size_t MAX_BLING_COUNT = 16;
 constexpr size_t MAX_ATTRIBUTE_COUNT = 8;
@@ -527,7 +527,7 @@ inline std::string encodeCompact(const CompactSelection& compact)
 	std::string out;
 	out.push_back('~');
 	out.append(base64UrlEncode(bytes));
-	const std::string safeName = sanitizeToken(compact.heroName, 16);
+	const std::string safeName = sanitizeToken(compact.heroName, MAX_HERO_NAME_LENGTH);
 	if (!safeName.empty())
 	{
 		out.push_back('.');
@@ -545,7 +545,7 @@ inline bool decodeCompact(std::string_view encoded, CompactSelection& out)
 	const size_t dot = encoded.find('.');
 	const std::string_view payload = dot == std::string_view::npos ? encoded : encoded.substr(0, dot);
 	const std::string_view namePart = dot == std::string_view::npos ? std::string_view{} : encoded.substr(dot + 1);
-	if (namePart.size() > MAX_HERO_NAME_LENGTH)
+	if ((dot != std::string_view::npos && namePart.empty()) || namePart.size() > MAX_HERO_NAME_LENGTH)
 		return false;
 	for (char c : namePart)
 	{
@@ -581,7 +581,7 @@ inline bool decodeCompact(std::string_view encoded, CompactSelection& out)
 		out.secondaryColor[i] = bytes[pos++];
 	for (int i = 0; i < 3; ++i)
 		out.tertiaryColor[i] = bytes[pos++];
-	out.heroName.assign(namePart.data(), namePart.size());
+	out.heroName = namePart;
 	return true;
 }
 

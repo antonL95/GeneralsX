@@ -45,7 +45,7 @@
 #include "GameNetwork/FileTransfer.h"
 #include "GameNetwork/GameInfo.h"
 #include "Common/RetailFileLayers.h"
-#include "GameLogic/CreateAHeroRules.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameNetwork/GameSpy/ThreadUtils.h"
 #include "GameNetwork/GameSpy/StagingRoomGameInfo.h"
 #include "GameNetwork/LANAPI.h"						// for testing packet size
@@ -54,6 +54,8 @@
 #include "WWLib/utf8.h"
 
 
+
+static_assert(kRetailLanSetupBudget >= m_lanMaxOptionsLength + MAX_SLOTS * (5 + CreateAHeroRules::MAX_COMPACT_LENGTH));
 
 GameInfo *TheGameInfo = nullptr;
 
@@ -980,7 +982,7 @@ static Bool truncatePlayerNames(const GameInfo& game, AsciiString playerNames[MA
 	return true;
 }
 
-static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiString playerNames[MAX_SLOTS])
+static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiString playerNames[MAX_SLOTS], Bool includeHeroes)
 {
 	AsciiString mapName = game.getMap();
 	mapName = TheGameState->realMapPathToPortableMapPath(mapName);
@@ -1026,7 +1028,7 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 			options.format("RF=%d;RR=%d;RH=%d;", rules.commandPointFactor, Int(rules.ringHeroes), Int(rules.customHeroes));
 			optionsString.concat(options);
 		}
-		for (Int i = 0; i < MAX_SLOTS; ++i)
+		for (Int i = 0; includeHeroes && i < MAX_SLOTS; ++i)
 		{
 			const GameSlot *slot = game.getConstSlot(i);
 			if (slot && !slot->getCreateAHeroConfig().isEmpty())
@@ -1092,12 +1094,14 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 	return optionsString;
 }
 
-AsciiString GameInfoToAsciiString( const GameInfo *game )
+AsciiString GameInfoToAsciiString(const GameInfo* game, Int budget, Bool includeHeroes)
 {
 	if (!game)
 	{
 		return AsciiString::TheEmptyString;
 	}
+	if (budget == 0 && TheLAN && !RetailFileLayers::enabled())
+		budget = m_lanMaxOptionsLength;
 
 	AsciiString playerNames[MAX_SLOTS];
 	Int playerNamesLength = 0;
@@ -1113,23 +1117,23 @@ AsciiString GameInfoToAsciiString( const GameInfo *game )
 
 	// TheSuperHackers @bugfix bobtista 23/08/2026 Prevent an infinite loop when player names exceed
 	// the LAN options limit by rebuilding the payload with bounded UTF-8 names.
-	AsciiString optionsString = buildGameInfoAsciiString(*game, playerNames);
-	Bool optionsFit = TheLAN == nullptr || optionsString.getLength() <= m_lanMaxOptionsLength;
+	AsciiString optionsString = buildGameInfoAsciiString(*game, playerNames, includeHeroes);
+	Bool optionsFit = budget == 0 || optionsString.getLength() <= budget;
 	if (!optionsFit)
 	{
 		const Int fixedLength = optionsString.getLength() - playerNamesLength;
-		const Int maxPlayerNamesLength = m_lanMaxOptionsLength - fixedLength;
+		const Int maxPlayerNamesLength = budget - fixedLength;
 		if (truncatePlayerNames(*game, playerNames, maxPlayerNamesLength))
 		{
-			optionsString = buildGameInfoAsciiString(*game, playerNames);
-			optionsFit = optionsString.getLength() <= m_lanMaxOptionsLength;
+			optionsString = buildGameInfoAsciiString(*game, playerNames, includeHeroes);
+			optionsFit = optionsString.getLength() <= budget;
 		}
 	}
 
 	if (!optionsFit)
 	{
 		DEBUG_CRASH(("WARNING: options string cannot fit within the expected length!  Length is %d, but max is %d!",
-			optionsString.getLength(), m_lanMaxOptionsLength));
+			optionsString.getLength(), budget));
 		return AsciiString::TheEmptyString;
 	}
 
@@ -1195,11 +1199,12 @@ static Int grabHexInt(const char *s)
 	Int b = strtol(tmp, nullptr, 16);
 	return b;
 }
-Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
+Bool ParseAsciiStringToGameInfo(GameInfo* game, const AsciiString& options)
 {
-	// Parse game options
-	char *buf = strdup(options.str());
-	char *bufPtr = buf;
+	if (options.getLength() > (RetailFileLayers::enabled() ? kRetailLanSetupBudget : AsciiString::MAX_FORMAT_BUF_LEN))
+		return FALSE;
+	std::string buffer(options.str(), options.getLength());
+	char *bufPtr = buffer.data();
 	char *strPos, *keyValPair;
 	GameSlot newSlot[MAX_SLOTS];
 	Bool optionsOk = true;
@@ -1213,7 +1218,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 	Int useStats = TRUE;
   Money startingCash = TheGlobalData->m_defaultStartingCash;
 	RetailSkirmishRules retailRules;
-	AsciiString createAHeroConfigs[MAX_SLOTS];
+	std::string_view createAHeroConfigs[MAX_SLOTS];
 	Bool sawHeroSlot[MAX_SLOTS] = {};
 	Bool invalidHeroSlot[MAX_SLOTS] = {};
   UnsignedShort restriction = 0; // Always the default
@@ -1239,7 +1244,18 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		AsciiString key, val;
 		char *pos = nullptr;
 		char *keyPtr, *valPtr;
-		keyPtr = (strtok_r(keyValPair, "=", &pos));
+		keyPtr = strtok_r(keyValPair, "=", &pos);
+		if (RetailFileLayers::enabled() && keyPtr && strlen(keyPtr) == 3 &&
+			keyPtr[0] == 'C' && keyPtr[1] == 'H' && keyPtr[2] >= '0' && keyPtr[2] < '0' + MAX_SLOTS)
+		{
+			const Int slot = keyPtr[2] - '0';
+			if (sawHeroSlot[slot])
+				invalidHeroSlot[slot] = TRUE;
+			else if (pos)
+				createAHeroConfigs[slot] = pos;
+			sawHeroSlot[slot] = TRUE;
+			continue;
+		}
 		valPtr = (strtok_r(nullptr, "\n", &pos));
 		if (keyPtr)
 			key = keyPtr;
@@ -1362,22 +1378,6 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 			retailRules.ringHeroes = val == "1";
 		else if (RetailFileLayers::enabled() && key == "RH")
 			retailRules.customHeroes = val == "1";
-		else if (RetailFileLayers::enabled() && key.getLength() == 3 &&
-			key.str()[0] == 'C' && key.str()[1] == 'H' &&
-			key.str()[2] >= '0' && key.str()[2] < '0' + MAX_SLOTS)
-		{
-			const Int heroSlot = key.str()[2] - '0';
-			if (sawHeroSlot[heroSlot] || static_cast<size_t>(val.getLength()) > CreateAHeroRules::MAX_ENCODED_LENGTH)
-			{
-				invalidHeroSlot[heroSlot] = TRUE;
-				createAHeroConfigs[heroSlot].clear();
-			}
-			else
-			{
-				sawHeroSlot[heroSlot] = TRUE;
-				createAHeroConfigs[heroSlot] = val;
-			}
-		}
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
 			sawSlotlist = true;
@@ -1714,8 +1714,6 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		}
 	}
 
-	free(buf);
-
 	// TheSuperHackers @tweak The following settings are no longer
 	// a strict requirement in the Zero Hour Replay file:
 	//  * UseStats
@@ -1770,10 +1768,8 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 
 		for(Int i = 0; i<MAX_SLOTS; i++)
 		{
-			if (!invalidHeroSlot[i] && !createAHeroConfigs[i].isEmpty())
-				newSlot[i].setCreateAHeroConfig(createAHeroConfigs[i]);
-			else
-				newSlot[i].setCreateAHeroConfig(AsciiString::TheEmptyString);
+			if (!invalidHeroSlot[i] && !createAHeroConfigs[i].empty())
+				newSlot[i].setCreateAHeroConfig(CreateAHeroSystem::validateSetupSelection(createAHeroConfigs[i], newSlot[i]));
 			game->setSlot(i,newSlot[i]);
 		}
 
