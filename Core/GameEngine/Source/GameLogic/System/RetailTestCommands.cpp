@@ -181,6 +181,9 @@ void runRetailPackage07TestCommand(std::string_view action, Object* source, Obje
 void runRetailPackage09TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
 void runRetailPackage10TestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 void runRetailPackage50TestCommand(std::string_view action, Object* source, Object* target, const char* name, const char* argument, UnsignedInt frame);
+void runRetailPackage12TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
+void runRetailPackage12AttachTestCommand(std::string_view action, Object* source, UnsignedInt frame);
+void runRetailPackage12PickupTestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 
 void runRetailPackage08TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D* position, UnsignedInt frame);
 void runRetailPackage11TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D& inputs, UnsignedInt frame);
@@ -2723,6 +2726,21 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action.starts_with("pkg10-"))
 	{
 		runRetailPackage10TestCommand(command.action, obj, command.structure.c_str(), frame);
+		return;
+	}
+	if (command.action.starts_with("pkg12-ai-"))
+	{
+		runRetailPackage12TestCommand(command.action, obj, findTarget(command, true), frame);
+		return;
+	}
+	if (command.action == "pkg12-attach")
+	{
+		runRetailPackage12AttachTestCommand(command.action, obj, frame);
+		return;
+	}
+	if (command.action.starts_with("pkg12-pickup-"))
+	{
+		runRetailPackage12PickupTestCommand(command.action, obj, command.structure.c_str(), frame);
 		return;
 	}
 	if (command.action.starts_with("pkg09-"))
