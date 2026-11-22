@@ -38,8 +38,8 @@
 365 destroy PlyrCreeps Pkg61Target 1
 365 destroy PlyrCreeps Pkg61Target 0
 
-380 create Player_1 Pkg61AuxActor 0 2090,900,0
-380 create PlyrCreeps Pkg61AuxTarget 0 2190,900,180
+380 create Player_1 Pkg61AuxActor 0 1810,500,0
+380 create PlyrCreeps Pkg61AuxTarget 0 1910,500,180
 382 orderattack Player_1 Pkg61AuxActor 0 PlyrCreeps:Pkg61AuxTarget:0
 400 create Player_1 Pkg61DodgeActor 0 2090,620,0
 400 create Player_1 Pkg61DodgeControlActor 0 2090,760,0
@@ -72,13 +72,13 @@
 541 destroy PlyrCreeps Pkg61Target 1
 541 destroy PlyrCreeps Pkg61Target 0
 
-560 create Player_1 Pkg61TrollCargo 0 2070,620,0
-560 create Player_1 Pkg61NonInfantryCargo 0 2070,630,0
-560 create PlyrCreeps Pkg61Target 0 2260,620,180
+560 create Player_1 Pkg61TrollCargo 0 1810,500,0
+560 create Player_1 Pkg61NonInfantryCargo 0 1810,510,0
+560 create PlyrCreeps Pkg61Target 0 2000,500,180
 561 testcontain Player_1 Pkg61TrollCargo 0 Player_1:Pkg61NonInfantryCargo:0
 564 orderattack Player_1 Pkg61TrollCargo 0 PlyrCreeps:Pkg61Target:0
 630 pkg61-state Player_1 Pkg61TrollCargo 0
-631 create Player_1 MordorGoblinSwordsman 0 2070,635,0
+631 create Player_1 MordorGoblinSwordsman 0 1810,515,0
 632 testcontain Player_1 Pkg61TrollCargo 0 Player_1:MordorGoblinSwordsman:0
 633 orderattack Player_1 Pkg61TrollCargo 0 PlyrCreeps:Pkg61Target:0
 681 pkg61-state Player_1 Pkg61TrollCargo 0
