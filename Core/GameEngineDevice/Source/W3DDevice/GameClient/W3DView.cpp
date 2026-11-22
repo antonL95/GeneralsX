@@ -33,6 +33,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////////////////////////
+#include <cmath>
 #include <stdlib.h>
 #include "GameLogic/FPUControl.h"
 #include <windows.h>
@@ -44,8 +45,10 @@
 #include "Common/FramePacer.h"
 #include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
+#include "Common/MapObject.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/Module.h"
+#include "Common/NameKeyGenerator.h"
 #include "Common/Radar.h"
 #include "Common/RandomValue.h"
 #include "Common/ThingTemplate.h"
@@ -2274,10 +2277,20 @@ void W3DView::setCameraHeightAboveGroundLimitsToDefault(Real heightScale)
 		aspectRatioScale = fabs(( 1 - ( baseAspectRatio - currentAspectRatio) ));
 	}
 
+	Real maxHeight = TheGlobalData->m_maxCameraHeight;
 	if (RetailFileLayers::enabled())
+	{
 		aspectRatioScale = 1.0f;
+		if (TheGameLogic && TheGameLogic->getGameMode() == GAME_SKIRMISH)
+		{
+			Bool exists = false;
+			const Real authored = MapObject::getWorldDict()->getReal(NAMEKEY("cameraMaxHeight"), &exists);
+			if (exists && authored > 0.0f && std::isfinite(authored))
+				maxHeight = authored;
+		}
+	}
 
-	m_maxHeightAboveGround = TheGlobalData->m_maxCameraHeight * aspectRatioScale * heightScale;
+	m_maxHeightAboveGround = maxHeight * aspectRatioScale * heightScale;
 	m_minHeightAboveGround = TheGlobalData->m_minCameraHeight * aspectRatioScale;
 
 	if (m_minHeightAboveGround > m_maxHeightAboveGround)
@@ -2768,6 +2781,19 @@ void W3DView::lookAt( const Coord3D *o )
 //-------------------------------------------------------------------------------------------------
 void W3DView::initHeightForMap()
 {
+	if (RetailFileLayers::enabled())
+	{
+		Real pitch = TheGlobalData->m_cameraPitch;
+		if (TheGameLogic && TheGameLogic->getGameMode() == GAME_SKIRMISH)
+		{
+			Bool exists = false;
+			const Real authored = MapObject::getWorldDict()->getReal(NAMEKEY("cameraPitchAngle"), &exists);
+			if (exists && authored > 0.0f && authored < 90.0f)
+				pitch = authored;
+		}
+		setDefaultPitch(pitch == 0.0f ? ViewDefaultPitchRadians : DEG_TO_RADF(pitch));
+	}
+
 #if PRESERVE_RETAIL_SCRIPTED_CAMERA
 	// jba - starting ground level can't exceed this height.
 	constexpr const Real MAX_GROUND_LEVEL = 120.0f;
