@@ -1,0 +1,127 @@
+213 create Player_1 Pkg61Stun 0 2970,620,0
+213 create Player_1 Pkg61StunControlActor 0 2970,620,0
+213 create PlyrCreeps Pkg61Target 0 3000,620,180
+214 pkg61-elevation Player_1 Pkg61Stun 0 PlyrCreeps:Pkg61Target:0 29 0
+214 pkg61-range Player_1 Pkg61Stun 0 PlyrCreeps:Pkg61Target:0
+215 pkg61-elevation Player_1 Pkg61Stun 0 PlyrCreeps:Pkg61Target:0 30 0
+215 pkg61-range Player_1 Pkg61Stun 0 PlyrCreeps:Pkg61Target:0
+216 pkg61-elevation Player_1 Pkg61Stun 0 PlyrCreeps:Pkg61Target:0 64 0
+216 pkg61-range Player_1 Pkg61Stun 0 PlyrCreeps:Pkg61Target:0
+216 pkg61-elevation Player_1 Pkg61StunControlActor 0 PlyrCreeps:Pkg61Target:0 64 0
+216 pkg61-range Player_1 Pkg61StunControlActor 0 PlyrCreeps:Pkg61Target:0
+218 destroy Player_1 Pkg61Stun 0
+218 destroy Player_1 Pkg61StunControlActor 0
+218 destroy PlyrCreeps Pkg61Target 0
+
+228 create Player_1 Pkg61WallScatterActor 0 2050,620,0
+228 create Player_1 Pkg61ScatterControlActor 0 2050,760,0
+228 create Player_1 Pkg61WallScatterActor 1 2050,900,0
+228 create Player_1 Pkg61AngmarRockActor 0 2050,1020,0
+228 create PlyrCreeps Pkg61Target 0 2250,620,180
+228 create PlyrCreeps Pkg61Target 1 2250,760,180
+228 create PlyrCreeps Pkg61Target 2 2250,900,180
+228 create PlyrCreeps Pkg61Target 3 2250,1020,180
+229 pkg61-wall-layer Player_1 Pkg61WallScatterActor 0 PlyrCreeps:Pkg61Target:0 20 0
+229 pkg61-wall-layer Player_1 Pkg61ScatterControlActor 0 PlyrCreeps:Pkg61Target:1 20 0
+231 orderattack Player_1 Pkg61WallScatterActor 0 PlyrCreeps:Pkg61Target:0
+231 orderattack Player_1 Pkg61ScatterControlActor 0 PlyrCreeps:Pkg61Target:1
+231 orderattack Player_1 Pkg61WallScatterActor 1 PlyrCreeps:Pkg61Target:2
+231 orderattack Player_1 Pkg61AngmarRockActor 0 PlyrCreeps:Pkg61Target:3
+252 pkg61-state PlyrCreeps Pkg61Target 0
+252 pkg61-state PlyrCreeps Pkg61Target 1
+365 destroy Player_1 Pkg61AngmarRockActor 0
+365 destroy Player_1 Pkg61ScatterControlActor 0
+365 destroy Player_1 Pkg61WallScatterActor 1
+365 destroy Player_1 Pkg61WallScatterActor 0
+365 destroy PlyrCreeps Pkg61Target 3
+365 destroy PlyrCreeps Pkg61Target 2
+365 destroy PlyrCreeps Pkg61Target 1
+365 destroy PlyrCreeps Pkg61Target 0
+
+380 create Player_1 Pkg61AuxActor 0 2090,900,0
+380 create PlyrCreeps Pkg61AuxTarget 0 2190,900,180
+382 orderattack Player_1 Pkg61AuxActor 0 PlyrCreeps:Pkg61AuxTarget:0
+400 create Player_1 Pkg61DodgeActor 0 2090,620,0
+400 create Player_1 Pkg61DodgeControlActor 0 2090,760,0
+400 create PlyrCreeps Pkg61Dodger 0 2190,620,180
+400 create PlyrCreeps Pkg61Dodger 1 2190,760,180
+402 orderattack Player_1 Pkg61DodgeActor 0 PlyrCreeps:Pkg61Dodger:0
+402 orderattack Player_1 Pkg61DodgeControlActor 0 PlyrCreeps:Pkg61Dodger:1
+448 destroy Player_1 Pkg61DodgeControlActor 0
+448 destroy Player_1 Pkg61DodgeActor 0
+448 destroy PlyrCreeps Pkg61Dodger 1
+448 destroy PlyrCreeps Pkg61Dodger 0
+477 destroy Player_1 Pkg61AuxActor 0
+477 destroy PlyrCreeps Pkg61AuxTarget 0
+
+479 pkg61-resolve - - 0 Pkg61IndependentBombard
+479 pkg61-resolve - - 0 Pkg61SharedBombard
+480 create Player_1 Pkg61IndependentActor 0 2050,620,0
+480 create Player_1 Pkg61SharedActor 0 2050,760,0
+480 create Player_1 Pkg61ShipActor 0 2050,900,0
+480 create PlyrCreeps Pkg61Target 0 2250,620,180
+480 create PlyrCreeps Pkg61Target 1 2250,760,180
+480 create PlyrCreeps Pkg61Target 2 2250,900,180
+482 orderattack Player_1 Pkg61IndependentActor 0 PlyrCreeps:Pkg61Target:0
+482 orderattack Player_1 Pkg61SharedActor 0 PlyrCreeps:Pkg61Target:1
+482 orderattack Player_1 Pkg61ShipActor 0 PlyrCreeps:Pkg61Target:2
+541 destroy Player_1 Pkg61ShipActor 0
+541 destroy Player_1 Pkg61SharedActor 0
+541 destroy Player_1 Pkg61IndependentActor 0
+541 destroy PlyrCreeps Pkg61Target 2
+541 destroy PlyrCreeps Pkg61Target 1
+541 destroy PlyrCreeps Pkg61Target 0
+
+560 create Player_1 Pkg61TrollCargo 0 2070,620,0
+560 create Player_1 Pkg61NonInfantryCargo 0 2070,630,0
+560 create PlyrCreeps Pkg61Target 0 2260,620,180
+561 testcontain Player_1 Pkg61TrollCargo 0 Player_1:Pkg61NonInfantryCargo:0
+564 orderattack Player_1 Pkg61TrollCargo 0 PlyrCreeps:Pkg61Target:0
+630 pkg61-state Player_1 Pkg61TrollCargo 0
+631 create Player_1 MordorGoblinSwordsman 0 2070,635,0
+632 testcontain Player_1 Pkg61TrollCargo 0 Player_1:MordorGoblinSwordsman:0
+633 orderattack Player_1 Pkg61TrollCargo 0 PlyrCreeps:Pkg61Target:0
+681 pkg61-state Player_1 Pkg61TrollCargo 0
+700 destroy Player_1 Pkg61TrollCargo 0
+700 destroy Player_1 MordorGoblinSwordsman 0
+700 destroy Player_1 Pkg61NonInfantryCargo 0
+700 destroy PlyrCreeps Pkg61Target 0
+
+728 create Player_1 Pkg61RampageActor 0 2050,620,0
+728 create Player_1 Pkg61RampageControlActor 0 2050,770,0
+728 create PlyrCreeps Pkg61Target 0 2180,620,180
+728 create PlyrCreeps Pkg61Target 1 2122,627,180
+728 create PlyrCreeps Pkg61Target 2 2180,770,180
+728 create PlyrCreeps Pkg61Target 3 2122,777,180
+730 orderattack Player_1 Pkg61RampageActor 0 PlyrCreeps:Pkg61Target:0
+730 orderattack Player_1 Pkg61RampageControlActor 0 PlyrCreeps:Pkg61Target:2
+746 destroy Player_1 Pkg61RampageControlActor 0
+805 destroy Player_1 Pkg61RampageActor 0
+805 destroy PlyrCreeps Pkg61Target 3
+805 destroy PlyrCreeps Pkg61Target 2
+805 destroy PlyrCreeps Pkg61Target 1
+805 destroy PlyrCreeps Pkg61Target 0
+
+850 create Player_1 Pkg61SwoopActor 0 2090,620,180
+850 create Player_1 Pkg61LevelFlightActor 0 2090,760,180
+850 create PlyrCreeps Pkg61Target 0 2055,620,0
+850 create PlyrCreeps Pkg61Target 1 2055,760,0
+852 orderattack Player_1 Pkg61SwoopActor 0 PlyrCreeps:Pkg61Target:0
+852 orderattack Player_1 Pkg61LevelFlightActor 0 PlyrCreeps:Pkg61Target:1
+855 pkg61-state Player_1 Pkg61SwoopActor 0
+855 pkg61-state Player_1 Pkg61LevelFlightActor 0
+861 pkg61-state Player_1 Pkg61SwoopActor 0
+861 pkg61-state Player_1 Pkg61LevelFlightActor 0
+880 destroy Player_1 Pkg61LevelFlightActor 0
+880 destroy Player_1 Pkg61SwoopActor 0
+880 destroy PlyrCreeps Pkg61Target 1
+880 destroy PlyrCreeps Pkg61Target 0
+
+910 create Player_1 Pkg61PreferenceActor 0 2050,620,0
+910 create Player_1 Pkg61DefaultFxActor 0 2050,650,0
+910 create PlyrCreeps Pkg61BoneTarget 0 2250,630,0
+912 orderattack Player_1 Pkg61PreferenceActor 0 PlyrCreeps:Pkg61BoneTarget:0
+912 orderattack Player_1 Pkg61DefaultFxActor 0 PlyrCreeps:Pkg61BoneTarget:0
+937 destroy Player_1 Pkg61PreferenceActor 0
+937 destroy Player_1 Pkg61DefaultFxActor 0
+937 destroy PlyrCreeps Pkg61BoneTarget 0
