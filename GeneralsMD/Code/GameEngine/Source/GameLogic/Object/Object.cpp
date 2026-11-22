@@ -2150,11 +2150,21 @@ ObjectShroudStatus Object::getShroudedStatus(Int playerIndex) const
 void Object::attemptDamage( DamageInfo *damageInfo )
 {
 	BodyModuleInterface* body = getBodyModule();
+	const Bool retail = RetailFileLayers::enabled();
+	const Object* anchor = retail && body ? HordeContain::getAnchor(this) : nullptr;
+	const ObjectID anchorID = anchor ? anchor->getID() : INVALID_ID;
 	if (body)
 		body->attemptDamage( damageInfo );
-	if (RetailFileLayers::enabled() && body && damageInfo->out.m_actualDamageClipped > 0.0f && !isEffectivelyDead())
-		if (const Object* source = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID); source && getRelationship(source) == ENEMIES)
+	if (retail && body && damageInfo->out.m_actualDamageClipped > 0.0f)
+	{
+		const Object* source = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID);
+		if (source && getRelationship(source) == ENEMIES)
+		{
 			EmotionTrackerUpdate::signal(this, EMOTION_ALERT, source);
+			if (anchorID != INVALID_ID)
+				EmotionTrackerUpdate::signal(TheGameLogic->findObjectByID(anchorID), EMOTION_ALERT, source);
+		}
+	}
 	if (RetailSkirmishProbe::enabled() && body && isKindOf(KINDOF_STRUCTURE))
 		RetailSkirmishProbe::structureDamage(*this, *damageInfo);
 

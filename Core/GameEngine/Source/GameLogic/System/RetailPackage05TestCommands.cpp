@@ -11,10 +11,13 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "GameClient/ControlBar.h"
-#include "GameLogic/Module/RotwkAbilityModules.h"
-#include "GameLogic/Module/AIUpdate.h"
-#include "GameLogic/Module/StealthUpdate.h"
+#include "GameLogic/Damage.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
+#include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Object.h"
 
 void runRetailPackage05TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame)
@@ -75,6 +78,37 @@ void runRetailPackage05TestCommand(std::string_view action, Object* source, Obje
 		std::fprintf(stderr, "TEST ring-worn frame=%u worn=%d stealthed=%d frozen=%d\n", frame,
 			source->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE), source->testStatus(OBJECT_STATUS_STEALTHED),
 			source->isDisabledByType(DISABLED_PARALYZED));
+	}
+	else if (action == "pkg05-gladden-command-set")
+		source->setCommandSetStringOverride("IsildurLastAllianceCommandSet_GladdenFields");
+	else if (action == "pkg05-ignite" || action == "pkg05-quench")
+		source->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_AFLAME), action == "pkg05-ignite");
+	else if (action == "pkg05-fear" && target)
+	{
+		const Bool active = EmotionTrackerUpdate::signal(source, EMOTION_UNCONTROLLABLE_FEAR, target);
+		std::fprintf(stderr, "TEST horde-fear frame=%u active=%d\n", frame, active);
+	}
+	else if (action == "pkg05-attack-state")
+	{
+		const auto* hordeAI = static_cast<const HordeAIUpdate*>(source->findUpdateModule(NAMEKEY("HordeAIUpdate")));
+		if (hordeAI)
+			std::fprintf(stderr, "TEST horde-order frame=%u fear=%d attack=%d\n", frame,
+				EmotionTrackerUpdate::blocksPlayerCommands(source), hordeAI->hasAttackOrder());
+	}
+	else if (action == "pkg05-member-hit" && target)
+	{
+		const auto* horde = HordeContain::get(source);
+		Object* member = horde ? horde->findNearestLivingMember(*target->getPosition()) : nullptr;
+		if (!member || member->getRelationship(target) != ENEMIES)
+			return;
+		DamageInfo damage;
+		damage.in.m_sourceID = target->getID();
+		damage.in.m_damageType = DAMAGE_UNRESISTABLE;
+		damage.in.m_amount = 10.0f;
+		member->attemptDamage(&damage);
+		std::fprintf(stderr, "TEST horde-member-hit frame=%u damage=%.1f alive=%d alert=%d\n",
+			frame, damage.out.m_actualDamageClipped, !member->isEffectivelyDead(),
+			source->getLogicModelConditions().test(MODELCONDITION_EMOTION_ALERT));
 	}
 	else if (action == "pkg05-enrage-on")
 		source->setModelConditionState(MODELCONDITION_USER_45);

@@ -2737,6 +2737,9 @@ void AIUpdateInterface::joinTeam()
 //-------------------------------------------------------------------------------------------------
 Bool AIUpdateInterface::isAllowedToRespondToAiCommands(const AICommandParms* parms) const
 {
+	if (RetailFileLayers::enabled() && parms->m_cmdSource == CMD_FROM_PLAYER &&
+		EmotionTrackerUpdate::blocksPlayerCommands(getObject()))
+		return FALSE;
 	if (m_fearUntil > TheGameLogic->getFrame())
 		return FALSE;
 
@@ -2773,9 +2776,6 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 	// TheSuperHackers @info The AiCommandParms for m_obj, m_otherObj and m_team should be null tested before use.
 	// These variables could relate to a deleted object when a pending command is reconstituted.
 
-	if (RetailFileLayers::enabled() && parms->m_cmdSource == CMD_FROM_PLAYER &&
-		EmotionTrackerUpdate::blocksPlayerCommands(getObject()))
-		return;
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
 	m_retailPlannerAttackTarget = INVALID_ID;

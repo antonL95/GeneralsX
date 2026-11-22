@@ -331,47 +331,49 @@ UpdateSleepTime EntEnragedUpdate::update()
 	const auto* data = getEntEnragedUpdateModuleData();
 	const UnsignedInt now = TheGameLogic->getFrame();
 	const Bool burning = self->testStatus(OBJECT_STATUS_AFLAME);
-	const Bool recentlyQuenched = m_wasBurning && !burning;
+	const Bool ignited = burning && !m_wasBurning;
+	const Bool quenched = m_wasBurning && !burning;
 	m_wasBurning = burning;
-	if (m_end)
+	if (m_end && (quenched || now >= m_end))
 	{
-		if (now < m_end)
-			return UPDATE_SLEEP_NONE;
 		m_end = 0;
 		m_cooldownEnd = now + data->m_cooldown;
 		setEnragedState(self, FALSE);
 		if (data->m_offFX)
 			FXList::doFXObj(data->m_offFX, self);
 	}
-	if (now < m_cooldownEnd || burning || data->m_radius <= 0.0f)
+	if (m_end || quenched || (!ignited && (burning || now < m_cooldownEnd || data->m_radius <= 0.0f)))
 		return UPDATE_SLEEP_NONE;
 
 	Object* nearestThreat = nullptr;
-	Bool friendlyLoss = FALSE;
-	Real nearestDistance = data->m_radius * data->m_radius;
-	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_radius, FROM_CENTER_2D);
-	MemoryPoolObjectHolder holder(iter);
-	for (Object* other = iter->first(); other; other = iter->next())
+	if (!ignited)
 	{
-		if (other == self || other->isDestroyed())
-			continue;
-		if (other->isEffectivelyDead())
+		Bool friendlyLoss = FALSE;
+		Real nearestDistance = data->m_radius * data->m_radius;
+		SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_radius, FROM_CENTER_2D);
+		MemoryPoolObjectHolder holder(iter);
+		for (Object* other = iter->first(); other; other = iter->next())
 		{
-			if (self->getRelationship(other) == ALLIES && matchesEmotionFilter(data->m_friendlyDead, self, other))
-				friendlyLoss = TRUE;
-			continue;
+			if (other == self || other->isDestroyed())
+				continue;
+			if (other->isEffectivelyDead())
+			{
+				if (self->getRelationship(other) == ALLIES && matchesEmotionFilter(data->m_friendlyDead, self, other))
+					friendlyLoss = TRUE;
+				continue;
+			}
+			if (!matchesEmotionFilter(data->m_hated, self, other))
+				continue;
+			const Real distance = squaredDistance(self, other);
+			if (distance < nearestDistance || (distance == nearestDistance && (!nearestThreat || other->getID() < nearestThreat->getID())))
+			{
+				nearestDistance = distance;
+				nearestThreat = other;
+			}
 		}
-		if (!matchesEmotionFilter(data->m_hated, self, other))
-			continue;
-		const Real distance = squaredDistance(self, other);
-		if (distance < nearestDistance || (distance == nearestDistance && (!nearestThreat || other->getID() < nearestThreat->getID())))
-		{
-			nearestDistance = distance;
-			nearestThreat = other;
-		}
+		if (!nearestThreat && !friendlyLoss)
+			return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND / 5);
 	}
-	if (!nearestThreat && !friendlyLoss && !recentlyQuenched)
-		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND / 5);
 
 	m_end = now + std::max(data->m_duration, 1u);
 	setEnragedState(self, TRUE);
@@ -458,7 +460,9 @@ UpdateSleepTime OneRingPenaltyUpdate::update()
 {
 	Object* self = getObject();
 	StealthUpdate* stealth = self->getStealth();
-	if (!RetailFileLayers::enabled() || !stealth || self->isEffectivelyDead() || self->isDestroyed())
+	const auto* data = getOneRingPenaltyUpdateModuleData();
+	if (!RetailFileLayers::enabled() || !stealth || self->isEffectivelyDead() || self->isDestroyed() ||
+		!data->m_beforeSpawn || !data->m_roaming)
 	{
 		clearEye();
 		return UPDATE_SLEEP_FOREVER;
@@ -470,7 +474,6 @@ UpdateSleepTime OneRingPenaltyUpdate::update()
 		return UPDATE_SLEEP_NONE;
 	}
 
-	const auto* data = getOneRingPenaltyUpdateModuleData();
 	const UnsignedInt now = TheGameLogic->getFrame();
 	if (!m_wornSince)
 		m_wornSince = now;

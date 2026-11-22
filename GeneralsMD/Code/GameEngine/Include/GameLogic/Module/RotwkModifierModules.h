@@ -54,6 +54,7 @@ class EntEnragedUpdate final : public UpdateModule
 public:
 	EntEnragedUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
 	UpdateSleepTime update() override;
+	DisabledMaskType getDisabledTypesToProcess() const override { return MAKE_DISABLED_MASK(DISABLED_PARALYZED); }
 
 private:
 	void xferState(Xfer* xfer);
