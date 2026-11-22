@@ -85,6 +85,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/CastleRules.h
     Include/GameLogic/RotwkLocomotorRules.h
     Include/GameLogic/TerrainResourceRules.h
+    Include/GameLogic/RetailEconomyRules.h
     Include/GameLogic/CastleTemplateStore.h
     Include/GameLogic/ExperienceLevelRules.h
     Include/GameLogic/ExperienceLevelStore.h

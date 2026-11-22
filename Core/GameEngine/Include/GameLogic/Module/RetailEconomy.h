@@ -9,7 +9,7 @@ class Player;
 
 namespace RetailEconomy
 {
-Int applyDepositUpgrade(const Player& player, const AsciiString& name, Real multiplier, Int amount);
+Int applyDepositUpgrade(const Player& player, const AsciiString& name, UnsignedInt multiplier, Int amount);
 }
 
 class PillageModuleData : public BehaviorModuleData
@@ -43,7 +43,7 @@ class RefundDieModuleData : public DieModuleData
 public:
 	AsciiString m_upgrade;
 	std::optional<SpecialPowerObjectFilter> m_building;
-	Real m_percent = 0.0f;
+	UnsignedInt m_percent = 0;
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 };

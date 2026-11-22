@@ -1,7 +1,5 @@
 #include "PreRTS.h"
 
-#include <limits>
-
 #include "Common/BuildAssistant.h"
 #include "Common/INI.h"
 #include "Common/Player.h"
@@ -12,20 +10,21 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/RetailEconomy.h"
 #include "GameLogic/Object.h"
-#include "WWMath/wwmath.h"
+#include "GameLogic/RetailEconomyRules.h"
 
-Int RetailEconomy::applyDepositUpgrade(const Player& player, const AsciiString& name, Real multiplier, Int amount)
+void RetailEconomy::parsePercent(INI* ini, void*, void* store, const void*)
+{
+	const double percent = INI::scanReal(ini->getNextToken(ini->getSepsPercent()));
+	*static_cast<UnsignedInt*>(store) = fixedRate(percent / 100.0);
+}
+
+Int RetailEconomy::applyDepositUpgrade(const Player& player, const AsciiString& name, UnsignedInt multiplier, Int amount)
 {
 	const UpgradeTemplate* upgrade = name.isEmpty() ? nullptr : TheUpgradeCenter->findUpgrade(name);
 	if (!upgrade || !player.hasUpgradeComplete(upgrade))
 		return amount;
 
-	const Real scaled = amount * multiplier;
-	if (!(scaled > 0.0f))
-		return 0;
-	if (scaled >= static_cast<Real>(std::numeric_limits<Int>::max()))
-		return std::numeric_limits<Int>::max();
-	return static_cast<Int>(scaled);
+	return scaleMoney(amount, multiplier, Rounding::Down);
 }
 
 void PillageModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -95,7 +94,7 @@ void RefundDieModuleData::buildFieldParse(MultiIniFieldParse& p)
 			auto& building = static_cast<std::optional<SpecialPowerObjectFilter>*>(store)->emplace();
 			SpecialPowerObjectFilter::parse(ini, instance, &building, data);
 		}, nullptr, offsetof(RefundDieModuleData, m_building) },
-		{ "RefundPercent", INI::parsePercentToReal, nullptr, offsetof(RefundDieModuleData, m_percent) },
+		{ "RefundPercent", RetailEconomy::parsePercent, nullptr, offsetof(RefundDieModuleData, m_percent) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(fields);
@@ -109,7 +108,7 @@ void RefundDie::onDie(const DamageInfo* damageInfo)
 	const auto* data = getRefundDieModuleData();
 	Player* owner = structure->getControllingPlayer();
 	const Int paid = structure->getConstructionCostPaid();
-	if (!owner || paid <= 0 || !(data->m_percent > 0.0f) || !isDieApplicable(damageInfo) ||
+	if (!owner || paid <= 0 || data->m_percent == 0 || !isDieApplicable(damageInfo) ||
 		structure->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || structure->testStatus(OBJECT_STATUS_SOLD))
 		return;
 
@@ -132,9 +131,7 @@ void RefundDie::onDie(const DamageInfo* damageInfo)
 			return;
 	}
 
-	const Real refund = paid * data->m_percent;
-	const Int amount = refund >= static_cast<Real>(std::numeric_limits<Int>::max())
-		? std::numeric_limits<Int>::max() : static_cast<Int>(WWMath::Ceil(refund));
+	const Int amount = RetailEconomy::scaleMoney(paid, data->m_percent, RetailEconomy::Rounding::Up);
 	owner->getMoney()->deposit(amount, FALSE, FALSE);
 	RetailWorldUI::showPayout(*structure, amount, FALSE);
 }

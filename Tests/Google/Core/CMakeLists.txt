@@ -14,6 +14,7 @@ set(COREI_GOOGLETEST_SRC
     GameEngine/Common/ExperienceLevelRulesTest.cpp
     GameEngine/Common/RotwkLocomotorRulesTest.cpp
     GameEngine/Common/TerrainResourceRulesTest.cpp
+    GameEngine/Common/RetailEconomyRulesTest.cpp
     GameEngine/Common/CommandButtonRulesTest.cpp
     GameEngine/Common/HeroRulesTest.cpp
     GameEngine/Common/AbilityRulesTest.cpp

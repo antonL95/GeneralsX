@@ -53,6 +53,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/RetailEconomyRules.h"
 #include "GameLogic/Module/UpdateModule.h"
 //-----------------------------------------------------------------------------
 // FORWARD REFERENCES /////////////////////////////////////////////////////////
@@ -77,7 +78,7 @@ public:
 	Int m_depositAmount;
 	Int m_initialCaptureBonus;
 	AsciiString m_retailUpgrade;
-	Real m_retailUpgradeMultiplier = 1.0f;
+	UnsignedInt m_retailUpgradeMultiplier = RetailEconomy::fullRate;
 	Bool m_isActualMoney;
 	std::list<upgradePair> m_upgradeBoost;
 
@@ -108,7 +109,7 @@ public:
 			static const FieldParse retailFields[] =
 			{
 				{ "Upgrade", INI::parseAsciiString, nullptr, offsetof(AutoDepositUpdateModuleData, m_retailUpgrade) },
-				{ "UpgradeBonusPercent", INI::parsePercentToReal, nullptr, offsetof(AutoDepositUpdateModuleData, m_retailUpgradeMultiplier) },
+				{ "UpgradeBonusPercent", RetailEconomy::parsePercent, nullptr, offsetof(AutoDepositUpdateModuleData, m_retailUpgradeMultiplier) },
 				{ nullptr, nullptr, nullptr, 0 }
 			};
 			p.add(retailFields);
