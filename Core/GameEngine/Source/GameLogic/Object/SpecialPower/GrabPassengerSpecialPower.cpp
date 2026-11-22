@@ -46,7 +46,14 @@ ModuleData* GrabPassengerSpecialPower::friend_newModuleData(INI* ini)
 GrabPassengerSpecialPower::~GrabPassengerSpecialPower() = default;
 
 #if !RTS_GENERALS
-static const ActiveBodyModuleData* chunkVendorData(const Object* target)
+static Bool isGrabVendor(const Object* target, SpecialPowerType power)
+{
+	return RetailFileLayers::enabled() &&
+		((power == SPECIAL_GRAB_CHUNK && target->isKindOf(KINDOF_CHUNK_VENDOR)) ||
+		 (power == SPECIAL_GRAB_PASSENGER && target->isKindOf(KINDOF_ROCK_VENDOR)));
+}
+
+static const ActiveBodyModuleData* grabVendorData(const Object* target)
 {
 	const auto* body = dynamic_cast<const ActiveBody*>(target->getBodyModule());
 	return body ? body->getRetailBodyData() : nullptr;
@@ -69,10 +76,9 @@ Bool GrabPassengerSpecialPower::canGrab(const Object* target) const
 	if (!target || target == caster || target->isEffectivelyDead() || !contain)
 		return FALSE;
 #if !RTS_GENERALS
-	if (RetailFileLayers::enabled() && getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_CHUNK &&
-		target->isKindOf(KINDOF_CHUNK_VENDOR))
+	if (isGrabVendor(target, getSpecialPowerTemplate()->getSpecialPowerType()))
 	{
-		const auto* vendor = chunkVendorData(target);
+		const auto* vendor = grabVendorData(target);
 		const Int capacity = contain->getContainMax();
 		return vendor && !vendor->m_grabObject.isEmpty() &&
 			TheThingFactory->findTemplate(vendor->m_grabObject, FALSE) &&
@@ -184,10 +190,9 @@ void GrabPassengerSpecialPower::applyPowerEffect(const Coord3D*)
 		return;
 
 #if !RTS_GENERALS
-	if (RetailFileLayers::enabled() && getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_CHUNK &&
-		target->isKindOf(KINDOF_CHUNK_VENDOR))
+	if (isGrabVendor(target, getSpecialPowerTemplate()->getSpecialPowerType()))
 	{
-		const auto* vendor = chunkVendorData(target);
+		const auto* vendor = grabVendorData(target);
 		const ThingTemplate* chunkTemplate = TheThingFactory->findTemplate(vendor->m_grabObject, FALSE);
 		Object* chunk = TheThingFactory->newObject(chunkTemplate, target->getTeam());
 		if (!chunk)
@@ -221,6 +226,10 @@ void GrabPassengerSpecialPower::applyPowerEffect(const Coord3D*)
 	caster->getContain()->addToContain(target);
 	if (target->getContainedBy() != caster || target->isKindOf(KINDOF_CLUB))
 		return;
+#if !RTS_GENERALS
+	if (RetailFileLayers::enabled() && target->isKindOf(KINDOF_ROCK))
+		return;
+#endif
 
 	const SpecialAbilityUpdate* update = caster->findSpecialAbilityUpdate(getSpecialPowerTemplate()->getSpecialPowerType());
 	if (update)
