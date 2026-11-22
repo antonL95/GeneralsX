@@ -262,6 +262,8 @@ private:
 	Real											m_elevatorCorrectionRate;
 
 	RotwkLocomotorRules::Authored	m_rotwk;
+	Real m_slowTurnRadius = 0.0f;
+	Real m_fastTurnRadius = 0.0f;
 	Bool											m_waitForFormation;
 	Real											m_maxTurnWithoutReform;
 	Bool											m_turnWhileMoving;
@@ -432,6 +434,8 @@ protected:
 	void moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
+	Bool usesCavalrySteering(const Object* obj) const;
+	void moveCavalryForward(Object* obj, PhysicsBehavior* physics, const Coord3D& goal, Real distance, Real speed);
 	void steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord3D& dirToApplyForce, Real onPathDistToGoal,
 		Real goalSpeed, Bool backing = FALSE);
 	Real rotwkLegsTurnSlowdown(const Object* obj, const Coord3D& goalPos, Real angleCoeff, Real maxSpeed) const;
