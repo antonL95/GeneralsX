@@ -1049,6 +1049,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/SmartBombTargetHomingUpdate.cpp
     Source/GameLogic/Object/Update/SpecialAbilityUpdate.cpp
     Source/GameLogic/Object/Update/RotwkAbilityModules.cpp
+    Source/GameLogic/Object/Update/RetailUpgradeModules.cpp
     Source/GameLogic/Object/Update/RotwkModifierModules.cpp
     Source/GameLogic/Object/Update/RetailDetectionModules.cpp
 

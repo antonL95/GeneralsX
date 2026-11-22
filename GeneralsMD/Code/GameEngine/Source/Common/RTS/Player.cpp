@@ -68,6 +68,7 @@
 #include "GameClient/RetailWorldUI.h"
 #include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/HeroRoster.h"
+#include "GameLogic/Module/RetailUpgradeModules.h"
 #include "Common/ProductionPrerequisite.h"
 #include "Common/Radar.h"
 #include "Common/ResourceGatheringManager.h"
@@ -2632,6 +2633,13 @@ void Player::ensureRetailSpellBook(Bool restoringSave)
 	Object* object = TheThingFactory->newObject(book, m_defaultTeam);
 	m_retailSpellBookID = object->getID();
 	object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+	if (!restoringSave)
+	{
+		static const NameKeyType ringRosterKey = NAMEKEY("BuildableHeroListUpgrade");
+		for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+			if ((*module)->getModuleNameKey() == ringRosterKey && !(*module)->getUpgrade()->isAlreadyUpgraded())
+				BuildableHeroListUpgrade::setRingHeroesBuildable(this, FALSE);
+	}
 	if (restoringSave)
 		for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
 			if (SpecialPowerModuleInterface* power = (*module)->getSpecialPower())
@@ -4262,6 +4270,10 @@ void Player::crc( Xfer *xfer )
 		UnsignedInt cash = m_money.countMoney();
 		xfer->xferUnsignedInt(&cash);
 		xferPowerProductionBonuses(xfer);
+		UnsignedInt forbiddenCount = static_cast<UnsignedInt>(m_forbiddenBuildings.size());
+		xfer->xferUnsignedInt(&forbiddenCount);
+		for (AsciiString& name : m_forbiddenBuildings)
+			xfer->xferAsciiString(&name);
 		xfer->xferBool(&m_hasCommandPointOverride);
 		xfer->xferInt(&m_commandPointOverrideTotal);
 		xfer->xferInt(&m_commandPointOverrideMaximum);

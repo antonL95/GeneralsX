@@ -94,6 +94,7 @@
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ActiveBody.h"
+#include "GameLogic/Module/RetailUpgradeModules.h"
 #include "GameLogic/Module/GrabPassengerSpecialPower.h"
 #include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -4418,17 +4419,23 @@ void Object::crc( Xfer *xfer )
 		static const NameKeyType autoAbilityKey = NAMEKEY("AutoAbilityBehavior");
 		static const NameKeyType pickupKey = NAMEKEY("PickupStuffUpdate");
 		static const NameKeyType runOffKey = NAMEKEY("RunOffMapBehavior");
+		static const NameKeyType inheritUpgradeKey = NAMEKEY("InheritUpgradeCreate");
+		static const NameKeyType giveUpgradeKey = NAMEKEY("GiveUpgradeUpdate");
 		static const NameKeyType grantUpgradeKey = NAMEKEY("GrantUpgradeCreate");
+		static const NameKeyType heroListKey = NAMEKEY("BuildableHeroListUpgrade");
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
 			const NameKeyType key = (*module)->getModuleNameKey();
 			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey ||
-				key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || key == pillageKey || key == autoAbilityKey || (*module)->getSlowDeathBehaviorInterface())
+				key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || key == pillageKey || key == autoAbilityKey ||
+				key == inheritUpgradeKey || key == heroListKey || (*module)->getSlowDeathBehaviorInterface())
 				xfer->xferSnapshot(*module);
 			if (key == pickupKey)
 				static_cast<PickupStuffUpdate*>(*module)->crcRetailState(xfer);
 			if (key == runOffKey)
 				static_cast<RunOffMapBehavior*>(*module)->crcRetailState(xfer);
+			if (key == giveUpgradeKey)
+				static_cast<GiveUpgradeUpdate*>(*module)->crcRetailState(xfer);
 			if (key == grantUpgradeKey)
 			{
 				Bool pending = (*module)->getCreate()->shouldDoOnBuildComplete();

@@ -305,6 +305,7 @@
 #include "GameLogic/Module/AISpecialPowerUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/RetailUpgradeModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/Module/RetailDetectionModules.h"
 
@@ -547,6 +548,9 @@ void ModuleFactory::init()
 		addModule( ReplaceSelfUpgrade );
 		addModule( DoCommandUpgrade );
 		addModule( GeometryUpgrade );
+		addModule( InheritUpgradeCreate );
+		addModule( BuildableHeroListUpgrade );
+		addModule( GiveUpgradeUpdate );
 		addModule( FoundationAIUpdate );
 		addModule( GateOpenAndCloseBehavior );
 		addModule( AIGateUpdate );
