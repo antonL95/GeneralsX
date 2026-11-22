@@ -138,6 +138,45 @@ void runRetailPackage16TestCommand(std::string_view action, Object* source, cons
 		return;
 	}
 
+	if (action == "pkg16-group-special-power")
+	{
+		if (!TheSpecialPowerStore || !argument || !*argument || !source->getControllingPlayer())
+			return;
+		const SpecialPowerTemplate* power = TheSpecialPowerStore->findSpecialPowerTemplate(argument);
+		if (!power)
+			return;
+		const CommandButton* btn = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(source, power) : nullptr;
+		const UnsignedInt options = btn ? btn->getOptions() : 0;
+		GameMessage* sel = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+		sel->appendBooleanArgument(TRUE);
+		for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+		{
+			if (!obj->isEffectivelyDead() && obj->getTemplate() == source->getTemplate() &&
+				obj->getControllingPlayer() == source->getControllingPlayer())
+			{
+				sel->appendObjectIDArgument(obj->getID());
+			}
+		}
+		GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER);
+		msg->appendIntegerArgument(power->getID());
+		msg->appendIntegerArgument(options);
+		msg->appendObjectIDArgument(INVALID_ID);
+		return;
+	}
+
+	if (action == "pkg16-ai-special-power")
+	{
+		if (!TheSpecialPowerStore || !argument || !*argument)
+			return;
+		const SpecialPowerTemplate* power = TheSpecialPowerStore->findSpecialPowerTemplate(argument);
+		if (!power)
+			return;
+		const CommandButton* btn = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(source, power) : nullptr;
+		const UnsignedInt options = btn ? btn->getOptions() : 0;
+		source->doSpecialPower(power, options);
+		return;
+	}
+
 	if (action == "pkg16-special-power")
 	{
 		if (!TheSpecialPowerStore || !argument || !*argument)
