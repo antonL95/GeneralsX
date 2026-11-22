@@ -134,7 +134,7 @@
 320 pkg08-fire-state Player_1 IthilienPathfinder 0
 320 create Player_1 DolAmrothGondorBulwark 0 2250,2730,0
 321 pkg08-fire-state Player_1 GondorFighter 0
-321 pkg23-kill Player_1 GondorMarketPlace 0 -
+321 destroy Player_1 GondorMarketPlace 0
 321 pkg23-pay Player_1 DolAmrothGondorBulwark 0 101
 323 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
 334 create Player_1 GondorMarketPlace 0 2100,2630,0
