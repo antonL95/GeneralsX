@@ -142,6 +142,8 @@ void RetailInvisibilityNugget::parse(INI* ini, void*, void* store, const void*)
 		nugget.m_awayFromTrees = nugget.m_takingDamage = nugget.m_usingAbility = nugget.m_moving = nugget.m_firingAny = FALSE;
 		for (const char* token = input->getNextToken(); token; token = input->getNextTokenOrNull())
 		{
+			if (stricmp(token, "NONE") == 0)
+				break;
 			if (stricmp(token, "AWAY_FROM_TREES") == 0)
 				nugget.m_awayFromTrees = TRUE;
 			else if (stricmp(token, "TAKING_DAMAGE") == 0)

@@ -213,12 +213,8 @@ UpdateSleepTime StealthDetectorUpdate::update()
 			continue;
 
 		StealthUpdate* stealth = them->getStealth();
-		if (!stealth && RetailFileLayers::enabled() && them->hasPowerInvisibility())
-		{
-			them->markRetailInvisibilityDetected(data->m_updateRate + 1);
-			foundSomeone = TRUE;
-		}
-		if ( stealth )
+		const Bool powerInvisible = RetailFileLayers::enabled() && them->hasPowerInvisibility();
+		if (stealth && (!powerInvisible || stealth->isLegacyStealthed()))
 		{
 
 			// we have found someone
@@ -341,7 +337,7 @@ UpdateSleepTime StealthDetectorUpdate::update()
 			}
 
 		}
-		else // perhaps they are garrisoning something stealthy, eh?
+		else if (!powerInvisible)
 		{
 			ContainModuleInterface *contain = them->getContain();
 			if( contain && contain->isGarrisonable() && contain->getStealthUnitsContained() )
@@ -364,6 +360,11 @@ UpdateSleepTime StealthDetectorUpdate::update()
 					}
 				}
 			}
+		}
+		if (powerInvisible)
+		{
+			them->markRetailInvisibilityDetected(data->m_updateRate + 1);
+			foundSomeone = TRUE;
 		}
 	}
 

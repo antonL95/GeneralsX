@@ -43,6 +43,11 @@ Bool Object::hasPowerInvisibility() const
 	return m_rotwkPowerState && m_rotwkPowerState->powerStealthed;
 }
 
+Bool Object::isPowerInvisibilityDetected(UnsignedInt now) const
+{
+	return hasPowerInvisibility() && m_rotwkPowerState->detectionEnd > now;
+}
+
 void Object::markRetailInvisibilityDetected(UnsignedInt duration)
 {
 	if (!m_rotwkPowerState || !m_rotwkPowerState->powerStealthed)
@@ -160,9 +165,9 @@ void Object::updateRotwkPowerState()
 	if (hidden || wasHidden)
 	{
 		const auto detected = MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_DETECTED);
-		if (hidden && now < state.detectionEnd)
+		if (isPowerInvisibilityDetected(now) || (stealth && stealth->isLegacyDetected(now)))
 			setStatus(detected);
-		else if (!stealth || !stealth->isLegacyDetected(now))
+		else
 			clearStatus(detected);
 
 		const auto mask = MAKE_MODELCONDITION_MASK2(MODELCONDITION_INVISIBLE_STEALTH, MODELCONDITION_INVISIBLE_CAMOUFLAGE);

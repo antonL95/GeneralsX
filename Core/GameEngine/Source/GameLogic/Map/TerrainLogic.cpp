@@ -29,6 +29,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include <algorithm>
+#include <utility>
 
 #include "Common/DataChunk.h"
 #include "Common/GameState.h"
@@ -3035,7 +3036,8 @@ void TerrainLogic::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion currentVersion = retail ? 4 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -3115,9 +3117,26 @@ void TerrainLogic::xfer( Xfer *xfer )
 
 	}
 
-	if (version >= 3)
+	if (version == 3 && xfer->getXferMode() == XFER_LOAD)
+	{
+		auto mapTrees = std::exchange(m_mapTrees, {});
 		xferMapTrees(xfer);
-	else if (xfer->getXferMode() == XFER_LOAD)
+		for (const auto& tree : mapTrees)
+		{
+			if (tree.boxes != 0)
+				continue;
+			const auto samePosition = [&tree](const MapTree& saved)
+			{
+				return saved.position.x == tree.position.x && saved.position.y == tree.position.y &&
+					saved.position.z == tree.position.z;
+			};
+			if (std::none_of(m_mapTrees.begin(), m_mapTrees.end(), samePosition))
+				m_mapTrees.push_back(tree);
+		}
+	}
+	else if (version >= 3)
+		xferMapTrees(xfer);
+	else if (!retail && xfer->getXferMode() == XFER_LOAD)
 		m_mapTrees.clear();
 }
 

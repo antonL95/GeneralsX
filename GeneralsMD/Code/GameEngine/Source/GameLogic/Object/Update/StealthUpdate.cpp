@@ -230,6 +230,9 @@ void StealthUpdate::receiveGrant( Bool active, UnsignedInt frames )
 	}
 
 	m_enabled = active;
+	const Bool retail = RetailFileLayers::enabled();
+	if (retail)
+		m_retailStealthed = active;
 
 	if( m_enabled )
 	{
@@ -241,13 +244,23 @@ void StealthUpdate::receiveGrant( Bool active, UnsignedInt frames )
 	}
 	else
 	{
-		//Off
-		obj->clearStatus( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_CAN_STEALTH, OBJECT_STATUS_STEALTHED ) );
+		const Bool powerInvisible = retail && obj->hasPowerInvisibility();
+		obj->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_CAN_STEALTH));
+		if (!powerInvisible)
+			obj->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_STEALTHED));
+		if (retail)
+		{
+			m_detectionExpiresFrame = 0;
+			if (!obj->isPowerInvisibilityDetected(TheGameLogic->getFrame()))
+				obj->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_DETECTED));
+		}
 		m_stealthAllowedFrame = FOREVER;
 		m_framesGranted = 0;
 		Drawable *draw = obj->getDrawable();
-		if( draw )
+		if (draw && !powerInvisible)
 		{
+			if (retail)
+				draw->setStealthLook(STEALTHLOOK_NONE);
 			draw->setEffectiveOpacity( 1.0f );
 		}
 	}
@@ -556,7 +569,7 @@ StealthLookType StealthUpdate::calcStealthedStatusForPlayer(const Object* obj, c
 
 // srj sez: disguised stuff doesn't work well when combined with the normal "detected" stuff.
 // so special case it here.
-		if (canDisguise())
+		if (canDisguise() && (!RetailFileLayers::enabled() || !obj->hasPowerInvisibility() || isDisguised()))
 		{
 			if (r != ALLIES && isDisguised())
 				return STEALTHLOOK_DISGUISED_ENEMY;
@@ -800,8 +813,15 @@ UpdateSleepTime StealthUpdate::update()
 			{
 				//We're finished removing disguise so turn off stealth update.
 				m_enabled = false;
-				self->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_STEALTHED ) );
-				self->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_DETECTED ) );
+				if (RetailFileLayers::enabled())
+				{
+					m_retailStealthed = FALSE;
+					m_detectionExpiresFrame = 0;
+				}
+				if (!self->hasPowerInvisibility())
+					self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_STEALTHED));
+				if (!self->isPowerInvisibilityDetected(now))
+					self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_DETECTED));
 				return calcSleepTime();
 			}
 		}
@@ -914,7 +934,7 @@ UpdateSleepTime StealthUpdate::update()
 	}
 
 	Bool detectedStatusChangedThisFrame = FALSE;
-	if (m_detectionExpiresFrame > now)
+	if (m_detectionExpiresFrame > now || (RetailFileLayers::enabled() && self->isPowerInvisibilityDetected(now)))
 	{
 		// if this is the first time being detected, play stealth off sound
 		if( !self->getStatusBits().test( OBJECT_STATUS_DETECTED ) )

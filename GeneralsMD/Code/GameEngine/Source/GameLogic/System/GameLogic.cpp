@@ -2046,7 +2046,10 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 			if (RetailFileLayers::enabled() &&
 				TheTerrainVisual->placeMapVegetation(*thingTemplate, *pMapObj->getProperties(), pos, angle))
+			{
+				TheTerrainLogic->registerMapTree(*thingTemplate, pos);
 				continue;
+			}
 
 			if (thingTemplate->isKindOf(KINDOF_OPTIMIZED_TREE)) {
 				createOptimizedTree(thingTemplate, &pos, angle);

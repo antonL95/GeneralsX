@@ -616,6 +616,7 @@ public:
 	void checkDisabledStatus();
 	void offerRetailInvisibility(ObjectID source, const AsciiString& module, UnsignedInt expiry);
 	Bool hasPowerInvisibility() const;
+	Bool isPowerInvisibilityDetected(UnsignedInt now) const;
 	void markRetailInvisibilityDetected(UnsignedInt duration);
 	void grantPowerInvisibility(UnsignedInt duration, Real range, const ModelConditionFlags& forbidden);
 	void setPowerModelCondition(Int condition, UnsignedInt duration);

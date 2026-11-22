@@ -159,8 +159,8 @@ public:
 	void disguiseAsObject( const Object *target ); //wrapper function for ease.
 	Real getFriendlyOpacity() const;
 	StealthLookType calcStealthedStatusForPlayer(const Object* obj, const Player* player);
-	Bool isLegacyStealthed() const { return m_retailStealthed; }
-	Bool isLegacyDetected(UnsignedInt now) const { return m_detectionExpiresFrame > now; }
+	Bool isLegacyStealthed() const { return m_enabled && m_retailStealthed; }
+	Bool isLegacyDetected(UnsignedInt now) const { return m_enabled && m_detectionExpiresFrame > now; }
 	UnsignedInt getStealthDelay() const { return getStealthUpdateModuleData()->m_stealthDelay; }
 	UnsignedInt getStealthLevel() const { return getStealthUpdateModuleData()->m_stealthLevel; }
   EvaMessage getEnemyDetectionEvaEvent() const { return getStealthUpdateModuleData()->m_enemyDetectionEvaEvent; }
