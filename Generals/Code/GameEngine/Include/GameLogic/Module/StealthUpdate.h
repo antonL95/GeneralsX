@@ -96,6 +96,13 @@ public:
 	Bool					m_innateStealth;
 	UnsignedInt		m_disguiseTransitionFrames;
 	UnsignedInt		m_disguiseRevealTransitionFrames;
+	UnsignedInt m_ringDelayOn = 0;
+	UnsignedInt m_ringDelayOff = 0;
+	UnsignedInt m_ringAnimOn = 0;
+	UnsignedInt m_ringAnimOff = 0;
+	UnsignedInt m_ringRecovery = 0;
+	const FXList* m_ringOnFX = nullptr;
+	const FXList* m_ringOffFX = nullptr;
 
 	StealthUpdateModuleData()
 	{
@@ -146,6 +153,13 @@ public:
 	void disguiseAsObject( const Object *target ); //wrapper function for ease.
 	Real getFriendlyOpacity() const;
 	UnsignedInt getStealthDelay() const { return getStealthUpdateModuleData()->m_stealthDelay; }
+	Bool canToggleRing() const;
+	void toggleRing();
+	void cancelOneRingEffect();
+	void suppressRing(UnsignedInt until);
+	UnsignedInt getRingToggleFrame() const { return m_ringToggleFrame; }
+	UnsignedInt getRingAnimEndFrame() const { return m_ringAnimEnd; }
+	UnsignedInt getRingBlockedUntilFrame() const { return m_ringBlockedUntil; }
 
 protected:
 
@@ -160,6 +174,13 @@ protected:
 	UpdateSleepTime calcSleepTime() const;
 
 private:
+	void setRingWorn(Bool worn);
+	void xferRingState(Xfer* xfer);
+	UnsignedInt m_ringToggleFrame = 0;
+	UnsignedInt m_ringAnimEnd = 0;
+	UnsignedInt m_ringBlockedUntil = 0;
+	Bool m_ringToggleOn = FALSE;
+	Bool m_ringAnimOn = FALSE;
 	UnsignedInt						m_stealthAllowedFrame;
 	UnsignedInt						m_detectionExpiresFrame;
 	Bool									m_enabled;

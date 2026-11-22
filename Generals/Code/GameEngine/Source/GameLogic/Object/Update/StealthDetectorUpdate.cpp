@@ -292,8 +292,7 @@ UpdateSleepTime StealthDetectorUpdate::update()
 			if (RetailFileLayers::enabled() && data->m_cancelOneRingEffect &&
 				them->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE))
 			{
-				them->clearWeaponSetFlag(WEAPONSET_ONE_RING_MODE);
-				them->clearModelConditionState(MODELCONDITION_ONE_RING);
+				stealth->cancelOneRingEffect();
 			}
 
 			/** @todo srj -- evil hack here... this whole heat-vision thing is fucked.

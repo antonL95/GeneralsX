@@ -56,8 +56,13 @@
 
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
+#include "GameLogic/RingStealthTiming.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 
 
 
@@ -88,6 +93,20 @@ void StealthUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+	if (RetailFileLayers::enabled())
+	{
+		static const FieldParse ringFields[] = {
+			{ "OneRingDelayOn", INI::parseDurationUnsignedInt, nullptr, offsetof(StealthUpdateModuleData, m_ringDelayOn) },
+			{ "OneRingDelayOff", INI::parseDurationUnsignedInt, nullptr, offsetof(StealthUpdateModuleData, m_ringDelayOff) },
+			{ "RingAnimTimeOn", INI::parseDurationUnsignedInt, nullptr, offsetof(StealthUpdateModuleData, m_ringAnimOn) },
+			{ "RingAnimTimeOff", INI::parseDurationUnsignedInt, nullptr, offsetof(StealthUpdateModuleData, m_ringAnimOff) },
+			{ "RingDelayAfterRemoving", INI::parseDurationUnsignedInt, nullptr, offsetof(StealthUpdateModuleData, m_ringRecovery) },
+			{ "BecomeStealthedOneRingFX", INI::parseFXList, nullptr, offsetof(StealthUpdateModuleData, m_ringOnFX) },
+			{ "ExitStealthOneRingFX", INI::parseFXList, nullptr, offsetof(StealthUpdateModuleData, m_ringOffFX) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(ringFields);
+	}
 }
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -343,6 +362,130 @@ UpdateSleepTime StealthUpdate::calcSleepTime() const
 //-------------------------------------------------------------------------------------------------
 /** The update callback. */
 //-------------------------------------------------------------------------------------------------
+static RingStealthTiming::Config buildRingConfig(const StealthUpdateModuleData* data)
+{
+	RingStealthTiming::Config cfg;
+	cfg.delayOn = data->m_ringDelayOn;
+	cfg.delayOff = data->m_ringDelayOff;
+	cfg.animOn = data->m_ringAnimOn;
+	cfg.animOff = data->m_ringAnimOff;
+	cfg.delayAfterRemoving = data->m_ringRecovery;
+	cfg.hasOnFX = data->m_ringOnFX != nullptr;
+	cfg.hasOffFX = data->m_ringOffFX != nullptr;
+	return cfg;
+}
+
+Bool StealthUpdate::canToggleRing() const
+{
+	const Object* self = getObject();
+	if (!RetailFileLayers::enabled() || self->isEffectivelyDead() || self->isDisabled())
+		return FALSE;
+	const auto* data = getStealthUpdateModuleData();
+	RingStealthTiming::State state{m_ringToggleFrame, m_ringAnimEnd, m_ringBlockedUntil, m_ringToggleOn != FALSE, m_ringAnimOn != FALSE};
+	return RingStealthTiming::canToggle(
+		buildRingConfig(data), state, TheGameLogic->getFrame(), self->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE) != FALSE);
+}
+
+void StealthUpdate::toggleRing()
+{
+	if (!canToggleRing())
+		return;
+	Object* self = getObject();
+	const auto* data = getStealthUpdateModuleData();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const Bool turnOn = !self->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE);
+	RingStealthTiming::State state{m_ringToggleFrame, m_ringAnimEnd, m_ringBlockedUntil, m_ringToggleOn != FALSE, m_ringAnimOn != FALSE};
+	RingStealthTiming::startTransition(buildRingConfig(data), state, now, turnOn != FALSE);
+	m_ringToggleFrame = state.toggleFrame;
+	m_ringAnimEnd = state.animEndFrame;
+	m_ringToggleOn = state.toggleOn ? TRUE : FALSE;
+	m_ringAnimOn = state.animOn ? TRUE : FALSE;
+	self->clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_PUTTING_ON_RING, MODELCONDITION_TAKING_OFF_RING));
+	if (m_ringAnimEnd)
+		self->setModelConditionState(m_ringAnimOn ? MODELCONDITION_PUTTING_ON_RING : MODELCONDITION_TAKING_OFF_RING);
+	setWakeFrame(self, UPDATE_SLEEP_NONE);
+}
+
+void StealthUpdate::setRingWorn(Bool worn)
+{
+	Object* self = getObject();
+	const auto* data = getStealthUpdateModuleData();
+	if (self->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE) == worn)
+		return;
+	if (worn)
+	{
+		self->setWeaponSetFlag(WEAPONSET_ONE_RING_MODE);
+		self->setModelConditionState(MODELCONDITION_ONE_RING);
+		self->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_CAN_STEALTH));
+		m_enabled = TRUE;
+		setWakeFrame(self, UPDATE_SLEEP_NONE);
+	}
+	else
+	{
+		self->clearWeaponSetFlag(WEAPONSET_ONE_RING_MODE);
+		self->clearModelConditionState(MODELCONDITION_ONE_RING);
+		if (!data->m_innateStealth)
+		{
+			self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_CAN_STEALTH));
+			self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_STEALTHED));
+			self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_DETECTED));
+			m_enabled = FALSE;
+		}
+		m_ringBlockedUntil = std::max(m_ringBlockedUntil, TheGameLogic->getFrame() + data->m_ringRecovery);
+	}
+	const auto* fx = worn ? data->m_ringOnFX : data->m_ringOffFX;
+	if (fx)
+		FXList::doFXObj(fx, self);
+	if (std::getenv("GENERALSX_TEST_COMMANDS"))
+	{
+		std::fprintf(stderr, "TEST ring-fx frame=%u object=%s kind=%s fired=%d\n",
+			TheGameLogic->getFrame(), self->getTemplate()->getName().str(),
+			worn ? "on" : "off", fx ? 1 : 0);
+	}
+}
+
+void StealthUpdate::cancelOneRingEffect()
+{
+	Object* self = getObject();
+	if (!RetailFileLayers::enabled() || !self || self->isEffectivelyDead())
+		return;
+	if (!self->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE))
+		return;
+	if (m_ringToggleFrame && !m_ringToggleOn)
+		return;
+	const auto* data = getStealthUpdateModuleData();
+	if (data->m_ringDelayOff || data->m_ringAnimOff)
+	{
+		const UnsignedInt now = TheGameLogic->getFrame();
+		RingStealthTiming::State state{m_ringToggleFrame, m_ringAnimEnd, m_ringBlockedUntil, m_ringToggleOn != FALSE, m_ringAnimOn != FALSE};
+		RingStealthTiming::startTransition(buildRingConfig(data), state, now, false);
+		m_ringToggleFrame = state.toggleFrame;
+		m_ringAnimEnd = state.animEndFrame;
+		m_ringToggleOn = FALSE;
+		m_ringAnimOn = FALSE;
+		self->clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_PUTTING_ON_RING, MODELCONDITION_TAKING_OFF_RING));
+		if (m_ringAnimEnd)
+			self->setModelConditionState(MODELCONDITION_TAKING_OFF_RING);
+		setWakeFrame(self, UPDATE_SLEEP_NONE);
+	}
+	else
+	{
+		m_ringToggleFrame = 0;
+		m_ringAnimEnd = 0;
+		self->clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_PUTTING_ON_RING, MODELCONDITION_TAKING_OFF_RING));
+		setRingWorn(FALSE);
+	}
+}
+
+void StealthUpdate::suppressRing(UnsignedInt until)
+{
+	m_ringToggleFrame = 0;
+	m_ringAnimEnd = 0;
+	m_ringBlockedUntil = std::max(m_ringBlockedUntil, until);
+	getObject()->clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_PUTTING_ON_RING, MODELCONDITION_TAKING_OFF_RING));
+	setRingWorn(FALSE);
+}
+
 UpdateSleepTime StealthUpdate::update()
 {
 
@@ -369,12 +512,24 @@ UpdateSleepTime StealthUpdate::update()
 	Object *self = getObject();
 	UnsignedInt now = TheGameLogic->getFrame();
 	const StealthUpdateModuleData *data = getStealthUpdateModuleData();
+	if (m_ringToggleFrame && now >= m_ringToggleFrame)
+	{
+		m_ringToggleFrame = 0;
+		setRingWorn(m_ringToggleOn);
+	}
+	if (m_ringAnimEnd && now >= m_ringAnimEnd)
+	{
+		m_ringAnimEnd = 0;
+		self->clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_PUTTING_ON_RING, MODELCONDITION_TAKING_OFF_RING));
+	}
 
 /// @todo srj -- improve sleeping behavior. we currently just sleep when not enabled,
 // and demand every-frame attention when enabled. this could probably be smartened.
 
 	if( !m_enabled )
 	{
+		if (m_ringToggleFrame || m_ringAnimEnd)
+			return UPDATE_SLEEP_NONE;
 		return calcSleepTime();
 	}
 
@@ -828,6 +983,8 @@ void StealthUpdate::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
+	if (RetailFileLayers::enabled())
+		xferRingState(xfer);
 
 }
 
@@ -840,7 +997,7 @@ void StealthUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -899,7 +1056,18 @@ void StealthUpdate::xfer( Xfer *xfer )
 
 	// disguised
 	xfer->xferBool( &m_disguised );
+	if (version >= 2)
+		xferRingState(xfer);
 
+}
+
+void StealthUpdate::xferRingState(Xfer* xfer)
+{
+	xfer->xferUnsignedInt(&m_ringToggleFrame);
+	xfer->xferUnsignedInt(&m_ringAnimEnd);
+	xfer->xferUnsignedInt(&m_ringBlockedUntil);
+	xfer->xferBool(&m_ringToggleOn);
+	xfer->xferBool(&m_ringAnimOn);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -920,5 +1088,7 @@ void StealthUpdate::loadPostProcess()
 	//
 	if( isDisguised() )
 		m_xferRestoreDisguise = TRUE;
+	if (RetailFileLayers::enabled() && m_ringAnimEnd)
+		getObject()->setModelConditionState(m_ringAnimOn ? MODELCONDITION_PUTTING_ON_RING : MODELCONDITION_TAKING_OFF_RING);
 
 }

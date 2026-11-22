@@ -173,6 +173,9 @@ public:
 	void toggleRing();
 	void cancelOneRingEffect();
 	void suppressRing(UnsignedInt until);
+	UnsignedInt getRingToggleFrame() const { return m_ringToggleFrame; }
+	UnsignedInt getRingAnimEndFrame() const { return m_ringAnimEnd; }
+	UnsignedInt getRingBlockedUntilFrame() const { return m_ringBlockedUntil; }
 
   Bool isGrantedBySpecialPower() { return getStealthUpdateModuleData()->m_grantedBySpecialPower; }
 	Bool isTemporaryGrant() { return m_framesGranted > 0; }
@@ -194,6 +197,7 @@ private:
 	UnsignedInt m_ringAnimEnd = 0;
 	UnsignedInt m_ringBlockedUntil = 0;
 	Bool m_ringToggleOn = FALSE;
+	Bool m_ringAnimOn = FALSE;
 	Bool m_retailStealthed = FALSE;
 
 	UnsignedInt						m_stealthAllowedFrame;
