@@ -940,6 +940,8 @@ public:
 			{ "OrientInSecondaryDirection", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_orientInSecondaryDirection) },
 			{ "VelocityScale", INI::parseReal, nullptr, offsetof(GenericObjectCreationNugget, m_velocityScale) },
 			{ "WaypointSpawnPoints", INI::parseAsciiString, nullptr, offsetof(GenericObjectCreationNugget, m_waypointSpawnPoints) },
+			{ "DestinationPlayer", INI::parseAsciiString, nullptr, offsetof(GenericObjectCreationNugget, m_destinationPlayer) },
+			{ "VeterancyLevel", INI::parseInt, nullptr, offsetof(GenericObjectCreationNugget, m_veterancyLevel) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 
@@ -1421,8 +1423,13 @@ protected:
 
 
 
-		if (retailObject && m_useJustBuiltFlag)
-			obj->setPowerModelCondition(MODELCONDITION_JUST_BUILT, std::max<UnsignedInt>(1, m_justBuiltDuration));
+		if (retailObject)
+		{
+			if (m_veterancyLevel > 0)
+				obj->getExperienceTracker()->gainRetailLevels(m_veterancyLevel);
+			if (m_useJustBuiltFlag)
+				obj->setPowerModelCondition(MODELCONDITION_JUST_BUILT, std::max<UnsignedInt>(1, m_justBuiltDuration));
+		}
 
     if ( m_diesOnBadLand && obj )
     {
@@ -1509,10 +1516,12 @@ protected:
 		std::vector<Object*> pendingObjects;
 
 		// Object type debris might need this information to process visual UpgradeModules.
-		Team *debrisOwner = ThePlayerList->getNeutralPlayer() ? ThePlayerList->getNeutralPlayer()->getDefaultTeam() : nullptr;
-
-		if( sourceObj && sourceObj->getControllingPlayer() )
-			debrisOwner = sourceObj->getControllingPlayer()->getDefaultTeam();
+		Player* owner = sourceObj ? sourceObj->getControllingPlayer() : nullptr;
+		if (retailObject && m_destinationPlayer.isNotEmpty())
+			owner = ThePlayerList->findPlayerWithNameKey(NAMEKEY(m_destinationPlayer.str()));
+		if (!owner)
+			owner = ThePlayerList->getNeutralPlayer();
+		Team* debrisOwner = owner ? owner->getDefaultTeam() : nullptr;
 
 		Object* container = nullptr;
 		Object *firstObject = nullptr;
@@ -1757,6 +1766,8 @@ private:
 	Bool m_orientInSecondaryDirection = FALSE;
 	Real m_velocityScale = 1.0f;
 	AsciiString m_waypointSpawnPoints;
+	AsciiString m_destinationPlayer;
+	Int m_veterancyLevel = 0;
 
 };
 EMPTY_DTOR(GenericObjectCreationNugget)
