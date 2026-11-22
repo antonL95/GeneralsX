@@ -819,6 +819,11 @@ void Object::onContainedBy( Object *containedBy )
 		clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_MASKED ) );
 	m_containedBy = containedBy;
 	m_containedByFrame = TheGameLogic->getFrame();
+	if (RetailFileLayers::enabled())
+	{
+		if (auto* ai = getAI())
+			ai->refreshRetailContainedLocomotor();
+	}
 
 	DEBUG_ASSERTCRASH(containedBy == nullptr || !containedBy->isDestroyed(),
 		("Object::onContainedBy - Adding to a destroyed container"));
@@ -835,6 +840,11 @@ void Object::onRemovedFrom( Object *removedFrom )
 	clearStatus( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_MASKED, OBJECT_STATUS_UNSELECTABLE ) );
 	m_containedBy = nullptr;
 	m_containedByFrame = 0;
+	if (RetailFileLayers::enabled())
+	{
+		if (auto* ai = getAI())
+			ai->refreshRetailContainedLocomotor();
+	}
 	if( m_attributeModifierHelper )
 		m_attributeModifierHelper->refreshDerived();
 

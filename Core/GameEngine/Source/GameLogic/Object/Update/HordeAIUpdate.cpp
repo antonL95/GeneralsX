@@ -390,6 +390,15 @@ UpdateSleepTime HordeAIUpdate::update()
 		privateIdle(m_attackSource);
 		target = nullptr;
 	}
+#if RTS_ZEROHOUR
+	const HordeAIUpdateModuleData* moveData = getHordeAIUpdateModuleData();
+	const Bool comboEnabled = RetailFileLayers::enabled() && moveData->m_comboLocomotorSet.compareNoCase("SET_COMBO") == 0;
+	const Real comboAttackDistance = moveData->m_comboLocoAttackDistance;
+	const Bool comboApproach = target && comboAttackDistance > 0.0f &&
+		distanceSquared(*horde->getPosition(), *target->getPosition()) > sqr(comboAttackDistance);
+	if (comboEnabled)
+		setRetailComboLocomotor(comboApproach || (!target && isMoving()));
+#endif
 	const Real facingBefore = horde->getOrientation();
 	Path* path = getPath();
 	const PathNode* end = path ? path->getLastNode() : nullptr;
@@ -512,6 +521,15 @@ UpdateSleepTime HordeAIUpdate::update()
 		AIUpdateInterface* ai = member->getAI();
 		if (!ai || member->isEffectivelyDead())
 			continue;
+#if RTS_ZEROHOUR
+		if (comboEnabled)
+		{
+			HordeContain::FormationGoal comboGoal;
+			const Bool following = !target && isMoving() &&
+				contain->getFormationGoal(member, comboGoal) && comboGoal.error <= 2.0f * PATHFIND_CELL_SIZE_F;
+			ai->setRetailComboLocomotor(comboApproach || following);
+		}
+#endif
 
 		const auto backing = RetailFileLayers::enabled() ? const_cast<HordeContain*>(contain)->updateBacking(member)
 			: HordeContain::BackingPhase::Available;

@@ -238,6 +238,10 @@ Int AIUpdateModuleData::findLocomotorSetType(const AsciiString& name)
 		return LOCOMOTORSET_ENRAGED;
 	if (name.compareNoCase("SET_BURNINGDEATH") == 0)
 		return LOCOMOTORSET_BURNINGDEATH;
+	if (name.compareNoCase("SET_COMBO") == 0)
+		return LOCOMOTORSET_COMBO;
+	if (name.compareNoCase("SET_CONTAINED") == 0)
+		return LOCOMOTORSET_CONTAINED;
 	return -1;
 }
 
@@ -856,6 +860,44 @@ void AIUpdateInterface::setLocomotorUpgrade(Bool set)
 }
 
 //=============================================================================
+void AIUpdateInterface::refreshRetailContainedLocomotor()
+{
+	const auto* tmpl = getObject()->getTemplate();
+	if (!RetailFileLayers::enabled() || (!tmpl->findRotWKLocomotor(LOCOMOTORSET_CONTAINED) &&
+		m_curLocomotorSet != LOCOMOTORSET_COMBO))
+		return;
+
+	switch (m_curLocomotorSet)
+	{
+		case LOCOMOTORSET_NORMAL:
+		case LOCOMOTORSET_NORMAL_UPGRADED:
+		case LOCOMOTORSET_MOUNTED:
+		case LOCOMOTORSET_COMBO:
+		case LOCOMOTORSET_CONTAINED:
+			getObject()->clearModelConditionState(MODELCONDITION_USING_COMBO_LOCOMOTOR);
+			chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+			break;
+		default:
+			break;
+	}
+}
+
+void AIUpdateInterface::setRetailComboLocomotor(Bool enabled)
+{
+	if (!RetailFileLayers::enabled() ||
+		!getObject()->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_COMBO))
+		return;
+
+	if (enabled && (m_curLocomotorSet == LOCOMOTORSET_NORMAL || m_curLocomotorSet == LOCOMOTORSET_NORMAL_UPGRADED ||
+		m_curLocomotorSet == LOCOMOTORSET_CONTAINED || m_curLocomotorSet == LOCOMOTORSET_MOUNTED))
+		chooseLocomotorSet(LOCOMOTORSET_COMBO);
+	else if (!enabled && m_curLocomotorSet == LOCOMOTORSET_COMBO)
+	{
+		getObject()->clearModelConditionState(MODELCONDITION_USING_COMBO_LOCOMOTOR);
+		chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+	}
+}
+
 Bool AIUpdateInterface::chooseLocomotorSet(LocomotorSetType wst)
 {
 	if (wst == LOCOMOTORSET_NORMAL && RetailFileLayers::enabled() && getObject()->testStatus(OBJECT_STATUS_ENRAGED))
@@ -867,6 +909,16 @@ Bool AIUpdateInterface::chooseLocomotorSet(LocomotorSetType wst)
 			wst = LOCOMOTORSET_PANIC;
 	}
 	DEBUG_ASSERTCRASH(wst != LOCOMOTORSET_NORMAL_UPGRADED, ("never pass LOCOMOTORSET_NORMAL_UPGRADED here"));
+	if (wst == LOCOMOTORSET_NORMAL && RetailFileLayers::enabled())
+	{
+		const Object* object = getObject();
+		const auto* tmpl = object->getTemplate();
+		if (object->getLogicModelConditions().test(MODELCONDITION_USING_COMBO_LOCOMOTOR) &&
+			tmpl->findRotWKLocomotor(LOCOMOTORSET_COMBO))
+			wst = LOCOMOTORSET_COMBO;
+		else if (object->getContainedBy() && tmpl->findRotWKLocomotor(LOCOMOTORSET_CONTAINED))
+			wst = LOCOMOTORSET_CONTAINED;
+	}
 	if (wst == LOCOMOTORSET_NORMAL && RetailFileLayers::enabled() && getObject()->testWeaponSetFlag(WEAPONSET_MOUNTED) &&
 		getObject()->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_MOUNTED))
 		wst = LOCOMOTORSET_MOUNTED;
@@ -878,6 +930,13 @@ Bool AIUpdateInterface::chooseLocomotorSet(LocomotorSetType wst)
 
 	if (chooseLocomotorSetExplicit(wst))
 	{
+		if (RetailFileLayers::enabled())
+		{
+			if (wst == LOCOMOTORSET_COMBO)
+				getObject()->setModelConditionState(MODELCONDITION_USING_COMBO_LOCOMOTOR);
+			else if (getObject()->getLogicModelConditions().test(MODELCONDITION_USING_COMBO_LOCOMOTOR))
+				getObject()->clearModelConditionState(MODELCONDITION_USING_COMBO_LOCOMOTOR);
+		}
 		chooseGoodLocomotorFromCurrentSet();
 		return TRUE;
 	}

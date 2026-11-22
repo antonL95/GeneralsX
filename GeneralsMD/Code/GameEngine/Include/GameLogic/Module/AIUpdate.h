@@ -85,7 +85,9 @@ enum LocomotorSetType CPP_11(: Int)
 	LOCOMOTORSET_COUNT,
 	LOCOMOTORSET_MOUNTED = LOCOMOTORSET_COUNT,
 	LOCOMOTORSET_ENRAGED,
-	LOCOMOTORSET_BURNINGDEATH
+	LOCOMOTORSET_BURNINGDEATH,
+	LOCOMOTORSET_COMBO,
+	LOCOMOTORSET_CONTAINED
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -539,6 +541,8 @@ public:
 	Real getPathExtraDistance() const { return m_pathExtraDistance; }
 
 	virtual Bool chooseLocomotorSet(LocomotorSetType wst);
+	void refreshRetailContainedLocomotor();
+	void setRetailComboLocomotor(Bool enabled);
 
 	virtual CommandSourceType getLastCommandSource() const { return m_lastCommandSource; }
 	Bool issueRetailPlannerAttack(Object* target);
