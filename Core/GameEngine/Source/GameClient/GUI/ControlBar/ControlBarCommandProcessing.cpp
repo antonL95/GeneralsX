@@ -111,55 +111,8 @@ CBCommandStatus ControlBar::processCommandTransitionUI( GameWindow *control, Gad
 
 	}
 
-	dispatchRetailCommandTrigger(commandButton, obj);
-
 	return CBC_COMMAND_USED;
 
-}
-
-void ControlBar::dispatchRetailCommandTrigger(const CommandButton *commandButton, Object *obj)
-{
-	if (!RetailFileLayers::enabled() || m_inCommandTrigger || !commandButton || commandButton->getCommandTrigger().isEmpty())
-		return;
-	const CommandButton *triggered = findCommandButton(commandButton->getCommandTrigger());
-	if (!triggered || triggered == commandButton || triggered->isRetailPassive())
-		return;
-
-	m_inCommandTrigger = TRUE;
-	if (Player *player = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr)
-	{
-		AudioEventRTS sound = *triggered->getUnitSpecificSound();
-		sound.setPlayerIndex(player->getPlayerIndex());
-		TheAudio->addAudioEvent(&sound);
-	}
-	if (!BitIsSet(triggered->getOptions(), COMMAND_OPTION_NEED_TARGET))
-	{
-		switch (triggered->getCommandType())
-		{
-			case GUI_COMMAND_SPECIAL_POWER:
-			case GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT:
-				if (const SpecialPowerTemplate *power = triggered->getSpecialPowerTemplate())
-				{
-					GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER);
-					msg->appendIntegerArgument(power->getID());
-					msg->appendIntegerArgument(triggered->getOptions());
-					msg->appendObjectIDArgument(obj ? obj->getID() : INVALID_ID);
-				}
-				break;
-			case GUI_COMMAND_OBJECT_UPGRADE:
-			case GUI_COMMAND_PLAYER_UPGRADE:
-				if (obj && triggered->getUpgradeTemplate())
-				{
-					GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UPGRADE);
-					msg->appendObjectIDArgument(obj->getID());
-					msg->appendIntegerArgument(triggered->getUpgradeTemplate()->getUpgradeNameKey());
-				}
-				break;
-			default:
-				break;
-		}
-	}
-	m_inCommandTrigger = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------

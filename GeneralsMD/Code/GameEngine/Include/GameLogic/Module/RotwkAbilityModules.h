@@ -454,6 +454,7 @@ private:
 
 	Int m_toggledState = 0;
 	UnsignedInt m_idleSinceFrame = 0;
+	UnsignedInt m_readySinceFrame = 0;
 };
 
 class PlayerHealSpecialPowerModuleData : public SpecialPowerModuleData

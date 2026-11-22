@@ -128,6 +128,7 @@
 #include "GameLogic/Module/FireSpreadUpdate.h"
 #include "GameLogic/Module/FirestormDynamicGeometryInfoUpdate.h"
 #include "GameLogic/Module/FireWeaponUpdate.h"
+#include "GameLogic/Module/ClickReactionBehavior.h"
 #include "GameLogic/Module/FlammableUpdate.h"
 #include "GameLogic/Module/FloatUpdate.h"
 #include "GameLogic/Module/TensileFormationUpdate.h"
@@ -513,6 +514,7 @@ void ModuleFactory::init()
 		addModule( SpecialEnemySenseUpdate );
 		addModule( AimWeaponBehavior );
 		addModule( DualWeaponBehavior );
+		addModule( ClickReactionBehavior );
 		addModule( InvisibilityUpdate );
 		addModule( ToggleHiddenSpecialAbilityUpdate );
 

@@ -1559,10 +1559,30 @@ UpdateSleepTime AutoAbilityBehavior::update()
 		return scan;
 	SpecialPowerModuleInterface* power = self->getSpecialPowerModule(data->m_specialAbility);
 	if (!power || !power->isReady())
+	{
+		m_readySinceFrame = 0;
 		return scan;
+	}
 	const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(self, data->m_specialAbility) : nullptr;
+	if (button && button->getAutoAbilityDisallowedOnModelCondition().any() &&
+		self->getLogicModelConditions().testForAny(button->getAutoAbilityDisallowedOnModelCondition()))
+	{
+		m_readySinceFrame = 0;
+		return scan;
+	}
 	if (!TheSpecialPowerStore->canUseSpecialPower(self, data->m_specialAbility))
 		return scan;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const UnsignedInt delayFrames = button
+		? CommandButtonRules::autoDelayFrames(button->getAutoDelay(), LOGICFRAMES_PER_SECOND)
+		: 0;
+	if (delayFrames > 0)
+	{
+		if (m_readySinceFrame == 0)
+			m_readySinceFrame = now;
+		if (!CommandButtonRules::isAutoAbilityAllowed(false, true, delayFrames, m_readySinceFrame, now))
+			return scan;
+	}
 	const UnsignedInt options = button ? button->getOptions() : 0;
 	for (BehaviorModule** module = self->getBehaviorModules(); *module; ++module)
 	{
@@ -1578,7 +1598,6 @@ UpdateSleepTime AutoAbilityBehavior::update()
 	}
 	if (data->m_idleFrames > 0)
 	{
-		const UnsignedInt now = TheGameLogic->getFrame();
 		if (!ai || !ai->isIdle())
 		{
 			m_idleSinceFrame = 0;
@@ -1589,12 +1608,23 @@ UpdateSleepTime AutoAbilityBehavior::update()
 		if (now - m_idleSinceFrame < data->m_idleFrames)
 			return scan;
 	}
+	Bool casted = FALSE;
 	for (const AutoAbilityQuery& query : data->m_queries)
 	{
 		Object* target = nullptr;
 		if (queryMatches(query, options, target) && cast(options, target))
+		{
+			casted = TRUE;
 			break;
+		}
 	}
+	if (!casted && button && button->isTriggerWhenReady() &&
+		!BitIsSet(options, COMMAND_OPTION_NEED_OBJECT_TARGET) && !BitIsSet(options, NEED_TARGET_POS))
+	{
+		casted = cast(options, self);
+	}
+	if (casted)
+		m_readySinceFrame = 0;
 	return scan;
 }
 
@@ -1603,15 +1633,20 @@ void AutoAbilityBehavior::crc(Xfer* xfer)
 	UpdateModule::crc(xfer);
 	xfer->xferInt(&m_toggledState);
 	xfer->xferUnsignedInt(&m_idleSinceFrame);
+	xfer->xferUnsignedInt(&m_readySinceFrame);
 }
 
 void AutoAbilityBehavior::xfer(Xfer* xfer)
 {
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
+	XferVersion version = 2;
+	xfer->xferVersion(&version, 2);
 	UpdateModule::xfer(xfer);
 	xfer->xferInt(&m_toggledState);
 	xfer->xferUnsignedInt(&m_idleSinceFrame);
+	if (version >= 2)
+		xfer->xferUnsignedInt(&m_readySinceFrame);
+	else
+		m_readySinceFrame = 0;
 }
 
 void AutoAbilityBehavior::loadPostProcess()

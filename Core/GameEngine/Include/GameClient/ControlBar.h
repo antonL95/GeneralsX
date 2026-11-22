@@ -32,6 +32,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "Common/AudioEventRTS.h"
 #include "Common/GameType.h"
+#include "Common/ModelState.h"
 #include "Common/Overridable.h"
 #include "Common/Science.h"
 #include "GameClient/Color.h"
@@ -1237,6 +1238,7 @@ private:
 	void setCommandBarBorder( GameWindow *button, CommandButtonMappedBorderType type);
 public:
 	void updateCommandBarBorderColors(Color build, Color action, Color upgrade, Color system );
+	CommandAvailability queryRetailCommandAvailability(const CommandButton *command, Object *obj) const { return getCommandAvailability(command, obj, nullptr); }
 
 private:
 

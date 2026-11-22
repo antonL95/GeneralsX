@@ -3653,10 +3653,11 @@ void Object::crc( Xfer *xfer )
 			m_firingTracker->crcRetailState(xfer);
 		static const NameKeyType dualWeaponKey = NAMEKEY("DualWeaponBehavior");
 		static const NameKeyType deathWeaponKey = NAMEKEY("FireWeaponWhenDeadBehavior");
+		static const NameKeyType clickReactionKey = NAMEKEY("ClickReactionBehavior");
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
 			const NameKeyType key = (*module)->getModuleNameKey();
-			if (key == dualWeaponKey || key == deathWeaponKey || (*module)->getSlowDeathBehaviorInterface())
+			if (key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || (*module)->getSlowDeathBehaviorInterface())
 				xfer->xferSnapshot(*module);
 		}
 	}

@@ -67,6 +67,7 @@
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/WallHubBehavior.h"
+#include "GameLogic/Module/ClickReactionBehavior.h"
 #include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
@@ -2328,6 +2329,11 @@ bool GameLogic::onCreateSelectedGroup(MAYBE_UNUSED GameMessage *msg)
 		}
 
 		selectObject(obj, createNewGroup && firstObject, msgPlayer->getPlayerMask());
+		if (RetailFileLayers::enabled() && msg->getType() == GameMessage::MSG_CREATE_SELECTED_GROUP)
+		{
+			if (ClickReactionBehavior* clickReaction = ClickReactionBehavior::find(obj))
+				clickReaction->onClick();
+		}
 		firstObject = FALSE;
 	}
 
