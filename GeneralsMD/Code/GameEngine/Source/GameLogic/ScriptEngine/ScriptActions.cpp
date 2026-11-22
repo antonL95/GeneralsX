@@ -752,7 +752,8 @@ void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiS
 			for (DLINK_ITERATOR<Object> iter = theTeam->iterate_TeamMemberList(); !iter.done(); iter.advance())
 			{
 				Object* member = iter.cur();
-				if (member && !member->getContainedBy() && member->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+				if (member && !member->getContainedBy() &&
+					(member->isKindOf(KINDOF_STRUCTURE) || member->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
 					TheAI->pathfinder()->addObjectToPathfindMap(member);
 			}
 		}
@@ -1046,14 +1047,14 @@ void ScriptActions::doCreateObject(const AsciiString& objectName, const AsciiStr
 
 			obj->setOrientation(angle);
 			obj->setPosition( pos );
-			if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
-				TheAI->pathfinder()->addObjectToPathfindMap(obj);
-
       if ( obj->isKindOf( KINDOF_BLAST_CRATER ) ) // since these footprints are permanent
       {
         TheTerrainLogic->createCraterInTerrain( obj );
         TheAI->pathfinder()->addObjectToPathfindMap( obj );
       }
+			else if (RetailFileLayers::enabled() &&
+				(obj->isKindOf(KINDOF_STRUCTURE) || obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
+				TheAI->pathfinder()->addObjectToPathfindMap(obj);
 
 
 		}
@@ -1242,7 +1243,8 @@ void ScriptActions::createUnitOnTeamAt(const AsciiString& unitName, const AsciiS
 			{
 				Coord3D destination = *way->getLocation();
 				obj->setPosition(&destination);
-				if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+				if (RetailFileLayers::enabled() &&
+					(obj->isKindOf(KINDOF_STRUCTURE) || obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
 					TheAI->pathfinder()->addObjectToPathfindMap(obj);
 			}
 		}

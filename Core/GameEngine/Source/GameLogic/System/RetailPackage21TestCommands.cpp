@@ -5,7 +5,9 @@
 #include <string_view>
 
 #include "Common/BuildAssistant.h"
+#include "Common/LatchRestore.h"
 #include "Common/Player.h"
+#include "Common/Team.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
@@ -13,10 +15,58 @@
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/ScriptActions.h"
+#include "GameLogic/Scripts.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 
 void runRetailPackage21TestCommand(std::string_view action, Object* object, const char* argument, const Coord3D* position, UnsignedInt frame)
 {
+	if (action == "pkg21-spawn-script" && position)
+	{
+		ScriptAction* script = newInstance(ScriptAction)(ScriptAction::CREATE_OBJECT);
+		script->getParameter(0)->friend_setString(argument);
+		script->getParameter(1)->friend_setString(object->getTeam()->getName());
+		script->getParameter(2)->friend_setCoord3D(position);
+		script->getParameter(3)->friend_setReal(0.0f);
+		TheScriptActions->executeAction(script);
+		deleteInstance(script);
+		return;
+	}
+
+	if ((action == "pkg21-spawn-waypoint" || action == "pkg21-spawn-reinforcement") && position)
+	{
+		Team* team = object->getTeam();
+		Waypoint* waypoint = TheTerrainLogic->getFirstWaypoint();
+		if (!waypoint)
+			return;
+		LatchRestore<Coord3D> location(*const_cast<Coord3D*>(waypoint->getLocation()), *position);
+		if (action == "pkg21-spawn-waypoint")
+		{
+			ScriptAction* script = newInstance(ScriptAction)(ScriptAction::CREATE_NAMED_ON_TEAM_AT_WAYPOINT);
+			script->getParameter(0)->friend_setString("Pkg21WaypointStructure");
+			script->getParameter(1)->friend_setString(argument);
+			script->getParameter(2)->friend_setString(team->getName());
+			script->getParameter(3)->friend_setString(waypoint->getName());
+			TheScriptActions->executeAction(script);
+			deleteInstance(script);
+		}
+		else
+		{
+			auto* info = const_cast<TeamTemplateInfo*>(team->getPrototype()->getTemplateInfo());
+			LatchRestore<Int> count(info->m_numUnitsInfo, 1);
+			LatchRestore<TCreateUnitsInfo> entry(info->m_unitsInfo[0], {1, 1, argument});
+			LatchRestore<AsciiString> transport(info->m_transportUnitType, AsciiString());
+			LatchRestore<AsciiString> origin(info->m_startReinforceWaypoint, AsciiString());
+			ScriptAction* script = newInstance(ScriptAction)(ScriptAction::CREATE_REINFORCEMENT_TEAM);
+			script->getParameter(0)->friend_setString(team->getName());
+			script->getParameter(1)->friend_setString(waypoint->getName());
+			TheScriptActions->executeAction(script);
+			deleteInstance(script);
+		}
+		return;
+	}
+
 	if (action == "pkg21-build-at")
 	{
 		const ThingTemplate* type = TheThingFactory->findTemplate(argument, FALSE);

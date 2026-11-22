@@ -14,6 +14,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/Pathfinder/PathfindCell.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
@@ -115,6 +116,20 @@ void runRetailSaveLoadWallTestCommand(std::string_view action, Player* player, O
 
 void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, UnsignedInt frame)
 {
+	if (action == "snapshot-obstacle-owner")
+	{
+		Bool ownsCell = FALSE;
+		if (object)
+		{
+			const Coord3D& position = *object->getPosition();
+			const PathfindCell* cell = TheAI->pathfinder()->getCell(LAYER_GROUND,
+				REAL_TO_INT_FLOOR(position.x / PATHFIND_CELL_SIZE_F), REAL_TO_INT_FLOOR(position.y / PATHFIND_CELL_SIZE_F));
+			ownsCell = cell && cell->getType() == PathfindCell::CELL_OBSTACLE && cell->getObstacleID() == object->getID();
+		}
+		std::fprintf(stderr, "TEST save-load obstacle frame=%u template=%s ownsCell=%d\n", frame,
+			object ? object->getTemplate()->getName().str() : "-", ownsCell);
+		return;
+	}
 	if (action == "snapshot-register-footprint")
 	{
 		if (object)

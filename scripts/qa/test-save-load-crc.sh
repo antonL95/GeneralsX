@@ -194,6 +194,11 @@ for phase in continue resume; do
     if [ "$mode" = training ] && [ "$end" -ge 250 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 250 ]; }; then
         grep -E '^TEST damage frame=250 weapon=Pkg19SaveSecondary .*victim=[0-9]+\(Pkg19SaveTarget\) ' "$out/$phase.log"
     fi
+    for obstacle_frame in 262 286; do
+        if [ "$mode" = training ] && [ "$end" -ge "$obstacle_frame" ] && { [ "$phase" = continue ] || [ "$save_frame" -le "$obstacle_frame" ]; }; then
+            expect "$phase" "TEST save-load obstacle frame=$obstacle_frame template=CaHRestlessDeadBarrow ownsCell=1"
+        fi
+    done
     if [ "$mode" = training ] && [ "$end" -ge 285 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 285 ]; }; then
         expect "$phase" 'TEST frame 285: builderscriptmove object 182 to 1933.7 1774.0'
     fi

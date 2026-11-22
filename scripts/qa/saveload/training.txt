@@ -116,11 +116,15 @@
 255 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
 256 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
 260 pkg23-kill Player_1 Pkg23SmallerSaleDiscount 0
+260 create Player_1 SaveLoadBarrowCaster 0 1750,1060,0
 261 pkg23-quote Player_1 Pkg23DiscountedFarm 0
+261 placement-ocl Player_1 SaveLoadBarrowCaster 0 OCL_RestlessDead
+262 snapshot-obstacle-owner Player_1 CaHRestlessDeadBarrow 0
 274 create Player_1 Pkg23FarmWithoutIndicator 0 2040,2850,0
 275 pkg23-display Player_1 Pkg23FarmWithoutIndicator 0 -
 276 pkg23-kill Player_1 Pkg23FarmWithoutIndicator 0 -
 285 builderscriptmove * Wolf 8 - 1933.749145508 1773.990844727
+286 snapshot-obstacle-owner Player_1 CaHRestlessDeadBarrow 0
 290 create Player_1 DolAmrothGondorBulwark 0 2240,2710,0
 291 pkg23-pay Player_1 DolAmrothGondorBulwark 0 101
 292 create Player_1 GondorMarketPlace 0 2100,2630,0
