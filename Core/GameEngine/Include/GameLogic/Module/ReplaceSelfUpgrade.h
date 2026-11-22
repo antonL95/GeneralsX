@@ -20,6 +20,7 @@ public:
 	Bool isSubObjectsUpgrade() override { return FALSE; }
 	Bool wouldUpgrade(const UpgradeMaskType& mask) const override;
 	static Bool isBlocked(const Object* obj, const UpgradeTemplate* upgrade);
+	static const ThingTemplate* findReplacementTemplate(const Object* obj, const UpgradeTemplate* upgrade);
 
 protected:
 	void upgradeImplementation() override;

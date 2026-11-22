@@ -385,6 +385,7 @@ public:
 	GUICommandType getCommandType() const { return m_command; }
 	UnsignedInt getOptions() const { return m_options; }
 	OVERRIDE<ThingTemplate> getThingTemplate() const;
+	const ThingTemplate* resolveUpgradeTargetTemplate(const Object* source) const;
 	const AsciiString& getThingTemplateName() const { return m_thingTemplateName; }
 	const UpgradeTemplate* getUpgradeTemplate() const { return m_upgradeTemplate; }
 	const SpecialPowerTemplate* getSpecialPowerTemplate() const { return m_specialPower; }

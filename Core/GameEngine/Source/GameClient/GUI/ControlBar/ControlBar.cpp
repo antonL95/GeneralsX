@@ -63,6 +63,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/Module/ProductionUpdate.h"
+#include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/OCLUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
@@ -847,6 +848,15 @@ OVERRIDE<ThingTemplate> CommandButton::getThingTemplate() const
 	if (!m_thingTemplate && RetailFileLayers::enabled() && !m_thingTemplateName.isEmpty() && TheThingFactory)
 		m_thingTemplate = TheThingFactory->findTemplate(m_thingTemplateName);
 	return m_thingTemplate;
+}
+
+const ThingTemplate* CommandButton::resolveUpgradeTargetTemplate(const Object* source) const
+{
+	if (const ThingTemplate* direct = getThingTemplate())
+		return direct;
+	if (RetailFileLayers::enabled() && m_upgradeTemplate && source)
+		return ReplaceSelfUpgrade::findReplacementTemplate(source, m_upgradeTemplate);
+	return nullptr;
 }
 
 Bool CommandButton::isRetailPassive() const

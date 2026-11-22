@@ -139,6 +139,32 @@ Bool ReplaceSelfUpgrade::isBlocked(const Object* obj, const UpgradeTemplate* upg
 	return FALSE;
 }
 
+const ThingTemplate* ReplaceSelfUpgrade::findReplacementTemplate(const Object* obj, const UpgradeTemplate* upgrade)
+{
+	static const NameKeyType key = NAMEKEY("ReplaceSelfUpgrade");
+	if (!obj || !upgrade || !TheThingFactory)
+		return nullptr;
+	const UpgradeMaskType mask = upgrade->getUpgradeMask();
+	for (BehaviorModule** module = const_cast<Object*>(obj)->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != key)
+			continue;
+		const auto* replace = static_cast<const ReplaceSelfUpgrade*>(*module);
+		UpgradeMaskType activation;
+		UpgradeMaskType conflicting;
+		replace->getUpgradeActivationMasks(activation, conflicting);
+		if (!activation.testForAny(mask))
+			continue;
+		const auto& replacements = replace->getReplaceSelfUpgradeModuleData()->m_replacements;
+		if (!replacements.empty())
+		{
+			if (const ThingTemplate* tmpl = TheThingFactory->findTemplate(replacements.front()))
+				return tmpl;
+		}
+	}
+	return nullptr;
+}
+
 void ReplaceSelfUpgrade::upgradeImplementation()
 {
 	std::vector<Site> sites;
