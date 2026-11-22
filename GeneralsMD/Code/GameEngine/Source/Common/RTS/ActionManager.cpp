@@ -684,7 +684,8 @@ Bool ActionManager::canEnterObject( const Object *obj, const Object *objectToEnt
 		return FALSE;
 	}
 
-	if (RetailFileLayers::enabled() && objectToEnter->findUpdateModule(NAMEKEY("SlaughterHordeContain")))
+	if (RetailFileLayers::enabled() && (objectToEnter->findUpdateModule(NAMEKEY("SlaughterHordeContain")) ||
+		objectToEnter->findUpdateModule(NAMEKEY("CitadelSlaughterHordeContain"))))
 		return mode != COMBATDROP_INTO && contain->isValidContainerFor(obj, mode == CHECK_CAPACITY);
 
 	if( contain->isHealContain() )

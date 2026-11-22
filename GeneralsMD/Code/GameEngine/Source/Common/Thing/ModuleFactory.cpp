@@ -376,6 +376,7 @@ void ModuleFactory::init()
 	{
 		addModule( HordeContain );
 		addModule( SlaughterHordeContain );
+		addModule( CitadelSlaughterHordeContain );
 		addModule( SlaveWatcherBehavior );
 		addModule( BannerCarrierUpdate );
 		addModule( HorseHordeContain );
@@ -497,6 +498,7 @@ void ModuleFactory::init()
 		addModule( HitReactionBehavior );
 		addModule( HordeMemberCollide );
 		addModule( ExperienceLevelCreate );
+		addModule( AttachUpdate );
 		addModule( LevelUpUpgrade );
 		addModule( LevelGrantSpecialPower );
 		addModule( ShareExperienceBehavior );

@@ -4,16 +4,24 @@
 #include <vector>
 
 #include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/GameAudio.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
+#include "Common/Xfer.h"
+#include "GameClient/FXList.h"
+#include "GameClient/RetailEva.h"
 #include "GameClient/RetailWorldUI.h"
 #include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CostModifierUpgrade.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
+#include "GameLogic/TerrainLogic.h"
 #include "WWMath/wwmath.h"
 
 void SlaughterHordeContainModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -37,17 +45,27 @@ SlaughterHordeContain::~SlaughterHordeContain() = default;
 
 Bool SlaughterHordeContain::canSlaughter(const Object* passenger) const
 {
-	return passenger && !passenger->isEffectivelyDead() && !passenger->isDestroyed() &&
-		OpenContain::isValidContainerFor(passenger, FALSE) &&
-		getSlaughterHordeContainModuleData()->m_passengers.matchesObject(getObject(), passenger);
+	if (!passenger || passenger->isEffectivelyDead() || passenger->isDestroyed())
+		return FALSE;
+	const auto* data = getSlaughterHordeContainModuleData();
+	const Bool ownPlayer = data->m_allowOwnPlayer && passenger->getControllingPlayer() == getObject()->getControllingPlayer();
+	const Bool allowed = ownPlayer ?
+		passenger->isAnyKindOf(data->m_allowInsideKindOf) && !passenger->isAnyKindOf(data->m_forbidInsideKindOf) :
+		OpenContain::isValidContainerFor(passenger, FALSE);
+	return allowed && data->m_passengers.matchesObject(getObject(), passenger);
+}
+
+Bool SlaughterHordeContain::canAcceptEntry(const Object* passenger) const
+{
+	return RetailFileLayers::enabled() && passenger && passenger != getObject() &&
+		!passenger->isEffectivelyDead() && !passenger->isDestroyed() &&
+		!getObject()->isEffectivelyDead() && !getObject()->isDestroyed() &&
+		!getObject()->testStatus(OBJECT_STATUS_SOLD) && !getObject()->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
 }
 
 Bool SlaughterHordeContain::isValidContainerFor(const Object* passenger, Bool checkCapacity) const
 {
-	if (!RetailFileLayers::enabled() || !passenger || passenger == getObject() ||
-		passenger->isEffectivelyDead() || passenger->isDestroyed() ||
-		getObject()->isEffectivelyDead() || getObject()->isDestroyed() ||
-		getObject()->testStatus(OBJECT_STATUS_SOLD) || getObject()->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+	if (!canAcceptEntry(passenger))
 		return FALSE;
 
 	const auto* data = getSlaughterHordeContainModuleData();
@@ -89,18 +107,21 @@ void SlaughterHordeContain::slaughter(Object* passenger)
 	passenger->attemptDamage(&damage);
 }
 
-void SlaughterHordeContain::addToContain(Object* passenger)
+void SlaughterHordeContain::playEntrySound()
 {
-	if (!isValidContainerFor(passenger, TRUE))
-		return;
-
 	AudioEventRTS sound = getSlaughterHordeContainModuleData()->m_enterSound;
-	if (!sound.getEventName().isEmpty())
+	if (TheAudio && !sound.getEventName().isEmpty())
 	{
 		sound.setObjectID(getObject()->getID());
 		TheAudio->addAudioEvent(&sound);
 	}
+}
 
+void SlaughterHordeContain::addToContain(Object* passenger)
+{
+	if (!SlaughterHordeContain::isValidContainerFor(passenger, TRUE))
+		return;
+	playEntrySound();
 	if (const auto* horde = HordeContain::get(passenger))
 	{
 		const auto* contents = horde->getContainedItemsList();
@@ -126,4 +147,219 @@ void SlaughterHordeContain::xfer(Xfer* xfer)
 void SlaughterHordeContain::loadPostProcess()
 {
 	OpenContain::loadPostProcess();
+}
+
+void CitadelSlaughterHordeContainModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	SlaughterHordeContainModuleData::buildFieldParse(p);
+	static const FieldParse fields[] = {
+		{ "AllowOwnPlayerInsideOverride", INI::parseBool, nullptr, offsetof(CitadelSlaughterHordeContainModuleData, m_allowOwnPlayer) },
+		{ "StatusForRingEntry", ObjectStatusMaskType::parseFromINI, nullptr, offsetof(CitadelSlaughterHordeContainModuleData, m_ringStatus) },
+		{ "UpgradeForRingEntry", INI::parseAsciiStringVectorAppend, nullptr, offsetof(CitadelSlaughterHordeContainModuleData, m_ringUpgrades) },
+		{ "ObjectToDestroyForRingEntry", SpecialPowerObjectFilter::parse, nullptr, offsetof(CitadelSlaughterHordeContainModuleData, m_ringFilter) },
+		{ "FXForRingEntry", INI::parseFXList, nullptr, offsetof(CitadelSlaughterHordeContainModuleData, m_ringFX) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+CitadelSlaughterHordeContain::~CitadelSlaughterHordeContain() = default;
+
+Object* CitadelSlaughterHordeContain::findRing(const Object* passenger) const
+{
+	const auto* data = getCitadelSlaughterHordeContainModuleData();
+	const auto* horde = HordeContain::get(passenger);
+	if (!data->m_ringStatus.any() || passenger->getControllingPlayer() != getObject()->getControllingPlayer())
+		return nullptr;
+	const auto hasRingStatus = [&](const Object* candidate) { return candidate->getStatusBits().testForAll(data->m_ringStatus); };
+	if (!hasRingStatus(passenger))
+	{
+		const auto* members = horde ? horde->getContainedItemsList() : nullptr;
+		if (!members || std::none_of(members->begin(), members->end(), hasRingStatus))
+			return nullptr;
+	}
+
+	Object* result = nullptr;
+	for (Object* candidate = TheGameLogic->getFirstObject(); candidate; candidate = candidate->getNextObject())
+	{
+		if (!candidate->isKindOf(KINDOF_ONE_RING) || candidate->isDestroyed() || candidate->isEffectivelyDead() ||
+			!data->m_ringFilter.matchesObject(getObject(), candidate))
+			continue;
+		const auto* attachment = static_cast<const AttachUpdate*>(candidate->findUpdateModule(NAMEKEY("AttachUpdate")));
+		const Object* carrier = attachment ? TheGameLogic->findObjectByID(attachment->getParentID()) : nullptr;
+		if (carrier && (carrier == passenger || (horde && carrier->getContainedBy() == passenger)) &&
+			hasRingStatus(carrier) && (!result || candidate->getID() < result->getID()))
+			result = candidate;
+	}
+	return result;
+}
+
+Bool CitadelSlaughterHordeContain::isValidContainerFor(const Object* passenger, Bool checkCapacity) const
+{
+	if (!canAcceptEntry(passenger))
+		return FALSE;
+	if (findRing(passenger))
+		return TRUE;
+	return SlaughterHordeContain::isValidContainerFor(passenger, checkCapacity);
+}
+
+void CitadelSlaughterHordeContain::addToContain(Object* passenger)
+{
+	if (!canAcceptEntry(passenger))
+		return;
+	Object* ring = findRing(passenger);
+	if (!ring)
+	{
+		SlaughterHordeContain::addToContain(passenger);
+		return;
+	}
+
+	Object* self = getObject();
+	Player* player = self->getControllingPlayer();
+	const auto* data = getCitadelSlaughterHordeContainModuleData();
+	std::vector<const UpgradeTemplate*> upgrades;
+	for (const AsciiString& name : data->m_ringUpgrades)
+	{
+		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(name);
+		if (!upgrade)
+			return;
+		upgrades.push_back(upgrade);
+	}
+	playEntrySound();
+	TheGameLogic->destroyObject(ring);
+	for (const UpgradeTemplate* upgrade : upgrades)
+	{
+		if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+			player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+		else
+			self->giveUpgrade(upgrade);
+	}
+	if (data->m_ringFX)
+		FXList::doFXObj(data->m_ringFX, self);
+}
+
+void CitadelSlaughterHordeContain::crc(Xfer* xfer)
+{
+	SlaughterHordeContain::crc(xfer);
+}
+
+void CitadelSlaughterHordeContain::xfer(Xfer* xfer)
+{
+	SlaughterHordeContain::xfer(xfer);
+}
+
+void CitadelSlaughterHordeContain::loadPostProcess()
+{
+	SlaughterHordeContain::loadPostProcess();
+}
+
+void AttachUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] = {
+		{ "ObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(AttachUpdateModuleData, m_filter) },
+		{ "ParentStatus", ObjectStatusMaskType::parseFromINI, nullptr, offsetof(AttachUpdateModuleData, m_parentStatus) },
+		{ "ScanRange", INI::parseReal, nullptr, offsetof(AttachUpdateModuleData, m_scanRange) },
+		{ "AlwaysTeleport", INI::parseBool, nullptr, offsetof(AttachUpdateModuleData, m_alwaysTeleport) },
+		{ "AnchorToTopOfGeometry", INI::parseBool, nullptr, offsetof(AttachUpdateModuleData, m_anchorToTop) },
+		{ "ParentOwnerAttachmentEvaEvent", INI::parseAsciiString, nullptr, offsetof(AttachUpdateModuleData, m_parentOwnerAttachmentEva) },
+		{ "ParentEnemyAttachmentEvaEvent", INI::parseAsciiString, nullptr, offsetof(AttachUpdateModuleData, m_parentEnemyAttachmentEva) },
+		{ "ParentOwnerDiedEvaEvent", INI::parseAsciiString, nullptr, offsetof(AttachUpdateModuleData, m_parentOwnerDiedEva) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	UpdateModuleData::buildFieldParse(p);
+	p.add(fields);
+}
+
+AttachUpdate::~AttachUpdate() = default;
+
+UpdateSleepTime AttachUpdate::update()
+{
+	Object* self = getObject();
+	const auto* data = getAttachUpdateModuleData();
+	if (!RetailFileLayers::enabled() || !self->isKindOf(KINDOF_ONE_RING) ||
+		self->isEffectivelyDead() || self->isDestroyed() || data->m_scanRange <= 0.0f)
+		return UPDATE_SLEEP_FOREVER;
+
+	Object* parent = TheGameLogic->findObjectByID(m_parent);
+	if (m_parent != INVALID_ID)
+	{
+		if (parent && !parent->isEffectivelyDead() && !parent->isDestroyed())
+		{
+			Coord3D position = *parent->getPosition();
+			if (data->m_anchorToTop)
+				position.z += parent->getGeometryInfo().getMaxHeightAbovePosition();
+			self->setPosition(&position);
+			return UPDATE_SLEEP_NONE;
+		}
+		if (parent)
+		{
+			parent->clearStatus(data->m_parentStatus);
+			RetailEva::queue(parent->getControllingPlayer(), data->m_parentOwnerDiedEva, self->getPosition(), RetailEva::Ping::OneRing);
+		}
+		m_parent = INVALID_ID;
+		self->clearStatus(OBJECT_STATUS_ATTACHED);
+		Coord3D position = *self->getPosition();
+		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+		self->setPosition(&position);
+		parent = nullptr;
+	}
+
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_scanRange, FROM_CENTER_2D);
+	MemoryPoolObjectHolder holder(iter);
+	Real bestDistanceSquared = data->m_scanRange * data->m_scanRange;
+	for (Object* candidate = iter->first(); candidate; candidate = iter->next())
+	{
+		if (candidate == self || candidate->isEffectivelyDead() || candidate->isDestroyed() ||
+			candidate->testStatus(OBJECT_STATUS_HOLDING_THE_RING) ||
+			!data->m_filter.matchesObject(self, candidate))
+			continue;
+		const Real dx = candidate->getPosition()->x - self->getPosition()->x;
+		const Real dy = candidate->getPosition()->y - self->getPosition()->y;
+		const Real distanceSquared = dx * dx + dy * dy;
+		if (distanceSquared < bestDistanceSquared ||
+			(distanceSquared == bestDistanceSquared && (!parent || candidate->getID() < parent->getID())))
+		{
+			parent = candidate;
+			bestDistanceSquared = distanceSquared;
+		}
+	}
+	if (parent && !parent->isDestroyed() && !parent->isEffectivelyDead())
+	{
+		m_parent = parent->getID();
+		parent->setStatus(data->m_parentStatus);
+		self->setStatus(OBJECT_STATUS_ATTACHED);
+		const Player* owner = parent->getControllingPlayer();
+		RetailEva::queue(owner, data->m_parentOwnerAttachmentEva, self->getPosition(), RetailEva::Ping::OneRing);
+		const Player* local = ThePlayerList->getLocalPlayer();
+		if (local && local != owner)
+			RetailEva::queue(local, local->getRelationship(parent->getTeam()) == ENEMIES ?
+				data->m_parentEnemyAttachmentEva : data->m_parentOwnerAttachmentEva, self->getPosition(), RetailEva::Ping::OneRing);
+	}
+	return UPDATE_SLEEP_NONE;
+}
+
+void AttachUpdate::onDelete()
+{
+	if (m_parent != INVALID_ID)
+		if (Object* parent = TheGameLogic->findObjectByID(m_parent))
+			parent->clearStatus(getAttachUpdateModuleData()->m_parentStatus);
+}
+
+void AttachUpdate::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	xfer->xferObjectID(&m_parent);
+}
+
+void AttachUpdate::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	UpdateModule::xfer(xfer);
+	xfer->xferObjectID(&m_parent);
+}
+
+void AttachUpdate::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
 }
