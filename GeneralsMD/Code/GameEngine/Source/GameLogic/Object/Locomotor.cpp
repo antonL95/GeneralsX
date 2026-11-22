@@ -50,6 +50,8 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/SpecialAbilityUpdate.h"
 
 
 static const Real DONUT_TIME_DELAY_SECONDS=2.5f;
@@ -725,6 +727,9 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "WanderAboutPointRadius",				 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_wanderAboutPointRadius) },
 		{ "BurningDeathRadius", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.burningDeathRadius) },
 		{ "BurningDeathIsCavalry", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.burningDeathIsCavalry) },
+		{ "ChargeAvailable", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeAvailable) },
+		{ "ChargeIgnoresCondition", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeIgnoresCondition) },
+		{ "ChargeSpeed", parseRotwkField<INI::parsePercentToReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeSpeedFraction) },
 
 		{ "RudderCorrectionDegree",		 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionDegree) }, // Added in Zero Hour
 		{ "RudderCorrectionRate",			 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionRate) }, // Added in Zero Hour
@@ -1034,14 +1039,50 @@ void Locomotor::startMove()
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool Locomotor::hasRetailChargeSpeed(BodyDamageType condition, const Object* object) const
+{
+	if (!object || !RetailFileLayers::enabled() ||
+		(!m_template->m_rotwk.chargeIgnoresCondition &&
+			!IS_CONDITION_BETTER(condition, TheGlobalData->m_movementPenaltyDamageState)))
+		return FALSE;
+
+	if (m_template->m_rotwk.chargeAvailable)
+	{
+		if (object->testStatus(OBJECT_STATUS_IS_ATTACKING) || object->testStatus(OBJECT_STATUS_LEASHED_RETURNING))
+			return TRUE;
+
+		const AIUpdateInterface* ai = object->getAI();
+		if (ai && ai->getModuleNameKey() == NAMEKEY("HordeAIUpdate") &&
+			static_cast<const HordeAIUpdate*>(ai)->isApproachingAttackTarget())
+			return TRUE;
+	}
+
+	if (!object->testStatus(OBJECT_STATUS_IS_USING_ABILITY))
+		return FALSE;
+	if (object->getLogicModelConditions().test(MODELCONDITION_CHARGING))
+		return TRUE;
+
+	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+	{
+		auto* special = (*module)->getSpecialPowerUpdateInterface();
+		if (special && special->isSpecialAbility() && static_cast<SpecialAbilityUpdate*>(special)->isChargeAttack())
+			return TRUE;
+	}
+	return FALSE;
+}
+
 Real Locomotor::getMaxSpeedForCondition(BodyDamageType condition, const Object* obj) const
 {
 	Real speed;
 
-	if( IS_CONDITION_BETTER( condition, TheGlobalData->m_movementPenaltyDamageState ) )
+	if (IS_CONDITION_BETTER(condition, TheGlobalData->m_movementPenaltyDamageState) ||
+		(RetailFileLayers::enabled() && m_template->m_rotwk.chargeIgnoresCondition))
 		speed = m_template->getActualMaxSpeed();
 	else
 		speed = m_template->getActualMaxSpeedDamaged();
+
+	if (hasRetailChargeSpeed(condition, obj))
+		speed *= m_template->m_rotwk.chargeSpeedFraction;
 
 	if (obj && obj->getAttributeModifierHelper())
 		speed *= AttributeModifiers::speedFactor(obj);
@@ -2746,7 +2787,7 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 	const Real SLIDE_IN_PLACE_DISTANCE = 0.1f;
 
 	BodyDamageType bdt = obj->getBodyModule()->getDamageState();
-	Real maxSpeed = getMaxSpeedForCondition(bdt);
+	Real maxSpeed = getMaxSpeedForCondition(bdt, RetailFileLayers::enabled() ? obj : nullptr);
 	if (desiredSpeed > maxSpeed)
 		desiredSpeed = maxSpeed;
 
@@ -2783,7 +2824,7 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 	PhysicsBehavior* physics = obj->getPhysics();
 	if (!physics)
 		return;
-	Real maxSpeed = getMaxSpeedForCondition(obj->getBodyModule()->getDamageState());
+	Real maxSpeed = getMaxSpeedForCondition(obj->getBodyModule()->getDamageState(), RetailFileLayers::enabled() ? obj : nullptr);
 	if (desiredSpeed > maxSpeed)
 		desiredSpeed = maxSpeed;
 	Coord3D dir;

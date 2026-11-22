@@ -31,6 +31,7 @@ public:
 		return issuedFrame == m_plannerOrderFrame ? m_blockedPlannerRevision : 0;
 	}
 	Bool isEngaging() const { return m_engaging; }
+	Bool isApproachingAttackTarget() const { return m_attackTarget != INVALID_ID && !m_engaging && isMoving(); }
 
 private:
 	static constexpr AICommandType NO_ORDER = (AICommandType)-1;

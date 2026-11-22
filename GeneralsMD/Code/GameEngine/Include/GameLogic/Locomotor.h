@@ -353,6 +353,7 @@ public:
 
 	Real getWanderWidthFactor() const {return m_template->m_wanderWidthFactor;}
 	Real getWanderAboutPointRadius() const {return m_template->m_wanderAboutPointRadius;}
+	Bool hasRetailChargeSpeed(BodyDamageType condition, const Object* object) const;
 	Real getBurningDeathRadius() const { return m_template->m_rotwk.burningDeathRadius; }
 	Bool isBurningDeathCavalry() const { return m_template->m_rotwk.burningDeathIsCavalry; }
 
