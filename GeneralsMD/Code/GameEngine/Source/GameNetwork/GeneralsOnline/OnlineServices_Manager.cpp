@@ -789,7 +789,6 @@ void NGMP_OnlineServicesManager::requestLobbyDetailsAsync(int64_t lobbyId, bool 
             fprintf(stderr, "[NGMP] GET Lobby %lld failed (curl=%d, http=%ld)\n", (long long)targetId, res, httpCode);
             fflush(stderr);
             if (!m_isLobbyOwner && (httpCode == 404 || httpCode == 400 || httpCode == 410)) {
-                // Lobby was closed / host left
                 m_currentLobbyId = -1;
                 NGMPEvent leftEv;
                 leftEv.type = NGMPEvent::EVENT_LOBBY_LEFT;
@@ -822,7 +821,6 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
 
         std::vector<LobbyMemberEntry> lobbyMembers;
 
-        // Populate members
         auto membersIter = lobbyIter.contains("Members") ? lobbyIter["Members"] : (lobbyIter.contains("members") ? lobbyIter["members"] : json::array());
         if (membersIter.is_array()) {
             for (const auto& member : membersIter) {
@@ -878,7 +876,6 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
             }
         }
 
-        // Update NGMP LobbyInterface current lobby cache and roster under mutex
         {
             std::lock_guard<std::mutex> lock(m_eventMutex);
             NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
@@ -908,7 +905,6 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
             }
         }
 
-        // If guest is no longer part of the lobby members list, trigger lobby exit
         if (!m_isLobbyOwner && localSlotIndex < 0 && m_currentLobbyId == targetId) {
             fprintf(stderr, "[NGMP] Local player %lld no longer in lobby %lld members roster\n",
                 (long long)m_userId, (long long)targetId);
