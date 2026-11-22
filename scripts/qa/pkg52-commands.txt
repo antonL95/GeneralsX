@@ -38,6 +38,17 @@
 37 particle-fx Player_1 RohanOathbreaker1 0 FX_Resurrect
 38 particle-systems - - 0 AODLightLenzflare
 110 particle-systems - - 0 AODLightLenzflare
+111 particle-systems - - 0 HSLightningStrike3
+112 create Player_1 Pkg52QuietSanctum 0 3110,700,0
+113 pkg50-power Player_1 Pkg52QuietSanctum 0 SpecialAbilityBlessingOfBelegur
+115 pkg50-state Player_1 Pkg52QuietSanctum 0
+115 particle-systems - - 0 HSLightningStrike3
+120 create Player_1 SecondAgeAnarion 0 2950,485,0
+121 pkg50-kill Player_1 SecondAgeAnarion 0
+125 create Player_1 SanctumofZigur 0 3150,480,0
+127 pkg50-power Player_1 SanctumofZigur 0 SpecialAbilityBlessingOfBelegur
+129 pkg50-state Player_1 SanctumofZigur 0
+129 particle-systems - - 0 HSLightningStrike3
 185 particle-fx - - 0 FX_AODDeath 2958 480 0
 186 particle-systems - - 0 AODLightShafts
 188 unreveal Player_1 MenPorter 0
