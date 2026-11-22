@@ -32,6 +32,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #define DEFINE_ANIM_2D_MODE_NAMES
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameClient/Anim2D.h"
 #include "GameClient/Display.h"
@@ -616,12 +617,12 @@ void Anim2D::draw( Int x, Int y )
 	DEBUG_ASSERTCRASH( image != nullptr, ("Anim2D::draw - Image not found for frame '%d' on animation '%s'",
 										 m_currentFrame, m_template->getName().str()) );
 
-	// get the natural width and height of this image
-	const ICoord2D *imageSize = image->getImageSize();
-
-	// draw the image
-	Color color = GameMakeColor( 255, 255, 255, 255 * m_alpha );
-	TheDisplay->drawImage( image, x, y, x + imageSize->x, y + imageSize->y, color );
+	if (!RetailFileLayers::enabled() || TheDisplay->hasImageTexture(image))
+	{
+		const ICoord2D *imageSize = image->getImageSize();
+		Color color = GameMakeColor( 255, 255, 255, 255 * m_alpha );
+		TheDisplay->drawImage( image, x, y, x + imageSize->x, y + imageSize->y, color );
+	}
 
 	//
 	// see if it's time for us to go to the next frame in the sequence, we do not update
@@ -647,9 +648,11 @@ void Anim2D::draw( Int x, Int y, Int width, Int height )
 										 m_currentFrame, m_template->getName().str()) );
 
 
-	// draw image to the display
-	Color color = GameMakeColor( 255, 255, 255, 255 * m_alpha );
-	TheDisplay->drawImage( image, x, y, x + width, y + height, color );
+	if (!RetailFileLayers::enabled() || TheDisplay->hasImageTexture(image))
+	{
+		Color color = GameMakeColor( 255, 255, 255, 255 * m_alpha );
+		TheDisplay->drawImage( image, x, y, x + width, y + height, color );
+	}
 
 	//
 	// see if it's time for us to go to the next frame in the sequence, we do not update
