@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if RTS_ZEROHOUR
 #include "Common/ThingTemplate.h"
@@ -123,3 +124,20 @@ void runRetailPackage25TestCommand(std::string_view action, Object* object, Obje
 	}
 }
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailPackage25TestCommands()
+{
+#if RTS_ZEROHOUR
+	registerPrefix("pkg25-", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		const Coord3D position = ctx.hasPosition ? ctx.groundLocation() : Coord3D{};
+		runRetailPackage25TestCommand(ctx.action, source, ctx.target,
+			ctx.hasPosition ? &position : nullptr, ctx.frame);
+	});
+#endif
+}
+}

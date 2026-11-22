@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
 #include <cstdio>
@@ -37,3 +38,18 @@ void runRetailPackage19TestCommand(std::string_view action, Object* source, Unsi
 		source->getPosition()->x, source->getPosition()->y, source->getPosition()->z);
 }
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailPackage19TestCommands()
+{
+#if !RTS_GENERALS
+	registerPrefix("pkg19-", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		runRetailPackage19TestCommand(ctx.action, source, ctx.frame);
+	});
+#endif
+}
+}

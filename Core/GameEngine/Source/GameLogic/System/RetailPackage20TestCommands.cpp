@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
 #define DEFINE_DEATH_NAMES
@@ -112,3 +113,18 @@ void runRetailPackage20TestCommand(std::string_view action, Object* source, Obje
 	}
 }
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailPackage20TestCommands()
+{
+#if !RTS_GENERALS
+	registerPrefix("pkg20-", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		runRetailPackage20TestCommand(ctx.action, source, ctx.target, ctx.argument, ctx.position, ctx.frame);
+	});
+#endif
+}
+}

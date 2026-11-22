@@ -1,0 +1,14 @@
+#include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
+
+namespace RetailTestCommands
+{
+@RETAIL_TEST_COMMAND_DECLARATIONS@
+void registerAllCommands()
+{
+	static bool registered = false;
+	if (registered)
+		return;
+	registered = true;
+@RETAIL_TEST_COMMAND_CALLS@}
+}

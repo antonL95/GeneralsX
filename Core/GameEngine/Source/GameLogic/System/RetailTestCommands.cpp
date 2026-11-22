@@ -166,23 +166,6 @@ struct RetailTeamBudgetFixture
 };
 #endif
 
-void runRetailPackage23TestCommand(std::string_view action, Player* player, Object* object, Object* target,
-	const char* name, const Coord3D& point, UnsignedInt frame);
-#if !RTS_GENERALS
-void runRetailPackage41TestCommand(std::string_view action, Object* source, UnsignedInt frame);
-void runRetailPackage17TestCommand(std::string_view action, Object* source, Object* target);
-void runRetailPackage50TestCommand(std::string_view action, Object* source, Object* target, const char* name, const char* argument, UnsignedInt frame);
-void runRetailPackage21TestCommand(std::string_view action, Object* source, const char* argument, const Coord3D* position, UnsignedInt frame);
-void runRetailPackage19TestCommand(std::string_view action, Object* source, UnsignedInt frame);
-void runRetailPackage18TestCommand(std::string_view action, Player* player, Object* source, const char* argument, UnsignedInt frame);
-void runRetailPackage25TestCommand(std::string_view action, Object* source, Object* target, const Coord3D* position, UnsignedInt frame);
-void runRetailPackage24TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
-
-void runRetailPackage20TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D& inputs, UnsignedInt frame);
-void runRetailPackage22TestCommand(std::string_view action, Object* source, Object* target, const Coord3D& inputs, UnsignedInt frame);
-void runRetailPackage53TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
-#endif
-
 namespace RetailTestCommands
 {
 namespace
@@ -2328,20 +2311,6 @@ void execute(const Command& command, unsigned int frame)
 		handler(context);
 		return;
 	}
-	if (command.action.starts_with("pkg23-"))
-	{
-		runRetailPackage23TestCommand(command.action, findPlayer(command), findObject(command, true),
-			findTarget(command, true), command.structure.c_str(), command.location, frame);
-		return;
-	}
-#if !RTS_GENERALS
-	if (command.action.starts_with("pkg50-"))
-	{
-		runRetailPackage50TestCommand(command.action, findObject(command), command.action == "pkg50-bored" ? findTarget(command) : nullptr,
-			command.target.c_str(), command.structure.c_str(), frame);
-		return;
-	}
-#endif
 	if (command.action.starts_with("sweep-"))
 	{
 		sweepCommand(command, frame);
@@ -2678,62 +2647,6 @@ void execute(const Command& command, unsigned int frame)
 			command.player.c_str());
 		return;
 	}
-
-#if !RTS_GENERALS
-	if (command.action.starts_with("pkg17-"))
-	{
-		runRetailPackage17TestCommand(command.action, obj, findTarget(command, true));
-		return;
-	}
-	if (command.action.starts_with("pkg21-"))
-	{
-		const Coord3D position = command.hasLocation ? groundLocation(command) : Coord3D{};
-		runRetailPackage21TestCommand(command.action, obj, command.structure.c_str(), command.hasLocation ? &position : nullptr, frame);
-		return;
-	}
-	if (command.action.starts_with("pkg24-"))
-	{
-		runRetailPackage24TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(), frame);
-		return;
-	}
-	if (command.action.starts_with("pkg19-"))
-	{
-		runRetailPackage19TestCommand(command.action, obj, frame);
-		return;
-	}
-	if (command.action.starts_with("pkg18-"))
-	{
-		runRetailPackage18TestCommand(command.action, findPlayer(command.player), obj, command.structure.c_str(), frame);
-		return;
-	}
-	if (command.action.starts_with("pkg25-"))
-	{
-		const Coord3D position = command.hasLocation ? groundLocation(command) : Coord3D{};
-		runRetailPackage25TestCommand(command.action, obj, findTarget(command, true),
-			command.hasLocation ? &position : nullptr, frame);
-		return;
-	}
-	if (command.action.starts_with("pkg41-"))
-	{
-		runRetailPackage41TestCommand(command.action, obj, frame);
-		return;
-	}
-	if (command.action.starts_with("pkg20-"))
-	{
-		runRetailPackage20TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(), command.location, frame);
-		return;
-	}
-	if (command.action.starts_with("pkg22-"))
-	{
-		runRetailPackage22TestCommand(command.action, obj, findTarget(command, true), command.location, frame);
-		return;
-	}
-	if (command.action.starts_with("pkg53-"))
-	{
-		runRetailPackage53TestCommand(command.action, obj, findTarget(command, true), frame);
-		return;
-	}
-#endif
 
 	const Bool placeAtPoint = command.action == "place" && command.hasPlacementPoint;
 	if (command.action == "snapshot-devastation")
@@ -3661,57 +3574,6 @@ void registerPrefix(std::string_view prefix, Handler handler)
 		std::fflush(stderr);
 		std::abort();
 	}
-}
-
-void registerRetailAbilityTimingTestCommands();
-void registerRetailAttachTestCommands();
-void registerRetailBuildingTestCommands();
-void registerRetailMarshTestCommands();
-void registerRetailMordorTestCommands();
-void registerRetailParticleTestCommands();
-void registerRetailPlacementTestCommands();
-void registerRetailPowerTestCommands();
-void registerRetailSaveLoadTestCommands();
-void registerRetailPackage05TestCommands();
-void registerRetailPackage07TestCommands();
-void registerRetailPackage08TestCommands();
-void registerRetailPackage09TestCommands();
-void registerRetailPackage10TestCommands();
-void registerRetailPackage11TestCommands();
-void registerRetailPackage12TestCommands();
-void registerRetailPackage12PickupTestCommands();
-void registerRetailPackage13TestCommands();
-void registerRetailPackage14TestCommands();
-void registerRetailPackage15TestCommands();
-void registerRetailPackage16TestCommands();
-
-void registerAllCommands()
-{
-	static bool registered = false;
-	if (registered)
-		return;
-	registered = true;
-	registerRetailAbilityTimingTestCommands();
-	registerRetailAttachTestCommands();
-	registerRetailBuildingTestCommands();
-	registerRetailMarshTestCommands();
-	registerRetailMordorTestCommands();
-	registerRetailParticleTestCommands();
-	registerRetailPlacementTestCommands();
-	registerRetailPowerTestCommands();
-	registerRetailSaveLoadTestCommands();
-	registerRetailPackage05TestCommands();
-	registerRetailPackage07TestCommands();
-	registerRetailPackage08TestCommands();
-	registerRetailPackage09TestCommands();
-	registerRetailPackage10TestCommands();
-	registerRetailPackage11TestCommands();
-	registerRetailPackage12TestCommands();
-	registerRetailPackage12PickupTestCommands();
-	registerRetailPackage13TestCommands();
-	registerRetailPackage14TestCommands();
-	registerRetailPackage15TestCommands();
-	registerRetailPackage16TestCommands();
 }
 
 bool tracesCombat()

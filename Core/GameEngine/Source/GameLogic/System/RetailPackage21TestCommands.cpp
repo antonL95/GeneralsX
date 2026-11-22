@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
 #include <cstdio>
@@ -121,3 +122,20 @@ void runRetailPackage21TestCommand(std::string_view action, Object* object, cons
 		weapon ? weapon->getTemplate()->getName().str() : "-");
 }
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailPackage21TestCommands()
+{
+#if !RTS_GENERALS
+	registerPrefix("pkg21-", [](const Context& ctx) {
+		Object* source = ctx.requireObject();
+		if (!source)
+			return;
+		const Coord3D position = ctx.hasPosition ? ctx.groundLocation() : Coord3D{};
+		runRetailPackage21TestCommand(ctx.action, source, ctx.argument,
+			ctx.hasPosition ? &position : nullptr, ctx.frame);
+	});
+#endif
+}
+}

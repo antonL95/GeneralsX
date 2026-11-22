@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -79,4 +80,15 @@ void runRetailPackage23TestCommand(std::string_view action, Player* player, Obje
 		std::fprintf(stderr, "TEST pkg23 destroy frame=%u name=%s refund=%d\n",
 			frame, object->getTemplate()->getName().str(), static_cast<Int>(money->countMoney()) - before);
 	}
+}
+
+namespace RetailTestCommands
+{
+void registerRetailPackage23TestCommands()
+{
+	registerPrefix("pkg23-", [](const Context& ctx) {
+		runRetailPackage23TestCommand(ctx.action, ctx.player, ctx.findObject(true),
+			ctx.target, ctx.argument, ctx.position, ctx.frame);
+	});
+}
 }

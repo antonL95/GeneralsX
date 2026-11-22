@@ -739,42 +739,8 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/ExperienceLevelStore.cpp
     Source/GameLogic/System/RetailCreationUpgrades.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
-    Source/GameLogic/System/RetailParticleTestCommands.cpp
-    Source/GameLogic/System/RetailSaveLoadTestCommands.cpp
-    Source/GameLogic/System/RetailMarshTestCommands.cpp
-    Source/GameLogic/System/RetailBuildingTestCommands.cpp
-    Source/GameLogic/System/RetailPlacementTestCommands.cpp
     Source/GameLogic/System/RetailBuildingEvents.cpp
     Source/GameLogic/Object/Behavior/RetailConstruction.cpp
-    Source/GameLogic/System/RetailMordorTestCommands.cpp
-    Source/GameLogic/System/RetailPowerTestCommands.cpp
-    Source/GameLogic/System/RetailAbilityTimingTestCommands.cpp
-    Source/GameLogic/System/RetailPackage05TestCommands.cpp
-    Source/GameLogic/System/RetailPackage41TestCommands.cpp
-    Source/GameLogic/System/RetailPackage07TestCommands.cpp
-    Source/GameLogic/System/RetailPackage17TestCommands.cpp
-    Source/GameLogic/System/RetailPackage09TestCommands.cpp
-    Source/GameLogic/System/RetailPackage10TestCommands.cpp
-    Source/GameLogic/System/RetailPackage50TestCommands.cpp
-    Source/GameLogic/System/RetailPackage12TestCommands.cpp
-    Source/GameLogic/System/RetailAttachTestCommands.cpp
-    Source/GameLogic/System/RetailPackage12PickupTestCommands.cpp
-    Source/GameLogic/System/RetailPackage15TestCommands.cpp
-    Source/GameLogic/System/RetailPackage21TestCommands.cpp
-    Source/GameLogic/System/RetailPackage13TestCommands.cpp
-    Source/GameLogic/System/RetailPackage16TestCommands.cpp
-    Source/GameLogic/System/RetailPackage19TestCommands.cpp
-    Source/GameLogic/System/RetailPackage18TestCommands.cpp
-    Source/GameLogic/System/RetailPackage25TestCommands.cpp
-    Source/GameLogic/System/RetailPackage24TestCommands.cpp
-
-    Source/GameLogic/System/RetailPackage08TestCommands.cpp
-    Source/GameLogic/System/RetailPackage11TestCommands.cpp
-    Source/GameLogic/System/RetailPackage14TestCommands.cpp
-    Source/GameLogic/System/RetailPackage20TestCommands.cpp
-    Source/GameLogic/System/RetailPackage23TestCommands.cpp
-    Source/GameLogic/System/RetailPackage22TestCommands.cpp
-    Source/GameLogic/System/RetailPackage53TestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
     Source/GameLogic/Object/Upgrade/ReplaceSelfUpgrade.cpp
@@ -1385,6 +1351,30 @@ configure_file(Source/GameClient/UiFramesIni.cpp.in "${CMAKE_CURRENT_BINARY_DIR}
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS Source/GameClient/UiFrames.ini Source/GameClient/RetailHud.wnd)
 target_sources(corei_gameengine_private INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/UiFramesIni.cpp")
 target_sources(corei_gameengine_private INTERFACE Source/GameClient/RetailHud.wnd)
+
+file(GLOB RETAIL_TEST_COMMAND_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/GameLogic/System/Retail*TestCommands.cpp"
+)
+list(REMOVE_ITEM RETAIL_TEST_COMMAND_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/GameLogic/System/RetailTestCommands.cpp"
+)
+list(SORT RETAIL_TEST_COMMAND_SOURCES)
+set(RETAIL_TEST_COMMAND_DECLARATIONS "")
+set(RETAIL_TEST_COMMAND_CALLS "")
+foreach(RETAIL_TEST_COMMAND_SOURCE IN LISTS RETAIL_TEST_COMMAND_SOURCES)
+    get_filename_component(RETAIL_TEST_COMMAND_STEM "${RETAIL_TEST_COMMAND_SOURCE}" NAME_WE)
+    string(APPEND RETAIL_TEST_COMMAND_DECLARATIONS "void register${RETAIL_TEST_COMMAND_STEM}();\n")
+    string(APPEND RETAIL_TEST_COMMAND_CALLS "\tregister${RETAIL_TEST_COMMAND_STEM}();\n")
+endforeach()
+configure_file(
+    Source/GameLogic/System/RetailTestCommandRegistrations.cpp.in
+    "${CMAKE_CURRENT_BINARY_DIR}/RetailTestCommandRegistrations.cpp"
+    @ONLY
+)
+target_sources(corei_gameengine_private INTERFACE
+    ${RETAIL_TEST_COMMAND_SOURCES}
+    "${CMAKE_CURRENT_BINARY_DIR}/RetailTestCommandRegistrations.cpp"
+)
 
 target_include_directories(corei_gameengine_private INTERFACE
     Include/Precompiled

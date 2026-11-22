@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
 #include "Common/ActionManager.h"
@@ -46,3 +47,17 @@ void runRetailPackage50TestCommand(std::string_view action, Object* source, Obje
 	}
 }
 #endif
+
+namespace RetailTestCommands
+{
+void registerRetailPackage50TestCommands()
+{
+#if !RTS_GENERALS
+	registerPrefix("pkg50-", [](const Context& ctx) {
+		runRetailPackage50TestCommand(ctx.action, ctx.source,
+			ctx.action == "pkg50-bored" ? ctx.findTarget(false) : nullptr,
+			ctx.targetName, ctx.argument, ctx.frame);
+	});
+#endif
+}
+}
