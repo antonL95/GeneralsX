@@ -13,6 +13,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Weapon.h"
 
@@ -54,10 +55,10 @@ void runRetailPackage11TestCommand(std::string_view action, Object* source, Obje
 	else if (action == "pkg11-shoot" && target)
 	{
 		const WeaponTemplate* weapon = TheWeaponStore->findWeaponTemplate(inputs.x == 1 ? "Pkg11Undodgeable" :
-			inputs.x == 2 ? "Pkg11SiegeLaunch" : "Pkg11Dodgeable");
+			inputs.x == 2 ? "Pkg11SiegeLaunch" : inputs.x == 3 ? "Pkg11DelayedLaunch" : "Pkg11Dodgeable");
 		if (weapon)
 		{
-			if (inputs.x == 2)
+			if (inputs.x == 2 || inputs.x == 3)
 				const_cast<WeaponTemplate*>(weapon)->postProcessLoad();
 			for (Int shot = 0; shot < std::max(1, static_cast<Int>(inputs.y)); ++shot)
 				TheWeaponStore->createAndFireTempWeapon(weapon, source, target, TRUE);
@@ -96,10 +97,27 @@ void runRetailPackage11TestCommand(std::string_view action, Object* source, Obje
 	else if (action == "pkg11-debris")
 	{
 		Int debris = 0;
+		Int westbound = 0;
 		for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		{
 			if (object->getTemplate()->getName().startsWith(name))
+			{
 				++debris;
+				const auto* physics = object->getPhysics();
+				if (physics && physics->getVelocity()->x < -1.0f)
+					++westbound;
+			}
+		}
 		std::fprintf(stderr, "TEST pkg11 debris frame=%u prefix=%s count=%d\n", frame, name, debris);
+		std::fprintf(stderr, "TEST pkg11 debris-velocity frame=%u prefix=%s westbound=%d\n", frame, name, westbound);
+	}
+	else if (action == "pkg11-held")
+	{
+		const auto* contain = source->getContain();
+		const auto* passengers = contain ? contain->getContainedItemsList() : nullptr;
+		const Object* held = passengers && !passengers->empty() ? passengers->front() : nullptr;
+		std::fprintf(stderr, "TEST pkg11 held frame=%u id=%u name=%s\n", frame,
+			static_cast<UnsignedInt>(held ? held->getID() : INVALID_ID), held ? held->getTemplate()->getName().str() : "-");
 	}
 }
 #endif
