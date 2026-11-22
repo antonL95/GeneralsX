@@ -114,6 +114,7 @@
 #include "GameLogic/Module/ObjectDefectionHelper.h"
 #include "GameLogic/Module/ObjectRepulsorHelper.h"
 #include "GameLogic/Module/ObjectSMCHelper.h"
+#include "GameLogic/Module/RetailTransportTeleportModules.h"
 #include "GameLogic/Module/ObjectWeaponStatusHelper.h"
 #include "GameLogic/Module/OverchargeBehavior.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
@@ -403,7 +404,8 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	// this at or near the end of the drawable construction so that we have
 	// all the valid data about the thing when we create the module
 	//
-	Int totalModules = tt->getBehaviorModuleInfo().getCount() + NUM_SLEEP_HELPERS;  // need to take into account all the helper modules
+	const Bool retailLayers = RetailFileLayers::enabled();
+	Int totalModules = tt->getBehaviorModuleInfo().getCount() + NUM_SLEEP_HELPERS + retailLayers;
 
 	// allocate the publicModule arrays
 // pool[]ify
@@ -523,6 +525,13 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 		BehaviorModule* newMod = (BehaviorModule*)TheModuleFactory->newModule(this, modName, mi.getNthData(modIdx), MODULETYPE_BEHAVIOR);
 		*curB++ = newMod;
 
+		if (retailLayers)
+		{
+			static const NameKeyType temporaryDefectionKey = NAMEKEY("TemporarilyDefectUpdate");
+			if (newMod->getModuleNameKey() == temporaryDefectionKey)
+				m_temporaryDefection = static_cast<TemporarilyDefectUpdate*>(newMod);
+		}
+
 		static const NameKeyType slavedUpdateKey = NAMEKEY("SlavedUpdate");
 		if (newMod->getModuleNameKey() == slavedUpdateKey)
 			m_slavedUpdate = static_cast<SlavedUpdate*>(newMod);
@@ -567,6 +576,13 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 		}
 	}
 
+	if (retailLayers && !m_temporaryDefection)
+	{
+		static TemporarilyDefectUpdateModuleData temporaryDefectionData;
+		temporaryDefectionData.setModuleTagNameKey(NAMEKEY("ModuleTag_RetailTemporaryDefectionFallback"));
+		m_temporaryDefection = newInstance(TemporarilyDefectUpdate)(this, &temporaryDefectionData);
+		*curB++ = m_temporaryDefection;
+	}
 	*curB = nullptr;
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
@@ -2447,6 +2463,8 @@ void Object::setEffectivelyDead(Bool dead)
 
 	if (dead)
 	{
+		if (RetailFileLayers::enabled())
+			m_domination = {};
 		if( m_radarData )
 			TheRadar->removeObject( this );
 	}
@@ -5206,9 +5224,37 @@ void Object::xfer( Xfer *xfer )
 		xferRetailBlocks(xfer, version >= 19);
 }
 
+void Object::inheritDomination(const Object& source)
+{
+	if (RetailFileLayers::enabled())
+		setDominationState(source.m_domination);
+}
+
+void Object::setDominationState(const DominationState& state)
+{
+	if (m_temporaryDefection && state.deadline != 0)
+	{
+		m_domination = state;
+		m_temporaryDefection->schedule();
+	}
+}
+
 void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 {
-	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	if (!loading && m_domination.deadline == 0)
+	{
+		RetailSaveBlocks::transferSection<Xfer>(xfer, FALSE, present, {});
+		return;
+	}
+	RetailSaveBlocks::transferSection<Xfer>(xfer, loading, present, {
+		{"temporary-domination", [this](Xfer* x) {
+			x->xferUnsignedInt(&m_domination.originalTeam);
+			x->xferObjectID(&m_domination.caster);
+			x->xferUnsignedInt(&m_domination.deadline);
+			x->xferUnsignedInt(&m_domination.nextCheck);
+		}, [this] { m_domination = {}; }}
+	});
 }
 
 void Object::inheritMountedUpgradeCommands(std::vector<AsciiString> commands)

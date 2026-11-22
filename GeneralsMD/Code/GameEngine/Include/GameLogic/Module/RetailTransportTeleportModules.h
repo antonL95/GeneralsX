@@ -4,10 +4,41 @@
 
 #include "Common/SpecialPowerINI.h"
 #include "Common/Team.h"
+#include "GameLogic/Module/ObjectHelper.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 
 class FXList;
 class WeaponTemplate;
+
+class TemporarilyDefectUpdateModuleData : public ModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	UnsignedInt m_defectDuration = 0;
+};
+
+class TemporarilyDefectUpdate final : public ObjectHelper
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(TemporarilyDefectUpdate, "TemporarilyDefectUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(TemporarilyDefectUpdate, TemporarilyDefectUpdateModuleData)
+
+public:
+	TemporarilyDefectUpdate(Thing* thing, const ModuleData* data) : ObjectHelper(thing, data) {}
+
+	static TemporarilyDefectUpdate* find(Object* object);
+	void restoreLegacy(ObjectID caster, TeamID originalTeam, UnsignedInt deadline);
+	void invalidateCaster(ObjectID caster);
+	Bool convert(ObjectID caster, Team* team, UnsignedInt fallbackDuration);
+	void cancel();
+	UpdateSleepTime update() override;
+	DisabledMaskType getDisabledTypesToProcess() const override { return DISABLEDMASK_ALL; }
+
+private:
+	friend class Object;
+	void schedule();
+	UnsignedInt m_legacyEarliestDeadline = 0;
+};
 
 class DominateEnemySpecialPowerModuleData : public SpecialAbilityUpdateModuleData
 {
@@ -29,7 +60,7 @@ class DominateEnemySpecialPower final : public SpecialAbilityUpdate
 
 public:
 	DominateEnemySpecialPower(Thing* thing, const ModuleData* data) : SpecialAbilityUpdate(thing, data) {}
-	UpdateSleepTime update() override;
+	void onDelete() override;
 
 protected:
 	Bool acceptsIntent(const Object* target, const Coord3D* position) const override;
@@ -43,11 +74,9 @@ private:
 		UnsignedInt revertFrame = 0;
 	};
 
-	void xferDominateState(Xfer* xfer);
-	void revertExpiredEntries(UnsignedInt now);
 	Bool matchesDominateFilter(const Object* victim) const;
 
-	std::vector<DominatedEntry> m_dominated;
+	std::vector<DominatedEntry> m_legacyDominated;
 };
 
 class FlingPassengerSpecialAbilityUpdateModuleData : public SpecialAbilityUpdateModuleData

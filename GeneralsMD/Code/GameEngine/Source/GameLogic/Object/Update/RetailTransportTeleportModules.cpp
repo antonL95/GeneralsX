@@ -4,8 +4,10 @@
 
 #include <algorithm>
 
+#include "Common/GameCommon.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
 #include "Common/Xfer.h"
@@ -27,6 +29,7 @@
 namespace
 {
 constexpr UnsignedInt MAX_SERIALIZED_ENTRIES = 256;
+constexpr UnsignedInt DEFECTION_RECHECK_FRAMES = 10;
 
 void teleportObjectWithMembers(Object* unit, const Coord3D& dest)
 {
@@ -62,17 +65,18 @@ void teleportObjectWithMembers(Object* unit, const Coord3D& dest)
 	}
 }
 
-void convertObjectOwnership(Object* victim, Team* newTeam)
+void convertObjectOwnership(Object* victim, Team* newTeam, Bool reverting = FALSE)
 {
 	if (!victim || !newTeam || victim->isEffectivelyDead() || victim->isDestroyed())
 		return;
-	if (victim->isKindOf(KINDOF_HORDE) && victim->getContain())
+	const Bool horde = victim->isKindOf(KINDOF_HORDE) && victim->getContain();
+	if (horde || reverting)
 	{
 		victim->setTeam(newTeam);
 		victim->handlePartitionCellMaintenance();
 		if (AIUpdateInterface* ai = victim->getAI())
 			ai->aiIdle(CMD_FROM_AI);
-		const ContainedItemsList* items = victim->getContain()->getContainedItemsList();
+		const ContainedItemsList* items = horde ? victim->getContain()->getContainedItemsList() : nullptr;
 		if (items)
 		{
 			std::vector<Object*> members;
@@ -109,6 +113,139 @@ Bool hasObjectFilter(const SpecialPowerObjectFilter& filter)
 	return filter.m_rules != 0 || filter.m_includeKinds.any() || filter.m_excludeKinds.any() ||
 		!filter.m_includeObjects.empty() || !filter.m_excludeObjects.empty();
 }
+}
+
+void TemporarilyDefectUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] = {
+		{ "DefectDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(TemporarilyDefectUpdateModuleData, m_defectDuration) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+TemporarilyDefectUpdate::~TemporarilyDefectUpdate() = default;
+
+void TemporarilyDefectUpdate::crc(Xfer* xfer)
+{
+	ObjectHelper::crc(xfer);
+}
+
+void TemporarilyDefectUpdate::xfer(Xfer* xfer)
+{
+	ObjectHelper::xfer(xfer);
+}
+
+void TemporarilyDefectUpdate::loadPostProcess()
+{
+	ObjectHelper::loadPostProcess();
+}
+
+TemporarilyDefectUpdate* TemporarilyDefectUpdate::find(Object* object)
+{
+	return object->m_temporaryDefection;
+}
+
+void TemporarilyDefectUpdate::schedule()
+{
+	const auto& state = getObject()->m_domination;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	sleepUntil(std::max(now + 1, std::min(state.deadline, state.nextCheck)));
+}
+
+Bool TemporarilyDefectUpdate::convert(ObjectID caster, Team* team, UnsignedInt fallbackDuration)
+{
+	Object* victim = getObject();
+	auto& state = victim->m_domination;
+	const UnsignedInt authoredDuration = getTemporarilyDefectUpdateModuleData()->m_defectDuration;
+	const UnsignedInt duration = authoredDuration ? authoredDuration : fallbackDuration;
+	if (!duration || !victim->getTeam())
+		return FALSE;
+
+	const TeamPrototypeID originalTeam = victim->getTeam()->getPrototype()->getID();
+	convertObjectOwnership(victim, team);
+	if (victim->getTeam() != team)
+		return FALSE;
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (state.deadline == 0)
+		state.originalTeam = originalTeam;
+	state.caster = caster;
+	state.deadline = std::max(state.deadline, now + duration);
+	state.nextCheck = now + 2 * LOGICFRAMES_PER_SECOND;
+	schedule();
+	return TRUE;
+}
+
+void TemporarilyDefectUpdate::restoreLegacy(ObjectID caster, TeamID originalTeam, UnsignedInt deadline)
+{
+	Object* victim = getObject();
+	if (!deadline || originalTeam == TEAM_ID_INVALID || victim->isEffectivelyDead() || victim->isDestroyed())
+		return;
+	auto& state = victim->m_domination;
+	if (state.deadline != 0 && m_legacyEarliestDeadline == 0)
+		return;
+	Team* team = TheTeamFactory->findTeamByID(originalTeam);
+	const TeamPrototypeID prototype = team ? team->getPrototype()->getID() : TEAM_PROTOTYPE_ID_INVALID;
+	if (m_legacyEarliestDeadline == 0 || deadline < m_legacyEarliestDeadline ||
+		(deadline == m_legacyEarliestDeadline && prototype < state.originalTeam))
+	{
+		m_legacyEarliestDeadline = deadline;
+		state.originalTeam = prototype;
+	}
+	if (deadline > state.deadline || (deadline == state.deadline && caster < state.caster))
+		state.caster = caster;
+	state.deadline = std::max(state.deadline, deadline);
+	state.nextCheck = TheGameLogic->getFrame() + DEFECTION_RECHECK_FRAMES;
+	schedule();
+}
+
+void TemporarilyDefectUpdate::invalidateCaster(ObjectID caster)
+{
+	auto& state = getObject()->m_domination;
+	if (state.caster == caster)
+		state.caster = INVALID_ID;
+}
+
+void TemporarilyDefectUpdate::cancel()
+{
+	auto& state = getObject()->m_domination;
+	if (state.deadline)
+	{
+		state = {};
+		sleepUntil(NEVER);
+	}
+}
+
+UpdateSleepTime TemporarilyDefectUpdate::update()
+{
+	Object* victim = getObject();
+	auto& state = victim->m_domination;
+	if (!state.deadline || victim->isEffectivelyDead() || victim->isDestroyed())
+	{
+		state = {};
+		return UPDATE_SLEEP_FOREVER;
+	}
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const Object* caster = TheGameLogic->findObjectByID(state.caster);
+	if (now < state.deadline && caster && !caster->isEffectivelyDead() && !caster->isDestroyed())
+	{
+		state.nextCheck = now + DEFECTION_RECHECK_FRAMES;
+		return UPDATE_SLEEP(std::min(state.deadline, state.nextCheck) - now);
+	}
+
+	const TeamPrototype* originalPrototype = TheTeamFactory->findTeamPrototypeByID(state.originalTeam);
+	Team* originalTeam = originalPrototype ? TheTeamFactory->findTeam(originalPrototype->getName()) : nullptr;
+	state = {};
+	if (originalTeam && originalTeam->getControllingPlayer())
+	{
+		convertObjectOwnership(victim, originalTeam, TRUE);
+		const Player* restoredOwner = victim->getControllingPlayer();
+		if (restoredOwner && restoredOwner->isPlayerDead())
+			victim->kill();
+	}
+	return UPDATE_SLEEP_FOREVER;
 }
 
 void DominateEnemySpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -166,49 +303,14 @@ Bool DominateEnemySpecialPower::acceptsIntent(const Object* target, const Coord3
 	return position != nullptr && radius > 0.0f;
 }
 
-void DominateEnemySpecialPower::revertExpiredEntries(UnsignedInt now)
+void DominateEnemySpecialPower::onDelete()
 {
-	if (m_dominated.empty())
+	SpecialAbilityUpdate::onDelete();
+	if (!RetailFileLayers::enabled())
 		return;
-	auto it = m_dominated.begin();
-	while (it != m_dominated.end())
-	{
-		if (it->revertFrame != 0 && now < it->revertFrame)
-		{
-			++it;
-			continue;
-		}
-		Object* victim = TheGameLogic->findObjectByID(it->objectID);
-		Team* originalTeam = TheTeamFactory ? TheTeamFactory->findTeamByID(it->originalTeamID) : nullptr;
-		if (victim && originalTeam && !victim->isEffectivelyDead() && !victim->isDestroyed())
-			convertObjectOwnership(victim, originalTeam);
-		it = m_dominated.erase(it);
-	}
-}
-
-UpdateSleepTime DominateEnemySpecialPower::update()
-{
-	const UpdateSleepTime baseSleep = SpecialAbilityUpdate::update();
-	if (!m_dominated.empty())
-	{
-		const UnsignedInt now = TheGameLogic->getFrame();
-		revertExpiredEntries(now);
-		if (!m_dominated.empty())
-		{
-			UnsignedInt earliest = 0;
-			for (const DominatedEntry& entry : m_dominated)
-			{
-				if (entry.revertFrame > now && (earliest == 0 || entry.revertFrame < earliest))
-					earliest = entry.revertFrame;
-			}
-			if (earliest > now)
-			{
-				const UpdateSleepTime wait = UPDATE_SLEEP(earliest - now);
-				return wait < baseSleep ? wait : baseSleep;
-			}
-		}
-	}
-	return baseSleep;
+	for (Object* victim = TheGameLogic->getFirstObject(); victim; victim = victim->getNextObject())
+		if (auto* defection = TemporarilyDefectUpdate::find(victim))
+			defection->invalidateCaster(getObject()->getID());
 }
 
 void DominateEnemySpecialPower::triggerAbilityEffect()
@@ -262,44 +364,29 @@ void DominateEnemySpecialPower::triggerAbilityEffect()
 		seen.push_back(victim->getID());
 		if (!matchesDominateFilter(victim))
 			continue;
-		const TeamID originalTeamID = victim->getTeam() ? victim->getTeam()->getID() : TEAM_ID_INVALID;
-		convertObjectOwnership(victim, newTeam);
+		if (data->m_permanentlyConvert)
+		{
+			convertObjectOwnership(victim, newTeam);
+			if (victim->getTeam() == newTeam)
+				if (auto* defection = TemporarilyDefectUpdate::find(victim))
+					defection->cancel();
+		}
+		else
+		{
+			auto* defection = TemporarilyDefectUpdate::find(victim);
+			if (!defection || !defection->convert(self->getID(), newTeam, data->m_effectDuration))
+				continue;
+		}
 		if (data->m_dominatedFX)
 			FXList::doFXObj(data->m_dominatedFX, victim);
-		if (!data->m_permanentlyConvert && data->m_effectDuration > 0 && originalTeamID != TEAM_ID_INVALID &&
-			m_dominated.size() < MAX_SERIALIZED_ENTRIES)
-		{
-			DominatedEntry entry;
-			entry.objectID = victim->getID();
-			entry.originalTeamID = originalTeamID;
-			entry.revertFrame = TheGameLogic->getFrame() + data->m_effectDuration;
-			m_dominated.push_back(entry);
-		}
-	}
-}
-
-void DominateEnemySpecialPower::xferDominateState(Xfer* xfer)
-{
-	UnsignedInt count = static_cast<UnsignedInt>(m_dominated.size());
-	xfer->xferUnsignedInt(&count);
-	if (xfer->getXferMode() == XFER_LOAD)
-	{
-		if (count > MAX_SERIALIZED_ENTRIES)
-			count = MAX_SERIALIZED_ENTRIES;
-		m_dominated.resize(count);
-	}
-	for (UnsignedInt i = 0; i < count; ++i)
-	{
-		xfer->xferObjectID(&m_dominated[i].objectID);
-		xfer->xferUser(&m_dominated[i].originalTeamID, sizeof(TeamID));
-		xfer->xferUnsignedInt(&m_dominated[i].revertFrame);
 	}
 }
 
 void DominateEnemySpecialPower::crc(Xfer* xfer)
 {
 	SpecialAbilityUpdate::crc(xfer);
-	xferDominateState(xfer);
+	UnsignedInt legacyCount = 0;
+	xfer->xferUnsignedInt(&legacyCount);
 }
 
 void DominateEnemySpecialPower::xfer(Xfer* xfer)
@@ -308,12 +395,30 @@ void DominateEnemySpecialPower::xfer(Xfer* xfer)
 	XferVersion version = currentVersion;
 	xfer->xferVersion(&version, currentVersion);
 	SpecialAbilityUpdate::xfer(xfer);
-	xferDominateState(xfer);
+	UnsignedInt legacyCount = 0;
+	xfer->xferUnsignedInt(&legacyCount);
+	if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_legacyDominated.resize(std::min(legacyCount, MAX_SERIALIZED_ENTRIES));
+		for (auto& entry : m_legacyDominated)
+		{
+			xfer->xferObjectID(&entry.objectID);
+			xfer->xferUser(&entry.originalTeamID, sizeof(TeamID));
+			xfer->xferUnsignedInt(&entry.revertFrame);
+		}
+	}
 }
 
 void DominateEnemySpecialPower::loadPostProcess()
 {
 	SpecialAbilityUpdate::loadPostProcess();
+	if (!RetailFileLayers::enabled())
+		return;
+	for (const auto& entry : m_legacyDominated)
+		if (Object* victim = TheGameLogic->findObjectByID(entry.objectID))
+			if (auto* defection = TemporarilyDefectUpdate::find(victim))
+				defection->restoreLegacy(getObject()->getID(), entry.originalTeamID, entry.revertFrame);
+	m_legacyDominated.clear();
 }
 
 void FlingPassengerSpecialAbilityUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)

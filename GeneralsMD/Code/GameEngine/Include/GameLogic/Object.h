@@ -111,6 +111,7 @@ class TempWeaponBonusHelper;
 class ObjectWeaponStatusHelper;
 class ObjectDefectionHelper;
 class AttributeModifierHelper;
+class TemporarilyDefectUpdate;
 
 enum CommandSourceType CPP_11(: Int);
 enum HackerAttackMode CPP_11(: Int);
@@ -173,6 +174,7 @@ public:
 	void initObject();
 
 	void onDestroy();																							///< run during TheGameLogic::destroyObject
+	void inheritDomination(const Object& source);
 
 	Object* getNextObject() { return m_next; }
 	const Object* getNextObject() const { return m_next; }
@@ -794,6 +796,17 @@ private:
 	friend class GameLogic;
 	friend class AIUpdateInterface;
 	friend class ThingFactory;
+	friend class TemporarilyDefectUpdate;
+	struct DominationState
+	{
+		UnsignedInt originalTeam = 0;
+		ObjectID caster = INVALID_ID;
+		UnsignedInt deadline = 0;
+		UnsignedInt nextCheck = 0;
+	};
+	DominationState m_domination;
+	TemporarilyDefectUpdate* m_temporaryDefection = nullptr;
+	void setDominationState(const DominationState& state);
 	const ThingTemplate* m_mountedHeroIdentity = nullptr;
 	std::vector<std::pair<AsciiString, UnsignedInt>> m_mountedPowerTimers;
 	std::vector<AsciiString> m_mountedExecutedCommands;

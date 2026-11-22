@@ -572,6 +572,7 @@ void ModuleFactory::init()
 		addModule( ModelConditionSpecialAbilityUpdate );
 		addModule( CurseSpecialPower );
 		addModule( DominateEnemySpecialPower );
+		addModule( TemporarilyDefectUpdate );
 		addModule( FlingPassengerSpecialAbilityUpdate );
 		addModule( StoreObjectsSpecialPower );
 		addModule( TeleportSpecialAbilityUpdate );

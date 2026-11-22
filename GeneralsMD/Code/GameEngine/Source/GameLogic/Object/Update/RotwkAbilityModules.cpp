@@ -639,6 +639,8 @@ void GameLogic::processMountedTemplateSwaps()
 		AsciiString stanceModifier;
 		NameKeyType stanceTag;
 		AttributeModifierHelper::TransferState modifiers;
+		Object* source;
+		Object::DominationState domination;
 #if !RETAIL_COMPATIBLE_AIGROUP
 		AIGroupPtr group;
 #endif
@@ -685,7 +687,7 @@ void GameLogic::processMountedTemplateSwaps()
 			stances ? stances->getStance() : source->m_mountedStance,
 			stances ? stances->getAppliedModifier() : AsciiString::TheEmptyString,
 			stances ? stances->getModuleTagNameKey() : NAMEKEY_INVALID,
-			modifiers ? modifiers->getTransferState() : AttributeModifierHelper::TransferState{}
+			modifiers ? modifiers->getTransferState() : AttributeModifierHelper::TransferState{}, source, {}
 #if !RETAIL_COMPATIBLE_AIGROUP
 			, source->m_group
 #endif
@@ -717,12 +719,15 @@ void GameLogic::processMountedTemplateSwaps()
 		}
 		destroyObject(source);
 	}
+	for (Swap& swap : swaps)
+		swap.domination = swap.source->m_domination;
 	processDestroyList();
 
 	for (Swap& swap : swaps)
 	{
 		Object* replacement = TheThingFactory->newObjectFromExactTemplate(swap.target, swap.team, OBJECT_STATUS_MASK_NONE, swap.id,
 			std::move(swap.executedCommands));
+		replacement->setDominationState(swap.domination);
 		replacement->m_mountedHeroIdentity = swap.identity;
 		replacement->m_producerID = swap.producer;
 		replacement->m_builderID = swap.builder;

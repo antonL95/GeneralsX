@@ -186,6 +186,9 @@ void ReplaceSelfUpgrade::upgradeImplementation()
 		const Bool structure = site.type->isKindOf(KINDOF_STRUCTURE);
 		Object* replacement = TheThingFactory->newObjectFromExactTemplate(site.type, team,
 			inPlace && structure ? construction : OBJECT_STATUS_MASK_NONE);
+#if !RTS_GENERALS
+		replacement->inheritDomination(*source);
+#endif
 		if (inPlace)
 		{
 			replacement->setTransformMatrix(&transform);
