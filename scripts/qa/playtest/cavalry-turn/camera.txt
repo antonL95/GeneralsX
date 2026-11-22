@@ -1,1 +1,6 @@
-12 Player_1 GondorKnightHorde 2540 1005 0.80
+12 Player_1 GondorKnightHorde 2500 1080 0.34
+60 Player_1 GondorKnightHorde 2610 1060 0.37
+112 Player_1 GondorKnightHorde 2595 980 0.37
+132 Player_1 GondorKnightHorde 2575 885 0.38
+185 Player_1 GondorKnightHorde 2485 895 0.34
+205 Player_1 GondorKnightHorde 2435 890 0.34

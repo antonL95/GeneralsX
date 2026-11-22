@@ -1,1 +1,1 @@
-21 Player_1 MenFortressCitadel 895 590 0.85
+21 Player_1 MenFortressCitadel 870 623 0.54
