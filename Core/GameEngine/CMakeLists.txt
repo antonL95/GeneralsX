@@ -90,6 +90,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/ExperienceLevelStore.h
     Include/GameLogic/RetailCreationUpgrades.h
     Include/GameLogic/WeaponNuggetRules.h
+    Include/GameLogic/WeaponSlotSelectionRules.h
     Include/GameLogic/RetailTestCommands.h
     Include/GameLogic/RetailBuildingEvents.h
     Include/GameLogic/Module/RetailConstruction.h
