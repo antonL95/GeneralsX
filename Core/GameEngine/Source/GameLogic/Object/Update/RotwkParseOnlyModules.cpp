@@ -247,11 +247,11 @@ void CastleMemberBehavior::crc(Xfer* xfer)
 
 void CastleMemberBehavior::xfer(Xfer* xfer)
 {
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
+	XferVersion version = 2;
+	xfer->xferVersion(&version, 2);
 	BehaviorModule::xfer(xfer);
 	if (RetailFileLayers::enabled())
-		xferRetailBlocks(xfer, version >= 1);
+		xferRetailBlocks(xfer, version >= 2);
 }
 
 void CastleMemberBehavior::loadPostProcess()

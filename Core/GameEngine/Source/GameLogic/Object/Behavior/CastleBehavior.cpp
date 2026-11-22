@@ -11,6 +11,7 @@
 #include "Common/Money.h"
 #include "Common/INIAudit.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/PlayerList.h"
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
@@ -243,16 +244,16 @@ Bool CastleBehavior::isOwnedMemberTemplate(const ThingTemplate& type) const
 
 void CastleBehavior::onObjectTeamChanged(Object* object, Team* team)
 {
-	if (!object || !team || !object->areModulesReady())
+	if (!object || !team || !RetailFileLayers::enabled() || !object->areModulesReady())
 		return;
 	if (CastleBehavior* castle = find(object))
 	{
 		castle->transferOwnership(team);
 		return;
 	}
-	if (const CastleMemberBehavior* cm = CastleMemberBehavior::find(object); cm && cm->isKeep())
+	if (object->isKindOf(KINDOF_CASTLE_KEEP))
 	{
-		if (CastleBehavior* castle = find(TheGameLogic->findObjectByID(cm->getCastleID())))
+		if (CastleBehavior* castle = findForMember(*object); castle && castle->getKeep() == object)
 			castle->transferOwnership(team);
 	}
 }
@@ -272,7 +273,8 @@ void CastleBehavior::transferOwnership(Team* newTeam)
 		if (!member || member->isDestroyed() || member->isEffectivelyDead())
 			continue;
 		const CastleMemberBehavior* cm = CastleMemberBehavior::find(member);
-		const Bool owned = cm ? cm->isOwnedByCastle() : isOwnedMemberTemplate(*member->getTemplate());
+		const Bool owned = cm && cm->getCastleID() == packed->getID()
+			? cm->isOwnedByCastle() : isOwnedMemberTemplate(*member->getTemplate());
 		if (!owned)
 			continue;
 		if (member->getTeam() != newTeam)
