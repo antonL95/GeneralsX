@@ -1357,11 +1357,11 @@ Bool SpecialAbilityUpdate::continuePreparation()
 //-------------------------------------------------------------------------------------------------
 static void captureLinkedBuilding(Object* flag, Team* oldTeam, Team* newTeam)
 {
-	const Real linkRange = 200.0f;
+	const Real linkRange = 150.0f;
 	PartitionFilterAcceptByKindOf linkedFilter(MAKE_KINDOF_MASK(KINDOF_LINKED_TO_FLAG), KINDOFMASK_NONE);
 	PartitionFilter* filters[] = { &linkedFilter, nullptr };
 	ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(flag,
-		linkRange, FROM_CENTER_2D, filters, ITER_FASTEST);
+		linkRange, FROM_CENTER_3D, filters, ITER_FASTEST);
 	MemoryPoolObjectHolder hold(iter);
 	Object* nearest = nullptr;
 	Real nearestDistance = linkRange * linkRange;
@@ -1372,7 +1372,7 @@ static void captureLinkedBuilding(Object* flag, Team* oldTeam, Team* newTeam)
 			(candidate->getControllingPlayer() != oldTeam->getControllingPlayer() &&
 				(!neutralFlag || candidate->getControllingPlayer()->isPlayableSide())))
 			continue;
-		const Real distance = ThePartitionManager->getDistanceSquared(flag, candidate, FROM_CENTER_2D);
+		const Real distance = ThePartitionManager->getDistanceSquared(flag, candidate, FROM_CENTER_3D);
 		if (distance < nearestDistance || (distance == nearestDistance && (!nearest || candidate->getID() < nearest->getID())))
 		{
 			nearest = candidate;
