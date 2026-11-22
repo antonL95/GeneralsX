@@ -2896,10 +2896,14 @@ void DozerAIUpdate::crc( Xfer *xfer )
 	// extend base class
 	AIUpdateInterface::crc(xfer);
 	if (usesRetailBuilder(this))
-	{
-		xfer->xferSTLObjectIDList(&m_constructionQueue);
-		xfer->xferUnsignedByte(&m_riderEventState);
-	}
+		crcRetailState(xfer);
+}
+
+void DozerAIUpdate::crcRetailState(Xfer* xfer)
+{
+	xfer->xferSTLObjectIDList(&m_constructionQueue);
+	xfer->xferUnsignedByte(&m_riderEventState);
+	xfer->xferBool(&m_isRebuild);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2918,7 +2922,7 @@ void DozerAIUpdate::xfer( Xfer *xfer )
 	XferVersion currentVersion = 2;
 #endif
 	if (usesRetailBuilder(this))
-		currentVersion = 4;
+		currentVersion = 5;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -2962,11 +2966,16 @@ void DozerAIUpdate::xfer( Xfer *xfer )
 	{
 		m_constructionQueue.clear();
 		m_riderEventState = 0;
+		m_restoreRebuildFromSite = version < 5 && usesRetailBuilder(this);
+		if (m_restoreRebuildFromSite)
+			m_isRebuild = FALSE;
 	}
 	if (version >= 3)
 		xfer->xferSTLObjectIDList(&m_constructionQueue);
 	if (version >= 4)
 		xfer->xferUnsignedByte(&m_riderEventState);
+	if (version >= 5)
+		xfer->xferBool(&m_isRebuild);
 
 }
 
@@ -2977,6 +2986,15 @@ void DozerAIUpdate::loadPostProcess()
 {
  // extend base class
 	AIUpdateInterface::loadPostProcess();
+	if (m_restoreRebuildFromSite)
+	{
+		ObjectID siteID = getTaskTarget(DOZER_TASK_BUILD);
+		if (siteID == INVALID_ID && m_previousTask == DOZER_TASK_BUILD)
+			siteID = m_previousTaskInfo.m_targetObjectID;
+		const Object* site = TheGameLogic->findObjectByID(siteID);
+		m_isRebuild = site && site->testStatus(OBJECT_STATUS_RECONSTRUCTING);
+		m_restoreRebuildFromSite = FALSE;
+	}
 }
 
 

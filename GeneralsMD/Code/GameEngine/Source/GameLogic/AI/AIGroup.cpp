@@ -2308,6 +2308,8 @@ void AIGroup::groupAttackObjectPrivate( Bool forced, Object *victim, Int maxShot
 				for( ContainedItemsList::const_iterator it = items->begin(); it != items->end(); ++it )
 				{
 					Object* garrisonedMember = *it;
+					if (RetailFileLayers::enabled() && !garrisonedMember->isAbleToAttack())
+						continue;
 					CanAttackResult result = garrisonedMember->getAbleToAttackSpecificObject( forced ? ATTACK_NEW_TARGET_FORCED : ATTACK_NEW_TARGET, victim, cmdSource );
 					if( result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING )
 					{
@@ -2396,6 +2398,8 @@ void AIGroup::groupAttackPosition( const Coord3D *pos, Int maxShotsToFire, Comma
 				for( ContainedItemsList::const_iterator it = items->begin(); it != items->end(); ++it )
 				{
 					Object* garrisonedMember = *it;
+					if (RetailFileLayers::enabled() && !garrisonedMember->isAbleToAttack())
+						continue;
 					CanAttackResult result = garrisonedMember->getAbleToUseWeaponAgainstTarget( ATTACK_NEW_TARGET, nullptr, &attackPos, cmdSource ) ;
 					if( result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING )
 					{

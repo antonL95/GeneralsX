@@ -22,7 +22,21 @@
 void runRetailPackage08TestCommand(std::string_view action, Object* source, Object* target, const char* name,
 	const Coord3D* position, UnsignedInt frame)
 {
-	if (action == "pkg08-queue" && position)
+	if (action == "pkg08-rebuild" && position)
+	{
+		const ThingTemplate* building = TheThingFactory->findTemplate(name, FALSE);
+		auto* dozer = source->getAI() ? source->getAI()->getDozerAIInterface() : nullptr;
+		if (building && dozer)
+			dozer->construct(building, position, 0.0f, source->getControllingPlayer(), TRUE);
+	}
+	else if (action == "pkg08-rebuild-state")
+	{
+		auto* dozer = source->getAI() ? source->getAI()->getDozerAIInterface() : nullptr;
+		const Object* site = dozer ? TheGameLogic->findObjectByID(dozer->getTaskTarget(DOZER_TASK_BUILD)) : nullptr;
+		std::fprintf(stderr, "TEST pkg08 rebuild frame=%u active=%d reconstructing=%d\n", frame,
+			dozer && dozer->getIsRebuild(), site && site->testStatus(OBJECT_STATUS_RECONSTRUCTING));
+	}
+	else if (action == "pkg08-queue" && position)
 	{
 		const ThingTemplate* building = TheThingFactory->findTemplate(name, FALSE);
 		if (!building)
@@ -101,6 +115,8 @@ void runRetailPackage08TestCommand(std::string_view action, Object* source, Obje
 	{
 		const auto* behavior = static_cast<const BuildingBehavior*>(source->findUpdateModule(NAMEKEY("BuildingBehavior")));
 		std::fprintf(stderr, "TEST pkg08 windows frame=%u state=%d\n", frame, behavior ? behavior->getWindowState() : -1);
+		if (behavior)
+			std::fprintf(stderr, "TEST pkg08 night-meshes frame=%u count=%zu\n", frame, behavior->getNightWindowCount());
 	}
 	else if (action == "pkg08-enter" && target && source->getAI())
 		source->getAI()->aiEnter(target, CMD_FROM_PLAYER);

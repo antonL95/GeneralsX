@@ -1,11 +1,13 @@
 #pragma once
 
+#include <vector>
+
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/UpgradeModule.h"
 
 struct BuildingBehaviorModuleData : public UpdateModuleData
 {
-	AsciiString m_nightWindow;
+	std::vector<AsciiString> m_nightWindows;
 	AsciiString m_fireWindow;
 	AsciiString m_glowWindow;
 	AsciiString m_fire;
@@ -21,6 +23,7 @@ public:
 	BuildingBehavior(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
 	UpdateSleepTime update() override;
 	Int getWindowState() const { return m_windowState; }
+	std::size_t getNightWindowCount() const { return getBuildingBehaviorModuleData()->m_nightWindows.size(); }
 
 private:
 	Int m_windowState = -1;

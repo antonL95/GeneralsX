@@ -204,6 +204,7 @@ public:
 	static Bool findGoodBuildOrRepairPosition(const Object* me, const Object* target, Coord3D& positionOut);
 	static Object* findGoodBuildOrRepairPositionAndTarget(Object* me, Object* target, Coord3D& positionOut);
 	Object* queueConstruction(const ThingTemplate* what, const Coord3D* pos, Real angle, Player* owningPlayer);
+	void crcRetailState(Xfer* xfer);
 
 public:
 
@@ -302,7 +303,7 @@ protected:
 	DozerTask m_previousTask;						///< previous task the dozer was attending to (if any)
 	DozerTaskInfo m_previousTaskInfo;		///< info on the previous task the dozer was attending to (if any)
 	AudioEventRTS	m_buildingSound;			///< sound is pulled from the object we are building!
-	Bool m_isRebuild;										///< is this a rebuild of a previous building?
+	Bool m_isRebuild = FALSE;
 
 	//
 	// the following info array can be used if we want to have more complicated approaches
@@ -324,6 +325,7 @@ private:
 	void startQueuedConstruction();
 	std::list<ObjectID> m_constructionQueue;
 	UnsignedByte m_riderEventState = 0;
+	Bool m_restoreRebuildFromSite = FALSE;
 
 	void createMachines();		///< create our behavior machines we need
 

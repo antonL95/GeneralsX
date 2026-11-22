@@ -16,7 +16,7 @@ void BuildingBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
 	UpdateModuleData::buildFieldParse(p);
 	static const FieldParse fields[] = {
-		{ "NightWindowName", INI::parseAsciiString, nullptr, offsetof(BuildingBehaviorModuleData, m_nightWindow) },
+		{ "NightWindowName", INI::parseAsciiStringVector, nullptr, offsetof(BuildingBehaviorModuleData, m_nightWindows) },
 		{ "FireWindowName", INI::parseAsciiString, nullptr, offsetof(BuildingBehaviorModuleData, m_fireWindow) },
 		{ "GlowWindowName", INI::parseAsciiString, nullptr, offsetof(BuildingBehaviorModuleData, m_glowWindow) },
 		{ "FireName", INI::parseAsciiString, nullptr, offsetof(BuildingBehaviorModuleData, m_fire) },
@@ -44,7 +44,8 @@ UpdateSleepTime BuildingBehavior::update()
 	if (state != m_windowState)
 	{
 		const auto* data = getBuildingBehaviorModuleData();
-		drawable->showSubObject(data->m_nightWindow, night && !fire);
+		for (const AsciiString& window : data->m_nightWindows)
+			drawable->showSubObject(window, night && !fire);
 		drawable->showSubObject(data->m_fireWindow, fire);
 		drawable->showSubObject(data->m_glowWindow, fire);
 		drawable->showSubObject(data->m_fire, night && fire);
