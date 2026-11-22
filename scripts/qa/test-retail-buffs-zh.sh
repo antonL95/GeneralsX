@@ -39,9 +39,9 @@ done
 cmp "$out/render.crc" "$out/headless.crc"
 
 log="$out/render.log"
-grep -Eq '^\[Retail Buff\] model=FXLdrship1E owner=GondorTowerShieldGuard .* duration=90 loaded=1 preDraw=1$' "$log"
+grep -Eq '^\[Retail Buff\] model=FXLdrship1E owner=GondorTowerShieldGuard .* duration=90 loaded=1 preDraw=1 visibleMeshes=[1-9][0-9]*$' "$log"
 grep -q '^\[Retail Buff\] refresh model=FXLdrship1E owner=GondorTowerShieldGuard ' "$log"
-grep -Eq '^\[Retail Buff\] model=EXHealbuff owner=GondorTowerShieldGuard .* duration=72 loaded=1 preDraw=0$' "$log"
+grep -Eq '^\[Retail Buff\] model=EXHealbuff owner=GondorTowerShieldGuard .* duration=72 loaded=1 preDraw=0 visibleMeshes=[1-9][0-9]*$' "$log"
 grep -q '^\[Retail Buff\] expired model=EXHealbuff owner=GondorTowerShieldGuard ' "$log"
 grep -Eq '^TEST particle-systems frame=34 name=AragornAthelas systems=1 particles=[1-9]' "$log"
 grep -Eq '^TEST particle-systems frame=34 name=AragornAthelas02 systems=1 particles=[1-9]' "$log"

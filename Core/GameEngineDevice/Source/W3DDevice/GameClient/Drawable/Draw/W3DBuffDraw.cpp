@@ -37,6 +37,17 @@ struct ActiveBuff
 
 std::map<std::pair<ObjectID, std::string>, ActiveBuff> activeBuffs;
 constexpr size_t MAX_ACTIVE_BUFFS = 4096;
+
+void revealBuffArt(RenderObjClass &model)
+{
+	model.Set_Hidden(FALSE);
+	for (Int i = 0; i < model.Get_Num_Sub_Objects(); ++i)
+		if (auto* child = model.Get_Sub_Object(i))
+		{
+			revealBuffArt(*child);
+			child->Release_Ref();
+		}
+}
 }
 
 void W3DBuffDrawModuleData::buildFieldParse(MultiIniFieldParse& parse)
@@ -135,10 +146,26 @@ void W3DBuffDraw::render(RenderInfoClass& info, Int viewer, Bool preDraw)
 		{
 			active.attempted = TRUE;
 			active.model = active.art->createModel(*W3DDisplay::m_assetManager, draw->getScale(), TheGlobalData->m_weather);
+			if (active.model)
+				revealBuffArt(*active.model);
 			if (std::getenv("GENERALSX_TRACE_RETAIL_FX_LISTS"))
-				std::fprintf(stderr, "[Retail Buff] model=%s owner=%s id=%u frame=%u duration=%u loaded=%d preDraw=%d\n",
+			{
+				Int visibleMeshes = 0;
+				if (active.model)
+				{
+					if (active.model->Class_ID() == RenderObjClass::CLASSID_MESH)
+						visibleMeshes = !active.model->Is_Hidden();
+					for (Int i = 0; i < active.model->Get_Num_Sub_Objects(); ++i)
+						if (auto* subObject = active.model->Get_Sub_Object(i))
+						{
+							visibleMeshes += subObject->Class_ID() == RenderObjClass::CLASSID_MESH && !subObject->Is_Hidden();
+							subObject->Release_Ref();
+						}
+				}
+				std::fprintf(stderr, "[Retail Buff] model=%s owner=%s id=%u frame=%u duration=%u loaded=%d preDraw=%d visibleMeshes=%d\n",
 					active.art->m_modelName.str(), owner->getTemplate()->getName().str(), static_cast<UnsignedInt>(owner->getID()),
-					now, active.duration, active.model != nullptr, preDraw);
+					now, active.duration, active.model != nullptr, preDraw, visibleMeshes);
+			}
 		}
 		if (active.model)
 		{
