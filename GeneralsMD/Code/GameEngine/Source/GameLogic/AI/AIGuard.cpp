@@ -40,6 +40,8 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/PerfTimer.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/Team.h"
 #include "Common/Xfer.h"
 #include "Common/ThingTemplate.h"
@@ -317,6 +319,8 @@ Bool AIGuardMachine::lookForInnerTarget()
 // ------------------------------------------------------------------------------------------------
 void AIGuardMachine::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		this->xfer(xfer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -362,6 +366,8 @@ void AIGuardMachine::loadPostProcess()
 // ------------------------------------------------------------------------------------------------
 void AIGuardInnerState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -369,11 +375,41 @@ void AIGuardInnerState::crc( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void AIGuardInnerState::xfer( Xfer *xfer )
 {
-  // version
-  XferVersion currentVersion = 1;
-  XferVersion version = currentVersion;
-  xfer->xferVersion( &version, currentVersion );
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion currentVersion = retail ? 2 : 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
+	if (retail)
+		xferRetailBlocks(xfer, version >= 2);
+}
 
+void AIGuardInnerState::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection<Xfer>(xfer, loading, present, {
+		{"guard-action", [this, loading](Xfer* transfer) {
+			Bool attack = m_attackState != nullptr;
+			Bool enter = m_enterState != nullptr;
+			transfer->xferBool(&attack);
+			transfer->xferBool(&enter);
+			if (attack)
+			{
+				transfer->xferCoord3D(&m_exitConditions.m_center);
+				transfer->xferReal(&m_exitConditions.m_radiusSqr);
+				transfer->xferUnsignedInt(&m_exitConditions.m_attackGiveUpFrame);
+				transfer->xferInt(&m_exitConditions.m_conditionsToConsider);
+				if (loading && !m_attackState)
+					m_attackState = newInstance(AIAttackState)(getMachine(), FALSE, TRUE, FALSE, &m_exitConditions);
+				transfer->xferSnapshot(m_attackState);
+			}
+			if (enter)
+			{
+				if (loading && !m_enterState)
+					m_enterState = newInstance(AIEnterState)(getMachine());
+				transfer->xferSnapshot(m_enterState);
+			}
+		}, {}}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -381,7 +417,8 @@ void AIGuardInnerState::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void AIGuardInnerState::loadPostProcess()
 {
-	onEnter();
+	if (!RetailFileLayers::enabled() || (!m_attackState && !m_enterState))
+		onEnter();
 }
 
 // ------------------------------------------------------------------------------------------------

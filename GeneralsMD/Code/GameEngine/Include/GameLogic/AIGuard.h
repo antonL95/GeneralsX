@@ -153,6 +153,7 @@ protected:
 private:
 	AIGuardMachine* getGuardMachine() { return (AIGuardMachine*)getMachine(); }
 
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	ExitConditions m_exitConditions;
 	AIAttackState *m_attackState;
 	AIEnterState *m_enterState;

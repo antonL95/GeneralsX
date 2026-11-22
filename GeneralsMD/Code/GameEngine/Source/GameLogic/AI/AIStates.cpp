@@ -6833,6 +6833,8 @@ AsciiString AIGuardState::getName(  ) const
 // ------------------------------------------------------------------------------------------------
 void AIGuardState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferSnapshot(m_guardMachine);
 }
 
 // ------------------------------------------------------------------------------------------------
