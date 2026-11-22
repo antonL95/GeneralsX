@@ -1,0 +1,6 @@
+20 create Player_1 AmrothianGuardsmen 0 2520,1010,0
+20 create Player_1 AmrothianGuardsmen 0 2540,1010,0
+21 reveal Player_1 AmrothianGuardsmen 0
+24 camera Player_1 AmrothianGuardsmen 0 2520,1010,0.45
+40 kill Player_1 AmrothianGuardsmen 0
+130 quit - - 0
