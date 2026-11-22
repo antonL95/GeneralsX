@@ -10,6 +10,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
+#include "GameClient/ClientRandomValue.h"
 #include "GameClient/FXList.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailWorldUI.h"
@@ -19,6 +20,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CostModifierUpgrade.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -264,6 +266,7 @@ void AttachUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "ScanRange", INI::parseReal, nullptr, offsetof(AttachUpdateModuleData, m_scanRange) },
 		{ "AlwaysTeleport", INI::parseBool, nullptr, offsetof(AttachUpdateModuleData, m_alwaysTeleport) },
 		{ "AnchorToTopOfGeometry", INI::parseBool, nullptr, offsetof(AttachUpdateModuleData, m_anchorToTop) },
+		{ "AttachFX", INI::parseFXList, nullptr, offsetof(AttachUpdateModuleData, m_attachFX) },
 		{ "ParentOwnerAttachmentEvaEvent", INI::parseAsciiString, nullptr, offsetof(AttachUpdateModuleData, m_parentOwnerAttachmentEva) },
 		{ "ParentEnemyAttachmentEvaEvent", INI::parseAsciiString, nullptr, offsetof(AttachUpdateModuleData, m_parentEnemyAttachmentEva) },
 		{ "ParentOwnerDiedEvaEvent", INI::parseAsciiString, nullptr, offsetof(AttachUpdateModuleData, m_parentOwnerDiedEva) },
@@ -275,50 +278,70 @@ void AttachUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 
 AttachUpdate::~AttachUpdate() = default;
 
+void AttachUpdate::followParent(const Object* parent)
+{
+	Object* self = getObject();
+	const auto* data = getAttachUpdateModuleData();
+	Coord3D position = *parent->getPosition();
+	if (data->m_anchorToTop)
+		position.z += parent->getGeometryInfo().getMaxHeightAbovePosition();
+	if (position == *self->getPosition())
+		return;
+
+	self->setPosition(&position);
+	if (data->m_alwaysTeleport)
+	{
+		self->setLayer(parent->getLayer());
+		if (auto* physics = self->getPhysics())
+			physics->resetDynamicPhysics();
+	}
+}
+
 UpdateSleepTime AttachUpdate::update()
 {
 	Object* self = getObject();
 	const auto* data = getAttachUpdateModuleData();
-	if (!RetailFileLayers::enabled() || !self->isKindOf(KINDOF_ONE_RING) ||
-		self->isEffectivelyDead() || self->isDestroyed() || data->m_scanRange <= 0.0f)
+	if (!RetailFileLayers::enabled() || self->isEffectivelyDead() || self->isDestroyed() || data->m_scanRange < 0.0f)
 		return UPDATE_SLEEP_FOREVER;
 
+	const Bool ring = self->isKindOf(KINDOF_ONE_RING);
+	const auto ping = ring ? RetailEva::Ping::OneRing : RetailEva::Ping::None;
 	Object* parent = TheGameLogic->findObjectByID(m_parent);
 	if (m_parent != INVALID_ID)
 	{
 		if (parent && !parent->isEffectivelyDead() && !parent->isDestroyed())
 		{
-			Coord3D position = *parent->getPosition();
-			if (data->m_anchorToTop)
-				position.z += parent->getGeometryInfo().getMaxHeightAbovePosition();
-			self->setPosition(&position);
+			followParent(parent);
 			return UPDATE_SLEEP_NONE;
 		}
 		if (parent)
 		{
 			parent->clearStatus(data->m_parentStatus);
-			RetailEva::queue(parent->getControllingPlayer(), data->m_parentOwnerDiedEva, self->getPosition(), RetailEva::Ping::OneRing);
+			RetailEva::queue(parent->getControllingPlayer(), data->m_parentOwnerDiedEva, self->getPosition(), ping);
 		}
 		m_parent = INVALID_ID;
-		self->clearStatus(OBJECT_STATUS_ATTACHED);
+		self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_ATTACHED));
+		if (!ring)
+		{
+			self->kill();
+			return UPDATE_SLEEP_FOREVER;
+		}
 		Coord3D position = *self->getPosition();
 		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
 		self->setPosition(&position);
 		parent = nullptr;
 	}
 
-	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_scanRange, FROM_CENTER_2D);
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_scanRange, FROM_CENTER_3D);
 	MemoryPoolObjectHolder holder(iter);
 	Real bestDistanceSquared = data->m_scanRange * data->m_scanRange;
 	for (Object* candidate = iter->first(); candidate; candidate = iter->next())
 	{
 		if (candidate == self || candidate->isEffectivelyDead() || candidate->isDestroyed() ||
-			candidate->testStatus(OBJECT_STATUS_HOLDING_THE_RING) ||
+			TEST_OBJECT_STATUS_MASK_ANY(candidate->getStatusBits(), data->m_parentStatus) ||
 			!data->m_filter.matchesObject(self, candidate))
 			continue;
-		const Real dx = candidate->getPosition()->x - self->getPosition()->x;
-		const Real dy = candidate->getPosition()->y - self->getPosition()->y;
-		const Real distanceSquared = dx * dx + dy * dy;
+		const Real distanceSquared = ThePartitionManager->getDistanceSquared(candidate, self, FROM_CENTER_3D);
 		if (distanceSquared < bestDistanceSquared ||
 			(distanceSquared == bestDistanceSquared && (!parent || candidate->getID() < parent->getID())))
 		{
@@ -330,13 +353,19 @@ UpdateSleepTime AttachUpdate::update()
 	{
 		m_parent = parent->getID();
 		parent->setStatus(data->m_parentStatus);
-		self->setStatus(OBJECT_STATUS_ATTACHED);
+		self->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_ATTACHED));
+		if (data->m_attachFX)
+		{
+			const ScopedVisualRandom random(TRUE);
+			FXList::doFXObj(data->m_attachFX, self, parent);
+		}
 		const Player* owner = parent->getControllingPlayer();
-		RetailEva::queue(owner, data->m_parentOwnerAttachmentEva, self->getPosition(), RetailEva::Ping::OneRing);
+		RetailEva::queue(owner, data->m_parentOwnerAttachmentEva, parent->getPosition(), ping);
 		const Player* local = ThePlayerList->getLocalPlayer();
 		if (local && local != owner)
 			RetailEva::queue(local, local->getRelationship(parent->getTeam()) == ENEMIES ?
-				data->m_parentEnemyAttachmentEva : data->m_parentOwnerAttachmentEva, self->getPosition(), RetailEva::Ping::OneRing);
+				data->m_parentEnemyAttachmentEva : data->m_parentOwnerAttachmentEva, parent->getPosition(), ping);
+		followParent(parent);
 	}
 	return UPDATE_SLEEP_NONE;
 }

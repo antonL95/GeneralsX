@@ -1,5 +1,7 @@
 #pragma once
 
+class FXList;
+
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/OpenContain.h"
 
@@ -67,9 +69,10 @@ public:
 
 	SpecialPowerObjectFilter m_filter;
 	ObjectStatusMaskType m_parentStatus;
-	Real m_scanRange = 0.0f;
+	Real m_scanRange = 10.0f;
 	Bool m_anchorToTop = FALSE;
-	Bool m_alwaysTeleport = FALSE;
+	Bool m_alwaysTeleport = TRUE;
+	const FXList* m_attachFX = nullptr;
 	AsciiString m_parentOwnerAttachmentEva;
 	AsciiString m_parentEnemyAttachmentEva;
 	AsciiString m_parentOwnerDiedEva;
@@ -87,5 +90,6 @@ public:
 	ObjectID getParentID() const { return m_parent; }
 
 private:
+	void followParent(const Object* parent);
 	ObjectID m_parent = INVALID_ID;
 };
