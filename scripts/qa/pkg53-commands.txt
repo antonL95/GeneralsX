@@ -1,8 +1,14 @@
 3 reveal Player_1 MenPorter 0
 5 create Player_1 TDHDwarvesCampDoor 0 3020,615,0
 5 create Player_1 IsengardOrthancDoor 0 2850,655,0
-9 particle-fx Player_1 MenPorter 0 FX_BuildingHitByFlyer
-10 particle-fx Player_1 MenFortressCitadel 0 FX_BuildingHitByFlyer
+5 create Player_1 Pkg53StaticGate 0 2830,725,0
+5 create Player_1 Pkg53TintTarget 0 2980,685,0
+5 create Player_1 GondorGwaihir 0 2960,685,0
+5 create PlyrCreeps IsengardFighter 0 3020,680,0
+5 create PlyrCreeps MenFortressCitadel 0 3100,565,0
+7 pkg53-disable Player_1 Pkg53TintTarget 0
+9 pkg53-flyer-hit Player_1 GondorGwaihir 0 PlyrCreeps:IsengardFighter:0
+13 pkg53-flyer-hit Player_1 GondorGwaihir 0 PlyrCreeps:MenFortressCitadel:0
 18 damage Player_1 TDHDwarvesCampDoor 0 550
 18 damage Player_1 IsengardOrthancDoor 0 1100
 27 damage Player_1 TDHDwarvesCampDoor 0 320
@@ -14,3 +20,7 @@
 48 particle-fx - - 0 Pkg53NoShake 2958 630 60
 49 particle-fx - - 0 FX_BatteringRamHit 2958 630 60
 59 particle-fx Player_1 MenPorter 1 FX_CavalryBurningFlame
+60 pkg53-tint Player_1 Pkg53TintTarget 0
+61 particle-fx Player_1 Pkg53TintTarget 0 Pkg53ShortTint
+65 pkg53-tint Player_1 Pkg53TintTarget 0
+100 pkg53-tint Player_1 Pkg53TintTarget 0
