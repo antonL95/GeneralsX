@@ -38,6 +38,7 @@
 #include "Common/GlobalData.h"
 #include "Common/ModuleFactory.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
@@ -5563,9 +5564,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 15 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 16 : 4;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 15 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 16 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5845,6 +5846,13 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		m_preFearLocomotorSet = LOCOMOTORSET_INVALID;
 
 
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 16);
+}
+
+void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
 }
 
 const AttackPriorityInfo* AIUpdateInterface::getAttackInfo()

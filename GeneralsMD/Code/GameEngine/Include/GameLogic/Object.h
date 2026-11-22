@@ -789,6 +789,7 @@ private:
 	// cache these, for convenience
 	std::unique_ptr<RotwkPowerState> m_rotwkPowerState;
 	void xferRotwkPowerState(Xfer* xfer);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	void xferRetailInvisibilitySources(Xfer* xfer);
 	friend class GameLogic;
 	friend class AIUpdateInterface;

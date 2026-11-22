@@ -783,6 +783,7 @@ private:
 	};
 	std::vector<PowerProductionBonus> m_powerProductionBonuses;
 	void xferPowerProductionBonuses(Xfer* xfer);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 	ProductionChangeMap					m_productionCostChanges;			///< Map to keep track of Faction specific discounts or penalties on prices of units
 	ProductionChangeMap					m_productionTimeChanges;			///< Map to keep track of Faction specific discounts or penalties on build times of units

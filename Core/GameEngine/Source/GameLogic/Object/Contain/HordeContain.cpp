@@ -28,6 +28,7 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "Common/GameState.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/WeaponSet.h"
@@ -575,7 +576,13 @@ void HordeContain::crc( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_lastMeleeFrame);
 		xfer->xferUnsignedInt(&m_lastMemberDamageFrame);
 		xferRetailFormationCombat(xfer);
+		xferRetailBlocks(xfer, TRUE);
 	}
+}
+
+void HordeContain::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
 }
 
 void HordeContain::xferRetailFormationCombat(Xfer* xfer, Bool includeBackingSource)
@@ -645,7 +652,7 @@ void HordeContain::xferRetailFormationCombat(Xfer* xfer, Bool includeBackingSour
 
 void HordeContain::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 3;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -684,6 +691,8 @@ void HordeContain::xfer( Xfer *xfer )
 		m_lastMemberDamageFrame = 0;
 	if (version >= 6)
 		xferRetailFormationCombat(xfer, version >= 7);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 8);
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		m_formationOverride = switched ? findAlternateFormation() : nullptr;

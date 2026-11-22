@@ -140,6 +140,7 @@ public:
 	// --------------- inherited from Snapshot interface --------------
 	virtual void crc( Xfer *xfer ) override;
 	virtual void xfer( Xfer *xfer ) override;
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	virtual void loadPostProcess() override;
 
 	Bool clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet, const Coord3D *from, const Coord3D *to );  ///< Can we build any path at all between the locations	(terrain & buildings check - fast)

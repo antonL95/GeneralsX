@@ -157,6 +157,25 @@ TEST(RetailSaveBlocks, ResetAllCallsEveryReset)
 	EXPECT_EQ(second, 0);
 }
 
+TEST(RetailSaveBlocks, AbsentSectionResetsOnLoadAndWritesNothing)
+{
+	int value = 5;
+	FakeXfer reader(true);
+	RetailSaveBlocks::transferSection<FakeXfer>(&reader, true, false, {
+		Block{"value", [&](FakeXfer* x) { x->xferInt(&value); }, [&] { value = 0; }},
+	});
+	EXPECT_EQ(value, 0);
+	EXPECT_EQ(reader.position(), 0u);
+
+	value = 5;
+	FakeXfer writer(false);
+	RetailSaveBlocks::transferSection<FakeXfer>(&writer, false, false, {
+		Block{"value", [&](FakeXfer* x) { x->xferInt(&value); }, [&] { value = 0; }},
+	});
+	EXPECT_EQ(value, 5);
+	EXPECT_TRUE(writer.bytes().empty());
+}
+
 TEST(RetailSaveBlocks, RejectsDuplicateOrEmptyNames)
 {
 	EXPECT_FALSE(RetailSaveBlocks::hasUniqueNames<FakeXfer>({

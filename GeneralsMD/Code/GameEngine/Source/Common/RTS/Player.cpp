@@ -63,6 +63,7 @@
 #include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/RetailSkirmishProbe.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailWorldUI.h"
@@ -4282,6 +4283,7 @@ void Player::crc( Xfer *xfer )
 		xfer->xferBool(&hasPlanner);
 		if (hasPlanner)
 			xfer->xferSnapshot(m_ai);
+		xferRetailBlocks(xfer, TRUE);
 	}
 
 }
@@ -4303,7 +4305,7 @@ void Player::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 14 : 8;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 15 : 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4874,7 +4876,14 @@ void Player::xfer( Xfer *xfer )
 		xfer->xferBool(&m_logicalRetaliationModeEnabled);
 	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
 		m_logicalRetaliationModeEnabled = FALSE;
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 15);
 
+}
+
+void Player::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
 }
 
 // ------------------------------------------------------------------------------------------------

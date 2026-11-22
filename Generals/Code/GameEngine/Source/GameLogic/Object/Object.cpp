@@ -49,6 +49,7 @@
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/Module/RetailEconomy.h"
 #include "GameClient/RetailEva.h"
 #include "GameLogic/ExperienceLevelStore.h"
@@ -3672,6 +3673,7 @@ void Object::crc( Xfer *xfer )
 			if (key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || key == pillageKey || (*module)->getSlowDeathBehaviorInterface())
 				xfer->xferSnapshot(*module);
 		}
+		xferRetailBlocks(xfer, TRUE);
 	}
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;
@@ -3838,13 +3840,9 @@ void Object::xfer( Xfer *xfer )
 		}
 	}
 #endif
-	if (RetailFileLayers::enabled() && m_rotwkPowerState)
-		version = 11;
-	const XferVersion maxVersion = RetailFileLayers::enabled() ? 13 : 11;
-	if (maxVersion == 13 && getCreateAHeroColors())
-		version = 13;
-	else if (maxVersion == 13 && m_constructionCostPaid >= 0)
-		version = 12;
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 14 : 11;
+	if (RetailFileLayers::enabled())
+		version = maxVersion;
 	xfer->xferVersion(&version, maxVersion);
 
 	// object ID
@@ -4299,7 +4297,14 @@ void Object::xfer( Xfer *xfer )
 		for (Color& color : m_createAHeroColors)
 			xfer->xferInt(&color);
 	}
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 14);
 
+}
+
+void Object::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
 }
 
 //-------------------------------------------------------------------------------------------------

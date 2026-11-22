@@ -62,6 +62,7 @@
 #include "Common/CommandPointRules.h"
 #include "GameLogic/RetailBuildingEvents.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailWorldUI.h"
 #include "GameLogic/CreateAHeroSystem.h"
@@ -4041,6 +4042,7 @@ void Player::crc( Xfer *xfer )
 		xfer->xferUnsignedInt(&cash);
 		xfer->xferBool(&m_logicalRetaliationModeEnabled);
 		xferPowerProductionBonuses(xfer);
+		xferRetailBlocks(xfer, TRUE);
 	}
 
 }
@@ -4062,7 +4064,7 @@ void Player::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 8;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4621,7 +4623,14 @@ void Player::xfer( Xfer *xfer )
 		xfer->xferBool(&m_logicalRetaliationModeEnabled);
 	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
 		m_logicalRetaliationModeEnabled = FALSE;
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 13);
 
+}
+
+void Player::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -35,6 +35,7 @@ public:
 	Real getCavalryTurn() const { return m_cavalryTurn; }
 	static Bool isReforming(const AIUpdateInterface* ai);
 	void crcReformState(Xfer* xfer);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 private:
 	static constexpr AICommandType NO_ORDER = (AICommandType)-1;

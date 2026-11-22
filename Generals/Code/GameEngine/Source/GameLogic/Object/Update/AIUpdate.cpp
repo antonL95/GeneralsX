@@ -29,6 +29,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 
 #define DEFINE_LOCOMOTORSET_NAMES					// for TheLocomotorSetNames[]
 #define DEFINE_AUTOACQUIRE_NAMES
@@ -4938,9 +4939,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 4;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5179,6 +5180,13 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferBool(&m_retryPath);
 	}
 
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 8);
+}
+
+void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
 }
 
 // ------------------------------------------------------------------------------------------------

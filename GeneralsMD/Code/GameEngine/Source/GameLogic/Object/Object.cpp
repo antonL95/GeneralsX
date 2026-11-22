@@ -52,6 +52,7 @@
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/Module/RetailEconomy.h"
 #include "GameClient/RetailEva.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
@@ -4543,6 +4544,7 @@ void Object::crc( Xfer *xfer )
 					dozer->crcRetailState(xfer);
 			}
 		}
+		xferRetailBlocks(xfer, TRUE);
 	}
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;
@@ -4695,19 +4697,10 @@ void Object::xfer( Xfer *xfer )
 	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
 		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
 	const Bool retail = RetailFileLayers::enabled();
-	const XferVersion maxVersion = retail ? 18 : 10;
+	const XferVersion maxVersion = retail ? 19 : 10;
 	XferVersion version = extendedSlots ? 10 : legacyVersion;
 	if (retail)
-	{
-		if (getCreateAHeroColors())
-			version = 18;
-		else if (m_rotwkPowerState)
-			version = 17;
-		else if (m_invulnerableUntil != NEVER)
-			version = 16;
-		else
-			version = m_constructionCostPaid >= 0 ? 15 : 14;
-	}
+		version = maxVersion;
 	xfer->xferVersion(&version, maxVersion);
 
 	// object ID
@@ -5191,6 +5184,13 @@ void Object::xfer( Xfer *xfer )
 		for (Color& color : m_createAHeroColors)
 			xfer->xferInt(&color);
 	}
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 19);
+}
+
+void Object::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
 }
 
 void Object::inheritMountedUpgradeCommands(std::vector<AsciiString> commands)

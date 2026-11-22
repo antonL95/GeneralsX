@@ -5,6 +5,7 @@
 #include "Common/Xfer.h"
 #include "Common/AttributeModifierRules.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
@@ -696,12 +697,13 @@ void HordeAIUpdate::crc(Xfer* xfer)
 			xfer->xferReal(&m_cavalryTurnSinceReform);
 		}
 		crcReformState(xfer);
+		xferRetailBlocks(xfer, TRUE);
 	}
 }
 
 void HordeAIUpdate::xfer(Xfer* xfer)
 {
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 9 : 5;
 	XferVersion version = currentVersion;
 	xfer->xferVersion(&version, currentVersion);
 	AIUpdateInterface::xfer(xfer);
@@ -740,6 +742,13 @@ void HordeAIUpdate::xfer(Xfer* xfer)
 		xfer->xferUnsignedInt(&m_reformUntil);
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_reformUntil = 0;
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 9);
+}
+
+void HordeAIUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
 }
 
 void HordeAIUpdate::loadPostProcess()

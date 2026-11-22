@@ -236,6 +236,7 @@ class AIUpdateInterface : public UpdateModule, public AICommandInterface
 {
 
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( AIUpdateInterface, "AIUpdateInterface" )
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( AIUpdateInterface, AIUpdateModuleData )
 
 protected:

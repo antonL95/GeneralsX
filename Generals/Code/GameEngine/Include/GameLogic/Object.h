@@ -727,6 +727,7 @@ private:
 	// cache these, for convenience
 	std::unique_ptr<RotwkPowerState> m_rotwkPowerState;
 	void xferRotwkPowerState(Xfer* xfer);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	ContainModuleInterface*				m_contain;
 	class SlavedUpdate* m_slavedUpdate = nullptr;
 	BodyModuleInterface*					m_body;

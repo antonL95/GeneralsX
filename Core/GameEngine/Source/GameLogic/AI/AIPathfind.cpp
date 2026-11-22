@@ -49,6 +49,7 @@
 #include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 
 static Bool isSameHorde(const Object* obj, const Object* unit);
 #include "GameLogic/Module/CastleBehavior.h"
@@ -7734,6 +7735,7 @@ void Pathfinder::crc( Xfer *xfer )
 		xfer->xferIRegion2D(&m_logicalExtent);
 		Real wadeDepth = TheAI->getAiData()->m_wadeWaterDepth;
 		xfer->xferReal(&wadeDepth);
+		xferRetailBlocks(xfer, TRUE);
 	}
 
 }
@@ -7743,7 +7745,7 @@ void Pathfinder::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 8 : 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 9 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -7858,6 +7860,13 @@ void Pathfinder::xfer( Xfer *xfer )
 		xfer->xferIRegion2D(&m_logicalExtent);
 	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD && m_isMapReady)
 		m_logicalExtent = currentLogicalPathfindExtent();
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 9);
+}
+
+void Pathfinder::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
 }
 
 //-----------------------------------------------------------------------------

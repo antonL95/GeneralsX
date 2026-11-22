@@ -112,4 +112,13 @@ void transfer(XferType* xfer, bool loading, std::initializer_list<Block<XferType
 		++position;
 	}
 }
+
+template<typename XferType>
+void transferSection(XferType* xfer, bool loading, bool present, std::initializer_list<Block<XferType>> blocks)
+{
+	if (present)
+		transfer(xfer, loading, blocks);
+	else if (loading)
+		resetAll(blocks);
+}
 }

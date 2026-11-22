@@ -184,6 +184,7 @@ public:
 	enum class BackingPhase { Available, Backing, Recovered };
 	BackingPhase updateBacking(Object* member);
 	void xferRetailFormationCombat(Xfer* xfer, Bool includeBackingSource = TRUE);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	static void applyWeaponDamage(Object* victim, DamageInfo& damage, Bool contactHit);
 	static Drawable* resolveSelection(Drawable* draw);
 
