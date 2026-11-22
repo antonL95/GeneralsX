@@ -22,6 +22,7 @@
 
 class PathfindCell;
 class PathfindLayer;
+class Xfer;
 
 typedef UnsignedShort zoneStorageType;
 
@@ -39,6 +40,7 @@ public:
 
 	void blockCalculateZones(	PathfindCell **map, PathfindLayer layers[], const IRegion2D &bounds);	///< Does zone calculations.
 	zoneStorageType getEffectiveZone(LocomotorSurfaceTypeMask acceptableSurfaces, Bool crusher, zoneStorageType zone) const;
+	void xferConnectivity(Xfer* xfer, zoneStorageType maxZone);
 
 	void clearMarkedPassable() {m_markedPassable = false;}
 	Bool isPassable() {return m_markedPassable;}

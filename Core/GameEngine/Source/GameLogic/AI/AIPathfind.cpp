@@ -7715,7 +7715,7 @@ void Pathfinder::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 5 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -7810,6 +7810,17 @@ void Pathfinder::xfer( Xfer *xfer )
 	}
 	if (version >= 4)
 		xfer->xferUnsignedInt(&m_retailRouteRevision);
+	if (version >= 5)
+	{
+		Bool hasZones = m_isMapReady;
+		xfer->xferBool(&hasZones);
+		if (hasZones)
+		{
+			if (!m_isMapReady)
+				throw XFER_INVALID_PARAMETERS;
+			m_zoneManager.xferConnectivity(xfer, m_map, m_layers, m_extent);
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------

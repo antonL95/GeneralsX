@@ -24,6 +24,7 @@
 class PathfindCell;
 class PathfindLayer;
 class ZoneBlock;
+class Xfer;
 
 typedef UnsignedShort zoneStorageType;
 
@@ -53,6 +54,7 @@ public:
 	void setZoneUpdateFrame(UnsignedInt frame) { m_nextFrameToCalculateZones = frame; }
 	void updateZonesForModify( PathfindCell **map,  PathfindLayer layers[], const IRegion2D &structureBounds, const IRegion2D &globalBounds ) ; ///< Called to recalculate an area when a structure has been removed.
 	void calculateZones(	PathfindCell **map, PathfindLayer layers[], const IRegion2D &bounds);	///< Does zone calculations.
+	void xferConnectivity(Xfer* xfer, PathfindCell** map, PathfindLayer layers[], const IRegion2D& bounds);
 	zoneStorageType getEffectiveZone(LocomotorSurfaceTypeMask acceptableSurfaces, Bool crusher, zoneStorageType zone) const;
 	zoneStorageType getEffectiveTerrainZone(zoneStorageType zone) const;
 
@@ -73,6 +75,7 @@ public:
 	Bool interactsWithBridge(Int cellX, Int cellY) const;
 
 private:
+	static constexpr Int MAX_GROUND_ZONE_COUNT = 24000;
 	void allocateZones();
 	void freeZones();
 	void freeBlocks();

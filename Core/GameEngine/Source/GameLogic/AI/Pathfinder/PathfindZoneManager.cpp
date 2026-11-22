@@ -16,6 +16,7 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "Common/Xfer.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
 #include "GameLogic/Pathfinder/PathfindConstants.h"
 #include "GameLogic/Pathfinder/PathfindLayer.h"
@@ -163,7 +164,7 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 #endif
 
 	m_maxZone = 1;	// we start using zone 0 as a flag.
-	const Int maxZones=24000;
+	constexpr Int maxZones = MAX_GROUND_ZONE_COUNT;
 	zoneStorageType zoneEquivalency[maxZones];
 	Int i, j;
 	for (i=0; i<maxZones; i++) {
@@ -479,6 +480,62 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 	}
 #endif
 	m_nextFrameToCalculateZones = 0xffffffff;
+}
+
+void PathfindZoneManager::xferConnectivity(Xfer* xfer, PathfindCell** map, PathfindLayer layers[], const IRegion2D& bounds)
+{
+	IRegion2D savedBounds = bounds;
+	xfer->xferIRegion2D(&savedBounds);
+	if (savedBounds.lo.x != bounds.lo.x || savedBounds.lo.y != bounds.lo.y ||
+		savedBounds.hi.x != bounds.hi.x || savedBounds.hi.y != bounds.hi.y)
+		throw XFER_INVALID_PARAMETERS;
+
+	xfer->xferUnsignedShort(&m_maxZone);
+	if (m_maxZone == 0 || m_maxZone > MAX_GROUND_ZONE_COUNT + LAYER_LAST + 1)
+		throw XFER_INVALID_PARAMETERS;
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	if (loading)
+		allocateZones();
+	for (auto* table : {m_groundCliffZones, m_groundWaterZones, m_groundRubbleZones,
+		m_terrainZones, m_crusherZones, m_hierarchicalZones})
+	{
+		for (Int i = 0; i <= m_maxZone; ++i)
+		{
+			xfer->xferUnsignedShort(&table[i]);
+			if (table[i] > m_maxZone)
+				throw XFER_INVALID_PARAMETERS;
+		}
+	}
+
+	for (Int x = bounds.lo.x; x <= bounds.hi.x; ++x)
+	{
+		for (Int y = bounds.lo.y; y <= bounds.hi.y; ++y)
+		{
+			zoneStorageType zone = map[x][y].getZone();
+			xfer->xferUnsignedShort(&zone);
+			if (zone > m_maxZone || zone >= (1u << 14))
+				throw XFER_INVALID_PARAMETERS;
+			if (loading)
+				map[x][y].setZone(zone);
+		}
+	}
+
+	for (Int layer = LAYER_GROUND + 1; layer <= LAYER_LAST; ++layer)
+	{
+		Int zone = layers[layer].getZone();
+		xfer->xferInt(&zone);
+		if (zone < 0 || zone > m_maxZone)
+			throw XFER_INVALID_PARAMETERS;
+		if (loading)
+		{
+			layers[layer].setZone(zone);
+			layers[layer].applyZone();
+		}
+	}
+
+	for (Int x = 0; x < m_zoneBlockExtent.x; ++x)
+		for (Int y = 0; y < m_zoneBlockExtent.y; ++y)
+			m_zoneBlocks[x][y].xferConnectivity(xfer, m_maxZone);
 }
 
 /**

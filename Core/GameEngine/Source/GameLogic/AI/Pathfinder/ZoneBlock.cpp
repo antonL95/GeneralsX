@@ -16,6 +16,7 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "Common/Xfer.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
 #include "GameLogic/Pathfinder/PathfindZoneManager.h"
 #include "GameLogic/Pathfinder/ZoneBlock.h"
@@ -38,6 +39,30 @@ m_interactsWithBridge(FALSE)
 ZoneBlock::~ZoneBlock()
 {
 	freeZones();
+}
+
+void ZoneBlock::xferConnectivity(Xfer* xfer, zoneStorageType maxZone)
+{
+	xfer->xferUnsignedShort(&m_firstZone);
+	xfer->xferUnsignedShort(&m_numZones);
+	xfer->xferBool(&m_interactsWithBridge);
+	xfer->xferBool(&m_markedPassable);
+	const Int end = m_firstZone + m_numZones;
+	if (m_numZones == 0 || m_firstZone > maxZone || end > maxZone + 1)
+		throw XFER_INVALID_PARAMETERS;
+	if (m_numZones == 1)
+		return;
+	if (xfer->getXferMode() == XFER_LOAD)
+		allocateZones();
+	for (auto* table : {m_groundCliffZones, m_groundWaterZones, m_groundRubbleZones, m_crusherZones})
+	{
+		for (Int i = 0; i < m_numZones; ++i)
+		{
+			xfer->xferUnsignedShort(&table[i]);
+			if (table[i] < m_firstZone || table[i] >= end)
+				throw XFER_INVALID_PARAMETERS;
+		}
+	}
 }
 
 void ZoneBlock::freeZones()
