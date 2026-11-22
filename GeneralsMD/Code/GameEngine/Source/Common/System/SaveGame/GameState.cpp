@@ -726,7 +726,11 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 		gameStatePostProcessLoad();
 		if (m_loadedObjectIDCounter)
 		{
-			TheGameLogic->setObjectIDCounter(*m_loadedObjectIDCounter);
+			ObjectID nextID = *m_loadedObjectIDCounter;
+			for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+				if (object->getID() >= nextID)
+					nextID = static_cast<ObjectID>(static_cast<UnsignedInt>(object->getID()) + 1);
+			TheGameLogic->setObjectIDCounter(nextID);
 			m_loadedObjectIDCounter.reset();
 		}
 		if (m_loadedRandomState)
