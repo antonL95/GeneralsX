@@ -127,9 +127,15 @@ TEST(CreateAHeroRulesTest, CompactNameMustBeCanonical)
 	CreateAHeroRules::CompactSelection input;
 	input.classIndex = 0;
 	input.subClassIndex = 0;
-	const std::string unnamed = CreateAHeroRules::encodeCompact(input);
+	EXPECT_TRUE(CreateAHeroRules::encodeCompact(input).empty());
+	input.heroName = "Name";
+	const std::string named = CreateAHeroRules::encodeCompact(input);
+	ASSERT_FALSE(named.empty());
+	const std::string unnamed = named.substr(0, named.find('.'));
 	CreateAHeroRules::CompactSelection decoded;
 	EXPECT_FALSE(CreateAHeroRules::decodeCompact(unnamed + ".", decoded));
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact(unnamed, decoded));
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact("~" + std::string(66, 'A') + ".Name", decoded));
 	input.heroName.assign(CreateAHeroRules::MAX_HERO_NAME_LENGTH, 'A');
 	ASSERT_TRUE(CreateAHeroRules::decodeCompact(CreateAHeroRules::encodeCompact(input), decoded));
 	EXPECT_EQ(decoded.heroName, input.heroName);
@@ -140,6 +146,9 @@ TEST(CreateAHeroRulesTest, RejectsHostileAndMalformedInputs)
 	CreateAHeroRules::SelectionData sel;
 	EXPECT_FALSE(CreateAHeroRules::decodeSelection("", sel));
 	EXPECT_FALSE(CreateAHeroRules::decodeSelection("invalid|data", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|Name||||01,2,3,4,5,6,7,8,9", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|||||1,2,3,4,5,6,7,8,9", sel));
+	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C:bad|S|Name||||1,2,3,4,5,6,7,8,9", sel));
 	EXPECT_FALSE(CreateAHeroRules::decodeSelection(std::string(CreateAHeroRules::MAX_ENCODED_LENGTH + 1, 'A'), sel));
 	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|Name|A,,B|||1,2,3,4,5,6,7,8,9", sel));
 	EXPECT_FALSE(CreateAHeroRules::decodeSelection("C|S|Name||||256,0,0,0,0,0,0,0,0", sel));

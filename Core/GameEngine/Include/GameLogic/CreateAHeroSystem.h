@@ -130,7 +130,7 @@ namespace CreateAHeroSystem
 	Int effectivePowerCost(const CommandButton* button, Int selectedLevel);
 
 	AsciiString encodeSelectionCompact(const CreateAHeroRules::SelectionData& sel);
-	Bool decodeSelectionCompact(const AsciiString& encoded, CreateAHeroRules::SelectionData& out);
+	Bool decodeSelectionCompact(std::string_view encoded, CreateAHeroRules::SelectionData& out);
 
 	AsciiString validateSetupSelection(std::string_view encoded, const GameSlot& slot);
 	void setPlayerSelection(Int playerIndex, const CreateAHeroRules::SelectionData& sel);

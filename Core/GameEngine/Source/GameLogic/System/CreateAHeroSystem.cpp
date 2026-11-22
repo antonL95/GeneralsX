@@ -692,13 +692,13 @@ AsciiString encodeSelectionCompact(const CreateAHeroRules::SelectionData& sel)
 	return AsciiString(CreateAHeroRules::encodeCompact(compact).c_str());
 }
 
-Bool decodeSelectionCompact(const AsciiString& encoded, CreateAHeroRules::SelectionData& out)
+Bool decodeSelectionCompact(std::string_view encoded, CreateAHeroRules::SelectionData& out)
 {
 	out = CreateAHeroRules::SelectionData{};
 	if (!s_data.loaded)
 		return FALSE;
 	CreateAHeroRules::CompactSelection compact;
-	if (!CreateAHeroRules::decodeCompact(encoded.str(), compact))
+	if (!CreateAHeroRules::decodeCompact(encoded, compact))
 		return FALSE;
 	if (compact.classIndex < 0 || static_cast<size_t>(compact.classIndex) >= s_data.classes.size())
 		return FALSE;
@@ -764,7 +764,7 @@ static Bool decodeValidatedSelection(std::string_view encoded, const AsciiString
 		return FALSE;
 	CreateAHeroRules::SelectionData decoded;
 	const Bool parsed = encoded.front() == '~'
-		? encoded.size() <= CreateAHeroRules::MAX_COMPACT_LENGTH && decodeSelectionCompact(AsciiString(std::string(encoded).c_str()), decoded)
+		? decodeSelectionCompact(encoded, decoded)
 		: CreateAHeroRules::decodeSelection(encoded, decoded);
 	return parsed && validateSelection(decoded, faction, normalized);
 }

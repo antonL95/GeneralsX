@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <span>
 #include <cctype>
 #include <cstdint>
 #include <string>
@@ -16,6 +17,7 @@ constexpr size_t MAX_HERO_NAME_LENGTH = 32;
 constexpr size_t MAX_BLING_COUNT = 16;
 constexpr size_t MAX_ATTRIBUTE_COUNT = 8;
 constexpr size_t MAX_POWER_COUNT = 10;
+constexpr size_t MAX_COMPACT_BYTES = 14 + MAX_BLING_COUNT + MAX_ATTRIBUTE_COUNT + MAX_POWER_COUNT;
 
 inline bool equalsIgnoreCase(std::string_view a, std::string_view b)
 {
@@ -46,6 +48,8 @@ inline bool parseStrictInt(std::string_view token, int minVal, int maxVal, int& 
 	{
 		return false;
 	}
+	if (token[idx] == '0' && (neg || token.size() != 1))
+		return false;
 	int64_t val = 0;
 	for (; idx < token.size(); ++idx)
 	{
@@ -264,54 +268,39 @@ inline std::string joinList(const std::vector<std::string>& items)
 	return out;
 }
 
-inline bool splitStrictList(std::string_view input, size_t maxItems, std::vector<std::string>& out)
+inline std::span<std::string_view> splitFields(std::string_view input, char separator, std::span<std::string_view> fields)
 {
-	out.clear();
-	if (input.empty())
-		return true;
-	size_t start = 0;
-	while (start <= input.size())
+	size_t count = 0;
+	for (;;)
 	{
-		const size_t comma = input.find(',', start);
-		const std::string_view part = comma == std::string_view::npos
-			? input.substr(start)
-			: input.substr(start, comma - start);
-		if (part.empty() || out.size() >= maxItems)
-			return false;
-		out.emplace_back(part.data(), part.size());
-		if (comma == std::string_view::npos)
-			break;
-		start = comma + 1;
+		if (count == fields.size())
+			return {};
+		const size_t end = input.find(separator);
+		fields[count++] = input.substr(0, end);
+		if (end == std::string_view::npos)
+			return fields.first(count);
+		input.remove_prefix(end + 1);
 	}
-	return true;
 }
 
-inline bool splitStrictIntList(std::string_view input, size_t maxItems, int minVal, int maxVal, std::vector<int>& out)
+inline bool isCanonicalToken(std::string_view token, size_t maxLength)
 {
-	out.clear();
-	if (input.empty())
+	return !token.empty() && token.size() <= maxLength && std::all_of(token.begin(), token.end(), isSafeTokenChar);
+}
+
+inline bool readTokenList(std::string_view value, std::span<std::string_view> storage, std::span<std::string_view>& tokens)
+{
+	if (value.empty())
 		return true;
-	size_t start = 0;
-	while (start <= input.size())
-	{
-		const size_t comma = input.find(',', start);
-		const std::string_view part = comma == std::string_view::npos
-			? input.substr(start)
-			: input.substr(start, comma - start);
-		int value = 0;
-		if (out.size() >= maxItems || !parseStrictInt(part, minVal, maxVal, value))
-			return false;
-		out.push_back(value);
-		if (comma == std::string_view::npos)
-			break;
-		start = comma + 1;
-	}
-	return true;
+	tokens = splitFields(value, ',', storage);
+	return !tokens.empty() && std::all_of(tokens.begin(), tokens.end(), [](std::string_view token) {
+		return isCanonicalToken(token, 64);
+	});
 }
 
 inline std::string encodeSelection(const SelectionData& sel)
 {
-	if (sel.empty())
+	if (sel.empty() || !isCanonicalToken(sel.heroName, MAX_HERO_NAME_LENGTH))
 		return {};
 	std::string out;
 	out.append(sanitizeToken(sel.classUpgrade));
@@ -355,46 +344,31 @@ inline bool decodeSelection(std::string_view encoded, SelectionData& out)
 	if (encoded.empty() || encoded.size() > MAX_ENCODED_LENGTH)
 		return false;
 	std::string_view fields[7];
-	size_t fieldCount = 0;
-	size_t start = 0;
-	while (start <= encoded.size())
-	{
-		if (fieldCount >= 7)
+	if (splitFields(encoded, '|', fields).size() != std::size(fields) ||
+		!isCanonicalToken(fields[0], 64) || !isCanonicalToken(fields[1], 64) ||
+		!isCanonicalToken(fields[2], MAX_HERO_NAME_LENGTH))
+		return false;
+	std::string_view blingStorage[MAX_BLING_COUNT], attributeStorage[MAX_ATTRIBUTE_COUNT], powerStorage[MAX_POWER_COUNT];
+	std::span<std::string_view> bling, attributes, powers;
+	if (!readTokenList(fields[3], blingStorage, bling) || !readTokenList(fields[4], attributeStorage, attributes) ||
+		!readTokenList(fields[5], powerStorage, powers))
+		return false;
+	std::string_view colors[9];
+	if (splitFields(fields[6], ',', colors).size() != std::size(colors))
+		return false;
+	int rgb[9];
+	for (size_t i = 0; i < std::size(colors); ++i)
+		if (!parseStrictInt(colors[i], 0, 255, rgb[i]))
 			return false;
-		const size_t bar = encoded.find('|', start);
-		if (bar == std::string_view::npos)
-		{
-			fields[fieldCount++] = encoded.substr(start);
-			break;
-		}
-		fields[fieldCount++] = encoded.substr(start, bar - start);
-		start = bar + 1;
-	}
-	if (fieldCount != 7 || fields[0].empty() || fields[1].empty() || fields[2].size() > MAX_HERO_NAME_LENGTH)
-		return false;
-	for (char c : fields[2])
-	{
-		if (!isSafeTokenChar(c))
-			return false;
-	}
-	out.classUpgrade.assign(fields[0].data(), fields[0].size());
-	out.subClassUpgrade.assign(fields[1].data(), fields[1].size());
-	out.heroName.assign(fields[2].data(), fields[2].size());
-	if (!splitStrictList(fields[3], MAX_BLING_COUNT, out.blingUpgrades))
-		return false;
-	if (!splitStrictList(fields[4], MAX_ATTRIBUTE_COUNT, out.attributeUpgrades))
-		return false;
-	if (!splitStrictList(fields[5], MAX_POWER_COUNT, out.powerButtons))
-		return false;
-	std::vector<int> colors;
-	if (!splitStrictIntList(fields[6], 9, 0, 255, colors) || colors.size() != 9)
-		return false;
-	for (int i = 0; i < 3; ++i)
-	{
-		out.primaryColor[i] = colors[i];
-		out.secondaryColor[i] = colors[i + 3];
-		out.tertiaryColor[i] = colors[i + 6];
-	}
+	out.classUpgrade = fields[0];
+	out.subClassUpgrade = fields[1];
+	out.heroName = fields[2];
+	out.blingUpgrades.assign(bling.begin(), bling.end());
+	out.attributeUpgrades.assign(attributes.begin(), attributes.end());
+	out.powerButtons.assign(powers.begin(), powers.end());
+	std::copy_n(rgb, 3, out.primaryColor);
+	std::copy_n(rgb + 3, 3, out.secondaryColor);
+	std::copy_n(rgb + 6, 3, out.tertiaryColor);
 	return true;
 }
 
@@ -449,9 +423,8 @@ inline std::string base64UrlEncode(const std::vector<uint8_t>& bytes)
 	return out;
 }
 
-inline bool base64UrlDecode(std::string_view input, std::vector<uint8_t>& out)
+inline bool base64UrlDecode(std::string_view input, std::span<uint8_t> out)
 {
-	out.clear();
 	if (input.empty() || (input.size() % 4) == 1)
 		return false;
 	auto valOf = [](char c) -> int
@@ -463,7 +436,9 @@ inline bool base64UrlDecode(std::string_view input, std::vector<uint8_t>& out)
 		if (c == '_') return 63;
 		return -1;
 	};
-	out.reserve((input.size() * 3) / 4);
+	if ((input.size() * 3) / 4 != out.size())
+		return false;
+	size_t written = 0;
 	size_t i = 0;
 	while (i + 4 <= input.size())
 	{
@@ -475,9 +450,9 @@ inline bool base64UrlDecode(std::string_view input, std::vector<uint8_t>& out)
 			return false;
 		const uint32_t v = (static_cast<uint32_t>(a) << 18) | (static_cast<uint32_t>(b) << 12) |
 			(static_cast<uint32_t>(c) << 6) | static_cast<uint32_t>(d);
-		out.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
-		out.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
-		out.push_back(static_cast<uint8_t>(v & 0xFF));
+		out[written++] = static_cast<uint8_t>((v >> 16) & 0xFF);
+		out[written++] = static_cast<uint8_t>((v >> 8) & 0xFF);
+		out[written++] = static_cast<uint8_t>(v & 0xFF);
 		i += 4;
 	}
 	const size_t rem = input.size() - i;
@@ -487,7 +462,7 @@ inline bool base64UrlDecode(std::string_view input, std::vector<uint8_t>& out)
 		const int b = valOf(input[i + 1]);
 		if (a < 0 || b < 0 || (b & 0x0F) != 0)
 			return false;
-		out.push_back(static_cast<uint8_t>((a << 2) | (b >> 4)));
+		out[written++] = static_cast<uint8_t>((a << 2) | (b >> 4));
 	}
 	else if (rem == 3)
 	{
@@ -496,8 +471,8 @@ inline bool base64UrlDecode(std::string_view input, std::vector<uint8_t>& out)
 		const int c = valOf(input[i + 2]);
 		if (a < 0 || b < 0 || c < 0 || (c & 0x03) != 0)
 			return false;
-		out.push_back(static_cast<uint8_t>((a << 2) | (b >> 4)));
-		out.push_back(static_cast<uint8_t>(((b & 0x0F) << 4) | (c >> 2)));
+		out[written++] = static_cast<uint8_t>((a << 2) | (b >> 4));
+		out[written++] = static_cast<uint8_t>(((b & 0x0F) << 4) | (c >> 2));
 	}
 	return true;
 }
@@ -508,7 +483,7 @@ inline std::string encodeCompact(const CompactSelection& compact)
 		compact.subClassIndex < 0 || compact.subClassIndex > 255 ||
 		compact.blingIndices.size() > MAX_BLING_COUNT ||
 		compact.attributeIndices.size() > MAX_ATTRIBUTE_COUNT ||
-		compact.powerIndices.size() > MAX_POWER_COUNT)
+		compact.powerIndices.size() > MAX_POWER_COUNT || !isCanonicalToken(compact.heroName, MAX_HERO_NAME_LENGTH))
 		return {};
 	std::vector<uint8_t> bytes;
 	bytes.push_back(static_cast<uint8_t>(compact.classIndex));
@@ -544,12 +519,8 @@ inline std::string encodeCompact(const CompactSelection& compact)
 	std::string out;
 	out.push_back('~');
 	out.append(base64UrlEncode(bytes));
-	const std::string safeName = sanitizeToken(compact.heroName, MAX_HERO_NAME_LENGTH);
-	if (!safeName.empty())
-	{
-		out.push_back('.');
-		out.append(safeName);
-	}
+	out.push_back('.');
+	out.append(compact.heroName);
 	return out;
 }
 
@@ -560,38 +531,39 @@ inline bool decodeCompact(std::string_view encoded, CompactSelection& out)
 		return false;
 	encoded.remove_prefix(1);
 	const size_t dot = encoded.find('.');
-	const std::string_view payload = dot == std::string_view::npos ? encoded : encoded.substr(0, dot);
-	const std::string_view namePart = dot == std::string_view::npos ? std::string_view{} : encoded.substr(dot + 1);
-	if ((dot != std::string_view::npos && namePart.empty()) || namePart.size() > MAX_HERO_NAME_LENGTH)
+	if (dot == std::string_view::npos)
 		return false;
-	for (char c : namePart)
-	{
-		if (!isSafeTokenChar(c))
-			return false;
-	}
-	std::vector<uint8_t> bytes;
+	const auto payload = encoded.substr(0, dot);
+	const auto namePart = encoded.substr(dot + 1);
+	if (!isCanonicalToken(namePart, MAX_HERO_NAME_LENGTH))
+		return false;
+	const size_t size = payload.size() * 3 / 4;
+	uint8_t storage[MAX_COMPACT_BYTES];
+	if (size < 14 || size > std::size(storage))
+		return false;
+	const auto bytes = std::span(storage).first(size);
 	if (!base64UrlDecode(payload, bytes))
 		return false;
-	size_t pos = 0;
-	if (bytes.size() < 5)
+	size_t pos = 2;
+	const auto readIndices = [&](size_t cap, std::span<uint8_t>& indices) {
+		if (pos >= bytes.size())
+			return false;
+		const size_t count = bytes[pos++];
+		if (count > cap || count > bytes.size() - pos)
+			return false;
+		indices = bytes.subspan(pos, count);
+		pos += count;
+		return true;
+	};
+	std::span<uint8_t> bling, attributes, powers;
+	if (!readIndices(MAX_BLING_COUNT, bling) || !readIndices(MAX_ATTRIBUTE_COUNT, attributes) ||
+		!readIndices(MAX_POWER_COUNT, powers) || bytes.size() - pos != 9)
 		return false;
-	out.classIndex = bytes[pos++];
-	out.subClassIndex = bytes[pos++];
-	const size_t blingCount = bytes[pos++];
-	if (blingCount > MAX_BLING_COUNT || pos + blingCount >= bytes.size())
-		return false;
-	for (size_t i = 0; i < blingCount; ++i)
-		out.blingIndices.push_back(bytes[pos++]);
-	const size_t attrCount = bytes[pos++];
-	if (attrCount > MAX_ATTRIBUTE_COUNT || pos + attrCount >= bytes.size())
-		return false;
-	for (size_t i = 0; i < attrCount; ++i)
-		out.attributeIndices.push_back(bytes[pos++]);
-	const size_t powerCount = bytes[pos++];
-	if (powerCount > MAX_POWER_COUNT || pos + powerCount + 9 != bytes.size())
-		return false;
-	for (size_t i = 0; i < powerCount; ++i)
-		out.powerIndices.push_back(bytes[pos++]);
+	out.classIndex = bytes[0];
+	out.subClassIndex = bytes[1];
+	out.blingIndices.assign(bling.begin(), bling.end());
+	out.attributeIndices.assign(attributes.begin(), attributes.end());
+	out.powerIndices.assign(powers.begin(), powers.end());
 	for (int i = 0; i < 3; ++i)
 		out.primaryColor[i] = bytes[pos++];
 	for (int i = 0; i < 3; ++i)
