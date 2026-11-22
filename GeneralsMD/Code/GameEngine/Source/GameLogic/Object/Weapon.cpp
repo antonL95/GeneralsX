@@ -272,14 +272,14 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "RotatingTurret", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_rotatingTurret) },
 	{ "CanBeDodged", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canBeDodged) },
 	{ "CanSwoop", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canSwoop) },
-	{ "DisableScatterForTargetsOnWall", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_disableScatterForTargetsOnWall) },
+	{ "DisableScatterForTargetsOnWall", WeaponTemplate::parseScatterRule, nullptr, offsetof(WeaponTemplate, m_disableScatterForTargetsOnWall) },
 	{ "IgnoreLinearFirstTarget", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_ignoreLinearFirstTarget) },
 	{ "LinearTarget", WeaponTemplate::parseLinearTarget, nullptr, offsetof(WeaponTemplate, m_linearTargets) },
 	{ "PreferredTargetBone", INI::parseAsciiString, nullptr, offsetof(WeaponTemplate, m_preferredTargetBone) },
 	{ "RangeBonus", INI::parseReal, nullptr, offsetof(WeaponTemplate, m_rangeBonus) },
 	{ "RangeBonusMinHeight", INI::parseReal, nullptr, offsetof(WeaponTemplate, m_rangeBonusMinHeight) },
 	{ "RangeBonusPerFoot", INI::parseReal, nullptr, offsetof(WeaponTemplate, m_rangeBonusPerFoot) },
-	{ "ScatterIndependently", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_scatterIndependently) },
+	{ "ScatterIndependently", WeaponTemplate::parseScatterRule, nullptr, offsetof(WeaponTemplate, m_scatterIndependently) },
 	{ "DamageNugget", WeaponNugget::parseDamageNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DOTNugget", WeaponNugget::parseDOTNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "ProjectileNugget", WeaponNugget::parseProjectileNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
@@ -460,6 +460,12 @@ void WeaponTemplate::parseLinearTarget(INI* ini, void*, void* store, const void*
 	static_cast<std::vector<LinearTarget>*>(store)->push_back(target);
 }
 
+void WeaponTemplate::parseScatterRule(INI* ini, void* instance, void* store, const void* userData)
+{
+	static_cast<WeaponTemplate*>(instance)->m_hasScatterRules = TRUE;
+	INI::parseBool(ini, instance, store, userData);
+}
+
 //-------------------------------------------------------------------------------------------------
 static void parseRetailWeaponDelay(INI* ini, Int& minFrames, Int& maxFrames)
 {
@@ -602,7 +608,7 @@ void WeaponTemplate::postProcessLoad()
 Real WeaponTemplate::getAttackRange(const WeaponBonus& bonus, Real heightAdvantage) const
 {
 	Real range = m_attackRange * bonus.getField(WeaponBonus::RANGE);
-	if (heightAdvantage >= m_rangeBonusMinHeight && (m_rangeBonus != 0.0f || m_rangeBonusPerFoot != 0.0f))
+	if (heightAdvantage >= m_rangeBonusMinHeight && hasHeightRangeBonus())
 		range += m_rangeBonus + (heightAdvantage - m_rangeBonusMinHeight) * m_rangeBonusPerFoot;
 #ifdef RATIONALIZE_ATTACK_RANGE
 	// Note - undersize by 1/4 of a pathfind cell, so that the goal is not teetering on the edge
@@ -626,6 +632,34 @@ Bool WeaponTemplate::getPreferredTargetPosition(const Object* target, Coord3D& p
 		return FALSE;
 	position = bone;
 	return TRUE;
+}
+
+WeaponTemplate::TargetReach WeaponTemplate::getTargetReach(const Object* source, const Object* target)
+{
+	TargetReach reach{*target->getPosition(), 0.0f, FALSE};
+	Coord3D offset;
+	if (const auto* ai = target->getAI(); ai && ai->getSneakyTargetingOffset(&offset))
+	{
+		reach.position.x += offset.x;
+		reach.position.y += offset.y;
+		reach.position.z += offset.z;
+		reach.distanceSquared = ThePartitionManager->getDistanceSquared(source, &reach.position, ATTACK_RANGE_CALC_TYPE);
+		reach.targetsPosition = TRUE;
+	}
+	else if (target->isKindOf(KINDOF_BRIDGE))
+	{
+		TBridgeAttackInfo info;
+		TheTerrainLogic->getBridgeAttackPoints(target, &info);
+		const Real first = ThePartitionManager->getDistanceSquared(source, &info.attackPoint1, ATTACK_RANGE_CALC_TYPE);
+		const Real second = ThePartitionManager->getDistanceSquared(source, &info.attackPoint2, ATTACK_RANGE_CALC_TYPE);
+		reach.position = second < first ? info.attackPoint2 : info.attackPoint1;
+		reach.distanceSquared = second < first ? second : first;
+	}
+	else
+	{
+		reach.distanceSquared = ThePartitionManager->getDistanceSquared(source, target, ATTACK_RANGE_CALC_TYPE);
+	}
+	return reach;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1013,7 +1047,6 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 
 	Real distSqr;
 	ObjectID victimID;
-	TBridgeAttackInfo info;
 	Coord3D victimPosStorage;
 	if (victimObj)
 	{
@@ -1021,41 +1054,17 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		victimPos = victimObj->getPosition();
 		victimID = victimObj->getID();
 
-		Coord3D sneakyOffset;
-		const AIUpdateInterface* ai = victimObj->getAI();
-		if (ai != nullptr && ai->getSneakyTargetingOffset(&sneakyOffset))
+		const TargetReach reach = getTargetReach(sourceObj, victimObj);
+		distSqr = reach.distanceSquared;
+		if (reach.targetsPosition || victimObj->isKindOf(KINDOF_BRIDGE))
 		{
-			victimPosStorage = *victimPos;
-			victimPosStorage.x += sneakyOffset.x;
-			victimPosStorage.y += sneakyOffset.y;
-			victimPosStorage.z += sneakyOffset.z;
-
+			victimPosStorage = reach.position;
 			victimPos = &victimPosStorage;
-			// for a sneaky offset, we always target a position rather than an object
+		}
+		if (reach.targetsPosition)
+		{
 			victimObj = nullptr;
 			victimID = INVALID_ID;
-			distSqr = ThePartitionManager->getDistanceSquared(sourceObj, victimPos, ATTACK_RANGE_CALC_TYPE);
-		}
-		else
-		{
-			if (victimObj->isKindOf(KINDOF_BRIDGE))
-			{
-				// Bridges are kind of oddball - they have 2 target points at either end.
-				TheTerrainLogic->getBridgeAttackPoints(victimObj, &info);
-				distSqr = ThePartitionManager->getDistanceSquared( sourceObj, &info.attackPoint1, ATTACK_RANGE_CALC_TYPE );
-				victimPos = &info.attackPoint1;
- 				Real distSqr2 = ThePartitionManager->getDistanceSquared( sourceObj, &info.attackPoint2, ATTACK_RANGE_CALC_TYPE );
-				if (distSqr > distSqr2)
-				{
-					// Try the other one.
-					distSqr = distSqr2;
-					victimPos = &info.attackPoint2;
-				}
-			}
-			else
-			{
-				distSqr = ThePartitionManager->getDistanceSquared(sourceObj, victimObj, ATTACK_RANGE_CALC_TYPE);
-			}
 		}
 	}
 	else
@@ -1227,7 +1236,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	Coord3D projectileDestination = *victimPos;
 	getPreferredTargetPosition(victimObj, projectileDestination);
 	const Bool infantryScatter = m_infantryInaccuracyDist > 0.0f && victimObj && victimObj->isKindOf(KINDOF_INFANTRY);
-	const Bool forceScatter = RetailFileLayers::enabled() && hasNuggets() && !isProjectileDetonation && infantryScatter &&
+	const Bool forceScatter = m_hasScatterRules && RetailFileLayers::enabled() && hasNuggets() && !isProjectileDetonation && infantryScatter &&
 		(!m_disableScatterForTargetsOnWall || victimObj->getLayer() != LAYER_WALL);
 	const Bool scatter = (!nuggetHit || forceScatter) && (m_scatterRadius > 0.0f || infantryScatter);
 	const Real scatterLimit = scatter ? m_scatterRadius + (infantryScatter ? m_infantryInaccuracyDist : 0.0f) : 0.0f;
@@ -2619,22 +2628,28 @@ Bool Weapon::isWithinAttackRange(const Object *source, const Coord3D* pos) const
 Bool Weapon::isWithinAttackRange(const Object *source, const Object *target) const
 {
 	Real distSqr;
-	Real attackRangeSqr = sqr(getAttackRange(source, target->getPosition()));
+	Real attackRangeSqr;
 
-	if( !target->isKindOf(KINDOF_BRIDGE) )
+	if (m_template->hasHeightRangeBonus())
 	{
-		distSqr = ThePartitionManager->getDistanceSquared( source, target, ATTACK_RANGE_CALC_TYPE );
+		const auto reach = WeaponTemplate::getTargetReach(source, target);
+		distSqr = reach.distanceSquared;
+		attackRangeSqr = sqr(getAttackRange(source, &reach.position));
 	}
 	else
 	{
-		// Special case - bridges have two attackable points at either end.
-		TBridgeAttackInfo info;
-		TheTerrainLogic->getBridgeAttackPoints(target, &info);
-		distSqr = ThePartitionManager->getDistanceSquared( source, &info.attackPoint1, ATTACK_RANGE_CALC_TYPE );
-		if (distSqr>attackRangeSqr)
+		attackRangeSqr = sqr(getAttackRange(source));
+		if (!target->isKindOf(KINDOF_BRIDGE))
 		{
-			// Try the other one.
-			distSqr = ThePartitionManager->getDistanceSquared( source, &info.attackPoint2, ATTACK_RANGE_CALC_TYPE );
+			distSqr = ThePartitionManager->getDistanceSquared(source, target, ATTACK_RANGE_CALC_TYPE);
+		}
+		else
+		{
+			TBridgeAttackInfo info;
+			TheTerrainLogic->getBridgeAttackPoints(target, &info);
+			distSqr = ThePartitionManager->getDistanceSquared(source, &info.attackPoint1, ATTACK_RANGE_CALC_TYPE);
+			if (distSqr > attackRangeSqr)
+				distSqr = ThePartitionManager->getDistanceSquared(source, &info.attackPoint2, ATTACK_RANGE_CALC_TYPE);
 		}
 	}
 

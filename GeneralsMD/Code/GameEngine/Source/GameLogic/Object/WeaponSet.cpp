@@ -1165,6 +1165,10 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 
 	const Bool targetingHorde = retail && obj->isKindOf(KINDOF_GIANT_BIRD) &&
 		HordeContain::get(victim->getContainedBy());
+	const Bool useTargetReach = retail && std::any_of(m_weapons, m_weapons + WEAPONSLOT_COUNT, [](const Weapon* weapon) {
+		return weapon && weapon->getTemplate()->hasHeightRangeBonus();
+	});
+	const auto targetReach = useTargetReach ? WeaponTemplate::getTargetReach(obj, victim) : WeaponTemplate::TargetReach{};
 
 	// go backwards, so that in the event of ties, the primary weapon is preferred
 	for (Int i = WEAPONSLOT_COUNT - 1; i >= PRIMARY_WEAPON ; --i)
@@ -1209,7 +1213,7 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 			continue;
 
 		Real damage = weapon->estimateWeaponDamage(obj, victim);
-		Real attackRange = weapon->getAttackRange(obj, victim->getPosition());
+		Real attackRange = weapon->getAttackRange(obj, useTargetReach ? &targetReach.position : victim->getPosition());
 		const WeaponStatus status = weapon->getStatus();
 		Bool weaponIsReady = status == READY_TO_FIRE || (retail && status == PRE_ATTACK);
 
@@ -1227,7 +1231,7 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 			const Real dx = objPos->x - victimPos->x;
 			const Real dy = objPos->y - victimPos->y;
 			const Real dz = objPos->z - victimPos->z;
-			const Real distance = WWMath::SqrtfOrigin(dx * dx + dy * dy + dz * dz);
+			const Real distance = WWMath::SqrtfOrigin(useTargetReach ? targetReach.distanceSquared : dx * dx + dy * dy + dz * dz);
 
 			const KindOfMaskType& preferredAgainst = m_curWeaponTemplateSet->getNthPreferredAgainstMask((WeaponSlotType)i);
 			const Bool prefersHorde = targetingHorde && preferredAgainst.test(KINDOF_HORDE);

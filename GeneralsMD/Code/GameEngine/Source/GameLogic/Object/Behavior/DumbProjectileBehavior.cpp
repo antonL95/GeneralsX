@@ -856,7 +856,10 @@ void DumbProjectileBehavior::crc( Xfer *xfer )
 void DumbProjectileBehavior::crcSelfFlight(Xfer* xfer)
 {
 	if (isPassengerFlight())
+	{
 		xfer->xferObjectID(&m_launcherID);
+		xfer->xferUnsignedInt(&m_extraBonusFlags);
+	}
 	AsciiString warhead = m_detonationWeaponTmpl ? m_detonationWeaponTmpl->getName() : AsciiString();
 	xfer->xferAsciiString(&warhead);
 	xfer->xferObjectID(&m_victimID);
@@ -880,9 +883,9 @@ void DumbProjectileBehavior::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 1;
 #else
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 2;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -947,6 +950,10 @@ void DumbProjectileBehavior::xfer( Xfer *xfer )
 		if (xfer->getXferMode() == XFER_LOAD)
 			m_launchWeaponTmpl = launchName.isEmpty() ? nullptr : TheWeaponStore->findWeaponTemplate(launchName);
 	}
+	if (version >= 4)
+		xfer->xferUnsignedInt(&m_extraBonusFlags);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_extraBonusFlags = 0;
 
 }
 
