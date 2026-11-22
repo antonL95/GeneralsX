@@ -1,6 +1,7 @@
 225 create Player_1 DominateRevertCasterAlive 0 2120,585,0
 225 create Player_1 DominateRevertCasterKilled 0 2120,610,0
 225 create Player_1 DominateRevertCasterDeleted 0 2120,635,0
+225 create Player_2 DominateRevertCasterRecast 0 2120,660,0
 225 create PlyrCreeps DominateRevertVictimAlive 0 2140,585,0
 225 create PlyrCreeps DominateRevertVictimKilled 0 2140,610,0
 225 create PlyrCreeps DominateRevertVictimDeleted 0 2140,635,0
@@ -10,6 +11,7 @@
 230 dominate-revert-cast Player_1 DominateRevertCasterAlive 0 PlyrCreeps:DominateRevertVictimAlive:0
 230 dominate-revert-cast Player_1 DominateRevertCasterKilled 0 PlyrCreeps:DominateRevertVictimKilled:0
 230 dominate-revert-cast Player_1 DominateRevertCasterDeleted 0 PlyrCreeps:DominateRevertVictimDeleted:0
+250 dominate-revert-cast Player_2 DominateRevertCasterRecast 0 Player_1:DominateRevertVictimKilled:0
 240 kill Player_1 DominateRevertCasterKilled 0
 240 dominate-revert-remove Player_1 DominateRevertCasterDeleted 0
 241 dominate-revert-probe - DominateRevertCasterKilled 0

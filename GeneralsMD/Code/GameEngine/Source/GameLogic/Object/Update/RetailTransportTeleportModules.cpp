@@ -150,7 +150,7 @@ void TemporarilyDefectUpdate::schedule()
 {
 	const auto& state = getObject()->m_domination;
 	const UnsignedInt now = TheGameLogic->getFrame();
-	sleepUntil(std::max(now + 1, std::min(state.deadline, state.nextCheck)));
+	sleepUntil(std::max(now + 1, state.nextCheck));
 }
 
 Bool TemporarilyDefectUpdate::convert(ObjectID caster, Team* team, UnsignedInt fallbackDuration)
@@ -161,6 +161,8 @@ Bool TemporarilyDefectUpdate::convert(ObjectID caster, Team* team, UnsignedInt f
 	const UnsignedInt duration = authoredDuration ? authoredDuration : fallbackDuration;
 	if (!duration || !victim->getTeam())
 		return FALSE;
+	if (state.deadline != 0)
+		return FALSE;
 
 	const TeamPrototypeID originalTeam = victim->getTeam()->getPrototype()->getID();
 	convertObjectOwnership(victim, team);
@@ -168,10 +170,9 @@ Bool TemporarilyDefectUpdate::convert(ObjectID caster, Team* team, UnsignedInt f
 		return FALSE;
 
 	const UnsignedInt now = TheGameLogic->getFrame();
-	if (state.deadline == 0)
-		state.originalTeam = originalTeam;
+	state.originalTeam = originalTeam;
 	state.caster = caster;
-	state.deadline = std::max(state.deadline, now + duration);
+	state.deadline = now + duration;
 	state.nextCheck = now + 2 * LOGICFRAMES_PER_SECOND;
 	schedule();
 	return TRUE;
@@ -232,7 +233,7 @@ UpdateSleepTime TemporarilyDefectUpdate::update()
 	if (now < state.deadline && caster && !caster->isEffectivelyDead() && !caster->isDestroyed())
 	{
 		state.nextCheck = now + DEFECTION_RECHECK_FRAMES;
-		return UPDATE_SLEEP(std::min(state.deadline, state.nextCheck) - now);
+		return UPDATE_SLEEP(state.nextCheck - now);
 	}
 
 	const TeamPrototype* originalPrototype = TheTeamFactory->findTeamPrototypeByID(state.originalTeam);

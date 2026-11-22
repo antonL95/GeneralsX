@@ -1,5 +1,5 @@
 prepare() {
-    for frame in 230 231 232 233 234 235 236 290 291 292 293 294 295 296 320 321 322 323 324 325 326; do
+    for frame in 230 231 232 233 234 235 236 253 254 290 291 292 293 294 295 296 320 321 322 323 324 325 326 330 331 332 333 334 335 336 337; do
         for victim in Alive Killed Deleted; do
             printf '%s dominate-revert-probe - DominateRevertVictim%s 0\n' "$frame" "$victim"
         done
@@ -24,14 +24,19 @@ check() {
         cast_frame=$((first_converted - 1))
         delay=60
         if [ "$victim" = Alive ]; then
-            delay=90
+            delay=100
         fi
         revert_frame=$((cast_frame + delay))
         expect_owner "$revert_frame" "$victim" Player_1
         expect_owner "$((revert_frame + 1))" "$victim" PlyrCreeps
-        expect_owner 326 "$victim" PlyrCreeps
+        expect_owner 337 "$victim" PlyrCreeps
         printf 'DominateRevertVictim%s %s cast=%s revert=%s\n' "$victim" "$phase" "$cast_frame" "$revert_frame"
     done
+
+    expect_owner 254 Killed Player_1
+    if covers 293; then
+        expect_owner 293 Killed PlyrCreeps
+    fi
 
     if covers 241; then
         expect "TEST dominate-revert frame=241 object=DominateRevertCasterDeleted state=absent owner=-"
