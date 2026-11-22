@@ -2139,6 +2139,17 @@ void PartitionData::updateCellsTouched()
 	}
 
 	removeAllTouchedCells();
+	if (obj && RetailFileLayers::enabled() && TheGameState && TheGameState->isInLoadGame())
+	{
+		const Int count = calcMaxCoiForShape(geom, majorRadius, minorRadius, isSmall);
+		if (count != m_coiArrayCount)
+		{
+			auto* intersections = MSGNEW("PartitionManager_COI") CellAndObjectIntersection[count];
+			delete[] m_coiArray;
+			m_coiArray = intersections;
+			m_coiArrayCount = count;
+		}
+	}
 	if (isSmall)
 	{
 		doSmallFill(pos.x, pos.y, majorRadius);
