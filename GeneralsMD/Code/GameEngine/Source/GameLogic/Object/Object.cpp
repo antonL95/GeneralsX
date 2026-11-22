@@ -1504,9 +1504,17 @@ void Object::holdForWeaponUntil(UnsignedInt frame) const
 
 void Object::setFiringConditionForCurrentWeapon() const
 {
+	WeaponSlotType wslot = m_weaponSet.getCurWeaponSlot();
+	if (RetailFileLayers::enabled())
+	{
+		ModelConditionFlags c = m_weaponSet.getModelConditionForWeaponSlot(wslot, WSF_FIRING);
+		m_logicModelConditions.clearAndSet(weaponFireFlags(wslot), c);
+		if (m_drawable)
+			m_drawable->clearAndSetModelConditionFlags(weaponFireFlags(wslot), c);
+		return;
+	}
 	if (m_drawable)
 	{
-		WeaponSlotType wslot = m_weaponSet.getCurWeaponSlot();
 		ModelConditionFlags c = m_weaponSet.getModelConditionForWeaponSlot(wslot, WSF_FIRING);
 		m_drawable->clearAndSetModelConditionFlags(weaponFireFlags(wslot), c);
 	}
@@ -5656,25 +5664,32 @@ void Object::adjustModelConditionForWeaponStatus()
 
 		}
 
-		if (m_drawable)
+		if (retail && conditionToSet != WSF_INVALID && conditionToSet != m_lastWeaponCondition[i])
+		{
+			m_lastWeaponCondition[i] = conditionToSet;
+			ModelConditionFlags c = m_weaponSet.getModelConditionForWeaponSlot((WeaponSlotType)i, conditionToSet);
+			m_logicModelConditions.clearAndSet(weaponFireFlags(i), c);
+			if (m_drawable)
+			{
+				m_drawable->updateDrawableClipStatus( w->getRemainingAmmo(), w->getClipSize(), w->getWeaponSlot() );
+				m_drawable->clearAndSetModelConditionFlags(weaponFireFlags(i), c);
+				if (i == m_weaponSet.getCurWeaponSlot())
+				{
+					const Bool timed = conditionToSet == WSF_PREATTACK || conditionToSet == WSF_FIRING;
+					m_drawable->setWeaponTimingDuration(timed ? weaponTimingFrames(w, conditionToSet, now) : 0);
+				}
+			}
+		}
+		else if (m_drawable)
 		{
 			m_drawable->updateDrawableClipStatus( w->getRemainingAmmo(), w->getClipSize(), w->getWeaponSlot() );
-			if (conditionToSet != WSF_INVALID && conditionToSet != m_lastWeaponCondition[i])
+			if (!retail && conditionToSet != WSF_INVALID && conditionToSet != m_lastWeaponCondition[i])
 			{
 				m_lastWeaponCondition[i] = conditionToSet;
 				ModelConditionFlags c = m_weaponSet.getModelConditionForWeaponSlot((WeaponSlotType)i, conditionToSet);
 				m_drawable->clearAndSetModelConditionFlags(weaponFireFlags(i), c);
-				if (retail)
+				if (conditionToSet == WSF_PREATTACK)
 				{
-					if (i == m_weaponSet.getCurWeaponSlot())
-					{
-						const Bool timed = conditionToSet == WSF_PREATTACK || conditionToSet == WSF_FIRING;
-						m_drawable->setWeaponTimingDuration(timed ? weaponTimingFrames(w, conditionToSet, now) : 0);
-					}
-				}
-				else if (conditionToSet == WSF_PREATTACK)
-				{
-					// in the preattack state, adjust the speed of the preattack anim to match the actual time it will take
 					UnsignedInt preAttackDone = w->getPreAttackFinishedFrame();
 					if (preAttackDone > now)
 						m_drawable->setAnimationLoopDuration(preAttackDone - now);

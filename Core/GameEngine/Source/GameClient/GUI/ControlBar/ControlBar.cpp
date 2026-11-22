@@ -125,7 +125,7 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 
 	{ "Command",							CommandButton::parseCommand, nullptr, offsetof( CommandButton, m_command ) },
 	{ "Options",							CommandButton::parseOptions,		   TheCommandOptionNames, offsetof( CommandButton, m_options ) },
-	{ "Object",								INI::parseThingTemplate,		 nullptr, offsetof( CommandButton, m_thingTemplate ) },
+	{ "Object",								CommandButton::parseObject,		 nullptr, offsetof( CommandButton, m_thingTemplate ) },
 	{ "Upgrade",							INI::parseUpgradeTemplate,	 nullptr, offsetof( CommandButton, m_upgradeTemplate ) },
 	{ "WeaponSlot",						INI::parseLookupList,				 TheWeaponSlotTypeNamesLookupList, offsetof( CommandButton, m_weaponSlot ) },
 	{ "MaxShotsToFire",				INI::parseInt,							 nullptr, offsetof( CommandButton, m_maxShotsToFire ) },
@@ -167,7 +167,7 @@ const FieldParse CommandButton::s_rotwkCommandButtonFieldParseTable[] =
 	{ "TriggerWhenReady", INI::parseBool, nullptr, offsetof(CommandButton, m_triggerWhenReady) },
 	{ "AutoDelay", INI::parseReal, nullptr, offsetof(CommandButton, m_autoDelay) },
 	{ "AutoAbilityDisallowedOnModelCondition", ModelConditionFlags::parseFromINI, nullptr, offsetof(CommandButton, m_autoAbilityDisallowedOnModelCondition) },
-	{ "CommandTrigger", INI::parseAsciiString, nullptr, offsetof(CommandButton, m_commandTrigger) },
+	{ "CommandTrigger", INI::parseAsciiStringVector, nullptr, offsetof(CommandButton, m_commandTriggers) },
 	{ "ToggleButtonName", INI::parseAsciiString, nullptr, offsetof(CommandButton, m_toggleButtonName) },
 	{ nullptr, nullptr, nullptr, 0 }
 };
@@ -804,7 +804,7 @@ Bool CommandButton::isValidToUseOn(const Object *sourceObj, const Object *target
 Bool CommandButton::canCastRetailSpell(const Object* book, const Object* target, const Coord3D* position) const
 {
 	if (!book || m_command != GUI_COMMAND_SPELL_BOOK || !m_specialPower ||
-		isRetailPassive() ||
+		!isRetailButtonUsable() ||
 		!m_specialPower->isUnlockedFor(book->getControllingPlayer()))
 		return FALSE;
 	const SpecialPowerModuleInterface* module = book->getSpecialPowerModule(m_specialPower);
@@ -816,6 +816,32 @@ Bool CommandButton::canCastRetailSpell(const Object* book, const Object* target,
 		!std::isfinite(position->y) || !std::isfinite(position->z)))
 		return FALSE;
 	return isValidToUseOn(book, target, position, CMD_FROM_PLAYER);
+}
+
+void CommandButton::parseObject(INI* ini, void* instance, void* store, const void* userData)
+{
+	if (!RetailFileLayers::enabled())
+	{
+		INI::parseThingTemplate(ini, instance, store, userData);
+		return;
+	}
+	CommandButton* self = static_cast<CommandButton*>(instance);
+	const char* token = ini->getNextToken();
+	if (!token || stricmp(token, "None") == 0)
+	{
+		self->m_thingTemplate = nullptr;
+		self->m_thingTemplateName.clear();
+		return;
+	}
+	self->m_thingTemplateName = token;
+	self->m_thingTemplate = TheThingFactory ? TheThingFactory->findTemplate(token) : nullptr;
+}
+
+OVERRIDE<ThingTemplate> CommandButton::getThingTemplate() const
+{
+	if (!m_thingTemplate && RetailFileLayers::enabled() && !m_thingTemplateName.isEmpty() && TheThingFactory)
+		m_thingTemplate = TheThingFactory->findTemplate(m_thingTemplateName);
+	return m_thingTemplate;
 }
 
 Bool CommandButton::isRetailPassive() const
@@ -830,6 +856,13 @@ Bool CommandButton::isRetailPassive() const
 		m_command == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT ||
 		m_command == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
 		m_command == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT);
+}
+
+Bool CommandButton::isRetailButtonUsable() const
+{
+	if (!RetailFileLayers::enabled())
+		return TRUE;
+	return m_showButton && !isRetailPassive();
 }
 
 Bool CommandButton::isReady(const Object *sourceObj) const

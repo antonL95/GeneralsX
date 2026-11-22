@@ -541,7 +541,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			const CommandSet* set = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
 			const CommandButton* button = set && slot >= 0 && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET ?
 				set->getCommandButton(slot) : nullptr;
-			if (!button || button->getCommandType() != GUI_COMMAND_BLOODTHIRSTY)
+			if (!button || button->getCommandType() != GUI_COMMAND_BLOODTHIRSTY || !button->isRetailButtonUsable())
 				break;
 			if (!HeroRoster::buttonUpgradesMet(button, msgPlayer, source))
 				break;
@@ -566,7 +566,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 				break;
 			const CommandSet* set = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
 			const CommandButton* button = set ? set->getCommandButton(slot) : nullptr;
-			if (button && button->isAutoAbility() && button->getSpecialPowerTemplate())
+			if (button && button->isRetailButtonUsable() && button->isAutoAbility() && button->getSpecialPowerTemplate())
 			{
 				if (AutoAbilityBehavior* behavior = AutoAbilityBehavior::find(source, button->getSpecialPowerTemplate()))
 					behavior->setToggledState(behavior->isAutoActive() ? -1 : 1);
@@ -619,7 +619,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 				break;
 			const CommandSet* sourceSet = TheControlBar->findCommandSet(source->getCommandSetString());
 			const CommandButton* button = sourceSet ? sourceSet->getCommandButton(slot) : nullptr;
-			if (!button)
+			if (!button || !button->isRetailButtonUsable())
 				break;
 
 #if !RTS_GENERALS
@@ -1401,6 +1401,78 @@ bool GameLogic::onDoWeaponAtLocation(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &
 	return true;
 }
 
+static void runRetailCommandTriggers(Object* source, const CommandButton* primaryButton, Object* targetObj, const Coord3D* targetPos, Int depth = 0)
+{
+	if (!RetailFileLayers::enabled() || !TheRetailCommandCatalog || !source || source->isEffectivelyDead() ||
+		!primaryButton || depth >= 4)
+		return;
+	const std::vector<AsciiString>& triggers = primaryButton->getCommandTriggers();
+	if (triggers.empty())
+		return;
+	for (const AsciiString& triggerName : triggers)
+	{
+		if (triggerName.isEmpty())
+			continue;
+		const CommandButton* triggered = TheRetailCommandCatalog->findCommandButton(triggerName);
+		if (!triggered || triggered == primaryButton || !triggered->isRetailButtonUsable())
+			continue;
+		switch (triggered->getCommandType())
+		{
+			case GUI_COMMAND_SPECIAL_POWER:
+			case GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT:
+			case GUI_COMMAND_SPECIAL_POWER_TOGGLE:
+			{
+				const CommandButton* effective = triggered->resolveRetailToggleButton(source);
+				const SpecialPowerTemplate* power = effective ? effective->getSpecialPowerTemplate() : nullptr;
+				if (!power)
+					break;
+				const UnsignedInt options = effective->getOptions();
+				if (BitIsSet(options, COMMAND_OPTION_NEED_OBJECT_TARGET))
+				{
+					if (targetObj)
+						source->doSpecialPowerAtObject(power, targetObj, options);
+				}
+				else if (BitIsSet(options, NEED_TARGET_POS))
+				{
+					const Coord3D* pos = targetPos ? targetPos : (targetObj ? targetObj->getPosition() : nullptr);
+					if (pos)
+						source->doSpecialPowerAtLocation(power, pos, INVALID_ANGLE, options);
+				}
+				else
+				{
+					source->doSpecialPower(power, options);
+				}
+				break;
+			}
+			case GUI_COMMAND_OBJECT_UPGRADE:
+			case GUI_COMMAND_PLAYER_UPGRADE:
+			{
+				const UpgradeTemplate* upgrade = triggered->getUpgradeTemplate();
+				ProductionUpdateInterface* pu = upgrade ? source->getProductionUpdateInterface() : nullptr;
+				if (pu)
+					pu->queueUpgrade(upgrade);
+				break;
+			}
+			default:
+				break;
+		}
+		if (!triggered->getCommandTriggers().empty())
+			runRetailCommandTriggers(source, triggered, targetObj, targetPos, depth + 1);
+	}
+}
+
+static void runRetailPowerTriggers(Object* source, UnsignedInt specialPowerID, Object* targetObj, const Coord3D* targetPos)
+{
+	if (!RetailFileLayers::enabled() || !TheRetailCommandCatalog || !TheSpecialPowerStore || !source)
+		return;
+	const SpecialPowerTemplate* power = TheSpecialPowerStore->findSpecialPowerTemplateByID(specialPowerID);
+	if (!power)
+		return;
+	const CommandButton* button = TheRetailCommandCatalog->findPowerButton(source, power);
+	if (button && !button->getCommandTriggers().empty())
+		runRetailCommandTriggers(source, button, targetObj, targetPos);
+}
+
 bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	// first argument is the special power ID
@@ -1435,6 +1507,7 @@ bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 #else
 		theGroup->removeAll();
 #endif
+		runRetailPowerTriggers(source, specialPowerID, nullptr, nullptr);
 	}
 	else
 	{
@@ -1442,6 +1515,11 @@ bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 		if( currentlySelectedGroup )
 		{
 			currentlySelectedGroup->groupDoSpecialPower( specialPowerID, options );
+			if (RetailFileLayers::enabled())
+			{
+				for (const ObjectID id : currentlySelectedGroup->getAllIDs())
+					runRetailPowerTriggers(findObjectByID(id), specialPowerID, nullptr, nullptr);
+			}
 		}
 	}
 
@@ -1495,6 +1573,7 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 #else
 		theGroup->removeAll();
 #endif
+		runRetailPowerTriggers(source, specialPowerID, objectInWay, &targetCoord);
 	}
 	else
 	{
@@ -1502,6 +1581,11 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 		if( currentlySelectedGroup )
 		{
 			currentlySelectedGroup->groupDoSpecialPowerAtLocation( specialPowerID, &targetCoord, angle, objectInWay, options );
+			if (RetailFileLayers::enabled())
+			{
+				for (const ObjectID id : currentlySelectedGroup->getAllIDs())
+					runRetailPowerTriggers(findObjectByID(id), specialPowerID, objectInWay, &targetCoord);
+			}
 		}
 	}
 
@@ -1551,12 +1635,18 @@ bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupP
 #else
 		theGroup->removeAll();
 #endif
+		runRetailPowerTriggers(source, specialPowerID, target, target->getPosition());
 	}
 	else
 	{
 		if( currentlySelectedGroup )
 		{
 			currentlySelectedGroup->groupDoSpecialPowerAtObject( specialPowerID, target, options );
+			if (RetailFileLayers::enabled())
+			{
+				for (const ObjectID id : currentlySelectedGroup->getAllIDs())
+					runRetailPowerTriggers(findObjectByID(id), specialPowerID, target, target->getPosition());
+			}
 		}
 	}
 	return true;
@@ -2048,7 +2138,28 @@ bool GameLogic::onQueueUpgrade(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curren
 		return false;
 
 	if (currentlySelectedGroup)
+	{
 		currentlySelectedGroup->queueUpgrade( upgradeT );
+		if (RetailFileLayers::enabled() && TheRetailCommandCatalog)
+		{
+			for (const ObjectID id : currentlySelectedGroup->getAllIDs())
+			{
+				Object* obj = findObjectByID(id);
+				const CommandSet* set = obj ? TheRetailCommandCatalog->findCommandSet(obj->getCommandSetString()) : nullptr;
+				if (!set)
+					continue;
+				for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+				{
+					const CommandButton* btn = set->getCommandButton(slot);
+					if (btn && btn->getUpgradeTemplate() == upgradeT && !btn->getCommandTriggers().empty())
+					{
+						runRetailCommandTriggers(obj, btn, nullptr, nullptr);
+						break;
+					}
+				}
+			}
+		}
+	}
 
 	return true;
 }
@@ -2321,15 +2432,24 @@ bool GameLogic::onCreateSelectedGroup(MAYBE_UNUSED GameMessage *msg)
 	Player *msgPlayer = getMessagePlayer(msg);
 	Bool createNewGroup = msg->getArgument( 0 )->boolean;
 	Bool firstObject = TRUE;
+	Bool isPointClick = FALSE;
+	Int argEnd = msg->getArgumentCount();
+	if (RetailFileLayers::enabled() && msg->getType() == GameMessage::MSG_CREATE_SELECTED_GROUP &&
+		argEnd >= 3 && msg->getArgumentDataType(argEnd - 1) == ARGUMENTDATATYPE_BOOLEAN)
+	{
+		isPointClick = msg->getArgument(argEnd - 1)->boolean;
+		--argEnd;
+	}
+	const Bool allowClickReaction = isPointClick && argEnd == 2;
 
-	for (Int i = 1; i < msg->getArgumentCount(); ++i) {
+	for (Int i = 1; i < argEnd; ++i) {
 		Object *obj = findObjectByID( msg->getArgument( i )->objectID );
 		if (!obj) {
 			continue;
 		}
 
 		selectObject(obj, createNewGroup && firstObject, msgPlayer->getPlayerMask());
-		if (RetailFileLayers::enabled() && msg->getType() == GameMessage::MSG_CREATE_SELECTED_GROUP)
+		if (allowClickReaction && obj->getControllingPlayer() == msgPlayer)
 		{
 			if (ClickReactionBehavior* clickReaction = ClickReactionBehavior::find(obj))
 				clickReaction->onClick();

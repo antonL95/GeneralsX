@@ -2,6 +2,8 @@
 
 #if !RTS_GENERALS
 #include <cstdio>
+#include <cstdlib>
+#include <string>
 #include <string_view>
 
 #include "Common/MessageStream.h"
@@ -26,8 +28,19 @@ void runRetailPackage16TestCommand(std::string_view action, Object* source, cons
 			? TheControlBar->queryRetailCommandAvailability(btn, source)
 			: COMMAND_HIDDEN;
 		const ThingTemplate* targetObj = btn ? btn->getThingTemplate() : nullptr;
+		std::string triggersJoined;
+		if (btn)
+		{
+			for (const AsciiString& trig : btn->getCommandTriggers())
+			{
+				if (!triggersJoined.empty())
+					triggersJoined.push_back(',');
+				triggersJoined.append(trig.str());
+			}
+		}
+		const CommandButton* resolvedToggle = (btn && source) ? btn->resolveRetailToggleButton(source) : btn;
 		std::fprintf(stderr,
-			"TEST pkg16 button frame=%u name=%s found=%d clickable=%d show=%d passive=%d doubleClick=%d triggerReady=%d autoDelay=%.2f trigger=%s toggle=%s obj=%s avail=%d\n",
+			"TEST pkg16 button frame=%u name=%s found=%d clickable=%d show=%d passive=%d doubleClick=%d triggerReady=%d autoDelay=%.2f triggerCount=%zu trigger=%s toggle=%s resolvedToggle=%s obj=%s objName=%s avail=%d\n",
 			frame,
 			argument ? argument : "-",
 			btn ? 1 : 0,
@@ -37,9 +50,12 @@ void runRetailPackage16TestCommand(std::string_view action, Object* source, cons
 			btn && btn->isDoubleClick() ? 1 : 0,
 			btn && btn->isTriggerWhenReady() ? 1 : 0,
 			btn ? btn->getAutoDelay() : 0.0f,
-			btn && !btn->getCommandTrigger().isEmpty() ? btn->getCommandTrigger().str() : "-",
+			btn ? btn->getCommandTriggers().size() : 0u,
+			triggersJoined.empty() ? "-" : triggersJoined.c_str(),
 			btn && !btn->getToggleButtonName().isEmpty() ? btn->getToggleButtonName().str() : "-",
+			resolvedToggle ? resolvedToggle->getName().str() : "-",
 			targetObj ? targetObj->getName().str() : "-",
+			btn && !btn->getThingTemplateName().isEmpty() ? btn->getThingTemplateName().str() : "-",
 			static_cast<int>(avail));
 		return;
 	}
@@ -52,6 +68,64 @@ void runRetailPackage16TestCommand(std::string_view action, Object* source, cons
 		GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
 		msg->appendBooleanArgument(TRUE);
 		msg->appendObjectIDArgument(source->getID());
+		msg->appendBooleanArgument(TRUE);
+		return;
+	}
+
+	if (action == "pkg16-click-drag")
+	{
+		GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+		msg->appendBooleanArgument(TRUE);
+		msg->appendObjectIDArgument(source->getID());
+		return;
+	}
+
+	if (action == "pkg16-auto-toggle")
+	{
+		const Int slot = (argument && *argument) ? std::atoi(argument) : 0;
+		GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_AUTO_ABILITY);
+		msg->appendObjectIDArgument(source->getID());
+		msg->appendIntegerArgument(slot);
+		return;
+	}
+
+	if (action == "pkg16-special-power")
+	{
+		if (!TheSpecialPowerStore || !argument || !*argument)
+			return;
+		std::string_view spec(argument);
+		const size_t at = spec.find('@');
+		std::string powerName(at == std::string_view::npos ? spec : spec.substr(0, at));
+		const SpecialPowerTemplate* power = TheSpecialPowerStore->findSpecialPowerTemplate(powerName.c_str());
+		if (!power)
+			return;
+		const CommandButton* btn = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(source, power) : nullptr;
+		const UnsignedInt options = btn ? btn->getOptions() : 0;
+		if (at != std::string_view::npos)
+		{
+			Coord3D pos = *source->getPosition();
+			float x = 0.0f;
+			float y = 0.0f;
+			if (std::sscanf(argument + at + 1, "%f,%f", &x, &y) == 2)
+			{
+				pos.x = x;
+				pos.y = y;
+			}
+			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION);
+			msg->appendIntegerArgument(power->getID());
+			msg->appendLocationArgument(pos);
+			msg->appendRealArgument(INVALID_ANGLE);
+			msg->appendObjectIDArgument(INVALID_ID);
+			msg->appendIntegerArgument(options);
+			msg->appendObjectIDArgument(source->getID());
+		}
+		else
+		{
+			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER);
+			msg->appendIntegerArgument(power->getID());
+			msg->appendIntegerArgument(options);
+			msg->appendObjectIDArgument(source->getID());
+		}
 		return;
 	}
 
@@ -83,8 +157,9 @@ void runRetailPackage16TestCommand(std::string_view action, Object* source, cons
 			: nullptr;
 		const SpecialPowerModuleInterface* mod = power ? source->getSpecialPowerModule(power) : nullptr;
 		const AutoAbilityBehavior* autoMod = power ? AutoAbilityBehavior::find(source, power) : nullptr;
+		const Int firingFlag = source->getLogicModelConditions().test(MODELCONDITION_FIRING_OR_PREATTACK_A) ? 1 : 0;
 		std::fprintf(stderr,
-			"TEST pkg16 auto frame=%u object=%u template=%s power=%s hasAuto=%d active=%d ready=%d pct=%.3f\n",
+			"TEST pkg16 auto frame=%u object=%u template=%s power=%s hasAuto=%d active=%d ready=%d pct=%.3f firingFlag=%d\n",
 			frame,
 			static_cast<unsigned>(source->getID()),
 			source->getTemplate()->getName().str(),
@@ -92,7 +167,8 @@ void runRetailPackage16TestCommand(std::string_view action, Object* source, cons
 			autoMod ? 1 : 0,
 			autoMod && autoMod->isAutoActive() ? 1 : 0,
 			mod && mod->isReady() ? 1 : 0,
-			mod ? mod->getPercentReady() : 0.0f);
+			mod ? mod->getPercentReady() : 0.0f,
+			firingFlag);
 		return;
 	}
 

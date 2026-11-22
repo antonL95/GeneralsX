@@ -123,21 +123,13 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 																							GadgetGameMessage gadgetMessage )
 {
 	const CommandButton *commandButton = control ? static_cast<const CommandButton *>(GadgetButtonGetData(control)) : nullptr;
-	if (commandButton && (commandButton->isRetailPassive() || (RetailFileLayers::enabled() && !commandButton->isShowButton())))
+	if (commandButton && !commandButton->isRetailButtonUsable())
 		return CBC_COMMAND_USED;
 
 	if (RetailFileLayers::enabled() && commandButton && commandButton->isDoubleClick() && gadgetMessage != GBM_SELECTED_RIGHT)
 	{
-		const UnsignedInt now = TheGameLogic ? TheGameLogic->getFrame() : 0;
-		const UnsignedInt prev = m_lastRetailClickButton == commandButton ? m_lastRetailClickFrame : 0;
-		if (!CommandButtonRules::isDoubleClickSatisfied(true, false, prev, now, LOGICFRAMES_PER_SECOND / 2))
-		{
-			m_lastRetailClickButton = commandButton;
-			m_lastRetailClickFrame = now;
+		if (!checkRetailDoubleClick(commandButton))
 			return CBC_COMMAND_USED;
-		}
-		m_lastRetailClickButton = nullptr;
-		m_lastRetailClickFrame = 0;
 	}
 
 	if (m_retailSelectionName && control && getRetailSlot(control) >= 0)
@@ -234,8 +226,6 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		const CBCommandStatus result = processRetailCommand(commandButton, control, obj);
 		if (getRetailTrayChoice(control) >= 0)
 			closeRetailTray();
-		if (result == CBC_COMMAND_USED)
-			dispatchRetailCommandTrigger(commandButton, obj);
 		return result;
 	}
 
@@ -984,54 +974,24 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 	}
 
-	dispatchRetailCommandTrigger(commandButton, obj);
-
 	return CBC_COMMAND_USED;
 
 }
 
-void ControlBar::dispatchRetailCommandTrigger(const CommandButton *commandButton, Object *obj)
+Bool ControlBar::checkRetailDoubleClick(const CommandButton *commandButton)
 {
-	if (!RetailFileLayers::enabled() || m_inCommandTrigger || !commandButton || commandButton->getCommandTrigger().isEmpty())
-		return;
-	const CommandButton *triggered = findCommandButton(commandButton->getCommandTrigger());
-	if (!triggered || triggered == commandButton || triggered->isRetailPassive())
-		return;
-
-	m_inCommandTrigger = TRUE;
-	if (Player *player = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr)
+	if (!RetailFileLayers::enabled() || !commandButton || !commandButton->isDoubleClick())
+		return TRUE;
+	const UnsignedInt now = TheGameLogic ? TheGameLogic->getFrame() : 0;
+	const UnsignedInt prev = m_lastRetailClickButton == commandButton ? m_lastRetailClickFrame : 0;
+	if (!CommandButtonRules::isDoubleClickSatisfied(true, false, prev, now, LOGICFRAMES_PER_SECOND / 2))
 	{
-		AudioEventRTS sound = *triggered->getUnitSpecificSound();
-		sound.setPlayerIndex(player->getPlayerIndex());
-		TheAudio->addAudioEvent(&sound);
+		m_lastRetailClickButton = commandButton;
+		m_lastRetailClickFrame = now;
+		return FALSE;
 	}
-	if (!BitIsSet(triggered->getOptions(), COMMAND_OPTION_NEED_TARGET))
-	{
-		switch (triggered->getCommandType())
-		{
-			case GUI_COMMAND_SPECIAL_POWER:
-			case GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT:
-				if (const SpecialPowerTemplate *power = triggered->getSpecialPowerTemplate())
-				{
-					GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER);
-					msg->appendIntegerArgument(power->getID());
-					msg->appendIntegerArgument(triggered->getOptions());
-					msg->appendObjectIDArgument(obj ? obj->getID() : INVALID_ID);
-				}
-				break;
-			case GUI_COMMAND_OBJECT_UPGRADE:
-			case GUI_COMMAND_PLAYER_UPGRADE:
-				if (obj && triggered->getUpgradeTemplate())
-				{
-					GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UPGRADE);
-					msg->appendObjectIDArgument(obj->getID());
-					msg->appendIntegerArgument(triggered->getUpgradeTemplate()->getUpgradeNameKey());
-				}
-				break;
-			default:
-				break;
-		}
-	}
-	m_inCommandTrigger = FALSE;
+	m_lastRetailClickButton = nullptr;
+	m_lastRetailClickFrame = 0;
+	return TRUE;
 }
 

@@ -853,7 +853,7 @@ private:
 	Coord2D												m_formationOffset;
 
 	AsciiString										m_commandSetStringOverride;///< To allow specific object to switch command sets
-	ModelConditionFlags m_logicModelConditions;
+	mutable ModelConditionFlags m_logicModelConditions;
 
 	UnsignedInt										m_safeOcclusionFrame;	///<flag used by occlusion renderer so it knows when objects have exited their production building.
 

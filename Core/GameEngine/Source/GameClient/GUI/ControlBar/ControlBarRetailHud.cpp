@@ -5,6 +5,7 @@
 #include "Common/INIException.h"
 #include "Common/BuildAssistant.h"
 #include "Common/MessageStream.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/Player.h"
@@ -40,6 +41,7 @@
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/CostModifierUpgrade.h"
@@ -1099,8 +1101,10 @@ Bool ControlBar::executeRetailTrayHotKey(const AsciiString& key, GameWindow *map
 			return FALSE;
 		const CommandButton* command = static_cast<const CommandButton*>(GadgetButtonGetData(mappedControl));
 		const Object* obj = getRetailSelection();
-		if (!command || !command->canUseRetailToggle(obj, -1))
+		if (!command || !command->isRetailButtonUsable() || !command->canUseRetailToggle(obj, -1))
 			return FALSE;
+		if (command->isDoubleClick() && !checkRetailDoubleClick(command))
+			return TRUE;
 		if (processRetailCommand(command, mappedControl, nullptr) != CBC_COMMAND_USED)
 			return FALSE;
 		closeRetailTray();
@@ -1333,6 +1337,15 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 		case GUI_COMMAND_ONE_RING:
 			return obj && obj->getStealth() && obj->getStealth()->canToggleRing() ?
 				COMMAND_AVAILABLE : COMMAND_RESTRICTED;
+		case GUI_COMMAND_SPECIAL_POWER_TOGGLE:
+		{
+			const CommandButton* effective = command->resolveRetailToggleButton(obj);
+			if (!effective || !effective->isRetailButtonUsable())
+				return COMMAND_RESTRICTED;
+			const SpecialPowerTemplate* power = effective->getSpecialPowerTemplate();
+			const SpecialPowerModuleInterface* mod = (obj && power) ? obj->getSpecialPowerModule(power) : nullptr;
+			return mod && mod->isReady() ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
+		}
 		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
 		case GUI_COMMAND_TOGGLE_WEAPONSET:
 			return (usesToggleTray(command)
@@ -1394,6 +1407,25 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 			msg->appendObjectIDArgument(obj->getID());
 			msg->appendIntegerArgument(slot);
 			msg->appendIntegerArgument(-1);
+			return CBC_COMMAND_USED;
+		}
+		case GUI_COMMAND_SPECIAL_POWER_TOGGLE:
+		{
+			const Object* source = obj ? obj : getRetailSelection();
+			const CommandButton* effective = command->resolveRetailToggleButton(source);
+			const SpecialPowerTemplate* power = effective ? effective->getSpecialPowerTemplate() : nullptr;
+			if (!source || !effective || !effective->isRetailButtonUsable() || !power)
+				return CBC_COMMAND_NOT_USED;
+			if (BitIsSet(effective->getOptions(), COMMAND_OPTION_NEED_TARGET))
+			{
+				if (TheInGameUI)
+					TheInGameUI->setGUICommand(effective);
+				return CBC_COMMAND_USED;
+			}
+			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER);
+			msg->appendIntegerArgument(power->getID());
+			msg->appendIntegerArgument(effective->getOptions());
+			msg->appendObjectIDArgument(source->getID());
 			return CBC_COMMAND_USED;
 		}
 #if !RTS_GENERALS
@@ -1514,6 +1546,7 @@ Bool CommandButton::canUseRetailToggle(const Object* object, Int state) const
 		object->testScriptStatusBit(OBJECT_STATUS_SCRIPT_DISABLED) ||
 		object->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED) ||
 		BitIsSet(getOptions(), SCRIPT_ONLY) ||
+		!m_showButton ||
 		!m_isClickable ||
 		hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE) ||
 		!HeroRoster::buttonUpgradesMet(this, object->getControllingPlayer(), object))
@@ -1529,6 +1562,37 @@ Bool CommandButton::canUseRetailToggle(const Object* object, Int state) const
 		return getFlagsUsedForToggle().any();
 	const HordeContain* horde = HordeContain::get(object);
 	return horde && horde->canSetAlternateFormation(state < 0 ? !horde->isAlternateFormation() : state != 0);
+}
+
+const CommandButton* CommandButton::resolveRetailToggleButton(const Object* obj) const
+{
+	if (!RetailFileLayers::enabled() || m_command != GUI_COMMAND_SPECIAL_POWER_TOGGLE ||
+		m_toggleButtonName.isEmpty() || !obj)
+		return this;
+	const CommandButton* toggleBtn = TheRetailCommandCatalog
+		? TheRetailCommandCatalog->findCommandButton(m_toggleButtonName)
+		: (TheControlBar ? TheControlBar->findCommandButton(m_toggleButtonName) : nullptr);
+	if (!toggleBtn || toggleBtn == this)
+		return this;
+	if (m_specialPower)
+	{
+		for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+		{
+			const SpecialPowerUpdateInterface* update = (*module)->getSpecialPowerUpdateInterface();
+			if (update && update->isPowerCurrentlyInUse(this))
+				return toggleBtn;
+		}
+#if !RTS_GENERALS
+		if (ToggleHiddenSpecialAbilityUpdate::timerProgress(obj, m_specialPower) >= 0.0f)
+			return toggleBtn;
+#endif
+		const SpecialPowerModuleInterface* primaryMod = obj->getSpecialPowerModule(m_specialPower);
+		const SpecialPowerTemplate* togglePower = toggleBtn->getSpecialPowerTemplate();
+		const SpecialPowerModuleInterface* toggleMod = togglePower ? obj->getSpecialPowerModule(togglePower) : nullptr;
+		if (primaryMod && !primaryMod->isReady() && toggleMod && toggleMod->isReady())
+			return toggleBtn;
+	}
+	return this;
 }
 
 void ControlBar::populateRetailUnderConstruction(Object *obj)
@@ -1645,6 +1709,13 @@ const Image* ControlBar::getRetailButtonImage(GameWindow *window) const
 		}
 		return image;
 	}
+	if (command && obj && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_TOGGLE)
+	{
+		const CommandButton* effective = command->resolveRetailToggleButton(obj);
+		if (effective && effective != command && effective->getButtonImage())
+			return effective->getButtonImage();
+		return image;
+	}
 	if (!command || !obj || !command->getToggleButtonImage() ||
 		!command->hasRotwkOption(CommandButtonRules::ROTWK_TOGGLE_IMAGE_ON_WEAPONSET) || !command->getFlagsUsedForToggle().any())
 		return image;
@@ -1654,19 +1725,25 @@ const Image* ControlBar::getRetailButtonImage(GameWindow *window) const
 Real ControlBar::getRetailRecharge(const GameWindow *window) const
 {
 	const CommandButton *command = static_cast<const CommandButton *>(GadgetButtonGetData(const_cast<GameWindow *>(window)));
-	if (!command || command->isRetailPassive() || !m_currentSelectedDrawable ||
-		command->getCommandType() != GUI_COMMAND_SPECIAL_POWER || !command->getSpecialPowerTemplate())
+	if (!command || command->isRetailPassive() || !m_currentSelectedDrawable)
 		return -1.0f;
 	Object *obj = m_currentSelectedDrawable->getObject();
+	const CommandButton *effective = command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_TOGGLE
+		? command->resolveRetailToggleButton(obj)
+		: command;
+	if (!effective || !effective->getSpecialPowerTemplate() ||
+		(effective->getCommandType() != GUI_COMMAND_SPECIAL_POWER &&
+		 effective->getCommandType() != GUI_COMMAND_SPECIAL_POWER_TOGGLE))
+		return -1.0f;
 #if !RTS_GENERALS
 	if (obj)
 	{
-		const Real effect = ToggleHiddenSpecialAbilityUpdate::timerProgress(obj, command->getSpecialPowerTemplate());
+		const Real effect = ToggleHiddenSpecialAbilityUpdate::timerProgress(obj, effective->getSpecialPowerTemplate());
 		if (effect >= 0.0f)
 			return effect;
 	}
 #endif
-	SpecialPowerModuleInterface *power = obj ? obj->getSpecialPowerModule(command->getSpecialPowerTemplate()) : nullptr;
+	SpecialPowerModuleInterface *power = obj ? obj->getSpecialPowerModule(effective->getSpecialPowerTemplate()) : nullptr;
 	if (!power || power->isReady())
 		return -1.0f;
 	return std::clamp(power->getPercentReady(), 0.0f, 1.0f);

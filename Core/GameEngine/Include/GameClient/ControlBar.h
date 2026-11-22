@@ -356,6 +356,7 @@ public:
 	static const FieldParse s_commandButtonFieldParseTable[];		///< the parse table
 	static void parseCommand( INI* ini, void *instance, void *store, const void *userData );
 	static void parseOptions( INI* ini, void *instance, void *store, const void *userData );
+	static void parseObject( INI* ini, void *instance, void *store, const void *userData );
 	static void parseNeededUpgrades( INI* ini, void *instance, void *store, const void *userData );
 
 	Bool isContextCommand() const;									///< determines if this is a context sensitive command.
@@ -383,7 +384,8 @@ public:
 
 	GUICommandType getCommandType() const { return m_command; }
 	UnsignedInt getOptions() const { return m_options; }
-	OVERRIDE<ThingTemplate> getThingTemplate() const { return m_thingTemplate; }
+	OVERRIDE<ThingTemplate> getThingTemplate() const;
+	const AsciiString& getThingTemplateName() const { return m_thingTemplateName; }
 	const UpgradeTemplate* getUpgradeTemplate() const { return m_upgradeTemplate; }
 	const SpecialPowerTemplate* getSpecialPowerTemplate() const { return m_specialPower; }
 	RadiusCursorType getRadiusCursorType() const { return m_radiusCursor; }
@@ -407,10 +409,12 @@ public:
 	Bool isTriggerWhenReady() const { return m_triggerWhenReady; }
 	Real getAutoDelay() const { return m_autoDelay; }
 	const ModelConditionFlags& getAutoAbilityDisallowedOnModelCondition() const { return m_autoAbilityDisallowedOnModelCondition; }
-	const AsciiString& getCommandTrigger() const { return m_commandTrigger; }
+	const std::vector<AsciiString>& getCommandTriggers() const { return m_commandTriggers; }
 	const AsciiString& getToggleButtonName() const { return m_toggleButtonName; }
+	const CommandButton* resolveRetailToggleButton(const Object* obj) const;
 	static const FieldParse* getRetailFieldParse() { return s_rotwkCommandButtonFieldParseTable; }
 	Bool isRetailPassive() const;
+	Bool isRetailButtonUsable() const;
 	Bool isMountStateAllowed(const Object* source) const;
 	Real getPresetRange() const { return m_presetRange; }
 	const WeaponSetFlags& getFlagsUsedForToggle() const { return m_flagsUsedForToggle; }
@@ -453,7 +457,8 @@ private:
 	GUICommandType								m_command;										///< type of command this button
 	CommandButton*								m_next;
 	UnsignedInt										m_options;										///< command options (see CommandOption enum)
-	const ThingTemplate*					m_thingTemplate;							///< for commands that use thing templates in command data
+	mutable const ThingTemplate*					m_thingTemplate;							///< for commands that use thing templates in command data
+	AsciiString										m_thingTemplateName;
 	const UpgradeTemplate*				m_upgradeTemplate;						///< for commands that use upgrade templates in command data
 	const SpecialPowerTemplate*		m_specialPower;								///< actual special power template
 	RadiusCursorType							m_radiusCursor;								///< radius cursor, if any
@@ -503,7 +508,7 @@ private:
 	Bool m_triggerWhenReady = FALSE;
 	Real m_autoDelay = 0.0f;
 	ModelConditionFlags m_autoAbilityDisallowedOnModelCondition;
-	AsciiString m_commandTrigger;
+	std::vector<AsciiString> m_commandTriggers;
 	AsciiString m_toggleButtonName;
 
 	static const FieldParse s_rotwkCommandButtonFieldParseTable[];
@@ -1277,9 +1282,8 @@ private:
 	GameWindow *m_radarAttackGlowWindow;
 	const CommandButton *m_lastRetailClickButton = nullptr;
 	UnsignedInt m_lastRetailClickFrame = 0;
-	Bool m_inCommandTrigger = FALSE;
 
-	void dispatchRetailCommandTrigger(const CommandButton *commandButton, Object *obj);
+	Bool checkRetailDoubleClick(const CommandButton *commandButton);
 
 #if defined(RTS_DEBUG)
 	UnsignedInt m_lastFrameMarkedDirty;

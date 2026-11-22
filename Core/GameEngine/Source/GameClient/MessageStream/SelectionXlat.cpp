@@ -967,6 +967,11 @@ GameMessageDisposition SelectionTranslator::onMouseLeftClick(MAYBE_UNUSED const 
 			}
 		}
 
+		if (RetailFileLayers::enabled() && isPoint && newDrawablesSelected == 1)
+		{
+			newMsg->appendBooleanArgument(TRUE);
+		}
+
 		if( newDrawablesSelected > 1 )
 		{
 			localPlayer->getAcademyStats()->recordDragSelection();
