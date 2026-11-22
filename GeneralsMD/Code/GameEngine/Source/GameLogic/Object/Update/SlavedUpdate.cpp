@@ -939,6 +939,8 @@ void SlavedUpdate::crc( Xfer *xfer )
 
 void SlavedUpdate::crcRetailState(Xfer* xfer)
 {
+	Bool returning = getObject()->testStatus(OBJECT_STATUS_LEASHED_RETURNING);
+	xfer->xferBool(&returning);
 	xfer->xferObjectID(&m_slaver);
 	xfer->xferCoord3D(&m_guardPointOffset);
 	xfer->xferInt(&m_framesToWait);
