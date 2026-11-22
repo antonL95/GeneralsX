@@ -43,13 +43,20 @@
 190 create Player_1 Pkg22Static 0 2890,620,0
 191 testcontain Player_1 Pkg22Tosser 0 Player_1:Pkg22Static:0
 192 pkg22-fire Player_1 Pkg22Tosser 0 PlyrCreeps:Pkg22Static:0
+195 create Player_1 Pkg22FootprintShooter 0 2400,890,0
+195 create PlyrCreeps Pkg22RangeStructure 0 2480,890,180
+196 pkg22-place Player_1 Pkg22FootprintShooter 0 PlyrCreeps:Pkg22RangeStructure:0 64 0
+196 pkg22-choose-near Player_1 Pkg22FootprintShooter 0 PlyrCreeps:Pkg22RangeStructure:0
+196 pkg22-fire Player_1 Pkg22FootprintShooter 0 PlyrCreeps:Pkg22RangeStructure:0
 215 create Player_1 Pkg22Rampage 0 2900,650,90
 215 create Player_1 Pkg22RampageControl 0 2900,720,90
 215 pkg22-fire Player_1 Pkg22Rampage 0
 215 pkg22-fire Player_1 Pkg22RampageControl 0
 240 pkg22-fire Player_1 Pkg22Rampage 0
 241 testcontain Player_1 Pkg22Tosser 0 Player_1:DwarvenGimli:0
+241 pkg22-bombardment Player_1 Pkg22Tosser 0 - 1 0
 241 pkg22-fire Player_1 Pkg22Tosser 0 PlyrCreeps:Pkg22Static:0
+242 pkg22-bombardment Player_1 Pkg22Tosser 0 - 0 0
 244 pkg22-flight Player_1 DwarvenGimli 0
 245 pkg22-fire Player_1 Pkg22Rampage 0
 245 pkg22-fire Player_1 Pkg22RampageControl 0

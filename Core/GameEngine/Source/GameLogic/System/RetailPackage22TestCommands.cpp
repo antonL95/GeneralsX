@@ -39,12 +39,31 @@ void runRetailPackage22TestCommand(std::string_view action, Object* source, Obje
 			source->getLogicModelConditions().test(MODELCONDITION_THROWN_PROJECTILE));
 		return;
 	}
+	if (action == "pkg22-bombardment")
+	{
+		if (inputs.x > 0.0f)
+			source->setWeaponBonusCondition(WEAPONBONUSCONDITION_BATTLEPLAN_BOMBARDMENT);
+		else
+			source->clearWeaponBonusCondition(WEAPONBONUSCONDITION_BATTLEPLAN_BOMBARDMENT);
+		return;
+	}
+	if (action == "pkg22-choose-near" && target)
+	{
+		const Weapon* primary = source->getWeaponInWeaponSlot(PRIMARY_WEAPON);
+		const Weapon* secondary = source->getWeaponInWeaponSlot(SECONDARY_WEAPON);
+		if (!primary || !secondary)
+			return;
+		std::fprintf(stderr, "TEST pkg22 footprint frame=%u primary-ready=%d primary-range=%d secondary-ready=%d secondary-range=%d\n",
+			frame, primary->getStatus() == READY_TO_FIRE, primary->isWithinAttackRange(source, target),
+			secondary->getStatus() == READY_TO_FIRE, secondary->isWithinAttackRange(source, target));
+		source->chooseBestWeaponForTarget(target, PREFER_LEAST_MOVEMENT, CMD_FROM_PLAYER);
+	}
 	if (action == "pkg22-choose" && target)
 		source->chooseBestWeaponForTarget(target, PREFER_LONGEST_RANGE, CMD_FROM_PLAYER);
 	Weapon* weapon = source->getCurrentWeapon();
 	if (!weapon)
 		return;
-	if (action == "pkg22-choose" || action == "pkg22-range")
+	if (action == "pkg22-choose" || action == "pkg22-choose-near" || action == "pkg22-range")
 	{
 		if (!target)
 			return;
