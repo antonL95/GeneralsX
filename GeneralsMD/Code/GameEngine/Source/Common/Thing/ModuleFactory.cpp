@@ -305,6 +305,7 @@
 #include "GameLogic/Module/AISpecialPowerUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/RetailTransportTeleportModules.h"
 #include "GameLogic/Module/RetailUpgradeModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/Module/RetailDetectionModules.h"
@@ -570,6 +571,11 @@ void ModuleFactory::init()
 		addModule( WeaponFireSpecialAbilityUpdate );
 		addModule( ModelConditionSpecialAbilityUpdate );
 		addModule( CurseSpecialPower );
+		addModule( DominateEnemySpecialPower );
+		addModule( FlingPassengerSpecialAbilityUpdate );
+		addModule( StoreObjectsSpecialPower );
+		addModule( TeleportSpecialAbilityUpdate );
+		addModule( TeleportToCasterSpecialPower );
 		addModule( RousingSpeechUpdate );
 		addModule( ToggleMountedSpecialAbilityUpdate );
 		addModule( SummonReplacementSpecialAbilityUpdate );

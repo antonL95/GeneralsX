@@ -429,6 +429,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/SpecialAbility.h
     Include/GameLogic/Module/SpecialAbilityUpdate.h
     Include/GameLogic/Module/RotwkAbilityModules.h
+    Include/GameLogic/Module/RetailTransportTeleportModules.h
     Include/GameLogic/Module/RotwkModifierModules.h
     Include/GameLogic/Module/RetailDetectionModules.h
 
@@ -1049,6 +1050,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/SmartBombTargetHomingUpdate.cpp
     Source/GameLogic/Object/Update/SpecialAbilityUpdate.cpp
     Source/GameLogic/Object/Update/RotwkAbilityModules.cpp
+    Source/GameLogic/Object/Update/RetailTransportTeleportModules.cpp
     Source/GameLogic/Object/Update/RetailUpgradeModules.cpp
     Source/GameLogic/Object/Update/RotwkModifierModules.cpp
     Source/GameLogic/Object/Update/RetailDetectionModules.cpp
