@@ -248,6 +248,26 @@ TEST(RetailFxTest, RequiresALiteralBoundForVertexRepeat)
 	EXPECT_FALSE(RetailFX::readProgram(encodeWords(words), true));
 }
 
+TEST(RetailFxTest, EvaluatesStandaloneStateProgram)
+{
+	const uint32_t words[] = {
+		0x46580200, 0x0006fffe, 0x54494c43, 2, 0, 0x40000000, 0, 0x40000000,
+		0x000dfffe, 0x434c5846, 1,
+		0xa0300001, 2, 0, 1, 0, 0, 1, 1, 0, 4, 0,
+		0x0000ffff
+	};
+	const auto bytes = encodeWords(words);
+	const auto program = RetailFX::readStateProgram(bytes);
+	ASSERT_TRUE(program);
+	RetailFX::Registers output;
+	ASSERT_TRUE(RetailFX::fillRegisters(*program, [](const auto &, auto, auto) {}, output));
+	EXPECT_EQ(output.floats[0][0], 1.0f);
+	EXPECT_FALSE(RetailFX::readStateProgram(std::span(bytes).first(bytes.size() - 4)));
+	auto trailing = bytes;
+	trailing.insert(trailing.end() - 4, {0, 0, 0, 0});
+	EXPECT_FALSE(RetailFX::readStateProgram(trailing));
+}
+
 TEST(RetailFxTest, RequiresTheVertexAddressRegisterForRelativeConstants)
 {
 	std::vector<uint32_t> words = {

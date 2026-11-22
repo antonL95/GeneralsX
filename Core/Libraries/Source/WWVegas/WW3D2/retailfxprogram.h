@@ -56,6 +56,7 @@ struct Program
 using SetBinding = std::function<void(const Binding &, std::span<Register>, std::span<int>)>;
 
 std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex);
+std::optional<Program> readStateProgram(std::span<const uint8_t> bytes);
 bool fillRegisters(const Program &program, const SetBinding &setBinding, Registers &registers);
 
 }

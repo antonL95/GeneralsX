@@ -276,7 +276,7 @@ unsigned inputCount(unsigned operation)
 	{
 		case 0x100: case 0x101: case 0x103: case 0x104: case 0x107: case 0x108: case 0x109:
 			return 1;
-		case 0x200: case 0x201: case 0x202: case 0x204: case 0x205: case 0x500:
+		case 0x200: case 0x201: case 0x202: case 0x203: case 0x204: case 0x205: case 0x500:
 			return 2;
 		case 0x300:
 			return 3;
@@ -321,7 +321,7 @@ bool readInstructions(Words words, Program &program, size_t &remaining)
 	return true;
 }
 
-bool readPreshader(Words words, Program &program, size_t &remaining)
+bool readPreshader(Words words, Program &program, size_t &remaining, bool standalone = false)
 {
 	if (words.empty())
 		return true;
@@ -364,7 +364,7 @@ bool readPreshader(Words words, Program &program, size_t &remaining)
 				return false;
 		}
 	}
-	return !program.instructions.empty();
+	return !program.instructions.empty() && (!standalone || (words.size() == 1 && words.front() == 0x0000ffffu));
 }
 
 void applyBindings(const std::vector<Binding> &bindings, const SetBinding &setBinding, Registers &registers)
@@ -404,6 +404,7 @@ double evaluate(unsigned operation, double a, double b, double c)
 		case 0x200: return std::fmin(a, b);
 		case 0x201: return std::fmax(a, b);
 		case 0x202: return a < b ? 1.0 : 0.0;
+		case 0x203: return a >= b ? 1.0 : 0.0;
 		case 0x204: return a + b;
 		case 0x205: return a * b;
 		case 0x300: return a >= 0.0 ? b : c;
@@ -501,6 +502,22 @@ std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 	}
 	if (words.size() != 1 || words.front() != 0x0000ffffu || !constantsSeen || nesting || repeating)
 		return std::nullopt;
+	return program;
+}
+
+std::optional<Program> readStateProgram(std::span<const uint8_t> bytes)
+{
+	size_t remaining = maxDecodedProgramBytes;
+	if (bytes.size() < 8 || bytes.size() % 4 || !spend(remaining, bytes.size()) ||
+		readWord(bytes) != 0x46580200u || readWord(bytes.last(4)) != 0x0000ffffu)
+		return {};
+	std::vector<uint32_t> words;
+	words.reserve(bytes.size() / 4);
+	for (; !bytes.empty(); bytes = bytes.subspan(4))
+		words.push_back(readWord(bytes));
+	Program program;
+	if (!readPreshader(words, program, remaining, true))
+		return {};
 	return program;
 }
 
