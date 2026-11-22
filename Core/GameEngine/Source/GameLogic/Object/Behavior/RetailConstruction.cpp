@@ -19,7 +19,7 @@ void BuildingBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "NightWindowName", INI::parseAsciiStringVector, nullptr, offsetof(BuildingBehaviorModuleData, m_nightWindows) },
 		{ "FireWindowName", INI::parseAsciiString, nullptr, offsetof(BuildingBehaviorModuleData, m_fireWindow) },
 		{ "GlowWindowName", INI::parseAsciiString, nullptr, offsetof(BuildingBehaviorModuleData, m_glowWindow) },
-		{ "FireName", INI::parseAsciiString, nullptr, offsetof(BuildingBehaviorModuleData, m_fire) },
+		{ "FireName", INI::parseAsciiStringVectorAppend, nullptr, offsetof(BuildingBehaviorModuleData, m_fireMeshes) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(fields);
@@ -48,7 +48,8 @@ UpdateSleepTime BuildingBehavior::update()
 			drawable->showSubObject(window, night && !fire);
 		drawable->showSubObject(data->m_fireWindow, fire);
 		drawable->showSubObject(data->m_glowWindow, fire);
-		drawable->showSubObject(data->m_fire, night && fire);
+		for (const AsciiString& mesh : data->m_fireMeshes)
+			drawable->showSubObject(mesh, night && fire);
 		drawable->updateSubObjects();
 		m_windowState = state;
 	}

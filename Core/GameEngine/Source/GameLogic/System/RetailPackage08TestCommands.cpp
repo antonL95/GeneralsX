@@ -133,7 +133,10 @@ void runRetailPackage08TestCommand(std::string_view action, Object* source, Obje
 		const auto* behavior = static_cast<const BuildingBehavior*>(source->findUpdateModule(NAMEKEY("BuildingBehavior")));
 		std::fprintf(stderr, "TEST pkg08 windows frame=%u state=%d\n", frame, behavior ? behavior->getWindowState() : -1);
 		if (behavior)
+		{
 			std::fprintf(stderr, "TEST pkg08 night-meshes frame=%u count=%zu\n", frame, behavior->getNightWindowCount());
+			std::fprintf(stderr, "TEST pkg08 fire-meshes frame=%u count=%zu\n", frame, behavior->getFireMeshCount());
+		}
 	}
 	else if (action == "pkg08-enter" && target && source->getAI())
 		source->getAI()->aiEnter(target, CMD_FROM_PLAYER);
@@ -179,6 +182,8 @@ void runRetailPackage08TestCommand(std::string_view action, Object* source, Obje
 		std::fprintf(stderr, "TEST pkg08 priority frame=%u resolved=%d weight=%d\n",
 			frame, info && info != TheScriptEngine->getDefaultAttackInfo(), info ? info->getPriority(target->getTemplate()) : -1);
 	}
+	else if (action == "pkg08-priority-default" && source->getAI())
+		source->getAI()->setAttackInfo(TheScriptEngine->getDefaultAttackInfo());
 	else if (action == "pkg08-queue-crc" && position)
 	{
 		const auto* building = TheThingFactory->findTemplate(name, FALSE);

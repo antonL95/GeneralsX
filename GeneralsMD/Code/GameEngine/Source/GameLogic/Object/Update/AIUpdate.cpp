@@ -5388,9 +5388,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 10 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 11 : 4;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 10 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 11 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5439,13 +5439,18 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	}
 
 	AsciiString attackName;
-	if (m_attackInfo) attackName = m_attackInfo->getName();
+	if (m_attackInfo)
+		attackName = m_attackInfo->getName();
 	xfer->xferAsciiString(&attackName);
+	Bool hasAttackOverride = m_attackInfo != nullptr;
+	if (version >= 11)
+		xfer->xferBool(&hasAttackOverride);
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
-		if (attackName.isNotEmpty()) {
+		if (attackName.isNotEmpty() || (version >= 11 && hasAttackOverride))
 			m_attackInfo = TheScriptEngine->getAttackInfo(attackName);
-		}
+		else if (version >= 11)
+			m_attackInfo = nullptr;
 	}
 
 	xfer->xferInt(&m_waypointCount);
@@ -5662,7 +5667,7 @@ Bool AIUpdateInterface::enterRetailBurningDeath()
 {
 	Object* object = getObject();
 	const UnsignedInt duration = getAIUpdateModuleData()->m_burningDeathTime;
-	if (!RetailFileLayers::enabled() || !duration || !object->isMobile() || object->getContainedBy() ||
+	if (!RetailFileLayers::enabled() || !duration || !object->isMobile() || object->getEnclosingContainedBy() ||
 		!object->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_BURNINGDEATH))
 		return FALSE;
 

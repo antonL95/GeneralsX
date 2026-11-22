@@ -10,7 +10,7 @@ struct BuildingBehaviorModuleData : public UpdateModuleData
 	std::vector<AsciiString> m_nightWindows;
 	AsciiString m_fireWindow;
 	AsciiString m_glowWindow;
-	AsciiString m_fire;
+	std::vector<AsciiString> m_fireMeshes;
 	static void buildFieldParse(MultiIniFieldParse& p);
 };
 
@@ -24,6 +24,7 @@ public:
 	UpdateSleepTime update() override;
 	Int getWindowState() const { return m_windowState; }
 	std::size_t getNightWindowCount() const { return getBuildingBehaviorModuleData()->m_nightWindows.size(); }
+	std::size_t getFireMeshCount() const { return getBuildingBehaviorModuleData()->m_fireMeshes.size(); }
 
 private:
 	Int m_windowState = -1;
