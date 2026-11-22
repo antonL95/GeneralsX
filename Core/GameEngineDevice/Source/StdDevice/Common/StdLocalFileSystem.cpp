@@ -196,6 +196,11 @@ static std::filesystem::path fixFilenameFromWindowsPath(const Char *filename, In
 	return path;
 }
 
+AsciiString StdLocalFileSystem::resolveLocalPath(const AsciiString& filePath) const
+{
+	return AsciiString(fixFilenameFromWindowsPath(filePath.str(), File::READ).string().c_str());
+}
+
 File * StdLocalFileSystem::openFile(const Char *filename, Int access, size_t bufferSize)
 {
 	//USE_PERF_TIMER(StdLocalFileSystem_openFile)

@@ -705,7 +705,7 @@ Int parseFile(char *args[], int num)
 	if (num > 1)
 	{
 		TheWritableGlobalData->m_initialFile = args[1];
-		if (!RetailFileLayers::enabled() || !TheFileSystem->doesFileExist(args[1]))
+		if (!RetailFileLayers::enabled())
 			ConvertShortMapPathToLongMapPath(TheWritableGlobalData->m_initialFile);
 	}
 	return 2;

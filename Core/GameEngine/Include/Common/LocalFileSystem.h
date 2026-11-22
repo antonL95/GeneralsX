@@ -42,6 +42,7 @@ public:
 	virtual Bool getFileInfo(const AsciiString& filename, FileInfo *fileInfo) const = 0; ///< see FileSystem.h
 	virtual Bool createDirectory(AsciiString directory) = 0; ///< see FileSystem.h
 	virtual AsciiString normalizePath(const AsciiString& filePath) const = 0;	///< see FileSystem.h
+	virtual AsciiString resolveLocalPath(const AsciiString& filePath) const { return filePath; }
 
 	// GeneralsX @bugfix felipebraz 23/03/2026 On Linux/macOS the binary cwd and the asset root (game data dir) are
 	// separate. Relative paths like "Data\Scripts\..." are resolved from cwd on Windows (where cwd == install dir)

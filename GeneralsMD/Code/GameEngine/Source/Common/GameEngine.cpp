@@ -1071,13 +1071,19 @@ void GameEngine::init()
 
 			if (fname.endsWithNoCase(".map"))
 			{
+				const Bool retail = RetailFileLayers::enabled();
+				const MapMetaData* map = retail ? TheMapCache->ensureRetailLaunchMap(TheGlobalData->m_initialFile) : nullptr;
+				if (retail && !map)
+				{
+					std::fputs("Rejected retail map path. Choose a map in the user or install Maps folder.\n", stderr);
+					TheWritableGlobalData->m_initialFile.clear();
+					TheWritableGlobalData->m_pendingFile.clear();
+					setQuitting(TRUE);
+					return;
+				}
 				TheWritableGlobalData->m_shellMapOn = FALSE;
 				TheWritableGlobalData->m_playIntro = FALSE;
-				TheWritableGlobalData->m_pendingFile = TheGlobalData->m_initialFile;
-
-				const MapMetaData* map = RetailFileLayers::enabled() ? TheMapCache->ensureMap(TheGlobalData->m_initialFile) : nullptr;
-				if (map)
-					TheWritableGlobalData->m_pendingFile = map->m_fileName;
+				TheWritableGlobalData->m_pendingFile = map ? map->m_fileName : TheGlobalData->m_initialFile;
 				const Bool skirmish = map && map->m_isMultiplayer && map->m_numPlayers >= 2;
 				if (skirmish)
 					startRetailFileSkirmish(*map);

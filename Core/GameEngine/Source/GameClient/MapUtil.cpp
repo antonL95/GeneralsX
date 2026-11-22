@@ -29,14 +29,16 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include <array>
 #include <cstdint>
+#include <filesystem>
 #include <set>
 
 #if !defined(_WIN32)
-#include <filesystem>
 static std::set<std::string> s_failedMapLookups;
 #endif
 
+#include "Common/ArchiveFileSystem.h"
 #include "Common/crc.h"
 #include "Common/FileSystem.h"
 #include "Common/LocalFileSystem.h"
@@ -51,6 +53,7 @@ static std::set<std::string> s_failedMapLookups;
 #include "Common/WellKnownKeys.h"
 #include "Common/INI.h"
 #include "Common/QuotedPrintable.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/SkirmishBattleHonors.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -72,6 +75,79 @@ static std::set<std::string> s_failedMapLookups;
 //-------------------------------------------------------------------------------
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 static const char *mapExtension = ".map";
+
+static std::filesystem::path canonicalLocalPath(const AsciiString& name)
+{
+	const AsciiString local = TheLocalFileSystem->resolveLocalPath(name);
+	if (local.isEmpty())
+		return {};
+	std::error_code error;
+	return std::filesystem::canonical(local.str(), error);
+}
+
+static Bool isBelowMapRoot(const std::filesystem::path& path, const std::filesystem::path& root)
+{
+	if (root.empty())
+		return FALSE;
+	for (auto parent = path.parent_path(); !parent.empty(); parent = parent.parent_path())
+	{
+		std::error_code error;
+		if (parent == root || std::filesystem::equivalent(parent, root, error))
+			return TRUE;
+		if (parent == parent.root_path())
+			break;
+	}
+	return FALSE;
+}
+
+static auto retailInstallPrefixes()
+{
+	return std::array{TheGlobalData->m_modDir, RetailFileLayers::languageDirectory(), AsciiString()};
+}
+
+static Bool resolveRetailMapPath(const MapCache& cache, AsciiString& name)
+{
+	const auto prefixes = retailInstallPrefixes();
+	std::filesystem::path local;
+	const Bool absolute = std::filesystem::path(name.str()).is_absolute();
+	if (absolute)
+	{
+		local = canonicalLocalPath(name);
+		if (local.empty())
+			return FALSE;
+	}
+	else
+	{
+		for (auto prefix : prefixes)
+		{
+			prefix.concat(name);
+			local = canonicalLocalPath(prefix);
+			if (!local.empty())
+				break;
+		}
+		if (local.empty())
+			return TheArchiveFileSystem->doesFileExist(name.str());
+	}
+
+	Bool allowed = isBelowMapRoot(local, canonicalLocalPath(cache.getUserMapDir()));
+	for (auto prefix : prefixes)
+	{
+		if (allowed)
+			break;
+		prefix.concat(cache.getMapDir());
+		allowed = isBelowMapRoot(local, canonicalLocalPath(prefix));
+	}
+	if (!allowed)
+		return FALSE;
+
+	std::error_code error;
+	const std::string resolved = local.generic_string();
+	if (resolved.find('\\') != std::string::npos || !AsciiString(resolved.c_str()).endsWithNoCase(mapExtension) ||
+		!std::filesystem::is_regular_file(local, error))
+		return FALSE;
+	name = resolved.c_str();
+	return TRUE;
+}
 
 // GeneralsX @bugfix Copilot 27/04/2026 Accept both '\' and '/' separators so user custom maps work on macOS/Linux paths.
 static const char *findLastPathSeparator(const AsciiString& path)
@@ -576,6 +652,7 @@ void MapCache::loadMapsFromMapCacheINI( const AsciiString &mapDir )
 Bool MapCache::loadMapsFromDisk( const AsciiString &mapDir, Bool isOfficial, Bool filterByAllowedMaps )
 {
 	prepareUnseenMaps(mapDir);
+	const auto scanRoot = RetailFileLayers::enabled() ? canonicalLocalPath(mapDir) : std::filesystem::path();
 
 	FilenameList filepathList;
 	FilenameListIter filepathIt;
@@ -617,13 +694,28 @@ Bool MapCache::loadMapsFromDisk( const AsciiString &mapDir, Bool isOfficial, Boo
 			continue;
 		}
 
-		if (!TheFileSystem->getFileInfo(*filepathIt, &fileInfo))
+		AsciiString fileName = *filepathIt;
+		if (RetailFileLayers::enabled())
+		{
+			if (mapDir == getMapDir())
+			{
+				std::string spelling(fileName.str());
+				std::replace(spelling.begin(), spelling.end(), '\\', '/');
+				fileName = spelling.c_str();
+				if (!resolveRetailMapPath(*this, fileName))
+					continue;
+			}
+			else if (!isBelowMapRoot(canonicalLocalPath(fileName), scanRoot))
+				continue;
+		}
+
+		if (!TheFileSystem->getFileInfo(fileName, &fileInfo))
 		{
 			DEBUG_CRASH(("Could not get file info for map %s", filepathIt->str()));
 			continue;
 		}
 
-		mapListChanged |= addMap(mapDir, *filepathIt, filepathLower, fileInfo, isOfficial);
+		mapListChanged |= addMap(mapDir, fileName, filepathLower, fileInfo, isOfficial);
 	}
 
 	if (clearUnseenMaps(mapDir))
@@ -1164,21 +1256,49 @@ Bool isOfficialMap( AsciiString mapName )
 }
 
 
-const MapMetaData *MapCache::ensureMap(const AsciiString &mapName)
+const MapMetaData *MapCache::ensureRetailLaunchMap(const AsciiString &mapName)
 {
-	AsciiString fileName = mapName;
-	FileInfo fileInfo;
-	if (!TheFileSystem->getFileInfo(fileName, &fileInfo))
+	std::string spelling(mapName.str());
+	std::replace(spelling.begin(), spelling.end(), '\\', '/');
+	std::filesystem::path path(spelling);
+	if (!path.has_parent_path() && !path.has_root_path() && spelling.find(':') == std::string::npos)
 	{
-		const MapMetaData *alias = findMap(mapName);
-		if (!alias || !TheFileSystem->getFileInfo(alias->m_fileName, &fileInfo))
+		const MapMetaData *alias = findMap(mapName, FALSE);
+		if (!alias)
 			return nullptr;
-		fileName = alias->m_fileName;
+		spelling = alias->m_fileName.str();
+		std::replace(spelling.begin(), spelling.end(), '\\', '/');
+		path = spelling;
 	}
+
+	if (spelling.find(':') != std::string::npos && !path.has_root_name())
+		return nullptr;
+	if (!AsciiString(path.extension().string().c_str()).endsWithNoCase(mapExtension))
+		return nullptr;
+	if (!path.is_absolute())
+	{
+		if (path.has_root_path())
+			return nullptr;
+		for (const auto& part : path)
+			if (part == "..")
+				return nullptr;
+		path = path.lexically_normal();
+		AsciiString first((*path.begin()).string().c_str());
+		if (first.compareNoCase(getMapDir()) != 0)
+			return nullptr;
+	}
+
+	AsciiString fileName(path.generic_string().c_str());
+	FileInfo fileInfo;
+	if (!resolveRetailMapPath(*this, fileName) || !TheFileSystem->getFileInfo(fileName, &fileInfo))
+		return nullptr;
+
 	AsciiString key = fileName;
 	key.toLower();
-	const auto existing = find(key);
-	const Bool isOfficial = existing != end() && existing->second.m_isOfficial;
+	AsciiString originalKey(path.generic_string().c_str());
+	originalKey.toLower();
+	const MapMetaData* existing = findMap(originalKey, FALSE);
+	const Bool isOfficial = existing && existing->m_isOfficial;
 	if (!addMap(getMapDir(), fileName, key, fileInfo, isOfficial, TRUE))
 		return nullptr;
 	auto &map = find(key)->second;
@@ -1186,7 +1306,7 @@ const MapMetaData *MapCache::ensureMap(const AsciiString &mapName)
 	return &map;
 }
 
-const MapMetaData *MapCache::findMap(AsciiString mapName)
+const MapMetaData *MapCache::findMap(AsciiString mapName, Bool searchLegacyPaths)
 {
 	if (mapName.isEmpty())
 		return nullptr;
@@ -1262,7 +1382,7 @@ const MapMetaData *MapCache::findMap(AsciiString mapName)
 #if !defined(_WIN32)
 	// Fallback 2: Check standard custom map folders on POSIX if not in cache
 	const char* home = getenv("HOME");
-	if (home && !baseQuery.empty() && s_failedMapLookups.find(baseQuery) == s_failedMapLookups.end())
+	if (searchLegacyPaths && home && !baseQuery.empty() && s_failedMapLookups.find(baseQuery) == s_failedMapLookups.end())
 	{
 		std::vector<std::string> searchDirs = {
 			std::string(home) + "/Library/Application Support/GeneralsX/GeneralsZH/Maps",

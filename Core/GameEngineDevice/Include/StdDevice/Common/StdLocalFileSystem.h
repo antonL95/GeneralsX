@@ -48,6 +48,7 @@ public:
 
 	virtual Bool createDirectory(AsciiString directory) override;
 	virtual AsciiString normalizePath(const AsciiString& filePath) const override;
+	AsciiString resolveLocalPath(const AsciiString& filePath) const override;
 
 #ifndef _WIN32
 	// GeneralsX @bugfix felipebraz 23/03/2026 Set the asset root as a fallback search directory for relative paths.
