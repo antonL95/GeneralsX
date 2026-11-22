@@ -594,6 +594,7 @@ void ModuleFactory::init()
 		addModule( RespawnUpdate );
 		addModule( HordeAIUpdate );
 		addModule( HordeWorkerAIUpdate );
+		addModule( RepairSpecialPower );
 		addModule( RubbleRiseUpdate );
 		addModule( AnimalAIUpdate );
 		addModule( CritterEmitterUpdate );

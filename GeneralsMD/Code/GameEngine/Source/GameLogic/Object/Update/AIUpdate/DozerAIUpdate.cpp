@@ -56,7 +56,6 @@
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/WallHubBehavior.h"
-#include "GameLogic/Module/WorkerAIUpdate.h"
 #include "GameLogic/RetailBuildingEvents.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/TerrainVisual.h"
@@ -703,6 +702,8 @@ StateReturnType DozerActionDoActionState::update()
 			{
 				if( ai->isIdle() )
 				{
+					if (RetailFileLayers::enabled() && GettingBuiltBehavior::takeOverConstruction(*goalObject))
+						return STATE_SUCCESS;
 					dozerAI->setBuildSubTask( DOZER_DO_BUILD_AT_DOCK );
 					if( usesRetailBuilder(ai) )
 						enterStructure( goalObject );
@@ -722,6 +723,7 @@ StateReturnType DozerActionDoActionState::update()
 
 				// increase the construction percent of the goal object
 				Int framesToBuild = goalObject->getTemplate()->calcTimeToBuild( dozer->getControllingPlayer() );
+				framesToBuild = GettingBuiltBehavior::getConstructionFrames(*goalObject, framesToBuild);
 				Real percentProgressThisFrame = WWMath::Div_FixNaN(100.0f, (Real)framesToBuild, 100.0f);
 				goalObject->setConstructionPercent( goalObject->getConstructionPercent() +
 																						percentProgressThisFrame );
@@ -738,7 +740,8 @@ StateReturnType DozerActionDoActionState::update()
 				// since we've just actually contributed a "piece" to this building, we'll say that
 				// we are now the producer and the builder
 				//
-				goalObject->setProducer( dozer );
+				if (!RetailFileLayers::enabled() || !GettingBuiltBehavior::isAuthoredWorker(*goalObject, *dozer))
+					goalObject->setProducer(dozer);
 				goalObject->setBuilder( dozer );
 
 				// check for construction complete
@@ -1872,7 +1875,8 @@ UpdateSleepTime DozerAIUpdate::update()
 	else
 		getObject()->setWeaponSetFlag(WEAPONSET_MINE_CLEARING_DETAIL);//maybe go clear some mines, if I feel like it
 
-	if (!m_constructionQueue.empty() && !isTaskPending(DOZER_TASK_BUILD) && !getObject()->isDisabled())
+	if (!m_constructionQueue.empty() && !isTaskPending(DOZER_TASK_BUILD) && !getObject()->isDisabled() &&
+		!GettingBuiltBehavior::hasDelegatedConstruction(getObject()->getID()))
 		startQueuedConstruction();
 
 	// run our own state machine
@@ -2010,8 +2014,7 @@ Object* DozerAIUpdate::placeConstruction(const ThingTemplate* what, const Coord3
 		releaseConstructionQueue();
 		if (usesRetailBuilder(this))
 			m_isRebuild = isRebuild;
-		if (!RetailFileLayers::enabled() || GettingBuiltBehavior::spawnBuilder(*obj) == nullptr)
-			newTask(DOZER_TASK_BUILD, obj);
+		newTask(DOZER_TASK_BUILD, obj);
 	}
 
 	return obj;
@@ -2179,46 +2182,8 @@ void DozerAIUpdate::privateResumeConstruction( Object *obj, CommandSourceType cm
 //-------------------------------------------------------------------------------------------------
 /*static*/ Bool DozerAIUpdate::findGoodBuildOrRepairPosition(const Object* me, const Object* target, Coord3D& positionOut)
 {
-	if (RetailFileLayers::enabled())
-	{
-		UnsignedInt mask = 0;
-		if (const auto* ai = me->getAIUpdateInterface())
-			if (const auto* dozer = ai->getDozerAIInterface())
-				mask = dozer->getSpecialContactPoints();
-		if (mask)
-		{
-			FindPositionOptions options;
-			options.maxRadius = 20.0f;
-			options.maxZDelta = 10.0f;
-			options.startAngle = 0.0f;
-			options.sourceToPathToDest = me;
-			if (me->isUsingAirborneLocomotor())
-				options.ignoreObject = target;
-			Real closest = 0.0f;
-			Bool found = FALSE;
-			for (const auto& contact : target->getTemplate()->getRotWKObjectData().geometryContactPoints)
-			{
-				if (!(contact.flags & mask))
-					continue;
-				Vector3 world;
-				Matrix3D::Transform_Vector(*target->getTransformMatrix(),
-					Vector3(contact.position.x, contact.position.y, contact.position.z), &world);
-				const Coord3D contactPosition = { world.X, world.Y, world.Z };
-				Coord3D candidate;
-				if (!ThePartitionManager->findPositionAround(&contactPosition, &options, &candidate))
-					continue;
-				const Real distance = sqr(me->getPosition()->x - candidate.x) + sqr(me->getPosition()->y - candidate.y);
-				if (!found || distance < closest)
-				{
-					found = TRUE;
-					closest = distance;
-					positionOut = candidate;
-				}
-			}
-			if (found)
-				return TRUE;
-		}
-	}
+	if (RetailFileLayers::enabled() && findRetailBuildContact(*me, *target, positionOut))
+		return TRUE;
 
 	// The place we go to build or repair is the closest spot from us to them
 	Coord3D ourPosition = *me->getPosition();

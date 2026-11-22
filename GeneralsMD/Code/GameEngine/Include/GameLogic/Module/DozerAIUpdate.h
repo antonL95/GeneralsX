@@ -203,6 +203,7 @@ class DozerAIUpdate : public AIUpdateInterface, public DozerAIInterface
 
 public:
 	static Bool findGoodBuildOrRepairPosition(const Object* me, const Object* target, Coord3D& positionOut);
+	static Bool findRetailBuildContact(const Object& builder, const Object& target, Coord3D& position);
 	static Object* findGoodBuildOrRepairPositionAndTarget(Object* me, Object* target, Coord3D& positionOut);
 	Object* queueConstruction(const ThingTemplate* what, const Coord3D* pos, Real angle, Player* owningPlayer);
 	void crcRetailState(Xfer* xfer);

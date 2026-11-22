@@ -1,6 +1,7 @@
 #include "PreRTS.h"
 
 #include "GameLogic/Module/FoundationAIUpdate.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 
 #include <algorithm>
 
@@ -161,6 +162,8 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player,
 		body->internalChangeHealth(body->getMaxHealth() - body->getHealth());
 		advanceConstruction(*structure, foundation);
 	}
+	else if (RetailFileLayers::enabled())
+		GettingBuiltBehavior::beginConstruction(*structure);
 	setWakeFrame(foundation, UPDATE_SLEEP_NONE);
 	return structure;
 }
@@ -179,14 +182,18 @@ void FoundationAIUpdate::showFoundation(Bool show)
 void FoundationAIUpdate::advanceConstruction(Object& structure, Object* builder, Int overrideFrames, Bool isRebuild)
 {
 	Player* player = structure.getControllingPlayer();
-	const Int frames = overrideFrames > 0 ? overrideFrames : structure.getTemplate()->calcTimeToBuild(player);
+	const Int frames = overrideFrames > 0 ? overrideFrames :
+		GettingBuiltBehavior::getConstructionFrames(structure, structure.getTemplate()->calcTimeToBuild(player));
 	structure.setConstructionPercent(structure.getConstructionPercent() + CastleRules::constructionStep(frames));
 	BodyModuleInterface* body = structure.getBodyModule();
 	body->internalChangeHealth(body->getMaxHealth() / INT_TO_REAL(frames > 0 ? frames : 1));
 	if (structure.getConstructionPercent() < 100.0f)
 		return;
 
+	const Bool reconstructing = RetailFileLayers::enabled() && structure.testStatus(OBJECT_STATUS_RECONSTRUCTING);
 	structure.clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNDER_CONSTRUCTION));
+	if (reconstructing)
+		structure.clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_RECONSTRUCTING));
 	structure.clearModelConditionFlags(MAKE_MODELCONDITION_MASK3(MODELCONDITION_AWAITING_CONSTRUCTION,
 		MODELCONDITION_PARTIALLY_CONSTRUCTED, MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED));
 	structure.setConstructionPercent(CONSTRUCTION_COMPLETE);
@@ -195,7 +202,7 @@ void FoundationAIUpdate::advanceConstruction(Object& structure, Object* builder,
 
 	if (player)
 	{
-		player->onStructureConstructionComplete(builder, &structure, isRebuild);
+		player->onStructureConstructionComplete(builder, &structure, isRebuild || reconstructing);
 		for (BehaviorModule** module = structure.getBehaviorModules(); *module; ++module)
 		{
 			CreateModuleInterface* create = (*module)->getCreate();
@@ -223,6 +230,12 @@ UpdateSleepTime FoundationAIUpdate::update()
 
 	if (structure->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && !structure->isEffectivelyDead())
 	{
+		if (RetailFileLayers::enabled())
+		{
+			const auto* behavior = GettingBuiltBehavior::find(*structure);
+			if (behavior && behavior->managesConstruction())
+				return UPDATE_SLEEP(STRUCTURE_CHECK_FRAMES);
+		}
 		advanceConstruction(*structure, getObject());
 		return UPDATE_SLEEP_NONE;
 	}

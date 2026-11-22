@@ -21,6 +21,7 @@
 #include "Common/Xfer.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
+#include "GameLogic/Module/HordeWorkerAIUpdate.h"
 #include "GameClient/ControlBar.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ExperienceTracker.h"
@@ -473,6 +474,14 @@ UnsignedInt GettingBuiltBehavior::getRebuildFrames() const
 		static_cast<double>(UPDATE_SLEEP_FOREVER))));
 }
 
+UnsignedInt GettingBuiltBehavior::getSpawnDelayFrames() const
+{
+	const double frames = static_cast<double>(getGettingBuiltBehaviorModuleData()->m_spawnTimer) * LOGICFRAMES_PER_SECOND;
+	if (!(frames >= 0.0 && frames < UPDATE_SLEEP_FOREVER))
+		return UPDATE_SLEEP_FOREVER;
+	return static_cast<UnsignedInt>(frames);
+}
+
 Bool GettingBuiltBehavior::canRebuildNow() const
 {
 	const auto* data = getGettingBuiltBehaviorModuleData();
@@ -505,11 +514,16 @@ void GettingBuiltBehavior::onRubbleEntered(Object& structure)
 	if (!behavior)
 		return;
 	behavior->m_keptAsRubble = TRUE;
+	behavior->m_running = FALSE;
+	behavior->m_rebuildingFromRubble = FALSE;
+	behavior->m_workerSpawned = FALSE;
+	behavior->m_repairFrame = 0;
+	behavior->releaseBuilder();
+	behavior->stopLoop();
 	const auto* data = behavior->getGettingBuiltBehaviorModuleData();
-	const Real delayFrames = data->m_spawnTimer * LOGICFRAMES_PER_SECOND;
-	if (!data->m_rebuildWhenDead || !(delayFrames >= 0.0f && delayFrames < UPDATE_SLEEP_FOREVER))
+	const UnsignedInt delay = behavior->getSpawnDelayFrames();
+	if (!data->m_rebuildWhenDead || delay == UPDATE_SLEEP_FOREVER)
 		return;
-	const UnsignedInt delay = static_cast<UnsignedInt>(delayFrames);
 	behavior->m_waitingToRebuild = TRUE;
 	behavior->m_rebuildReadyFrame = TheGameLogic->getFrame() + delay;
 	behavior->setWakeFrame(&structure, UPDATE_SLEEP(delay));
@@ -568,39 +582,132 @@ UnsignedInt GettingBuiltBehavior::constructionRefund(const Object& structure, co
 	return static_cast<UnsignedInt>(std::max(0, cost));
 }
 
-Object* GettingBuiltBehavior::spawnBuilder(Object& structure)
+Bool GettingBuiltBehavior::beginConstruction(Object& structure)
 {
-	const auto* behavior = find(structure);
+	if (!RetailFileLayers::enabled())
+		return FALSE;
+	auto* behavior = findMutable(structure);
 	if (!behavior)
+		return FALSE;
+	behavior->m_startFrame = TheGameLogic->getFrame();
+	behavior->m_running = TRUE;
+	behavior->setWakeFrame(&structure, UPDATE_SLEEP_NONE);
+	return TRUE;
+}
+
+Bool GettingBuiltBehavior::takeOverConstruction(Object& structure)
+{
+	if (!RetailFileLayers::enabled())
+		return FALSE;
+	auto* behavior = findMutable(structure);
+	if (!behavior || behavior->m_workerSpawned || behavior->m_running)
+		return FALSE;
+	behavior->m_workerSpawned = TRUE;
+	if (!behavior->spawnBuilder(FALSE) && !structure.testStatus(OBJECT_STATUS_RECONSTRUCTING))
+		return FALSE;
+	beginConstruction(structure);
+	return TRUE;
+}
+
+Bool GettingBuiltBehavior::hasDelegatedConstruction(ObjectID builder)
+{
+	if (!RetailFileLayers::enabled())
+		return FALSE;
+	for (const Object* site = TheGameLogic->getFirstObject(); site; site = site->getNextObject())
+	{
+		if (site->getProducerID() == builder && site->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) &&
+			!site->isEffectivelyDead())
+		{
+			const auto* behavior = find(*site);
+			if (behavior && behavior->m_running)
+				return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+Bool GettingBuiltBehavior::isAuthoredWorker(const Object& structure, const Object& worker)
+{
+	if (!RetailFileLayers::enabled())
+		return FALSE;
+	const auto* behavior = find(structure);
+	return behavior && behavior->m_workerID == worker.getID();
+}
+
+Int GettingBuiltBehavior::getConstructionFrames(const Object& structure, Int fallback)
+{
+	if (!RetailFileLayers::enabled() || !structure.testStatus(OBJECT_STATUS_RECONSTRUCTING))
+		return fallback;
+	const auto* behavior = find(structure);
+	const UnsignedInt frames = behavior ? behavior->getRebuildFrames() : 0;
+	return frames > 0 ? static_cast<Int>(frames) : fallback;
+}
+
+void GettingBuiltBehavior::onObjectCreated()
+{
+	if (!RetailFileLayers::enabled())
+		return;
+	const auto* data = getGettingBuiltBehaviorModuleData();
+	if (getSpawnDelayFrames() != UPDATE_SLEEP_FOREVER && (data->m_timerWithoutWorker || data->m_worker.isNotEmpty()))
+		setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
+}
+
+Object* GettingBuiltBehavior::spawnBuilder(Bool repair)
+{
+	if (!RetailFileLayers::enabled())
 		return nullptr;
-	const AsciiString& workerName = behavior->getGettingBuiltBehaviorModuleData()->m_worker;
+	Object* structure = getObject();
+	const AsciiString& workerName = getGettingBuiltBehaviorModuleData()->m_worker;
 	if (workerName.isEmpty())
 		return nullptr;
 	const ThingTemplate* workerType = TheThingFactory->findTemplate(workerName, FALSE);
-	if (!workerType || workerType->isKindOf(KINDOF_STRUCTURE))
+	if (!workerType || !workerType->isKindOf(KINDOF_DOZER) || workerType->isKindOf(KINDOF_STRUCTURE))
 		return nullptr;
-	Player* owner = structure.getControllingPlayer();
+	Player* owner = structure->getControllingPlayer();
 	if (!owner)
 		return nullptr;
 	Object* worker = TheThingFactory->newObject(workerType, owner->getDefaultTeam());
 	if (!worker)
 		return nullptr;
-	Coord3D position = *structure.getPosition();
-	const Real spacing = structure.getGeometryInfo().getBoundingCircleRadius() +
-		worker->getGeometryInfo().getBoundingCircleRadius() + 10.0f;
-	position.x += spacing;
-	worker->setOrientation(structure.getOrientation());
-	worker->setPosition(&position);
-	if (auto* ai = worker->getAIUpdateInterface())
-		if (auto* dozer = ai->getDozerAIInterface())
-			dozer->newTask(DOZER_TASK_BUILD, &structure);
+	auto* ai = worker->getAIUpdateInterface();
+	auto* dozer = ai ? ai->getDozerAIInterface() : nullptr;
+	if (!dozer)
+	{
+		TheGameLogic->destroyObject(worker);
+		return nullptr;
+	}
+	worker->setOrientation(structure->getOrientation());
+	worker->setPosition(structure->getPosition());
+	m_workerID = worker->getID();
+	dozer->newTask(repair ? DOZER_TASK_REPAIR : DOZER_TASK_BUILD, structure);
 	return worker;
+}
+
+void GettingBuiltBehavior::releaseBuilder()
+{
+	if (m_workerID == INVALID_ID)
+		return;
+	Object* worker = TheGameLogic->findObjectByID(m_workerID);
+	m_workerID = INVALID_ID;
+	if (worker)
+		TheGameLogic->destroyObject(worker);
+}
+
+void GettingBuiltBehavior::onDelete()
+{
+	if (RetailFileLayers::enabled())
+		releaseBuilder();
+	stopLoop();
 }
 
 void GettingBuiltBehavior::playLoop(const AsciiString& name)
 {
+	const AsciiString* event = name.isEmpty() ? nullptr : &name;
+	if (m_currentLoop == event)
+		return;
 	stopLoop();
-	if (name.isEmpty())
+	m_currentLoop = event;
+	if (!TheAudio || !event)
 		return;
 	AudioEventRTS loop(name);
 	loop.setObjectID(getObject()->getID());
@@ -609,17 +716,22 @@ void GettingBuiltBehavior::playLoop(const AsciiString& name)
 
 void GettingBuiltBehavior::stopLoop()
 {
+	m_currentLoop = nullptr;
 	if (m_loopHandle == 0)
 		return;
-	TheAudio->removeAudioEvent(m_loopHandle);
+	if (TheAudio)
+		TheAudio->removeAudioEvent(m_loopHandle);
 	m_loopHandle = 0;
 }
 
 UpdateSleepTime GettingBuiltBehavior::update()
 {
 	Object* structure = getObject();
+	if (!RetailFileLayers::enabled())
+		return UPDATE_SLEEP_FOREVER;
+
 	const UnsignedInt frame = TheGameLogic->getFrame();
-	if (RetailFileLayers::enabled() && m_waitingToRebuild && structure->isEffectivelyDead())
+	if (m_waitingToRebuild && structure->isEffectivelyDead())
 	{
 		if (frame < m_rebuildReadyFrame)
 			return UPDATE_SLEEP(m_rebuildReadyFrame - frame);
@@ -627,48 +739,52 @@ UpdateSleepTime GettingBuiltBehavior::update()
 			return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
 		return UPDATE_SLEEP_NONE;
 	}
-	const auto* data = getGettingBuiltBehaviorModuleData();
-
-	if (!m_running || structure->isEffectivelyDead())
+	if (structure->isEffectivelyDead())
 	{
+		releaseBuilder();
 		stopLoop();
 		return UPDATE_SLEEP_FOREVER;
 	}
 
 	if (!structure->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 	{
-		m_running = FALSE;
-		stopLoop();
-		return UPDATE_SLEEP_FOREVER;
+		if (m_running)
+		{
+			m_running = FALSE;
+			m_rebuildingFromRubble = FALSE;
+			m_workerSpawned = FALSE;
+			releaseBuilder();
+			stopLoop();
+		}
+		return updateRepair();
 	}
+	const auto* data = getGettingBuiltBehaviorModuleData();
+	if (!m_running)
+		return getSpawnDelayFrames() != UPDATE_SLEEP_FOREVER && (data->m_timerWithoutWorker || data->m_worker.isNotEmpty())
+			? UPDATE_SLEEP_NONE : UPDATE_SLEEP_FOREVER;
 
 	if (frame < m_startFrame)
 		return UPDATE_SLEEP(m_startFrame - frame);
 
-	if (!m_workerSpawned)
+	if (!m_workerSpawned && !m_rebuildingFromRubble)
 	{
 		m_workerSpawned = TRUE;
-		if (!data->m_worker.isEmpty())
-		{
-			Object* worker = spawnBuilder(*structure);
-			if (worker)
-			{
-				m_workerID = worker->getID();
-				return UPDATE_SLEEP_NONE;
-			}
-		}
-		playLoop(data->m_buildLoop);
+		spawnBuilder(FALSE);
 	}
 
 	if (m_workerID != INVALID_ID)
 	{
 		Object* worker = TheGameLogic->findObjectByID(m_workerID);
-		if (worker && !worker->isEffectivelyDead())
+		auto* ai = worker ? worker->getAIUpdateInterface() : nullptr;
+		auto* dozer = ai ? ai->getDozerAIInterface() : nullptr;
+		if (dozer && !worker->isEffectivelyDead() && worker->getControllingPlayer() == structure->getControllingPlayer() &&
+			dozer->getTaskTarget(DOZER_TASK_BUILD) == structure->getID())
 			return UPDATE_SLEEP_NONE;
-		m_workerID = INVALID_ID;
-		playLoop(data->m_buildLoop);
+		releaseBuilder();
 	}
 
+	playLoop(m_rebuildingFromRubble || structure->testStatus(OBJECT_STATUS_RECONSTRUCTING)
+		? data->m_rebuildLoop : data->m_buildLoop);
 	structure->clearAndSetModelConditionFlags(
 		MAKE_MODELCONDITION_MASK(MODELCONDITION_AWAITING_CONSTRUCTION),
 		MAKE_MODELCONDITION_MASK2(MODELCONDITION_PARTIALLY_CONSTRUCTED, MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED));
@@ -679,8 +795,60 @@ UpdateSleepTime GettingBuiltBehavior::update()
 	{
 		m_running = FALSE;
 		m_rebuildingFromRubble = FALSE;
+		m_workerSpawned = FALSE;
 		stopLoop();
+		return updateRepair();
+	}
+	return UPDATE_SLEEP_NONE;
+}
+
+UpdateSleepTime GettingBuiltBehavior::updateRepair()
+{
+	Object* structure = getObject();
+	const auto* data = getGettingBuiltBehaviorModuleData();
+	const UnsignedInt delay = getSpawnDelayFrames();
+	if (delay == UPDATE_SLEEP_FOREVER || (!data->m_timerWithoutWorker && data->m_worker.isEmpty()))
 		return UPDATE_SLEEP_FOREVER;
+
+	BodyModuleInterface* body = structure->getBodyModule();
+	if (body->getHealth() >= body->getMaxHealth())
+	{
+		m_repairFrame = 0;
+		releaseBuilder();
+		stopLoop();
+		return UPDATE_SLEEP_NONE;
+	}
+
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	const UnsignedInt* damageFrame = body->getLastDamageTimestamp();
+	if (damageFrame)
+		m_repairFrame = *damageFrame + delay;
+	else if (!m_repairFrame)
+		m_repairFrame = frame + delay;
+	if (frame < m_repairFrame)
+	{
+		releaseBuilder();
+		stopLoop();
+		return UPDATE_SLEEP(m_repairFrame - frame);
+	}
+
+	if (m_workerID != INVALID_ID)
+	{
+		Object* worker = TheGameLogic->findObjectByID(m_workerID);
+		auto* ai = worker ? worker->getAIUpdateInterface() : nullptr;
+		auto* dozer = ai ? ai->getDozerAIInterface() : nullptr;
+		if (dozer && !worker->isEffectivelyDead() && worker->getControllingPlayer() == structure->getControllingPlayer() &&
+			dozer->getTaskTarget(DOZER_TASK_REPAIR) == structure->getID())
+			return UPDATE_SLEEP_NONE;
+		releaseBuilder();
+	}
+	if (!data->m_worker.isEmpty() && spawnBuilder(TRUE))
+		return UPDATE_SLEEP_NONE;
+	if (data->m_timerWithoutWorker)
+	{
+		playLoop(data->m_repairLoop);
+		const Real duration = data->m_rebuildTime * LOGICFRAMES_PER_SECOND;
+		body->internalChangeHealth(body->getMaxHealth() / std::max(1.0f, duration));
 	}
 	return UPDATE_SLEEP_NONE;
 }
@@ -710,7 +878,9 @@ void GettingBuiltBehavior::xferRetailBlocks(Xfer* xfer, Bool present)
 		{
 			m_workerID = INVALID_ID;
 			m_workerSpawned = FALSE;
-		} }
+		} },
+		{ "repair-timer", [this](Xfer* x) { x->xferUnsignedInt(&m_repairFrame); },
+			[this] { m_repairFrame = 0; } }
 	});
 }
 
@@ -851,4 +1021,48 @@ void WallUpgradeUpdate::xfer(Xfer* xfer)
 void WallUpgradeUpdate::loadPostProcess()
 {
 	UpdateModule::loadPostProcess();
+}
+
+Bool DozerAIUpdate::findRetailBuildContact(const Object& builder, const Object& target, Coord3D& position)
+{
+	if (!RetailFileLayers::enabled())
+		return FALSE;
+	const auto* ai = builder.getAIUpdateInterface();
+	const auto* dozer = ai ? ai->getDozerAIInterface() : nullptr;
+	UnsignedInt mask = dozer ? dozer->getSpecialContactPoints() : 0;
+	if (const auto* horde = HordeWorkerAIUpdate::find(builder.getContainedBy()))
+		mask |= horde->getSpecialContactPoints();
+	if (!mask)
+		return FALSE;
+
+	FindPositionOptions options;
+	options.maxRadius = 20.0f;
+	options.maxZDelta = 10.0f;
+	options.startAngle = 0.0f;
+	options.sourceToPathToDest = &builder;
+	if (builder.isUsingAirborneLocomotor())
+		options.ignoreObject = &target;
+
+	Real closest = 0.0f;
+	Bool found = FALSE;
+	for (const auto& contact : target.getTemplate()->getRotWKObjectData().geometryContactPoints)
+	{
+		if (!(contact.flags & mask))
+			continue;
+		Vector3 world;
+		Matrix3D::Transform_Vector(*target.getTransformMatrix(),
+			Vector3(contact.position.x, contact.position.y, contact.position.z), &world);
+		const Coord3D contactPosition = {world.X, world.Y, world.Z};
+		Coord3D candidate;
+		if (!ThePartitionManager->findPositionAround(&contactPosition, &options, &candidate))
+			continue;
+		const Real distance = sqr(builder.getPosition()->x - candidate.x) + sqr(builder.getPosition()->y - candidate.y);
+		if (!found || distance < closest)
+		{
+			found = TRUE;
+			closest = distance;
+			position = candidate;
+		}
+	}
+	return found;
 }

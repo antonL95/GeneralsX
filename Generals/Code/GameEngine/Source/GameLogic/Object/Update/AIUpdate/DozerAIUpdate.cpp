@@ -550,6 +550,8 @@ StateReturnType DozerActionDoActionState::update()
 			{
 				if( ai->isIdle() )
 				{
+					if (RetailFileLayers::enabled() && GettingBuiltBehavior::takeOverConstruction(*goalObject))
+						return STATE_SUCCESS;
 					dozerAI->setBuildSubTask( DOZER_DO_BUILD_AT_DOCK );
 					// Get the audio sound and start playing the construction sound (get the sound
 					// from the building itself)
@@ -567,6 +569,7 @@ StateReturnType DozerActionDoActionState::update()
 
 				// increase the construction percent of the goal object
 				Int framesToBuild = goalObject->getTemplate()->calcTimeToBuild( dozer->getControllingPlayer() );
+				framesToBuild = GettingBuiltBehavior::getConstructionFrames(*goalObject, framesToBuild);
 				Real percentProgressThisFrame = WWMath::Div_FixNaN(100.0f, (Real)framesToBuild, 100.0f);
 				goalObject->setConstructionPercent( goalObject->getConstructionPercent() +
 																						percentProgressThisFrame );
@@ -583,7 +586,8 @@ StateReturnType DozerActionDoActionState::update()
 				// since we've just actually contributed a "piece" to this building, we'll say that
 				// we are now the producer and the builder
 				//
-				goalObject->setProducer( dozer );
+				if (!RetailFileLayers::enabled() || !GettingBuiltBehavior::isAuthoredWorker(*goalObject, *dozer))
+					goalObject->setProducer(dozer);
 				goalObject->setBuilder( dozer );
 
 				// check for construction complete
@@ -1924,6 +1928,8 @@ void DozerAIUpdate::privateResumeConstruction( Object *obj, CommandSourceType cm
 //-------------------------------------------------------------------------------------------------
 /*static*/ Bool DozerAIUpdate::findGoodBuildOrRepairPosition(const Object* me, const Object* target, Coord3D& positionOut)
 {
+	if (RetailFileLayers::enabled() && findRetailBuildContact(*me, *target, positionOut))
+		return TRUE;
 	// The place we go to build or repair is the closest spot from us to them
 	Coord3D ourPosition = *me->getPosition();
 	Coord3D theirPosition = *target->getPosition();

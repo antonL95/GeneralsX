@@ -2,7 +2,7 @@
 
 #include "GameLogic/Module/AIUpdate.h"
 
-class HordeAIUpdateModuleData final : public AIUpdateModuleData
+class HordeAIUpdateModuleData : public AIUpdateModuleData
 {
 public:
 	static void buildFieldParse(MultiIniFieldParse& p);
@@ -11,7 +11,7 @@ public:
 	Real m_comboLocoAttackDistance = 0.0f;
 };
 
-class HordeAIUpdate final : public AIUpdateInterface
+class HordeAIUpdate : public AIUpdateInterface
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(HordeAIUpdate, "HordeAIUpdate")
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(HordeAIUpdate, HordeAIUpdateModuleData)

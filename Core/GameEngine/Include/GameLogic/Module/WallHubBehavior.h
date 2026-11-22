@@ -70,8 +70,8 @@ public:
 	AsciiString m_buildLoop;
 	AsciiString m_repairLoop;
 	AsciiString m_rebuildLoop;
-	Real m_spawnTimer = -1.0f;
-	Real m_rebuildTime = 0.0f;
+	Real m_spawnTimer = 30.0f;
+	Real m_rebuildTime = 60.0f;
 	Bool m_timerWithoutWorker = FALSE;
 	Bool m_rebuildWhenDead = FALSE;
 	Bool m_testFaction = FALSE;
@@ -93,7 +93,15 @@ public:
 	static Bool startRebuild(Object& structure);
 	static Bool canOrderRebuild(const Object* structure, const Player* owner);
 	static void onRubbleEntered(Object& structure);
-	static Object* spawnBuilder(Object& structure);
+	static Bool beginConstruction(Object& structure);
+	static Bool takeOverConstruction(Object& structure);
+	static Bool hasDelegatedConstruction(ObjectID builder);
+	static Bool isAuthoredWorker(const Object& structure, const Object& worker);
+	static Int getConstructionFrames(const Object& structure, Int fallback);
+	Bool managesConstruction() const { return m_running; }
+	const AsciiString* getActiveLoop() const { return m_currentLoop; }
+	void onObjectCreated() override;
+	void onDelete() override;
 	static UnsignedInt constructionRefund(const Object& structure, const Player& player);
 	ObjectID getSpan() const { return m_span; }
 	UnsignedInt getRebuildFrames() const;
@@ -104,7 +112,11 @@ public:
 
 private:
 	Bool canRebuildNow() const;
+	UnsignedInt getSpawnDelayFrames() const;
 	void xferRetailBlocks(Xfer* xfer, Bool present);
+	Object* spawnBuilder(Bool repair);
+	void releaseBuilder();
+	UpdateSleepTime updateRepair();
 	void playLoop(const AsciiString& name);
 	void stopLoop();
 
@@ -118,6 +130,8 @@ private:
 	UnsignedInt m_rebuildReadyFrame = 0;
 	ObjectID m_workerID = INVALID_ID;
 	Bool m_workerSpawned = FALSE;
+	UnsignedInt m_repairFrame = 0;
+	const AsciiString* m_currentLoop = nullptr;
 	UnsignedInt m_loopHandle = 0;
 };
 

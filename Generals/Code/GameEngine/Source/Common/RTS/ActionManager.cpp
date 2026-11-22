@@ -40,6 +40,8 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/WallHubBehavior.h"
+#include "GameLogic/Module/HordeWorkerAIUpdate.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
@@ -381,15 +383,19 @@ Bool ActionManager::canRepairObject( const Object *obj, const Object *objectToRe
 	if( obj == nullptr || objectToRepair == nullptr )
 		return FALSE;
 
-	if( RetailFileLayers::enabled() )
+	if( RetailFileLayers::enabled() && !GettingBuiltBehavior::isAuthoredWorker(*objectToRepair, *obj) )
 	{
-		const CommandSet *commands = TheControlBar ? TheControlBar->findCommandSet( obj->getCommandSetString() ) : nullptr;
+		const Object* source = HordeWorkerAIUpdate::find(obj->getContainedBy()) ? obj->getContainedBy() : obj;
+		const CommandSet* commands = TheControlBar ? TheControlBar->findCommandSet(source->getCommandSetString()) : nullptr;
 		Bool allowsRepair = FALSE;
 		for( Int i = 0; commands && i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i )
 		{
 			const CommandButton *button = commands->getCommandButton( i );
-			if( button && button->getCommandType() == GUI_COMMAND_START_NEIGHBORHOOD_REPAIR &&
-				(button->getOptions() & NEED_TARGET_ALLY_OBJECT) )
+			if (!button || !(button->getOptions() & NEED_TARGET_ALLY_OBJECT))
+				continue;
+			const auto* power = button->getSpecialPowerTemplate();
+			if (button->getCommandType() == GUI_COMMAND_START_NEIGHBORHOOD_REPAIR ||
+				(power && power->getSpecialPowerType() == SPECIAL_REPAIR_STRUCTURE && source->getSpecialPowerModule(power)))
 			{
 				allowsRepair = TRUE;
 				break;
@@ -449,7 +455,7 @@ Bool ActionManager::canRepairObject( const Object *obj, const Object *objectToRe
 	if (isObjectShroudedForAction(obj, objectToRepair, commandSource))
 		return FALSE;
 
-	if( obj->getContainedBy() )
+	if (obj->getContainedBy() && !HordeWorkerAIUpdate::find(obj->getContainedBy()))
 	{
 		// We can't heal things while in a transport (especially our own transport, you cheater)
 		return FALSE;

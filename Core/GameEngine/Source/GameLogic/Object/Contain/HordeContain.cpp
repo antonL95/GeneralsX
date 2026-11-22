@@ -18,6 +18,8 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/HordeWorkerAIUpdate.h"
+#include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -1401,6 +1403,13 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	const Object* horde = getObject();
 	if (horde->isEffectivelyDead() || (getMemberSlot(member->getID()) < 0 && !isBannerCarrier(member)))
 		return FALSE;
+	if (HordeWorkerAIUpdate::find(horde))
+	{
+		const auto* ai = member->getAIUpdateInterface();
+		const auto* worker = ai ? ai->getDozerAIInterface() : nullptr;
+		if (worker && worker->getCurrentTask() == DOZER_TASK_REPAIR)
+			return FALSE;
+	}
 
 	const Coord3D& position = *member->getPosition();
 	if (const auto move = m_backingMoves.find(member->getID());
