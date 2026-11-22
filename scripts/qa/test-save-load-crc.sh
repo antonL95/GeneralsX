@@ -205,6 +205,13 @@ for phase in continue resume; do
             expect "$phase" "TEST save-load obstacle frame=$obstacle_frame template=CaHRestlessDeadBarrow ownsCell=1"
         fi
     done
+    if [ "$mode" = training ] && [ "$end" -ge 254 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 254 ]; }; then
+        horde=$(sed -n 's/^TEST frame 235: create PartitionScaleHorde for Player_1 id=\([0-9]*\) .*/\1/p' "$out/continue.log")
+        bulwark=$(sed -n 's/^TEST frame 230: create RetaliationSaveBulwark for PlyrCreeps id=\([0-9]*\) .*/\1/p' "$out/continue.log")
+        test -n "$horde" && test -n "$bulwark"
+        grep -E "^TEST damage frame=254 weapon=FortressArrowTowerBowWarhead .*source=$bulwark victim=[0-9]+\(RetaliationSaveCottage\) .*dealt=30\.00 " "$out/$phase.log"
+        expect "$phase" "TEST horde retaliate 254 $horde $bulwark"
+    fi
     if [ "$mode" = training ] && [ "$end" -ge 285 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 285 ]; }; then
         expect "$phase" 'TEST frame 285: builderscriptmove object 182 to 1933.7 1774.0'
     fi

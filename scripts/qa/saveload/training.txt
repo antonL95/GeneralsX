@@ -75,6 +75,8 @@
 207 pkg23-sell Player_1 Pkg23DiscountedFarm 0
 220 pkg08-queue-state Player_1 DolAmrothPorter 0
 220 create Player_1 DaleShoremansCottageFoundation 0 1870,2530,0
+220 create Player_1 RetaliationSaveCottage 0 2900,1900,0
+220 snapshot-register-footprint Player_1 RetaliationSaveCottage 0
 221 objupgrade Player_1 DaleShoremansCottageFoundation 0 Upgrade_ObjectUnderAIControl
 221 create Player_1 Pkg23TributeCartProducer 0 1530,2860,0
 222 pkg23-display Player_1 DaleShoremansCottageFoundation 0 -
@@ -84,6 +86,8 @@
 230 create PlyrCreeps Pkg23PillageTarget 0 3060,1900,0
 230 create Player_1 DaleShoremansCottageFoundation 0 1690,2490,0
 230 placement-ocl Player_1 SaveLoadStampCaster 0 SaveLoadPlacementStamp 2030 1620
+230 create PlyrCreeps RetaliationSaveBulwark 0 2980,1800,0
+230 snapshot-register-footprint PlyrCreeps RetaliationSaveBulwark 0
 231 pkg23-set-cash PlyrCreeps - 0 100
 231 pkg23-cash Player_1 - 0 cart-before
 232 queuebutton Player_1 Pkg23TributeCartProducer 0 Command_BuildHaradTributeCart
