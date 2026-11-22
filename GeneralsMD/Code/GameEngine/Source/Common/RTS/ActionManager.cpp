@@ -1583,6 +1583,9 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 			}
 		}
 
+		if (RetailFileLayers::enabled() && !mod->isRetailCastAllowed(commandOptions))
+			return false;
+
 		if( RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2 )
 		{
 			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
@@ -1759,7 +1762,7 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 				return FALSE;
 		}
 
-		if (RetailFileLayers::enabled() && !mod->isValidPowerTarget(target))
+		if (RetailFileLayers::enabled() && (!mod->isRetailCastAllowed(commandOptions) || !mod->isValidPowerTarget(target)))
 			return FALSE;
 
 		if( RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2 )
@@ -2020,6 +2023,9 @@ Bool ActionManager::canDoSpecialPower( const Object *obj, const SpecialPowerTemp
 				return false;
 			}
 		}
+
+		if (RetailFileLayers::enabled() && !mod->isRetailCastAllowed(commandOptions))
+			return false;
 
 		if( RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2 )
 		{

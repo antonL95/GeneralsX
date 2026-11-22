@@ -1399,6 +1399,9 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 			}
 		}
 
+		if (RetailFileLayers::enabled() && !mod->isRetailCastAllowed(commandOptions))
+			return false;
+
 		if (RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2)
 			return spTemplate->isValidRetailTarget(obj, nullptr, loc, commandSource);
 
@@ -1504,6 +1507,9 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 		// if the target is in the shroud, we can't do anything
 		if (isObjectShroudedForAction(obj, target, commandSource))
 			return FALSE;
+
+		if (RetailFileLayers::enabled() && !mod->isRetailCastAllowed(commandOptions))
+			return false;
 
 		if (RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2)
 			return spTemplate->isValidRetailTarget(obj, target, nullptr, commandSource) && mod->isValidPowerTarget(target);
@@ -1716,6 +1722,9 @@ Bool ActionManager::canDoSpecialPower( const Object *obj, const SpecialPowerTemp
 				return false;
 			}
 		}
+
+		if (RetailFileLayers::enabled() && !mod->isRetailCastAllowed(commandOptions))
+			return false;
 
 		if (RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2)
 			return spTemplate->isValidRetailTarget(obj, nullptr, nullptr, commandSource);

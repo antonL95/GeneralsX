@@ -36,10 +36,12 @@ HordeDispatchSpecialPower::~HordeDispatchSpecialPower() = default;
 void HordeDispatchSpecialPower::doSpecialPower(UnsignedInt commandOptions)
 {
 	Object* horde = getObject();
-	if (!horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || m_pausedCount > 0 || horde->isDisabled())
+	if (!horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || m_pausedCount > 0 || horde->isDisabled() || !isRetailCastAllowed(commandOptions))
 		return;
 
 	SpecialPowerModule::doSpecialPower(commandOptions);
+	if (!wasLastCastAccepted())
+		return;
 	dispatchToMembers(horde, getSpecialPowerTemplate(), [commandOptions](SpecialPowerModuleInterface* member)
 	{
 		member->doSpecialPower(commandOptions);
@@ -49,23 +51,27 @@ void HordeDispatchSpecialPower::doSpecialPower(UnsignedInt commandOptions)
 void HordeDispatchSpecialPower::doSpecialPowerAtObject(Object* target, UnsignedInt commandOptions)
 {
 	Object* horde = getObject();
-	if (!target || !horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || m_pausedCount > 0 || horde->isDisabled())
+	if (!target || !horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || m_pausedCount > 0 || horde->isDisabled() || !isRetailCastAllowed(commandOptions))
 		return;
 
+	SpecialPowerModule::doSpecialPowerAtObject(target, commandOptions);
+	if (!wasLastCastAccepted())
+		return;
 	dispatchToMembers(horde, getSpecialPowerTemplate(), [target, commandOptions](SpecialPowerModuleInterface* member)
 	{
 		member->doSpecialPowerAtObject(target, commandOptions);
 	});
-	SpecialPowerModule::doSpecialPowerAtObject(target, commandOptions);
 }
 
 void HordeDispatchSpecialPower::doSpecialPowerAtLocation(const Coord3D* position, Real angle, UnsignedInt commandOptions)
 {
 	Object* horde = getObject();
-	if (!position || !horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || m_pausedCount > 0 || horde->isDisabled())
+	if (!position || !horde->isKindOf(KINDOF_HORDE) || !horde->getContain() || m_pausedCount > 0 || horde->isDisabled() || !isRetailCastAllowed(commandOptions))
 		return;
 
 	SpecialPowerModule::doSpecialPowerAtLocation(position, angle, commandOptions);
+	if (!wasLastCastAccepted())
+		return;
 	dispatchToMembers(horde, getSpecialPowerTemplate(), [position, angle, commandOptions](SpecialPowerModuleInterface* member)
 	{
 		member->doSpecialPowerAtLocation(position, angle, commandOptions);

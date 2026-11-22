@@ -863,13 +863,13 @@ void ActivateModuleSpecialPower::triggerAbilityEffect()
 			switch (entry.m_position)
 			{
 				case ActivateModuleEntry::POSITION_OBJECT:
-					power->doSpecialPowerAtLocation(&ownPos, INVALID_ANGLE, 0);
+					power->doSpecialPowerAtLocation(&ownPos, INVALID_ANGLE, COMMAND_OPTION_INTERNAL_AUTO);
 					break;
 				case ActivateModuleEntry::POSITION_TARGET:
-					power->doSpecialPowerAtLocation(&targetPos, INVALID_ANGLE, 0);
+					power->doSpecialPowerAtLocation(&targetPos, INVALID_ANGLE, COMMAND_OPTION_INTERNAL_AUTO);
 					break;
 				default:
-					power->doSpecialPower(0);
+					power->doSpecialPower(COMMAND_OPTION_INTERNAL_AUTO);
 					break;
 			}
 			break;
@@ -1121,7 +1121,7 @@ ModuleData* PlayerUpgradeSpecialPower::friend_newModuleData(INI* ini)
 void PlayerUpgradeSpecialPower::onScienceUnlocked()
 {
 	if (getObject() == getObject()->getControllingPlayer()->getRetailSpellBook())
-		doSpecialPower(0);
+		doSpecialPower(COMMAND_OPTION_INTERNAL_AUTO);
 }
 
 const std::vector<AsciiString>& PlayerUpgradeSpecialPower::getGrantedUpgradeNames() const
@@ -1689,12 +1689,17 @@ void PlayerHealSpecialPower::doSpecialPowerAtObject(Object* obj, UnsignedInt com
 
 void PlayerHealSpecialPower::doSpecialPowerAtLocation(const Coord3D* loc, Real angle, UnsignedInt commandOptions)
 {
-	if (!loc || m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank())
+	if (!loc || m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions))
 		return;
 	const Coord3D center = *loc;
 	m_pendingCenter = center;
 	m_hasPendingCenter = TRUE;
 	SpecialPowerModule::doSpecialPowerAtLocation(&center, angle, commandOptions);
+	if (!wasLastCastAccepted())
+	{
+		m_hasPendingCenter = FALSE;
+		return;
+	}
 	if (!getPlayerHealSpecialPowerModuleData()->m_updateModuleStartsAttack && m_hasPendingCenter)
 	{
 		m_hasPendingCenter = FALSE;

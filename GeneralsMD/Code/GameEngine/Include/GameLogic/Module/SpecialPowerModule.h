@@ -65,6 +65,9 @@ public:
 	virtual void pauseCountdown( Bool pause ) = 0;
 	virtual void doSpecialPower( UnsignedInt commandOptions ) = 0;
 	virtual Bool isValidPowerTarget(const Object*) const { return TRUE; }
+	virtual Bool isRetailCastAllowed(UnsignedInt commandOptions = 0) const { return TRUE; }
+	virtual Bool wasLastCastAccepted() const { return FALSE; }
+	virtual void resetLastCastAccepted() {}
 	virtual void doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions ) = 0;
 	virtual void doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions ) = 0;
 	virtual void doSpecialPowerUsingWaypoints( const Waypoint *way, UnsignedInt commandOptions ) = 0;
@@ -179,6 +182,9 @@ public:
 	// and carry out the special power executions
 	//
 	virtual void doSpecialPower( UnsignedInt commandOptions ) override;
+	Bool isRetailCastAllowed(UnsignedInt commandOptions = 0) const override;
+	Bool wasLastCastAccepted() const override { return m_lastCastAccepted; }
+	void resetLastCastAccepted() override { m_lastCastAccepted = FALSE; }
 	virtual void doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions ) override;
 	virtual void doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions ) override;
 	virtual void doSpecialPowerUsingWaypoints( const Waypoint *way, UnsignedInt commandOptions ) override;
@@ -225,5 +231,6 @@ protected:
 	Int m_pausedCount;									///< Reference count of sources pausing me
 	UnsignedInt m_pausedOnFrame;
 	Real m_pausedPercent;
+	Bool m_lastCastAccepted = FALSE;
 
 };

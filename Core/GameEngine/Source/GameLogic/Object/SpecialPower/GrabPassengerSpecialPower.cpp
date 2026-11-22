@@ -110,7 +110,8 @@ void GrabPassengerSpecialPower::doSpecialPower(UnsignedInt commandOptions)
 
 void GrabPassengerSpecialPower::doSpecialPowerAtLocation(const Coord3D* position, Real, UnsignedInt commandOptions)
 {
-	if (!position || m_pausedCount > 0 || getObject()->isDisabled())
+	m_lastCastAccepted = FALSE;
+	if (!position || m_pausedCount > 0 || getObject()->isDisabled() || !isRetailCastAllowed(commandOptions))
 		return;
 
 	const auto* data = static_cast<const GrabPassengerSpecialPowerModuleData*>(getModuleData());
@@ -168,8 +169,9 @@ void GrabPassengerSpecialPower::doSpecialPowerAtObject(Object* requested, Unsign
 
 Bool GrabPassengerSpecialPower::requestGrab(Object* requested, UnsignedInt commandOptions)
 {
+	m_lastCastAccepted = FALSE;
 	Object* caster = getObject();
-	if (m_pausedCount > 0 || caster->isDisabled())
+	if (m_pausedCount > 0 || caster->isDisabled() || !isRetailCastAllowed(commandOptions))
 		return FALSE;
 	const Object* target = findGrabTarget(requested);
 	if (!target)
@@ -189,7 +191,8 @@ Bool GrabPassengerSpecialPower::requestGrab(Object* requested, UnsignedInt comma
 	}
 	if (accepted && TheFXListStore)
 		FXList::doFXObj(TheFXListStore->findFXList(getPowerModuleData()->m_initiateFX.str()), caster);
-	return accepted || !getPowerModuleData()->m_updateModuleStartsAttack;
+	m_lastCastAccepted = accepted || !getPowerModuleData()->m_updateModuleStartsAttack;
+	return m_lastCastAccepted;
 }
 
 void GrabPassengerSpecialPower::applyPowerEffect(const Coord3D*)

@@ -17,6 +17,7 @@
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/LogicRandomValue.h"
@@ -316,7 +317,7 @@ void dispatch(Object& object, const char* event)
 				break;
 			case Action::Power:
 				if (const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate(operation.name.c_str()))
-					object.doSpecialPower(power, 0, TRUE);
+					object.doSpecialPower(power, COMMAND_OPTION_INTERNAL_AUTO, TRUE);
 				break;
 			case Action::Visibility:
 				if (operation.hide)

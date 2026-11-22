@@ -665,89 +665,99 @@ void SpecialPowerModule::aboutToDoSpecialPower( const Coord3D *location )
 //then all we do is initiate the special power, and trust that the update module will
 //do the rest.
 //-------------------------------------------------------------------------------------------------
+Bool SpecialPowerModule::isRetailCastAllowed(UnsignedInt commandOptions) const
+{
+	if ((commandOptions & COMMAND_OPTION_INTERNAL_AUTO) != 0)
+		return TRUE;
+	if (!RetailFileLayers::enabled() || !TheRetailCommandCatalog)
+		return TRUE;
+	const Object* obj = getObject();
+	const SpecialPowerTemplate* power = getSpecialPowerTemplate();
+	if (!obj || !power)
+		return TRUE;
+	const CommandButton* button = TheRetailCommandCatalog->findPowerButton(obj, power);
+	if (!button)
+		return TRUE;
+	return button->isRetailButtonUsable();
+}
+
 void SpecialPowerModule::doSpecialPower( UnsignedInt commandOptions )
 {
-	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank()) {
+	m_lastCastAccepted = FALSE;
+	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)) {
 		return;
 	}
 
-	//This tells the update module that we want to do our special power. The update modules
-	//will then start processing each frame.
-	initiateIntentToDoSpecialPower( nullptr, nullptr, nullptr, commandOptions );
+	const Bool initiated = initiateIntentToDoSpecialPower( nullptr, nullptr, nullptr, commandOptions );
 
-	//Only trigger the special power immediately if the updatemodule doesn't start the attack.
-	//An example of a case that wouldn't trigger immediately is for a unit that needs to
-	//close to range before firing the special attack. A case that would trigger immediately
-	//is the napalm strike. If we don't call this now, it's up to the update module to do so.
 	if( !getSpecialPowerModuleData()->m_updateModuleStartsAttack )
 	{
-		triggerSpecialPower( nullptr );// Location-less trigger
+		triggerSpecialPower( nullptr );
+		m_lastCastAccepted = TRUE;
+	}
+	else
+	{
+		m_lastCastAccepted = initiated;
 	}
 }
 
-//-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
 void SpecialPowerModule::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions )
 {
-	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank()) {
+	m_lastCastAccepted = FALSE;
+	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)) {
 		return;
 	}
 
-	//This tells the update module that we want to do our special power. The update modules
-	//will then start processing each frame.
-	initiateIntentToDoSpecialPower( obj, nullptr, nullptr, commandOptions );
+	const Bool initiated = initiateIntentToDoSpecialPower( obj, nullptr, nullptr, commandOptions );
 
-	//Only trigger the special power immediately if the updatemodule doesn't start the attack.
-	//An example of a case that wouldn't trigger immediately is for a unit that needs to
-	//close to range before firing the special attack. A case that would trigger immediately
-	//is the napalm strike. If we don't call this now, it's up to the update module to do so.
 	if( !getSpecialPowerModuleData()->m_updateModuleStartsAttack )
 	{
 		triggerSpecialPower( obj->getPosition() );
+		m_lastCastAccepted = TRUE;
+	}
+	else
+	{
+		m_lastCastAccepted = initiated;
 	}
 }
 
-//-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
 void SpecialPowerModule::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank()) {
+	m_lastCastAccepted = FALSE;
+	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)) {
 		return;
 	}
 
-	//This tells the update module that we want to do our special power. The update modules
-	//will then start processing each frame.
-	initiateIntentToDoSpecialPower( nullptr, loc, nullptr, commandOptions );
+	const Bool initiated = initiateIntentToDoSpecialPower( nullptr, loc, nullptr, commandOptions );
 
-	//Only trigger the special power immediately if the updatemodule doesn't start the attack.
-	//An example of a case that wouldn't trigger immediately is for a unit that needs to
-	//close to range before firing the special attack. A case that would trigger immediately
-	//is the napalm strike. If we don't call this now, it's up to the update module to do so.
 	if( !getSpecialPowerModuleData()->m_updateModuleStartsAttack )
 	{
 		triggerSpecialPower( loc );
+		m_lastCastAccepted = TRUE;
+	}
+	else
+	{
+		m_lastCastAccepted = initiated;
 	}
 }
 
-//-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
 void SpecialPowerModule::doSpecialPowerUsingWaypoints( const Waypoint *way, UnsignedInt commandOptions )
 {
-	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank()) {
+	m_lastCastAccepted = FALSE;
+	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)) {
 		return;
 	}
 
-	//This tells the update module that we want to do our special power. The update modules
-	//will then start processing each frame.
-	initiateIntentToDoSpecialPower( nullptr, nullptr, way, commandOptions );
+	const Bool initiated = initiateIntentToDoSpecialPower( nullptr, nullptr, way, commandOptions );
 
-	//Only trigger the special power immediately if the updatemodule doesn't start the attack.
-	//An example of a case that wouldn't trigger immediately is for a unit that needs to
-	//close to range before firing the special attack. A case that would trigger immediately
-	//is the napalm strike. If we don't call this now, it's up to the update module to do so.
 	if( !getSpecialPowerModuleData()->m_updateModuleStartsAttack )
 	{
-		triggerSpecialPower( nullptr );// This type doesn't create view objects
+		triggerSpecialPower( nullptr );
+		m_lastCastAccepted = TRUE;
+	}
+	else
+	{
+		m_lastCastAccepted = initiated;
 	}
 }
 

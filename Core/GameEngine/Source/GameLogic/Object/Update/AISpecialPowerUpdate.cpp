@@ -236,7 +236,8 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		TheRetailCommandCatalog->findPowerButton(source, power) != button)
 		return checkAgain;
 	const auto* module = source->getSpecialPowerModule(power);
-	if (!module || !module->isReady() || !TheSpecialPowerStore->canUseSpecialPower(source, power))
+	if (!module || !module->isReady() || !module->isRetailCastAllowed(button->getOptions()) ||
+		!TheSpecialPowerStore->canUseSpecialPower(source, power))
 		return checkAgain;
 
 	const std::string_view policy(specialPowerAITypes[data->m_specialPowerAIType]);

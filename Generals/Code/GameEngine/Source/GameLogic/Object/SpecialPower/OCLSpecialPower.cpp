@@ -148,15 +148,16 @@ OCLSpecialPower::~OCLSpecialPower()
 //-------------------------------------------------------------------------------------------------
 void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled() || !meetsRequiredRank())
+	if (getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions))
 		return;
 
-	// sanity
 	if( loc == nullptr )
 		return;
 
-	// call the base class action cause we are *EXTENDING* functionality
 	SpecialPowerModule::doSpecialPowerAtLocation( loc, angle, commandOptions );
+
+	if (!wasLastCastAccepted())
+		return;
 
 	const ObjectCreationList* ocl = findOCL();
 
@@ -220,14 +221,16 @@ void OCLSpecialPower::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOp
 // ------------------------------------------------------------------------------------------------
 void OCLSpecialPower::doSpecialPower( UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled() || !meetsRequiredRank())
+	if (getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions))
 		return;
 
 	Coord3D creationCoord;
 	creationCoord.set( *getObject()->getPosition() );
 
-	// call the base class action cause we are *EXTENDING* functionality
 	SpecialPowerModule::doSpecialPowerAtLocation( &creationCoord, INVALID_ANGLE, commandOptions );
+
+	if (!wasLastCastAccepted())
+		return;
 
 	const ObjectCreationList* ocl = findOCL();
 	ObjectCreationList::create( ocl, getObject(), &creationCoord, &creationCoord, false );

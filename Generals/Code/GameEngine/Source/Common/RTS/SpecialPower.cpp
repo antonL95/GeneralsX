@@ -35,6 +35,7 @@
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/ControlBar.h"
 #include "GameLogic/Object.h"
 #include "Common/BitFlagsIO.h"
 
@@ -474,6 +475,12 @@ Bool SpecialPowerStore::canUseSpecialPower( Object *obj, const SpecialPowerTempl
 	// as a first sanity check, the object must have a module capable of executing the power
 	if( obj->getSpecialPowerModule( specialPowerTemplate ) == nullptr )
 		return FALSE;
+	if (RetailFileLayers::enabled() && TheRetailCommandCatalog)
+	{
+		const CommandButton* button = TheRetailCommandCatalog->findPowerButton(obj, specialPowerTemplate);
+		if (button && (!button->isMountStateAllowed(obj) || !button->isRetailButtonUsable()))
+			return FALSE;
+	}
 
 	//
 	// in order to execute the special powers we have attached special power modules to the objects

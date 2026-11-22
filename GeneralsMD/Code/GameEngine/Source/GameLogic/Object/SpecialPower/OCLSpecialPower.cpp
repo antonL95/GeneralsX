@@ -153,7 +153,7 @@ OCLSpecialPower::~OCLSpecialPower()
 //-------------------------------------------------------------------------------------------------
 void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled() || !meetsRequiredRank())
+	if (getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions))
 		return;
 
 	// sanity
@@ -182,8 +182,7 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 	// call the base class action cause we are *EXTENDING* functionality
 	SpecialPowerModule::doSpecialPowerAtLocation( &targetCoord, angle, commandOptions );
 
-	// GeneralsX @bugfix Copilot 06/09/2026 Do not create an OCL after the base special-power intent was rejected.
-	if (m_availableOnFrame == 0xFFFFFFFF)
+	if (m_availableOnFrame == 0xFFFFFFFF || !wasLastCastAccepted())
 		return;
 
 	const ObjectCreationList* ocl = findOCL();
@@ -245,17 +244,15 @@ void OCLSpecialPower::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOp
 // ------------------------------------------------------------------------------------------------
 void OCLSpecialPower::doSpecialPower( UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled() || !meetsRequiredRank())
+	if (getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions))
 		return;
 
 	Coord3D creationCoord;
 	creationCoord.set( *getObject()->getPosition() );
 
-	// call the base class action cause we are *EXTENDING* functionality
 	SpecialPowerModule::doSpecialPowerAtLocation( &creationCoord, INVALID_ANGLE, commandOptions );
 
-	// GeneralsX @bugfix Copilot 06/09/2026 Do not create a targetless OCL after its intent was rejected.
-	if (m_availableOnFrame == 0xFFFFFFFF)
+	if (m_availableOnFrame == 0xFFFFFFFF || !wasLastCastAccepted())
 		return;
 
 	const ObjectCreationList* ocl = findOCL();
