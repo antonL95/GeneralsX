@@ -578,9 +578,11 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 				static_cast<WeaponModeSpecialPowerUpdate*>(*module)->resolveCastOwner();
 	}
 
-	// If a valid team has been assigned me, then I have a Player I can ask about my starting level
-	const Player* controller = getControllingPlayer();
-	m_experienceTracker->setVeterancyLevel( controller->getProductionVeterancyLevel( getTemplate()->getName() ) );
+	if (!TheGameState || !TheGameState->isInLoadGame())
+	{
+		const Player* controller = getControllingPlayer();
+		m_experienceTracker->setVeterancyLevel(controller->getProductionVeterancyLevel(getTemplate()->getName()));
+	}
 
 	/// allow for inter-Module resolution
 	for (BehaviorModule** b = m_behaviors; *b; ++b)
