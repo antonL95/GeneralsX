@@ -1,0 +1,11 @@
+20 create Player_1 GondorGandalf 0 2520,1010,0
+21 reveal Player_1 GondorGandalf 0
+22 objupgrade Player_1 GondorGandalf 0 Upgrade_ObjectLevel10
+22 objupgrade Player_1 GondorGandalf 0 Upgrade_GandalfWhite
+220 power Player_1 GondorGandalf 0 SpecialAbilityWordOfPower
+223 ability Player_1 GondorGandalf 0
+239 ability Player_1 GondorGandalf 0
+262 ability Player_1 GondorGandalf 0
+272 ability Player_1 GondorGandalf 0
+277 ability Player_1 GondorGandalf 0
+280 ability Player_1 GondorGandalf 0

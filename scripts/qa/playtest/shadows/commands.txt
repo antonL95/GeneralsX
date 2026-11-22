@@ -1,0 +1,2 @@
+11 reveal Player_1 MenPorter 0
+13 create Player_1 GondorFighterHorde 0 945,615,0

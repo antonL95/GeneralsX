@@ -1,0 +1,16 @@
+5 create Player_1 GondorElessar 0 3050,520,0
+5 create Player_1 GondorTowerShieldGuard 0 3000,525,0
+6 reveal Player_1 GondorElessar 0
+102 damage Player_1 GondorElessar 0 700
+103 health Player_1 GondorElessar 0
+105 pkg50-power Player_1 GondorElessar 0 SpecialAbility202ElessarAthelas
+118 health Player_1 GondorElessar 0
+127 particle-systems - - 0 AragornAthelas
+127 particle-systems - - 0 AragornAthelas02
+148 health Player_1 GondorElessar 0
+170 science Player_1 - 0 SCIENCE_Heal
+172 damage Player_1 GondorTowerShieldGuard 0 175
+173 health Player_1 GondorTowerShieldGuard 0
+177 power-cast Player_1 - 1 at 3000 525
+186 health Player_1 GondorTowerShieldGuard 0
+188 particle-systems - - 0 SpellHeal

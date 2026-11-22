@@ -1,0 +1,11 @@
+20 create Player_1 GondorTowerShieldGuardHorde 0 2320,970,0
+20 create Player_1 GondorFountainGuardHorde 0 2320,1110,0
+21 reveal Player_1 GondorTowerShieldGuardHorde 0
+52 builderscriptmove Player_1 GondorTowerShieldGuardHorde 0 - 2560 970
+52 builderscriptmove Player_1 GondorFountainGuardHorde 0 - 2560 1110
+108 builderscriptmove Player_1 GondorTowerShieldGuardHorde 0 - 2415 780
+108 builderscriptmove Player_1 GondorFountainGuardHorde 0 - 2415 1300
+202 pkg07-formation-on Player_1 GondorTowerShieldGuardHorde 0
+202 pkg07-formation-on Player_1 GondorFountainGuardHorde 0
+223 builderscriptmove Player_1 GondorTowerShieldGuardHorde 0 - 2250 900
+223 builderscriptmove Player_1 GondorFountainGuardHorde 0 - 2250 1160
