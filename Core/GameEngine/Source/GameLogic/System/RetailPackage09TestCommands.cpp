@@ -12,6 +12,8 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/TerrainLogic.h"
+
 
 void runRetailPackage09TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame)
 {
@@ -59,9 +61,14 @@ void runRetailPackage09TestCommand(std::string_view action, Object* source, Obje
 		source->getStealth()->disguiseAsObject(target);
 		std::fprintf(stderr, "TEST pkg09 frame=%u disguise=%d\n", frame, source->getStealth()->isDisguised());
 	}
-	else if (action == "pkg09-relation" && target)
-		std::fprintf(stderr, "TEST pkg09 frame=%u relation=%d\n", frame, static_cast<Int>(source->getRelationship(target)));
-	else if (action == "pkg09-move-to" && target)
-		source->setPosition(target->getPosition());
+	else if (action == "pkg09-position")
+	{
+		Coord3D point;
+		if (std::sscanf(argument, "%f,%f", &point.x, &point.y) == 2)
+		{
+			point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+			source->setPosition(&point);
+		}
+	}
 }
 #endif
