@@ -787,9 +787,9 @@ void LANAPI::handleChat( LANMessage *msg, UnsignedInt senderIP )
 void LANAPI::handleRetailGameStart(const RetailLanGameStart& packet, UnsignedInt senderIP)
 {
 	if (packet.type == LANMessage::MSG_RETAIL_GAME_START && !m_inLobby && m_currentGame &&
-		m_currentGame->getIP(0) == senderIP && !m_currentGame->isGameInProgress() &&
+		senderIP && m_currentGame->getIP(0) == senderIP && !m_currentGame->isGameInProgress() &&
 		memchr(packet.options, 0, sizeof(packet.options)) &&
-		ParseGameOptionsString(m_currentGame, AsciiString(packet.options)))
+		ParseGameOptionsString(m_currentGame, AsciiString(packet.options), senderIP))
 		OnGameStart();
 }
 

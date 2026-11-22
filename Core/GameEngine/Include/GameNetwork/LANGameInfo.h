@@ -177,4 +177,4 @@ void LANDisplaySlotList();		///< Displays the slot list according to TheLANGameI
 void LANDisplayGameOptions();	///< Displays the game options according to TheLANGameInfo
 
 AsciiString GenerateGameOptionsString();
-Bool ParseGameOptionsString(LANGameInfo *game, AsciiString options);
+Bool ParseGameOptionsString(LANGameInfo* game, AsciiString options, UnsignedInt startHostIP = 0);

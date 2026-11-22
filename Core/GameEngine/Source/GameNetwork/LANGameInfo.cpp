@@ -281,10 +281,20 @@ AsciiString GenerateGameOptionsString()
 	return GameInfoToAsciiString(TheLAN->GetMyGame(), m_lanMaxOptionsLength, FALSE);
 }
 
-Bool ParseGameOptionsString(LANGameInfo *game, AsciiString options)
+Bool ParseGameOptionsString(LANGameInfo* game, AsciiString options, UnsignedInt startHostIP)
 {
 	if (!TheLAN || !game)
 		return false;
+
+	if (startHostIP)
+	{
+		LANGameInfo roster;
+		roster.enterGame();
+		if (!ParseAsciiStringToGameInfo(&roster, options) ||
+			!roster.getConstLANSlot(0)->isHuman() || roster.getIP(0) != startHostIP ||
+			roster.getLocalSlotNum() <= 0)
+			return false;
+	}
 
 	Int oldLocalSlotNum = (game->isInGame()) ? game->getLocalSlotNum() : -1;
 	Bool wasInGame = oldLocalSlotNum >= 0;
