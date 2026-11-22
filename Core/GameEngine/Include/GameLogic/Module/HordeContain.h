@@ -156,6 +156,7 @@ public:
 		Real facing;
 		Bool hordeMoving;
 		Bool backing;
+		ObjectID backingSource;
 	};
 	Coord3D getMemberPosition(ObjectID id, Bool followLeader) const;
 	Bool getFormationGoal(const Object* member, FormationGoal& goal) const;
@@ -180,8 +181,9 @@ public:
 	static Object* getAnchor(Object* member);
 	static Bool isFlanked(const Object* victim, const Object* attacker, Bool record = TRUE);
 	Bool beginBacking(const Object* source, Bool uncontrollable);
-	Bool updateBacking();
-	void xferRetailFormationCombat(Xfer* xfer);
+	enum class BackingPhase { Available, Backing, Recovered };
+	BackingPhase updateBacking(Object* member);
+	void xferRetailFormationCombat(Xfer* xfer, Bool includeBackingSource = TRUE);
 	static void applyWeaponDamage(Object* victim, DamageInfo& damage, Bool contactHit);
 	static Drawable* resolveSelection(Drawable* draw);
 
@@ -225,6 +227,7 @@ private:
 		UnsignedInt deadline;
 	};
 	std::map<ObjectID, BackingMove> m_backingMoves;
+	ObjectID m_backingSource = INVALID_ID;
 };
 
 class BannerCarrierUpdateModuleData : public UpdateModuleData

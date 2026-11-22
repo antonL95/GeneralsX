@@ -2293,7 +2293,7 @@ Bool AIUpdateInterface::steerInFormation()
 	const Real maxSpeed = m_curLocomotor->getMaxSpeedForCondition(obj->getBodyModule()->getDamageState());
 	const Real speed = goal.speed < maxSpeed ? goal.speed : maxSpeed;
 	if (goal.backing)
-		m_curLocomotor->locoUpdate_moveTowardsFormationSlot(obj, goal.position, goal.distance, speed, TRUE);
+		m_curLocomotor->locoUpdate_moveTowardsFormationSlot(obj, goal.position, goal.distance, speed, TRUE, goal.backingSource);
 	else if (m_curLocomotor->getAppearance() == LOCO_LEGS_TWO)
 	{
 		Bool blocked = FALSE;
@@ -3336,14 +3336,19 @@ void AIUpdateInterface::privateMoveToAndEvacuateAndExit( const Coord3D *pos, Com
 /**
  * Enter idle state.
  */
+void AIUpdateInterface::idleSelf(CommandSourceType cmdSource)
+{
+	getStateMachine()->clear();
+	getStateMachine()->setState(AI_IDLE);
+	setLastCommandSource(cmdSource);
+}
+
 void AIUpdateInterface::privateIdle(CommandSourceType cmdSource)
 {
 	if (getObject()->isKindOf(KINDOF_PROJECTILE))
 		return;
 
-	getStateMachine()->clear();
-	getStateMachine()->setState( AI_IDLE );
-	setLastCommandSource( cmdSource );
+	idleSelf(cmdSource);
 
 	ContainModuleInterface *contain = getObject()->getContain();
 	if (contain)
@@ -5830,7 +5835,7 @@ Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration,
 		auto* horde = const_cast<HordeContain*>(HordeContain::get(self));
 		if (horde && horde->beginBacking(source, condition == MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID))
 		{
-			privateIdle(CMD_FROM_SCRIPT);
+			idleSelf(CMD_FROM_SCRIPT);
 			m_fearUntil = now + duration;
 			self->setModelConditionState(condition);
 			wakeUpNow();

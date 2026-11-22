@@ -520,7 +520,11 @@ void HordeContain::onRemoving( Object *rider )
 		m_memberSlots.erase(slot);
 	}
 	if (m_backingMoves.erase(rider->getID()))
+	{
 		rider->clearModelConditionState(MODELCONDITION_BACKING_UP);
+		if (m_backingMoves.empty())
+			m_backingSource = INVALID_ID;
+	}
 	updateRankWeaponConditions(rider);
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained, false );
 	OpenContain::onRemoving( rider );
@@ -572,7 +576,7 @@ void HordeContain::crc( Xfer *xfer )
 	}
 }
 
-void HordeContain::xferRetailFormationCombat(Xfer* xfer)
+void HordeContain::xferRetailFormationCombat(Xfer* xfer, Bool includeBackingSource)
 {
 	const Bool loading = xfer->getXferMode() == XFER_LOAD;
 	UnsignedInt count = static_cast<UnsignedInt>(m_flankHeadings.size());
@@ -633,11 +637,13 @@ void HordeContain::xferRetailFormationCombat(Xfer* xfer)
 			xfer->xferUnsignedInt(&move.deadline);
 		}
 	}
+	if (includeBackingSource)
+		xfer->xferObjectID(&m_backingSource);
 }
 
 void HordeContain::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 3;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -675,7 +681,7 @@ void HordeContain::xfer( Xfer *xfer )
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_lastMemberDamageFrame = 0;
 	if (version >= 6)
-		xferRetailFormationCombat(xfer);
+		xferRetailFormationCombat(xfer, version >= 7);
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		m_formationOverride = switched ? findAlternateFormation() : nullptr;
@@ -857,35 +863,35 @@ Bool HordeContain::beginBacking(const Object* source, Bool uncontrollable)
 		const UnsignedInt travel = static_cast<UnsignedInt>(distance / speed) + LOGICFRAMES_PER_SECOND;
 		m_backingMoves.emplace(member->getID(), BackingMove{goal, start, start + travel});
 	}
+	if (!m_backingMoves.empty())
+		m_backingSource = source->getID();
 	return TRUE;
 }
 
-Bool HordeContain::updateBacking()
+HordeContain::BackingPhase HordeContain::updateBacking(Object* member)
 {
+	const auto it = m_backingMoves.find(member->getID());
 	const UnsignedInt frame = TheGameLogic->getFrame();
-	for (auto it = m_backingMoves.begin(); it != m_backingMoves.end(); )
+	if (it == m_backingMoves.end() || frame < it->second.start)
+		return BackingPhase::Available;
+
+	FormationGoal goal;
+	if (frame >= it->second.deadline || !getFormationGoal(member, goal) ||
+		goal.error < 2.0f || !canSteerToFormationGoal(member, goal))
 	{
-		Object* member = TheGameLogic->findObjectByID(it->first);
-		const BackingMove& move = it->second;
-		FormationGoal goal;
-		AIUpdateInterface* ai = member && member->getContainedBy() == getObject() && !member->isEffectivelyDead()
-			? member->getAI() : nullptr;
-		if (!ai || frame >= move.deadline || (frame >= move.start &&
-			(!getFormationGoal(member, goal) || goal.error < 2.0f || !canSteerToFormationGoal(member, goal))))
-		{
-			if (member)
-				member->clearModelConditionState(MODELCONDITION_BACKING_UP);
-			it = m_backingMoves.erase(it);
-			continue;
-		}
-		if (!ai->isIdle())
-			ai->aiIdle(CMD_FROM_SCRIPT);
-		if (frame >= move.start)
-			member->setModelConditionState(MODELCONDITION_BACKING_UP);
-		ai->wakeForFormation();
-		++it;
+		m_backingMoves.erase(it);
+		if (m_backingMoves.empty())
+			m_backingSource = INVALID_ID;
+		member->clearModelConditionState(MODELCONDITION_BACKING_UP);
+		return BackingPhase::Recovered;
 	}
-	return !m_backingMoves.empty();
+
+	AIUpdateInterface* ai = member->getAI();
+	if (!ai->isIdle())
+		ai->aiIdle(CMD_FROM_SCRIPT);
+	member->setModelConditionState(MODELCONDITION_BACKING_UP);
+	ai->wakeForFormation();
+	return BackingPhase::Backing;
 }
 
 void HordeContain::applyWeaponDamage(Object* victim, DamageInfo& damage, Bool contactHit)
@@ -1304,10 +1310,12 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 		return FALSE;
 
 	const Coord3D& position = *member->getPosition();
-	if (const auto move = m_backingMoves.find(member->getID()); move != m_backingMoves.end())
+	if (const auto move = m_backingMoves.find(member->getID());
+		move != m_backingMoves.end() && TheGameLogic->getFrame() >= move->second.start)
 	{
-		goal.backing = TheGameLogic->getFrame() >= move->second.start;
-		goal.position = goal.slot = goal.backing ? move->second.goal : position;
+		goal.backing = TRUE;
+		goal.backingSource = m_backingSource;
+		goal.position = goal.slot = move->second.goal;
 		const Real dx = goal.position.x - position.x;
 		const Real dy = goal.position.y - position.y;
 		goal.error = WWMath::SqrtfOrigin(dx * dx + dy * dy);
@@ -1319,6 +1327,7 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	}
 
 	goal.backing = FALSE;
+	goal.backingSource = INVALID_ID;
 	goal.slot = getMemberPosition(member->getID(), FALSE);
 	const Real dx = goal.slot.x - position.x;
 	const Real dy = goal.slot.y - position.y;

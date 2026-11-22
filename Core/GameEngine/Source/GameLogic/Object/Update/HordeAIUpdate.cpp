@@ -411,11 +411,6 @@ UpdateSleepTime HordeAIUpdate::update()
 	const HordeContain* contain = HordeContain::get(horde);
 	if (!contain || horde->isEffectivelyDead())
 		return UPDATE_SLEEP_NONE;
-	if (RetailFileLayers::enabled() && const_cast<HordeContain*>(contain)->updateBacking())
-	{
-		m_engaging = FALSE;
-		return UPDATE_SLEEP_NONE;
-	}
 	if (fabs(stdAngleDiff(horde->getOrientation(), facingBefore)) > FORMATION_REFORM_ANGLE)
 		const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
 
@@ -518,6 +513,14 @@ UpdateSleepTime HordeAIUpdate::update()
 		if (!ai || member->isEffectivelyDead())
 			continue;
 
+		const auto backing = RetailFileLayers::enabled() ? const_cast<HordeContain*>(contain)->updateBacking(member)
+			: HordeContain::BackingPhase::Available;
+		if (backing == HordeContain::BackingPhase::Backing)
+		{
+			groundAttackInProgress |= contain->rankCanAttack(member);
+			continue;
+		}
+		const Bool recovered = backing == HordeContain::BackingPhase::Recovered;
 		if (m_engaging && contain->rankCanAttack(member))
 		{
 			if (target)
@@ -529,7 +532,7 @@ UpdateSleepTime HordeAIUpdate::update()
 				const Bool attackingAnchor = enemy && current == target && ai->isAttacking();
 				if (attackingAnchor)
 					ai->aiIdle(CMD_FROM_SCRIPT);
-				if ((refresh || !wasEngaging || attackingAnchor) && member->isAbleToAttack())
+				if ((refresh || !wasEngaging || attackingAnchor || recovered) && member->isAbleToAttack())
 				{
 					CanAttackResult result;
 					Object* victim = target;
@@ -558,7 +561,7 @@ UpdateSleepTime HordeAIUpdate::update()
 			}
 			if (attackGround)
 			{
-				if (!wasEngaging && member->isAbleToAttack())
+				if ((!wasEngaging || recovered) && member->isAbleToAttack())
 				{
 					const auto result = member->getAbleToUseWeaponAgainstTarget(ATTACK_NEW_TARGET_FORCED, nullptr,
 						&m_orderPosition, m_attackSource);

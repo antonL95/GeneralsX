@@ -2776,7 +2776,7 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 }
 
 void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& goalPos, Real onPathDistToGoal,
-	Real desiredSpeed, Bool backing)
+	Real desiredSpeed, Bool backing, ObjectID backingSource)
 {
 	const Real SLIDE_IN_PLACE_DISTANCE = 0.1f;
 	PhysicsBehavior* physics = obj->getPhysics();
@@ -2789,7 +2789,7 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 	dir.x = goalPos.x - obj->getPosition()->x;
 	dir.y = goalPos.y - obj->getPosition()->y;
 	dir.z = 0.0f;
-	const Real distToGoal = dir.length();
+	const Real distToGoal = backing ? WWMath::SqrtfOrigin(dir.x * dir.x + dir.y * dir.y) : dir.length();
 	if (distToGoal < SLIDE_IN_PLACE_DISTANCE)
 	{
 		dir = *obj->getUnitDirectionVector2D();
@@ -2800,33 +2800,50 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 		dir.x /= distToGoal;
 		dir.y /= distToGoal;
 		if (backing)
-			locoUpdate_moveTowardsAngle(obj, WWMath::Atan2Origin(-dir.y, -dir.x));
-		else
-			physics->setTurning(rotateTowardsPosition(obj, goalPos));
-		const Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
-		if (turnRate > 0.0f && distToGoal < 2.0f * maxSpeed / turnRate)
 		{
-			const Coord3D* facing = obj->getUnitDirectionVector2D();
-			const Real forward = facing->x * dir.x + facing->y * dir.y;
-			const Real alignment = backing ? -forward : forward;
-			desiredSpeed *= alignment > 0.0f ? alignment : 0.0f;
+			const Object* source = backingSource != INVALID_ID ? TheGameLogic->findObjectByID(backingSource) : nullptr;
+			const Coord3D& origin = *obj->getPosition();
+			const Real facingDistance = 1000.0f;
+			Coord3D face{origin.x - dir.x * facingDistance, origin.y - dir.y * facingDistance, origin.z};
+			if (source && !source->isEffectivelyDead() && !source->isDestroyed())
+			{
+				const Coord3D& position = *source->getPosition();
+				if (position.x != origin.x || position.y != origin.y)
+					face = position;
+			}
+			if (!physics->getIsStunned())
+				physics->setTurning(rotateTowardsPosition(obj, face));
+		}
+		else
+		{
+			physics->setTurning(rotateTowardsPosition(obj, goalPos));
+			const Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
+			if (turnRate > 0.0f && distToGoal < 2.0f * maxSpeed / turnRate)
+			{
+				const Coord3D* facing = obj->getUnitDirectionVector2D();
+				const Real alignment = facing->x * dir.x + facing->y * dir.y;
+				desiredSpeed *= alignment > 0.0f ? alignment : 0.0f;
+			}
 		}
 	}
-	steerVelocity(obj, physics, dir, onPathDistToGoal, desiredSpeed);
+	steerVelocity(obj, physics, dir, onPathDistToGoal, desiredSpeed, backing);
 }
 
-void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord3D& dirToApplyForce, Real onPathDistToGoal, Real goalSpeed)
+void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord3D& dirToApplyForce, Real onPathDistToGoal,
+	Real goalSpeed, Bool backing)
 {
 	const BodyDamageType bdt = obj->getBodyModule()->getDamageState();
 	const Coord3D* velocity = physics->getVelocity();
-	const Real actualSpeed = sqrtf(velocity->x * velocity->x + velocity->y * velocity->y);
+	const Real speedSquared = velocity->x * velocity->x + velocity->y * velocity->y;
+	const Real actualSpeed = backing ? WWMath::SqrtfOrigin(speedSquared) : sqrtf(speedSquared);
 
 	if (!getFlag(NO_SLOW_DOWN_AS_APPROACHING_DEST))
 	{
 		Real slowDownDist = calcSlowDownDist(actualSpeed, getMinSpeed(), getBraking());
 		if (onPathDistToGoal < slowDownDist)
 			goalSpeed = getMinSpeed();
-		const Real arrivalSpeed = sqrtf(2.0f * getBraking() * onPathDistToGoal);
+		const Real arrivalSpeedSquared = 2.0f * getBraking() * onPathDistToGoal;
+		const Real arrivalSpeed = backing ? WWMath::SqrtfOrigin(arrivalSpeedSquared) : sqrtf(arrivalSpeedSquared);
 		if (goalSpeed > arrivalSpeed)
 			goalSpeed = arrivalSpeed > getMinSpeed() ? arrivalSpeed : getMinSpeed();
 	}
@@ -2835,7 +2852,8 @@ void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord
 	velocityDelta.x = dirToApplyForce.x * goalSpeed - velocity->x;
 	velocityDelta.y = dirToApplyForce.y * goalSpeed - velocity->y;
 	velocityDelta.z = 0.0f;
-	const Real deltaLength = velocityDelta.length();
+	const Real deltaLength = backing ? WWMath::SqrtfOrigin(sqr(velocityDelta.x) + sqr(velocityDelta.y))
+		: velocityDelta.length();
 	if (deltaLength > 0.0f)
 	{
 		const Real limit = goalSpeed > actualSpeed ? getMaxAcceleration(bdt) : getBraking();

@@ -281,7 +281,7 @@ public:
 	void setPhysicsOptions(Object* obj);
 
 	void locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed,
-		Bool backing = FALSE);
+		Bool backing = FALSE, ObjectID backingSource = INVALID_ID);
 	void locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalPos,
 		Real onPathDistToGoal, Real desiredSpeed, Bool *blocked);
 	void locoUpdate_moveTowardsAngle(Object* obj, Real angle);
@@ -428,7 +428,8 @@ protected:
 	void moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
-	void steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord3D& dirToApplyForce, Real onPathDistToGoal, Real goalSpeed);
+	void steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord3D& dirToApplyForce, Real onPathDistToGoal,
+		Real goalSpeed, Bool backing = FALSE);
 	Real rotwkLegsTurnSlowdown(const Object* obj, const Coord3D& goalPos, Real angleCoeff, Real maxSpeed) const;
 	void moveTowardsPositionHover(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
