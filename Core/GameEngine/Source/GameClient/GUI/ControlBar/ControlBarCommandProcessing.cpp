@@ -125,6 +125,12 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 	const CommandButton *commandButton = control ? static_cast<const CommandButton *>(GadgetButtonGetData(control)) : nullptr;
 	if (commandButton && !commandButton->isRetailButtonUsable())
 		return CBC_COMMAND_USED;
+	if (RetailFileLayers::enabled() && commandButton && m_currentSelectedDrawable && m_currentSelectedDrawable->getObject())
+	{
+		const Object* selectedObj = m_currentSelectedDrawable->getObject();
+		if (!commandButton->isModelConditionAllowed(selectedObj) || !commandButton->isValidContainerForCommand(selectedObj))
+			return CBC_COMMAND_USED;
+	}
 
 	if (RetailFileLayers::enabled() && commandButton && commandButton->isDoubleClick() && gadgetMessage != GBM_SELECTED_RIGHT)
 	{

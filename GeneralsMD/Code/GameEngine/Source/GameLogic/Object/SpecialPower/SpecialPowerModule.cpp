@@ -814,8 +814,6 @@ void SpecialPowerModule::aboutToDoSpecialPower( const Coord3D *location )
 //-------------------------------------------------------------------------------------------------
 Bool SpecialPowerModule::isRetailCastAllowed(UnsignedInt commandOptions) const
 {
-	if ((commandOptions & COMMAND_OPTION_INTERNAL_AUTO) != 0)
-		return TRUE;
 	if (!RetailFileLayers::enabled() || !TheRetailCommandCatalog)
 		return TRUE;
 	const Object* obj = getObject();
@@ -825,7 +823,8 @@ Bool SpecialPowerModule::isRetailCastAllowed(UnsignedInt commandOptions) const
 	const CommandButton* button = TheRetailCommandCatalog->findPowerButton(obj, power);
 	if (!button)
 		return TRUE;
-	return button->isRetailButtonUsable();
+	return button->isModelConditionAllowed(obj) && button->isValidContainerForCommand(obj) &&
+		((commandOptions & COMMAND_OPTION_INTERNAL_AUTO) != 0 || button->isRetailButtonUsable());
 }
 
 void SpecialPowerModule::doSpecialPower( UnsignedInt commandOptions )
@@ -854,6 +853,8 @@ void SpecialPowerModule::doSpecialPowerAtObject( Object *obj, UnsignedInt comman
 	if (m_pausedCount > 0 || getObject()->isDisabled() || !meetsRequiredRank() || !isRetailCastAllowed(commandOptions)) {
 		return;
 	}
+	if (!CommandButton::isRetailPowerObjectTargetAllowed(getObject(), getSpecialPowerTemplate(), obj))
+		return;
 
 	const Bool initiated = initiateIntentToDoSpecialPower( obj, nullptr, nullptr, commandOptions );
 

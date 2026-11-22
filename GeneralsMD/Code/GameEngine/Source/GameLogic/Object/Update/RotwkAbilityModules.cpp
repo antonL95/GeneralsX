@@ -1470,6 +1470,7 @@ Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, UnsignedIn
 	const AutoAbilityBehaviorModuleData* data = getAutoAbilityBehaviorModuleData();
 	Object* self = getObject();
 	const SpecialPowerTemplate* power = getSpecialAbility();
+	const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(self, power) : nullptr;
 	const Bool needsObject = (options & COMMAND_OPTION_NEED_OBJECT_TARGET) != 0;
 	const Bool needsPosition = (options & NEED_TARGET_POS) != 0;
 	const Bool checkQueryTargetPlacement = needsPosition &&
@@ -1485,7 +1486,7 @@ Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, UnsignedIn
 	};
 	Int count = 0;
 	Object* first = nullptr;
-	if (data->m_allowSelf && objectMatches(query.m_filter, self))
+	if (data->m_allowSelf && objectMatches(query.m_filter, self) && (!button || button->matchesRetailObjectTarget(self)))
 	{
 		if (eligible(self))
 			first = self;
@@ -1512,7 +1513,7 @@ Bool AutoAbilityBehavior::queryMatches(const AutoAbilityQuery& query, UnsignedIn
 			continue;
 		if (minSquared > 0.0f && ThePartitionManager->getDistanceSquared(self, other, FROM_BOUNDINGSPHERE_2D) < minSquared)
 			continue;
-		if (!objectMatches(query.m_filter, other))
+		if (!objectMatches(query.m_filter, other) || (button && !button->matchesRetailObjectTarget(other)))
 			continue;
 		if (!first && eligible(other))
 			first = other;
@@ -1564,8 +1565,9 @@ UpdateSleepTime AutoAbilityBehavior::update()
 		return scan;
 	}
 	const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(self, data->m_specialAbility) : nullptr;
-	if (button && button->getAutoAbilityDisallowedOnModelCondition().any() &&
-		self->getLogicModelConditions().testForAny(button->getAutoAbilityDisallowedOnModelCondition()))
+	if (button && ((button->getAutoAbilityDisallowedOnModelCondition().any() &&
+		self->getLogicModelConditions().testForAny(button->getAutoAbilityDisallowedOnModelCondition())) ||
+		!button->isModelConditionAllowed(self) || !button->isValidContainerForCommand(self)))
 	{
 		m_readySinceFrame = 0;
 		return scan;
@@ -1683,7 +1685,8 @@ void PlayerHealSpecialPower::doSpecialPower(UnsignedInt commandOptions)
 
 void PlayerHealSpecialPower::doSpecialPowerAtObject(Object* obj, UnsignedInt commandOptions)
 {
-	if (obj)
+	resetLastCastAccepted();
+	if (obj && CommandButton::isRetailPowerObjectTargetAllowed(getObject(), getSpecialPowerTemplate(), obj))
 		doSpecialPowerAtLocation(obj->getPosition(), INVALID_ANGLE, commandOptions);
 }
 

@@ -1148,6 +1148,8 @@ Bool ControlBar::retailEntryShown(const CommandSet *commandSet, Int entry, const
 		return FALSE;
 	if (!obj)
 		return TRUE;
+	if (!command->isValidContainerForCommand(obj))
+		return FALSE;
 	if (command->getCommandType() == GUI_COMMAND_REVIVE)
 	{
 		hero = HeroRoster::reviveSlotForEntry(commandSet, entry);
@@ -1340,7 +1342,8 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 		case GUI_COMMAND_SPECIAL_POWER_TOGGLE:
 		{
 			const CommandButton* effective = command->resolveRetailToggleButton(obj);
-			if (!effective || !effective->isRetailButtonUsable())
+			if (!effective || !effective->isRetailButtonUsable() || !effective->isModelConditionAllowed(obj) ||
+				!effective->isValidContainerForCommand(obj))
 				return COMMAND_RESTRICTED;
 			const SpecialPowerTemplate* power = effective->getSpecialPowerTemplate();
 			const SpecialPowerModuleInterface* mod = (obj && power) ? obj->getSpecialPowerModule(power) : nullptr;
@@ -1414,7 +1417,8 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 			const Object* source = obj ? obj : getRetailSelection();
 			const CommandButton* effective = command->resolveRetailToggleButton(source);
 			const SpecialPowerTemplate* power = effective ? effective->getSpecialPowerTemplate() : nullptr;
-			if (!source || !effective || !effective->isRetailButtonUsable() || !power)
+			if (!source || !effective || !effective->isRetailButtonUsable() || !effective->isModelConditionAllowed(source) ||
+				!effective->isValidContainerForCommand(source) || !power)
 				return CBC_COMMAND_NOT_USED;
 			if (BitIsSet(effective->getOptions(), COMMAND_OPTION_NEED_TARGET))
 			{
@@ -1550,6 +1554,8 @@ Bool CommandButton::canUseRetailToggle(const Object* object, Int state) const
 		!m_isClickable ||
 		hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE) ||
 		!HeroRoster::buttonUpgradesMet(this, object->getControllingPlayer(), object))
+		return FALSE;
+	if (!isModelConditionAllowed(object) || !isValidContainerForCommand(object))
 		return FALSE;
 	const Bool mounted = object->testWeaponSetFlag(WEAPONSET_MOUNTED);
 	if ((mounted && hasRotwkOption(CommandButtonRules::ROTWK_UNMOUNTED_ONLY)) ||

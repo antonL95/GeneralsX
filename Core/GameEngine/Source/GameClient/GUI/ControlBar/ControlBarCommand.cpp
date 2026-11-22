@@ -185,6 +185,12 @@ void ControlBar::doTransportInventoryUI( Object *transport, const CommandSet *co
 		// get command button
 		commandButton = commandSet->getCommandButton(i);
 
+		if (commandButton && !commandButton->isValidContainerForCommand(transport))
+		{
+			m_commandWindows[i]->winHide(TRUE);
+			continue;
+		}
+
 		// is this an inventory exit command
 		if( commandButton && commandButton->getCommandType() == GUI_COMMAND_EXIT_CONTAINER )
 		{
@@ -1059,8 +1065,15 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 	if (obj == nullptr)
 		return COMMAND_HIDDEN;	// probably better than crashing....
 
-	if (RetailFileLayers::enabled() && command->getRequiredRank() > obj->getExperienceTracker()->getRank())
-		return COMMAND_RESTRICTED;
+	if (RetailFileLayers::enabled())
+	{
+		if (command->getRequiredRank() > obj->getExperienceTracker()->getRank())
+			return COMMAND_RESTRICTED;
+		if (!command->isValidContainerForCommand(obj))
+			return COMMAND_HIDDEN;
+		if (!command->isModelConditionAllowed(obj))
+			return COMMAND_RESTRICTED;
+	}
 
 	Player *player = obj->getControllingPlayer();
 

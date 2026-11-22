@@ -507,7 +507,8 @@ Bool SpecialPowerStore::canUseSpecialPower( Object *obj, const SpecialPowerTempl
 	if (TheRetailCommandCatalog)
 	{
 		const CommandButton* button = TheRetailCommandCatalog->findPowerButton(obj, specialPowerTemplate);
-		if (button && (!button->isMountStateAllowed(obj) || (RetailFileLayers::enabled() && !button->isRetailButtonUsable())))
+		if (button && (!button->isMountStateAllowed(obj) ||
+			(RetailFileLayers::enabled() && (!button->isRetailButtonUsable() || !button->isModelConditionAllowed(obj) || !button->isValidContainerForCommand(obj)))))
 			return FALSE;
 	}
 

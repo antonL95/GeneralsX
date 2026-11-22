@@ -3531,6 +3531,25 @@ void Object::setWeaponSetFlags(const WeaponSetFlags& flags, Bool enabled)
 		m_weaponSet.updateWeaponSet(this);
 }
 
+ModelConditionFlags CommandButton::getRetailCommandModelConditions(const Object* source)
+{
+	ModelConditionFlags conditions = source->getLogicModelConditions();
+	if (!RetailFileLayers::enabled())
+		return conditions;
+	for (Int i = 0; i < WEAPONSET_COUNT; ++i)
+	{
+		const ModelConditionFlagType condition = TheWeaponSetTypeToModelConditionTypeMap[i];
+		if (condition != MODELCONDITION_INVALID)
+			conditions.set(condition, source->getWeaponSetFlags().test(i));
+	}
+	WeaponSlotType slot = PRIMARY_WEAPON;
+	if (source->isCurWeaponLocked() && source->getCurrentWeapon(&slot) && slot == SECONDARY_WEAPON)
+		conditions.set(MODELCONDITION_WEAPONLOCK_SECONDARY);
+	if (source->getContainedBy())
+		conditions.set(MODELCONDITION_PASSENGER);
+	return conditions;
+}
+
 void Object::setWeaponSetFlag(WeaponSetType wst)
 {
 	m_curWeaponSetFlags.set(wst);
@@ -3541,7 +3560,6 @@ void Object::setWeaponSetFlag(WeaponSetType wst)
 	}
 }
 
-//-------------------------------------------------------------------------------------------------
 void Object::clearWeaponSetFlag(WeaponSetType wst)
 {
 	m_curWeaponSetFlags.set(wst, 0);
@@ -6573,6 +6591,9 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 	AIUpdateInterface *ai = getAIUpdateInterface();
 	if( commandButton )
 	{
+		if (RetailFileLayers::enabled() &&
+			(!commandButton->isModelConditionAllowed(this) || !commandButton->isValidContainerForCommand(this)))
+			return;
 		switch( commandButton->getCommandType() )
 		{
 			case GUI_COMMAND_WAKE_AUTO_PICKUP:
@@ -6706,6 +6727,14 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 	AIUpdateInterface *ai = getAIUpdateInterface();
 	if( commandButton )
 	{
+		if (RetailFileLayers::enabled())
+		{
+			if (!commandButton->isModelConditionAllowed(this) || !commandButton->isValidContainerForCommand(this))
+				return;
+			if (BitIsSet(commandButton->getOptions(), COMMAND_OPTION_NEED_OBJECT_TARGET) && obj &&
+				!commandButton->isValidObjectTarget(this, obj))
+				return;
+		}
 		switch( commandButton->getCommandType() )
 		{
 			case GUI_COMMAND_COMBATDROP:
@@ -6831,6 +6860,9 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 	AIUpdateInterface *ai = getAIUpdateInterface();
 	if( commandButton )
 	{
+		if (RetailFileLayers::enabled() &&
+			(!commandButton->isModelConditionAllowed(this) || !commandButton->isValidContainerForCommand(this)))
+			return;
 		switch( commandButton->getCommandType() )
 		{
 			case GUI_COMMAND_SPECIAL_POWER:

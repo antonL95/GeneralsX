@@ -65,7 +65,11 @@
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/OCLUpdate.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/OpenContain.h"
+#endif
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/RebuildHoleBehavior.h"
@@ -169,6 +173,11 @@ const FieldParse CommandButton::s_rotwkCommandButtonFieldParseTable[] =
 	{ "TriggerWhenReady", INI::parseBool, nullptr, offsetof(CommandButton, m_triggerWhenReady) },
 	{ "AutoDelay", INI::parseReal, nullptr, offsetof(CommandButton, m_autoDelay) },
 	{ "AutoAbilityDisallowedOnModelCondition", ModelConditionFlags::parseFromINI, nullptr, offsetof(CommandButton, m_autoAbilityDisallowedOnModelCondition) },
+	{ "DisableOnModelCondition", ModelConditionFlags::parseFromINI, nullptr, offsetof(CommandButton, m_disableOnModelCondition) },
+	{ "EnableOnModelCondition", ModelConditionFlags::parseFromINI, nullptr, offsetof(CommandButton, m_enableOnModelCondition) },
+	{ "AffectsKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof(CommandButton, m_affectsKindOf) },
+	{ "NeedDamagedTarget", INI::parseBool, nullptr, offsetof(CommandButton, m_needDamagedTarget) },
+	{ "RequiresValidContainer", INI::parseBool, nullptr, offsetof(CommandButton, m_requiresValidContainer) },
 	{ "CommandTrigger", INI::parseAsciiStringVector, nullptr, offsetof(CommandButton, m_commandTriggers) },
 	{ "ToggleButtonName", INI::parseAsciiString, nullptr, offsetof(CommandButton, m_toggleButtonName) },
 	{ "CreateAHeroUIAllowableUpgrades", INI::parseAsciiStringVector, nullptr, offsetof(CommandButton, m_createAHeroUIAllowableUpgrades) },
@@ -725,34 +734,100 @@ Bool CommandButton::isMountStateAllowed(const Object* source) const
 		hasRotwkOption(CommandButtonRules::ROTWK_UNMOUNTED_ONLY), source->testWeaponSetFlag(WEAPONSET_MOUNTED));
 }
 
-//-------------------------------------------------------------------------------------------------
+Bool CommandButton::isModelConditionAllowed(const Object* source) const
+{
+	if (!RetailFileLayers::enabled() || !source)
+		return TRUE;
+#if !RTS_GENERALS
+	if (!m_disableOnModelCondition.any() && !m_enableOnModelCondition.any())
+		return TRUE;
+	const ModelConditionFlags conditions = getRetailCommandModelConditions(source);
+	if (m_disableOnModelCondition.any() && conditions.testForAny(m_disableOnModelCondition))
+		return FALSE;
+	if (m_enableOnModelCondition.any() && !conditions.testForAny(m_enableOnModelCondition))
+		return FALSE;
+#endif
+	return TRUE;
+}
+
+Bool CommandButton::isValidContainerForCommand(const Object* source) const
+{
+	return !m_requiresValidContainer || hasValidRetailContainer(source);
+}
+
+Bool CommandButton::hasValidRetailContainer(const Object* source)
+{
+	if (!RetailFileLayers::enabled())
+		return TRUE;
+	const ContainModuleInterface* contain = source ? source->getContain() : nullptr;
+	if (!contain || contain->getContainMax() == 0)
+		return FALSE;
+#if !RTS_GENERALS
+	if (const OpenContain* openContain = const_cast<ContainModuleInterface*>(contain)->asOpenContain())
+	{
+		if (!openContain->isRetailEnabled())
+			return FALSE;
+	}
+#endif
+	return TRUE;
+}
+
+Bool CommandButton::matchesRetailObjectTarget(const Object* target) const
+{
+	if (!RetailFileLayers::enabled())
+		return TRUE;
+	return (!m_affectsKindOf.any() || (target && target->isAnyKindOf(m_affectsKindOf))) &&
+		isDamagedTargetValid(target);
+}
+
+Bool CommandButton::isRetailPowerObjectTargetAllowed(const Object* source, const SpecialPowerTemplate* power, const Object* target)
+{
+	if (!RetailFileLayers::enabled() || !TheRetailCommandCatalog || !source || !power)
+		return TRUE;
+	const CommandButton* button = TheRetailCommandCatalog->findPowerButton(source, power);
+	return !button || !BitIsSet(button->getOptions(), COMMAND_OPTION_NEED_OBJECT_TARGET) ||
+		button->matchesRetailObjectTarget(target);
+}
+
+Bool CommandButton::isDamagedTargetValid(const Object* targetObj) const
+{
+	if (!RetailFileLayers::enabled() || !m_needDamagedTarget)
+		return TRUE;
+	if (!targetObj)
+		return FALSE;
+	const BodyModuleInterface* body = targetObj->getBodyModule();
+	return body && !targetObj->isEffectivelyDead() && body->getHealth() < body->getMaxHealth();
+}
+
 Bool CommandButton::isValidObjectTarget(const Player* sourcePlayer, const Object* targetObj) const
 {
 	if (!sourcePlayer || !targetObj)
 		return false;
 
 	Relationship r = sourcePlayer->getRelationship(targetObj->getTeam());
-
-	return isValidRelationshipTarget(r);
+	return isValidRelationshipTarget(r) && matchesRetailObjectTarget(targetObj);
 }
 
-//-------------------------------------------------------------------------------------------------
 Bool CommandButton::isValidObjectTarget(const Object* sourceObj, const Object* targetObj) const
 {
 	if (!sourceObj || !targetObj)
 		return false;
 
 	Relationship r = sourceObj->getRelationship(targetObj);
-
-	return isValidRelationshipTarget(r);
+	return isValidRelationshipTarget(r) && matchesRetailObjectTarget(targetObj);
 }
 
-//-------------------------------------------------------------------------------------------------
 Bool CommandButton::isValidToUseOn(const Object *sourceObj, const Object *targetObj, const Coord3D *targetLocation, CommandSourceType commandSource) const
 {
-	if (RetailFileLayers::enabled() && m_requiredRank > 0 &&
-		(!sourceObj || sourceObj->getExperienceTracker()->getRank() < m_requiredRank))
-		return FALSE;
+	if (RetailFileLayers::enabled())
+	{
+		if (m_requiredRank > 0 && (!sourceObj || sourceObj->getExperienceTracker()->getRank() < m_requiredRank))
+			return FALSE;
+		if (!isModelConditionAllowed(sourceObj) || !isValidContainerForCommand(sourceObj))
+			return FALSE;
+		if (BitIsSet(m_options, COMMAND_OPTION_NEED_OBJECT_TARGET) && targetObj && !isValidObjectTarget(sourceObj, targetObj))
+			return FALSE;
+	}
 	if (m_upgradeTemplate) {
 		// @todo: Make a const version of pui. We're not altering the production queue, so this const-cast
 		// is okay.

@@ -605,7 +605,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		}
 		case GameMessage::MSG_RETAIL_HORDE_COMMAND:
 		{
-			if (!RetailFileLayers::enabled() || !currentlySelectedGroup || !TheControlBar ||
+			if (!RetailFileLayers::enabled() || !currentlySelectedGroup || !TheRetailCommandCatalog ||
 				msg->getArgumentCount() != 3 ||
 				msg->getArgumentDataType(0) != ARGUMENTDATATYPE_OBJECTID ||
 				msg->getArgumentDataType(1) != ARGUMENTDATATYPE_INTEGER ||
@@ -618,7 +618,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			if (!source || !currentlySelectedGroup->isMember(source) ||
 				slot < 0 || slot >= CommandButtonRules::RETAIL_COMMANDS_PER_SET || state < -1 || state > 1)
 				break;
-			const CommandSet* sourceSet = TheControlBar->findCommandSet(source->getCommandSetString());
+			const CommandSet* sourceSet = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
 			const CommandButton* button = sourceSet ? sourceSet->getCommandButton(slot) : nullptr;
 			if (!button || !button->isRetailButtonUsable())
 				break;
@@ -633,7 +633,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 					Object* object = findObjectByID(id);
 					if (!object || object->getControllingPlayer() != msgPlayer)
 						continue;
-					const CommandSet* set = TheControlBar->findCommandSet(object->getCommandSetString());
+					const CommandSet* set = TheRetailCommandCatalog->findCommandSet(object->getCommandSetString());
 					if (set && set->getCommandButton(slot) == button && HeroRoster::buttonUpgradesMet(button, msgPlayer, object))
 						object->doCommandButton(button, CMD_FROM_PLAYER);
 				}
@@ -651,7 +651,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			for (const ObjectID id : currentlySelectedGroup->getAllIDs())
 			{
 				Object* object = findObjectByID(id);
-				const CommandSet* set = object ? TheControlBar->findCommandSet(object->getCommandSetString()) : nullptr;
+				const CommandSet* set = object ? TheRetailCommandCatalog->findCommandSet(object->getCommandSetString()) : nullptr;
 				if (!set || set->getCommandButton(slot) != button || !button->canUseRetailToggle(object, state))
 					continue;
 
@@ -1415,7 +1415,8 @@ static void runRetailCommandTriggers(Object* source, const CommandButton* primar
 		if (triggerName.isEmpty())
 			continue;
 		const CommandButton* triggered = TheRetailCommandCatalog->findCommandButton(triggerName);
-		if (!triggered || triggered == primaryButton || !triggered->isRetailButtonUsable())
+		if (!triggered || triggered == primaryButton || !triggered->isRetailButtonUsable() ||
+			!triggered->isModelConditionAllowed(source) || !triggered->isValidContainerForCommand(source))
 			continue;
 		Bool accepted = FALSE;
 		switch (triggered->getCommandType())
@@ -1426,7 +1427,7 @@ static void runRetailCommandTriggers(Object* source, const CommandButton* primar
 			{
 				const CommandButton* effective = triggered->resolveRetailToggleButton(source);
 				const SpecialPowerTemplate* power = effective ? effective->getSpecialPowerTemplate() : nullptr;
-				if (!power)
+				if (!power || !effective->isModelConditionAllowed(source) || !effective->isValidContainerForCommand(source))
 					break;
 				SpecialPowerModuleInterface* mod = source->getSpecialPowerModule(power);
 				if (!mod)
@@ -1435,7 +1436,7 @@ static void runRetailCommandTriggers(Object* source, const CommandButton* primar
 				const UnsignedInt options = effective->getOptions();
 				if (BitIsSet(options, COMMAND_OPTION_NEED_OBJECT_TARGET))
 				{
-					if (targetObj)
+					if (effective->isValidObjectTarget(source, targetObj))
 						source->doSpecialPowerAtObject(power, targetObj, options);
 				}
 				else if (BitIsSet(options, NEED_TARGET_POS))
@@ -1950,6 +1951,9 @@ bool GameLogic::onExit(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelec
 	if( objectContainingExiter == nullptr )
 		return false;
 
+	if (RetailFileLayers::enabled() && !CommandButton::hasValidRetailContainer(objectContainingExiter))
+		return false;
+
 	// sanity, the player must actually control this object
 	if( objectWantingToExit->getControllingPlayer() != msgPlayer )
 		return false;
@@ -1980,12 +1984,7 @@ bool GameLogic::onEvacuate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlyS
 		//if (hasArgs)
 		//	pos = msg->getArgument(0)->location;
 
-		currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-
-		// evacuate message is for the selected group
-		//if (hasArgs)
-		//	currentlySelectedGroup->groupMoveToAndEvacuate( &pos, CMD_FROM_PLAYER );
-		//else
+		currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);
 		currentlySelectedGroup->groupEvacuate( CMD_FROM_PLAYER );
 
 		// no, this is bad, don't do here, do when POSTING message

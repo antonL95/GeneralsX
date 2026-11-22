@@ -32,6 +32,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "Common/AudioEventRTS.h"
 #include "Common/GameType.h"
+#include "Common/KindOf.h"
 #include "Common/ModelState.h"
 #include "Common/Overridable.h"
 #include "Common/Science.h"
@@ -411,6 +412,12 @@ public:
 	Bool isTriggerWhenReady() const { return m_triggerWhenReady; }
 	Real getAutoDelay() const { return m_autoDelay; }
 	const ModelConditionFlags& getAutoAbilityDisallowedOnModelCondition() const { return m_autoAbilityDisallowedOnModelCondition; }
+	Bool isModelConditionAllowed(const Object* source) const;
+	Bool isValidContainerForCommand(const Object* source) const;
+	static Bool hasValidRetailContainer(const Object* source);
+	static Bool isRetailPowerObjectTargetAllowed(const Object* source, const SpecialPowerTemplate* power, const Object* target);
+	Bool matchesRetailObjectTarget(const Object* target) const;
+	Bool isDamagedTargetValid(const Object* targetObj) const;
 	const std::vector<AsciiString>& getCommandTriggers() const { return m_commandTriggers; }
 	const AsciiString& getToggleButtonName() const { return m_toggleButtonName; }
 	const std::vector<AsciiString>& getCreateAHeroUIAllowableUpgrades() const { return m_createAHeroUIAllowableUpgrades; }
@@ -514,6 +521,12 @@ private:
 	Bool m_triggerWhenReady = FALSE;
 	Real m_autoDelay = 0.0f;
 	ModelConditionFlags m_autoAbilityDisallowedOnModelCondition;
+	ModelConditionFlags m_disableOnModelCondition;
+	ModelConditionFlags m_enableOnModelCondition;
+	static ModelConditionFlags getRetailCommandModelConditions(const Object* source);
+	KindOfMaskType m_affectsKindOf;
+	Bool m_needDamagedTarget = FALSE;
+	Bool m_requiresValidContainer = FALSE;
 	std::vector<AsciiString> m_commandTriggers;
 	AsciiString m_toggleButtonName;
 	std::vector<AsciiString> m_createAHeroUIAllowableUpgrades;

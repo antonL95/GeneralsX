@@ -55,6 +55,7 @@ class OpenContainModuleData : public UpdateModuleData
 public:
 	DieMuxData m_dieMuxData;
 	Bool m_ejectPassengersOnDeath = TRUE;
+	Bool m_enabled = TRUE;
 	Int m_containMax;								///< how many things we can have inside (-1 = "I don't care")
 	AudioEventRTS m_enterSound;			///< sound to play on entering
 	AudioEventRTS m_exitSound;			///< sound to play on exiting
@@ -118,6 +119,7 @@ public:
 
 	// ContainModuleInterface
 	virtual OpenContain *asOpenContain() override { return this; }  ///< treat as open container
+	Bool isRetailEnabled() const { return getOpenContainModuleData()->m_enabled; }
 
 	// DamageModuleInterface
 	virtual void onDamage( DamageInfo *damageInfo ) override {};	///< damage callback

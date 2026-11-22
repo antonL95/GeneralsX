@@ -5028,6 +5028,10 @@ Bool InGameUI::canSelectedObjectsDoSpecialPower( const CommandButton *command, c
 		// get this drawable
 		Drawable* other = *it;
 		count++;
+		if (RetailFileLayers::enabled() &&
+			(!command->isModelConditionAllowed(other->getObject()) || !command->isValidContainerForCommand(other->getObject()) ||
+			(doAtObject && !command->isValidObjectTarget(other->getObject(), objectToInteractWith))))
+			continue;
 
 		if( !doAtObject && !doAtPosition )
 		{
@@ -5146,6 +5150,10 @@ Bool InGameUI::canSelectedObjectsEffectivelyUseWeapon( const CommandButton *comm
 		// get this drawable
 		Drawable *other = *it;
 		count++;
+		if (RetailFileLayers::enabled() &&
+			(!command->isModelConditionAllowed(other->getObject()) || !command->isValidContainerForCommand(other->getObject()) ||
+			(doAtObject && !command->isValidObjectTarget(other->getObject(), objectToInteractWith))))
+			continue;
 
 		if( !doAtObject && !doAtPosition )
 		{

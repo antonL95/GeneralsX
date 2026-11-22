@@ -115,6 +115,7 @@ OpenContainModuleData::OpenContainModuleData()
 		static const FieldParse retailFields[] =
 		{
 			{ "EjectPassengersOnDeath", INI::parseBool, nullptr, offsetof(OpenContainModuleData, m_ejectPassengersOnDeath) },
+			{ "Enabled", INI::parseBool, nullptr, offsetof(OpenContainModuleData, m_enabled) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(retailFields);
