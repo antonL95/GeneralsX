@@ -239,25 +239,14 @@ expect() {
 }
 run save start -file "$map"
 expect save "TEST snapshot-save frame=$save_frame code=0"
-if [ "$mode" = spellbook ]; then
-    package_step spellbook after_save
-    run resume resume -loadsave parity.sav
-    expect resume "TEST frame $end: quit"
-    package_step spellbook compare
-    exit
-fi
-run continue start -file "$map"
-expect continue "TEST frame $end: quit"
-run resume resume -loadsave parity.sav
-expect resume "TEST frame $end: quit"
 
-failed=
-for name in $packages; do
-    if ! package_step "$name" check continue || ! package_step "$name" check resume || ! package_step "$name" compare; then
-        failed="${failed:+$failed }$name"
-    fi
-done
-if [ -n "$failed" ]; then
+check_packages() {
+    failed=
+    for name in $packages; do
+        if ! package_step "$name" check "$1" || ! package_step "$name" check resume || ! package_step "$name" compare; then
+            failed="${failed:+$failed }$name"
+        fi
+    done
     for name in $failed; do
         if [ -z "$only" ]; then
             isolated=$(mktemp -d "$out/only-$name.XXXXXX")
@@ -270,8 +259,24 @@ if [ -n "$failed" ]; then
             printf 'Fixture failed: %s (%s)\n' "$name" "$out" >&2
         fi
     done
-    exit 1
+    [ -z "$failed" ]
+}
+
+if [ "$mode" = spellbook ]; then
+    for name in $packages; do
+        package_step "$name" after_save
+    done
+    run resume resume -loadsave parity.sav
+    expect resume "TEST frame $end: quit"
+    check_packages save
+    exit
 fi
+
+run continue start -file "$map"
+expect continue "TEST frame $end: quit"
+run resume resume -loadsave parity.sav
+expect resume "TEST frame $end: quit"
+check_packages continue
 
 for phase in continue resume; do
     awk -v first="$save_frame" -v last="$end" '
