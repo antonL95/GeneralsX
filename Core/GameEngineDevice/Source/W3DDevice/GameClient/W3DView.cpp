@@ -389,8 +389,11 @@ void W3DView::buildCameraTransform( Matrix3D *transform, const Vector3 &sourcePo
 	//WST 11/12/2002 New camera shaker system
 	// TheSuperHackers @tweak The camera shaker is now decoupled from the render update.
 	// TheSuperHackers @todo Move Update_Camera_Shaker to the W3DView::update function.
-	CameraShakerSystem.Timestep(TheFramePacer->getLogicTimeStepMilliseconds());
-	CameraShakerSystem.Update_Camera_Shaker(sourcePos, &m_shakerAngles);
+	if (!RetailFileLayers::enabled())
+	{
+		CameraShakerSystem.Timestep(TheFramePacer->getLogicTimeStepMilliseconds());
+		CameraShakerSystem.Update_Camera_Shaker(sourcePos, &m_shakerAngles);
+	}
 	transform->Rotate_X(m_shakerAngles.X);
 	transform->Rotate_Y(m_shakerAngles.Y);
 	transform->Rotate_Z(m_shakerAngles.Z);
@@ -761,6 +764,12 @@ void W3DView::updateCameraTransform()
 			sourcePos.Z += repositionZ;
 			targetPos.Z += repositionZ;
 		}
+	}
+
+	if (RetailFileLayers::enabled())
+	{
+		CameraShakerSystem.Timestep(TheFramePacer->getLogicTimeStepMilliseconds() * 0.001f);
+		CameraShakerSystem.Update_Camera_Shaker(targetPos, &m_shakerAngles);
 	}
 
 	Matrix3D cameraTransform;
@@ -3839,16 +3848,11 @@ void W3DView::cameraDisableRealZoomMode() //WST added 10/18/2002
 	updateView();
 }
 
-void W3DView::Add_Camera_Shake (const Coord3D & position,float radius,float duration,float power) //WST added 11/13/02
+void W3DView::Add_Camera_Shake(const Coord3D &position, float radius, float duration, float power)
 {
-	Vector3 vpos;
-
-	vpos.X = position.x;
-	vpos.Y = position.y;
-	vpos.Z = position.z;
-
-
-	CameraShakerSystem.Add_Camera_Shake(vpos,radius,duration,power);
+	if (RetailFileLayers::enabled() && TheGlobalData->m_headless)
+		return;
+	CameraShakerSystem.Add_Camera_Shake(Vector3(position.x, position.y, position.z), radius, duration, power);
 }
 
 bool W3DView::getDesiredTerrainDrawSize(ICoord2D &dimensions) const

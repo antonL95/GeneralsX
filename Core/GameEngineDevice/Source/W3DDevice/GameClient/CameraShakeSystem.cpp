@@ -47,7 +47,9 @@
 #include <d3dx8core.h>
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
+#include "Common/RetailFileLayers.h"
 
+#include "GameClient/ClientRandomValue.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
 #include "GameClient/Water.h"
@@ -103,6 +105,14 @@ const Vector3 AXIS_ROTATION	= Vector3(DEG_TO_RADF(7.5f),DEG_TO_RADF(15.0f),DEG_T
 ** CameraShakeSystemClass::CameraShakerClass Implementation
 **
 ************************************************************************************************/
+static float cameraShakeRandom(float lo, float hi)
+{
+	if (!RetailFileLayers::enabled())
+		return WWMath::Random_Float(lo, hi);
+	const ScopedVisualRandom random(TRUE);
+	return GameClientRandomValueReal(lo, hi);
+}
+
 CameraShakeSystemClass::CameraShakerClass::CameraShakerClass
 (
 	const Vector3 & position,
@@ -119,12 +129,12 @@ CameraShakeSystemClass::CameraShakerClass::CameraShakerClass
 	/*
 	** Initialize random sinusoid values
 	*/
-	Omega.X = WWMath::Random_Float(MIN_OMEGA,MAX_OMEGA);
-	Omega.Y = WWMath::Random_Float(MIN_OMEGA,MAX_OMEGA);
-	Omega.Z = WWMath::Random_Float(MIN_OMEGA,MAX_OMEGA);
-	Phi.X = WWMath::Random_Float(MIN_PHI,MAX_PHI);
-	Phi.Y = WWMath::Random_Float(MIN_PHI,MAX_PHI);
-	Phi.Z = WWMath::Random_Float(MIN_PHI,MAX_PHI);
+	Omega.X = cameraShakeRandom(MIN_OMEGA, MAX_OMEGA);
+	Omega.Y = cameraShakeRandom(MIN_OMEGA, MAX_OMEGA);
+	Omega.Z = cameraShakeRandom(MIN_OMEGA, MAX_OMEGA);
+	Phi.X = cameraShakeRandom(MIN_PHI, MAX_PHI);
+	Phi.Y = cameraShakeRandom(MIN_PHI, MAX_PHI);
+	Phi.Z = cameraShakeRandom(MIN_PHI, MAX_PHI);
 }
 
 CameraShakeSystemClass::CameraShakerClass::~CameraShakerClass()
@@ -167,9 +177,9 @@ void CameraShakeSystemClass::CameraShakerClass::Compute_Rotations(const Vector3 
 		//WST 11/14/2002. Add in additional random fudge.  There seems to be a too mathematical pattern of shake with the above
 		Vector3 secondary_angles;
 		float minor_intensity = intensity * 0.5f;
-		secondary_angles.X = WWMath::Random_Float(-minor_intensity,minor_intensity);
-		secondary_angles.Y = WWMath::Random_Float(-minor_intensity,minor_intensity);
-		secondary_angles.Z = WWMath::Random_Float(-minor_intensity,minor_intensity);
+		secondary_angles.X = cameraShakeRandom(-minor_intensity, minor_intensity);
+		secondary_angles.Y = cameraShakeRandom(-minor_intensity, minor_intensity);
+		secondary_angles.Z = cameraShakeRandom(-minor_intensity, minor_intensity);
 		(*set_angles) += secondary_angles;
 	}
 }

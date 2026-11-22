@@ -501,10 +501,32 @@ public:
 	{
 	}
 
+	void doFXObj(const Object* primary, const Object* secondary) const override
+	{
+		doFXPosWithObjects(primary ? primary->getPosition() : nullptr, nullptr, 0.0f,
+			nullptr, 0.0f, primary, secondary);
+	}
+
+	void doFXPosWithObjects(const Coord3D* primary, const Matrix3D*, Real, const Coord3D*, Real,
+		const Object* subject, const Object* source) const override
+	{
+		if (m_filter && (!subject || !m_filter->matchesObject(source ? source : subject, subject)))
+			return;
+		doShake(primary);
+	}
+
 	virtual void doFXPos(const Coord3D *primary, const Matrix3D* /*primaryMtx*/, const Real /*primarySpeed*/, const Coord3D * /*secondary*/, const Real /*overrideRadius*/ ) const override
+	{
+		if (!m_filter)
+			doShake(primary);
+	}
+
+	void doShake(const Coord3D* primary) const
 	{
 		if (primary)
 		{
+			if (traceRetailFXLists())
+				std::fprintf(stderr, "[Retail FXList] ViewShake type=%d\n", static_cast<Int>(m_shake));
 			if (TheTacticalView)
 				TheTacticalView->shake(primary, m_shake);
 		}
@@ -523,7 +545,15 @@ public:
 		};
 
 		ViewShakeFXNugget* nugget = newInstance( ViewShakeFXNugget );
-		ini->initFromINI(nugget, myFieldParse);
+		static const FieldParse retailFields[] = {
+			{ "ObjectFilter", parseFilter, nullptr, 0 },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		MultiIniFieldParse fields;
+		if (RetailFileLayers::enabled())
+			fields.add(retailFields);
+		fields.add(myFieldParse);
+		ini->initFromINIMulti(nugget, fields);
 		((FXList*)instance)->addFXNugget(nugget);
 	}
 
@@ -546,10 +576,113 @@ protected:
 	}
 
 private:
+	static void parseFilter(INI* ini, void* instance, void*, const void* userData)
+	{
+		auto& filter = static_cast<ViewShakeFXNugget*>(instance)->m_filter;
+		SpecialPowerObjectFilter::parse(ini, instance, &filter.emplace(), userData);
+	}
+
 	View::CameraShakeType m_shake;
+	std::optional<SpecialPowerObjectFilter> m_filter;
 
 };
 EMPTY_DTOR(ViewShakeFXNugget)
+
+class CameraShakerVolumeFXNugget : public FXNugget
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(CameraShakerVolumeFXNugget, "CameraShakerVolumeFXNugget")
+
+public:
+	void doFXPos(const Coord3D* position, const Matrix3D*, Real, const Coord3D*, Real) const override
+	{
+		if (!position || !TheTacticalView || !(m_radius > 0.0f && m_duration > 0.0f && m_amplitude > 0.0f) ||
+			!std::isfinite(m_radius) || !std::isfinite(m_duration) || !std::isfinite(m_amplitude))
+			return;
+		TheTacticalView->Add_Camera_Shake(*position, m_radius, m_duration, m_amplitude);
+		if (traceRetailFXLists())
+			std::fprintf(stderr, "[Retail FXList] CameraShakerVolume radius=%.3f duration=%.3f amplitude=%.3f\n",
+				m_radius, m_duration, m_amplitude);
+	}
+
+	static void parse(INI* ini, void* instance, void*, const void*)
+	{
+		static const FieldParse fields[] = {
+			{ "Radius", INI::parseReal, nullptr, offsetof(CameraShakerVolumeFXNugget, m_radius) },
+			{ "Duration_Seconds", INI::parseReal, nullptr, offsetof(CameraShakerVolumeFXNugget, m_duration) },
+			{ "Amplitude_Degrees", INI::parseReal, nullptr, offsetof(CameraShakerVolumeFXNugget, m_amplitude) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		auto* nugget = newInstance(CameraShakerVolumeFXNugget);
+		ini->initFromINI(nugget, fields);
+		static_cast<FXList*>(instance)->addFXNugget(nugget);
+	}
+
+private:
+	Real m_radius = 0.0f;
+	Real m_duration = 0.0f;
+	Real m_amplitude = 0.0f;
+};
+EMPTY_DTOR(CameraShakerVolumeFXNugget)
+
+class TintDrawableFXNugget : public FXNugget
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(TintDrawableFXNugget, "TintDrawableFXNugget")
+
+public:
+	void doFXPos(const Coord3D*, const Matrix3D*, Real, const Coord3D*, Real) const override {}
+
+	void doFXObj(const Object* primary, const Object*) const override
+	{
+		Drawable* draw = primary ? primary->getDrawable() : nullptr;
+		if (!draw || !(m_attack || m_decay || m_hold))
+			return;
+		draw->colorFlash(&m_color, m_decay, m_attack, m_hold);
+		if (traceRetailFXLists())
+			std::fprintf(stderr, "[Retail FXList] TintDrawable attack=%u hold=%u decay=%u rgb=(%.3f,%.3f,%.3f)\n",
+				m_attack, m_hold, m_decay, m_color.red, m_color.green, m_color.blue);
+	}
+
+	void doFXPosWithObjects(const Coord3D*, const Matrix3D*, Real, const Coord3D*, Real,
+		const Object* subject, const Object*) const override
+	{
+		doFXObj(subject, nullptr);
+	}
+
+	static void parse(INI* ini, void* instance, void*, const void*)
+	{
+		static const FieldParse fields[] = {
+			{ "Color", parseColor, nullptr, offsetof(TintDrawableFXNugget, m_color) },
+			{ "PreColorTime", INI::parseUnsignedInt, nullptr, offsetof(TintDrawableFXNugget, m_attack) },
+			{ "PostColorTime", INI::parseUnsignedInt, nullptr, offsetof(TintDrawableFXNugget, m_decay) },
+			{ "SustainedColorTime", INI::parseUnsignedInt, nullptr, offsetof(TintDrawableFXNugget, m_hold) },
+			{ "Frequency", INI::parseReal, nullptr, offsetof(TintDrawableFXNugget, m_frequency) },
+			{ "Amplitude", INI::parseReal, nullptr, offsetof(TintDrawableFXNugget, m_amplitude) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		auto* nugget = newInstance(TintDrawableFXNugget);
+		ini->initFromINI(nugget, fields);
+		static_cast<FXList*>(instance)->addFXNugget(nugget);
+	}
+
+private:
+	static void parseColor(INI* ini, void*, void* store, const void*)
+	{
+		const Int red = INI::scanInt(ini->getNextSubToken("R"));
+		const Int green = INI::scanInt(ini->getNextSubToken("G"));
+		const Int blue = INI::scanInt(ini->getNextSubToken("B"));
+		if (red < -255 || red > 255 || green < -255 || green > 255 || blue < -255 || blue > 255)
+			throw INI_INVALID_DATA;
+		*static_cast<RGBColor*>(store) = {red / 255.0f, green / 255.0f, blue / 255.0f};
+	}
+
+	RGBColor m_color{0.0f, 0.0f, 0.0f};
+	UnsignedInt m_attack = 0;
+	UnsignedInt m_decay = 0;
+	UnsignedInt m_hold = 0;
+	Real m_frequency = 0.0f;
+	Real m_amplitude = 0.0f;
+};
+EMPTY_DTOR(TintDrawableFXNugget)
 
 //-------------------------------------------------------------------------------------------------
 class TerrainScorchFXNugget : public FXNugget
@@ -1195,6 +1328,8 @@ const FXList *FXListStore::findFXList(const char* name) const
 	fxl.clear();
 	static const FieldParse retailFields[] = {
 		{ "EvaEvent", EvaEventFXNugget::parse, nullptr, 0 },
+		{ "CameraShakerVolume", CameraShakerVolumeFXNugget::parse, nullptr, 0 },
+		{ "TintDrawable", TintDrawableFXNugget::parse, nullptr, 0 },
 		{ "PlayEvenIfShrouded", INI::parseBool, nullptr, offsetof(FXList, m_playEvenIfShrouded) },
 		{ "CullingInfo", FXList::parseCullingInfo, nullptr, 0 },
 		{ nullptr, nullptr, nullptr, 0 }
