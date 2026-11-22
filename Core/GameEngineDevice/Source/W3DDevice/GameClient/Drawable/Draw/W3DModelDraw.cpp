@@ -2371,6 +2371,7 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	}
 
 	handleClientTurretPositioning();
+	dispatchAnimationFXEvents();
 	recalcBonesForClientParticleSystems();
 
   const W3DModelDrawModuleData *modData = getW3DModelDrawModuleData();
@@ -2487,6 +2488,8 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 				}
 
 				m_renderObject->Set_Animation(animHandle, startFrame, mode);
+				m_previousAnimationFXFrame = static_cast<Real>(startFrame);
+				m_animationFXFirstSample = TRUE;
 				REF_PTR_RELEASE(animHandle);
 				animHandle = nullptr;
 
@@ -2509,6 +2512,46 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 }
 
 //-------------------------------------------------------------------------------------------------
+void W3DModelDraw::dispatchAnimationFXEvents()
+{
+	if (!m_curState || !m_curState->m_animationFXEvents || !RetailFileLayers::enabled() ||
+		!TheFXListStore || !m_renderObject || m_renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD ||
+		(TheGameState && TheGameState->isInLoadGame()))
+		return;
+
+	Real frame = 0.0f;
+	Int frameCount = 0;
+	Int mode = 0;
+	Real rate = 1.0f;
+	if (!static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, frameCount, mode, rate) ||
+		(mode != RenderObjClass::ANIM_MODE_ONCE && mode != RenderObjClass::ANIM_MODE_ONCE_BACKWARDS))
+		return;
+
+	const Bool backwards = mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS;
+	const Real previous = m_previousAnimationFXFrame;
+	const Bool first = m_animationFXFirstSample;
+	m_previousAnimationFXFrame = frame;
+	m_animationFXFirstSample = FALSE;
+	for (const auto& event : *m_curState->m_animationFXEvents)
+	{
+		if (event.frameStop > 0 || event.frame < 0 || event.frame >= frameCount)
+			continue;
+		const Real marker = static_cast<Real>(event.frame);
+		const Bool crossed = backwards ? frame <= marker && (marker < previous || (first && marker == previous))
+			: frame >= marker && (marker > previous || (first && marker == previous));
+		if (!crossed)
+			continue;
+		if (const FXList* fx = TheFXListStore->findFXList(event.name.str()))
+		{
+			FXList::doFXFromDrawable(fx, *getDrawable());
+			if (TheGameLogic && std::getenv("GENERALSX_TEST_DRAWTRACE"))
+				std::fprintf(stderr, "TEST animation-fx frame=%u template=%s event=%s marker=%d clip=%.2f\n",
+					TheGameLogic->getFrame(), getDrawable()->getTemplate()->getName().str(), event.name.str(),
+					event.frame, frame);
+		}
+	}
+}
+
 Bool W3DModelDraw::setCurAnimDurationInMsec(Real desiredDurationInMsec)
 {
 	if (m_renderObject && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD)
@@ -4936,8 +4979,9 @@ void W3DModelDraw::xfer( Xfer *xfer )
 	// version
 	const Bool extendedSlots = !m_weaponRecoilInfoVec[QUATERNARY_WEAPON].empty() ||
 		!m_weaponRecoilInfoVec[QUINARY_WEAPON].empty();
-	XferVersion version = extendedSlots ? 3 : 2;
-	xfer->xferVersion( &version, 3 );
+	const Bool retail = RetailFileLayers::enabled();
+	XferVersion version = retail ? 4 : (extendedSlots ? 3 : 2);
+	xfer->xferVersion(&version, retail ? 4 : 3);
 
 	// extend base class
 	DrawModule::xfer( xfer );
@@ -5086,6 +5130,8 @@ void W3DModelDraw::xfer( Xfer *xfer )
 					//
 					Real percent = frame / INT_TO_REAL( anim->Get_Num_Frames()-1 );
 					xfer->xferReal( &percent );
+					if (version >= 4)
+						xfer->xferReal(&dummy);
 
 				}
 
@@ -5119,6 +5165,9 @@ void W3DModelDraw::xfer( Xfer *xfer )
 				// read percent
 				Real percent;
 				xfer->xferReal( &percent );
+				Real rate = 1.0f;
+				if (version >= 4)
+					xfer->xferReal(&rate);
 
 				//
 				// cast render object to HLod, if this is no longer possible we have read the
@@ -5147,6 +5196,13 @@ void W3DModelDraw::xfer( Xfer *xfer )
 
 						// set animation data
 						hlod->Set_Animation( anim, frame, curMode );
+						if (version >= 4)
+							hlod->Set_Animation_Frame_Rate_Multiplier(rate);
+						if (retail)
+						{
+							m_previousAnimationFXFrame = frame;
+							m_animationFXFirstSample = FALSE;
+						}
 
 					}
 

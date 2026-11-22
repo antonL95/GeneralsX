@@ -507,6 +507,8 @@ const ModelConditionInfo* W3DScriptedModelDrawModuleData::combineState(const Mod
 		combined.m_animationState = &animation.draw;
 		combined.m_modelState = model;
 		combined.m_enteringStateFX = animation.enteringStateFX.isEmpty() || TheFXListStore == nullptr ? nullptr : TheFXListStore->findFXList(animation.enteringStateFX.str());
+		if (!animation.fxEvents.empty())
+			combined.m_animationFXEvents = &animation.fxEvents;
 		combined.m_validStuff &= ModelConditionInfo::HAS_PROJECTILE_BONES | ModelConditionInfo::PUBLIC_BONES_VALID;
 		combined.m_particleSysBones.insert(combined.m_particleSysBones.end(),
 			animation.draw.m_particleSysBones.begin(), animation.draw.m_particleSysBones.end());

@@ -16,13 +16,7 @@ public:
 		AsciiString replacement;
 	};
 
-	struct FXEvent
-	{
-		Int frame = 0;
-		Int frameStop = 0;
-		AsciiString name;
-		Bool fireWhenSkipped = FALSE;
-	};
+	using FXEvent = ModelConditionInfo::AnimationFXEvent;
 
 	struct LuaEvent
 	{

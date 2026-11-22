@@ -158,6 +158,14 @@ class SubObjectsUpgradeModuleData;
 
 struct ModelConditionInfo
 {
+	struct AnimationFXEvent
+	{
+		Int frame = 0;
+		Int frameStop = 0;
+		AsciiString name;
+		Bool fireWhenSkipped = FALSE;
+	};
+
 	struct HideShowSubObjInfo
 	{
 		AsciiString subObjName;
@@ -248,6 +256,7 @@ struct ModelConditionInfo
 
 	Int m_pristineBoneFrame;
 	const FXList* m_enteringStateFX = nullptr;
+	const std::vector<AnimationFXEvent>* m_animationFXEvents = nullptr;
 	const ModelConditionInfo* m_animationState = nullptr;
 	const ModelConditionInfo* m_modelState = nullptr;
 
@@ -561,8 +570,11 @@ private:
 	Bool													m_pauseAnimation;
 	Int														m_animationMode;
 	UnsignedInt										m_weaponTimingEnd = 0;
+	Real m_previousAnimationFXFrame = 0.0f;
+	Bool m_animationFXFirstSample = TRUE;
 
 	void adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction);
+	void dispatchAnimationFXEvents();
 	void applyWeaponTiming();
 	void traceAnimationState() const;
 	Real getCurrentAnimFraction() const;
