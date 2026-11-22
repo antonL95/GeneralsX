@@ -20,6 +20,8 @@ RetailTerrainShadow *TheRetailTerrainShadow = nullptr;
 
 namespace
 {
+constexpr auto ShadowDepthFloat = static_cast<D3DFORMAT>(114);
+
 const DWORD DepthShader[] = {
 	0xffff0104,
 	0x00000040, 0x80070000, 0xb0e40000,
@@ -160,6 +162,7 @@ RetailTerrainShadow::~RetailTerrainShadow()
 void RetailTerrainShadow::ReleaseResources()
 {
 	m_ready = false;
+	m_floatDepth = false;
 	m_size = 0;
 	if (m_depth) { m_depth->Release(); m_depth = nullptr; }
 	if (m_surface) { m_surface->Release(); m_surface = nullptr; }
@@ -186,8 +189,11 @@ bool RetailTerrainShadow::prepare(Int size)
 	ReleaseResources();
 	m_size = size;
 	auto *device = DX8Wrapper::_Get_D3D_Device8();
-	return SUCCEEDED(device->CreateTexture(size, size, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &m_texture)) &&
-		SUCCEEDED(m_texture->GetSurfaceLevel(0, &m_surface)) &&
+	const auto createDepthMap = [&](D3DFORMAT format) {
+		return SUCCEEDED(device->CreateTexture(size, size, 1, D3DUSAGE_RENDERTARGET, format, D3DPOOL_DEFAULT, &m_texture));
+	};
+	m_floatDepth = DX8Wrapper::Get_Effect_Device9() && createDepthMap(ShadowDepthFloat);
+	return (m_floatDepth || createDepthMap(D3DFMT_A8R8G8B8)) && SUCCEEDED(m_texture->GetSurfaceLevel(0, &m_surface)) &&
 		SUCCEEDED(device->CreateDepthStencilSurface(size, size, D3DFMT_D24S8, D3DMULTISAMPLE_NONE, &m_depth)) &&
 		SUCCEEDED(device->CreatePixelShader(DepthShader, &m_depthShader)) &&
 		SUCCEEDED(device->CreatePixelShader(CutoutDepthShader, &m_cutoutShader)) &&
@@ -313,7 +319,7 @@ void RetailTerrainShadow::render(SceneClass &scene, const Vector3 &centre, Int s
 		device->SetRenderState(D3DRS_STENCILENABLE, FALSE);
 		device->SetRenderState(D3DRS_COLORWRITEENABLE, 15);
 		device->SetVertexShader(D3DFVF_XYZRHW | D3DFVF_TEX2);
-		const float encode[4] = {1.0f, 255.0f / 256.0f, -1.0f / 255.0f, 0.0f};
+		const float encode[4] = {1.0f, 255.0f / 256.0f, m_floatDepth ? 0.0f : -1.0f / 255.0f, 0.0f};
 		device->SetPixelShaderConstant(0, encode, 1);
 		setStage(1, D3DTADDRESS_WRAP, D3DTEXF_LINEAR);
 
@@ -347,6 +353,30 @@ void RetailTerrainShadow::render(SceneClass &scene, const Vector3 &centre, Int s
 	if (depth) depth->Release();
 }
 
+void RetailTerrainShadow::worldToShadowMatrix(D3DMATRIX &matrix) const
+{
+	const Vector3 right = m_right * (1.0f / m_viewDistance);
+	const Vector3 up = m_up * (-1.0f / m_viewDistance);
+	const Vector3 ray = m_ray * (1.0f / m_viewDistance);
+	matrix = D3DXMATRIX(right.X, up.X, ray.X, 0,
+		right.Y, up.Y, ray.Y, 0, right.Z, up.Z, ray.Z, 0,
+		0.5f - Vector3::Dot_Product(m_centre, right),
+		0.5f - Vector3::Dot_Product(m_centre, up),
+		0.5f - Vector3::Dot_Product(m_centre, ray), 1);
+}
+
+bool RetailTerrainShadow::getAuthoredShadow(void *&texture, D3DMATRIX &worldToShadow, float &texelSize) const
+{
+	if (!m_ready || !m_floatDepth || ShaderClass::Is_Backface_Culling_Inverted())
+		return false;
+	texture = DX8Wrapper::Get_Effect_Texture9(m_texture);
+	if (!texture)
+		return false;
+	worldToShadowMatrix(worldToShadow);
+	texelSize = 1.0f / m_size;
+	return true;
+}
+
 bool RetailTerrainShadow::beginTerrainPass()
 {
 	if (!m_ready || ShaderClass::Is_Backface_Culling_Inverted())
@@ -358,14 +388,8 @@ bool RetailTerrainShadow::beginTerrainPass()
 	if (!D3DXMatrixInverse(&inverse, nullptr, reinterpret_cast<const D3DXMATRIX *>(&view)))
 		return false;
 
-	const Vector3 right = m_right * (1.0f / m_viewDistance);
-	const Vector3 up = m_up * (-1.0f / m_viewDistance);
-	const Vector3 ray = m_ray * (1.0f / m_viewDistance);
-	D3DXMATRIX projection(right.X, up.X, ray.X, 0,
-		right.Y, up.Y, ray.Y, 0, right.Z, up.Z, ray.Z, 0,
-		0.5f - Vector3::Dot_Product(m_centre, right),
-		0.5f - Vector3::Dot_Product(m_centre, up),
-		0.5f - Vector3::Dot_Product(m_centre, ray), 1);
+	D3DXMATRIX projection;
+	worldToShadowMatrix(projection);
 	const float offset = 0.5f / m_size;
 	auto *device = DX8Wrapper::_Get_D3D_Device8();
 	DX8Wrapper::Apply_Render_State_Changes();

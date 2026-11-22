@@ -107,6 +107,11 @@ std::unique_ptr<NativePass> NativePass::makeTerrain(void *handle, const Effect &
 	return make(handle, effect, createShader, Kind::Terrain);
 }
 
+std::unique_ptr<NativePass> NativePass::makeTerrainWithShadows(void *handle, const Effect &effect, CreateShader createShader)
+{
+	return make(handle, effect, createShader, Kind::ShadowTerrain);
+}
+
 std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *handle, const Effect &effect, CreateShader createShader)
 {
 	return make(handle, effect, createShader, Kind::NormalMapped);
@@ -125,7 +130,8 @@ std::unique_ptr<NativePass> NativePass::makeVegetation(void *handle, const Effec
 std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect, CreateShader createShader, Kind kind)
 {
 	auto *device = static_cast<IDirect3DDevice9 *>(handle);
-	const bool terrain = kind == Kind::Terrain;
+	const bool shadowTerrain = kind == Kind::ShadowTerrain;
+	const bool terrain = kind == Kind::Terrain || shadowTerrain;
 	const bool model = kind == Kind::NormalMapped;
 	const bool defaultMesh = kind == Kind::DefaultMesh;
 	const bool vegetation = kind == Kind::Vegetation;
@@ -154,7 +160,7 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 					model ? (vertex ? "VS_M_Array" : "PS_M_Array") :
 					defaultMesh ? (vertex ? "VS_Array" : "PS_Array") : vegetation && !vertex ? "PS_Array" :
 					fullWater && !vertex ? "PSBumpSpecular_Array" : "";
-				const unsigned variant = terrain ? 4 : vertex || vegetation || fullWater ? 0 : defaultMesh ? 37 : 1;
+				const unsigned variant = terrain ? (shadowTerrain ? 9 : 4) : vertex || vegetation || fullWater ? 0 : defaultMesh ? 37 : 1;
 				if (array.empty() || state.parameterReference != array)
 					return nullptr;
 				const auto parameter = std::find_if(effect.parameters.begin(), effect.parameters.end(),
@@ -228,10 +234,11 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 		{0, static_cast<WORD>(offsetof(WaterVertex, terrain)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
 		D3DDECL_END()
 	};
+	const auto terrainColor = static_cast<WORD>(shadowTerrain ? offsetof(TerrainVertex, fill) : offsetof(TerrainVertex, diffuse));
 	const D3DVERTEXELEMENT9 terrainDeclaration[] = {
 		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
 		{0, static_cast<WORD>(offsetof(TerrainVertex, normal)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
-		{0, static_cast<WORD>(offsetof(TerrainVertex, diffuse)), D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+		{0, terrainColor, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
 		{0, static_cast<WORD>(offsetof(TerrainVertex, uv)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
 		D3DDECL_END()
 	};
@@ -291,10 +298,11 @@ bool NativePass::drawWater(void *handle, std::span<const WaterVertex> vertices, 
 
 bool NativePass::drawTerrain(void *handle, std::span<const TerrainVertex> base, std::span<const uint32_t> baseIndices,
 	std::span<const TerrainVertex> blend, std::span<const uint32_t> blendIndices,
-	const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture)
+	const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture,
+	std::span<const TerrainVertex> third, std::span<const uint32_t> thirdIndices, void *thirdAtlas)
 {
 	auto *device = static_cast<IDirect3DDevice9 *>(handle);
-	if (base.empty() || baseIndices.empty())
+	if (base.empty() || baseIndices.empty() || (!thirdIndices.empty() && (!thirdAtlas || third.empty())))
 		return false;
 	return m_data->draw(device, setBinding, getTexture, [&] {
 		const auto draw = [&](auto vertices, auto indices) {
@@ -306,9 +314,12 @@ bool NativePass::drawTerrain(void *handle, std::span<const TerrainVertex> base, 
 			FAILED(device->SetRenderState(D3DRS_DEPTHBIAS, std::bit_cast<uint32_t>(-0.000001f))) ||
 			FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE)) || !draw(base, baseIndices))
 			return false;
-		if (!blendIndices.empty() &&
-			(FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE)) ||
-			 !draw(blend, blendIndices)))
+		if ((!blendIndices.empty() || !thirdIndices.empty()) && FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE)))
+			return false;
+		if (!blendIndices.empty() && !draw(blend, blendIndices))
+			return false;
+		if (!thirdIndices.empty() && (FAILED(device->SetTexture(0, static_cast<IDirect3DBaseTexture9 *>(thirdAtlas))) ||
+			!draw(third, thirdIndices)))
 			return false;
 		return true;
 	});
@@ -400,6 +411,7 @@ struct NativePass::Data {};
 std::unique_ptr<NativePass> NativePass::makeWater(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeFullWater(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeTerrain(void *, const Effect &, CreateShader) { return nullptr; }
+std::unique_ptr<NativePass> NativePass::makeTerrainWithShadows(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeDefaultMesh(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeVegetation(void *, const Effect &, CreateShader) { return nullptr; }
@@ -412,7 +424,8 @@ bool NativePass::drawWater(void *, std::span<const WaterVertex>, std::span<const
 
 bool NativePass::drawTerrain(void *, std::span<const TerrainVertex>, std::span<const uint32_t>,
 	std::span<const TerrainVertex>, std::span<const uint32_t>, const SetBinding &,
-	const std::function<void *(std::string_view)> &) { return false; }
+	const std::function<void *(std::string_view)> &, std::span<const TerrainVertex>,
+	std::span<const uint32_t>, void *) { return false; }
 
 bool NativePass::drawNormalMapped(void *, std::span<const NormalMappedVertex>, std::span<const uint32_t>,
 	const SetBinding &, const std::function<void *(std::string_view)> &, bool, bool) { return false; }

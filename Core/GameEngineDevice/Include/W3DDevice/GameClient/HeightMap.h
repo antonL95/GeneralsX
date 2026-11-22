@@ -118,7 +118,7 @@ protected:
 	///update vertex buffers associated with the given rectangle
 	void initDestAlphaLUT();	///<initialize water depth LUT stored in m_destAlphaTexture
 	void renderTerrainPass(CameraClass *pCamera);	///< renders additional terrain pass.
-	bool drawRetailTerrain(CameraClass &camera);
+	bool drawRetailTerrain(CameraClass &camera, bool &authoredShadow);
 	std::shared_ptr<class RetailTerrainRuntime> m_retailTerrainRuntime;
 	virtual Int	getNumExtraBlendTiles(Bool visible) override { return visible?m_numVisibleExtraBlendTiles:m_numExtraBlendTiles;}
 	void freeIndexVertexBuffers();

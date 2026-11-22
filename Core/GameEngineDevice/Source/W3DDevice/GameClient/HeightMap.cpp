@@ -2038,8 +2038,9 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	}
 
 	Int pass;
+	bool authoredShadow = false;
 	const bool compiledTerrain = !doMultiPassWireFrame && !m_disableTextures && !Is_Hidden() &&
-		!ShaderClass::Is_Backface_Culling_Inverted() && doCloud && useMacroTexture() && drawRetailTerrain(rinfo.Camera);
+		!ShaderClass::Is_Backface_Culling_Inverted() && doCloud && useMacroTexture() && drawRetailTerrain(rinfo.Camera, authoredShadow);
 	// GeneralsX @bugfix fbraz3 08/10/2026 A water mirror leaves the ground out (Reforged pattern)
 	for (pass = 0; !compiledTerrain && pass < devicePasses && !ShaderClass::Is_Backface_Culling_Inverted(); ++pass) {
 #ifdef TIMING_TESTS
@@ -2094,9 +2095,9 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 			renderShoreLines(&rinfo.Camera);
 
 			//Do additional pass over any tiles that have 3 textures blended together.
-			if (TheGlobalData->m_use3WayTerrainBlends)
+			if (TheGlobalData->m_use3WayTerrainBlends && !authoredShadow)
 				renderExtraBlendTiles();
-			if (TheRetailTerrainShadow && TheRetailTerrainShadow->beginTerrainPass())
+			if (!authoredShadow && TheRetailTerrainShadow && TheRetailTerrainShadow->beginTerrainPass())
 			{
 				renderTerrainPass(&rinfo.Camera);
 				TheRetailTerrainShadow->endTerrainPass();

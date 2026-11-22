@@ -4,6 +4,7 @@
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/TerrainLogic.h"
 #include "W3DDevice/GameClient/RetailEffectInput.h"
+#include "W3DDevice/GameClient/RetailTerrainShadow.h"
 #include "W3DDevice/GameClient/TerrainTex.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
@@ -13,6 +14,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <cstdio>
 #include <memory>
 
@@ -30,15 +32,19 @@ class RetailTerrainRuntime
 {
 public:
 	std::unique_ptr<RetailFX::NativePass> pass;
+	std::unique_ptr<RetailFX::NativePass> shadowPass;
 	std::vector<RetailFX::TerrainVertex> base;
 	std::vector<RetailFX::TerrainVertex> blend;
+	std::vector<RetailFX::TerrainVertex> third;
 	std::vector<uint32_t> indices;
 	std::vector<uint32_t> blendIndices;
+	std::vector<uint32_t> thirdIndices;
 	bool drew = false;
+	bool drewShadow = false;
 	bool failed = false;
 };
 
-bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera)
+bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera, bool &authoredShadow)
 {
 	if (!RetailFileLayers::enabled() || !m_map || !m_vertexBufferBackup || !TheTerrainLogic)
 		return false;
@@ -50,12 +56,15 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera)
 	{
 		m_retailTerrainRuntime = std::make_shared<RetailTerrainRuntime>();
 		if (const auto effect = RetailFX::loadEffectFile("shaders/compiled/terrain.fxo"))
+		{
 			m_retailTerrainRuntime->pass = RetailFX::NativePass::makeTerrain(device, *effect, DX8Wrapper::Create_Effect_Shader9);
-		if (!m_retailTerrainRuntime->pass)
+			m_retailTerrainRuntime->shadowPass = RetailFX::NativePass::makeTerrainWithShadows(device, *effect, DX8Wrapper::Create_Effect_Shader9);
+		}
+		if (!m_retailTerrainRuntime->pass && !m_retailTerrainRuntime->shadowPass)
 			std::fprintf(stderr, "[RetailFX] Could not load Terrain Default\n");
 	}
 	auto &runtime = *m_retailTerrainRuntime;
-	if (!runtime.pass)
+	if (!runtime.pass && !runtime.shadowPass)
 		return false;
 
 	auto *baseTexture = RetailFX::nativeTexture(m_stageZeroTexture);
@@ -76,6 +85,78 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera)
 
 	const auto fog = RetailFX::fogBindings(device8);
 	const auto cloud = W3DShaderManager::getRetailCloudUV();
+	const auto &sun = TheGlobalData->m_terrainDiffuse[0];
+	const auto &direction = TheGlobalData->m_terrainLightPos[0];
+	Vector3 sunRay(-direction.x, -direction.y, -direction.z);
+	sunRay.Normalize();
+	const float encodingScale = m_map->usesRetailOverbright() ? 0.5f : 1.0f;
+	const auto encodeFill = [&](uint32_t baked, const Coord3D &normal, float sourceScale) {
+		const float direct = std::clamp(sunRay.X * normal.x + sunRay.Y * normal.y + sunRay.Z * normal.z, 0.0f, 1.0f);
+		const auto channel = [baked, direct, sourceScale, encodingScale](unsigned shift, float intensity) {
+			const float original = static_cast<float>((baked >> shift) & 255u) * sourceScale;
+			const float fill = original - direct * intensity * encodingScale * 255.0f;
+			return static_cast<uint32_t>(std::clamp(fill, 0.0f, 255.0f) + 0.5f) << shift;
+		};
+		return (baked & 0xff000000u) | channel(16, sun.red) | channel(8, sun.green) | channel(0, sun.blue);
+	};
+	D3DXMATRIX worldToShadow;
+	float shadowTexel = 0.0f;
+	void *shadowTexture = nullptr;
+	const bool legacyShore = TheGlobalData->m_showSoftWaterEdge && m_numShoreLineTiles > 0;
+	bool shadowReady = runtime.shadowPass && TheRetailTerrainShadow && !legacyShore &&
+		TheGlobalData->m_use3WayTerrainBlends != 2 &&
+		TheRetailTerrainShadow->getAuthoredShadow(shadowTexture, worldToShadow, shadowTexel);
+	void *thirdAtlas = nullptr;
+	runtime.third.clear();
+	runtime.thirdIndices.clear();
+	if (shadowReady && TheGlobalData->m_use3WayTerrainBlends && m_numExtraBlendTiles)
+	{
+		const Int minX = m_map->getDrawOrgX(), minY = m_map->getDrawOrgY();
+		const Int maxX = std::min(minX + m_map->getDrawWidth(), m_map->getXExtent()) - 1;
+		const Int maxY = std::min(minY + m_map->getDrawHeight(), m_map->getYExtent()) - 1;
+		const Int border = m_map->getBorderSizeInline();
+		const auto *heights = m_map->getDataPtr();
+		for (Int i = 0; i < m_numExtraBlendTiles; ++i)
+		{
+			const Int x = m_extraBlendTilePositions[i] & 0xffff, y = m_extraBlendTilePositions[i] >> 16;
+			if (x < minX || x >= maxX || y < minY || y >= maxY)
+				continue;
+			Real u[4], v[4];
+			UnsignedByte alpha[4];
+			Bool flip, cliff;
+			if (!m_map->getExtraAlphaUVData(x, y, u, v, alpha, &flip, &cliff))
+				continue;
+			if (std::none_of(std::begin(alpha), std::end(alpha), [](auto value) { return value != 0; }))
+			{
+				shadowReady = false;
+				break;
+			}
+			const auto first = static_cast<uint32_t>(runtime.third.size());
+			const Int px[] = {x, x + 1, x + 1, x};
+			const Int py[] = {y, y, y + 1, y + 1};
+			for (Int corner = 0; corner < 4; ++corner)
+			{
+				const float wx = static_cast<float>(px[corner] - border) * MAP_XY_FACTOR;
+				const float wy = static_cast<float>(py[corner] - border) * MAP_XY_FACTOR;
+				const float z = m_map->toWorldHeight(heights[px[corner] + py[corner] * m_map->getXExtent()]);
+				Coord3D normal{0.0f, 0.0f, 1.0f};
+				TheTerrainLogic->getGroundHeight(wx, wy, &normal);
+				const uint32_t color = (getStaticDiffuse(px[corner], py[corner]) & 0xffffffu) | (uint32_t(alpha[corner]) << 24);
+				runtime.third.push_back({{wx, wy, z}, {normal.x, normal.y, normal.z}, color, {u[corner], v[corner]},
+					encodeFill(color, normal, encodingScale)});
+			}
+			const auto z = [&](int offset) { return runtime.third[first + offset].position[2]; };
+			if (flip || (cliff && std::abs(z(0) - z(2)) > std::abs(z(1) - z(3))))
+				runtime.thirdIndices.insert(runtime.thirdIndices.end(), {first + 1, first + 3, first, first + 1, first + 2, first + 3});
+			else
+				pushQuad(runtime.thirdIndices, first);
+		}
+		if (shadowReady && !runtime.thirdIndices.empty())
+		{
+			thirdAtlas = RetailFX::nativeTexture(m_stageOneTexture);
+			shadowReady = thirdAtlas != nullptr;
+		}
+	}
 	const auto setBinding = [&](const RetailFX::Binding &binding, std::span<RetailFX::Register> floats, std::span<int> bools) {
 		if (!bools.empty() || floats.empty())
 			return;
@@ -92,13 +173,17 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera)
 			RetailFX::writeMatrix(floats, inverseView);
 		else if (name == "Cloud")
 			floats[0] = cloud;
+		else if (name == "ShadowInfo" && shadowReady)
+		{
+			RetailFX::writeMatrix(floats, worldToShadow);
+			if (floats.size() > 4)
+				floats[4] = {0.0f, 0.0f, shadowTexel, shadowTexel};
+		}
 		else if (name == "MainDirectionalLight")
 		{
-			const auto &sun = TheGlobalData->m_terrainDiffuse[0];
-			const auto &direction = TheGlobalData->m_terrainLightPos[0];
 			floats[0] = {sun.red, sun.green, sun.blue, 0.0f};
 			if (floats.size() > 1)
-				floats[1] = {direction.x, direction.y, direction.z, 0.0f};
+				floats[1] = {-direction.x, -direction.y, -direction.z, 0.0f};
 		}
 		else if (name == "Fog")
 			std::copy_n(fog.begin(), std::min(fog.size(), floats.size()), floats.begin());
@@ -119,6 +204,7 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera)
 		if (name == "BaseTexture") return baseTexture;
 		if (name == "CloudTexture") return cloudTexture;
 		if (name == "MacroTexture") return macroTexture;
+		if (name == "ShadowMap") return shadowTexture;
 		return nullptr;
 	};
 
@@ -147,12 +233,15 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera)
 						const auto &input = quad[i];
 						Coord3D normal{0.0f, 0.0f, 1.0f};
 						TheTerrainLogic->getGroundHeight(input.x, input.y, &normal);
-						RetailFX::TerrainVertex vertex{{input.x, input.y, input.z},
-							{normal.x, normal.y, normal.z}, static_cast<uint32_t>(input.diffuse) | 0xff000000u, {input.u1, input.v1}};
+						const auto color = static_cast<uint32_t>(input.diffuse);
+						const auto fill = shadowReady ? encodeFill(color, normal, 1.0f) : color;
+						RetailFX::TerrainVertex vertex{{input.x, input.y, input.z}, {normal.x, normal.y, normal.z},
+							color | 0xff000000u, {input.u1, input.v1}, fill | 0xff000000u};
 						runtime.base.push_back(vertex);
 						if (blended)
 						{
-							vertex.diffuse = static_cast<uint32_t>(input.diffuse);
+							vertex.diffuse = color;
+							vertex.fill = fill;
 							vertex.uv[0] = input.u2;
 							vertex.uv[1] = input.v2;
 							runtime.blend.push_back(vertex);
@@ -173,12 +262,17 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera)
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, zWrite);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, colorWrite);
 
-	const bool drawn = runtime.pass->drawTerrain(device, runtime.base, runtime.indices, runtime.blend,
-		runtime.blendIndices, setBinding, getTexture);
-	if (drawn && !runtime.drew)
+	authoredShadow = shadowReady && runtime.shadowPass->drawTerrain(device, runtime.base, runtime.indices,
+		runtime.blend, runtime.blendIndices, setBinding, getTexture, runtime.third, runtime.thirdIndices, thirdAtlas);
+	if (authoredShadow)
+		m_numVisibleExtraBlendTiles = static_cast<Int>(runtime.third.size() / 4);
+	const bool drawn = authoredShadow || (runtime.pass && runtime.pass->drawTerrain(device, runtime.base, runtime.indices,
+		runtime.blend, runtime.blendIndices, setBinding, getTexture));
+	auto &reported = authoredShadow ? runtime.drewShadow : runtime.drew;
+	if (drawn && !reported)
 	{
-		std::fprintf(stderr, "[RetailFX] Drew Terrain Default\n");
-		runtime.drew = true;
+		std::fprintf(stderr, "[RetailFX] Drew Terrain Default%s\n", authoredShadow ? " with authored shadows" : "");
+		reported = true;
 	}
 	if (!drawn && !runtime.failed)
 	{

@@ -22,6 +22,7 @@ public:
 	bool beginTerrainPass();
 	void endTerrainPass();
 	bool isReady() const { return m_ready; }
+	bool getAuthoredShadow(void *&texture, D3DMATRIX &worldToShadow, float &texelSize) const;
 
 private:
 	struct CasterVertex
@@ -34,6 +35,7 @@ private:
 	bool prepare(Int size);
 	void castObject(RenderObjClass &object);
 	void project(const Vector3 &position, Vector3 &coord) const;
+	void worldToShadowMatrix(D3DMATRIX &matrix) const;
 
 	IDirect3DTexture8 *m_texture = nullptr;
 	IDirect3DSurface8 *m_surface = nullptr;
@@ -45,6 +47,7 @@ private:
 	Int m_authoredSize = 0;
 	Real m_viewDistance = 1500.0f;
 	bool m_ready = false;
+	bool m_floatDepth = false;
 	Vector3 m_centre;
 	Vector3 m_right;
 	Vector3 m_up;
