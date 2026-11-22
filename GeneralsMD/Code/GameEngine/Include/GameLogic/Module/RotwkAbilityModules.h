@@ -442,3 +442,15 @@ private:
 	Coord3D m_pendingCenter;
 	Bool m_hasPendingCenter = FALSE;
 };
+
+class SplitHordeSpecialPower final : public SpecialPowerModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(SplitHordeSpecialPower, "SplitHordeSpecialPower")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(SplitHordeSpecialPower, SpecialPowerModuleData)
+
+public:
+	using SpecialPowerModule::SpecialPowerModule;
+
+protected:
+	void applyPowerEffect(const Coord3D* position) override;
+};

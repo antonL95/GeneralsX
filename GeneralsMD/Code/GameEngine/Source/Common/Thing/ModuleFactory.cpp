@@ -502,6 +502,8 @@ void ModuleFactory::init()
 		addModule( AttributeModifierAuraUpdate );
 		addModule( PassiveAreaEffectBehavior );
 		addModule( AttributeModifierUpgrade );
+		addModule( AllowBannerSpawnUpgrade );
+
 		addModule( LargeGroupAudioUpdate );
 		addModule( PickupStuffUpdate );
 		addModule( AttachUpdate );
@@ -672,6 +674,8 @@ void ModuleFactory::init()
 		addModule( GrabPassengerSpecialPower );
 		addModule( AISpecialPowerUpdate );
 		addModule( PlayerHealSpecialPower );
+		addModule( SplitHordeSpecialPower );
+
 	}
 	addModule( FireWeaponPower );
 	addModule( SpecialAbility );

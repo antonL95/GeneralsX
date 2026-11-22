@@ -34,6 +34,7 @@
 #if !RTS_GENERALS
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #endif
 
 #include <algorithm>
@@ -42,6 +43,21 @@
 #include <sstream>
 #include <string>
 #include <utility>
+
+#if !RTS_GENERALS
+Bool HordeContain::allowsBannerSpawn(const Object* horde)
+{
+	const Object* building = horde;
+	while (const Object* container = building->getContainedBy())
+		building = container;
+	if (!building->isKindOf(KINDOF_STRUCTURE))
+		return TRUE;
+	for (BehaviorModule** module = building->getBehaviorModules(); *module; ++module)
+		if ((*module)->getModuleNameKey() == NAMEKEY("AllowBannerSpawnUpgrade"))
+			return (*module)->getUpgrade()->isAlreadyUpgraded();
+	return TRUE;
+}
+#endif
 
 namespace
 {
@@ -709,6 +725,10 @@ Bool HordeContain::addBannerCarrier(Bool feedback)
 	Object* anchor = getObject();
 	if (!RetailFileLayers::enabled() || anchor->isEffectivelyDead() || getBannerCarrier())
 		return FALSE;
+#if !RTS_GENERALS
+	if (!allowsBannerSpawn(anchor))
+		return FALSE;
+#endif
 	const auto* data = getHordeContainModuleData();
 	for (const AsciiString& name : data->m_bannerCarriersAllowed)
 	{
@@ -766,6 +786,10 @@ void HordeContain::updateReplenishment()
 	const auto* data = findBannerData(type);
 	if (!data)
 		return;
+#if !RTS_GENERALS
+	if (!allowsBannerSpawn(getObject()))
+		return;
+#endif
 
 	const auto frame = TheGameLogic->getFrame();
 	if (std::any_of(getContainList().begin(), getContainList().end(), isAttackingMelee))
@@ -1402,6 +1426,131 @@ void HordeContain::toggleWeaponSet(const WeaponSetFlags& flags, Bool enabled)
 		if (!member->isEffectivelyDead())
 			member->setWeaponSetFlags(flags, enabled);
 }
+
+#if !RTS_GENERALS
+Bool HordeContain::splitHorde()
+{
+	Object* anchor = getObject();
+	const auto* formation = getActiveFormation();
+	const auto& definitions = formation->m_splitHordes.empty() ?
+		getHordeContainModuleData()->m_splitHordes : formation->m_splitHordes;
+	if (!RetailFileLayers::enabled() || anchor->isEffectivelyDead() || !m_payloadCreated || definitions.empty() ||
+		anchor->getContainedBy())
+		return FALSE;
+
+	struct SplitGroup
+	{
+		const ThingTemplate* type = nullptr;
+		std::vector<Object*> members;
+		Object* result = nullptr;
+		HordeContain* contain = nullptr;
+	};
+	std::vector<SplitGroup> groups(definitions.size());
+	for (std::size_t index = 0; index < definitions.size(); ++index)
+	{
+		groups[index].type = TheThingFactory->findTemplate(definitions[index].result.c_str(), FALSE);
+		if (!groups[index].type || !groups[index].type->isKindOf(KINDOF_HORDE))
+			return FALSE;
+	}
+	Object* banner = nullptr;
+	for (Object* member : getContainList())
+	{
+		if (member->isEffectivelyDead())
+			continue;
+		if (isBannerCarrier(member))
+		{
+			banner = member;
+			continue;
+		}
+		const Int slot = getMemberSlot(member->getID());
+		const Int rank = slot >= 0 ? formation->m_layout.slots()[slot].rank : 0;
+		bool assigned = false;
+		for (std::size_t index = 0; index < definitions.size(); ++index)
+		{
+			const auto& def = definitions[index];
+			if (stricmp(def.unitType.c_str(), member->getTemplate()->getName().str()) != 0 ||
+				(def.rankNumber > 0 && def.rankNumber != rank))
+				continue;
+			groups[index].members.push_back(member);
+			assigned = true;
+			break;
+		}
+		if (!assigned)
+			return FALSE;
+	}
+	if (std::none_of(groups.begin(), groups.end(), [](const SplitGroup& group) { return !group.members.empty(); }))
+		return FALSE;
+
+	for (auto& group : groups)
+	{
+		if (group.members.empty())
+			continue;
+		group.result = TheThingFactory->newObject(group.type, anchor->getTeam());
+		group.contain = const_cast<HordeContain*>(get(group.result));
+		if (!group.contain || group.members.size() > static_cast<std::size_t>(group.contain->getContainMax()))
+		{
+			for (auto& created : groups)
+				if (created.result)
+					TheGameLogic->destroyObject(created.result);
+			return FALSE;
+		}
+		group.contain->m_payloadCreated = TRUE;
+	}
+
+	const Real experience = anchor->getExperienceTracker()->getRetailExperience();
+	for (auto& group : groups)
+	{
+		if (!group.result)
+			continue;
+		Coord3D center{};
+		for (const Object* member : group.members)
+		{
+			center.x += member->getPosition()->x;
+			center.y += member->getPosition()->y;
+		}
+		center.x /= group.members.size();
+		center.y /= group.members.size();
+		center.z = TheTerrainLogic->getGroundHeight(center.x, center.y);
+		group.result->setPosition(&center);
+		group.result->setOrientation(anchor->getOrientation());
+		group.result->getExperienceTracker()->advanceRetailLevel(experience, FALSE);
+		if (const auto* sourceStance = StancesBehavior::find(anchor))
+			if (auto* stance = StancesBehavior::find(group.result))
+				stance->setStance(sourceStance->getStance());
+		RotwkModifierModules::applyHordeFormationModifiers(group.result);
+
+		group.contain->enableLoadSounds(FALSE);
+		for (Object* member : group.members)
+		{
+			if (auto* ai = member->getAI())
+				ai->aiIdle(CMD_FROM_SCRIPT);
+			removeFromContain(member);
+			group.contain->OpenContain::addToContain(member, FALSE);
+			if (member->getExperienceTracker()->getExperienceSink() == anchor->getID())
+				member->getExperienceTracker()->setExperienceSink(group.result->getID());
+		}
+		if (banner)
+		{
+			const auto& allowed = group.contain->getHordeContainModuleData()->m_bannerCarriersAllowed;
+			if (std::any_of(allowed.begin(), allowed.end(), [&](const AsciiString& name)
+				{ return name.compareNoCase(banner->getTemplate()->getName()) == 0; }))
+			{
+				removeFromContain(banner);
+				group.contain->OpenContain::addToContain(banner, FALSE);
+				banner = nullptr;
+			}
+		}
+		group.contain->enableLoadSounds(TRUE);
+	}
+	if (banner)
+	{
+		removeFromContain(banner);
+		TheGameLogic->destroyObject(banner);
+	}
+	TheGameLogic->destroyObject(anchor);
+	return TRUE;
+}
+#endif
 
 UpdateSleepTime HordeContain::update()
 {

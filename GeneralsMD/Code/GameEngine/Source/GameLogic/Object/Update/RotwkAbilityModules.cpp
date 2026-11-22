@@ -1629,3 +1629,14 @@ AutoAbilityBehavior::~AutoAbilityBehavior()
 PlayerHealSpecialPower::~PlayerHealSpecialPower()
 {
 }
+
+SplitHordeSpecialPower::~SplitHordeSpecialPower() = default;
+void SplitHordeSpecialPower::crc(Xfer* xfer) { SpecialPowerModule::crc(xfer); }
+void SplitHordeSpecialPower::xfer(Xfer* xfer) { SpecialPowerModule::xfer(xfer); }
+void SplitHordeSpecialPower::loadPostProcess() { SpecialPowerModule::loadPostProcess(); }
+
+void SplitHordeSpecialPower::applyPowerEffect(const Coord3D*)
+{
+	if (auto* horde = const_cast<HordeContain*>(HordeContain::get(getObject())))
+		horde->splitHorde();
+}

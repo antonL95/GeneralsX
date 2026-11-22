@@ -354,3 +354,16 @@ namespace RotwkModifierModules
 void applyHordeFormationModifiers( Object* horde );
 void removeHordeFormationModifiers( Object* horde );
 }
+
+class AllowBannerSpawnUpgrade final : public UpgradeModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(AllowBannerSpawnUpgrade, "AllowBannerSpawnUpgrade")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(AllowBannerSpawnUpgrade, UpgradeModuleData)
+
+public:
+	using UpgradeModule::UpgradeModule;
+
+protected:
+	void upgradeImplementation() override;
+	Bool isSubObjectsUpgrade() override { return FALSE; }
+};

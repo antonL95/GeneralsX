@@ -1571,3 +1571,22 @@ void removeHordeFormationModifiers( Object* horde )
 		AttributeModifiers::remove(horde, name, AttributeModifiers::ownerOf(horde, contain->getModuleTagNameKey()));
 }
 }
+
+AllowBannerSpawnUpgrade::~AllowBannerSpawnUpgrade() = default;
+void AllowBannerSpawnUpgrade::crc(Xfer* xfer) { UpgradeModule::crc(xfer); }
+void AllowBannerSpawnUpgrade::xfer(Xfer* xfer) { UpgradeModule::xfer(xfer); }
+void AllowBannerSpawnUpgrade::loadPostProcess() { UpgradeModule::loadPostProcess(); }
+
+void AllowBannerSpawnUpgrade::upgradeImplementation()
+{
+	setUpgradeExecuted(TRUE);
+	const auto* building = getObject()->getContain();
+	if (!building)
+		return;
+	const auto* occupants = building->getContainedItemsList();
+	if (!occupants)
+		return;
+	for (Object* occupant : *occupants)
+		if (auto* horde = const_cast<HordeContain*>(HordeContain::get(occupant)))
+			horde->onRankAdvanced(occupant->getExperienceTracker()->getRank());
+}

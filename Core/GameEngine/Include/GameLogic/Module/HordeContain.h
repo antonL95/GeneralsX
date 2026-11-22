@@ -162,6 +162,10 @@ public:
 	Bool isAlternateFormation() const;
 	void setAlternateFormation(Bool alternate);
 	void toggleWeaponSet(const WeaponSetFlags& flags, Bool enabled);
+#if !RTS_GENERALS
+	Bool splitHorde();
+	static Bool allowsBannerSpawn(const Object* anchor);
+#endif
 	static const HordeContain* get(const Object* object);
 	const HordeContainModuleData* getActiveFormation() const;
 	const std::vector<AsciiString>& getFormationModifiers() const { return getActiveFormation()->m_attributeModifiers; }
