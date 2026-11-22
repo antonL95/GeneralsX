@@ -1140,6 +1140,8 @@ Bool ControlBar::retailExtraEntryUsable(const CommandButton *command, const Obje
 Bool ControlBar::retailEntryShown(const CommandSet *commandSet, Int entry, const CommandButton *command, Object *obj, Int &hero) const
 {
 	hero = -1;
+	if (!command || !command->isShowButton())
+		return FALSE;
 	if (!obj)
 		return TRUE;
 	if (command->getCommandType() == GUI_COMMAND_REVIVE)
@@ -1179,7 +1181,7 @@ void ControlBar::collectRetailPlacements(const CommandSet *commandSet, Object *o
 			if (!retailExtraEntryUsable(command, obj))
 				continue;
 		}
-		if (!command || command->getCommandType() == GUI_COMMAND_SET_STANCE ||
+		if (!command || !command->isShowButton() || command->getCommandType() == GUI_COMMAND_SET_STANCE ||
 			(command->getCommandType() == GUI_COMMAND_CANCEL_NEIGHBORHOOD && !WallHubBehavior::canCancelSpan(obj)) ||
 			(m_retailRadialMode && !command->isRadial() && !command->isInPalantir()))
 			continue;
@@ -1512,6 +1514,7 @@ Bool CommandButton::canUseRetailToggle(const Object* object, Int state) const
 		object->testScriptStatusBit(OBJECT_STATUS_SCRIPT_DISABLED) ||
 		object->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED) ||
 		BitIsSet(getOptions(), SCRIPT_ONLY) ||
+		!m_isClickable ||
 		hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE) ||
 		!HeroRoster::buttonUpgradesMet(this, object->getControllingPlayer(), object))
 		return FALSE;

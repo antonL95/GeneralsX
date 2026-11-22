@@ -1036,6 +1036,9 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 																												GameWindow *applyToWin,
 																												Bool forceDisabledEvaluation ) const
 {
+	if (RetailFileLayers::enabled() && !command->isShowButton())
+		return COMMAND_HIDDEN;
+
 	const Bool passive = command->isRetailPassive();
 	if (!passive && (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
 			command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT))

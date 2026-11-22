@@ -158,6 +158,19 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 	{ nullptr,						nullptr,												 nullptr, 0 }
 
 };
+
+const FieldParse CommandButton::s_rotwkCommandButtonFieldParseTable[] =
+{
+	{ "IsClickable", INI::parseBool, nullptr, offsetof(CommandButton, m_isClickable) },
+	{ "ShowButton", INI::parseBool, nullptr, offsetof(CommandButton, m_showButton) },
+	{ "DoubleClick", INI::parseBool, nullptr, offsetof(CommandButton, m_doubleClick) },
+	{ "TriggerWhenReady", INI::parseBool, nullptr, offsetof(CommandButton, m_triggerWhenReady) },
+	{ "AutoDelay", INI::parseReal, nullptr, offsetof(CommandButton, m_autoDelay) },
+	{ "AutoAbilityDisallowedOnModelCondition", ModelConditionFlags::parseFromINI, nullptr, offsetof(CommandButton, m_autoAbilityDisallowedOnModelCondition) },
+	{ "CommandTrigger", INI::parseAsciiString, nullptr, offsetof(CommandButton, m_commandTrigger) },
+	{ "ToggleButtonName", INI::parseAsciiString, nullptr, offsetof(CommandButton, m_toggleButtonName) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
 static void commandButtonTooltip(GameWindow *window,
 													WinInstanceData *instData,
 													UnsignedInt mouse)
@@ -809,7 +822,7 @@ Bool CommandButton::isRetailPassive() const
 {
 	if (!RetailFileLayers::enabled())
 		return FALSE;
-	if (m_command == GUI_COMMAND_NONE || hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE))
+	if (!m_isClickable || m_command == GUI_COMMAND_NONE || hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE))
 		return TRUE;
 	if (m_specialPower && m_specialPower->getSpecialPowerType() == SPECIAL_FAKE_LEADERSHIP_BUTTON)
 		return TRUE;

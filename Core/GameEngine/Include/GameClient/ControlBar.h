@@ -400,6 +400,15 @@ public:
 	Int getCommandRangeStart() const { return m_commandRangeStart; }
 	Int getCommandRangeCount() const { return m_commandRangeCount; }
 	Bool isAutoAbility() const { return m_autoAbility; }
+	Bool isClickable() const { return m_isClickable; }
+	Bool isShowButton() const { return m_showButton; }
+	Bool isDoubleClick() const { return m_doubleClick; }
+	Bool isTriggerWhenReady() const { return m_triggerWhenReady; }
+	Real getAutoDelay() const { return m_autoDelay; }
+	const ModelConditionFlags& getAutoAbilityDisallowedOnModelCondition() const { return m_autoAbilityDisallowedOnModelCondition; }
+	const AsciiString& getCommandTrigger() const { return m_commandTrigger; }
+	const AsciiString& getToggleButtonName() const { return m_toggleButtonName; }
+	static const FieldParse* getRetailFieldParse() { return s_rotwkCommandButtonFieldParseTable; }
 	Bool isRetailPassive() const;
 	Bool isMountStateAllowed(const Object* source) const;
 	Real getPresetRange() const { return m_presetRange; }
@@ -487,6 +496,16 @@ private:
 	const Image *m_toggleButtonImage = nullptr;
 	std::vector<Int> m_stances;
 	std::vector<AsciiString> m_stateImageNames;
+	Bool m_isClickable = TRUE;
+	Bool m_showButton = TRUE;
+	Bool m_doubleClick = FALSE;
+	Bool m_triggerWhenReady = FALSE;
+	Real m_autoDelay = 0.0f;
+	ModelConditionFlags m_autoAbilityDisallowedOnModelCondition;
+	AsciiString m_commandTrigger;
+	AsciiString m_toggleButtonName;
+
+	static const FieldParse s_rotwkCommandButtonFieldParseTable[];
 
 };
 
@@ -1254,6 +1273,11 @@ private:
 	Bool m_radarAttackGlowOn;
 	Int m_remainingRadarAttackGlowFrames;
 	GameWindow *m_radarAttackGlowWindow;
+	const CommandButton *m_lastRetailClickButton = nullptr;
+	UnsignedInt m_lastRetailClickFrame = 0;
+	Bool m_inCommandTrigger = FALSE;
+
+	void dispatchRetailCommandTrigger(const CommandButton *commandButton, Object *obj);
 
 #if defined(RTS_DEBUG)
 	UnsignedInt m_lastFrameMarkedDirty;

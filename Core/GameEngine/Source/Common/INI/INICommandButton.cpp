@@ -32,6 +32,8 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "GameClient/ControlBar.h"
 
@@ -74,8 +76,17 @@ void ControlBar::parseCommandButtonDefinition( INI *ini )
 		button = catalog->newCommandButtonOverride( button );
 	}
 
-	// parse the ini definition
-	ini->initFromINI( button, button->getFieldParse() );
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		MultiIniFieldParse fields;
+		fields.add(button->getFieldParse());
+		fields.add(CommandButton::getRetailFieldParse());
+		ini->initFromINIMulti(button, fields);
+	}
+	else
+	{
+		ini->initFromINI(button, button->getFieldParse());
+	}
 
 	const SpecialPowerTemplate *spTemplate = button->getSpecialPowerTemplate();
 
