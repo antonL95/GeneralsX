@@ -171,6 +171,8 @@ struct CastleMemberBehaviorModuleData : public BehaviorModuleData
 	Bool m_countsForEvaCastleBreached = FALSE;
 	Bool m_storeUpgradePrice = FALSE;
 	AsciiString m_beingBuiltSound;
+	AsciiString m_underAttackEvaEventIfKeep;
+	AsciiString m_underAttackAllyEvaEventIfKeep;
 	AsciiString m_campDestroyedAllyEvaEvent;
 	AsciiString m_campDestroyedAttackerEvaEvent;
 	AsciiString m_campDestroyedOwnerEvaEvent;
@@ -185,4 +187,22 @@ class CastleMemberBehavior final : public BehaviorModule
 
 public:
 	CastleMemberBehavior(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data) {}
+	static CastleMemberBehavior* find(const Object* object);
+	static void linkToCastle(Object& object, ObjectID castleID, ObjectID keepID, Bool isKeep, Bool ownedByCastle);
+	static void recordUpgradePrice(Object& object, UnsignedInt cost);
+	ObjectID getCastleID() const { return m_castleID; }
+	ObjectID getKeepID() const { return m_keepID; }
+	Bool isKeep() const { return m_isKeep; }
+	Bool isOwnedByCastle() const { return m_ownedByCastle; }
+	Bool countsForEvaCastleBreached() const { return getCastleMemberBehaviorModuleData()->m_countsForEvaCastleBreached; }
+	UnsignedInt getStoredUpgradePrice() const { return m_storedUpgradePrice; }
+
+private:
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+
+	ObjectID m_castleID = INVALID_ID;
+	ObjectID m_keepID = INVALID_ID;
+	Bool m_isKeep = FALSE;
+	Bool m_ownedByCastle = FALSE;
+	UnsignedInt m_storedUpgradePrice = 0;
 };

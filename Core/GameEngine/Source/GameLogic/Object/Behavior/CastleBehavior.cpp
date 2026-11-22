@@ -30,6 +30,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/CastleUpgrade.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 
 CastleBehaviorModuleData::CastleBehaviorModuleData()
 {
@@ -212,6 +213,14 @@ Bool CastleBehavior::unpackFree()
 
 CastleBehavior* CastleBehavior::findForMember(const Object& member)
 {
+	if (const CastleMemberBehavior* cm = CastleMemberBehavior::find(&member))
+	{
+		if (cm->getCastleID() != INVALID_ID)
+		{
+			if (CastleBehavior* castle = find(TheGameLogic->findObjectByID(cm->getCastleID())))
+				return castle;
+		}
+	}
 	const NameKeyType key = NAMEKEY("CastleBehavior");
 	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 	{
@@ -220,6 +229,57 @@ CastleBehavior* CastleBehavior::findForMember(const Object& member)
 			return castle;
 	}
 	return nullptr;
+}
+
+Bool CastleBehavior::isOwnedMemberTemplate(const ThingTemplate& type) const
+{
+	return getCastleBehaviorModuleData()->m_ownedFilter.matchesTemplate(type);
+}
+
+void CastleBehavior::onObjectTeamChanged(Object* object, Team* team)
+{
+	if (!object || !team || !object->areModulesReady())
+		return;
+	if (CastleBehavior* castle = find(object))
+	{
+		castle->transferOwnership(team);
+		return;
+	}
+	if (const CastleMemberBehavior* cm = CastleMemberBehavior::find(object); cm && cm->isKeep())
+	{
+		if (CastleBehavior* castle = find(TheGameLogic->findObjectByID(cm->getCastleID())))
+			castle->transferOwnership(team);
+	}
+}
+
+void CastleBehavior::transferOwnership(Team* newTeam)
+{
+	static Bool transferring = FALSE;
+	if (!m_unpacked || !newTeam || transferring)
+		return;
+	transferring = TRUE;
+	Object* packed = getObject();
+	if (packed && packed->getTeam() != newTeam)
+		packed->setTeam(newTeam);
+	for (ObjectID id : m_members)
+	{
+		Object* member = TheGameLogic->findObjectByID(id);
+		if (!member || member->isDestroyed() || member->isEffectivelyDead())
+			continue;
+		const CastleMemberBehavior* cm = CastleMemberBehavior::find(member);
+		const Bool owned = cm ? cm->isOwnedByCastle() : isOwnedMemberTemplate(*member->getTemplate());
+		if (!owned)
+			continue;
+		if (member->getTeam() != newTeam)
+			member->setTeam(newTeam);
+		if (const FoundationAIUpdate* plot = FoundationAIUpdate::find(*member))
+		{
+			Object* structure = plot->getStructure();
+			if (structure && !structure->isDestroyed() && !structure->isEffectivelyDead() && structure->getTeam() != newTeam)
+				structure->setTeam(newTeam);
+		}
+	}
+	transferring = FALSE;
 }
 
 void CastleBehavior::grantMemberUpgrade(const Object& source, const UpgradeTemplate& upgrade)
@@ -449,6 +509,15 @@ void CastleBehavior::unpack(Bool charge)
 		m_members.push_back(piece->getID());
 		if (piece->isKindOf(KINDOF_CASTLE_KEEP))
 			m_keep = piece->getID();
+	}
+
+	for (ObjectID id : m_members)
+	{
+		if (Object* piece = TheGameLogic->findObjectByID(id))
+		{
+			const Bool owned = data->m_ownedFilter.matchesTemplate(*piece->getTemplate());
+			CastleMemberBehavior::linkToCastle(*piece, packed->getID(), m_keep, id == m_keep, owned);
+		}
 	}
 
 	if (data->m_maxCastleRadius > 0.0f)

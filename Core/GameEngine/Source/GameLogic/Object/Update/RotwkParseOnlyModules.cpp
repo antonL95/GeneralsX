@@ -3,6 +3,8 @@
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 
 #include "Common/AttributeModifierRules.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -87,6 +89,8 @@ void CastleMemberBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "CountsForEvaCastleBreached", INI::parseBool, nullptr, offsetof(CastleMemberBehaviorModuleData, m_countsForEvaCastleBreached) },
 		{ "StoreUpgradePrice", INI::parseBool, nullptr, offsetof(CastleMemberBehaviorModuleData, m_storeUpgradePrice) },
 		{ "BeingBuiltSound", INI::parseAsciiString, nullptr, offsetof(CastleMemberBehaviorModuleData, m_beingBuiltSound) },
+		{ "UnderAttackEvaEventIfKeep", INI::parseAsciiString, nullptr, offsetof(CastleMemberBehaviorModuleData, m_underAttackEvaEventIfKeep) },
+		{ "UnderAttackAllyEvaEventIfKeep", INI::parseAsciiString, nullptr, offsetof(CastleMemberBehaviorModuleData, m_underAttackAllyEvaEventIfKeep) },
 		{ "CampDestroyedAllyEvaEvent", INI::parseAsciiString, nullptr, offsetof(CastleMemberBehaviorModuleData, m_campDestroyedAllyEvaEvent) },
 		{ "CampDestroyedAttackerEvaEvent", INI::parseAsciiString, nullptr, offsetof(CastleMemberBehaviorModuleData, m_campDestroyedAttackerEvaEvent) },
 		{ "CampDestroyedOwnerEvaEvent", INI::parseAsciiString, nullptr, offsetof(CastleMemberBehaviorModuleData, m_campDestroyedOwnerEvaEvent) },
@@ -175,7 +179,85 @@ void HordeMemberCollide::onCollide(Object* other, const Coord3D*, const Coord3D*
 {
 	HordeAIUpdate::memberCollided(getObject(), other);
 }
-DEFINE_PARSE_ONLY_SNAPSHOT(CastleMemberBehavior, BehaviorModule)
+CastleMemberBehavior::~CastleMemberBehavior() = default;
+
+CastleMemberBehavior* CastleMemberBehavior::find(const Object* object)
+{
+	if (!object || !RetailFileLayers::enabled() || !object->areModulesReady())
+		return nullptr;
+	static const NameKeyType key = NAMEKEY("CastleMemberBehavior");
+	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() == key)
+			return static_cast<CastleMemberBehavior*>(*module);
+	}
+	return nullptr;
+}
+
+void CastleMemberBehavior::linkToCastle(Object& object, ObjectID castleID, ObjectID keepID, Bool isKeep, Bool ownedByCastle)
+{
+	if (CastleMemberBehavior* member = find(&object))
+	{
+		member->m_castleID = castleID;
+		member->m_keepID = keepID;
+		member->m_isKeep = isKeep;
+		member->m_ownedByCastle = ownedByCastle;
+	}
+}
+
+void CastleMemberBehavior::recordUpgradePrice(Object& object, UnsignedInt cost)
+{
+	CastleMemberBehavior* member = find(&object);
+	if (!member || !member->getCastleMemberBehaviorModuleData()->m_storeUpgradePrice || cost == 0)
+		return;
+	member->m_storedUpgradePrice += cost;
+	const Int basePaid = object.getConstructionCostPaid();
+	const UnsignedInt base = basePaid >= 0 ? static_cast<UnsignedInt>(basePaid) : 0u;
+	object.setConstructionCostPaid(base + cost);
+}
+
+void CastleMemberBehavior::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present,
+	{
+		{ "castle-member", [this](Xfer* x)
+		{
+			x->xferObjectID(&m_castleID);
+			x->xferObjectID(&m_keepID);
+			x->xferBool(&m_isKeep);
+			x->xferBool(&m_ownedByCastle);
+			x->xferUnsignedInt(&m_storedUpgradePrice);
+		}, [this]
+		{
+			m_castleID = INVALID_ID;
+			m_keepID = INVALID_ID;
+			m_isKeep = FALSE;
+			m_ownedByCastle = FALSE;
+			m_storedUpgradePrice = 0;
+		} }
+	});
+}
+
+void CastleMemberBehavior::crc(Xfer* xfer)
+{
+	BehaviorModule::crc(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
+}
+
+void CastleMemberBehavior::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	BehaviorModule::xfer(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 1);
+}
+
+void CastleMemberBehavior::loadPostProcess()
+{
+	BehaviorModule::loadPostProcess();
+}
 #if !RTS_GENERALS
 DEFINE_PARSE_ONLY_SNAPSHOT(HordeNotifyTargetsOfImminentProbableCrushingUpdate, UpdateModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(NotifyTargetsOfImminentProbableCrushingUpdate, UpdateModule)

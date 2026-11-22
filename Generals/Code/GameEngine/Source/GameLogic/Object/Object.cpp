@@ -31,6 +31,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/RetailTestCommands.h"
@@ -852,6 +853,8 @@ void Object::setTeam( Team *team )
 
 	setTemporaryTeam(team);
 	m_originalTeamName = m_team ? m_team->getName() : AsciiString::TheEmptyString;
+	if (RetailFileLayers::enabled() && m_team)
+		CastleBehavior::onObjectTeamChanged(this, m_team);
 }
 
 //=============================================================================

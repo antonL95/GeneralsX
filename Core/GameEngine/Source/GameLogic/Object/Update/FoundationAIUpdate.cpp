@@ -25,6 +25,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/CreateModule.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 
 namespace
 {
@@ -88,7 +89,18 @@ Object* FoundationAIUpdate::getStructure() const
 Bool FoundationAIUpdate::canBuildOn(const Player* player) const
 {
 	const Object* foundation = getObject();
-	return player && foundation->getControllingPlayer() == player && !foundation->isEffectivelyDead() && !getStructure();
+	if (!player || foundation->getControllingPlayer() != player || foundation->isEffectivelyDead() || getStructure())
+		return FALSE;
+	if (const CastleMemberBehavior* cm = CastleMemberBehavior::find(foundation))
+	{
+		if (cm->getKeepID() != INVALID_ID)
+		{
+			const Object* keep = TheGameLogic->findObjectByID(cm->getKeepID());
+			if (!keep || keep->isDestroyed() || keep->isEffectivelyDead())
+				return FALSE;
+		}
+	}
+	return TRUE;
 }
 
 Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player, Bool prebuilt)
@@ -136,7 +148,12 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player,
 
 	m_structure = structure->getID();
 	if (const CastleBehavior* castle = CastleBehavior::findForMember(*foundation))
+	{
 		castle->applyKeepUpgrades(*structure);
+		const Object* keep = castle->getKeep();
+		CastleMemberBehavior::linkToCastle(*structure, castle->getCastleObjectID(),
+			keep ? keep->getID() : INVALID_ID, FALSE, TRUE);
+	}
 	showFoundation(FALSE);
 	if (prebuilt)
 	{

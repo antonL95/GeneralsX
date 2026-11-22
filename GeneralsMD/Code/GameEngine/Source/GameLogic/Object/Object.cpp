@@ -32,6 +32,7 @@
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/ObjectCreationUpgrade.h"
+#include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/Module/DeployStyleAIUpdate.h"
@@ -1047,6 +1048,8 @@ void Object::setTeam( Team *team )
 
 	setTemporaryTeam(team);
 	m_originalTeamName = m_team ? m_team->getName() : AsciiString::TheEmptyString;
+	if (RetailFileLayers::enabled() && m_team)
+		CastleBehavior::onObjectTeamChanged(this, m_team);
 }
 
 //=============================================================================

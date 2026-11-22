@@ -60,6 +60,7 @@
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
@@ -1052,8 +1053,10 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 		if (RetailFileLayers::enabled() && !getProductionUpdateModuleData()->m_giveNoXP)
 			ExperienceLevelStore::awardProductionExperience(us, upgrade->calcCostToBuild(nullptr));
 
-		// we finished an upgrade, lets add that money spent on it to the scorekeeper
-		player->getScoreKeeper()->addMoneySpent(production->m_costPaid >= 0 ? production->m_costPaid : upgrade->calcCostToBuild(player));
+		const Int spent = production->m_costPaid >= 0 ? production->m_costPaid : upgrade->calcCostToBuild(player);
+		player->getScoreKeeper()->addMoneySpent(spent);
+		if (RetailFileLayers::enabled() && upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && spent > 0)
+			CastleMemberBehavior::recordUpgradePrice(*us, static_cast<UnsignedInt>(spent));
 
 		// notify the script engine
 		TheScriptEngine->notifyOfCompletedUpgrade(

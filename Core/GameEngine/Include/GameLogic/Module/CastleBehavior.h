@@ -80,12 +80,16 @@ public:
 	Bool isUnpacked() const { return m_unpacked; }
 	static CastleBehavior* find(const Object* object);
 	Object* getKeep() const;
+	ObjectID getCastleObjectID() const { return getObject()->getID(); }
 	Bool unpackFree();
 	Bool orderUnpack(Player* player);
 	Real getMaxCastleRadius() const { return getCastleBehaviorModuleData()->m_maxCastleRadius; }
 	static CastleBehavior* findForMember(const Object& member);
+	static void onObjectTeamChanged(Object* object, Team* team);
+	void transferOwnership(Team* newTeam);
 	void grantMemberUpgrade(const Object& source, const UpgradeTemplate& upgrade);
 	void applyKeepUpgrades(Object& member) const;
+	Bool isOwnedMemberTemplate(const ThingTemplate& type) const;
 
 private:
 	void unpack(Bool charge = FALSE);
