@@ -42,6 +42,7 @@
 //
 //-----------------------------------------------------------------------------
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/RetailFileLayers.h"
 
 #define DEFINE_BUILDABLE_STATUS_NAMES
 #define DEFINE_OBJECT_STATUS_NAMES
@@ -965,7 +966,7 @@ void Script::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 #else
 	XferVersion currentVersion = 2;
 #endif
