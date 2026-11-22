@@ -3467,6 +3467,8 @@ void Object::friend_bindToDrawable( Drawable *draw )
 	{
 		ModelConditionFlags set;
 		ModelConditionFlags clr;
+		if (RetailFileLayers::enabled())
+			set = m_logicModelConditions;
 		for (int i = 0; i < WEAPONSET_COUNT; ++i)
 		{
 			ModelConditionFlagType mcs = TheWeaponSetTypeToModelConditionTypeMap[i];

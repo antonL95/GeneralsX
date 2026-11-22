@@ -1,0 +1,17 @@
+5 cash Player_1 - 0 10000
+6 create Player_1 DolAmrothCitadel 0 2440,1080,0
+7 queue Player_1 DolAmrothCitadel 0 GondorImrahil
+8 create Player_1 RohanEomer 0 2180,1080,0
+8 create Player_1 RohanTheoden 0 2080,1080,0
+1595 ability Player_1 RohanEomer 0
+1595 ability Player_1 RohanTheoden 0
+1599 ability Player_1 GondorImrahil 0
+1608 move Player_1 GondorImrahil 0 - 2525 1020
+1640 ability Player_1 GondorImrahil 0
+1680 ability Player_1 GondorImrahil 0
+1685 power Player_1 GondorImrahil 0 SpecialAbilityToggleMounted
+1818 ability Player_1 GondorImrahil 0
+1820 power Player_1 GondorImrahil 0 SpecialAbilityToggleMounted
+1892 ability Player_1 GondorImrahil 0
+1893 move Player_1 GondorImrahil 0 - 2595 1020
+1910 ability Player_1 GondorImrahil 0
