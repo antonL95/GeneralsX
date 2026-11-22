@@ -61,6 +61,7 @@ namespace
 {
 constexpr UnsignedInt maxGpuParticles = 4096;
 constexpr UnsignedInt defaultGpuLifetime = 30;
+constexpr Int maxLightningPoints = 29;
 }
 
 //------------------------------------------------------------------------------ Performance Timers
@@ -2015,7 +2016,51 @@ Particle *ParticleSystem::createParticle( const ParticleInfo *info,
  * particleNum and particleCount are used to get 'tween frame particles emitted in the correct
  * place. (jkmcd) */
 // ------------------------------------------------------------------------------------------------
-const ParticleInfo *ParticleSystem::generateParticleInfo( Int particleNum, Int particleCount )
+void ParticleSystem::generateRetailLightningBurst(std::span<Coord3D> points) const
+{
+	if (points.empty())
+		return;
+
+	const Coord3D& startOffset = m_template->m_lightningStart;
+	const Coord3D& endOffset = m_template->m_lightningEnd;
+	Vector3 start, end;
+	Matrix3D::Transform_Vector(m_transform, Vector3(startOffset.x, startOffset.y, startOffset.z), &start);
+	if (const Coord3D* target = getRetailTargetEndpoint())
+		end.Set(target->x, target->y, target->z);
+	else
+		Matrix3D::Transform_Vector(m_transform, Vector3(endOffset.x, endOffset.y, endOffset.z), &end);
+
+	const Vector3 delta = end - start;
+	const Real length = delta.Length();
+	const Vector3 sideways = length > 0.0f ? Vector3(-delta.Y / length, delta.X / length, 0.0f) : Vector3(0.0f, 0.0f, 0.0f);
+	struct Wave
+	{
+		Real amplitude, frequency, phase;
+	};
+	Wave waves[3];
+	for (Int i = 0; i < 3; ++i)
+	{
+		const auto& source = m_template->m_lightningWaves[i];
+		waves[i] = {source.amplitude.getValue(), source.frequency.getValue(), source.phase.getValue()};
+	}
+
+	const auto& offsets = m_template->m_lightningOffsets;
+	for (std::size_t i = 0; i < points.size(); ++i)
+	{
+		const Real fraction = points.size() > 1 ? static_cast<Real>(i) / static_cast<Real>(points.size() - 1) : 0.0f;
+		Real waveOffset = 0.0f;
+		for (const auto& wave : waves)
+			waveOffset += wave.amplitude * WWMath::SinTrig(wave.frequency * fraction + wave.phase);
+		const Real taper = std::min(fraction, 1.0f - fraction);
+		const Vector3 jitter{offsets[0].getValue(), offsets[1].getValue(), offsets[2].getValue()};
+		const Vector3 world = start + delta * fraction + sideways * (taper * waveOffset) + jitter;
+		Vector3 local;
+		Matrix3D::Inverse_Transform_Vector(m_transform, world, &local);
+		points[i] = {local.X, local.Y, local.Z};
+	}
+}
+
+const ParticleInfo *ParticleSystem::generateParticleInfo(Int particleNum, Int particleCount, const Coord3D* lightningPoint)
 {
 	static ParticleInfo info;
 	if (particleCount == 0) {
@@ -2025,7 +2070,7 @@ const ParticleInfo *ParticleSystem::generateParticleInfo( Int particleNum, Int p
 
 	// NOTE: position MUST be computed before velocity, in case OUTWARD velocity is
 	// specified, which must know where the particle is in space.
-	info.m_pos = *computeParticlePosition();
+	info.m_pos = lightningPoint ? *lightningPoint : *computeParticlePosition();
 	info.m_vel = *computeParticleVelocity( &info.m_pos );
 	if (m_emissionVolumeType == CYLINDER && m_template)
 		info.m_pos.add(*m_template->getCylinderOffset());
@@ -2044,7 +2089,7 @@ const ParticleInfo *ParticleSystem::generateParticleInfo( Int particleNum, Int p
 			m_isFirstPos = false;
 		}
 
-		const Coord3D frameDeltaPos = m_pos - m_lastPos;
+		const Coord3D frameDeltaPos = lightningPoint ? Coord3D{} : m_pos - m_lastPos;
 		const Real frameStep = 1 - (INT_TO_REAL(particleNum) / particleCount);
 
 		Coord3D emissionAdjustment;	// this is the adjustment for inter-frame emission
@@ -2229,6 +2274,7 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 					// emit a burst of particles
 					const Real burstCount = m_burstCount.getValue();
 					const Bool gpu = m_template && m_template->usesGpuDraw();
+					const Bool lightning = !gpu && m_template && m_template->m_hasLightningEmission && RetailFileLayers::enabled();
 					Int count;
 					if (gpu)
 					{
@@ -2237,17 +2283,26 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 						count = std::isfinite(scaledCount) && scaledCount > 0.0f
 							? static_cast<Int>(std::min(scaledCount, static_cast<Real>(remaining))) : 0;
 					}
+					else if (lightning)
+					{
+						const Real scaledCount = burstCount * m_countCoeff;
+						count = std::isfinite(scaledCount) && scaledCount > 0.0f
+							? static_cast<Int>(std::min(scaledCount, static_cast<Real>(maxLightningPoints))) : 0;
+					}
 					else
 					{
 						count = REAL_TO_INT(burstCount);
 						count *= m_countCoeff;
 					}
+					std::array<Coord3D, maxLightningPoints> lightningPoints;
+					if (lightning && count > 0)
+						generateRetailLightningBurst(std::span(lightningPoints).first(static_cast<std::size_t>(count)));
 					for( Int i=0; i<count; i++ )
 					{
 						if (gpu && TheParticleSystemManager->getGpuParticleCount() >= maxGpuParticles)
 							break;
 						// generate this particle's unique attributes
-						const ParticleInfo *info = generateParticleInfo(i, count);
+						const ParticleInfo *info = generateParticleInfo(i, count, lightning ? &lightningPoints[i] : nullptr);
 						if (!m_isEmitAboveGroundOnly || (info->m_pos.z >= TheTerrainLogic->getGroundHeight(info->m_pos.x, info->m_pos.y)))
 						{
 							// actually create a particle

@@ -1,0 +1,6 @@
+4 reveal Player_1 MenPorter 0
+5 create Player_1 SanctumofZigur 0 3150,480,0
+31 pkg50-power Player_1 SanctumofZigur 0 SpecialAbilityBlessingOfBelegur
+34 particle-systems - - 0 HSLightningStrike3
+52 particle-systems - - 0 HSLightningStrike2
+70 particle-systems - - 0 HSLightningStrike

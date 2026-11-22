@@ -146,6 +146,17 @@ void ParticleSystemTemplate::resetForFXDefinition()
 	setZero(m_gpuAngularRateXY);
 	m_gpuAngularDampingXY.setRange(1.0f, 1.0f, GameClientRandomVariable::CONSTANT);
 	m_gpuDetailTexture.clear();
+	m_hasLightningEmission = FALSE;
+	m_lightningStart.zero();
+	m_lightningEnd.zero();
+	for (auto& wave : m_lightningWaves)
+	{
+		setZero(wave.amplitude);
+		setZero(wave.frequency);
+		setZero(wave.phase);
+	}
+	for (auto& offset : m_lightningOffsets)
+		setZero(offset);
 	for (Int axis = 0; axis < 3; ++axis)
 	{
 		setZero(m_modelStartSize[axis]);
@@ -185,13 +196,13 @@ void ParticleSystemTemplate::parseFXModule( INI* ini, void *instance, void *, co
 		{ "EmissionVolume",   "BoxEmissionVolume",             m_fxBoxVolumeFieldParseTable,           FX_MODULE_VOLUME,        BOX },
 		{ "EmissionVolume",   "SphereEmissionVolume",          m_fxSphereVolumeFieldParseTable,        FX_MODULE_VOLUME,        SPHERE },
 		{ "EmissionVolume",   "CylinderEmissionVolume",        m_fxCylinderVolumeFieldParseTable,      FX_MODULE_VOLUME,        CYLINDER },
-		{ "EmissionVolume",   "LightningEmission",             m_fxLightningVolumeFieldParseTable,     FX_MODULE_UNRENDERED,    0 },
+		{ "EmissionVolume",   "LightningEmission",             m_fxLightningVolumeFieldParseTable,     FX_MODULE_KEEP,          0 },
 		{ "EmissionVolume",   "TerrainFireEmission",           m_fxTerrainFireVolumeFieldParseTable,   FX_MODULE_UNRENDERED,    0 },
 		{ "Draw",             "DefaultDraw",                   m_fxDefaultDrawFieldParseTable,         FX_MODULE_DRAW_PARTICLE, 0 },
 		{ "Draw",             "StreakDraw",                    m_fxDefaultDrawFieldParseTable,         FX_MODULE_DRAW_STREAK,   0 },
 		{ "Draw",             "RenderObjectDraw",              m_fxRenderObjectDrawFieldParseTable,    FX_MODULE_DRAW_MODEL,    0 },
 		{ "Draw",             "GpuDraw",                       m_fxGpuDrawFieldParseTable,             FX_MODULE_DRAW_GPU,      0 },
-		{ "Draw",             "LightningDraw",                 m_fxLightningDrawFieldParseTable,       FX_MODULE_UNRENDERED,    0 },
+		{ "Draw",             "LightningDraw",                 m_fxLightningDrawFieldParseTable,       FX_MODULE_DRAW_STREAK,   0 },
 		{ "Draw",             "ButterflyDraw",                 m_fxDefaultDrawFieldParseTable,         FX_MODULE_UNRENDERED,    0 },
 		{ "Draw",             "QuadDraw",                      m_fxDefaultDrawFieldParseTable,         FX_MODULE_UNRENDERED,    0 },
 		{ nullptr,            nullptr,                         nullptr,                                FX_MODULE_KEEP,          0 }
@@ -235,6 +246,8 @@ void ParticleSystemTemplate::parseFXModule( INI* ini, void *instance, void *, co
 	}
 	if (strcmp(section, "Alpha") == 0)
 		self->m_modelHasAlpha = TRUE;
+	else if (strcmp(section, "EmissionVolume") == 0)
+		self->m_hasLightningEmission = choice->table == m_fxLightningVolumeFieldParseTable;
 	ini->initFromINI( instance, choice->table );
 }
 
@@ -515,18 +528,18 @@ const FieldParse ParticleSystemTemplate::m_fxCylinderVolumeFieldParseTable[] =
 
 const FieldParse ParticleSystemTemplate::m_fxLightningVolumeFieldParseTable[] =
 {
-	{ "IsHollow",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "StartPoint", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "EndPoint",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Amplitude1", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Amplitude2", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Amplitude3", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Frequency1", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Frequency2", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Frequency3", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Phase1",     ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Phase2",     ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Phase3",     ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "IsHollow", INI::parseBool, nullptr, offsetof(ParticleSystemTemplate, m_isEmissionVolumeHollow) },
+	{ "StartPoint", INI::parseCoord3D, nullptr, offsetof(ParticleSystemTemplate, m_lightningStart) },
+	{ "EndPoint", INI::parseCoord3D, nullptr, offsetof(ParticleSystemTemplate, m_lightningEnd) },
+	{ "Amplitude1", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningWaves[0].amplitude) },
+	{ "Frequency1", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningWaves[0].frequency) },
+	{ "Phase1", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningWaves[0].phase) },
+	{ "Amplitude2", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningWaves[1].amplitude) },
+	{ "Frequency2", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningWaves[1].frequency) },
+	{ "Phase2", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningWaves[1].phase) },
+	{ "Amplitude3", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningWaves[2].amplitude) },
+	{ "Frequency3", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningWaves[2].frequency) },
+	{ "Phase3", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningWaves[2].phase) },
 	{ nullptr,      nullptr,                                   nullptr, 0 }
 };
 
@@ -556,9 +569,9 @@ const FieldParse ParticleSystemTemplate::m_fxGpuDrawFieldParseTable[] =
 
 const FieldParse ParticleSystemTemplate::m_fxLightningDrawFieldParseTable[] =
 {
-	{ "OffsetX", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "OffsetY", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "OffsetZ", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "OffsetX", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningOffsets[0]) },
+	{ "OffsetY", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningOffsets[1]) },
+	{ "OffsetZ", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_lightningOffsets[2]) },
 	{ nullptr,   nullptr,                                   nullptr, 0 }
 };
 

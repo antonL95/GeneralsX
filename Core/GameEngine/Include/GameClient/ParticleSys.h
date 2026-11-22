@@ -40,6 +40,7 @@
 #include "Common/STLTypedefs.h"
 
 #include <array>
+#include <span>
 
 
 /// @todo Once the client framerate is decoupled, the frame counters within will have to become time-based
@@ -682,6 +683,17 @@ protected:
 
 	Bool m_isRenderable;
 	Real m_windStrength;
+	struct LightningWave
+	{
+		GameClientRandomVariable amplitude;
+		GameClientRandomVariable frequency;
+		GameClientRandomVariable phase;
+	};
+	Bool m_hasLightningEmission = FALSE;
+	Coord3D m_lightningStart{};
+	Coord3D m_lightningEnd{};
+	LightningWave m_lightningWaves[3];
+	GameClientRandomVariable m_lightningOffsets[3];
 	GameClientRandomVariable m_modelStartSize[3];
 	GameClientRandomVariable m_modelSizeRate[3];
 	GameClientRandomVariable m_modelSizeDamping[3];
@@ -857,7 +869,8 @@ protected:
 
 	VisibilityState updateVisibility( Int localPlayerIndex );
 
-	const ParticleInfo *generateParticleInfo( Int particleNum, Int particleCount );	///< generate a new, random set of ParticleInfo
+	const ParticleInfo *generateParticleInfo(Int particleNum, Int particleCount, const Coord3D* lightningPoint = nullptr);
+	void generateRetailLightningBurst(std::span<Coord3D> points) const;
 	const Coord3D *computeParticlePosition();		///< compute a position based on emission properties
 	const Coord3D *computeParticleVelocity( const Coord3D *pos );	///< compute a velocity vector based on emission properties
 	const Coord3D *computePointOnUnitSphere();	///< compute a random point on a unit sphere
