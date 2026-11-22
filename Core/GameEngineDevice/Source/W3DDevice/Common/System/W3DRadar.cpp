@@ -309,10 +309,7 @@ void W3DRadar::drawViewBox( Int pixelX, Int pixelY, Int width, Int height )
 	Real lineWidth = 1.0f;
 	Color topColor = GameMakeColor( 225, 225, 0, 255 );
 	Color bottomColor = GameMakeColor( 158, 158, 0, 255 );
-	const Image *edge = RetailFileLayers::enabled() && TheMappedImageCollection ?
-		TheMappedImageCollection->findImageByName("RadarViewBoxEdge") : nullptr;
-	if (edge && !TheDisplay->hasImageTexture(edge))
-		edge = nullptr;
+	const Bool retail = RetailFileLayers::enabled();
 
 	//
 	// setup the clipping region ... note that this clipping region is not over just the
@@ -330,8 +327,8 @@ void W3DRadar::drawViewBox( Int pixelX, Int pixelY, Int width, Int height )
 	{
 		if (!ClipLine2D(&pixelStart, &pixelEnd, &clipStart, &clipEnd, &clipRegion))
 			return;
-		if (edge)
-			static_cast<W3DDisplay*>(TheDisplay)->drawTexturedLine(edge, clipStart, clipEnd, 2.0f);
+		if (retail)
+			TheDisplay->drawLine(clipStart.x, clipStart.y, clipEnd.x, clipEnd.y, 2.0f, GameMakeColor(255, 225, 64, 255));
 		else if (first == last)
 			TheDisplay->drawLine(clipStart.x, clipStart.y, clipEnd.x, clipEnd.y, lineWidth, first);
 		else
