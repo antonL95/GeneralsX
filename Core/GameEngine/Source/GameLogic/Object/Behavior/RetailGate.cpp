@@ -638,6 +638,13 @@ Bool DynamicPortalBehaviour::allowsClimber(const Object& unit) const
 	return data->m_numberOfBones > 0 && data->m_objectFilter.matchesObject(getObject(), &unit);
 }
 
+Bool DynamicPortalBehaviour::getClimbEntryPosition(Coord3D& position) const
+{
+	const auto* data = getDynamicPortalBehaviourModuleData();
+	return data->m_numberOfBones > 0 && !data->m_bonePrefix.isEmpty() &&
+		getObject()->getMultiLogicalBonePosition(data->m_bonePrefix.str(), 1, &position, nullptr) == 1;
+}
+
 void DynamicPortalBehaviour::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present,

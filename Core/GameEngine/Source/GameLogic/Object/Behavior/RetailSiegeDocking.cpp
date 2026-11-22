@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "Common/ActionManager.h"
 #include "Common/GameAudio.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
@@ -97,6 +98,33 @@ void SiegeDockingBehavior::release(const Object* carrier)
 			owner = INVALID_ID;
 }
 
+Object* SiegeDockingBehavior::findDockedCarrierFor(const Object& rider) const
+{
+	Object* closest = nullptr;
+	Real closestDistance = 0;
+	for (const auto& type : m_owners)
+	{
+		for (const ObjectID id : type)
+		{
+			Object* carrier = TheGameLogic->findObjectByID(id);
+			const auto* ai = SiegeAIUpdate::find(carrier);
+			if (!ai || !ai->isDockedAt(getObject()) || carrier->isEffectivelyDead())
+				continue;
+			const auto* contain = SiegeEngineContain::find(carrier);
+			if (!contain || !contain->isValidContainerFor(&rider, TRUE))
+				continue;
+			const Real distance = distanceSquared(*rider.getPosition(), *carrier->getPosition());
+			if (!closest || distance < closestDistance ||
+				(distance == closestDistance && id < closest->getID()))
+			{
+				closest = carrier;
+				closestDistance = distance;
+			}
+		}
+	}
+	return closest;
+}
+
 void SiegeDockingBehavior::transferSockets(Xfer* xfer)
 {
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, TRUE, {
@@ -159,6 +187,17 @@ SiegeAIUpdate* SiegeAIUpdate::find(const Object* carrier)
 	if (!RetailFileLayers::enabled() || !carrier || !carrier->areModulesReady())
 		return nullptr;
 	return static_cast<SiegeAIUpdate*>(carrier->findUpdateModule(NAMEKEY("SiegeAIUpdate")));
+}
+
+Bool SiegeAIUpdate::getClimbEntryPosition(const Object* carrier, const Object* rider, Coord3D& position)
+{
+	const auto* siege = find(carrier);
+	const auto* portal = DynamicPortalBehaviour::find(carrier);
+	if (!siege || !siege->isDocked() || !portal || !rider || !portal->allowsClimber(*rider) ||
+		!portal->getClimbEntryPosition(position))
+		return FALSE;
+	position.z = TheTerrainLogic->getLayerHeight(position.x, position.y, LAYER_GROUND);
+	return TRUE;
 }
 
 Real SiegeAIUpdate::dockingRadiusSquared() const
@@ -266,7 +305,7 @@ void SiegeAIUpdate::setPhase(Phase phase)
 	carrier->clearModelConditionState(MODELCONDITION_UNPACKING);
 	carrier->clearModelConditionState(MODELCONDITION_PACKING);
 	carrier->clearModelConditionState(MODELCONDITION_DEPLOYED);
-	carrier->setStatus(OBJECT_STATUS_DEPLOYED, phase == Docked);
+	carrier->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_DEPLOYED), phase == Docked);
 	if (phase == Lowering)
 		carrier->setModelConditionState(MODELCONDITION_UNPACKING);
 	else if (phase == Raising)
@@ -637,28 +676,8 @@ SiegeDeployHordeSpecialPower::~SiegeDeployHordeSpecialPower() = default;
 
 Object* SiegeDeployHordeSpecialPower::findCarrier(const Object* target) const
 {
-	if (!SiegeDockingBehavior::find(target))
-		return nullptr;
-	const Object* source = getObject();
-	Object* closest = nullptr;
-	Real closestDistance = 0;
-	for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
-	{
-		const auto* ai = SiegeAIUpdate::find(obj);
-		if (!ai || !ai->isDockedAt(target) || obj->isEffectivelyDead())
-			continue;
-		const auto* contain = SiegeEngineContain::find(obj);
-		if (!contain || !contain->isValidContainerFor(source, TRUE))
-			continue;
-		const Real distance = distanceSquared(*source->getPosition(), *obj->getPosition());
-		if (!closest || distance < closestDistance ||
-			(distance == closestDistance && obj->getID() < closest->getID()))
-		{
-			closest = obj;
-			closestDistance = distance;
-		}
-	}
-	return closest;
+	const auto* wall = SiegeDockingBehavior::find(target);
+	return wall ? wall->findDockedCarrierFor(*getObject()) : nullptr;
 }
 
 Bool SiegeDeployHordeSpecialPower::isValidPowerTarget(const Object* target) const
@@ -707,6 +726,8 @@ void SiegeDeployHordeSpecialPower::doSpecialPowerAtObject(Object* target, Unsign
 		return;
 	const CommandSourceType source = (options & COMMAND_FIRED_BY_SCRIPT) ? CMD_FROM_SCRIPT :
 		(options & COMMAND_OPTION_INTERNAL_AUTO) ? CMD_FROM_AI : CMD_FROM_PLAYER;
+	if (!getObject()->isMobile() || !TheActionManager->canEnterObject(getObject(), carrier, source, CHECK_CAPACITY))
+		return;
 	ai->aiEnter(carrier, source);
 	m_lastCastAccepted = TRUE;
 	markSpecialPowerTriggered(target->getPosition());

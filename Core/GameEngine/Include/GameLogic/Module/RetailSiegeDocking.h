@@ -24,6 +24,7 @@ public:
 	Bool available(const Object* carrier, Int slot) const;
 	void reserve(const Object* carrier, Int slot);
 	void release(const Object* carrier);
+	Object* findDockedCarrierFor(const Object& rider) const;
 
 private:
 	void transferSockets(Xfer* xfer);
@@ -50,6 +51,7 @@ class SiegeAIUpdate final : public AIUpdateInterface
 public:
 	SiegeAIUpdate(Thing* thing, const ModuleData* data);
 	static SiegeAIUpdate* find(const Object* carrier);
+	static Bool getClimbEntryPosition(const Object* carrier, const Object* rider, Coord3D& position);
 	static Bool hasSpecializedAI(const ModuleInfo& modules);
 	const AsciiString& getRetailLuaEventList() const override;
 	Bool beginDock(Object* wall, const SiegeDeploySpecialPowerModuleData& data, CommandSourceType source);

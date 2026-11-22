@@ -42,14 +42,15 @@ void reportSiegeState(const RetailTestCommands::Context& ctx)
 		std::fprintf(stderr, "TEST pkg27 landing frame=%u bone=%d raw=%.2f,%.2f,%.2f legal=%d pos=%.2f,%.2f,%.2f\n",
 			ctx.frame, hasBone, authored.x, authored.y, authored.z, legal, landing.x, landing.y, landing.z);
 	}
-	std::fprintf(stderr, "TEST pkg27 frame=%u object=%s occupants=%d deployed=%d packing=%d unpacking=%d power=%d ready=%d layer=%d pos=%.2f,%.2f,%.2f facing=%.4f approaching=%d idle=%d moving=%d siege=%d cooldown=%d accepted=%d goal=%.2f,%.2f,%.2f wall=%d\n",
+	std::fprintf(stderr, "TEST pkg27 frame=%u object=%s occupants=%d deployed=%d packing=%d unpacking=%d power=%d ready=%d layer=%d pos=%.2f,%.2f,%.2f facing=%.4f approaching=%d idle=%d moving=%d siege=%d cooldown=%d accepted=%d goal=%.2f,%.2f,%.2f deployedFlag=%d constructing=%d wall=%d\n",
 		ctx.frame, object->getTemplate()->getName().str(), contain ? static_cast<Int>(contain->getContainCount()) : -1,
 		conditions.test(MODELCONDITION_DEPLOYED), conditions.test(MODELCONDITION_PACKING), conditions.test(MODELCONDITION_UNPACKING),
 		module != nullptr, module && module->isReady() && module->isRetailCastAllowed(),
 		object->getLayer(), point.x, point.y, point.z, object->getOrientation(),
 		siege && siege->isApproaching(), ai && ai->isIdle(), ai && ai->isMoving(), siege != nullptr,
 		module && module->isReady(), module && module->wasLastCastAccepted(),
-		goal.x, goal.y, goal.z, object->getLayer() == LAYER_WALL);
+		goal.x, goal.y, goal.z, object->testStatus(OBJECT_STATUS_DEPLOYED),
+		object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION), object->getLayer() == LAYER_WALL);
 }
 
 void issueOrder(const RetailTestCommands::Context& ctx)

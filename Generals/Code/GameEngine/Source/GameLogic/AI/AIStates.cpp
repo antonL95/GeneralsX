@@ -63,6 +63,7 @@
 #include "GameLogic/Weapon.h"
 
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/RetailSiegeDocking.h"
 #include "GameLogic/Module/GiantBirdAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -6089,6 +6090,7 @@ StateReturnType AIEnterState::onEnter()
 		m_goalPosition = *goal->getPosition();
 
 		ContainModuleInterface* contain = goal->getContain();
+		SiegeAIUpdate::getClimbEntryPosition(goal, obj, m_goalPosition);
 		if (contain)
 		{
 			contain->onObjectWantsToEnterOrExit(obj, WANTS_TO_ENTER);
@@ -6175,6 +6177,7 @@ StateReturnType AIEnterState::update()
 
 		m_goalPosition = *goal->getPosition();
 		obj->getAI()->friend_setGoalObject(goal);
+		SiegeAIUpdate::getClimbEntryPosition(goal, obj, m_goalPosition);
 		if (!TheActionManager->canEnterObject(obj, goal, obj->getAI()->getLastCommandSource(), CHECK_CAPACITY))
 		{
 			/*
