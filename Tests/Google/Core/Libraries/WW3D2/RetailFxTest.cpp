@@ -176,6 +176,40 @@ TEST(RetailFxTest, AcceptsTheLegacyTerrainVertexDeclarations)
 	EXPECT_TRUE(RetailFX::readProgram(encodeWords(words), true));
 }
 
+TEST(RetailFxTest, RequiresALiteralBoundForVertexRepeat)
+{
+	std::vector<uint32_t> words = {
+		0xfffe0200, 0x000efffe, 0x42415443, 28, 0, 0xfffe0200, 1, 28, 0, 0,
+		48, 0x00030002, 1, 0, 0, 'T',
+		0x05000030, 0xf00f0000, 3, 0, 0, 0,
+		0x01000026, 0xf0e40000, 0x00000027,
+		0x0000ffff
+	};
+	EXPECT_TRUE(RetailFX::readProgram(encodeWords(words), true));
+	words[18] = 17;
+	EXPECT_FALSE(RetailFX::readProgram(encodeWords(words), true));
+	words[18] = 3;
+	words.erase(words.end() - 2);
+	EXPECT_FALSE(RetailFX::readProgram(encodeWords(words), true));
+}
+
+TEST(RetailFxTest, RequiresTheVertexAddressRegisterForRelativeConstants)
+{
+	std::vector<uint32_t> words = {
+		0xfffe0200, 0x000efffe, 0x42415443, 28, 0, 0xfffe0200, 1, 28, 0, 0,
+		48, 0x00030002, 1, 0, 0, 'T',
+		0x0200002e, 0xb0080000, 0x90ff0000,
+		0x03000001, 0x800f0000, 0xa0e42003, 0xb0ff0000,
+		0x0000ffff
+	};
+	EXPECT_TRUE(RetailFX::readProgram(encodeWords(words), true));
+	words[22] = 0xb0ff0001;
+	EXPECT_FALSE(RetailFX::readProgram(encodeWords(words), true));
+	words[22] = 0xb0ff0000;
+	words[21] = 0x90e42003;
+	EXPECT_FALSE(RetailFX::readProgram(encodeWords(words), true));
+}
+
 TEST(RetailFxTest, RejectsRepeatedShaderAndPreshaderMetadata)
 {
 	const uint32_t table[] = {

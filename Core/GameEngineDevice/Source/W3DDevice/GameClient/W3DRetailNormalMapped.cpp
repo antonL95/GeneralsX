@@ -2,12 +2,15 @@
 
 #include "Common/RetailFileLayers.h"
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "W3DDevice/GameClient/TerrainTex.h"
+#include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/lightenvironment.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
+#include "WW3D2/vertmaterial.h"
 #include "WW3D2/w3dfxmaterial.h"
 
 #include <cstdlib>
@@ -31,42 +34,45 @@ public:
 	~NormalMappedRuntime() { DX8Wrapper::RemoveCleanupHook(this); }
 	void ReleaseResources() override
 	{
-		pass.reset();
-		initialized = false;
+		for (auto &pass : passes)
+			pass.reset();
+		initialized.fill(false);
 	}
 	void ReAcquireResources() override {}
 
-	std::unique_ptr<NativePass> pass;
+	std::array<std::unique_ptr<NativePass>, 2> passes;
 	std::vector<NormalMappedVertex> vertices;
 	std::vector<uint32_t> indices;
 	std::set<std::string, std::less<>> traced;
-	bool initialized = false;
-	bool reportedFailure = false;
+	std::array<bool, 2> initialized{};
+	std::array<bool, 2> reportedFailure{};
 };
 
 std::unique_ptr<NormalMappedRuntime> runtime;
 
-bool fillMesh(MeshModelClass &model, const W3dFx::Mesh &fx, NormalMappedRuntime &renderer)
+bool fillMesh(MeshModelClass &model, const W3dFx::Mesh *fx, NormalMappedRuntime &renderer)
 {
 	const Int vertexCount = model.Get_Vertex_Count();
 	const Int polygonCount = model.Get_Polygon_Count();
-	if (vertexCount <= 0 || polygonCount <= 0 || fx.tangents.size() != static_cast<size_t>(vertexCount) ||
-		fx.bitangents.size() != static_cast<size_t>(vertexCount))
+	if (vertexCount <= 0 || polygonCount <= 0 || (fx &&
+		(fx->tangents.size() != static_cast<size_t>(vertexCount) || fx->bitangents.size() != static_cast<size_t>(vertexCount))))
 		return false;
 	const auto *uv = model.Get_UV_Array(0, 0);
 	const auto *position = model.Get_Vertex_Array();
 	const auto *normal = model.Get_Vertex_Normal_Array();
+	const auto *color = model.Get_Color_Array(0, false);
 	const auto *polys = model.MeshGeometryClass::Get_Polygon_Array();
 	if (!uv || !position || !normal || !polys)
 		return false;
 	renderer.vertices.clear();
 	for (Int i = 0; i < vertexCount; ++i)
 	{
-		const auto &t = fx.tangents[i];
-		const auto &b = fx.bitangents[i];
+		const auto t = fx ? fx->tangents[i] : W3dFx::Float3{};
+		const auto b = fx ? fx->bitangents[i] : W3dFx::Float3{};
 		renderer.vertices.push_back({
 			{position[i].X, position[i].Y, position[i].Z}, {normal[i].X, normal[i].Y, normal[i].Z},
-			{t[0], t[1], t[2]}, {b[0], b[1], b[2]}, {uv[i].U, uv[i].V}
+			{t[0], t[1], t[2]}, {b[0], b[1], b[2]}, {uv[i].U, uv[i].V},
+			{uv[i].U, uv[i].V}, color ? static_cast<uint32_t>(color[i]) : 0xffffffffu
 		});
 	}
 	renderer.indices.clear();
@@ -88,25 +94,35 @@ Register fromVector(const Vector3 &value)
 	return {value.X, value.Y, value.Z, 0.0f};
 }
 
-bool drawNormalMapped(MeshClass &mesh, TextureClass *diffuse)
+bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *secondary,
+	VertexMaterialClass *vertexMaterial, const ShaderClass &shader)
 {
 	if (!RetailFileLayers::enabled() || !TheTerrainRenderObject || !diffuse ||
 		ShaderClass::Is_Backface_Culling_Inverted())
 		return false;
 	auto &model = *mesh.Peek_Model();
 	const auto *fx = model.Peek_Fx_Materials();
+	const bool normalMapped = fx && !fx->materials.empty();
 	const auto *lights = mesh.Get_Lighting_Environment();
 	auto *shroud = TheTerrainRenderObject->getShroud();
-	if (!fx || fx->materials.size() != 1 || fx->materials[0].effect != "normalmapped.fx" ||
-		model.Get_Pass_Count() != 1 || model.Get_Flag(MeshGeometryClass::SKIN) || !lights ||
+	if (model.Get_Pass_Count() != 1 || model.Get_Flag(MeshGeometryClass::SKIN) || !lights ||
 		!shroud || shroud->getTextureWidth() <= 0 || shroud->getTextureHeight() <= 0 ||
 		shroud->getCellWidth() <= 0.0f || shroud->getCellHeight() <= 0.0f)
 		return false;
-	const auto &material = fx->materials[0];
+	if (normalMapped && (fx->materials.size() != 1 || fx->materials[0].effect != "normalmapped.fx"))
+		return false;
+	if (!normalMapped && (secondary || !vertexMaterial || vertexMaterial->Peek_Mapper() ||
+		vertexMaterial->Get_Opacity() != 1.0f || shader.Get_Depth_Compare() != ShaderClass::PASS_LEQUAL ||
+		shader.Get_Depth_Mask() != ShaderClass::DEPTH_WRITE_ENABLE ||
+		shader.Get_Src_Blend_Func() != ShaderClass::SRCBLEND_ONE ||
+		shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO))
+		return false;
+	static const W3dFx::Material noFx{};
+	const auto &material = normalMapped ? fx->materials[0] : noFx;
 	const auto normalName = material.get<std::string>("NormalMap", {});
 	const auto diffuseColor = material.get<W3dFx::Float4>("DiffuseColor", {1.0f, 1.0f, 1.0f, 1.0f});
-	if (normalName.empty() || normalName == "None" || diffuseColor[3] != 1.0f ||
-		material.get<bool>("AlphaBlendEnable", false))
+	if (normalMapped && (normalName.empty() || normalName == "None" || diffuseColor[3] != 1.0f ||
+		material.get<bool>("AlphaBlendEnable", false)))
 		return false;
 
 	auto *device = DX8Wrapper::Get_Effect_Device9();
@@ -114,23 +130,28 @@ bool drawNormalMapped(MeshClass &mesh, TextureClass *diffuse)
 		return false;
 	if (!runtime)
 		runtime = std::make_unique<NormalMappedRuntime>();
-	if (!runtime->initialized)
+	const auto slot = normalMapped ? 0u : 1u;
+	const char *label = normalMapped ? "NormalMapped Default_M" : "DefaultW3D Default";
+	auto &pass = runtime->passes[slot];
+	if (!runtime->initialized[slot])
 	{
-		runtime->initialized = true;
-		if (const auto effect = loadEffectFile("shaders/compiled/normalmapped.fxo"))
-			runtime->pass = NativePass::makeNormalMapped(device, *effect, DX8Wrapper::Create_Effect_Shader9);
-		if (!runtime->pass)
-			std::fprintf(stderr, "[RetailFX] Could not load NormalMapped Default_M\n");
+		runtime->initialized[slot] = true;
+		if (const auto effect = loadEffectFile(normalMapped ? "shaders/compiled/normalmapped.fxo" : "shaders/compiled/defaultw3d.fxo"))
+			pass = normalMapped ? NativePass::makeNormalMapped(device, *effect, DX8Wrapper::Create_Effect_Shader9)
+				: NativePass::makeDefaultMesh(device, *effect, DX8Wrapper::Create_Effect_Shader9);
+		if (!pass)
+			std::fprintf(stderr, "[RetailFX] Could not load %s\n", label);
 	}
-	if (!runtime->pass)
+	if (!pass)
 		return false;
 
 	const std::unique_ptr<TextureClass, TextureRelease> normalTexture(
-		WW3DAssetManager::Get_Instance()->Get_Texture(normalName.c_str()));
+		normalMapped ? WW3DAssetManager::Get_Instance()->Get_Texture(normalName.c_str()) : nullptr);
 	auto *normal = nativeTexture(normalTexture.get());
 	auto *base = nativeTexture(diffuse);
 	auto *mask = nativeTexture(shroud->getShroudTexture());
-	if (!normal || !base || !mask || !fillMesh(model, *fx, *runtime))
+	const auto cloud = normalMapped ? nullptr : nativeTexture(TheTerrainRenderObject->peekCloudTexture());
+	if ((normalMapped && !normal) || !base || !mask || !fillMesh(model, normalMapped ? fx : nullptr, *runtime))
 		return false;
 
 	const float scaleU = 1.0f / (shroud->getCellWidth() * static_cast<float>(shroud->getTextureWidth()));
@@ -146,6 +167,19 @@ bool drawNormalMapped(MeshClass &mesh, TextureClass *diffuse)
 		!D3DXMatrixInverse(&inverseView, nullptr, &view))
 		return false;
 	const auto fog = fogBindings(device8);
+	Register ambient{}, colorDiffuse{}, specular{}, emissive{};
+	if (!normalMapped)
+	{
+		Vector3 color;
+		vertexMaterial->Get_Ambient(&color);
+		ambient = fromVector(color);
+		vertexMaterial->Get_Diffuse(&color);
+		colorDiffuse = fromVector(color);
+		vertexMaterial->Get_Specular(&color);
+		specular = fromVector(color);
+		vertexMaterial->Get_Emissive(&color);
+		emissive = fromVector(color);
+	}
 	std::array<Register, 6> directional{};
 	std::array<Register, 3> point{{{}, {}, {1.0f, 0.0f, 0.0f, 0.0f}}};
 	unsigned numDirectional = 0;
@@ -193,8 +227,22 @@ bool drawNormalMapped(MeshClass &mesh, TextureClass *diffuse)
 			floats[0] = fromVector(lights->Get_Equivalent_Ambient());
 		else if (name == "DiffuseColor")
 			floats[0] = diffuseColor;
-		else if (name == "OpacityOverride")
+		else if (name == "ColorAmbient")
+			floats[0] = ambient;
+		else if (name == "ColorDiffuse")
+			floats[0] = colorDiffuse;
+		else if (name == "ColorSpecular")
+			floats[0] = specular;
+		else if (name == "ColorEmissive")
+			floats[0] = emissive;
+		else if (name == "Shininess" && !normalMapped)
+			floats[0][0] = vertexMaterial->Get_Shininess();
+		else if (name == "Opacity" || name == "OpacityOverride")
 			floats[0][0] = mesh.Get_Alpha_Override();
+		else if (name == "HouseColorEnable")
+			floats[0][0] = 0.0f;
+		else if (name == "Cloud")
+			floats[0] = W3DShaderManager::getRetailCloudUV();
 		else if (const auto property = material.properties.find(name); property != material.properties.end())
 		{
 			if (const auto *scalar = std::get_if<float>(&property->second))
@@ -207,30 +255,33 @@ bool drawNormalMapped(MeshClass &mesh, TextureClass *diffuse)
 	};
 	const auto getTexture = [&](std::string_view name) -> void * {
 		if (name == "NormalMap") return normal;
-		if (name == "DiffuseTexture") return base;
+		if (name == "DiffuseTexture" || name == "Texture_0") return base;
 		if (name == "ShroudTexture") return mask;
+		if (name == "CloudTexture") return cloud;
 		return nullptr;
 	};
-	const bool drawn = runtime->pass->drawNormalMapped(device, runtime->vertices, runtime->indices, setBinding, getTexture,
-		material.get<bool>("AlphaTestEnable", false), model.Get_Flag(MeshGeometryClass::TWO_SIDED));
+	const bool alphaTest = normalMapped ? material.get<bool>("AlphaTestEnable", false) :
+		shader.Get_Alpha_Test() != ShaderClass::ALPHATEST_DISABLE;
+	const bool drawn = pass->drawNormalMapped(device, runtime->vertices, runtime->indices, setBinding, getTexture,
+		alphaTest, model.Get_Flag(MeshGeometryClass::TWO_SIDED) || shader.Get_Cull_Mode() == ShaderClass::CULL_MODE_DISABLE);
 	if (drawn && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS") && runtime->traced.insert(mesh.Get_Name()).second)
-		std::fprintf(stderr, "[RetailFX] Drew NormalMapped Default_M (%s)\n", mesh.Get_Name());
-	if (!drawn && !runtime->reportedFailure)
+		std::fprintf(stderr, "[RetailFX] Drew %s (%s)\n", label, mesh.Get_Name());
+	if (!drawn && !runtime->reportedFailure[slot])
 	{
-		std::fprintf(stderr, "[RetailFX] Could not bind or draw NormalMapped Default_M\n");
-		runtime->reportedFailure = true;
+		std::fprintf(stderr, "[RetailFX] Could not bind or draw %s\n", label);
+		runtime->reportedFailure[slot] = true;
 	}
 	return drawn;
 }
 
 }
 
-void installNormalMappedDraw()
+void installRetailMeshDraw()
 {
-	DX8TextureCategoryClass::Set_Effect_Draw(drawNormalMapped);
+	DX8TextureCategoryClass::Set_Effect_Draw(drawRetailMesh);
 }
 
-void removeNormalMappedDraw()
+void removeRetailMeshDraw()
 {
 	DX8TextureCategoryClass::Set_Effect_Draw(nullptr);
 	runtime.reset();

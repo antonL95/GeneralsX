@@ -194,6 +194,7 @@ public:
 	void removeTerrainBibHighlighting();
 
 	W3DShroud *getShroud()	{return m_shroud;}
+	CloudMapTerrainTextureClass *peekCloudTexture() const { return m_stageTwoTexture; }
 	void updateShorelineTiles(Int minX, Int minY, Int maxX, Int maxY, WorldHeightMap *pMap);	///<figure out which tiles on this map cross water plane
 	void updateShorelineTile(Int X, Int Y, Int Border, WorldHeightMap *pMap);	///<figure out which tiles on this map cross water plane
 	void recordShoreLineSortInfos();

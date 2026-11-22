@@ -22,7 +22,7 @@ enum class ShaderStage { Vertex11, Vertex20, Pixel20 };
 
 enum class RegisterClass : uint32_t
 {
-	Temporary, Input, Constant, Texture, RasterOutput, AttributeOutput, TexcoordOutput,
+	Temporary, Input, Constant, Texture, RasterOutput, AttributeOutput, TexcoordOutput, Integer,
 	ColorOutput = 8, DepthOutput, Sampler, Boolean = 14
 };
 
@@ -113,15 +113,15 @@ size_t shaderOperands(uint32_t opcode)
 {
 	switch (opcode)
 	{
-		case 0x00: case 0x2a: case 0x2b: return 0;
-		case 0x28: return 1;
+		case 0x00: case 0x27: case 0x2a: case 0x2b: return 0;
+		case 0x26: case 0x28: return 1;
 		case 0x01: case 0x06: case 0x07: case 0x0e: case 0x0f: case 0x10:
-		case 0x13: case 0x1f: case 0x24: return 2;
+		case 0x13: case 0x1f: case 0x24: case 0x2e: return 2;
 		case 0x02: case 0x03: case 0x05: case 0x08: case 0x09: case 0x0a:
 		case 0x0b: case 0x0c: case 0x0d: case 0x11: case 0x20: case 0x42:
 			return 3;
 		case 0x04: case 0x12: case 0x58: return 4;
-		case 0x51: return 5;
+		case 0x30: case 0x51: return 5;
 		default: return 16;
 	}
 }
@@ -197,32 +197,63 @@ bool validShaderInstruction(Words words, ShaderStage stage, size_t &length)
 	const auto token = words.front();
 	const auto opcode = token & 0xffffu;
 	const bool legacy = stage == ShaderStage::Vertex11;
+	const bool vertex = stage != ShaderStage::Pixel20;
 	const unsigned control = (token >> 16) & 0xffu;
-	length = shaderOperands(opcode);
-	if (length >= 16 || length >= words.size() - 1 || (token & 0xf0000000u) ||
-		((token >> 24) & 0xfu) != (legacy ? 0 : length) || control > (opcode == 0x42 ? 2u : 0u))
+	const size_t operands = shaderOperands(opcode);
+	const size_t encoded = (token >> 24) & 0xfu;
+	length = legacy ? operands : encoded;
+	if (operands >= 16 || length < operands || length >= words.size() - 1 ||
+		(legacy && encoded) || (token & 0xf0000000u) || control > (opcode == 0x42 ? 2u : 0u))
 		return false;
-	const size_t registers = opcode == 0x51 ? 1 : length;
-	for (size_t i = opcode == 0x1f ? 2 : 1; i <= registers; ++i)
-		if ((words[i] & 0x80002000u) != 0x80000000u)
-			return false;
+	const auto direct = [](uint32_t word) { return (word & 0x80002000u) == 0x80000000u; };
+	if (operands && !direct(words[opcode == 0x1f ? 2 : 1]))
+		return false;
 	switch (opcode)
 	{
-		case 0x00: return true;
-		case 0x1f: return validDeclaration(words[1], words[2], stage);
-		case 0x28: return stage == ShaderStage::Vertex20 &&
+		case 0x00: return length == 0;
+		case 0x1f: return length == operands && validDeclaration(words[1], words[2], stage);
+		case 0x26: return length == operands && stage == ShaderStage::Vertex20 &&
+			registerClass(words[1]) == RegisterClass::Integer && registerIndex(words[1]) < 16 &&
+			((words[1] >> 16) & 0xfffu) == 0xe4u;
+		case 0x28: return length == operands && stage == ShaderStage::Vertex20 &&
 			registerClass(words[1]) == RegisterClass::Boolean && registerIndex(words[1]) < 16;
-		case 0x2a: case 0x2b: return stage == ShaderStage::Vertex20;
-		case 0x42: return stage == ShaderStage::Pixel20 &&
+		case 0x27: case 0x2a: case 0x2b: return length == operands && stage == ShaderStage::Vertex20;
+		case 0x30: return length == operands && stage == ShaderStage::Vertex20 &&
+			registerClass(words[1]) == RegisterClass::Integer && registerIndex(words[1]) < 16;
+		case 0x42: return length == operands && !vertex && direct(words[2]) && direct(words[3]) &&
 			registerClass(words[1]) == RegisterClass::Temporary && validDestination(words[1], stage) &&
 			validSource(words[2], stage) && registerClass(words[3]) == RegisterClass::Sampler &&
 			registerIndex(words[3]) < 16;
-		case 0x51: return registerClass(words[1]) == RegisterClass::Constant &&
+		case 0x51: return length == operands && registerClass(words[1]) == RegisterClass::Constant &&
 			registerIndex(words[1]) < floatRegisterCount(stage);
-		default: return validDestination(words[1], stage) &&
-			std::all_of(words.begin() + 2, words.begin() + 1 + length,
-				[stage](uint32_t source) { return validSource(source, stage); });
 	}
+	const bool writesAddress = registerClass(words[1]) == RegisterClass::Texture && !registerIndex(words[1]) &&
+		((words[1] >> 16) & 0xfu) == (legacy ? 1u : 8u);
+	if ((opcode == 0x2e && (stage != ShaderStage::Vertex20 || !writesAddress)) ||
+		(opcode != 0x2e && !(opcode == 1 && legacy && writesAddress) && !validDestination(words[1], stage)))
+		return false;
+	size_t cursor = 2;
+	for (size_t i = 1; i < operands; ++i)
+	{
+		if (cursor > length || !(words[cursor] & 0x80000000u) || !validSource(words[cursor], stage))
+			return false;
+		const auto source = words[cursor++];
+		if (source & 0x2000u)
+		{
+			if (!vertex || registerClass(source) != RegisterClass::Constant)
+				return false;
+			if (!legacy)
+			{
+				if (cursor > length)
+					return false;
+				const auto address = words[cursor++];
+				if (!direct(address) || registerClass(address) != RegisterClass::Texture || registerIndex(address) ||
+					((address >> 16) & 0xfffu) != 0xffu)
+					return false;
+			}
+		}
+	}
+	return cursor == length + 1;
 }
 
 unsigned inputCount(unsigned operation)
@@ -382,7 +413,9 @@ std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 	words = words.subspan(1);
 	bool constantsSeen = false, preshaderSeen = false;
 	std::array<bool, 24> elseSeen{};
+	std::array<unsigned, 16> repeatCount{};
 	size_t nesting = 0;
+	bool repeating = false;
 	while (words.size() > 1)
 	{
 		const auto opcode = words.front() & 0xffffu;
@@ -409,6 +442,25 @@ std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 			size_t operands;
 			if (!validShaderInstruction(words, stage, operands))
 				return std::nullopt;
+			if (opcode == 0x30)
+			{
+				if (repeating || nesting)
+					return std::nullopt;
+				repeatCount[registerIndex(words[1])] = words[2];
+			}
+			else if (opcode == 0x26)
+			{
+				const auto count = repeatCount[registerIndex(words[1])];
+				if (repeating || nesting || !count || count > 16)
+					return std::nullopt;
+				repeating = true;
+			}
+			else if (opcode == 0x27)
+			{
+				if (!repeating || nesting)
+					return std::nullopt;
+				repeating = false;
+			}
 			if (opcode == 0x28)
 			{
 				if (nesting == elseSeen.size())
@@ -430,7 +482,7 @@ std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 			words = words.subspan(1 + operands);
 		}
 	}
-	if (words.size() != 1 || words.front() != 0x0000ffffu || program.bindings.empty() || nesting)
+	if (words.size() != 1 || words.front() != 0x0000ffffu || program.bindings.empty() || nesting || repeating)
 		return std::nullopt;
 	return program;
 }

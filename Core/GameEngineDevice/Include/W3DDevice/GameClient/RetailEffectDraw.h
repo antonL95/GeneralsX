@@ -8,8 +8,8 @@
 namespace RetailFX
 {
 
-void installNormalMappedDraw();
-void removeNormalMappedDraw();
+void installRetailMeshDraw();
+void removeRetailMeshDraw();
 
 struct WaterVertex
 {
@@ -34,6 +34,8 @@ struct NormalMappedVertex
 	float tangent[3];
 	float bitangent[3];
 	float uv[2];
+	float uv1[2]{};
+	uint32_t color = 0xffffffffu;
 };
 
 class NativePass
@@ -45,6 +47,7 @@ public:
 	static std::unique_ptr<NativePass> makeWater(void *device, const Effect &effect, CreateShader createShader);
 	static std::unique_ptr<NativePass> makeTerrain(void *device, const Effect &effect, CreateShader createShader);
 	static std::unique_ptr<NativePass> makeNormalMapped(void *device, const Effect &effect, CreateShader createShader);
+	static std::unique_ptr<NativePass> makeDefaultMesh(void *device, const Effect &effect, CreateShader createShader);
 
 	bool drawWater(void *device, std::span<const WaterVertex> vertices, std::span<const uint16_t> indices,
 		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture, bool additive);
@@ -55,7 +58,7 @@ public:
 		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture, bool alphaTest, bool twoSided);
 
 private:
-	enum class Kind { Water, Terrain, NormalMapped };
+	enum class Kind { Water, Terrain, NormalMapped, DefaultMesh };
 	struct Data;
 	explicit NativePass(std::unique_ptr<Data> data);
 	static std::unique_ptr<NativePass> make(void *device, const Effect &effect, CreateShader createShader, Kind kind);

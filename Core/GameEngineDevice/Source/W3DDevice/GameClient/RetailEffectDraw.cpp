@@ -107,12 +107,18 @@ std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *handle, const Eff
 	return make(handle, effect, createShader, Kind::NormalMapped);
 }
 
+std::unique_ptr<NativePass> NativePass::makeDefaultMesh(void *handle, const Effect &effect, CreateShader createShader)
+{
+	return make(handle, effect, createShader, Kind::DefaultMesh);
+}
+
 std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect, CreateShader createShader, Kind kind)
 {
 	auto *device = static_cast<IDirect3DDevice9 *>(handle);
 	const bool terrain = kind == Kind::Terrain;
 	const bool model = kind == Kind::NormalMapped;
-	const std::string_view techniqueName = terrain ? "Default" : model ? "Default_M" : "BumpSpecular_M";
+	const bool defaultMesh = kind == Kind::DefaultMesh;
+	const std::string_view techniqueName = terrain || defaultMesh ? "Default" : model ? "Default_M" : "BumpSpecular_M";
 	const auto technique = std::find_if(effect.techniques.begin(), effect.techniques.end(),
 		[&](const auto &item) { return item.name == techniqueName; });
 	if (!device || technique == effect.techniques.end() || technique->passes.size() != 1)
@@ -130,8 +136,9 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 			if (state.resourceUsage == ResourceUsage::ArraySelector)
 			{
 				const std::string_view array = terrain && !vertex ? "PSDefault_Array" :
-					model ? (vertex ? "VS_M_Array" : "PS_M_Array") : "";
-				const unsigned variant = terrain ? 4 : vertex ? 0 : 1;
+					model ? (vertex ? "VS_M_Array" : "PS_M_Array") :
+					defaultMesh ? (vertex ? "VS_Array" : "PS_Array") : "";
+				const unsigned variant = terrain ? 4 : vertex ? 0 : defaultMesh ? 37 : 1;
 				if (array.empty() || state.parameterReference != array)
 					return nullptr;
 				const auto parameter = std::find_if(effect.parameters.begin(), effect.parameters.end(),
@@ -159,7 +166,10 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 			const auto native = renderState(state.operation);
 			if (state.resourceUsage == ResourceUsage::Program &&
 				((terrain && (state.operation == 3 || state.operation == 13)) ||
-				 (model && (state.operation == 4 || state.operation == 13 || state.operation == 14 || state.operation == 16))))
+				 (model && (state.operation == 4 || state.operation == 13 || state.operation == 14 || state.operation == 16)) ||
+				 (defaultMesh && (state.operation == 3 || state.operation == 4 || state.operation == 6 ||
+					state.operation == 7 || state.operation == 8 || state.operation == 13 ||
+					(state.operation >= 165 && state.operation <= 171)))))
 				continue;
 			if (!native || state.index || state.resourceUsage || state.value.words.size() != 1)
 			{
@@ -184,7 +194,7 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 		sampler->white = terrain && sampler->texture == "ShroudTexture";
 		data->samplers.push_back(std::move(*sampler));
 	}
-	if (terrain)
+	if (terrain || defaultMesh)
 	{
 		IDirect3DTexture9 *texture = nullptr;
 		if (FAILED(device->CreateTexture(1, 1, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &texture, nullptr)))
@@ -218,8 +228,17 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 		{0, static_cast<WORD>(offsetof(NormalMappedVertex, uv)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
 		D3DDECL_END()
 	};
+	const D3DVERTEXELEMENT9 defaultDeclaration[] = {
+		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+		{0, static_cast<WORD>(offsetof(NormalMappedVertex, normal)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+		{0, static_cast<WORD>(offsetof(NormalMappedVertex, uv)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		{0, static_cast<WORD>(offsetof(NormalMappedVertex, uv1)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+		{0, static_cast<WORD>(offsetof(NormalMappedVertex, color)), D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+		D3DDECL_END()
+	};
 	IDirect3DVertexDeclaration9 *decl = nullptr;
-	if (FAILED(device->CreateVertexDeclaration(terrain ? terrainDeclaration : model ? modelDeclaration : declaration, &decl)))
+	if (FAILED(device->CreateVertexDeclaration(terrain ? terrainDeclaration : model ? modelDeclaration :
+		defaultMesh ? defaultDeclaration : declaration, &decl)))
 		return nullptr;
 	data->declaration.reset(decl);
 	data->vertex.reset(static_cast<IDirect3DVertexShader9 *>(createShader(true, data->vs.tokens.data())));
@@ -283,6 +302,8 @@ bool NativePass::Data::draw(IDirect3DDevice9 *device, const SetBinding &setBindi
 	for (const auto &sampler : samplers)
 	{
 		auto *texture = sampler.white ? white.get() : static_cast<IDirect3DBaseTexture9 *>(getTexture(sampler.texture));
+		if (!texture && sampler.texture == "CloudTexture")
+			texture = white.get();
 		if (!texture)
 			return false;
 		textures[sampler.slot] = texture;
@@ -342,6 +363,7 @@ struct NativePass::Data {};
 std::unique_ptr<NativePass> NativePass::makeWater(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeTerrain(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *, const Effect &, CreateShader) { return nullptr; }
+std::unique_ptr<NativePass> NativePass::makeDefaultMesh(void *, const Effect &, CreateShader) { return nullptr; }
 
 bool NativePass::drawWater(void *, std::span<const WaterVertex>, std::span<const uint16_t>,
 	const SetBinding &, const std::function<void *(std::string_view)> &, bool) { return false; }

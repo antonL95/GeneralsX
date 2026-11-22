@@ -2714,7 +2714,7 @@ W3DShaderManager::W3DShaderManager()
 void W3DShaderManager::init()
 {
 	if (RetailFileLayers::enabled())
-		RetailFX::installNormalMappedDraw();
+		RetailFX::installRetailMeshDraw();
 	int i,j;
 
 	D3DSURFACE_DESC desc;
@@ -2803,7 +2803,7 @@ void W3DShaderManager::init()
 //=============================================================================
 void W3DShaderManager::shutdown()
 {
-	RetailFX::removeNormalMappedDraw();
+	RetailFX::removeRetailMeshDraw();
 	SAFE_RELEASE(m_newRenderSurface);
 	SAFE_RELEASE(m_renderTexture);
 	SAFE_RELEASE(m_oldRenderSurface);

@@ -2018,7 +2018,7 @@ void DX8TextureCategoryClass::Render()
 			}
 			else if (!meshEffectDraw || pass != 0 || m_gForceMultiply ||
 				renderer->Get_Index_Count() != static_cast<unsigned>(mesh->Peek_Model()->Get_Polygon_Count()) * 3 ||
-				!meshEffectDraw(*mesh, Peek_Texture(0)))
+				!meshEffectDraw(*mesh, Peek_Texture(0), Peek_Texture(1), vmaterial, theShader))
 				renderer->Render(mesh->Get_Base_Vertex_Offset());
 		}
 //--------------------------------------------------------------------
