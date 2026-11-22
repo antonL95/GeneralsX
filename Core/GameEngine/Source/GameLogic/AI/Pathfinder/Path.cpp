@@ -67,7 +67,7 @@ void Path::crc( Xfer *xfer )
 void Path::xfer( Xfer *xfer )
 {
   // version
-  XferVersion currentVersion = 1;
+  XferVersion currentVersion = 2;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -139,9 +139,35 @@ void Path::xfer( Xfer *xfer )
 	xfer->xferBool(&m_isOptimized);
 	Int obsolete1 = 0;
 	xfer->xferInt(&obsolete1);
-	UnsignedInt obsolete2;
+	UnsignedInt obsolete2 = 0;
 	xfer->xferUnsignedInt(&obsolete2);
 	xfer->xferBool(&m_blockedByAlly);
+
+	if (version >= 2)
+	{
+		xfer->xferBool(&m_cpopValid);
+		xfer->xferInt(&m_cpopCountdown);
+		xfer->xferCoord3D(&m_cpopIn);
+		xfer->xferCoord3D(&m_cpopOut.posOnPath);
+		xfer->xferReal(&m_cpopOut.distAlongPath);
+		xfer->xferUser(&m_cpopOut.layer, sizeof(m_cpopOut.layer));
+
+		Int recentID = m_cpopRecentStart ? m_cpopRecentStart->m_id : 0;
+		xfer->xferInt(&recentID);
+		if (xfer->getXferMode() == XFER_LOAD)
+		{
+			m_cpopRecentStart = nullptr;
+			if (recentID)
+			{
+				const PathNode *recent = m_path;
+				while (recent && recent->m_id != recentID)
+					recent = recent->getNext();
+				if (!recent)
+					throw XFER_INVALID_PARAMETERS;
+				m_cpopRecentStart = recent;
+			}
+		}
+	}
 
 
 #if defined(RTS_DEBUG)
