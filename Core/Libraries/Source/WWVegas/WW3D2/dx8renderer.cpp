@@ -2016,10 +2016,19 @@ void DX8TextureCategoryClass::Render()
 				DX8Wrapper::Set_Material(nullptr);	//force a reset of vertex material since we secretly changed opacity
 				DX8Wrapper::Set_Material(vmaterial);	//restore previous material.
 			}
-			else if (!meshEffectDraw || pass != 0 || m_gForceMultiply ||
-				renderer->Get_Index_Count() != static_cast<unsigned>(mesh->Peek_Model()->Get_Polygon_Count()) * 3 ||
-				!meshEffectDraw(*mesh, Peek_Texture(0), Peek_Texture(1), vmaterial, theShader))
-				renderer->Render(mesh->Get_Base_Vertex_Offset());
+			else
+			{
+				bool drawn = false;
+				if (meshEffectDraw && pass == 0 && !m_gForceMultiply &&
+					renderer->Get_Index_Count() == static_cast<unsigned>(mesh->Peek_Model()->Get_Polygon_Count()) * 3)
+				{
+					Matrix4x4 queuedWorld;
+					DX8Wrapper::Get_Transform(D3DTS_WORLD, queuedWorld);
+					drawn = meshEffectDraw(*mesh, Peek_Texture(0), Peek_Texture(1), vmaterial, theShader, queuedWorld);
+				}
+				if (!drawn)
+					renderer->Render(mesh->Get_Base_Vertex_Offset());
+			}
 		}
 //--------------------------------------------------------------------
 		if (mesh->Get_ObjectScale() != 1.0f)

@@ -95,7 +95,7 @@ Register fromVector(const Vector3 &value)
 }
 
 bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *secondary,
-	VertexMaterialClass *vertexMaterial, const ShaderClass &shader)
+	VertexMaterialClass *vertexMaterial, const ShaderClass &shader, const Matrix4x4 &world)
 {
 	if (!RetailFileLayers::enabled() || !TheTerrainRenderObject || !diffuse ||
 		ShaderClass::Is_Backface_Culling_Inverted())
@@ -161,8 +161,8 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 		(shroud->getCellHeight() - shroud->getDrawOriginY()) * scaleV};
 
 	auto *device8 = DX8Wrapper::_Get_D3D_Device8();
-	D3DXMATRIX world, view, projection, inverseView;
-	if (FAILED(device8->GetTransform(D3DTS_WORLD, &world)) || FAILED(device8->GetTransform(D3DTS_VIEW, &view)) ||
+	D3DXMATRIX view, projection, inverseView;
+	if (FAILED(device8->GetTransform(D3DTS_VIEW, &view)) ||
 		FAILED(device8->GetTransform(D3DTS_PROJECTION, &projection)) ||
 		!D3DXMatrixInverse(&inverseView, nullptr, &view))
 		return false;
@@ -208,7 +208,10 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 			return;
 		const auto &name = binding.name;
 		if (name == "World")
-			writeMatrix(floats, world);
+		{
+			for (size_t i = 0; i < std::min(floats.size(), size_t{4}); ++i)
+				floats[i] = {world[i][0], world[i][1], world[i][2], world[i][3]};
+		}
 		else if (name == "View")
 			writeMatrix(floats, view);
 		else if (name == "Projection")
@@ -263,7 +266,8 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	const bool alphaTest = normalMapped ? material.get<bool>("AlphaTestEnable", false) :
 		shader.Get_Alpha_Test() != ShaderClass::ALPHATEST_DISABLE;
 	const bool drawn = pass->drawNormalMapped(device, runtime->vertices, runtime->indices, setBinding, getTexture,
-		alphaTest, model.Get_Flag(MeshGeometryClass::TWO_SIDED) || shader.Get_Cull_Mode() == ShaderClass::CULL_MODE_DISABLE);
+		alphaTest, shader.Get_Depth_Mask() == ShaderClass::DEPTH_WRITE_ENABLE,
+		model.Get_Flag(MeshGeometryClass::TWO_SIDED) || shader.Get_Cull_Mode() == ShaderClass::CULL_MODE_DISABLE);
 	if (drawn && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS") && runtime->traced.insert(mesh.Get_Name()).second)
 		std::fprintf(stderr, "[RetailFX] Drew %s (%s)\n", label, mesh.Get_Name());
 	if (!drawn && !runtime->reportedFailure[slot])

@@ -69,7 +69,8 @@ public:
 		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture,
 		std::span<const TerrainVertex> third = {}, std::span<const uint32_t> thirdIndices = {}, void *thirdAtlas = nullptr);
 	bool drawNormalMapped(void *device, std::span<const NormalMappedVertex> vertices, std::span<const uint32_t> indices,
-		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture, bool alphaTest, bool twoSided);
+		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture,
+		bool alphaTest, bool depthWrite, bool twoSided);
 	bool drawVegetation(void *device, std::span<const VegetationVertex> vertices, std::span<const uint16_t> indices,
 		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture);
 

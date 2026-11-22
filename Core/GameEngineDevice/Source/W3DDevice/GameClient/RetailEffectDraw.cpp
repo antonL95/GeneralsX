@@ -86,6 +86,7 @@ struct NativePass::Data
 	std::vector<Sampler> samplers;
 	Program vs;
 	Program ps;
+	bool useCategoryDepthAndCull = false;
 
 	bool draw(IDirect3DDevice9 *device, const SetBinding &setBinding,
 		const std::function<void *(std::string_view)> &getTexture,
@@ -145,6 +146,7 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 	if (!device || technique == effect.techniques.end() || technique->passes.size() != 1)
 		return nullptr;
 	auto data = std::make_unique<Data>();
+	data->useCategoryDepthAndCull = defaultMesh;
 	for (const auto &state : technique->passes[0].states)
 	{
 		if (state.operation == 146 || state.operation == 147)
@@ -388,16 +390,19 @@ bool NativePass::Data::draw(IDirect3DDevice9 *device, const SetBinding &setBindi
 }
 
 bool NativePass::drawNormalMapped(void *handle, std::span<const NormalMappedVertex> vertices, std::span<const uint32_t> indices,
-	const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture, bool alphaTest, bool twoSided)
+	const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture,
+	bool alphaTest, bool depthWrite, bool twoSided)
 {
 	auto *device = static_cast<IDirect3DDevice9 *>(handle);
 	if (vertices.empty() || indices.empty())
 		return false;
 	return m_data->draw(device, setBinding, getTexture, [&] {
+		const bool categoryState = m_data->useCategoryDepthAndCull;
 		if (FAILED(device->SetRenderState(D3DRS_ALPHATESTENABLE, alphaTest ? TRUE : FALSE)) ||
 			FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE)) ||
 			FAILED(device->SetRenderState(D3DRS_FOGENABLE, FALSE)) ||
-			(twoSided && FAILED(device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE))))
+			(categoryState && FAILED(device->SetRenderState(D3DRS_ZWRITEENABLE, depthWrite ? TRUE : FALSE))) ||
+			((categoryState || twoSided) && FAILED(device->SetRenderState(D3DRS_CULLMODE, twoSided ? D3DCULL_NONE : D3DCULL_CW))))
 			return false;
 		return SUCCEEDED(device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, static_cast<UINT>(vertices.size()),
 			static_cast<UINT>(indices.size() / 3), indices.data(), D3DFMT_INDEX32, vertices.data(), sizeof(NormalMappedVertex)));
@@ -428,7 +433,7 @@ bool NativePass::drawTerrain(void *, std::span<const TerrainVertex>, std::span<c
 	std::span<const uint32_t>, void *) { return false; }
 
 bool NativePass::drawNormalMapped(void *, std::span<const NormalMappedVertex>, std::span<const uint32_t>,
-	const SetBinding &, const std::function<void *(std::string_view)> &, bool, bool) { return false; }
+	const SetBinding &, const std::function<void *(std::string_view)> &, bool, bool, bool) { return false; }
 
 #endif
 
