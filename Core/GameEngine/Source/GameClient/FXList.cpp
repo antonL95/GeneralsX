@@ -643,7 +643,11 @@ public:
 		Drawable* draw = primary ? primary->getDrawable() : nullptr;
 		if (!draw || !(m_attack || m_decay || m_hold))
 			return;
+#if RTS_GENERALS
 		draw->colorFlash(&m_color, m_decay, m_attack, m_hold);
+#else
+		draw->playFXTint(m_color, m_attack, m_hold, m_decay);
+#endif
 		if (traceRetailFXLists())
 			std::fprintf(stderr, "[Retail FXList] TintDrawable attack=%u hold=%u decay=%u rgb=(%.3f,%.3f,%.3f)\n",
 				m_attack, m_hold, m_decay, m_color.red, m_color.green, m_color.blue);

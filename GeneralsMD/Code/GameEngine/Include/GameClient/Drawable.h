@@ -390,6 +390,7 @@ public:
 	Bool getDrawsInMirror() const { return BitIsSet(m_status, DRAWABLE_STATUS_DRAWS_IN_MIRROR) || isKindOf(KINDOF_CAN_CAST_REFLECTIONS); }
 
 	void colorFlash( const RGBColor *color, UnsignedInt decayFrames = DEF_DECAY_FRAMES, UnsignedInt attackFrames = 0, UnsignedInt sustainAtPeak = 0 );  ///< flash a drawable in the color specified for a short time
+	void playFXTint(const RGBColor& color, UnsignedInt attackFrames, UnsignedInt holdFrames, UnsignedInt decayFrames);
 	void colorTint( const RGBColor *color );	 ///< tint this drawable the color specified
 	void setTintEnvelope( const RGBColor *color, Real attack, Real decay );	 ///< how to transition color
 	void flashAsSelected( const RGBColor *color = nullptr ); ///< drawable takes care of the details if you spec no color
@@ -529,7 +530,7 @@ public:
 	Vector3 * getAmbientLight();					///< get color value to add to ambient light when drawing
 	void setAmbientLight( Vector3 *ambient );		///< set color value to add to ambient light when drawing
 
-	const Vector3 * getTintColor() const;					///< get FX color value to add to ALL LIGHTS when drawing
+	const Vector3* getTintColor(Vector3& combined) const;
 	const Vector3 * getSelectionColor() const;					///< get FX color value to add to ALL LIGHTS when drawing
 
 	TerrainDecalType getTerrainDecalType() const { return m_terrainDecalType; }
@@ -671,6 +672,7 @@ private:
 	// note, these are lazily allocated!
 	TintEnvelope*		m_selectionFlashEnvelope;	///< used for selection flash, works WITH m_colorTintEnvelope
 	TintEnvelope*		m_colorTintEnvelope;			///< house color flashing, etc... works WITH m_selectionFlashEnvelope
+	TintEnvelope*		m_fxTintEnvelope = nullptr;
 																//   this used to use m_ambientLight... but this replaces it
 																//   int most places. It works harder to change the drawable's
 																//   color, by tinting all four scene lights, not just ambient

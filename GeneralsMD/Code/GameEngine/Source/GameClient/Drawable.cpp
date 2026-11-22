@@ -597,6 +597,7 @@ Drawable::~Drawable()
 
 	deleteInstance(m_colorTintEnvelope);
 	m_colorTintEnvelope = nullptr;
+	deleteInstance(m_fxTintEnvelope);
 
 	deleteInstance(m_locoInfo);
 	m_locoInfo = nullptr;
@@ -991,6 +992,13 @@ void Drawable::colorFlash( const RGBColor* color, UnsignedInt decayFrames, Unsig
 	}
 }
 
+void Drawable::playFXTint(const RGBColor& color, UnsignedInt attackFrames, UnsignedInt holdFrames, UnsignedInt decayFrames)
+{
+	if (!m_fxTintEnvelope)
+		m_fxTintEnvelope = newInstance(TintEnvelope);
+	m_fxTintEnvelope->play(&color, attackFrames, decayFrames, holdFrames);
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Tint a drawable a specified color */
 // ------------------------------------------------------------------------------------------------
@@ -1043,18 +1051,15 @@ void Drawable::onUnselected()
 //-------------------------------------------------------------------------------------------------
 /** get FX color value to add to ALL LIGHTS when drawing */
 //-------------------------------------------------------------------------------------------------
-const Vector3 * Drawable::getTintColor() const
+const Vector3* Drawable::getTintColor(Vector3& combined) const
 {
-	if ( m_colorTintEnvelope )
-	{
-		if (m_colorTintEnvelope->isEffective())
-		{
-			return m_colorTintEnvelope->getColor();
-		}
-	}
+	const Vector3* status = m_colorTintEnvelope && m_colorTintEnvelope->isEffective() ? m_colorTintEnvelope->getColor() : nullptr;
+	const Vector3* effect = m_fxTintEnvelope && m_fxTintEnvelope->isEffective() ? m_fxTintEnvelope->getColor() : nullptr;
+	if (!status || !effect)
+		return status ? status : effect;
 
-	return nullptr;
-
+	combined = *status + *effect;
+	return &combined;
 }
 //-------------------------------------------------------------------------------------------------
 /** get SELECTION color value to add to ALL LIGHTS when drawing */
@@ -1320,6 +1325,16 @@ void Drawable::updateDrawable(Real timeScale)
 
 	if (m_colorTintEnvelope)
 	  m_colorTintEnvelope->update(); // defector fx, disable fx, etc...
+
+	if (m_fxTintEnvelope)
+	{
+		m_fxTintEnvelope->update();
+		if (!m_fxTintEnvelope->isEffective())
+		{
+			deleteInstance(m_fxTintEnvelope);
+			m_fxTintEnvelope = nullptr;
+		}
+	}
 
 	if (m_selectionFlashEnvelope)
 		m_selectionFlashEnvelope->update(); // selection flashing
@@ -4977,12 +4992,13 @@ void Drawable::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE && RTS_GENERALS
-	const XferVersion currentVersion = 5;
+	const XferVersion stockVersion = 5;
 #elif RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = 7;
+	const XferVersion stockVersion = 7;
 #else
-	const XferVersion currentVersion = 9;
+	const XferVersion stockVersion = 9;
 #endif
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 10 : stockVersion;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -5493,6 +5509,23 @@ void Drawable::xfer( Xfer *xfer )
       }
     }
   }
+
+	Bool hasFXTint = m_fxTintEnvelope != nullptr;
+	if (version >= 10)
+	{
+		xfer->xferBool(&hasFXTint);
+		if (hasFXTint)
+		{
+			if (!m_fxTintEnvelope)
+				m_fxTintEnvelope = newInstance(TintEnvelope);
+			xfer->xferSnapshot(m_fxTintEnvelope);
+		}
+	}
+	if (xfer->getXferMode() == XFER_LOAD && (version < 10 || !hasFXTint))
+	{
+		deleteInstance(m_fxTintEnvelope);
+		m_fxTintEnvelope = nullptr;
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

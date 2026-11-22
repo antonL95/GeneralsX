@@ -709,7 +709,8 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		const Vector3 *tintColor = nullptr;
 		const Vector3 *selectionColor = nullptr;
 
-		tintColor			 = draw->getTintColor();
+		Vector3 combinedTint;
+		tintColor = draw->getTintColor(combinedTint);
 		if (!RetailFileLayers::enabled() || !obj || !obj->isKindOf(KINDOF_STRUCTURE))
 			selectionColor = draw->getSelectionColor();
 
