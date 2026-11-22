@@ -30,7 +30,9 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/INIAudit.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -62,6 +64,16 @@ OCLUpdateModuleData::OCLUpdateModuleData()
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "Amount", INI::parseInt, nullptr, offsetof(OCLUpdateModuleData, m_amount) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -82,6 +94,11 @@ OCLUpdate::~OCLUpdate()
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime OCLUpdate::update()
 {
+	const OCLUpdateModuleData* data = getOCLUpdateModuleData();
+	const Int amount = RetailFileLayers::enabled() ? data->m_amount : 0;
+	if (amount > 0 && m_creationCount >= amount)
+		return UPDATE_SLEEP_FOREVER;
+
 #if !RETAIL_COMPATIBLE_CRC
 	// TheSuperHackers @bugfix dizzyj/Caball009/Mauller 14/07/2025 prevent triggering supply drop when subdued while under construction
 	// When the construction is finished, we allow the timer to be initialized and then start shifting the timer while subdued
@@ -106,12 +123,14 @@ UpdateSleepTime OCLUpdate::update()
 		setNextCreationFrame();
 
 		Coord3D creationCoord;
-		if( getOCLUpdateModuleData()->m_isCreateAtEdge )
+		if( data->m_isCreateAtEdge )
 			creationCoord = TheTerrainLogic->findClosestEdgePoint( getObject()->getPosition() );
 		else
 			creationCoord = *getObject()->getPosition();
 
-		ObjectCreationList::create( getOCLUpdateModuleData()->m_ocl, getObject(), &creationCoord, getObject()->getPosition() );
+		ObjectCreationList::create( data->m_ocl, getObject(), &creationCoord, getObject()->getPosition() );
+		if (amount > 0 && ++m_creationCount >= amount)
+			return UPDATE_SLEEP_FOREVER;
 	}
 	return UPDATE_SLEEP_NONE;
 }
@@ -183,7 +202,7 @@ void OCLUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -196,6 +215,8 @@ void OCLUpdate::xfer( Xfer *xfer )
 	// timer stated frame
 	xfer->xferUnsignedInt( &m_timerStartedFrame );
 
+	if (version >= 2)
+		xfer->xferInt(&m_creationCount);
 }
 
 // ------------------------------------------------------------------------------------------------

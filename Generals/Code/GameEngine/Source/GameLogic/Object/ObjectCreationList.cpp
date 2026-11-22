@@ -52,6 +52,7 @@
 #include "GameClient/ParticleSys.h"
 #include "GameClient/Shadow.h"
 
+#include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
@@ -878,6 +879,8 @@ public:
 		{
 			{ "DispositionAngle", INI::parseAngleReal, nullptr, offsetof(GenericObjectCreationNugget, m_dispositionAngle) },
 			{ "IgnoreCommandPointLimit", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_ignoreCommandPointLimit) },
+			{ "DestinationPlayer", INI::parseAsciiString, nullptr, offsetof(GenericObjectCreationNugget, m_destinationPlayer) },
+			{ "VeterancyLevel", INI::parseInt, nullptr, offsetof(GenericObjectCreationNugget, m_veterancyLevel) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 
@@ -1270,6 +1273,12 @@ protected:
 				TheGameLogic->destroyObject(obj);
 			}
 		}
+
+		if (RetailFileLayers::enabled() && m_nameAreObjects && m_veterancyLevel > 0)
+		{
+			ExperienceLevelStore::applyPendingLevels(obj);
+			obj->getExperienceTracker()->gainRetailLevels(m_veterancyLevel);
+		}
 	}
 
 	Object* reallyCreate(const Coord3D *pos, const Matrix3D *mtx, Real orientation, const Object *sourceObj, UnsignedInt lifetimeFrames ) const
@@ -1283,9 +1292,16 @@ protected:
 			return nullptr; // don't spawn useful objects for dead players.  Avoid the zombie units from Yuri's.
 
 		// Object type debris might need this information to process visual UpgradeModules.
-		Team *debrisOwner = nullptr;
-		if( sourceObj )
-			debrisOwner = sourceObj->getControllingPlayer()->getDefaultTeam();
+		const Bool retailObject = RetailFileLayers::enabled() && m_nameAreObjects;
+		Player* owner = sourceObj ? sourceObj->getControllingPlayer() : nullptr;
+		if (retailObject)
+		{
+			if (m_destinationPlayer.isNotEmpty())
+				owner = ThePlayerList->findPlayerWithNameKey(NAMEKEY(m_destinationPlayer.str()));
+			if (!owner || !owner->isPlayerActive())
+				owner = ThePlayerList->getNeutralPlayer();
+		}
+		Team* debrisOwner = owner ? owner->getDefaultTeam() : nullptr;
 
 		Object* container = nullptr;
 		Object *firstObject = nullptr;
@@ -1326,7 +1342,7 @@ protected:
 			if (!tmpl)
 				continue;
 
-			if (RetailFileLayers::enabled() && m_nameAreObjects && !m_ignoreCommandPointLimit)
+			if (retailObject && !m_ignoreCommandPointLimit)
 			{
 				const Player *ownerPlayer = debrisOwner ? debrisOwner->getControllingPlayer() : nullptr;
 				if (ownerPlayer && !ownerPlayer->hasEnoughCommandPoints(tmpl))
@@ -1482,6 +1498,8 @@ private:
 	Bool											m_inheritsVeterancy;
 	Bool											m_skipIfSignificantlyAirborne;
 	Bool											m_ignoreCommandPointLimit = FALSE;
+	AsciiString								m_destinationPlayer;
+	Int												m_veterancyLevel = 0;
 
 };
 EMPTY_DTOR(GenericObjectCreationNugget)
