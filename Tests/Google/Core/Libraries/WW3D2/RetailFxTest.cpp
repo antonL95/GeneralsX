@@ -140,6 +140,22 @@ TEST(RetailFxTest, ReadsShaderConstantTableAndRequiresBoundedTokens)
 	EXPECT_FALSE(RetailFX::readProgram(bad, true));
 }
 
+TEST(RetailFxTest, ReadsExplicitlyEmptyShaderMetadata)
+{
+	const uint32_t words[] = {
+		0xfffe0101, 0x0008fffe, 0x42415443, 28, 0, 0xfffe0101, 0, 0, 0, 0,
+		0x0001fffe, 0x53455250,
+		0x00000001, 0xc00f0000, 0x90e40000,
+		0x0000ffff
+	};
+	const auto program = RetailFX::readProgram(encodeWords(words), true);
+	ASSERT_TRUE(program);
+	EXPECT_TRUE(program->bindings.empty());
+	EXPECT_TRUE(program->instructions.empty());
+	const uint32_t noTable[] = {words[0], 0x00000001, 0xc00f0000, 0x90e40000, 0x0000ffff};
+	EXPECT_FALSE(RetailFX::readProgram(encodeWords(noTable), true));
+}
+
 TEST(RetailFxTest, ValidatesShaderOperandRolesAndRegisterLimits)
 {
 	const auto accepts = [](bool vertex, std::initializer_list<uint32_t> instruction) {

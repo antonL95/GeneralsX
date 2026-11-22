@@ -482,7 +482,7 @@ std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 			words = words.subspan(1 + operands);
 		}
 	}
-	if (words.size() != 1 || words.front() != 0x0000ffffu || program.bindings.empty() || nesting || repeating)
+	if (words.size() != 1 || words.front() != 0x0000ffffu || !constantsSeen || nesting || repeating)
 		return std::nullopt;
 	return program;
 }

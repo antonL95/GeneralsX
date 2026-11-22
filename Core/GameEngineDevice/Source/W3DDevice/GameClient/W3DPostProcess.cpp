@@ -22,6 +22,8 @@
 
 #include "W3DDevice/GameClient/W3DPostProcess.h"
 #include "W3DDevice/GameClient/W3DPostProcessShaders.h"
+#include "W3DDevice/GameClient/W3DRetailPostEffect.h"
+#include "W3DDevice/GameClient/RetailEffectInput.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "Common/BfmeAssetPath.h"
@@ -34,11 +36,12 @@
 #include "WWLib/TARGA.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <stdio.h>
 
 W3DPostProcess *TheW3DPostProcess = nullptr;
 
-static constexpr Int RetailLookupSize = 32;
+static constexpr Int RetailLookupSize = RetailFX::LookupSize;
 static constexpr Int RetailLookupSliceWidth = RetailLookupSize + 2;
 static constexpr Int RetailLookupAtlasWidth = (RetailLookupSize + 2) * RetailLookupSliceWidth;
 
@@ -92,9 +95,7 @@ W3DPostProcess::W3DPostProcess()
 W3DPostProcess::~W3DPostProcess()
 {
 	DX8Wrapper::RemoveCleanupHook(this);
-	releaseResources();
-	if (m_retailLookup)
-		m_retailLookup->Release();
+	ReleaseResources();
 
 	LPDIRECT3DDEVICE8 pDev = DX8Wrapper::_Get_D3D_Device8();
 	if (pDev)
@@ -134,7 +135,26 @@ void W3DPostProcess::init()
 
 void W3DPostProcess::reset()
 {
+	ReleaseResources();
+}
+
+void W3DPostProcess::ReleaseResources()
+{
 	releaseResources();
+	releaseRetailLookup();
+}
+
+void W3DPostProcess::releaseRetailLookup()
+{
+	m_nativeRetailLookup.reset();
+	if (m_retailLookup)
+	{
+		m_retailLookup->Release();
+		m_retailLookup = nullptr;
+	}
+	m_retailLookupName.clear();
+	m_retailLookupBlend = 0.0f;
+	m_tracedRetailLookup = false;
 }
 
 void W3DPostProcess::update()
@@ -298,12 +318,8 @@ bool W3DPostProcess::prepareRetailLookup()
 	const auto &name = map->getRetailLookupTexture();
 	if (name != m_retailLookupName)
 	{
+		releaseRetailLookup();
 		m_retailLookupName = name;
-		if (m_retailLookup)
-		{
-			m_retailLookup->Release();
-			m_retailLookup = nullptr;
-		}
 
 		const auto path = makeBfmeAssetPath("Art/CompiledTextures/", name.str());
 		Targa image;
@@ -315,47 +331,56 @@ bool W3DPostProcess::prepareRetailLookup()
 			header.ImageType != TGA_TRUECOLOR || (header.PixelDepth != 24 && header.PixelDepth != 32))
 			return false;
 		const Int pixelSize = header.PixelDepth / 8;
-		const Bool topOrigin = (header.ImageDescriptor & TGAIDF_YORIGIN) != 0;
 		if (image.Load(path.c_str(), TGAF_IMAGE, false) != 0 || !image.GetImage())
 			return false;
-		if (!m_psRetailLookup &&
-			FAILED(device->CreatePixelShader(W3DPostProcessShaders::ColorLookupAtlas, &m_psRetailLookup)))
-			return false;
-		if (FAILED(device->CreateTexture(RetailLookupAtlasWidth, size, 1, 0, D3DFMT_X8R8G8B8,
-			D3DPOOL_MANAGED, &m_retailLookup)))
-			return false;
 
-		D3DLOCKED_RECT rect;
-		if (FAILED(m_retailLookup->LockRect(0, &rect, nullptr, 0)))
+		const auto *pixels = reinterpret_cast<const uint8_t *>(image.GetImage());
+		const bool topOrigin = (image.Header.ImageDescriptor & TGAIDF_YORIGIN) != 0;
+		if (auto *native = DX8Wrapper::Get_Effect_Device9())
+		{
+			if (const auto effect = RetailFX::loadEffectFile("shaders/compiled/postfx_lookuptable.fxo"))
+				m_nativeRetailLookup = RetailFX::LookupPass::make(native, *effect, DX8Wrapper::Create_Effect_Shader9,
+					std::span(pixels, static_cast<size_t>(size * size * size * pixelSize)),
+					static_cast<unsigned>(pixelSize), topOrigin);
+		}
+
+		const auto createAtlas = [&] {
+			if ((!m_psRetailLookup &&
+				FAILED(device->CreatePixelShader(W3DPostProcessShaders::ColorLookupAtlas, &m_psRetailLookup))) ||
+				FAILED(device->CreateTexture(RetailLookupAtlasWidth, size, 1, 0, D3DFMT_X8R8G8B8,
+					D3DPOOL_MANAGED, &m_retailLookup)))
+				return false;
+
+			D3DLOCKED_RECT rect;
+			if (FAILED(m_retailLookup->LockRect(0, &rect, nullptr, 0)))
+				return false;
+			auto *atlas = static_cast<UnsignedByte *>(rect.pBits);
+			for (Int green = 0; green < size; ++green)
+			{
+				const Int row = topOrigin ? green : size - 1 - green;
+				auto *target = atlas + green * rect.Pitch;
+				for (Int blue = -1; blue <= size; ++blue)
+				{
+					const auto *slice = pixels + (row * size * size + std::clamp(blue, 0, size - 1) * size) * pixelSize;
+					for (Int column = 0; column < RetailLookupSliceWidth; ++column)
+					{
+						const auto *source = slice + std::clamp(column - 1, 0, size - 1) * pixelSize;
+						std::copy_n(source, 3, target);
+						target[3] = 255;
+						target += 4;
+					}
+				}
+			}
+			return SUCCEEDED(m_retailLookup->UnlockRect(0));
+		};
+		if (!createAtlas() && m_retailLookup)
 		{
 			m_retailLookup->Release();
 			m_retailLookup = nullptr;
-			return false;
 		}
-		const auto *pixels = reinterpret_cast<const UnsignedByte *>(image.GetImage());
-		auto *atlas = static_cast<UnsignedByte *>(rect.pBits);
-		for (Int green = 0; green < size; ++green)
-		{
-			const Int row = topOrigin ? green : size - 1 - green;
-			auto *target = atlas + green * rect.Pitch;
-			for (Int blue = -1; blue <= size; ++blue)
-			{
-				const auto *slice = pixels + (row * size * size + std::clamp(blue, 0, size - 1) * size) * pixelSize;
-				for (Int column = 0; column < RetailLookupSliceWidth; ++column)
-				{
-					const auto *source = slice + std::clamp(column - 1, 0, size - 1) * pixelSize;
-					target[0] = source[0];
-					target[1] = source[1];
-					target[2] = source[2];
-					target[3] = 255;
-					target += 4;
-				}
-			}
-		}
-		m_retailLookup->UnlockRect(0);
 	}
 
-	if (!m_retailLookup)
+	if (!m_retailLookup && !m_nativeRetailLookup)
 		return false;
 	m_retailLookupBlend = map->getRetailLookupBlend();
 	return true;
@@ -505,27 +530,46 @@ bool W3DPostProcess::endSceneAndApply()
 	if (m_retailLookupBlend > 0.0f)
 	{
 		D3DVIEWPORT8 viewport = {0, 0, (DWORD)m_sceneWidth, (DWORD)m_sceneHeight, 0.0f, 1.0f};
-		const float lookupConstants[3][4] = {
-			{1.0f, -0.5f / RetailLookupSize, 0.0f, 1.0f},
-			{Real(RetailLookupSize) / RetailLookupAtlasWidth, Real(RetailLookupSliceWidth + 1) / RetailLookupAtlasWidth, 0.0f, 0.0f},
-			{Real(RetailLookupSliceWidth) / RetailLookupAtlasWidth, 0.0f, 0.0f, m_retailLookupBlend}
-		};
 		if (SUCCEEDED(pDev->SetRenderTarget(m_compositeSurface, nullptr)) &&
-			SUCCEEDED(pDev->SetViewport(&viewport)) &&
-			SUCCEEDED(pDev->SetPixelShaderConstant(0, lookupConstants, 3)))
+			SUCCEEDED(pDev->SetViewport(&viewport)))
 		{
-			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
-			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
-			pDev->SetTexture(2, m_retailLookup);
-			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
-			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
-			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
-			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
-			renderQuad(m_sceneTexture, m_psRetailLookup, m_sceneWidth, m_sceneHeight, m_retailLookup);
-			pDev->SetTexture(2, nullptr);
-			std::swap(m_sceneTexture, m_compositeTexture);
-			std::swap(m_sceneSurface, m_compositeSurface);
-			lookupApplied = true;
+			if (m_nativeRetailLookup)
+			{
+				auto *native = DX8Wrapper::Get_Effect_Device9();
+				lookupApplied = m_nativeRetailLookup->draw(native, DX8Wrapper::Get_Effect_Texture9(m_sceneTexture),
+					m_sceneWidth, m_sceneHeight, m_retailLookupBlend);
+				if (lookupApplied && !m_tracedRetailLookup && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS"))
+				{
+					std::fprintf(stderr, "[RetailFX] Drew PostFX_LookupTable Default (%s)\n", m_retailLookupName.str());
+					m_tracedRetailLookup = true;
+				}
+			}
+			if (!lookupApplied && m_retailLookup && m_psRetailLookup)
+			{
+				const float lookupConstants[3][4] = {
+					{1.0f, -0.5f / RetailLookupSize, 0.0f, 1.0f},
+					{Real(RetailLookupSize) / RetailLookupAtlasWidth, Real(RetailLookupSliceWidth + 1) / RetailLookupAtlasWidth, 0.0f, 0.0f},
+					{Real(RetailLookupSliceWidth) / RetailLookupAtlasWidth, 0.0f, 0.0f, m_retailLookupBlend}
+				};
+				if (SUCCEEDED(pDev->SetPixelShaderConstant(0, lookupConstants, 3)))
+				{
+					DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
+					DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+					pDev->SetTexture(2, m_retailLookup);
+					DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+					DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+					DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+					DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+					renderQuad(m_sceneTexture, m_psRetailLookup, m_sceneWidth, m_sceneHeight, m_retailLookup);
+					pDev->SetTexture(2, nullptr);
+					lookupApplied = true;
+				}
+			}
+			if (lookupApplied)
+			{
+				std::swap(m_sceneTexture, m_compositeTexture);
+				std::swap(m_sceneSurface, m_compositeSurface);
+			}
 		}
 	}
 

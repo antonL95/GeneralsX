@@ -29,6 +29,13 @@
 #include "Common/AsciiString.h"
 #include "WW3D2/dx8wrapper.h"
 
+#include <memory>
+
+namespace RetailFX
+{
+class LookupPass;
+}
+
 class W3DPostProcess : public SubsystemInterface, public DX8_CleanupHook
 {
 public:
@@ -40,7 +47,7 @@ public:
 	virtual void update() override;
 
 	// DX8_CleanupHook interface
-	virtual void ReleaseResources() override { releaseResources(); }
+	virtual void ReleaseResources() override;
 	virtual void ReAcquireResources() override {}
 
 	void releaseResources();
@@ -57,6 +64,7 @@ public:
 private:
 	bool initShaders();
 	bool prepareRetailLookup();
+	void releaseRetailLookup();
 	void renderQuad(IDirect3DTexture8 *tex0, DWORD pixelShader, int width, int height,
 	                IDirect3DTexture8 *tex1 = nullptr);
 	void renderQuad4Tap(IDirect3DTexture8 *tex, DWORD pixelShader, int width, int height,
@@ -93,8 +101,10 @@ private:
 	DWORD m_psFXAA;
 	DWORD m_psRetailLookup = 0;
 	IDirect3DTexture8 *m_retailLookup = nullptr;
+	std::unique_ptr<RetailFX::LookupPass> m_nativeRetailLookup;
 	AsciiString m_retailLookupName;
 	Real m_retailLookupBlend = 0.0f;
+	bool m_tracedRetailLookup = false;
 };
 
 extern W3DPostProcess *TheW3DPostProcess;

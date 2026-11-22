@@ -8,6 +8,7 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/Common/W3DRadar.h
     Include/W3DDevice/Common/W3DThingFactory.h
     Include/W3DDevice/GameClient/BaseHeightMap.h
+    Include/W3DDevice/GameClient/W3DRetailPostEffect.h
 #    Include/W3DDevice/GameClient/camerashakesystem.h
     Include/W3DDevice/GameClient/FlatHeightMap.h
     Include/W3DDevice/GameClient/HeightMap.h
@@ -170,6 +171,7 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/W3DMouse.cpp
     Source/W3DDevice/GameClient/W3DParticleSys.cpp
     Source/W3DDevice/GameClient/W3DPostProcess.cpp
+    Source/W3DDevice/GameClient/W3DRetailPostEffect.cpp
     Source/W3DDevice/GameClient/RetailEffectDraw.cpp
     Source/W3DDevice/GameClient/W3DRetailTerrain.cpp
     Source/W3DDevice/GameClient/W3DRetailNormalMapped.cpp
