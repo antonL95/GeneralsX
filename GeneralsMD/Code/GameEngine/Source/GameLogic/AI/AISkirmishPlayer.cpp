@@ -1388,12 +1388,15 @@ void AISkirmishPlayer::updateRetail()
 		if (object->getControllingPlayer() != m_player || object->isEffectivelyDead())
 			continue;
 		owned.push_back(object);
-		fortressPresent = fortressPresent || object->isKindOf(KINDOF_CASTLE_KEEP) ||
-			(object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && isRetailFortress(*object->getTemplate()));
 		if (isFarm(*object->getTemplate()))
 			++farms;
-		else if (object->isKindOf(KINDOF_STRUCTURE) && !isScavengedBuilding(*object->getTemplate()))
-			m_retailBuiltStructures.insert(object->getTemplate()->getName());
+		else
+		{
+			fortressPresent = fortressPresent || object->isKindOf(KINDOF_CASTLE_KEEP) ||
+				(object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && isRetailFortress(*object->getTemplate()));
+			if (object->isKindOf(KINDOF_STRUCTURE) && !isScavengedBuilding(*object->getTemplate()))
+				m_retailBuiltStructures.insert(object->getTemplate()->getName());
+		}
 		if (object->isDisabled() || object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || object->getContainedBy())
 			continue;
 		if (!keep && object->isKindOf(KINDOF_COMMANDCENTER))
