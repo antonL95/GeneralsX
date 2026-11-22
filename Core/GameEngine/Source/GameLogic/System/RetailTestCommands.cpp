@@ -2646,6 +2646,8 @@ void execute(const Command& command, unsigned int frame)
 #if !RTS_GENERALS
 	if (command.action.starts_with("pkg05-"))
 	{
+		if (command.action == "pkg05-wear-ring")
+			selectObject(obj);
 		runRetailPackage05TestCommand(command.action, obj, findTarget(command, true), frame);
 		return;
 	}

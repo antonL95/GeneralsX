@@ -13,6 +13,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 
@@ -51,6 +52,41 @@ void runRetailPackage05TestCommand(std::string_view action, Object* source, Obje
 		std::fprintf(stderr, "TEST ring-order-result frame=%u alive=%d entered=%d carrier=%d enter-active=%d\n",
 			frame, alive, source->hasUpgrade(citadelUpgrade), alive && courier->testStatus(OBJECT_STATUS_HOLDING_THE_RING),
 			alive && courier->getAI() && courier->getAI()->getEnterTarget() == source);
+	}
+	else if (action == "pkg05-wear-ring")
+	{
+		StealthUpdate* stealth = source->getStealth();
+		std::fprintf(stderr, "TEST ring-toggle frame=%u allowed=%d\n", frame, stealth && stealth->canToggleRing());
+		const CommandSet* set = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
+		for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+		{
+			const CommandButton* button = set->getCommandButton(slot);
+			if (!button || button->getCommandType() != GUI_COMMAND_ONE_RING)
+				continue;
+			GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_HORDE_COMMAND);
+			message->appendObjectIDArgument(source->getID());
+			message->appendIntegerArgument(slot);
+			message->appendIntegerArgument(-1);
+			break;
+		}
+	}
+	else if (action == "pkg05-worn-state")
+	{
+		std::fprintf(stderr, "TEST ring-worn frame=%u worn=%d stealthed=%d frozen=%d\n", frame,
+			source->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE), source->testStatus(OBJECT_STATUS_STEALTHED),
+			source->isDisabledByType(DISABLED_PARALYZED));
+	}
+	else if (action == "pkg05-enrage-on")
+		source->setModelConditionState(MODELCONDITION_USER_45);
+	else if (action == "pkg05-enrage-off")
+		source->clearModelConditionState(MODELCONDITION_USER_45);
+	else if (action == "pkg05-enrage-state")
+	{
+		const auto* ai = source->getAI();
+		std::fprintf(stderr, "TEST enrage-state frame=%u object=%s active=%d weapon=%d enrage-loco=%d panic-loco=%d\n",
+			frame, source->getTemplate()->getName().str(), source->testStatus(OBJECT_STATUS_ENRAGED),
+			source->testWeaponSetFlag(WEAPONSET_ENRAGED), ai && ai->getCurLocomotorSetType() == LOCOMOTORSET_ENRAGED,
+			ai && ai->getCurLocomotorSetType() == LOCOMOTORSET_PANIC);
 	}
 	else if (action == "pkg05-grant-arkenstone")
 	{
