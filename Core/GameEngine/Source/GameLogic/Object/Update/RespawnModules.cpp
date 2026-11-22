@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "Common/ModelState.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
@@ -179,7 +180,9 @@ UpdateSleepTime RespawnUpdate::update()
 
 void RespawnUpdate::onDie(const DamageInfo *)
 {
-	FXList::doFXPos(getRespawnUpdateModuleData()->m_deathFX, getObject()->getPosition());
+	const Object* source = getObject();
+	FXList::doFXPos(getRespawnUpdateModuleData()->m_deathFX, source->getPosition(), nullptr, 0.0f,
+		nullptr, 0.0f, RetailFileLayers::enabled() ? source : nullptr);
 }
 
 void RespawnUpdate::crc(Xfer *xfer)
