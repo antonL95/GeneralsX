@@ -17,6 +17,7 @@ struct LobbyMemberEntry : public NetworkMemberBase
 	int color = -1;
 	int team = -1;
 	int startpos = -1;
+	AsciiString createAHeroConfig;
 	bool has_map = false;
 
 	uint16_t m_SlotIndex = 9999;

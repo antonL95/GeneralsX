@@ -62,11 +62,15 @@ struct NGMPEvent {
         EVENT_MATCHMAKING_MATCH_FOUND,
         EVENT_MATCHMAKING_MESSAGE,
         EVENT_MOTD_FETCHED,
-        EVENT_OUTCOME_COMMITTED
+        EVENT_OUTCOME_COMMITTED,
+        EVENT_LOBBY_DETAILS
     };
 
     Type type = EVENT_NONE;
     std::string payload;
+    int64_t lobbyId = -1;
+    uint64_t lobbyDetailsRequest = 0;
+    bool startGame = false;
 };
 
 struct NGMPLobby {
@@ -189,7 +193,7 @@ public:
     void setCurrentLobbyId(int64_t id) { m_currentLobbyId = id; }
     bool isLobbyOwner() const { return m_isLobbyOwner; }
 
-    void requestLobbyDetailsAsync(int64_t lobbyId = -1);
+    void requestLobbyDetailsAsync(int64_t lobbyId = -1, bool startGame = false);
 
     // Staging room modification methods (matching ELobbyUpdateField)
     void updateLobbyMap(const std::string& mapName, const std::string& mapPath, bool isOfficial, int maxPlayers);
@@ -294,6 +298,9 @@ private:
 
     // Staging room state
     int64_t m_currentLobbyId = -1;
+    bool applyLobbyDetails(int64_t lobbyId, const std::string& payload);
+    std::atomic<uint64_t> m_lobbyDetailsRequests{0};
+    uint64_t m_appliedLobbyDetailsRequest = 0;
     int64_t m_hostUserId = -1;
     bool m_isLobbyOwner = false;
     std::string m_turnUsername;

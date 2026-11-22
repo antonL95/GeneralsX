@@ -32,6 +32,7 @@
 
 #include "Common/GameEngine.h"
 #include "Common/GameState.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/OptionPreferences.h"
 #include "GameClient/GameText.h"
@@ -1072,6 +1073,8 @@ static void StartPressed()
 				fprintf(stderr, "[NGMP] Host sent START_GAME broadcast (msg_id=13)\n");
 				fflush(stderr);
 			}
+			if (RetailFileLayers::enabled())
+				return;
 
 			if (buttonBack) buttonBack->winEnable(FALSE);
 			GameWindow* buttonBuddy = TheWindowManager->winGetWindowFromId(
@@ -2115,8 +2118,7 @@ void WOLGameSetupMenuUpdate( WindowLayout * layout, void *userData)
 				continue;
 			}
 
-			// Host already called startGame() directly in StartPressed(); ignore the echo
-			if (TheNGMPGame->amIHost()) {
+			if (TheNGMPGame->amIHost() && !ev.startGame) {
 				fprintf(stderr, "[NGMP] EVENT_GAME_START: ignoring echo (we are host)\n");
 				fflush(stderr);
 				continue;
@@ -2129,7 +2131,7 @@ void WOLGameSetupMenuUpdate( WindowLayout * layout, void *userData)
 				continue;
 			}
 
-			fprintf(stderr, "[NGMP] Received START_GAME (guest), launching game\n");
+			fprintf(stderr, "[NGMP] Launching the synchronized lobby\n");
 			fflush(stderr);
 
 			if (buttonBack) buttonBack->winEnable(FALSE);

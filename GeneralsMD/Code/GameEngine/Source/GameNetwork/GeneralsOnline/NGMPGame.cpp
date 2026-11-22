@@ -146,11 +146,9 @@ void NGMPGame::UpdateSlotsFromCurrentLobby()
 				continue;
 			}
 
-			const AsciiString savedHeroConfig = slot->getCreateAHeroConfig();
 			UnicodeString uName = NGMP::UTF8ToUnicode(pLobbyMember.display_name);
 			slot->setState((SlotState)pLobbyMember.m_SlotState, uName, pLobbyMember.m_SlotIndex);
-			if (!savedHeroConfig.isEmpty())
-				slot->setCreateAHeroConfig(savedHeroConfig);
+			slot->setCreateAHeroConfig(pLobbyMember.createAHeroConfig);
 
 			slot->setColor(pLobbyMember.color);
 			slot->setTeamNumber(pLobbyMember.team);
