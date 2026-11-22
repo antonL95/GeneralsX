@@ -431,6 +431,8 @@ public:
 	void setID( DrawableID id );											///< set this drawable's unique ID
 
 	const ModelConditionFlags& getModelConditionFlags() const { return m_conditionState; }
+	void requestRetailHitReactionRestart(UnsignedInt frame) { m_retailHitReactionRestart = frame; }
+	UnsignedInt getRetailHitReactionRestart() const { return m_retailHitReactionRestart; }
 
 	//
 	// NOTE: avoid repeated calls to the set and clear for the condition state as they
@@ -749,6 +751,7 @@ private:
 
 	DrawableInfo				m_drawableInfo;		///< structure pointed to by W3D render objects so they know which drawable they belong to.
 
+	UnsignedInt m_retailHitReactionRestart = 0;
 	ModelConditionFlags	m_conditionState;				///< The Drawables current behavior state
 	Real								m_lastConstructDisplayed;						///< last construct percent used to make the string
 	DisplayString*			m_constructDisplayString;  ///< string to display construction % complete

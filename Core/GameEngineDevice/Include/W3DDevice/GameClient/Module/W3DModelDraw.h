@@ -572,12 +572,13 @@ private:
 	UnsignedInt										m_weaponTimingEnd = 0;
 	Real m_previousAnimationFXFrame = 0.0f;
 	Bool m_animationFXFirstSample = TRUE;
+	UnsignedInt m_lastRetailHitReactionRestart = 0;
 	UnsignedInt m_distanceSampleFrame = FOREVER;
 	Coord2D m_distanceSamplePosition{};
 	Real m_distancePerFrame = 0.0f;
 	Real m_authoredAnimationSpeed = 1.0f;
 
-	void adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction);
+	void adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction, Bool restartCurrent = FALSE);
 	void dispatchAnimationFXEvents();
 	void applyWeaponTiming();
 	void traceAnimationState() const;

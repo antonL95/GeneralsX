@@ -1,0 +1,7 @@
+5 create Player_1 LAGondorFighter 0 2990,650,0
+5 create Player_1 LAGondorArcher 0 3020,650,0
+6 reveal Player_1 LAGondorFighter 0
+28 damage Player_1 LAGondorFighter 0 10
+28 damage Player_1 LAGondorArcher 0 10
+39 damage Player_1 LAGondorFighter 0 10
+39 damage Player_1 LAGondorArcher 0 10

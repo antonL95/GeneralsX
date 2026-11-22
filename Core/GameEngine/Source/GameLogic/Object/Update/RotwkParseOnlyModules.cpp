@@ -6,6 +6,7 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
 #include "Common/Xfer.h"
+#include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -15,7 +16,6 @@
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
-#include "GameClient/Drawable.h"
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
@@ -279,6 +279,7 @@ UpdateSleepTime HitReactionBehavior::update()
 	m_previousHealth = health;
 	const auto* data = getHitReactionBehaviorModuleData();
 	const Bool dead = object->isEffectivelyDead() || health <= 0.0f;
+	const Bool wasReacting = m_remaining != 0;
 	if (m_remaining && (--m_remaining == 0 || dead))
 	{
 		object->clearModelConditionState(MODELCONDITION_HIT_REACTION);
@@ -303,6 +304,9 @@ UpdateSleepTime HitReactionBehavior::update()
 		m_remaining = durations[index];
 		object->setModelConditionState(MODELCONDITION_HIT_REACTION);
 		object->setModelConditionState(levels[index]);
+		if (wasReacting && RetailFileLayers::enabled())
+			if (Drawable* drawable = object->getDrawable())
+				drawable->requestRetailHitReactionRestart(TheGameLogic->getFrame());
 		if (data->m_hitsParalyze)
 			object->setDisabledUntil(DISABLED_PARALYZED, TheGameLogic->getFrame() + m_remaining);
 		break;

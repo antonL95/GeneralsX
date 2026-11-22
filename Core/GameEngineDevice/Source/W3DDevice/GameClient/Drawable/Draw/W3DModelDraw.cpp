@@ -50,6 +50,7 @@
 #include "Common/GameLOD.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameClient/ClientRandomValue.h"
 #include "GameClient/FXList.h"
 #include "GameClient/Shadow.h"
 #include "GameLogic/GameLogic.h"		// for real-time frame
@@ -2343,6 +2344,19 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 			m_curState = nullptr;
 			setModelState(state);
 		}
+		const UnsignedInt restart = getDrawable()->getRetailHitReactionRestart();
+		if (restart != m_lastRetailHitReactionRestart)
+		{
+			m_lastRetailHitReactionRestart = restart;
+			const ModelConditionInfo* animationState = m_curState->m_animationState;
+			if (m_whichAnimInCurState >= 0 && animationState && !animationState->m_conditionsYesVec.empty() &&
+				animationState->m_conditionsYesVec.front().test(MODELCONDITION_HIT_REACTION) &&
+				getDrawable()->getModelConditionFlags().test(MODELCONDITION_HIT_REACTION))
+			{
+				const ScopedVisualRandom random(TRUE);
+				adjustAnimation(nullptr, -1.0f, TRUE);
+			}
+		}
 	}
 	traceAnimationState();
 
@@ -2463,7 +2477,7 @@ Real W3DModelDraw::getCurrentAnimFraction() const
 }
 
 //-------------------------------------------------------------------------------------------------
-void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction)
+void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction, Bool restartCurrent)
 {
 	if (!m_curState)
 		return;
@@ -2472,7 +2486,12 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 	Int numAnims = m_curState->m_animations.size();
 	if (numAnims > 0)
 	{
-		if (numAnims == 1)
+		if (restartCurrent)
+		{
+			DEBUG_ASSERTCRASH(m_whichAnimInCurState >= 0 && m_whichAnimInCurState < numAnims,
+				("Hit reaction restart requires a selected animation"));
+		}
+		else if (numAnims == 1)
 		{
 			m_whichAnimInCurState = 0;
 		}
@@ -2525,7 +2544,13 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 					startFrame = REAL_TO_INT(prevAnimFraction * animHandle->Get_Num_Frames()-1);
 				}
 
-				m_renderObject->Set_Animation(animHandle, startFrame, mode);
+				if (restartCurrent && m_pauseAnimation)
+				{
+					m_animationMode = mode;
+					m_renderObject->Set_Animation(animHandle, startFrame, RenderObjClass::ANIM_MODE_MANUAL);
+				}
+				else
+					m_renderObject->Set_Animation(animHandle, startFrame, mode);
 				m_previousAnimationFXFrame = static_cast<Real>(startFrame);
 				m_animationFXFirstSample = TRUE;
 				REF_PTR_RELEASE(animHandle);
