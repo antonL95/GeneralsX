@@ -5,6 +5,7 @@
 #include "Common/FileSystem.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/GameLogic.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
@@ -13,7 +14,10 @@
 #include "d3dx8math.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <sstream>
 
 RetailTerrainShadow *TheRetailTerrainShadow = nullptr;
@@ -21,6 +25,24 @@ RetailTerrainShadow *TheRetailTerrainShadow = nullptr;
 namespace
 {
 constexpr auto ShadowDepthFloat = static_cast<D3DFORMAT>(114);
+
+struct ShadowTrace
+{
+	unsigned sequence = 0;
+	unsigned props = 0;
+	unsigned trees = 0;
+	unsigned treeCutouts = 0;
+	unsigned failures = 0;
+	uint32_t treeHash = 2166136261u;
+};
+
+ShadowTrace shadowTrace;
+
+bool tracingShadows()
+{
+	static const bool enabled = std::getenv("GENERALSX_TRACE_RETAIL_SHADOWS") != nullptr;
+	return enabled;
+}
 
 const DWORD DepthShader[] = {
 	0xffff0104,
@@ -252,9 +274,23 @@ void RetailTerrainShadow::castMesh(MeshClass &mesh, const Matrix3D &transform, B
 	device->SetTexture(1, cutout);
 	device->SetPixelShader(cutout ? m_cutoutShader : m_depthShader);
 	device->SetRenderState(D3DRS_ALPHATESTENABLE, cutout != nullptr);
-	device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, vertices, triangles,
+	const HRESULT result = device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, vertices, triangles,
 		model->Get_Polygon_Array(), sizeof(TriIndex) == 6 ? D3DFMT_INDEX16 : D3DFMT_INDEX32,
 		m_vertices.data(), sizeof(CasterVertex));
+	if (tracingShadows())
+	{
+		shadowTrace.failures += FAILED(result);
+		if (tree)
+		{
+			++shadowTrace.trees;
+			shadowTrace.treeCutouts += cutout != nullptr;
+			for (const auto &vertex : m_vertices)
+				for (float value : {vertex.x, vertex.y, vertex.depth})
+					shadowTrace.treeHash = (shadowTrace.treeHash ^ std::bit_cast<uint32_t>(value)) * 16777619u;
+		}
+		else
+			++shadowTrace.props;
+	}
 }
 
 void RetailTerrainShadow::castObject(RenderObjClass &object)
@@ -303,11 +339,23 @@ void RetailTerrainShadow::render(SceneClass &scene, const Vector3 &centre, Int s
 	device->GetRenderTarget(&target);
 	device->GetDepthStencilSurface(&depth);
 	device->GetViewport(&viewport);
-	if (target && depth && SUCCEEDED(device->SetRenderTarget(m_surface, m_depth)))
+	DWORD coordIndex = 0, texTransform = 0, zBias = 0;
+	if (tracingShadows())
+	{
+		const unsigned sequence = shadowTrace.sequence + 1;
+		shadowTrace = {};
+		shadowTrace.sequence = sequence;
+		device->GetTextureStageState(1, D3DTSS_TEXCOORDINDEX, &coordIndex);
+		device->GetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, &texTransform);
+		device->GetRenderState(D3DRS_ZBIAS, &zBias);
+	}
+	const HRESULT targetResult = target && depth ? device->SetRenderTarget(m_surface, m_depth) : E_FAIL;
+	HRESULT clearResult = E_FAIL;
+	if (SUCCEEDED(targetResult))
 	{
 		const D3DVIEWPORT8 shadowViewport{0, 0, DWORD(m_size), DWORD(m_size), 0, 1};
 		device->SetViewport(&shadowViewport);
-		device->Clear(0, nullptr, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xffff0000, 1.0f, 0);
+		clearResult = device->Clear(0, nullptr, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xffff0000, 1.0f, 0);
 		device->SetRenderState(D3DRS_ZENABLE, TRUE);
 		device->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
 		device->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
@@ -349,8 +397,22 @@ void RetailTerrainShadow::render(SceneClass &scene, const Vector3 &centre, Int s
 		ShaderClass::Invalidate();
 		m_ready = true;
 	}
+	if (tracingShadows())
+		std::fprintf(stderr,
+			"[Retail Shadow] pass=%u game=%u center=(%.3f,%.3f,%.3f) size=%d float=%d target=%08x clear=%08x props=%u trees=%u cutouts=%u hash=%08x failures=%u coord=%u texTransform=%u zBias=%u\n",
+			shadowTrace.sequence, TheGameLogic->getFrame(), centre.X, centre.Y, centre.Z, m_size, m_floatDepth,
+			static_cast<unsigned>(targetResult), static_cast<unsigned>(clearResult), shadowTrace.props, shadowTrace.trees,
+			shadowTrace.treeCutouts, shadowTrace.treeHash, shadowTrace.failures, static_cast<unsigned>(coordIndex),
+			static_cast<unsigned>(texTransform), static_cast<unsigned>(zBias));
 	if (target) target->Release();
 	if (depth) depth->Release();
+}
+
+void RetailTerrainShadow::traceReceiver(bool compiled, bool authored, bool legacy) const
+{
+	if (tracingShadows())
+		std::fprintf(stderr, "[Retail Shadow] receiver=%u game=%u compiled=%d authored=%d legacy=%d ready=%d\n",
+			shadowTrace.sequence, TheGameLogic->getFrame(), compiled, authored, legacy, m_ready);
 }
 
 void RetailTerrainShadow::worldToShadowMatrix(D3DMATRIX &matrix) const

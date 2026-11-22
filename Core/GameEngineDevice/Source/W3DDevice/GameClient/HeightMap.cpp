@@ -2097,11 +2097,14 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 			//Do additional pass over any tiles that have 3 textures blended together.
 			if (TheGlobalData->m_use3WayTerrainBlends && !authoredShadow)
 				renderExtraBlendTiles();
-			if (!authoredShadow && TheRetailTerrainShadow && TheRetailTerrainShadow->beginTerrainPass())
+			const bool legacyShadow = !authoredShadow && TheRetailTerrainShadow && TheRetailTerrainShadow->beginTerrainPass();
+			if (legacyShadow)
 			{
 				renderTerrainPass(&rinfo.Camera);
 				TheRetailTerrainShadow->endTerrainPass();
 			}
+			if (TheRetailTerrainShadow)
+				TheRetailTerrainShadow->traceReceiver(compiledTerrain, authoredShadow, legacyShadow);
 		}
 
 		Int yCoordMin = m_map->getDrawOrgY();

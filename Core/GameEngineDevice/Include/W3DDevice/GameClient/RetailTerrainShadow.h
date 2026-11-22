@@ -23,6 +23,7 @@ public:
 	void endTerrainPass();
 	bool isReady() const { return m_ready; }
 	bool getAuthoredShadow(void *&texture, D3DMATRIX &worldToShadow, float &texelSize) const;
+	void traceReceiver(bool compiled, bool authored, bool legacy) const;
 
 private:
 	struct CasterVertex
