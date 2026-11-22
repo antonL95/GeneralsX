@@ -435,6 +435,7 @@ void ModuleFactory::init()
 	if (registersRotwkModules())
 	{
 		addModule( StancesBehavior );
+		addModule( DualWeaponBehavior );
 		addModule( LargeGroupAudioUpdate );
 		addModule( PickupStuffUpdate );
 		addModule( HitReactionBehavior );

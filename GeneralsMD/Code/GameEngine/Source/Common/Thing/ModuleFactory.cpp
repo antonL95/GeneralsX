@@ -505,6 +505,7 @@ void ModuleFactory::init()
 		addModule( EntEnragedUpdate );
 		addModule( SpecialEnemySenseUpdate );
 		addModule( AimWeaponBehavior );
+		addModule( DualWeaponBehavior );
 		addModule( InvisibilityUpdate );
 		addModule( ToggleHiddenSpecialAbilityUpdate );
 

@@ -116,3 +116,32 @@ public:
 	AimWeaponBehavior(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
 	UpdateSleepTime update() override;
 };
+
+class DualWeaponBehaviorModuleData : public UpdateModuleData
+{
+public:
+	Real m_switchWeaponOnCloseRangeDistance = 0.0f;
+	Bool m_useCloseRangeWhileMounted = FALSE;
+	UnsignedInt m_minimumSwitchTime = 0;
+	Bool m_useHordeRangeWeapon = FALSE;
+	Bool m_useRealVictimRange = FALSE;
+
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
+class DualWeaponBehavior : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(DualWeaponBehavior, "DualWeaponBehavior")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(DualWeaponBehavior, DualWeaponBehaviorModuleData)
+
+public:
+	DualWeaponBehavior(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	UpdateSleepTime update() override;
+	void setForceCloseRange(Bool force) { m_forceCloseRange = force; }
+	Bool isForceCloseRange() const { return m_forceCloseRange; }
+	UnsignedInt getLastSwitchFrame() const { return m_lastSwitchFrame; }
+
+private:
+	Bool m_forceCloseRange = FALSE;
+	UnsignedInt m_lastSwitchFrame = 0;
+};

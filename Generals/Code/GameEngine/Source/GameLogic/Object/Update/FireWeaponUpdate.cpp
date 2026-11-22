@@ -33,7 +33,11 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/FireWeaponUpdate.h"
+#include "GameLogic/WeaponSlotSelectionRules.h"
 #include "GameLogic/WeaponStatus.h"
 
 
@@ -147,4 +151,133 @@ void FireWeaponUpdate::loadPostProcess()
 	// extend base class
 	UpdateModule::loadPostProcess();
 
+}
+
+DualWeaponBehavior::~DualWeaponBehavior() = default;
+
+void DualWeaponBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	UpdateModuleData::buildFieldParse(p);
+	static const FieldParse fields[] =
+	{
+		{ "SwitchWeaponOnCloseRangeDistance", INI::parseReal, nullptr, offsetof(DualWeaponBehaviorModuleData, m_switchWeaponOnCloseRangeDistance) },
+		{ "UseCloseRangeWhileMounted", INI::parseBool, nullptr, offsetof(DualWeaponBehaviorModuleData, m_useCloseRangeWhileMounted) },
+		{ "MinimumSwitchTime", INI::parseDurationUnsignedInt, nullptr, offsetof(DualWeaponBehaviorModuleData, m_minimumSwitchTime) },
+		{ "UseHordeRangeWeapon", INI::parseBool, nullptr, offsetof(DualWeaponBehaviorModuleData, m_useHordeRangeWeapon) },
+		{ "UseRealVictimRange", INI::parseBool, nullptr, offsetof(DualWeaponBehaviorModuleData, m_useRealVictimRange) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+UpdateSleepTime DualWeaponBehavior::update()
+{
+	Object* obj = getObject();
+	const AIUpdateInterface* ai = obj->getAI();
+	if (!ai || obj->isEffectivelyDead())
+		return UPDATE_SLEEP_FOREVER;
+
+	if (obj->testWeaponSetFlag(WEAPONSET_HERO_MODE))
+		return UPDATE_SLEEP(5);
+
+	const Object* containedBy = obj->getContainedBy();
+	const Bool inHorde = containedBy != nullptr && containedBy->isKindOf(KINDOF_HORDE);
+	if (containedBy != nullptr && !inHorde)
+		return UPDATE_SLEEP(5);
+
+	const auto* data = getDualWeaponBehaviorModuleData();
+	const Bool currentlyCloseRange = obj->testWeaponSetFlag(WEAPONSET_CLOSE_RANGE);
+	const Bool isMounted = obj->testWeaponSetFlag(WEAPONSET_MOUNTED);
+	Bool hasCloseEnemy = FALSE;
+
+	if (!m_forceCloseRange && !(data->m_useHordeRangeWeapon && inHorde) &&
+		!(data->m_useCloseRangeWhileMounted && isMounted))
+	{
+		const Real switchDist = data->m_switchWeaponOnCloseRangeDistance;
+		if (switchDist > 0.0f)
+		{
+			const Object* enemy = nullptr;
+			const Coord3D* selfPos = obj->getPosition();
+			if (data->m_useRealVictimRange && ai->getCurrentVictim() != nullptr)
+			{
+				const Object* victim = ai->getCurrentVictim();
+				if (!victim->isEffectivelyDead())
+				{
+					const Coord3D* vPos = victim->getPosition();
+					if (WeaponSlotSelectionRules::isEnemyWithinDualWeaponRange(
+						vPos->x - selfPos->x, vPos->y - selfPos->y, vPos->z - selfPos->z, switchDist))
+					{
+						enemy = victim;
+					}
+				}
+			}
+			else
+			{
+				enemy = TheAI->findClosestEnemy(obj, switchDist, AI::CAN_ATTACK);
+				if (enemy && !enemy->isEffectivelyDead())
+				{
+					const Coord3D* ePos = enemy->getPosition();
+					if (!WeaponSlotSelectionRules::isEnemyWithinDualWeaponRange(
+						ePos->x - selfPos->x, ePos->y - selfPos->y, ePos->z - selfPos->z, switchDist))
+					{
+						enemy = nullptr;
+					}
+				}
+			}
+			hasCloseEnemy = (enemy != nullptr && !enemy->isEffectivelyDead());
+		}
+	}
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const auto decision = WeaponSlotSelectionRules::evaluateDualWeaponDecision(
+		currentlyCloseRange != FALSE,
+		m_forceCloseRange != FALSE,
+		data->m_useHordeRangeWeapon != FALSE,
+		inHorde != FALSE,
+		data->m_useCloseRangeWhileMounted != FALSE,
+		isMounted != FALSE,
+		hasCloseEnemy != FALSE,
+		now,
+		m_lastSwitchFrame,
+		data->m_minimumSwitchTime);
+
+	if (decision.sleepFrames > 0)
+		return UPDATE_SLEEP(decision.sleepFrames);
+
+	m_lastSwitchFrame = decision.nextLastSwitchFrame;
+	if (decision.switched)
+	{
+		if (decision.shouldUseCloseRange)
+		{
+			obj->setWeaponSetFlag(WEAPONSET_CLOSE_RANGE);
+			obj->setModelConditionState(MODELCONDITION_WEAPONSET_CLOSE_RANGE);
+		}
+		else
+		{
+			obj->clearWeaponSetFlag(WEAPONSET_CLOSE_RANGE);
+			obj->clearModelConditionState(MODELCONDITION_WEAPONSET_CLOSE_RANGE);
+		}
+	}
+	return UPDATE_SLEEP(5);
+}
+
+void DualWeaponBehavior::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	xfer->xferBool(&m_forceCloseRange);
+	xfer->xferUnsignedInt(&m_lastSwitchFrame);
+}
+
+void DualWeaponBehavior::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	UpdateModule::xfer(xfer);
+	xfer->xferBool(&m_forceCloseRange);
+	xfer->xferUnsignedInt(&m_lastSwitchFrame);
+}
+
+void DualWeaponBehavior::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
 }
