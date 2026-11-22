@@ -56,6 +56,7 @@
 #include "GameLogic/Module/DumbProjectileBehavior.h"
 #include "GameLogic/Module/InstantDeathBehavior.h"
 #include "GameLogic/Module/SlowDeathBehavior.h"
+#include "GameLogic/Module/RetailSlowDeath.h"
 #include "GameLogic/Module/HelicopterSlowDeathUpdate.h"
 #include "GameLogic/Module/NeutronMissileSlowDeathUpdate.h"
 #include "GameLogic/Module/CaveContain.h"
@@ -368,6 +369,12 @@ void ModuleFactory::init()
 	addModule( PhysicsBehavior );
 	addModule( InstantDeathBehavior );
 	addModule( SlowDeathBehavior );
+	if (registersRotwkModules())
+	{
+		addModule( ClearanceTestingSlowDeathBehavior );
+		addModule( GiantBirdSlowDeathBehavior );
+		addModule( ShipSlowDeathBehavior );
+	}
 	addModule( HelicopterSlowDeathBehavior );
 	addModule( NeutronMissileSlowDeathBehavior );
 	addModule( CaveContain );

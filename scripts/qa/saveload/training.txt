@@ -82,4 +82,6 @@
 126 snapshot-wall-occupant Player_1 - 0 WallDeleteOccupant
 126 snapshot-wall-occupant Player_1 - 0 WallGateOccupant
 126 list Player_1 - 0
+240 create Player_1 GuldurEntwife 0 2120,660,90
+243 pkg14-fatal Player_1 GuldurEntwife 0
 285 builderscriptmove * Wolf 8 - 1933.749145508 1773.990844727

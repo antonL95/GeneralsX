@@ -101,6 +101,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/GeometryUpgrade.h
     Include/GameLogic/Module/FoundationAIUpdate.h
     Include/GameLogic/Module/RetailGate.h
+    Include/GameLogic/Module/RetailSlowDeath.h
     Include/GameLogic/Module/WallHubBehavior.h
     Include/GameLogic/Module/TerrainResourceBehavior.h
     Include/GameLogic/Module/CommandPointsUpgrade.h
@@ -753,6 +754,7 @@ set(GAMEENGINE_SRC
 
     Source/GameLogic/System/RetailPackage08TestCommands.cpp
     Source/GameLogic/System/RetailPackage11TestCommands.cpp
+    Source/GameLogic/System/RetailPackage14TestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
     Source/GameLogic/Object/Upgrade/ReplaceSelfUpgrade.cpp
@@ -760,6 +762,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Upgrade/GeometryUpgrade.cpp
     Source/GameLogic/Object/Update/FoundationAIUpdate.cpp
     Source/GameLogic/Object/Behavior/RetailGate.cpp
+    Source/GameLogic/Object/Behavior/RetailSlowDeath.cpp
     Source/GameLogic/Object/Behavior/WallHubBehavior.cpp
     Source/GameLogic/Object/Update/TerrainResourceBehavior.cpp
     Source/GameLogic/Object/Update/RetailWorkerHarvest.cpp

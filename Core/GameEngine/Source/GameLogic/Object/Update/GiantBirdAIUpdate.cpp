@@ -9,6 +9,7 @@
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
+#include "GameLogic/Module/RetailSlowDeath.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
@@ -142,6 +143,9 @@ UpdateSleepTime GiantBirdAIUpdate::update()
 UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 {
 	Object* bird = getObject();
+	if (bird->isEffectivelyDead() && GiantBirdSlowDeathBehavior::controlsMotion(*bird))
+		return UPDATE_SLEEP_FOREVER;
+
 	Locomotor* locomotor = getCurLocomotor();
 	if (!locomotor || locomotor->getAppearance() != LOCO_GIANT_BIRD || bird->isEffectivelyDead())
 		return AIUpdateInterface::doLocomotor();

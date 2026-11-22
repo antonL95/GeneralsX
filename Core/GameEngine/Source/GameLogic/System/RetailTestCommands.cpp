@@ -188,6 +188,7 @@ void runRetailPackage13TestCommand(std::string_view action, Object* source, Obje
 
 void runRetailPackage08TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D* position, UnsignedInt frame);
 void runRetailPackage11TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D& inputs, UnsignedInt frame);
+void runRetailPackage14TestCommand(std::string_view action, Object* object, const Object* killer, const char* argument, UnsignedInt frame);
 #endif
 
 namespace RetailTestCommands
@@ -2775,6 +2776,11 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action.starts_with("pkg11-"))
 	{
 		runRetailPackage11TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(), command.location, frame);
+		return;
+	}
+	if (command.action.starts_with("pkg14-"))
+	{
+		runRetailPackage14TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(), frame);
 		return;
 	}
 #endif
