@@ -120,7 +120,7 @@ size_t shaderOperands(uint32_t opcode)
 		case 0x02: case 0x03: case 0x05: case 0x08: case 0x09: case 0x0a:
 		case 0x0b: case 0x0c: case 0x0d: case 0x11: case 0x20: case 0x42:
 			return 3;
-		case 0x04: case 0x12: case 0x58: return 4;
+		case 0x04: case 0x12: case 0x25: case 0x58: return 4;
 		case 0x30: case 0x51: return 5;
 		default: return 16;
 	}
@@ -212,6 +212,20 @@ bool validShaderInstruction(Words words, ShaderStage stage, size_t &length)
 	{
 		case 0x00: return length == 0;
 		case 0x1f: return length == operands && validDeclaration(words[1], words[2], stage);
+		case 0x25:
+		{
+			if (length != operands || stage != ShaderStage::Vertex20 ||
+				registerClass(words[1]) != RegisterClass::Temporary || !validDestination(words[1], stage) ||
+				(words[1] & 0x000c0000u) || !direct(words[2]) || !validSource(words[2], stage))
+				return false;
+			const auto swizzle = (words[2] >> 16) & 0xffu;
+			const auto polynomial = [&](uint32_t word) {
+				return direct(word) && registerClass(word) == RegisterClass::Constant &&
+					((word >> 16) & 0xfffu) == 0xe4u && validSource(word, stage);
+			};
+			return swizzle == (swizzle & 3u) * 0x55u && polynomial(words[3]) && polynomial(words[4]) &&
+				registerIndex(words[3]) != registerIndex(words[4]);
+		}
 		case 0x26: return length == operands && stage == ShaderStage::Vertex20 &&
 			registerClass(words[1]) == RegisterClass::Integer && registerIndex(words[1]) < 16 &&
 			((words[1] >> 16) & 0xfffu) == 0xe4u;
@@ -262,7 +276,7 @@ unsigned inputCount(unsigned operation)
 	{
 		case 0x100: case 0x101: case 0x103: case 0x104: case 0x107: case 0x108: case 0x109:
 			return 1;
-		case 0x204: case 0x205: case 0x500:
+		case 0x200: case 0x201: case 0x202: case 0x204: case 0x205: case 0x500:
 			return 2;
 		case 0x300:
 			return 3;
@@ -387,6 +401,9 @@ double evaluate(unsigned operation, double a, double b, double c)
 		case 0x107: return 1.0 / std::sqrt(std::abs(a));
 		case 0x108: return std::sin(a);
 		case 0x109: return std::cos(a);
+		case 0x200: return std::fmin(a, b);
+		case 0x201: return std::fmax(a, b);
+		case 0x202: return a < b ? 1.0 : 0.0;
 		case 0x204: return a + b;
 		case 0x205: return a * b;
 		case 0x300: return a >= 0.0 ? b : c;

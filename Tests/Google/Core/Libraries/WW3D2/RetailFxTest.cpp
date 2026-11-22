@@ -192,6 +192,45 @@ TEST(RetailFxTest, AcceptsTheLegacyTerrainVertexDeclarations)
 	EXPECT_TRUE(RetailFX::readProgram(encodeWords(words), true));
 }
 
+TEST(RetailFxTest, ValidatesVertexShaderSineCosineOperands)
+{
+	const auto accepts = [](uint32_t version, uint32_t dest, uint32_t angle, uint32_t first, uint32_t second) {
+		const uint32_t words[] = {
+			version, 0x0008fffe, 0x42415443, 28, 0, version, 0, 0, 0, 0,
+			0x04000025, dest, angle, first, second, 0x0000ffff
+		};
+		return RetailFX::readProgram(encodeWords(words), version != 0xffff0200).has_value();
+	};
+	EXPECT_TRUE(accepts(0xfffe0200, 0x80030001, 0x80ff0004, 0xa0e40058, 0xa0e40059));
+	EXPECT_FALSE(accepts(0xfffe0101, 0x80030001, 0x80ff0004, 0xa0e40058, 0xa0e40059));
+	EXPECT_FALSE(accepts(0xffff0200, 0x80030001, 0x80ff0004, 0xa0e40018, 0xa0e40019));
+	EXPECT_FALSE(accepts(0xfffe0200, 0xc0030000, 0x80ff0004, 0xa0e40058, 0xa0e40059));
+	EXPECT_FALSE(accepts(0xfffe0200, 0x80070001, 0x80ff0004, 0xa0e40058, 0xa0e40059));
+	EXPECT_FALSE(accepts(0xfffe0200, 0x80030001, 0x80e40004, 0xa0e40058, 0xa0e40059));
+	EXPECT_FALSE(accepts(0xfffe0200, 0x80030001, 0x80ff0004, 0x80e40003, 0xa0e40059));
+	EXPECT_FALSE(accepts(0xfffe0200, 0x80030001, 0x80ff0004, 0xa0e40058, 0xa0e40058));
+	EXPECT_FALSE(accepts(0xfffe0200, 0x80030001, 0x80ff0004, 0xa0e40058, 0xa0e40100));
+}
+
+TEST(RetailFxTest, EvaluatesParticlePreshaderComparisons)
+{
+	const uint32_t words[] = {
+		0xfffe0200, 0x0008fffe, 0x42415443, 28, 0, 0xfffe0200, 0, 0, 0, 0,
+		0x002dfffe, 0x53455250, 0x46580201,
+		0x0006fffe, 0x54494c43, 2, 0, 0x40000000, 0, 0x40080000,
+		0x0023fffe, 0x434c5846, 3,
+		0xa0000001, 2, 0, 1, 0, 0, 1, 1, 0, 4, 0,
+		0xa0100001, 2, 0, 1, 0, 0, 1, 1, 0, 4, 1,
+		0xa0200001, 2, 0, 1, 0, 0, 1, 1, 0, 4, 2,
+		0x0000ffff
+	};
+	const auto program = RetailFX::readProgram(encodeWords(words), true);
+	ASSERT_TRUE(program);
+	RetailFX::Registers output;
+	ASSERT_TRUE(RetailFX::fillRegisters(*program, [](const auto &, auto, auto) {}, output));
+	EXPECT_EQ(output.floats[0], (RetailFX::Register{2.0f, 3.0f, 1.0f, 0.0f}));
+}
+
 TEST(RetailFxTest, RequiresALiteralBoundForVertexRepeat)
 {
 	std::vector<uint32_t> words = {
