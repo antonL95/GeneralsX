@@ -27,6 +27,7 @@ stage_map() {
 stage_map "$user_maps/$name"
 stage_map "$user_maps-other/$name"
 stage_map "$install/Maps/$name"
+stage_map "$install/outside/$name"
 for asset in "$rotwk"/*; do
     case "${asset##*/}" in Maps|maps) continue ;; esac
     ln -s "$asset" "$install/"
@@ -54,10 +55,11 @@ expect() {
 }
 
 printf '%s\n' '34 quit - - 0' > "$GENERALSX_TEST_COMMANDS"
-for escape in outside parent directory-link file-link missing; do
+for escape in outside parent relative-parent directory-link file-link missing; do
     case "$escape" in
         outside) path="$user_maps-other/$name/$name.map" ;;
         parent) path="$user_maps/../Maps-other/$name/$name.map" ;;
+        relative-parent) path="Maps/../outside/$name/$name.map" ;;
         directory-link) path="$user_maps/escape/$name.map" ;;
         file-link) path="$user_maps/link/link.map" ;;
         missing) path="$out/missing/$name.map" ;;
@@ -79,9 +81,11 @@ cat > "$GENERALSX_TEST_COMMANDS" <<'COMMANDS'
 50 pkg50-state Player_1 MordorGreatBeast 0
 51 quit - - 0
 COMMANDS
-for form in user install relative filename; do
+for form in user rotwk-user aotr-user install relative filename; do
     case "$form" in
         user) path="$user_maps/$name/$name.map" ;;
+        rotwk-user) path="$rotwk/UserData/Maps/$name/$name.map" ;;
+        aotr-user) path="$aotr/UserData/Maps/$name/$name.map" ;;
         install) path="$install/Maps/$name/$name.map" ;;
         relative) path="maps/$name/$name.map" ;;
         filename) path="$name.map" ;;

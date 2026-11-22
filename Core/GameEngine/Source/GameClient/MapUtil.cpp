@@ -138,6 +138,14 @@ static Bool resolveRetailMapPath(const MapCache& cache, AsciiString& name)
 		allowed = isBelowMapRoot(local, canonicalLocalPath(prefix));
 	}
 	if (!allowed)
+	{
+		const AsciiString installUserMaps = "UserData/Maps";
+		AsciiString modUserMaps = TheGlobalData->m_modDir;
+		modUserMaps.concat(installUserMaps);
+		allowed = isBelowMapRoot(local, canonicalLocalPath(installUserMaps)) ||
+			isBelowMapRoot(local, canonicalLocalPath(modUserMaps));
+	}
+	if (!allowed)
 		return FALSE;
 
 	std::error_code error;
