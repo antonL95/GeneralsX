@@ -401,14 +401,14 @@ void HordeGarrisonContain::exitObjectViaDoor(Object* exitObj, ExitDoorType exitD
 	removeFromContain(exitObj);
 	const auto* data = getHordeGarrisonContainModuleData();
 	const Object* self = getObject();
-	Coord3D exitPos;
-	if (hasNonZeroOffset(data->m_exitOffset))
-		exitPos = transformOffsetToWorld(self, data->m_exitOffset);
-	else
-		exitPos = transformOffsetToWorld(self, data->m_entryOffset);
+	const Coord3D& offset = hasNonZeroOffset(data->m_exitOffset) ? data->m_exitOffset : data->m_entryOffset;
+	Coord3D exitPos = transformOffsetToWorld(self, offset);
+	if (!hasNonZeroOffset(offset))
+	{
+		if (AIUpdateInterface* ai = exitObj->getAI())
+			TheAI->pathfinder()->adjustToPossibleDestination(exitObj, ai->getLocomotorSet(), &exitPos);
+	}
 
-	if (AIUpdateInterface* ai = exitObj->getAI())
-		TheAI->pathfinder()->adjustToPossibleDestination(exitObj, ai->getLocomotorSet(), &exitPos);
 	if (PhysicsBehavior* physics = exitObj->getPhysics())
 		physics->resetDynamicPhysics();
 	placeHordeAtPosition(exitObj, exitPos, self->getOrientation());
