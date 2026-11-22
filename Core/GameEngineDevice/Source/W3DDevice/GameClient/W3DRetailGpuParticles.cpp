@@ -206,10 +206,13 @@ bool GpuParticlePass::draw(void *handle, void *atlas, std::span<const GpuParticl
 		!fillRegisters(m_data->pixelPrograms[*pixel], setBinding, pixelValues) || FAILED(m_data->state->Capture()))
 		return false;
 	const ScopedState restore{m_data->state.get()};
+	static constexpr std::array<std::array<int, 4>, 16> vertexIntegers{};
 	if (FAILED(device->SetVertexDeclaration(m_data->declaration.get())) ||
 		FAILED(device->SetVertexShader(m_data->vertex.get())) ||
 		FAILED(device->SetPixelShader(m_data->pixels[*pixel].get())) ||
-		FAILED(device->SetVertexShaderConstantF(0, vertexValues.floats.front().data(), 83)) ||
+		FAILED(device->SetVertexShaderConstantF(0, vertexValues.floats.front().data(), static_cast<UINT>(vertexValues.floats.size()))) ||
+		FAILED(device->SetVertexShaderConstantB(0, vertexValues.booleans.data(), static_cast<UINT>(vertexValues.booleans.size()))) ||
+		FAILED(device->SetVertexShaderConstantI(0, vertexIntegers.front().data(), static_cast<UINT>(vertexIntegers.size()))) ||
 		FAILED(device->SetPixelShaderConstantF(0, pixelValues.floats.front().data(), 32)))
 		return false;
 	const std::pair<D3DRENDERSTATETYPE, DWORD> states[] = {
