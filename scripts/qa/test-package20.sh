@@ -8,13 +8,28 @@ export PKGS1_TRAINING_EXTRA_COMMANDS="$qa/saveload/package20.txt"
 export PKGS1_TRAINING_EXTRA_GDB="$qa/saveload/package20-fx.gdb"
 result=$(mktemp)
 trap 'rm -f "$result"' EXIT
-if ! sh "$qa/test-save-load-crc.sh" "$build" training 241 303 > "$result" 2>&1; then
+checkpoint_states() {
+    awk -v checkpoint="$checkpoint" '
+        /^TEST pkg20 (held|state|ownership|targeting) frame=(241|243|245|246|269|270|315|440) / {
+            split($4, field, "=")
+            if (field[2] >= checkpoint)
+                print
+        }
+    ' "$1"
+}
+
+for checkpoint in 241 244; do
+    if ! sh "$qa/test-save-load-crc.sh" "$build" training "$checkpoint" "$((544 - checkpoint))" > "$result" 2>&1; then
+        cat "$result"
+        exit 1
+    fi
     cat "$result"
-    exit 1
-fi
-cat "$result"
-session=$(sed -n '1p' "$result")
-log="$session/continue.log"
+    session=$(sed -n '1p' "$result")
+    log="$session/continue.log"
+    checkpoint_states "$log" > "$session/package20-continued.txt"
+    checkpoint_states "$session/resume.log" > "$session/package20-resumed.txt"
+    diff -u "$session/package20-continued.txt" "$session/package20-resumed.txt"
+done
 
 expect() {
     if ! grep -E "$1" "$log"; then
@@ -63,10 +78,6 @@ expect '^TEST pkg20 targeting frame=315 caster=MordorMountainTroll valid=0 allow
 expect '^TEST pkg20 held frame=440 caster=MordorMountainTroll id=0 name=- '
 expect '^TEST pkg20 ownership frame=243 caster=Pkg20ImmediateEnt vendor-hostile=1 stock=GenericThrowableRock neutral=1 producer=1$'
 expect '^TEST pkg20 ownership frame=440 caster=Pkg20FindRockEnt vendor-hostile=1 stock=GenericThrowableRock neutral=1 producer=1$'
-
-grep -E '^TEST pkg20 (held|state|ownership|targeting) frame=(241|243|245|246|269|270|315|440) ' "$log" > "$session/package20-continued.txt"
-grep -E '^TEST pkg20 (held|state|ownership|targeting) frame=(241|243|245|246|269|270|315|440) ' "$session/resume.log" > "$session/package20-resumed.txt"
-diff -u "$session/package20-continued.txt" "$session/package20-resumed.txt"
 
 awk '
     function near(x, y, targetX, targetY) {
