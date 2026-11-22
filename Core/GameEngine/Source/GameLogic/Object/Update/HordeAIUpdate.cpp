@@ -4,6 +4,7 @@
 
 #include "Common/Xfer.h"
 #include "Common/AttributeModifierRules.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
@@ -105,6 +106,30 @@ HordeAIUpdate::HordeAIUpdate(Thing* thing, const ModuleData* data) : AIUpdateInt
 }
 
 HordeAIUpdate::~HordeAIUpdate() = default;
+
+void HordeAIUpdate::memberCollided(Object* member, Object* target)
+{
+	Object* anchor = HordeContain::getAnchor(member);
+	if (!RetailFileLayers::enabled() || !anchor || !target || target->isEffectivelyDead() ||
+		anchor->getRelationship(target) != ENEMIES)
+		return;
+	auto* ai = anchor->getAI();
+	if (!ai || ai->getModuleNameKey() != NAMEKEY("HordeAIUpdate"))
+		return;
+	auto* horde = static_cast<HordeAIUpdate*>(ai);
+	const Object* targetAnchor = HordeContain::getAnchor(target);
+	if (horde->m_attackTarget == target->getID() || (targetAnchor && horde->m_attackTarget == targetAnchor->getID()))
+	{
+		horde->m_contactTarget = horde->m_attackTarget;
+		horde->m_contactUntil = TheGameLogic->getFrame() + 3 * LOGICFRAMES_PER_SECOND;
+	}
+}
+
+Bool HordeAIUpdate::hasRecentContact() const
+{
+	return RetailFileLayers::enabled() && m_contactTarget != INVALID_ID && m_contactTarget == m_attackTarget &&
+		m_contactUntil > TheGameLogic->getFrame();
+}
 
 void HordeAIUpdate::retaliate(Object* victim, Object* attacker)
 {
@@ -280,7 +305,12 @@ Object* HordeAIUpdate::updateOrder(Object* anchor, Object* target, Bool refresh)
 			const Real range = area ? area->getRadius() : vision;
 			const Coord3D& origin = *anchor->getPosition();
 			const Real rangeFromAnchor = range + std::abs(origin.x - position.x) + std::abs(origin.y - position.y);
-			target = TheAI->findClosestEnemy(anchor, rangeFromAnchor, AI::CAN_ATTACK | AI::ATTACK_BUILDINGS, getAttackInfo(), &filter);
+			UnsignedInt qualifiers = AI::CAN_ATTACK | AI::ATTACK_BUILDINGS;
+#if !RTS_GENERALS
+			if (!area && !guardObject && distanceSquared(origin, position) <= 16.0f)
+				qualifiers |= AI::USE_HORDE_VISION;
+#endif
+			target = TheAI->findClosestEnemy(anchor, rangeFromAnchor, qualifiers, getAttackInfo(), &filter);
 			break;
 		}
 	}
@@ -335,9 +365,9 @@ void HordeAIUpdate::advance(const Coord3D& position)
 	privateMoveToPosition(&position, m_attackSource);
 }
 
-void HordeAIUpdate::approach(const Coord3D& position, Real range)
+void HordeAIUpdate::approach(const Coord3D& position, Bool inRange)
 {
-	m_engaging = distanceSquared(*getObject()->getPosition(), position) <= range * range;
+	m_engaging = inRange;
 	if (m_engaging && isMoving())
 		privateIdle(m_attackSource);
 	else if (!m_engaging && (isIdle() || distanceSquared(*getGoalPosition(), position) > 100.0f))
@@ -401,7 +431,18 @@ UpdateSleepTime HordeAIUpdate::update()
 		m_plannerOrder = FALSE;
 	const auto* stances = StancesBehavior::find(horde);
 	const Bool autonomous = stances && m_order == NO_ORDER && m_attackSource == CMD_FROM_AI;
-	const Bool hold = autonomous && StancesBehavior::holdsGround(stances->getStance());
+	const auto* formation = contain->getActiveFormation();
+	const auto* melee = &formation->m_meleeBehavior;
+#if !RTS_GENERALS
+	if (stances && RetailFileLayers::enabled())
+	{
+		const Int stance = formation->m_isPorcupineFormation ? AttributeModifierRules::STANCE_PORCUPINE : stances->getStance();
+		if (const auto* rule = stances->getMeleeBehavior(stance))
+			melee = rule;
+	}
+#endif
+	const Bool hold = autonomous && (StancesBehavior::holdsGround(stances->getStance()) ||
+		melee->name.compareNoCase("HoldGround") == 0);
 	const Bool defend = autonomous && stances->getStance() == AttributeModifierRules::STANCE_BATTLE;
 	if (target && defend)
 	{
@@ -410,7 +451,7 @@ UpdateSleepTime HordeAIUpdate::update()
 		const Real radius = authored > 0.0f ? authored : (meleeLeash > 0.0f ? meleeLeash : horde->getVisionRange());
 		const Real retaliationFloor = authored > 0.0f ? 0.0f : m_retaliationStartDistanceSquared;
 		const Real pursuitLimitSquared = std::max(radius * radius, retaliationFloor);
-		if (radius > 0.0f && distanceSquared(m_orderPosition, *target->getPosition()) > pursuitLimitSquared)
+		if (radius > 0.0f && !hasRecentContact() && distanceSquared(m_orderPosition, *target->getPosition()) > pursuitLimitSquared)
 		{
 			const Coord3D origin = m_orderPosition;
 			m_attackTarget = INVALID_ID;
@@ -435,19 +476,30 @@ UpdateSleepTime HordeAIUpdate::update()
 	else if ((target || attackGround) && (!m_engaging || autonomous) && (refresh || isIdle()))
 	{
 		Real approachRange = 0.0f;
+		Bool rankedAdvance = FALSE;
+		Bool rankReached = FALSE;
+		const Coord3D& destination = target ? *target->getPosition() : m_orderPosition;
 		for (const Object* member : members)
 		{
 			if (const Weapon* weapon = member->getCurrentWeapon();
 				weapon && !member->isEffectivelyDead() && contain->rankCanAttack(member))
 			{
 				approachRange = std::max(approachRange, weapon->getAttackRange(member));
+				if (RetailFileLayers::enabled() && contain->rankStopsAdvance(member))
+				{
+					rankedAdvance = TRUE;
+					rankReached |= target ? weapon->isWithinAttackRange(member, target) :
+						weapon->isWithinAttackRange(member, &destination);
+				}
 			}
 		}
 
-		const auto* data = contain->getActiveFormation();
-		const Real contactDistance = std::max(8.0f, std::max(data->m_meleeAttackLeashDistance, data->m_meleeBehavior.innerRange));
+		const Real innerRange = melee->innerRange > 0.0f ? melee->innerRange : formation->m_meleeBehavior.innerRange;
+		const Real contactDistance = std::max(8.0f, std::max(formation->m_meleeAttackLeashDistance, innerRange));
 		const Real targetRadius = target ? target->getGeometryInfo().getBoundingCircleRadius() : 0.0f;
-		approach(target ? *target->getPosition() : m_orderPosition, std::max(approachRange, contactDistance) + targetRadius);
+		const Real range = std::max(approachRange, contactDistance) + targetRadius;
+		approach(destination, rankedAdvance ? rankReached :
+			distanceSquared(*horde->getPosition(), destination) <= range * range);
 		if (target && m_attackTarget == INVALID_ID)
 			target = nullptr;
 	}
@@ -556,12 +608,18 @@ void HordeAIUpdate::crc(Xfer* xfer)
 	xfer->xferUnsignedInt(&m_advanceRouteRevision);
 	xfer->xferUnsignedInt(&m_plannerOrderFrame);
 	xfer->xferUnsignedInt(&m_blockedPlannerRevision);
+	if (RetailFileLayers::enabled())
+	{
+		xfer->xferObjectID(&m_contactTarget);
+		xfer->xferUnsignedInt(&m_contactUntil);
+	}
 }
 
 void HordeAIUpdate::xfer(Xfer* xfer)
 {
-	XferVersion version = 5;
-	xfer->xferVersion(&version, 5);
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 5;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
 	AIUpdateInterface::xfer(xfer);
 	xfer->xferObjectID(&m_attackTarget);
 	xfer->xferUser(&m_attackSource, sizeof(m_attackSource));
@@ -583,6 +641,11 @@ void HordeAIUpdate::xfer(Xfer* xfer)
 		xfer->xferUnsignedInt(&m_advanceRouteRevision);
 		xfer->xferUnsignedInt(&m_plannerOrderFrame);
 		xfer->xferUnsignedInt(&m_blockedPlannerRevision);
+	}
+	if (version >= 6)
+	{
+		xfer->xferObjectID(&m_contactTarget);
+		xfer->xferUnsignedInt(&m_contactUntil);
 	}
 }
 

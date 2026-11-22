@@ -5,6 +5,7 @@
 #include "Common/AttributeModifierRules.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Object.h"
 #if !RTS_GENERALS
 #include "Common/RetailFileLayers.h"
@@ -99,6 +100,11 @@ DEFINE_PARSE_ONLY_SNAPSHOT(LargeGroupAudioUpdate, UpdateModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(PickupStuffUpdate, UpdateModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(HitReactionBehavior, BehaviorModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(HordeMemberCollide, BehaviorModule)
+
+void HordeMemberCollide::onCollide(Object* other, const Coord3D*, const Coord3D*)
+{
+	HordeAIUpdate::memberCollided(getObject(), other);
+}
 DEFINE_PARSE_ONLY_SNAPSHOT(CastleMemberBehavior, BehaviorModule)
 #if !RTS_GENERALS
 DEFINE_PARSE_ONLY_SNAPSHOT(HordeNotifyTargetsOfImminentProbableCrushingUpdate, UpdateModule)
@@ -244,6 +250,17 @@ Bool StancesBehavior::holdsGround(Int stance)
 		stance == AttributeModifierRules::STANCE_HOLD_GROUND_MOVING ||
 		stance == AttributeModifierRules::STANCE_PORCUPINE;
 }
+
+#if !RTS_GENERALS
+const HordeContainModuleData::MeleeBehavior* StancesBehavior::getMeleeBehavior(Int stance) const
+{
+	const auto* data = TheAttributeModifierStore ?
+		TheAttributeModifierStore->findStanceTemplate(getStancesBehaviorModuleData()->m_stanceTemplate) : nullptr;
+	if (!data || stance < 0 || stance >= AttributeModifierRules::STANCE_COUNT || data->m_melee[stance].name.isEmpty())
+		return nullptr;
+	return &data->m_melee[stance];
+}
+#endif
 
 const StancesBehavior* StancesBehavior::findForUnit(const Object* obj)
 {

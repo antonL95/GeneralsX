@@ -64,6 +64,7 @@ struct HordeSlot
 	bool hasLeader = false;
 	int leaderRank = 0;
 	int leaderIndex = 0;
+	std::size_t rankInfoIndex = 0;
 };
 
 struct HordePayload
@@ -102,4 +103,5 @@ private:
 	std::vector<HordeSlot> m_slots;
 	std::vector<HordePayload> m_payloads;
 	int m_capacity = 0;
+	std::size_t m_rankInfoCount = 0;
 };

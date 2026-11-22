@@ -40,6 +40,7 @@ public:
 	HordeContainModuleData();
 
 	static void buildFieldParse(MultiIniFieldParse& p);
+	static void parseMeleeBehavior(INI* ini, void* instance, void* store, const void* userData);
 
 	virtual const HordeLayout* getAsHordeLayout() const override { return &m_layout; }
 
@@ -100,7 +101,6 @@ private:
 	static void parseSplitHorde(INI* ini, void* instance, void* store, const void* userData);
 	static void parseComboHorde(INI* ini, void* instance, void* store, const void* userData);
 	static void parseRankList(INI* ini, void* instance, void* store, const void* userData);
-	static void parseMeleeBehavior(INI* ini, void* instance, void* store, const void* userData);
 };
 
 class BannerCarrierUpdateModuleData;
@@ -135,6 +135,9 @@ public:
 
 	Int getMemberSlot( ObjectID id ) const;
 	Bool rankCanAttack(const Object* member) const;
+	Bool rankStopsAdvance(const Object* member) const;
+	Real directionalVisionScale(const Object* target) const;
+	Real maximumVisionScale() const;
 	Object* findAttackTarget(const Object* attacker, AbleToAttackType attackType, CommandSourceType source,
 		WeaponSlotType slot = (WeaponSlotType)-1, CanAttackResult* attackResult = nullptr) const;
 	Object* findNearestLivingMember(const Coord3D& fromPos) const;
@@ -190,6 +193,7 @@ private:
 	void rebuildMemberSlots();
 	const HordeContainModuleData* findAlternateFormation() const;
 	void updateFormationModelConditions(Object* object) const;
+	void updateRankWeaponConditions(Object* member) const;
 	std::vector<ObjectID> m_slotMembers;
 	std::map<ObjectID, Int> m_memberSlots;
 	std::vector<Coord2D> m_slotOffsets;

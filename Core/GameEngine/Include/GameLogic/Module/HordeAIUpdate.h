@@ -23,6 +23,8 @@ public:
 	Bool issuePlannerOrder(Object* target, const Coord3D& position);
 	static void retaliate(Object* victim, Object* attacker);
 	Bool hasAttackOrder() const { return m_attackTarget != INVALID_ID || m_order == AICMD_ATTACKMOVE_TO_POSITION; }
+	static void memberCollided(Object* member, Object* target);
+	Bool hasRecentContact() const;
 	Bool isOnPlannerAdvance() const { return m_plannerOrder && m_order == AICMD_ATTACKMOVE_TO_POSITION; }
 	UnsignedInt blockedPlannerRevision(UnsignedInt issuedFrame) const
 	{
@@ -34,11 +36,13 @@ private:
 	static constexpr AICommandType NO_ORDER = (AICommandType)-1;
 	void respondToAttack(Object* attacker, Int maxShots, CommandSourceType source);
 	Object* updateOrder(Object* anchor, Object* target, Bool refresh);
-	void approach(const Coord3D& position, Real range);
+	void approach(const Coord3D& position, Bool inRange);
 	void advance(const Coord3D& position);
 	void xferOrder(Xfer* xfer);
 
 	ObjectID m_attackTarget = INVALID_ID;
+	ObjectID m_contactTarget = INVALID_ID;
+	UnsignedInt m_contactUntil = 0;
 	CommandSourceType m_attackSource = CMD_FROM_AI;
 	Int m_maxShots = 0;
 	Bool m_forceAttack = FALSE;

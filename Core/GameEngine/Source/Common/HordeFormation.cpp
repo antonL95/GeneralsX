@@ -245,8 +245,9 @@ void HordeLayout::addRank(const HordeRankInfo& rank)
 	{
 		const auto& position = rank.positions[index];
 		added.push_back({ rank.rankNumber, static_cast<int>(index), rank.unitType, position.point,
-			position.hasLeader, position.leaderRank, position.leaderIndex });
+			position.hasLeader, position.leaderRank, position.leaderIndex, m_rankInfoCount });
 	}
+	++m_rankInfoCount;
 	m_slots.insert(insert, added.begin(), added.end());
 }
 

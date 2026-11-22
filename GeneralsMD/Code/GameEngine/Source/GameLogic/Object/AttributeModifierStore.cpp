@@ -122,21 +122,13 @@ const FieldParse s_listFields[] =
 struct StanceEntry
 {
 	AsciiString modifier;
-	AsciiString melee;
+	HordeContainModuleData::MeleeBehavior melee;
 };
-
-void parseMelee(INI* ini, void*, void* store, const void*)
-{
-	*static_cast<AsciiString*>(store) = ini->getNextAsciiString();
-	static const FieldParse noFields[] = { { nullptr, nullptr, nullptr, 0 } };
-	Int unused = 0;
-	ini->initFromINI(&unused, noFields);
-}
 
 const FieldParse s_stanceFields[] =
 {
 	{ "AttributeModifier", INI::parseAsciiString, nullptr, offsetof(StanceEntry, modifier) },
-	{ "MeleeBehavior", parseMelee, nullptr, offsetof(StanceEntry, melee) },
+	{ "MeleeBehavior", HordeContainModuleData::parseMeleeBehavior, nullptr, offsetof(StanceEntry, melee) },
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
@@ -147,7 +139,9 @@ void parseStance(INI* ini, void*, void* store, const void*)
 		throw INI_INVALID_DATA;
 	StanceEntry entry;
 	ini->initFromINI(&entry, s_stanceFields);
-	static_cast<StanceTemplateData*>(store)->m_modifiers[stance] = entry.modifier;
+	auto* data = static_cast<StanceTemplateData*>(store);
+	data->m_modifiers[stance] = entry.modifier;
+	data->m_melee[stance] = std::move(entry.melee);
 }
 
 const FieldParse s_stanceTemplateFields[] =

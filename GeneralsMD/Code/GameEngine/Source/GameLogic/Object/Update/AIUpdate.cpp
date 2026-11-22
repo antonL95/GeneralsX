@@ -4911,7 +4911,7 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 			return nullptr;
 		}
 	}
-	UnsignedInt flags = AI::CAN_ATTACK;
+	UnsignedInt flags = AI::CAN_ATTACK | AI::USE_HORDE_VISION;
 	if (TheAI->getAiData()->m_attackUsesLineOfSight) {
 		if (obj->isKindOf(KINDOF_ATTACK_NEEDS_LINE_OF_SIGHT)) {
 			flags |= AI::CAN_SEE;

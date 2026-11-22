@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Common/SpecialPowerINI.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/UpdateModule.h"
 
 struct StancesBehaviorModuleData : public BehaviorModuleData
@@ -22,6 +24,9 @@ public:
 	Int getStance() const { return m_stance; }
 	const AsciiString& getAppliedModifier() const { return m_appliedModifier; }
 	static Bool holdsGround(Int stance);
+#if !RTS_GENERALS
+	const HordeContainModuleData::MeleeBehavior* getMeleeBehavior(Int stance) const;
+#endif
 	static const StancesBehavior* findForUnit(const Object* obj);
 	void setStance(Int stance);
 	void inheritStance(Int stance, const AsciiString& modifier, NameKeyType moduleTag);
@@ -118,13 +123,14 @@ public:
 	HitReactionBehavior(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data) {}
 };
 
-class HordeMemberCollide final : public BehaviorModule
+class HordeMemberCollide final : public CollideModule
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( HordeMemberCollide, "HordeMemberCollide" )
-	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( HordeMemberCollide, BehaviorModuleData )
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( HordeMemberCollide, CollideModuleData )
 
 public:
-	HordeMemberCollide(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data) {}
+	HordeMemberCollide(Thing* thing, const ModuleData* data) : CollideModule(thing, data) {}
+	void onCollide(Object* other, const Coord3D* location, const Coord3D* normal) override;
 };
 
 struct CastleMemberBehaviorModuleData : public BehaviorModuleData

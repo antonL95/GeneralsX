@@ -7,6 +7,7 @@
 #include "Common/AsciiString.h"
 #include "Common/AttributeModifierRules.h"
 #include "Common/SubsystemInterface.h"
+#include "GameLogic/Module/HordeContain.h"
 
 class INI;
 class FXList;
@@ -32,6 +33,7 @@ struct StanceTemplateData
 {
 	AsciiString m_name;
 	AsciiString m_modifiers[AttributeModifierRules::STANCE_COUNT];
+	HordeContainModuleData::MeleeBehavior m_melee[AttributeModifierRules::STANCE_COUNT];
 };
 
 class AttributeModifierStore : public SubsystemInterface

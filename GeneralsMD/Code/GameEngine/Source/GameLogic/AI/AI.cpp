@@ -638,6 +638,29 @@ Object *AI::findClosestEnemy( const Object *me, Real range, UnsignedInt qualifie
 	// (optional) only stuff clear of fog
 	PartitionFilterFreeOfFog filterFogged(me->getControllingPlayer()->getPlayerIndex());
 
+	class HordeVisionFilter final : public PartitionFilter
+	{
+	public:
+		HordeVisionFilter(const Object* observer, const HordeContain* horde, Real radius) :
+			m_observer(observer), m_horde(horde), m_radius(radius) {}
+		Bool allow(Object* candidate) override
+		{
+			const Real radius = m_radius * m_horde->directionalVisionScale(candidate);
+			return ThePartitionManager->getDistanceSquared(m_observer, candidate, FROM_BOUNDINGSPHERE_2D) <= radius * radius;
+		}
+#if defined(RTS_DEBUG)
+		const char* debugGetName() override { return "HordeVisionFilter"; }
+#endif
+	private:
+		const Object* m_observer;
+		const HordeContain* m_horde;
+		Real m_radius;
+	};
+	const HordeContain* horde = (qualifiers & USE_HORDE_VISION) && RetailFileLayers::enabled() ? HordeContain::get(me) : nullptr;
+	HordeVisionFilter hordeVision(me, horde, range);
+	if (horde)
+		range *= horde->maximumVisionScale();
+
 	PartitionFilter *filters[16];
 	Int numFilters = 0;
 
@@ -675,6 +698,8 @@ Object *AI::findClosestEnemy( const Object *me, Real range, UnsignedInt qualifie
 		filters[numFilters++] = &filterInsignificant;
 
 	filters[numFilters++] = &filterStealth;
+	if (horde)
+		filters[numFilters++] = &hordeVision;
 
 	if (optionalFilter)
 	{

@@ -119,8 +119,8 @@ HordeContainModuleData::HordeContainModuleData()
 	m_backUpMaxDistance = 0.0f;
 	m_backupPercentage = 0.0f;
 	m_cowerRadius = 0.0f;
-	m_visionRearOverride = 0.0f;
-	m_visionSideOverride = 0.0f;
+	m_visionRearOverride = -1.0f;
+	m_visionSideOverride = -1.0f;
 	m_backUpMinDelayTime = 0;
 	m_backUpMaxDelayTime = 0;
 	m_flankedDelay = 0;
@@ -478,6 +478,7 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 		toggles.set(flag, getObject()->testWeaponSetFlag(flag));
 	if (toggles.any())
 		rider->setWeaponSetFlags(toggles, TRUE);
+	updateRankWeaponConditions(rider);
 	if (RetailFileLayers::enabled() && (!TheGameState || !TheGameState->isInLoadGame()))
 		rider->getExperienceTracker()->setMinRetailRank(getObject()->getExperienceTracker()->getRank());
 	const UpgradeMaskType hordeUpgrades = getObject()->getObjectCompletedUpgradeMask();
@@ -518,6 +519,7 @@ void HordeContain::onRemoving( Object *rider )
 		m_slotMembers[slot->second] = INVALID_ID;
 		m_memberSlots.erase(slot);
 	}
+	updateRankWeaponConditions(rider);
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained, false );
 	OpenContain::onRemoving( rider );
 }
@@ -618,6 +620,8 @@ void HordeContain::xfer( Xfer *xfer )
 void HordeContain::loadPostProcess()
 {
 	TransportContain::loadPostProcess();
+	for (Object* member : getContainList())
+		updateRankWeaponConditions(member);
 	for (Object* member : getContainList())
 		if (isBannerCarrier(member))
 		{
@@ -949,6 +953,44 @@ Bool HordeContain::rankCanAttack(const Object* member) const
 	const auto* data = getActiveFormation();
 	const Int rank = slot >= 0 ? data->m_layout.slots()[slot].rank : 0;
 	return HordeLayout::rankCanAttack(rank, data->m_ranksToReleaseWhenAttacking, data->m_ranksToJustFreeWhenAttacking);
+}
+
+Bool HordeContain::rankStopsAdvance(const Object* member) const
+{
+	const Int slot = getMemberSlot(member->getID());
+	const auto* data = getActiveFormation();
+	if (slot < 0)
+		return FALSE;
+	const Int rank = data->m_layout.slots()[slot].rank;
+	const auto& ranks = data->m_ranksThatStopAdvance;
+	return std::find(ranks.begin(), ranks.end(), rank) != ranks.end();
+}
+
+Real HordeContain::directionalVisionScale(const Object* target) const
+{
+	const Object* anchor = getObject();
+	const auto& origin = *anchor->getPosition();
+	const Real dx = target->getPosition()->x - origin.x;
+	const Real dy = target->getPosition()->y - origin.y;
+	const auto& direction = *anchor->getUnitDirectionVector2D();
+	const Real forward = dx * direction.x + dy * direction.y;
+	const Real halfDistanceSquared = (dx * dx + dy * dy) * 0.5f;
+	const Bool axial = forward * forward >= halfDistanceSquared;
+	if (axial && forward >= 0.0f)
+		return 1.0f;
+	const auto* data = getActiveFormation();
+	const auto& object = anchor->getTemplate()->getRotWKObjectData();
+	const Real override = axial ? data->m_visionRearOverride : data->m_visionSideOverride;
+	return std::max(0.0f, override >= 0.0f ? override : (axial ? object.visionRear : object.visionSide));
+}
+
+Real HordeContain::maximumVisionScale() const
+{
+	const auto* data = getActiveFormation();
+	const auto& object = getObject()->getTemplate()->getRotWKObjectData();
+	return std::max({1.0f,
+		data->m_visionRearOverride >= 0.0f ? data->m_visionRearOverride : object.visionRear,
+		data->m_visionSideOverride >= 0.0f ? data->m_visionSideOverride : object.visionSide});
 }
 
 const HordeBannerCarrierPosition* HordeContain::getBannerFormationPosition() const
@@ -1314,6 +1356,8 @@ void HordeContain::reassignSlotsByPosition()
 	m_slotMembers.swap(members);
 	m_slotOffsets.swap(offsets);
 	rebuildMemberSlots();
+	for (Object* member : getContainList())
+		updateRankWeaponConditions(member);
 }
 
 const HordeContainModuleData* HordeContain::findAlternateFormation() const
@@ -1417,6 +1461,48 @@ void HordeContain::setAlternateFormation(Bool alternate)
 	m_slotMembers.swap(members);
 	m_slotOffsets.swap(offsets);
 	rebuildMemberSlots();
+	for (Object* member : getContainList())
+		updateRankWeaponConditions(member);
+}
+
+void HordeContain::updateRankWeaponConditions(Object* member) const
+{
+	if (!RetailFileLayers::enabled() || isBannerCarrier(member) || member->isEffectivelyDead())
+		return;
+	const auto collect = [](const HordeContainModuleData* formation, WeaponSetFlags& flags)
+	{
+		for (const auto& info : formation->m_rankInfos)
+		{
+			if (info.grantedWeaponCondition >= 0)
+				flags.set(static_cast<WeaponSetType>(info.grantedWeaponCondition));
+			if (info.revokedWeaponCondition >= 0)
+				flags.set(static_cast<WeaponSetType>(info.revokedWeaponCondition));
+		}
+	};
+	WeaponSetFlags controlled;
+	collect(getHordeContainModuleData(), controlled);
+	if (const auto* alternate = findAlternateFormation())
+		collect(alternate, controlled);
+	if (!controlled.any())
+		return;
+
+	WeaponSetFlags absent = getObject()->getWeaponSetFlags();
+	absent.flip();
+	WeaponSetFlags desired = controlled;
+	desired.clear(absent);
+	const Int slot = getMemberSlot(member->getID());
+	if (slot >= 0)
+	{
+		const auto* formation = getActiveFormation();
+		const auto& rank = formation->m_rankInfos[formation->m_layout.slots()[slot].rankInfoIndex];
+		if (rank.revokedWeaponCondition >= 0)
+			desired.clear(static_cast<WeaponSetType>(rank.revokedWeaponCondition));
+		if (rank.grantedWeaponCondition >= 0)
+			desired.set(static_cast<WeaponSetType>(rank.grantedWeaponCondition));
+	}
+	controlled.clear(desired);
+	member->setWeaponSetFlags(controlled, FALSE);
+	member->setWeaponSetFlags(desired, TRUE);
 }
 
 void HordeContain::toggleWeaponSet(const WeaponSetFlags& flags, Bool enabled)
@@ -1424,7 +1510,10 @@ void HordeContain::toggleWeaponSet(const WeaponSetFlags& flags, Bool enabled)
 	getObject()->setWeaponSetFlags(flags, enabled);
 	for (Object* member : getContainList())
 		if (!member->isEffectivelyDead())
+		{
 			member->setWeaponSetFlags(flags, enabled);
+			updateRankWeaponConditions(member);
+		}
 }
 
 #if !RTS_GENERALS
