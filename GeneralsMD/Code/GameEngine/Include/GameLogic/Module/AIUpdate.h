@@ -87,7 +87,8 @@ enum LocomotorSetType CPP_11(: Int)
 	LOCOMOTORSET_ENRAGED,
 	LOCOMOTORSET_BURNINGDEATH,
 	LOCOMOTORSET_COMBO,
-	LOCOMOTORSET_CONTAINED
+	LOCOMOTORSET_CONTAINED,
+	LOCOMOTORSET_SCARED
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -843,6 +844,7 @@ private:
 	Bool				m_movementComplete;					///< True if we finished an AIInternalMoveToState.
 	Bool				m_isMoving;									///< True if we are in an AIInternalMoveToState.
 	UnsignedInt m_fearUntil = 0;
+	LocomotorSetType m_preFearLocomotorSet = LOCOMOTORSET_INVALID;
 	UnsignedInt m_burningDeathUntil = 0;
 	UnsignedInt m_crushWarningUntil = 0;
 	Coord3D m_autoAttackOrigin{};

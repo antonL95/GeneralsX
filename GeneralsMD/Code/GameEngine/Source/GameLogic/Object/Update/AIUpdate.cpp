@@ -242,6 +242,8 @@ Int AIUpdateModuleData::findLocomotorSetType(const AsciiString& name)
 		return LOCOMOTORSET_COMBO;
 	if (name.compareNoCase("SET_CONTAINED") == 0)
 		return LOCOMOTORSET_CONTAINED;
+	if (name.compareNoCase("SET_SCARED") == 0)
+		return LOCOMOTORSET_SCARED;
 	return -1;
 }
 
@@ -900,6 +902,9 @@ void AIUpdateInterface::setRetailComboLocomotor(Bool enabled)
 
 Bool AIUpdateInterface::chooseLocomotorSet(LocomotorSetType wst)
 {
+	if (wst == LOCOMOTORSET_NORMAL && m_fearUntil && RetailFileLayers::enabled() &&
+		getObject()->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_SCARED))
+		wst = LOCOMOTORSET_SCARED;
 	if (wst == LOCOMOTORSET_NORMAL && RetailFileLayers::enabled() && getObject()->testStatus(OBJECT_STATUS_ENRAGED))
 	{
 		const auto* tmpl = getObject()->getTemplate();
@@ -1211,6 +1216,14 @@ UpdateSleepTime AIUpdateInterface::update()
 		if (m_fearUntil && now >= m_fearUntil)
 		{
 			m_fearUntil = 0;
+			if (m_curLocomotorSet == LOCOMOTORSET_SCARED)
+			{
+				const auto previous = m_preFearLocomotorSet;
+				if (previous == LOCOMOTORSET_INVALID || previous == LOCOMOTORSET_NORMAL_UPGRADED ||
+					!chooseLocomotorSet(previous))
+					chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+			}
+			m_preFearLocomotorSet = LOCOMOTORSET_INVALID;
 			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_AFRAID);
 			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_TERROR);
 			getObject()->clearModelConditionState(MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID);
@@ -5529,6 +5542,8 @@ void AIUpdateInterface::crcRetailAttackState(Xfer* xfer)
 
 void AIUpdateInterface::crcRetailLocomotion(Xfer* xfer)
 {
+	Int preFear = m_preFearLocomotorSet;
+	xfer->xferInt(&preFear);
 	Int set = m_curLocomotorSet;
 	xfer->xferInt(&set);
 	AsciiString name = m_curLocomotor ? m_curLocomotor->getTemplateName() : AsciiString();
@@ -5550,9 +5565,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 14 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 15 : 4;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 14 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 15 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5826,6 +5841,10 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_rampageUntil);
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_rampageUntil = 0;
+	if (version >= 15)
+		xfer->xferUser(&m_preFearLocomotorSet, sizeof(m_preFearLocomotorSet));
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_preFearLocomotorSet = LOCOMOTORSET_INVALID;
 
 
 }
@@ -5905,15 +5924,23 @@ Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration,
 	if (!duration)
 		return FALSE;
 
+	const Bool retail = RetailFileLayers::enabled();
+	const auto previous = m_curLocomotorSet == LOCOMOTORSET_SCARED ? m_preFearLocomotorSet : m_curLocomotorSet;
+	const auto beginFear = [&]() {
+		m_fearUntil = now + duration;
+		if (retail && chooseLocomotorSet(LOCOMOTORSET_SCARED))
+			m_preFearLocomotorSet = previous;
+		self->setModelConditionState(condition);
+		wakeUpNow();
+	};
+
 	if (RetailFileLayers::enabled() && backAway)
 	{
 		auto* horde = const_cast<HordeContain*>(HordeContain::get(self));
 		if (horde && horde->beginBacking(source, condition == MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID))
 		{
 			idleSelf(CMD_FROM_SCRIPT);
-			m_fearUntil = now + duration;
-			self->setModelConditionState(condition);
-			wakeUpNow();
+			beginFear();
 			return TRUE;
 		}
 	}
@@ -5932,13 +5959,13 @@ Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration,
 		dx = self->getUnitDirectionVector2D()->x;
 		dy = self->getUnitDirectionVector2D()->y;
 	}
+	if (retail)
+		chooseLocomotorSet(LOCOMOTORSET_SCARED);
 	const Real travel = std::max(12.0f, getCurLocomotorSpeed() * duration);
 	goal.x += dx * travel;
 	goal.y += dy * travel;
 	aiMoveToPositionEvenIfSleeping(&goal, CMD_FROM_SCRIPT);
-	m_fearUntil = now + duration;
-	self->setModelConditionState(condition);
-	wakeUpNow();
+	beginFear();
 	return TRUE;
 }
 
