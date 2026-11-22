@@ -3636,6 +3636,11 @@ void Object::crc( Xfer *xfer )
 {
 	if (RetailFileLayers::enabled())
 	{
+		UnsignedByte deathStatus = 0;
+		for (Int bit = OBJECT_STATUS_DEATH_1; bit <= OBJECT_STATUS_DEATH_5; ++bit)
+			if (m_status.test(static_cast<ObjectStatusTypes>(bit)))
+				deathStatus |= 1u << (bit - OBJECT_STATUS_DEATH_1);
+		xfer->xferUnsignedByte(&deathStatus);
 		xferRotwkPowerState(xfer);
 		xfer->xferInt(&m_constructionCostPaid);
 		if (StealthUpdate* stealth = getStealth())

@@ -8,6 +8,7 @@
 #include "Common/Player.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "Common/XferCRC.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -34,6 +35,29 @@ void runRetailPackage14TestCommand(std::string_view action, Object* object, cons
 	else if (action == "pkg14-construction")
 	{
 		object->setStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
+	}
+	else if (action == "pkg14-death-crc")
+	{
+		const auto checksum = [object] {
+			XferCRC xfer;
+			xfer.open("Package14");
+			xfer.xferSnapshot(object);
+			const UnsignedInt result = xfer.getCRC();
+			xfer.close();
+			return result;
+		};
+		const UnsignedInt baseline = checksum();
+		UnsignedInt changed = 0;
+		for (Int bit = OBJECT_STATUS_DEATH_1; bit <= OBJECT_STATUS_DEATH_5; ++bit)
+		{
+			const auto status = static_cast<ObjectStatusTypes>(bit);
+			const Bool original = object->testStatus(status);
+			object->setStatus(MAKE_OBJECT_STATUS_MASK(status), !original);
+			changed += checksum() != baseline;
+			object->setStatus(MAKE_OBJECT_STATUS_MASK(status), original);
+		}
+		std::fprintf(stderr, "TEST pkg14 death-crc frame=%u changed=%u restored=%d\n",
+			frame, changed, checksum() == baseline);
 	}
 	else if (action == "pkg14-lift")
 	{
