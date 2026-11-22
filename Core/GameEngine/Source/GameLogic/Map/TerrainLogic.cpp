@@ -37,6 +37,7 @@
 #include "Common/MapObject.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/SpecialPowerINI.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/WellKnownKeys.h"
@@ -2924,6 +2925,50 @@ void TerrainLogic::registerMapTree(const ThingTemplate& thing, const Coord3D& po
 
 	const Int boxes = tree.supplyOverride > 0 ? tree.supplyOverride : TheGlobalData->m_supplyBoxesPerTree;
 	m_mapTrees.push_back({pos, tree.isHarvestable ? std::max(0, boxes) : 0});
+}
+
+const ThingTemplate* TerrainLogic::findNearestGrabbableMapTree(const Coord3D& origin, Real distanceSquared,
+	const SpecialPowerObjectFilter& filter, Coord3D& position, Real& angle) const
+{
+	const ThingTemplate* result = nullptr;
+	for (const MapObject* mapObject = MapObject::getFirstMapObject(); mapObject; mapObject = mapObject->getNext())
+	{
+		const ThingTemplate* thing = mapObject->getThingTemplate();
+		if (!thing || !thing->isKindOf(KINDOF_TREE) || !thing->isKindOf(KINDOF_CLUB) ||
+			!thing->getRotWKObjectData().isGrabbable || !filter.matchesTemplate(*thing))
+			continue;
+
+		const Coord3D& point = *mapObject->getLocation();
+		const Real distance = sqr(point.x - origin.x) + sqr(point.y - origin.y);
+		if (distance >= distanceSquared)
+			continue;
+		const auto registered = [&point](const MapTree& tree)
+		{
+			return tree.position.x == point.x && tree.position.y == point.y;
+		};
+		const auto tree = std::find_if(m_mapTrees.begin(), m_mapTrees.end(), registered);
+		if (tree == m_mapTrees.end())
+			continue;
+		position = tree->position;
+		angle = normalizeAngle(mapObject->getAngle());
+		result = thing;
+		distanceSquared = distance;
+	}
+	return result;
+}
+
+void TerrainLogic::removeMapTreeAt(const Coord3D& position)
+{
+	const auto match = [&position](const MapTree& tree)
+	{
+		return tree.position.x == position.x && tree.position.y == position.y && tree.position.z == position.z;
+	};
+	const auto tree = std::find_if(m_mapTrees.begin(), m_mapTrees.end(), match);
+	if (tree == m_mapTrees.end())
+		return;
+	if (TheTerrainVisual)
+		TheTerrainVisual->removeMapTree(tree->position);
+	m_mapTrees.erase(tree);
 }
 
 Bool TerrainLogic::isNearMapTree(const Coord3D& origin, Real radius) const

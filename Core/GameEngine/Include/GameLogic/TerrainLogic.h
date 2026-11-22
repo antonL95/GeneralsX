@@ -43,6 +43,7 @@ class Object;
 class Dict;
 class PolygonTrigger;
 class ThingTemplate;
+struct SpecialPowerObjectFilter;
 class Vector3;
 class Drawable;
 class Matrix3D;
@@ -317,6 +318,9 @@ public:
   void createCraterInTerrain(Object *obj);  ///< Flatten the terrain under a building.
 
 	void registerMapTree(const ThingTemplate& thing, const Coord3D& pos);
+	const ThingTemplate* findNearestGrabbableMapTree(const Coord3D& origin, Real distanceSquared,
+		const SpecialPowerObjectFilter& filter, Coord3D& position, Real& angle) const;
+	void removeMapTreeAt(const Coord3D& position);
 	Bool isNearMapTree(const Coord3D& origin, Real radius) const;
 	void clearMapTreesForConstruction(const Coord3D& pos, const GeometryInfo& geometry, Real angle);
 	Bool findNearestHarvestTree(const Coord3D& origin, Real radius, const std::vector<Coord3D>& excluded,

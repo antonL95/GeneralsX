@@ -213,6 +213,20 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 
 	const auto* data = getAISpecialPowerUpdateModuleData();
 	const CommandButton* button = TheRetailCommandCatalog->findCommandButton(data->m_commandButtonName);
+	if (button && button->getCommandType() == GUI_COMMAND_WAKE_AUTO_PICKUP)
+	{
+		if (data->m_specialPowerAIType < 0 || !source->getAI() || !source->getAI()->isAttacking() ||
+			std::string_view(specialPowerAITypes[data->m_specialPowerAIType]) != "AI_SPECIAL_POWER_BASIC_SELF_BUFF")
+			return checkAgain;
+		const CommandSet* commands = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
+		for (Int slot = 0; commands && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			if (commands->getCommandButton(slot) == button)
+			{
+				source->doCommandButton(button, CMD_FROM_AI);
+				break;
+			}
+		return checkAgain;
+	}
 	const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
 	if (!power || data->m_specialPowerAIType < 0 ||
 		TheRetailCommandCatalog->findPowerButton(source, power) != button)

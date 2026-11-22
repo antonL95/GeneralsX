@@ -53,7 +53,9 @@
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/AutoPickUpUpdate.h"
 #include "GameLogic/Module/DeletionUpdate.h"
+#include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/AutoHealBehavior.h"
@@ -1034,6 +1036,11 @@ void SpecialPowerModule::applyRotwkTrigger( const Coord3D *location )
 {
 	const SpecialPowerModuleData *data = getSpecialPowerModuleData();
 	Object *self = getObject();
+	if (!data->m_updateModuleStartsAttack && data->m_setModelCondition == MODELCONDITION_USER_6 &&
+		data->m_specialPowerTemplate->getSpecialPowerType() == SPECIAL_GENERAL_TARGETLESS &&
+		AutoPickUpUpdate::hasEatingButton(self))
+		self->setPowerModelCondition(data->m_setModelCondition,
+			std::max(1u, SpecialAbilityUpdate::secondsToFrames(data->m_setModelConditionTime)));
 	if (data->m_changeWeather != GameLogic::WEATHER_NONE)
 		TheGameLogic->changeRetailWeather(data->m_changeWeather, data->m_weatherDuration);
 	if( data->m_triggerFX.isNotEmpty() && TheFXListStore )

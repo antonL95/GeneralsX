@@ -76,6 +76,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/InvisibilitySpecialPower.h
     Include/GameLogic/Module/WeaponChangeSpecialPowerModule.h
     Include/GameLogic/Module/GrabPassengerSpecialPower.h
+    Include/GameLogic/Module/AutoPickUpUpdate.h
     Include/GameLogic/HeroRoster.h
     Include/Common/HeroRules.h
     Include/Common/AbilityRules.h
@@ -723,6 +724,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/SpecialPower/InvisibilitySpecialPower.cpp
     Source/GameLogic/Object/SpecialPower/WeaponChangeSpecialPowerModule.cpp
     Source/GameLogic/Object/SpecialPower/GrabPassengerSpecialPower.cpp
+    Source/GameLogic/Object/Update/AutoPickUpUpdate.cpp
     Source/GameLogic/Object/Update/RespawnModules.cpp
     Source/GameLogic/System/HeroRoster.cpp
     Source/GameLogic/Map/CastleTemplateStore.cpp

@@ -51,6 +51,7 @@
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "Common/AttributeModifierRules.h"
 #if !RTS_GENERALS
+#include "GameLogic/Module/AutoPickUpUpdate.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/Module/RetailDetectionModules.h"
@@ -1322,6 +1323,8 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 		case GUI_COMMAND_POP_VISIBLE_COMMAND_RANGE:
 			return COMMAND_AVAILABLE;
 #if !RTS_GENERALS
+		case GUI_COMMAND_WAKE_AUTO_PICKUP:
+			return AutoPickUpUpdate::canUseButton(obj, command) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		case GUI_COMMAND_BLOODTHIRSTY:
 			return BloodthirstyUpdate::find(obj) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 #endif
@@ -1366,6 +1369,20 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 {
 	switch (command->getCommandType())
 	{
+#if !RTS_GENERALS
+		case GUI_COMMAND_WAKE_AUTO_PICKUP:
+		{
+			const Object* source = obj ? obj : getRetailSelection();
+			const Int slot = getRetailSlot(control);
+			if (slot < 0 || !AutoPickUpUpdate::canUseButton(source, command))
+				return CBC_COMMAND_NOT_USED;
+			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_HORDE_COMMAND);
+			msg->appendObjectIDArgument(source->getID());
+			msg->appendIntegerArgument(slot);
+			msg->appendIntegerArgument(-1);
+			return CBC_COMMAND_USED;
+		}
+#endif
 		case GUI_COMMAND_ONE_RING:
 		{
 			const Int slot = getRetailSlot(control);

@@ -621,6 +621,23 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			if (!button)
 				break;
 
+#if !RTS_GENERALS
+			if (button->getCommandType() == GUI_COMMAND_WAKE_AUTO_PICKUP)
+			{
+				if (source->getControllingPlayer() != msgPlayer || state != -1)
+					break;
+				for (const ObjectID id : currentlySelectedGroup->getAllIDs())
+				{
+					Object* object = findObjectByID(id);
+					if (!object || object->getControllingPlayer() != msgPlayer)
+						continue;
+					const CommandSet* set = TheControlBar->findCommandSet(object->getCommandSetString());
+					if (set && set->getCommandButton(slot) == button && HeroRoster::buttonUpgradesMet(button, msgPlayer, object))
+						object->doCommandButton(button, CMD_FROM_PLAYER);
+				}
+				break;
+			}
+#endif
 			if (button->getCommandType() == GUI_COMMAND_ONE_RING)
 			{
 				if (source->getControllingPlayer() == msgPlayer && HeroRoster::buttonUpgradesMet(button, msgPlayer, source))

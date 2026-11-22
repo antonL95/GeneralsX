@@ -21,11 +21,13 @@ public:
 
 	static ModuleData* friend_newModuleData(INI* ini);
 	ObjectID getPendingTarget() const { return m_target; }
+	static GrabPassengerSpecialPower* find(Object* object);
 
 	void doSpecialPower(UnsignedInt commandOptions) override;
 	Bool isValidPowerTarget(const Object* target) const override;
 	void doSpecialPowerAtObject(Object* target, UnsignedInt commandOptions) override;
 	void doSpecialPowerAtLocation(const Coord3D* position, Real angle, UnsignedInt commandOptions) override;
+	Bool requestGrab(Object* target, UnsignedInt commandOptions);
 
 protected:
 	void applyPowerEffect(const Coord3D*) override;

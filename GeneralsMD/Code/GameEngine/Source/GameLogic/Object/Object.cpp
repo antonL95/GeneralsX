@@ -81,8 +81,10 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Locomotor.h"
+#include "GameLogic/RetailBuildingEvents.h"
 
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/AutoPickUpUpdate.h"
 #include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -1512,23 +1514,31 @@ void Object::setFiringConditionForCurrentWeapon() const
 //=============================================================================
 void Object::setModelConditionState( ModelConditionFlagType a )
 {
+	const Bool userSixStarted = a == MODELCONDITION_USER_6 && RetailFileLayers::enabled() &&
+		!m_logicModelConditions.test(a);
 	if (RetailFileLayers::enabled() && a != MODELCONDITION_INVALID)
 		m_logicModelConditions.set(a);
 	if (m_drawable)
 	{
 		m_drawable->setModelConditionState(a);
 	}
+	if (userSixStarted && (!TheGameState || !TheGameState->isInLoadGame()))
+		RetailBuildingEvents::trollEatingChanged(*this, true);
 }
 
 //=============================================================================
 void Object::clearModelConditionState( ModelConditionFlagType a )
 {
+	const Bool userSixStopped = a == MODELCONDITION_USER_6 && RetailFileLayers::enabled() &&
+		m_logicModelConditions.test(a);
 	if (RetailFileLayers::enabled() && a != MODELCONDITION_INVALID)
 		m_logicModelConditions.set(a, FALSE);
 	if (m_drawable)
 	{
 		m_drawable->clearModelConditionState(a);
 	}
+	if (userSixStopped && (!TheGameState || !TheGameState->isInLoadGame()))
+		RetailBuildingEvents::trollEatingChanged(*this, false);
 }
 
 //=============================================================================
@@ -6420,6 +6430,9 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 	{
 		switch( commandButton->getCommandType() )
 		{
+			case GUI_COMMAND_WAKE_AUTO_PICKUP:
+				AutoPickUpUpdate::issueButton(this, commandButton);
+				return;
 			case GUI_COMMAND_SPECIAL_POWER:
 				if( commandButton->getSpecialPowerTemplate() )
 				{

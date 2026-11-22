@@ -66,6 +66,7 @@
 #include "GameLogic/Module/InternetHackContain.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
+#include "GameLogic/Module/AutoPickUpUpdate.h"
 #include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/RailedTransportContain.h"
 #include "GameLogic/Module/RiderChangeContain.h"
@@ -517,6 +518,7 @@ void ModuleFactory::init()
 		addModule( PickupStuffUpdate );
 		addModule( BoredUpdate );
 		addModule( AttachUpdate );
+		addModule( AutoPickUpUpdate );
 		addModule( HitReactionBehavior );
 		addModule( OathbreakersFadeAwayBehavior );
 		addModule( HordeMemberCollide );

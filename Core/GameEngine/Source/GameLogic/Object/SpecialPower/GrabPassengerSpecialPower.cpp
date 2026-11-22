@@ -53,6 +53,14 @@ static const ActiveBodyModuleData* chunkVendorData(const Object* target)
 }
 #endif
 
+GrabPassengerSpecialPower* GrabPassengerSpecialPower::find(Object* object)
+{
+	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+		if ((*module)->getModuleNameKey() == NAMEKEY("GrabPassengerSpecialPower"))
+			return static_cast<GrabPassengerSpecialPower*>(*module);
+	return nullptr;
+}
+
 Bool GrabPassengerSpecialPower::canGrab(const Object* target) const
 {
 	const Object* caster = getObject();
@@ -138,12 +146,17 @@ Bool GrabPassengerSpecialPower::isValidPowerTarget(const Object* target) const
 
 void GrabPassengerSpecialPower::doSpecialPowerAtObject(Object* requested, UnsignedInt commandOptions)
 {
+	requestGrab(requested, commandOptions);
+}
+
+Bool GrabPassengerSpecialPower::requestGrab(Object* requested, UnsignedInt commandOptions)
+{
 	Object* caster = getObject();
 	if (m_pausedCount > 0 || caster->isDisabled())
-		return;
+		return FALSE;
 	const Object* target = findGrabTarget(requested);
 	if (!target)
-		return;
+		return FALSE;
 
 	const ObjectID previousTarget = m_target;
 	m_target = target->getID();
@@ -159,6 +172,7 @@ void GrabPassengerSpecialPower::doSpecialPowerAtObject(Object* requested, Unsign
 	}
 	if (accepted && TheFXListStore)
 		FXList::doFXObj(TheFXListStore->findFXList(getPowerModuleData()->m_initiateFX.str()), caster);
+	return accepted || !getPowerModuleData()->m_updateModuleStartsAttack;
 }
 
 void GrabPassengerSpecialPower::applyPowerEffect(const Coord3D*)
