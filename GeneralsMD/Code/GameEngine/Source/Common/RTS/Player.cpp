@@ -3639,7 +3639,9 @@ void Player::friend_applyDifficultyBonusesForObject(Object* obj, Bool apply) con
 {
 	if (TheGameLogic->isInSinglePlayerGame())
 	{
-		Real healthFactor = TheGlobalData->m_soloPlayerHealthBonusForDifficulty[getPlayerType()][getPlayerDifficulty()];
+		const GameDifficulty difficulty = getPlayerDifficulty();
+		const GameDifficulty bonusDifficulty = difficulty > DIFFICULTY_HARD ? DIFFICULTY_HARD : difficulty;
+		Real healthFactor = TheGlobalData->m_soloPlayerHealthBonusForDifficulty[getPlayerType()][bonusDifficulty];
 		if (healthFactor != 1.0f)
 		{
 			BodyModuleInterface* body = obj->getBodyModule();
@@ -3662,9 +3664,9 @@ void Player::friend_applyDifficultyBonusesForObject(Object* obj, Bool apply) con
 			}
 		};
 		if (apply)
-			obj->setWeaponBonusCondition(wbonus[getPlayerType()][getPlayerDifficulty()]);
+			obj->setWeaponBonusCondition(wbonus[getPlayerType()][bonusDifficulty]);
 		else
-			obj->clearWeaponBonusCondition(wbonus[getPlayerType()][getPlayerDifficulty()]);
+			obj->clearWeaponBonusCondition(wbonus[getPlayerType()][bonusDifficulty]);
 	}
 
 }
