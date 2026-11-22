@@ -6,6 +6,7 @@
 #include "GameLogic/Module/UpdateModule.h"
 
 class CommandButton;
+class GrabPassengerSpecialPower;
 
 class AutoPickUpUpdateModuleData : public UpdateModuleData
 {
@@ -38,6 +39,7 @@ public:
 	AutoPickUpUpdate(Thing* thing, const ModuleData* data);
 
 	static Bool canUseButton(const Object* object, const CommandButton* button);
+	static Bool canScanFromButton(const Object* object, const CommandButton* button);
 	static Bool hasEatingButton(const Object* object);
 	static void issueButton(Object* object, const CommandButton* button);
 	UpdateSleepTime update() override;
@@ -45,5 +47,6 @@ public:
 private:
 	static AutoPickUpUpdate* findButtonModule(const Object* object, const CommandButton* button);
 	static AutoPickUpUpdate* findButtonNumber(const Object* object, Int number);
+	GrabPassengerSpecialPower* findEligibleGrab();
 	void scan();
 };

@@ -297,6 +297,60 @@ void AttachUpdate::followParent(const Object* parent)
 	}
 }
 
+Object* AttachUpdate::reconcileParent()
+{
+	if (m_parent == INVALID_ID)
+		return nullptr;
+
+	Object* self = getObject();
+	Object* parent = TheGameLogic->findObjectByID(m_parent);
+	const auto* data = getAttachUpdateModuleData();
+	const Bool parentAlive = parent && !parent->isEffectivelyDead() && !parent->isDestroyed();
+	if (parentAlive && data->m_filter.matchesObject(self, parent))
+		return parent;
+
+	const Bool ring = self->isKindOf(KINDOF_ONE_RING);
+	if (parent)
+	{
+		parent->clearStatus(data->m_parentStatus);
+		if (!parentAlive)
+			RetailEva::queue(parent->getControllingPlayer(), data->m_parentOwnerDiedEva,
+				self->getPosition(), ring ? RetailEva::Ping::OneRing : RetailEva::Ping::None);
+	}
+
+	m_parent = INVALID_ID;
+	self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_ATTACHED));
+	if (ring)
+	{
+		Coord3D position = *self->getPosition();
+		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+		self->setPosition(&position);
+	}
+	else
+		self->kill();
+	return nullptr;
+}
+
+void AttachUpdate::reconcileOwnershipChange(const Object* changed)
+{
+	static const NameKeyType attachKey = NAMEKEY("AttachUpdate");
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if (object->isEffectivelyDead() || object->isDestroyed())
+			continue;
+		for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+		{
+			if ((*module)->getModuleNameKey() != attachKey)
+				continue;
+			auto* attach = static_cast<AttachUpdate*>(*module);
+			if (object == changed || attach->m_parent == changed->getID())
+				attach->reconcileParent();
+			if (object->isEffectivelyDead() || object->isDestroyed())
+				break;
+		}
+	}
+}
+
 UpdateSleepTime AttachUpdate::update()
 {
 	Object* self = getObject();
@@ -306,32 +360,15 @@ UpdateSleepTime AttachUpdate::update()
 
 	const Bool ring = self->isKindOf(KINDOF_ONE_RING);
 	const auto ping = ring ? RetailEva::Ping::OneRing : RetailEva::Ping::None;
-	Object* parent = TheGameLogic->findObjectByID(m_parent);
-	if (m_parent != INVALID_ID)
+	if (const Object* parent = reconcileParent())
 	{
-		if (parent && !parent->isEffectivelyDead() && !parent->isDestroyed())
-		{
-			followParent(parent);
-			return UPDATE_SLEEP_NONE;
-		}
-		if (parent)
-		{
-			parent->clearStatus(data->m_parentStatus);
-			RetailEva::queue(parent->getControllingPlayer(), data->m_parentOwnerDiedEva, self->getPosition(), ping);
-		}
-		m_parent = INVALID_ID;
-		self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_ATTACHED));
-		if (!ring)
-		{
-			self->kill();
-			return UPDATE_SLEEP_FOREVER;
-		}
-		Coord3D position = *self->getPosition();
-		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
-		self->setPosition(&position);
-		parent = nullptr;
+		followParent(parent);
+		return UPDATE_SLEEP_NONE;
 	}
+	if (self->isEffectivelyDead() || self->isDestroyed())
+		return UPDATE_SLEEP_FOREVER;
 
+	Object* parent = nullptr;
 	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_scanRange, FROM_CENTER_3D);
 	MemoryPoolObjectHolder holder(iter);
 	Real bestDistanceSquared = data->m_scanRange * data->m_scanRange;
@@ -394,4 +431,6 @@ void AttachUpdate::xfer(Xfer* xfer)
 void AttachUpdate::loadPostProcess()
 {
 	UpdateModule::loadPostProcess();
+	if (RetailFileLayers::enabled() && !getObject()->isEffectivelyDead() && !getObject()->isDestroyed())
+		reconcileParent();
 }

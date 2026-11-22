@@ -87,9 +87,11 @@ public:
 	AttachUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
 	UpdateSleepTime update() override;
 	void onDelete() override;
+	static void reconcileOwnershipChange(const Object* changed);
 	ObjectID getParentID() const { return m_parent; }
 
 private:
+	Object* reconcileParent();
 	void followParent(const Object* parent);
 	ObjectID m_parent = INVALID_ID;
 };

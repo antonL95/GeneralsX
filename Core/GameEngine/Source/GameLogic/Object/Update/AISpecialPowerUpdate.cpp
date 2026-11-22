@@ -14,6 +14,9 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
+#if RTS_ZEROHOUR
+#include "GameLogic/Module/AutoPickUpUpdate.h"
+#endif
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -215,8 +218,9 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 	const CommandButton* button = TheRetailCommandCatalog->findCommandButton(data->m_commandButtonName);
 	if (button && button->getCommandType() == GUI_COMMAND_WAKE_AUTO_PICKUP)
 	{
-		if (data->m_specialPowerAIType < 0 || !source->getAI() || !source->getAI()->isAttacking() ||
-			std::string_view(specialPowerAITypes[data->m_specialPowerAIType]) != "AI_SPECIAL_POWER_BASIC_SELF_BUFF")
+		if (data->m_specialPowerAIType < 0 ||
+			std::string_view(specialPowerAITypes[data->m_specialPowerAIType]) != "AI_SPECIAL_POWER_BASIC_SELF_BUFF" ||
+			!AutoPickUpUpdate::canScanFromButton(source, button))
 			return checkAgain;
 		const CommandSet* commands = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
 		for (Int slot = 0; commands && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)

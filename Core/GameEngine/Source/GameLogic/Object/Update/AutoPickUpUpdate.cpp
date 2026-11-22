@@ -94,6 +94,12 @@ Bool AutoPickUpUpdate::canUseButton(const Object* object, const CommandButton* b
 	return findButtonModule(object, button) != nullptr;
 }
 
+Bool AutoPickUpUpdate::canScanFromButton(const Object* object, const CommandButton* button)
+{
+	auto* pickup = findButtonModule(object, button);
+	return pickup && pickup->findEligibleGrab();
+}
+
 Bool AutoPickUpUpdate::hasEatingButton(const Object* object)
 {
 	const AutoPickUpUpdate* pickup = findButtonNumber(object, 3);
@@ -115,21 +121,29 @@ UpdateSleepTime AutoPickUpUpdate::update()
 	return data->m_runFromButton ? UPDATE_SLEEP_FOREVER : UPDATE_SLEEP(std::max(1u, data->m_delay));
 }
 
-void AutoPickUpUpdate::scan()
+GrabPassengerSpecialPower* AutoPickUpUpdate::findEligibleGrab()
 {
 	Object* self = getObject();
 	const auto* data = getAutoPickUpUpdateModuleData();
 	const AIUpdateInterface* ai = self->getAI();
-	if (!ai || self->isEffectivelyDead() || self->isDisabled() || self->getEnclosingContainedBy() ||
+	if (!ai || self->isDestroyed() || self->isEffectivelyDead() || self->isDisabled() || self->getEnclosingContainedBy() ||
 		self->testWeaponSetFlag(WEAPONSET_TOGGLE_1) || data->m_range <= 0.0f ||
 		!self->getContain() || self->getContain()->getContainCount() > 0 ||
 		ai->isBusy() || (!data->m_scanWhileBusy && (ai->isMoving() || ai->isAttacking())))
-		return;
+		return nullptr;
 
 	auto* grab = GrabPassengerSpecialPower::find(self);
-	if (!grab || !TheSpecialPowerStore->canUseSpecialPower(self, grab->getSpecialPowerTemplate()))
+	return grab && TheSpecialPowerStore->canUseSpecialPower(self, grab->getSpecialPowerTemplate()) ? grab : nullptr;
+}
+
+void AutoPickUpUpdate::scan()
+{
+	auto* grab = findEligibleGrab();
+	if (!grab)
 		return;
 
+	Object* self = getObject();
+	const auto* data = getAutoPickUpUpdateModuleData();
 	SimpleObjectIterator* objects = ThePartitionManager->iterateObjectsInRange(self, data->m_range, FROM_CENTER_2D);
 	MemoryPoolObjectHolder hold(objects);
 	Real best = sqr(data->m_range);

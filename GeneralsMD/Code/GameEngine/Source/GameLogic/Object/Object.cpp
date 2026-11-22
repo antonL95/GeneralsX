@@ -85,6 +85,7 @@
 
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AutoPickUpUpdate.h"
+#include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -4408,6 +4409,8 @@ void Object::crc( Xfer *xfer )
 			xfer->xferUnsignedInt(&fearUntil);
 			UnsignedInt rampageUntil = ai->getRetailRampageDeadline();
 			xfer->xferUnsignedInt(&rampageUntil);
+			Coord3D pursuitOrigin = ai->getRetailPursuitOrigin();
+			xfer->xferCoord3D(&pursuitOrigin);
 			if (ai->getDozerAIInterface() && !ai->getWorkerAIInterface())
 			{
 				static const NameKeyType dozerKey = NAMEKEY("DozerAIUpdate");
@@ -5350,6 +5353,8 @@ void Object::onCapture( Player *oldOwner, Player *newOwner )
 			TheBuildAssistant->sellObject( this );
 		}
 	}
+	if (RetailFileLayers::enabled() && oldOwner != newOwner)
+		AttachUpdate::reconcileOwnershipChange(this);
 
 }
 
