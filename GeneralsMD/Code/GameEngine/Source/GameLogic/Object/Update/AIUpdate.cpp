@@ -63,6 +63,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/ProneUpdate.h"
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
 #include "GameLogic/Module/HackInternetAIUpdate.h"
@@ -73,6 +74,7 @@
 #include "GameLogic/Module/HordeUpdate.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Pathfinder/PathfindCell.h"
 
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
@@ -159,6 +161,7 @@ const LocomotorTemplateVector* AIUpdateModuleData::findLocomotorTemplateVector(L
 			{ "MaxCowerTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_maxCowerTime) },
 			{ "BurningDeathTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_burningDeathTime) },
 			{ "StopChaseDistance", INI::parseReal, nullptr, offsetof(AIUpdateModuleData, m_stopChaseDistance) },
+			{ "FadeOnPortals", INI::parseBool, nullptr, offsetof(AIUpdateModuleData, m_fadeOnPortals) },
 			{ "CanAttackWhileContained", INI::parseBool, nullptr, offsetof(AIUpdateModuleData, m_canAttackWhileContained) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
@@ -1078,6 +1081,27 @@ UpdateSleepTime AIUpdateInterface::update()
 
 	// assume we can sleep forever, unless the state machine (or turret, etc) demand otherwise
 	UpdateSleepTime subMachineSleep = UPDATE_SLEEP_FOREVER;
+	if (RetailFileLayers::enabled() && getAIUpdateModuleData()->m_fadeOnPortals)
+	{
+		Object* unit = getObject();
+		if (Drawable* draw = unit->getDrawable())
+		{
+			const PathfindCell* cell = TheAI->pathfinder()->getCell(unit->getLayer(), unit->getPosition());
+			const Object* gate = cell && cell->getType() == PathfindCell::CELL_OBSTACLE
+				? TheGameLogic->findObjectByID(cell->getObstacleID()) : nullptr;
+			const Bool inPortal = gate && gate->findUpdateModule(NAMEKEY("FakePathfindPortalBehaviour")) &&
+				GateOpenAndCloseBehavior::canPass(gate, unit, FALSE);
+			if (m_fadedInPortal != inPortal)
+			{
+				const UnsignedInt fadeFrames = LOGICFRAMES_PER_SECOND / 4;
+				if (inPortal)
+					draw->fadeOut(fadeFrames);
+				else
+					draw->fadeIn(fadeFrames);
+				m_fadedInPortal = inPortal;
+			}
+		}
+	}
 	if (m_burningDeathUntil)
 	{
 		if (TheGameLogic->getFrame() >= m_burningDeathUntil)
@@ -5404,9 +5428,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 4;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5672,6 +5696,10 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_weaponMovementHoldUntil);
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_weaponMovementHoldUntil = 0;
+	if (version >= 13)
+		xfer->xferBool(&m_fadedInPortal);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_fadedInPortal = FALSE;
 
 
 }

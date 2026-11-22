@@ -33,6 +33,7 @@
 
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/Xfer.h"
 #include "GameLogic/AI.h"
@@ -44,6 +45,7 @@
 #include "GameLogic/Module/RebuildHoleExposeDie.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameClient/Drawable.h"
 #include "GameClient/SelectionXlat.h"
 
 
@@ -71,6 +73,15 @@ RebuildHoleExposeDieModuleData::RebuildHoleExposeDieModuleData()
 	};
 
 	p.add( dataFieldParse );
+	if (RetailFileLayers::enabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "FadeInTimeSeconds", INI::parseReal, nullptr, offsetof(RebuildHoleExposeDieModuleData, m_fadeInTimeSeconds) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 
 }
 
@@ -137,6 +148,12 @@ void RebuildHoleExposeDie::onDie( const DamageInfo *damageInfo )
 		// put the hole at our position and angle
 		hole->setPosition( us->getPosition() );
 		hole->setOrientation( us->getOrientation() );
+		if (RetailFileLayers::enabled())
+		{
+			const Real frames = modData->m_fadeInTimeSeconds * LOGICFRAMES_PER_SECOND;
+			if (auto* drawable = hole->getDrawable(); drawable && frames >= 1.0f && frames < 0x1p31f)
+				drawable->fadeIn(static_cast<UnsignedInt>(frames));
+		}
 
 		//
 		// modify the hole extents to be the same as ours because we need to preserve the

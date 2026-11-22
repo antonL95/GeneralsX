@@ -206,6 +206,7 @@ public:
 	UnsignedInt m_maxCowerTime = 0;
 	UnsignedInt m_burningDeathTime = 0;
 	Real m_stopChaseDistance = 0.0f;
+	Bool m_fadeOnPortals = FALSE;
 	Bool m_canAttackWhileContained = FALSE;
 #ifdef ALLOW_SURRENDER
  	UnsignedInt						m_surrenderDuration;					///< when we surrender, how long we stay surrendered.
@@ -836,6 +837,7 @@ private:
 	UnsignedInt m_retailPlannerPathRevision = 0;
 	UnsignedInt m_retailPlannerBlockedRevision = 0;
 	UnsignedInt m_weaponMovementHoldUntil = 0;
+	Bool m_fadedInPortal = FALSE;
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.
 	Bool				m_upgradedLocomotors;
