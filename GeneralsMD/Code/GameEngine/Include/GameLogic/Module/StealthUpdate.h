@@ -31,6 +31,8 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "GameLogic/Module/UpdateModule.h"
+#include "GameLogic/WeaponSetFlags.h"
+
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Thing;
@@ -116,6 +118,12 @@ public:
 	UnsignedInt m_ringRecovery = 0;
 	const FXList* m_ringOnFX = nullptr;
 	const FXList* m_ringOffFX = nullptr;
+	Real m_detectedByAnyoneRange = 0.0f;
+	WeaponSetFlags m_revealWeaponSets;
+	std::vector<AsciiString> m_requiredUpgrades;
+	std::vector<AsciiString> m_forbiddenUpgrades;
+	std::vector<AsciiString> m_removeTerrainRestriction;
+	Bool m_detectedByFriendliesOnly = FALSE;
 
   StealthUpdateModuleData();
 	static void buildFieldParse(MultiIniFieldParse& p);
@@ -150,6 +158,9 @@ public:
 	void markAsDetected( UnsignedInt numFrames = 0 );
 	void disguiseAsObject( const Object *target ); //wrapper function for ease.
 	Real getFriendlyOpacity() const;
+	StealthLookType calcStealthedStatusForPlayer(const Object* obj, const Player* player);
+	Bool isLegacyStealthed() const { return m_retailStealthed; }
+	Bool isLegacyDetected(UnsignedInt now) const { return m_detectionExpiresFrame > now; }
 	UnsignedInt getStealthDelay() const { return getStealthUpdateModuleData()->m_stealthDelay; }
 	UnsignedInt getStealthLevel() const { return getStealthUpdateModuleData()->m_stealthLevel; }
   EvaMessage getEnemyDetectionEvaEvent() const { return getStealthUpdateModuleData()->m_enemyDetectionEvaEvent; }
@@ -167,7 +178,6 @@ public:
 
 protected:
 
-	StealthLookType calcStealthedStatusForPlayer(const Object* obj, const Player* player);
 	Bool canDisguise() const { return getStealthUpdateModuleData()->m_teamDisguised; }
 	Real getRevealDistanceFromTarget() const { return getStealthUpdateModuleData()->m_revealDistanceFromTarget; }
 	void hintDetectableWhileUnstealthed() ;
@@ -183,6 +193,7 @@ private:
 	UnsignedInt m_ringAnimEnd = 0;
 	UnsignedInt m_ringBlockedUntil = 0;
 	Bool m_ringToggleOn = FALSE;
+	Bool m_retailStealthed = FALSE;
 
 	UnsignedInt						m_stealthAllowedFrame;
 	UnsignedInt						m_detectionExpiresFrame;

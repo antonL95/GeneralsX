@@ -4273,6 +4273,7 @@ void Object::crc( Xfer *xfer )
 	if (RetailFileLayers::enabled())
 	{
 		xferRotwkPowerState(xfer);
+		xferRetailInvisibilitySources(xfer);
 		xferMountedTemplateState(xfer);
 		xferMountedCombatState(xfer);
 		xfer->xferInt(&m_constructionCostPaid);
@@ -4428,7 +4429,7 @@ void Object::xfer( Xfer *xfer )
 #endif
 	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
 		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
-	const XferVersion maxVersion = RetailFileLayers::enabled() ? 16 : 10;
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 17 : 10;
 	XferVersion version = maxVersion == 16 ? (m_invulnerableUntil != NEVER ? 16 : (m_constructionCostPaid >= 0 ? 15 : 14)) :
 		(extendedSlots ? 10 : legacyVersion);
 	xfer->xferVersion(&version, maxVersion);
@@ -4903,6 +4904,8 @@ void Object::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_invulnerableUntil);
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_invulnerableUntil = NEVER;
+	if (version >= 17)
+		xferRetailInvisibilitySources(xfer);
 }
 
 void Object::inheritMountedUpgradeCommands(std::vector<AsciiString> commands)

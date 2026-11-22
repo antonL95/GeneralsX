@@ -317,6 +317,7 @@ public:
   void createCraterInTerrain(Object *obj);  ///< Flatten the terrain under a building.
 
 	void registerMapTree(const ThingTemplate& thing, const Coord3D& pos);
+	Bool isNearMapTree(const Coord3D& origin, Real radius) const;
 	void clearMapTreesForConstruction(const Coord3D& pos, const GeometryInfo& geometry, Real angle);
 	Bool findNearestHarvestTree(const Coord3D& origin, Real radius, const std::vector<Coord3D>& excluded,
 		Coord3D& position) const;
@@ -355,12 +356,12 @@ protected:
 	VecICoord2D m_boundaries;
 	Int m_activeBoundary;
 
-	struct HarvestableTree
+	struct MapTree
 	{
 		Coord3D position;
 		Int boxes;
 	};
-	std::vector<HarvestableTree> m_harvestableTrees;
+	std::vector<MapTree> m_mapTrees;
 
 	Waypoint *m_waypointListHead;
 	Bridge *m_bridgeListHead;

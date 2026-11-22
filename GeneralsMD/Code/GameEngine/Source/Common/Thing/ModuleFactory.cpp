@@ -300,6 +300,8 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
+#include "GameLogic/Module/RetailDetectionModules.h"
+
 #include "GameLogic/Module/SpecialAbility.h"
 #include "GameLogic/Module/SpyVisionSpecialPower.h"
 #include "GameLogic/Module/CashBountyPower.h"
@@ -499,6 +501,11 @@ void ModuleFactory::init()
 		addModule( OneRingPenaltyUpdate );
 		addModule( EnragedBehavior );
 		addModule( EntEnragedUpdate );
+		addModule( SpecialEnemySenseUpdate );
+		addModule( InvisibilityUpdate );
+		addModule( ToggleHiddenSpecialAbilityUpdate );
+
+
 		addModule( AttributeModifierAuraUpdate );
 		addModule( PassiveAreaEffectBehavior );
 		addModule( AttributeModifierUpgrade );

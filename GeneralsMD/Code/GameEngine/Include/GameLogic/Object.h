@@ -614,6 +614,9 @@ public:
 
 	//Checks any timers and clears disabled statii that have expired.
 	void checkDisabledStatus();
+	void offerRetailInvisibility(ObjectID source, const AsciiString& module, UnsignedInt expiry);
+	Bool hasPowerInvisibility() const;
+	void markRetailInvisibilityDetected(UnsignedInt duration);
 	void grantPowerInvisibility(UnsignedInt duration, Real range, const ModelConditionFlags& forbidden);
 	void setPowerModelCondition(Int condition, UnsignedInt duration);
 	void schedulePassengerConsumption(ObjectID passenger, const SpecialPowerAnimation& animation, Real healFraction);
@@ -777,6 +780,7 @@ private:
 	// cache these, for convenience
 	std::unique_ptr<RotwkPowerState> m_rotwkPowerState;
 	void xferRotwkPowerState(Xfer* xfer);
+	void xferRetailInvisibilitySources(Xfer* xfer);
 	friend class GameLogic;
 	friend class AIUpdateInterface;
 	friend class ThingFactory;

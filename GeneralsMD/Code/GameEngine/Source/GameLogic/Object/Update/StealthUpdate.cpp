@@ -34,6 +34,8 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/FramePacer.h"
+#include "WWMath/wwmath.h"
+
 #include "Common/GameState.h"
 #include "Common/GameUtility.h"
 #include "Common/Player.h"
@@ -57,6 +59,7 @@
 
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
+#include "GameLogic/Module/RetailDetectionModules.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -123,6 +126,12 @@ void StealthUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 	if (RetailFileLayers::enabled())
 	{
 		static const FieldParse ringFields[] = {
+			{ "DetectedByAnyoneRange", INI::parseReal, nullptr, offsetof(StealthUpdateModuleData, m_detectedByAnyoneRange) },
+			{ "DetectedByFriendliesOnly", INI::parseBool, nullptr, offsetof(StealthUpdateModuleData, m_detectedByFriendliesOnly) },
+			{ "RevealWeaponSets", WeaponSetFlags::parseFromINI, nullptr, offsetof(StealthUpdateModuleData, m_revealWeaponSets) },
+			{ "RequiredUpgradeNames", INI::parseAsciiStringVector, nullptr, offsetof(StealthUpdateModuleData, m_requiredUpgrades) },
+			{ "ForbiddenUpgradeNames", INI::parseAsciiStringVector, nullptr, offsetof(StealthUpdateModuleData, m_forbiddenUpgrades) },
+			{ "RemoveTerrainRestrictionOnUpgrade", INI::parseAsciiStringVector, nullptr, offsetof(StealthUpdateModuleData, m_removeTerrainRestriction) },
 			{ "OneRingDelayOn", INI::parseDurationUnsignedInt, nullptr, offsetof(StealthUpdateModuleData, m_ringDelayOn) },
 			{ "OneRingDelayOff", INI::parseDurationUnsignedInt, nullptr, offsetof(StealthUpdateModuleData, m_ringDelayOff) },
 			{ "RingAnimTimeOn", INI::parseDurationUnsignedInt, nullptr, offsetof(StealthUpdateModuleData, m_ringAnimOn) },
@@ -280,6 +289,26 @@ Bool StealthUpdate::allowedToStealth( Object *stealthOwner ) const
 		}
 	}
 
+	if (RetailFileLayers::enabled())
+	{
+		const auto hasUpgrade = [self](const AsciiString& name) { return RetailDetection::hasUpgrade(self, name); };
+		if (!std::all_of(data->m_requiredUpgrades.begin(), data->m_requiredUpgrades.end(), hasUpgrade) ||
+			std::any_of(data->m_forbiddenUpgrades.begin(), data->m_forbiddenUpgrades.end(), hasUpgrade) ||
+			self->getWeaponSetFlags().testForAny(data->m_revealWeaponSets))
+			return FALSE;
+
+		const Object* container = self->getContainedBy();
+		if ((flags & STEALTH_NOT_WHILE_HORDEBRAIN_NOT_STEALTHED) &&
+			(!container || !container->isKindOf(KINDOF_HORDE) || !container->testStatus(OBJECT_STATUS_STEALTHED)))
+			return FALSE;
+
+		if ((flags & STEALTH_NOT_WHILE_AWAY_FROM_TREES) &&
+			!RetailDetection::nearTrees(self) &&
+			(data->m_removeTerrainRestriction.empty() ||
+				!std::all_of(data->m_removeTerrainRestriction.begin(), data->m_removeTerrainRestriction.end(), hasUpgrade)))
+			return FALSE;
+	}
+
 	//With regards to slaves that stealth with us, we need to all be stealthed or not at all. If
 	//any of the slaves can't stealth, then reveal everyone!
 	if( self->isKindOf( KINDOF_SPAWNS_ARE_THE_WEAPONS ) )
@@ -400,7 +429,8 @@ Bool StealthUpdate::allowedToStealth( Object *stealthOwner ) const
 	if( containedBy )
 	{
 		ContainModuleInterface *contain = containedBy->getContain();
-		if( contain && !contain->isGarrisonable() )
+		if (contain && !contain->isGarrisonable() &&
+			(!RetailFileLayers::enabled() || !containedBy->isKindOf(KINDOF_HORDE)))
 		{
 			return FALSE;
 		}
@@ -461,7 +491,13 @@ void StealthUpdate::hintDetectableWhileUnstealthed()
 
 Real StealthUpdate::getFriendlyOpacity() const
 {
-	return getStealthUpdateModuleData()->m_friendlyOpacityMin;
+	const auto* data = getStealthUpdateModuleData();
+	if (!RetailFileLayers::enabled() || !data->m_pulseFrames || data->m_friendlyOpacityMin == data->m_friendlyOpacityMax)
+		return data->m_friendlyOpacityMin;
+	const auto frame = TheGameLogic->getFrame() % data->m_pulseFrames;
+	const Real phase = static_cast<Real>(frame) / data->m_pulseFrames;
+	const Real weight = (1.0f - WWMath::CosTrig(phase * (2.0f * PI))) * 0.5f;
+	return data->m_friendlyOpacityMin + weight * (data->m_friendlyOpacityMax - data->m_friendlyOpacityMin);
 }
 
 
@@ -837,6 +873,9 @@ UpdateSleepTime StealthUpdate::update()
 			TheAudio->addAudioEvent( &soundEvent );
 		}
 
+		if (RetailFileLayers::enabled())
+			m_retailStealthed = TRUE;
+
 		// The timer is zero, so if we aren't stealthed, do so now!
 		self->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_STEALTHED ) );
 	}
@@ -852,9 +891,26 @@ UpdateSleepTime StealthUpdate::update()
 			TheAudio->addAudioEvent( &soundEvent );
 		}
 
-		self->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_STEALTHED ) );
+		if (RetailFileLayers::enabled())
+			m_retailStealthed = FALSE;
+		if (!self->hasPowerInvisibility())
+		{
+			self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_STEALTHED));
+			hintDetectableWhileUnstealthed();
+		}
+	}
 
-		hintDetectableWhileUnstealthed();
+	if (RetailFileLayers::enabled() && self->testStatus(OBJECT_STATUS_STEALTHED))
+	{
+		const auto* data = getStealthUpdateModuleData();
+		if (data->m_detectedByAnyoneRange > 0.0f &&
+			RetailDetection::hasNearbyObserver(self, data->m_detectedByAnyoneRange, data->m_detectedByFriendliesOnly))
+		{
+			if (m_detectionExpiresFrame <= now)
+				markAsDetected(2);
+			else
+				m_detectionExpiresFrame = std::max(m_detectionExpiresFrame, now + 2);
+		}
 	}
 
 	Bool detectedStatusChangedThisFrame = FALSE;
@@ -914,6 +970,9 @@ UpdateSleepTime StealthUpdate::update()
 	{
 		StealthLookType stealthLook = calcStealthedStatusForPlayer( self, rts::getObservedOrLocalPlayer() );
 		draw->setStealthLook( stealthLook );
+		if (RetailFileLayers::enabled() && (stealthLook == STEALTHLOOK_VISIBLE_FRIENDLY ||
+			stealthLook == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED) && !isDisguised() && !self->isKindOf(KINDOF_MINE))
+			draw->setEffectiveOpacity(0.0f, getFriendlyOpacity());
 	}
 
 	return calcSleepTime();
@@ -1022,6 +1081,10 @@ void StealthUpdate::disguiseAsObject( const Object *target )
 {
 	Object *self = getObject();
 	const StealthUpdateModuleData *data = getStealthUpdateModuleData();
+	if (target && RetailFileLayers::enabled() &&
+		!std::all_of(data->m_requiredUpgrades.begin(), data->m_requiredUpgrades.end(),
+			[self](const AsciiString& name) { return RetailDetection::hasUpgrade(self, name); }))
+		return;
 	if( target && target->getControllingPlayer() )
 	{
     StealthUpdate* stealth = target->getStealth();
@@ -1213,7 +1276,10 @@ void StealthUpdate::crc( Xfer *xfer )
 	// extend base class
 	UpdateModule::crc( xfer );
 	if (RetailFileLayers::enabled())
+	{
 		xferRingState(xfer);
+		xfer->xferBool(&m_retailStealthed);
+	}
 
 }
 
@@ -1226,7 +1292,7 @@ void StealthUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1292,6 +1358,8 @@ void StealthUpdate::xfer( Xfer *xfer )
 	}
 	if (version >= 3)
 		xferRingState(xfer);
+	if (version >= 4)
+		xfer->xferBool(&m_retailStealthed);
 
 }
 

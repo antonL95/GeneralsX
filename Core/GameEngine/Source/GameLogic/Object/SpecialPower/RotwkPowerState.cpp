@@ -12,6 +12,46 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#if !RTS_GENERALS
+#include "Common/GameUtility.h"
+#include "Common/GlobalData.h"
+#include "Common/NameKeyGenerator.h"
+#include "Common/Player.h"
+#include "GameLogic/Module/RetailDetectionModules.h"
+#include "GameLogic/Module/StealthUpdate.h"
+#endif
+
+
+#if !RTS_GENERALS
+void Object::offerRetailInvisibility(ObjectID source, const AsciiString& module, UnsignedInt expiry)
+{
+	if (!m_rotwkPowerState)
+		m_rotwkPowerState = std::make_unique<RotwkPowerState>();
+	auto& entries = m_rotwkPowerState->invisibilitySources;
+	const auto found = std::find_if(entries.begin(), entries.end(), [&](const auto& entry)
+	{
+		return entry.object == source && entry.module == module;
+	});
+	if (found == entries.end())
+		entries.push_back({source, module, expiry});
+	else
+		found->expires = expiry;
+}
+
+Bool Object::hasPowerInvisibility() const
+{
+	return m_rotwkPowerState && m_rotwkPowerState->powerStealthed;
+}
+
+void Object::markRetailInvisibilityDetected(UnsignedInt duration)
+{
+	if (!m_rotwkPowerState || !m_rotwkPowerState->powerStealthed)
+		return;
+	m_rotwkPowerState->detectionEnd = std::max(m_rotwkPowerState->detectionEnd, TheGameLogic->getFrame() + duration);
+	setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_DETECTED));
+}
+
+#endif
 
 void Object::grantPowerInvisibility(UnsignedInt duration, Real range, const ModelConditionFlags& forbidden)
 {
@@ -76,6 +116,88 @@ void Object::updateRotwkPowerState()
 	}
 
 	const auto stealthed = MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_STEALTHED);
+#if !RTS_GENERALS
+	const Bool wasHidden = state.powerStealthed;
+	StealthUpdate* stealth = getStealth();
+	const RetailInvisibilityNugget* nugget = nullptr;
+	Bool hasHint = FALSE;
+	Bool hint = FALSE;
+	std::erase_if(state.invisibilitySources, [&](const auto& entry)
+	{
+		if (now >= entry.expires)
+			return true;
+		const Object* source = TheGameLogic->findObjectByID(entry.object);
+		const auto* module = source ? InvisibilityUpdate::find(source, TheNameKeyGenerator->nameToKey(entry.module)) : nullptr;
+		if (!module || source->isEffectivelyDead())
+			return true;
+		const auto& candidate = module->getNugget();
+		const Bool enabled = module->isEnabled();
+		if (enabled && candidate.m_hintDetected.any())
+		{
+			hasHint = TRUE;
+			hint = hint || getStatusBits().testForAny(candidate.m_hintDetected);
+		}
+		const Object* subject = getContainedBy();
+		if (!subject || !subject->isKindOf(KINDOF_HORDE))
+			subject = this;
+		const Bool stronger = !nugget || candidate.m_type > nugget->m_type ||
+			(candidate.m_type == nugget->m_type && candidate.m_detectionRange < nugget->m_detectionRange);
+		if (enabled && stronger && candidate.canConceal(subject))
+			nugget = &candidate;
+		return false;
+	});
+	const Bool camouflage = !hidden && nugget && nugget->m_type == RetailInvisibilityNugget::CAMOUFLAGE;
+	hidden = hidden || nugget;
+	if (camouflage && nugget->m_detectionRange > 0.0f &&
+		RetailDetection::hasNearbyObserver(this, nugget->m_detectionRange, nugget->m_options & RetailInvisibilityNugget::DETECTED_BY_FRIENDLIES))
+		state.detectionEnd = std::max(state.detectionEnd, now + 1);
+	state.powerStealthed = hidden;
+	if (hidden)
+		setStatus(stealthed);
+	else if (wasHidden && (!stealth || !stealth->isLegacyStealthed()))
+		clearStatus(stealthed);
+
+	if (hidden || wasHidden)
+	{
+		const auto detected = MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_DETECTED);
+		if (hidden && now < state.detectionEnd)
+			setStatus(detected);
+		else if (!stealth || !stealth->isLegacyDetected(now))
+			clearStatus(detected);
+
+		const auto mask = MAKE_MODELCONDITION_MASK2(MODELCONDITION_INVISIBLE_STEALTH, MODELCONDITION_INVISIBLE_CAMOUFLAGE);
+		ModelConditionFlags appearance;
+		if (hidden)
+			appearance.set(camouflage ?
+				MODELCONDITION_INVISIBLE_CAMOUFLAGE : MODELCONDITION_INVISIBLE_STEALTH);
+		clearAndSetModelConditionFlags(mask, appearance);
+
+		if (getDrawable())
+		{
+			const Player* viewer = rts::getObservedOrLocalPlayer();
+			const Bool friendly = viewer && (!viewer->isPlayerActive() || viewer->getRelationship(getTeam()) == ALLIES);
+			const Bool exposed = testStatus(OBJECT_STATUS_DETECTED);
+			const auto look = stealth && viewer ? stealth->calcStealthedStatusForPlayer(this, viewer) :
+				!hidden ? STEALTHLOOK_NONE : friendly ?
+				(exposed ? STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED : STEALTHLOOK_VISIBLE_FRIENDLY) :
+				(exposed ? STEALTHLOOK_VISIBLE_DETECTED : STEALTHLOOK_INVISIBLE);
+			getDrawable()->setStealthLook(look);
+			if ((!stealth || !stealth->isDisguised()) &&
+				(look == STEALTHLOOK_VISIBLE_FRIENDLY || look == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED))
+			{
+				const Real opacity = stealth ? stealth->getFriendlyOpacity() : TheGlobalData->m_stealthFriendlyOpacity;
+				getDrawable()->setEffectiveOpacity(0.0f, opacity);
+			}
+			else if (look == STEALTHLOOK_NONE && (!stealth || !stealth->isDisguised()))
+				getDrawable()->setEffectiveOpacity(1.0f);
+		}
+	}
+	if ((hasHint || state.hinting) && !hidden && !stealth && getDrawable() && isLocallyControlled())
+	{
+		getDrawable()->setSecondMaterialPassOpacity(hint ? 1.0f : 0.0f);
+		state.hinting = hint;
+	}
+#else
 	if (hidden && !testStatus(OBJECT_STATUS_STEALTHED))
 	{
 		setStatus(stealthed);
@@ -86,6 +208,7 @@ void Object::updateRotwkPowerState()
 		clearStatus(stealthed);
 		state.powerStealthed = FALSE;
 	}
+#endif
 	if (state.passenger != INVALID_ID && now >= state.consumeFrame)
 	{
 		Object* passenger = TheGameLogic->findObjectByID(state.passenger);
@@ -98,7 +221,7 @@ void Object::updateRotwkPowerState()
 				attemptHealing(getBodyModule()->getMaxHealth() * state.healFraction, this);
 		}
 	}
-	if (now >= state.invisibilityEnd && state.conditionEnd == 0 && state.passenger == INVALID_ID)
+	if (now >= state.invisibilityEnd && state.conditionEnd == 0 && state.passenger == INVALID_ID && state.invisibilitySources.empty())
 		m_rotwkPowerState.reset();
 }
 
@@ -122,6 +245,26 @@ void Object::xferRotwkPowerState(Xfer* xfer)
 	xfer->xferUnsignedInt(&state.consumeFrame);
 	xfer->xferReal(&state.healFraction);
 }
+
+#if !RTS_GENERALS
+void Object::xferRetailInvisibilitySources(Xfer* xfer)
+{
+	if (!m_rotwkPowerState)
+		return;
+	auto& state = *m_rotwkPowerState;
+	xfer->xferUnsignedInt(&state.detectionEnd);
+	UnsignedInt count = state.invisibilitySources.size();
+	xfer->xferUnsignedInt(&count);
+	if (xfer->getXferMode() == XFER_LOAD)
+		state.invisibilitySources.resize(count);
+	for (auto& entry : state.invisibilitySources)
+	{
+		xfer->xferObjectID(&entry.object);
+		xfer->xferAsciiString(&entry.module);
+		xfer->xferUnsignedInt(&entry.expires);
+	}
+}
+#endif
 
 void Object::schedulePassengerConsumption(ObjectID passenger, const SpecialPowerAnimation& animation, Real healFraction)
 {

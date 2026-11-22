@@ -35,6 +35,8 @@
 #include "Common/GameUtility.h"
 #include "Common/MiscAudio.h"
 #include "Common/Radar.h"
+#include "Common/RetailFileLayers.h"
+
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
@@ -211,6 +213,11 @@ UpdateSleepTime StealthDetectorUpdate::update()
 			continue;
 
 		StealthUpdate* stealth = them->getStealth();
+		if (!stealth && RetailFileLayers::enabled() && them->hasPowerInvisibility())
+		{
+			them->markRetailInvisibilityDetected(data->m_updateRate + 1);
+			foundSomeone = TRUE;
+		}
 		if ( stealth )
 		{
 

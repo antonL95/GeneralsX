@@ -973,7 +973,7 @@ void TerrainLogic::init()
 //-------------------------------------------------------------------------------------------------
 void TerrainLogic::reset()
 {
-	m_harvestableTrees.clear();
+	m_mapTrees.clear();
 
 	deleteWaypoints();
 	deleteBridges();
@@ -1086,7 +1086,7 @@ void TerrainLogic::update()
 //-------------------------------------------------------------------------------------------------
 void TerrainLogic::newMap( Bool saveGame )
 {
-	m_harvestableTrees.clear();
+	m_mapTrees.clear();
 
 	// Set waypoint's z value, now that the height map is loaded.
 	for( Waypoint *way = m_waypointListHead; way; way = way->getNext() )
@@ -2918,18 +2918,25 @@ void TerrainLogic::createCraterInTerrain(Object *obj)
 void TerrainLogic::registerMapTree(const ThingTemplate& thing, const Coord3D& pos)
 {
 	const auto& tree = thing.getRotWKObjectData();
-	if (!thing.isKindOf(KINDOF_TREE) || !tree.isHarvestable)
+	if (!thing.isKindOf(KINDOF_TREE))
 		return;
 
 	const Int boxes = tree.supplyOverride > 0 ? tree.supplyOverride : TheGlobalData->m_supplyBoxesPerTree;
-	if (boxes > 0)
-		m_harvestableTrees.push_back({pos, boxes});
+	m_mapTrees.push_back({pos, tree.isHarvestable ? std::max(0, boxes) : 0});
+}
+
+Bool TerrainLogic::isNearMapTree(const Coord3D& origin, Real radius) const
+{
+	return std::any_of(m_mapTrees.begin(), m_mapTrees.end(), [&](const MapTree& tree)
+	{
+		return sqr(tree.position.x - origin.x) + sqr(tree.position.y - origin.y) <= sqr(radius);
+	});
 }
 
 void TerrainLogic::clearMapTreesForConstruction(const Coord3D& pos, const GeometryInfo& geometry, Real angle)
 {
 	const GeometryInfo treeGeometry(GEOMETRY_CYLINDER, FALSE, 35.0f, 14.0f, 14.0f);
-	std::erase_if(m_harvestableTrees, [&](const HarvestableTree& tree) {
+	std::erase_if(m_mapTrees, [&](const MapTree& tree) {
 		return ThePartitionManager->geomCollidesWithGeom(&pos, geometry, angle, &tree.position, treeGeometry, 0.0f);
 	});
 }
@@ -2939,10 +2946,10 @@ Bool TerrainLogic::findNearestHarvestTree(const Coord3D& origin, Real radius, co
 {
 	Real best = sqr(radius);
 	Bool found = FALSE;
-	for (const auto& tree : m_harvestableTrees)
+	for (const auto& tree : m_mapTrees)
 	{
 		const Real distance = sqr(tree.position.x - origin.x) + sqr(tree.position.y - origin.y);
-		if (distance < best && std::none_of(excluded.begin(), excluded.end(), [&](const Coord3D& point)
+		if (tree.boxes > 0 && distance < best && std::none_of(excluded.begin(), excluded.end(), [&](const Coord3D& point)
 			{
 				return point.x == tree.position.x && point.y == tree.position.y && point.z == tree.position.z;
 			}))
@@ -2959,9 +2966,9 @@ Int TerrainLogic::takeMapTreeBoxes(const Coord3D& position, Int capacity)
 {
 	if (capacity <= 0)
 		return 0;
-	for (auto it = m_harvestableTrees.begin(); it != m_harvestableTrees.end(); ++it)
+	for (auto it = m_mapTrees.begin(); it != m_mapTrees.end(); ++it)
 	{
-		if (it->position.x != position.x || it->position.y != position.y || it->position.z != position.z)
+		if (it->boxes <= 0 || it->position.x != position.x || it->position.y != position.y || it->position.z != position.z)
 			continue;
 		const Int taken = std::min(capacity, it->boxes);
 		it->boxes -= taken;
@@ -2969,7 +2976,7 @@ Int TerrainLogic::takeMapTreeBoxes(const Coord3D& position, Int capacity)
 		{
 			if (TheTerrainVisual)
 				TheTerrainVisual->removeMapTree(it->position);
-			m_harvestableTrees.erase(it);
+			m_mapTrees.erase(it);
 		}
 		return taken;
 	}
@@ -2981,11 +2988,11 @@ std::uint64_t TerrainLogic::harvestMapTrees(const Coord3D& origin, Real radius, 
 	std::uint64_t boxes = 0;
 	const Real treeRadius = 7.0f;
 	const Real radiusSquared = sqr(radius + treeRadius);
-	std::erase_if(m_harvestableTrees, [&](const HarvestableTree& tree) {
+	std::erase_if(m_mapTrees, [&](const MapTree& tree) {
 		const Real dx = tree.position.x - origin.x;
 		const Real dy = tree.position.y - origin.y;
 		const Real dz = tree.position.z - origin.z;
-		if (dx * dx + dy * dy + dz * dz >= radiusSquared)
+		if (tree.boxes <= 0 || dx * dx + dy * dy + dz * dz >= radiusSquared)
 			return false;
 
 		boxes += tree.boxes;
@@ -3006,11 +3013,11 @@ void TerrainLogic::crc( Xfer *xfer )
 
 void TerrainLogic::xferMapTrees(Xfer* xfer)
 {
-	UnsignedInt count = m_harvestableTrees.size();
+	UnsignedInt count = m_mapTrees.size();
 	xfer->xferUnsignedInt(&count);
 	if (xfer->getXferMode() == XFER_LOAD)
-		m_harvestableTrees.resize(count);
-	for (auto& tree : m_harvestableTrees)
+		m_mapTrees.resize(count);
+	for (auto& tree : m_mapTrees)
 	{
 		xfer->xferCoord3D(&tree.position);
 		xfer->xferInt(&tree.boxes);
@@ -3111,7 +3118,7 @@ void TerrainLogic::xfer( Xfer *xfer )
 	if (version >= 3)
 		xferMapTrees(xfer);
 	else if (xfer->getXferMode() == XFER_LOAD)
-		m_harvestableTrees.clear();
+		m_mapTrees.clear();
 }
 
 // ------------------------------------------------------------------------------------------------

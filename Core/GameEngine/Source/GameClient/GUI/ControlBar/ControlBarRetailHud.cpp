@@ -53,6 +53,8 @@
 #if !RTS_GENERALS
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
+#include "GameLogic/Module/RetailDetectionModules.h"
+
 #include "GameLogic/Module/StealthUpdate.h"
 #endif
 
@@ -1636,6 +1638,14 @@ Real ControlBar::getRetailRecharge(const GameWindow *window) const
 		command->getCommandType() != GUI_COMMAND_SPECIAL_POWER || !command->getSpecialPowerTemplate())
 		return -1.0f;
 	Object *obj = m_currentSelectedDrawable->getObject();
+#if !RTS_GENERALS
+	if (obj)
+	{
+		const Real effect = ToggleHiddenSpecialAbilityUpdate::timerProgress(obj, command->getSpecialPowerTemplate());
+		if (effect >= 0.0f)
+			return effect;
+	}
+#endif
 	SpecialPowerModuleInterface *power = obj ? obj->getSpecialPowerModule(command->getSpecialPowerTemplate()) : nullptr;
 	if (!power || power->isReady())
 		return -1.0f;
