@@ -48,6 +48,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Team.h"
 #include "Common/Upgrade.h"
+#include "GameLogic/AIPathfind.h"
 
 #include "GameClient/Anim2D.h"
 #include "GameClient/CampaignManager.h"
@@ -1002,6 +1003,8 @@ void ScriptActions::doCreateObject(const AsciiString& objectName, const AsciiStr
 
 			obj->setOrientation(angle);
 			obj->setPosition( pos );
+			if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+				TheAI->pathfinder()->addObjectToPathfindMap(obj);
 		}
 	} else {
 		DEBUG_LOG(("WARNING - ThingTemplate '%s' not found.", thingName.str()));
@@ -1175,6 +1178,8 @@ void ScriptActions::createUnitOnTeamAt(const AsciiString& unitName, const AsciiS
 			{
 				Coord3D destination = *way->getLocation();
 				obj->setPosition(&destination);
+				if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+					TheAI->pathfinder()->addObjectToPathfindMap(obj);
 			}
 		}
 	} else {

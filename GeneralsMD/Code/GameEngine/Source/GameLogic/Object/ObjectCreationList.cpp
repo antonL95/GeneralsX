@@ -1481,6 +1481,8 @@ protected:
 
 
 
+		if (retailObject && !obj->isDestroyed() && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+			TheAI->pathfinder()->addObjectToPathfindMap(obj);
 	}
 
 	Object* reallyCreate(const Coord3D *pos, const Matrix3D *mtx, Real orientation, const Object *sourceObj,

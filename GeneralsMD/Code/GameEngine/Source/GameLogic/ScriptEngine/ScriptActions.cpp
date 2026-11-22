@@ -1037,6 +1037,8 @@ void ScriptActions::doCreateObject(const AsciiString& objectName, const AsciiStr
 
 			obj->setOrientation(angle);
 			obj->setPosition( pos );
+			if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+				TheAI->pathfinder()->addObjectToPathfindMap(obj);
 
       if ( obj->isKindOf( KINDOF_BLAST_CRATER ) ) // since these footprints are permanent
       {
@@ -1231,6 +1233,8 @@ void ScriptActions::createUnitOnTeamAt(const AsciiString& unitName, const AsciiS
 			{
 				Coord3D destination = *way->getLocation();
 				obj->setPosition(&destination);
+				if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+					TheAI->pathfinder()->addObjectToPathfindMap(obj);
 			}
 		}
 	} else {

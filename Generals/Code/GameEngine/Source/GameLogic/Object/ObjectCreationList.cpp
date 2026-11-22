@@ -52,6 +52,8 @@
 #include "GameClient/ParticleSys.h"
 #include "GameClient/Shadow.h"
 
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
@@ -1279,6 +1281,9 @@ protected:
 			ExperienceLevelStore::applyPendingLevels(obj);
 			obj->getExperienceTracker()->gainRetailLevels(m_veterancyLevel);
 		}
+		if (RetailFileLayers::enabled() && m_nameAreObjects && !obj->isDestroyed() &&
+			obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+			TheAI->pathfinder()->addObjectToPathfindMap(obj);
 	}
 
 	Object* reallyCreate(const Coord3D *pos, const Matrix3D *mtx, Real orientation, const Object *sourceObj, UnsignedInt lifetimeFrames ) const
