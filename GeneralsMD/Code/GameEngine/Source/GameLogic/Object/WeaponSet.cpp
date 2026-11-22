@@ -1270,6 +1270,14 @@ void WeaponSet::reloadAllAmmo(const Object *obj, Bool now)
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool WeaponSet::isHoldingMovementForReload(UnsignedInt frame) const
+{
+	for (const Weapon* weapon : m_weapons)
+		if (weapon && weapon->isHoldingMovementForReload(frame))
+			return TRUE;
+	return FALSE;
+}
+
 Bool WeaponSet::isOutOfAmmo() const
 {
 	for( Int i = 0; i < WEAPONSLOT_COUNT;	i++ )

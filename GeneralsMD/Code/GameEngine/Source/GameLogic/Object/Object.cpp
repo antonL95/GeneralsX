@@ -198,7 +198,7 @@ static ModelConditionFlags weaponFireFlags(Int slot)
 static WeaponSetConditionType retailWeaponCondition(const Object* obj, const Weapon* weapon, UnsignedInt now, Byte lastCondition, Bool currentSlot)
 {
 	const UnsignedInt lastShot = weapon->getLastShotFrame();
-	if (lastShot == now)
+	if (lastShot == now || weapon->isWaitingToIdle())
 		return WSF_FIRING;
 
 	const WeaponStatus status = weapon->getStatus();

@@ -2259,8 +2259,6 @@ void Weapon::reloadWithBonus(const Object *sourceObj, const WeaponBonus& bonus, 
 	Real reloadTime = loadInstantly ? 0 : m_template->getClipReloadTime(bonus, TRUE);
 	m_whenLastReloadStarted = TheGameLogic->getFrame();
 	m_whenWeCanFireAgain = m_whenLastReloadStarted + reloadTime;
-	if (reloadTime > 0 && m_template->holdsDuringReload())
-		sourceObj->holdForWeaponUntil(m_whenWeCanFireAgain);
 	if (!loadInstantly && RetailTestCommands::tracesCombat())
 		std::fprintf(stderr, "TEST cooldown frame=%u weapon=%s source=%u phase=reload frames=%u\n",
 			m_whenLastReloadStarted, getName().str(), static_cast<UnsignedInt>(sourceObj->getID()),
@@ -2333,8 +2331,6 @@ void Weapon::onWeaponBonusChange(const Object *source)
 	{
 		m_whenLastReloadStarted = TheGameLogic->getFrame();
 		m_whenWeCanFireAgain = m_whenLastReloadStarted + newDelay;
-		if (getStatus() == RELOADING_CLIP && m_template->holdsDuringReload())
-			source->holdForWeaponUntil(m_whenWeCanFireAgain);
 
 		if (source->isReloadTimeShared())
 		{
@@ -3063,8 +3059,10 @@ void Weapon::preFireWeapon( const Object *source, const Object *victim )
 	Int delay = getPreAttackDelay( source, victim );
 	if( delay > 0 )
 	{
-		setStatus( PRE_ATTACK );
-		setPreAttackFinishedFrame( TheGameLogic->getFrame() + delay );
+		const UnsignedInt frame = TheGameLogic->getFrame();
+		if (!isHoldingMovementForReload(frame))
+			setStatus(PRE_ATTACK);
+		setPreAttackFinishedFrame(frame + delay);
 		if( m_template->isLeechRangeWeapon() )
 		{
 			setLeechRangeActive( TRUE );
@@ -3134,7 +3132,7 @@ Bool Weapon::canFireInCurrentMovement(const Object* source) const
 		return m_template->canFireWhileCharging();
 
 	const auto* physics = source->getPhysics();
-	if (!physics || m_template->canFireWhileMoving() || source->getContainedBy())
+	if (!physics || m_template->canFireWhileMoving() || source->getEnclosingContainedBy())
 		return TRUE;
 
 	const auto* velocity = physics->getVelocity();
@@ -3145,6 +3143,11 @@ Bool Weapon::isWaitingToIdle() const
 {
 	return m_lastFireFrame && m_template->getIdleAfterFiringDelay() &&
 		TheGameLogic->getFrame() < m_lastFireFrame + m_template->getIdleAfterFiringDelay();
+}
+
+Bool Weapon::isHoldingMovementForReload(UnsignedInt frame) const
+{
+	return m_template->holdsDuringReload() && m_status == RELOADING_CLIP && frame < m_whenWeCanFireAgain;
 }
 
 Bool Weapon::hasCommittedAttack() const

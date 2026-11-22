@@ -508,6 +508,7 @@ public:
 	const Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr) const;
 	void setFiringConditionForCurrentWeapon() const;
 	void holdForWeaponUntil(UnsignedInt frame) const;
+	Bool isHoldingMovementForReload(UnsignedInt frame) const { return m_weaponSet.isHoldingMovementForReload(frame); }
 	void adjustModelConditionForWeaponStatus();	///< Check to see if I should change my model condition.
 	void fireCurrentWeapon(Object *target);
 	void fireCurrentWeapon(const Coord3D* pos);

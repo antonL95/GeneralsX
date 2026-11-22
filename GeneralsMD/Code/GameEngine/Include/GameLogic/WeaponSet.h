@@ -321,6 +321,7 @@ public:
 
 	void updateWeaponSet(const Object* obj);
 	void reloadAllAmmo(const Object *obj, Bool now);
+	Bool isHoldingMovementForReload(UnsignedInt frame) const;
 	Bool isOutOfAmmo() const;
 	Bool hasAnyWeapon() const { return m_filledWeaponSlotMask != 0; }
 	Bool hasAnyDamageWeapon() const { return m_hasDamageWeapon; }

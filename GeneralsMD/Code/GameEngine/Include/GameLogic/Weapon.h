@@ -752,6 +752,7 @@ public:
 	void reloadAmmo(const Object *source);
 
 	WeaponStatus getStatus() const;
+	Bool isHoldingMovementForReload(UnsignedInt frame) const;
 
 	/// Some AI needs to know when the soonest I can possibly next shoot.  Bonuses have been figured into this number already.
 	UnsignedInt getPossibleNextShotFrame() const;

@@ -2288,15 +2288,22 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 	if (m_curLocomotor)
 	{
 		m_curLocomotor->setPhysicsOptions(getObject());
+		const UnsignedInt now = TheGameLogic->getFrame();
 
 		if (isAiInDeadState() && !m_curLocomotor->getLocomotorWorksWhenDead())
 		{
 			// now it's over, I'm dead, and I haven't done anything that I want,
 			// or, I'm still alive, and there's nothing I want to do
 		}
-		else if (!m_burningDeathUntil && TheGameLogic->getFrame() < m_weaponMovementHoldUntil)
+		else if (RetailFileLayers::enabled() && !m_burningDeathUntil &&
+			(now < m_weaponMovementHoldUntil || getObject()->isHoldingMovementForReload(now)))
 		{
 			m_curLocomotor->locoUpdate_maintainCurrentPosition(getObject());
+			if (m_locomotorGoalType == ANGLE && m_curLocomotor->getMinSpeed() == 0.0f)
+			{
+				m_curLocomotor->locoUpdate_moveTowardsAngle(getObject(), m_locomotorGoalData.x);
+				m_doFinalPosition = FALSE;
+			}
 		}
 		else
 		{
