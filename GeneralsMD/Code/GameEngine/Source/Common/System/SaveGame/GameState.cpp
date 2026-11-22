@@ -60,6 +60,7 @@
 #include "GameClient/TerrainVisual.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/GhostObject.h"
+#include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/SidesList.h"
@@ -79,6 +80,7 @@ static const Int MAX_SAVE_FILE_NUMBER  =  99999999;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 #define GAME_STATE_BLOCK_STRING "CHUNK_GameState"  // block of save game data with game info data
 #define CAMPAIGN_BLOCK_STRING "CHUNK_Campaign"		 // block of game data that has campaign info
+static const char simulationBlockName[] = "CHUNK_SimulationState";
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
@@ -366,6 +368,7 @@ void GameState::init()
 void GameState::reset()
 {
 	m_loadedRandomState.reset();
+	m_loadedObjectIDCounter.reset();
 
 	// clear the post process snapshot list
 	m_snapshotPostProcessList.clear();
@@ -721,6 +724,11 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	{
 		// do the post-process from a save game load
 		gameStatePostProcessLoad();
+		if (m_loadedObjectIDCounter)
+		{
+			TheGameLogic->setObjectIDCounter(*m_loadedObjectIDCounter);
+			m_loadedObjectIDCounter.reset();
+		}
 		if (m_loadedRandomState)
 		{
 			setGameLogicRandomState(*m_loadedRandomState);
@@ -1467,6 +1475,49 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 
 }
 
+void GameState::xferSimulationState(Xfer *xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+
+	GameLogicRandomState state = getGameLogicRandomState();
+	state.xfer(xfer);
+
+	ObjectID nextID = TheGameLogic->getObjectIDCounter();
+	xfer->xferObjectID(&nextID);
+
+	if (xfer->getXferMode() == XFER_SAVE)
+	{
+		for (Object *object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		{
+			ObjectID id = object->getID();
+			xfer->xferObjectID(&id);
+			xfer->beginBlock();
+			object->xferTransformCache(xfer);
+			xfer->endBlock();
+		}
+		ObjectID end = INVALID_ID;
+		xfer->xferObjectID(&end);
+	}
+	else
+	{
+		m_loadedObjectIDCounter = nextID;
+		m_loadedRandomState = state;
+		for (ObjectID id = INVALID_ID; ; )
+		{
+			xfer->xferObjectID(&id);
+			if (id == INVALID_ID)
+				break;
+			const Int blockSize = xfer->beginBlock();
+			if (Object *object = TheGameLogic->findObjectByID(id))
+				object->xferTransformCache(xfer);
+			else
+				xfer->skip(blockSize);
+			xfer->endBlock();
+		}
+	}
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Save game to xfer or load game using xfer */
 // ------------------------------------------------------------------------------------------------
@@ -1551,6 +1602,15 @@ void GameState::xferSaveData( Xfer *xfer, SnapshotType which )
 
 		}
 
+		if (which == SNAPSHOT_SAVELOAD && getSaveGameInfo()->saveFileType != SAVE_FILE_TYPE_MISSION)
+		{
+			AsciiString blockName = simulationBlockName;
+			xfer->xferAsciiString(&blockName);
+			xfer->beginBlock();
+			xferSimulationState(xfer);
+			xfer->endBlock();
+		}
+
 		// write an end of file token
 		AsciiString eofToken = SAVE_FILE_EOF;
 		xfer->xferAsciiString( &eofToken );
@@ -1581,6 +1641,14 @@ void GameState::xferSaveData( Xfer *xfer, SnapshotType which )
 			}
 			else
 			{
+
+				if (which == SNAPSHOT_SAVELOAD && token.compareNoCase(simulationBlockName) == 0)
+				{
+					xfer->beginBlock();
+					xferSimulationState(xfer);
+					xfer->endBlock();
+					continue;
+				}
 
 				// find matching token in the save file lexicon
 				blockInfo = findBlockInfoByToken( token, which );

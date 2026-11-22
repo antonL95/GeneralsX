@@ -222,6 +222,7 @@ private:
 	AsciiString findNextSaveFilename( UnicodeString desc );			///< find next acceptable filename for a new save game
 	void iterateSaveFiles( IterateSaveFileCallback callback, void *userData );	///< iterate save files on disk
 
+	void xferSimulationState(Xfer *xfer);
 	void xferSaveData( Xfer *xfer, SnapshotType which );				///< save/load the file data
 
 	void gameStatePostProcessLoad();											///< post process entry point after a game load
@@ -241,6 +242,7 @@ private:
 	SnapshotBlockList m_snapshotBlockList[SNAPSHOT_MAX];	///< list of snapshot blocks of save file data
 	SaveGameInfo m_gameInfo;						///< save game info struct
 	std::optional<GameLogicRandomState> m_loadedRandomState;
+	std::optional<ObjectID> m_loadedObjectIDCounter;
 
 	typedef std::list< Snapshot * > SnapshotList;
 	typedef SnapshotList::iterator SnapshotListIterator;

@@ -4519,19 +4519,22 @@ void Object::xfer( Xfer *xfer )
 	{
 		Matrix3D mtx = *getTransformMatrix();
 		xfer->xferMatrix3D(&mtx);
-		setTransformMatrix(&mtx);
+		if (xfer->getXferMode() == XFER_LOAD)
+			setTransformMatrix(&mtx);
 	}
 	else
 	{
 		// object position
 		Coord3D pos = *getPosition();
 		xfer->xferCoord3D( &pos );
-		setPosition( &pos );
+		if (xfer->getXferMode() == XFER_LOAD)
+			setPosition(&pos);
 
 		// orientation
 		Real orientation = getOrientation();
 		xfer->xferReal( &orientation );
-		setOrientation( orientation );
+		if (xfer->getXferMode() == XFER_LOAD)
+			setOrientation(orientation);
 	}
 
 	// team

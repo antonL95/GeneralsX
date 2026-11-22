@@ -43,6 +43,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/Team.h"
+#include "Common/Xfer.h"
 #include "Lib/trig.h"
 #include "GameLogic/TerrainLogic.h"
 
@@ -269,6 +270,19 @@ void Thing::setTransformMatrix( const Matrix3D *mx )
 
 	reactToTransformChange(&oldMtx, &oldPos, oldAngle);
 	DEBUG_ASSERTCRASH(!(_isnan(getPosition()->x) || _isnan(getPosition()->y) || _isnan(getPosition()->z)), ("Drawable/Object position NAN! '%s'", m_template->getName().str() ));
+}
+
+void Thing::xferTransformCache(Xfer *xfer)
+{
+	xfer->xferCoord3D(&m_cachedPos);
+	xfer->xferReal(&m_cachedAngle);
+	xfer->xferInt(&m_cacheFlags);
+	if (m_cacheFlags & VALID_DIRVECTOR)
+		xfer->xferCoord3D(&m_cachedDirVector);
+	if (m_cacheFlags & VALID_ALTITUDE_TERRAIN)
+		xfer->xferReal(&m_cachedAltitudeAboveTerrain);
+	if (m_cacheFlags & VALID_ALTITUDE_SEALEVEL)
+		xfer->xferReal(&m_cachedAltitudeAboveTerrainOrWater);
 }
 
 //-------------------------------------------------------------------------------------------------

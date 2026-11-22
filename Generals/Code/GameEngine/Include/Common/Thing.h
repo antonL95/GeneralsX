@@ -66,6 +66,7 @@ class Object;
 class AIObject;
 class Drawable;
 class Team;
+class Xfer;
 class ThingTemplate;
 
 //-----------------------------------------------------------------------------
@@ -138,6 +139,8 @@ public:
 
 	void setTransformMatrix( const Matrix3D *mx );												///< set the world transformation matrix
 	const Matrix3D* getTransformMatrix() const { return &m_transform; }		///< return the world transformation matrix
+
+	void xferTransformCache(Xfer *xfer);
 
 	void transformPoint( const Coord3D *in, Coord3D *out );								///< transform this point using the m_transform matrix of this thing
 
