@@ -395,7 +395,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		if (!sys) {
 			continue;
 		}
-		if (RetailFileLayers::enabled() && sys->getTemplate() && sys->getTemplate()->usesGpuDraw())
+		if (RetailFileLayers::enabled() && !sys->isUsingSmudge() && sys->getTemplate() && sys->getTemplate()->usesGpuDraw())
 		{
 			flushParticleBatch(rinfo, pointCount);
 			if (sys->getTemplate()->canDrawGpuParticles())

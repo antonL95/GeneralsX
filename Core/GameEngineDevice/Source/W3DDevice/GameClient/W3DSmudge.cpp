@@ -32,6 +32,7 @@
 #include "W3DDevice/GameClient/W3DSmudge.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "Common/GameMemory.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/View.h"
 #include "GameClient/Display.h"
 #include "WW3D2/texture.h"
@@ -311,8 +312,8 @@ Bool W3DSmudgeManager::testHardwareSupport()
 
 void W3DSmudgeManager::render(RenderInfoClass &rinfo)
 {
-	//Verify that the card supports the effect.
-	if (!testHardwareSupport())
+	const Bool retail = RetailFileLayers::enabled();
+	if (!retail && !testHardwareSupport())
 		return;
 
 	// TheSuperHackers @performance stephanmeesters 14/08/2026 Early return when we have no smudge sets
@@ -323,21 +324,41 @@ void W3DSmudgeManager::render(RenderInfoClass &rinfo)
 		return;
 	}
 
-	SurfaceClass *backBuffer = DX8Wrapper::_Get_DX8_Back_Buffer();
-
-	if (!backBuffer)
+	auto *device = DX8Wrapper::_Get_D3D_Device8();
+	if (!device)
 		return;
 
-	SurfaceClass *background=m_backgroundTexture ? m_backgroundTexture->Get_Surface_Level() : nullptr;
-
-	if (!background)
+	RefCountPtr<SurfaceClass> renderTarget;
+	D3DVIEWPORT8 viewport{};
+	if (retail)
 	{
-		REF_PTR_RELEASE(backBuffer);
-		return;
+		IDirect3DSurface8 *activeTarget = nullptr;
+		if (FAILED(device->GetViewport(&viewport)) ||
+			FAILED(device->GetRenderTarget(&activeTarget)) || !activeTarget)
+			return;
+		renderTarget.Assign_No_Add_Ref(NEW_REF(SurfaceClass, (activeTarget)));
+		activeTarget->Release();
 	}
+	else
+	{
+		renderTarget.Assign_No_Add_Ref(DX8Wrapper::_Get_DX8_Back_Buffer());
+		viewport.Width = TheTacticalView->getWidth();
+		viewport.Height = TheTacticalView->getHeight();
+	}
+	if (!renderTarget.Peek())
+		return;
 
 	SurfaceClass::SurfaceDescription surface_desc;
-	backBuffer->Get_Description(surface_desc);
+	renderTarget->Get_Description(surface_desc);
+
+	if (retail && (!m_backgroundTexture || m_backgroundTexture->Get_Width() != surface_desc.Width ||
+		m_backgroundTexture->Get_Height() != surface_desc.Height ||
+		m_backgroundTexture->Get_Texture_Format() != surface_desc.Format))
+	{
+		REF_PTR_RELEASE(m_backgroundTexture);
+		m_backgroundTexture = MSGNEW("TextureClass") TextureClass(surface_desc.Width, surface_desc.Height,
+			surface_desc.Format, MIP_LEVELS_1, TextureClass::POOL_DEFAULT, true);
+	}
 
 	CameraClass &camera=rinfo.Camera;
 	Vector3 vsVert;
@@ -360,11 +381,12 @@ void W3DSmudgeManager::render(RenderInfoClass &rinfo)
 	camera.Get_View_Matrix(&view);
 	camera.Get_Projection_Matrix(&proj);
 
-	Real texClampX = (Real)TheTacticalView->getWidth()/(Real)surface_desc.Width;
-	Real texClampY = (Real)TheTacticalView->getHeight()/(Real)surface_desc.Height;
-
-	Real texScaleX = texClampX*0.5f;
-	Real texScaleY = texClampY*0.5f;
+	const Real texLeft = static_cast<Real>(viewport.X) / surface_desc.Width;
+	const Real texTop = static_cast<Real>(viewport.Y) / surface_desc.Height;
+	const Real texScaleX = 0.5f * viewport.Width / surface_desc.Width;
+	const Real texScaleY = 0.5f * viewport.Height / surface_desc.Height;
+	const Real texRight = texLeft + 2.0f * texScaleX;
+	const Real texBottom = texTop + 2.0f * texScaleY;
 
 	//Do a first pass over the smudges to determine how many are visible
 	//and to fill in their world-space positions and screen uv coordinates.
@@ -407,15 +429,15 @@ void W3DSmudgeManager::render(RenderInfoClass &rinfo)
 				Real oow = 1.0f/ssVert.W;
 				ssVert *= oow;	//returned in camera space which is -1,-1 (bottom-left) to 1,1 (top-right)
 				//convert camera space to uv space: 0,0 (top-left), 1,1 (bottom-right)
-				verts[i].uv.Set((ssVert.X+1.0f)*texScaleX,(1.0f-ssVert.Y)*texScaleY);
+				verts[i].uv.Set(texLeft + (ssVert.X + 1.0f) * texScaleX, texTop + (1.0f - ssVert.Y) * texScaleY);
 
 				Vector2 &thisUV=verts[i].uv;
 
 				// Zero coordinates that fall outside valid texel bounds
-				if (thisUV.X < 0 || thisUV.X > texClampX)
+				if (thisUV.X < texLeft || thisUV.X > texRight)
 					offset.X = 0;
 
-				if (thisUV.Y < 0 || thisUV.Y > texClampY)
+				if (thisUV.Y < texTop || thisUV.Y > texBottom)
 					offset.Y = 0;
 			}
 
@@ -432,18 +454,20 @@ void W3DSmudgeManager::render(RenderInfoClass &rinfo)
 
 	m_smudgeCountLastFrame = count;
 
-	if (!count)
+	if (!count || !m_backgroundTexture)
+		return;
+
+	RefCountPtr<SurfaceClass> background;
+	background.Assign_No_Add_Ref(m_backgroundTexture->Get_Surface_Level());
+	if (!background.Peek())
+		return;
+	if (retail)
 	{
-		REF_PTR_RELEASE(background);
-		REF_PTR_RELEASE(backBuffer);
-		return;	//nothing to render.
+		if (FAILED(device->CopyRects(renderTarget->Peek_D3D_Surface(), nullptr, 0, background->Peek_D3D_Surface(), nullptr)))
+			return;
 	}
-
-	//Copy the area of backbuffer occupied by smudges into an alternate buffer.
-	background->Copy(0,0,0,0,surface_desc.Width,surface_desc.Height,backBuffer);
-
-	REF_PTR_RELEASE(background);
-	REF_PTR_RELEASE(backBuffer);
+	else
+		background->Copy(0, 0, 0, 0, surface_desc.Width, surface_desc.Height, renderTarget.Peek());
 
 	Matrix4x4 identity(true);
 	DX8Wrapper::Set_Transform(D3DTS_WORLD,identity);
@@ -467,6 +491,12 @@ void W3DSmudgeManager::render(RenderInfoClass &rinfo)
 	REF_PTR_RELEASE(vmat);
 	DX8Wrapper::Apply_Render_State_Changes();
 
+	if (retail)
+	{
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+	}
 	//Disable reading texture alpha since it's undefined.
 	//DX8Wrapper::Set_DX8_Texture_Stage_State(0,D3DTSS_COLOROP,D3DTOP_SELECTARG1);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0,D3DTSS_ALPHAOP,D3DTOP_SELECTARG2);
@@ -557,6 +587,11 @@ flushSmudges:
 		smudgesRemaining -= smudgesInRenderBatch;
 	}
 
+	if (retail)
+	{
+		DX8Wrapper::Set_Texture(0, nullptr);
+		DX8Wrapper::Set_DX8_Texture(0, nullptr);
+	}
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0,D3DTSS_COLOROP,D3DTOP_MODULATE);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0,D3DTSS_ALPHAOP,D3DTOP_MODULATE);
 

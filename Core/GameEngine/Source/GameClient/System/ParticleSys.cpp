@@ -288,7 +288,7 @@ void Particle::computeAlphaRate()
 // ------------------------------------------------------------------------------------------------
 void Particle::computeColorRate()
 {
-	if (m_colorKey[ m_colorTargetKey ].frame == 0)
+	if (m_colorTargetKey >= MAX_KEYFRAMES || m_colorKey[ m_colorTargetKey ].frame == 0)
 	{
 		m_colorRate.red = 0.0f;
 		m_colorRate.green = 0.0f;
@@ -297,13 +297,14 @@ void Particle::computeColorRate()
 	}
 
 	UnsignedInt time = m_colorKey[ m_colorTargetKey ].frame - m_colorKey[ m_colorTargetKey-1 ].frame;
-	Real delta = m_colorKey[ m_colorTargetKey ].color.red - m_colorKey[ m_colorTargetKey-1 ].color.red;
+	const RGBColor &start = RetailFileLayers::enabled() ? m_color : m_colorKey[ m_colorTargetKey-1 ].color;
+	Real delta = m_colorKey[ m_colorTargetKey ].color.red - start.red;
 	m_colorRate.red = delta/time;
 
-	delta = m_colorKey[ m_colorTargetKey ].color.green - m_colorKey[ m_colorTargetKey-1 ].color.green;
+	delta = m_colorKey[ m_colorTargetKey ].color.green - start.green;
 	m_colorRate.green = delta/time;
 
-	delta = m_colorKey[ m_colorTargetKey ].color.blue - m_colorKey[ m_colorTargetKey-1 ].color.blue;
+	delta = m_colorKey[ m_colorTargetKey ].color.blue - start.blue;
 	m_colorRate.blue = delta/time;
 }
 
@@ -542,7 +543,8 @@ Bool Particle::update()
 	//
 	if ((m_colorTargetKey < MAX_KEYFRAMES && m_colorKey[ m_colorTargetKey ].frame != 0) || m_colorTargetKey == 0)
 	{
-		if (frameCount > m_colorKey[ m_colorTargetKey ].frame)
+		const UnsignedInt targetFrame = m_colorKey[ m_colorTargetKey ].frame;
+		if (frameCount > targetFrame || (RetailFileLayers::enabled() && m_colorTargetKey > 0 && frameCount == targetFrame))
 		{
 			m_colorTargetKey++;
 			computeColorRate();
@@ -619,8 +621,8 @@ void Particle::draw(Real timeScale)
 	//
 	m_color += m_colorRate * timeScale;
 
-	/// @todo Rethink this - at least its name
-	m_color += m_colorScale * timeScale;
+	if (!RetailFileLayers::enabled())
+		m_color += m_colorScale * timeScale;
 
 	m_color.red = clamp(0.0f, m_color.red, 1.0f);
 	m_color.green = clamp(0.0f, m_color.green, 1.0f);
@@ -1246,14 +1248,13 @@ void ParticleSystemInfo::validate()
 		m_volumeParticleDepth = DEFAULT_VOLUME_PARTICLE_DEPTH;
 	}
 
-#if PRESERVE_RETAIL_PARTICLES
-	// TheSuperHackers @info Hack to allow isUsingSmudge() functionality with retail smudge particles
-	// The retail data template for smudge particles is not correctly configured with the smudge particle type
-	if (m_particleType != ParticleSystemInfo::SMUDGE && m_particleTypeName.startsWithNoCase("SMUDGE."))
+	if ((PRESERVE_RETAIL_PARTICLES || RetailFileLayers::enabled()) &&
+		m_particleType != ParticleSystemInfo::SMUDGE && m_particleTypeName.startsWithNoCase("SMUDGE."))
 	{
 		m_particleType = ParticleSystemInfo::SMUDGE;
 	}
-#endif
+	if (RetailFileLayers::enabled() && m_particleType == ParticleSystemInfo::SMUDGE)
+		m_shaderType = ParticleSystemInfo::ALPHA;
 
 	validateAlphaKeyframes(m_alphaKey, ARRAY_SIZE(m_alphaKey));
 
@@ -2118,6 +2119,22 @@ const ParticleInfo *ParticleSystem::generateParticleInfo( Int particleNum, Int p
 		info.m_alphaKey[i].value = m_alphaKey[i].var.getValue();
 		info.m_alphaKey[i].frame = m_alphaKey[i].frame;
 		info.m_colorKey[i] = m_colorKey[i];
+	}
+	if (RetailFileLayers::enabled() &&
+		(m_colorScale.getMinimumValue() != 0.0f || m_colorScale.getMaximumValue() != 0.0f))
+	{
+		const auto vary = [this](Real &channel)
+		{
+			if (channel != 0.0f)
+				channel = clamp(0.0f, channel + m_colorScale.getValue(), 1.0f);
+		};
+		for (Int i = 1; i < MAX_KEYFRAMES - 1; ++i)
+		{
+			RGBColor &color = info.m_colorKey[i].color;
+			vary(color.red);
+			vary(color.green);
+			vary(color.blue);
+		}
 	}
 	info.m_modelSize.set(1.0f, 1.0f, 1.0f);
 	info.m_modelSizeRate.set(0.0f, 0.0f, 0.0f);
@@ -3254,6 +3271,11 @@ ParticleSystemTemplate::~ParticleSystemTemplate()
 void ParticleSystemTemplate::validate()
 {
 	ParticleSystemInfo::validate();
+	if (RetailFileLayers::enabled() && m_particleType == ParticleSystemInfo::SMUDGE)
+	{
+		m_isGpuParticle = FALSE;
+		m_hasGpuDraw = FALSE;
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
