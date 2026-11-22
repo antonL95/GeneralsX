@@ -422,7 +422,19 @@ UpdateSleepTime HordeAIUpdate::update()
 	const HordeContain* contain = HordeContain::get(horde);
 	if (!contain || horde->isEffectivelyDead())
 		return UPDATE_SLEEP_NONE;
-	if (fabs(stdAngleDiff(horde->getOrientation(), facingBefore)) > FORMATION_REFORM_ANGLE)
+	const Real turn = stdAngleDiff(horde->getOrientation(), facingBefore);
+	const Bool cavalry = RetailFileLayers::enabled() && horde->isKindOf(KINDOF_CAVALRY);
+	if (cavalry)
+	{
+		m_cavalryTurn = turn;
+		m_cavalryTurnSinceReform = stdAngleDiff(m_cavalryTurnSinceReform + turn, 0.0f);
+		if (fabs(m_cavalryTurnSinceReform) >= PI / 3.0f)
+		{
+			const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
+			m_cavalryTurnSinceReform = 0.0f;
+		}
+	}
+	else if (fabs(turn) > FORMATION_REFORM_ANGLE)
 		const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
 
 	target = liveTarget(m_attackTarget);
@@ -599,7 +611,7 @@ UpdateSleepTime HordeAIUpdate::update()
 		HordeContain::FormationGoal goal;
 		if (!contain->getFormationGoal(member, goal))
 			continue;
-		if (goal.error > FORMATION_PATHFIND_DISTANCE || !HordeContain::canSteerToFormationGoal(member, goal))
+		if ((!cavalry && goal.error > FORMATION_PATHFIND_DISTANCE) || !HordeContain::canSteerToFormationGoal(member, goal))
 		{
 			if (ai->isAttacking() || (refresh && (ai->isIdle() ||
 				distanceSquared(*ai->getGoalPosition(), goal.slot) > FORMATION_REPATH_DISTANCE * FORMATION_REPATH_DISTANCE)))
@@ -648,12 +660,17 @@ void HordeAIUpdate::crc(Xfer* xfer)
 	{
 		xfer->xferObjectID(&m_contactTarget);
 		xfer->xferUnsignedInt(&m_contactUntil);
+		if (getObject()->isKindOf(KINDOF_CAVALRY))
+		{
+			xfer->xferReal(&m_cavalryTurn);
+			xfer->xferReal(&m_cavalryTurnSinceReform);
+		}
 	}
 }
 
 void HordeAIUpdate::xfer(Xfer* xfer)
 {
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 5;
 	XferVersion version = currentVersion;
 	xfer->xferVersion(&version, currentVersion);
 	AIUpdateInterface::xfer(xfer);
@@ -682,6 +699,11 @@ void HordeAIUpdate::xfer(Xfer* xfer)
 	{
 		xfer->xferObjectID(&m_contactTarget);
 		xfer->xferUnsignedInt(&m_contactUntil);
+	}
+	if (version >= 7 && getObject()->isKindOf(KINDOF_CAVALRY))
+	{
+		xfer->xferReal(&m_cavalryTurn);
+		xfer->xferReal(&m_cavalryTurnSinceReform);
 	}
 }
 

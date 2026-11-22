@@ -18,6 +18,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -1365,6 +1366,34 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 		leadY = pathY * scale;
 		remaining = std::max(0.0f, point->distAlongPath);
 	}
+	if (horde->isKindOf(KINDOF_CAVALRY) && RetailFileLayers::enabled() &&
+		hordeAI->getModuleNameKey() == NAMEKEY("HordeAIUpdate"))
+	{
+		const Real turn = static_cast<const HordeAIUpdate*>(hordeAI)->getCavalryTurn();
+		const Real leadFrames = std::min(FORMATION_LEAD_FRAMES,
+			hordeSpeed > 0.0f ? remaining / hordeSpeed : FORMATION_LEAD_FRAMES);
+		const Real angle = std::clamp(turn * leadFrames, -PI / 4.0f, PI / 4.0f);
+		const Real offsetX = goal.slot.x - anchor.x;
+		const Real offsetY = goal.slot.y - anchor.y;
+		const Real cosAngle = Cos(angle);
+		const Real sinAngle = Sin(angle);
+		goal.position.x = anchor.x + leadX + offsetX * cosAngle - offsetY * sinAngle;
+		goal.position.y = anchor.y + leadY + offsetX * sinAngle + offsetY * cosAngle;
+		if (TheTerrainLogic)
+			goal.position.z = TheTerrainLogic->getGroundHeight(goal.position.x, goal.position.y);
+
+		const Real slotVX = velocity.x - turn * offsetY;
+		const Real slotVY = velocity.y + turn * offsetX;
+		const Real slotSpeed = WWMath::SqrtfOrigin(slotVX * slotVX + slotVY * slotVY);
+		const Real correctionX = slotVX + dx * FORMATION_CATCH_UP_PER_FRAME;
+		const Real correctionY = slotVY + dy * FORMATION_CATCH_UP_PER_FRAME;
+		goal.speed = WWMath::SqrtfOrigin(correctionX * correctionX + correctionY * correctionY);
+		const Real stepX = goal.position.x - position.x;
+		const Real stepY = goal.position.y - position.y;
+		const Real step = WWMath::SqrtfOrigin(stepX * stepX + stepY * stepY);
+		goal.distance = step + std::max(0.0f, remaining - slotSpeed * leadFrames);
+		return TRUE;
+	}
 	goal.position.x += leadX;
 	goal.position.y += leadY;
 	if (TheTerrainLogic)
@@ -1384,6 +1413,11 @@ Bool HordeContain::canSteerToFormationGoal(const Object* member, const Formation
 	const auto layer = member->getLayer();
 	const Coord3D& position = *member->getPosition();
 	Pathfinder* pathfinder = TheAI->pathfinder();
+	if (!goal.backing && RetailFileLayers::enabled() && member->isKindOf(KINDOF_CAVALRY) &&
+		locomotor->getAppearance() == LOCO_WHEELS_FOUR &&
+		pathfinder->validMovementTerrain(layer, locomotor, &position) &&
+		!pathfinder->isMovementSegmentPassable(member, surfaces, layer, position, goal.position, TRUE))
+		return FALSE;
 	return pathfinder->validMovementTerrain(layer, locomotor, &goal.position) &&
 		pathfinder->isLinePassable(member, surfaces, layer, position, goal.position, FALSE, TRUE);
 }
@@ -1428,7 +1462,13 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 		member->isSignificantlyAboveTerrain() || !std::isfinite(movement.x) || !std::isfinite(movement.y))
 		return;
 	const HordeContain* horde = get(member->getContainedBy());
-	if (!horde || horde->getMemberSlot(member->getID()) < 0)
+	if (!horde)
+		return;
+	const Bool cavalry = horde->getObject()->isKindOf(KINDOF_CAVALRY);
+	const auto hasFormationPosition = [&](const Object* rider) {
+		return horde->getMemberSlot(rider->getID()) >= 0 || (cavalry && horde->isBannerCarrier(rider));
+	};
+	if (!hasFormationPosition(member))
 		return;
 	const AIUpdateInterface* ai = member->getAI();
 	const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
@@ -1436,6 +1476,7 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 		return;
 
 	const Real radius = member->getGeometryInfo().getBoundingCircleRadius();
+	const Bool cavalryBanner = cavalry && horde->isBannerCarrier(member);
 	const Coord3D& origin = *member->getPosition();
 	const auto layer = member->getLayer();
 	Coord3D next = {origin.x + movement.x, origin.y + movement.y, origin.z};
@@ -1451,11 +1492,12 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 		if (!eligibleNeighbor(other))
 			continue;
 		const Coord3D& position = *other->getPosition();
-		const Real diameter = radius + other->getGeometryInfo().getBoundingCircleRadius() + CLEARANCE;
+		const Real separation = cavalryBanner || (cavalry && horde->isBannerCarrier(other)) ? 0.75f : 1.0f;
+		const Real diameter = (radius + other->getGeometryInfo().getBoundingCircleRadius()) * separation + CLEARANCE;
 		const Real dx = next.x - position.x;
 		const Real dy = next.y - position.y;
 		const Real distanceSquared = dx * dx + dy * dy;
-		if (distanceSquared >= diameter * diameter || horde->getMemberSlot(other->getID()) < 0)
+		if (distanceSquared >= diameter * diameter || !hasFormationPosition(other))
 			continue;
 
 		const Real oldX = origin.x - position.x;
@@ -1515,8 +1557,7 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 			continue;
 		const Real plannedX = planned.x - position.x;
 		const Real plannedY = planned.y - position.y;
-		if (plannedX * plannedX + plannedY * plannedY >= pileRadius * pileRadius &&
-			horde->getMemberSlot(other->getID()) >= 0)
+		if (plannedX * plannedX + plannedY * plannedY >= pileRadius * pileRadius && hasFormationPosition(other))
 			return;
 	}
 
