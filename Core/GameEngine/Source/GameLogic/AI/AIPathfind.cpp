@@ -7687,7 +7687,8 @@ void Pathfinder::crc( Xfer *xfer )
 	Int obsolete1 = 0;
 	xfer->xferInt( &obsolete1 );
 
-	xfer->xferUser(&m_ignoreObstacleID, sizeof(ObjectID));
+	if (!RetailFileLayers::enabled())
+		xfer->xferUser(&m_ignoreObstacleID, sizeof(ObjectID));
 	CRCDEBUG_LOG(("m_ignoreObstacleID: %8.8X", ((XferCRC *)xfer)->getCRC()));
 
 	xfer->xferUser(m_queuedPathfindRequests, sizeof(ObjectID)*PATHFIND_QUEUE_LEN);
@@ -7867,7 +7868,10 @@ void Pathfinder::xfer( Xfer *xfer )
 
 void Pathfinder::xferRetailBlocks(Xfer* xfer, Bool present)
 {
-	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{ "ignored-obstacle", [this](Xfer* x) { x->xferObjectID(&m_ignoreObstacleID); },
+			[this] { m_ignoreObstacleID = INVALID_ID; } }
+	});
 }
 
 //-----------------------------------------------------------------------------

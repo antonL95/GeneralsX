@@ -1907,7 +1907,7 @@ void OpenContain::loadPostProcess()
 		addToContainList( obj );
 
 		// remove this object from the world if we need to
-		if( isEnclosingContainerFor( obj ) )
+		if (isEnclosingContainerFor(obj) || (RetailFileLayers::enabled() && us->getEnclosingContainedBy()))
 			addOrRemoveObjFromWorld( obj, FALSE );
 
 		// record in the object who we are contained by
