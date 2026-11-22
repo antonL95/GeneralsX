@@ -1133,9 +1133,20 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		{
 			if (!isProjectileDetonation && !suspended && m_fxTrigger.isNotEmpty() && !m_fxTrigger.isNone())
 				sourceObj->getDrawable()->handleWeaponFXTrigger(m_fxTrigger);
+			const AIUpdateInterface* ai = sourceObj->getAIUpdateInterface();
+			const Bool rotatingFX = RetailFileLayers::enabled() && m_rotatingTurret && fx && !isProjectileDetonation &&
+				ai && ai->getWhichTurretForWeaponSlot(wslot, nullptr, nullptr) != TURRET_INVALID;
+			if (rotatingFX)
+			{
+				Matrix3D muzzleTransform(true);
+				Coord3D muzzle;
+				Weapon::calcProjectileLaunchPosition(sourceObj, wslot, specificBarrelToUse, muzzleTransform, muzzle, FALSE);
+				FXList::doFXPos(fx, &muzzle, &muzzleTransform, getWeaponSpeed(), &targetPos, getPrimaryDamageRadius(bonus),
+					sourceObj, victimObj);
+			}
 			handled = sourceObj->getDrawable()->handleWeaponFireFX(wslot,
 																															specificBarrelToUse,
-																															fx,
+																															rotatingFX ? nullptr : fx,
 																															getWeaponSpeed(),
 																															reAngle,
 																															reDir,
@@ -1143,6 +1154,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 																															getPrimaryDamageRadius(bonus),
 																															RetailFileLayers::enabled() ? victimObj : nullptr
 																															);
+			handled = handled || rotatingFX;
 		}
 
 		if (handled == false && fx != nullptr)
@@ -3468,7 +3480,8 @@ void Weapon::processRequestAssistance( const Object *requestingObject, Object *v
 	WeaponSlotType wslot,
 	Int specificBarrelToUse,
 	Matrix3D& worldTransform,
-	Coord3D& worldPos
+	Coord3D& worldPos,
+	Bool requireLaunchBone
 )
 {
 	if( launcher->getContainedBy() )
@@ -3500,7 +3513,8 @@ void Weapon::processRequestAssistance( const Object *requestingObject, Object *v
 	if (!draw || !draw->getProjectileLaunchOffset(wslot, specificBarrelToUse, &attachTransform, tur, &turretRotPos, &turretPitchPos))
 	{
 		//CRCDEBUG_LOG(("ProjectileLaunchPos %d %d not found!",wslot, specificBarrelToUse));
-		DEBUG_CRASH(("ProjectileLaunchPos %d %d not found!",wslot, specificBarrelToUse));
+		if (requireLaunchBone)
+			DEBUG_CRASH(("ProjectileLaunchPos %d %d not found!",wslot, specificBarrelToUse));
 		attachTransform.Make_Identity();
 		turretRotPos.zero();
 		turretPitchPos.zero();

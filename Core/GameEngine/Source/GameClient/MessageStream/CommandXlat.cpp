@@ -704,6 +704,16 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 				}
 				if( weapon )
 				{
+#if !RTS_GENERALS
+					const AudioEventRTS* overrideVoice = &weapon->getTemplate()->getOverrideVoiceAttackSound();
+					if (RetailFileLayers::enabled() && TheAudio->isValidAudioEvent(overrideVoice))
+					{
+						soundToPlayPtr = overrideVoice;
+						objectWithSound = obj;
+						skip = true;
+						break;
+					}
+#endif
 					switch( weapon->getDamageType() )
 					{
 // this stays, even if ALLOW_SURRENDER is not defed, since flashbangs still use 'em
@@ -771,6 +781,16 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 				}
 				if( weapon )
 				{
+#if !RTS_GENERALS
+					const AudioEventRTS* overrideVoice = &weapon->getTemplate()->getOverrideVoiceAttackSound();
+					if (RetailFileLayers::enabled() && TheAudio->isValidAudioEvent(overrideVoice))
+					{
+						soundToPlayPtr = overrideVoice;
+						objectWithSound = obj;
+						skip = true;
+						break;
+					}
+#endif
 					switch( weapon->getDamageType() )
 					{
 // this stays, even if ALLOW_SURRENDER is not defed, since flashbangs still use 'em

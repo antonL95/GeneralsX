@@ -494,6 +494,8 @@ public:
 	const ParticleSystemTemplate* getProjectileExhaust(VeterancyLevel v) const { return m_projectileExhausts[v]; }
 
 	const AudioEventRTS& getFireSound() const { return m_fireSound; }
+	const AudioEventRTS& getOverrideVoiceAttackSound() const { return m_overrideVoiceAttackSound; }
+	const AudioEventRTS& getOverrideVoiceEnterStateAttackSound() const { return m_overrideVoiceEnterStateAttackSound; }
 	Bool shouldLockWhenUsing() const { return m_lockWhenUsing; }
 	UnsignedInt getFireSoundLoopTime() const { return m_fireSoundLoopTime; }
 	const std::vector<Coord2D>& getScatterTargetsVector() const { return m_scatterTargets; }
@@ -622,11 +624,14 @@ private:
 	Bool m_shareTimers = FALSE;
 	Bool m_requireFollowThru = FALSE;
 	Bool m_lockWhenUsing = FALSE;
+	AudioEventRTS m_overrideVoiceAttackSound;
+	AudioEventRTS m_overrideVoiceEnterStateAttackSound;
 	SpecialPowerObjectFilter m_projectileFilterInContainer;
 	Int m_maxAttackPassengers = 0;
 	Bool m_passengerProportionalAttack = FALSE;
 	Bool m_shouldPlayUnderAttackEvaEvent = TRUE;
 	Bool m_projectileSelf = FALSE;
+	Bool m_rotatingTurret = FALSE;
 	Int m_affectsMask;											///< what we can affect
 	Int m_collideMask;											///< what we can collide with (projectiles only)
 	Bool m_damageDealtAtSelfPosition;				///< if T, weapon damage is done at source's position, not victim's pos. (useful for suicide weapons.)
@@ -863,7 +868,8 @@ public:
 		WeaponSlotType wslot,
 		Int specificBarrelToUse,
 		Matrix3D& worldTransform,
-		Coord3D& worldPos
+		Coord3D& worldPos,
+		Bool requireLaunchBone = TRUE
 	);
 
 	static void positionProjectileForLaunch(

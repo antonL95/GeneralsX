@@ -5648,6 +5648,15 @@ StateReturnType AIAttackState::onEnter()
 	{
 		source->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IS_ATTACKING ) );
 		source->setModelConditionState( MODELCONDITION_ATTACKING );
+		if (RetailFileLayers::enabled() && curWeapon)
+		{
+			AudioEventRTS voice = curWeapon->getTemplate()->getOverrideVoiceEnterStateAttackSound();
+			if (TheAudio->isValidAudioEvent(&voice))
+			{
+				voice.setObjectID(source->getID());
+				TheAudio->addAudioEvent(&voice);
+			}
+		}
 	}
 	return retType;
 }
