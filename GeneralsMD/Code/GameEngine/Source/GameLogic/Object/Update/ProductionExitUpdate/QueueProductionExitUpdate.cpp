@@ -30,7 +30,9 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameLogic/AI.h"
@@ -39,6 +41,31 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/QueueProductionExitUpdate.h"
+
+void QueueProductionExitUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	UpdateModuleData::buildFieldParse(p);
+	static const FieldParse dataFieldParse[] =
+	{
+		{ "UnitCreatePoint", INI::parseCoord3D, nullptr, offsetof(QueueProductionExitUpdateModuleData, m_unitCreatePoint) },
+		{ "NaturalRallyPoint", INI::parseCoord3D, nullptr, offsetof(QueueProductionExitUpdateModuleData, m_naturalRallyPoint) },
+		{ "ExitDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(QueueProductionExitUpdateModuleData, m_exitDelayData) },
+		{ "AllowAirborneCreation", INI::parseBool, nullptr, offsetof(QueueProductionExitUpdateModuleData, m_allowAirborneCreationData) },
+		{ "InitialBurst", INI::parseUnsignedInt, nullptr, offsetof(QueueProductionExitUpdateModuleData, m_initialBurst) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(dataFieldParse);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "PlacementViewAngle", INI::parseAngleReal, nullptr, offsetof(QueueProductionExitUpdateModuleData, m_placementViewAngle) },
+			{ "NoExitPath", INI::parseBool, nullptr, offsetof(QueueProductionExitUpdateModuleData, m_noExitPath) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
+}
 
 //-------------------------------------------------------------------------------------------------
 QueueProductionExitUpdate::QueueProductionExitUpdate( Thing *thing, const ModuleData* moduleData ) : UpdateModule( thing, moduleData )
@@ -73,6 +100,8 @@ void QueueProductionExitUpdate::exitObjectViaDoor( Object *newObj, ExitDoorType 
 		const QueueProductionExitUpdateModuleData* md = getQueueProductionExitUpdateModuleData();
 
 		Real exitAngle = creationObject->getOrientation();
+		if (RetailFileLayers::enabled())
+			exitAngle = normalizeAngle(exitAngle + md->m_placementViewAngle);
 		const Matrix3D *transform = creationObject->getTransformMatrix();
 		Vector3 loc;
 		Coord3D createPoint;
@@ -149,7 +178,13 @@ void QueueProductionExitUpdate::exitObjectViaDoor( Object *newObj, ExitDoorType 
 			// Double the destination to keep redguards from stacking.
 			exitPath.push_back(tmp);
 		}
-		if (ai) {
+		if (RetailFileLayers::enabled() && md->m_noExitPath && !m_rallyPointExists)
+		{
+			if (ai)
+				ai->aiIdle(CMD_FROM_AI);
+		}
+		else if (ai)
+		{
 			ai->aiFollowExitProductionPath( &exitPath, creationObject, CMD_FROM_AI );
 		}
 		m_currentDelay = md->m_exitDelayData;

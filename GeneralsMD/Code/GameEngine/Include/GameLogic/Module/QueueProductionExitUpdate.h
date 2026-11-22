@@ -45,6 +45,8 @@ public:
 	UnsignedInt m_exitDelayData;
 	Bool m_allowAirborneCreationData;
 	UnsignedInt m_initialBurst;
+	Real m_placementViewAngle;
+	Bool m_noExitPath;
 
 	QueueProductionExitUpdateModuleData()
 	{
@@ -53,22 +55,11 @@ public:
 		m_exitDelayData = 0;
 		m_allowAirborneCreationData = FALSE;
 		m_initialBurst = 0;
+		m_placementViewAngle = 0.0f;
+		m_noExitPath = FALSE;
 	}
 
-	static void buildFieldParse(MultiIniFieldParse& p)
-	{
-    UpdateModuleData::buildFieldParse(p);
-		static const FieldParse dataFieldParse[] =
-		{
-			{ "UnitCreatePoint",				INI::parseCoord3D,							nullptr, offsetof( QueueProductionExitUpdateModuleData, m_unitCreatePoint ) },
-			{ "NaturalRallyPoint",			INI::parseCoord3D,							nullptr, offsetof( QueueProductionExitUpdateModuleData, m_naturalRallyPoint ) },
-			{ "ExitDelay",							INI::parseDurationUnsignedInt,	nullptr, offsetof( QueueProductionExitUpdateModuleData, m_exitDelayData ) },
-			{ "AllowAirborneCreation",	INI::parseBool,									nullptr, offsetof( QueueProductionExitUpdateModuleData, m_allowAirborneCreationData ) },
-			{ "InitialBurst",						INI::parseUnsignedInt,					nullptr, offsetof( QueueProductionExitUpdateModuleData, m_initialBurst ) },
-			{ nullptr, nullptr, nullptr, 0 }
-		};
-    p.add(dataFieldParse);
-	}
+	static void buildFieldParse(MultiIniFieldParse& p);
 };
 
 //-------------------------------------------------------------------------------------------------
