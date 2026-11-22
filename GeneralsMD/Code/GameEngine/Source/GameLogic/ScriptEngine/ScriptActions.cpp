@@ -552,6 +552,16 @@ void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiS
 	if (theTeam==nullptr) {
 		return;
 	}
+	const Bool retail = RetailFileLayers::enabled();
+	std::vector<ObjectID> newObstacles;
+	const auto createMember = [&](const ThingTemplate* type)
+	{
+		Object* member = TheThingFactory->newObject(type, theTeam);
+		if (retail && member &&
+			(member->isKindOf(KINDOF_STRUCTURE) || member->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
+			newObstacles.push_back(member->getID());
+		return member;
+	};
 	const ThingTemplate *transportTemplate;
 	const ThingTemplate *unitTemplate;
 
@@ -562,7 +572,7 @@ void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiS
 	transportTemplate = TheThingFactory->findTemplate( pInfo->m_transportUnitType );
 	if( transportTemplate )
 	{
-		transport = TheThingFactory->newObject( transportTemplate, theTeam );
+		transport = createMember(transportTemplate);
 		transport->setPosition( &origin );
 		transport->setOrientation( 0.0f );
 		if( transport )
@@ -603,7 +613,7 @@ void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiS
 			for (j=0; j<pInfo->m_unitsInfo[i].maxUnits; j++)
 			{
 				// create new object in the world
-				obj = TheThingFactory->newObject( unitTemplate, theTeam );
+				obj = createMember(unitTemplate);
 				if( obj )
 				{
 					/// @todo - have better positioning for reinforcement units.
@@ -710,7 +720,7 @@ void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiS
 				if (!contain->isValidContainerFor(obj, true))
 				{
 					// full, try building another.
-					transport = TheThingFactory->newObject( transportTemplate, theTeam );
+					transport = createMember(transportTemplate);
 					transport->setPosition( &pos );
 					transportCount++;
 					transport->setOrientation(0.0f);
@@ -723,7 +733,7 @@ void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiS
 				//do so now.
 				if( putInContainerTemplate )
 				{
-					Object* container = TheThingFactory->newObject( putInContainerTemplate, theTeam );
+					Object* container = createMember(putInContainerTemplate);
 					container->setPosition( &pos );
 
 					//Make sure this is valid.
@@ -747,15 +757,11 @@ void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiS
 
 	if (theTeam)
 	{
-		if (RetailFileLayers::enabled())
+		for (ObjectID id : newObstacles)
 		{
-			for (DLINK_ITERATOR<Object> iter = theTeam->iterate_TeamMemberList(); !iter.done(); iter.advance())
-			{
-				Object* member = iter.cur();
-				if (member && !member->getContainedBy() &&
-					(member->isKindOf(KINDOF_STRUCTURE) || member->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
-					TheAI->pathfinder()->addObjectToPathfindMap(member);
-			}
+			Object* member = TheGameLogic->findObjectByID(id);
+			if (member && !member->isDestroyed() && !member->isEffectivelyDead() && !member->getContainedBy())
+				TheAI->pathfinder()->addObjectToPathfindMap(member);
 		}
 		if (transport)
 		{
