@@ -48,6 +48,7 @@
 #include "dx8fvf.h"
 #include "dx8caps.h"
 #include "dx8rendererdebugger.h"
+#include "Common/RetailFileLayers.h"
 #include "WWDebug/wwdebug.h"
 #include "WWDebug/wwprofile.h"
 #include "WWDebug/wwmemlog.h"
@@ -1777,6 +1778,8 @@ void DX8TextureCategoryClass::Render()
 
 	SNAPSHOT_SAY(("Set_Shader(%x)",Get_Shader().Get_Bits()));
 	ShaderClass theShader = Get_Shader();
+	const bool retailAdditiveMaterial = theShader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE &&
+		theShader.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_ONE && RetailFileLayers::enabled();
 
 	//Setup an alpha blend version of this shader just in case it's needed. -MW
 	ShaderClass theAlphaShader = theShader;
@@ -1950,7 +1953,9 @@ void DX8TextureCategoryClass::Render()
 
 		const float animationOpacity = mesh->Get_Animation_Opacity();
 		const bool particle = mesh->Get_Particle_Tint() != 0;
-		if (!particle && animationOpacity == 1.0f && mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled()) {
+		const bool retailAdditiveFade = retailAdditiveMaterial && mesh->Is_Additive() && mesh->Get_Alpha_Override() != 1.0f;
+		if (!particle && !retailAdditiveFade && animationOpacity == 1.0f &&
+			mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled()) {
 			renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
 		} else {
 			//non-transparent mesh that will be rendered immediately.  Okay to adjust the shader/material
@@ -1976,7 +1981,7 @@ void DX8TextureCategoryClass::Render()
 				else
 					oldMapper=nullptr;
 
-				if (particle || animationOpacity != 1.0f)
+				if (particle || animationOpacity != 1.0f || retailAdditiveFade)
 				{
 					ShaderClass shader = mesh->Is_Additive() ? theShader : theAlphaShader;
 					if (particle && Peek_Texture(0))

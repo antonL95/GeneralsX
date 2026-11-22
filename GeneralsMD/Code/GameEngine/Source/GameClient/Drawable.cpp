@@ -1126,6 +1126,8 @@ void Drawable::inheritRetailOclFadeIn(const Drawable& parent)
 
 Real Drawable::getRetailOclFadeOpacity() const
 {
+	if (!m_oclFadeIn && !m_oclFadeOut)
+		return 1.0f;
 	const UnsignedInt elapsed = TheGameLogic->getFrame() - m_oclFadeStartFrame;
 	const Real progress = elapsed >= m_oclFadeFrames ? 1.0f : static_cast<Real>(elapsed) / m_oclFadeFrames;
 	return m_oclFadeOut ? 1.0f - progress : progress;

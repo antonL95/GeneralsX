@@ -548,6 +548,7 @@ public:
 		const Real opacity = m_explicitOpacity * m_effectiveStealthOpacity;
 		return m_oclFadeIn || m_oclFadeOut ? opacity * getRetailOclFadeOpacity() : opacity;
 	}
+	Real getRetailOclFadeOpacity() const;
 	void setEffectiveOpacity( Real pulseFactor, Real explicitOpacity = -1.0f );
 
 	// this is for the add'l pass fx which operates completely independently of the stealth opacity effects. Draw() does the fading every frame.
@@ -722,7 +723,6 @@ private:
 	Real			m_timeElapsedFade;			///< for how many logic frames - incl. fractional ones - have i been fading
 	UnsignedInt		m_timeToFade;						///< how slowly am I fading
 
-	Real getRetailOclFadeOpacity() const;
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	UnsignedInt m_oclFadeStartFrame = 0;
 	UnsignedInt m_oclFadeFrames = 0;

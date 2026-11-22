@@ -82,6 +82,7 @@
 #include "WW3D2/surfaceclass.h"
 #include "WW3D2/texture.h"
 #include "WW3D2/textureloader.h"
+#include "WW3D2/vertmaterial.h"
 #include "Common/BitFlagsIO.h"
 #include "GameClient/RetailClientAudio.h"
 
@@ -4801,6 +4802,20 @@ void W3DModelDraw::traceAnimationState() const
 				subObjects += ',';
 			subObjects += subObj->Get_Name();
 			subObjects += subObj->Is_Hidden() ? ":hidden" : ":shown";
+#if !RTS_GENERALS
+			if (subObj->Class_ID() == RenderObjClass::CLASSID_MESH)
+			{
+				auto* mesh = static_cast<MeshClass*>(subObj);
+				auto* model = mesh->Peek_Model();
+				const auto* material = model->Peek_Single_Material();
+				const ShaderClass shader = model->Get_Single_Shader();
+				std::fprintf(stderr, "TEST draw-opacity frame %u id %u mesh %s effective %.6f ocl %.6f material %.6f animation %.6f sorted %d blend %d/%d\n",
+					TheGameLogic->getFrame(), static_cast<unsigned>(draw->getID()), mesh->Get_Name(),
+					draw->getEffectiveOpacity(), draw->getRetailOclFadeOpacity(), material ? material->Get_Opacity() : 1.0f,
+					mesh->Get_Animation_Opacity(), model->Get_Flag(MeshGeometryClass::SORT),
+					static_cast<int>(shader.Get_Src_Blend_Func()), static_cast<int>(shader.Get_Dst_Blend_Func()));
+			}
+#endif
 			subObj->Release_Ref();
 		}
 	}

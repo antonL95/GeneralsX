@@ -1,0 +1,15 @@
+20 create Player_1 GondorAragorn 0 3000,690,0
+21 reveal Player_1 GondorAragorn 0
+22 objupgrade Player_1 GondorAragorn 0 Upgrade_ObjectLevel9
+41 oathbreaker-cast Player_1 GondorAragorn 0 Command_SpawnOathbreakers 3100 690 0
+45 particle-systems - - 0 OathBreakerSmokeGlow
+55 create Player_1 GondorElessar 0 3090,850,0
+56 objupgrade Player_1 GondorElessar 0 Upgrade_ObjectLevel10
+60 power Player_1 GondorElessar 0 SpecialAbilityPersonalFlood
+60 aim Player_1 GondorElessar 0 130,0
+102 ocl-fade-trace Player_1 RohanOathbreakerHordeSmall 0
+115 ocl-fade-trace Player_1 RohanOathbreakerHordeSmall 0
+115 particle-systems - - 0 SpookyOathBreakerSmokeGlow
+130 ocl-fade-trace Player_1 RohanOathbreakerHordeSmall 0
+205 create Player_1 FloodOathbreaker 0 3310,850,0
+220 pkg50-kill Player_1 FloodOathbreaker 0
