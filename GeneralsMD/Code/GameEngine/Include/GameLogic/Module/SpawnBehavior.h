@@ -65,6 +65,7 @@ public:
 	UnsignedInt m_fadeInTime = 0;
 	Bool m_spawnInsideBuilding = TRUE;
 	Bool m_shareUpgrades = FALSE;
+	Bool m_killSpawnsBasedOnModelConditionState = FALSE;
 
 	SpawnBehaviorModuleData()
 	{
@@ -99,6 +100,7 @@ public:
 			{ "FadeInTime", INI::parseDurationUnsignedInt, nullptr, offsetof( SpawnBehaviorModuleData, m_fadeInTime ) },
 			{ "SpawnInsideBuilding", INI::parseBool, nullptr, offsetof( SpawnBehaviorModuleData, m_spawnInsideBuilding ) },
 			{ "ShareUpgrades", INI::parseBool, nullptr, offsetof( SpawnBehaviorModuleData, m_shareUpgrades ) },
+			{ "KillSpawnsBasedOnModelConditionState", INI::parseBool, nullptr, offsetof( SpawnBehaviorModuleData, m_killSpawnsBasedOnModelConditionState ) },
 			{ "SlavesHaveFreeWill",				INI::parseBool,										nullptr, offsetof( SpawnBehaviorModuleData, m_slavesHaveFreeWill ) },
 			{ nullptr, nullptr, nullptr, 0 }
 

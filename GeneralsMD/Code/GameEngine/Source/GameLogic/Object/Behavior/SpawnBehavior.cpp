@@ -206,6 +206,25 @@ UpdateSleepTime SpawnBehavior::update()
 	}
 
 	const SpawnBehaviorModuleData* md = getSpawnBehaviorModuleData();
+	if (RetailFileLayers::enabled() && md->m_shareUpgrades && !m_spawnIDs.empty())
+	{
+		Object* parent = getObject();
+		const UpgradeMaskType parentMask = parent->getObjectCompletedUpgradeMask();
+		if (parentMask.any())
+		{
+			for (objectIDListIterator it = m_spawnIDs.begin(); it != m_spawnIDs.end(); ++it)
+			{
+				Object* spawn = TheGameLogic->findObjectByID(*it);
+				if (!spawn || spawn->getObjectCompletedUpgradeMask().testForAll(parentMask))
+					continue;
+				for (const UpgradeTemplate* upgrade = TheUpgradeCenter->firstUpgradeTemplate(); upgrade; upgrade = upgrade->friend_getNext())
+				{
+					if (upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && parent->hasUpgrade(upgrade) && !spawn->hasUpgrade(upgrade))
+						spawn->giveUpgrade(upgrade);
+				}
+			}
+		}
+	}
 	if ( ! m_initialBurstTimesInited )
 	{
 		m_initialBurstTimesInited = TRUE;
@@ -265,7 +284,9 @@ UpdateSleepTime SpawnBehavior::update()
 		}
 
 		if( md->m_isOneShotData  &&  (m_oneShotCountdown <= 0) )
-			stopSpawning(); //I only trigger one batch.  ie on Creation.
+			stopSpawning();
+		if (RetailFileLayers::enabled() && md->m_killSpawnsBasedOnModelConditionState)
+			stopSpawning();
 	}
 	return UPDATE_SLEEP_NONE;
 }
