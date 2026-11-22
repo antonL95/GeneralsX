@@ -249,9 +249,14 @@ Bool matchesArmyType(const ThingTemplate& actual, const ThingTemplate& planned)
 	return actual.isEquivalentTo(&planned) || names(actual, planned.getName()) || names(planned, actual.getName());
 }
 
+Bool isRetailFortressKeep(const ThingTemplate& type)
+{
+	return type.isKindOf(KINDOF_COMMANDCENTER) && type.isKindOf(KINDOF_CASTLE_KEEP);
+}
+
 Bool isRetailFortress(const ThingTemplate& type)
 {
-	if (type.isKindOf(KINDOF_CASTLE_KEEP))
+	if (isRetailFortressKeep(type))
 		return TRUE;
 	if (!type.isKindOf(KINDOF_BASE_SITE))
 		return FALSE;
@@ -1392,7 +1397,7 @@ void AISkirmishPlayer::updateRetail()
 			++farms;
 		else
 		{
-			fortressPresent = fortressPresent || object->isKindOf(KINDOF_CASTLE_KEEP) ||
+			fortressPresent = fortressPresent || isRetailFortressKeep(*object->getTemplate()) ||
 				(object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && isRetailFortress(*object->getTemplate()));
 			if (object->isKindOf(KINDOF_STRUCTURE) && !isScavengedBuilding(*object->getTemplate()))
 				m_retailBuiltStructures.insert(object->getTemplate()->getName());
@@ -1526,7 +1531,7 @@ void AISkirmishPlayer::updateRetail()
 		const Bool replaceFortress = !fortressPresent && std::any_of(m_retailBuiltStructures.begin(),
 			m_retailBuiltStructures.end(), [](const AsciiString& name) {
 				const ThingTemplate* type = TheThingFactory->findTemplate(name, FALSE);
-				return type && type->isKindOf(KINDOF_CASTLE_KEEP);
+				return type && isRetailFortressKeep(*type);
 			});
 		Int maximumCommandPoints = 0;
 		const Int commandPoints = m_player->getCommandPointsTotal(&maximumCommandPoints);

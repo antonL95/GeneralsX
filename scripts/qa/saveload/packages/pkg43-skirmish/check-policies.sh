@@ -62,9 +62,9 @@ INI
             fi
             printf 'End\n'
             ;;
-        fort-control-fixed|fort-priority-fixed)
+        fort-control-sited|fort-priority-sited)
             printf '\nArmyDefinition MordorArmy\n EconomyBuilderMinTimeBetweenFarms_Rush = 0\n'
-            if [ "$label" = fort-priority-fixed ]; then
+            if [ "$label" = fort-priority-sited ]; then
                 printf ' FortressRebuildPriority = 100\n'
             fi
             printf 'End\n'
@@ -74,8 +74,8 @@ INI
         no-lumber) printf '600 quit - - 0\n';;
         rebuild-control|no-rebuild) printf '80 kill Player_2 MordorOrcPit 0\n600 quit - - 0\n';;
         rate-control|rate-drop) printf '932 cash Player_2 - 0 6000\n1600 quit - - 0\n';;
-        fort-control-fixed|fort-priority-fixed)
-            printf '25 create Player_2 MordorFighterHorde 0 3100,3010,0\n190 cash Player_2 - 0 12000\n210 kill Player_2 MordorFortressCitadel 0\n650 quit - - 0\n';;
+        fort-control-sited|fort-priority-sited)
+            printf '25 create Player_2 MordorFighterHorde 0 3100,3010,0\n190 cash Player_2 - 0 12000\n210 kill Player_2 MordorFortressCitadel 0\n300 create Player_2 MordorPorter 0 2600,3100,0\n700 logall - - 0\n760 quit - - 0\n';;
         *) printf '820 heroes Player_2 - 0\n1000 heroes Player_2 - 0\n1120 heroes Player_2 - 0\n1180 quit - - 0\n';;
     esac >"$GENERALSX_TEST_COMMANDS"
     cd /game-install/rotwk
@@ -84,7 +84,7 @@ INI
 )
 
 if [ "$#" -eq 1 ]; then
-    for label in default nofarm interval budget-control save-rush save-mid save-end no-lumber rebuild-control no-rebuild rate-control rate-drop fort-control-fixed fort-priority-fixed; do
+    for label in default nofarm interval budget-control save-rush save-mid save-end no-lumber rebuild-control no-rebuild rate-control rate-drop fort-control-sited fort-priority-sited; do
         probe "$label"
     done
 fi
@@ -120,10 +120,10 @@ expect_build rebuild-control 124 MordorOrcPit
 expect_build no-rebuild 124 MordorHaradrimPalace
 expect_build rate-control 1204 MordorSlaughterHouse_ForAI
 expect_build rate-drop 1204 MordorHaradrimPalace
-expect_build fort-control-fixed 184 MordorSlaughterHouse_ForAI
-expect_build fort-priority-fixed 184 MordorSlaughterHouse_ForAI
-expect_build fort-control-fixed 544 MordorLumberMill_ForAI
-expect_build fort-priority-fixed 544 MordorSlaughterHouse_ForAI
+expect_build fort-control-sited 184 MordorSlaughterHouse_ForAI
+expect_build fort-priority-sited 184 MordorSlaughterHouse_ForAI
+expect_build fort-control-sited 304 MordorFortress
+expect_build fort-priority-sited 304 MordorSlaughterHouse_ForAI
 
 expect budget-control "$(printf 'AI_PHASE\t844\t4\t1\t318\t13\t3')"
 expect save-rush 'TEST heroes 820 Player_2 money=33 '
