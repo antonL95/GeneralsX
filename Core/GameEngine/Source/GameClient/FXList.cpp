@@ -934,6 +934,15 @@ void FXList::clear()
 }
 
 //-------------------------------------------------------------------------------------------------
+void FXList::doFXFromDrawable(const FXList* fx, const Drawable& drawable)
+{
+	const ScopedVisualRandom random(RetailFileLayers::enabled());
+	if (const Object* object = drawable.getObject())
+		doFXObj(fx, object);
+	else
+		doFXPos(fx, drawable.getPosition());
+}
+
 void FXList::doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
 	const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const
 {

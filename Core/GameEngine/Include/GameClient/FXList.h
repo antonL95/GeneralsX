@@ -41,6 +41,7 @@ class FXListStore;
 class INI;
 class Object;
 class Matrix3D;
+class Drawable;
 
 //-------------------------------------------------------------------------------------------------
 /**
@@ -160,6 +161,7 @@ public:
 
 	}
 
+	static void doFXFromDrawable(const FXList* fx, const Drawable& drawable);
 
 
 protected:

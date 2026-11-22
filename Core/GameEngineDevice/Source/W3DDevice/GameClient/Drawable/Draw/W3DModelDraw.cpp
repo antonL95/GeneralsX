@@ -3747,13 +3747,7 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 	m_enteredAnimationState = newState->m_animationState;
 
 	if (newState->m_enteringStateFX != nullptr && !(TheGameState && TheGameState->isInLoadGame()))
-	{
-		const Drawable* drawable = getDrawable();
-		if (drawable->getObject() != nullptr)
-			FXList::doFXObj(newState->m_enteringStateFX, drawable->getObject());
-		else
-			FXList::doFXPos(newState->m_enteringStateFX, drawable->getPosition());
-	}
+		FXList::doFXFromDrawable(newState->m_enteringStateFX, *getDrawable());
 }
 
 //-------------------------------------------------------------------------------------------------

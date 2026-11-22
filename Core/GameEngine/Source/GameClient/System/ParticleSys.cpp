@@ -2209,13 +2209,21 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 					ParticlePriorityType priority = getPriority();
 
 					// emit a burst of particles
-					Int count = REAL_TO_INT(m_burstCount.getValue());
-
-					count *= m_countCoeff;
-
+					const Real burstCount = m_burstCount.getValue();
 					const Bool gpu = m_template && m_template->usesGpuDraw();
+					Int count;
 					if (gpu)
-						count = std::min(count, static_cast<Int>(maxGpuParticles - TheParticleSystemManager->getGpuParticleCount()));
+					{
+						const Real scaledCount = burstCount * m_countCoeff;
+						const auto remaining = maxGpuParticles - TheParticleSystemManager->getGpuParticleCount();
+						count = std::isfinite(scaledCount) && scaledCount > 0.0f
+							? static_cast<Int>(std::min(scaledCount, static_cast<Real>(remaining))) : 0;
+					}
+					else
+					{
+						count = REAL_TO_INT(burstCount);
+						count *= m_countCoeff;
+					}
 					for( Int i=0; i<count; i++ )
 					{
 						if (gpu && TheParticleSystemManager->getGpuParticleCount() >= maxGpuParticles)
