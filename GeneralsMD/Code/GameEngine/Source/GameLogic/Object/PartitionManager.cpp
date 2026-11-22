@@ -56,6 +56,7 @@
 #include "Common/GameEngine.h"
 #include "Common/GameState.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/ShroudGeometry.h"
 #include "Common/GameUtility.h"
 #include "Common/MessageStream.h"
 #include "Common/NameKeyGenerator.h"
@@ -4128,7 +4129,11 @@ void PartitionManager::processPendingUndoShroudRevealQueue( Bool considerTimesta
 	{
 		SightingInfo *thisInfo = m_pendingUndoShroudReveals.front();
 
-		undoShroudReveal( thisInfo->m_where.x, thisInfo->m_where.y, thisInfo->m_howFar, thisInfo->m_forWhom );
+		if (thisInfo->m_sideRange >= 0.0f)
+			undoShroudRevealDirectional( thisInfo->m_where.x, thisInfo->m_where.y, thisInfo->m_howFar,
+				thisInfo->m_sideRange, thisInfo->m_rearRange, thisInfo->m_orientation, thisInfo->m_forWhom );
+		else
+			undoShroudReveal( thisInfo->m_where.x, thisInfo->m_where.y, thisInfo->m_howFar, thisInfo->m_forWhom );
 
 		deleteInstance(thisInfo);
 		m_pendingUndoShroudReveals.pop();
@@ -4190,6 +4195,116 @@ void PartitionManager::queueUndoShroudReveal(Real centerX, Real centerY, Real ra
 	newInfo->m_forWhom = playerMask;
 	newInfo->m_data = now + TheGlobalData->m_unlookPersistDuration;
 
+	m_pendingUndoShroudReveals.push(newInfo);
+}
+
+void PartitionManager::doShroudRevealDirectional(
+	Real centerX,
+	Real centerY,
+	Real frontRange,
+	Real sideRange,
+	Real rearRange,
+	Real orientation,
+	PlayerMaskType playerMask)
+{
+	Int cellCenterX, cellCenterY;
+	worldToCell(centerX, centerY, &cellCenterX, &cellCenterY);
+	const Real maxRange = MAX(frontRange, MAX(sideRange, rearRange));
+	Int cellRadius = worldToCellDist(maxRange);
+	if (cellRadius < 1)
+		cellRadius = 1;
+	const Real cosAngle = WWMath::Cos(orientation);
+	const Real sinAngle = WWMath::Sin(orientation);
+	const Int minY = MAX(0, cellCenterY - cellRadius);
+	const Int maxY = MIN(m_cellCountY - 1, cellCenterY + cellRadius);
+	const Int minX = MAX(0, cellCenterX - cellRadius);
+	const Int maxX = MIN(m_cellCountX - 1, cellCenterX + cellRadius);
+	for (Int y = minY; y <= maxY; ++y)
+	{
+		const Real wy = m_worldExtents.lo.y + (static_cast<Real>(y) + 0.5f) * m_cellSize;
+		const Real dy = wy - centerY;
+		for (Int x = minX; x <= maxX; ++x)
+		{
+			const Real wx = m_worldExtents.lo.x + (static_cast<Real>(x) + 0.5f) * m_cellSize;
+			const Real dx = wx - centerX;
+			if ((x == cellCenterX && y == cellCenterY) ||
+				ShroudGeometry::isPointInDirectionalShroud(dx, dy, cosAngle, sinAngle, frontRange, sideRange, rearRange))
+			{
+				PartitionCell* cell = &m_cells[y * m_cellCountX + x];
+				for (Int currentIndex = ThePlayerList->getPlayerCount() - 1; currentIndex >= 0; --currentIndex)
+				{
+					const Player* currentPlayer = ThePlayerList->getNthPlayer(currentIndex);
+					if (BitIsSet(playerMask, currentPlayer->getPlayerMask()))
+						cell->addLooker(currentIndex);
+				}
+			}
+		}
+	}
+}
+
+void PartitionManager::undoShroudRevealDirectional(
+	Real centerX,
+	Real centerY,
+	Real frontRange,
+	Real sideRange,
+	Real rearRange,
+	Real orientation,
+	PlayerMaskType playerMask)
+{
+	Int cellCenterX, cellCenterY;
+	worldToCell(centerX, centerY, &cellCenterX, &cellCenterY);
+	const Real maxRange = MAX(frontRange, MAX(sideRange, rearRange));
+	Int cellRadius = worldToCellDist(maxRange);
+	if (cellRadius < 1)
+		cellRadius = 1;
+	const Real cosAngle = WWMath::Cos(orientation);
+	const Real sinAngle = WWMath::Sin(orientation);
+	const Int minY = MAX(0, cellCenterY - cellRadius);
+	const Int maxY = MIN(m_cellCountY - 1, cellCenterY + cellRadius);
+	const Int minX = MAX(0, cellCenterX - cellRadius);
+	const Int maxX = MIN(m_cellCountX - 1, cellCenterX + cellRadius);
+	for (Int y = minY; y <= maxY; ++y)
+	{
+		const Real wy = m_worldExtents.lo.y + (static_cast<Real>(y) + 0.5f) * m_cellSize;
+		const Real dy = wy - centerY;
+		for (Int x = minX; x <= maxX; ++x)
+		{
+			const Real wx = m_worldExtents.lo.x + (static_cast<Real>(x) + 0.5f) * m_cellSize;
+			const Real dx = wx - centerX;
+			if ((x == cellCenterX && y == cellCenterY) ||
+				ShroudGeometry::isPointInDirectionalShroud(dx, dy, cosAngle, sinAngle, frontRange, sideRange, rearRange))
+			{
+				PartitionCell* cell = &m_cells[y * m_cellCountX + x];
+				for (Int currentIndex = ThePlayerList->getPlayerCount() - 1; currentIndex >= 0; --currentIndex)
+				{
+					const Player* currentPlayer = ThePlayerList->getNthPlayer(currentIndex);
+					if (BitIsSet(playerMask, currentPlayer->getPlayerMask()))
+						cell->removeLooker(currentIndex);
+				}
+			}
+		}
+	}
+}
+
+void PartitionManager::queueUndoShroudRevealDirectional(
+	Real centerX,
+	Real centerY,
+	Real frontRange,
+	Real sideRange,
+	Real rearRange,
+	Real orientation,
+	PlayerMaskType playerMask)
+{
+	UnsignedInt now = TheGameLogic->getFrame();
+	SightingInfo* newInfo = newInstance(SightingInfo);
+	newInfo->m_where.x = centerX;
+	newInfo->m_where.y = centerY;
+	newInfo->m_howFar = frontRange;
+	newInfo->m_sideRange = sideRange;
+	newInfo->m_rearRange = rearRange;
+	newInfo->m_orientation = orientation;
+	newInfo->m_forWhom = playerMask;
+	newInfo->m_data = now + TheGlobalData->m_unlookPersistDuration;
 	m_pendingUndoShroudReveals.push(newInfo);
 }
 
@@ -5963,50 +6078,54 @@ void SightingInfo::reset()
 {
 	m_where.zero();
 	m_howFar = 0.0f;
+	m_sideRange = -1.0f;
+	m_rearRange = -1.0f;
+	m_orientation = 0.0f;
 	m_forWhom = 0;
 	m_data = 0;
 }
 
-// ------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------
 Bool SightingInfo::isInvalid() const
 {
 	return m_howFar == 0.0f;
 }
 
-// ------------------------------------------------------------------------------------------------
-/** CRC */
-// ------------------------------------------------------------------------------------------------
 void SightingInfo::crc( Xfer *xfer )
 {
-
+	if (RetailFileLayers::enabled() && m_sideRange >= 0.0f)
+	{
+		xfer->xferReal(&m_sideRange);
+		xfer->xferReal(&m_rearRange);
+		xfer->xferReal(&m_orientation);
+	}
 }
 
-// ------------------------------------------------------------------------------------------------
-/** Xfer Method
-	* Version Info:
-	* 1: Initial version */
-// ------------------------------------------------------------------------------------------------
 void SightingInfo::xfer( Xfer *xfer )
 {
-
-	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
-	// where
 	xfer->xferCoord3D( &m_where );
 
-	// how far
 	xfer->xferReal( &m_howFar );
 
-	// for whom
 	xfer->xferUser( &m_forWhom, sizeof( PlayerMaskType ) );
 
-	// how much
 	xfer->xferUnsignedInt( &m_data );
 
+	if (version >= 2)
+	{
+		xfer->xferReal(&m_sideRange);
+		xfer->xferReal(&m_rearRange);
+		xfer->xferReal(&m_orientation);
+	}
+	else
+	{
+		m_sideRange = -1.0f;
+		m_rearRange = -1.0f;
+		m_orientation = 0.0f;
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

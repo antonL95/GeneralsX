@@ -250,9 +250,12 @@ public:
 
 	Coord3D					m_where;
 	Real						m_howFar;
-	PlayerMaskType	m_forWhom;	// ask not for whom the sighting is masked; it masks for thee
+	Real						m_sideRange;
+	Real						m_rearRange;
+	Real						m_orientation;
+	PlayerMaskType	m_forWhom;
 
-	UnsignedInt			m_data;			// Threat and value use as the value.  Sighting uses it for a Timestamp
+	UnsignedInt			m_data;
 
 protected:
 
@@ -1314,6 +1317,9 @@ public:
 	void doShroudReveal( Real centerX, Real centerY, Real radius, PlayerMaskType playerMask);
 	void undoShroudReveal( Real centerX, Real centerY, Real radius, PlayerMaskType playerMask);
 	void queueUndoShroudReveal( Real centerX, Real centerY, Real radius, PlayerMaskType playerMask );
+	void doShroudRevealDirectional( Real centerX, Real centerY, Real frontRange, Real sideRange, Real rearRange, Real orientation, PlayerMaskType playerMask );
+	void undoShroudRevealDirectional( Real centerX, Real centerY, Real frontRange, Real sideRange, Real rearRange, Real orientation, PlayerMaskType playerMask );
+	void queueUndoShroudRevealDirectional( Real centerX, Real centerY, Real frontRange, Real sideRange, Real rearRange, Real orientation, PlayerMaskType playerMask );
 
 	void doShroudCover( Real centerX, Real centerY, Real radius, PlayerMaskType playerMask);
 	void undoShroudCover( Real centerX, Real centerY, Real radius, PlayerMaskType playerMask);

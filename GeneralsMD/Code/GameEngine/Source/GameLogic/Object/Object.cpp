@@ -35,6 +35,8 @@
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/RetailSkirmishProbe.h"
+#include "GameLogic/ShroudGeometry.h"
+#include "WWMath/wwmath.h"
 #include <cmath>	// For isnan() on Linux
 #define DEFINE_WEAPONCONDITIONMAP
 #include "Common/BitFlagsIO.h"
@@ -296,6 +298,11 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	m_partitionLastShroud(nullptr),
 	m_partitionLastThreat(nullptr),
 	m_partitionLastValue(nullptr),
+	m_averageLocalGroundHeight(0.0f),
+	m_averageGroundSampleX(0),
+	m_averageGroundSampleY(0),
+	m_averageGroundSampleLayer(0),
+	m_averageGroundHeightValid(FALSE),
 	m_smcUntil(NEVER),
 	m_invulnerableUntil(NEVER),
 	m_privateStatus(0),
@@ -2115,6 +2122,16 @@ void Object::reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPo
 
 		if (getContain())
 			getContain()->containReactToTransformChange();
+	}
+
+	if (RetailFileLayers::enabled() && angDiff && m_partitionLastLook &&
+		!m_partitionLastLook->isInvalid() && m_partitionLastLook->m_sideRange >= 0.0f)
+	{
+		Real angleDelta = getOrientation() - m_partitionLastLook->m_orientation;
+		if (angleDelta < 0.0f)
+			angleDelta = -angleDelta;
+		if (angleDelta > 0.05f)
+			handleShroud();
 	}
 
 	if (posDiff)
@@ -5733,11 +5750,55 @@ void Object::look()
 				}
 
 				Coord3D pos = *getPosition();
-				ThePartitionManager->doShroudReveal( pos.x, pos.y, shroudClearingRange, lookingMask );
+				Real sideRange = -1.0f;
+				Real rearRange = -1.0f;
+				Real orientation = getOrientation();
+				if (RetailFileLayers::enabled())
+				{
+					const auto& rotwk = getTemplate()->getRotWKObjectData();
+					Real sideMult = rotwk.visionSide;
+					Real rearMult = rotwk.visionRear;
+					if (const HordeContain* horde = HordeContain::get(this))
+					{
+						const HordeContainModuleData* formation = horde->getActiveFormation();
+						if (formation)
+						{
+							if (formation->m_visionSideOverride >= 0.0f)
+								sideMult = formation->m_visionSideOverride;
+							if (formation->m_visionRearOverride >= 0.0f)
+								rearMult = formation->m_visionRearOverride;
+						}
+					}
+					const Real candidateSide = shroudClearingRange * sideMult;
+					const Real candidateRear = shroudClearingRange * rearMult;
+					if (ShroudGeometry::isDirectionalShroud(shroudClearingRange, candidateSide, candidateRear))
+					{
+						sideRange = candidateSide;
+						rearRange = candidateRear;
+					}
+				}
+				if (sideRange >= 0.0f)
+				{
+					ThePartitionManager->doShroudRevealDirectional(
+						pos.x,
+						pos.y,
+						shroudClearingRange,
+						sideRange,
+						rearRange,
+						orientation,
+						lookingMask);
+				}
+				else
+				{
+					ThePartitionManager->doShroudReveal( pos.x, pos.y, shroudClearingRange, lookingMask );
+				}
 
 				m_partitionLastLook->m_where = pos;
 				m_partitionLastLook->m_forWhom = lookingMask;
-				m_partitionLastLook->m_howFar = getShroudClearingRange();
+				m_partitionLastLook->m_howFar = shroudClearingRange;
+				m_partitionLastLook->m_sideRange = sideRange;
+				m_partitionLastLook->m_rearRange = rearRange;
+				m_partitionLastLook->m_orientation = orientation;
 
 	//			DEBUG_LOG(( "A %s looks at %f, %f for %x at range %f",
 	//									getTemplate()->getName().str(),
@@ -5783,11 +5844,25 @@ void Object::unlook()
 		return;
 	}
 
-	ThePartitionManager->queueUndoShroudReveal(m_partitionLastLook->m_where.x,
+	if (m_partitionLastLook->m_sideRange >= 0.0f)
+	{
+		ThePartitionManager->queueUndoShroudRevealDirectional(
+			m_partitionLastLook->m_where.x,
+			m_partitionLastLook->m_where.y,
+			m_partitionLastLook->m_howFar,
+			m_partitionLastLook->m_sideRange,
+			m_partitionLastLook->m_rearRange,
+			m_partitionLastLook->m_orientation,
+			m_partitionLastLook->m_forWhom);
+	}
+	else
+	{
+		ThePartitionManager->queueUndoShroudReveal(m_partitionLastLook->m_where.x,
 																				m_partitionLastLook->m_where.y,
 																				m_partitionLastLook->m_howFar,
 																				m_partitionLastLook->m_forWhom
 																				);
+	}
 
 //			DEBUG_LOG(( "A %s queues an unlook at %f, %f for %x at range %f",
 //									getTemplate()->getName().str(),
@@ -5868,6 +5943,51 @@ void Object::unshroud()
 }
 
 //-------------------------------------------------------------------------------------------------
+Real Object::getAverageLocalGroundHeight() const
+{
+	const Coord3D* pos = getPosition();
+	if (!TheTerrainLogic)
+		return pos->z;
+	const ThingTemplate* tmpl = getTemplate();
+	if (!tmpl)
+		return pos->z;
+	const auto& rotwk = tmpl->getRotWKObjectData();
+	const Int sampleX = static_cast<Int>(pos->x);
+	const Int sampleY = static_cast<Int>(pos->y);
+	const Int sampleLayer = static_cast<Int>(getLayer());
+	if (m_averageGroundHeightValid &&
+		m_averageGroundSampleX == sampleX &&
+		m_averageGroundSampleY == sampleY &&
+		m_averageGroundSampleLayer == sampleLayer)
+	{
+		return m_averageLocalGroundHeight;
+	}
+	const Int segments = rotwk.visionBonusTestSegments > 0 ? rotwk.visionBonusTestSegments : 8;
+	const Real radius = rotwk.visionBonusTestRadius;
+	if (radius <= 0.0f)
+	{
+		m_averageLocalGroundHeight = TheTerrainLogic->getLayerHeight(pos->x, pos->y, getLayer());
+	}
+	else
+	{
+		Real sum = 0.0f;
+		const Real step = (2.0f * PI) / static_cast<Real>(segments);
+		for (Int i = 0; i < segments; ++i)
+		{
+			const Real angle = step * static_cast<Real>(i);
+			const Real sx = pos->x + WWMath::Cos(angle) * radius;
+			const Real sy = pos->y + WWMath::Sin(angle) * radius;
+			sum += TheTerrainLogic->getLayerHeight(sx, sy, getLayer());
+		}
+		m_averageLocalGroundHeight = sum / static_cast<Real>(segments);
+	}
+	m_averageGroundSampleX = sampleX;
+	m_averageGroundSampleY = sampleY;
+	m_averageGroundSampleLayer = sampleLayer;
+	m_averageGroundHeightValid = TRUE;
+	return m_averageLocalGroundHeight;
+}
+
 Real Object::getVisionRange() const
 {
 #if defined(RTS_DEBUG)
@@ -5885,9 +6005,24 @@ Real Object::getVisionRange() const
 		}
 	}
 #endif
+	Real visionRange = m_visionRange;
 	if (m_attributeModifierHelper)
-		return m_visionRange * AttributeModifiers::visionFactor(this);
-	return m_visionRange;
+		visionRange *= AttributeModifiers::visionFactor(this);
+	if (RetailFileLayers::enabled())
+	{
+		const auto& rotwk = getTemplate()->getRotWKObjectData();
+		if (rotwk.visionBonusPercentPerFoot > 0.0f)
+		{
+			visionRange = ShroudGeometry::applyVisionElevationBonus(
+				visionRange,
+				getPosition()->z,
+				getAverageLocalGroundHeight(),
+				rotwk.visionBonusPercentPerFoot,
+				rotwk.minVisionBonusPercent,
+				rotwk.maxVisionBonusPercent);
+		}
+	}
+	return visionRange;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -5907,9 +6042,26 @@ Real Object::getShroudClearingRange() const
 		//on the geometry extents so the structure can only see itself.
 		shroudClearingRange = getGeometryInfo().getBoundingCircleRadius();
 	}
-	else if (m_attributeModifierHelper)
+	else
 	{
-		shroudClearingRange *= AttributeModifiers::shroudFactor(this);
+		if (m_attributeModifierHelper)
+		{
+			shroudClearingRange *= AttributeModifiers::shroudFactor(this);
+		}
+		if (RetailFileLayers::enabled())
+		{
+			const auto& rotwk = getTemplate()->getRotWKObjectData();
+			if (rotwk.visionBonusPercentPerFoot > 0.0f)
+			{
+				shroudClearingRange = ShroudGeometry::applyVisionElevationBonus(
+					shroudClearingRange,
+					getPosition()->z,
+					getAverageLocalGroundHeight(),
+					rotwk.visionBonusPercentPerFoot,
+					rotwk.minVisionBonusPercent,
+					rotwk.maxVisionBonusPercent);
+			}
+		}
 	}
 
 #if defined(RTS_DEBUG)

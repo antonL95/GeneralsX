@@ -411,6 +411,7 @@ public:
 	Real getShroudRange() const;				///< How far can you shroud?  Even more dynamic since it'll start at zero for everyone.
 	void setShroudRange( Real newShroudRange );	///< Access to setting someone's shrouding distance
 	Real getShroudClearingRange() const;				///< How far do you clear shroud?
+	Real getAverageLocalGroundHeight() const;
 	void setShroudClearingRange( Real newShroudClearingRange );	///< Access to setting someone's clear shroud distance
 
 
@@ -703,6 +704,11 @@ private:
 	Real					m_visionRange;										///< looking range
 	Real					m_shroudClearingRange;						///< looking range for shroud ONLY
 	Real					m_shroudRange;										///< like looking range, this is how far I shroud others' looks
+	mutable Real			m_averageLocalGroundHeight;
+	mutable Int				m_averageGroundSampleX;
+	mutable Int				m_averageGroundSampleY;
+	mutable Int				m_averageGroundSampleLayer;
+	mutable Bool			m_averageGroundHeightValid;
 
 	DisabledMaskType	m_disabledMask;
 	UnsignedInt				m_disabledTillFrame[ DISABLED_COUNT ];
