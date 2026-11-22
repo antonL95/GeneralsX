@@ -2339,6 +2339,18 @@ Path *Pathfinder::getAircraftPath( const Object *obj, const Coord3D *to )
 }
 
 
+static IRegion2D currentLogicalPathfindExtent()
+{
+	Region3D extent;
+	TheTerrainLogic->getExtent(&extent);
+	IRegion2D bounds;
+	bounds.lo.x = REAL_TO_INT_FLOOR(extent.lo.x / PATHFIND_CELL_SIZE_F);
+	bounds.lo.y = REAL_TO_INT_FLOOR(extent.lo.y / PATHFIND_CELL_SIZE_F);
+	bounds.hi.x = REAL_TO_INT_FLOOR(extent.hi.x / PATHFIND_CELL_SIZE_F) - 1;
+	bounds.hi.y = REAL_TO_INT_FLOOR(extent.hi.y / PATHFIND_CELL_SIZE_F) - 1;
+	return bounds;
+}
+
 /**
  * Process some path requests in the pathfind queue.
  */
@@ -2365,17 +2377,7 @@ void Pathfinder::processPathfindQueue()
 		return;
 	}
 
-	// Get the current logical extent.
-	Region3D terrainExtent;
-	TheTerrainLogic->getExtent( &terrainExtent );
-	IRegion2D bounds;
-	bounds.lo.x = REAL_TO_INT_FLOOR(terrainExtent.lo.x / PATHFIND_CELL_SIZE_F);
-	bounds.hi.x = REAL_TO_INT_FLOOR(terrainExtent.hi.x / PATHFIND_CELL_SIZE_F);
-	bounds.lo.y = REAL_TO_INT_FLOOR(terrainExtent.lo.y / PATHFIND_CELL_SIZE_F);
-	bounds.hi.y = REAL_TO_INT_FLOOR(terrainExtent.hi.y / PATHFIND_CELL_SIZE_F);
-	bounds.hi.x--;
-	bounds.hi.y--;
-	m_logicalExtent = bounds;
+	m_logicalExtent = currentLogicalPathfindExtent();
 
 	m_cumulativeCellsAllocated = 0;	// Number of pathfind cells examined.
 	Int pathsFound = 0;
@@ -7718,7 +7720,7 @@ void Pathfinder::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 7 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -7826,6 +7828,8 @@ void Pathfinder::xfer( Xfer *xfer )
 	}
 	if (version >= 6)
 		xfer->xferIRegion2D(&m_logicalExtent);
+	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD && m_isMapReady)
+		m_logicalExtent = currentLogicalPathfindExtent();
 }
 
 //-----------------------------------------------------------------------------
