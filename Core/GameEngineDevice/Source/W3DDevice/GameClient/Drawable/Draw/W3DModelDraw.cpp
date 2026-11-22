@@ -1805,9 +1805,6 @@ W3DModelDraw::W3DModelDraw(Thing *thing, const ModuleData* moduleData) : DrawMod
 	getW3DModelDrawModuleData()->validateStuffForTimeAndWeather(getDrawable(),
 											TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT,
 											TheGlobalData->m_weather == WEATHER_SNOWY);
-	if (RetailFileLayers::enabled())
-		updateSubObjects();
-
 	ModelConditionFlags emptyFlags;
 	const ModelConditionInfo* info = findBestInfo(emptyFlags);
 	if (!info)
@@ -1847,6 +1844,8 @@ void W3DModelDraw::onDrawableBoundToObject()
 	getW3DModelDrawModuleData()->validateStuffForTimeAndWeather(getDrawable(),
 											TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT,
 											TheGlobalData->m_weather == WEATHER_SNOWY);
+	if (RetailFileLayers::enabled())
+		updateSubObjects();
 }
 
 //-------------------------------------------------------------------------------------------------
