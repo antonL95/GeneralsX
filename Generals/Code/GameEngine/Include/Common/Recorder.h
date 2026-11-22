@@ -168,7 +168,7 @@ protected:
 	void logGameStart(AsciiString options);
 	void logGameEnd();
 
-	AsciiString readAsciiString();										///< Read the next string from m_file using ascii characters.
+	Bool readAsciiString(AsciiString& value, Int limit);
 	UnicodeString readUnicodeString();								///< Read the next string from m_file using unicode characters.
 	Int readReplayWideChar();											///< Read a replay wide character using the detected on-disk width.
 	void writeReplayUnicodeString(const UnicodeString& value);

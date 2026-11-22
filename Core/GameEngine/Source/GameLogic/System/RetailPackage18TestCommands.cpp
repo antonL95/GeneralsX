@@ -6,7 +6,9 @@
 #include <string>
 #include <string_view>
 
+#include "Common/FileSystem.h"
 #include "Common/Player.h"
+#include "Common/Recorder.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameNetwork/LANAPI.h"
 #include "Common/PlayerTemplate.h"
@@ -17,6 +19,116 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
 #include "GameNetwork/GameInfo.h"
+#include "GameNetwork/LANAPICallbacks.h"
+#if defined(SAGE_USE_NGMP)
+#include "GameNetwork/GeneralsOnline/NGMPGame.h"
+#include "GameNetwork/GeneralsOnline/OnlineServices_LobbyInterface.h"
+#include "GameNetwork/GeneralsOnline/OnlineServices_Manager.h"
+#include "GameNetwork/GeneralsOnline/ngmp_curl_utils.h"
+#endif
+
+static Bool checkLanStartRoster(SkirmishGameInfo& source, const AsciiString& setup)
+{
+	if (TheLAN)
+		return FALSE;
+	class Guest : public LANAPI
+	{
+	public:
+		UnsignedInt GetLocalIP() override { return 0xFFFFFF01u; }
+	} guest;
+	TheLAN = &guest;
+	LANGameInfo lobby;
+	lobby.enterGame();
+	const GameSlot oldGuest = *source.getConstSlot(1);
+	const GameSlot oldHost = *source.getConstSlot(0);
+	GameSlot closed;
+	closed.setState(SLOT_CLOSED);
+	source.setSlot(1, closed);
+	const AsciiString missingGuest = GameInfoToAsciiString(&source);
+	source.setSlot(1, oldGuest);
+	source.setSlot(0, closed);
+	const AsciiString missingHost = GameInfoToAsciiString(&source);
+	source.setSlot(0, oldHost);
+	const Bool rejected = ParseAsciiStringToGameInfo(&lobby, setup) &&
+		!ParseGameOptionsString(&lobby, missingGuest, oldHost.getIP()) &&
+		!ParseGameOptionsString(&lobby, missingHost, oldHost.getIP()) &&
+		lobby.getLocalSlotNum() == 1 && lobby.getIP(0) == oldHost.getIP() &&
+		lobby.getConstSlot(1)->getCreateAHeroConfig() == oldGuest.getCreateAHeroConfig();
+	TheLAN = nullptr;
+	return rejected;
+}
+
+#if defined(SAGE_USE_NGMP)
+bool checkPackage18LobbyDetails(const AsciiString& selection)
+{
+	NGMP_OnlineServices_LobbyInterface lobby;
+	NGMP_OnlineServicesManager manager;
+	manager.m_pLobbyInterface = &lobby;
+	manager.m_userId = 1;
+	const std::string hero = std::string(R"JSON(,"CreateAHeroConfig":")JSON") + selection.str() + '"';
+	const std::string host = R"JSON({"Owner":1,"MapName":"Before","Members":[{"UserID":1,"SlotIndex":0,"SlotState":5})JSON";
+	const std::string oldGuest = R"JSON(,{"UserID":2,"SlotIndex":1,"SlotState":5)JSON";
+	const std::string movedGuest = R"JSON(,{"UserID":3,"SlotIndex":2,"SlotState":5}])JSON";
+	if (!manager.applyLobbyDetails(31, host + oldGuest + hero + "}]}"))
+		return false;
+	const auto& published = lobby.GetCurrentLobby();
+	if (published.owner != 1 || published.map_name != "Before" ||
+		lobby.GetRoomMemberFromIndex(1).createAHeroConfig != selection)
+		return false;
+	const std::string duplicate = host + oldGuest + hero + hero + "}]}";
+	const std::string badCount = R"JSON({"Owner":2,"MapName":"After","NumCurrentPlayers":"wrong","Members":[{"UserID":1,"SlotIndex":0,"SlotState":5}]})JSON";
+	if (manager.applyLobbyDetails(31, duplicate) || manager.applyLobbyDetails(31, badCount) ||
+		manager.applyLobbyDetails(31, std::string(64 * 1024 + 1, ' ')) ||
+		manager.m_hostUserId != 1 || published.owner != 1 || published.map_name != "Before" ||
+		lobby.GetRoomMemberFromIndex(1).createAHeroConfig != selection)
+		return false;
+	auto& globalManager = NGMP_OnlineServicesManager::getInstance();
+	auto* original = globalManager.m_pLobbyInterface;
+	globalManager.m_pLobbyInterface = &lobby;
+	NGMPGame game;
+	const bool updated = manager.applyLobbyDetails(31, host + movedGuest + "}");
+	game.UpdateSlotsFromCurrentLobby();
+	globalManager.m_pLobbyInterface = original;
+	NGMP::Internal::CurlResponse response{{}, 3};
+	char chunk[] = "1234";
+	return updated && !game.getConstSlot(1)->isOccupied() &&
+		game.getConstSlot(1)->getCreateAHeroConfig().isEmpty() && game.getConstSlot(2)->isHuman() &&
+		game.getGameSpySlot(1)->m_userID == -1 &&
+		NGMP::Internal::WriteCallback(chunk, 1, 3, &response) == 3 &&
+		NGMP::Internal::WriteCallback(chunk, 1, 1, &response) == 0 && response.text == "123";
+}
+#endif
+
+static Bool checkReplaySetup(const AsciiString& setup)
+{
+	const AsciiString directory = RecorderClass::getReplayDir();
+	TheFileSystem->createDirectory(directory);
+	AsciiString path = directory;
+	path.concat("pkg18-setup.rep");
+	File* file = TheFileSystem->openFile(path.str(), File::WRITE | File::BINARY);
+	if (!file)
+		return FALSE;
+	const uint32_t timesAndFrames[3] = {};
+	const Bool flags[MAX_SLOTS + 2] = {};
+	const uint16_t name[] = { 'C', 'H', 0 };
+	const SYSTEMTIME time = {};
+	const uint16_t versionText[2] = {};
+	const uint32_t versionNumbers[3] = {};
+	const Bool written = file->write("GENREP", 6) == 6 &&
+		file->write(timesAndFrames, sizeof(timesAndFrames)) == sizeof(timesAndFrames) &&
+		file->write(flags, sizeof(flags)) == sizeof(flags) &&
+		file->write(name, sizeof(name)) == sizeof(name) &&
+		file->write(&time, sizeof(time)) == sizeof(time) &&
+		file->write(versionText, sizeof(versionText)) == sizeof(versionText) &&
+		file->write(versionNumbers, sizeof(versionNumbers)) == sizeof(versionNumbers) &&
+		file->write(setup.str(), setup.getLength() + 1) == setup.getLength() + 1 &&
+		file->write("7", 2) == 2;
+	file->close();
+	RecorderClass recorder;
+	RecorderClass::ReplayHeader header;
+	return written && recorder.readReplayHeader(header, path, FALSE) &&
+		header.gameOptions == setup && header.localPlayerIndex == 7;
+}
 
 bool RetailTestCommands::configurePackage18Match(GameInfo& game)
 {
@@ -95,7 +207,7 @@ void runRetailPackage18TestCommand(std::string_view action, Player* player, Obje
 		if (!selected || selected->getCreateAHeroConfig().isEmpty())
 			return;
 		CreateAHeroRules::SelectionData profile;
-		if (!CreateAHeroSystem::decodeSelectionCompact(selected->getCreateAHeroConfig(), profile))
+		if (!CreateAHeroSystem::decodeSelectionCompact(selected->getCreateAHeroConfig().str(), profile))
 			return;
 		profile.heroName.assign(CreateAHeroRules::MAX_HERO_NAME_LENGTH, 'D');
 		for (const CommandButton* candidate = TheRetailCommandCatalog->getCommandButtons(); candidate;
@@ -134,10 +246,23 @@ void runRetailPackage18TestCommand(std::string_view action, Player* player, Obje
 				accepted += received.getConstSlot(i)->getCreateAHeroConfig().isNotEmpty();
 		const AsciiString normal = GameInfoToAsciiString(&worst, 0, FALSE);
 		const std::string good = std::string("CH0=") + encoded.str() + ";";
+		const char* fixtureSelection = std::getenv("GENERALSX_TEST_PKG18_SELECTION");
+		if (!fixtureSelection)
+			return;
+		const std::string text = fixtureSelection;
+		const size_t nameStart = text.find('|', text.find('|') + 1) + 1;
+		std::string leadingZero = text;
+		leadingZero.insert(leadingZero.rfind('|') + 1, 1, '0');
+		std::string emptyName = text;
+		emptyName.erase(nameStart, text.find('|', nameStart) - nameStart);
+		const std::string compact = encoded.str();
 		const std::string invalid[] = { "CH0=;", "CH0=invalid;", good + good,
 			std::string("CH0=") + selected->getCreateAHeroConfig().str() + ";CH1=invalid;",
 			std::string("CH0=") + std::string(CreateAHeroRules::MAX_ENCODED_LENGTH + 1, 'x') + ";",
-			"CH0=UnknownClass|UnknownSubclass|Bad||||0,0,0,0,0,0,0,0,0;" };
+			"CH0=UnknownClass|UnknownSubclass|Bad||||0,0,0,0,0,0,0,0,0;",
+			"CH0=" + leadingZero + ";", "CH0=" + emptyName + ";",
+			"CH0=" + compact.substr(0, compact.find('.')) + ";",
+			"CH0=~" + std::string(66, 'A') + ".Name;" };
 		Int rejected = 0;
 		for (size_t i = 0; i < std::size(invalid); ++i)
 		{
@@ -149,9 +274,14 @@ void runRetailPackage18TestCommand(std::string_view action, Player* player, Obje
 				++rejected;
 		}
 		const AsciiString oversized(std::string(kRetailLanSetupBudget + 1, 'x').c_str());
-		std::fprintf(stderr, "TEST pkg18 budget normal=%d full=%d retail=%d budget=%d legacyBudget=%d accepted=%d rejected=%d oversize=%d\n",
+		const Bool lanRoster = checkLanStartRoster(worst, retail);
+		Bool ngmpLobby = TRUE;
+#if defined(SAGE_USE_NGMP)
+		ngmpLobby = checkPackage18LobbyDetails(selected->getCreateAHeroConfig());
+#endif
+		std::fprintf(stderr, "TEST pkg18 budget normal=%d full=%d retail=%d budget=%d legacyBudget=%d accepted=%d rejected=%d oversize=%d replay=%d lanRoster=%d ngmpLobby=%d\n",
 			normal.getLength(), fullSetup.getLength(), retail.getLength(), kRetailLanSetupBudget, m_lanMaxOptionsLength,
-			accepted, rejected, !ParseAsciiStringToGameInfo(&received, oversized));
+			accepted, rejected, !ParseAsciiStringToGameInfo(&received, oversized), checkReplaySetup(retail), lanRoster, ngmpLobby);
 		return;
 	}
 

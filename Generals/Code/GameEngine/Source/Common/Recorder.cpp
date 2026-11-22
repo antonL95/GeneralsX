@@ -41,6 +41,8 @@
 #include "GameClient/GameText.h"
 
 #include "GameNetwork/LANAPICallbacks.h"
+#include "GameNetwork/LANAPI.h"
+#include "Common/RetailFileLayers.h"
 #include "GameNetwork/GameMessageParser.h"
 #include "GameNetwork/GameSpy/PeerDefs.h"
 #include "GameNetwork/networkutil.h"
@@ -66,6 +68,11 @@ extern NGMPGame* TheNGMPGame;
 
 constexpr const char s_genrep[] = "GENREP";
 constexpr const UnsignedInt replayBufferBytes = 8192;
+
+static Int replaySetupLimit()
+{
+	return RetailFileLayers::enabled() ? kRetailLanSetupBudget : 1023;
+}
 
 Int REPLAY_CRC_INTERVAL = 100;
 
@@ -579,7 +586,7 @@ void RecorderClass::startRecording(GameDifficulty diff, GameMode originalGameMod
 		{
 			GameInfo *game = TheLAN->GetMyGame();
 			DEBUG_ASSERTCRASH(game, ("Starting a LAN game with no LANGameInfo object!"));
-			theSlotList = GameInfoToAsciiString(game);
+			theSlotList = GameInfoToAsciiString(game, RetailFileLayers::enabled() ? replaySetupLimit() : 0);
 
 			for (Int i=0; i<MAX_SLOTS; ++i)
 			{
@@ -592,7 +599,7 @@ void RecorderClass::startRecording(GameDifficulty diff, GameMode originalGameMod
 		}
 		else
 		{
-			theSlotList = GameInfoToAsciiString(TheGameSpyGame);
+			theSlotList = GameInfoToAsciiString(TheGameSpyGame, RetailFileLayers::enabled() ? replaySetupLimit() : 0);
 			localIndex = TheGameSpyGame->getLocalSlotNum();
 		}
 	}
@@ -601,7 +608,7 @@ void RecorderClass::startRecording(GameDifficulty diff, GameMode originalGameMod
     if(TheSkirmishGameInfo)
     {
 			TheSkirmishGameInfo->setCRCInterval(REPLAY_CRC_INTERVAL);
-      theSlotList = GameInfoToAsciiString(TheSkirmishGameInfo);
+      theSlotList = GameInfoToAsciiString(TheSkirmishGameInfo, RetailFileLayers::enabled() ? replaySetupLimit() : 0);
       DEBUG_LOG(("GameInfo String: %s",theSlotList.str()));
 			localIndex = 0;
     }
@@ -609,7 +616,7 @@ void RecorderClass::startRecording(GameDifficulty diff, GameMode originalGameMod
     {
 		  // single player.  format the generic (empty) slotlist
 			m_gameInfo.setCRCInterval(REPLAY_CRC_INTERVAL);
-		  theSlotList = GameInfoToAsciiString(&m_gameInfo);
+		  theSlotList = GameInfoToAsciiString(&m_gameInfo, RetailFileLayers::enabled() ? replaySetupLimit() : 0);
     }
 	}
 	logGameStart(theSlotList);
@@ -906,7 +913,13 @@ Bool RecorderClass::readReplayHeader(ReplayHeader& header, const AsciiString& fi
 	m_file->read(&header.iniCRC, sizeof(header.iniCRC));
 
 	// Read in the GameInfo
-	header.gameOptions = readAsciiString();
+	AsciiString playerIndex;
+	if (!readAsciiString(header.gameOptions, replaySetupLimit()) || !readAsciiString(playerIndex, 1023))
+	{
+		m_file->close();
+		m_file = nullptr;
+		return FALSE;
+	}
 	m_gameInfo.reset();
 	m_gameInfo.enterGame();
 	DEBUG_LOG(("RecorderClass::readReplayHeader - GameInfo = %s", header.gameOptions.str()));
@@ -919,7 +932,6 @@ Bool RecorderClass::readReplayHeader(ReplayHeader& header, const AsciiString& fi
 	}
 	m_gameInfo.startGame(0);
 
-	AsciiString playerIndex = readAsciiString();
 	header.localPlayerIndex = atoi(playerIndex.str());
 	if (header.localPlayerIndex < -1 || header.localPlayerIndex >= MAX_SLOTS)
 	{
@@ -1409,29 +1421,24 @@ void RecorderClass::writeReplayWideChar(WideChar value)
 /**
  * Read an ascii string from the current file position. The string is assumed to be 0-terminated.
  */
-AsciiString RecorderClass::readAsciiString() {
-	char str[1024] = "";
-	Int index = 0;
-
-	Int c =	m_file->readChar();
-	if (c == EOF) {
-		str[index] = 0;
-	}
-	str[index] = c;
-
-	while (index < 1024 && str[index] != 0) {
-		++index;
-		Int c = m_file->readChar();
-		if (c == EOF) {
-			str[index] = 0;
-			break;
+Bool RecorderClass::readAsciiString(AsciiString& value, Int limit)
+{
+	if (limit < 0 || limit > kRetailLanSetupBudget)
+		return FALSE;
+	char buffer[kRetailLanSetupBudget + 1];
+	for (Int i = 0; i <= limit; ++i)
+	{
+		const Int character = m_file->readChar();
+		if (character == EOF)
+			return FALSE;
+		buffer[i] = static_cast<char>(character);
+		if (character == 0)
+		{
+			value = buffer;
+			return TRUE;
 		}
-		str[index] = c;
 	}
-	str[1023] = '\0';
-
-	AsciiString retval(str);
-	return retval;
+	return FALSE;
 }
 
 /**
