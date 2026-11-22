@@ -1,0 +1,60 @@
+174 hordespawn Player_1 AmrothianGuardsmenHorde 0 - 2990 510 0
+174 hordespawn Player_1 AmrothianGuardsmenHorde 0 - 2990 970 0
+174 hordespawn Player_1 DolAmrothSquiresHorde 0 - 2950 720 0
+174 hordespawn PlyrCreeps MordorBlackOrcHorde 0 - 3090 510 3.14159
+174 hordespawn PlyrCreeps MordorBlackOrcHorde 0 - 3090 970 3.14159
+174 hordespawn PlyrCreeps MordorBlackOrcHorde 0 - 3090 720 3.14159
+188 stance Player_1 AmrothianGuardsmenHorde 0 Battle
+188 stance Player_1 AmrothianGuardsmenHorde 1 HoldGround
+190 pkg07-state Player_1 AmrothianGuardsmenHorde 0
+190 pkg07-state Player_1 AmrothianGuardsmenHorde 1
+190 pkg07-state Player_1 DolAmrothSquiresHorde 0
+191 attack PlyrCreeps MordorBlackOrcHorde 0 Player_1:AmrothianGuardsmenHorde:0
+191 attack PlyrCreeps MordorBlackOrcHorde 1 Player_1:AmrothianGuardsmenHorde:1
+191 attack PlyrCreeps MordorBlackOrcHorde 2 Player_1:DolAmrothSquiresHorde:0
+210 hordespawn Player_1 DolAmrothPikemenHorde 0 - 2500 1430 0
+210 hordespawn PlyrCreeps AmrothianGuardsmenHorde 0 - 2500 1560 0
+210 hordespawn PlyrCreeps DolAmrothSquiresHorde 0 - 2580 1570 0
+214 stance Player_1 DolAmrothPikemenHorde 0 HoldGround
+223 pkg07-state Player_1 AmrothianGuardsmenHorde 0
+223 pkg07-state Player_1 AmrothianGuardsmenHorde 1
+223 pkg07-state Player_1 DolAmrothSquiresHorde 0
+225 pkg17-fire PlyrCreeps AmrothianGuardsmenHorde 0 Player_1:DolAmrothPikemenHorde:0
+229 pkg10-position Player_1 DolAmrothPikemenHorde 0 2500,1430,-90
+230 pkg07-state Player_1 AmrothianGuardsmenHorde 0
+230 pkg07-state Player_1 AmrothianGuardsmenHorde 1
+230 pkg07-state Player_1 DolAmrothSquiresHorde 0
+230 pkg12-ai-cower Player_1 AmrothianGuardsmenHorde 0 PlyrCreeps:MordorBlackOrcHorde:0
+230 pkg12-ai-cower Player_1 AmrothianGuardsmenHorde 1 PlyrCreeps:MordorBlackOrcHorde:1
+230 pkg12-ai-cower Player_1 DolAmrothSquiresHorde 0 PlyrCreeps:MordorBlackOrcHorde:2
+234 pkg17-fire PlyrCreeps AmrothianGuardsmenHorde 0 Player_1:DolAmrothPikemenHorde:0
+240 pkg10-position Player_1 DolAmrothPikemenHorde 0 2500,1430,90
+244 pkg17-state Player_1 AmrothianGuardsmenHorde 0
+244 pkg17-state Player_1 AmrothianGuardsmenHorde 1
+244 pkg17-state Player_1 DolAmrothSquiresHorde 0
+245 pkg17-fire PlyrCreeps DolAmrothSquiresHorde 0 Player_1:DolAmrothPikemenHorde:0
+269 pkg07-state Player_1 AmrothianGuardsmenHorde 0
+269 pkg07-state Player_1 AmrothianGuardsmenHorde 1
+269 pkg07-state Player_1 DolAmrothSquiresHorde 0
+275 pkg17-state Player_1 AmrothianGuardsmenHorde 0
+275 pkg17-state Player_1 AmrothianGuardsmenHorde 1
+275 pkg17-state Player_1 DolAmrothSquiresHorde 0
+275 pkg07-state Player_1 AmrothianGuardsmenHorde 0
+275 pkg07-state Player_1 AmrothianGuardsmenHorde 1
+275 pkg07-state Player_1 DolAmrothSquiresHorde 0
+302 pkg17-state Player_1 AmrothianGuardsmenHorde 0
+302 pkg17-state Player_1 AmrothianGuardsmenHorde 1
+302 pkg17-state Player_1 DolAmrothSquiresHorde 0
+330 pkg07-state Player_1 AmrothianGuardsmenHorde 0
+330 pkg07-state Player_1 AmrothianGuardsmenHorde 1
+330 pkg07-state Player_1 DolAmrothSquiresHorde 0
+349 pkg17-state Player_1 AmrothianGuardsmenHorde 0
+349 pkg17-state Player_1 AmrothianGuardsmenHorde 1
+349 pkg17-state Player_1 DolAmrothSquiresHorde 0
+385 pkg17-state Player_1 AmrothianGuardsmenHorde 0
+385 pkg17-state Player_1 AmrothianGuardsmenHorde 1
+385 pkg17-state Player_1 DolAmrothSquiresHorde 0
+385 pkg07-state Player_1 AmrothianGuardsmenHorde 0
+385 pkg07-state Player_1 AmrothianGuardsmenHorde 1
+385 pkg07-state Player_1 DolAmrothSquiresHorde 0
+405 pkg17-fire PlyrCreeps AmrothianGuardsmenHorde 0 Player_1:DolAmrothPikemenHorde:0
