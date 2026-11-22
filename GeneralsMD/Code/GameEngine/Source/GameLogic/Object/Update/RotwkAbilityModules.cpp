@@ -41,6 +41,208 @@
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 
+void CurseSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] = {
+		{ "CursePercentage", INI::parsePercentToReal, nullptr, offsetof(CurseSpecialPowerModuleData, m_cursePercentage) },
+		{ "CursedFX", INI::parseFXList, nullptr, offsetof(CurseSpecialPowerModuleData, m_cursedFX) },
+		{ "TriggerFX", INI::parseFXList, nullptr, offsetof(CurseSpecialPowerModuleData, m_triggerFX) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	SpecialAbilityUpdateModuleData::buildFieldParse(p);
+	p.add(fields);
+}
+
+CurseSpecialPower::~CurseSpecialPower() = default;
+
+Bool CurseSpecialPower::acceptsIntent(const Object* target, const Coord3D* position) const
+{
+	if (!usesRotwkRules() || !SpecialAbilityUpdate::acceptsIntent(target, position))
+		return FALSE;
+	return target ? !target->isEffectivelyDead() && getObject()->getRelationship(target) == ENEMIES :
+		position && getTemplate()->getRadiusCursorRadius() > 0.0f;
+}
+
+void CurseSpecialPower::triggerAbilityEffect()
+{
+	SpecialAbilityUpdate::triggerAbilityEffect();
+	Object* self = getObject();
+	const auto* data = getCurseSpecialPowerModuleData();
+	const auto* templateData = getTemplate();
+	const Real fraction = std::clamp(data->m_cursePercentage, 0.0f, 1.0f);
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const auto curseTarget = [&](Object* victim)
+	{
+		if (!victim || victim->isEffectivelyDead() || victim->isDestroyed() || self->getRelationship(victim) != ENEMIES)
+			return;
+		if (templateData->hasRetailFlag(SpecialPowerTemplate::RETAIL_NEEDS_OBJECT_FILTER) &&
+			!templateData->getObjectFilter().matchesObject(self, victim))
+			return;
+
+		for (BehaviorModule** module = victim->getBehaviorModules(); *module; ++module)
+		{
+			auto* power = (*module)->getSpecialPower();
+			const auto* powerTemplate = power ? power->getSpecialPowerTemplate() : nullptr;
+			if (!powerTemplate || !powerTemplate->getReloadTime())
+				continue;
+			const UnsignedInt reload = powerTemplate->getReloadTime();
+			const UnsignedInt ready = power->getReadyFrame();
+			const UnsignedInt remaining = ready > now ? ready - now : 0;
+			if (remaining < reload)
+			{
+				const UnsignedInt increase = static_cast<UnsignedInt>(reload * fraction);
+				power->setReadyFrame(now + remaining + std::min(increase, reload - remaining));
+			}
+		}
+		if (data->m_cursedFX)
+			FXList::doFXObj(data->m_cursedFX, victim);
+	};
+
+	if (data->m_triggerFX)
+		FXList::doFXObj(data->m_triggerFX, self);
+	if (getAbilityTargetID() != INVALID_ID)
+		curseTarget(TheGameLogic->findObjectByID(getAbilityTargetID()));
+	else if (templateData->getRadiusCursorRadius() > 0.0f)
+	{
+		SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(&getAbilityTargetPos(),
+			templateData->getRadiusCursorRadius(), FROM_CENTER_2D);
+		MemoryPoolObjectHolder holder(iter);
+		std::vector<Object*> targets;
+		for (Object* target = iter->first(); target; target = iter->next())
+			targets.push_back(target);
+		std::sort(targets.begin(), targets.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
+		for (Object* target : targets)
+			curseTarget(target);
+	}
+}
+
+void CurseSpecialPower::crc(Xfer* xfer)
+{
+	SpecialAbilityUpdate::crc(xfer);
+}
+
+void CurseSpecialPower::xfer(Xfer* xfer)
+{
+	SpecialAbilityUpdate::xfer(xfer);
+}
+
+void CurseSpecialPower::loadPostProcess()
+{
+	SpecialAbilityUpdate::loadPostProcess();
+}
+
+void RousingSpeechUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] = {
+		{ "UpdateInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(RousingSpeechUpdateModuleData, m_interval) },
+		{ "SpeechDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(RousingSpeechUpdateModuleData, m_duration) },
+		{ "BonusRadius", INI::parseReal, nullptr, offsetof(RousingSpeechUpdateModuleData, m_radius) },
+		{ "CreateWave", INI::parseBool, nullptr, offsetof(RousingSpeechUpdateModuleData, m_createWave) },
+		{ "WaveWidth", INI::parseReal, nullptr, offsetof(RousingSpeechUpdateModuleData, m_waveWidth) },
+		{ "ModifierName", INI::parseAsciiString, nullptr, offsetof(RousingSpeechUpdateModuleData, m_modifier) },
+		{ "ObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(RousingSpeechUpdateModuleData, m_filter) },
+		{ "LeaderFX", INI::parseFXList, nullptr, offsetof(RousingSpeechUpdateModuleData, m_leaderFX) },
+		{ "FollowerFX", INI::parseFXList, nullptr, offsetof(RousingSpeechUpdateModuleData, m_followerFX) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	SpecialAbilityUpdateModuleData::buildFieldParse(p);
+	p.add(fields);
+}
+
+RousingSpeechUpdate::~RousingSpeechUpdate() = default;
+
+void RousingSpeechUpdate::triggerAbilityEffect()
+{
+	SpecialAbilityUpdate::triggerAbilityEffect();
+	if (!usesRotwkRules())
+		return;
+
+	const auto* data = getRousingSpeechUpdateModuleData();
+	m_nextPulse = TheGameLogic->getFrame();
+	m_speechEnd = m_nextPulse + std::max(data->m_duration, 1u);
+	m_previousRadius = 0.0f;
+	if (data->m_leaderFX)
+		FXList::doFXObj(data->m_leaderFX, getObject());
+}
+
+UnsignedInt RousingSpeechUpdate::holdFramesAfterTrigger() const
+{
+	return std::max(SpecialAbilityUpdate::holdFramesAfterTrigger(), getRousingSpeechUpdateModuleData()->m_duration);
+}
+
+UpdateSleepTime RousingSpeechUpdate::update()
+{
+	const UpdateSleepTime sleep = SpecialAbilityUpdate::update();
+	Object* self = getObject();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (now >= m_speechEnd || self->isEffectivelyDead())
+		return sleep;
+	if (now < m_nextPulse)
+		return std::min(sleep, UPDATE_SLEEP(m_nextPulse - now));
+
+	const auto* data = getRousingSpeechUpdateModuleData();
+	const Bool wave = data->m_createWave && data->m_waveWidth > 0.0f;
+	const Real radius = wave ? std::min(data->m_radius, m_previousRadius + data->m_waveWidth) : data->m_radius;
+	const Int list = AttributeModifiers::findList(data->m_modifier);
+	if (radius <= 0.0f || list < 0)
+		return sleep;
+
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), radius, FROM_CENTER_2D);
+	MemoryPoolObjectHolder holder(iter);
+	std::vector<Object*> targets;
+	for (Object* target = iter->first(); target; target = iter->next())
+	{
+		if (target == self || target->isEffectivelyDead() || target->isDestroyed() ||
+			!AttributeModifiers::sidesMatch(self, target, &data->m_filter, AttributeModifiers::SIDES_ALLIES) ||
+			!data->m_filter.matchesObject(self, target))
+			continue;
+		const Real dx = self->getPosition()->x - target->getPosition()->x;
+		const Real dy = self->getPosition()->y - target->getPosition()->y;
+		if (m_previousRadius == 0.0f || dx * dx + dy * dy > m_previousRadius * m_previousRadius)
+			targets.push_back(target);
+	}
+	std::sort(targets.begin(), targets.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
+	for (Object* target : targets)
+		if (AttributeModifiers::apply(target, list) && data->m_followerFX)
+			FXList::doFXObj(data->m_followerFX, target);
+
+	if (wave)
+	{
+		m_previousRadius = radius;
+		if (radius >= data->m_radius)
+		{
+			m_speechEnd = 0;
+			return sleep;
+		}
+	}
+	const UnsignedInt interval = std::max(data->m_interval, 1u);
+	m_nextPulse = now + interval;
+	return std::min(sleep, UPDATE_SLEEP(interval));
+}
+
+void RousingSpeechUpdate::crc(Xfer* xfer)
+{
+	SpecialAbilityUpdate::crc(xfer);
+	xfer->xferUnsignedInt(&m_speechEnd);
+	xfer->xferUnsignedInt(&m_nextPulse);
+	xfer->xferReal(&m_previousRadius);
+}
+
+void RousingSpeechUpdate::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	SpecialAbilityUpdate::xfer(xfer);
+	xfer->xferUnsignedInt(&m_speechEnd);
+	xfer->xferUnsignedInt(&m_nextPulse);
+	xfer->xferReal(&m_previousRadius);
+}
+
+void RousingSpeechUpdate::loadPostProcess()
+{
+	SpecialAbilityUpdate::loadPostProcess();
+}
+
 namespace
 {
 enum FilterRuleBit

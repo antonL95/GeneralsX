@@ -17,6 +17,64 @@ class Waypoint;
 class ObjectCreationList;
 class WeaponTemplate;
 
+class CurseSpecialPowerModuleData : public SpecialAbilityUpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	Real m_cursePercentage = 0.0f;
+	const FXList* m_cursedFX = nullptr;
+	const FXList* m_triggerFX = nullptr;
+};
+
+class CurseSpecialPower final : public SpecialAbilityUpdate
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(CurseSpecialPower, "CurseSpecialPower")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(CurseSpecialPower, CurseSpecialPowerModuleData)
+
+public:
+	CurseSpecialPower(Thing* thing, const ModuleData* data) : SpecialAbilityUpdate(thing, data) {}
+
+protected:
+	Bool acceptsIntent(const Object* target, const Coord3D* position) const override;
+	void triggerAbilityEffect() override;
+};
+
+class RousingSpeechUpdateModuleData : public SpecialAbilityUpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	SpecialPowerObjectFilter m_filter;
+	AsciiString m_modifier;
+	const FXList* m_leaderFX = nullptr;
+	const FXList* m_followerFX = nullptr;
+	UnsignedInt m_interval = 1;
+	UnsignedInt m_duration = 0;
+	Real m_radius = 0.0f;
+	Real m_waveWidth = 0.0f;
+	Bool m_createWave = FALSE;
+};
+
+class RousingSpeechUpdate final : public SpecialAbilityUpdate
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(RousingSpeechUpdate, "RousingSpeechUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(RousingSpeechUpdate, RousingSpeechUpdateModuleData)
+
+public:
+	RousingSpeechUpdate(Thing* thing, const ModuleData* data) : SpecialAbilityUpdate(thing, data) {}
+	UpdateSleepTime update() override;
+
+protected:
+	void triggerAbilityEffect() override;
+	UnsignedInt holdFramesAfterTrigger() const override;
+
+private:
+	UnsignedInt m_speechEnd = 0;
+	UnsignedInt m_nextPulse = 0;
+	Real m_previousRadius = 0.0f;
+};
+
 class WeaponFireSpecialAbilityUpdateModuleData : public SpecialAbilityUpdateModuleData
 {
 public:
