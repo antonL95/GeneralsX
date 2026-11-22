@@ -262,6 +262,18 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "HordeAttackNugget", WeaponNugget::parseHordeAttackNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DamageFieldNugget", WeaponNugget::parseDamageFieldNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "FiringDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_firingDuration) },
+	{ "IdleAfterFiringDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_idleAfterFiringDelay) },
+	{ "HoldAfterFiringDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_holdAfterFiringDelay) },
+	{ "HoldDuringReload", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_holdDuringReload) },
+	{ "CanFireWhileMoving", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canFireWhileMoving) },
+	{ "CanFireWhileCharging", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canFireWhileCharging) },
+	{ "FinishAttackOnceStarted", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_finishAttackOnceStarted) },
+	{ "ForceDisplayPercentReady", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_forceDisplayPercentReady) },
+	{ "InstantLoadClipOnActivate", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_instantLoadClipOnActivate) },
+	{ "IsAimingWeapon", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_isAimingWeapon) },
+	{ "HitPassengerPercentage", INI::parsePercentToReal, nullptr, offsetof(WeaponTemplate, m_hitPassengerPercentage) },
+	{ "FireFlankFX", INI::parseFXList, nullptr, offsetof(WeaponTemplate, m_fireFlankFX) },
+	{ "FXTrigger", INI::parseAsciiString, nullptr, offsetof(WeaponTemplate, m_fxTrigger) },
 	{ "HitPercentage", WeaponTemplate::parseHitPercentage, nullptr, offsetof(WeaponTemplate, m_hitPercentage) },
 	{ "MaxWeaponSpeed", INI::parseVelocityReal, nullptr, offsetof(WeaponTemplate, m_maxWeaponSpeed) },
 	{ "MeleeWeapon", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_meleeWeapon) },
@@ -870,6 +882,41 @@ Bool WeaponTemplate::shouldProjectileCollideWith(
 }
 
 //-------------------------------------------------------------------------------------------------
+static Bool isRetailFlankShot(const Object* source, const Object* victim)
+{
+	const Object* sourceHorde = source->getContainedBy();
+	const Object* victimHorde = victim->getContainedBy();
+	if (!HordeContain::get(sourceHorde) || !HordeContain::get(victimHorde))
+		return FALSE;
+
+	const Coord3D& facing = *victimHorde->getUnitDirectionVector2D();
+	const Coord3D& targetPosition = *victimHorde->getPosition();
+	const Coord3D& sourcePosition = *sourceHorde->getPosition();
+	const Real dx = sourcePosition.x - targetPosition.x;
+	const Real dy = sourcePosition.y - targetPosition.y;
+	const Real dot = facing.x * dx + facing.y * dy;
+	return dot <= 0.0f || 2.0f * dot * dot < dx * dx + dy * dy;
+}
+
+static Object* selectWeaponPassenger(Object* victim, Real chance)
+{
+	const auto* contain = victim->getContain();
+	if (!contain || !contain->getContainCount() || !contain->isEnclosingContainerFor(nullptr))
+		return nullptr;
+
+	const auto* passengers = contain->getContainedItemsList();
+	const auto isLiving = [](const Object* object) { return !object->isEffectivelyDead(); };
+	const Int count = std::count_if(passengers->begin(), passengers->end(), isLiving);
+	if (!count || (chance < 1.0f && GameLogicRandomValueReal(0.0f, 1.0f) >= chance))
+		return nullptr;
+
+	Int index = count == 1 ? 0 : GameLogicRandomValue(0, count - 1);
+	for (Object* passenger : *passengers)
+		if (isLiving(passenger) && index-- == 0)
+			return passenger;
+	return nullptr;
+}
+
 UnsignedInt WeaponTemplate::fireWeaponTemplate
 (
 	const Object *sourceObj,
@@ -1027,6 +1074,10 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		}
 	}
 
+	if (!isProjectileDetonation && m_holdAfterFiringDelay)
+		sourceObj->holdForWeaponUntil(TheGameLogic->getFrame() + m_holdAfterFiringDelay);
+
+	const Bool flank = !isProjectileDetonation && m_fireFlankFX && victimObj && isRetailFlankShot(sourceObj, victimObj);
 	// call this even if FXList is null, because this also handles stuff like Gun Barrel Recoil
 	if (sourceObj && sourceObj->getDrawable())
 	{
@@ -1044,7 +1095,10 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		VeterancyLevel v = sourceObj->getVeterancyLevel();
 		const FXList* fx = isProjectileDetonation ? getProjectileDetonateFX(v) : getFireFX(v);
 
-		if ( TheGameLogic->getFrame() < firingWeapon->getSuspendFXFrame() )
+		if (flank)
+			fx = m_fireFlankFX;
+		const Bool suspended = TheGameLogic->getFrame() < firingWeapon->getSuspendFXFrame();
+		if (suspended)
 			fx = nullptr;
 
 		Bool handled;
@@ -1060,6 +1114,8 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		}
 		else
 		{
+			if (!isProjectileDetonation && !suspended && m_fxTrigger.isNotEmpty() && !m_fxTrigger.isNone())
+				sourceObj->getDrawable()->handleWeaponFXTrigger(m_fxTrigger);
 			handled = sourceObj->getDrawable()->handleWeaponFireFX(wslot,
 																															specificBarrelToUse,
 																															fx,
@@ -1082,6 +1138,13 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		}
 	}
 
+	if (!isProjectileDetonation && RetailTestCommands::tracesCombat() &&
+		(m_fxTrigger.isNotEmpty() || m_fireFlankFX))
+	{
+		std::fprintf(stderr, "TEST weapon-fx frame=%u weapon=%s trigger=%s flank=%d\n",
+			TheGameLogic->getFrame(), m_name.str(), m_fxTrigger.str(), flank);
+	}
+
 	// Now do the FireOCL if there is one
 	if( sourceObj )
 	{
@@ -1097,10 +1160,19 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		orderNuggetHorde(sourceObj, victimObj, victimPos);
 	}
 
-	Coord3D projectileDestination = *victimPos; //Need to copy this, as we have a pointer to their actual position
-	Real scatterRadius = 0.0f;
 	const Bool nuggetHit = hasNuggets() && (isProjectileDetonation || !WeaponNuggetRules::needsHitRoll(m_hitPercentage) ||
 		WeaponNuggetRules::rollHits(GameLogicRandomValue(0, 99), m_hitPercentage));
+	if (!isProjectileDetonation && inflictDamage && victimObj && m_hitPassengerPercentage > 0.0f && (!hasNuggets() || nuggetHit))
+	{
+		if (Object* passenger = selectWeaponPassenger(victimObj, m_hitPassengerPercentage))
+		{
+			victimObj = passenger;
+			victimID = passenger->getID();
+			victimPos = passenger->getPosition();
+		}
+	}
+	Coord3D projectileDestination = *victimPos;
+	Real scatterRadius = 0.0f;
 	if( !nuggetHit && (m_scatterRadius > 0.0f || (m_infantryInaccuracyDist > 0.0f && victimObj && victimObj->isKindOf( KINDOF_INFANTRY ))) )
 	{
 		// This weapon scatters, so clear the victimObj, as we are no longer shooting it directly,
@@ -2108,6 +2180,13 @@ void Weapon::computeBonus(const Object *source, WeaponBonusConditionFlags extraB
 }
 
 //-------------------------------------------------------------------------------------------------
+void Weapon::activate(const Object* source)
+{
+	WeaponBonus bonus;
+	computeBonus(source, 0, bonus);
+	reloadWithBonus(source, bonus, m_template->instantLoadClipOnActivate(), FALSE);
+}
+
 void Weapon::loadAmmoNow(const Object *sourceObj)
 {
 	WeaponBonus bonus;
@@ -2165,7 +2244,7 @@ void Weapon::rebuildScatterTargets()
 }
 
 //-------------------------------------------------------------------------------------------------
-void Weapon::reloadWithBonus(const Object *sourceObj, const WeaponBonus& bonus, Bool loadInstantly)
+void Weapon::reloadWithBonus(const Object *sourceObj, const WeaponBonus& bonus, Bool loadInstantly, Bool shareReload)
 {
 	if (m_template->getClipSize() > 0 &&
 			m_ammoInClip == m_template->getClipSize() &&
@@ -2180,6 +2259,8 @@ void Weapon::reloadWithBonus(const Object *sourceObj, const WeaponBonus& bonus, 
 	Real reloadTime = loadInstantly ? 0 : m_template->getClipReloadTime(bonus, TRUE);
 	m_whenLastReloadStarted = TheGameLogic->getFrame();
 	m_whenWeCanFireAgain = m_whenLastReloadStarted + reloadTime;
+	if (reloadTime > 0 && m_template->holdsDuringReload())
+		sourceObj->holdForWeaponUntil(m_whenWeCanFireAgain);
 	if (!loadInstantly && RetailTestCommands::tracesCombat())
 		std::fprintf(stderr, "TEST cooldown frame=%u weapon=%s source=%u phase=reload frames=%u\n",
 			m_whenLastReloadStarted, getName().str(), static_cast<UnsignedInt>(sourceObj->getID()),
@@ -2190,7 +2271,7 @@ void Weapon::reloadWithBonus(const Object *sourceObj, const WeaponBonus& bonus, 
 			// go through other weapons in weapon set
 			// set their m_whenWeCanFireAgain to this guy's delay
 			// set their m_status to this guy's status
-	if (sourceObj->isReloadTimeShared())
+	if (shareReload && sourceObj->isReloadTimeShared())
 	{
 		for (Int wt = 0; wt<WEAPONSLOT_COUNT; wt++)
 		{
@@ -2252,6 +2333,8 @@ void Weapon::onWeaponBonusChange(const Object *source)
 	{
 		m_whenLastReloadStarted = TheGameLogic->getFrame();
 		m_whenWeCanFireAgain = m_whenLastReloadStarted + newDelay;
+		if (getStatus() == RELOADING_CLIP && m_template->holdsDuringReload())
+			source->holdForWeaponUntil(m_whenWeCanFireAgain);
 
 		if (source->isReloadTimeShared())
 		{
@@ -2993,7 +3076,7 @@ void Weapon::preFireWeapon( const Object *source, const Object *victim )
 Bool Weapon::fireWeapon(const Object *source, Object *target, ObjectID* projectileID)
 {
 	//CRCDEBUG_LOG(("Weapon::fireWeapon() for %s at %s", DescribeObject(source).str(), DescribeObject(target).str()));
-	return privateFireWeapon( source, target, nullptr, false, false, 0, projectileID, TRUE );
+	return privateFireWeapon(source, target, nullptr, false, hasCommittedAttack(), 0, projectileID, TRUE);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3001,7 +3084,7 @@ Bool Weapon::fireWeapon(const Object *source, Object *target, ObjectID* projecti
 Bool Weapon::fireWeapon(const Object *source, const Coord3D* pos, ObjectID* projectileID)
 {
 	//CRCDEBUG_LOG(("Weapon::fireWeapon() for %s", DescribeObject(source).str()));
-	return privateFireWeapon( source, nullptr, pos, false, false, 0, projectileID, TRUE );
+	return privateFireWeapon(source, nullptr, pos, false, hasCommittedAttack(), 0, projectileID, TRUE);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3034,6 +3117,42 @@ Object* Weapon::forceFireWeapon( const Object *source, const Coord3D *pos)
 }
 
 //-------------------------------------------------------------------------------------------------
+UnsignedInt Weapon::getPossibleNextShotFrame() const
+{
+	if (m_lastFireFrame && m_template->getIdleAfterFiringDelay())
+		return std::max(m_whenWeCanFireAgain, m_lastFireFrame + m_template->getIdleAfterFiringDelay());
+	return m_whenWeCanFireAgain;
+}
+
+Bool Weapon::canFireInCurrentMovement(const Object* source) const
+{
+	if (!RetailFileLayers::enabled() || source->isKindOf(KINDOF_PROJECTILE))
+		return TRUE;
+
+	const auto& conditions = source->getLogicModelConditions();
+	if (conditions.test(MODELCONDITION_CHARGING))
+		return m_template->canFireWhileCharging();
+
+	const auto* physics = source->getPhysics();
+	if (!physics || m_template->canFireWhileMoving() || source->getContainedBy())
+		return TRUE;
+
+	const auto* velocity = physics->getVelocity();
+	return velocity->x * velocity->x + velocity->y * velocity->y < 0.01f;
+}
+
+Bool Weapon::isWaitingToIdle() const
+{
+	return m_lastFireFrame && m_template->getIdleAfterFiringDelay() &&
+		TheGameLogic->getFrame() < m_lastFireFrame + m_template->getIdleAfterFiringDelay();
+}
+
+Bool Weapon::hasCommittedAttack() const
+{
+	return RetailFileLayers::enabled() && m_template->finishesAttackOnceStarted() &&
+		m_whenPreAttackFinished > m_lastFireFrame;
+}
+
 WeaponStatus Weapon::getStatus() const
 {
 	UnsignedInt now = TheGameLogic->getFrame();
@@ -3041,7 +3160,7 @@ WeaponStatus Weapon::getStatus() const
 	{
 		return PRE_ATTACK;
 	}
-	if( now >= m_whenWeCanFireAgain )
+	if( now >= getPossibleNextShotFrame() )
 	{
 		if (m_ammoInClip > 0)
 			m_status = READY_TO_FIRE;

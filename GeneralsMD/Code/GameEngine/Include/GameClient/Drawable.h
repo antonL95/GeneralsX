@@ -442,6 +442,7 @@ public:
 	void clearAndSetModelConditionFlags( const ModelConditionFlags& clr, const ModelConditionFlags& set );
 	void replaceModelConditionFlags( const ModelConditionFlags &flags, Bool forceReplace = FALSE );
 
+	void handleWeaponFXTrigger(const AsciiString& trigger);
 	Bool handleWeaponFireFX(
 							WeaponSlotType wslot,
 							Int specificBarrelToUse,

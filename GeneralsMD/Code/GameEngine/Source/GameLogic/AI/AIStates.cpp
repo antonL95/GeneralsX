@@ -1121,6 +1121,8 @@ Bool outOfWeaponRangeObject( State *thisState, void* userData )
 	Object *obj = thisState->getMachineOwner();
 	Object *victim = thisState->getMachineGoalObject();
 	Weapon *weapon = obj->getCurrentWeapon();
+	if (weapon && (weapon->hasCommittedAttack() || weapon->isWaitingToIdle()))
+		return FALSE;
 
 	CRCDEBUG_LOG(("outOfWeaponRangeObject()"));
 	if (victim && weapon)
@@ -1211,6 +1213,8 @@ Bool outOfWeaponRangePosition( State *thisState, void* userData )
 	Object *obj = thisState->getMachineOwner();
 	const Coord3D *pos = thisState->getMachineGoalPosition();
 	Weapon *weapon = obj->getCurrentWeapon();
+	if (weapon && (weapon->hasCommittedAttack() || weapon->isWaitingToIdle()))
+		return FALSE;
 
 	if (weapon && pos)
 	{
@@ -5234,6 +5238,8 @@ StateReturnType AIAttackFireWeaponState::onEnter()
 
 	obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IS_FIRING_WEAPON ) );
 	obj->preFireCurrentWeapon( getMachineGoalObject() );
+	if (const Weapon* weapon = obj->getCurrentWeapon(); weapon && weapon->getTemplate()->isAimingWeapon())
+		obj->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_IS_AIMING_WEAPON));
 	return STATE_CONTINUE;
 }
 
@@ -5261,6 +5267,9 @@ StateReturnType AIAttackFireWeaponState::update()
 	{
 		return STATE_FAILURE;
 	}
+
+	if (!weapon->canFireInCurrentMovement(obj))
+		return STATE_CONTINUE;
 
 	const Coord3D* strike = victim ? victim->getPosition() : getMachineGoalPosition();
 	if (strike && !GiantBirdAIUpdate::canStrike(*obj, *strike))
@@ -5387,10 +5396,10 @@ void AIAttackFireWeaponState::onExit( StateExitType status )
 	// leaving us thinking we're still "pre attacking". cancel this state
 	// to avoid confusion. (srj)
 	Weapon* weapon = obj->getCurrentWeapon();
-	if (weapon && weapon->getStatus() == PRE_ATTACK)
-	{
+	if (weapon && (RetailFileLayers::enabled() || weapon->getStatus() == PRE_ATTACK))
 		weapon->setPreAttackFinishedFrame(0);
-	}
+	if (RetailFileLayers::enabled())
+		obj->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_IS_AIMING_WEAPON));
 }
 
 //----------------------------------------------------------------------------------------------------------
@@ -5655,6 +5664,9 @@ StateReturnType AIAttackState::update()
 	}
 
 	Object* source = getMachineOwner();
+	Weapon* curWeapon = source->getCurrentWeapon();
+	if (curWeapon && curWeapon->isWaitingToIdle())
+		return STATE_CONTINUE;
 
 	// if all of our weapons are out of ammo, can't attack.
 	// (this can happen for units which never auto-reload, like the Raptor)
@@ -5753,11 +5765,11 @@ StateReturnType AIAttackState::update()
 
 	// Something can happen to make none of our weapons work.  Return failure, or we will start shooting
 	// our Primary (default pick) regardless of legality.
-	Bool weaponPicked = chooseWeapon();
+	Bool weaponPicked = (curWeapon && curWeapon->hasCommittedAttack()) || chooseWeapon();
 	if( !weaponPicked )
 		return STATE_FAILURE;
 
-	Weapon* curWeapon = source->getCurrentWeapon();
+	curWeapon = source->getCurrentWeapon();
 
 	// if we entered with a locked weapon (ie, a special weapon), then we will
 	// only keep attacking as long as that weapon remains the cur weapon...

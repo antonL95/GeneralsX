@@ -286,7 +286,7 @@ void W3DScriptedModelDrawModuleData::parseParticleBone(INI* ini, void*, void* st
 		else if (stricmp(option, "HouseColor") == 0)
 			particle.houseColor = INI::scanBool(ini->getNextToken());
 		else if (stricmp(option, "FXTrigger") == 0)
-			particle.fxTrigger = ini->getNextToken();
+			particle.draw.fxTrigger = ini->getNextToken();
 		else if (stricmp(option, "Persist") == 0)
 			particle.persist = ini->getNextToken();
 		else if (stricmp(option, "PersistID") == 0)

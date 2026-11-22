@@ -96,3 +96,23 @@ private:
 
 	std::vector<Payload> m_payloads;
 };
+class AimWeaponBehaviorModuleData : public UpdateModuleData
+{
+public:
+	Real m_low = -0.15f;
+	Real m_high = 0.15f;
+	Real m_near = 0.0f;
+	Real m_far = 0.0f;
+
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
+class AimWeaponBehavior : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(AimWeaponBehavior, "AimWeaponBehavior")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(AimWeaponBehavior, AimWeaponBehaviorModuleData)
+
+public:
+	AimWeaponBehavior(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	UpdateSleepTime update() override;
+};

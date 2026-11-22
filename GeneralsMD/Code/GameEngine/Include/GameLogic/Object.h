@@ -507,6 +507,7 @@ public:
 	Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr);
 	const Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr) const;
 	void setFiringConditionForCurrentWeapon() const;
+	void holdForWeaponUntil(UnsignedInt frame) const;
 	void adjustModelConditionForWeaponStatus();	///< Check to see if I should change my model condition.
 	void fireCurrentWeapon(Object *target);
 	void fireCurrentWeapon(const Coord3D* pos);

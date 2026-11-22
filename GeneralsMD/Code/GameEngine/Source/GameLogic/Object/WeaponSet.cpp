@@ -476,7 +476,10 @@ void WeaponSet::updateWeaponSet(const Object* obj)
 			if (set->getNth((WeaponSlotType)i))
 			{
 				m_weapons[i] = TheWeaponStore->allocateNewWeapon(set->getNth((WeaponSlotType)i), (WeaponSlotType)i);
-				m_weapons[i]->loadAmmoNow(obj);	// start 'em all with full clips.
+				if (RetailFileLayers::enabled())
+					m_weapons[i]->activate(obj);
+				else
+					m_weapons[i]->loadAmmoNow(obj);
 				m_filledWeaponSlotMask |= (1 << i);
 				m_totalAntiMask |= m_weapons[i]->getAntiMask();
 				m_totalDamageTypeMask.set(m_weapons[i]->getDamageType());

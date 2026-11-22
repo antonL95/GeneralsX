@@ -36,6 +36,7 @@
 #include "Common/Xfer.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/FireWeaponUpdate.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/WeaponStatus.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/RetailTestCommands.h"
@@ -296,4 +297,71 @@ void FireWeaponUpdate::loadPostProcess()
 	// extend base class
 	UpdateModule::loadPostProcess();
 
+}
+
+AimWeaponBehavior::~AimWeaponBehavior() = default;
+
+void AimWeaponBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	UpdateModuleData::buildFieldParse(p);
+	static const FieldParse fields[] =
+	{
+		{ "AimLowThreshold", INI::parseReal, nullptr, offsetof(AimWeaponBehaviorModuleData, m_low) },
+		{ "AimHighThreshold", INI::parseReal, nullptr, offsetof(AimWeaponBehaviorModuleData, m_high) },
+		{ "AimNearDistance", INI::parseReal, nullptr, offsetof(AimWeaponBehaviorModuleData, m_near) },
+		{ "AimFarDistance", INI::parseReal, nullptr, offsetof(AimWeaponBehaviorModuleData, m_far) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+UpdateSleepTime AimWeaponBehavior::update()
+{
+	Object* self = getObject();
+	const Weapon* weapon = self->getCurrentWeapon();
+	const AIUpdateInterface* ai = self->getAI();
+	const ModelConditionFlags aim = MAKE_MODELCONDITION_MASK5(
+		MODELCONDITION_AIM_LOW, MODELCONDITION_AIM_STRAIGHT, MODELCONDITION_AIM_HIGH,
+		MODELCONDITION_AIM_NEAR, MODELCONDITION_AIM_FAR);
+	ModelConditionFlags next;
+	if (weapon && weapon->getTemplate()->isAimingWeapon() && ai &&
+		(self->testStatus(OBJECT_STATUS_IS_AIMING_WEAPON) || self->testStatus(OBJECT_STATUS_IS_FIRING_WEAPON)))
+	{
+		const auto* data = getAimWeaponBehaviorModuleData();
+		const Object* victim = ai->getCurrentVictim();
+		const Coord3D* target = victim ? victim->getPosition() : ai->getGoalPosition();
+		const Coord3D* source = self->getPosition();
+		const Real dx = target->x - source->x;
+		const Real dy = target->y - source->y;
+		const Real distance = std::max(1.0f, WWMath::SqrtfOrigin(dx * dx + dy * dy));
+		const Real slope = (target->z - source->z) / distance;
+		next.set(slope > data->m_high ? MODELCONDITION_AIM_HIGH :
+			slope < data->m_low ? MODELCONDITION_AIM_LOW : MODELCONDITION_AIM_STRAIGHT);
+		if (distance < data->m_near)
+			next.set(MODELCONDITION_AIM_NEAR);
+		else if (data->m_far > 0.0f && distance > data->m_far)
+			next.set(MODELCONDITION_AIM_FAR);
+	}
+	ModelConditionFlags clear = aim;
+	clear.clear(next);
+	if (!self->getLogicModelConditions().testSetAndClear(next, clear))
+		self->clearAndSetModelConditionFlags(clear, next);
+	return UPDATE_SLEEP_NONE;
+}
+
+void AimWeaponBehavior::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+}
+
+void AimWeaponBehavior::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	UpdateModule::xfer(xfer);
+}
+
+void AimWeaponBehavior::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
 }

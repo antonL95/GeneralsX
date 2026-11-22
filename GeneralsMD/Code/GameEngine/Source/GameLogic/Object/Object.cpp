@@ -1490,6 +1490,12 @@ Real Object::getLargestWeaponRange() const
 }
 
 //=============================================================================
+void Object::holdForWeaponUntil(UnsignedInt frame) const
+{
+	if (m_ai)
+		m_ai->holdForWeaponUntil(frame);
+}
+
 void Object::setFiringConditionForCurrentWeapon() const
 {
 	if (m_drawable)

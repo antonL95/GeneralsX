@@ -4284,6 +4284,13 @@ void Drawable::reactToGeometryChange()
 }
 
 //-------------------------------------------------------------------------------------------------
+void Drawable::handleWeaponFXTrigger(const AsciiString& trigger)
+{
+	for (DrawModule** module = getDrawModules(); *module; ++module)
+		if (ObjectDrawInterface* draw = (*module)->getObjectDrawInterface())
+			draw->handleWeaponFXTrigger(trigger);
+}
+
 Bool Drawable::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, Real recoilAmount, Real recoilAngle, const Coord3D* victimPos, Real damageRadius, const Object* target)
 {
 	if (recoilAmount != 0.0f)

@@ -470,6 +470,14 @@ public:
 	Bool getAutoReloadsClip() const { return m_reloadType == AUTO_RELOAD; }
 	Int getClipSize() const { return m_clipSize; }
 	UnsignedInt getFiringDuration() const { return m_firingDuration; }
+	UnsignedInt getIdleAfterFiringDelay() const { return m_idleAfterFiringDelay; }
+	Bool holdsDuringReload() const { return m_holdDuringReload; }
+	Bool canFireWhileMoving() const { return m_canFireWhileMoving; }
+	Bool canFireWhileCharging() const { return m_canFireWhileCharging; }
+	Bool finishesAttackOnceStarted() const { return m_finishAttackOnceStarted; }
+	Bool forcesDisplayPercentReady() const { return m_forceDisplayPercentReady || m_canFireWhileCharging; }
+	Bool instantLoadClipOnActivate() const { return m_instantLoadClipOnActivate; }
+	Bool isAimingWeapon() const { return m_isAimingWeapon; }
 	Int getContinuousFireOneShotsNeeded() const { return m_continuousFireOneShotsNeeded; }
 	Int getContinuousFireTwoShotsNeeded() const { return m_continuousFireTwoShotsNeeded; }
 	UnsignedInt getContinuousFireCoastFrames() const { return m_continuousFireCoastFrames; }
@@ -626,7 +634,19 @@ private:
 	Bool m_dieOnDetonate;
 	std::vector<WeaponNugget> m_nuggets;
 	Real m_hitPercentage;
+	Real m_hitPassengerPercentage = 0.0f;
+	const FXList* m_fireFlankFX = nullptr;
+	AsciiString m_fxTrigger;
 	UnsignedInt m_firingDuration;
+	UnsignedInt m_idleAfterFiringDelay = 0;
+	UnsignedInt m_holdAfterFiringDelay = 0;
+	Bool m_holdDuringReload = false;
+	Bool m_canFireWhileMoving = false;
+	Bool m_canFireWhileCharging = false;
+	Bool m_finishAttackOnceStarted = true;
+	Bool m_forceDisplayPercentReady = false;
+	Bool m_instantLoadClipOnActivate = false;
+	Bool m_isAimingWeapon = false;
 	Real m_maxWeaponSpeed;
 	Bool m_meleeWeapon;
 	Bool m_hitStoredTarget;
@@ -727,13 +747,17 @@ public:
 		state until the clip-reload-time is up. Normally you should use "load" only for newly-created
 		units, who presumably come into existence with fully loaded weapons.
 	*/
+	void activate(const Object* source);
 	void loadAmmoNow(const Object *source);
 	void reloadAmmo(const Object *source);
 
 	WeaponStatus getStatus() const;
 
 	/// Some AI needs to know when the soonest I can possibly next shoot.  Bonuses have been figured into this number already.
-	UnsignedInt getPossibleNextShotFrame() const { return m_whenWeCanFireAgain; }
+	UnsignedInt getPossibleNextShotFrame() const;
+	Bool canFireInCurrentMovement(const Object* source) const;
+	Bool hasCommittedAttack() const;
+	Bool isWaitingToIdle() const;
 	UnsignedInt getPreAttackFinishedFrame() const { return m_whenPreAttackFinished; }
 	UnsignedInt getLastReloadStartedFrame() const { return m_whenLastReloadStarted; }
 	Real getPercentReadyToFire() const;
@@ -854,7 +878,7 @@ protected:
 		ObjectID detonationVictimID = INVALID_ID
 	);
 	Real estimateWeaponDamage(const Object *sourceObj, const Object *victimObj, const Coord3D* victimPos);
-	void reloadWithBonus(const Object *source, const WeaponBonus& bonus, Bool loadInstantly);
+	void reloadWithBonus(const Object *source, const WeaponBonus& bonus, Bool loadInstantly, Bool shareReload = TRUE);
 
 	void processRequestAssistance( const Object *requestingObject, Object *victimObject ); ///< Weapons can call for extra attacks from nearby objects
 

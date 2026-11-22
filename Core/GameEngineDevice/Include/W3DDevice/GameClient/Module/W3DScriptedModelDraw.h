@@ -35,7 +35,6 @@ public:
 	{
 		ParticleSysBoneInfo draw{};
 		AsciiString templateName;
-		AsciiString fxTrigger;
 		AsciiString persist;
 		Coord3D offset{};
 		Int persistId = 0;

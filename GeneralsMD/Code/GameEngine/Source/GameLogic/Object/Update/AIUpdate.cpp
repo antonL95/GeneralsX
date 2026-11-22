@@ -2294,6 +2294,10 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 			// now it's over, I'm dead, and I haven't done anything that I want,
 			// or, I'm still alive, and there's nothing I want to do
 		}
+		else if (!m_burningDeathUntil && TheGameLogic->getFrame() < m_weaponMovementHoldUntil)
+		{
+			m_curLocomotor->locoUpdate_maintainCurrentPosition(getObject());
+		}
 		else
 		{
 			switch (m_locomotorGoalType)
@@ -3371,6 +3375,11 @@ Bool AIUpdateInterface::isMovingAwayFrom(Object *obj)	 const
 	}
 	return FALSE;
 }
+void AIUpdateInterface::holdForWeaponUntil(UnsignedInt frame)
+{
+	m_weaponMovementHoldUntil = std::max(m_weaponMovementHoldUntil, frame);
+}
+
 //----------------------------------------------------------------------------------------
 /**
  * Is this moving out of the way of another unit.
@@ -5388,9 +5397,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 11 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 4;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 11 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5652,6 +5661,10 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_burningDeathUntil);
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_burningDeathUntil = 0;
+	if (version >= 12)
+		xfer->xferUnsignedInt(&m_weaponMovementHoldUntil);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_weaponMovementHoldUntil = 0;
 
 
 }

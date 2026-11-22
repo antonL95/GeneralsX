@@ -1340,7 +1340,12 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			UnsignedInt now = TheGameLogic->getFrame();
 
 			/// @Kris -- We need to show the button as always available for anything with a 0 clip reload time.
-			if( w && w->getClipReloadTime( obj ) == 0 )
+#if !RTS_GENERALS
+			const Bool forceDisplay = RetailFileLayers::enabled() && w && w->getTemplate()->forcesDisplayPercentReady();
+#else
+			const Bool forceDisplay = FALSE;
+#endif
+			if( w && !forceDisplay && w->getClipReloadTime( obj ) == 0 )
 			{
 				return COMMAND_AVAILABLE;
 			}
@@ -1359,7 +1364,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 				if ( w != nullptr )
 				{
 					// only draw the clock when reloading a clip, not when merely between shots, since that's usually a tiny amount of time
-					if ( w->getStatus() == RELOADING_CLIP)
+					if (forceDisplay || w->getStatus() == RELOADING_CLIP)
 					{
 						Int percent = w->getPercentReadyToFire() * 100;
 						GadgetButtonDrawInverseClock( applyToWin, percent, m_buildUpClockColor );

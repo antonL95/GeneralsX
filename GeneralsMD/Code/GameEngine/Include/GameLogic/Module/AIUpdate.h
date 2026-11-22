@@ -495,6 +495,7 @@ public:
 	Bool computeQuickPath(const Coord3D *destination); ///< Computes a quick path to the destination.
 
 	Bool isMoving() const;
+	void holdForWeaponUntil(UnsignedInt frame);
 	Bool fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition, Real durationScale = 1.0f);
 	UnsignedInt getRetailFearDeadline() const { return m_fearUntil; }
 	Bool enterRetailBurningDeath();
@@ -834,6 +835,7 @@ private:
 	UnsignedInt m_retailPlannerIssuedFrame = 0;
 	UnsignedInt m_retailPlannerPathRevision = 0;
 	UnsignedInt m_retailPlannerBlockedRevision = 0;
+	UnsignedInt m_weaponMovementHoldUntil = 0;
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.
 	Bool				m_upgradedLocomotors;
