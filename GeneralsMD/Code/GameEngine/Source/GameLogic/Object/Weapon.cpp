@@ -1067,7 +1067,8 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 																															reAngle,
 																															reDir,
 																															&targetPos,
-																															getPrimaryDamageRadius(bonus)
+																															getPrimaryDamageRadius(bonus),
+																															RetailFileLayers::enabled() ? victimObj : nullptr
 																															);
 		}
 
@@ -1076,7 +1077,8 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 			// bah. just play it at the drawable's pos.
 			//DEBUG_LOG(("*** WeaponFireFX not fully handled by the client"));
 			const Coord3D* where = isContactWeapon() ? &targetPos : sourceObj->getDrawable()->getPosition();
-			FXList::doFXPos(fx, where, sourceObj->getDrawable()->getTransformMatrix(), getWeaponSpeed(), &targetPos, getPrimaryDamageRadius(bonus));
+			FXList::doFXPos(fx, where, sourceObj->getDrawable()->getTransformMatrix(), getWeaponSpeed(), &targetPos, getPrimaryDamageRadius(bonus),
+				RetailFileLayers::enabled() ? sourceObj : nullptr, RetailFileLayers::enabled() ? victimObj : nullptr);
 		}
 	}
 

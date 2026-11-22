@@ -450,7 +450,8 @@ public:
 							Real recoilAmount,
 							Real recoilAngle,
 							const Coord3D* victimPos,
-							Real damageRadius
+							Real damageRadius,
+							const Object* target
 							);
 
 	Int getBarrelCount(WeaponSlotType wslot) const;

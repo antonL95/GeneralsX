@@ -29,10 +29,13 @@
 #include "Common/GlobalData.h"
 #include "Common/RetailFileLayers.h"
 #include "GameClient/Color.h"
+#include "GameClient/GameClient.h"
+#include "W3DDevice/GameClient/RetailEffectInput.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "W3DDevice/GameClient/W3DRetailGpuParticles.h"
 #include "W3DDevice/GameClient/W3DSmudge.h"
 #include "W3DDevice/GameClient/W3DSnow.h"
 #include "W3DDevice/GameClient/W3DTerrainParticles.h"
@@ -41,6 +44,9 @@
 #include "WW3D2/rendobj.h"
 
 #include <algorithm>
+#include <bit>
+#include <cmath>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -88,6 +94,8 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 			if (!model)
 				break;
 			Matrix3D transform(true);
+			if (const Matrix3D* target = system->getRetailTargetMatrix())
+				transform = *target;
 			transform.Rotate_Z(particle->getAngle());
 			transform.Scale(size.x, size.y, size.z);
 			transform.Set_Translation(Vector3(position->x, position->y, position->z));
@@ -173,6 +181,153 @@ void W3DParticleSystemManager::queueParticleRender()
 	m_readyToRender = true;
 }
 
+UnsignedInt W3DParticleSystemManager::drawGpuParticles(ParticleSystem &system)
+{
+	const auto *definition = system.getTemplate();
+	const auto *first = system.getFirstParticle();
+	if (!definition->canDrawGpuParticles() || !first || !W3DDisplay::m_assetManager)
+		return 0;
+	auto *device = DX8Wrapper::Get_Effect_Device9();
+	if (!device)
+		return 0;
+	if (device != m_gpuEffectDevice)
+	{
+		m_gpuEffectDevice = device;
+		m_gpuParticlePass.reset();
+		if (const auto effect = RetailFX::loadEffectFile("shaders/compiled/gpuparticle.fxo"))
+			m_gpuParticlePass = RetailFX::GpuParticlePass::make(device, *effect, DX8Wrapper::Create_Effect_Shader9);
+	}
+	if (!m_gpuParticlePass)
+		return 0;
+	RefCountPtr<TextureClass> texture;
+	texture.Assign_No_Add_Ref(W3DDisplay::m_assetManager->Get_Texture(system.getParticleTypeName().str()));
+	auto *atlas = RetailFX::nativeTexture(texture.Peek());
+	auto *device8 = DX8Wrapper::_Get_D3D_Device8();
+	D3DXMATRIX world, view, projection, inverseView, viewProjection;
+	if (!atlas || FAILED(device8->GetTransform(D3DTS_VIEW, &view)) ||
+		FAILED(device8->GetTransform(D3DTS_PROJECTION, &projection)) || !D3DXMatrixInverse(&inverseView, nullptr, &view))
+		return 0;
+	D3DXMatrixIdentity(&world);
+	D3DXMatrixMultiply(&viewProjection, &view, &projection);
+	const auto fog = RetailFX::fogBindings(device8);
+	const auto settings = definition->getGpuDrawSettings(*first, system.getSizeMultiplier() * TheGlobalData->m_particleScale);
+	const auto frame = TheGameClient->getFrame();
+	const RetailFX::SetBinding setBinding = [&](const auto &binding, auto values, auto) {
+		const auto copy = [&](const auto &registers) {
+			std::copy_n(registers.begin(), std::min(registers.size(), values.size()), values.begin());
+		};
+		if (binding.name == "Draw") copy(settings.draw);
+		else if (binding.name == "Update") copy(settings.update);
+		else if (binding.name == "Physics") copy(settings.physics);
+		else if (binding.name == "Fog") copy(fog);
+		else if (binding.name == "World") RetailFX::writeMatrix(values, world);
+		else if (binding.name == "View") RetailFX::writeMatrix(values, view);
+		else if (binding.name == "ViewI") RetailFX::writeMatrix(values, inverseView);
+		else if (binding.name == "WorldViewProjection") RetailFX::writeMatrix(values, viewProjection);
+		else if (binding.name == "Time" && !values.empty()) values[0][0] = static_cast<Real>(frame) / 30.0f;
+	};
+	std::vector<RetailFX::GpuParticleVertex> vertices;
+	std::vector<uint16_t> indices;
+	const size_t capacity = std::min<UnsignedInt>(system.getParticleCount(), MAX_POINTS_PER_GROUP);
+	vertices.reserve(capacity * 4);
+	indices.reserve(capacity * 6);
+	UnsignedInt drawn = 0;
+	const auto draw = [&] {
+		if (!indices.empty() && m_gpuParticlePass->draw(device, atlas, vertices, indices, setBinding))
+			drawn += static_cast<UnsignedInt>(vertices.size() / 4);
+		vertices.clear();
+		indices.clear();
+	};
+	for (const Particle *particle = first; particle; particle = particle->m_systemNext)
+	{
+		if (!particle->m_lifetime)
+			continue;
+		const auto &position = particle->getGpuSpawnPosition();
+		const auto &velocity = particle->getGpuSpawnVelocity();
+		const auto base = static_cast<uint16_t>(vertices.size());
+		for (unsigned corner = 0; corner < 4; ++corner)
+		{
+			vertices.push_back({
+				{position.x, position.y, position.z, static_cast<Real>(particle->m_lifetime)},
+				{velocity.x, velocity.y, velocity.z, static_cast<Real>(particle->getCreateTimestamp())},
+				{particle->getGpuSeed(), static_cast<Real>(corner)}
+			});
+		}
+		for (const unsigned index : {0, 2, 1, 0, 3, 2})
+			indices.push_back(static_cast<uint16_t>(base + index));
+		if (vertices.size() == MAX_POINTS_PER_GROUP * 4)
+			draw();
+	}
+	draw();
+	if (drawn && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS") &&
+		std::find(m_tracedGpuTemplates.begin(), m_tracedGpuTemplates.end(), definition->getName()) == m_tracedGpuTemplates.end())
+	{
+		m_tracedGpuTemplates.push_back(definition->getName());
+		std::fprintf(stderr, "[RetailFX] Drew GPUParticle Default (%s, %u)\n", definition->getName().str(), drawn);
+	}
+	return drawn;
+}
+
+UnsignedInt W3DParticleSystemManager::drawGpuFallback(RenderInfoClass &rinfo, ParticleSystem &system)
+{
+	const auto &definition = *system.getTemplate();
+	const auto rows = definition.getGpuFramesPerRow();
+	if (!system.getFirstParticle() || !W3DDisplay::m_assetManager || rows > 16 || !std::has_single_bit(rows))
+		return 0;
+	RefCountPtr<TextureClass> texture;
+	texture.Assign_No_Add_Ref(W3DDisplay::m_assetManager->Get_Texture(system.getParticleTypeName().str()));
+	if (!texture)
+		return 0;
+	if (!texture->Is_Initialized())
+		texture->Init();
+	if (texture->Is_Missing_Texture())
+		return 0;
+	if (!m_gpuFrameBuffer)
+		m_gpuFrameBuffer.Assign_No_Add_Ref(NEW_REF(ShareBufferClass<uint8>, (MAX_POINTS_PER_GROUP, "GpuParticleFrames")));
+	m_pointGroup->Set_Texture(texture.Peek());
+	m_pointGroup->Set_Shader(system.getShaderType() == ParticleSystemInfo::ADDITIVE ?
+		ShaderClass::_PresetAdditiveSpriteShader : ShaderClass::_PresetAlphaSpriteShader);
+	m_pointGroup->Set_Flag(PointGroupClass::TRANSFORM, true);
+	m_pointGroup->Set_Point_Mode(PointGroupClass::QUADS);
+	m_pointGroup->Set_Billboard(true);
+	m_pointGroup->Set_Frame_Row_Column_Count_Log2(static_cast<uint8>(std::countr_zero(rows)));
+	const auto &bounds = m_currentBoundingBox;
+	const auto speed = static_cast<double>(definition.getGpuSpeedMultiplier());
+	const auto frames = static_cast<double>(definition.getGpuTotalFrames());
+	UnsignedInt count = 0, drawn = 0;
+	const auto flush = [&] {
+		if (!count)
+			return;
+		m_pointGroup->Set_Arrays(m_posBuffer, m_RGBABuffer, nullptr, m_sizeBuffer, m_angleBuffer, m_gpuFrameBuffer.Peek(), count);
+		m_pointGroup->Render(rinfo);
+		drawn += count;
+		count = 0;
+	};
+	for (Particle *particle = system.getFirstParticle(); particle; particle = particle->m_systemNext)
+	{
+		const auto &pos = *particle->getPosition();
+		const Real size = particle->getSize();
+		if (!particle->m_lifetime || !(size > 0.0f) || WWMath::Fabs(pos.x - bounds.Center.X) > bounds.Extent.X + size ||
+			WWMath::Fabs(pos.y - bounds.Center.Y) > bounds.Extent.Y + size ||
+			WWMath::Fabs(pos.z - bounds.Center.Z) > bounds.Extent.Z + size)
+			continue;
+		const auto &color = *particle->getColor();
+		const auto alpha = definition.hasGpuAlphaKeys() ? particle->getAlpha() : 1.0f;
+		m_posBuffer->Get_Array()[count] = Vector3(pos.x, pos.y, pos.z);
+		m_sizeBuffer->Get_Array()[count] = size;
+		m_RGBABuffer->Get_Array()[count] = Vector4(color.red, color.green, color.blue, alpha);
+		const Real angle = std::isfinite(particle->getAngle()) ? std::fmod(particle->getAngle(), TWO_PI) : 0.0f;
+		m_angleBuffer->Get_Array()[count] = static_cast<uint8>(static_cast<Int>(angle * 256.0f / TWO_PI));
+		const auto age = static_cast<double>(particle->getElapsedFrames());
+		m_gpuFrameBuffer->Get_Array()[count] = static_cast<uint8>(std::fmod(age * speed, frames));
+		if (++count == MAX_POINTS_PER_GROUP)
+			flush();
+	}
+	flush();
+	m_pointGroup->Set_Frame_Row_Column_Count_Log2(0);
+	return drawn;
+}
+
 /**
  * Nasty hack to render particles last. Called directly by WW3D::Flush()
  */
@@ -235,6 +390,16 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	{
 		ParticleSystem *sys = (*it);
 		if (!sys) {
+			continue;
+		}
+		if (RetailFileLayers::enabled() && sys->getTemplate() && sys->getTemplate()->usesGpuDraw())
+		{
+			flushParticleBatch(rinfo, pointCount);
+			if (sys->getTemplate()->canDrawGpuParticles())
+			{
+				const auto drawn = drawGpuParticles(*sys);
+				m_onScreenParticleCount += drawn ? drawn : drawGpuFallback(rinfo, *sys);
+			}
 			continue;
 		}
 

@@ -5,6 +5,8 @@
 #include "Common/INI.h"
 #include "GameClient/ParticleSys.h"
 
+#include <cmath>
+
 namespace
 {
 enum FXModuleEffect
@@ -15,6 +17,7 @@ enum FXModuleEffect
 	FX_MODULE_DRAW_PARTICLE,
 	FX_MODULE_DRAW_STREAK,
 	FX_MODULE_DRAW_MODEL,
+	FX_MODULE_DRAW_GPU,
 	FX_MODULE_UNRENDERED
 };
 
@@ -79,7 +82,7 @@ const FXNamedValue fxTypes[] =
 	{ "VOLUME_PARTICLE",  ParticleSystemInfo::VOLUME_PARTICLE, TRUE },
 	{ "SMUDGE",           ParticleSystemInfo::SMUDGE,          TRUE },
 	{ "TERRAIN_PARTICLE", ParticleSystemInfo::PARTICLE,        FALSE },
-	{ "GPU_PARTICLE",     ParticleSystemInfo::PARTICLE,        FALSE },
+	{ "GPU_PARTICLE",     ParticleSystemInfo::PARTICLE,        TRUE },
 	{ "GPU_TERRAINFIRE",  ParticleSystemInfo::PARTICLE,        FALSE },
 	{ nullptr,            0,                                   FALSE }
 };
@@ -133,6 +136,15 @@ void ParticleSystemTemplate::resetForFXDefinition()
 	m_slaveTemplate = nullptr;
 	m_isRenderable = TRUE;
 	m_modelHasAlpha = FALSE;
+	m_isGpuParticle = FALSE;
+	m_hasGpuDraw = FALSE;
+	m_gpuFramesPerRow = 1;
+	m_gpuTotalFrames = 1;
+	m_gpuSpeedMultiplier = 1.0f;
+	setZero(m_gpuAngleXY);
+	setZero(m_gpuAngularRateXY);
+	m_gpuAngularDampingXY.setRange(1.0f, 1.0f, GameClientRandomVariable::CONSTANT);
+	m_gpuDetailTexture.clear();
 	for (Int axis = 0; axis < 3; ++axis)
 	{
 		setZero(m_modelStartSize[axis]);
@@ -177,7 +189,7 @@ void ParticleSystemTemplate::parseFXModule( INI* ini, void *instance, void *, co
 		{ "Draw",             "DefaultDraw",                   m_fxDefaultDrawFieldParseTable,         FX_MODULE_DRAW_PARTICLE, 0 },
 		{ "Draw",             "StreakDraw",                    m_fxDefaultDrawFieldParseTable,         FX_MODULE_DRAW_STREAK,   0 },
 		{ "Draw",             "RenderObjectDraw",              m_fxRenderObjectDrawFieldParseTable,    FX_MODULE_DRAW_MODEL,    0 },
-		{ "Draw",             "GpuDraw",                       m_fxGpuDrawFieldParseTable,             FX_MODULE_UNRENDERED,    0 },
+		{ "Draw",             "GpuDraw",                       m_fxGpuDrawFieldParseTable,             FX_MODULE_DRAW_GPU,      0 },
 		{ "Draw",             "LightningDraw",                 m_fxLightningDrawFieldParseTable,       FX_MODULE_UNRENDERED,    0 },
 		{ "Draw",             "ButterflyDraw",                 m_fxDefaultDrawFieldParseTable,         FX_MODULE_UNRENDERED,    0 },
 		{ "Draw",             "QuadDraw",                      m_fxDefaultDrawFieldParseTable,         FX_MODULE_UNRENDERED,    0 },
@@ -210,6 +222,9 @@ void ParticleSystemTemplate::parseFXModule( INI* ini, void *instance, void *, co
 		case FX_MODULE_DRAW_STREAK:
 			self->m_particleType = STREAK;
 			break;
+		case FX_MODULE_DRAW_GPU:
+			self->m_hasGpuDraw = TRUE;
+			break;
 		case FX_MODULE_UNRENDERED:
 			self->m_isRenderable = FALSE;
 			break;
@@ -238,10 +253,13 @@ void ParticleSystemTemplate::parseFXShader( INI* ini, void *instance, void *stor
 
 void ParticleSystemTemplate::parseFXType( INI* ini, void *instance, void *store, const void* )
 {
-	const FXNamedValue *value = findNamedValue(fxTypes, ini->getNextToken());
+	const char *token = ini->getNextToken();
+	const FXNamedValue *value = findNamedValue(fxTypes, token);
 	*static_cast<ParticleType *>(store) = static_cast<ParticleType>(value->value);
+	auto *self = static_cast<ParticleSystemTemplate *>(instance);
+	self->m_isGpuParticle = stricmp(token, "GPU_PARTICLE") == 0;
 	if (!value->renderable)
-		static_cast<ParticleSystemTemplate *>(instance)->m_isRenderable = FALSE;
+		self->m_isRenderable = FALSE;
 }
 
 void ParticleSystemTemplate::parseFXUnrendered( INI* ini, void *, void *, const void* )
@@ -251,6 +269,46 @@ void ParticleSystemTemplate::parseFXUnrendered( INI* ini, void *, void *, const 
 	while (ini->getNextTokenOrNull() != nullptr)
 	{
 	}
+}
+
+Bool ParticleSystemTemplate::canDrawGpuParticles() const
+{
+	return m_isRenderable && m_isGpuParticle && m_hasGpuDraw && m_gpuDetailTexture.isEmpty() &&
+		(m_shaderType == ADDITIVE || m_shaderType == ALPHA) && m_particleAlignment == PARTICLE_ALIGNMENT_BILLBOARD &&
+		m_gpuFramesPerRow > 0 && m_gpuFramesPerRow <= 256 && m_gpuTotalFrames > 0 &&
+		m_gpuTotalFrames <= m_gpuFramesPerRow * m_gpuFramesPerRow &&
+		m_gpuSpeedMultiplier >= 0.0f && std::isfinite(m_gpuSpeedMultiplier);
+}
+
+ParticleSystemTemplate::GpuDrawSettings ParticleSystemTemplate::getGpuDrawSettings(const Particle &particle, Real sizeScale) const
+{
+	const auto range = [](const GameClientRandomVariable &value, Real scale)
+	{
+		return std::array<Real, 4>{value.getMinimumValue() * scale, value.getMaximumValue() * scale, 0.0f, 0.0f};
+	};
+	GpuDrawSettings data;
+	data.draw[0] = {static_cast<Real>(m_gpuFramesPerRow), static_cast<Real>(m_gpuTotalFrames), 0.0f, 0.0f};
+	for (unsigned key = 0; key < 4; ++key)
+	{
+		const auto &color = m_colorKey[key].color;
+		const Real alpha = m_modelHasAlpha ? particle.m_alphaKey[key].value : 1.0f;
+		data.draw[key + 1] = {color.red, color.green, color.blue, alpha};
+		data.draw[5][key] = static_cast<Real>(m_colorKey[key].frame);
+	}
+	data.draw[6][0] = m_shaderType == ADDITIVE ? 1.0f : 3.0f;
+	data.draw[7][0] = m_gpuSpeedMultiplier;
+	data.draw[8] = range(m_colorScale, 1.0f);
+	data.update = {{
+		range(m_startSize, sizeScale), range(m_sizeRate, sizeScale), range(m_sizeRateDamping, 1.0f),
+		range(m_gpuAngleXY, 1.0f), range(m_gpuAngularRateXY, 1.0f), range(m_gpuAngularDampingXY, 1.0f),
+		range(m_angleZ, 1.0f), range(m_angularRateZ, 1.0f), range(m_angularDamping, 1.0f)
+	}};
+	data.physics = {{
+		{0.0f, 0.0f, m_gravity, 0.0f},
+		{m_driftVelocity.x, m_driftVelocity.y, m_driftVelocity.z, 0.0f},
+		range(m_velDamping, 1.0f)
+	}};
+	return data;
 }
 
 const FieldParse ParticleSystemTemplate::m_fxSystemFieldParseTable[] =
@@ -314,9 +372,9 @@ const FieldParse ParticleSystemTemplate::m_fxDefaultUpdateFieldParseTable[] =
 	{ "AngularRateZ",     INI::parseGameClientRandomVariable,        nullptr, offsetof( ParticleSystemTemplate, m_angularRateZ ) },
 	{ "AngularDamping",   INI::parseGameClientRandomVariable,        nullptr, offsetof( ParticleSystemTemplate, m_angularDamping ) },
 	{ "Rotation",         ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "AngleXY",          ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "AngularRateXY",    ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "AngularDampingXY", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "AngleXY",          INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_gpuAngleXY) },
+	{ "AngularRateXY",    INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_gpuAngularRateXY) },
+	{ "AngularDampingXY", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_gpuAngularDampingXY) },
 	{ nullptr,            nullptr,                                   nullptr, 0 }
 };
 
@@ -485,10 +543,10 @@ const FieldParse ParticleSystemTemplate::m_fxDefaultDrawFieldParseTable[] =
 
 const FieldParse ParticleSystemTemplate::m_fxGpuDrawFieldParseTable[] =
 {
-	{ "FramesPerRow",    ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "TotalFrames",     ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "SpeedMultiplier", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "DetailTexture",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "FramesPerRow",     INI::parseUnsignedInt,              nullptr, offsetof(ParticleSystemTemplate, m_gpuFramesPerRow) },
+	{ "TotalFrames",      INI::parseUnsignedInt,              nullptr, offsetof(ParticleSystemTemplate, m_gpuTotalFrames) },
+	{ "SpeedMultiplier", INI::parseReal,                     nullptr, offsetof(ParticleSystemTemplate, m_gpuSpeedMultiplier) },
+	{ "DetailTexture",    INI::parseAsciiString,              nullptr, offsetof(ParticleSystemTemplate, m_gpuDetailTexture) },
 	{ nullptr,           nullptr,                                   nullptr, 0 }
 };
 

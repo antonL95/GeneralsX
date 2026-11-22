@@ -80,6 +80,8 @@ public:
 		needed. Note that primary and/or secondary can be null, so you must check for this.
 	*/
 	virtual void doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx = nullptr, const Real primarySpeed = 0.0f, const Coord3D *secondary = nullptr, const Real overrideRadius = 0.0f) const = 0;
+	virtual void doFXPosWithObjects(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
+		const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const;
 
 	/**
 		the object-based version... by default, just call the location-based implementation.
@@ -139,9 +141,10 @@ public:
 	}
 
 	/// inline convenience method to avoid having to check for null.
-	inline static void doFXPos(const FXList* fx, const Coord3D *primary, const Matrix3D* primaryMtx = nullptr, const Real primarySpeed = 0.0f, const Coord3D *secondary = nullptr, const Real overrideRadius = 0.0f)
+	inline static void doFXPos(const FXList* fx, const Coord3D *primary, const Matrix3D* primaryMtx = nullptr, const Real primarySpeed = 0.0f, const Coord3D *secondary = nullptr, const Real overrideRadius = 0.0f,
+		const Object* source = nullptr, const Object* target = nullptr)
 	{
-		if (fx) fx->doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
+		if (fx) fx->doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius, source, target);
 	}
 
 	/// inline convenience method to avoid having to check for null.
@@ -166,7 +169,8 @@ protected:
 		The main guts of the system: actually perform the sound and/or video effects
 		needed. Note that primary and/or secondary can be null, so you must check for this.
 	*/
-	void doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx = nullptr, const Real primarySpeed = 0.0f, const Coord3D *secondary = nullptr, const Real overrideRadius = 0.0f) const;
+	void doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
+		const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const;
 
 	/**
 		the object-based version... by default, just call the location-based implementation.

@@ -39,6 +39,8 @@
 #include "WWMath/matrix3d.h"		///< @todo Replace with our own matrix library
 #include "Common/STLTypedefs.h"
 
+#include <array>
+
 
 /// @todo Once the client framerate is decoupled, the frame counters within will have to become time-based
 
@@ -216,6 +218,11 @@ public:
 	void setPersonality(UnsignedInt p) { m_personality = p; };
 
 	UnsignedInt getElapsedFrames() const;
+	UnsignedInt getCreateTimestamp() const { return m_createTimestamp; }
+	const Coord3D &getGpuSpawnPosition() const { return m_gpuSpawnPosition; }
+	const Coord3D &getGpuSpawnVelocity() const { return m_gpuSpawnVelocity; }
+	Real getGpuSeed() const { return m_gpuSeed; }
+	void setGpuSeed(Real seed) { m_gpuSeed = seed; }
 
 protected:
 
@@ -253,6 +260,9 @@ protected:
 
 
 	Bool							m_isCulled;														///< status of particle relative to screen bounds
+	Coord3D m_gpuSpawnPosition{};
+	Coord3D m_gpuSpawnVelocity{};
+	Real m_gpuSeed = 0.0f;
 public:
 	Bool							m_inSystemList;
 	Bool							m_inOverallList;
@@ -601,6 +611,19 @@ public:
 	static const FieldParse *getFXFieldParse() { return m_fxFieldParseTable; }
 	void resetForFXDefinition();
 	Bool isRenderable() const { return m_isRenderable; }
+	Bool usesGpuDraw() const { return m_hasGpuDraw || m_isGpuParticle; }
+	Bool canDrawGpuParticles() const;
+	UnsignedInt getGpuFramesPerRow() const { return m_gpuFramesPerRow; }
+	UnsignedInt getGpuTotalFrames() const { return m_gpuTotalFrames; }
+	Real getGpuSpeedMultiplier() const { return m_gpuSpeedMultiplier; }
+	Bool hasGpuAlphaKeys() const { return m_modelHasAlpha; }
+	struct GpuDrawSettings
+	{
+		std::array<std::array<Real, 4>, 9> draw{};
+		std::array<std::array<Real, 4>, 9> update{};
+		std::array<std::array<Real, 4>, 3> physics{};
+	};
+	GpuDrawSettings getGpuDrawSettings(const Particle &particle, Real sizeScale) const;
 	Real getWindStrength() const { return m_windStrength; }
 	Real getWindFullStrengthDistance() const { return m_windFullStrengthDistance; }
 	Real getWindZeroStrengthDistance() const { return m_windZeroStrengthDistance; }
@@ -661,6 +684,15 @@ protected:
 	GameClientRandomVariable m_modelSizeRate[3];
 	GameClientRandomVariable m_modelSizeDamping[3];
 	Bool m_modelHasAlpha = FALSE;
+	Bool m_isGpuParticle = FALSE;
+	Bool m_hasGpuDraw = FALSE;
+	UnsignedInt m_gpuFramesPerRow = 1;
+	UnsignedInt m_gpuTotalFrames = 1;
+	Real m_gpuSpeedMultiplier = 1.0f;
+	GameClientRandomVariable m_gpuAngleXY;
+	GameClientRandomVariable m_gpuAngularRateXY;
+	GameClientRandomVariable m_gpuAngularDampingXY;
+	AsciiString m_gpuDetailTexture;
 	Real m_windFullStrengthDistance;
 	Real m_windZeroStrengthDistance;
 	Coord3D m_cylinderOffset;
@@ -700,6 +732,9 @@ public:
 
 	void attachToDrawable( const Drawable *draw );							///< attach this particle system to a Drawable
 	void attachToObject( const Object *obj );									///< attach this particle system to an Object
+	void attachToObjectBone(const Object* object, const AsciiString& bone);
+	void setRetailTargetMatrix(const Matrix3D* matrix) { setLocalTransform(matrix); m_retailHasTargetMatrix = TRUE; }
+	const Matrix3D* getRetailTargetMatrix() const { return m_retailHasTargetMatrix ? &m_localTransform : nullptr; }
 
 	virtual Bool update( Int localPlayerIndex );								///< update this particle system, return false if dead
 	void updateWindMotion();							///< update wind motion
@@ -749,6 +784,11 @@ public:
 	const Coord3D *getSlavePositionOffset() { return &m_slavePosOffset; }
 
 	void setSystemLifetime( UnsignedInt frames ) { m_systemLifetimeLeft = frames; }; ///< not the particle life, the system!... Lorenzen
+	void setRetailSystemLifetime(UnsignedInt frames)
+	{
+		m_systemLifetimeLeft = frames;
+		m_isForever = FALSE;
+	}
 	void setLifetimeRange( Real min, Real max );
 	Bool isSystemForever() const {return m_isForever;}
 
@@ -854,6 +894,8 @@ protected:
 	ParticleSystem *	m_masterSystem;									///< if non-null, the system that controls this one
 	ParticleSystemID	m_masterSystemID;								///< master system id (if present);
 
+	AsciiString m_retailAttachmentBone;
+	Bool m_retailHasTargetMatrix = FALSE;
 	const ParticleSystemTemplate *	m_template;						///< the template this system was constructed from
 	Particle *											m_controlParticle;		///< if non-null, this system is controlled by this particle
 

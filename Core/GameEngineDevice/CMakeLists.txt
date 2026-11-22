@@ -9,6 +9,7 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/Common/W3DThingFactory.h
     Include/W3DDevice/GameClient/BaseHeightMap.h
     Include/W3DDevice/GameClient/W3DRetailPostEffect.h
+    Include/W3DDevice/GameClient/W3DRetailGpuParticles.h
 #    Include/W3DDevice/GameClient/camerashakesystem.h
     Include/W3DDevice/GameClient/FlatHeightMap.h
     Include/W3DDevice/GameClient/HeightMap.h
@@ -29,6 +30,8 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/GameClient/Module/W3DQuadrupedDraw.h
     Include/W3DDevice/GameClient/Module/W3DSailModelDraw.h
     Include/W3DDevice/GameClient/Module/W3DStreakDraw.h
+    Include/W3DDevice/GameClient/Module/W3DLightDraw.h
+    Include/W3DDevice/GameClient/Module/W3DTornadoDraw.h
     Include/W3DDevice/GameClient/Module/W3DRopeDraw.h
     Include/W3DDevice/GameClient/Module/W3DScienceModelDraw.h
     Include/W3DDevice/GameClient/Module/W3DSupplyDraw.h
@@ -122,6 +125,8 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/Drawable/Draw/W3DQuadrupedDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DSailModelDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DStreakDraw.cpp
+    Source/W3DDevice/GameClient/Drawable/Draw/W3DLightDraw.cpp
+    Source/W3DDevice/GameClient/Drawable/Draw/W3DTornadoDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DRopeDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DScienceModelDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DSupplyDraw.cpp
@@ -172,6 +177,7 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/W3DParticleSys.cpp
     Source/W3DDevice/GameClient/W3DPostProcess.cpp
     Source/W3DDevice/GameClient/W3DRetailPostEffect.cpp
+    Source/W3DDevice/GameClient/W3DRetailGpuParticles.cpp
     Source/W3DDevice/GameClient/RetailEffectDraw.cpp
     Source/W3DDevice/GameClient/W3DRetailTerrain.cpp
     Source/W3DDevice/GameClient/W3DRetailNormalMapped.cpp

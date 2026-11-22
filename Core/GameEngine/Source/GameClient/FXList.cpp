@@ -35,10 +35,13 @@
 #include "Common/DrawModule.h"
 #include "Common/GameAudio.h"
 #include "Common/GameUtility.h"
+#include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/SpecialPowerINI.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
 
@@ -50,6 +53,9 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/ParticleSys.h"
 #include "GameLogic/PartitionManager.h"
+#include "WWMath/wwmath.h"
+
+#include <optional>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
@@ -86,6 +92,12 @@ void FXNugget::doFXObj(const Object* primary, const Object* secondary) const
 	const Real speed = 0.0f;	// yes, that's right -- NOT the object's speed.
 	const Coord3D* s = secondary ? secondary->getPosition() : nullptr;
 	doFXPos(p, mtx, speed, s);
+}
+
+void FXNugget::doFXPosWithObjects(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
+	const Coord3D* secondary, Real overrideRadius, const Object*, const Object*) const
+{
+	doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -526,6 +538,7 @@ public:
 		m_offset.x = m_offset.y = m_offset.z = 0;
 		m_orientToObject = false;
 		m_attachToObject = false;
+		m_ricochet = false;
 		m_createAtGroundHeight = FALSE;
 		m_useCallersRadius = FALSE;
 		m_rotateX = m_rotateY = m_rotateZ = 0;
@@ -558,17 +571,26 @@ public:
 				Matrix3D aimingMatrix(1);
 				aimingMatrix.Rotate_Z( aimingAngle );
 
-				reallyDoFX(primary->getPosition(), &aimingMatrix, primary, 0.0f);
+				doFXFromObject(primary->getPosition(), &aimingMatrix, primary, secondary, 0.0f);
 			}
 			else
 				// if we have an object, then adjust the offset and direction by the object's transformation
 				// matrix, so that (say) an offset of +10 in the z axis "follows" the orientation of the object.
-				reallyDoFX(primary->getPosition(), primary->getTransformMatrix(), primary, 0.0f);
+				doFXFromObject(primary->getPosition(), primary->getTransformMatrix(), primary, secondary, 0.0f);
 		}
 		else
 		{
 			DEBUG_CRASH(("You must have a primary source for this effect"));
 		}
+	}
+
+	void doFXPosWithObjects(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
+		const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const override
+	{
+		if (primary && source && RetailFileLayers::enabled())
+			doFXFromObject(primary, primaryMtx, source, target, overrideRadius);
+		else
+			doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
 	}
 
 	static void parse(INI *ini, void *instance, void* /*store*/, const void* /*userData*/)
@@ -591,16 +613,77 @@ public:
 			{ "UseCallersRadius",			INI::parseBool,							nullptr, offsetof( ParticleSystemFXNugget, m_useCallersRadius ) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
+		static const FieldParse retailOnlyFieldParse[] =
+		{
+			{ "Name", parseRetailName, nullptr, 0 },
+			{ "AttachToBone", INI::parseAsciiString, nullptr, offsetof(ParticleSystemFXNugget, m_retailAttachmentBone) },
+			{ "CreateBoneOverride", INI::parseAsciiString, nullptr, offsetof(ParticleSystemFXNugget, m_retailCreateBone) },
+			{ "SetTargetMatrix", INI::parseBool, nullptr, offsetof(ParticleSystemFXNugget, m_retailSetTargetMatrix) },
+			{ "OnlyIfOnLand", INI::parseBool, nullptr, offsetof(ParticleSystemFXNugget, m_retailOnlyIfOnLand) },
+			{ "OnlyIfOnWater", INI::parseBool, nullptr, offsetof(ParticleSystemFXNugget, m_retailOnlyIfOnWater) },
+			{ "Weather", INI::parseIndexList, WeatherNames, offsetof(ParticleSystemFXNugget, m_retailWeather) },
+			{ "ObjectFilter", parseRetailObjectFilter, nullptr, 0 },
+			{ "SystemLife", INI::parseInt, nullptr, offsetof(ParticleSystemFXNugget, m_retailSystemLife) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
 
 		ParticleSystemFXNugget* nugget = newInstance( ParticleSystemFXNugget );
-		ini->initFromINI(nugget, myFieldParse);
+		MultiIniFieldParse fields;
+		if (RetailFileLayers::enabled())
+			fields.add(retailOnlyFieldParse);
+		fields.add(myFieldParse);
+		ini->initFromINIMulti(nugget, fields);
 		((FXList*)instance)->addFXNugget(nugget);
 	}
 
 protected:
 
-	void reallyDoFX(const Coord3D *primary, const Matrix3D* mtx, const Object* thingToAttachTo, Real overrideRadius ) const
+	static void parseRetailName(INI* ini, void* instance, void*, const void*)
 	{
+		auto* nugget = static_cast<ParticleSystemFXNugget*>(instance);
+		nugget->m_name = ini->getNextAsciiString();
+		const char* field = ini->getNextTokenOrNull(INI::getSepsColon());
+		if (field && stricmp(field, "FollowBone") == 0)
+			nugget->m_retailFollowBone = INI::scanBool(ini->getNextToken(INI::getSepsColon()));
+	}
+
+	static void parseRetailObjectFilter(INI* ini, void* instance, void*, const void* userData)
+	{
+		auto* nugget = static_cast<ParticleSystemFXNugget*>(instance);
+		if (!nugget->m_retailObjectFilter)
+			nugget->m_retailObjectFilter.emplace();
+		SpecialPowerObjectFilter::parse(ini, instance, &*nugget->m_retailObjectFilter, userData);
+	}
+
+	void doFXFromObject(const Coord3D* position, const Matrix3D* transform, const Object* object, const Object* target,
+		Real overrideRadius) const
+	{
+		const Drawable* drawable = object->getDrawable();
+		const AsciiString& boneName = m_retailCreateBone.isNotEmpty() ? m_retailCreateBone : m_retailAttachmentBone;
+		Matrix3D bone;
+		if (drawable && boneName.isNotEmpty() && drawable->getCurrentWorldspaceClientBonePositions(boneName.str(), bone))
+		{
+			const Coord3D origin = {bone.Get_X_Translation(), bone.Get_Y_Translation(), bone.Get_Z_Translation()};
+			const Bool follow = m_retailFollowBone || m_attachToObject;
+			reallyDoFX(&origin, &bone, object, overrideRadius, follow ? &boneName : nullptr, target);
+			return;
+		}
+
+		reallyDoFX(position, transform, object, overrideRadius, nullptr, target);
+	}
+
+	void reallyDoFX(const Coord3D *primary, const Matrix3D* mtx, const Object* thingToAttachTo,
+		Real overrideRadius, const AsciiString* attachmentBone = nullptr, const Object* target = nullptr) const
+	{
+		if (m_retailWeather >= 0 && m_retailWeather != (TheGlobalData ? TheGlobalData->m_weather : WEATHER_NORMAL))
+			return;
+		if (m_retailObjectFilter)
+		{
+			const Object* subject = target ? target : thingToAttachTo;
+			if (!subject || !m_retailObjectFilter->matchesObject(thingToAttachTo, subject))
+				return;
+		}
+
 		Coord3D offset = m_offset;
 		if (mtx)
 		{
@@ -611,10 +694,11 @@ protected:
 		DEBUG_ASSERTCRASH(tmp, ("ParticleSystem %s not found",m_name.str()));
 		if (tmp)
 		{
+			const bool filterSurface = m_retailOnlyIfOnLand || m_retailOnlyIfOnWater;
 			for (Int i = 0; i < m_count; i++ )
 			{
-				ParticleSystem *sys = TheParticleSystemManager->createParticleSystem(tmp);
-				if (sys)
+				ParticleSystem* sys = filterSurface ? nullptr : TheParticleSystemManager->createParticleSystem(tmp);
+				if (sys || filterSurface)
 				{
 					Coord3D newPos;
 					Real radius = m_radius.getValue();
@@ -635,10 +719,27 @@ protected:
 					else
 						newPos.z += m_height.getValue();
 
-
-					if (m_orientToObject && mtx)
+					if (filterSurface)
 					{
-						sys->setLocalTransform(mtx);
+						if (!TheTerrainLogic || TheTerrainLogic->isUnderwater(newPos.x, newPos.y) == m_retailOnlyIfOnLand)
+							continue;
+						sys = TheParticleSystemManager->createParticleSystem(tmp);
+						if (!sys)
+							continue;
+					}
+
+					if (m_orientToObject && mtx && !attachmentBone)
+					{
+						if (m_retailSetTargetMatrix && target)
+						{
+							const Coord3D delta = *target->getPosition() - newPos;
+							Matrix3D aim = *mtx;
+							aim.Rotate_Y(DEG_TO_RADF(180.0f) - WWMath::Atan2Origin(delta.z + 10.0f,
+								WWMath::Sqrt(delta.x * delta.x + delta.y * delta.y)));
+							sys->setRetailTargetMatrix(&aim);
+						}
+						else
+							sys->setLocalTransform(mtx);
 					}
 					if (m_rotateX != 0.0f)
 						sys->rotateLocalTransformX(m_rotateX);
@@ -647,10 +748,22 @@ protected:
 					if (m_rotateZ != 0.0f)
 						sys->rotateLocalTransformZ(m_rotateZ);
 
-					if (m_attachToObject && thingToAttachTo)
+					if (attachmentBone)
+					{
+						const Vector3 worldPosition(newPos.x, newPos.y, newPos.z);
+						Vector3 bonePosition;
+						Matrix3D::Inverse_Transform_Vector(*mtx, worldPosition, &bonePosition);
+						const Coord3D local = {bonePosition.X, bonePosition.Y, bonePosition.Z};
+						sys->setPosition(&local);
+						sys->attachToObjectBone(thingToAttachTo, *attachmentBone);
+					}
+					else if (m_attachToObject && thingToAttachTo)
 						sys->attachToObject(thingToAttachTo);
 					else
 						sys->setPosition( &newPos );
+
+					if (m_retailSystemLife >= 0)
+						sys->setRetailSystemLifetime(static_cast<UnsignedInt>(m_retailSystemLife));
 
 					Real delayInMsec = m_delay.getValue();
 					if (delayInMsec >= 0.0f)
@@ -675,6 +788,15 @@ protected:
 
 
 private:
+	AsciiString m_retailAttachmentBone;
+	AsciiString m_retailCreateBone;
+	Bool m_retailFollowBone = FALSE;
+	Bool m_retailSetTargetMatrix = FALSE;
+	Bool m_retailOnlyIfOnLand = FALSE;
+	Bool m_retailOnlyIfOnWater = FALSE;
+	Int m_retailWeather = -1;
+	Int m_retailSystemLife = -1;
+	std::optional<SpecialPowerObjectFilter> m_retailObjectFilter;
 	AsciiString			m_name;
 	Int							m_count;
 	Coord3D					m_offset;
@@ -811,7 +933,8 @@ void FXList::clear()
 }
 
 //-------------------------------------------------------------------------------------------------
-void FXList::doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx, const Real primarySpeed, const Coord3D *secondary, const Real overrideRadius ) const
+void FXList::doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
+	const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const
 {
 	const Int playerIndex = rts::getObservedOrLocalPlayer()->getPlayerIndex();
 
@@ -820,7 +943,10 @@ void FXList::doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx, const R
 
 	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
 	{
-		(*it)->doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
+		if (source || target)
+			(*it)->doFXPosWithObjects(primary, primaryMtx, primarySpeed, secondary, overrideRadius, source, target);
+		else
+			(*it)->doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
 	}
 }
 

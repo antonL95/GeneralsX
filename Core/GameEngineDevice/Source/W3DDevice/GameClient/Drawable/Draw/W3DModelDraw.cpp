@@ -4271,7 +4271,7 @@ Int W3DModelDraw::getBarrelCount(WeaponSlotType wslot) const
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius)
+Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius, const Object* target)
 {
 	DEBUG_ASSERTCRASH(specificBarrelToUse >= 0, ("specificBarrelToUse should now always be explicit"));
 
@@ -4299,6 +4299,7 @@ Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelTo
 		if (info.m_fxBone && m_renderObject)
 		{
 			const Object *logicObject = getDrawable()->getObject();// This is slow, so store it
+			const Object* source = RetailFileLayers::enabled() ? logicObject : nullptr;
 			if( ! m_renderObject->Is_Hidden() || (logicObject == nullptr) )
 			{
 				// I can ask the drawable's bone position if I am not hidden (if I have no object I have no choice)
@@ -4307,7 +4308,7 @@ Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelTo
 				pos.x = mtx.Get_X_Translation();
 				pos.y = mtx.Get_Y_Translation();
 				pos.z = mtx.Get_Z_Translation();
-				FXList::doFXPos(fxl, &pos, &mtx, weaponSpeed, victimPos, damageRadius);
+				FXList::doFXPos(fxl, &pos, &mtx, weaponSpeed, victimPos, damageRadius, source, target);
 			}
 			else
 			{
@@ -4322,7 +4323,7 @@ Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelTo
 				// In that case, tracers will have to be rewritten to be "point towards secondary" instead of
 				// "point straight ahead" which assumes we are facing the target.
 				*/
-				FXList::doFXPos(fxl, &pos, mtx, weaponSpeed, victimPos, damageRadius);
+				FXList::doFXPos(fxl, &pos, mtx, weaponSpeed, victimPos, damageRadius, source, target);
 			}
 
 			handled = true;

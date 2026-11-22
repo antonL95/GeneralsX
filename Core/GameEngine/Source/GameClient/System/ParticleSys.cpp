@@ -312,6 +312,11 @@ Particle::Particle( ParticleSystem *system, const ParticleInfo *info )
 
 	m_vel = info->m_vel;
 	m_pos = info->m_pos;
+	if (system->getTemplate() && system->getTemplate()->canDrawGpuParticles())
+	{
+		m_gpuSpawnPosition = info->m_pos;
+		m_gpuSpawnVelocity = info->m_vel;
+	}
 
 #if PARTICLE_USE_XY_ROTATION
 	m_angleX = info->m_angleX;
@@ -775,6 +780,8 @@ void Particle::xfer( Xfer *xfer )
 #else
 	XferVersion currentVersion = 2;
 #endif
+	if (RetailFileLayers::enabled())
+		currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -826,6 +833,17 @@ void Particle::xfer( Xfer *xfer )
 	ParticleSystemID systemUnderControlID = m_systemUnderControl ? m_systemUnderControl->getSystemID() : INVALID_PARTICLE_SYSTEM_ID;
 	xfer->xferUser( &systemUnderControlID, sizeof( ParticleSystemID ) );
 
+	if (version >= 3)
+	{
+		Bool gpu = m_system->getTemplate() && m_system->getTemplate()->canDrawGpuParticles();
+		xfer->xferBool(&gpu);
+		if (gpu)
+		{
+			xfer->xferCoord3D(&m_gpuSpawnPosition);
+			xfer->xferCoord3D(&m_gpuSpawnVelocity);
+			xfer->xferReal(&m_gpuSeed);
+		}
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1578,6 +1596,7 @@ void ParticleSystem::attachToDrawable( const Drawable *draw )
 // ------------------------------------------------------------------------------------------------
 void ParticleSystem::attachToObject( const Object *obj )
 {
+	m_retailAttachmentBone.clear();
 	if (obj)
 	{
 		DEBUG_ASSERTCRASH( m_attachedToDrawableID == INVALID_ID, ( "ParticleSystem is already attached to a Drawable" ) );
@@ -1588,6 +1607,12 @@ void ParticleSystem::attachToObject( const Object *obj )
 	{
 		m_attachedToObjectID = INVALID_ID;
 	}
+}
+
+void ParticleSystem::attachToObjectBone(const Object* object, const AsciiString& bone)
+{
+	attachToObject(object);
+	m_retailAttachmentBone = bone;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1912,7 +1937,8 @@ Particle *ParticleSystem::createParticle( const ParticleInfo *info,
 		if (TheGlobalData->m_useFX == FALSE)
 			return nullptr;
 
-		if (m_template && !m_template->isRenderable())
+		if (m_template && (!m_template->isRenderable() ||
+			(m_template->usesGpuDraw() && !m_template->canDrawGpuParticles())))
 			return nullptr;
 
 		//
@@ -1951,6 +1977,8 @@ Particle *ParticleSystem::createParticle( const ParticleInfo *info,
 	}
 
 	Particle *p = newInstance(Particle)( this, info );
+	if (!forceCreate && m_template && m_template->canDrawGpuParticles())
+		p->setGpuSeed(GameClientRandomValueReal(0.0f, 15.0f));
 	return p;
 
 }
@@ -2288,17 +2316,24 @@ void ParticleSystem::updateTransform()
 	{
 		if (Object *objectAttachedTo = TheGameLogic->findObjectByID( m_attachedToObjectID ))
 		{
+			m_lastPos = m_pos;
+			m_pos = *objectAttachedTo->getPosition();
 			if (const Drawable * draw = objectAttachedTo->getDrawable())
 			{
-				applyParentTransform( *draw->getTransformMatrix() );
+				Matrix3D bone;
+				if (m_retailAttachmentBone.isNotEmpty() &&
+					draw->getCurrentWorldspaceClientBonePositions(m_retailAttachmentBone.str(), bone))
+				{
+					applyParentTransform(bone);
+					m_pos = {m_transform.Get_X_Translation(), m_transform.Get_Y_Translation(), m_transform.Get_Z_Translation()};
+				}
+				else
+					applyParentTransform(*draw->getTransformMatrix());
 			}
 			else
 			{
 				applyParentTransform( *objectAttachedTo->getTransformMatrix() );
 			}
-
-			m_lastPos = m_pos;
-			m_pos = *objectAttachedTo->getPosition();
 		}
 		else
 		{
@@ -2729,7 +2764,7 @@ void ParticleSystem::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2813,6 +2848,12 @@ void ParticleSystem::xfer( Xfer *xfer )
 
 	// master system
 	xfer->xferUser( &m_masterSystemID, sizeof( ParticleSystemID ) );
+
+	if (version >= 2)
+	{
+		xfer->xferAsciiString(&m_retailAttachmentBone);
+		xfer->xferBool(&m_retailHasTargetMatrix);
+	}
 
 	// particle count
 	UnsignedInt particleCount = m_particleCount;

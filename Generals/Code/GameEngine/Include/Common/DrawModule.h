@@ -51,6 +51,7 @@ class DebrisDrawInterface;
 class TracerDrawInterface;
 class RopeDrawInterface;
 class LaserDrawInterface;
+class Object;
 class FXList;
 enum TerrainDecalType CPP_11(: Int);
 enum ShadowType CPP_11(: Int);
@@ -185,7 +186,7 @@ public:
 	virtual void setHidden(Bool h) = 0;
 	virtual void replaceModelConditionState(const ModelConditionFlags& a) = 0;
 	virtual void replaceIndicatorColor(Color color) = 0;
-	virtual Bool handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius) = 0;
+	virtual Bool handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius, const Object* target) = 0;
 	virtual Int getBarrelCount(WeaponSlotType wslot) const = 0;
 
 	virtual void setSelectable(Bool selectable) = 0;

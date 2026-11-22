@@ -33,7 +33,11 @@
 #include "WW3D2/rinfo.h"
 #include "WWLib/bittype.h"
 
+#include <memory>
+#include <vector>
+
 class W3DTerrainParticles;
+namespace RetailFX { class GpuParticlePass; }
 
 //=============================================================================
 /** W3D implementation of the game display which is responsible for creating
@@ -55,10 +59,16 @@ private:
 	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture);
 	void initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture);
 	void flushParticleBatch(RenderInfoClass& rinfo, UnsignedInt& pointCount);
+	UnsignedInt drawGpuParticles(ParticleSystem &system);
+	UnsignedInt drawGpuFallback(RenderInfoClass &rinfo, ParticleSystem &system);
 
 	enum { MAX_POINTS_PER_GROUP = 512 };
 
 	RefCountPtr<TextureClass> m_batchTexture;		///< the texture used as the drawing surface for batched particle draws
+	std::unique_ptr<RetailFX::GpuParticlePass> m_gpuParticlePass;
+	void *m_gpuEffectDevice = nullptr;
+	RefCountPtr<ShareBufferClass<uint8>> m_gpuFrameBuffer;
+	std::vector<AsciiString> m_tracedGpuTemplates;
 	PointGroupClass *m_pointGroup;							///< the point group that contains all of the particles
 	StreakLineClass *m_streakLine;							///< the streak class that contains all of the streaks
 	W3DTerrainParticles *m_terrainParticles;			///< the terrain-conforming particles renderer
