@@ -30,6 +30,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <cmath>
 #include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
@@ -100,8 +101,19 @@ void QueueProductionExitUpdate::exitObjectViaDoor( Object *newObj, ExitDoorType 
 		const QueueProductionExitUpdateModuleData* md = getQueueProductionExitUpdateModuleData();
 
 		Real exitAngle = creationObject->getOrientation();
-		if (RetailFileLayers::enabled())
-			exitAngle = normalizeAngle(exitAngle + md->m_placementViewAngle);
+		if (RetailFileLayers::enabled() && std::isfinite(md->m_placementViewAngle))
+		{
+			Real combined = exitAngle + md->m_placementViewAngle;
+			if (std::isfinite(combined))
+			{
+				combined = std::fmod(combined, 2.0f * PI);
+				if (combined > PI)
+					combined -= 2.0f * PI;
+				else if (combined < -PI)
+					combined += 2.0f * PI;
+				exitAngle = combined;
+			}
+		}
 		const Matrix3D *transform = creationObject->getTransformMatrix();
 		Vector3 loc;
 		Coord3D createPoint;

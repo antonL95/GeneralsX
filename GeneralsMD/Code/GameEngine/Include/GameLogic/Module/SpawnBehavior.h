@@ -82,33 +82,7 @@ public:
 		m_slavesHaveFreeWill = FALSE;
 	}
 
-	static void buildFieldParse(MultiIniFieldParse& p)
-	{
-    BehaviorModuleData::buildFieldParse(p);
-		static const FieldParse dataFieldParse[] =
-		{
-			{ "SpawnNumber",							INI::parseInt,										nullptr, offsetof( SpawnBehaviorModuleData, m_spawnNumberData ) },
-			{ "SpawnReplaceDelay",				INI::parseDurationUnsignedInt,		nullptr, offsetof( SpawnBehaviorModuleData, m_spawnReplaceDelayData ) },
-			{ "OneShot",									INI::parseBool,										nullptr, offsetof( SpawnBehaviorModuleData, m_isOneShotData ) },
-			{ "CanReclaimOrphans",				INI::parseBool,										nullptr,	offsetof( SpawnBehaviorModuleData, m_canReclaimOrphans ) },
-			{ "AggregateHealth",  				INI::parseBool,										nullptr, offsetof( SpawnBehaviorModuleData, m_aggregateHealth ) },
-			{ "ExitByBudding",    				INI::parseBool,										nullptr, offsetof( SpawnBehaviorModuleData, m_exitByBudding ) },
-			{ "SpawnTemplateName",				INI::parseAsciiStringVectorAppend,nullptr, offsetof( SpawnBehaviorModuleData, m_spawnTemplateNameData ) },
-			{ "SpawnedRequireSpawner",		INI::parseBool,										nullptr,	offsetof( SpawnBehaviorModuleData, m_spawnedRequireSpawner ) },
-			{ "PropagateDamageTypesToSlavesWhenExisting",   INI::parseDamageTypeFlags, nullptr, offsetof( SpawnBehaviorModuleData, m_damageTypesToPropagateToSlaves ) },
-			{ "InitialBurst",				      INI::parseInt,						        nullptr, offsetof( SpawnBehaviorModuleData, m_initialBurst ) },
-			{ "FadeInTime", INI::parseDurationUnsignedInt, nullptr, offsetof( SpawnBehaviorModuleData, m_fadeInTime ) },
-			{ "SpawnInsideBuilding", INI::parseBool, nullptr, offsetof( SpawnBehaviorModuleData, m_spawnInsideBuilding ) },
-			{ "ShareUpgrades", INI::parseBool, nullptr, offsetof( SpawnBehaviorModuleData, m_shareUpgrades ) },
-			{ "KillSpawnsBasedOnModelConditionState", INI::parseBool, nullptr, offsetof( SpawnBehaviorModuleData, m_killSpawnsBasedOnModelConditionState ) },
-			{ "SlavesHaveFreeWill",				INI::parseBool,										nullptr, offsetof( SpawnBehaviorModuleData, m_slavesHaveFreeWill ) },
-			{ nullptr, nullptr, nullptr, 0 }
-
-		};
-    p.add(dataFieldParse);
-		p.add(DieMuxData::getFieldParse(), offsetof( SpawnBehaviorModuleData, m_dieMuxData ));
-		p.add(UpgradeMuxData::getFieldParse(), offsetof( SpawnBehaviorModuleData, m_spawnUpgradeGate ));
-	}
+	static void buildFieldParse(MultiIniFieldParse& p);
 };
 
 // ------------------------------------------------------------------------------------------------

@@ -30,6 +30,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/GameState.h"
+#include "Common/ModuleFactory.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Player.h"
@@ -57,6 +58,41 @@
 
 #define SPAWN_DELAY_MIN_FRAMES (16) // about as rapidly as you'd expect people to successively exit through the same door
 //-------------------------------------------------------------------------------------------------
+void SpawnBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	BehaviorModuleData::buildFieldParse(p);
+	static const FieldParse dataFieldParse[] =
+	{
+		{ "SpawnNumber", INI::parseInt, nullptr, offsetof(SpawnBehaviorModuleData, m_spawnNumberData) },
+		{ "SpawnReplaceDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(SpawnBehaviorModuleData, m_spawnReplaceDelayData) },
+		{ "OneShot", INI::parseBool, nullptr, offsetof(SpawnBehaviorModuleData, m_isOneShotData) },
+		{ "CanReclaimOrphans", INI::parseBool, nullptr, offsetof(SpawnBehaviorModuleData, m_canReclaimOrphans) },
+		{ "AggregateHealth", INI::parseBool, nullptr, offsetof(SpawnBehaviorModuleData, m_aggregateHealth) },
+		{ "ExitByBudding", INI::parseBool, nullptr, offsetof(SpawnBehaviorModuleData, m_exitByBudding) },
+		{ "SpawnTemplateName", INI::parseAsciiStringVectorAppend, nullptr, offsetof(SpawnBehaviorModuleData, m_spawnTemplateNameData) },
+		{ "SpawnedRequireSpawner", INI::parseBool, nullptr, offsetof(SpawnBehaviorModuleData, m_spawnedRequireSpawner) },
+		{ "PropagateDamageTypesToSlavesWhenExisting", INI::parseDamageTypeFlags, nullptr, offsetof(SpawnBehaviorModuleData, m_damageTypesToPropagateToSlaves) },
+		{ "InitialBurst", INI::parseInt, nullptr, offsetof(SpawnBehaviorModuleData, m_initialBurst) },
+		{ "FadeInTime", INI::parseDurationUnsignedInt, nullptr, offsetof(SpawnBehaviorModuleData, m_fadeInTime) },
+		{ "SpawnInsideBuilding", INI::parseBool, nullptr, offsetof(SpawnBehaviorModuleData, m_spawnInsideBuilding) },
+		{ "ShareUpgrades", INI::parseBool, nullptr, offsetof(SpawnBehaviorModuleData, m_shareUpgrades) },
+		{ "SlavesHaveFreeWill", INI::parseBool, nullptr, offsetof(SpawnBehaviorModuleData, m_slavesHaveFreeWill) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(dataFieldParse);
+	p.add(DieMuxData::getFieldParse(), offsetof(SpawnBehaviorModuleData, m_dieMuxData));
+	p.add(UpgradeMuxData::getFieldParse(), offsetof(SpawnBehaviorModuleData, m_spawnUpgradeGate));
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "KillSpawnsBasedOnModelConditionState", INI::parseBool, nullptr, offsetof(SpawnBehaviorModuleData, m_killSpawnsBasedOnModelConditionState) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
+}
+
 SpawnBehavior::SpawnBehavior( Thing *thing, const ModuleData* moduleData )
 						 : UpdateModule( thing, moduleData )
 {
@@ -215,13 +251,8 @@ UpdateSleepTime SpawnBehavior::update()
 			for (objectIDListIterator it = m_spawnIDs.begin(); it != m_spawnIDs.end(); ++it)
 			{
 				Object* spawn = TheGameLogic->findObjectByID(*it);
-				if (!spawn || spawn->getObjectCompletedUpgradeMask().testForAll(parentMask))
-					continue;
-				for (const UpgradeTemplate* upgrade = TheUpgradeCenter->firstUpgradeTemplate(); upgrade; upgrade = upgrade->friend_getNext())
-				{
-					if (upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && parent->hasUpgrade(upgrade) && !spawn->hasUpgrade(upgrade))
-						spawn->giveUpgrade(upgrade);
-				}
+				if (spawn)
+					spawn->giveUpgradeMask(parentMask);
 			}
 		}
 	}
@@ -694,11 +725,9 @@ Bool SpawnBehavior::createSpawn()
 
 	if (retail && md->m_shareUpgrades)
 	{
-		for (const UpgradeTemplate* upgrade = TheUpgradeCenter->firstUpgradeTemplate(); upgrade; upgrade = upgrade->friend_getNext())
-		{
-			if (upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && parent->hasUpgrade(upgrade) && !newSpawn->hasUpgrade(upgrade))
-				newSpawn->giveUpgrade(upgrade);
-		}
+		const UpgradeMaskType parentMask = parent->getObjectCompletedUpgradeMask();
+		if (parentMask.any())
+			newSpawn->giveUpgradeMask(parentMask);
 	}
 
 	// If they have a SlavedUpdate, then I have to tell them who their daddy is from now on.
