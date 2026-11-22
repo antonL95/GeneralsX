@@ -1,14 +1,21 @@
 8 create Player_1 DolAmrothPorter 0 2390,840,0
 10 fund Player_1 DolAmrothPorter 0
 11 shroudmap Player_1 DolAmrothPorter 0
+13 pkg23-display Player_1 - 0 DolAmrothFarm 2440 520
+13 pkg23-display Player_1 - 0 DaleShoremansCottageFoundation 2440 520
+13 pkg23-display Player_1 - 0 Pkg23FarmWithoutIndicator 2440 520
 14 placecheck Player_1 DolAmrothPorter 0 DolAmrothGuardhouse 2450 1040 0
 15 pkg08-queue-state Player_1 DolAmrothPorter 0
 20 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothGuardhouse 2450 1040
+22 pkg23-cash Player_1 - 0 before-build
 23 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothFarm 2440 520
 26 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothBattleTower 2400 620
+28 pkg23-display Player_1 DolAmrothFarm 0 -
 29 pkg08-queue-state Player_1 DolAmrothPorter 0
+29 pkg23-cash Player_1 - 0 before-cancel
 30 cancelbuild Player_1 DolAmrothFarm 0
 32 pkg08-queue-state Player_1 DolAmrothPorter 0
+32 pkg23-cash Player_1 - 0 after-cancel
 33 create Player_1 Pkg08PorterControl 0 2390,840,0
 34 pkg08-contact Player_1 DolAmrothPorter 0 Player_1:DolAmrothGuardhouse:0
 34 pkg08-contact Player_1 Pkg08PorterControl 0 Player_1:DolAmrothGuardhouse:0
@@ -60,6 +67,14 @@
 126 snapshot-wall-occupant Player_1 - 0 WallGateOccupant
 126 list Player_1 - 0
 220 pkg08-queue-state Player_1 DolAmrothPorter 0
+220 create Player_1 DaleShoremansCottageFoundation 0 1870,2530,0
+221 objupgrade Player_1 DaleShoremansCottageFoundation 0 Upgrade_ObjectUnderAIControl
+222 pkg23-display Player_1 DaleShoremansCottageFoundation 0 -
+230 create Player_1 RowdyTubDwarf 0 2000,2500,0
+230 create PlyrCreeps MordorPorter 0 3020,1850,0
+230 create PlyrCreeps Pkg23PillageTarget 0 3060,1900,0
+230 create Player_1 DaleShoremansCottageFoundation 0 1690,2490,0
+231 pkg23-set-cash PlyrCreeps - 0 - 100 0
 235 create Player_1 PartitionUpgradeBuilding 0 2640,1580,35
 235 create Player_1 PartitionScaleFighter 0 2590,1820,20
 235 create Player_1 PartitionScaleHorde 0 2880,2000,0
@@ -70,6 +85,8 @@
 239 create PlyrCreeps Pkg19SaveTarget 0 2250,1710,180
 240 create Player_1 GuldurEntwife 0 2120,660,90
 240 orderattack Player_1 Pkg19SaveShooter 0 PlyrCreeps:Pkg19SaveTarget:0
+240 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 0 0
+242 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
 243 pkg14-fatal Player_1 GuldurEntwife 0
 244 pkg19-state Player_1 Pkg19SaveShooter 0
 244 snapshot-partition-cells Player_1 GondorCastleWallSegment 0
@@ -78,14 +95,54 @@
 244 snapshot-partition-cells Player_1 PartitionUpgradeBuilding 0
 244 snapshot-partition-cells Player_1 PartitionScaleFighter 0
 244 snapshot-partition-cells Player_1 PartitionScaleHorde 0
+245 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:MordorPorter:2 1 0
+247 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
+248 pkg23-set-cash PlyrCreeps - 0 - 0 0
+249 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
 250 pkg19-secondary Player_1 Pkg19SaveShooter 0
+250 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
+254 pkg23-set-cash PlyrCreeps - 0 - 100 0
+255 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
+256 pkg23-hit Player_1 RowdyTubDwarf 0 PlyrCreeps:Pkg23PillageTarget:0 10 0
+274 create Player_1 Pkg23FarmWithoutIndicator 0 2040,2850,0
+275 pkg23-display Player_1 Pkg23FarmWithoutIndicator 0 -
+276 pkg23-kill Player_1 Pkg23FarmWithoutIndicator 0 -
 285 builderscriptmove * Wolf 8 - 1933.749145508 1773.990844727
+290 create Player_1 DolAmrothGondorBulwark 0 2240,2710,0
+291 pkg23-pay Player_1 DolAmrothGondorBulwark 0 - 101 0
+292 create Player_1 GondorMarketPlace 0 2100,2630,0
+294 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
+300 grant Player_1 - 0 Upgrade_MarketplaceUpgradeDefiance
+300 create Player_1 DolAmrothGondorBulwark 0 2280,2700,0
+301 pkg23-pay Player_1 DolAmrothGondorBulwark 0 - 101 0
+303 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
+306 create Player_1 DolAmrothGondorBulwark 0 2240,2720,0
+308 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
 320 pkg08-fire-state Player_1 IthilienPathfinder 0
+320 create Player_1 DolAmrothGondorBulwark 0 2250,2730,0
 321 pkg08-fire-state Player_1 GondorFighter 0
+321 pkg23-kill Player_1 GondorMarketPlace 0 -
+321 pkg23-pay Player_1 DolAmrothGondorBulwark 0 - 101 0
+323 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
+334 create Player_1 GondorMarketPlace 0 2100,2630,0
+335 create Player_1 DolAmrothGondorBulwark 0 2410,2830,0
+336 pkg23-pay Player_1 DolAmrothGondorBulwark 0 - 101 0
+337 pkg23-sell Player_1 DolAmrothGondorBulwark 0 -
+338 pkg23-kill Player_1 DolAmrothGondorBulwark 0 -
+340 create Player_1 DolAmrothFarm 0 2250,2790,0
+341 pkg23-pay Player_1 DolAmrothFarm 0 - 300 0
+342 pkg23-sell Player_1 DolAmrothFarm 0 -
+400 pkg23-cash Player_1 - 0 basic-deposit-before
+401 pkg23-cash Player_1 - 0 basic-deposit-after
+403 grant Player_1 - 0 Upgrade_ObjectUnderAIControl
+410 pkg23-cash Player_1 - 0 upgraded-deposit-before
+411 pkg23-cash Player_1 - 0 upgraded-deposit-after
 450 create Player_1 PartitionSplashSource 0 2540,1240,0
 450 create PlyrCreeps PartitionSplashTarget 0 2540,1240,180
 450 firetestweapon Player_1 PartitionSplashSource 0 MordorCatapultRockWarhead,PlyrCreeps:PartitionSplashTarget:0
 450 health Player_1 MenWallGate 0
+521 pkg23-cash Player_1 - 0 sale-before
+522 pkg23-cash Player_1 - 0 sale-after
 600 pkg08-queue-state Player_1 DolAmrothPorter 0
 1000 pkg08-queue-state Player_1 DolAmrothPorter 0
 1300 pkg08-queue-state Player_1 DolAmrothPorter 0

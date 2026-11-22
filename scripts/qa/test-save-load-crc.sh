@@ -15,7 +15,13 @@ for number in "$save_frame" "$count"; do
 done
 end=$((save_frame + count))
 fixtures=$(cd "$(dirname "$0")/saveload" && pwd)
-out=$(mktemp -d "$build/pkgs1-$mode.XXXXXX")
+out=${PKGS1_STATE_DIR:-}
+if [ -n "$out" ]; then
+    mkdir -p "$out"
+    out=$(cd "$out" && pwd)
+else
+    out=$(mktemp -d "$build/pkgs1-$mode.XXXXXX")
+fi
 printf '%s\n' "$out"
 
 export XDG_DATA_HOME="$out/data" XDG_CONFIG_HOME="$out/config"
@@ -151,6 +157,13 @@ expect continue "TEST frame $end: quit"
 run resume resume -loadsave parity.sav
 expect resume "TEST frame $end: quit"
 for phase in continue resume; do
+    if [ "$mode" = training ]; then
+        first=0
+        if [ "$phase" = resume ]; then
+            first=$save_frame
+        fi
+        awk -v first="$first" -v last="$end" -f "$fixtures/economy.awk" "$out/$phase.log"
+    fi
     if [ -n "$path_unit" ]; then
         expect "$phase" "TEST save-load path-state frame=$save_frame waiting=1"
         expect "$phase" "TEST save-load path-state frame=$((save_frame + 1)) waiting=0"
