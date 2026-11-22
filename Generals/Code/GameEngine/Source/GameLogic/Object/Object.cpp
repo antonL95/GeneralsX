@@ -431,7 +431,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	// allocate experience tracker
 	m_experienceTracker = newInstance(ExperienceTracker)(this);
 
-	if (!TheGameState || !TheGameState->isInLoadGame())
+	if (!RetailFileLayers::enabled() || !TheGameState || !TheGameState->isInLoadGame())
 	{
 		const Player* controller = getControllingPlayer();
 		m_experienceTracker->setVeterancyLevel(controller->getProductionVeterancyLevel(getTemplate()->getName()));
@@ -3815,7 +3815,7 @@ void Object::xfer( Xfer *xfer )
 	{
 		Matrix3D mtx = *getTransformMatrix();
 		xfer->xferMatrix3D(&mtx);
-		if (xfer->getXferMode() == XFER_LOAD)
+		if (!RetailFileLayers::enabled() || xfer->getXferMode() == XFER_LOAD)
 			setTransformMatrix(&mtx);
 	}
 	else
@@ -3823,13 +3823,13 @@ void Object::xfer( Xfer *xfer )
 		// object position
 		Coord3D pos = *getPosition();
 		xfer->xferCoord3D( &pos );
-		if (xfer->getXferMode() == XFER_LOAD)
+		if (!RetailFileLayers::enabled() || xfer->getXferMode() == XFER_LOAD)
 			setPosition(&pos);
 
 		// orientation
 		Real orientation = getOrientation();
 		xfer->xferReal( &orientation );
-		if (xfer->getXferMode() == XFER_LOAD)
+		if (!RetailFileLayers::enabled() || xfer->getXferMode() == XFER_LOAD)
 			setOrientation(orientation);
 	}
 

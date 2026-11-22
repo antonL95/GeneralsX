@@ -5836,6 +5836,9 @@ void AIUpdateInterface::loadPostProcess()
 	if (TheAI->pathfinder()->hasLoadedReservations())
 		return;
 
+	if (RetailFileLayers::enabled() && m_waitingForPath && m_queueForPathFrame == 0)
+		TheAI->pathfinder()->queueForPath(getObject()->getID());
+
 	if (!isMoving()) {
 		m_pathfindGoalCell.x = -1;
 		m_pathfindGoalCell.y = -1;

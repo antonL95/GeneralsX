@@ -4315,7 +4315,7 @@ Object *GameLogic::getFirstObject()
 // ------------------------------------------------------------------------------------------------
 ObjectID GameLogic::allocateObjectID()
 {
-	if (TheGameState && TheGameState->isInLoadGame())
+	if (RetailFileLayers::enabled() && TheGameState && TheGameState->isInLoadGame())
 	{
 		while (findObjectByID(m_nextObjID))
 			m_nextObjID = static_cast<ObjectID>(static_cast<UnsignedInt>(m_nextObjID) + 1);
@@ -5517,7 +5517,9 @@ void GameLogic::xfer( Xfer *xfer )
 			}
 
 			// create new object
-			obj = TheThingFactory->newObjectFromExactTemplate(thingTemplate, defaultTeam, OBJECT_STATUS_MASK_NONE);
+			obj = RetailFileLayers::enabled()
+				? TheThingFactory->newObjectFromExactTemplate(thingTemplate, defaultTeam, OBJECT_STATUS_MASK_NONE)
+				: TheThingFactory->newObject(thingTemplate, defaultTeam);
 
 			// xfer the rest of the object data
 			xfer->xferSnapshot( obj );

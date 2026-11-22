@@ -1602,7 +1602,7 @@ void GameState::xferSaveData( Xfer *xfer, SnapshotType which )
 
 		}
 
-		if (which == SNAPSHOT_SAVELOAD && getSaveGameInfo()->saveFileType != SAVE_FILE_TYPE_MISSION)
+		if (which == SNAPSHOT_SAVELOAD && RetailFileLayers::enabled() && getSaveGameInfo()->saveFileType != SAVE_FILE_TYPE_MISSION)
 		{
 			AsciiString blockName = simulationBlockName;
 			xfer->xferAsciiString(&blockName);
@@ -1642,7 +1642,7 @@ void GameState::xferSaveData( Xfer *xfer, SnapshotType which )
 			else
 			{
 
-				if (which == SNAPSHOT_SAVELOAD && token.compareNoCase(simulationBlockName) == 0)
+				if (which == SNAPSHOT_SAVELOAD && RetailFileLayers::enabled() && token.compareNoCase(simulationBlockName) == 0)
 				{
 					xfer->beginBlock();
 					xferSimulationState(xfer);

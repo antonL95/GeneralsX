@@ -17,6 +17,7 @@
 */
 
 #include "Common/CRCDebug.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Object.h"
@@ -67,7 +68,7 @@ void Path::crc( Xfer *xfer )
 void Path::xfer( Xfer *xfer )
 {
   // version
-  XferVersion currentVersion = 2;
+  const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
