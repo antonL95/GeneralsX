@@ -173,6 +173,7 @@
 #include "GameLogic/Module/MobMemberSlavedUpdate.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
+#include "GameLogic/Module/RetailConstruction.h"
 #include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/CastleUpgrade.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
@@ -523,6 +524,8 @@ void ModuleFactory::init()
 		addModule( CastleMemberBehavior );
 		addModule( CastleBehavior );
 		addModule( CastleUpgrade );
+		addModule( BaseUpgrade );
+		addModule( BuildingBehavior );
 		addModule( ReplaceSelfUpgrade );
 		addModule( DoCommandUpgrade );
 		addModule( GeometryUpgrade );

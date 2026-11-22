@@ -91,6 +91,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/WeaponNuggetRules.h
     Include/GameLogic/RetailTestCommands.h
     Include/GameLogic/RetailBuildingEvents.h
+    Include/GameLogic/Module/RetailConstruction.h
     Include/GameLogic/Module/CastleBehavior.h
     Include/GameLogic/Module/CastleUpgrade.h
     Include/GameLogic/Module/ReplaceSelfUpgrade.h
@@ -729,12 +730,14 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailBuildingTestCommands.cpp
     Source/GameLogic/System/RetailPlacementTestCommands.cpp
     Source/GameLogic/System/RetailBuildingEvents.cpp
+    Source/GameLogic/Object/Behavior/RetailConstruction.cpp
     Source/GameLogic/System/RetailMordorTestCommands.cpp
     Source/GameLogic/System/RetailPowerTestCommands.cpp
     Source/GameLogic/System/RetailPackage05TestCommands.cpp
     Source/GameLogic/System/RetailPackage07TestCommands.cpp
     Source/GameLogic/System/RetailPackage09TestCommands.cpp
 
+    Source/GameLogic/System/RetailPackage08TestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
     Source/GameLogic/Object/Upgrade/ReplaceSelfUpgrade.cpp

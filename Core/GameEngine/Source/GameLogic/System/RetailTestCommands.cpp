@@ -173,6 +173,7 @@ void runRetailPackage05TestCommand(std::string_view action, Object* source, Obje
 void runRetailPackage07TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage09TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
 
+void runRetailPackage08TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D* position, UnsignedInt frame);
 #endif
 
 namespace RetailTestCommands
@@ -2647,6 +2648,13 @@ void execute(const Command& command, unsigned int frame)
 		return;
 	}
 #if !RTS_GENERALS
+	if (command.action.starts_with("pkg08-"))
+	{
+		const Coord3D position = command.hasLocation ? groundLocation(command) : Coord3D{};
+		runRetailPackage08TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(),
+			command.hasLocation ? &position : nullptr, frame);
+		return;
+	}
 	if (command.action.starts_with("pkg05-"))
 	{
 		if (command.action == "pkg05-wear-ring")
