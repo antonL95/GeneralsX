@@ -1,0 +1,128 @@
+100 create Player_1 Pkg58ChargeYes 0 1150,1100,0
+100 create Player_1 Pkg58ChargeNo 0 1150,1140,0
+100 create PlyrCreeps AngmarDarkDunedain 0 1240,1120,180
+101 pkg58-charge Player_1 Pkg58ChargeYes 0 on
+101 pkg58-charge Player_1 Pkg58ChargeNo 0 on
+102 orderattack Player_1 Pkg58ChargeYes 0 PlyrCreeps:AngmarDarkDunedain:0
+102 orderattack Player_1 Pkg58ChargeNo 0 PlyrCreeps:AngmarDarkDunedain:0
+108 pkg58-state Player_1 Pkg58ChargeYes 0 charge-yes
+108 pkg58-state Player_1 Pkg58ChargeNo 0 charge-no
+115 destroy Player_1 Pkg58ChargeYes 0
+115 destroy Player_1 Pkg58ChargeNo 0
+115 destroy PlyrCreeps AngmarDarkDunedain 0
+130 create Player_1 Pkg58MoveYes 0 1150,1200,0
+130 create Player_1 Pkg58MoveNo 0 1150,1240,0
+130 create PlyrCreeps Pkg58Target 0 1240,1220,180
+132 orderattack Player_1 Pkg58MoveYes 0 PlyrCreeps:Pkg58Target:0
+132 orderattack Player_1 Pkg58MoveNo 0 PlyrCreeps:Pkg58Target:0
+133 pkg58-velocity Player_1 Pkg58MoveYes 0
+133 pkg58-velocity Player_1 Pkg58MoveNo 0
+134 pkg58-state Player_1 Pkg58MoveYes 0 move-yes
+134 pkg58-state Player_1 Pkg58MoveNo 0 move-no
+134 pkg58-velocity Player_1 Pkg58MoveYes 0
+134 pkg58-velocity Player_1 Pkg58MoveNo 0
+135 pkg58-velocity Player_1 Pkg58MoveYes 0
+135 pkg58-velocity Player_1 Pkg58MoveNo 0
+136 pkg58-state Player_1 Pkg58MoveYes 0 move-yes-shot
+136 pkg58-state Player_1 Pkg58MoveNo 0 move-no-shot
+145 destroy Player_1 Pkg58MoveYes 0
+145 destroy Player_1 Pkg58MoveNo 0
+145 destroy PlyrCreeps Pkg58Target 0
+160 create Player_1 Pkg58FinishYes 0 1150,1300,0
+160 create Player_1 Pkg58FinishNo 0 1150,1380,0
+160 create PlyrCreeps Pkg58Target 0 1210,1300,180
+160 create PlyrCreeps Pkg58Target 1 1210,1380,180
+162 orderattack Player_1 Pkg58FinishYes 0 PlyrCreeps:Pkg58Target:0
+162 orderattack Player_1 Pkg58FinishNo 0 PlyrCreeps:Pkg58Target:1
+166 pkg58-state Player_1 Pkg58FinishYes 0 finish-yes-pre
+166 pkg58-state Player_1 Pkg58FinishNo 0 finish-no-pre
+167 pkg58-teleport PlyrCreeps Pkg58Target 0 1460,1300
+167 pkg58-teleport PlyrCreeps Pkg58Target 1 1460,1380
+188 pkg58-state Player_1 Pkg58FinishYes 0 finish-yes-post
+188 pkg58-state Player_1 Pkg58FinishNo 0 finish-no-post
+195 destroy Player_1 Pkg58FinishYes 0
+195 destroy Player_1 Pkg58FinishNo 0
+195 destroy PlyrCreeps Pkg58Target 0
+195 destroy PlyrCreeps Pkg58Target 1
+196 create Player_1 HaradBlackNumenoreanPolemarchHorde 0 1185,1450,0
+196 create PlyrCreeps AngmarDarkDunedainHorde 0 1215,1450,0
+198 pkg58-flank-probe Player_1 HaradBlackNumenoreanPolemarchHorde 0 PlyrCreeps:AngmarDarkDunedainHorde:0
+199 orderattack Player_1 HaradBlackNumenoreanPolemarchHorde 0 PlyrCreeps:AngmarDarkDunedainHorde:0
+238 destroy Player_1 HaradBlackNumenoreanPolemarchHorde 0
+238 destroy PlyrCreeps AngmarDarkDunedainHorde 0
+240 create Player_1 Pkg58PassHit100 0 1150,1520,0
+240 create Player_1 Pkg58PassHit0 0 1150,1620,0
+240 create Player_1 Pkg58PassHitAux 0 1150,1720,0
+240 create Player_1 Pkg58PassHitAux 1 1150,1740,0
+240 create Player_1 Pkg58PassHitAux 2 1150,1760,0
+240 create PlyrCreeps Pkg58Transport 0 1250,1520,180
+240 create PlyrCreeps Pkg58Transport 1 1250,1620,180
+240 create PlyrCreeps Pkg58AuxTransport 0 1250,1740,180
+242 orderattack Player_1 Pkg58PassHit100 0 PlyrCreeps:Pkg58Transport:0
+242 orderattack Player_1 Pkg58PassHit0 0 PlyrCreeps:Pkg58Transport:1
+242 orderattack Player_1 Pkg58PassHitAux 0 PlyrCreeps:Pkg58AuxTransport:0
+242 orderattack Player_1 Pkg58PassHitAux 1 PlyrCreeps:Pkg58AuxTransport:0
+242 orderattack Player_1 Pkg58PassHitAux 2 PlyrCreeps:Pkg58AuxTransport:0
+275 pkg58-state PlyrCreeps Pkg58Transport 0 tower-pass100
+275 pkg58-passenger PlyrCreeps Pkg58Transport 0 passenger-pass100
+275 pkg58-state PlyrCreeps Pkg58Transport 1 tower-pass0
+275 pkg58-passenger PlyrCreeps Pkg58Transport 1 passenger-pass0
+285 destroy Player_1 Pkg58PassHit100 0
+285 destroy Player_1 Pkg58PassHit0 0
+285 destroy PlyrCreeps Pkg58Transport 0
+285 destroy PlyrCreeps Pkg58Transport 1
+370 pkg58-state PlyrCreeps Pkg58AuxTransport 0 tower-aux
+370 pkg58-passenger PlyrCreeps Pkg58AuxTransport 0 passenger-aux
+375 destroy Player_1 Pkg58PassHitAux 0
+375 destroy Player_1 Pkg58PassHitAux 1
+375 destroy Player_1 Pkg58PassHitAux 2
+375 destroy PlyrCreeps Pkg58AuxTransport 0
+300 create Player_1 Pkg58HoldAfterUnit 0 1150,1100,0
+300 create Player_1 Pkg58NoHoldAfterUnit 0 1150,1180,0
+300 create PlyrCreeps Pkg58Target 0 1200,1100,180
+300 create PlyrCreeps Pkg58Target 1 1200,1180,180
+302 orderattack Player_1 Pkg58HoldAfterUnit 0 PlyrCreeps:Pkg58Target:0
+302 orderattack Player_1 Pkg58NoHoldAfterUnit 0 PlyrCreeps:Pkg58Target:1
+312 move Player_1 Pkg58HoldAfterUnit 0 1050,1100,0
+312 move Player_1 Pkg58NoHoldAfterUnit 0 1050,1180,0
+340 pkg58-state Player_1 Pkg58HoldAfterUnit 0 hold-after-yes
+340 pkg58-state Player_1 Pkg58NoHoldAfterUnit 0 hold-after-no
+415 pkg58-state Player_1 Pkg58HoldAfterUnit 0 hold-after-released
+420 destroy Player_1 Pkg58HoldAfterUnit 0
+420 destroy Player_1 Pkg58NoHoldAfterUnit 0
+420 destroy PlyrCreeps Pkg58Target 0
+420 destroy PlyrCreeps Pkg58Target 1
+430 create Player_1 Pkg58TrollAimHold 0 1150,1260,0
+430 create Player_1 Pkg58TrollControl 0 1150,1340,0
+430 create PlyrCreeps Pkg58Target 0 1250,1260,180
+430 create PlyrCreeps Pkg58Target 1 1250,1340,180
+432 orderattack Player_1 Pkg58TrollAimHold 0 PlyrCreeps:Pkg58Target:0
+432 orderattack Player_1 Pkg58TrollControl 0 PlyrCreeps:Pkg58Target:1
+440 pkg58-state Player_1 Pkg58TrollAimHold 0 aim-yes
+440 pkg58-state Player_1 Pkg58TrollControl 0 aim-no
+456 move Player_1 Pkg58TrollAimHold 0 1050,1260,0
+456 move Player_1 Pkg58TrollControl 0 1050,1340,0
+475 pkg58-state Player_1 Pkg58TrollAimHold 0 hold-reload-yes
+475 pkg58-state Player_1 Pkg58TrollControl 0 hold-reload-no
+540 destroy Player_1 Pkg58TrollAimHold 0
+540 destroy Player_1 Pkg58TrollControl 0
+540 destroy PlyrCreeps Pkg58Target 0
+540 destroy PlyrCreeps Pkg58Target 1
+590 create Player_1 Pkg58IdleDelayUnit 0 1150,1400,0
+590 create Player_1 Pkg58NoIdleDelayUnit 0 1150,1460,0
+590 create PlyrCreeps Pkg58Target 0 1250,1400,180
+590 create PlyrCreeps Pkg58Target 1 1250,1460,180
+592 orderattack Player_1 Pkg58IdleDelayUnit 0 PlyrCreeps:Pkg58Target:0
+592 orderattack Player_1 Pkg58NoIdleDelayUnit 0 PlyrCreeps:Pkg58Target:1
+602 pkg58-state Player_1 Pkg58IdleDelayUnit 0 idle-yes
+602 pkg58-state Player_1 Pkg58NoIdleDelayUnit 0 idle-no
+670 destroy Player_1 Pkg58IdleDelayUnit 0
+670 destroy Player_1 Pkg58NoIdleDelayUnit 0
+670 destroy PlyrCreeps Pkg58Target 0
+670 destroy PlyrCreeps Pkg58Target 1
+690 create Player_1 Pkg58InstantClip 0 1150,1520,0
+690 create Player_1 Pkg58DelayedClip 0 1150,1580,0
+691 pkg58-state Player_1 Pkg58InstantClip 0 instant-yes
+691 pkg58-state Player_1 Pkg58DelayedClip 0 instant-no
+700 destroy Player_1 Pkg58InstantClip 0
+700 destroy Player_1 Pkg58DelayedClip 0

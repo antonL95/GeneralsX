@@ -1120,7 +1120,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	if (!isProjectileDetonation && m_holdAfterFiringDelay)
 		sourceObj->holdForWeaponUntil(TheGameLogic->getFrame() + m_holdAfterFiringDelay);
 
-	const Bool flank = !isProjectileDetonation && m_fireFlankFX && HordeContain::isFlanked(victimObj, sourceObj);
+	const Bool flank = !isProjectileDetonation && m_fireFlankFX && HordeContain::isFlanked(victimObj, sourceObj, FALSE);
 	// call this even if FXList is null, because this also handles stuff like Gun Barrel Recoil
 	if (sourceObj && sourceObj->getDrawable())
 	{
@@ -1217,7 +1217,18 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 
 	Bool nuggetHit = hasNuggets() && (isProjectileDetonation || !WeaponNuggetRules::needsHitRoll(m_hitPercentage) ||
 		WeaponNuggetRules::rollHits(GameLogicRandomValue(0, 99), m_hitPercentage));
-	if (!isProjectileDetonation && inflictDamage && victimObj && m_hitPassengerPercentage > 0.0f && (!hasNuggets() || nuggetHit))
+	if (hasNuggets() && !isProjectileDetonation && m_canBeDodged && victimObj && RetailFileLayers::enabled())
+	{
+		const auto* body = dynamic_cast<const ActiveBody*>(victimObj->getBodyModule());
+		const Real dodge = body ? body->getRetailBodyData()->m_dodgePercent : 0.0f;
+		if (dodge > 0.0f && GameLogicRandomValueReal(0.0f, 1.0f) <= dodge)
+			nuggetHit = FALSE;
+	}
+	const Bool infantryScatter = m_infantryInaccuracyDist > 0.0f && victimObj && victimObj->isKindOf(KINDOF_INFANTRY);
+	const Bool forceScatter = m_hasScatterRules && RetailFileLayers::enabled() && hasNuggets() && !isProjectileDetonation && infantryScatter &&
+		(!m_disableScatterForTargetsOnWall || victimObj->getLayer() != LAYER_WALL);
+	if (RetailFileLayers::enabled() && !isProjectileDetonation && inflictDamage && victimObj && m_hitPassengerPercentage > 0.0f &&
+		(!hasNuggets() || (nuggetHit && !forceScatter)))
 	{
 		if (Object* passenger = selectWeaponPassenger(victimObj, m_hitPassengerPercentage))
 		{
@@ -1226,18 +1237,8 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 			victimPos = passenger->getPosition();
 		}
 	}
-	if (hasNuggets() && !isProjectileDetonation && m_canBeDodged && victimObj && RetailFileLayers::enabled())
-	{
-		const auto* body = dynamic_cast<const ActiveBody*>(victimObj->getBodyModule());
-		const Real dodge = body ? body->getRetailBodyData()->m_dodgePercent : 0.0f;
-		if (dodge > 0.0f && GameLogicRandomValueReal(0.0f, 1.0f) <= dodge)
-			nuggetHit = FALSE;
-	}
 	Coord3D projectileDestination = *victimPos;
 	getPreferredTargetPosition(victimObj, projectileDestination);
-	const Bool infantryScatter = m_infantryInaccuracyDist > 0.0f && victimObj && victimObj->isKindOf(KINDOF_INFANTRY);
-	const Bool forceScatter = m_hasScatterRules && RetailFileLayers::enabled() && hasNuggets() && !isProjectileDetonation && infantryScatter &&
-		(!m_disableScatterForTargetsOnWall || victimObj->getLayer() != LAYER_WALL);
 	const Bool scatter = (!nuggetHit || forceScatter) && (m_scatterRadius > 0.0f || infantryScatter);
 	const Real scatterLimit = scatter ? m_scatterRadius + (infantryScatter ? m_infantryInaccuracyDist : 0.0f) : 0.0f;
 	if (scatter && victimObj && victimObj->isKindOf(KINDOF_STRUCTURE))

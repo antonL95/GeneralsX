@@ -1257,7 +1257,9 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 			candidate.preferredScore = prefersHorde ? 2e10f : 1e10f;
 			candidate.hasOnlyInCondition = hasOnlyInCondition != FALSE;
 			candidate.onlyInConditionMatched = onlyInConditionMatched != FALSE;
-			retailCandidates.push_back(WeaponSlotSelectionRules::evaluateSlotCandidate(candidate));
+			auto evaluated = WeaponSlotSelectionRules::evaluateSlotCandidate(candidate);
+			evaluated.ready = evaluated.ready && weapon->canFireInCurrentMovement(obj);
+			retailCandidates.push_back(evaluated);
 			continue;
 		}
 
