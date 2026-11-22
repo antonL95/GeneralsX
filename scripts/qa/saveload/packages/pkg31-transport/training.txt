@@ -1,0 +1,78 @@
+200 create Player_1 Pkg31BattleTower 0 600,2700,0
+200 create Player_1 Pkg31ArcherHorde 0 645,2700,0
+200 create Player_1 Pkg31ArcherHorde 1 1050,3100,0
+
+200 create Player_1 Pkg31CastleKeep 0 800,2700,0
+200 create Player_1 Pkg31Fighter 0 845,2700,0
+200 create Player_1 Pkg31Trebuchet 0 880,2740,0
+200 create PlyrCivilian Pkg31RuinedTower 0 600,2920,0
+200 create Player_1 Pkg31ArcherHorde 2 645,2920,0
+200 create Player_1 Pkg31Mumakil 0 800,2920,0
+
+205 create Player_1 Pkg31Cavalry 0 560,2740,0
+205 create PlyrCreeps Pkg31EnemyArcher 0 560,2660,0
+205 create PlyrCreeps Pkg31Fighter 0 760,2740,0
+205 pkg31-check-enter Player_1 Pkg31ArcherHorde 0 Player_1:Pkg31BattleTower:0|tower-empty-ok
+205 pkg31-check-enter Player_1 Pkg31Cavalry 0 Player_1:Pkg31BattleTower:0|tower-cav-reject
+205 pkg31-check-enter PlyrCreeps Pkg31EnemyArcher 0 Player_1:Pkg31BattleTower:0|tower-enemy-reject
+205 pkg31-check-enter Player_1 Pkg31Fighter 0 Player_1:Pkg31CastleKeep:0|keep-inf-ok
+205 pkg31-check-enter Player_1 Pkg31Trebuchet 0 Player_1:Pkg31CastleKeep:0|keep-siege-reject
+205 pkg31-check-enter PlyrCreeps Pkg31Fighter 0 Player_1:Pkg31CastleKeep:0|keep-enemy-reject
+205 pkg31-check-enter Player_1 Pkg31ArcherHorde 2 PlyrCivilian:Pkg31RuinedTower:0|neutral-tower-ok
+
+205 pkg31-kill PlyrCreeps Pkg31EnemyArcher 0
+205 pkg31-kill PlyrCreeps Pkg31Fighter 0
+205 pkg31-kill Player_1 Pkg31Cavalry 0
+
+206 pkg31-msg-enter Player_1 Pkg31ArcherHorde 0 Player_1:Pkg31BattleTower:0
+206 pkg31-msg-enter Player_1 Pkg31Fighter 0 Player_1:Pkg31CastleKeep:0
+206 pkg31-ai-enter Player_1 Pkg31ArcherHorde 2 PlyrCivilian:Pkg31RuinedTower:0
+
+
+242 pkg31-container-state Player_1 Pkg31BattleTower 0 tower-loaded-pre
+242 pkg31-unit-state Player_1 Pkg31ArcherHorde 0 horde-loaded-pre
+242 pkg31-check-enter Player_1 Pkg31ArcherHorde 1 Player_1:Pkg31BattleTower:0|tower-full-reject
+242 pkg31-container-state Player_1 Pkg31CastleKeep 0 keep-loaded-pre
+242 pkg31-unit-state Player_1 Pkg31Fighter 0 fighter-loaded-pre
+242 pkg31-container-state Player_1 Pkg31RuinedTower 0 neutral-captured-pre
+242 pkg31-container-state Player_1 Pkg31Mumakil 0 mumakil-initial-pre
+242 pkg31-check-enter Player_1 Pkg31Fighter 0 Player_1:Pkg31Mumakil:0|mumakil-filter-reject
+242 create Player_1 MordorHaradrimArcherHordeOnMumakil 1 900,2920,0
+242 pkg31-check-enter Player_1 MordorHaradrimArcherHordeOnMumakil 1 Player_1:Pkg31Mumakil:0|mumakil-full-reject
+242 pkg31-unit-state Player_1 MordorHaradrimArcherHordeOnMumakil 0 mumakil-passenger-pre
+
+242 pkg31-kill Player_1 MordorHaradrimArcherHordeOnMumakil 1
+
+248 pkg31-container-state Player_1 Pkg31BattleTower 0 tower-loaded-post
+248 pkg31-unit-state Player_1 Pkg31ArcherHorde 0 horde-loaded-post
+248 pkg31-container-state Player_1 Pkg31CastleKeep 0 keep-loaded-post
+248 pkg31-unit-state Player_1 Pkg31Fighter 0 fighter-loaded-post
+248 pkg31-container-state Player_1 Pkg31Mumakil 0 mumakil-initial-post
+248 pkg31-unit-state Player_1 MordorHaradrimArcherHordeOnMumakil 0 mumakil-passenger-post
+
+252 create PlyrCreeps Pkg31Catapult 0 460,2400,0
+252 pkg31-hit-weapon PlyrCreeps Pkg31Catapult 0 Player_1:Pkg31BattleTower:0|MordorCatapultRock
+252 pkg31-kill PlyrCreeps Pkg31Catapult 0
+258 pkg31-container-state Player_1 Pkg31BattleTower 0 tower-after-control-hit
+260 create PlyrCreeps Pkg31Catapult 0 460,2400,0
+260 pkg31-hit-weapon PlyrCreeps Pkg31Catapult 0 Player_1:Pkg31BattleTower:0|MordorCatapultHumanHeads
+260 pkg31-kill PlyrCreeps Pkg31Catapult 0
+270 pkg31-container-state Player_1 Pkg31BattleTower 0 tower-after-evac-hit
+270 pkg31-unit-state Player_1 Pkg31ArcherHorde 0 horde-after-evac-hit
+
+275 pkg31-msg-evacuate Player_1 Pkg31CastleKeep 0
+285 pkg31-container-state Player_1 Pkg31CastleKeep 0 keep-after-evac
+285 pkg31-unit-state Player_1 Pkg31Fighter 0 fighter-after-evac
+
+275 pkg31-exit-button Player_1 Pkg31RuinedTower 0 Player_1:Pkg31ArcherHorde:2
+285 pkg31-container-state PlyrCivilian Pkg31RuinedTower 0 neutral-reverted
+
+290 pkg31-damage-half Player_1 Pkg31Mumakil 0
+295 pkg31-container-state Player_1 Pkg31Mumakil 0 mumakil-after-half-dmg
+300 pkg31-kill Player_1 Pkg31Mumakil 0
+306 pkg31-unit-state Player_1 MordorHaradrimArcherHordeOnMumakil 0 rider-after-mumakil-death
+
+310 pkg31-msg-enter Player_1 Pkg31ArcherHorde 0 Player_1:Pkg31BattleTower:0
+400 pkg31-container-state Player_1 Pkg31BattleTower 0 tower-loaded-before-death
+402 pkg31-kill Player_1 Pkg31BattleTower 0
+408 pkg31-unit-state Player_1 Pkg31ArcherHorde 0 horde-after-tower-death
