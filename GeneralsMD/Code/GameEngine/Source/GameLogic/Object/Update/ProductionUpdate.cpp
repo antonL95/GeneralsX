@@ -56,6 +56,7 @@
 #include "GameClient/InGameUI.h"
 
 #include "GameLogic/ExperienceLevelStore.h"
+#include "GameLogic/RetailSkirmishSpending.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
@@ -533,6 +534,11 @@ Bool ProductionUpdate::getUnitPriceOverride(const ThingTemplate* unit, HeroRules
 		return FALSE;
 
 	price = HeroRoster::price(player, unit);
+	if (reviving)
+	{
+		costMultiplier *= RetailSkirmishSpending::brutalFactor(*player, FALSE);
+		timeMultiplier *= RetailSkirmishSpending::brutalFactor(*player, TRUE);
+	}
 	price.cost = scaleProductionValue(price.cost, costMultiplier);
 	price.frames = std::max(1, scaleProductionValue(static_cast<Int>(price.frames), timeMultiplier));
 	return TRUE;

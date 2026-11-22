@@ -33,6 +33,7 @@
 
 #include <map>
 #include <tuple>
+#include <set>
 
 class BuildListInfo;
 class SpecialPowerTemplate;
@@ -127,5 +128,11 @@ protected:
 		UnsignedInt blockedRevision = 0;
 	};
 	std::map<std::tuple<ObjectID, ObjectID, UnsignedInt>, RetailObjective> m_retailObjectives;
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+	UnsignedInt m_retailLastFarmFrame = 0;
+	UnsignedInt m_retailSavings = 0;
+	Int m_retailScavengedBuilding = -1;
+	Real m_retailFarmPriority = 0.0f;
+	std::set<AsciiString> m_retailBuiltStructures;
 
 };

@@ -246,6 +246,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/FPUControl.h
     Include/GameLogic/GameLogic.h
     Include/GameLogic/RetailSkirmishProbe.h
+    Include/GameLogic/RetailSkirmishSpending.h
     Include/GameLogic/GhostObject.h
     Include/GameLogic/AttributeModifierStore.h
     Include/GameLogic/Locomotor.h

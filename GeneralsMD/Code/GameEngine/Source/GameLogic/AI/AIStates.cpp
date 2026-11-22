@@ -6194,6 +6194,7 @@ Object *AIAttackSquadState::chooseVictim()
 			break;
 		}
 
+		case DIFFICULTY_BRUTAL:
 		case DIFFICULTY_HARD:
 		{
 			// everyone picks the same unit

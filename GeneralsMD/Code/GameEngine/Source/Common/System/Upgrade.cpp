@@ -34,6 +34,7 @@
 #include "Common/Upgrade.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/RetailSkirmishSpending.h"
 #include "GameLogic/Module/CostModifierUpgrade.h"
 #include "Common/SpecialPowerINI.h"
 #include "Common/Player.h"
@@ -212,8 +213,10 @@ Int UpgradeTemplate::calcTimeToBuild( Player *player ) const
 	}
 #endif
 
-	///@todo modify this by power state of player
-	return m_buildTime * static_cast<float>(LOGICFRAMES_PER_SECOND);
+	const Real frames = m_buildTime * static_cast<Real>(LOGICFRAMES_PER_SECOND);
+	if (RetailFileLayers::enabled() && player && frames > 0.0f)
+		return std::max<Int>(1, static_cast<Int>(frames * RetailSkirmishSpending::brutalFactor(*player, TRUE)));
+	return frames;
 
 }
 
@@ -223,7 +226,10 @@ Int UpgradeTemplate::calcTimeToBuild( Player *player ) const
 Int UpgradeTemplate::calcCostToBuild( Player *player ) const
 {
 	if (RetailFileLayers::enabled() && player)
-		return static_cast<Int>(m_cost * CostModifierUpgrade::retailUpgradeFactor(*player, *this));
+	{
+		const Int cost = static_cast<Int>(m_cost * CostModifierUpgrade::retailUpgradeFactor(*player, *this));
+		return static_cast<Int>(cost * RetailSkirmishSpending::brutalFactor(*player, FALSE));
+	}
 
 	///@todo modify this by any player handicaps
 	return m_cost;

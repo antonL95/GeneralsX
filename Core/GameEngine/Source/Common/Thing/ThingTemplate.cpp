@@ -46,6 +46,9 @@
 #include "GameClient/RetailClientAudio.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#if !RTS_GENERALS
+#include "GameLogic/RetailSkirmishSpending.h"
+#endif
 #include "GameLogic/Module/CostModifierUpgrade.h"
 #include "Common/LatchRestore.h"
 #include "Common/MessageStream.h"
@@ -2047,7 +2050,12 @@ Int ThingTemplate::calcCostToBuild( const Player* player) const
 	factionModifier *= player->getProductionCostChangeBasedOnKindOf( m_kindof );
 	if (RetailFileLayers::enabled())
 		factionModifier *= CostModifierUpgrade::retailBuildFactor(*player, *this);
-	return getBuildCost() * factionModifier * player->getHandicap()->getHandicap(Handicap::BUILDCOST, this);
+	const Real cost = getBuildCost() * factionModifier * player->getHandicap()->getHandicap(Handicap::BUILDCOST, this);
+#if !RTS_GENERALS
+	if (RetailFileLayers::enabled())
+		return static_cast<Int>(static_cast<Int>(cost) * RetailSkirmishSpending::brutalFactor(*player, FALSE));
+#endif
+	return cost;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2107,6 +2115,10 @@ Int ThingTemplate::calcTimeToBuild( const Player* player) const
 		}
 	}
 
+#if !RTS_GENERALS
+	if (RetailFileLayers::enabled() && buildTime > 0)
+		buildTime = std::max<Int>(1, static_cast<Int>(buildTime * RetailSkirmishSpending::brutalFactor(*player, TRUE)));
+#endif
 	return(buildTime);
 }
 

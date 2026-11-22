@@ -172,6 +172,7 @@ namespace
 		{
 			case SLOT_MED_AI: return "GUI:MediumAI";
 			case SLOT_BRUTAL_AI: return "GUI:HardAI";
+			case SLOT_RETAIL_BRUTAL_AI: return "GUI:BrutalAI";
 			default: return "GUI:EasyAI";
 		}
 	}
@@ -684,6 +685,7 @@ namespace
 			case SLOT_EASY_AI: return localize("GUI:EasyAI", "Easy AI");
 			case SLOT_MED_AI: return localize("GUI:MediumAI", "Medium AI");
 			case SLOT_BRUTAL_AI: return localize("GUI:HardAI", "Hard AI");
+			case SLOT_RETAIL_BRUTAL_AI: return localize("GUI:BrutalAI", "Brutal AI");
 			default: return localize("GUI:Closed", "Closed");
 		}
 	}
@@ -1139,7 +1141,7 @@ namespace
 					options.push_back({factor.percent, localize(factor.key, factor.label)});
 				break;
 			case MenuChoice::Slot:
-				for (SlotState state : {SLOT_OPEN, SLOT_CLOSED, SLOT_EASY_AI, SLOT_MED_AI, SLOT_BRUTAL_AI})
+				for (SlotState state : {SLOT_OPEN, SLOT_CLOSED, SLOT_EASY_AI, SLOT_MED_AI, SLOT_BRUTAL_AI, SLOT_RETAIL_BRUTAL_AI})
 					options.push_back({state, slotName(state)});
 				break;
 			case MenuChoice::Faction:

@@ -69,6 +69,7 @@
 #include "Common/RandomValue.h"
 #include "Common/Recorder.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/RetailSkirmishSpending.h"
 #include "Common/StatsCollector.h"
 #include "Common/ThingFactory.h"
 #include "Common/Team.h"
@@ -1625,6 +1626,10 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 					case SLOT_EASY_AI : d.setInt(TheKey_skirmishDifficulty, DIFFICULTY_EASY); break;
 					case SLOT_MED_AI : d.setInt(TheKey_skirmishDifficulty, DIFFICULTY_NORMAL); break;
 					case SLOT_BRUTAL_AI : d.setInt(TheKey_skirmishDifficulty, DIFFICULTY_HARD); break;
+					case SLOT_RETAIL_BRUTAL_AI :
+						if (RetailFileLayers::enabled())
+							d.setInt(TheKey_skirmishDifficulty, DIFFICULTY_BRUTAL);
+						break;
 					default: break;	 // no setting.
 				}
 			}
@@ -2707,6 +2712,8 @@ static void findAndSelectCommandCenter(Object *obj, void* alreadyFound)
 // ------------------------------------------------------------------------------------------------
 void GameLogic::loadMapINI( AsciiString mapName )
 {
+	if (RetailFileLayers::enabled())
+		RetailSkirmishSpending::resetMapPolicies();
 
 	if (!TheMapCache) {
 		// Need the map cache to get the map and user map directories.

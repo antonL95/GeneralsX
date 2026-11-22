@@ -479,6 +479,8 @@ Bool configure(SkirmishGameInfo& game)
 		state = SLOT_MED_AI;
 	else if (std::strcmp(difficulty, "hard") == 0)
 		state = SLOT_BRUTAL_AI;
+	else if (std::strcmp(difficulty, "brutal") == 0)
+		state = SLOT_RETAIL_BRUTAL_AI;
 	else
 		invalidConfig();
 

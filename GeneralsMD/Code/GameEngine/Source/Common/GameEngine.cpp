@@ -289,10 +289,10 @@ static void startRetailFileSkirmish(const MapMetaData& map)
 	TheSkirmishGameInfo->setLocalIP(human.getIP());
 
 	const char *opponent = std::getenv("GENERALSX_RETAIL_SKIRMISH_AI");
-	if (opponent && std::strcmp(opponent, "1") == 0)
+	if (opponent && (std::strcmp(opponent, "1") == 0 || std::strcmp(opponent, "brutal") == 0))
 	{
 		GameSlot ai;
-		ai.setState(SLOT_EASY_AI);
+		ai.setState(std::strcmp(opponent, "brutal") == 0 ? SLOT_RETAIL_BRUTAL_AI : SLOT_EASY_AI);
 		ai.setStartPos(1);
 		ai.setColor(1);
 		ai.setPlayerTemplate(findRetailSkirmishFaction("FactionMordor"));

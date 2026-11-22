@@ -7102,6 +7102,7 @@ void ScriptEngine::executeScript( Script *pScript )
 	switch (difficulty) {
 		case DIFFICULTY_EASY : if (!pScript->isEasy()) return;  break;
 		case DIFFICULTY_NORMAL : if (!pScript->isNormal()) return;  break;
+		case DIFFICULTY_BRUTAL:
 		case DIFFICULTY_HARD : if (!pScript->isHard()) return;  break;
 	}
 	// If we are doing periodic evaluation, check the frame.

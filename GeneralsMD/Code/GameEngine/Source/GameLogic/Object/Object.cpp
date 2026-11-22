@@ -5339,7 +5339,7 @@ void Object::refreshRetailAIDifficultyUpgrade(const Player* previousOwner)
 		return;
 
 	const Bool multiplayer = TheGameLogic->isInSkirmishGame() || TheGameLogic->isInMultiplayerGame();
-	const char* const difficulty[] = { "Easy", "Medium", "Hard" };
+	const char* const difficulty[] = { "Easy", "Medium", "Hard", "Brutal" };
 	const auto computerFaction = [](const Player* player) {
 		return player && player->getPlayerType() == PLAYER_COMPUTER && player->isPlayableSide();
 	};
@@ -5347,7 +5347,7 @@ void Object::refreshRetailAIDifficultyUpgrade(const Player* previousOwner)
 		if (!computerFaction(player))
 			return nullptr;
 		const GameDifficulty level = player->getPlayerDifficulty();
-		if (level < DIFFICULTY_EASY || level > DIFFICULTY_HARD)
+		if (level < DIFFICULTY_EASY || level > DIFFICULTY_BRUTAL)
 			return nullptr;
 		AsciiString name;
 		name.format("Upgrade_%sAI%sPlayer", difficulty[level], multiplayer ? "Multi" : "Single");

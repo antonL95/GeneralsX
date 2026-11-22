@@ -1168,6 +1168,7 @@ Bool TeamPrototype::evaluateProductionCondition()
 					return false;
 				}
 				break;
+			case DIFFICULTY_BRUTAL:
 			case DIFFICULTY_HARD:
 				if (!pScript->isHard()) {
 					m_productionConditionAlwaysFalse = true;

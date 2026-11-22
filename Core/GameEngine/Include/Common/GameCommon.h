@@ -139,7 +139,8 @@ enum GameDifficulty CPP_11(: Int)
 	DIFFICULTY_NORMAL,
 	DIFFICULTY_HARD,
 
-	DIFFICULTY_COUNT
+	DIFFICULTY_COUNT,
+	DIFFICULTY_BRUTAL = DIFFICULTY_COUNT
 };
 
 //-------------------------------------------------------------------------------------------------

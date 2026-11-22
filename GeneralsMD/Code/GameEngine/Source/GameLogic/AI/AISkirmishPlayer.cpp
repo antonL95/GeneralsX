@@ -34,7 +34,9 @@
 #include "Common/INI.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
 #include "Common/BuildAssistant.h"
@@ -47,6 +49,7 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/AISkirmishPlayer.h"
+#include "GameLogic/RetailSkirmishSpending.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/AI.h"
@@ -68,6 +71,8 @@
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/ControlBar.h"
 
+#include <limits>
+
 namespace
 {
 struct RetailArmyMember
@@ -81,24 +86,42 @@ constexpr Real RETAIL_DEFENDED_TARGET_DISTANCE = 350.0f;
 
 struct RetailArmy
 {
+	AsciiString name;
 	AsciiString side;
 	AsciiString farm;
 	std::vector<RetailArmyMember> members;
 	std::vector<AsciiString> heroes;
-	Real rushSeconds = 0.0f;
-	Real midgameSeconds = 0.0f;
-	Int minimumFarms = 0;
+	std::vector<AsciiString> scavengedBuildings;
+	Real rushSeconds = 120.0f;
+	Real midgameSeconds = 420.0f;
+	Int minimumFarms = 2;
+	Int minimumFarmMoney = 300;
+	Int perFarmValue = 70;
+	Real farmPriorityPerSecond = 3.0f;
+	Real rushFarmInterval = 20.0f;
+	Real percentToSave[3] = {};
+	Real fortressRebuildPriority = 1950.0f;
+	Real structureRebuildModifier = 0.5f;
+	Real defaultPriority = 100.0f;
 };
 
 struct RetailDifficulty
 {
 	AsciiString name;
-	Int farmLimit = 0;
+	Int farmLimit = -1;
+	Int farmChance[2] = {1, 1};
+};
+
+struct RetailBrutalCheats
+{
+	Real costReduction = 0.0f;
+	Real timeReduction = 0.1f;
 };
 
 struct RetailAITuning
 {
 	std::vector<RetailDifficulty> difficulties;
+	RetailBrutalCheats brutal;
 	Bool disableBaseBuilding = FALSE;
 	Bool disableEconomyBuilding = FALSE;
 	Bool disableUnitBuilding = FALSE;
@@ -108,6 +131,36 @@ struct RetailAITuning
 
 std::vector<RetailArmy> retailArmies;
 RetailAITuning retailTuning;
+std::vector<RetailArmy> baseRetailArmies;
+RetailAITuning baseRetailTuning;
+
+struct RetailSkirmishPolicy
+{
+	const RetailArmy* army = nullptr;
+	const RetailDifficulty* difficulty = nullptr;
+};
+
+RetailSkirmishPolicy retailPolicy(const Player& player)
+{
+	RetailSkirmishPolicy policy;
+	for (const RetailArmy& army : retailArmies)
+	{
+		if (army.side.compareNoCase(player.getSide()) == 0)
+		{
+			policy.army = &army;
+			break;
+		}
+	}
+	const GameDifficulty level = player.getPlayerDifficulty();
+	const char* const names[] = {"EASY", "NORMAL", "HARD", "BRUTAL"};
+	if (level >= DIFFICULTY_EASY && level <= DIFFICULTY_BRUTAL)
+	{
+		for (const RetailDifficulty& difficulty : retailTuning.difficulties)
+			if (difficulty.name.compareNoCase(names[level]) == 0)
+				policy.difficulty = &difficulty;
+	}
+	return policy;
+}
 
 void skipRetailAISection(INI* ini, void*, void*, const void* section)
 {
@@ -142,6 +195,17 @@ void parseFarmAssignment(INI* ini, void*, void* store, const void*)
 	ini->initFromINI(store, fields);
 }
 
+void parseEconomyProbability(INI* ini, void*, void* store, const void*)
+{
+	const Int numerator = INI::scanInt(ini->getNextToken(ini->getSepsColon()));
+	const Int denominator = INI::scanInt(ini->getNextToken(ini->getSepsColon()));
+	if (denominator < 1)
+		throw INI_INVALID_DATA;
+	auto* chance = static_cast<Int*>(store);
+	chance[0] = numerator;
+	chance[1] = denominator;
+}
+
 void parseDifficultyTuning(INI* ini, void* instance, void*, const void*)
 {
 	ini->getNextToken();
@@ -150,11 +214,23 @@ void parseDifficultyTuning(INI* ini, void* instance, void*, const void*)
 	static const FieldParse fields[] = {
 		{ "Difficulty", INI::parseAsciiString, nullptr, offsetof(RetailDifficulty, name) },
 		{ "EconomyMaxFarms", INI::parseInt, nullptr, offsetof(RetailDifficulty, farmLimit) },
+		{ "EconomyUpgradeProbability", parseEconomyProbability, nullptr, offsetof(RetailDifficulty, farmChance) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	ini->initFromINI(&difficulty, fields);
 	if (difficulty.name.isNotEmpty())
 		tuning.difficulties.push_back(difficulty);
+}
+
+void parseBrutalCheats(INI* ini, void*, void* store, const void*)
+{
+	ini->getNextToken();
+	static const FieldParse fields[] = {
+		{ "BuildCostReduction", INI::parsePercentToReal, nullptr, offsetof(RetailBrutalCheats, costReduction) },
+		{ "BuildTimeReduction", INI::parsePercentToReal, nullptr, offsetof(RetailBrutalCheats, timeReduction) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(store, fields);
 }
 
 const CommandSet* retailCommands(const Object& object)
@@ -171,6 +247,19 @@ Bool matchesArmyType(const ThingTemplate& actual, const ThingTemplate& planned)
 		});
 	};
 	return actual.isEquivalentTo(&planned) || names(actual, planned.getName()) || names(planned, actual.getName());
+}
+
+Bool isRetailFortress(const ThingTemplate& type)
+{
+	if (type.isKindOf(KINDOF_CASTLE_KEEP))
+		return TRUE;
+	if (!type.isKindOf(KINDOF_BASE_SITE))
+		return FALSE;
+	const ModuleInfo& modules = type.getBehaviorModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+		if (modules.getNthName(i) == "CastleBehavior")
+			return TRUE;
+	return FALSE;
 }
 
 const ThingTemplate* automaticReplacement(const ThingTemplate& building)
@@ -274,12 +363,24 @@ void AISkirmishPlayer::loadRetailData()
 	retailTuning = {};
 	INI ini;
 	ini.load("Data\\INI\\Default\\SkirmishAIData.ini", INI_LOAD_OVERWRITE, nullptr);
+	baseRetailArmies = retailArmies;
+	baseRetailTuning = retailTuning;
+}
+
+void RetailSkirmishSpending::resetMapPolicies()
+{
+	retailArmies = baseRetailArmies;
+	retailTuning = baseRetailTuning;
 }
 
 void AISkirmishPlayer::parseRetailArmy(INI* ini)
 {
-	ini->getNextToken();
-	RetailArmy army;
+	const AsciiString name = ini->getNextToken();
+	const auto existing = std::find_if(retailArmies.begin(), retailArmies.end(), [&](const RetailArmy& army) {
+		return army.name.compareNoCase(name) == 0;
+	});
+	RetailArmy army = existing == retailArmies.end() ? RetailArmy{} : *existing;
+	army.name = name;
 	static const FieldParse fields[] = {
 		{ "Side", INI::parseAsciiString, nullptr, offsetof(RetailArmy, side) },
 		{ "AIEconomyAssigment", parseFarmAssignment, nullptr, offsetof(RetailArmy, farm) },
@@ -289,10 +390,23 @@ void AISkirmishPlayer::parseRetailArmy(INI* ini)
 		{ "PhaseDuration_Rush", INI::parseReal, nullptr, offsetof(RetailArmy, rushSeconds) },
 		{ "PhaseDuration_MidGame", INI::parseReal, nullptr, offsetof(RetailArmy, midgameSeconds) },
 		{ "EconomyBuilderMinFarmsOwned", INI::parseInt, nullptr, offsetof(RetailArmy, minimumFarms) },
+		{ "EconomyBuilderMinMoney", INI::parseInt, nullptr, offsetof(RetailArmy, minimumFarmMoney) },
+		{ "EconomyBuilderPerFarmValue", INI::parseInt, nullptr, offsetof(RetailArmy, perFarmValue) },
+		{ "EconomyBuilderPerSecPriorityIncreaseBase", INI::parseReal, nullptr, offsetof(RetailArmy, farmPriorityPerSecond) },
+		{ "EconomyBuilderMinTimeBetweenFarms_Rush", INI::parseReal, nullptr, offsetof(RetailArmy, rushFarmInterval) },
+		{ "PercentToSave_Rush", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, percentToSave) },
+		{ "PercentToSave_MidGame", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, percentToSave) + sizeof(Real) },
+		{ "PercentToSave_EndGame", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, percentToSave) + 2 * sizeof(Real) },
+		{ "FortressRebuildPriority", INI::parseReal, nullptr, offsetof(RetailArmy, fortressRebuildPriority) },
+		{ "StructureRebuildPriorityModifier", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, structureRebuildModifier) },
+		{ "DefaultUnitPriority", INI::parseReal, nullptr, offsetof(RetailArmy, defaultPriority) },
+		{ "ScavangedResourceBuildings", INI::parseAsciiStringVector, nullptr, offsetof(RetailArmy, scavengedBuildings) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	ini->initFromINI(&army, fields);
-	if (army.side.isNotEmpty())
+	if (existing != retailArmies.end())
+		*existing = std::move(army);
+	else if (army.side.isNotEmpty())
 		retailArmies.push_back(std::move(army));
 }
 
@@ -302,7 +416,7 @@ void AISkirmishPlayer::parseRetailTuning(INI* ini)
 	static const FieldParse fields[] = {
 		{ "DifficultyTuning", parseDifficultyTuning, nullptr, 0 },
 		{ "CombatChainDefinition", skipRetailAISection, "CombatChainDefinition", 0 },
-		{ "BrutalDifficultyCheats", skipRetailAISection, "BrutalDifficultyCheats", 0 },
+		{ "BrutalDifficultyCheats", parseBrutalCheats, nullptr, offsetof(RetailAITuning, brutal) },
 		{ "DisableBaseBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableBaseBuilding) },
 		{ "DisableEconomyBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableEconomyBuilding) },
 		{ "DisableUnitBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableUnitBuilding) },
@@ -311,6 +425,15 @@ void AISkirmishPlayer::parseRetailTuning(INI* ini)
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	ini->initFromINI(&retailTuning, fields);
+}
+
+Real RetailSkirmishSpending::brutalFactor(const Player& player, Bool time)
+{
+	if (!RetailFileLayers::enabled() || player.getPlayerType() != PLAYER_COMPUTER ||
+		!player.isPlayableSide() || player.getPlayerDifficulty() != DIFFICULTY_BRUTAL)
+		return 1.0f;
+	const Real reduction = time ? retailTuning.brutal.timeReduction : retailTuning.brutal.costReduction;
+	return 1.0f - std::min(reduction, 1.0f);
 }
 
 #define USE_DOZER 1
@@ -1224,30 +1347,37 @@ void AISkirmishPlayer::updateRetail()
 	if (!TheRetailCommandCatalog || !m_player->isPlayableSide() || !m_player->isPlayerActive() || frame == 0 ||
 		frame % (2 * LOGICFRAMES_PER_SECOND) != static_cast<UnsignedInt>(m_player->getPlayerIndex()))
 		return;
-	const auto rules = std::find_if(retailArmies.begin(), retailArmies.end(), [this](const RetailArmy& army) {
-		return army.side.compareNoCase(m_player->getSide().str()) == 0;
-	});
-	if (rules == retailArmies.end())
+	const RetailSkirmishPolicy policy = retailPolicy(*m_player);
+	const RetailArmy* rules = policy.army;
+	if (!rules)
 		return;
 
 	const Real elapsed = INT_TO_REAL(frame) / LOGICFRAMES_PER_SECOND;
-	const Int phase = elapsed < rules->rushSeconds ? 0 : elapsed < rules->rushSeconds + rules->midgameSeconds ? 1 : 2;
+	const auto phaseAt = [rules](Real seconds) {
+		return seconds < rules->rushSeconds ? 0 : seconds < rules->rushSeconds + rules->midgameSeconds ? 1 : 2;
+	};
+	const Int phase = phaseAt(elapsed);
 	const ThingTemplate* farm = TheThingFactory->findTemplate(rules->farm, FALSE);
-	const auto isFarm = [farm](const ThingTemplate& type) {
+	const auto isScavengedBuilding = [&](const ThingTemplate& type) {
+		return std::any_of(rules->scavengedBuildings.begin(), rules->scavengedBuildings.end(), [&](const AsciiString& building) {
+			const ThingTemplate* scavenged = TheThingFactory->findTemplate(building, FALSE);
+			return scavenged && type.isEquivalentTo(scavenged);
+		});
+	};
+	const auto isFarm = [&](const ThingTemplate& type) -> Bool {
+		if (isScavengedBuilding(type))
+			return FALSE;
 		return type.isKindOf(KINDOF_ECONOMY_STRUCTURE) || (farm && type.isEquivalentTo(farm));
 	};
 	static const Bool trace = std::getenv("GENERALSX_SKIRMISH_AI_TRACE") != nullptr;
 	const Int playerIndex = m_player->getPlayerIndex();
 	Int farms = 0;
-	Int farmLimit = rules->minimumFarms;
 	const GameDifficulty difficulty = m_player->getPlayerDifficulty();
-	const char* const names[] = { "EASY", "NORMAL", "HARD" };
-	if (difficulty >= DIFFICULTY_EASY && difficulty <= DIFFICULTY_HARD)
-		for (const RetailDifficulty& tuning : retailTuning.difficulties)
-			if (tuning.name == names[difficulty])
-				farmLimit = tuning.farmLimit;
+	const Int farmLimit = policy.difficulty && policy.difficulty->farmLimit >= 0
+		? policy.difficulty->farmLimit : std::numeric_limits<Int>::max();
 
 	Object* keep = nullptr;
+	Bool fortressPresent = FALSE;
 	std::vector<Object*> builders;
 	std::vector<Object*> plots;
 	std::vector<Object*> producers;
@@ -1258,8 +1388,12 @@ void AISkirmishPlayer::updateRetail()
 		if (object->getControllingPlayer() != m_player || object->isEffectivelyDead())
 			continue;
 		owned.push_back(object);
+		fortressPresent = fortressPresent || object->isKindOf(KINDOF_CASTLE_KEEP) ||
+			(object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && isRetailFortress(*object->getTemplate()));
 		if (isFarm(*object->getTemplate()))
 			++farms;
+		else if (object->isKindOf(KINDOF_STRUCTURE) && !isScavengedBuilding(*object->getTemplate()))
+			m_retailBuiltStructures.insert(object->getTemplate()->getName());
 		if (object->isDisabled() || object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || object->getContainedBy())
 			continue;
 		if (!keep && object->isKindOf(KINDOF_COMMANDCENTER))
@@ -1288,6 +1422,41 @@ void AISkirmishPlayer::updateRetail()
 		return static_cast<Int>(std::count_if(owned.begin(), owned.end(), [type](const Object* object) {
 			return object->getTemplate()->isEquivalentTo(type) || object->getHeroIdentityTemplate()->isEquivalentTo(type);
 		}));
+	};
+	Money* money = m_player->getMoney();
+	const Int savingsDifficulty = std::clamp<Int>(difficulty, DIFFICULTY_EASY, DIFFICULTY_HARD);
+	UnsignedInt savingsLimit = 5000 * savingsDifficulty;
+	for (const AsciiString& name : rules->heroes)
+	{
+		const ThingTemplate* hero = TheThingFactory->findTemplate(name, FALSE);
+		if (hero && !HeroRoster::isAlive(m_player, hero) && !HeroRoster::isQueued(m_player, hero))
+			savingsLimit = std::max(savingsLimit, static_cast<UnsignedInt>(std::max(0, HeroRoster::price(m_player, hero).cost)));
+	}
+	if (farms > 2 && m_retailSavings < savingsLimit)
+	{
+		const Real saving = money->countMoney() * rules->percentToSave[phase] / (3 - savingsDifficulty);
+		if (saving > 1.0f)
+			m_retailSavings += money->withdraw(static_cast<UnsignedInt>(std::min<Real>(saving, money->countMoney())), FALSE);
+	}
+	if (trace && (frame < 2 * LOGICFRAMES_PER_SECOND || phase != phaseAt(elapsed - 2.0f)))
+	{
+		std::fprintf(stderr, "AI_PHASE\t%u\t%d\t%d\t%u\t%u\t%d\n",
+			frame, playerIndex, phase, money->countMoney(), m_retailSavings, farms);
+	}
+	const auto spendWithSavings = [&](Int cost, auto purchase) {
+		const UnsignedInt cash = money->countMoney();
+		const UnsignedInt price = static_cast<UnsignedInt>(std::max(0, cost));
+		const UnsignedInt needed = price > cash ? price - cash : 0;
+		if (needed > m_retailSavings)
+			return FALSE;
+		money->deposit(needed, FALSE, FALSE);
+		if (purchase())
+		{
+			m_retailSavings -= needed;
+			return TRUE;
+		}
+		money->withdraw(needed, FALSE);
+		return FALSE;
 	};
 	std::vector<std::pair<const ThingTemplate*, const RetailArmyMember*>> army;
 	for (const RetailArmyMember& member : rules->members)
@@ -1351,12 +1520,51 @@ void AISkirmishPlayer::updateRetail()
 
 	if (!retailTuning.disableBaseBuilding && m_player->getCanBuildBase())
 	{
+		const Bool replaceFortress = !fortressPresent && std::any_of(m_retailBuiltStructures.begin(),
+			m_retailBuiltStructures.end(), [](const AsciiString& name) {
+				const ThingTemplate* type = TheThingFactory->findTemplate(name, FALSE);
+				return type && type->isKindOf(KINDOF_CASTLE_KEEP);
+			});
+		Int maximumCommandPoints = 0;
+		const Int commandPoints = m_player->getCommandPointsTotal(&maximumCommandPoints);
+		const Real sinceFarm = INT_TO_REAL(frame - m_retailLastFarmFrame) / LOGICFRAMES_PER_SECOND;
+		const Bool belowFarmFloor = farms < rules->minimumFarms;
+		const Bool farmDue = phase == 0
+			? belowFarmFloor && (m_retailLastFarmFrame == 0 || sinceFarm > rules->rushFarmInterval)
+			: belowFarmFloor || (farms < phase * 3 + 4 && sinceFarm > 30.0f);
+		const Bool seekFarm = !retailTuning.disableEconomyBuilding && farmDue &&
+			farms < farmLimit && commandPoints < maximumCommandPoints;
+		const RetailDifficulty defaultDifficulty;
+		const Int* farmChance = policy.difficulty ? policy.difficulty->farmChance : defaultDifficulty.farmChance;
+		const Bool planFarm = seekFarm && (farmChance[0] >= farmChance[1] ||
+			(farmChance[0] > 0 && GameLogicRandomValue(0, farmChance[1] - 1) < farmChance[0]));
+		const Real initialFarmPriority = belowFarmFloor ? 2000.0f : 100.0f;
+		if (!seekFarm)
+			m_retailFarmPriority = 0.0f;
+		else if (planFarm && m_retailFarmPriority == 0.0f)
+			m_retailFarmPriority = initialFarmPriority;
+		if (seekFarm && m_retailFarmPriority > 0.0f && phase > 0)
+		{
+			const Real rate = rules->farmPriorityPerSecond / std::max(1, farms);
+			const Real usage = static_cast<Real>(m_player->getCommandPointsUsed()) / std::max(1, commandPoints);
+			m_retailFarmPriority = std::min(2000.0f, m_retailFarmPriority + 2.0f * rate * (1.0f + 10.0f * usage));
+		}
+		const ThingTemplate* scavenged = nullptr;
+		const Int scavengedCount = static_cast<Int>(rules->scavengedBuildings.size());
+		if (!retailTuning.disableEconomyBuilding && scavengedCount > 0 &&
+			money->countMoney() + m_retailSavings > 599 && !builders.empty())
+		{
+			if (m_retailScavengedBuilding < 0 || m_retailScavengedBuilding >= scavengedCount)
+				m_retailScavengedBuilding = scavengedCount == 1 ? 0 : GameLogicRandomValue(0, scavengedCount - 1);
+			scavenged = TheThingFactory->findTemplate(rules->scavengedBuildings[m_retailScavengedBuilding], FALSE);
+		}
 		const auto buildFrom = [&](Object& builder, FoundationAIUpdate* plot) -> Bool {
 			const CommandSet* set = retailCommands(builder);
 			if (!set)
 				return FALSE;
 			const CommandButton* selected = nullptr;
-			Int priority = 0;
+			Bool selectedUsesSavings = FALSE;
+			Real priority = 0.0f;
 			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 			{
 				const CommandButton* button = set->getCommandButton(slot);
@@ -1366,42 +1574,83 @@ void AISkirmishPlayer::updateRetail()
 				if (!type || button->getRequiredRank() > builder.getExperienceTracker()->getRank() ||
 					!HeroRoster::buttonUpgradesMet(button, m_player, &builder))
 					continue;
-				if (plot ? (!m_player->canBuild(type) || !m_player->canAffordBuild(type))
-					: TheBuildAssistant->canMakeUnit(&builder, type) != CANMAKE_OK)
-					continue;
 				const Bool economy = isFarm(*type);
-				Int score = 0;
+				Bool usesSavings = FALSE;
+				Real score = 0.0f;
 				if (economy)
 				{
-					const auto money = m_player->getMoney()->countMoney();
 					const auto cost = static_cast<UnsignedInt>(std::max(0, type->calcCostToBuild(m_player)));
-					if (!retailTuning.disableEconomyBuilding && farms < farmLimit &&
-						(farms < 2 || (money >= cost && money - cost >= openingUnitReserve)))
-						score = farms < 2 ? 3 : 1;
+					const UnsignedInt cash = money->countMoney();
+					if (seekFarm && (belowFarmFloor || (cash >= cost && cash - cost >= openingUnitReserve)))
+						score = m_retailFarmPriority;
 				}
 				else if (countType(type) == 0)
 				{
-					const ThingTemplate* replacement = automaticReplacement(*type);
-					if (producesArmy(*type) || (replacement && countType(replacement) == 0 && producesArmy(*replacement)))
-						score = 2;
-					else if (plot && farms >= 2 && soldiers.size() >= 2 && type->isKindOf(KINDOF_FS_BASE_DEFENSE))
-						score = 1;
+					if (replaceFortress && isRetailFortress(*type))
+					{
+						usesSavings = TRUE;
+						score = rules->fortressRebuildPriority;
+					}
+					else if (scavenged && type->isEquivalentTo(scavenged))
+					{
+						usesSavings = TRUE;
+						score = rules->defaultPriority;
+					}
+					else
+					{
+						const ThingTemplate* replacement = automaticReplacement(*type);
+						if (producesArmy(*type) || (replacement && countType(replacement) == 0 && producesArmy(*replacement)) ||
+							(plot && farms >= 2 && soldiers.size() >= 2 && type->isKindOf(KINDOF_FS_BASE_DEFENSE)))
+							score = rules->defaultPriority;
+						if (m_retailBuiltStructures.contains(type->getName()))
+						{
+							score *= rules->structureRebuildModifier;
+							usesSavings = TRUE;
+						}
+					}
 				}
 				if (score > priority)
 				{
+					const auto cost = static_cast<UnsignedInt>(std::max(0, type->calcCostToBuild(m_player)));
+					const auto cash = money->countMoney();
+					if (cost > cash && (!usesSavings || cost - cash > m_retailSavings))
+						continue;
+					if (plot)
+					{
+						if (!m_player->canBuild(type))
+							continue;
+					}
+					else
+					{
+						const CanMakeType canMake = TheBuildAssistant->canMakeUnit(&builder, type);
+						if (canMake != CANMAKE_OK && !(usesSavings && canMake == CANMAKE_NO_MONEY))
+							continue;
+					}
 					priority = score;
 					selected = button;
+					selectedUsesSavings = usesSavings;
 				}
 			}
 			if (!selected)
 				return FALSE;
 			const ThingTemplate* type = selected->getThingTemplate();
-			const Bool built = plot ? plot->construct(type, m_player) != nullptr
-				: placeRetailBuilding(builder, *type, keep ? *keep->getPosition() : *builder.getPosition());
+			const auto construct = [&]() {
+				return plot ? plot->construct(type, m_player) != nullptr
+					: placeRetailBuilding(builder, *type, keep ? *keep->getPosition() : *builder.getPosition());
+			};
+			const Bool built = selectedUsesSavings ? spendWithSavings(type->calcCostToBuild(m_player), construct) : construct();
 			if (built)
 			{
 				if (isFarm(*type))
+				{
 					++farms;
+					m_retailLastFarmFrame = frame;
+					m_retailFarmPriority = 0.0f;
+				}
+				else if (scavenged && type->isEquivalentTo(scavenged))
+					m_retailScavengedBuilding = (m_retailScavengedBuilding + 1) % scavengedCount;
+				else
+					m_retailBuiltStructures.insert(type->getName());
 				if (trace)
 				{
 					std::fprintf(stderr, "AI_BUILD\t%u\t%d\t%s\t%s\t%d\t%d\t%d\n", frame, playerIndex,
@@ -1476,8 +1725,14 @@ void AISkirmishPlayer::updateRetail()
 			for (const AsciiString& name : rules->heroes)
 			{
 				const ThingTemplate* hero = TheThingFactory->findTemplate(name, FALSE);
-				if (hero && !HeroRoster::isAlive(m_player, hero) && train(hero, nullptr))
-					break;
+				if (hero && !HeroRoster::isAlive(m_player, hero))
+				{
+					HeroRules::Price price;
+					if (!production->getUnitPriceOverride(hero, price))
+						price = HeroRoster::price(m_player, hero);
+					if (spendWithSavings(price.cost, [&] { return train(hero, nullptr); }))
+						break;
+				}
 			}
 		if (production->getProductionCount() != 0)
 			continue;
@@ -1789,6 +2044,11 @@ void AISkirmishPlayer::adjustBuildList(BuildListInfo *list)
 void AISkirmishPlayer::newMap()
 {
 	m_retailObjectives.clear();
+	m_retailLastFarmFrame = 0;
+	m_retailSavings = 0;
+	m_retailScavengedBuilding = -1;
+	m_retailFarmPriority = 0.0f;
+	m_retailBuiltStructures.clear();
 
 	/* Get our proper build list. */
 	AsciiString mySide = m_player->getSide();
@@ -1899,7 +2159,10 @@ Bool AISkirmishPlayer::computeSuperweaponTarget(const SpecialPowerTemplate *powe
 void AISkirmishPlayer::crc( Xfer *xfer )
 {
 	if (RetailFileLayers::enabled())
+	{
 		xferRetailObjectives(xfer, TRUE);
+		xferRetailBlocks(xfer, TRUE);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1911,7 +2174,7 @@ void AISkirmishPlayer::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1944,6 +2207,44 @@ void AISkirmishPlayer::xfer( Xfer *xfer )
 
 	if (version >= 2)
 		xferRetailObjectives(xfer, version >= 3);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 4);
+}
+
+void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection(xfer, loading, present, {
+		{"skirmish-spending", [this, loading](Xfer* x) {
+			x->xferUnsignedInt(&m_retailLastFarmFrame);
+			x->xferUnsignedInt(&m_retailSavings);
+			x->xferInt(&m_retailScavengedBuilding);
+			x->xferReal(&m_retailFarmPriority);
+			UnsignedInt count = static_cast<UnsignedInt>(m_retailBuiltStructures.size());
+			x->xferUnsignedInt(&count);
+			if (loading)
+			{
+				m_retailBuiltStructures.clear();
+				for (UnsignedInt i = 0; i < count; ++i)
+				{
+					AsciiString name;
+					x->xferAsciiString(&name);
+					m_retailBuiltStructures.insert(name);
+				}
+			}
+			else
+			{
+				for (AsciiString name : m_retailBuiltStructures)
+					x->xferAsciiString(&name);
+			}
+		}, [this] {
+			m_retailLastFarmFrame = 0;
+			m_retailSavings = 0;
+			m_retailScavengedBuilding = -1;
+			m_retailFarmPriority = 0.0f;
+			m_retailBuiltStructures.clear();
+		}}
+	});
 }
 
 void AISkirmishPlayer::xferRetailObjectives(Xfer* xfer, Bool hasRouteHistory)
