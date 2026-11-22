@@ -11,3 +11,29 @@
 250 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 0 settled 2520 1010
 250 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 1 settled 2520 1010
 250 rohan-allies-trace Player_1 RohanRohirrimHorde_Summoned 2 settled 2520 1010
+34 particle-systems Player_1 - 0 RohirimAlliesDust01
+34 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+64 particle-systems Player_1 - 0 RohirimAlliesDust01
+64 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+94 particle-systems Player_1 - 0 RohirimAlliesDust01
+94 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+105 particle-systems Player_1 - 0 RohirimAlliesDust01
+105 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+124 particle-systems Player_1 - 0 RohirimAlliesDust01
+124 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+154 particle-systems Player_1 - 0 RohirimAlliesDust01
+154 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+184 particle-systems Player_1 - 0 RohirimAlliesDust01
+184 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+214 particle-systems Player_1 - 0 RohirimAlliesDust01
+214 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+244 particle-systems Player_1 - 0 RohirimAlliesDust01
+244 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+274 particle-systems Player_1 - 0 RohirimAlliesDust01
+274 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+304 particle-systems Player_1 - 0 RohirimAlliesDust01
+304 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+334 particle-systems Player_1 - 0 RohirimAlliesDust01
+334 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+349 particle-systems Player_1 - 0 RohirimAlliesDust01
+349 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
