@@ -56,6 +56,7 @@
 #include "GameClient/View.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/RetailSpawnFootprint.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/GhostObject.h"
 #include "GameLogic/HeroRoster.h"
@@ -756,6 +757,8 @@ void createObject(const Command& command, unsigned int frame)
 	pos.set(x, y, TheTerrainLogic->getGroundHeight(x, y));
 	obj->setPosition(&pos);
 	obj->setOrientation(angle * PI / 180.0f);
+	if (needsRetailSpawnFootprint(*obj))
+		TheAI->pathfinder()->addObjectToPathfindMap(obj);
 	std::fprintf(stderr, "TEST frame %u: create %s for %s id=%u at (%.1f, %.1f)\n", frame, command.target.c_str(),
 		command.player.c_str(), static_cast<unsigned>(obj->getID()), x, y);
 }

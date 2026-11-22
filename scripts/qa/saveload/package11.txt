@@ -1,12 +1,9 @@
 130 create Player_1 RohanEntFir 0 2280,660,0
 130 create PlyrCreeps TDHDwarfCampWall 0 2300,660,180
-130 snapshot-register-footprint PlyrCreeps TDHDwarfCampWall 0
 132 pkg11-power Player_1 RohanEntFir 0 PlyrCreeps:TDHDwarfCampWall:0
 180 create PlyrCreeps Pkg11Source 0 1850,780,180
 180 create Player_1 DolAmrothGuardhouse 1 1570,780,0
 180 create Player_1 Pkg11GuardhouseControl 0 1570,1050,0
-181 snapshot-register-footprint Player_1 DolAmrothGuardhouse 1
-181 snapshot-register-footprint Player_1 Pkg11GuardhouseControl 0
 181 create Player_1 Pkg11PorterControl 0 1650,480,0
 181 create Player_1 Pkg11Captain 0 1760,480,0
 181 create Player_1 AmrothianMilitia 0 1600,560,0
@@ -96,7 +93,6 @@
 328 pkg11-state Player_1 DolAmrothGuardhouse 1
 340 create Player_1 RohanEntOak 0 2280,540,0
 340 create PlyrCreeps Pkg11WallControl 0 2300,540,180
-340 snapshot-register-footprint PlyrCreeps Pkg11WallControl 0
 342 pkg11-power Player_1 RohanEntOak 0 PlyrCreeps:Pkg11WallControl:0
 380 create PlyrCreeps Pkg11Cheerer 0 1600,560,0
 384 log Player_1 AmrothianMilitia 0

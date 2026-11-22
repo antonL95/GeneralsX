@@ -26,13 +26,6 @@
 180 create PlyrCreeps Pkg20RockVendor 0 2300,270,0
 180 create Player_1 RohanEntOak 0 2280,160,0
 180 create PlyrCreeps GenericThrowableRock 0 2300,160,0
-181 snapshot-register-footprint PlyrCreeps IthilienRuinedTower 0
-181 snapshot-register-footprint PlyrCreeps Pkg20RuinsControl 0
-181 snapshot-register-footprint PlyrCreeps RockRohan01 0
-181 snapshot-register-footprint Player_1 DolAmrothBattleTower 1
-181 snapshot-register-footprint Player_1 Pkg20TowerControl 0
-181 snapshot-register-footprint Player_1 CaHRestlessDeadBarrow 0
-181 snapshot-register-footprint Player_1 Pkg20BarrowControl 0
 190 log Player_1 Pkg20ImmediateEnt 1
 190 log Player_1 Pkg20ImmediateEnt 2
 190 pkg20-grab Player_1 Pkg20ImmediateEnt 0 PlyrCreeps:RockRohan01:0
@@ -131,8 +124,6 @@
 310 create PlyrCreeps RockRohan01 1 1300,1050,0
 310 create Player_1 Pkg20FindRockEnt 0 1510,1050,0
 310 create PlyrCreeps RockRohan01 2 1560,1050,0
-311 snapshot-register-footprint PlyrCreeps RockRohan01 1
-311 snapshot-register-footprint PlyrCreeps RockRohan01 2
 315 pkg20-check-grab Player_1 MordorMountainTroll 0 PlyrCreeps:RockRohan01:1
 315 pkg12-pickup-order Player_1 Pkg20FindRockEnt 0 Command_SpecialAbilityEntFindRock
 316 pkg12-pickup-state Player_1 Pkg20FindRockEnt 0

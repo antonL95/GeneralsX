@@ -17,7 +17,6 @@
 253 pkg49-model-condition Player_1 AmrothianGuardsmen 0 on
 260 kill Player_1 AmrothianGuardsmen 0
 229 create Player_1 DolAmrothFortressCitadel 0 2380,900,0
-229 snapshot-register-footprint Player_1 DolAmrothFortressCitadel 0
 238 objupgrade Player_1 DolAmrothFortressCitadel 0 Upgrade_MenFortressHouseOfHealing
 241 snapshot-obstacle-owner Player_1 DolAmrothFortressCitadel 0
 245 snapshot-obstacle-owner Player_1 DolAmrothFortressCitadel 0

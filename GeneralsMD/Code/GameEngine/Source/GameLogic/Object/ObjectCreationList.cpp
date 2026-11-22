@@ -74,6 +74,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/RetailSpawnFootprint.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
@@ -1529,11 +1530,6 @@ protected:
 		}
 		const Bool hasSpawnOrders = retailObject && secondary && (m_issueMoveAfterCreation || m_orientInSecondaryDirection);
 		const Bool hasSpawnBusyTime = retailObject && m_startingBusyTime > 0;
-		const auto needsFootprint = [retailObject](const Object* object)
-		{
-			return retailObject && !object->getEnclosingContainedBy() &&
-				(object->isKindOf(KINDOF_STRUCTURE) || object->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL));
-		};
 		std::vector<Object*> pendingObjects;
 
 		// Object type debris might need this information to process visual UpgradeModules.
@@ -1643,7 +1639,7 @@ protected:
 			}
 			doStuffToObj(debris, m_names[pick], &spawnPosition, mtx, orientation, sourceObj, lifetimeFrames, nn, impactVelocity);
 
-			if (hasSpawnOrders || hasSpawnBusyTime || needsFootprint(debris))
+			if (hasSpawnOrders || hasSpawnBusyTime || (m_nameAreObjects && needsRetailSpawnFootprint(*debris)))
 				pendingObjects.push_back(debris);
 			if (!hasSpawnOrders && retailObject && m_orientInSecondaryDirection && mtx && sourceObj)
 				debris->setOrientation(sourceObj->getOrientation() + m_orientationOffset);
@@ -1673,7 +1669,7 @@ protected:
 		if (container)
 		{
 			doStuffToObj(container, AsciiString::TheEmptyString, pos, mtx, orientation, sourceObj, lifetimeFrames, 0, impactVelocity);
-			if (hasSpawnBusyTime || needsFootprint(container))
+			if (hasSpawnBusyTime || (m_nameAreObjects && needsRetailSpawnFootprint(*container)))
 				pendingObjects.push_back(container);
 		}
 
@@ -1700,7 +1696,7 @@ protected:
 			if (hasSpawnBusyTime)
 				if (AIUpdateInterface* ai = obj->getAI())
 					ai->setRetailSpawnBusyTime(m_startingBusyTime);
-			if (needsFootprint(obj))
+			if (m_nameAreObjects && needsRetailSpawnFootprint(*obj))
 				TheAI->pathfinder()->addObjectToPathfindMap(obj);
 		}
 

@@ -8,9 +8,6 @@
 200 create PlyrCivilian Pkg31RuinedTower 0 600,2920,0
 200 create Player_1 Pkg31ArcherHorde 2 645,2920,0
 200 create Player_1 Pkg31Mumakil 0 800,2920,0
-200 snapshot-register-footprint Player_1 Pkg31BattleTower 0
-200 snapshot-register-footprint Player_1 Pkg31CastleKeep 0
-200 snapshot-register-footprint PlyrCivilian Pkg31RuinedTower 0
 
 205 create Player_1 Pkg31Cavalry 0 560,2740,0
 205 create PlyrCreeps Pkg31EnemyArcher 0 560,2660,0
