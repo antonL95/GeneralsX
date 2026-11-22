@@ -3,12 +3,14 @@
 #include <string_view>
 
 class DamageInfo;
+class GameInfo;
 class Object;
 class Player;
 struct Coord3D;
 
 namespace RetailTestCommands
 {
+bool configurePackage18Match(GameInfo& game);
 void runFrame(unsigned int frame);
 void saveCheckpoint(unsigned int frame);
 bool tracesCombat();

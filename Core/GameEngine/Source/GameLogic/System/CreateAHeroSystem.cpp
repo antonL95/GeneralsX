@@ -49,6 +49,7 @@ struct SystemData
 	AsciiString examineSelfAnimName;
 	Int examineAnimTweakValue = 0;
 	Real specialAnimPercentChance = 0.0f;
+	std::map<std::string, AsciiString> colorMasks;
 	Int heroRevivalDiscount = 0;
 	Int specialPowerDiscountPerLevel = 0;
 	std::vector<CreateAHeroBlingDef> blings;
@@ -332,6 +333,32 @@ void parseDefinition(INI* ini)
 	s_data.loaded = TRUE;
 }
 
+static void parseColorMask(INI* ini)
+{
+	struct Mask
+	{
+		AsciiString base;
+		AsciiString texture;
+	} mask;
+	static const FieldParse fields[] =
+	{
+		{ "BaseTexture", INI::parseAsciiString, nullptr, offsetof(Mask, base) },
+		{ "HouseTexture", INI::parseAsciiString, nullptr, offsetof(Mask, texture) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(&mask, fields);
+	mask.base.toLower();
+	if (!mask.base.isEmpty() && !mask.texture.isEmpty())
+		s_data.colorMasks[mask.base.str()] = mask.texture;
+}
+
+AsciiString findColorMask(AsciiString baseTexture)
+{
+	baseTexture.toLower();
+	const auto found = s_data.colorMasks.find(baseTexture.str());
+	return found != s_data.colorMasks.end() ? found->second : AsciiString::TheEmptyString;
+}
+
 void load()
 {
 	if (!RetailFileLayers::enabled() && !INIAudit::isEnabled())
@@ -342,6 +369,12 @@ void load()
 		return;
 	INI ini;
 	ini.load(AsciiString(path), INI_LOAD_OVERWRITE, nullptr, "CreateAHeroSystem", parseDefinition);
+	const char* maskPath = "Data\\INI\\HouseColor.ini";
+	if (RetailFileLayers::enabled() && TheFileSystem->doesFileExist(maskPath))
+	{
+		INI masks;
+		masks.load(AsciiString(maskPath), INI_LOAD_OVERWRITE, nullptr, "HouseColor", parseColorMask);
+	}
 }
 
 void resetAllPlayers()
@@ -813,6 +846,13 @@ Bool applyToHero(Object* hero)
 	if (!sel || sel->empty())
 		return FALSE;
 
+	const auto makeColor = [](const int* rgb)
+	{
+		return GameMakeColor(rgb[0], rgb[1], rgb[2], 255);
+	};
+	hero->setCreateAHeroAppearance(AsciiString(sel->heroName.c_str()),
+		makeColor(sel->primaryColor), makeColor(sel->secondaryColor), makeColor(sel->tertiaryColor));
+
 	grantNamedUpgrade(hero, s_data.gameModeUpgradeName);
 	grantNamedUpgrade(hero, AsciiString(sel->classUpgrade.c_str()));
 	grantNamedUpgrade(hero, AsciiString(sel->subClassUpgrade.c_str()));
@@ -836,23 +876,39 @@ Bool applyToHero(Object* hero)
 				hero->giveUpgrade(needed);
 		}
 	}
-	if (!sel->heroName.empty())
-		hero->setName(AsciiString(sel->heroName.c_str()));
-	const Color indicatorColor = GameMakeColor(
-		static_cast<UnsignedByte>(std::clamp(sel->primaryColor[0], 0, 255)),
-		static_cast<UnsignedByte>(std::clamp(sel->primaryColor[1], 0, 255)),
-		static_cast<UnsignedByte>(std::clamp(sel->primaryColor[2], 0, 255)),
-		255);
-	hero->setCustomIndicatorColor(indicatorColor);
+	const AsciiString encoded = encodeSelectionCompact(*sel);
+	if (!encoded.isEmpty())
+	{
+		AsciiString name(COMMAND_SET_PREFIX.data());
+		name.concat(encoded);
+		hero->setCommandSetStringOverride(name);
+	}
 	return TRUE;
 }
 
-const std::vector<std::string>* getAppliedPowerButtons(const Object* hero)
+Bool populateCommandSet(CommandCatalog& catalog, CommandSet& commands)
 {
-	if (!hero || !hero->getControllingPlayer())
-		return nullptr;
-	const CreateAHeroRules::SelectionData* sel = getPlayerSelection(hero->getControllingPlayer()->getPlayerIndex());
-	return sel ? &sel->powerButtons : nullptr;
+	const char* encoded = commands.getName().str() + COMMAND_SET_PREFIX.size();
+	CreateAHeroRules::SelectionData selection;
+	if (!decodeValidatedSelection(encoded, AsciiString::TheEmptyString, selection))
+		return FALSE;
+	const CommandSet* base = catalog.findCommandSet(s_data.commandSetTemplate);
+	if (!base)
+		return FALSE;
+	Int nextPower = 0;
+	while (nextPower < CommandButtonRules::RETAIL_COMMANDS_PER_SET && base->getCommandButton(nextPower))
+		++nextPower;
+	for (Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
+		commands.setCommandButton(i, base->getCommandButton(i));
+	for (const std::string& power : selection.powerButtons)
+	{
+		while (nextPower >= 6 && nextPower < CommandButtonRules::RETAIL_COMMANDS_PER_SET && base->getCommandButton(nextPower))
+			++nextPower;
+		if (nextPower == CommandButtonRules::RETAIL_COMMANDS_PER_SET)
+			return FALSE;
+		commands.setCommandButton(nextPower++, catalog.findCommandButton(power.c_str()));
+	}
+	return TRUE;
 }
 
 void xferPlayer(const Player* player, Xfer* xfer)

@@ -4649,11 +4649,13 @@ void Object::xfer( Xfer *xfer )
 	const Bool extendedSlots = m_weaponSet.getWeaponInWeaponSlot(QUATERNARY_WEAPON) ||
 		m_weaponSet.getWeaponInWeaponSlot(QUINARY_WEAPON);
 	const Bool retail = RetailFileLayers::enabled();
-	const XferVersion maxVersion = retail ? 17 : 10;
+	const XferVersion maxVersion = retail ? 18 : 10;
 	XferVersion version = extendedSlots ? 10 : legacyVersion;
 	if (retail)
 	{
-		if (m_rotwkPowerState)
+		if (getCreateAHeroColors())
+			version = 18;
+		else if (m_rotwkPowerState)
 			version = 17;
 		else if (m_invulnerableUntil != NEVER)
 			version = 16;
@@ -5137,6 +5139,12 @@ void Object::xfer( Xfer *xfer )
 		m_invulnerableUntil = NEVER;
 	if (version >= 17)
 		xferRetailInvisibilitySources(xfer);
+	if (version >= 18)
+	{
+		xfer->xferAsciiString(&m_createAHeroDisplayName);
+		for (Color& color : m_createAHeroColors)
+			xfer->xferInt(&color);
+	}
 }
 
 void Object::inheritMountedUpgradeCommands(std::vector<AsciiString> commands)
@@ -7219,6 +7227,23 @@ Int Object::getMultiLogicalBonePosition(const char* boneNamePrefix, Int maxBones
 }
 
 //=============================================================================
+UnicodeString Object::getDisplayName() const
+{
+	if (m_createAHeroDisplayName.isEmpty())
+		return getTemplate()->getDisplayName();
+	UnicodeString name;
+	name.translate(m_createAHeroDisplayName);
+	return name;
+}
+
+void Object::setCreateAHeroAppearance(const AsciiString& name, Color primary, Color secondary, Color tertiary)
+{
+	m_createAHeroDisplayName = name;
+	m_createAHeroColors[0] = primary;
+	m_createAHeroColors[1] = secondary;
+	m_createAHeroColors[2] = tertiary;
+}
+
 const AsciiString& Object::getCommandSetString() const
 {
 	if (RetailFileLayers::enabled() && areModulesReady())

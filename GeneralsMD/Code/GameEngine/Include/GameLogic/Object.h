@@ -484,6 +484,9 @@ public:
 	const AsciiString& getBaseCommandSetString() const;
 	const ModelConditionFlags& getLogicModelConditions() const { return m_logicModelConditions; }
 	void setCommandSetStringOverride( AsciiString newCommandSetString ) { m_commandSetStringOverride = newCommandSetString; }
+	UnicodeString getDisplayName() const;
+	void setCreateAHeroAppearance(const AsciiString& name, Color primary, Color secondary, Color tertiary);
+	const Color* getCreateAHeroColors() const { return m_createAHeroColors[0] ? m_createAHeroColors : nullptr; }
 
 	/// People are faking their commandsets, and, Surprise!, they are authoritative.  Challenge everything.
 	Bool canProduceUpgrade( const UpgradeTemplate *upgrade );
@@ -853,6 +856,8 @@ private:
 	Coord2D												m_formationOffset;
 
 	AsciiString										m_commandSetStringOverride;///< To allow specific object to switch command sets
+	AsciiString m_createAHeroDisplayName;
+	Color m_createAHeroColors[3] = {};
 	mutable ModelConditionFlags m_logicModelConditions;
 
 	UnsignedInt										m_safeOcclusionFrame;	///<flag used by occlusion renderer so it knows when objects have exited their production building.

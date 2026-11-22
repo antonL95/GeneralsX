@@ -541,7 +541,8 @@ void showTooltipFor(Int button)
 	else
 	{
 		const HeroSlot &slot = s_bar.slots[button];
-		tooltip.title = slot.appearance->getDisplayName();
+		const Object* object = TheGameLogic ? TheGameLogic->findObjectByID(slot.id) : nullptr;
+		tooltip.title = object && object->getCreateAHeroColors() ? object->getDisplayName() : slot.appearance->getDisplayName();
 		UnicodeString rank;
 		rank.format(TheGameText->fetchOrSubstitute("TOOLTIP:Rank", L"Level: %d / Maximum Level: %d"), slot.level, slot.maxLevel);
 		tooltip.body = rank;

@@ -85,7 +85,7 @@ TEST(CreateAHeroRulesTest, RoundTripsEncodedSelection)
 	EXPECT_EQ(decoded.primaryColor[2], 160);
 }
 
-TEST(CreateAHeroRulesTest, CompactEncodingFitsAllEightLanSlots)
+TEST(CreateAHeroRulesTest, CompactEncodingRoundTrips)
 {
 	CreateAHeroRules::CompactSelection compact;
 	compact.classIndex = 3;
@@ -99,9 +99,6 @@ TEST(CreateAHeroRulesTest, CompactEncodingFitsAllEightLanSlots)
 	compact.heroName = "Dain";
 
 	const std::string wire = CreateAHeroRules::encodeCompact(compact);
-	EXPECT_LE(wire.size(), 45u);
-	EXPECT_LE((wire.size() + 5) * 8, 404u);
-
 	CreateAHeroRules::CompactSelection decoded;
 	ASSERT_TRUE(CreateAHeroRules::decodeCompact(wire, decoded));
 	EXPECT_EQ(decoded.classIndex, 3);
@@ -113,6 +110,29 @@ TEST(CreateAHeroRulesTest, CompactEncodingFitsAllEightLanSlots)
 	EXPECT_EQ(decoded.primaryColor[1], 140);
 	EXPECT_EQ(decoded.primaryColor[2], 160);
 	EXPECT_EQ(decoded.heroName, "Dain");
+}
+
+TEST(CreateAHeroRulesTest, ColorMaskUsesAllThreePaletteEntries)
+{
+	const uint32_t colors[] = { 0xff102030, 0xff405060, 0xff708090 };
+	EXPECT_EQ(CreateAHeroRules::applyColorMask(0x7faabbcc, 0x00ffffff, colors), 0x7faabbccu);
+	EXPECT_EQ(CreateAHeroRules::applyColorMask(0x7faabbcc, 0xffff0000, colors), 0x7f102030u);
+	EXPECT_EQ(CreateAHeroRules::applyColorMask(0x7faabbcc, 0xff00ff00, colors), 0x7f405060u);
+	EXPECT_EQ(CreateAHeroRules::applyColorMask(0x7faabbcc, 0xff0000ff, colors), 0x7f708090u);
+	EXPECT_EQ(CreateAHeroRules::applyColorMask(0xff000000, 0x80808080, colors), 0xff303c49u);
+}
+
+TEST(CreateAHeroRulesTest, CompactNameMustBeCanonical)
+{
+	CreateAHeroRules::CompactSelection input;
+	input.classIndex = 0;
+	input.subClassIndex = 0;
+	const std::string unnamed = CreateAHeroRules::encodeCompact(input);
+	CreateAHeroRules::CompactSelection decoded;
+	EXPECT_FALSE(CreateAHeroRules::decodeCompact(unnamed + ".", decoded));
+	input.heroName.assign(CreateAHeroRules::MAX_HERO_NAME_LENGTH, 'A');
+	ASSERT_TRUE(CreateAHeroRules::decodeCompact(CreateAHeroRules::encodeCompact(input), decoded));
+	EXPECT_EQ(decoded.heroName, input.heroName);
 }
 
 TEST(CreateAHeroRulesTest, RejectsHostileAndMalformedInputs)

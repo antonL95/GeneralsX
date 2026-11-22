@@ -733,7 +733,7 @@ void ControlBar::showRetailLevelTooltip() const
 	if (!TheMouse || maximum <= 1)
 		return;
 	Mouse::RetailTooltip tooltip;
-	tooltip.title = object->getTemplate()->getDisplayName();
+	tooltip.title = object->getDisplayName();
 	tooltip.body.format(TheGameText->fetchOrSubstitute("TOOLTIP:Rank", L"Level: %d / Maximum Level: %d"),
 		object->getExperienceTracker()->getRank(), maximum);
 	TheMouse->setRetailTooltip(tooltip);

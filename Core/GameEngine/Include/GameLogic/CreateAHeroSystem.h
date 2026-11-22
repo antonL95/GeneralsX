@@ -106,6 +106,7 @@ namespace CreateAHeroSystem
 	void load();
 	void parseDefinition(INI* ini);
 	void resetAllPlayers();
+	AsciiString findColorMask(AsciiString baseTexture);
 	void resetPlayer(Int playerIndex);
 
 	Bool isLoaded();
@@ -139,6 +140,7 @@ namespace CreateAHeroSystem
 	void ingestGameInfo(const GameInfo* gameInfo);
 
 	Bool applyToHero(Object* hero);
-	const std::vector<std::string>* getAppliedPowerButtons(const Object* hero);
+	Bool populateCommandSet(CommandCatalog& catalog, CommandSet& commands);
+	inline constexpr std::string_view COMMAND_SET_PREFIX = "CreateAHeroProfile:";
 	void xferPlayer(const Player* player, Xfer* xfer);
 }

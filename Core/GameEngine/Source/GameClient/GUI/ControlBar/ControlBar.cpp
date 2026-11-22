@@ -61,6 +61,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/OCLUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -2156,6 +2157,12 @@ void CommandCatalog::init()
 
 CommandCatalog::~CommandCatalog()
 {
+	while (m_createAHeroCommandSets)
+	{
+		CommandSet* next = m_createAHeroCommandSets->friend_getNext();
+		deleteInstance(m_createAHeroCommandSets);
+		m_createAHeroCommandSets = next;
+	}
 	while (m_commandSets)
 	{
 		CommandSet* next = m_commandSets->friend_getNext();
@@ -2174,6 +2181,12 @@ CommandCatalog::~CommandCatalog()
 
 void CommandCatalog::reset()
 {
+	while (m_createAHeroCommandSets)
+	{
+		CommandSet* next = m_createAHeroCommandSets->friend_getNext();
+		deleteInstance(m_createAHeroCommandSets);
+		m_createAHeroCommandSets = next;
+	}
 	for (CommandSet* set = m_commandSets; set;)
 	{
 		CommandSet* next = set->friend_getNext();
@@ -2347,6 +2360,20 @@ const CommandButton *CommandCatalog::findCommandButton( const AsciiString& name 
 //-------------------------------------------------------------------------------------------------
 const CommandSet *CommandCatalog::findCommandSet( const AsciiString& name )
 {
+	if (RetailFileLayers::enabled() && std::string_view(name.str()).starts_with(CreateAHeroSystem::COMMAND_SET_PREFIX))
+	{
+		for (CommandSet* set = m_createAHeroCommandSets; set; set = set->friend_getNext())
+			if (set->getName() == name)
+				return set;
+		CommandSet* set = newInstance(CommandSet)(name);
+		if (!CreateAHeroSystem::populateCommandSet(*this, *set))
+		{
+			deleteInstance(set);
+			return nullptr;
+		}
+		set->friend_addToList(&m_createAHeroCommandSets);
+		return set;
+	}
 	CommandSet *set = findNonConstCommandSet(name);
 	if (set)
 		set = (CommandSet*)set->friend_getFinalOverride();

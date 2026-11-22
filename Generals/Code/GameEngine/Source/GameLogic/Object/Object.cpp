@@ -3830,8 +3830,10 @@ void Object::xfer( Xfer *xfer )
 #endif
 	if (RetailFileLayers::enabled() && m_rotwkPowerState)
 		version = 11;
-	const XferVersion maxVersion = RetailFileLayers::enabled() ? 12 : 11;
-	if (maxVersion == 12 && m_constructionCostPaid >= 0)
+	const XferVersion maxVersion = RetailFileLayers::enabled() ? 13 : 11;
+	if (maxVersion == 13 && getCreateAHeroColors())
+		version = 13;
+	else if (maxVersion == 13 && m_constructionCostPaid >= 0)
 		version = 12;
 	xfer->xferVersion(&version, maxVersion);
 
@@ -4281,6 +4283,12 @@ void Object::xfer( Xfer *xfer )
 
 	if (version >= 11)
 		xferRotwkPowerState(xfer);
+	if (version >= 13)
+	{
+		xfer->xferAsciiString(&m_createAHeroDisplayName);
+		for (Color& color : m_createAHeroColors)
+			xfer->xferInt(&color);
+	}
 
 }
 
@@ -5867,6 +5875,23 @@ Bool Object::canProduceUpgrade( const UpgradeTemplate *upgrade )
 }
 
  //=============================================================================
+UnicodeString Object::getDisplayName() const
+{
+	if (m_createAHeroDisplayName.isEmpty())
+		return getTemplate()->getDisplayName();
+	UnicodeString name;
+	name.translate(m_createAHeroDisplayName);
+	return name;
+}
+
+void Object::setCreateAHeroAppearance(const AsciiString& name, Color primary, Color secondary, Color tertiary)
+{
+	m_createAHeroDisplayName = name;
+	m_createAHeroColors[0] = primary;
+	m_createAHeroColors[1] = secondary;
+	m_createAHeroColors[2] = tertiary;
+}
+
 const AsciiString& Object::getCommandSetString() const
 {
 	if (m_commandSetStringOverride.isNotEmpty())

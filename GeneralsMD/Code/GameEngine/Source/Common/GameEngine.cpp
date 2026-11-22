@@ -93,6 +93,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/RetailSkirmishProbe.h"
+#include <stdexcept>
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/BattlePlanUpdate.h"
 #include "GameLogic/RankInfo.h"
@@ -299,6 +300,8 @@ static void startRetailFileSkirmish(const MapMetaData& map)
 	TheSkirmishGameInfo->setMap(map.m_fileName);
 	TheSkirmishGameInfo->setMapCRC(map.m_CRC);
 	TheSkirmishGameInfo->setMapSize(map.m_filesize);
+	if (std::getenv("GENERALSX_TEST_PKG18_SELECTION") && !RetailTestCommands::configurePackage18Match(*TheSkirmishGameInfo))
+		throw std::runtime_error("Package 18 test setup was rejected");
 	TheSkirmishGameInfo->startGame(0);
 }
 

@@ -398,6 +398,23 @@ inline bool decodeSelection(std::string_view encoded, SelectionData& out)
 	return true;
 }
 
+inline uint32_t applyColorMask(uint32_t diffuse, uint32_t mask, const uint32_t (&colors)[3])
+{
+	const unsigned coverage = mask >> 24;
+	const unsigned weights[] = { (mask >> 16) & 255, (mask >> 8) & 255, mask & 255 };
+	uint32_t result = diffuse & 0xff000000;
+	for (unsigned shift = 0; shift < 24; shift += 8)
+	{
+		unsigned tinted = 0;
+		for (size_t i = 0; i < 3; ++i)
+			tinted += ((colors[i] >> shift) & 255) * weights[i];
+		tinted = std::min(255u, (tinted + 127) / 255);
+		const unsigned original = (diffuse >> shift) & 255;
+		result |= ((original * (255 - coverage) + tinted * coverage + 127) / 255) << shift;
+	}
+	return result;
+}
+
 inline std::string base64UrlEncode(const std::vector<uint8_t>& bytes)
 {
 	static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";

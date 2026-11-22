@@ -54,6 +54,7 @@
 #include "GameClient/Shadow.h"
 #include "GameLogic/GameLogic.h"		// for real-time frame
 #include "GameLogic/Object.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/WeaponSet.h"
 #include "GameLogic/FPUControl.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -76,12 +77,18 @@
 #include "WW3D2/rendobj.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
+#include "WW3D2/matinfo.h"
+#include "WW3D2/surfaceclass.h"
+#include "WW3D2/texture.h"
+#include "WW3D2/textureloader.h"
 #include "Common/BitFlagsIO.h"
 
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <map>
+#include <memory>
 #include <vector>
 
 
@@ -2285,6 +2292,20 @@ void W3DModelDraw::driveBuildUpAnimation()
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 {
+	if (m_curState && RetailFileLayers::enabled())
+	{
+		const Object* object = getDrawable()->getObject();
+		const Color* colors = object ? object->getCreateAHeroColors() : nullptr;
+		const Color neutral[3] = {};
+		if (!colors)
+			colors = neutral;
+		if (!std::equal(std::begin(m_createAHeroColors), std::end(m_createAHeroColors), colors))
+		{
+			const ModelConditionInfo* state = m_curState;
+			m_curState = nullptr;
+			setModelState(state);
+		}
+	}
 	traceAnimationState();
 
 	// update whether or not we should be animating.
@@ -3426,6 +3447,121 @@ void W3DModelDraw::hideAllMuzzleFlashes(const ModelConditionInfo* state, RenderO
 }
 
 //-------------------------------------------------------------------------------------------------
+template<class T>
+struct ReleaseHeroAsset
+{
+	void operator()(T* asset) const { asset->Release_Ref(); }
+};
+
+template<class T>
+using HeroAssetRef = std::unique_ptr<T, ReleaseHeroAsset<T>>;
+
+using HeroTextureCache = std::map<TextureClass*, HeroAssetRef<TextureClass>>;
+
+static HeroAssetRef<TextureClass> makeHeroTexture(
+	TextureClass& diffuse, TextureClass& mask, const uint32_t (&palette)[3])
+{
+	for (TextureClass* texture : { &diffuse, &mask })
+	{
+		if (!texture->Is_Initialized())
+			TextureLoader::Request_Foreground_Loading(texture);
+		if (!texture->Is_Initialized() || texture->Is_Missing_Texture())
+			return {};
+	}
+
+	HeroAssetRef<SurfaceClass> source(diffuse.Get_Surface_Level());
+	HeroAssetRef<SurfaceClass> sourceMask(mask.Get_Surface_Level());
+	if (!source || !sourceMask)
+		return {};
+	SurfaceClass::SurfaceDescription desc;
+	SurfaceClass::SurfaceDescription maskDesc;
+	source->Get_Description(desc);
+	sourceMask->Get_Description(maskDesc);
+	if (!desc.Width || !desc.Height || !maskDesc.Width || !maskDesc.Height)
+		return {};
+
+	HeroAssetRef<SurfaceClass> output(NEW_REF(SurfaceClass, (desc.Width, desc.Height, WW3D_FORMAT_A8R8G8B8)));
+	HeroAssetRef<SurfaceClass> weights(NEW_REF(SurfaceClass, (maskDesc.Width, maskDesc.Height, WW3D_FORMAT_A8R8G8B8)));
+	output->Copy(0, 0, 0, 0, desc.Width, desc.Height, source.get());
+	weights->Copy(0, 0, 0, 0, maskDesc.Width, maskDesc.Height, sourceMask.get());
+
+	int texturePitch;
+	int maskPitch;
+	auto* pixels = static_cast<unsigned char*>(output->Lock(&texturePitch));
+	const auto* masks = static_cast<const unsigned char*>(weights->Lock(&maskPitch));
+	if (pixels && masks)
+	{
+		for (unsigned y = 0; y < desc.Height; ++y)
+		{
+			auto* row = reinterpret_cast<uint32_t*>(pixels + y * texturePitch);
+			const auto* maskRow = reinterpret_cast<const uint32_t*>(masks + (y * maskDesc.Height / desc.Height) * maskPitch);
+			for (unsigned x = 0; x < desc.Width; ++x)
+				row[x] = CreateAHeroRules::applyColorMask(row[x], maskRow[x * maskDesc.Width / desc.Width], palette);
+		}
+	}
+	if (masks)
+		weights->Unlock();
+	if (pixels)
+		output->Unlock();
+	if (!pixels || !masks)
+		return {};
+
+	HeroAssetRef<TextureClass> result(NEW_REF(TextureClass, (output.get(), static_cast<MipCountType>(diffuse.Get_Mip_Level_Count()))));
+	result->Get_Filter() = diffuse.Get_Filter();
+	return result;
+}
+
+static void applyHeroColors(RenderObjClass* object, W3DAssetManager& assets,
+	const uint32_t (&palette)[3], HeroTextureCache& cache)
+{
+	if (object->Class_ID() == RenderObjClass::CLASSID_MESH)
+	{
+		auto* mesh = static_cast<MeshClass*>(object);
+		HeroAssetRef<MaterialInfoClass> materials(mesh->Get_Material_Info());
+		if (!materials)
+			return;
+		std::vector<std::pair<TextureClass*, TextureClass*>> replacements;
+		for (int i = 0; i < materials->Texture_Count(); ++i)
+		{
+			TextureClass* diffuse = materials->Peek_Texture(i);
+			if (!diffuse)
+				continue;
+			auto [entry, added] = cache.try_emplace(diffuse);
+			if (added)
+			{
+				const AsciiString maskName = CreateAHeroSystem::findColorMask(diffuse->Get_Texture_Name().str());
+				if (!maskName.isEmpty())
+				{
+					HeroAssetRef<TextureClass> mask(assets.Get_Texture(maskName.str()));
+					if (mask)
+						entry->second = makeHeroTexture(*diffuse, *mask, palette);
+				}
+			}
+			if (entry->second)
+				replacements.emplace_back(diffuse, entry->second.get());
+		}
+		if (replacements.empty())
+			return;
+		mesh->Make_Unique();
+		materials.reset(mesh->Get_Material_Info());
+		HeroAssetRef<MeshModelClass> model(mesh->Get_Model());
+		for (const auto& [original, replacement] : replacements)
+		{
+			model->Replace_Texture(original, replacement);
+			for (int i = 0; i < materials->Texture_Count(); ++i)
+				if (materials->Peek_Texture(i) == original)
+					materials->Replace_Texture(i, replacement);
+		}
+		return;
+	}
+	for (int i = 0; i < object->Get_Num_Sub_Objects(); ++i)
+	{
+		HeroAssetRef<RenderObjClass> child(object->Get_Sub_Object(i));
+		if (child)
+			applyHeroColors(child.get(), assets, palette, cache);
+	}
+}
+
 static std::vector<const SubObjectsUpgradeModuleData*> getSubObjectTextureUpgrades(const Drawable& drawable)
 {
 	std::vector<const SubObjectsUpgradeModuleData*> upgrades;
@@ -3597,6 +3733,17 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 				for (const auto* upgrade : m_textureUpgrades)
 					assets->replaceInstanceTextures(m_renderObject, upgrade->m_upgradeTextures,
 						upgrade->m_recolorHouse ? m_hexColor : 0, &upgrade->m_excludeSubObjects);
+				const Object* object = draw->getObject();
+				const Color* colors = object ? object->getCreateAHeroColors() : nullptr;
+				if (colors)
+				{
+					std::copy_n(colors, 3, m_createAHeroColors);
+					const uint32_t palette[] = { uint32_t(colors[0]), uint32_t(colors[1]), uint32_t(colors[2]) };
+					HeroTextureCache cache;
+					applyHeroColors(m_renderObject, *assets, palette, cache);
+				}
+				else
+					std::fill_n(m_createAHeroColors, 3, 0);
 			}
 			DEBUG_ASSERTCRASH(m_renderObject, ("*** ASSET ERROR: Model %s not found!",newState->m_modelName.str()));
 		}

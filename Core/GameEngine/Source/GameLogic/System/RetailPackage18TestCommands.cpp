@@ -7,6 +7,8 @@
 #include <string_view>
 
 #include "Common/Player.h"
+#include "GameLogic/RetailTestCommands.h"
+#include "GameNetwork/LANAPI.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/Upgrade.h"
 #include "GameClient/ControlBar.h"
@@ -15,6 +17,25 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
 #include "GameNetwork/GameInfo.h"
+
+bool RetailTestCommands::configurePackage18Match(GameInfo& game)
+{
+	const char* selection = std::getenv("GENERALSX_TEST_PKG18_SELECTION");
+	if (!selection || strnlen(selection, CreateAHeroRules::MAX_ENCODED_LENGTH + 1) > CreateAHeroRules::MAX_ENCODED_LENGTH)
+		return false;
+	const AsciiString normal = GameInfoToAsciiString(&game, 0, FALSE);
+	AsciiString setup = normal;
+	setup.concat("CH0=");
+	setup.concat(selection);
+	setup.concat(';');
+	if (!ParseAsciiStringToGameInfo(&game, setup))
+		return false;
+	const GameSlot* slot = game.getConstSlot(0);
+	if (!slot || slot->getCreateAHeroConfig().isEmpty())
+		return false;
+	std::fprintf(stderr, "TEST pkg18 setup accepted=1 compactLen=%d\n", slot->getCreateAHeroConfig().getLength());
+	return true;
+}
 
 void runRetailPackage18TestCommand(std::string_view action, Player* player, Object* source, const char* argument, UnsignedInt frame)
 {
@@ -68,59 +89,69 @@ void runRetailPackage18TestCommand(std::string_view action, Player* player, Obje
 		return;
 	}
 
-	if (action == "pkg18-select")
+	if (action == "pkg18-setup-budget")
 	{
-		if (!player || !argument || !*argument)
+		const GameSlot* selected = TheGameInfo ? TheGameInfo->getConstSlot(0) : nullptr;
+		if (!selected || selected->getCreateAHeroConfig().isEmpty())
 			return;
-		CreateAHeroRules::SelectionData decoded;
-		Bool ok = CreateAHeroRules::decodeSelection(argument, decoded);
-		CreateAHeroRules::SelectionData normalized;
-		const AsciiString faction = player->getPlayerTemplate() ? player->getPlayerTemplate()->getSide() : AsciiString::TheEmptyString;
-		if (ok)
-			ok = CreateAHeroSystem::validateSelection(decoded, faction, normalized);
-		Bool wireOk = FALSE;
-		Int compactLen = 0;
-		if (ok)
+		CreateAHeroRules::SelectionData profile;
+		if (!CreateAHeroSystem::decodeSelectionCompact(selected->getCreateAHeroConfig(), profile))
+			return;
+		profile.heroName.assign(CreateAHeroRules::MAX_HERO_NAME_LENGTH, 'D');
+		for (const CommandButton* candidate = TheRetailCommandCatalog->getCommandButtons(); candidate;
+			candidate = candidate->getNext())
 		{
-			const AsciiString compact = CreateAHeroSystem::encodeSelectionCompact(normalized);
-			compactLen = compact.getLength();
-			SkirmishGameInfo srcInfo;
-			srcInfo.init();
-			srcInfo.setMap("Maps/Training/Training.map");
-			srcInfo.setMapCRC(1);
-			srcInfo.setMapSize(1);
-			srcInfo.setSeed(1);
-			GameSlot slot0;
-			slot0.setState(SLOT_PLAYER, UnicodeString(L"P1"), 0x01020304);
-			slot0.setCreateAHeroConfig(compact);
-			srcInfo.setSlot(0, slot0);
-			const AsciiString wire = GameInfoToAsciiString(&srcInfo);
-			SkirmishGameInfo dstInfo;
-			dstInfo.init();
-			if (ParseAsciiStringToGameInfo(&dstInfo, wire))
-			{
-				const GameSlot* dstSlot = dstInfo.getConstSlot(0);
-				if (dstSlot && dstSlot->getCreateAHeroConfig() == compact)
-				{
-					CreateAHeroSystem::ingestGameInfo(&dstInfo);
-					wireOk = CreateAHeroSystem::getPlayerSelection(player->getPlayerIndex()) != nullptr
-						? TRUE
-						: CreateAHeroSystem::setPlayerSelectionEncoded(player->getPlayerIndex(), dstSlot->getCreateAHeroConfig(), faction);
-				}
-			}
+			if (profile.powerButtons.size() == CreateAHeroRules::MAX_POWER_COUNT)
+				break;
+			if (std::find(profile.powerButtons.begin(), profile.powerButtons.end(), candidate->getName().str()) == profile.powerButtons.end() &&
+				CreateAHeroSystem::isPowerButtonLegalForSelection(candidate, profile, profile.powerButtons.size() + 1, profile.powerButtons))
+				profile.powerButtons.emplace_back(candidate->getName().str());
 		}
-		std::fprintf(stderr,
-			"TEST pkg18 select frame=%u player=%d accepted=%d wireOk=%d compactLen=%d class=%s subclass=%s blings=%zu attrs=%zu powers=%zu\n",
-			frame,
-			player->getPlayerIndex(),
-			ok ? 1 : 0,
-			wireOk ? 1 : 0,
-			compactLen,
-			ok ? normalized.classUpgrade.c_str() : "-",
-			ok ? normalized.subClassUpgrade.c_str() : "-",
-			ok ? normalized.blingUpgrades.size() : 0u,
-			ok ? normalized.attributeUpgrades.size() : 0u,
-			ok ? normalized.powerButtons.size() : 0u);
+		const AsciiString encoded = CreateAHeroSystem::encodeSelectionCompact(profile);
+		SkirmishGameInfo worst;
+		worst.init();
+		worst.setMap(TheGameInfo->getMap());
+		worst.setMapCRC(0xFFFFFFFFu);
+		worst.setMapSize(2147483647);
+		worst.setSeed(-2147483647 - 1);
+		for (Int i = 0; i < MAX_SLOTS; ++i)
+		{
+			GameSlot slot;
+			slot.setState(SLOT_PLAYER, UnicodeString(L"TwelveCharsX"), 0xFFFFFF00u + i);
+			slot.setPort(65535);
+			slot.setPlayerTemplate(selected->getPlayerTemplate());
+			slot.setStartPos(i);
+			slot.setCreateAHeroConfig(CreateAHeroSystem::validateSetupSelection(encoded.str(), slot));
+			worst.setSlot(i, slot);
+		}
+		const AsciiString fullSetup = GameInfoToAsciiString(&worst);
+		const AsciiString retail = GameInfoToAsciiString(&worst, kRetailLanSetupBudget);
+		SkirmishGameInfo received;
+		received.init();
+		Int accepted = 0;
+		if (ParseAsciiStringToGameInfo(&received, retail))
+			for (Int i = 0; i < MAX_SLOTS; ++i)
+				accepted += received.getConstSlot(i)->getCreateAHeroConfig().isNotEmpty();
+		const AsciiString normal = GameInfoToAsciiString(&worst, 0, FALSE);
+		const std::string good = std::string("CH0=") + encoded.str() + ";";
+		const std::string invalid[] = { "CH0=;", "CH0=invalid;", good + good,
+			std::string("CH0=") + selected->getCreateAHeroConfig().str() + ";CH1=invalid;",
+			std::string("CH0=") + std::string(CreateAHeroRules::MAX_ENCODED_LENGTH + 1, 'x') + ";",
+			"CH0=UnknownClass|UnknownSubclass|Bad||||0,0,0,0,0,0,0,0,0;" };
+		Int rejected = 0;
+		for (size_t i = 0; i < std::size(invalid); ++i)
+		{
+			AsciiString wire = normal;
+			wire.concat(invalid[i].c_str());
+			const Int rejectedSlot = i == 3 ? 1 : 0;
+			if (ParseAsciiStringToGameInfo(&received, wire) && received.getConstSlot(rejectedSlot)->getCreateAHeroConfig().isEmpty() &&
+				(rejectedSlot == 0 || received.getConstSlot(0)->getCreateAHeroConfig() == selected->getCreateAHeroConfig()))
+				++rejected;
+		}
+		const AsciiString oversized(std::string(kRetailLanSetupBudget + 1, 'x').c_str());
+		std::fprintf(stderr, "TEST pkg18 budget normal=%d full=%d retail=%d budget=%d legacyBudget=%d accepted=%d rejected=%d oversize=%d\n",
+			normal.getLength(), fullSetup.getLength(), retail.getLength(), kRetailLanSetupBudget, m_lanMaxOptionsLength,
+			accepted, rejected, !ParseAsciiStringToGameInfo(&received, oversized));
 		return;
 	}
 
@@ -136,21 +167,27 @@ void runRetailPackage18TestCommand(std::string_view action, Player* player, Obje
 			return (upg && source->hasUpgrade(upg)) ? 1 : 0;
 		};
 		const ExperienceTracker* tracker = source->getExperienceTracker();
-		const std::vector<std::string>* powers = CreateAHeroSystem::getAppliedPowerButtons(source);
-		const char* firstPower = (powers && !powers->empty()) ? powers->front().c_str() : "-";
+		const CommandSet* commands = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
+		const CommandButton* power = commands ? commands->getCommandButton(1) : nullptr;
+		const Color* colors = source->getCreateAHeroColors();
+		AsciiString displayName;
+		displayName.translate(source->getDisplayName());
 		std::fprintf(stderr,
-			"TEST pkg18 hero frame=%u object=%u name=%s hasGameMode=%d hasDwarf=%d hasSub0=%d hasSub1=%d hasCheck=%d checkName=%s powerCount=%zu firstPower=%s rank=%d xp=%d\n",
+			"TEST pkg18 hero frame=%u object=%u scriptName=%s name=%s colors=%08X,%08X,%08X hasGameMode=%d hasDwarf=%d hasSub0=%d hasSub1=%d hasCheck=%d checkName=%s firstPower=%s rank=%d xp=%d\n",
 			frame,
 			static_cast<unsigned>(source->getID()),
 			!source->getName().isEmpty() ? source->getName().str() : "-",
+			displayName.str(),
+			colors ? static_cast<unsigned>(colors[0]) : 0u,
+			colors ? static_cast<unsigned>(colors[1]) : 0u,
+			colors ? static_cast<unsigned>(colors[2]) : 0u,
 			hasNamed(CreateAHeroSystem::getGameModeUpgradeName().str()),
 			hasNamed("Upgrade_CreateAHero_ClassDwarf"),
 			hasNamed("Upgrade_CreateAHero_SubClass_0"),
 			hasNamed("Upgrade_CreateAHero_SubClass_1"),
 			hasNamed(argument),
 			(argument && *argument) ? argument : "-",
-			powers ? powers->size() : 0u,
-			firstPower,
+			power ? power->getName().str() : "-",
 			tracker ? tracker->getRank() : 0,
 			tracker ? static_cast<Int>(tracker->getRetailExperience()) : 0);
 		return;

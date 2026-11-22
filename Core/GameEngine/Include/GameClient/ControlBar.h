@@ -549,6 +549,7 @@ public:
 
 	const AsciiString& getName() const { return m_name; }
 	const CommandButton* getCommandButton(Int i) const;
+	void setCommandButton(Int i, const CommandButton* button) { m_command[i] = button; }
 	Int getInitialVisible() const { return m_initialVisible; }
 
 	// only for the control bar.
@@ -793,6 +794,7 @@ public:
 private:
 	CommandButton* m_commandButtons = nullptr;
 	CommandSet* m_commandSets = nullptr;
+	CommandSet* m_createAHeroCommandSets = nullptr;
 };
 
 extern CommandCatalog* TheRetailCommandCatalog;

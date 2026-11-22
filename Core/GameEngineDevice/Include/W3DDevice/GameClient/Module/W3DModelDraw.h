@@ -538,6 +538,8 @@ private:
 	std::vector<const SubObjectsUpgradeModuleData*> m_textureUpgrades;
 	const ModelConditionInfo*			m_nextState;
 	UnsignedInt										m_nextStateAnimLoopDuration;
+	Color m_createAHeroColors[3] = {};
+
 	Int														m_hexColor;
 	Int														m_whichAnimInCurState;						///< the index of the currently playing anim in cur state (if any)
 	WeaponRecoilInfoVec						m_weaponRecoilInfoVec[WEAPONSLOT_COUNT];
