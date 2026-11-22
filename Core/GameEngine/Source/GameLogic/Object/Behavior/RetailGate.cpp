@@ -1,6 +1,7 @@
 #include "PreRTS.h"
 
 #include "GameLogic/Module/RetailGate.h"
+#include "GameLogic/Module/WallHubBehavior.h"
 
 #include <algorithm>
 #include <cmath>
@@ -74,9 +75,9 @@ GateOpenAndCloseBehavior* GateOpenAndCloseBehavior::resolveForControl(const Obje
 {
 	if (!object || !RetailFileLayers::enabled() || !object->areModulesReady())
 		return nullptr;
-	if (GateOpenAndCloseBehavior* proxied = GateProxyBehavior::resolveGate(object))
-		return proxied;
-	return find(object);
+	if (GateOpenAndCloseBehavior* gate = find(object))
+		return gate;
+	return GateProxyBehavior::resolveGate(object);
 }
 
 Bool GateOpenAndCloseBehavior::canPass(const Object* obstacle, const Object* unit, Bool planning)
@@ -85,8 +86,15 @@ Bool GateOpenAndCloseBehavior::canPass(const Object* obstacle, const Object* uni
 		return FALSE;
 	if (const auto* gate = find(obstacle))
 		return gate->permits(*unit, planning);
-	if (const auto* portal = DynamicPortalBehaviour::find(obstacle))
-		return portal->permits(*unit);
+	if (DynamicPortalBehaviour::find(obstacle))
+	{
+		const NameKeyType key = NAMEKEY("DynamicPortalBehaviour");
+		for (BehaviorModule** module = obstacle->getBehaviorModules(); *module; ++module)
+		{
+			if ((*module)->getModuleNameKey() == key && static_cast<const DynamicPortalBehaviour*>(*module)->permits(*unit))
+				return TRUE;
+		}
+	}
 	return FALSE;
 }
 
@@ -182,39 +190,6 @@ void GateOpenAndCloseBehavior::configureGeometry()
 	TheAI->pathfinder()->addObjectToPathfindMap(gate);
 }
 
-void GateOpenAndCloseBehavior::resolveProxy()
-{
-	const AsciiString& proxyName = getGateOpenAndCloseBehaviorModuleData()->m_proxy;
-	if (proxyName.isEmpty())
-		return;
-	if (m_proxyID != INVALID_ID && TheGameLogic->findObjectByID(m_proxyID))
-		return;
-	Object* best = nullptr;
-	Bool bestByName = FALSE;
-	for (Object* candidate = TheGameLogic->getFirstObject(); candidate; candidate = candidate->getNextObject())
-	{
-		if (candidate == getObject() || candidate->isDestroyed())
-			continue;
-		if (!GateProxyBehavior::find(candidate))
-			continue;
-		const Bool byName = candidate->getName().isNotEmpty() && candidate->getName().compareNoCase(proxyName) == 0;
-		const Bool byTemplate = candidate->getTemplate()->getName().compareNoCase(proxyName) == 0;
-		if (!byName && !byTemplate)
-			continue;
-		if (!best || (byName && !bestByName) || (byName == bestByName && candidate->getID() < best->getID()))
-		{
-			best = candidate;
-			bestByName = byName;
-		}
-	}
-	if (best)
-	{
-		m_proxyID = best->getID();
-		if (GateProxyBehavior* proxy = GateProxyBehavior::find(best))
-			proxy->setGateID(getObject()->getID());
-	}
-}
-
 UpdateSleepTime GateOpenAndCloseBehavior::update()
 {
 	if (getObject()->isEffectivelyDead())
@@ -222,7 +197,6 @@ UpdateSleepTime GateOpenAndCloseBehavior::update()
 	if (!m_geometryReady)
 	{
 		configureGeometry();
-		resolveProxy();
 		m_geometryReady = TRUE;
 		applyModelState();
 	}
@@ -248,16 +222,7 @@ UpdateSleepTime GateOpenAndCloseBehavior::update()
 
 void GateOpenAndCloseBehavior::xferRetailBlocks(Xfer* xfer, Bool present)
 {
-	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present,
-	{
-		{ "gate-proxy", [this](Xfer* x)
-		{
-			x->xferObjectID(&m_proxyID);
-		}, [this]
-		{
-			m_proxyID = INVALID_ID;
-		} }
-	});
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
 }
 
 void GateOpenAndCloseBehavior::crc(Xfer* xfer)
@@ -266,8 +231,6 @@ void GateOpenAndCloseBehavior::crc(Xfer* xfer)
 	xfer->xferBool(&m_wantsOpen);
 	xfer->xferBool(&m_passable);
 	xfer->xferUnsignedInt(&m_pathFrame);
-	if (RetailFileLayers::enabled())
-		xferRetailBlocks(xfer, TRUE);
 }
 
 void GateOpenAndCloseBehavior::xfer(Xfer* xfer)
@@ -428,24 +391,15 @@ GateProxyBehavior* GateProxyBehavior::find(const Object* object)
 
 GateOpenAndCloseBehavior* GateProxyBehavior::resolveGate(const Object* object)
 {
-	GateProxyBehavior* proxy = find(object);
-	if (!proxy)
+	if (!find(object) || object->isEffectivelyDead())
 		return nullptr;
-	if (proxy->m_gateID != INVALID_ID)
-	{
-		if (Object* target = TheGameLogic->findObjectByID(proxy->m_gateID))
-		{
-			if (GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::find(target))
-				return gate;
-		}
-		proxy->m_gateID = INVALID_ID;
-	}
+
 	GateOpenAndCloseBehavior* best = nullptr;
 	ObjectID bestID = INVALID_ID;
-	Bool bestByName = FALSE;
 	for (Object* candidate = TheGameLogic->getFirstObject(); candidate; candidate = candidate->getNextObject())
 	{
-		if (candidate == object || candidate->isDestroyed())
+		if (candidate == object || candidate->isDestroyed() || candidate->isEffectivelyDead() ||
+			candidate->getControllingPlayer() != object->getControllingPlayer())
 			continue;
 		GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::find(candidate);
 		if (!gate)
@@ -453,44 +407,21 @@ GateOpenAndCloseBehavior* GateProxyBehavior::resolveGate(const Object* object)
 		const AsciiString& proxyName = gate->getProxyName();
 		if (proxyName.isEmpty())
 			continue;
-		const Bool byName = object->getName().isNotEmpty() && object->getName().compareNoCase(proxyName) == 0;
-		const Bool byTemplate = object->getTemplate()->getName().compareNoCase(proxyName) == 0;
-		if (!byName && !byTemplate)
+		if (object->getName() != proxyName)
 			continue;
-		if (!best || (byName && !bestByName) || (byName == bestByName && candidate->getID() < bestID))
+		const ObjectID id = candidate->getID();
+		if (!best || id < bestID)
 		{
 			best = gate;
-			bestID = candidate->getID();
-			bestByName = byName;
+			bestID = id;
 		}
 	}
-	if (best)
-	{
-		proxy->m_gateID = bestID;
-		best->setProxyID(object->getID());
-	}
 	return best;
-}
-
-void GateProxyBehavior::xferRetailBlocks(Xfer* xfer, Bool present)
-{
-	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present,
-	{
-		{ "gate-proxy", [this](Xfer* x)
-		{
-			x->xferObjectID(&m_gateID);
-		}, [this]
-		{
-			m_gateID = INVALID_ID;
-		} }
-	});
 }
 
 void GateProxyBehavior::crc(Xfer* xfer)
 {
 	BehaviorModule::crc(xfer);
-	if (RetailFileLayers::enabled())
-		xferRetailBlocks(xfer, TRUE);
 }
 
 void GateProxyBehavior::xfer(Xfer* xfer)
@@ -499,7 +430,7 @@ void GateProxyBehavior::xfer(Xfer* xfer)
 	xfer->xferVersion(&version, 1);
 	BehaviorModule::xfer(xfer);
 	if (RetailFileLayers::enabled())
-		xferRetailBlocks(xfer, version >= 1);
+		RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, TRUE, {});
 }
 
 void GateProxyBehavior::loadPostProcess()
@@ -625,29 +556,35 @@ UpdateSleepTime DynamicPortalBehaviour::update()
 		m_activationScheduled = FALSE;
 		return UPDATE_SLEEP_FOREVER;
 	}
-	if (m_active)
-		return UPDATE_SLEEP_FOREVER;
-	if (!shouldActivate())
-		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND / 4);
-
 	const auto* data = getDynamicPortalBehaviourModuleData();
+	const Bool changesWithUpgrades = !data->m_triggeredBy.empty() || !data->m_conflictsWith.empty();
+	if (!shouldActivate())
+	{
+		if (m_activationScheduled && data->m_customAnim.m_condition >= 0)
+			self->clearModelConditionState(static_cast<ModelConditionFlagType>(data->m_customAnim.m_condition));
+		m_active = FALSE;
+		m_activationScheduled = FALSE;
+		return UPDATE_SLEEP_NONE;
+	}
+	if (m_active)
+		return changesWithUpgrades ? UPDATE_SLEEP_NONE : UPDATE_SLEEP_FOREVER;
 	const UnsignedInt frame = TheGameLogic->getFrame();
 	if (!m_activationScheduled)
 	{
 		const Real seconds = std::isfinite(data->m_activationDelaySeconds) && data->m_activationDelaySeconds > 0.0f
 			? data->m_activationDelaySeconds : 0.0f;
-		const UnsignedInt delayFrames = static_cast<UnsignedInt>(seconds * LOGICFRAMES_PER_SECOND);
-		m_activationFrame = frame + delayFrames;
+		const double targetFrame = frame + static_cast<double>(seconds) * LOGICFRAMES_PER_SECOND;
+		m_activationFrame = static_cast<UnsignedInt>(std::min(targetFrame, static_cast<double>(UPDATE_SLEEP_FOREVER)));
 		m_activationScheduled = TRUE;
 		if (data->m_customAnim.m_condition >= 0)
 			self->setModelConditionState(static_cast<ModelConditionFlagType>(data->m_customAnim.m_condition));
 	}
 	if (frame < m_activationFrame)
-		return UPDATE_SLEEP(m_activationFrame - frame);
+		return changesWithUpgrades ? UPDATE_SLEEP_NONE : UPDATE_SLEEP(m_activationFrame - frame);
 
 	m_active = TRUE;
 	TheAI->pathfinder()->noteRetailRouteOpening();
-	return UPDATE_SLEEP_FOREVER;
+	return changesWithUpgrades ? UPDATE_SLEEP_NONE : UPDATE_SLEEP_FOREVER;
 }
 
 Bool DynamicPortalBehaviour::permits(const Object& unit) const
@@ -655,6 +592,8 @@ Bool DynamicPortalBehaviour::permits(const Object& unit) const
 	if (!m_active || !RetailFileLayers::enabled())
 		return FALSE;
 	const Object* self = getObject();
+	if (const auto* upgrade = WallUpgradeUpdate::find(self); upgrade && upgrade->isWaitingForWall())
+		return FALSE;
 	if (self->isEffectivelyDead() || self->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 		return FALSE;
 	const Player* unitPlayer = unit.getControllingPlayer();

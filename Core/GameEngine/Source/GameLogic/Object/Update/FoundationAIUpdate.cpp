@@ -152,7 +152,7 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player,
 		castle->applyKeepUpgrades(*structure);
 		const Object* keep = castle->getKeep();
 		CastleMemberBehavior::linkToCastle(*structure, castle->getCastleObjectID(),
-			keep ? keep->getID() : INVALID_ID, FALSE, TRUE);
+			keep ? keep->getID() : INVALID_ID, FALSE, castle->isOwnedMemberTemplate(*foundation->getTemplate()));
 	}
 	showFoundation(FALSE);
 	if (prebuilt)
@@ -176,7 +176,7 @@ void FoundationAIUpdate::showFoundation(Bool show)
 		drawable->setDrawableHidden(!show);
 }
 
-void FoundationAIUpdate::advanceConstruction(Object& structure, Object* builder, Int overrideFrames)
+void FoundationAIUpdate::advanceConstruction(Object& structure, Object* builder, Int overrideFrames, Bool isRebuild)
 {
 	Player* player = structure.getControllingPlayer();
 	const Int frames = overrideFrames > 0 ? overrideFrames : structure.getTemplate()->calcTimeToBuild(player);
@@ -195,7 +195,7 @@ void FoundationAIUpdate::advanceConstruction(Object& structure, Object* builder,
 
 	if (player)
 	{
-		player->onStructureConstructionComplete(builder, &structure, FALSE);
+		player->onStructureConstructionComplete(builder, &structure, isRebuild);
 		for (BehaviorModule** module = structure.getBehaviorModules(); *module; ++module)
 		{
 			CreateModuleInterface* create = (*module)->getCreate();

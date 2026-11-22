@@ -1319,6 +1319,9 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 	{
 		case GUI_COMMAND_CANCEL_NEIGHBORHOOD:
 			return WallHubBehavior::canCancelSpan(obj) ? COMMAND_AVAILABLE : COMMAND_HIDDEN;
+		case GUI_COMMAND_START_SELF_REPAIR:
+			return GettingBuiltBehavior::canOrderRebuild(obj, ThePlayerList->getLocalPlayer())
+				? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		case GUI_COMMAND_CLOSE_GATE:
 		case GUI_COMMAND_OPEN_GATE:
 		case GUI_COMMAND_TOGGLE_GATE:
@@ -1444,6 +1447,15 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 				return CBC_COMMAND_NOT_USED;
 			TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_CANCEL_WALL_SPAN)->appendObjectIDArgument(obj->getID());
 			return CBC_COMMAND_USED;
+		case GUI_COMMAND_START_SELF_REPAIR:
+		{
+			if (!GettingBuiltBehavior::canOrderRebuild(obj, ThePlayerList->getLocalPlayer()))
+				return CBC_COMMAND_NOT_USED;
+			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_REPAIR);
+			msg->appendObjectIDArgument(obj->getID());
+			msg->appendIntegerArgument(command->getCommandType());
+			return CBC_COMMAND_USED;
+		}
 		case GUI_COMMAND_CASTLE_UNPACK:
 			if (!CastleBehavior::find(obj))
 				return CBC_COMMAND_NOT_USED;

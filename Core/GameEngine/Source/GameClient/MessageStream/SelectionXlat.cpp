@@ -125,11 +125,8 @@ Bool CanSelectDrawable( const Drawable *draw, Bool dragSelecting )
 	}
 	const Object *obj = draw->getObject();
 
-	if( obj->isEffectivelyDead() && !obj->isKindOf(KINDOF_ALWAYS_SELECTABLE))
-	{
-		//Don't select dead/dying units.
+	if (obj->isEffectivelyDead() && !obj->isSelectable())
 		return FALSE;
-	}
 
 	//Added this to support attacking cargo planes without being able to select them.
 	//I added the KINDOF_FORCEATTACKABLE to them, but unsure if it's possible to select

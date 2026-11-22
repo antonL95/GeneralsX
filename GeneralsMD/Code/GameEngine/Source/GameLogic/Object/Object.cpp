@@ -2462,7 +2462,13 @@ void Object::setEffectivelyDead(Bool dead)
 	if (dead)
 		BitSet(m_privateStatus, EFFECTIVELY_DEAD);
 	else
+	{
 		BitClear(m_privateStatus, EFFECTIVELY_DEAD);
+#if defined(RTS_DEBUG)
+		if (RetailFileLayers::enabled())
+			m_hasDiedAlready = false;
+#endif
+	}
 
 	if (dead)
 	{
@@ -3513,9 +3519,10 @@ Bool Object::isSelectable() const
 	if (getTemplate()->isKindOf(KINDOF_ALWAYS_SELECTABLE))
     return TRUE;
 
-	if ( m_isSelectable )
+	const Bool selectableRubble = RetailFileLayers::enabled() && isEffectivelyDead() &&
+		getTemplate()->getRotWKObjectData().keepSelectableWhenDead;
+	if (selectableRubble || (m_isSelectable && !isEffectivelyDead()))
     if ( !testStatus(OBJECT_STATUS_UNSELECTABLE) )
-		  if ( !isEffectivelyDead() )
 #if !RETAIL_COMPATIBLE_CRC
 				if ( !getTemplate()->isKindOf(KINDOF_NO_SELECT) )
 #endif

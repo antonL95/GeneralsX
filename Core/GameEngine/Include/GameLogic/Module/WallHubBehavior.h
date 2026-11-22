@@ -91,6 +91,7 @@ public:
 	static Object* start(const ThingTemplate& type, Object& builder, const Coord3D& position,
 		Real facing, UnsignedInt delay, Int cost, ObjectID span);
 	static Bool startRebuild(Object& structure);
+	static Bool canOrderRebuild(const Object* structure, const Player* owner);
 	static void onRubbleEntered(Object& structure);
 	static UnsignedInt constructionRefund(const Object& structure, const Player& player);
 	ObjectID getSpan() const { return m_span; }
@@ -110,6 +111,7 @@ private:
 	ObjectID m_span = INVALID_ID;
 	Bool m_rebuildingFromRubble = FALSE;
 	Bool m_waitingToRebuild = FALSE;
+	Bool m_keptAsRubble = FALSE;
 	UnsignedInt m_rebuildReadyFrame = 0;
 };
 
@@ -127,11 +129,13 @@ class WallUpgradeUpdate final : public UpdateModule
 public:
 	WallUpgradeUpdate(Thing* thing, const ModuleData* data);
 	static WallUpgradeUpdate* find(const Object* object);
-	Bool isUpgraded() const { return m_upgraded; }
+	ObjectID getSupportingWallID() const { return m_supportingWall; }
+	Bool isWaitingForWall() const { return m_waitingForWall; }
 	UpdateSleepTime update() override;
 
 private:
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 
-	Bool m_upgraded = FALSE;
+	ObjectID m_supportingWall = INVALID_ID;
+	Bool m_waitingForWall = FALSE;
 };

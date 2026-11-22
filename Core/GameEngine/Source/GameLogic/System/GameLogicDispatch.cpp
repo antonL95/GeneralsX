@@ -907,8 +907,11 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			if (!RetailFileLayers::enabled() || msg->getArgumentCount() != 2)
 				break;
 			Object* source = findObjectByID(msg->getArgument(0)->objectID);
+			if (!source || source->getControllingPlayer() != getMessagePlayer(msg) ||
+				source->isEffectivelyDead() || source->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+				break;
 			GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::resolveForControl(source);
-			if (!gate || source->getControllingPlayer() != getMessagePlayer(msg))
+			if (!gate)
 				break;
 			const Int type = msg->getArgument(1)->integer;
 			if (type == GUI_COMMAND_OPEN_GATE || type == GUI_COMMAND_CLOSE_GATE || type == GUI_COMMAND_TOGGLE_GATE)
@@ -2062,7 +2065,16 @@ bool GameLogic::onGetHealed(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currently
 
 bool GameLogic::onDoRepair(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
+	if (msg->getArgumentCount() < 1 || msg->getArgumentDataType(0) != ARGUMENTDATATYPE_OBJECTID)
+		return false;
 	Object *repairTarget = findObjectByID( msg->getArgument( 0 )->objectID );
+	if (RetailFileLayers::enabled() && msg->getArgumentCount() == 2 &&
+		msg->getArgumentDataType(1) == ARGUMENTDATATYPE_INTEGER &&
+		msg->getArgument(1)->integer == GUI_COMMAND_START_SELF_REPAIR)
+	{
+		return GettingBuiltBehavior::canOrderRebuild(repairTarget, getMessagePlayer(msg)) &&
+			GettingBuiltBehavior::startRebuild(*repairTarget);
+	}
 
 	// sanity
 	if( repairTarget == nullptr )

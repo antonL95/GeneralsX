@@ -42,9 +42,8 @@ public:
 	static Bool canPass(const Object* obstacle, const Object* unit, Bool planning);
 	static Bool couldConnect(const Object* unit);
 	void request(Bool open);
+	const Object* getGateObject() const { return getObject(); }
 	Bool wantsOpen() const { return m_wantsOpen; }
-	void setProxyID(ObjectID proxyID) { m_proxyID = proxyID; }
-	ObjectID getProxyID() const { return m_proxyID; }
 	const AsciiString& getProxyName() const { return getGateOpenAndCloseBehaviorModuleData()->m_proxy; }
 	UpdateSleepTime update() override;
 
@@ -52,7 +51,6 @@ private:
 	void playSound(const AsciiString& name) const;
 	void applyModelState();
 	void configureGeometry();
-	void resolveProxy();
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	Bool permits(const Object& unit, Bool planning) const;
 
@@ -64,7 +62,6 @@ private:
 	Bool m_moving = FALSE;
 	Bool m_soundPending = FALSE;
 	Bool m_geometryReady = FALSE;
-	ObjectID m_proxyID = INVALID_ID;
 };
 
 class GateProxyBehaviorModuleData : public BehaviorModuleData
@@ -82,13 +79,6 @@ public:
 	GateProxyBehavior(Thing* thing, const ModuleData* data);
 	static GateProxyBehavior* find(const Object* object);
 	static GateOpenAndCloseBehavior* resolveGate(const Object* object);
-	void setGateID(ObjectID gateID) { m_gateID = gateID; }
-	ObjectID getGateID() const { return m_gateID; }
-
-private:
-	void xferRetailBlocks(Xfer* xfer, Bool present);
-
-	ObjectID m_gateID = INVALID_ID;
 };
 
 class AIGateUpdateModuleData : public UpdateModuleData

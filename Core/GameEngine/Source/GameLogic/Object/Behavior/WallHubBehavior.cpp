@@ -15,6 +15,7 @@
 #include "Common/RetailSaveBlocks.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameClient/ControlBar.h"
@@ -465,7 +466,8 @@ UnsignedInt GettingBuiltBehavior::getRebuildFrames() const
 	const Real seconds = getGettingBuiltBehaviorModuleData()->m_rebuildTime;
 	if (!std::isfinite(seconds) || seconds <= 0.0f)
 		return 0;
-	return std::max(1u, static_cast<UnsignedInt>(seconds * LOGICFRAMES_PER_SECOND));
+	return std::max(1u, static_cast<UnsignedInt>(std::min(static_cast<double>(seconds) * LOGICFRAMES_PER_SECOND,
+		static_cast<double>(UPDATE_SLEEP_FOREVER))));
 }
 
 Bool GettingBuiltBehavior::canRebuildNow() const
@@ -499,15 +501,24 @@ void GettingBuiltBehavior::onRubbleEntered(Object& structure)
 	GettingBuiltBehavior* behavior = findMutable(structure);
 	if (!behavior)
 		return;
+	behavior->m_keptAsRubble = TRUE;
 	const auto* data = behavior->getGettingBuiltBehaviorModuleData();
-	if (!data->m_rebuildWhenDead)
+	if (!data->m_rebuildWhenDead || data->m_spawnTimer >= UPDATE_SLEEP_FOREVER)
 		return;
-	const UnsignedInt rebuildFrames = behavior->getRebuildFrames();
-	const UnsignedInt delay = rebuildFrames > 0 ? rebuildFrames :
-		(data->m_spawnTimer > 0 ? data->m_spawnTimer : LOGICFRAMES_PER_SECOND);
+	const UnsignedInt delay = data->m_spawnTimer;
 	behavior->m_waitingToRebuild = TRUE;
 	behavior->m_rebuildReadyFrame = TheGameLogic->getFrame() + delay;
 	behavior->setWakeFrame(&structure, UPDATE_SLEEP(delay));
+}
+
+Bool GettingBuiltBehavior::canOrderRebuild(const Object* structure, const Player* owner)
+{
+	if (!RetailFileLayers::enabled() || !structure || !owner || structure->getControllingPlayer() != owner ||
+		structure->isDestroyed() || !structure->isEffectivelyDead() ||
+		!structure->getTemplate()->getRotWKObjectData().keepSelectableWhenDead)
+		return FALSE;
+	const auto* behavior = find(*structure);
+	return behavior && behavior->m_keptAsRubble && behavior->getRebuildFrames() > 0;
 }
 
 Bool GettingBuiltBehavior::startRebuild(Object& structure)
@@ -515,12 +526,14 @@ Bool GettingBuiltBehavior::startRebuild(Object& structure)
 	if (!RetailFileLayers::enabled() || structure.isDestroyed() || !structure.isEffectivelyDead())
 		return FALSE;
 	GettingBuiltBehavior* behavior = findMutable(structure);
-	if (!behavior || !behavior->canRebuildNow())
+	if (!behavior || !behavior->m_keptAsRubble || !behavior->canRebuildNow())
 		return FALSE;
 
 	structure.setEffectivelyDead(FALSE);
 	structure.setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNDER_CONSTRUCTION));
 	structure.clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+	if (!structure.isKindOf(KINDOF_NO_COLLIDE))
+		structure.clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_COLLISIONS));
 	structure.clearAndSetModelConditionFlags(
 		MAKE_MODELCONDITION_MASK4(MODELCONDITION_RUBBLE, MODELCONDITION_COLLAPSING,
 			MODELCONDITION_POST_RUBBLE, MODELCONDITION_POST_COLLAPSE),
@@ -535,6 +548,7 @@ Bool GettingBuiltBehavior::startRebuild(Object& structure)
 	behavior->m_running = TRUE;
 	behavior->m_rebuildingFromRubble = TRUE;
 	behavior->m_waitingToRebuild = FALSE;
+	behavior->m_keptAsRubble = FALSE;
 	behavior->m_rebuildReadyFrame = 0;
 	behavior->setWakeFrame(&structure, UPDATE_SLEEP_NONE);
 	return TRUE;
@@ -558,8 +572,6 @@ UpdateSleepTime GettingBuiltBehavior::update()
 	{
 		if (frame < m_rebuildReadyFrame)
 			return UPDATE_SLEEP(m_rebuildReadyFrame - frame);
-		if (!canRebuildNow())
-			return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
 		if (!startRebuild(*structure))
 			return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
 		return UPDATE_SLEEP_NONE;
@@ -574,7 +586,7 @@ UpdateSleepTime GettingBuiltBehavior::update()
 		MAKE_MODELCONDITION_MASK2(MODELCONDITION_PARTIALLY_CONSTRUCTED, MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED));
 	Object* builder = TheGameLogic->findObjectByID(structure->getBuilderID());
 	const Int overrideFrames = m_rebuildingFromRubble ? static_cast<Int>(getRebuildFrames()) : 0;
-	FoundationAIUpdate::advanceConstruction(*structure, builder, overrideFrames);
+	FoundationAIUpdate::advanceConstruction(*structure, builder, overrideFrames, m_rebuildingFromRubble);
 	if (!structure->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 	{
 		m_running = FALSE;
@@ -598,7 +610,9 @@ void GettingBuiltBehavior::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_rebuildingFromRubble = FALSE;
 			m_waitingToRebuild = FALSE;
 			m_rebuildReadyFrame = 0;
-		} }
+		} },
+		{ "kept-rubble", [this](Xfer* x) { x->xferBool(&m_keptAsRubble); },
+			[this] { m_keptAsRubble = m_waitingToRebuild; } }
 	});
 }
 
@@ -651,26 +665,71 @@ WallUpgradeUpdate* WallUpgradeUpdate::find(const Object* object)
 
 UpdateSleepTime WallUpgradeUpdate::update()
 {
-	if (!RetailFileLayers::enabled())
+	if (!RetailFileLayers::enabled() || getObject()->isEffectivelyDead())
 		return UPDATE_SLEEP_FOREVER;
-	const Object* self = getObject();
-	if (self->isEffectivelyDead())
-		return UPDATE_SLEEP_FOREVER;
-	if (!m_upgraded && self->getObjectCompletedUpgradeMask().any())
-		m_upgraded = TRUE;
-	return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND / 4);
+
+	Object* self = getObject();
+	if (m_supportingWall == INVALID_ID)
+	{
+		const Object* closest = nullptr;
+		const Real supportRadius = 200.0f;
+		Real closestDistance = supportRadius * supportRadius;
+		for (const Object* candidate = TheGameLogic->getFirstObject(); candidate; candidate = candidate->getNextObject())
+		{
+			if (candidate == self || candidate->isDestroyed() || candidate->isKindOf(KINDOF_WALL_UPGRADE) ||
+				!candidate->isKindOf(KINDOF_STRUCTURE) || !candidate->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+				continue;
+			const Real dx = candidate->getPosition()->x - self->getPosition()->x;
+			const Real dy = candidate->getPosition()->y - self->getPosition()->y;
+			const Real distance = dx * dx + dy * dy;
+			if (distance < closestDistance || (distance == closestDistance && (!closest || candidate->getID() < closest->getID())))
+			{
+				closest = candidate;
+				closestDistance = distance;
+			}
+		}
+		if (!closest)
+			return UPDATE_SLEEP(5);
+		m_supportingWall = closest->getID();
+	}
+
+	const Object* support = TheGameLogic->findObjectByID(m_supportingWall);
+	const Bool available = support && !support->isDestroyed() && !support->isEffectivelyDead() &&
+		!support->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
+	if (!available && !m_waitingForWall)
+	{
+		m_waitingForWall = TRUE;
+		self->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+		self->setModelConditionState(MODELCONDITION_SOLD);
+		TheGameLogic->deselectObject(self, PLAYERMASK_ALL, TRUE);
+	}
+	else if (available && m_waitingForWall)
+	{
+		m_waitingForWall = FALSE;
+		for (const UpgradeTemplate* upgrade = TheUpgradeCenter->firstUpgradeTemplate(); upgrade; upgrade = upgrade->friend_getNext())
+		{
+			if (upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && self->hasUpgrade(upgrade))
+				self->removeUpgrade(upgrade);
+		}
+		self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+		self->clearModelConditionState(MODELCONDITION_SOLD);
+		TheAI->pathfinder()->noteRetailRouteOpening();
+	}
+	return UPDATE_SLEEP(5);
 }
 
 void WallUpgradeUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present,
 	{
-		{ "wall-upgrade", [this](Xfer* x)
+		{ "wall-upgrade-support", [this](Xfer* x)
 		{
-			x->xferBool(&m_upgraded);
+			x->xferObjectID(&m_supportingWall);
+			x->xferBool(&m_waitingForWall);
 		}, [this]
 		{
-			m_upgraded = FALSE;
+			m_supportingWall = INVALID_ID;
+			m_waitingForWall = FALSE;
 		} }
 	});
 }
