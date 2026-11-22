@@ -4259,6 +4259,8 @@ void Player::crc( Xfer *xfer )
 	{
 		HeroRoster::xferPlayer(this, xfer);
 		CreateAHeroSystem::xferPlayer(this, xfer);
+		UnsignedInt cash = m_money.countMoney();
+		xfer->xferUnsignedInt(&cash);
 		xferPowerProductionBonuses(xfer);
 		xfer->xferBool(&m_hasCommandPointOverride);
 		xfer->xferInt(&m_commandPointOverrideTotal);

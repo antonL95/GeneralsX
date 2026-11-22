@@ -173,6 +173,8 @@ void logRetailPlacementTestObject(const Object* object, const char* name, Unsign
 void logRetailSpawnPoints(const Object* object, const char* prefix, UnsignedInt frame);
 void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, UnsignedInt frame);
 void runRetailSaveLoadPartitionTestCommand(std::string_view action, Object* object, const char* argument, UnsignedInt frame);
+void runRetailPackage23TestCommand(std::string_view action, Player* player, Object* object, Object* target,
+	const char* name, const Coord3D& point, UnsignedInt frame);
 void runRetailSaveLoadWallTestCommand(std::string_view action, Player* player, Object* wall,
 	const char* name, const Coord3D& position, UnsignedInt frame);
 void runRetailSaveLoadBookTestCommand(Player* player, const char* templateName);
@@ -2347,6 +2349,12 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action == "snapshot-partition-cells" || command.action == "snapshot-partition-scale")
 	{
 		runRetailSaveLoadPartitionTestCommand(command.action, findObject(command, true), command.structure.c_str(), frame);
+		return;
+	}
+	if (command.action.starts_with("pkg23-"))
+	{
+		runRetailPackage23TestCommand(command.action, findPlayer(command), findObject(command, true),
+			findTarget(command, true), command.structure.c_str(), command.location, frame);
 		return;
 	}
 	if (command.action == "snapshot-path-state" || command.action == "snapshot-register-footprint" ||

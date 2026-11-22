@@ -63,6 +63,7 @@
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AutoDepositUpdate.h"
+#include "GameLogic/Module/RetailEconomy.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameClient/InGameUI.h"
@@ -161,12 +162,17 @@ UpdateSleepTime AutoDepositUpdate::update()
 		if( getObject()->getConstructionPercent() != CONSTRUCTION_COMPLETE )
 			return UPDATE_SLEEP_NONE;
 
-		getObject()->getControllingPlayer()->getMoney()->deposit( getAutoDepositUpdateModuleData()->m_depositAmount);
-		getObject()->getControllingPlayer()->getScoreKeeper()->addMoneyEarned( getAutoDepositUpdateModuleData()->m_depositAmount);
+		const auto* data = getAutoDepositUpdateModuleData();
+		const Bool retail = RetailFileLayers::enabled();
+		Player* owner = getObject()->getControllingPlayer();
+		const Int amount = retail ? RetailEconomy::applyDepositUpgrade(*owner, data->m_retailUpgrade,
+			data->m_retailUpgradeMultiplier, data->m_depositAmount) : data->m_depositAmount;
+		owner->getMoney()->deposit(amount);
+		owner->getScoreKeeper()->addMoneyEarned(amount);
 
 		//Display cash income floating over the blacklotus
-		if (RetailFileLayers::enabled())
-			RetailWorldUI::showPayout(*getObject(), getAutoDepositUpdateModuleData()->m_depositAmount, FALSE);
+		if (retail)
+			RetailWorldUI::showPayout(*getObject(), amount, FALSE);
 		else if (getAutoDepositUpdateModuleData()->m_depositAmount > 0)
 		{
 			UnicodeString moneyString;

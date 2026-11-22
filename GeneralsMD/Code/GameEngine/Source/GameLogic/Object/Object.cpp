@@ -51,6 +51,7 @@
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/RetailEconomy.h"
 #include "GameClient/RetailEva.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
@@ -2250,6 +2251,8 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 	if (retail && body && damageInfo->out.m_actualDamageClipped > 0.0f)
 	{
 		const Object* source = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID);
+		if (source)
+			PillageModule::onDamageDealt(*source, *this);
 		if (source && getRelationship(source) == ENEMIES)
 		{
 			EmotionTrackerUpdate::signal(this, EMOTION_ALERT, source);
@@ -4408,6 +4411,7 @@ void Object::crc( Xfer *xfer )
 		static const NameKeyType dualWeaponKey = NAMEKEY("DualWeaponBehavior");
 		static const NameKeyType deathWeaponKey = NAMEKEY("FireWeaponWhenDeadBehavior");
 		static const NameKeyType clickReactionKey = NAMEKEY("ClickReactionBehavior");
+		static const NameKeyType pillageKey = NAMEKEY("PillageModule");
 		static const NameKeyType autoAbilityKey = NAMEKEY("AutoAbilityBehavior");
 		static const NameKeyType pickupKey = NAMEKEY("PickupStuffUpdate");
 		static const NameKeyType runOffKey = NAMEKEY("RunOffMapBehavior");
@@ -4415,7 +4419,7 @@ void Object::crc( Xfer *xfer )
 		{
 			const NameKeyType key = (*module)->getModuleNameKey();
 			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey ||
-				key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || key == autoAbilityKey || (*module)->getSlowDeathBehaviorInterface())
+				key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || key == pillageKey || key == autoAbilityKey || (*module)->getSlowDeathBehaviorInterface())
 				xfer->xferSnapshot(*module);
 			if (key == pickupKey)
 				static_cast<PickupStuffUpdate*>(*module)->crcRetailState(xfer);

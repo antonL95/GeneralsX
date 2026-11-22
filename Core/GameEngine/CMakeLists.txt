@@ -104,6 +104,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/RetailSlowDeath.h
     Include/GameLogic/Module/WallHubBehavior.h
     Include/GameLogic/Module/TerrainResourceBehavior.h
+    Include/GameLogic/Module/RetailEconomy.h
     Include/GameLogic/Module/CommandPointsUpgrade.h
     Include/GameLogic/Module/ClickReactionBehavior.h
     Include/Common/CommandPointRules.h
@@ -764,6 +765,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailPackage11TestCommands.cpp
     Source/GameLogic/System/RetailPackage14TestCommands.cpp
     Source/GameLogic/System/RetailPackage20TestCommands.cpp
+    Source/GameLogic/System/RetailPackage23TestCommands.cpp
     Source/GameLogic/System/RetailPackage53TestCommands.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
@@ -776,6 +778,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Behavior/WallHubBehavior.cpp
     Source/GameLogic/Object/Behavior/ClickReactionBehavior.cpp
     Source/GameLogic/Object/Update/TerrainResourceBehavior.cpp
+    Source/GameLogic/Object/Behavior/RetailEconomy.cpp
     Source/GameLogic/Object/Update/RetailWorkerHarvest.cpp
     Source/GameLogic/Object/Upgrade/CommandPointsUpgrade.cpp
     Source/Common/INI/INITerrain.cpp

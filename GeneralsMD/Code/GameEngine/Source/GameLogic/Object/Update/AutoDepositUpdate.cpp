@@ -63,6 +63,7 @@
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AutoDepositUpdate.h"
+#include "GameLogic/Module/RetailEconomy.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameClient/Drawable.h"
@@ -164,14 +165,19 @@ UpdateSleepTime AutoDepositUpdate::update()
 			return UPDATE_SLEEP_NONE;
 
 		int moneyAmount = modData->m_depositAmount + getUpgradedSupplyBoost();
+		const Bool retail = RetailFileLayers::enabled();
+		Player* owner = getObject()->getControllingPlayer();
+		if (retail)
+			moneyAmount = RetailEconomy::applyDepositUpgrade(*owner, modData->m_retailUpgrade,
+				modData->m_retailUpgradeMultiplier, moneyAmount);
 
 		if( modData->m_isActualMoney )
 		{
-			getObject()->getControllingPlayer()->getMoney()->deposit( moneyAmount );
-			getObject()->getControllingPlayer()->getScoreKeeper()->addMoneyEarned( modData->m_depositAmount);
+			owner->getMoney()->deposit( moneyAmount );
+			owner->getScoreKeeper()->addMoneyEarned( retail ? moneyAmount : modData->m_depositAmount );
 		}
 
-		if (RetailFileLayers::enabled() && modData->m_isActualMoney)
+		if (retail && modData->m_isActualMoney)
 			RetailWorldUI::showPayout(*getObject(), moneyAmount, FALSE);
 		else if (moneyAmount > 0 && getObject()->isLogicallyVisible())
 		{

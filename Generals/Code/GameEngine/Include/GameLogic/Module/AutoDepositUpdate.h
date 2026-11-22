@@ -52,6 +52,7 @@
 //-----------------------------------------------------------------------------
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/UpdateModule.h"
 //-----------------------------------------------------------------------------
 // FORWARD REFERENCES /////////////////////////////////////////////////////////
@@ -74,6 +75,8 @@ public:
 	UnsignedInt m_depositFrame;
 	Int m_depositAmount;
 	Int m_initialCaptureBonus;
+	AsciiString m_retailUpgrade;
+	Real m_retailUpgradeMultiplier = 1.0f;
 
 	AutoDepositUpdateModuleData()
 	{
@@ -93,6 +96,16 @@ public:
 			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
+		if (RetailFileLayers::enabled())
+		{
+			static const FieldParse retailFields[] =
+			{
+				{ "Upgrade", INI::parseAsciiString, nullptr, offsetof(AutoDepositUpdateModuleData, m_retailUpgrade) },
+				{ "UpgradeBonusPercent", INI::parsePercentToReal, nullptr, offsetof(AutoDepositUpdateModuleData, m_retailUpgradeMultiplier) },
+				{ nullptr, nullptr, nullptr, 0 }
+			};
+			p.add(retailFields);
+		}
 	}
 };
 

@@ -48,6 +48,7 @@
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/RetailEconomy.h"
 #include "GameClient/RetailEva.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "Common/SpecialPower.h"
@@ -1862,6 +1863,9 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 	BodyModuleInterface* body = getBodyModule();
 	if (body)
 		body->attemptDamage( damageInfo );
+	if (RetailFileLayers::enabled() && body && damageInfo->out.m_actualDamageClipped > 0.0f)
+		if (const Object* source = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID))
+			PillageModule::onDamageDealt(*source, *this);
 
 	/// @todo track damage dealt/attempted
 
@@ -3656,10 +3660,11 @@ void Object::crc( Xfer *xfer )
 		static const NameKeyType dualWeaponKey = NAMEKEY("DualWeaponBehavior");
 		static const NameKeyType deathWeaponKey = NAMEKEY("FireWeaponWhenDeadBehavior");
 		static const NameKeyType clickReactionKey = NAMEKEY("ClickReactionBehavior");
+		static const NameKeyType pillageKey = NAMEKEY("PillageModule");
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
 			const NameKeyType key = (*module)->getModuleNameKey();
-			if (key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || (*module)->getSlowDeathBehaviorInterface())
+			if (key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || key == pillageKey || (*module)->getSlowDeathBehaviorInterface())
 				xfer->xferSnapshot(*module);
 		}
 	}

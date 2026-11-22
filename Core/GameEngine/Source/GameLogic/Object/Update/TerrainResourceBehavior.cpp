@@ -149,6 +149,12 @@ Bool TerrainResourceBehavior::getDisplayInfo(const ThingTemplate& type, const Co
 	const NameKeyType moduleKey = NAMEKEY("TerrainResourceBehavior");
 	if (object)
 	{
+		const auto& clientBehaviors = type.getRotWKObjectData().clientBehaviors;
+		if (std::none_of(clientBehaviors.begin(), clientBehaviors.end(), [](const auto& module) {
+			return module.name.compareNoCase("TerrainResourceClientBehavior") == 0;
+		}))
+			return FALSE;
+
 		for (BehaviorModule** module = object->getBehaviorModules(); module && *module; ++module)
 		{
 			if ((*module)->getModuleNameKey() != moduleKey)

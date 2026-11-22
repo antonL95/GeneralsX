@@ -167,6 +167,7 @@
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/WallHubBehavior.h"
+#include "GameLogic/Module/RetailEconomy.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
@@ -466,6 +467,8 @@ void ModuleFactory::init()
 		addModule( GettingBuiltBehavior );
 		addModule( FakePathfindPortalBehaviour );
 		addModule( TerrainResourceBehavior );
+		addModule( PillageModule );
+		addModule( RefundDie );
 		addModule( HordeContain );
 		addModule( SlaughterHordeContain );
 		addModule( BannerCarrierUpdate );
