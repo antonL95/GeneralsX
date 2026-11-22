@@ -154,7 +154,7 @@ UpdateSleepTime FireWeaponUpdate::update()
 		const auto* data = getFireWeaponUpdateModuleData();
 		const Object* object = getObject();
 		const auto& conditions = object->getLogicModelConditions();
-		if ((data->m_aliveOnly && object->isEffectivelyDead()) ||
+		if (object->isDestroyed() || (data->m_aliveOnly && object->isEffectivelyDead()) ||
 			(data->m_chargingModeTrigger && !conditions.test(MODELCONDITION_CHARGING)) ||
 			(data->m_heroModeTrigger && !conditions.test(MODELCONDITION_HERO)))
 			return UPDATE_SLEEP_NONE;
