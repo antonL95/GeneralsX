@@ -4386,6 +4386,14 @@ void Object::crc( Xfer *xfer )
 			stealth->crcRingState(xfer);
 		ModelConditionFlags weaponConditions = getLogicModelConditions();
 		weaponConditions.xfer(xfer);
+		const Weapon* current = m_weaponSet.getCurWeapon();
+		if (current && current->getTemplate()->shouldLockWhenUsing() && isCurWeaponLocked())
+		{
+			Int slot = m_weaponSet.getCurWeaponSlot();
+			Int lock = m_weaponSet.getCurWeaponLockType();
+			xfer->xferInt(&slot);
+			xfer->xferInt(&lock);
+		}
 		if (m_firingTracker)
 			m_firingTracker->crcRetailState(xfer);
 		if (m_slavedUpdate)
