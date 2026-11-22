@@ -4726,7 +4726,7 @@ StateReturnType AIWanderInPlaceState::onEnter()
 
 	AIUpdateInterface *ai = getMachineOwner()->getAI();
 	if (ai) {
-		ai->chooseLocomotorSet(LOCOMOTORSET_WANDER);
+		ai->chooseLocomotorSet(ai->getRetailBurningDeathDeadline() ? LOCOMOTORSET_BURNINGDEATH : LOCOMOTORSET_WANDER);
 	}
 
 	Int delta = 3;

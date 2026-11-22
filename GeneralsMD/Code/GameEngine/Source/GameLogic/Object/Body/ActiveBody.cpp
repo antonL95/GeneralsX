@@ -44,6 +44,7 @@
 #include "Common/Xfer.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
+#include "GameClient/FXList.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/ParticleSys.h"
 #include "GameLogic/AI.h"
@@ -200,6 +201,8 @@ void ActiveBodyModuleData::buildFieldParse(MultiIniFieldParse& p)
 	{
 		static const FieldParse rotwkFields[] =
 		{
+			{ "BurningDeathBehavior", INI::parseBool, nullptr, offsetof(ActiveBodyModuleData, m_burningDeathBehavior) },
+			{ "BurningDeathFX", INI::parseFXList, nullptr, offsetof(ActiveBodyModuleData, m_burningDeathFX) },
 			{ "MaxHealthDamaged",				INI::parseReal,	nullptr,	offsetof( ActiveBodyModuleData, m_maxHealthDamaged ) },
 			{ "MaxHealthReallyDamaged",	INI::parseReal,	nullptr,	offsetof( ActiveBodyModuleData, m_maxHealthReallyDamaged ) },
 			{ nullptr, nullptr, nullptr, 0 }
@@ -752,7 +755,18 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 				damager->scoreTheKill( obj );
 			}
 
-			obj->onDie( damageInfo );
+			const auto* data = getActiveBodyModuleData();
+			AIUpdateInterface* ai = obj->getAI();
+			if (RetailFileLayers::enabled() && data->m_burningDeathBehavior && ai &&
+				(damageInfo->in.m_damageType == DAMAGE_FLAME || damageInfo->in.m_deathType == DEATH_BURNED) &&
+				ai->enterRetailBurningDeath())
+			{
+				damageInfo->in.m_deathType = DEATH_BURNED;
+				m_lastDamageInfo = *damageInfo;
+				FXList::doFXObj(data->m_burningDeathFX, obj);
+			}
+			else
+				obj->onDie(damageInfo);
 		}
 	}
 

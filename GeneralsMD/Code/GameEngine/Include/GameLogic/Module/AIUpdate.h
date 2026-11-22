@@ -84,7 +84,8 @@ enum LocomotorSetType CPP_11(: Int)
 
 	LOCOMOTORSET_COUNT,
 	LOCOMOTORSET_MOUNTED = LOCOMOTORSET_COUNT,
-	LOCOMOTORSET_ENRAGED
+	LOCOMOTORSET_ENRAGED,
+	LOCOMOTORSET_BURNINGDEATH
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -203,6 +204,7 @@ public:
 	AsciiString m_attackPriority;
 	UnsignedInt m_minCowerTime = 0;
 	UnsignedInt m_maxCowerTime = 0;
+	UnsignedInt m_burningDeathTime = 0;
 	Real m_stopChaseDistance = 0.0f;
 	Bool m_canAttackWhileContained = FALSE;
 #ifdef ALLOW_SURRENDER
@@ -493,7 +495,10 @@ public:
 	Bool computeQuickPath(const Coord3D *destination); ///< Computes a quick path to the destination.
 
 	Bool isMoving() const;
-	Bool fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition);
+	Bool fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition, Real durationScale = 1.0f);
+	UnsignedInt getRetailFearDeadline() const { return m_fearUntil; }
+	Bool enterRetailBurningDeath();
+	UnsignedInt getRetailBurningDeathDeadline() const { return m_burningDeathUntil; }
 	void braceForCrush(UnsignedInt deadline);
 	void clearCrushBrace();
 	Bool stanceAllowsChase(const Object* target) const;
@@ -536,7 +541,7 @@ public:
 		return issuedFrame == m_retailPlannerIssuedFrame ? m_retailPlannerBlockedRevision : 0;
 	}
 
-	const AttackPriorityInfo *getAttackInfo() {return m_attackInfo;}
+	const AttackPriorityInfo* getAttackInfo();
 	void setAttackInfo(const AttackPriorityInfo *info) {m_attackInfo = info;}
 
 	void setCurPathfindCell(const ICoord2D &cell) {m_pathfindCurCell = cell;}
@@ -821,6 +826,7 @@ private:
 	Bool				m_movementComplete;					///< True if we finished an AIInternalMoveToState.
 	Bool				m_isMoving;									///< True if we are in an AIInternalMoveToState.
 	UnsignedInt m_fearUntil = 0;
+	UnsignedInt m_burningDeathUntil = 0;
 	UnsignedInt m_crushWarningUntil = 0;
 	Coord3D m_autoAttackOrigin{};
 	ObjectID m_retailPlannerAttackTarget = INVALID_ID;

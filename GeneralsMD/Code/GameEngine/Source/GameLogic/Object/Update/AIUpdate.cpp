@@ -157,6 +157,7 @@ const LocomotorTemplateVector* AIUpdateModuleData::findLocomotorTemplateVector(L
 			{ "AttackPriority", INI::parseAsciiString, nullptr, offsetof(AIUpdateModuleData, m_attackPriority) },
 			{ "MinCowerTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_minCowerTime) },
 			{ "MaxCowerTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_maxCowerTime) },
+			{ "BurningDeathTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_burningDeathTime) },
 			{ "StopChaseDistance", INI::parseReal, nullptr, offsetof(AIUpdateModuleData, m_stopChaseDistance) },
 			{ "CanAttackWhileContained", INI::parseBool, nullptr, offsetof(AIUpdateModuleData, m_canAttackWhileContained) },
 			{ nullptr, nullptr, nullptr, 0 }
@@ -228,6 +229,8 @@ Int AIUpdateModuleData::findLocomotorSetType(const AsciiString& name)
 		return LOCOMOTORSET_MOUNTED;
 	if (name.compareNoCase("SET_ENRAGED") == 0)
 		return LOCOMOTORSET_ENRAGED;
+	if (name.compareNoCase("SET_BURNINGDEATH") == 0)
+		return LOCOMOTORSET_BURNINGDEATH;
 	return -1;
 }
 
@@ -1075,6 +1078,19 @@ UpdateSleepTime AIUpdateInterface::update()
 
 	// assume we can sleep forever, unless the state machine (or turret, etc) demand otherwise
 	UpdateSleepTime subMachineSleep = UPDATE_SLEEP_FOREVER;
+	if (m_burningDeathUntil)
+	{
+		if (TheGameLogic->getFrame() >= m_burningDeathUntil)
+		{
+			m_burningDeathUntil = 0;
+			Object* object = getObject();
+			DamageInfo damage = *object->getBodyModule()->getLastDamageInfo();
+			m_isInUpdate = FALSE;
+			object->onDie(&damage);
+			return UPDATE_SLEEP_NONE;
+		}
+		subMachineSleep = UPDATE_SLEEP_NONE;
+	}
 	if (m_fearUntil || m_crushWarningUntil)
 	{
 		const UnsignedInt now = TheGameLogic->getFrame();
@@ -5372,9 +5388,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 9 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 10 : 4;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 9 : 5;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 10 : 5;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5627,17 +5643,57 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_retailPlannerPathRevision);
 		xfer->xferUnsignedInt(&m_retailPlannerBlockedRevision);
 	}
+	if (version >= 10)
+		xfer->xferUnsignedInt(&m_burningDeathUntil);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_burningDeathUntil = 0;
 
 
 }
 
-Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition)
+const AttackPriorityInfo* AIUpdateInterface::getAttackInfo()
+{
+	if (m_attackInfo || !RetailFileLayers::enabled() || getAIUpdateModuleData()->m_attackPriority.isEmpty())
+		return m_attackInfo;
+	return TheScriptEngine->getAttackInfo(getAIUpdateModuleData()->m_attackPriority);
+}
+
+Bool AIUpdateInterface::enterRetailBurningDeath()
+{
+	Object* object = getObject();
+	const UnsignedInt duration = getAIUpdateModuleData()->m_burningDeathTime;
+	if (!RetailFileLayers::enabled() || !duration || !object->isMobile() || object->getContainedBy() ||
+		!object->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_BURNINGDEATH))
+		return FALSE;
+
+	m_burningDeathUntil = TheGameLogic->getFrame() + duration;
+	object->setModelConditionState(MODELCONDITION_BURNINGDEATH);
+	privateWanderInPlace(CMD_FROM_AI);
+	wakeUpNow();
+	return TRUE;
+}
+
+Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition, Real durationScale)
 {
 	Object* self = getObject();
-	if (!self->isMobile() || self->isEffectivelyDead() || duration == 0)
+	if (!self->isMobile() || self->isEffectivelyDead() || duration == 0 || durationScale <= 0.0f)
 		return FALSE;
 	const UnsignedInt now = TheGameLogic->getFrame();
 	if (m_fearUntil > now)
+		return FALSE;
+
+	if (RetailFileLayers::enabled() && condition == MODELCONDITION_EMOTION_AFRAID)
+	{
+		const auto* data = getAIUpdateModuleData();
+		const UnsignedInt low = data->m_minCowerTime;
+		const UnsignedInt high = data->m_maxCowerTime;
+		if (low && high > low)
+			duration = GameLogicRandomValue(low, high);
+		else if (low || high)
+			duration = std::max(low, high);
+	}
+	duration = static_cast<UnsignedInt>(duration * durationScale);
+	if (!duration)
 		return FALSE;
 
 	Coord3D goal = *self->getPosition();

@@ -11,13 +11,30 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "Common/XferCRC.h"
 #include "GameClient/GameClient.h"
+#include "GameLogic/Damage.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/RetailConstruction.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/ScriptEngine.h"
+#include "GameLogic/Scripts.h"
 #include "GameLogic/Weapon.h"
+
+namespace
+{
+UnsignedInt objectCRC(Object* object)
+{
+	XferCRC xfer;
+	xfer.open("Package08");
+	xfer.xferSnapshot(object);
+	const UnsignedInt checksum = xfer.getCRC();
+	xfer.close();
+	return checksum;
+}
+}
 
 void runRetailPackage08TestCommand(std::string_view action, Object* source, Object* target, const char* name,
 	const Coord3D* position, UnsignedInt frame)
@@ -128,5 +145,50 @@ void runRetailPackage08TestCommand(std::string_view action, Object* source, Obje
 	else if (action == "pkg08-fire-state")
 		std::fprintf(stderr, "TEST pkg08 fire frame=%u contained=%d attack=%d\n",
 			frame, source->getContainedBy() != nullptr, source->isAbleToAttack());
+	else if (action == "pkg08-burn")
+	{
+		DamageInfo damage;
+		damage.in.m_damageType = DAMAGE_FLAME;
+		damage.in.m_deathType = DEATH_BURNED;
+		damage.in.m_kill = TRUE;
+		source->attemptDamage(&damage);
+	}
+	else if (action == "pkg08-burn-state" && source->getAI())
+		std::fprintf(stderr, "TEST pkg08 burn frame=%u name=%s end=%u burning=%d dead=%d x=%.2f y=%.2f\n", frame,
+			source->getTemplate()->getName().str(), source->getAI()->getRetailBurningDeathDeadline(),
+			source->getLogicModelConditions().test(MODELCONDITION_BURNINGDEATH), source->isEffectivelyDead(),
+			source->getPosition()->x, source->getPosition()->y);
+	else if (action == "pkg08-cower" && target && source->getAI())
+		source->getAI()->fleeFromFear(target, LOGICFRAMES_PER_SECOND, MODELCONDITION_EMOTION_AFRAID);
+	else if (action == "pkg08-cower-state")
+		std::fprintf(stderr, "TEST pkg08 cower frame=%u active=%d\n", frame,
+			source->getLogicModelConditions().test(MODELCONDITION_EMOTION_AFRAID));
+	else if (action == "pkg08-priority-define" && target)
+	{
+		auto* priority = newInstance(ScriptAction)(ScriptAction::SET_ATTACK_PRIORITY_THING);
+		priority->setNextAction(nullptr);
+		priority->getParameter(0)->friend_setString("AttackPriority_HERO");
+		priority->getParameter(1)->friend_setString(target->getTemplate()->getName());
+		priority->getParameter(2)->friend_setInt(1000);
+		TheScriptEngine->friend_executeAction(priority, source->getTeam());
+		deleteInstance(priority);
+	}
+	else if (action == "pkg08-priority" && target && source->getAI())
+	{
+		const AttackPriorityInfo* info = source->getAI()->getAttackInfo();
+		std::fprintf(stderr, "TEST pkg08 priority frame=%u resolved=%d weight=%d\n",
+			frame, info && info != TheScriptEngine->getDefaultAttackInfo(), info ? info->getPriority(target->getTemplate()) : -1);
+	}
+	else if (action == "pkg08-queue-crc" && position)
+	{
+		const auto* building = TheThingFactory->findTemplate(name, FALSE);
+		auto* dozer = static_cast<DozerAIUpdate*>(source->findUpdateModule(NAMEKEY("DozerAIUpdate")));
+		if (!building || !dozer)
+			return;
+		const UnsignedInt before = objectCRC(source);
+		const Object* site = dozer->queueConstruction(building, position, 0.0f, source->getControllingPlayer());
+		std::fprintf(stderr, "TEST pkg08 queue-crc frame=%u placed=%d changed=%d\n",
+			frame, site != nullptr, objectCRC(source) != before);
+	}
 }
 #endif

@@ -4284,11 +4284,18 @@ void Object::crc( Xfer *xfer )
 		xferMountedCombatState(xfer);
 		xfer->xferInt(&m_constructionCostPaid);
 		xfer->xferUnsignedInt(&m_invulnerableUntil);
-		if (AIUpdateInterface* ai = getAIUpdateInterface(); ai && ai->getDozerAIInterface() && !ai->getWorkerAIInterface())
+		if (AIUpdateInterface* ai = getAIUpdateInterface())
 		{
-			static const NameKeyType dozerKey = NAMEKEY("DozerAIUpdate");
-			if (auto* dozer = static_cast<DozerAIUpdate*>(findUpdateModule(dozerKey)))
-				dozer->crcRetailState(xfer);
+			UnsignedInt burningDeathUntil = ai->getRetailBurningDeathDeadline();
+			xfer->xferUnsignedInt(&burningDeathUntil);
+			UnsignedInt fearUntil = ai->getRetailFearDeadline();
+			xfer->xferUnsignedInt(&fearUntil);
+			if (ai->getDozerAIInterface() && !ai->getWorkerAIInterface())
+			{
+				static const NameKeyType dozerKey = NAMEKEY("DozerAIUpdate");
+				if (auto* dozer = static_cast<DozerAIUpdate*>(findUpdateModule(dozerKey)))
+					dozer->crcRetailState(xfer);
+			}
 		}
 	}
 #ifdef DEBUG_CRC

@@ -961,14 +961,16 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 		{
 			const Int resistance = type == EMOTION_TERROR ? AttributeModifierRules::RESIST_TERROR : AttributeModifierRules::RESIST_FEAR;
 			const Real scale = 1.0f - std::clamp(AttributeModifiers::value(subject, resistance), -1.0f, 1.0f);
+			const UnsignedInt movementDuration = aiLock ? aiLock : duration;
 			duration = static_cast<UnsignedInt>(duration * scale);
 			if (!duration)
 				continue;
 			if (ai && !anchor && source && (nugget->m_ai == EMOTION_AI_BACK_AWAY || nugget->m_ai == EMOTION_AI_AVOID_SCARER ||
 				nugget->m_ai == EMOTION_AI_RUN_AWAY_PANIC))
-				ai->fleeFromFear(source, aiLock ? static_cast<UnsignedInt>(aiLock * scale) : duration,
+				ai->fleeFromFear(source, movementDuration,
 					type == EMOTION_TERROR ? MODELCONDITION_EMOTION_TERROR :
-					(type == EMOTION_UNCONTROLLABLE_FEAR ? MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID : MODELCONDITION_EMOTION_AFRAID));
+					(type == EMOTION_UNCONTROLLABLE_FEAR ? MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID : MODELCONDITION_EMOTION_AFRAID),
+					scale);
 		}
 		if (ai && !anchor && nugget->m_ai == EMOTION_AI_IDLE)
 			ai->aiIdle(CMD_FROM_AI);
@@ -1241,13 +1243,14 @@ UpdateSleepTime RadiateFearUpdate::update()
 			(data->m_generateUncontrollableFear ? EMOTION_UNCONTROLLABLE_FEAR : EMOTION_FEAR), self))
 			continue;
 		const Real resistance = std::clamp(AttributeModifiers::value(victim, kind), -1.0f, 1.0f);
-		const UnsignedInt duration = static_cast<UnsignedInt>(std::max(interval, UnsignedInt(LOGICFRAMES_PER_SECOND)) * (1.0f - resistance));
+		const UnsignedInt duration = std::max(interval, UnsignedInt(LOGICFRAMES_PER_SECOND));
 		auto* ai = victim->getAI();
-		if (ai && ai->fleeFromFear(self, duration, condition) && RetailTestCommands::tracesCombat())
+		if (ai && ai->fleeFromFear(self, duration, condition, 1.0f - resistance) && RetailTestCommands::tracesCombat())
 		{
 			std::fprintf(stderr, "TEST fear frame=%u source=%u(%s) victim=%u(%s) duration=%u terror=%d\n",
 				TheGameLogic->getFrame(), unsigned(self->getID()), self->getTemplate()->getName().str(),
-				unsigned(victim->getID()), victim->getTemplate()->getName().str(), duration, data->m_generateTerror);
+				unsigned(victim->getID()), victim->getTemplate()->getName().str(),
+				ai->getRetailFearDeadline() - TheGameLogic->getFrame(), data->m_generateTerror);
 			std::fflush(stderr);
 		}
 	}

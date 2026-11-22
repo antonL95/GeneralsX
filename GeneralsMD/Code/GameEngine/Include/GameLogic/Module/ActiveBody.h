@@ -45,9 +45,13 @@ class ParticleSystemTemplate;
 //-------------------------------------------------------------------------------------------------
 
 //-------------------------------------------------------------------------------------------------
+class FXList;
+
 class ActiveBodyModuleData : public BodyModuleData
 {
 public:
+	Bool m_burningDeathBehavior = FALSE;
+	const FXList* m_burningDeathFX = nullptr;
 	Real m_maxHealth;
 	Real m_initialHealth;
 	Bool m_initialHealthSet;
