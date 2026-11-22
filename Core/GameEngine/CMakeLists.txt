@@ -766,6 +766,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailPackage19TestCommands.cpp
     Source/GameLogic/System/RetailPackage18TestCommands.cpp
     Source/GameLogic/System/RetailPackage25TestCommands.cpp
+    Source/GameLogic/System/RetailPackage24TestCommands.cpp
 
     Source/GameLogic/System/RetailPackage08TestCommands.cpp
     Source/GameLogic/System/RetailPackage11TestCommands.cpp
