@@ -4341,6 +4341,19 @@ void Object::crc( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_invulnerableUntil);
 		if (StealthUpdate* stealth = getStealth())
 			stealth->crcRingState(xfer);
+		Bool damageImmune = getLogicModelConditions().test(MODELCONDITION_INVULNERABLE);
+		xfer->xferBool(&damageImmune);
+		xfer->xferUnsignedInt(&m_disabledTillFrame[DISABLED_PARALYZED]);
+		static const NameKeyType boredKey = NAMEKEY("BoredUpdate");
+		static const NameKeyType abilityKey = NAMEKEY("ModelConditionSpecialAbilityUpdate");
+		static const NameKeyType hitKey = NAMEKEY("HitReactionBehavior");
+		static const NameKeyType oathKey = NAMEKEY("OathbreakersFadeAwayBehavior");
+		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
+		{
+			const NameKeyType key = (*module)->getModuleNameKey();
+			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey)
+				xfer->xferSnapshot(*module);
+		}
 		if (AIUpdateInterface* ai = getAIUpdateInterface())
 		{
 			UnsignedInt burningDeathUntil = ai->getRetailBurningDeathDeadline();

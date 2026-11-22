@@ -2172,6 +2172,25 @@ void SpecialAbilityUpdate::crc( Xfer *xfer )
 
 }
 
+void SpecialAbilityUpdate::crcRetailAbilityPhase(Xfer* xfer)
+{
+	xfer->xferBool(&m_active);
+	if (m_active)
+	{
+		UnsignedInt packingState = m_packingState;
+		xfer->xferUnsignedInt(&packingState);
+		xfer->xferUnsignedInt(&m_prepFrames);
+		xfer->xferUnsignedInt(&m_animFrames);
+		xfer->xferObjectID(&m_targetID);
+		xfer->xferCoord3D(&m_targetPos);
+		xfer->xferInt(&m_rotwkTriggers);
+		xfer->xferUnsignedInt(&m_holdFrames);
+	}
+	xfer->xferInt(&m_timedCondition);
+	if (m_timedCondition >= 0)
+		xfer->xferUnsignedInt(&m_timedConditionEndFrame);
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Xfer method
 	* Version Info:

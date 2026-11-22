@@ -220,7 +220,12 @@ UpdateSleepTime BoredUpdate::update()
 	return delay;
 }
 
-void BoredUpdate::crc(Xfer* xfer) { UpdateModule::crc(xfer); }
+void BoredUpdate::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	UnsignedInt scanDeadline = friend_getNextCallFrame();
+	xfer->xferUnsignedInt(&scanDeadline);
+}
 void BoredUpdate::xfer(Xfer* xfer) { UpdateModule::xfer(xfer); }
 void BoredUpdate::loadPostProcess() { UpdateModule::loadPostProcess(); }
 
@@ -278,7 +283,11 @@ void ModelConditionSpecialAbilityUpdate::triggerAbilityEffect()
 	}
 }
 
-void ModelConditionSpecialAbilityUpdate::crc(Xfer* xfer) { SpecialAbilityUpdate::crc(xfer); }
+void ModelConditionSpecialAbilityUpdate::crc(Xfer* xfer)
+{
+	SpecialAbilityUpdate::crc(xfer);
+	crcRetailAbilityPhase(xfer);
+}
 void ModelConditionSpecialAbilityUpdate::xfer(Xfer* xfer) { SpecialAbilityUpdate::xfer(xfer); }
 void ModelConditionSpecialAbilityUpdate::loadPostProcess() { SpecialAbilityUpdate::loadPostProcess(); }
 

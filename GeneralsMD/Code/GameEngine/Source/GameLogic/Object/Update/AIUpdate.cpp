@@ -5696,7 +5696,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_weaponMovementHoldUntil);
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_weaponMovementHoldUntil = 0;
-	if (version >= 13)
+	if (version >= 13 && xfer->getXferMode() != XFER_CRC)
 		xfer->xferBool(&m_fadedInPortal);
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_fadedInPortal = FALSE;
