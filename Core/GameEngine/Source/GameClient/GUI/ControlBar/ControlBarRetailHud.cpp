@@ -52,6 +52,7 @@
 #include "Common/AttributeModifierRules.h"
 #if !RTS_GENERALS
 #include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #endif
 
 namespace
@@ -1317,6 +1318,10 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 		case GUI_COMMAND_PUSH_VISIBLE_COMMAND_RANGE:
 		case GUI_COMMAND_POP_VISIBLE_COMMAND_RANGE:
 			return COMMAND_AVAILABLE;
+#if !RTS_GENERALS
+		case GUI_COMMAND_BLOODTHIRSTY:
+			return BloodthirstyUpdate::find(obj) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
+#endif
 		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
 		case GUI_COMMAND_TOGGLE_WEAPONSET:
 			return (usesToggleTray(command)
@@ -1355,6 +1360,13 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 {
 	switch (command->getCommandType())
 	{
+#if !RTS_GENERALS
+		case GUI_COMMAND_BLOODTHIRSTY:
+			if (!BloodthirstyUpdate::find(obj) || !TheInGameUI)
+				return CBC_COMMAND_NOT_USED;
+			TheInGameUI->setGUICommand(command);
+			return CBC_COMMAND_USED;
+#endif
 		case GUI_COMMAND_CANCEL_NEIGHBORHOOD:
 			if (!WallHubBehavior::canCancelSpan(obj))
 				return CBC_COMMAND_NOT_USED;

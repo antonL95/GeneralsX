@@ -28,6 +28,9 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/RetailFileLayers.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/RotwkModifierModules.h"
+#endif
 #include "GameLogic/Module/CollideModule.h"
 
 #include "stdlib.h"				// VC++ wants this here, or gives compile error...
@@ -2421,6 +2424,39 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 	resolveContextTarget( draw, obj, drawableInWay );
 
 	const CommandButton* spell = TheInGameUI->getGUICommand();
+#if !RTS_GENERALS
+	if (spell && spell->getCommandType() == GUI_COMMAND_BLOODTHIRSTY && RetailFileLayers::enabled())
+	{
+		const Drawable* selected = TheInGameUI->getFirstSelectedDrawable();
+		const Object* source = selected ? selected->getObject() : nullptr;
+		const auto* brawl = BloodthirstyUpdate::find(source);
+		const Bool valid = brawl && brawl->canSacrifice(obj) && TheInGameUI->areSelectedObjectsControllable();
+		if (type == DO_HINT)
+		{
+			const auto hint = valid ? GameMessage::MSG_VALID_GUICOMMAND_HINT : GameMessage::MSG_INVALID_GUICOMMAND_HINT;
+			TheMessageStream->appendMessage(hint)->appendObjectIDArgument(obj ? obj->getID() : INVALID_ID);
+			return hint;
+		}
+		if (!valid)
+			return GameMessage::MSG_INVALID;
+		if (type == DO_COMMAND)
+		{
+			const CommandSet* set = TheRetailCommandCatalog ? TheRetailCommandCatalog->findCommandSet(source->getCommandSetString()) : nullptr;
+			for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			{
+				if (set->getCommandButton(slot) != spell)
+					continue;
+				GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_BLOODTHIRSTY);
+				msg->appendObjectIDArgument(source->getID());
+				msg->appendObjectIDArgument(obj->getID());
+				msg->appendIntegerArgument(slot);
+				TheInGameUI->setGUICommand(nullptr);
+				break;
+			}
+		}
+		return GameMessage::MSG_RETAIL_BLOODTHIRSTY;
+	}
+#endif
 	if (spell && spell->getCommandType() == GUI_COMMAND_SPELL_BOOK)
 	{
 		const Bool valid = TheControlBar && TheControlBar->targetRetailSpell(spell, obj, pos, type == DO_COMMAND);

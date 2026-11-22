@@ -54,6 +54,7 @@
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailHudExtras.h"
 #include "GameLogic/AttributeModifierStore.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/RetailCreationUpgrades.h"
 #include "Common/GlobalData.h"
@@ -858,6 +859,12 @@ void GameEngine::init()
 
 
 
+		if (RetailFileLayers::enabled())
+		{
+			EmotionTrackerUpdate::clearEmotionNuggets();
+			if (TheFileSystem->doesFileExist("Data\\INI\\Emotions.ini"))
+				ini.load("Data\\INI\\Emotions.ini", INI_LOAD_OVERWRITE, &xferCRC);
+		}
 		initSubsystem(TheThingFactory,"TheThingFactory", createThingFactory(), &xferCRC, "Data\\INI\\Default\\Object", "Data\\INI\\Object");
 		if (RetailFileLayers::enabled())
 		{

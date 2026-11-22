@@ -2,9 +2,116 @@
 
 #include <vector>
 
+#include "Common/ModelState.h"
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/UpgradeModule.h"
+
+class BloodthirstyUpdateModuleData : public UpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	SpecialPowerObjectFilter m_sacrificeFilter;
+	AsciiString m_initiateVoice;
+	AsciiString m_initiateVoice2;
+	Int m_numToSacrifice = 0;
+	Real m_experienceModifier = 1.0f;
+};
+
+class BloodthirstyUpdate final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(BloodthirstyUpdate, "BloodthirstyUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(BloodthirstyUpdate, BloodthirstyUpdateModuleData)
+
+public:
+	BloodthirstyUpdate(Thing* thing, const ModuleData* data);
+	static BloodthirstyUpdate* find(const Object* source);
+	Bool canSacrifice(const Object* donor) const;
+	void orderSacrifice(Object* donor);
+	UpdateSleepTime update() override;
+
+private:
+	ObjectID m_donor = INVALID_ID;
+	UnsignedInt m_deadline = 0;
+};
+
+struct RetailEmotionEntry
+{
+	AsciiString m_name;
+	AsciiString m_modifier;
+	Int m_type = -1;
+	Int m_duration = -1;
+	Int m_aiLock = -1;
+};
+
+class EmotionTrackerUpdateModuleData : public UpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	std::vector<RetailEmotionEntry> m_emotions;
+	SpecialPowerObjectFilter m_afraidOf;
+	SpecialPowerObjectFilter m_alwaysAfraidOf;
+	SpecialPowerObjectFilter m_pointAt;
+	SpecialPowerObjectFilter m_tauntExcluded;
+	Real m_tauntRadius = 0.0f;
+	Real m_fearRadius = 0.0f;
+	Real m_heroRadius = 0.0f;
+	Real m_quarrelChance = 0.0f;
+	UnsignedInt m_tauntInterval = LOGICFRAMES_PER_SECOND;
+	Int m_immuneRank = 0;
+	Bool m_ignoreVeterancy = FALSE;
+};
+
+class EmotionTrackerUpdate final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(EmotionTrackerUpdate, "EmotionTrackerUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(EmotionTrackerUpdate, EmotionTrackerUpdateModuleData)
+
+public:
+	EmotionTrackerUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	static void parseEmotionNugget(INI* ini);
+	static void clearEmotionNuggets();
+	UpdateSleepTime update() override;
+
+private:
+	void finishEmotion();
+	void xferEmotionState(Xfer* xfer);
+
+	Int m_activeEntry = -1;
+	UnsignedInt m_endFrame = 0;
+	UnsignedInt m_recheckFrame = 0;
+	UnsignedInt m_modifierFrame = 0;
+	ModelConditionFlags m_appliedConditions;
+};
+
+class LargeGroupBonusUpdateModuleData : public UpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	SpecialPowerObjectFilter m_memberFilter;
+	AsciiString m_modifier;
+	UnsignedInt m_updateRate = LOGICFRAMES_PER_SECOND;
+	Int m_count = 0;
+	Real m_radius = 0.0f;
+	Real m_rubOffRadius = 0.0f;
+	Bool m_alliesOnly = FALSE;
+};
+
+class LargeGroupBonusUpdate final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(LargeGroupBonusUpdate, "LargeGroupBonusUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(LargeGroupBonusUpdate, LargeGroupBonusUpdateModuleData)
+
+public:
+	LargeGroupBonusUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	UpdateSleepTime update() override;
+
+private:
+	Bool m_meetsThreshold = FALSE;
+};
 
 class AttributeModifierAuraUpdateModuleData : public UpdateModuleData
 {

@@ -97,6 +97,7 @@
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #if !RTS_GENERALS
 #include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #endif
 
 
@@ -522,6 +523,30 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			break;
 		}
 #if !RTS_GENERALS
+		case GameMessage::MSG_RETAIL_BLOODTHIRSTY:
+		{
+			if (!RetailFileLayers::enabled() || !TheRetailCommandCatalog || msg->getArgumentCount() != 3 ||
+				msg->getArgumentDataType(0) != ARGUMENTDATATYPE_OBJECTID ||
+				msg->getArgumentDataType(1) != ARGUMENTDATATYPE_OBJECTID ||
+				msg->getArgumentDataType(2) != ARGUMENTDATATYPE_INTEGER)
+				break;
+			Object* source = findObjectByID(msg->getArgument(0)->objectID);
+			Object* donor = findObjectByID(msg->getArgument(1)->objectID);
+			if (!source || source->getControllingPlayer() != msgPlayer)
+				break;
+			const Int slot = msg->getArgument(2)->integer;
+			const CommandSet* set = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
+			const CommandButton* button = set && slot >= 0 && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET ?
+				set->getCommandButton(slot) : nullptr;
+			if (!button || button->getCommandType() != GUI_COMMAND_BLOODTHIRSTY)
+				break;
+			const UpgradeTemplate* upgrade = button->getUpgradeTemplate();
+			if (upgrade && !source->hasUpgrade(upgrade) && !msgPlayer->hasUpgradeComplete(upgrade))
+				break;
+			if (auto* brawl = BloodthirstyUpdate::find(source))
+				brawl->orderSacrifice(donor);
+			break;
+		}
 		case GameMessage::MSG_RETAIL_AUTO_ABILITY:
 		{
 			if (!TheRetailCommandCatalog || msg->getArgumentCount() != 2 ||

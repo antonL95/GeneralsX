@@ -490,6 +490,9 @@ void ModuleFactory::init()
 		addModule( StancesBehavior );
 		addModule( HordeNotifyTargetsOfImminentProbableCrushingUpdate );
 		addModule( RadiateFearUpdate );
+		addModule( EmotionTrackerUpdate );
+		addModule( LargeGroupBonusUpdate );
+		addModule( BloodthirstyUpdate );
 		addModule( AttributeModifierAuraUpdate );
 		addModule( PassiveAreaEffectBehavior );
 		addModule( AttributeModifierUpgrade );

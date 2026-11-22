@@ -45,6 +45,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/AttributeModifierStore.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #endif
 #include "Common/RotwkDuration.h"
 #include "Common/INIException.h"
@@ -534,6 +535,8 @@ static INIBlockParse findBlockParse(const char* token)
 #if !RTS_GENERALS
 	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "ModifierList") == 0)
 		return AttributeModifierStore::parseModifierListDefinition;
+	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "EmotionNugget") == 0)
+		return EmotionTrackerUpdate::parseEmotionNugget;
 	if (RetailFileLayers::enabled() && strcmp(token, "ArmyDefinition") == 0)
 		return AISkirmishPlayer::parseRetailArmy;
 	if (RetailFileLayers::enabled() && strcmp(token, "SkirmishAIData") == 0)
