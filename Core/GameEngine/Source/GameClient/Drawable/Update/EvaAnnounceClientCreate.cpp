@@ -14,6 +14,7 @@
 #include "GameClient/RetailEva.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 
 void EvaAnnounceClientCreateModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
@@ -57,7 +58,10 @@ void EvaAnnounceClientCreate::clientUpdate()
 		return;
 	const Player* owner = object->getControllingPlayer();
 	const auto relationship = viewer->getRelationship(object->getTeam());
-	if (data->onlyIfVisible && (object->getShroudedStatus(viewer->getPlayerIndex()) > OBJECTSHROUD_PARTIAL_CLEAR ||
+	const PartitionData* partition = object->friend_getPartitionData();
+	const Bool hidden = partition && !object->isKindOf(KINDOF_ALWAYS_VISIBLE) &&
+		!partition->hasClearCell(viewer->getPlayerIndex());
+	if (data->onlyIfVisible && (hidden ||
 		(relationship == ENEMIES && object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED))))
 		return;
 	if (data->firstSighted)

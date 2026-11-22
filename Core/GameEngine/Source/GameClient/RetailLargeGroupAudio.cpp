@@ -15,6 +15,7 @@
 #include "GameClient/RetailClientAudio.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 
 namespace
 {
@@ -224,8 +225,11 @@ void update()
 	for (const Drawable* drawable = TheGameClient->firstDrawable(); drawable; drawable = drawable->getNextDrawable())
 	{
 		const Object* object = drawable->getObject();
-		if (!object || object->isEffectivelyDead() || !object->isLogicallyVisible() ||
-			(viewer && object->getShroudedStatus(viewer->getPlayerIndex()) > OBJECTSHROUD_PARTIAL_CLEAR))
+		if (!object || object->isEffectivelyDead() || !object->isLogicallyVisible())
+			continue;
+		const PartitionData* partition = object->friend_getPartitionData();
+		if (viewer && partition && !object->isKindOf(KINDOF_ALWAYS_VISIBLE) &&
+			!partition->hasClearCell(viewer->getPlayerIndex()))
 			continue;
 		for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
 		{
