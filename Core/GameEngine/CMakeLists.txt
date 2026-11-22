@@ -126,6 +126,8 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/SlaughterHordeContain.h
     Include/GameLogic/Module/ExperienceModules.h
     Include/GameLogic/Module/HordeAIUpdate.h
+    Include/GameLogic/Module/HordeWorkerAIUpdate.h
+    Include/GameLogic/Module/RubbleRiseUpdate.h
     Include/GameLogic/Module/AnimalAIUpdate.h
     Include/GameLogic/Module/GiantBirdAIUpdate.h
     Include/Common/RetailFileLayers.h
@@ -707,6 +709,8 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/RetailToggleDeploy.cpp
     Source/GameLogic/Object/Contain/SlaughterHordeContain.cpp
     Source/GameLogic/Object/Update/HordeAIUpdate.cpp
+    Source/GameLogic/Object/Update/HordeWorkerAIUpdate.cpp
+    Source/GameLogic/Object/Update/RubbleRiseUpdate.cpp
     Source/GameLogic/Object/Update/AnimalAIUpdate.cpp
     Source/GameLogic/Object/Update/GiantBirdAIUpdate.cpp
 #    Source/Common/GlobalData.cpp

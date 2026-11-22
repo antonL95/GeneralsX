@@ -118,6 +118,7 @@ public:
 	virtual Real getRepairHealthPerSecond() const = 0;	///< get health to repair per second
 	virtual Real getBoredTime() const = 0;							///< how long till we're bored
 	virtual Real getBoredRange() const = 0;							///< when we're bored, we look this far away to do things
+	virtual UnsignedInt getSpecialContactPoints() const { return 0; }
 
 	// methods to override for the dozer behaviors
 	virtual Object *construct( const ThingTemplate *what,
@@ -225,6 +226,7 @@ public:
 	virtual Real getRepairHealthPerSecond() const override;	///< get health to repair per second
 	virtual Real getBoredTime() const override;							///< how long till we're bored
 	virtual Real getBoredRange() const override;							///< when we're bored, we look this far away to do things
+	virtual UnsignedInt getSpecialContactPoints() const override;
 
 	// methods to override for the dozer behaviors
 	virtual Object* construct( const ThingTemplate *what,

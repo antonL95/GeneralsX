@@ -177,6 +177,7 @@
 #include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/HordeWorkerAIUpdate.h"
 #include "GameLogic/Module/AnimalAIUpdate.h"
 #include "GameLogic/Module/GiantBirdAIUpdate.h"
 #include "GameLogic/Module/CommandPointsUpgrade.h"
@@ -191,6 +192,7 @@
 #include "GameLogic/Module/HijackerUpdate.h"
 #include "GameLogic/Module/StructureCollapseUpdate.h"
 #include "GameLogic/Module/StructureToppleUpdate.h"
+#include "GameLogic/Module/RubbleRiseUpdate.h"
 #include "GameLogic/Module/SupplyCenterDockUpdate.h"
 #include "GameLogic/Module/SupplyCenterProductionExitUpdate.h"
 #include "GameLogic/Module/SupplyTruckAIUpdate.h"
@@ -495,6 +497,8 @@ void ModuleFactory::init()
 		addModule( HorseHordeContain );
 		addModule( AODHordeContain );
 		addModule( HordeAIUpdate );
+		addModule( HordeWorkerAIUpdate );
+		addModule( RubbleRiseUpdate );
 		addModule( AnimalAIUpdate );
 		addModule( CritterEmitterUpdate );
 		addModule( GiantBirdAIUpdate );

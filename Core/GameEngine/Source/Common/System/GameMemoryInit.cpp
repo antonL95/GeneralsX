@@ -104,6 +104,8 @@ static const PoolSizeRec RetailPoolSizes[] =
 	{ "WallHubBehavior", 64, 32 },
 	{ "WallUpgradeUpdate", 32, 16 },
 	{ "GettingBuiltBehavior", 256, 64 },
+	{ "RubbleRiseUpdate", 64, 32 },
+	{ "HordeWorkerAIUpdate", 64, 32 },
 	{ "ReplaceSelfUpgrade", 64, 32 },
 	{ "FakePathfindPortalBehaviour", 32, 16 },
 	{ "DynamicPortalBehaviour", 32, 16 },

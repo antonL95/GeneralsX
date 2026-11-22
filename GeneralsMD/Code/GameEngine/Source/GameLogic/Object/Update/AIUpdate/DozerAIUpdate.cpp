@@ -2182,15 +2182,9 @@ void DozerAIUpdate::privateResumeConstruction( Object *obj, CommandSourceType cm
 	if (RetailFileLayers::enabled())
 	{
 		UnsignedInt mask = 0;
-		const auto* dozer = static_cast<const DozerAIUpdate*>(me->findUpdateModule(NAMEKEY("DozerAIUpdate")));
-		if (dozer)
-			mask = static_cast<const DozerAIUpdateModuleData*>(dozer->getModuleData())->m_specialContactPoints;
-		if (mask == 0)
-		{
-			const auto* worker = static_cast<const WorkerAIUpdate*>(me->findUpdateModule(NAMEKEY("WorkerAIUpdate")));
-			if (worker)
-				mask = worker->getSpecialContactPoints();
-		}
+		if (const auto* ai = me->getAIUpdateInterface())
+			if (const auto* dozer = ai->getDozerAIInterface())
+				mask = dozer->getSpecialContactPoints();
 		if (mask)
 		{
 			FindPositionOptions options;
@@ -2773,6 +2767,11 @@ const Coord3D* DozerAIUpdate::getDockPoint( DozerTask task, DozerDockPoint point
 Real DozerAIUpdate::getRepairHealthPerSecond() const
 {
 	return getDozerAIUpdateModuleData()->m_repairHealthPercentPerSecond;
+}
+
+UnsignedInt DozerAIUpdate::getSpecialContactPoints() const
+{
+	return getDozerAIUpdateModuleData()->m_specialContactPoints;
 }
 // ------------------------------------------------------------------------------------------------
 Real DozerAIUpdate::getBoredTime() const
