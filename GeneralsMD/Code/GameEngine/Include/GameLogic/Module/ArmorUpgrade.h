@@ -53,6 +53,8 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "GameLogic/Module/UpgradeModule.h"
+#include "Common/SpecialPowerINI.h"
+#include "GameLogic/ArmorSet.h"
 
 //-----------------------------------------------------------------------------
 // FORWARD REFERENCES /////////////////////////////////////////////////////////
@@ -63,11 +65,22 @@ class Thing;
 // TYPE DEFINES ///////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 
+class ArmorUpgradeModuleData : public UpgradeModuleData
+{
+public:
+	Int m_armorSetFlag = ARMORSET_PLAYER_UPGRADE;
+	Bool m_ignoreArmorUpgrade = FALSE;
+	Bool m_killArmorUpgrade = FALSE;
+	SpecialPowerAnimation m_animation;
+
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
 class ArmorUpgrade : public UpgradeModule
 {
 
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( ArmorUpgrade, "ArmorUpgrade" )
-	MAKE_STANDARD_MODULE_MACRO( ArmorUpgrade );
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( ArmorUpgrade, ArmorUpgradeModuleData );
 
 public:
 

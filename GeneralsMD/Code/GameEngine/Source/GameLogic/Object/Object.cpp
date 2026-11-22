@@ -4432,6 +4432,11 @@ void Object::crc( Xfer *xfer )
 #if !RTS_GENERALS
 		if (auto* body = dynamic_cast<ActiveBody*>(getBodyModule()))
 		{
+			for (Int armor = 0; armor < ARMORSET_COUNT; ++armor)
+			{
+				Bool enabled = body->testArmorSetFlag(static_cast<ArmorSetType>(armor));
+				xfer->xferBool(&enabled);
+			}
 			const UnsignedInt* lastDamage = body->getLastDamageTimestamp();
 			UnsignedInt damageFrame = lastDamage ? *lastDamage : FOREVER;
 			xfer->xferUnsignedInt(&damageFrame);

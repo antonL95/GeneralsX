@@ -133,6 +133,7 @@ void GeometryUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 	{
 		{ "ShowGeometry", INI::parseAsciiStringVector, nullptr, offsetof(GeometryUpgradeModuleData, m_showGeometry) },
 		{ "HideGeometry", INI::parseAsciiStringVector, nullptr, offsetof(GeometryUpgradeModuleData, m_hideGeometry) },
+		{ "CustomAnimAndDuration", SpecialPowerAnimation::parse, nullptr, offsetof(GeometryUpgradeModuleData, m_animation) },
 		{ "WallBoundsMesh", INI::parseAsciiString, nullptr, offsetof(GeometryUpgradeModuleData, m_wallBoundsMesh) },
 		{ "RampMesh1", INI::parseAsciiString, nullptr, offsetof(GeometryUpgradeModuleData, m_rampMesh1) },
 		{ "RampMesh2", INI::parseAsciiString, nullptr, offsetof(GeometryUpgradeModuleData, m_rampMesh2) },
@@ -205,6 +206,9 @@ void GeometryUpgrade::upgradeImplementation()
 	const ThingTemplate* definition = object->getTemplate();
 	const auto& retail = definition->getRotWKObjectData();
 	const auto* data = getGeometryUpgradeModuleData();
+#if !RTS_GENERALS
+	object->applyUpgradeAnimation(data->m_animation);
+#endif
 	const auto upgrades = activeUpgrades(*object, this);
 
 	Bool affectsBounds = FALSE;

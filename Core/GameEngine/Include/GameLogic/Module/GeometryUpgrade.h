@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "GameLogic/Module/UpgradeModule.h"
+#include "Common/SpecialPowerINI.h"
 
 class GeometryInfo;
 
@@ -14,6 +15,7 @@ public:
 	AsciiString m_wallBoundsMesh;
 	AsciiString m_rampMesh1;
 	AsciiString m_rampMesh2;
+	SpecialPowerAnimation m_animation;
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 };

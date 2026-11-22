@@ -88,6 +88,20 @@ void Object::setPowerModelCondition(Int condition, UnsignedInt duration)
 	setModelConditionState(static_cast<ModelConditionFlagType>(condition));
 }
 
+#if !RTS_GENERALS
+void Object::applyUpgradeAnimation(const SpecialPowerAnimation& animation)
+{
+	if (animation.m_condition < 0)
+		return;
+
+	if (animation.m_duration == 0)
+		setModelConditionState(static_cast<ModelConditionFlagType>(animation.m_condition));
+	else
+		setPowerModelCondition(animation.m_condition,
+			static_cast<UnsignedInt>((static_cast<UnsignedInt64>(animation.m_duration) * LOGICFRAMES_PER_SECOND + 999) / 1000));
+}
+#endif
+
 void Object::updateRotwkPowerState()
 {
 	if (!m_rotwkPowerState)

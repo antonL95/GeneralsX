@@ -627,6 +627,7 @@ public:
 	void markRetailInvisibilityDetected(UnsignedInt duration);
 	void grantPowerInvisibility(UnsignedInt duration, Real range, const ModelConditionFlags& forbidden);
 	void setPowerModelCondition(Int condition, UnsignedInt duration);
+	void applyUpgradeAnimation(const SpecialPowerAnimation& animation);
 	void schedulePassengerConsumption(ObjectID passenger, const SpecialPowerAnimation& animation, Real healFraction);
 	void updateRotwkPowerState();
 
