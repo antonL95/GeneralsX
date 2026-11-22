@@ -939,14 +939,14 @@ void OpenContain::onDie( const DamageInfo * damageInfo )
 				for (Object* member : members)
 				{
 					if (member && !member->isEffectivelyDead())
-						member->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
+						member->kill();
 				}
 				if (!passenger->isEffectivelyDead())
-					passenger->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
+					passenger->kill();
 			}
 			else if (!passenger->isEffectivelyDead())
 			{
-				passenger->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
+				passenger->kill();
 			}
 		}
 		return;

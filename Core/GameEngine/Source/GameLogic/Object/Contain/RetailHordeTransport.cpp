@@ -12,6 +12,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/RetailHordeTransport.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
@@ -125,7 +126,7 @@ Bool damageRetailHordePassengers(Object* passenger, ObjectID source, Real fracti
 		damage.in.m_amount = member->getBodyModule()->getMaxHealth() * fraction;
 		member->attemptDamage(&damage);
 		if (fraction == 1.0f && !member->isEffectivelyDead())
-			member->kill(DAMAGE_UNRESISTABLE, deathType);
+			member->kill();
 	}
 	return TRUE;
 }
@@ -346,6 +347,9 @@ void HordeGarrisonContain::releaseHordeMembers(Object* obj)
 #endif
 		if (AIUpdateInterface* ai = member->getAI())
 			ai->aiIdle(CMD_FROM_AI);
+		if (PhysicsBehavior* physics = member->getPhysics())
+			physics->resetDynamicPhysics();
+		member->clearModelConditionState(MODELCONDITION_MOVING);
 	}
 }
 
@@ -397,35 +401,18 @@ void HordeGarrisonContain::exitObjectViaDoor(Object* exitObj, ExitDoorType exitD
 	removeFromContain(exitObj);
 	const auto* data = getHordeGarrisonContainModuleData();
 	const Object* self = getObject();
-	Coord3D startPos = *self->getPosition();
-	Coord3D endPos = startPos;
+	Coord3D exitPos;
 	if (hasNonZeroOffset(data->m_exitOffset))
-	{
-		endPos = transformOffsetToWorld(self, data->m_exitOffset);
-		startPos = endPos;
-	}
-	else if (hasNonZeroOffset(data->m_entryOffset))
-	{
-		endPos = transformOffsetToWorld(self, data->m_entryOffset);
-		startPos = endPos;
-	}
+		exitPos = transformOffsetToWorld(self, data->m_exitOffset);
 	else
-	{
-		startPos.z = TheTerrainLogic->getGroundHeight(startPos.x, startPos.y);
-		endPos = startPos;
-	}
+		exitPos = transformOffsetToWorld(self, data->m_entryOffset);
 
-	const Real exitAngle = self->getOrientation();
-	placeHordeAtPosition(exitObj, startPos, exitAngle);
-	TheAI->pathfinder()->addObjectToPathfindMap(exitObj);
 	if (AIUpdateInterface* ai = exitObj->getAI())
-	{
-		TheAI->pathfinder()->adjustToPossibleDestination(exitObj, ai->getLocomotorSet(), &endPos);
-		std::vector<Coord3D> exitPath;
-		exitPath.push_back(endPos);
-		ai->aiFollowPath(&exitPath, getObject(), CMD_FROM_AI);
-		TheAI->pathfinder()->updateGoal(exitObj, &endPos, TheTerrainLogic->getLayerForDestination(&endPos));
-	}
+		TheAI->pathfinder()->adjustToPossibleDestination(exitObj, ai->getLocomotorSet(), &exitPos);
+	if (PhysicsBehavior* physics = exitObj->getPhysics())
+		physics->resetDynamicPhysics();
+	placeHordeAtPosition(exitObj, exitPos, self->getOrientation());
+	TheAI->pathfinder()->addObjectToPathfindMap(exitObj);
 	recalcApparentControllingPlayer();
 }
 
@@ -624,7 +611,7 @@ void HordeTransportContainDamage::onDamage(DamageInfo* damageInfo)
 		if (Object* victim = TheGameLogic->findObjectByID(id))
 		{
 			if (!victim->isEffectivelyDead())
-				victim->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
+				victim->kill();
 		}
 	}
 }
