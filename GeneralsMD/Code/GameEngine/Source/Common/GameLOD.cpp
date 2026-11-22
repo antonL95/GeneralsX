@@ -530,14 +530,14 @@ ParticlePriorityType GameLODManager::getMinDynamicParticlePriority()
 {
 	const auto *settings = getStaticRenderSettings();
 	return RetailFileLayers::enabled() && settings
-		? std::max(m_minDynamicParticlePriority, settings->m_minParticlePriority) : m_minDynamicParticlePriority;
+		? settings->m_minParticlePriority : m_minDynamicParticlePriority;
 }
 
 ParticlePriorityType GameLODManager::getMinDynamicParticleSkipPriority()
 {
 	const auto *settings = getStaticRenderSettings();
 	return RetailFileLayers::enabled() && settings
-		? std::min(m_minDynamicParticleSkipPriority, settings->m_minParticleSkipPriority) : m_minDynamicParticleSkipPriority;
+		? settings->m_minParticleSkipPriority : m_minDynamicParticleSkipPriority;
 }
 
 /**Parse a description of all the LOD settings for a given detail level*/
