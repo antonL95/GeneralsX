@@ -47,6 +47,7 @@
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "d3dx8math.h"
 #include "Common/GlobalData.h"
+#include "Common/RetailFileLayers.h"
 #include "W3DDevice/GameClient/W3DProjectedShadow.h"
 #include "WW3D2/statistics.h"
 #include "Common/Debug.h"
@@ -1174,6 +1175,15 @@ void W3DProjectedShadowManager::queueDecal(W3DProjectedShadow *shadow, Bool sunC
 */
 		DEBUG_ASSERTCRASH(numVerts == ((endY-startY+1)*(endX-startX+1)), ("queueDecal VB size mismatch"));
 
+		UnsignedInt diffuse = shadow->m_diffuse;
+		if (RetailFileLayers::enabled() && (shadow->m_type & SHADOW_ADDITIVE_DECAL))
+		{
+			const UnsignedInt opacity = std::min(shadow->m_opacity, 255u);
+			const UnsignedInt red = ((shadow->m_color >> 16) & 255u) * opacity / 255u;
+			const UnsignedInt green = ((shadow->m_color >> 8) & 255u) * opacity / 255u;
+			const UnsignedInt blue = (shadow->m_color & 255u) * opacity / 255u;
+			diffuse = 0xff000000u | (red << 16) | (green << 8) | blue;
+		}
 		if(pvVertices)
 		{
 			if (layerHeight)
@@ -1189,7 +1199,7 @@ void W3DProjectedShadowManager::queueDecal(W3DProjectedShadow *shadow, Bool sunC
 						pvVertices->x=hmapVertex.X;
 						pvVertices->y=hmapVertex.Y;
 						pvVertices->z=hmapVertex.Z;
-						pvVertices->diffuse=shadow->m_diffuse;
+						pvVertices->diffuse = diffuse;
 						pvVertices->u=Vector3::Dot_Product(uVector, (hmapVertex-objPos))+uOffset;
 						pvVertices->v=Vector3::Dot_Product(vVector, (hmapVertex-objPos))+vOffset;
 						pvVertices++;
@@ -1208,7 +1218,7 @@ void W3DProjectedShadowManager::queueDecal(W3DProjectedShadow *shadow, Bool sunC
 					pvVertices->x=hmapVertex.X;
 					pvVertices->y=hmapVertex.Y;
 					pvVertices->z=hmapVertex.Z;
-					pvVertices->diffuse=shadow->m_diffuse;
+					pvVertices->diffuse = diffuse;
 					pvVertices->u=Vector3::Dot_Product(uVector, (hmapVertex-objPos))+uOffset;
 					pvVertices->v=Vector3::Dot_Product(vVector, (hmapVertex-objPos))+vOffset;
 					pvVertices++;

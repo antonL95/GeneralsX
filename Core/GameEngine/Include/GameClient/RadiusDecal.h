@@ -50,7 +50,8 @@ public:
 	WorldGroundDecal& operator=(const WorldGroundDecal&) = delete;
 	~WorldGroundDecal();
 	void clear();
-	void set(const AsciiString& texture, const Coord3D& position, Real width, Real height, Int opacity, Color color = 0xffffffff);
+	void set(const AsciiString& texture, const Coord3D& position, Real width, Real height, Int opacity,
+		Color color = 0xffffffff, Bool additive = FALSE, Real angle = 0.0f);
 	void setComposited(const Coord3D& position, Real extent, Int opacity, Color color,
 		std::vector<UnsignedInt>&& pixels, Int size);
 
@@ -58,6 +59,7 @@ private:
 	AsciiString m_texture;
 	std::vector<UnsignedInt> m_pixels;
 	Shadow* m_shadow = nullptr;
+	Bool m_additive = FALSE;
 };
 
 void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, const Drawable* selected,

@@ -34,6 +34,7 @@
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/MapReaderWriterInfo.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/TerrainTypes.h"
@@ -49,6 +50,7 @@
 
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DTerrainVisual.h"
+#include "GameClient/RetailFXDecals.h"
 #include "W3DDevice/GameClient/Module/W3DTreeDraw.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "W3DDevice/GameClient/W3DWater.h"
@@ -177,6 +179,7 @@ W3DTerrainVisual::W3DTerrainVisual()
 //-------------------------------------------------------------------------------------------------
 W3DTerrainVisual::~W3DTerrainVisual()
 {
+	clearRetailFXDecals();
 	// release our render object
 	if (TheTerrainRenderObject == m_terrainRenderObject) {
 		TheTerrainRenderObject = nullptr;
@@ -285,6 +288,7 @@ void W3DTerrainVisual::init()
 //-------------------------------------------------------------------------------------------------
 void W3DTerrainVisual::reset()
 {
+	clearRetailFXDecals();
 
 	// extend
 	TerrainVisual::reset();
@@ -327,6 +331,7 @@ void W3DTerrainVisual::reset()
 //-------------------------------------------------------------------------------------------------
 void W3DTerrainVisual::update()
 {
+	updateRetailFXDecals();
 
 	// extend
 	TerrainVisual::update();
@@ -1191,6 +1196,8 @@ void W3DTerrainVisual::xfer( Xfer *xfer )
 #else
 	XferVersion currentVersion = 3;
 #endif
+	if (RetailFileLayers::enabled())
+		currentVersion = 4;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1273,6 +1280,10 @@ void W3DTerrainVisual::xfer( Xfer *xfer )
 	if (version >= 3) {
 		xfer->xferSnapshot(m_terrainRenderObject);
 	}
+	if (version >= 4)
+		xferRetailFXDecals(xfer);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		clearRetailFXDecals();
 
          // XFER //
          // X  R //

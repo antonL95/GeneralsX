@@ -393,19 +393,21 @@ void WorldGroundDecal::clear()
 	m_pixels.clear();
 }
 
-void WorldGroundDecal::set(const AsciiString& texture, const Coord3D& position, Real width, Real height, Int opacity, Color color)
+void WorldGroundDecal::set(const AsciiString& texture, const Coord3D& position, Real width, Real height, Int opacity,
+	Color color, Bool additive, Real angle)
 {
 	if (!TheProjectedShadowManager || texture.isEmpty() || width <= 0.0f || height <= 0.0f)
 	{
 		clear();
 		return;
 	}
-	if (m_texture != texture)
+	if (m_texture != texture || m_additive != additive)
 	{
 		clear();
 		m_texture = texture;
+		m_additive = additive;
 		Shadow::ShadowTypeInfo info;
-		info.m_type = SHADOW_ALPHA_DECAL;
+		info.m_type = additive ? SHADOW_ADDITIVE_DECAL : SHADOW_ALPHA_DECAL;
 		info.allowWorldAlign = TRUE;
 		info.m_sizeX = width;
 		info.m_sizeY = height;
@@ -418,6 +420,7 @@ void WorldGroundDecal::set(const AsciiString& texture, const Coord3D& position, 
 	{
 		m_shadow->setSize(width, height);
 		m_shadow->setPosition(position.x, position.y, position.z);
+		m_shadow->setAngle(angle);
 		m_shadow->setColor(color);
 		m_shadow->setOpacity(opacity);
 	}

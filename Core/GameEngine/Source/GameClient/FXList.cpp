@@ -34,6 +34,7 @@
 
 #include "Common/DrawModule.h"
 #include "Common/GameAudio.h"
+#include "Common/GameState.h"
 #include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
@@ -44,6 +45,7 @@
 #include "Common/SpecialPowerINI.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
+#include "Common/Xfer.h"
 
 #include "GameLogic/Object.h"
 #include "GameLogic/GameLogic.h"
@@ -52,13 +54,16 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/ParticleSys.h"
+#include "GameClient/RadiusDecal.h"
 #include "GameClient/RetailEva.h"
+#include "GameClient/RetailFXDecals.h"
 #include "GameLogic/PartitionManager.h"
 #include "WWMath/wwmath.h"
 
 #include <optional>
 #include <cmath>
 #include <limits>
+#include <list>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
@@ -695,6 +700,220 @@ private:
 };
 EMPTY_DTOR(TintDrawableFXNugget)
 
+namespace
+{
+struct TimedDecal
+{
+	AsciiString texture;
+	Coord2D offset{};
+	Real size = 0.0f;
+	RGBColor color{};
+	Int start = 0;
+	Int peak = 0;
+	Int end = 0;
+	UnsignedInt fadeIn = 0;
+	UnsignedInt hold = 0;
+	UnsignedInt fadeOut = 0;
+	UnsignedInt delay = 0;
+	UnsignedInt lifetime = 0;
+	Bool additive = FALSE;
+	Bool orientToObject = TRUE;
+
+	Bool isValid() const
+	{
+		return lifetime && texture.isNotEmpty() && size > 0.0f && size <= 65536.0f &&
+			start >= 0 && start <= 255 && peak >= 0 && peak <= 255 && end >= 0 && end <= 255 &&
+			color.red >= 0.0f && color.red <= 1.0f && color.green >= 0.0f && color.green <= 1.0f &&
+			color.blue >= 0.0f && color.blue <= 1.0f;
+	}
+
+	Int opacityAt(UnsignedInt age) const
+	{
+		if (age < fadeIn)
+			return start + static_cast<Int>((static_cast<Real>(age) / fadeIn) * (peak - start));
+		age -= fadeIn;
+		if (age < hold)
+			return peak;
+		age -= hold;
+		if (age < fadeOut)
+			return peak + static_cast<Int>((static_cast<Real>(age) / fadeOut) * (end - peak));
+		return end;
+	}
+};
+
+struct ActiveTimedDecal
+{
+	TimedDecal data;
+	Coord3D position;
+	Real angle;
+	UnsignedInt issued;
+	Int opacity = -1;
+	WorldGroundDecal projection;
+
+	ActiveTimedDecal(const TimedDecal& decal, const Coord3D& origin, Real yaw, UnsignedInt frame)
+		: data(decal), position(origin), angle(yaw), issued(frame) {}
+};
+
+std::list<ActiveTimedDecal> retailFXDecals;
+constexpr size_t MAX_RETAIL_FX_DECALS = 256;
+}
+
+void clearRetailFXDecals()
+{
+	retailFXDecals.clear();
+}
+
+void xferRetailFXDecals(Xfer* xfer)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	UnsignedInt count = static_cast<UnsignedInt>(retailFXDecals.size());
+	xfer->xferUnsignedInt(&count);
+	if (count > MAX_RETAIL_FX_DECALS)
+		throw SC_INVALID_DATA;
+
+	if (loading)
+	{
+		clearRetailFXDecals();
+		for (UnsignedInt i = 0; i < count; ++i)
+			retailFXDecals.emplace_back(TimedDecal{}, Coord3D{}, 0.0f, 0);
+	}
+
+	for (auto& decal : retailFXDecals)
+	{
+		auto& data = decal.data;
+		xfer->xferAsciiString(&data.texture);
+		xfer->xferReal(&data.size);
+		xfer->xferRGBColor(&data.color);
+		xfer->xferInt(&data.start);
+		xfer->xferInt(&data.peak);
+		xfer->xferInt(&data.end);
+		xfer->xferUnsignedInt(&data.fadeIn);
+		xfer->xferUnsignedInt(&data.hold);
+		xfer->xferUnsignedInt(&data.fadeOut);
+		xfer->xferUnsignedInt(&data.delay);
+		xfer->xferUnsignedInt(&data.lifetime);
+		xfer->xferBool(&data.additive);
+		xfer->xferCoord3D(&decal.position);
+		xfer->xferReal(&decal.angle);
+		xfer->xferUnsignedInt(&decal.issued);
+		if (loading && (!data.isValid() || !std::isfinite(decal.position.x) ||
+			!std::isfinite(decal.position.y) || !std::isfinite(decal.position.z) || !std::isfinite(decal.angle)))
+			throw SC_INVALID_DATA;
+	}
+}
+
+void updateRetailFXDecals()
+{
+	if (retailFXDecals.empty())
+		return;
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	for (auto it = retailFXDecals.begin(); it != retailFXDecals.end();)
+	{
+		auto& decal = *it;
+		const UnsignedInt elapsed = frame - decal.issued;
+		const auto& data = decal.data;
+		if (frame < decal.issued || elapsed < data.delay)
+		{
+			++it;
+			continue;
+		}
+		if (elapsed - data.delay >= data.lifetime)
+		{
+			if (traceRetailFXLists())
+				std::fprintf(stderr, "[Retail FXList] DynamicDecal expired name=%s frame=%u\n", data.texture.str(), frame);
+			it = retailFXDecals.erase(it);
+			continue;
+		}
+		const Int opacity = data.opacityAt(elapsed - data.delay);
+		if (!TheGlobalData->m_headless && opacity != decal.opacity)
+		{
+			decal.opacity = opacity;
+			if (opacity == 0)
+				decal.projection.clear();
+			else
+			{
+				const Color tint = GameMakeColor(static_cast<Int>(data.color.red * 255.0f),
+					static_cast<Int>(data.color.green * 255.0f), static_cast<Int>(data.color.blue * 255.0f), 255);
+				decal.projection.set(data.texture, decal.position, data.size, data.size, opacity, tint, data.additive, decal.angle);
+			}
+			if (traceRetailFXLists())
+				std::fprintf(stderr, "[Retail FXList] DynamicDecal name=%s frame=%u opacity=%d additive=%d\n",
+					data.texture.str(), frame, opacity, data.additive);
+		}
+		++it;
+	}
+}
+
+class DynamicDecalFXNugget : public FXNugget
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(DynamicDecalFXNugget, "DynamicDecalFXNugget")
+
+public:
+	void doFXPos(const Coord3D* primary, const Matrix3D* transform, Real, const Coord3D*, Real) const override
+	{
+		if (!primary || TheGlobalData->m_headless || !m_decal.isValid())
+			return;
+		Coord3D offset{m_decal.offset.x, m_decal.offset.y, 0.0f};
+		Real angle = 0.0f;
+		if (transform && m_decal.orientToObject)
+		{
+			adjustVector(&offset, transform);
+			angle = transform->Get_Z_Rotation();
+		}
+		Coord3D position = *primary + offset;
+		if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z) || !std::isfinite(angle))
+			return;
+		if (retailFXDecals.size() == MAX_RETAIL_FX_DECALS)
+			retailFXDecals.pop_front();
+		retailFXDecals.emplace_back(m_decal, position, angle, TheGameLogic->getFrame());
+	}
+
+	static void parse(INI* ini, void* instance, void*, const void*)
+	{
+		static const FieldParse fields[] = {
+			{ "DecalName", INI::parseAsciiString, nullptr, offsetof(TimedDecal, texture) },
+			{ "Size", INI::parseReal, nullptr, offsetof(TimedDecal, size) },
+			{ "Color", INI::parseRGBColor, nullptr, offsetof(TimedDecal, color) },
+			{ "Offset", INI::parseCoord2D, nullptr, offsetof(TimedDecal, offset) },
+			{ "OrientToObject", INI::parseBool, nullptr, offsetof(TimedDecal, orientToObject) },
+			{ "OpacityStart", parseOpacity, nullptr, offsetof(TimedDecal, start) },
+			{ "OpacityPeak", parseOpacity, nullptr, offsetof(TimedDecal, peak) },
+			{ "OpacityEnd", parseOpacity, nullptr, offsetof(TimedDecal, end) },
+			{ "OpacityFadeTimeOne", INI::parseDurationUnsignedInt, nullptr, offsetof(TimedDecal, fadeIn) },
+			{ "OpacityPeakTime", INI::parseDurationUnsignedInt, nullptr, offsetof(TimedDecal, hold) },
+			{ "OpacityFadeTimeTwo", INI::parseDurationUnsignedInt, nullptr, offsetof(TimedDecal, fadeOut) },
+			{ "StartingDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(TimedDecal, delay) },
+			{ "Lifetime", INI::parseDurationUnsignedInt, nullptr, offsetof(TimedDecal, lifetime) },
+			{ "Shader", parseShader, nullptr, offsetof(TimedDecal, additive) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		TimedDecal data;
+		ini->initFromINI(&data, fields);
+		auto* nugget = newInstance(DynamicDecalFXNugget);
+		nugget->m_decal = data;
+		static_cast<FXList*>(instance)->addFXNugget(nugget);
+	}
+
+private:
+	static void parseOpacity(INI* ini, void*, void* store, const void*)
+	{
+		*static_cast<Int*>(store) = std::clamp(INI::scanInt(ini->getNextToken()), 0, 255);
+	}
+
+	static void parseShader(INI* ini, void*, void* store, const void*)
+	{
+		static const LookupListRec names[] = {
+			{ "ALPHA", FALSE },
+			{ "ADDITIVE", TRUE },
+			{ nullptr, 0 }
+		};
+		*static_cast<Bool*>(store) = INI::scanLookupList(ini->getNextToken(), names) != 0;
+	}
+
+	TimedDecal m_decal;
+};
+EMPTY_DTOR(DynamicDecalFXNugget)
+
 //-------------------------------------------------------------------------------------------------
 class TerrainScorchFXNugget : public FXNugget
 {
@@ -709,12 +928,20 @@ public:
 	{
 		if (primary)
 		{
+			if (m_weather >= 0 && m_weather != TheGlobalData->m_weather)
+				return;
+			const ScopedVisualRandom random(RetailFileLayers::enabled());
 			Int scorch = m_scorch;
 			if (scorch < 0)
 			{
-				scorch = GameClientRandomValue( SCORCH_1, SCORCH_4 );
+				const Int first = m_randomRange.x >= 0 ? m_randomRange.x : Int(SCORCH_1);
+				const Int last = m_randomRange.x >= 0 ? m_randomRange.y : Int(SCORCH_4);
+				scorch = GameClientRandomValue(first, last);
 			}
 			TheGameClient->addScorch(primary, m_radius, (Scorches)scorch);
+			if (traceRetailFXLists())
+				std::fprintf(stderr, "[Retail FXList] TerrainScorch cell=%d x=%.3f y=%.3f radius=%.3f\n",
+					scorch, primary->x, primary->y, m_radius);
 		}
 		else
 		{
@@ -732,7 +959,16 @@ public:
 		};
 
 		TerrainScorchFXNugget* nugget = newInstance( TerrainScorchFXNugget );
-		ini->initFromINI(nugget, myFieldParse);
+		static const FieldParse retailFields[] = {
+			{ "Weather", INI::parseIndexList, WeatherNames, offsetof(TerrainScorchFXNugget, m_weather) },
+			{ "RandomRange", parseRandomRange, nullptr, offsetof(TerrainScorchFXNugget, m_randomRange) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		MultiIniFieldParse fields;
+		if (RetailFileLayers::enabled())
+			fields.add(retailFields);
+		fields.add(myFieldParse);
+		ini->initFromINIMulti(nugget, fields);
 		((FXList*)instance)->addFXNugget(nugget);
 	}
 
@@ -756,8 +992,19 @@ protected:
 	}
 
 private:
+	static void parseRandomRange(INI* ini, void* instance, void* store, const void* userData)
+	{
+		ICoord2D range;
+		INI::parseICoord2D(ini, instance, &range, userData);
+		if (range.x < 0 || range.y > 8 || range.x > range.y)
+			throw INI_INVALID_DATA;
+		*static_cast<ICoord2D*>(store) = range;
+	}
+
 	Int		m_scorch;
 	Real	m_radius;
+	Int m_weather = -1;
+	ICoord2D m_randomRange{-1, -1};
 };
 EMPTY_DTOR(TerrainScorchFXNugget)
 
@@ -1094,6 +1341,9 @@ public:
 
 	virtual void doFXObj(const Object* primary, const Object* /*secondary*/) const override
 	{
+		if (m_weather >= 0 && m_weather != TheGlobalData->m_weather)
+			return;
+		const ScopedVisualRandom random(RetailFileLayers::enabled());
 		if (primary)
 		{
       // first, try the unadorned name.
@@ -1108,6 +1358,13 @@ public:
 		}
 	}
 
+	void doFXPosWithObjects(const Coord3D*, const Matrix3D*, Real, const Coord3D*, Real,
+		const Object* source, const Object*) const override
+	{
+		if (source && RetailFileLayers::enabled())
+			doFXObj(source, nullptr);
+	}
+
 	static void parse(INI *ini, void *instance, void* /*store*/, const void* /*userData*/)
 	{
 		static const FieldParse myFieldParse[] =
@@ -1119,7 +1376,15 @@ public:
 		};
 
 		FXListAtBonePosFXNugget* nugget = newInstance( FXListAtBonePosFXNugget );
-		ini->initFromINI(nugget, myFieldParse);
+		static const FieldParse retailFields[] = {
+			{ "Weather", INI::parseIndexList, WeatherNames, offsetof(FXListAtBonePosFXNugget, m_weather) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		MultiIniFieldParse fields;
+		if (RetailFileLayers::enabled())
+			fields.add(retailFields);
+		fields.add(myFieldParse);
+		ini->initFromINIMulti(nugget, fields);
 		((FXList*)instance)->addFXNugget(nugget);
 	}
 
@@ -1140,7 +1405,9 @@ protected:
 				Coord3D p;
 				Matrix3D m;
 				obj->convertBonePosToWorldPos(&bonePos[i], &boneMtx[i], &p, &m);
-				FXList::doFXPos(m_fx, &p, &m, 0.0f, nullptr, 0.0f);
+				if (traceRetailFXLists())
+					std::fprintf(stderr, "[Retail FXList] BoneFX bone=%s weather=%d\n", m_boneName.str(), m_weather);
+				FXList::doFXPos(m_fx, &p, m_orientToBone || !RetailFileLayers::enabled() ? &m : nullptr, 0.0f, nullptr, 0.0f);
 			}
 		}
 	}
@@ -1152,6 +1419,7 @@ private:
 	const FXList*		m_fx;
   AsciiString     m_boneName;
   Bool            m_orientToBone;
+	Int m_weather = -1;
 };
 EMPTY_DTOR(FXListAtBonePosFXNugget)
 
@@ -1341,6 +1609,7 @@ const FXList *FXListStore::findFXList(const char* name) const
 		{ "EvaEvent", EvaEventFXNugget::parse, nullptr, 0 },
 		{ "CameraShakerVolume", CameraShakerVolumeFXNugget::parse, nullptr, 0 },
 		{ "TintDrawable", TintDrawableFXNugget::parse, nullptr, 0 },
+		{ "DynamicDecal", DynamicDecalFXNugget::parse, nullptr, 0 },
 		{ "PlayEvenIfShrouded", INI::parseBool, nullptr, offsetof(FXList, m_playEvenIfShrouded) },
 		{ "CullingInfo", FXList::parseCullingInfo, nullptr, 0 },
 		{ nullptr, nullptr, nullptr, 0 }
