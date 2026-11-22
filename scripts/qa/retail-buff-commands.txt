@@ -1,0 +1,17 @@
+3 reveal Player_1 MenPorter 0
+5 create Player_1 GondorElessar 0 3050,520,0
+5 create Player_1 GondorBoromir 0 3020,520,0
+5 create Player_1 GondorTowerShieldGuard 0 3000,525,0
+8 camera Player_1 MenPorter 0 - 3030 525 0.65
+11 health Player_1 GondorElessar 0
+12 pkg50-power Player_1 GondorElessar 0 SpecialAbility202ElessarAthelas
+34 particle-systems - - 0 AragornAthelas
+34 particle-systems - - 0 AragornAthelas02
+35 health Player_1 GondorElessar 0
+60 science Player_1 - 0 SCIENCE_Heal
+65 damage Player_1 GondorTowerShieldGuard 0 175
+66 health Player_1 GondorTowerShieldGuard 0
+67 power-cast Player_1 - 1 at 3000 525
+78 health Player_1 GondorTowerShieldGuard 0
+78 particle-systems - - 0 SpellHeal
+160 quit - - 0
