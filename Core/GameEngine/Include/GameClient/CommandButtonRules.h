@@ -158,4 +158,89 @@ inline VisibleRange pushRange(int start, int count)
 	}
 	return range;
 }
+
+inline unsigned int autoDelayFrames(float autoDelaySeconds, unsigned int framesPerSecond)
+{
+	if (autoDelaySeconds <= 0.0f || framesPerSecond == 0)
+		return 0;
+	return static_cast<unsigned int>(autoDelaySeconds * static_cast<float>(framesPerSecond) + 0.5f);
+}
+
+inline bool isButtonInteractive(bool isClickable, bool showButton, bool isPassive)
+{
+	return showButton && isClickable && !isPassive;
+}
+
+inline bool isDoubleClickSatisfied(
+	bool requiresDoubleClick,
+	bool directDoubleClick,
+	unsigned int lastClickFrame,
+	unsigned int currentFrame,
+	unsigned int windowFrames)
+{
+	if (!requiresDoubleClick)
+		return true;
+	if (directDoubleClick)
+		return true;
+	return lastClickFrame > 0 && currentFrame >= lastClickFrame && currentFrame - lastClickFrame <= windowFrames;
+}
+
+inline bool isAutoAbilityAllowed(
+	bool disallowedConditionActive,
+	bool isReady,
+	unsigned int autoDelayFrameCount,
+	unsigned int readySinceFrame,
+	unsigned int currentFrame)
+{
+	if (disallowedConditionActive || !isReady)
+		return false;
+	if (autoDelayFrameCount > 0)
+	{
+		if (readySinceFrame == 0 || currentFrame < readySinceFrame + autoDelayFrameCount)
+			return false;
+	}
+	return true;
+}
+
+struct ClickReactionStep
+{
+	int nextTimer = 0;
+	int nextCountdown = 0;
+	int triggeredLevel = 0;
+};
+
+inline ClickReactionStep advanceClickReaction(
+	int currentTimer,
+	int currentCountdown,
+	int clickReactionTimer,
+	const int reactionFrames[5],
+	int randomLowLevel)
+{
+	ClickReactionStep step;
+	step.nextTimer = currentTimer;
+	step.nextCountdown = currentCountdown;
+	if (clickReactionTimer < 1)
+		return step;
+
+	int nextTimer = currentTimer + clickReactionTimer;
+	const int maxTimer = clickReactionTimer * 5;
+	if (nextTimer > maxTimer)
+		nextTimer = maxTimer;
+	step.nextTimer = nextTimer;
+
+	if (currentCountdown > 0)
+		return step;
+
+	int level = nextTimer / clickReactionTimer;
+	if (level < 4)
+		level = randomLowLevel;
+	if (level < 1)
+		return step;
+	if (level > 5)
+		level = 5;
+
+	step.triggeredLevel = level;
+	step.nextCountdown = reactionFrames[level - 1];
+	return step;
+}
 }

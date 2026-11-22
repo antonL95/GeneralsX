@@ -66,3 +66,58 @@ TEST(CommandButtonRules, PushedRangeReplacesTheMainMenu)
 	EXPECT_FALSE(CommandButtonRules::pushRange(40, 2).active());
 	EXPECT_FALSE(CommandButtonRules::pushRange(3, 0).active());
 }
+
+TEST(CommandButtonRules, VisibilityAndClickabilityGateInteractivity)
+{
+	EXPECT_TRUE(CommandButtonRules::isButtonInteractive(true, true, false));
+	EXPECT_FALSE(CommandButtonRules::isButtonInteractive(false, true, false));
+	EXPECT_FALSE(CommandButtonRules::isButtonInteractive(true, false, false));
+	EXPECT_FALSE(CommandButtonRules::isButtonInteractive(true, true, true));
+}
+
+TEST(CommandButtonRules, DoubleClickRequiresSecondClickWithinWindow)
+{
+	EXPECT_TRUE(CommandButtonRules::isDoubleClickSatisfied(false, false, 0, 10, 15));
+	EXPECT_FALSE(CommandButtonRules::isDoubleClickSatisfied(true, false, 0, 10, 15));
+	EXPECT_TRUE(CommandButtonRules::isDoubleClickSatisfied(true, false, 10, 20, 15));
+	EXPECT_FALSE(CommandButtonRules::isDoubleClickSatisfied(true, false, 10, 30, 15));
+	EXPECT_TRUE(CommandButtonRules::isDoubleClickSatisfied(true, true, 0, 30, 15));
+}
+
+TEST(CommandButtonRules, AutoAbilityRespectsConditionAndAutoDelay)
+{
+	EXPECT_EQ(CommandButtonRules::autoDelayFrames(0.0f, 30), 0u);
+	EXPECT_EQ(CommandButtonRules::autoDelayFrames(1.5f, 30), 45u);
+	EXPECT_FALSE(CommandButtonRules::isAutoAbilityAllowed(true, true, 0, 10, 100));
+	EXPECT_FALSE(CommandButtonRules::isAutoAbilityAllowed(false, false, 0, 10, 100));
+	EXPECT_FALSE(CommandButtonRules::isAutoAbilityAllowed(false, true, 30, 10, 39));
+	EXPECT_TRUE(CommandButtonRules::isAutoAbilityAllowed(false, true, 30, 10, 40));
+}
+
+TEST(CommandButtonRules, ClickReactionEscalatesAndRespectsActiveCountdown)
+{
+	const int frames[5] = { 10, 12, 14, 16, 20 };
+	const CommandButtonRules::ClickReactionStep first =
+		CommandButtonRules::advanceClickReaction(0, 0, 600, frames, 2);
+	EXPECT_EQ(first.nextTimer, 600);
+	EXPECT_EQ(first.triggeredLevel, 2);
+	EXPECT_EQ(first.nextCountdown, 12);
+
+	const CommandButtonRules::ClickReactionStep busy =
+		CommandButtonRules::advanceClickReaction(600, 8, 600, frames, 3);
+	EXPECT_EQ(busy.nextTimer, 1200);
+	EXPECT_EQ(busy.triggeredLevel, 0);
+	EXPECT_EQ(busy.nextCountdown, 8);
+
+	const CommandButtonRules::ClickReactionStep high =
+		CommandButtonRules::advanceClickReaction(1800, 0, 600, frames, 1);
+	EXPECT_EQ(high.nextTimer, 2400);
+	EXPECT_EQ(high.triggeredLevel, 4);
+	EXPECT_EQ(high.nextCountdown, 16);
+
+	const CommandButtonRules::ClickReactionStep capped =
+		CommandButtonRules::advanceClickReaction(3000, 0, 600, frames, 1);
+	EXPECT_EQ(capped.nextTimer, 3000);
+	EXPECT_EQ(capped.triggeredLevel, 5);
+	EXPECT_EQ(capped.nextCountdown, 20);
+}
