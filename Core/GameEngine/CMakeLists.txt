@@ -728,6 +728,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/ExperienceLevelStore.cpp
     Source/GameLogic/System/RetailCreationUpgrades.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
+    Source/GameLogic/System/RetailParticleTestCommands.cpp
     Source/GameLogic/System/RetailBuildingTestCommands.cpp
     Source/GameLogic/System/RetailPlacementTestCommands.cpp
     Source/GameLogic/System/RetailBuildingEvents.cpp

@@ -166,6 +166,8 @@ struct RetailTeamBudgetFixture
 #endif
 
 void runRetailMordorTestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
+void runRetailParticleTestCommand(std::string_view action, const Object* source, const Object* target,
+	const Coord3D* location, const char* argument, UnsignedInt frame);
 void runRetailPlacementTestCommand(Object* source, const char* name, const Coord3D* target, UnsignedInt frame);
 void logRetailPlacementTestObject(const Object* object, const char* name, UnsignedInt frame);
 #if !RTS_GENERALS
@@ -2290,6 +2292,22 @@ void logTracked(unsigned int frame)
 
 void execute(const Command& command, unsigned int frame)
 {
+	if (command.action == "particle-fx" || command.action == "particle-systems")
+	{
+		const Coord3D location = command.hasLocation ? groundLocation(command) : Coord3D{};
+		const auto separator = command.structure.find(',');
+		const Object* target = nullptr;
+		if (separator != std::string::npos)
+		{
+			Command targetCommand;
+			targetCommand.structure = command.structure.substr(separator + 1);
+			target = findTarget(targetCommand);
+		}
+		const std::string name = command.structure.substr(0, separator);
+		runRetailParticleTestCommand(command.action, command.target != "-" ? findObject(command) : nullptr,
+			target, command.hasLocation ? &location : nullptr, name.c_str(), frame);
+		return;
+	}
 	if (command.action.starts_with("pw-") && runPowerCommand(command.action, findPlayer(command),
 		command.action == "pw-rank" ? findObject(command) : nullptr, command.structure.c_str(), frame))
 		return;
