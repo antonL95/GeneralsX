@@ -37,3 +37,45 @@
 334 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
 349 particle-systems Player_1 - 0 RohirimAlliesDust01
 349 ocl-fade-trace Player_1 RohanRohirrimHorde_Summoned 0
+34 particle-stats Player_1 - 0 RohirimAlliesDust01
+34 particle-stats Player_1 - 0 RohirimAlliesGrassA
+40 particle-stats Player_1 - 0 RohirimAlliesDust01
+40 particle-stats Player_1 - 0 RohirimAlliesGrassA
+50 particle-stats Player_1 - 0 RohirimAlliesDust01
+50 particle-stats Player_1 - 0 RohirimAlliesGrassA
+64 particle-stats Player_1 - 0 RohirimAlliesDust01
+64 particle-stats Player_1 - 0 RohirimAlliesGrassA
+80 particle-stats Player_1 - 0 RohirimAlliesDust01
+80 particle-stats Player_1 - 0 RohirimAlliesGrassA
+94 particle-stats Player_1 - 0 RohirimAlliesDust01
+94 particle-stats Player_1 - 0 RohirimAlliesGrassA
+105 particle-stats Player_1 - 0 RohirimAlliesDust01
+105 particle-stats Player_1 - 0 RohirimAlliesGrassA
+115 particle-stats Player_1 - 0 RohirimAlliesDust01
+115 particle-stats Player_1 - 0 RohirimAlliesGrassA
+124 particle-stats Player_1 - 0 RohirimAlliesDust01
+124 particle-stats Player_1 - 0 RohirimAlliesGrassA
+130 particle-stats Player_1 - 0 RohirimAlliesDust01
+130 particle-stats Player_1 - 0 RohirimAlliesGrassA
+135 particle-stats Player_1 - 0 RohirimAlliesDust01
+135 particle-stats Player_1 - 0 RohirimAlliesGrassA
+140 particle-stats Player_1 - 0 RohirimAlliesDust01
+140 particle-stats Player_1 - 0 RohirimAlliesGrassA
+154 particle-stats Player_1 - 0 RohirimAlliesDust01
+154 particle-stats Player_1 - 0 RohirimAlliesGrassA
+170 particle-stats Player_1 - 0 RohirimAlliesDust01
+170 particle-stats Player_1 - 0 RohirimAlliesGrassA
+184 particle-stats Player_1 - 0 RohirimAlliesDust01
+184 particle-stats Player_1 - 0 RohirimAlliesGrassA
+200 particle-stats Player_1 - 0 RohirimAlliesDust01
+200 particle-stats Player_1 - 0 RohirimAlliesGrassA
+214 particle-stats Player_1 - 0 RohirimAlliesDust01
+214 particle-stats Player_1 - 0 RohirimAlliesGrassA
+230 particle-stats Player_1 - 0 RohirimAlliesDust01
+230 particle-stats Player_1 - 0 RohirimAlliesGrassA
+244 particle-stats Player_1 - 0 RohirimAlliesDust01
+244 particle-stats Player_1 - 0 RohirimAlliesGrassA
+274 particle-stats Player_1 - 0 RohirimAlliesDust01
+274 particle-stats Player_1 - 0 RohirimAlliesGrassA
+94 particle-budget-breakdown Player_1 - 0
+184 particle-budget-breakdown Player_1 - 0
