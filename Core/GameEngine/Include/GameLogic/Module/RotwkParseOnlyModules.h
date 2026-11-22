@@ -66,6 +66,16 @@ public:
 	UpdateSleepTime update() override;
 };
 
+class NotifyTargetsOfImminentProbableCrushingUpdate final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(NotifyTargetsOfImminentProbableCrushingUpdate, "NotifyTargetsOfImminentProbableCrushingUpdate")
+	MAKE_STANDARD_MODULE_MACRO(NotifyTargetsOfImminentProbableCrushingUpdate)
+
+public:
+	NotifyTargetsOfImminentProbableCrushingUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	UpdateSleepTime update() override;
+};
+
 struct PickupStuffUpdateModuleData : public UpdateModuleData
 {
 	Bool m_skirmishAIOnly = FALSE;

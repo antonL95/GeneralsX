@@ -248,6 +248,7 @@
 #include "GameLogic/Module/TransitionDamageFX.h"
 
 // collide includes
+#include "GameLogic/Module/AODCrushCollide.h"
 #include "GameLogic/Module/FireWeaponCollide.h"
 #include "GameLogic/Module/SquishCollide.h"
 
@@ -489,6 +490,8 @@ void ModuleFactory::init()
 	{
 		addModule( StancesBehavior );
 		addModule( HordeNotifyTargetsOfImminentProbableCrushingUpdate );
+		addModule( NotifyTargetsOfImminentProbableCrushingUpdate );
+		addModule( AODCrushCollide );
 		addModule( RadiateFearUpdate );
 		addModule( EmotionTrackerUpdate );
 		addModule( LargeGroupBonusUpdate );
