@@ -622,6 +622,11 @@ private:
 	Bool m_shareTimers = FALSE;
 	Bool m_requireFollowThru = FALSE;
 	Bool m_lockWhenUsing = FALSE;
+	SpecialPowerObjectFilter m_projectileFilterInContainer;
+	Int m_maxAttackPassengers = 0;
+	Bool m_passengerProportionalAttack = FALSE;
+	Bool m_shouldPlayUnderAttackEvaEvent = TRUE;
+	Bool m_projectileSelf = FALSE;
 	Int m_affectsMask;											///< what we can affect
 	Int m_collideMask;											///< what we can collide with (projectiles only)
 	Bool m_damageDealtAtSelfPosition;				///< if T, weapon damage is done at source's position, not victim's pos. (useful for suicide weapons.)

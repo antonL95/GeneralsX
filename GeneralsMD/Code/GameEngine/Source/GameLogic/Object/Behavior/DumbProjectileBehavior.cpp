@@ -346,9 +346,12 @@ void DumbProjectileBehavior::projectileLaunchAtObjectOrPosition(
 
 	Object* projectile = getObject();
 
-	Weapon::positionProjectileForLaunch(projectile, launcher, wslot, specificBarrelToUse);
+	if (!isSelfFlight())
+		Weapon::positionProjectileForLaunch(projectile, launcher, wslot, specificBarrelToUse);
 
 	projectileFireAtObjectOrPosition( victim, victimPos, detWeap, exhaustSysOverride );
+	if (isSelfFlight())
+		setWakeFrame(projectile, UPDATE_SLEEP_NONE);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -364,7 +367,13 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
 
 	// if an object, aim at the center, not the ground part
 	Coord3D victimPosToUse;
-	if (victim)
+	if (isSelfFlight())
+	{
+		victimPosToUse = *victimPos;
+		victimPosToUse.z = TheTerrainLogic->getLayerHeight(victimPosToUse.x, victimPosToUse.y,
+			TheTerrainLogic->getHighestLayerForDestination(&victimPosToUse));
+	}
+	else if (victim)
 		victim->getGeometryInfo().getCenterPosition(*victim->getPosition(), victimPosToUse);
 	else
 		victimPosToUse = *victimPos;
@@ -398,7 +407,7 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
 	}
 
  	PhysicsBehavior* physics = projectile->getPhysics();
- 	if ( d->m_tumbleRandomly && physics)
+	if (d->m_tumbleRandomly && physics && !isSelfFlight())
 	{
 		physics->setPitchRate( GameLogicRandomValueReal( -1.0f/PI, 1.0f/PI ) );
 		physics->setYawRate( GameLogicRandomValueReal( -1.0f/PI, 1.0f/PI ) );
@@ -409,6 +418,11 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
 	m_flightPathEnd = victimPosToUse;
 	if (!calcFlightPath(true))
 	{
+		if (isSelfFlight())
+		{
+			clearSelfFlight();
+			return;
+		}
 		//Can only fail if wildly incorrect points
 		TheGameLogic->destroyObject( projectile );
 		return;
@@ -483,6 +497,10 @@ Bool DumbProjectileBehavior::calcFlightPath(Bool recalcNumSegments)
 //-------------------------------------------------------------------------------------------------
 Bool DumbProjectileBehavior::projectileHandleCollision( Object *other )
 {
+	if (RetailFileLayers::enabled() && !getObject()->isKindOf(KINDOF_PROJECTILE) &&
+		(!hasLaunched() || isSelfFlight()))
+		return FALSE;
+
 	const DumbProjectileBehaviorModuleData* d = getDumbProjectileBehaviorModuleData();
 
 	if (other != nullptr)
@@ -561,6 +579,17 @@ Bool DumbProjectileBehavior::projectileGetImpactVelocity(Coord3D& velocity) cons
 
 void DumbProjectileBehavior::detonate(const Object* hit)
 {
+	if (isSelfFlight())
+	{
+		Object* source = getObject();
+		if (m_detonationWeaponTmpl && !source->isEffectivelyDead())
+			TheWeaponStore->handleProjectileDetonation(m_detonationWeaponTmpl, source, source->getPosition(),
+				source->getWeaponBonusCondition(), TRUE,
+				m_detonationWeaponTmpl->hitsStoredTarget() ? m_victimID : INVALID_ID);
+		clearSelfFlight();
+		return;
+	}
+
   if ( m_hasDetonated )
     return;
 
@@ -612,12 +641,37 @@ Bool DumbProjectileBehavior::isApproachingLanding(UnsignedInt lead) const
 	return steps && static_cast<size_t>(m_currentFlightPathStep) == steps - std::min(steps, static_cast<size_t>(std::max(1u, lead)));
 }
 
+Bool DumbProjectileBehavior::isSelfFlight() const
+{
+	return RetailFileLayers::enabled() && m_launcherID != INVALID_ID && m_launcherID == getObject()->getID();
+}
+
+void DumbProjectileBehavior::clearSelfFlight()
+{
+	m_launcherID = INVALID_ID;
+	m_victimID = INVALID_ID;
+	m_detonationWeaponTmpl = nullptr;
+	m_launchWeaponTmpl = nullptr;
+	m_lifespanFrame = 0;
+	m_flightPathSegments = 0;
+	m_currentFlightPathStep = 0;
+	m_flightPath.clear();
+}
+
 //-------------------------------------------------------------------------------------------------
 /**
  * Simulate one frame of a missile's behavior
  */
 UpdateSleepTime DumbProjectileBehavior::update()
 {
+	if (RetailFileLayers::enabled() && !getObject()->isKindOf(KINDOF_PROJECTILE) && !hasLaunched())
+		return UPDATE_SLEEP_FOREVER;
+	if (isSelfFlight() && getObject()->isEffectivelyDead())
+	{
+		clearSelfFlight();
+		return UPDATE_SLEEP_FOREVER;
+	}
+
 	const DumbProjectileBehaviorModuleData* d = getDumbProjectileBehaviorModuleData();
 
 	if (m_lifespanFrame != 0 && TheGameLogic->getFrame() >= m_lifespanFrame)
@@ -637,7 +691,7 @@ UpdateSleepTime DumbProjectileBehavior::update()
 		return UPDATE_SLEEP_NONE;
 	}
 
-	if (m_victimID != INVALID_ID && d->m_flightPathAdjustDistPerFrame > 0.0f)
+	if (m_victimID != INVALID_ID && d->m_flightPathAdjustDistPerFrame > 0.0f && !isSelfFlight())
 	{
 		Object* victim = TheGameLogic->findObjectByID(m_victimID);
 		if (victim)
@@ -782,6 +836,19 @@ void DumbProjectileBehavior::crc( Xfer *xfer )
 	// extend base class
 	UpdateModule::crc( xfer );
 
+}
+
+void DumbProjectileBehavior::crcSelfFlight(Xfer* xfer)
+{
+	AsciiString warhead = m_detonationWeaponTmpl ? m_detonationWeaponTmpl->getName() : AsciiString();
+	xfer->xferAsciiString(&warhead);
+	xfer->xferObjectID(&m_victimID);
+	xfer->xferUnsignedInt(&m_lifespanFrame);
+	xfer->xferInt(&m_currentFlightPathStep);
+	xfer->xferInt(&m_flightPathSegments);
+	xfer->xferReal(&m_flightPathSpeed);
+	xfer->xferCoord3D(&m_flightPathStart);
+	xfer->xferCoord3D(&m_flightPathEnd);
 }
 
 // ------------------------------------------------------------------------------------------------

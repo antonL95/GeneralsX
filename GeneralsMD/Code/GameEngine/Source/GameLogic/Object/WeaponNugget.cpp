@@ -20,6 +20,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/DeletionUpdate.h"
 #include "GameLogic/Module/FireWeaponUpdate.h"
+#include "GameLogic/Module/DumbProjectileBehavior.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/ObjectCreationUpgrade.h"
@@ -494,16 +495,29 @@ void WeaponTemplate::launchNuggetProjectiles(const Object* sourceObj, WeaponSlot
 	for (size_t index = 0; index < m_nuggets.size(); ++index)
 	{
 		const WeaponNugget& nugget = m_nuggets[index];
-		if (nugget.m_type != WEAPON_NUGGET_PROJECTILE || !nugget.m_projectileTemplate || !nugget.m_warheadTemplate)
+		if (nugget.m_type != WEAPON_NUGGET_PROJECTILE || !nugget.m_warheadTemplate ||
+			(!m_projectileSelf && !nugget.m_projectileTemplate))
 			continue;
 		if (!nugget.isEnabledFor(sourceObj) || (victimObj && !nugget.affects(sourceObj, victimObj)))
 			continue;
 
-		Object* projectile = TheThingFactory->newObject(nugget.m_projectileTemplate, owner->getDefaultTeam());
-		projectile->setProducer(sourceObj);
+		Object* projectile;
+		if (m_projectileSelf)
+		{
+			auto* self = dynamic_cast<DumbProjectileBehavior*>(projectileInterface(sourceObj));
+			if (!self || self->isSelfFlight() || sourceObj->isEffectivelyDead())
+				continue;
+			projectile = const_cast<Object*>(sourceObj);
+		}
+		else
+		{
+			projectile = TheThingFactory->newObject(nugget.m_projectileTemplate, owner->getDefaultTeam());
+			projectile->setProducer(sourceObj);
+		}
 		if (projectileID)
 			*projectileID = projectile->getID();
-		firingWeapon->newProjectileFired(sourceObj, projectile, victimObj, &destination);
+		if (!m_projectileSelf)
+			firingWeapon->newProjectileFired(sourceObj, projectile, victimObj, &destination);
 
 		if (ProjectileUpdateInterface* pui = projectileInterface(projectile))
 		{
@@ -516,7 +530,7 @@ void WeaponTemplate::launchNuggetProjectiles(const Object* sourceObj, WeaponSlot
 
 		if (RetailTestCommands::tracesCombat())
 			std::fprintf(stderr, "TEST projectile frame=%u weapon=%s nugget=%u projectile=%s id=%u warhead=%s source=%u victim=%u dest=%.1f,%.1f\n",
-				TheGameLogic->getFrame(), m_name.str(), static_cast<unsigned>(index), nugget.m_projectileTemplate->getName().str(),
+				TheGameLogic->getFrame(), m_name.str(), static_cast<unsigned>(index), projectile->getTemplate()->getName().str(),
 				static_cast<unsigned>(projectile->getID()), nugget.m_warheadTemplate->getName().str(),
 				static_cast<unsigned>(sourceObj->getID()), static_cast<unsigned>(victimObj ? victimObj->getID() : INVALID_ID),
 				destination.x, destination.y);
@@ -729,6 +743,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damageInfo.in.m_sourcePlayerMask = source && source->getControllingPlayer() ? source->getControllingPlayer()->getPlayerMask() : 0;
 		damageInfo.in.m_amount = amount;
 		damageInfo.retailFXTrigger = warheadTrigger != RETAIL_DAMAGE_FX_NONE ? warheadTrigger : launchTrigger;
+		damageInfo.shouldPlayUnderAttackEvaEvent = m_shouldPlayUnderAttackEvaEvent;
 		if (impactVelocity)
 			damageInfo.impactVelocity = *impactVelocity;
 		else if (source && source->getPhysics())

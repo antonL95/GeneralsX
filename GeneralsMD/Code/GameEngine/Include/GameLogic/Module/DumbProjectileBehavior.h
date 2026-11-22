@@ -97,6 +97,8 @@ public:
 	virtual void projectileSetLaunchWeapon(const WeaponTemplate* launchWeapon) override { m_launchWeaponTmpl = launchWeapon; }
 	virtual const WeaponTemplate* projectileGetLaunchWeapon() const override { return m_launchWeaponTmpl; }
 	virtual Bool projectileGetImpactVelocity(Coord3D& velocity) const override;
+	void crcSelfFlight(Xfer* xfer);
+	Bool isSelfFlight() const;
 
 protected:
 
@@ -124,6 +126,7 @@ private:
   Bool                  m_hasDetonated;           ///<
 
 	Bool calcFlightPath(Bool recalcNumSegments);
+	void clearSelfFlight();
 #if defined(RTS_DEBUG)
 	void displayFlightPath();	///< Uses little debug icons in worldspace to show the path chosen when it is decided upon
 #endif

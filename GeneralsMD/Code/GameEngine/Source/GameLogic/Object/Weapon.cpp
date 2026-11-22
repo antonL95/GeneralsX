@@ -259,6 +259,14 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "ShareTimers", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_shareTimers) },
 	{ "RequireFollowThru", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_requireFollowThru) },
 	{ "LockWhenUsing", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_lockWhenUsing) },
+	{ "OverrideVoiceAttackSound", INI::parseAudioEventRTS, nullptr, offsetof(WeaponTemplate, m_overrideVoiceAttackSound) },
+	{ "OverrideVoiceEnterStateAttackSound", INI::parseAudioEventRTS, nullptr, offsetof(WeaponTemplate, m_overrideVoiceEnterStateAttackSound) },
+	{ "ProjectileFilterInContainer", SpecialPowerObjectFilter::parse, nullptr, offsetof(WeaponTemplate, m_projectileFilterInContainer) },
+	{ "MaxAttackPassengers", INI::parseInt, nullptr, offsetof(WeaponTemplate, m_maxAttackPassengers) },
+	{ "PassengerProportionalAttack", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_passengerProportionalAttack) },
+	{ "ShouldPlayUnderAttackEvaEvent", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_shouldPlayUnderAttackEvaEvent) },
+	{ "ProjectileSelf", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_projectileSelf) },
+	{ "RotatingTurret", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_rotatingTurret) },
 	{ "CanBeDodged", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canBeDodged) },
 	{ "DamageNugget", WeaponNugget::parseDamageNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DOTNugget", WeaponNugget::parseDOTNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
@@ -1696,6 +1704,7 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 			const Bool killSelf = verdict == RADIUS_DAMAGE_KILL_SELF;
 
 			DamageInfo damageInfo;
+			damageInfo.shouldPlayUnderAttackEvaEvent = m_shouldPlayUnderAttackEvaEvent;
 			damageInfo.in.m_damageType = damageType;
 			damageInfo.in.m_deathType = deathType;
 			damageInfo.in.m_sourceID = sourceID;
@@ -2227,6 +2236,19 @@ void Weapon::computeBonus(const Object *source, WeaponBonusConditionFlags extraB
 	const WeaponBonusSet* extra = m_template->getExtraBonus();
 	if (extra)
 		extra->appendBonuses(flags, bonus);
+
+	if (RetailFileLayers::enabled() && m_template->m_passengerProportionalAttack)
+	{
+		const ContainModuleInterface* contain = source->getContain();
+		const ContainedItemsList* passengers = contain ? contain->getContainedItemsList() : nullptr;
+		const Int count = passengers ? std::count_if(passengers->begin(), passengers->end(), [&](const Object* passenger)
+		{
+			return !passenger->isEffectivelyDead() && m_template->m_projectileFilterInContainer.matchesObject(source, passenger);
+		}) : 0;
+		const Int cap = m_template->m_maxAttackPassengers > 0 ? m_template->m_maxAttackPassengers : contain ? contain->getContainMax() : 0;
+		const Real fraction = cap > 0 ? static_cast<Real>(std::min(count, cap)) / cap : static_cast<Real>(count > 0);
+		bonus.setField(WeaponBonus::DAMAGE, bonus.getField(WeaponBonus::DAMAGE) * fraction);
+	}
 
 	const Bool hasNuggets = m_template->hasNuggets();
 	const Bool useInnate = m_template->usesInnateAttributes();
@@ -3009,6 +3031,8 @@ Bool Weapon::privateFireWeapon(
 
 	WeaponBonus bonus;
 	computeBonus(sourceObj, extraBonusFlags, bonus);
+	if (RetailFileLayers::enabled() && m_template->m_passengerProportionalAttack && bonus.getField(WeaponBonus::DAMAGE) <= 0.0f)
+		return FALSE;
 
 	DEBUG_ASSERTCRASH(getStatus() != OUT_OF_AMMO, ("Hmm, firing weapon that is OUT_OF_AMMO"));
 	DEBUG_ASSERTCRASH(getStatus() == READY_TO_FIRE, ("Hmm, Weapon is firing more often than should be possible"));

@@ -106,6 +106,7 @@
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
+#include "GameLogic/Module/DumbProjectileBehavior.h"
 #include "GameLogic/Module/ObjectDefectionHelper.h"
 #include "GameLogic/Module/ObjectRepulsorHelper.h"
 #include "GameLogic/Module/ObjectSMCHelper.h"
@@ -2307,6 +2308,7 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 	// that occurs with explicit player knowledge
 	//
 	if( damageInfo->out.m_actualDamageDealt > 0.0f &&
+			damageInfo->shouldPlayUnderAttackEvaEvent &&
 			damageInfo->in.m_damageType != DAMAGE_PENALTY &&
 			damageInfo->in.m_damageType != DAMAGE_HEALING &&
 			getControllingPlayer() &&
@@ -4447,6 +4449,8 @@ void Object::crc( Xfer *xfer )
 				const WeaponTemplate* launch = projectile->projectileGetLaunchWeapon();
 				AsciiString name = launch ? launch->getName() : AsciiString();
 				xfer->xferAsciiString(&name);
+				if (auto* flight = dynamic_cast<DumbProjectileBehavior*>(*module); flight && flight->isSelfFlight())
+					flight->crcSelfFlight(xfer);
 			}
 		}
 		if (const auto* container = getContain())
