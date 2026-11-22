@@ -168,6 +168,9 @@ struct RetailTeamBudgetFixture
 void runRetailMordorTestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
 void runRetailPlacementTestCommand(Object* source, const char* name, const Coord3D* target, UnsignedInt frame);
 void logRetailPlacementTestObject(const Object* object, const char* name, UnsignedInt frame);
+#if !RTS_GENERALS
+void runRetailPackage05TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
+#endif
 
 namespace RetailTestCommands
 {
@@ -2640,6 +2643,13 @@ void execute(const Command& command, unsigned int frame)
 		runRetailMordorTestCommand(command.action, obj, findTarget(command), command.structure.c_str(), frame);
 		return;
 	}
+#if !RTS_GENERALS
+	if (command.action.starts_with("pkg05-"))
+	{
+		runRetailPackage05TestCommand(command.action, obj, findTarget(command, true), frame);
+		return;
+	}
+#endif
 
 	const Bool placeAtPoint = command.action == "place" && command.hasPlacementPoint;
 	if (command.action.starts_with("bparity-") &&
