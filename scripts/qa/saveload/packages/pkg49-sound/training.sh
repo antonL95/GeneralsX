@@ -88,7 +88,7 @@ TrollVoxFindTastyOrc'
     expect_request start 302 "$voice_control" BelfalasMarineVoiceSelectMS
     expect_request start 303 "$always" DeadArnorVoiceUnique
     if covers 305; then
-        first_voice=$(sed -n 's/^RETAIL AUDIO start frame=304 \(owner=.*\)$/\1/p' "$log")
+        first_voice=$(sed -n 's/^RETAIL AUDIO start frame=304 \(owner='"$voice_control"' sound=.*\)$/\1/p' "$log" | head -n 1)
         [ -n "$first_voice" ]
         expect "RETAIL AUDIO start frame=305 $first_voice"
     fi
