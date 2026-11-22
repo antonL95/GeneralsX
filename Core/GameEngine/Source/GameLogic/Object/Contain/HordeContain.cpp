@@ -1530,18 +1530,39 @@ Bool HordeContain::splitHorde()
 	struct SplitGroup
 	{
 		const ThingTemplate* type = nullptr;
+		const ThingTemplate* unitType = nullptr;
+		const HordeLayout* layout = nullptr;
 		std::vector<Object*> members;
 		Object* result = nullptr;
 		HordeContain* contain = nullptr;
 	};
+	const auto matchesUnit = [](const ThingTemplate* member, const ThingTemplate* unit) -> bool
+	{
+		if (!unit)
+			return FALSE;
+		const auto hasAlias = [](const ThingTemplate* type, const AsciiString& name)
+		{
+			const auto& aliases = type->getRotWKObjectData().equivalentTo;
+			return std::any_of(aliases.begin(), aliases.end(), [&](const AsciiString& alias) { return alias.compareNoCase(name) == 0; });
+		};
+		const auto& aliases = member->getRotWKObjectData().equivalentTo;
+		return member->isEquivalentTo(unit) || hasAlias(member, unit->getName()) || hasAlias(unit, member->getName()) ||
+			std::any_of(aliases.begin(), aliases.end(), [&](const AsciiString& alias) { return hasAlias(unit, alias); });
+	};
 	std::vector<SplitGroup> groups(definitions.size());
 	for (std::size_t index = 0; index < definitions.size(); ++index)
 	{
-		groups[index].type = TheThingFactory->findTemplate(definitions[index].result.c_str(), FALSE);
-		if (!groups[index].type || !groups[index].type->isKindOf(KINDOF_HORDE))
+		auto& group = groups[index];
+		group.type = TheThingFactory->findTemplate(definitions[index].result.c_str(), FALSE);
+		if (!group.type || !group.type->isKindOf(KINDOF_HORDE))
 			return FALSE;
+		group.unitType = TheThingFactory->findTemplate(definitions[index].unitType.c_str(), FALSE);
+		const ModuleInfo& modules = group.type->getBehaviorModuleInfo();
+		for (Int module = 0; module < modules.getCount() && !group.layout; ++module)
+			group.layout = modules.getNthData(module)->getAsHordeLayout();
 	}
 	Object* banner = nullptr;
+	std::vector<Object*> unmatched;
 	for (Object* member : getContainList())
 	{
 		if (member->isEffectivelyDead())
@@ -1553,23 +1574,54 @@ Bool HordeContain::splitHorde()
 		}
 		const Int slot = getMemberSlot(member->getID());
 		const Int rank = slot >= 0 ? formation->m_layout.slots()[slot].rank : 0;
-		bool assigned = false;
+		const ThingTemplate* memberType = member->getTemplate();
+		SplitGroup* match = nullptr;
+		Int best = 0;
 		for (std::size_t index = 0; index < definitions.size(); ++index)
 		{
 			const auto& def = definitions[index];
-			if (stricmp(def.unitType.c_str(), member->getTemplate()->getName().str()) != 0 ||
-				(def.rankNumber > 0 && def.rankNumber != rank))
+			if (def.rankNumber > 0 && def.rankNumber != rank)
 				continue;
-			groups[index].members.push_back(member);
-			assigned = true;
-			break;
+			auto& group = groups[index];
+			Int priority = 0;
+			if (memberType->getName().compareNoCase(def.unitType.c_str()) == 0)
+				priority = 3;
+			else if (matchesUnit(memberType, group.unitType))
+				priority = 2;
+			else if (group.layout && std::any_of(group.layout->payloads().begin(), group.layout->payloads().end(),
+				[&](const HordePayload& payload)
+				{ return matchesUnit(memberType, TheThingFactory->findTemplate(payload.name.c_str(), FALSE)); }))
+				priority = 1;
+			if (priority > best)
+			{
+				match = &group;
+				best = priority;
+			}
 		}
-		if (!assigned)
-			return FALSE;
+		if (match)
+			match->members.push_back(member);
+		else
+			unmatched.push_back(member);
 	}
 	if (std::none_of(groups.begin(), groups.end(), [](const SplitGroup& group) { return !group.members.empty(); }))
 		return FALSE;
-
+	if (!unmatched.empty())
+	{
+		SplitGroup* remaining = nullptr;
+		for (std::size_t index = 0; index < definitions.size(); ++index)
+		{
+			if (!groups[index].members.empty() || definitions[index].rankNumber > 0)
+				continue;
+			if (remaining)
+				return FALSE;
+			remaining = &groups[index];
+		}
+		const ThingTemplate* type = unmatched.front()->getTemplate();
+		if (!remaining || std::any_of(unmatched.begin(), unmatched.end(),
+			[&](const Object* member) { return !matchesUnit(member->getTemplate(), type); }))
+			return FALSE;
+		remaining->members = std::move(unmatched);
+	}
 	for (auto& group : groups)
 	{
 		if (group.members.empty())
@@ -1587,6 +1639,9 @@ Bool HordeContain::splitHorde()
 	}
 
 	const Real experience = anchor->getExperienceTracker()->getRetailExperience();
+	const AsciiString recoveringBanner = m_replenishmentBanner;
+	const UnsignedInt bannerRespawnFrame = m_bannerRespawnFrame;
+	const UnsignedInt unitSpawnFrame = m_unitSpawnFrame;
 	for (auto& group : groups)
 	{
 		if (!group.result)
@@ -1602,7 +1657,8 @@ Bool HordeContain::splitHorde()
 		center.z = TheTerrainLogic->getGroundHeight(center.x, center.y);
 		group.result->setPosition(&center);
 		group.result->setOrientation(anchor->getOrientation());
-		group.result->getExperienceTracker()->advanceRetailLevel(experience, FALSE);
+		auto* tracker = group.result->getExperienceTracker();
+		tracker->advanceRetailLevel(experience, FALSE);
 		if (const auto* sourceStance = StancesBehavior::find(anchor))
 			if (auto* stance = StancesBehavior::find(group.result))
 				stance->setStance(sourceStance->getStance());
@@ -1618,17 +1674,26 @@ Bool HordeContain::splitHorde()
 			if (member->getExperienceTracker()->getExperienceSink() == anchor->getID())
 				member->getExperienceTracker()->setExperienceSink(group.result->getID());
 		}
-		if (banner)
+		const auto& allowed = group.contain->getHordeContainModuleData()->m_bannerCarriersAllowed;
+		const auto acceptsBanner = [&](const AsciiString& name)
 		{
-			const auto& allowed = group.contain->getHordeContainModuleData()->m_bannerCarriersAllowed;
-			if (std::any_of(allowed.begin(), allowed.end(), [&](const AsciiString& name)
-				{ return name.compareNoCase(banner->getTemplate()->getName()) == 0; }))
-			{
-				removeFromContain(banner);
-				group.contain->OpenContain::addToContain(banner, FALSE);
-				banner = nullptr;
-			}
+			return std::any_of(allowed.begin(), allowed.end(), [&](const AsciiString& candidate)
+				{ return candidate.compareNoCase(name) == 0; });
+		};
+		group.contain->m_lastMeleeFrame = m_lastMeleeFrame;
+		if (banner && acceptsBanner(banner->getTemplate()->getName()))
+		{
+			removeFromContain(banner);
+			group.contain->OpenContain::addToContain(banner, FALSE);
+			group.contain->m_unitSpawnFrame = unitSpawnFrame;
+			banner = nullptr;
 		}
+		else if (bannerRespawnFrame && acceptsBanner(recoveringBanner))
+		{
+			group.contain->m_replenishmentBanner = recoveringBanner;
+			group.contain->m_bannerRespawnFrame = bannerRespawnFrame;
+		}
+		group.contain->onRankAdvanced(tracker->getRank());
 		group.contain->enableLoadSounds(TRUE);
 	}
 	if (banner)
