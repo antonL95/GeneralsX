@@ -4360,6 +4360,10 @@ void Object::crc( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_invulnerableUntil);
 		if (StealthUpdate* stealth = getStealth())
 			stealth->crcRingState(xfer);
+		ModelConditionFlags weaponConditions = getLogicModelConditions();
+		weaponConditions.xfer(xfer);
+		if (m_firingTracker)
+			m_firingTracker->crcRetailState(xfer);
 		Bool damageImmune = getLogicModelConditions().test(MODELCONDITION_INVULNERABLE);
 		xfer->xferBool(&damageImmune);
 		xfer->xferUnsignedInt(&m_disabledTillFrame[DISABLED_PARALYZED]);
@@ -4367,10 +4371,11 @@ void Object::crc( Xfer *xfer )
 		static const NameKeyType abilityKey = NAMEKEY("ModelConditionSpecialAbilityUpdate");
 		static const NameKeyType hitKey = NAMEKEY("HitReactionBehavior");
 		static const NameKeyType oathKey = NAMEKEY("OathbreakersFadeAwayBehavior");
+		static const NameKeyType dualWeaponKey = NAMEKEY("DualWeaponBehavior");
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
 			const NameKeyType key = (*module)->getModuleNameKey();
-			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey)
+			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey || key == dualWeaponKey)
 				xfer->xferSnapshot(*module);
 		}
 #if !RTS_GENERALS

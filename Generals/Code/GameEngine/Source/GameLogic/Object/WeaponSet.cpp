@@ -921,6 +921,12 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 			Weapon *weapon = m_weapons[ i ];
 			if (weapon && weapon->estimateWeaponDamage( source, victim ))
 			{
+				if (RetailFileLayers::enabled() && m_curWeaponTemplateSet)
+				{
+					const ModelConditionFlags& onlyInCondition = m_curWeaponTemplateSet->getNthOnlyInCondition(static_cast<WeaponSlotType>(i));
+					if (onlyInCondition.any() && (!source->getDrawable() || !source->getDrawable()->getModelConditionFlags().testForAll(onlyInCondition)))
+						continue;
+				}
 				return okResult;
 			}
 		}
@@ -999,6 +1005,7 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 		return TRUE;
 
 	const Bool retail = RetailFileLayers::enabled();
+	Bool sharedBusy = FALSE;
 	if (retail)
 	{
 		if (criteria == USE_WEAPONSET_DEFAULT_CRITERIA)
@@ -1018,8 +1025,7 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 					break;
 				}
 			}
-			if (WeaponSlotSelectionRules::shouldHoldWeaponSetForSharedReadyStatus(true, anyNotReady != FALSE))
-				return TRUE;
+			sharedBusy = WeaponSlotSelectionRules::shouldHoldWeaponSetForSharedReadyStatus(true, anyNotReady != FALSE);
 		}
 	}
 
@@ -1187,9 +1193,11 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 
 	if (retail)
 	{
-		const Int selected = WeaponSlotSelectionRules::selectBestSlot(
+		const Int selected = WeaponSlotSelectionRules::selectBestSlotWithSharedReady(
 			retailCandidates,
-			static_cast<WeaponSlotSelectionRules::Criteria>(criteria));
+			static_cast<WeaponSlotSelectionRules::Criteria>(criteria),
+			static_cast<int>(m_curWeapon),
+			sharedBusy != FALSE);
 		if (selected >= PRIMARY_WEAPON && selected < WEAPONSLOT_COUNT)
 		{
 			m_curWeapon = static_cast<WeaponSlotType>(selected);

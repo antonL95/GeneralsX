@@ -115,6 +115,35 @@ TEST(WeaponSlotSelectionRulesTest, SharedReadyStatusHoldsSelectionWhenAnySlotBus
 	EXPECT_FALSE(shouldHoldWeaponSetForSharedReadyStatus(false, true));
 	EXPECT_FALSE(shouldHoldWeaponSetForSharedReadyStatus(true, false));
 	EXPECT_TRUE(shouldHoldWeaponSetForSharedReadyStatus(true, true));
+
+	SlotCandidateInput gatedPrimary;
+	gatedPrimary.slot = 0;
+	gatedPrimary.damage = 1.0f;
+	gatedPrimary.attackRange = 100.0f;
+	gatedPrimary.distance = 50.0f;
+	gatedPrimary.baseReady = false;
+	gatedPrimary.hasOnlyInCondition = true;
+	gatedPrimary.onlyInConditionMatched = true;
+
+	SlotCandidateInput secondary;
+	secondary.slot = 1;
+	secondary.damage = 1.0f;
+	secondary.attackRange = 100.0f;
+	secondary.distance = 50.0f;
+	secondary.baseReady = true;
+
+	const std::vector<SlotEvaluation> stillEligible = {
+		evaluateSlotCandidate(secondary),
+		evaluateSlotCandidate(gatedPrimary)
+	};
+	EXPECT_EQ(selectBestSlotWithSharedReady(stillEligible, Criteria::PreferMostDamage, 0, true), 0);
+
+	gatedPrimary.onlyInConditionMatched = false;
+	const std::vector<SlotEvaluation> primaryDisqualified = {
+		evaluateSlotCandidate(secondary),
+		evaluateSlotCandidate(gatedPrimary)
+	};
+	EXPECT_EQ(selectBestSlotWithSharedReady(primaryDisqualified, Criteria::PreferMostDamage, 0, true), 1);
 }
 
 TEST(WeaponSlotSelectionRulesTest, DualWeaponRangeAndCooldownDecisions)

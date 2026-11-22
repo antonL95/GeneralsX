@@ -432,7 +432,11 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "ShadowOverrideLODVisibility", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.shadowOverrideLODVisibility) },
 	{ "ShadowSunAngle", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.shadowSunAngle) },
 	{ "ShockwaveResistance", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.shockwaveResistance) },
-	{ "ShouldClearShotsOnIdle", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.shouldClearShotsOnIdle) },
+	{ "ShouldClearShotsOnIdle", [](INI* ini, void*, void* store, const void*) {
+		if (!RetailFileLayers::enabled() && !INIAudit::isEnabled())
+			throw INI_UNKNOWN_TOKEN;
+		INI::parseBool(ini, nullptr, store, nullptr);
+	}, nullptr, offsetof(ThingTemplate, m_rotwk.shouldClearShotsOnIdle) },
 	{ "ShowHealthInSelectionDecal", INI::parseBool, nullptr, offsetof(ThingTemplate, m_rotwk.showHealthInSelectionDecal) },
 	{ "SoundAmbientBattle", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_soundAmbientBattle]) },
 	{ "SoundCrushing", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_soundCrushing]) },

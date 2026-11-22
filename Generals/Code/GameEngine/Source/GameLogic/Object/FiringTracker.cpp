@@ -332,6 +332,12 @@ void FiringTracker::crc( Xfer *xfer )
 
 }
 
+void FiringTracker::crcRetailState(Xfer* xfer)
+{
+	xfer->xferInt(&m_consecutiveShots);
+	xfer->xferObjectID(&m_victimID);
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Xfer method
 	* Version Info:

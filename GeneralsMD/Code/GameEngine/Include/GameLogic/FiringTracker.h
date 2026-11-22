@@ -56,6 +56,7 @@ public:
 	ObjectID getLastShotVictim() const { return m_victimID; }						///< get the last victim ID that was shot at
 	Int getNumConsecutiveShotsAtVictim( const Object *victim ) const;
 	void clearConsecutiveShots() { m_consecutiveShots = 0; }
+	void crcRetailState(Xfer* xfer);
 
 	/// this is never disabled, since we want disabled things to continue to slowly "spin down"... (srj)
 	virtual DisabledMaskType getDisabledTypesToProcess() const override { return DISABLEDMASK_ALL; }

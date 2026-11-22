@@ -43,6 +43,7 @@
 #include "Common/GameAudio.h"
 #include "Common/GameState.h"
 #include "Common/INI.h"
+#include "Common/INIAudit.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
@@ -235,10 +236,6 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 	{ "PreAttackType",						INI::parseIndexList,										TheWeaponPrefireNames, offsetof(WeaponTemplate, m_prefireType) },
 	{ "ContinueAttackRange",			INI::parseReal,													nullptr,							offsetof(WeaponTemplate, m_continueAttackRange) },
 	{ "SuspendFXDelay",						INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_suspendFXDelay) },
-	{ "ChaseWeapon", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_chaseWeapon) },
-	{ "AntiStructure", [](INI* ini, void*, void* store, const void*) {
-		*static_cast<Int*>(store) = INI::scanBool(ini->getNextToken());
-	}, nullptr, offsetof(WeaponTemplate, m_antiStructure) },
 	{ nullptr,												nullptr,																		nullptr,							0 }
 
 };
@@ -1710,7 +1707,25 @@ void WeaponStore::postProcessLoad()
 	}
 
 	// parse the ini weapon definition
-	ini->initFromINI(weapon, weapon->getFieldParse());
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "ChaseWeapon", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_chaseWeapon) },
+			{ "AntiStructure", [](INI* ini, void*, void* store, const void*) {
+				*static_cast<Int*>(store) = INI::scanBool(ini->getNextToken());
+			}, nullptr, offsetof(WeaponTemplate, m_antiStructure) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		MultiIniFieldParse fields;
+		fields.add(weapon->getFieldParse());
+		fields.add(retailFields);
+		ini->initFromINIMulti(weapon, fields);
+	}
+	else
+	{
+		ini->initFromINI(weapon, weapon->getFieldParse());
+	}
 
 	if (RetailFileLayers::enabled())
 	{

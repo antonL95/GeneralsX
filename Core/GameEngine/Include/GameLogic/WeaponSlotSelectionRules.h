@@ -215,6 +215,23 @@ inline int selectBestSlot(const std::vector<SlotEvaluation>& candidates, Criteri
 	return -1;
 }
 
+inline int selectBestSlotWithSharedReady(
+	const std::vector<SlotEvaluation>& candidates,
+	Criteria criteria,
+	int currentSlot,
+	bool sharedReadyBusy)
+{
+	if (sharedReadyBusy)
+	{
+		for (const SlotEvaluation& c : candidates)
+		{
+			if (c.slot == currentSlot && !c.disqualified)
+				return currentSlot;
+		}
+	}
+	return selectBestSlot(candidates, criteria);
+}
+
 inline bool isEnemyWithinDualWeaponRange(float dx, float dy, float dz, float switchDistance)
 {
 	if (switchDistance <= 0.0f)

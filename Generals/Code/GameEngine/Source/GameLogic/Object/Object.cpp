@@ -3640,6 +3640,18 @@ void Object::crc( Xfer *xfer )
 		xfer->xferInt(&m_constructionCostPaid);
 		if (StealthUpdate* stealth = getStealth())
 			stealth->crcRingState(xfer);
+		ModelConditionFlags weaponConditions;
+		if (m_drawable)
+			weaponConditions = m_drawable->getModelConditionFlags();
+		weaponConditions.xfer(xfer);
+		if (m_firingTracker)
+			m_firingTracker->crcRetailState(xfer);
+		static const NameKeyType dualWeaponKey = NAMEKEY("DualWeaponBehavior");
+		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
+		{
+			if ((*module)->getModuleNameKey() == dualWeaponKey)
+				xfer->xferSnapshot(*module);
+		}
 	}
 #ifdef DEBUG_CRC
 //	g_logObjectCRCs = TRUE;
