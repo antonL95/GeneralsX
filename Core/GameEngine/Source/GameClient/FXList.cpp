@@ -52,10 +52,13 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/ParticleSys.h"
+#include "GameClient/RetailEva.h"
 #include "GameLogic/PartitionManager.h"
 #include "WWMath/wwmath.h"
 
 #include <optional>
+#include <cmath>
+#include <limits>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
@@ -100,6 +103,23 @@ void FXNugget::doFXPosWithObjects(const Coord3D* primary, const Matrix3D* primar
 	doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
 }
 
+static Bool matchesSourceConditions(const Object* source, const ModelConditionFlags& required)
+{
+	if (!required.any())
+		return TRUE;
+#if RTS_GENERALS
+	return source && source->getDrawable() && source->getDrawable()->getModelConditionFlags().testForAll(required);
+#else
+	return source && source->getLogicModelConditions().testForAll(required);
+#endif
+}
+
+static Bool traceRetailFXLists()
+{
+	static const Bool trace = std::getenv("GENERALSX_TRACE_RETAIL_FX_LISTS") != nullptr;
+	return trace && RetailFileLayers::enabled();
+}
+
 //-------------------------------------------------------------------------------------------------
 class SoundFXNugget : public FXNugget
 {
@@ -109,28 +129,19 @@ public:
 
 	virtual void doFXPos(const Coord3D *primary, const Matrix3D* /*primaryMtx*/, const Real /*primarySpeed*/, const Coord3D * /*secondary*/, const Real /*overrideRadius*/ ) const override
 	{
-		AudioEventRTS sound(m_soundName);
-
-		if (primary)
-		{
-			sound.setPosition(primary);
-		}
-
-		TheAudio->addAudioEvent(&sound);
+		play(primary, nullptr);
 	}
 
 	virtual void doFXObj(const Object* primary, const Object* secondary = nullptr) const override
 	{
-		AudioEventRTS sound(m_soundName);
-		if (primary)
-		{
-			sound.setPlayerIndex(primary->getControllingPlayer()->getPlayerIndex());
-			sound.setPosition(primary->getPosition());
-		}
-
-		TheAudio->addAudioEvent(&sound);
+		play(primary ? primary->getPosition() : nullptr, primary);
 	}
 
+	void doFXPosWithObjects(const Coord3D* primary, const Matrix3D*, Real, const Coord3D*, Real,
+		const Object* source, const Object*) const override
+	{
+		play(primary, RetailFileLayers::enabled() ? source : nullptr);
+	}
 
 	static void parse(INI *ini, void *instance, void* /*store*/, const void* /*userData*/)
 	{
@@ -141,15 +152,100 @@ public:
 		};
 
 		SoundFXNugget* nugget = newInstance(SoundFXNugget);
-		ini->initFromINI(nugget, myFieldParse);
+		static const FieldParse retailFields[] = {
+			{ "RequiredSourceModelConditions", ModelConditionFlags::parseFromINI, nullptr, offsetof(SoundFXNugget, m_requiredConditions) },
+			{ "SourceObjectFilter", parseSourceFilter, nullptr, 0 },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		MultiIniFieldParse fields;
+		if (RetailFileLayers::enabled())
+			fields.add(retailFields);
+		fields.add(myFieldParse);
+		ini->initFromINIMulti(nugget, fields);
 		((FXList*)instance)->addFXNugget(nugget);
 	}
 
 private:
+	static void parseSourceFilter(INI* ini, void* instance, void*, const void* userData)
+	{
+		auto& filter = static_cast<SoundFXNugget*>(instance)->m_sourceFilter;
+		SpecialPowerObjectFilter::parse(ini, instance, &filter.emplace(), userData);
+	}
+
+	void play(const Coord3D* position, const Object* source) const
+	{
+		if (!matchesSourceConditions(source, m_requiredConditions) ||
+			(m_sourceFilter && (!source || !m_sourceFilter->matchesObject(source, source))))
+			return;
+		AudioEventRTS sound(m_soundName);
+		if (source)
+			sound.setPlayerIndex(source->getControllingPlayer()->getPlayerIndex());
+		if (position)
+			sound.setPosition(position);
+		if (traceRetailFXLists())
+			std::fprintf(stderr, "[Retail FXList] Sound %s\n", m_soundName.str());
+		TheAudio->addAudioEvent(&sound);
+	}
+
+	ModelConditionFlags m_requiredConditions;
+	std::optional<SpecialPowerObjectFilter> m_sourceFilter;
 	AsciiString		m_soundName;
 };
 EMPTY_DTOR(SoundFXNugget)
 
+class EvaEventFXNugget : public FXNugget
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(EvaEventFXNugget, "EvaEventFXNugget")
+
+public:
+	void doFXPos(const Coord3D*, const Matrix3D*, Real, const Coord3D*, Real) const override {}
+
+	void doFXObj(const Object* source, const Object*) const override
+	{
+		if (source)
+			play(source, source->getPosition());
+	}
+
+	void doFXPosWithObjects(const Coord3D* primary, const Matrix3D*, Real, const Coord3D*, Real,
+		const Object* source, const Object*) const override
+	{
+		if (source)
+			play(source, primary);
+	}
+
+	static void parse(INI* ini, void* instance, void*, const void*)
+	{
+		static const FieldParse fields[] = {
+			{ "EvaEventOwner", INI::parseAsciiString, nullptr, offsetof(EvaEventFXNugget, m_ownerEvent) },
+			{ "EvaEventAlly", INI::parseAsciiString, nullptr, offsetof(EvaEventFXNugget, m_allyEvent) },
+			{ "RequiredSourceModelConditions", ModelConditionFlags::parseFromINI, nullptr, offsetof(EvaEventFXNugget, m_requiredConditions) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		auto* nugget = newInstance(EvaEventFXNugget);
+		ini->initFromINI(nugget, fields);
+		static_cast<FXList*>(instance)->addFXNugget(nugget);
+	}
+
+private:
+	void play(const Object* source, const Coord3D* position) const
+	{
+		if (!matchesSourceConditions(source, m_requiredConditions))
+			return;
+		const Player* viewer = rts::getObservedOrLocalPlayer_Safe();
+		if (!viewer)
+			return;
+		const AsciiString& event = viewer == source->getControllingPlayer() ? m_ownerEvent :
+			(viewer->getRelationship(source->getTeam()) == ALLIES ? m_allyEvent : AsciiString::TheEmptyString);
+		if (traceRetailFXLists() && event.isNotEmpty())
+			std::fprintf(stderr, "[Retail FXList] EvaEvent %s\n", event.str());
+		RetailEva::queue(viewer, event, position);
+	}
+
+	AsciiString m_ownerEvent;
+	AsciiString m_allyEvent;
+	ModelConditionFlags m_requiredConditions;
+};
+EMPTY_DTOR(EvaEventFXNugget)
 //-------------------------------------------------------------------------------------------------
 static Real calcDist(const Coord3D& src, const Coord3D& dst)
 {
@@ -544,11 +640,11 @@ public:
 		m_rotateX = m_rotateY = m_rotateZ = 0;
 	}
 
-	virtual void doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx, const Real /*primarySpeed*/, const Coord3D * /*secondary*/, const Real overrideRadius ) const override
+	virtual void doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx, const Real /*primarySpeed*/, const Coord3D *secondary, const Real overrideRadius ) const override
 	{
 		if (primary)
 		{
-			reallyDoFX(primary, primaryMtx, nullptr, overrideRadius);
+			reallyDoFX(primary, primaryMtx, nullptr, overrideRadius, nullptr, nullptr, secondary);
 		}
 		else
 		{
@@ -588,7 +684,9 @@ public:
 		const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const override
 	{
 		if (primary && source && RetailFileLayers::enabled())
-			doFXFromObject(primary, primaryMtx, source, target, overrideRadius);
+			doFXFromObject(primary, primaryMtx, source, target, overrideRadius, secondary);
+		else if (primary && target && RetailFileLayers::enabled())
+			reallyDoFX(primary, primaryMtx, nullptr, overrideRadius, nullptr, target, secondary);
 		else
 			doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
 	}
@@ -618,6 +716,9 @@ public:
 			{ "Name", parseRetailName, nullptr, 0 },
 			{ "AttachToBone", INI::parseAsciiString, nullptr, offsetof(ParticleSystemFXNugget, m_retailAttachmentBone) },
 			{ "CreateBoneOverride", INI::parseAsciiString, nullptr, offsetof(ParticleSystemFXNugget, m_retailCreateBone) },
+			{ "TargetBoneOverride", INI::parseAsciiString, nullptr, offsetof(ParticleSystemFXNugget, m_retailTargetBone) },
+			{ "UseTargetOffset", INI::parseBool, nullptr, offsetof(ParticleSystemFXNugget, m_retailUseTargetOffset) },
+			{ "TargetOffset", INI::parseCoord3D, nullptr, offsetof(ParticleSystemFXNugget, m_retailTargetOffset) },
 			{ "SetTargetMatrix", INI::parseBool, nullptr, offsetof(ParticleSystemFXNugget, m_retailSetTargetMatrix) },
 			{ "OnlyIfOnLand", INI::parseBool, nullptr, offsetof(ParticleSystemFXNugget, m_retailOnlyIfOnLand) },
 			{ "OnlyIfOnWater", INI::parseBool, nullptr, offsetof(ParticleSystemFXNugget, m_retailOnlyIfOnWater) },
@@ -656,7 +757,7 @@ protected:
 	}
 
 	void doFXFromObject(const Coord3D* position, const Matrix3D* transform, const Object* object, const Object* target,
-		Real overrideRadius) const
+		Real overrideRadius, const Coord3D* secondary = nullptr) const
 	{
 		const Drawable* drawable = object->getDrawable();
 		const AsciiString& boneName = m_retailCreateBone.isNotEmpty() ? m_retailCreateBone : m_retailAttachmentBone;
@@ -665,15 +766,15 @@ protected:
 		{
 			const Coord3D origin = {bone.Get_X_Translation(), bone.Get_Y_Translation(), bone.Get_Z_Translation()};
 			const Bool follow = m_retailFollowBone || m_attachToObject;
-			reallyDoFX(&origin, &bone, object, overrideRadius, follow ? &boneName : nullptr, target);
+			reallyDoFX(&origin, &bone, object, overrideRadius, follow ? &boneName : nullptr, target, secondary);
 			return;
 		}
 
-		reallyDoFX(position, transform, object, overrideRadius, nullptr, target);
+		reallyDoFX(position, transform, object, overrideRadius, nullptr, target, secondary);
 	}
 
 	void reallyDoFX(const Coord3D *primary, const Matrix3D* mtx, const Object* thingToAttachTo,
-		Real overrideRadius, const AsciiString* attachmentBone = nullptr, const Object* target = nullptr) const
+		Real overrideRadius, const AsciiString* attachmentBone, const Object* target, const Coord3D* secondary) const
 	{
 		const ScopedVisualRandom random(RetailFileLayers::enabled());
 		if (m_retailWeather >= 0 && m_retailWeather != (TheGlobalData ? TheGlobalData->m_weather : WEATHER_NORMAL))
@@ -731,9 +832,10 @@ protected:
 
 					if (m_orientToObject && mtx && !attachmentBone)
 					{
-						if (m_retailSetTargetMatrix && target)
+						const Coord3D* aimPosition = target ? target->getPosition() : secondary;
+						if (m_retailSetTargetMatrix && aimPosition)
 						{
-							const Coord3D delta = *target->getPosition() - newPos;
+							const Coord3D delta = *aimPosition - newPos;
 							Matrix3D aim = *mtx;
 							aim.Rotate_Y(DEG_TO_RADF(180.0f) - WWMath::Atan2Origin(delta.z + 10.0f,
 								WWMath::Sqrt(delta.x * delta.x + delta.y * delta.y)));
@@ -763,6 +865,18 @@ protected:
 					else
 						sys->setPosition( &newPos );
 
+					if (m_retailUseTargetOffset)
+						sys->setRetailTargetEndpoint(newPos + m_retailTargetOffset);
+					else if (target && m_retailTargetBone.isNotEmpty())
+					{
+						const Drawable* draw = target->getDrawable();
+						Matrix3D bone;
+						if (draw && draw->getCurrentWorldspaceClientBonePositions(m_retailTargetBone.str(), bone))
+							sys->setRetailTargetEndpoint({bone.Get_X_Translation(), bone.Get_Y_Translation(), bone.Get_Z_Translation()});
+						else
+							sys->setRetailTargetEndpoint(*target->getPosition());
+					}
+
 					if (m_retailSystemLife >= 0)
 						sys->setRetailSystemLifetime(static_cast<UnsignedInt>(m_retailSystemLife));
 
@@ -791,6 +905,9 @@ protected:
 private:
 	AsciiString m_retailAttachmentBone;
 	AsciiString m_retailCreateBone;
+	AsciiString m_retailTargetBone;
+	Bool m_retailUseTargetOffset = FALSE;
+	Coord3D m_retailTargetOffset{};
 	Bool m_retailFollowBone = FALSE;
 	Bool m_retailSetTargetMatrix = FALSE;
 	Bool m_retailOnlyIfOnLand = FALSE;
@@ -931,6 +1048,49 @@ void FXList::clear()
 		deleteInstance(*it);
 	}
 	m_nuggets.clear();
+	m_playEvenIfShrouded = FALSE;
+	m_cullingFrames = 0;
+	m_startCullingAbove = 0;
+	m_cullAllAbove = 0;
+	resetCulling();
+}
+
+void FXList::parseCullingInfo(INI* ini, void* instance, void*, const void*)
+{
+	auto& fx = *static_cast<FXList*>(instance);
+	const Real seconds = INI::scanReal(ini->getNextSubToken("TrackingSeconds"));
+	const Int start = INI::scanInt(ini->getNextSubToken("StartCullingAbove"));
+	const Int stop = INI::scanInt(ini->getNextSubToken("CullAllAbove"));
+	if (!(seconds > 0.0f) || !std::isfinite(seconds) || start < 0 || stop <= start ||
+		static_cast<double>(seconds) * LOGICFRAMES_PER_SECOND >= std::numeric_limits<UnsignedInt>::max())
+		return;
+	fx.m_cullingFrames = std::max(1u, static_cast<UnsignedInt>(static_cast<double>(seconds) * LOGICFRAMES_PER_SECOND));
+	fx.m_startCullingAbove = start;
+	fx.m_cullAllAbove = stop;
+}
+
+void FXList::resetCulling()
+{
+	m_recentPlays.clear();
+}
+
+Bool FXList::allowRetailPlayback() const
+{
+	if (!m_cullingFrames || !TheGameLogic)
+		return TRUE;
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	if (!m_recentPlays.empty() && frame < m_recentPlays.back())
+		m_recentPlays.clear();
+	while (!m_recentPlays.empty() && frame - m_recentPlays.front() >= m_cullingFrames)
+		m_recentPlays.pop_front();
+	const Int count = static_cast<Int>(m_recentPlays.size());
+	if (count >= m_cullAllAbove)
+		return FALSE;
+	m_recentPlays.push_back(frame);
+	if (count <= m_startCullingAbove)
+		return TRUE;
+	const ScopedVisualRandom random(TRUE);
+	return GameClientRandomValue(m_startCullingAbove, m_cullAllAbove - 1) >= count;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -947,8 +1107,9 @@ void FXList::doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real pr
 	const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const
 {
 	const Int playerIndex = rts::getObservedOrLocalPlayer()->getPlayerIndex();
-
-	if (ThePartitionManager->getShroudStatusForPlayer(playerIndex, primary) != CELLSHROUD_CLEAR)
+	if (!m_playEvenIfShrouded && ThePartitionManager->getShroudStatusForPlayer(playerIndex, primary) != CELLSHROUD_CLEAR)
+		return;
+	if (!allowRetailPlayback())
 		return;
 
 	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
@@ -965,8 +1126,10 @@ void FXList::doFXObj(const Object* primary, const Object* secondary) const
 {
 	const Int playerIndex = rts::getObservedOrLocalPlayer()->getPlayerIndex();
 
-	if (primary && primary->getShroudedStatus(playerIndex) > OBJECTSHROUD_PARTIAL_CLEAR)
-		return;	//the primary object is fogged or shrouded so don't bother with the effect.
+	if (!m_playEvenIfShrouded && primary && primary->getShroudedStatus(playerIndex) > OBJECTSHROUD_PARTIAL_CLEAR)
+		return;
+	if (!allowRetailPlayback())
+		return;
 
 	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
 	{
@@ -993,6 +1156,12 @@ FXListStore::~FXListStore()
 	m_fxmap.clear();
 }
 
+void FXListStore::reset()
+{
+	for (auto& entry : m_fxmap)
+		entry.second.resetCulling();
+}
+
 //-------------------------------------------------------------------------------------------------
 const FXList *FXListStore::findFXList(const char* name) const
 {
@@ -1015,7 +1184,17 @@ const FXList *FXListStore::findFXList(const char* name) const
 	NameKeyType key = TheNameKeyGenerator->nameToKey(c);
 	FXList& fxl = TheFXListStore->m_fxmap[key];
 	fxl.clear();
-	ini->initFromINI(&fxl, TheFXListFieldParse);
+	static const FieldParse retailFields[] = {
+		{ "EvaEvent", EvaEventFXNugget::parse, nullptr, 0 },
+		{ "PlayEvenIfShrouded", INI::parseBool, nullptr, offsetof(FXList, m_playEvenIfShrouded) },
+		{ "CullingInfo", FXList::parseCullingInfo, nullptr, 0 },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	MultiIniFieldParse fields;
+	if (RetailFileLayers::enabled())
+		fields.add(retailFields);
+	fields.add(TheFXListFieldParse);
+	ini->initFromINIMulti(&fxl, fields);
 }
 
 //-------------------------------------------------------------------------------------------------

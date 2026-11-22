@@ -736,6 +736,8 @@ public:
 	void attachToObjectBone(const Object* object, const AsciiString& bone);
 	void setRetailTargetMatrix(const Matrix3D* matrix) { setLocalTransform(matrix); m_retailHasTargetMatrix = TRUE; }
 	const Matrix3D* getRetailTargetMatrix() const { return m_retailHasTargetMatrix ? &m_localTransform : nullptr; }
+	void setRetailTargetEndpoint(const Coord3D& endpoint) { m_retailTargetEndpoint = endpoint; m_retailHasTargetEndpoint = TRUE; }
+	const Coord3D* getRetailTargetEndpoint() const { return m_retailHasTargetEndpoint ? &m_retailTargetEndpoint : nullptr; }
 
 	virtual Bool update( Int localPlayerIndex );								///< update this particle system, return false if dead
 	void updateWindMotion();							///< update wind motion
@@ -897,6 +899,8 @@ protected:
 
 	AsciiString m_retailAttachmentBone;
 	Bool m_retailHasTargetMatrix = FALSE;
+	Bool m_retailHasTargetEndpoint = FALSE;
+	Coord3D m_retailTargetEndpoint{};
 	const ParticleSystemTemplate *	m_template;						///< the template this system was constructed from
 	Particle *											m_controlParticle;		///< if non-null, this system is controlled by this particle
 

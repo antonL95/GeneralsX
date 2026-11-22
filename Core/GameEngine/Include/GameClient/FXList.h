@@ -33,6 +33,7 @@
 #include "Common/GameMemory.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/STLTypedefs.h"
+#include <deque>
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class FXNugget;
@@ -122,6 +123,7 @@ EMPTY_DTOR(FXNugget)
 */
 class FXList
 {
+	friend class FXListStore;
 
 public:
 
@@ -181,10 +183,18 @@ protected:
 	void doFXObj(const Object* primary, const Object* secondary = nullptr) const;
 
 private:
+	static void parseCullingInfo(INI* ini, void* instance, void*, const void*);
+	Bool allowRetailPlayback() const;
+	void resetCulling();
 
 	typedef std::list< FXNugget* > FXNuggetList;
 
 	FXNuggetList m_nuggets;
+	Bool m_playEvenIfShrouded = FALSE;
+	UnsignedInt m_cullingFrames = 0;
+	Int m_startCullingAbove = 0;
+	Int m_cullAllAbove = 0;
+	mutable std::deque<UnsignedInt> m_recentPlays;
 
 };
 
@@ -201,7 +211,7 @@ public:
 	virtual ~FXListStore() override;
 
 	virtual void init() override { }
-	virtual void reset() override { }
+	void reset() override;
 	virtual void update() override { }
 
 	/**

@@ -2810,7 +2810,7 @@ void ParticleSystem::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2900,6 +2900,14 @@ void ParticleSystem::xfer( Xfer *xfer )
 		xfer->xferAsciiString(&m_retailAttachmentBone);
 		xfer->xferBool(&m_retailHasTargetMatrix);
 	}
+	if (version >= 3)
+	{
+		xfer->xferBool(&m_retailHasTargetEndpoint);
+		if (m_retailHasTargetEndpoint)
+			xfer->xferCoord3D(&m_retailTargetEndpoint);
+	}
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_retailHasTargetEndpoint = FALSE;
 
 	// particle count
 	UnsignedInt particleCount = m_particleCount;
