@@ -394,10 +394,12 @@ UpdateSleepTime HordeAIUpdate::update()
 	const HordeAIUpdateModuleData* moveData = getHordeAIUpdateModuleData();
 	const Bool comboEnabled = RetailFileLayers::enabled() && moveData->m_comboLocomotorSet.compareNoCase("SET_COMBO") == 0;
 	const Real comboAttackDistance = moveData->m_comboLocoAttackDistance;
-	const Bool comboApproach = target && comboAttackDistance > 0.0f &&
-		distanceSquared(*horde->getPosition(), *target->getPosition()) > sqr(comboAttackDistance);
+	const auto useComboForTarget = [&](const Object* enemy) {
+		return !enemy || horde->getRelationship(enemy) != ENEMIES ||
+			distanceSquared(*horde->getPosition(), *enemy->getPosition()) > sqr(comboAttackDistance);
+	};
 	if (comboEnabled)
-		setRetailComboLocomotor(comboApproach || (!target && isMoving()));
+		setRetailComboLocomotor(useComboForTarget(target));
 #endif
 	const Real facingBefore = horde->getOrientation();
 	Path* path = getPath();
@@ -516,6 +518,10 @@ UpdateSleepTime HordeAIUpdate::update()
 	const HordeContain* enemy = HordeContain::get(target);
 	const auto attackType = m_forceAttack ? ATTACK_NEW_TARGET_FORCED : ATTACK_NEW_TARGET;
 	Bool groundAttackInProgress = FALSE;
+#if RTS_ZEROHOUR
+	const Bool comboPursuit = comboEnabled && useComboForTarget(target);
+	const Real anchorRadius = horde->getGeometryInfo().getBoundingCircleRadius();
+#endif
 	for (Object* member : members)
 	{
 		AIUpdateInterface* ai = member->getAI();
@@ -524,10 +530,9 @@ UpdateSleepTime HordeAIUpdate::update()
 #if RTS_ZEROHOUR
 		if (comboEnabled)
 		{
-			HordeContain::FormationGoal comboGoal;
-			const Bool following = !target && isMoving() &&
-				contain->getFormationGoal(member, comboGoal) && comboGoal.error <= 2.0f * PATHFIND_CELL_SIZE_F;
-			ai->setRetailComboLocomotor(comboApproach || following);
+			const Real memberLimit = 3.0f * anchorRadius + member->getGeometryInfo().getBoundingCircleRadius();
+			const Bool following = distanceSquared(*horde->getPosition(), *member->getPosition()) < sqr(memberLimit);
+			ai->setRetailComboLocomotor(target ? comboPursuit : following);
 		}
 #endif
 
