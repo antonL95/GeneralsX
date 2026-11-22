@@ -1081,17 +1081,14 @@ protected:
 				orientation += sourceObj->getOrientation();
 		}
 
-		if (retail && BitIsSet(m_disposition, SPAWN_AROUND))
+		if (retail && BitIsSet(m_disposition, SPAWN_AROUND) &&
+			!BitIsSet(m_disposition, LIKE_EXISTING | ABSOLUTE_ANGLE | RELATIVE_ANGLE))
 		{
-			if (m_dispositionIntensity != 0.0f)
-			{
-				const Real angle = orientation + static_cast<Real>(spawnIndex) * m_dispositionAngle;
-				chunkPos.x += WWMath::CosTrig(angle) * m_dispositionIntensity;
-				chunkPos.y += WWMath::SinTrig(angle) * m_dispositionIntensity;
-				chunkPos.z += TheTerrainLogic->getGroundHeight(chunkPos.x, chunkPos.y) -
-					TheTerrainLogic->getGroundHeight(pos->x + offset.x, pos->y + offset.y);
-			}
-			obj->setOrientation(orientation);
+			const Real angle = static_cast<Real>(spawnIndex) * m_dispositionAngle;
+			const Real radius = m_dispositionIntensity * 0.2f;
+			chunkPos.x += WWMath::CosTrig(angle) * radius;
+			chunkPos.y += WWMath::SinTrig(angle) * radius;
+			obj->setOrientation(angle);
 			obj->setPosition(&chunkPos);
 		}
 		else if (hasDispositionAngle)
