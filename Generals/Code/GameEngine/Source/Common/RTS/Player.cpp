@@ -4039,6 +4039,7 @@ void Player::crc( Xfer *xfer )
 		CreateAHeroSystem::xferPlayer(this, xfer);
 		UnsignedInt cash = m_money.countMoney();
 		xfer->xferUnsignedInt(&cash);
+		xfer->xferBool(&m_logicalRetaliationModeEnabled);
 		xferPowerProductionBonuses(xfer);
 	}
 
@@ -4061,7 +4062,7 @@ void Player::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 11 : 8;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4616,6 +4617,10 @@ void Player::xfer( Xfer *xfer )
 		CreateAHeroSystem::xferPlayer(this, xfer);
 	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
 		CreateAHeroSystem::resetPlayer(m_playerIndex);
+	if (version >= 12)
+		xfer->xferBool(&m_logicalRetaliationModeEnabled);
+	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
+		m_logicalRetaliationModeEnabled = FALSE;
 
 }
 
