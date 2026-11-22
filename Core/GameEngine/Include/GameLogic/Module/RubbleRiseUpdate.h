@@ -1,7 +1,8 @@
 #pragma once
 
-#include "GameLogic/Module/UpdateModule.h"
+#include "GameLogic/Module/StructureCollapseUpdate.h"
 
+#include <array>
 #include <vector>
 
 class FXList;
@@ -11,15 +12,15 @@ class RubbleRiseUpdateModuleData final : public UpdateModuleData
 public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 
-	Int m_minRubbleRiseDelay = 0;
-	Int m_maxRubbleRiseDelay = 0;
+	UnsignedInt m_minRubbleRiseDelay = 0;
+	UnsignedInt m_maxRubbleRiseDelay = 0;
 	Real m_rubbleRiseDamping = 0.0f;
 	Real m_rubbleHeight = 0.0f;
 	Real m_maxShudder = 0.0f;
-	Int m_minBurstDelay = 0;
-	Int m_maxBurstDelay = 0;
+	UnsignedInt m_minBurstDelay = 0;
+	UnsignedInt m_maxBurstDelay = 0;
 	Int m_bigBurstFrequency = 0;
-	std::vector<const FXList*> m_fx;
+	std::array<std::vector<const FXList*>, SC_PHASE_COUNT> m_fx;
 };
 
 class RubbleRiseUpdate final : public UpdateModule
@@ -29,5 +30,17 @@ class RubbleRiseUpdate final : public UpdateModule
 
 public:
 	RubbleRiseUpdate(Thing* thing, const ModuleData* data);
+	void onObjectCreated() override;
 	UpdateSleepTime update() override;
+	Real getRiseOffset() const { return m_height; }
+
+private:
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+	void playPhase(StructureCollapsePhaseType phase) const;
+	void setVisualOffset(Real x, Real y) const;
+	UnsignedInt m_riseFrame = 0;
+	UnsignedInt m_burstFrame = 0;
+	Real m_height = 0.0f;
+	Real m_speed = 0.0f;
+	Bool m_rising = FALSE;
 };
