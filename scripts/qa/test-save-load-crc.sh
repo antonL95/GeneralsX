@@ -27,6 +27,7 @@ aotr=${PKGS1_AOTR_DATA:-/game-install/aotr}
 bfme2=${PKGS1_BFME2_DATA:-/game-install/bfme2}
 engine="$build/GeneralsMD/GeneralsXZH"
 path_unit=
+wall=
 case "$mode" in
     training|spellbook)
         scenario="$fixtures/training.txt"
@@ -48,6 +49,9 @@ case "$mode" in
             cat "$fixtures/drop-book.gdb" >> "$out/start.gdb"
         else
             path_unit='Player_1 IthilienPathfinder 1'
+            if [ "$save_frame" -ge 118 ]; then
+                wall='Player_1 GondorCastleWallTrebuchet 0'
+            fi
         fi
         ;;
     high-pass)
@@ -75,6 +79,9 @@ diag=${PKGS1_DIAGNOSTICS:-"$save_frame,$((save_frame + 1))"}
         printf '%s snapshot-path-queue %s\n' "$save_frame" "$path_unit"
         printf '%s snapshot-path-state %s\n' "$save_frame" "$path_unit"
         printf '%s snapshot-path-state %s\n' "$((save_frame + 1))" "$path_unit"
+    fi
+    if [ -n "$wall" ]; then
+        printf '%s snapshot-wall-state %s\n' "$save_frame" "$wall"
     fi
     printf '%s\n' "$diag" | tr ',' '\n' | awk -v end="$end" '/^[0-9]+$/ && $1 <= end {print $1, "snapshot-crc - - 0"; print $1, "logall - - 0"}'
     seq "$save_frame" "$end" | awk '{ print $1, "xpcrc - - 0" }'
@@ -142,6 +149,9 @@ for phase in continue resume; do
     if [ -n "$path_unit" ]; then
         expect "$phase" "TEST save-load path-state frame=$save_frame waiting=1"
         expect "$phase" "TEST save-load path-state frame=$((save_frame + 1)) waiting=0"
+    fi
+    if [ -n "$wall" ]; then
+        expect "$phase" "TEST save-load wall-state frame=$save_frame walkable=1"
     fi
     awk -v first="$save_frame" -v last="$end" '
         /^TEST xp-crc frame=[0-9]+ crc=[0-9A-F]+$/ {

@@ -17,12 +17,13 @@ void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, U
 	if (action == "snapshot-register-footprint")
 	{
 		if (object)
-		{
-			Pathfinder* pathfinder = TheAI->pathfinder();
-			if (object->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
-				pathfinder->addWallPiece(object);
-			pathfinder->addObjectToPathfindMap(object);
-		}
+			TheAI->pathfinder()->addObjectToPathfindMap(object);
+		return;
+	}
+	if (action == "snapshot-wall-state")
+	{
+		const Bool walkable = object && TheAI->pathfinder()->isPointOnWall(object->getPosition());
+		std::fprintf(stderr, "TEST save-load wall-state frame=%u walkable=%d\n", frame, walkable);
 		return;
 	}
 	AIUpdateInterface* ai = object ? object->getAIUpdateInterface() : nullptr;

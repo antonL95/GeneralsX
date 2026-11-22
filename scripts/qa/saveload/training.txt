@@ -64,3 +64,6 @@
 110 pkg08-chase-order Player_1 IthilienPathfinder 1 PlyrCreeps:MordorPorter:0
 111 pkg08-chase Player_1 IthilienPathfinder 1 PlyrCreeps:MordorPorter:0
 112 pkg08-chase Player_1 IthilienPathfinder 1 PlyrCreeps:MordorPorter:1
+114 create Player_1 GondorCastleWallSegment 0 2660,1110,0
+114 snapshot-register-footprint Player_1 GondorCastleWallSegment 0
+115 objupgrade Player_1 GondorCastleWallSegment 0 Upgrade_MenWallTrebuchet

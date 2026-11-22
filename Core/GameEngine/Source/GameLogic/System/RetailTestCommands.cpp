@@ -2314,7 +2314,8 @@ void execute(const Command& command, unsigned int frame)
 			target, command.hasLocation ? &location : nullptr, name.c_str(), frame);
 		return;
 	}
-	if (command.action == "snapshot-path-state" || command.action == "snapshot-register-footprint")
+	if (command.action == "snapshot-path-state" || command.action == "snapshot-register-footprint" ||
+		command.action == "snapshot-wall-state")
 	{
 		runRetailSaveLoadPathTestCommand(command.action, findObject(command, true), frame);
 		return;
