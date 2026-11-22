@@ -1,0 +1,36 @@
+5 create Player_1 GondorElessar 0 3050,520,0
+5 create Player_1 GondorFarm 0 3110,520,0
+5 create Player_1 TheDroppedRing 0 2980,525,0
+5 create Player_1 GondorCastleUpgrade 0 3180,540,0
+6 reveal Player_1 GondorElessar 0
+20 science Player_1 - 0 SCIENCE_SpawnLoneTower
+27 cursor-radar - - 0
+29 cursor-arm Player_1 - 0 Command_SpellBookLoneTowerGondor
+30 cursor-point Player_1 - 0 - 3000 520
+32 cursor-status - - 0
+37 cursor-point Player_1 - 0 - 3110 485
+39 cursor-status - - 0
+44 cursor-point Player_1 - 0 - 3225 510
+46 cursor-status - - 0
+51 cursor-cancel - - 0
+53 cursor-status - - 0
+58 cursor-template - - 0 Command_SpecialAbilityArnorAragornKingsfoil
+58 cursor-template - - 0 Command_MorgulGothmogIronHandLvl5
+58 cursor-template - - 0 Command_GreyCompanyBladesWesternesse
+58 cursor-template - - 0 Command_ElessarOathbreakerFlood
+59 objupgrade Player_1 GondorElessar 0 Upgrade_ObjectLevel10
+60 cursor-arm Player_1 GondorElessar 0 Command_ElessarOathbreakerFlood
+61 cursor-point Player_1 - 0 - 3225 510
+63 cursor-status - - 0
+66 cursor-screen Player_1 - 0 - 1140 54
+68 cursor-status - - 0
+72 cursor-cancel - - 0
+76 cursor-name Player_1 GondorCastleUpgrade 0
+76 cursor-name Player_1 GondorFarm 0
+76 cursor-point Player_1 GondorCastleUpgrade 0
+94 objupgrade Player_1 GondorCastleUpgrade 0 Upgrade_OpenGarrison
+95 cursor-name Player_1 GondorCastleUpgrade 0
+95 cursor-name Player_1 GondorFarm 0
+95 cursor-point Player_1 GondorCastleUpgrade 0
+116 destroy Player_1 TheDroppedRing 0
+120 cursor-radar - - 0
