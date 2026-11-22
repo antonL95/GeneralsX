@@ -71,6 +71,7 @@
 #include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/VictoryConditions.h"
@@ -1461,6 +1462,75 @@ static void runRetailCommandTriggers(Object* source, const CommandButton* primar
 	}
 }
 
+struct RetailPowerCastSnapshot
+{
+	ObjectID objectID = INVALID_ID;
+	Bool wasReady = FALSE;
+	UnsignedInt prevReadyFrame = 0;
+	Bool wasUsingAbility = FALSE;
+	Bool wasPowerInUse = FALSE;
+};
+
+static Bool isRetailPowerInUse(const Object* source, const CommandButton* button)
+{
+	if (!source || !button)
+		return FALSE;
+	for (BehaviorModule** module = const_cast<Object*>(source)->getBehaviorModules(); *module; ++module)
+	{
+		const SpecialPowerUpdateInterface* update = (*module)->getSpecialPowerUpdateInterface();
+		if (update && update->isPowerCurrentlyInUse(button))
+			return TRUE;
+	}
+	return FALSE;
+}
+
+static Bool isRetailPowerCastAllowed(const Object* source, UnsignedInt specialPowerID)
+{
+	if (!RetailFileLayers::enabled() || !TheRetailCommandCatalog || !TheSpecialPowerStore || !source)
+		return TRUE;
+	const SpecialPowerTemplate* power = TheSpecialPowerStore->findSpecialPowerTemplateByID(specialPowerID);
+	if (!power)
+		return TRUE;
+	const CommandButton* button = TheRetailCommandCatalog->findPowerButton(source, power);
+	if (!button)
+		return TRUE;
+	return button->isRetailButtonUsable();
+}
+
+static RetailPowerCastSnapshot captureRetailPowerState(const Object* source, UnsignedInt specialPowerID)
+{
+	RetailPowerCastSnapshot snap;
+	if (!RetailFileLayers::enabled() || !TheSpecialPowerStore || !source)
+		return snap;
+	snap.objectID = source->getID();
+	const SpecialPowerTemplate* power = TheSpecialPowerStore->findSpecialPowerTemplateByID(specialPowerID);
+	if (!power)
+		return snap;
+	const SpecialPowerModuleInterface* mod = source->getSpecialPowerModule(power);
+	snap.wasReady = mod && mod->isReady();
+	snap.prevReadyFrame = mod ? mod->getReadyFrame() : 0;
+	snap.wasUsingAbility = source->testStatus(OBJECT_STATUS_IS_USING_ABILITY);
+	const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(source, power) : nullptr;
+	snap.wasPowerInUse = isRetailPowerInUse(source, button);
+	return snap;
+}
+
+static Bool didRetailPowerAccept(const Object* source, UnsignedInt specialPowerID, const RetailPowerCastSnapshot& before)
+{
+	if (!RetailFileLayers::enabled() || !TheSpecialPowerStore || !source || source->getID() != before.objectID)
+		return FALSE;
+	const SpecialPowerTemplate* power = TheSpecialPowerStore->findSpecialPowerTemplateByID(specialPowerID);
+	if (!power)
+		return FALSE;
+	const SpecialPowerModuleInterface* mod = source->getSpecialPowerModule(power);
+	if (mod && (mod->getReadyFrame() > before.prevReadyFrame || (before.wasReady && !mod->isReady())))
+		return TRUE;
+	if (!before.wasUsingAbility && source->testStatus(OBJECT_STATUS_IS_USING_ABILITY))
+		return TRUE;
+	const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(source, power) : nullptr;
+	return !before.wasPowerInUse && isRetailPowerInUse(source, button);
+}
+
 static void runRetailPowerTriggers(Object* source, UnsignedInt specialPowerID, Object* targetObj, const Coord3D* targetPos)
 {
 	if (!RetailFileLayers::enabled() || !TheRetailCommandCatalog || !TheSpecialPowerStore || !source)
@@ -1475,19 +1545,13 @@ static void runRetailPowerTriggers(Object* source, UnsignedInt specialPowerID, O
 
 bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
-	// first argument is the special power ID
 	UnsignedInt specialPowerID = msg->getArgument( 0 )->integer;
-
-	// Command button options -- special power may care about variance options
 	UnsignedInt options = msg->getArgument( 1 )->integer;
-
-	// check for possible specific source, ignoring selection.
 	ObjectID sourceID = msg->getArgument(2)->objectID;
 	Object* source = findObjectByID(sourceID);
 	if (source != nullptr)
 	{
 #if !RETAIL_COMPATIBLE_CRC
-		// TheSuperHackers @fix stephanmeesters 01/03/2026 Validate the origin of the source object
 		Player *msgPlayer = getMessagePlayer(msg);
 		if ( source->getControllingPlayer() != msgPlayer )
 		{
@@ -1498,7 +1562,9 @@ bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 			return false;
 		}
 #endif
-
+		if (!isRetailPowerCastAllowed(source, specialPowerID))
+			return false;
+		const RetailPowerCastSnapshot before = captureRetailPowerState(source, specialPowerID);
 		AIGroupPtr theGroup = TheAI->createGroup();
 		theGroup->add(source);
 		theGroup->groupDoSpecialPower( specialPowerID, options );
@@ -1507,18 +1573,45 @@ bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 #else
 		theGroup->removeAll();
 #endif
-		runRetailPowerTriggers(source, specialPowerID, nullptr, nullptr);
+		if (didRetailPowerAccept(source, specialPowerID, before))
+			runRetailPowerTriggers(source, specialPowerID, nullptr, nullptr);
 	}
 	else
 	{
-		//Use the selected group!
 		if( currentlySelectedGroup )
 		{
-			currentlySelectedGroup->groupDoSpecialPower( specialPowerID, options );
 			if (RetailFileLayers::enabled())
 			{
+				std::vector<RetailPowerCastSnapshot> snapshots;
+				AIGroupPtr allowedGroup = TheAI->createGroup();
 				for (const ObjectID id : currentlySelectedGroup->getAllIDs())
-					runRetailPowerTriggers(findObjectByID(id), specialPowerID, nullptr, nullptr);
+				{
+					Object* member = findObjectByID(id);
+					if (member && isRetailPowerCastAllowed(member, specialPowerID))
+					{
+						snapshots.push_back(captureRetailPowerState(member, specialPowerID));
+						allowedGroup->add(member);
+					}
+				}
+				if (!snapshots.empty())
+				{
+					allowedGroup->groupDoSpecialPower( specialPowerID, options );
+					for (const RetailPowerCastSnapshot& snap : snapshots)
+					{
+						Object* member = findObjectByID(snap.objectID);
+						if (didRetailPowerAccept(member, specialPowerID, snap))
+							runRetailPowerTriggers(member, specialPowerID, nullptr, nullptr);
+					}
+				}
+#if RETAIL_COMPATIBLE_AIGROUP
+				TheAI->destroyGroup(allowedGroup);
+#else
+				allowedGroup->removeAll();
+#endif
+			}
+			else
+			{
+				currentlySelectedGroup->groupDoSpecialPower( specialPowerID, options );
 			}
 		}
 	}
@@ -1530,30 +1623,17 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 {
 	const Bool hasAngle = msg->getArgumentCount() >= 6;
 	Int argumentIndex = 0;
-
-	// first argument is the special power ID
 	UnsignedInt specialPowerID = msg->getArgument( argumentIndex++ )->integer;
-
-	// Location argument 2 is destination
 	Coord3D targetCoord = msg->getArgument( argumentIndex++ )->location;
-
-	// Angle argument 3 is the orientation of the special power (if applicable)
 	Real angle = hasAngle ? msg->getArgument( argumentIndex++ )->real : INVALID_ANGLE;
-
-	// Object in way -- if applicable (some specials care, others don't)
 	ObjectID objectID = msg->getArgument( argumentIndex++ )->objectID;
 	Object *objectInWay = findObjectByID( objectID );
-
-	// Command button options -- special power may care about variance options
 	UnsignedInt options = msg->getArgument( argumentIndex++ )->integer;
-
-	// check for possible specific source, ignoring selection.
 	ObjectID sourceID = msg->getArgument( argumentIndex++ )->objectID;
 	Object* source = findObjectByID( sourceID );
 	if (source != nullptr)
 	{
 #if !RETAIL_COMPATIBLE_CRC
-		// TheSuperHackers @fix stephanmeesters 01/03/2026 Validate the origin of the source object
 		Player *msgPlayer = getMessagePlayer(msg);
 		if ( source->getControllingPlayer() != msgPlayer )
 		{
@@ -1564,7 +1644,9 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 			return false;
 		}
 #endif
-
+		if (!isRetailPowerCastAllowed(source, specialPowerID))
+			return false;
+		const RetailPowerCastSnapshot before = captureRetailPowerState(source, specialPowerID);
 		AIGroupPtr theGroup = TheAI->createGroup();
 		theGroup->add(source);
 		theGroup->groupDoSpecialPowerAtLocation( specialPowerID, &targetCoord, angle, objectInWay, options );
@@ -1573,18 +1655,45 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 #else
 		theGroup->removeAll();
 #endif
-		runRetailPowerTriggers(source, specialPowerID, objectInWay, &targetCoord);
+		if (didRetailPowerAccept(source, specialPowerID, before))
+			runRetailPowerTriggers(source, specialPowerID, objectInWay, &targetCoord);
 	}
 	else
 	{
-		//Use the selected group!
 		if( currentlySelectedGroup )
 		{
-			currentlySelectedGroup->groupDoSpecialPowerAtLocation( specialPowerID, &targetCoord, angle, objectInWay, options );
 			if (RetailFileLayers::enabled())
 			{
+				std::vector<RetailPowerCastSnapshot> snapshots;
+				AIGroupPtr allowedGroup = TheAI->createGroup();
 				for (const ObjectID id : currentlySelectedGroup->getAllIDs())
-					runRetailPowerTriggers(findObjectByID(id), specialPowerID, objectInWay, &targetCoord);
+				{
+					Object* member = findObjectByID(id);
+					if (member && isRetailPowerCastAllowed(member, specialPowerID))
+					{
+						snapshots.push_back(captureRetailPowerState(member, specialPowerID));
+						allowedGroup->add(member);
+					}
+				}
+				if (!snapshots.empty())
+				{
+					allowedGroup->groupDoSpecialPowerAtLocation( specialPowerID, &targetCoord, angle, objectInWay, options );
+					for (const RetailPowerCastSnapshot& snap : snapshots)
+					{
+						Object* member = findObjectByID(snap.objectID);
+						if (didRetailPowerAccept(member, specialPowerID, snap))
+							runRetailPowerTriggers(member, specialPowerID, objectInWay, &targetCoord);
+					}
+				}
+#if RETAIL_COMPATIBLE_AIGROUP
+				TheAI->destroyGroup(allowedGroup);
+#else
+				allowedGroup->removeAll();
+#endif
+			}
+			else
+			{
+				currentlySelectedGroup->groupDoSpecialPowerAtLocation( specialPowerID, &targetCoord, angle, objectInWay, options );
 			}
 		}
 	}
@@ -1594,28 +1703,19 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 
 bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
-
-	// first argument is the special power ID
 	UnsignedInt specialPowerID = msg->getArgument( 0 )->integer;
-
-	// argument 2 is target object
 	ObjectID targetID = msg->getArgument(1)->objectID;
 	Object *target = findObjectByID( targetID );
 	if( !target )
 	{
 		return false;
 	}
-
-	// Command button options -- special power may care about variance options
 	UnsignedInt options = msg->getArgument( 2 )->integer;
-
-	// check for possible specific source, ignoring selection.
 	ObjectID sourceID = msg->getArgument(3)->objectID;
 	Object* source = findObjectByID(sourceID);
 	if (source != nullptr)
 	{
 #if !RETAIL_COMPATIBLE_CRC
-		// TheSuperHackers @fix stephanmeesters 01/03/2026 Validate the origin of the source object
 		Player *msgPlayer = getMessagePlayer(msg);
 		if ( source->getControllingPlayer() != msgPlayer )
 		{
@@ -1626,7 +1726,9 @@ bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupP
 			return false;
 		}
 #endif
-
+		if (!isRetailPowerCastAllowed(source, specialPowerID))
+			return false;
+		const RetailPowerCastSnapshot before = captureRetailPowerState(source, specialPowerID);
 		AIGroupPtr theGroup = TheAI->createGroup();
 		theGroup->add(source);
 		theGroup->groupDoSpecialPowerAtObject( specialPowerID, target, options );
@@ -1635,17 +1737,45 @@ bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupP
 #else
 		theGroup->removeAll();
 #endif
-		runRetailPowerTriggers(source, specialPowerID, target, target->getPosition());
+		if (didRetailPowerAccept(source, specialPowerID, before))
+			runRetailPowerTriggers(source, specialPowerID, target, target->getPosition());
 	}
 	else
 	{
 		if( currentlySelectedGroup )
 		{
-			currentlySelectedGroup->groupDoSpecialPowerAtObject( specialPowerID, target, options );
 			if (RetailFileLayers::enabled())
 			{
+				std::vector<RetailPowerCastSnapshot> snapshots;
+				AIGroupPtr allowedGroup = TheAI->createGroup();
 				for (const ObjectID id : currentlySelectedGroup->getAllIDs())
-					runRetailPowerTriggers(findObjectByID(id), specialPowerID, target, target->getPosition());
+				{
+					Object* member = findObjectByID(id);
+					if (member && isRetailPowerCastAllowed(member, specialPowerID))
+					{
+						snapshots.push_back(captureRetailPowerState(member, specialPowerID));
+						allowedGroup->add(member);
+					}
+				}
+				if (!snapshots.empty())
+				{
+					allowedGroup->groupDoSpecialPowerAtObject( specialPowerID, target, options );
+					for (const RetailPowerCastSnapshot& snap : snapshots)
+					{
+						Object* member = findObjectByID(snap.objectID);
+						if (didRetailPowerAccept(member, specialPowerID, snap))
+							runRetailPowerTriggers(member, specialPowerID, target, target->getPosition());
+					}
+				}
+#if RETAIL_COMPATIBLE_AIGROUP
+				TheAI->destroyGroup(allowedGroup);
+#else
+				allowedGroup->removeAll();
+#endif
+			}
+			else
+			{
+				currentlySelectedGroup->groupDoSpecialPowerAtObject( specialPowerID, target, options );
 			}
 		}
 	}
@@ -2134,30 +2264,78 @@ bool GameLogic::onDoForceAttackGround(MAYBE_UNUSED GameMessage *msg, AIGroupPtr 
 bool GameLogic::onQueueUpgrade(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	const UpgradeTemplate *upgradeT = TheUpgradeCenter->findUpgradeByKey( (NameKeyType)(msg->getArgument( 1 )->integer) );
-	if (!upgradeT)	// sanity
+	if (!upgradeT)
 		return false;
 
 	if (currentlySelectedGroup)
 	{
-		currentlySelectedGroup->queueUpgrade( upgradeT );
 		if (RetailFileLayers::enabled() && TheRetailCommandCatalog)
 		{
+			struct UpgradeState
+			{
+				ObjectID id = INVALID_ID;
+				const CommandButton* button = nullptr;
+				Bool wasQueued = FALSE;
+				Bool hadUpgrade = FALSE;
+			};
+			std::vector<UpgradeState> states;
+			AIGroupPtr allowedGroup = TheAI->createGroup();
 			for (const ObjectID id : currentlySelectedGroup->getAllIDs())
 			{
 				Object* obj = findObjectByID(id);
-				const CommandSet* set = obj ? TheRetailCommandCatalog->findCommandSet(obj->getCommandSetString()) : nullptr;
-				if (!set)
+				if (!obj)
 					continue;
-				for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+				const CommandSet* set = TheRetailCommandCatalog->findCommandSet(obj->getCommandSetString());
+				const CommandButton* matchBtn = nullptr;
+				if (set)
 				{
-					const CommandButton* btn = set->getCommandButton(slot);
-					if (btn && btn->getUpgradeTemplate() == upgradeT && !btn->getCommandTriggers().empty())
+					for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 					{
-						runRetailCommandTriggers(obj, btn, nullptr, nullptr);
-						break;
+						const CommandButton* btn = set->getCommandButton(slot);
+						if (btn && btn->getUpgradeTemplate() == upgradeT)
+						{
+							matchBtn = btn;
+							break;
+						}
 					}
 				}
+				if (matchBtn && !matchBtn->isRetailButtonUsable())
+					continue;
+				ProductionUpdateInterface* pu = obj->getProductionUpdateInterface();
+				states.push_back(UpgradeState{
+					id,
+					matchBtn,
+					pu && pu->isUpgradeInQueue(upgradeT),
+					obj->hasUpgrade(upgradeT)
+				});
+				allowedGroup->add(obj);
 			}
+			if (!states.empty())
+			{
+				allowedGroup->queueUpgrade( upgradeT );
+				for (const UpgradeState& st : states)
+				{
+					if (!st.button || st.button->getCommandTriggers().empty())
+						continue;
+					Object* obj = findObjectByID(st.id);
+					if (!obj)
+						continue;
+					ProductionUpdateInterface* pu = obj->getProductionUpdateInterface();
+					const Bool nowQueued = pu && pu->isUpgradeInQueue(upgradeT);
+					const Bool nowHas = obj->hasUpgrade(upgradeT);
+					if ((!st.wasQueued && nowQueued) || (!st.hadUpgrade && nowHas))
+						runRetailCommandTriggers(obj, st.button, nullptr, nullptr);
+				}
+			}
+#if RETAIL_COMPATIBLE_AIGROUP
+			TheAI->destroyGroup(allowedGroup);
+#else
+			allowedGroup->removeAll();
+#endif
+		}
+		else
+		{
+			currentlySelectedGroup->queueUpgrade( upgradeT );
 		}
 	}
 
