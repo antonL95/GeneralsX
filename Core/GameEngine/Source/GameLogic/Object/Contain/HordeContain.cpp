@@ -691,6 +691,23 @@ void HordeContain::applyWeaponDamage(Object* victim, DamageInfo& damage, Bool co
 			horde->m_lastMeleeFrame = TheGameLogic->getFrame();
 }
 
+Bool HordeContain::canAddCrateBanner(const Object* anchor)
+{
+	const auto* contain = get(anchor);
+	if (!RetailFileLayers::enabled() || !contain || anchor->isEffectivelyDead() || contain->getBannerCarrier())
+		return FALSE;
+	const auto* data = contain->getHordeContainModuleData();
+	for (const AsciiString& name : data->m_bannerCarriersAllowed)
+	{
+		if (contain->m_bannerRespawnFrame && name.compareNoCase(contain->m_replenishmentBanner) != 0)
+			continue;
+		const ThingTemplate* type = TheThingFactory->findTemplate(name);
+		if (type && type->isKindOf(KINDOF_BANNER))
+			return TRUE;
+	}
+	return FALSE;
+}
+
 Bool HordeContain::addCrateBanner(Object* anchor)
 {
 	auto* contain = const_cast<HordeContain*>(get(anchor));

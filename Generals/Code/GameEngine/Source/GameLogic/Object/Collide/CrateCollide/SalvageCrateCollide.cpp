@@ -133,13 +133,22 @@ Bool SalvageCrateCollide::executeRetailPickup(Object* other)
 {
 	const auto* data = getSalvageCrateCollideModuleData();
 	Player* player = other->getControllingPlayer();
+	Object* anchor = HordeContain::get(other) ? other : HordeContain::getAnchor(other);
 	Int money = 0;
 	Int levels = 0;
+	Int banner = 0;
 	const char* reward = nullptr;
 
-	if (GameLogicRandomValueReal(0.0f, 1.0f) < data->m_levelUpChance)
+	if (data->m_bannerChance > 0.0f && anchor && HordeContain::canAddCrateBanner(anchor) &&
+		(data->m_bannerChance >= 1.0f || GameLogicRandomValueReal(0.0f, 1.0f) < data->m_bannerChance) &&
+		HordeContain::addCrateBanner(anchor))
 	{
-		Object* anchor = HordeContain::getAnchor(other);
+		banner = 1;
+		reward = "banner";
+	}
+	else if (data->m_levelUpChance > 0.0f &&
+		(data->m_levelUpChance >= 1.0f || GameLogicRandomValueReal(0.0f, 1.0f) < data->m_levelUpChance))
+	{
 		std::vector<ObjectID> units{anchor ? anchor->getID() : other->getID()};
 		if (data->m_levelUpRadius > 0.0f)
 		{
@@ -150,7 +159,7 @@ Bool SalvageCrateCollide::executeRetailPickup(Object* other)
 			MemoryPoolObjectHolder hold(iter);
 			for (Object* unit = iter->first(); unit; unit = iter->next())
 			{
-				if (unit->isEffectivelyDead())
+				if (unit->isEffectivelyDead() || unit->isKindOf(KINDOF_STRUCTURE))
 					continue;
 				Object* horde = HordeContain::getAnchor(unit);
 				units.push_back(horde ? horde->getID() : unit->getID());
@@ -172,13 +181,22 @@ Bool SalvageCrateCollide::executeRetailPickup(Object* other)
 	else if (data->m_pickupUpgrade.isNotEmpty())
 	{
 		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(data->m_pickupUpgrade);
-		if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+		if (upgrade)
 		{
-			player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
-			reward = "upgrade";
+			if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+			{
+				player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+				reward = "upgrade";
+			}
+			else if (Object* recipient = anchor ? anchor : other)
+			{
+				recipient->giveUpgrade(upgrade);
+				reward = "upgrade";
+			}
 		}
 	}
-	else
+	else if (data->m_resourceChance > 0.0f &&
+		(data->m_resourceChance >= 1.0f || GameLogicRandomValueReal(0.0f, 1.0f) < data->m_resourceChance))
 	{
 		const Int low = std::min(data->m_minResource, data->m_maxResource);
 		const Int high = std::max(data->m_minResource, data->m_maxResource);
@@ -188,9 +206,9 @@ Bool SalvageCrateCollide::executeRetailPickup(Object* other)
 	}
 
 	if (std::getenv("GENERALSX_TEST_COMMANDS"))
-		fprintf(stderr, "TEST crate frame=%u crate=%s id=%u collector=%s id=%u reward=%s resources=%d levels=%d\n",
+		fprintf(stderr, "TEST crate frame=%u crate=%s id=%u collector=%s id=%u reward=%s resources=%d levels=%d banner=%d\n",
 			TheGameLogic->getFrame(), getObject()->getTemplate()->getName().str(), static_cast<unsigned>(getObject()->getID()),
-			other->getTemplate()->getName().str(), static_cast<unsigned>(other->getID()), reward ? reward : "none", money, levels);
+			other->getTemplate()->getName().str(), static_cast<unsigned>(other->getID()), reward ? reward : "none", money, levels, banner);
 	return TRUE;
 }
 
