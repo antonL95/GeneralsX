@@ -34,6 +34,7 @@
 #include "WWMath/wwmath.h"
 #include "Common/INI.h"
 #include "GameClient/RetailEva.h"
+#include "GameClient/RetailLargeGroupAudio.h"
 #include "GameClient/RetailHudExtras.h"
 #include "GameLogic/BfmeMapScripts.h"
 #include "Common/INIAudit.h"
@@ -523,6 +524,10 @@ static INIBlockParse findBlockParse(const char* token)
 			return RetailEva::parseEvent;
 		if (strcmp(token, "MiscEvaData") == 0)
 			return RetailEva::parseSettings;
+		if (strcmp(token, "LargeGroupAudioMap") == 0)
+			return RetailLargeGroupAudio::parseMap;
+		if (strcmp(token, "LargeGroupAudioUnusedKnownKeys") == 0)
+			return RetailLargeGroupAudio::parseUnusedKeys;
 		if (strcmp(token, "InGameNotificationBox") == 0)
 			return RetailNotification::parse;
 	}

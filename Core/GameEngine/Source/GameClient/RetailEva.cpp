@@ -75,9 +75,7 @@ AudioEventRTS s_speech;
 UnsignedInt s_quietUntil = 0;
 std::map<std::pair<ObjectID, UnsignedInt>, const SpecialPowerTemplate *> s_recharging;
 std::set<ObjectID> s_seenRings;
-#if !RTS_GENERALS
 std::set<ObjectID> s_seenEnemies;
-#endif
 const Player *s_viewer = nullptr;
 
 void parseSideSound(INI *ini, void *, void *store, const void *)
@@ -190,24 +188,24 @@ void reset()
 	s_lastPlayed.clear();
 	s_recharging.clear();
 	s_seenRings.clear();
-#if !RTS_GENERALS
 	s_seenEnemies.clear();
-#endif
 	s_viewer = nullptr;
 	s_speech.setPlayingHandle(0);
 	s_quietUntil = 0;
 }
 
-void queue(const Player *recipient, const AsciiString &name, const Coord3D *position, Ping ping)
+void queue(const Player *recipient, const AsciiString &name, const Coord3D *position, Ping ping,
+	const Coord3D *radarPosition)
 {
 	if (!RetailFileLayers::enabled() || !recipient || !ThePlayerList || recipient != rts::getObservedOrLocalPlayer_Safe() || !TheGameLogic)
 		return;
 	const auto key = eventKey(name);
 	const auto it = s_events.find(key);
-	if (position && TheRadar && ping != Ping::None && (it != s_events.end() || name.isEmpty()))
+	const Coord3D* location = radarPosition ? radarPosition : position;
+	if (location && TheRadar && ping != Ping::None && (it != s_events.end() || name.isEmpty()))
 	{
 		const Bool jumpTo = it == s_events.end() || it->second.jumpTo;
-		TheRadar->tryEvent(radarType(ping), position, jumpTo);
+		TheRadar->tryEvent(radarType(ping), location, jumpTo);
 	}
 	if (it == s_events.end())
 		return;
@@ -220,6 +218,16 @@ void queue(const Player *recipient, const AsciiString &name, const Coord3D *posi
 	if (std::any_of(s_pending.begin(), s_pending.end(), [&event](const Pending &pending) { return pending.event == &event; }))
 		return;
 	s_pending.push_back({&event, name, frame, position ? *position : Coord3D{}, position != nullptr});
+}
+
+void markFirstSighted(const Object& object)
+{
+#if !RTS_GENERALS
+	const Object* control = SlavedUpdate::getEvaSightedControl(&object);
+#else
+	const Object* control = &object;
+#endif
+	s_seenEnemies.insert(control->getID());
 }
 
 void watchRecharge(const Object &object, const SpecialPowerTemplate &power)

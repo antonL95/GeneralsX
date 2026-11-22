@@ -286,6 +286,7 @@ set(GAMEENGINE_SRC
     Include/GameClient/MetaEvent.h
     Include/GameClient/Module/AnimatedParticleSysBoneClientUpdate.h
     Include/GameClient/Module/BeaconClientUpdate.h
+    Include/GameClient/Module/EvaAnnounceClientCreate.h
     Include/GameClient/Module/SwayClientUpdate.h
     Include/GameClient/Mouse.h
     Include/GameClient/ParabolicEase.h
@@ -314,6 +315,8 @@ set(GAMEENGINE_SRC
     Include/GameClient/UiPixelSpace.h
     Include/GameClient/UiRadialRing.h
     Include/GameClient/RetailEva.h
+    Include/GameClient/RetailClientAudio.h
+    Include/GameClient/RetailLargeGroupAudio.h
     Include/GameClient/RetailHudExtras.h
     Include/GameClient/RetailHudSettings.h
     Include/GameClient/UiHudRules.h
@@ -858,6 +861,7 @@ set(GAMEENGINE_SRC
 #    Source/GameClient/Drawable.cpp
     Source/GameClient/Drawable/Update/AnimatedParticleSysBoneClientUpdate.cpp
     Source/GameClient/Drawable/Update/BeaconClientUpdate.cpp
+    Source/GameClient/Drawable/Update/EvaAnnounceClientCreate.cpp
     Source/GameClient/Drawable/Update/SwayClientUpdate.cpp
     Source/GameClient/DrawGroupInfo.cpp
 #    Source/GameClient/Eva.cpp
@@ -884,6 +888,8 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/ControlBar/ControlBarUnderConstruction.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailHud.cpp
     Source/GameClient/RetailEva.cpp
+    Source/GameClient/RetailClientAudio.cpp
+    Source/GameClient/RetailLargeGroupAudio.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailEdges.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailHeroes.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailPowers.cpp

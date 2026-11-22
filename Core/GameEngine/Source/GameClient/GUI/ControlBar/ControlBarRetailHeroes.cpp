@@ -93,6 +93,7 @@ struct HeroMemory
 	Bool alive = FALSE;
 	UnsignedInt levelUpStart = 0;
 	Bool levelUp = FALSE;
+	Bool lifecycleAnnouncements = FALSE;
 };
 
 struct BarState
@@ -321,6 +322,17 @@ std::vector<HeroSlot> collectHeroes(const Player *player, HeroSlot& builders)
 	return slots;
 }
 
+Bool announcesLifecycle(const ThingTemplate* hero)
+{
+	const ModuleInfo& modules = hero->getBehaviorModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		if (modules.getNthName(i) == "AnnounceBirthAndDeathBehavior")
+			return TRUE;
+	}
+	return FALSE;
+}
+
 void trackEvents(const std::vector<HeroSlot> &slots)
 {
 	const UnsignedInt now = timeGetTime();
@@ -328,13 +340,17 @@ void trackEvents(const std::vector<HeroSlot> &slots)
 	{
 		HeroMemory &memory = memoryFor(slot.hero);
 		const Bool known = memory.level > 0;
+		const Bool direct = slot.alive ? announcesLifecycle(slot.appearance) : memory.lifecycleAnnouncements;
 		if (s_bar.populated)
 		{
 			if (slot.alive && !known)
-				RetailNotification::showHero(RetailNotification::HeroEvent::InitialSpawn, slot.appearance);
+			{
+				if (!direct)
+					RetailNotification::showHero(RetailNotification::HeroEvent::InitialSpawn, slot.appearance);
+			}
 			else if (slot.alive && known && !memory.alive)
 				RetailNotification::showHero(RetailNotification::HeroEvent::Respawn, slot.appearance);
-			else if (!slot.alive && known && memory.alive)
+			else if (!slot.alive && known && memory.alive && !direct)
 				RetailNotification::showHero(RetailNotification::HeroEvent::Death, slot.hero);
 		}
 		if (known && slot.alive && memory.alive && slot.level > memory.level)
@@ -346,13 +362,14 @@ void trackEvents(const std::vector<HeroSlot> &slots)
 		memory.maxLevel = slot.maxLevel;
 		memory.rankProgress = slot.rankProgress;
 		memory.alive = slot.alive;
+		memory.lifecycleAnnouncements = direct;
 	}
 	for (HeroMemory &memory : s_bar.memory)
 	{
 		Bool present = FALSE;
 		for (const HeroSlot &slot : slots)
 			present = present || slot.hero == memory.hero;
-		if (!present && memory.alive && s_bar.populated)
+		if (!present && memory.alive && s_bar.populated && !memory.lifecycleAnnouncements)
 			RetailNotification::showHero(RetailNotification::HeroEvent::Death, memory.hero);
 		if (!present)
 			memory.alive = FALSE;

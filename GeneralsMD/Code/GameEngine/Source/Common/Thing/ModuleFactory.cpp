@@ -307,6 +307,7 @@
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/RetailTransportTeleportModules.h"
 #include "GameLogic/Module/RetailUpgradeModules.h"
+#include "GameLogic/Module/AnnounceBirthAndDeathBehavior.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/Module/RetailDetectionModules.h"
 
@@ -323,6 +324,7 @@
 #include "GameClient/Module/AnimatedParticleSysBoneClientUpdate.h"
 #include "GameClient/Module/SwayClientUpdate.h"
 #include "GameClient/Module/BeaconClientUpdate.h"
+#include "GameClient/Module/EvaAnnounceClientCreate.h"
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 ModuleFactory *TheModuleFactory = nullptr;  ///< the module factory singleton
@@ -551,6 +553,8 @@ void ModuleFactory::init()
 		addModule( GeometryUpgrade );
 		addModule( InheritUpgradeCreate );
 		addModule( BuildableHeroListUpgrade );
+		addModule( AudioLoopUpgrade );
+		addModule( AnnounceBirthAndDeathBehavior );
 		addModule( GiveUpgradeUpdate );
 		addModule( FoundationAIUpdate );
 		addModule( GateOpenAndCloseBehavior );
@@ -732,6 +736,8 @@ void ModuleFactory::init()
 	addModule( AnimatedParticleSysBoneClientUpdate );
 	addModule( SwayClientUpdate );
 	addModule( BeaconClientUpdate );
+	if (RetailFileLayers::enabled())
+		addModule( EvaAnnounceClientCreate );
 
 }
 

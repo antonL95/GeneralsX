@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common/AudioEventRTS.h"
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
@@ -38,6 +39,44 @@ public:
 
 protected:
 	void upgradeImplementation() override;
+};
+
+class AudioLoopUpgradeModuleData : public UpdateModuleData
+{
+public:
+	UpgradeMuxData m_upgrade;
+	AsciiString m_sound;
+	UnsignedInt m_duration = 0;
+	Bool m_killOnDeath = FALSE;
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
+class AudioLoopUpgrade final : public UpdateModule, public UpgradeMux
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(AudioLoopUpgrade, "AudioLoopUpgrade")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(AudioLoopUpgrade, AudioLoopUpgradeModuleData)
+
+public:
+	AudioLoopUpgrade(Thing* thing, const ModuleData* data);
+	static Int getInterfaceMask() { return MODULEINTERFACE_UPGRADE | MODULEINTERFACE_UPDATE; }
+	UpgradeModuleInterface* getUpgrade() override { return this; }
+	DisabledMaskType getDisabledTypesToProcess() const override { return DISABLEDMASK_ALL; }
+	UpdateSleepTime update() override;
+	Bool resetUpgrade(const UpgradeMaskType& mask) override;
+	void onDelete() override;
+
+private:
+	void upgradeImplementation() override;
+	void getUpgradeActivationMasks(UpgradeMaskType& activation, UpgradeMaskType& conflicting) const override;
+	void performUpgradeFX() override;
+	void processUpgradeRemoval() override;
+	Bool requiresAllActivationUpgrades() const override;
+	Bool isSubObjectsUpgrade() override { return FALSE; }
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+
+	UnsignedInt m_playUntil = 0;
+	AudioHandle m_handle = 0;
+	Bool m_requested = FALSE;
 };
 
 class GiveUpgradeUpdateModuleData : public SpecialAbilityUpdateModuleData

@@ -52,6 +52,7 @@
 #include "Common/LocalFileSystem.h"
 #include "Common/RetailFileLayers.h"
 #include "GameClient/RetailEva.h"
+#include "GameClient/RetailLargeGroupAudio.h"
 #include "GameClient/RetailHudExtras.h"
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
@@ -897,6 +898,7 @@ void GameEngine::init()
 		if (RetailFileLayers::enabled() || INIAudit::isEnabled())
 		{
 			RetailEva::load();
+			RetailLargeGroupAudio::load();
 			RetailNotification::load();
 			CreateAHeroSystem::load();
 		}

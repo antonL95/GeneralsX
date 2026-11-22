@@ -32,6 +32,7 @@
 #include <cstdio>
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "GameClient/GameClient.h"
+#include "GameClient/RetailLargeGroupAudio.h"
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "Common/ActionManager.h"
@@ -476,6 +477,8 @@ void GameClient::init()
 /** Reset the game client for a new game */
 void GameClient::reset()
 {
+	if (RetailFileLayers::enabled())
+		RetailLargeGroupAudio::reset();
 	m_drawableHash.clear();
 #if USING_STLPORT
 	m_drawableHash.resize(DRAWABLE_HASH_SIZE);
@@ -726,6 +729,8 @@ void GameClient::update()
 			draw->updateDrawable(timeScale);
 			draw = next;
 		}
+		if (RetailFileLayers::enabled())
+			RetailLargeGroupAudio::update();
 	}
 
 #if defined(RTS_DEBUG)

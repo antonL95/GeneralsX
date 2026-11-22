@@ -43,6 +43,7 @@
 #include "Common/GameCommon.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
+#include "GameClient/RetailClientAudio.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/CostModifierUpgrade.h"
@@ -629,14 +630,16 @@ void ThingTemplate::parseClientBehavior(INI* ini, void* instance, void*, const v
 	entry.name = ini->getNextToken();
 	entry.tag = ini->getNextToken();
 	const UnsignedInt line = ini->getLineNum();
-	if (INIAudit::isEnabled() || RetailFileLayers::enabled())
+	if (RetailFileLayers::enabled())
+		entry.audio = RetailClientAudio::parse(ini, entry.name);
+	if (!entry.audio && (INIAudit::isEnabled() || RetailFileLayers::enabled()))
 		entry.iniBody = ini->readStructuredBlock("ClientBehavior");
-	else
+	else if (!entry.audio)
 	{
 		const char* const legacyBlocks[] = {"SoundState", "SoundUpgrade", "UnitSpecificSounds", nullptr};
 		entry.iniBody = ini->readRawBlock(ini->getEndToken(), legacyBlocks);
 	}
-	if (INIAudit::isEnabled())
+	if (INIAudit::isEnabled() && !entry.audio)
 		INIAudit::record("module", entry.name.str(), ini->getFilename().str(), line);
 	else
 		INI::scanIndexList(entry.name.str(), clientBehaviorNames);

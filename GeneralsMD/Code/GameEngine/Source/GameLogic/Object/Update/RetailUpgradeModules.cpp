@@ -8,17 +8,145 @@
 #include "Common/NameKeyGenerator.h"
 #include "Common/Player.h"
 #include "Common/PlayerTemplate.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/ThingFactory.h"
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
+#include "GameClient/RetailClientAudio.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "WWMath/wwmath.h"
+
+#include <limits>
+
+void AudioLoopUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	UpdateModuleData::buildFieldParse(p);
+	p.add(UpgradeMuxData::getFieldParse(), offsetof(AudioLoopUpgradeModuleData, m_upgrade));
+	static const FieldParse fields[] =
+	{
+		{ "SoundToPlay", INI::parseAsciiString, nullptr, offsetof(AudioLoopUpgradeModuleData, m_sound) },
+		{ "KillAfterMS", INI::parseDurationUnsignedInt, nullptr, offsetof(AudioLoopUpgradeModuleData, m_duration) },
+		{ "KillOnDeath", INI::parseBool, nullptr, offsetof(AudioLoopUpgradeModuleData, m_killOnDeath) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+AudioLoopUpgrade::AudioLoopUpgrade(Thing* thing, const ModuleData* data) : UpdateModule(thing, data)
+{
+	setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
+}
+
+AudioLoopUpgrade::~AudioLoopUpgrade() = default;
+
+void AudioLoopUpgrade::upgradeImplementation()
+{
+	if (!RetailFileLayers::enabled())
+		return;
+	const auto* data = getAudioLoopUpgradeModuleData();
+	if (data->m_sound.isEmpty())
+		return;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const UnsignedInt remaining = std::numeric_limits<UnsignedInt>::max() - now;
+	m_playUntil = now + (data->m_duration ? std::min(data->m_duration, remaining) : remaining);
+	setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
+}
+
+UpdateSleepTime AudioLoopUpgrade::update()
+{
+	if (!RetailFileLayers::enabled() || m_playUntil == 0)
+		return UPDATE_SLEEP_FOREVER;
+	const auto* data = getAudioLoopUpgradeModuleData();
+	if (TheGameLogic->getFrame() >= m_playUntil || (data->m_killOnDeath && getObject()->isEffectivelyDead()))
+	{
+		onDelete();
+		return UPDATE_SLEEP_FOREVER;
+	}
+	if (!m_requested)
+	{
+		m_requested = TRUE;
+		m_handle = RetailClientAudio::start(*getObject(), data->m_sound);
+	}
+	return UPDATE_SLEEP_NONE;
+}
+
+void AudioLoopUpgrade::onDelete()
+{
+	m_playUntil = 0;
+	if (m_requested)
+	{
+		RetailClientAudio::stop(getObject()->getID(), getAudioLoopUpgradeModuleData()->m_sound, m_handle);
+		m_handle = 0;
+		m_requested = FALSE;
+	}
+}
+
+Bool AudioLoopUpgrade::resetUpgrade(const UpgradeMaskType& mask)
+{
+	if (!UpgradeMux::resetUpgrade(mask))
+		return FALSE;
+	onDelete();
+	return TRUE;
+}
+
+void AudioLoopUpgrade::getUpgradeActivationMasks(UpgradeMaskType& activation, UpgradeMaskType& conflicting) const
+{
+	getAudioLoopUpgradeModuleData()->m_upgrade.getUpgradeActivationMasks(activation, conflicting);
+}
+
+void AudioLoopUpgrade::processUpgradeRemoval()
+{
+	getAudioLoopUpgradeModuleData()->m_upgrade.muxDataProcessUpgradeRemoval(getObject());
+}
+
+Bool AudioLoopUpgrade::requiresAllActivationUpgrades() const
+{
+	return getAudioLoopUpgradeModuleData()->m_upgrade.m_requiresAllTriggers;
+}
+
+void AudioLoopUpgrade::performUpgradeFX()
+{
+	getAudioLoopUpgradeModuleData()->m_upgrade.performUpgradeFX(getObject());
+}
+
+void AudioLoopUpgrade::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{ "audio-loop-end", [this](Xfer* block) { block->xferUnsignedInt(&m_playUntil); },
+			[this] { m_playUntil = 0; } }
+	});
+}
+
+void AudioLoopUpgrade::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	upgradeMuxCRC(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
+}
+
+void AudioLoopUpgrade::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	UpdateModule::xfer(xfer);
+	upgradeMuxXfer(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
+}
+
+void AudioLoopUpgrade::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
+	upgradeMuxLoadPostProcess();
+}
 
 void InheritUpgradeCreateModuleData::buildFieldParse(MultiIniFieldParse& p)
 {

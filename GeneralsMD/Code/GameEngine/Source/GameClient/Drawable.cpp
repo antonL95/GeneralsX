@@ -45,6 +45,7 @@
 #include "Common/GameUtility.h"
 #include "Common/RetailFileLayers.h"
 #include "GameClient/RetailWorldUI.h"
+#include "GameClient/RetailClientAudio.h"
 #include "GameClient/UiRadialRing.h"
 #include "GameClient/UiScale.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -1177,6 +1178,19 @@ void Drawable::updateDrawable(Real timeScale)
 
 	UnsignedInt now = TheGameLogic->getFrame();
 	Object *obj = getObject();
+
+	if (RetailFileLayers::enabled())
+	{
+		if (!m_retailConditionAudio)
+		{
+			const auto& entries = getTemplate()->getRotWKObjectData().clientBehaviors;
+			if (std::any_of(entries.begin(), entries.end(), [](const auto& entry)
+				{ return entry.audio && !entry.audio->loops.empty(); }))
+				m_retailConditionAudio = std::make_unique<RetailClientAudio::Loops>();
+		}
+		if (m_retailConditionAudio)
+			m_retailConditionAudio->update(*this);
+	}
 
 	{
 		for (ClientUpdateModule** cu = getClientUpdateModules(); cu && *cu; ++cu)

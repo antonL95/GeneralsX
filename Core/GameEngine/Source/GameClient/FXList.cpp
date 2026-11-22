@@ -203,7 +203,7 @@ private:
 			(m_sourceFilter && (!source || !m_sourceFilter->matchesObject(source, source))))
 			return FALSE;
 		if (RetailFileLayers::enabled() && (!TheAudio || m_soundName.isEmpty() ||
-			m_soundName.compareNoCase("None") == 0 || m_soundName.compareNoCase("NoSound") == 0))
+			m_soundName.isNone() || m_soundName.compareNoCase("NoSound") == 0))
 			return FALSE;
 		AudioEventRTS sound(m_soundName);
 		if (source)
@@ -212,7 +212,7 @@ private:
 			sound.setPosition(position);
 		if (traceRetailFXLists())
 			std::fprintf(stderr, "[Retail FXList] Sound %s owner=%u action=start frame=%u\n", m_soundName.str(),
-				source ? static_cast<UnsignedInt>(source->getID()) : 0, TheGameLogic->getFrame());
+				source ? static_cast<UnsignedInt>(source->getID()) : 0, TheGameLogic ? TheGameLogic->getFrame() : 0);
 		TheAudio->addAudioEvent(&sound);
 		return TRUE;
 	}

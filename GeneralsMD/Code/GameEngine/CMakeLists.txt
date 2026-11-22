@@ -260,6 +260,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/AssistedTargetingUpdate.h
     Include/GameLogic/Module/AutoDepositUpdate.h
     Include/GameLogic/Module/AutoFindHealingUpdate.h
+    Include/GameLogic/Module/AnnounceBirthAndDeathBehavior.h
     Include/GameLogic/Module/AttributeModifierHelper.h
     Include/GameLogic/Module/AutoHealBehavior.h
     Include/GameLogic/Module/BaikonurLaunchPower.h
@@ -1052,6 +1053,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/RotwkAbilityModules.cpp
     Source/GameLogic/Object/Update/RetailTransportTeleportModules.cpp
     Source/GameLogic/Object/Update/RetailUpgradeModules.cpp
+    Source/GameLogic/Object/Update/AnnounceBirthAndDeathBehavior.cpp
     Source/GameLogic/Object/Update/RotwkModifierModules.cpp
     Source/GameLogic/Object/Update/RetailDetectionModules.cpp
 

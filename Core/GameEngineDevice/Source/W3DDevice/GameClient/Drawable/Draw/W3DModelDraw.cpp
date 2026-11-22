@@ -82,6 +82,7 @@
 #include "WW3D2/texture.h"
 #include "WW3D2/textureloader.h"
 #include "Common/BitFlagsIO.h"
+#include "GameClient/RetailClientAudio.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -2552,8 +2553,8 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::dispatchAnimationFXEvents()
 {
-	if (!m_curState || !m_curState->m_animationFXEvents || !RetailFileLayers::enabled() ||
-		!TheFXListStore || !m_renderObject || m_renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD ||
+	if (!m_curState || !RetailFileLayers::enabled() ||
+		!m_renderObject || m_renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD ||
 		(TheGameState && TheGameState->isInLoadGame()))
 		return;
 
@@ -2561,15 +2562,20 @@ void W3DModelDraw::dispatchAnimationFXEvents()
 	Int frameCount = 0;
 	Int mode = 0;
 	Real rate = 1.0f;
-	if (!static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, frameCount, mode, rate) ||
-		(mode != RenderObjClass::ANIM_MODE_ONCE && mode != RenderObjClass::ANIM_MODE_ONCE_BACKWARDS))
+	const HAnimClass* animation = static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, frameCount, mode, rate);
+	if (!animation)
 		return;
 
-	const Bool backwards = mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS;
+	const Bool backwards = mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS || mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS;
+	const Bool loop = mode == RenderObjClass::ANIM_MODE_LOOP || mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS;
 	const Real previous = m_previousAnimationFXFrame;
 	const Bool first = m_animationFXFirstSample;
 	m_previousAnimationFXFrame = frame;
 	m_animationFXFirstSample = FALSE;
+	RetailClientAudio::animate(*getDrawable(), animation->Get_Name(), previous, frame, frameCount, first, backwards, loop);
+	if (!m_curState->m_animationFXEvents || !TheFXListStore ||
+		(mode != RenderObjClass::ANIM_MODE_ONCE && mode != RenderObjClass::ANIM_MODE_ONCE_BACKWARDS))
+		return;
 	for (const auto& event : *m_curState->m_animationFXEvents)
 	{
 		if (event.frameStop > 0 || event.frame < 0 || event.frame >= frameCount)

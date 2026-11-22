@@ -53,6 +53,7 @@ class LargeGroupAudioUpdate final : public UpdateModule
 public:
 	LargeGroupAudioUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
 	UpdateSleepTime update() override { return UPDATE_SLEEP_FOREVER; }
+	const LargeGroupAudioUpdateModuleData* audioData() const { return getLargeGroupAudioUpdateModuleData(); }
 };
 
 struct HordeNotifyTargetsOfImminentProbableCrushingUpdateModuleData : public UpdateModuleData

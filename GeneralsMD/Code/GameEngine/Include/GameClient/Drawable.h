@@ -37,6 +37,9 @@
 #include "GameClient/Color.h"
 #include "WWMath/matrix3d.h"
 #include "GameClient/DrawableInfo.h"
+#include <memory>
+
+namespace RetailClientAudio { class Loops; }
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class PositionalSound;
@@ -718,6 +721,7 @@ private:
 	PhysicsXformInfo* m_physicsXform;
 
 	RefCountPtr<DynamicAudioEventRTS> m_ambientSound;		///< sound module for ambient sound (lazily allocated)
+	std::unique_ptr<RetailClientAudio::Loops> m_retailConditionAudio;
 
 	Module** m_modules[NUM_DRAWABLE_MODULE_TYPES];
 

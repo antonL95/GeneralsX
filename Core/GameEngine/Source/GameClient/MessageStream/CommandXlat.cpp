@@ -28,6 +28,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailClientAudio.h"
 #if !RTS_GENERALS
 #include "GameLogic/Module/RotwkModifierModules.h"
 #endif
@@ -468,6 +469,20 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 		target = info->m_drawTarget->getObject();
 	}
 
+	const Bool retail = RetailFileLayers::enabled();
+	DrawableList ordered;
+	if (retail && list->size() > 1)
+	{
+		ordered = *list;
+		ordered.sort([](const Drawable* lhs, const Drawable* rhs)
+		{
+			const Object* left = lhs->getObject();
+			const Object* right = rhs->getObject();
+			return left && (!right || RetailClientAudio::priority(*left) > RetailClientAudio::priority(*right));
+		});
+		list = &ordered;
+	}
+
 	//Now, loop through all the drawables (even if you find a match on the first.
 	//The innards are responsible for "upgrading" a sound that is played based on
 	//priorities. For example, the voice move or voice crush. Voice move gets set
@@ -477,7 +492,7 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 	{
 		Object *obj = (*it)->getObject();
 
-		if (obj->isKindOf( KINDOF_IGNORED_IN_GUI ))
+		if (!obj || obj->isKindOf( KINDOF_IGNORED_IN_GUI ))
 			continue;
 
 		// Use the object instead of the drawable to get the thing template from. This way, we get the
@@ -487,6 +502,20 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 		{
 			return;
 		}
+
+		const auto voice = [&](const char* key, const AudioEventRTS* fallback)
+		{
+			return retail ? RetailClientAudio::select(*obj, key, fallback) : fallback;
+		};
+		const auto attackVoice = [&]()
+		{
+			if (info && info->m_air)
+				return voice("VoiceAttackAir", templ->getVoiceAttackAir());
+			const AudioEventRTS* selected = voice("VoiceAttack", templ->getVoiceAttack());
+			if (retail && target && target->isKindOf(KINDOF_STRUCTURE))
+				selected = voice("VoiceAttackStructure", selected);
+			return selected;
+		};
 
 		switch (msgType)
 		{
@@ -506,7 +535,9 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 			case GameMessage::MSG_SELECT_TEAM8:
 			case GameMessage::MSG_SELECT_TEAM9:
 			case GameMessage::MSG_CREATE_SELECTED_GROUP:
-				soundToPlayPtr = templ->getVoiceSelect();
+				soundToPlayPtr = voice("VoiceSelect", templ->getVoiceSelect());
+				if (retail && (*it)->getModelConditionFlags().test(MODELCONDITION_ENGAGED))
+					soundToPlayPtr = voice("VoiceSelectBattle", soundToPlayPtr);
 				objectWithSound = obj;
 				skip = true;
 				break;
@@ -589,7 +620,7 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 					//through the rest of the drawables)
 					if( !soundToPlayPtr )
 					{
-						soundToPlayPtr = templ->getVoiceMove();
+					soundToPlayPtr = voice("VoiceMove", templ->getVoiceMove());
 						objectWithSound = obj;
 					}
 					if( TheInGameUI->isInForceMoveToMode() && target )
@@ -682,11 +713,7 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 				if( !soundToPlayPtr )
 				{
 					//Low priority sounds -- only do this if uninitialized.
-					if( info && info->m_air )
-						soundToPlayPtr = templ->getVoiceAttackAir();
-					else
-						soundToPlayPtr = templ->getVoiceAttack();
-
+					soundToPlayPtr = attackVoice();
 					objectWithSound = obj;
 				}
 
@@ -766,10 +793,7 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 				if( !soundToPlayPtr )
 				{
 					//Low priority sounds -- only do this if uninitialized.
-					if( info && info->m_air )
-						soundToPlayPtr = templ->getVoiceAttackAir();
-					else
-						soundToPlayPtr = templ->getVoiceAttack();
+					soundToPlayPtr = attackVoice();
 					objectWithSound = obj;
 				}
 
@@ -831,7 +855,7 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 			}
 			case GameMessage::MSG_DO_GUARD_POSITION:
 			case GameMessage::MSG_DO_GUARD_OBJECT:
-				soundToPlayPtr = templ->getVoiceGuard();
+				soundToPlayPtr = voice("VoiceGuard", templ->getVoiceGuard());
 				objectWithSound = obj;
 				skip = true;
 				break;
@@ -883,6 +907,8 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 	if( objectWithSound )
 	{
 		soundToPlay.setObjectID( objectWithSound->getID() );
+		if (retail)
+			RetailClientAudio::trace("start", objectWithSound->getID(), soundToPlay.getEventName());
 		TheAudio->addAudioEvent(&soundToPlay);
 
 		// This seems really hacky, and MarkL admits that it is. However, we do this so that we

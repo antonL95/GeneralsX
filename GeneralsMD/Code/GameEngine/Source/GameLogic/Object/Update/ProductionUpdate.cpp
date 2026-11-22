@@ -36,6 +36,7 @@
 #include "Common/GameState.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailClientAudio.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include <algorithm>
 #include <limits>
@@ -973,7 +974,7 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 						production->setExitDoor(DOOR_NONE_AVAILABLE);
 
 						// Now, play the sound associated with the new object's production.
-						AudioEventRTS voiceCreate = *newObj->getTemplate()->getVoiceCreated();
+						AudioEventRTS voiceCreate = *RetailClientAudio::select(*newObj, "VoiceCreated", newObj->getTemplate()->getVoiceCreated());
 						voiceCreate.setObjectID(newObj->getID());
 						TheAudio->addAudioEvent(&voiceCreate);
 

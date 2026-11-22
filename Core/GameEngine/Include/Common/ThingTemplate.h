@@ -30,6 +30,7 @@
 #pragma once
 
 #include <string>
+#include <memory>
 #include <vector>
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
@@ -68,6 +69,7 @@ enum ShadowType CPP_11(: Int);
 class WeaponTemplateSet;
 class ArmorTemplateSet;
 class FXList;
+namespace RetailClientAudio { struct Data; }
 
 // TYPEDEFS FOR FILE //////////////////////////////////////////////////////////////////////////////
 typedef std::map<AsciiString, AudioEventRTS> PerUnitSoundMap;
@@ -463,6 +465,7 @@ public:
 		AsciiString name;
 		AsciiString tag;
 		std::string iniBody;
+		std::shared_ptr<const RetailClientAudio::Data> audio;
 	};
 
 	struct RotWKObjectData
@@ -584,6 +587,7 @@ public:
 	ThingTemplate();
 
 	const RotWKObjectData& getRotWKObjectData() const { return m_rotwk; }
+	const AudioEventRTS* getRetailAudio(ThingTemplateAudioType type) const { return getAudio(type); }
 	const LocomotorTemplate* findRotWKLocomotor(Int setType) const;
 	void parseObjectFields(INI* ini, Bool isChild);
 

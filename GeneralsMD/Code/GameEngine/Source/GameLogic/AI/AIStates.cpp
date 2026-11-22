@@ -39,6 +39,7 @@
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailClientAudio.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
@@ -1735,7 +1736,7 @@ void AIInternalMoveToState::startMoveSound()
 	}
 	else
 	{
-		AudioEventRTS soundEventMove = *obj->getTemplate()->getSoundMoveStart();
+		AudioEventRTS soundEventMove = *RetailClientAudio::select(*obj, "SoundMoveStart", obj->getTemplate()->getSoundMoveStart());
 		soundEventMove.setObjectID(obj->getID());
 
 		if (!soundEventMove.getEventName().isEmpty())
@@ -1744,7 +1745,7 @@ void AIInternalMoveToState::startMoveSound()
 		}
 		else
 		{
-			soundEventMove = *obj->getTemplate()->getSoundMoveLoop();
+			soundEventMove = *RetailClientAudio::select(*obj, "SoundMoveLoop", obj->getTemplate()->getSoundMoveLoop());
 			soundEventMove.setObjectID(obj->getID());
 			if (!soundEventMove.getEventName().isEmpty())
 			{
@@ -5704,6 +5705,13 @@ StateReturnType AIAttackState::onEnter()
 		if (RetailFileLayers::enabled() && curWeapon)
 		{
 			AudioEventRTS voice = curWeapon->getTemplate()->getOverrideVoiceEnterStateAttackSound();
+			if (!TheAudio->isValidAudioEvent(&voice))
+			{
+				const AudioEventRTS* response = RetailClientAudio::select(*source, "VoiceEnterStateAttack",
+					source->getTemplate()->getRetailAudio(TTAUDIO_voiceEnterStateAttack));
+				voice = *response;
+			}
+			RetailClientAudio::trace("start", source->getID(), voice.getEventName());
 			if (TheAudio->isValidAudioEvent(&voice))
 			{
 				voice.setObjectID(source->getID());
