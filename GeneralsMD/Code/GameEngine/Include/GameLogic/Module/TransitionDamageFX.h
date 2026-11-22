@@ -31,6 +31,7 @@
 
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "GameClient/ParticleSys.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/DamageModule.h"
 #include "GameLogic/Module/BodyModule.h"
 
@@ -221,6 +222,19 @@ public:
 		};
     p.add(dataFieldParse);
 
+		if (RetailFileLayers::enabled())
+		{
+			static const FieldParse retailFields[] = {
+				{ "PristineHideSubObject", INI::parseAsciiStringVector, nullptr, offsetof(TransitionDamageFXModuleData, m_hideSubObjects[BODY_PRISTINE]) },
+				{ "PristineShowSubObject", INI::parseAsciiStringVector, nullptr, offsetof(TransitionDamageFXModuleData, m_showSubObjects[BODY_PRISTINE]) },
+				{ "DamagedHideSubObject", INI::parseAsciiStringVector, nullptr, offsetof(TransitionDamageFXModuleData, m_hideSubObjects[BODY_DAMAGED]) },
+				{ "DamagedShowSubObject", INI::parseAsciiStringVector, nullptr, offsetof(TransitionDamageFXModuleData, m_showSubObjects[BODY_DAMAGED]) },
+				{ "ReallyDamagedHideSubObject", INI::parseAsciiStringVector, nullptr, offsetof(TransitionDamageFXModuleData, m_hideSubObjects[BODY_REALLYDAMAGED]) },
+				{ "ReallyDamagedShowSubObject", INI::parseAsciiStringVector, nullptr, offsetof(TransitionDamageFXModuleData, m_showSubObjects[BODY_REALLYDAMAGED]) },
+				{ nullptr, nullptr, nullptr, 0 }
+			};
+			p.add(retailFields);
+		}
 	}
 
 	static void parseFXList( INI *ini, void *instance, void *store, const void *userData );
@@ -233,6 +247,8 @@ public:
 	FXDamageOCLInfo m_OCL[ BODYDAMAGETYPE_COUNT ][ DAMAGE_MODULE_MAX_FX ];
 	DamageTypeFlags m_damageParticleTypes;		///< flags used to play or not play the effects
 	FXDamageParticleSystemInfo m_particleSystem[ BODYDAMAGETYPE_COUNT ][ DAMAGE_MODULE_MAX_FX ];
+	std::vector<AsciiString> m_hideSubObjects[BODYDAMAGETYPE_COUNT];
+	std::vector<AsciiString> m_showSubObjects[BODYDAMAGETYPE_COUNT];
 
 };
 
@@ -246,6 +262,7 @@ class TransitionDamageFX : public DamageModule
 public:
 
 	TransitionDamageFX( Thing *thing, const ModuleData* moduleData );
+	const TransitionDamageFXModuleData& getSubObjectRules() const { return *getTransitionDamageFXModuleData(); }
 	// virtual destructor prototype provided by memory pool declaration
 
 	virtual void onDamage( DamageInfo *damageInfo ) override { }

@@ -1124,6 +1124,9 @@ void Drawable::reactToBodyDamageStateChange(BodyDamageType newState)
 		MAKE_MODELCONDITION_MASK3(MODELCONDITION_DAMAGED, MODELCONDITION_REALLY_DAMAGED, MODELCONDITION_RUBBLE),
 		newDamage);
 
+	if (RetailFileLayers::enabled())
+		updateSubObjects();
+
   // When loading map, ambient sound starting is handled by onLevelStart(), so that we can
   // correctly react to customizations
   if ( !TheGameLogic->isLoadingMap() )

@@ -59,6 +59,9 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/SubObjectsUpgrade.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/TransitionDamageFX.h"
+#endif
 #include "W3DDevice/GameClient/BaseHeightMap.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
@@ -1802,6 +1805,8 @@ W3DModelDraw::W3DModelDraw(Thing *thing, const ModuleData* moduleData) : DrawMod
 	getW3DModelDrawModuleData()->validateStuffForTimeAndWeather(getDrawable(),
 											TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT,
 											TheGlobalData->m_weather == WEATHER_SNOWY);
+	if (RetailFileLayers::enabled())
+		updateSubObjects();
 
 	ModelConditionFlags emptyFlags;
 	const ModelConditionInfo* info = findBestInfo(emptyFlags);
@@ -2631,7 +2636,7 @@ void W3DModelDraw::doHideShowSubObjs(const std::vector<ModelConditionInfo::HideS
 	//Kris (added Aug 2002)
 	//This is really important as it allows a person to override modelcondition show/hide objects. Used by the A10 strike
 	//September 2002 -- now used by the UpgradeSubObject system.
-	if( !m_subObjectVec.empty() )
+	if (RetailFileLayers::enabled() || !m_subObjectVec.empty())
 	{
 		updateSubObjects();
 	}
@@ -4704,6 +4709,20 @@ void W3DModelDraw::doHideShowProjectileObjects( UnsignedInt showCount, UnsignedI
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool W3DModelDraw::setSubObjectHidden(const AsciiString& name, Bool hidden)
+{
+	Int index;
+	RenderObjClass* subObject = m_renderObject->Get_Sub_Object_By_Name(name.str(), &index);
+	if (!subObject)
+		return FALSE;
+	subObject->Set_Hidden(hidden);
+	if (const HTreeClass* tree = m_renderObject->Get_HTree())
+		doHideShowBoneSubObjs(hidden, m_renderObject->Get_Num_Sub_Objects(),
+			m_renderObject->Get_Sub_Object_Bone_Index(0, index), m_renderObject, tree);
+	subObject->Release_Ref();
+	return TRUE;
+}
+
 void W3DModelDraw::updateSubObjects()
 {
 	if (!m_renderObject)
@@ -4720,33 +4739,29 @@ void W3DModelDraw::updateSubObjects()
 		return;
 	}
 
-	if (!m_subObjectVec.empty())
+	for (const auto& entry : m_subObjectVec)
 	{
-		for (std::vector<ModelConditionInfo::HideShowSubObjInfo>::const_iterator it = m_subObjectVec.begin(); it != m_subObjectVec.end(); ++it)
-		{
-			Int objIndex;
-			RenderObjClass* subObj;
-
-			if ((subObj = m_renderObject->Get_Sub_Object_By_Name(it->subObjName.str(), &objIndex)) != nullptr)
-			{
-				subObj->Set_Hidden(it->hide);
-
-				const HTreeClass *htree = m_renderObject->Get_HTree();
-				if (htree)
-				{
-					//get the bone of this subobject so we can hide all other child objects that use this bone
-					//as a parent.
-					Int boneIdx = m_renderObject->Get_Sub_Object_Bone_Index(0, objIndex);
-					doHideShowBoneSubObjs( it->hide, m_renderObject->Get_Num_Sub_Objects(), boneIdx, m_renderObject, htree);
-				}
-				subObj->Release_Ref();
-			}
-			else
-			{
-				DEBUG_CRASH(("*** ASSET ERROR: SubObject %s not found (%s)!",it->subObjName.str(),getDrawable()->getTemplate()->getName().str()));
-			}
-		}
+		if (!setSubObjectHidden(entry.subObjName, entry.hide))
+			DEBUG_CRASH(("*** ASSET ERROR: SubObject %s not found (%s)!", entry.subObjName.str(), getDrawable()->getTemplate()->getName().str()));
 	}
+
+#if !RTS_GENERALS
+	const Object* object = getDrawable()->getObject();
+	if (!RetailFileLayers::enabled() || !object || !object->getBodyModule())
+		return;
+	const BodyDamageType state = object->getBodyModule()->getDamageState();
+	static const NameKeyType key = NAMEKEY("TransitionDamageFX");
+	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != key)
+			continue;
+		const auto& rules = static_cast<const TransitionDamageFX*>(*module)->getSubObjectRules();
+		for (const auto& name : rules.m_hideSubObjects[state])
+			setSubObjectHidden(name, TRUE);
+		for (const auto& name : rules.m_showSubObjects[state])
+			setSubObjectHidden(name, FALSE);
+	}
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------
