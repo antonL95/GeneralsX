@@ -1,0 +1,4 @@
+20 create Player_1 GondorGandalf 0 2520,1010,0
+21 reveal Player_1 GondorGandalf 0
+30 science Player_1 - 0 SCIENCE_RohanAllies
+32 power-cast Player_1 - 8 at 2520 1010
