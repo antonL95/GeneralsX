@@ -57,6 +57,7 @@ enum
 
 #include "W3DDevice/GameClient/W3DTreeBuffer.h"
 #include "W3DDevice/GameClient/RetailTerrainShadow.h"
+#include "W3DDevice/GameClient/RetailEffectInput.h"
 
 #include <algorithm>
 #include <cstring>
@@ -879,6 +880,10 @@ void W3DTreeBuffer::loadTreesInVertexAndIndexBuffers(RefRenderObjListIterator *p
 	const Bool retail = RetailFileLayers::enabled();
 	const GlobalData::TerrainLighting *objectLighting = TheGlobalData->m_terrainObjectsLighting[TheGlobalData->m_timeOfDay];
 	for (bNdx=0; bNdx<MAX_BUFFERS && m_vertexTree[bNdx]; bNdx++) {
+		auto &retailVertices = m_retailVertices[bNdx];
+		auto &retailIndices = m_retailIndices[bNdx];
+		retailVertices.clear();
+		retailIndices.clear();
 		m_curNumTreeVertices[bNdx] = 0;
 		m_curNumTreeIndices[bNdx] = 0;
 		if (curTree >= m_numTrees) {
@@ -1037,23 +1042,25 @@ void W3DTreeBuffer::loadTreesInVertexAndIndexBuffers(RefRenderObjListIterator *p
 				curVb->nx = m_trees[curTree].swayType;
 				curVb->ny = 1.0f - m_treeTypes[type].m_data->m_darkening*m_trees[curTree].pushAside;
 				curVb->nz = loc.Z;
+				Vector3 normal(0.0f, 0.0f, 1.0f);
+				if (normals) {
+					normal.X = normals[i].X*theCos - normals[i].Y*theSin;
+					normal.Y = normals[i].Y*theCos + normals[i].X*theSin;
+					normal.Z = normals[i].Z;
+				}
+				const UnsignedInt vertexDiffuse = vecDiffuse ? vecDiffuse[i] : 0xffffffffu;
 				if (doVertexLighting) {
-					Vector3 normal(0.0f, 0.0f, 1.0f);
-					if (normals) {
-						normal.X = normals[i].X*theCos - normals[i].Y*theSin;
-						normal.Y = normals[i].Y*theCos + normals[i].X*theSin;
-						normal.Z = normals[i].Z;
-					}
-					UnsignedInt vertexDiffuse;
-					if (vecDiffuse) {
-						vertexDiffuse = vecDiffuse[i];
-					} else {
-						vertexDiffuse = 0xffffffff;
-					}
 					curVb->diffuse = doLighting(&normal, objectLighting, &emissive,
 														vertexDiffuse, 1.0f);
 				} else {
 					curVb->diffuse = diffuse;
+				}
+				if (retail) {
+					const bool upright = m_trees[curTree].m_toppleState == TOPPLE_UPRIGHT;
+					if (!upright && normals)
+						Matrix3D::Rotate_Vector(m_trees[curTree].m_mtx, normals[i], &normal);
+					retailVertices.push_back({{vLoc.X, vLoc.Y, vLoc.Z}, {normal.X, normal.Y, normal.Z},
+						{curVb->u1, curVb->v1}, {upright ? static_cast<float>(m_trees[curTree].swayType) : 0.0f, loc.Z}, vertexDiffuse});
 				}
 				curVb++;
 				m_curNumTreeVertices[bNdx]++;
@@ -1068,6 +1075,8 @@ void W3DTreeBuffer::loadTreesInVertexAndIndexBuffers(RefRenderObjListIterator *p
 				m_curNumTreeIndices[bNdx]+=3;
 			}
 		}
+		if (retail)
+			retailIndices.assign(ib, curIb);
 	}
 
 }
@@ -1126,6 +1135,7 @@ void W3DTreeBuffer::updateVertexBuffer()
 			Int i;
 			Int numVertex = m_treeTypes[type].m_mesh->Peek_Model()->Get_Vertex_Count();
 			Vector3 *pVert = m_treeTypes[type].m_mesh->Peek_Model()->Get_Vertex_Array();
+			const Vector3 *normals = m_treeTypes[type].m_mesh->Peek_Model()->Get_Vertex_Normal_Array();
 
 			for (i=0; i<numVertex; i++) {
 				Real x = pVert[i].X;
@@ -1156,6 +1166,24 @@ void W3DTreeBuffer::updateVertexBuffer()
 				curVb->y = vLoc.Y;
 				curVb->z = vLoc.Z;
 				curVb->ny = 1.0f - m_treeTypes[type].m_data->m_darkening*m_trees[curTree].pushAside;
+				auto &retailVertices = m_retailVertices[bNdx];
+				const auto index = static_cast<size_t>(startVertex + i);
+				if (index < retailVertices.size()) {
+					auto &vertex = retailVertices[index];
+					vertex.position[0] = vLoc.X;
+					vertex.position[1] = vLoc.Y;
+					vertex.position[2] = vLoc.Z;
+					if (m_trees[curTree].m_toppleState != TOPPLE_UPRIGHT) {
+						vertex.sway[0] = 0.0f;
+						if (normals) {
+							Vector3 normal;
+							Matrix3D::Rotate_Vector(m_trees[curTree].m_mtx, normals[i], &normal);
+							vertex.normal[0] = normal.X;
+							vertex.normal[1] = normal.Y;
+							vertex.normal[2] = normal.Z;
+						}
+					}
+				}
 				curVb++;
 			}
 		}
@@ -1236,6 +1264,9 @@ W3DTreeBuffer::W3DTreeBuffer()
 //=============================================================================
 void W3DTreeBuffer::freeTreeBuffers()
 {
+	m_vegetationPass.reset();
+	m_vegetationInitialized = false;
+	m_tracedVegetation = false;
 	Int i;
 	for	(i=0; i<MAX_BUFFERS; i++) {
 		REF_PTR_RELEASE(m_vertexTree[i]);
@@ -1703,6 +1734,91 @@ void W3DTreeBuffer::pushAsideTree(DrawableID id, const Coord3D *pusherPos,
 
 DECLARE_PERF_TIMER(Tree_Render)
 
+bool W3DTreeBuffer::drawRetailVegetation(Int batch, const Vector3 *sway)
+{
+	if (!RetailFileLayers::enabled() || !TheTerrainRenderObject || ShaderClass::Is_Backface_Culling_Inverted() ||
+		m_retailVertices[batch].size() != static_cast<size_t>(m_curNumTreeVertices[batch]) ||
+		m_retailIndices[batch].size() != static_cast<size_t>(m_curNumTreeIndices[batch]))
+		return false;
+	auto *device = DX8Wrapper::Get_Effect_Device9();
+	auto *shroud = TheTerrainRenderObject->getShroud();
+	if (!device || !shroud || !shroud->getTextureWidth() || !shroud->getTextureHeight() ||
+		shroud->getCellWidth() <= 0 || shroud->getCellHeight() <= 0)
+		return false;
+	if (!m_vegetationInitialized) {
+		m_vegetationInitialized = true;
+		if (const auto effect = RetailFX::loadEffectFile("shaders/compiled/vegetation.fxo"))
+			m_vegetationPass = RetailFX::NativePass::makeVegetation(device, *effect, DX8Wrapper::Create_Effect_Shader9);
+		if (!m_vegetationPass)
+			std::fprintf(stderr, "[RetailFX] Could not load Vegetation Default\n");
+	}
+	if (!m_vegetationPass)
+		return false;
+
+	auto *device8 = DX8Wrapper::_Get_D3D_Device8();
+	D3DXMATRIX view, projection, inverseView, viewProjection, world;
+	if (FAILED(device8->GetTransform(D3DTS_VIEW, &view)) || FAILED(device8->GetTransform(D3DTS_PROJECTION, &projection)) ||
+		!D3DXMatrixInverse(&inverseView, nullptr, &view))
+		return false;
+	D3DXMatrixMultiply(&viewProjection, &view, &projection);
+	D3DXMatrixIdentity(&world);
+	const auto fog = RetailFX::fogBindings(device8);
+	const float scaleU = 1.0f / (shroud->getCellWidth() * static_cast<float>(shroud->getTextureWidth()));
+	const float scaleV = 1.0f / (shroud->getCellHeight() * static_cast<float>(shroud->getTextureHeight()));
+	const RetailFX::Register shroudUV{scaleU, scaleV, (shroud->getCellWidth() - shroud->getDrawOriginX()) * scaleU,
+		(shroud->getCellHeight() - shroud->getDrawOriginY()) * scaleV};
+	const auto *lighting = TheGlobalData->m_terrainObjectsLighting[TheGlobalData->m_timeOfDay];
+	const auto setBinding = [&](const RetailFX::Binding &binding, std::span<RetailFX::Register> values, std::span<int>) {
+		if (values.empty())
+			return;
+		const auto &name = binding.name;
+		if (name == "WorldViewProjection")
+			RetailFX::writeMatrix(values, viewProjection);
+		else if (name == "World")
+			RetailFX::writeMatrix(values, world);
+		else if (name == "ViewI")
+			RetailFX::writeMatrix(values, inverseView);
+		else if (name == "Shroud")
+			values[0] = shroudUV;
+		else if (name == "Cloud")
+			values[0] = W3DShaderManager::getRetailCloudUV();
+		else if (name == "Fog")
+			std::copy_n(fog.begin(), std::min(fog.size(), values.size()), values.begin());
+		else if (name == "AmbientLightColor")
+			values[0] = {lighting[0].ambient.red, lighting[0].ambient.green, lighting[0].ambient.blue, 0.0f};
+		else if (name == "DirectionalLight") {
+			for (size_t i = 0; i < std::min(values.size() / 2, static_cast<size_t>(MAX_GLOBAL_LIGHTS)); ++i) {
+				const auto &light = lighting[i];
+				Vector3 direction(-light.lightPos.x, -light.lightPos.y, -light.lightPos.z);
+				direction.Normalize();
+				values[i * 2] = {light.diffuse.red, light.diffuse.green, light.diffuse.blue, 0.0f};
+				values[i * 2 + 1] = {direction.X, direction.Y, direction.Z, 0.0f};
+			}
+		} else if (name == "SwayOffsets") {
+			values[0] = {};
+			for (size_t i = 1; i < std::min(values.size(), static_cast<size_t>(MAX_SWAY_TYPES + 1)); ++i)
+				values[i] = {sway[i - 1].X, sway[i - 1].Y, sway[i - 1].Z, 0.0f};
+		} else if (name == "PointLight" && values.size() == 3) {
+			values[0] = {};
+			values[1] = {0.0f, 0.0f, -100000.0f, 0.0f};
+			values[2] = {1.0f, 0.0f, 0.0f, 0.0f};
+		}
+	};
+	const auto getTexture = [&](std::string_view name) -> void * {
+		if (name == "BaseTexture") return RetailFX::nativeTexture(m_treeTexture);
+		if (name == "ShroudTexture") return RetailFX::nativeTexture(shroud->getShroudTexture());
+		if (name == "CloudTexture") return RetailFX::nativeTexture(TheTerrainRenderObject->peekCloudTexture());
+		return nullptr;
+	};
+	const bool drawn = m_vegetationPass->drawVegetation(device, m_retailVertices[batch], m_retailIndices[batch], setBinding, getTexture);
+	if (!m_tracedVegetation && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS")) {
+		m_tracedVegetation = true;
+		std::fprintf(stderr, "[RetailFX] %s Vegetation Default (%d atlas vertices)\n",
+			drawn ? "Drew" : "Could not draw", m_curNumTreeVertices[batch]);
+	}
+	return drawn;
+}
+
 //=============================================================================
 // W3DTreeBuffer::drawTrees
 //=============================================================================
@@ -1730,6 +1846,7 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 	Int i;
 	for (i=0; i<MAX_SWAY_TYPES; i++)
 	{
+		swayFactor[i].Set(0.0f, 0.0f, 0.0f);
 		m_curSwayOffset[i] += m_curSwayStep[i] * timeScale;
 		if (m_curSwayOffset[i] > NUM_SWAY_ENTRIES-1) {
 			m_curSwayOffset[i] -= NUM_SWAY_ENTRIES-1;
@@ -1986,6 +2103,8 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 		if (m_curNumTreeIndices[bNdx]==0) {
 			break;
 		}
+		if (drawRetailVegetation(bNdx, swayFactor))
+			continue;
 		DX8Wrapper::Set_Index_Buffer(m_indexTree[bNdx],0);
 		DX8Wrapper::Set_Vertex_Buffer(m_vertexTree[bNdx]);
 		// Render the waving grass

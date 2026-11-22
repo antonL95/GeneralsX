@@ -112,13 +112,21 @@ std::unique_ptr<NativePass> NativePass::makeDefaultMesh(void *handle, const Effe
 	return make(handle, effect, createShader, Kind::DefaultMesh);
 }
 
+std::unique_ptr<NativePass> NativePass::makeVegetation(void *handle, const Effect &effect, CreateShader createShader)
+{
+	return make(handle, effect, createShader, Kind::Vegetation);
+}
+
 std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect, CreateShader createShader, Kind kind)
 {
 	auto *device = static_cast<IDirect3DDevice9 *>(handle);
 	const bool terrain = kind == Kind::Terrain;
 	const bool model = kind == Kind::NormalMapped;
 	const bool defaultMesh = kind == Kind::DefaultMesh;
-	const std::string_view techniqueName = terrain || defaultMesh ? "Default" : model ? "Default_M" : "BumpSpecular_M";
+	const bool vegetation = kind == Kind::Vegetation;
+	const std::string_view techniqueName = terrain || defaultMesh || vegetation ? "Default" : model ? "Default_M" : "BumpSpecular_M";
+	const char *effectName = terrain ? "Terrain" : model ? "NormalMapped" :
+		defaultMesh ? "DefaultW3D" : vegetation ? "Vegetation" : "WaterShader";
 	const auto technique = std::find_if(effect.techniques.begin(), effect.techniques.end(),
 		[&](const auto &item) { return item.name == techniqueName; });
 	if (!device || technique == effect.techniques.end() || technique->passes.size() != 1)
@@ -137,8 +145,8 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 			{
 				const std::string_view array = terrain && !vertex ? "PSDefault_Array" :
 					model ? (vertex ? "VS_M_Array" : "PS_M_Array") :
-					defaultMesh ? (vertex ? "VS_Array" : "PS_Array") : "";
-				const unsigned variant = terrain ? 4 : vertex ? 0 : defaultMesh ? 37 : 1;
+					defaultMesh ? (vertex ? "VS_Array" : "PS_Array") : vegetation && !vertex ? "PS_Array" : "";
+				const unsigned variant = terrain ? 4 : vertex || vegetation ? 0 : defaultMesh ? 37 : 1;
 				if (array.empty() || state.parameterReference != array)
 					return nullptr;
 				const auto parameter = std::find_if(effect.parameters.begin(), effect.parameters.end(),
@@ -155,8 +163,7 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 			auto shader = readProgram(*bytes, vertex);
 			if (!shader)
 			{
-				std::fprintf(stderr, "[RetailFX] Unsupported %s %s bytecode\n",
-					terrain ? "Terrain" : model ? "NormalMapped" : "WaterShader", vertex ? "vertex" : "pixel");
+				std::fprintf(stderr, "[RetailFX] Unsupported %s %s bytecode\n", effectName, vertex ? "vertex" : "pixel");
 				return nullptr;
 			}
 			(vertex ? data->vs : data->ps) = std::move(*shader);
@@ -165,7 +172,7 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 		{
 			const auto native = renderState(state.operation);
 			if (state.resourceUsage == ResourceUsage::Program &&
-				((terrain && (state.operation == 3 || state.operation == 13)) ||
+				((terrain && (state.operation == 3 || state.operation == 13)) || (vegetation && state.operation == 13) ||
 				 (model && (state.operation == 4 || state.operation == 13 || state.operation == 14 || state.operation == 16)) ||
 				 (defaultMesh && (state.operation == 3 || state.operation == 4 || state.operation == 6 ||
 					state.operation == 7 || state.operation == 8 || state.operation == 13 ||
@@ -173,7 +180,7 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 				continue;
 			if (!native || state.index || state.resourceUsage || state.value.words.size() != 1)
 			{
-				std::fprintf(stderr, "[RetailFX] Unsupported WaterShader state %u\n", state.operation);
+				std::fprintf(stderr, "[RetailFX] Unsupported %s state %u\n", effectName, state.operation);
 				return nullptr;
 			}
 			data->states.emplace_back(*native, state.value.words[0]);
@@ -188,13 +195,13 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 		auto sampler = readSampler(effect, binding);
 		if (!sampler)
 		{
-			std::fprintf(stderr, "[RetailFX] Unsupported WaterShader sampler %s\n", binding.name.c_str());
+			std::fprintf(stderr, "[RetailFX] Unsupported %s sampler %s\n", effectName, binding.name.c_str());
 			return nullptr;
 		}
 		sampler->white = terrain && sampler->texture == "ShroudTexture";
 		data->samplers.push_back(std::move(*sampler));
 	}
-	if (terrain || defaultMesh)
+	if (terrain || defaultMesh || vegetation)
 	{
 		IDirect3DTexture9 *texture = nullptr;
 		if (FAILED(device->CreateTexture(1, 1, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &texture, nullptr)))
@@ -236,16 +243,24 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 		{0, static_cast<WORD>(offsetof(NormalMappedVertex, color)), D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
 		D3DDECL_END()
 	};
+	const D3DVERTEXELEMENT9 vegetationDeclaration[] = {
+		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+		{0, static_cast<WORD>(offsetof(VegetationVertex, normal)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+		{0, static_cast<WORD>(offsetof(VegetationVertex, uv)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		{0, static_cast<WORD>(offsetof(VegetationVertex, sway)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+		{0, static_cast<WORD>(offsetof(VegetationVertex, color)), D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+		D3DDECL_END()
+	};
 	IDirect3DVertexDeclaration9 *decl = nullptr;
 	if (FAILED(device->CreateVertexDeclaration(terrain ? terrainDeclaration : model ? modelDeclaration :
-		defaultMesh ? defaultDeclaration : declaration, &decl)))
+		defaultMesh ? defaultDeclaration : vegetation ? vegetationDeclaration : declaration, &decl)))
 		return nullptr;
 	data->declaration.reset(decl);
 	data->vertex.reset(static_cast<IDirect3DVertexShader9 *>(createShader(true, data->vs.tokens.data())));
 	data->pixel.reset(static_cast<IDirect3DPixelShader9 *>(createShader(false, data->ps.tokens.data())));
 	if (!data->vertex || !data->pixel)
 	{
-		std::fprintf(stderr, "[RetailFX] D3D9 rejected WaterShader shader creation\n");
+		std::fprintf(stderr, "[RetailFX] D3D9 rejected %s shader creation\n", effectName);
 		return nullptr;
 	}
 	return std::unique_ptr<NativePass>(new NativePass(std::move(data)));
@@ -288,6 +303,20 @@ bool NativePass::drawTerrain(void *handle, std::span<const TerrainVertex> base, 
 			 !draw(blend, blendIndices)))
 			return false;
 		return true;
+	});
+}
+
+bool NativePass::drawVegetation(void *handle, std::span<const VegetationVertex> vertices, std::span<const uint16_t> indices,
+	const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture)
+{
+	auto *device = static_cast<IDirect3DDevice9 *>(handle);
+	if (vertices.empty() || indices.empty())
+		return false;
+	return m_data->draw(device, setBinding, getTexture, [&] {
+		return SUCCEEDED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE)) &&
+			SUCCEEDED(device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE)) &&
+			SUCCEEDED(device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, static_cast<UINT>(vertices.size()),
+				static_cast<UINT>(indices.size() / 3), indices.data(), D3DFMT_INDEX16, vertices.data(), sizeof(VegetationVertex)));
 	});
 }
 
@@ -364,6 +393,10 @@ std::unique_ptr<NativePass> NativePass::makeWater(void *, const Effect &, Create
 std::unique_ptr<NativePass> NativePass::makeTerrain(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeDefaultMesh(void *, const Effect &, CreateShader) { return nullptr; }
+std::unique_ptr<NativePass> NativePass::makeVegetation(void *, const Effect &, CreateShader) { return nullptr; }
+
+bool NativePass::drawVegetation(void *, std::span<const VegetationVertex>, std::span<const uint16_t>,
+	const SetBinding &, const std::function<void *(std::string_view)> &) { return false; }
 
 bool NativePass::drawWater(void *, std::span<const WaterVertex>, std::span<const uint16_t>,
 	const SetBinding &, const std::function<void *(std::string_view)> &, bool) { return false; }

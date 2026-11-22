@@ -59,6 +59,7 @@
 #include "Common/GameType.h"
 #include "Common/AsciiString.h"
 #include "Common/GlobalData.h"
+#include "W3DDevice/GameClient/RetailEffectDraw.h"
 
 //-----------------------------------------------------------------------------
 //           Forward References
@@ -247,6 +248,11 @@ private:
 				MAX_SHADOW_BATCH_VERTEX = 8000};	///< per texture, per frame
 	DX8VertexBufferClass	*m_vertexTree[MAX_BUFFERS];	///<Tree vertex buffer.
 	DX8IndexBufferClass			*m_indexTree[MAX_BUFFERS];	///<indices defining a triangles for the tree drawing.
+	std::array<std::vector<RetailFX::VegetationVertex>, MAX_BUFFERS> m_retailVertices;
+	std::array<std::vector<uint16_t>, MAX_BUFFERS> m_retailIndices;
+	std::unique_ptr<RetailFX::NativePass> m_vegetationPass;
+	bool m_vegetationInitialized = false;
+	bool m_tracedVegetation = false;
 	DWORD					m_dwTreePixelShader;	///<handle to D3D pixel shader
 	DWORD					m_dwTreeVertexShader;	///<handle to D3D vertex shader
 
@@ -297,6 +303,7 @@ protected:
 	void updateSway(const BreezeInfo& info);
 	void loadTreesInVertexAndIndexBuffers(RefRenderObjListIterator *pDynamicLightsIterator); ///< Fills the index and vertex buffers for drawing.
 	void updateVertexBuffer(); ///< Fills the index and vertex buffers for drawing.
+	bool drawRetailVegetation(Int batch, const Vector3 *sway);
 	void drawModelShadows(CameraClass *camera, Real stretchX, Real stretchY); ///< the object trees' shadows
 	Int  addShadowTexture(TextureClass *tex);	///< index of this texture in the shadow list, adding it if new
 	void cull(const CameraClass * camera);						 ///< Culls the trees.
