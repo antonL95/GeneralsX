@@ -1,4 +1,5 @@
 #include "PreRTS.h"
+#include "Common/GlobalData.h"
 #include "GameClient/FXList.h"
 #include "GameClient/ParticleSys.h"
 #include "GameLogic/Object.h"
@@ -9,6 +10,32 @@
 void runRetailParticleTestCommand(std::string_view action, const Object* source, const Object* target, const Coord3D* location,
 	const char* argument, UnsignedInt frame)
 {
+	if (action == "particle-weather")
+	{
+		TheWritableGlobalData->m_weather = std::string_view(argument) == "snow" ? WEATHER_SNOWY : WEATHER_NORMAL;
+		std::fprintf(stderr, "TEST particle-weather frame=%u weather=%d\n", frame, TheGlobalData->m_weather);
+		return;
+	}
+
+	if (action == "particle-bone-sample")
+	{
+		for (ParticleSystem* system : TheParticleSystemManager->getAllParticleSystems())
+		{
+			const auto* definition = system->getTemplate();
+			if (!definition || definition->getName() != argument)
+				continue;
+			Particle* particle = system->getFirstParticle();
+			if (!particle)
+				continue;
+			while (particle->m_systemNext)
+				particle = particle->m_systemNext;
+			const Coord3D& position = particle->usesGpuDraw() ? particle->getGpuSpawnPosition() : *particle->getPosition();
+			std::fprintf(stderr, "TEST particle-bone frame=%u name=%s attached=%u x=%.3f y=%.3f z=%.3f\n",
+				frame, argument, static_cast<UnsignedInt>(system->getAttachedObject()), position.x, position.y, position.z);
+		}
+		return;
+	}
+
 	if (action == "particle-water-fx")
 	{
 		Region3D bounds;

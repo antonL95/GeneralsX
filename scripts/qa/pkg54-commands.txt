@@ -1,0 +1,29 @@
+3 reveal Player_1 MenPorter 0
+5 create Player_1 RivendellGandalfTheGrey 0 2920,630,0
+5 create Player_1 ShireFrodo 0 2970,630,0
+5 create Player_1 WildMountainGiant 0 2900,685,0
+5 create Player_1 HaradBlackNumenoreanWarrior 0 2945,650,0
+8 particle-weather - - 0 normal
+9 particle-fx - - 0 FX_CorsairFireBombProjectileExplosion 2890 610 60
+10 particle-fx Player_1 WildMountainGiant 0 FX_GiantLeftFootStep
+12 particle-fx Player_1 RivendellGandalfTheGrey 0 FX_GandalfLightningSword
+13 particle-fx Player_1 ShireFrodo 0 FX_FrodoRingOn
+14 particle-fx Player_1 HaradBlackNumenoreanWarrior 0 FX_ArmoredCharge
+16 particle-fx - - 0 FX_AnbornMasterScout 3030 640 60
+17 particle-fx - - 0 Pkg54DecalControl 2910 640 60
+18 particle-fx Player_1 RivendellGandalfTheGrey 0 Pkg54BoneOverrides,Player_1:ShireFrodo:0 2920 630 60
+20 particle-systems - - 0 LightningCharge
+23 particle-fx - - 0 FX_BurodapanGiveNothingBack 3130 620 60
+28 particle-weather - - 0 snow
+29 particle-fx - - 0 FX_CorsairFireBombProjectileExplosion 2900 620 60
+30 particle-fx Player_1 WildMountainGiant 0 FX_GiantLeftFootStep
+33 particle-fx - - 0 FX_BombardExplosion 2990 600 60
+36 particle-fx - - 0 FX_BurodapanGiveNothingBack 3140 620 60
+42 particle-bone-sample - - 0 ArmoredChargePulseFX
+48 snapshot-overlap Player_1 HaradBlackNumenoreanWarrior 0 at 3065 650
+80 particle-bone-sample - - 0 ArmoredChargePulseFX
+109 particle-fx Player_1 RivendellGandalfTheGrey 0 FX_CreateAHeroLightningCharge
+110 particle-systems - - 0 LightningStrike3
+111 create Player_1 SanctumofZigur 0 3150,480,0
+114 pkg50-power Player_1 SanctumofZigur 0 SpecialAbilityBlessingOfBelegur
+118 particle-systems - - 0 HSLightningStrike3

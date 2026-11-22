@@ -2313,7 +2313,8 @@ void logTracked(unsigned int frame)
 
 void execute(const Command& command, unsigned int frame)
 {
-	if (command.action == "particle-fx" || command.action == "particle-systems" || command.action == "particle-water-fx")
+	if (command.action == "particle-fx" || command.action == "particle-systems" || command.action == "particle-water-fx" ||
+		command.action == "particle-weather" || command.action == "particle-bone-sample")
 	{
 		const Coord3D location = command.hasLocation ? groundLocation(command) : Coord3D{};
 		const auto separator = command.structure.find(',');
