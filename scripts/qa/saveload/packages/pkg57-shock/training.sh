@@ -5,10 +5,10 @@ prepare() {
                 print frame, command
         }'
     }
-    samples 221 395 'pkg57-probe PlyrCreeps AngmarDarkDunedain 0 dunedain'
-    samples 221 395 'pkg57-probe PlyrCreeps Pkg57DefaultControl 0 control'
-    samples 221 395 'pkg57-probe PlyrCreeps Pkg57HighGravityControl 0 highgrav'
-    samples 221 395 'pkg57-probe PlyrCreeps Pkg57FixedHighControl 0 fixedhigh'
+    samples 221 429 'pkg57-probe PlyrCreeps AngmarDarkDunedain 0 dunedain'
+    samples 221 429 'pkg57-probe PlyrCreeps Pkg57DefaultControl 0 control'
+    samples 221 429 'pkg57-probe PlyrCreeps Pkg57HighGravityControl 0 highgrav'
+    samples 221 429 'pkg57-probe PlyrCreeps Pkg57FixedHighControl 0 fixedhigh'
     samples 401 609 'pkg57-probe PlyrCreeps MordorDrummerTroll 0 troll'
     samples 401 530 'pkg57-probe PlyrCreeps HaradZigur 0 zigur'
     samples 641 829 'pkg57-horde-probe PlyrCreeps AngmarDarkDunedainHorde 0 horde'
@@ -17,7 +17,7 @@ prepare() {
 }
 
 check() {
-    if ! covers 395 || ! covers 939; then
+    if ! covers 429 || ! covers 939; then
         return 0
     fi
     awk -v first="$first" '

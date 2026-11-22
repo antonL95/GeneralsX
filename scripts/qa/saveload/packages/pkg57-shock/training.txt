@@ -4,11 +4,11 @@
 220 create PlyrCreeps Pkg57FixedHighControl 0 1200,1960,180
 220 create Player_1 Pkg57ShockCaster 0 1140,2040,0
 222 orderattack Player_1 Pkg57ShockCaster 0 PlyrCreeps:AngmarDarkDunedain:0
-398 destroy PlyrCreeps AngmarDarkDunedain 0
-398 destroy PlyrCreeps Pkg57DefaultControl 0
-398 destroy PlyrCreeps Pkg57HighGravityControl 0
-398 destroy PlyrCreeps Pkg57FixedHighControl 0
 398 destroy Player_1 Pkg57ShockCaster 0
+430 destroy PlyrCreeps AngmarDarkDunedain 0
+430 destroy PlyrCreeps Pkg57DefaultControl 0
+430 destroy PlyrCreeps Pkg57HighGravityControl 0
+430 destroy PlyrCreeps Pkg57FixedHighControl 0
 400 create PlyrCreeps MordorDrummerTroll 0 1200,2200,180
 400 create PlyrCreeps HaradZigur 0 1200,2240,180
 400 create Player_1 Pkg57ShockCaster 0 1140,2220,0
