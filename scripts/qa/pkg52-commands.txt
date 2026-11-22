@@ -1,0 +1,49 @@
+3 reveal Player_1 MenPorter 0
+5 create Player_1 RohanOathbreaker1 0 2958,490,0
+5 create Player_1 IsengardFighter 0 2930,495,0
+7 particle-fx Player_1 MenPorter 0 FX_CreateAHeroDie
+8 particle-condition Player_1 MenPorter 0 hero
+9 particle-fx Player_1 MenPorter 0 FX_CreateAHeroDie
+12 particle-fx Player_1 MenPorter 0 FX_DiebyFalling
+13 particle-fx Player_1 IsengardFighter 0 FX_DiebyFalling
+15 particle-fx Player_1 MenFortressCitadel 0 AnnounceFortressDeathLostRingFX
+16 particle-condition Player_1 MenFortressCitadel 0 ring
+17 particle-fx Player_1 MenFortressCitadel 0 AnnounceFortressDeathLostRingFX
+20 particle-fx Player_1 RohanOathbreaker1 0 FX_CaHBeamWeapon,Player_1:MenFortressCitadel:0
+21 particle-systems - - 0 GandalfIstariLightRays
+22 particle-fx - - 0 FX_DwarvenCatapultFlamingProjectileExplosion 2958 480 0
+23 particle-systems - - 0 CatapultExplosionSmoke
+23 particle-systems - - 0 ProjectileSplash01
+24 particle-water-fx - - 0 FX_DwarvenCatapultFlamingProjectileExplosion
+25 particle-systems - - 0 CatapultExplosionSmoke
+25 particle-systems - - 0 ProjectileSplash01
+27 particle-fx - - 0 FX_SanctumOfZigurLightningCharge 2950 485 0
+28 particle-systems - - 0 HSLightningStrike3
+28 particle-systems - - 0 HSLightningStrike2
+29 particle-fx - - 0 Pkg52OffsetOff 2950 485 0
+29 particle-systems - - 0 HSLightningStrike
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+33 particle-fx - - 0 FX_AODDeath 2958 480 0
+34 particle-systems - - 0 AODLightShafts
+37 particle-fx Player_1 RohanOathbreaker1 0 FX_Resurrect
+38 particle-systems - - 0 AODLightLenzflare
+110 particle-systems - - 0 AODLightLenzflare
+185 particle-fx - - 0 FX_AODDeath 2958 480 0
+186 particle-systems - - 0 AODLightShafts
+188 unreveal Player_1 MenPorter 0
+188 unreveal Player_1 MenPorter 0
+189 shroudmap Player_1 MenPorter 0
+190 particle-fx - - 0 Pkg52ShroudedControl 1800 700 0
+190 particle-systems - - 0 GPUUnitFire
+191 particle-fx - - 0 FX_CavalryBurningFlame 1800 700 0
+192 particle-systems - - 0 GPUUnitFire

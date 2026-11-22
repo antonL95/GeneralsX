@@ -2304,7 +2304,7 @@ void logTracked(unsigned int frame)
 
 void execute(const Command& command, unsigned int frame)
 {
-	if (command.action == "particle-fx" || command.action == "particle-systems")
+	if (command.action == "particle-fx" || command.action == "particle-systems" || command.action == "particle-water-fx")
 	{
 		const Coord3D location = command.hasLocation ? groundLocation(command) : Coord3D{};
 		const auto separator = command.structure.find(',');
@@ -2320,6 +2320,19 @@ void execute(const Command& command, unsigned int frame)
 			target, command.hasLocation ? &location : nullptr, name.c_str(), frame);
 		return;
 	}
+#if !RTS_GENERALS
+	if (command.action == "particle-condition")
+	{
+		if (Object* object = findObject(command))
+		{
+			if (command.structure == "ring")
+				object->setModelConditionState(MODELCONDITION_ONE_RING);
+			else if (command.structure == "hero")
+				object->setModelConditionState(MODELCONDITION_CREATE_A_HERO_02);
+		}
+		return;
+	}
+#endif
 	if (command.action == "snapshot-path-state" || command.action == "snapshot-register-footprint" ||
 		command.action == "snapshot-wall-state")
 	{
