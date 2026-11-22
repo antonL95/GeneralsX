@@ -723,7 +723,8 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "WanderWidthFactor", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_wanderWidthFactor) },
 		{ "WanderLengthFactor",				 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_wanderLengthFactor) },
 		{ "WanderAboutPointRadius",				 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_wanderAboutPointRadius) },
-		{ "BurningDeathRadius", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_wanderAboutPointRadius) },
+		{ "BurningDeathRadius", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.burningDeathRadius) },
+		{ "BurningDeathIsCavalry", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.burningDeathIsCavalry) },
 
 		{ "RudderCorrectionDegree",		 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionDegree) }, // Added in Zero Hour
 		{ "RudderCorrectionRate",			 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionRate) }, // Added in Zero Hour

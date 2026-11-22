@@ -11,6 +11,8 @@ struct Authored
 	float minTurnSpeedFraction = -1.0f;
 	float liftFraction = -1.0f;
 	float liftDamagedFraction = -1.0f;
+	float burningDeathRadius = 0.0f;
+	bool burningDeathIsCavalry = false;
 	unsigned int accelerationFrames = 0;
 	unsigned int brakingFrames = 0;
 	unsigned int turnFrames = 0;

@@ -4731,6 +4731,29 @@ void AIWanderInPlaceState::loadPostProcess()
 }
 
 // ------------------------------------------------------------------------------------------------
+static Coord3D chooseWanderGoal(const AIUpdateInterface* ai, const Coord3D& origin)
+{
+	const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+	const Bool burning = locomotor && RetailFileLayers::enabled() &&
+		ai->getCurLocomotorSetType() == LOCOMOTORSET_BURNINGDEATH;
+	const Real radius = locomotor ? (burning ? locomotor->getBurningDeathRadius() :
+		locomotor->getWanderAboutPointRadius()) : 3 * PATHFIND_CELL_SIZE_F;
+	Coord3D goal = origin;
+	if (burning && locomotor->isBurningDeathCavalry())
+	{
+		const Real angle = GameLogicRandomValueReal(0.0f, 2.0f * PI);
+		goal.x += WWMath::CosTrig(angle) * radius;
+		goal.y += WWMath::SinTrig(angle) * radius;
+	}
+	else
+	{
+		const Int cells = REAL_TO_INT_FLOOR(radius / PATHFIND_CELL_SIZE_F + 0.5f);
+		goal.x += GameLogicRandomValue(-cells, cells) * PATHFIND_CELL_SIZE_F;
+		goal.y += GameLogicRandomValue(-cells, cells) * PATHFIND_CELL_SIZE_F;
+	}
+	return goal;
+}
+
 StateReturnType AIWanderInPlaceState::onEnter()
 {
 	m_origin = *getMachineOwner()->getPosition();
@@ -4740,16 +4763,7 @@ StateReturnType AIWanderInPlaceState::onEnter()
 		ai->chooseLocomotorSet(ai->getRetailBurningDeathDeadline() ? LOCOMOTORSET_BURNINGDEATH : LOCOMOTORSET_WANDER);
 	}
 
-	Int delta = 3;
-	if (ai->getCurLocomotor()) {
-		delta = REAL_TO_INT_FLOOR( (ai->getCurLocomotor()->getWanderAboutPointRadius()/PATHFIND_CELL_SIZE_F) + 0.5f);
-	}
-	Coord3D offset;
-	offset.x = GameLogicRandomValue(-delta, delta)*PATHFIND_CELL_SIZE_F;
-	offset.y = GameLogicRandomValue(-delta, delta)*PATHFIND_CELL_SIZE_F;
-	m_goalPosition = m_origin;
-	m_goalPosition.x += offset.x;
-	m_goalPosition.y += offset.y;
+	m_goalPosition = chooseWanderGoal(ai, m_origin);
 	m_timer = 0;
 	m_waitFrames = 10 + (getMachineOwner()->getID() & 0x7);
 	StateReturnType ret = AIInternalMoveToState::onEnter();
@@ -4779,16 +4793,7 @@ StateReturnType AIWanderInPlaceState::update()
 	// if move to has finished, move to next point on waypoint path
 	if (status != STATE_CONTINUE)
 	{
-		Int delta = 3;
-		if (ai->getCurLocomotor()) {
-			delta = REAL_TO_INT_FLOOR( (ai->getCurLocomotor()->getWanderAboutPointRadius()/PATHFIND_CELL_SIZE_F) + 0.5f);
-		}
-		Coord3D offset;
-		offset.x = GameLogicRandomValue(-delta, delta)*PATHFIND_CELL_SIZE_F;
-		offset.y = GameLogicRandomValue(-delta, delta)*PATHFIND_CELL_SIZE_F;
-		m_goalPosition = m_origin;
-		m_goalPosition.x += offset.x;
-		m_goalPosition.y += offset.y;
+		m_goalPosition = chooseWanderGoal(ai, m_origin);
 		AIInternalMoveToState::onEnter();
 		return STATE_CONTINUE;
 	}
