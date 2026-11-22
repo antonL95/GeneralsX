@@ -37,6 +37,7 @@
 #include "Common/INIAudit.h"
 #include "Common/PerfTimer.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/PartitionManager.h"
 #include "Common/ThingFactory.h"
 #include "Common/GameLOD.h"
 #include "Common/Xfer.h"
@@ -2471,7 +2472,13 @@ ParticleSystem::VisibilityState ParticleSystem::updateVisibility( Int localPlaye
 	{
 		if (Object *objectAttachedTo = TheGameLogic->findObjectByID( m_attachedToObjectID ))
 		{
-			visibilityState.isShrouded = objectAttachedTo->getShroudedStatus(localPlayerIndex) >= OBJECTSHROUD_FOGGED;
+			if (RetailFileLayers::enabled())
+			{
+				const PartitionData* partition = objectAttachedTo->friend_getPartitionData();
+				visibilityState.isShrouded = !objectAttachedTo->isKindOf(KINDOF_ALWAYS_VISIBLE) && partition && !partition->hasClearCell(localPlayerIndex);
+			}
+			else
+				visibilityState.isShrouded = objectAttachedTo->getShroudedStatus(localPlayerIndex) >= OBJECTSHROUD_FOGGED;
 		}
 		else
 		{
