@@ -99,6 +99,10 @@ TEST(HordeFormation, OrdersSlotsByRankNumberAndKeepsDeclarationOrderWithinARank)
 	EXPECT_EQ(layout.slots()[1].index, 1);
 	EXPECT_EQ(layout.slots()[2].unitType, "B");
 	EXPECT_EQ(layout.slots()[3].unitType, "C");
+	EXPECT_EQ(layout.slots()[0].rankInfoIndex, 1u);
+	EXPECT_EQ(layout.slots()[1].rankInfoIndex, 1u);
+	EXPECT_EQ(layout.slots()[2].rankInfoIndex, 0u);
+	EXPECT_EQ(layout.slots()[3].rankInfoIndex, 2u);
 }
 
 TEST(HordeFormation, AssignsMembersToMatchingSlotsThenAnyFreeSlot)
