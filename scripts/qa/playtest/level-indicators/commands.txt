@@ -1,0 +1,35 @@
+20 create Player_1 GondorPippin 0 2520,1010,0
+20 create Player_1 LamedonClansmenHorde 0 3300,670,0
+20 create Player_1 MordorAttackTroll 0 3050,620,0
+21 reveal Player_1 GondorPippin 0
+105 cursor-screen - - 0 - 1150 180
+106 xpstate Player_1 GondorPippin 0
+114 cursor-point Player_1 GondorPippin 0
+123 cursor-screen - - 0 - 1150 180
+123 select Player_1 GondorPippin 0
+132 deselect - - 0
+132 veterancy Player_1 GondorPippin 0 3
+133 xpstate Player_1 GondorPippin 0
+136 xpstate Player_1 LamedonClansmenHorde 0
+144 cursor-point Player_1 LamedonClansman2 0
+153 cursor-screen - - 0 - 1150 180
+153 select Player_1 LamedonClansmenHorde 0
+162 deselect - - 0
+162 veterancy Player_1 LamedonClansmenHorde 0 1
+165 xpstate Player_1 LamedonClansmenHorde 0
+165 hordelog Player_1 LamedonClansmenHorde 0
+172 cursor-point Player_1 GondorInfantryBanner 0
+181 cursor-screen - - 0 - 1150 180
+181 select Player_1 LamedonClansmenHorde 0
+190 veterancy Player_1 LamedonClansmenHorde 0 4
+191 xpstate Player_1 LamedonClansmenHorde 0
+194 deselect - - 0
+195 veterancy Player_1 MordorAttackTroll 0 1
+196 xpstate Player_1 MordorAttackTroll 0
+205 cursor-point Player_1 MordorAttackTroll 0
+213 cursor-screen - - 0 - 1150 180
+213 select Player_1 MordorAttackTroll 0
+222 deselect - - 0
+232 cursor-point Player_1 GondorPippin 0
+241 cursor-screen - - 0 - 1150 180
+241 select Player_1 GondorPippin 0

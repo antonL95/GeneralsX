@@ -1,0 +1,4 @@
+104 Player_1 GondorPippin 2520 1010 0.80
+134 Player_1 LamedonClansmenHorde 3335 670 0.80
+196 Player_1 MordorAttackTroll 3050 620 0.80
+224 Player_1 GondorPippin 2520 1010 0.80
