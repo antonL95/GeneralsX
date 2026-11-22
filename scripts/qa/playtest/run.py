@@ -167,6 +167,8 @@ def main():
         output = state / "results"
         output.mkdir()
         render(build, output, state, map_path, frames, camera_frames, end_frame, commands, render_from, checks)
+        if "check_captures" in checks:
+            checks["check_captures"](output, frames)
         make_media(output, frames)
         (output / "frames.txt").write_text("\n".join(map(str, frames)) + "\n")
         (output / "frame-count.txt").write_text(f"{end_frame}\n")
