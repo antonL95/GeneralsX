@@ -65,6 +65,13 @@ public:
 	Real	m_minFallSpeedForDamage;
 	Real	m_fallHeightDamageFactor;
 	Real	m_pitchRollYawFactor;
+	Real	m_gravityMult = 1.0f;
+	Real	m_firstHeight = 1.3f;
+	Real	m_secondHeight = 1.3f;
+	UnsignedInt m_shockStunnedTimeLow = LOGICFRAMES_PER_SECOND;
+	UnsignedInt m_shockStunnedTimeHigh = 2 * LOGICFRAMES_PER_SECOND;
+	UnsignedInt m_shockStandingTime = LOGICFRAMES_PER_SECOND;
+	Bool m_orientToFlightPath = FALSE;
 
 	const WeaponTemplate* m_vehicleCrashesIntoBuildingWeaponTemplate;
 	const WeaponTemplate* m_vehicleCrashesIntoNonBuildingWeaponTemplate;
@@ -111,7 +118,8 @@ public:
 
 	void applyForce( const Coord3D *force );		///< apply a force at the object's CG
 	void applyShock( const Coord3D *force );					///< apply a shockwave force against the object's CG
-	void launchFromImpact(const Coord3D& direction, Real amount, Real zFactor);
+	void launchFromImpact(const Coord3D& direction, Real amount, Real zFactor, Bool ram = FALSE);
+	Bool isInRetailImpact() const { return m_impactFlightFrames != 0 || m_impactEndFrame != 0; }
 	void applyRandomRotation();											  ///< apply a random rotation at the object's CG
 	void addVelocityTo(const Coord3D* vel) ;
 
@@ -294,6 +302,16 @@ private:
 	ObjectID										m_previousOverlap;				///< last frame's object(s) being overlapped
 	std::vector<ObjectID> m_crushContacts;
 	std::vector<ObjectID> m_previousCrushContacts;
+	UnsignedInt m_impactFlightFrames = 0;
+	UnsignedInt m_impactFlightDuration = 0;
+	UnsignedInt m_impactStandFrame = 0;
+	UnsignedInt m_impactEndFrame = 0;
+	Coord3D m_impactStart = {};
+	Coord3D m_impactEnd = {};
+	Real m_impactHeight = 0.0f;
+	void updateImpactRecovery();
+	void finishImpactFlight();
+	void xferImpact(Xfer* xfer);
 	ObjectID										m_lastCollidee;						///< ID of the last object I collided with, can be quite old.
 	UnsignedInt									m_motiveForceExpires;			///< frames at which "recent" applyMotiveForce is no longer considered
 	Real												m_extraBounciness;				///< modifier to ground stiffness

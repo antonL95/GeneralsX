@@ -34,6 +34,7 @@
 #include <Utility/intrin_compat.h>	// For _isnan compatibility
 #include "Common/PerfTimer.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
@@ -195,6 +196,21 @@ static void parseFrictionPerSec( INI* ini, void * /*instance*/, void *store, con
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+	if (RetailFileLayers::enabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "GravityMult", INI::parseReal, nullptr, offsetof(PhysicsBehaviorModuleData, m_gravityMult) },
+			{ "FirstHeight", INI::parseReal, nullptr, offsetof(PhysicsBehaviorModuleData, m_firstHeight) },
+			{ "SecondHeight", INI::parseReal, nullptr, offsetof(PhysicsBehaviorModuleData, m_secondHeight) },
+			{ "ShockStandingTime", INI::parseDurationUnsignedInt, nullptr, offsetof(PhysicsBehaviorModuleData, m_shockStandingTime) },
+			{ "ShockStunnedTimeLow", INI::parseDurationUnsignedInt, nullptr, offsetof(PhysicsBehaviorModuleData, m_shockStunnedTimeLow) },
+			{ "ShockStunnedTimeHigh", INI::parseDurationUnsignedInt, nullptr, offsetof(PhysicsBehaviorModuleData, m_shockStunnedTimeHigh) },
+			{ "OrientToFlightPath", INI::parseBool, nullptr, offsetof(PhysicsBehaviorModuleData, m_orientToFlightPath) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -443,7 +459,8 @@ void PhysicsBehavior::resetDynamicPhysics()
 //-------------------------------------------------------------------------------------------------
 void PhysicsBehavior::applyGravitationalForces()
 {
-	m_accel.z += TheGlobalData->m_gravity;
+	m_accel.z += RetailFileLayers::enabled() ?
+		TheGlobalData->m_gravity * getPhysicsBehaviorModuleData()->m_gravityMult : TheGlobalData->m_gravity;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -625,6 +642,8 @@ UpdateSleepTime PhysicsBehavior::update()
 
 	Object*														obj = getObject();
 	const PhysicsBehaviorModuleData*	d = getPhysicsBehaviorModuleData();
+	const Bool retail = RetailFileLayers::enabled();
+	const Bool impactFlight = retail && m_impactFlightFrames != 0;
 	Bool															airborneAtStart = obj->isAboveTerrain();
 	Real															activeVelZ = 0;
 	Coord3D														bounceForce;
@@ -641,18 +660,30 @@ UpdateSleepTime PhysicsBehavior::update()
 
 	Coord3D prevPos = *obj->getPosition();
 	m_prevAccel = m_accel;
+	if (retail && m_impactEndFrame != 0)
+		updateImpactRecovery();
 
 	if (!obj->isDisabledByType(DISABLED_HELD))
 	{
 		Matrix3D mtx = *obj->getTransformMatrix();
 
-		applyGravitationalForces();
-		applyFrictionalForces();
-
-		// integrate acceleration into velocity
-		m_vel.x += m_accel.x;
-		m_vel.y += m_accel.y;
-		m_vel.z += m_accel.z;
+		if (impactFlight)
+		{
+			const Real t = Real(m_impactFlightDuration - --m_impactFlightFrames) / Real(m_impactFlightDuration);
+			const Real u = 1.0f - t;
+			m_vel.x = m_impactStart.x + (m_impactEnd.x - m_impactStart.x) * t - prevPos.x;
+			m_vel.y = m_impactStart.y + (m_impactEnd.y - m_impactStart.y) * t - prevPos.y;
+			m_vel.z = m_impactStart.z * u + m_impactEnd.z * t +
+				3.0f * t * u * m_impactHeight * (u * d->m_firstHeight + t * d->m_secondHeight) - prevPos.z;
+		}
+		else
+		{
+			applyGravitationalForces();
+			applyFrictionalForces();
+			m_vel.x += m_accel.x;
+			m_vel.y += m_accel.y;
+			m_vel.z += m_accel.z;
+		}
 
 		// when vel gets tiny, just clamp to zero
 		const Real THRESH = 0.001f;
@@ -665,7 +696,13 @@ UpdateSleepTime PhysicsBehavior::update()
 		Real oldPosZ = mtx.Get_Z_Translation();
 
 		// integrate velocity into position
-		if (obj->testStatus(OBJECT_STATUS_BRAKING))
+		if (impactFlight)
+		{
+			mtx.Adjust_X_Translation(m_vel.x);
+			mtx.Adjust_Y_Translation(m_vel.y);
+			mtx.Adjust_Z_Translation(m_vel.z);
+		}
+		else if (obj->testStatus(OBJECT_STATUS_BRAKING))
 		{
 			// Don't update position if the locomotor is braking.
 			if (!obj->isKindOf(KINDOF_PROJECTILE))
@@ -691,7 +728,7 @@ UpdateSleepTime PhysicsBehavior::update()
 		}
 
 		// Check when to clear the stunned status
-		if (getIsStunned())
+		if (getIsStunned() && !impactFlight && m_impactEndFrame == 0)
 		{
 			if ( (fabs(m_vel.x) < STUN_RELIEF_EPSILON &&
 				    fabs(m_vel.y) < STUN_RELIEF_EPSILON &&
@@ -762,7 +799,7 @@ UpdateSleepTime PhysicsBehavior::update()
 		{
 			groundZ += obj->getCarrierDeckHeight();
 		}
-		gotBounceForce = handleBounce(oldPosZ, mtx.Get_Z_Translation(), groundZ, &bounceForce);
+		gotBounceForce = !impactFlight && handleBounce(oldPosZ, mtx.Get_Z_Translation(), groundZ, &bounceForce);
 
 		// remember our z-vel prior to doing ground-slam adjustment
 		activeVelZ = m_vel.z;
@@ -797,10 +834,22 @@ UpdateSleepTime PhysicsBehavior::update()
 				obj->setDisabled(DISABLED_FREEFALL);
 				obj->setModelConditionState(MODELCONDITION_FREEFALL);
 			}
-			else if (getFlag(STICK_TO_GROUND) && !getFlag(ALLOW_TO_FALL))
+			else if (!impactFlight && getFlag(STICK_TO_GROUND) && !getFlag(ALLOW_TO_FALL))
 			{
 				mtx.Set_Z_Translation(groundZ);
 			}
+		}
+
+		if (retail && d->m_orientToFlightPath && mtx.Get_Z_Translation() > groundZ &&
+			(m_vel.x != 0.0f || m_vel.y != 0.0f || m_vel.z != 0.0f))
+		{
+			const Vector3 position = mtx.Get_Translation();
+			const Real horizontal = WWMath::SqrtfOrigin(sqr(m_vel.x) + sqr(m_vel.y));
+			const Real yaw = horizontal > 0.0f ? WWMath::Atan2Origin(m_vel.y, m_vel.x) : obj->getOrientation();
+			mtx.Make_Identity();
+			mtx.Set_Translation(position);
+			mtx.In_Place_Pre_Rotate_Y(-WWMath::Atan2Origin(m_vel.z, horizontal));
+			mtx.In_Place_Pre_Rotate_Z(yaw);
 		}
 
 		if (gotBounceForce)
@@ -904,6 +953,8 @@ UpdateSleepTime PhysicsBehavior::update()
 		obj->clearModelConditionState(MODELCONDITION_FREEFALL);
 	}
 
+	if (impactFlight && m_impactFlightFrames == 0)
+		finishImpactFlight();
 
 	// If we are effectively dead, we shouldn't recall kill.
 	if (d->m_killWhenRestingOnGround && !airborneAtEnd && isVerySmall3D(m_vel))
@@ -936,7 +987,7 @@ UpdateSleepTime PhysicsBehavior::calcSleepTime() const
 			(getObject()->getLayer() == LAYER_GROUND && !getObject()->isAboveTerrain()) &&
 			getCurrentOverlap() == INVALID_ID &&
 			getPreviousOverlap() == INVALID_ID &&
-			getFlag(UPDATE_EVER_RUN))
+		getFlag(UPDATE_EVER_RUN) && m_impactEndFrame == 0 && m_impactFlightFrames == 0)
 	{
 		return UPDATE_SLEEP_FOREVER;
 	}
@@ -1098,28 +1149,92 @@ void PhysicsBehavior::addVelocityTo( const Coord3D *vel)
 		m_vel.add( *vel );
 }
 
-void PhysicsBehavior::launchFromImpact(const Coord3D& direction, Real amount, Real zFactor)
+void PhysicsBehavior::launchFromImpact(const Coord3D& direction, Real amount, Real zFactor, Bool ram)
 {
+	if (!RetailFileLayers::enabled())
+		return;
 	Object* victim = getObject();
 	amount *= std::clamp(1.0f - AttributeModifiers::value(victim, AttributeModifierRules::RESIST_KNOCKBACK), 0.0f, 2.0f);
-	if (amount <= 0.0f || victim->isKindOf(KINDOF_IMMOBILE) || victim->isAirborneTarget())
+	if (!(amount > 0.0f) || victim->isKindOf(KINDOF_IMMOBILE) || victim->isAirborneTarget())
 		return;
 
-	const Real gravity = std::abs(TheGlobalData->m_gravity);
-	const Real speed = WWMath::SqrtfOrigin(gravity * amount * 0.5f);
+	const Real baseGravity = std::abs(TheGlobalData->m_gravity);
+	const Real gravity = baseGravity * getPhysicsBehaviorModuleData()->m_gravityMult;
+	const Real speed = ram ? amount / Real(LOGICFRAMES_PER_SECOND) : WWMath::SqrtfOrigin(baseGravity * amount * 0.5f);
+	const Real lift = std::max(0.0f, speed * zFactor);
+	const Real flightGravity = gravity > 0.0f ? gravity : baseGravity;
+	const Real flight = flightGravity > 0.0f ? 2.0f * lift / flightGravity : 0.0f;
+	m_impactFlightDuration = static_cast<UnsignedInt>(WWMath::Ceil(std::clamp(flight, 2.0f, 360.0f)));
+	m_impactFlightFrames = m_impactFlightDuration;
+	m_impactHeight = lift * Real(m_impactFlightDuration) * 0.25f;
+	m_impactStart = *victim->getPosition();
+	m_impactEnd = { m_impactStart.x + direction.x * speed * Real(m_impactFlightDuration),
+		m_impactStart.y + direction.y * speed * Real(m_impactFlightDuration), 0.0f };
+	m_impactEnd.z = TheTerrainLogic->getLayerHeight(m_impactEnd.x, m_impactEnd.y, victim->getLayer());
+	m_impactStandFrame = 0;
+	m_impactEndFrame = 0;
 	m_vel.x = direction.x * speed;
 	m_vel.y = direction.y * speed;
-	m_vel.z = speed * zFactor;
+	m_vel.z = lift;
 	m_velMag = INVALID_VEL_MAG;
 	setAllowToFall(TRUE);
 	setStunned(TRUE);
-	victim->setModelConditionState(MODELCONDITION_STUNNED);
+	victim->clearModelConditionState(MODELCONDITION_STUNNED);
+	victim->clearModelConditionState(MODELCONDITION_STUNNED_STANDING_UP);
+	victim->setModelConditionState(MODELCONDITION_STUNNED_FLAILING);
 	setWakeFrame(victim, UPDATE_SLEEP_NONE);
 	if (RetailTestCommands::tracesCombat())
 	{
 		std::fprintf(stderr, "TEST launch frame=%u victim=%u velocity=%.3f,%.3f,%.3f\n",
 			TheGameLogic->getFrame(), unsigned(victim->getID()), m_vel.x, m_vel.y, m_vel.z);
 		std::fflush(stderr);
+	}
+}
+
+void PhysicsBehavior::finishImpactFlight()
+{
+	Object* victim = getObject();
+	const auto* data = getPhysicsBehaviorModuleData();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	m_vel.zero();
+	m_velMag = 0.0f;
+	victim->clearModelConditionState(MODELCONDITION_STUNNED_FLAILING);
+	if (data->m_orientToFlightPath)
+		setAngles(victim->getOrientation(), 0.0f, 0.0f);
+	if (victim->isEffectivelyDead())
+	{
+		updateImpactRecovery();
+		return;
+	}
+
+	const UnsignedInt low = std::min(data->m_shockStunnedTimeLow, data->m_shockStunnedTimeHigh);
+	const UnsignedInt high = std::max(data->m_shockStunnedTimeLow, data->m_shockStunnedTimeHigh);
+	constexpr UnsignedInt framesPerRetailTick = LOGICFRAMES_PER_SECOND / RotwkDuration::FRAMES_PER_SECOND;
+	const UnsignedInt stun = low == high ? low :
+		GameLogicRandomValue(low / framesPerRetailTick, high / framesPerRetailTick) * framesPerRetailTick;
+	m_impactStandFrame = now + stun;
+	m_impactEndFrame = m_impactStandFrame + data->m_shockStandingTime;
+	victim->setModelConditionState(MODELCONDITION_STUNNED);
+	updateImpactRecovery();
+}
+
+void PhysicsBehavior::updateImpactRecovery()
+{
+	Object* victim = getObject();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (victim->isEffectivelyDead() || now >= m_impactEndFrame)
+	{
+		victim->clearModelConditionState(MODELCONDITION_STUNNED);
+		victim->clearModelConditionState(MODELCONDITION_STUNNED_STANDING_UP);
+		setStunned(FALSE);
+		m_impactStandFrame = 0;
+		m_impactEndFrame = 0;
+	}
+	else if (m_impactStandFrame != 0 && now >= m_impactStandFrame)
+	{
+		victim->clearModelConditionState(MODELCONDITION_STUNNED);
+		victim->setModelConditionState(MODELCONDITION_STUNNED_STANDING_UP);
+		m_impactStandFrame = 0;
 	}
 }
 
@@ -1570,8 +1685,18 @@ Bool PhysicsBehavior::checkRetailCrushCollision(Object* victim)
 
 	if (auto* physics = victim->getPhysics())
 	{
-		const Coord3D direction = { m_vel.x / speed, m_vel.y / speed, 0.0f };
-		physics->launchFromImpact(direction, data.crushKnockback, data.crushZFactor);
+		Coord3D direction = { m_vel.x / speed, m_vel.y / speed, 0.0f };
+		if (data.ramPower > 0.0f)
+		{
+			const Real dx = to.x - from.x;
+			const Real dy = to.y - from.y;
+			const Real distance = WWMath::SqrtfOrigin(sqr(dx) + sqr(dy));
+			if (distance > 0.0f)
+				direction = { dx / distance, dy / distance, 0.0f };
+			physics->launchFromImpact(direction, data.ramPower, data.ramZMult, TRUE);
+		}
+		else
+			physics->launchFromImpact(direction, data.crushKnockback, data.crushZFactor);
 	}
 
 	const Real deceleration = data.crushDecelerationPercent * AttributeModifiers::value(crusher, AttributeModifierRules::CRUSH_DECELERATE);
@@ -1977,6 +2102,7 @@ void PhysicsBehavior::crc( Xfer *xfer )
 	{
 		xfer->xferSTLObjectIDVector(&m_crushContacts);
 		xfer->xferSTLObjectIDVector(&m_previousCrushContacts);
+		xferImpact(xfer);
 	}
 
 }
@@ -1990,7 +2116,7 @@ void PhysicsBehavior::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2063,9 +2189,24 @@ void PhysicsBehavior::xfer( Xfer *xfer )
 		xfer->xferSTLObjectIDVector(&m_crushContacts);
 		xfer->xferSTLObjectIDVector(&m_previousCrushContacts);
 	}
+	if (version >= 4)
+		xferImpact(xfer);
 
 }
 
+void PhysicsBehavior::xferImpact(Xfer* xfer)
+{
+	xfer->xferUnsignedInt(&m_impactFlightFrames);
+	if (m_impactFlightFrames != 0)
+	{
+		xfer->xferUnsignedInt(&m_impactFlightDuration);
+		xfer->xferCoord3D(&m_impactStart);
+		xfer->xferCoord3D(&m_impactEnd);
+		xfer->xferReal(&m_impactHeight);
+	}
+	xfer->xferUnsignedInt(&m_impactStandFrame);
+	xfer->xferUnsignedInt(&m_impactEndFrame);
+}
 // ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------

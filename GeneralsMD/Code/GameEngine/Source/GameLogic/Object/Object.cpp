@@ -3554,6 +3554,8 @@ void Object::createVeterancyLevelFX(VeterancyLevel oldLevel, VeterancyLevel newL
  */
 Bool Object::isAbleToAttack() const
 {
+	if (RetailFileLayers::enabled() && m_physics && m_physics->isInRetailImpact())
+		return FALSE;
 
 	//******************************************************
 	//********* AUTOMATICALLY FALSE CONDITIONS *************
