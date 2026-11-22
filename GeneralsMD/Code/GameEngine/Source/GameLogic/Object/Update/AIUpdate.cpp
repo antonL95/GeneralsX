@@ -1008,6 +1008,9 @@ void AIUpdateInterface::chooseGoodLocomotorFromCurrentSet()
 
 	if (prevLoco != m_curLocomotor)
 	{
+		if (prevLoco)
+			prevLoco->clearRetailGait(getObject());
+
 		// make sure the group's speed will be recalculated
 		if (getGroup())
 			getGroup()->recomputeGroupSpeed();
