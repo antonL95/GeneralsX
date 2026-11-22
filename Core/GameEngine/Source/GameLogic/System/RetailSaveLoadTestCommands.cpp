@@ -13,10 +13,50 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
 #include "GameLogic/TerrainLogic.h"
+
+void runRetailSaveLoadPartitionTestCommand(std::string_view action, Object* object, const char* argument, UnsignedInt frame)
+{
+	if (!object)
+		return;
+
+	const GeometryInfo& geometry = object->getGeometryInfo();
+	if (action == "snapshot-partition-scale")
+	{
+		Real factor;
+		if (std::sscanf(argument, "%f", &factor) == 1 && factor > 0.0f)
+			object->setGeometryInfo(GeometryInfo(geometry.getGeomType(), FALSE, geometry.getMaxHeightAbovePosition() * factor,
+				geometry.getMajorRadius() * factor, geometry.getMinorRadius() * factor));
+		return;
+	}
+
+	const PartitionData* data = object->friend_getPartitionData();
+	if (!data)
+		return;
+
+	Int count = 0;
+	std::fprintf(stderr, "TEST save-load partition frame=%u template=%s major=%.2f cells=", frame,
+		object->getTemplate()->getName().str(), geometry.getMajorRadius());
+	for (Int y = 0; y < ThePartitionManager->getCellCountY(); ++y)
+	{
+		for (Int x = 0; x < ThePartitionManager->getCellCountX(); ++x)
+		{
+			for (auto* entry = ThePartitionManager->getCellAt(x, y)->getFirstCoiInCell(); entry; entry = entry->getNextCoi())
+			{
+				if (entry->getModule() != data)
+					continue;
+				std::fprintf(stderr, "%d,%d;", x, y);
+				++count;
+				break;
+			}
+		}
+	}
+	std::fprintf(stderr, " count=%d\n", count);
+}
 
 void runRetailSaveLoadWallTestCommand(std::string_view action, Player* player, Object* wall,
 	const char* name, const Coord3D& position, UnsignedInt frame)

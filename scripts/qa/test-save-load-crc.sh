@@ -169,12 +169,22 @@ for phase in continue resume; do
     fi
     if [ "$mode" = training ] && [ "$end" -ge 244 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 244 ]; }; then
         grep -E '^TEST pkg19 frame=244 template=Pkg19SaveShooter weapon=Pkg19SaveWindup locked=1 .*draw=272 ' "$out/$phase.log"
+        grep -E '^TEST save-load partition frame=244 .* count=[1-9][0-9]*$' "$out/$phase.log" > "$out/$phase.cells"
+        test "$(wc -l < "$out/$phase.cells")" -eq 6
+        grep -E 'template=MenWallGate .* count=12$' "$out/$phase.cells"
+        grep -E 'template=PartitionUpgradeBuilding major=100\.00 ' "$out/$phase.cells"
+        grep -E 'template=PartitionScaleFighter major=96\.00 ' "$out/$phase.cells"
+        grep -E 'template=PartitionScaleHorde major=120\.00 ' "$out/$phase.cells"
     fi
     if [ "$mode" = training ] && [ "$end" -ge 250 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 250 ]; }; then
         grep -E '^TEST damage frame=250 weapon=Pkg19SaveSecondary .*victim=[0-9]+\(Pkg19SaveTarget\) ' "$out/$phase.log"
     fi
     if [ "$mode" = training ] && [ "$end" -ge 285 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 285 ]; }; then
         expect "$phase" 'TEST frame 285: builderscriptmove object 182 to 1933.7 1774.0'
+    fi
+    if [ "$mode" = training ] && [ "$end" -ge 450 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 450 ]; }; then
+        grep -E '^TEST damage frame=450 weapon=MordorCatapultRockWarhead .*victim=[0-9]+\(MenWallGate\) .*dealt=4\.00 ' "$out/$phase.log"
+        grep -E '^TEST health 450 Player_1 MenWallGate 0 id=[0-9]+ health=1495\.99 ' "$out/$phase.log"
     fi
     awk -v first="$save_frame" -v last="$end" '
         /^TEST xp-crc frame=[0-9]+ crc=[0-9A-F]+$/ {
@@ -185,6 +195,9 @@ for phase in continue resume; do
         END {if (count != last - first + 1) exit 1}
     ' "$out/$phase.log" > "$out/$phase.crc"
 done
+if [ "$mode" = training ] && [ "$save_frame" -le 244 ] && [ "$end" -ge 244 ]; then
+    cmp "$out/continue.cells" "$out/resume.cells"
+fi
 if [ -n "$path_unit" ]; then
     expect save "TEST save-load path-queue frame=$save_frame queued=1"
     expect continue "TEST save-load path-queue frame=$save_frame queued=1"

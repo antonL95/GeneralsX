@@ -171,6 +171,7 @@ void runRetailParticleTestCommand(std::string_view action, const Object* source,
 void runRetailPlacementTestCommand(Object* source, const char* name, const Coord3D* target, UnsignedInt frame);
 void logRetailPlacementTestObject(const Object* object, const char* name, UnsignedInt frame);
 void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, UnsignedInt frame);
+void runRetailSaveLoadPartitionTestCommand(std::string_view action, Object* object, const char* argument, UnsignedInt frame);
 void runRetailSaveLoadWallTestCommand(std::string_view action, Player* player, Object* wall,
 	const char* name, const Coord3D& position, UnsignedInt frame);
 void runRetailSaveLoadBookTestCommand(Player* player, const char* templateName);
@@ -2340,6 +2341,11 @@ void execute(const Command& command, unsigned int frame)
 		return;
 	}
 #endif
+	if (command.action == "snapshot-partition-cells" || command.action == "snapshot-partition-scale")
+	{
+		runRetailSaveLoadPartitionTestCommand(command.action, findObject(command, true), command.structure.c_str(), frame);
+		return;
+	}
 	if (command.action == "snapshot-path-state" || command.action == "snapshot-register-footprint" ||
 		command.action == "snapshot-wall-state")
 	{
