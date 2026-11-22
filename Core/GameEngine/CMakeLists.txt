@@ -129,6 +129,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/HordeWorkerAIUpdate.h
     Include/GameLogic/Module/RubbleRiseUpdate.h
     Include/GameLogic/Module/AnimalAIUpdate.h
+    Include/GameLogic/Module/FloodUpdate.h
     Include/GameLogic/Module/GiantBirdAIUpdate.h
     Include/Common/RetailFileLayers.h
     Include/Common/RetailAIKindOf.h
@@ -713,6 +714,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/HordeWorkerAIUpdate.cpp
     Source/GameLogic/Object/Update/RubbleRiseUpdate.cpp
     Source/GameLogic/Object/Update/AnimalAIUpdate.cpp
+    Source/GameLogic/Object/Update/FloodUpdate.cpp
     Source/GameLogic/Object/Update/GiantBirdAIUpdate.cpp
 #    Source/Common/GlobalData.cpp
     Source/Common/INI/INI.cpp

@@ -180,6 +180,7 @@
 #include "GameLogic/Module/MobMemberSlavedUpdate.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
+#include "GameLogic/Module/FloodUpdate.h"
 #include "GameLogic/Module/RunOffMapBehavior.h"
 #include "GameLogic/Module/RetailConstruction.h"
 #include "GameLogic/Module/CastleBehavior.h"
@@ -559,6 +560,7 @@ void ModuleFactory::init()
 		addModule( AutoPickUpUpdate );
 		addModule( HitReactionBehavior );
 		addModule( OathbreakersFadeAwayBehavior );
+		addModule( FloodUpdate );
 		addModule( HordeMemberCollide );
 		addModule( ExperienceLevelCreate );
 		addModule( LevelUpUpgrade );

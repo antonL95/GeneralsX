@@ -4476,6 +4476,7 @@ void Object::crc( Xfer *xfer )
 		static const NameKeyType abilityKey = NAMEKEY("ModelConditionSpecialAbilityUpdate");
 		static const NameKeyType hitKey = NAMEKEY("HitReactionBehavior");
 		static const NameKeyType oathKey = NAMEKEY("OathbreakersFadeAwayBehavior");
+		static const NameKeyType floodKey = NAMEKEY("FloodUpdate");
 		static const NameKeyType dualWeaponKey = NAMEKEY("DualWeaponBehavior");
 		static const NameKeyType deathWeaponKey = NAMEKEY("FireWeaponWhenDeadBehavior");
 		static const NameKeyType clickReactionKey = NAMEKEY("ClickReactionBehavior");
@@ -4495,7 +4496,7 @@ void Object::crc( Xfer *xfer )
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
 			const NameKeyType key = (*module)->getModuleNameKey();
-			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey ||
+			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey || key == floodKey ||
 				key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || key == pillageKey || key == autoAbilityKey ||
 				key == inheritUpgradeKey || key == heroListKey || key == dominateKey || key == flingKey ||
 				key == storeKey || key == teleportKey || key == teleportToCasterKey ||
