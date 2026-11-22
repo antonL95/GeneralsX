@@ -67,7 +67,7 @@ TrollVoxFindTastyOrc'
     expect_request start 399 "$doomed" "$construction"
     expect_request stop 408 "$doomed" "$construction"
 
-    group=$(find_id 264 AmrothianGuardsmen Player_1)
+    group=$(find_id 264 Pkg49PointingGuardA Player_1)
     expect_request start 271 "$group" ManTauntCalloutsLoop1
     expect_request stop 281 "$group" ManTauntCalloutsLoop1
     reject_line "RETAIL AUDIO start frame=268 owner=$group sound=ManTauntCalloutsLoop1"

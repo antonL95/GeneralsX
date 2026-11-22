@@ -1,7 +1,7 @@
-208 create Player_1 MordorMountainTroll 0 2270,810,0
-208 create Player_1 Pkg49ClubRock 0 2290,810,0
-208 create Player_1 CreateAHero 0 2250,820,0
-208 create Player_1 IsengardFighter 0 2270,840,0
+208 create Player_1 MordorMountainTroll 0 3270,810,0
+208 create Player_1 Pkg49ClubRock 0 3290,810,0
+208 create Player_1 CreateAHero 0 3250,820,0
+208 create Player_1 IsengardFighter 0 3270,840,0
 218 pkg49-fx:FX_TrollGrabInitiate Player_1 MordorMountainTroll 0 Player_1:Pkg49ClubRock:0
 219 pkg49-fx:FX_TrollGrabInitiate Player_1 MordorMountainTroll 0 Player_1:CreateAHero:0
 220 pkg49-fx:Pkg49SoundAlternatives Player_1 MordorMountainTroll 0 Player_1:Pkg49ClubRock:0
@@ -10,44 +10,58 @@
 223 pkg49-fx:FX_CreateAHeroDie Player_1 CreateAHero 0
 224 pkg49-fx:FX_DiebyFalling Player_1 IsengardFighter 0
 225 pkg49-fx:FX_DiebyFalling Player_1 Pkg49ClubRock 0
-258 pkg49-fx:FX_TrollGrabInitiate Player_1 MordorMountainTroll 0 Player_1:Pkg49ClubRock:0
-232 create Player_1 AmrothianGuardsmen 0 2260,815,0
+226 destroy Player_1 IsengardFighter 0
+229 create Player_1 DolAmrothFortressCitadel 0 3380,815,0
+232 create Player_1 AmrothianGuardsmen 0 3260,815,0
 236 pkg49-model-condition Player_1 AmrothianGuardsmen 0 on
+238 objupgrade Player_1 DolAmrothFortressCitadel 0 Upgrade_MenFortressHouseOfHealing
 249 pkg49-model-condition Player_1 AmrothianGuardsmen 0 off
 253 pkg49-model-condition Player_1 AmrothianGuardsmen 0 on
+258 pkg49-fx:FX_TrollGrabInitiate Player_1 MordorMountainTroll 0 Player_1:Pkg49ClubRock:0
+259 destroy Player_1 MordorMountainTroll 0
+259 destroy Player_1 Pkg49ClubRock 0
 260 kill Player_1 AmrothianGuardsmen 0
-229 create Player_1 DolAmrothFortressCitadel 0 2380,900,0
-238 objupgrade Player_1 DolAmrothFortressCitadel 0 Upgrade_MenFortressHouseOfHealing
-264 create Player_1 AmrothianGuardsmen 0 2265,827,0
-265 create Player_1 AmrothianGuardsmen 0 2272,828,0
-267 pkg49-model-condition Player_1 AmrothianGuardsmen 0 point-on
-270 pkg49-model-condition Player_1 AmrothianGuardsmen 1 point-on
-275 pkg49-model-condition Player_1 AmrothianGuardsmen 1 point-off
-280 pkg49-model-condition Player_1 AmrothianGuardsmen 0 point-off
-285 create Player_1 BelfalasMarines 0 2245,865,0
+264 create Player_1 Pkg49PointingGuardA 0 3265,827,0
+265 create Player_1 Pkg49PointingGuardB 0 3272,828,0
+267 pkg49-model-condition Player_1 Pkg49PointingGuardA 0 point-on
+270 pkg49-model-condition Player_1 Pkg49PointingGuardB 0 point-on
+275 pkg49-model-condition Player_1 Pkg49PointingGuardB 0 point-off
+280 pkg49-model-condition Player_1 Pkg49PointingGuardA 0 point-off
+283 destroy Player_1 Pkg49PointingGuardB 0
+284 destroy Player_1 Pkg49PointingGuardA 0
+285 create Player_1 BelfalasMarines 0 3245,865,0
 288 pkg49-attack-voice Player_1 BelfalasMarines 0
 289 pkg49-model-condition Player_1 BelfalasMarines 0 melee-on
 289 pkg49-attack-voice Player_1 BelfalasMarines 0
 290 pkg49-model-condition Player_1 BelfalasMarines 0 melee-off
 290 pkg49-attack-voice Player_1 BelfalasMarines 0
+291 destroy Player_1 BelfalasMarines 0
 292 pkg49-select-voice Player_1 CreateAHero 0
 293 objupgrade Player_1 CreateAHero 0 Upgrade_CreateAHero_ClassArcher
 293 pkg49-select-voice Player_1 CreateAHero 0
 294 objupgrade Player_1 CreateAHero 0 Upgrade_CreateAHero_SubClass_0
 294 pkg49-select-voice Player_1 CreateAHero 0
-299 create Player_1 Pkg49RestlessAlways 0 2250,842,0
-299 create Player_1 Pkg49RestlessNever 0 2258,842,0
-300 create Player_1 GuldurRestlessWarrior 0 2266,842,0
+296 destroy Player_1 CreateAHero 0
+298 create Player_1 Pkg49MarineVoiceControl 0 3245,865,0
+299 create Player_1 Pkg49RestlessAlways 0 3250,842,0
+299 create Player_1 Pkg49RestlessNever 0 3258,842,0
+300 create Player_1 GuldurRestlessWarrior 0 3266,842,0
 302 pkg49-select-voice Player_1 Pkg49MarineVoiceControl 0 Player_1:Pkg49RestlessNever:0
 303 pkg49-select-voice Player_1 Pkg49MarineVoiceControl 0 Player_1:Pkg49RestlessAlways:0
 304 pkg49-select-voice Player_1 Pkg49MarineVoiceControl 0 Player_1:GuldurRestlessWarrior:0
 305 pkg49-select-voice Player_1 Pkg49MarineVoiceControl 0 Player_1:GuldurRestlessWarrior:0
-310 create Player_1 RingHeroFrodo 0 2250,850,0
+307 destroy Player_1 Pkg49MarineVoiceControl 0
+307 destroy Player_1 Pkg49RestlessAlways 0
+307 destroy Player_1 Pkg49RestlessNever 0
+307 destroy Player_1 GuldurRestlessWarrior 0
+310 create Player_1 RingHeroFrodo 0 3250,850,0
 316 pkg49-alliance - - 0 on
-317 create PlyrCivilian RingHeroFrodo 0 2258,850,0
+317 create PlyrCivilian RingHeroFrodo 0 3258,850,0
 324 pkg49-alliance - - 0 off
+325 destroy PlyrCivilian RingHeroFrodo 0
 327 kill Player_1 RingHeroFrodo 0
-298 create Player_1 Pkg49MarineVoiceControl 0 2245,865,0
-390 create Player_1 Pkg49CitadelDeath 0 2440,975,0
+389 destroy Player_1 DolAmrothFortressCitadel 0
+390 create Player_1 Pkg49CitadelDeath 0 3500,815,0
 398 objupgrade Player_1 Pkg49CitadelDeath 0 Upgrade_MenFortressHouseOfHealing
 408 kill Player_1 Pkg49CitadelDeath 0
+410 destroy Player_1 Pkg49CitadelDeath 0
