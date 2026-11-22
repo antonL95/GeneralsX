@@ -1265,6 +1265,8 @@ void Locomotor::setPhysicsOptions(Object* obj)
 }
 
 //-------------------------------------------------------------------------------------------------
+static constexpr Real MIN_GAIT_SPEED = 0.001f;
+
 void Locomotor::clearRetailGait(Object* object)
 {
 	if (!RetailFileLayers::enabled() ||
@@ -1852,7 +1854,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 	//
 	// Maintain goal speed
 	//
-	updateRetailGait(obj, onPathDistToGoal, actualSpeed, getFlag(IS_BRAKING) || goalSpeed + 0.001f < actualSpeed);
+	updateRetailGait(obj, onPathDistToGoal, actualSpeed, getFlag(IS_BRAKING) || goalSpeed + MIN_GAIT_SPEED < actualSpeed);
 	Real speedDelta = goalSpeed - actualSpeed;
 	if (moveBackwards) {
 		speedDelta = -goalSpeed+actualSpeed;
@@ -2941,7 +2943,10 @@ void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord
 			goalSpeed = arrivalSpeed > getMinSpeed() ? arrivalSpeed : getMinSpeed();
 	}
 
-	updateRetailGait(obj, onPathDistToGoal, actualSpeed, backing || goalSpeed + 0.001f < actualSpeed);
+	if (goalSpeed <= MIN_GAIT_SPEED && actualSpeed <= MIN_GAIT_SPEED)
+		clearRetailGait(obj);
+	else
+		updateRetailGait(obj, onPathDistToGoal, actualSpeed, backing || goalSpeed + MIN_GAIT_SPEED < actualSpeed);
 
 	Coord3D velocityDelta;
 	velocityDelta.x = dirToApplyForce.x * goalSpeed - velocity->x;
@@ -2989,7 +2994,7 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 //	DEBUG_ASSERTLOG(obj->getID() != TheObjectIDToDebug, ("locoUpdate_maintainCurrentPosition %f %f %f, speed %f (%f)",m_maintainPos.x,m_maintainPos.y,m_maintainPos.z,physics->getSpeed(),physics->getForwardSpeed2D()));
 #endif
 
-	const Bool stopping = RetailFileLayers::enabled() && m_retailWasRunning && physics->getVelocityMagnitude() > 0.001f;
+	const Bool stopping = RetailFileLayers::enabled() && m_retailWasRunning && physics->getVelocityMagnitude() > MIN_GAIT_SPEED;
 	if (stopping)
 	{
 		updateRetailGait(obj, 0.0f, physics->getVelocityMagnitude(), TRUE);
