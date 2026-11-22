@@ -4282,6 +4282,8 @@ Bool W3DModelDraw::getCurrentWorldspaceClientBonePositions(const char* boneName,
 		return false;
 
 	Int boneIndex = m_renderObject->Get_Bone_Index(boneName);
+	if (boneIndex == 0 && RetailFileLayers::enabled() && stricmp(boneName, "ROOTDUMMY") == 0)
+		boneIndex = m_renderObject->Get_Bone_Index("ROOT DUMMY");
 	if (boneIndex == 0)
 		return false;
 

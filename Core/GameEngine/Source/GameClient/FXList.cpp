@@ -1033,6 +1033,8 @@ public:
 
 	virtual void doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx, const Real /*primarySpeed*/, const Coord3D *secondary, const Real overrideRadius ) const override
 	{
+		if (m_requireCreationBone)
+			return;
 		if (primary)
 		{
 			reallyDoFX(primary, primaryMtx, nullptr, overrideRadius, nullptr, nullptr, secondary);
@@ -1076,7 +1078,7 @@ public:
 	{
 		if (primary && source && RetailFileLayers::enabled())
 			doFXFromObject(primary, primaryMtx, source, target, overrideRadius, secondary);
-		else if (primary && target && RetailFileLayers::enabled())
+		else if (primary && target && !m_requireCreationBone && RetailFileLayers::enabled())
 			reallyDoFX(primary, primaryMtx, nullptr, overrideRadius, nullptr, target, secondary);
 		else
 			doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
@@ -1128,6 +1130,25 @@ public:
 		((FXList*)instance)->addFXNugget(nugget);
 	}
 
+	static void parseBone(INI* ini, void* instance, void*, const void*)
+	{
+		const AsciiString bone = ini->getNextAsciiString();
+		const AsciiString name = ini->getNextAsciiString();
+		Bool follow = FALSE;
+		if (const char* option = ini->getNextTokenOrNull(INI::getSepsColon()))
+		{
+			if (stricmp(option, "FollowBone") != 0)
+				throw INI_INVALID_DATA;
+			follow = INI::scanBool(ini->getNextToken(INI::getSepsColon()));
+		}
+		auto* nugget = newInstance(ParticleSystemFXNugget);
+		nugget->m_name = name;
+		nugget->m_retailCreateBone = bone;
+		nugget->m_retailFollowBone = follow;
+		nugget->m_requireCreationBone = TRUE;
+		static_cast<FXList*>(instance)->addFXNugget(nugget);
+	}
+
 protected:
 
 	static void parseRetailName(INI* ini, void* instance, void*, const void*)
@@ -1152,20 +1173,44 @@ protected:
 	{
 		const Drawable* drawable = object->getDrawable();
 		const AsciiString& boneName = m_retailCreateBone.isNotEmpty() ? m_retailCreateBone : m_retailAttachmentBone;
-		Matrix3D bone;
-		if (drawable && boneName.isNotEmpty() && drawable->getCurrentWorldspaceClientBonePositions(boneName.str(), bone))
-		{
-			const Coord3D origin = {bone.Get_X_Translation(), bone.Get_Y_Translation(), bone.Get_Z_Translation()};
-			const Bool follow = m_retailFollowBone || m_attachToObject;
-			reallyDoFX(&origin, &bone, object, overrideRadius, follow ? &boneName : nullptr, target, secondary);
+		Matrix3D creation;
+		Coord3D origin;
+		const Bool hasCreation = drawable && boneName.isNotEmpty() &&
+			drawable->getCurrentWorldspaceClientBonePositions(boneName.str(), creation);
+		if (!hasCreation && m_requireCreationBone)
 			return;
+		if (hasCreation)
+		{
+			origin = {creation.Get_X_Translation(), creation.Get_Y_Translation(), creation.Get_Z_Translation()};
+			position = &origin;
+			transform = &creation;
+			if (traceRetailFXLists())
+				std::fprintf(stderr, "[Retail FXList] ParticleOrigin name=%s bone=%s position=(%.3f,%.3f,%.3f)\n",
+					m_name.str(), boneName.str(), origin.x, origin.y, origin.z);
 		}
 
+		const AsciiString& followName = m_retailAttachmentBone.isNotEmpty() ? m_retailAttachmentBone : m_retailCreateBone;
+		if (drawable && followName.isNotEmpty() &&
+			(m_retailAttachmentBone.isNotEmpty() || m_retailFollowBone || m_attachToObject))
+		{
+			if (hasCreation && followName == boneName)
+			{
+				reallyDoFX(position, transform, object, overrideRadius, &followName, target, secondary, &creation);
+				return;
+			}
+			Matrix3D attachment;
+			if (drawable->getCurrentWorldspaceClientBonePositions(followName.str(), attachment))
+			{
+				reallyDoFX(position, transform, object, overrideRadius, &followName, target, secondary, &attachment);
+				return;
+			}
+		}
 		reallyDoFX(position, transform, object, overrideRadius, nullptr, target, secondary);
 	}
 
 	void reallyDoFX(const Coord3D *primary, const Matrix3D* mtx, const Object* thingToAttachTo,
-		Real overrideRadius, const AsciiString* attachmentBone, const Object* target, const Coord3D* secondary) const
+		Real overrideRadius, const AsciiString* attachmentBone, const Object* target, const Coord3D* secondary,
+		const Matrix3D* attachmentTransform = nullptr) const
 	{
 		const ScopedVisualRandom random(RetailFileLayers::enabled());
 		if (m_retailWeather >= 0 && m_retailWeather != (TheGlobalData ? TheGlobalData->m_weather : WEATHER_NORMAL))
@@ -1246,10 +1291,13 @@ protected:
 					{
 						const Vector3 worldPosition(newPos.x, newPos.y, newPos.z);
 						Vector3 bonePosition;
-						Matrix3D::Inverse_Transform_Vector(*mtx, worldPosition, &bonePosition);
+						Matrix3D::Inverse_Transform_Vector(*attachmentTransform, worldPosition, &bonePosition);
 						const Coord3D local = {bonePosition.X, bonePosition.Y, bonePosition.Z};
 						sys->setPosition(&local);
 						sys->attachToObjectBone(thingToAttachTo, *attachmentBone);
+						if (traceRetailFXLists())
+							std::fprintf(stderr, "[Retail FXList] ParticleBone name=%s bone=%s origin=(%.3f,%.3f,%.3f)\n",
+								m_name.str(), attachmentBone->str(), newPos.x, newPos.y, newPos.z);
 					}
 					else if (m_attachToObject && thingToAttachTo)
 						sys->attachToObject(thingToAttachTo);
@@ -1300,6 +1348,7 @@ private:
 	Bool m_retailUseTargetOffset = FALSE;
 	Coord3D m_retailTargetOffset{};
 	Bool m_retailFollowBone = FALSE;
+	Bool m_requireCreationBone = FALSE;
 	Bool m_retailSetTargetMatrix = FALSE;
 	Bool m_retailOnlyIfOnLand = FALSE;
 	Bool m_retailOnlyIfOnWater = FALSE;
@@ -1609,6 +1658,7 @@ const FXList *FXListStore::findFXList(const char* name) const
 		{ "EvaEvent", EvaEventFXNugget::parse, nullptr, 0 },
 		{ "CameraShakerVolume", CameraShakerVolumeFXNugget::parse, nullptr, 0 },
 		{ "TintDrawable", TintDrawableFXNugget::parse, nullptr, 0 },
+		{ "ParticleSysBone", ParticleSystemFXNugget::parseBone, nullptr, 0 },
 		{ "DynamicDecal", DynamicDecalFXNugget::parse, nullptr, 0 },
 		{ "PlayEvenIfShrouded", INI::parseBool, nullptr, offsetof(FXList, m_playEvenIfShrouded) },
 		{ "CullingInfo", FXList::parseCullingInfo, nullptr, 0 },
