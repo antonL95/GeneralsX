@@ -20,12 +20,36 @@
 #include <cinttypes>
 #include <thread>
 #include <set>
+#include <limits>
+#include <utility>
 #include <curl/curl.h>
 #include "GameNetwork/GeneralsOnline/NGMP_json.h"
 
 using json = nlohmann::json;
 
 static constexpr size_t kLobbyDetailsMaxBytes = 64 * 1024;
+
+template<class Integer>
+static Integer readLobbyInteger(const json& object, std::initializer_list<const char*> keys, Integer fallback,
+    Integer minimum = (std::numeric_limits<Integer>::min)(), Integer maximum = (std::numeric_limits<Integer>::max)())
+{
+    for (const char* key : keys) {
+        const auto value = object.find(key);
+        if (value == object.end())
+            continue;
+        const auto checked = [&](auto number) -> Integer {
+            if (std::cmp_less(number, minimum) || std::cmp_greater(number, maximum))
+                throw std::out_of_range(key);
+            return static_cast<Integer>(number);
+        };
+        if (value->is_number_unsigned())
+            return checked(value->get<uint64_t>());
+        if (value->is_number_integer())
+            return checked(value->get<int64_t>());
+        throw std::invalid_argument(key);
+    }
+    return fallback;
+}
 
 NGMP_OnlineServicesManager& NGMP_OnlineServicesManager::getInstance() {
     static NGMP_OnlineServicesManager instance;
@@ -821,10 +845,10 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
         const auto jsonRoot = json::parse(payload, checkKeys);
         const auto& lobbyIter = jsonRoot.contains("lobby") ? jsonRoot["lobby"] : (jsonRoot.contains("Lobby") ? jsonRoot["Lobby"] : jsonRoot);
 
-        int64_t ownerId = lobbyIter.value("Owner", lobbyIter.value("owner", int64_t(-1)));
+        int64_t ownerId = readLobbyInteger(lobbyIter, {"Owner", "owner"}, int64_t(-1));
         std::string mapName = lobbyIter.value("MapName", lobbyIter.value("map_name", ""));
         std::string mapPath = lobbyIter.value("MapPath", lobbyIter.value("map_path", ""));
-        int startingCash = lobbyIter.value("StartingCash", lobbyIter.value("starting_cash", 10000));
+        uint32_t startingCash = readLobbyInteger(lobbyIter, {"StartingCash", "starting_cash"}, uint32_t(10000));
         bool limitSuperweapons = lobbyIter.value("IsLimitSuperweapons", lobbyIter.value("is_limit_superweapons", false));
         bool allowObservers = lobbyIter.value("AllowObservers", lobbyIter.value("allow_observers", true));
 
@@ -843,19 +867,17 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
             return false;
         {
             for (const auto& member : *members) {
-                int64_t memberUserId = member.value("UserID", member.value("user_id", int64_t(-1)));
-                int slotIdx = member.value("SlotIndex", member.value("slot_index", -1));
-                int slotState = member.value("SlotState", member.value("slot_state", 0));
+                int64_t memberUserId = readLobbyInteger(member, {"UserID", "user_id"}, int64_t(-1));
+                int slotIdx = readLobbyInteger(member, {"SlotIndex", "slot_index"}, -1, -1, MAX_SLOTS - 1);
+                int slotState = readLobbyInteger<int>(member, {"SlotState", "slot_state"}, SLOT_OPEN, SLOT_OPEN, SLOT_PLAYER);
                 std::string dispName = member.value("DisplayName", member.value("display_name", ""));
-                int side = member.value("Side", member.value("side", -1));
-                int color = member.value("Color", member.value("color", -1));
-                int team = member.value("Team", member.value("team", -1));
-                int startPos = member.value("StartingPosition", member.value("starting_position", member.value("start_pos", member.value("startpos", member.value("StartPos", -1)))));
+                int side = readLobbyInteger(member, {"Side", "side"}, -1);
+                int color = readLobbyInteger(member, {"Color", "color"}, -1);
+                int team = readLobbyInteger(member, {"Team", "team"}, -1);
+                int startPos = readLobbyInteger(member, {"StartingPosition", "starting_position", "start_pos", "startpos", "StartPos"}, -1);
                 bool hasMap = member.value("HasMap", member.value("has_map", true));
                 bool isReady = member.value("IsReady", member.value("is_ready", false));
 
-                if (slotIdx >= MAX_SLOTS || slotIdx < -1 || slotState < SLOT_OPEN || slotState > SLOT_PLAYER)
-                    return false;
                 if (slotIdx >= 0) {
                     if (occupiedIndices[slotIdx])
                         return false;
@@ -911,7 +933,7 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
             return false;
         LobbyEntry snapshot = lobbyInterface->GetCurrentLobby();
         snapshot.lobbyID = targetId;
-        snapshot.match_id = lobbyIter.value("MatchID", lobbyIter.value("match_id", uint64_t(0)));
+        snapshot.match_id = readLobbyInteger(lobbyIter, {"MatchID", "match_id"}, uint64_t(0));
         snapshot.owner = ownerId;
         snapshot.name = lobbyIter.value("Name", lobbyIter.value("name", ""));
         snapshot.map_name = mapName;
@@ -921,11 +943,11 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
         snapshot.limit_superweapons = limitSuperweapons;
         snapshot.track_stats = lobbyIter.value("IsTrackingStats", lobbyIter.value("is_tracking_stats", true));
         snapshot.allow_observers = allowObservers;
-        snapshot.rng_seed = lobbyIter.value("RNGSeed", lobbyIter.value("rng_seed", 0));
-        snapshot.exe_crc = lobbyIter.value("ExeCRC", lobbyIter.value("exe_crc", 0));
-        snapshot.ini_crc = lobbyIter.value("IniCRC", lobbyIter.value("ini_crc", 0));
-        snapshot.max_players = lobbyIter.value("MaxPlayers", lobbyIter.value("max_players", 8));
-        snapshot.current_players = lobbyIter.value("NumCurrentPlayers", lobbyIter.value("num_current_players", 1));
+        snapshot.rng_seed = readLobbyInteger(lobbyIter, {"RNGSeed", "rng_seed"}, 0);
+        snapshot.exe_crc = readLobbyInteger(lobbyIter, {"ExeCRC", "exe_crc"}, uint32_t(0));
+        snapshot.ini_crc = readLobbyInteger(lobbyIter, {"IniCRC", "ini_crc"}, uint32_t(0));
+        snapshot.max_players = readLobbyInteger(lobbyIter, {"MaxPlayers", "max_players"}, 8);
+        snapshot.current_players = readLobbyInteger(lobbyIter, {"NumCurrentPlayers", "num_current_players"}, 1);
         snapshot.members = std::move(lobbyMembers);
         {
             std::lock_guard<std::mutex> lock(m_eventMutex);

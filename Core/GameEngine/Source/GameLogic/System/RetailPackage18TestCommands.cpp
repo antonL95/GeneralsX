@@ -78,7 +78,10 @@ bool checkPackage18LobbyDetails(const AsciiString& selection)
 		return false;
 	const std::string duplicate = host + oldGuest + hero + hero + "}]}";
 	const std::string badCount = R"JSON({"Owner":2,"MapName":"After","NumCurrentPlayers":"wrong","Members":[{"UserID":1,"SlotIndex":0,"SlotState":5}]})JSON";
+	const std::string badSlotIndex = R"JSON({"Owner":2,"MapName":"After","Members":[{"UserID":1,"SlotIndex":4294967296,"SlotState":5}]})JSON";
+	const std::string badSlotState = host + R"JSON(,{"UserID":2,"SlotIndex":1,"SlotState":5.5)JSON" + hero + "}]}";
 	if (manager.applyLobbyDetails(31, duplicate) || manager.applyLobbyDetails(31, badCount) ||
+		manager.applyLobbyDetails(31, badSlotIndex) || manager.applyLobbyDetails(31, badSlotState) ||
 		manager.applyLobbyDetails(31, std::string(64 * 1024 + 1, ' ')) ||
 		manager.m_hostUserId != 1 || published.owner != 1 || published.map_name != "Before" ||
 		lobby.GetRoomMemberFromIndex(1).createAHeroConfig != selection)
