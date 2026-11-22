@@ -1,0 +1,17 @@
+180 create Player_1 ArmyOfTheDeadFixtureElessar 0 3130,780,0
+181 reveal Player_1 ArmyOfTheDeadFixtureElessar 0
+190 power Player_1 ArmyOfTheDeadFixtureElessar 0 SpecialAbilityPersonalFlood
+190 aim Player_1 ArmyOfTheDeadFixtureElessar 0 120,0
+190 army-of-the-dead-trace Player_1 - 0 cast 3250 780
+230 army-of-the-dead-trace Player_1 - 0 start 3250 780
+236 army-of-the-dead-trace Player_1 - 0 spawn 3250 780
+243 army-of-the-dead-trace Player_1 - 0 before 3250 780
+244 army-of-the-dead-trace Player_1 - 0 resumed 3250 780
+260 army-of-the-dead-trace Player_1 - 0 moving 3250 780
+290 army-of-the-dead-trace Player_1 - 0 moving 3250 780
+320 army-of-the-dead-trace Player_1 - 0 moving 3250 780
+350 army-of-the-dead-trace Player_1 - 0 moving 3250 780
+380 army-of-the-dead-trace Player_1 - 0 moving 3250 780
+420 army-of-the-dead-trace Player_1 - 0 moving 3250 780
+490 army-of-the-dead-trace Player_1 - 0 end 3250 780
+536 army-of-the-dead-trace Player_1 - 0 expired 3250 780
