@@ -233,7 +233,7 @@ void GeometryUpgrade::upgradeImplementation()
 
 	const GeometryInfo& current = object->getGeometryInfo();
 	if (bounds.major == current.getMajorRadius() && bounds.minor == current.getMinorRadius() &&
-		bounds.isSmall == current.getIsSmall() && current.getGeomType() != GEOMETRY_SPHERE)
+		bounds.isSmall == current.getIsSmall() && current.getGeomType() == GEOMETRY_BOX)
 		object->setGeometryInfoZ(bounds.height);
 	else
 		object->setGeometryInfo(GeometryInfo(GEOMETRY_BOX, bounds.isSmall, bounds.height, bounds.major, bounds.minor));
