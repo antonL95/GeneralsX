@@ -893,6 +893,8 @@ Bool AIUpdateInterface::chooseLocomotorSetExplicit(LocomotorSetType wst)
 	const LocomotorTemplateVector* set = getAIUpdateModuleData()->findLocomotorTemplateVector(wst);
 	if (set)
 	{
+		if (m_curLocomotor)
+			m_curLocomotor->clearRetailGait(getObject());
 		m_locomotorSet.clear();
 		m_curLocomotor = nullptr;
 		for (size_t i = 0; i < set->size(); ++i)
@@ -907,6 +909,8 @@ Bool AIUpdateInterface::chooseLocomotorSetExplicit(LocomotorSetType wst)
 	const LocomotorTemplate* rotwk = getObject()->getTemplate()->findRotWKLocomotor(wst);
 	if (rotwk)
 	{
+		if (m_curLocomotor)
+			m_curLocomotor->clearRetailGait(getObject());
 		m_locomotorSet.clear();
 		m_curLocomotor = nullptr;
 		m_locomotorSet.addLocomotor(rotwk);
@@ -5459,6 +5463,15 @@ void AIUpdateInterface::crc( Xfer *x )
 void AIUpdateInterface::crcRetailAttackState(Xfer* xfer)
 {
 	xfer->xferSnapshot(m_stateMachine);
+}
+
+void AIUpdateInterface::crcRetailLocomotion(Xfer* xfer)
+{
+	Int set = m_curLocomotorSet;
+	xfer->xferInt(&set);
+	AsciiString name = m_curLocomotor ? m_curLocomotor->getTemplateName() : AsciiString();
+	xfer->xferAsciiString(&name);
+	xfer->xferSnapshot(m_curLocomotor);
 }
 
 // ------------------------------------------------------------------------------------------------

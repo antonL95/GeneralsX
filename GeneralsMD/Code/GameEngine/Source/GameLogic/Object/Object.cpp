@@ -4507,6 +4507,7 @@ void Object::crc( Xfer *xfer )
 			if (auto* deploy = static_cast<DeployStyleAIUpdate*>(findUpdateModule(deployKey)))
 				deploy->crcRetailState(xfer);
 			ai->crcRetailAttackState(xfer);
+			ai->crcRetailLocomotion(xfer);
 			UnsignedInt burningDeathUntil = ai->getRetailBurningDeathDeadline();
 			xfer->xferUnsignedInt(&burningDeathUntil);
 			UnsignedInt fearUntil = ai->getRetailFearDeadline();

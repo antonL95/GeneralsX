@@ -730,6 +730,8 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "ChargeAvailable", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeAvailable) },
 		{ "ChargeIgnoresCondition", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeIgnoresCondition) },
 		{ "ChargeSpeed", parseRotwkField<INI::parsePercentToReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeSpeedFraction) },
+		{ "WalkDistance", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.walkDistance) },
+		{ "AccDecTrigger", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.accelDecelTrigger) },
 
 		{ "RudderCorrectionDegree",		 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionDegree) }, // Added in Zero Hour
 		{ "RudderCorrectionRate",			 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionRate) }, // Added in Zero Hour
@@ -985,7 +987,8 @@ Locomotor::~Locomotor()
 // ------------------------------------------------------------------------------------------------
 void Locomotor::crc( Xfer *xfer )
 {
-
+	if (RetailFileLayers::enabled())
+		xfer->xferBool(&m_retailWasRunning);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -996,7 +999,7 @@ void Locomotor::crc( Xfer *xfer )
 void Locomotor::xfer( Xfer *xfer )
 {
 	// version
-	const XferVersion currentVersion = 2;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1020,6 +1023,10 @@ void Locomotor::xfer( Xfer *xfer )
 	xfer->xferReal(&m_preferredHeightDamping);
 	xfer->xferReal(&m_angleOffset);
 	xfer->xferReal(&m_offsetIncrement);
+	if (version >= 3)
+		xfer->xferBool(&m_retailWasRunning);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_retailWasRunning = FALSE;
 
 }
 
@@ -1258,6 +1265,43 @@ void Locomotor::setPhysicsOptions(Object* obj)
 }
 
 //-------------------------------------------------------------------------------------------------
+void Locomotor::clearRetailGait(Object* object)
+{
+	if (!RetailFileLayers::enabled() || m_template->m_rotwk.walkDistance <= 0.0f)
+		return;
+	m_retailWasRunning = FALSE;
+	object->clearModelConditionState(MODELCONDITION_WALKING);
+	object->clearModelConditionState(MODELCONDITION_ACCELERATE);
+	object->clearModelConditionState(MODELCONDITION_DECELERATE);
+}
+
+void Locomotor::updateRetailGait(Object* object, Real distance, Real speed, Bool braking)
+{
+	const auto& data = m_template->m_rotwk;
+	if (!RetailFileLayers::enabled() || data.walkDistance <= 0.0f)
+		return;
+
+	const Real threshold = getMaxSpeedForCondition(object->getBodyModule()->getDamageState(), object) * data.accelDecelTrigger;
+	const Bool decelerating = m_retailWasRunning && braking;
+	const Bool walking = !m_retailWasRunning && distance < data.walkDistance && !braking;
+	const Bool accelerating = !walking && !braking && !m_retailWasRunning && speed < threshold;
+	if (!walking && !accelerating && !braking)
+		m_retailWasRunning = TRUE;
+
+	if (walking)
+		object->setModelConditionState(MODELCONDITION_WALKING);
+	else
+		object->clearModelConditionState(MODELCONDITION_WALKING);
+	if (accelerating)
+		object->setModelConditionState(MODELCONDITION_ACCELERATE);
+	else
+		object->clearModelConditionState(MODELCONDITION_ACCELERATE);
+	if (decelerating)
+		object->setModelConditionState(MODELCONDITION_DECELERATE);
+	else
+		object->clearModelConditionState(MODELCONDITION_DECELERATE);
+}
+
 void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalPos,
 																							 Real onPathDistToGoal, Real desiredSpeed, Bool *blocked)
 {
@@ -1360,6 +1404,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 
 	if (*blocked)
 	{
+		updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), TRUE);
 		physics->scrubVelocity2D(desiredSpeed); // stop if we are about to run into the blocking object.
 		Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
 		if (m_template->m_wanderWidthFactor == 0.0f)
@@ -1426,6 +1471,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		}
 	}
 
+	updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), getFlag(IS_BRAKING));
 	handleBehaviorZ(obj, physics, goalPos);
 	// Objects that are braking don't follow the normal physics, so they end up at their destination exactly.
 	obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ), getFlag(IS_BRAKING) );
@@ -2868,6 +2914,7 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 			}
 		}
 	}
+	updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), backing || getFlag(IS_BRAKING));
 	steerVelocity(obj, physics, dir, onPathDistToGoal, desiredSpeed, backing);
 }
 
@@ -2917,6 +2964,7 @@ void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord
 */
 Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 {
+	clearRetailGait(obj);
 	if (!getFlag(MAINTAIN_POS_IS_VALID))
 	{
 		m_maintainPos = *obj->getPosition();

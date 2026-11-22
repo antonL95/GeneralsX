@@ -354,6 +354,7 @@ public:
 	Real getWanderWidthFactor() const {return m_template->m_wanderWidthFactor;}
 	Real getWanderAboutPointRadius() const {return m_template->m_wanderAboutPointRadius;}
 	Bool hasRetailChargeSpeed(BodyDamageType condition, const Object* object) const;
+	void clearRetailGait(Object* object);
 	Real getBurningDeathRadius() const { return m_template->m_rotwk.burningDeathRadius; }
 	Bool isBurningDeathCavalry() const { return m_template->m_rotwk.burningDeathIsCavalry; }
 
@@ -501,6 +502,8 @@ private:
 	Bool getFlag(LocoFlag f) const { return (m_flags & (1 << f)) != 0; }
 	void setFlag(LocoFlag f, Bool b) { if (b) m_flags |= (1<<f); else m_flags &= ~(1<<f); }
 
+	void updateRetailGait(Object* object, Real distance, Real speed, Bool braking);
+
 	LocomotorTemplateOverride m_template;		///< the kind of Locomotor this is
 	Coord3D			m_maintainPos;
 	Real				m_brakingFactor;
@@ -520,6 +523,7 @@ private:
 	Real				m_angleOffset;
 	Real				m_offsetIncrement;
 	UnsignedInt m_donutTimer;				///< Frame time to keep units from doing the donut. jba.
+	Bool m_retailWasRunning = FALSE;
 
 
 };

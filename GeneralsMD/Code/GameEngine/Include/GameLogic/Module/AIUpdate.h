@@ -507,6 +507,7 @@ public:
 	Bool enterRetailBurningDeath();
 	UnsignedInt getRetailBurningDeathDeadline() const { return m_burningDeathUntil; }
 	void crcRetailAttackState(Xfer* xfer);
+	void crcRetailLocomotion(Xfer* xfer);
 	UnsignedInt getRetailRampageDeadline() const { return m_rampageUntil; }
 	const Coord3D& getRetailPursuitOrigin() const { return m_autoAttackOrigin; }
 	void braceForCrush(UnsignedInt deadline);
