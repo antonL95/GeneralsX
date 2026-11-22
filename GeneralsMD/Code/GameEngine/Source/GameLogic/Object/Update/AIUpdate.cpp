@@ -2369,17 +2369,15 @@ Bool AIUpdateInterface::steerInFormation()
 	}
 
 	obj->setModelConditionState(MODELCONDITION_MOVING);
-	const Real maxSpeed = m_curLocomotor->getMaxSpeedForCondition(obj->getBodyModule()->getDamageState());
-	const Real speed = goal.speed < maxSpeed ? goal.speed : maxSpeed;
 	if (goal.backing)
-		m_curLocomotor->locoUpdate_moveTowardsFormationSlot(obj, goal.position, goal.distance, speed, TRUE, goal.backingSource);
+		m_curLocomotor->locoUpdate_moveTowardsFormationSlot(obj, goal.position, goal.distance, goal.speed, TRUE, goal.backingSource);
 	else if (m_curLocomotor->getAppearance() == LOCO_LEGS_TWO)
 	{
 		Bool blocked = FALSE;
-		m_curLocomotor->locoUpdate_moveTowardsPosition(obj, goal.position, goal.distance, speed, &blocked);
+		m_curLocomotor->locoUpdate_moveTowardsPosition(obj, goal.position, goal.distance, goal.speed, &blocked);
 	}
 	else
-		m_curLocomotor->locoUpdate_moveTowardsFormationSlot(obj, goal.position, goal.distance, speed);
+		m_curLocomotor->locoUpdate_moveTowardsFormationSlot(obj, goal.position, goal.distance, goal.speed);
 	return TRUE;
 }
 

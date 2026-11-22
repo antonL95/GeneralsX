@@ -2875,7 +2875,7 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 	PhysicsBehavior* physics = obj->getPhysics();
 	if (!physics)
 		return;
-	Real maxSpeed = getMaxSpeedForCondition(obj->getBodyModule()->getDamageState(), RetailFileLayers::enabled() ? obj : nullptr);
+	const Real maxSpeed = getMaxSpeedForCondition(obj->getBodyModule()->getDamageState(), !backing && RetailFileLayers::enabled() ? obj : nullptr);
 	if (desiredSpeed > maxSpeed)
 		desiredSpeed = maxSpeed;
 	Coord3D dir;
