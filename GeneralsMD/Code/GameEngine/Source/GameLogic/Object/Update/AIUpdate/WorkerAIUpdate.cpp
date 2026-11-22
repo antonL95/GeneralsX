@@ -61,6 +61,7 @@
 #include "GameLogic/Module/SupplyCenterDockUpdate.h"
 #include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
 #include "GameLogic/Module/WorkerAIUpdate.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 
 
 
@@ -282,7 +283,8 @@ UpdateSleepTime WorkerAIUpdate::update()
 			// validate the task and the target
 			// TheSuperHackers @bugfix Stubbjax 16/11/2025 Invalidate the task when the build scaffold is destroyed.
 			if( currentTask == DOZER_TASK_REPAIR &&
-					TheActionManager->canRepairObject( getObject(), targetObject, getLastCommandSource() ) == FALSE )
+					!TheActionManager->canRepairObject(getObject(), targetObject, getLastCommandSource()) &&
+					!RepairSpecialPower::canRepairTarget(getObject(), targetObject, getLastCommandSource()) )
 				invalidTask = TRUE;
 #if !RETAIL_COMPATIBLE_CRC
 			else if (currentTask == DOZER_TASK_BUILD && targetObject == nullptr)
@@ -566,13 +568,9 @@ void WorkerAIUpdate::privateDock( Object *dock, CommandSourceType cmdSource )
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-void WorkerAIUpdate::privateRepair( Object *obj, CommandSourceType cmdSource )
+void WorkerAIUpdate::privateRepair( Object *obj, CommandSourceType )
 {
 	Object *dozer = getObject();
-
-	// sanity, if we can't repair the object then get out of there
-	if( TheActionManager->canRepairObject( dozer, obj, cmdSource ) == FALSE )
-		return;
 
 	// if we are already repairing this target do nothing
 	if( canAcceptNewRepair( obj ) == FALSE )
@@ -1074,8 +1072,12 @@ void WorkerAIUpdate::aiDoCommand(const AICommandParms* parms)
 			if( getCurrentTask() == DOZER_TASK_INVALID )
 				aiIdle( CMD_FROM_AI );
 
-			// do the repair
-			privateRepair(parms->m_obj, parms->m_cmdSource);
+			const Bool powerOrder = RetailFileLayers::enabled() && parms->m_intValue != 0;
+			const Bool allowed = powerOrder
+				? RepairSpecialPower::canRepairTarget(getObject(), parms->m_obj, parms->m_cmdSource)
+				: TheActionManager->canRepairObject(getObject(), parms->m_obj, parms->m_cmdSource);
+			if( allowed )
+				privateRepair(parms->m_obj, parms->m_cmdSource);
 			break;
 
 		}

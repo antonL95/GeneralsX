@@ -743,6 +743,7 @@ void ModuleFactory::init()
 		addModule( GrabPassengerSpecialPower );
 		addModule( AISpecialPowerUpdate );
 		addModule( PlayerHealSpecialPower );
+		addModule( RepairSpecialPower );
 		addModule( SplitHordeSpecialPower );
 
 	}

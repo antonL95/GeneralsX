@@ -54,6 +54,7 @@
 #include "GameLogic/Module/BridgeTowerBehavior.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/RetailBuildingEvents.h"
 #include "GameClient/InGameUI.h"
@@ -69,6 +70,13 @@ static const Real MIN_ACTION_TOLERANCE = 70.0f;
 static Bool usesRetailBuilder(const AIUpdateInterface* ai)
 {
 	return RetailFileLayers::enabled() && !ai->getWorkerAIInterface();
+}
+
+static Bool isAtDozerActionPosition(const Object* dozer, const Coord3D* goal)
+{
+	const Real slop = 15.0f;
+	const Real allowableDistance = max(MIN_ACTION_TOLERANCE, dozer->getGeometryInfo().getBoundingSphereRadius() + slop);
+	return ThePartitionManager->getDistanceSquared(dozer, goal, FROM_BOUNDINGSPHERE_2D) <= sqr(allowableDistance);
 }
 
 static void moveDozerForTask(AIUpdateInterface* ai, const Coord3D& goal)
@@ -248,7 +256,15 @@ StateReturnType DozerActionPickActionPosState::update()
 	machine->setGoalObject( goalObject );
 	machine->setGoalPosition( &goalPos );
 	ai->ignoreObstacle(goalObject);
-	moveDozerForTask( ai, goalPos );
+	if (RetailFileLayers::enabled() && m_task == DOZER_TASK_REPAIR && isAtDozerActionPosition(dozer, &goalPos))
+	{
+		const AICommandParms idle(AICMD_IDLE, CMD_FROM_AI);
+		ai->AIUpdateInterface::aiDoCommand(&idle);
+	}
+	else
+	{
+		moveDozerForTask(ai, goalPos);
+	}
 
 	return STATE_SUCCESS;
 
@@ -378,14 +394,7 @@ StateReturnType DozerActionMoveToActionPosState::update()
 		return STATE_FAILURE;
 	}
 
-	// if distance between us and our goal position is close enough
-	const Coord3D *goalPos = getMachine()->getGoalPosition();
-	Real distSqr = ThePartitionManager->getDistanceSquared( dozer, goalPos, FROM_BOUNDINGSPHERE_2D );
-	const Real SLOP = 15.0f;
-	Real allowableDistanceSqr = sqr(max( MIN_ACTION_TOLERANCE, dozer->getGeometryInfo().getBoundingSphereRadius() + SLOP ));
-
-
-	if( distSqr <= allowableDistanceSqr )
+	if (isAtDozerActionPosition(dozer, getMachine()->getGoalPosition()))
 	{
 		if( m_task == DOZER_TASK_BUILD )
 		{
@@ -1842,7 +1851,8 @@ UpdateSleepTime DozerAIUpdate::update()
 		// validate the task and the target
 		// TheSuperHackers @bugfix Stubbjax 16/11/2025 Invalidate the task when the build scaffold is destroyed.
 		if( currentTask == DOZER_TASK_REPAIR &&
-				TheActionManager->canRepairObject( getObject(), targetObject, getLastCommandSource() ) == FALSE )
+				!TheActionManager->canRepairObject(getObject(), targetObject, getLastCommandSource()) &&
+				!RepairSpecialPower::canRepairTarget(getObject(), targetObject, getLastCommandSource()) )
 			invalidTask = TRUE;
 #if !RETAIL_COMPATIBLE_CRC
 		else if (currentTask == DOZER_TASK_BUILD && targetObject == nullptr)
@@ -2096,16 +2106,12 @@ Bool DozerAIUpdate::canAcceptNewRepair( Object *obj )
 // ------------------------------------------------------------------------------------------------
 /** Issue an order for the Dozer to go repair the target 'obj' */
 // ------------------------------------------------------------------------------------------------
-void DozerAIUpdate::privateRepair( Object *obj, CommandSourceType cmdSource )
+void DozerAIUpdate::privateRepair( Object *obj, CommandSourceType )
 {
 	Object *dozer = getObject();
 
 	// if we are already repairing this target do nothing
 	if( canAcceptNewRepair( obj ) == FALSE )
-		return;
-
-	// sanity, if we can't repair the object then get out of there
-	if( TheActionManager->canRepairObject( dozer, obj, cmdSource ) == FALSE )
 		return;
 
 	// if this object is already actively being repaired by another dozertype we won't also try to go repair it
@@ -2820,15 +2826,19 @@ void DozerAIUpdate::aiDoCommand(const AICommandParms* parms)
 		// --------------------------------------------------------------------------------------------
 		case AICMD_REPAIR:
 		{
-			if( usesRetailBuilder(this) && !TheActionManager->canRepairObject( getObject(), parms->m_obj, parms->m_cmdSource ) )
+			const Bool powerOrder = RetailFileLayers::enabled() && parms->m_intValue != 0;
+			const Bool allowed = powerOrder
+				? RepairSpecialPower::canRepairTarget(getObject(), parms->m_obj, parms->m_cmdSource)
+				: TheActionManager->canRepairObject(getObject(), parms->m_obj, parms->m_cmdSource);
+			if( RetailFileLayers::enabled() && !allowed )
 				break;
 
 			// if we have no task right now, go idle so we can immediately respond to this
 			if( getCurrentTask() == DOZER_TASK_INVALID )
 				aiIdle( CMD_FROM_AI );
 
-			// do the repair
-			privateRepair(parms->m_obj, parms->m_cmdSource);
+			if( allowed )
+				privateRepair(parms->m_obj, parms->m_cmdSource);
 			break;
 
 		}

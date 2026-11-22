@@ -63,6 +63,8 @@
 #include "GameLogic/Module/SupplyCenterDockUpdate.h"
 #include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Weapon.h"
 
@@ -379,14 +381,14 @@ Bool ActionManager::canGetHealedAt( const Object *obj, const Object *healDest, C
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-Bool ActionManager::canRepairObject( const Object *obj, const Object *objectToRepair, CommandSourceType commandSource )
+static Bool canRepairStructure(const Object* obj, const Object* objectToRepair, CommandSourceType commandSource, Bool powerOrder)
 {
 
 	// sanity
 	if( obj == nullptr || objectToRepair == nullptr )
 		return FALSE;
 
-	if( RetailFileLayers::enabled() )
+	if( RetailFileLayers::enabled() && !powerOrder )
 	{
 		const CommandSet *commands = TheControlBar ? TheControlBar->findCommandSet( obj->getCommandSetString() ) : nullptr;
 		Bool allowsRepair = FALSE;
@@ -405,6 +407,8 @@ Bool ActionManager::canRepairObject( const Object *obj, const Object *objectToRe
 	}
 
 	Relationship r = obj->getRelationship(objectToRepair);
+	if (powerOrder && (r != ALLIES || objectToRepair->isKindOf(KINDOF_WALL_UPGRADE)))
+		return FALSE;
 
 	// you can only repair allies, we ignore this restriction for bridges
 	// srj sez: nope, allow neutral too, so civ bldgs can be repaired
@@ -447,14 +451,14 @@ Bool ActionManager::canRepairObject( const Object *obj, const Object *objectToRe
 	BodyModuleInterface *body = objectToRepair->getBodyModule();
 
 	// buildings that are at full health cannot be repaired
-	if( body->getHealth() == body->getMaxHealth() )
+	if( !body || body->getHealth() == body->getMaxHealth() )
 		return FALSE;
 
 	// if the target is in the shroud, we can't do anything
 	if (isObjectShroudedForAction(obj, objectToRepair, commandSource))
 		return FALSE;
 
-	if( obj->getContainedBy() )
+	if( obj->getContainedBy() && (!powerOrder || !HordeContain::get(obj->getContainedBy())) )
 	{
 		// We can't heal things while in a transport (especially our own transport, you cheater)
 		return FALSE;
@@ -462,6 +466,18 @@ Bool ActionManager::canRepairObject( const Object *obj, const Object *objectToRe
 
 	return TRUE;
 
+}
+
+Bool ActionManager::canRepairObject(const Object* obj, const Object* target, CommandSourceType commandSource)
+{
+	return canRepairStructure(obj, target, commandSource, FALSE);
+}
+
+Bool RepairSpecialPower::canRepairTarget(const Object* repairer, const Object* target, CommandSourceType source)
+{
+	return RetailFileLayers::enabled() && repairer && !repairer->isEffectivelyDead() && !repairer->isDestroyed() &&
+		target && !target->isDestroyed() &&
+		canRepairStructure(repairer, target, source, TRUE);
 }
 
 // ------------------------------------------------------------------------------------------------

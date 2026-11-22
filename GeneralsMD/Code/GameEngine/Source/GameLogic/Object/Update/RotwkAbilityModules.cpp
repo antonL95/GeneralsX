@@ -40,6 +40,7 @@
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
+#include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
@@ -1237,6 +1238,66 @@ Bool UntamedAllegianceSpecialPower::isValidPowerTarget(const Object* target) con
 		target->getControllingPlayer() != caster->getControllingPlayer() && filter.matchesObject(caster, target);
 }
 
+static Bool canIssueRepairPower(const Object* actor, const Object* target, CommandSourceType source)
+{
+	const AIUpdateInterface* ai = actor->getAI();
+	if (!ai || !ai->getDozerAIInterface() || actor->isDisabled() ||
+		!RepairSpecialPower::canRepairTarget(actor, target, source))
+		return FALSE;
+	const ObjectID repairer = target->getSoleHealingBenefactor();
+	return repairer == INVALID_ID || repairer == actor->getID();
+}
+
+Bool RepairSpecialPower::isValidPowerTarget(const Object* target) const
+{
+	const Object* caster = getObject();
+	if (!canRepairTarget(caster, target, CMD_FROM_SCRIPT) ||
+		!getSpecialPowerTemplate()->getObjectFilter().matchesObject(caster, target))
+		return FALSE;
+	if (const auto* horde = HordeContain::get(caster))
+	{
+		const auto& members = *horde->getContainedItemsList();
+		return std::any_of(members.begin(), members.end(), [target](const Object* member) {
+			return canIssueRepairPower(member, target, CMD_FROM_SCRIPT);
+		});
+	}
+	return canIssueRepairPower(caster, target, CMD_FROM_SCRIPT);
+}
+
+void RepairSpecialPower::doSpecialPowerAtObject(Object* target, UnsignedInt options)
+{
+	resetLastCastAccepted();
+	Object* caster = getObject();
+	if (!isReady() || caster->isDisabled() || !isRetailCastAllowed(options) || !isValidPowerTarget(target) ||
+		!CommandButton::isRetailPowerObjectTargetAllowed(caster, getSpecialPowerTemplate(), target))
+		return;
+
+	const CommandSourceType source = (options & COMMAND_OPTION_INTERNAL_AUTO) ? CMD_FROM_AI :
+		(options & COMMAND_FIRED_BY_SCRIPT) ? CMD_FROM_SCRIPT : CMD_FROM_PLAYER;
+	const auto repair = [&](Object* actor, CommandSourceType orderSource) {
+		if (!canIssueRepairPower(actor, target, orderSource))
+			return;
+		AIUpdateInterface* ai = actor->getAI();
+		AICommandParms parms(AICMD_REPAIR, orderSource);
+		parms.m_obj = target;
+		parms.m_intValue = TRUE;
+		ai->aiDoCommand(&parms);
+		DozerAIInterface* builder = ai->getDozerAIInterface();
+		if (builder->getTaskTarget(DOZER_TASK_REPAIR) == target->getID())
+			m_lastCastAccepted = TRUE;
+	};
+
+	if (const auto* horde = HordeContain::get(caster))
+	{
+		for (Object* member : *horde->getContainedItemsList())
+			repair(member, CMD_FROM_AI);
+	}
+	else
+	{
+		repair(caster, source);
+	}
+}
+
 void UntamedAllegianceSpecialPower::applyPowerEffect(const Coord3D* position)
 {
 	if (!position)
@@ -1807,6 +1868,7 @@ PlayerUpgradeSpecialPower::~PlayerUpgradeSpecialPower() = default;
 CloudBreakSpecialPower::~CloudBreakSpecialPower() = default;
 TaintSpecialPower::~TaintSpecialPower() = default;
 UntamedAllegianceSpecialPower::~UntamedAllegianceSpecialPower() = default;
+RepairSpecialPower::~RepairSpecialPower() = default;
 
 void PlayerUpgradeSpecialPower::crc(Xfer* xfer) { SpecialPowerModule::crc(xfer); }
 void PlayerUpgradeSpecialPower::xfer(Xfer* xfer) { SpecialPowerModule::xfer(xfer); }
@@ -1823,6 +1885,9 @@ void TaintSpecialPower::loadPostProcess() { SpecialPowerModule::loadPostProcess(
 void UntamedAllegianceSpecialPower::crc(Xfer* xfer) { SpecialPowerModule::crc(xfer); }
 void UntamedAllegianceSpecialPower::xfer(Xfer* xfer) { SpecialPowerModule::xfer(xfer); }
 void UntamedAllegianceSpecialPower::loadPostProcess() { SpecialPowerModule::loadPostProcess(); }
+void RepairSpecialPower::crc(Xfer* xfer) { SpecialPowerModule::crc(xfer); }
+void RepairSpecialPower::xfer(Xfer* xfer) { SpecialPowerModule::xfer(xfer); }
+void RepairSpecialPower::loadPostProcess() { SpecialPowerModule::loadPostProcess(); }
 
 MonitorConditionUpdate::~MonitorConditionUpdate()
 {

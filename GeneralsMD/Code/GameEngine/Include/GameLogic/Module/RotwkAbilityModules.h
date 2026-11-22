@@ -377,6 +377,19 @@ protected:
 	void applyPowerEffect(const Coord3D* position) override;
 };
 
+class RepairSpecialPower : public SpecialPowerModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( RepairSpecialPower, "RepairSpecialPower" )
+	MAKE_STANDARD_MODULE_MACRO( RepairSpecialPower )
+
+public:
+	using SpecialPowerModule::SpecialPowerModule;
+	Bool isValidPowerTarget(const Object* target) const override;
+	void doSpecialPowerAtObject(Object* target, UnsignedInt commandOptions) override;
+
+	static Bool canRepairTarget(const Object* repairer, const Object* target, CommandSourceType source);
+};
+
 class MonitorConditionUpdateModuleData : public UpdateModuleData
 {
 public:
