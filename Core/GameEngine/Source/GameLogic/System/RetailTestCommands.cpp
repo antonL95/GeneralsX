@@ -2308,6 +2308,8 @@ void execute(const Command& command, unsigned int frame)
 		const std::string name = command.structure.substr(0, separator);
 		runRetailParticleTestCommand(command.action, command.target != "-" ? findObject(command) : nullptr,
 			target, command.hasLocation ? &location : nullptr, name.c_str(), frame);
+		return;
+	}
 	if (command.action == "snapshot-path-state" || command.action == "snapshot-register-footprint")
 	{
 		runRetailSaveLoadPathTestCommand(command.action, findObject(command, true), frame);
