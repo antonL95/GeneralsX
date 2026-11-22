@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <string_view>
 
+#include "Common/ActionManager.h"
+#include "Common/PlayerList.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/ControlBar.h"
@@ -13,6 +15,7 @@
 #include "GameLogic/Damage.h"
 #include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/GrabPassengerSpecialPower.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Weapon.h"
@@ -51,6 +54,30 @@ void runRetailPackage20TestCommand(std::string_view action, Object* source, Obje
 			inputs.x > 0 ? "SpecialAbilityGrabPassenger2" : "SpecialAbilityGrabPassenger");
 		if (power)
 			source->doSpecialPowerAtObject(power, target, NEED_TARGET_NEUTRAL_OBJECT | NEED_TARGET_ENEMY_OBJECT);
+	}
+	else if (action == "pkg20-check-grab" && target)
+	{
+		const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate("SpecialAbilityGrabPassenger");
+		auto* grab = power ? dynamic_cast<GrabPassengerSpecialPower*>(source->getSpecialPowerModule(power)) : nullptr;
+		if (!grab)
+			return;
+		constexpr UnsignedInt options = NEED_TARGET_NEUTRAL_OBJECT | NEED_TARGET_ENEMY_OBJECT;
+		const Bool valid = grab->isValidPowerTarget(target);
+		const Bool allowed = TheActionManager->canDoSpecialPowerAtObject(source, target, CMD_FROM_PLAYER, power, options);
+		const Bool accepted = grab->requestGrab(target, options);
+		std::fprintf(stderr, "TEST pkg20 targeting frame=%u caster=%s valid=%d allowed=%d accepted=%d pending=%d\n",
+			frame, source->getTemplate()->getName().str(), valid, allowed, accepted, grab->getPendingTarget() != INVALID_ID);
+	}
+	else if (action == "pkg20-ownership" && target)
+	{
+		const auto* contain = source->getContain();
+		const auto* passengers = contain ? contain->getContainedItemsList() : nullptr;
+		const Object* held = passengers && !passengers->empty() ? passengers->front() : nullptr;
+		const Player* neutral = ThePlayerList->getNeutralPlayer();
+		std::fprintf(stderr, "TEST pkg20 ownership frame=%u caster=%s vendor-hostile=%d stock=%s neutral=%d producer=%d\n",
+			frame, source->getTemplate()->getName().str(), source->getRelationship(target) == ENEMIES,
+			held ? held->getTemplate()->getName().str() : "-",
+			held && held->getControllingPlayer() == neutral, held && held->getProducerID() == source->getID());
 	}
 	else if (action == "pkg20-held")
 	{

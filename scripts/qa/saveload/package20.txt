@@ -125,3 +125,16 @@
 181 pkg20-fx-list Player_1 Pkg20Captain 0 FX_SpellHealUnitHealBuff
 181 pkg20-fx-list Player_1 Pkg20Captain 0 FX_AragornAthelas
 181 pkg20-fx-list Player_1 Pkg20Captain 0 FX_WallGrab
+243 pkg20-ownership Player_1 Pkg20ImmediateEnt 0 PlyrCreeps:RockRohan01:0
+245 pkg20-ownership Player_1 Pkg20ImmediateEnt 0 PlyrCreeps:RockRohan01:0
+310 create Player_1 MordorMountainTroll 0 1250,1050,0
+310 create PlyrCreeps RockRohan01 1 1300,1050,0
+310 create Player_1 Pkg20FindRockEnt 0 1510,1050,0
+310 create PlyrCreeps RockRohan01 2 1560,1050,0
+311 snapshot-register-footprint PlyrCreeps RockRohan01 1
+311 snapshot-register-footprint PlyrCreeps RockRohan01 2
+315 pkg20-check-grab Player_1 MordorMountainTroll 0 PlyrCreeps:RockRohan01:1
+315 pkg12-pickup-order Player_1 Pkg20FindRockEnt 0 Command_SpecialAbilityEntFindRock
+316 pkg12-pickup-state Player_1 Pkg20FindRockEnt 0
+440 pkg20-held Player_1 MordorMountainTroll 0
+440 pkg20-ownership Player_1 Pkg20FindRockEnt 0 PlyrCreeps:RockRohan01:2

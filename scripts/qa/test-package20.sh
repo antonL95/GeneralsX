@@ -8,7 +8,7 @@ export PKGS1_TRAINING_EXTRA_COMMANDS="$qa/saveload/package20.txt"
 export PKGS1_TRAINING_EXTRA_GDB="$qa/saveload/package20-fx.gdb"
 result=$(mktemp)
 trap 'rm -f "$result"' EXIT
-if ! sh "$qa/test-save-load-crc.sh" "$build" training 244 300 > "$result" 2>&1; then
+if ! sh "$qa/test-save-load-crc.sh" "$build" training 241 303 > "$result" 2>&1; then
     cat "$result"
     exit 1
 fi
@@ -59,9 +59,13 @@ expect '^TEST pkg20 state frame=246 name=Pkg20Infantry hp=900.0/1000.0 '
 expect '^TEST pkg20 state frame=246 name=Pkg20InfantryControl hp=907.0/1000.0 '
 expect '^TEST pkg20 state frame=269 name=Pkg20Infantry hp=900.0/1000.0 '
 expect '^TEST pkg20 state frame=270 name=Pkg20Infantry hp=907.0/1000.0 '
+expect '^TEST pkg20 targeting frame=315 caster=MordorMountainTroll valid=0 allowed=0 accepted=0 pending=0$'
+expect '^TEST pkg20 held frame=440 caster=MordorMountainTroll id=0 name=- '
+expect '^TEST pkg20 ownership frame=243 caster=Pkg20ImmediateEnt vendor-hostile=1 stock=GenericThrowableRock neutral=1 producer=1$'
+expect '^TEST pkg20 ownership frame=440 caster=Pkg20FindRockEnt vendor-hostile=1 stock=GenericThrowableRock neutral=1 producer=1$'
 
-grep -E '^TEST pkg20 (held|state) frame=(245|246|269|270) ' "$log" > "$session/package20-continued.txt"
-grep -E '^TEST pkg20 (held|state) frame=(245|246|269|270) ' "$session/resume.log" > "$session/package20-resumed.txt"
+grep -E '^TEST pkg20 (held|state|ownership|targeting) frame=(241|243|245|246|269|270|315|440) ' "$log" > "$session/package20-continued.txt"
+grep -E '^TEST pkg20 (held|state|ownership|targeting) frame=(241|243|245|246|269|270|315|440) ' "$session/resume.log" > "$session/package20-resumed.txt"
 diff -u "$session/package20-continued.txt" "$session/package20-resumed.txt"
 
 awk '
