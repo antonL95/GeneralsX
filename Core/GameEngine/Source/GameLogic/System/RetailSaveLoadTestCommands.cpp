@@ -17,7 +17,12 @@ void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, U
 	if (action == "snapshot-register-footprint")
 	{
 		if (object)
-			TheAI->pathfinder()->addObjectToPathfindMap(object);
+		{
+			Pathfinder* pathfinder = TheAI->pathfinder();
+			if (object->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+				pathfinder->addWallPiece(object);
+			pathfinder->addObjectToPathfindMap(object);
+		}
 		return;
 	}
 	AIUpdateInterface* ai = object ? object->getAIUpdateInterface() : nullptr;
