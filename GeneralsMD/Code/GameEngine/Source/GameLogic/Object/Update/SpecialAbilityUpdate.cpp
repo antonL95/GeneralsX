@@ -899,6 +899,8 @@ void SpecialAbilityUpdate::startUnpacking()
   AIUpdateInterface *ai = getObject()->getAIUpdateInterface();
   if (ai)
     ai->aiBusy(CMD_FROM_AI);
+  if (usesRotwkRules())
+    onStartWindup();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1187,7 +1189,11 @@ void SpecialAbilityUpdate::startPreparation()
   }
   getObject()->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IS_USING_ABILITY ) );
   if( usesRotwkRules() )
+  {
     getObject()->setModelConditionState( MODELCONDITION_PREPARING );
+    if (data->m_unpackTime == 0 || (m_noTargetCommand && data->m_skipPackingWithNoTarget))
+      onStartWindup();
+  }
 
   m_prepSoundLoop = data->m_prepSoundLoop;
   m_prepSoundLoop.setObjectID( getObject()->getID() );

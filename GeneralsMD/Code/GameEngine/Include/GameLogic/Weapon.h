@@ -487,6 +487,7 @@ public:
 	UnsignedInt getSuspendFXDelay() const { return m_suspendFXDelay; }
 
 	const FXList* getFireFX(VeterancyLevel v) const { return m_fireFXs[v]; }
+	void playPreAttackFX(const Object& source, const Object* target, const Coord3D* targetPosition = nullptr) const;
 	const FXList* getProjectileDetonateFX(VeterancyLevel v) const { return m_projectileDetonateFXs[v]; }
 	const ObjectCreationList* getFireOCL(VeterancyLevel v) const { return m_fireOCLs[v]; }
 	const ObjectCreationList* getProjectileDetonationOCL(VeterancyLevel v) const { return m_projectileDetonationOCLs[v]; }
@@ -615,6 +616,7 @@ private:
 	Int m_shotsPerBarrel;										///< If non zero, don't cycle through your launch points every shot, mod the shot by this to get even chucks of firing
 	Int m_antiMask;													///< what we can target
 	Int m_antiStructure = -1;
+	const FXList* m_preAttackFX = nullptr;
 	Int m_affectsMask;											///< what we can affect
 	Int m_collideMask;											///< what we can collide with (projectiles only)
 	Bool m_damageDealtAtSelfPosition;				///< if T, weapon damage is done at source's position, not victim's pos. (useful for suicide weapons.)

@@ -45,6 +45,7 @@
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
 #include "Common/PerfTimer.h"
+#include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RotwkDuration.h"
 #include "Common/Player.h"
@@ -253,6 +254,7 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 
 const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 {
+	{ "PreAttackFX", INI::parseFXList, nullptr, offsetof(WeaponTemplate, m_preAttackFX) },
 	{ "CanBeDodged", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canBeDodged) },
 	{ "DamageNugget", WeaponNugget::parseDamageNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DOTNugget", WeaponNugget::parseDOTNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
@@ -3120,6 +3122,18 @@ Bool Weapon::privateFireWeapon(
 
 
 //-------------------------------------------------------------------------------------------------
+void WeaponTemplate::playPreAttackFX(const Object& source, const Object* target, const Coord3D* targetPosition) const
+{
+	if (!RetailFileLayers::enabled() || !m_preAttackFX)
+		return;
+	const ScopedVisualRandom random(TRUE);
+	if (targetPosition && !target)
+		FXList::doFXPos(m_preAttackFX, source.getPosition(), source.getTransformMatrix(), 0.0f,
+			targetPosition, 0.0f, &source);
+	else
+		FXList::doFXObj(m_preAttackFX, &source, target);
+}
+
 void Weapon::preFireWeapon( const Object *source, const Object *victim )
 {
 	Int delay = getPreAttackDelay( source, victim );
@@ -3129,6 +3143,7 @@ void Weapon::preFireWeapon( const Object *source, const Object *victim )
 		if (!isHoldingMovementForReload(frame))
 			setStatus(PRE_ATTACK);
 		setPreAttackFinishedFrame(frame + delay);
+		m_template->playPreAttackFX(*source, victim);
 		if( m_template->isLeechRangeWeapon() )
 		{
 			setLeechRangeActive( TRUE );

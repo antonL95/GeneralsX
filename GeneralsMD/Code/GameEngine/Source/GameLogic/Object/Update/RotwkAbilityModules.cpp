@@ -493,6 +493,17 @@ Bool WeaponFireSpecialAbilityUpdate::skipsContinue() const
 	return getWeaponFireSpecialAbilityUpdateModuleData()->m_skipContinue;
 }
 
+void WeaponFireSpecialAbilityUpdate::onStartWindup()
+{
+	const auto* data = getWeaponFireSpecialAbilityUpdateModuleData();
+	if (!data->m_playWeaponPreFireFX || !data->m_specialWeapon)
+		return;
+	const Object* target = TheGameLogic->findObjectByID(getAbilityTargetID());
+	if (getAbilityTargetID() != INVALID_ID && (!target || (data->m_needLivingTargets && target->isEffectivelyDead())))
+		return;
+	data->m_specialWeapon->playPreAttackFX(*getObject(), target, hasAbilityTargetPos() ? &getAbilityTargetPos() : nullptr);
+}
+
 UnsignedInt WeaponFireSpecialAbilityUpdate::holdFramesAfterTrigger() const
 {
 	const WeaponFireSpecialAbilityUpdateModuleData* data = getWeaponFireSpecialAbilityUpdateModuleData();

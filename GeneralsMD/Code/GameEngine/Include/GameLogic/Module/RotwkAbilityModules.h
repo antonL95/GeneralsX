@@ -145,6 +145,7 @@ public:
 protected:
 	virtual void triggerAbilityEffect() override;
 	virtual Bool skipsContinue() const override;
+	void onStartWindup() override;
 	virtual UnsignedInt holdFramesAfterTrigger() const override;
 	virtual void addAbilityConditions( ModelConditionFlags &flags ) const override;
 };

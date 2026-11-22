@@ -308,6 +308,7 @@ protected:
 	static Bool usesRotwkRules();
 	static UnsignedInt abilityConditionsOf( const Object *obj );
 	virtual Bool skipsContinue() const { return FALSE; }
+	virtual void onStartWindup() {}
 	virtual UnsignedInt holdFramesAfterTrigger() const;
 	virtual void addAbilityConditions( ModelConditionFlags &flags ) const;
 	virtual Bool acceptsIntent( const Object *targetObj, const Coord3D *targetPos ) const;
