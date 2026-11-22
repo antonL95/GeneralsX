@@ -747,6 +747,15 @@ void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiS
 
 	if (theTeam)
 	{
+		if (RetailFileLayers::enabled())
+		{
+			for (DLINK_ITERATOR<Object> iter = theTeam->iterate_TeamMemberList(); !iter.done(); iter.advance())
+			{
+				Object* member = iter.cur();
+				if (member && !member->getContainedBy() && member->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+					TheAI->pathfinder()->addObjectToPathfindMap(member);
+			}
+		}
 		if (transport)
 		{
 			for (DLINK_ITERATOR<Object> iter = theTeam->iterate_TeamMemberList(); !iter.done(); iter.advance())
