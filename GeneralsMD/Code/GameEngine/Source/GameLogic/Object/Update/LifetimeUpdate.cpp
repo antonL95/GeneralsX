@@ -37,6 +37,7 @@
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Object.h"
 
 void LifetimeUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -114,6 +115,8 @@ UnsignedInt LifetimeUpdate::calcSleepDelay(UnsignedInt minFrames, UnsignedInt ma
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime LifetimeUpdate::update()
 {
+	if (RetailFileLayers::enabled() && OathbreakersFadeAwayBehavior::begin(getObject()))
+		return UPDATE_SLEEP_FOREVER;
 	getObject()->kill(DAMAGE_UNRESISTABLE, getLifetimeUpdateModuleData()->m_deathType);
 	return UPDATE_SLEEP_FOREVER;
 }

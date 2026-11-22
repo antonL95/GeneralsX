@@ -101,27 +101,58 @@ public:
 	UpdateSleepTime update() override { return UPDATE_SLEEP_FOREVER; }
 };
 
-struct HitReactionBehaviorModuleData : public BehaviorModuleData
+struct HitReactionBehaviorModuleData : public UpdateModuleData
 {
-	Int m_hitReactionLifeTimer1 = 0;
-	Int m_hitReactionLifeTimer2 = 0;
-	Int m_hitReactionLifeTimer3 = 0;
+	UnsignedInt m_hitReactionLifeTimer1 = 0;
+	UnsignedInt m_hitReactionLifeTimer2 = 0;
+	UnsignedInt m_hitReactionLifeTimer3 = 0;
 	Real m_hitReactionThreshold1 = 0.0f;
 	Real m_hitReactionThreshold2 = 0.0f;
 	Real m_hitReactionThreshold3 = 0.0f;
 	Bool m_fastHitsResetReaction = FALSE;
+	Bool m_hitsParalyze = FALSE;
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 };
 
-class HitReactionBehavior final : public BehaviorModule
+class HitReactionBehavior final : public UpdateModule
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( HitReactionBehavior, "HitReactionBehavior" )
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( HitReactionBehavior, HitReactionBehaviorModuleData )
 
 public:
-	HitReactionBehavior(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data) {}
+	HitReactionBehavior(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	UpdateSleepTime update() override;
+	DisabledMaskType getDisabledTypesToProcess() const override { return DISABLEDMASK_ALL; }
+
+private:
+	Real m_previousHealth = -1.0f;
+	UnsignedInt m_remaining = 0;
+	Int m_level = 0;
 };
+
+#if !RTS_GENERALS
+struct OathbreakersFadeAwayBehaviorModuleData : public UpdateModuleData
+{
+	UnsignedInt m_frames = 0;
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
+class OathbreakersFadeAwayBehavior final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(OathbreakersFadeAwayBehavior, "OathbreakersFadeAwayBehavior")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(OathbreakersFadeAwayBehavior, OathbreakersFadeAwayBehaviorModuleData)
+
+public:
+	OathbreakersFadeAwayBehavior(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	static Bool begin(Object* object);
+	UpdateSleepTime update() override;
+	DisabledMaskType getDisabledTypesToProcess() const override { return DISABLEDMASK_ALL; }
+
+private:
+	UnsignedInt m_endFrame = 0;
+};
+#endif
 
 class HordeMemberCollide final : public CollideModule
 {

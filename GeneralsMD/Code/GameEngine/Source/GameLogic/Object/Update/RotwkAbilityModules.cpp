@@ -5,6 +5,7 @@
 #include "GameLogic/Module/RotwkAbilityModules.h"
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <string>
 
@@ -14,6 +15,7 @@
 #include "Common/INIAudit.h"
 #include "Common/INIException.h"
 #include "Common/Player.h"
+#include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
@@ -40,6 +42,7 @@
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 
 void CurseSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
@@ -143,6 +146,141 @@ void CurseSpecialPower::loadPostProcess()
 {
 	SpecialAbilityUpdate::loadPostProcess();
 }
+
+void BoredUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	UpdateModuleData::buildFieldParse(p);
+	static const FieldParse fields[] = {
+		{ "ScanDelayTime", INI::parseDurationUnsignedInt, nullptr, offsetof(BoredUpdateModuleData, m_scanDelay) },
+		{ "ScanDistance", INI::parseReal, nullptr, offsetof(BoredUpdateModuleData, m_scanDistance) },
+		{ "CanScanWhileAttackingOrMoving", INI::parseBool, nullptr, offsetof(BoredUpdateModuleData, m_scanWhileAttackingOrMoving) },
+		{ "BoredFilter", [](INI* ini, void* instance, void* store, const void* data) {
+			SpecialPowerObjectFilter::parse(ini, instance, store, data);
+			static_cast<BoredUpdateModuleData*>(instance)->m_hasFilter = TRUE;
+		}, nullptr, offsetof(BoredUpdateModuleData, m_filter) },
+		{ "SpecialPowerTemplate", INI::parseSpecialPowerTemplate, nullptr, offsetof(BoredUpdateModuleData, m_power) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+BoredUpdate::BoredUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data)
+{
+	const UnsignedInt delay = std::min(getBoredUpdateModuleData()->m_scanDelay, static_cast<UnsignedInt>(UPDATE_SLEEP_FOREVER));
+	if (delay)
+		setWakeFrame(getObject(), UPDATE_SLEEP(std::max(1, GameLogicRandomValue(0, static_cast<Int>(delay)))));
+}
+
+BoredUpdate::~BoredUpdate() = default;
+
+UpdateSleepTime BoredUpdate::update()
+{
+	Object* self = getObject();
+	const auto* data = getBoredUpdateModuleData();
+	const auto* power = data->m_power;
+	if (!power || self->isEffectivelyDead())
+		return UPDATE_SLEEP_FOREVER;
+	const UpdateSleepTime delay = UPDATE_SLEEP(std::clamp(data->m_scanDelay, 1u, static_cast<UnsignedInt>(UPDATE_SLEEP_FOREVER)));
+	const auto* ai = self->getAI();
+	const auto* ability = self->getSpecialPowerModule(power);
+	if (!ai || !ability || !ability->isReady() ||
+		(!data->m_scanWhileAttackingOrMoving && (ai->isMoving() || ai->isAttacking())))
+		return delay;
+	if (!data->m_hasFilter)
+	{
+		if (TheActionManager->canDoSpecialPower(self, power, CMD_FROM_AI, 0))
+			self->doSpecialPower(power, 0);
+		return delay;
+	}
+	if (!(data->m_scanDistance > 0.0f) || !std::isfinite(data->m_scanDistance))
+		return delay;
+
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_scanDistance,
+		FROM_CENTER_2D, nullptr, ITER_FASTEST);
+	MemoryPoolObjectHolder holder(iter);
+	Object* nearest = nullptr;
+	Real nearestDistance = 0.0f;
+	for (Object* candidate = iter->first(); candidate; candidate = iter->next())
+	{
+		if (candidate == self || candidate->isEffectivelyDead() || self->getRelationship(candidate) != ALLIES ||
+			!data->m_filter.matchesObject(self, candidate))
+			continue;
+		const Real dx = candidate->getPosition()->x - self->getPosition()->x;
+		const Real dy = candidate->getPosition()->y - self->getPosition()->y;
+		const Real distance = dx * dx + dy * dy;
+		if (!nearest || distance < nearestDistance || (distance == nearestDistance && candidate->getID() < nearest->getID()))
+		{
+			nearest = candidate;
+			nearestDistance = distance;
+		}
+	}
+	const UnsignedInt options = NEED_TARGET_ALLY_OBJECT;
+	if (nearest && TheActionManager->canDoSpecialPowerAtObject(self, nearest, CMD_FROM_AI, power, options))
+		self->doSpecialPowerAtObject(power, nearest, options);
+	return delay;
+}
+
+void BoredUpdate::crc(Xfer* xfer) { UpdateModule::crc(xfer); }
+void BoredUpdate::xfer(Xfer* xfer) { UpdateModule::xfer(xfer); }
+void BoredUpdate::loadPostProcess() { UpdateModule::loadPostProcess(); }
+
+void ModelConditionSpecialAbilityUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	SpecialAbilityUpdateModuleData::buildFieldParse(p);
+	static const FieldParse fields[] = {
+		{ "WhichSpecialPower", INI::parseInt, nullptr, offsetof(ModelConditionSpecialAbilityUpdateModuleData, m_whichSpecialPower) },
+		{ "GenerateTerror", INI::parseBool, nullptr, offsetof(ModelConditionSpecialAbilityUpdateModuleData, m_generateTerror) },
+		{ "GenerateUncontrollableFear", INI::parseBool, nullptr, offsetof(ModelConditionSpecialAbilityUpdateModuleData, m_generateUncontrollableFear) },
+		{ "EmotionPulseRadius", INI::parseReal, nullptr, offsetof(ModelConditionSpecialAbilityUpdateModuleData, m_emotionPulseRadius) },
+		{ "ObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(ModelConditionSpecialAbilityUpdateModuleData, m_filter) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+ModelConditionSpecialAbilityUpdate::~ModelConditionSpecialAbilityUpdate() = default;
+
+void ModelConditionSpecialAbilityUpdate::addAbilityConditions(ModelConditionFlags& flags) const
+{
+	SpecialAbilityUpdate::addAbilityConditions(flags);
+	constexpr ModelConditionFlagType conditions[] = {MODELCONDITION_INVULNERABLE, MODELCONDITION_SPECIAL_POWER_1,
+		MODELCONDITION_SPECIAL_POWER_2, MODELCONDITION_SPECIAL_POWER_3};
+	const Int index = getModelConditionSpecialAbilityUpdateModuleData()->m_whichSpecialPower;
+	if (index >= 0 && index < 4)
+		flags.set(conditions[index]);
+}
+
+void ModelConditionSpecialAbilityUpdate::triggerAbilityEffect()
+{
+	SpecialAbilityUpdate::triggerAbilityEffect();
+	const auto* data = getModelConditionSpecialAbilityUpdateModuleData();
+	if (!(data->m_emotionPulseRadius > 0.0f) || !std::isfinite(data->m_emotionPulseRadius) ||
+		!(data->m_generateTerror || data->m_generateUncontrollableFear))
+		return;
+
+	Object* self = getObject();
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_emotionPulseRadius,
+		FROM_CENTER_2D, nullptr, ITER_FASTEST);
+	MemoryPoolObjectHolder holder(iter);
+	std::vector<Object*> targets;
+	for (Object* target = iter->first(); target; target = iter->next())
+	{
+		if (self->getRelationship(target) == ENEMIES && !target->isEffectivelyDead() && data->m_filter.matchesObject(self, target))
+			targets.push_back(target);
+	}
+	std::sort(targets.begin(), targets.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
+	for (Object* target : targets)
+	{
+		if (data->m_generateTerror)
+			EmotionTrackerUpdate::signal(target, EMOTION_TERROR, self);
+		if (data->m_generateUncontrollableFear)
+			EmotionTrackerUpdate::signal(target, EMOTION_UNCONTROLLABLE_FEAR, self);
+	}
+}
+
+void ModelConditionSpecialAbilityUpdate::crc(Xfer* xfer) { SpecialAbilityUpdate::crc(xfer); }
+void ModelConditionSpecialAbilityUpdate::xfer(Xfer* xfer) { SpecialAbilityUpdate::xfer(xfer); }
+void ModelConditionSpecialAbilityUpdate::loadPostProcess() { SpecialAbilityUpdate::loadPostProcess(); }
 
 void RousingSpeechUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 {

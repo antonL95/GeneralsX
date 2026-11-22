@@ -75,6 +75,52 @@ private:
 	Real m_previousRadius = 0.0f;
 };
 
+class BoredUpdateModuleData : public UpdateModuleData
+{
+public:
+	UnsignedInt m_scanDelay = 0;
+	Real m_scanDistance = 300.0f;
+	Bool m_scanWhileAttackingOrMoving = FALSE;
+	Bool m_hasFilter = FALSE;
+	SpecialPowerObjectFilter m_filter;
+	const SpecialPowerTemplate* m_power = nullptr;
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
+class BoredUpdate final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(BoredUpdate, "BoredUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(BoredUpdate, BoredUpdateModuleData)
+
+public:
+	BoredUpdate(Thing* thing, const ModuleData* data);
+	UpdateSleepTime update() override;
+};
+
+class ModelConditionSpecialAbilityUpdateModuleData : public SpecialAbilityUpdateModuleData
+{
+public:
+	Int m_whichSpecialPower = 0;
+	Bool m_generateTerror = FALSE;
+	Bool m_generateUncontrollableFear = FALSE;
+	Real m_emotionPulseRadius = 0.0f;
+	SpecialPowerObjectFilter m_filter;
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
+class ModelConditionSpecialAbilityUpdate final : public SpecialAbilityUpdate
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(ModelConditionSpecialAbilityUpdate, "ModelConditionSpecialAbilityUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(ModelConditionSpecialAbilityUpdate, ModelConditionSpecialAbilityUpdateModuleData)
+
+public:
+	ModelConditionSpecialAbilityUpdate(Thing* thing, const ModuleData* data) : SpecialAbilityUpdate(thing, data) {}
+
+protected:
+	void addAbilityConditions(ModelConditionFlags& flags) const override;
+	void triggerAbilityEffect() override;
+};
+
 class WeaponFireSpecialAbilityUpdateModuleData : public SpecialAbilityUpdateModuleData
 {
 public:

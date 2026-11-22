@@ -515,8 +515,10 @@ void ModuleFactory::init()
 
 		addModule( LargeGroupAudioUpdate );
 		addModule( PickupStuffUpdate );
+		addModule( BoredUpdate );
 		addModule( AttachUpdate );
 		addModule( HitReactionBehavior );
+		addModule( OathbreakersFadeAwayBehavior );
 		addModule( HordeMemberCollide );
 		addModule( ExperienceLevelCreate );
 		addModule( LevelUpUpgrade );
@@ -545,6 +547,7 @@ void ModuleFactory::init()
 		addModule( GiantBirdAIUpdate );
 		addModule( CommandPointsUpgrade );
 		addModule( WeaponFireSpecialAbilityUpdate );
+		addModule( ModelConditionSpecialAbilityUpdate );
 		addModule( CurseSpecialPower );
 		addModule( RousingSpeechUpdate );
 		addModule( ToggleMountedSpecialAbilityUpdate );

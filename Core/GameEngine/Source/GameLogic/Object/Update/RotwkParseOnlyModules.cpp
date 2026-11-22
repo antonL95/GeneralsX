@@ -4,14 +4,16 @@
 
 #include "Common/AttributeModifierRules.h"
 #include "Common/Xfer.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Object.h"
 #if !RTS_GENERALS
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
+#include "GameClient/Drawable.h"
 #include "GameLogic/AttributeModifierStore.h"
-#include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
@@ -59,16 +61,17 @@ void PickupStuffUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 
 void HitReactionBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
-	BehaviorModuleData::buildFieldParse(p);
+	UpdateModuleData::buildFieldParse(p);
 	static const FieldParse fields[] =
 	{
-		{ "HitReactionLifeTimer1", INI::parseInt, nullptr, offsetof(HitReactionBehaviorModuleData, m_hitReactionLifeTimer1) },
-		{ "HitReactionLifeTimer2", INI::parseInt, nullptr, offsetof(HitReactionBehaviorModuleData, m_hitReactionLifeTimer2) },
-		{ "HitReactionLifeTimer3", INI::parseInt, nullptr, offsetof(HitReactionBehaviorModuleData, m_hitReactionLifeTimer3) },
+		{ "HitReactionLifeTimer1", INI::parseDurationUnsignedInt, nullptr, offsetof(HitReactionBehaviorModuleData, m_hitReactionLifeTimer1) },
+		{ "HitReactionLifeTimer2", INI::parseDurationUnsignedInt, nullptr, offsetof(HitReactionBehaviorModuleData, m_hitReactionLifeTimer2) },
+		{ "HitReactionLifeTimer3", INI::parseDurationUnsignedInt, nullptr, offsetof(HitReactionBehaviorModuleData, m_hitReactionLifeTimer3) },
 		{ "HitReactionThreshold1", INI::parseReal, nullptr, offsetof(HitReactionBehaviorModuleData, m_hitReactionThreshold1) },
 		{ "HitReactionThreshold2", INI::parseReal, nullptr, offsetof(HitReactionBehaviorModuleData, m_hitReactionThreshold2) },
 		{ "HitReactionThreshold3", INI::parseReal, nullptr, offsetof(HitReactionBehaviorModuleData, m_hitReactionThreshold3) },
 		{ "FastHitsResetReaction", INI::parseBool, nullptr, offsetof(HitReactionBehaviorModuleData, m_fastHitsResetReaction) },
+		{ "HitsParalyze", INI::parseBool, nullptr, offsetof(HitReactionBehaviorModuleData, m_hitsParalyze) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(fields);
@@ -98,7 +101,6 @@ void CastleMemberBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 
 DEFINE_PARSE_ONLY_SNAPSHOT(LargeGroupAudioUpdate, UpdateModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(PickupStuffUpdate, UpdateModule)
-DEFINE_PARSE_ONLY_SNAPSHOT(HitReactionBehavior, BehaviorModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(HordeMemberCollide, BehaviorModule)
 
 void HordeMemberCollide::onCollide(Object* other, const Coord3D*, const Coord3D*)
@@ -112,6 +114,146 @@ DEFINE_PARSE_ONLY_SNAPSHOT(NotifyTargetsOfImminentProbableCrushingUpdate, Update
 #endif
 
 #undef DEFINE_PARSE_ONLY_SNAPSHOT
+
+HitReactionBehavior::~HitReactionBehavior() = default;
+
+UpdateSleepTime HitReactionBehavior::update()
+{
+	Object* object = getObject();
+	const auto* body = object->getBodyModule();
+	if (!body)
+		return UPDATE_SLEEP_FOREVER;
+
+	const Real health = body->getHealth();
+	const Real damage = m_previousHealth - health;
+	m_previousHealth = health;
+	const auto* data = getHitReactionBehaviorModuleData();
+	const Bool dead = object->isEffectivelyDead() || health <= 0.0f;
+	if (m_remaining && (--m_remaining == 0 || dead))
+	{
+		object->clearModelConditionState(MODELCONDITION_HIT_REACTION);
+		object->clearModelConditionState(static_cast<ModelConditionFlagType>(m_level));
+		m_remaining = 0;
+	}
+	if (dead)
+		return UPDATE_SLEEP_FOREVER;
+	if (!(damage > 0.0f) || (m_remaining && !data->m_fastHitsResetReaction))
+		return UPDATE_SLEEP_NONE;
+
+	const Real thresholds[] = {data->m_hitReactionThreshold1, data->m_hitReactionThreshold2, data->m_hitReactionThreshold3};
+	const UnsignedInt durations[] = {data->m_hitReactionLifeTimer1, data->m_hitReactionLifeTimer2, data->m_hitReactionLifeTimer3};
+	const ModelConditionFlagType levels[] = {MODELCONDITION_HIT_LEVEL_1, MODELCONDITION_HIT_LEVEL_2, MODELCONDITION_HIT_LEVEL_3};
+	for (Int index = 2; index >= 0; --index)
+	{
+		if (damage < thresholds[index])
+			continue;
+		if (durations[index])
+		{
+			if (m_remaining)
+				object->clearModelConditionState(static_cast<ModelConditionFlagType>(m_level));
+			m_level = levels[index];
+			m_remaining = durations[index];
+			object->setModelConditionState(MODELCONDITION_HIT_REACTION);
+			object->setModelConditionState(levels[index]);
+			if (data->m_hitsParalyze)
+				object->setDisabledUntil(DISABLED_PARALYZED, TheGameLogic->getFrame() + m_remaining);
+		}
+		break;
+	}
+	return UPDATE_SLEEP_NONE;
+}
+
+void HitReactionBehavior::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	xfer->xferReal(&m_previousHealth);
+	xfer->xferUnsignedInt(&m_remaining);
+	xfer->xferInt(&m_level);
+}
+
+void HitReactionBehavior::xfer(Xfer* xfer)
+{
+	XferVersion version = 2;
+	xfer->xferVersion(&version, 2);
+	if (version == 1)
+	{
+		ObjectModule::xfer(xfer);
+		return;
+	}
+	UpdateModule::xfer(xfer);
+	xfer->xferReal(&m_previousHealth);
+	xfer->xferUnsignedInt(&m_remaining);
+	xfer->xferInt(&m_level);
+}
+
+void HitReactionBehavior::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
+}
+
+#if !RTS_GENERALS
+void OathbreakersFadeAwayBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	UpdateModuleData::buildFieldParse(p);
+	static const FieldParse fields[] = {
+		{ "FadeOutTime", INI::parseDurationUnsignedInt, nullptr, offsetof(OathbreakersFadeAwayBehaviorModuleData, m_frames) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+OathbreakersFadeAwayBehavior::~OathbreakersFadeAwayBehavior() = default;
+
+Bool OathbreakersFadeAwayBehavior::begin(Object* object)
+{
+	auto* fade = static_cast<OathbreakersFadeAwayBehavior*>(object->findUpdateModule(NAMEKEY("OathbreakersFadeAwayBehavior")));
+	if (!fade || object->isEffectivelyDead())
+		return FALSE;
+	if (fade->m_endFrame)
+		return TRUE;
+
+	const UnsignedInt frames = std::max(1u, fade->getOathbreakersFadeAwayBehaviorModuleData()->m_frames);
+	fade->m_endFrame = TheGameLogic->getFrame() + frames;
+	object->setModelConditionState(MODELCONDITION_OATH_FULLFILLED);
+	object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+	if (HordeContain::get(object))
+	{
+		for (Object* member : *HordeContain::get(object)->getContainedItemsList())
+			begin(member);
+	}
+	else if (auto* drawable = object->getDrawable())
+		drawable->fadeOut(frames);
+	fade->setWakeFrame(object, UPDATE_SLEEP(frames));
+	return TRUE;
+}
+
+UpdateSleepTime OathbreakersFadeAwayBehavior::update()
+{
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (!m_endFrame || getObject()->isEffectivelyDead())
+		return UPDATE_SLEEP_FOREVER;
+	if (now < m_endFrame)
+		return UPDATE_SLEEP(m_endFrame - now);
+	TheGameLogic->destroyObject(getObject());
+	return UPDATE_SLEEP_FOREVER;
+}
+
+void OathbreakersFadeAwayBehavior::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	xfer->xferUnsignedInt(&m_endFrame);
+}
+
+void OathbreakersFadeAwayBehavior::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	UpdateModule::xfer(xfer);
+	xfer->xferUnsignedInt(&m_endFrame);
+}
+
+void OathbreakersFadeAwayBehavior::loadPostProcess() { UpdateModule::loadPostProcess(); }
+#endif
 
 #if !RTS_GENERALS
 void HordeNotifyTargetsOfImminentProbableCrushingUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
