@@ -1300,6 +1300,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 		{ "DefaultCameraMaxHeight", INI::parseReal, nullptr, offsetof(GlobalData, m_maxCameraHeight) },
 		{ "UseShadowMapping", INI::parseBool, nullptr, offsetof(GlobalData, m_retailShadowMapping) },
 		{ "ShadowMapSize", INI::parseInt, nullptr, offsetof(GlobalData, m_retailShadowMapSize) },
+		{ "GenericDamageFieldName", INI::parseAsciiString, nullptr, offsetof(GlobalData, m_genericDamageFieldName) },
 		{ "MultiPlayBuildingXPMult", parseMultiplayerXP, nullptr, offsetof(GlobalData, m_multiPlayBuildingXPMult) },
 		{ "MultiPlayUnitXPMult", parseMultiplayerXP, nullptr, offsetof(GlobalData, m_multiPlayUnitXPMult) },
 		{ "TerrainResourceCellSize", INI::parseReal, nullptr, offsetof(GlobalData, m_terrainResourceCellSize) },

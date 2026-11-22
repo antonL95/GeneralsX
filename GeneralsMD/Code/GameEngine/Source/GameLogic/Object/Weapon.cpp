@@ -260,6 +260,7 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "AttributeModifierNugget", WeaponNugget::parseAttributeModifierNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "SlaveAttackNugget", WeaponNugget::parseSlaveAttackNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "HordeAttackNugget", WeaponNugget::parseHordeAttackNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "DamageFieldNugget", WeaponNugget::parseDamageFieldNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "FiringDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_firingDuration) },
 	{ "HitPercentage", WeaponTemplate::parseHitPercentage, nullptr, offsetof(WeaponTemplate, m_hitPercentage) },
 	{ "MaxWeaponSpeed", INI::parseVelocityReal, nullptr, offsetof(WeaponTemplate, m_maxWeaponSpeed) },

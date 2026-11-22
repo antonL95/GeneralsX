@@ -543,6 +543,8 @@ void HeroModeSpecialAbilityUpdate::triggerAbilityEffect()
 {
 	SpecialAbilityUpdate::triggerAbilityEffect();
 	const HeroModeSpecialAbilityUpdateModuleData* data = getHeroModeSpecialAbilityUpdateModuleData();
+	if (RetailFileLayers::enabled() && data->m_heroEffectDuration > 0)
+		startTimedCondition(MODELCONDITION_HERO, data->m_heroEffectDuration);
 	if (data->m_heroAttributeModifier.isNotEmpty())
 		AttributeModifiers::apply(getObject(), data->m_heroAttributeModifier,
 			data->m_heroEffectDuration > 0 ? data->m_heroEffectDuration : AttributeModifierHelper::USE_LIST_DURATION, 0, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()));

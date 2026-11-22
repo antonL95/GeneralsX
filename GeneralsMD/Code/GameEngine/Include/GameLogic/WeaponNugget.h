@@ -24,6 +24,7 @@ enum WeaponNuggetType CPP_11(: Int)
 	WEAPON_NUGGET_ATTRIBUTE_MODIFIER,
 	WEAPON_NUGGET_SLAVE_ATTACK,
 	WEAPON_NUGGET_HORDE_ATTACK,
+	WEAPON_NUGGET_DAMAGE_FIELD,
 };
 
 struct WeaponNuggetScalar
@@ -39,7 +40,7 @@ struct WeaponNugget
 	Bool isEnabledFor(const Object* attacker) const;
 	Bool affects(const Object* attacker, const Object* victim) const;
 	Real scalarFor(const Object* attacker, const Object* victim) const;
-	Bool isImpactNugget() const { return dealsDamage() || m_type == WEAPON_NUGGET_OCL || m_type == WEAPON_NUGGET_META_IMPACT; }
+	Bool isImpactNugget() const { return dealsDamage() || m_type == WEAPON_NUGGET_OCL || m_type == WEAPON_NUGGET_META_IMPACT || m_type == WEAPON_NUGGET_DAMAGE_FIELD; }
 	Bool dealsDamage() const { return m_type == WEAPON_NUGGET_DAMAGE || m_type == WEAPON_NUGGET_DOT; }
 	void postProcessLoad();
 
@@ -51,6 +52,7 @@ struct WeaponNugget
 	static void parseAttributeModifierNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseSlaveAttackNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseHordeAttackNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseDamageFieldNugget(INI* ini, void* instance, void* store, const void* userData);
 
 	WeaponNuggetType m_type;
 	std::vector<AsciiString> m_requiredUpgradeNames;
@@ -89,6 +91,9 @@ struct WeaponNugget
 	AsciiString m_warheadTemplateName;
 	const ThingTemplate* m_projectileTemplate = nullptr;
 	const WeaponTemplate* m_warheadTemplate = nullptr;
+	AsciiString m_fieldWeaponName;
+	const WeaponTemplate* m_fieldWeapon = nullptr;
+	UnsignedInt m_fieldDuration = 0;
 	Coord3D m_alwaysAttackHereOffset = {0.0f, 0.0f, 0.0f};
 	Bool m_useAlwaysAttackOffset = FALSE;
 	AsciiString m_launchBoneSlotOverride;

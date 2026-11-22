@@ -33,20 +33,34 @@
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Weapon.h"
 
+#include <vector>
+
 //-------------------------------------------------------------------------------------------------
 class FireWeaponUpdateModuleData : public UpdateModuleData
 {
 public:
+	struct Nugget
+	{
+		AsciiString weaponName;
+		UnsignedInt delay = 0;
+		Bool oneShot = FALSE;
+		Coord3D offset{};
+	};
+
 	const WeaponTemplate* m_weaponTemplate;
   UnsignedInt m_initialDelayFrames;
 	UnsignedInt m_exclusiveWeaponDelay;	///< If non-zero, any other weapon having fired this recently will keep us from doing anything
+	std::vector<Nugget> m_nuggets;
+	Bool m_aliveOnly = FALSE;
+	Bool m_chargingModeTrigger = FALSE;
+	Bool m_heroModeTrigger = FALSE;
 
 	FireWeaponUpdateModuleData();
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 
 private:
-
+	static void parseNugget(INI* ini, void* instance, void* store, const void* userData);
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -63,6 +77,7 @@ public:
 	// virtual destructor prototype provided by memory pool declaration
 
 	virtual UpdateSleepTime update() override;
+	void setRetailDamageFieldWeapon(const WeaponTemplate* weapon);
 
 protected:
 
@@ -71,4 +86,13 @@ protected:
 	Weapon* m_weapon;
   UnsignedInt m_initialDelayFrame;
 
+private:
+	struct Payload
+	{
+		Weapon* weapon;
+		UnsignedInt startFrame;
+		Bool spent = FALSE;
+	};
+
+	std::vector<Payload> m_payloads;
 };

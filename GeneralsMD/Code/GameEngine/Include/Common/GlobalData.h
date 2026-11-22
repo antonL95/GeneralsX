@@ -160,6 +160,7 @@ public:
 	Bool m_useShadowVolumes;
 	Int m_retailShadowMapSize = 0;
 	Bool m_retailShadowMapping = FALSE;
+	AsciiString m_genericDamageFieldName;
 	// GeneralsX @feature Olcay Seygan / Ilyas Akin 08/10/2026 Also cast volume shadows off skinned meshes
 	Bool m_useShadowVolumesForSkins;
 	// GeneralsX @feature Olcay Seygan / Ilyas Akin 08/10/2026 Missiles and bombs get decal shadows

@@ -7,14 +7,19 @@
 #include <algorithm>
 #include <cstdio>
 
+#include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/DeletionUpdate.h"
+#include "GameLogic/Module/FireWeaponUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/ObjectCreationUpgrade.h"
@@ -182,6 +187,13 @@ const FieldParse s_oclFields[] =
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
+const FieldParse s_damageFieldFields[] =
+{
+	{ "WeaponTemplateName", INI::parseAsciiString, nullptr, offsetof(WeaponNugget, m_fieldWeaponName) },
+	{ "Duration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponNugget, m_fieldDuration) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
 const FieldParse s_attributeModifierFields[] =
 {
 	{ "AttributeModifier", INI::parseAsciiString, nullptr, offsetof(WeaponNugget, m_attributeModifier) },
@@ -223,6 +235,7 @@ const char* nuggetTypeName(WeaponNuggetType type)
 		case WEAPON_NUGGET_ATTRIBUTE_MODIFIER: return "AttributeModifierNugget";
 		case WEAPON_NUGGET_SLAVE_ATTACK: return "SlaveAttackNugget";
 		case WEAPON_NUGGET_HORDE_ATTACK: return "HordeAttackNugget";
+		case WEAPON_NUGGET_DAMAGE_FIELD: return "DamageFieldNugget";
 	}
 	return "Nugget";
 }
@@ -281,6 +294,11 @@ void WeaponNugget::parseHordeAttackNugget(INI* ini, void*, void* store, const vo
 	parseNugget(ini, store, WEAPON_NUGGET_HORDE_ATTACK, s_hordeAttackFields);
 }
 
+void WeaponNugget::parseDamageFieldNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_DAMAGE_FIELD, s_damageFieldFields);
+}
+
 void WeaponNugget::postProcessLoad()
 {
 	m_requiredUpgrades.clear();
@@ -299,6 +317,8 @@ void WeaponNugget::postProcessLoad()
 		m_projectileTemplate = TheThingFactory->findTemplate(m_projectileTemplateName, FALSE);
 	if (!m_warheadTemplateName.isEmpty())
 		m_warheadTemplate = TheWeaponStore->findWeaponTemplate(m_warheadTemplateName);
+	if (!m_fieldWeaponName.isEmpty())
+		m_fieldWeapon = TheWeaponStore->findWeaponTemplate(m_fieldWeaponName);
 	if (!m_oclName.isEmpty())
 		m_ocl = TheObjectCreationListStore->findObjectCreationList(m_oclName.str());
 }
@@ -348,6 +368,9 @@ Bool WeaponTemplate::nuggetsCanDamage(Int depth) const
 		if (nugget.m_type == WEAPON_NUGGET_PROJECTILE && nugget.m_warheadTemplate && depth < MAX_WARHEAD_DEPTH &&
 			nugget.m_warheadTemplate->nuggetsCanDamage(depth + 1))
 			return TRUE;
+		if (nugget.m_type == WEAPON_NUGGET_DAMAGE_FIELD && nugget.m_fieldWeapon && depth < MAX_WARHEAD_DEPTH &&
+			nugget.m_fieldWeapon->nuggetsCanDamage(depth + 1))
+			return TRUE;
 	}
 	return FALSE;
 }
@@ -369,6 +392,12 @@ Real WeaponTemplate::estimateNuggetDamage(const Object* sourceObj, const Object*
 		{
 			if (nugget.m_warheadTemplate && depth < MAX_WARHEAD_DEPTH)
 				total += nugget.m_warheadTemplate->estimateNuggetDamage(sourceObj, victimObj, bonus, depth + 1);
+			continue;
+		}
+		if (nugget.m_type == WEAPON_NUGGET_DAMAGE_FIELD)
+		{
+			if (nugget.m_fieldWeapon && depth < MAX_WARHEAD_DEPTH && nugget.affects(sourceObj, victimObj))
+				total += nugget.m_fieldWeapon->estimateNuggetDamage(sourceObj, victimObj, bonus, depth + 1);
 			continue;
 		}
 		if (!nugget.dealsDamage() || nugget.m_damage <= 0.0f)
@@ -579,6 +608,38 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		pos = primaryVictim->getPosition();
 	if (!pos || (dotTick && (!primaryVictim || primaryVictim->isEffectivelyDead())))
 		return;
+
+	if (nugget.m_type == WEAPON_NUGGET_DAMAGE_FIELD)
+	{
+		Player* owner = source ? source->getControllingPlayer() : nullptr;
+		if (!RetailFileLayers::enabled() || !owner || !nugget.m_fieldWeapon || !nugget.affects(source, primaryVictim))
+			return;
+		const ThingTemplate* fieldTemplate = TheThingFactory->findTemplate(TheGlobalData->m_genericDamageFieldName, FALSE);
+		if (!fieldTemplate)
+			return;
+
+		Object* field = TheThingFactory->newObject(fieldTemplate, owner->getDefaultTeam());
+		static const NameKeyType fireKey = NAMEKEY("FireWeaponUpdate");
+		static const NameKeyType deletionKey = NAMEKEY("DeletionUpdate");
+		auto* fire = static_cast<FireWeaponUpdate*>(field->findUpdateModule(fireKey));
+		auto* deletion = static_cast<DeletionUpdate*>(field->findUpdateModule(deletionKey));
+		if (!fire || !deletion)
+		{
+			TheGameLogic->destroyObject(field);
+			return;
+		}
+
+		const Coord3D target{pos->x, pos->y, TheTerrainLogic->getGroundHeight(pos->x, pos->y)};
+		field->setPosition(&target);
+		field->setProducer(source);
+		fire->setRetailDamageFieldWeapon(nugget.m_fieldWeapon);
+		deletion->setLifetimeRange(nugget.m_fieldDuration, nugget.m_fieldDuration);
+		if (RetailTestCommands::tracesCombat())
+			std::fprintf(stderr, "TEST damage field frame=%u source=%u field=%u weapon=%s duration=%u target=%.1f,%.1f\n",
+				TheGameLogic->getFrame(), static_cast<UnsignedInt>(sourceID), static_cast<UnsignedInt>(field->getID()),
+				nugget.m_fieldWeapon->getName().str(), nugget.m_fieldDuration, target.x, target.y);
+		return;
+	}
 
 	if (nugget.m_type == WEAPON_NUGGET_OCL)
 	{
