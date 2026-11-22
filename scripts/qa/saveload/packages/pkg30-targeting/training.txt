@@ -1,66 +1,65 @@
-40 create Player_1 DolAmrothElphir 0 2120,2560,0
-40 create Player_1 IthilienAnborn 0 2180,2560,0
-40 create Player_1 IthilienMablung 0 2240,2560,0
-40 create Player_1 Pkg30Healer 0 2300,2560,0
-40 create Player_1 Pkg30Ally 0 2340,2560,0
-40 create Player_1 Pkg30NoContainer 0 2380,2560,0
-40 create Player_1 Pkg30DisabledContainer 0 2460,2560,0
-40 create Player_1 Pkg30ValidContainer 0 2560,2560,0
-40 create PlyrCreeps Pkg30Enemy 0 2140,2630,0
-40 create PlyrCreeps Pkg30EnemyStructure 0 2200,2680,0
-42 objupgrade Player_1 DolAmrothElphir 0 Upgrade_ObjectLevel10
-42 objupgrade Player_1 IthilienAnborn 0 Upgrade_ObjectLevel1
-42 objupgrade Player_1 IthilienMablung 0 Upgrade_ObjectLevel5
-45 pkg30-probe Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30Enemy:0
-45 pkg30-script Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30Enemy:0
-46 pkg30-probe Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30EnemyStructure:0
-46 pkg30-cancel Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson
-47 pkg30-dispatch Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30Enemy:0
-49 pkg30-probe Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30EnemyStructure:0
-50 pkg30-dispatch Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30EnemyStructure:0
-55 pkg30-probe Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
-56 pkg30-toggle-weapon Player_1 IthilienAnborn 0 on
-57 pkg30-probe Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
-57 pkg30-hotkey Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
-57 pkg30-script Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
-58 pkg30-dispatch Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
-60 pkg30-probe Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
-61 pkg30-toggle-weapon Player_1 IthilienAnborn 0 off
-62 pkg30-probe Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
-63 pkg30-dispatch Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
-65 pkg30-probe Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
-69 create PlyrCreeps Pkg30ThrustTarget 0 2265,2660,0
-70 pkg30-probe Player_1 IthilienMablung 0 Command_MablungDeadlyThrust,PlyrCreeps:Pkg30ThrustTarget:0
-70 pkg30-probe Player_1 IthilienMablung 0 Command_CreateAHero_RainOfArrows_Level1
-70 pkg30-hotkey Player_1 IthilienMablung 0 Command_MablungDeadlyThrust
-70 pkg30-script Player_1 IthilienMablung 0 Command_MablungDeadlyThrust,PlyrCreeps:Pkg30ThrustTarget:0
-71 pkg30-dispatch Player_1 IthilienMablung 0 Command_MablungDeadlyThrust,PlyrCreeps:Pkg30ThrustTarget:0
-73 pkg30-probe Player_1 IthilienMablung 0 Command_MablungDeadlyThrust,PlyrCreeps:Pkg30ThrustTarget:0
-74 pkg30-toggle-weapon Player_1 IthilienMablung 0 on
-75 pkg30-probe Player_1 IthilienMablung 0 Command_MablungDeadlyThrust,PlyrCreeps:Pkg30ThrustTarget:0
-75 pkg30-probe Player_1 IthilienMablung 0 Command_CreateAHero_RainOfArrows_Level1
-80 pkg30-probe Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
-80 pkg30-probe Player_1 Pkg30Healer 0 Command_CreateAHero_SpecialAbilityAthelas,Player_1:Pkg30Ally:0
-81 pkg30-dispatch Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
-83 pkg30-probe Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
-84 pkg30-damage Player_1 Pkg30Ally 0 50
-85 pkg30-probe Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
-85 pkg30-probe Player_1 Pkg30Healer 0 Command_CreateAHero_SpecialAbilityAthelas,Player_1:Pkg30Ally:0
-86 pkg30-dispatch Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
-88 pkg30-probe Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
-90 pkg30-probe Player_1 Pkg30NoContainer 0 Command_ExitGarrison
-90 pkg30-probe Player_1 Pkg30DisabledContainer 0 Command_ExitGarrison
-90 pkg30-probe Player_1 Pkg30ValidContainer 0 Command_ExitGarrison
-91 destroy Player_1 Pkg30Ally 0
-95 destroy Player_1 DolAmrothElphir 0
-95 destroy Player_1 IthilienAnborn 0
-95 destroy Player_1 Pkg30Healer 0
-95 destroy Player_1 Pkg30NoContainer 0
-95 destroy Player_1 Pkg30DisabledContainer 0
-95 destroy PlyrCreeps Pkg30Enemy 0
-95 destroy PlyrCreeps Pkg30EnemyStructure 0
-95 destroy PlyrCreeps Pkg30ThrustTarget 0
-260 pkg30-probe Player_1 IthilienMablung 0 Command_MablungDeadlyThrust
-260 pkg30-probe Player_1 Pkg30ValidContainer 0 Command_ExitGarrison
-261 destroy Player_1 IthilienMablung 0
-261 destroy Player_1 Pkg30ValidContainer 0
+1360 create Player_1 DolAmrothElphir 0 2120,2560,0
+1360 create Player_1 IthilienAnborn 0 2180,2560,0
+1360 create Player_1 IthilienMablung 0 2240,2560,0
+1360 create Player_1 Pkg30Healer 0 2300,2560,0
+1360 create Player_1 Pkg30Ally 0 2340,2560,0
+1360 create Player_1 Pkg30NoContainer 0 2380,2560,0
+1360 create Player_1 Pkg30DisabledContainer 0 2460,2560,0
+1360 create Player_1 Pkg30ValidContainer 0 2560,2560,0
+1360 create PlyrCreeps Pkg30Enemy 0 2140,2630,0
+1360 create PlyrCreeps Pkg30EnemyStructure 0 2200,2680,0
+1362 objupgrade Player_1 DolAmrothElphir 0 Upgrade_ObjectLevel10
+1362 objupgrade Player_1 IthilienAnborn 0 Upgrade_ObjectLevel1
+1362 objupgrade Player_1 IthilienMablung 0 Upgrade_ObjectLevel5
+1365 pkg30-probe Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30Enemy:0
+1365 pkg30-script Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30Enemy:0
+1366 pkg30-probe Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30EnemyStructure:0
+1366 pkg30-cancel Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson
+1367 pkg30-dispatch Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30Enemy:0
+1369 pkg30-probe Player_1 DolAmrothElphir 0 Command_SpecialAbilityElphirBitterLesson,PlyrCreeps:Pkg30EnemyStructure:0
+1375 pkg30-probe Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
+1376 pkg30-toggle-weapon Player_1 IthilienAnborn 0 on
+1377 pkg30-probe Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
+1377 pkg30-hotkey Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
+1377 pkg30-script Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
+1378 pkg30-dispatch Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
+1380 pkg30-probe Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
+1381 pkg30-toggle-weapon Player_1 IthilienAnborn 0 off
+1382 pkg30-probe Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
+1383 pkg30-dispatch Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
+1385 pkg30-probe Player_1 IthilienAnborn 0 Command_AnbornPoisonShots
+1389 create PlyrCreeps Pkg30ThrustTarget 0 2265,2660,0
+1390 pkg30-probe Player_1 IthilienMablung 0 Command_MablungDeadlyThrust,PlyrCreeps:Pkg30ThrustTarget:0
+1390 pkg30-probe Player_1 IthilienMablung 0 Command_CreateAHero_RainOfArrows_Level1
+1390 pkg30-hotkey Player_1 IthilienMablung 0 Command_MablungDeadlyThrust
+1390 pkg30-script Player_1 IthilienMablung 0 Command_MablungDeadlyThrust,PlyrCreeps:Pkg30ThrustTarget:0
+1391 pkg30-dispatch Player_1 IthilienMablung 0 Command_MablungDeadlyThrust,PlyrCreeps:Pkg30ThrustTarget:0
+1393 pkg30-probe Player_1 IthilienMablung 0 Command_MablungDeadlyThrust,PlyrCreeps:Pkg30ThrustTarget:0
+1394 pkg30-toggle-weapon Player_1 IthilienMablung 0 on
+1395 pkg30-probe Player_1 IthilienMablung 0 Command_MablungDeadlyThrust,PlyrCreeps:Pkg30ThrustTarget:0
+1395 pkg30-probe Player_1 IthilienMablung 0 Command_CreateAHero_RainOfArrows_Level1
+1400 pkg30-probe Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
+1400 pkg30-probe Player_1 Pkg30Healer 0 Command_CreateAHero_SpecialAbilityAthelas,Player_1:Pkg30Ally:0
+1401 pkg30-dispatch Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
+1403 pkg30-probe Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
+1404 pkg30-damage Player_1 Pkg30Ally 0 50
+1405 pkg30-probe Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
+1405 pkg30-probe Player_1 Pkg30Healer 0 Command_CreateAHero_SpecialAbilityAthelas,Player_1:Pkg30Ally:0
+1406 pkg30-dispatch Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
+1408 pkg30-probe Player_1 Pkg30Healer 0 Pkg30CommandHealTarget,Player_1:Pkg30Ally:0
+1410 pkg30-probe Player_1 Pkg30NoContainer 0 Command_ExitGarrison
+1410 pkg30-probe Player_1 Pkg30DisabledContainer 0 Command_ExitGarrison
+1410 pkg30-probe Player_1 Pkg30ValidContainer 0 Command_ExitGarrison
+1411 destroy Player_1 Pkg30Ally 0
+1415 destroy Player_1 DolAmrothElphir 0
+1415 destroy Player_1 IthilienAnborn 0
+1415 destroy Player_1 Pkg30Healer 0
+1415 destroy Player_1 Pkg30NoContainer 0
+1415 destroy Player_1 Pkg30DisabledContainer 0
+1415 destroy PlyrCreeps Pkg30Enemy 0
+1415 destroy PlyrCreeps Pkg30EnemyStructure 0
+1415 destroy PlyrCreeps Pkg30ThrustTarget 0
+1440 pkg30-probe Player_1 IthilienMablung 0 Command_MablungDeadlyThrust
+1440 pkg30-probe Player_1 Pkg30ValidContainer 0 Command_ExitGarrison
+1441 destroy Player_1 IthilienMablung 0
+1441 destroy Player_1 Pkg30ValidContainer 0
