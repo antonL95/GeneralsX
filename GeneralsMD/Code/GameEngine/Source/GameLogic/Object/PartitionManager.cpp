@@ -1588,6 +1588,20 @@ void PartitionData::friend_setShroudednessPrevious(Int playerIndex, ObjectShroud
 }
 
 //-----------------------------------------------------------------------------
+Bool PartitionData::hasClearCell(Int playerIndex) const
+{
+	if (playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT || !ThePartitionManager->getUpdatedSinceLastReset())
+		return FALSE;
+
+	const CellAndObjectIntersection* cells = m_coiArray;
+	for (Int i = 0; i < m_coiInUseCount; ++i)
+	{
+		if (cells[i].getCell()->getShroudStatusForPlayer(playerIndex) == CELLSHROUD_CLEAR)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 ObjectShroudStatus PartitionData::getShroudedStatus(Int playerIndex)
 {
 	// sanity

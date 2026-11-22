@@ -215,6 +215,7 @@ public:
 		return the Cell for this COI (null if the COI is not in use)
 	*/
 	PartitionCell *getCell() { return m_cell; }
+	const PartitionCell *getCell() const { return m_cell; }
 
 	/**
 		return the Module for this COI (null if the COI is not in use)
@@ -518,6 +519,7 @@ public:
 	void invalidateShroudedStatusForAllPlayers();
 
 	ObjectShroudStatus getShroudedStatus(Int playerIndex);
+	Bool hasClearCell(Int playerIndex) const;
 
 	Int wasSeenByAnyPlayers() const	///<check if a player in the game has seen the object but is now looking at fogged version.
 	{

@@ -1126,8 +1126,17 @@ void FXList::doFXObj(const Object* primary, const Object* secondary) const
 {
 	const Int playerIndex = rts::getObservedOrLocalPlayer()->getPlayerIndex();
 
-	if (!m_playEvenIfShrouded && primary && primary->getShroudedStatus(playerIndex) > OBJECTSHROUD_PARTIAL_CLEAR)
-		return;
+	if (!m_playEvenIfShrouded && primary)
+	{
+		if (RetailFileLayers::enabled())
+		{
+			const PartitionData* partition = primary->friend_getPartitionData();
+			if (!primary->isKindOf(KINDOF_ALWAYS_VISIBLE) && partition && !partition->hasClearCell(playerIndex))
+				return;
+		}
+		else if (primary->getShroudedStatus(playerIndex) > OBJECTSHROUD_PARTIAL_CLEAR)
+			return;
+	}
 	if (!allowRetailPlayback())
 		return;
 
