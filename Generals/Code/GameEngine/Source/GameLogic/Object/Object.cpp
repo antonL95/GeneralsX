@@ -224,11 +224,6 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	m_partitionLastShroud(nullptr),
 	m_partitionLastThreat(nullptr),
 	m_partitionLastValue(nullptr),
-	m_averageLocalGroundHeight(0.0f),
-	m_averageGroundSampleX(0.0f),
-	m_averageGroundSampleY(0.0f),
-	m_averageGroundSampleLayer(0),
-	m_averageGroundHeightValid(FALSE),
 	m_smcUntil(NEVER),
 	m_privateStatus(0),
 	m_formationID(NO_FORMATION_ID),
@@ -1806,7 +1801,10 @@ void Object::reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPo
 			Real dy = pos->y - m_partitionLastLook->m_where.y;
 			if (dy < 0.0f)
 				dy = -dy;
-			if (dz > 0.01f || dx > 0.01f || dy > 0.01f)
+			const Real directionalMoveThreshold = ThePartitionManager->getCellSize() * 0.5f;
+			if (m_partitionLastLook->m_sideRange >= 0.0f && (dx >= directionalMoveThreshold || dy >= directionalMoveThreshold))
+				refreshShroud = TRUE;
+			else if (dz > 0.01f || dx > 0.01f || dy > 0.01f)
 			{
 				const Real currentRange = getShroudClearingRange();
 				Real rangeDelta = currentRange - m_partitionLastLook->m_howFar;
@@ -4995,43 +4993,23 @@ Real Object::getAverageLocalGroundHeight() const
 	if (!tmpl)
 		return pos->z;
 	const auto& rotwk = tmpl->getRotWKObjectData();
-	const Real sampleX = pos->x;
-	const Real sampleY = pos->y;
-	const Int sampleLayer = static_cast<Int>(getLayer());
-	if (m_averageGroundHeightValid &&
-		m_averageGroundSampleX == sampleX &&
-		m_averageGroundSampleY == sampleY &&
-		m_averageGroundSampleLayer == sampleLayer)
-	{
-		return m_averageLocalGroundHeight;
-	}
 	Int segments = rotwk.visionBonusTestSegments > 0 ? rotwk.visionBonusTestSegments : 8;
 	if (segments > 64)
 		segments = 64;
 	const Real radius = rotwk.visionBonusTestRadius;
 	if (radius <= 0.0f)
+		return TheTerrainLogic->getLayerHeight(pos->x, pos->y, getLayer());
+	Real sum = 0.0f;
+	const Real step = 6.2820001f / static_cast<Real>(segments);
+	Real angle = 0.0f;
+	for (Int i = 0; i < segments; ++i)
 	{
-		m_averageLocalGroundHeight = TheTerrainLogic->getLayerHeight(pos->x, pos->y, getLayer());
+		const Real sx = pos->x + WWMath::Cos(angle) * radius;
+		const Real sy = pos->y + WWMath::Sin(angle) * radius;
+		sum += TheTerrainLogic->getLayerHeight(sx, sy, getLayer());
+		angle += step;
 	}
-	else
-	{
-		Real sum = 0.0f;
-		const Real step = 6.2820001f / static_cast<Real>(segments);
-		Real angle = 0.0f;
-		for (Int i = 0; i < segments; ++i)
-		{
-			const Real sx = pos->x + WWMath::Cos(angle) * radius;
-			const Real sy = pos->y + WWMath::Sin(angle) * radius;
-			sum += TheTerrainLogic->getLayerHeight(sx, sy, getLayer());
-			angle += step;
-		}
-		m_averageLocalGroundHeight = sum / static_cast<Real>(segments);
-	}
-	m_averageGroundSampleX = sampleX;
-	m_averageGroundSampleY = sampleY;
-	m_averageGroundSampleLayer = sampleLayer;
-	m_averageGroundHeightValid = TRUE;
-	return m_averageLocalGroundHeight;
+	return sum / static_cast<Real>(segments);
 }
 
 Real Object::getVisionRange() const

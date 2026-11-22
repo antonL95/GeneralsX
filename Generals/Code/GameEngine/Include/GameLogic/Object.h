@@ -704,11 +704,6 @@ private:
 	Real					m_visionRange;										///< looking range
 	Real					m_shroudClearingRange;						///< looking range for shroud ONLY
 	Real					m_shroudRange;										///< like looking range, this is how far I shroud others' looks
-	mutable Real			m_averageLocalGroundHeight;
-	mutable Real			m_averageGroundSampleX;
-	mutable Real			m_averageGroundSampleY;
-	mutable Int				m_averageGroundSampleLayer;
-	mutable Bool			m_averageGroundHeightValid;
 
 	DisabledMaskType	m_disabledMask;
 	UnsignedInt				m_disabledTillFrame[ DISABLED_COUNT ];
