@@ -37,6 +37,7 @@
 #include "Common/GlobalData.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "GameLogic/RetailEconomyRules.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "Common/ThingTemplate.h"
 #include "Common/GameAudio.h"
@@ -254,6 +255,9 @@ void BuildAssistant::update()
 				// 0 is the init, and means you have no override.  We would be marked unsellable if someone wanted us to not sell
 				if( obj->getTemplate()->getRefundValue() != 0 )
 					sellValue = obj->getTemplate()->getRefundValue();
+				else if (RetailFileLayers::enabled() && obj->getConstructionCostPaid() >= 0)
+					sellValue = RetailEconomy::scaleMoney(obj->getConstructionCostPaid(),
+						RetailEconomy::fixedRate(TheGlobalData->m_sellPercentage), RetailEconomy::Rounding::Down);
 				else
 					sellValue = REAL_TO_UNSIGNEDINT( obj->getTemplate()->calcCostToBuild( player ) *
 																										 TheGlobalData->m_sellPercentage );
