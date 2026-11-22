@@ -1,0 +1,16 @@
+3 reveal Player_1 MenPorter 0
+5 create Player_1 TDHDwarvesCampDoor 0 3020,615,0
+5 create Player_1 IsengardOrthancDoor 0 2850,655,0
+9 particle-fx Player_1 MenPorter 0 FX_BuildingHitByFlyer
+10 particle-fx Player_1 MenFortressCitadel 0 FX_BuildingHitByFlyer
+18 damage Player_1 TDHDwarvesCampDoor 0 550
+18 damage Player_1 IsengardOrthancDoor 0 1100
+27 damage Player_1 TDHDwarvesCampDoor 0 320
+27 damage Player_1 IsengardOrthancDoor 0 640
+36 damage Player_1 TDHDwarvesCampDoor 0 -870
+36 damage Player_1 IsengardOrthancDoor 0 -1740
+44 particle-fx - - 0 FX_AragornElessarEstelRec 2958 630 60
+45 particle-fx Player_1 MenPorter 0 FX_AragornElessarEstelRec
+48 particle-fx - - 0 Pkg53NoShake 2958 630 60
+49 particle-fx - - 0 FX_BatteringRamHit 2958 630 60
+59 particle-fx Player_1 MenPorter 1 FX_CavalryBurningFlame
