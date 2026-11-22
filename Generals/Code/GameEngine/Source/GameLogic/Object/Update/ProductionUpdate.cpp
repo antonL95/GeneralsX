@@ -794,7 +794,16 @@ UpdateSleepTime ProductionUpdate::update()
 
 							newObj->setProducer(creationBuilding);
 							if (RetailFileLayers::enabled())
+							{
+								if (production->m_costPaid >= 0)
+								{
+									const Int quantity = production->getProductionQuantity();
+									const Int index = quantity - production->getProductionQuantityRemaining();
+									newObj->setConstructionCostPaid(production->m_costPaid / quantity +
+										(index < production->m_costPaid % quantity ? 1 : 0));
+								}
 								HeroRoster::onHeroProduced(newObj);
+							}
 
 							// call the exit interface to do the rally point and position stuff
 							exitInterface->exitObjectViaDoor( newObj, exitDoor );

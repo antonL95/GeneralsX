@@ -953,6 +953,13 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 						newObj->setProducer(creationBuilding);
 						if (RetailFileLayers::enabled())
 						{
+							if (production->m_costPaid >= 0)
+							{
+								const Int quantity = production->getProductionQuantity();
+								const Int index = quantity - production->getProductionQuantityRemaining();
+								newObj->setConstructionCostPaid(production->m_costPaid / quantity +
+									(index < production->m_costPaid % quantity ? 1 : 0));
+							}
 							if (d->m_unitInvulnerableTime > 0)
 								newObj->setTempInvulnerable(d->m_unitInvulnerableTime);
 							HeroRoster::onHeroProduced(newObj);
