@@ -8,14 +8,17 @@
 #include "Common/MessageStream.h"
 #include "Common/Player.h"
 #include "Common/SpecialPower.h"
+#include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "GameClient/ControlBar.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 
 void runRetailPackage05TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame)
 {
+	static ObjectID ringCourier = INVALID_ID;
 	if (action == "pkg05-ringstate")
 	{
 		const auto* playerUpgrade = TheUpgradeCenter->findUpgrade("Upgrade_RingHero");
@@ -23,6 +26,36 @@ void runRetailPackage05TestCommand(std::string_view action, Object* source, Obje
 		std::fprintf(stderr, "TEST ringstate frame=%u player=%d citadel=%d carrier=%d\n", frame,
 			source->getControllingPlayer()->hasUpgradeComplete(playerUpgrade), source->hasUpgrade(objectUpgrade),
 			target && target->testStatus(OBJECT_STATUS_HOLDING_THE_RING));
+	}
+	else if (action == "pkg05-ring-order")
+	{
+		Object* carrier = nullptr;
+		for (Object* candidate = TheGameLogic->getFirstObject(); candidate; candidate = candidate->getNextObject())
+			if (candidate->getControllingPlayer() == source->getControllingPlayer() &&
+				candidate->testStatus(OBJECT_STATUS_HOLDING_THE_RING) &&
+				candidate->getTemplate()->getName() == "GondorFighter" && !candidate->isEffectivelyDead())
+				carrier = candidate;
+		const Bool allowed = carrier && carrier->getAI() && TheActionManager->canEnterObject(carrier, source, CMD_FROM_PLAYER, CHECK_CAPACITY);
+		std::fprintf(stderr, "TEST ring-order frame=%u allowed=%d\n", frame, allowed);
+		if (allowed)
+		{
+			ringCourier = carrier->getID();
+			carrier->getAI()->aiEnter(source, CMD_FROM_PLAYER);
+		}
+	}
+	else if (action == "pkg05-ring-survival")
+	{
+		const auto* citadelUpgrade = TheUpgradeCenter->findUpgrade("Upgrade_FortressRingHero");
+		Object* courier = TheGameLogic->findObjectByID(ringCourier);
+		const Bool alive = courier && !courier->isEffectivelyDead() && !courier->isDestroyed();
+		std::fprintf(stderr, "TEST ring-order-result frame=%u alive=%d entered=%d carrier=%d enter-active=%d\n",
+			frame, alive, source->hasUpgrade(citadelUpgrade), alive && courier->testStatus(OBJECT_STATUS_HOLDING_THE_RING),
+			alive && courier->getAI() && courier->getAI()->getEnterTarget() == source);
+	}
+	else if (action == "pkg05-grant-arkenstone")
+	{
+		if (const auto* upgrade = TheUpgradeCenter->findUpgrade("Upgrade_Arkenstone"))
+			source->getControllingPlayer()->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
 	}
 	else if (action == "pkg05-brawl" && target && TheRetailCommandCatalog)
 	{

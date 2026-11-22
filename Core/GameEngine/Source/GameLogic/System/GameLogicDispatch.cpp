@@ -98,6 +98,8 @@
 #if !RTS_GENERALS
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
+#include "GameLogic/Module/StealthUpdate.h"
+#include "GameLogic/HeroRoster.h"
 #endif
 
 
@@ -539,6 +541,8 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			const CommandButton* button = set && slot >= 0 && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET ?
 				set->getCommandButton(slot) : nullptr;
 			if (!button || button->getCommandType() != GUI_COMMAND_BLOODTHIRSTY)
+				break;
+			if (!HeroRoster::buttonUpgradesMet(button, msgPlayer, source))
 				break;
 			const UpgradeTemplate* upgrade = button->getUpgradeTemplate();
 			if (upgrade && !source->hasUpgrade(upgrade) && !msgPlayer->hasUpgradeComplete(upgrade))

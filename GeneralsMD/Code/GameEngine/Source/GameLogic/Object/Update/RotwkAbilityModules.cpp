@@ -71,6 +71,7 @@ void CurseSpecialPower::triggerAbilityEffect()
 	const auto* templateData = getTemplate();
 	const Real fraction = std::clamp(data->m_cursePercentage, 0.0f, 1.0f);
 	const UnsignedInt now = TheGameLogic->getFrame();
+	std::vector<std::pair<Player*, const SpecialPowerTemplate*>> sharedTimers;
 	const auto curseTarget = [&](Object* victim)
 	{
 		if (!victim || victim->isEffectivelyDead() || victim->isDestroyed() || self->getRelationship(victim) != ENEMIES)
@@ -85,13 +86,25 @@ void CurseSpecialPower::triggerAbilityEffect()
 			const auto* powerTemplate = power ? power->getSpecialPowerTemplate() : nullptr;
 			if (!powerTemplate || !powerTemplate->getReloadTime())
 				continue;
+			Player* sharedOwner = powerTemplate->isSharedNSync() ? victim->getControllingPlayer() : nullptr;
+			if (sharedOwner)
+			{
+				const auto timer = std::make_pair(sharedOwner, powerTemplate);
+				if (std::find(sharedTimers.begin(), sharedTimers.end(), timer) != sharedTimers.end())
+					continue;
+				sharedTimers.push_back(timer);
+			}
 			const UnsignedInt reload = powerTemplate->getReloadTime();
 			const UnsignedInt ready = power->getReadyFrame();
 			const UnsignedInt remaining = ready > now ? ready - now : 0;
 			if (remaining < reload)
 			{
 				const UnsignedInt increase = static_cast<UnsignedInt>(reload * fraction);
-				power->setReadyFrame(now + remaining + std::min(increase, reload - remaining));
+				const UnsignedInt nextReady = now + remaining + std::min(increase, reload - remaining);
+				if (sharedOwner)
+					sharedOwner->expressSpecialPowerReadyFrame(powerTemplate, nextReady);
+				else
+					power->setReadyFrame(nextReady);
 			}
 		}
 		if (data->m_cursedFX)

@@ -15,6 +15,7 @@
 #include "GameClient/RetailWorldUI.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CostModifierUpgrade.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -226,6 +227,8 @@ void CitadelSlaughterHordeContain::addToContain(Object* passenger)
 		upgrades.push_back(upgrade);
 	}
 	playEntrySound();
+	if (auto* ai = passenger->getAI(); ai && ai->getEnterTarget() == self)
+		ai->aiIdle(ai->getLastCommandSource());
 	TheGameLogic->destroyObject(ring);
 	for (const UpgradeTemplate* upgrade : upgrades)
 	{
