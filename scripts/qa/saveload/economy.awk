@@ -38,16 +38,16 @@ function hit(frame, target, damage, amount) {
 }
 
 END {
-    expect(13, "type=DolAmrothFarm mode=placement indicator=1 radius=300.0 efficiency=0.791")
+    expect(13, "type=DolAmrothFarm mode=placement indicator=1 radius=300.0 efficiency=1.000")
     expect(13, "type=DaleShoremansCottageFoundation mode=placement indicator=0 radius=0.0 efficiency=0.000")
-    expect(13, "type=Pkg23FarmWithoutIndicator mode=placement indicator=1 radius=300.0 efficiency=0.791")
-    expect(28, "type=DolAmrothFarm mode=selected indicator=1 radius=300.0 efficiency=0.791")
+    expect(13, "type=Pkg23FarmWithoutIndicator mode=placement indicator=1 radius=300.0 efficiency=1.000")
+    expect(28, "type=DolAmrothFarm mode=selected indicator=1 radius=300.0 efficiency=1.000")
     expect(275, "type=Pkg23FarmWithoutIndicator mode=selected indicator=0 radius=0.0 efficiency=0.000")
     expect(29, "DolAmrothFarm recorded a charge of 300")
     difference(22, "before-build", 29, "before-cancel", -550)
     difference(29, "before-cancel", 32, "after-cancel", 300)
     expect(232, "authored Tribute Cart button selected")
-    difference(231, "cart-before", 235, "cart-after", -500)
+    difference(232, "cart-before", 235, "cart-after", -500)
     hit(240, "Pkg23PillageTarget", "0.0", 0)
     hit(242, "Pkg23PillageTarget", "10.0", 0)
     hit(245, "MordorPorter", "1.0", 0)

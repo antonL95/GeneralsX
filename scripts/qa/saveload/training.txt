@@ -89,7 +89,7 @@
 230 create PlyrCreeps RetaliationSaveBulwark 0 2980,1800,0
 230 snapshot-register-footprint PlyrCreeps RetaliationSaveBulwark 0
 231 pkg23-set-cash PlyrCreeps - 0 100
-231 pkg23-cash Player_1 - 0 cart-before
+232 pkg23-cash Player_1 - 0 cart-before
 232 queuebutton Player_1 Pkg23TributeCartProducer 0 Command_BuildHaradTributeCart
 235 create Player_1 PartitionUpgradeBuilding 0 2640,1580,35
 235 create Player_1 PartitionScaleFighter 0 2590,1820,20
