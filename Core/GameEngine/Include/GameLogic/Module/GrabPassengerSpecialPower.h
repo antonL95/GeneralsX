@@ -20,6 +20,7 @@ public:
 	using SpecialPowerModule::SpecialPowerModule;
 
 	static ModuleData* friend_newModuleData(INI* ini);
+	ObjectID getPendingTarget() const { return m_target; }
 
 	void doSpecialPower(UnsignedInt commandOptions) override;
 	Bool isValidPowerTarget(const Object* target) const override;

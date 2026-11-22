@@ -174,11 +174,11 @@ public:
 	static Bool ownsCrushBraceCondition(const Object* object);
 	static Bool blocksPlayerCommands(const Object* object);
 	UpdateSleepTime update() override;
+	void xferEmotionState(Xfer* xfer);
 
 private:
 	Bool startEmotion(EmotionType type, const Object* source, Real enemyThreat);
 	void finishEmotion();
-	void xferEmotionState(Xfer* xfer);
 
 	Int m_activeEntry = -1;
 	UnsignedInt m_endFrame = 0;

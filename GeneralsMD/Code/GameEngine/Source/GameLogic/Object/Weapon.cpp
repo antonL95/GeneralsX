@@ -1922,7 +1922,8 @@ void WeaponStore::update()
 			const Bool isProjectileDetonation = false;
 			if (ddi->m_nuggetIndex >= 0)
 				ddi->m_delayedWeapon->dealNuggetDamage(ddi->m_nuggetIndex, ddi->m_delaySourceID, ddi->m_delayIntendedVictimID,
-					&ddi->m_delayDamagePos, ddi->m_bonus, ddi->m_dotTick, ddi->m_contactHit, nullptr, ddi->m_launchTrigger);
+					&ddi->m_delayDamagePos, ddi->m_bonus, ddi->m_dotTick, ddi->m_contactHit,
+					ddi->m_hasImpactVelocity ? &ddi->m_impactVelocity : nullptr, ddi->m_launchTrigger);
 			else
 				ddi->m_delayedWeapon->dealDamageInternal(ddi->m_delaySourceID, ddi->m_delayIntendedVictimID, &ddi->m_delayDamagePos, ddi->m_bonus, isProjectileDetonation);
 			ddi = m_weaponDDI.erase(ddi);
@@ -1973,7 +1974,8 @@ void WeaponStore::reset()
 
 //-------------------------------------------------------------------------------------------------
 void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID,
-	const WeaponBonus& bonus, Int nuggetIndex, Bool dotTick, Bool contactHit, RetailDamageFXTrigger launchTrigger)
+	const WeaponBonus& bonus, Int nuggetIndex, Bool dotTick, Bool contactHit, RetailDamageFXTrigger launchTrigger,
+	const Coord3D* impactVelocity)
 {
 	WeaponDelayedDamageInfo wi;
 	wi.m_delayedWeapon = weapon;
@@ -1986,7 +1988,60 @@ void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* 
 	wi.m_dotTick = dotTick;
 	wi.m_contactHit = contactHit;
 	wi.m_launchTrigger = launchTrigger;
+	if (impactVelocity)
+	{
+		wi.m_hasImpactVelocity = TRUE;
+		wi.m_impactVelocity = *impactVelocity;
+	}
 	m_weaponDDI.push_back(wi);
+}
+
+void WeaponStore::xferRetailDelayedDamage(Xfer* xfer)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	UnsignedInt count = loading ? 0 : static_cast<UnsignedInt>(m_weaponDDI.size());
+	xfer->xferUnsignedInt(&count);
+
+	const auto xferHit = [&](WeaponDelayedDamageInfo& hit) {
+		AsciiString weapon = loading ? AsciiString() : hit.m_delayedWeapon->getName();
+		xfer->xferAsciiString(&weapon);
+		xfer->xferCoord3D(&hit.m_delayDamagePos);
+		xfer->xferUnsignedInt(&hit.m_delayDamageFrame);
+		xfer->xferObjectID(&hit.m_delaySourceID);
+		xfer->xferObjectID(&hit.m_delayIntendedVictimID);
+		hit.m_bonus.xfer(xfer);
+		xfer->xferInt(&hit.m_nuggetIndex);
+		xfer->xferBool(&hit.m_dotTick);
+		xfer->xferBool(&hit.m_contactHit);
+		Int trigger = hit.m_launchTrigger;
+		xfer->xferInt(&trigger);
+		xfer->xferBool(&hit.m_hasImpactVelocity);
+		if (hit.m_hasImpactVelocity)
+			xfer->xferCoord3D(&hit.m_impactVelocity);
+
+		if (loading)
+		{
+			hit.m_delayedWeapon = findWeaponTemplatePrivate(TheNameKeyGenerator->nameToKey(weapon));
+			if (!hit.m_delayedWeapon || hit.m_nuggetIndex < -1 ||
+				(hit.m_nuggetIndex >= 0 && static_cast<size_t>(hit.m_nuggetIndex) >= hit.m_delayedWeapon->m_nuggets.size()) ||
+				trigger < RETAIL_DAMAGE_FX_NONE || trigger > RETAIL_DAMAGE_FX_TREBUCHET_ROCK)
+				throw SC_INVALID_DATA;
+			hit.m_launchTrigger = static_cast<RetailDamageFXTrigger>(trigger);
+		}
+	};
+
+	if (loading)
+	{
+		std::list<WeaponDelayedDamageInfo> restored;
+		for (UnsignedInt i = 0; i < count; ++i)
+			xferHit(restored.emplace_back());
+		m_weaponDDI.swap(restored);
+	}
+	else
+	{
+		for (WeaponDelayedDamageInfo& hit : m_weaponDDI)
+			xferHit(hit);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3896,6 +3951,15 @@ void Weapon::loadPostProcess()
 //-------------------------------------------------------------------------------------------------
 
 //-------------------------------------------------------------------------------------------------
+void WeaponBonus::xfer(Xfer* xfer)
+{
+	for (Real& field : m_field)
+		xfer->xferReal(&field);
+	xfer->xferReal(&m_nuggetDamageAdd);
+	xfer->xferReal(&m_nuggetDamageMultiplier);
+	xfer->xferReal(&m_nuggetSpellMultiplier);
+}
+
 void WeaponBonus::appendBonuses(WeaponBonus& bonus) const
 {
 	for (int f = 0; f < WeaponBonus::FIELD_COUNT; ++f)

@@ -548,6 +548,17 @@ Bool DumbProjectileBehavior::projectileHandleCollision( Object *other )
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool DumbProjectileBehavior::projectileGetImpactVelocity(Coord3D& velocity) const
+{
+	if (m_flightPath.size() < 2)
+		return FALSE;
+	const Int step = std::clamp(m_currentFlightPathStep, 1, static_cast<Int>(m_flightPath.size()) - 1);
+	const Coord3D& before = m_flightPath[step - 1];
+	const Coord3D& after = m_flightPath[step];
+	velocity.set(after.x - before.x, after.y - before.y, after.z - before.z);
+	return TRUE;
+}
+
 void DumbProjectileBehavior::detonate(const Object* hit)
 {
   if ( m_hasDetonated )

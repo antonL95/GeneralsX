@@ -96,6 +96,7 @@ public:
 	virtual void projectileNowJammed() override {}
 	virtual void projectileSetLaunchWeapon(const WeaponTemplate* launchWeapon) override { m_launchWeaponTmpl = launchWeapon; }
 	virtual const WeaponTemplate* projectileGetLaunchWeapon() const override { return m_launchWeaponTmpl; }
+	virtual Bool projectileGetImpactVelocity(Coord3D& velocity) const override;
 
 protected:
 

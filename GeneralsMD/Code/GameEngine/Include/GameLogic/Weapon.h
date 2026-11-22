@@ -310,6 +310,7 @@ public:
 	}
 
 	void appendBonuses(WeaponBonus& bonus) const;
+	void xfer(Xfer* xfer);
 
 private:
 	Real m_field[FIELD_COUNT];
@@ -954,6 +955,7 @@ public:
 	void handleProjectileDetonation( const WeaponTemplate* w, const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage = TRUE, ObjectID detonationVictimID = INVALID_ID );
 
 	static void parseWeaponTemplateDefinition(INI* ini);
+	void xferRetailDelayedDamage(Xfer* xfer);
 
 protected:
 
@@ -966,7 +968,7 @@ protected:
 	void resetWeaponTemplates();
 	void setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID,
 		const WeaponBonus& bonus, Int nuggetIndex = -1, Bool dotTick = FALSE, Bool contactHit = FALSE,
-		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE);
+		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE, const Coord3D* impactVelocity = nullptr);
 
 private:
 
@@ -989,6 +991,8 @@ private:
 		Bool m_dotTick;
 		Bool m_contactHit;
 		RetailDamageFXTrigger m_launchTrigger;
+		Bool m_hasImpactVelocity = FALSE;
+		Coord3D m_impactVelocity{};
 	};
 
 	std::vector<WeaponTemplate*> m_weaponTemplateVector;

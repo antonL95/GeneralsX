@@ -87,6 +87,7 @@
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ActiveBody.h"
+#include "GameLogic/Module/GrabPassengerSpecialPower.h"
 #include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/CountermeasuresBehavior.h"
@@ -4359,6 +4360,35 @@ void Object::crc( Xfer *xfer )
 		if (auto* body = dynamic_cast<ActiveBody*>(getBodyModule()))
 			if (!body->getRetailBodyData()->m_damageCreationLists.empty())
 				body->xferRetailSideDamage(xfer);
+		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
+		{
+			if (auto* emotion = dynamic_cast<EmotionTrackerUpdate*>(*module))
+				emotion->xferEmotionState(xfer);
+			if (const auto* grab = dynamic_cast<const GrabPassengerSpecialPower*>(*module))
+			{
+				ObjectID target = grab->getPendingTarget();
+				xfer->xferObjectID(&target);
+			}
+			if (const auto* projectile = (*module)->getProjectileUpdateInterface())
+			{
+				const WeaponTemplate* launch = projectile->projectileGetLaunchWeapon();
+				AsciiString name = launch ? launch->getName() : AsciiString();
+				xfer->xferAsciiString(&name);
+			}
+		}
+		if (const auto* container = getContain())
+		{
+			if (const auto* passengers = container->getContainedItemsList())
+			{
+				UnsignedInt count = static_cast<UnsignedInt>(passengers->size());
+				xfer->xferUnsignedInt(&count);
+				for (const Object* passenger : *passengers)
+				{
+					ObjectID passengerID = passenger->getID();
+					xfer->xferObjectID(&passengerID);
+				}
+			}
+		}
 #endif
 		if (AIUpdateInterface* ai = getAIUpdateInterface())
 		{
@@ -5326,6 +5356,11 @@ void Object::onDie( DamageInfo *damageInfo )
 	if (RetailFileLayers::enabled())
 	{
 		Object* killer = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID);
+#if !RTS_GENERALS
+		if (damageInfo->in.m_sourceID != INVALID_ID)
+			if (const auto* body = dynamic_cast<const ActiveBody*>(getBodyModule()))
+				body->cheerEnemiesInRange();
+#endif
 		if (killer && getRelationship(killer) == ENEMIES)
 		{
 			EmotionTrackerUpdate::signal(killer, EMOTION_CHEER, this);

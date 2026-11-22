@@ -793,17 +793,13 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 				FXList::doFXObj(data->m_burningDeathFX, obj);
 			}
 			else
-			{
-				if (RetailFileLayers::enabled() && damager)
-					cheerEnemiesInRange();
 				obj->onDie(damageInfo);
-			}
 		}
 	}
 
 	doDamageFX(damageInfo);
 	if (RetailFileLayers::enabled())
-		createDamageDebris(damageInfo->retailFXTrigger, RETAIL_SIDE_NONE);
+		createDamageDebris(damageInfo->retailFXTrigger, RETAIL_SIDE_NONE, damageInfo, damager);
 
 	// Damaged repulsable civilians scare (repulse) other civs.	jba.
 	if( TheAI->getAiData()->m_enableRepulsors )
@@ -976,11 +972,21 @@ void ActiveBody::updateDestroyedSide(BodyDamageType oldState)
 	}
 }
 
-void ActiveBody::createDamageDebris(RetailDamageFXTrigger trigger, RetailDestroyedSide side) const
+void ActiveBody::createDamageDebris(RetailDamageFXTrigger trigger, RetailDestroyedSide side,
+	const DamageInfo* impact, const Object* attacker) const
 {
 	for (const RetailDamageCreation& entry : getActiveBodyModuleData()->m_damageCreationLists)
+	{
 		if (entry.side == side && (side != RETAIL_SIDE_NONE || entry.trigger == trigger))
-			ObjectCreationList::create(entry.list, getObject(), nullptr);
+		{
+			const Object* victim = getObject();
+			if (impact)
+				ObjectCreationList::createFromImpact(entry.list, victim, victim->getPosition(),
+					attacker ? attacker->getPosition() : nullptr, impact->impactVelocity);
+			else
+				ObjectCreationList::create(entry.list, victim, nullptr);
+		}
+	}
 }
 
 void ActiveBody::cheerEnemiesInRange() const

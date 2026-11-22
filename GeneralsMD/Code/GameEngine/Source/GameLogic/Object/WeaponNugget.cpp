@@ -574,7 +574,9 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 	const WeaponTemplate* launchWeapon = projectile ? projectile->projectileGetLaunchWeapon() : nullptr;
 	const RetailDamageFXTrigger launchTrigger = launchWeapon ? damageFXTrigger(launchWeapon->m_fxTrigger) : RETAIL_DAMAGE_FX_NONE;
 	const PhysicsBehavior* physics = impactSource ? impactSource->getPhysics() : nullptr;
-	const Coord3D velocity = physics ? *physics->getVelocity() : Coord3D{};
+	Coord3D velocity;
+	if (!projectile || !projectile->projectileGetImpactVelocity(velocity))
+		velocity = physics ? *physics->getVelocity() : Coord3D{};
 	const ObjectID nuggetSourceID = attacker ? attacker->getID() : sourceID;
 	if (RetailTestCommands::tracesCombat())
 		std::fprintf(stderr, "TEST impact frame=%u weapon=%s source=%u victim=%u pos=%.1f,%.1f bonus=%.2f,%.2f\n", TheGameLogic->getFrame(),
@@ -596,7 +598,7 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit, &velocity, launchTrigger);
 		else if (TheWeaponStore)
 			TheWeaponStore->setDelayedDamage(this, pos, TheGameLogic->getFrame() + nugget.m_delayFrames, nuggetSourceID, victimID,
-				bonus, static_cast<Int>(index), FALSE, contactHit, launchTrigger);
+				bonus, static_cast<Int>(index), FALSE, contactHit, launchTrigger, &velocity);
 	}
 }
 
@@ -786,6 +788,6 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damage(curVictim, verdict == RADIUS_DAMAGE_KILL_SELF);
 		for (size_t tick = 1; tick < dotTicks.size() && TheWeaponStore; ++tick)
 			TheWeaponStore->setDelayedDamage(this, curVictim->getPosition(), TheGameLogic->getFrame() + dotTicks[tick], sourceID,
-				curVictim->getID(), bonus, nuggetIndex, TRUE, FALSE, launchTrigger);
+				curVictim->getID(), bonus, nuggetIndex, TRUE, FALSE, launchTrigger, impactVelocity);
 	}
 }

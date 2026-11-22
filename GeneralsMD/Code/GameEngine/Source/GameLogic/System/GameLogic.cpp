@@ -4544,6 +4544,8 @@ UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 	{
 		xferCRC->xferSnapshot( obj );
 	}
+	if (RetailFileLayers::enabled())
+		TheWeaponStore->xferRetailDelayedDamage(xferCRC);
 	UnsignedInt seed = GetGameLogicRandomSeedCRC();
 	if (isInGameLogicUpdate())
 	{
@@ -5405,9 +5407,9 @@ void GameLogic::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 15 : 10;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 16 : 10;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 15 : 11;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 16 : 11;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -5783,6 +5785,8 @@ void GameLogic::xfer( Xfer *xfer )
 	}
 	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
 		m_nextObjID = static_cast<ObjectID>(1);
+	if (RetailFileLayers::enabled() && version >= 16)
+		TheWeaponStore->xferRetailDelayedDamage(xfer);
 }
 
 // ------------------------------------------------------------------------------------------------

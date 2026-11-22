@@ -113,6 +113,7 @@ public:
 	virtual void onDelete() override;
 	const ActiveBodyModuleData* getRetailBodyData() const { return getActiveBodyModuleData(); }
 	void xferRetailSideDamage(Xfer* xfer);
+	void cheerEnemiesInRange() const;
 
 	virtual void attemptDamage( DamageInfo *damageInfo ) override;		///< try to damage this object
 	virtual Real estimateDamage( DamageInfoInput& damageInfo ) const override;
@@ -182,10 +183,10 @@ protected:
 	virtual void internalAddSubdualDamage( Real delta );								///< change health
 
 private:
-	void cheerEnemiesInRange() const;
 	void distributeSiegeDamage(Real amount, const Coord3D* origin);
 	void updateDestroyedSide(BodyDamageType oldState);
-	void createDamageDebris(RetailDamageFXTrigger trigger, RetailDestroyedSide side) const;
+	void createDamageDebris(RetailDamageFXTrigger trigger, RetailDestroyedSide side,
+		const DamageInfo* impact = nullptr, const Object* attacker = nullptr) const;
 	Real m_sideDamage[RETAIL_SIDE_COUNT - 1]{};
 	UnsignedInt m_destroyedSides = 0;
 
