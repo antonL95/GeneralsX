@@ -206,6 +206,7 @@ public:
 	UnsignedInt m_maxCowerTime = 0;
 	UnsignedInt m_burningDeathTime = 0;
 	UnsignedInt m_rampageTime = 0;
+	Bool m_rampageRequiresAflame = FALSE;
 	Real m_stopChaseDistance = 0.0f;
 	Bool m_fadeOnPortals = FALSE;
 	Real m_holdGroundCloseRangeDistance = 0.0f;

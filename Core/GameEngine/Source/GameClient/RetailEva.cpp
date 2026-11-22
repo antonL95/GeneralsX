@@ -23,6 +23,9 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/SlavedUpdate.h"
+#endif
 
 namespace
 {
@@ -72,6 +75,9 @@ AudioEventRTS s_speech;
 UnsignedInt s_quietUntil = 0;
 std::map<std::pair<ObjectID, UnsignedInt>, const SpecialPowerTemplate *> s_recharging;
 std::set<ObjectID> s_seenRings;
+#if !RTS_GENERALS
+std::set<ObjectID> s_seenEnemies;
+#endif
 const Player *s_viewer = nullptr;
 
 void parseSideSound(INI *ini, void *, void *store, const void *)
@@ -184,6 +190,9 @@ void reset()
 	s_lastPlayed.clear();
 	s_recharging.clear();
 	s_seenRings.clear();
+#if !RTS_GENERALS
+	s_seenEnemies.clear();
+#endif
 	s_viewer = nullptr;
 	s_speech.setPlayingHandle(0);
 	s_quietUntil = 0;
@@ -245,6 +254,18 @@ static void updateWorldEvents(Player &player, UnsignedInt frame)
 			object->getShroudedStatus(player.getPlayerIndex()) <= OBJECTSHROUD_PARTIAL_CLEAR &&
 			s_seenRings.insert(object->getID()).second)
 			queue(&player, "DiscoveredRing", object->getPosition(), Ping::OneRing);
+#if !RTS_GENERALS
+		if (!RetailFileLayers::enabled() || object->isEffectivelyDead() || object->getEnclosingContainedBy() ||
+			(object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED)))
+			continue;
+		const Object* control = SlavedUpdate::getEvaSightedControl(object);
+		const AsciiString& event = control->getTemplate()->getRotWKObjectData().evaEnemyObjectSightedEvent;
+		if (!event.isEmpty() && event.compareNoCase("None") != 0 &&
+			player.getRelationship(control->getTeam()) == ENEMIES &&
+			ThePartitionManager->getShroudStatusForPlayer(player.getPlayerIndex(), object->getPosition()) == CELLSHROUD_CLEAR &&
+			s_seenEnemies.insert(control->getID()).second)
+			queue(&player, event, control->getPosition(), Ping::Information);
+#endif
 	}
 }
 

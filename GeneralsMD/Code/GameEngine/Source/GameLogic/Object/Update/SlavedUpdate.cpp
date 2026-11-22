@@ -118,6 +118,71 @@ Bool SlavedUpdate::isWithinCreepLeash() const
 	return !home || ThePartitionManager->getDistanceSquared(getObject(), home, FROM_CENTER_2D) <= leash * leash;
 }
 
+const Object* SlavedUpdate::getEvaSightedControl(const Object* object)
+{
+	static const NameKeyType key = NAMEKEY("SlavedUpdate");
+	const auto* slave = static_cast<const SlavedUpdate*>(object->findUpdateModule(key));
+	if (slave && slave->m_slaver != INVALID_ID && slave->getSlavedUpdateModuleData()->m_useSlaverForSightedEvents)
+		if (const Object* master = TheGameLogic->findObjectByID(slave->m_slaver); master && !master->isEffectivelyDead())
+			return master;
+	return object;
+}
+
+Coord3D SlavedUpdate::getPinnedPosition(const Object& master) const
+{
+	const Coord3D& offset = getSlavedUpdateModuleData()->m_guardPositionOffset;
+	Vector3 world;
+	Matrix3D::Transform_Vector(*master.getTransformMatrix(), Vector3(offset.x, offset.y, offset.z), &world);
+	return {world.X, world.Y, world.Z};
+}
+
+void SlavedUpdate::updateGuardFade(const Coord3D& pinnedPosition)
+{
+	const auto* data = getSlavedUpdateModuleData();
+	if (data->m_fadeOutRange <= 0.0f)
+		return;
+	const Bool fade = ThePartitionManager->getDistanceSquared(getObject(), &pinnedPosition, FROM_CENTER_2D)
+		<= sqr(data->m_fadeOutRange);
+	if (fade == m_fadedAtGuardPoint)
+		return;
+	m_fadedAtGuardPoint = fade;
+	if (Drawable* draw = getObject()->getDrawable())
+	{
+		if (!data->m_fadeFrames)
+			draw->setDrawableOpacity(fade ? 0.0f : 1.0f);
+		else if (fade)
+			draw->fadeOut(data->m_fadeFrames);
+		else
+			draw->fadeIn(data->m_fadeFrames);
+	}
+}
+
+Bool SlavedUpdate::returnToSlaver(const Object& master, AIUpdateInterface& ai, const Coord3D& pinnedPosition)
+{
+	Object* self = getObject();
+	const Real leash = getSlavedUpdateModuleData()->m_leashRange;
+	if (leash <= 0.0f)
+		return FALSE;
+	const Bool outside = ThePartitionManager->getDistanceSquared(self, &master, FROM_CENTER_2D) > sqr(leash);
+	const Bool returning = self->testStatus(OBJECT_STATUS_LEASHED_RETURNING);
+	if (!outside && !returning)
+		return FALSE;
+	if (!outside && ThePartitionManager->getDistanceSquared(self, &pinnedPosition, FROM_CENTER_2D) <= CLOSE_ENOUGH_SQR)
+	{
+		self->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_LEASHED_RETURNING));
+		return FALSE;
+	}
+	const Coord3D* goal = ai.getGoalPosition();
+	if (!returning || !ai.isMoving() || !goal || goal->x != pinnedPosition.x || goal->y != pinnedPosition.y)
+	{
+		ai.aiIdle(CMD_FROM_AI);
+		ai.setCurrentVictim(nullptr);
+		ai.aiMoveToPosition(&pinnedPosition, CMD_FROM_AI);
+	}
+	self->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_LEASHED_RETURNING));
+	return TRUE;
+}
+
 //-------------------------------------------------------------------------------------------------
 void SlavedUpdate::onSlaverDamage( const DamageInfo *info )
 {
@@ -154,6 +219,15 @@ UpdateSleepTime SlavedUpdate::update()
 	{
 		return UPDATE_SLEEP_NONE;
 	}
+	const Bool retail = RetailFileLayers::enabled();
+	Object* master = TheGameLogic->findObjectByID(m_slaver);
+	const Bool masterLost = !master || master->isEffectivelyDead() || master->isDisabledByType(DISABLED_UNMANNED);
+	if (retail && masterLost)
+	{
+		onSlaverDie(nullptr);
+		return UPDATE_SLEEP_NONE;
+	}
+
 	AIUpdateInterface *myAI = me->getAIUpdateInterface();
 	if( !myAI )
 	{
@@ -165,14 +239,8 @@ UpdateSleepTime SlavedUpdate::update()
 		return UPDATE_SLEEP_NONE;
 	}
 
-	Object *master = TheGameLogic->findObjectByID( m_slaver );
-	if( !master || master->isEffectivelyDead() || master->isDisabledByType( DISABLED_UNMANNED ) )
+	if( masterLost )
 	{
-		if (RetailFileLayers::enabled())
-		{
-			onSlaverDie(nullptr);
-			return UPDATE_SLEEP_NONE;
-		}
 		stopSlavedEffects();
 
 		//Killing is lame.
@@ -204,7 +272,7 @@ UpdateSleepTime SlavedUpdate::update()
 	if (data->m_stayOnSameLayerAsMaster)
 		me->setLayer(master->getLayer());
 
-	if (RetailFileLayers::enabled() && isMapCreep() && (data->m_leashRange > 0.0f || data->m_guardMaxRange > 0))
+	if (retail && isMapCreep() && (data->m_leashRange > 0.0f || data->m_guardMaxRange > 0))
 	{
 		const Real leash = data->m_leashRange;
 		const Real guard = static_cast<Real>(data->m_guardMaxRange);
@@ -251,6 +319,15 @@ UpdateSleepTime SlavedUpdate::update()
 					victim ? ThePartitionManager->getDistanceSquared(victim, master, FROM_CENTER_2D) : 0.0f);
 		}
 		return UPDATE_SLEEP_NONE;
+	}
+
+	Coord3D retailPinned{};
+	if (retail)
+	{
+		retailPinned = getPinnedPosition(*master);
+		updateGuardFade(retailPinned);
+		if (returnToSlaver(*master, *myAI, retailPinned))
+			return UPDATE_SLEEP_NONE;
 	}
 
 	//Clear the drone spotting bonus to the master. Up to the drone
@@ -332,12 +409,17 @@ UpdateSleepTime SlavedUpdate::update()
 	}
 
 	// update our "pinned" location based on where our master is
-	Coord3D pinnedPosition = *master->getPosition();
-	pinnedPosition.x += m_guardPointOffset.x;
-	pinnedPosition.y += m_guardPointOffset.y;
+	Coord3D pinnedPosition = retail ? retailPinned : *master->getPosition();
+	const Bool hasOffset = data->m_guardPositionOffset.x != 0.0f ||
+		data->m_guardPositionOffset.y != 0.0f || data->m_guardPositionOffset.z != 0.0f;
+	if (!retail || !hasOffset)
+	{
+		pinnedPosition.x += m_guardPointOffset.x;
+		pinnedPosition.y += m_guardPointOffset.y;
+	}
 	m_guardPointOffset.z = TheTerrainLogic->getGroundHeight( pinnedPosition.x, pinnedPosition.y );
 
-	if( data->m_guardMaxRange )
+	if( data->m_guardMaxRange || (retail && hasOffset))
 	{
 		//3RD PRIORITY: Guard the master's area.
 		if( myAI->isIdle() && ThePartitionManager->getDistanceSquared(me, &pinnedPosition, FROM_CENTER_3D) > CLOSE_ENOUGH_SQR )
@@ -346,7 +428,7 @@ UpdateSleepTime SlavedUpdate::update()
 			endRepair();
 			doGuardLogic( &pinnedPosition );
 		}
-		else if( ThePartitionManager->getDistanceSquared( me, master, FROM_CENTER_3D ) > sqr(STRAY_MULTIPLIER * data->m_guardMaxRange ) )
+		else if( data->m_guardMaxRange && ThePartitionManager->getDistanceSquared( me, master, FROM_CENTER_3D ) > sqr(STRAY_MULTIPLIER * data->m_guardMaxRange ) )
 		{
 			//I'm too far away, no matter what I'm doing.
 			endRepair();
@@ -795,7 +877,10 @@ void SlavedUpdate::startSlavedEffects( const Object *slaver )
 
 	// mark selves as not selectable
 	if (!RetailFileLayers::enabled() || data->m_markUnselectable)
+	{
+		m_appliedUnselectable = m_appliedUnselectable || !getObject()->testStatus(OBJECT_STATUS_UNSELECTABLE);
 		getObject()->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+	}
 
 
   if ( slaver->testStatus( OBJECT_STATUS_STEALTHED ) )
@@ -821,7 +906,21 @@ void SlavedUpdate::stopSlavedEffects()
 	m_guardPointOffset.zero();
 
 	/// @todo Just a thought.  Our Status bits on objects really need to be reference counts so you don't clear someone else's flag
-	getObject()->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_UNSELECTABLE ) );
+	if (!RetailFileLayers::enabled() || m_appliedUnselectable)
+		getObject()->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+	m_appliedUnselectable = FALSE;
+	if (m_fadedAtGuardPoint)
+	{
+		if (Drawable* draw = getObject()->getDrawable())
+		{
+			const auto frames = getSlavedUpdateModuleData()->m_fadeFrames;
+			if (frames)
+				draw->fadeIn(frames);
+			else
+				draw->setDrawableOpacity(1.0f);
+		}
+		m_fadedAtGuardPoint = FALSE;
+	}
 	getObject()->clearDisabled( DISABLED_HELD );
 }
 
@@ -838,6 +937,17 @@ void SlavedUpdate::crc( Xfer *xfer )
 
 }
 
+void SlavedUpdate::crcRetailState(Xfer* xfer)
+{
+	xfer->xferObjectID(&m_slaver);
+	xfer->xferCoord3D(&m_guardPointOffset);
+	xfer->xferInt(&m_framesToWait);
+	xfer->xferUser(&m_repairState, sizeof(m_repairState));
+	xfer->xferBool(&m_repairing);
+	xfer->xferBool(&m_creepNeedsReturn);
+	xfer->xferBool(&m_appliedUnselectable);
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Xfer method
 	* Version Info:
@@ -847,7 +957,7 @@ void SlavedUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -870,6 +980,16 @@ void SlavedUpdate::xfer( Xfer *xfer )
 	xfer->xferBool( &m_repairing );
 	if (version >= 2)
 		xfer->xferBool(&m_creepNeedsReturn);
+	if (version >= 3)
+	{
+		xfer->xferBool(&m_appliedUnselectable);
+		xfer->xferBool(&m_fadedAtGuardPoint);
+	}
+	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
+	{
+		m_appliedUnselectable = m_slaver != INVALID_ID && getSlavedUpdateModuleData()->m_markUnselectable;
+		m_fadedAtGuardPoint = FALSE;
+	}
 
 }
 

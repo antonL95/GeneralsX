@@ -421,6 +421,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/SalvageCrateCollide.h
     Include/GameLogic/Module/ShroudCrateCollide.h
     Include/GameLogic/Module/SlavedUpdate.h
+    Include/GameLogic/Module/RunOffMapBehavior.h
     Include/GameLogic/Module/SlowDeathBehavior.h
     Include/GameLogic/Module/SmartBombTargetHomingUpdate.h
     Include/GameLogic/Module/SpawnBehavior.h
@@ -1044,6 +1045,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/RadarUpdate.cpp
     Source/GameLogic/Object/Update/RadiusDecalUpdate.cpp
     Source/GameLogic/Object/Update/SlavedUpdate.cpp
+    Source/GameLogic/Object/Update/RunOffMapBehavior.cpp
     Source/GameLogic/Object/Update/SmartBombTargetHomingUpdate.cpp
     Source/GameLogic/Object/Update/SpecialAbilityUpdate.cpp
     Source/GameLogic/Object/Update/RotwkAbilityModules.cpp

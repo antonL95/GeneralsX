@@ -176,6 +176,7 @@
 #include "GameLogic/Module/MobMemberSlavedUpdate.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
+#include "GameLogic/Module/RunOffMapBehavior.h"
 #include "GameLogic/Module/RetailConstruction.h"
 #include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/CastleUpgrade.h"
@@ -526,6 +527,7 @@ void ModuleFactory::init()
 
 		addModule( LargeGroupAudioUpdate );
 		addModule( PickupStuffUpdate );
+		addModule( RunOffMapBehavior );
 		addModule( BoredUpdate );
 		addModule( AttachUpdate );
 		addModule( AutoPickUpUpdate );

@@ -53,6 +53,9 @@ public:
 	Bool						m_turretsMustCenterBeforePacking;
 	Bool						m_manualDeployAnimations;
 
+	Bool m_mustDeployToAttack = TRUE;
+	AsciiString m_deployedAttributeModifier;
+
 	DeployStyleAIUpdateModuleData()
 	{
 		m_unpackTime = 0;
@@ -75,6 +78,8 @@ public:
 			{ "TurretsFunctionOnlyWhenDeployed", INI::parseBool,		nullptr, offsetof( DeployStyleAIUpdateModuleData, m_turretsFunctionOnlyWhenDeployed ) },
 			{ "TurretsMustCenterBeforePacking", INI::parseBool,			nullptr, offsetof( DeployStyleAIUpdateModuleData, m_turretsMustCenterBeforePacking ) },
 			{ "ManualDeployAnimations",	INI::parseBool,							nullptr, offsetof( DeployStyleAIUpdateModuleData, m_manualDeployAnimations ) },
+			{ "MustDeployToAttack", INI::parseBool, nullptr, offsetof(DeployStyleAIUpdateModuleData, m_mustDeployToAttack) },
+			{ "DeployedAttributeModifier", INI::parseAsciiString, nullptr, offsetof(DeployStyleAIUpdateModuleData, m_deployedAttributeModifier) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(dataFieldParse);
@@ -104,6 +109,7 @@ public:
 	Bool doTurretsFunctionOnlyWhenDeployed() const { return getDeployStyleAIUpdateModuleData()->m_turretsFunctionOnlyWhenDeployed; }
 	Bool doTurretsHaveToCenterBeforePacking() const { return getDeployStyleAIUpdateModuleData()->m_turretsMustCenterBeforePacking; }
 	void setMyState( DeployStateTypes StateID, Bool reverseDeploy = FALSE );
+	void crcRetailState(Xfer* xfer);
 
 protected:
 

@@ -33,6 +33,7 @@
 #include "GameLogic/Module/ObjectCreationUpgrade.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/SlavedUpdate.h"
+#include "GameLogic/Module/DeployStyleAIUpdate.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/RetailSkirmishProbe.h"
 #include "GameLogic/ShroudGeometry.h"
@@ -52,6 +53,8 @@
 #include "Common/RetailFileLayers.h"
 #include "GameClient/RetailEva.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
+#include "GameLogic/Module/RunOffMapBehavior.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
@@ -4377,6 +4380,8 @@ void Object::crc( Xfer *xfer )
 		weaponConditions.xfer(xfer);
 		if (m_firingTracker)
 			m_firingTracker->crcRetailState(xfer);
+		if (m_slavedUpdate)
+			m_slavedUpdate->crcRetailState(xfer);
 		Bool damageImmune = getLogicModelConditions().test(MODELCONDITION_INVULNERABLE);
 		xfer->xferBool(&damageImmune);
 		xfer->xferUnsignedInt(&m_disabledTillFrame[DISABLED_PARALYZED]);
@@ -4388,12 +4393,18 @@ void Object::crc( Xfer *xfer )
 		static const NameKeyType deathWeaponKey = NAMEKEY("FireWeaponWhenDeadBehavior");
 		static const NameKeyType clickReactionKey = NAMEKEY("ClickReactionBehavior");
 		static const NameKeyType autoAbilityKey = NAMEKEY("AutoAbilityBehavior");
+		static const NameKeyType pickupKey = NAMEKEY("PickupStuffUpdate");
+		static const NameKeyType runOffKey = NAMEKEY("RunOffMapBehavior");
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
 			const NameKeyType key = (*module)->getModuleNameKey();
 			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey ||
 				key == dualWeaponKey || key == deathWeaponKey || key == clickReactionKey || key == autoAbilityKey || (*module)->getSlowDeathBehaviorInterface())
 				xfer->xferSnapshot(*module);
+			if (key == pickupKey)
+				static_cast<PickupStuffUpdate*>(*module)->crcRetailState(xfer);
+			if (key == runOffKey)
+				static_cast<RunOffMapBehavior*>(*module)->crcRetailState(xfer);
 		}
 #if !RTS_GENERALS
 		if (auto* body = dynamic_cast<ActiveBody*>(getBodyModule()))
@@ -4448,6 +4459,9 @@ void Object::crc( Xfer *xfer )
 #endif
 		if (AIUpdateInterface* ai = getAIUpdateInterface())
 		{
+			static const NameKeyType deployKey = NAMEKEY("DeployStyleAIUpdate");
+			if (auto* deploy = static_cast<DeployStyleAIUpdate*>(findUpdateModule(deployKey)))
+				deploy->crcRetailState(xfer);
 			UnsignedInt burningDeathUntil = ai->getRetailBurningDeathDeadline();
 			xfer->xferUnsignedInt(&burningDeathUntil);
 			UnsignedInt fearUntil = ai->getRetailFearDeadline();

@@ -71,6 +71,7 @@
 #include "GameLogic/Module/RotwkModifierModules.h"
 #include "Common/AttributeModifierRules.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
+#include "GameLogic/Module/RunOffMapBehavior.h"
 #include "GameLogic/Module/HordeUpdate.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Object.h"
@@ -161,6 +162,7 @@ const LocomotorTemplateVector* AIUpdateModuleData::findLocomotorTemplateVector(L
 			{ "MaxCowerTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_maxCowerTime) },
 			{ "BurningDeathTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_burningDeathTime) },
 			{ "RampageTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_rampageTime) },
+			{ "RampageRequiresAflame", INI::parseBool, nullptr, offsetof(AIUpdateModuleData, m_rampageRequiresAflame) },
 			{ "HoldGroundCloseRangeDistance", INI::parseReal, nullptr, offsetof(AIUpdateModuleData, m_holdGroundCloseRangeDistance) },
 			{ "StopChaseDistance", INI::parseReal, nullptr, offsetof(AIUpdateModuleData, m_stopChaseDistance) },
 			{ "FadeOnPortals", INI::parseBool, nullptr, offsetof(AIUpdateModuleData, m_fadeOnPortals) },
@@ -1127,6 +1129,9 @@ UpdateSleepTime AIUpdateInterface::update()
 			WeaponSetFlags flags;
 			flags.set(WEAPONSET_RAMPAGE);
 			object->setWeaponSetFlags(flags, FALSE);
+			if (!m_burningDeathUntil && !object->isEffectivelyDead())
+				if (auto* runOff = RunOffMapBehavior::find(object))
+					runOff->trigger();
 		}
 		else
 		{
@@ -2811,6 +2816,9 @@ Bool AIUpdateInterface::isAllowedToRespondToAiCommands(const AICommandParms* par
 		return FALSE;
 	if (m_rampageUntil)
 		return FALSE;
+	if (RetailFileLayers::enabled() && parms->m_cmdSource != CMD_FROM_SCRIPT)
+		if (const auto* runOff = RunOffMapBehavior::find(getObject()); runOff && runOff->isRunning())
+			return FALSE;
 
 	// the dead don't listen very well
 	// (unless they are seeking to feed on the brains of the living)
@@ -4868,6 +4876,9 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 		return nullptr;
 
 	Object *obj = getObject();
+	if (RetailFileLayers::enabled())
+		if (const auto* runOff = RunOffMapBehavior::find(obj); runOff && runOff->isRunning())
+			return nullptr;
 	const Object* horde = obj->getContainedBy();
 	if (horde && horde->getContain()->isHordeContain())
 		return nullptr;
@@ -5757,10 +5768,18 @@ Bool AIUpdateInterface::enterRetailBurningDeath()
 void AIUpdateInterface::enterRetailRampage()
 {
 	Object* object = getObject();
-	const UnsignedInt duration = getAIUpdateModuleData()->m_rampageTime;
+	const auto* data = getAIUpdateModuleData();
+	const UnsignedInt duration = data->m_rampageTime;
 	if (!RetailFileLayers::enabled() || !duration || m_rampageUntil ||
 		object->isEffectivelyDead() || object->getEnclosingContainedBy())
 		return;
+
+	if (data->m_rampageRequiresAflame && !object->testStatus(OBJECT_STATUS_AFLAME))
+	{
+		if (auto* runOff = RunOffMapBehavior::find(object))
+			runOff->trigger();
+		return;
+	}
 
 	WeaponSetFlags flags;
 	flags.set(WEAPONSET_RAMPAGE);

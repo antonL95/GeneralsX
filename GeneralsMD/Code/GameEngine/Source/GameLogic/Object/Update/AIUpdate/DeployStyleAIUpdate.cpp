@@ -29,6 +29,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 
@@ -42,6 +43,7 @@
 #include "GameLogic/Weapon.h"
 
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DeployStyleAIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
@@ -112,8 +114,9 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 	Bool isInGuardIdleState = getStateMachine()->isInGuardIdleState();
 
 	AIUpdateInterface *ai = self->getAI();
+	const Bool requiresDeployment = !RetailFileLayers::enabled() || data->m_mustDeployToAttack;
 
-	if( isTryingToAttack && weapon )
+	if( requiresDeployment && isTryingToAttack && weapon )
 	{
 		Object *victim = ai->getCurrentVictim();
 		if( victim )
@@ -332,6 +335,9 @@ void DeployStyleAIUpdate::setMyState( DeployStateTypes stateID, Bool reverseDepl
 			//twitching on deploy. Make sure we clear it now so when it goes into that state, it'll
 			//actually move.
 			self->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_DEPLOYED ) );
+			if (RetailFileLayers::enabled() && !data->m_deployedAttributeModifier.isEmpty())
+				AttributeModifiers::remove(self, data->m_deployedAttributeModifier,
+					AttributeModifiers::ownerOf(self, getModuleTagNameKey()));
 
 			//Tell our object to pack up (so it can continue the same move later).
 			self->clearAndSetModelConditionFlags( MAKE_MODELCONDITION_MASK2( MODELCONDITION_UNPACKING, MODELCONDITION_DEPLOYED ),
@@ -389,7 +395,11 @@ void DeployStyleAIUpdate::setMyState( DeployStateTypes stateID, Bool reverseDepl
 		{
 			//This status will tell the approach AI state to succeed automatically. This prevents
 			//twitching on deploy.
+			const Bool wasDeployed = self->testStatus(OBJECT_STATUS_DEPLOYED);
 			self->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_DEPLOYED ) );
+			if (RetailFileLayers::enabled() && !wasDeployed && !data->m_deployedAttributeModifier.isEmpty())
+				AttributeModifiers::apply(self, data->m_deployedAttributeModifier, 0, 0,
+					AttributeModifiers::ownerOf(self, getModuleTagNameKey()));
 
 			m_frameToWaitForDeploy = 0;
 
@@ -428,6 +438,12 @@ void DeployStyleAIUpdate::crc( Xfer *xfer )
 {
 	// extend base class
 	AIUpdateInterface::crc(xfer);
+}
+
+void DeployStyleAIUpdate::crcRetailState(Xfer* xfer)
+{
+	xfer->xferUser(&m_state, sizeof(m_state));
+	xfer->xferUnsignedInt(&m_frameToWaitForDeploy);
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -53,6 +53,10 @@ public:
 	Real m_leashRange = 0.0f;
 	Bool m_dieOnMastersDeath = FALSE;
 	Bool m_markUnselectable = FALSE;
+	Coord3D m_guardPositionOffset{};
+	UnsignedInt m_fadeFrames = 0;
+	Real m_fadeOutRange = 0.0f;
+	Bool m_useSlaverForSightedEvents = FALSE;
 	Int m_attackWanderRange;//If I'm at the target point, how far can I wander from it.
 	Int m_scoutRange;				//If master is moving somewhere, I'll scout ahead -- how far am I allowed to go?
 	Int m_scoutWanderRange;	//If I'm at the scout point, how far can I wander from it.
@@ -105,6 +109,10 @@ public:
 			{ "LeashRange", INI::parseReal, nullptr, offsetof( SlavedUpdateModuleData, m_leashRange ) },
 			{ "DieOnMastersDeath", INI::parseBool, nullptr, offsetof( SlavedUpdateModuleData, m_dieOnMastersDeath ) },
 			{ "MarkUnselectable", INI::parseBool, nullptr, offsetof( SlavedUpdateModuleData, m_markUnselectable ) },
+			{ "GuardPositionOffset", INI::parseCoord3D, nullptr, offsetof(SlavedUpdateModuleData, m_guardPositionOffset) },
+			{ "FadeOutRange", INI::parseReal, nullptr, offsetof(SlavedUpdateModuleData, m_fadeOutRange) },
+			{ "FadeTime", INI::parseDurationUnsignedInt, nullptr, offsetof(SlavedUpdateModuleData, m_fadeFrames) },
+			{ "UseSlaverAsControlForEvaObjectSightedEvents", INI::parseBool, nullptr, offsetof(SlavedUpdateModuleData, m_useSlaverForSightedEvents) },
 			{ "AttackWanderRange",	INI::parseInt,	nullptr, offsetof( SlavedUpdateModuleData, m_attackWanderRange ) },
 			{ "ScoutRange",					INI::parseInt,	nullptr, offsetof( SlavedUpdateModuleData, m_scoutRange ) },
 			{ "ScoutWanderRange",		INI::parseInt,	nullptr, offsetof( SlavedUpdateModuleData, m_scoutWanderRange ) },
@@ -154,6 +162,8 @@ public:
 
 	virtual ObjectID getSlaverID() const override { return m_slaver; }
 	Bool isWithinCreepLeash() const;
+	static const Object* getEvaSightedControl(const Object* object);
+	void crcRetailState(Xfer* xfer);
 	virtual void onEnslave( const Object *slaver ) override;
 	virtual void onSlaverDie( const DamageInfo *info ) override;
 	virtual void onSlaverDamage( const DamageInfo *info ) override;
@@ -174,6 +184,9 @@ public:
 
 private:
 	Bool isMapCreep() const;
+	Coord3D getPinnedPosition(const Object& master) const;
+	void updateGuardFade(const Coord3D& pinnedPosition);
+	Bool returnToSlaver(const Object& master, AIUpdateInterface& ai, const Coord3D& pinnedPosition);
 	void startSlavedEffects( const Object *slaver );	///< We have been marked as Slaved, so we can't be selected or move too far or other stuff
 	void stopSlavedEffects();		///< We are no longer slaved.
 
@@ -183,4 +196,6 @@ private:
 	RepairStates m_repairState;
 	Bool m_repairing;
 	Bool m_creepNeedsReturn = FALSE;
+	Bool m_appliedUnselectable = FALSE;
+	Bool m_fadedAtGuardPoint = FALSE;
 };

@@ -98,7 +98,8 @@ class PickupStuffUpdate final : public UpdateModule
 
 public:
 	PickupStuffUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
-	UpdateSleepTime update() override { return UPDATE_SLEEP_FOREVER; }
+	UpdateSleepTime update() override;
+	void crcRetailState(Xfer* xfer);
 };
 
 struct HitReactionBehaviorModuleData : public UpdateModuleData

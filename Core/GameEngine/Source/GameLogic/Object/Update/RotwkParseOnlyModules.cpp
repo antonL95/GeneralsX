@@ -10,12 +10,14 @@
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Object.h"
 #if !RTS_GENERALS
+#include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
+#include "GameLogic/Module/CrateCollide.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/PartitionManager.h"
@@ -100,8 +102,74 @@ void CastleMemberBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 	void Module::loadPostProcess() { Base::loadPostProcess(); }
 
 DEFINE_PARSE_ONLY_SNAPSHOT(LargeGroupAudioUpdate, UpdateModule)
-DEFINE_PARSE_ONLY_SNAPSHOT(PickupStuffUpdate, UpdateModule)
 DEFINE_PARSE_ONLY_SNAPSHOT(HordeMemberCollide, BehaviorModule)
+
+PickupStuffUpdate::~PickupStuffUpdate() = default;
+
+void PickupStuffUpdate::crc(Xfer* xfer) { UpdateModule::crc(xfer); }
+void PickupStuffUpdate::xfer(Xfer* xfer) { UpdateModule::xfer(xfer); }
+
+void PickupStuffUpdate::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
+#if !RTS_GENERALS
+	if (RetailFileLayers::enabled() && getObject()->getAIUpdateInterface() &&
+		getPickupStuffUpdateModuleData()->m_scanRange > 0.0f && friend_getNextCallFrame() == UPDATE_SLEEP_FOREVER)
+		setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
+#endif
+}
+
+void PickupStuffUpdate::crcRetailState(Xfer* xfer)
+{
+	UnsignedInt wakeFrame = friend_getNextCallFrame();
+	xfer->xferUnsignedInt(&wakeFrame);
+}
+
+UpdateSleepTime PickupStuffUpdate::update()
+{
+#if !RTS_GENERALS
+	Object* self = getObject();
+	auto* ai = self->getAIUpdateInterface();
+	const auto* data = getPickupStuffUpdateModuleData();
+	if (!RetailFileLayers::enabled() || !ai || data->m_scanRange <= 0.0f)
+		return UPDATE_SLEEP_FOREVER;
+
+	const auto interval = UPDATE_SLEEP(static_cast<UnsignedInt>(MAX(1.0f,
+		data->m_scanIntervalSeconds * LOGICFRAMES_PER_SECOND)));
+	if ((data->m_skirmishAIOnly && !self->getControllingPlayer()->isSkirmishAIPlayer()) ||
+		self->isEffectivelyDead() || self->getEnclosingContainedBy() || !ai->isIdle())
+		return interval;
+
+	auto* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_scanRange, FROM_CENTER_2D);
+	MemoryPoolObjectHolder holder(iter);
+	Object* nearest = nullptr;
+	Real nearestDistance = sqr(data->m_scanRange);
+	for (Object* candidate = iter->first(); candidate; candidate = iter->next())
+	{
+		if (candidate == self || candidate->isEffectivelyDead() ||
+			!data->m_stuffToPickUp.matchesObject(self, candidate))
+			continue;
+		const Real distance = ThePartitionManager->getDistanceSquared(self, candidate, FROM_CENTER_2D);
+		if (distance > nearestDistance || (nearest && distance == nearestDistance && candidate->getID() >= nearest->getID()))
+			continue;
+		for (auto** module = candidate->getBehaviorModules(); *module; ++module)
+		{
+			auto* crate = dynamic_cast<CrateCollide*>(*module);
+			if (crate && crate->wouldLikeToCollideWith(self))
+			{
+				nearest = candidate;
+				nearestDistance = distance;
+				break;
+			}
+		}
+	}
+	if (nearest)
+		ai->aiMoveToObject(nearest, CMD_FROM_AI);
+	return interval;
+#else
+	return UPDATE_SLEEP_FOREVER;
+#endif
+}
 
 void HordeMemberCollide::onCollide(Object* other, const Coord3D*, const Coord3D*)
 {
