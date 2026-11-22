@@ -36,6 +36,7 @@
 #include "Common/INI.h"
 #include "Common/Player.h"
 #include "Common/Xfer.h"
+#include "GameClient/FXList.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/Anim2D.h"
 #include "GameClient/InGameUI.h"
@@ -43,6 +44,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -98,6 +100,17 @@ static Bool healerHasCombatTarget(const Object* obj)
 		return FALSE;
 	ai = horde->getAI();
 	return ai && ai->getCurrentVictim();
+}
+
+static Bool healerWasRecentlyDamaged(const Object* healer)
+{
+	UnsignedInt damageFrame = 0;
+	if (const auto* horde = HordeContain::get(healer))
+		damageFrame = horde->getLastMemberDamageFrame();
+	else if (const UnsignedInt* lastDamage = healer->getBodyModule()->getLastDamageTimestamp())
+		damageFrame = *lastDamage;
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	return frame > damageFrame && frame - damageFrame < LOGICFRAMES_PER_SECOND;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -202,6 +215,11 @@ UpdateSleepTime AutoHealBehavior::update()
 	if (d->m_healOnlyIfNotInCombat && healerHasCombatTarget(obj))
 		return UPDATE_SLEEP(d->m_startHealingDelay ? d->m_startHealingDelay : LOGICFRAMES_PER_SECOND);
 
+	if (d->m_healOnlyIfNotUnderAttack && (d->m_affectsWholePlayer || (!d->m_affectsContained && d->m_radius > 0.0f)) &&
+		healerWasRecentlyDamaged(obj))
+		return UPDATE_SLEEP(d->m_singleBurst && (d->m_buttonTriggered || !d->m_affectsWholePlayer) ?
+			UPDATE_SLEEP_FOREVER : d->m_healingDelay);
+
 	// TheSuperHackers @bugfix stephanmeesters 18/04/2026 Delay emitter creation until update, to ensure that the particle
 	// systems are not created before ParticleManager has xfer-loaded.
 	createEmitters();
@@ -220,7 +238,7 @@ UpdateSleepTime AutoHealBehavior::update()
 			helper.m_forbiddenKindOf = d->m_forbiddenKindOf;
 			helper.m_objectList = &objectsToHeal;
 			helper.m_theHealer = getObject();
-			helper.m_skipSelfForHealing = d->m_skipSelfForHealing;
+			helper.m_skipSelfForHealing = d->m_skipSelfForHealing || d->m_healOnlyOthers;
 
 			// Smack all objects with this function, and we will end up with a list of Objects deserving of pulseHealObject
 			owningPlayer->iterateObjects( checkForAutoHeal, &helper );
@@ -290,7 +308,7 @@ UpdateSleepTime AutoHealBehavior::update()
 			{
 				if( obj->isAnyKindOf( d->m_kindOf ) && !obj->isAnyKindOf( d->m_forbiddenKindOf ) )
 				{
-					if( !d->m_skipSelfForHealing || obj != getObject() )
+					if( !(d->m_skipSelfForHealing || d->m_healOnlyOthers) || obj != getObject() )
 					{
 						pulseHealObject( obj );
 
@@ -353,6 +371,8 @@ void AutoHealBehavior::pulseHealObject( Object *obj, Bool contained )
 	else
 		obj->attemptHealingFromSoleBenefactor( data->m_healingAmount, getObject(), data->m_healingDelay );
 
+	if (data->m_unitHealPulseFX && (!contained || !obj->getEnclosingContainedBy()))
+		FXList::doFXObj(data->m_unitHealPulseFX, obj);
 
 	if( data->m_unitHealPulseParticleSystemTmpl )
 	{
@@ -364,6 +384,12 @@ void AutoHealBehavior::pulseHealObject( Object *obj, Bool contained )
 	}
 
 	m_soonestHealFrame = TheGameLogic->getFrame() + data->m_healingDelay;// In case onDamage tries to wake us up early
+}
+
+void AutoHealBehavior::crcRetailHealingState(Xfer* xfer)
+{
+	xfer->xferUnsignedInt(&m_soonestHealFrame);
+	xfer->xferBool(&m_stopped);
 }
 
 // ------------------------------------------------------------------------------------------------

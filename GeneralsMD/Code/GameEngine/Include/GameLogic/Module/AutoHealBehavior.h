@@ -45,6 +45,7 @@
 
 class ParticleSystem;
 class ParticleSystemTemplate;
+class FXList;
 
 //-------------------------------------------------------------------------------------------------
 class AutoHealBehaviorModuleData : public UpdateModuleData
@@ -63,6 +64,9 @@ public:
 	Bool									m_affectsContained;
 	Bool m_buttonTriggered = FALSE;
 	Bool m_healOnlyIfNotInCombat = FALSE;
+	Bool m_healOnlyIfNotUnderAttack = FALSE;
+	Bool m_healOnlyOthers = FALSE;
+	const FXList* m_unitHealPulseFX = nullptr;
 	KindOfMaskType				m_kindOf;	//Only these types can heal -- defaults to everything.
 	KindOfMaskType				m_forbiddenKindOf;	//Only these types can heal -- defaults to everything.
 	const ParticleSystemTemplate*				m_radiusParticleSystemTmpl;					//Optional particle system meant to apply to entire effect for entire duration.
@@ -116,6 +120,9 @@ public:
 			{
 				{ "ButtonTriggered", INI::parseBool, nullptr, offsetof(AutoHealBehaviorModuleData, m_buttonTriggered) },
 				{ "HealOnlyIfNotInCombat", INI::parseBool, nullptr, offsetof(AutoHealBehaviorModuleData, m_healOnlyIfNotInCombat) },
+				{ "HealOnlyIfNotUnderAttack", INI::parseBool, nullptr, offsetof(AutoHealBehaviorModuleData, m_healOnlyIfNotUnderAttack) },
+				{ "HealOnlyOthers", INI::parseBool, nullptr, offsetof(AutoHealBehaviorModuleData, m_healOnlyOthers) },
+				{ "UnitHealPulseFX", INI::parseFXList, nullptr, offsetof(AutoHealBehaviorModuleData, m_unitHealPulseFX) },
 				{ nullptr, nullptr, nullptr, 0 }
 			};
 			p.add(retailFields);
@@ -156,6 +163,7 @@ public:
 	virtual DisabledMaskType getDisabledTypesToProcess() const override { return MAKE_DISABLED_MASK( DISABLED_HELD ); }
 
 	void stopHealing();
+	void crcRetailHealingState(Xfer* xfer);
 	static void triggerRetailButtonHealing(Object* healer);
 	void undoUpgrade(); ///<pretend like we have not been activated yet, so we can be reactivated later
 

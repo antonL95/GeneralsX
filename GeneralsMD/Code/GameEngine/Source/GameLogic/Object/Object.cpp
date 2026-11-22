@@ -4387,10 +4387,27 @@ void Object::crc( Xfer *xfer )
 		}
 #if !RTS_GENERALS
 		if (auto* body = dynamic_cast<ActiveBody*>(getBodyModule()))
+		{
+			const UnsignedInt* lastDamage = body->getLastDamageTimestamp();
+			UnsignedInt damageFrame = lastDamage ? *lastDamage : FOREVER;
+			xfer->xferUnsignedInt(&damageFrame);
+			const UnsignedInt* lastHealing = body->getLastHealingTimestamp();
+			UnsignedInt healingFrame = lastHealing ? *lastHealing : FOREVER;
+			xfer->xferUnsignedInt(&healingFrame);
 			if (!body->getRetailBodyData()->m_damageCreationLists.empty())
 				body->xferRetailSideDamage(xfer);
+		}
+		xfer->xferObjectID(&m_soleHealingBenefactorID);
+		xfer->xferUnsignedInt(&m_soleHealingBenefactorExpirationFrame);
+		if (const auto* horde = HordeContain::get(this))
+		{
+			UnsignedInt memberDamageFrame = horde->getLastMemberDamageFrame();
+			xfer->xferUnsignedInt(&memberDamageFrame);
+		}
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
+			if (auto* healing = dynamic_cast<AutoHealBehavior*>(*module))
+				healing->crcRetailHealingState(xfer);
 			if (auto* emotion = dynamic_cast<EmotionTrackerUpdate*>(*module))
 				emotion->xferEmotionState(xfer);
 			if (const auto* grab = dynamic_cast<const GrabPassengerSpecialPower*>(*module))

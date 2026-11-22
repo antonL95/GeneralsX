@@ -565,12 +565,13 @@ void HordeContain::crc( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_bannerRespawnFrame);
 		xfer->xferUnsignedInt(&m_unitSpawnFrame);
 		xfer->xferUnsignedInt(&m_lastMeleeFrame);
+		xfer->xferUnsignedInt(&m_lastMemberDamageFrame);
 	}
 }
 
 void HordeContain::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 3;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 5 : 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -603,6 +604,10 @@ void HordeContain::xfer( Xfer *xfer )
 		m_unitSpawnFrame = 0;
 		m_lastMeleeFrame = 0;
 	}
+	if (version >= 5)
+		xfer->xferUnsignedInt(&m_lastMemberDamageFrame);
+	else if (xfer->getXferMode() == XFER_LOAD)
+		m_lastMemberDamageFrame = 0;
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		m_formationOverride = switched ? findAlternateFormation() : nullptr;

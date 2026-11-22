@@ -171,6 +171,8 @@ public:
 	static Bool allowsBannerSpawn(const Object* anchor);
 #endif
 	static const HordeContain* get(const Object* object);
+	UnsignedInt getLastMemberDamageFrame() const { return m_lastMemberDamageFrame; }
+	void recordMemberDamage(UnsignedInt frame) { m_lastMemberDamageFrame = frame; }
 	const HordeContainModuleData* getActiveFormation() const;
 	const std::vector<AsciiString>& getFormationModifiers() const { return getActiveFormation()->m_attributeModifiers; }
 	static Object* getAnchor(Object* member);
@@ -206,6 +208,7 @@ private:
 	UnsignedInt m_bannerRespawnFrame = 0;
 	UnsignedInt m_unitSpawnFrame = 0;
 	UnsignedInt m_lastMeleeFrame = 0;
+	UnsignedInt m_lastMemberDamageFrame = 0;
 };
 
 class BannerCarrierUpdateModuleData : public UpdateModuleData

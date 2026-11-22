@@ -670,6 +670,8 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 
 		if (RetailFileLayers::enabled() && m_maxHealth > 0.0f && damageInfo->out.m_actualDamageClipped > 0.0f)
 		{
+			if (Object* horde = HordeContain::getAnchor(obj))
+				static_cast<HordeContain*>(horde->getContain())->recordMemberDamage(TheGameLogic->getFrame());
 			const Object* source = damager;
 			if (source)
 				if (Player* player = source->getControllingPlayer())
