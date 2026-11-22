@@ -66,6 +66,7 @@
 #include "GameLogic/Module/GarrisonContain.h"
 #include "GameLogic/Module/InternetHackContain.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/RetailHordeTransport.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Module/AutoPickUpUpdate.h"
 #include "GameLogic/Module/ExperienceModules.h"
@@ -394,6 +395,10 @@ void ModuleFactory::init()
 	if (registersRotwkModules())
 	{
 		addModule( HordeContain );
+		addModule( HordeTransportContain );
+		addModule( HordeGarrisonContain );
+		addModule( EvacuateDamage );
+		addModule( HordeTransportContainDamage );
 		addModule( SlaughterHordeContain );
 		addModule( CitadelSlaughterHordeContain );
 		addModule( SlaveWatcherBehavior );

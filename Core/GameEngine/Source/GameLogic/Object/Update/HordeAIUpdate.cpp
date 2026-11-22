@@ -436,7 +436,7 @@ UpdateSleepTime HordeAIUpdate::update()
 	}
 
 	const HordeContain* contain = HordeContain::get(horde);
-	if (!contain || horde->isEffectivelyDead())
+	if (!contain || horde->isEffectivelyDead() || (RetailFileLayers::enabled() && horde->getContainedBy() != nullptr))
 		return UPDATE_SLEEP_NONE;
 	const Real turn = stdAngleDiff(horde->getOrientation(), facingBefore);
 	const Bool cavalry = RetailFileLayers::enabled() && horde->isKindOf(KINDOF_CAVALRY);

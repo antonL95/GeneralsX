@@ -50,7 +50,10 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/OpenContain.h"
 #include "Common/ModuleFactory.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/RetailHordeTransport.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -83,6 +86,48 @@ OpenContainModuleData::OpenContainModuleData()
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+void OpenContainModuleData::parsePassengerFilter(INI* ini, void* instance, void* store, const void* custom)
+{
+	auto* data = static_cast<OpenContainModuleData*>(instance);
+	SpecialPowerObjectFilter::parse(ini, instance, store, custom);
+	data->m_hasPassengerFilter = TRUE;
+	data->m_allowInsideKindOf.clear();
+	data->m_allowInsideKindOf.flip();
+}
+
+void OpenContainModuleData::parsePassengerBonePrefix(INI* ini, void* instance, void*, const void*)
+{
+	auto* data = static_cast<OpenContainModuleData*>(instance);
+	PassengerBonePrefix entry;
+	const char* const* kindNames = KindOfMaskType::getBitNames();
+	while (const char* token = ini->getNextTokenOrNull())
+	{
+		if (strncasecmp(token, "PassengerBone:", 14) == 0)
+		{
+			const char* value = token[14] ? token + 14 : ini->getNextTokenOrNull();
+			if (value)
+				entry.bonePrefix.set(value);
+		}
+		else if (strncasecmp(token, "KindOf:", 7) == 0)
+		{
+			const char* value = token[7] ? token + 7 : ini->getNextTokenOrNull();
+			if (value && kindNames)
+			{
+				for (Int bit = 0; kindNames[bit]; ++bit)
+				{
+					if (strcasecmp(kindNames[bit], value) == 0)
+					{
+						entry.kindOf.set(bit, TRUE);
+						break;
+					}
+				}
+			}
+		}
+	}
+	if (!entry.bonePrefix.isEmpty())
+		data->m_passengerBonePrefixes.push_back(entry);
+}
+
 /*static*/ void OpenContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
   UpdateModuleData::buildFieldParse(p);
@@ -111,6 +156,12 @@ OpenContainModuleData::OpenContainModuleData()
 		static const FieldParse retailFields[] =
 		{
 			{ "EjectPassengersOnDeath", INI::parseBool, nullptr, offsetof(OpenContainModuleData, m_ejectPassengersOnDeath) },
+			{ "KillPassengersOnDeath", INI::parseBool, nullptr, offsetof(OpenContainModuleData, m_killPassengersOnDeath) },
+			{ "AllowOwnPlayerInsideOverride", INI::parseBool, nullptr, offsetof(OpenContainModuleData, m_allowOwnPlayerInsideOverride) },
+			{ "ShowPips", INI::parseBool, nullptr, offsetof(OpenContainModuleData, m_showPips) },
+			{ "PassengerFilter", parsePassengerFilter, nullptr, offsetof(OpenContainModuleData, m_passengerFilter) },
+			{ "ObjectStatusOfContained", ObjectStatusMaskType::parseFromINI, nullptr, offsetof(OpenContainModuleData, m_objectStatusOfContained) },
+			{ "PassengerBonePrefix", parsePassengerBonePrefix, nullptr, 0 },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(retailFields);
@@ -316,6 +367,10 @@ void OpenContain::addToContain( Object *rider )
 			rider->getTemplate()->getName().str(), getObject()->getTemplate()->getName().str()));
 		return;
 	}
+
+	if (RetailFileLayers::enabled() && !isHordeContain() &&
+		getOpenContainModuleData()->m_hasPassengerFilter && !isValidContainerFor(rider, TRUE))
+		return;
 
 #if defined(RTS_DEBUG)
 	if( !isValidContainerFor( rider, false ) )
@@ -722,25 +777,53 @@ void OpenContain::scatterToNearbyPosition(Object* rider)
 //-------------------------------------------------------------------------------------------------
 void OpenContain::onContaining( Object *rider )
 {
-	// Play audio
 	if( m_loadSoundsEnabled )
 	{
 		AudioEventRTS enterSound = *getObject()->getTemplate()->getSoundEnter();
 		enterSound.setObjectID(getObject()->getID());
 		TheAudio->addAudioEvent(&enterSound);
 	}
+	if (RetailFileLayers::enabled() && rider && !isHordeContain())
+	{
+		const ObjectStatusMaskType& status = getOpenContainModuleData()->m_objectStatusOfContained;
+		if (status.any())
+		{
+			rider->setStatus(status);
+			if (const HordeContain* horde = HordeContain::get(rider))
+			{
+				for (Object* member : *horde->getContainedItemsList())
+					member->setStatus(status);
+			}
+		}
+	}
 }
 
-//-------------------------------------------------------------------------------------------------
 void OpenContain::onRemoving( Object *rider)
 {
-	// Play audio
+	if (RetailFileLayers::enabled() && rider && !isHordeContain())
+	{
+		const ObjectStatusMaskType& status = getOpenContainModuleData()->m_objectStatusOfContained;
+		if (status.any())
+		{
+			rider->clearStatus(status);
+			if (const HordeContain* horde = HordeContain::get(rider))
+			{
+				ObjectStatusMaskType memberClear = status;
+				memberClear.clear(horde->getActiveFormation()->m_objectStatusOfContained);
+				memberClear.set(OBJECT_STATUS_UNSELECTABLE, FALSE);
+				if (memberClear.any())
+				{
+					for (Object* member : *horde->getContainedItemsList())
+						member->clearStatus(memberClear);
+				}
+			}
+		}
+	}
 	AudioEventRTS exitSound = *getObject()->getTemplate()->getSoundExit();
 	exitSound.setObjectID(getObject()->getID());
 	TheAudio->addAudioEvent(&exitSound);
 
 	if (rider) {
-		// This is a misnomer, but it makes it clearer for the user.
 		AudioEventRTS fallingSound = *rider->getTemplate()->getSoundFalling();
 		fallingSound.setObjectID(rider->getID());
 		TheAudio->addAudioEvent(&fallingSound);
@@ -840,10 +923,36 @@ void OpenContain::onDelete()	///< Last possible moment cleanup
 //-------------------------------------------------------------------------------------------------
 void OpenContain::onDie( const DamageInfo * damageInfo )
 {
-	if (!getOpenContainModuleData()->m_dieMuxData.isDieApplicable(getObject(), damageInfo))
+	const OpenContainModuleData* data = getOpenContainModuleData();
+	if (!data->m_dieMuxData.isDieApplicable(getObject(), damageInfo))
 		return;
 
-	if (!getOpenContainModuleData()->m_ejectPassengersOnDeath)
+	if (RetailFileLayers::enabled() && data->m_killPassengersOnDeath)
+	{
+		const ContainedItemsList passengers = m_containList;
+		for (Object* passenger : passengers)
+		{
+			removeFromContain(passenger);
+			if (const HordeContain* horde = HordeContain::get(passenger))
+			{
+				const ContainedItemsList members = *horde->getContainedItemsList();
+				for (Object* member : members)
+				{
+					if (member && !member->isEffectivelyDead())
+						member->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
+				}
+				if (!passenger->isEffectivelyDead())
+					passenger->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
+			}
+			else if (!passenger->isEffectivelyDead())
+			{
+				passenger->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
+			}
+		}
+		return;
+	}
+
+	if (!data->m_ejectPassengersOnDeath)
 	{
 		const ContainedItemsList passengers = m_containList;
 		for (Object* passenger : passengers)
@@ -855,20 +964,15 @@ void OpenContain::onDie( const DamageInfo * damageInfo )
 	killRidersWhoAreNotFreeToExit();
 #endif
 
-	//Check to see if we are going to inflict damage on contained units.
-	if( getOpenContainModuleData()->m_damagePercentageToUnits > 0 )
+	if( data->m_damagePercentageToUnits > 0 )
 	{
-		//Cycle through the units and apply damage to them!
-		processDamageToContained(getOpenContainModuleData()->m_damagePercentageToUnits);
+		processDamageToContained(data->m_damagePercentageToUnits);
 	}
 
 #if RETAIL_COMPATIBLE_CRC
 	killRidersWhoAreNotFreeToExit();
 #endif
 
-	// Leaving this commented out to show it can't work.  We are about to die, so they will have zero
-	// chance to hit an exitState::Update.  At least we would clean them up in onDelete.
-//	orderAllPassengersToExit( CMD_FROM_AI );
 	removeAllContained();
 }
 
@@ -877,50 +981,54 @@ void OpenContain::onDie( const DamageInfo * damageInfo )
 // ------------------------------------------------------------------------------------------------
 Bool OpenContain::isValidContainerFor(const Object* obj, Bool checkCapacity) const
 {
+	if (!obj)
+		return FALSE;
 	const Object *us = getObject();
 	const OpenContainModuleData *modData = getOpenContainModuleData();
 
-	// if we have any kind of masks set then we must make that check
 	if (obj->isAnyKindOf( modData->m_allowInsideKindOf ) == FALSE ||
 			obj->isAnyKindOf( modData->m_forbidInsideKindOf ) == TRUE)
 	{
 		return false;
 	}
 
- 	//
- 	// check relationship, note that this behavior is defined as the relation between
- 	// 'obj' and the container 'us', and not the reverse
- 	//
- 	Bool relationshipRestricted = FALSE;
- 	Relationship r = obj->getRelationship( us );
- 	switch( r )
- 	{
- 		case ALLIES:
- 			if( modData->m_allowAlliesInside == FALSE )
- 				relationshipRestricted = TRUE;
- 			break;
+	const Bool ownOverride = RetailFileLayers::enabled() && modData->m_allowOwnPlayerInsideOverride &&
+		obj->getControllingPlayer() == us->getControllingPlayer();
+	if (!ownOverride)
+	{
+		Bool relationshipRestricted = FALSE;
+		Relationship r = obj->getRelationship( us );
+		switch( r )
+		{
+			case ALLIES:
+				if( modData->m_allowAlliesInside == FALSE )
+					relationshipRestricted = TRUE;
+				break;
 
- 		case ENEMIES:
- 			if( modData->m_allowEnemiesInside == FALSE )
- 				relationshipRestricted = TRUE;
- 			break;
+			case ENEMIES:
+				if( modData->m_allowEnemiesInside == FALSE )
+					relationshipRestricted = TRUE;
+				break;
 
- 		case NEUTRAL:
- 			if( modData->m_allowNeutralInside == FALSE )
- 				relationshipRestricted = TRUE;
- 			break;
+			case NEUTRAL:
+				if( modData->m_allowNeutralInside == FALSE )
+					relationshipRestricted = TRUE;
+				break;
 
- 		default:
- 			DEBUG_CRASH(( "isValidContainerFor: Undefined relationship (%d) between '%s' and '%s'",
- 										r, getObject()->getTemplate()->getName().str(),
- 										obj->getTemplate()->getName().str() ));
- 			return FALSE;
+			default:
+				DEBUG_CRASH(( "isValidContainerFor: Undefined relationship (%d) between '%s' and '%s'",
+											r, getObject()->getTemplate()->getName().str(),
+											obj->getTemplate()->getName().str() ));
+				return FALSE;
+		}
+		if( relationshipRestricted == TRUE )
+			return FALSE;
+	}
 
- 	}
- 	if( relationshipRestricted == TRUE )
- 		return FALSE;
+	if (RetailFileLayers::enabled() && modData->m_hasPassengerFilter &&
+		!modData->m_passengerFilter.matchesObject(us, obj))
+		return FALSE;
 
-	// all is well
 	return true;
 
 }
@@ -1398,6 +1506,9 @@ void OpenContain::processDamageToContainedInternal(Object* const* objects, size_
 	{
 		Object* object = objects[i];
 
+		if (damageRetailHordePassengers(object, getObject()->getID(), percentDamage, DEATH_BURNED))
+			continue;
+
 		// Calculate the damage to be inflicted on each unit.
 		Real damage = object->getBodyModule()->getMaxHealth() * percentDamage;
 
@@ -1473,18 +1584,20 @@ void OpenContain::processDamageToContained(Real percentDamage)
 
 		DEBUG_ASSERTCRASH( object, ("Contain list must not contain null element") );
 
-		// Calculate the damage to be inflicted on each unit.
-		Real damage = object->getBodyModule()->getMaxHealth() * percentDamage;
+		if (!damageRetailHordePassengers(object, getObject()->getID(), percentDamage, DEATH_BURNED))
+		{
+			Real damage = object->getBodyModule()->getMaxHealth() * percentDamage;
 
-		DamageInfo damageInfo;
-		damageInfo.in.m_damageType = DAMAGE_UNRESISTABLE;
-		damageInfo.in.m_deathType = DEATH_BURNED;
-		damageInfo.in.m_sourceID = getObject()->getID();
-		damageInfo.in.m_amount = damage;
-		object->attemptDamage( &damageInfo );
+			DamageInfo damageInfo;
+			damageInfo.in.m_damageType = DAMAGE_UNRESISTABLE;
+			damageInfo.in.m_deathType = DEATH_BURNED;
+			damageInfo.in.m_sourceID = getObject()->getID();
+			damageInfo.in.m_amount = damage;
+			object->attemptDamage( &damageInfo );
 
-		if( !object->isEffectivelyDead() && killContained )
-			object->kill(); // in case we are carrying flame proof troops we have been asked to kill
+			if( !object->isEffectivelyDead() && killContained )
+				object->kill();
+		}
 
 		// GeneralsX @bugfix mreza0100 23/07/2026 A destroyed occupant cannot remove itself
 		// while the contain list is temporarily detached. Do not restore a pending dangling pointer.

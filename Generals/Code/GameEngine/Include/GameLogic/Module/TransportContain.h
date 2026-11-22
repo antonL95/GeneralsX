@@ -56,12 +56,15 @@ public:
 	Bool							m_resetMoodCheckTimeOnExit;
 	Bool							m_destroyRidersWhoAreNotFreeToExit;
 
-	SpecialPowerObjectFilter m_passengerFilter;
 	KindOfMaskType m_passengerTypeOne;
-	Bool m_hasPassengerFilter = FALSE;
+	Bool m_forceOrientationContainer = TRUE;
+	SpecialPowerObjectFilter m_fadeFilter;
+	Bool m_fadePassengerOnEnter = FALSE;
+	Bool m_fadePassengerOnExit = FALSE;
+	Real m_enterFadeTime = 0.0f;
+	Real m_exitFadeTime = 0.0f;
 
 	TransportContainModuleData();
-	static void parsePassengerFilter(INI* ini, void* instance, void* store, const void* custom);
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 	static void parseInitialPayload( INI* ini, void *instance, void *store, const void* /*userData*/ );

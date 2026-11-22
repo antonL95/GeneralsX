@@ -150,10 +150,7 @@ void HordeContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 	{
 		{ "InitialPayload", parseInitialPayload, nullptr, 0 },
 		{ "Slots", parseSlots, nullptr, 0 },
-		{ "PassengerFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( HordeContainModuleData, m_passengerFilter ) },
 		{ "ManualPickUpFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof( HordeContainModuleData, m_manualPickUpFilter ) },
-		{ "ShowPips", INI::parseBool, nullptr, offsetof( HordeContainModuleData, m_showPips ) },
-		{ "ObjectStatusOfContained", ObjectStatusMaskType::parseFromINI, nullptr, offsetof( HordeContainModuleData, m_objectStatusOfContained ) },
 		{ "ThisFormationIsTheMainFormation", INI::parseBool, nullptr, offsetof( HordeContainModuleData, m_thisFormationIsTheMainFormation ) },
 		{ "RankInfo", parseRankInfo, nullptr, 0 },
 		{ "RanksThatStopAdvance", parseRankList, nullptr, offsetof( HordeContainModuleData, m_ranksThatStopAdvance ) },
@@ -466,6 +463,33 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 		helper->refreshDerived();
 #endif
 	rider->setStatus( getHordeContainModuleData()->m_objectStatusOfContained );
+	if (RetailFileLayers::enabled())
+	{
+		if (Object* outer = getObject()->getContainedBy())
+		{
+			if (ContainModuleInterface* outerContain = outer->getContain())
+			{
+				if (const OpenContain* outerOpen = outerContain->asOpenContain())
+				{
+					const ObjectStatusMaskType& outerStatus = outerOpen->getRetailOpenContainData()->m_objectStatusOfContained;
+					if (outerStatus.any())
+						rider->setStatus(outerStatus);
+				}
+				if (getObject()->isDisabledByType(DISABLED_HELD))
+					rider->setDisabled(DISABLED_HELD);
+				if (outerContain->isGarrisonable())
+					rider->setWeaponBonusCondition(WEAPONBONUSCONDITION_GARRISONED);
+				if (outerContain->isEnclosingContainerFor(getObject()))
+				{
+					if (rider->getDrawable())
+						rider->getDrawable()->setDrawableHidden(true);
+					ThePartitionManager->unRegisterObject(rider);
+					TheAI->pathfinder()->removeObjectFromPathfindMap(rider);
+				}
+				rider->setPosition(outer->getPosition());
+			}
+		}
+	}
 	if (isBannerCarrier(rider))
 	{
 		m_replenishmentBanner = rider->getTemplate()->getName();
@@ -495,6 +519,16 @@ void HordeContain::onContaining(Object* rider, Bool wasSelected)
 				rider->giveUpgrade(upgrade);
 		}
 	}
+}
+
+#if RTS_GENERALS
+Bool HordeContain::isPassengerAllowedToFire() const
+#else
+Bool HordeContain::isPassengerAllowedToFire(ObjectID) const
+#endif
+{
+	const Object* outer = RetailFileLayers::enabled() ? getObject()->getContainedBy() : nullptr;
+	return !outer || outer->getContain()->isPassengerAllowedToFire();
 }
 
 void HordeContain::onRemoving( Object *rider )
@@ -2027,6 +2061,11 @@ Bool HordeContain::splitHorde()
 	return TRUE;
 }
 #endif
+
+DisabledMaskType HordeContain::getDisabledTypesToProcess() const
+{
+	return RetailFileLayers::enabled() ? MAKE_DISABLED_MASK(DISABLED_HELD) : TransportContain::getDisabledTypesToProcess();
+}
 
 UpdateSleepTime HordeContain::update()
 {

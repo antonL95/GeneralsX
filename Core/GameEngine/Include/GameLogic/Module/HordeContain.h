@@ -56,9 +56,7 @@ public:
 	std::vector<AsciiString> m_bannerCarriersAllowed;
 	std::vector<AsciiString> m_leadersAllowed;
 	std::vector<AsciiString> m_attributeModifiers;
-	SpecialPowerObjectFilter m_passengerFilter;
 	SpecialPowerObjectFilter m_manualPickUpFilter;
-	ObjectStatusMaskType m_objectStatusOfContained;
 	MeleeBehavior m_meleeBehavior;
 	AsciiString m_alternateFormation;
 	AsciiString m_machineType;
@@ -84,7 +82,6 @@ public:
 	Int m_splitHordeNumber;
 	Int m_forcedLocomotorSet;
 	UnsignedByte m_bannerCarrierMinLevel;
-	Bool m_showPips;
 	Bool m_thisFormationIsTheMainFormation;
 	Bool m_bannerCarrierDestroyHordeOnDeath;
 	Bool m_isPorcupineFormation;
@@ -124,12 +121,13 @@ public:
 	void clientVisibleContainedFlashAsSelected() override;
 #if RTS_GENERALS
 	void onContaining(Object* obj) override;
-	Bool isPassengerAllowedToFire() const override { return TRUE; }
+	Bool isPassengerAllowedToFire() const override;
 #else
 	void onContaining(Object* obj, Bool wasSelected) override;
-	Bool isPassengerAllowedToFire(ObjectID = INVALID_ID) const override { return TRUE; }
+	Bool isPassengerAllowedToFire(ObjectID = INVALID_ID) const override;
 #endif
 	UpdateSleepTime update() override;
+	DisabledMaskType getDisabledTypesToProcess() const override;
 	virtual void onRemoving( Object *obj ) override;
 	virtual void onCapture( Player *oldOwner, Player *newOwner ) override;
 	virtual void addToContainList( Object *obj ) override;

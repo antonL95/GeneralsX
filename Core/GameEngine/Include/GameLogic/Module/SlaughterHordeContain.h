@@ -10,11 +10,8 @@ class SlaughterHordeContainModuleData : public OpenContainModuleData
 public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 
-	SpecialPowerObjectFilter m_passengers;
-	ObjectStatusMaskType m_passengerStatus;
 	Real m_cashBack = 0.0f;
 	Int m_maxHordeCapacity = 0;
-	Bool m_allowOwnPlayer = FALSE;
 };
 
 class SlaughterHordeContain : public OpenContain

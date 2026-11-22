@@ -53,6 +53,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/RailroadGuideAIUpdate.h"
@@ -697,6 +698,13 @@ Bool ActionManager::canEnterObject( const Object *obj, const Object *objectToEnt
 			//enter it with full health. This is not a normal container.
 			return FALSE;
 		}
+	}
+
+	if (RetailFileLayers::enabled() && mode != COMBATDROP_INTO)
+	{
+		const OpenContain* open = contain->asOpenContain();
+		if (open && open->getRetailOpenContainData()->m_hasPassengerFilter)
+			return contain->isValidContainerFor(obj, mode == CHECK_CAPACITY);
 	}
 
 	if (mode == COMBATDROP_INTO)

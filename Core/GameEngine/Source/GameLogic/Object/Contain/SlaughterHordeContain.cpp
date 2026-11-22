@@ -31,8 +31,6 @@ void SlaughterHordeContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
 	OpenContainModuleData::buildFieldParse(p);
 	static const FieldParse fields[] = {
-		{ "PassengerFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(SlaughterHordeContainModuleData, m_passengers) },
-		{ "ObjectStatusOfContained", ObjectStatusMaskType::parseFromINI, nullptr, offsetof(SlaughterHordeContainModuleData, m_passengerStatus) },
 		{ "CashBackPercent", INI::parsePercentToReal, nullptr, offsetof(SlaughterHordeContainModuleData, m_cashBack) },
 		{ "MaxHordeCapacity", INI::parseInt, nullptr, offsetof(SlaughterHordeContainModuleData, m_maxHordeCapacity) },
 		{ nullptr, nullptr, nullptr, 0 }
@@ -51,11 +49,11 @@ Bool SlaughterHordeContain::canSlaughter(const Object* passenger) const
 	if (!passenger || passenger->isEffectivelyDead() || passenger->isDestroyed())
 		return FALSE;
 	const auto* data = getSlaughterHordeContainModuleData();
-	const Bool ownPlayer = data->m_allowOwnPlayer && passenger->getControllingPlayer() == getObject()->getControllingPlayer();
+	const Bool ownPlayer = data->m_allowOwnPlayerInsideOverride && passenger->getControllingPlayer() == getObject()->getControllingPlayer();
 	const Bool allowed = ownPlayer ?
 		passenger->isAnyKindOf(data->m_allowInsideKindOf) && !passenger->isAnyKindOf(data->m_forbidInsideKindOf) :
 		OpenContain::isValidContainerFor(passenger, FALSE);
-	return allowed && data->m_passengers.matchesObject(getObject(), passenger);
+	return allowed && (!data->m_hasPassengerFilter || data->m_passengerFilter.matchesObject(getObject(), passenger));
 }
 
 Bool SlaughterHordeContain::canAcceptEntry(const Object* passenger) const
@@ -100,7 +98,7 @@ void SlaughterHordeContain::slaughter(Object* passenger)
 		RetailWorldUI::showPayout(*passenger, amount, FALSE);
 		getObject()->getExperienceTracker()->addRetailExperience(refund, FALSE);
 	}
-	passenger->setStatus(data->m_passengerStatus);
+	passenger->setStatus(data->m_objectStatusOfContained);
 	DamageInfo damage;
 	damage.in.m_sourceID = INVALID_ID;
 	damage.in.m_damageType = DAMAGE_UNRESISTABLE;
@@ -156,7 +154,6 @@ void CitadelSlaughterHordeContainModuleData::buildFieldParse(MultiIniFieldParse&
 {
 	SlaughterHordeContainModuleData::buildFieldParse(p);
 	static const FieldParse fields[] = {
-		{ "AllowOwnPlayerInsideOverride", INI::parseBool, nullptr, offsetof(CitadelSlaughterHordeContainModuleData, m_allowOwnPlayer) },
 		{ "StatusForRingEntry", ObjectStatusMaskType::parseFromINI, nullptr, offsetof(CitadelSlaughterHordeContainModuleData, m_ringStatus) },
 		{ "UpgradeForRingEntry", INI::parseAsciiStringVectorAppend, nullptr, offsetof(CitadelSlaughterHordeContainModuleData, m_ringUpgrades) },
 		{ "ObjectToDestroyForRingEntry", SpecialPowerObjectFilter::parse, nullptr, offsetof(CitadelSlaughterHordeContainModuleData, m_ringFilter) },

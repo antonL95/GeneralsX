@@ -117,6 +117,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/RingStealthTiming.h
     Include/GameLogic/ShroudGeometry.h
     Include/GameLogic/Module/HordeContain.h
+    Include/GameLogic/Module/RetailHordeTransport.h
     Include/GameLogic/Module/SlaughterHordeContain.h
     Include/GameLogic/Module/ExperienceModules.h
     Include/GameLogic/Module/HordeAIUpdate.h
@@ -694,6 +695,7 @@ set(GAMEENGINE_SRC
     Source/Common/GameUtility.cpp
     Source/Common/HordeFormation.cpp
     Source/GameLogic/Object/Contain/HordeContain.cpp
+    Source/GameLogic/Object/Contain/RetailHordeTransport.cpp
     Source/GameLogic/Object/Contain/SlaughterHordeContain.cpp
     Source/GameLogic/Object/Update/HordeAIUpdate.cpp
     Source/GameLogic/Object/Update/AnimalAIUpdate.cpp

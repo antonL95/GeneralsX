@@ -43,6 +43,9 @@
 #include "Common/KindOf.h"
 #include "Common/GameMemory.h"
 #include "Common/ModelState.h"
+#include "Common/ObjectStatusTypes.h"
+#include "Common/SpecialPowerINI.h"
+#include <vector>
 
 // ------------------------------------------------------------------------------------------------
 enum { CONTAIN_MAX_UNKNOWN = -1 };  // means we don't care, infinite, unassigned, whatever
@@ -65,11 +68,25 @@ public:
 	UnsignedInt m_doorOpenTime;
 	KindOfMaskType m_allowInsideKindOf;			///< objects must have at least one of these kind of bits set to be contained by us
 	KindOfMaskType m_forbidInsideKindOf;		///< objects must have NONE of these kind of bits set to be contained by us
- 	Bool m_allowAlliesInside;				///< allow allies inside us
- 	Bool m_allowEnemiesInside;			///< allow enemies inside us
- 	Bool m_allowNeutralInside;			///< allow neutral inside us
+	Bool m_allowAlliesInside;
+	Bool m_allowEnemiesInside;
+	Bool m_allowNeutralInside;
+	Bool m_allowOwnPlayerInsideOverride = FALSE;
+	Bool m_killPassengersOnDeath = FALSE;
+	Bool m_showPips = TRUE;
+	Bool m_hasPassengerFilter = FALSE;
+	SpecialPowerObjectFilter m_passengerFilter;
+	ObjectStatusMaskType m_objectStatusOfContained;
+	struct PassengerBonePrefix
+	{
+		AsciiString bonePrefix;
+		KindOfMaskType kindOf;
+	};
+	std::vector<PassengerBonePrefix> m_passengerBonePrefixes;
 
 	OpenContainModuleData();
+	static void parsePassengerFilter(INI* ini, void* instance, void* store, const void* custom);
+	static void parsePassengerBonePrefix(INI* ini, void* instance, void* store, const void* custom);
 	static void buildFieldParse(MultiIniFieldParse& p);
 };
 
@@ -93,6 +110,7 @@ public:
 	// virtual destructor prototype provided by memory pool declaration
 
 	virtual ContainModuleInterface* getContain() override { return this; }
+	const OpenContainModuleData* getRetailOpenContainData() const { return getOpenContainModuleData(); }
 	virtual CollideModuleInterface* getCollide() override { return this; }
 	virtual DieModuleInterface* getDie() override { return this; }
 	virtual DamageModuleInterface* getDamage() override { return this; }

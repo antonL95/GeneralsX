@@ -46,6 +46,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/GarrisonContain.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Weapon.h"
@@ -1622,14 +1623,23 @@ void GarrisonContain::onContaining( Object *obj, Bool wasSelected )
 	// get the structure object
 	Object *structure = getObject();
 
-	// objects inside a building are held
 	obj->setDisabled( DISABLED_HELD );
 
-	// the building can now attack, since it has soldiers inside of it
 	structure->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_CAN_ATTACK ) );
 
-	// give the object a garrisoned version of its weapon
 	obj->setWeaponBonusCondition( WEAPONBONUSCONDITION_GARRISONED );
+
+	if (RetailFileLayers::enabled())
+	{
+		if (const HordeContain* horde = HordeContain::get(obj))
+		{
+			for (Object* member : *horde->getContainedItemsList())
+			{
+				member->setDisabled(DISABLED_HELD);
+				member->setWeaponBonusCondition(WEAPONBONUSCONDITION_GARRISONED);
+			}
+		}
+	}
 
 	// put the object in the center of the building
   if (isEnclosingContainerFor( obj ))
@@ -1668,11 +1678,21 @@ void GarrisonContain::onRemoving( Object *obj )
 		//were dropping contained infantry to incorrect altitudes.
     obj->setPositionZ( TheTerrainLogic->getGroundHeight( obj->getPosition()->x, obj->getPosition()->y ) );
   }
-	// give the object back a regular weapon
 	obj->clearWeaponBonusCondition( WEAPONBONUSCONDITION_GARRISONED );
 
-	// object is no longer held inside a garrisoned building
 	obj->clearDisabled( DISABLED_HELD );
+
+	if (RetailFileLayers::enabled())
+	{
+		if (const HordeContain* horde = HordeContain::get(obj))
+		{
+			for (Object* member : *horde->getContainedItemsList())
+			{
+				member->clearWeaponBonusCondition(WEAPONBONUSCONDITION_GARRISONED);
+				member->clearDisabled(DISABLED_HELD);
+			}
+		}
+	}
 
 	// if we have nothing left inside of us then we are once again back to our original team
 	if( getContainCount() == 0 )

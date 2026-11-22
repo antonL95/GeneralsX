@@ -1988,6 +1988,7 @@ bool GameLogic::onEvacuate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlyS
 		//	pos = msg->getArgument(0)->location;
 
 		currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);
+
 		currentlySelectedGroup->groupEvacuate( CMD_FROM_PLAYER );
 
 		// no, this is bad, don't do here, do when POSTING message

@@ -87,15 +87,6 @@ void TransportContainModuleData::parseInitialPayload( INI* ini, void *instance, 
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-void TransportContainModuleData::parsePassengerFilter(INI* ini, void* instance, void* store, const void* custom)
-{
-	auto* data = static_cast<TransportContainModuleData*>(instance);
-	SpecialPowerObjectFilter::parse(ini, instance, store, custom);
-	data->m_hasPassengerFilter = TRUE;
-	data->m_allowInsideKindOf.clear();
-	data->m_allowInsideKindOf.flip();
-}
-
 void TransportContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
   OpenContainModuleData::buildFieldParse(p);
@@ -121,9 +112,14 @@ void TransportContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 	{
 		static const FieldParse retailFields[] =
 		{
-			{ "PassengerFilter", parsePassengerFilter, nullptr, offsetof(TransportContainModuleData, m_passengerFilter) },
 			{ "TypeOneForWeaponSet", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeOne) },
 			{ "TypeOneForWeaponState", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeOne) },
+			{ "ForceOrientationContainer", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_forceOrientationContainer) },
+			{ "FadeFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(TransportContainModuleData, m_fadeFilter) },
+			{ "FadePassengerOnEnter", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_fadePassengerOnEnter) },
+			{ "FadePassengerOnExit", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_fadePassengerOnExit) },
+			{ "EnterFadeTime", INI::parseReal, nullptr, offsetof(TransportContainModuleData, m_enterFadeTime) },
+			{ "ExitFadeTime", INI::parseReal, nullptr, offsetof(TransportContainModuleData, m_exitFadeTime) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(retailFields);

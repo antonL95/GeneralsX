@@ -170,6 +170,7 @@
 #include "GameLogic/Module/RetailEconomy.h"
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/RetailHordeTransport.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
@@ -473,6 +474,10 @@ void ModuleFactory::init()
 		addModule( PillageModule );
 		addModule( RefundDie );
 		addModule( HordeContain );
+		addModule( HordeTransportContain );
+		addModule( HordeGarrisonContain );
+		addModule( EvacuateDamage );
+		addModule( HordeTransportContainDamage );
 		addModule( SlaughterHordeContain );
 		addModule( BannerCarrierUpdate );
 		addModule( HorseHordeContain );

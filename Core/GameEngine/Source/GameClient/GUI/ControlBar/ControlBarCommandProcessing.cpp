@@ -749,7 +749,9 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			//
 			for (i = 0; i < MAX_COMMANDS_PER_SET; i++)
 			{
-				if (m_containData[i].control == control)
+				if (m_containData[i].control == control ||
+					(RetailFileLayers::enabled() && m_containData[i].control &&
+					 (m_commandWindows[i] == control || m_commandWindows[i] == retailRadialSource(control))))
 				{
 					objID = m_containData[ i ].objectID;
 					break;
