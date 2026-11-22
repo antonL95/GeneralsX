@@ -66,6 +66,7 @@
 #include "GameLogic/RetailSkirmishProbe.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailWorldUI.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/HeroRoster.h"
 #include "Common/ProductionPrerequisite.h"
 #include "Common/Radar.h"
@@ -4257,6 +4258,7 @@ void Player::crc( Xfer *xfer )
 	if (RetailFileLayers::enabled())
 	{
 		HeroRoster::xferPlayer(this, xfer);
+		CreateAHeroSystem::xferPlayer(this, xfer);
 		xferPowerProductionBonuses(xfer);
 		xfer->xferBool(&m_hasCommandPointOverride);
 		xfer->xferInt(&m_commandPointOverrideTotal);
@@ -4286,7 +4288,7 @@ void Player::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 12 : 8;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 13 : 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4849,6 +4851,10 @@ void Player::xfer( Xfer *xfer )
 		m_commandPointOverrideTotal = 0;
 		m_commandPointOverrideMaximum = 0;
 	}
+	if (version >= 13)
+		CreateAHeroSystem::xferPlayer(this, xfer);
+	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
+		CreateAHeroSystem::resetPlayer(m_playerIndex);
 
 }
 

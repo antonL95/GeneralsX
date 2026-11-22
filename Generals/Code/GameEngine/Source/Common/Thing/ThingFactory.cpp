@@ -37,6 +37,7 @@
 #include "Common/MapObject.h"
 #include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/RetailCreationUpgrades.h"
 #include "GameLogic/GameLogic.h"
@@ -362,6 +363,7 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 	{
 		ExperienceLevelStore::onObjectCreated(obj);
 		RetailCreationUpgrades::onObjectCreated(obj);
+		CreateAHeroSystem::applyToHero(obj);
 	}
 
 	return obj;

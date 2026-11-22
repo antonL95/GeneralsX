@@ -64,6 +64,7 @@
 #include "Common/RetailFileLayers.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailWorldUI.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/HeroRoster.h"
 #include "Common/ProductionPrerequisite.h"
 #include "Common/Radar.h"
@@ -4035,6 +4036,7 @@ void Player::crc( Xfer *xfer )
 	if (RetailFileLayers::enabled())
 	{
 		HeroRoster::xferPlayer(this, xfer);
+		CreateAHeroSystem::xferPlayer(this, xfer);
 		xferPowerProductionBonuses(xfer);
 	}
 
@@ -4057,7 +4059,7 @@ void Player::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 10 : 8;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 11 : 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4608,6 +4610,10 @@ void Player::xfer( Xfer *xfer )
 		HeroRoster::reset(m_playerIndex);
 	if (version >= 10)
 		xferPowerProductionBonuses(xfer);
+	if (version >= 11)
+		CreateAHeroSystem::xferPlayer(this, xfer);
+	else if (RetailFileLayers::enabled() && xfer->getXferMode() == XFER_LOAD)
+		CreateAHeroSystem::resetPlayer(m_playerIndex);
 
 }
 

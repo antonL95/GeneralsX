@@ -190,6 +190,7 @@ void runRetailPackage15TestCommand(std::string_view action, Object* source, Unsi
 void runRetailPackage13TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
 void runRetailPackage16TestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 void runRetailPackage19TestCommand(std::string_view action, Object* source, UnsignedInt frame);
+void runRetailPackage18TestCommand(std::string_view action, Player* player, Object* source, const char* argument, UnsignedInt frame);
 
 void runRetailPackage08TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D* position, UnsignedInt frame);
 void runRetailPackage11TestCommand(std::string_view action, Object* source, Object* target, const char* name, const Coord3D& inputs, UnsignedInt frame);
@@ -269,11 +270,11 @@ void load()
 		char action[32] = {};
 		char player[64] = {};
 		char target[128] = {};
-		char structure[128] = {};
+		char structure[384] = {};
 		float x = 0.0f;
 		float y = 0.0f;
 		float angle = 0.0f;
-		const int fields = std::sscanf(line, "%u %31s %63s %127s %d %127s %f %f %f", &command.frame, action, player, target,
+		const int fields = std::sscanf(line, "%u %31s %63s %127s %d %383s %f %f %f", &command.frame, action, player, target,
 			&command.ordinal, structure, &x, &y, &angle);
 		if (fields < 5 || (std::string_view(action) == "place" && fields != 6 && fields < 8))
 			continue;
@@ -2793,6 +2794,11 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action.starts_with("pkg19-"))
 	{
 		runRetailPackage19TestCommand(command.action, obj, frame);
+		return;
+	}
+	if (command.action.starts_with("pkg18-"))
+	{
+		runRetailPackage18TestCommand(command.action, findPlayer(command.player), obj, command.structure.c_str(), frame);
 		return;
 	}
 	if (command.action.starts_with("pkg09-"))

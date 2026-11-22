@@ -85,6 +85,7 @@ void GameSlot::reset()
 	m_origPlayerTemplate = -1;
 	m_origStartPos = -1;
 	m_origColor = -1;
+	m_createAHeroConfig.clear();
 }
 
 void GameSlot::saveOriginalSetup()
@@ -1024,6 +1025,16 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 			options.format("RF=%d;RR=%d;RH=%d;", rules.commandPointFactor, Int(rules.ringHeroes), Int(rules.customHeroes));
 			optionsString.concat(options);
 		}
+		for (Int i = 0; i < MAX_SLOTS; ++i)
+		{
+			const GameSlot *slot = game.getConstSlot(i);
+			if (slot && !slot->getCreateAHeroConfig().isEmpty())
+			{
+				AsciiString heroOpt;
+				heroOpt.format("CH%d=%s;", i, slot->getCreateAHeroConfig().str());
+				optionsString.concat(heroOpt);
+			}
+		}
 	}
 
 	//add player info for each slot
@@ -1201,6 +1212,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 	Int useStats = TRUE;
   Money startingCash = TheGlobalData->m_defaultStartingCash;
 	RetailSkirmishRules retailRules;
+	AsciiString createAHeroConfigs[MAX_SLOTS];
   UnsignedShort restriction = 0; // Always the default
 
 	Bool sawMap = FALSE;
@@ -1347,6 +1359,13 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 			retailRules.ringHeroes = val == "1";
 		else if (RetailFileLayers::enabled() && key == "RH")
 			retailRules.customHeroes = val == "1";
+		else if (RetailFileLayers::enabled() && key.getLength() == 3 &&
+			key.str()[0] == 'C' && key.str()[1] == 'H' &&
+			key.str()[2] >= '0' && key.str()[2] < '0' + MAX_SLOTS)
+		{
+			const Int heroSlot = key.str()[2] - '0';
+			createAHeroConfigs[heroSlot] = val;
+		}
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
 			sawSlotlist = true;
@@ -1738,7 +1757,11 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		//DEBUG_LOG(("ParseAsciiStringToGameInfo - game options all good, setting info"));
 
 		for(Int i = 0; i<MAX_SLOTS; i++)
+		{
+			if (!createAHeroConfigs[i].isEmpty())
+				newSlot[i].setCreateAHeroConfig(createAHeroConfigs[i]);
 			game->setSlot(i,newSlot[i]);
+		}
 
 		game->setMap(mapName);
 		game->setMapCRC(mapCRC);
@@ -1799,7 +1822,7 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 #if RTS_GENERALS
 	const XferVersion currentVersion = 2;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 5 : 4;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 4;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -1906,6 +1929,41 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 	}
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_retailSkirmishRules = {};
+
+	if (version >= 6)
+	{
+		for (Int i = 0; i < MAX_SLOTS; ++i)
+		{
+			if (xfer->getXferMode() == XFER_LOAD)
+			{
+				UnsignedInt len = 0;
+				xfer->xferUnsignedInt(&len);
+				if (len > 0 && len <= 4096)
+				{
+					std::string buf(len, '\0');
+					xfer->xferUser(buf.data(), static_cast<Int>(len));
+					m_skirmishSlot[i].setCreateAHeroConfig(AsciiString(buf.c_str()));
+				}
+				else
+				{
+					m_skirmishSlot[i].setCreateAHeroConfig(AsciiString::TheEmptyString);
+				}
+			}
+			else
+			{
+				const AsciiString& cfg = m_skirmishSlot[i].getCreateAHeroConfig();
+				UnsignedInt len = static_cast<UnsignedInt>(cfg.getLength());
+				xfer->xferUnsignedInt(&len);
+				if (len > 0)
+					xfer->xferUser(const_cast<char*>(cfg.str()), static_cast<Int>(len));
+			}
+		}
+	}
+	else if (xfer->getXferMode() == XFER_LOAD)
+	{
+		for (Int i = 0; i < MAX_SLOTS; ++i)
+			m_skirmishSlot[i].setCreateAHeroConfig(AsciiString::TheEmptyString);
+	}
 
 }
 

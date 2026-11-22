@@ -126,6 +126,8 @@ public:
 
 	void mute( Bool isMuted ) { m_isMuted = isMuted; }
 	Bool isMuted() const { return m_isMuted; }
+	void setCreateAHeroConfig( const AsciiString& config ) { m_createAHeroConfig = config; }
+	const AsciiString& getCreateAHeroConfig() const { return m_createAHeroConfig; }
 protected:
 	SlotState m_state;
 	Bool m_isAccepted;
@@ -145,6 +147,7 @@ protected:
 	FirewallHelperClass::FirewallBehaviorType m_NATBehavior;	///< The NAT behavior for this slot's player.
 	UnsignedInt m_lastFrameInGame;	// only valid for human players
 	Bool m_disconnected;						// only valid for human players
+	AsciiString m_createAHeroConfig;
 };
 
 /**
