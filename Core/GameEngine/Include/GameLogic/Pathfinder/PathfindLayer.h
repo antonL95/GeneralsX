@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <vector>
+
 class Bridge;
 class LocomotorSet;
 class PathfindCell;
@@ -36,9 +38,10 @@ public:
 	void reset();
 	Bool init(Bridge *theBridge, PathfindLayerEnum layer);
 	void allocateCells(const IRegion2D *extent);
-	void allocateCellsForWallLayer(const IRegion2D *extent, ObjectID *wallPieces, Int numPieces);
+	void allocateCellsForWallLayer(const IRegion2D *extent, const ObjectID *wallPieces, Int numPieces);
+	void rebuildWallCells(const IRegion2D &extent, const std::vector<ObjectID>& wallPieces);
 	void classifyCells();
-	void classifyWallCells(ObjectID *wallPieces, Int numPieces);
+	void classifyWallCells(const ObjectID *wallPieces, Int numPieces);
 	Bool setDestroyed(Bool destroyed);
 	Bool isUnused(); // True if it doesn't contain a bridge.
 	Bool isDestroyed() {return m_destroyed;} // True if it has been destroyed.
@@ -51,14 +54,14 @@ public:
 
 	ObjectID getBridgeID();
 	Bool connectsZones(PathfindZoneManager *zm, const LocomotorSet& locomotorSet,Int zone1, Int zone2);
-	Bool isPointOnWall(ObjectID *wallPieces, Int numPieces, const Coord3D *pt);
+	Bool isPointOnWall(const ObjectID *wallPieces, Int numPieces, const Coord3D *pt);
 
 #if defined(RTS_DEBUG)
 	void doDebugIcons() ;
 #endif
 protected:
 	void classifyLayerMapCell( Int i, Int j , PathfindCell *cell, Bridge *theBridge);
-	void classifyWallMapCell( Int i, Int j, PathfindCell *cell , ObjectID *wallPieces, Int numPieces);
+	void classifyWallMapCell( Int i, Int j, PathfindCell *cell, const ObjectID *wallPieces, Int numPieces);
 
 private:
 	PathfindCell *m_blockOfMapCells;		///< Pathfinding map - contains iconic representation of the map

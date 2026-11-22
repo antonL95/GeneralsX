@@ -5346,7 +5346,8 @@ void Object::onCapture( Player *oldOwner, Player *newOwner )
 void Object::onDie( DamageInfo *damageInfo )
 {
 	if (RetailFileLayers::enabled() &&
-		(isKindOf(KINDOF_WALL_SEGMENT) || isKindOf(KINDOF_WALL_GATE) || isKindOf(KINDOF_WALL_HUB) || isKindOf(KINDOF_DEFENSIVE_WALL)))
+		(isKindOf(KINDOF_WALL_SEGMENT) || isKindOf(KINDOF_WALL_GATE) || isKindOf(KINDOF_WALL_HUB) ||
+		 isKindOf(KINDOF_DEFENSIVE_WALL) || isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
 	{
 		TheAI->pathfinder()->removeObjectFromPathfindMap(this);
 		setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_COLLISIONS));

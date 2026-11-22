@@ -35,6 +35,7 @@
 #include "Common/Player.h"
 #include "Common/CRCDebug.h"
 #include "Common/GlobalData.h"
+#include "Common/GameState.h"
 #include "Common/LatchRestore.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
@@ -217,6 +218,7 @@ void Pathfinder::reset()
 	m_queuePRTail = 0;
 
 	m_numWallPieces = 0;
+	m_retailWallPieces.clear();
 	for (i=0; i<MAX_WALL_PIECES; ++i)
 	{
 		m_wallPieces[i] = INVALID_ID;
@@ -244,8 +246,31 @@ void Pathfinder::reset()
 /**
  * Adds a piece of a wall.
  */
+static Bool isRetailWalkableWall(const Object* object)
+{
+	return object->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL) && !object->isDestroyed() &&
+		!object->isEffectivelyDead() && !object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
+}
+
+void Pathfinder::refreshRetailWallLayer()
+{
+	if (m_isMapReady && !(TheGameState && TheGameState->isInLoadGame()))
+		m_layers[LAYER_WALL].rebuildWallCells(m_extent, m_retailWallPieces);
+}
+
 void Pathfinder::addWallPiece(Object *wallPiece)
 {
+	if (RetailFileLayers::enabled())
+	{
+		if (!isRetailWalkableWall(wallPiece))
+			return;
+		const ObjectID id = wallPiece->getID();
+		const auto pos = std::lower_bound(m_retailWallPieces.begin(), m_retailWallPieces.end(), id);
+		if (pos == m_retailWallPieces.end() || *pos != id)
+			m_retailWallPieces.insert(pos, id);
+		refreshRetailWallLayer();
+		return;
+	}
 	if (m_numWallPieces<MAX_WALL_PIECES-1) {
 		m_wallPieces[m_numWallPieces] = wallPiece->getID();
 		m_numWallPieces++;
@@ -261,6 +286,18 @@ void Pathfinder::removeWallPiece(Object *wallPiece)
 	// sanity
   if( wallPiece == nullptr )
 		return;
+
+	if (RetailFileLayers::enabled())
+	{
+		const ObjectID id = wallPiece->getID();
+		const auto pos = std::lower_bound(m_retailWallPieces.begin(), m_retailWallPieces.end(), id);
+		if (pos != m_retailWallPieces.end() && *pos == id)
+		{
+			m_retailWallPieces.erase(pos);
+			refreshRetailWallLayer();
+		}
+		return;
+	}
 
 	// find entry
 	for( Int i = 0; i < m_numWallPieces; ++i )
@@ -290,7 +327,7 @@ void Pathfinder::removeWallPiece(Object *wallPiece)
  */
 Bool Pathfinder::isPointOnWall(const Coord3D *pos)
 {
-	if (m_numWallPieces==0) return false;
+	if (RetailFileLayers::enabled() ? m_retailWallPieces.empty() : m_numWallPieces == 0) return false;
 	if (m_layers[LAYER_WALL].isUnused()) return false;
 	PathfindLayerEnum layer = (PathfindLayerEnum)LAYER_WALL;
 	PathfindCell *cell = getCell(layer, pos);
@@ -463,9 +500,17 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 		if (castle && castle->isUnpacked())
 			return;
 	}
+	if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+	{
+		if (insert)
+			addWallPiece(obj);
+		else if (obj->isDestroyed() || obj->isEffectivelyDead())
+			removeWallPiece(obj);
+	}
 	if (insert && RetailFileLayers::enabled() && obj->isEffectivelyDead() &&
 		(obj->isKindOf(KINDOF_WALL_SEGMENT) || obj->isKindOf(KINDOF_WALL_GATE) ||
-		 obj->isKindOf(KINDOF_WALL_HUB) || obj->isKindOf(KINDOF_DEFENSIVE_WALL)))
+		 obj->isKindOf(KINDOF_WALL_HUB) || obj->isKindOf(KINDOF_DEFENSIVE_WALL) ||
+		 obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
 		return;
 	if (obj->isKindOf(KINDOF_MINE)) {
 		return;  // don't pathfind around mines.
@@ -500,10 +545,14 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 
 		removeUnitFromPathfindMap(obj);
 		if (obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)) {
-			if (!m_layers[LAYER_WALL].isUnused()) {
+			const Bool retail = RetailFileLayers::enabled();
+			const Bool checkFalling = retail
+				? (obj->isDestroyed() || obj->isEffectivelyDead()) && !(TheGameState && TheGameState->isInLoadGame())
+				: !m_layers[LAYER_WALL].isUnused();
+			if (checkFalling) {
 				Int i;
 				ObjectID curID = obj->getID();
-				for (i=0; i<m_numWallPieces; i++) {
+				for (i=0; !retail && i<m_numWallPieces; i++) {
 					if (curID == m_wallPieces[i]) {
 						m_wallPieces[i]=INVALID_ID;
 					}
@@ -512,7 +561,8 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 				Object *obj;
 				for (obj = TheGameLogic->getFirstObject(); obj; obj=obj->getNextObject()) {
 					if (obj->getLayer() == LAYER_WALL) {
-						if (m_layers[LAYER_WALL].isPointOnWall(&curID, 1, obj->getPosition()))
+						if (m_layers[LAYER_WALL].isPointOnWall(&curID, 1, obj->getPosition()) &&
+							(!retail || !isPointOnWall(obj->getPosition())))
 						{
 							// The object fell off the wall.
 							// Destroy it.
@@ -526,7 +576,8 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 					}
 				}
 				// recalc the wall.
-				m_layers[LAYER_WALL].classifyWallCells(m_wallPieces, m_numWallPieces);
+				if (!retail)
+					m_layers[LAYER_WALL].classifyWallCells(m_wallPieces, m_numWallPieces);
 			}
 		}
 	}
@@ -965,10 +1016,19 @@ void Pathfinder::newMap()
 				m_layers[i].allocateCells(&m_extent);
 			}
 		}
-		if (m_numWallPieces>0) {
+		if (!RetailFileLayers::enabled() && m_numWallPieces > 0) {
 			m_layers[LAYER_WALL].init(nullptr, LAYER_WALL);
 			m_layers[LAYER_WALL].allocateCellsForWallLayer(&m_extent, m_wallPieces, m_numWallPieces);
 		}
+	}
+	if (RetailFileLayers::enabled())
+	{
+		m_retailWallPieces.clear();
+		for (const Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+			if (isRetailWalkableWall(obj))
+				m_retailWallPieces.push_back(obj->getID());
+		std::sort(m_retailWallPieces.begin(), m_retailWallPieces.end());
+		m_layers[LAYER_WALL].rebuildWallCells(m_extent, m_retailWallPieces);
 	}
 	classifyMap();
 	// Add existing objects.
@@ -1055,7 +1115,7 @@ void Pathfinder::classifyMap()
 			m_layers[i].classifyCells();
 		}
 	}
-	if (!m_layers[LAYER_WALL].isUnused()) {
+	if (!RetailFileLayers::enabled() && !m_layers[LAYER_WALL].isUnused()) {
 		m_layers[LAYER_WALL].classifyWallCells(m_wallPieces, m_numWallPieces);
 	}
 	m_zoneManager.calculateZones(m_map, m_layers, m_extent);
@@ -7589,23 +7649,33 @@ void Pathfinder::crc( Xfer *xfer )
 	xfer->xferInt(&m_queuePRTail);
 	CRCDEBUG_LOG(("m_queuePRTail: %8.8X", ((XferCRC *)xfer)->getCRC()));
 
-	xfer->xferInt(&m_numWallPieces);
-	CRCDEBUG_LOG(("m_numWallPieces: %8.8X", ((XferCRC *)xfer)->getCRC()));
+	if (RetailFileLayers::enabled())
+	{
+		UnsignedInt count = static_cast<UnsignedInt>(m_retailWallPieces.size());
+		xfer->xferUnsignedInt(&count);
+		for (ObjectID id : m_retailWallPieces)
+			xfer->xferObjectID(&id);
+	}
+	else
+	{
+		xfer->xferInt(&m_numWallPieces);
+		CRCDEBUG_LOG(("m_numWallPieces: %8.8X", ((XferCRC *)xfer)->getCRC()));
 
 #if RETAIL_COMPATIBLE_CRC
 	// TheSuperHackers @fix The original code effectively accessed m_numWallPieces 128 times,
 	// because it used &m_wallPieces[MAX_WALL_PIECES] which is out-of-bounds and points to m_numWallPieces.
-	static_assert(sizeof(Int) == sizeof(ObjectID), "Type sizes must be equal for correct xfer");
+		static_assert(sizeof(Int) == sizeof(ObjectID), "Type sizes must be equal for correct xfer");
 
-	for (Int i = 0; i < MAX_WALL_PIECES; ++i)
-	{
-		xfer->xferInt(&m_numWallPieces);
-	}
+		for (Int i = 0; i < MAX_WALL_PIECES; ++i)
+		{
+			xfer->xferInt(&m_numWallPieces);
+		}
 #else
-	xfer->xferUser(m_wallPieces, sizeof(m_wallPieces));
+		xfer->xferUser(m_wallPieces, sizeof(m_wallPieces));
 #endif
 
-	CRCDEBUG_LOG(("m_wallPieces: %8.8X", ((XferCRC *)xfer)->getCRC()));
+		CRCDEBUG_LOG(("m_wallPieces: %8.8X", ((XferCRC *)xfer)->getCRC()));
+	}
 
 	xfer->xferReal(&m_wallHeight);
 	CRCDEBUG_LOG(("m_wallHeight: %8.8X", ((XferCRC *)xfer)->getCRC()));

@@ -97,6 +97,20 @@ void PathfindCell::reset()
 
 }
 
+void PathfindCell::takeWallReservations(PathfindCell& previous)
+{
+	if (previous.getPosUnit() == INVALID_ID && previous.getGoalUnit() == INVALID_ID &&
+		previous.getGoalAircraft() == INVALID_ID)
+		return;
+
+	m_info = previous.m_info;
+	previous.m_info = nullptr;
+	m_info->m_cell = this;
+	m_info->m_pathParent = nullptr;
+	m_flags = previous.m_flags;
+	m_aircraftGoal = previous.m_aircraftGoal;
+}
+
 /**
  * Reset the pathfinding values in the cell.
  */

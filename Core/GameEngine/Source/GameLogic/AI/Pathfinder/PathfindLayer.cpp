@@ -234,7 +234,7 @@ void PathfindLayer::allocateCells(const IRegion2D *extent)
 /**
  * Allocates the pathfind cells for the wall bridge layer.
  */
-void PathfindLayer::allocateCellsForWallLayer(const IRegion2D *extent, ObjectID *wallPieces, Int numPieces)
+void PathfindLayer::allocateCellsForWallLayer(const IRegion2D *extent, const ObjectID *wallPieces, Int numPieces)
 {
 	DEBUG_ASSERTCRASH(m_layer==LAYER_WALL, ("Wrong layer for wall."));
 	if (m_layer != LAYER_WALL) return;
@@ -254,6 +254,8 @@ void PathfindLayer::allocateCellsForWallLayer(const IRegion2D *extent, ObjectID 
 			bridgeBounds.uniteWith(objBounds);
 		}
 	}
+	if (first)
+		return;
 
 	Int maxX, maxY;
 	m_xOrigin = REAL_TO_INT_FLOOR((bridgeBounds.lo.x-PATHFIND_CELL_SIZE/100)/PATHFIND_CELL_SIZE);
@@ -283,6 +285,35 @@ void PathfindLayer::allocateCellsForWallLayer(const IRegion2D *extent, ObjectID 
 
 	for (i=0; i<m_width; i++) {
 		m_layerCells[i] = &m_blockOfMapCells[i*m_height];
+	}
+}
+
+void PathfindLayer::rebuildWallCells(const IRegion2D &extent, const std::vector<ObjectID>& wallPieces)
+{
+	PathfindLayer previous;
+	std::swap(previous.m_blockOfMapCells, m_blockOfMapCells);
+	std::swap(previous.m_layerCells, m_layerCells);
+	std::swap(previous.m_width, m_width);
+	std::swap(previous.m_height, m_height);
+	std::swap(previous.m_xOrigin, m_xOrigin);
+	std::swap(previous.m_yOrigin, m_yOrigin);
+	if (wallPieces.empty())
+		return;
+
+	init(nullptr, LAYER_WALL);
+	allocateCellsForWallLayer(&extent, wallPieces.data(), static_cast<Int>(wallPieces.size()));
+	classifyWallCells(wallPieces.data(), static_cast<Int>(wallPieces.size()));
+	applyZone();
+	for (Int x = 0; x < m_width; ++x)
+	{
+		for (Int y = 0; y < m_height; ++y)
+		{
+			const Int oldX = x + m_xOrigin - previous.m_xOrigin;
+			const Int oldY = y + m_yOrigin - previous.m_yOrigin;
+			if (oldX >= 0 && oldX < previous.m_width && oldY >= 0 && oldY < previous.m_height &&
+				m_layerCells[x][y].getType() != PathfindCell::CELL_IMPASSABLE)
+				m_layerCells[x][y].takeWallReservations(previous.m_layerCells[oldX][oldY]);
+		}
 	}
 }
 
@@ -375,7 +406,7 @@ void PathfindLayer::classifyCells()
 /**
  * Classifies the pathfind cells for the wall bridge layer.
  */
-void PathfindLayer::classifyWallCells(ObjectID *wallPieces, Int numPieces)
+void PathfindLayer::classifyWallCells(const ObjectID *wallPieces, Int numPieces)
 {
 	DEBUG_ASSERTCRASH(m_layer==LAYER_WALL, ("Wrong layer for wall."));
 	if (m_layer != LAYER_WALL) return;
@@ -597,7 +628,7 @@ void PathfindLayer::classifyLayerMapCell( Int i, Int j , PathfindCell *cell, Bri
 }
 
 
-Bool PathfindLayer::isPointOnWall(ObjectID *wallPieces, Int numPieces, const Coord3D *pt)
+Bool PathfindLayer::isPointOnWall(const ObjectID *wallPieces, Int numPieces, const Coord3D *pt)
 {
 	Int i;
 	for (i=0; i<numPieces; i++) {
@@ -629,7 +660,7 @@ Bool PathfindLayer::isPointOnWall(ObjectID *wallPieces, Int numPieces, const Coo
 /**
  * Classify the given map cell as clear, or not, etc.
  */
-void PathfindLayer::classifyWallMapCell( Int i, Int j , PathfindCell *cell, ObjectID *wallPieces, Int numPieces)
+void PathfindLayer::classifyWallMapCell( Int i, Int j, PathfindCell *cell, const ObjectID *wallPieces, Int numPieces)
 {
 	Coord3D topLeftCorner, bottomRightCorner;
 

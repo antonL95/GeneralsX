@@ -386,6 +386,8 @@ private:
 	PathfindLayer m_layers[LAYER_LAST+1];
 
 	ObjectID			m_wallPieces[MAX_WALL_PIECES];
+	std::vector<ObjectID> m_retailWallPieces;
+	void refreshRetailWallLayer();
 	Int						m_numWallPieces;
 	Real					m_wallHeight;
 
