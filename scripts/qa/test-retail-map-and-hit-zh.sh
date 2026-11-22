@@ -8,7 +8,7 @@ bfme2=${PKGS1_BFME2_DATA:-/game-install/bfme2}
 out=$(mktemp -d "$build/retail-map-and-hit.XXXXXX")
 printf '%s\n' "$out"
 
-export XDG_DATA_HOME="$out/data" XDG_CONFIG_HOME="$out/config"
+export XDG_DATA_HOME="$out/Library/Application Support" XDG_CONFIG_HOME="$out/config"
 export XDG_CACHE_HOME="$out/cache" XDG_RUNTIME_DIR="$out/runtime" SDL_AUDIO_DRIVER=dummy
 export LD_LIBRARY_PATH="$build/GeneralsMD:$(find "$build" -name '*.so*' -printf '%h\n' | sort -u | paste -sd :)"
 export GENERALSX_TEST_COMMANDS="$out/commands.txt"
@@ -72,6 +72,7 @@ for escape in outside parent relative-parent directory-link file-link missing; d
     fi
 done
 
+rm -f "$user_maps/MapCache.ini"
 cat > "$GENERALSX_TEST_COMMANDS" <<'COMMANDS'
 6 create Player_1 MordorGreatBeast 0 2958,470,0
 10 damage Player_1 MordorGreatBeast 0 120
@@ -95,6 +96,13 @@ for form in user rotwk-user aotr-user install relative filename; do
     expect "$form" '^TEST pkg50 frame=18 name=MordorGreatBeast present=1 .*hit=1100 '
     expect "$form" '^TEST pkg50 frame=50 name=MordorGreatBeast present=1 .*hit=0000 '
     expect "$form" '^TEST frame 51: quit'
+    if [ "$form" = user ] || [ "$form" = filename ]; then
+        if [ "$(grep -c '^MapCache ' "$user_maps/MapCache.ini")" -ne 1 ] ||
+           ! grep -Eq '^  Player_1_Start = X:2958\.11 Y:629\.25 Z:0\.00$' "$user_maps/MapCache.ini"; then
+            printf 'Missing Training Grounds entry or waypoint in %s/MapCache.ini after %s\n' "$user_maps" "$form" >&2
+            result=1
+        fi
+    fi
 done
 
 printf '%s\n' '5 xpcrc - - 0' '6 quit - - 0' > "$GENERALSX_TEST_COMMANDS"

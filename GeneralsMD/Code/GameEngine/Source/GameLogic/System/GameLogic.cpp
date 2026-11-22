@@ -2334,6 +2334,14 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	TheTacticalView->setPitchToDefault();
 	TheTacticalView->setZoomToDefault();
 
+	if (!loadingSaveGame && RetailFileLayers::enabled() && TheGlobalData->m_initialFile.isNotEmpty())
+	{
+		const Coord3D& position = TheTacticalView->getPosition();
+		fprintf(stderr, "[Retail camera] Startup waypoint=%s found=%d position=(%.3f, %.3f, %.3f) pitch=%.3f\n",
+			startingCamName.str(), way != nullptr, position.x, position.y, position.z, TheTacticalView->getPitch());
+		fflush(stderr);
+	}
+
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_STARTING_CAMERA_2);
 

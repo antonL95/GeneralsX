@@ -660,7 +660,9 @@ void MapCache::loadMapsFromMapCacheINI( const AsciiString &mapDir )
 Bool MapCache::loadMapsFromDisk( const AsciiString &mapDir, Bool isOfficial, Bool filterByAllowedMaps )
 {
 	prepareUnseenMaps(mapDir);
-	const auto scanRoot = RetailFileLayers::enabled() ? canonicalLocalPath(mapDir) : std::filesystem::path();
+	const Bool retail = RetailFileLayers::enabled();
+	const Bool localOnly = retail && mapDir != getMapDir();
+	const auto scanRoot = localOnly ? canonicalLocalPath(mapDir) : std::filesystem::path();
 
 	FilenameList filepathList;
 	FilenameListIter filepathIt;
@@ -670,7 +672,10 @@ Bool MapCache::loadMapsFromDisk( const AsciiString &mapDir, Bool isOfficial, Boo
 	AsciiString filenamepattern;
 	filenamepattern.format("*.%s", getMapExtension().str());
 
-	TheFileSystem->getFileListInDirectory(toplevelPattern, filenamepattern, filepathList, TRUE);
+	if (localOnly)
+		TheLocalFileSystem->getFileListInDirectory(AsciiString::TheEmptyString, toplevelPattern, filenamepattern, filepathList, TRUE);
+	else
+		TheFileSystem->getFileListInDirectory(toplevelPattern, filenamepattern, filepathList, TRUE);
 
 	filepathIt = filepathList.begin();
 
@@ -703,9 +708,9 @@ Bool MapCache::loadMapsFromDisk( const AsciiString &mapDir, Bool isOfficial, Boo
 		}
 
 		AsciiString fileName = *filepathIt;
-		if (RetailFileLayers::enabled())
+		if (retail)
 		{
-			if (mapDir == getMapDir())
+			if (!localOnly)
 			{
 				std::string spelling(fileName.str());
 				std::replace(spelling.begin(), spelling.end(), '\\', '/');
@@ -735,13 +740,14 @@ Bool MapCache::loadMapsFromDisk( const AsciiString &mapDir, Bool isOfficial, Boo
 }
 
 Bool MapCache::addMap(
-	const AsciiString &/*mapDir*/,
+	const AsciiString &mapDir,
 	const AsciiString &fname,
 	const AsciiString &lowerFname,
 	FileInfo &fileInfo,
 	Bool isOfficial,
 	Bool refresh)
 {
+	const Bool keepLocalPath = RetailFileLayers::enabled() && mapDir != getMapDir();
 	MapCache::iterator it = find(lowerFname);
 	if (!refresh && it != end())
 	{
@@ -778,6 +784,8 @@ Bool MapCache::addMap(
 			}
 
 			it->second.m_doesExist = TRUE;
+			if (keepLocalPath)
+				it->second.m_fileName = fname;
 
 //			DEBUG_LOG(("MapCache::addMap - found match for map %s", lowerFname.str()));
 			return FALSE;	// OK, it checks out.
@@ -801,7 +809,7 @@ Bool MapCache::addMap(
 
 	// The map is now loaded.  Pick out what we need.
 	MapMetaData md;
-	md.m_fileName = lowerFname;
+	md.m_fileName = keepLocalPath ? fname : lowerFname;
 	md.m_filesize = fileInfo.sizeLow;
 	md.m_isOfficial = isOfficial;
 	md.m_doesExist = TRUE;
