@@ -67,6 +67,7 @@ public:
 	Real m_harvestRange = 0.0f;
 	UnsignedInt m_harvestPreparation = 0;
 	UnsignedInt m_harvestAction = 0;
+	UnsignedInt m_specialContactPoints = 0;
 	static void addRetailHarvestFields(MultiIniFieldParse& p);
 
 	// !!!
@@ -186,6 +187,7 @@ public:
 
 // Supply truck stuff
 	virtual Int getNumberBoxes() const override { return m_numberBoxes; }
+	UnsignedInt getSpecialContactPoints() const { return getWorkerAIUpdateModuleData()->m_specialContactPoints; }
 	virtual Bool loseOneBox() override;
 	virtual Bool gainOneBox( Int remainingStock ) override;
 

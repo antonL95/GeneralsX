@@ -70,7 +70,7 @@ public:
 	AsciiString m_buildLoop;
 	AsciiString m_repairLoop;
 	AsciiString m_rebuildLoop;
-	UnsignedInt m_spawnTimer = 0;
+	Real m_spawnTimer = -1.0f;
 	Real m_rebuildTime = 0.0f;
 	Bool m_timerWithoutWorker = FALSE;
 	Bool m_rebuildWhenDead = FALSE;
@@ -93,6 +93,7 @@ public:
 	static Bool startRebuild(Object& structure);
 	static Bool canOrderRebuild(const Object* structure, const Player* owner);
 	static void onRubbleEntered(Object& structure);
+	static Object* spawnBuilder(Object& structure);
 	static UnsignedInt constructionRefund(const Object& structure, const Player& player);
 	ObjectID getSpan() const { return m_span; }
 	UnsignedInt getRebuildFrames() const;
@@ -104,6 +105,8 @@ public:
 private:
 	Bool canRebuildNow() const;
 	void xferRetailBlocks(Xfer* xfer, Bool present);
+	void playLoop(const AsciiString& name);
+	void stopLoop();
 
 	UnsignedInt m_startFrame = 0;
 	Bool m_running = FALSE;
@@ -113,6 +116,9 @@ private:
 	Bool m_waitingToRebuild = FALSE;
 	Bool m_keptAsRubble = FALSE;
 	UnsignedInt m_rebuildReadyFrame = 0;
+	ObjectID m_workerID = INVALID_ID;
+	Bool m_workerSpawned = FALSE;
+	UnsignedInt m_loopHandle = 0;
 };
 
 class WallUpgradeUpdateModuleData : public UpdateModuleData

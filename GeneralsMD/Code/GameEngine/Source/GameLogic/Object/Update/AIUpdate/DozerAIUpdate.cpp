@@ -56,6 +56,7 @@
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/WallHubBehavior.h"
+#include "GameLogic/Module/WorkerAIUpdate.h"
 #include "GameLogic/RetailBuildingEvents.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/TerrainVisual.h"
@@ -2009,7 +2010,8 @@ Object* DozerAIUpdate::placeConstruction(const ThingTemplate* what, const Coord3
 		releaseConstructionQueue();
 		if (usesRetailBuilder(this))
 			m_isRebuild = isRebuild;
-		newTask(DOZER_TASK_BUILD, obj);
+		if (!RetailFileLayers::enabled() || GettingBuiltBehavior::spawnBuilder(*obj) == nullptr)
+			newTask(DOZER_TASK_BUILD, obj);
 	}
 
 	return obj;
@@ -2179,10 +2181,18 @@ void DozerAIUpdate::privateResumeConstruction( Object *obj, CommandSourceType cm
 {
 	if (RetailFileLayers::enabled())
 	{
+		UnsignedInt mask = 0;
 		const auto* dozer = static_cast<const DozerAIUpdate*>(me->findUpdateModule(NAMEKEY("DozerAIUpdate")));
-		if (dozer && dozer->getDozerAIUpdateModuleData()->m_specialContactPoints)
+		if (dozer)
+			mask = static_cast<const DozerAIUpdateModuleData*>(dozer->getModuleData())->m_specialContactPoints;
+		if (mask == 0)
 		{
-			const UnsignedInt mask = dozer->getDozerAIUpdateModuleData()->m_specialContactPoints;
+			const auto* worker = static_cast<const WorkerAIUpdate*>(me->findUpdateModule(NAMEKEY("WorkerAIUpdate")));
+			if (worker)
+				mask = worker->getSpecialContactPoints();
+		}
+		if (mask)
+		{
 			FindPositionOptions options;
 			options.maxRadius = 20.0f;
 			options.maxZDelta = 10.0f;

@@ -5,6 +5,7 @@
 #include "Common/INIAudit.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/RetailWorldUI.h"
@@ -50,6 +51,7 @@ void WorkerAIUpdateModuleData::addRetailHarvestFields(MultiIniFieldParse& p)
 		{ "HarvestActivationRange", INI::parseReal, nullptr, offsetof(WorkerAIUpdateModuleData, m_harvestRange) },
 		{ "HarvestPreparationTime", INI::parseDurationUnsignedInt, nullptr, offsetof(WorkerAIUpdateModuleData, m_harvestPreparation) },
 		{ "HarvestActionTime", INI::parseDurationUnsignedInt, nullptr, offsetof(WorkerAIUpdateModuleData, m_harvestAction) },
+		{ "SpecialContactPoints", ThingTemplate::parseContactPointFlags, nullptr, offsetof(WorkerAIUpdateModuleData, m_specialContactPoints) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(fields);
