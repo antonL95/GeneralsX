@@ -1322,7 +1322,7 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 		case GUI_COMMAND_CLOSE_GATE:
 		case GUI_COMMAND_OPEN_GATE:
 		case GUI_COMMAND_TOGGLE_GATE:
-			return GateOpenAndCloseBehavior::find(obj) && !obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)
+			return GateOpenAndCloseBehavior::resolveForControl(obj) && !obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)
 				? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		case GUI_COMMAND_CASTLE_UNPACK:
 			return CastleBehavior::find(obj) && !obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)
@@ -1453,7 +1453,7 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 		case GUI_COMMAND_OPEN_GATE:
 		case GUI_COMMAND_TOGGLE_GATE:
 		{
-			if (!GateOpenAndCloseBehavior::find(obj))
+			if (!GateOpenAndCloseBehavior::resolveForControl(obj))
 				return CBC_COMMAND_NOT_USED;
 			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_GATE);
 			msg->appendObjectIDArgument(obj->getID());

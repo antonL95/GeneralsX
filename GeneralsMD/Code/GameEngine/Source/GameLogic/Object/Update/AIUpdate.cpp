@@ -1165,7 +1165,8 @@ UpdateSleepTime AIUpdateInterface::update()
 			const PathfindCell* cell = TheAI->pathfinder()->getCell(unit->getLayer(), unit->getPosition());
 			const Object* gate = cell && cell->getType() == PathfindCell::CELL_OBSTACLE
 				? TheGameLogic->findObjectByID(cell->getObstacleID()) : nullptr;
-			const Bool inPortal = gate && gate->findUpdateModule(NAMEKEY("FakePathfindPortalBehaviour")) &&
+			const Bool inPortal = gate && (gate->findUpdateModule(NAMEKEY("FakePathfindPortalBehaviour")) ||
+				gate->findUpdateModule(NAMEKEY("DynamicPortalBehaviour"))) &&
 				GateOpenAndCloseBehavior::canPass(gate, unit, FALSE);
 			if (m_fadedInPortal != inPortal)
 			{

@@ -907,7 +907,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			if (!RetailFileLayers::enabled() || msg->getArgumentCount() != 2)
 				break;
 			Object* source = findObjectByID(msg->getArgument(0)->objectID);
-			GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::find(source);
+			GateOpenAndCloseBehavior* gate = GateOpenAndCloseBehavior::resolveForControl(source);
 			if (!gate || source->getControllingPlayer() != getMessagePlayer(msg))
 				break;
 			const Int type = msg->getArgument(1)->integer;

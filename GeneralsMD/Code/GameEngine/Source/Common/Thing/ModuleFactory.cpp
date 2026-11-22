@@ -558,10 +558,12 @@ void ModuleFactory::init()
 		addModule( GiveUpgradeUpdate );
 		addModule( FoundationAIUpdate );
 		addModule( GateOpenAndCloseBehavior );
+		addModule( GateProxyBehavior );
 		addModule( AIGateUpdate );
 		addModule( WallHubBehavior );
 		addModule( GettingBuiltBehavior );
 		addModule( FakePathfindPortalBehaviour );
+		addModule( DynamicPortalBehaviour );
 		addModule( TerrainResourceBehavior );
 		addModule( PillageModule );
 		addModule( RefundDie );

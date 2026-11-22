@@ -6739,7 +6739,7 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::GATE_CLOSE:
 		{
 			Object* object = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
-			if (auto* gate = GateOpenAndCloseBehavior::find(object))
+			if (auto* gate = GateOpenAndCloseBehavior::resolveForControl(object))
 				gate->request(pAction->getActionType() == ScriptAction::GATE_OPEN);
 			return;
 		}
