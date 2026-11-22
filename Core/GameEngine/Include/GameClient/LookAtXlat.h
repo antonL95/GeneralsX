@@ -87,6 +87,7 @@ private:
 	void setScrolling( ScrollType scrollType );
 	void stopScrolling();
 	Bool canScrollAtScreenEdge() const;
+	ICoord2D getScreenEdgeScrollDirection() const;
 };
 
 extern LookAtTranslator *TheLookAtTranslator;

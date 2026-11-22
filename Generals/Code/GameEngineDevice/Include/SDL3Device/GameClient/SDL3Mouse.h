@@ -61,6 +61,7 @@ public:
 	virtual void setVisibility(Bool visible);
 	virtual void loseFocus();
 	virtual void regainFocus();
+	Bool getEdgeScrollPosition(ICoord2D& position) const override;
 
 	// SDL3-specific methods
 	// Fighter19 pattern: addSDLEvent() accepts raw SDL_Event directly

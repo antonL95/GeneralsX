@@ -328,6 +328,7 @@ public:
 	void onCursorMovedOutside(); ///< called when cursor has left game window
 	void onCursorMovedInside(); ///< called when cursor has entered game window
 	Bool isCursorInside() const; ///< true if the mouse is located inside the game window
+	virtual Bool getEdgeScrollPosition(ICoord2D& position) const;
 
 	void onResolutionChanged();
 	void onGameModeChanged(GameMode prev, GameMode next);

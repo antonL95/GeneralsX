@@ -133,6 +133,23 @@ Bool LookAtTranslator::canScrollAtScreenEdge() const
 	return true;
 }
 
+ICoord2D LookAtTranslator::getScreenEdgeScrollDirection() const
+{
+	ICoord2D position;
+	if (!canScrollAtScreenEdge() || !TheMouse->getEdgeScrollPosition(position))
+		return {0, 0};
+
+	const Int width = TheDisplay->getWidth();
+	const Int height = TheDisplay->getHeight();
+	if (position.x < 0 || position.x >= width || position.y < 0 || position.y >= height)
+		return {0, 0};
+
+	return {
+		(position.x >= width - edgeScrollSize) - (position.x < edgeScrollSize),
+		(position.y >= height - edgeScrollSize) - (position.y < edgeScrollSize)
+	};
+}
+
 //-----------------------------------------------------------------------------
 LookAtTranslator::LookAtTranslator() :
 	m_isScrolling(false),
@@ -233,6 +250,12 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				break;
 			}
 
+			if (m_scrollType == SCROLL_SCREENEDGE)
+			{
+				const ICoord2D direction = getScreenEdgeScrollDirection();
+				if (!direction.x && !direction.y)
+					stopScrolling();
+			}
 			if (TheInGameUI->isSelecting() || (m_isScrolling && m_scrollType != SCROLL_KEY))
 				break;
 
@@ -336,9 +359,6 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 
 			m_currentPos = msg->getArgument( 0 )->pixel;
 
-			UnsignedInt height = TheDisplay->getHeight();
-			UnsignedInt width  = TheDisplay->getWidth();
-
 			if (TheInGameUI->getInputEnabled() == FALSE) {
 				// We don't care how we're scrolling, just stop.
 				if (m_isScrolling)
@@ -346,22 +366,13 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				break;
 			}
 
-			if (canScrollAtScreenEdge())
+			if (!m_isScrolling || m_scrollType == SCROLL_SCREENEDGE)
 			{
-				if (m_isScrolling)
-				{
-					if ( m_scrollType == SCROLL_SCREENEDGE && (m_currentPos.x >= edgeScrollSize && m_currentPos.y >= edgeScrollSize && m_currentPos.y < height-edgeScrollSize && m_currentPos.x < width-edgeScrollSize) )
-					{
-						stopScrolling();
-					}
-				}
-				else
-				{
-					if ( m_currentPos.x < edgeScrollSize || m_currentPos.y < edgeScrollSize || m_currentPos.y >= height-edgeScrollSize || m_currentPos.x >= width-edgeScrollSize )
-					{
-						setScrolling(SCROLL_SCREENEDGE);
-					}
-				}
+				const ICoord2D direction = getScreenEdgeScrollDirection();
+				if (!m_isScrolling && (direction.x || direction.y))
+					setScrolling(SCROLL_SCREENEDGE);
+				else if (m_isScrolling && !direction.x && !direction.y)
+					stopScrolling();
 			}
 
 			// rotate the view
@@ -441,6 +452,9 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		case GameMessage::MSG_FRAME_TICK:
 		{
 			Coord2D offset = {0, 0};
+			const ICoord2D edgeDirection = m_scrollType == SCROLL_SCREENEDGE ? getScreenEdgeScrollDirection() : ICoord2D{0, 0};
+			if (m_scrollType == SCROLL_SCREENEDGE && !edgeDirection.x && !edgeDirection.y)
+				stopScrolling();
 
 			if (m_isScrolling && !TheInGameUI->isScrolling())
 			{
@@ -508,24 +522,8 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 					break;
 				case SCROLL_SCREENEDGE:
 					{
-						UnsignedInt height = TheDisplay->getHeight();
-						UnsignedInt width  = TheDisplay->getWidth();
-						if (m_currentPos.y < edgeScrollSize)
-						{
-							offset.y -= TheGlobalData->m_verticalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
-						}
-						if (m_currentPos.y >= height-edgeScrollSize)
-						{
-							offset.y += TheGlobalData->m_verticalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
-						}
-						if (m_currentPos.x < edgeScrollSize)
-						{
-							offset.x -= TheGlobalData->m_horizontalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
-						}
-						if (m_currentPos.x >= width-edgeScrollSize)
-						{
-							offset.x += TheGlobalData->m_horizontalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
-						}
+						offset.x = edgeDirection.x * TheGlobalData->m_horizontalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+						offset.y = edgeDirection.y * TheGlobalData->m_verticalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
 					}
 					break;
 				}

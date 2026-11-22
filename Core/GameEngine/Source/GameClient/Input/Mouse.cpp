@@ -1109,6 +1109,12 @@ Bool Mouse::isCursorInside() const
 	return (m_captureBlockReasonBits & (1 << CursorCaptureBlockReadon_CursorIsOutside)) == 0;
 }
 
+Bool Mouse::getEdgeScrollPosition(ICoord2D& position) const
+{
+	position = m_currMouse.pos;
+	return isCursorInside();
+}
+
 // ------------------------------------------------------------------------------------------------
 void Mouse::initCapture()
 {

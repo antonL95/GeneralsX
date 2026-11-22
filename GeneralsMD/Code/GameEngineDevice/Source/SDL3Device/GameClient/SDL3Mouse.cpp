@@ -950,6 +950,23 @@ void SDL3Mouse::scaleMouseCoordinates(float rawX, float rawY, Uint32 windowID, i
 	scaledY = point.y;
 }
 
+Bool SDL3Mouse::getEdgeScrollPosition(ICoord2D& position) const
+{
+	if (!m_Window || SDL_GetKeyboardFocus() != m_Window || SDL_GetMouseFocus() != m_Window)
+		return FALSE;
+
+	Int width, height;
+	if (!SDL_GetWindowSize(m_Window, &width, &height))
+		return FALSE;
+	float x, y;
+	SDL_GetMouseState(&x, &y);
+	if (!(x >= 0.0f && y >= 0.0f && x < width && y < height))
+		return FALSE;
+
+	scaleMouseCoordinates(x, y, SDL_GetWindowID(m_Window), position.x, position.y);
+	return TRUE;
+}
+
 /**
  * Add raw SDL_Event to mouse event buffer
  * Fighter19 pattern: unified method that accepts any SDL_Event
