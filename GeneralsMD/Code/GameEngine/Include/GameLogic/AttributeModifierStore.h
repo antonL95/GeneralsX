@@ -26,7 +26,7 @@ struct ModifierListTemplate
 	std::vector<AsciiString> m_upgradeNames;
 	UnsignedInt m_upgradeDelayFrames = 0;
 
-	void playFX(const Object* obj, Bool end) const;
+	void playFX(const Object* obj, Bool end, Bool buffsOnly = FALSE) const;
 };
 
 struct StanceTemplateData

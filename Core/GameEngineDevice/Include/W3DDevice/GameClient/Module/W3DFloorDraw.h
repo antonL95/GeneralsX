@@ -21,7 +21,7 @@ struct W3DFloorDrawModuleData : public ModuleData
 	RenderObjClass* createModel(W3DAssetManager& assets, Real scale, Weather weather) const;
 };
 
-class W3DFloorDraw final : public DrawModule
+class W3DFloorDraw : public DrawModule
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( W3DFloorDraw, "W3DFloorDraw" )
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( W3DFloorDraw, W3DFloorDrawModuleData )

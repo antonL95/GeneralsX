@@ -6,6 +6,7 @@
 #include <cstdio>
 
 #include "Common/GlobalData.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/SpecialPowerINI.h"
 #include "Common/ThingTemplate.h"
@@ -155,6 +156,8 @@ ApplyResult AttributeModifierHelper::apply( Int list, UnsignedInt durationFrames
 		added.push_back(list);
 	if (!added.empty() || !removed.empty())
 		changed(added, std::vector<Int>(removed.begin(), removed.end()));
+	if (result == REFRESHED && RetailFileLayers::enabled() && !TheGlobalData->m_headless)
+		TheAttributeModifierStore->get(list)->playFX(getObject(), FALSE, TRUE);
 	scheduleWake();
 	return result;
 }

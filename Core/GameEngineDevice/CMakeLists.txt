@@ -15,6 +15,7 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/GameClient/HeightMap.h
     Include/W3DDevice/GameClient/Module/W3DDebrisDraw.h
     Include/W3DDevice/GameClient/Module/W3DDefaultDraw.h
+    Include/W3DDevice/GameClient/Module/W3DBuffDraw.h
     Include/W3DDevice/GameClient/Module/W3DDependencyModelDraw.h
     Include/W3DDevice/GameClient/Module/W3DLaserDraw.h
     Include/W3DDevice/GameClient/Module/W3DModelDraw.h
@@ -110,6 +111,7 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/CameraShakeSystem.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DDebrisDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DDefaultDraw.cpp
+    Source/W3DDevice/GameClient/Drawable/Draw/W3DBuffDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DDependencyModelDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DLaserDraw.cpp
     Source/W3DDevice/GameClient/Drawable/Draw/W3DModelDraw.cpp

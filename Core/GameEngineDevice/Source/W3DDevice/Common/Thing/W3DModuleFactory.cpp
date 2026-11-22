@@ -31,6 +31,7 @@
 #include "W3DDevice/Common/W3DModuleFactory.h"
 #include "W3DDevice/GameClient/Module/W3DDebrisDraw.h"
 #include "W3DDevice/GameClient/Module/W3DDefaultDraw.h"
+#include "W3DDevice/GameClient/Module/W3DBuffDraw.h"
 #include "W3DDevice/GameClient/Module/W3DDependencyModelDraw.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "W3DDevice/GameClient/Module/W3DScriptedModelDraw.h"
@@ -97,6 +98,7 @@ void W3DModuleFactory::init()
 #endif
 	if (registersRotwkModules())
 	{
+		addModule( W3DBuffDraw );
 		addModule( W3DFloorDraw );
 		addModule( W3DLightDraw );
 		addModule( W3DQuadrupedDraw );

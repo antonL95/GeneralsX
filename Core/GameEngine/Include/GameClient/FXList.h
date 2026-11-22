@@ -84,6 +84,7 @@ public:
 	virtual void doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx = nullptr, const Real primarySpeed = 0.0f, const Coord3D *secondary = nullptr, const Real overrideRadius = 0.0f) const = 0;
 	virtual void doFXPosWithObjects(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
 		const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const;
+	virtual Bool isBuffNugget() const { return FALSE; }
 
 	/**
 		the object-based version... by default, just call the location-based implementation.
@@ -164,6 +165,7 @@ public:
 	}
 
 	static void doFXFromDrawable(const FXList* fx, const Drawable& drawable);
+	void refreshBuffs(const Object* primary) const { doFXObj(primary, nullptr, TRUE); }
 
 
 protected:
@@ -180,7 +182,7 @@ protected:
 		the object-based version... by default, just call the location-based implementation.
 		Note that primary and/or secondary can be null, so you must check for this.
 	*/
-	void doFXObj(const Object* primary, const Object* secondary = nullptr) const;
+	void doFXObj(const Object* primary, const Object* secondary, Bool buffsOnly = FALSE) const;
 
 private:
 	static void parseCullingInfo(INI* ini, void* instance, void*, const void*);

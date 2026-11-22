@@ -239,6 +239,7 @@ set(GAMEENGINE_SRC
 #    Include/GameClient/FontDesc.h
     Include/GameClient/FXList.h
     Include/GameClient/RetailFXDecals.h
+    Include/GameClient/RetailBuffVisuals.h
     Include/GameClient/FontSubstitution.h
     Include/GameClient/Gadget.h
     Include/GameClient/GadgetCheckBox.h

@@ -151,7 +151,7 @@ const FieldParse s_stanceTemplateFields[] =
 };
 }
 
-void ModifierListTemplate::playFX(const Object* obj, Bool end) const
+void ModifierListTemplate::playFX(const Object* obj, Bool end, Bool buffsOnly) const
 {
 	if (!obj || !TheFXListStore)
 		return;
@@ -161,7 +161,12 @@ void ModifierListTemplate::playFX(const Object* obj, Bool end) const
 		if (names[index].isEmpty())
 			continue;
 		if (const FXList* fx = TheFXListStore->findFXList(names[index].str()))
-			FXList::doFXObj(fx, obj);
+		{
+			if (buffsOnly)
+				fx->refreshBuffs(obj);
+			else
+				FXList::doFXObj(fx, obj);
+		}
 		if (!m_multiLevelFX)
 			break;
 	}

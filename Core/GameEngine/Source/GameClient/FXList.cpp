@@ -55,9 +55,11 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/RadiusDecal.h"
+#include "GameClient/RetailBuffVisuals.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailFXDecals.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "WWMath/wwmath.h"
 
 #include <optional>
@@ -914,6 +916,91 @@ private:
 };
 EMPTY_DTOR(DynamicDecalFXNugget)
 
+class BuffFXNugget : public FXNugget
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(BuffFXNugget, "BuffFXNugget")
+
+public:
+	Bool isBuffNugget() const override { return TRUE; }
+
+	void doFXPos(const Coord3D*, const Matrix3D*, Real, const Coord3D*, Real) const override {}
+
+	void doFXPosWithObjects(const Coord3D*, const Matrix3D*, Real, const Coord3D*, Real,
+		const Object* source, const Object* target) const override
+	{
+		doFXObj(target ? target : source, nullptr);
+	}
+
+	void doFXObj(const Object* primary, const Object*) const override
+	{
+		if (!primary || TheGlobalData->m_headless || m_complex)
+			return;
+		if (const HordeContain* horde = HordeContain::get(primary))
+		{
+			for (const Object* member : *horde->getContainedItemsList())
+				apply(*member);
+		}
+		else
+			apply(*primary);
+	}
+
+	static void parse(INI* ini, void* instance, void*, const void*)
+	{
+		static const FieldParse fields[] =
+		{
+			{ "BuffType", INI::parseAsciiString, nullptr, offsetof(BuffFXNugget, m_type) },
+			{ "BuffThingTemplate", INI::parseAsciiString, nullptr, offsetof(BuffFXNugget, m_default) },
+			{ "BuffInfantryTemplate", INI::parseAsciiString, nullptr, offsetof(BuffFXNugget, m_infantry) },
+			{ "BuffCavalryTemplate", INI::parseAsciiString, nullptr, offsetof(BuffFXNugget, m_cavalry) },
+			{ "BuffTrollTemplate", INI::parseAsciiString, nullptr, offsetof(BuffFXNugget, m_troll) },
+			{ "BuffOrcTemplate", INI::parseAsciiString, nullptr, offsetof(BuffFXNugget, m_orc) },
+			{ "BuffShipTemplate", INI::parseAsciiString, nullptr, offsetof(BuffFXNugget, m_ship) },
+			{ "BuffMonsterTemplate", INI::parseAsciiString, nullptr, offsetof(BuffFXNugget, m_monster) },
+			{ "BuffMumakilTemplate", INI::parseAsciiString, nullptr, offsetof(BuffFXNugget, m_mumakil) },
+			{ "BuffLifeTime", INI::parseDurationUnsignedInt, nullptr, offsetof(BuffFXNugget, m_duration) },
+			{ "IsComplexBuff", INI::parseBool, nullptr, offsetof(BuffFXNugget, m_complex) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		auto* nugget = newInstance(BuffFXNugget);
+		ini->initFromINI(nugget, fields);
+		nugget->m_type.toLower();
+		static_cast<FXList*>(instance)->addFXNugget(nugget);
+	}
+
+private:
+	void apply(const Object& owner) const
+	{
+		if (owner.isEffectivelyDead())
+			return;
+		const struct
+		{
+			KindOfType kind;
+			const AsciiString& art;
+		} choices[] =
+		{
+			{ KINDOF_MUMAKIL_BUFF_NUGGET, m_mumakil },
+			{ KINDOF_SHIP, m_ship },
+			{ KINDOF_TROLL, m_troll },
+			{ KINDOF_CAVALRY, m_cavalry },
+			{ KINDOF_ORC, m_orc },
+			{ KINDOF_MONSTER, m_monster },
+			{ KINDOF_INFANTRY, m_infantry }
+		};
+		for (const auto& choice : choices)
+			if (owner.isKindOf(choice.kind) && choice.art.isNotEmpty())
+			{
+				setRetailBuffVisual(owner, m_type, choice.art, m_duration);
+				return;
+			}
+		setRetailBuffVisual(owner, m_type, m_default, m_duration);
+	}
+
+	AsciiString m_type, m_default, m_infantry, m_cavalry, m_troll, m_orc, m_ship, m_monster, m_mumakil;
+	UnsignedInt m_duration = 0;
+	Bool m_complex = FALSE;
+};
+EMPTY_DTOR(BuffFXNugget)
+
 //-------------------------------------------------------------------------------------------------
 class TerrainScorchFXNugget : public FXNugget
 {
@@ -1583,7 +1670,7 @@ void FXList::doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real pr
 }
 
 //-------------------------------------------------------------------------------------------------
-void FXList::doFXObj(const Object* primary, const Object* secondary) const
+void FXList::doFXObj(const Object* primary, const Object* secondary, Bool buffsOnly) const
 {
 	const Int playerIndex = rts::getObservedOrLocalPlayer()->getPlayerIndex();
 
@@ -1598,14 +1685,15 @@ void FXList::doFXObj(const Object* primary, const Object* secondary) const
 		else if (primary->getShroudedStatus(playerIndex) > OBJECTSHROUD_PARTIAL_CLEAR)
 			return;
 	}
-	if (!allowRetailPlayback())
+	if (!buffsOnly && !allowRetailPlayback())
 		return;
 
 	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
 	{
 
 		// HERE THE PRIMARY IS THE GUY RECEIVING THE FX, AND SECONDARY MIGHT BE THE GUY DEALING IT
-		(*it)->doFXObj(primary, secondary);
+		if (!buffsOnly || (*it)->isBuffNugget())
+			(*it)->doFXObj(primary, secondary);
 	}
 }
 
@@ -1660,6 +1748,7 @@ const FXList *FXListStore::findFXList(const char* name) const
 		{ "TintDrawable", TintDrawableFXNugget::parse, nullptr, 0 },
 		{ "ParticleSysBone", ParticleSystemFXNugget::parseBone, nullptr, 0 },
 		{ "DynamicDecal", DynamicDecalFXNugget::parse, nullptr, 0 },
+		{ "BuffNugget", BuffFXNugget::parse, nullptr, 0 },
 		{ "PlayEvenIfShrouded", INI::parseBool, nullptr, offsetof(FXList, m_playEvenIfShrouded) },
 		{ "CullingInfo", FXList::parseCullingInfo, nullptr, 0 },
 		{ nullptr, nullptr, nullptr, 0 }

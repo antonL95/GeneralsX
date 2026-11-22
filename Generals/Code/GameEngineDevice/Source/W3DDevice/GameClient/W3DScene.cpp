@@ -49,6 +49,7 @@
 #include "GameClient/View.h"
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameClient/W3DScene.h"
+#include "W3DDevice/GameClient/Module/W3DBuffDraw.h"
 #include "W3DDevice/GameClient/W3DDynamicLight.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
 #include "W3DDevice/GameClient/W3DStatusCircle.h"
@@ -1165,6 +1166,11 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 	}
 #endif
 
+	const Bool renderBuffs = terrainObject && m_customPassMode == SCENE_PASS_DEFAULT &&
+		!ShaderClass::Is_Backface_Culling_Inverted() && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE;
+	if (renderBuffs)
+		W3DBuffDraw::render(rinfo, localPlayerIndex, TRUE);
+
 	// loop through all render objects in the list:
 	for (it.First(&RenderList); !it.Is_Done();)
 	{
@@ -1188,6 +1194,9 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 				renderOneObject(rinfo, robj, localPlayerIndex);
 		}
 	}
+
+	if (renderBuffs)
+		W3DBuffDraw::render(rinfo, localPlayerIndex, FALSE);
 
 	//Tell shadow manager to render shadows at the end of this frame
 	//Don't draw shadows if there is no terrain present.

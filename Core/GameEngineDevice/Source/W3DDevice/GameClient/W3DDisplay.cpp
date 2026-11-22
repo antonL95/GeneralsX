@@ -75,6 +75,7 @@ static void drawFramerateBar();
 #include "Common/DrawModule.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "W3DDevice/GameClient/Module/W3DFloorDraw.h"
+#include "W3DDevice/GameClient/Module/W3DBuffDraw.h"
 #include "W3DDevice/GameClient/Module/W3DTreeDraw.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
@@ -474,6 +475,7 @@ W3DDisplay::W3DDisplay()
 //=============================================================================
 W3DDisplay::~W3DDisplay()
 {
+	W3DBuffDraw::reset();
 #ifdef PROFILER_ENABLED
 	delete m_profilerFrameCapture;
 	m_profilerFrameCapture = nullptr;
@@ -1275,6 +1277,7 @@ void W3DDisplay::init()
 //=============================================================================
 void W3DDisplay::reset()
 {
+	W3DBuffDraw::reset();
 
 	Display::reset();
 
