@@ -1,0 +1,4 @@
+20 pkg43-difficulty Player_2 MordorPorter 0
+20 pkg43-template-price Player_1 MordorPorter 0
+120 pkg43-difficulty Player_2 MordorPorter 0
+120 pkg43-template-price Player_1 MordorPorter 0
