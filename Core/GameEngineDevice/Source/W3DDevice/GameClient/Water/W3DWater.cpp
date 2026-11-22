@@ -1460,7 +1460,10 @@ void WaterRenderObjClass::loadSetting( Setting *setting, TimeOfDay timeOfDay )
 void WaterRenderObjClass::updateRenderTargetTextures(CameraClass *cam)
 {
 	if (!TheTerrainRenderObject || !TheTerrainRenderObject->getMap())
+	{
+		m_retailReflectionSourceValid = false;
 		return;
+	}
 
 	if (m_waterType == WATER_TYPE_2_PVSHADER && getClippedWaterPlane(cam, nullptr))
 	{
@@ -1471,7 +1474,10 @@ void WaterRenderObjClass::updateRenderTargetTextures(CameraClass *cam)
 
 	// GeneralsX @feature fbraz3 08/10/2026 Water reflection toggle via INI/Options for translucent water
 	if (m_waterType != WATER_TYPE_0_TRANSLUCENT || !m_pReflectionTexture || !m_pReflectionZTexture || (TheGlobalData && !TheGlobalData->isWaterReflections()))
+	{
+		m_retailReflectionSourceValid = false;
 		return;
+	}
 
 	// A camera that has not moved looks at the same water from the same place, so a reflection one
 	// frame old lines up with it exactly and only what moved in it is a frame late.  Such a frame
@@ -1484,6 +1490,7 @@ void WaterRenderObjClass::updateRenderTargetTextures(CameraClass *cam)
 	}
 	m_reflectionReused = FALSE;
 	m_reflectionCameraTransform = cam->Get_Transform();
+	m_retailReflectionSourceValid = false;
 
 	// One mirror a frame, so the first water area in view decides the plane.  A map whose visible
 	// water sits at two different heights reflects the second one at the first one's level.  The
@@ -1642,6 +1649,8 @@ void WaterRenderObjClass::renderMirror(CameraClass *cam, Real level)
 	// Change the rendertarget back to the main backbuffer
 	DX8Wrapper::Set_Render_Target((IDirect3DSurface8 *)nullptr);
 	m_reflectionTextureValid = TRUE;
+	m_retailReflectionSourceValid = m_waterType == WATER_TYPE_0_TRANSLUCENT;
+	++m_reflectionRevision;
 }
 
 //-------------------------------------------------------------------------------------------------

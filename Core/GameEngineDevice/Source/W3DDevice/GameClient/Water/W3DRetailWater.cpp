@@ -1,4 +1,5 @@
 #include "W3DDevice/GameClient/W3DWater.h"
+#include "W3DRetailWaterReflection.h"
 
 #include "Common/GlobalData.h"
 #include "Common/RetailFileLayers.h"
@@ -139,8 +140,13 @@ class RetailStandingWater
 {
 public:
 	std::unique_ptr<RetailFX::NativePass> pass;
+	std::unique_ptr<RetailFX::NativePass> fullPass;
+	RetailFX::WaterReflectionImage reflection;
+	std::optional<unsigned> reflectionRevision;
+	bool reflectionReady = false;
 	std::map<std::array<std::string, 3>, std::optional<WaterMaterial>> materials;
 	bool drew = false;
+	bool drewFull = false;
 	bool failed = false;
 };
 
@@ -156,13 +162,16 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 	{
 		m_retailStandingWater = std::make_shared<RetailStandingWater>();
 		if (const auto effect = RetailFX::loadEffectFile("shaders/compiled/watershader.fxo"))
+		{
 			m_retailStandingWater->pass = RetailFX::NativePass::makeWater(device, *effect, DX8Wrapper::Create_Effect_Shader9);
-		if (!m_retailStandingWater->pass)
-			std::fprintf(stderr, "[RetailFX] Could not load WaterShader BumpSpecular_M\n");
+			m_retailStandingWater->fullPass = RetailFX::NativePass::makeFullWater(device, *effect, DX8Wrapper::Create_Effect_Shader9);
+		}
+		if (!m_retailStandingWater->pass && !m_retailStandingWater->fullPass)
+			std::fprintf(stderr, "[RetailFX] Could not load WaterShader passes\n");
 	}
 
 	auto &runtime = *m_retailStandingWater;
-	if (!runtime.pass)
+	if (!runtime.pass && !runtime.fullPass)
 		return false;
 	const auto &settings = *polygon.getStandingWater();
 	auto [entry, inserted] = runtime.materials.try_emplace(
@@ -176,6 +185,19 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 	if (!entry->second)
 		return false;
 	auto &water = *entry->second;
+	void *reflection = nullptr;
+	if (runtime.fullPass && water.material.technique == 1 && m_retailReflectionSourceValid &&
+		m_reflectionLevel == static_cast<Real>(polygon.getPoint(0)->z) && TheGlobalData && TheGlobalData->isWaterReflections())
+	{
+		if (runtime.reflectionRevision != m_reflectionRevision)
+		{
+			runtime.reflectionRevision = m_reflectionRevision;
+			runtime.reflectionReady = runtime.reflection.prepare(device, RetailFX::nativeTexture(m_pReflectionTexture),
+				{m_reflectionAreaMin.X, m_reflectionAreaMin.Y, m_reflectionAreaMax.X, m_reflectionAreaMax.Y});
+		}
+		if (runtime.reflectionReady)
+			reflection = runtime.reflection.texture();
+	}
 
 	auto *shroud = TheTerrainRenderObject->getShroud();
 	if (!shroud || !shroud->getShroudTexture() || shroud->getTextureWidth() <= 0 || shroud->getTextureHeight() <= 0 ||
@@ -260,6 +282,8 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 			return RetailFX::nativeTexture(water.bump.get());
 		if (name == "WaterEnvTexture")
 			return RetailFX::nativeTexture(water.environment.get());
+		if (name == "WaterReflectionTexture")
+			return reflection;
 		if (name == "WaveTexture")
 			return RetailFX::nativeTexture(water.wave.get());
 		if (name == "ShroudTexture")
@@ -271,12 +295,19 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 	std::vector<uint16_t> indices;
 	if (!makeGeometry(polygon, vertices, indices))
 		return false;
-	const bool drawn = runtime.pass->drawWater(device, vertices, indices, setBinding, getTexture, settings.additive);
-	if (drawn && !runtime.drew)
+	const bool full = reflection && runtime.fullPass->drawWater(device, vertices, indices, setBinding, getTexture, settings.additive);
+	const bool drawn = full || (runtime.pass && runtime.pass->drawWater(device, vertices, indices, setBinding, getTexture, settings.additive));
+	auto &reported = full ? runtime.drewFull : runtime.drew;
+	if (drawn && !reported)
 	{
-		std::fprintf(stderr, "[RetailFX] Drew WaterShader BumpSpecular_M (%s)\n", settings.fxShader.str());
+		std::fprintf(stderr, "[RetailFX] Drew WaterShader %s (%s)\n",
+			full ? "BumpSpecular" : "BumpSpecular_M", settings.fxShader.str());
 		if (std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS"))
 		{
+			std::fprintf(stderr, "[RetailFX] Water reflection technique=%u type=%d source=%d enabled=%d plane=%g area=%d prepared=%d available=%d\n",
+				static_cast<unsigned>(water.material.technique), static_cast<int>(m_waterType), m_retailReflectionSourceValid,
+				TheGlobalData && TheGlobalData->isWaterReflections(), m_reflectionLevel, polygon.getPoint(0)->z,
+				runtime.reflectionReady, static_cast<bool>(runtime.fullPass));
 			const auto color = water.material.get<W3dFx::Float4>("MaterialColorDiffuse", {0.15f, 0.3f, 0.35f, 0.5f});
 			const auto &light = TheGlobalData->m_terrainLightPos[0];
 			std::fprintf(stderr,
@@ -287,11 +318,11 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 				static_cast<unsigned>(m_settings[m_tod].waterDiffuse), maxDepth, authoredAlpha,
 				TheGlobalData->m_showSoftWaterEdge && maxDepth > 0.0f, light.x, light.y, light.z);
 		}
-		runtime.drew = true;
+		reported = true;
 	}
 	if (!drawn && !runtime.failed)
 	{
-		std::fprintf(stderr, "[RetailFX] Could not bind or draw WaterShader BumpSpecular_M\n");
+		std::fprintf(stderr, "[RetailFX] Could not bind or draw WaterShader\n");
 		runtime.failed = true;
 	}
 	return drawn;

@@ -97,6 +97,11 @@ std::unique_ptr<NativePass> NativePass::makeWater(void *handle, const Effect &ef
 	return make(handle, effect, createShader, Kind::Water);
 }
 
+std::unique_ptr<NativePass> NativePass::makeFullWater(void *handle, const Effect &effect, CreateShader createShader)
+{
+	return make(handle, effect, createShader, Kind::FullWater);
+}
+
 std::unique_ptr<NativePass> NativePass::makeTerrain(void *handle, const Effect &effect, CreateShader createShader)
 {
 	return make(handle, effect, createShader, Kind::Terrain);
@@ -124,7 +129,9 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 	const bool model = kind == Kind::NormalMapped;
 	const bool defaultMesh = kind == Kind::DefaultMesh;
 	const bool vegetation = kind == Kind::Vegetation;
-	const std::string_view techniqueName = terrain || defaultMesh || vegetation ? "Default" : model ? "Default_M" : "BumpSpecular_M";
+	const bool fullWater = kind == Kind::FullWater;
+	const std::string_view techniqueName = terrain || defaultMesh || vegetation ? "Default" :
+		model ? "Default_M" : fullWater ? "BumpSpecular" : "BumpSpecular_M";
 	const char *effectName = terrain ? "Terrain" : model ? "NormalMapped" :
 		defaultMesh ? "DefaultW3D" : vegetation ? "Vegetation" : "WaterShader";
 	const auto technique = std::find_if(effect.techniques.begin(), effect.techniques.end(),
@@ -145,8 +152,9 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 			{
 				const std::string_view array = terrain && !vertex ? "PSDefault_Array" :
 					model ? (vertex ? "VS_M_Array" : "PS_M_Array") :
-					defaultMesh ? (vertex ? "VS_Array" : "PS_Array") : vegetation && !vertex ? "PS_Array" : "";
-				const unsigned variant = terrain ? 4 : vertex || vegetation ? 0 : defaultMesh ? 37 : 1;
+					defaultMesh ? (vertex ? "VS_Array" : "PS_Array") : vegetation && !vertex ? "PS_Array" :
+					fullWater && !vertex ? "PSBumpSpecular_Array" : "";
+				const unsigned variant = terrain ? 4 : vertex || vegetation || fullWater ? 0 : defaultMesh ? 37 : 1;
 				if (array.empty() || state.parameterReference != array)
 					return nullptr;
 				const auto parameter = std::find_if(effect.parameters.begin(), effect.parameters.end(),
@@ -390,6 +398,7 @@ bool NativePass::drawNormalMapped(void *handle, std::span<const NormalMappedVert
 struct NativePass::Data {};
 
 std::unique_ptr<NativePass> NativePass::makeWater(void *, const Effect &, CreateShader) { return nullptr; }
+std::unique_ptr<NativePass> NativePass::makeFullWater(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeTerrain(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeDefaultMesh(void *, const Effect &, CreateShader) { return nullptr; }

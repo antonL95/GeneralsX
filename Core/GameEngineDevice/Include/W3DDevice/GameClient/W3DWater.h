@@ -180,6 +180,8 @@ protected:
 	Bool m_reflectionReused;	///<the frame before this one kept the previous reflection texture
 	// GeneralsX @bugfix fbraz3 14/10/2026 Track whether reflection texture contains a rendered frame
 	Bool m_reflectionTextureValid;
+	bool m_retailReflectionSourceValid = false;
+	unsigned m_reflectionRevision = 0;
 	RenderObjClass	*m_skyBox;		///<box around level
 	WaterTracksRenderSystem *m_waterTrackSystem;	///<object responsible for rendering water wakes
 

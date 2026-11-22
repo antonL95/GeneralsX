@@ -54,6 +54,7 @@ public:
 
 	using CreateShader = void *(*)(bool, const uint32_t *);
 	static std::unique_ptr<NativePass> makeWater(void *device, const Effect &effect, CreateShader createShader);
+	static std::unique_ptr<NativePass> makeFullWater(void *device, const Effect &effect, CreateShader createShader);
 	static std::unique_ptr<NativePass> makeTerrain(void *device, const Effect &effect, CreateShader createShader);
 	static std::unique_ptr<NativePass> makeNormalMapped(void *device, const Effect &effect, CreateShader createShader);
 	static std::unique_ptr<NativePass> makeDefaultMesh(void *device, const Effect &effect, CreateShader createShader);
@@ -70,7 +71,7 @@ public:
 		const SetBinding &setBinding, const std::function<void *(std::string_view)> &getTexture);
 
 private:
-	enum class Kind { Water, Terrain, NormalMapped, DefaultMesh, Vegetation };
+	enum class Kind { Water, FullWater, Terrain, NormalMapped, DefaultMesh, Vegetation };
 	struct Data;
 	explicit NativePass(std::unique_ptr<Data> data);
 	static std::unique_ptr<NativePass> make(void *device, const Effect &effect, CreateShader createShader, Kind kind);
