@@ -347,10 +347,12 @@ void DumbProjectileBehavior::projectileLaunchAtObjectOrPosition(
 	Object* projectile = getObject();
 
 	if (!isSelfFlight())
-		Weapon::positionProjectileForLaunch(projectile, launcher, wslot, specificBarrelToUse);
+		Weapon::positionProjectileForLaunch(projectile, launcher, wslot, specificBarrelToUse, !isPassengerFlight());
+	if (isPassengerFlight())
+		projectile->setModelConditionState(MODELCONDITION_THROWN_PROJECTILE);
 
 	projectileFireAtObjectOrPosition( victim, victimPos, detWeap, exhaustSysOverride );
-	if (isSelfFlight())
+	if (isSelfFlight() || isPassengerFlight())
 		setWakeFrame(projectile, UPDATE_SLEEP_NONE);
 }
 
@@ -374,7 +376,10 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
 			TheTerrainLogic->getHighestLayerForDestination(&victimPosToUse));
 	}
 	else if (victim)
-		victim->getGeometryInfo().getCenterPosition(*victim->getPosition(), victimPosToUse);
+	{
+		if (!m_launchWeaponTmpl || !m_launchWeaponTmpl->getPreferredTargetPosition(victim, victimPosToUse))
+			victim->getGeometryInfo().getCenterPosition(*victim->getPosition(), victimPosToUse);
+	}
 	else
 		victimPosToUse = *victimPos;
 
@@ -418,9 +423,9 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
 	m_flightPathEnd = victimPosToUse;
 	if (!calcFlightPath(true))
 	{
-		if (isSelfFlight())
+		if (isSelfFlight() || isPassengerFlight())
 		{
-			clearSelfFlight();
+			clearFlight();
 			return;
 		}
 		//Can only fail if wildly incorrect points
@@ -579,14 +584,15 @@ Bool DumbProjectileBehavior::projectileGetImpactVelocity(Coord3D& velocity) cons
 
 void DumbProjectileBehavior::detonate(const Object* hit)
 {
-	if (isSelfFlight())
+	const Bool selfFlight = isSelfFlight();
+	if (selfFlight || (isPassengerFlight() && !killsPassengerOnImpact()))
 	{
 		Object* source = getObject();
 		if (m_detonationWeaponTmpl && !source->isEffectivelyDead())
 			TheWeaponStore->handleProjectileDetonation(m_detonationWeaponTmpl, source, source->getPosition(),
-				source->getWeaponBonusCondition(), TRUE,
-				m_detonationWeaponTmpl->hitsStoredTarget() ? m_victimID : INVALID_ID);
-		clearSelfFlight();
+				selfFlight ? source->getWeaponBonusCondition() : m_extraBonusFlags, TRUE,
+				!selfFlight && hit ? hit->getID() : (m_detonationWeaponTmpl->hitsStoredTarget() ? m_victimID : INVALID_ID));
+		clearFlight();
 		return;
 	}
 
@@ -646,8 +652,16 @@ Bool DumbProjectileBehavior::isSelfFlight() const
 	return RetailFileLayers::enabled() && m_launcherID != INVALID_ID && m_launcherID == getObject()->getID();
 }
 
-void DumbProjectileBehavior::clearSelfFlight()
+Bool DumbProjectileBehavior::isPassengerFlight() const
 {
+	return RetailFileLayers::enabled() && m_launcherID != INVALID_ID && !getObject()->isKindOf(KINDOF_PROJECTILE) &&
+		m_launchWeaponTmpl && m_launchWeaponTmpl->usesContainedProjectile();
+}
+
+void DumbProjectileBehavior::clearFlight()
+{
+	if (isPassengerFlight())
+		getObject()->clearModelConditionState(MODELCONDITION_THROWN_PROJECTILE);
 	m_launcherID = INVALID_ID;
 	m_victimID = INVALID_ID;
 	m_detonationWeaponTmpl = nullptr;
@@ -666,9 +680,9 @@ UpdateSleepTime DumbProjectileBehavior::update()
 {
 	if (RetailFileLayers::enabled() && !getObject()->isKindOf(KINDOF_PROJECTILE) && !hasLaunched())
 		return UPDATE_SLEEP_FOREVER;
-	if (isSelfFlight() && getObject()->isEffectivelyDead())
+	if ((isSelfFlight() || isPassengerFlight()) && getObject()->isEffectivelyDead())
 	{
-		clearSelfFlight();
+		clearFlight();
 		return UPDATE_SLEEP_FOREVER;
 	}
 
@@ -697,7 +711,8 @@ UpdateSleepTime DumbProjectileBehavior::update()
 		if (victim)
 		{
 			Coord3D newVictimPos;
-			victim->getGeometryInfo().getCenterPosition(*victim->getPosition(), newVictimPos);
+			if (!m_launchWeaponTmpl || !m_launchWeaponTmpl->getPreferredTargetPosition(victim, newVictimPos))
+				victim->getGeometryInfo().getCenterPosition(*victim->getPosition(), newVictimPos);
 			Coord3D delta;
 			delta.x = newVictimPos.x - m_flightPathEnd.x;
 			delta.y = newVictimPos.y - m_flightPathEnd.y;
@@ -840,6 +855,8 @@ void DumbProjectileBehavior::crc( Xfer *xfer )
 
 void DumbProjectileBehavior::crcSelfFlight(Xfer* xfer)
 {
+	if (isPassengerFlight())
+		xfer->xferObjectID(&m_launcherID);
 	AsciiString warhead = m_detonationWeaponTmpl ? m_detonationWeaponTmpl->getName() : AsciiString();
 	xfer->xferAsciiString(&warhead);
 	xfer->xferObjectID(&m_victimID);

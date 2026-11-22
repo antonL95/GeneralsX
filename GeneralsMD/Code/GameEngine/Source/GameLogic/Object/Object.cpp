@@ -4397,6 +4397,9 @@ void Object::crc( Xfer *xfer )
 			xfer->xferInt(&slot);
 			xfer->xferInt(&lock);
 		}
+		for (Int slot = 0; slot < WEAPONSLOT_COUNT; ++slot)
+			if (const Weapon* weapon = getWeaponInWeaponSlot(static_cast<WeaponSlotType>(slot)))
+				weapon->crcLinearTarget(xfer);
 		if (m_firingTracker)
 			m_firingTracker->crcRetailState(xfer);
 		if (m_slavedUpdate)
@@ -4462,7 +4465,7 @@ void Object::crc( Xfer *xfer )
 				const WeaponTemplate* launch = projectile->projectileGetLaunchWeapon();
 				AsciiString name = launch ? launch->getName() : AsciiString();
 				xfer->xferAsciiString(&name);
-				if (auto* flight = dynamic_cast<DumbProjectileBehavior*>(*module); flight && flight->isSelfFlight())
+				if (auto* flight = dynamic_cast<DumbProjectileBehavior*>(*module); flight && (flight->isSelfFlight() || flight->isPassengerFlight()))
 					flight->crcSelfFlight(xfer);
 			}
 		}

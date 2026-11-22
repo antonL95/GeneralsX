@@ -261,13 +261,25 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "LockWhenUsing", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_lockWhenUsing) },
 	{ "OverrideVoiceAttackSound", INI::parseAudioEventRTS, nullptr, offsetof(WeaponTemplate, m_overrideVoiceAttackSound) },
 	{ "OverrideVoiceEnterStateAttackSound", INI::parseAudioEventRTS, nullptr, offsetof(WeaponTemplate, m_overrideVoiceEnterStateAttackSound) },
-	{ "ProjectileFilterInContainer", SpecialPowerObjectFilter::parse, nullptr, offsetof(WeaponTemplate, m_projectileFilterInContainer) },
+	{ "ProjectileFilterInContainer", [](INI* ini, void* instance, void* store, const void* userData) {
+		static_cast<WeaponTemplate*>(instance)->m_hasProjectileFilterInContainer = TRUE;
+		SpecialPowerObjectFilter::parse(ini, instance, store, userData);
+	}, nullptr, offsetof(WeaponTemplate, m_projectileFilterInContainer) },
 	{ "MaxAttackPassengers", INI::parseInt, nullptr, offsetof(WeaponTemplate, m_maxAttackPassengers) },
 	{ "PassengerProportionalAttack", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_passengerProportionalAttack) },
 	{ "ShouldPlayUnderAttackEvaEvent", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_shouldPlayUnderAttackEvaEvent) },
 	{ "ProjectileSelf", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_projectileSelf) },
 	{ "RotatingTurret", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_rotatingTurret) },
 	{ "CanBeDodged", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canBeDodged) },
+	{ "CanSwoop", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canSwoop) },
+	{ "DisableScatterForTargetsOnWall", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_disableScatterForTargetsOnWall) },
+	{ "IgnoreLinearFirstTarget", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_ignoreLinearFirstTarget) },
+	{ "LinearTarget", WeaponTemplate::parseLinearTarget, nullptr, offsetof(WeaponTemplate, m_linearTargets) },
+	{ "PreferredTargetBone", INI::parseAsciiString, nullptr, offsetof(WeaponTemplate, m_preferredTargetBone) },
+	{ "RangeBonus", INI::parseReal, nullptr, offsetof(WeaponTemplate, m_rangeBonus) },
+	{ "RangeBonusMinHeight", INI::parseReal, nullptr, offsetof(WeaponTemplate, m_rangeBonusMinHeight) },
+	{ "RangeBonusPerFoot", INI::parseReal, nullptr, offsetof(WeaponTemplate, m_rangeBonusPerFoot) },
+	{ "ScatterIndependently", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_scatterIndependently) },
 	{ "DamageNugget", WeaponNugget::parseDamageNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DOTNugget", WeaponNugget::parseDOTNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "ProjectileNugget", WeaponNugget::parseProjectileNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
@@ -440,6 +452,14 @@ void WeaponTemplate::reset()
 	self->m_scatterTargets.push_back(target);
 }
 
+void WeaponTemplate::parseLinearTarget(INI* ini, void*, void* store, const void*)
+{
+	LinearTarget target{};
+	INI::parseCoord2D(ini, nullptr, &target.offset, nullptr);
+	target.delay = INI::scanInt(ini->getNextSubToken("T"));
+	static_cast<std::vector<LinearTarget>*>(store)->push_back(target);
+}
+
 //-------------------------------------------------------------------------------------------------
 static void parseRetailWeaponDelay(INI* ini, Int& minFrames, Int& maxFrames)
 {
@@ -579,20 +599,33 @@ void WeaponTemplate::postProcessLoad()
 }
 
 //-------------------------------------------------------------------------------------------------
-Real WeaponTemplate::getAttackRange(const WeaponBonus& bonus) const
+Real WeaponTemplate::getAttackRange(const WeaponBonus& bonus, Real heightAdvantage) const
 {
+	Real range = m_attackRange * bonus.getField(WeaponBonus::RANGE);
+	if (heightAdvantage >= m_rangeBonusMinHeight && (m_rangeBonus != 0.0f || m_rangeBonusPerFoot != 0.0f))
+		range += m_rangeBonus + (heightAdvantage - m_rangeBonusMinHeight) * m_rangeBonusPerFoot;
 #ifdef RATIONALIZE_ATTACK_RANGE
 	// Note - undersize by 1/4 of a pathfind cell, so that the goal is not teetering on the edge
 	// of firing range.  jba.
 	const Real UNDERSIZE = PATHFIND_CELL_SIZE_F*0.25f;
-	Real r = m_attackRange * bonus.getField(WeaponBonus::RANGE) - UNDERSIZE;
+	Real r = range - UNDERSIZE;
 	if (r < 0.0f) r = 0.0f;
 	return r;
 #else
 // fudge this a little to account for pathfinding roundoff & such
 	const Real ATTACK_RANGE_FUDGE = 1.05f;
-	return m_attackRange * bonus.getField(WeaponBonus::RANGE) * ATTACK_RANGE_FUDGE;
+	return range * ATTACK_RANGE_FUDGE;
 #endif
+}
+
+Bool WeaponTemplate::getPreferredTargetPosition(const Object* target, Coord3D& position) const
+{
+	Coord3D bone;
+	if (!target || m_preferredTargetBone.isEmpty() ||
+		!target->getSingleLogicalBonePosition(m_preferredTargetBone.str(), &bone, nullptr))
+		return FALSE;
+	position = bone;
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1037,7 +1070,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	//Only perform this check if the weapon isn't a leech range weapon (which can have unlimited range!)
 	if( !ignoreRanges && !isLeechRangeWeapon() )
 	{
-		Real attackRangeSqr = sqr(getAttackRange(bonus));
+		Real attackRangeSqr = sqr(getAttackRange(bonus, sourcePos->z - victimPos->z));
 		if (distSqr > attackRangeSqr)
 		{
 			//DEBUG_ASSERTCRASH(distSqr < 5*5 || distSqr < attackRangeSqr*1.2f, ("*** victim is out of range (%f vs %f) of this weapon -- why did we attempt to fire?",WWMath::SqrtfOrigin(distSqr),WWMath::SqrtfOrigin(attackRangeSqr)));
@@ -1192,57 +1225,26 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 			nuggetHit = FALSE;
 	}
 	Coord3D projectileDestination = *victimPos;
-	Real scatterRadius = 0.0f;
-	if( !nuggetHit && (m_scatterRadius > 0.0f || (m_infantryInaccuracyDist > 0.0f && victimObj && victimObj->isKindOf( KINDOF_INFANTRY ))) )
-	{
-		// This weapon scatters, so clear the victimObj, as we are no longer shooting it directly,
-		// and find a random point within the radius to shoot at as victimPos
-		scatterRadius = m_scatterRadius;
+	getPreferredTargetPosition(victimObj, projectileDestination);
+	const Bool infantryScatter = m_infantryInaccuracyDist > 0.0f && victimObj && victimObj->isKindOf(KINDOF_INFANTRY);
+	const Bool forceScatter = RetailFileLayers::enabled() && hasNuggets() && !isProjectileDetonation && infantryScatter &&
+		(!m_disableScatterForTargetsOnWall || victimObj->getLayer() != LAYER_WALL);
+	const Bool scatter = (!nuggetHit || forceScatter) && (m_scatterRadius > 0.0f || infantryScatter);
+	const Real scatterLimit = scatter ? m_scatterRadius + (infantryScatter ? m_infantryInaccuracyDist : 0.0f) : 0.0f;
+	if (scatter && victimObj && victimObj->isKindOf(KINDOF_STRUCTURE))
+		victimObj->getGeometryInfo().getCenterPosition(*victimObj->getPosition(), projectileDestination);
 
-		// if it's an object, aim at the center, not the ground part (srj)
-		PathfindLayerEnum targetLayer = LAYER_GROUND;
-		if( victimObj )
-		{
-			if( victimObj->isKindOf( KINDOF_STRUCTURE ) )
-			{
-				victimObj->getGeometryInfo().getCenterPosition(*victimObj->getPosition(), projectileDestination);
-			}
-			if( m_infantryInaccuracyDist > 0.0f && victimObj->isKindOf( KINDOF_INFANTRY ) )
-			{
-				//If we are firing a weapon that is considered inaccurate against infantry, then add it to
-				//the scatter radius!
-				scatterRadius += m_infantryInaccuracyDist;
-			}
-			targetLayer = victimObj->getLayer();
-		}
-
-		//victimObj = nullptr; // his position is already in victimPos, if he existed
-
-		//Randomize the scatter radius (sometimes it can be more accurate than others)
-		scatterRadius = GameLogicRandomValueReal( 0, scatterRadius );
-		Real scatterAngleRadian = GameLogicRandomValueReal( 0, 2*PI );
-
-		Coord3D firingOffset;
-		firingOffset.zero();
-		firingOffset.x = scatterRadius * Cos( scatterAngleRadian );
-		firingOffset.y = scatterRadius * Sin( scatterAngleRadian );
-
-		projectileDestination.x += firingOffset.x;
-		projectileDestination.y += firingOffset.y;
-
-		//What's suddenly become crucially important is to FIRE at the ground at this location!!!
-		//If we aim for the center point of our target and miss, the shot will go much farther than
-		//we expect!
-		// srj sez: we should actually fire at the layer the victim is on, if possible, in case it is on a bridge...
-		projectileDestination.z = TheTerrainLogic->getLayerHeight( projectileDestination.x, projectileDestination.y, targetLayer );
-	}
+	const Bool independent = m_scatterIndependently && scatter && !isProjectileDetonation && hasProjectileNuggets();
+	Real scatterRadius = scatter && !independent ? scatterProjectile(projectileDestination, scatterLimit, victimObj) : 0.0f;
 
 	if (hasNuggets() && !isProjectileDetonation && hasProjectileNuggets())
 	{
-		launchNuggetProjectiles(sourceObj, wslot, specificBarrelToUse, nuggetHit ? victimObj : nullptr, projectileDestination,
-			firingWeapon, projectileID);
+		launchNuggetProjectiles(sourceObj, wslot, specificBarrelToUse, nuggetHit && !forceScatter ? victimObj : nullptr,
+			projectileDestination, firingWeapon, projectileID, independent ? scatterLimit : 0.0f, victimObj);
 		if (!hasImpactNuggets())
 			return 0;
+		if (independent)
+			scatterRadius = scatterProjectile(projectileDestination, scatterLimit, victimObj);
 	}
 
 	if (getProjectileTemplate() == nullptr || isProjectileDetonation)
@@ -1256,7 +1258,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		Real delayInFrames = WWMath::Div_FixNaN(v.length(), getWeaponSpeed());
 
 		ObjectID damageID = getDamageDealtAtSelfPosition() ? INVALID_ID : victimID;
-		const Bool nuggetMissed = hasNuggets() && !nuggetHit;
+		const Bool nuggetMissed = hasNuggets() && (!nuggetHit || forceScatter);
 		if (nuggetMissed)
 			damageID = INVALID_ID;
 		else if (damageID == INVALID_ID)
@@ -2202,6 +2204,7 @@ Weapon& Weapon::operator=(const Weapon& that)
 		this->m_suspendFXFrame = that.getSuspendFXFrame();
 		this->m_numShotsForCurBarrel = m_template->getShotsPerBarrel();
 		this->m_projectileStreamID = INVALID_ID;
+		this->m_linearTargetIndex = 0;
 	}
 	return *this;
 }
@@ -2469,7 +2472,7 @@ Bool Weapon::computeApproachTarget(const Object *source, const Object *target, c
 	if (minAttackRange > PATHFIND_CELL_SIZE_F && dist < minAttackRange)
 	{
 		// We aret too close, so move away from the target.
-		DEBUG_ASSERTCRASH((minAttackRange<0.9f*getAttackRange(source)), ("Min attack range is too near attack range."));
+		DEBUG_ASSERTCRASH((minAttackRange<0.9f*getAttackRange(source, targetPos)), ("Min attack range is too near attack range."));
 		// Recompute dir, cause if the bounding spheres touch, it will be 0.
 		Coord3D srcPos = *source->getPosition();
 		dir.x = srcPos.x-targetPos->x;
@@ -2504,7 +2507,7 @@ Bool Weapon::computeApproachTarget(const Object *source, const Object *target, c
 		}
 
 		// select a spot along the line between us, halfway between the min & max range.
-		Real attackRange = (getAttackRange(source) + minAttackRange)/2.0f;
+		Real attackRange = (getAttackRange(source, targetPos) + minAttackRange)/2.0f;
 #ifdef ATTACK_RANGE_IS_2D
 		if (target)
 			attackRange += target->getGeometryInfo().getBoundingCircleRadius();
@@ -2552,7 +2555,7 @@ Bool Weapon::computeApproachTarget(const Object *source, const Object *target, c
 
 		// select a spot along the line between us, in range of our weapon
 		const Real ATTACK_RANGE_APPROACH_FUDGE = 0.9f;
-		Real attackRange = getAttackRange(source) * ATTACK_RANGE_APPROACH_FUDGE;
+		Real attackRange = getAttackRange(source, targetPos) * ATTACK_RANGE_APPROACH_FUDGE;
 		approachTargetPos.x = attackRange * dir.x + targetPos->x;
 		approachTargetPos.y = attackRange * dir.y + targetPos->y;
 		approachTargetPos.z = attackRange * dir.z + targetPos->z;
@@ -2582,7 +2585,7 @@ Bool Weapon::isSourceObjectWithGoalPositionWithinAttackRange( const Object *sour
 	else
 		return false;
 
-	Real attackRangeSqr = sqr( getAttackRange( source ) );
+	Real attackRangeSqr = sqr(getAttackRange(source, target ? target->getPosition() : targetPos, goalPos));
 	Real minAttackRangeSqr = sqr(m_template->getMinimumAttackRange());
 #ifdef RATIONALIZE_ATTACK_RANGE
 	if (distSqr < minAttackRangeSqr)
@@ -2599,7 +2602,7 @@ Bool Weapon::isSourceObjectWithGoalPositionWithinAttackRange( const Object *sour
 Bool Weapon::isWithinAttackRange(const Object *source, const Coord3D* pos) const
 {
 	Real distSqr = ThePartitionManager->getDistanceSquared( source, pos, ATTACK_RANGE_CALC_TYPE );
-	Real attackRangeSqr = sqr(getAttackRange(source));
+	Real attackRangeSqr = sqr(getAttackRange(source, pos));
 	Real minAttackRangeSqr = sqr(m_template->getMinimumAttackRange());
 #ifdef RATIONALIZE_ATTACK_RANGE
 	if (distSqr < minAttackRangeSqr)
@@ -2616,7 +2619,7 @@ Bool Weapon::isWithinAttackRange(const Object *source, const Coord3D* pos) const
 Bool Weapon::isWithinAttackRange(const Object *source, const Object *target) const
 {
 	Real distSqr;
-	Real attackRangeSqr = sqr(getAttackRange(source));
+	Real attackRangeSqr = sqr(getAttackRange(source, target->getPosition()));
 
 	if( !target->isKindOf(KINDOF_BRIDGE) )
 	{
@@ -2709,7 +2712,7 @@ Bool Weapon::isGoalPosWithinAttackRange(const Object *source, const Coord3D* goa
 	// of firing range.  jba.
 	// Note 2 - even with RATIONALIZE_ATTACK_RANGE, we still need to subtract 1/4 of a pathfind cell,
 	// otherwise if it teters on the edge, attacks can fail.  jba.
-	Real attackRangeSqr = sqr(getAttackRange(source)-(PATHFIND_CELL_SIZE_F*0.25f));
+	Real attackRangeSqr = sqr(getAttackRange(source, target ? target->getPosition() : targetPos, goalPos) - (PATHFIND_CELL_SIZE_F*0.25f));
 
 	if (target != nullptr)
 	{
@@ -2797,11 +2800,12 @@ Real Weapon::getPercentReadyToFire() const
 }
 
 //-------------------------------------------------------------------------------------------------
-Real Weapon::getAttackRange(const Object *source) const
+Real Weapon::getAttackRange(const Object* source, const Coord3D* target, const Coord3D* origin) const
 {
 	WeaponBonus bonus;
 	computeBonus(source, 0, bonus);
-	return m_template->getAttackRange(bonus);
+	const Real heightAdvantage = target ? (origin ? origin : source->getPosition())->z - target->z : 0.0f;
+	return m_template->getAttackRange(bonus, heightAdvantage);
 
 	//Contained objects have longer ranges.
 	//const Object *container = source->getContainedBy();
@@ -2815,7 +2819,7 @@ Real Weapon::getAttackRange(const Object *source) const
 //-------------------------------------------------------------------------------------------------
 Real Weapon::getAttackDistance(const Object *source, const Object *victimObj, const Coord3D* victimPos) const
 {
-	Real range = getAttackRange(source);
+	Real range = getAttackRange(source, victimObj ? victimObj->getPosition() : victimPos);
 
 	if (victimObj != nullptr)
 	{
@@ -3027,7 +3031,9 @@ Bool Weapon::privateFireWeapon(
 
 	WeaponBonus bonus;
 	computeBonus(sourceObj, extraBonusFlags, bonus);
-	if (RetailFileLayers::enabled() && m_template->m_passengerProportionalAttack && bonus.getField(WeaponBonus::DAMAGE) <= 0.0f)
+	if (RetailFileLayers::enabled() &&
+		((!isProjectileDetonation && !m_template->hasRequiredProjectile(sourceObj)) ||
+			(m_template->m_passengerProportionalAttack && bonus.getField(WeaponBonus::DAMAGE) <= 0.0f)))
 		return FALSE;
 
 	DEBUG_ASSERTCRASH(getStatus() != OUT_OF_AMMO, ("Hmm, firing weapon that is OUT_OF_AMMO"));
@@ -3041,6 +3047,7 @@ Bool Weapon::privateFireWeapon(
 	Bool reloaded = false;
 	if (m_ammoInClip > 0)
 	{
+		Int linearDelay = -1;
 		// TheSuperHackers @logic-client-separation helmutbuhler 11/04/2025
 		// barrelCount shouln't depend on Drawable, which belongs to client.
 		Int barrelCount = sourceObj->getDrawable()->getBarrelCount(m_wslot);
@@ -3050,7 +3057,34 @@ Bool Weapon::privateFireWeapon(
 			m_numShotsForCurBarrel = m_template->getShotsPerBarrel();
 		}
 
-		if( !m_scatterTargetsUnused.empty() )
+		if (RetailFileLayers::enabled() && !isProjectileDetonation && !m_template->m_linearTargets.empty())
+		{
+			const auto& targets = m_template->m_linearTargets;
+			const Coord3D& origin = *sourceObj->getPosition();
+			const Real facing = sourceObj->getOrientation();
+			const Real sine = Sin(facing);
+			const Real cosine = Cos(facing);
+			m_template->getDelayBetweenShots(bonus);
+			for (size_t step = 0; step < targets.size(); ++step)
+			{
+				const auto& target = targets[m_linearTargetIndex];
+				const Bool skip = m_template->m_ignoreLinearFirstTarget && m_linearTargetIndex == 0;
+				m_linearTargetIndex = (m_linearTargetIndex + 1) % targets.size();
+				linearDelay = RotwkDuration::engineFrames(std::max(0, target.delay), LOGICFRAMES_PER_SECOND);
+				if (!skip)
+				{
+					Coord3D pos;
+					pos.x = origin.x + cosine * target.offset.x - sine * target.offset.y;
+					pos.y = origin.y + sine * target.offset.x + cosine * target.offset.y;
+					pos.z = TheTerrainLogic->getGroundHeight(pos.x, pos.y);
+					m_template->fireWeaponTemplate(sourceObj, m_wslot, m_curBarrel, nullptr, &pos, bonus,
+						FALSE, ignoreRanges, this, projectileID, inflictDamage);
+				}
+				if (linearDelay > 0)
+					break;
+			}
+		}
+		else if( !m_scatterTargetsUnused.empty() )
 		{
 			// If I have a set scatter pattern, I need to offset the target by a random pick from that pattern
 			if( victimObj )
@@ -3111,7 +3145,7 @@ Bool Weapon::privateFireWeapon(
 		{
 			m_status = BETWEEN_FIRING_SHOTS;
 			//CRCDEBUG_LOG(("Weapon::privateFireWeapon() just set m_status to BETWEEN_FIRING_SHOTS"));
-			Int delay = m_template->getDelayBetweenShots(bonus);
+			Int delay = linearDelay >= 0 ? linearDelay : m_template->getDelayBetweenShots(bonus);
 			m_whenLastReloadStarted = now;
 			m_whenWeCanFireAgain = now + delay;
 			if (RetailTestCommands::tracesCombat())
@@ -3548,7 +3582,8 @@ void Weapon::processRequestAssistance( const Object *requestingObject, Object *v
 	Object* projectile,
 	const Object* launcher,
 	WeaponSlotType wslot,
-	Int specificBarrelToUse
+	Int specificBarrelToUse,
+	Bool redirectExperience
 )
 {
 	//CRCDEBUG_LOG(("Weapon::positionProjectileForLaunch() for %s from %s",
@@ -3569,7 +3604,8 @@ void Weapon::processRequestAssistance( const Object *requestingObject, Object *v
 	projectile->getDrawable()->setDrawableHidden(false);
 	projectile->setTransformMatrix(&worldTransform);
 	projectile->setPosition(&worldPos);
-	projectile->getExperienceTracker()->setExperienceSink( launcher->getID() );
+	if (redirectExperience)
+		projectile->getExperienceTracker()->setExperienceSink(launcher->getID());
 
 	const PhysicsBehavior* launcherPhys = launcher->getPhysics();
 	PhysicsBehavior* missilePhys = projectile->getPhysics();
@@ -3687,6 +3723,8 @@ void Weapon::transferNextShotStatsFrom( const Weapon &weapon )
 // ------------------------------------------------------------------------------------------------
 void Weapon::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		crcLinearTarget(xfer);
 #ifdef DEBUG_CRC
 	AsciiString logString;
 	AsciiString tmp;
@@ -3889,10 +3927,19 @@ void Weapon::crc( Xfer *xfer )
 	* Version Info:
 	* 1: Initial version */
 // ------------------------------------------------------------------------------------------------
+void Weapon::crcLinearTarget(Xfer* xfer) const
+{
+	if (!m_template->m_linearTargets.empty())
+	{
+		UnsignedInt index = m_linearTargetIndex;
+		xfer->xferUnsignedInt(&index);
+	}
+}
+
 void Weapon::xfer( Xfer *xfer )
 {
 	// version
-	const XferVersion currentVersion = 3;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -3990,6 +4037,10 @@ void Weapon::xfer( Xfer *xfer )
 	// leech weapon range active
 	xfer->xferBool( &m_leechWeaponRangeActive );
 
+	if (version >= 4)
+		xfer->xferUnsignedInt(&m_linearTargetIndex);
+	if (version < 4 || m_linearTargetIndex >= m_template->m_linearTargets.size())
+		m_linearTargetIndex = 0;
 }
 
 // ------------------------------------------------------------------------------------------------

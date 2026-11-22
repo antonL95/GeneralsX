@@ -18,6 +18,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DeletionUpdate.h"
 #include "GameLogic/Module/FireWeaponUpdate.h"
 #include "GameLogic/Module/DumbProjectileBehavior.h"
@@ -72,7 +73,13 @@ ProjectileUpdateInterface* projectileInterface(const Object* obj)
 
 ObjectID launcherOf(const Object* source)
 {
-	const ProjectileUpdateInterface* projectile = source && source->isKindOf(KINDOF_PROJECTILE) ? projectileInterface(source) : nullptr;
+	const ProjectileUpdateInterface* projectile = projectileInterface(source);
+	if (source && !source->isKindOf(KINDOF_PROJECTILE))
+	{
+		const auto* flight = dynamic_cast<const DumbProjectileBehavior*>(projectile);
+		if (!flight || !flight->isPassengerFlight())
+			return INVALID_ID;
+	}
 	return projectile ? projectile->projectileGetLauncherID() : INVALID_ID;
 }
 
@@ -485,8 +492,44 @@ void WeaponTemplate::orderNuggetHorde(const Object* source, Object* victim, cons
 	}
 }
 
+Object* WeaponTemplate::findContainedProjectile(const Object* source) const
+{
+	const ContainModuleInterface* contain = source->getContain();
+	const ContainedItemsList* passengers = contain ? contain->getContainedItemsList() : nullptr;
+	if (!passengers)
+		return nullptr;
+	for (Object* passenger : *passengers)
+	{
+		if (!passenger->isEffectivelyDead() && m_projectileFilterInContainer.matchesObject(source, passenger) &&
+			projectileInterface(passenger))
+			return passenger;
+	}
+	return nullptr;
+}
+
+Bool WeaponTemplate::hasRequiredProjectile(const Object* source) const
+{
+	if (m_projectileSelf || !m_hasProjectileFilterInContainer)
+		return TRUE;
+	for (const WeaponNugget& nugget : m_nuggets)
+		if (nugget.m_type == WEAPON_NUGGET_PROJECTILE && !nugget.m_projectileTemplate && nugget.isEnabledFor(source))
+			return findContainedProjectile(source) != nullptr;
+	return TRUE;
+}
+
+Real WeaponTemplate::scatterProjectile(Coord3D& destination, Real radius, const Object* target)
+{
+	const Real distance = GameLogicRandomValueReal(0, radius);
+	const Real angle = GameLogicRandomValueReal(0, 2 * PI);
+	destination.x += distance * Cos(angle);
+	destination.y += distance * Sin(angle);
+	destination.z = TheTerrainLogic->getLayerHeight(destination.x, destination.y, target ? target->getLayer() : LAYER_GROUND);
+	return distance;
+}
+
 void WeaponTemplate::launchNuggetProjectiles(const Object* sourceObj, WeaponSlotType wslot, Int specificBarrelToUse,
-	Object* victimObj, const Coord3D& destination, Weapon* firingWeapon, ObjectID* projectileID) const
+	Object* victimObj, const Coord3D& destination, Weapon* firingWeapon, ObjectID* projectileID,
+	Real independentScatterRadius, const Object* scatterTarget) const
 {
 	Player* owner = sourceObj->getControllingPlayer();
 	if (!owner)
@@ -495,8 +538,7 @@ void WeaponTemplate::launchNuggetProjectiles(const Object* sourceObj, WeaponSlot
 	for (size_t index = 0; index < m_nuggets.size(); ++index)
 	{
 		const WeaponNugget& nugget = m_nuggets[index];
-		if (nugget.m_type != WEAPON_NUGGET_PROJECTILE || !nugget.m_warheadTemplate ||
-			(!m_projectileSelf && !nugget.m_projectileTemplate))
+		if (nugget.m_type != WEAPON_NUGGET_PROJECTILE || !nugget.m_warheadTemplate)
 			continue;
 		if (!nugget.isEnabledFor(sourceObj) || (victimObj && !nugget.affects(sourceObj, victimObj)))
 			continue;
@@ -509,31 +551,41 @@ void WeaponTemplate::launchNuggetProjectiles(const Object* sourceObj, WeaponSlot
 				continue;
 			projectile = const_cast<Object*>(sourceObj);
 		}
-		else
+		else if (nugget.m_projectileTemplate)
 		{
 			projectile = TheThingFactory->newObject(nugget.m_projectileTemplate, owner->getDefaultTeam());
 			projectile->setProducer(sourceObj);
 		}
+		else
+		{
+			projectile = m_hasProjectileFilterInContainer ? findContainedProjectile(sourceObj) : nullptr;
+			if (!projectile)
+				continue;
+			sourceObj->getContain()->removeFromContain(projectile);
+		}
+		Coord3D aim = destination;
+		if (independentScatterRadius > 0.0f)
+			scatterProjectile(aim, independentScatterRadius, scatterTarget);
 		if (projectileID)
 			*projectileID = projectile->getID();
 		if (!m_projectileSelf)
-			firingWeapon->newProjectileFired(sourceObj, projectile, victimObj, &destination);
+			firingWeapon->newProjectileFired(sourceObj, projectile, victimObj, &aim);
 
 		if (ProjectileUpdateInterface* pui = projectileInterface(projectile))
 		{
 			pui->projectileSetLaunchWeapon(this);
-			pui->projectileLaunchAtObjectOrPosition(victimObj, &destination, sourceObj, wslot, specificBarrelToUse,
+			pui->projectileLaunchAtObjectOrPosition(victimObj, &aim, sourceObj, wslot, specificBarrelToUse,
 				nugget.m_warheadTemplate, m_projectileExhausts[veterancy]);
 		}
 		else
-			projectile->setPosition(&destination);
+			projectile->setPosition(&aim);
 
 		if (RetailTestCommands::tracesCombat())
 			std::fprintf(stderr, "TEST projectile frame=%u weapon=%s nugget=%u projectile=%s id=%u warhead=%s source=%u victim=%u dest=%.1f,%.1f\n",
 				TheGameLogic->getFrame(), m_name.str(), static_cast<unsigned>(index), projectile->getTemplate()->getName().str(),
 				static_cast<unsigned>(projectile->getID()), nugget.m_warheadTemplate->getName().str(),
 				static_cast<unsigned>(sourceObj->getID()), static_cast<unsigned>(victimObj ? victimObj->getID() : INVALID_ID),
-				destination.x, destination.y);
+				aim.x, aim.y);
 	}
 }
 

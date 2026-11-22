@@ -425,7 +425,11 @@ public:
 		const WeaponBonus& bonus
 	) const;
 
-	Real getAttackRange(const WeaponBonus& bonus) const;
+	Real getAttackRange(const WeaponBonus& bonus, Real heightAdvantage = 0.0f) const;
+	Bool canSwoop() const { return m_canSwoop; }
+	Bool getPreferredTargetPosition(const Object* target, Coord3D& position) const;
+	Bool hasRequiredProjectile(const Object* source) const;
+	Bool usesContainedProjectile() const { return m_hasProjectileFilterInContainer && !m_projectileSelf; }
 	Real getUnmodifiedAttackRange() const;
 	Real getMinimumAttackRange() const;
 	Int getDelayBetweenShots(const WeaponBonus& bonus) const;
@@ -539,7 +543,10 @@ protected:
 		Bool dotTick, Bool contactHit, const Coord3D* impactVelocity = nullptr,
 		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE) const;
 	void launchNuggetProjectiles(const Object* sourceObj, WeaponSlotType wslot, Int specificBarrelToUse, Object* victimObj,
-		const Coord3D& destination, Weapon* firingWeapon, ObjectID* projectileID) const;
+		const Coord3D& destination, Weapon* firingWeapon, ObjectID* projectileID,
+		Real independentScatterRadius, const Object* scatterTarget) const;
+	Object* findContainedProjectile(const Object* source) const;
+	static Real scatterProjectile(Coord3D& destination, Real radius, const Object* target);
 	Real estimateNuggetDamage(const Object* sourceObj, const Object* victimObj, const WeaponBonus& bonus, Int depth) const;
 
 	enum RadiusDamageVerdict
@@ -560,6 +567,7 @@ private:
 
 	static void parseWeaponBonusSet( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseScatterTarget( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
+	static void parseLinearTarget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseShotDelay( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseClipReloadTime(INI* ini, void* instance, void* store, const void* userData);
 	static void parseHitPercentage(INI* ini, void* instance, void* store, const void* userData);
@@ -673,6 +681,21 @@ private:
 	Bool m_hitStoredTarget;
 	Bool m_bombardType;
 	Bool m_canBeDodged = FALSE;
+	Bool m_canSwoop = FALSE;
+	Bool m_disableScatterForTargetsOnWall = FALSE;
+	Bool m_scatterIndependently = FALSE;
+	Bool m_hasProjectileFilterInContainer = FALSE;
+	Bool m_ignoreLinearFirstTarget = FALSE;
+	Real m_rangeBonus = 0.0f;
+	Real m_rangeBonusMinHeight = 0.0f;
+	Real m_rangeBonusPerFoot = 0.0f;
+	AsciiString m_preferredTargetBone;
+	struct LinearTarget
+	{
+		Coord2D offset;
+		Int delay;
+	};
+	std::vector<LinearTarget> m_linearTargets;
 	Bool m_noVictimNeeded;
 	Bool m_useInnateAttributes;
 
@@ -798,7 +821,8 @@ public:
 	// so that we can take the source's weapon bonuses, if any, into account.
 	// Also note: you should RARELY need to call getAttackRange. If what you want is to
 	// determine if you are within attack range, please call isWithinAttackRange instead.
-	Real getAttackRange(const Object *source) const;
+	Real getAttackRange(const Object* source, const Coord3D* target = nullptr, const Coord3D* origin = nullptr) const;
+	void crcLinearTarget(Xfer* xfer) const;
 
 	// Returns the max distance between the centerpoints of source & victim	for victim to be in range.
 	Real getAttackDistance(const Object *source, const Object *victim, const Coord3D* victimPos) const;
@@ -876,7 +900,8 @@ public:
 		Object* projectile,
 		const Object *launcher,
 		WeaponSlotType wslot,
-		Int specificBarrelToUse
+		Int specificBarrelToUse,
+		Bool redirectExperience = TRUE
 	);
 
 	/**
@@ -930,6 +955,7 @@ private:
 	Int												m_curBarrel;								///< current barrel used for firing
 	Int												m_numShotsForCurBarrel;			///< how many shots to fire from cur barrel before moving to next barrel
 	std::vector<Int>					m_scatterTargetsUnused;			///< A running memory of which targets I've used, so I can shoot them all at random
+	UnsignedInt m_linearTargetIndex = 0;
 	Bool											m_pitchLimited;
 	Bool											m_leechWeaponRangeActive;		///< This weapon has unlimited range until attack state is aborted!
 

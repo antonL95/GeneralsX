@@ -99,13 +99,15 @@ public:
 	virtual Bool projectileGetImpactVelocity(Coord3D& velocity) const override;
 	void crcSelfFlight(Xfer* xfer);
 	Bool isSelfFlight() const;
+	Bool isPassengerFlight() const;
+	const Coord3D& landingPosition() const { return m_flightPathEnd; }
 
 protected:
 
 	void positionForLaunch(const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse);
 	Bool hasLaunched() const { return m_lifespanFrame != 0 || !m_flightPath.empty(); }
 	Bool isApproachingLanding(UnsignedInt lead) const;
-	const Coord3D& landingPosition() const { return m_flightPathEnd; }
+	virtual Bool killsPassengerOnImpact() const { return FALSE; }
 	void detonate(const Object* hit = nullptr);
 
 private:
@@ -126,7 +128,7 @@ private:
   Bool                  m_hasDetonated;           ///<
 
 	Bool calcFlightPath(Bool recalcNumSegments);
-	void clearSelfFlight();
+	void clearFlight();
 #if defined(RTS_DEBUG)
 	void displayFlightPath();	///< Uses little debug icons in worldspace to show the path chosen when it is decided upon
 #endif

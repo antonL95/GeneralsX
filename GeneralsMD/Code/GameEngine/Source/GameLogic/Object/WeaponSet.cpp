@@ -1205,8 +1205,11 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 		if (!weapon->isWithinTargetPitch(obj, victim))
 			continue;
 
+		if (retail && !weapon->getTemplate()->hasRequiredProjectile(obj))
+			continue;
+
 		Real damage = weapon->estimateWeaponDamage(obj, victim);
-		Real attackRange = weapon->getAttackRange(obj);
+		Real attackRange = weapon->getAttackRange(obj, victim->getPosition());
 		const WeaponStatus status = weapon->getStatus();
 		Bool weaponIsReady = status == READY_TO_FIRE || (retail && status == PRE_ATTACK);
 

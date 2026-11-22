@@ -45,4 +45,7 @@ public:
 	virtual UpdateSleepTime update() override;
 	virtual void projectileLaunchAtObjectOrPosition(const Object* victim, const Coord3D* victimPos, const Object* launcher,
 		WeaponSlotType wslot, Int specificBarrelToUse, const WeaponTemplate* detWeap, const ParticleSystemTemplate* exhaustSysOverride) override;
+
+protected:
+	Bool killsPassengerOnImpact() const override { return getBezierProjectileBehaviorModuleData()->m_dieOnImpact; }
 };

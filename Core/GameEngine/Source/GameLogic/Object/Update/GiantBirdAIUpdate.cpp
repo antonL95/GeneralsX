@@ -79,6 +79,11 @@ Bool GiantBirdAIUpdate::canStrike(const Object& bird, const Coord3D& target)
 	const auto* ai = static_cast<const GiantBirdAIUpdate*>(bird.findUpdateModule(NAMEKEY("GiantBirdAIUpdate")));
 	if (!ai)
 		return TRUE;
+#if !RTS_GENERALS
+	const Weapon* weapon = bird.getCurrentWeapon();
+	if (weapon && !weapon->getTemplate()->canSwoop())
+		return TRUE;
+#endif
 	const Locomotor* locomotor = ai->getCurLocomotor();
 	if (!locomotor || locomotor->getAppearance() != LOCO_GIANT_BIRD)
 		return TRUE;
@@ -177,9 +182,15 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 		victim = nullptr;
 	const Weapon* weapon = bird->getCurrentWeapon();
 	const Coord3D* strike = victim ? victim->getPosition() : getCurrentVictimPos();
+	Bool canSwoop = weapon != nullptr;
+#if RTS_GENERALS
 	const Real range = weapon ? weapon->getAttackRange(bird) : 0.0f;
+#else
+	canSwoop = canSwoop && weapon->getTemplate()->canSwoop();
+	const Real range = weapon ? weapon->getAttackRange(bird, strike) : 0.0f;
+#endif
 	const Real approach = range + std::max(40.0f, locomotor->getPreferredAttackHeight());
-	const Bool swooping = strike && weapon && (victim
+	const Bool swooping = strike && canSwoop && (victim
 		? ThePartitionManager->getDistanceSquared(bird, victim, FROM_BOUNDINGSPHERE_2D)
 		: ThePartitionManager->getDistanceSquared(bird, strike, FROM_BOUNDINGSPHERE_2D)) <= approach * approach;
 	setSwooping(swooping);
