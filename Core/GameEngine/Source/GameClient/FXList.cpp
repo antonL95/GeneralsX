@@ -133,6 +133,7 @@ class SoundFXNugget : public FXNugget
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(SoundFXNugget, "SoundFXNugget")
 
 public:
+	const SoundFXNugget* asSoundNugget() const override { return this; }
 
 	virtual void doFXPos(const Coord3D *primary, const Matrix3D* /*primaryMtx*/, const Real /*primarySpeed*/, const Coord3D * /*secondary*/, const Real /*overrideRadius*/ ) const override
 	{
@@ -150,6 +151,15 @@ public:
 		play(primary, RetailFileLayers::enabled() ? source : nullptr);
 	}
 
+	void playRetail(const Coord3D* position, const Object* source, const Object* target, Bool& played) const
+	{
+		if ((m_stopIfPlayed && played) ||
+			(m_objectFilter && (!target || !m_objectFilter->matchesObject(source, target))))
+			return;
+		if (play(position, source))
+			played = TRUE;
+	}
+
 	static void parse(INI *ini, void *instance, void* /*store*/, const void* /*userData*/)
 	{
 		static const FieldParse myFieldParse[] =
@@ -162,6 +172,8 @@ public:
 		static const FieldParse retailFields[] = {
 			{ "RequiredSourceModelConditions", ModelConditionFlags::parseFromINI, nullptr, offsetof(SoundFXNugget, m_requiredConditions) },
 			{ "SourceObjectFilter", parseSourceFilter, nullptr, 0 },
+			{ "ObjectFilter", parseObjectFilter, nullptr, 0 },
+			{ "StopIfNuggetPlayed", INI::parseBool, nullptr, offsetof(SoundFXNugget, m_stopIfPlayed) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		MultiIniFieldParse fields;
@@ -179,23 +191,36 @@ private:
 		SpecialPowerObjectFilter::parse(ini, instance, &filter.emplace(), userData);
 	}
 
-	void play(const Coord3D* position, const Object* source) const
+	static void parseObjectFilter(INI* ini, void* instance, void*, const void* userData)
+	{
+		auto& filter = static_cast<SoundFXNugget*>(instance)->m_objectFilter;
+		SpecialPowerObjectFilter::parse(ini, instance, &filter.emplace(), userData);
+	}
+
+	Bool play(const Coord3D* position, const Object* source) const
 	{
 		if (!matchesSourceConditions(source, m_requiredConditions) ||
 			(m_sourceFilter && (!source || !m_sourceFilter->matchesObject(source, source))))
-			return;
+			return FALSE;
+		if (RetailFileLayers::enabled() && (!TheAudio || m_soundName.isEmpty() ||
+			m_soundName.compareNoCase("None") == 0 || m_soundName.compareNoCase("NoSound") == 0))
+			return FALSE;
 		AudioEventRTS sound(m_soundName);
 		if (source)
 			sound.setPlayerIndex(source->getControllingPlayer()->getPlayerIndex());
 		if (position)
 			sound.setPosition(position);
 		if (traceRetailFXLists())
-			std::fprintf(stderr, "[Retail FXList] Sound %s\n", m_soundName.str());
+			std::fprintf(stderr, "[Retail FXList] Sound %s owner=%u action=start frame=%u\n", m_soundName.str(),
+				source ? static_cast<UnsignedInt>(source->getID()) : 0, TheGameLogic->getFrame());
 		TheAudio->addAudioEvent(&sound);
+		return TRUE;
 	}
 
 	ModelConditionFlags m_requiredConditions;
 	std::optional<SpecialPowerObjectFilter> m_sourceFilter;
+	std::optional<SpecialPowerObjectFilter> m_objectFilter;
+	Bool m_stopIfPlayed = FALSE;
 	AsciiString		m_soundName;
 };
 EMPTY_DTOR(SoundFXNugget)
@@ -1660,8 +1685,15 @@ void FXList::doFXPos(const Coord3D* primary, const Matrix3D* primaryMtx, Real pr
 	if (!allowRetailPlayback())
 		return;
 
+	Bool playedSound = FALSE;
+	const Bool retail = RetailFileLayers::enabled();
 	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
 	{
+		if (const SoundFXNugget* sound = retail ? (*it)->asSoundNugget() : nullptr)
+		{
+			sound->playRetail(primary, source, target, playedSound);
+			continue;
+		}
 		if (source || target)
 			(*it)->doFXPosWithObjects(primary, primaryMtx, primarySpeed, secondary, overrideRadius, source, target);
 		else
@@ -1688,11 +1720,17 @@ void FXList::doFXObj(const Object* primary, const Object* secondary, Bool buffsO
 	if (!buffsOnly && !allowRetailPlayback())
 		return;
 
+	Bool playedSound = FALSE;
+	const Bool retail = RetailFileLayers::enabled();
 	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
 	{
 
 		// HERE THE PRIMARY IS THE GUY RECEIVING THE FX, AND SECONDARY MIGHT BE THE GUY DEALING IT
-		if (!buffsOnly || (*it)->isBuffNugget())
+		if (buffsOnly && !(*it)->isBuffNugget())
+			continue;
+		if (const SoundFXNugget* sound = retail ? (*it)->asSoundNugget() : nullptr)
+			sound->playRetail(primary ? primary->getPosition() : nullptr, primary, primary, playedSound);
+		else
 			(*it)->doFXObj(primary, secondary);
 	}
 }

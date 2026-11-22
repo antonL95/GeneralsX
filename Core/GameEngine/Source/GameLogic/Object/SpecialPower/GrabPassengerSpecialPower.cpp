@@ -190,7 +190,14 @@ Bool GrabPassengerSpecialPower::requestGrab(Object* requested, UnsignedInt comma
 		triggerSpecialPower(target->getPosition());
 	}
 	if (accepted && TheFXListStore)
-		FXList::doFXObj(TheFXListStore->findFXList(getPowerModuleData()->m_initiateFX.str()), caster);
+	{
+		const FXList* fx = TheFXListStore->findFXList(getPowerModuleData()->m_initiateFX.str());
+		if (RetailFileLayers::enabled())
+			FXList::doFXPos(fx, caster->getPosition(), caster->getTransformMatrix(), 0.0f,
+				target->getPosition(), 0.0f, caster, target);
+		else
+			FXList::doFXObj(fx, caster);
+	}
 	m_lastCastAccepted = accepted || !getPowerModuleData()->m_updateModuleStartsAttack;
 	return m_lastCastAccepted;
 }

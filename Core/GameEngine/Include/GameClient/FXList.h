@@ -39,6 +39,7 @@
 class FXNugget;
 class FXList;
 class FXListStore;
+class SoundFXNugget;
 class INI;
 class Object;
 class Matrix3D;
@@ -85,6 +86,7 @@ public:
 	virtual void doFXPosWithObjects(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
 		const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const;
 	virtual Bool isBuffNugget() const { return FALSE; }
+	virtual const SoundFXNugget* asSoundNugget() const { return nullptr; }
 
 	/**
 		the object-based version... by default, just call the location-based implementation.
