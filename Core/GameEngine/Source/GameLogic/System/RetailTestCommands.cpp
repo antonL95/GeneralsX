@@ -184,6 +184,7 @@ void runRetailPackage50TestCommand(std::string_view action, Object* source, Obje
 void runRetailPackage12TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage12AttachTestCommand(std::string_view action, Object* source, UnsignedInt frame);
 void runRetailPackage12PickupTestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
+void runRetailPackage15TestCommand(std::string_view action, Object* source, UnsignedInt frame);
 void runRetailPackage13TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
 void runRetailPackage16TestCommand(std::string_view action, Object* source, const char* argument, UnsignedInt frame);
 
@@ -2759,6 +2760,11 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action.starts_with("pkg12-pickup-"))
 	{
 		runRetailPackage12PickupTestCommand(command.action, obj, command.structure.c_str(), frame);
+		return;
+	}
+	if (command.action.starts_with("pkg15-"))
+	{
+		runRetailPackage15TestCommand(command.action, obj, frame);
 		return;
 	}
 	if (command.action.starts_with("pkg13-"))
