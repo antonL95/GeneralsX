@@ -1354,6 +1354,46 @@ constexpr Real FORMATION_STOP_ERROR = 65.0f;
 constexpr Real FORMATION_MIN_SPEED_SCALE = 0.25f;
 constexpr Real FORMATION_STRAGGLER_LIMIT = 120.0f;
 constexpr Real FORMATION_STRAGGLER_WEIGHT = 0.5f;
+
+void avoidBlockingRanks(const HordeContain& horde, const Object& anchor, const Object& banner, HordeContain::FormationGoal& goal)
+{
+	const Coord3D& origin = *banner.getPosition();
+	const Coord3D step = goal.slot - origin;
+	const Real lengthSquared = sqr(step.x) + sqr(step.y);
+	if (lengthSquared == 0.0f)
+		return;
+
+	const Coord3D& forward = *anchor.getUnitDirectionVector2D();
+	const Real radius = banner.getGeometryInfo().getBoundingCircleRadius();
+	Real front = -FAST_AS_POSSIBLE;
+	Real left = 0.0f;
+	Real right = 0.0f;
+	Bool blocked = FALSE;
+	for (const Object* rider : *horde.getContainedItemsList())
+	{
+		if (rider->isEffectivelyDead() || horde.getMemberSlot(rider->getID()) < 0)
+			continue;
+		const Coord3D delta = *rider->getPosition() - origin;
+		const Real clearance = radius + rider->getGeometryInfo().getBoundingCircleRadius();
+		const Real distance = delta.x * forward.x + delta.y * forward.y;
+		const Real lateral = delta.y * forward.x - delta.x * forward.y;
+		front = std::max(front, distance + clearance);
+		left = std::min(left, lateral - clearance);
+		right = std::max(right, lateral + clearance);
+		const Real fraction = std::clamp((delta.x * step.x + delta.y * step.y) / lengthSquared, 0.0f, 1.0f);
+		blocked |= sqr(delta.x - fraction * step.x) + sqr(delta.y - fraction * step.y) < sqr(clearance);
+	}
+	if (!blocked)
+		return;
+
+	const Real side = -left < right ? left : right;
+	const Real ahead = left < 0.0f && right > 0.0f ? 0.0f : std::max(front, step.x * forward.x + step.y * forward.y);
+	goal.position.x = origin.x + ahead * forward.x - side * forward.y;
+	goal.position.y = origin.y + ahead * forward.y + side * forward.x;
+	if (TheTerrainLogic)
+		goal.position.z = TheTerrainLogic->getGroundHeight(goal.position.x, goal.position.y);
+	goal.distance = WWMath::SqrtfOrigin(sqr(ahead) + sqr(side));
+}
 }
 
 Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) const
@@ -1395,6 +1435,8 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 	{
 		goal.speed = FAST_AS_POSSIBLE;
 		goal.distance = goal.error;
+		if (RetailFileLayers::enabled() && horde->isKindOf(KINDOF_CAVALRY) && isBannerCarrier(member))
+			avoidBlockingRanks(*this, *horde, *member, goal);
 		return TRUE;
 	}
 
@@ -1534,7 +1576,12 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 		return;
 
 	const Real radius = member->getGeometryInfo().getBoundingCircleRadius();
+	const AIUpdateInterface* anchorAI = horde->getObject()->getAI();
 	const Bool cavalryBanner = cavalry && horde->isBannerCarrier(member);
+	const Bool cavalrySettling = cavalry && (!anchorAI || !anchorAI->isMoving());
+	const Bool alternate = horde->isAlternateFormation();
+	const Int memberSlot = alternate ? horde->getMemberSlot(member->getID()) : -1;
+	const auto& slots = horde->getActiveFormation()->m_layout.slots();
 	const Coord3D& origin = *member->getPosition();
 	const auto layer = member->getLayer();
 	Coord3D next = {origin.x + movement.x, origin.y + movement.y, origin.z};
@@ -1547,15 +1594,23 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 	};
 	for (const Object* other : horde->getContainList())
 	{
-		if (!eligibleNeighbor(other))
+		if (!eligibleNeighbor(other) || !hasFormationPosition(other))
 			continue;
 		const Coord3D& position = *other->getPosition();
-		const Real separation = cavalryBanner || (cavalry && horde->isBannerCarrier(other)) ? 0.75f : 1.0f;
-		const Real diameter = (radius + other->getGeometryInfo().getBoundingCircleRadius()) * separation + CLEARANCE;
+		Real diameter = radius + other->getGeometryInfo().getBoundingCircleRadius() + CLEARANCE;
+		if (cavalrySettling && (cavalryBanner || horde->isBannerCarrier(other)))
+			diameter = (diameter - CLEARANCE) * 0.75f + CLEARANCE;
+		const Int otherSlot = memberSlot >= 0 ? horde->getMemberSlot(other->getID()) : -1;
+		if (otherSlot >= 0)
+		{
+			const HordePoint& a = slots[memberSlot].position;
+			const HordePoint& b = slots[otherSlot].position;
+			diameter = std::min(diameter, WWMath::SqrtfOrigin(sqr(a.x - b.x) + sqr(a.y - b.y)));
+		}
 		const Real dx = next.x - position.x;
 		const Real dy = next.y - position.y;
 		const Real distanceSquared = dx * dx + dy * dy;
-		if (distanceSquared >= diameter * diameter || !hasFormationPosition(other))
+		if (distanceSquared >= diameter * diameter)
 			continue;
 
 		const Real oldX = origin.x - position.x;
@@ -1597,7 +1652,7 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 	if (next.x == planned.x && next.y == planned.y)
 		return;
 
-	if (locomotor->getAppearance() == LOCO_LEGS_TWO)
+	if (locomotor->getAppearance() == LOCO_LEGS_TWO || (cavalryBanner && !cavalrySettling))
 	{
 		const Real stepSquared = movement.x * movement.x + movement.y * movement.y;
 		const Real dx = next.x - origin.x;
@@ -1669,7 +1724,7 @@ Real HordeContain::getFormationSpeedScale() const
 }
 
 #if RTS_ZEROHOUR
-Real HordeContain::getCavalryWheelRate(Real radius) const
+Real HordeContain::getFormationWheelRate(Real radius) const
 {
 	const Coord3D& anchor = *getObject()->getPosition();
 	Real limit = FAST_AS_POSSIBLE;
@@ -1684,7 +1739,7 @@ Real HordeContain::getCavalryWheelRate(Real radius) const
 		const Real reach = WWMath::SqrtfOrigin(sqr(slot.x - anchor.x) + sqr(slot.y - anchor.y));
 		const auto damage = member->getBodyModule()->getDamageState();
 		const Real speed = locomotor->getMaxSpeedForCondition(damage, member);
-		if (speed > 0.0f)
+		if (speed > 0.0f && radius + reach > 0.0f)
 			limit = std::min(limit, speed / (radius + reach));
 	}
 	return limit;
@@ -1868,8 +1923,11 @@ void HordeContain::setAlternateFormation(Bool alternate)
 	m_slotMembers.swap(members);
 	m_slotOffsets.swap(offsets);
 	rebuildMemberSlots();
-	for (Object* member : getContainList())
-		updateRankWeaponConditions(member);
+	if (RetailFileLayers::enabled() && alternate)
+		reassignSlotsByPosition();
+	else
+		for (Object* member : getContainList())
+			updateRankWeaponConditions(member);
 	if (Object* anchor = getObject())
 	{
 		const Coord3D* pos = anchor->getPosition();

@@ -2354,7 +2354,8 @@ Bool AIUpdateInterface::steerInFormation()
 	if (!RetailFileLayers::enabled() || !isIdle())
 		return FALSE;
 	Object* obj = getObject();
-	const HordeContain* horde = HordeContain::get(obj->getContainedBy());
+	const Object* anchor = obj->getContainedBy();
+	const HordeContain* horde = HordeContain::get(anchor);
 	HordeContain::FormationGoal goal;
 	if (!horde || !horde->getFormationGoal(obj, goal) || !HordeContain::canSteerToFormationGoal(obj, goal))
 		return FALSE;
@@ -2375,7 +2376,7 @@ Bool AIUpdateInterface::steerInFormation()
 	if (goal.backing)
 		m_curLocomotor->locoUpdate_moveTowardsFormationSlot(obj, goal.position, goal.distance, goal.speed, TRUE, goal.backingSource);
 	else if (m_curLocomotor->getAppearance() == LOCO_LEGS_TWO &&
-		!HordeAIUpdate::isReforming(obj->getContainedBy()->getAI()))
+		!HordeAIUpdate::isReforming(anchor ? anchor->getAI() : nullptr))
 	{
 		Bool blocked = FALSE;
 		m_curLocomotor->locoUpdate_moveTowardsPosition(obj, goal.position, goal.distance, goal.speed, &blocked);

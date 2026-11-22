@@ -49,7 +49,6 @@ private:
 	ObjectID m_contactTarget = INVALID_ID;
 	UnsignedInt m_contactUntil = 0;
 	Real m_cavalryTurn = 0.0f;
-	Real m_cavalryTurnSinceReform = 0.0f;
 	UnsignedInt m_reformUntil = 0;
 	CommandSourceType m_attackSource = CMD_FROM_AI;
 	Int m_maxShots = 0;

@@ -2909,11 +2909,21 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 		dirToApplyForce.y /= distToGoal;
 		const Real desiredAngle = WWMath::Atan2Origin(dirToApplyForce.y, dirToApplyForce.x);
 		const Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
-		if (fabs(relAngle) > m_template->m_maxTurnWithoutReform && onPathDistToGoal > REFORM_MIN_DISTANCE)
+		const HordeContain* formation = HordeContain::get(obj);
+		if (formation && formation->isAlternateFormation() && m_template->m_waitForFormation)
+		{
+			const Real radius = m_template->m_fastTurnRadius;
+			const Real rate = std::min(getMaxTurnRate(bdt), formation->getFormationWheelRate(radius));
+			physics->setTurning(rotateObjAroundLocoPivot(obj, goalPos, rate));
+			if (radius > 0.0f && fabs(relAngle) > rate)
+				desiredSpeed = std::min(desiredSpeed, rate * radius);
+			desiredSpeed *= std::max(0.0f, Cos(stdAngleDiff(desiredAngle, obj->getOrientation())));
+		}
+		else if (fabs(relAngle) > m_template->m_maxTurnWithoutReform && onPathDistToGoal > REFORM_MIN_DISTANCE)
 		{
 			obj->setOrientation(desiredAngle);
 			physics->setTurning(TURN_NONE);
-			if (m_template->m_waitForFormation)
+			if (m_template->m_waitForFormation && formation)
 				desiredSpeed = 0.0f;
 		}
 		else if (m_template->m_turnWhileMoving)
@@ -2955,7 +2965,7 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 	{
 		if (const HordeContain* formation = HordeContain::get(obj))
 		{
-			const Real wheelRate = formation->getCavalryWheelRate(m_template->m_fastTurnRadius);
+			const Real wheelRate = formation->getFormationWheelRate(m_template->m_fastTurnRadius);
 			if (fabs(angle) > wheelRate)
 			{
 				turnRate = std::min(turnRate, wheelRate);

@@ -458,7 +458,7 @@ UpdateSleepTime HordeAIUpdate::update()
 		if (RetailFileLayers::enabled() && isMoving() && locomotor && locomotor->getAppearance() == LOCO_HORDE &&
 			locomotor->getWaitForFormation() && fabs(turn) > locomotor->getMaxTurnWithoutReform() &&
 			horde->isKindOf(KINDOF_INFANTRY) && !horde->isKindOf(KINDOF_CAVALRY) &&
-			!isReforming(this))
+			!contain->isAlternateFormation() && !isReforming(this))
 		{
 			const Real turnRate = locomotor->getMaxTurnRate(horde->getBodyModule()->getDamageState());
 			if (turnRate > 0.0f)
@@ -468,7 +468,7 @@ UpdateSleepTime HordeAIUpdate::update()
 #endif
 	}
 #if RTS_ZEROHOUR
-	if (m_reformUntil && contain->getFormationReformTravelFrames() == 0)
+	if (m_reformUntil && (contain->isAlternateFormation() || contain->getFormationReformTravelFrames() == 0))
 		m_reformUntil = 0;
 #endif
 	if (m_reformUntil && (!isMoving() || m_reformUntil <= TheGameLogic->getFrame()))
@@ -700,7 +700,8 @@ void HordeAIUpdate::crc(Xfer* xfer)
 		if (getObject()->isKindOf(KINDOF_CAVALRY))
 		{
 			xfer->xferReal(&m_cavalryTurn);
-			xfer->xferReal(&m_cavalryTurnSinceReform);
+			Real legacyAccumulatedTurn = 0.0f;
+			xfer->xferReal(&legacyAccumulatedTurn);
 		}
 		crcReformState(xfer);
 		xferRetailBlocks(xfer, TRUE);
@@ -742,7 +743,8 @@ void HordeAIUpdate::xfer(Xfer* xfer)
 	if (version >= 7 && getObject()->isKindOf(KINDOF_CAVALRY))
 	{
 		xfer->xferReal(&m_cavalryTurn);
-		xfer->xferReal(&m_cavalryTurnSinceReform);
+		Real legacyAccumulatedTurn = 0.0f;
+		xfer->xferReal(&legacyAccumulatedTurn);
 	}
 	if (version >= 8)
 		xfer->xferUnsignedInt(&m_reformUntil);
