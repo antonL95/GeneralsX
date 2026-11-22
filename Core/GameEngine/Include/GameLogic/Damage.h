@@ -436,6 +436,7 @@ public:
 	DamageInfoOutput	out;				///< results for the damage occurrence
 	Coord3D impactVelocity{};
 	RetailDamageFXTrigger retailFXTrigger = RETAIL_DAMAGE_FX_NONE;
+	AsciiString retailWeaponName;
 	Bool shouldPlayUnderAttackEvaEvent = TRUE;
 
 protected:

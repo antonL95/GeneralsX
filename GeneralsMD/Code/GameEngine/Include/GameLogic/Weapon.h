@@ -549,7 +549,7 @@ protected:
 	void orderNuggetHorde(const Object* source, Object* victim, const Coord3D* position) const;
 	void dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
 		Bool dotTick, Bool contactHit, const Coord3D* impactVelocity = nullptr,
-		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE) const;
+		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE, const WeaponTemplate* launchWeapon = nullptr) const;
 	void launchNuggetProjectiles(const Object* sourceObj, WeaponSlotType wslot, Int specificBarrelToUse, Object* victimObj,
 		const Coord3D& destination, Weapon* firingWeapon, ObjectID* projectileID,
 		Real independentScatterRadius, const Object* scatterTarget) const;
@@ -1014,6 +1014,7 @@ public:
 
 	static void parseWeaponTemplateDefinition(INI* ini);
 	void xferRetailDelayedDamage(Xfer* xfer);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 protected:
 
@@ -1026,7 +1027,8 @@ protected:
 	void resetWeaponTemplates();
 	void setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID,
 		const WeaponBonus& bonus, Int nuggetIndex = -1, Bool dotTick = FALSE, Bool contactHit = FALSE,
-		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE, const Coord3D* impactVelocity = nullptr);
+		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE, const Coord3D* impactVelocity = nullptr,
+		const WeaponTemplate* launchWeapon = nullptr);
 
 private:
 
@@ -1049,6 +1051,7 @@ private:
 		Bool m_dotTick;
 		Bool m_contactHit;
 		RetailDamageFXTrigger m_launchTrigger;
+		const WeaponTemplate* m_launchWeapon = nullptr;
 		Bool m_hasImpactVelocity = FALSE;
 		Coord3D m_impactVelocity{};
 	};

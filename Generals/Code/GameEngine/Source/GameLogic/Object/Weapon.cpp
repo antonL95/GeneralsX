@@ -1420,6 +1420,8 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 			}
 
 			DamageInfo damageInfo;
+			if (RetailFileLayers::enabled())
+				damageInfo.retailWeaponName = m_name;
 			damageInfo.in.m_damageType = damageType;
 			damageInfo.in.m_deathType = deathType;
 			damageInfo.in.m_sourceID = sourceID;

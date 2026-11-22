@@ -47,6 +47,7 @@
 #include "Common/PerfTimer.h"
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/RotwkDuration.h"
 #include "Common/Player.h"
 #include "Common/ThingFactory.h"
@@ -1713,6 +1714,8 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 
 			DamageInfo damageInfo;
 			damageInfo.shouldPlayUnderAttackEvaEvent = m_shouldPlayUnderAttackEvaEvent;
+			if (RetailFileLayers::enabled())
+				damageInfo.retailWeaponName = m_name;
 			damageInfo.in.m_damageType = damageType;
 			damageInfo.in.m_deathType = deathType;
 			damageInfo.in.m_sourceID = sourceID;
@@ -1947,7 +1950,7 @@ void WeaponStore::update()
 			if (ddi->m_nuggetIndex >= 0)
 				ddi->m_delayedWeapon->dealNuggetDamage(ddi->m_nuggetIndex, ddi->m_delaySourceID, ddi->m_delayIntendedVictimID,
 					&ddi->m_delayDamagePos, ddi->m_bonus, ddi->m_dotTick, ddi->m_contactHit,
-					ddi->m_hasImpactVelocity ? &ddi->m_impactVelocity : nullptr, ddi->m_launchTrigger);
+					ddi->m_hasImpactVelocity ? &ddi->m_impactVelocity : nullptr, ddi->m_launchTrigger, ddi->m_launchWeapon);
 			else
 				ddi->m_delayedWeapon->dealDamageInternal(ddi->m_delaySourceID, ddi->m_delayIntendedVictimID, &ddi->m_delayDamagePos, ddi->m_bonus, isProjectileDetonation);
 			ddi = m_weaponDDI.erase(ddi);
@@ -1999,7 +2002,7 @@ void WeaponStore::reset()
 //-------------------------------------------------------------------------------------------------
 void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID,
 	const WeaponBonus& bonus, Int nuggetIndex, Bool dotTick, Bool contactHit, RetailDamageFXTrigger launchTrigger,
-	const Coord3D* impactVelocity)
+	const Coord3D* impactVelocity, const WeaponTemplate* launchWeapon)
 {
 	WeaponDelayedDamageInfo wi;
 	wi.m_delayedWeapon = weapon;
@@ -2012,6 +2015,7 @@ void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* 
 	wi.m_dotTick = dotTick;
 	wi.m_contactHit = contactHit;
 	wi.m_launchTrigger = launchTrigger;
+	wi.m_launchWeapon = launchWeapon;
 	if (impactVelocity)
 	{
 		wi.m_hasImpactVelocity = TRUE;
@@ -2066,6 +2070,30 @@ void WeaponStore::xferRetailDelayedDamage(Xfer* xfer)
 		for (WeaponDelayedDamageInfo& hit : m_weaponDDI)
 			xferHit(hit);
 	}
+}
+
+void WeaponStore::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection(xfer, loading, present, {
+		{ "delayed-launch-weapons", [this, loading](Xfer* x) {
+			for (WeaponDelayedDamageInfo& hit : m_weaponDDI)
+			{
+				AsciiString name = hit.m_launchWeapon ? hit.m_launchWeapon->getName() : AsciiString();
+				x->xferAsciiString(&name);
+				if (loading && !name.isEmpty())
+				{
+					hit.m_launchWeapon = findWeaponTemplate(name);
+					if (!hit.m_launchWeapon)
+						throw SC_INVALID_DATA;
+				}
+			}
+		}, [this] {
+			for (WeaponDelayedDamageInfo& hit : m_weaponDDI)
+				hit.m_launchWeapon = nullptr;
+		}
+		}
+	});
 }
 
 //-------------------------------------------------------------------------------------------------

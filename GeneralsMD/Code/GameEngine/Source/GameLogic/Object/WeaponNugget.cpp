@@ -661,15 +661,16 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 		if (!nugget.isImpactNugget() || !nugget.isEnabledFor(attacker))
 			continue;
 		if (nugget.m_delayFrames == 0)
-			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit, &velocity, launchTrigger);
+			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit, &velocity, launchTrigger, launchWeapon);
 		else if (TheWeaponStore)
 			TheWeaponStore->setDelayedDamage(this, pos, TheGameLogic->getFrame() + nugget.m_delayFrames, nuggetSourceID, victimID,
-				bonus, static_cast<Int>(index), FALSE, contactHit, launchTrigger, &velocity);
+				bonus, static_cast<Int>(index), FALSE, contactHit, launchTrigger, &velocity, launchWeapon);
 	}
 }
 
 void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
-	Bool dotTick, Bool contactHit, const Coord3D* impactVelocity, RetailDamageFXTrigger launchTrigger) const
+	Bool dotTick, Bool contactHit, const Coord3D* impactVelocity, RetailDamageFXTrigger launchTrigger,
+	const WeaponTemplate* launchWeapon) const
 {
 	const WeaponNugget& nugget = m_nuggets[nuggetIndex];
 	Object* source = TheGameLogic->findObjectByID(sourceID);
@@ -795,6 +796,8 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damageInfo.in.m_sourcePlayerMask = source && source->getControllingPlayer() ? source->getControllingPlayer()->getPlayerMask() : 0;
 		damageInfo.in.m_amount = amount;
 		damageInfo.retailFXTrigger = warheadTrigger != RETAIL_DAMAGE_FX_NONE ? warheadTrigger : launchTrigger;
+		if (RetailFileLayers::enabled())
+			damageInfo.retailWeaponName = launchWeapon ? launchWeapon->m_name : m_name;
 		damageInfo.shouldPlayUnderAttackEvaEvent = m_shouldPlayUnderAttackEvaEvent;
 		if (impactVelocity)
 			damageInfo.impactVelocity = *impactVelocity;
@@ -855,6 +858,6 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damage(curVictim, verdict == RADIUS_DAMAGE_KILL_SELF);
 		for (size_t tick = 1; tick < dotTicks.size() && TheWeaponStore; ++tick)
 			TheWeaponStore->setDelayedDamage(this, curVictim->getPosition(), TheGameLogic->getFrame() + dotTicks[tick], sourceID,
-				curVictim->getID(), bonus, nuggetIndex, TRUE, FALSE, launchTrigger, impactVelocity);
+				curVictim->getID(), bonus, nuggetIndex, TRUE, FALSE, launchTrigger, impactVelocity, launchWeapon);
 	}
 }
