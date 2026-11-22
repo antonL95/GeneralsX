@@ -21,6 +21,7 @@ check() {
         expect_state "TEST pkg31-unit frame=242 label=horde-loaded-pre contained=1 unsel=1 unatk=0 canatk=1 encl=1 mem_unsel=1 mem_encl=1 "
         expect "TEST pkg31-enter-check frame=242 label=tower-full-reject player=0 ai=0"
         expect_state "TEST pkg31-container frame=242 label=keep-loaded-pre count=1 cap=10 "
+        expect "TEST save-load obstacle frame=242 template=Pkg31CastleKeep ownsCell=1"
         expect_state "TEST pkg31-unit frame=242 label=fighter-loaded-pre contained=1 unsel=1 unatk=0 canatk=1 encl=0 "
         expect_state "TEST pkg31-container frame=242 label=neutral-captured-pre count=1 cap=1 members=15 owner=Player_1 "
         expect_state "TEST pkg31-container frame=242 label=mumakil-initial-pre count=1 cap=1 "

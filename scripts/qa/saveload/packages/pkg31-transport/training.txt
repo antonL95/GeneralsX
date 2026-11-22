@@ -8,6 +8,9 @@
 200 create PlyrCivilian Pkg31RuinedTower 0 600,2920,0
 200 create Player_1 Pkg31ArcherHorde 2 645,2920,0
 200 create Player_1 Pkg31Mumakil 0 800,2920,0
+200 snapshot-register-footprint Player_1 Pkg31BattleTower 0
+200 snapshot-register-footprint Player_1 Pkg31CastleKeep 0
+200 snapshot-register-footprint PlyrCivilian Pkg31RuinedTower 0
 
 205 create Player_1 Pkg31Cavalry 0 560,2740,0
 205 create PlyrCreeps Pkg31EnemyArcher 0 560,2660,0
@@ -33,6 +36,7 @@
 242 pkg31-unit-state Player_1 Pkg31ArcherHorde 0 horde-loaded-pre
 242 pkg31-check-enter Player_1 Pkg31ArcherHorde 1 Player_1:Pkg31BattleTower:0|tower-full-reject
 242 pkg31-container-state Player_1 Pkg31CastleKeep 0 keep-loaded-pre
+242 snapshot-obstacle-owner Player_1 Pkg31CastleKeep 0
 242 pkg31-unit-state Player_1 Pkg31Fighter 0 fighter-loaded-pre
 242 pkg31-container-state Player_1 Pkg31RuinedTower 0 neutral-captured-pre
 242 pkg31-container-state Player_1 Pkg31Mumakil 0 mumakil-initial-pre
