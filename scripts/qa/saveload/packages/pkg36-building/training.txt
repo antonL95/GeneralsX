@@ -1,0 +1,73 @@
+55 create Player_1 Pkg36Porter 0 2440,1120,0
+60 construct Player_1 Pkg36Porter 0 GondorFarm 2540 1120 0
+225 pkg08-queue Player_1 Pkg36Porter 0 GondorFarm 2380 1250
+243 pkg36-site Player_1 GondorFarm 1
+243 pkg36-site Player_1 GondorFarm 0
+320 pkg36-site Player_1 GondorFarm 0
+320 pkg36-site Player_1 GondorFarm 1
+321 cancelbuild Player_1 GondorFarm 1
+745 pkg36-site Player_1 GondorFarm 0
+746 destroy Player_1 GondorFarm 0
+747 destroy Player_1 Pkg36Porter 0
+810 create Player_1 ArnorPeasantAdult 0 2440,1120,0
+810 create Player_1 Pkg36PeasantControl 0 2460,1120,0
+812 pkg36-lua Player_1 ArnorPeasantAdult 0
+812 pkg36-lua Player_1 Pkg36PeasantControl 0
+812 pkg36-attackinfo Player_1 ArnorPeasantAdult 0
+812 pkg36-attackinfo Player_1 Pkg36PeasantControl 0
+813 destroy Player_1 ArnorPeasantAdult 0
+813 destroy Player_1 Pkg36PeasantControl 0
+820 create Player_1 Pkg36RepairClock 0 2300,1140,0
+820 create Player_1 Pkg36RepairDisabled 0 2450,1140,0
+820 create Player_1 Pkg36RepairNoTimer 0 2600,1140,0
+825 pkg36-damage Player_1 Pkg36RepairClock 0 300
+825 pkg36-damage Player_1 Pkg36RepairDisabled 0 300
+825 pkg36-damage Player_1 Pkg36RepairNoTimer 0 300
+853 pkg36-site Player_1 Pkg36RepairClock 0
+857 pkg36-site Player_1 Pkg36RepairClock 0
+857 pkg36-site Player_1 Pkg36RepairDisabled 0
+857 pkg36-site Player_1 Pkg36RepairNoTimer 0
+890 pkg36-site Player_1 Pkg36RepairClock 0
+891 destroy Player_1 Pkg36RepairClock 0
+891 destroy Player_1 Pkg36RepairDisabled 0
+891 destroy Player_1 Pkg36RepairNoTimer 0
+900 create Player_1 Pkg36Foundation 0 2450,1140,0
+905 pkg36-foundation Player_1 Pkg36Foundation 0 Pkg36SelfBuild
+910 pkg36-site Player_1 Pkg36SelfBuild 0
+960 pkg36-site Player_1 Pkg36SelfBuild 0
+961 destroy Player_1 Pkg36SelfBuild 0
+962 destroy Player_1 Pkg36Foundation 0
+970 create Player_1 Pkg36Foundation 0 2450,1140,0
+975 pkg36-foundation Player_1 Pkg36Foundation 0 Pkg36SelfControl
+980 pkg36-site Player_1 Pkg36SelfControl 0
+999 cancelbuild Player_1 Pkg36SelfControl 0
+1000 destroy Player_1 Pkg36Foundation 0
+1040 create Player_1 Pkg36ContactTarget 0 2500,1200,0
+1040 create Player_1 Pkg36DaleContact 0 2400,1170,0
+1045 pkg36-damage Player_1 Pkg36ContactTarget 0 300
+1047 repair Player_1 Pkg36DaleContact 0 Pkg36ContactTarget
+1048 pkg36-dock Player_1 Pkg36DaleContact 0
+1049 destroy Player_1 Pkg36DaleContact 0
+1050 create Player_1 Pkg36DaleControl 0 2400,1170,0
+1052 repair Player_1 Pkg36DaleControl 0 Pkg36ContactTarget
+1053 pkg36-dock Player_1 Pkg36DaleControl 0
+1054 destroy Player_1 Pkg36DaleControl 0
+1060 create Player_1 ArnorBreelandPeasantHorde 0 2380,1200,0
+1060 create Player_1 Pkg36HordeControl 0 2350,1240,0
+1070 power Player_1 ArnorBreelandPeasantHorde 0 SpecialRepairStructure
+1071 aim Player_1 ArnorBreelandPeasantHorde 0 Player_1:Pkg36ContactTarget:0
+1075 pkg36-horde Player_1 ArnorBreelandPeasantHorde 0
+1075 pkg36-horde Player_1 Pkg36HordeControl 0
+1090 pkg36-site Player_1 Pkg36ContactTarget 0
+1091 destroy Player_1 ArnorBreelandPeasantHorde 0
+1091 destroy Player_1 Pkg36HordeControl 0
+1091 destroy Player_1 Pkg36ContactTarget 0
+1120 create Player_1 Pkg36Porter 0 2440,1120,0
+1130 pkg08-rebuild Player_1 Pkg36Porter 0 IsengardCampKeep 2540 1220 0
+1132 pkg36-site Player_1 IsengardCampKeep 0
+1320 pkg36-site Player_1 IsengardCampKeep 0
+1321 cancelbuild Player_1 IsengardCampKeep 0
+1322 pkg08-rebuild Player_1 Pkg36Porter 0 Pkg36NoRiseKeep 2540 1220 0
+1324 pkg36-site Player_1 Pkg36NoRiseKeep 0
+1330 cancelbuild Player_1 Pkg36NoRiseKeep 0
+1331 destroy Player_1 Pkg36Porter 0
