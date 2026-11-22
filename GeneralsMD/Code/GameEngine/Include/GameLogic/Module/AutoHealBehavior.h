@@ -40,6 +40,8 @@
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/DamageModule.h"
 #include "Common/BitFlagsIO.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 
 class ParticleSystem;
 class ParticleSystemTemplate;
@@ -59,6 +61,8 @@ public:
 	Bool									m_skipSelfForHealing; ///< Don't heal myself.
 	Bool									m_nonStackable;
 	Bool									m_affectsContained;
+	Bool m_buttonTriggered = FALSE;
+	Bool m_healOnlyIfNotInCombat = FALSE;
 	KindOfMaskType				m_kindOf;	//Only these types can heal -- defaults to everything.
 	KindOfMaskType				m_forbiddenKindOf;	//Only these types can heal -- defaults to everything.
 	const ParticleSystemTemplate*				m_radiusParticleSystemTmpl;					//Optional particle system meant to apply to entire effect for entire duration.
@@ -106,6 +110,16 @@ public:
 		UpdateModuleData::buildFieldParse(p);
 		p.add(dataFieldParse);
 		p.add(UpgradeMuxData::getFieldParse(), offsetof( AutoHealBehaviorModuleData, m_upgradeMuxData ));
+		if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+		{
+			static const FieldParse retailFields[] =
+			{
+				{ "ButtonTriggered", INI::parseBool, nullptr, offsetof(AutoHealBehaviorModuleData, m_buttonTriggered) },
+				{ "HealOnlyIfNotInCombat", INI::parseBool, nullptr, offsetof(AutoHealBehaviorModuleData, m_healOnlyIfNotInCombat) },
+				{ nullptr, nullptr, nullptr, 0 }
+			};
+			p.add(retailFields);
+		}
 	}
 
 };
@@ -142,13 +156,15 @@ public:
 	virtual DisabledMaskType getDisabledTypesToProcess() const override { return MAKE_DISABLED_MASK( DISABLED_HELD ); }
 
 	void stopHealing();
+	static void triggerRetailButtonHealing(Object* healer);
 	void undoUpgrade(); ///<pretend like we have not been activated yet, so we can be reactivated later
 
 protected:
 
 	virtual void upgradeImplementation() override
 	{
-		setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
+		if (!getAutoHealBehaviorModuleData()->m_buttonTriggered)
+			setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
 	}
 
 	virtual void getUpgradeActivationMasks(UpgradeMaskType& activation, UpgradeMaskType& conflicting) const override

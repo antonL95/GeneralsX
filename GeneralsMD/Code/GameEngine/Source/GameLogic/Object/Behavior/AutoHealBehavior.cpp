@@ -40,6 +40,7 @@
 #include "GameClient/Anim2D.h"
 #include "GameClient/InGameUI.h"
 #include "GameLogic/Module/AutoHealBehavior.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/GameLogic.h"
@@ -87,6 +88,18 @@ static void checkForAutoHeal( Object *testObj, void *userData )
 	listToAddTo->push_back(testObj);
 }
 
+static Bool healerHasCombatTarget(const Object* obj)
+{
+	const AIUpdateInterface* ai = obj->getAI();
+	if (ai && ai->getCurrentVictim())
+		return TRUE;
+	const Object* horde = obj->getContainedBy();
+	if (!horde || !horde->isKindOf(KINDOF_HORDE))
+		return FALSE;
+	ai = horde->getAI();
+	return ai && ai->getCurrentVictim();
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 AutoHealBehavior::AutoHealBehavior( Thing *thing, const ModuleData* moduleData ) : UpdateModule( thing, moduleData )
@@ -103,7 +116,10 @@ AutoHealBehavior::AutoHealBehavior( Thing *thing, const ModuleData* moduleData )
 		// start these guys with random phasings so that we don't
 		// have all of 'em check on the same frame.
 		UnsignedInt delay = getAutoHealBehaviorModuleData()->m_healingDelay;
-		setWakeFrame(getObject(), UPDATE_SLEEP(GameLogicRandomValue(1, delay)));
+		if (d->m_buttonTriggered)
+			setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
+		else
+			setWakeFrame(getObject(), UPDATE_SLEEP(GameLogicRandomValue(1, delay)));
 	}
 	else
 	{
@@ -145,6 +161,8 @@ void AutoHealBehavior::onDamage( DamageInfo *damageInfo )
 		return;
 
 	const AutoHealBehaviorModuleData *d = getAutoHealBehaviorModuleData();
+	if (d->m_buttonTriggered)
+		return;
 	if (isUpgradeActive() && d->m_radius == 0.0f)
 	{
 		// if this is nonzero, getting damaged resets our healing process. so go to
@@ -181,6 +199,9 @@ UpdateSleepTime AutoHealBehavior::update()
 		return UPDATE_SLEEP_FOREVER;
 	}
 
+	if (d->m_healOnlyIfNotInCombat && healerHasCombatTarget(obj))
+		return UPDATE_SLEEP(d->m_startHealingDelay ? d->m_startHealingDelay : LOGICFRAMES_PER_SECOND);
+
 	// TheSuperHackers @bugfix stephanmeesters 18/04/2026 Delay emitter creation until update, to ensure that the particle
 	// systems are not created before ParticleManager has xfer-loaded.
 	createEmitters();
@@ -210,7 +231,7 @@ UpdateSleepTime AutoHealBehavior::update()
 			}
 			objectsToHeal.clear();
 		}
-		return UPDATE_SLEEP(d->m_healingDelay);
+		return UPDATE_SLEEP(d->m_buttonTriggered && d->m_singleBurst ? UPDATE_SLEEP_FOREVER : d->m_healingDelay);
 	}
 	else if( d->m_affectsContained )
 	{
@@ -241,7 +262,7 @@ UpdateSleepTime AutoHealBehavior::update()
 		if( body->getHealth() < body->getMaxHealth() )
 		{
   		pulseHealObject( obj );
-			return UPDATE_SLEEP(d->m_healingDelay);
+			return UPDATE_SLEEP(d->m_buttonTriggered && d->m_singleBurst ? UPDATE_SLEEP_FOREVER : d->m_healingDelay);
 		}
 		else
 		{
@@ -300,6 +321,17 @@ UpdateSleepTime AutoHealBehavior::update()
 	}
 }
 
+void AutoHealBehavior::triggerRetailButtonHealing(Object* healer)
+{
+	for (BehaviorModule** modules = healer->getBehaviorModules(); *modules; ++modules)
+	{
+		auto* healing = dynamic_cast<AutoHealBehavior*>(*modules);
+		if (healing && healing->getAutoHealBehaviorModuleData()->m_buttonTriggered &&
+			healing->isUpgradeActive() && !healing->m_stopped)
+			healing->setWakeFrame(healer, UPDATE_SLEEP_NONE);
+	}
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void AutoHealBehavior::pulseHealObject( Object *obj, Bool contained )
@@ -316,7 +348,7 @@ void AutoHealBehavior::pulseHealObject( Object *obj, Bool contained )
 			return;
 	}
 
-	if ( !contained && data->m_radius == 0.0f )
+	if ( (!contained || RetailFileLayers::enabled()) && data->m_radius == 0.0f )
 		obj->attemptHealing(data->m_healingAmount, getObject());
 	else
 		obj->attemptHealingFromSoleBenefactor( data->m_healingAmount, getObject(), data->m_healingDelay );

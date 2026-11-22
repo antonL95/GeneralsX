@@ -56,6 +56,7 @@
 #include "GameLogic/Module/DeletionUpdate.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/WorkerAIUpdate.h"
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/ScriptEngine.h"
@@ -616,6 +617,9 @@ void SpecialPowerModule::triggerSpecialPower( const Coord3D *location )
 		applyRotwkTrigger( location );
 
 	applyPowerEffect(location);
+	const SpecialPowerType power = getSpecialPowerTemplate()->getSpecialPowerType();
+	if (RetailFileLayers::enabled() && (power == SPECIAL_ATHELAS || power == SPECIAL_ELVEN_GRACE))
+		AutoHealBehavior::triggerRetailButtonHealing(getObject());
 	createViewObject(location);
 
 	// we won't be able to use the power for X number of frames now
