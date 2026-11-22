@@ -443,12 +443,13 @@ UpdateSleepTime HordeAIUpdate::update()
 	if (cavalry)
 	{
 		m_cavalryTurn = turn;
-		m_cavalryTurnSinceReform = stdAngleDiff(m_cavalryTurnSinceReform + turn, 0.0f);
-		if (fabs(m_cavalryTurnSinceReform) >= PI / 3.0f)
+#if RTS_ZEROHOUR
+		if (locomotor && fabs(turn) > locomotor->getMaxTurnWithoutReform())
 		{
 			const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
-			m_cavalryTurnSinceReform = 0.0f;
+			m_cavalryTurn = 0.0f;
 		}
+#endif
 	}
 	else if (fabs(turn) > FORMATION_REFORM_ANGLE)
 	{
@@ -461,10 +462,15 @@ UpdateSleepTime HordeAIUpdate::update()
 		{
 			const Real turnRate = locomotor->getMaxTurnRate(horde->getBodyModule()->getDamageState());
 			if (turnRate > 0.0f)
-				m_reformUntil = TheGameLogic->getFrame() + static_cast<UnsignedInt>(WWMath::Ceil(fabs(turn) / turnRate));
+				m_reformUntil = TheGameLogic->getFrame() +
+					static_cast<UnsignedInt>(WWMath::Ceil(fabs(turn) / turnRate)) + contain->getFormationReformTravelFrames();
 		}
 #endif
 	}
+#if RTS_ZEROHOUR
+	if (m_reformUntil && contain->getFormationReformTravelFrames() == 0)
+		m_reformUntil = 0;
+#endif
 	if (m_reformUntil && (!isMoving() || m_reformUntil <= TheGameLogic->getFrame()))
 		m_reformUntil = 0;
 

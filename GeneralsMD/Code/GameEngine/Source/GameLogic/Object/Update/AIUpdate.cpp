@@ -69,6 +69,7 @@
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
 #include "GameLogic/Module/HackInternetAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
 #include "Common/AttributeModifierRules.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
@@ -2373,7 +2374,8 @@ Bool AIUpdateInterface::steerInFormation()
 	obj->setModelConditionState(MODELCONDITION_MOVING);
 	if (goal.backing)
 		m_curLocomotor->locoUpdate_moveTowardsFormationSlot(obj, goal.position, goal.distance, goal.speed, TRUE, goal.backingSource);
-	else if (m_curLocomotor->getAppearance() == LOCO_LEGS_TWO)
+	else if (m_curLocomotor->getAppearance() == LOCO_LEGS_TWO &&
+		!HordeAIUpdate::isReforming(obj->getContainedBy()->getAI()))
 	{
 		Bool blocked = FALSE;
 		m_curLocomotor->locoUpdate_moveTowardsPosition(obj, goal.position, goal.distance, goal.speed, &blocked);

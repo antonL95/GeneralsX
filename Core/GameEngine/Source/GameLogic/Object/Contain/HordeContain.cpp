@@ -1425,6 +1425,12 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 		const Real leadFrames = std::min(FORMATION_LEAD_FRAMES,
 			hordeSpeed > 0.0f ? remaining / hordeSpeed : FORMATION_LEAD_FRAMES);
 		const Real angle = std::clamp(turn * leadFrames, -PI / 4.0f, PI / 4.0f);
+		if (angle != 0.0f)
+		{
+			const Real midpoint = horde->getOrientation() + angle * 0.5f;
+			leadX = hordeSpeed * leadFrames * Cos(midpoint);
+			leadY = hordeSpeed * leadFrames * Sin(midpoint);
+		}
 		const Real offsetX = goal.slot.x - anchor.x;
 		const Real offsetY = goal.slot.y - anchor.y;
 		const Real cosAngle = Cos(angle);
@@ -1661,6 +1667,49 @@ Real HordeContain::getFormationSpeedScale() const
 	const Real scale = 1.0f - (lag - FORMATION_SLOW_ERROR) / (FORMATION_STOP_ERROR - FORMATION_SLOW_ERROR);
 	return std::max(FORMATION_MIN_SPEED_SCALE, scale);
 }
+
+#if RTS_ZEROHOUR
+Real HordeContain::getCavalryWheelRate(Real radius) const
+{
+	const Coord3D& anchor = *getObject()->getPosition();
+	Real limit = FAST_AS_POSSIBLE;
+	for (const Object* member : getContainList())
+	{
+		const AIUpdateInterface* ai = member->getAI();
+		const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+		if (!locomotor || member->isEffectivelyDead() || ai->isAttacking() ||
+			(getMemberSlot(member->getID()) < 0 && !isBannerCarrier(member)))
+			continue;
+		const Coord3D slot = getMemberPosition(member->getID(), FALSE);
+		const Real reach = WWMath::SqrtfOrigin(sqr(slot.x - anchor.x) + sqr(slot.y - anchor.y));
+		const auto damage = member->getBodyModule()->getDamageState();
+		const Real speed = locomotor->getMaxSpeedForCondition(damage, member);
+		if (speed > 0.0f)
+			limit = std::min(limit, speed / (radius + reach));
+	}
+	return limit;
+}
+
+UnsignedInt HordeContain::getFormationReformTravelFrames() const
+{
+	Real frames = 0.0f;
+	for (const Object* member : getContainList())
+	{
+		const AIUpdateInterface* ai = member->getAI();
+		const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+		if (!locomotor || member->isEffectivelyDead() || ai->isAttacking() || getMemberSlot(member->getID()) < 0)
+			continue;
+		const Coord3D slot = getMemberPosition(member->getID(), FALSE);
+		const Coord3D& position = *member->getPosition();
+		const Real errorSquared = sqr(position.x - slot.x) + sqr(position.y - slot.y);
+		const Real radius = member->getGeometryInfo().getBoundingCircleRadius();
+		const Real speed = locomotor->getMaxSpeedForCondition(member->getBodyModule()->getDamageState(), member);
+		if (speed > 0.0f && errorSquared > sqr(radius))
+			frames = std::max(frames, (WWMath::SqrtfOrigin(errorSquared) - radius) / speed);
+	}
+	return static_cast<UnsignedInt>(WWMath::Ceil(frames));
+}
+#endif
 
 void HordeContain::reassignSlotsByPosition()
 {

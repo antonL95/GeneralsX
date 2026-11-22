@@ -162,6 +162,10 @@ public:
 	static void constrainGroundMovement(const Object* member, Coord3D& movement);
 	static void separateGroundMovement(const Object* member, Coord3D& movement);
 	Real getFormationSpeedScale() const;
+#if RTS_ZEROHOUR
+	Real getCavalryWheelRate(Real radius) const;
+	UnsignedInt getFormationReformTravelFrames() const;
+#endif
 	void reassignSlotsByPosition();
 	Bool canSetAlternateFormation(Bool alternate) const;
 	Bool isAlternateFormation() const;
