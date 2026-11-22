@@ -253,7 +253,6 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 
 const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 {
-	{ "FXTrigger", INI::parseIndexList, RetailDamageFXTriggerNames, offsetof(WeaponTemplate, m_retailFXTrigger) },
 	{ "CanBeDodged", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canBeDodged) },
 	{ "DamageNugget", WeaponNugget::parseDamageNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DOTNugget", WeaponNugget::parseDOTNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },

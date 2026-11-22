@@ -38,6 +38,15 @@ namespace
 constexpr UnsignedInt FILTER_ALL = 1u << 10;
 constexpr Int MAX_WARHEAD_DEPTH = 2;
 
+RetailDamageFXTrigger damageFXTrigger(const AsciiString& name)
+{
+	if (name.compareNoCase(RetailDamageFXTriggerNames[RETAIL_DAMAGE_FX_CATAPULT_ROCK]) == 0)
+		return RETAIL_DAMAGE_FX_CATAPULT_ROCK;
+	if (name.compareNoCase(RetailDamageFXTriggerNames[RETAIL_DAMAGE_FX_TREBUCHET_ROCK]) == 0)
+		return RETAIL_DAMAGE_FX_TREBUCHET_ROCK;
+	return RETAIL_DAMAGE_FX_NONE;
+}
+
 Bool hasUpgrade(const Object* obj, const UpgradeTemplate* upgrade)
 {
 	if (!obj || !upgrade)
@@ -563,7 +572,7 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 	const Object* attacker = getNuggetAttacker(impactSource);
 	const ProjectileUpdateInterface* projectile = projectileInterface(impactSource);
 	const WeaponTemplate* launchWeapon = projectile ? projectile->projectileGetLaunchWeapon() : nullptr;
-	const RetailDamageFXTrigger launchTrigger = launchWeapon ? launchWeapon->m_retailFXTrigger : RETAIL_DAMAGE_FX_NONE;
+	const RetailDamageFXTrigger launchTrigger = launchWeapon ? damageFXTrigger(launchWeapon->m_fxTrigger) : RETAIL_DAMAGE_FX_NONE;
 	const PhysicsBehavior* physics = impactSource ? impactSource->getPhysics() : nullptr;
 	const Coord3D velocity = physics ? *physics->getVelocity() : Coord3D{};
 	const ObjectID nuggetSourceID = attacker ? attacker->getID() : sourceID;
@@ -703,6 +712,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		return;
 	}
 
+	const RetailDamageFXTrigger warheadTrigger = damageFXTrigger(m_fxTrigger);
 	const auto damage = [&](Object* victim, Bool killSelf)
 	{
 		const Real scalar = nugget.scalarFor(source, victim);
@@ -716,7 +726,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damageInfo.in.m_sourceID = sourceID;
 		damageInfo.in.m_sourcePlayerMask = source && source->getControllingPlayer() ? source->getControllingPlayer()->getPlayerMask() : 0;
 		damageInfo.in.m_amount = amount;
-		damageInfo.retailFXTrigger = m_retailFXTrigger != RETAIL_DAMAGE_FX_NONE ? m_retailFXTrigger : launchTrigger;
+		damageInfo.retailFXTrigger = warheadTrigger != RETAIL_DAMAGE_FX_NONE ? warheadTrigger : launchTrigger;
 		if (impactVelocity)
 			damageInfo.impactVelocity = *impactVelocity;
 		else if (source && source->getPhysics())

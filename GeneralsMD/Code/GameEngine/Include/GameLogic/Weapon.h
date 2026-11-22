@@ -652,7 +652,6 @@ private:
 	Bool m_meleeWeapon;
 	Bool m_hitStoredTarget;
 	Bool m_bombardType;
-	RetailDamageFXTrigger m_retailFXTrigger = RETAIL_DAMAGE_FX_NONE;
 	Bool m_canBeDodged = FALSE;
 	Bool m_noVictimNeeded;
 	Bool m_useInnateAttributes;
