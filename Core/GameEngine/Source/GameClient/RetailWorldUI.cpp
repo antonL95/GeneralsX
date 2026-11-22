@@ -56,6 +56,71 @@ Bool isVisibleUnit(Drawable* draw)
 	return isVisibleSelectionDrawable(draw) && !draw->getObject()->isKindOf(KINDOF_STRUCTURE);
 }
 
+Bool drawsHordeRank(const HordeContain& horde, const Object& member)
+{
+	if (horde.isBannerCarrier(&member))
+		return TRUE;
+
+	const auto& members = *horde.getContainedItemsList();
+	const auto first = std::ranges::find_if(members, [](const Object* candidate) {
+		return !candidate->isEffectivelyDead();
+	});
+	return first != members.end() && *first == &member &&
+		std::ranges::none_of(members, [&horde](const Object* candidate) {
+			return !candidate->isEffectivelyDead() && horde.isBannerCarrier(candidate);
+		});
+}
+
+Bool usesEvilRankPips(const Object& object)
+{
+	const AsciiString& side = object.getTemplate()->getDefaultOwningSide();
+	for (Int i = 0; i < ThePlayerTemplateStore->getPlayerTemplateCount(); ++i)
+	{
+		const PlayerTemplate* faction = ThePlayerTemplateStore->getNthPlayerTemplate(i);
+		if (faction->getSide() == side)
+			return faction->isEvil();
+	}
+	return FALSE;
+}
+
+void drawRank(const Object& object, Int rank, Int center, Int barTop)
+{
+	if (!TheMappedImageCollection)
+		return;
+
+	constexpr Int ranksPerStar = 5;
+	constexpr Real rankBottomAboveHealthBar = 5.0f;
+	const Real zoom = TheTacticalView->getZoom();
+	if (zoom <= 0.0f)
+		return;
+
+	const Real scaleX = TheDisplay->getWidth() / (2048.0f * zoom);
+	const Real scaleY = TheDisplay->getHeight() / (1536.0f * zoom);
+	const Real gapX = 2.0f * scaleX;
+	const Real gapY = 2.0f * scaleY;
+	const Bool evil = usesEvilRankPips(object);
+	const Image* dot = TheMappedImageCollection->findImageByName(evil ? "Evil_Vet_Dot" : "Good_Vet_Dot");
+	const Image* star = TheMappedImageCollection->findImageByName(evil ? "Evil_Vet" : "Good_Vet");
+	const auto drawRow = [&](const Image* image, Int count, Real bottom) {
+		if (!image || count == 0)
+			return;
+		const Real width = image->getImageWidth() * scaleX;
+		const Real top = bottom - image->getImageHeight() * scaleY;
+		const Real rowWidth = count * width + (count - 1) * gapX;
+		for (Int index = 0; index < count; ++index)
+		{
+			const Real left = center - rowWidth * 0.5f + index * (width + gapX);
+			TheDisplay->drawImage(image, static_cast<Int>(left), static_cast<Int>(top),
+				static_cast<Int>(left + width), static_cast<Int>(bottom));
+		}
+	};
+
+	const Real dotBottom = barTop - rankBottomAboveHealthBar;
+	const Real dotHeight = dot ? dot->getImageHeight() * scaleY : 0.0f;
+	drawRow(dot, rank % ranksPerStar, dotBottom);
+	drawRow(star, rank / ranksPerStar, dotBottom - dotHeight - gapY);
+}
+
 void groundLine(View& view, Coord3D start, Coord3D end, Real width, Color color)
 {
 	start.z = TheTerrainLogic->getGroundHeight(start.x, start.y) + 1.0f;
@@ -362,9 +427,12 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 	const DrawableID hover = TheInGameUI->getMousedOverDrawableID();
 	const Bool showBar = TheGlobalData->m_showObjectHealth &&
 		(group->isSelected() || drawable.getID() == hover);
-	const ExperienceTracker* tracker = (anchor ? anchor : obj)->getExperienceTracker();
+	const Object& rankObject = anchor ? *anchor : *obj;
+	const ExperienceTracker* tracker = rankObject.getExperienceTracker();
 	const Int rank = tracker ? tracker->getRank() : 1;
-	const Bool showRank = rank > 1 && (!anchor || HordeContain::get(anchor)->isBannerCarrier(obj)) && isVisibleUnit(&drawable);
+	const Bool showRank = rank > 1 && (!anchor || drawsHordeRank(*HordeContain::get(anchor), *obj)) &&
+		TheGlobalData->m_veterancyPipDrawFilter.matchesObject(nullptr, &rankObject) &&
+		(tracker->getRetailThreshold() > 1 || ExperienceLevelStore::nextThreshold(&rankObject, tracker->getRetailThreshold()) > 0);
 	const Real lifetime = (group->isSelected() || drawable.getID() == hover) && obj->isLocallyControlled()
 		? remainingLifetime(anchor ? *anchor : *obj) : 0.0f;
 	if (!showBar && !showRank && lifetime <= 0.0f)
@@ -423,43 +491,7 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 	if (lifetime > 0.0f)
 		drawLifetimeBar(screen.x - width / 2, barTop + height + 3 * edge, width, 2 * edge, lifetime);
 	if (showRank)
-	{
-		const Player* owner = obj->getControllingPlayer();
-		const PlayerTemplate* side = owner ? owner->getPlayerTemplate() : nullptr;
-		const Bool evil = side && side->isEvil();
-		const Image* star = TheMappedImageCollection ?
-			TheMappedImageCollection->findImageByName(evil ? "Evil_Vet" : "Good_Vet") : nullptr;
-		const Image* dot = TheMappedImageCollection ?
-			TheMappedImageCollection->findImageByName(evil ? "Evil_Vet_Dot" : "Good_Vet_Dot") : nullptr;
-		if (anchor && dot)
-		{
-			const Int pipSize = std::max(1, static_cast<Int>(dot->getImageWidth() * scale * 0.5f));
-			const Int pips = std::min(rank, 10);
-			const Int spacing = std::max(1, static_cast<Int>(2.0f * scale));
-			const Int x = screen.x - (pips * pipSize + (pips - 1) * spacing) / 2;
-			const Int y = barTop - edge - spacing - pipSize;
-			for (Int index = 0; index < pips; ++index)
-			{
-				const Int pipX = x + index * (pipSize + spacing);
-				TheDisplay->drawImage(dot, pipX, y, pipX + pipSize, y + pipSize);
-			}
-			return;
-		}
-		if (!star)
-			return;
-		const Int starSize = std::max(1, static_cast<Int>(star->getImageWidth() * scale * 0.5f));
-		const Int dotSize = dot ? std::max(1, static_cast<Int>(dot->getImageWidth() * scale * 0.5f)) : 0;
-		const Int dots = dot ? std::min(rank, 10) - 2 : 0;
-		const Int x = screen.x - (starSize + dots * dotSize) / 2;
-		const Int y = (showBar ? barTop - edge : screen.y - 6 * edge) - starSize;
-		TheDisplay->drawImage(star, x, y, x + starSize, y + starSize);
-		for (Int index = 0; index < dots; ++index)
-		{
-			const Int dotX = x + starSize + index * dotSize;
-			const Int dotY = y + (starSize - dotSize) / 2;
-			TheDisplay->drawImage(dot, dotX, dotY, dotX + dotSize, dotY + dotSize);
-		}
-	}
+		drawRank(rankObject, rank, screen.x, barTop);
 }
 
 void RetailWorldUI::drawSelection(View& view, const IRegion2D* dragRegion,

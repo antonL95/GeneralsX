@@ -235,6 +235,7 @@ public:
 	Real m_viewportHeightScale; // The height scale of the tactical view ranging 0..1. Used to hide the world behind the Control Bar.
 	Real m_cameraPitch;
 	SpecialPowerObjectFilter m_victoryStructureFilter;
+	SpecialPowerObjectFilter m_veterancyPipDrawFilter;
 	Real m_terrainResourceCellSize = 20.0f;
 	Bool m_useSimpleHordeDecals = FALSE;
 	Bool m_useSimpleMergeDecals = FALSE;

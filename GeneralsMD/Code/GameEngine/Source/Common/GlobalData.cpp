@@ -1294,6 +1294,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	};
 	static const FieldParse retailFields[] =
 	{
+		{ "VeterancyPipDrawObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(GlobalData, m_veterancyPipDrawFilter) },
 		{ "DefaultCameraPitchAngle", INI::parseReal, nullptr, offsetof(GlobalData, m_cameraPitch) },
 		{ "DefaultCameraYawAngle", INI::parseReal, nullptr, offsetof(GlobalData, m_cameraYaw) },
 		{ "DefaultCameraMinHeight", INI::parseReal, nullptr, offsetof(GlobalData, m_minCameraHeight) },

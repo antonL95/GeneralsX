@@ -1272,6 +1272,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	};
 	static const FieldParse retailFields[] =
 	{
+		{ "VeterancyPipDrawObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(GlobalData, m_veterancyPipDrawFilter) },
 		{ "MultiPlayBuildingXPMult", parseMultiplayerXP, nullptr, offsetof(GlobalData, m_multiPlayBuildingXPMult) },
 		{ "MultiPlayUnitXPMult", parseMultiplayerXP, nullptr, offsetof(GlobalData, m_multiPlayUnitXPMult) },
 		{ "TerrainResourceCellSize", INI::parseReal, nullptr, offsetof(GlobalData, m_terrainResourceCellSize) },
