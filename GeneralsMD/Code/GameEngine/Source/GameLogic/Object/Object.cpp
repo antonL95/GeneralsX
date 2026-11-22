@@ -118,6 +118,7 @@
 #include "GameLogic/Module/UpgradeModule.h"
 
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptEngine.h"
@@ -2151,6 +2152,9 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 	BodyModuleInterface* body = getBodyModule();
 	if (body)
 		body->attemptDamage( damageInfo );
+	if (RetailFileLayers::enabled() && body && damageInfo->out.m_actualDamageClipped > 0.0f && !isEffectivelyDead())
+		if (const Object* source = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID); source && getRelationship(source) == ENEMIES)
+			EmotionTrackerUpdate::signal(this, EMOTION_ALERT, source);
 	if (RetailSkirmishProbe::enabled() && body && isKindOf(KINDOF_STRUCTURE))
 		RetailSkirmishProbe::structureDamage(*this, *damageInfo);
 
@@ -5197,6 +5201,16 @@ void Object::onDie( DamageInfo *damageInfo )
 	}
 
 	RetailTestCommands::logHordeDeath(this, damageInfo);
+	if (RetailFileLayers::enabled())
+	{
+		Object* killer = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID);
+		if (killer && getRelationship(killer) == ENEMIES)
+		{
+			EmotionTrackerUpdate::signal(killer, EMOTION_CHEER, this);
+			if (Object* horde = HordeContain::getAnchor(killer))
+				EmotionTrackerUpdate::signal(horde, EMOTION_CHEER, this);
+		}
+	}
 	if (RetailSkirmishProbe::enabled())
 		RetailSkirmishProbe::death(*this, damageInfo->in.m_sourceID);
 

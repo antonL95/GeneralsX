@@ -100,6 +100,8 @@ protected:
 
 	void positionForLaunch(const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse);
 	Bool hasLaunched() const { return m_lifespanFrame != 0 || !m_flightPath.empty(); }
+	Bool isApproachingLanding(UnsignedInt lead) const;
+	const Coord3D& landingPosition() const { return m_flightPathEnd; }
 	void detonate(const Object* hit = nullptr);
 
 private:

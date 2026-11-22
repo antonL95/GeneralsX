@@ -67,6 +67,7 @@
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
 #include "GameLogic/Module/HackInternetAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #include "Common/AttributeModifierRules.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/HordeUpdate.h"
@@ -225,6 +226,8 @@ Int AIUpdateModuleData::findLocomotorSetType(const AsciiString& name)
 	}
 	if (name.compareNoCase("SET_MOUNTED") == 0)
 		return LOCOMOTORSET_MOUNTED;
+	if (name.compareNoCase("SET_ENRAGED") == 0)
+		return LOCOMOTORSET_ENRAGED;
 	return -1;
 }
 
@@ -845,6 +848,14 @@ void AIUpdateInterface::setLocomotorUpgrade(Bool set)
 //=============================================================================
 Bool AIUpdateInterface::chooseLocomotorSet(LocomotorSetType wst)
 {
+	if (wst == LOCOMOTORSET_NORMAL && RetailFileLayers::enabled() && getObject()->testStatus(OBJECT_STATUS_ENRAGED))
+	{
+		const auto* tmpl = getObject()->getTemplate();
+		if (tmpl->findRotWKLocomotor(LOCOMOTORSET_ENRAGED))
+			wst = LOCOMOTORSET_ENRAGED;
+		else if (tmpl->getDefaultOwningSide().compareNoCase("Civilian") == 0 && tmpl->findRotWKLocomotor(LOCOMOTORSET_PANIC))
+			wst = LOCOMOTORSET_PANIC;
+	}
 	DEBUG_ASSERTCRASH(wst != LOCOMOTORSET_NORMAL_UPGRADED, ("never pass LOCOMOTORSET_NORMAL_UPGRADED here"));
 	if (wst == LOCOMOTORSET_NORMAL && RetailFileLayers::enabled() && getObject()->testWeaponSetFlag(WEAPONSET_MOUNTED) &&
 		getObject()->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_MOUNTED))
@@ -2762,6 +2773,9 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 	// TheSuperHackers @info The AiCommandParms for m_obj, m_otherObj and m_team should be null tested before use.
 	// These variables could relate to a deleted object when a pending command is reconstituted.
 
+	if (RetailFileLayers::enabled() && parms->m_cmdSource == CMD_FROM_PLAYER &&
+		EmotionTrackerUpdate::blocksPlayerCommands(getObject()))
+		return;
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
 	m_retailPlannerAttackTarget = INVALID_ID;

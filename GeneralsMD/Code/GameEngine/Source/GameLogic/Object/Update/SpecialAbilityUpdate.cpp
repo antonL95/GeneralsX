@@ -2283,6 +2283,8 @@ void SpecialAbilityUpdate::addAbilityConditions( ModelConditionFlags &flags ) co
 Bool SpecialAbilityUpdate::acceptsIntent( const Object *, const Coord3D * ) const
 {
 	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
+	if (data->m_disableWhenWearingTheRing && getObject()->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE))
+		return FALSE;
 	return AbilityRules::conditionsAllow( data->m_requiredConditions, data->m_rejectedConditions, abilityConditionsOf( getObject() ) );
 }
 

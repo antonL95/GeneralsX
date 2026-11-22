@@ -50,6 +50,7 @@ struct EventList
 {
 	std::string parent;
 	std::string handler;
+	std::map<std::string, std::string> enrageHandlers;
 };
 
 std::string readData(const char* path)
@@ -117,8 +118,12 @@ std::map<std::string, EventList> readEventLists(std::string xml)
 			if (fieldsEnd - fieldsStart > 1024)
 				continue;
 			const std::string fields = xml.substr(fieldsStart, fieldsEnd - fieldsStart);
-			if (attribute(fields, "EventName") == "OnBuildingComplete")
+			const auto event = attribute(fields, "EventName");
+			if (event == "OnBuildingComplete")
 				entry.handler = attribute(fields, "ScriptFunctionName");
+			else if (event == "OnAflame" || event == "OnQuenched" ||
+				event == "User45IsActive" || event == "User45IsNotActive")
+				entry.enrageHandlers[event] = attribute(fields, "ScriptFunctionName");
 		}
 		start = listEnd + 12;
 	}
@@ -304,4 +309,50 @@ void RetailBuildingEvents::complete(Object& object)
 		}
 		return;
 	}
+}
+
+int RetailBuildingEvents::enrageAction(const Object& object, const char* event)
+{
+	if (!RetailFileLayers::enabled() || !object.getAIUpdateInterface())
+		return -1;
+	static const auto lists = readEventLists(readData("Data\\Scripts\\ScriptEvents.xml"));
+	static const auto actions = []
+	{
+		std::map<std::string, int> result;
+		std::istringstream lua(readData("Data\\Scripts\\Scripts.lua"));
+		const std::regex definition(R"(^\s*function\s+(\w+)\s*\(self\)\s*$)");
+		const std::regex enrage(R"(^\s*ObjectSetEnragedState\(\s*self\s*,\s*(true|false)\s*\)\s*$)");
+		std::string function;
+		for (std::string line; std::getline(lua, line);)
+		{
+			line = line.substr(0, line.find("--"));
+			if (line.size() > 1024)
+			{
+				function.clear();
+				continue;
+			}
+			std::smatch match;
+			if (std::regex_match(line, match, definition))
+				function = match[1].str();
+			else if (!function.empty() && std::regex_match(line, match, enrage))
+				result[function] = match[1] == "true" ? 1 : 0;
+			else if (line.find_first_not_of(" \t\r") != std::string::npos &&
+				line.find("ObjectGrantUpgrade") == std::string::npos && line.find("ObjectRemoveUpgrade") == std::string::npos)
+				function.clear();
+		}
+		return result;
+	}();
+
+	auto list = lists.find(object.getAIUpdateInterface()->getRetailLuaEventsList().str());
+	for (std::size_t depth = 0; list != lists.end() && depth < lists.size(); ++depth)
+	{
+		const auto handler = list->second.enrageHandlers.find(event);
+		if (handler != list->second.enrageHandlers.end())
+		{
+			const auto action = actions.find(handler->second);
+			return action == actions.end() ? -1 : action->second;
+		}
+		list = lists.find(list->second.parent);
+	}
+	return -1;
 }

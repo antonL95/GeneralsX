@@ -3,6 +3,10 @@
 #include "GameLogic/Module/BezierProjectileBehavior.h"
 
 #include "Common/INI.h"
+#include "Common/RetailFileLayers.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
+#include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 #include "Common/Xfer.h"
 
 void BezierProjectileBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -59,6 +63,16 @@ UpdateSleepTime BezierProjectileBehavior::update()
 {
 	if (!hasLaunched())
 		return UPDATE_SLEEP_FOREVER;
+	const auto* data = getBezierProjectileBehaviorModuleData();
+	if (RetailFileLayers::enabled() && data->m_preLandingEmotion.compareNoCase("DOOM") == 0 &&
+		data->m_preLandingEmotionRadius > 0.0f && isApproachingLanding(data->m_preLandingStateTime))
+	{
+		SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(&landingPosition(), data->m_preLandingEmotionRadius, FROM_CENTER_2D);
+		MemoryPoolObjectHolder holder(iter);
+		for (Object* target = iter->first(); target; target = iter->next())
+			if (getObject()->getRelationship(target) == ENEMIES)
+				EmotionTrackerUpdate::signal(target, EMOTION_DOOM, getObject());
+	}
 	return DumbProjectileBehavior::update();
 }
 

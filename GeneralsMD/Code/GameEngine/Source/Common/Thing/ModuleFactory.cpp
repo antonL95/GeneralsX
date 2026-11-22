@@ -493,6 +493,9 @@ void ModuleFactory::init()
 		addModule( EmotionTrackerUpdate );
 		addModule( LargeGroupBonusUpdate );
 		addModule( BloodthirstyUpdate );
+		addModule( OneRingPenaltyUpdate );
+		addModule( EnragedBehavior );
+		addModule( EntEnragedUpdate );
 		addModule( AttributeModifierAuraUpdate );
 		addModule( PassiveAreaEffectBehavior );
 		addModule( AttributeModifierUpgrade );

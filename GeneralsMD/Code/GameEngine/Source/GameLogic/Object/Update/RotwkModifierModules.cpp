@@ -10,6 +10,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
@@ -21,27 +22,25 @@
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/RetailTestCommands.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/WeaponNugget.h"
+#include "WWMath/wwmath.h"
 
 #include <algorithm>
 
 namespace
 {
-enum EmotionType
-{
-	EMOTION_TAUNT, EMOTION_CHEER, EMOTION_HERO_CHEER, EMOTION_POINT, EMOTION_FEAR,
-	EMOTION_UNCONTROLLABLE_FEAR, EMOTION_TERROR, EMOTION_DOOM, EMOTION_ALERT,
-	EMOTION_QUARRELSOME, EMOTION_OVERRIDE, EMOTION_PRE_CRUSH, EMOTION_BRACE
-};
-
 const char* const emotionTypes[] = {
 	"TAUNT", "CHEER", "HERO_CHEER", "POINT", "FEAR", "UNCONTROLLABLE_FEAR", "TERROR", "DOOM",
 	"ALERT", "QUARRELSOME", "OVERRIDE", "CHEER_FOR_ABOUT_TO_CRUSH", "BRACE_FOR_BEING_CRUSHED", nullptr
@@ -204,6 +203,345 @@ Bool healedRecently(const BodyModuleInterface* body, UnsignedInt window)
 	const UnsignedInt* last = body->getLastHealingTimestamp();
 	return last && AttributeModifierRules::healedWithin(TheGameLogic->getFrame(), *last, window);
 }
+
+void setEnragedState(Object* object, Bool enabled)
+{
+	object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_ENRAGED), enabled);
+	if (enabled)
+	{
+		object->setWeaponSetFlag(WEAPONSET_ENRAGED);
+		object->setModelConditionState(MODELCONDITION_WEAPONSET_ENRAGED);
+	}
+	else
+	{
+		object->clearWeaponSetFlag(WEAPONSET_ENRAGED);
+		object->clearModelConditionState(MODELCONDITION_WEAPONSET_ENRAGED);
+	}
+	if (auto* ai = object->getAI())
+		if (object->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_ENRAGED) ||
+			(object->getTemplate()->getDefaultOwningSide().compareNoCase("Civilian") == 0 &&
+				object->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_PANIC)))
+			ai->chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+	if (traces())
+		std::fprintf(stderr, "TEST enrage frame=%u object=%s active=%d\n",
+			TheGameLogic->getFrame(), object->getTemplate()->getName().str(), enabled);
+}
+}
+
+void EnragedBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] = {
+		{ "EnragedLifeTimer", INI::parseDurationUnsignedInt, nullptr, offsetof(EnragedBehaviorModuleData, m_life) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	UpdateModuleData::buildFieldParse(p);
+	p.add(fields);
+}
+
+EnragedBehavior::~EnragedBehavior() = default;
+
+void EnragedBehavior::setEnraged(Bool enabled)
+{
+	Object* self = getObject();
+	if (!RetailFileLayers::enabled() || self->isEffectivelyDead())
+		return;
+	const UnsignedInt life = getEnragedBehaviorModuleData()->m_life;
+	m_end = enabled && life ? TheGameLogic->getFrame() + life : 0;
+	if (self->testStatus(OBJECT_STATUS_ENRAGED) != enabled)
+		setEnragedState(self, enabled);
+}
+
+UpdateSleepTime EnragedBehavior::update()
+{
+	const Object* self = getObject();
+	if (!RetailFileLayers::enabled() || self->isEffectivelyDead())
+		return UPDATE_SLEEP_FOREVER;
+	const Bool user45 = self->getLogicModelConditions().test(MODELCONDITION_USER_45);
+	const Bool aflame = self->testStatus(OBJECT_STATUS_AFLAME);
+	if (user45 != m_user45)
+	{
+		m_user45 = user45;
+		const Int action = RetailBuildingEvents::enrageAction(*self, user45 ? "User45IsActive" : "User45IsNotActive");
+		if (action >= 0)
+			setEnraged(action != 0);
+	}
+	if (aflame != m_aflame)
+	{
+		m_aflame = aflame;
+		const Int action = RetailBuildingEvents::enrageAction(*self, aflame ? "OnAflame" : "OnQuenched");
+		if (action >= 0)
+			setEnraged(action != 0);
+	}
+	if (m_end && TheGameLogic->getFrame() >= m_end)
+		setEnraged(FALSE);
+	return UPDATE_SLEEP_NONE;
+}
+
+void EnragedBehavior::xferState(Xfer* xfer)
+{
+	xfer->xferUnsignedInt(&m_end);
+	xfer->xferBool(&m_user45);
+	xfer->xferBool(&m_aflame);
+}
+
+void EnragedBehavior::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	xferState(xfer);
+}
+
+void EnragedBehavior::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	UpdateModule::xfer(xfer);
+	xferState(xfer);
+}
+
+void EnragedBehavior::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
+}
+
+void EntEnragedUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] = {
+		{ "HatedObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(EntEnragedUpdateModuleData, m_hated) },
+		{ "FriendlyDeadFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(EntEnragedUpdateModuleData, m_friendlyDead) },
+		{ "EnragedSearchDistance", INI::parseReal, nullptr, offsetof(EntEnragedUpdateModuleData, m_radius) },
+		{ "EnragedTime", INI::parseDurationUnsignedInt, nullptr, offsetof(EntEnragedUpdateModuleData, m_duration) },
+		{ "TimeUntilCanRageAgain", INI::parseDurationUnsignedInt, nullptr, offsetof(EntEnragedUpdateModuleData, m_cooldown) },
+		{ "EnragedTransitionTime", INI::parseDurationUnsignedInt, nullptr, offsetof(EntEnragedUpdateModuleData, m_transition) },
+		{ "EnragedTransitionFX", INI::parseFXList, nullptr, offsetof(EntEnragedUpdateModuleData, m_transitionFX) },
+		{ "EnragedOnBuffFX", INI::parseFXList, nullptr, offsetof(EntEnragedUpdateModuleData, m_onFX) },
+		{ "EnragedOffBuffFX", INI::parseFXList, nullptr, offsetof(EntEnragedUpdateModuleData, m_offFX) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	UpdateModuleData::buildFieldParse(p);
+	p.add(fields);
+}
+
+EntEnragedUpdate::~EntEnragedUpdate() = default;
+
+UpdateSleepTime EntEnragedUpdate::update()
+{
+	Object* self = getObject();
+	if (!RetailFileLayers::enabled() || self->isEffectivelyDead())
+		return UPDATE_SLEEP_FOREVER;
+	const auto* data = getEntEnragedUpdateModuleData();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const Bool burning = self->testStatus(OBJECT_STATUS_AFLAME);
+	const Bool recentlyQuenched = m_wasBurning && !burning;
+	m_wasBurning = burning;
+	if (m_end)
+	{
+		if (now < m_end)
+			return UPDATE_SLEEP_NONE;
+		m_end = 0;
+		m_cooldownEnd = now + data->m_cooldown;
+		setEnragedState(self, FALSE);
+		if (data->m_offFX)
+			FXList::doFXObj(data->m_offFX, self);
+	}
+	if (now < m_cooldownEnd || burning || data->m_radius <= 0.0f)
+		return UPDATE_SLEEP_NONE;
+
+	Object* nearestThreat = nullptr;
+	Bool friendlyLoss = FALSE;
+	Real nearestDistance = data->m_radius * data->m_radius;
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_radius, FROM_CENTER_2D);
+	MemoryPoolObjectHolder holder(iter);
+	for (Object* other = iter->first(); other; other = iter->next())
+	{
+		if (other == self || other->isDestroyed())
+			continue;
+		if (other->isEffectivelyDead())
+		{
+			if (self->getRelationship(other) == ALLIES && matchesEmotionFilter(data->m_friendlyDead, self, other))
+				friendlyLoss = TRUE;
+			continue;
+		}
+		if (!matchesEmotionFilter(data->m_hated, self, other))
+			continue;
+		const Real distance = squaredDistance(self, other);
+		if (distance < nearestDistance || (distance == nearestDistance && (!nearestThreat || other->getID() < nearestThreat->getID())))
+		{
+			nearestDistance = distance;
+			nearestThreat = other;
+		}
+	}
+	if (!nearestThreat && !friendlyLoss && !recentlyQuenched)
+		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND / 5);
+
+	m_end = now + std::max(data->m_duration, 1u);
+	setEnragedState(self, TRUE);
+	if (data->m_transition && !self->isDisabledByType(DISABLED_PARALYZED))
+		self->setDisabledUntil(DISABLED_PARALYZED, now + data->m_transition);
+	if (data->m_transitionFX)
+		FXList::doFXObj(data->m_transitionFX, self);
+	if (data->m_onFX)
+		FXList::doFXObj(data->m_onFX, self);
+	if (nearestThreat && self->getTemplate()->getDefaultOwningSide().compareNoCase("Civilian") == 0)
+		if (auto* ai = self->getAI())
+			ai->fleeFromFear(nearestThreat, data->m_duration, MODELCONDITION_EMOTION_TERROR);
+	return UPDATE_SLEEP_NONE;
+}
+
+void EntEnragedUpdate::xferState(Xfer* xfer)
+{
+	xfer->xferUnsignedInt(&m_end);
+	xfer->xferUnsignedInt(&m_cooldownEnd);
+	xfer->xferBool(&m_wasBurning);
+}
+
+void EntEnragedUpdate::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	xferState(xfer);
+}
+
+void EntEnragedUpdate::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	UpdateModule::xfer(xfer);
+	xferState(xfer);
+}
+
+void EntEnragedUpdate::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
+}
+
+void OneRingPenaltyUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] = {
+		{ "SpecialObjectName", INI::parseAsciiString, nullptr, offsetof(OneRingPenaltyUpdateModuleData, m_specialObject) },
+		{ "RingTimeBeforeSpawning", INI::parseDurationUnsignedInt, nullptr, offsetof(OneRingPenaltyUpdateModuleData, m_beforeSpawn) },
+		{ "TimeSpentRoamingAround", INI::parseDurationUnsignedInt, nullptr, offsetof(OneRingPenaltyUpdateModuleData, m_roaming) },
+		{ "TimeRingPowerSuppressed", INI::parseDurationUnsignedInt, nullptr, offsetof(OneRingPenaltyUpdateModuleData, m_suppression) },
+		{ "TimeFrozenFromPenalty", INI::parseDurationUnsignedInt, nullptr, offsetof(OneRingPenaltyUpdateModuleData, m_freeze) },
+		{ "StartingDistanceFromMe", INI::parseReal, nullptr, offsetof(OneRingPenaltyUpdateModuleData, m_distance) },
+		{ "DiscoveredSound", INI::parseAsciiString, nullptr, offsetof(OneRingPenaltyUpdateModuleData, m_discoveredSound) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	UpdateModuleData::buildFieldParse(p);
+	p.add(fields);
+}
+
+OneRingPenaltyUpdate::~OneRingPenaltyUpdate() = default;
+
+void OneRingPenaltyUpdate::clearEye()
+{
+	if (m_eye != INVALID_ID)
+	{
+		if (Object* eye = TheGameLogic->findObjectByID(m_eye))
+			TheGameLogic->destroyObject(eye);
+		m_eye = INVALID_ID;
+	}
+	m_eyeSince = 0;
+}
+
+void OneRingPenaltyUpdate::onDelete()
+{
+	clearEye();
+}
+
+DisabledMaskType OneRingPenaltyUpdate::getDisabledTypesToProcess() const
+{
+	DisabledMaskType allowed;
+	allowed.flip();
+	return allowed;
+}
+
+UpdateSleepTime OneRingPenaltyUpdate::update()
+{
+	Object* self = getObject();
+	StealthUpdate* stealth = self->getStealth();
+	if (!RetailFileLayers::enabled() || !stealth || self->isEffectivelyDead() || self->isDestroyed())
+	{
+		clearEye();
+		return UPDATE_SLEEP_FOREVER;
+	}
+	if (!self->testWeaponSetFlag(WEAPONSET_ONE_RING_MODE))
+	{
+		m_wornSince = 0;
+		clearEye();
+		return UPDATE_SLEEP_NONE;
+	}
+
+	const auto* data = getOneRingPenaltyUpdateModuleData();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (!m_wornSince)
+		m_wornSince = now;
+	if (now - m_wornSince < data->m_beforeSpawn)
+		return UPDATE_SLEEP_NONE;
+
+	if (!m_eyeSince)
+	{
+		m_eyeSince = now;
+		m_angle = GameLogicRandomValueReal(0.0f, 2.0f * PI);
+		if (const ThingTemplate* type = TheThingFactory->findTemplate(data->m_specialObject, FALSE))
+			if (Object* eye = TheThingFactory->newObject(type, self->getTeam()))
+				m_eye = eye->getID();
+		if (traces())
+			std::fprintf(stderr, "TEST ring-penalty frame=%u spawned=%d\n", now, m_eye != INVALID_ID);
+	}
+	const UnsignedInt elapsed = now - m_eyeSince;
+	if (elapsed >= data->m_roaming)
+	{
+		clearEye();
+		stealth->suppressRing(now + data->m_suppression);
+		if (data->m_freeze && !self->isDisabledByType(DISABLED_PARALYZED))
+			self->setDisabledUntil(DISABLED_PARALYZED, now + data->m_freeze);
+		if (TheAudio && data->m_discoveredSound.isNotEmpty())
+		{
+			AudioEventRTS sound(data->m_discoveredSound, self->getID());
+			TheAudio->addAudioEvent(&sound);
+		}
+		m_wornSince = 0;
+		if (traces())
+			std::fprintf(stderr, "TEST ring-penalty frame=%u suppressed=%u frozen=%u\n", now, data->m_suppression, data->m_freeze);
+	}
+	else if (Object* eye = TheGameLogic->findObjectByID(m_eye))
+	{
+		const Real progress = static_cast<Real>(elapsed) / data->m_roaming;
+		const Real distance = data->m_distance * (1.0f - progress);
+		const Real angle = m_angle + progress * (2.0f * PI);
+		Coord3D point = *self->getPosition();
+		point.x += distance * WWMath::CosTrig(angle);
+		point.y += distance * WWMath::SinTrig(angle);
+		point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+		eye->setPosition(&point);
+	}
+	return UPDATE_SLEEP_NONE;
+}
+
+void OneRingPenaltyUpdate::transferState(Xfer* xfer)
+{
+	xfer->xferObjectID(&m_eye);
+	xfer->xferUnsignedInt(&m_wornSince);
+	xfer->xferUnsignedInt(&m_eyeSince);
+	xfer->xferReal(&m_angle);
+}
+
+void OneRingPenaltyUpdate::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	transferState(xfer);
+}
+
+void OneRingPenaltyUpdate::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	UpdateModule::xfer(xfer);
+	transferState(xfer);
+}
+
+void OneRingPenaltyUpdate::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
 }
 
 void BloodthirstyUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -453,8 +791,6 @@ UpdateSleepTime EmotionTrackerUpdate::update()
 
 	Object* anchor = HordeContain::getAnchor(self);
 	Object* subject = anchor ? anchor : self;
-	auto* ai = subject->getAI();
-	const Bool idle = !ai || ai->isIdle();
 	const Bool veteranImmune = !data->m_ignoreVeterancy && data->m_immuneRank > 0 && rankOf(subject) >= data->m_immuneRank;
 	Real enemyThreat = 0.0f;
 	Object* fearSource = nullptr;
@@ -507,51 +843,143 @@ UpdateSleepTime EmotionTrackerUpdate::update()
 	{
 		if (!opportunity.source)
 			continue;
-		for (Int index = 0; index < static_cast<Int>(data->m_emotions.size()); ++index)
-		{
-			const auto& entry = data->m_emotions[index];
-			const auto* nugget = findEmotionNugget(entry.m_name);
-			if (!nugget)
-				continue;
-			const Int type = entry.m_type >= 0 && entry.m_type != EMOTION_OVERRIDE ? entry.m_type : nugget->m_type;
-			if (type != opportunity.type || (idle && nugget->m_ignoreIdle) || (!idle && nugget->m_ignoreBusy) ||
-				(nugget->m_enemyThreatLimit >= 0.0f && enemyThreat >= nugget->m_enemyThreatLimit))
-				continue;
-			const UnsignedInt aiLock = entry.m_aiLock >= 0 ? static_cast<UnsignedInt>(entry.m_aiLock) : nugget->m_aiLock;
-			UnsignedInt duration = entry.m_duration >= 0 ? static_cast<UnsignedInt>(entry.m_duration) : nugget->m_duration;
-			if (!duration)
-				duration = std::max(aiLock, interval);
-			if (type == EMOTION_FEAR || type == EMOTION_TERROR)
-			{
-				const Int resistance = type == EMOTION_FEAR ? AttributeModifierRules::RESIST_FEAR : AttributeModifierRules::RESIST_TERROR;
-				const Real scale = 1.0f - std::clamp(AttributeModifiers::value(subject, resistance), -1.0f, 1.0f);
-				duration = static_cast<UnsignedInt>(duration * scale);
-				if (!duration)
-					continue;
-				if (ai && !anchor && (nugget->m_ai == EMOTION_AI_BACK_AWAY || nugget->m_ai == EMOTION_AI_AVOID_SCARER ||
-					nugget->m_ai == EMOTION_AI_RUN_AWAY_PANIC))
-					ai->fleeFromFear(opportunity.source, static_cast<UnsignedInt>((aiLock ? aiLock : duration) * (aiLock ? scale : 1.0f)),
-						type == EMOTION_TERROR ? MODELCONDITION_EMOTION_TERROR : MODELCONDITION_EMOTION_AFRAID);
-			}
-
-			m_activeEntry = index;
-			m_endFrame = now + duration;
-			m_recheckFrame = m_endFrame + std::max({interval, nugget->m_inactive, nugget->m_inactiveSameObject, nugget->m_inactiveSameType});
-			m_appliedConditions = nugget->m_conditions;
-			if (const Drawable* draw = self->getDrawable())
-				m_appliedConditions.clear(draw->getModelConditionFlags());
-			self->clearAndSetModelConditionFlags(nugget->m_clearConditions, nugget->m_conditions);
-			if (nugget->m_startFX)
-				FXList::doFXObj(nugget->m_startFX, self);
-			if (entry.m_modifier.isNotEmpty() && nugget->m_modifierDelay < duration)
-				m_modifierFrame = now + nugget->m_modifierDelay;
-			if (traces())
-				std::fprintf(stderr, "TEST emotion frame=%u unit=%s type=%s source=%s duration=%u\n",
-					now, self->getTemplate()->getName().str(), emotionTypes[type], opportunity.source->getTemplate()->getName().str(), duration);
-			return UPDATE_SLEEP(m_modifierFrame ? std::max(1u, m_modifierFrame - now) : duration);
-		}
+		if (startEmotion(static_cast<EmotionType>(opportunity.type), opportunity.source, enemyThreat))
+			return UPDATE_SLEEP(m_modifierFrame ? std::max(1u, m_modifierFrame - now) : m_endFrame - now);
 	}
+	if (data->m_quarrelChance > 0.0f && (!subject->getAI() || subject->getAI()->isIdle()) &&
+		GameLogicRandomValueReal(0.0f, 1.0f) < data->m_quarrelChance &&
+		startEmotion(EMOTION_QUARRELSOME, nullptr, enemyThreat))
+		return UPDATE_SLEEP(m_endFrame - now);
 	return UPDATE_SLEEP(interval);
+}
+
+Bool EmotionTrackerUpdate::signal(Object* victim, EmotionType type, const Object* source)
+{
+	if (!RetailFileLayers::enabled() || !victim || victim->isEffectivelyDead() || victim->isDestroyed())
+		return FALSE;
+	auto* tracker = static_cast<EmotionTrackerUpdate*>(victim->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
+	if (!tracker || !tracker->startEmotion(type, source, -1.0f))
+		return FALSE;
+	tracker->setWakeFrame(victim, UPDATE_SLEEP_NONE);
+	return TRUE;
+}
+
+Bool EmotionTrackerUpdate::blocksPlayerCommands(const Object* object)
+{
+	const auto* tracker = static_cast<const EmotionTrackerUpdate*>(object->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
+	if (!tracker || tracker->m_activeEntry < 0 || TheGameLogic->getFrame() >= tracker->m_endFrame)
+		return FALSE;
+	const auto& entry = tracker->getEmotionTrackerUpdateModuleData()->m_emotions[tracker->m_activeEntry];
+	const auto* nugget = findEmotionNugget(entry.m_name);
+	return nugget && nugget->m_preventCommands;
+}
+
+static Int emotionPriority(Int type)
+{
+	switch (type)
+	{
+		case EMOTION_DOOM:
+		case EMOTION_BRACE:
+		case EMOTION_UNCONTROLLABLE_FEAR:
+			return 3;
+		case EMOTION_TERROR:
+		case EMOTION_FEAR:
+			return 2;
+		case EMOTION_ALERT:
+		case EMOTION_CHEER:
+		case EMOTION_PRE_CRUSH:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
+Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, Real enemyThreat)
+{
+	Object* self = getObject();
+	const auto* data = getEmotionTrackerUpdateModuleData();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (m_activeEntry >= 0 && now < m_endFrame)
+	{
+		const auto& active = data->m_emotions[m_activeEntry];
+		const auto* current = findEmotionNugget(active.m_name);
+		const Int activeType = active.m_type >= 0 && active.m_type != EMOTION_OVERRIDE ?
+			active.m_type : (current ? current->m_type : -1);
+		if (emotionPriority(type) <= emotionPriority(activeType))
+			return FALSE;
+	}
+	else if (now < m_recheckFrame && emotionPriority(type) < 2)
+		return FALSE;
+
+	Object* anchor = HordeContain::getAnchor(self);
+	Object* subject = anchor ? anchor : self;
+	auto* ai = subject->getAI();
+	const Bool idle = !ai || ai->isIdle();
+	const UnsignedInt interval = std::max(data->m_tauntInterval, UnsignedInt(LOGICFRAMES_PER_SECOND / 5));
+	for (Int index = 0; index < static_cast<Int>(data->m_emotions.size()); ++index)
+	{
+		const auto& entry = data->m_emotions[index];
+		const auto* nugget = findEmotionNugget(entry.m_name);
+		if (!nugget)
+			continue;
+		const Int configured = entry.m_type >= 0 && entry.m_type != EMOTION_OVERRIDE ? entry.m_type : nugget->m_type;
+		if (configured != type || (idle && nugget->m_ignoreIdle) || (!idle && nugget->m_ignoreBusy))
+			continue;
+		if (nugget->m_enemyThreatLimit >= 0.0f && enemyThreat < 0.0f)
+		{
+			enemyThreat = 0.0f;
+			const Real radius = std::max({data->m_tauntRadius, data->m_fearRadius, data->m_heroRadius});
+			if (radius > 0.0f)
+			{
+				SimpleObjectIterator* scan = ThePartitionManager->iterateObjectsInRange(self->getPosition(), radius, FROM_CENTER_2D);
+				MemoryPoolObjectHolder holder(scan);
+				for (Object* other = scan->first(); other; other = scan->next())
+					if (!other->isEffectivelyDead() && self->getRelationship(other) == ENEMIES)
+						enemyThreat = std::max(enemyThreat, other->getTemplate()->getRotWKObjectData().threatLevel);
+			}
+		}
+		if (nugget->m_enemyThreatLimit >= 0.0f && enemyThreat >= nugget->m_enemyThreatLimit)
+			continue;
+
+		const UnsignedInt aiLock = entry.m_aiLock >= 0 ? static_cast<UnsignedInt>(entry.m_aiLock) : nugget->m_aiLock;
+		UnsignedInt duration = entry.m_duration >= 0 ? static_cast<UnsignedInt>(entry.m_duration) : nugget->m_duration;
+		if (!duration)
+			duration = std::max(aiLock, interval);
+		if (type == EMOTION_FEAR || type == EMOTION_TERROR || type == EMOTION_UNCONTROLLABLE_FEAR)
+		{
+			const Int resistance = type == EMOTION_TERROR ? AttributeModifierRules::RESIST_TERROR : AttributeModifierRules::RESIST_FEAR;
+			const Real scale = 1.0f - std::clamp(AttributeModifiers::value(subject, resistance), -1.0f, 1.0f);
+			duration = static_cast<UnsignedInt>(duration * scale);
+			if (!duration)
+				continue;
+			if (ai && !anchor && source && (nugget->m_ai == EMOTION_AI_BACK_AWAY || nugget->m_ai == EMOTION_AI_AVOID_SCARER ||
+				nugget->m_ai == EMOTION_AI_RUN_AWAY_PANIC))
+				ai->fleeFromFear(source, aiLock ? static_cast<UnsignedInt>(aiLock * scale) : duration,
+					type == EMOTION_TERROR ? MODELCONDITION_EMOTION_TERROR :
+					(type == EMOTION_UNCONTROLLABLE_FEAR ? MODELCONDITION_EMOTION_UNCONTROLLABLY_AFRAID : MODELCONDITION_EMOTION_AFRAID));
+		}
+		if (ai && !anchor && nugget->m_ai == EMOTION_AI_IDLE)
+			ai->aiIdle(CMD_FROM_AI);
+
+		if (m_activeEntry >= 0)
+			finishEmotion();
+		m_activeEntry = index;
+		m_endFrame = now + duration;
+		m_recheckFrame = m_endFrame + std::max({interval, nugget->m_inactive, nugget->m_inactiveSameObject, nugget->m_inactiveSameType});
+		m_appliedConditions = nugget->m_conditions;
+		m_appliedConditions.clear(self->getLogicModelConditions());
+		self->clearAndSetModelConditionFlags(nugget->m_clearConditions, nugget->m_conditions);
+		if (nugget->m_startFX)
+			FXList::doFXObj(nugget->m_startFX, self);
+		if (entry.m_modifier.isNotEmpty() && nugget->m_modifierDelay < duration)
+			m_modifierFrame = std::max(1u, now + nugget->m_modifierDelay);
+		if (traces())
+			std::fprintf(stderr, "TEST emotion frame=%u unit=%s type=%s source=%s duration=%u\n",
+				now, self->getTemplate()->getName().str(), emotionTypes[type],
+				source ? source->getTemplate()->getName().str() : "-", duration);
+		return TRUE;
+	}
+	return FALSE;
 }
 
 void EmotionTrackerUpdate::xferEmotionState(Xfer* xfer)
@@ -795,6 +1223,9 @@ UpdateSleepTime RadiateFearUpdate::update()
 	targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
 	for (Object* victim : targets)
 	{
+		if (EmotionTrackerUpdate::signal(victim, data->m_generateTerror ? EMOTION_TERROR :
+			(data->m_generateUncontrollableFear ? EMOTION_UNCONTROLLABLE_FEAR : EMOTION_FEAR), self))
+			continue;
 		const Real resistance = std::clamp(AttributeModifiers::value(victim, kind), -1.0f, 1.0f);
 		const UnsignedInt duration = static_cast<UnsignedInt>(std::max(interval, UnsignedInt(LOGICFRAMES_PER_SECOND)) * (1.0f - resistance));
 		auto* ai = victim->getAI();

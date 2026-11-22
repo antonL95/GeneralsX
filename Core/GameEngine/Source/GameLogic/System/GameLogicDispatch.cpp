@@ -621,6 +621,16 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			if (!button)
 				break;
 
+#if !RTS_GENERALS
+			if (button->getCommandType() == GUI_COMMAND_ONE_RING)
+			{
+				if (source->getControllingPlayer() == msgPlayer && HeroRoster::buttonUpgradesMet(button, msgPlayer, source))
+					if (StealthUpdate* stealth = source->getStealth())
+						stealth->toggleRing();
+				break;
+			}
+#endif
+
 			for (const ObjectID id : currentlySelectedGroup->getAllIDs())
 			{
 				Object* object = findObjectByID(id);

@@ -13,6 +13,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/PartitionManager.h"
 #endif
 
@@ -138,6 +139,8 @@ UpdateSleepTime HordeNotifyTargetsOfImminentProbableCrushingUpdate::update()
 		return UPDATE_SLEEP(scanInterval);
 	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(center, ahead + halfWidth, FROM_CENTER_2D);
 	MemoryPoolObjectHolder holder(iter);
+	Object* nearest = nullptr;
+	Real nearestAlong = ahead;
 	for (Object* victim = iter->first(); victim; victim = iter->next())
 	{
 		auto* victimAI = victim->getAI();
@@ -147,9 +150,18 @@ UpdateSleepTime HordeNotifyTargetsOfImminentProbableCrushingUpdate::update()
 		const Real dy = victim->getPosition()->y - center->y;
 		const Real along = (dx * velocity.x + dy * velocity.y) / speed;
 		const Real across = (dx * velocity.y - dy * velocity.x) / speed;
-		if (along > 0.0f && along <= ahead && std::abs(across) <= halfWidth)
+		if (along <= 0.0f || along > ahead || std::abs(across) > halfWidth)
+			continue;
+		if (!EmotionTrackerUpdate::signal(victim, EMOTION_BRACE, crusher))
 			victimAI->braceForCrush(TheGameLogic->getFrame() + 2 * scanInterval);
+		if (!nearest || along < nearestAlong || (along == nearestAlong && victim->getID() < nearest->getID()))
+		{
+			nearest = victim;
+			nearestAlong = along;
+		}
 	}
+	if (nearest)
+		EmotionTrackerUpdate::signal(self, EMOTION_PRE_CRUSH, nearest);
 	return UPDATE_SLEEP(scanInterval);
 }
 #endif

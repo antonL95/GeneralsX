@@ -109,6 +109,13 @@ public:
 	Bool					m_teamDisguised;
 	Bool					m_useRiderStealth;
   Bool          m_grantedBySpecialPower;
+	UnsignedInt m_ringDelayOn = 0;
+	UnsignedInt m_ringDelayOff = 0;
+	UnsignedInt m_ringAnimOn = 0;
+	UnsignedInt m_ringAnimOff = 0;
+	UnsignedInt m_ringRecovery = 0;
+	const FXList* m_ringOnFX = nullptr;
+	const FXList* m_ringOffFX = nullptr;
 
   StealthUpdateModuleData();
 	static void buildFieldParse(MultiIniFieldParse& p);
@@ -151,6 +158,9 @@ public:
 	Object* calcStealthOwner(); //Is it me that can stealth or is it my rider?
 	Bool allowedToStealth( Object *stealthOwner ) const;
   void receiveGrant( Bool active = TRUE, UnsignedInt frames = 0 );
+	Bool canToggleRing() const;
+	void toggleRing();
+	void suppressRing(UnsignedInt until);
 
   Bool isGrantedBySpecialPower() { return getStealthUpdateModuleData()->m_grantedBySpecialPower; }
 	Bool isTemporaryGrant() { return m_framesGranted > 0; }
@@ -167,6 +177,13 @@ protected:
 	UpdateSleepTime calcSleepTime() const;
 
 private:
+	void setRingWorn(Bool worn);
+	void xferRingState(Xfer* xfer);
+	UnsignedInt m_ringToggleFrame = 0;
+	UnsignedInt m_ringAnimEnd = 0;
+	UnsignedInt m_ringBlockedUntil = 0;
+	Bool m_ringToggleOn = FALSE;
+
 	UnsignedInt						m_stealthAllowedFrame;
 	UnsignedInt						m_detectionExpiresFrame;
 	mutable UnsignedInt		m_nextBlackMarketCheckFrame;

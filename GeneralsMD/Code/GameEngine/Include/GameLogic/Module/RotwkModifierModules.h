@@ -7,6 +7,95 @@
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/UpgradeModule.h"
 
+class EnragedBehaviorModuleData : public UpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+	UnsignedInt m_life = 0;
+};
+
+class EnragedBehavior final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(EnragedBehavior, "EnragedBehavior")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(EnragedBehavior, EnragedBehaviorModuleData)
+
+public:
+	EnragedBehavior(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	void setEnraged(Bool enabled);
+	UpdateSleepTime update() override;
+
+private:
+	void xferState(Xfer* xfer);
+	UnsignedInt m_end = 0;
+	Bool m_user45 = FALSE;
+	Bool m_aflame = FALSE;
+};
+
+class EntEnragedUpdateModuleData : public UpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+	SpecialPowerObjectFilter m_hated;
+	SpecialPowerObjectFilter m_friendlyDead;
+	Real m_radius = 300.0f;
+	UnsignedInt m_duration = LOGICFRAMES_PER_SECOND;
+	UnsignedInt m_cooldown = 0;
+	UnsignedInt m_transition = 0;
+	const FXList* m_transitionFX = nullptr;
+	const FXList* m_onFX = nullptr;
+	const FXList* m_offFX = nullptr;
+};
+
+class EntEnragedUpdate final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(EntEnragedUpdate, "EntEnragedUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(EntEnragedUpdate, EntEnragedUpdateModuleData)
+
+public:
+	EntEnragedUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	UpdateSleepTime update() override;
+
+private:
+	void xferState(Xfer* xfer);
+	UnsignedInt m_end = 0;
+	UnsignedInt m_cooldownEnd = 0;
+	Bool m_wasBurning = FALSE;
+};
+
+class OneRingPenaltyUpdateModuleData : public UpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	AsciiString m_specialObject;
+	AsciiString m_discoveredSound;
+	UnsignedInt m_beforeSpawn = 0;
+	UnsignedInt m_roaming = 0;
+	UnsignedInt m_suppression = 0;
+	UnsignedInt m_freeze = 0;
+	Real m_distance = 0.0f;
+};
+
+class OneRingPenaltyUpdate final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(OneRingPenaltyUpdate, "OneRingPenaltyUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(OneRingPenaltyUpdate, OneRingPenaltyUpdateModuleData)
+
+public:
+	OneRingPenaltyUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
+	UpdateSleepTime update() override;
+	void onDelete() override;
+	DisabledMaskType getDisabledTypesToProcess() const override;
+
+private:
+	void clearEye();
+	void transferState(Xfer* xfer);
+	ObjectID m_eye = INVALID_ID;
+	UnsignedInt m_wornSince = 0;
+	UnsignedInt m_eyeSince = 0;
+	Real m_angle = 0.0f;
+};
+
 class BloodthirstyUpdateModuleData : public UpdateModuleData
 {
 public:
@@ -34,6 +123,13 @@ public:
 private:
 	ObjectID m_donor = INVALID_ID;
 	UnsignedInt m_deadline = 0;
+};
+
+enum EmotionType
+{
+	EMOTION_TAUNT, EMOTION_CHEER, EMOTION_HERO_CHEER, EMOTION_POINT, EMOTION_FEAR,
+	EMOTION_UNCONTROLLABLE_FEAR, EMOTION_TERROR, EMOTION_DOOM, EMOTION_ALERT,
+	EMOTION_QUARRELSOME, EMOTION_OVERRIDE, EMOTION_PRE_CRUSH, EMOTION_BRACE
 };
 
 struct RetailEmotionEntry
@@ -73,9 +169,12 @@ public:
 	EmotionTrackerUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
 	static void parseEmotionNugget(INI* ini);
 	static void clearEmotionNuggets();
+	static Bool signal(Object* victim, EmotionType type, const Object* source);
+	static Bool blocksPlayerCommands(const Object* object);
 	UpdateSleepTime update() override;
 
 private:
+	Bool startEmotion(EmotionType type, const Object* source, Real enemyThreat);
 	void finishEmotion();
 	void xferEmotionState(Xfer* xfer);
 

@@ -53,6 +53,7 @@
 #if !RTS_GENERALS
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
+#include "GameLogic/Module/StealthUpdate.h"
 #endif
 
 namespace
@@ -1321,6 +1322,9 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 #if !RTS_GENERALS
 		case GUI_COMMAND_BLOODTHIRSTY:
 			return BloodthirstyUpdate::find(obj) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
+		case GUI_COMMAND_ONE_RING:
+			return obj && obj->getStealth() && obj->getStealth()->canToggleRing() ?
+				COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 #endif
 		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
 		case GUI_COMMAND_TOGGLE_WEAPONSET:
@@ -1361,6 +1365,17 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 	switch (command->getCommandType())
 	{
 #if !RTS_GENERALS
+		case GUI_COMMAND_ONE_RING:
+		{
+			const Int slot = getRetailSlot(control);
+			if (slot < 0 || !obj || !obj->getStealth() || !obj->getStealth()->canToggleRing())
+				return CBC_COMMAND_NOT_USED;
+			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_HORDE_COMMAND);
+			msg->appendObjectIDArgument(obj->getID());
+			msg->appendIntegerArgument(slot);
+			msg->appendIntegerArgument(-1);
+			return CBC_COMMAND_USED;
+		}
 		case GUI_COMMAND_BLOODTHIRSTY:
 			if (!BloodthirstyUpdate::find(obj) || !TheInGameUI)
 				return CBC_COMMAND_NOT_USED;

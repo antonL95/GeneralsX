@@ -595,6 +595,12 @@ void DumbProjectileBehavior::detonate(const Object* hit)
 
 }
 
+Bool DumbProjectileBehavior::isApproachingLanding(UnsignedInt lead) const
+{
+	const auto steps = m_flightPath.size();
+	return steps && static_cast<size_t>(m_currentFlightPathStep) == steps - std::min(steps, static_cast<size_t>(std::max(1u, lead)));
+}
+
 //-------------------------------------------------------------------------------------------------
 /**
  * Simulate one frame of a missile's behavior
