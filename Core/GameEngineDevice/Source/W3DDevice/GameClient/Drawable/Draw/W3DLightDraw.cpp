@@ -33,6 +33,7 @@ void W3DLightDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 W3DLightDraw::W3DLightDraw(Thing* thing, const ModuleData* moduleData)
 	: DrawModule(thing, moduleData)
 {
+	const ScopedVisualRandom random(TRUE);
 	m_pulsePhase = GameClientRandomValueReal(0.0f, 30.0f);
 	m_flickerStart = getW3DLightDrawModuleData()->m_intensity;
 	m_flickerTarget = m_flickerStart;
@@ -87,6 +88,7 @@ void W3DLightDraw::doDrawModule(const Matrix3D* transformMtx)
 		Real progress = (elapsed - m_flickerStartTime) * data->m_flickerFrequency;
 		if (m_flickerStartTime < 0.0f || progress < 0.0f || progress >= 1.0f)
 		{
+			const ScopedVisualRandom random(TRUE);
 			m_flickerStart = m_flickerTarget;
 			m_flickerTarget = intensity + GameClientRandomValueReal(-data->m_flickerAmplitude, data->m_flickerAmplitude);
 			m_flickerStartTime = elapsed;

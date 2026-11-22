@@ -223,6 +223,7 @@ public:
 	const Coord3D &getGpuSpawnVelocity() const { return m_gpuSpawnVelocity; }
 	Real getGpuSeed() const { return m_gpuSeed; }
 	void setGpuSeed(Real seed) { m_gpuSeed = seed; }
+	Bool usesGpuDraw() const;
 
 protected:
 
@@ -988,6 +989,7 @@ public:
 	UnsignedInt getParticleCount() const { return m_particleCount; }
 
 	UnsignedInt getFieldParticleCount()     const { return m_fieldParticleCount; }
+	UnsignedInt getGpuParticleCount() const { return m_gpuParticleCount; }
 
 	UnsignedInt getParticleSystemCount() const { return m_particleSystemCount; }
 
@@ -1021,6 +1023,7 @@ protected:
 	ParticleSystemList m_allParticleSystemList;
 
 	UnsignedInt m_particleCount;
+	UnsignedInt m_gpuParticleCount = 0;
 	UnsignedInt m_fieldParticleCount; ///< this does not need to be xfered, since it is evaluated every frame
 	UnsignedInt m_particleSystemCount;
 	Int m_onScreenParticleCount;                ///< number of particles displayed on screen per frame

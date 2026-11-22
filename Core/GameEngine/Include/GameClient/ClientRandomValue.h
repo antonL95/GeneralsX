@@ -37,6 +37,18 @@ extern Real GetGameClientRandomValueReal( Real lo, Real hi, const char *file, in
 #define GameClientRandomValue( lo, hi ) GetGameClientRandomValue( lo, hi, __FILE__, __LINE__ )
 #define GameClientRandomValueReal( lo, hi ) GetGameClientRandomValueReal( lo, hi, __FILE__, __LINE__ )
 
+class ScopedVisualRandom
+{
+public:
+	explicit ScopedVisualRandom(Bool enabled);
+	~ScopedVisualRandom();
+	ScopedVisualRandom(const ScopedVisualRandom&) = delete;
+	ScopedVisualRandom& operator=(const ScopedVisualRandom&) = delete;
+
+private:
+	Bool m_previous;
+};
+
 //--------------------------------------------------------------------------------------------------------------
 class CColorAlphaDialog;
 class DebugWindowDialog;

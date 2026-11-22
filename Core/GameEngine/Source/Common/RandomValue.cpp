@@ -32,6 +32,7 @@
 #include "Common/crc.h"
 #include "Common/Debug.h"
 #include "Common/Xfer.h"
+#include "GameClient/ClientRandomValue.h"
 #include "GameLogic/GameLogic.h"
 
 #undef DEBUG_RANDOM_AUDIO
@@ -61,6 +62,22 @@ static UnsignedInt theGameLogicSeed[6] =
 {
 	0xf22d0e56L, 0x883126e9L, 0xc624dd2fL, 0x702c49cL, 0x9e353f7dL, 0x6fdf3b64L
 };
+
+static UnsignedInt theVisualSeed[6] =
+{
+	0xf22d0e56L, 0x883126e9L, 0xc624dd2fL, 0x702c49cL, 0x9e353f7dL, 0x6fdf3b64L
+};
+static thread_local Bool useVisualSeed = FALSE;
+
+ScopedVisualRandom::ScopedVisualRandom(Bool enabled) : m_previous(useVisualSeed)
+{
+	useVisualSeed = m_previous || enabled;
+}
+
+ScopedVisualRandom::~ScopedVisualRandom()
+{
+	useVisualSeed = m_previous;
+}
 
 static UnsignedInt theGameLogicBaseSeed = 0;
 
@@ -122,6 +139,7 @@ void InitRandom()
 	// needs to be the same every time
 	seedRandom(0, theGameAudioSeed);
 	seedRandom(0, theGameClientSeed);
+	seedRandom(0, theVisualSeed);
 	seedRandom(0, theGameLogicSeed);
 	theGameLogicBaseSeed = 0;
 #else
@@ -129,6 +147,7 @@ void InitRandom()
 
 	seedRandom(seconds, theGameAudioSeed);
 	seedRandom(seconds, theGameClientSeed);
+	seedRandom(seconds, theVisualSeed);
 	seedRandom(seconds, theGameLogicSeed);
 	theGameLogicBaseSeed = seconds;
 #endif
@@ -142,6 +161,7 @@ void InitRandom( UnsignedInt seed )
 
 	seedRandom(seed, theGameAudioSeed);
 	seedRandom(seed, theGameClientSeed);
+	seedRandom(seed, theVisualSeed);
 	seedRandom(seed, theGameLogicSeed);
 	theGameLogicBaseSeed = seed;
 
@@ -252,7 +272,7 @@ Int GetGameClientRandomValue( int lo, int hi, const char *file, int line )
 		return hi;
 
 	const UnsignedInt delta = hi - lo + 1;
-	const Int rval = ((Int)(randomValue(theGameClientSeed) % delta)) + lo;
+	const Int rval = ((Int)(randomValue(useVisualSeed ? theVisualSeed : theGameClientSeed) % delta)) + lo;
 
 #ifdef DEBUG_RANDOM_CLIENT
 	DEBUG_LOG(( "%d: GetGameClientRandomValue = %d (%d - %d), %s line %d",
@@ -272,7 +292,7 @@ Real GetGameClientRandomValueReal( Real lo, Real hi, const char *file, int line 
 		return hi;
 
 	const Real delta = hi - lo;
-	const Real rval = ((Real)(randomValue(theGameClientSeed)) * theMultFactor) * delta + lo;
+	const Real rval = ((Real)(randomValue(useVisualSeed ? theVisualSeed : theGameClientSeed)) * theMultFactor) * delta + lo;
 
 #ifdef DEBUG_RANDOM_CLIENT
 	DEBUG_LOG(( "%d: GetGameClientRandomValueReal = %f, %s line %d",

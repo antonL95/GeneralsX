@@ -675,6 +675,7 @@ protected:
 	void reallyDoFX(const Coord3D *primary, const Matrix3D* mtx, const Object* thingToAttachTo,
 		Real overrideRadius, const AsciiString* attachmentBone = nullptr, const Object* target = nullptr) const
 	{
+		const ScopedVisualRandom random(RetailFileLayers::enabled());
 		if (m_retailWeather >= 0 && m_retailWeather != (TheGlobalData ? TheGlobalData->m_weather : WEATHER_NORMAL))
 			return;
 		if (m_retailObjectFilter)

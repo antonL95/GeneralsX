@@ -53,6 +53,14 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 
+#include <cmath>
+#include <limits>
+
+namespace
+{
+constexpr UnsignedInt maxGpuParticles = 4096;
+constexpr UnsignedInt defaultGpuLifetime = 30;
+}
 
 //------------------------------------------------------------------------------ Performance Timers
 //#include "Common/PerfMetrics.h"
@@ -432,6 +440,12 @@ void Particle::applyForce( const Coord3D *force )
 	m_accel.x += force->x;
 	m_accel.y += force->y;
 	m_accel.z += force->z;
+}
+
+Bool Particle::usesGpuDraw() const
+{
+	const auto* definition = m_system->getTemplate();
+	return definition && definition->usesGpuDraw();
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -843,6 +857,13 @@ void Particle::xfer( Xfer *xfer )
 			xfer->xferCoord3D(&m_gpuSpawnVelocity);
 			xfer->xferReal(&m_gpuSeed);
 		}
+	}
+	if (xfer->getXferMode() == XFER_LOAD && usesGpuDraw())
+	{
+		if (m_lifetime == 0)
+			m_lifetime = defaultGpuLifetime;
+		if (m_lifetimeLeft == 0 || m_lifetimeLeft > m_lifetime)
+			m_lifetimeLeft = m_lifetime;
 	}
 }
 
@@ -1941,6 +1962,10 @@ Particle *ParticleSystem::createParticle( const ParticleInfo *info,
 			(m_template->usesGpuDraw() && !m_template->canDrawGpuParticles())))
 			return nullptr;
 
+		if (m_template && m_template->usesGpuDraw() &&
+			TheParticleSystemManager->getGpuParticleCount() >= maxGpuParticles)
+			return nullptr;
+
 		//
 		// Enforce particle limit.
 		// If we are at the limit, destroy the oldest particle in order
@@ -2067,7 +2092,15 @@ const ParticleInfo *ParticleSystem::generateParticleInfo( Int particleNum, Int p
 #endif
 	info.m_angularRateZ = m_angularRateZ.getValue();
 
-	info.m_lifetime = (UnsignedInt)m_lifetime.getValue();
+	const Real lifetime = m_lifetime.getValue();
+	if (m_template && m_template->usesGpuDraw())
+	{
+		info.m_lifetime = std::isfinite(lifetime) && lifetime > 0.0f &&
+			static_cast<double>(lifetime) <= std::numeric_limits<UnsignedInt>::max()
+			? static_cast<UnsignedInt>(std::max(1.0f, lifetime)) : defaultGpuLifetime;
+	}
+	else
+		info.m_lifetime = static_cast<UnsignedInt>(lifetime);
 
 	info.m_size = m_startSize.getValue()*m_sizeCoeff*TheGlobalData->m_particleScale;
 	info.m_sizeRate = m_sizeRate.getValue()*m_sizeCoeff*TheGlobalData->m_particleScale;
@@ -2180,8 +2213,13 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 
 					count *= m_countCoeff;
 
+					const Bool gpu = m_template && m_template->usesGpuDraw();
+					if (gpu)
+						count = std::min(count, static_cast<Int>(maxGpuParticles - TheParticleSystemManager->getGpuParticleCount()));
 					for( Int i=0; i<count; i++ )
 					{
+						if (gpu && TheParticleSystemManager->getGpuParticleCount() >= maxGpuParticles)
+							break;
 						// generate this particle's unique attributes
 						const ParticleInfo *info = generateParticleInfo(i, count);
 						if (!m_isEmitAboveGroundOnly || (info->m_pos.z >= TheTerrainLogic->getGroundHeight(info->m_pos.x, info->m_pos.y)))
@@ -2858,6 +2896,9 @@ void ParticleSystem::xfer( Xfer *xfer )
 	// particle count
 	UnsignedInt particleCount = m_particleCount;
 	xfer->xferUnsignedInt( &particleCount );
+	if (xfer->getXferMode() == XFER_LOAD && m_template && m_template->usesGpuDraw() &&
+		particleCount > maxGpuParticles - TheParticleSystemManager->getGpuParticleCount())
+		throw SC_INVALID_DATA;
 
 	// particles
 	if( xfer->getXferMode() == XFER_SAVE )
@@ -3307,6 +3348,7 @@ void ParticleSystemManager::reset()
 	}
 
 	m_particleCount = 0;
+	m_gpuParticleCount = 0;
 	m_fieldParticleCount = 0;
 	m_particleSystemCount = 0;
 
@@ -3323,6 +3365,7 @@ void ParticleSystemManager::reset()
 //DECLARE_PERF_TIMER(ParticleSystemManager)
 void ParticleSystemManager::update()
 {
+	const ScopedVisualRandom random(RetailFileLayers::enabled());
 	//USE_PERF_TIMER(ParticleSystemManager)
 
 	// TheSuperHackers @tweak Complete the render update of the previous logic frame before the logic update
@@ -3419,6 +3462,7 @@ void ParticleSystemManager::completeLogicFrameDrawUpdate()
 // ------------------------------------------------------------------------------------------------
 void ParticleSystemManager::drawSystems(Real timeScale)
 {
+	const ScopedVisualRandom random(RetailFileLayers::enabled());
 	DEBUG_ASSERTCRASH(timeScale > 0.0f, ("ParticleSystemManager::drawSystems: timeScale %f is not greater than zero", timeScale));
 
 	ParticleSystemListIt it = m_allParticleSystemList.begin();
@@ -3444,6 +3488,7 @@ void ParticleSystemManager::setOnScreenParticleCount(int count)
 // ------------------------------------------------------------------------------------------------
 ParticleSystem *ParticleSystemManager::createParticleSystem( const ParticleSystemTemplate *sysTemplate, Bool createSlaves )
 {
+	const ScopedVisualRandom random(RetailFileLayers::enabled());
 	// sanity
 	if (sysTemplate == nullptr)
 		return nullptr;
@@ -3604,6 +3649,8 @@ void ParticleSystemManager::addParticle( Particle *particleToAdd, ParticlePriori
 	particleToAdd->m_inOverallList = TRUE;
 
 	++m_particleCount;
+	if (particleToAdd->usesGpuDraw())
+		++m_gpuParticleCount;
 
 
 }
@@ -3634,6 +3681,8 @@ void ParticleSystemManager::removeParticle( Particle *particleToRemove)
 	particleToRemove->m_overallNext = particleToRemove->m_overallPrev = nullptr;
 	particleToRemove->m_inOverallList = FALSE;
 	--m_particleCount;
+	if (particleToRemove->usesGpuDraw())
+		--m_gpuParticleCount;
 
 
 }
@@ -3725,6 +3774,7 @@ void ParticleSystemManager::crc( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void ParticleSystemManager::xfer( Xfer *xfer )
 {
+	const ScopedVisualRandom random(RetailFileLayers::enabled());
 
 	// version
 	XferVersion currentVersion = 1;

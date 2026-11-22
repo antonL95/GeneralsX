@@ -34,7 +34,7 @@ void runRetailParticleTestCommand(std::string_view action, const Object* source,
 				targeted += system->getRetailTargetMatrix() != nullptr;
 			}
 		}
-		std::fprintf(stderr, "TEST particle-systems frame=%u name=%s systems=%u particles=%u targeted=%u\n",
-			frame, argument, systems, particles, targeted);
+		std::fprintf(stderr, "TEST particle-systems frame=%u name=%s systems=%u particles=%u targeted=%u gpu-total=%u\n",
+			frame, argument, systems, particles, targeted, TheParticleSystemManager->getGpuParticleCount());
 	}
 }
