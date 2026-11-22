@@ -886,7 +886,7 @@ public:
 			{ "ExtraFriction",				parseFrictionPerSec,						nullptr, offsetof( GenericObjectCreationNugget, m_extraFriction ) },
 			{ "Offset",						INI::parseCoord3D,				nullptr, offsetof( GenericObjectCreationNugget, m_offset ) },
 			{ "Disposition",			INI::parseBitString32,			DebrisDispositionNames, offsetof( GenericObjectCreationNugget, m_disposition ) },
-			{ "DispositionIntensity",	parseDispositionIntensity, nullptr, offsetof(GenericObjectCreationNugget, m_dispositionIntensity) },
+			{ "DispositionIntensity",	INI::parseReal,						nullptr,	offsetof( GenericObjectCreationNugget, m_dispositionIntensity ) },
 			{ "SpinRate",					INI::parseAngularVelocityReal,	nullptr, offsetof(GenericObjectCreationNugget, m_spinRate) },
 			{ "YawRate",					INI::parseAngularVelocityReal,	nullptr, offsetof(GenericObjectCreationNugget, m_yawRate) },
 			{ "RollRate",					INI::parseAngularVelocityReal,	nullptr, offsetof(GenericObjectCreationNugget, m_rollRate) },
@@ -1087,7 +1087,7 @@ protected:
 			!BitIsSet(m_disposition, LIKE_EXISTING | ABSOLUTE_ANGLE | RELATIVE_ANGLE))
 		{
 			const Real angle = static_cast<Real>(spawnIndex) * m_dispositionAngle;
-			const Real radius = m_dispositionIntensity;
+			const Real radius = m_dispositionIntensity / RotwkDuration::FRAMES_PER_SECOND;
 			chunkPos.x += WWMath::CosTrig(angle) * radius;
 			chunkPos.y += WWMath::SinTrig(angle) * radius;
 			obj->setOrientation(angle);
@@ -1725,13 +1725,6 @@ protected:
 		}
 
 		return firstObject;
-	}
-
-	static void parseDispositionIntensity(INI* ini, void* instance, void* store, const void* userData)
-	{
-		INI::parseReal(ini, instance, store, userData);
-		if (RetailFileLayers::enabled())
-			*static_cast<Real*>(store) *= 1.0f / RotwkDuration::FRAMES_PER_SECOND;
 	}
 
 	static void parseDebrisObjectNames( INI* ini, void *instance, void *store, const void* /*userData*/ )
