@@ -19,10 +19,13 @@
 #include <cstdio>
 #include <cinttypes>
 #include <thread>
+#include <set>
 #include <curl/curl.h>
 #include "GameNetwork/GeneralsOnline/NGMP_json.h"
 
 using json = nlohmann::json;
+
+static constexpr size_t kLobbyDetailsMaxBytes = 64 * 1024;
 
 NGMP_OnlineServicesManager& NGMP_OnlineServicesManager::getInstance() {
     static NGMP_OnlineServicesManager instance;
@@ -756,8 +759,8 @@ void NGMP_OnlineServicesManager::requestLobbyDetailsAsync(int64_t lobbyId, bool 
         CURL* curl = curl_easy_init();
         if (!curl) return;
 
-        std::string url = NGMP::GetAPIEndpoint(("Lobby/" + std::to_string(targetId)).c_str());
-        NGMP::Internal::CurlResponse response;
+        const std::string url = NGMP::GetAPIEndpoint(("Lobby/" + std::to_string(targetId)).c_str());
+        NGMP::Internal::CurlResponse response{{}, kLobbyDetailsMaxBytes};
 
         struct curl_slist* headers = nullptr;
         headers = curl_slist_append(headers, "Content-Type: application/json");
@@ -788,7 +791,8 @@ void NGMP_OnlineServicesManager::requestLobbyDetailsAsync(int64_t lobbyId, bool 
         } else {
             fprintf(stderr, "[NGMP] GET Lobby %lld failed (curl=%d, http=%ld)\n", (long long)targetId, res, httpCode);
             fflush(stderr);
-            if (!m_isLobbyOwner && (httpCode == 404 || httpCode == 400 || httpCode == 410)) {
+            if (res == CURLE_OK && targetId == m_currentLobbyId && !m_isLobbyOwner &&
+                (httpCode == 404 || httpCode == 400 || httpCode == 410)) {
                 m_currentLobbyId = -1;
                 NGMPEvent leftEv;
                 leftEv.type = NGMPEvent::EVENT_LOBBY_LEFT;
@@ -800,8 +804,22 @@ void NGMP_OnlineServicesManager::requestLobbyDetailsAsync(int64_t lobbyId, bool 
 
 bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::string& payload) {
     try {
-        auto jsonRoot = json::parse(payload);
-        auto lobbyIter = jsonRoot.contains("lobby") ? jsonRoot["lobby"] : (jsonRoot.contains("Lobby") ? jsonRoot["Lobby"] : jsonRoot);
+        if (payload.size() > kLobbyDetailsMaxBytes)
+            return false;
+        std::vector<std::set<std::string>> keys;
+        const auto checkKeys = [&](int depth, json::parse_event_t event, json& value) {
+            if (depth > 32)
+                throw std::invalid_argument("Lobby response nesting limit exceeded");
+            if (event == json::parse_event_t::object_start)
+                keys.emplace_back();
+            else if (event == json::parse_event_t::object_end)
+                keys.pop_back();
+            else if (event == json::parse_event_t::key && !keys.back().insert(value.get_ref<const std::string&>()).second)
+                throw std::invalid_argument("Duplicate lobby response key");
+            return true;
+        };
+        const auto jsonRoot = json::parse(payload, checkKeys);
+        const auto& lobbyIter = jsonRoot.contains("lobby") ? jsonRoot["lobby"] : (jsonRoot.contains("Lobby") ? jsonRoot["Lobby"] : jsonRoot);
 
         int64_t ownerId = lobbyIter.value("Owner", lobbyIter.value("owner", int64_t(-1)));
         std::string mapName = lobbyIter.value("MapName", lobbyIter.value("map_name", ""));
@@ -810,20 +828,21 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
         bool limitSuperweapons = lobbyIter.value("IsLimitSuperweapons", lobbyIter.value("is_limit_superweapons", false));
         bool allowObservers = lobbyIter.value("AllowObservers", lobbyIter.value("allow_observers", true));
 
-        bool bHostMigrated = (m_hostUserId > 0 && ownerId != m_hostUserId);
-        m_hostUserId = ownerId;
-        m_currentLobbyId = targetId;
-        m_isLobbyOwner = (ownerId == m_userId);
-
-        int localSlotIndex = -1;
+        if (ownerId <= 0)
+            return false;
+        const bool isOwner = ownerId == m_userId;
+        bool localMember = false;
         std::vector<NGMPLobbyPlayer> updatedLobbyPlayers;
-
-
         std::vector<LobbyMemberEntry> lobbyMembers;
+        bool occupiedIndices[MAX_SLOTS] = {};
 
-        auto membersIter = lobbyIter.contains("Members") ? lobbyIter["Members"] : (lobbyIter.contains("members") ? lobbyIter["members"] : json::array());
-        if (membersIter.is_array()) {
-            for (const auto& member : membersIter) {
+        auto members = lobbyIter.find("Members");
+        if (members == lobbyIter.end())
+            members = lobbyIter.find("members");
+        if (members == lobbyIter.end() || !members->is_array() || members->size() > MAX_SLOTS)
+            return false;
+        {
+            for (const auto& member : *members) {
                 int64_t memberUserId = member.value("UserID", member.value("user_id", int64_t(-1)));
                 int slotIdx = member.value("SlotIndex", member.value("slot_index", -1));
                 int slotState = member.value("SlotState", member.value("slot_state", 0));
@@ -835,8 +854,13 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
                 bool hasMap = member.value("HasMap", member.value("has_map", true));
                 bool isReady = member.value("IsReady", member.value("is_ready", false));
 
-                if (memberUserId == m_userId && slotIdx >= 0) {
-                    localSlotIndex = slotIdx;
+                if (slotIdx >= MAX_SLOTS || slotIdx < -1 || slotState < SLOT_OPEN || slotState > SLOT_PLAYER)
+                    return false;
+                if (slotIdx >= 0) {
+                    if (occupiedIndices[slotIdx])
+                        return false;
+                    occupiedIndices[slotIdx] = true;
+                    localMember |= slotState == SLOT_PLAYER && memberUserId == m_userId;
                 }
 
                 if (memberUserId > 0 && !dispName.empty()) {
@@ -861,9 +885,14 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
                 if (RetailFileLayers::enabled() && slotIdx >= 0 && slotIdx < MAX_SLOTS &&
                     slotState == SLOT_PLAYER && memberUserId > 0) {
                     auto selection = member.find("CreateAHeroConfig");
+                    const auto snakeCase = member.find("create_a_hero_config");
+                    if (selection != member.end() && snakeCase != member.end())
+                        return false;
                     if (selection == member.end())
-                        selection = member.find("create_a_hero_config");
-                    if (selection != member.end() && selection->is_string()) {
+                        selection = snakeCase;
+                    if (selection != member.end() && !selection->is_null()) {
+                        if (!selection->is_string())
+                            return false;
                         GameSlot slot;
                         slot.setState(SLOT_PLAYER);
                         slot.setPlayerTemplate(side);
@@ -876,72 +905,50 @@ bool NGMP_OnlineServicesManager::applyLobbyDetails(int64_t targetId, const std::
             }
         }
 
+        const auto previousHost = m_hostUserId;
+        auto* lobbyInterface = m_pLobbyInterface;
+        if (!lobbyInterface)
+            return false;
+        LobbyEntry snapshot = lobbyInterface->GetCurrentLobby();
+        snapshot.lobbyID = targetId;
+        snapshot.match_id = lobbyIter.value("MatchID", lobbyIter.value("match_id", uint64_t(0)));
+        snapshot.owner = ownerId;
+        snapshot.name = lobbyIter.value("Name", lobbyIter.value("name", ""));
+        snapshot.map_name = mapName;
+        snapshot.map_path = mapPath;
+        snapshot.map_official = lobbyIter.value("IsMapOfficial", lobbyIter.value("is_map_official", true));
+        snapshot.starting_cash = startingCash;
+        snapshot.limit_superweapons = limitSuperweapons;
+        snapshot.track_stats = lobbyIter.value("IsTrackingStats", lobbyIter.value("is_tracking_stats", true));
+        snapshot.allow_observers = allowObservers;
+        snapshot.rng_seed = lobbyIter.value("RNGSeed", lobbyIter.value("rng_seed", 0));
+        snapshot.exe_crc = lobbyIter.value("ExeCRC", lobbyIter.value("exe_crc", 0));
+        snapshot.ini_crc = lobbyIter.value("IniCRC", lobbyIter.value("ini_crc", 0));
+        snapshot.max_players = lobbyIter.value("MaxPlayers", lobbyIter.value("max_players", 8));
+        snapshot.current_players = lobbyIter.value("NumCurrentPlayers", lobbyIter.value("num_current_players", 1));
+        snapshot.members = std::move(lobbyMembers);
         {
             std::lock_guard<std::mutex> lock(m_eventMutex);
-            NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
-            if (pLobbyInterface) {
-                LobbyEntry& curLobby = pLobbyInterface->GetCurrentLobby();
-                curLobby.lobbyID = targetId;
-                curLobby.match_id = lobbyIter.value("MatchID", lobbyIter.value("match_id", uint64_t(0)));
-                curLobby.owner = ownerId;
-                curLobby.name = lobbyIter.value("Name", lobbyIter.value("name", ""));
-                curLobby.map_name = mapName;
-                curLobby.map_path = mapPath;
-                curLobby.map_official = lobbyIter.value("IsMapOfficial", lobbyIter.value("is_map_official", true));
-                curLobby.starting_cash = startingCash;
-                curLobby.limit_superweapons = limitSuperweapons;
-                curLobby.track_stats = lobbyIter.value("IsTrackingStats", lobbyIter.value("is_tracking_stats", true));
-                curLobby.allow_observers = allowObservers;
-                curLobby.rng_seed = lobbyIter.value("RNGSeed", lobbyIter.value("rng_seed", 0));
-                curLobby.exe_crc = lobbyIter.value("ExeCRC", lobbyIter.value("exe_crc", 0));
-                curLobby.ini_crc = lobbyIter.value("IniCRC", lobbyIter.value("ini_crc", 0));
-                curLobby.max_players = lobbyIter.value("MaxPlayers", lobbyIter.value("max_players", 8));
-                curLobby.current_players = lobbyIter.value("NumCurrentPlayers", lobbyIter.value("num_current_players", 1));
-                curLobby.members = std::move(lobbyMembers);
-            }
-
-            if (!updatedLobbyPlayers.empty()) {
-                m_lobbyPlayers = std::move(updatedLobbyPlayers);
-            }
+            lobbyInterface->GetCurrentLobby() = std::move(snapshot);
+            m_lobbyPlayers = std::move(updatedLobbyPlayers);
+            m_hostUserId = ownerId;
+            m_currentLobbyId = localMember ? targetId : -1;
+            m_isLobbyOwner = localMember && isOwner;
         }
-
-        if (!m_isLobbyOwner && localSlotIndex < 0 && m_currentLobbyId == targetId) {
-            fprintf(stderr, "[NGMP] Local player %lld no longer in lobby %lld members roster\n",
-                (long long)m_userId, (long long)targetId);
-            fflush(stderr);
-            m_currentLobbyId = -1;
-            NGMPEvent leftEv;
-            leftEv.type = NGMPEvent::EVENT_LOBBY_LEFT;
-            postEvent(leftEv);
-            return false;
+        if (!localMember) {
+            NGMPEvent left;
+            left.type = NGMPEvent::EVENT_LOBBY_LEFT;
+            postEvent(left);
         }
-
-        fprintf(stderr, "[NGMP] Synchronized staging room with Lobby %lld (map=%s, cash=%d, superweapons=%d, isOwner=%d, localSlot=%d)\n",
-            (long long)targetId, mapName.c_str(), startingCash, limitSuperweapons, m_isLobbyOwner ? 1 : 0, localSlotIndex);
-        fflush(stderr);
-
-        if (bHostMigrated) {
-            fprintf(stderr, "[NGMP] Host migrated to new owner %lld (previous host=%lld)\n",
-                (long long)ownerId, (long long)m_hostUserId);
+        if (previousHost > 0 && previousHost != ownerId) {
+            fprintf(stderr, "[NGMP] Host migrated from %lld to %lld\n",
+                (long long)previousHost, (long long)ownerId);
             fflush(stderr);
         }
-
-        if (ownerId <= 0) {
-            fprintf(stderr, "[NGMP] Lobby %lld has no valid owner, disbanding staging room\n", (long long)targetId);
-            fflush(stderr);
-            m_currentLobbyId = -1;
-            m_isLobbyOwner = false;
-            m_hostUserId = -1;
-            NGMPEvent leftEv;
-            leftEv.type = NGMPEvent::EVENT_LOBBY_LEFT;
-            postEvent(leftEv);
-            return false;
-        }
-
         return true;
 
     } catch (const std::exception& e) {
-        fprintf(stderr, "[NGMP] Failed to parse Lobby details (%s): %s\n", e.what(), payload.c_str());
+        fprintf(stderr, "[NGMP] Failed to parse lobby details: %s\n", e.what());
         fflush(stderr);
     }
     return false;

@@ -271,6 +271,7 @@ public:
     std::shared_ptr<WebSocket> m_pWebSocketWrapper;
 
 private:
+    friend bool checkPackage18LobbyDetails(const AsciiString& selection);
     NGMP_OnlineServicesManager();
     ~NGMP_OnlineServicesManager();
 

@@ -229,10 +229,6 @@ LobbyMemberEntry NGMP_OnlineServices_LobbyInterface::GetRoomMemberFromIndex(int 
 		if (member.m_SlotIndex == index)
 			return member;
 	}
-	if (index >= 0 && index < (int)m_CurrentLobby.members.size())
-	{
-		return m_CurrentLobby.members[index];
-	}
 	return LobbyMemberEntry();
 }
 

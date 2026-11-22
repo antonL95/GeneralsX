@@ -140,7 +140,7 @@ void NGMPGame::UpdateSlotsFromCurrentLobby()
 				continue;
 			}
 
-			NGMPGameSlot* slot = (NGMPGameSlot*)getSlot(pLobbyMember.m_SlotIndex);
+			NGMPGameSlot* slot = (NGMPGameSlot*)getSlot(i);
 			if (slot == nullptr)
 			{
 				continue;
@@ -183,6 +183,8 @@ void NGMPGame::UpdateSlotsFromCurrentLobby()
 			if (slot)
 			{
 				slot->setState((SlotState)pLobbyMember.m_SlotState);
+				slot->m_userID = -1;
+				slot->setCreateAHeroConfig(AsciiString::TheEmptyString);
 			}
 		}
 	}
