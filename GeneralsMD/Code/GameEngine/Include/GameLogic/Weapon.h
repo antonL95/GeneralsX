@@ -576,7 +576,6 @@ private:
 	static void parseWeaponBonusSet( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseScatterTarget( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseLinearTarget(INI* ini, void* instance, void* store, const void* userData);
-	static void parseScatterRule(INI* ini, void* instance, void* store, const void* userData);
 	static void parseShotDelay( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseClipReloadTime(INI* ini, void* instance, void* store, const void* userData);
 	static void parseHitPercentage(INI* ini, void* instance, void* store, const void* userData);
@@ -693,7 +692,6 @@ private:
 	Bool m_canSwoop = FALSE;
 	Bool m_disableScatterForTargetsOnWall = FALSE;
 	Bool m_scatterIndependently = FALSE;
-	Bool m_hasScatterRules = FALSE;
 	Bool m_hasProjectileFilterInContainer = FALSE;
 	Bool m_ignoreLinearFirstTarget = FALSE;
 	Real m_rangeBonus = 0.0f;

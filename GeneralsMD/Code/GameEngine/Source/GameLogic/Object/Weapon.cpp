@@ -273,14 +273,14 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "RotatingTurret", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_rotatingTurret) },
 	{ "CanBeDodged", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canBeDodged) },
 	{ "CanSwoop", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canSwoop) },
-	{ "DisableScatterForTargetsOnWall", WeaponTemplate::parseScatterRule, nullptr, offsetof(WeaponTemplate, m_disableScatterForTargetsOnWall) },
+	{ "DisableScatterForTargetsOnWall", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_disableScatterForTargetsOnWall) },
 	{ "IgnoreLinearFirstTarget", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_ignoreLinearFirstTarget) },
 	{ "LinearTarget", WeaponTemplate::parseLinearTarget, nullptr, offsetof(WeaponTemplate, m_linearTargets) },
 	{ "PreferredTargetBone", INI::parseAsciiString, nullptr, offsetof(WeaponTemplate, m_preferredTargetBone) },
 	{ "RangeBonus", INI::parseReal, nullptr, offsetof(WeaponTemplate, m_rangeBonus) },
 	{ "RangeBonusMinHeight", INI::parseReal, nullptr, offsetof(WeaponTemplate, m_rangeBonusMinHeight) },
 	{ "RangeBonusPerFoot", INI::parseReal, nullptr, offsetof(WeaponTemplate, m_rangeBonusPerFoot) },
-	{ "ScatterIndependently", WeaponTemplate::parseScatterRule, nullptr, offsetof(WeaponTemplate, m_scatterIndependently) },
+	{ "ScatterIndependently", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_scatterIndependently) },
 	{ "DamageNugget", WeaponNugget::parseDamageNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DOTNugget", WeaponNugget::parseDOTNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "ProjectileNugget", WeaponNugget::parseProjectileNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
@@ -459,12 +459,6 @@ void WeaponTemplate::parseLinearTarget(INI* ini, void*, void* store, const void*
 	INI::parseCoord2D(ini, nullptr, &target.offset, nullptr);
 	target.delay = INI::scanInt(ini->getNextSubToken("T"));
 	static_cast<std::vector<LinearTarget>*>(store)->push_back(target);
-}
-
-void WeaponTemplate::parseScatterRule(INI* ini, void* instance, void* store, const void* userData)
-{
-	static_cast<WeaponTemplate*>(instance)->m_hasScatterRules = TRUE;
-	INI::parseBool(ini, instance, store, userData);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1128,7 +1122,11 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		Coord3D targetPos;
 		if( victimObj )
 		{
-			victimObj->getGeometryInfo().getCenterPosition( *victimObj->getPosition(), targetPos );
+			if (!RetailFileLayers::enabled() || !getPreferredTargetPosition(victimObj, targetPos))
+				victimObj->getGeometryInfo().getCenterPosition(*victimObj->getPosition(), targetPos);
+			else if (RetailTestCommands::tracesCombat())
+				std::fprintf(stderr, "TEST weapon-aim frame=%u weapon=%s target=%.2f,%.2f,%.2f\n",
+					TheGameLogic->getFrame(), m_name.str(), targetPos.x, targetPos.y, targetPos.z);
 		}
 		else
 		{
@@ -1226,7 +1224,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 			nuggetHit = FALSE;
 	}
 	const Bool infantryScatter = m_infantryInaccuracyDist > 0.0f && victimObj && victimObj->isKindOf(KINDOF_INFANTRY);
-	const Bool forceScatter = m_hasScatterRules && RetailFileLayers::enabled() && hasNuggets() && !isProjectileDetonation && infantryScatter &&
+	const Bool forceScatter = RetailFileLayers::enabled() && hasNuggets() && !isProjectileDetonation && infantryScatter &&
 		(!m_disableScatterForTargetsOnWall || victimObj->getLayer() != LAYER_WALL);
 	if (RetailFileLayers::enabled() && !isProjectileDetonation && inflictDamage && victimObj && m_hitPassengerPercentage > 0.0f &&
 		(!hasNuggets() || (nuggetHit && !forceScatter)))
