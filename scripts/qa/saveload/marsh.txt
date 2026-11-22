@@ -1,0 +1,12 @@
+25 create Player_1 GondorFaramir 0 2045,625,0
+30 passmap - - 0
+30 marsh-route Player_1 GondorFaramir 0 - 1405 1075
+40 marsh-water - - 0 - 1945 625 64
+41 passmap - - 0
+41 marsh-route Player_1 GondorFaramir 0 - 1405 1075
+90 marsh-water - - 0 - 1945 625 59
+91 passmap - - 0
+91 marsh-route Player_1 GondorFaramir 0 - 1405 1075
+101 move Player_1 GondorFaramir 0 - 1405 1075
+290 log Player_1 GondorFaramir 0
+800 health Player_1 GondorFaramir 0

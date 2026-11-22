@@ -172,6 +172,8 @@ void runRetailPlacementTestCommand(Object* source, const char* name, const Coord
 void logRetailPlacementTestObject(const Object* object, const char* name, UnsignedInt frame);
 void logRetailSpawnPoints(const Object* object, const char* prefix, UnsignedInt frame);
 void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, UnsignedInt frame);
+void runRetailMarshWaterTestCommand(const Coord3D& position, Real height, UnsignedInt frame);
+void runRetailMarshRouteTestCommand(const Object* object, const Coord3D& destination, UnsignedInt frame);
 void runRetailSaveLoadPartitionTestCommand(std::string_view action, Object* object, const char* argument, UnsignedInt frame);
 void runRetailPackage23TestCommand(std::string_view action, Player* player, Object* object, Object* target,
 	const char* name, const Coord3D& point, UnsignedInt frame);
@@ -2319,6 +2321,16 @@ void logTracked(unsigned int frame)
 
 void execute(const Command& command, unsigned int frame)
 {
+	if (command.action == "marsh-water" && command.hasLocation)
+	{
+		runRetailMarshWaterTestCommand(command.location, command.angle, frame);
+		return;
+	}
+	if (command.action == "marsh-route" && command.hasLocation)
+	{
+		runRetailMarshRouteTestCommand(findObject(command, true), groundLocation(command), frame);
+		return;
+	}
 	if (command.action == "particle-fx" || command.action == "particle-systems" || command.action == "particle-water-fx" ||
 		command.action == "particle-weather" || command.action == "particle-bone-sample")
 	{
