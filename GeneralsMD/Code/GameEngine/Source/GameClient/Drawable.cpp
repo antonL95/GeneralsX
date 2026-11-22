@@ -44,6 +44,7 @@
 #include "Common/GameState.h"
 #include "Common/GameUtility.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameClient/RetailWorldUI.h"
 #include "GameClient/RetailClientAudio.h"
 #include "GameClient/UiRadialRing.h"
@@ -1100,6 +1101,34 @@ void Drawable::fadeIn( UnsignedInt frames )		///< decloak object
 	m_fadeMode = FADING_IN;
 	m_timeToFade = frames;
 	m_timeElapsedFade = 0;
+}
+
+void Drawable::startRetailOclFade(UnsignedInt frames, Bool fadeIn, Bool fadeOut, Bool fadePayload)
+{
+	m_oclFadeStartFrame = TheGameLogic->getFrame();
+	m_oclFadeFrames = frames;
+	m_oclFadeIn = fadeIn && !fadePayload && !fadeOut && frames != 0;
+	m_oclFadeOut = fadeOut;
+	m_oclFadePayload = fadeIn && fadePayload && frames != 0;
+}
+
+void Drawable::inheritRetailOclFadeIn(const Drawable& parent)
+{
+	if (!parent.m_oclFadePayload ||
+		TheGameLogic->getFrame() - parent.m_oclFadeStartFrame >= parent.m_oclFadeFrames)
+		return;
+
+	m_oclFadeStartFrame = parent.m_oclFadeStartFrame;
+	m_oclFadeFrames = parent.m_oclFadeFrames;
+	m_oclFadeIn = TRUE;
+	m_oclFadeOut = FALSE;
+}
+
+Real Drawable::getRetailOclFadeOpacity() const
+{
+	const UnsignedInt elapsed = TheGameLogic->getFrame() - m_oclFadeStartFrame;
+	const Real progress = elapsed >= m_oclFadeFrames ? 1.0f : static_cast<Real>(elapsed) / m_oclFadeFrames;
+	return m_oclFadeOut ? 1.0f - progress : progress;
 }
 
 
@@ -5012,7 +5041,7 @@ void Drawable::xfer( Xfer *xfer )
 #else
 	const XferVersion stockVersion = 9;
 #endif
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 10 : stockVersion;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 11 : stockVersion;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -5540,6 +5569,28 @@ void Drawable::xfer( Xfer *xfer )
 		deleteInstance(m_fxTintEnvelope);
 		m_fxTintEnvelope = nullptr;
 	}
+
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 11);
+}
+
+void Drawable::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"ocl-fade", [this](Xfer* block) {
+			block->xferUnsignedInt(&m_oclFadeStartFrame);
+			block->xferUnsignedInt(&m_oclFadeFrames);
+			block->xferBool(&m_oclFadeIn);
+			block->xferBool(&m_oclFadeOut);
+			block->xferBool(&m_oclFadePayload);
+		}, [this] {
+			m_oclFadeStartFrame = 0;
+			m_oclFadeFrames = 0;
+			m_oclFadeIn = FALSE;
+			m_oclFadeOut = FALSE;
+			m_oclFadePayload = FALSE;
+		}},
+	});
 }
 
 // ------------------------------------------------------------------------------------------------

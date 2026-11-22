@@ -71,6 +71,7 @@
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/SpecialPowerCompletionDie.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RadiusDecalUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -1642,20 +1643,45 @@ protected:
 			if (!hasSpawnOrders && retailObject && m_orientInSecondaryDirection && mtx && sourceObj)
 				debris->setOrientation(sourceObj->getOrientation() + m_orientationOffset);
 
-			if (m_fadeIn)
+			if (retailObject && (m_fadeIn || m_fadeOut))
 			{
-				AudioEventRTS fadeAudioEvent(m_fadeSoundName);
-				fadeAudioEvent.setObjectID(sourceObj->getID());
-				TheAudio->addAudioEvent(&fadeAudioEvent);
-				debris->getDrawable()->fadeIn(m_fadeFrames);
-			}
+				const HordeContain* horde = HordeContain::get(debris);
+				if (Drawable* drawable = debris->getDrawable())
+				{
+					drawable->startRetailOclFade(m_fadeFrames, m_fadeIn, m_fadeOut, horde != nullptr);
+					if (horde && m_fadeIn)
+						for (Object* member : *horde->getContainedItemsList())
+							if (Drawable* memberDrawable = member->getDrawable())
+								memberDrawable->inheritRetailOclFadeIn(*drawable);
+				}
 
-			if (m_fadeOut)
+				if (!m_fadeSoundName.isEmpty())
+				{
+					AudioEventRTS fadeAudioEvent(m_fadeSoundName);
+					if (sourceObj)
+						fadeAudioEvent.setObjectID(sourceObj->getID());
+					if (m_fadeIn)
+						TheAudio->addAudioEvent(&fadeAudioEvent);
+					if (m_fadeOut)
+						TheAudio->addAudioEvent(&fadeAudioEvent);
+				}
+			}
+			else
 			{
-				AudioEventRTS fadeAudioEvent(m_fadeSoundName);
-				fadeAudioEvent.setObjectID(sourceObj->getID());
-				TheAudio->addAudioEvent(&fadeAudioEvent);
-				debris->getDrawable()->fadeOut(m_fadeFrames);
+				if (m_fadeIn)
+				{
+					AudioEventRTS fadeAudioEvent(m_fadeSoundName);
+					fadeAudioEvent.setObjectID(sourceObj->getID());
+					TheAudio->addAudioEvent(&fadeAudioEvent);
+					debris->getDrawable()->fadeIn(m_fadeFrames);
+				}
+				if (m_fadeOut)
+				{
+					AudioEventRTS fadeAudioEvent(m_fadeSoundName);
+					fadeAudioEvent.setObjectID(sourceObj->getID());
+					TheAudio->addAudioEvent(&fadeAudioEvent);
+					debris->getDrawable()->fadeOut(m_fadeFrames);
+				}
 			}
 		}
 

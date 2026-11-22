@@ -541,7 +541,11 @@ public:
 	void setDrawableOpacity( Real value ) { m_explicitOpacity = value; }	///< set alpha/opacity value used to override defaults when drawing.
 
 	// note that this is not the 'get' inverse of setDrawableOpacity, since stealthing can also affect the effective opacity!
-	Real getEffectiveOpacity() const { return m_explicitOpacity * m_effectiveStealthOpacity; }		///< get alpha/opacity value used to override defaults when drawing.
+	Real getEffectiveOpacity() const
+	{
+		const Real opacity = m_explicitOpacity * m_effectiveStealthOpacity;
+		return m_oclFadeIn || m_oclFadeOut ? opacity * getRetailOclFadeOpacity() : opacity;
+	}
 	void setEffectiveOpacity( Real pulseFactor, Real explicitOpacity = -1.0f );
 
 	// this is for the add'l pass fx which operates completely independently of the stealth opacity effects. Draw() does the fading every frame.
@@ -551,6 +555,8 @@ public:
 	// both of these assume that you are starting at one extreme 100% or 0% opacity and are trying to go to the other!! -- amit
 	void fadeOut( UnsignedInt frames );		///< fade object out...how gradually this is done is determined by frames
 	void fadeIn( UnsignedInt frames );		///< fade object in...how gradually this is done is determined by frames
+	void startRetailOclFade(UnsignedInt frames, Bool fadeIn, Bool fadeOut, Bool fadePayload);
+	void inheritRetailOclFadeIn(const Drawable& parent);
 
 	void preloadAssets( TimeOfDay timeOfDay );	///< preload the assets
 
@@ -713,6 +719,14 @@ private:
 	FadingMode		m_fadeMode;
 	Real			m_timeElapsedFade;			///< for how many logic frames - incl. fractional ones - have i been fading
 	UnsignedInt		m_timeToFade;						///< how slowly am I fading
+
+	Real getRetailOclFadeOpacity() const;
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+	UnsignedInt m_oclFadeStartFrame = 0;
+	UnsignedInt m_oclFadeFrames = 0;
+	Bool m_oclFadeIn = FALSE;
+	Bool m_oclFadeOut = FALSE;
+	Bool m_oclFadePayload = FALSE;
 
 	UnsignedInt		m_shroudClearFrame;						///< Last frame the local player saw this drawable "OBJECTSHROUD_CLEAR"
 

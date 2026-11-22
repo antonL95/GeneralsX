@@ -418,7 +418,15 @@ void HordeContain::createPayload()
 
 	m_payloadCreated = TRUE;
 	if (RetailFileLayers::enabled())
+	{
 		onRankAdvanced(horde->getExperienceTracker()->getRank());
+#if !RTS_GENERALS
+		if (const Drawable* drawable = horde->getDrawable())
+			for (Object* member : getContainList())
+				if (Drawable* memberDrawable = member->getDrawable())
+					memberDrawable->inheritRetailOclFadeIn(*drawable);
+#endif
+	}
 }
 
 void HordeContain::addToContainList( Object *rider )
