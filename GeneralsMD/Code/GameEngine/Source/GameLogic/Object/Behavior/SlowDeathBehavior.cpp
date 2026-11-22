@@ -37,6 +37,7 @@
 #include "Common/INI.h"
 #include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Thing.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -264,7 +265,7 @@ void SlowDeathBehavior::beginSlowDeath(const DamageInfo *damageInfo)
 
 
 		// Ask game detail manager if we need to speedup all deaths to improve performance
-		Real timeScale = TheGameLODManager->getSlowDeathScale();
+		Real timeScale = RetailFileLayers::enabled() ? 1.0f : TheGameLODManager->getSlowDeathScale();
 		m_acceleratedTimeScale = 1.0f;	// assume normal death speed.
 
 		if (timeScale == 0.0f && !d->hasNonLodEffects())
@@ -364,7 +365,22 @@ void SlowDeathBehavior::beginSlowDeath(const DamageInfo *damageInfo)
 		m_flags |= (1<<SLOW_DEATH_ACTIVATED);
 
 		if (d->m_deathFlags.any())
+		{
 			obj->setModelConditionFlags(d->m_deathFlags);
+			if (RetailFileLayers::enabled())
+			{
+				static const ModelConditionFlagType deathConditions[] = {
+					MODELCONDITION_DEATH_1, MODELCONDITION_DEATH_2, MODELCONDITION_DEATH_3,
+					MODELCONDITION_DEATH_4, MODELCONDITION_DEATH_5
+				};
+				ObjectStatusMaskType status;
+				for (Int i = 0; i < ARRAY_SIZE(deathConditions); ++i)
+					if (d->m_deathFlags.test(deathConditions[i]))
+						status.set(static_cast<ObjectStatusTypes>(OBJECT_STATUS_DEATH_1 + i));
+				if (status.any())
+					obj->setStatus(status);
+			}
+		}
 
 		if (!d->m_shadowWhenDead && obj->getDrawable())
 			obj->getDrawable()->setShadowsEnabled(false);
@@ -390,6 +406,12 @@ void SlowDeathBehavior::playPhaseSound(SlowDeathPhaseType sdphase)
 //-------------------------------------------------------------------------------------------------
 void SlowDeathBehavior::doPhaseStuff(SlowDeathPhaseType sdphase)
 {
+	if (sdphase == SDPHASE_HIT_GROUND && RetailFileLayers::enabled())
+	{
+		if (m_flags & (1 << GROUND_PHASE_EXECUTED))
+			return;
+		m_flags |= 1 << GROUND_PHASE_EXECUTED;
+	}
 	const SlowDeathBehaviorModuleData* d = getSlowDeathBehaviorModuleData();
 	Int idx, listSize;
 
@@ -442,7 +464,7 @@ UpdateSleepTime SlowDeathBehavior::update()
 	const SlowDeathBehaviorModuleData* d = getSlowDeathBehaviorModuleData();
 	Object* obj = getObject();
 
-	Real timeScale = TheGameLODManager->getSlowDeathScale();
+	Real timeScale = RetailFileLayers::enabled() ? 1.0f : TheGameLODManager->getSlowDeathScale();
 
 	// Check if we have normal time scale but LODManager is requesting acceleration
 	if (timeScale != 1.0f && m_acceleratedTimeScale == 1.0f && !d->hasNonLodEffects())
@@ -482,7 +504,10 @@ UpdateSleepTime SlowDeathBehavior::update()
 				obj->clearAndSetModelConditionFlags(MAKE_MODELCONDITION_MASK(MODELCONDITION_EXPLODED_FLAILING),
 																						MAKE_MODELCONDITION_MASK(MODELCONDITION_EXPLODED_BOUNCING));
 				m_flags |= (1<<BOUNCED);
-				playPhaseSound(SDPHASE_HIT_GROUND);
+				if (RetailFileLayers::enabled())
+					doPhaseStuff(SDPHASE_HIT_GROUND);
+				else
+					playPhaseSound(SDPHASE_HIT_GROUND);
 			}
 
 			// Here we want to make sure we die if we collide with a tree on the way down
@@ -560,6 +585,14 @@ void SlowDeathBehavior::onDie( const DamageInfo *damageInfo )
 		ai->markAsDead();
 	}
 
+	else if (RetailFileLayers::enabled())
+	{
+		for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+			if (const auto* death = dynamic_cast<const SlowDeathBehavior*>(*module))
+				if (death->isSlowDeathActivated())
+					return;
+	}
+
 	// deselect this unit for all players.
 	TheGameLogic->deselectObject(obj, PLAYERMASK_ALL, TRUE);
 
@@ -604,6 +637,8 @@ void SlowDeathBehavior::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
+	if (RetailFileLayers::enabled())
+		xferDeathState(xfer, getSlowDeathBehaviorModuleData()->m_fadeTime > 0);
 
 }
 
@@ -622,6 +657,11 @@ void SlowDeathBehavior::xfer( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::xfer( xfer );
+	xferDeathState(xfer, version >= 2);
+}
+
+void SlowDeathBehavior::xferDeathState(Xfer* xfer, Bool includeFade)
+{
 
 	// sink frame
 	xfer->xferUnsignedInt( &m_sinkFrame );
@@ -638,8 +678,8 @@ void SlowDeathBehavior::xfer( Xfer *xfer )
 	// flags
 	xfer->xferUnsignedInt( &m_flags );
 
-	if (version >= 2)
-		xfer->xferUnsignedInt( &m_fadeFrame );
+	if (includeFade)
+		xfer->xferUnsignedInt(&m_fadeFrame);
 
 }
 

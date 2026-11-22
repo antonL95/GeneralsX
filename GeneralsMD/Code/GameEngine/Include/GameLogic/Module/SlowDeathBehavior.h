@@ -172,6 +172,7 @@ protected:
 	UnsignedInt getDestructionFrame() const { return m_destructionFrame; }
 
 private:
+	void xferDeathState(Xfer* xfer, Bool includeFade);
 
 	enum
 	{
@@ -179,7 +180,8 @@ private:
 		MIDPOINT_EXECUTED,
 		FLUNG_INTO_AIR,
 		BOUNCED,
-		FADE_STARTED
+		FADE_STARTED,
+		GROUND_PHASE_EXECUTED
 	};
 
 	UnsignedInt m_sinkFrame;							///< Frame to be sunken into the ground on

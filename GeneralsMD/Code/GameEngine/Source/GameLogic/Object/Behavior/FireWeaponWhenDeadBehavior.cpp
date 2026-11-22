@@ -37,6 +37,7 @@
 #include "Common/RandomValue.h"
 #include "Common/Xfer.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
 #include "GameClient/InGameUI.h"
@@ -58,12 +59,14 @@ const Real END_MIDPOINT_RATIO = 0.65f;
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 FireWeaponWhenDeadBehavior::FireWeaponWhenDeadBehavior( Thing *thing, const ModuleData* moduleData ) :
-	BehaviorModule( thing, moduleData )
+	UpdateModule( thing, moduleData )
 {
 	if (getFireWeaponWhenDeadBehaviorModuleData()->m_initiallyActive)
 	{
 		giveSelfUpgrade();
 	}
+	if (getUpdate())
+		setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -77,6 +80,40 @@ FireWeaponWhenDeadBehavior::~FireWeaponWhenDeadBehavior()
 //-------------------------------------------------------------------------------------------------
 void FireWeaponWhenDeadBehavior::onDie( const DamageInfo *damageInfo )
 {
+	const auto* data = getFireWeaponWhenDeadBehaviorModuleData();
+	if (getUpdate())
+	{
+		m_fireFrame = TheGameLogic->getFrame() + data->m_delay;
+		m_pendingDeathType = damageInfo->in.m_deathType;
+		setWakeFrame(getObject(), UPDATE_SLEEP(data->m_delay));
+		return;
+	}
+	fireDeathWeapon(damageInfo);
+}
+
+UpdateModuleInterface* FireWeaponWhenDeadBehavior::getUpdate()
+{
+	return RetailFileLayers::enabled() && getFireWeaponWhenDeadBehaviorModuleData()->m_delay ? this : nullptr;
+}
+
+UpdateSleepTime FireWeaponWhenDeadBehavior::update()
+{
+	if (!m_fireFrame || getObject()->isDestroyed())
+		return UPDATE_SLEEP_FOREVER;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (now < m_fireFrame)
+		return UPDATE_SLEEP(m_fireFrame - now);
+
+	DamageInfo damageInfo;
+	damageInfo.in.m_deathType = m_pendingDeathType;
+	m_fireFrame = 0;
+	m_pendingDeathType = DEATH_NORMAL;
+	fireDeathWeapon(&damageInfo);
+	return UPDATE_SLEEP_FOREVER;
+}
+
+void FireWeaponWhenDeadBehavior::fireDeathWeapon(const DamageInfo* damageInfo)
+{
 	const FireWeaponWhenDeadBehaviorModuleData* d = getFireWeaponWhenDeadBehaviorModuleData();
 	Object *obj = getObject();
 
@@ -87,9 +124,8 @@ void FireWeaponWhenDeadBehavior::onDie( const DamageInfo *damageInfo )
 	if (!d->m_dieMuxData.isDieApplicable(getObject(), damageInfo))
 		return;
 
-	// This will never apply until built.  Otherwise canceling construction sets it off, and killing
-	// a one hitpoint one percent building will too.
-	if( obj->getStatusBits().test( OBJECT_STATUS_UNDER_CONSTRUCTION ) )
+	if (obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) &&
+		(!RetailFileLayers::enabled() || !d->m_activeDuringConstruction))
 		return;
 
 
@@ -108,7 +144,18 @@ void FireWeaponWhenDeadBehavior::onDie( const DamageInfo *damageInfo )
 	if (d->m_deathWeapon)
 	{
 		// fire the default weapon
-	  TheWeaponStore->createAndFireTempWeapon(d->m_deathWeapon, obj, obj->getPosition());
+		if (RetailFileLayers::enabled())
+		{
+			const Coord3D& offset = d->m_weaponOffset;
+			Vector3 target;
+			Matrix3D::Transform_Vector(*obj->getTransformMatrix(), Vector3(offset.x, offset.y, offset.z), &target);
+			Coord3D position{target.X, target.Y, target.Z};
+			TheWeaponStore->createAndFireTempWeapon(d->m_deathWeapon, obj, &position);
+		}
+		else
+		{
+			TheWeaponStore->createAndFireTempWeapon(d->m_deathWeapon, obj, obj->getPosition());
+		}
 	}
 }
 
@@ -123,7 +170,15 @@ void FireWeaponWhenDeadBehavior::crc( Xfer *xfer )
 
 	// extend upgrade mux
 	UpgradeMux::upgradeMuxCRC( xfer );
+	if (getUpdate())
+		xferPendingFire(xfer);
 
+}
+
+void FireWeaponWhenDeadBehavior::xferPendingFire(Xfer* xfer)
+{
+	xfer->xferUnsignedInt(&m_fireFrame);
+	xfer->xferUser(&m_pendingDeathType, sizeof(m_pendingDeathType));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -135,15 +190,20 @@ void FireWeaponWhenDeadBehavior::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	const XferVersion currentVersion = getUpdate() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
 	// extend base class
-	BehaviorModule::xfer( xfer );
+	if (version >= 2)
+		UpdateModule::xfer(xfer);
+	else
+		BehaviorModule::xfer( xfer );
 
 	// extend upgrade mux
 	UpgradeMux::upgradeMuxXfer( xfer );
+	if (version >= 2)
+		xferPendingFire(xfer);
 
 }
 

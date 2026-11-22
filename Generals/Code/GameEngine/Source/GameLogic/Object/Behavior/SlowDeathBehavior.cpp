@@ -31,9 +31,13 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #define DEFINE_SLOWDEATHPHASE_NAMES
+#include "Common/AudioEventRTS.h"
+#include "Common/GameAudio.h"
 #include "Common/GameLOD.h"
 #include "Common/INI.h"
+#include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Thing.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -70,6 +74,11 @@ SlowDeathBehaviorModuleData::SlowDeathBehaviorModuleData()
 	m_flingForceVariance = 0;
 	m_flingPitch = 0;
 	m_flingPitchVariance = 0;
+	m_fadeDelay = 0;
+	m_fadeTime = 0;
+	m_decayBeginTime = 0;
+	m_shadowWhenDead = TRUE;
+	m_doNotRandomizeMidpoint = FALSE;
 	// redundant.
 	//m_fx.clear();
 	//m_ocls.clear();
@@ -118,6 +127,14 @@ static void parseWeapon( INI* ini, void *instance, void * /*store*/, const void*
 	}
 }
 
+static void parseSound( INI* ini, void *instance, void *, const void* )
+{
+	SlowDeathBehaviorModuleData* self = (SlowDeathBehaviorModuleData*)instance;
+	SlowDeathPhaseType sdphase = (SlowDeathPhaseType)INI::scanIndexList(ini->getNextToken(), TheSlowDeathPhaseNames);
+	for (const char* token = ini->getNextToken(); token; token = ini->getNextTokenOrNull())
+		self->m_sounds[sdphase].push_back(AsciiString(token));
+}
+
 //-------------------------------------------------------------------------------------------------
 /*static*/ void SlowDeathBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
@@ -144,6 +161,21 @@ static void parseWeapon( INI* ini, void *instance, void * /*store*/, const void*
 	};
   p.add(dataFieldParse);
 	p.add(DieMuxData::getFieldParse(), offsetof( SlowDeathBehaviorModuleData, m_dieMuxData ));
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse rotwkFields[] =
+		{
+			{ "Sound",									parseSound,										nullptr, 0 },
+			{ "DeathFlags",							ModelConditionFlags::parseFromINI,	nullptr, offsetof( SlowDeathBehaviorModuleData, m_deathFlags ) },
+			{ "FadeDelay",							INI::parseDurationUnsignedInt,		nullptr, offsetof( SlowDeathBehaviorModuleData, m_fadeDelay ) },
+			{ "FadeTime",								INI::parseDurationUnsignedInt,		nullptr, offsetof( SlowDeathBehaviorModuleData, m_fadeTime ) },
+			{ "DecayBeginTime",					INI::parseDurationUnsignedInt,		nullptr, offsetof( SlowDeathBehaviorModuleData, m_decayBeginTime ) },
+			{ "ShadowWhenDead",					INI::parseBool,									nullptr, offsetof( SlowDeathBehaviorModuleData, m_shadowWhenDead ) },
+			{ "DoNotRandomizeMidpoint",	INI::parseBool,									nullptr, offsetof( SlowDeathBehaviorModuleData, m_doNotRandomizeMidpoint ) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(rotwkFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -155,6 +187,7 @@ SlowDeathBehavior::SlowDeathBehavior( Thing *thing, const ModuleData* moduleData
 	m_midpointFrame = 0;
 	m_destructionFrame = 0;
 	m_acceleratedTimeScale = 1.0f;
+	m_fadeFrame = 0;
 
 	if (getSlowDeathBehaviorModuleData()->m_probabilityModifier < 1)
 	{
@@ -232,7 +265,7 @@ void SlowDeathBehavior::beginSlowDeath(const DamageInfo *damageInfo)
 
 
 		// Ask game detail manager if we need to speedup all deaths to improve performance
-		Real timeScale = TheGameLODManager->getSlowDeathScale();
+		Real timeScale = RetailFileLayers::enabled() ? 1.0f : TheGameLODManager->getSlowDeathScale();
 		m_acceleratedTimeScale = 1.0f;	// assume normal death speed.
 
 		if (timeScale == 0.0f && !d->hasNonLodEffects())
@@ -256,10 +289,14 @@ void SlowDeathBehavior::beginSlowDeath(const DamageInfo *damageInfo)
 			{
 				m_sinkFrame = timeScale * (d->m_sinkDelay + GameLogicRandomValue(0, d->m_sinkDelayVariance));
 				m_destructionFrame = timeScale * (d->m_destructionDelay + GameLogicRandomValue(0, d->m_destructionDelayVariance));
-				m_midpointFrame = GameLogicRandomValue( BEGIN_MIDPOINT_RATIO * m_destructionFrame, END_MIDPOINT_RATIO * m_destructionFrame );
+				if (d->m_doNotRandomizeMidpoint)
+					m_midpointFrame = m_destructionFrame / 2;
+				else
+					m_midpointFrame = GameLogicRandomValue( BEGIN_MIDPOINT_RATIO * m_destructionFrame, END_MIDPOINT_RATIO * m_destructionFrame );
 				m_acceleratedTimeScale = timeScale;
 			}
 		}
+		m_fadeFrame = m_acceleratedTimeScale * d->m_fadeDelay;
 
 		UnsignedInt now = TheGameLogic->getFrame();
 
@@ -316,25 +353,69 @@ void SlowDeathBehavior::beginSlowDeath(const DamageInfo *damageInfo)
 				whenToWakeTime = m_destructionFrame;
 			if (whenToWakeTime > m_midpointFrame)
 				whenToWakeTime = m_midpointFrame;
+			if (d->m_fadeTime > 0 && whenToWakeTime > m_fadeFrame)
+				whenToWakeTime = m_fadeFrame;
 			setWakeFrame(obj, UPDATE_SLEEP(whenToWakeTime));
 		}
 		m_sinkFrame += now;
 		m_destructionFrame += now;
 		m_midpointFrame += now;
+		m_fadeFrame += now;
 
 		m_flags |= (1<<SLOW_DEATH_ACTIVATED);
+
+		if (d->m_deathFlags.any())
+		{
+			obj->setModelConditionFlags(d->m_deathFlags);
+			if (RetailFileLayers::enabled())
+			{
+				static const ModelConditionFlagType deathConditions[] = {
+					MODELCONDITION_DEATH_1, MODELCONDITION_DEATH_2, MODELCONDITION_DEATH_3,
+					MODELCONDITION_DEATH_4, MODELCONDITION_DEATH_5
+				};
+				ObjectStatusMaskType status;
+				for (Int i = 0; i < ARRAY_SIZE(deathConditions); ++i)
+					if (d->m_deathFlags.test(deathConditions[i]))
+						status.set(static_cast<ObjectStatusTypes>(OBJECT_STATUS_DEATH_1 + i));
+				if (status.any())
+					obj->setStatus(status);
+			}
+		}
+
+		if (!d->m_shadowWhenDead && obj->getDrawable())
+			obj->getDrawable()->setShadowsEnabled(false);
 
 		doPhaseStuff(SDPHASE_INITIAL);
 
 	}
 }
 
+void SlowDeathBehavior::playPhaseSound(SlowDeathPhaseType sdphase)
+{
+	const std::vector<AsciiString>& sounds = getSlowDeathBehaviorModuleData()->m_sounds[sdphase];
+	if (sounds.empty() || TheAudio == nullptr)
+		return;
+
+	const Int idx = sounds.size() > 1 ? GameClientRandomValue(0, (Int)sounds.size() - 1) : 0;
+	AudioEventRTS sound(sounds[idx]);
+	sound.setObjectID(getObject()->getID());
+	TheAudio->addAudioEvent(&sound);
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void SlowDeathBehavior::doPhaseStuff(SlowDeathPhaseType sdphase)
 {
+	if (sdphase == SDPHASE_HIT_GROUND && RetailFileLayers::enabled())
+	{
+		if (m_flags & (1 << GROUND_PHASE_EXECUTED))
+			return;
+		m_flags |= 1 << GROUND_PHASE_EXECUTED;
+	}
 	const SlowDeathBehaviorModuleData* d = getSlowDeathBehaviorModuleData();
 	Int idx, listSize;
+
+	playPhaseSound(sdphase);
 
 	if (!d->m_maskOfLoadedEffects)
 		return;	//has no ocl, fx, or weapons.
@@ -383,7 +464,7 @@ UpdateSleepTime SlowDeathBehavior::update()
 	const SlowDeathBehaviorModuleData* d = getSlowDeathBehaviorModuleData();
 	Object* obj = getObject();
 
-	Real timeScale = TheGameLODManager->getSlowDeathScale();
+	Real timeScale = RetailFileLayers::enabled() ? 1.0f : TheGameLODManager->getSlowDeathScale();
 
 	// Check if we have normal time scale but LODManager is requesting acceleration
 	if (timeScale != 1.0f && m_acceleratedTimeScale == 1.0f && !d->hasNonLodEffects())
@@ -400,6 +481,9 @@ UpdateSleepTime SlowDeathBehavior::update()
 		m_sinkFrame = (Real)m_sinkFrame * timeScale;
 		m_midpointFrame = (Real)m_midpointFrame * timeScale;
 		m_destructionFrame = (Real)m_destructionFrame * timeScale;
+		const UnsignedInt frame = TheGameLogic->getFrame();
+		if (d->m_fadeTime > 0 && m_fadeFrame > frame && (m_flags & (1<<FADE_STARTED)) == 0)
+			m_fadeFrame = frame + (m_fadeFrame - frame) * timeScale;
 		m_acceleratedTimeScale = timeScale;
 	};
 
@@ -413,11 +497,17 @@ UpdateSleepTime SlowDeathBehavior::update()
 			++m_sinkFrame;
 			++m_midpointFrame;
 			++m_destructionFrame;
+			if (d->m_fadeTime > 0 && (m_flags & (1<<FADE_STARTED)) == 0)
+				++m_fadeFrame;
 			if (!obj->isAboveTerrain())
 			{
 				obj->clearAndSetModelConditionFlags(MAKE_MODELCONDITION_MASK(MODELCONDITION_EXPLODED_FLAILING),
 																						MAKE_MODELCONDITION_MASK(MODELCONDITION_EXPLODED_BOUNCING));
 				m_flags |= (1<<BOUNCED);
+				if (RetailFileLayers::enabled())
+					doPhaseStuff(SDPHASE_HIT_GROUND);
+				else
+					playPhaseSound(SDPHASE_HIT_GROUND);
 			}
 
 			// Here we want to make sure we die if we collide with a tree on the way down
@@ -462,6 +552,13 @@ UpdateSleepTime SlowDeathBehavior::update()
 		m_flags |= (1<<MIDPOINT_EXECUTED);
 	}
 
+	if (d->m_fadeTime > 0 && now >= m_fadeFrame && (m_flags & (1<<FADE_STARTED)) == 0)
+	{
+		m_flags |= (1<<FADE_STARTED);
+		if (Drawable *draw = obj->getDrawable())
+			draw->fadeOut(m_acceleratedTimeScale * d->m_fadeTime);
+	}
+
 	if (now >= m_destructionFrame)
 	{
 		doPhaseStuff(SDPHASE_FINAL);
@@ -474,10 +571,12 @@ UpdateSleepTime SlowDeathBehavior::update()
 //-------------------------------------------------------------------------------------------------
 void SlowDeathBehavior::onDie( const DamageInfo *damageInfo )
 {
+	Object *obj = getObject();
+
 	if (!isDieApplicable(damageInfo))
 		return;
 
-	AIUpdateInterface *ai = getObject()->getAIUpdateInterface();
+	AIUpdateInterface *ai = obj->getAIUpdateInterface();
 	if (ai)
 	{
 		// has another AI already handled us. (hopefully another SlowDeathBehavior)
@@ -486,11 +585,19 @@ void SlowDeathBehavior::onDie( const DamageInfo *damageInfo )
 		ai->markAsDead();
 	}
 
+	else if (RetailFileLayers::enabled())
+	{
+		for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+			if (const auto* death = dynamic_cast<const SlowDeathBehavior*>(*module))
+				if (death->isSlowDeathActivated())
+					return;
+	}
+
 	// deselect this unit for all players.
-	TheGameLogic->deselectObject(getObject(), PLAYERMASK_ALL, TRUE);
+	TheGameLogic->deselectObject(obj, PLAYERMASK_ALL, TRUE);
 
 	Int total = 0;
-	BehaviorModule** update = getObject()->getBehaviorModules();
+	BehaviorModule** update = obj->getBehaviorModules();
 	for (; *update; ++update)
 	{
 		SlowDeathBehaviorInterface* sdu = (*update)->getSlowDeathBehaviorInterface();
@@ -505,7 +612,7 @@ void SlowDeathBehavior::onDie( const DamageInfo *damageInfo )
 	// this returns a value from 1...total, inclusive
 	Int roll = GameLogicRandomValue(1, total);
 
-	for (/* UpdateModuleInterface** */ update = getObject()->getBehaviorModules(); *update; ++update)
+	for (update = obj->getBehaviorModules(); *update; ++update)
 	{
 		SlowDeathBehaviorInterface* sdu = (*update)->getSlowDeathBehaviorInterface();
 		if (sdu != nullptr && sdu->isDieApplicable(damageInfo))
@@ -530,6 +637,8 @@ void SlowDeathBehavior::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
+	if (RetailFileLayers::enabled())
+		xferDeathState(xfer, getSlowDeathBehaviorModuleData()->m_fadeTime > 0);
 
 }
 
@@ -542,12 +651,17 @@ void SlowDeathBehavior::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = getSlowDeathBehaviorModuleData()->m_fadeTime > 0 ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
 	// extend base class
 	UpdateModule::xfer( xfer );
+	xferDeathState(xfer, version >= 2);
+}
+
+void SlowDeathBehavior::xferDeathState(Xfer* xfer, Bool includeFade)
+{
 
 	// sink frame
 	xfer->xferUnsignedInt( &m_sinkFrame );
@@ -563,6 +677,9 @@ void SlowDeathBehavior::xfer( Xfer *xfer )
 
 	// flags
 	xfer->xferUnsignedInt( &m_flags );
+
+	if (includeFade)
+		xfer->xferUnsignedInt(&m_fadeFrame);
 
 }
 

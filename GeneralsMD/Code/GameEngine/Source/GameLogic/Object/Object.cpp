@@ -4372,10 +4372,12 @@ void Object::crc( Xfer *xfer )
 		static const NameKeyType hitKey = NAMEKEY("HitReactionBehavior");
 		static const NameKeyType oathKey = NAMEKEY("OathbreakersFadeAwayBehavior");
 		static const NameKeyType dualWeaponKey = NAMEKEY("DualWeaponBehavior");
+		static const NameKeyType deathWeaponKey = NAMEKEY("FireWeaponWhenDeadBehavior");
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
 			const NameKeyType key = (*module)->getModuleNameKey();
-			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey || key == dualWeaponKey)
+			if (key == boredKey || key == abilityKey || key == hitKey || key == oathKey ||
+				key == dualWeaponKey || key == deathWeaponKey || (*module)->getSlowDeathBehaviorInterface())
 				xfer->xferSnapshot(*module);
 		}
 #if !RTS_GENERALS

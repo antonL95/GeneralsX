@@ -3647,9 +3647,11 @@ void Object::crc( Xfer *xfer )
 		if (m_firingTracker)
 			m_firingTracker->crcRetailState(xfer);
 		static const NameKeyType dualWeaponKey = NAMEKEY("DualWeaponBehavior");
+		static const NameKeyType deathWeaponKey = NAMEKEY("FireWeaponWhenDeadBehavior");
 		for (BehaviorModule** module = getBehaviorModules(); *module; ++module)
 		{
-			if ((*module)->getModuleNameKey() == dualWeaponKey)
+			const NameKeyType key = (*module)->getModuleNameKey();
+			if (key == dualWeaponKey || key == deathWeaponKey || (*module)->getSlowDeathBehaviorInterface())
 				xfer->xferSnapshot(*module);
 		}
 	}
