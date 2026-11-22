@@ -5825,6 +5825,10 @@ void AIAttackState::onExit( StateExitType status )
 																							OBJECT_STATUS_IGNORING_STEALTH ) );
 	obj->clearModelConditionState( MODELCONDITION_ATTACKING );
 
+	const Weapon* weapon = obj->getCurrentWeapon();
+	if (RetailFileLayers::enabled() && weapon && weapon->getTemplate()->shouldLockWhenUsing())
+		obj->releaseWeaponLock(LOCKED_TEMPORARILY);
+
 	obj->clearLeechRangeModeForAllWeapons();
 
 	AIUpdateInterface *ai = obj->getAI();

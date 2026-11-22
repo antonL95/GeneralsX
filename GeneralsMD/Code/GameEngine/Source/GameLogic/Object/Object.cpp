@@ -1817,6 +1817,8 @@ void Object::fireCurrentWeapon(Object *target)
 	Weapon* weapon = m_weaponSet.getCurWeapon();
 	if (weapon && (weapon->getStatus() == READY_TO_FIRE))
 	{
+		if (RetailFileLayers::enabled() && weapon->getTemplate()->shouldLockWhenUsing())
+			setWeaponLock(m_weaponSet.getCurWeaponSlot(), LOCKED_TEMPORARILY);
 		Bool reloaded = weapon->fireWeapon(this, target);
 		DEBUG_ASSERTCRASH(m_firingTracker, ("hey, we are firing but have no firing tracker. this is wrong."));
 		if (m_firingTracker)
@@ -1839,6 +1841,8 @@ void Object::fireCurrentWeapon(const Coord3D* pos)
 	Weapon* weapon = m_weaponSet.getCurWeapon();
 	if (weapon && (weapon->getStatus() == READY_TO_FIRE))
 	{
+		if (RetailFileLayers::enabled() && weapon->getTemplate()->shouldLockWhenUsing())
+			setWeaponLock(m_weaponSet.getCurWeaponSlot(), LOCKED_TEMPORARILY);
 		Bool reloaded = weapon->fireWeapon(this, pos);
 		DEBUG_ASSERTCRASH(m_firingTracker, ("hey, we are firing but have no firing tracker. this is wrong."));
 		if (m_firingTracker)
@@ -1874,6 +1878,8 @@ void Object::preFireCurrentWeapon( const Object *victim )
 	//next frame.
 	if (weapon && TheGameLogic->getFrame() + 1 >= weapon->getPossibleNextShotFrame() )
 	{
+		if (RetailFileLayers::enabled() && weapon->getTemplate()->shouldLockWhenUsing())
+			setWeaponLock(m_weaponSet.getCurWeaponSlot(), LOCKED_TEMPORARILY);
 		weapon->preFireWeapon( this, victim );
 		friend_setUndetectedDefector( FALSE );// My secret is out
 	}

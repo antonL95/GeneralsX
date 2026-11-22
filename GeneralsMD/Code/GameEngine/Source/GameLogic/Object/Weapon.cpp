@@ -255,6 +255,10 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 {
 	{ "PreAttackFX", INI::parseFXList, nullptr, offsetof(WeaponTemplate, m_preAttackFX) },
+	{ "PreAttackRandomAmount", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_preAttackRandomAmount) },
+	{ "ShareTimers", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_shareTimers) },
+	{ "RequireFollowThru", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_requireFollowThru) },
+	{ "LockWhenUsing", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_lockWhenUsing) },
 	{ "CanBeDodged", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_canBeDodged) },
 	{ "DamageNugget", WeaponNugget::parseDamageNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DOTNugget", WeaponNugget::parseDOTNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
@@ -3120,6 +3124,17 @@ Bool Weapon::privateFireWeapon(
 	return reloaded;
 }
 
+void Weapon::inheritSharedTimer(const Weapon& previous)
+{
+	if (!previous.m_template->m_shareTimers || previous.m_status == OUT_OF_AMMO || !m_ammoInClip ||
+		previous.m_whenWeCanFireAgain <= TheGameLogic->getFrame() ||
+		m_whenWeCanFireAgain >= previous.m_whenWeCanFireAgain)
+		return;
+
+	m_whenLastReloadStarted = previous.m_whenLastReloadStarted;
+	m_whenWeCanFireAgain = previous.m_whenWeCanFireAgain;
+	m_status = BETWEEN_FIRING_SHOTS;
+}
 
 //-------------------------------------------------------------------------------------------------
 void WeaponTemplate::playPreAttackFX(const Object& source, const Object* target, const Coord3D* targetPosition) const
@@ -3136,7 +3151,12 @@ void WeaponTemplate::playPreAttackFX(const Object& source, const Object* target,
 
 void Weapon::preFireWeapon( const Object *source, const Object *victim )
 {
-	Int delay = getPreAttackDelay( source, victim );
+	Int delay = getPreAttackDelay(source, victim);
+	if (delay > 0 && RetailFileLayers::enabled() && m_template->m_preAttackRandomAmount)
+	{
+		constexpr Int framesPerTick = LOGICFRAMES_PER_SECOND / RotwkDuration::FRAMES_PER_SECOND;
+		delay += GameLogicRandomValue(0, m_template->m_preAttackRandomAmount / framesPerTick) * framesPerTick;
+	}
 	if( delay > 0 )
 	{
 		const UnsignedInt frame = TheGameLogic->getFrame();
@@ -3222,8 +3242,10 @@ Bool Weapon::canFireInCurrentMovement(const Object* source) const
 
 Bool Weapon::isWaitingToIdle() const
 {
-	return m_lastFireFrame && m_template->getIdleAfterFiringDelay() &&
-		TheGameLogic->getFrame() < m_lastFireFrame + m_template->getIdleAfterFiringDelay();
+	const UnsignedInt followThrough = RetailFileLayers::enabled() && m_template->m_requireFollowThru
+		? m_template->getFiringDuration() : 0;
+	return m_lastFireFrame &&
+		TheGameLogic->getFrame() < m_lastFireFrame + std::max(followThrough, m_template->getIdleAfterFiringDelay());
 }
 
 Bool Weapon::isHoldingMovementForReload(UnsignedInt frame) const

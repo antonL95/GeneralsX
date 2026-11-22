@@ -1460,6 +1460,8 @@ Bool WeaponSet::setWeaponLock( WeaponSlotType weaponSlot, WeaponLockType lockTyp
 	{
 		if( lockType == LOCKED_PERMANENTLY )
 		{
+			if (RetailFileLayers::enabled() && weaponSlot != m_curWeapon && getCurWeapon())
+				m_weapons[weaponSlot]->inheritSharedTimer(*getCurWeapon());
 			m_curWeapon = weaponSlot;
 			m_curWeaponLockedStatus = lockType;
 			//DEBUG_LOG(("WeaponSet::setWeaponLock permanently -- changed curweapon to %s",getCurWeapon()->getName().str()));

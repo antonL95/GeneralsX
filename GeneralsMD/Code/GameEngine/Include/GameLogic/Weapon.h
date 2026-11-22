@@ -494,6 +494,7 @@ public:
 	const ParticleSystemTemplate* getProjectileExhaust(VeterancyLevel v) const { return m_projectileExhausts[v]; }
 
 	const AudioEventRTS& getFireSound() const { return m_fireSound; }
+	Bool shouldLockWhenUsing() const { return m_lockWhenUsing; }
 	UnsignedInt getFireSoundLoopTime() const { return m_fireSoundLoopTime; }
 	const std::vector<Coord2D>& getScatterTargetsVector() const { return m_scatterTargets; }
 	const WeaponBonusSet* getExtraBonus() const { return m_extraBonus; }
@@ -617,6 +618,10 @@ private:
 	Int m_antiMask;													///< what we can target
 	Int m_antiStructure = -1;
 	const FXList* m_preAttackFX = nullptr;
+	UnsignedInt m_preAttackRandomAmount = 0;
+	Bool m_shareTimers = FALSE;
+	Bool m_requireFollowThru = FALSE;
+	Bool m_lockWhenUsing = FALSE;
 	Int m_affectsMask;											///< what we can affect
 	Int m_collideMask;											///< what we can collide with (projectiles only)
 	Bool m_damageDealtAtSelfPosition;				///< if T, weapon damage is done at source's position, not victim's pos. (useful for suicide weapons.)
@@ -765,6 +770,7 @@ public:
 	UnsignedInt getPossibleNextShotFrame() const;
 	Bool canFireInCurrentMovement(const Object* source) const;
 	Bool hasCommittedAttack() const;
+	void inheritSharedTimer(const Weapon& previous);
 	Bool isWaitingToIdle() const;
 	UnsignedInt getPreAttackFinishedFrame() const { return m_whenPreAttackFinished; }
 	UnsignedInt getLastReloadStartedFrame() const { return m_whenLastReloadStarted; }
