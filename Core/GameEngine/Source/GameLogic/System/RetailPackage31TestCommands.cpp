@@ -62,6 +62,18 @@ void handlePackage31(const RetailTestCommands::Context& ctx)
 	if (!source)
 		return;
 	const std::string_view action(ctx.action);
+	if (action == "pkg31-remove-horde")
+	{
+		if (const HordeContain* horde = HordeContain::get(source))
+		{
+			const ContainedItemsList members = *horde->getContainedItemsList();
+			for (Object* member : members)
+				TheGameLogic->destroyObject(member);
+		}
+		TheGameLogic->destroyObject(source);
+		return;
+	}
+
 	const std::string_view argument(ctx.argument);
 	const auto separator = argument.find('|');
 	Object* target = separator == std::string_view::npos ? ctx.target : ctx.findTarget(argument.substr(0, separator));

@@ -80,3 +80,12 @@
 400 pkg31-container-state Player_1 Pkg31BattleTower 0 tower-loaded-before-death
 402 pkg31-kill Player_1 Pkg31BattleTower 0
 408 pkg31-unit-state Player_1 Pkg31ArcherHorde 0 horde-after-tower-death
+
+410 pkg31-remove-horde Player_1 Pkg31ArcherHorde 2
+410 pkg31-remove-horde Player_1 Pkg31ArcherHorde 1
+410 pkg31-remove-horde Player_1 Pkg31ArcherHorde 0
+410 pkg31-remove-horde Player_1 MordorHaradrimArcherHordeOnMumakil 0
+410 destroy Player_1 Pkg31Fighter 0
+410 destroy Player_1 Pkg31Trebuchet 0
+410 destroy Player_1 Pkg31CastleKeep 0
+410 destroy PlyrCivilian Pkg31RuinedTower 0
