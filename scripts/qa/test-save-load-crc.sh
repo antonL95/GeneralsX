@@ -38,6 +38,10 @@ case "$mode" in
         cp "$package/map.ini" "$package/map.str" "$mapdir/"
         printf '\n' >> "$mapdir/map.ini"
         cat "$fixtures/training.ini" >> "$mapdir/map.ini"
+        if [ "$mode" = training ] && [ -n "${PKGS1_TRAINING_EXTRA_INI:-}" ]; then
+            printf '\n' >> "$mapdir/map.ini"
+            cat "$PKGS1_TRAINING_EXTRA_INI" >> "$mapdir/map.ini"
+        fi
         cat "$fixtures/training.gdb" > "$out/start.gdb"
         sed '/^break ScriptEngine::startEndGameTimer/,$!d' "$fixtures/training.gdb" > "$out/resume.gdb"
         if [ "$mode" = spellbook ]; then
@@ -64,6 +68,9 @@ esac
 diag=${PKGS1_DIAGNOSTICS:-"$save_frame,$((save_frame + 1))"}
 {
     awk -v end="$end" '$1 <= end && $2 != "quit" && $2 != "xpcrc"' "$scenario"
+    if [ "$mode" = training ] && [ -n "${PKGS1_TRAINING_EXTRA_COMMANDS:-}" ]; then
+        awk -v end="$end" '$1 <= end && $2 != "quit" && $2 != "xpcrc"' "$PKGS1_TRAINING_EXTRA_COMMANDS"
+    fi
     if [ -n "$path_unit" ]; then
         printf '%s snapshot-path-queue %s\n' "$save_frame" "$path_unit"
         printf '%s snapshot-path-state %s\n' "$save_frame" "$path_unit"
