@@ -2,11 +2,14 @@
 5 create Player_1 MenPorter 0 3040,710,0
 8 placement-ocl Player_1 MenPorter 0 OCL_GondorSpellBookSpawnLoneTower 2945 650 60
 9 placement-ocl Player_1 MenPorter 2 OCL_SpawnTrebuchetEgg 3065 700 60
+10 placement-ocl Player_1 MenPorter 0 OCL_WildBarricade 3100 840 60
 18 placement-spawn-points Player_1 GondorSentryTower_Independant 0 ARROW_
+18 snapshot-save - - 0 barricade-early.sav
 90 placement-state Player_1 GondorBigTrebuchet_Summoned 0 trebuchet
 90 placement-state Player_1 GondorBigTrebuchetGuards 0 guards
 90 placement-spawn-points Player_1 GondorBigTrebuchetGuards 0 BOYO
 100 snapshot-save - - 0 spawn-points.sav
 180 placement-spawn-points Player_1 GondorSentryTower_Independant 0 ARROW_
 180 placement-spawn-points Player_1 GondorBigTrebuchetGuards 0 BOYO
+180 placement-spawn-points Player_1 MordorBarricade 0 ARCHER_
 181 quit - - 0
