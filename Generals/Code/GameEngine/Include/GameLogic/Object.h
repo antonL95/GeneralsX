@@ -705,8 +705,8 @@ private:
 	Real					m_shroudClearingRange;						///< looking range for shroud ONLY
 	Real					m_shroudRange;										///< like looking range, this is how far I shroud others' looks
 	mutable Real			m_averageLocalGroundHeight;
-	mutable Int				m_averageGroundSampleX;
-	mutable Int				m_averageGroundSampleY;
+	mutable Real			m_averageGroundSampleX;
+	mutable Real			m_averageGroundSampleY;
 	mutable Int				m_averageGroundSampleLayer;
 	mutable Bool			m_averageGroundHeightValid;
 

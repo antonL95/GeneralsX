@@ -225,8 +225,8 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	m_partitionLastThreat(nullptr),
 	m_partitionLastValue(nullptr),
 	m_averageLocalGroundHeight(0.0f),
-	m_averageGroundSampleX(0),
-	m_averageGroundSampleY(0),
+	m_averageGroundSampleX(0.0f),
+	m_averageGroundSampleY(0.0f),
 	m_averageGroundSampleLayer(0),
 	m_averageGroundHeightValid(FALSE),
 	m_smcUntil(NEVER),
@@ -1779,13 +1779,44 @@ void Object::reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPo
 			getContain()->containReactToTransformChange();
 	}
 
-	if (RetailFileLayers::enabled() && angDiff && m_partitionLastLook &&
-		!m_partitionLastLook->isInvalid() && m_partitionLastLook->m_sideRange >= 0.0f)
+	if (RetailFileLayers::enabled() && m_partitionLastLook && !m_partitionLastLook->isInvalid())
 	{
-		Real angleDelta = getOrientation() - m_partitionLastLook->m_orientation;
-		if (angleDelta < 0.0f)
-			angleDelta = -angleDelta;
-		if (angleDelta > 0.05f)
+		Bool refreshShroud = FALSE;
+		if (m_partitionLastLook->m_sideRange >= 0.0f)
+		{
+			Real angleDelta = getOrientation() - m_partitionLastLook->m_orientation;
+			while (angleDelta > PI)
+				angleDelta -= 2.0f * PI;
+			while (angleDelta < -PI)
+				angleDelta += 2.0f * PI;
+			if (angleDelta < 0.0f)
+				angleDelta = -angleDelta;
+			if (angleDelta > 0.05f)
+				refreshShroud = TRUE;
+		}
+		if (!refreshShroud)
+		{
+			const Coord3D* pos = getPosition();
+			Real dz = pos->z - m_partitionLastLook->m_where.z;
+			if (dz < 0.0f)
+				dz = -dz;
+			Real dx = pos->x - m_partitionLastLook->m_where.x;
+			if (dx < 0.0f)
+				dx = -dx;
+			Real dy = pos->y - m_partitionLastLook->m_where.y;
+			if (dy < 0.0f)
+				dy = -dy;
+			if (dz > 0.01f || dx > 0.01f || dy > 0.01f)
+			{
+				const Real currentRange = getShroudClearingRange();
+				Real rangeDelta = currentRange - m_partitionLastLook->m_howFar;
+				if (rangeDelta < 0.0f)
+					rangeDelta = -rangeDelta;
+				if (rangeDelta > 0.01f)
+					refreshShroud = TRUE;
+			}
+		}
+		if (refreshShroud)
 			handleShroud();
 	}
 
@@ -4805,9 +4836,9 @@ void Object::look()
 					const HordeContainModuleData* formation = horde->getActiveFormation();
 					if (formation)
 					{
-						if (formation->m_visionSideOverride >= 0.0f)
+						if (formation->m_visionSideOverride > 0.0f)
 							sideMult = formation->m_visionSideOverride;
-						if (formation->m_visionRearOverride >= 0.0f)
+						if (formation->m_visionRearOverride > 0.0f)
 							rearMult = formation->m_visionRearOverride;
 					}
 				}
@@ -4964,8 +4995,8 @@ Real Object::getAverageLocalGroundHeight() const
 	if (!tmpl)
 		return pos->z;
 	const auto& rotwk = tmpl->getRotWKObjectData();
-	const Int sampleX = static_cast<Int>(pos->x);
-	const Int sampleY = static_cast<Int>(pos->y);
+	const Real sampleX = pos->x;
+	const Real sampleY = pos->y;
 	const Int sampleLayer = static_cast<Int>(getLayer());
 	if (m_averageGroundHeightValid &&
 		m_averageGroundSampleX == sampleX &&
@@ -4974,7 +5005,9 @@ Real Object::getAverageLocalGroundHeight() const
 	{
 		return m_averageLocalGroundHeight;
 	}
-	const Int segments = rotwk.visionBonusTestSegments > 0 ? rotwk.visionBonusTestSegments : 8;
+	Int segments = rotwk.visionBonusTestSegments > 0 ? rotwk.visionBonusTestSegments : 8;
+	if (segments > 64)
+		segments = 64;
 	const Real radius = rotwk.visionBonusTestRadius;
 	if (radius <= 0.0f)
 	{
@@ -4983,13 +5016,14 @@ Real Object::getAverageLocalGroundHeight() const
 	else
 	{
 		Real sum = 0.0f;
-		const Real step = (2.0f * PI) / static_cast<Real>(segments);
+		const Real step = 6.2820001f / static_cast<Real>(segments);
+		Real angle = 0.0f;
 		for (Int i = 0; i < segments; ++i)
 		{
-			const Real angle = step * static_cast<Real>(i);
 			const Real sx = pos->x + WWMath::Cos(angle) * radius;
 			const Real sy = pos->y + WWMath::Sin(angle) * radius;
 			sum += TheTerrainLogic->getLayerHeight(sx, sy, getLayer());
+			angle += step;
 		}
 		m_averageLocalGroundHeight = sum / static_cast<Real>(segments);
 	}

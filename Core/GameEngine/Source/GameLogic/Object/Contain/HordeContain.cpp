@@ -998,7 +998,7 @@ Real HordeContain::directionalVisionScale(const Object* target) const
 	const auto* data = getActiveFormation();
 	const auto& object = anchor->getTemplate()->getRotWKObjectData();
 	const Real override = axial ? data->m_visionRearOverride : data->m_visionSideOverride;
-	return std::max(0.0f, override >= 0.0f ? override : (axial ? object.visionRear : object.visionSide));
+	return std::max(0.0f, override > 0.0f ? override : (axial ? object.visionRear : object.visionSide));
 }
 
 Real HordeContain::maximumVisionScale() const
@@ -1006,8 +1006,8 @@ Real HordeContain::maximumVisionScale() const
 	const auto* data = getActiveFormation();
 	const auto& object = getObject()->getTemplate()->getRotWKObjectData();
 	return std::max({1.0f,
-		data->m_visionRearOverride >= 0.0f ? data->m_visionRearOverride : object.visionRear,
-		data->m_visionSideOverride >= 0.0f ? data->m_visionSideOverride : object.visionSide});
+		data->m_visionRearOverride > 0.0f ? data->m_visionRearOverride : object.visionRear,
+		data->m_visionSideOverride > 0.0f ? data->m_visionSideOverride : object.visionSide});
 }
 
 const HordeBannerCarrierPosition* HordeContain::getBannerFormationPosition() const
@@ -1480,6 +1480,12 @@ void HordeContain::setAlternateFormation(Bool alternate)
 	rebuildMemberSlots();
 	for (Object* member : getContainList())
 		updateRankWeaponConditions(member);
+	if (Object* anchor = getObject())
+	{
+		const Coord3D* pos = anchor->getPosition();
+		if (pos->x || pos->y || pos->z)
+			anchor->handlePartitionCellMaintenance();
+	}
 }
 
 void HordeContain::updateRankWeaponConditions(Object* member) const
