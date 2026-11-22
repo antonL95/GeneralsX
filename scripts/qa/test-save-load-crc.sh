@@ -82,6 +82,8 @@ diag=${PKGS1_DIAGNOSTICS:-"$save_frame,$((save_frame + 1))"}
     fi
     if [ -n "$wall" ]; then
         printf '%s snapshot-wall-state %s\n' "$save_frame" "$wall"
+        printf '%s snapshot-wall-state Player_1 GondorCastleWallSegment 0\n' "$save_frame"
+        printf '%s snapshot-wall-occupant Player_1 - 0 WallTrebuchetOccupant\n' "$save_frame"
     fi
     printf '%s\n' "$diag" | tr ',' '\n' | awk -v end="$end" '/^[0-9]+$/ && $1 <= end {print $1, "snapshot-crc - - 0"; print $1, "logall - - 0"}'
     seq "$save_frame" "$end" | awk '{ print $1, "xpcrc - - 0" }'
@@ -151,7 +153,16 @@ for phase in continue resume; do
         expect "$phase" "TEST save-load path-state frame=$((save_frame + 1)) waiting=0"
     fi
     if [ -n "$wall" ]; then
-        expect "$phase" "TEST save-load wall-state frame=$save_frame walkable=1"
+        expect "$phase" "TEST save-load wall-state frame=$save_frame template=GondorCastleWallTrebuchet walkable=1"
+        expect "$phase" "TEST save-load wall-state frame=$save_frame template=GondorCastleWallSegment walkable=1"
+        expect "$phase" "TEST save-load wall-occupant frame=$save_frame name=WallTrebuchetOccupant layer=15 walkable=1"
+    fi
+    if [ "$mode" = training ] && [ "$end" -ge 126 ] && { [ "$phase" = continue ] || [ "$save_frame" -le 124 ]; }; then
+        expect "$phase" 'TEST save-load wall-occupant frame=124 name=WallDeleteOccupant layer=15 walkable=1'
+        expect "$phase" 'TEST save-load wall-occupant frame=124 name=WallGateOccupant layer=15 walkable=1'
+        expect "$phase" 'TEST save-load wall-occupant frame=126 name=WallDeleteOccupant layer=1 walkable=0'
+        expect "$phase" 'TEST save-load wall-occupant frame=126 name=WallGateOccupant layer=1 walkable=0'
+        grep '^TEST list 126 Player_1 MenWallGate 0 ' "$out/$phase.log"
     fi
     awk -v first="$save_frame" -v last="$end" '
         /^TEST xp-crc frame=[0-9]+ crc=[0-9A-F]+$/ {

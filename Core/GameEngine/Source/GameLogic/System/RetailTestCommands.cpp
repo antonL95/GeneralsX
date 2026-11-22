@@ -171,6 +171,8 @@ void runRetailParticleTestCommand(std::string_view action, const Object* source,
 void runRetailPlacementTestCommand(Object* source, const char* name, const Coord3D* target, UnsignedInt frame);
 void logRetailPlacementTestObject(const Object* object, const char* name, UnsignedInt frame);
 void runRetailSaveLoadPathTestCommand(std::string_view action, Object* object, UnsignedInt frame);
+void runRetailSaveLoadWallTestCommand(std::string_view action, Player* player, Object* wall,
+	const char* name, const Coord3D& position, UnsignedInt frame);
 void runRetailSaveLoadBookTestCommand(Player* player, const char* templateName);
 #if !RTS_GENERALS
 void runRetailPackage05TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
@@ -2318,6 +2320,14 @@ void execute(const Command& command, unsigned int frame)
 		command.action == "snapshot-wall-state")
 	{
 		runRetailSaveLoadPathTestCommand(command.action, findObject(command, true), frame);
+		return;
+	}
+	if (command.action == "snapshot-wall-reinforce" || command.action == "snapshot-wall-occupy" ||
+		command.action == "snapshot-wall-occupant" || command.action == "snapshot-wall-delete")
+	{
+		const Coord3D position = command.hasLocation ? groundLocation(command) : Coord3D{};
+		runRetailSaveLoadWallTestCommand(command.action, findPlayer(command), findObject(command, true),
+			command.structure.c_str(), position, frame);
 		return;
 	}
 	if (command.action == "snapshot-book-repair")

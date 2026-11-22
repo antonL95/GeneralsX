@@ -64,6 +64,21 @@
 110 pkg08-chase-order Player_1 IthilienPathfinder 1 PlyrCreeps:MordorPorter:0
 111 pkg08-chase Player_1 IthilienPathfinder 1 PlyrCreeps:MordorPorter:0
 112 pkg08-chase Player_1 IthilienPathfinder 1 PlyrCreeps:MordorPorter:1
+113 snapshot-wall-reinforce Player_1 - 0 at 2450 1160
 114 create Player_1 GondorCastleWallSegment 0 2660,1110,0
-114 snapshot-register-footprint Player_1 GondorCastleWallSegment 0
-115 objupgrade Player_1 GondorCastleWallSegment 0 Upgrade_MenWallTrebuchet
+114 snapshot-register-footprint Player_1 GondorCastleWallSegment 1
+114 snapshot-wall-occupy Player_1 GondorCastleWallSegment 1 WallTrebuchetOccupant
+115 objupgrade Player_1 GondorCastleWallSegment 1 Upgrade_MenWallTrebuchet
+122 create Player_1 GondorCastleWallSegment 0 2270,1120,0
+122 create Player_1 GondorCastleWallSegment 0 2480,1280,0
+122 snapshot-register-footprint Player_1 GondorCastleWallSegment 1
+122 snapshot-register-footprint Player_1 GondorCastleWallSegment 2
+123 snapshot-wall-occupy Player_1 GondorCastleWallSegment 1 WallDeleteOccupant
+123 snapshot-wall-occupy Player_1 GondorCastleWallSegment 2 WallGateOccupant
+124 snapshot-wall-occupant Player_1 - 0 WallDeleteOccupant
+124 snapshot-wall-occupant Player_1 - 0 WallGateOccupant
+125 objupgrade Player_1 GondorCastleWallSegment 2 Upgrade_MenWallRegularGate
+125 snapshot-wall-delete Player_1 GondorCastleWallSegment 1 WallDeleteSupport
+126 snapshot-wall-occupant Player_1 - 0 WallDeleteOccupant
+126 snapshot-wall-occupant Player_1 - 0 WallGateOccupant
+126 list Player_1 - 0
