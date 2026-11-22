@@ -503,16 +503,15 @@ public:
 
 	void doFXObj(const Object* primary, const Object* secondary) const override
 	{
-		doFXPosWithObjects(primary ? primary->getPosition() : nullptr, nullptr, 0.0f,
-			nullptr, 0.0f, primary, secondary);
+		if (matchesReceiver(secondary, primary))
+			doShake(primary ? primary->getPosition() : nullptr);
 	}
 
 	void doFXPosWithObjects(const Coord3D* primary, const Matrix3D*, Real, const Coord3D*, Real,
-		const Object* subject, const Object* source) const override
+		const Object* source, const Object* target) const override
 	{
-		if (m_filter && (!subject || !m_filter->matchesObject(source ? source : subject, subject)))
-			return;
-		doShake(primary);
+		if (matchesReceiver(source, target))
+			doShake(m_filter ? target->getPosition() : primary);
 	}
 
 	virtual void doFXPos(const Coord3D *primary, const Matrix3D* /*primaryMtx*/, const Real /*primarySpeed*/, const Coord3D * /*secondary*/, const Real /*overrideRadius*/ ) const override
@@ -528,7 +527,10 @@ public:
 			if (traceRetailFXLists())
 				std::fprintf(stderr, "[Retail FXList] ViewShake type=%d\n", static_cast<Int>(m_shake));
 			if (TheTacticalView)
+			{
+				const ScopedVisualRandom random(RetailFileLayers::enabled());
 				TheTacticalView->shake(primary, m_shake);
+			}
 		}
 		else
 		{
@@ -576,6 +578,11 @@ protected:
 	}
 
 private:
+	Bool matchesReceiver(const Object* source, const Object* receiver) const
+	{
+		return !m_filter || (receiver && m_filter->matchesObject(source ? source : receiver, receiver));
+	}
+
 	static void parseFilter(INI* ini, void* instance, void*, const void* userData)
 	{
 		auto& filter = static_cast<ViewShakeFXNugget*>(instance)->m_filter;
