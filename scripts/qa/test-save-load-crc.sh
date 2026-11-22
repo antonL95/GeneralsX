@@ -45,6 +45,9 @@ case "$mode" in
         fi
         cat "$fixtures/training.gdb" > "$out/start.gdb"
         sed '/^break ScriptEngine::startEndGameTimer/,$!d' "$fixtures/training.gdb" > "$out/resume.gdb"
+        if [ "$mode" = training ] && [ -n "${PKGS1_TRAINING_EXTRA_GDB:-}" ]; then
+            cat "$PKGS1_TRAINING_EXTRA_GDB" >> "$out/start.gdb"
+        fi
         if [ "$mode" = spellbook ]; then
             cat "$fixtures/drop-book.gdb" >> "$out/start.gdb"
         else
