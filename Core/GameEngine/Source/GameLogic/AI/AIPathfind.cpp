@@ -7706,7 +7706,10 @@ void Pathfinder::crc( Xfer *xfer )
 	xfer->xferInt(&m_cumulativeCellsAllocated);
 	CRCDEBUG_LOG(("m_cumulativeCellsAllocated: %8.8X", ((XferCRC *)xfer)->getCRC()));
 	if (RetailFileLayers::enabled())
+	{
 		xfer->xferUnsignedInt(&m_retailRouteRevision);
+		xfer->xferIRegion2D(&m_logicalExtent);
+	}
 
 }
 
@@ -7715,7 +7718,7 @@ void Pathfinder::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 5 : 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 6 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -7821,6 +7824,8 @@ void Pathfinder::xfer( Xfer *xfer )
 			m_zoneManager.xferConnectivity(xfer, m_map, m_layers, m_extent);
 		}
 	}
+	if (version >= 6)
+		xfer->xferIRegion2D(&m_logicalExtent);
 }
 
 //-----------------------------------------------------------------------------
