@@ -1355,7 +1355,7 @@ Bool SpecialAbilityUpdate::continuePreparation()
 }
 
 //-------------------------------------------------------------------------------------------------
-static void captureLinkedBuilding(Object* flag, Team* oldTeam, Team* newTeam)
+static Object* findLinkedBuilding(Object* flag, Team* oldTeam, Real& nearestDistance)
 {
 	const Real linkRange = 150.0f;
 	PartitionFilterAcceptByKindOf linkedFilter(MAKE_KINDOF_MASK(KINDOF_LINKED_TO_FLAG), KINDOFMASK_NONE);
@@ -1364,7 +1364,7 @@ static void captureLinkedBuilding(Object* flag, Team* oldTeam, Team* newTeam)
 		linkRange, FROM_CENTER_3D, filters, ITER_FASTEST);
 	MemoryPoolObjectHolder hold(iter);
 	Object* nearest = nullptr;
-	Real nearestDistance = linkRange * linkRange;
+	nearestDistance = linkRange * linkRange;
 	const Bool neutralFlag = !oldTeam->getControllingPlayer()->isPlayableSide();
 	for (Object* candidate = iter->first(); candidate; candidate = iter->next())
 	{
@@ -1379,19 +1379,7 @@ static void captureLinkedBuilding(Object* flag, Team* oldTeam, Team* newTeam)
 			nearestDistance = distance;
 		}
 	}
-	if (nearest)
-	{
-		nearest->defect(newTeam, 0);
-		if (nearest->getTeam() == newTeam)
-		{
-			nearest->setModelConditionState(MODELCONDITION_CAPTURED);
-			nearest->updateUpgradeModules();
-		}
-	}
-	if (std::getenv("GENERALSX_TEST_COMMANDS"))
-		fprintf(stderr, "TEST capture flag=%u linked=%u owner=%d distanceSq=%.2f\n",
-			static_cast<unsigned>(flag->getID()), nearest ? static_cast<unsigned>(nearest->getID()) : 0,
-			flag->getControllingPlayer()->getPlayerIndex(), nearestDistance);
+	return nearest;
 }
 
 void SpecialAbilityUpdate::triggerAbilityEffect()
@@ -1602,13 +1590,39 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
 			Team* oldTeam = target->getTeam();
 			Team* newTeam = object->getControllingPlayer()->getDefaultTeam();
 			const Bool retailFlag = RetailFileLayers::enabled() && target->isKindOf(KINDOF_CAPTUREFLAG);
-			target->defect(newTeam, retailFlag ? 0 : 1);
-			if (retailFlag && target->getTeam() == newTeam)
+			if (retailFlag)
 			{
-				target->clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_START_CAPTURE, MODELCONDITION_CANCEL_CAPTURE));
-				target->setModelConditionState(MODELCONDITION_CAPTURED);
-				showRetailCaptureFlag(target, target->getControllingPlayer());
-				captureLinkedBuilding(target, oldTeam, newTeam);
+				Real nearestDistance = 0.0f;
+				Object* linked = findLinkedBuilding(target, oldTeam, nearestDistance);
+				if (!linked)
+				{
+					if (std::getenv("GENERALSX_TEST_COMMANDS"))
+						fprintf(stderr, "TEST capture flag=%u linked=0 owner=%d distanceSq=%.2f\n",
+							static_cast<unsigned>(target->getID()),
+							target->getControllingPlayer()->getPlayerIndex(), nearestDistance);
+					return;
+				}
+				target->defect(newTeam, 0);
+				if (target->getTeam() == newTeam)
+				{
+					target->clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_START_CAPTURE, MODELCONDITION_CANCEL_CAPTURE));
+					target->setModelConditionState(MODELCONDITION_CAPTURED);
+					showRetailCaptureFlag(target, target->getControllingPlayer());
+					linked->defect(newTeam, 0);
+					if (linked->getTeam() == newTeam)
+					{
+						linked->setModelConditionState(MODELCONDITION_CAPTURED);
+						linked->updateUpgradeModules();
+					}
+				}
+				if (std::getenv("GENERALSX_TEST_COMMANDS"))
+					fprintf(stderr, "TEST capture flag=%u linked=%u owner=%d distanceSq=%.2f\n",
+						static_cast<unsigned>(target->getID()), static_cast<unsigned>(linked->getID()),
+						target->getControllingPlayer()->getPlayerIndex(), nearestDistance);
+			}
+			else
+			{
+				target->defect(newTeam, 1);
 			}
 
       SpecialPowerModuleInterface *spmInterface = getMySPM();
