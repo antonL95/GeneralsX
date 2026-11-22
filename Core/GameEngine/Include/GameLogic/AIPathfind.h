@@ -250,6 +250,7 @@ public:
 
 	void addWallPiece(Object *wallPiece); // Adds a wall piece.
 	void removeWallPiece(Object *wallPiece);  // Removes a wall piece.
+	void dropUnsupportedWallOccupants(const Object& wall);
 	Real getWallHeight() {return m_wallHeight;}
 	Bool isPointOnWall(const Coord3D *pos);
 

@@ -17,6 +17,7 @@
 */
 
 #include "GameLogic/AIPathfind.h"
+#include "Common/RetailFileLayers.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
@@ -507,6 +508,8 @@ ObjectID PathfindLayer::getBridgeID()
  */
 PathfindCell *PathfindLayer::getCell(Int x, Int y)
 {
+	if (!m_layerCells && m_layer == LAYER_WALL && RetailFileLayers::enabled())
+		return nullptr;
 	DEBUG_ASSERTCRASH(m_layerCells, ("no data in layer, why get cells?"));
 	if (m_layerCells==nullptr) {
 		return nullptr;

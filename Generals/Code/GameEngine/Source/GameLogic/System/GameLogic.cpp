@@ -2402,6 +2402,9 @@ void GameLogic::processDestroyList()
 			DEBUG_ASSERTCRASH(sleepyUpdatesForThisObject[numSUO]->friend_getIndexInLogic() == -1, ("Hmm, expected index to be -1 here"));
 		}
 
+		if (RetailFileLayers::enabled() && currentObject->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+			TheAI->pathfinder()->dropUnsupportedWallOccupants(*currentObject);
+
 		currentObject->removeFromList(&m_objList);//remove from object list
 
 		// remove object from lookup table

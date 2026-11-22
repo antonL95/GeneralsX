@@ -2835,6 +2835,9 @@ void GameLogic::processDestroyList()
 		}
 
 
+		if (RetailFileLayers::enabled() && currentObject->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+			TheAI->pathfinder()->dropUnsupportedWallOccupants(*currentObject);
+
 		currentObject->removeFromList(&m_objList);//remove from object list
 
 		// remove object from lookup table

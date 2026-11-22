@@ -322,9 +322,33 @@ void Pathfinder::removeWallPiece(Object *wallPiece)
 
 }
 
-/**
- * Checks if a point is on the wall.
- */
+void Pathfinder::dropUnsupportedWallOccupants(const Object& wall)
+{
+	if (!m_isMapReady || (TheGameState && TheGameState->isInLoadGame()))
+		return;
+
+	const ObjectID wallID = wall.getID();
+	for (Object* unit = TheGameLogic->getFirstObject(); unit; unit = unit->getNextObject())
+	{
+		if (unit->isDestroyed() || unit->isEffectivelyDead() || unit->getLayer() != LAYER_WALL ||
+			!m_layers[LAYER_WALL].isPointOnWall(&wallID, 1, unit->getPosition()) ||
+			isPointOnWall(unit->getPosition()))
+			continue;
+
+		removeGoal(unit);
+		if (AIUpdateInterface* ai = unit->getAIUpdateInterface())
+		{
+			ai->setLocomotorGoalNone();
+			ai->destroyPath();
+		}
+		unit->setDestinationLayer(LAYER_GROUND);
+		unit->setLayer(LAYER_GROUND);
+		Coord3D ground = *unit->getPosition();
+		ground.z = TheTerrainLogic->getGroundHeight(ground.x, ground.y);
+		unit->setPosition(&ground);
+	}
+}
+
 Bool Pathfinder::isPointOnWall(const Coord3D *pos)
 {
 	if (RetailFileLayers::enabled() ? m_retailWallPieces.empty() : m_numWallPieces == 0) return false;
@@ -547,7 +571,7 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 		if (obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)) {
 			const Bool retail = RetailFileLayers::enabled();
 			const Bool checkFalling = retail
-				? (obj->isDestroyed() || obj->isEffectivelyDead()) && !(TheGameState && TheGameState->isInLoadGame())
+				? !obj->isDestroyed() && obj->isEffectivelyDead() && !(TheGameState && TheGameState->isInLoadGame())
 				: !m_layers[LAYER_WALL].isUnused();
 			if (checkFalling) {
 				Int i;
