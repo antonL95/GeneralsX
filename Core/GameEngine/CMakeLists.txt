@@ -108,6 +108,7 @@ set(GAMEENGINE_SRC
     Include/Common/ZeroHourUpgradeMaskLayout.h
     Include/Common/INIRetailTolerance.h
     Include/Common/HordeFormation.h
+    Include/GameLogic/ShroudGeometry.h
     Include/GameLogic/Module/HordeContain.h
     Include/GameLogic/Module/SlaughterHordeContain.h
     Include/GameLogic/Module/ExperienceModules.h

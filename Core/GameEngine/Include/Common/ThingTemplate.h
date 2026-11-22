@@ -484,7 +484,7 @@ public:
 		Int displayRangedDamage = 0;
 		Int supplyOverride = 0;
 		Real threatLevel = 0;
-		Real visionBonusTestRadius = 0;
+		Real visionBonusTestRadius = 100.0f;
 		Real evaEventSecondDamageFarFromFirstScanRange = 0;
 		Real emotionRange = 0;
 		Real crushKnockback = 0;
@@ -508,7 +508,9 @@ public:
 		Real visionBonusPercentPerFoot = 0;
 		Real visionRear = 1.0f;
 		Real visionSide = 1.0f;
-		Real maxVisionBonusPercent = 0;
+		Real maxVisionBonusPercent = 0.5f;
+		Real minVisionBonusPercent = -0.5f;
+		Int visionBonusTestSegments = 8;
 		Real crushDecelerationPercent = 0;
 		Real minCrushVelocityPercent = 0;
 		Bool keepSelectableWhenDead = FALSE;
