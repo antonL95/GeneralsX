@@ -55,6 +55,7 @@
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/WallHubBehavior.h"
+#include "GameLogic/RetailBuildingEvents.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/TerrainVisual.h"
 
@@ -1643,6 +1644,15 @@ void DozerAIUpdateModuleData::buildFieldParse( MultiIniFieldParse& p)
 	};
 
   p.add( dataFieldParse );
+	if (RetailFileLayers::enabled())
+	{
+		static const FieldParse retailFields[] = {
+			{ "SpecialContactPoints", ThingTemplate::parseContactPointFlags, nullptr,
+				offsetof(DozerAIUpdateModuleData, m_specialContactPoints) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 
 }
 
@@ -1801,9 +1811,22 @@ UpdateSleepTime DozerAIUpdate::update()
 	///@todo shouldn't this be at a higher level?
 	if( getObject()->isEffectivelyDead() )
 	{
+		releaseConstructionQueue();
 		if( RetailFileLayers::enabled() && getCurrentTask() != DOZER_TASK_INVALID )
 			m_dozerMachine->resetToDefaultState();
 		return UPDATE_SLEEP_NONE;
+	}
+
+	if (usesRetailBuilder(this) && getRetailLuaEventsList().isNotEmpty())
+	{
+		const Bool mounted = getObject()->getLogicModelConditions().test(MODELCONDITION_RIDER8) ||
+			getObject()->testWeaponSetFlag(WEAPONSET_RIDER8);
+		const UnsignedByte state = mounted ? 2 : 1;
+		if (state != m_riderEventState)
+		{
+			m_riderEventState = state;
+			RetailBuildingEvents::riderChanged(*getObject(), mounted);
+		}
 	}
 
 	// get and validate our current task
@@ -1825,8 +1848,9 @@ UpdateSleepTime DozerAIUpdate::update()
 		else if (currentTask == DOZER_TASK_BUILD && targetObject == nullptr)
 			invalidTask = TRUE;
 #endif
-		else if( currentTask == DOZER_TASK_BUILD && RetailFileLayers::enabled() && targetObject &&
-				( targetObject->isEffectivelyDead() || targetObject->getControllingPlayer() != getObject()->getControllingPlayer() ) )
+		else if( currentTask == DOZER_TASK_BUILD && RetailFileLayers::enabled() &&
+				( !targetObject || targetObject->isEffectivelyDead() ||
+				  targetObject->getControllingPlayer() != getObject()->getControllingPlayer() ) )
 			invalidTask = TRUE;
 
 		// cancel the task if it's now invalid
@@ -1836,6 +1860,9 @@ UpdateSleepTime DozerAIUpdate::update()
 	}
 	else
 		getObject()->setWeaponSetFlag(WEAPONSET_MINE_CLEARING_DETAIL);//maybe go clear some mines, if I feel like it
+
+	if (!m_constructionQueue.empty() && !isTaskPending(DOZER_TASK_BUILD) && !getObject()->isDisabled())
+		startQueuedConstruction();
 
 	// run our own state machine
 	m_dozerMachine->updateStateMachine();
@@ -1854,12 +1881,20 @@ Object *DozerAIUpdate::construct( const ThingTemplate *what,
 																	Bool isRebuild )
 {
 
-	// !!! NOTE: If you modify this you must modify the worker too !!!
-	// !!! Graham: Please please please have inspiration for how to *not* duplicate this code
+	return placeConstruction(what, pos, angle, owningPlayer, isRebuild, FALSE);
+}
 
-	// create our machines if they don't yet exist
-	///@todo make 'construct' a real AI command and you won't need a special case
-	m_isRebuild = isRebuild;
+Object* DozerAIUpdate::queueConstruction(const ThingTemplate* what, const Coord3D* pos,
+	Real angle, Player* owningPlayer)
+{
+	return placeConstruction(what, pos, angle, owningPlayer, FALSE, TRUE);
+}
+
+Object* DozerAIUpdate::placeConstruction(const ThingTemplate* what, const Coord3D* pos,
+	Real angle, Player* owningPlayer, Bool isRebuild, Bool queued)
+{
+	if (!usesRetailBuilder(this))
+		m_isRebuild = isRebuild;
 
 	createMachines();
 
@@ -1957,11 +1992,49 @@ Object *DozerAIUpdate::construct( const ThingTemplate *what,
 		MAKE_MODELCONDITION_MASK(MODELCONDITION_AWAITING_CONSTRUCTION)
 	);
 
-	// we have a construction pending
-	newTask( DOZER_TASK_BUILD, obj );
+	if (queued)
+		m_constructionQueue.push_back(obj->getID());
+	else
+	{
+		releaseConstructionQueue();
+		if (usesRetailBuilder(this))
+			m_isRebuild = isRebuild;
+		newTask(DOZER_TASK_BUILD, obj);
+	}
 
 	return obj;
 
+}
+
+void DozerAIUpdate::releaseConstructionQueue()
+{
+	for (ObjectID id : m_constructionQueue)
+	{
+		Object* site = TheGameLogic->findObjectByID(id);
+		if (site && site->getBuilderID() == getObject()->getID())
+			site->setBuilder(nullptr);
+	}
+	m_constructionQueue.clear();
+}
+
+void DozerAIUpdate::startQueuedConstruction()
+{
+	while (!m_constructionQueue.empty())
+	{
+		Object* site = TheGameLogic->findObjectByID(m_constructionQueue.front());
+		m_constructionQueue.pop_front();
+		if (!site || site->getBuilderID() != getObject()->getID())
+			continue;
+		if (site->isEffectivelyDead() || !site->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) ||
+			site->getControllingPlayer() != getObject()->getControllingPlayer())
+		{
+			site->setBuilder(nullptr);
+			continue;
+		}
+		m_isRebuild = FALSE;
+		newTask(DOZER_TASK_BUILD, site);
+		return;
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2098,6 +2171,45 @@ void DozerAIUpdate::privateResumeConstruction( Object *obj, CommandSourceType cm
 //-------------------------------------------------------------------------------------------------
 /*static*/ Bool DozerAIUpdate::findGoodBuildOrRepairPosition(const Object* me, const Object* target, Coord3D& positionOut)
 {
+	if (RetailFileLayers::enabled())
+	{
+		const auto* dozer = static_cast<const DozerAIUpdate*>(me->findUpdateModule(NAMEKEY("DozerAIUpdate")));
+		if (dozer && dozer->getDozerAIUpdateModuleData()->m_specialContactPoints)
+		{
+			const UnsignedInt mask = dozer->getDozerAIUpdateModuleData()->m_specialContactPoints;
+			FindPositionOptions options;
+			options.maxRadius = 20.0f;
+			options.maxZDelta = 10.0f;
+			options.startAngle = 0.0f;
+			options.sourceToPathToDest = me;
+			if (me->isUsingAirborneLocomotor())
+				options.ignoreObject = target;
+			Real closest = 0.0f;
+			Bool found = FALSE;
+			for (const auto& contact : target->getTemplate()->getRotWKObjectData().geometryContactPoints)
+			{
+				if (!(contact.flags & mask))
+					continue;
+				Vector3 world;
+				Matrix3D::Transform_Vector(*target->getTransformMatrix(),
+					Vector3(contact.position.x, contact.position.y, contact.position.z), &world);
+				const Coord3D contactPosition = { world.X, world.Y, world.Z };
+				Coord3D candidate;
+				if (!ThePartitionManager->findPositionAround(&contactPosition, &options, &candidate))
+					continue;
+				const Real distance = sqr(me->getPosition()->x - candidate.x) + sqr(me->getPosition()->y - candidate.y);
+				if (!found || distance < closest)
+				{
+					found = TRUE;
+					closest = distance;
+					positionOut = candidate;
+				}
+			}
+			if (found)
+				return TRUE;
+		}
+	}
+
 	// The place we go to build or repair is the closest spot from us to them
 	Coord3D ourPosition = *me->getPosition();
 	Coord3D theirPosition = *target->getPosition();
@@ -2279,6 +2391,7 @@ void DozerAIUpdate::cancelTask( DozerTask task, Bool rememberTask )
 
 void DozerAIUpdate::cancelAllTasks()
 {
+	releaseConstructionQueue();
 	clearPreviousTask();
 
 	for (UnsignedInt task = DOZER_TASK_FIRST; task < DOZER_NUM_TASKS; ++task)
@@ -2539,6 +2652,7 @@ void DozerAIUpdate::internalTaskCompleteOrCancelled( DozerTask task )
 //-------------------------------------------------------------------------------------------------
 void DozerAIUpdate::onDelete()
 {
+	releaseConstructionQueue();
 	Int i;
 
 	// cancel any of the tasks we had queued up
@@ -2679,6 +2793,9 @@ void DozerAIUpdate::aiDoCommand(const AICommandParms* parms)
 	// if we haven't made the dozer machine yet, do so now
 	createMachines();
 
+	if (parms->m_cmdSource == CMD_FROM_PLAYER || parms->m_cmdSource == CMD_FROM_SCRIPT)
+		releaseConstructionQueue();
+
 	switch( parms->m_cmd )
 	{
 		case AICMD_MOVE_AWAY_FROM_UNIT:
@@ -2778,6 +2895,11 @@ void DozerAIUpdate::crc( Xfer *xfer )
 {
 	// extend base class
 	AIUpdateInterface::crc(xfer);
+	if (usesRetailBuilder(this))
+	{
+		xfer->xferSTLObjectIDList(&m_constructionQueue);
+		xfer->xferUnsignedByte(&m_riderEventState);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2795,6 +2917,8 @@ void DozerAIUpdate::xfer( Xfer *xfer )
 #else
 	XferVersion currentVersion = 2;
 #endif
+	if (usesRetailBuilder(this))
+		currentVersion = 4;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -2834,6 +2958,15 @@ void DozerAIUpdate::xfer( Xfer *xfer )
 		}
 	}
 	xfer->xferUser(&m_buildSubTask, sizeof(m_buildSubTask));
+	if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_constructionQueue.clear();
+		m_riderEventState = 0;
+	}
+	if (version >= 3)
+		xfer->xferSTLObjectIDList(&m_constructionQueue);
+	if (version >= 4)
+		xfer->xferUnsignedByte(&m_riderEventState);
 
 }
 

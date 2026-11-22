@@ -144,7 +144,7 @@ public:
 	/// create object from a build and put it in the world now
 	virtual Object *buildObjectNow( Object *constructorObject, const ThingTemplate *what,
 																	const Coord3D *pos, Real angle, Player *owningPlayer,
-																	const Object* replacedSite = nullptr );
+												const Object* replacedSite = nullptr, Bool queued = FALSE );
 
 	/// using the "line placement" for objects (like walls etc) create that line of objects line
 	virtual void buildObjectLineNow( Object *constructorObject, const ThingTemplate *what,

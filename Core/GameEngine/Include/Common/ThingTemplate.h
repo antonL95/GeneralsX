@@ -418,6 +418,8 @@ public:
 		UnsignedInt flags = 0;
 	};
 
+	static void parseContactPointFlags(INI* ini, void* instance, void* store, const void* userData);
+
 	struct AutoResolveReference
 	{
 		AsciiString name;

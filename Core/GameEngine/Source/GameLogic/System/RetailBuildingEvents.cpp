@@ -26,7 +26,7 @@
 
 namespace
 {
-enum class Action { Grant, Power, Visibility, Roll };
+enum class Action { Grant, Remove, Power, Visibility, Roll };
 
 struct Condition
 {
@@ -49,7 +49,7 @@ using Program = std::vector<Operation>;
 struct EventList
 {
 	std::string parent;
-	std::string handler;
+	std::map<std::string, std::string> handlers;
 	std::map<std::string, std::string> enrageHandlers;
 };
 
@@ -119,8 +119,8 @@ std::map<std::string, EventList> readEventLists(std::string xml)
 				continue;
 			const std::string fields = xml.substr(fieldsStart, fieldsEnd - fieldsStart);
 			const auto event = attribute(fields, "EventName");
-			if (event == "OnBuildingComplete")
-				entry.handler = attribute(fields, "ScriptFunctionName");
+			if (event == "OnBuildingComplete" || event == "Rider8IsActive" || event == "Rider8IsNotActive")
+				entry.handlers[event] = attribute(fields, "ScriptFunctionName");
 			else if (event == "OnAflame" || event == "OnQuenched" ||
 				event == "User45IsActive" || event == "User45IsNotActive")
 				entry.enrageHandlers[event] = attribute(fields, "ScriptFunctionName");
@@ -134,7 +134,7 @@ bool compile(const std::vector<std::string>& lines, Program& program)
 {
 	static const std::regex roll(R"(local\s+(\w+)\s*=\s*GetRandomNumber\(\s*\))");
 	static const std::regex branch(R"((if|elseif)\s+(\w+)\s*<=\s*([0-9]+(?:\.[0-9]+)?)\s+then)");
-	static const std::regex call(R"re((ObjectGrantUpgrade|ObjectDoSpecialPower|ObjectHideSubObjectPermanently)\(\s*self\s*,\s*"([A-Za-z0-9_]+)"(?:\s*,\s*(true|false))?\s*\))re");
+	static const std::regex call(R"re((ObjectGrantUpgrade|ObjectRemoveUpgrade|ObjectDoSpecialPower|ObjectHideSubObjectPermanently)\(\s*self\s*,\s*"([A-Za-z0-9_]+)"(?:\s*,\s*(true|false))?\s*\))re");
 	std::map<std::string, std::size_t> rolls;
 	std::vector<Condition> conditions;
 	std::vector<std::size_t> levels;
@@ -191,6 +191,7 @@ bool compile(const std::vector<std::string>& lines, Program& program)
 		else if (std::regex_match(line, token, call))
 		{
 			const Action action = token[1] == "ObjectGrantUpgrade" ? Action::Grant :
+				token[1] == "ObjectRemoveUpgrade" ? Action::Remove :
 				token[1] == "ObjectDoSpecialPower" ? Action::Power : Action::Visibility;
 			if (token[3].matched != (action == Action::Visibility))
 				return false;
@@ -211,8 +212,9 @@ struct BuildingEvents
 	{
 		std::map<std::string, std::vector<std::string>> bodies;
 		for (const auto& [name, list] : lists)
-			if (!list.handler.empty())
-				bodies.try_emplace(list.handler);
+			for (const auto& [event, handler] : list.handlers)
+				if (!handler.empty())
+					bodies.try_emplace(handler);
 
 		std::istringstream lua(readData("Data\\Scripts\\Scripts.lua"));
 		const std::regex definition(R"(^\s*function\s+(\w+)\s*\(([^)]*)\).*)");
@@ -244,15 +246,14 @@ struct BuildingEvents
 			if (compile(lines, program))
 				programs.emplace(name, std::move(program));
 			else
-				std::fprintf(stderr, "Building completion: unsupported callback %s\n", name.c_str());
+				std::fprintf(stderr, "Retail events: unsupported callback %s\n", name.c_str());
 		}
 		if (std::getenv("GENERALSX_TEST_COMMANDS"))
 			std::fprintf(stderr, "BPARITY building callbacks %zu/%zu\n", programs.size(), bodies.size());
 	}
 };
-}
 
-void RetailBuildingEvents::complete(Object& object)
+void dispatch(Object& object, const char* event)
 {
 	if (!RetailFileLayers::enabled() || !object.getAIUpdateInterface())
 		return;
@@ -263,17 +264,18 @@ void RetailBuildingEvents::complete(Object& object)
 	auto list = events.lists.find(listName.str());
 	for (std::size_t depth = 0; list != events.lists.end() && depth < events.lists.size(); ++depth)
 	{
-		if (list->second.handler.empty())
+		const auto handler = list->second.handlers.find(event);
+		if (handler == list->second.handlers.end() || handler->second.empty())
 		{
 			list = events.lists.find(list->second.parent);
 			continue;
 		}
-		const auto found = events.programs.find(list->second.handler);
+		const auto found = events.programs.find(handler->second);
 		if (found == events.programs.end())
 			return;
-		if (std::getenv("GENERALSX_TEST_COMMANDS"))
+		if (std::string_view(event) == "OnBuildingComplete" && std::getenv("GENERALSX_TEST_COMMANDS"))
 			std::fprintf(stderr, "BPARITY complete %u %s %s %zu\n", TheGameLogic->getFrame(),
-				object.getTemplate()->getName().str(), list->second.handler.c_str(), found->second.size());
+				object.getTemplate()->getName().str(), handler->second.c_str(), found->second.size());
 
 		std::vector<double> rolls;
 		for (const Operation& operation : found->second)
@@ -292,6 +294,10 @@ void RetailBuildingEvents::complete(Object& object)
 				if (const auto* upgrade = TheUpgradeCenter->findUpgrade(operation.name.c_str()))
 					object.giveUpgrade(upgrade);
 				break;
+			case Action::Remove:
+				if (const auto* upgrade = TheUpgradeCenter->findUpgrade(operation.name.c_str()))
+					object.removeUpgrade(upgrade);
+				break;
 			case Action::Power:
 				if (const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate(operation.name.c_str()))
 					object.doSpecialPower(power, 0, TRUE);
@@ -309,6 +315,17 @@ void RetailBuildingEvents::complete(Object& object)
 		}
 		return;
 	}
+}
+}
+
+void RetailBuildingEvents::complete(Object& object)
+{
+	dispatch(object, "OnBuildingComplete");
+}
+
+void RetailBuildingEvents::riderChanged(Object& object, bool mounted)
+{
+	dispatch(object, mounted ? "Rider8IsActive" : "Rider8IsNotActive");
 }
 
 int RetailBuildingEvents::enrageAction(const Object& object, const char* event)

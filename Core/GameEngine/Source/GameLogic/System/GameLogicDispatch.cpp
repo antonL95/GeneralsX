@@ -2151,8 +2151,16 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 
 	if( msg->getType() == GameMessage::MSG_DOZER_CONSTRUCT )
 	{
+#if RTS_GENERALS
+		TheBuildAssistant->buildObjectNow(constructorObject, place, &loc, angle,
+			constructorObject->getControllingPlayer());
+#else
+		const Bool queued = RetailFileLayers::enabled() && msg->getArgumentCount() == 4 &&
+			msg->getArgumentDataType(3) == ARGUMENTDATATYPE_BOOLEAN &&
+			msg->getArgument(3)->boolean;
 		TheBuildAssistant->buildObjectNow( constructorObject, place, &loc, angle,
-																				constructorObject->getControllingPlayer() );
+			constructorObject->getControllingPlayer(), nullptr, queued );
+#endif
 	}
 	else
 	{

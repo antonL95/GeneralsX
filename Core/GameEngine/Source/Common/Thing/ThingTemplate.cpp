@@ -535,9 +535,16 @@ void ThingTemplate::parseContactPoint(INI* ini, void* instance, void* store, con
 	auto& points = *static_cast<std::vector<ContactPoint>*>(store);
 	ContactPoint point;
 	INI::parseCoord3D(ini, instance, &point.position, nullptr);
-	for (const char* token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
-		point.flags |= 1u << INI::scanIndexList(token, contactPointNames);
+	parseContactPointFlags(ini, instance, &point.flags, nullptr);
 	points.push_back(point);
+}
+
+void ThingTemplate::parseContactPointFlags(INI* ini, void*, void* store, const void*)
+{
+	auto& flags = *static_cast<UnsignedInt*>(store);
+	flags = 0;
+	for (const char* token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+		flags |= 1u << INI::scanIndexList(token, contactPointNames);
 }
 
 void ThingTemplate::parseRotWKBlock(INI* ini, void*, void* store, const void* userData)

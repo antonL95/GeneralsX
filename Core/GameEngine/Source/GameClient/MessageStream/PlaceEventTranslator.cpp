@@ -314,14 +314,17 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 					placeMsg->appendIntegerArgument(build->getTemplateID());
 					placeMsg->appendLocationArgument(worldStart);
 					placeMsg->appendRealArgument(angle);
+					const Bool retailBuilder = RetailFileLayers::enabled() && builderObj && builderObj->isKindOf(KINDOF_DOZER);
+					const Bool queueConstruction = retailBuilder && (msg->getArgument(1)->integer & KEY_STATE_SHIFT);
 					if( isLineBuild )
 					{
 						placeMsg->appendLocationArgument( worldEnd );
 					}
+					else if (queueConstruction)
+						placeMsg->appendBooleanArgument(TRUE);
 
 					pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), placeMsg->getType() );
-					const Bool retailBuilder = RetailFileLayers::enabled() && builderObj && builderObj->isKindOf(KINDOF_DOZER);
-					if (retailBuilder && (msg->getArgument(1)->integer & KEY_STATE_SHIFT))
+					if (queueConstruction)
 					{
 						TheInGameUI->setPlacementStart(nullptr);
 					}

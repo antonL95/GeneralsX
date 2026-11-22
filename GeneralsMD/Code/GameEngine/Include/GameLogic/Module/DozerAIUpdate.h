@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <list>
+
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "GameLogic/Module/AIUpdate.h"
 
@@ -183,6 +185,7 @@ public:
 	Real m_boredRange;										///< range the dozers try to auto repair when they're bored
 
 	static void buildFieldParse( MultiIniFieldParse &p );
+	UnsignedInt m_specialContactPoints = 0;
 
 };
 
@@ -200,6 +203,7 @@ class DozerAIUpdate : public AIUpdateInterface, public DozerAIInterface
 public:
 	static Bool findGoodBuildOrRepairPosition(const Object* me, const Object* target, Coord3D& positionOut);
 	static Object* findGoodBuildOrRepairPositionAndTarget(Object* me, Object* target, Coord3D& positionOut);
+	Object* queueConstruction(const ThingTemplate* what, const Coord3D* pos, Real angle, Player* owningPlayer);
 
 public:
 
@@ -313,6 +317,13 @@ protected:
 	DozerBuildSubTask m_buildSubTask;		///< for building and actually docking for the build
 
 private:
+
+	Object* placeConstruction(const ThingTemplate* what, const Coord3D* pos, Real angle,
+		Player* owningPlayer, Bool isRebuild, Bool queued);
+	void releaseConstructionQueue();
+	void startQueuedConstruction();
+	std::list<ObjectID> m_constructionQueue;
+	UnsignedByte m_riderEventState = 0;
 
 	void createMachines();		///< create our behavior machines we need
 
