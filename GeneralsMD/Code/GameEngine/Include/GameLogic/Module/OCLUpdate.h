@@ -51,6 +51,7 @@ public:
 	FactionOCLList							m_factionOCL;
 	UnsignedInt									m_minDelay;
 	UnsignedInt									m_maxDelay;
+	Int												m_amount = 0;
 	Bool												m_isCreateAtEdge;				///< Otherwise, it is created on top of myself
 	Bool												m_isFactionTriggered;		///< Faction has to be present before update will happen
 
@@ -88,6 +89,7 @@ protected:
 	UnsignedInt			m_timerStartedFrame;
 	Bool						m_isFactionNeutral;
 	Color						m_currentPlayerColor;
+	Int							m_creationCount = 0;
 
 	Bool shouldCreate();
 	void setNextCreationFrame();

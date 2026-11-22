@@ -31,6 +31,8 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/RandomValue.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "Common/Player.h"
 #include "Common/PlayerTemplate.h"
@@ -97,6 +99,16 @@ OCLUpdateModuleData::OCLUpdateModuleData()
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "Amount", INI::parseInt, nullptr, offsetof(OCLUpdateModuleData, m_amount) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -119,6 +131,11 @@ OCLUpdate::~OCLUpdate()
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime OCLUpdate::update()
 {
+	const OCLUpdateModuleData* data = getOCLUpdateModuleData();
+	const Int amount = RetailFileLayers::enabled() ? data->m_amount : 0;
+	if (amount > 0 && m_creationCount >= amount)
+		return UPDATE_SLEEP_FOREVER;
+
 #if RETAIL_COMPATIBLE_CRC
 	if( getObject()->isDisabled() )
 	{
@@ -135,8 +152,6 @@ UpdateSleepTime OCLUpdate::update()
 		return UPDATE_SLEEP_NONE;
 	}
 #endif
-
-	const OCLUpdateModuleData *data = getOCLUpdateModuleData();
 
 	// Test if the OCL update is faction dependent. If so, check for faction changes
 	if (data->m_isFactionTriggered)
@@ -222,6 +237,8 @@ UpdateSleepTime OCLUpdate::update()
 		{
 			ObjectCreationList::create( data->m_ocl, getObject(), &creationCoord, getObject()->getPosition(), getObject()->getOrientation() );
 		}
+		if (amount > 0 && ++m_creationCount >= amount)
+			return UPDATE_SLEEP_FOREVER;
 	}
 	return UPDATE_SLEEP_NONE;
 }
@@ -299,7 +316,7 @@ void OCLUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -318,6 +335,8 @@ void OCLUpdate::xfer( Xfer *xfer )
 	// current owning player color
 	xfer->xferInt( &m_currentPlayerColor );
 
+	if (version >= 2)
+		xfer->xferInt(&m_creationCount);
 }
 
 // ------------------------------------------------------------------------------------------------
