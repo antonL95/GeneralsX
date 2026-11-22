@@ -171,6 +171,8 @@ void logRetailPlacementTestObject(const Object* object, const char* name, Unsign
 #if !RTS_GENERALS
 void runRetailPackage05TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
 void runRetailPackage07TestCommand(std::string_view action, Object* source, Object* target, UnsignedInt frame);
+void runRetailPackage09TestCommand(std::string_view action, Object* source, Object* target, const char* argument, UnsignedInt frame);
+
 #endif
 
 namespace RetailTestCommands
@@ -2655,6 +2657,11 @@ void execute(const Command& command, unsigned int frame)
 	if (command.action.starts_with("pkg07-"))
 	{
 		runRetailPackage07TestCommand(command.action, obj, findTarget(command, true), frame);
+		return;
+	}
+	if (command.action.starts_with("pkg09-"))
+	{
+		runRetailPackage09TestCommand(command.action, obj, findTarget(command, true), command.structure.c_str(), frame);
 		return;
 	}
 #endif

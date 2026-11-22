@@ -733,6 +733,8 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailPowerTestCommands.cpp
     Source/GameLogic/System/RetailPackage05TestCommands.cpp
     Source/GameLogic/System/RetailPackage07TestCommands.cpp
+    Source/GameLogic/System/RetailPackage09TestCommands.cpp
+
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp
     Source/GameLogic/Object/Upgrade/ReplaceSelfUpgrade.cpp
