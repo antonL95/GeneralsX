@@ -1437,6 +1437,12 @@ Bool Object::chooseBestWeaponForTarget(const Object* target, WeaponChoiceCriteri
 	return m_weaponSet.chooseBestWeaponForTarget(this, target, criteria, cmdSource );
 }
 
+void Object::clearFiringTrackerConsecutiveShots()
+{
+	if (m_firingTracker)
+		m_firingTracker->clearConsecutiveShots();
+}
+
 //DECLARE_PERF_TIMER(fireCurrentWeapon)
 //=============================================================================
 void Object::fireCurrentWeapon(Object *target)

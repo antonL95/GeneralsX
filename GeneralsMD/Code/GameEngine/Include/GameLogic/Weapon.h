@@ -479,6 +479,7 @@ public:
 	Bool forcesDisplayPercentReady() const { return m_forceDisplayPercentReady || m_canFireWhileCharging; }
 	Bool instantLoadClipOnActivate() const { return m_instantLoadClipOnActivate; }
 	Bool isAimingWeapon() const { return m_isAimingWeapon; }
+	Bool isChaseWeapon() const { return m_chaseWeapon; }
 	Int getContinuousFireOneShotsNeeded() const { return m_continuousFireOneShotsNeeded; }
 	Int getContinuousFireTwoShotsNeeded() const { return m_continuousFireTwoShotsNeeded; }
 	UnsignedInt getContinuousFireCoastFrames() const { return m_continuousFireCoastFrames; }
@@ -649,6 +650,7 @@ private:
 	Bool m_forceDisplayPercentReady = false;
 	Bool m_instantLoadClipOnActivate = false;
 	Bool m_isAimingWeapon = false;
+	Bool m_chaseWeapon = false;
 	Real m_maxWeaponSpeed;
 	Bool m_meleeWeapon;
 	Bool m_hitStoredTarget;
@@ -814,6 +816,7 @@ public:
 	Int getClipSize() const { return m_template->getClipSize(); }
 	// Contact weapons (like car bombs) need to basically collide with their target.
 	Bool isContactWeapon() const { return m_template->isContactWeapon(); }
+	Bool isChaseWeapon() const { return m_template->isChaseWeapon(); }
 
 	Int getClipReloadTime(const Object *source) const;
 

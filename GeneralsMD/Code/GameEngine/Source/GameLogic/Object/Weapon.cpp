@@ -273,6 +273,7 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "ForceDisplayPercentReady", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_forceDisplayPercentReady) },
 	{ "InstantLoadClipOnActivate", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_instantLoadClipOnActivate) },
 	{ "IsAimingWeapon", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_isAimingWeapon) },
+	{ "ChaseWeapon", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_chaseWeapon) },
 	{ "HitPassengerPercentage", INI::parsePercentToReal, nullptr, offsetof(WeaponTemplate, m_hitPassengerPercentage) },
 	{ "FireFlankFX", INI::parseFXList, nullptr, offsetof(WeaponTemplate, m_fireFlankFX) },
 	{ "FXTrigger", INI::parseAsciiString, nullptr, offsetof(WeaponTemplate, m_fxTrigger) },

@@ -1846,6 +1846,12 @@ void Object::notifyFiringTrackerShotFired( const Weapon* weaponFired, ObjectID v
     m_firingTracker->shotFired( weaponFired, victimID );
 }
 
+void Object::clearFiringTrackerConsecutiveShots()
+{
+	if (m_firingTracker)
+		m_firingTracker->clearConsecutiveShots();
+}
+
 
 //=============================================================================
 void Object::preFireCurrentWeapon( const Object *victim )

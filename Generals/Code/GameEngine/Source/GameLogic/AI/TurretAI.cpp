@@ -33,6 +33,7 @@
 #include "Common/GameAudio.h"
 #include "Common/PerfTimer.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 
@@ -885,7 +886,7 @@ void TurretAI::friend_checkForIdleMoodTarget()
 	if (enemy)
 	{
 		setTurretTargetObject(enemy, FALSE);
-		obj->chooseBestWeaponForTarget(enemy, PREFER_MOST_DAMAGE, CMD_FROM_AI);
+		obj->chooseBestWeaponForTarget(enemy, RetailFileLayers::enabled() ? USE_WEAPONSET_DEFAULT_CRITERIA : PREFER_MOST_DAMAGE, CMD_FROM_AI);
 		// set this magic flag to indicate that this was an independent attack-of-opportunity,
 		// and we should check to see if out-of-range, and if so, nuke it
 		m_targetWasSetByIdleMood = true;

@@ -235,6 +235,10 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 	{ "PreAttackType",						INI::parseIndexList,										TheWeaponPrefireNames, offsetof(WeaponTemplate, m_prefireType) },
 	{ "ContinueAttackRange",			INI::parseReal,													nullptr,							offsetof(WeaponTemplate, m_continueAttackRange) },
 	{ "SuspendFXDelay",						INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_suspendFXDelay) },
+	{ "ChaseWeapon", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_chaseWeapon) },
+	{ "AntiStructure", [](INI* ini, void*, void* store, const void*) {
+		*static_cast<Int*>(store) = INI::scanBool(ini->getNextToken());
+	}, nullptr, offsetof(WeaponTemplate, m_antiStructure) },
 	{ nullptr,												nullptr,																		nullptr,							0 }
 
 };
@@ -1707,6 +1711,15 @@ void WeaponStore::postProcessLoad()
 
 	// parse the ini weapon definition
 	ini->initFromINI(weapon, weapon->getFieldParse());
+
+	if (RetailFileLayers::enabled())
+	{
+		const Bool antiStructure = weapon->m_antiStructure < 0
+			? (weapon->m_antiMask & WEAPON_ANTI_GROUND) != 0 : weapon->m_antiStructure;
+		weapon->m_antiMask &= ~WEAPON_ANTI_STRUCTURE;
+		if (antiStructure)
+			weapon->m_antiMask |= WEAPON_ANTI_STRUCTURE;
+	}
 
 	if (weapon->m_projectileName.isNone())
 		weapon->m_projectileName.clear();

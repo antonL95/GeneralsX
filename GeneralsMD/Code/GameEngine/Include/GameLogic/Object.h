@@ -519,6 +519,7 @@ public:
 	Bool getAmmoPipShowingInfo(Int& numTotal, Int& numFull) const;
 
   void notifyFiringTrackerShotFired( const Weapon* weaponFired, ObjectID victimID ) ;
+	void clearFiringTrackerConsecutiveShots();
 
   /**
 		Determines if the unit has any weapon that could conceivably

@@ -109,6 +109,7 @@ enum WeaponAntiMaskType CPP_11(: Int)
 	WEAPON_ANTI_BALLISTIC_MISSILE	= 0x40, // Specifically large missiles that are vulnerable to base defenses
 	WEAPON_ANTI_PARACHUTE					= 0x80, // Parachutes can be targeted directly
 	WEAPON_ANTI_AIRBORNE_MONSTER = 0x100,
+	WEAPON_ANTI_STRUCTURE = 0x200,
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -462,6 +463,7 @@ public:
 	Bool isCapableOfFollowingWaypoint() const { return m_capableOfFollowingWaypoint; }
 	Bool isShowsAmmoPips() const { return m_isShowsAmmoPips; }
 	Bool isPlayFXWhenStealthed() const { return m_playFXWhenStealthed; }
+	Bool isChaseWeapon() const { return m_chaseWeapon; }
 
 	Bool shouldProjectileCollideWith(
 		const Object* projectileLauncher,
@@ -536,6 +538,8 @@ private:
 	UnsignedInt m_autoReloadWhenIdleFrames;	///< How long we have to wait after our last shot to force a reload
 	Int m_shotsPerBarrel;										///< If non zero, don't cycle through your launch points every shot, mod the shot by this to get even chucks of firing
 	Int m_antiMask;													///< what we can target
+	Int m_antiStructure = -1;
+	Bool m_chaseWeapon = false;
 	Int m_affectsMask;											///< what we can affect
 	Int m_collideMask;											///< what we can collide with (projectiles only)
 	Bool m_damageDealtAtSelfPosition;				///< if T, weapon damage is done at source's position, not victim's pos. (useful for suicide weapons.)
@@ -699,6 +703,7 @@ public:
 	Int getClipSize() const { return m_template->getClipSize(); }
 	// Contact weapons (like car bombs) need to basically collide with their target.
 	Bool isContactWeapon() const { return m_template->isContactWeapon(); }
+	Bool isChaseWeapon() const { return m_template->isChaseWeapon(); }
 
 	UnsignedInt getClipReloadTime(const Object *source) const;
 

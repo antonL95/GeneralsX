@@ -505,6 +505,7 @@ public:
 		Note that this DOES take weapon attack range into account.
 	*/
 	Bool chooseBestWeaponForTarget(const Object* target, WeaponChoiceCriteria criteria, CommandSourceType cmdSource);
+	void clearFiringTrackerConsecutiveShots();
 
 	// set and/or clear a single modelcondition flag
 	void setModelConditionState( ModelConditionFlagType a );

@@ -1333,6 +1333,9 @@ StateReturnType AIIdleState::onEnter()
 
 	m_inited = true;
 
+	if (RetailFileLayers::enabled() && obj->getTemplate()->shouldClearShotsOnIdle())
+		obj->clearFiringTrackerConsecutiveShots();
+
 	// reset the idle countdown so that we don't do expensive checks too often,
 	// randomized so we avoid spikes
 	m_initialSleepOffset = (UnsignedShort)GameLogicRandomValue(0, IDLE_COUNTDOWN_DELAY);
@@ -2566,7 +2569,7 @@ StateReturnType AIAttackApproachTargetState::onEnter()
 
 		if (source->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN) {
 			if (ai->getLastCommandSource() == CMD_FROM_AI && !ai->isAllowedToChase() ) {
-				if (!weapon->isContactWeapon()) {
+				if (!weapon->isContactWeapon() && !(RetailFileLayers::enabled() && weapon->isChaseWeapon())) {
 					return STATE_FAILURE;
 				}
 			}
@@ -5304,7 +5307,7 @@ void AIAttackState::chooseWeapon()
 
 	if (victim)
 	{
-		/*bool found =*/ source->chooseBestWeaponForTarget(victim, PREFER_MOST_DAMAGE, ai->getLastCommandSource());
+		source->chooseBestWeaponForTarget(victim, RetailFileLayers::enabled() ? USE_WEAPONSET_DEFAULT_CRITERIA : PREFER_MOST_DAMAGE, ai->getLastCommandSource());
 		//DEBUG_ASSERTLOG(found, ("unable to autochoose any weapon for %s",source->getTemplate()->getName().str()));
 	}
 

@@ -53,6 +53,10 @@
 #include "GameLogic/Module/SpawnBehavior.h"
 
 #include "GameLogic/Weapon.h"
+#include "GameClient/Drawable.h"
+#include "GameLogic/WeaponSlotSelectionRules.h"
+#include "GameLogic/LogicRandomValue.h"
+#include "WWMath/wwmath.h"
 
 
 
@@ -190,16 +194,30 @@ static_assert(ARRAY_SIZE(WeaponSetFlags::s_bitNameList) == WeaponSetFlags::NumBi
 //-------------------------------------------------------------------------------------------------
 
 //-------------------------------------------------------------------------------------------------
+static const char* const TheWeaponChoiceCriteriaNames[] =
+{
+	"PREFER_MOST_DAMAGE",
+	"PREFER_LONGEST_RANGE",
+	"PREFER_GRAB_OVER_DAMAGE",
+	"PREFER_LEAST_MOVEMENT",
+	"SELECT_AT_RANDOM",
+	"USE_WEAPONSET_DEFAULT_CRITERIA",
+	nullptr
+};
+
 void WeaponTemplateSet::clear()
 {
 	m_isReloadTimeShared = false;
 	m_isWeaponLockSharedAcrossSets = FALSE;
+	m_readyStatusSharedWithinSet = FALSE;
+	m_defaultWeaponChoiceCriteria = PREFER_MOST_DAMAGE;
 	m_types.clear();
 	for (int i = 0; i < WEAPONSLOT_COUNT; ++i)
 	{
 		m_template[i] = nullptr;
-		m_autoChooseMask[i] = 0xffffffff;					// by default, allow autochoosing from any CommandSource
-		CLEAR_KINDOFMASK(m_preferredAgainst[i]);	// by default, weapon isn't preferred against anything in particular
+		m_autoChooseMask[i] = 0xffffffff;
+		CLEAR_KINDOFMASK(m_preferredAgainst[i]);
+		m_onlyInCondition[i].clear();
 	}
 }
 
@@ -238,7 +256,13 @@ void WeaponTemplateSet::parsePreferredAgainst(INI* ini, void *instance, void * /
 	KindOfMaskType::parseFromINI(ini, instance, &self->m_preferredAgainst[wslot], nullptr);
 }
 
-//-------------------------------------------------------------------------------------------------
+void WeaponTemplateSet::parseOnlyInCondition(INI* ini, void* instance, void*, const void*)
+{
+	WeaponTemplateSet* self = static_cast<WeaponTemplateSet*>(instance);
+	const WeaponSlotType slot = static_cast<WeaponSlotType>(INI::scanIndexList(ini->getNextToken(), TheWeaponSlotTypeNames));
+	ModelConditionFlags::parseFromINI(ini, instance, &self->m_onlyInCondition[slot], nullptr);
+}
+
 void WeaponTemplateSet::parseWeaponTemplateSet( INI* ini, const ThingTemplate* tt )
 {
 	static const FieldParse myFieldParse[] =
@@ -252,7 +276,24 @@ void WeaponTemplateSet::parseWeaponTemplateSet( INI* ini, const ThingTemplate* t
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
-	ini->initFromINI(this, myFieldParse);
+	if (RetailFileLayers::enabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "OnlyInCondition", WeaponTemplateSet::parseOnlyInCondition, nullptr, 0 },
+			{ "DefaultWeaponChoiceCritera", INI::parseIndexList, TheWeaponChoiceCriteriaNames, offsetof(WeaponTemplateSet, m_defaultWeaponChoiceCriteria) },
+			{ "ReadyStatusSharedWithinSet", INI::parseBool, nullptr, offsetof(WeaponTemplateSet, m_readyStatusSharedWithinSet) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		MultiIniFieldParse fieldParse;
+		fieldParse.add(myFieldParse);
+		fieldParse.add(retailFields);
+		ini->initFromINIMulti(this, fieldParse);
+	}
+	else
+	{
+		ini->initFromINI(this, myFieldParse);
+	}
 	this->m_thingTemplate = tt;
 }
 
@@ -580,7 +621,8 @@ static Int getVictimAntiMask(const Object* victim)
 	}
 	else
 	{
-		return WEAPON_ANTI_GROUND;
+		return RetailFileLayers::enabled() && victim->isKindOf(KINDOF_STRUCTURE)
+			? WEAPON_ANTI_STRUCTURE : WEAPON_ANTI_GROUND;
 	}
 }
 
@@ -954,15 +996,43 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 		return false; // Usually cause victim just got killed.  jba.
 
 	if( isCurWeaponLocked() )
-		return TRUE; // I have been forced into choosing a specific weapon, so it is right until someone says otherwise
+		return TRUE;
 
-	Bool found = FALSE;				// A Ready weapon has been found
-	Bool foundBackup = FALSE;	// An unready, but valid weapon has been found
+	const Bool retail = RetailFileLayers::enabled();
+	if (retail)
+	{
+		if (criteria == USE_WEAPONSET_DEFAULT_CRITERIA)
+		{
+			criteria = m_curWeaponTemplateSet
+				? m_curWeaponTemplateSet->getDefaultWeaponChoiceCriteria()
+				: PREFER_MOST_DAMAGE;
+		}
+		if (m_curWeaponTemplateSet && m_curWeaponTemplateSet->isReadyStatusSharedWithinSet())
+		{
+			Bool anyNotReady = FALSE;
+			for (Int i = PRIMARY_WEAPON; i < WEAPONSLOT_COUNT; ++i)
+			{
+				if (m_weapons[i] && m_weapons[i]->getStatus() != READY_TO_FIRE)
+				{
+					anyNotReady = TRUE;
+					break;
+				}
+			}
+			if (WeaponSlotSelectionRules::shouldHoldWeaponSetForSharedReadyStatus(true, anyNotReady != FALSE))
+				return TRUE;
+		}
+	}
+
+	Bool found = FALSE;
+	Bool foundBackup = FALSE;
 
 	Real longestRange = 0.0f;
 	Real bestDamage = 0.0f;
 	Real longestRangeBackup = 0.0f;
 	Real bestDamageBackup = 0.0f;
+	std::vector<WeaponSlotSelectionRules::SlotEvaluation> retailCandidates;
+	if (retail)
+		retailCandidates.reserve(WEAPONSLOT_COUNT);
 
 	WeaponSlotType currentDecision = PRIMARY_WEAPON;
 	WeaponSlotType currentDecisionBackup = PRIMARY_WEAPON;
@@ -1013,22 +1083,47 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 		if (ai && ai->isWeaponSlotOnTurretAndAimingAtTarget((WeaponSlotType)i, victim))
 			weaponIsReady = false;
 
-		// weapon would do no damage against this target.
-		// exception: 'unresistable' weapons are allowed to do zero damage.
 		if (damage <= 0.0f && weapon->getDamageType() != DAMAGE_UNRESISTABLE)
 			continue;
 
-		/*
-			now that we've eliminated the impossible ones, let's decide which
-			one we will prefer.
-		*/
+		if (retail)
+		{
+			const Real randomRoll = GameLogicRandomValueReal(0.0f, 1.0f);
+			const Coord3D* objPos = obj->getPosition();
+			const Coord3D* victimPos = victim->getPosition();
+			const Real dx = objPos->x - victimPos->x;
+			const Real dy = objPos->y - victimPos->y;
+			const Real dz = objPos->z - victimPos->z;
+			const Real distance = WWMath::SqrtfOrigin(dx * dx + dy * dy + dz * dz);
 
-		/*
-			if a weapon matches the magic "preferred" bits, it's ALWAYS preferred over other weapons, regardless
-			of actual damage/range. (eg, the Comanche cannon, which is always preferred against infantry, rather
-			than its antitank missiles.) we accomplish this cheesily, by magnifying the damage/range, and by declaring
-			the weapon "ready" in a more liberal manner.
-		*/
+			const KindOfMaskType& preferredAgainst = m_curWeaponTemplateSet->getNthPreferredAgainstMask((WeaponSlotType)i);
+			const Bool prefersHorde = targetingHorde && preferredAgainst.test(KINDOF_HORDE);
+			const Bool preferredMatch = KINDOFMASK_ANY_SET(preferredAgainst) &&
+				(prefersHorde || victim->isAnyKindOf(preferredAgainst));
+
+			const ModelConditionFlags& onlyInCondition = m_curWeaponTemplateSet->getNthOnlyInCondition((WeaponSlotType)i);
+			const Bool hasOnlyInCondition = onlyInCondition.any();
+			const Bool onlyInConditionMatched = hasOnlyInCondition &&
+				obj->getDrawable() && obj->getDrawable()->getModelConditionFlags().testForAll(onlyInCondition);
+
+			WeaponSlotSelectionRules::SlotCandidateInput candidate;
+			candidate.slot = i;
+			candidate.damage = damage > 0.0f ? 1.0f : 0.0f;
+			candidate.attackRange = attackRange;
+			candidate.minRange = weapon->getTemplate()->getMinimumAttackRange();
+			candidate.distance = distance;
+			candidate.randomRoll = randomRoll;
+			candidate.isMeleeOrContact = weapon->isContactWeapon();
+			candidate.baseReady = weaponIsReady != FALSE;
+			candidate.outOfAmmo = weapon->getStatus() == OUT_OF_AMMO;
+			candidate.preferredMatch = preferredMatch != FALSE;
+			candidate.preferredScore = prefersHorde ? 2e10f : 1e10f;
+			candidate.hasOnlyInCondition = hasOnlyInCondition != FALSE;
+			candidate.onlyInConditionMatched = onlyInConditionMatched != FALSE;
+			retailCandidates.push_back(WeaponSlotSelectionRules::evaluateSlotCandidate(candidate));
+			continue;
+		}
+
 		const KindOfMaskType& preferredAgainst = m_curWeaponTemplateSet->getNthPreferredAgainstMask((WeaponSlotType)i);
 		const Bool prefersHorde = targetingHorde && preferredAgainst.test(KINDOF_HORDE);
 		if (KINDOFMASK_ANY_SET(preferredAgainst) &&
@@ -1037,16 +1132,15 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 			const Real preferenceScore = prefersHorde ? 2e10f : 1e10f;
 			damage = preferenceScore;
 			attackRange = preferenceScore;
-			// preferred weapons are also kept if they are merely reloading. (if out of ammo, we can punt.)
 			weaponIsReady = (weapon->getStatus() != OUT_OF_AMMO);
 		}
 
 		switch (criteria)
 		{
 			case PREFER_MOST_DAMAGE:
+			case PREFER_GRAB_OVER_DAMAGE:
 				if( !weaponIsReady )
 				{
-					// If this weapon is not ready, the best it can do is qualify as the Best Backup choice
 					if (damage >= bestDamageBackup)
 					{
 						bestDamageBackup = damage;
@@ -1086,10 +1180,27 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 					}
 				}
 				break;
+			default:
+				break;
 		}
 	}
 
-	if ( found )
+	if (retail)
+	{
+		const Int selected = WeaponSlotSelectionRules::selectBestSlot(
+			retailCandidates,
+			static_cast<WeaponSlotSelectionRules::Criteria>(criteria));
+		if (selected >= PRIMARY_WEAPON && selected < WEAPONSLOT_COUNT)
+		{
+			m_curWeapon = static_cast<WeaponSlotType>(selected);
+			found = TRUE;
+		}
+		else
+		{
+			found = FALSE;
+		}
+	}
+	else if ( found )
 	{
 		// If we found a good best one, then just use it
 		m_curWeapon = currentDecision;

@@ -5903,6 +5903,9 @@ Bool AIUpdateInterface::stanceAllowsChase(const Object* target) const
 {
 	if (!RetailFileLayers::enabled() || getLastCommandSource() != CMD_FROM_AI || hasRetailPlannerAttack(target))
 		return TRUE;
+	const Weapon* weapon = getObject()->getCurrentWeapon();
+	if (weapon && weapon->isChaseWeapon())
+		return TRUE;
 	const auto* stances = StancesBehavior::findForUnit(getObject());
 	if (!stances)
 		return TRUE;

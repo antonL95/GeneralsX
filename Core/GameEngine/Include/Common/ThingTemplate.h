@@ -519,6 +519,7 @@ public:
 		Bool forceLuaRegistration = FALSE;
 		Bool isAutoBuilt = FALSE;
 		Bool showHealthInSelectionDecal = FALSE;
+		Bool shouldClearShotsOnIdle = FALSE;
 		Bool isGrabbable = FALSE;
 		Bool isHarvestable = FALSE;
 		Bool canPathThroughGates = FALSE;
@@ -807,6 +808,7 @@ public:
 	const ThingTemplate *getBuildFacilityTemplate( const Player *player ) const;
 
 	Bool isBuildableItem() const;
+	Bool shouldClearShotsOnIdle() const { return m_rotwk.shouldClearShotsOnIdle; }
 
 	/// calculate how long (in logic frames) it will take the given player to build this unit
 	Int calcTimeToBuild( const Player* player) const;

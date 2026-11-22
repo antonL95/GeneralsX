@@ -217,24 +217,38 @@ enum WeaponSetConditionType CPP_11(: Int)
 };
 
 //-------------------------------------------------------------------------------------------------
+enum WeaponChoiceCriteria CPP_11(: Int)
+{
+	PREFER_MOST_DAMAGE,
+	PREFER_LONGEST_RANGE,
+	PREFER_GRAB_OVER_DAMAGE,
+	PREFER_LEAST_MOVEMENT,
+	SELECT_AT_RANDOM,
+	USE_WEAPONSET_DEFAULT_CRITERIA
+};
+
 class WeaponTemplateSet
 {
 	friend class ThingTemplate;
 
 private:
-	const ThingTemplate*		m_thingTemplate;	// needed for save/load
+	const ThingTemplate*		m_thingTemplate;
 	WeaponSetFlags					m_types;
 	const WeaponTemplate*		m_template[WEAPONSLOT_COUNT];
 	UnsignedInt							m_autoChooseMask[WEAPONSLOT_COUNT];
 	KindOfMaskType					m_preferredAgainst[WEAPONSLOT_COUNT];
 	KindOfMaskType					m_onlyAgainst[WEAPONSLOT_COUNT];
+	ModelConditionFlags			m_onlyInCondition[WEAPONSLOT_COUNT];
+	WeaponChoiceCriteria		m_defaultWeaponChoiceCriteria;
 	Bool										m_isReloadTimeShared;
-	Bool										m_isWeaponLockSharedAcrossSets; ///< A weapon set so similar that it is safe to hold locks across
+	Bool										m_isWeaponLockSharedAcrossSets;
+	Bool										m_readyStatusSharedWithinSet;
 
 	static void parseWeapon(INI* ini, void *instance, void *store, const void* userData);
 	static void parseAutoChoose(INI* ini, void *instance, void *store, const void* userData);
 	static void parsePreferredAgainst(INI* ini, void *instance, void *store, const void* userData);
 	static void parseOnlyAgainst(INI* ini, void* instance, void* store, const void* userData);
+	static void parseOnlyInCondition(INI* ini, void* instance, void* store, const void* userData);
 
 public:
 	inline WeaponTemplateSet()
@@ -242,19 +256,22 @@ public:
 		clear();
 	}
 
-	const ThingTemplate* friend_getThingTemplate() const { return m_thingTemplate; }	// only for WeaponSet::xfer
-	const WeaponSetFlags& friend_getWeaponSetFlags() const { return m_types; }	// only for WeaponSet::xfer
+	const ThingTemplate* friend_getThingTemplate() const { return m_thingTemplate; }
+	const WeaponSetFlags& friend_getWeaponSetFlags() const { return m_types; }
 
 	void clear();
 	void parseWeaponTemplateSet( INI* ini, const ThingTemplate* tt );
 	Bool testWeaponSetFlag( WeaponSetType wst ) const;
 	Bool isSharedReloadTime() const { return m_isReloadTimeShared; }
 	Bool isWeaponLockSharedAcrossSets() const {return m_isWeaponLockSharedAcrossSets; }
+	Bool isReadyStatusSharedWithinSet() const { return m_readyStatusSharedWithinSet; }
+	WeaponChoiceCriteria getDefaultWeaponChoiceCriteria() const { return m_defaultWeaponChoiceCriteria; }
 
 	Bool hasAnyWeapons() const;
 	inline const WeaponTemplate* getNth(WeaponSlotType n) const { return m_template[n]; }
 	inline UnsignedInt getNthCommandSourceMask(WeaponSlotType n) const { return m_autoChooseMask[n]; }
 	inline const KindOfMaskType& getNthPreferredAgainstMask(WeaponSlotType n) const { return m_preferredAgainst[n]; }
+	inline const ModelConditionFlags& getNthOnlyInCondition(WeaponSlotType n) const { return m_onlyInCondition[n]; }
 	Bool canTargetObject(WeaponSlotType slot, const Object* victim) const;
 
 	inline Int getConditionsYesCount() const { return 1; }
@@ -264,15 +281,7 @@ public:
 #endif
 };
 
-//-------------------------------------------------------------------------------------------------
 typedef std::vector<WeaponTemplateSet> WeaponTemplateSetVector;
-
-//-------------------------------------------------------------------------------------------------
-enum WeaponChoiceCriteria CPP_11(: Int)
-{
-	PREFER_MOST_DAMAGE,		///< choose the weapon that will do the most damage
-	PREFER_LONGEST_RANGE	///< choose the weapon with the longest range (that will do nonzero damage)
-};
 
 //-------------------------------------------------------------------------------------------------
 enum WeaponLockType CPP_11(: Int)
