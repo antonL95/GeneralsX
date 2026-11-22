@@ -3568,8 +3568,14 @@ Bool Object::isAbleToAttack() const
 	// if we're contained within a transport we cannot attack unless it specifically allows us
 	const Object *containedBy = getContainedBy();
 	DEBUG_ASSERTCRASH( (containedBy == nullptr) || (containedBy->getContain() != nullptr), ("A %s thinks they are contained by something with no contain module!", getTemplate()->getName().str() ) );
-	if( containedBy && containedBy->getContain() && !containedBy->getContain()->isPassengerAllowedToFire( getID() ) )
-		return false;
+	if (const ContainModuleInterface* container = containedBy ? containedBy->getContain() : nullptr)
+	{
+		if (!container->isPassengerAllowedToFire(getID()))
+			return FALSE;
+		if (RetailFileLayers::enabled() && container->isGarrisonable() && getAIUpdateInterface() &&
+			!getAIUpdateInterface()->canAttackFromGarrison())
+			return FALSE;
+	}
 
 
 	// We can't fire if under construction

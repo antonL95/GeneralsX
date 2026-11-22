@@ -618,6 +618,7 @@ public:
 
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
 	const AsciiString& getRetailLuaEventsList() const { return getAIUpdateModuleData()->m_luaEventsList; }
+	Bool canAttackFromGarrison() const { return getAIUpdateModuleData()->m_canAttackWhileContained; }
 
   Bool canAutoAcquireWhileStealthed() const ;
 
