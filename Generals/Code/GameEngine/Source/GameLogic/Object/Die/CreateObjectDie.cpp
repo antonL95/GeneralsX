@@ -31,6 +31,10 @@
 
 #define DEFINE_OBJECT_STATUS_NAMES
 #include "Common/ThingFactory.h"
+#include "Common/ModuleFactory.h"
+#include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/CreateObjectDie.h"
@@ -59,6 +63,16 @@ CreateObjectDieModuleData::CreateObjectDieModuleData()
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
+	if (ModuleFactory::registersRotwkModules())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "DebrisPortionOfSelf", INI::parseAsciiString, nullptr, offsetof(CreateObjectDieModuleData, m_debrisPortionOfSelf) },
+			{ "UpgradeRequired", INI::parseAsciiStringVectorAppend, nullptr, offsetof(CreateObjectDieModuleData, m_requiredUpgrades) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 
 }
 
@@ -84,8 +98,22 @@ CreateObjectDie::~CreateObjectDie()
 //-------------------------------------------------------------------------------------------------
 void CreateObjectDie::onDie( const DamageInfo * damageInfo )
 {
+	const auto* data = getCreateObjectDieModuleData();
 	if (!isDieApplicable(damageInfo))
 		return;
+
+	if (RetailFileLayers::enabled())
+	{
+		const Object* object = getObject();
+		const Player* owner = object->getControllingPlayer();
+		for (const AsciiString& name : data->m_requiredUpgrades)
+		{
+			const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(name);
+			if (upgrade && !(upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER
+				? owner && owner->hasUpgradeComplete(upgrade) : object->hasUpgrade(upgrade)))
+				return;
+		}
+	}
 
 	Object *damageDealer = TheGameLogic->findObjectByID( damageInfo->in.m_sourceID );
 

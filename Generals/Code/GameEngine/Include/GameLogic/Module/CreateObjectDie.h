@@ -44,6 +44,8 @@ class CreateObjectDieModuleData : public DieModuleData
 public:
 
 	const ObjectCreationList* m_ocl;			///< object creaton list to make
+	AsciiString m_debrisPortionOfSelf;
+	std::vector<AsciiString> m_requiredUpgrades;
 
 	CreateObjectDieModuleData();
 
