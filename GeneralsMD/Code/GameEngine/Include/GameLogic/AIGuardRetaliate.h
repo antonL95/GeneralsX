@@ -247,9 +247,11 @@ protected:
 	virtual void xfer( Xfer *xfer ) override;
 	virtual void loadPostProcess() override;
 private:
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	AIGuardRetaliateMachine* getGuardMachine() { return (AIGuardRetaliateMachine*)getMachine(); }
 	GuardRetaliateExitConditions m_exitConditions;
 	AIAttackState *m_attackState;
+	Bool m_reenterOnLoad = FALSE;
 };
 
 //--------------------------------------------------------------------------------------

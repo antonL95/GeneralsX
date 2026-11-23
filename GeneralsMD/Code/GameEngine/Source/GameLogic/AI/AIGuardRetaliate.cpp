@@ -39,6 +39,8 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/PerfTimer.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/Team.h"
 #include "Common/Xfer.h"
 #include "Common/ThingTemplate.h"
@@ -309,6 +311,8 @@ Bool AIGuardRetaliateMachine::lookForInnerTarget()
 // ------------------------------------------------------------------------------------------------
 void AIGuardRetaliateMachine::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		this->xfer(xfer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -859,22 +863,49 @@ void AIGuardRetaliateAttackAggressorState::onExit( StateExitType status )
 //-------------------------------------------------------------------------------------------------
 void AIGuardRetaliateAttackAggressorState::crc( Xfer *xfer )
 {
-
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 }
 
 //-------------------------------------------------------------------------------------------------
 void AIGuardRetaliateAttackAggressorState::xfer( Xfer *xfer )
 {
-  // version
-  XferVersion currentVersion = 1;
-  XferVersion version = currentVersion;
-  xfer->xferVersion( &version, currentVersion );
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion currentVersion = retail ? 2 : 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
+	if (retail)
+		xferRetailBlocks(xfer, version >= 2);
+}
 
+void AIGuardRetaliateAttackAggressorState::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection<Xfer>(xfer, loading, present, {
+		{ "retaliate-attack", [this, loading](Xfer* transfer)
+		{
+			Bool attack = m_attackState != nullptr;
+			transfer->xferBool(&attack);
+			if (loading)
+				m_reenterOnLoad = FALSE;
+			if (!attack)
+				return;
+
+			transfer->xferCoord3D(&m_exitConditions.m_center);
+			transfer->xferReal(&m_exitConditions.m_radiusSqr);
+			transfer->xferUnsignedInt(&m_exitConditions.m_attackGiveUpFrame);
+			transfer->xferInt(&m_exitConditions.m_conditionsToConsider);
+			if (loading && !m_attackState)
+				m_attackState = newInstance(AIAttackState)(getMachine(), FALSE, TRUE, FALSE, &m_exitConditions);
+			transfer->xferSnapshot(m_attackState);
+		}, [this] { m_reenterOnLoad = TRUE; } }
+	});
 }
 
 //-------------------------------------------------------------------------------------------------
 void AIGuardRetaliateAttackAggressorState::loadPostProcess()
 {
-	onEnter();
+	if (!RetailFileLayers::enabled() || m_reenterOnLoad)
+		onEnter();
 }
 

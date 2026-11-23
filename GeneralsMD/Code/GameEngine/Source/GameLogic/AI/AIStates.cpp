@@ -751,6 +751,8 @@ void AIStateMachine::crc( Xfer *xfer )
 	const AIUpdateInterface* ai = getOwner()->getAI();
 	if (ai && ai->isFollowingRetailGroupRoute())
 		this->xfer(xfer);
+	else if (RetailFileLayers::enabled() && getCurrentStateID() == AI_GUARD_RETALIATE)
+		xfer->xferSnapshot(internalGetState(AI_GUARD_RETALIATE));
 	else
 		StateMachine::crc(xfer);
 }
@@ -7074,6 +7076,8 @@ AsciiString AIGuardRetaliateState::getName(  ) const
 // ------------------------------------------------------------------------------------------------
 void AIGuardRetaliateState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferSnapshot(m_guardRetaliateMachine);
 }
 
 // ------------------------------------------------------------------------------------------------
