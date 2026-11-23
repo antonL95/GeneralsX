@@ -1,8 +1,9 @@
 prepare() {
     awk -v end="$end" 'BEGIN {
-        for (frame = 101; frame <= end && frame <= 1907; ++frame) {
+        for (frame = 91; frame <= end && frame <= 1907; ++frame) {
             print frame, "ambient-roam-sample Player_1 RivendellHallOfFire 0"
-            print frame, "ambient-roam-sample Player_1 ElvenGreenPasture 0"
+            if (frame >= 101)
+                print frame, "ambient-roam-sample Player_1 ElvenGreenPasture 0"
         }
     }'
 }
@@ -26,7 +27,7 @@ check() {
                 peak[id] = $8
                 peak_frame[id] = frame
             }
-            if ($4 == "RivendellTownsman" && $10 && ($11 != 0.5 || $12 != 110.5)) {
+            if ($4 == "RivendellTownsman" && $10 && !$13) {
                 roaming[id] = 1
                 goal = sqrt($11 * $11 + $12 * $12)
                 if (frame == checkpoint && goal <= 100.05)

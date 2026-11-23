@@ -32,10 +32,11 @@ void sampleAmbientRoam(const RetailTestCommands::Context& ctx)
 		const auto* goal = ai ? ai->getGoalPosition() : nullptr;
 		const Real dx = position.x - center.x;
 		const Real dy = position.y - center.y;
-		std::fprintf(stderr, "TEST ambient-roam %u %s %u %.5f %.5f %.5f %d %d %.5f %.5f\n",
+		std::fprintf(stderr, "TEST ambient-roam %u %s %u %.5f %.5f %.5f %d %d %.5f %.5f %d\n",
 			ctx.frame, name, unsigned(actor->getID()), dx, dy, WWMath::Sqrt(dx * dx + dy * dy),
 			dynamic_cast<const AnimalAIUpdate*>(ai) != nullptr, ai && ai->isMoving(),
-			goal ? goal->x - center.x : 0.0f, goal ? goal->y - center.y : 0.0f);
+			goal ? goal->x - center.x : 0.0f, goal ? goal->y - center.y : 0.0f,
+			ai && ai->getCurrentStateID() == AI_FOLLOW_EXITPRODUCTION_PATH);
 	}
 	std::fflush(stderr);
 }
