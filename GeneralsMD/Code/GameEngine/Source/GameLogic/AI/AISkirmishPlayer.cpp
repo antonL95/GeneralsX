@@ -2157,7 +2157,7 @@ void AISkirmishPlayer::updateRetail()
 				if (!button || button->getCommandType() != (plot ? GUI_COMMAND_FOUNDATION_CONSTRUCT : GUI_COMMAND_DOZER_CONSTRUCT))
 					continue;
 				const ThingTemplate* type = button->getThingTemplate();
-				if (!type || isOffensiveBuilding(*type) || button->getRequiredRank() > builder.getExperienceTracker()->getRank() ||
+				if (!type || button->getRequiredRank() > builder.getExperienceTracker()->getRank() ||
 					!HeroRoster::buttonUpgradesMet(button, m_player, &builder))
 					continue;
 				const Bool economy = isFarm(*type);

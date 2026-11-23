@@ -24,7 +24,7 @@ probe() (
     printf '\n' >> "$mapdir/map.ini"
 
     case "$label" in
-        forward|no-targetless|unavailable-building)
+        forward|no-targetless|unavailable-building|ordinary-building)
             defense="$fixtures/../pkg46-defense"
             cat "$defense/high-pass.ini" "$defense/high-pass-alone.ini" >> "$mapdir/map.ini"
             cat "$defense/high-pass.txt" > "$GENERALSX_TEST_COMMANDS"
@@ -34,6 +34,16 @@ probe() (
                     ;;
                 unavailable-building)
                     printf '\nArmyDefinition MordorArmy\n    OffensiveBuildings = MenWallHubSmall\nEnd\n' >> "$mapdir/map.ini"
+                    ;;
+                ordinary-building)
+                    cat >> "$mapdir/map.ini" <<'INI'
+
+ArmyDefinition MordorArmy
+    TacticalAITargets = DEFENSIVE ENEMY_STRUCTURE
+    OffensiveBuildings = MordorBattleTower
+    ScavangedResourceBuildings = MordorBattleTower
+End
+INI
                     ;;
             esac
             printf '320 quit - - 0\n' >> "$GENERALSX_TEST_COMMANDS"
@@ -85,6 +95,7 @@ COMMANDS
         -mod /game-install/aotr -bfme2 /game-install/bfme2 -file "$mapdir/$map.map" > "$state/run.log" 2>&1
     awk -v label="$label" '
         $1 == "AI_FORWARD_BUILD" && $3 == 4 && !built { built = $2; building = $4; x = $13; y = $14 }
+        $1 == "AI_BUILD" && $3 == 4 && $5 == "MordorBattleTower" && !ordinary { ordinary = $2 }
         /^TEST frame 342: create SkirmishOpportunityBuilder for Player_1 .*2740.0, 3070.0/ {
             split($8, id, "=")
             target = id[2]
@@ -93,23 +104,24 @@ COMMANDS
         $1 == "AI_UNIT_REQUEST" && $2 == 184 && $3 == 4 && $4 == "SkirmishPendingHorde" { previous = $6; priority = $7 }
         $2 == 184 && $3 == 4 && ($1 == "AI_BUILD" || $1 == "AI_TRAIN") && !action { action = $1; payload = $5 }
         END {
-            printf "%s %d %s %g %g %d %d %d %g %g %s %s\n", label, built, building ? building : "-", x, y,
-                wave, picked, target, previous, priority, action ? action : "-", payload ? payload : "-"
+            printf "%s %d %s %g %g %d %d %d %g %g %s %s %d\n", label, built, building ? building : "-", x, y,
+                wave, picked, target, previous, priority, action ? action : "-", payload ? payload : "-", ordinary
         }
     ' "$state/run.log"
 )
 
-printf 'policy build-frame building x y wave-frame selected-builder expected-builder previous-priority priority first-order-at-184 template\n'
-for label in forward no-targetless unavailable-building opportunity no-offense priority no-growth; do
+printf 'policy build-frame building x y wave-frame selected-builder expected-builder previous-priority priority first-order-at-184 template ordinary-tower-frame\n'
+for label in forward no-targetless unavailable-building ordinary-building opportunity no-offense priority no-growth; do
     probe "$label"
 done | tee "$work/decisions.txt"
 
 awk '
     $1 == "forward" { seen++; bad += ($2 != 304 || $3 != "MordorBattleTower") }
     $1 == "no-targetless" || $1 == "unavailable-building" { seen++; bad += ($2 != 0) }
+    $1 == "ordinary-building" { seen++; bad += ($2 != 0 || !$13) }
     $1 == "opportunity" { seen++; bad += ($6 != 364 || !$8 || $7 != $8) }
     $1 == "no-offense" { seen++; bad += ($6 != 0 || !$8) }
     $1 == "priority" { seen++; bad += ($9 <= 500 || $10 <= 1450 || $11 != "AI_TRAIN" || $12 != "SkirmishPendingHorde") }
     $1 == "no-growth" { seen++; bad += ($9 != 500 || $10 != 500 || $11 != "AI_BUILD" || $12 != "MordorFortress") }
-    END { exit bad || seen != 7 }
+    END { exit bad || seen != 8 }
 ' "$work/decisions.txt"
