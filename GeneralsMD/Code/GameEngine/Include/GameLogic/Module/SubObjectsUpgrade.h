@@ -100,4 +100,8 @@ protected:
 	virtual void upgradeImplementation( ) override; ///< Here's the actual work of Upgrading
 	virtual Bool isSubObjectsUpgrade() override { return true; }
 
+private:
+	void applyUpgrade(Bool animate);
+	Bool canFade() const;
+	UnsignedInt m_creationFrame = 0;
 };

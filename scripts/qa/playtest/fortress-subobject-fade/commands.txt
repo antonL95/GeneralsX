@@ -1,0 +1,5 @@
+5 sweep-setup Player_1 - 0
+30 fortress-sample Player_1 MenFortressCitadel 0 Upgrade_MenFortressBanners
+33 fortress-purchase Player_1 MenFortressCitadel 0 Command_PurchaseUpgradeMenFortressBanners
+63 fortress-sample Player_1 MenFortressCitadel 0 Upgrade_MenFortressBanners
+485 fortress-sample Player_1 MenFortressCitadel 0 Upgrade_MenFortressBanners

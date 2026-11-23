@@ -2386,6 +2386,9 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 			}
 		}
 	}
+#if !RTS_GENERALS
+	applyRetailSubObjectFades();
+#endif
 	traceAnimationState();
 
 	// update whether or not we should be animating.
@@ -2721,7 +2724,8 @@ Real W3DModelDraw::getCurAnimDistanceCovered() const
 	Utility function to make it easier to recursively hide all objects connected to a certain bone.
 	We will hide all objects connected to bones which are children of boneIdx
 */
-static void doHideShowBoneSubObjs(Bool state, Int numSubObjects, Int boneIdx, RenderObjClass *fullObject, const HTreeClass *htree)
+static void doHideShowBoneSubObjs(Bool state, Int numSubObjects, Int boneIdx, RenderObjClass *fullObject, const HTreeClass *htree,
+	Real opacity = -1.0f)
 {
 	if (boneIdx == 0 && RetailFileLayers::enabled())
 		return;
@@ -2747,6 +2751,8 @@ static void doHideShowBoneSubObjs(Bool state, Int numSubObjects, Int boneIdx, Re
 		{
 			RenderObjClass* childObject = fullObject->Get_Sub_Object(i);
 			childObject->Set_Hidden(state);
+			if (opacity >= 0.0f)
+				childObject->Set_Sub_Object_Opacity(opacity);
 			childObject->Release_Ref();
 		}
 	}
@@ -5051,19 +5057,38 @@ void W3DModelDraw::doHideShowProjectileObjects( UnsignedInt showCount, UnsignedI
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool W3DModelDraw::setSubObjectHidden(const AsciiString& name, Bool hidden)
+Bool W3DModelDraw::setSubObjectHidden(const AsciiString& name, Bool hidden, Real opacity)
 {
 	Int index;
 	RenderObjClass* subObject = m_renderObject->Get_Sub_Object_By_Name(name.str(), &index);
 	if (!subObject)
 		return FALSE;
 	subObject->Set_Hidden(hidden);
+	if (opacity >= 0.0f)
+		subObject->Set_Sub_Object_Opacity(opacity);
 	if (const HTreeClass* tree = m_renderObject->Get_HTree())
 		doHideShowBoneSubObjs(hidden, m_renderObject->Get_Num_Sub_Objects(),
-			m_renderObject->Get_Sub_Object_Bone_Index(0, index), m_renderObject, tree);
+			m_renderObject->Get_Sub_Object_Bone_Index(0, index), m_renderObject, tree, opacity);
 	subObject->Release_Ref();
 	return TRUE;
 }
+
+#if !RTS_GENERALS
+void W3DModelDraw::applyRetailSubObjectFades()
+{
+	if (!m_renderObject || !TheGameLogic)
+		return;
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	for (const auto& fade : getDrawable()->getRetailSubObjectFades())
+	{
+		const Real progress = fade.progress(frame);
+		const Bool complete = progress == 1.0f;
+		const Bool hidden = fade.show ? progress == 0.0f : complete;
+		const Real opacity = complete ? 1.0f : (fade.show ? progress : 1.0f - progress);
+		setSubObjectHidden(fade.name, hidden, opacity);
+	}
+}
+#endif
 
 void W3DModelDraw::updateSubObjects()
 {
@@ -5088,6 +5113,7 @@ void W3DModelDraw::updateSubObjects()
 	}
 
 #if !RTS_GENERALS
+	applyRetailSubObjectFades();
 	const Object* object = getDrawable()->getObject();
 	if (!RetailFileLayers::enabled() || !object || !object->getBodyModule())
 		return;

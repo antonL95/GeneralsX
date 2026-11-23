@@ -52,6 +52,7 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/SubObjectsUpgrade.h"
 
@@ -101,6 +102,7 @@ void SubObjectsUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 //-------------------------------------------------------------------------------------------------
 SubObjectsUpgrade::SubObjectsUpgrade( Thing *thing, const ModuleData* moduleData ) : UpgradeModule( thing, moduleData )
 {
+	m_creationFrame = TheGameLogic ? TheGameLogic->getFrame() : 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -118,7 +120,7 @@ void SubObjectsUpgrade::onDrawableBoundToObject()
 		return;
 	if (isAlreadyUpgraded())
 	{
-		upgradeImplementation();
+		applyUpgrade(FALSE);
 		return;
 	}
 	const SubObjectsUpgradeModuleData* data = getSubObjectsUpgradeModuleData();
@@ -129,9 +131,22 @@ void SubObjectsUpgrade::onDrawableBoundToObject()
 	draw->updateSubObjects();
 }
 
+Bool SubObjectsUpgrade::canFade() const
+{
+	constexpr UnsignedInt creationFrames = 3;
+	return RetailFileLayers::enabled() && TheGameLogic &&
+		!getSubObjectsUpgradeModuleData()->m_skipFadeOnCreate &&
+		TheGameLogic->getFrame() - m_creationFrame >= creationFrames;
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void SubObjectsUpgrade::upgradeImplementation()
+{
+	applyUpgrade(!isAlreadyUpgraded() && canFade());
+}
+
+void SubObjectsUpgrade::applyUpgrade(Bool animate)
 {
 	const SubObjectsUpgradeModuleData *data = getSubObjectsUpgradeModuleData();
 	UpgradeMaskType activation, conflicting;
@@ -154,20 +169,22 @@ void SubObjectsUpgrade::upgradeImplementation()
 	Drawable *draw = obj->getDrawable();
 	if( draw )
 	{
+		const Real fade = animate ? data->m_fadeTimeInSeconds * LOGICFRAMES_PER_SECOND : 0.0f;
+		const Real wait = animate ? data->m_waitBeforeFadeInSeconds * LOGICFRAMES_PER_SECOND : 0.0f;
 		std::vector<AsciiString>::const_iterator subObjectName;
 		Bool updateSubObjects = false;
 
 		//Show these subobjects
 		for( subObjectName = data->m_showSubObjectNames.begin(); subObjectName != data->m_showSubObjectNames.end(); ++subObjectName )
 		{
-			draw->showSubObject( *subObjectName, true );
+			draw->showSubObject(*subObjectName, true, fade, wait);
 			updateSubObjects = true;
 		}
 
 		//Hide these subobjects
 		for( subObjectName = data->m_hideSubObjectNames.begin(); subObjectName != data->m_hideSubObjectNames.end(); ++subObjectName )
 		{
-			draw->showSubObject( *subObjectName, false );
+			draw->showSubObject(*subObjectName, false, fade, wait);
 			updateSubObjects = true;
 		}
 
@@ -193,15 +210,18 @@ Bool SubObjectsUpgrade::resetUpgrade(const UpgradeMaskType& keyMask)
 	const auto* data = getSubObjectsUpgradeModuleData();
 	if (Drawable* draw = getObject()->getDrawable())
 	{
+		const Bool animate = canFade();
+		const Real fade = animate ? data->m_fadeTimeInSeconds * LOGICFRAMES_PER_SECOND : 0.0f;
+		const Real wait = animate ? data->m_waitBeforeFadeInSeconds * LOGICFRAMES_PER_SECOND : 0.0f;
 		if (data->m_hideSubObjectsOnRemove)
 		{
 			for (const AsciiString& name : data->m_showSubObjectNames)
-				draw->showSubObject(name, FALSE);
+				draw->showSubObject(name, FALSE, fade, wait);
 		}
 		if (data->m_unHideSubObjectsOnRemove)
 		{
 			for (const AsciiString& name : data->m_hideSubObjectNames)
-				draw->showSubObject(name, TRUE);
+				draw->showSubObject(name, TRUE, fade, wait);
 		}
 		if (data->m_hideSubObjectsOnRemove || data->m_unHideSubObjectsOnRemove || !data->m_upgradeTextures.empty())
 			draw->updateSubObjects();

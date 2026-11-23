@@ -379,7 +379,8 @@ SceneClass * RenderObjClass::Get_Scene()
 void RenderObjClass::Update_Animation_Opacity(float opacity)
 {
 	AnimationOpacity = opacity <= 0.0f ? 0.0f : opacity < 1.0f ? opacity : 1.0f;
-	const float effective = Container ? Container->Get_Animation_Opacity() * AnimationOpacity : AnimationOpacity;
+	const float local = AnimationOpacity * SubObjectOpacity;
+	const float effective = Container ? Container->Get_Animation_Opacity() * local : local;
 	if (effective == EffectiveAnimationOpacity)
 		return;
 
@@ -393,13 +394,21 @@ void RenderObjClass::Update_Animation_Opacity(float opacity)
 	}
 }
 
+void RenderObjClass::Set_Sub_Object_Opacity(float opacity)
+{
+	if (SubObjectOpacity == opacity)
+		return;
+	SubObjectOpacity = opacity;
+	Update_Animation_Opacity(AnimationOpacity);
+}
+
 void RenderObjClass::Set_Container(RenderObjClass * con)
 {
 	// Either we arent currently in a container or we are clearing our container, otherwise
 	// Houston, there is a problem!
 	WWASSERT((con == nullptr) || (Container == nullptr));
 	Container = con;
-	if (AnimationOpacity != EffectiveAnimationOpacity || (con && con->Get_Animation_Opacity() != 1.0f))
+	if (AnimationOpacity * SubObjectOpacity != EffectiveAnimationOpacity || (con && con->Get_Animation_Opacity() != 1.0f))
 		Update_Animation_Opacity(AnimationOpacity);
 }
 

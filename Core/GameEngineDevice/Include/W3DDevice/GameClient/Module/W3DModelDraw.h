@@ -497,7 +497,10 @@ protected:
 	void recalcBonesForClientParticleSystems();
 	void stopClientParticleSystems();
 	void doHideShowSubObjs(const std::vector<ModelConditionInfo::HideShowSubObjInfo>* vec);
-	Bool setSubObjectHidden(const AsciiString& name, Bool hidden);
+	Bool setSubObjectHidden(const AsciiString& name, Bool hidden, Real opacity = -1.0f);
+#if !RTS_GENERALS
+	void applyRetailSubObjectFades();
+#endif
 	virtual void adjustTransformMtx(Matrix3D& mtx) const;
 
 	Real getCurAnimDistanceCovered() const;

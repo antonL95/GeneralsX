@@ -516,7 +516,19 @@ public:
 	virtual void setAnimationFrame( int frame );
 
 	void updateSubObjects();
-	void showSubObject( const AsciiString& name, Bool show );
+	struct RetailSubObjectFade
+	{
+		AsciiString name;
+		UnsignedInt startFrame = 0;
+		Real duration = 0.0f;
+		Real delay = 0.0f;
+		Bool show = FALSE;
+
+		Real progress(UnsignedInt frame) const;
+	};
+
+	void showSubObject(const AsciiString& name, Bool show, Real fadeFrames = 0.0f, Real waitFrames = 0.0f);
+	const std::vector<RetailSubObjectFade>& getRetailSubObjectFades() const { return m_retailSubObjectFades; }
 
 #ifdef ALLOW_ANIM_INQUIRIES
 // srj sez: not sure if this is a good idea, for net sync reasons...
@@ -764,6 +776,7 @@ private:
 	Real m_secondMaterialPassOpacity;			///< drawable gets rendered again in hardware with an extra material layer
 	// --------- BYTE-SIZED THINGS GO HERE
 	Byte m_selected;						///< drawable is selected or not
+	std::vector<RetailSubObjectFade> m_retailSubObjectFades;
 	Bool m_hidden;							///< drawable is "hidden" or not (overrides stealth effects)
 	Bool m_hiddenByStealth;			///< drawable is hidden due to stealth
 	Bool m_instanceIsIdentity;	///< If true, instance matrix can be skipped

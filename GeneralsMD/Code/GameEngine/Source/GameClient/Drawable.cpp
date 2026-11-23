@@ -761,10 +761,29 @@ void Drawable::updateSubObjects()
 }
 
 //-------------------------------------------------------------------------------------------------
-void Drawable::showSubObject( const AsciiString& name, Bool show )
+Real Drawable::RetailSubObjectFade::progress(UnsignedInt frame) const
+{
+	const Real elapsed = static_cast<Real>(frame - startFrame) - delay;
+	if (elapsed < 0.0f)
+		return 0.0f;
+	return elapsed >= duration ? 1.0f : elapsed / duration;
+}
+
+void Drawable::showSubObject(const AsciiString& name, Bool show, Real fadeFrames, Real waitFrames)
 {
 	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
 		(*dm)->showDrawableSubObject(name, show);
+
+	if (!RetailFileLayers::enabled() || !TheGameLogic || name.isEmpty())
+		return;
+
+	const auto fade = std::find_if(m_retailSubObjectFades.begin(), m_retailSubObjectFades.end(),
+		[&](const auto& entry) { return entry.name.compareNoCase(name) == 0; });
+	const Bool animated = fadeFrames > 0.0f || waitFrames > 0.0f;
+	if (fade != m_retailSubObjectFades.end() && fade->show != show)
+		*fade = {name, TheGameLogic->getFrame(), fadeFrames, waitFrames, show};
+	else if (fade == m_retailSubObjectFades.end() && animated)
+		m_retailSubObjectFades.push_back({name, TheGameLogic->getFrame(), fadeFrames, waitFrames, show});
 }
 
 #ifdef ALLOW_ANIM_INQUIRIES
@@ -2738,6 +2757,9 @@ void Drawable::draw()
 	{
 		(*dm)->doDrawModule(&transformMtx);
 	}
+	std::erase_if(m_retailSubObjectFades, [](const auto& fade) {
+		return fade.progress(TheGameLogic->getFrame()) == 1.0f;
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -5565,6 +5587,19 @@ void Drawable::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_oclFadeOut = FALSE;
 			m_oclFadePayload = FALSE;
 		}},
+		{"subobject-fades", [this](Xfer* block) {
+			UnsignedInt count = m_retailSubObjectFades.size();
+			block->xferUnsignedInt(&count);
+			m_retailSubObjectFades.resize(count);
+			for (auto& fade : m_retailSubObjectFades)
+			{
+				block->xferAsciiString(&fade.name);
+				block->xferUnsignedInt(&fade.startFrame);
+				block->xferReal(&fade.duration);
+				block->xferReal(&fade.delay);
+				block->xferBool(&fade.show);
+			}
+		}, [this] { m_retailSubObjectFades.clear(); }},
 	});
 }
 

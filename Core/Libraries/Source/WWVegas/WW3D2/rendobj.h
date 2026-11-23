@@ -459,6 +459,7 @@ public:
 			Update_Animation_Opacity(opacity);
 	}
 	float Get_Animation_Opacity() const { return EffectiveAnimationOpacity; }
+	void Set_Sub_Object_Opacity(float opacity);
 	void Set_Particle_Tint(unsigned tint, bool additive)
 	{
 		ParticleTint = tint;
@@ -541,6 +542,7 @@ protected:
 
 	mutable unsigned long		Bits;
 	float AnimationOpacity = 1.0f;
+	float SubObjectOpacity = 1.0f;
 	float EffectiveAnimationOpacity = 1.0f;
 	unsigned ParticleTint = 0;
 	bool AdditiveParticle = false;
