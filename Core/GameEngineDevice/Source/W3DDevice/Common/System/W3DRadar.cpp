@@ -63,6 +63,9 @@
 #include "WW3D2/dx8caps.h"
 #include "WWMath/vector2i.h"
 
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
@@ -710,6 +713,11 @@ void W3DRadar::updateObjectTexture(TextureClass *texture)
 	// rebuild the object overlay
 	renderObjectList( m_objectList, texture );
 	renderObjectList( m_localObjectList, texture );
+	if (RetailFileLayers::enabled())
+	{
+		renderObjectList(m_objectList, texture, TRUE);
+		renderObjectList(m_localObjectList, texture, TRUE);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -763,7 +771,56 @@ Bool W3DRadar::canRenderObject( const RadarObject *rObj, const Player *localPlay
 //-------------------------------------------------------------------------------------------------
 /** Render an object list into the texture passed in */
 //-------------------------------------------------------------------------------------------------
-void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *texture )
+namespace
+{
+Color readOverlayPixel(const void* pixel, unsigned bytesPerPixel)
+{
+	Color color = 0;
+	std::memcpy(&color, pixel, bytesPerPixel);
+	if (bytesPerPixel == sizeof(UnsignedShort))
+		return GameMakeColor(((color >> 8) & 15) * 17, ((color >> 4) & 15) * 17,
+			(color & 15) * 17, (color >> 12) * 17);
+	return color;
+}
+
+template <Int HalfSize>
+void drawHeroMask(SurfaceClass& surface, WW3DFormat format, unsigned bytesPerPixel, void* bits, Int pitch,
+	const ICoord2D& center, Color color, const UnsignedByte (&mask)[HalfSize][HalfSize])
+{
+	UnsignedByte red, green, blue, alpha;
+	GameGetColorComponents(color, &red, &green, &blue, &alpha);
+	for (Int y = 0; y < HalfSize * 2; ++y)
+	{
+		const Int py = center.y - HalfSize + y;
+		const Int maskY = std::min(y, HalfSize * 2 - 1 - y);
+		for (Int x = 0; x < HalfSize * 2; ++x)
+		{
+			const Int px = center.x - HalfSize + x;
+			const Int maskX = std::min(x, HalfSize * 2 - 1 - x);
+			const Int opacity = alpha * mask[maskY][maskX] / 255;
+			if (opacity == 0 || !legalRadarPoint(px, py))
+				continue;
+
+			const auto* pixel = static_cast<const UnsignedByte*>(bits) + py * pitch + px * bytesPerPixel;
+			UnsignedByte oldRed, oldGreen, oldBlue, oldAlpha;
+			GameGetColorComponents(readOverlayPixel(pixel, bytesPerPixel), &oldRed, &oldGreen, &oldBlue, &oldAlpha);
+			Color blended = GameMakeColor(red, green, blue, opacity);
+			if (oldAlpha != 0 && opacity != 255)
+			{
+				const auto blend = [oldAlpha, opacity](Int oldComponent, Int component)
+				{
+					return (oldComponent * oldAlpha + component * opacity) / (oldAlpha + opacity);
+				};
+				blended = GameMakeColor(blend(oldRed, red), blend(oldGreen, green), blend(oldBlue, blue),
+					255 - (255 - oldAlpha) * (255 - opacity) / 255);
+			}
+			surface.Draw_Pixel(px, py, ARGB_Color_To_WW3D_Color(format, blended), bytesPerPixel, bits, pitch);
+		}
+	}
+}
+}
+
+void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *texture, Bool heroesOnly )
 {
 
 	// sanity
@@ -783,14 +840,18 @@ void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *text
 	int pitch;
 	void *pBits = surface->Lock(&pitch);
 	const unsigned int bytesPerPixel = Get_Bytes_Per_Pixel(surfaceDesc.Format);
+	const Bool retail = RetailFileLayers::enabled();
+	const Bool logMarks = heroesOnly && std::getenv("GENERALSX_RETAIL_RADAR_LOG");
 
 	for( const RadarObject *rObj = listHead; rObj; rObj = rObj->friend_getNext() )
 	{
+		const Object *obj = rObj->friend_getObject();
+		if (retail && (obj->isKindOf(KINDOF_HERO) != heroesOnly))
+			continue;
 		if (!canRenderObject(rObj, player))
 			continue;
 
 		// get object position
-		const Object *obj = rObj->friend_getObject();
 		const Coord3D *pos = obj->getPosition();
 
 		// compute object position as a radar blip
@@ -819,6 +880,26 @@ void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *text
 				a = REAL_TO_UNSIGNEDBYTE( (alphaScale * (255.0f - minAlpha)) + minAlpha );
 			argbColor = GameMakeColor( r, g, b, a );
 
+		}
+
+		if (heroesOnly)
+		{
+			constexpr UnsignedByte halo[][3] = {{3, 36, 69}, {36, 79, 79}, {69, 79, 79}};
+			constexpr UnsignedByte core[][2] = {{0, 74}, {74, 255}};
+			UnsignedByte red, green, blue, alpha;
+			GameGetColorComponents(argbColor, &red, &green, &blue, &alpha);
+			const auto brighten = [](Int component) { return component + (255 - component) / 2; };
+			drawHeroMask(*surface, surfaceDesc.Format, bytesPerPixel, pBits, pitch, radarPoint, argbColor, halo);
+			drawHeroMask(*surface, surfaceDesc.Format, bytesPerPixel, pBits, pitch, radarPoint,
+				GameMakeColor(brighten(red), brighten(green), brighten(blue), alpha), core);
+			if (logMarks)
+			{
+				std::fprintf(stderr, "RADAR hero frame=%u object=%u cell=%d,%d rgba=%u,%u,%u,%u halo=6 core=4 layer=overlay\n",
+					TheGameLogic->getFrame(), static_cast<unsigned>(obj->getID()), radarPoint.x, radarPoint.y,
+					red, green, blue, alpha);
+				std::fflush(stderr);
+			}
+			continue;
 		}
 
 		const unsigned int pixelColor = ARGB_Color_To_WW3D_Color(surfaceDesc.Format, argbColor);
@@ -1647,8 +1728,8 @@ void W3DRadar::draw( Int pixelX, Int pixelY, Int width, Int height )
 		TheDisplay->drawImage(m_shroudImage, ul.x, ul.y, lr.x, lr.y, 0xFFFFFFFF, mode);
 	}
 
-	// draw any icons
-	drawIcons( ul.x, ul.y, scaledWidth, scaledHeight );
+	if (!RetailFileLayers::enabled())
+		drawIcons( ul.x, ul.y, scaledWidth, scaledHeight );
 
 	// draw any radar events
 	drawEvents( ul.x, ul.y, scaledWidth, scaledHeight );
