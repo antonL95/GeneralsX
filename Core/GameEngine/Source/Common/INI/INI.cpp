@@ -526,6 +526,8 @@ static INIBlockParse findBlockParse(const char* token)
 			return RetailEva::parseSettings;
 		if (strcmp(token, "LargeGroupAudioMap") == 0)
 			return RetailLargeGroupAudio::parseMap;
+		if (stricmp(token, "Multisound") == 0)
+			return RetailLargeGroupAudio::parseMultiSound;
 		if (strcmp(token, "LargeGroupAudioUnusedKnownKeys") == 0)
 			return RetailLargeGroupAudio::parseUnusedKeys;
 		if (strcmp(token, "InGameNotificationBox") == 0)

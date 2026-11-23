@@ -31,6 +31,7 @@
 #include "Common/RandomValue.h"
 #include "Common/crc.h"
 #include "Common/Debug.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameClient/ClientRandomValue.h"
 #include "GameLogic/GameLogic.h"
@@ -46,6 +47,14 @@
 //#define DETERMINISTIC       // to allow repetition for debugging
 
 static const Real theMultFactor = 1.0f / static_cast<float>(UINT_MAX);
+static UnsignedInt retailAudioSeed = 0;
+
+static UnsignedInt retailAudioRandom()
+{
+	const UnsignedInt64 product = static_cast<UnsignedInt64>(retailAudioSeed) * 0x08088405u;
+	retailAudioSeed = static_cast<UnsignedInt>(product) + 1u;
+	return retailAudioSeed ^ static_cast<UnsignedInt>(product >> 32);
+}
 
 // Initial seed values.
 static UnsignedInt theGameAudioSeed[6] =
@@ -137,6 +146,7 @@ void InitRandom()
 {
 #ifdef DETERMINISTIC
 	// needs to be the same every time
+	retailAudioSeed = 0;
 	seedRandom(0, theGameAudioSeed);
 	seedRandom(0, theGameClientSeed);
 	seedRandom(0, theVisualSeed);
@@ -145,6 +155,7 @@ void InitRandom()
 #else
 	const time_t seconds = time( nullptr );
 
+	retailAudioSeed = static_cast<UnsignedInt>(seconds) * 0x7fffffedu;
 	seedRandom(seconds, theGameAudioSeed);
 	seedRandom(seconds, theGameClientSeed);
 	seedRandom(seconds, theVisualSeed);
@@ -159,6 +170,7 @@ void InitRandom( UnsignedInt seed )
 	seed = 0;
 #endif
 
+	retailAudioSeed = seed * 0x7fffffedu;
 	seedRandom(seed, theGameAudioSeed);
 	seedRandom(seed, theGameClientSeed);
 	seedRandom(seed, theVisualSeed);
@@ -228,6 +240,11 @@ static UnsignedInt randomValue(UnsignedInt (&seed)[6])
 //
 Int GetGameAudioRandomValue( int lo, int hi, const char *file, int line )
 {
+	if (RetailFileLayers::enabled() && hi >= lo)
+	{
+		const UnsignedInt range = static_cast<UnsignedInt>(hi) - static_cast<UnsignedInt>(lo) + 1u;
+		return range ? static_cast<Int>(static_cast<UnsignedInt>(lo) + retailAudioRandom() % range) : hi;
+	}
 	if (lo >= hi)
 		return hi;
 
@@ -250,6 +267,10 @@ Real GetGameAudioRandomValueReal( Real lo, Real hi, const char *file, int line )
 {
 	if (lo >= hi)
 		return hi;
+
+	if (RetailFileLayers::enabled())
+		return static_cast<Real>(static_cast<double>(retailAudioRandom()) *
+			(static_cast<double>(theMultFactor) * (hi - lo)) + lo);
 
 	const Real delta = hi - lo;
 	const Real rval = ((Real)(randomValue(theGameAudioSeed)) * theMultFactor) * delta + lo;

@@ -40,7 +40,7 @@ private:
 struct LargeGroupAudioUpdateModuleData : public UpdateModuleData
 {
 	std::vector<AsciiString> m_keys;
-	Int m_unitWeight = 0;
+	UnsignedShort m_unitWeight = 1;
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 };

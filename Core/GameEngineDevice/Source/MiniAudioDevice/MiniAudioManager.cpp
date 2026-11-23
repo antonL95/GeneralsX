@@ -1293,7 +1293,7 @@ void MiniAudioManager::processPlayingList(void)
 			continue;
 		}
 
-		if (m_volumeHasChanged) {
+		if (m_volumeHasChanged || (playing->m_audioEventRTS && playing->m_audioEventRTS->hasRetailEmitter())) {
 			adjustPlayingVolume(playing);
 		}
 

@@ -214,6 +214,7 @@ AudioEventRTS::AudioEventRTS( const AsciiString& eventName, const Coord3D *posit
 //-------------------------------------------------------------------------------------------------
 AudioEventRTS::AudioEventRTS( const AudioEventRTS& right )
 {
+	m_retailEmitter = right.m_retailEmitter;
 	m_filenameToLoad			= right.m_filenameToLoad;
 	m_eventInfo						= right.m_eventInfo;
 	m_playingHandle				= right.m_playingHandle;
@@ -255,6 +256,7 @@ AudioEventRTS::AudioEventRTS( const AudioEventRTS& right )
 //-------------------------------------------------------------------------------------------------
 AudioEventRTS& AudioEventRTS::operator=( const AudioEventRTS& right )
 {
+	m_retailEmitter = right.m_retailEmitter;
 	m_filenameToLoad			= right.m_filenameToLoad;
 	m_eventInfo						= right.m_eventInfo;
 	m_playingHandle				= right.m_playingHandle;
@@ -428,6 +430,8 @@ Real AudioEventRTS::getPitchShift() const
 //-------------------------------------------------------------------------------------------------
 Real AudioEventRTS::getVolumeShift() const
 {
+	if (m_retailEmitter)
+		return m_volumeShift * m_retailEmitter->gain;
 	return m_volumeShift;
 }
 
@@ -724,6 +728,8 @@ void AudioEventRTS::setVolume( Real vol )
 //-------------------------------------------------------------------------------------------------
 const Coord3D *AudioEventRTS::getCurrentPosition()
 {
+	if (m_retailEmitter)
+		return &m_retailEmitter->position;
 	switch (m_ownerType)
 	{
 	case OT_Positional:

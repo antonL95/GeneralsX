@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "Common/AsciiString.h"
 #include "Common/GameAudio.h"
 #include "Common/GameMemory.h"
@@ -86,6 +88,13 @@ public:
 	void generatePlayInfo();
 	Real getPitchShift() const;
 	Real getVolumeShift() const;
+	struct RetailEmitter
+	{
+		Coord3D position;
+		Real gain = 1.0f;
+	};
+	void setRetailEmitter(const std::shared_ptr<RetailEmitter>& emitter) { m_retailEmitter = emitter; }
+	Bool hasRetailEmitter() const { return m_retailEmitter != nullptr; }
 	AsciiString getAttackFilename() const;
 	AsciiString getDecayFilename() const;
 	Real getDelay() const;
@@ -159,6 +168,7 @@ protected:
 	void adjustForLocalization( AsciiString &strToAdjust );
 
 protected:
+	std::shared_ptr<RetailEmitter> m_retailEmitter;
 	AsciiString m_filenameToLoad;
 	mutable const AudioEventInfo *m_eventInfo;	// Mutable so that it can be modified even on const objects
 	AudioHandle m_playingHandle;

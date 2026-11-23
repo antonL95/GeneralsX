@@ -1,0 +1,57 @@
+602 largegroup-audio-trace - - 0 GoblinVoxAmbienceSinglesLoop
+604 create Player_1 GoblinArcher 0 1050,2850,0
+604 create Player_1 GoblinArcher 1 1062,2850,0
+604 create Player_1 GoblinArcher 2 1074,2850,0
+604 create Player_1 GoblinArcher 3 1086,2850,0
+604 create Player_1 GoblinArcher 4 1098,2850,0
+604 create Player_1 GoblinArcher 5 1050,2862,0
+604 create Player_1 GoblinArcher 6 1062,2862,0
+604 create Player_1 GoblinArcher 7 1074,2862,0
+604 create Player_1 GoblinArcher 8 1086,2862,0
+604 create Player_1 GoblinArcher 9 1098,2862,0
+604 create Player_1 GoblinArcher 10 1040,2250,0
+604 create Player_1 GoblinArcher 11 1052,2250,0
+620 move Player_1 GoblinArcher 0 410,0
+620 move Player_1 GoblinArcher 1 410,0
+620 move Player_1 GoblinArcher 2 410,0
+620 move Player_1 GoblinArcher 3 410,0
+620 move Player_1 GoblinArcher 4 410,0
+620 move Player_1 GoblinArcher 5 410,0
+620 move Player_1 GoblinArcher 6 410,0
+620 move Player_1 GoblinArcher 7 410,0
+620 move Player_1 GoblinArcher 8 410,0
+620 move Player_1 GoblinArcher 9 410,0
+620 move Player_1 GoblinArcher 10 410,0
+620 move Player_1 GoblinArcher 11 410,0
+920 largegroup-audio-trace - - 0 SmallGroupCelebrating
+922 largegroup-audio-celebrate Player_1 GoblinArcher 0 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 1 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 2 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 3 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 4 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 5 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 6 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 7 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 8 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 9 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 10 on
+922 largegroup-audio-celebrate Player_1 GoblinArcher 11 on
+942 largegroup-audio-celebrate Player_1 GoblinArcher 9 off
+942 largegroup-audio-celebrate Player_1 GoblinArcher 8 off
+942 largegroup-audio-celebrate Player_1 GoblinArcher 7 off
+942 largegroup-audio-celebrate Player_1 GoblinArcher 6 off
+942 largegroup-audio-celebrate Player_1 GoblinArcher 5 off
+942 largegroup-audio-celebrate Player_1 GoblinArcher 4 off
+962 largegroup-audio-trace - - 0 off
+970 kill Player_1 GoblinArcher 11
+970 kill Player_1 GoblinArcher 10
+970 kill Player_1 GoblinArcher 9
+970 kill Player_1 GoblinArcher 8
+970 kill Player_1 GoblinArcher 7
+970 kill Player_1 GoblinArcher 6
+970 kill Player_1 GoblinArcher 5
+970 kill Player_1 GoblinArcher 4
+970 kill Player_1 GoblinArcher 3
+970 kill Player_1 GoblinArcher 2
+970 kill Player_1 GoblinArcher 1
+970 kill Player_1 GoblinArcher 0

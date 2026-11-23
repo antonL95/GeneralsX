@@ -43,7 +43,7 @@ void LargeGroupAudioUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 	static const FieldParse fields[] =
 	{
 		{ "Key", INI::parseAsciiStringVectorAppend, nullptr, offsetof(LargeGroupAudioUpdateModuleData, m_keys) },
-		{ "UnitWeight", INI::parseInt, nullptr, offsetof(LargeGroupAudioUpdateModuleData, m_unitWeight) },
+		{ "UnitWeight", INI::parseUnsignedShort, nullptr, offsetof(LargeGroupAudioUpdateModuleData, m_unitWeight) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(fields);
