@@ -7,8 +7,8 @@ expect_stealth_state() {
 }
 
 check() {
-    for hero in GondorPippin ArnorFattyBolger; do
-        for idle_frame in 205 214 415; do
+    for hero in HobbitStealthFixturePippin ArnorFattyBolger; do
+        for idle_frame in 205 415; do
             expect_stealth_state "$idle_frame" "$hero" 0 0
         done
         for moving_frame in 231 245; do
@@ -16,14 +16,14 @@ check() {
         done
     done
 
-    expect_stealth_state 438 GondorPippin 0 1
+    expect_stealth_state 438 HobbitStealthFixturePippin 0 1
     expect_stealth_state 438 ArnorFattyBolger 0 0
-    expect_stealth_state 458 GondorPippin 1 0
+    expect_stealth_state 458 HobbitStealthFixturePippin 1 0
     if covers 438; then
-        expect 'TEST hobbit-stealth-source 438 GondorPippin ModuleTag_StealthForEscape type=1 enabled=1 eligible=1'
+        expect 'TEST hobbit-stealth-source 438 HobbitStealthFixturePippin ModuleTag_StealthForEscape type=1 enabled=1 eligible=1'
     fi
     if covers 458; then
-        expect 'TEST hobbit-stealth-source 458 GondorPippin ModuleTag_StealthForEscape type=1 enabled=0 eligible=0'
+        expect 'TEST hobbit-stealth-source 458 HobbitStealthFixturePippin ModuleTag_StealthForEscape type=1 enabled=0 eligible=0'
     fi
 }
 
