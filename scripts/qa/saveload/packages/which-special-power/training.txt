@@ -1,5 +1,5 @@
 215 create Player_1 GondorBoromir 0 2700,2250,0
-215 create Player_1 MordorBalrog 0 2870,2460,0
+215 create Player_1 MordorBalrog 0 3090,2910,0
 216 objupgrade Player_1 GondorBoromir 0 Upgrade_ObjectLevel4
 225 which-special-power-state Player_1 GondorBoromir 0
 225 which-special-power-state Player_1 MordorBalrog 0
