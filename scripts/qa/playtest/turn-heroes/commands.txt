@@ -1,0 +1,21 @@
+10 create Player_1 GondorPippin 0 2320,1000,0
+11 reveal Player_1 GondorPippin 0
+11 track Player_1 GondorPippin 0
+32 move Player_1 GondorPippin 0 - 2680 1000
+92 move Player_1 GondorPippin 0 - 2418 1230
+152 move Player_1 GondorPippin 0 - 2418 900
+220 destroy Player_1 GondorPippin 0
+230 create Player_1 GondorGandalf 0 2320,1000,0
+231 track Player_1 GondorGandalf 0
+252 move Player_1 GondorGandalf 0 - 2680 1000
+312 move Player_1 GondorGandalf 0 - 2408 1230
+372 move Player_1 GondorGandalf 0 - 2408 900
+440 destroy Player_1 GondorGandalf 0
+455 create Player_1 GondorGandalf 0 2320,1000,0
+456 track Player_1 GondorGandalf 0
+460 power Player_1 GondorGandalf 0 SpecialAbilityToggleMounted
+575 steering-path Player_1 GondorGandalf 0
+590 move Player_1 GondorGandalf 0 - 2820 1000
+676 move Player_1 GondorGandalf 0 - 2550 1300
+765 move Player_1 GondorGandalf 0 - 2550 860
+769 steering-path Player_1 GondorGandalf 0

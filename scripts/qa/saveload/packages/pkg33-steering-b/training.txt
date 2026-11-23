@@ -3,7 +3,7 @@
 160 create Player_1 GondorPippin 0 3150,950,0
 175 move Player_1 GondorPippin 0 - 3390 950
 193 destroy Player_1 GondorKnightHorde 0
-239 move Player_1 GondorPippin 0 - 3260 1160
+236 move Player_1 GondorPippin 0 - 3050 1075
 279 select Player_1 GondorPippin 0
 279 steering-stop - - 0
 292 move Player_1 GondorPippin 0 - 3050 1010
@@ -14,3 +14,6 @@
 381 create Player_1 MordorAttackTroll 0 3150,1350,0
 392 move Player_1 MordorAttackTroll 0 - 3390 1350
 449 move Player_1 MordorAttackTroll 0 - 3260 1170
+495 create Player_1 BlackrootValeArcherHorde 0 3150,950,0
+505 move Player_1 BlackrootValeArcherHorde 0 - 3010 1180
+525 destroy Player_1 BlackrootValeArcherHorde 0

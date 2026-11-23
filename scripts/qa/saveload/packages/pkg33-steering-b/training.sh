@@ -15,6 +15,8 @@ prepare() {
                 sample(frame, "GondorPippin")
             for (frame = 448; frame <= 462; ++frame)
                 sample(frame, "MordorAttackTroll")
+            for (frame = 504; frame <= 518; ++frame)
+                print frame, "steering-reaction Player_1 BlackrootValeArcherHorde 0"
         }
         function sample(frame, actor) {
             print frame, "steering-path Player_1", actor, "0"
@@ -24,7 +26,11 @@ prepare() {
 
 check() {
     covers 462 || return 0
-    awk -v first="$first" '
+    check_archer=0
+    if covers 518; then
+        check_archer=1
+    fi
+    awk -v first="$first" -v checkArcher="$check_archer" '
         $1 == "TEST" && $2 == "steering" && $4 == "GondorKnightHorde" {
             speed = $9
             sub("velocity=", "", speed)
@@ -39,8 +45,6 @@ check() {
         $1 == "TEST" && $2 == "steering" && $4 == "GondorPippin" {
             if ($3 == 238 && /left=0 right=0 leftHS=0 rightHS=0/)
                 aligned = 1
-            if ($3 == 244 && /left=0 right=0 leftHS=1 rightHS=0/)
-                leftFast = 1
             if ($3 >= 293 && $3 <= 303 && /left=1 right=0 leftHS=0 rightHS=0/)
                 leftSlow = 1
             if ($3 >= 342 && $3 <= 344 && /left=0 right=0 leftHS=0 rightHS=1/)
@@ -49,6 +53,31 @@ check() {
                 stopped = 1
             if ($3 >= 361 && $3 <= 372 && /left=0 right=1 leftHS=0 rightHS=0/)
                 rightSlow = 1
+            if ($3 >= 238 && $3 <= 244) {
+                split(substr($5, 5), position, ",")
+                split(substr($7, 6), goal, ",")
+                facing = substr($6, 8)
+                if ($3 == 244 && /left=0 right=0 leftHS=1 rightHS=0/) {
+                    aimX = goal[1] - position[1]
+                    aimY = goal[2] - position[2]
+                    forward = aimX * cos(facing) + aimY * sin(facing)
+                    lateral = aimY * cos(facing) - aimX * sin(facing)
+                    leftFast = atan2(lateral, forward) > atan2(0, -1) / 12
+                }
+                dx = position[1] - previousX
+                dy = position[2] - previousY
+                toX = goal[1] - previousX
+                toY = goal[2] - previousY
+                if (!redirected && $3 > 238 && /leftHS=1/ && dx * dx + dy * dy > 0) {
+                    redirected = 1
+                    along = dx * toX + dy * toY
+                    across = dx * toY - dy * toX
+                    forward = dx * cos(facing) + dy * sin(facing)
+                    translatedTowardGoal = along > 0 && across * across < along * along / 100 && forward > 0
+                }
+                previousX = position[1]
+                previousY = position[2]
+            }
         }
         $1 == "TEST" && $2 == "steering" && $4 == "MordorAttackTroll" {
             if ($3 == 448) {
@@ -62,9 +91,24 @@ check() {
             if (/leftHS=1|rightHS=1/)
                 trollFast = 1
         }
+        $1 == "TEST" && $2 == "steering-reaction" && $4 == "BlackrootValeArcherHorde" {
+            if ($3 == 504 && /velocity=0.00000,0.00000/)
+                archerStationary = 1
+            if ($3 >= 505 && $3 <= 518 && /path=1 waiting=0 groupRoute=0/ && /reform=0/ &&
+                $7 != "velocity=0.00000,0.00000")
+                archerDisplaced = 1
+        }
         END {
             gait = first > 35 || (cavAccelerated && cavBrakedAtThreshold)
-            exit !(gait && (first > 238 || aligned) && leftFast && leftSlow && rightFast && stopped && rightSlow && trollReady && trollTurned && !trollFast)
+            if (first <= 238 && !translatedTowardGoal)
+                print "Pippin did not translate toward the route on the first high speed turn step"
+            if (!leftFast)
+                print "Pippin did not have a remaining high speed turn at the frame 244 checkpoint"
+            if (checkArcher && first <= 504 && !(archerStationary && archerDisplaced))
+                print "Idle archer horde did not start its independent sharp move by frame 518"
+            exit !(gait && (first > 238 || (aligned && translatedTowardGoal)) &&
+                leftFast && leftSlow && rightFast && stopped && rightSlow && trollReady && trollTurned && !trollFast &&
+                (!checkArcher || first > 504 || (archerStationary && archerDisplaced)))
         }
     ' "$log"
 }
