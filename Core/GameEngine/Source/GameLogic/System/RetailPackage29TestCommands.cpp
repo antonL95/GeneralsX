@@ -9,6 +9,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/SpecialPower.h"
 #include "GameClient/ControlBar.h"
+#include "GameClient/Drawable.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/Mouse.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -26,6 +27,34 @@
 
 namespace
 {
+void handleDisguise(const RetailTestCommands::Context& ctx)
+{
+	Object* source = ctx.requireObject(TRUE);
+	const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate("SpecialAbilityDisguise");
+	if (!source || !power)
+		return;
+	if (ctx.action == "pkg29-disguise-state")
+	{
+		const auto* update = source->findSpecialAbilityUpdate(SPECIAL_DISGUISE);
+		const Drawable* draw = source->getDrawable();
+		std::fprintf(stderr, "TEST pkg29 disguise frame=%u active=%d mounted=%d disguised=%d opacity=%.3f\n",
+			ctx.frame, update && update->isActive(), source->testWeaponSetFlag(WEAPONSET_MOUNTED),
+			source->getLogicModelConditions().test(MODELCONDITION_DISGUISED), draw ? draw->getEffectiveOpacity() : 1.0f);
+	}
+	else if (ctx.action == "pkg29-disguise-script")
+	{
+		const auto* button = TheRetailCommandCatalog->findCommandButton("Command_Disguise");
+		if (button)
+			source->doCommandButton(button, CMD_FROM_SCRIPT);
+	}
+	else if (ctx.action == "pkg29-disguise-ai")
+	{
+		const UnsignedInt options = COMMAND_OPTION_INTERNAL_AUTO;
+		if (TheActionManager->canDoSpecialPower(source, power, CMD_FROM_AI, options))
+			source->doSpecialPower(power, options);
+	}
+}
+
 void handleDeflect(const RetailTestCommands::Context& ctx)
 {
 	Object* source = ctx.requireObject(TRUE);
@@ -290,6 +319,7 @@ void registerRetailPackage29TestCommands()
 	registerPrefix("pkg29-poultry-", handlePoultry);
 	registerPrefix("pkg29-swoop-", handleSwoop);
 	registerPrefix("pkg29-deflect-", handleDeflect);
+	registerPrefix("pkg29-disguise-", handleDisguise);
 #endif
 }
 }

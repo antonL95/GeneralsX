@@ -29,6 +29,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
+#include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
@@ -134,6 +135,177 @@ void DeflectSpecialPower::loadPostProcess()
 	SpecialPowerModule::loadPostProcess();
 	if (RetailFileLayers::enabled() && m_active)
 		getObject()->setModelConditionState(MODELCONDITION_DEFLECT_SPECIAL_POWER);
+}
+
+EMPTY_DTOR(SpecialDisguiseUpdate)
+
+void SpecialDisguiseUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	SpecialAbilityUpdateModuleData::buildFieldParse(p);
+	static const FieldParse fields[] = {
+		{ "OpacityTarget", INI::parseReal, nullptr, offsetof(SpecialDisguiseUpdateModuleData, m_opacityTarget) },
+		{ "DisguiseAsTemplate", INI::parseAsciiString, nullptr, offsetof(SpecialDisguiseUpdateModuleData, m_disguiseTemplate) },
+		{ "DisguisedAsTemplate_EnemyPerspective", INI::parseAsciiString, nullptr, offsetof(SpecialDisguiseUpdateModuleData, m_enemyTemplate) },
+		{ "DisguiseFX", INI::parseFXList, nullptr, offsetof(SpecialDisguiseUpdateModuleData, m_revealFX) },
+		{ "ForceMountedWhenDisguising", INI::parseBool, nullptr, offsetof(SpecialDisguiseUpdateModuleData, m_forceMounted) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+Bool SpecialDisguiseUpdate::acceptsIntent(const Object* target, const Coord3D* location) const
+{
+	return usesRotwkRules() && !target && !location && !isActive() &&
+		TheThingFactory->findTemplate(getSpecialDisguiseUpdateModuleData()->m_disguiseTemplate, FALSE) &&
+		SpecialAbilityUpdate::acceptsIntent(target, location);
+}
+
+Bool SpecialDisguiseUpdate::initiateIntentToDoSpecialPower(const SpecialPowerTemplate* power, const Object* target,
+	const Coord3D* location, const Waypoint* waypoint, UnsignedInt options)
+{
+	if (waypoint || !SpecialAbilityUpdate::initiateIntentToDoSpecialPower(power, target, location, waypoint, options))
+		return FALSE;
+	if (const auto* starter = static_cast<const SpecialPowerModule*>(getMySPM()); starter && TheFXListStore)
+	{
+		const AsciiString& fx = starter->getPowerModuleData()->m_initiateFX;
+		if (fx.isNotEmpty())
+			FXList::doFXObj(TheFXListStore->findFXList(fx.str()), getObject(), nullptr);
+	}
+	return TRUE;
+}
+
+void SpecialDisguiseUpdate::triggerAbilityEffect()
+{
+	SpecialAbilityUpdate::triggerAbilityEffect();
+	if (!usesRotwkRules())
+		return;
+	if (!m_disguised && getSpecialDisguiseUpdateModuleData()->m_forceMounted)
+		ToggleMountedSpecialAbilityUpdate::setMounted(getObject(), TRUE);
+	setDisguised(!m_disguised);
+}
+
+Real SpecialDisguiseUpdate::opacity() const
+{
+	const auto* data = getSpecialDisguiseUpdateModuleData();
+	const auto& flags = getObject()->getLogicModelConditions();
+	const Real target = std::clamp(data->m_opacityTarget, 0.0f, 1.0f);
+	if (flags.test(MODELCONDITION_UNPACKING) && data->m_unpackTime)
+		return std::lerp(target, 1.0f, static_cast<Real>(animationFramesRemaining()) / data->m_unpackTime);
+	if (flags.test(MODELCONDITION_PACKING) && data->m_packTime)
+		return std::lerp(1.0f, target, static_cast<Real>(animationFramesRemaining()) / data->m_packTime);
+	return isActive() && (hasTriggeredAbility() || flags.test(MODELCONDITION_PREPARING)) ? target : 1.0f;
+}
+
+UpdateSleepTime SpecialDisguiseUpdate::update()
+{
+	const auto sleep = SpecialAbilityUpdate::update();
+	if (usesRotwkRules())
+		if (Drawable* draw = getObject()->getDrawable())
+			draw->setDrawableOpacity(opacity());
+	return sleep;
+}
+
+void SpecialDisguiseUpdate::onAbilityExit()
+{
+	if (Drawable* draw = getObject()->getDrawable())
+		draw->setDrawableOpacity(1.0f);
+}
+
+void SpecialDisguiseUpdate::setDisguised(Bool disguised)
+{
+	m_disguised = disguised;
+	if (disguised)
+		getObject()->setModelConditionState(MODELCONDITION_DISGUISED);
+	else
+		getObject()->clearModelConditionState(MODELCONDITION_DISGUISED);
+	syncDrawable();
+}
+
+void SpecialDisguiseUpdate::syncDrawable()
+{
+	Object* self = getObject();
+	Drawable* draw = self->getDrawable();
+	if (!draw || !TheGameClient)
+		return;
+	const ThingTemplate* visual = self->getTemplate();
+	if (m_disguised && !self->isLocallyViewed())
+		if (const auto* disguise = TheThingFactory->findTemplate(getSpecialDisguiseUpdateModuleData()->m_disguiseTemplate, FALSE))
+			visual = disguise;
+	if (draw->getTemplate() != visual)
+	{
+		const Bool selected = draw->isSelected();
+		const ModelConditionFlags flags = draw->getModelConditionFlags();
+		Drawable* replacement = TheThingFactory->newDrawable(visual);
+		if (!replacement)
+			return;
+		TheGameClient->destroyDrawable(draw);
+		TheGameLogic->bindObjectAndDrawable(self, replacement);
+		replacement->setPosition(self->getPosition());
+		replacement->setOrientation(self->getOrientation());
+		replacement->setModelConditionFlags(flags);
+		replacement->setIndicatorColor(TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT ?
+			self->getNightIndicatorColor() : self->getIndicatorColor());
+		self->forceRefreshSubObjectUpgradeStatus();
+		if (selected && TheInGameUI)
+			TheInGameUI->selectDrawable(replacement);
+		draw = replacement;
+	}
+	draw->setDrawableOpacity(opacity());
+}
+
+void SpecialDisguiseUpdate::reveal(Object* self, Bool playFX)
+{
+	if (!usesRotwkRules() || !self->getLogicModelConditions().test(MODELCONDITION_DISGUISED))
+		return;
+	auto* disguise = static_cast<SpecialDisguiseUpdate*>(self->findUpdateModule(NAMEKEY("SpecialDisguiseUpdate")));
+	if (disguise && disguise->m_disguised)
+	{
+		disguise->setDisguised(FALSE);
+		if (playFX)
+			FXList::doFXObj(disguise->getSpecialDisguiseUpdateModuleData()->m_revealFX, self, nullptr);
+	}
+}
+
+const ThingTemplate* SpecialDisguiseUpdate::enemyDisplayTemplate(const Object* object, const Player* viewer)
+{
+	if (!usesRotwkRules() || !viewer || !viewer->isPlayerActive() || viewer->getRelationship(object->getTeam()) != ENEMIES ||
+		!object->getLogicModelConditions().test(MODELCONDITION_DISGUISED))
+		return nullptr;
+	const auto* disguise = static_cast<const SpecialDisguiseUpdate*>(object->findUpdateModule(NAMEKEY("SpecialDisguiseUpdate")));
+	return disguise && disguise->m_disguised ?
+		TheThingFactory->findTemplate(disguise->getSpecialDisguiseUpdateModuleData()->m_enemyTemplate, FALSE) : nullptr;
+}
+
+void SpecialDisguiseUpdate::xferRetailBlocks(Xfer* xfer)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, TRUE, {
+		{ "disguise-visual", [this](Xfer* block) { block->xferBool(&m_disguised); },
+			[this] { m_disguised = FALSE; } }
+	});
+}
+
+void SpecialDisguiseUpdate::crc(Xfer* xfer)
+{
+	SpecialAbilityUpdate::crc(xfer);
+	if (usesRotwkRules())
+	{
+		crcRetailAbilityPhase(xfer);
+		xferRetailBlocks(xfer);
+	}
+}
+
+void SpecialDisguiseUpdate::xfer(Xfer* xfer)
+{
+	SpecialAbilityUpdate::xfer(xfer);
+	if (usesRotwkRules())
+		xferRetailBlocks(xfer);
+}
+
+void SpecialDisguiseUpdate::loadPostProcess()
+{
+	SpecialAbilityUpdate::loadPostProcess();
+	if (usesRotwkRules() && (m_disguised || isActive()))
+		syncDrawable();
 }
 
 void ArrowStormUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -1143,7 +1315,12 @@ void ToggleMountedSpecialAbilityUpdate::triggerAbilityEffect()
 	SpecialAbilityUpdate::triggerAbilityEffect();
 	const ToggleMountedSpecialAbilityUpdateModuleData* data = getToggleMountedSpecialAbilityUpdateModuleData();
 	if (data->m_mountedTemplate.isEmpty())
-		setMounted(getObject(), !isMounted(getObject()));
+	{
+		const Bool mounting = !isMounted(getObject());
+		setMounted(getObject(), mounting);
+		if (!mounting && data->m_cancelDisguiseWhenDismounting)
+			SpecialDisguiseUpdate::reveal(getObject(), FALSE);
+	}
 	else if (usesRotwkRules())
 		TheGameLogic->queueMountedTemplateSwap(getObject()->getID(), data,
 			hasAbilityTargetPos() ? std::optional<Coord3D>(getAbilityTargetPos()) : std::nullopt);

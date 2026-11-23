@@ -1,4 +1,17 @@
 check() {
+	if covers 213; then
+		expect 'TEST pkg29 disguise frame=213 active=0 mounted=0 disguised=0 opacity=1.000'
+	fi
+	if covers 244; then
+		expect 'TEST pkg29 disguise frame=244 active=1 mounted=0 disguised=0 opacity=0.673'
+	fi
+	if covers 280; then
+		grep -E '^TEST pkg29 disguise frame=280 active=1 mounted=1 disguised=1 opacity=0\.[0-9]+$' "$log" || return 1
+		expect 'TEST pkg29 disguise frame=345 active=0 mounted=1 disguised=1 opacity=1.000'
+		expect 'TEST pkg29 disguise frame=670 active=0 mounted=1 disguised=0 opacity=1.000'
+		expect 'TEST pkg29 disguise frame=1010 active=1 mounted=1 disguised=1 opacity=0.977'
+		expect 'TEST pkg29 disguise frame=1170 active=0 mounted=0 disguised=0 opacity=1.000'
+	fi
 	if covers 229; then
 		expect 'TEST pkg29 deflect frame=229 module=1 active=0 hp=150.0'
 		grep -E '^TEST projectile frame=241 weapon=Pkg29MarkedShot .*projectile=GoodFactionFireArrow .*warhead=Pkg29DeflectWarhead ' "$log" || return 1

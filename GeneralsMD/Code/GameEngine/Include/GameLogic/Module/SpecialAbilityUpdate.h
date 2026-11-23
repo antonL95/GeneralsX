@@ -322,6 +322,7 @@ protected:
 	void applyRotwkTrigger();
 	void crcRetailAbilityPhase(Xfer* xfer);
 	Bool hasTriggeredAbility() const { return m_rotwkTriggers > 0; }
+	UnsignedInt animationFramesRemaining() const { return m_animFrames; }
 	ObjectID getAbilityTargetID() const { return m_targetID; }
 	const Coord3D& getAbilityTargetPos() const { return m_targetPos; }
 	Bool hasAbilityTargetPos() const { return m_targetPos.x || m_targetPos.y || m_targetPos.z; }

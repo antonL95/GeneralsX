@@ -113,3 +113,17 @@
 464 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0
 520 pkg29-deflect-ai Player_1 Pkg29DeflectLossoth 0
 534 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0
+205 create Player_1 Pkg29DisguiseHero 0 680,320,0
+208 objupgrade Player_1 Pkg29DisguiseHero 0 Upgrade_ObjectLevel1
+213 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
+226 power Player_1 Pkg29DisguiseHero 0 SpecialAbilityDisguise
+244 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
+280 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
+333 damage Player_1 Pkg29DisguiseHero 0 100
+345 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
+580 pkg29-disguise-script Player_1 Pkg29DisguiseHero 0
+670 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
+930 pkg29-disguise-ai Player_1 Pkg29DisguiseHero 0
+1010 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
+1012 power Player_1 Pkg29DisguiseHero 0 SpecialAbilityToggleMountedTwo
+1170 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0

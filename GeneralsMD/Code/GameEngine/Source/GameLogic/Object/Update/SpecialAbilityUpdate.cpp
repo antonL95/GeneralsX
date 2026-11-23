@@ -59,6 +59,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/LaserUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "Common/AbilityRules.h"
 #include "Common/RetailFileLayers.h"
@@ -2428,6 +2429,8 @@ void SpecialAbilityUpdate::applyRotwkTrigger()
 {
 	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
 	++m_rotwkTriggers;
+	if (data->m_specialPowerTemplate->getSpecialPowerType() == SPECIAL_SMITE_CANCELDISGUISE)
+		SpecialDisguiseUpdate::reveal(getObject(), TRUE);
 	if( data->m_triggerAttributeModifier.isNotEmpty() )
 		AttributeModifiers::apply( getObject(), data->m_triggerAttributeModifier,
 			data->m_attributeModifierDuration > 0 ? data->m_attributeModifierDuration : AttributeModifierHelper::USE_LIST_DURATION, 0, AttributeModifiers::ownerOf(getObject(), getModuleTagNameKey()) );

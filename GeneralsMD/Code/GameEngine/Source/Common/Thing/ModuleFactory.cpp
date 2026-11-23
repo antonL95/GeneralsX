@@ -608,6 +608,7 @@ void ModuleFactory::init()
 		addModule( GiantBirdAIUpdate );
 		addModule( CommandPointsUpgrade );
 		addModule( ArrowStormUpdate );
+		addModule( SpecialDisguiseUpdate );
 		addModule( ReplaceObjectUpdate );
 		addModule( FellBeastSwoopPower );
 		addModule( WeaponFireSpecialAbilityUpdate );

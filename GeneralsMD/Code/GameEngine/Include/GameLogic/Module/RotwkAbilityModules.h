@@ -30,6 +30,45 @@ public:
 	Bool m_canShootEmptyGround = FALSE;
 };
 
+class SpecialDisguiseUpdateModuleData : public SpecialAbilityUpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	Real m_opacityTarget = 0.0f;
+	AsciiString m_disguiseTemplate;
+	AsciiString m_enemyTemplate;
+	const FXList* m_revealFX = nullptr;
+	Bool m_forceMounted = FALSE;
+};
+
+class SpecialDisguiseUpdate final : public SpecialAbilityUpdate
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(SpecialDisguiseUpdate, "SpecialDisguiseUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(SpecialDisguiseUpdate, SpecialDisguiseUpdateModuleData)
+
+public:
+	using SpecialAbilityUpdate::SpecialAbilityUpdate;
+	static void reveal(Object* self, Bool playFX);
+	static const ThingTemplate* enemyDisplayTemplate(const Object* object, const Player* viewer);
+	Bool initiateIntentToDoSpecialPower(const SpecialPowerTemplate* power, const Object* target,
+		const Coord3D* location, const Waypoint* waypoint, UnsignedInt options) override;
+	UpdateSleepTime update() override;
+
+protected:
+	Bool acceptsIntent(const Object* target, const Coord3D* location) const override;
+	Bool isPersistentAbility(Bool) const override { return FALSE; }
+	void triggerAbilityEffect() override;
+	void onAbilityExit() override;
+
+private:
+	void setDisguised(Bool disguised);
+	void syncDrawable();
+	Real opacity() const;
+	void xferRetailBlocks(Xfer* xfer);
+	Bool m_disguised = FALSE;
+};
+
 class ArrowStormUpdate final : public SpecialAbilityUpdate
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(ArrowStormUpdate, "ArrowStormUpdate")

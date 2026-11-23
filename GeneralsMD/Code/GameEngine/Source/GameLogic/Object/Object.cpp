@@ -7435,6 +7435,10 @@ Int Object::getMultiLogicalBonePosition(const char* boneNamePrefix, Int maxBones
 //=============================================================================
 UnicodeString Object::getDisplayName() const
 {
+	if (RetailFileLayers::enabled())
+		if (const ThingTemplate* disguise = SpecialDisguiseUpdate::enemyDisplayTemplate(this, rts::getObservedOrLocalPlayer_Safe()))
+			return disguise->getDisplayName();
+
 	if (const auto* labels = TooltipUpgrade::activeLabels(*this);
 		labels && labels->displayName.isNotEmpty() && TheGameText)
 		return TheGameText->fetch(labels->displayName);
