@@ -17,6 +17,7 @@
 #include "Common/Player.h"
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -44,6 +45,223 @@
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
+
+void ArrowStormUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	static const FieldParse fields[] = {
+		{ "ActiveLoopSound", INI::parseAudioEventRTS, nullptr, offsetof(ArrowStormUpdateModuleData, m_prepSoundLoop) },
+		{ "WeaponTemplate", INI::parseWeaponTemplate, nullptr, offsetof(ArrowStormUpdateModuleData, m_weapon) },
+		{ "TargetRadius", INI::parseReal, nullptr, offsetof(ArrowStormUpdateModuleData, m_targetRadius) },
+		{ "ShotsPerTarget", INI::parseUnsignedInt, nullptr, offsetof(ArrowStormUpdateModuleData, m_shotsPerTarget) },
+		{ "ShotsPerBurst", INI::parseUnsignedInt, nullptr, offsetof(ArrowStormUpdateModuleData, m_shotsPerBurst) },
+		{ "MaxShots", INI::parseUnsignedInt, nullptr, offsetof(ArrowStormUpdateModuleData, m_maxShots) },
+		{ "CanShootEmptyGround", INI::parseBool, nullptr, offsetof(ArrowStormUpdateModuleData, m_canShootEmptyGround) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+	SpecialAbilityUpdateModuleData::buildFieldParse(p);
+}
+
+ArrowStormUpdate::~ArrowStormUpdate() = default;
+
+Bool ArrowStormUpdate::allowsLocation(const Object* source, const SpecialPowerTemplate* power, const Coord3D* location)
+{
+	for (BehaviorModule** module = source->getBehaviorModules(); *module; ++module)
+	{
+		const auto* volley = dynamic_cast<const ArrowStormUpdate*>(*module);
+		if (volley && volley->getTemplate() == power)
+			return volley->acceptsIntent(nullptr, location);
+	}
+	return TRUE;
+}
+
+Bool ArrowStormUpdate::initiateIntentToDoSpecialPower(const SpecialPowerTemplate* power, const Object* target,
+	const Coord3D* location, const Waypoint* waypoint, UnsignedInt options)
+{
+	if (!usesRotwkRules() || power != getTemplate() || !location || target)
+		return FALSE;
+	const auto* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(getObject(), power) : nullptr;
+	if (button && !button->isMountStateAllowed(getObject()))
+		return FALSE;
+	const CommandSourceType source = options & COMMAND_FIRED_BY_SCRIPT ? CMD_FROM_SCRIPT : CMD_FROM_PLAYER;
+	const auto* starter = getMySPM();
+	if (source != CMD_FROM_SCRIPT && (!starter || !starter->isReady()))
+		return FALSE;
+	if (!power->isValidRetailTarget(getObject(), nullptr, location, source))
+		return FALSE;
+	return SpecialAbilityUpdate::initiateIntentToDoSpecialPower(power, nullptr, location, waypoint, options);
+}
+
+Bool ArrowStormUpdate::acceptsIntent(const Object* target, const Coord3D* location) const
+{
+	const auto* data = getArrowStormUpdateModuleData();
+	const Object* self = getObject();
+	if (!location || target || isActive() || !data->m_weapon || !data->m_shotsPerTarget ||
+		!data->m_shotsPerBurst || !data->m_maxShots ||
+		!SpecialAbilityUpdate::acceptsIntent(nullptr, location))
+		return FALSE;
+	const Real distance = ThePartitionManager->getDistanceSquared(self, location, FROM_BOUNDINGSPHERE_2D);
+	const Real minimum = data->m_weapon->getMinimumAttackRange();
+	if (distance < minimum * minimum)
+		return FALSE;
+	if (self->isKindOf(KINDOF_IMMOBILE))
+	{
+		const Real maximum = data->m_weapon->getAttackRange(WeaponBonus(), self->getPosition()->z - location->z);
+		return distance <= maximum * maximum;
+	}
+	return TRUE;
+}
+
+void ArrowStormUpdate::resetVolley()
+{
+	m_targets.clear();
+	m_currentTarget = INVALID_ID;
+	m_shotsAtTarget = 0;
+	m_shotsFired = 0;
+	m_volleyComplete = FALSE;
+}
+
+void ArrowStormUpdate::startPreparation()
+{
+	SpecialAbilityUpdate::startPreparation();
+	getObject()->getAI()->aiBusy(CMD_FROM_AI);
+	resetVolley();
+
+	const auto* data = getArrowStormUpdateModuleData();
+	const Object* self = getObject();
+	PartitionFilterAlive alive;
+	PartitionFilterRelationship enemy(self, PartitionFilterRelationship::ALLOW_ENEMIES);
+	PartitionFilter* filters[] = { &alive, &enemy, nullptr };
+	static const Int rejectedKinds[] = {KINDOF_BASE_FOUNDATION, KINDOF_INERT, KINDOF_IGNORED_IN_GUI,
+		KINDOF_WALL_UPGRADE, KINDOF_UNATTACKABLE, KINDOF_MOVE_ONLY};
+	const KindOfMaskType rejected(KindOfMaskType::kInit, rejectedKinds, ARRAY_SIZE(rejectedKinds));
+	const Coord3D& center = getAbilityTargetPos();
+	SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(&center, data->m_targetRadius, FROM_CENTER_2D, filters);
+	MemoryPoolObjectHolder holder(nearby);
+	std::vector<std::pair<Real, Object*>> candidates;
+	const Bool unselectable = self->testStatus(OBJECT_STATUS_UNSELECTABLE);
+	for (Object* target = nearby->first(); target; target = nearby->next())
+	{
+		if (target->isKindOfMulti(KINDOFMASK_NONE, rejected) &&
+			target->testStatus(OBJECT_STATUS_UNSELECTABLE) == unselectable)
+			candidates.emplace_back(ThePartitionManager->getDistanceSquared(target, &center, FROM_CENTER_2D), target);
+	}
+	std::sort(candidates.begin(), candidates.end(), [](const auto& a, const auto& b) {
+		return a.first != b.first ? a.first < b.first : a.second->getID() < b.second->getID();
+	});
+
+	std::vector<ObjectID> monsters;
+	for (const auto& candidate : candidates)
+	{
+		if (m_targets.size() == data->m_maxShots)
+			break;
+		const Object* target = candidate.second;
+		m_targets.push_back(target->getID());
+		if (target->isKindOf(KINDOF_MONSTER))
+			monsters.push_back(target->getID());
+	}
+	if (m_targets.empty())
+		return;
+	const std::vector<ObjectID> repeats = monsters.empty()
+		? std::vector<ObjectID>(m_targets.begin(), m_targets.end()) : std::move(monsters);
+	for (UnsignedInt next = 0; m_targets.size() < data->m_maxShots; ++next)
+		m_targets.push_back(repeats[next % repeats.size()]);
+}
+
+void ArrowStormUpdate::triggerAbilityEffect()
+{
+	if (m_shotsFired == 0)
+		SpecialAbilityUpdate::triggerAbilityEffect();
+	const auto* data = getArrowStormUpdateModuleData();
+	for (UnsignedInt shot = 0; shot < data->m_shotsPerBurst && m_shotsFired < data->m_maxShots; ++shot)
+	{
+		Object* target = m_shotsAtTarget < data->m_shotsPerTarget ? TheGameLogic->findObjectByID(m_currentTarget) : nullptr;
+		while ((!target || target->isEffectivelyDead()) && !m_targets.empty())
+		{
+			m_currentTarget = m_targets.front();
+			m_targets.pop_front();
+			m_shotsAtTarget = 0;
+			target = TheGameLogic->findObjectByID(m_currentTarget);
+		}
+		if (target && !target->isEffectivelyDead())
+		{
+			TheWeaponStore->createAndFireTempWeapon(data->m_weapon, getObject(), target, TRUE);
+			++m_shotsAtTarget;
+		}
+		else if (data->m_canShootEmptyGround)
+		{
+			const Coord3D& center = getAbilityTargetPos();
+			const Real radius = data->m_targetRadius;
+			Coord3D aim = {GameLogicRandomValueReal(center.x - radius, center.x + radius),
+				GameLogicRandomValueReal(center.y - radius, center.y + radius), 0.0f};
+			aim.z = TheTerrainLogic->getGroundHeight(aim.x, aim.y);
+			TheWeaponStore->createAndFireTempWeapon(data->m_weapon, getObject(), &aim, TRUE);
+		}
+		else
+		{
+			m_volleyComplete = TRUE;
+			return;
+		}
+		++m_shotsFired;
+	}
+	m_volleyComplete = m_shotsFired >= data->m_maxShots;
+}
+
+Bool ArrowStormUpdate::isPersistentAbility(Bool) const
+{
+	return !m_volleyComplete && getArrowStormUpdateModuleData()->m_persistentPrepFrames > 0;
+}
+
+void ArrowStormUpdate::onAbilityExit()
+{
+	Object* self = getObject();
+	const auto* data = getArrowStormUpdateModuleData();
+	const UnsignedInt frames = m_volleyComplete ? data->m_paralyzeDurationWhenCompleted : data->m_paralyzeDurationWhenAborted;
+	if (frames && !self->isEffectivelyDead())
+	{
+		const UnsignedInt until = TheGameLogic->getFrame() + frames;
+		if (until > self->getDisabledUntil(DISABLED_PARALYZED))
+			self->setDisabledUntil(DISABLED_PARALYZED, until);
+	}
+	resetVolley();
+}
+
+void ArrowStormUpdate::xferRetailBlocks(Xfer* xfer)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, TRUE, {
+		{ "arrow-storm-volley", [this](Xfer* block) {
+			block->xferSTLObjectIDList(&m_targets);
+			block->xferObjectID(&m_currentTarget);
+			block->xferUnsignedInt(&m_shotsAtTarget);
+			block->xferUnsignedInt(&m_shotsFired);
+			block->xferBool(&m_volleyComplete);
+		}, [this] { resetVolley(); } }
+	});
+}
+
+void ArrowStormUpdate::crc(Xfer* xfer)
+{
+	SpecialAbilityUpdate::crc(xfer);
+	if (usesRotwkRules())
+	{
+		crcRetailAbilityPhase(xfer);
+		xferRetailBlocks(xfer);
+	}
+}
+
+void ArrowStormUpdate::xfer(Xfer* xfer)
+{
+	SpecialAbilityUpdate::xfer(xfer);
+	if (usesRotwkRules())
+		xferRetailBlocks(xfer);
+}
+
+void ArrowStormUpdate::loadPostProcess()
+{
+	SpecialAbilityUpdate::loadPostProcess();
+	if (usesRotwkRules() && isActive() && getObject()->getLogicModelConditions().test(MODELCONDITION_PREPARING))
+		startPreparationSound();
+}
 
 void CurseSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& p)
 {

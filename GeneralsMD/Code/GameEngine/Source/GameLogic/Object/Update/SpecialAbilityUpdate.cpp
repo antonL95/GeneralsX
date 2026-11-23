@@ -455,13 +455,14 @@ UpdateSleepTime SpecialAbilityUpdate::update()
 
         // Lorenzen added this additional flag to support the NapalmBombDrop
         // It causes this update to force a recharge of the SPM between drops
-        if( isPersistentAbility() && getDoesPersistenceRequireRecharge())
+        if( isPersistentAbility(TRUE) )
         {
           //VARIATION -- PERSISTENCE (repeats preparation)
           resetPreparation();
 
           //tell the special power module to restart the recharge timer
-          spm->startPowerRecharge();
+          if( getDoesPersistenceRequireRecharge() )
+            spm->startPowerRecharge();
 
           return calcSleepTime();
 
@@ -678,7 +679,11 @@ static void showRetailCaptureFlag(Object* flag, const Player* player)
 void SpecialAbilityUpdate::onExit( Bool cleanup )
 {
 	if (m_active)
+	{
 		traceRetailWeaponAbility(*this, getObject(), getTemplate(), "exit", 0);
+		if (usesRotwkRules())
+			onAbilityExit();
+	}
 	if (m_active && RetailFileLayers::enabled() &&
 		getSpecialAbilityUpdateModuleData()->m_specialPowerTemplate->getSpecialPowerType() == SPECIAL_INFANTRY_CAPTURE_BUILDING)
 	{
@@ -1212,10 +1217,14 @@ void SpecialAbilityUpdate::startPreparation()
       onStartWindup();
   }
 
-  m_prepSoundLoop = data->m_prepSoundLoop;
+  startPreparationSound();
+}
+
+void SpecialAbilityUpdate::startPreparationSound()
+{
+  m_prepSoundLoop = getSpecialAbilityUpdateModuleData()->m_prepSoundLoop;
   m_prepSoundLoop.setObjectID( getObject()->getID() );
   m_prepSoundLoop.setPlayingHandle( TheAudio->addAudioEvent( &m_prepSoundLoop ) );
-
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2311,9 +2320,11 @@ UnsignedInt SpecialAbilityUpdate::abilityConditionsOf( const Object *obj )
 	return conditions;
 }
 
-Bool SpecialAbilityUpdate::isPersistentAbility() const
+Bool SpecialAbilityUpdate::isPersistentAbility(Bool afterZeroPreparation) const
 {
 	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
+	if( afterZeroPreparation && !data->m_persistenceRequiresRecharge )
+		return FALSE;
 	if( data->m_persistentPrepFrames == 0 )
 		return FALSE;
 	if( !usesRotwkRules() )

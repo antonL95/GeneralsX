@@ -7,6 +7,7 @@
 #include "Common/SpecialPower.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Mouse.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
@@ -17,6 +18,74 @@
 
 namespace
 {
+void handleArrowStorm(const RetailTestCommands::Context& ctx)
+{
+	Object* source = ctx.requireObject();
+	if (!source)
+		return;
+	if (ctx.action == "pkg29-arrow-click")
+	{
+		const MouseIO* mouse = TheMouse->getMouseStatus();
+		for (const auto type : {GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN, GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP})
+		{
+			GameMessage* message = TheMessageStream->appendMessage(type);
+			message->appendPixelArgument(mouse->pos);
+			message->appendIntegerArgument(0);
+			message->appendIntegerArgument(mouse->time);
+		}
+		return;
+	}
+	if (ctx.action == "pkg29-arrow-health")
+	{
+		std::fprintf(stderr, "TEST pkg29 arrow health frame=%u owner=%.*s hp=%.3f\n", ctx.frame,
+			static_cast<Int>(ctx.playerName.size()), ctx.playerName.data(), source->getBodyModule()->getHealth());
+		return;
+	}
+	if (ctx.action == "pkg29-arrow-bow")
+	{
+		source->setWeaponSetFlag(WEAPONSET_TOGGLE_1);
+		return;
+	}
+	const CommandButton* button = TheRetailCommandCatalog->findCommandButton(ctx.argument);
+	const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
+	if (!power)
+		return;
+	const Coord3D position = ctx.hasPosition ? ctx.groundLocation() : *source->getPosition();
+	if (ctx.action == "pkg29-arrow-probe")
+	{
+		ctx.selectObject(source);
+		TheInGameUI->setGUICommand(button);
+		const Bool valid = TheInGameUI->canSelectedObjectsDoSpecialPower(button, nullptr, &position,
+			InGameUI::SELECTION_ANY, button->getOptions(), source);
+		std::fprintf(stderr, "TEST pkg29 arrow cursor frame=%u armed=%d valid=%d cursor=%s\n",
+			ctx.frame, TheInGameUI->getGUICommand() == button, valid,
+			(valid ? button->getCursorName() : button->getInvalidCursorName()).str());
+	}
+	else if (ctx.action == "pkg29-arrow-cast")
+	{
+		ctx.selectObject(source);
+		GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION);
+		message->appendIntegerArgument(power->getID());
+		message->appendLocationArgument(position);
+		message->appendRealArgument(INVALID_ANGLE);
+		message->appendObjectIDArgument(INVALID_ID);
+		message->appendIntegerArgument(button->getOptions());
+		message->appendObjectIDArgument(source->getID());
+	}
+	else if (ctx.action == "pkg29-arrow-script")
+	{
+		source->doCommandButtonAtPosition(button, &position, CMD_FROM_SCRIPT);
+	}
+	else if (ctx.action == "pkg29-arrow-state")
+	{
+		const SpecialPowerModuleInterface* module = source->getSpecialPowerModule(power);
+		const Bool casting = source->getLogicModelConditions().test(MODELCONDITION_PREPARING);
+		std::fprintf(stderr, "TEST pkg29 arrow frame=%u ready=%d accepted=%d firing=%d paralyzed=%d\n",
+			ctx.frame, module && module->isReady(), module && module->wasLastCastAccepted(), casting,
+			source->isDisabledByType(DISABLED_PARALYZED));
+	}
+}
+
 void handlePackage29(const RetailTestCommands::Context& ctx)
 {
 	Object* source = ctx.requireObject();
@@ -83,6 +152,7 @@ void registerRetailPackage29TestCommands()
 {
 #if RTS_ZEROHOUR
 	registerPrefix("pkg29-", handlePackage29);
+	registerPrefix("pkg29-arrow-", handleArrowStorm);
 #endif
 }
 }

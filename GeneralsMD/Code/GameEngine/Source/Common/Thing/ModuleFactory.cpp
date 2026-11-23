@@ -601,6 +601,7 @@ void ModuleFactory::init()
 		addModule( CritterEmitterUpdate );
 		addModule( GiantBirdAIUpdate );
 		addModule( CommandPointsUpgrade );
+		addModule( ArrowStormUpdate );
 		addModule( WeaponFireSpecialAbilityUpdate );
 		addModule( ModelConditionSpecialAbilityUpdate );
 		addModule( CurseSpecialPower );

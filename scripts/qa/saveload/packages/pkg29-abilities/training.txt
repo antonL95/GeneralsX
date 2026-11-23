@@ -1,0 +1,42 @@
+190 create Player_1 Pkg29VolleyLegolas 0 2950,1010,0
+192 reveal Player_1 Pkg29VolleyLegolas 0
+197 pkg29-arrow-probe Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm -50 -50
+198 pkg29-arrow-cast Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm -50 -50
+199 pkg29-arrow-state Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm
+200 pkg29-arrow-probe Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm 3020 1010
+201 pkg29-arrow-cast Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm 3020 1010
+225 create PlyrCreeps Pkg29VolleyTarget 0 3020,1010,0
+225 create Player_1 Pkg29VolleyTarget 0 3020,1025,0
+244 pkg29-arrow-state Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm
+244 pkg29-arrow-health PlyrCreeps Pkg29VolleyTarget 0
+244 pkg29-arrow-health Player_1 Pkg29VolleyTarget 0
+360 pkg29-arrow-state Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm
+360 pkg29-arrow-health PlyrCreeps Pkg29VolleyTarget 0
+360 pkg29-arrow-health Player_1 Pkg29VolleyTarget 0
+480 pkg29-arrow-state Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm
+510 pkg29-arrow-script Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm -50 -50
+511 pkg29-arrow-state Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm
+512 pkg29-arrow-script Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm 3020 1010
+555 pkg29-arrow-state Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm
+556 move Player_1 Pkg29VolleyLegolas 0 go 2890 1010
+560 pkg29-arrow-state Player_1 Pkg29VolleyLegolas 0 Command_SpecialAbilityArrowStorm
+610 create Player_1 Pkg29VolleyAuto 0 2950,1010,0
+690 pkg29-arrow-state Player_1 Pkg29VolleyAuto 0 Command_SpecialAbilityArrowStorm
+1000 create Player_1 Pkg29Archer 0 2950,1010,0
+1001 objupgrade Player_1 Pkg29Archer 0 Upgrade_CreateAHeroRainOfArrows_Level1
+1001 objupgrade Player_1 Pkg29Archer 0 Upgrade_CreateAHero_ClassArcher
+1006 pkg29-arrow-probe Player_1 Pkg29Archer 0 Pkg29RainOfArrows 3020 1010
+1007 pkg29-arrow-script Player_1 Pkg29Archer 0 Pkg29RainOfArrows 3020 1010
+1008 pkg29-arrow-state Player_1 Pkg29Archer 0 Pkg29RainOfArrows
+1011 pkg29-arrow-bow Player_1 Pkg29Archer 0
+1012 pkg29-arrow-probe Player_1 Pkg29Archer 0 Pkg29RainOfArrows 3020 1010
+1013 pkg29-arrow-cast Player_1 Pkg29Archer 0 Pkg29RainOfArrows 3020 1010
+1080 pkg29-arrow-state Player_1 Pkg29Archer 0 Pkg29RainOfArrows
+1210 create Player_1 ArnorMalbeth 0 3290,1420,180
+1210 create Player_1 ArnorFarm 0 3040,1420,0
+1211 objupgrade Player_1 ArnorMalbeth 0 Upgrade_ObjectLevel3
+1215 mods Player_1 ArnorFarm 0
+1216 pkg29-arrow-script Player_1 ArnorMalbeth 0 Command_SpecialAbilityMalbethPreparations 3160 1250
+1217 pkg29-arrow-state Player_1 ArnorMalbeth 0 Command_SpecialAbilityMalbethPreparations
+1218 pkg29-arrow-script Player_1 ArnorMalbeth 0 Command_SpecialAbilityMalbethPreparations 3040 1420
+1280 mods Player_1 ArnorFarm 0

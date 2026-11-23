@@ -1005,7 +1005,7 @@ public:
 		return newInstance(Weapon)(tmpl, wslot);	// my, that was easy
 	}
 
-	void createAndFireTempWeapon(const WeaponTemplate* w, const Object *source, const Coord3D* pos);
+	void createAndFireTempWeapon(const WeaponTemplate* w, const Object *source, const Coord3D* pos, Bool ignoreRanges = FALSE);
 	void createAndFireTempWeapon(const WeaponTemplate* w, const Object *source, Object *target, Bool ignoreRanges = FALSE);
 
 	void handleProjectileDetonation( const WeaponTemplate* w, const Object *source, const Coord3D* pos, WeaponBonusConditionFlags extraBonusFlags, Bool inflictDamage = TRUE, ObjectID detonationVictimID = INVALID_ID );

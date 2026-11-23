@@ -1624,6 +1624,7 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 			return (!button || (button->isMountStateAllowed(obj) && button->isModelConditionAllowed(obj) &&
 				button->isValidContainerForCommand(obj) && (options & NEED_TARGET_POS))) &&
 				retailPowerLocationAllowed(obj, loc, spTemplate) &&
+				(spTemplate->getSpecialPowerType() != SPECIAL_ARROW_STORM || ArrowStormUpdate::allowsLocation(obj, spTemplate, loc)) &&
 				(commandSource == CMD_FROM_AI ? !spTemplate->hasForbiddenRetailObjects(obj, loc, objectInWay) :
 					spTemplate->isValidRetailTarget(obj, nullptr, loc, commandSource));
 		}

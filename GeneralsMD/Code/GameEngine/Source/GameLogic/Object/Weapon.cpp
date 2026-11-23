@@ -1850,13 +1850,16 @@ void WeaponStore::handleProjectileDetonation(const WeaponTemplate* wt, const Obj
 }
 
 //-------------------------------------------------------------------------------------------------
-void WeaponStore::createAndFireTempWeapon(const WeaponTemplate* wt, const Object *source, const Coord3D* pos)
+void WeaponStore::createAndFireTempWeapon(const WeaponTemplate* wt, const Object *source, const Coord3D* pos, Bool ignoreRanges)
 {
 	if (wt == nullptr)
 		return;
 	Weapon* w = allocateNewWeapon(wt, PRIMARY_WEAPON);
 	w->loadAmmoNow(source);
-	w->fireWeapon(source, pos);
+	if (ignoreRanges)
+		w->privateFireWeapon(source, nullptr, pos, FALSE, TRUE, 0, nullptr, TRUE);
+	else
+		w->fireWeapon(source, pos);
 	deleteInstance(w);
 }
 

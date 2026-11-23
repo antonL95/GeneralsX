@@ -280,7 +280,8 @@ protected:
 
 	//Various steps of performing any special ability. Not all special abilities will use all of them.
 	Bool approachTarget();			//Approaches the target before starting the special attack (if appropriate)
-	void startPreparation();		//Begins the preparation of ability -- like firing off a hacker attack, or laser tracer, etc.
+	virtual void startPreparation();
+	void startPreparationSound();
 	Bool continuePreparation();	//Updates the preparation of ability -- like recalculating tracer lines.
 	virtual void triggerAbilityEffect();
 	void finishAbility();
@@ -298,7 +299,7 @@ protected:
 
 	Bool isPreparationComplete() const { return !m_prepFrames; }
 	void endPreparation();
-	Bool isPersistentAbility() const;
+	virtual Bool isPersistentAbility(Bool afterZeroPreparation = FALSE) const;
 	void resetPreparation() { m_prepFrames = getSpecialAbilityUpdateModuleData()->m_persistentPrepFrames; }
 
 	Bool isFacing();
@@ -309,6 +310,7 @@ protected:
 	static UnsignedInt abilityConditionsOf( const Object *obj );
 	virtual Bool skipsContinue() const { return FALSE; }
 	virtual void onStartWindup() {}
+	virtual void onAbilityExit() {}
 	virtual UnsignedInt holdFramesAfterTrigger() const;
 	virtual void addAbilityConditions( ModelConditionFlags &flags ) const;
 	virtual Bool acceptsIntent( const Object *targetObj, const Coord3D *targetPos ) const;

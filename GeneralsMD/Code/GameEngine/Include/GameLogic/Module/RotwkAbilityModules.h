@@ -17,6 +17,48 @@ class Waypoint;
 class ObjectCreationList;
 class WeaponTemplate;
 
+class ArrowStormUpdateModuleData : public SpecialAbilityUpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	const WeaponTemplate* m_weapon = nullptr;
+	Real m_targetRadius = 0.0f;
+	UnsignedInt m_shotsPerTarget = 1;
+	UnsignedInt m_shotsPerBurst = 1;
+	UnsignedInt m_maxShots = 1;
+	Bool m_canShootEmptyGround = FALSE;
+};
+
+class ArrowStormUpdate final : public SpecialAbilityUpdate
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(ArrowStormUpdate, "ArrowStormUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(ArrowStormUpdate, ArrowStormUpdateModuleData)
+
+public:
+	ArrowStormUpdate(Thing* thing, const ModuleData* data) : SpecialAbilityUpdate(thing, data) {}
+	static Bool allowsLocation(const Object* source, const SpecialPowerTemplate* power, const Coord3D* location);
+	Bool initiateIntentToDoSpecialPower(const SpecialPowerTemplate* power, const Object* target,
+		const Coord3D* location, const Waypoint* waypoint, UnsignedInt options) override;
+
+protected:
+	Bool acceptsIntent(const Object* target, const Coord3D* location) const override;
+	void startPreparation() override;
+	void triggerAbilityEffect() override;
+	Bool isPersistentAbility(Bool afterZeroPreparation) const override;
+	UnsignedInt holdFramesAfterTrigger() const override { return 0; }
+	void onAbilityExit() override;
+
+private:
+	void resetVolley();
+	void xferRetailBlocks(Xfer* xfer);
+	std::list<ObjectID> m_targets;
+	ObjectID m_currentTarget = INVALID_ID;
+	UnsignedInt m_shotsAtTarget = 0;
+	UnsignedInt m_shotsFired = 0;
+	Bool m_volleyComplete = FALSE;
+};
+
 class CurseSpecialPowerModuleData : public SpecialAbilityUpdateModuleData
 {
 public:

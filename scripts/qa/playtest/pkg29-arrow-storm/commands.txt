@@ -1,0 +1,9 @@
+20 create Player_1 RohanLegolas_Summoned 0 3170,630,0
+21 reveal Player_1 RohanLegolas_Summoned 0
+39 select Player_1 RohanLegolas_Summoned 0
+45 pointer Player_1 RohanLegolas_Summoned 0 3
+48 cursor-screen - - 0 - 908 501
+50 cursor-status Player_1 RohanLegolas_Summoned 0
+54 pkg29-arrow-click Player_1 RohanLegolas_Summoned 0
+103 pkg29-arrow-state Player_1 RohanLegolas_Summoned 0 Command_SpecialAbilityArrowStorm
+153 pkg29-arrow-state Player_1 RohanLegolas_Summoned 0 Command_SpecialAbilityArrowStorm
