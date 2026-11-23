@@ -26,6 +26,11 @@
 #include "WW3D2/rinfo.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/assetmgr.h"
+#if !RTS_GENERALS
+#include "GameLogic/GameLogic.h"
+#include <cstdio>
+#include <cstdlib>
+#endif
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -182,6 +187,7 @@ void W3DSnowManager::updateIniSettings()
 
 	if (m_retailWeather)
 	{
+		m_heightTraveled = 0.0f;
 		ReleaseResources();
 		return;
 	}
@@ -196,12 +202,19 @@ void W3DSnowManager::updateIniSettings()
 void W3DSnowManager::reset()
 {
 	SnowManager::reset();
+	if (m_retailWeather)
+		m_heightTraveled = 0.0f;
 }
 
 void W3DSnowManager::update()
 {
-	if (m_retailWeather && (!isPrecipitationEnabled() || m_fullTimePeriod <= 0.0f))
+	if (m_retailWeather)
+	{
+		updateRetailSpellRain();
+		if (isPrecipitationEnabled())
+			m_heightTraveled = std::fmod(m_heightTraveled + WW3D::Get_Logic_Frame_Time_Seconds() * m_velocity, m_boxDimensions);
 		return;
+	}
 
 	// TheSuperHackers @tweak The snow render update is now decoupled from the logic step.
 	m_time += WW3D::Get_Logic_Frame_Time_Seconds();
@@ -369,6 +382,23 @@ flush_particles:
 void W3DSnowManager::render(RenderInfoClass &rinfo)
 {
 	m_totalRendered = 0;
+	renderPrecipitation(rinfo);
+#if !RTS_GENERALS
+	static const Bool traceWeather = std::getenv("GENERALSX_TEST_WEATHER_DRAW") != nullptr;
+	if (traceWeather && m_retailWeather && TheGameLogic)
+	{
+		std::fprintf(stderr, "TEST weather-draw frame=%u state=%d end=%u enabled=%d visible=%d map=%d spell=%d system=snow-manager count=%d texture=%s authored=%s spacing=%.1f speed=%.1f\n",
+			TheGameLogic->getFrame(), TheGameLogic->getRetailWeather(), TheGameLogic->getRetailWeatherEndFrame(),
+			isPrecipitationEnabled() && m_isVisible, m_isVisible, TheWeatherSetting->m_isSnowing, TheWeatherSetting->m_spellEnabled,
+			m_totalRendered, m_snowTexture ? m_snowTexture->Get_Texture_Name().str() : "-",
+			TheWeatherSetting->m_snowTexture.str(), m_emitterSpacing, m_velocity);
+		std::fflush(stderr);
+	}
+#endif
+}
+
+void W3DSnowManager::renderPrecipitation(RenderInfoClass &rinfo)
+{
 	if (!isPrecipitationEnabled() || !m_isVisible)
 		return;
 
@@ -421,7 +451,6 @@ void W3DSnowManager::render(RenderInfoClass &rinfo)
 	else
 	{
 		m_snowCeiling = m_boxDimensions;
-		m_heightTraveled = m_time * m_velocity;
 	}
 
 	Matrix4x4 identity(true);

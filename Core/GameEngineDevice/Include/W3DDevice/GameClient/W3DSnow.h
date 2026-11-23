@@ -50,6 +50,8 @@ class W3DSnowManager : public SnowManager
 	Bool	ReAcquireResources();
 
  private:
+	void renderPrecipitation(RenderInfoClass &rinfo);
+
 	struct RetailBlock
 	{
 		Vector3 origin;

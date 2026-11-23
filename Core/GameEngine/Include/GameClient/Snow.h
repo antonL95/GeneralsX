@@ -62,9 +62,9 @@ class WeatherSetting : public Overridable
 		Real	m_lightningChance = 0.0f;
 		Bool	m_spellEnabled = TRUE;
 		Int		m_spellDuration = 200;
-		Coord2D	m_rampControl = {};
-		Coord2D	m_rampSpeed = {};
-		Coord2D	m_rampSpacing = {};
+		Coord2D	m_rampControl = { 0.3f, 0.7f };
+		Coord2D	m_rampSpeed = { 0.0f, 100.0f };
+		Coord2D	m_rampSpacing = { 50.0f, 20.0f };
 		Bool	m_hardwareFogEnable = FALSE;
 		RGBColor m_hardwareFogColor = {};
 		Real	m_hardwareFogStart = 300.0f;
@@ -119,6 +119,8 @@ class SnowManager : public SubsystemInterface
   protected :
 
 	Bool isPrecipitationEnabled() const;
+	void updateRetailSpellRain();
+
 	Bool				m_retailWeather;
 	Real				*m_startingHeights;
 	Real				m_time;	///<time elapsed since it started snowing.
@@ -134,6 +136,13 @@ class SnowManager : public SubsystemInterface
 	Real				m_boxDimensions;	///<used to set dimensions of box surrounding camera.
 	Real				m_emitterSpacing;		///<used to control how many emitters are present per world unit
 	Bool				m_isVisible;		///<used to prevent map weather (if defined) from rendering.
+
+ private:
+	void resetRetailSpellRain();
+	void setRetailFallParameters(Real spacing, Real velocity);
+
+	Bool m_spellRainActive = FALSE;
+	Int m_spellRainTicks = 0;
 };
 
 extern SnowManager *TheSnowManager;  ///< the ray effects singleton external

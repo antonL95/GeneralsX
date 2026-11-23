@@ -35,6 +35,7 @@
 #if !RTS_GENERALS
 #include "GameLogic/GameLogic.h"
 #endif
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -63,8 +64,6 @@ void SnowManager::updateIniSettings()
 {
 	m_retailWeather = RetailFileLayers::enabled();
 	m_boxDimensions = m_retailWeather ? TheWeatherSetting->m_snowBoxHeight : TheWeatherSetting->m_snowBoxDimensions;
-	m_velocity = m_retailWeather ? TheWeatherSetting->m_snowSpeed : TheWeatherSetting->m_snowVelocity;
-	m_emitterSpacing = m_retailWeather ? TheWeatherSetting->m_snowSpacing : 1.0f / TheWeatherSetting->m_snowBoxDensity;
 
 	Real *dst=m_startingHeights;
 	//initialize a table of random starting positions for each particle.
@@ -99,10 +98,12 @@ void SnowManager::updateIniSettings()
 	if (m_retailWeather)
 	{
 		m_time = 0.0f;
-		m_fullTimePeriod = m_velocity != 0.0f ? m_boxDimensions / std::abs(m_velocity) : 0.0f;
+		resetRetailSpellRain();
 	}
 	else
 	{
+		m_velocity = TheWeatherSetting->m_snowVelocity;
+		m_emitterSpacing = 1.0f / TheWeatherSetting->m_snowBoxDensity;
 		m_fullTimePeriod = m_boxDimensions / m_velocity;
 	}
 }
@@ -113,7 +114,66 @@ Bool SnowManager::isPrecipitationEnabled() const
 	if (m_retailWeather && TheGameLogic && TheGameLogic->getRetailWeather() == GameLogic::WEATHER_SUNNY)
 		return FALSE;
 #endif
-	return TheWeatherSetting->m_snowEnabled && (!m_retailWeather || TheWeatherSetting->m_isSnowing);
+	return TheWeatherSetting->m_snowEnabled &&
+		(!m_retailWeather || TheWeatherSetting->m_isSnowing || m_spellRainActive || m_spellRainTicks > 0);
+}
+
+void SnowManager::setRetailFallParameters(Real spacing, Real velocity)
+{
+	m_emitterSpacing = spacing;
+	m_velocity = velocity;
+	m_fullTimePeriod = m_velocity != 0.0f ? m_boxDimensions / std::abs(m_velocity) : 0.0f;
+}
+
+void SnowManager::resetRetailSpellRain()
+{
+	m_spellRainActive = FALSE;
+	m_spellRainTicks = 0;
+	setRetailFallParameters(TheWeatherSetting->m_snowSpacing, TheWeatherSetting->m_snowSpeed);
+}
+
+void SnowManager::updateRetailSpellRain()
+{
+	const WeatherSetting &weather = **TheWeatherSetting;
+#if !RTS_GENERALS
+	const Bool active = weather.m_spellEnabled && TheGameLogic && TheGameLogic->getRetailWeather() == GameLogic::WEATHER_RAINY;
+#else
+	const Bool active = FALSE;
+#endif
+	if (!active && !m_spellRainActive && m_spellRainTicks == 0)
+		return;
+
+	const Int duration = std::max(0, weather.m_spellDuration);
+	const Real rampIn = duration * std::clamp(weather.m_rampControl.x, 0.0f, 1.0f);
+	const Real fadeStart = std::clamp(weather.m_rampControl.y, 0.0f, 1.0f);
+	const Int rampOut = static_cast<Int>(std::max(0.0, duration * (1.0 - fadeStart)));
+	if (active != m_spellRainActive)
+	{
+		m_spellRainActive = active;
+		m_spellRainTicks = active ? 0 : rampOut;
+	}
+	else if (active && m_spellRainTicks < duration)
+	{
+		++m_spellRainTicks;
+	}
+	else if (!active)
+	{
+		--m_spellRainTicks;
+	}
+
+	if (!active && m_spellRainTicks == 0)
+	{
+		resetRetailSpellRain();
+		return;
+	}
+
+	const Real rampLength = active ? rampIn : static_cast<Real>(rampOut);
+	const Real strength = rampLength > 0.0f ? std::min(1.0f, m_spellRainTicks / rampLength) : 1.0f;
+	const Real spacing = std::lerp(weather.m_rampSpacing.x, weather.m_rampSpacing.y, strength);
+	const Real velocity = std::lerp(weather.m_rampSpeed.x, weather.m_rampSpeed.y, strength);
+	setRetailFallParameters(
+		spacing >= 1.0f && spacing < static_cast<Real>(std::numeric_limits<Int>::max()) ? spacing : weather.m_snowSpacing,
+		std::isfinite(velocity) ? velocity : weather.m_snowSpeed);
 }
 
 void SnowManager::setVisible(Bool showWeather)
@@ -124,6 +184,8 @@ void SnowManager::setVisible(Bool showWeather)
 void SnowManager::reset()
 {
 	m_isVisible = TRUE;	//default to showing if it's enabled via INI.
+	if (m_retailWeather)
+		resetRetailSpellRain();
 }
 
 SnowManager::~SnowManager()

@@ -1,0 +1,10 @@
+20 create Player_1 GondorGandalf 0 2520,1010,0
+21 power-reveal Player_1 - 0
+30 science Player_1 - 0 SCIENCE_BlessingofUlmo
+30 powerstate Player_1 - 0
+31 weatherstate Player_1 - 0
+36 power-cast Player_1 - 9
+38 weatherstate Player_1 - 0
+38 list Player_1 UlmoRainWeatherChanger 0
+5436 weatherstate Player_1 - 0
+5438 weatherstate Player_1 - 0

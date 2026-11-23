@@ -19,6 +19,9 @@ class Draw(gdb.Breakpoint):
         if self.last_frame is None:
             gdb.execute("set variable TheFramePacer->m_enableLogicTimeScale = 0", to_string=True)
             gdb.execute("set variable TheFramePacer->m_enableFpsLimit = 0", to_string=True)
+            if os.environ.get("PLAYTEST_HIDE_WEATHER") == "1":
+                gdb.execute("set variable TheSnowManager->m_isVisible = 0", to_string=True)
+                gdb.write("TEST playtest weather hidden\n")
         skip_static_frame = self.capture_windows and frame >= 28 and frame not in self.capture_windows
         if frame == self.last_frame or 28 <= frame < self.render_from or skip_static_frame:
             gdb.execute("return", to_string=True)
