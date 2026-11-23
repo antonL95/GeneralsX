@@ -56,6 +56,15 @@ def click(x, y, settle=0.8):
     time.sleep(settle)
 
 
+def drag(x, y, end_x, end_y):
+    motion(display, 0, x, y, 0)
+    button(display, 1, 1, 80)
+    motion(display, 0, end_x, end_y, 80)
+    button(display, 1, 0, 80)
+    sync(display, 0)
+    time.sleep(1)
+
+
 def pixel(x, y):
     image = get_image(display, root, x, y, 1, 1, 0xFFFFFFFF, 2)
     value = get_pixel(image, 0, 0)
@@ -109,15 +118,31 @@ def faction_history():
 
 def start_match(faction_row):
     click(512, 296)
+    setup_title = title_signature(400, 4, 224, 50)
+    configure_match(faction_row)
+    return setup_title
+
+
+def configure_match(faction_row):
     click(360, 444)
     click(360, 169 + 25 * faction_row)
     click(170, 465)
     click(170, 541)
+    if "--all" in sys.argv or "--restart" in sys.argv:
+        capture("setup-before-match", 104, 425, 506, 105)
     click(833, 689)
 
 
 def menu_visible():
-    return pixel(365, 318) == 0x14212A and pixel(366, 319) == 0x14212A
+    return pixel(365, 210) == 0x14212A and not subpage_visible()
+
+
+def subpage_visible():
+    return pixel(304, 200) == 0x14212A and pixel(305, 201) == 0x14212A
+
+
+def confirmation_visible():
+    return pixel(365, 318) == 0x14212A and not menu_visible() and not subpage_visible()
 
 
 def title_signature(x, y, width, height):
@@ -354,7 +379,7 @@ def check():
     if "--loading" in sys.argv:
         check_loading()
         return
-    start_match(1)
+    setup_title = start_match(1)
     wait_for("first skirmish is running", lambda: len(faction_history()) == 1, 100)
     wait_for("first skirmish reaches frame 60", lambda: log_count("TEST powerstate 60 Player_1") >= 1, 60)
     if "--spellbook" in sys.argv:
@@ -363,42 +388,67 @@ def check():
     if "--hud-actions" in sys.argv:
         check_hud_actions()
         return
+    all_pages = "--all" in sys.argv
+    if all_pages or "--save-load" in sys.argv:
+        check_save_load()
+        if not all_pages:
+            return
+    if all_pages or "--restart" in sys.argv:
+        check_restart()
+        if not all_pages:
+            return
+    if all_pages or "--settings" in sys.argv:
+        check_settings()
+        if not all_pages:
+            return
+        key(0xFF1B)
+        wait_for("Resume closes Pause after settings", lambda: not menu_visible())
+    matches = faction_history()
+    first_frame_60_count = log_count("TEST powerstate 60 Player_1")
     key(0xFF1B)
     wait_for("Escape opens the in-game menu", menu_visible)
-    capture("pause-menu", 360, 312, 304, 170)
+    capture("pause-menu", 360, 205, 304, 332)
     progress = log_count("TEST powerstate ")
     time.sleep(3)
     if log_count("TEST powerstate ") != progress:
         sys.exit("FAIL simulation advances while the match menu is open")
     print("PASS the match is paused", flush=True)
-    click(512, 391)
+    click(512, 504)
     wait_for("Resume dismisses the menu", lambda: not menu_visible())
     wait_for("the same match advances again",
-             lambda: len(faction_history()) == 1 and log_count("TEST powerstate ") > progress, 45)
-    key(0xFF1B)
-    wait_for("Escape reopens the menu in the same match", menu_visible)
-    pause_title = title_signature(376, 323, 272, 35)
-    click(512, 442)
-    wait_for("Leave opens the confirmation", lambda: title_signature(376, 323, 272, 35) != pause_title)
+             lambda: faction_history() == matches and log_count("TEST powerstate ") > progress, 45)
+    capture("hud-menu-button", 54, 529, 150, 71)
+    drag(480, 430, 85, 559)
+    if menu_visible():
+        sys.exit("FAIL releasing a world drag over the HUD button opens Pause")
+    click(85, 559)
+    wait_for("HUD menu button opens the same pause menu", menu_visible, 12)
+    click(512, 453)
+    wait_for("Leave opens the confirmation", confirmation_visible)
     capture("leave-confirmation", 360, 312, 304, 170)
     key(0xFF1B)
-    wait_for("Escape cancels the leave confirmation",
-             lambda: title_signature(376, 323, 272, 35) == pause_title)
-    click(512, 442)
-    wait_for("Leave opens the confirmation again", lambda: title_signature(376, 323, 272, 35) != pause_title)
-    click(512, 442)
-    wait_for("repeating the Leave click returns to the pause menu",
-             lambda: title_signature(376, 323, 272, 35) == pause_title)
-    click(512, 442)
-    wait_for("Leave reopens the confirmation", lambda: title_signature(376, 323, 272, 35) != pause_title)
+    wait_for("Escape cancels the leave confirmation", menu_visible)
+    click(512, 453)
+    wait_for("Leave opens the confirmation again", confirmation_visible)
+    click(512, 453)
+    wait_for("repeating the Leave click returns to the pause menu", menu_visible)
+    click(512, 453)
+    wait_for("Leave reopens the confirmation", confirmation_visible)
     click(512, 391)
-    wait_for("Quit returns to the main menu",
-             lambda: len(skirmish_label & skirmish_label_pixels()) >= len(skirmish_label) * 0.8)
-    capture("main-menu-return", 425, 265, 174, 170)
-    start_match(2)
+    wait_for("Leave opens the score screen",
+             lambda: not confirmation_visible() and pixel(400, 420) == 0
+             and title_signature(400, 4, 224, 50) != setup_title
+             and len(skirmish_label & skirmish_label_pixels()) < len(skirmish_label) * 0.8)
+    capture("score-screen", 112, 140, 800, 430)
+    click(934, 730)
+    wait_for("Continue returns to the skirmish lobby",
+             lambda: title_signature(400, 4, 224, 50) == setup_title)
+    capture("skirmish-lobby", 115, 100, 800, 500)
+    configure_match(2)
     wait_for("a second skirmish runs with a different faction",
-             lambda: len(faction_history()) == 2 and len(set(faction_history())) == 2, 100)
-    wait_for("second skirmish reaches frame 60", lambda: log_count("TEST powerstate 60 Player_1") >= 2, 60)
+             lambda: len(faction_history()) == len(matches) + 1 and faction_history()[-1] != matches[-1], 100)
+    wait_for("second skirmish reaches frame 60",
+             lambda: log_count("TEST powerstate 60 Player_1") > first_frame_60_count, 60)
     print("Factions: " + ", ".join(faction_history()), flush=True)
     key(0xFF1B)
     wait_for("Escape opens the in-game menu in the second match", menu_visible)
@@ -539,7 +589,7 @@ def check_options(restarted=False):
     key(0xFF1B)
     wait_for("the pause menu opens", menu_visible)
     progress = log_count("TEST powerstate ")
-    click(512, 489)
+    click(512, 249)
     wait_for("Settings opens from the pause menu", options_visible)
     click(471, 411)
     if custom_visible():
@@ -565,10 +615,131 @@ def check_options(restarted=False):
         sys.exit("FAIL cancelling from Pause changed scroll speed")
     if log_count("TEST powerstate ") != progress:
         sys.exit("FAIL simulation advances while Settings is open")
-    click(512, 391)
+    click(512, 504)
     wait_for("Resume closes Pause", lambda: not menu_visible())
     wait_for("Resume advances the same skirmish",
              lambda: len(faction_history()) == 1 and log_count("TEST powerstate ") > progress, 45)
+
+
+def crc_history():
+    log = (out / "game.log").read_text(errors="replace")
+    start = log.find("TEST player 30 Player_1 template=")
+    if start < 0:
+        return []
+    return [(int(frame), crc) for frame, crc in re.findall(
+        r"TEST xp-crc frame=(\d+) crc=([0-9A-F]+)", log[start:])]
+
+
+def check_save_load():
+    key(0xFF1B)
+    wait_for("Pause opens before saving", menu_visible, 15)
+    click(512, 300)
+    wait_for("Save opens the save page", subpage_visible, 10)
+    for char in "slotfour":
+        key(ord(char))
+    wait_for("the typed save name is visible", lambda: sum(
+        min(color.to_bytes(4, "big")[1:]) > 150
+        for color in title_signature(336, 486, 120, 25)) >= 10)
+    capture("save-menu", 230, 195, 564, 378)
+    key(0xFF0D)
+    wait_for("Save creates a file and returns to Pause",
+             lambda: menu_visible() and list((out / "data").rglob("*.sav")), 15)
+    save = next((out / "data").rglob("*.sav"))
+    contents = save.read_bytes()
+    if not any("slotfour".encode(encoding) in contents for encoding in ("utf-16-le", "utf-32-le")):
+        sys.exit("FAIL save file has no entered slot name")
+    saved_at = len(crc_history())
+    key(0xFF1B)
+    wait_for("the uninterrupted match advances", lambda: len(crc_history()) >= saved_at + 35, 30)
+    motion(display, 0, 690, 581, 0)
+    sync(display, 0)
+    time.sleep(0.5)
+    key(0xFF1B)
+    wait_for("Pause reopens before loading", menu_visible, 15)
+    for name, y in (("Leave", 453), ("Restart", 402), ("Load", 351)):
+        key(0xFF52)
+        wait_for(f"Up selects {name}", lambda: pixel(386, y) == 0x365665, 10)
+    key(0xFF0D)
+    wait_for("Load opens the save list", subpage_visible, 10)
+    capture("load-menu", 230, 195, 564, 378)
+    feedback = title_signature(321, 487, 382, 27)
+    save.write_bytes(contents[:-32])
+    key(0xFF0D)
+    wait_for("a truncated save reports an error without closing Load",
+             lambda: subpage_visible() and title_signature(321, 487, 382, 27) != feedback)
+    save.write_bytes(contents)
+    key(0xFF0D)
+    def loaded():
+        history = crc_history()
+        return any(b[0] <= a[0] for a, b in zip(history, history[1:]))
+
+    wait_for("loading rewinds the same skirmish", loaded, 120)
+    history = crc_history()
+    split = next(i for i in range(1, len(history)) if history[i][0] <= history[i - 1][0])
+    expected = dict(history[:split])
+    first_frame = history[split][0]
+    wait_for("the loaded match advances", lambda: len(crc_history()) >= split + 30, 30)
+    compared = 0
+    different = 0
+    for frame, crc in crc_history()[split:]:
+        if frame in expected:
+            compared += 1
+            if crc != expected[frame]:
+                print(f"CRC mismatch at {frame}: {expected[frame]} != {crc}", flush=True)
+                different += 1
+    print(f"Compared {compared} frames from {first_frame}. Differences {different}", flush=True)
+    if compared < 30 or different:
+        sys.exit("FAIL menu save and resume CRCs")
+
+
+def match_factions():
+    log = (out / "game.log").read_text(errors="replace")
+    return re.findall(r"TEST player 30 (Player_\d+) template=(\S+)", log)
+
+
+def check_restart():
+    initial = match_factions()
+    if len(initial) < 2:
+        sys.exit("FAIL restart needs both skirmish factions")
+    key(0xFF1B)
+    wait_for("Pause opens before restart", menu_visible)
+    click(512, 402)
+    wait_for("Restart opens a confirmation", confirmation_visible, 8)
+    capture("restart-confirmation", 360, 312, 304, 170)
+    click(580, 447)
+    wait_for("No returns from Restart to Pause", menu_visible)
+    click(512, 402)
+    wait_for("Restart reopens a confirmation", confirmation_visible)
+    click(437, 447)
+    wait_for("restarted skirmish reaches frame 30", lambda: len(match_factions()) == len(initial) * 2, 120)
+    if match_factions() != initial + initial:
+        sys.exit(f"FAIL restart changed the factions: {match_factions()}")
+    print("PASS restart rewound to frame 30 with factions " + ", ".join(f"{p}={f}" for p, f in initial), flush=True)
+    wait_for("restarted skirmish reaches frame 60", lambda: log_count("TEST powerstate 60 Player_1") >= 2, 60)
+
+
+def check_settings():
+    key(0xFF1B)
+    wait_for("Pause opens before settings", menu_visible)
+    click(512, 249)
+    wait_for("Settings opens", options_visible)
+    capture("settings", 132, 104, 760, 560)
+    click(237, 381)
+    click(660, 260)
+    key(0xFF1B)
+    wait_for("Settings Cancel returns to Pause", lambda: not options_visible() and menu_visible())
+    options = next((out / "data").rglob("Options.ini"), None)
+    if options and "ScrollFactor" in options.read_text():
+        sys.exit("FAIL cancelling Settings saved ScrollFactor")
+    click(512, 249)
+    wait_for("Settings opens again", options_visible)
+    click(237, 381)
+    click(660, 260)
+    click(809, 621)
+    wait_for("Settings Accept returns to Pause", lambda: not options_visible() and menu_visible())
+    if not preferences().get("ScrollFactor"):
+        sys.exit("FAIL accepting Settings did not save ScrollFactor")
+    print("PASS Settings persists the edited ScrollFactor", flush=True)
 
 
 build = Path(sys.argv[1]).resolve()
@@ -578,9 +749,12 @@ runtime = out / "runtime"
 runtime.mkdir(mode=0o700)
 commands = out / "commands.txt"
 commands.write_text(("15 pkg44-points Player_1 - 0 10\n" if "--spellbook" in sys.argv else "") +
-                    "30 player Player_1 - 0\n" + "".join(
+                    "30 player Player_1 - 0\n" +
+                    ("".join(f"30 player Player_{slot} - 0\n" for slot in range(2, 9))
+                     if "--restart" in sys.argv or "--all" in sys.argv else "") + "".join(
     f"{frame} powerstate Player_1 - 0\n" for frame in range(60, 3600, 30)
-))
+) + ("".join(f"{frame} xpcrc - - 0\n" for frame in range(60, 900))
+     if "--save-load" in sys.argv or "--all" in sys.argv else ""))
 if "--shell-load" in sys.argv:
     commands.write_text("30 shell-setup - - 0\n89 shell-crc - - 0\n90 snapshot-save - - 0 shell-qa.sav\n91 shell-crc - - 0\n")
 env = os.environ | {
