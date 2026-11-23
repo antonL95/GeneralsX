@@ -27,6 +27,7 @@
 // Author: Michael S. Booth, January 2002
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <limits>
 
 #include "Common/ActionManager.h"
 #include "Common/BuildAssistant.h"
@@ -1633,6 +1634,11 @@ Bool rotwkGroupSegmentPassable(const RotwkGroupMove& move, const Coord3D& from, 
 		move.object->getAI()->getLocomotorSet().getValidSurfaces(), LAYER_GROUND, from, to, FALSE);
 }
 
+Bool rotwkGroupClearLeg(const RotwkGroupMove& move, const Coord3D& from, const Coord3D& to)
+{
+	return rotwkGroupSegmentPassable(move, from, to) && rotwkGroupLinePassable(move, from, to);
+}
+
 Bool appendRotwkGroupApproach(RotwkGroupMove& move, Coord3D& from, const Coord3D& target)
 {
 	Path* approach = TheAI->pathfinder()->findGroundPath(&from, &target, PATH_DIAMETER_IN_CELLS, FALSE);
@@ -1643,12 +1649,12 @@ Bool appendRotwkGroupApproach(RotwkGroupMove& move, Coord3D& from, const Coord3D
 	for (const PathNode* node = approach->getFirstNode()->getNextOptimized(); node; node = node->getNextOptimized())
 	{
 		const Coord3D& point = *node->getPosition();
-		if (node->getLayer() != LAYER_GROUND || !rotwkGroupSegmentPassable(move, from, point))
+		if (node->getLayer() != LAYER_GROUND || !rotwkGroupClearLeg(move, from, point))
 			return FALSE;
 		move.waypoints.push_back(point);
 		from = point;
 	}
-	return (from.x == target.x && from.y == target.y) || rotwkGroupLinePassable(move, from, target);
+	return (from.x == target.x && from.y == target.y) || rotwkGroupClearLeg(move, from, target);
 }
 
 Bool buildRotwkGroupWaypoints(RotwkGroupMove& move, const PathNode* entry, const Coord2D& offset)
@@ -1660,7 +1666,7 @@ Bool buildRotwkGroupWaypoints(RotwkGroupMove& move, const PathNode* entry, const
 		const PathNode* next = node->getNextOptimized();
 		const Coord3D& bend = *node->getPosition();
 		const Coord3D& onward = next ? *next->getPosition() : move.destination;
-		if (!next && rotwkGroupLinePassable(move, from, onward))
+		if (!next && rotwkGroupClearLeg(move, from, onward))
 			break;
 
 		Coord3D target = bend;
@@ -1670,25 +1676,23 @@ Bool buildRotwkGroupWaypoints(RotwkGroupMove& move, const PathNode* entry, const
 			offsetBend.x += scale * offset.x;
 			offsetBend.y += scale * offset.y;
 			offsetBend.z = TheTerrainLogic->getGroundHeight(offsetBend.x, offsetBend.y);
-			if (rotwkGroupLinePassable(move, bend, offsetBend) && rotwkGroupLinePassable(move, from, offsetBend) &&
-				rotwkGroupLinePassable(move, offsetBend, onward))
+			if (rotwkGroupClearLeg(move, bend, offsetBend) && rotwkGroupClearLeg(move, from, offsetBend) &&
+				rotwkGroupClearLeg(move, offsetBend, onward))
 			{
 				target = offsetBend;
 				break;
 			}
 		}
-		if (!rotwkGroupLinePassable(move, from, target))
+		if (!rotwkGroupClearLeg(move, from, target))
 		{
-			const Bool canReach = move.waypoints.empty() ?
-				appendRotwkGroupApproach(move, from, target) : rotwkGroupSegmentPassable(move, from, target);
-			if (!canReach)
+			if (!move.waypoints.empty() || !appendRotwkGroupApproach(move, from, target))
 				return FALSE;
 		}
 		if (from.x != target.x || from.y != target.y)
 			move.waypoints.push_back(target);
 		from = target;
 	}
-	if (!rotwkGroupLinePassable(move, from, move.destination))
+	if (!rotwkGroupClearLeg(move, from, move.destination))
 		return FALSE;
 	move.waypoints.push_back(move.destination);
 	return TRUE;
@@ -1697,6 +1701,48 @@ Bool buildRotwkGroupWaypoints(RotwkGroupMove& move, const PathNode* entry, const
 Real rotwkGroupTravelDistance(const Coord3D& from, const Coord3D& to)
 {
 	return WWMath::SqrtfOrigin(sqr(to.x - from.x) + sqr(to.y - from.y));
+}
+
+Bool tryRotwkGroupCorridor(std::vector<RotwkGroupMove>& movers, const Coord3D& from, const Coord3D& to,
+	const Coord2D& spineOffset, Real& longestDistance)
+{
+	Path* path = TheAI->pathfinder()->findGroundPath(&from, &to, PATH_DIAMETER_IN_CELLS, FALSE);
+	MemoryPoolObjectHolder holder;
+	holder.hold(path);
+	if (!path || !path->getFirstNode())
+		return FALSE;
+	const PathNode* entry = path->getFirstNode()->getNextOptimized();
+	if (!entry || !entry->getNextOptimized())
+		return FALSE;
+	for (const PathNode* node = entry; node; node = node->getNextOptimized())
+		if (node->getLayer() != LAYER_GROUND)
+			return FALSE;
+
+	std::vector<RotwkGroupMove> candidate = movers;
+	Real longest = 0.0f;
+	for (RotwkGroupMove& move : candidate)
+	{
+		move.waypoints.clear();
+		if (!buildRotwkGroupWaypoints(move, entry, move.offset - spineOffset))
+			return FALSE;
+		Coord3D previous = *move.object->getPosition();
+		move.distance = 0.0f;
+		for (const Coord3D& point : move.waypoints)
+		{
+			move.distance += rotwkGroupTravelDistance(previous, point);
+			previous = point;
+		}
+		longest = std::max(longest, move.distance);
+	}
+	if (longest >= longestDistance)
+		return FALSE;
+	longestDistance = longest;
+	for (size_t index = 0; index < movers.size(); ++index)
+	{
+		movers[index].waypoints.swap(candidate[index].waypoints);
+		movers[index].distance = candidate[index].distance;
+	}
+	return TRUE;
 }
 }
 
@@ -1727,6 +1773,7 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 
 	center.x /= movers.size();
 	center.y /= movers.size();
+	center.z = TheTerrainLogic->getGroundHeight(center.x, center.y);
 	Real rotation = 0.0f;
 	const Real travelX = pos->x - center.x;
 	const Real travelY = pos->y - center.y;
@@ -1794,46 +1841,33 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 	}
 
 	Bool sharedRoute = FALSE;
+	Real longestDistance = 0.0f;
 	const Bool openTerrainPass = allGround && representative && directLane && terrainDetours &&
 		rotwkGroupSegmentPassable(*representative, center, *pos);
 	if (allGround && representative && !openTerrainPass)
 	{
-		Object* leader = representative->object;
 		pathfinder->setIgnoreObstacleID(INVALID_ID);
-		Path* path = pathfinder->findGroundPath(leader->getPosition(), &representative->destination,
-			PATH_DIAMETER_IN_CELLS, FALSE);
-		MemoryPoolObjectHolder holder;
-		holder.hold(path);
-		if (path && path->getFirstNode())
+		longestDistance = std::numeric_limits<Real>::max();
+		sharedRoute = tryRotwkGroupCorridor(movers, *representative->object->getPosition(),
+			representative->destination, representative->offset, longestDistance);
+		sharedRoute |= tryRotwkGroupCorridor(movers, center, *pos, Coord2D{}, longestDistance);
+		const auto lateralOffset = [travelX, travelY](const RotwkGroupMove& lhs, const RotwkGroupMove& rhs) {
+			return lhs.offset.y * travelX - lhs.offset.x * travelY < rhs.offset.y * travelX - rhs.offset.x * travelY;
+		};
+		const auto flanks = std::minmax_element(movers.begin(), movers.end(), lateralOffset);
+		for (const RotwkGroupMove* flank : { &*flanks.first, &*flanks.second })
 		{
-			sharedRoute = TRUE;
-			for (const PathNode* node = path->getFirstNode(); node; node = node->getNextOptimized())
-				sharedRoute = sharedRoute && node->getLayer() == layer;
-
-			const PathNode* entry = path->getFirstNode()->getNextOptimized();
-			for (RotwkGroupMove& move : movers)
-				sharedRoute = sharedRoute && buildRotwkGroupWaypoints(move, entry, move.offset - representative->offset);
+			if (flank != representative)
+				sharedRoute |= tryRotwkGroupCorridor(movers, *flank->object->getPosition(),
+					flank->destination, flank->offset, longestDistance);
 		}
 	}
 
-	Real longestDistance = 0.0f;
-	if (sharedRoute || (allGround && !representative))
+	if (allGround && !representative)
 	{
 		for (RotwkGroupMove& move : movers)
 		{
-			Coord3D from = *move.object->getPosition();
-			if (sharedRoute)
-			{
-				for (const Coord3D& point : move.waypoints)
-				{
-					move.distance += rotwkGroupTravelDistance(from, point);
-					from = point;
-				}
-			}
-			else
-			{
-				move.distance = rotwkGroupTravelDistance(from, move.destination);
-			}
+			move.distance = rotwkGroupTravelDistance(*move.object->getPosition(), move.destination);
 			longestDistance = std::max(longestDistance, move.distance);
 		}
 	}
