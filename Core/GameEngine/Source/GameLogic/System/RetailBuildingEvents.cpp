@@ -489,7 +489,7 @@ namespace
 {
 void dispatchModelConditions(Object& object, const ModelConditionFlags& previous, DispatchMode mode)
 {
-	if (!RetailFileLayers::enabled() || !object.areModulesReady() || !object.isKindOf(KINDOF_HORDE) ||
+	if (!RetailFileLayers::enabled() || !object.areModulesReady() ||
 		object.isEffectivelyDead() || !object.getAIUpdateInterface() ||
 		object.getAIUpdateInterface()->getRetailLuaEventsList().isEmpty())
 		return;

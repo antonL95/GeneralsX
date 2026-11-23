@@ -1,0 +1,11 @@
+186 create Player_1 RhunFlamesprayer 0 3400,420,0
+187 pkg21-build-complete Player_1 RhunFlamesprayer 0
+193 create Player_1 MorgulBurghash 0 3610,420,0
+194 pkg21-build-complete Player_1 MorgulBurghash 0
+199 pkg18-award-xp Player_1 MorgulBurghash 0 645
+221 weapon-upgrade-toggle Player_1 RhunFlamesprayer 0 Command_SpecialAbilityFlamesprayerBoilerExceed
+227 weapon-upgrade-toggle Player_1 MorgulBurghash 0 Command_SpecialAbilityBurghashImmolation
+282 weapon-upgrade-toggle Player_1 RhunFlamesprayer 0 Command_SpecialAbilityFlamesprayerBoilerExceed
+288 weapon-upgrade-toggle Player_1 MorgulBurghash 0 Command_SpecialAbilityBurghashImmolation
+349 destroy Player_1 RhunFlamesprayer 0
+349 destroy Player_1 MorgulBurghash 0
