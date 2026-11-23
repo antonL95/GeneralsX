@@ -347,6 +347,7 @@ W3DAnimationInfo::W3DAnimationInfo( const W3DAnimationInfo &r ) :
 	m_minSpeed(r.m_minSpeed),
 	m_maxSpeed(r.m_maxSpeed),
 	m_blendFrames(r.m_blendFrames),
+	m_mustCompleteBlend(r.m_mustCompleteBlend),
 	m_useWeaponTiming(r.m_useWeaponTiming),
 	m_priority(r.m_priority)
 {
@@ -367,6 +368,7 @@ W3DAnimationInfo& W3DAnimationInfo::operator=(const W3DAnimationInfo &r)
 	m_minSpeed = r.m_minSpeed;
 	m_maxSpeed = r.m_maxSpeed;
 	m_blendFrames = r.m_blendFrames;
+	m_mustCompleteBlend = r.m_mustCompleteBlend;
 	m_useWeaponTiming = r.m_useWeaponTiming;
 	m_priority = r.m_priority;
 
@@ -381,12 +383,13 @@ W3DAnimationInfo& W3DAnimationInfo::operator=(const W3DAnimationInfo &r)
 }
 
 
-void W3DAnimationInfo::setPlayback(RenderObjClass::AnimMode mode, Real minSpeed, Real maxSpeed, Real blendFrames)
+void W3DAnimationInfo::setPlayback(RenderObjClass::AnimMode mode, Real minSpeed, Real maxSpeed, Real blendFrames, Bool mustCompleteBlend)
 {
 	m_playbackMode = mode;
 	m_minSpeed = minSpeed;
 	m_maxSpeed = maxSpeed;
 	m_blendFrames = blendFrames;
+	m_mustCompleteBlend = mustCompleteBlend;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2606,6 +2609,8 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 			HAnimClass* animHandle = animInfo.getAnimHandle();	// note that this now returns an ADDREFED handle, which must be released by the caller!
 			if (animHandle)
 			{
+				auto* hlod = m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD
+					? static_cast<HLodClass*>(m_renderObject) : nullptr;
 				Int startFrame = 0;
 				const Int mode = animInfo.getPlaybackMode(m_curState->m_mode);
 				if (mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS || mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS)
@@ -2642,23 +2647,25 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 					m_renderObject->Set_Animation(animHandle, startFrame, RenderObjClass::ANIM_MODE_MANUAL);
 				}
 				else if (RetailFileLayers::enabled() && !disableBlend && !restartCurrent && !m_pauseAnimation &&
-					animInfo.getBlendFrames() > 0.0f && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD &&
+					animInfo.getBlendFrames() > 0.0f && hlod &&
 					!(TheGameState && TheGameState->isInLoadGame()))
 				{
-					static_cast<HLodClass*>(m_renderObject)->Set_Animation_With_Blend(animHandle, startFrame, mode,
-						animInfo.getBlendFrames());
+					hlod->Set_Animation_With_Blend(animHandle, startFrame, mode,
+						animInfo.getBlendFrames(), animInfo.mustCompleteBlend());
 				}
 				else
 					m_renderObject->Set_Animation(animHandle, startFrame, mode);
-				stopTimedAnimationParticles();
-				m_previousAnimationFXFrame = static_cast<Real>(startFrame);
-				m_animationFXFirstSample = TRUE;
+
+				m_queuedAnimation = hlod ? hlod->Peek_Queued_Animation() : nullptr;
+				if (m_queuedAnimation)
+					m_queuedAnimationStartFrame = static_cast<Real>(startFrame);
+				else
+					startAnimationFX(static_cast<Real>(startFrame));
 				REF_PTR_RELEASE(animHandle);
 				animHandle = nullptr;
 
-				if (m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD)
+				if (hlod)
 				{
-					HLodClass *hlod = (HLodClass*)m_renderObject;
 					Real factor = GameClientRandomValueReal(animInfo.getMinSpeed(m_curState->m_animMinSpeedFactor),
 						animInfo.getMaxSpeed(m_curState->m_animMaxSpeedFactor));
 					m_authoredAnimationSpeed = factor;
@@ -2671,8 +2678,18 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 	else
 	{
 		m_whichAnimInCurState = -1;
+		if (!m_queuedAnimation)
+			m_playingAnimationFXEvents = m_curState->m_animationFXEvents;
 	}
 
+}
+
+void W3DModelDraw::startAnimationFX(Real frame)
+{
+	stopTimedAnimationParticles();
+	m_previousAnimationFXFrame = frame;
+	m_animationFXFirstSample = TRUE;
+	m_playingAnimationFXEvents = m_curState->m_animationFXEvents;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2687,9 +2704,16 @@ void W3DModelDraw::dispatchAnimationFXEvents()
 	Int frameCount = 0;
 	Int mode = 0;
 	Real rate = 1.0f;
-	const HAnimClass* animation = static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, frameCount, mode, rate);
+	auto* hlod = static_cast<HLodClass*>(m_renderObject);
+	const HAnimClass* animation = hlod->Peek_Animation_And_Info(frame, frameCount, mode, rate);
 	if (!animation)
 		return;
+	if (m_queuedAnimation && !hlod->Peek_Queued_Animation())
+	{
+		if (animation == m_queuedAnimation)
+			startAnimationFX(m_queuedAnimationStartFrame);
+		m_queuedAnimation = nullptr;
+	}
 
 	const Bool backwards = mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS || mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS;
 	const Bool loop = mode == RenderObjClass::ANIM_MODE_LOOP || mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS;
@@ -2698,7 +2722,7 @@ void W3DModelDraw::dispatchAnimationFXEvents()
 	m_previousAnimationFXFrame = frame;
 	m_animationFXFirstSample = FALSE;
 	RetailClientAudio::animate(*getDrawable(), animation->Get_Name(), previous, frame, frameCount, first, backwards, loop);
-	if (!m_curState->m_animationFXEvents || !TheFXListStore)
+	if (!m_playingAnimationFXEvents || !TheFXListStore)
 		return;
 	const Int sample = static_cast<Int>(frame);
 	const Int previousSample = static_cast<Int>(previous);
@@ -2721,7 +2745,7 @@ void W3DModelDraw::dispatchAnimationFXEvents()
 	}
 
 	const Bool wrapped = loop && (backwards ? frame > previous : frame < previous);
-	for (const auto& event : *m_curState->m_animationFXEvents)
+	for (const auto& event : *m_playingAnimationFXEvents)
 	{
 		if (event.frame < 0 || event.frame >= frameCount)
 			continue;
@@ -2781,7 +2805,9 @@ Bool W3DModelDraw::setCurAnimDurationInMsec(Real desiredDurationInMsec)
 	if (m_renderObject && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD)
 	{
 		HLodClass* hlod = (HLodClass*)m_renderObject;
-		HAnimClass* anim = hlod->Peek_Animation();
+		HAnimClass* anim = hlod->Peek_Queued_Animation();
+		if (!anim)
+			anim = hlod->Peek_Animation();
 		if (anim)
 		{
 			Real naturalDurationInMsec = anim->Get_Num_Frames() * 1000.0f / anim->Get_Frame_Rate();
@@ -4838,7 +4864,7 @@ void W3DModelDraw::setWeaponTimingDuration(UnsignedInt numFrames)
 		Int clipFrames = 0;
 		Int mode = 0;
 		Real multiplier = 1.0f;
-		static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, clipFrames, mode, multiplier);
+		static_cast<HLodClass*>(m_renderObject)->Peek_Requested_Animation_And_Info(frame, clipFrames, mode, multiplier);
 		const Bool backwards = mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS;
 		const Bool once = mode == RenderObjClass::ANIM_MODE_ONCE || backwards;
 		const Real remainingFrames = backwards ? frame : static_cast<Real>(clipFrames - 1) - frame;
@@ -4866,7 +4892,7 @@ void W3DModelDraw::applyWeaponTiming()
 	Int numFrames = 0;
 	Int mode = 0;
 	Real multiplier = 1.0f;
-	HAnimClass* anim = hlod->Peek_Animation_And_Info(frame, numFrames, mode, multiplier);
+	HAnimClass* anim = hlod->Peek_Requested_Animation_And_Info(frame, numFrames, mode, multiplier);
 	if (anim == nullptr || numFrames <= 1 || anim->Get_Frame_Rate() <= 0.0f)
 		return;
 
@@ -4962,13 +4988,15 @@ void W3DModelDraw::traceAnimationState(const Matrix3D& drawTransform) const
 		float blendWeight;
 		float blendDuration;
 		const HAnimClass* blendSource = hlod->Peek_Animation_Blend_Source(blendWeight, blendDuration);
-		std::fprintf(stderr, "TEST gait frame=%u id=%u actor=%s module=%s state=%s requires=%s flags=%s clip=%s mode=%d pose=%.3f length=%d fps=%.3f rate=%.5f authored=%.5f distance=%.3f x=%.4f y=%.4f blend=%.4f blend_frames=%.3f blend_from=%s logic=%s\n",
+		const HAnimClass* queued = hlod->Peek_Queued_Animation();
+		std::fprintf(stderr, "TEST gait frame=%u id=%u actor=%s module=%s state=%s requires=%s flags=%s clip=%s mode=%d pose=%.3f length=%d fps=%.3f rate=%.5f authored=%.5f distance=%.3f x=%.4f y=%.4f blend=%.4f blend_frames=%.3f blend_from=%s logic=%s model=%s playing=%s queued=%s\n",
 			TheGameLogic->getFrame(), static_cast<unsigned>(draw->getID()), name.str(),
 			TheNameKeyGenerator->keyToName(getModuleTagNameKey()).str(),
 			stateName.isEmpty() ? "-" : stateName.str(), required.empty() ? "-" : required.c_str(),
 			flags.empty() ? "-" : flags.c_str(), clip, mode, frame, numFrames, animation->Get_Frame_Rate(),
 			multiplier, m_authoredAnimationSpeed, getCurAnimDistanceCovered(), position.x, position.y,
-			blendWeight, blendDuration, blendSource ? blendSource->Get_Name() : "-", logicFlags.empty() ? "-" : logicFlags.c_str());
+			blendWeight, blendDuration, blendSource ? blendSource->Get_Name() : "-", logicFlags.empty() ? "-" : logicFlags.c_str(),
+			m_curState ? m_curState->m_modelName.str() : "-", animation->Get_Name(), queued ? queued->Get_Name() : "-");
 		return;
 	}
 	std::string subObjects;
@@ -5396,7 +5424,7 @@ void W3DModelDraw::xfer( Xfer *xfer )
 				// get animation info
 				Int mode, numFrames;
 				Real frame, dummy;
-				HAnimClass *anim = hlod->Peek_Animation_And_Info( frame, numFrames, mode, dummy );
+				HAnimClass *anim = hlod->Peek_Requested_Animation_And_Info( frame, numFrames, mode, dummy );
 
 				// animation data is present
 				Bool present = anim ? TRUE : FALSE;

@@ -110,6 +110,7 @@ private:
 	Real m_minSpeed = 1.0f;
 	Real m_maxSpeed = 1.0f;
 	Real m_blendFrames = 0.0f;
+	Bool m_mustCompleteBlend = FALSE;
 	Bool m_useWeaponTiming = FALSE;
 	Int m_priority = 1;
 
@@ -125,11 +126,12 @@ public:
 	Bool isIdleAnim() const { return m_isIdleAnim; }
 	Real getDistanceCovered() const { return m_distanceCovered; }
 	Real getNaturalDurationInMsec() const { return m_naturalDurationInMsec; }
-	void setPlayback(RenderObjClass::AnimMode mode, Real minSpeed, Real maxSpeed, Real blendFrames);
+	void setPlayback(RenderObjClass::AnimMode mode, Real minSpeed, Real maxSpeed, Real blendFrames, Bool mustCompleteBlend);
 	Int getPlaybackMode(Int stateMode) const { return m_playbackMode < 0 ? stateMode : m_playbackMode; }
 	Real getMinSpeed(Real stateSpeed) const { return m_playbackMode < 0 ? stateSpeed : m_minSpeed; }
 	Real getMaxSpeed(Real stateSpeed) const { return m_playbackMode < 0 ? stateSpeed : m_maxSpeed; }
 	Real getBlendFrames() const { return m_blendFrames; }
+	Bool mustCompleteBlend() const { return m_mustCompleteBlend; }
 	void setUseWeaponTiming(Bool useWeaponTiming) { m_useWeaponTiming = useWeaponTiming; }
 	Bool usesWeaponTiming() const { return m_useWeaponTiming; }
 	void setPriority(Int priority) { m_priority = priority; }
@@ -580,6 +582,9 @@ private:
 	UnsignedInt										m_weaponTimingEnd = 0;
 	Real m_previousAnimationFXFrame = 0.0f;
 	Bool m_animationFXFirstSample = TRUE;
+	const std::vector<ModelConditionInfo::AnimationFXEvent>* m_playingAnimationFXEvents = nullptr;
+	Real m_queuedAnimationStartFrame = 0.0f;
+	const HAnimClass* m_queuedAnimation = nullptr;
 	struct TimedAnimationParticle
 	{
 		ParticleSystemID id;
@@ -594,6 +599,7 @@ private:
 
 	void adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction, Bool restartCurrent = FALSE);
 	void dispatchAnimationFXEvents();
+	void startAnimationFX(Real frame);
 	void stopTimedAnimationParticles();
 	void applyWeaponTiming();
 	void traceAnimationState(const Matrix3D& drawTransform) const;

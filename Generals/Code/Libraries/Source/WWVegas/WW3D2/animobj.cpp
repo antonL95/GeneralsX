@@ -240,6 +240,7 @@ Animatable3DObjClass & Animatable3DObjClass::operator = (const Animatable3DObjCl
 void Animatable3DObjClass::Release()
 {
 	REF_PTR_RELEASE(BlendSource.Motion);
+	REF_PTR_RELEASE(QueuedBlend.Motion);
 	switch (CurMotionMode) {
 
 		case BASE_POSE:
@@ -502,12 +503,25 @@ void Animatable3DObjClass::Set_Animation(HAnimClass * motion, float frame, int m
 }
 
 
-void Animatable3DObjClass::Set_Animation_With_Blend(HAnimClass* motion, float frame, int mode, float blendFrames)
+void Animatable3DObjClass::Set_Animation_With_Blend(HAnimClass* motion, float frame, int mode, float blendFrames, bool mustComplete)
 {
 	if (CurMotionMode != SINGLE_ANIM || !ModeAnim.Motion || !motion || !(blendFrames > 0.0f) ||
 		motion->Get_Num_Frames() <= 1 || stricmp(ModeAnim.Motion->Get_HName(), motion->Get_HName()) != 0)
 	{
 		Set_Animation(motion, frame, mode);
+		return;
+	}
+
+	if (BlendSource.Motion && BlendMustComplete)
+	{
+		REF_PTR_SET(QueuedBlend.Motion, motion);
+		QueuedBlend.Frame = frame;
+		QueuedBlend.PrevFrame = frame;
+		QueuedBlend.AnimMode = mode;
+		QueuedBlend.LastSyncTime = WW3D::Get_Logic_Time_Milliseconds();
+		QueuedBlend.animDirection = mode < ANIM_MODE_LOOP_BACKWARDS ? 1.0f : -1.0f;
+		QueuedBlendFrames = blendFrames;
+		QueuedBlendMustComplete = mustComplete;
 		return;
 	}
 
@@ -519,6 +533,7 @@ void Animatable3DObjClass::Set_Animation_With_Blend(HAnimClass* motion, float fr
 	BlendSource = source;
 	BlendTotalFrames = std::min(blendFrames, static_cast<float>(motion->Get_Num_Frames() - 1));
 	BlendRemainingFrames = BlendTotalFrames;
+	BlendMustComplete = mustComplete;
 }
 
 const HAnimClass* Animatable3DObjClass::Peek_Animation_Blend_Source(float& weight, float& duration) const
@@ -1081,9 +1096,9 @@ void Animatable3DObjClass::Single_Anim_Progress ()
 	//
 	WWASSERT(CurMotionMode == SINGLE_ANIM);
 
+	const int time = WW3D::Get_Logic_Time_Milliseconds();
 	if (BlendSource.Motion)
 	{
-		const int time = WW3D::Get_Logic_Time_Milliseconds();
 		const float elapsed = (time - ModeAnim.LastSyncTime) * 0.001f;
 		BlendRemainingFrames -= elapsed * ModeAnim.Motion->Get_Frame_Rate() * ModeAnim.frameRateMultiplier;
 		if (BlendRemainingFrames > 0.0f)
@@ -1098,12 +1113,31 @@ void Animatable3DObjClass::Single_Anim_Progress ()
 		}
 	}
 
+	if (QueuedBlend.Motion)
+	{
+		QueuedBlend.frameRateMultiplier = ModeAnim.frameRateMultiplier;
+		QueuedBlend.PrevFrame = QueuedBlend.Frame;
+		QueuedBlend.Frame = Compute_Current_Frame(&QueuedBlend.animDirection, &QueuedBlend);
+		QueuedBlend.LastSyncTime = time;
+	}
+
 	//
 	// Update the frame number and sync time
 	//
 	ModeAnim.PrevFrame		= ModeAnim.Frame;
 	ModeAnim.Frame				= Compute_Current_Frame(&ModeAnim.animDirection);
-	ModeAnim.LastSyncTime	= WW3D::Get_Logic_Time_Milliseconds();
+	ModeAnim.LastSyncTime = time;
+
+	if (!BlendSource.Motion && QueuedBlend.Motion)
+	{
+		const AnimationTrack next = QueuedBlend;
+		QueuedBlend.Motion = nullptr;
+		Set_Animation_With_Blend(next.Motion, next.Frame, next.AnimMode, QueuedBlendFrames, QueuedBlendMustComplete);
+		ModeAnim.PrevFrame = next.Frame;
+		ModeAnim.animDirection = next.animDirection;
+		ModeAnim.frameRateMultiplier = next.frameRateMultiplier;
+		next.Motion->Release_Ref();
+	}
 }
 
 
@@ -1150,6 +1184,18 @@ HAnimClass * Animatable3DObjClass::Peek_Animation_And_Info(float& frame, int& nu
 	} else {
 		return nullptr;
 	}
+}
+
+HAnimClass* Animatable3DObjClass::Peek_Requested_Animation_And_Info(float& frame, int& numFrames, int& mode, float& mult)
+{
+	if (!QueuedBlend.Motion)
+		return Peek_Animation_And_Info(frame, numFrames, mode, mult);
+
+	frame = QueuedBlend.Frame;
+	numFrames = QueuedBlend.Motion->Get_Num_Frames();
+	mode = QueuedBlend.AnimMode;
+	mult = ModeAnim.frameRateMultiplier;
+	return QueuedBlend.Motion;
 }
 
 /***********************************************************************************************

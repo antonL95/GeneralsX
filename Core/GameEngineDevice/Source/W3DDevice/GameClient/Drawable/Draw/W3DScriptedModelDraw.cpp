@@ -221,7 +221,8 @@ void W3DScriptedModelDrawModuleData::parseAnimationState(INI* ini, void* instanc
 		name.toLower();
 		state.draw.m_animations.emplace_back(name, type == StateType::Idle, animation.distance);
 		state.draw.m_animations.back().setPlayback(static_cast<RenderObjClass::AnimMode>(animation.mode),
-			animation.minSpeed, animation.maxSpeed, animation.blendTime < 0.0f ? Animation::DEFAULT_BLEND_FRAMES : animation.blendTime);
+			animation.minSpeed, animation.maxSpeed,
+			animation.blendTime < 0.0f ? Animation::DEFAULT_BLEND_FRAMES : animation.blendTime, animation.mustCompleteBlend);
 		state.draw.m_animations.back().setUseWeaponTiming(animation.useWeaponTiming);
 		state.draw.m_animations.back().setPriority(animation.priority);
 	}

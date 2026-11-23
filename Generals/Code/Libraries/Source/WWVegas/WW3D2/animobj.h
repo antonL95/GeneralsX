@@ -93,8 +93,10 @@ public:
 
 	virtual HAnimClass *	Peek_Animation_And_Info(float& frame, int& numFrames, int& mode, float& mult);	// 020710 srj -- added
 
-	void Set_Animation_With_Blend(HAnimClass* motion, float frame, int mode, float blendFrames);
+	void Set_Animation_With_Blend(HAnimClass* motion, float frame, int mode, float blendFrames, bool mustComplete);
 	const HAnimClass* Peek_Animation_Blend_Source(float& weight, float& duration) const;
+	HAnimClass* Peek_Queued_Animation() const { return QueuedBlend.Motion; }
+	HAnimClass* Peek_Requested_Animation_And_Info(float& frame, int& numFrames, int& mode, float& mult);
 
 	virtual HAnimClass *			Peek_Animation() override;
 	virtual bool					Is_Animation_Complete() const;
@@ -192,8 +194,12 @@ protected:
 	int								CurMotionMode;
 
 	AnimationTrack BlendSource{};
+	AnimationTrack QueuedBlend{};
 	float BlendTotalFrames = 0.0f;
 	float BlendRemainingFrames = 0.0f;
+	float QueuedBlendFrames = 0.0f;
+	bool BlendMustComplete = false;
+	bool QueuedBlendMustComplete = false;
 
 	union {
 		// CurMotionMode == SINGLE_ANIM
