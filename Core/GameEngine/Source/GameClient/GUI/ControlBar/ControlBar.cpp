@@ -3109,6 +3109,7 @@ void ControlBar::setPortraitByObject( Object *obj )
 				thing = nullptr;
 		}
 
+		m_retailPortraitObject = thing ? obj->getID() : INVALID_ID;
 		m_retailPortrait->winHide(!thing);
 		if (!thing)
 			GadgetStaticTextSetText(m_retailSelectionName, UnicodeString::TheEmptyString);

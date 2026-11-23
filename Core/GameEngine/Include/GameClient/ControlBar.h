@@ -1059,6 +1059,7 @@ protected:
 	GameWindow *m_contextParent[ NUM_CONTEXT_PARENTS ];		///< "parent" window for buttons that are part of the context sensitive interface
 	GameWindow *m_retailSelectionName = nullptr;
 	GameWindow *m_retailPortrait = nullptr;
+	ObjectID m_retailPortraitObject = INVALID_ID;
 	GameWindow *m_retailResources = nullptr;
 	GameWindow *m_retailCommandPoints = nullptr;
 	mutable DisplayString *m_retailLevelLabel = nullptr;
@@ -1121,6 +1122,7 @@ protected:
 	Int getRetailTrayChoice(const GameWindow *control) const;
 	void updateRetailTray();
 	const Object* getRetailSelection() const;
+	const Object* getRetailPortraitObject() const;
 	const Object* getRetailFormationSource(const CommandButton* command) const;
 	Int getRetailFormationChoice(const CommandButton* command) const;
 	void initRetailRadial(GameWindow *master);

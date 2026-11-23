@@ -512,11 +512,13 @@ void ControlBar::drawRetailTexts() const
 	drawTextWindow(m_retailCommandPoints, 1, text);
 	if (!m_retailPortrait->winIsHidden())
 	{
-		const Object* object = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+		const Object* object = getRetailPortraitObject();
 		const Real remaining = object && object->isLocallyControlled() ? RetailWorldUI::remainingLifetime(*object) : 0.0f;
 		const Bool timed = remaining > 0.0f;
 		const Int maximumRank = ExperienceLevelStore::maximumRank(object);
-		if (timed || maximumRank > 1)
+		const Bool hero = object && object->isKindOf(KINDOF_HERO);
+		const Bool ranked = hero ? maximumRank > 0 : m_currContext != CB_CONTEXT_MULTI_SELECT && maximumRank > 1;
+		if (timed || ranked)
 		{
 			const auto* tracker = object->getExperienceTracker();
 			const Int rank = timed ? -1 : tracker->getRank();
@@ -748,9 +750,10 @@ Bool ControlBar::toggleRetailAutoAbility(const GameWindow* window)
 
 void ControlBar::showRetailLevelTooltip() const
 {
-	const Object* object = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+	const Object* object = getRetailPortraitObject();
 	const Int maximum = ExperienceLevelStore::maximumRank(object);
-	if (!TheMouse || maximum <= 1)
+	if (!TheMouse || !object || maximum == 0 ||
+		(!object->isKindOf(KINDOF_HERO) && (maximum == 1 || m_currContext == CB_CONTEXT_MULTI_SELECT)))
 		return;
 	Mouse::RetailTooltip tooltip;
 	tooltip.title = object->getDisplayName();
@@ -1004,6 +1007,11 @@ const Object* ControlBar::getRetailSelection() const
 	if (!draw && m_currContext == CB_CONTEXT_MULTI_SELECT)
 		draw = TheInGameUI->getFirstSelectedDrawable();
 	return draw ? draw->getObject() : nullptr;
+}
+
+const Object* ControlBar::getRetailPortraitObject() const
+{
+	return TheGameLogic ? TheGameLogic->findObjectByID(m_retailPortraitObject) : nullptr;
 }
 
 const Object* ControlBar::getRetailFormationSource(const CommandButton* command) const

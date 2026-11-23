@@ -38,8 +38,37 @@
 #include "GameClient/GadgetPushButton.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/InGameUI.h"
+#include "GameLogic/ExperienceLevelStore.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
 
+namespace
+{
+Object* chooseRetailMultiPortrait(const DrawableList& selected)
+{
+	Object* first = nullptr;
+	Object* hero = nullptr;
+	Int rank = 0;
+	for (Drawable* drawable : selected)
+	{
+		Object* object = drawable->getObject();
+		if (!object || object->isEffectivelyDead() || object->isKindOf(KINDOF_IGNORED_IN_GUI) ||
+			object->testStatus(OBJECT_STATUS_SOLD))
+			continue;
+		if (!first)
+			first = object;
+		if (!object->isKindOf(KINDOF_HERO) || ExperienceLevelStore::maximumRank(object) == 0)
+			continue;
+		const Int candidateRank = object->getExperienceTracker()->getRank();
+		if (!hero || candidateRank > rank || (candidateRank == rank && object->getID() < hero->getID()))
+		{
+			hero = object;
+			rank = candidateRank;
+		}
+	}
+	return hero ? hero : first;
+}
+}
 
 
 
@@ -286,6 +315,7 @@ void ControlBar::populateMultiSelect()
 
 	if (m_retailSelectionName)
 	{
+		portraitObj = chooseRetailMultiPortrait(*selectedDrawables);
 		for (const Drawable* drawable : *selectedDrawables)
 		{
 			const Object* object = drawable->getObject();
@@ -332,6 +362,12 @@ void ControlBar::updateContextMultiSelect()
 
 	// get the list of drawable IDs from the in game UI
 	const DrawableList *selectedDrawables = TheInGameUI->getAllSelectedDrawables();
+	if (m_retailSelectionName)
+	{
+		Object* portrait = chooseRetailMultiPortrait(*selectedDrawables);
+		if (portrait != getRetailPortraitObject())
+			setPortraitByObject(portrait);
+	}
 
 	// sanity
 	DEBUG_ASSERTCRASH( selectedDrawables->empty() == FALSE, ("populateMultiSelect: Drawable list is empty") );
