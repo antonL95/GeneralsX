@@ -1,0 +1,14 @@
+20 create Player_1 ArnorHalbarad 0 3240,690,0
+21 reveal Player_1 ArnorHalbarad 0
+22 objupgrade Player_1 ArnorHalbarad 0 Upgrade_ObjectLevel10
+36 power Player_1 ArnorHalbarad 0 SpecialAbilityArwenBanner
+36 aim Player_1 ArnorHalbarad 0 20,0
+85 ocl-fade-trace Player_1 BannerOfArwen 0
+100 ocl-fade-trace Player_1 BannerOfArwen 0
+140 ocl-fade-trace Player_1 BannerOfArwen 0
+200 ocl-fade-trace Player_1 BannerOfArwen 0
+150 move Player_1 ArnorHalbarad 0 155,45
+230 ocl-fade-trace Player_1 BannerOfArwen 0
+350 ocl-fade-trace Player_1 BannerOfArwen 0
+658 ocl-fade-trace Player_1 BannerOfArwen 0
+670 ocl-fade-trace Player_1 BannerOfArwen 0
