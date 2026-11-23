@@ -2,6 +2,7 @@
 
 #include "Common/RetailFileLayers.h"
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "W3DDevice/GameClient/RetailTerrainShadow.h"
 #include "W3DDevice/GameClient/TerrainTex.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
@@ -43,6 +44,8 @@ struct PackedMesh
 namespace
 {
 
+constexpr auto normalMappedEffect = "shaders/compiled/normalmapped.fxo";
+
 struct TextureRelease
 {
 	void operator()(TextureClass *texture) const { texture->Release_Ref(); }
@@ -57,14 +60,21 @@ public:
 	{
 		for (auto &pass : passes)
 			pass.reset();
+		for (auto &pass : shadowed)
+			pass.reset();
+		composite.reset();
 		initialized.fill(false);
+		shadowsInitialized = false;
 	}
 	void ReAcquireResources() override {}
 
 	std::array<std::unique_ptr<NativePass>, 2> passes;
+	std::array<std::unique_ptr<NativePass>, 4> shadowed;
+	std::unique_ptr<NativePass> composite;
 	std::set<std::string, std::less<>> traced;
 	std::array<bool, 2> initialized{};
 	std::array<bool, 2> reportedFailure{};
+	bool shadowsInitialized = false;
 };
 
 std::unique_ptr<NormalMappedRuntime> runtime;
@@ -162,7 +172,7 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	if (!runtime->initialized[slot])
 	{
 		runtime->initialized[slot] = true;
-		if (const auto effect = loadEffectFile(normalMapped ? "shaders/compiled/normalmapped.fxo" : "shaders/compiled/defaultw3d.fxo"))
+		if (const auto effect = loadEffectFile(normalMapped ? normalMappedEffect : "shaders/compiled/defaultw3d.fxo"))
 			pass = normalMapped ? NativePass::makeNormalMapped(device, *effect, DX8Wrapper::Create_Effect_Shader9)
 				: NativePass::makeDefaultMesh(device, *effect, DX8Wrapper::Create_Effect_Shader9);
 		if (!pass)
@@ -176,7 +186,12 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 	auto *normal = nativeTexture(normalTexture.get());
 	auto *base = nativeTexture(diffuse);
 	auto *mask = nativeTexture(shroud->getShroudTexture());
-	const auto cloud = normalMapped ? nullptr : nativeTexture(TheTerrainRenderObject->peekCloudTexture());
+	D3DXMATRIX worldToShadow;
+	float shadowTexel = 0.0f;
+	void *shadow = nullptr;
+	const bool useShadows = normalMapped && material.technique == 2 && TheRetailTerrainShadow &&
+		TheRetailTerrainShadow->getAuthoredShadow(shadow, worldToShadow, shadowTexel);
+	const auto cloud = !normalMapped || useShadows ? nativeTexture(TheTerrainRenderObject->peekCloudTexture()) : nullptr;
 	if ((normalMapped && !normal) || !base || !mask)
 		return false;
 	PackedMesh temporary;
@@ -237,6 +252,18 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 			++numDirectional;
 		}
 	}
+	if (useShadows && !runtime->shadowsInitialized)
+	{
+		runtime->shadowsInitialized = true;
+		if (const auto effect = loadEffectFile(normalMappedEffect))
+		{
+			runtime->composite = NativePass::makeNormalMappedComposite(device, *effect, DX8Wrapper::Create_Effect_Shader9);
+			if (runtime->composite)
+				for (unsigned index = 0; index < runtime->shadowed.size(); ++index)
+					runtime->shadowed[index] = NativePass::makeShadowedNormalMapped(device, *effect,
+						DX8Wrapper::Create_Effect_Shader9, (index & 1u) != 0, (index & 2u) != 0);
+		}
+	}
 	const auto setBinding = [&](const Binding &binding, std::span<Register> floats, std::span<int>) {
 		if (floats.empty())
 			return;
@@ -254,6 +281,12 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 			writeMatrix(floats, inverseView);
 		else if (name == "Shroud")
 			floats[0] = shroudUV;
+		else if (name == "ShadowInfo" && useShadows)
+		{
+			writeMatrix(floats, worldToShadow);
+			if (floats.size() > 4)
+				floats[4] = {0.0f, 0.0f, shadowTexel, shadowTexel};
+		}
 		else if (name == "Fog")
 			std::copy_n(fog.begin(), std::min(fog.size(), floats.size()), floats.begin());
 		else if (name == "DirectionalLight")
@@ -295,13 +328,23 @@ bool drawRetailMesh(MeshClass &mesh, TextureClass *diffuse, TextureClass *second
 		if (name == "DiffuseTexture" || name == "Texture_0") return base;
 		if (name == "ShroudTexture") return mask;
 		if (name == "CloudTexture") return cloud;
+		if (name == "ShadowMap") return shadow;
 		return nullptr;
 	};
 	const bool alphaTest = normalMapped ? material.get<bool>("AlphaTestEnable", false) :
 		shader.Get_Alpha_Test() != ShaderClass::ALPHATEST_DISABLE;
-	const bool drawn = pass->drawNormalMapped(device, geometry.vertices, geometry.indices, setBinding, getTexture,
-		alphaTest, shader.Get_Depth_Mask() == ShaderClass::DEPTH_WRITE_ENABLE,
-		model.Get_Flag(MeshGeometryClass::TWO_SIDED) || shader.Get_Cull_Mode() == ShaderClass::CULL_MODE_DISABLE);
+	const auto draw = [&](NativePass &effectPass) {
+		return effectPass.drawNormalMapped(device, geometry.vertices, geometry.indices, setBinding, getTexture,
+			alphaTest, shader.Get_Depth_Mask() == ShaderClass::DEPTH_WRITE_ENABLE,
+			model.Get_Flag(MeshGeometryClass::TWO_SIDED) || shader.Get_Cull_Mode() == ShaderClass::CULL_MODE_DISABLE);
+	};
+	const auto variant = (havePoint ? 1u : 0u) | (fog[0][0] != 0.0f ? 2u : 0u);
+	const auto &shadowedPass = runtime->shadowed[variant];
+	const bool drewShadows = useShadows && shadowedPass && runtime->composite &&
+		draw(*shadowedPass) && draw(*runtime->composite);
+	const bool drawn = drewShadows || draw(*pass);
+	if (drewShadows)
+		label = "NormalMapped Default with authored shadows";
 	if (drawn && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS") && runtime->traced.insert(mesh.Get_Name()).second)
 		std::fprintf(stderr, "[RetailFX] Drew %s (%s)\n", label, mesh.Get_Name());
 	if (!drawn && !runtime->reportedFailure[slot])

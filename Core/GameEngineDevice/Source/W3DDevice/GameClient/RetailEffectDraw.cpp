@@ -88,6 +88,7 @@ struct NativePass::Data
 	Program vs;
 	Program ps;
 	bool useCategoryDepthAndCull = false;
+	bool composite = false;
 
 	bool draw(IDirect3DDevice9 *device, const SetBinding &setBinding,
 		const std::function<void *(std::string_view)> &getTexture,
@@ -124,6 +125,18 @@ std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *handle, const Eff
 	return make(handle, effect, createShader, Kind::NormalMapped);
 }
 
+std::unique_ptr<NativePass> NativePass::makeShadowedNormalMapped(void *handle, const Effect &effect,
+	CreateShader createShader, bool pointLight, bool fog)
+{
+	const unsigned variant = 1u | (pointLight ? 2u : 0u) | (fog ? 8u : 0u);
+	return make(handle, effect, createShader, Kind::ShadowedNormalMapped, variant);
+}
+
+std::unique_ptr<NativePass> NativePass::makeNormalMappedComposite(void *handle, const Effect &effect, CreateShader createShader)
+{
+	return make(handle, effect, createShader, Kind::NormalMappedComposite);
+}
+
 std::unique_ptr<NativePass> NativePass::makeDefaultMesh(void *handle, const Effect &effect, CreateShader createShader)
 {
 	return make(handle, effect, createShader, Kind::DefaultMesh);
@@ -134,27 +147,32 @@ std::unique_ptr<NativePass> NativePass::makeVegetation(void *handle, const Effec
 	return make(handle, effect, createShader, Kind::Vegetation);
 }
 
-std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect, CreateShader createShader, Kind kind)
+std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect, CreateShader createShader,
+	Kind kind, unsigned pixelVariant)
 {
 	auto *device = static_cast<IDirect3DDevice9 *>(handle);
 	const bool shadowTerrain = kind == Kind::ShadowTerrain;
 	const bool terrain = kind == Kind::Terrain || shadowTerrain;
-	const bool model = kind == Kind::NormalMapped;
+	const bool shadowModel = kind == Kind::ShadowedNormalMapped;
+	const bool composite = kind == Kind::NormalMappedComposite;
+	const bool fullModel = shadowModel || composite;
+	const bool model = kind == Kind::NormalMapped || fullModel;
 	const bool defaultMesh = kind == Kind::DefaultMesh;
 	const bool vegetation = kind == Kind::Vegetation;
 	const bool fullWater = kind == Kind::FullWater;
 	const bool pcaWater = kind == Kind::PcaWater;
-	const std::string_view techniqueName = terrain || defaultMesh || vegetation ? "Default" :
+	const std::string_view techniqueName = terrain || defaultMesh || vegetation || fullModel ? "Default" :
 		model ? "Default_M" : pcaWater ? "PCA_U" : fullWater ? "BumpSpecular" : "BumpSpecular_M";
 	const char *effectName = terrain ? "Terrain" : model ? "NormalMapped" :
 		defaultMesh ? "DefaultW3D" : vegetation ? "Vegetation" : "WaterShader";
 	const auto technique = std::find_if(effect.techniques.begin(), effect.techniques.end(),
 		[&](const auto &item) { return item.name == techniqueName; });
-	if (!device || technique == effect.techniques.end() || technique->passes.size() != 1)
+	if (!device || technique == effect.techniques.end() || technique->passes.size() != (fullModel ? 2u : 1u))
 		return nullptr;
 	auto data = std::make_unique<Data>();
 	data->useCategoryDepthAndCull = defaultMesh;
-	for (const auto &state : technique->passes[0].states)
+	data->composite = composite;
+	for (const auto &state : technique->passes[composite ? 1 : 0].states)
 	{
 		if (state.operation == 146 || state.operation == 147)
 		{
@@ -166,11 +184,13 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 			if (state.resourceUsage == ResourceUsage::ArraySelector)
 			{
 				const std::string_view array = terrain && !vertex ? "PSDefault_Array" :
+					composite ? (vertex ? "VS1_Array" : "PS1_Array") :
+					shadowModel ? (vertex ? "VS_Array" : "PS_Array") :
 					model ? (vertex ? "VS_M_Array" : "PS_M_Array") :
 					defaultMesh ? (vertex ? "VS_Array" : "PS_Array") : vegetation && !vertex ? "PS_Array" :
 						fullWater && !vertex ? "PSBumpSpecular_Array" : pcaWater && !vertex ? "PSPCAUltra_Array" : "";
 				const unsigned variant = terrain ? (shadowTerrain ? 9 : 4) :
-					vertex || vegetation || fullWater || pcaWater ? 0 : defaultMesh ? 37 : 1;
+					vertex || vegetation || fullWater || pcaWater ? 0 : shadowModel ? pixelVariant : defaultMesh ? 37 : 1;
 				if (array.empty() || state.parameterReference != array)
 					return nullptr;
 				const auto parameter = std::find_if(effect.parameters.begin(), effect.parameters.end(),
@@ -225,7 +245,7 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 		sampler->white = terrain && sampler->texture == "ShroudTexture";
 		data->samplers.push_back(std::move(*sampler));
 	}
-	if (terrain || defaultMesh || vegetation)
+	if (terrain || defaultMesh || vegetation || shadowModel)
 	{
 		IDirect3DTexture9 *texture = nullptr;
 		if (FAILED(device->CreateTexture(1, 1, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &texture, nullptr)))
@@ -423,7 +443,9 @@ bool NativePass::drawNormalMapped(void *handle, std::span<const NormalMappedVert
 	return m_data->draw(device, setBinding, getTexture, [&] {
 		const bool categoryState = m_data->useCategoryDepthAndCull;
 		if (FAILED(device->SetRenderState(D3DRS_ALPHATESTENABLE, alphaTest ? TRUE : FALSE)) ||
-			FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE)) ||
+			FAILED(device->SetRenderState(D3DRS_ALPHABLENDENABLE, m_data->composite ? TRUE : FALSE)) ||
+			(m_data->composite && (FAILED(device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD)) ||
+				FAILED(device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, FALSE)))) ||
 			FAILED(device->SetRenderState(D3DRS_FOGENABLE, FALSE)) ||
 			(categoryState && FAILED(device->SetRenderState(D3DRS_ZWRITEENABLE, depthWrite ? TRUE : FALSE))) ||
 			((categoryState || twoSided) && FAILED(device->SetRenderState(D3DRS_CULLMODE, twoSided ? D3DCULL_NONE : D3DCULL_CW))))
@@ -443,6 +465,8 @@ std::unique_ptr<NativePass> NativePass::makePcaWater(void *, const Effect &, Cre
 std::unique_ptr<NativePass> NativePass::makeTerrain(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeTerrainWithShadows(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *, const Effect &, CreateShader) { return nullptr; }
+std::unique_ptr<NativePass> NativePass::makeShadowedNormalMapped(void *, const Effect &, CreateShader, bool, bool) { return nullptr; }
+std::unique_ptr<NativePass> NativePass::makeNormalMappedComposite(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeDefaultMesh(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeVegetation(void *, const Effect &, CreateShader) { return nullptr; }
 
