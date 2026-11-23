@@ -13,6 +13,27 @@
 
 namespace
 {
+void requestFixtureYield(const RetailTestCommands::Context& ctx)
+{
+	Object* object = ctx.requireObject();
+	AIUpdateInterface* ai = object ? object->getAI() : nullptr;
+	const std::string_view targets(ctx.argument);
+	const auto separator = targets.find(',');
+	const auto requesterName = targets.substr(0, separator);
+	Object* requester = ctx.findTarget(requesterName, true);
+	if (!ai || !requester)
+		return;
+
+	Object* previous = separator == std::string_view::npos ? requester : ctx.findTarget(targets.substr(separator + 1), true);
+	const Bool waiting = ai->isWaitingForPath();
+	const Bool active = previous && ai->isMovingAwayFrom(previous);
+	ai->aiMoveAwayFromUnit(requester, CMD_FROM_AI);
+	std::fprintf(stderr, "TEST hero-bump-yield %u %s %.*s waiting=%d active=%d accepted=%d path=%d\n",
+		ctx.frame, object->getTemplate()->getName().str(), static_cast<int>(requesterName.size()), requesterName.data(),
+		static_cast<int>(waiting), static_cast<int>(active),
+		static_cast<int>(ai->isMovingAwayFrom(requester)), ai->getPath() ? 1 : 0);
+}
+
 void probeHeroBump(const RetailTestCommands::Context& ctx)
 {
 	Object* object = ctx.requireObject();
@@ -48,6 +69,7 @@ void registerRetailHeroBumpTestCommands()
 {
 #if !RTS_GENERALS
 	registerAction("hero-bump-probe", probeHeroBump);
+	registerAction("hero-bump-yield", requestFixtureYield);
 #endif
 }
 }

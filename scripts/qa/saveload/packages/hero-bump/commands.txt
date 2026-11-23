@@ -7,3 +7,26 @@
 190 track Player_1 HeroBumpKnights 0
 190 move Player_1 HeroBumpMount 0 - 2335 1340
 196 builderscriptmove Player_1 HeroBumpKnights 0 - 2010 1340
+250 create Player_1 YieldSingleFighter 0 1255,185,0
+250 create Player_1 YieldDoubleFighter 0 1255,275,0
+250 create Player_1 YieldSingleRider 0 1350,185,180
+250 create Player_1 YieldFirstRider 0 1350,275,180
+250 create Player_1 YieldSecondRider 0 1255,315,270
+251 stance Player_1 YieldSingleFighter 0 HoldGround
+251 stance Player_1 YieldDoubleFighter 0 HoldGround
+251 stance Player_1 YieldSingleRider 0 HoldGround
+251 stance Player_1 YieldFirstRider 0 HoldGround
+251 stance Player_1 YieldSecondRider 0 HoldGround
+258 builderscriptmove Player_1 YieldSingleRider 0 - 1200 185
+258 builderscriptmove Player_1 YieldFirstRider 0 - 1200 275
+264 builderscriptmove Player_1 YieldSingleFighter 0 - 1365 185
+264 hero-bump-yield Player_1 YieldSingleFighter 0 Player_1:YieldSingleRider:0
+264 builderscriptmove Player_1 YieldDoubleFighter 0 - 1365 275
+264 hero-bump-yield Player_1 YieldDoubleFighter 0 Player_1:YieldFirstRider:0
+268 builderscriptmove Player_1 YieldSecondRider 0 - 1255 225
+271 hero-bump-yield Player_1 YieldDoubleFighter 0 Player_1:YieldSecondRider:0,Player_1:YieldFirstRider:0
+441 destroy Player_1 YieldSingleFighter 0
+441 destroy Player_1 YieldDoubleFighter 0
+441 destroy Player_1 YieldSingleRider 0
+441 destroy Player_1 YieldFirstRider 0
+441 destroy Player_1 YieldSecondRider 0

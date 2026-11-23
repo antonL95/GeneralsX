@@ -909,8 +909,7 @@ StateReturnType AIStateMachine::updateStateMachine()
 			temporaryState->onExit(EXIT_NORMAL);
 			m_temporaryState = nullptr;
 			if (RetailFileLayers::enabled() && temporaryState->getID() == AI_MOVE_OUT_OF_THE_WAY &&
-				getCurrentStateID() == AI_MOVE_TO && getOwner()->isKindOf(KINDOF_HERO) &&
-				!getOwner()->getAI()->isMovingWithRetailGroup())
+				getCurrentStateID() == AI_MOVE_TO)
 			{
 				static_cast<AIMoveToState*>(internalGetState(AI_MOVE_TO))->resumeAfterYield();
 			}
