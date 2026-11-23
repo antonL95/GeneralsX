@@ -1,0 +1,15 @@
+198 create Player_1 EngagedFixtureFighter 0 75,1250,90
+201 engaged-probe Player_1 EngagedFixtureFighter 0
+202 create PlyrCreeps EngagedFixtureTarget 0 75,1270,270
+202 orderattack Player_1 EngagedFixtureFighter 0 PlyrCreeps:EngagedFixtureTarget:0
+208 engaged-probe Player_1 EngagedFixtureFighter 0
+210 damage Player_1 EngagedFixtureFighter 0 5
+212 engaged-probe Player_1 EngagedFixtureFighter 0
+220 engaged-relocate PlyrCreeps EngagedFixtureTarget 0 75,1410
+236 engaged-probe Player_1 EngagedFixtureFighter 0
+240 destroy PlyrCreeps EngagedFixtureTarget 0
+244 engaged-probe Player_1 EngagedFixtureFighter 0
+245 engaged-probe Player_1 EngagedFixtureFighter 0
+264 engaged-probe Player_1 EngagedFixtureFighter 0
+272 engaged-probe Player_1 EngagedFixtureFighter 0
+280 destroy Player_1 EngagedFixtureFighter 0
