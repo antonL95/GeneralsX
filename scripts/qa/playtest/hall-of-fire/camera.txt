@@ -1,0 +1,3 @@
+62 Player_1 ArnorSpellBook 3320 1720 0.65
+155 Player_1 RivendellHallOfFire 3340 1640 0.82
+229 Player_1 RivendellHallOfFire 3370 1540 0.55

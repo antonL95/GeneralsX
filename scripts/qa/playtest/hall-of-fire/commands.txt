@@ -1,0 +1,12 @@
+45 create Player_1 ArnorSpellBook 0 3300,1720,0
+46 science Player_1 - 0 SCIENCE_HallOfFire
+47 power-reveal - - 0
+65 create PlyrCreeps GondorFighter 0 3310,1720,0
+80 hall-cast Player_1 ArnorSpellBook 0 cast 3300 1720
+86 hall-residents Player_1 RivendellHallOfFire 0
+107 hall-residents Player_1 RivendellHallOfFire 0
+159 select Player_1 RivendellHallOfFire 0
+170 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnGilGaladDummy 3370 1540
+173 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnTurinDummy 3370 1540
+237 hall-probe Player_1 RivendellGilGalad 0 arrival 3370 1540
+270 hall-probe Player_1 RivendellGilGalad 0 settled 3370 1540
