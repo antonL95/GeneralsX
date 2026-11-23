@@ -473,10 +473,11 @@ void PathfindCell::clearObstruction()
  */
 Bool PathfindCell::setTypeAsObstacle( Object *obstacle, Bool isFence, const ICoord2D &pos )
 {
-	if (m_type!=CELL_CLEAR && m_type != CELL_IMPASSABLE) {
+	const Bool isRubble = obstacle->getBodyModule() && obstacle->getBodyModule()->getDamageState() == BODY_RUBBLE;
+	const Bool replacesRubble = RetailFileLayers::enabled() && m_type == CELL_RUBBLE && !isRubble;
+	if (m_type != CELL_CLEAR && m_type != CELL_IMPASSABLE && !replacesRubble) {
 		if (m_type == CELL_OBSTACLE && m_obstacleID != INVALID_ID && m_obstacleID != obstacle->getID() &&
-			RetailFileLayers::enabled() &&
-			(!obstacle->getBodyModule() || obstacle->getBodyModule()->getDamageState() != BODY_RUBBLE))
+			RetailFileLayers::enabled() && !isRubble)
 		{
 			auto& others = sharedObstacles()[this];
 			CellObstacle added{obstacle->getID(), isFence, obstacle->isKindOf(KINDOF_CAN_SEE_THROUGH_STRUCTURE)};
@@ -495,12 +496,6 @@ Bool PathfindCell::setTypeAsObstacle( Object *obstacle, Bool isFence, const ICoo
 			return true;
 		}
 		return false;
-	}
-
-	Bool isRubble = false;
-	if (obstacle->getBodyModule() && obstacle->getBodyModule()->getDamageState() == BODY_RUBBLE)
-	{
-		isRubble = true;
 	}
 
 	if (isRubble) {
