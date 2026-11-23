@@ -398,11 +398,8 @@ static Bool canRepairStructure(const Object* obj, const Object* objectToRepair, 
 		for( Int i = 0; commands && i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i )
 		{
 			const CommandButton *button = commands->getCommandButton( i );
-			if (!button || !(button->getOptions() & NEED_TARGET_ALLY_OBJECT))
-				continue;
-			const auto* power = button->getSpecialPowerTemplate();
-			if (button->getCommandType() == GUI_COMMAND_START_NEIGHBORHOOD_REPAIR ||
-				(power && power->getSpecialPowerType() == SPECIAL_REPAIR_STRUCTURE && source->getSpecialPowerModule(power)))
+			if (button && button->getCommandType() == GUI_COMMAND_START_NEIGHBORHOOD_REPAIR &&
+				(button->getOptions() & NEED_TARGET_ALLY_OBJECT))
 			{
 				allowsRepair = TRUE;
 				break;
