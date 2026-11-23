@@ -1,2 +1,2 @@
 102 Player_1 RivendellHallOfFire 2625 145 0.78
-360 Player_1 ElvenGreenPasture 250 3180 0.58
+360 Player_1 ElvenGreenPasture 3100 220 0.58
