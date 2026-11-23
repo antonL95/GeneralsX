@@ -240,10 +240,22 @@ expect() {
 run save start -file "$map"
 expect save "TEST snapshot-save frame=$save_frame code=0"
 
+check_package_step() {
+    if check_output=$(package_step "$@" 2>&1); then
+        [ -z "$check_output" ] || printf '%s\n' "$check_output"
+    else
+        printf 'Package assertion failed: %s (%s%s)\n' "$1" "$2" "${3:+ $3}" >&2
+        [ -z "$check_output" ] || printf '%s\n' "$check_output" >&2
+        return 1
+    fi
+}
+
 check_packages() {
     failed=
     for name in $packages; do
-        if ! package_step "$name" check "$1" || ! package_step "$name" check resume || ! package_step "$name" compare; then
+        if ! check_package_step "$name" check "$1" ||
+           ! check_package_step "$name" check resume ||
+           ! check_package_step "$name" compare; then
             failed="${failed:+$failed }$name"
         fi
     done
