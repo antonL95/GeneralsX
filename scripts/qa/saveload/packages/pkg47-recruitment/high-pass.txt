@@ -6,9 +6,14 @@
 90 create Player_1 Pkg47ControlArcher 0 2100,2400,0
 90 create Player_2 Pkg47Near 0 2160,2400,0
 90 create Player_2 Pkg47Far 0 2230,2400,0
+90 create Player_2 Pkg47ChangedArcher 0 1800,3150,0
+90 create Player_1 Pkg47Near 0 1860,3150,0
+90 create Player_1 Pkg47Far 0 1930,3150,0
 91 stance Player_1 Pkg47ChangedArcher 0 Aggressive
 91 stance Player_1 Pkg47ControlArcher 0 Aggressive
+91 stance Player_2 Pkg47ChangedArcher 0 Aggressive
 92 attackmove Player_1 Pkg47ChangedArcher 0 at 2300 1480
 93 attackmove Player_1 Pkg47ControlArcher 0 at 2300 2400
 180 pkg47-target Player_1 Pkg47ChangedArcher 0
 180 pkg47-target Player_1 Pkg47ControlArcher 0
+180 pkg47-target Player_2 Pkg47ChangedArcher 0

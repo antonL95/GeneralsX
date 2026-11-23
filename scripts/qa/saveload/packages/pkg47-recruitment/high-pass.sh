@@ -1,7 +1,8 @@
 check() {
     if covers 180; then
-        expect "TEST pkg47 target frame=180 source=Pkg47ChangedArcher target=Pkg47Far" || return 1
-        expect "TEST pkg47 target frame=180 source=Pkg47ControlArcher target=Pkg47Near" || return 1
+        expect "TEST pkg47 target frame=180 owner=human source=Pkg47ChangedArcher target=Pkg47Far" || return 1
+        expect "TEST pkg47 target frame=180 owner=human source=Pkg47ControlArcher target=Pkg47Near" || return 1
+        expect "TEST pkg47 target frame=180 owner=computer source=Pkg47ChangedArcher target=Pkg47Far" || return 1
     fi
     awk -F '\t' -v first="$first" -v end="$end" '
         $1 == "AI_UNIT_PRIORITY" && $3 == 4 {
