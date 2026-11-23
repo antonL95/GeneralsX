@@ -1411,6 +1411,8 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 /// -----------------------------------------------------------------------------------------------
 DECLARE_PERF_TIMER(GameEngine_update)
 
+void updateRetailPauseMenu();
+
 /** -----------------------------------------------------------------------------------------------
  * Update the game engine by updating the GameClient and GameLogic singletons.
  */
@@ -1431,6 +1433,7 @@ void GameEngine::update()
 			TheAudio->UPDATE();
 			TheGameClient->UPDATE();
 			TheMessageStream->propagateMessages();
+			updateRetailPauseMenu();
 
 			if (TheNetwork != nullptr)
 			{

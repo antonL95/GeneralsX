@@ -30,6 +30,8 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"
 #include <cstdio>
+#include <fstream>
+#include <limits>
 #ifndef _WIN32
 #include <filesystem>     // std::filesystem for Linux directory operations
 #include "socket_compat.h" // CreateDirectory stub for Linux
@@ -664,6 +666,23 @@ SaveResult GameState::missionSave()
 
 }
 
+static Bool hasCompleteRetailSaveBlocks(const AsciiString &path)
+{
+	std::ifstream probe(path.str(), std::ios::binary);
+	UnsignedByte length;
+	Char token[std::numeric_limits<UnsignedByte>::max() + 1];
+	while (probe.read(reinterpret_cast<char *>(&length), sizeof length) && length && probe.read(token, length))
+	{
+		token[length] = '\0';
+		if (length == std::strlen(SAVE_FILE_EOF) && stricmp(token, SAVE_FILE_EOF) == 0)
+			return TRUE;
+		XferBlockSize size;
+		if (!probe.read(reinterpret_cast<char *>(&size), sizeof size) || size < 0 || !probe.seekg(size, std::ios::cur))
+			return FALSE;
+	}
+	return FALSE;
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Load the save game pointed to by filename */
 // ------------------------------------------------------------------------------------------------
@@ -672,6 +691,10 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	// sanity check for file
 	if( doesSaveGameExist( gameInfo.filename ) == FALSE )
 		return SC_FILE_NOT_FOUND;
+
+	const AsciiString filepath = getSaveGamePathForRead(gameInfo.filename);
+	if (RetailFileLayers::enabled() && TheGameLogic->isInGame() && !hasCompleteRetailSaveBlocks(filepath))
+		return SC_INVALID_DATA;
 
 	// clear game data just like loading from the debug map load screen for mission saves
 	if( gameInfo.saveGameInfo.saveFileType == SAVE_FILE_TYPE_MISSION )
@@ -687,8 +710,6 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	// from any previously loaded save game files
 	//
 	TheGameStateMap->clearScratchPadMaps();
-
-	AsciiString filepath = getSaveGamePathForRead(gameInfo.filename);
 
 	// open the save file
 	XferLoad xferLoad;

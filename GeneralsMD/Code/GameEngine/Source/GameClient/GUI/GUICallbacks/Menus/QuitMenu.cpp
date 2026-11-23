@@ -30,10 +30,18 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <algorithm>
+#include <array>
+#include <vector>
+
+#include "Common/AudioAffect.h"
+#include "Common/AudioSettings.h"
 #include "Common/FramePacer.h"
+#include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
 #include "Common/GameState.h"
 #include "Common/MessageStream.h"
+#include "Common/OptionPreferences.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
@@ -57,8 +65,10 @@
 #include "GameClient/DisplayString.h"
 #include "GameClient/DisplayStringManager.h"
 #include "GameClient/GameFont.h"
+#include "GameClient/IMEManager.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/RetailOptions.h"
+#include "GameClient/MapUtil.h"
 #include "GameLogic/ScriptEngine.h"
 
 
@@ -86,16 +96,34 @@ static NameKeyType buttonReturn = NAMEKEY_INVALID;
 static NameKeyType buttonOptions = NAMEKEY_INVALID;
 static NameKeyType buttonSaveLoad = NAMEKEY_INVALID;
 
+static void restartMissionMenu();
+
 namespace
 {
-enum class PauseChoice { None, Resume, Leave, Settings };
+enum class PausePage { Main, Save, Load, ConfirmLeave, ConfirmRestart };
+enum class PauseChoice { None = -1, Settings, Save, Load, Restart, Leave, Resume, Count };
 
 GameWindow *retailPauseMenu = nullptr;
 Bool retailMenuPausedGame = FALSE;
-Bool confirmLeave = FALSE;
 Bool leaveQueued = FALSE;
+PausePage pausePage = PausePage::Main;
 PauseChoice pauseSelection = PauseChoice::Resume;
 PauseChoice pausePress = PauseChoice::None;
+UnicodeString saveName;
+UnicodeString saveFeedback;
+struct PauseSave
+{
+	AvailableGameInfo game;
+	UnicodeString title;
+	UnicodeString map;
+	UnicodeString time;
+	UnicodeString date;
+};
+std::vector<PauseSave> saves;
+Int selectedSave = 0;
+Int firstSave = 0;
+Bool loadQueued = FALSE;
+Bool restartQueued = FALSE;
 
 struct PauseCard
 {
@@ -110,12 +138,33 @@ struct PauseCard
 	}
 };
 
+struct PauseLabel
+{
+	const char *key;
+	const WideChar *fallback;
+};
+
 constexpr Int pauseDesignHeight = 768;
-constexpr PauseCard pausePanel{360, 312, 304, 170};
-constexpr PauseCard extendedPausePanel{360, 312, 304, 220};
-constexpr PauseCard resumeButton{376, 370, 272, 42};
-constexpr PauseCard leaveButton{376, 421, 272, 42};
-constexpr PauseCard settingsButton{376, 472, 272, 42};
+constexpr PauseCard pausePanel{360, 205, 304, 332};
+constexpr PauseCard confirmationPanel{360, 312, 304, 170};
+constexpr PauseCard savesPanel{230, 195, 564, 378};
+constexpr PauseCard acceptButton{529, 520, 174, 36};
+constexpr PauseCard cancelButton{321, 520, 174, 36};
+constexpr Int firstFileRow = 272;
+constexpr Int fileRowHeight = 26;
+constexpr Int visibleFiles = 7;
+constexpr Int saveColumnEdges[] = {260, 431, 586, 651, 764};
+constexpr PauseLabel saveColumns[] = {
+	{"GUI:Name", L"Name"}, {"GUI:Map", L"Map"}, {"GUI:Time", L"Time"}, {"GUI:Date", L"Date"},
+};
+constexpr PauseLabel mainLabels[] = {
+	{"GUI:Settings", L"Settings"},
+	{"GUI:SaveGame", L"Save"},
+	{"GUI:LoadGame", L"Load"},
+	{"GUI:Restart", L"Restart"},
+	{"GUI:LeaveMatch", L"Leave Match"},
+	{"GUI:Resume", L"Resume"},
+};
 
 PauseCard pauseCardOnScreen(PauseCard card)
 {
@@ -124,18 +173,107 @@ PauseCard pauseCardOnScreen(PauseCard card)
 		Int(card.width * scale), Int(card.height * scale)};
 }
 
-PauseCard pauseButtonOnScreen(PauseChoice choice)
+PauseCard pauseButton(PauseChoice choice)
 {
-	const Bool topButton = (choice == PauseChoice::Resume) != confirmLeave;
-	return pauseCardOnScreen(topButton ? resumeButton : leaveButton);
+	if (pausePage == PausePage::ConfirmRestart)
+		return choice == PauseChoice::Restart ? PauseCard{376, 430, 128, 36} : PauseCard{520, 430, 128, 36};
+	if (pausePage == PausePage::ConfirmLeave)
+		return choice == PauseChoice::Leave ? PauseCard{376, 370, 272, 42} : PauseCard{376, 421, 272, 42};
+	return {376, 230 + Int(choice) * 51, 272, 39};
 }
 
-void drawPauseLabel(DisplayString *text, PauseCard card, const char *key, const WideChar *fallback)
+PauseCard fileRow(Int index)
 {
-	text->setText(TheGameText->fetchOrSubstitute(key, fallback));
+	return {252, firstFileRow + index * fileRowHeight, 520, fileRowHeight};
+}
+
+PauseCard fileCell(Int rowY, Int column)
+{
+	return {saveColumnEdges[column], rowY, saveColumnEdges[column + 1] - saveColumnEdges[column] - 8, fileRowHeight};
+}
+
+Bool choiceAvailable(PauseChoice choice)
+{
+	if (choice == PauseChoice::Restart)
+		return !TheGameLogic->isInMultiplayerGame() &&
+			(!TheGameLogic->isInSkirmishGame() || TheSkirmishGameInfo != nullptr);
+	if (choice == PauseChoice::Save || choice == PauseChoice::Load)
+		return !TheGameLogic->isInMultiplayerGame() && !TheGameLogic->isInReplayGame();
+	return TRUE;
+}
+
+PauseChoice confirmedChoice()
+{
+	if (pausePage == PausePage::ConfirmRestart)
+		return PauseChoice::Restart;
+	if (pausePage == PausePage::ConfirmLeave)
+		return PauseChoice::Leave;
+	return PauseChoice::None;
+}
+
+UnicodeString pauseText(PauseLabel label)
+{
+	return TheGameText->fetchOrSubstitute(label.key, label.fallback);
+}
+
+void drawPauseLabel(DisplayString *text, PauseCard card, UnicodeString label, Bool centered = TRUE)
+{
+	card = pauseCardOnScreen(card);
 	Int width, height;
+	text->setText(label);
 	text->getSize(&width, &height);
-	text->draw(card.x + (card.width - width) / 2, card.y + (card.height - height) / 2, 0xFFF5F6F7, 0);
+	while (width > card.width && !label.isEmpty())
+	{
+		label.removeLastChar();
+		text->setText(label);
+		text->getSize(&width, &height);
+	}
+	text->draw(card.x + (centered ? (card.width - width) / 2 : 0),
+		card.y + (card.height - height) / 2, 0xFFF5F6F7, 0);
+}
+
+void fillPauseCard(PauseCard card, Color color, Bool border = FALSE)
+{
+	card = pauseCardOnScreen(card);
+	TheDisplay->drawFillRect(card.x, card.y, card.width, card.height, color);
+	if (border)
+		TheDisplay->drawOpenRect(card.x, card.y, card.width, card.height, 1.0f, 0xFF7897A8);
+}
+
+void drawPauseFiles(DisplayString *text)
+{
+	const Bool saving = pausePage == PausePage::Save;
+	fillPauseCard(savesPanel, 0xFF14212A, TRUE);
+	drawPauseLabel(text, {321, 210, 382, 35},
+		pauseText(saving ? PauseLabel{"GUI:SaveGame", L"Save Game"} : PauseLabel{"GUI:LoadGame", L"Load Game"}));
+	for (Int column = 0; column < Int(std::size(saveColumns)); ++column)
+		drawPauseLabel(text, fileCell(firstFileRow - fileRowHeight, column), pauseText(saveColumns[column]), FALSE);
+	for (Int row = 0; row < visibleFiles && firstSave + row < Int(saves.size()); ++row)
+	{
+		const Int index = firstSave + row;
+		const PauseSave &save = saves[index];
+		const PauseCard box = fileRow(row);
+		fillPauseCard(box, !saving && index == selectedSave ? 0xFF365665 : 0xFF233741);
+		drawPauseLabel(text, fileCell(box.y, 0), save.title, FALSE);
+		drawPauseLabel(text, fileCell(box.y, 1), save.map, FALSE);
+		drawPauseLabel(text, fileCell(box.y, 2), save.time, FALSE);
+		drawPauseLabel(text, fileCell(box.y, 3), save.date, FALSE);
+	}
+	if (saving)
+	{
+		drawPauseLabel(text, {321, 461, 382, 23},
+			saveFeedback.isEmpty() ? pauseText({"GUI:SaveName", L"Save name"}) : saveFeedback, FALSE);
+		fillPauseCard({321, 484, 382, 27}, 0xFF233741, TRUE);
+		UnicodeString editing = saveName;
+		editing.concat(L'|');
+		drawPauseLabel(text, {329, 484, 366, 27}, editing, FALSE);
+	}
+	else
+		drawPauseLabel(text, {321, 487, 382, 27}, saveFeedback);
+	fillPauseCard(cancelButton, 0xFF233741);
+	fillPauseCard(acceptButton, saving || !saves.empty() ? 0xFF365665 : 0xFF233741);
+	drawPauseLabel(text, cancelButton, pauseText({"GUI:Cancel", L"Cancel"}));
+	drawPauseLabel(text, acceptButton, pauseText(mainLabels[Int(saving ? PauseChoice::Save : PauseChoice::Load)]));
 }
 
 void drawRetailPauseMenu(GameWindow *window, WinInstanceData *)
@@ -147,100 +285,175 @@ void drawRetailPauseMenu(GameWindow *window, WinInstanceData *)
 	if (oldWidth != width || oldHeight != height)
 		window->winSetSize(width, height);
 	TheDisplay->drawFillRect(0, 0, width, height, 0x98000000);
-	const PauseCard panel = pauseCardOnScreen(confirmLeave ? pausePanel : extendedPausePanel);
-	TheDisplay->drawFillRect(panel.x, panel.y, panel.width, panel.height, 0xFF14212A);
-	TheDisplay->drawOpenRect(panel.x, panel.y, panel.width, panel.height, 1.0f, 0xFF7897A8);
-
-	const PauseCard resume = pauseButtonOnScreen(PauseChoice::Resume);
-	const PauseCard leave = pauseButtonOnScreen(PauseChoice::Leave);
-	TheDisplay->drawFillRect(resume.x, resume.y, resume.width, resume.height,
-		pauseSelection == PauseChoice::Resume ? 0xFF365665 : 0xFF233741);
-	TheDisplay->drawFillRect(leave.x, leave.y, leave.width, leave.height,
-		pauseSelection == PauseChoice::Leave ? 0xFF365665 : 0xFF233741);
-
+	const PauseCard panel = pausePage == PausePage::Main ? pausePanel : confirmationPanel;
+	const PauseChoice confirm = confirmedChoice();
+	if (pausePage == PausePage::Main || confirm != PauseChoice::None)
+		fillPauseCard(panel, 0xFF14212A, TRUE);
 	GameFont *font = TheFontLibrary->getFontPixels("Albertus MT", 18 * height / pauseDesignHeight, FALSE);
 	if (!font)
 		return;
 	DisplayString *text = TheDisplayStringManager->newDisplayString();
 	text->setFont(font);
-	const PauseCard title = pauseCardOnScreen({376, 323, 272, 35});
-	if (confirmLeave)
+	if (pausePage == PausePage::Main)
 	{
-		drawPauseLabel(text, title, "GUI:LeaveMatch", L"Leave this match?");
-		drawPauseLabel(text, resume, "GUI:Cancel", L"Cancel");
+		drawPauseLabel(text, {376, 207, 272, 22}, pauseText({"GUI:MatchMenu", L"Match Menu"}));
+		for (Int i = 0; i < Int(PauseChoice::Count); ++i)
+		{
+			const auto choice = static_cast<PauseChoice>(i);
+			if (!choiceAvailable(choice))
+				continue;
+			const PauseCard box = pauseButton(choice);
+			fillPauseCard(box, pauseSelection == choice ? 0xFF365665 : 0xFF233741);
+			drawPauseLabel(text, box, pauseText(mainLabels[i]));
+		}
+	}
+	else if (confirm != PauseChoice::None)
+	{
+		drawPauseLabel(text, {376, 323, 272, 35}, pauseText(confirm == PauseChoice::Restart
+			? PauseLabel{"GUI:RestartPrompt", L"Restart this match?"}
+			: PauseLabel{"GUI:LeaveMatchPrompt", L"Leave this match?"}));
+		for (const PauseChoice choice : {confirm, PauseChoice::Resume})
+			fillPauseCard(pauseButton(choice), pauseSelection == choice ? 0xFF365665 : 0xFF233741);
+		drawPauseLabel(text, pauseButton(confirm), pauseText({"GUI:Yes", L"Yes"}));
+		drawPauseLabel(text, pauseButton(PauseChoice::Resume), pauseText({"GUI:No", L"No"}));
 	}
 	else
-	{
-		drawPauseLabel(text, title, "GUI:MatchMenu", L"Match Menu");
-		drawPauseLabel(text, resume, "GUI:Resume", L"Resume");
-	}
-	if (TheGameLogic->isInMultiplayerGame())
-		drawPauseLabel(text, leave, "GUI:LeaveMultiplayerMatch", L"Leave Match");
-	else
-		drawPauseLabel(text, leave, "GUI:LeaveForMainMenu", L"Return to Main Menu");
-	if (!confirmLeave)
-	{
-		const PauseCard settings = pauseCardOnScreen(settingsButton);
-		TheDisplay->drawFillRect(settings.x, settings.y, settings.width, settings.height,
-			pauseSelection == PauseChoice::Settings ? 0xFF365665 : 0xFF233741);
-		drawPauseLabel(text, settings, "APT:Settings", L"Settings");
-	}
+		drawPauseFiles(text);
 	TheDisplayStringManager->freeDisplayString(text);
+}
+
+void resetRetailPauseMenu(GameWindow *window)
+{
+	closeRetailOptionsFor(window);
+	if (TheIMEManager && TheIMEManager->isAttachedTo(window))
+		TheIMEManager->detach();
+	if (window != retailPauseMenu)
+		return;
+	retailPauseMenu = nullptr;
+	saves.clear();
+	loadQueued = FALSE;
+	restartQueued = FALSE;
+	if (TheInGameUI)
+		TheInGameUI->setQuitMenuVisible(FALSE);
 }
 
 WindowMsgHandledType retailPauseSystem(GameWindow *window, UnsignedInt message, WindowMsgData state, WindowMsgData data)
 {
-	if (message == GWM_INPUT_FOCUS && state == TRUE)
+	if (message == GWM_INPUT_FOCUS)
 	{
-		*reinterpret_cast<Bool *>(data) = TRUE;
+		if (TheIMEManager)
+		{
+			if (state == TRUE && pausePage == PausePage::Save)
+				TheIMEManager->attach(window);
+			else if (TheIMEManager->isAttachedTo(window))
+				TheIMEManager->detach();
+		}
+		*reinterpret_cast<Bool *>(data) = state == TRUE;
 		return MSG_HANDLED;
 	}
-	if (message == GWM_DESTROY && window == retailPauseMenu)
-	{
-		closeRetailOptionsFor(window);
-		retailPauseMenu = nullptr;
-		if (TheInGameUI)
-			TheInGameUI->setQuitMenuVisible(FALSE);
-	}
+	if (message == GWM_DESTROY)
+		resetRetailPauseMenu(window);
 	return MSG_IGNORED;
 }
 
 void closeRetailPauseMenu()
 {
-	closeRetailOptionsFor(retailPauseMenu);
-	TheWindowManager->winDestroy(retailPauseMenu);
-	retailPauseMenu = nullptr;
-	TheInGameUI->setQuitMenuVisible(FALSE);
+	GameWindow *window = retailPauseMenu;
+	resetRetailPauseMenu(window);
+	TheWindowManager->winDestroy(window);
 	if (retailMenuPausedGame && TheGameLogic->isGamePaused())
 		TheGameLogic->setGamePaused(FALSE);
 	retailMenuPausedGame = FALSE;
 }
 
+void showPauseMain()
+{
+	pausePage = PausePage::Main;
+	pauseSelection = PauseChoice::Resume;
+	pausePress = PauseChoice::None;
+	BitClear(retailPauseMenu->winGetInstanceData()->m_style, GWS_ENTRY_FIELD);
+	if (TheIMEManager && TheIMEManager->isAttachedTo(retailPauseMenu))
+		TheIMEManager->detach();
+}
+
+void openPauseFiles(PausePage page)
+{
+	pausePage = page;
+	saveName.clear();
+	saveFeedback.clear();
+	saves.clear();
+	for (const AvailableGameInfo *info = TheGameState->refreshAvailableGames(); info; info = info->next)
+	{
+		if (info->saveGameInfo.saveFileType == SAVE_FILE_TYPE_NORMAL)
+		{
+			const SaveGameInfo &game = info->saveGameInfo;
+			UnicodeString title = game.description;
+			if (title.isEmpty())
+				title.translate(info->filename);
+			UnicodeString map;
+			map.translate(game.mapLabel);
+			const AsciiString path = TheGameState->portableMapPathToRealMapPath(game.pristineMapName);
+			if (const MapMetaData *meta = TheMapCache->findMap(path))
+				map = meta->m_displayName;
+			const SaveDate &date = game.date;
+			const SYSTEMTIME time{date.year, date.month, date.dayOfWeek, date.day, date.hour, date.minute,
+				date.second, date.milliseconds};
+			saves.push_back({{info->filename, game, nullptr, nullptr}, title,
+				TheGameText->fetchOrSubstitute(game.mapLabel.str(), map.str()),
+				getUnicodeTimeBuffer(time), getUnicodeDateBuffer(time)});
+		}
+	}
+	firstSave = 0;
+	selectedSave = 0;
+	if (page == PausePage::Save)
+	{
+		BitSet(retailPauseMenu->winGetInstanceData()->m_style, GWS_ENTRY_FIELD);
+		if (TheIMEManager)
+			TheIMEManager->attach(retailPauseMenu);
+	}
+}
+
+void acceptPauseFiles()
+{
+	if (pausePage == PausePage::Load)
+	{
+		loadQueued = !saves.empty();
+		return;
+	}
+
+	saveName.trim();
+	if (saveName.isEmpty())
+	{
+		saveFeedback = pauseText({"GUI:EnterSaveName", L"Enter a save name."});
+		return;
+	}
+	if (TheGameState->saveGame({}, saveName, SAVE_FILE_TYPE_NORMAL).saveCode == SC_OK)
+		showPauseMain();
+	else
+		saveFeedback = pauseText({"GUI:SaveGameFailed", L"Could not save the match."});
+}
+
 void activatePauseChoice(PauseChoice choice)
 {
-	if (leaveQueued)
+	if (leaveQueued || loadQueued || restartQueued)
 		return;
 	switch (choice)
 	{
 		case PauseChoice::Resume:
-			if (confirmLeave)
-			{
-				confirmLeave = FALSE;
-				pauseSelection = PauseChoice::Resume;
-				pausePress = PauseChoice::None;
-			}
-			else
+			if (pausePage == PausePage::Main)
 				HideQuitMenu();
+			else
+				showPauseMain();
 			break;
 		case PauseChoice::Leave:
-			if (confirmLeave)
+			if (pausePage == PausePage::ConfirmLeave)
 			{
 				leaveQueued = TRUE;
 				TheGameLogic->quit(FALSE);
 			}
 			else
 			{
-				confirmLeave = TRUE;
+				pausePage = PausePage::ConfirmLeave;
 				pauseSelection = PauseChoice::Resume;
 				pausePress = PauseChoice::None;
 			}
@@ -248,37 +461,123 @@ void activatePauseChoice(PauseChoice choice)
 		case PauseChoice::Settings:
 			openRetailOptions(retailPauseMenu, TRUE);
 			break;
-		case PauseChoice::None:
+		case PauseChoice::Save:
+			openPauseFiles(PausePage::Save);
 			break;
+		case PauseChoice::Load:
+			openPauseFiles(PausePage::Load);
+			break;
+		case PauseChoice::Restart:
+			if (pausePage == PausePage::ConfirmRestart)
+				restartQueued = TRUE;
+			else
+			{
+				pausePage = PausePage::ConfirmRestart;
+				pauseSelection = PauseChoice::Resume;
+				pausePress = PauseChoice::None;
+			}
+			break;
+		default:
+			break;
+	}
+}
+
+void stepPauseChoice(Int direction)
+{
+	if (const PauseChoice confirm = confirmedChoice(); confirm != PauseChoice::None)
+	{
+		pauseSelection = pauseSelection == PauseChoice::Resume ? confirm : PauseChoice::Resume;
+		return;
+	}
+	const Int count = Int(PauseChoice::Count);
+	do
+	{
+		pauseSelection = static_cast<PauseChoice>((Int(pauseSelection) + count + direction) % count);
+	}
+	while (!choiceAvailable(pauseSelection));
+}
+
+void moveSaveSelection(Int direction)
+{
+	if (saves.empty())
+		return;
+	if (pausePage == PausePage::Save)
+	{
+		firstSave = std::clamp(firstSave + direction, 0, std::max(0, Int(saves.size()) - visibleFiles));
+		return;
+	}
+	selectedSave = std::clamp(selectedSave + direction, 0, Int(saves.size()) - 1);
+	firstSave = std::clamp(firstSave, std::max(0, selectedSave - visibleFiles + 1), selectedSave);
+}
+
+void pauseFilesInput(UnsignedInt message, WindowMsgData point, WindowMsgData state)
+{
+	if (loadQueued)
+		return;
+	const Bool saving = pausePage == PausePage::Save;
+	const Bool key = message == GWM_CHAR && (state & KEY_STATE_UP);
+	if (saving && message == GWM_IME_CHAR && point >= L' ' && point != 127 && saveName.getLength() < 32)
+	{
+		saveFeedback.clear();
+		saveName.concat(static_cast<WideChar>(point));
+	}
+	else if (key && saving && point == KEY_BACKSPACE && !saveName.isEmpty())
+		saveName.removeLastChar();
+	else if (key && point == KEY_ESC)
+		showPauseMain();
+	else if (key && (point == KEY_ENTER || point == KEY_KPENTER))
+		acceptPauseFiles();
+	else if (message == GWM_WHEEL_UP || (key && point == KEY_UP))
+		moveSaveSelection(-1);
+	else if (message == GWM_WHEEL_DOWN || (key && point == KEY_DOWN))
+		moveSaveSelection(1);
+	else if (message == GWM_LEFT_UP)
+	{
+		const Int x = point & 0xFFFF;
+		const Int y = point >> 16;
+		if (pauseCardOnScreen(cancelButton).contains(x, y))
+			showPauseMain();
+		else if (pauseCardOnScreen(acceptButton).contains(x, y))
+			acceptPauseFiles();
+		else if (!saving)
+		{
+			for (Int row = 0; row < visibleFiles && firstSave + row < Int(saves.size()); ++row)
+				if (pauseCardOnScreen(fileRow(row)).contains(x, y))
+					selectedSave = firstSave + row;
+		}
 	}
 }
 
 WindowMsgHandledType retailPauseInput(GameWindow *, UnsignedInt message, WindowMsgData point, WindowMsgData state)
 {
+	if (pausePage == PausePage::Save || pausePage == PausePage::Load)
+	{
+		pauseFilesInput(message, point, state);
+		return MSG_HANDLED;
+	}
 	if (message == GWM_CHAR && (state & KEY_STATE_UP))
 	{
 		if (point == KEY_ESC)
 			activatePauseChoice(PauseChoice::Resume);
-		else if (point == KEY_ENTER)
+		else if (point == KEY_ENTER || point == KEY_KPENTER)
 			activatePauseChoice(pauseSelection);
 		else if (point == KEY_UP || point == KEY_DOWN || point == KEY_TAB)
-		{
-			const Int count = confirmLeave ? 2 : 3;
-			const Int index = Int(pauseSelection) - Int(PauseChoice::Resume);
-			pauseSelection = PauseChoice(Int(PauseChoice::Resume) + (index + (point == KEY_UP ? -1 : 1) + count) % count);
-		}
+			stepPauseChoice(point == KEY_UP ? -1 : 1);
 	}
 	if (message == GWM_MOUSE_POS || message == GWM_LEFT_DOWN || message == GWM_LEFT_UP)
 	{
 		const Int x = point & 0xFFFF;
 		const Int y = point >> 16;
 		PauseChoice at = PauseChoice::None;
-		if (pauseButtonOnScreen(PauseChoice::Resume).contains(x, y))
-			at = PauseChoice::Resume;
-		else if (pauseButtonOnScreen(PauseChoice::Leave).contains(x, y))
-			at = PauseChoice::Leave;
-		else if (!confirmLeave && pauseCardOnScreen(settingsButton).contains(x, y))
-			at = PauseChoice::Settings;
+		const PauseChoice confirm = confirmedChoice();
+		for (Int i = 0; i < Int(PauseChoice::Count); ++i)
+		{
+			const auto choice = static_cast<PauseChoice>(i);
+			if (confirm != PauseChoice::None && choice != PauseChoice::Resume && choice != confirm)
+				continue;
+			if (choiceAvailable(choice) && pauseCardOnScreen(pauseButton(choice)).contains(x, y))
+				at = choice;
+		}
 		if (at != PauseChoice::None)
 			pauseSelection = at;
 		if (message == GWM_LEFT_DOWN)
@@ -305,10 +604,8 @@ void openRetailPauseMenu()
 	retailPauseMenu->winSetDrawFunc(drawRetailPauseMenu);
 	retailPauseMenu->winSetInputFunc(retailPauseInput);
 	retailPauseMenu->winSetSystemFunc(retailPauseSystem);
-	confirmLeave = FALSE;
 	leaveQueued = FALSE;
-	pauseSelection = PauseChoice::Resume;
-	pausePress = PauseChoice::None;
+	showPauseMain();
 	HideDiplomacy();
 	HideInGameChat();
 	TheControlBar->hidePurchaseScience();
@@ -327,6 +624,41 @@ void openRetailPauseMenu()
 	if (retailMenuPausedGame)
 		TheGameLogic->setGamePaused(TRUE);
 }
+}
+
+void updateRetailPauseMenu()
+{
+	if (restartQueued)
+	{
+		restartQueued = FALSE;
+		restartMissionMenu();
+		return;
+	}
+	if (!loadQueued)
+		return;
+
+	const AvailableGameInfo selected = saves[selectedSave].game;
+	loadQueued = FALSE;
+	SaveCode result = SC_ERROR;
+	try
+	{
+		result = TheGameState->loadGame(selected);
+	}
+	catch (...)
+	{
+	}
+	if (result == SC_OK)
+		return;
+	const UnicodeString failure = pauseText({"GUI:SaveGameLoadFailed", L"Could not load the match."});
+	if (retailPauseMenu && TheGameLogic->isInGame())
+		saveFeedback = failure;
+	else
+	{
+		TheWritableGlobalData->m_initialFile.clear();
+		TheGameEngine->setQuitting(FALSE);
+		TheShell->showShell(TRUE);
+		MessageBoxOk(pauseText({"GUI:LoadGame", L"Load Game"}), failure, nullptr);
+	}
 }
 
 static void initGadgetsFullQuit()
