@@ -20,6 +20,7 @@
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/WeaponNugget.h"
 
 using namespace AttributeModifierRules;
@@ -315,6 +316,7 @@ void AttributeModifierHelper::refreshDerived()
 				conditions.push_back(tmpl->m_modelCondition);
 		}
 	}
+	const ModelConditionFlags previousConditions = obj->getLogicModelConditions();
 	for (Int condition : m_appliedConditions)
 	{
 		if (std::find(conditions.begin(), conditions.end(), condition) == conditions.end())
@@ -326,6 +328,8 @@ void AttributeModifierHelper::refreshDerived()
 			obj->setModelConditionState((ModelConditionFlagType)condition);
 	}
 	m_appliedConditions = conditions;
+	if (previousConditions != obj->getLogicModelConditions())
+		RetailBuildingEvents::modelConditionsChanged(*obj, previousConditions);
 }
 
 void AttributeModifierHelper::scheduleWake()

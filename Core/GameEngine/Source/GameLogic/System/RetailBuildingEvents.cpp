@@ -13,6 +13,7 @@
 
 #include "Common/File.h"
 #include "Common/FileSystem.h"
+#include "Common/GameState.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
@@ -47,6 +48,13 @@ struct Operation
 
 using Program = std::vector<Operation>;
 
+struct ModelConditionEvent
+{
+	std::string name;
+	ModelConditionFlags required;
+	ModelConditionFlags forbidden;
+};
+
 struct EventList
 {
 	std::string parent;
@@ -80,13 +88,49 @@ std::string attribute(const std::string& tag, const char* key)
 	return std::regex_search(tag, match, value) ? match[1].str() : std::string();
 }
 
-std::map<std::string, EventList> readEventLists(std::string xml)
+bool isDirectEvent(std::string_view event)
+{
+	return event == "OnBuildingComplete" || event == "Rider8IsActive" || event == "Rider8IsNotActive" ||
+		event == "UserSixIsActive" || event == "UserSixIsNotActive";
+}
+
+std::vector<ModelConditionEvent> readModelConditionEvents(const std::string& xml)
+{
+	static const std::regex declaration(R"(<ModelConditionEvent\s+([^>]+)>\s*<Conditions>([^<]+)</Conditions>\s*</ModelConditionEvent>)");
+	std::vector<ModelConditionEvent> rules;
+	for (auto it = std::sregex_iterator(xml.begin(), xml.end(), declaration); it != std::sregex_iterator(); ++it)
+	{
+		ModelConditionEvent event{attribute((*it)[1].str(), "Name"), {}, {}};
+		if (event.name.empty())
+			continue;
+		std::istringstream conditions((*it)[2].str());
+		std::string token;
+		Bool valid = TRUE;
+		while (conditions >> token)
+		{
+			const Int bit = ModelConditionFlags::getSingleBitFromName(token.c_str() + 1);
+			if (bit < 0 || (token.front() != '+' && token.front() != '-'))
+			{
+				valid = FALSE;
+				break;
+			}
+			(token.front() == '+' ? event.required : event.forbidden).set(bit);
+		}
+		if (valid && (event.required.any() || event.forbidden.any()))
+			rules.push_back(std::move(event));
+	}
+	return rules;
+}
+
+std::map<std::string, EventList> readEventLists(std::string xml, std::vector<ModelConditionEvent>* modelConditions = nullptr)
 {
 	for (std::size_t start = xml.find("<!--"); start != std::string::npos; start = xml.find("<!--", start))
 	{
 		const auto end = xml.find("-->", start + 4);
 		xml.erase(start, end == std::string::npos ? end : end + 3 - start);
 	}
+	if (modelConditions)
+		*modelConditions = readModelConditionEvents(xml);
 	std::map<std::string, EventList> lists;
 	for (std::size_t start = 0; (start = xml.find("<EventList", start)) != std::string::npos;)
 	{
@@ -120,9 +164,9 @@ std::map<std::string, EventList> readEventLists(std::string xml)
 				continue;
 			const std::string fields = xml.substr(fieldsStart, fieldsEnd - fieldsStart);
 			const auto event = attribute(fields, "EventName");
-			if (event == "OnCreated" || event == "OnBuildingComplete" ||
-				event == "Rider8IsActive" || event == "Rider8IsNotActive" ||
-				event == "UserSixIsActive" || event == "UserSixIsNotActive")
+			if (event == "OnCreated" || isDirectEvent(event) ||
+				(modelConditions && std::any_of(modelConditions->begin(), modelConditions->end(),
+					[&event](const ModelConditionEvent& condition) { return condition.name == event; })))
 				entry.handlers[event] = attribute(fields, "ScriptFunctionName");
 			else if (event == "OnAflame" || event == "OnQuenched" || event == "ReallyDamaged" ||
 				event == "User45IsActive" || event == "User45IsNotActive")
@@ -208,10 +252,11 @@ bool compile(const std::vector<std::string>& lines, Program& program)
 
 struct BuildingEvents
 {
+	std::vector<ModelConditionEvent> modelConditions;
 	std::map<std::string, EventList> lists;
 	std::map<std::string, Program> programs;
 
-	BuildingEvents() : lists(readEventLists(readData("Data\\Scripts\\ScriptEvents.xml")))
+	BuildingEvents() : lists(readEventLists(readData("Data\\Scripts\\ScriptEvents.xml"), &modelConditions))
 	{
 		std::map<std::string, std::vector<std::string>> bodies;
 		std::map<std::string, bool> establishedHandlers;
@@ -220,7 +265,7 @@ struct BuildingEvents
 				if (!handler.empty())
 				{
 					bodies.try_emplace(handler);
-					if (event != "OnCreated")
+					if (isDirectEvent(event))
 						establishedHandlers[handler] = true;
 				}
 
@@ -261,14 +306,20 @@ struct BuildingEvents
 	}
 };
 
-void dispatch(Object& object, const char* event)
+const BuildingEvents& buildingEvents()
+{
+	static const BuildingEvents events;
+	return events;
+}
+
+void dispatch(Object& object, const char* event, bool modelConditionChange = false)
 {
 	if (!RetailFileLayers::enabled() || !object.getAIUpdateInterface())
 		return;
 	const AsciiString& listName = object.getAIUpdateInterface()->getRetailLuaEventsList();
 	if (listName.isEmpty())
 		return;
-	static const BuildingEvents events;
+	const auto& events = buildingEvents();
 	auto list = events.lists.find(listName.str());
 	for (std::size_t depth = 0; list != events.lists.end() && depth < events.lists.size(); ++depth)
 	{
@@ -280,6 +331,11 @@ void dispatch(Object& object, const char* event)
 		}
 		const auto found = events.programs.find(handler->second);
 		if (found == events.programs.end())
+			return;
+		if (modelConditionChange && !std::all_of(found->second.begin(), found->second.end(), [](const Operation& operation)
+		{
+			return operation.action == Action::Grant || operation.action == Action::Remove;
+		}))
 			return;
 		const std::string_view eventName(event);
 		const bool creation = eventName == "OnCreated";
@@ -377,6 +433,26 @@ void RetailBuildingEvents::trollEatingChanged(Object& object, bool enabled)
 {
 	dispatch(object, enabled ? "UserSixIsActive" : "UserSixIsNotActive");
 }
+
+#if !RTS_GENERALS
+void RetailBuildingEvents::modelConditionsChanged(Object& object, const ModelConditionFlags& previous)
+{
+	if (!RetailFileLayers::enabled() || !object.areModulesReady() || !object.isKindOf(KINDOF_HORDE) ||
+		object.isEffectivelyDead() || !object.getAIUpdateInterface() ||
+		object.getAIUpdateInterface()->getRetailLuaEventsList().isEmpty() || (TheGameState && TheGameState->isInLoadGame()))
+		return;
+	const ModelConditionFlags current = object.getLogicModelConditions();
+	for (const auto& event : buildingEvents().modelConditions)
+	{
+		if (!current.testSetAndClear(event.required, event.forbidden) ||
+			previous.testSetAndClear(event.required, event.forbidden))
+			continue;
+		dispatch(object, event.name.c_str(), true);
+		if (object.isDestroyed() || object.isEffectivelyDead())
+			return;
+	}
+}
+#endif
 
 namespace
 {
