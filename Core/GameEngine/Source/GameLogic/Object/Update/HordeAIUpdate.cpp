@@ -145,6 +145,13 @@ Bool HordeAIUpdate::hasRecentContact() const
 		m_contactUntil > TheGameLogic->getFrame();
 }
 
+Object* HordeAIUpdate::getAttackTarget() const
+{
+	if (!RetailFileLayers::enabled())
+		return nullptr;
+	return liveTarget(m_attackTarget);
+}
+
 void HordeAIUpdate::retaliate(Object* victim, Object* attacker)
 {
 	Object* anchor = HordeContain::get(victim) ? victim : HordeContain::getAnchor(victim);

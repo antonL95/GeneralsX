@@ -2121,6 +2121,12 @@ void SpecialAbilityUpdate::startFacing()
 }
 
 //-------------------------------------------------------------------------------------------------
+Real SpecialAbilityUpdate::getStartAbilityRangeFor(const SpecialPowerTemplate* power) const
+{
+	const auto* data = getSpecialAbilityUpdateModuleData();
+	return data->m_specialPowerTemplate == power ? data->m_startAbilityRange : 0.0f;
+}
+
 const SpecialPowerTemplate* SpecialAbilityUpdate::getTemplate() const
 {
 	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();

@@ -16,7 +16,9 @@
 #include "GameLogic/Module/AIUpdate.h"
 #if RTS_ZEROHOUR
 #include "GameLogic/AISkirmishPlayer.h"
+#include "GameLogic/HeroRoster.h"
 #include "GameLogic/Module/AutoPickUpUpdate.h"
+#include "GameLogic/Module/SpecialAbilityUpdate.h"
 #endif
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
@@ -92,6 +94,82 @@ void parseSpecialPowerAIType(INI* ini, void*, void* store, const void*)
 }
 
 #if RTS_ZEROHOUR
+Bool isActiveCommand(const Object& source, const CommandButton& button)
+{
+	const CommandSet* commands = TheRetailCommandCatalog->findCommandSet(source.getCommandSetString());
+	for (Int slot = 0; commands && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+		if (commands->getCommandButton(slot) == &button)
+			return TRUE;
+	return FALSE;
+}
+
+const Object* combatVictim(const Object& source)
+{
+	const auto* horde = static_cast<const HordeAIUpdate*>(source.findUpdateModule(NAMEKEY("HordeAIUpdate")));
+	const AIUpdateInterface* ai = source.getAI();
+	const Object* victim = horde ? horde->getAttackTarget() : (ai ? ai->getCurrentVictim() : nullptr);
+	return victim && !victim->isEffectivelyDead() && source.getRelationship(victim) == ENEMIES ? victim : nullptr;
+}
+
+Bool canPoisonVictim(const Object& source, const Object& victim)
+{
+	constexpr Real poisonDistanceSquared = 10000.0f;
+	return !victim.isKindOf(KINDOF_STRUCTURE) && !victim.isKindOf(KINDOF_MACHINE) &&
+		!victim.isKindOf(KINDOF_SHIP) &&
+		ThePartitionManager->getDistanceSquared(&source, &victim, FROM_CENTER_2D) < poisonDistanceSquared;
+}
+
+Real bodyHealthFraction(const Object& object)
+{
+	const auto* body = object.getBodyModule();
+	const Real maximum = body->getMaxHealth();
+	return maximum > 0.0f ? body->getHealth() / maximum : 1.0f;
+}
+
+Bool canUseSelfBuff(const Object& source)
+{
+	constexpr Real selfBuffHealthLimit = 0.8f;
+	const auto* horde = HordeContain::get(&source);
+	if (!horde)
+		return bodyHealthFraction(source) < selfBuffHealthLimit;
+
+	const Int capacity = horde->getContainMax();
+	if (capacity <= 0)
+		return FALSE;
+	Real total = 0.0f;
+	for (const Object* member : *horde->getContainedItemsList())
+		if (member && !member->isEffectivelyDead())
+			total += bodyHealthFraction(*member);
+	return total / static_cast<Real>(capacity) < selfBuffHealthLimit;
+}
+
+Real targetKillerRange(const Object& source, const SpecialPowerTemplate& power, Real authoredRange)
+{
+	if (authoredRange > 0.0f)
+		return authoredRange;
+	for (BehaviorModule** mod = source.getBehaviorModules(); *mod; ++mod)
+	{
+		const auto* update = (*mod)->getSpecialPowerUpdateInterface();
+		if (!update || !update->isSpecialAbility())
+			continue;
+		const Real range = static_cast<const SpecialAbilityUpdate*>(update)->getStartAbilityRangeFor(&power);
+		if (range > 0.0f)
+			return range;
+	}
+	return power.getMaxCastRange();
+}
+
+void tracePowerTarget(const Object& source, const SpecialPowerTemplate& power, const Object& target, ObjectShroudStatus shroud)
+{
+	static const Bool trace = std::getenv("GENERALSX_SKIRMISH_AI_TRACE") != nullptr;
+	if (trace)
+	{
+		std::fprintf(stderr, "AI_TARGET\t%u\t%d\t%s\t%d\t%d\t%d\n", TheGameLogic->getFrame(),
+			source.getControllingPlayer()->getPlayerIndex(), power.getName().str(), source.getID(), target.getID(), shroud);
+		std::fflush(stderr);
+	}
+}
+
 void scoutWithPower(Object& source, const CommandButton& button, const SpecialPowerTemplate& power, Real range)
 {
 	constexpr Int samplesPerAxis = 16;
@@ -219,31 +297,25 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 
 	const auto* data = getAISpecialPowerUpdateModuleData();
 	const CommandButton* button = TheRetailCommandCatalog->findCommandButton(data->m_commandButtonName);
-	if (button && button->getCommandType() == GUI_COMMAND_WAKE_AUTO_PICKUP)
+	if (!button || data->m_specialPowerAIType < 0 || !isActiveCommand(*source, *button))
+		return checkAgain;
+	const std::string_view policy(specialPowerAITypes[data->m_specialPowerAIType]);
+	const Bool selfBuff = policy == "AI_SPECIAL_POWER_BASIC_SELF_BUFF";
+	if (button->getCommandType() == GUI_COMMAND_WAKE_AUTO_PICKUP)
 	{
-		if (data->m_specialPowerAIType < 0 ||
-			std::string_view(specialPowerAITypes[data->m_specialPowerAIType]) != "AI_SPECIAL_POWER_BASIC_SELF_BUFF" ||
-			!AutoPickUpUpdate::canScanFromButton(source, button))
-			return checkAgain;
-		const CommandSet* commands = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
-		for (Int slot = 0; commands && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
-			if (commands->getCommandButton(slot) == button)
-			{
-				source->doCommandButton(button, CMD_FROM_AI);
-				break;
-			}
+		if (selfBuff && AutoPickUpUpdate::canScanFromButton(source, button))
+			source->doCommandButton(button, CMD_FROM_AI);
 		return checkAgain;
 	}
-	const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
-	if (!power || data->m_specialPowerAIType < 0 ||
-		TheRetailCommandCatalog->findPowerButton(source, power) != button)
+	const SpecialPowerTemplate* power = button->getSpecialPowerTemplate();
+	if (!power || TheRetailCommandCatalog->findPowerButton(source, power) != button ||
+		(BitIsSet(button->getOptions(), NEED_UPGRADE) && !HeroRoster::buttonUpgradesMet(button, player, source)))
 		return checkAgain;
 	const auto* module = source->getSpecialPowerModule(power);
 	if (!module || !module->isReady() || !module->isRetailCastAllowed(button->getOptions()) ||
 		!TheSpecialPowerStore->canUseSpecialPower(source, power))
 		return checkAgain;
 
-	const std::string_view policy(specialPowerAITypes[data->m_specialPowerAIType]);
 	const Bool always = policy == "AI_SPELLBOOK_ALWAYS_FIRE";
 	const Bool allyBattle = policy == "AI_SPELLBOOK_ASSIST_BATTLE_BUFF" ||
 		policy == "AI_SPELLBOOK_BUFFTERRAIN" || policy == "AI_SPECIAL_POWER_GIVEXP_AOE";
@@ -256,18 +328,40 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		policy == "AI_SPECIAL_POWER_ENEMY_TYPE_KILLER_STRUCTURES";
 	const Bool enemyArmy = policy == "AI_SPELLBOOK_ASSIST_BATTLE_DEBUFF" || policy == "AI_SPELLBOOK_ARMY_BREAKER" ||
 		policy == "AI_SPECIAL_POWER_RANGED_AOE_ATTACK" || policy == "AI_SPECIAL_POWER_RANGED_AOE_ATTACK_UNITS" ||
-		policy == "AI_SPECIAL_POWER_ENEMY_TYPE_KILLER" || policy == "AI_SPECIAL_POWER_ENEMY_TYPE_KILLER_RANGED";
+		policy == "AI_SPECIAL_POWER_ENEMY_TYPE_KILLER_RANGED";
+	const Bool enemyTypeKiller = policy == "AI_SPECIAL_POWER_ENEMY_TYPE_KILLER";
+	const Bool goblinPoison = policy == "AI_SPECIAL_POWER_GOBLIN_POISON";
 	const Bool reveal = policy == "AI_SPELLBOOK_SHROUD_REVEAL";
 	const Bool captureCreep = policy == "AI_SPELLBOOK_CAPTURE_CREEP";
-	const Bool selfBattle = policy == "AI_SPECIAL_POWER_BASIC_SELF_BUFF" || policy == "AI_SPECIAL_POWER_BASIC_SELF_DEBUFF";
-	if (!(always || allyBattle || repair || heal || allyEconomy || enemyStructure || enemyArmy || reveal || captureCreep || selfBattle))
+	const Bool selfDebuff = policy == "AI_SPECIAL_POWER_BASIC_SELF_DEBUFF";
+	if (!(always || allyBattle || repair || heal || allyEconomy || enemyStructure || enemyArmy ||
+		reveal || captureCreep || selfBuff || selfDebuff || goblinPoison || enemyTypeKiller))
 		return checkAgain;
 
 	const UnsignedInt options = button->getOptions();
 	const Bool objectTarget = (options & COMMAND_OPTION_NEED_OBJECT_TARGET) != 0;
 	const Bool positionTarget = (options & NEED_TARGET_POS) != 0;
+	const Object* victim = nullptr;
+	if (selfBuff || goblinPoison || enemyTypeKiller)
+	{
+		victim = combatVictim(*source);
+		if (!victim)
+			return checkAgain;
+	}
+	if (selfBuff || goblinPoison)
+	{
+		if (!objectTarget && !positionTarget &&
+			(goblinPoison ? canPoisonVictim(*source, *victim) : canUseSelfBuff(*source)) &&
+			button->isValidToUseOn(source, nullptr, nullptr, CMD_FROM_AI) &&
+			AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+		{
+			tracePowerTarget(*source, *power, *victim, victim->getShroudedStatus(player->getPlayerIndex()));
+			source->doSpecialPower(power, options);
+		}
+		return checkAgain;
+	}
 	if (!objectTarget && !positionTarget && (always ||
-		(selfBattle && source->getAI() && source->getAI()->isAttacking())))
+		(selfDebuff && source->getAI() && source->getAI()->isAttacking())))
 	{
 		if (button->isValidToUseOn(source, nullptr, nullptr, CMD_FROM_AI) &&
 			AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
@@ -275,8 +369,14 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		return checkAgain;
 	}
 
-	const Real range = data->m_specialPowerRange > 0.0f || (book && captureCreep)
+	Real range = data->m_specialPowerRange > 0.0f || (book && captureCreep)
 		? data->m_specialPowerRange : data->m_specialPowerRadius;
+	if (enemyTypeKiller)
+	{
+		range = targetKillerRange(*source, *power, data->m_specialPowerRange);
+		if (range <= 0.0f)
+			return checkAgain;
+	}
 	if (reveal && positionTarget && !objectTarget)
 	{
 		scoutWithPower(*source, *button, *power, book ? 0.0f : range);
@@ -300,7 +400,13 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		const Bool building = target->isKindOf(KINDOF_STRUCTURE);
 		AIUpdateInterface* ai = target->getAI();
 		Real score = 0.0f;
-		if (captureCreep)
+		if (enemyTypeKiller)
+		{
+			if (relationship == ENEMIES && (target->isKindOf(KINDOF_HERO) || target->isKindOf(KINDOF_MONSTER) ||
+				target->isKindOf(KINDOF_BIG_MONSTER) || target->isKindOf(KINDOF_CREATE_A_HERO)))
+				score = 2.0f - bodyHealthFraction(*target);
+		}
+		else if (captureCreep)
 		{
 			if (building && relationship == ENEMIES && !target->getControllingPlayer()->isPlayableSide() &&
 				module->isValidPowerTarget(target))
@@ -345,13 +451,8 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 	}
 	if (best && AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 	{
-		static const Bool trace = std::getenv("GENERALSX_SKIRMISH_AI_TRACE") != nullptr;
-		if (trace && (objectTarget || positionTarget))
-		{
-			std::fprintf(stderr, "AI_TARGET\t%u\t%d\t%s\t%d\t%d\t%d\n", TheGameLogic->getFrame(),
-				player->getPlayerIndex(), power->getName().str(), source->getID(), best->getID(), bestShroud);
-			std::fflush(stderr);
-		}
+		if (objectTarget || positionTarget)
+			tracePowerTarget(*source, *power, *best, bestShroud);
 		if (objectTarget)
 			source->doSpecialPowerAtObject(power, best, options);
 		else if (positionTarget)
