@@ -30,6 +30,7 @@
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GameText.h"
+#include "GameClient/GUICallbacks.h"
 #include "GameClient/HotKey.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
@@ -89,6 +90,10 @@ constexpr DesignRect TopPlate = { 51.0f, 60.0f, 155.0f, 64.0f };
 constexpr DesignRect OptionsKey = { 70.0f, 76.0f, 31.0f, 31.0f };
 constexpr DesignRect Objectives = { 156.0f, 76.0f, 31.0f, 31.0f };
 constexpr DesignRect PlaqueArea = { 20.0f, 240.0f, 210.0f, 50.0f };
+
+enum { RimNone = -1, RimOptions = 0, RimObjectives = 1 };
+Int s_rimButton = RimNone;
+
 constexpr Coord2D RetailTrayPair[RetailTrayAnchors][2] = {
 	{ {263.2f, 54.2f}, {320.9f, 57.3f} },
 	{ {350.0f, 68.0f}, {394.8f, 104.4f} },
@@ -287,6 +292,25 @@ WindowMsgHandledType retailPalantirInput(GameWindow *window, UnsignedInt msg, Wi
 	const Real scale = width / PalantirDesignWidth;
 	const Int px = mData1 & 0xFFFF;
 	const Int py = mData1 >> 16;
+	const Bool overOptions = insideRect(px, py, x, y, scale, OptionsKey);
+	const Bool overObjectives = insideRect(px, py, x, y, scale, Objectives);
+	if (msg == GWM_LEFT_DOWN && (overOptions || overObjectives))
+	{
+		s_rimButton = overOptions ? RimOptions : RimObjectives;
+		return MSG_HANDLED;
+	}
+	if (msg == GWM_LEFT_UP)
+	{
+		const Int pressed = s_rimButton;
+		s_rimButton = RimNone;
+		if (pressed == RimOptions && overOptions)
+		{
+			ToggleQuitMenu();
+			return MSG_HANDLED;
+		}
+		if (pressed == RimObjectives && overObjectives)
+			return MSG_HANDLED;
+	}
 	const Bool inside = insideCircle(px, py, x, y, scale, 125.85f, 172.0f, 118.0f)
 		|| insideCircle(px, py, x, y, scale, 285.7f, 191.4f, 92.0f)
 		|| insideRect(px, py, x, y, scale, PlaqueArea) || insideRect(px, py, x, y, scale, TopPlate)
