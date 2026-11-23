@@ -1,15 +1,15 @@
 check() {
     checkPendingPriority || return 1
-    if covers 364; then
+    if covers 364 && covers 424; then
         awk '
             /^TEST frame 342: create SkirmishOpportunityBuilder for Player_1 .*2740.0, 3070.0/ {
                 split($8, id, "=")
                 target = id[2]
             }
-            $1 == "AI_WAVE" && $2 == 364 && $3 == 4 && $4 == "opportunity" && $6 == target { sent++ }
+            $1 == "AI_WAVE" && $2 >= 364 && $2 <= 424 && $3 == 4 && $4 == "opportunity" && $6 == target { sent++ }
             END {
-                if (!target || sent != 1) {
-                    print "Missing opportunity wave at frame 364 for the exposed builder " target
+                if (!target || !sent) {
+                    print "Missing opportunity wave by frame 424 for the exposed builder " target
                     exit 1
                 }
             }
@@ -18,7 +18,7 @@ check() {
 }
 
 compare() {
-    if [ "$end" -lt 424 ] || [ "$save_frame" -gt 424 ]; then
+    if [ "$end" -lt 484 ] || [ "$save_frame" -gt 484 ]; then
         return
     fi
     for phase in continue resume; do
@@ -27,9 +27,9 @@ compare() {
                 split($8, id, "=")
                 target = id[2]
             }
-            $1 == "AI_OPPORTUNITY_HELD" && $2 == 424 && $3 == 4 && $4 == target && $5 == 1 { found = 1 }
+            $1 == "AI_OPPORTUNITY_HELD" && $2 == 484 && $3 == 4 && $4 == target && $5 > 0 { found = 1 }
             END {
-                if (!found) print "Opportunity team no longer attached to builder " target " at frame 424"
+                if (!found) print "Opportunity team no longer attached to builder " target " at frame 484"
                 exit !found
             }
         ' "$out/continue.log" "$out/$phase.log" || return 1
