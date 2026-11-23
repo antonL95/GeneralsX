@@ -1,0 +1,12 @@
+30 create Player_1 HudBuilderPorter 0 2850,1600,0
+35 hud-builder Player_1 HudBuilderPorter 0
+40 construct Player_1 HudBuilderPorter 0 HudBuilderFarm 2920 1600 0
+243 pkg36-site Player_1 HudBuilderFarm 0
+243 hud-builder Player_1 HudBuilderPorter 0
+245 hud-builder Player_1 HudBuilderPorter 0
+430 hud-builder Player_1 HudBuilderPorter 0
+430 pkg36-site Player_1 HudBuilderFarm 0
+748 pkg36-site Player_1 HudBuilderFarm 0
+748 hud-builder Player_1 HudBuilderPorter 0
+749 destroy Player_1 HudBuilderPorter 0
+750 destroy Player_1 HudBuilderFarm 0

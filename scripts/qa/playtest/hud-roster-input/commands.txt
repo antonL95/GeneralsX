@@ -1,0 +1,18 @@
+23 create Player_1 GondorGandalf 0 1050,590,0
+35 hud-click Player_1 GondorGandalf 0 single 471 682
+36 hud-state Player_1 GondorGandalf 0
+37 hud-click Player_1 GondorGandalf 0 double 471 682
+38 hud-state Player_1 GondorGandalf 0
+42 create Player_1 GondorFaramir 0 1180,730,0
+44 selectadd Player_1 GondorFaramir 0
+45 hud-key Player_1 GondorGandalf 0 assign
+46 deselect Player_1 GondorGandalf 0
+48 hud-key Player_1 GondorGandalf 0 tap
+49 hud-state Player_1 GondorGandalf 0
+49 hud-state Player_1 GondorFaramir 0
+49 hud-group-state Player_1 GondorGandalf 0
+76 hud-key Player_1 GondorGandalf 0 tap
+77 hud-state Player_1 GondorGandalf 0
+108 hud-key Player_1 GondorGandalf 0 tap
+138 hud-key Player_1 GondorGandalf 0 tap
+139 hud-state Player_1 GondorGandalf 0
