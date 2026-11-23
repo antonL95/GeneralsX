@@ -30,6 +30,7 @@ public:
 	UpdateSleepTime update() override;
 	void aiDoCommand(const AICommandParms* parms) override;
 	static Bool canStrike(const Object& bird, const Coord3D& target);
+	static void trackGrabbedPassenger(Object& bird, const Object& passenger);
 
 protected:
 	UpdateSleepTime doLocomotor() override;
@@ -37,9 +38,12 @@ protected:
 private:
 	void startFollowThrough();
 	void setSwooping(Bool swooping);
+	void releaseGrabbedPassenger();
 	void xferFlightState(Xfer* xfer);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 	Coord3D m_followThroughGoal = {};
 	Bool m_followingThrough = FALSE;
 	Bool m_swooping = FALSE;
+	ObjectID m_grabbedPassenger = INVALID_ID;
 };

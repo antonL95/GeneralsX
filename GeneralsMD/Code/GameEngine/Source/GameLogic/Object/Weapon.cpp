@@ -290,6 +290,7 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "SlaveAttackNugget", WeaponNugget::parseSlaveAttackNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "HordeAttackNugget", WeaponNugget::parseHordeAttackNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DamageFieldNugget", WeaponNugget::parseDamageFieldNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "GrabNugget", WeaponNugget::parseGrabNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "FiringDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_firingDuration) },
 	{ "IdleAfterFiringDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_idleAfterFiringDelay) },
 	{ "HoldAfterFiringDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponTemplate, m_holdAfterFiringDelay) },
@@ -3337,6 +3338,8 @@ Bool Weapon::canFireInCurrentMovement(const Object* source) const
 	const auto& conditions = source->getLogicModelConditions();
 	if (conditions.test(MODELCONDITION_CHARGING))
 		return m_template->canFireWhileCharging();
+	if (m_template->canSwoop() && conditions.test(MODELCONDITION_SWOOPING))
+		return TRUE;
 
 	const auto* physics = source->getPhysics();
 	if (!physics || m_template->canFireWhileMoving() || source->getEnclosingContainedBy())

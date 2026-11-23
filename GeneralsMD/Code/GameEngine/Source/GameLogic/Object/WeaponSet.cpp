@@ -1163,8 +1163,8 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 	WeaponSlotType currentDecision = PRIMARY_WEAPON;
 	WeaponSlotType currentDecisionBackup = PRIMARY_WEAPON;
 
-	const Bool targetingHorde = retail && obj->isKindOf(KINDOF_GIANT_BIRD) &&
-		HordeContain::get(victim->getContainedBy());
+	const Bool targetingHorde = retail && HordeContain::get(victim->getContainedBy()) &&
+		(obj->isKindOf(KINDOF_GIANT_BIRD) || obj->findUpdateModule(NAMEKEY("GiantBirdAIUpdate")));
 	const Bool useTargetReach = retail && std::any_of(m_weapons, m_weapons + WEAPONSLOT_COUNT, [](const Weapon* weapon) {
 		return weapon && weapon->getTemplate()->hasHeightRangeBonus();
 	});

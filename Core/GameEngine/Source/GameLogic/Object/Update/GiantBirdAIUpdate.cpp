@@ -6,9 +6,13 @@
 
 #include "Common/INI.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/Xfer.h"
+#include "GameClient/FXList.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
+#include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/RetailSlowDeath.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -88,7 +92,47 @@ Bool GiantBirdAIUpdate::canStrike(const Object& bird, const Coord3D& target)
 	if (!locomotor || locomotor->getAppearance() != LOCO_GIANT_BIRD)
 		return TRUE;
 	const Real dz = bird.getPosition()->z - target.z - locomotor->getPreferredAttackHeight();
-	return !ai->m_followingThrough && dz <= CONTACT_HEIGHT_TOLERANCE && dz >= -CONTACT_HEIGHT_TOLERANCE;
+	return ai->m_swooping && !ai->m_followingThrough && dz <= CONTACT_HEIGHT_TOLERANCE && dz >= -CONTACT_HEIGHT_TOLERANCE;
+}
+
+void GiantBirdAIUpdate::trackGrabbedPassenger(Object& bird, const Object& passenger)
+{
+	if (RetailFileLayers::enabled())
+		if (auto* ai = static_cast<GiantBirdAIUpdate*>(bird.findUpdateModule(NAMEKEY("GiantBirdAIUpdate"))))
+			ai->m_grabbedPassenger = passenger.getID();
+}
+
+void GiantBirdAIUpdate::releaseGrabbedPassenger()
+{
+	if (!RetailFileLayers::enabled() || m_grabbedPassenger == INVALID_ID)
+		return;
+	Object* bird = getObject();
+	Object* passenger = TheGameLogic->findObjectByID(m_grabbedPassenger);
+	if (!passenger || passenger->getContainedBy() != bird || !bird->getContain())
+	{
+		m_grabbedPassenger = INVALID_ID;
+		return;
+	}
+
+	const auto* data = getGiantBirdAIUpdateModuleData();
+	const Coord3D& pos = *bird->getPosition();
+	const Real height = pos.z - TheTerrainLogic->getGroundHeight(pos.x, pos.y);
+	const UnsignedInt heldFrames = TheGameLogic->getFrame() - passenger->getContainedByFrame();
+	const Bool timeReached = data->m_grabTossTimeTrigger > 0.0f &&
+		heldFrames > data->m_grabTossTimeTrigger * LOGICFRAMES_PER_SECOND;
+	const Bool heightReached = data->m_grabTossHeightTrigger > 0.0f && height > data->m_grabTossHeightTrigger;
+	if (!timeReached && !heightReached)
+		return;
+
+	m_grabbedPassenger = INVALID_ID;
+	bird->getContain()->removeFromContain(passenger);
+	if (auto* physics = passenger->getPhysics())
+	{
+		if (const auto* carrierPhysics = bird->getPhysics())
+			carrierPhysics->transferVelocityTo(physics);
+		physics->setAllowToFall(TRUE);
+	}
+	FXList::doFXObj(data->m_tossFX, passenger, bird);
 }
 
 void GiantBirdAIUpdate::startFollowThrough()
@@ -126,6 +170,7 @@ UpdateSleepTime GiantBirdAIUpdate::update()
 	const Bool wasSwooping = m_swooping;
 	const UpdateSleepTime sleep = AIUpdateInterface::update();
 	Object* bird = getObject();
+	releaseGrabbedPassenger();
 	if (bird->isEffectivelyDead() || !getCurLocomotor())
 		return sleep;
 
@@ -226,14 +271,27 @@ void GiantBirdAIUpdate::crc(Xfer* xfer)
 {
 	AIUpdateInterface::crc(xfer);
 	xferFlightState(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 }
 
 void GiantBirdAIUpdate::xfer(Xfer* xfer)
 {
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
 	AIUpdateInterface::xfer(xfer);
 	xferFlightState(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 2);
+}
+
+void GiantBirdAIUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{ "grabbed-passenger", [this](Xfer* x) { x->xferObjectID(&m_grabbedPassenger); },
+			[this] { m_grabbedPassenger = INVALID_ID; } }
+	});
 }
 
 void GiantBirdAIUpdate::loadPostProcess()

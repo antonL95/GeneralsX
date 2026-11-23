@@ -21,6 +21,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DeletionUpdate.h"
 #include "GameLogic/Module/FireWeaponUpdate.h"
+#include "GameLogic/Module/GiantBirdAIUpdate.h"
 #include "GameLogic/Module/DumbProjectileBehavior.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
@@ -200,6 +201,18 @@ const FieldParse s_oclFields[] =
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
+const FieldParse s_grabFields[] =
+{
+	{ "ContainTargetOnEffect", INI::parseBool, nullptr, offsetof(WeaponNugget, m_containTargetOnEffect) },
+	{ "ImpactTargetOnEffect", INI::parseBool, nullptr, offsetof(WeaponNugget, m_impactTargetOnEffect) },
+	{ "RemoveTargetFromOtherContain", INI::parseBool, nullptr, offsetof(WeaponNugget, m_removeTargetFromOtherContain) },
+	{ "ShockWaveAmount", INI::parseReal, nullptr, offsetof(WeaponNugget, m_shockWaveAmount) },
+	{ "ShockWaveRadius", INI::parseReal, nullptr, offsetof(WeaponNugget, m_shockWaveRadius) },
+	{ "ShockWaveTaperOff", INI::parseReal, nullptr, offsetof(WeaponNugget, m_shockWaveTaperOff) },
+	{ "ShockWaveZMult", INI::parseReal, nullptr, offsetof(WeaponNugget, m_shockWaveZMult) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
 const FieldParse s_damageFieldFields[] =
 {
 	{ "WeaponTemplateName", INI::parseAsciiString, nullptr, offsetof(WeaponNugget, m_fieldWeaponName) },
@@ -249,6 +262,7 @@ const char* nuggetTypeName(WeaponNuggetType type)
 		case WEAPON_NUGGET_SLAVE_ATTACK: return "SlaveAttackNugget";
 		case WEAPON_NUGGET_HORDE_ATTACK: return "HordeAttackNugget";
 		case WEAPON_NUGGET_DAMAGE_FIELD: return "DamageFieldNugget";
+		case WEAPON_NUGGET_GRAB: return "GrabNugget";
 	}
 	return "Nugget";
 }
@@ -310,6 +324,11 @@ void WeaponNugget::parseHordeAttackNugget(INI* ini, void*, void* store, const vo
 void WeaponNugget::parseDamageFieldNugget(INI* ini, void*, void* store, const void*)
 {
 	parseNugget(ini, store, WEAPON_NUGGET_DAMAGE_FIELD, s_damageFieldFields);
+}
+
+void WeaponNugget::parseGrabNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_GRAB, s_grabFields);
 }
 
 void WeaponNugget::postProcessLoad()
@@ -688,6 +707,52 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		pos = primaryVictim->getPosition();
 	if (!pos || (dotTick && (!primaryVictim || primaryVictim->isEffectivelyDead())))
 		return;
+
+	if (nugget.m_type == WEAPON_NUGGET_GRAB)
+	{
+		if (!RetailFileLayers::enabled() || !source || source->isEffectivelyDead() || !primaryVictim ||
+			primaryVictim == source || primaryVictim->isDestroyed() || !nugget.affects(source, primaryVictim))
+			return;
+
+		Object* previousContainer = primaryVictim->getContainedBy();
+		if (previousContainer == source)
+			return;
+		ContainModuleInterface* contain = source->getContain();
+		if (nugget.m_containTargetOnEffect && !primaryVictim->isEffectivelyDead() && contain &&
+			contain->isValidContainerFor(primaryVictim, TRUE) &&
+			(!previousContainer || nugget.m_removeTargetFromOtherContain || HordeContain::get(previousContainer)))
+		{
+			if (previousContainer)
+				previousContainer->getContain()->removeFromContain(primaryVictim);
+			contain->addToContain(primaryVictim);
+			if (primaryVictim->getContainedBy() == source)
+			{
+				GiantBirdAIUpdate::trackGrabbedPassenger(*source, *primaryVictim);
+				return;
+			}
+		}
+
+		auto* physics = primaryVictim->getPhysics();
+		if (nugget.m_impactTargetOnEffect && nugget.m_shockWaveRadius > 0.0f && physics && !primaryVictim->getEnclosingContainedBy())
+		{
+			const Coord3D& origin = *source->getPosition();
+			const Coord3D& target = *primaryVictim->getPosition();
+			Coord3D direction{target.x - origin.x, target.y - origin.y, 0.0f};
+			const Real distance = WWMath::SqrtfOrigin(direction.x * direction.x + direction.y * direction.y);
+			const Real dz = target.z - origin.z;
+			const Real separation = WWMath::SqrtfOrigin(distance * distance + dz * dz);
+			const Real fraction = std::min(separation / nugget.m_shockWaveRadius, 1.0f);
+			const Real amount = nugget.m_shockWaveAmount * (1.0f - (1.0f - nugget.m_shockWaveTaperOff) * fraction);
+			if (distance > 0.0f)
+			{
+				direction.x /= distance;
+				direction.y /= distance;
+			}
+			if (amount > primaryVictim->getTemplate()->getRotWKObjectData().shockwaveResistance)
+				physics->launchFromImpact(direction, amount, nugget.m_shockWaveZMult);
+		}
+		return;
+	}
 
 	if (nugget.m_type == WEAPON_NUGGET_DAMAGE_FIELD)
 	{
