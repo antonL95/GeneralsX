@@ -1502,13 +1502,14 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	if (getAllowMotiveForceWhileAirborne() || !treatAsAirborne)
 	{
 		LocomotorAppearance appearance = m_template->m_appearance;
+		const Bool retailHero = RetailFileLayers::enabled() && obj->isKindOf(KINDOF_HERO) && !obj->getContainedBy();
 		if ((appearance == LOCO_HORDE || appearance == LOCO_FOUR_LEGS_HUGE || appearance == LOCO_HUGE_TWO_LEGS) &&
 			!RetailFileLayers::enabled())
 			appearance = LOCO_OTHER;
 		switch (appearance)
 		{
 			case LOCO_LEGS_TWO:
-				if (RetailFileLayers::enabled() && !obj->getContainedBy() && m_template->m_wanderWidthFactor == 0.0f)
+				if (retailHero && m_template->m_wanderWidthFactor == 0.0f)
 				{
 					moveRetailGroundTowardsPosition(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					usedRetailGroundSteering = TRUE;
@@ -1523,7 +1524,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 					moveTowardsPositionClimb(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
 			case LOCO_WHEELS_FOUR:
-				if (RetailFileLayers::enabled() && !obj->getContainedBy() && !m_template->m_canMoveBackward &&
+				if (retailHero && !m_template->m_canMoveBackward &&
 					obj->getAI() && obj->getAI()->getCurLocomotorSetType() == LOCOMOTORSET_MOUNTED)
 				{
 					moveRetailGroundTowardsPosition(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
