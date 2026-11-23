@@ -23,8 +23,8 @@ check() {
             } else {
                 if (frame == 429)
                     idleDogs[dog] = 1
-                dx = $6 - 3300
-                dy = $7 - 3050
+                dx = $6 - 500
+                dy = $7 - 1000
                 if ($14 || dx * dx + dy * dy > 75 * 75)
                     stray[dog] = frame
                 dx = $6 - $9
