@@ -1,3 +1,4 @@
-5 create Player_1 GondorElessar 0 2670,930,0
-6 reveal Player_1 GondorElessar 0
-31 create Player_1 GondorFountainGuardHorde 0 2670,930,0
+5 create Player_1 ArnorHalbarad 0 2670,930,0
+6 reveal Player_1 ArnorHalbarad 0
+31 create Player_1 ElvenRivendellKnightHorde 0 2670,930,0
+51 kill Player_1 ArnorHalbarad 0

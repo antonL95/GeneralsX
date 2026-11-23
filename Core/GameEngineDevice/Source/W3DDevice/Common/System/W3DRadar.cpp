@@ -38,10 +38,12 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/ThingTemplate.h"
 
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/StealthUpdate.h"
 
 #include "GameClient/Color.h"
 #include "GameClient/AptScene.h"
@@ -846,8 +848,15 @@ void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *text
 	for( const RadarObject *rObj = listHead; rObj; rObj = rObj->friend_getNext() )
 	{
 		const Object *obj = rObj->friend_getObject();
-		if (retail && (obj->isKindOf(KINDOF_HERO) != heroesOnly))
-			continue;
+		StealthUpdate* stealth = retail ? obj->getStealth() : nullptr;
+		const ThingTemplate* disguise = stealth ? stealth->getDisguisedTemplate() : nullptr;
+		if (retail)
+		{
+			const ThingTemplate* radarTemplate = disguise && obj->getControllingPlayer() != player
+				? disguise : obj->getTemplate();
+			if (radarTemplate->isKindOf(KINDOF_HERO) != heroesOnly)
+				continue;
+		}
 		if (!canRenderObject(rObj, player))
 			continue;
 
@@ -860,6 +869,34 @@ void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *text
 
 		// get the color we're going to draw in
 		Color argbColor = rObj->getColor();
+
+		if (heroesOnly)
+		{
+			constexpr UnsignedByte halo[][3] = {{3, 36, 69}, {36, 79, 79}, {69, 79, 79}};
+			constexpr UnsignedByte core[][2] = {{0, 74}, {74, 255}};
+			UnsignedByte red, green, blue, alpha;
+			GameGetColorComponents(argbColor, &red, &green, &blue, &alpha);
+			const UnsignedInt frame = TheGameLogic->getFrame();
+			if (!disguise && obj->testStatus(OBJECT_STATUS_STEALTHED))
+			{
+				constexpr UnsignedInt period = 2 * LOGICFRAMES_PER_SECOND;
+				const UnsignedInt phase = frame % period;
+				alpha = 64 + (255 - 64) * std::min(phase, period - phase) / LOGICFRAMES_PER_SECOND;
+				argbColor = GameMakeColor(red, green, blue, alpha);
+			}
+			const auto brighten = [](Int component) { return component + (255 - component) / 2; };
+			drawHeroMask(*surface, surfaceDesc.Format, bytesPerPixel, pBits, pitch, radarPoint, argbColor, halo);
+			drawHeroMask(*surface, surfaceDesc.Format, bytesPerPixel, pBits, pitch, radarPoint,
+				GameMakeColor(brighten(red), brighten(green), brighten(blue), alpha), core);
+			if (logMarks)
+			{
+				std::fprintf(stderr, "RADAR hero frame=%u object=%u cell=%d,%d rgba=%u,%u,%u,%u halo=6 core=4 layer=overlay\n",
+					frame, static_cast<unsigned>(obj->getID()), radarPoint.x, radarPoint.y,
+					red, green, blue, alpha);
+				std::fflush(stderr);
+			}
+			continue;
+		}
 
 		// adjust the alpha for stealth units so they "fade/blink" on the radar for the controller
 		// if( obj->getRadarPriority() == RADAR_PRIORITY_LOCAL_UNIT_ONLY )
@@ -880,26 +917,6 @@ void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *text
 				a = REAL_TO_UNSIGNEDBYTE( (alphaScale * (255.0f - minAlpha)) + minAlpha );
 			argbColor = GameMakeColor( r, g, b, a );
 
-		}
-
-		if (heroesOnly)
-		{
-			constexpr UnsignedByte halo[][3] = {{3, 36, 69}, {36, 79, 79}, {69, 79, 79}};
-			constexpr UnsignedByte core[][2] = {{0, 74}, {74, 255}};
-			UnsignedByte red, green, blue, alpha;
-			GameGetColorComponents(argbColor, &red, &green, &blue, &alpha);
-			const auto brighten = [](Int component) { return component + (255 - component) / 2; };
-			drawHeroMask(*surface, surfaceDesc.Format, bytesPerPixel, pBits, pitch, radarPoint, argbColor, halo);
-			drawHeroMask(*surface, surfaceDesc.Format, bytesPerPixel, pBits, pitch, radarPoint,
-				GameMakeColor(brighten(red), brighten(green), brighten(blue), alpha), core);
-			if (logMarks)
-			{
-				std::fprintf(stderr, "RADAR hero frame=%u object=%u cell=%d,%d rgba=%u,%u,%u,%u halo=6 core=4 layer=overlay\n",
-					TheGameLogic->getFrame(), static_cast<unsigned>(obj->getID()), radarPoint.x, radarPoint.y,
-					red, green, blue, alpha);
-				std::fflush(stderr);
-			}
-			continue;
 		}
 
 		const unsigned int pixelColor = ARGB_Color_To_WW3D_Color(surfaceDesc.Format, argbColor);
