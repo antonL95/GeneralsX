@@ -2236,6 +2236,7 @@ Weapon& Weapon::operator=(const Weapon& that)
 		this->m_status = OUT_OF_AMMO;
 		this->m_ammoInClip = 0;
 		this->m_whenPreAttackFinished = 0;
+		this->m_whenFollowThroughFinished = 0;
 		this->m_whenLastReloadStarted = 0;
 		this->m_whenWeCanFireAgain = 0;
 		this->m_leechWeaponRangeActive = false;
@@ -3256,18 +3257,22 @@ void WeaponTemplate::playPreAttackFX(const Object& source, const Object* target,
 
 void Weapon::preFireWeapon( const Object *source, const Object *victim )
 {
-	Int delay = getPreAttackDelay(source, victim);
-	if (delay > 0 && RetailFileLayers::enabled() && m_template->m_preAttackRandomAmount)
+	Int randomDelay = 0;
+	if (RetailFileLayers::enabled() && m_template->m_preAttackRandomAmount)
 	{
-		constexpr Int framesPerTick = LOGICFRAMES_PER_SECOND / RotwkDuration::FRAMES_PER_SECOND;
-		delay += GameLogicRandomValue(0, m_template->m_preAttackRandomAmount / framesPerTick) * framesPerTick;
+		constexpr Int framesPerTick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+		const Int retailDelay = GameLogicRandomValue(0, m_template->m_preAttackRandomAmount / framesPerTick);
+		randomDelay = RotwkDuration::engineFrames(retailDelay, LOGICFRAMES_PER_SECOND);
 	}
+	const Int delay = getPreAttackDelay(source, victim, randomDelay);
 	if( delay > 0 )
 	{
 		const UnsignedInt frame = TheGameLogic->getFrame();
 		if (!isHoldingMovementForReload(frame))
 			setStatus(PRE_ATTACK);
 		setPreAttackFinishedFrame(frame + delay);
+		if (RetailFileLayers::enabled() && m_template->m_requireFollowThru && m_template->getFiringDuration())
+			m_whenFollowThroughFinished = m_whenPreAttackFinished + m_template->getFiringDuration();
 		m_template->playPreAttackFX(*source, victim);
 		if( m_template->isLeechRangeWeapon() )
 		{
@@ -3352,10 +3357,14 @@ Bool Weapon::canFireInCurrentMovement(const Object* source) const
 
 Bool Weapon::isWaitingToIdle() const
 {
-	const UnsignedInt followThrough = RetailFileLayers::enabled() && m_template->m_requireFollowThru
-		? m_template->getFiringDuration() : 0;
 	return m_lastFireFrame &&
-		TheGameLogic->getFrame() < m_lastFireFrame + std::max(followThrough, m_template->getIdleAfterFiringDelay());
+		TheGameLogic->getFrame() < m_lastFireFrame + m_template->getIdleAfterFiringDelay();
+}
+
+Bool Weapon::isInFollowThrough(UnsignedInt frame) const
+{
+	return RetailFileLayers::enabled() && m_template->m_requireFollowThru &&
+		frame < m_whenFollowThroughFinished && frame > m_whenFollowThroughFinished - m_template->getFiringDuration();
 }
 
 Bool Weapon::isHoldingMovementForReload(UnsignedInt frame) const
@@ -3456,7 +3465,7 @@ Bool Weapon::isDamageWeapon() const
 }
 
 //-------------------------------------------------------------------------------------------------
-Int Weapon::getPreAttackDelay( const Object *source, const Object *victim ) const
+Int Weapon::getPreAttackDelay(const Object* source, const Object* victim, Int randomDelay) const
 {
 	// Look for a reason to return zero and have no delay.
 	WeaponPrefireType type = m_template->getPrefireType();
@@ -3474,7 +3483,7 @@ Int Weapon::getPreAttackDelay( const Object *source, const Object *victim ) cons
 
 	WeaponBonus bonus;
 	computeBonus(source, 0, bonus);
-	return m_template->getPreAttackDelay( bonus );
+	return m_template->getPreAttackDelay(bonus) + randomDelay;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3780,7 +3789,10 @@ void Weapon::transferNextShotStatsFrom( const Weapon &weapon )
 void Weapon::crc( Xfer *xfer )
 {
 	if (RetailFileLayers::enabled())
+	{
 		crcLinearTarget(xfer);
+		xferRetailBlocks(xfer, TRUE);
+	}
 #ifdef DEBUG_CRC
 	AsciiString logString;
 	AsciiString tmp;
@@ -3995,7 +4007,7 @@ void Weapon::crcLinearTarget(Xfer* xfer) const
 void Weapon::xfer( Xfer *xfer )
 {
 	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 3;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 5 : 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4097,6 +4109,22 @@ void Weapon::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_linearTargetIndex);
 	if (version < 4 || m_linearTargetIndex >= m_template->m_linearTargets.size())
 		m_linearTargetIndex = 0;
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 5);
+}
+
+void Weapon::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	if (!loading && !m_whenFollowThroughFinished)
+	{
+		RetailSaveBlocks::transferSection<Xfer>(xfer, FALSE, present, {});
+		return;
+	}
+	RetailSaveBlocks::transferSection<Xfer>(xfer, loading, present, {
+		{"follow-through", [this](Xfer* x) { x->xferUnsignedInt(&m_whenFollowThroughFinished); },
+			[this] { m_whenFollowThroughFinished = 0; }}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------

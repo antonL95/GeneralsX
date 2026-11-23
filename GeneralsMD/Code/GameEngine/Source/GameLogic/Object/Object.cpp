@@ -219,6 +219,8 @@ static WeaponSetConditionType retailWeaponCondition(const Object* obj, const Wea
 	const UnsignedInt lastShot = weapon->getLastShotFrame();
 	if (lastShot == now || weapon->isWaitingToIdle())
 		return WSF_FIRING;
+	if (weapon->isInFollowThrough(now))
+		return WSF_PREATTACK;
 
 	const WeaponStatus status = weapon->getStatus();
 	if (!obj->testStatus(OBJECT_STATUS_IS_ATTACKING))
@@ -246,6 +248,8 @@ static WeaponSetConditionType retailWeaponCondition(const Object* obj, const Wea
 
 static UnsignedInt weaponTimingFrames(const Weapon* weapon, WeaponSetConditionType condition, UnsignedInt now)
 {
+	if (condition == WSF_PREATTACK && weapon->isInFollowThrough(now))
+		return weapon->getFollowThroughFinishedFrame() - now;
 	const UnsignedInt start = condition == WSF_PREATTACK ? weapon->getPreAttackFinishedFrame() : weapon->getLastShotFrame();
 	const UnsignedInt end = start + weapon->getTemplate()->getFiringDuration();
 	return end > now ? end - now : 0;
@@ -4492,8 +4496,11 @@ void Object::crc( Xfer *xfer )
 			xfer->xferInt(&lock);
 		}
 		for (Int slot = 0; slot < WEAPONSLOT_COUNT; ++slot)
-			if (const Weapon* weapon = getWeaponInWeaponSlot(static_cast<WeaponSlotType>(slot)))
+			if (Weapon* weapon = getWeaponInWeaponSlot(static_cast<WeaponSlotType>(slot)))
+			{
 				weapon->crcLinearTarget(xfer);
+				weapon->xferRetailBlocks(xfer, TRUE);
+			}
 		if (m_firingTracker)
 			m_firingTracker->crcRetailState(xfer);
 		if (m_slavedUpdate)

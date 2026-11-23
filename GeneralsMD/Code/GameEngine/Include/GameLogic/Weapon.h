@@ -815,6 +815,8 @@ public:
 	Bool hasCommittedAttack() const;
 	void inheritSharedTimer(const Weapon& previous);
 	Bool isWaitingToIdle() const;
+	Bool isInFollowThrough(UnsignedInt frame) const;
+	UnsignedInt getFollowThroughFinishedFrame() const { return m_whenFollowThroughFinished; }
 	UnsignedInt getPreAttackFinishedFrame() const { return m_whenPreAttackFinished; }
 	UnsignedInt getLastReloadStartedFrame() const { return m_whenLastReloadStarted; }
 	Real getPercentReadyToFire() const;
@@ -833,6 +835,7 @@ public:
 	// determine if you are within attack range, please call isWithinAttackRange instead.
 	Real getAttackRange(const Object* source, const Coord3D* target = nullptr, const Coord3D* origin = nullptr) const;
 	void crcLinearTarget(Xfer* xfer) const;
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 	// Returns the max distance between the centerpoints of source & victim	for victim to be in range.
 	Real getAttackDistance(const Object *source, const Object *victim, const Coord3D* victimPos) const;
@@ -874,7 +877,7 @@ public:
 
 	Real getPrimaryDamageRadius(const Object *source) const;
 
-	Int getPreAttackDelay( const Object *source, const Object *victim ) const;
+	Int getPreAttackDelay(const Object* source, const Object* victim, Int randomDelay) const;
 
 	Bool isDamageWeapon() const;
 
@@ -958,6 +961,7 @@ private:
 	UnsignedInt								m_ammoInClip;								///< how many shots left in current clip
 	UnsignedInt								m_whenWeCanFireAgain;				///< the first frame the weapon can fire again
 	UnsignedInt								m_whenPreAttackFinished;		///< the frame the pre attack will complete.
+	UnsignedInt								m_whenFollowThroughFinished = 0;
 	UnsignedInt								m_whenLastReloadStarted;		///< the frame the current reload/between-shots began. (only valid if status is RELOADING_CLIP or BETWEEN_FIRING_SHOTS)
 	UnsignedInt								m_lastFireFrame;						///< frame a shot was last fired on
 	UnsignedInt								m_suspendFXFrame;						///< The fireFX can be suspended for any delay, in frames, then they will execute as normal
