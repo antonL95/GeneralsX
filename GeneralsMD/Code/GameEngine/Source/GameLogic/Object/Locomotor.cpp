@@ -2107,11 +2107,13 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 	const Real acceleration = getMaxAcceleration(damage);
 	const Bool mounted = m_template->m_appearance == LOCO_WHEELS_FOUR;
 	const Real facing = obj->getOrientation();
+	const Real goalHeading = distance > 0.0f ? WWMath::Atan2Origin(dy, dx) : facing;
+	const Real headingError = stdAngleDiff(goalHeading, facing);
+	const Real angle = fabs(headingError);
 	const Real maxSpeed = getMaxSpeedForCondition(damage, obj);
 	const Real radius = mounted ? getRetailTurnRadius(speed, maxSpeed) : 0.0f;
 	if (mounted && distance > 0.0f)
 	{
-		const Real angle = fabs(stdAngleDiff(WWMath::Atan2Origin(dy, dx), facing));
 		if (speed <= 0.25f * maxSpeed)
 		{
 			const Real adjustedAngle = speed <= acceleration * framesPerRetailStep ? 2.0f * angle : angle;
@@ -2121,34 +2123,41 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 		if (m_template->m_fastTurnRadius > 0.0f && lateral > 0.0f)
 			desiredSpeed = std::min(desiredSpeed, maxSpeed * distance / (2.0f * m_template->m_fastTurnRadius * lateral));
 	}
-	const Bool steeringStep = TheGameLogic->getFrame() % framesPerRetailStep == 0;
-	Coord3D direction{0.0f, 0.0f, 0.0f};
-	if (steeringStep)
+	Real travelHeading = facing;
+	if (distance > 0.0f)
 	{
-		if (distance > 0.0f)
+		Real turnRate = getMaxTurnRate(damage);
+		if (radius > 0.0f && speed > 0.0f)
+			turnRate = std::min(turnRate, speed / radius);
+		physics->setTurning(rotateObjAroundLocoPivot(obj, goalPos, turnRate));
+
+		const Real newFacing = obj->getOrientation();
+		const Real previousTravel = speed > 0.0f ? WWMath::Atan2Origin(velocity.y, velocity.x) : facing;
+		if (mounted)
 		{
-			Real turnRate = getMaxTurnRate(damage) * framesPerRetailStep;
-			if (radius > 0.0f && speed > 0.0f)
-				turnRate = std::min(turnRate, speed * framesPerRetailStep / radius);
-			physics->setTurning(rotateObjAroundLocoPivot(obj, goalPos, turnRate));
-			if (mounted)
-			{
-				const Real turn = stdAngleDiff(obj->getOrientation(), facing);
-				const Real travelHeading = facing + turn * 0.5f;
-				direction = {Cos(travelHeading), Sin(travelHeading), 0.0f};
-			}
-			else
-			{
-				direction = {dx / distance, dy / distance, 0.0f};
-			}
+			const Real settleFrames = std::max(1.0f, 0.5f * framesPerRetailStep);
+			travelHeading = previousTravel + stdAngleDiff(newFacing, previousTravel) / settleFrames;
 		}
 		else
-			updateRetailTurnConditions(obj, 0.0f);
+		{
+			const Real retailTurn = turnRate * framesPerRetailStep;
+			const Real previousLead = stdAngleDiff(previousTravel, facing);
+			const Bool travelLeads = angle > retailTurn ||
+				(fabs(previousLead) > turnRate && previousLead * headingError > 0.0f);
+			if (travelLeads && angle > turnRate && turnRate > 0.0f && speed > 0.0f)
+			{
+				const Real remaining = fabs(stdAngleDiff(goalHeading, previousTravel));
+				const Real travelTurn = std::min(remaining, 2.0f * turnRate);
+				const Real nextTravel = previousTravel + (headingError > 0.0f ? travelTurn : -travelTurn);
+				const Real lead = stdAngleDiff(nextTravel, newFacing);
+				travelHeading = newFacing + std::clamp(lead, -0.5f * retailTurn, 0.5f * retailTurn);
+			}
+			else if (angle <= turnRate || speed == 0.0f || distance <= speed + acceleration)
+				travelHeading = newFacing;
+		}
 	}
-	else if (speed > 0.0f)
-		direction = {velocity.x / speed, velocity.y / speed, 0.0f};
 	else
-		return;
+		updateRetailTurnConditions(obj, 0.0f);
 
 	const Real braking = getBraking();
 	if (!getFlag(NO_SLOW_DOWN_AS_APPROACHING_DEST) &&
@@ -2157,6 +2166,7 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 
 	const Real nextSpeed = std::min(distance, speed + std::clamp(desiredSpeed - speed, -braking, acceleration));
 	physics->scrubVelocity2D(0.0f);
+	Coord3D direction{Cos(travelHeading), Sin(travelHeading), 0.0f};
 	direction.scale(physics->getMass() * nextSpeed);
 	physics->applyMotiveForce(&direction);
 	updateRetailGait(obj, onPathDistToGoal, speed, desiredSpeed + MIN_GAIT_SPEED < speed, nextSpeed);
