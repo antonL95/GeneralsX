@@ -136,7 +136,7 @@ void ParticleSystemTemplate::resetForFXDefinition()
 	m_slaveTemplate = nullptr;
 	m_isRenderable = TRUE;
 	m_modelHasAlpha = FALSE;
-	m_modelOpacityOnly = FALSE;
+	m_modelMaterialMode = ModelMaterialMode::Authored;
 	m_isGpuParticle = FALSE;
 	m_hasGpuDraw = FALSE;
 	m_isTerrainFire = FALSE;
@@ -271,7 +271,14 @@ void ParticleSystemTemplate::parseFXShader( INI* ini, void *instance, void *stor
 	const FXNamedValue *value = findNamedValue(fxShaders, token);
 	*static_cast<ParticleShaderType *>(store) = static_cast<ParticleShaderType>(value->value);
 	auto *self = static_cast<ParticleSystemTemplate *>(instance);
-	self->m_modelOpacityOnly = stricmp(token, "W3D_ALPHA") == 0;
+	if (stricmp(token, "W3D_ALPHA") == 0)
+		self->m_modelMaterialMode = ModelMaterialMode::Opacity;
+	else if (stricmp(token, "W3D_DIFFUSE") == 0)
+		self->m_modelMaterialMode = ModelMaterialMode::Diffuse;
+	else if (stricmp(token, "W3D_EMISSIVE") == 0)
+		self->m_modelMaterialMode = ModelMaterialMode::Emissive;
+	else
+		self->m_modelMaterialMode = ModelMaterialMode::Authored;
 	if (!value->renderable)
 		self->m_isRenderable = FALSE;
 }

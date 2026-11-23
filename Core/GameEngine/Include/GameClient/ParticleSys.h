@@ -613,7 +613,8 @@ public:
 	static const FieldParse *getFXFieldParse() { return m_fxFieldParseTable; }
 	void resetForFXDefinition();
 	Bool isRenderable() const { return m_isRenderable; }
-	Bool usesModelOpacityOnly() const { return m_modelOpacityOnly; }
+	enum class ModelMaterialMode { Authored, Diffuse, Opacity, Emissive };
+	ModelMaterialMode getModelMaterialMode() const { return m_modelMaterialMode; }
 	Bool usesGpuDraw() const { return m_hasGpuDraw || m_isGpuParticle; }
 	Bool usesTerrainFire() const { return m_isTerrainFire && m_hasTerrainFireEmission; }
 	Bool canDrawGpuParticles() const;
@@ -699,7 +700,7 @@ protected:
 	GameClientRandomVariable m_modelSizeRate[3];
 	GameClientRandomVariable m_modelSizeDamping[3];
 	Bool m_modelHasAlpha = FALSE;
-	Bool m_modelOpacityOnly = FALSE;
+	ModelMaterialMode m_modelMaterialMode = ModelMaterialMode::Authored;
 	Bool m_isGpuParticle = FALSE;
 	Bool m_hasGpuDraw = FALSE;
 	Bool m_isTerrainFire = FALSE;

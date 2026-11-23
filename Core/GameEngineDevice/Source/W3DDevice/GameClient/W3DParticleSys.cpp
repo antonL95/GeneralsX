@@ -71,12 +71,15 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 	if (!W3DDisplay::m_assetManager)
 		return;
 	const bool traceTargetMatrices = std::getenv("GENERALSX_TEST_PARTICLE_MODEL") != nullptr;
+	using MaterialMode = ParticleSystemTemplate::ModelMaterialMode;
 	std::vector<RenderObjClass*> drawn;
 	for (ParticleSystem* system : systems)
 	{
 		if (!system || !system->isUsingDrawables() || system->getParticleTypeName().isEmpty())
 			continue;
-		const bool opacityOnly = system->getTemplate() && system->getTemplate()->usesModelOpacityOnly();
+		const auto* definition = system->getTemplate();
+		const auto materialMode = definition ? definition->getModelMaterialMode() : MaterialMode::Authored;
+		const bool overridesMaterial = materialMode != MaterialMode::Authored;
 		std::string modelName(system->getParticleTypeName().str());
 		if (modelName.size() > 4 && stricmp(modelName.c_str() + modelName.size() - 4, ".w3d") == 0)
 			modelName.resize(modelName.size() - 4);
@@ -84,7 +87,7 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 		{
 			const auto& size = particle->getModelSize();
 			const Real opacity = particle->getAlpha();
-			if (!(size.x > 0.0f && size.y > 0.0f && size.z > 0.0f && opacity > 0.0f))
+			if (!(size.x > 0.0f && size.y > 0.0f && size.z > 0.0f) || (overridesMaterial && !(opacity > 0.0f)))
 				continue;
 			const auto* position = particle->getPosition();
 			const Real margin = std::max({size.x, size.y, size.z}) * 50.0f;
@@ -108,15 +111,18 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 					TheGameClient->getFrame(), system->getTemplate()->getName().str(),
 					system->getSystemID(), transform[0][1], transform[1][1], transform[2][1]);
 			model->Set_Transform(transform);
-			model->Set_Animation_Opacity(opacity);
-			unsigned tint = 0xFFFFFFFF;
-			if (!opacityOnly)
+			if (overridesMaterial)
 			{
-				const auto* color = particle->getColor();
-				const auto channel = [](Real value) { return static_cast<unsigned>(std::clamp(value, 0.0f, 1.0f) * 255.0f); };
-				tint = 0xFF000000 | channel(color->red) << 16 | channel(color->green) << 8 | channel(color->blue);
+				model->Set_Animation_Opacity(opacity);
+				unsigned tint = 0xFFFFFFFF;
+				if (materialMode != MaterialMode::Opacity)
+				{
+					const auto* color = particle->getColor();
+					const auto channel = [](Real value) { return static_cast<unsigned>(std::clamp(value, 0.0f, 1.0f) * 255.0f); };
+					tint = 0xFF000000 | channel(color->red) << 16 | channel(color->green) << 8 | channel(color->blue);
+				}
+				setModelParticleTint(*model, tint, materialMode == MaterialMode::Emissive);
 			}
-			setModelParticleTint(*model, tint, system->getShaderType() == ParticleSystemInfo::ADDITIVE);
 			model->Render(info);
 			drawn.push_back(model);
 		}

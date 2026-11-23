@@ -55,6 +55,9 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 #include <cmath>
 #include <limits>
 
@@ -3672,6 +3675,17 @@ ParticleSystem *ParticleSystemManager::createParticleSystem( const ParticleSyste
 
 	m_uniqueSystemID = (ParticleSystemID)((UnsignedInt)m_uniqueSystemID + 1);
 	ParticleSystem *sys = newInstance(ParticleSystem)( sysTemplate, m_uniqueSystemID, createSlaves );
+	static const bool traceSpawns = std::getenv("GENERALSX_TRACE_RETAIL_PARTICLE_SPAWNS") != nullptr;
+	if (traceSpawns && RetailFileLayers::enabled())
+	{
+		std::fprintf(stderr, "[Retail Particle] frame=%u id=%u name=%s type=%d asset=%s shader=%d material=%d",
+			TheGameLogic ? TheGameLogic->getFrame() : 0, static_cast<UnsignedInt>(sys->getSystemID()),
+			sysTemplate->getName().str(), sysTemplate->m_particleType, sysTemplate->m_particleTypeName.str(),
+			sysTemplate->m_shaderType, static_cast<Int>(sysTemplate->getModelMaterialMode()));
+		for (const auto& key : sysTemplate->m_colorKey)
+			std::fprintf(stderr, " rgb=%g,%g,%g@%u", key.color.red, key.color.green, key.color.blue, key.frame);
+		std::fputc('\n', stderr);
+	}
 	return sys;
 }
 

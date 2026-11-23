@@ -1,0 +1,14 @@
+20 create Player_1 GondorTrebuchet 0 3240,1020,0
+21 reveal Player_1 GondorTrebuchet 0
+22 objupgrade Player_1 GondorTrebuchet 0 Upgrade_GondorFireStones
+30 forceattackground Player_1 GondorTrebuchet 0 0,-330
+163 create PlyrCreeps MordorMountainTroll 0 3240,690,0
+165 orderattack Player_1 GondorTrebuchet 0 PlyrCreeps:MordorMountainTroll:0
+166 health PlyrCreeps MordorMountainTroll 0
+407 health PlyrCreeps MordorMountainTroll 0
+107 particle-live - - 0
+119 particle-live - - 0
+130 particle-live - - 0
+394 particle-live - - 0
+407 particle-live - - 0
+420 particle-live - - 0
