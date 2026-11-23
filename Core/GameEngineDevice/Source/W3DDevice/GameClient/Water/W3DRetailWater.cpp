@@ -2,6 +2,7 @@
 #include "W3DRetailWaterReflection.h"
 
 #include "Common/GlobalData.h"
+#include "Common/GameLOD.h"
 #include "Common/RetailFileLayers.h"
 #include "GameClient/Water.h"
 #include "GameLogic/GameLogic.h"
@@ -24,8 +25,10 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <locale>
 #include <map>
 #include <memory>
+#include <sstream>
 
 namespace
 {
@@ -39,12 +42,43 @@ struct Release
 template<class T>
 using Reference = std::unique_ptr<T, Release<T>>;
 
+constexpr std::array<std::string_view, 5> pcaTextureNames{
+	"WaterPCATexture1", "WaterPCATexture2", "WaterPCATexture3", "PCANoiseTexture", "PCAFrothTexture"
+};
+
+constexpr unsigned pcaBasisCount = 12;
+constexpr float noShoreWaveCenter = 100000.0f;
+constexpr float shoreWaveDepth = 100.0f;
+
+using PcaFrame = std::array<RetailFX::Register, 10>;
+
+struct PcaWater
+{
+	float speed = 0.0f;
+	std::vector<PcaFrame> frames;
+	std::array<Reference<TextureClass>, pcaTextureNames.size()> textures;
+
+	PcaFrame sample(UnsignedInt elapsedFrames) const
+	{
+		const auto phase = std::fmod(static_cast<double>(elapsedFrames) * speed, static_cast<double>(frames.size()));
+		const auto first = static_cast<size_t>(phase);
+		const auto next = (first + 1) % frames.size();
+		const auto fraction = static_cast<float>(phase - static_cast<double>(first));
+		PcaFrame result{};
+		for (size_t row = 0; row < result.size(); ++row)
+			for (size_t channel = 0; channel < result[row].size(); ++channel)
+				result[row][channel] = std::lerp(frames[first][row][channel], frames[next][row][channel], fraction);
+		return result;
+	}
+};
+
 struct WaterMaterial
 {
 	W3dFx::Material material;
 	Reference<TextureClass> bump;
 	Reference<TextureClass> environment;
 	Reference<TextureClass> wave;
+	std::optional<PcaWater> pca;
 };
 
 const W3dFx::Material *findMaterial(RenderObjClass &object)
@@ -74,6 +108,80 @@ Reference<TextureClass> loadTexture(const std::string &name)
 	return Reference<TextureClass>(WW3DAssetManager::Get_Instance()->Get_Texture(name.c_str()));
 }
 
+std::optional<PcaWater> loadPcaWater(const W3dFx::Material &material)
+{
+	auto name = material.get<std::string>(pcaTextureNames[0], {});
+	const auto extension = name.find_last_of('.');
+	if (extension == std::string::npos || !extension || name.find_first_of("/\\") != std::string::npos)
+		return {};
+	name.replace(extension, std::string::npos, ".basis");
+	const auto path = "art/textures/" + name;
+	auto file = std::unique_ptr<File, void (*)(File *)>(TheFileSystem->openFile(path.c_str(), File::READ | File::BINARY),
+		[](File *value) { value->close(); });
+	if (!file)
+		return {};
+	const Int size = file->size();
+	if (size <= 0 || size > 1024 * 1024)
+		return {};
+	std::string content(static_cast<size_t>(size), '\0');
+	if (file->read(content.data(), size) != size)
+		return {};
+
+	PcaWater result;
+	std::istringstream input(std::move(content));
+	input.imbue(std::locale::classic());
+	std::string field;
+	size_t frameCount = 0;
+	if (!(input >> field >> frameCount) || field != "NumFrames:" || !frameCount ||
+		frameCount > static_cast<size_t>(size) / ((pcaBasisCount + 1) * 3) ||
+		!(input >> field >> result.speed) || field != "Speed:" ||
+		!std::isfinite(result.speed) || result.speed < 0.0f)
+		return {};
+
+	result.frames.resize(frameCount);
+	const auto readSamples = [&](std::string_view label, auto store) {
+		if (!(input >> field) || field != label)
+			return false;
+		for (const auto axis : {0u, 2u, 1u})
+			for (auto &frame : result.frames)
+			{
+				float value;
+				if (!(input >> value) || !std::isfinite(value))
+					return false;
+				store(frame, axis, value / 255.0f);
+			}
+		return true;
+	};
+	if (!readSamples("Mean:", [](PcaFrame &frame, unsigned axis, float value) { frame[0][axis] = value; }))
+		return {};
+	for (unsigned basis = 0; basis < pcaBasisCount; ++basis)
+	{
+		if (!readSamples("Basis" + std::to_string(basis) + ':', [basis](PcaFrame &frame, unsigned axis, float value) {
+			frame[1 + 3 * (basis / 4) + axis][basis % 4] = value;
+		}))
+			return {};
+	}
+	if (input >> field)
+		return {};
+	for (size_t i = 0; i < result.textures.size(); ++i)
+	{
+		result.textures[i] = loadTexture(material.get<std::string>(pcaTextureNames[i], {}));
+		if (!result.textures[i])
+			return {};
+	}
+	return result;
+}
+
+bool useUltraWater()
+{
+#if RTS_GENERALS
+	return false;
+#else
+	const auto *settings = TheGameLODManager ? TheGameLODManager->getStaticRenderSettings() : nullptr;
+	return settings && settings->m_waterQuality == 4;
+#endif
+}
+
 std::optional<WaterMaterial> loadMaterial(const PolygonTrigger::StandingWaterSettings &settings)
 {
 	std::string name(settings.fxShader.str());
@@ -90,12 +198,15 @@ std::optional<WaterMaterial> loadMaterial(const PolygonTrigger::StandingWaterSet
 	result.bump = loadTexture(material->get<std::string>("WaterBumpTexture", settings.bumpTexture.str()));
 	result.environment = loadTexture(material->get<std::string>("WaterEnvTexture", settings.skyTexture.str()));
 	result.wave = loadTexture(material->get<std::string>("WaveTexture", {}));
+	if (material->technique == 5)
+		result.pca = loadPcaWater(*material);
 	if (!result.bump || !result.environment || !result.wave)
 		return {};
 	return result;
 }
 
-bool makeGeometry(const PolygonTrigger &polygon, std::vector<RetailFX::WaterVertex> &vertices, std::vector<uint16_t> &indices)
+bool makeGeometry(const PolygonTrigger &polygon, std::vector<RetailFX::WaterVertex> &vertices,
+	std::vector<uint16_t> &indices, bool pca)
 {
 	const float height = static_cast<float>(polygon.getPoint(0)->z);
 	for (const auto &patch : polygon.getStandingWater()->patches)
@@ -119,7 +230,12 @@ bool makeGeometry(const PolygonTrigger &polygon, std::vector<RetailFX::WaterVert
 				const float u = static_cast<float>(col) / static_cast<float>(cols);
 				const float x = std::lerp(std::lerp(patch[0].x, patch[1].x, u), std::lerp(patch[3].x, patch[2].x, u), v);
 				const float y = std::lerp(std::lerp(patch[0].y, patch[1].y, u), std::lerp(patch[3].y, patch[2].y, u), v);
-				vertices.push_back({x, y, height, {0.0f, 0.0f, TheTerrainLogic->getGroundHeight(x, y)}});
+				const auto ground = TheTerrainLogic->getGroundHeight(x, y);
+				if (pca)
+					vertices.push_back({x, y, height, {noShoreWaveCenter, noShoreWaveCenter, ground},
+						{1.0f, 0.0f}, {shoreWaveDepth, 0.0f}});
+				else
+					vertices.push_back({x, y, height, {0.0f, 0.0f, ground}});
 				if (row < rows && col < cols)
 				{
 					const auto a = static_cast<uint16_t>(base + row * (cols + 1) + col);
@@ -141,12 +257,14 @@ class RetailStandingWater
 public:
 	std::unique_ptr<RetailFX::NativePass> pass;
 	std::unique_ptr<RetailFX::NativePass> fullPass;
+	std::unique_ptr<RetailFX::NativePass> pcaPass;
 	RetailFX::WaterReflectionImage reflection;
 	std::optional<unsigned> reflectionRevision;
 	bool reflectionReady = false;
 	std::map<std::array<std::string, 3>, std::optional<WaterMaterial>> materials;
 	bool drew = false;
 	bool drewFull = false;
+	bool drewPca = false;
 	bool failed = false;
 };
 
@@ -165,13 +283,14 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 		{
 			m_retailStandingWater->pass = RetailFX::NativePass::makeWater(device, *effect, DX8Wrapper::Create_Effect_Shader9);
 			m_retailStandingWater->fullPass = RetailFX::NativePass::makeFullWater(device, *effect, DX8Wrapper::Create_Effect_Shader9);
+			m_retailStandingWater->pcaPass = RetailFX::NativePass::makePcaWater(device, *effect, DX8Wrapper::Create_Effect_Shader9);
 		}
-		if (!m_retailStandingWater->pass && !m_retailStandingWater->fullPass)
+		if (!m_retailStandingWater->pass && !m_retailStandingWater->fullPass && !m_retailStandingWater->pcaPass)
 			std::fprintf(stderr, "[RetailFX] Could not load WaterShader passes\n");
 	}
 
 	auto &runtime = *m_retailStandingWater;
-	if (!runtime.pass && !runtime.fullPass)
+	if (!runtime.pass && !runtime.fullPass && !runtime.pcaPass)
 		return false;
 	const auto &settings = *polygon.getStandingWater();
 	auto [entry, inserted] = runtime.materials.try_emplace(
@@ -185,8 +304,10 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 	if (!entry->second)
 		return false;
 	auto &water = *entry->second;
+	const bool usePca = runtime.pcaPass && water.pca && useUltraWater();
+	const bool useFull = runtime.fullPass && water.material.technique == 1;
 	void *reflection = nullptr;
-	if (runtime.fullPass && water.material.technique == 1 && m_retailReflectionSourceValid &&
+	if ((useFull || usePca) && m_retailReflectionSourceValid &&
 		m_reflectionLevel == static_cast<Real>(polygon.getPoint(0)->z) && TheGlobalData && TheGlobalData->isWaterReflections())
 	{
 		if (runtime.reflectionRevision != m_reflectionRevision)
@@ -224,6 +345,8 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 	const float maxDepth = authoredDepth >= 0.0f ? authoredDepth :
 		TheWaterTransparency ? TheWaterTransparency->m_transparentWaterDepth : 0.0f;
 	const float time = static_cast<float>(TheGameLogic->getFrame()) / static_cast<float>(LOGICFRAMES_PER_SECOND);
+	const auto pcaFrame = usePca && reflection
+		? std::optional(water.pca->sample(TheGameLogic->getFrame())) : std::nullopt;
 	const auto setBinding = [&](const RetailFX::Binding &binding, std::span<RetailFX::Register> values, std::span<int> booleans) {
 		const auto name = std::string_view(binding.name);
 		if (!booleans.empty())
@@ -238,8 +361,14 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 			RetailFX::writeMatrix(values, viewProjection);
 		else if (name == "World")
 			RetailFX::writeMatrix(values, world);
+		else if (name == "View")
+			RetailFX::writeMatrix(values, view);
+		else if (name == "Projection")
+			RetailFX::writeMatrix(values, projection);
 		else if (name == "ViewI")
 			RetailFX::writeMatrix(values, inverse);
+		else if (name == "PCA" && pcaFrame)
+			std::copy_n(pcaFrame->begin(), std::min(pcaFrame->size(), values.size()), values.begin());
 		else if (name == "Shroud")
 			values[0] = shroudUV;
 		else if (name == "Fog")
@@ -288,20 +417,30 @@ bool WaterRenderObjClass::drawRetailStandingWater(const PolygonTrigger &polygon)
 			return RetailFX::nativeTexture(water.wave.get());
 		if (name == "ShroudTexture")
 			return RetailFX::nativeTexture(shroud->getShroudTexture());
+		if (pcaFrame)
+		{
+			const auto property = std::find(pcaTextureNames.begin(), pcaTextureNames.end(), name);
+			if (property != pcaTextureNames.end())
+				return RetailFX::nativeTexture(water.pca->textures[property - pcaTextureNames.begin()].get());
+		}
 		return nullptr;
 	};
 
 	std::vector<RetailFX::WaterVertex> vertices;
 	std::vector<uint16_t> indices;
-	if (!makeGeometry(polygon, vertices, indices))
+	if (!makeGeometry(polygon, vertices, indices, pcaFrame.has_value()))
 		return false;
-	const bool full = reflection && runtime.fullPass->drawWater(device, vertices, indices, setBinding, getTexture, settings.additive);
-	const bool drawn = full || (runtime.pass && runtime.pass->drawWater(device, vertices, indices, setBinding, getTexture, settings.additive));
-	auto &reported = full ? runtime.drewFull : runtime.drew;
+	const bool pca = pcaFrame && runtime.pcaPass->drawWater(device, vertices, indices, setBinding, getTexture, settings.additive);
+	if (pcaFrame && !pca)
+		for (auto &vertex : vertices)
+			vertex.terrain[0] = vertex.terrain[1] = 0.0f;
+	const bool full = useFull && reflection && runtime.fullPass->drawWater(device, vertices, indices, setBinding, getTexture, settings.additive);
+	const bool drawn = pca || full || (runtime.pass && runtime.pass->drawWater(device, vertices, indices, setBinding, getTexture, settings.additive));
+	auto &reported = pca ? runtime.drewPca : full ? runtime.drewFull : runtime.drew;
 	if (drawn && !reported)
 	{
 		std::fprintf(stderr, "[RetailFX] Drew WaterShader %s (%s)\n",
-			full ? "BumpSpecular" : "BumpSpecular_M", settings.fxShader.str());
+			pca ? "PCA_U" : full ? "BumpSpecular" : "BumpSpecular_M", settings.fxShader.str());
 		if (std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS"))
 		{
 			std::fprintf(stderr, "[RetailFX] Water reflection technique=%u type=%d source=%d enabled=%d plane=%g area=%d prepared=%d available=%d\n",

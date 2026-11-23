@@ -104,6 +104,11 @@ std::unique_ptr<NativePass> NativePass::makeFullWater(void *handle, const Effect
 	return make(handle, effect, createShader, Kind::FullWater);
 }
 
+std::unique_ptr<NativePass> NativePass::makePcaWater(void *handle, const Effect &effect, CreateShader createShader)
+{
+	return make(handle, effect, createShader, Kind::PcaWater);
+}
+
 std::unique_ptr<NativePass> NativePass::makeTerrain(void *handle, const Effect &effect, CreateShader createShader)
 {
 	return make(handle, effect, createShader, Kind::Terrain);
@@ -138,8 +143,9 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 	const bool defaultMesh = kind == Kind::DefaultMesh;
 	const bool vegetation = kind == Kind::Vegetation;
 	const bool fullWater = kind == Kind::FullWater;
+	const bool pcaWater = kind == Kind::PcaWater;
 	const std::string_view techniqueName = terrain || defaultMesh || vegetation ? "Default" :
-		model ? "Default_M" : fullWater ? "BumpSpecular" : "BumpSpecular_M";
+		model ? "Default_M" : pcaWater ? "PCA_U" : fullWater ? "BumpSpecular" : "BumpSpecular_M";
 	const char *effectName = terrain ? "Terrain" : model ? "NormalMapped" :
 		defaultMesh ? "DefaultW3D" : vegetation ? "Vegetation" : "WaterShader";
 	const auto technique = std::find_if(effect.techniques.begin(), effect.techniques.end(),
@@ -162,8 +168,9 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 				const std::string_view array = terrain && !vertex ? "PSDefault_Array" :
 					model ? (vertex ? "VS_M_Array" : "PS_M_Array") :
 					defaultMesh ? (vertex ? "VS_Array" : "PS_Array") : vegetation && !vertex ? "PS_Array" :
-					fullWater && !vertex ? "PSBumpSpecular_Array" : "";
-				const unsigned variant = terrain ? (shadowTerrain ? 9 : 4) : vertex || vegetation || fullWater ? 0 : defaultMesh ? 37 : 1;
+						fullWater && !vertex ? "PSBumpSpecular_Array" : pcaWater && !vertex ? "PSPCAUltra_Array" : "";
+				const unsigned variant = terrain ? (shadowTerrain ? 9 : 4) :
+					vertex || vegetation || fullWater || pcaWater ? 0 : defaultMesh ? 37 : 1;
 				if (array.empty() || state.parameterReference != array)
 					return nullptr;
 				const auto parameter = std::find_if(effect.parameters.begin(), effect.parameters.end(),
@@ -237,6 +244,13 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 		{0, static_cast<WORD>(offsetof(WaterVertex, terrain)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
 		D3DDECL_END()
 	};
+	const D3DVERTEXELEMENT9 pcaDeclaration[] = {
+		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+		{0, static_cast<WORD>(offsetof(WaterVertex, terrain)), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+		{0, static_cast<WORD>(offsetof(WaterVertex, uv)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		{0, static_cast<WORD>(offsetof(WaterVertex, wave)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+		D3DDECL_END()
+	};
 	const auto terrainColor = static_cast<WORD>(shadowTerrain ? offsetof(TerrainVertex, fill) : offsetof(TerrainVertex, diffuse));
 	const D3DVERTEXELEMENT9 terrainDeclaration[] = {
 		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
@@ -271,7 +285,8 @@ std::unique_ptr<NativePass> NativePass::make(void *handle, const Effect &effect,
 	};
 	IDirect3DVertexDeclaration9 *decl = nullptr;
 	if (FAILED(device->CreateVertexDeclaration(terrain ? terrainDeclaration : model ? modelDeclaration :
-		defaultMesh ? defaultDeclaration : vegetation ? vegetationDeclaration : declaration, &decl)))
+		defaultMesh ? defaultDeclaration : vegetation ? vegetationDeclaration :
+		pcaWater ? pcaDeclaration : declaration, &decl)))
 		return nullptr;
 	data->declaration.reset(decl);
 	data->vertex.reset(static_cast<IDirect3DVertexShader9 *>(createShader(true, data->vs.tokens.data())));
@@ -390,7 +405,8 @@ bool NativePass::Data::draw(IDirect3DDevice9 *device, const SetBinding &setBindi
 			SUCCEEDED(device->SetPixelShader(pixel.get())) &&
 			SUCCEEDED(device->SetVertexShaderConstantF(0, vertexRegs.floats[0].data(), 256)) &&
 			SUCCEEDED(device->SetVertexShaderConstantB(0, booleans.data(), 16)) &&
-			SUCCEEDED(device->SetPixelShaderConstantF(0, pixelRegs.floats[0].data(), 32));
+			SUCCEEDED(device->SetPixelShaderConstantF(0, pixelRegs.floats[0].data(),
+				D3DSHADER_VERSION_MAJOR(ps.tokens.front()) == 3 ? 224 : 32));
 	}();
 	const bool drawn = ready && issueDraw();
 	const bool restored = SUCCEEDED(saved->Apply());
@@ -423,6 +439,7 @@ struct NativePass::Data {};
 
 std::unique_ptr<NativePass> NativePass::makeWater(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeFullWater(void *, const Effect &, CreateShader) { return nullptr; }
+std::unique_ptr<NativePass> NativePass::makePcaWater(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeTerrain(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeTerrainWithShadows(void *, const Effect &, CreateShader) { return nullptr; }
 std::unique_ptr<NativePass> NativePass::makeNormalMapped(void *, const Effect &, CreateShader) { return nullptr; }
