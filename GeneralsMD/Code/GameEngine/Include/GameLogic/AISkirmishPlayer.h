@@ -52,6 +52,8 @@ public:	 // AISkirmish specific methods.
 	static void loadRetailData();
 	static void parseRetailArmy(INI* ini);
 	static void parseRetailTuning(INI* ini);
+	static Bool hasRetailCombatChain(const ThingTemplate& attacker);
+	static Real getRetailCombatChainModifier(const ThingTemplate& attacker, const ThingTemplate& target);
 	virtual Bool computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord3D *pos, Int playerNdx, Real weaponRadius) override; ///< Calculates best pos for weapon given radius.
 
 public:	// AIPlayer interface methods.

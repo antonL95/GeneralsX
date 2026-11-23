@@ -61,6 +61,7 @@
 #include "Common/RandomValue.h"
 #include "Common/Science.h"
 #include "Common/ThingTemplate.h"
+#include "Common/RetailAIKindOf.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingSort.h"
 #include "Common/BitFlagsIO.h"
@@ -127,11 +128,6 @@ const char* const thingClassNames[] = {
 	"BUSH", "TREE", "MACHINE", "BUFF", nullptr
 };
 const char* const deadCollideSizeNames[] = { "SMALL", "MEDIUM", "LARGE", nullptr };
-const char* const aiKindOfNames[] = {
-	"INFANTRY", "ARCHER", "PIKEMAN", "CAVALRY", "CREEP", "CREEP_STRUCTURE", "STRUCTURE", "SIEGEWEAPON",
-	"SLAYER", "WALL", "HERO", "BATTLE_TOWER", "SHIP_BATTLESHIP", "SHIP_BOMBARD", "MONSTER", "FLYERS",
-	"PATROL", "SPAM", nullptr
-};
 const char* const contactPointNames[] = { "Repair", "Swoop", "Grab", "Ram", "Bomb", "Menu", nullptr };
 const char* const clientBehaviorNames[] = {
 	"AnimationSoundClientBehavior", "ModelConditionAudioLoopClientBehavior",
@@ -184,7 +180,7 @@ const FieldParse flammabilityFields[] = {
 	{ nullptr, nullptr, nullptr, 0 }
 };
 const FieldParse threatBreakdownFields[] = {
-	{ "AIKindOf", INI::parseIndexList, aiKindOfNames, offsetof(Template::ThreatBreakdown, aiKindOf) },
+	{ "AIKindOf", INI::parseIndexList, RetailAIKindOf::names, offsetof(Template::ThreatBreakdown, aiKindOf) },
 	{ nullptr, nullptr, nullptr, 0 }
 };
 const FieldParse locomotorSetFields[] = {

@@ -35,6 +35,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailAIKindOf.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
 #include "Common/Team.h"
@@ -92,6 +93,7 @@ struct RetailArmy
 	std::vector<RetailArmyMember> members;
 	std::vector<AsciiString> heroes;
 	std::vector<AsciiString> scavengedBuildings;
+	std::vector<AsciiString> offensiveBuildings;
 	Real rushSeconds = 120.0f;
 	Real midgameSeconds = 420.0f;
 	Int minimumFarms = 2;
@@ -103,6 +105,10 @@ struct RetailArmy
 	Real fortressRebuildPriority = 1950.0f;
 	Real structureRebuildModifier = 0.5f;
 	Real defaultPriority = 100.0f;
+	Real lowUnitPriority[3] = {};
+	Real mustUseCommandPoints[3] = {};
+	Int attackRecruitDepth = 0;
+	Int exploreRecruitDepth = 0;
 };
 
 struct RetailDifficulty
@@ -118,9 +124,17 @@ struct RetailBrutalCheats
 	Real timeReduction = 0.1f;
 };
 
+struct RetailCombatChain
+{
+	Int unit = -1;
+	std::vector<Int> targets;
+	std::vector<Real> modifiers;
+};
+
 struct RetailAITuning
 {
 	std::vector<RetailDifficulty> difficulties;
+	std::array<RetailCombatChain, std::size(RetailAIKindOf::names) - 1> combatChains;
 	RetailBrutalCheats brutal;
 	Bool disableBaseBuilding = FALSE;
 	Bool disableEconomyBuilding = FALSE;
@@ -166,6 +180,42 @@ void skipRetailAISection(INI* ini, void*, void*, const void* section)
 {
 	ini->recordSkipped("subblock", static_cast<const char*>(section));
 	ini->readRawBlock(INI::getEndToken());
+}
+
+void parseCombatChainTargets(INI* ini, void*, void* store, const void*)
+{
+	auto& targets = *static_cast<std::vector<Int>*>(store);
+	for (const char* token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+		targets.push_back(INI::scanIndexList(token, RetailAIKindOf::names));
+}
+
+void parseCombatChainModifiers(INI* ini, void*, void* store, const void*)
+{
+	auto& modifiers = *static_cast<std::vector<Real>*>(store);
+	for (const char* token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+		modifiers.push_back(INI::scanReal(token));
+}
+
+void parseCombatChain(INI* ini, void* instance, void*, const void*)
+{
+	ini->getNextToken();
+	RetailCombatChain chain;
+	static const FieldParse fields[] = {
+		{ "Unit", INI::parseIndexList, RetailAIKindOf::names, offsetof(RetailCombatChain, unit) },
+		{ "TargetTypes", parseCombatChainTargets, nullptr, offsetof(RetailCombatChain, targets) },
+		{ "TargetPriorityModifiers", parseCombatChainModifiers, nullptr, offsetof(RetailCombatChain, modifiers) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	ini->initFromINI(&chain, fields);
+	auto& chains = static_cast<RetailAITuning*>(instance)->combatChains;
+	if (chain.unit >= 0 && static_cast<size_t>(chain.unit) < chains.size())
+		chains[chain.unit] = std::move(chain);
+}
+
+Int combatKind(const ThingTemplate& type)
+{
+	const auto& threats = type.getRotWKObjectData().threatBreakdowns;
+	return threats.empty() ? -1 : threats.back().aiKindOf;
 }
 
 void parseArmyMember(INI* ini, void* instance, void*, const void*)
@@ -405,6 +455,15 @@ void AISkirmishPlayer::parseRetailArmy(INI* ini)
 		{ "FortressRebuildPriority", INI::parseReal, nullptr, offsetof(RetailArmy, fortressRebuildPriority) },
 		{ "StructureRebuildPriorityModifier", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, structureRebuildModifier) },
 		{ "DefaultUnitPriority", INI::parseReal, nullptr, offsetof(RetailArmy, defaultPriority) },
+		{ "LowUnitPriorityModifier_Rush", INI::parseReal, nullptr, offsetof(RetailArmy, lowUnitPriority) },
+		{ "LowUnitPriorityModifier_MidGame", INI::parseReal, nullptr, offsetof(RetailArmy, lowUnitPriority) + sizeof(Real) },
+		{ "LowUnitPriorityModifier_EndGame", INI::parseReal, nullptr, offsetof(RetailArmy, lowUnitPriority) + 2 * sizeof(Real) },
+		{ "MustUseCommandPointPercentage_Phase1", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, mustUseCommandPoints) },
+		{ "MustUseCommandPointPercentage_Phase2", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, mustUseCommandPoints) + sizeof(Real) },
+		{ "MustUseCommandPointPercentage_Phase3", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, mustUseCommandPoints) + 2 * sizeof(Real) },
+		{ "CombatChainSearchDepthForTeamRecruits_AttackTeams", INI::parseInt, nullptr, offsetof(RetailArmy, attackRecruitDepth) },
+		{ "CombatChainSearchDepthForTeamRecruits_ExploreTeams", INI::parseInt, nullptr, offsetof(RetailArmy, exploreRecruitDepth) },
+		{ "OffensiveBuildings", INI::parseAsciiStringVector, nullptr, offsetof(RetailArmy, offensiveBuildings) },
 		{ "ScavangedResourceBuildings", INI::parseAsciiStringVector, nullptr, offsetof(RetailArmy, scavengedBuildings) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -420,7 +479,7 @@ void AISkirmishPlayer::parseRetailTuning(INI* ini)
 	ini->getNextToken();
 	static const FieldParse fields[] = {
 		{ "DifficultyTuning", parseDifficultyTuning, nullptr, 0 },
-		{ "CombatChainDefinition", skipRetailAISection, "CombatChainDefinition", 0 },
+		{ "CombatChainDefinition", parseCombatChain, nullptr, 0 },
 		{ "BrutalDifficultyCheats", parseBrutalCheats, nullptr, offsetof(RetailAITuning, brutal) },
 		{ "DisableBaseBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableBaseBuilding) },
 		{ "DisableEconomyBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableEconomyBuilding) },
@@ -430,6 +489,30 @@ void AISkirmishPlayer::parseRetailTuning(INI* ini)
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	ini->initFromINI(&retailTuning, fields);
+}
+
+Bool AISkirmishPlayer::hasRetailCombatChain(const ThingTemplate& attacker)
+{
+	if (!RetailFileLayers::enabled())
+		return FALSE;
+	const Int kind = combatKind(attacker);
+	return kind >= 0 && static_cast<size_t>(kind) < retailTuning.combatChains.size() &&
+		retailTuning.combatChains[kind].unit >= 0;
+}
+
+Real AISkirmishPlayer::getRetailCombatChainModifier(const ThingTemplate& attacker, const ThingTemplate& target)
+{
+	if (!hasRetailCombatChain(attacker))
+		return 0.0f;
+	const Int kind = combatKind(target);
+	if (kind < 0)
+		return 0.0f;
+	const RetailCombatChain& chain = retailTuning.combatChains[combatKind(attacker)];
+	const size_t count = std::min<size_t>(17, std::min(chain.targets.size(), chain.modifiers.size()));
+	for (size_t slot = 0; slot < count; ++slot)
+		if (chain.targets[slot] == kind)
+			return chain.modifiers[slot];
+	return 0.0f;
 }
 
 Real RetailSkirmishSpending::brutalFactor(const Player& player, Bool time)
@@ -1498,6 +1581,50 @@ void AISkirmishPlayer::updateRetail()
 			armyWeight(*unit->getHeroIdentityTemplate(), TRUE) > 0.0f;
 	});
 	const Bool needsArmy = armySize < RETAIL_ATTACK_WAVE_MIN_UNITS;
+	const Int commandPointTotal = m_player->getCommandPointsTotal();
+	const Real commandPointUsage = commandPointTotal > 0
+		? INT_TO_REAL(m_player->getCommandPointsUsed()) / INT_TO_REAL(commandPointTotal) : 0.0f;
+	const Real baseUnitPriority = phase == 0 ? 500.0f : rules->defaultPriority;
+	const Real adjustedUnitPriority = baseUnitPriority +
+		(rules->mustUseCommandPoints[phase] - commandPointUsage) * rules->lowUnitPriority[phase];
+	const Real unitPriority = owned.size() > 1
+		? std::max(baseUnitPriority,
+			std::min(std::max(rules->defaultPriority, adjustedUnitPriority), 1800.0f + (1.0f - commandPointUsage) * 300.0f))
+		: baseUnitPriority;
+	const auto chooseArmyUnit = [&](Object& producer, const CommandSet& set) {
+		const CommandButton* selected = nullptr;
+		Real bestWeight = 0.0f;
+		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+		{
+			const CommandButton* button = set.getCommandButton(slot);
+			const ThingTemplate* unit = button ? button->getThingTemplate() : nullptr;
+			if (!unit || button->getCommandType() != GUI_COMMAND_UNIT_BUILD)
+				continue;
+			const Real weight = armyWeight(*unit, FALSE);
+			if (weight <= 0.0f)
+				continue;
+			const Real score = weight / INT_TO_REAL(1 + countType(unit));
+			if (score > bestWeight && button->getRequiredRank() <= producer.getExperienceTracker()->getRank() &&
+				HeroRoster::buttonUpgradesMet(button, m_player, &producer) && TheBuildAssistant->canMakeUnit(&producer, unit) == CANMAKE_OK)
+			{
+				bestWeight = score;
+				selected = button;
+			}
+		}
+		return selected;
+	};
+	const auto canTrainArmy = [&]() {
+		if (retailTuning.disableUnitBuilding || !m_player->getCanBuildUnits())
+			return FALSE;
+		return std::any_of(producers.begin(), producers.end(), [&](Object* producer) {
+			const CommandSet* set = retailCommands(*producer);
+			return set && producer->getProductionUpdateInterface()->getProductionCount() == 0 && chooseArmyUnit(*producer, *set);
+		}) ? TRUE : FALSE;
+	};
+	if (trace && !producers.empty())
+		std::fprintf(stderr, "AI_UNIT_PRIORITY\t%u\t%d\t%d\t%g\t%g\t%g\t%g\t%g\n", frame, playerIndex, phase,
+			commandPointUsage, rules->mustUseCommandPoints[phase], rules->lowUnitPriority[phase], rules->defaultPriority, unitPriority);
+	Bool deferBuildingForUnit = FALSE;
 	UnsignedInt openingUnitReserve = 0;
 	if (needsArmy && farms >= 2 && farmLimit > farms &&
 		!retailTuning.disableUnitBuilding && m_player->getCanBuildUnits())
@@ -1641,6 +1768,11 @@ void AISkirmishPlayer::updateRetail()
 			}
 			if (!selected)
 				return FALSE;
+			if (unitPriority > priority && canTrainArmy())
+			{
+				deferBuildingForUnit = TRUE;
+				return FALSE;
+			}
 			const ThingTemplate* type = selected->getThingTemplate();
 			const auto construct = [&]() {
 				return plot ? plot->construct(type, m_player) != nullptr
@@ -1677,6 +1809,7 @@ void AISkirmishPlayer::updateRetail()
 				break;
 	}
 
+	deferBuildingForUnit = deferBuildingForUnit && canTrainArmy();
 	for (Object* producer : producers)
 	{
 		ProductionUpdateInterface* production = producer->getProductionUpdateInterface();
@@ -1696,6 +1829,12 @@ void AISkirmishPlayer::updateRetail()
 			}
 			return TRUE;
 		};
+		if (deferBuildingForUnit)
+		{
+			if (const CommandButton* unit = chooseArmyUnit(*producer, *set); unit && train(unit->getThingTemplate(), unit))
+				deferBuildingForUnit = FALSE;
+			continue;
+		}
 		const auto unlocksArmy = [&](const UpgradeTemplate* upgrade) {
 			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 			{
@@ -1744,26 +1883,7 @@ void AISkirmishPlayer::updateRetail()
 			}
 		if (production->getProductionCount() != 0)
 			continue;
-		const CommandButton* selected = nullptr;
-		Real priority = 0.0f;
-		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
-		{
-			const CommandButton* button = set->getCommandButton(slot);
-			const ThingTemplate* unit = button ? button->getThingTemplate() : nullptr;
-			if (!unit || button->getCommandType() != GUI_COMMAND_UNIT_BUILD)
-				continue;
-			const Real weight = armyWeight(*unit, FALSE);
-			if (weight <= 0.0f)
-				continue;
-			const Real score = weight / INT_TO_REAL(1 + countType(unit));
-			if (score > priority && button->getRequiredRank() <= producer->getExperienceTracker()->getRank() &&
-				HeroRoster::buttonUpgradesMet(button, m_player, producer) && TheBuildAssistant->canMakeUnit(producer, unit) == CANMAKE_OK)
-			{
-				priority = score;
-				selected = button;
-			}
-		}
-		if (selected)
+		if (const CommandButton* selected = chooseArmyUnit(*producer, *set))
 			train(selected->getThingTemplate(), selected);
 	}
 

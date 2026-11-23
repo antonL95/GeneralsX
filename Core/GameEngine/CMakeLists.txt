@@ -131,6 +131,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/AnimalAIUpdate.h
     Include/GameLogic/Module/GiantBirdAIUpdate.h
     Include/Common/RetailFileLayers.h
+    Include/Common/RetailAIKindOf.h
     Include/Common/INILegacyLines.h
     Include/Common/INIMath.h
     Include/Common/RotwkDuration.h

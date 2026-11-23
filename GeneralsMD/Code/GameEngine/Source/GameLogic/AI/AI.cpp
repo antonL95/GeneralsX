@@ -38,6 +38,7 @@
 #include "Common/XferCRC.h"
 
 #include "GameLogic/AI.h"
+#include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -600,6 +601,39 @@ static void priorityFunc(Object *obj, void *userData)
 /**
  * Return the closest enemy, according to the qualifiers.
  */
+static Object* findRetailCombatTarget(const Object* attacker, Real range, PartitionFilter** filters,
+	const AttackPriorityInfo* info, Real distanceScale)
+{
+	if (!info)
+		info = TheScriptEngine->getDefaultAttackInfo();
+	ObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(attacker, range, FROM_BOUNDINGSPHERE_2D,
+		filters, ITER_SORTED_NEAR_TO_FAR);
+	MemoryPoolObjectHolder holder(iter);
+	Object* selected = nullptr;
+	Real bestScore = 0.0f;
+	for (Object* target = iter->first(); target; target = iter->next())
+	{
+		const Real modifier = AISkirmishPlayer::getRetailCombatChainModifier(*attacker->getTemplate(), *target->getTemplate());
+		if (modifier == -1.0f)
+			continue;
+		TPriorityInfo priorityInfo;
+		priorityInfo.priority = info->getPriority(target->getTemplate());
+		priorityInfo.info = info;
+		if (priorityInfo.priority == 0)
+			continue;
+		if (ContainModuleInterface* contain = target->getContain())
+			contain->iterateContained(priorityFunc, &priorityInfo, false);
+		const Real distance = WWMath::SqrtOrigin(ThePartitionManager->getDistanceSquared(attacker, target, FROM_BOUNDINGSPHERE_2D));
+		const Real score = INT_TO_REAL(priorityInfo.priority) + WWMath::Div_FixNaN(modifier - distance, distanceScale, 0.0f);
+		if (!selected || score > bestScore)
+		{
+			selected = target;
+			bestScore = score;
+		}
+	}
+	return selected;
+}
+
 Object *AI::findClosestEnemy( const Object *me, Real range, UnsignedInt qualifiers,
 														 const AttackPriorityInfo *info, PartitionFilter *optionalFilter)
 {
@@ -712,6 +746,11 @@ Object *AI::findClosestEnemy( const Object *me, Real range, UnsignedInt qualifie
 	}
 
 	filters[numFilters] = nullptr;
+
+	const Bool useCombatChain = RetailFileLayers::enabled() && (qualifiers & CAN_ATTACK) &&
+		AISkirmishPlayer::hasRetailCombatChain(*me->getTemplate());
+	if (useCombatChain)
+		return findRetailCombatTarget(me, range, filters, info, getAiData()->m_attackPriorityDistanceModifier);
 
 	if (info == nullptr || info == TheScriptEngine->getDefaultAttackInfo())
 	{
