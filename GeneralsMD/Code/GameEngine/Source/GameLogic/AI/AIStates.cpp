@@ -3401,9 +3401,10 @@ StateReturnType AIFollowPathState::update()
 	const Bool groupRoute = ai->isFollowingRetailGroupRoute();
 	if (groupRoute)
 	{
-		const Coord3D* from = obj->getPosition();
-		Real remainingDistance = 0.0f;
-		for (Int index = m_index; const Coord3D* point = ai->friend_getGoalPathPosition(index); ++index)
+		const Coord3D* from = &m_goalPosition;
+		const Coord3D delta = m_goalPosition - *obj->getPosition();
+		Real remainingDistance = WWMath::SqrtfOrigin(sqr(delta.x) + sqr(delta.y));
+		for (Int index = m_index + 1; const Coord3D* point = ai->friend_getGoalPathPosition(index); ++index)
 		{
 			remainingDistance += WWMath::SqrtfOrigin(sqr(point->x - from->x) + sqr(point->y - from->y));
 			from = point;
@@ -3447,6 +3448,26 @@ StateReturnType AIFollowPathState::update()
 			}
 		}
 
+		Pathfinder* pathfinder = TheAI->pathfinder();
+		const auto surfaces = ai->getLocomotorSet().getValidSurfaces();
+		if (groupRoute && pos && m_index > 1)
+		{
+			const Coord3D* final = ai->friend_getGoalPathPosition(m_index + 1);
+			if (final && !ai->friend_getGoalPathPosition(m_index + 2))
+			{
+				const Bool exitBendBlocked =
+					!pathfinder->isMovementSegmentPassable(obj, surfaces, LAYER_GROUND, *pos, *pos, FALSE) ||
+					!pathfinder->isLinePassable(obj, surfaces, LAYER_GROUND, *pos, *pos, FALSE, TRUE);
+				const Bool directExit =
+					pathfinder->isMovementSegmentPassable(obj, surfaces, LAYER_GROUND, *obj->getPosition(), *final, FALSE) &&
+					pathfinder->isLinePassable(obj, surfaces, LAYER_GROUND, *obj->getPosition(), *final, FALSE, TRUE);
+				if (exitBendBlocked || directExit)
+				{
+					++m_index;
+					pos = final;
+				}
+			}
+		}
 
 		//Assign this value to the AIUpdateInterface so object's can access this value while
 		//determine which waypoints to plot in the waypoint renderer.
@@ -3480,12 +3501,14 @@ StateReturnType AIFollowPathState::update()
 			if (groupRoute)
 				ai->setPathExtraDistance(0.0f);
 			setAdjustsDestination(m_adjustFinal && (m_adjustFinalOverride || ai->isDoingGroundMovement()));
-			if (getAdjustsDestination() && !groupRoute)
+			if (getAdjustsDestination())
 			{
-				if (!TheAI->pathfinder()->adjustDestination(getMachineOwner(), ai->getLocomotorSet(), &m_goalPosition)) {
+				if ((!groupRoute || !pathfinder->isMovementSegmentPassable(obj, surfaces, LAYER_GROUND, m_goalPosition, m_goalPosition, FALSE)) &&
+					!pathfinder->adjustDestination(obj, ai->getLocomotorSet(), &m_goalPosition))
+				{
 					return STATE_FAILURE;
 				}
-				TheAI->pathfinder()->updateGoal(getMachineOwner(), &m_goalPosition, TheTerrainLogic->getLayerForDestination(&m_goalPosition));
+				pathfinder->updateGoal(obj, &m_goalPosition, TheTerrainLogic->getLayerForDestination(&m_goalPosition));
 			}
 
 			// urg. hacky. if we are a projectile on the last segment, turn on precise z-pos.
