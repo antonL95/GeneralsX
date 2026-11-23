@@ -5654,12 +5654,10 @@ Bool AIAttackState::chooseWeapon()
 	Object* source = getMachineOwner();
 	AIUpdateInterface *ai = source->getAI();
 
-	Bool found = FALSE;
-//	if (victim) // Pardon?  We still need to pick a weapon if we are attacking the ground.
-//	{
-		found = source->chooseBestWeaponForTarget(victim, RetailFileLayers::enabled() ? USE_WEAPONSET_DEFAULT_CRITERIA : PREFER_MOST_DAMAGE, ai->getLastCommandSource());
-		//DEBUG_ASSERTLOG(found, ("unable to autochoose any weapon for %s",source->getTemplate()->getName().str()));
-//	}
+	WeaponChoiceCriteria criteria = PREFER_MOST_DAMAGE;
+	if (RetailFileLayers::enabled())
+		criteria = dynamic_cast<const GiantBirdAIUpdate*>(ai) ? PREFER_GRAB_OVER_DAMAGE : USE_WEAPONSET_DEFAULT_CRITERIA;
+	const Bool found = source->chooseBestWeaponForTarget(victim, criteria, ai->getLastCommandSource());
 
 	// Check if we need to update because of the weapon choice switch.
 	source->adjustModelConditionForWeaponStatus();

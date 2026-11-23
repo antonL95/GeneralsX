@@ -2,6 +2,8 @@ prepare() {
     awk -v end="$end" 'BEGIN {
         for (frame = 185; frame <= 370 && frame <= end; ++frame)
             print frame, "eagle-trace Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackTarget:0"
+        for (frame = 447; frame <= 632 && frame <= end; ++frame)
+            print frame, "eagle-trace Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackOrc:0"
     }'
 }
 
@@ -13,7 +15,7 @@ check() {
         return
     fi
     awk '
-        /^TEST eagle / {
+        /^TEST eagle / && substr($3, 7) + 0 <= 370 {
             for (i = 3; i <= NF; ++i) {
                 split($i, field, "=")
                 sample[field[1]] = field[2]
@@ -38,6 +40,33 @@ check() {
         END {
             printf "eagle shot=%u contact=%u damage=%u grab=%u released=%u\n", shot, contact, damage, grab, released
             exit !(contact && damage && grab && released && !interference)
+        }
+    ' "$log" || return
+    if ! covers 632; then
+        return
+    fi
+    awk '
+        /^TEST eagle / && substr($3, 7) + 0 >= 447 {
+            for (i = 3; i <= NF; ++i) {
+                split($i, field, "=")
+                sample[field[1]] = field[2]
+            }
+            if (sample["victim"] == "EagleAttackOrc" && sample["carrier"] == "EagleAttackOrcHorde" &&
+                sample["swoop"] == 1 && !sample["fire0"] && !sample["fire2"])
+                selected = sample["slot"]
+            if (sample["fire2"] && !shot)
+                plow = 1
+            if (sample["fire0"] && !shot && !plow) {
+                shot = sample["fire0"] + 0
+                if (sample["target"] == "EagleAttackOrc" && sample["carrier"] == "GondorGwaihirHero_Summoned" && sample["hp"] > 0)
+                    grabbed = sample["frame"] + 0
+            }
+            if (grabbed && !released && sample["target"] == "EagleAttackOrc" && sample["carrier"] == "-" && sample["hp"] > 0)
+                released = sample["frame"] + 0
+        }
+        END {
+            printf "eagle horde slot=%s plow-first=%u grab-shot=%u contained=%u released=%u\n", selected, plow, shot, grabbed, released
+            exit !(selected == "0" && !plow && shot && grabbed && released)
         }
     ' "$log"
 }

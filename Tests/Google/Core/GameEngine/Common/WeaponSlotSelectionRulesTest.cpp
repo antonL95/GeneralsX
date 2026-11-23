@@ -76,6 +76,23 @@ TEST(WeaponSlotSelectionRulesTest, SelectAtRandomChoosesHighestRandomScore)
 	EXPECT_EQ(selectBestSlot(swapped, Criteria::SelectAtRandom), 0);
 }
 
+TEST(WeaponSlotSelectionRulesTest, PreferGrabSelectsFirstEligibleGrabBeforeReadinessAndDamage)
+{
+	std::vector<SlotEvaluation> candidates = {
+		{.slot = 3, .damage = 1.0f, .canGrab = true},
+		{.slot = 2, .damage = 10.0f, .ready = true},
+		{.slot = 0, .damage = 1.0f, .ready = true, .canGrab = true}
+	};
+	EXPECT_EQ(selectBestSlot(candidates, Criteria::PreferGrabOverDamage), 3);
+	EXPECT_EQ(selectBestSlot(candidates, Criteria::PreferMostDamage), 2);
+
+	candidates[0].disqualified = true;
+	EXPECT_EQ(selectBestSlot(candidates, Criteria::PreferGrabOverDamage), 0);
+
+	candidates[2].canGrab = false;
+	EXPECT_EQ(selectBestSlot(candidates, Criteria::PreferGrabOverDamage), 2);
+}
+
 TEST(WeaponSlotSelectionRulesTest, OnlyInConditionBoostsMatchAndDisqualifiesMismatch)
 {
 	SlotCandidateInput baseSlot;

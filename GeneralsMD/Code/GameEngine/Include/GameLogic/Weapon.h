@@ -438,6 +438,7 @@ public:
 	Bool canSwoop() const { return m_canSwoop; }
 	Bool getPreferredTargetPosition(const Object* target, Coord3D& position) const;
 	Bool hasRequiredProjectile(const Object* source) const;
+	Bool canGrabTarget(const Object* source, const Object* target) const;
 	Bool usesContainedProjectile() const { return m_hasProjectileFilterInContainer && !m_projectileSelf; }
 	Real getUnmodifiedAttackRange() const;
 	Real getMinimumAttackRange() const;

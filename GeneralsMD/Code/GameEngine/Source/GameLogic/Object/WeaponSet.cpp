@@ -51,7 +51,6 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
-#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/SpawnBehavior.h"
 
@@ -1163,8 +1162,6 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 	WeaponSlotType currentDecision = PRIMARY_WEAPON;
 	WeaponSlotType currentDecisionBackup = PRIMARY_WEAPON;
 
-	const Bool targetingHorde = retail && HordeContain::get(victim->getContainedBy()) &&
-		(obj->isKindOf(KINDOF_GIANT_BIRD) || obj->findUpdateModule(NAMEKEY("GiantBirdAIUpdate")));
 	const Bool useTargetReach = retail && std::any_of(m_weapons, m_weapons + WEAPONSLOT_COUNT, [](const Weapon* weapon) {
 		return weapon && weapon->getTemplate()->hasHeightRangeBonus();
 	});
@@ -1234,9 +1231,8 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 			const Real distance = WWMath::SqrtfOrigin(useTargetReach ? targetReach.distanceSquared : dx * dx + dy * dy + dz * dz);
 
 			const KindOfMaskType& preferredAgainst = m_curWeaponTemplateSet->getNthPreferredAgainstMask((WeaponSlotType)i);
-			const Bool prefersHorde = targetingHorde && preferredAgainst.test(KINDOF_HORDE);
 			const Bool preferredMatch = KINDOFMASK_ANY_SET(preferredAgainst) &&
-				(prefersHorde || victim->isAnyKindOf(preferredAgainst));
+				victim->isAnyKindOf(preferredAgainst);
 
 			const ModelConditionFlags& onlyInCondition = m_curWeaponTemplateSet->getNthOnlyInCondition((WeaponSlotType)i);
 			const Bool hasOnlyInCondition = onlyInCondition.any();
@@ -1254,23 +1250,24 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 			candidate.baseReady = weaponIsReady != FALSE;
 			candidate.outOfAmmo = status == OUT_OF_AMMO;
 			candidate.preferredMatch = preferredMatch != FALSE;
-			candidate.preferredScore = prefersHorde ? 2e10f : 1e10f;
 			candidate.hasOnlyInCondition = hasOnlyInCondition != FALSE;
 			candidate.onlyInConditionMatched = onlyInConditionMatched != FALSE;
 			auto evaluated = WeaponSlotSelectionRules::evaluateSlotCandidate(candidate);
 			evaluated.ready = evaluated.ready && weapon->canFireInCurrentMovement(obj);
+			evaluated.canGrab = criteria == PREFER_GRAB_OVER_DAMAGE && !evaluated.disqualified &&
+				weapon->getTemplate()->canGrabTarget(obj, victim);
 			retailCandidates.push_back(evaluated);
+			if (evaluated.canGrab && !sharedBusy)
+				break;
 			continue;
 		}
 
 		const KindOfMaskType& preferredAgainst = m_curWeaponTemplateSet->getNthPreferredAgainstMask((WeaponSlotType)i);
-		const Bool prefersHorde = targetingHorde && preferredAgainst.test(KINDOF_HORDE);
 		if (KINDOFMASK_ANY_SET(preferredAgainst) &&
-			(prefersHorde || victim->isKindOfMulti(preferredAgainst, KINDOFMASK_NONE)))
+			victim->isKindOfMulti(preferredAgainst, KINDOFMASK_NONE))
 		{
-			const Real preferenceScore = prefersHorde ? 2e10f : 1e10f;
-			damage = preferenceScore;
-			attackRange = preferenceScore;
+			damage = 1e10f;
+			attackRange = 1e10f;
 			weaponIsReady = (weapon->getStatus() != OUT_OF_AMMO);
 		}
 

@@ -415,6 +415,14 @@ Bool WeaponTemplate::hasImpactNuggets() const
 	return std::any_of(m_nuggets.begin(), m_nuggets.end(), [](const WeaponNugget& nugget) { return nugget.isImpactNugget(); });
 }
 
+Bool WeaponTemplate::canGrabTarget(const Object* source, const Object* target) const
+{
+	const ContainModuleInterface* contain = source->getContain();
+	return contain && std::any_of(m_nuggets.begin(), m_nuggets.end(), [](const WeaponNugget& nugget) {
+		return nugget.m_type == WEAPON_NUGGET_GRAB;
+	}) && contain->isValidContainerFor(target, TRUE);
+}
+
 Bool WeaponTemplate::nuggetsCanDamage(Int depth) const
 {
 	for (const WeaponNugget& nugget : m_nuggets)

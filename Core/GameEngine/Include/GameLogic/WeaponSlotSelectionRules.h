@@ -49,6 +49,7 @@ struct SlotEvaluation
 	float randomScore = 0.0f;
 	bool ready = false;
 	bool disqualified = false;
+	bool canGrab = false;
 };
 
 struct SlotCandidateInput
@@ -134,8 +135,11 @@ inline int selectBestSlot(const std::vector<SlotEvaluation>& candidates, Criteri
 
 		switch (criteria)
 		{
-			case Criteria::PreferMostDamage:
 			case Criteria::PreferGrabOverDamage:
+				if (c.canGrab)
+					return c.slot;
+				[[fallthrough]];
+			case Criteria::PreferMostDamage:
 				if (c.ready)
 				{
 					if (c.damage >= bestDamage)
