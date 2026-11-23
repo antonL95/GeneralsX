@@ -18,6 +18,10 @@ check() {
                 split($i, field, "=")
                 sample[field[1]] = field[2]
             }
+            if (sample["victim"] != "-" && sample["victim"] != "EagleAttackTarget") {
+                printf "eagle acquired %s at frame %u\n", sample["victim"], sample["frame"]
+                interference = 1
+            }
             if (sample["fire0"] > 0 && !shot) {
                 shot = sample["fire0"] + 0
                 contact = shot == frame && swoop == 1 && inRange == 1 && sample["frame"] == shot + 1
@@ -33,7 +37,7 @@ check() {
         }
         END {
             printf "eagle shot=%u contact=%u damage=%u grab=%u released=%u\n", shot, contact, damage, grab, released
-            exit !(contact && damage && grab && released)
+            exit !(contact && damage && grab && released && !interference)
         }
     ' "$log"
 }
