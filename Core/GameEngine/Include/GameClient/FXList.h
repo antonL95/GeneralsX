@@ -141,10 +141,13 @@ public:
 	/**
 		add a nugget to the list. It belongs to the FXList, who is responsible for freeing it.
 	*/
-	void addFXNugget(FXNugget *fxn)
+	void addFXNugget(FXNugget *fxn, Bool createsBoneParticles = FALSE)
 	{
 		m_nuggets.push_back(fxn);
+		m_hasBoneParticles |= createsBoneParticles;
 	}
+
+	Bool hasBoneParticles() const { return m_hasBoneParticles; }
 
 	/// inline convenience method to avoid having to check for null.
 	inline static void doFXPos(const FXList* fx, const Coord3D *primary, const Matrix3D* primaryMtx = nullptr, const Real primarySpeed = 0.0f, const Coord3D *secondary = nullptr, const Real overrideRadius = 0.0f,
@@ -195,6 +198,7 @@ private:
 
 	FXNuggetList m_nuggets;
 	Bool m_playEvenIfShrouded = FALSE;
+	Bool m_hasBoneParticles = FALSE;
 	UnsignedInt m_cullingFrames = 0;
 	Int m_startCullingAbove = 0;
 	mutable std::deque<UnsignedInt> m_recentPlays;

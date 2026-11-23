@@ -2035,12 +2035,18 @@ void ParticleSystem::generateRetailLightningBurst(std::span<Coord3D> points) con
 
 	const Coord3D& startOffset = m_template->m_lightningStart;
 	const Coord3D& endOffset = m_template->m_lightningEnd;
+	const Coord3D* target = getRetailTargetEndpoint();
 	Vector3 start, end;
-	Matrix3D::Transform_Vector(m_transform, Vector3(startOffset.x, startOffset.y, startOffset.z), &start);
-	if (const Coord3D* target = getRetailTargetEndpoint())
+	if (target)
+	{
+		m_transform.Get_Translation(&start);
 		end.Set(target->x, target->y, target->z);
+	}
 	else
+	{
+		Matrix3D::Transform_Vector(m_transform, Vector3(startOffset.x, startOffset.y, startOffset.z), &start);
 		Matrix3D::Transform_Vector(m_transform, Vector3(endOffset.x, endOffset.y, endOffset.z), &end);
+	}
 
 	const Vector3 delta = end - start;
 	const Real length = delta.Length();
@@ -2065,7 +2071,9 @@ void ParticleSystem::generateRetailLightningBurst(std::span<Coord3D> points) con
 			waveOffset += wave.amplitude * WWMath::SinTrig(wave.frequency * fraction + wave.phase);
 		const Real taper = std::min(fraction, 1.0f - fraction);
 		const Vector3 jitter{offsets[0].getValue(), offsets[1].getValue(), offsets[2].getValue()};
-		const Vector3 world = start + delta * fraction + sideways * (taper * waveOffset) + jitter;
+		Vector3 world = start + delta * fraction + sideways * (taper * waveOffset);
+		if (!target || (i > 0 && i + 1 < points.size()))
+			world += jitter;
 		Vector3 local;
 		Matrix3D::Inverse_Transform_Vector(m_transform, world, &local);
 		points[i] = {local.X, local.Y, local.Z};

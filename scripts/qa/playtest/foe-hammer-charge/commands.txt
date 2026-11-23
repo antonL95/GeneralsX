@@ -1,0 +1,6 @@
+20 create Player_1 RivendellGandalfTheGrey_Summoned 0 3100,1220,0
+20 create PlyrCreeps WizardBlastTarget 0 3210,1220,180
+20 create PlyrCreeps WizardBlastTarget 1 3240,1240,180
+21 reveal Player_1 RivendellGandalfTheGrey_Summoned 0
+40 power Player_1 RivendellGandalfTheGrey_Summoned 0 SpecialAbilityLightningSword
+41 aim Player_1 RivendellGandalfTheGrey_Summoned 0 110,0

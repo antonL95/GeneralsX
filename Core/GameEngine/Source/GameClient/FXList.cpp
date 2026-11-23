@@ -1218,7 +1218,6 @@ public:
 		};
 		static const FieldParse retailOnlyFieldParse[] =
 		{
-			{ "Name", parseRetailName, nullptr, 0 },
 			{ "AttachToBone", INI::parseAsciiString, nullptr, offsetof(ParticleSystemFXNugget, m_retailAttachmentBone) },
 			{ "CreateBoneOverride", INI::parseAsciiString, nullptr, offsetof(ParticleSystemFXNugget, m_retailCreateBone) },
 			{ "TargetBoneOverride", INI::parseAsciiString, nullptr, offsetof(ParticleSystemFXNugget, m_retailTargetBone) },
@@ -1258,19 +1257,10 @@ public:
 		nugget->m_retailCreateBone = bone;
 		nugget->m_retailFollowBone = follow;
 		nugget->m_requireCreationBone = TRUE;
-		static_cast<FXList*>(instance)->addFXNugget(nugget);
+		static_cast<FXList*>(instance)->addFXNugget(nugget, TRUE);
 	}
 
 protected:
-
-	static void parseRetailName(INI* ini, void* instance, void*, const void*)
-	{
-		auto* nugget = static_cast<ParticleSystemFXNugget*>(instance);
-		nugget->m_name = ini->getNextAsciiString();
-		const char* field = ini->getNextTokenOrNull(INI::getSepsColon());
-		if (field && stricmp(field, "FollowBone") == 0)
-			nugget->m_retailFollowBone = INI::scanBool(ini->getNextToken(INI::getSepsColon()));
-	}
 
 	static void parseRetailObjectFilter(INI* ini, void* instance, void*, const void* userData)
 	{
@@ -1295,7 +1285,8 @@ protected:
 		{
 			origin = {creation.Get_X_Translation(), creation.Get_Y_Translation(), creation.Get_Z_Translation()};
 			position = &origin;
-			transform = &creation;
+			if (m_requireCreationBone)
+				transform = &creation;
 			if (traceRetailFXLists())
 				std::fprintf(stderr, "[Retail FXList] ParticleOrigin name=%s bone=%s position=(%.3f,%.3f,%.3f)\n",
 					m_name.str(), boneName.str(), origin.x, origin.y, origin.z);
@@ -1427,6 +1418,11 @@ protected:
 						else
 							sys->setRetailTargetEndpoint(*target->getPosition());
 					}
+
+				if (const auto* endpoint = sys->getRetailTargetEndpoint();
+					endpoint && !m_retailUseTargetOffset && std::getenv("GENERALSX_TEST_LIGHTNING"))
+					std::fprintf(stderr, "TEST particle-endpoints id=%d %s source=%.3f,%.3f,%.3f target=%.3f,%.3f,%.3f\n",
+						sys->getSystemID(), m_name.str(), newPos.x, newPos.y, newPos.z, endpoint->x, endpoint->y, endpoint->z);
 
 					if (m_retailSystemLife >= 0)
 						sys->setRetailSystemLifetime(static_cast<UnsignedInt>(m_retailSystemLife));
@@ -1622,6 +1618,7 @@ void FXList::clear()
 	}
 	m_nuggets.clear();
 	m_playEvenIfShrouded = FALSE;
+	m_hasBoneParticles = FALSE;
 	m_cullingFrames = 0;
 	m_startCullingAbove = 0;
 	resetCulling();

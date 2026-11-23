@@ -578,6 +578,12 @@ private:
 	UnsignedInt										m_weaponTimingEnd = 0;
 	Real m_previousAnimationFXFrame = 0.0f;
 	Bool m_animationFXFirstSample = TRUE;
+	struct TimedAnimationParticle
+	{
+		ParticleSystemID id;
+		Int stopFrame;
+	};
+	std::vector<TimedAnimationParticle> m_timedAnimationParticles;
 	UnsignedInt m_lastRetailHitReactionRestart = 0;
 	UnsignedInt m_distanceSampleFrame = FOREVER;
 	Coord2D m_distanceSamplePosition{};
@@ -586,6 +592,7 @@ private:
 
 	void adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction, Bool restartCurrent = FALSE);
 	void dispatchAnimationFXEvents();
+	void stopTimedAnimationParticles();
 	void applyWeaponTiming();
 	void traceAnimationState() const;
 	Real getCurrentAnimFraction() const;

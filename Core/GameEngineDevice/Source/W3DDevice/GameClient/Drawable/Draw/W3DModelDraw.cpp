@@ -1865,6 +1865,7 @@ void W3DModelDraw::onDrawableBoundToObject()
 //-------------------------------------------------------------------------------------------------
 W3DModelDraw::~W3DModelDraw()
 {
+	stopTimedAnimationParticles();
 	if (m_trackRenderObject && TheTerrainTracksRenderObjClassSystem)
 	{
 		TheTerrainTracksRenderObjClassSystem->unbindTrack(m_trackRenderObject);
@@ -2613,6 +2614,7 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 				}
 				else
 					m_renderObject->Set_Animation(animHandle, startFrame, mode);
+				stopTimedAnimationParticles();
 				m_previousAnimationFXFrame = static_cast<Real>(startFrame);
 				m_animationFXFirstSample = TRUE;
 				REF_PTR_RELEASE(animHandle);
@@ -2660,27 +2662,82 @@ void W3DModelDraw::dispatchAnimationFXEvents()
 	m_previousAnimationFXFrame = frame;
 	m_animationFXFirstSample = FALSE;
 	RetailClientAudio::animate(*getDrawable(), animation->Get_Name(), previous, frame, frameCount, first, backwards, loop);
-	if (!m_curState->m_animationFXEvents || !TheFXListStore ||
-		(mode != RenderObjClass::ANIM_MODE_ONCE && mode != RenderObjClass::ANIM_MODE_ONCE_BACKWARDS))
+	if (!m_curState->m_animationFXEvents || !TheFXListStore)
 		return;
+	const Int sample = static_cast<Int>(frame);
+	const Int previousSample = static_cast<Int>(previous);
+	const Bool newSample = first || sample != previousSample;
+	const Bool trace = TheGameLogic && std::getenv("GENERALSX_TEST_DRAWTRACE");
+	if (newSample && TheParticleSystemManager)
+	{
+		std::erase_if(m_timedAnimationParticles, [sample, trace](const TimedAnimationParticle& particle) {
+			if (sample < particle.stopFrame)
+				return false;
+			if (auto* system = TheParticleSystemManager->findParticleSystem(particle.id))
+			{
+				system->destroy();
+				if (trace)
+					std::fprintf(stderr, "TEST animation-fx-stop frame=%u particle=%s stop=%d clip=%d\n",
+						TheGameLogic->getFrame(), system->getTemplate()->getName().str(), particle.stopFrame, sample);
+			}
+			return true;
+		});
+	}
+
+	const Bool wrapped = loop && (backwards ? frame > previous : frame < previous);
 	for (const auto& event : *m_curState->m_animationFXEvents)
 	{
-		if (event.frameStop > 0 || event.frame < 0 || event.frame >= frameCount)
+		if (event.frame < 0 || event.frame >= frameCount)
 			continue;
 		const Real marker = static_cast<Real>(event.frame);
-		const Bool crossed = backwards ? frame <= marker && (marker < previous || (first && marker == previous))
-			: frame >= marker && (marker > previous || (first && marker == previous));
-		if (!crossed)
-			continue;
+		const Bool crossed = backwards ? (wrapped ? marker < previous || frame <= marker
+			: frame <= marker && (marker < previous || (first && marker == previous)))
+			: (wrapped ? marker > previous || frame >= marker
+			: frame >= marker && (marker > previous || (first && marker == previous)));
 		if (const FXList* fx = TheFXListStore->findFXList(event.name.str()))
 		{
-			FXList::doFXFromDrawable(fx, *getDrawable());
-			if (TheGameLogic && std::getenv("GENERALSX_TEST_DRAWTRACE"))
+			if (event.frameStop <= 0)
+			{
+				if (!crossed || (mode != RenderObjClass::ANIM_MODE_ONCE && mode != RenderObjClass::ANIM_MODE_ONCE_BACKWARDS))
+					continue;
+				FXList::doFXFromDrawable(fx, *getDrawable());
+			}
+			else if (fx->hasBoneParticles())
+			{
+				if (!TheParticleSystemManager || !crossed || (sample != event.frame && sample >= event.frameStop))
+					continue;
+				auto& systems = TheParticleSystemManager->getAllParticleSystems();
+				const auto last = systems.empty() ? systems.end() : std::prev(systems.end());
+				FXList::doFXFromDrawable(fx, *getDrawable());
+				const auto created = last == systems.end() ? systems.begin() : std::next(last);
+				for (auto it = created; it != systems.end(); ++it)
+				{
+					(*it)->setSaveable(FALSE);
+					m_timedAnimationParticles.push_back({(*it)->getSystemID(), event.frameStop});
+				}
+			}
+			else
+			{
+				const Bool withinWindow = sample >= event.frame && sample <= event.frameStop;
+				const Bool skipped = event.fireWhenSkipped && previousSample < event.frame && sample > event.frameStop;
+				if (!newSample || (!withinWindow && sample != event.frame && !skipped))
+					continue;
+				FXList::doFXFromDrawable(fx, *getDrawable());
+			}
+			if (trace)
 				std::fprintf(stderr, "TEST animation-fx frame=%u template=%s event=%s marker=%d clip=%.2f\n",
 					TheGameLogic->getFrame(), getDrawable()->getTemplate()->getName().str(), event.name.str(),
 					event.frame, frame);
 		}
 	}
+}
+
+void W3DModelDraw::stopTimedAnimationParticles()
+{
+	if (TheParticleSystemManager)
+		for (const auto& particle : m_timedAnimationParticles)
+			TheParticleSystemManager->destroyParticleSystemByID(particle.id);
+	m_timedAnimationParticles.clear();
 }
 
 Bool W3DModelDraw::setCurAnimDurationInMsec(Real desiredDurationInMsec)
@@ -2842,6 +2899,7 @@ void W3DModelDraw::doHideShowSubObjs(const std::vector<ModelConditionInfo::HideS
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::stopClientParticleSystems()
 {
+	stopTimedAnimationParticles();
 	for (std::vector<ParticleSysTrackerType>::const_iterator it = m_particleSystemIDs.begin(); it != m_particleSystemIDs.end(); ++it)
 	//for (std::vector<ParticleSystemID>::const_iterator it = m_particleSystemIDs.begin(); it != m_particleSystemIDs.end(); ++it)
 	{

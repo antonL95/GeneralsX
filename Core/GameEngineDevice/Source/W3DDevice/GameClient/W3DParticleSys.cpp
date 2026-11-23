@@ -423,11 +423,24 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 			continue;
 
 		// TheSuperHackers @performance Mauller 16/08/2026 Skip processing particle system if no particles are in view.
+		const Bool directedStreak = sys->isUsingStreak() && sys->getRetailTargetEndpoint();
+		AABoxClass streakBounds;
 		UnsignedInt particleCount = 0;
 		for (Particle* vp = sys->getFirstParticle(); vp; vp = vp->m_systemNext)
 		{
 			const Coord3D* pos = vp->getPosition();
 			const Real psize = vp->getSize();
+
+			if (directedStreak)
+			{
+				const AABoxClass pointBounds(Vector3(pos->x, pos->y, pos->z), Vector3(psize, psize, psize));
+				if (particleCount++ == 0)
+					streakBounds = pointBounds;
+				else
+					streakBounds.Add_Box(pointBounds);
+				vp->setIsCulled(false);
+				continue;
+			}
 
 			//Test if particle is at the screen or terrain edges.
 			if (WWMath::Fabs(pos->x - bcX) > (beX + psize) ||
@@ -443,7 +456,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		}
 
 		// Particle system has no particles on screen
-		if (particleCount == 0)
+		if (particleCount == 0 || (directedStreak && CollisionMath::Overlap_Test(frustum, streakBounds) == CollisionMath::OUTSIDE))
 			continue;
 
 		// Handle smudge type particles
@@ -552,6 +565,13 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		// Handle drawing streak type particles.
 		if ( sys->isUsingStreak() && (pointCount >= 2) )
 		{
+			if (directedStreak && std::getenv("GENERALSX_TEST_LIGHTNING"))
+			{
+				const auto& first = posArray[0];
+				const auto& last = posArray[pointCount - 1];
+				std::fprintf(stderr, "TEST lightning frame=%u id=%d points=%u first=%.3f,%.3f,%.3f last=%.3f,%.3f,%.3f\n",
+					TheGameClient->getFrame(), sys->getSystemID(), pointCount, first.X, first.Y, first.Z, last.X, last.Y, last.Z);
+			}
 			m_streakLine->Reset_Line();
 
 			m_streakLine->Set_Texture( texture.Peek() );
