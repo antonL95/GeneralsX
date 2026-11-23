@@ -88,7 +88,7 @@ UpdateSleepTime FireWeaponUpdate::update()
 	// If my weapon is ready, shoot it.
 	if( isOkayToFire() )
 	{
-		m_weapon->forceFireWeapon( getObject(), getObject()->getPosition() );
+		m_weapon->forceFireWeapon( getObject(), getObject()->getPosition(), TRUE );
 	}
 	return UPDATE_SLEEP_NONE;
 }

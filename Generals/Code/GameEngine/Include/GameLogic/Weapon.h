@@ -387,7 +387,8 @@ public:
 		Bool isProjectileDetonation,
 		Bool ignoreRanges,
 		Weapon *firingWeapon,
-		ObjectID* projectileID
+		ObjectID* projectileID,
+		Bool playFireFX = TRUE
 	) const;
 
 	/**
@@ -602,7 +603,7 @@ public:
 
 	//Currently, this function was added to allow a script to force fire a weapon,
 	//and immediately gain control of the weapon that was fired to give it special orders...
-	Object* forceFireWeapon( const Object *source, const Coord3D *pos );
+	Object* forceFireWeapon( const Object *source, const Coord3D *pos, Bool retailTimedFX = FALSE );
 
 	/**
 		return the estimate damage that would be done to the given target, taking bonuses, armor, etc
@@ -767,7 +768,8 @@ protected:
 		Bool isProjectileDetonation,
 		Bool ignoreRanges,
 		WeaponBonusConditionFlags extraBonusFlags,
-		ObjectID* projectileID
+		ObjectID* projectileID,
+		Bool playFireFX = TRUE
 	);
 	Real estimateWeaponDamage(const Object *sourceObj, const Object *victimObj, const Coord3D* victimPos);
 	void reloadWithBonus(const Object *source, const WeaponBonus& bonus, Bool loadInstantly);
