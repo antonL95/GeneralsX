@@ -648,6 +648,33 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 				break;
 			}
 
+			if (button->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION)
+			{
+				const Bool multiSelect = BitIsSet(button->getOptions(), OK_FOR_MULTI_SELECT);
+				for (const ObjectID id : currentlySelectedGroup->getAllIDs())
+				{
+					Object* object = findObjectByID(id);
+					if (!object || object->getControllingPlayer() != msgPlayer)
+						continue;
+					const CommandButton* formation = button;
+					if (object != source)
+					{
+						if (!multiSelect)
+							continue;
+						const CommandSet* set = TheRetailCommandCatalog->findCommandSet(object->getCommandSetString());
+						const Int memberSlot = set ? set->findRetailMultiSelectFormationSlot() : -1;
+						if (memberSlot < 0)
+							continue;
+						formation = set->getCommandButton(memberSlot);
+					}
+					if (!formation->canUseRetailToggle(object, state))
+						continue;
+					auto* horde = const_cast<HordeContain*>(HordeContain::get(object));
+					horde->setAlternateFormation(state < 0 ? !horde->isAlternateFormation() : state != 0);
+				}
+				break;
+			}
+
 			for (const ObjectID id : currentlySelectedGroup->getAllIDs())
 			{
 				Object* object = findObjectByID(id);
@@ -656,19 +683,12 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 					continue;
 
 				auto* horde = const_cast<HordeContain*>(HordeContain::get(object));
-				if (button->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION)
-				{
-					horde->setAlternateFormation(state < 0 ? !horde->isAlternateFormation() : state != 0);
-				}
+				const WeaponSetFlags& flags = button->getFlagsUsedForToggle();
+				const Bool enabled = state < 0 ? !object->getWeaponSetFlags().testForAll(flags) : state != 0;
+				if (horde)
+					horde->toggleWeaponSet(flags, enabled);
 				else
-				{
-					const WeaponSetFlags& flags = button->getFlagsUsedForToggle();
-					const Bool enabled = state < 0 ? !object->getWeaponSetFlags().testForAll(flags) : state != 0;
-					if (horde)
-						horde->toggleWeaponSet(flags, enabled);
-					else
-						object->setWeaponSetFlags(flags, enabled);
-				}
+					object->setWeaponSetFlags(flags, enabled);
 			}
 			break;
 		}

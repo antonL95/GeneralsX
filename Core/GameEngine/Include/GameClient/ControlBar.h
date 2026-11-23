@@ -564,6 +564,7 @@ public:
 
 	const AsciiString& getName() const { return m_name; }
 	const CommandButton* getCommandButton(Int i) const;
+	Int findRetailMultiSelectFormationSlot() const;
 	void setCommandButton(Int i, const CommandButton* button) { m_command[i] = button; }
 	Int getInitialVisible() const { return m_initialVisible; }
 
@@ -1120,6 +1121,8 @@ protected:
 	Int getRetailTrayChoice(const GameWindow *control) const;
 	void updateRetailTray();
 	const Object* getRetailSelection() const;
+	const Object* getRetailFormationSource(const CommandButton* command) const;
+	Int getRetailFormationChoice(const CommandButton* command) const;
 	void initRetailRadial(GameWindow *master);
 	void beginRetailRadial(Object *obj);
 	void addRetailRadialMirror(GameWindow *source, const CommandButton *command, Int entry);

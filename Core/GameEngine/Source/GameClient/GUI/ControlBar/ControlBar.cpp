@@ -1146,6 +1146,18 @@ const CommandButton* CommandSet::getCommandButton(Int i) const
 	return m_command[i];
 }
 
+Int CommandSet::findRetailMultiSelectFormationSlot() const
+{
+	for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+	{
+		const CommandButton* button = getCommandButton(slot);
+		if (button && button->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION &&
+			BitIsSet(button->getOptions(), OK_FOR_MULTI_SELECT) && button->isRetailButtonUsable())
+			return slot;
+	}
+	return -1;
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void CommandSet::friend_addToList(CommandSet** listHead)
@@ -2981,6 +2993,12 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		AsciiString hotKey =	TheHotKeyManager->searchHotKey(commandButton->getTextLabel());
 		if(hotKey.isNotEmpty())
 			TheHotKeyManager->addHotKey(button, hotKey, m_retailSelectionName ? button->winGetOwner() : nullptr);
+		if (m_retailSelectionName && commandButton->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION)
+		{
+			const AsciiString returnKey = TheHotKeyManager->searchHotKey(commandButton->getRetailChoiceLabel(1));
+			if (returnKey.isNotEmpty() && returnKey.compareNoCase(hotKey) != 0)
+				TheHotKeyManager->addHotKey(button, returnKey, button->winGetOwner());
+		}
 	}
 	GadgetButtonSetAltSound(button, "GUICommandBarClick");
 

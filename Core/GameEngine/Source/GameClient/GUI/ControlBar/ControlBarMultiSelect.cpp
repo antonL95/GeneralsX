@@ -284,6 +284,27 @@ void ControlBar::populateMultiSelect()
 
 	}
 
+	if (m_retailSelectionName)
+	{
+		for (const Drawable* drawable : *selectedDrawables)
+		{
+			const Object* object = drawable->getObject();
+			if (!object || !object->isLocallyControlled() || object->isKindOf(KINDOF_IGNORED_IN_GUI))
+				continue;
+			const CommandSet* set = findCommandSet(object->getCommandSetString());
+			const Int entry = set ? set->findRetailMultiSelectFormationSlot() : -1;
+			if (entry < 0 || entry >= MAX_COMMANDS_PER_SET)
+				continue;
+			const CommandButton* button = set->getCommandButton(entry);
+			m_commonCommands[entry] = button;
+			GameWindow* window = m_commandWindows[entry];
+			setControlCommand(window, button, FALSE);
+			window->winEnable(TRUE);
+			window->winHide(FALSE);
+			break;
+		}
+	}
+
 	// set the portrait image
 	setPortraitByObject( portraitObj );
 
@@ -352,6 +373,16 @@ void ControlBar::updateContextMultiSelect()
 			command = (const CommandButton *)GadgetButtonGetData(win);
 			if( command == nullptr )
 				continue;
+
+			if (m_retailSelectionName && command->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION)
+			{
+				const CommandSet* set = findCommandSet(obj->getCommandSetString());
+				const Int entry = set ? set->findRetailMultiSelectFormationSlot() : -1;
+				if (entry >= 0 && obj->isLocallyControlled() &&
+					getCommandAvailability(set->getCommandButton(entry), obj, win) == COMMAND_AVAILABLE)
+					objectsThatCanDoCommand[i]++;
+				continue;
+			}
 
 			// can we do the command
 			CommandAvailability availability = getCommandAvailability( command, obj, win );

@@ -107,7 +107,6 @@ Bool usesToggleTray(const CommandButton* command)
 {
 	switch (command->getCommandType())
 	{
-		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
 		case GUI_COMMAND_TOGGLE_WEAPONSET:
 			return command->getToggleButtonImage() != nullptr;
 		case GUI_COMMAND_TOGGLE_STANCE:
@@ -788,12 +787,14 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 	UnicodeString text;
 	const ThingTemplate *hero = getRetailHero(window);
 	const ThingTemplate *unit = command->getThingTemplate();
+	const Bool formation = command->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION;
+	const Int choice = formation ? getRetailFormationChoice(command) : getRetailTrayChoice(window);
 	if (hero)
 		unit = hero;
 	if (hero)
 		text = hero->getDisplayName();
 	else
-		text = TheGameText->fetchOrSubstitute(command->getRetailChoiceLabel(getRetailTrayChoice(window)).str(), L"");
+		text = TheGameText->fetchOrSubstitute(command->getRetailChoiceLabel(choice).str(), L"");
 	if (text.isEmpty() && unit)
 		text = unit->getDisplayName();
 	if (text.isEmpty())
@@ -811,13 +812,16 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 		text = label;
 	}
 
-	AsciiString hotKey = TheHotKeyManager ? TheHotKeyManager->searchHotKey(command->getTextLabel()) : AsciiString::TheEmptyString;
+	const AsciiString& keyLabel = formation ? command->getRetailChoiceLabel(choice) : command->getTextLabel();
+	AsciiString hotKey = TheHotKeyManager ? TheHotKeyManager->searchHotKey(keyLabel) : AsciiString::TheEmptyString;
+	if (formation && hotKey.isEmpty() && TheHotKeyManager)
+		hotKey = TheHotKeyManager->searchHotKey(command->getTextLabel());
 	hotKey.toUpper();
 	Mouse::RetailTooltip tooltip;
 	tooltip.title = text;
 	if (!hero && !command->isRetailPassive())
 		tooltip.shortcut.translate(hotKey);
-	tooltip.body = TheGameText->fetchOrSubstitute(command->getRetailChoiceDescription(getRetailTrayChoice(window)).str(), L"");
+	tooltip.body = TheGameText->fetchOrSubstitute(command->getRetailChoiceDescription(choice).str(), L"");
 	tooltip.cost = getRetailCommandCost(command, window);
 	const CommandAvailability availability = getRetailButtonAvailability(window);
 	UnicodeString reason;
@@ -981,6 +985,29 @@ const Object* ControlBar::getRetailSelection() const
 	return draw ? draw->getObject() : nullptr;
 }
 
+const Object* ControlBar::getRetailFormationSource(const CommandButton* command) const
+{
+	if (m_currContext != CB_CONTEXT_MULTI_SELECT)
+		return getRetailSelection();
+	for (const Drawable* drawable : *TheInGameUI->getAllSelectedDrawables())
+	{
+		const Object* object = drawable->getObject();
+		if (!object || !object->isLocallyControlled() || object->isKindOf(KINDOF_IGNORED_IN_GUI))
+			continue;
+		const CommandSet* set = TheRetailCommandCatalog->findCommandSet(object->getCommandSetString());
+		const Int slot = set ? set->findRetailMultiSelectFormationSlot() : -1;
+		if (slot >= 0 && set->getCommandButton(slot) == command)
+			return object;
+	}
+	return nullptr;
+}
+
+Int ControlBar::getRetailFormationChoice(const CommandButton* command) const
+{
+	const HordeContain* horde = HordeContain::get(getRetailFormationSource(command));
+	return horde && horde->isAlternateFormation() ? 1 : 0;
+}
+
 Int ControlBar::getRetailTrayChoice(const GameWindow *control) const
 {
 	if (control)
@@ -1100,8 +1127,15 @@ Bool ControlBar::executeRetailTrayHotKey(const AsciiString& key, GameWindow *map
 		if (slot < 0 || slot >= MAX_COMMANDS_PER_SET)
 			return FALSE;
 		const CommandButton* command = static_cast<const CommandButton*>(GadgetButtonGetData(mappedControl));
-		const Object* obj = getRetailSelection();
-		if (!command || !command->isRetailButtonUsable() || !command->canUseRetailToggle(obj, -1))
+		if (!command || !command->isRetailButtonUsable())
+			return FALSE;
+		if (command->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION)
+		{
+			const AsciiString actionKey = TheHotKeyManager->searchHotKey(command->getRetailChoiceLabel(getRetailFormationChoice(command)));
+			if (actionKey.isNotEmpty() && actionKey.compareNoCase(key) != 0)
+				return TRUE;
+		}
+		else if (!command->canUseRetailToggle(getRetailSelection(), -1))
 			return FALSE;
 		if (command->isDoubleClick() && !checkRetailDoubleClick(command))
 			return TRUE;
@@ -1353,6 +1387,7 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 			return mod && mod->isReady() ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		}
 		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
+			return command->canUseRetailToggle(obj, -1) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		case GUI_COMMAND_TOGGLE_WEAPONSET:
 			return (usesToggleTray(command)
 				? command->canUseRetailToggle(obj, 0) || command->canUseRetailToggle(obj, 1)
@@ -1475,7 +1510,8 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
 		case GUI_COMMAND_TOGGLE_WEAPONSET:
 		{
-			const Object* source = getRetailSelection();
+			const Bool formation = command->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION;
+			const Object* source = formation ? getRetailFormationSource(command) : getRetailSelection();
 			const CommandSet* set = source ? findCommandSet(source->getCommandSetString()) : nullptr;
 			const Int choice = getRetailTrayChoice(control);
 			for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
@@ -1486,6 +1522,8 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 				msg->appendObjectIDArgument(source->getID());
 				msg->appendIntegerArgument(slot);
 				msg->appendIntegerArgument(choice < 0 ? -1 : 1 - choice);
+				if (formation)
+					closeRetailTray();
 				return CBC_COMMAND_USED;
 			}
 			return CBC_COMMAND_NOT_USED;
@@ -1708,6 +1746,8 @@ const Image* ControlBar::getRetailButtonImage(GameWindow *window) const
 	const Image *image = window->winGetEnabledImage(0);
 	const CommandButton *command = static_cast<const CommandButton*>(GadgetButtonGetData(window));
 	const Object *obj = getRetailSelection();
+	if (command && command->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION)
+		obj = getRetailFormationSource(command);
 	const Int choice = getRetailTrayChoice(window);
 	if (choice >= 0 && command && command->getCommandType() != GUI_COMMAND_SET_STANCE)
 		return choice == 1 && command->getToggleButtonImage() ? command->getToggleButtonImage() : command->getButtonImage();

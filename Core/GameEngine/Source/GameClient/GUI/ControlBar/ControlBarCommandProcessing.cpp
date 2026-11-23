@@ -988,7 +988,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 Bool ControlBar::checkRetailDoubleClick(const CommandButton *commandButton)
 {
-	if (!RetailFileLayers::enabled() || !commandButton || !commandButton->isDoubleClick())
+	if (!RetailFileLayers::enabled() || !commandButton || !commandButton->isDoubleClick() ||
+		commandButton->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION)
 		return TRUE;
 	const UnsignedInt now = TheGameLogic ? TheGameLogic->getFrame() : 0;
 	const UnsignedInt prev = m_lastRetailClickButton == commandButton ? m_lastRetailClickFrame : 0;
