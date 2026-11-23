@@ -1,4 +1,15 @@
 check() {
+    awk '
+        /^TEST eagle frame=/ && / victim=(Pkg67[^ ]*|HaradNafaratiMarauderHorde|HaradCaranLambar|CreateAHero) / {
+            split($3, frame, "=")
+            match($0, / victim=[^ ]+/)
+            victim = substr($0, RSTART, RLENGTH)
+            if (!seen[victim]++)
+                printf "Package 67 intersects the eagle attack at frame %s:%s\n", frame[2], victim
+            failed = 1
+        }
+        END { exit failed }
+    ' "$log" || return 1
     if covers 111; then
         expect 'PKG67 binding 111 ModuleTag_Pkg67UnresolvedAI ai=1 name=Pkg67UndefinedButton catalog=0 power=- match=0' || return 1
     fi
