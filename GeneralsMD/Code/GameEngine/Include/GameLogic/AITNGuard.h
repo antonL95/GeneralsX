@@ -136,6 +136,7 @@ private:
 	TunnelNetworkExitConditions m_exitConditions;
 	Bool			m_scanForEnemy;
 	AIAttackState *m_attackState;
+	Bool m_reenterOnLoad = TRUE;
 };
 
 //--------------------------------------------------------------------------------------
@@ -241,6 +242,7 @@ private:
 	AITNGuardMachine* getGuardMachine() { return (AITNGuardMachine*)getMachine(); }
 	TunnelNetworkExitConditions m_exitConditions;
 	AIAttackState *m_attackState;
+	Bool m_reenterOnLoad = TRUE;
 };
 
 //--------------------------------------------------------------------------------------

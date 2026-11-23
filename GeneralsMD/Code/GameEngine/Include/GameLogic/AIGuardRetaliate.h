@@ -143,6 +143,7 @@ private:
 
 	GuardRetaliateExitConditions m_exitConditions;
 	AIAttackState *m_attackState;
+	Bool m_reenterOnLoad = TRUE;
 	AIEnterState *m_enterState;
 };
 

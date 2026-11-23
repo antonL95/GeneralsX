@@ -753,6 +753,8 @@ void AIStateMachine::crc( Xfer *xfer )
 		this->xfer(xfer);
 	else if (RetailFileLayers::enabled() && getCurrentStateID() == AI_GUARD_RETALIATE)
 		xfer->xferSnapshot(internalGetState(AI_GUARD_RETALIATE));
+	else if (RetailFileLayers::enabled() && getCurrentStateID() == AI_GUARD_TUNNEL_NETWORK)
+		xfer->xferSnapshot(internalGetState(AI_GUARD_TUNNEL_NETWORK));
 	else
 		StateMachine::crc(xfer);
 }
@@ -7215,6 +7217,8 @@ AsciiString AITunnelNetworkGuardState::getName(  ) const
 // ------------------------------------------------------------------------------------------------
 void AITunnelNetworkGuardState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferSnapshot(m_guardMachine);
 }
 
 // ------------------------------------------------------------------------------------------------

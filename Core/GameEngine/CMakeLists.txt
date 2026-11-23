@@ -64,6 +64,7 @@ set(GAMEENGINE_SRC
 #    Include/Common/IgnorePreferences.h
     Include/Common/INI.h
     Include/Common/SpecialPowerINI.h
+    Include/GameLogic/RetailGuardSave.h
     Include/GameLogic/Module/AISpecialPowerUpdate.h
     Include/GameLogic/Module/RotwkParseOnlyModules.h
     Include/GameLogic/Module/RespawnModules.h

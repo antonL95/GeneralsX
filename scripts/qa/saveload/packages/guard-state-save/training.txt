@@ -1,0 +1,9 @@
+205 create Player_1 GuardSaveFighter 0 2850,3090,0
+206 guard Player_1 GuardSaveFighter 0 0,0
+210 create PlyrCreeps GuardSaveBait 0 2910,3090,180
+211 orderattack PlyrCreeps GuardSaveBait 0 Player_1:GuardSaveFighter:0
+240 guard-save-relocate PlyrCreeps GuardSaveBait 0 3050,3090
+244 guard-save-probe Player_1 GuardSaveFighter 0
+245 guard-save-probe Player_1 GuardSaveFighter 0
+270 destroy Player_1 GuardSaveFighter 0
+270 destroy PlyrCreeps GuardSaveBait 0

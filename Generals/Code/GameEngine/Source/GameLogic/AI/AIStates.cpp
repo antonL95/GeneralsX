@@ -739,7 +739,11 @@ AIStateMachine::~AIStateMachine()
 // ------------------------------------------------------------------------------------------------
 void AIStateMachine::crc( Xfer *xfer )
 {
-	StateMachine::crc(xfer);
+	const StateID state = getCurrentStateID();
+	if (RetailFileLayers::enabled() && (state == AI_GUARD || state == AI_GUARD_TUNNEL_NETWORK))
+		xfer->xferSnapshot(internalGetState(state));
+	else
+		StateMachine::crc(xfer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -6417,6 +6421,8 @@ AsciiString AIGuardState::getName(  ) const
 // ------------------------------------------------------------------------------------------------
 void AIGuardState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferSnapshot(m_guardMachine);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -6543,6 +6549,8 @@ AsciiString AITunnelNetworkGuardState::getName(  ) const
 // ------------------------------------------------------------------------------------------------
 void AITunnelNetworkGuardState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xfer->xferSnapshot(m_guardMachine);
 }
 
 // ------------------------------------------------------------------------------------------------

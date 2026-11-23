@@ -42,6 +42,8 @@
 #include "Common/PerfTimer.h"
 #include "Common/Team.h"
 #include "Common/Xfer.h"
+#include "Common/RetailFileLayers.h"
+#include "GameLogic/RetailGuardSave.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/AIGuard.h"
@@ -288,6 +290,8 @@ Bool AIGuardMachine::lookForInnerTarget()
 // ------------------------------------------------------------------------------------------------
 void AIGuardMachine::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		this->xfer(xfer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -296,7 +300,8 @@ void AIGuardMachine::crc( Xfer *xfer )
 void AIGuardMachine::xfer( Xfer *xfer )
 {
   // version
-  XferVersion currentVersion = 2;
+	const Bool retail = RetailFileLayers::enabled();
+	XferVersion currentVersion = retail ? 3 : 2;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -318,6 +323,8 @@ void AIGuardMachine::xfer( Xfer *xfer )
 		}
 	}
 
+	if (retail)
+		RetailGuardSave::transferMode(xfer, version >= 3, m_guardMode);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -333,6 +340,8 @@ void AIGuardMachine::loadPostProcess()
 // ------------------------------------------------------------------------------------------------
 void AIGuardInnerState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		this->xfer(xfer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -340,11 +349,12 @@ void AIGuardInnerState::crc( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void AIGuardInnerState::xfer( Xfer *xfer )
 {
-  // version
-  XferVersion currentVersion = 1;
-  XferVersion version = currentVersion;
-  xfer->xferVersion( &version, currentVersion );
-
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion currentVersion = retail ? 2 : 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
+	if (retail)
+		RetailGuardSave::transferAttack(xfer, version >= 2, getMachine(), m_attackState, m_exitConditions, FALSE, &m_reenterOnLoad);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -352,7 +362,8 @@ void AIGuardInnerState::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void AIGuardInnerState::loadPostProcess()
 {
-	onEnter();
+	if (!RetailFileLayers::enabled() || m_reenterOnLoad)
+		onEnter();
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -426,6 +437,8 @@ void AIGuardInnerState::onExit( StateExitType status )
 // ------------------------------------------------------------------------------------------------
 void AIGuardOuterState::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		this->xfer(xfer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -433,11 +446,12 @@ void AIGuardOuterState::crc( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void AIGuardOuterState::xfer( Xfer *xfer )
 {
-  // version
-  XferVersion currentVersion = 1;
-  XferVersion version = currentVersion;
-  xfer->xferVersion( &version, currentVersion );
-
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion currentVersion = retail ? 2 : 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
+	if (retail)
+		RetailGuardSave::transferAttack(xfer, version >= 2, getMachine(), m_attackState, m_exitConditions, FALSE);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -831,22 +845,25 @@ void AIGuardAttackAggressorState::onExit( StateExitType status )
 //-------------------------------------------------------------------------------------------------
 void AIGuardAttackAggressorState::crc( Xfer *xfer )
 {
-
+	if (RetailFileLayers::enabled())
+		this->xfer(xfer);
 }
 
 //-------------------------------------------------------------------------------------------------
 void AIGuardAttackAggressorState::xfer( Xfer *xfer )
 {
-  // version
-  XferVersion currentVersion = 1;
-  XferVersion version = currentVersion;
-  xfer->xferVersion( &version, currentVersion );
-
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion currentVersion = retail ? 2 : 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
+	if (retail)
+		RetailGuardSave::transferAttack(xfer, version >= 2, getMachine(), m_attackState, m_exitConditions, TRUE, &m_reenterOnLoad);
 }
 
 //-------------------------------------------------------------------------------------------------
 void AIGuardAttackAggressorState::loadPostProcess()
 {
-	onEnter();
+	if (!RetailFileLayers::enabled() || m_reenterOnLoad)
+		onEnter();
 }
 

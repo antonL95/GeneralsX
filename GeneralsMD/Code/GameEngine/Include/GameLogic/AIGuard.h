@@ -266,6 +266,7 @@ private:
 	AIGuardMachine* getGuardMachine() { return (AIGuardMachine*)getMachine(); }
 	ExitConditions m_exitConditions;
 	AIAttackState *m_attackState;
+	Bool m_reenterOnLoad = TRUE;
 };
 
 //--------------------------------------------------------------------------------------
