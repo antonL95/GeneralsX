@@ -7,6 +7,7 @@
 #include "GameClient/Drawable.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/TerrainLogic.h"
 
 namespace
 {
@@ -30,10 +31,14 @@ void probeEngaged(const RetailTestCommands::Context& ctx)
 
 void relocateEngagedTarget(const RetailTestCommands::Context& ctx)
 {
-	if (Object* target = ctx.requireObject(); target && ctx.hasPosition)
+	if (Object* target = ctx.requireObject())
 	{
-		const Coord3D position = ctx.groundLocation();
-		target->setPosition(&position);
+		Coord3D position = *target->getPosition();
+		if (std::sscanf(ctx.argument, "%f,%f", &position.x, &position.y) == 2)
+		{
+			position.z = TheTerrainLogic->getLayerHeight(position.x, position.y, target->getLayer());
+			target->setPosition(&position);
+		}
 	}
 }
 }
