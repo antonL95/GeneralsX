@@ -13,8 +13,6 @@
 10 science Player_1 - 0 SCIENCE_RallyingCallMPG
 10 science Player_1 - 0 SCIENCE_SpawnLoneTower
 10 science Player_1 - 0 SCIENCE_SpawnTrebuchet
-45 power Player_1 GondorElessar 0 SpecialAbility202ElessarAthelas
-46 ability Player_1 GondorElessar 0
 100 damage Player_1 GondorTowerShieldGuard 0 175
 105 power-cast Player_1 - 1 at 3150 690
 160 power Player_1 GondorFaramir 0 SpecialAbilityFaramirAmbush2
@@ -27,3 +25,6 @@
 435 power-cast Player_1 - 3 at 3150 690
 490 power-cast Player_1 - 4 at 2765 980
 620 power-cast Player_1 - 6 at 3260 970
+798 damage Player_1 GondorElessar 0 175
+805 power Player_1 GondorElessar 0 SpecialAbility202ElessarAthelas
+806 ability Player_1 GondorElessar 0
