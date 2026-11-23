@@ -1474,6 +1474,13 @@ static void runRetailCommandTriggers(Object* source, const CommandButton* primar
 					if (pos)
 						source->doSpecialPowerAtLocation(power, pos, INVALID_ANGLE, options);
 				}
+#if !RTS_GENERALS
+				else if (targetPos && power->hasRetailFlag(SpecialPowerTemplate::RETAIL_LIMIT_DISTANCE))
+				{
+					if (power->isValidRetailTarget(source, nullptr, targetPos, CMD_FROM_PLAYER))
+						source->doSpecialPowerAtLocation(power, targetPos, INVALID_ANGLE, options);
+				}
+#endif
 				else
 				{
 					source->doSpecialPower(power, options);
