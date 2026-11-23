@@ -1,0 +1,1 @@
+20 Player_1 PlaytestAnimationBlendSoldier 3020 650 0.7

@@ -4000,6 +4000,7 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 	// and always hide muzzle flashes, in case modelstate and model have crossed at the same time
 	hideAllMuzzleFlashes(newState, m_renderObject);
 
+	Bool keepAnimation = FALSE;
 	// note that different states might use the same model; for these, don't go thru the
 	// expense of creating a new render-object. (exception: if color is changing, or subobjs are changing,
 	// or a few other things...)
@@ -4013,6 +4014,16 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 			//|| (newState->m_validStuff & ModelConditionInfo::HAS_PROJECTILE_BONES)
 		)
 	{
+		const auto releaseModel = [](HLodClass* model) { model->Release_Ref(); };
+		std::unique_ptr<HLodClass, decltype(releaseModel)> previousModel(nullptr, releaseModel);
+		const Bool wasPaused = m_pauseAnimation;
+		if (RetailFileLayers::enabled() && !(TheGameState && TheGameState->isInLoadGame()) &&
+			!newState->m_animations.empty() &&
+			m_renderObject && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD)
+		{
+			previousModel.reset(static_cast<HLodClass*>(m_renderObject));
+			previousModel->Add_Ref();
+		}
 		Matrix3D transform;
 		nukeCurrentRender(&transform);
 		Drawable* draw = getDrawable();
@@ -4053,6 +4064,18 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		//BONEPOS_DUMPREAL(draw->getScale());
 
 		newState->validateStuff(m_renderObject, draw->getScale(), getW3DModelDrawModuleData()->m_extraPublicBones);
+		if (previousModel)
+		{
+			if (m_renderObject && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD &&
+				static_cast<HLodClass*>(m_renderObject)->Copy_Animation_State_From(*previousModel))
+			{
+				const ModelConditionInfo* previousAnimation = m_curState ? m_curState->m_animationState : m_enteredAnimationState;
+				keepAnimation = previousAnimation && previousAnimation == newState->m_animationState;
+				if (keepAnimation)
+					m_pauseAnimation = wasPaused;
+			}
+			previousModel.reset();
+		}
 		// ensure that any muzzle flashes from the *new* state, start out hidden...
 //		hideAllMuzzleFlashes(newState, m_renderObject);//moved to above
 		rebuildWeaponRecoilInfo(newState);
@@ -4196,7 +4219,8 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 	m_curState = newState;
 	m_nextState = nextState;
 	m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
-	adjustAnimation(prevState, prevAnimFraction);
+	if (!keepAnimation)
+		adjustAnimation(prevState, prevAnimFraction);
 
 	if (newState->m_animationState == m_enteredAnimationState)
 		return;

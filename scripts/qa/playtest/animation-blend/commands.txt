@@ -1,0 +1,6 @@
+5 create Player_1 PlaytestAnimationBlendSoldier 0 2980,650,0
+6 reveal Player_1 PlaytestAnimationBlendSoldier 0
+35 builderscriptmove Player_1 PlaytestAnimationBlendSoldier 0 - 3260 650
+42 pkg13-condition Player_1 PlaytestAnimationBlendSoldier 0 USER_1
+46 pkg13-condition Player_1 PlaytestAnimationBlendSoldier 0 USER_2
+50 pkg13-condition Player_1 PlaytestAnimationBlendSoldier 0 DAMAGED

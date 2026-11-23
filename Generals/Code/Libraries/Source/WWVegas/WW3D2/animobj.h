@@ -97,6 +97,7 @@ public:
 	const HAnimClass* Peek_Animation_Blend_Source(float& weight, float& duration) const;
 	HAnimClass* Peek_Queued_Animation() const { return QueuedBlend.Motion; }
 	HAnimClass* Peek_Requested_Animation_And_Info(float& frame, int& numFrames, int& mode, float& mult);
+	bool Copy_Animation_State_From(const Animatable3DObjClass& source);
 
 	virtual HAnimClass *			Peek_Animation() override;
 	virtual bool					Is_Animation_Complete() const;

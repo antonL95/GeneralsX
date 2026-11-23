@@ -543,6 +543,29 @@ const HAnimClass* Animatable3DObjClass::Peek_Animation_Blend_Source(float& weigh
 	return BlendSource.Motion;
 }
 
+bool Animatable3DObjClass::Copy_Animation_State_From(const Animatable3DObjClass& source)
+{
+	if (&source == this || source.CurMotionMode != SINGLE_ANIM || !source.ModeAnim.Motion ||
+		!HTree || !source.HTree || HTree->Num_Pivots() != source.HTree->Num_Pivots() ||
+		stricmp(HTree->Get_Name(), source.HTree->Get_Name()) != 0)
+		return false;
+
+	Set_Animation(source.ModeAnim.Motion, source.ModeAnim.Frame, source.ModeAnim.AnimMode);
+	ModeAnim = source.ModeAnim;
+	BlendSource = source.BlendSource;
+	if (BlendSource.Motion)
+		BlendSource.Motion->Add_Ref();
+	QueuedBlend = source.QueuedBlend;
+	if (QueuedBlend.Motion)
+		QueuedBlend.Motion->Add_Ref();
+	BlendTotalFrames = source.BlendTotalFrames;
+	BlendRemainingFrames = source.BlendRemainingFrames;
+	BlendMustComplete = source.BlendMustComplete;
+	QueuedBlendFrames = source.QueuedBlendFrames;
+	QueuedBlendMustComplete = source.QueuedBlendMustComplete;
+	return true;
+}
+
 /***********************************************************************************************
  * Animatable3DObjClass::Set_Animation -- set the animation state to a blend of two anims      *
  *                                                                                             *
