@@ -1,10 +1,35 @@
 prepare() {
     awk -v end="$end" 'BEGIN {
-        for (frame = 185; frame <= 370 && frame <= end; ++frame)
+        for (frame = 185; frame <= 370 && frame <= end; ++frame) {
             print frame, "eagle-trace Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackTarget:0"
+            print frame, "air-swoop-trace Player_1 GondorGwaihirHero_Summoned 0"
+        }
         for (frame = 447; frame <= 632 && frame <= end; ++frame)
             print frame, "eagle-trace Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackOrc:0"
     }'
+}
+
+check_moving_contact() {
+    awk '
+        /^TEST eagle / && substr($3, 7) + 0 <= 370 && !shot {
+            for (i = 5; i <= NF; ++i)
+                if ($i ~ /^fire0=/)
+                    shot = substr($i, 7) + 0
+        }
+        /^TEST air-swoop .* actor=GondorGwaihirHero_Summoned / {
+            for (i = 5; i <= NF; ++i) {
+                split($i, field, "=")
+                sample[field[1]] = field[2]
+            }
+            frame = substr($3, 7) + 0
+            speedSquared[frame] = sample["vx"] ^ 2 + sample["vy"] ^ 2
+        }
+        END {
+            printf "eagle moving contact shot=%u speed before=%.3f at=%.3f after=%.3f\n",
+                shot, sqrt(speedSquared[shot - 1]), sqrt(speedSquared[shot]), sqrt(speedSquared[shot + 1])
+            exit !(shot && speedSquared[shot - 1] > 0 && speedSquared[shot] > 0 && speedSquared[shot + 1] > 0)
+        }
+    ' "$log"
 }
 
 check() {
@@ -13,6 +38,9 @@ check() {
     fi
     if ! covers 370; then
         return
+    fi
+    if [ "$phase" = continue ]; then
+        check_moving_contact || return
     fi
     awk '
         /^TEST eagle / && substr($3, 7) + 0 <= 370 {
@@ -75,6 +103,10 @@ compare() {
     for eagle_phase in continue resume; do
         awk -v frame="$save_frame" '/^TEST eagle frame=/ && substr($3, 7) + 0 > frame' \
             "$out/$eagle_phase.log" > "$out/eagle-$eagle_phase.trace"
+        awk -v frame="$save_frame" '
+            /^TEST air-swoop .* actor=GondorGwaihirHero_Summoned / && substr($3, 7) + 0 > frame
+        ' "$out/$eagle_phase.log" > "$out/eagle-flight-$eagle_phase.trace"
     done
     cmp "$out/eagle-continue.trace" "$out/eagle-resume.trace"
+    cmp "$out/eagle-flight-continue.trace" "$out/eagle-flight-resume.trace"
 }

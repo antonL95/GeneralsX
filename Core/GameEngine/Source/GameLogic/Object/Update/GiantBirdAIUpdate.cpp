@@ -11,6 +11,7 @@
 #include "GameClient/FXList.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/RetailSlowDeath.h"
@@ -178,27 +179,9 @@ void GiantBirdAIUpdate::startFollowThrough()
 
 UpdateSleepTime GiantBirdAIUpdate::update()
 {
-	const Bool wasSwooping = m_swooping;
 	const UpdateSleepTime sleep = AIUpdateInterface::update();
-	Object* bird = getObject();
 	releaseGrabbedPassenger();
-	if (bird->isEffectivelyDead() || !getCurLocomotor())
-		return sleep;
-
-	if (wasSwooping)
-	{
-		for (Int slot = PRIMARY_WEAPON; slot < WEAPONSLOT_COUNT; ++slot)
-		{
-			const Weapon* weapon = bird->getWeaponInWeaponSlot(static_cast<WeaponSlotType>(slot));
-			if (weapon && weapon->getLastShotFrame() == TheGameLogic->getFrame())
-			{
-				setSwooping(FALSE);
-				startFollowThrough();
-				break;
-			}
-		}
-	}
-	return UPDATE_SLEEP_NONE;
+	return getObject()->isEffectivelyDead() || !getCurLocomotor() ? sleep : UPDATE_SLEEP_NONE;
 }
 
 UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
@@ -211,6 +194,19 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 	if (!locomotor || locomotor->getAppearance() != LOCO_GIANT_BIRD || bird->isEffectivelyDead())
 		return AIUpdateInterface::doLocomotor();
 
+	if (m_swooping)
+	{
+		for (Int slot = PRIMARY_WEAPON; slot < WEAPONSLOT_COUNT; ++slot)
+		{
+			const Weapon* weapon = bird->getWeaponInWeaponSlot(static_cast<WeaponSlotType>(slot));
+			if (weapon && weapon->getLastShotFrame() == TheGameLogic->getFrame())
+			{
+				setSwooping(FALSE);
+				startFollowThrough();
+				break;
+			}
+		}
+	}
 	const Coord3D& at = *bird->getPosition();
 	if (m_followingThrough)
 	{
@@ -276,6 +272,35 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 		{
 			const Real surface = TheTerrainLogic->getGroundHeight(at.x, at.y);
 			attackLoco->setPreferredHeight(std::max(1.0f, strike->z + attackLoco->getPreferredAttackHeight() - surface));
+			const PhysicsBehavior* physics = bird->getPhysics();
+			if (!getPath() && physics)
+			{
+				const Real launchSpeed = attackLoco->getMaxAcceleration(bird->getBodyModule()->getDamageState());
+				Real speed = std::max(physics->getForwardSpeed2D(), launchSpeed);
+				const Coord3D& heading = *bird->getUnitDirectionVector2D();
+				const Coord3D delta = *strike - at;
+				const Real forward = delta.x * heading.x + delta.y * heading.y;
+				const Real descent = std::max(0.0f, -physics->getVelocity()->z);
+				const Real heightToContact = -delta.z - attackLoco->getPreferredAttackHeight() - CONTACT_HEIGHT_TOLERANCE;
+				if (forward > 0.0f && heightToContact > descent)
+					speed = std::clamp(forward * (descent / heightToContact), launchSpeed, speed);
+
+				Coord3D guide = *strike;
+				if (bird->testStatus(OBJECT_STATUS_IS_FIRING_WEAPON))
+				{
+					const Real lookAhead = std::max(speed, attackLoco->getCloseEnoughDist());
+					const Real extension = std::max(0.0f, lookAhead - forward);
+					guide.x += heading.x * extension;
+					guide.y += heading.y * extension;
+				}
+				const Real remaining = WWMath::Sqrt(planarDistanceSquared(at, guide)) +
+					std::max(0.0f, getGiantBirdAIUpdateModuleData()->m_followThroughDistance);
+				attackLoco->setPhysicsOptions(bird);
+				Bool blocked = FALSE;
+				attackLoco->locoUpdate_moveTowardsPosition(bird, guide, remaining, speed, &blocked);
+				updateAirborneTargetStatus();
+				return UPDATE_SLEEP_NONE;
+			}
 		}
 	}
 	else
