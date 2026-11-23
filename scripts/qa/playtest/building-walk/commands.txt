@@ -1,0 +1,12 @@
+10 create Player_1 GondorBarracks 0 2440,1430,0
+10 create Player_1 GondorPippin 0 2260,1416,0
+10 create Player_1 LamedonClansmenHorde 0 2250,1485,0
+10 create Player_1 LamedonClansmenHorde 1 2220,1400,0
+11 reveal Player_1 GondorPippin 0
+11 track Player_1 GondorPippin 0
+11 track Player_1 LamedonClansmenHorde 0
+11 track Player_1 LamedonClansmenHorde 1
+20 move Player_1 GondorPippin 0 - 2600 1416
+240 select Player_1 LamedonClansmenHorde 0
+240 selectadd Player_1 LamedonClansmenHorde 1
+240 movesel - - 0 - 2600 1430

@@ -1,0 +1,15 @@
+180 create Player_1 BuildingWalkBarracks 0 2440,1430,0
+180 create Player_1 BuildingWalkSingle 0 2260,1416,0
+180 create Player_1 BuildingWalkGroup 0 2250,1445,0
+180 create Player_1 BuildingWalkGroup 1 2240,1470,0
+181 track Player_1 BuildingWalkSingle 0
+181 track Player_1 BuildingWalkGroup 0
+181 track Player_1 BuildingWalkGroup 1
+190 move Player_1 BuildingWalkSingle 0 - 2600 1416
+244 track Player_1 BuildingWalkSingle 0
+244 track Player_1 BuildingWalkGroup 0
+244 track Player_1 BuildingWalkGroup 1
+245 snapshot-obstacle-owner Player_1 BuildingWalkBarracks 0
+365 select Player_1 BuildingWalkGroup 0
+365 selectadd Player_1 BuildingWalkGroup 1
+365 movesel - - 0 - 2600 1450

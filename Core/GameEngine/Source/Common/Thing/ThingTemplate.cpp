@@ -510,10 +510,10 @@ void ThingTemplate::parseAdditionalGeometry(INI* ini, void* instance, void*, con
 void ThingTemplate::parseGeometrySize(INI* ini, void* instance, void* store, const void* userData)
 {
 	auto& self = *static_cast<ThingTemplate*>(instance);
-	auto* shape = static_cast<GeometryInfo*>(store);
-	if (self.m_parsingAdditionalGeometry)
-		shape = &self.m_rotwk.additionalGeometries.back().shape;
 	const auto parse = *static_cast<const INIFieldParseProc*>(userData);
+	auto* shape = static_cast<GeometryInfo*>(store);
+	if (self.m_parsingAdditionalGeometry && (parse != geometryIsSmall || !RetailFileLayers::enabled()))
+		shape = &self.m_rotwk.additionalGeometries.back().shape;
 	parse(ini, instance, shape, nullptr);
 }
 

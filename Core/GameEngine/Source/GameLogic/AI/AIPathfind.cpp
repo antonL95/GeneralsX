@@ -633,9 +633,12 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 	if (obj->isMobile()) {
 		return; // mobile aren't obstacles.
 	}
-	/// For now, all small objects will not be obstacles
-	if (obj->getGeometryInfo().getIsSmall()) {
-		return;
+	if (obj->getGeometryInfo().getIsSmall())
+	{
+		const ThingTemplate* definition = obj->getTemplate();
+		if (!RetailFileLayers::enabled() || definition->getRotWKObjectData().additionalGeometries.empty() ||
+			definition->getTemplateGeometryInfo().getIsSmall())
+			return;
 	}
 
 #if RTS_GENERALS
@@ -683,7 +686,7 @@ void Pathfinder::internal_classifyObjectFootprint( Object *obj, Bool insert )
 #endif
 
 	std::vector<GeometryUpgrade::CollisionPart> parts;
-	if (RetailFileLayers::enabled() && GeometryUpgrade::collectCollisionParts(*obj, parts))
+	if (RetailFileLayers::enabled() && GeometryUpgrade::collectCollisionParts(*obj, parts, TRUE))
 	{
 		m_zoneManager.markZonesDirty();
 		const Real angle = obj->getOrientation();

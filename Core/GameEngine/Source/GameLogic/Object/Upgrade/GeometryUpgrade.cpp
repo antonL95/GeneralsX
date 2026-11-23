@@ -159,24 +159,31 @@ std::vector<const GeometryUpgradeModuleData*> GeometryUpgrade::activeUpgrades(co
 	return upgrades;
 }
 
-Bool GeometryUpgrade::collectCollisionParts(const Object& object, std::vector<CollisionPart>& parts)
+Bool GeometryUpgrade::collectCollisionParts(const Object& object, std::vector<CollisionPart>& parts, Bool includeAuthored)
 {
 	const ThingTemplate* definition = object.getTemplate();
 	const auto& data = definition->getRotWKObjectData();
-	if (data.additionalGeometries.empty() && data.primaryGeometry.name.isEmpty())
+	const auto& primary = data.primaryGeometry;
+	const Bool hasAdditional = !data.additionalGeometries.empty();
+	const Bool hasAuthoredParts = includeAuthored && (hasAdditional || !primary.active ||
+		primary.offset.x != 0.0f || primary.offset.y != 0.0f || primary.offset.z != 0.0f);
+	if (!hasAuthoredParts && !hasAdditional && primary.name.isEmpty())
 		return FALSE;
 
 	const auto upgrades = activeUpgrades(object, nullptr);
-	if (upgrades.empty())
-		return FALSE;
-
 	const auto hasUpgrade = [&](const ThingTemplate::GeometryDetails& details)
 	{
 		return std::any_of(upgrades.begin(), upgrades.end(),
 			[&](const auto* upgrade) { return affectsGeometry(*upgrade, details.name); });
 	};
-	if (!hasUpgrade(data.primaryGeometry) && std::none_of(data.additionalGeometries.begin(), data.additionalGeometries.end(),
-		[&](const auto& geometry) { return hasUpgrade(geometry.details); }))
+	const Bool upgraded = !upgrades.empty() && (hasUpgrade(primary) ||
+		std::any_of(data.additionalGeometries.begin(), data.additionalGeometries.end(),
+			[&](const auto& geometry) { return hasUpgrade(geometry.details); }));
+	const GeometryInfo& baseShape = definition->getTemplateGeometryInfo();
+	const GeometryInfo& currentShape = object.getGeometryInfo();
+	if (!upgraded && (!hasAuthoredParts || currentShape.getGeomType() != baseShape.getGeomType() ||
+		currentShape.getMajorRadius() != baseShape.getMajorRadius() ||
+		currentShape.getMinorRadius() != baseShape.getMinorRadius()))
 		return FALSE;
 
 	const Coord3D& position = *object.getPosition();
@@ -194,7 +201,7 @@ Bool GeometryUpgrade::collectCollisionParts(const Object& object, std::vector<Co
 		};
 		parts.push_back({&shape, center});
 	};
-	addPart(definition->getTemplateGeometryInfo(), data.primaryGeometry);
+	addPart(upgraded ? baseShape : currentShape, primary);
 	for (const auto& geometry : data.additionalGeometries)
 		addPart(geometry.shape, geometry.details);
 	return TRUE;
