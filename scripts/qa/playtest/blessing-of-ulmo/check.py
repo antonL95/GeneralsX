@@ -4,19 +4,20 @@ from pathlib import Path
 from PIL import Image, ImageChops
 
 
-render_env = {
-    "PLAYTEST_FACTION": "FactionArnor",
-    "PLAYTEST_STATIC_CAPTURES": "1",
-    "GENERALSX_TEST_WEATHER_DRAW": "1",
-}
-render_variants = {"weather-hidden": {"PLAYTEST_HIDE_WEATHER": "1"}}
-
 CAST_FRAME = 37
 FIRST_RAIN_DRAW = CAST_FRAME + 1
 RAIN_END = CAST_FRAME + 180 * 30
 DRY_FRAME = RAIN_END + 103
 TERRAIN_CROP = (780, 45, 1240, 295)
 CAPTURE_FRAMES = tuple(map(int, Path(__file__).with_name("frames.txt").read_text().split()))
+HIDDEN_FRAMES = (184, 185, 187, 188)
+
+render_env = {
+    "PLAYTEST_FACTION": "FactionArnor",
+    "PLAYTEST_STATIC_CAPTURES": "1",
+    "PLAYTEST_HIDE_WEATHER_FRAMES": " ".join(map(str, HIDDEN_FRAMES)),
+    "GENERALSX_TEST_WEATHER_DRAW": "1",
+}
 
 
 def check(log):
@@ -39,12 +40,12 @@ def check(log):
             (state, end, enabled, visible, map_rain, spell, count, texture, authored, float(spacing), float(speed))
         )
 
-    hidden = "TEST playtest weather hidden" in log
     for frame in CAPTURE_FRAMES:
         passes = samples.get(frame)
         if not passes:
             raise RuntimeError(f"No snow manager trace for frame {frame}")
         expected_logic = (2, RAIN_END) if FIRST_RAIN_DRAW <= frame < RAIN_END else (0, 0)
+        hidden = frame in HIDDEN_FRAMES
         draws_rain = not hidden and FIRST_RAIN_DRAW <= frame < DRY_FRAME
         expected = (*expected_logic, int(draws_rain), int(not hidden), 0, 1)
         if any(sample[:6] != expected for sample in passes):
@@ -65,22 +66,35 @@ def check(log):
         raise RuntimeError(f"Rain did not ramp out after logic expiry: {samples[5487]}")
 
 
-def changed_pixels(output, frame):
-    name = f"frame-{frame:04d}.png"
-    with Image.open(output.parent / name) as a, Image.open(output / name) as b:
-        difference = ImageChops.difference(a.convert("RGB").crop(TERRAIN_CROP), b.convert("RGB").crop(TERRAIN_CROP))
-    return sum(max(pixel) >= 8 for pixel in difference.get_flattened_data())
+def terrain_crop(output, frame):
+    with Image.open(output / f"frame-{frame:04d}.png") as image:
+        return image.convert("RGB").crop(TERRAIN_CROP)
+
+
+def changed_pixels(sample, controls):
+    low = high = controls[0]
+    for control in controls[1:]:
+        low = ImageChops.darker(low, control)
+        high = ImageChops.lighter(high, control)
+    motion = ImageChops.subtract(high, low)
+    difference = ImageChops.lighter(ImageChops.subtract(low, sample), ImageChops.subtract(sample, high))
+    return sum(max(delta) >= 8 and max(background) <= 2 for delta, background in zip(
+        difference.get_flattened_data(), motion.get_flattened_data()
+    ))
 
 
 def check_captures(output, _frames):
-    if output.name != "weather-hidden":
-        return
-    wet = changed_pixels(output, 186)
-    dry = max(changed_pixels(output, frame) for frame in (32, DRY_FRAME))
-    (output.parent / "rain-crop.txt").write_text(
-        f"Crop {TERRAIN_CROP}, pixels changing by at least 8 channel levels\n"
-        f"Rainy frame with and without precipitation: {wet}\n"
-        f"Largest dry control difference: {dry}\n"
+    before, hidden_before, rainy, hidden_after, after = [terrain_crop(output, frame) for frame in range(184, 189)]
+    wet = changed_pixels(rainy, (before, hidden_before, hidden_after, after))
+    dry = max(
+        changed_pixels(hidden_before, (before, hidden_after, after)),
+        changed_pixels(hidden_after, (before, hidden_before, after)),
+    )
+    (output / "rain-crop.txt").write_text(
+        f"Crop {TERRAIN_CROP}, pixels at least 8 levels outside the control range\n"
+        "Counted only pixels varying by at most 2 levels across the controls\n"
+        f"Rainy frame against four hidden captures: {wet}\n"
+        f"Largest hidden frame difference against the other hidden captures: {dry}\n"
     )
     if wet <= max(20, dry * 2):
-        raise RuntimeError(f"No visible rain in the terrain crop: {wet} vs dry control {dry}")
+        raise RuntimeError(f"No visible rain in the terrain crop: {wet} vs hidden control {dry}")
