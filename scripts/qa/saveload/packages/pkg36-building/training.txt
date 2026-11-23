@@ -1,7 +1,7 @@
 55 create Player_1 Pkg36Porter 0 1800,1240,0
 60 construct Player_1 Pkg36Porter 0 Pkg36Farm 1900 1240 0
 224 placecheck Player_1 Pkg36Porter 0 Pkg36Farm 1710 1280 0
-225 pkg08-queue Player_1 Pkg36Porter 0 Pkg36Farm 2220 1430
+61 pkg08-queue Player_1 Pkg36Porter 0 Pkg36Farm 2220 1430
 243 pkg36-site Player_1 Pkg36Farm 1
 243 pkg36-site Player_1 Pkg36Farm 0
 320 pkg36-site Player_1 Pkg36Farm 0
