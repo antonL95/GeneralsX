@@ -1535,8 +1535,10 @@ void HordeContain::constrainGroundMovement(const Object* member, Coord3D& moveme
 {
 	if (!RetailFileLayers::enabled() || (movement.x == 0.0f && movement.y == 0.0f) ||
 		!std::isfinite(movement.x) || !std::isfinite(movement.y) ||
-		member->isEffectivelyDead() || member->isSignificantlyAboveTerrain() ||
-		(!get(member->getContainedBy()) && !get(member)))
+		member->isEffectivelyDead() || member->isSignificantlyAboveTerrain())
+		return;
+	const Bool isHordeMember = get(member->getContainedBy()) != nullptr;
+	if (!isHordeMember && !get(member))
 		return;
 
 	const AIUpdateInterface* ai = member->getAI();
@@ -1550,9 +1552,11 @@ void HordeContain::constrainGroundMovement(const Object* member, Coord3D& moveme
 	const auto surfaces = locomotor->getLegalSurfaces();
 	if (!pathfinder->validMovementTerrain(layer, locomotor, &position))
 		return;
+	const Bool terrainOnly = !isHordeMember ||
+		!pathfinder->isMovementSegmentPassable(member, surfaces, layer, position, position, FALSE);
 	const auto passable = [&](Real dx, Real dy) {
 		const Coord3D next = {position.x + dx, position.y + dy, position.z};
-		return pathfinder->isMovementSegmentPassable(member, surfaces, layer, position, next, TRUE);
+		return pathfinder->isMovementSegmentPassable(member, surfaces, layer, position, next, terrainOnly);
 	};
 	if (passable(movement.x, movement.y))
 		return;
