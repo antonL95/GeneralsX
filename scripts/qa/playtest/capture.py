@@ -1,4 +1,5 @@
 import os
+import struct
 
 import gdb
 
@@ -9,10 +10,12 @@ class Draw(gdb.Breakpoint):
     hidden_weather_frames = {int(frame) for frame in os.environ.get("PLAYTEST_HIDE_WEATHER_FRAMES", "").split()}
     render_from = int(os.environ["PLAYTEST_RENDER_FROM"])
     capture_windows = set()
-    if os.environ.get("PLAYTEST_STATIC_CAPTURES") == "1":
+    static_captures = os.environ.get("PLAYTEST_STATIC_CAPTURES")
+    if static_captures in ("1", "exact"):
+        warmup = 2 if static_captures == "1" else 0
         for capture in os.environ["PLAYTEST_FRAMES"].split():
             frame = int(capture)
-            capture_windows.update(range(frame - 2, frame + 1))
+            capture_windows.update(range(frame - warmup, frame + 1))
 
     def stop(self):
         frame = logic_frame()
@@ -41,15 +44,34 @@ def logic_frame():
     return int(logic["m_frame"]) if int(logic) else 0
 
 
+def capture_resources():
+    textures = gdb.parse_and_eval("WW3DAssetManager::TheInstance->TextureHash")
+    table = textures["Table"]
+    stride = table.type.target().sizeof
+    cached = int(textures["Size"])
+    entries = gdb.selected_inferior().read_memory(int(table), cached * stride)
+    slot = int(textures["First"])
+    while slot != -1:
+        cached -= 1
+        slot = struct.unpack_from("<i", entries, slot * stride)[0]
+    return int(gdb.parse_and_eval("DX8Wrapper::FrameCount")), cached, int(gdb.parse_and_eval("_VertexBufferCount"))
+
+
 class Capture(gdb.Breakpoint):
     def __init__(self):
         super().__init__("UiTest::capturePath", internal=True)
         self.frames = {int(frame) for frame in os.environ["PLAYTEST_FRAMES"].split()}
+        self.trace_resources = os.environ.get("PLAYTEST_TRACE_CAPTURE_RESOURCES") == "1"
+        self.before = None
+        if self.trace_resources:
+            CaptureComplete(self)
 
     def stop(self):
         frame = logic_frame()
         if frame not in self.frames:
             return False
+        if self.trace_resources:
+            self.before = int(gdb.parse_and_eval("DX8Wrapper::FrameCount"))
         prefix = f"PLAYTEST_PNG_{frame}="
         entry = gdb.parse_and_eval("(char **) __environ")
         while int(entry.dereference()):
@@ -60,6 +82,20 @@ class Capture(gdb.Breakpoint):
                 return False
             entry += 1
         raise gdb.GdbError(f"Missing capture path for frame {frame}")
+
+
+class CaptureComplete(gdb.Breakpoint):
+    def __init__(self, capture):
+        super().__init__("UiTest::markCaptured", internal=True)
+        self.capture = capture
+
+    def stop(self):
+        if self.capture.before is not None:
+            present, textures, vertices = capture_resources()
+            delta = present - self.capture.before
+            gdb.write(f"CAPTURE frame={logic_frame()} present_delta={delta} textures={textures} vertex_buffers={vertices}\n")
+            self.capture.before = None
+        return False
 
 
 class PinDynamicLOD(gdb.Breakpoint):

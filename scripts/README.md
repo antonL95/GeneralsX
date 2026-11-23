@@ -65,6 +65,7 @@ Utilities for large-scale code refactoring and fixes:
 - `test-rotwk-modifiers-zh.sh` runs the contained and radius healing, innate damage, and modifier snapshot checks on High Pass. Pass a session label, the devbox build directory, and the BFME High Pass runner path.
 - `playtest/shadow-casters` casts Rohan Allies on Training Grounds and checks the stage 1 state of each shadow caster draw. From the BFME project root, run `tools/playtest.sh WORKTREE BUILD_DIR shadow-casters`.
 - `playtest/drawable-particles` captures the authored Dunedain grass and Army of the Dead light shafts through their FX lists.
+- `playtest/capture-resources` runs a High Pass capture session through frame 4137. It checks that each capture presents once and that cached textures and live vertex buffers stay within their warm peaks. From the BFME project root, run `tools/playtest.sh WORKTREE BUILD_DIR capture-resources`.
 
 #### `qa/smoke/` - Smoke Tests
 - `docker-smoke-test-zh.sh` - Quick startup validation (expects crash, checks init output)
