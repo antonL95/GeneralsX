@@ -1,0 +1,6 @@
+button	upgrade	build_frames	before	order	during	after	art
+Command_PurchaseUpgradeRivendellFortressBanners	Upgrade_ArnorFortressBanners	450	30	33	63	492	-
+Command_PurchaseUpgradeRivendellFortressMerriment	Upgrade_ArnorFortressBoilingOil	900	497	500	530	1409	-
+Command_PurchaseUpgradeRivendellFortressFlamingMunitions	Upgrade_GoodFortressFlamingMunitionsTrigger	900	1414	1417	1447	2326	-
+Command_PurchaseUpgradeRivendellFortressMoat	Upgrade_ArnorFortressHouseOfHealing	900	2331	2334	2364	3243	-
+Command_PurchaseUpgradeRivendellFortressObservatory	Upgrade_ArnorFortressIvoryTower	1350	3248	3251	3281	4610	-

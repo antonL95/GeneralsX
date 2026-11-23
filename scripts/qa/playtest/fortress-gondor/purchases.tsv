@@ -1,0 +1,7 @@
+button	upgrade	build_frames	before	order	during	after	art
+Command_PurchaseUpgradeMenFortressBanners	Upgrade_MenFortressBanners	450	30	33	63	492	model=gbfbnnrs
+Command_PurchaseUpgradeMenFortressHouseOfHealing	Upgrade_MenFortressHouseOfHealing	900	497	500	530	1409	model=gbfheal
+Command_PurchaseUpgradeMenFortressBoilingOil	Upgrade_MenFortressBoilingOil	900	1414	1417	1447	2326	-
+Command_PurchaseUpgradeMenFortressFlamingMunitions	Upgrade_GoodFortressFlamingMunitionsTrigger	900	2331	2334	2364	3243	-
+Command_PurchaseUpgradeMenFortressNumenorStonework	Upgrade_MenFortressNumenorStoneworkTrigger	900	3248	3251	3281	4160	flag=UPGRADE_NUMENOR_STONEWORK
+Command_PurchaseUpgradeMenFortressIvoryTower	Upgrade_MenFortressIvoryTower	1350	4165	4168	4198	5527	flag=UPGRADE_IVORY_TOWER

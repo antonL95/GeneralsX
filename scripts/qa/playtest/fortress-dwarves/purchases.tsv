@@ -1,0 +1,8 @@
+button	upgrade	build_frames	before	order	during	after	art
+Command_PurchaseUpgradeDwarvenFortressLotREra	Upgrade_LotRErebor	0	30	33	-	42	-
+Command_PurchaseUpgradeDwarvenFortressBanners	Upgrade_DwarvenFortressBanners	450	47	50	80	509	-
+Command_PurchaseUpgradeDwarvenHornsoftheGate	Upgrade_DwarvenHornsoftheGate	900	514	517	547	1426	-
+Command_PurchaseUpgradeDwarvenFortressSiegeKegs	Upgrade_DwarvenFortressSiegeKegs	900	1431	1434	1464	2343	-
+Command_PurchaseUpgradeDwarvenFortressFlamingMunitions	Upgrade_GoodFortressFlamingMunitionsTrigger	900	2348	2351	2381	3260	-
+Command_PurchaseUpgradeDwarvenFortressDwarvenStonework	Upgrade_DwarvenFortressDwarvenStoneworkTrigger	900	3265	3268	3298	4177	-
+Command_PurchaseUpgradeDwarvenFortressArkenstoneLotREra	Upgrade_DwarvenFortressMightyCatapult	1350	4182	4185	4215	5544	-

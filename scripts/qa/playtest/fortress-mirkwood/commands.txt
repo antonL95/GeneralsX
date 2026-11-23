@@ -1,0 +1,27 @@
+5 sweep-setup Player_1 - 0
+10 player Player_1 - 0
+15 list Player_1 - 0
+30 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressBanners
+33 fortress-purchase Player_1 MirkwoodCitadel 0 Command_PurchaseUpgradeMirkwoodFortressBanners
+63 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressBanners
+492 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressBanners
+497 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressFeastofStarlight
+500 fortress-purchase Player_1 MirkwoodCitadel 0 Command_PurchaseUpgradeMirkwoodFortressHouseOfHealing
+530 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressFeastofStarlight
+1409 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressFeastofStarlight
+1414 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressEmperorProtection
+1417 fortress-purchase Player_1 MirkwoodCitadel 0 Command_PurchaseUpgradeMirkwoodFortressEmperorProtection
+1447 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressEmperorProtection
+1876 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressEmperorProtection
+1881 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressCrystalMoat
+1884 fortress-purchase Player_1 MirkwoodCitadel 0 Command_PurchaseUpgradeMirkwoodFortressEnchantedRiver
+1914 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressCrystalMoat
+2793 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressCrystalMoat
+2798 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressGarrison
+2801 fortress-purchase Player_1 MirkwoodCitadel 0 Command_PurchaseUpgradeMirkwoodFortressGarrison
+2831 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressGarrison
+3710 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressGarrison
+3715 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressOromeTribute
+3718 fortress-purchase Player_1 MirkwoodCitadel 0 Command_PurchaseUpgradeMirkwoodFortressOromeTribute
+3748 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressOromeTribute
+5077 fortress-sample Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressOromeTribute

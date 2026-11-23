@@ -1,0 +1,8 @@
+button	upgrade	build_frames	before	order	during	after	art
+Command_PurchaseUpgradeRohanFortressBanners	Upgrade_MenFortressBanners	450	30	33	63	492	-
+Command_PurchaseUpgradeRohanFortressDesperateGarrison	Upgrade_RohanFortressDesperateGarrison	900	497	500	530	1409	-
+Command_PurchaseUpgradeRohanFortressFlamingMunitions	Upgrade_RohanFortressFlamingMunitionsTrigger	900	1414	1417	1447	2326	-
+Command_PurchaseUpgradeRohanFortressHornsOfHammerhand	Upgrade_RohanFortressHornsOfHammerhand	900	2331	2334	2364	3243	-
+Command_PurchaseUpgradeRohanFortressFortifications	Upgrade_RohanFortressHastyFortificationsTrigger	900	3248	3251	3281	4160	-
+Command_PurchaseUpgradeRohanFortressMeadHall	Upgrade_RohanFortressMeadHall	900	4165	4168	4198	5077	-
+Command_PurchaseUpgradeRohanFortressRideOfTheRohirrim	Upgrade_RohanFortressRideoftheRohirrim	1350	5082	5085	5115	6444	-

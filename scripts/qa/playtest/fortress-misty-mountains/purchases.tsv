@@ -1,0 +1,8 @@
+button	upgrade	build_frames	before	order	during	after	art
+Command_PurchaseUpgradeWildFortressGoblinTown	Upgrade_WildFortressGoblinTownTrigger	900	30	33	63	942	-
+Command_PurchaseUpgradeWildFortressBatCloud	Upgrade_WildFortressBatCloud	450	947	950	980	1409	-
+Command_PurchaseUpgradeWildFortressRazorSpines	Upgrade_WildFortressRazorSpines	450	1414	1417	1447	1876	-
+Command_PurchaseUpgradeWildFortressFireArrows	Upgrade_WildFortressFireArrowsTrigger	900	1881	1884	1914	2793	-
+Command_PurchaseUpgradeWildFortressNorthernWastes	Upgrade_WildFortressNorthernWastes	900	2798	2801	2831	3710	-
+Command_PurchaseUpgradeWildFortressWebCocoon	Upgrade_WildFortressWebCocoonTrigger	900	3715	3718	3748	4627	-
+Command_PurchaseUpgradeWildFortressDrumsInTheDeep	Upgrade_WildFortressDrums	1350	4632	4635	4665	5994	-

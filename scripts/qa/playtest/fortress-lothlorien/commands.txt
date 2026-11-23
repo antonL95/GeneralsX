@@ -1,0 +1,31 @@
+5 sweep-setup Player_1 - 0
+10 player Player_1 - 0
+15 list Player_1 - 0
+30 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressEnchantedAnvil
+33 fortress-purchase Player_1 ElvenCitadel 0 Command_PurchaseUpgradeElvenFortressBannersLorien
+63 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressEnchantedAnvil
+492 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressEnchantedAnvil
+497 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressBlessedMist
+500 fortress-purchase Player_1 ElvenCitadel 0 Command_PurchaseUpgradeElvenFortressBlessedMistLorien
+530 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressBlessedMist
+959 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressBlessedMist
+964 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressMysticFountains
+967 fortress-purchase Player_1 ElvenCitadel 0 Command_PurchaseUpgradeElvenFortressMysticFountainsLorien
+997 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressMysticFountains
+1876 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressMysticFountains
+1881 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressCrystalMoat
+1884 fortress-purchase Player_1 ElvenCitadel 0 Command_PurchaseUpgradeElvenFortressCrystalMoatLorien
+1914 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressCrystalMoat
+2343 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressCrystalMoat
+2348 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressFlamingMunitionsTrigger
+2351 fortress-purchase Player_1 ElvenCitadel 0 Command_PurchaseUpgradeElvenFortressFlamingMunitionsLorien
+2381 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressFlamingMunitionsTrigger
+3260 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressFlamingMunitionsTrigger
+3265 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressEncasingVinesTrigger
+3268 fortress-purchase Player_1 ElvenCitadel 0 Command_PurchaseUpgradeElvenFortressEncasingVinesLorien
+3298 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressEncasingVinesTrigger
+4177 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressEncasingVinesTrigger
+4182 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressEaglesNest
+4185 fortress-purchase Player_1 ElvenCitadel 0 Command_PurchaseUpgradeElvenFortressEarendilLorien
+4215 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressEaglesNest
+5544 fortress-sample Player_1 ElvenCitadel 0 Upgrade_ElvenFortressEaglesNest

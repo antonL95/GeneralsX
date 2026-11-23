@@ -1,0 +1,23 @@
+5 sweep-setup Player_1 - 0
+10 player Player_1 - 0
+15 list Player_1 - 0
+30 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressBanners
+33 fortress-purchase Player_1 AngmarFortressCitadel 0 Command_PurchaseUpgradeHaradFortressMordorBanners
+63 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressBanners
+492 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressBanners
+497 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressHouseOfLamentation
+500 fortress-purchase Player_1 AngmarFortressCitadel 0 Command_PurchaseUpgradeHaradFortressNafarat
+530 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressHouseOfLamentation
+959 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressHouseOfLamentation
+964 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressSpikes
+967 fortress-purchase Player_1 AngmarFortressCitadel 0 Command_PurchaseUpgradeHaradFortressHarondor
+997 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressSpikes
+1426 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressSpikes
+1431 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressIceMunitionsTrigger
+1434 fortress-purchase Player_1 AngmarFortressCitadel 0 Command_PurchaseUpgradeHaradFortressMahud
+1464 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressIceMunitionsTrigger
+2343 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressIceMunitionsTrigger
+2348 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressSanctum
+2351 fortress-purchase Player_1 AngmarFortressCitadel 0 Command_PurchaseUpgradeHaradFortressHegemony
+2381 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressSanctum
+3710 fortress-sample Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressSanctum
