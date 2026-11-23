@@ -19,3 +19,12 @@
 720 power Player_1 RivendellGandalfTheGrey_Summoned 0 SpecialAbilityWordOfPower
 910 destroy Player_1 RivendellGandalfTheGrey_Summoned 0
 910 destroy PlyrCreeps WizardBlastTarget 0
+930 create Player_1 RivendellGandalfTheGrey_Summoned 0 2460,910,0
+930 create PlyrCreeps WizardBlastTarget 0 2570,910,180
+930 create PlyrCreeps WizardBlastTarget 1 2600,930,180
+931 reveal Player_1 RivendellGandalfTheGrey_Summoned 0
+950 power Player_1 RivendellGandalfTheGrey_Summoned 0 SpecialAbilityLightningSword
+951 aim Player_1 RivendellGandalfTheGrey_Summoned 0 110,0
+1300 destroy Player_1 RivendellGandalfTheGrey_Summoned 0
+1300 destroy PlyrCreeps WizardBlastTarget 1
+1300 destroy PlyrCreeps WizardBlastTarget 0

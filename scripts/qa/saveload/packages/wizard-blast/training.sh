@@ -6,6 +6,10 @@ prepare() {
             print frame, "wizard-blast-probe Player_1 WizardBlastCaster 0 PlyrCreeps:WizardBlastTarget:0"
         for (frame = 720; frame <= 850; ++frame)
             print frame, "wizard-blast-probe Player_1 RivendellGandalfTheGrey_Summoned 0 PlyrCreeps:WizardBlastTarget:0"
+        for (frame = 951; frame <= 1260; ++frame) {
+            for (target = 0; target < 2; ++target)
+                print frame, "wizard-blast-probe Player_1 RivendellGandalfTheGrey_Summoned 0 PlyrCreeps:WizardBlastTarget:" target
+        }
     }'
 }
 
@@ -35,6 +39,15 @@ check() {
             expected[724] = "unpack=1 prepare=0"
             expected[777] = "unpack=1 prepare=0 weapon2=0 weapon3=0 hp=10000.0"
             expected[778] = "unpack=0 prepare=0 weapon2=0 weapon3=0 hp=9940.0"
+            expected[1032] = "unpack=1 prepare=0"
+            expected[1033] = "unpack=0 prepare=1"
+            volley["1042:0"] = "hp=10000.0"
+            volley["1043:0"] = "hp=9640.0"
+            volley["1043:1"] = "hp=10000.0"
+            volley["1061:1"] = "hp=10000.0"
+            volley["1062:1"] = "hp=9640.0"
+            volley["1223:0"] = "hp=7840.0"
+            volley["1223:1"] = "hp=8200.0"
         }
         /^TEST wizard-blast / {
             split($3, f, "=")
@@ -55,13 +68,26 @@ check() {
             }
             if (frame >= 724 && frame <= 778 && $17 != "weapon1=1")
                 next
+            if ((frame == 1032 || frame == 1033) && $20 != "packing1=1")
+                next
             if ((frame in expected) && index($0, expected[frame]))
                 delete expected[frame]
+            split($19, target, ":")
+            shot = frame ":" target[3]
+            if ((shot in volley) && $13 == volley[shot])
+                delete volley[shot]
         }
         END {
             for (frame in expected) {
                 if (frame >= first && frame <= end) {
                     print "Missing expected cast state at frame", frame, expected[frame]
+                    failed = 1
+                }
+            }
+            for (shot in volley) {
+                split(shot, fields, ":")
+                if (fields[1] >= first && fields[1] <= end) {
+                    print "Missing Lightning Sword target health at", shot, volley[shot]
                     failed = 1
                 }
             }
