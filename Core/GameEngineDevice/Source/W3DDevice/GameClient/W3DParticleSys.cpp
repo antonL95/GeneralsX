@@ -261,7 +261,7 @@ UnsignedInt W3DParticleSystemManager::drawGpuParticles(ParticleSystem &system)
 				{particle->getGpuSeed(), static_cast<Real>(corner)}
 			});
 		}
-		for (const unsigned index : {0, 2, 1, 0, 3, 2})
+		for (const unsigned index : {0, 1, 2, 0, 2, 3})
 			indices.push_back(static_cast<uint16_t>(base + index));
 		if (vertices.size() == MAX_POINTS_PER_GROUP * 4)
 			draw();
