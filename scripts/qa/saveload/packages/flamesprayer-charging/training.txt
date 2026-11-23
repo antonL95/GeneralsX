@@ -1,4 +1,4 @@
-186 create Player_1 RhunFlamesprayer 0 3400,420,0
+186 create Player_1 RhunFlamesprayer 0 3710,245,0
 187 pkg21-build-complete Player_1 RhunFlamesprayer 0
 193 create Player_1 MorgulBurghash 0 3610,420,0
 194 pkg21-build-complete Player_1 MorgulBurghash 0
