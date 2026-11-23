@@ -1,0 +1,18 @@
+20 create Player_1 WizardBlastCaster 0 3100,1220,180
+20 create PlyrCreeps WizardBlastTarget 0 3210,1220,180
+21 reveal Player_1 WizardBlastCaster 0
+22 objupgrade Player_1 WizardBlastCaster 0 Upgrade_GandalfWhite
+40 power Player_1 WizardBlastCaster 0 SpecialAbilityIstariLight
+41 aim Player_1 WizardBlastCaster 0 PlyrCreeps:WizardBlastTarget:0
+147 destroy Player_1 WizardBlastCaster 0
+147 destroy PlyrCreeps WizardBlastTarget 0
+150 create Player_1 EyeBeamCaster 0 3100,1220,0
+150 create PlyrCreeps WizardBlastTarget 0 3210,1220,180
+151 reveal Player_1 EyeBeamCaster 0
+161 orderattack Player_1 EyeBeamCaster 0 PlyrCreeps:WizardBlastTarget:0
+239 destroy Player_1 EyeBeamCaster 0
+239 destroy PlyrCreeps WizardBlastTarget 0
+242 create Player_1 LightBlastCaster 0 3100,1220,90
+242 create PlyrCreeps WizardBlastTarget 0 3100,1330,270
+243 reveal Player_1 LightBlastCaster 0
+245 orderattack Player_1 LightBlastCaster 0 PlyrCreeps:WizardBlastTarget:0

@@ -70,6 +70,7 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 {
 	if (!W3DDisplay::m_assetManager)
 		return;
+	const bool traceTargetMatrices = std::getenv("GENERALSX_TEST_PARTICLE_MODEL") != nullptr;
 	std::vector<RenderObjClass*> drawn;
 	for (ParticleSystem* system : systems)
 	{
@@ -95,11 +96,17 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 			if (!model)
 				break;
 			Matrix3D transform(true);
-			if (const Matrix3D* target = system->getRetailTargetMatrix())
+			const Matrix3D* target = system->getRetailTargetMatrix();
+			if (target)
 				transform = *target;
-			transform.Rotate_Z(particle->getAngle());
+			const Real angle = particle->getAngle();
+			transform.Rotate_Z(target ? -angle : angle);
 			transform.Scale(size.x, size.y, size.z);
 			transform.Set_Translation(Vector3(position->x, position->y, position->z));
+			if (target && traceTargetMatrices)
+				std::fprintf(stderr, "TEST particle-model %u %s y-axis=%.5f,%.5f,%.5f\n",
+					TheGameClient->getFrame(), system->getTemplate()->getName().str(),
+					transform[0][1], transform[1][1], transform[2][1]);
 			model->Set_Transform(transform);
 			model->Set_Animation_Opacity(opacity);
 			unsigned tint = 0xFFFFFFFF;
