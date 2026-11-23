@@ -120,7 +120,7 @@ def render(build, output, state, map_path, frames, camera_frames, end_frame, com
     for frame in frames:
         env[f"PLAYTEST_PNG_{frame}"] = str(output / f"frame-{frame:04d}.png")
     argv = [
-        "timeout", "--signal=INT", "--kill-after=10", str(checks.get("engine_timeout", 225)), "xvfb-run", "-a",
+        "timeout", "--signal=INT", "--kill-after=10", env.get("PLAYTEST_TIMEOUT_SECONDS", str(checks.get("engine_timeout", 225))), "xvfb-run", "-a",
         "-s", f"-screen 0 {width}x{height}x24",
         "gdb", "-q", "-nx", "-batch", "-return-child-result",
         "-x", str(ROOT / "start.gdb"), "-ex", f"source {ROOT / 'capture.py'}", "-ex", "run",
