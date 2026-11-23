@@ -1,0 +1,6 @@
+20 create Player_1 RivendellGilGalad 0 3055,900,0
+20 create Player_1 RivendellFingolfin 0 3115,900,0
+21 reveal Player_1 RivendellGilGalad 0
+60 particle-bone-sample Player_1 RivendellGilGalad 0 HoFUnitTrails
+68 objupgrade Player_1 RivendellGilGalad 0 Upgrade_HallOfFireGlowFixture
+120 particle-bone-sample Player_1 RivendellGilGalad 0 HoFUnitTrails
