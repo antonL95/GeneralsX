@@ -1,0 +1,8 @@
+20 create Player_1 TerrainFireRecoveryObserver 0 951,2151,0
+21 reveal Player_1 TerrainFireRecoveryObserver 0
+35 terrain-fire-state Player_1 TerrainFireRecoveryObserver 0 - 955 2155 0
+40 create Player_1 TerrainFireRecoveryLauncher 0 861,2151,0
+47 terrain-fire-state Player_1 TerrainFireRecoveryObserver 0 - 955 2155 0
+55 destroy Player_1 TerrainFireRecoveryLauncher 0
+100 terrain-fire-state Player_1 TerrainFireRecoveryObserver 0 - 955 2155 0
+220 terrain-fire-state Player_1 TerrainFireRecoveryObserver 0 - 955 2155 0

@@ -1,0 +1,15 @@
+190 create Player_1 TerrainFireFixtureObserver 0 2601,451,0
+193 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2605 455 0
+200 create Player_1 TerrainFireFixtureLauncher 0 2511,451,0
+225 destroy Player_1 TerrainFireFixtureLauncher 0
+243 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2605 455 0
+245 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2605 455 0
+275 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2605 455 0
+330 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2605 455 0
+1000 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2605 455 0
+1030 create Player_1 TerrainFireFixtureDirectionalLauncher 0 2514.75,534.95,0
+1037 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2595 535 0
+1037 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2605 535 0
+1037 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2615 535 0
+1040 destroy Player_1 TerrainFireFixtureDirectionalLauncher 0
+1041 destroy Player_1 TerrainFireFixtureObserver 0
