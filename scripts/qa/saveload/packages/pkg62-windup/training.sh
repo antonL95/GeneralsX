@@ -21,7 +21,7 @@ check() {
         grep -E "^TEST pkg62 actor frame=480 name=HaradKaradd .* self=0 .* pos=160\.00,2980\.00," "$log"
     fi
     if covers 560; then
-        grep -E '^TEST pkg62 slot frame=556 name=Pkg62RandomActor slot=0 active=1 weapon=Pkg62RandomOnly pre=[1-9][0-9]* shot=0 ' "$log"
+        grep -E '^TEST pkg62 slot frame=556 name=Pkg62RandomActor slot=0 active=1 weapon=Pkg62RandomOnly pre=(0 shot=555|(55[6-9]|5[6-9][0-9]|60[0-9]|61[0-5]) shot=0) ' "$log"
         grep -E '^TEST pkg62 slot frame=560 name=Pkg62RandomControlActor slot=0 active=1 weapon=Pkg62RandomControl pre=0 shot=555 ' "$log"
     fi
     if covers 656; then
