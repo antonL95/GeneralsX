@@ -142,7 +142,7 @@ public:
 class ModelConditionSpecialAbilityUpdateModuleData : public SpecialAbilityUpdateModuleData
 {
 public:
-	Int m_whichSpecialPower = 0;
+	Int m_whichSpecialPower = 1;
 	Bool m_generateTerror = FALSE;
 	Bool m_generateUncontrollableFear = FALSE;
 	Real m_emotionPulseRadius = 0.0f;
