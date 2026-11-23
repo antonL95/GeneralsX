@@ -40,6 +40,8 @@ public:
 	ModelConditionFlagType m_conditionFlag;
 	ModelConditionFlags m_addConditions;
 	ModelConditionFlags m_removeConditions;
+	Int m_tempCondition = MODELCONDITION_INVALID;
+	Real m_tempConditionTime = 0.0f;
 
 	ModelConditionUpgradeModuleData();
 

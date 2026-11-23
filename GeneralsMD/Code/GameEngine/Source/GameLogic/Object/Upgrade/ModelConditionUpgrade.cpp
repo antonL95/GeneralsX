@@ -30,8 +30,12 @@
 
 #include "GameLogic/Module/ModelConditionUpgrade.h"
 
+#include <limits>
+
 #include "Common/ModuleFactory.h"
 #include "Common/ModelState.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/SpecialPowerINI.h"
 #include "GameLogic/Object.h"
 
 // ------------------------------------------------------------------------------------------------
@@ -59,6 +63,8 @@ void ModelConditionUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{
 			{ "AddConditionFlags", ModelConditionFlags::parseFromINI, nullptr, offsetof(ModelConditionUpgradeModuleData, m_addConditions) },
 			{ "RemoveConditionFlags", ModelConditionFlags::parseFromINI, nullptr, offsetof(ModelConditionUpgradeModuleData, m_removeConditions) },
+			{ "AddTempConditionFlag", parseSpecialPowerModelCondition, nullptr, offsetof(ModelConditionUpgradeModuleData, m_tempCondition) },
+			{ "TempConditionTime", INI::parseReal, nullptr, offsetof(ModelConditionUpgradeModuleData, m_tempConditionTime) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(retailFields);
@@ -89,6 +95,12 @@ void ModelConditionUpgrade::upgradeImplementation()
 		me->setModelConditionState(data->m_conditionFlag);
 	if (data->m_addConditions.any() || data->m_removeConditions.any())
 		me->clearAndSetModelConditionFlags(data->m_removeConditions, data->m_addConditions);
+	if (RetailFileLayers::enabled() && data->m_tempCondition != MODELCONDITION_INVALID)
+	{
+		const Real frames = data->m_tempConditionTime * LOGICFRAMES_PER_SECONDS_REAL;
+		if (frames >= 1.0f && frames < static_cast<Real>(std::numeric_limits<UnsignedInt>::max()))
+			me->setTimedModelCondition(static_cast<ModelConditionFlagType>(data->m_tempCondition), static_cast<UnsignedInt>(frames));
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

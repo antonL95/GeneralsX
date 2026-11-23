@@ -169,8 +169,8 @@ void SubObjectsUpgrade::applyUpgrade(Bool animate)
 	Drawable *draw = obj->getDrawable();
 	if( draw )
 	{
-		const Real fade = animate ? data->m_fadeTimeInSeconds * LOGICFRAMES_PER_SECOND : 0.0f;
-		const Real wait = animate ? data->m_waitBeforeFadeInSeconds * LOGICFRAMES_PER_SECOND : 0.0f;
+		const Real fade = animate ? data->m_fadeTimeInSeconds * LOGICFRAMES_PER_SECONDS_REAL : 0.0f;
+		const Real wait = animate ? data->m_waitBeforeFadeInSeconds * LOGICFRAMES_PER_SECONDS_REAL : 0.0f;
 		std::vector<AsciiString>::const_iterator subObjectName;
 		Bool updateSubObjects = false;
 
@@ -211,8 +211,8 @@ Bool SubObjectsUpgrade::resetUpgrade(const UpgradeMaskType& keyMask)
 	if (Drawable* draw = getObject()->getDrawable())
 	{
 		const Bool animate = canFade();
-		const Real fade = animate ? data->m_fadeTimeInSeconds * LOGICFRAMES_PER_SECOND : 0.0f;
-		const Real wait = animate ? data->m_waitBeforeFadeInSeconds * LOGICFRAMES_PER_SECOND : 0.0f;
+		const Real fade = animate ? data->m_fadeTimeInSeconds * LOGICFRAMES_PER_SECONDS_REAL : 0.0f;
+		const Real wait = animate ? data->m_waitBeforeFadeInSeconds * LOGICFRAMES_PER_SECONDS_REAL : 0.0f;
 		if (data->m_hideSubObjectsOnRemove)
 		{
 			for (const AsciiString& name : data->m_showSubObjectNames)

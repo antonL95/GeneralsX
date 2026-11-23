@@ -1646,14 +1646,22 @@ void Object::clearAndSetModelConditionFlags( const ModelConditionFlags& clr, con
 // animations. Setting a special state will automatically clear any other
 // special states that may be turned on so you can only have one at a time.
 //=============================================================================
-void Object::scheduleSMCHelper()
+UnsignedInt Object::nextSpecialModelConditionFrame() const
 {
 	UnsignedInt nextFrame = m_smcUntil;
 	if (RetailFileLayers::enabled() && m_invulnerableUntil != NEVER &&
 		(nextFrame == NEVER || m_invulnerableUntil < nextFrame))
 		nextFrame = m_invulnerableUntil;
+	for (const auto& entry : m_timedModelConditions)
+		if (nextFrame == NEVER || entry.second < nextFrame)
+			nextFrame = entry.second;
+	return nextFrame;
+}
+
+void Object::scheduleSMCHelper()
+{
 	if (m_smcHelper)
-		m_smcHelper->sleepUntil(nextFrame);
+		m_smcHelper->sleepUntil(nextSpecialModelConditionFrame());
 }
 
 void Object::setSpecialModelConditionState( ModelConditionFlagType set, UnsignedInt frames )
@@ -1692,6 +1700,23 @@ void Object::setTempInvulnerable(UnsignedInt frames)
 	scheduleSMCHelper();
 }
 
+void Object::setTimedModelCondition(ModelConditionFlagType condition, UnsignedInt frames)
+{
+	if (!RetailFileLayers::enabled() || condition == MODELCONDITION_INVALID || frames == 0)
+		return;
+	const UnsignedInt expiry = TheGameLogic->getFrame() + frames;
+	const auto existing = std::find_if(m_timedModelConditions.begin(), m_timedModelConditions.end(),
+		[&](const auto& entry) { return entry.first == condition; });
+	if (existing == m_timedModelConditions.end())
+	{
+		m_timedModelConditions.emplace_back(condition, expiry);
+		setModelConditionState(condition);
+	}
+	else
+		existing->second = std::max(existing->second, expiry);
+	scheduleSMCHelper();
+}
+
 UpdateSleepTime Object::updateSpecialModelConditions()
 {
 	if (!RetailFileLayers::enabled())
@@ -1710,9 +1735,13 @@ UpdateSleepTime Object::updateSpecialModelConditions()
 		clearModelConditionFlags(MAKE_MODELCONDITION_MASK(MODELCONDITION_INVULNERABLE));
 		m_invulnerableUntil = NEVER;
 	}
-	UnsignedInt nextFrame = m_smcUntil;
-	if (m_invulnerableUntil != NEVER && (nextFrame == NEVER || m_invulnerableUntil < nextFrame))
-		nextFrame = m_invulnerableUntil;
+	std::erase_if(m_timedModelConditions, [&](const auto& entry) {
+		if (entry.second > now)
+			return false;
+		clearModelConditionState(static_cast<ModelConditionFlagType>(entry.first));
+		return true;
+	});
+	const UnsignedInt nextFrame = nextSpecialModelConditionFrame();
 	if (nextFrame == NEVER)
 		return UPDATE_SLEEP_FOREVER;
 	return UPDATE_SLEEP(nextFrame - now);
@@ -5259,7 +5288,7 @@ void Object::setDominationState(const DominationState& state)
 void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	const Bool loading = xfer->getXferMode() == XFER_LOAD;
-	if (!loading && m_domination.deadline == 0)
+	if (!loading && m_domination.deadline == 0 && m_timedModelConditions.empty())
 	{
 		RetailSaveBlocks::transferSection<Xfer>(xfer, FALSE, present, {});
 		return;
@@ -5270,7 +5299,18 @@ void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferObjectID(&m_domination.caster);
 			x->xferUnsignedInt(&m_domination.deadline);
 			x->xferUnsignedInt(&m_domination.nextCheck);
-		}, [this] { m_domination = {}; }}
+		}, [this] { m_domination = {}; }},
+		{"timed-model-conditions", [this, loading](Xfer* x) {
+			UnsignedInt count = m_timedModelConditions.size();
+			x->xferUnsignedInt(&count);
+			if (loading)
+				m_timedModelConditions.resize(count);
+			for (auto& [condition, expiry] : m_timedModelConditions)
+			{
+				x->xferInt(&condition);
+				x->xferUnsignedInt(&expiry);
+			}
+		}, [this] { m_timedModelConditions.clear(); }},
 	});
 }
 
@@ -5328,7 +5368,8 @@ void Object::loadPostProcess()
 		m_containedBy = TheGameLogic->findObjectByID(m_xferContainedByID);
 	else
 		m_containedBy = nullptr;
-	if (RetailFileLayers::enabled() && (m_smcUntil != NEVER || m_invulnerableUntil != NEVER))
+	if (RetailFileLayers::enabled() &&
+		(m_smcUntil != NEVER || m_invulnerableUntil != NEVER || !m_timedModelConditions.empty()))
 		scheduleSMCHelper();
 }
 

@@ -1,0 +1,8 @@
+40 create Player_1 FortressTimingFixture 0 2550,1900,0
+55 conditions Player_1 FortressTimingFixture 0
+60 fortress-purchase Player_1 FortressTimingFixture 0 Command_FortressTimingFixture
+120 conditions Player_1 FortressTimingFixture 0
+244 conditions Player_1 FortressTimingFixture 0
+245 conditions Player_1 FortressTimingFixture 0
+310 conditions Player_1 FortressTimingFixture 0
+365 conditions Player_1 FortressTimingFixture 0

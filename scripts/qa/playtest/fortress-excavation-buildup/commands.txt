@@ -1,0 +1,6 @@
+5 sweep-setup Player_1 - 0
+10 player Player_1 - 0
+30 fortress-sample Player_1 IsengardFortressCitadel 0 Upgrade_IsengardFortressExcavations
+33 fortress-purchase Player_1 IsengardFortressCitadel 0 Command_PurchaseUpgradeIsengardFortressExcavations
+63 fortress-sample Player_1 IsengardFortressCitadel 0 Upgrade_IsengardFortressExcavations
+492 fortress-sample Player_1 IsengardFortressCitadel 0 Upgrade_IsengardFortressExcavations

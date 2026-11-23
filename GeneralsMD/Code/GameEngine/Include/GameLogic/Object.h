@@ -562,6 +562,7 @@ public:
 	void setSpecialModelConditionState( ModelConditionFlagType set, UnsignedInt frames = 0 );
 	void clearSpecialModelConditionStates();
 	void setTempInvulnerable(UnsignedInt frames);
+	void setTimedModelCondition(ModelConditionFlagType condition, UnsignedInt frames);
 	UpdateSleepTime updateSpecialModelConditions();
 
 	// set and/or clear multiple modelcondition flags
@@ -772,6 +773,8 @@ private:
 
 	UnsignedInt		m_smcUntil;
 	UnsignedInt		m_invulnerableUntil;
+	std::vector<std::pair<Int, UnsignedInt>> m_timedModelConditions;
+	UnsignedInt nextSpecialModelConditionFrame() const;
 	void scheduleSMCHelper();
 
 	enum { NUM_SLEEP_HELPERS = 9 };

@@ -45,11 +45,14 @@ def check_purchases(log, faction, fortress, purchases, draw=True):
     failures = []
     for row in purchases:
         upgrade = row["upgrade"]
+        temporary_flags = row.get("temporary", "-").split(",")
+        expected_art = row["art"].split(",") if row["art"] != "-" else ()
         expected_order = (row["button"], upgrade, "available=1", f"frames={row['build_frames']}")
         if orders.get(row["order"]) != expected_order:
             failures.append(f"{upgrade} order at {row['order']}: {orders.get(row['order'])}")
-        for phase, queued, complete in (("before", 0, 0), ("during", 1, 0), ("after", 0, 1)):
-            frame = row[phase]
+        for phase, queued, complete in (("before", 0, 0), ("during", 1, 0),
+                                         ("buildup", 0, 1), ("after", 0, 1)):
+            frame = row.get(phase, "-")
             if frame == "-":
                 continue
             state = states.get(frame)
@@ -59,9 +62,13 @@ def check_purchases(log, faction, fortress, purchases, draw=True):
                 art = draws.get((frame, state[1]))
                 if not art:
                     failures.append(f"{upgrade} {phase} at {frame}: missing fortress draw")
-                elif row["art"] != "-":
-                    for expected in row["art"].split(","):
-                        if (expected in art) != bool(complete):
-                            failures.append(f"{upgrade} {phase} at {frame}: unexpected state for {expected}")
+                else:
+                    for flag in temporary_flags:
+                        if flag != "-" and (f"flag={flag}" in art) != (phase == "buildup"):
+                            failures.append(f"{upgrade} {phase} at {frame}: unexpected temporary flag {flag}")
+                    if phase != "buildup":
+                        for expected in expected_art:
+                            if (expected in art) != (phase == "after"):
+                                failures.append(f"{upgrade} {phase} at {frame}: unexpected state for {expected}")
     if failures:
         raise RuntimeError("\n".join(failures))
