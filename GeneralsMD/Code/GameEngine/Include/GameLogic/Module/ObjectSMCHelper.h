@@ -53,5 +53,6 @@ public:
 	// virtual destructor prototype provided by memory pool object
 
 	virtual UpdateSleepTime update() override;
+	DisabledMaskType getDisabledTypesToProcess() const override;
 
 };

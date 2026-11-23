@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/ObjectSMCHelper.h"
@@ -45,6 +46,11 @@ ObjectSMCHelper::~ObjectSMCHelper()
 UpdateSleepTime ObjectSMCHelper::update()
 {
 	return getObject()->updateSpecialModelConditions();
+}
+
+DisabledMaskType ObjectSMCHelper::getDisabledTypesToProcess() const
+{
+	return RetailFileLayers::enabled() ? DISABLEDMASK_ALL : ObjectHelper::getDisabledTypesToProcess();
 }
 
 // ------------------------------------------------------------------------------------------------

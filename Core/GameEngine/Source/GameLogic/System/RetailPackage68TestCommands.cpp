@@ -68,6 +68,16 @@ void handlePackage68(const RetailTestCommands::Context& ctx)
 			source->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE),
 			damage.out.m_actualDamageDealt);
 	}
+	else if (ctx.action == "pkg68-script-disable")
+	{
+		source->setScriptStatus(OBJECT_STATUS_SCRIPT_DISABLED);
+	}
+	else if (ctx.action == "pkg68-protection")
+	{
+		std::fprintf(stderr, "PKG68 protection frame=%u unit=%s disabled=%d protected=%d\n",
+			ctx.frame, source->getTemplate()->getName().str(), source->isDisabledByType(DISABLED_SCRIPT_DISABLED),
+			source->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE));
+	}
 }
 }
 #endif

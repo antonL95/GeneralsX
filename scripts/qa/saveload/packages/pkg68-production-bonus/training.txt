@@ -1,5 +1,7 @@
 200 create Player_1 Pkg68ProtectedPit 0 1300,1280,0
+200 create Player_1 Pkg68DisabledPit 0 1900,800,0
 209 queue Player_1 Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
+209 queue Player_1 Pkg68DisabledPit 0 Pkg68DisabledRecruit
 211 create Player_1 MordorOrcPit 0 660,1280,0
 211 create Player_1 MordorOrcPit 1 980,1280,0
 211 create Player_1 MordorOrcPit 2 1140,1280,0
@@ -16,17 +18,25 @@
 240 pkg68-spawn Player_1 Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
 241 pkg68-spawn Player_1 Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
 242 pkg68-spawn Player_1 Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
+242 pkg68-script-disable Player_1 Pkg68DisabledRecruit 0
 243 pkg68-state Player_1 MordorOrcPit 0 MordorFighterHorde
 244 pkg68-state Player_1 MordorOrcPit 0 MordorFighterHorde
 244 pkg68-state Player_1 MordorOrcPit_WotR 0 MordorFighterHorde_WOTRBattle
+244 pkg68-protection Player_1 Pkg68DisabledRecruit 0
 257 pkg68-spawn Player_1 MordorOrcPit 0 MordorFighterHorde
 258 pkg68-spawn Player_1 MordorOrcPit 0 MordorFighterHorde
 270 pkg68-state Player_1 MordorOrcPit 0 MordorFighterHorde
 418 pkg68-hit Player_1 Pkg68ProtectedRecruit 0 slash
 419 pkg68-hit Player_1 Pkg68ProtectedRecruit 0 unresistable
 420 pkg68-hit Player_1 Pkg68ProtectedRecruit 0 slash
+420 pkg68-protection Player_1 Pkg68DisabledRecruit 0
+420 pkg68-hit Player_1 Pkg68DisabledRecruit 0 slash
 421 pkg68-hit Player_1 Pkg68ProtectedRecruit 0 slash
+421 pkg68-protection Player_1 Pkg68DisabledRecruit 0
+421 pkg68-hit Player_1 Pkg68DisabledRecruit 0 slash
 435 destroy Player_1 Pkg68ProtectedPit 0
+435 destroy Player_1 Pkg68DisabledPit 0
+435 destroy Player_1 Pkg68DisabledRecruit 0
 971 pkg68-spawn Player_1 MordorOrcPit_WotR 0 MordorFighterHorde_WOTRBattle
 972 pkg68-spawn Player_1 MordorOrcPit_WotR 0 MordorFighterHorde_WOTRBattle
 973 pkg68-spawn Player_1 MordorOrcPit_WotR 0 MordorFighterHorde_WOTRBattle
