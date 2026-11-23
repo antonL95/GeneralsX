@@ -5852,7 +5852,11 @@ void Object::adjustModelConditionForWeaponStatus()
 		else if (m_drawable)
 		{
 			m_drawable->updateDrawableClipStatus( w->getRemainingAmmo(), w->getClipSize(), w->getWeaponSlot() );
-			if (!retail && conditionToSet != WSF_INVALID && conditionToSet != m_lastWeaponCondition[i])
+			if (retail && conditionToSet == WSF_FIRING && i == m_weaponSet.getCurWeaponSlot() && w->getLastShotFrame() == now)
+			{
+				m_drawable->setWeaponTimingDuration(weaponTimingFrames(w, conditionToSet, now));
+			}
+			else if (!retail && conditionToSet != WSF_INVALID && conditionToSet != m_lastWeaponCondition[i])
 			{
 				m_lastWeaponCondition[i] = conditionToSet;
 				ModelConditionFlags c = m_weaponSet.getModelConditionForWeaponSlot((WeaponSlotType)i, conditionToSet);

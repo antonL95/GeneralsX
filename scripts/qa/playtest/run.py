@@ -62,10 +62,10 @@ def read_scenario(name):
         raise ValueError("The first camera command must run before the first capture")
     commands.sort(key=lambda line: int(line.split()[0]))
     commands.append(f"{end_frame} quit - - 0")
-    return map_path, frames, camera_frames, end_frame, commands, render_from
+    return map_path, frames, camera_frames, end_frame, commands, render_from, fixture / "map.ini"
 
 
-def render(build, output, state, map_path, frames, camera_frames, end_frame, commands, render_from, checks):
+def render(build, output, state, map_path, frames, camera_frames, end_frame, commands, render_from, map_additions, checks):
     configured = build / "CMakeCache.txt"
     source = ROOT.parents[2]
     if f"CMAKE_HOME_DIRECTORY:INTERNAL={source}" not in configured.read_text().splitlines():
@@ -83,6 +83,9 @@ def render(build, output, state, map_path, frames, camera_frames, end_frame, com
     for asset in map_path.parent.iterdir():
         if asset.is_file():
             shutil.copyfile(asset, map_dir / asset.name.lower())
+    if map_additions.is_file():
+        with (map_dir / "map.ini").open("ab") as stream:
+            stream.write(b"\n" + map_additions.read_bytes())
     map_path = map_dir / map_path.name.lower()
     commands_path = state / "commands.txt"
     commands_path.write_text("\n".join(commands) + "\n")
@@ -162,7 +165,7 @@ def make_media(output, frames):
 def main():
     build = Path(sys.argv[1])
     scenario = read_scenario(sys.argv[2])
-    _, frames, _, end_frame, _, _ = scenario
+    frames, end_frame = scenario[1], scenario[3]
     check_path = ROOT / sys.argv[2] / "check.py"
     checks = runpy.run_path(str(check_path)) if check_path.is_file() else {}
     with tempfile.TemporaryDirectory(prefix="playtest-", dir=build) as temp:
