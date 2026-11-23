@@ -833,6 +833,9 @@ WinInputReturnCode GameWindowManager::winProcessMouseEvent( GameWindowMessage ms
 	GameWindow *toolTipWindow = nullptr;
 	Int dx, dy;
 	Bool clearGrabWindow = FALSE;
+	const WindowMsgData buttonEvent = msg == GWM_LEFT_DOUBLE_CLICK ? GWM_LEFT_DOUBLE_CLICK : 0;
+	if (buttonEvent)
+		msg = GWM_LEFT_DOWN;
 
 	// pack mouse coords into one entity for message passing
 	packedMouseCoords = SHORTTOLONG( mousePos->x, mousePos->y );
@@ -863,7 +866,7 @@ WinInputReturnCode GameWindowManager::winProcessMouseEvent( GameWindowMessage ms
 				while( win != nullptr )
 				{
 
-					if( winSendInputMsg( win, msg, packedMouseCoords, 0 ) == MSG_HANDLED )
+					if( winSendInputMsg( win, msg, packedMouseCoords, buttonEvent ) == MSG_HANDLED )
 					{
 
 						// if used clear the event
@@ -885,7 +888,7 @@ WinInputReturnCode GameWindowManager::winProcessMouseEvent( GameWindowMessage ms
 			{
 
 				// if used clear the event
-				if(	winSendInputMsg( m_mouseCaptor, msg, packedMouseCoords, 0 ) == MSG_HANDLED )
+				if(	winSendInputMsg( m_mouseCaptor, msg, packedMouseCoords, buttonEvent ) == MSG_HANDLED )
 					returnCode = WIN_INPUT_USED;
 
 			}
@@ -1045,7 +1048,7 @@ WinInputReturnCode GameWindowManager::winProcessMouseEvent( GameWindowMessage ms
 
 					// Give everyone a chance to do something with the clicks
 					GameWindow *oldLoneWindow = m_loneWindow;
-					while( winSendInputMsg( tempWin, msg, packedMouseCoords, 0 ) == MSG_IGNORED )
+					while( winSendInputMsg( tempWin, msg, packedMouseCoords, buttonEvent ) == MSG_IGNORED )
 					{
 
 						tempWin = tempWin->m_parent;

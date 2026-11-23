@@ -107,6 +107,7 @@ struct BarState
 	Bool populated = FALSE;
 	Int pressed = ButtonNone;
 	ObjectID pressedHero = INVALID_ID;
+	Bool pressedDouble = FALSE;
 	UnsignedInt builderTime = 0;
 	ObjectID builder = INVALID_ID;
 	std::array<DisplayString *, MaxHeroes> levelText = {};
@@ -521,7 +522,11 @@ void activate(Int button, Bool center)
 		return;
 	if (s_bar.slots[button].builder)
 	{
-		selectNearestBuilder();
+		Object* builder = center ? TheGameLogic->findObjectByID(s_bar.builder) : nullptr;
+		if (builder && builder->isSelectable())
+			selectObject(builder, TRUE);
+		else
+			selectNearestBuilder();
 		return;
 	}
 	selectObject(TheGameLogic->findObjectByID(s_bar.slots[button].id), center);
@@ -748,8 +753,10 @@ void drawHeroBar(GameWindow *, WinInstanceData *)
 		drawHero(s_bar.slots[i], i, origin, scale, now, hovered == i);
 }
 
-WindowMsgHandledType heroBarInput(GameWindow *, UnsignedInt msg, WindowMsgData mData1, WindowMsgData)
+WindowMsgHandledType heroBarInput(GameWindow *, UnsignedInt msg, WindowMsgData mData1, WindowMsgData buttonEvent)
 {
+	if (buttonEvent == GWM_LEFT_DOUBLE_CLICK)
+		msg = GWM_LEFT_DOUBLE_CLICK;
 	return RetailHeroBar::handleInput(msg, mData1 & 0xFFFF, mData1 >> 16) ? MSG_HANDLED : MSG_IGNORED;
 }
 
@@ -811,6 +818,7 @@ void reset()
 	s_bar.populated = FALSE;
 	s_bar.pressed = ButtonNone;
 	s_bar.pressedHero = INVALID_ID;
+	s_bar.pressedDouble = FALSE;
 	s_bar.builder = INVALID_ID;
 	s_bar.builderTime = 0;
 	s_bar.shownLevel.fill(-1);
@@ -849,23 +857,23 @@ Bool handleInput(UnsignedInt msg, Int x, Int y)
 	switch (msg)
 	{
 		case GWM_LEFT_DOWN:
+		case GWM_LEFT_DOUBLE_CLICK:
 			s_bar.pressed = button;
 			s_bar.pressedHero = button >= 0 ? s_bar.slots[button].id : INVALID_ID;
+			s_bar.pressedDouble = msg == GWM_LEFT_DOUBLE_CLICK;
 			return button != ButtonNone;
 		case GWM_LEFT_UP:
 		{
 			const Int pressed = s_bar.pressed;
 			const ObjectID pressedHero = s_bar.pressedHero;
+			const Bool pressedDouble = s_bar.pressedDouble;
 			s_bar.pressed = ButtonNone;
 			s_bar.pressedHero = INVALID_ID;
+			s_bar.pressedDouble = FALSE;
 			if (button == pressed && (button == ButtonSelectHeroes || (button >= 0 && s_bar.slots[button].id == pressedHero)))
-				activate(button, FALSE);
+				activate(button, pressedDouble);
 			return button != ButtonNone || pressed != ButtonNone;
 		}
-		case GWM_LEFT_DOUBLE_CLICK:
-			if (button != ButtonNone)
-				activate(button, TRUE);
-			return button != ButtonNone;
 		case GWM_LEFT_DRAG:
 		case GWM_RIGHT_DOWN:
 		case GWM_RIGHT_UP:

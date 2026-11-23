@@ -94,9 +94,10 @@ static GameWindowMessage rawMouseToWindowMessage( const GameMessage *msg )
 			break;
 
 		// ------------------------------------------------------------------------
-		// Strange, but true. The window stuff really doesn't care about double clicks, so just
-		// treat it as a down click.. Kinda like a second click.
 		case GameMessage::MSG_RAW_MOUSE_LEFT_DOUBLE_CLICK:
+			gwm = RetailFileLayers::enabled() ? GWM_LEFT_DOUBLE_CLICK : GWM_LEFT_DOWN;
+			break;
+
 		case GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN:
 			gwm = GWM_LEFT_DOWN;
 			break;
@@ -251,11 +252,12 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 			// process the mouse event position
 			GameWindowMessage gwm = rawMouseToWindowMessage( msg );
 			const Bool overTray = TheControlBar && TheControlBar->isOverRetailTray(mousePos.x, mousePos.y);
-			if (!overTray && (gwm == GWM_LEFT_DOWN || gwm == GWM_RIGHT_DOWN) && TheControlBar)
+			const Bool leftPress = gwm == GWM_LEFT_DOWN || gwm == GWM_LEFT_DOUBLE_CLICK;
+			if (!overTray && (leftPress || gwm == GWM_RIGHT_DOWN) && TheControlBar)
 				TheControlBar->closeRetailTray();
 			if( TheWindowManager )
 				returnCode = TheWindowManager->winProcessMouseEvent( gwm, &mousePos, nullptr );
-			if (overTray && (gwm == GWM_LEFT_DOWN || gwm == GWM_LEFT_UP || gwm == GWM_RIGHT_DOWN || gwm == GWM_RIGHT_UP))
+			if (overTray && (leftPress || gwm == GWM_LEFT_UP || gwm == GWM_RIGHT_DOWN || gwm == GWM_RIGHT_UP))
 				returnCode = WIN_INPUT_USED;
 
 			if( TheShell && TheShell->isShellActive() )

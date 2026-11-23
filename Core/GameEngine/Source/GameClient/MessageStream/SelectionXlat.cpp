@@ -1180,7 +1180,9 @@ GameMessageDisposition SelectionTranslator::onMetaSelectTeam(MAYBE_UNUSED const 
 	{
 		DEBUG_LOG(("META: select team %d",group));
 
-		UnsignedInt now = timeGetTime();
+		const Bool retail = RetailFileLayers::enabled();
+		const UnsignedInt now = retail ? TheGameLogic->getFrame() : timeGetTime();
+		const UnsignedInt doubleTapTime = retail ? LOGICFRAMES_PER_SECOND : TheGlobalData->m_doubleClickTimeMS;
 		if ( m_lastGroupSelTime == 0 )
 		{
 			m_lastGroupSelTime = now;
@@ -1189,7 +1191,7 @@ GameMessageDisposition SelectionTranslator::onMetaSelectTeam(MAYBE_UNUSED const 
 		Bool performSelection = TRUE;
 
 		// check for double-press to jump view
-		if ( now - m_lastGroupSelTime < TheGlobalData->m_doubleClickTimeMS && group == m_lastGroupSelGroup )
+		if (now - m_lastGroupSelTime < doubleTapTime && group == m_lastGroupSelGroup)
 		{
 			DEBUG_LOG(("META: DOUBLETAP select team %d",group));
 			// TheSuperHackers @bugfix Stubbjax 26/05/2025 Perform selection on double-press
@@ -1206,9 +1208,12 @@ GameMessageDisposition SelectionTranslator::onMetaSelectTeam(MAYBE_UNUSED const 
 					if (numObjs > 0)
 					{
 						// if there's someone in the group, center the camera on them.
-						Drawable* drawable = objlist[numObjs - 1]->getDrawable();
-						TheTacticalView->userLookAt( drawable->getPosition() );
 						performSelection = !TheInGameUI->areAllObjectsSelected( objlist );
+						if (!retail || !performSelection)
+						{
+							if (const Drawable* drawable = objlist.back()->getDrawable())
+								TheTacticalView->userLookAt(drawable->getPosition());
+						}
 					}
 				}
 			}
@@ -1252,7 +1257,9 @@ GameMessageDisposition SelectionTranslator::onMetaAddTeam(MAYBE_UNUSED const Gam
 	{
 		DEBUG_LOG(("META: select team %d",group));
 
-		UnsignedInt now = timeGetTime();
+		const Bool retail = RetailFileLayers::enabled();
+		const UnsignedInt now = retail ? TheGameLogic->getFrame() : timeGetTime();
+		const UnsignedInt doubleTapTime = retail ? LOGICFRAMES_PER_SECOND : TheGlobalData->m_doubleClickTimeMS;
 		if ( m_lastGroupSelTime == 0 )
 		{
 			m_lastGroupSelTime = now;
@@ -1260,7 +1267,7 @@ GameMessageDisposition SelectionTranslator::onMetaAddTeam(MAYBE_UNUSED const Gam
 
 		// check for double-press to jump view
 
-		if ( now - m_lastGroupSelTime < TheGlobalData->m_doubleClickTimeMS && group == m_lastGroupSelGroup )
+		if (now - m_lastGroupSelTime < doubleTapTime && group == m_lastGroupSelGroup)
 		{
 			DEBUG_LOG(("META: DOUBLETAP select team %d",group));
 			Player *player = ThePlayerList->getLocalPlayer();

@@ -245,7 +245,7 @@ Bool isMouseMessage(UnsignedInt msg)
 		|| msg == GWM_MIDDLE_DOWN || msg == GWM_MIDDLE_UP || msg == GWM_MOUSE_POS;
 }
 
-WindowMsgHandledType retailPalantirInput(GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData)
+WindowMsgHandledType retailPalantirInput(GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData buttonEvent)
 {
 	if (!isMouseMessage(msg))
 		return MSG_IGNORED;
@@ -260,7 +260,8 @@ WindowMsgHandledType retailPalantirInput(GameWindow *window, UnsignedInt msg, Wi
 		|| TheControlBar->isOverRetailSocket(px, py);
 	if (inside)
 		return MSG_HANDLED;
-	return RetailHeroBar::handleInput(msg, px, py) || RetailEdges::handleInput(msg, px, py) ? MSG_HANDLED : MSG_IGNORED;
+	const UnsignedInt heroMsg = buttonEvent == GWM_LEFT_DOUBLE_CLICK ? GWM_LEFT_DOUBLE_CLICK : msg;
+	return RetailHeroBar::handleInput(heroMsg, px, py) || RetailEdges::handleInput(msg, px, py) ? MSG_HANDLED : MSG_IGNORED;
 }
 
 WindowMsgHandledType retailPortraitInput(GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2)
