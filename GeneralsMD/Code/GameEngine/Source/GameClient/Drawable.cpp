@@ -1212,13 +1212,8 @@ void Drawable::updateDrawable(Real timeScale)
 
 	if (RetailFileLayers::enabled())
 	{
-		if (!m_retailConditionAudio)
-		{
-			const auto& entries = getTemplate()->getRotWKObjectData().clientBehaviors;
-			if (std::any_of(entries.begin(), entries.end(), [](const auto& entry)
-				{ return entry.audio && !entry.audio->loops.empty(); }))
-				m_retailConditionAudio = std::make_unique<RetailClientAudio::Loops>();
-		}
+		if (!m_retailConditionAudio && RetailClientAudio::Loops::hasLoops(*this))
+			m_retailConditionAudio = std::make_unique<RetailClientAudio::Loops>();
 		if (m_retailConditionAudio)
 			m_retailConditionAudio->update(*this);
 	}

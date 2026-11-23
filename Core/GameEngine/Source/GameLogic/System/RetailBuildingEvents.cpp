@@ -283,9 +283,23 @@ void dispatch(Object& object, const char* event)
 			return;
 		const std::string_view eventName(event);
 		const bool creation = eventName == "OnCreated";
-		if (creation && !std::all_of(found->second.begin(), found->second.end(), [](const Operation& operation)
+		if (creation && !std::all_of(found->second.begin(), found->second.end(), [&](const Operation& operation)
 		{
-			return operation.action == Action::Visibility || operation.action == Action::Roll;
+			if (operation.action != Action::Power)
+				return operation.action == Action::Visibility || operation.action == Action::Roll;
+
+			const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate(operation.name.c_str());
+			const auto* caster = object.getSpecialPowerModule(power);
+			if (!caster)
+				return false;
+
+			static const NameKeyType productionBonus = NAMEKEY("ProductionSpeedBonus");
+			for (BehaviorModule** module = object.getBehaviorModules(); *module; ++module)
+			{
+				if ((*module)->getModuleNameKey() == productionBonus && (*module)->getSpecialPower() == caster)
+					return true;
+			}
+			return false;
 		}))
 			return;
 		if (eventName == "OnBuildingComplete" && std::getenv("GENERALSX_TEST_COMMANDS"))

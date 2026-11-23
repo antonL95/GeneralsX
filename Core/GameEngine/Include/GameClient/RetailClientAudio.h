@@ -74,6 +74,7 @@ void trace(const char* action, ObjectID owner, const AsciiString& sound);
 class Loops
 {
 public:
+	static Bool hasLoops(const Drawable& drawable);
 	~Loops();
 	void update(const Drawable& drawable);
 

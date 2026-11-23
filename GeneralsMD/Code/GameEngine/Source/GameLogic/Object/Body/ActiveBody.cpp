@@ -368,6 +368,10 @@ Real ActiveBody::estimateDamage( DamageInfoInput& damageInfo ) const
 {
 	validateArmorAndDamageFX();
 
+	if (RetailFileLayers::enabled() &&
+		getObject()->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE))
+		return 0.0f;
+
 	//Subdual damage can't affect you if you can't be subdued
 	if( IsSubdualDamage(damageInfo.m_damageType)  &&  !canBeSubdued() )
 		return 0.0f;
@@ -389,11 +393,6 @@ Real ActiveBody::estimateDamage( DamageInfoInput& damageInfo ) const
 			return 0.0f;
 		}
 	}
-
-	if (RetailFileLayers::enabled() && damageInfo.m_damageType != DAMAGE_HEALING &&
-		damageInfo.m_damageType != DAMAGE_UNRESISTABLE &&
-		getObject()->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE))
-		return 0.0f;
 
 	const Bool flanked = RetailFileLayers::enabled() && damageInfo.m_damageType != DAMAGE_HEALING &&
 		damageInfo.m_damageType != DAMAGE_UNRESISTABLE &&
@@ -451,8 +450,7 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 	if( obj->isEffectivelyDead() )
 		return;
 
-	if (RetailFileLayers::enabled() && damageInfo->in.m_damageType != DAMAGE_HEALING &&
-		damageInfo->in.m_damageType != DAMAGE_UNRESISTABLE &&
+	if (RetailFileLayers::enabled() &&
 		obj->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE))
 		return;
 

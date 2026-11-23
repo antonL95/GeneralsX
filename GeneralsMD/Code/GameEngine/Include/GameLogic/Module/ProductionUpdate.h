@@ -151,6 +151,7 @@ public:
 	Bool m_setBonusModelConditionOnSpeedBonus = FALSE;
 	UnsignedInt m_unitInvulnerableTime = 0;
 	AsciiString m_bonusForType;
+	AsciiString m_speedBonusAudioLoop;
 	std::vector<RetailProductionModifier> m_retailModifiers;
 
 	ProductionUpdateModuleData();
@@ -221,6 +222,7 @@ public:
 	virtual ProductionUpdateInterface* getProductionUpdateInterface() override { return this; }
 	virtual DieModuleInterface* getDie() override { return this; }
 	static ProductionUpdateInterface *getProductionUpdateInterfaceFromObject( Object *obj );
+	static const AsciiString* getRetailSpeedBonusLoop(const Object& object, Bool activeOnly);
 
 	virtual CanMakeType canQueueCreateUnit( const ThingTemplate *unitType ) const override;
 	virtual CanMakeType canQueueUpgrade( const UpgradeTemplate *upgrade ) const override;

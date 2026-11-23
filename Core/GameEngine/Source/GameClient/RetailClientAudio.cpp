@@ -20,6 +20,10 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 
+#if !RTS_GENERALS
+#include "GameLogic/Module/ProductionUpdate.h"
+#endif
+
 namespace
 {
 using namespace RetailClientAudio;
@@ -301,6 +305,18 @@ Loops::~Loops()
 		stop(m_owner, sound, handle);
 }
 
+Bool Loops::hasLoops(const Drawable& drawable)
+{
+#if !RTS_GENERALS
+	const Object* object = drawable.getObject();
+	if (object && ProductionUpdate::getRetailSpeedBonusLoop(*object, FALSE))
+		return TRUE;
+#endif
+	const auto& entries = drawable.getTemplate()->getRotWKObjectData().clientBehaviors;
+	return std::any_of(entries.begin(), entries.end(), [](const auto& entry)
+		{ return entry.audio && !entry.audio->loops.empty(); });
+}
+
 void Loops::update(const Drawable& drawable)
 {
 	const Object* object = drawable.getObject();
@@ -308,6 +324,10 @@ void Loops::update(const Drawable& drawable)
 	if (object && !object->isEffectivelyDead())
 	{
 		m_owner = object->getID();
+#if !RTS_GENERALS
+		if (const auto* sound = ProductionUpdate::getRetailSpeedBonusLoop(*object, TRUE))
+			desired.insert(*sound);
+#endif
 		const auto& flags = drawable.getModelConditionFlags();
 		for (const auto& entry : drawable.getTemplate()->getRotWKObjectData().clientBehaviors)
 		{

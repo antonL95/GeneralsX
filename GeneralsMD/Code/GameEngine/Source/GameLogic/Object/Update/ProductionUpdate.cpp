@@ -36,6 +36,7 @@
 #include "Common/GameState.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "GameClient/RetailClientAudio.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include <algorithm>
@@ -143,6 +144,12 @@ Int scaleProductionValue(Int value, Real multiplier)
 		return std::numeric_limits<Int>::max();
 	return scaled > 0.0f ? static_cast<Int>(scaled) : 0;
 }
+
+Bool hasSpeedBonus(const Object& producer, const ProductionUpdateModuleData& data)
+{
+	const Player* owner = producer.getControllingPlayer();
+	return owner && data.m_bonusForType.isNotEmpty() && owner->getPowerProductionSpeed(data.m_bonusForType) > 1.0f;
+}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -186,6 +193,7 @@ Int scaleProductionValue(Int value, Real multiplier)
 			{ "ProductionModifier", parseRetailProductionModifier, nullptr, offsetof(ProductionUpdateModuleData, m_retailModifiers) },
 			{ "SetBonusModelConditionOnSpeedBonus", INI::parseBool, nullptr, offsetof(ProductionUpdateModuleData, m_setBonusModelConditionOnSpeedBonus) },
 			{ "BonusForType", INI::parseAsciiString, nullptr, offsetof(ProductionUpdateModuleData, m_bonusForType) },
+			{ "SpeedBonusAudioLoop", INI::parseAsciiString, nullptr, offsetof(ProductionUpdateModuleData, m_speedBonusAudioLoop) },
 			{ "UnitInvulnerableTime", INI::parseDurationUnsignedInt, nullptr, offsetof(ProductionUpdateModuleData, m_unitInvulnerableTime) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
@@ -678,6 +686,26 @@ void ProductionUpdate::updateDoors()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+const AsciiString* ProductionUpdate::getRetailSpeedBonusLoop(const Object& object, Bool activeOnly)
+{
+	if (!RetailFileLayers::enabled())
+		return nullptr;
+
+	static const NameKeyType key = NAMEKEY("ProductionUpdate");
+	const auto* production = static_cast<const ProductionUpdate*>(object.findUpdateModule(key));
+	if (!production)
+		return nullptr;
+
+	const auto& data = *production->getProductionUpdateModuleData();
+	if (data.m_speedBonusAudioLoop.isEmpty() || data.m_speedBonusAudioLoop.isNone())
+		return nullptr;
+
+	if (activeOnly && (object.testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || !hasSpeedBonus(object, data)))
+		return nullptr;
+
+	return &data.m_speedBonusAudioLoop;
+}
+
 UpdateSleepTime ProductionUpdate::update()
 {
 /// @todo srj use SLEEPY_UPDATE here
@@ -688,12 +716,7 @@ UpdateSleepTime ProductionUpdate::update()
 
 	if (RetailFileLayers::enabled() && d->m_setBonusModelConditionOnSpeedBonus)
 	{
-		Bool hasBonus = FALSE;
-		if (d->m_bonusForType.isNotEmpty())
-		{
-			if (Player* owner = us->getControllingPlayer())
-				hasBonus = owner->getPowerProductionSpeed(d->m_bonusForType) > 1.0f;
-		}
+		const Bool hasBonus = hasSpeedBonus(*us, *d);
 		const Bool hadBonus = us->getLogicModelConditions().test(MODELCONDITION_UPGRADE_ECONOMY_BONUS);
 		if (hasBonus && !hadBonus)
 			us->setModelConditionState(MODELCONDITION_UPGRADE_ECONOMY_BONUS);
@@ -833,15 +856,27 @@ Bool ProductionUpdate::advanceProduction(ProductionEntry *production, Player *pl
 	}
 
 	production->m_framesUnderConstruction++;
-	if (RetailFileLayers::enabled() && production->m_type == PRODUCTION_UNIT)
-		production->m_powerBonusFrames += player->getPowerProductionSpeed(production->m_objectToProduce->getName()) - 1.0f;
 
 	// how many total logic frames does it take to produce this unit
 	Int totalProductionFrames;
 	if( production->m_type == PRODUCTION_UNIT && production->m_framesOverride > 0 )
 		totalProductionFrames = production->m_framesOverride;
 	else if( production->m_type == PRODUCTION_UNIT )
+	{
 		totalProductionFrames = production->m_objectToProduce->calcTimeToBuild( player );
+		if (RetailFileLayers::enabled())
+		{
+			const Real speed = player->getPowerProductionSpeed(production->m_objectToProduce->getName());
+			if (speed != 1.0f)
+			{
+				const Int framesPerTick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+				const Int baseTicks = totalProductionFrames / framesPerTick;
+				const Int ticks = std::clamp(scaleProductionValue(baseTicks, 1.0f / speed),
+					1, std::numeric_limits<Int>::max() / framesPerTick);
+				totalProductionFrames = ticks * framesPerTick;
+			}
+		}
+	}
 	else
 		totalProductionFrames = production->m_upgradeToResearch->calcTimeToBuild( player );
 	if( getObject()->getAttributeModifierHelper() )
