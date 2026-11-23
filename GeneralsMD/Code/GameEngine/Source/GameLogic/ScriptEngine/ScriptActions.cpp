@@ -6743,6 +6743,19 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::CLOSE_OBJECTIVES_SCREEN:
 			RetailObjectives::close();
 			return;
+		case ScriptAction::DISPLAY_NOTIFICATION_BOX:
+		case ScriptAction::DISPLAY_NOTIFICATION_BOX_WITH_OBJECT_TYPE_IMAGE_OVERRIDE:
+		{
+			if (TheGlobalData->m_headless)
+				return;
+			const Parameter *imageOverride = pAction->getParameter(3);
+			const ThingTemplate *object = imageOverride && !imageOverride->getString().isEmpty() ?
+				TheThingFactory->findTemplate(imageOverride->getString(), FALSE) : nullptr;
+			const UnicodeString message = TheGameText->fetchOrSubstitute(pAction->getParameter(1)->getString().str(), L"");
+			RetailNotification::showType(pAction->getParameter(0)->getString(), message,
+				static_cast<Real>(pAction->getParameter(2)->getInt()), object ? object->getButtonImage() : nullptr);
+			return;
+		}
 		default:
 			if (pAction->getActionType() >= ScriptAction::FIRST_ROTWK)
 			{

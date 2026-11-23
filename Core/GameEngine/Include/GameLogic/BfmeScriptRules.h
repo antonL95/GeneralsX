@@ -12,6 +12,7 @@ enum class WireKind
 	ModelCondition,
 	ObjectType,
 	EvaEvent,
+	NotificationType,
 	Unknown
 };
 
@@ -27,6 +28,7 @@ constexpr int WIRE_UNIT_REFERENCE = 54;
 constexpr int WIRE_MODEL_CONDITION = 58;
 constexpr int WIRE_OBJECT_TYPE = 61;
 constexpr int WIRE_EVA_EVENT = 76;
+constexpr int WIRE_NOTIFICATION_TYPE = 77;
 
 constexpr WireType classifyWire(int wire)
 {
@@ -40,6 +42,7 @@ constexpr WireType classifyWire(int wire)
 		case WIRE_MODEL_CONDITION: return { WireKind::ModelCondition, -1 };
 		case WIRE_OBJECT_TYPE: return { WireKind::ObjectType, -1 };
 		case WIRE_EVA_EVENT: return { WireKind::EvaEvent, -1 };
+		case WIRE_NOTIFICATION_TYPE: return { WireKind::NotificationType, -1 };
 		default: return { WireKind::Unknown, -1 };
 	}
 }

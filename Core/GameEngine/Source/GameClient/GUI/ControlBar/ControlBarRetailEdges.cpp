@@ -89,6 +89,7 @@ constexpr Real ClockTextY = 19.0f;
 constexpr Real NoteAspect = 4.0f / 3.0f;
 constexpr UnsignedInt NoteOpenMs = 200;
 constexpr UnsignedInt NoteFadeMs = 500;
+constexpr UnsignedInt NoteUntilDismissed = std::numeric_limits<UnsignedInt>::max();
 
 struct SpellEntry
 {
@@ -424,7 +425,8 @@ Real noteAlpha(UnsignedInt now)
 {
 	const UnsignedInt elapsed = now - s_note.start;
 	const Real opening = elapsed < NoteOpenMs ? static_cast<Real>(elapsed) / NoteOpenMs : 1.0f;
-	return opening * static_cast<Real>(UiHudRules::fadeAlpha(elapsed, s_note.holdMs, NoteFadeMs));
+	return s_note.holdMs == NoteUntilDismissed ? opening :
+		opening * static_cast<Real>(UiHudRules::fadeAlpha(elapsed, s_note.holdMs, NoteFadeMs));
 }
 
 void drawNoteArt(const AptScene::Visibility &visible, Real scale, Real alpha)
@@ -755,7 +757,7 @@ static void openNext()
 	}
 }
 
-static void enqueue(const AsciiString &type, const UnicodeString &message, Real seconds, const Image *portrait)
+static void enqueue(const AsciiString &type, const UnicodeString &message, Real seconds, const Image *portrait, Bool replace = FALSE)
 {
 	if (!s_note.window || !s_note.artBounds.valid() || message.isEmpty() || !std::isfinite(seconds) || seconds < 0.0f)
 		return;
@@ -768,21 +770,23 @@ static void enqueue(const AsciiString &type, const UnicodeString &message, Real 
 		const NoteType &style = entry->second;
 		if (!style.title.isEmpty() && TheGameText)
 			title = TheGameText->fetchOrSubstitute(style.title.str(), L"");
-		if (!style.icon.isEmpty())
+		if ((!replace || !portrait) && !style.icon.isEmpty())
 			if (const Image *icon = findImage(style.icon.str()))
 				portrait = icon;
 	}
-	const double millis = std::min(seconds * 1000.0 + 0.5, double(std::numeric_limits<UnsignedInt>::max() - NoteFadeMs));
-	s_note.pending.push_back({title, message, portrait, static_cast<UnsignedInt>(millis)});
+	else if (replace && name != "generic")
+		return;
+	if (replace)
+		reset();
+	const double millis = std::min(seconds * 1000.0 + 0.5, double(NoteUntilDismissed - NoteFadeMs));
+	const UnsignedInt hold = replace && seconds == 0.0f ? NoteUntilDismissed : static_cast<UnsignedInt>(millis);
+	s_note.pending.push_back({title, message, portrait, hold});
 	openNext();
 }
 
-void showType(const AsciiString &type, const UnicodeString &message, Real seconds)
+void showType(const AsciiString &type, const UnicodeString &message, Real seconds, const Image *icon)
 {
-	if (message.isEmpty())
-		return;
-	reset();
-	enqueue(type, message, seconds, nullptr);
+	enqueue(type, message, seconds, icon, TRUE);
 }
 
 void showHero(HeroEvent event, const ThingTemplate *hero, const UnicodeString *award, const Image *awardIcon)
@@ -825,7 +829,7 @@ void update()
 {
 	if (!s_note.window)
 		return;
-	if (s_note.open && timeGetTime() - s_note.start >= s_note.holdMs + NoteFadeMs)
+	if (s_note.open && s_note.holdMs != NoteUntilDismissed && timeGetTime() - s_note.start >= s_note.holdMs + NoteFadeMs)
 		dismiss();
 	if (!s_note.open && !s_note.pending.empty())
 		openNext();

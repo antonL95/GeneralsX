@@ -1,0 +1,13 @@
+31 hud-camera - - 0
+35 hud-click - - 0 - 31 324
+119 hud-camera - - 0
+125 hud-click - - 0 - 31 453
+132 hud-note - - 0 NewObjective
+169 hud-camera - - 0
+169 hud-note-state - - 0
+170 hud-click - - 0 - 865 65
+173 hud-note-state - - 0
+175 hud-note - GondorGandalf 0 NewBonusObjective
+201 hud-note-state - - 0
+202 hud-click - - 0 - 865 65
+205 hud-note-state - - 0

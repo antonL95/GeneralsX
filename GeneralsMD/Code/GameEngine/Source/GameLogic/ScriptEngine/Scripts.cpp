@@ -1931,6 +1931,9 @@ AsciiString Parameter::getUiText() const
 		case EVA_EVENT:
 			uiText.format("EVA event '%s'", uiString.str());
 			break;
+		case NOTIFICATION_TYPE:
+			uiText.format("Notification type '%s'", uiString.str());
+			break;
 		case BRIDGE:
 			uiText.format("Bridge '%s'", uiString.str());
 			break;
@@ -2171,6 +2174,7 @@ Parameter::ParameterType Parameter::fromBfmeWireType(Int wireType)
 		case BfmeScriptRules::WireKind::ModelCondition: return MODEL_CONDITION;
 		case BfmeScriptRules::WireKind::ObjectType: return OBJECT_TYPE;
 		case BfmeScriptRules::WireKind::EvaEvent: return EVA_EVENT;
+		case BfmeScriptRules::WireKind::NotificationType: return NOTIFICATION_TYPE;
 		default: return NUM_ITEMS;
 	}
 }

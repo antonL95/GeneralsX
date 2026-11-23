@@ -19,6 +19,8 @@
 #include "GameClient/View.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/ScriptActions.h"
+#include "GameLogic/Scripts.h"
 #include "GameLogic/Squad.h"
 
 namespace
@@ -61,6 +63,33 @@ void probeBuilderCommand(const RetailTestCommands::Context& ctx)
 	const Drawable* drawable = builder->getDrawable();
 	std::fprintf(stderr, "TEST hud-builder %u selectable=%d masked=%d hidden=%d\n", ctx.frame,
 		builder->isSelectable(), builder->testStatus(OBJECT_STATUS_MASKED), drawable && drawable->isDrawableEffectivelyHidden());
+}
+
+void probeCameraCommand(const RetailTestCommands::Context& ctx)
+{
+	const Coord3D& position = TheTacticalView->getPosition();
+	std::fprintf(stderr, "TEST hud-camera %u %.2f %.2f %.3f %.3f\n",
+		ctx.frame, position.x, position.y, TheTacticalView->getFXPitch(), TheTacticalView->getZoom());
+}
+
+void showNotificationCommand(const RetailTestCommands::Context& ctx)
+{
+	const Bool overrideIcon = std::strcmp(ctx.targetName, "-") != 0;
+	ScriptAction *action = newInstance(ScriptAction)(overrideIcon ?
+		ScriptAction::DISPLAY_NOTIFICATION_BOX_WITH_OBJECT_TYPE_IMAGE_OVERRIDE : ScriptAction::DISPLAY_NOTIFICATION_BOX);
+	action->getParameter(0)->friend_setString(ctx.argument);
+	action->getParameter(1)->friend_setString("GUI:Victory");
+	action->getParameter(2)->friend_setInt(ctx.ordinal);
+	if (overrideIcon)
+		action->getParameter(3)->friend_setString(ctx.targetName);
+	TheScriptActions->executeAction(action);
+	deleteInstance(action);
+}
+
+void probeNotificationCommand(const RetailTestCommands::Context& ctx)
+{
+	GameWindow *window = TheWindowManager->winGetWindowFromId(nullptr, NAMEKEY("ControlBar.wnd:Notification"));
+	std::fprintf(stderr, "TEST hud-notification %u visible=%d\n", ctx.frame, window && !window->winIsHidden());
 }
 
 void clickHudCommand(const RetailTestCommands::Context& ctx)
@@ -116,6 +145,9 @@ void registerRetailHudLeftoversTestCommands()
 	registerAction("hud-rank", setRankCommand);
 	registerAction("hud-state", probeHudCommand);
 	registerAction("hud-builder", probeBuilderCommand);
+	registerAction("hud-camera", probeCameraCommand);
+	registerAction("hud-note", showNotificationCommand);
+	registerAction("hud-note-state", probeNotificationCommand);
 	registerAction("hud-click", clickHudCommand);
 	registerAction("hud-key", keyCommand);
 	registerAction("hud-group-state", groupStateCommand);
