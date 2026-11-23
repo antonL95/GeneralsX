@@ -1,0 +1,211 @@
+230 create Player_1 Pkg62IceActor 0 3100,2700,0
+230 create Player_1 Pkg62FollowActor 0 3100,2800,0
+230 create Player_1 Pkg62TimerActor 0 3100,2600,0
+230 create PlyrCreeps Pkg62Target 0 3280,2700,180
+230 create PlyrCreeps Pkg62Target 1 3280,2800,180
+230 create PlyrCreeps Pkg62Target 2 3280,2600,180
+232 orderattack Player_1 Pkg62IceActor 0 PlyrCreeps:Pkg62Target:0
+232 orderattack Player_1 Pkg62FollowActor 0 PlyrCreeps:Pkg62Target:1
+232 orderattack Player_1 Pkg62TimerActor 0 PlyrCreeps:Pkg62Target:2
+233 pkg62-state Player_1 Pkg62IceActor 0
+233 pkg62-state Player_1 Pkg62FollowActor 0
+233 pkg62-state Player_1 Pkg62TimerActor 0
+234 pkg62-state Player_1 Pkg62IceActor 0
+234 pkg62-state Player_1 Pkg62FollowActor 0
+234 pkg62-state Player_1 Pkg62TimerActor 0
+235 pkg62-state Player_1 Pkg62IceActor 0
+235 pkg62-state Player_1 Pkg62FollowActor 0
+235 pkg62-state Player_1 Pkg62TimerActor 0
+244 pkg62-state Player_1 Pkg62IceActor 0
+244 pkg62-state Player_1 Pkg62FollowActor 0
+244 pkg62-state Player_1 Pkg62TimerActor 0
+257 pkg62-state Player_1 Pkg62IceActor 0
+257 pkg62-state Player_1 Pkg62FollowActor 0
+257 pkg62-state Player_1 Pkg62TimerActor 0
+258 pkg62-state Player_1 Pkg62IceActor 0
+258 pkg62-state Player_1 Pkg62FollowActor 0
+258 pkg62-state Player_1 Pkg62TimerActor 0
+259 pkg62-state Player_1 Pkg62IceActor 0
+259 pkg62-state Player_1 Pkg62FollowActor 0
+259 pkg62-state Player_1 Pkg62TimerActor 0
+260 pkg62-state Player_1 Pkg62IceActor 0
+260 pkg62-state Player_1 Pkg62FollowActor 0
+260 pkg62-state Player_1 Pkg62TimerActor 0
+261 pkg62-state Player_1 Pkg62IceActor 0
+261 pkg62-state Player_1 Pkg62FollowActor 0
+261 pkg62-state Player_1 Pkg62TimerActor 0
+263 pkg62-state Player_1 Pkg62IceActor 0
+263 pkg62-state Player_1 Pkg62FollowActor 0
+263 pkg62-state Player_1 Pkg62TimerActor 0
+264 pkg62-stop Player_1 Pkg62IceActor 0
+264 pkg62-stop Player_1 Pkg62FollowActor 0
+264 pkg62-stop Player_1 Pkg62TimerActor 0
+264 destroy PlyrCreeps Pkg62Target 2
+264 destroy PlyrCreeps Pkg62Target 1
+264 destroy PlyrCreeps Pkg62Target 0
+264 pkg62-state Player_1 Pkg62IceActor 0
+264 pkg62-state Player_1 Pkg62FollowActor 0
+264 pkg62-state Player_1 Pkg62TimerActor 0
+270 pkg62-switch Player_1 Pkg62IceActor 0 secondary
+270 pkg62-switch Player_1 Pkg62FollowActor 0 secondary
+270 pkg62-switch Player_1 Pkg62TimerActor 0 secondary
+275 pkg62-state Player_1 Pkg62IceActor 0
+275 pkg62-state Player_1 Pkg62FollowActor 0
+275 pkg62-state Player_1 Pkg62TimerActor 0
+347 pkg62-state Player_1 Pkg62IceActor 0
+347 pkg62-state Player_1 Pkg62FollowActor 0
+347 pkg62-state Player_1 Pkg62TimerActor 0
+348 pkg62-state Player_1 Pkg62IceActor 0
+348 pkg62-state Player_1 Pkg62FollowActor 0
+348 pkg62-state Player_1 Pkg62TimerActor 0
+349 pkg62-state Player_1 Pkg62IceActor 0
+349 pkg62-state Player_1 Pkg62FollowActor 0
+349 pkg62-state Player_1 Pkg62TimerActor 0
+350 pkg62-state Player_1 Pkg62IceActor 0
+350 pkg62-state Player_1 Pkg62FollowActor 0
+350 pkg62-state Player_1 Pkg62TimerActor 0
+351 pkg62-state Player_1 Pkg62IceActor 0
+351 pkg62-state Player_1 Pkg62FollowActor 0
+351 pkg62-state Player_1 Pkg62TimerActor 0
+352 pkg62-state Player_1 Pkg62IceActor 0
+352 pkg62-state Player_1 Pkg62FollowActor 0
+352 pkg62-state Player_1 Pkg62TimerActor 0
+353 pkg62-state Player_1 Pkg62IceActor 0
+353 pkg62-state Player_1 Pkg62FollowActor 0
+353 pkg62-state Player_1 Pkg62TimerActor 0
+355 destroy Player_1 Pkg62IceActor 0
+355 destroy Player_1 Pkg62FollowActor 0
+355 destroy Player_1 Pkg62TimerActor 0
+
+415 pkg62-resolve - - 0 Pkg62LeapControl
+416 create Player_1 HaradKaradd 0 3100,2800,0
+416 create Player_1 Pkg62LeapControlActor 0 3100,2900,0
+417 objupgrade Player_1 HaradKaradd 0 Upgrade_ObjectLevel3
+417 objupgrade Player_1 Pkg62LeapControlActor 0 Upgrade_ObjectLevel3
+418 ability Player_1 HaradKaradd 0
+418 ability Player_1 Pkg62LeapControlActor 0
+421 pkg62-cast Player_1 HaradKaradd 0 Command_HaradKaraddMonkeyLeap 3190 2800
+424 pkg62-cast Player_1 Pkg62LeapControlActor 0 Command_HaradKaraddMonkeyLeap 3190 2900
+420 pkg62-state Player_1 HaradKaradd 0
+420 pkg62-state Player_1 Pkg62LeapControlActor 0
+424 pkg62-state Player_1 HaradKaradd 0
+424 pkg62-state Player_1 Pkg62LeapControlActor 0
+438 pkg62-state Player_1 HaradKaradd 0
+438 pkg62-state Player_1 Pkg62LeapControlActor 0
+440 pkg62-state Player_1 HaradKaradd 0
+440 pkg62-state Player_1 Pkg62LeapControlActor 0
+441 pkg62-state Player_1 HaradKaradd 0
+441 pkg62-state Player_1 Pkg62LeapControlActor 0
+442 pkg62-state Player_1 HaradKaradd 0
+442 pkg62-state Player_1 Pkg62LeapControlActor 0
+444 pkg62-state Player_1 HaradKaradd 0
+444 pkg62-state Player_1 Pkg62LeapControlActor 0
+445 pkg62-state Player_1 HaradKaradd 0
+445 pkg62-state Player_1 Pkg62LeapControlActor 0
+446 pkg62-state Player_1 HaradKaradd 0
+446 pkg62-state Player_1 Pkg62LeapControlActor 0
+454 pkg62-state Player_1 HaradKaradd 0
+454 pkg62-state Player_1 Pkg62LeapControlActor 0
+460 pkg62-state Player_1 HaradKaradd 0
+460 pkg62-state Player_1 Pkg62LeapControlActor 0
+470 pkg62-state Player_1 HaradKaradd 0
+470 pkg62-state Player_1 Pkg62LeapControlActor 0
+480 pkg62-state Player_1 HaradKaradd 0
+480 pkg62-state Player_1 Pkg62LeapControlActor 0
+490 pkg62-state Player_1 HaradKaradd 0
+490 pkg62-state Player_1 Pkg62LeapControlActor 0
+520 pkg62-state Player_1 HaradKaradd 0
+520 pkg62-state Player_1 Pkg62LeapControlActor 0
+521 destroy Player_1 HaradKaradd 0
+521 destroy Player_1 Pkg62LeapControlActor 0
+
+550 create Player_1 Pkg62RandomActor 0 3100,2700,0
+550 create Player_1 Pkg62RandomControlActor 0 3100,2800,0
+550 create Player_1 Pkg62AuxiliaryActor 0 3100,2600,0
+550 create Player_1 Pkg62ArbiterActor 0 3100,2500,0
+550 create PlyrCreeps Pkg62Target 0 3200,2700,180
+550 create PlyrCreeps Pkg62Target 1 3200,2800,180
+550 create PlyrCreeps Pkg62Target 2 3200,2600,180
+550 create PlyrCreeps Pkg62Target 3 3200,2500,180
+552 orderattack Player_1 Pkg62RandomActor 0 PlyrCreeps:Pkg62Target:0
+552 orderattack Player_1 Pkg62RandomControlActor 0 PlyrCreeps:Pkg62Target:1
+552 orderattack Player_1 Pkg62AuxiliaryActor 0 PlyrCreeps:Pkg62Target:2
+552 orderattack Player_1 Pkg62ArbiterActor 0 PlyrCreeps:Pkg62Target:3
+553 pkg62-state Player_1 Pkg62RandomActor 0
+553 pkg62-state Player_1 Pkg62RandomControlActor 0
+553 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+553 pkg62-state Player_1 Pkg62ArbiterActor 0
+554 pkg62-state Player_1 Pkg62RandomActor 0
+554 pkg62-state Player_1 Pkg62RandomControlActor 0
+554 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+554 pkg62-state Player_1 Pkg62ArbiterActor 0
+555 pkg62-state Player_1 Pkg62RandomActor 0
+555 pkg62-state Player_1 Pkg62RandomControlActor 0
+555 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+555 pkg62-state Player_1 Pkg62ArbiterActor 0
+556 pkg62-state Player_1 Pkg62RandomActor 0
+556 pkg62-state Player_1 Pkg62RandomControlActor 0
+556 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+556 pkg62-state Player_1 Pkg62ArbiterActor 0
+557 pkg62-state Player_1 Pkg62RandomActor 0
+557 pkg62-state Player_1 Pkg62RandomControlActor 0
+557 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+557 pkg62-state Player_1 Pkg62ArbiterActor 0
+560 pkg62-state Player_1 Pkg62RandomActor 0
+560 pkg62-state Player_1 Pkg62RandomControlActor 0
+560 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+560 pkg62-state Player_1 Pkg62ArbiterActor 0
+574 pkg62-state Player_1 Pkg62RandomActor 0
+574 pkg62-state Player_1 Pkg62RandomControlActor 0
+574 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+574 pkg62-state Player_1 Pkg62ArbiterActor 0
+585 pkg62-state Player_1 Pkg62RandomActor 0
+585 pkg62-state Player_1 Pkg62RandomControlActor 0
+585 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+585 pkg62-state Player_1 Pkg62ArbiterActor 0
+595 pkg62-state Player_1 Pkg62RandomActor 0
+595 pkg62-state Player_1 Pkg62RandomControlActor 0
+595 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+595 pkg62-state Player_1 Pkg62ArbiterActor 0
+616 pkg62-state Player_1 Pkg62RandomActor 0
+616 pkg62-state Player_1 Pkg62RandomControlActor 0
+616 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+616 pkg62-state Player_1 Pkg62ArbiterActor 0
+617 destroy Player_1 Pkg62RandomActor 0
+617 destroy Player_1 Pkg62RandomControlActor 0
+635 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+641 pkg62-state Player_1 Pkg62AuxiliaryActor 0
+642 destroy Player_1 Pkg62AuxiliaryActor 0
+642 destroy Player_1 Pkg62ArbiterActor 0
+642 destroy PlyrCreeps Pkg62Target 3
+642 destroy PlyrCreeps Pkg62Target 2
+642 destroy PlyrCreeps Pkg62Target 1
+642 destroy PlyrCreeps Pkg62Target 0
+
+645 pkg62-resolve - - 0 Pkg62CorsairControl
+646 create Player_1 Pkg62CorsairActor 0 3100,2700,0
+646 create Player_1 Pkg62CorsairControlActor 0 3100,2800,0
+646 create Player_1 Pkg62FxActor 0 3100,2600,0
+646 create Player_1 Pkg62FxControlActor 0 3100,2500,0
+647 create PlyrCreeps Pkg62Target 0 3200,2700,180
+647 create PlyrCreeps Pkg62Target 1 3200,2800,180
+647 create PlyrCreeps Pkg62Target 2 3200,2600,180
+647 create PlyrCreeps Pkg62Target 3 3200,2500,180
+648 pkg62-state Player_1 Pkg62CorsairActor 0
+648 pkg62-state Player_1 Pkg62CorsairControlActor 0
+650 pkg62-attack Player_1 Pkg62CorsairActor 0 PlyrCreeps:Pkg62Target:0
+654 pkg62-attack Player_1 Pkg62CorsairControlActor 0 PlyrCreeps:Pkg62Target:1
+656 orderattack Player_1 Pkg62FxActor 0 PlyrCreeps:Pkg62Target:2
+656 orderattack Player_1 Pkg62FxControlActor 0 PlyrCreeps:Pkg62Target:3
+660 pkg62-state Player_1 Pkg62FxActor 0
+660 pkg62-state Player_1 Pkg62FxControlActor 0
+744 pkg62-state Player_1 Pkg62FxActor 0
+744 pkg62-state Player_1 Pkg62FxControlActor 0
+760 destroy Player_1 Pkg62CorsairActor 0
+760 destroy Player_1 Pkg62CorsairControlActor 0
+760 destroy Player_1 Pkg62FxActor 0
+760 destroy Player_1 Pkg62FxControlActor 0
+760 destroy PlyrCreeps Pkg62Target 3
+760 destroy PlyrCreeps Pkg62Target 2
+760 destroy PlyrCreeps Pkg62Target 1
+760 destroy PlyrCreeps Pkg62Target 0
