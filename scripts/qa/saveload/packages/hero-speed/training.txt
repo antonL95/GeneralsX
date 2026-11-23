@@ -1,9 +1,9 @@
-192 create Player_1 ArnorHalbarad 0 2300,1450,0
-193 create Player_1 RohanMerry 0 2300,1520,0
-194 create Player_1 ElvenAragorn 0 2300,1590,0
-211 move Player_1 ArnorHalbarad 0 - 2680 1450
-212 move Player_1 RohanMerry 0 - 2680 1520
-213 move Player_1 ElvenAragorn 0 - 2680 1590
+192 create Player_1 ArnorHalbarad 0 500,3010,0
+193 create Player_1 RohanMerry 0 500,3080,0
+194 create Player_1 ElvenAragorn 0 500,3150,0
+211 move Player_1 ArnorHalbarad 0 - 880 3010
+212 move Player_1 RohanMerry 0 - 880 3080
+213 move Player_1 ElvenAragorn 0 - 880 3150
 235 hero-speed Player_1 ArnorHalbarad 0 bow
 236 hero-speed Player_1 RohanMerry 0 comparison
 237 hero-speed Player_1 ElvenAragorn 0 comparison

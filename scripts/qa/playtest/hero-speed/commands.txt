@@ -4,16 +4,16 @@
 12 heroes Player_1 - 0
 1555 heroes Player_1 - 0
 1627 xpstate Player_1 ArnorHalbarad 0
-1628 snapshot-overlap Player_1 ArnorHalbarad 0 - 2320 1000
-1629 create Player_1 GondorPippin 0 2320,1090,0
-1630 create Player_1 ElvenAragorn 0 2320,1180,0
-1630 create Player_1 RohanMerry 0 2320,1270,0
-1630 create Player_1 GondorAragorn 0 2300,1360,0
+1628 snapshot-overlap Player_1 ArnorHalbarad 0 - 520 2560
+1629 create Player_1 GondorPippin 0 520,2650,0
+1630 create Player_1 ElvenAragorn 0 520,2740,0
+1630 create Player_1 RohanMerry 0 520,2830,0
+1630 create Player_1 GondorAragorn 0 500,2920,0
 1631 reveal Player_1 ArnorHalbarad 0
-1637 move Player_1 ArnorHalbarad 0 - 2680 1000
-1638 move Player_1 GondorPippin 0 - 2680 1090
-1639 move Player_1 ElvenAragorn 0 - 2680 1180
-1640 move Player_1 RohanMerry 0 - 2680 1270
+1637 move Player_1 ArnorHalbarad 0 - 880 2560
+1638 move Player_1 GondorPippin 0 - 880 2650
+1639 move Player_1 ElvenAragorn 0 - 880 2740
+1640 move Player_1 RohanMerry 0 - 880 2830
 1665 hero-speed Player_1 ArnorHalbarad 0 bow
 1666 hero-speed Player_1 GondorPippin 0 comparison
 1667 hero-speed Player_1 ElvenAragorn 0 comparison
@@ -26,9 +26,9 @@
 1705 hero-speed-rank Player_1 GondorAragorn 0 9
 1712 power Player_1 GondorAragorn 0 SuperweaponGreyCompany
 1715 hero-speed Player_1 ArnorHalbarad 0 bow-high
-1720 create Player_1 BannerOfArwen 0 2500,950,0
-1722 snapshot-overlap Player_1 ArnorHalbarad_Summoned 0 - 2360 1350
-1725 move Player_1 ArnorHalbarad_Summoned 0 - 2700 1350
+1720 create Player_1 BannerOfArwen 0 700,2510,0
+1722 snapshot-overlap Player_1 ArnorHalbarad_Summoned 0 - 560 2910
+1725 move Player_1 ArnorHalbarad_Summoned 0 - 900 2910
 1730 hero-speed Player_1 ArnorHalbarad 0 nearby-banner
 1745 hero-speed-toggle Player_1 ArnorHalbarad 0
 1753 hero-speed Player_1 ArnorHalbarad 0 sword

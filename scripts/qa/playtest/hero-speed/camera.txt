@@ -1,2 +1,2 @@
-1632 Player_1 ArnorHalbarad 2400 1120 1.0
-1735 Player_1 ArnorHalbarad 2530 1190 1.0
+1632 Player_1 ArnorHalbarad 600 2680 1.0
+1735 Player_1 ArnorHalbarad 730 2750 1.0
