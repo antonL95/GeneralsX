@@ -833,8 +833,8 @@ StateReturnType DozerActionDoActionState::update()
 						audio.setObjectID(dozer->getID());
 						TheAudio->addAudioEvent(&audio);
 
-						/// make radar neat-o attention grabber event at build location
-						TheRadar->createEvent( goalObject->getPosition(), RADAR_EVENT_CONSTRUCTION );
+						if (!RetailFileLayers::enabled())
+							TheRadar->createEvent(goalObject->getPosition(), RADAR_EVENT_CONSTRUCTION);
 
 					}
 

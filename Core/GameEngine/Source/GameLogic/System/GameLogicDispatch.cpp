@@ -2707,7 +2707,10 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 			TheAudio->addAudioEvent(&aSound);
 
 			if (RetailFileLayers::enabled())
-				RetailEva::queue(ThePlayerList->getLocalPlayer(), "BeaconDetected", object->getPosition(), RetailEva::Ping::Beacon);
+			{
+				TheRadar->createEvent(object->getPosition(), RADAR_EVENT_RETAIL_INFORMATION);
+				RetailEva::queue(ThePlayerList->getLocalPlayer(), "BeaconDetected", object->getPosition());
+			}
 			else
 			{
 				TheRadar->createEvent(object->getPosition(), RADAR_EVENT_INFORMATION);

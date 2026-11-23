@@ -72,7 +72,7 @@ void EvaAnnounceClientCreate::clientUpdate()
 	if (event.isEmpty() || event.isNone())
 		return;
 	RetailEva::queue(viewer, event, data->usePosition ? object->getPosition() : nullptr,
-		data->fakeRadar ? RetailEva::Ping::Information : RetailEva::Ping::None, object->getPosition());
+		data->fakeRadar ? RetailEva::Ping::JumpOnly : RetailEva::Ping::None, object->getPosition());
 }
 
 void EvaAnnounceClientCreate::crc(Xfer* xfer)

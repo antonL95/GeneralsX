@@ -35,6 +35,7 @@
 #include "Common/GameUtility.h"
 #include "Common/MiscAudio.h"
 #include "Common/Radar.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/ThingTemplate.h"
@@ -881,8 +882,34 @@ static RadarColorLookup radarColorLookupTable[] =
 	{ RADAR_EVENT_STEALTH_NEUTRALIZED,	{   0, 255,   0, 255 },	 {    0, 128,   0, 255 } },
 	{ RADAR_EVENT_FAKE,									{   0,	 0,   0,	 0 },	 {    0,	 0,   0,   0 } },
 	{ RADAR_EVENT_ONE_RING, { 255, 204, 0, 255 }, { 255, 255, 128, 255 } },
+	{ RADAR_EVENT_RETAIL_INFORMATION, { 255, 255, 0, 255 }, { 255, 255, 128, 255 } },
 	{ RADAR_EVENT_INVALID,							{   0,   0,   0,   0 },  {    0,   0,   0,   0 } }
 };
+
+void Radar::createScriptEvent(const Coord3D* world, Int type)
+{
+	if (!RetailFileLayers::enabled())
+	{
+		createEvent(world, static_cast<RadarEventType>(type));
+		return;
+	}
+
+	constexpr RadarEventType retailTypes[] = {
+		RADAR_EVENT_RETAIL_INFORMATION,
+		RADAR_EVENT_CONSTRUCTION,
+		RADAR_EVENT_UPGRADE,
+		RADAR_EVENT_UNDER_ATTACK,
+		RADAR_EVENT_INFILTRATION,
+		RADAR_EVENT_INFORMATION,
+		RADAR_EVENT_BEACON_PULSE,
+		RADAR_EVENT_BATTLE_PLAN,
+		RADAR_EVENT_STEALTH_DISCOVERED,
+		RADAR_EVENT_STEALTH_NEUTRALIZED,
+		RADAR_EVENT_FAKE,
+	};
+	if (type >= 0 && static_cast<size_t>(type) < std::size(retailTypes))
+		createEvent(world, retailTypes[type]);
+}
 
 //-------------------------------------------------------------------------------------------------
 /** Create a new radar event */
@@ -1174,7 +1201,8 @@ Bool Radar::tryEvent( RadarEventType event, const Coord3D *pos, Bool jumpTo )
 
 	// see if there was an event of this type within the given range within the given time
 	UnsignedInt currentFrame = TheGameLogic->getFrame();
-	const Real closeEnoughDistanceSq = 250.0f * 250.0f;
+	const Bool retailAttack = RetailFileLayers::enabled() && event == RADAR_EVENT_UNDER_ATTACK;
+	const Real closeEnoughDistanceSq = retailAttack ? 600.0f * 600.0f : 250.0f * 250.0f;
 	const UnsignedInt framesBetweenEvents = LOGICFRAMES_PER_SECOND * 10;
 	//
 
@@ -1195,7 +1223,7 @@ Bool Radar::tryEvent( RadarEventType event, const Coord3D *pos, Bool jumpTo )
 			#if PRESERVE_RADAR_WARNING_SUPPRESSION
 				// TheSuperHackers @tweak Preserve retail map-wide suppression for under attack events
 				// because otherwise they trigger way too frequent from cargo planes.
-				isClose |= (event == RADAR_EVENT_UNDER_ATTACK);
+				isClose |= (!retailAttack && event == RADAR_EVENT_UNDER_ATTACK);
 			#endif
 
 			if( isClose )

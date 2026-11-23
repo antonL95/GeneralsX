@@ -16,8 +16,7 @@ enum class Ping
 	None,
 	Attack,
 	Generic,
-	Information,
-	Beacon,
+	JumpOnly,
 	Upgrade,
 	OneRing
 };
@@ -30,7 +29,7 @@ void parseSettings(INI *ini);
 void queue(const Player *recipient, const AsciiString &name, const Coord3D *position = nullptr,
 	Ping ping = Ping::None, const Coord3D *radarPosition = nullptr);
 void markFirstSighted(const Object& object);
-void underAttack(const Object &object);
+void underAttack(Object &object);
 void destroyed(const Object &object);
 void watchRecharge(const Object &object, const SpecialPowerTemplate &power);
 }

@@ -1,0 +1,24 @@
+5 power-reveal - - 0
+8 create Player_1 RadarTestHalbarad 0 1112,230,180
+8 create PlyrCreeps SignalFire 0 1350,300,0
+8 create PlyrCreeps CaptureFlag 0 1310,300,0
+8 create Player_1 RadarTestHalbarad 1 1320,300,180
+8 create Player_1 RadarTestPorter 0 1830,1240,0
+8 create Player_1 GondorFaramir 0 2880,1450,180
+9 radar-neutralize PlyrCreeps SignalFire 0
+9 radar-neutralize PlyrCreeps CaptureFlag 0
+12 power Player_1 RadarTestHalbarad 0 SpecialAbilityCaptureBuilding
+13 aim Player_1 RadarTestHalbarad 0 *:CaptureFlag:0
+19 construct Player_1 RadarTestPorter 0 RadarTestFarm 1900 1240 0
+55 radar-capture Player_1 RadarTestHalbarad 1 *:CaptureFlag:2
+60 ability Player_1 RadarTestHalbarad 1
+72 radar-hit PlyrCreeps SpiderLair 0 Player_1:GondorFaramir:0
+95 science Player_1 - 0 SCIENCE_SpawnLoneTower
+97 power-cast Player_1 - 4 at 2600 1280
+110 radar-fall PlyrCreeps SpiderLair 0 Player_1:GondorFaramir:0
+116 radar-script - - 0 0 2650 1100
+117 radar-script-object Player_1 RadarTestHalbarad 1 4
+118 radar-script-team Player_1 RadarTestHalbarad 1 6
+132 neutralstate * SignalFire 0
+132 neutralstate * Inn 1
+210 log Player_1 RadarTestFarm 0

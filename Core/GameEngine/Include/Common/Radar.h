@@ -74,6 +74,7 @@ enum RadarEventType CPP_11(: Int)
 														//for example, so we can use the spacebar to jump to the event).
 
 	RADAR_EVENT_ONE_RING,
+	RADAR_EVENT_RETAIL_INFORMATION,
 	RADAR_EVENT_NUM_EVENTS
 
 };
@@ -181,6 +182,7 @@ public:
 
 	// radar events
 	void createEvent( const Coord3D *world, RadarEventType type, Real secondsToLive = 4.0f, Bool jumpTo = TRUE );
+	void createScriptEvent(const Coord3D* world, Int type);
 	void createPlayerEvent( Player *player, const Coord3D *world, RadarEventType type, Real secondsToLive = 4.0f );  ///< create radar event using player colors
 
 	Bool getLastEventLoc( Coord3D *eventPos );							///< get last event loc (if any)

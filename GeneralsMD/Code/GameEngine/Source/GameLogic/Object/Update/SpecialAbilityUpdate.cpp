@@ -1160,7 +1160,8 @@ void SpecialAbilityUpdate::startPreparation()
       {
         TheEva->setShouldPlay( EVA_BuildingBeingStolen );
       }
-      TheRadar->tryInfiltrationEvent( target );
+      if (!RetailFileLayers::enabled())
+        TheRadar->tryInfiltrationEvent(target);
 
       break;
     }

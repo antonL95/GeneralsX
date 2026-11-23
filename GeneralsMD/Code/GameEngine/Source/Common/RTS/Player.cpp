@@ -1693,7 +1693,8 @@ void Player::onStructureConstructionComplete( Object *builder, Object *structure
 		RetailBuildingEvents::complete(*structure);
 
 	if (RetailFileLayers::enabled() && !isRebuild)
-		RetailEva::queue(this, "GenericBuildingComplete-Builder", structure->getPosition(), RetailEva::Ping::Generic);
+		RetailEva::queue(this, "GenericBuildingComplete-Builder", structure->getPosition(),
+			builder ? RetailEva::Ping::Generic : RetailEva::Ping::None);
 
 	// When a a structure is completed, it becomes "real" as far as scripting is
 	// concerned. jba.

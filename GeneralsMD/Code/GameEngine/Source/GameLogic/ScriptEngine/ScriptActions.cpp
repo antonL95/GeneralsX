@@ -2955,7 +2955,7 @@ void ScriptActions::updatePlayerRelationTowardPlayer(const AsciiString& playerSr
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doRadarCreateEvent(Coord3D *pos, Int eventType)
 {
-	TheRadar->createEvent(pos, (RadarEventType)eventType);
+	TheRadar->createScriptEvent(pos, eventType);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2974,7 +2974,7 @@ void ScriptActions::doObjectRadarCreateEvent(const AsciiString& unitName, Int ev
 		return;
 
 	// create event
-	TheRadar->createEvent(pos, (RadarEventType)eventType);
+	TheRadar->createScriptEvent(pos, eventType);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2995,7 +2995,7 @@ void ScriptActions::doTeamRadarCreateEvent(const AsciiString& teamName, Int even
 		return;
 
 	// create event
-	TheRadar->createEvent(pos, (RadarEventType)eventType);
+	TheRadar->createScriptEvent(pos, eventType);
 }
 
 //-------------------------------------------------------------------------------------------------

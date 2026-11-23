@@ -614,9 +614,9 @@ void W3DRadar::drawEvents( Int pixelX, Int pixelY, Int width, Int height )
 
 			}
 
-			m_event[ i ].soundPlayed = TRUE;
-
-			if (drawRetailAlert(pixelX, pixelY, width, height, m_event[i]))
+			const Bool retailDraw = drawRetailAlert(pixelX, pixelY, width, height, m_event[i]);
+			m_event[i].soundPlayed = TRUE;
+			if (retailDraw)
 				continue;
 			if (m_event[i].type == RADAR_EVENT_BEACON_PULSE)
 				drawSingleBeaconEvent(pixelX, pixelY, width, height, i);
@@ -639,27 +639,26 @@ Bool W3DRadar::drawRetailAlert(Int pixelX, Int pixelY, Int width, Int height, co
 	if (now < event.createFrame || now >= event.dieFrame)
 		return TRUE;
 
-	const Player *viewer = rts::getObservedOrLocalPlayer();
-	if (viewer && ThePartitionManager
-#if ENABLE_CONFIGURABLE_SHROUD
-		&& TheGlobalData->m_shroudOn
-#endif
-		&& ThePartitionManager->getShroudStatusForPlayer(viewer->getPlayerIndex(), &event.worldLoc) != CELLSHROUD_CLEAR)
-		return TRUE;
-
 	const char *name;
 	switch (event.type)
 	{
 		case RADAR_EVENT_UNDER_ATTACK: name = "PingAttack"; break;
-		case RADAR_EVENT_INFORMATION: name = "PingInformation"; break;
+		case RADAR_EVENT_RETAIL_INFORMATION: name = "PingInformation"; break;
 		case RADAR_EVENT_BEACON_PULSE: name = "PingBeacon"; break;
 		case RADAR_EVENT_UPGRADE: name = "PingUpgrade"; break;
-		case RADAR_EVENT_ONE_RING: name = "PingOneRing"; break;
-		default: name = "PingGeneric"; break;
+		case RADAR_EVENT_CONSTRUCTION: name = "PingGeneric"; break;
+		default: return TRUE;
 	}
 
 	drawRetailPing(pixelX, pixelY, width, height, event.worldLoc, name, now - event.createFrame,
 		event.dieFrame - event.createFrame);
+	if (!event.soundPlayed && std::getenv("GENERALSX_RETAIL_RADAR_LOG"))
+	{
+		std::fprintf(stderr, "RADAR ping frame=%u created=%u type=%d export=%s world=%.1f,%.1f lifetime=%u layer=event\n",
+			now, event.createFrame, static_cast<Int>(event.type), name, event.worldLoc.x, event.worldLoc.y,
+			event.dieFrame - event.createFrame);
+		std::fflush(stderr);
+	}
 	return TRUE;
 }
 

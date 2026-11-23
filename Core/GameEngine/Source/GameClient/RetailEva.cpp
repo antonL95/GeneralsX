@@ -117,8 +117,7 @@ RadarEventType radarType(RetailEva::Ping ping)
 	{
 		case RetailEva::Ping::Attack: return RADAR_EVENT_UNDER_ATTACK;
 		case RetailEva::Ping::Generic: return RADAR_EVENT_CONSTRUCTION;
-		case RetailEva::Ping::Information: return RADAR_EVENT_INFORMATION;
-		case RetailEva::Ping::Beacon: return RADAR_EVENT_BEACON_PULSE;
+		case RetailEva::Ping::JumpOnly: return RADAR_EVENT_FAKE;
 		case RetailEva::Ping::Upgrade: return RADAR_EVENT_UPGRADE;
 		case RetailEva::Ping::OneRing: return RADAR_EVENT_ONE_RING;
 		default: return RADAR_EVENT_INVALID;
@@ -202,10 +201,19 @@ void queue(const Player *recipient, const AsciiString &name, const Coord3D *posi
 	const auto key = eventKey(name);
 	const auto it = s_events.find(key);
 	const Coord3D* location = radarPosition ? radarPosition : position;
-	if (location && TheRadar && ping != Ping::None && (it != s_events.end() || name.isEmpty()))
+	if (location && TheRadar && ping != Ping::None)
 	{
 		const Bool jumpTo = it == s_events.end() || it->second.jumpTo;
-		TheRadar->tryEvent(radarType(ping), location, jumpTo);
+		const RadarEventType type = radarType(ping);
+		if (ping == Ping::Generic || ping == Ping::Upgrade)
+			TheRadar->createEvent(location, type, 4.0f, jumpTo);
+		else if (ping == Ping::JumpOnly)
+		{
+			if (it != s_events.end() && jumpTo)
+				TheRadar->tryEvent(type, location);
+		}
+		else if (ping == Ping::Attack || it != s_events.end() || name.isEmpty())
+			TheRadar->tryEvent(type, location, jumpTo);
 	}
 	if (it == s_events.end())
 		return;
@@ -246,8 +254,7 @@ static void updateWorldEvents(Player &player, UnsignedInt frame)
 			it = s_recharging.erase(it);
 		else if (module->getReadyFrame() <= frame && module->isReady())
 		{
-			const AsciiString name = it->second->getName();
-			queue(&player, s_events.contains(eventKey(name)) ? name : AsciiString(), object->getPosition(), Ping::Information);
+			queue(&player, it->second->getName(), object->getPosition(), Ping::JumpOnly);
 			it = s_recharging.erase(it);
 		}
 		else
@@ -272,7 +279,7 @@ static void updateWorldEvents(Player &player, UnsignedInt frame)
 			player.getRelationship(control->getTeam()) == ENEMIES &&
 			ThePartitionManager->getShroudStatusForPlayer(player.getPlayerIndex(), object->getPosition()) == CELLSHROUD_CLEAR &&
 			s_seenEnemies.insert(control->getID()).second)
-			queue(&player, event, control->getPosition(), Ping::Information);
+			queue(&player, event, control->getPosition(), Ping::JumpOnly);
 #endif
 	}
 }
@@ -348,12 +355,12 @@ void update()
 	}
 }
 
-void underAttack(const Object &object)
+void underAttack(Object &object)
 {
 	const Bool structure = object.isKindOf(KINDOF_STRUCTURE);
 	const AsciiString &name = object.getTemplate()->getRotWKObjectData().evaEventDamagedOwner;
 	queue(object.getControllingPlayer(), name.isEmpty() ? AsciiString(structure ? "StructureUnderAttack" : "UnitUnderAttack") : name,
-		object.getPosition(), Ping::Attack);
+		object.getPosition(), object.friend_getRadarData() ? Ping::Attack : Ping::None);
 }
 
 void destroyed(const Object &object)
@@ -365,7 +372,7 @@ void destroyed(const Object &object)
 
 	const auto &data = object.getTemplate()->getRotWKObjectData();
 	if (owner == viewer)
-		queue(viewer, data.evaEventDieOwner, object.getPosition(), Ping::Information);
+		queue(viewer, data.evaEventDieOwner, object.getPosition(), Ping::JumpOnly);
 	else
 	{
 		const Relationship relationship = viewer->getRelationship(object.getTeam());
@@ -377,9 +384,9 @@ void destroyed(const Object &object)
 			return;
 
 		if (relationship == ALLIES)
-			queue(viewer, data.evaEventDieAlly, object.getPosition(), Ping::Information);
+			queue(viewer, data.evaEventDieAlly, object.getPosition(), Ping::JumpOnly);
 		else if (relationship == ENEMIES)
-			queue(viewer, data.evaEventDieEnemy, object.getPosition(), Ping::Information);
+			queue(viewer, data.evaEventDieEnemy, object.getPosition(), Ping::JumpOnly);
 	}
 }
 }
