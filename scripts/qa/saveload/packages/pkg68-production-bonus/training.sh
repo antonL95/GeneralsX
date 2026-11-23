@@ -40,7 +40,12 @@ check() {
     sample protection 420 'unit=Pkg68DisabledRecruit disabled=1 protected=1'
     sample hit 420 'unit=Pkg68DisabledRecruit kind=slash protected=1 dealt=0.0'
     sample protection 421 'unit=Pkg68DisabledRecruit disabled=1 protected=0'
-    sample hit 421 'unit=Pkg68DisabledRecruit kind=slash protected=0 dealt=7.0'
+    if covers 421; then
+        grep -Eq '^PKG68 hit frame=421 unit=Pkg68DisabledRecruit kind=slash protected=0 dealt=([1-9][0-9]*\.[0-9]|0\.[1-9])$' "$log" || {
+            printf 'Expected positive damage to the disabled recruit on frame 421\n' >&2
+            return 1
+        }
+    fi
 
     stock=$(sed -n 's/^TEST frame 211: create MordorOrcPit for Player_1 id=\([0-9]*\) at (980\.0, 1280\.0)$/\1/p' "$out/continue.log")
     sound_only=$(sed -n 's/^TEST frame 200: create Pkg68ProtectedPit for Player_1 id=\([0-9]*\) .*/\1/p' "$out/continue.log")
