@@ -1,0 +1,15 @@
+10 create Player_1 GondorBarracks 0 1300,900,0
+11 camera Player_1 GondorBarracks 0 at 1300 900
+12 select Player_1 GondorBarracks 0
+14 followup-button-state Player_1 - 0 Command_ConstructGondorFighterHorde
+15 followup-button-state Player_1 - 0 Command_PurchaseUpgradeGondorBarracksLevel2
+16 followup-left Player_1 - 0 Command_PurchaseUpgradeGondorBarracksLevel2
+25 followup-button-state Player_1 - 0 Command_PurchaseUpgradeGondorBarracksLevel2
+26 followup-right Player_1 - 0 Command_PurchaseUpgradeGondorBarracksLevel2
+30 followup-button-state Player_1 - 0 Command_PurchaseUpgradeGondorBarracksLevel2
+31 followup-button-state Player_1 - 0 Command_ConstructLamedonClansmenHorde
+32 followup-left Player_1 - 0 Command_ConstructLamedonClansmenHorde
+41 followup-button-state Player_1 - 0 Command_ConstructLamedonClansmenHorde
+42 followup-right Player_1 - 0 Command_ConstructLamedonClansmenHorde
+46 followup-button-state Player_1 - 0 Command_ConstructLamedonClansmenHorde
+47 quit - - 0

@@ -660,6 +660,11 @@ CBCommandStatus ControlBar::cancelRetailProduction(GameWindow *window) const
 		GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UNIT_CREATE);
 		msg->appendIntegerArgument(entry->getProductionID());
 	}
+	else if (entry && entry->getProductionType() == PRODUCTION_UPGRADE)
+	{
+		GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UPGRADE);
+		msg->appendIntegerArgument(entry->getProductionUpgrade()->getUpgradeNameKey());
+	}
 	return CBC_COMMAND_USED;
 }
 
@@ -1276,7 +1281,10 @@ void ControlBar::assignRetailSlots(const CommandSet *commandSet, Object *obj, In
 		GameWindow *target = m_retailVisible[placement.slot];
 		setControlCommand(target, placement.command);
 		const GUICommandType type = placement.command->getCommandType();
-		setRetailRightClick(target, type == GUI_COMMAND_UNIT_BUILD || type == GUI_COMMAND_REVIVE || hasRetailAutoAbility(target));
+		const Bool cancelableProduction = placement.command->hasRotwkOption(CommandButtonRules::ROTWK_CANCELABLE)
+			&& (type == GUI_COMMAND_UNIT_BUILD || type == GUI_COMMAND_REVIVE
+				|| type == GUI_COMMAND_PLAYER_UPGRADE || type == GUI_COMMAND_OBJECT_UPGRADE);
+		setRetailRightClick(target, cancelableProduction || hasRetailAutoAbility(target));
 		const Bool passive = placement.command->isRetailPassive();
 		const Bool enabled = !passive && (placement.entry >= MAX_COMMANDS_PER_SET
 			|| BitIsSet(m_retailHolders[placement.entry]->winGetStatus(), WIN_STATUS_ENABLED));
