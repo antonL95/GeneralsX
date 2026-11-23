@@ -237,7 +237,7 @@ void W3DScriptedModelDrawModuleData::parseAnimationState(INI* ini, void* instanc
 		self->m_animationStates.push_back(std::move(state));
 }
 
-void W3DScriptedModelDrawModuleData::parseAnimation(INI* ini, void*, void* store, const void*)
+void W3DScriptedModelDrawModuleData::parseAnimation(INI* ini, void* instance, void* store, const void*)
 {
 	static const FieldParse fields[] =
 	{
@@ -256,6 +256,8 @@ void W3DScriptedModelDrawModuleData::parseAnimation(INI* ini, void*, void* store
 	};
 
 	Animation animation;
+	if (RetailFileLayers::enabled() && !static_cast<const AnimationState*>(instance)->idle)
+		animation.mode = RenderObjClass::ANIM_MODE_LOOP;
 	animation.label = ini->getNextAsciiString();
 	ini->initFromINI(&animation, fields);
 	static_cast<std::vector<Animation>*>(store)->push_back(std::move(animation));

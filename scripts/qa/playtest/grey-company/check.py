@@ -28,3 +28,20 @@ def check(log):
         if len(cycling) < 2:
             raise RuntimeError(f"Expected two Grey Company members to cycle a run clip in {start}–{end}, "
                                f"got {len(cycling)}. First/last moving samples per actor: {diagnostics}")
+
+    death_clip = "gufaramir_skl.gufaramir_diec"
+    death_poses = {}
+    for actor, frames in samples.items():
+        death = [(frame, pose, length) for frame, (clip, pose, length, flags) in sorted(frames.items())
+                 if clip == death_clip and "DYING" in flags]
+        if death:
+            death_poses[actor] = death
+    if len(death_poses) != 1:
+        raise RuntimeError(f"Expected one member playing the authored death clip, found {list(death_poses)}")
+    poses = next(iter(death_poses.values()))
+    first = poses[0]
+    if (first[1] >= first[2] - 1 or
+            any(current[1] < previous[1] for previous, current in zip(poses, poses[1:])) or
+            sum(pose == length - 1 for _, pose, length in poses) < 2):
+        raise RuntimeError(f"Expected the death clip to play once and hold its final pose, "
+                           f"observed {first} through {poses[-1]}")
