@@ -1,7 +1,17 @@
 check() {
     if covers 304; then
-        awk '
-            $1 == "AI_FORWARD_BUILD" && $2 >= 184 && $2 <= 304 && $3 == 4 && $4 == "MordorBattleTower" {
+        awk -v phase="$phase" '
+            FNR == NR && /^TEST frame 95: create Pkg46DefenseAnchor for Player_2 / {
+                split($8, id, "=")
+                anchor[id[2]] = 1
+            }
+            FNR == NR && /^TEST frame 125: create Pkg46ForwardBuilder for Player_2 / {
+                split($8, id, "=")
+                builder = id[2]
+            }
+            FNR == NR { next }
+            $1 == "AI_FORWARD_BUILD" && $2 >= 184 && $2 <= 304 && $3 == 4 && $4 == "MordorBattleTower" &&
+            $5 in anchor && $6 == builder {
                 dx = $7 - $10
                 dy = $8 - $11
                 dz = $9 - $12
@@ -12,10 +22,10 @@ check() {
                 if (ex * ex + ey * ey < 0.001) found = 1
             }
             END {
-                if (!found) print "Missing targetless forward building 200 units toward home"
+                if (!found) print "Missing targetless forward building 200 units toward home in " phase " at frames 184-304 for builder " builder
                 exit !found
             }
-        ' "$log" || return 1
+        ' "$out/continue.log" "$log" || return 1
     fi
     if covers 64; then
         awk '
