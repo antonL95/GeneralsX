@@ -1,0 +1,16 @@
+240 create Player_1 OclIntensitySource 0 3070,2720,0
+240 create Player_1 OclIntensitySource 1 3360,2480,0
+240 create Player_1 OclIntensitySource 2 3330,2720,0
+240 create Player_1 OclIntensitySource 3 3300,3020,0
+242 ocl-intensity-fixture-spawn Player_1 OclIntensitySource 0 OclIntensityChunkList
+242 ocl-intensity-fixture-spawn Player_1 OclIntensitySource 1 OclIntensityOutList
+242 ocl-intensity-fixture-spawn Player_1 OclIntensitySource 2 OclIntensityUpList
+242 ocl-intensity-fixture-spawn Player_1 OclIntensitySource 3 OclIntensityFlyingList
+421 destroy Player_1 OclIntensityChunk 0
+421 destroy Player_1 OclIntensityOut 0
+421 destroy Player_1 OclIntensityUp 0
+421 destroy Player_1 OclIntensityFlying 0
+421 destroy Player_1 OclIntensitySource 3
+421 destroy Player_1 OclIntensitySource 2
+421 destroy Player_1 OclIntensitySource 1
+421 destroy Player_1 OclIntensitySource 0
