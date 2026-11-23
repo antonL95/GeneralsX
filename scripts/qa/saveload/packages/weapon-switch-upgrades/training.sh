@@ -57,12 +57,12 @@ check() {
     if covers 1178; then
         expect "WEAPON-UPGRADE result frame=1178 actor=ElvenRivendellKnightHorde set=RivendellLancerBowCommandSet_Lvl2 rank=2 banner=1 button=1 queued=0 complete=1" || return
     fi
-    if covers 1210; then
-        expect "WEAPON-UPGRADE button frame=1210 actor=GaladhrimWarriorHorde slot=5 name=Command_PurchaseUpgradeElvenSilverthornArrows upgrade=Upgrade_ElvenSilverthornArrows state=enabled prerequisite=1 affected=1 offered=1 affordable=1" || return
-        expect "WEAPON-UPGRADE result frame=1210 actor=GaladhrimWarriorHorde set=GalWarriorHordeCommandSet rank=1 banner=0 button=0 queued=0 complete=0" || return
+    if covers 1195; then
+        expect "WEAPON-UPGRADE button frame=1195 actor=GaladhrimWarriorHorde slot=5 name=Command_PurchaseUpgradeElvenSilverthornArrows upgrade=Upgrade_ElvenSilverthornArrows state=enabled prerequisite=1 affected=1 offered=1 affordable=1" || return
+        expect "WEAPON-UPGRADE result frame=1195 actor=GaladhrimWarriorHorde set=GalWarriorHordeCommandSet rank=1 banner=0 button=0 queued=0 complete=0" || return
     fi
-    if covers 1215; then
-        expect "WEAPON-UPGRADE button frame=1215 actor=GaladhrimWarriorHorde slot=5 name=Command_PurchaseUpgradeElvenForgedBlades upgrade=Upgrade_ElvenForgedBlades state=enabled prerequisite=1 affected=1 offered=1 affordable=1" || return
-        expect "WEAPON-UPGRADE result frame=1215 actor=GaladhrimWarriorHorde set=GalWarriorHordeSwordCommandSet rank=1 banner=0 button=0 queued=0 complete=0" || return
+    if covers 1200; then
+        expect "WEAPON-UPGRADE button frame=1200 actor=GaladhrimWarriorHorde slot=5 name=Command_PurchaseUpgradeElvenForgedBlades upgrade=Upgrade_ElvenForgedBlades state=enabled prerequisite=1 affected=1 offered=1 affordable=1" || return
+        expect "WEAPON-UPGRADE result frame=1200 actor=GaladhrimWarriorHorde set=GalWarriorHordeSwordCommandSet rank=1 banner=0 button=0 queued=0 complete=0" || return
     fi
 }
