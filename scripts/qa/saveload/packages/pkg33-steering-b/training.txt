@@ -3,7 +3,7 @@
 160 create Player_1 GondorPippin 0 3150,950,0
 175 move Player_1 GondorPippin 0 - 3390 950
 193 destroy Player_1 GondorKnightHorde 0
-236 move Player_1 GondorPippin 0 - 3050 1075
+240 move Player_1 GondorPippin 0 - 3050 1075
 279 select Player_1 GondorPippin 0
 279 steering-stop - - 0
 292 move Player_1 GondorPippin 0 - 3050 1010

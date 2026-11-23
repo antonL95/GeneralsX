@@ -19,3 +19,11 @@
 676 move Player_1 GondorGandalf 0 - 2550 1300
 765 move Player_1 GondorGandalf 0 - 2550 860
 769 steering-path Player_1 GondorGandalf 0
+850 destroy Player_1 GondorGandalf 0
+860 create Player_1 GondorGandalf 0 2320,1000,0
+861 track Player_1 GondorGandalf 0
+865 power Player_1 GondorGandalf 0 SpecialAbilityToggleMounted
+980 steering-path Player_1 GondorGandalf 0
+995 move Player_1 GondorGandalf 0 - 2820 1000
+1081 move Player_1 GondorGandalf 0 - 2250 1000
+1085 steering-path Player_1 GondorGandalf 0

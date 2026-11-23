@@ -53,10 +53,22 @@ check() {
                 stopped = 1
             if ($3 >= 361 && $3 <= 372 && /left=0 right=1 leftHS=0 rightHS=0/)
                 rightSlow = 1
-            if ($3 >= 238 && $3 <= 244) {
+            if ($3 >= 238 && $3 <= 249) {
                 split(substr($5, 5), position, ",")
                 split(substr($7, 6), goal, ",")
                 facing = substr($6, 8)
+                pi = atan2(0, -1)
+                if (headingFrame == $3 - 1 && /leftHS=1/) {
+                    headingStep = facing - previousFacing
+                    headingStep = atan2(sin(headingStep), cos(headingStep))
+                    headingLimit = 2 * pi / (3 * 6) + 0.0001
+                    if (headingStep < -headingLimit || headingStep > headingLimit)
+                        yawJump = 1
+                    if (headingStep > 0.0001)
+                        yawSteps++
+                }
+                previousFacing = facing
+                headingFrame = $3
                 if ($3 == 244 && /left=0 right=0 leftHS=1 rightHS=0/) {
                     aimX = goal[1] - position[1]
                     aimY = goal[2] - position[2]
@@ -68,12 +80,12 @@ check() {
                 dy = position[2] - previousY
                 toX = goal[1] - previousX
                 toY = goal[2] - previousY
-                if (!redirected && $3 > 238 && /leftHS=1/ && dx * dx + dy * dy > 0) {
-                    redirected = 1
+                if ($3 > 240 && $3 <= 244 && /leftHS=1/ && dx * dx + dy * dy > 0) {
                     along = dx * toX + dy * toY
-                    across = dx * toY - dy * toX
                     forward = dx * cos(facing) + dy * sin(facing)
-                    translatedTowardGoal = along > 0 && across * across < along * along / 100 && forward > 0
+                    turnedTowardGoal = dy * toY > 0
+                    if (along > 0 && forward > 0 && turnedTowardGoal)
+                        translatedTowardGoal = 1
                 }
                 previousX = position[1]
                 previousY = position[2]
@@ -101,12 +113,14 @@ check() {
         END {
             gait = first > 35 || (cavAccelerated && cavBrakedAtThreshold)
             if (first <= 238 && !translatedTowardGoal)
-                print "Pippin did not translate toward the route on the first high speed turn step"
+                print "Pippin did not translate toward the route during the high speed turn at the checkpoint"
             if (!leftFast)
                 print "Pippin did not have a remaining high speed turn at the frame 244 checkpoint"
+            if (first <= 238 && (yawJump || yawSteps < 2))
+                print "Pippin's high speed turn did not advance in bounded render frame steps"
             if (checkArcher && first <= 504 && !(archerStationary && archerDisplaced))
                 print "Idle archer horde did not start its independent sharp move by frame 518"
-            exit !(gait && (first > 238 || (aligned && translatedTowardGoal)) &&
+            exit !(gait && (first > 238 || (aligned && translatedTowardGoal && !yawJump && yawSteps >= 2)) &&
                 leftFast && leftSlow && rightFast && stopped && rightSlow && trollReady && trollTurned && !trollFast &&
                 (!checkArcher || first > 504 || (archerStationary && archerDisplaced)))
         }

@@ -1,3 +1,4 @@
 20 Player_1 GondorPippin 2430 1070 0.75
 240 Player_1 GondorGandalf 2430 1070 0.75
 575 Player_1 GondorGandalf 2560 1080 0.75
+980 Player_1 GondorGandalf 2560 1050 0.75
