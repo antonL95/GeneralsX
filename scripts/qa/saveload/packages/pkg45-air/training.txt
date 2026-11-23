@@ -1,0 +1,24 @@
+169 create Player_1 Pkg45Eagle 0 2210,1050,0
+169 create PlyrCreeps Pkg45Target 0 2540,1050,0
+170 reveal Player_1 Pkg45Eagle 0
+197 air-swoop-trace Player_1 Pkg45Eagle 0
+205 orderattack Player_1 Pkg45Eagle 0 PlyrCreeps:Pkg45Target:0
+237 air-swoop-trace Player_1 Pkg45Eagle 0
+244 air-swoop-trace Player_1 Pkg45Eagle 0
+245 air-swoop-trace Player_1 Pkg45Eagle 0
+253 air-swoop-trace Player_1 Pkg45Eagle 0
+274 air-swoop-trace Player_1 Pkg45Eagle 0
+277 air-swoop-trace Player_1 Pkg45Eagle 0
+279 air-swoop-trace Player_1 Pkg45Eagle 0
+289 air-swoop-trace Player_1 Pkg45Eagle 0
+299 air-swoop-trace Player_1 Pkg45Eagle 0
+309 air-swoop-trace Player_1 Pkg45Eagle 0
+320 move Player_1 Pkg45Eagle 0 2780,1050,0
+328 air-swoop-trace Player_1 Pkg45Eagle 0
+336 move Player_1 Pkg45Eagle 0 2690,1170,0
+346 air-swoop-trace Player_1 Pkg45Eagle 0
+352 select Player_1 Pkg45Eagle 0
+352 steering-stop - - 0
+357 air-swoop-trace Player_1 Pkg45Eagle 0
+360 destroy Player_1 Pkg45Eagle 0
+360 destroy PlyrCreeps Pkg45Target 0
