@@ -3217,11 +3217,14 @@ Bool W3DModelDraw::updateBonesForClientParticleSystems()
 			if (ParticleSystem* sys = TheParticleSystemManager->findParticleSystem(tracker.id))
 			{
 				const Matrix3D& boneTransform = m_renderObject->Get_Bone_Transform(tracker.boneIndex);
+				const Vector3 translation = boneTransform.Get_Translation();
+				const Coord3D position = {translation.X, translation.Y, translation.Z};
+				sys->setPosition(&position);
+				sys->rotateLocalTransformZ(boneTransform.Get_Z_Rotation());
 				sys->setLocalTransform(&boneTransform);
 				sys->setSkipParentXfrm(true);
 			}
 		}
-
 	}
 
 	return TRUE;
