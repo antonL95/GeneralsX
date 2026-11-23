@@ -1610,12 +1610,102 @@ Real AIGroup::getRotwkMoveSpeed() const
 	return movers > 1 ? speed : FAST_AS_POSSIBLE;
 }
 
+namespace
+{
+struct RotwkGroupMove
+{
+	Object* object;
+	Coord2D offset = {};
+	Coord3D destination = {};
+	std::vector<Coord3D> waypoints;
+	Real distance = 0.0f;
+};
+
+Bool rotwkGroupLinePassable(const RotwkGroupMove& move, const Coord3D& from, const Coord3D& to)
+{
+	return TheAI->pathfinder()->isLinePassable(move.object,
+		move.object->getAI()->getLocomotorSet().getValidSurfaces(), LAYER_GROUND, from, to, FALSE, TRUE);
+}
+
+Bool rotwkGroupSegmentPassable(const RotwkGroupMove& move, const Coord3D& from, const Coord3D& to)
+{
+	return TheAI->pathfinder()->isMovementSegmentPassable(move.object,
+		move.object->getAI()->getLocomotorSet().getValidSurfaces(), LAYER_GROUND, from, to, FALSE);
+}
+
+Bool appendRotwkGroupApproach(RotwkGroupMove& move, Coord3D& from, const Coord3D& target)
+{
+	Path* approach = TheAI->pathfinder()->findGroundPath(&from, &target, PATH_DIAMETER_IN_CELLS, FALSE);
+	MemoryPoolObjectHolder holder;
+	holder.hold(approach);
+	if (!approach || !approach->getFirstNode())
+		return FALSE;
+	for (const PathNode* node = approach->getFirstNode()->getNextOptimized(); node; node = node->getNextOptimized())
+	{
+		const Coord3D& point = *node->getPosition();
+		if (node->getLayer() != LAYER_GROUND || !rotwkGroupSegmentPassable(move, from, point))
+			return FALSE;
+		move.waypoints.push_back(point);
+		from = point;
+	}
+	return (from.x == target.x && from.y == target.y) || rotwkGroupLinePassable(move, from, target);
+}
+
+Bool buildRotwkGroupWaypoints(RotwkGroupMove& move, const PathNode* entry, const Coord2D& offset)
+{
+	Coord3D from = *move.object->getPosition();
+	const Real offsetSquared = offset.lengthSqr();
+	for (const PathNode* node = entry; node; node = node->getNextOptimized())
+	{
+		const PathNode* next = node->getNextOptimized();
+		const Coord3D& bend = *node->getPosition();
+		const Coord3D& onward = next ? *next->getPosition() : move.destination;
+		if (!next && rotwkGroupLinePassable(move, from, onward))
+			break;
+
+		Coord3D target = bend;
+		for (Real scale = 1.0f; scale * scale * offsetSquared >= sqr(PATHFIND_CELL_SIZE_F); scale *= 0.5f)
+		{
+			Coord3D offsetBend = bend;
+			offsetBend.x += scale * offset.x;
+			offsetBend.y += scale * offset.y;
+			offsetBend.z = TheTerrainLogic->getGroundHeight(offsetBend.x, offsetBend.y);
+			if (rotwkGroupLinePassable(move, bend, offsetBend) && rotwkGroupLinePassable(move, from, offsetBend) &&
+				rotwkGroupLinePassable(move, offsetBend, onward))
+			{
+				target = offsetBend;
+				break;
+			}
+		}
+		if (!rotwkGroupLinePassable(move, from, target))
+		{
+			const Bool canReach = move.waypoints.empty() ?
+				appendRotwkGroupApproach(move, from, target) : rotwkGroupSegmentPassable(move, from, target);
+			if (!canReach)
+				return FALSE;
+		}
+		if (from.x != target.x || from.y != target.y)
+			move.waypoints.push_back(target);
+		from = target;
+	}
+	if (!rotwkGroupLinePassable(move, from, move.destination))
+		return FALSE;
+	move.waypoints.push_back(move.destination);
+	return TRUE;
+}
+
+Real rotwkGroupTravelDistance(const Coord3D& from, const Coord3D& to)
+{
+	return WWMath::SqrtfOrigin(sqr(to.x - from.x) + sqr(to.y - from.y));
+}
+}
+
 Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType cmdSource, Real speed )
 {
 	const Real REARRANGE_ANGLE = PI / 4.0f;
 	const Real MAX_OFFSET_RADII = 6.0f;
 
-	std::vector<Object*> movers;
+	std::vector<RotwkGroupMove> movers;
 	Coord3D center;
 	center.zero();
 	Real facingX = 0.0f;
@@ -1626,7 +1716,7 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 		AIUpdateInterface* ai = obj->getAIUpdateInterface();
 		if (!ai || obj->isKindOf(KINDOF_IMMOBILE) || obj->isDisabledByType(DISABLED_HELD) || !ai->isDoingGroundMovement())
 			continue;
-		movers.push_back(obj);
+		movers.push_back(RotwkGroupMove{obj});
 		center.x += obj->getPosition()->x;
 		center.y += obj->getPosition()->y;
 		facingX += obj->getUnitDirectionVector2D()->x;
@@ -1650,30 +1740,134 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 	const Real cosRotation = Cos(rotation);
 	const Real sinRotation = Sin(rotation);
 
-	for (Object* obj : movers)
+	Pathfinder* pathfinder = TheAI->pathfinder();
+	const PathfindLayerEnum layer = TheTerrainLogic->getLayerForDestination(pos);
+	Bool allGround = layer == LAYER_GROUND;
+	Bool directLane = FALSE;
+	Bool terrainDetours = TRUE;
+	const RotwkGroupMove* representative = nullptr;
+	Real representativeDistance = 0.0f;
+	for (const RotwkGroupMove& move : movers)
+		pathfinder->removeGoal(move.object);
+
+	for (RotwkGroupMove& move : movers)
 	{
+		Object* obj = move.object;
 		AIUpdateInterface* ai = obj->getAIUpdateInterface();
 		Real offsetX = obj->getPosition()->x - center.x;
 		Real offsetY = obj->getPosition()->y - center.y;
-		const Real length = sqrtf(offsetX * offsetX + offsetY * offsetY);
+		const Real length = WWMath::SqrtfOrigin(offsetX * offsetX + offsetY * offsetY);
 		const Real maxLength = MAX_OFFSET_RADII * obj->getGeometryInfo().getBoundingCircleRadius();
 		if (length > maxLength && length > 0.0f)
 		{
 			offsetX *= maxLength / length;
 			offsetY *= maxLength / length;
 		}
-		Coord3D dest;
-		dest.x = pos->x + offsetX * cosRotation - offsetY * sinRotation;
-		dest.y = pos->y + offsetX * sinRotation + offsetY * cosRotation;
-		const PathfindLayerEnum layer = TheTerrainLogic->getLayerForDestination(pos);
+		move.offset.x = offsetX * cosRotation - offsetY * sinRotation;
+		move.offset.y = offsetX * sinRotation + offsetY * cosRotation;
+		Coord3D& dest = move.destination;
+		dest.x = pos->x + move.offset.x;
+		dest.y = pos->y + move.offset.y;
 		dest.z = TheTerrainLogic->getLayerHeight(dest.x, dest.y, layer);
-		TheAI->pathfinder()->removeGoal(obj);
-		TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), &dest, nullptr);
-		TheAI->pathfinder()->updateGoal(obj, &dest, layer);
+		pathfinder->adjustDestination(obj, ai->getLocomotorSet(), &dest, nullptr);
+		pathfinder->updateGoal(obj, &dest, layer);
+		allGround = allGround && obj->getLayer() == layer && TheTerrainLogic->getLayerForDestination(&dest) == layer;
+		if (allGround)
+		{
+			if (rotwkGroupLinePassable(move, *obj->getPosition(), dest))
+				directLane = TRUE;
+			else
+			{
+				terrainDetours = terrainDetours && !pathfinder->isMovementSegmentPassable(obj,
+					ai->getLocomotorSet().getValidSurfaces(), layer, *obj->getPosition(), dest, TRUE);
+				const Real distance = sqr(offsetX) + sqr(offsetY);
+				if (!representative || distance < representativeDistance)
+				{
+					representative = &move;
+					representativeDistance = distance;
+				}
+			}
+		}
+		const Real maxSpeed = ai->getCurLocomotorSpeed();
+		if (maxSpeed > 0.0f)
+			speed = std::min(speed, maxSpeed);
+	}
+
+	Bool sharedRoute = FALSE;
+	const Bool openTerrainPass = allGround && representative && directLane && terrainDetours &&
+		rotwkGroupSegmentPassable(*representative, center, *pos);
+	if (allGround && representative && !openTerrainPass)
+	{
+		Object* leader = representative->object;
+		pathfinder->setIgnoreObstacleID(INVALID_ID);
+		Path* path = pathfinder->findGroundPath(leader->getPosition(), &representative->destination,
+			PATH_DIAMETER_IN_CELLS, FALSE);
+		MemoryPoolObjectHolder holder;
+		holder.hold(path);
+		if (path && path->getFirstNode())
+		{
+			sharedRoute = TRUE;
+			for (const PathNode* node = path->getFirstNode(); node; node = node->getNextOptimized())
+				sharedRoute = sharedRoute && node->getLayer() == layer;
+
+			const PathNode* entry = path->getFirstNode()->getNextOptimized();
+			for (RotwkGroupMove& move : movers)
+				sharedRoute = sharedRoute && buildRotwkGroupWaypoints(move, entry, move.offset - representative->offset);
+		}
+	}
+
+	Real longestDistance = 0.0f;
+	if (sharedRoute || (allGround && !representative))
+	{
+		for (RotwkGroupMove& move : movers)
+		{
+			Coord3D from = *move.object->getPosition();
+			if (sharedRoute)
+			{
+				for (const Coord3D& point : move.waypoints)
+				{
+					move.distance += rotwkGroupTravelDistance(from, point);
+					from = point;
+				}
+			}
+			else
+			{
+				move.distance = rotwkGroupTravelDistance(from, move.destination);
+			}
+			longestDistance = std::max(longestDistance, move.distance);
+		}
+	}
+
+	std::vector<ObjectID> routePeers;
+	if (sharedRoute)
+	{
+		for (const RotwkGroupMove& move : movers)
+			if (move.waypoints.size() > 1)
+				routePeers.push_back(move.object->getID());
+	}
+
+	for (RotwkGroupMove& move : movers)
+	{
+		Object* obj = move.object;
+		AIUpdateInterface* ai = obj->getAIUpdateInterface();
 		obj->setFormationID(NO_FORMATION_ID);
-		ai->aiMoveToPosition(&dest, cmdSource);
+		if (sharedRoute && move.waypoints.size() > 1)
+		{
+			ai->aiFollowRetailGroupPath(&move.waypoints, representative->object, cmdSource);
+			if (ai->isFollowingRetailGroupRoute())
+			{
+				pathfinder->updateGoal(obj, &move.destination, layer);
+				ai->setRetailGroupArrival(routePeers, speed);
+			}
+		}
+		else
+			ai->aiMoveToPosition(&move.destination, cmdSource);
 		if (speed < FAST_AS_POSSIBLE)
-			ai->setDesiredSpeed(speed);
+		{
+			const Real cap = move.distance > 0.0f && longestDistance > 0.0f ?
+				speed * (move.distance / longestDistance) : speed;
+			ai->setDesiredSpeed(cap);
+		}
 	}
 	return TRUE;
 }

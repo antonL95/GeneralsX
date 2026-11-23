@@ -269,6 +269,9 @@ protected:
 	virtual void privateFollowWaypointPathExact( const Waypoint *way, CommandSourceType cmdSource );///< start following the path from the given point
 	virtual void privateFollowWaypointPathAsTeamExact( const Waypoint *way, CommandSourceType cmdSource );///< start following the path from the given point
 	virtual void privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction );///< follow the path defined by the given array of points
+	void startFollowPath(std::vector<Coord3D>* path, Object* ignoreObject, CommandSourceType cmdSource,
+		Bool exitProduction, ObjectID retailGroupLeader);
+	Bool isRetailGroupHordePeer(const Object* other) const;
 	virtual void privateFollowPathAppend( const Coord3D *pos, CommandSourceType cmdSource );
 	virtual void privateAttackObject( Object *victim, Int maxShotsToFire, CommandSourceType cmdSource );					///< attack given object
 	void privateRetailHordeAttack(const AICommandParms& parms);
@@ -707,6 +710,12 @@ public:
 
 	// this is intended for use ONLY by AIFollowPathState.
 	void friend_setCurrentGoalPathIndex( Int index ) { m_nextGoalPathIndex = index; }
+	Bool isFollowingRetailGroupRoute() const;
+	void endRetailGroupRoute(Bool arrived);
+	void setRetailGroupArrival(const std::vector<ObjectID>& peers, Real speed);
+	Bool stageRetailGroupArrival(const Coord3D& destination);
+	Bool isStagedForRetailGroupArrival() const { return m_retailGroupReadyFrame != 0; }
+	Bool releaseRetailGroupArrival();
 #ifdef DEBUG_LOGGING
 	inline const Coord3D *friend_getRequestedDestination() const { return &m_requestedDestination; }
 	inline const Coord3D *friend_getRequestedDestination2() const { return &m_requestedDestination2; }
@@ -851,6 +860,12 @@ private:
 	Coord3D m_autoAttackOrigin{};
 	ObjectID m_retailPlannerAttackTarget = INVALID_ID;
 	Bool m_retailPlannerOrderActive = FALSE;
+	ObjectID m_retailGroupRouteLeader = INVALID_ID;
+	UnsignedInt m_retailGroupRouteFrame = 0;
+	std::vector<ObjectID> m_retailGroupPeers;
+	UnsignedInt m_retailGroupReadyFrame = 0;
+	Real m_retailGroupArrivalDistance = 0.0f;
+	Real m_retailGroupArrivalSpeed = FAST_AS_POSSIBLE;
 	UnsignedInt m_retailPlannerIssuedFrame = 0;
 	UnsignedInt m_retailPlannerPathRevision = 0;
 	UnsignedInt m_retailPlannerBlockedRevision = 0;

@@ -571,6 +571,15 @@ public:
 		aiDoCommand(&parms);
 	}
 
+	void aiFollowRetailGroupPath(std::vector<Coord3D>* path, Object* leader, CommandSourceType cmdSource)
+	{
+		AICommandParms parms(AICMD_FOLLOW_PATH, cmdSource);
+		MOVE_TO(parms.m_coords) = std::move(*path);
+		parms.m_obj = leader;
+		parms.m_intValue = TRUE;
+		aiDoCommand(&parms);
+	}
+
 	void aiFollowPathAppend( const Coord3D* pos, CommandSourceType cmdSource )
 	{
 		AICommandParms parms(AICMD_FOLLOW_PATH_APPEND, cmdSource);

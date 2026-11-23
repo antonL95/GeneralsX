@@ -39,6 +39,7 @@
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameClient/RetailClientAudio.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
@@ -55,6 +56,7 @@
 #include "GameLogic/AIGuardRetaliate.h"
 #include "GameLogic/AITNGuard.h"
 #include "GameLogic/AIStateMachine.h"
+#include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/PartitionManager.h"
@@ -746,7 +748,11 @@ AIStateMachine::~AIStateMachine()
 // ------------------------------------------------------------------------------------------------
 void AIStateMachine::crc( Xfer *xfer )
 {
-	StateMachine::crc(xfer);
+	const AIUpdateInterface* ai = getOwner()->getAI();
+	if (ai && ai->isFollowingRetailGroupRoute())
+		this->xfer(xfer);
+	else
+		StateMachine::crc(xfer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1831,7 +1837,7 @@ StateReturnType AIInternalMoveToState::update()
 		m_pathGoalPosition = m_goalPosition;
 		if (this->getAdjustsDestination()) {
 				TheAI->pathfinder()->updateGoal(obj, thePath->getLastNode()->getPosition(), thePath->getLastNode()->getLayer());
-		} else {
+		} else if (!ai->isFollowingRetailGroupRoute()) {
 				TheAI->pathfinder()->removeGoal(obj);
 		}
 		if (!ai->getRetryPath()) {
@@ -1844,7 +1850,8 @@ StateReturnType AIInternalMoveToState::update()
 		forceRecompute = true;
 	}
 	Bool blocked=false;
-	if (ai->isBlockedAndStuck() || ai->getNumFramesBlocked()>2*LOGICFRAMES_PER_SECOND) {
+	if ((ai->isBlockedAndStuck() || ai->getNumFramesBlocked()>2*LOGICFRAMES_PER_SECOND) &&
+		!(ai->isFollowingRetailGroupRoute() && HordeAIUpdate::isReforming(ai))) {
 		forceRecompute = true;
 		blocked = true;
 		m_blockedRepathTimestamp = TheGameLogic->getFrame();
@@ -3262,7 +3269,11 @@ StateReturnType AIPickUpCrateState::update()
 // ------------------------------------------------------------------------------------------------
 void AIFollowPathState::crc( Xfer *xfer )
 {
-	AIInternalMoveToState::crc(xfer);
+	const AIUpdateInterface* ai = getMachineOwner()->getAI();
+	if (ai && ai->isFollowingRetailGroupRoute())
+		this->xfer(xfer);
+	else
+		AIInternalMoveToState::crc(xfer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -3270,8 +3281,7 @@ void AIFollowPathState::crc( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void AIFollowPathState::xfer( Xfer *xfer )
 {
-  // version
-  XferVersion currentVersion = 1;
+  XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -3280,6 +3290,13 @@ void AIFollowPathState::xfer( Xfer *xfer )
 	xfer->xferInt(&m_index);
 	xfer->xferBool(&m_adjustFinal);
 	xfer->xferBool(&m_adjustFinalOverride);
+	if (RetailFileLayers::enabled())
+	{
+		RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, version >= 2, {
+			{ "group-route-retries", [this](Xfer* x) { x->xferInt(&m_retryCount); },
+				[this] { m_retryCount = 10; } }
+		});
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -3316,6 +3333,11 @@ StateReturnType AIFollowPathState::onEnter()
 		ai->setCanPathThroughUnits(true);
 		setAdjustsDestination(false);
 		m_adjustFinal = true;
+	}
+	if (ai->isFollowingRetailGroupRoute())
+	{
+		m_retryCount = 10;
+		setAdjustsDestination(nextPos == nullptr);
 	}
 	StateReturnType ret = AIInternalMoveToState::onEnter();
 	if (obj->getFormationID() != NO_FORMATION_ID) {
@@ -3360,6 +3382,7 @@ void AIFollowPathState::onExit( StateExitType status )
 	// turn off precision-z-pos when we exit, just in case.
 	AIUpdateInterface *ai = getMachineOwner()->getAI();
 	if (!ai) return;
+	ai->endRetailGroupRoute(status == EXIT_NORMAL && ai->friend_getGoalPathPosition(m_index) == nullptr);
 	ai->setCanPathThroughUnits(false);
 	if (ai->getCurLocomotor())
 		ai->getCurLocomotor()->setUsePreciseZPos(false);
@@ -3373,13 +3396,31 @@ void AIFollowPathState::onExit( StateExitType status )
 StateReturnType AIFollowPathState::update()
 {
 	getMachine()->setGoalPosition(&m_goalPosition);
+	Object *obj = getMachineOwner();
+	AIUpdateInterface *ai = obj->getAI();
+	const Bool groupRoute = ai->isFollowingRetailGroupRoute();
+	const Coord3D* arrival = groupRoute ? ai->friend_getGoalPathPosition(m_index + 1) : nullptr;
+	const Bool atStagingWaypoint = arrival && !ai->friend_getGoalPathPosition(m_index + 2);
+	const Bool staged = atStagingWaypoint && ai->isStagedForRetailGroupArrival();
+	if (staged && !ai->releaseRetailGroupArrival())
+		return STATE_CONTINUE;
 	// do movement
-	StateReturnType status = AIInternalMoveToState::update();
+	StateReturnType status = staged ? STATE_SUCCESS : AIInternalMoveToState::update();
 	// if move to has finished, move to next point on path
 	if (status == STATE_SUCCESS || status == STATE_FAILURE)
 	{
-		Object *obj = getMachineOwner();
-		AIUpdateInterface *ai = obj->getAI();
+		if (groupRoute && !staged &&
+			(status == STATE_FAILURE || sqr(obj->getPosition()->x - m_goalPosition.x) +
+				sqr(obj->getPosition()->y - m_goalPosition.y) >= sqr(PATHFIND_CELL_SIZE_F)))
+		{
+			if (m_retryCount <= 0)
+				return STATE_FAILURE;
+			--m_retryCount;
+			computePath();
+			return STATE_CONTINUE;
+		}
+		if (status == STATE_SUCCESS && atStagingWaypoint && !staged && ai->stageRetailGroupArrival(*arrival))
+			return STATE_CONTINUE;
 		if (status == STATE_FAILURE && m_retryCount>0) {
 			// If we failed, & haven't reached retry limit, try again.  jba.
 			m_retryCount--;
@@ -3390,6 +3431,8 @@ StateReturnType AIFollowPathState::update()
 
 		Bool tooClose=true;
 		while (pos && tooClose) {
+			if (groupRoute && ai->friend_getGoalPathPosition(m_index + 1) && !ai->friend_getGoalPathPosition(m_index + 2))
+				break;
 			Real dx = pos->x - obj->getPosition()->x;
 			Real dy = pos->y - obj->getPosition()->y;
 			tooClose = false;
@@ -3433,7 +3476,7 @@ StateReturnType AIFollowPathState::update()
 		else
 		{
 			setAdjustsDestination(m_adjustFinal && (m_adjustFinalOverride || ai->isDoingGroundMovement()));
-			if (getAdjustsDestination())
+			if (getAdjustsDestination() && !groupRoute)
 			{
 				if (!TheAI->pathfinder()->adjustDestination(getMachineOwner(), ai->getLocomotorSet(), &m_goalPosition)) {
 					return STATE_FAILURE;

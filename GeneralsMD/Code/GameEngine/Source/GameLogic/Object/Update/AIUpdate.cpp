@@ -549,6 +549,16 @@ void AIUpdateInterface::requestPath( Coord3D *destination, Bool isFinalGoal )
 	m_requestedVictimID = INVALID_ID;
 	m_isApproachPath = FALSE;
 	m_isSafePath = FALSE;
+	if (isFollowingRetailGroupRoute() && getStateMachine()->getTemporaryState() == INVALID_STATE_ID &&
+		!m_isBlockedAndStuck && getObject()->getLayer() == LAYER_GROUND &&
+		TheAI->pathfinder()->isMovementSegmentPassable(getObject(), m_locomotorSet.getValidSurfaces(),
+			LAYER_GROUND, *getObject()->getPosition(), *destination, FALSE))
+	{
+		m_waitingForPath = FALSE;
+		m_retryPath = FALSE;
+		computeQuickPath(destination);
+		return;
+	}
 	if (canComputeQuickPath()) {
 		computeQuickPath(destination);
 		return;
@@ -1664,6 +1674,8 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 
 	AIUpdateInterface* aiOther = other->getAI();
 	if (aiOther == nullptr)
+		return FALSE;
+	if ((isFollowingRetailGroupRoute() || aiOther->isFollowingRetailGroupRoute()) && isRetailGroupHordePeer(other))
 		return FALSE;
 
 	Bool selfMoving = isMoving();
@@ -2939,6 +2951,11 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
+	if (parms->m_cmdSource != CMD_FROM_AI && !isFollowingRetailGroupRoute())
+	{
+		m_retailGroupRouteLeader = INVALID_ID;
+		m_retailGroupRouteFrame = 0;
+	}
 	m_retailPlannerAttackTarget = INVALID_ID;
 	m_retailPlannerOrderActive = FALSE;
 
@@ -3010,7 +3027,10 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 		case AICMD_FOLLOW_PATH:
 		{
 			std::vector<Coord3D> coords = parms->m_coords;
-			privateFollowPath(&coords, parms->m_obj, parms->m_cmdSource, FALSE);
+			if (RetailFileLayers::enabled() && parms->m_intValue && parms->m_obj)
+				startFollowPath(&coords, nullptr, parms->m_cmdSource, FALSE, parms->m_obj->getID());
+			else
+				privateFollowPath(&coords, parms->m_obj, parms->m_cmdSource, FALSE);
 			break;
 		}
 		case AICMD_FOLLOW_PATH_APPEND:
@@ -3553,6 +3573,8 @@ Bool AIUpdateInterface::isMoving() const
  */
 void AIUpdateInterface::privateMoveAwayFromUnit( Object *unit, CommandSourceType cmdSource )
 {
+	if (unit && m_retailGroupRouteLeader != INVALID_ID && isRetailGroupHordePeer(unit))
+		return;
 	// the dead don't listen very well
 	if (isAiInDeadState() || (getObject()->isMobile() == FALSE) || !isAllowedToMoveAwayFromUnit())
 	{
@@ -3731,6 +3753,12 @@ void AIUpdateInterface::privateFollowPathAppend( const Coord3D *pos, CommandSour
  */
 void AIUpdateInterface::privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction )
 {
+	startFollowPath(path, ignoreObject, cmdSource, exitProduction, INVALID_ID);
+}
+
+void AIUpdateInterface::startFollowPath(std::vector<Coord3D>* path, Object* ignoreObject, CommandSourceType cmdSource,
+	Bool exitProduction, ObjectID retailGroupLeader)
+{
 	if (getObject()->isMobile() == FALSE)
 		return;
 
@@ -3742,6 +3770,8 @@ void AIUpdateInterface::privateFollowPath( std::vector<Coord3D>* path, Object *i
 
 	// clear current state machine
 	getStateMachine()->clear();
+	m_retailGroupRouteLeader = retailGroupLeader;
+	m_retailGroupRouteFrame = retailGroupLeader != INVALID_ID ? TheGameLogic->getFrame() : 0;
 
 	if (!path->empty()) {
 		const Coord3D goal = (*path)[path->size()-1];
@@ -3759,6 +3789,88 @@ void AIUpdateInterface::privateFollowPath( std::vector<Coord3D>* path, Object *i
 	// start us following
 	getStateMachine()->setState( exitProduction ? AI_FOLLOW_EXITPRODUCTION_PATH : AI_FOLLOW_PATH );
 
+}
+
+Bool AIUpdateInterface::isFollowingRetailGroupRoute() const
+{
+	return m_retailGroupRouteLeader != INVALID_ID && getStateMachine()->getCurrentStateID() == AI_FOLLOW_PATH;
+}
+
+Bool AIUpdateInterface::isRetailGroupHordePeer(const Object* other) const
+{
+	const Object* object = getObject();
+	const Object* anchor = HordeContain::get(object) ? object : object->getContainedBy();
+	const Object* otherAnchor = HordeContain::get(other) ? other : other->getContainedBy();
+	if (anchor != object && otherAnchor != other)
+		return FALSE;
+	const AIUpdateInterface* route = HordeContain::get(anchor) ? anchor->getAI() : nullptr;
+	const AIUpdateInterface* otherRoute = HordeContain::get(otherAnchor) ? otherAnchor->getAI() : nullptr;
+	return route && otherRoute && route->m_retailGroupRouteLeader != INVALID_ID &&
+		route->m_retailGroupRouteLeader == otherRoute->m_retailGroupRouteLeader &&
+		route->m_retailGroupRouteFrame == otherRoute->m_retailGroupRouteFrame &&
+		(route->isFollowingRetailGroupRoute() || otherRoute->isFollowingRetailGroupRoute());
+}
+
+void AIUpdateInterface::endRetailGroupRoute(Bool arrived)
+{
+	if (m_retailGroupRouteLeader == INVALID_ID)
+		return;
+	if (!arrived)
+	{
+		m_retailGroupRouteLeader = INVALID_ID;
+		m_retailGroupRouteFrame = 0;
+	}
+	m_waitingForPath = FALSE;
+	TheAI->pathfinder()->removeGoal(getObject());
+	m_retailGroupPeers.clear();
+	m_retailGroupReadyFrame = 0;
+	m_retailGroupArrivalDistance = 0.0f;
+	m_retailGroupArrivalSpeed = FAST_AS_POSSIBLE;
+}
+
+void AIUpdateInterface::setRetailGroupArrival(const std::vector<ObjectID>& peers, Real speed)
+{
+	m_retailGroupPeers = peers;
+	m_retailGroupArrivalSpeed = speed;
+}
+
+Bool AIUpdateInterface::stageRetailGroupArrival(const Coord3D& destination)
+{
+	if (m_retailGroupPeers.size() < 2)
+		return FALSE;
+	const Coord3D& from = *getObject()->getPosition();
+	m_retailGroupArrivalDistance = WWMath::SqrtfOrigin(sqr(destination.x - from.x) + sqr(destination.y - from.y));
+	m_retailGroupReadyFrame = TheGameLogic->getFrame();
+	setLocomotorGoalNone();
+	setPathExtraDistance(0.0f);
+	return TRUE;
+}
+
+Bool AIUpdateInterface::releaseRetailGroupArrival()
+{
+	UnsignedInt latestReadyFrame = m_retailGroupReadyFrame;
+	Real longestDistance = m_retailGroupArrivalDistance;
+	for (ObjectID id : m_retailGroupPeers)
+	{
+		if (id == getObject()->getID())
+			continue;
+		const Object* peer = TheGameLogic->findObjectByID(id);
+		if (!peer || peer->isEffectivelyDead() || !peer->isMobile() || peer->isDisabledByType(DISABLED_HELD))
+			continue;
+		const AIUpdateInterface* ai = peer->getAI();
+		if (!ai || !ai->isFollowingRetailGroupRoute() || ai->m_retailGroupRouteLeader != m_retailGroupRouteLeader ||
+			ai->m_retailGroupRouteFrame != m_retailGroupRouteFrame)
+			continue;
+		if (!ai->isStagedForRetailGroupArrival())
+			return FALSE;
+		latestReadyFrame = std::max(latestReadyFrame, ai->m_retailGroupReadyFrame);
+		longestDistance = std::max(longestDistance, ai->m_retailGroupArrivalDistance);
+	}
+	if (TheGameLogic->getFrame() <= latestReadyFrame)
+		return FALSE;
+	if (m_retailGroupArrivalSpeed < FAST_AS_POSSIBLE && longestDistance > 0.0f && m_retailGroupArrivalDistance > 0.0f)
+		setDesiredSpeed(m_retailGroupArrivalSpeed * (m_retailGroupArrivalDistance / longestDistance));
+	return TRUE;
 }
 
 //----------------------------------------------------------------------------------------
@@ -5856,7 +5968,26 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 
 void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 {
-	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{ "group-route", [this](Xfer* x) {
+			x->xferObjectID(&m_retailGroupRouteLeader);
+			x->xferUnsignedInt(&m_retailGroupRouteFrame);
+		}, [this] {
+			m_retailGroupRouteLeader = INVALID_ID;
+			m_retailGroupRouteFrame = 0;
+		} },
+		{ "group-arrival", [this](Xfer* x) {
+			x->xferSTLObjectIDVector(&m_retailGroupPeers);
+			x->xferUnsignedInt(&m_retailGroupReadyFrame);
+			x->xferReal(&m_retailGroupArrivalDistance);
+			x->xferReal(&m_retailGroupArrivalSpeed);
+		}, [this] {
+			m_retailGroupPeers.clear();
+			m_retailGroupReadyFrame = 0;
+			m_retailGroupArrivalDistance = 0.0f;
+			m_retailGroupArrivalSpeed = FAST_AS_POSSIBLE;
+		} }
+	});
 }
 
 const AttackPriorityInfo* AIUpdateInterface::getAttackInfo()
