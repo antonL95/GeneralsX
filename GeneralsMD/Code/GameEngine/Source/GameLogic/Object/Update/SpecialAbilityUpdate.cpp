@@ -907,7 +907,7 @@ void SpecialAbilityUpdate::startUnpacking()
         MAKE_MODELCONDITION_MASK( MODELCONDITION_UNPACKING ) );
 
   if (usesRotwkRules())
-    applyAbilityConditions();
+    applyAbilityConditions(FALSE);
 
   AudioEventRTS sound = data->m_unpackSound;
   sound.setObjectID( getObject()->getID() );
@@ -921,7 +921,10 @@ void SpecialAbilityUpdate::startUnpacking()
   if (ai)
     ai->aiBusy(CMD_FROM_AI);
   if (usesRotwkRules())
+  {
+    applyAbilityConditions(TRUE);
     onStartWindup();
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1215,7 +1218,7 @@ void SpecialAbilityUpdate::startPreparation()
     getObject()->setModelConditionState( MODELCONDITION_PREPARING );
     if (data->m_unpackTime == 0 || (m_noTargetCommand && data->m_skipPackingWithNoTarget))
     {
-      applyAbilityConditions();
+      applyAbilityConditions(TRUE);
       onStartWindup();
     }
   }
@@ -2355,9 +2358,12 @@ UnsignedInt SpecialAbilityUpdate::holdFramesAfterTrigger() const
 	return std::max( hold, data->m_freezeAfterTriggerDuration );
 }
 
-void SpecialAbilityUpdate::applyAbilityConditions()
+void SpecialAbilityUpdate::applyAbilityConditions(Bool includeAbilityAnimation)
 {
-	addAbilityConditions(m_rotwkConditions);
+	if (includeAbilityAnimation)
+		addAbilityConditions(m_rotwkConditions);
+	else
+		SpecialAbilityUpdate::addAbilityConditions(m_rotwkConditions);
 	getObject()->setModelConditionFlags(m_rotwkConditions);
 }
 

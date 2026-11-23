@@ -1,1 +1,2 @@
 24 Player_1 WizardBlastCaster 2585 910 0.85
+225 Player_1 WizardBlastCaster 2515 910 0.65

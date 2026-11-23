@@ -341,7 +341,7 @@ protected:
 
 private:
 
-	void applyAbilityConditions();
+	void applyAbilityConditions(Bool includeAbilityAnimation);
 
 	enum PackingState
 	{

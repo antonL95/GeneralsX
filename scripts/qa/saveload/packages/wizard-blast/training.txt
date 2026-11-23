@@ -5,3 +5,17 @@
 221 aim Player_1 WizardBlastCaster 0 PlyrCreeps:WizardBlastTarget:0
 470 destroy Player_1 WizardBlastCaster 0
 470 destroy PlyrCreeps WizardBlastTarget 0
+490 create Player_1 WizardBlastCaster 0 2460,910,180
+490 create PlyrCreeps WizardBlastTarget 0 2570,910,180
+491 reveal Player_1 WizardBlastCaster 0
+492 objupgrade Player_1 WizardBlastCaster 0 Upgrade_GandalfWhite
+520 power Player_1 WizardBlastCaster 0 SpecialAbilityIstariLight
+521 aim Player_1 WizardBlastCaster 0 PlyrCreeps:WizardBlastTarget:0
+680 destroy Player_1 WizardBlastCaster 0
+680 destroy PlyrCreeps WizardBlastTarget 0
+700 create Player_1 RivendellGandalfTheGrey_Summoned 0 2460,910,0
+700 create PlyrCreeps WizardBlastTarget 0 2570,910,180
+701 reveal Player_1 RivendellGandalfTheGrey_Summoned 0
+720 power Player_1 RivendellGandalfTheGrey_Summoned 0 SpecialAbilityWordOfPower
+910 destroy Player_1 RivendellGandalfTheGrey_Summoned 0
+910 destroy PlyrCreeps WizardBlastTarget 0
