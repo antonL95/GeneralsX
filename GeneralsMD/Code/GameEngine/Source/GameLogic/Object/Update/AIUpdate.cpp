@@ -1675,7 +1675,8 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 	AIUpdateInterface* aiOther = other->getAI();
 	if (aiOther == nullptr)
 		return FALSE;
-	if ((isFollowingRetailGroupRoute() || aiOther->isFollowingRetailGroupRoute()) && isRetailGroupHordePeer(other))
+	if ((m_retailGroupRouteLeader != INVALID_ID || aiOther->m_retailGroupRouteLeader != INVALID_ID) &&
+		ignoreRetailGroupAnchorContact(other))
 		return FALSE;
 
 	Bool selfMoving = isMoving();
@@ -3573,7 +3574,7 @@ Bool AIUpdateInterface::isMoving() const
  */
 void AIUpdateInterface::privateMoveAwayFromUnit( Object *unit, CommandSourceType cmdSource )
 {
-	if (unit && m_retailGroupRouteLeader != INVALID_ID && isRetailGroupHordePeer(unit))
+	if (unit && m_retailGroupRouteLeader != INVALID_ID && ignoreRetailGroupAnchorContact(unit))
 		return;
 	// the dead don't listen very well
 	if (isAiInDeadState() || (getObject()->isMobile() == FALSE) || !isAllowedToMoveAwayFromUnit())
@@ -3796,7 +3797,7 @@ Bool AIUpdateInterface::isFollowingRetailGroupRoute() const
 	return m_retailGroupRouteLeader != INVALID_ID && getStateMachine()->getCurrentStateID() == AI_FOLLOW_PATH;
 }
 
-Bool AIUpdateInterface::isRetailGroupHordePeer(const Object* other) const
+Bool AIUpdateInterface::ignoreRetailGroupAnchorContact(const Object* other) const
 {
 	const Object* object = getObject();
 	const Object* anchor = HordeContain::get(object) ? object : object->getContainedBy();
@@ -3805,10 +3806,16 @@ Bool AIUpdateInterface::isRetailGroupHordePeer(const Object* other) const
 		return FALSE;
 	const AIUpdateInterface* route = HordeContain::get(anchor) ? anchor->getAI() : nullptr;
 	const AIUpdateInterface* otherRoute = HordeContain::get(otherAnchor) ? otherAnchor->getAI() : nullptr;
+	const AIUpdateInterface* anchorAI = anchor == object ? route : otherRoute;
+	const Object* infantry = anchor == object ? other : object;
+	if (anchorAI && anchorAI->isFollowingRetailGroupRoute() && infantry->isMobile() &&
+		infantry->isKindOf(KINDOF_INFANTRY) && !HordeContain::get(infantry) && object->getRelationship(other) == ALLIES)
+		return TRUE;
 	return route && otherRoute && route->m_retailGroupRouteLeader != INVALID_ID &&
 		route->m_retailGroupRouteLeader == otherRoute->m_retailGroupRouteLeader &&
 		route->m_retailGroupRouteFrame == otherRoute->m_retailGroupRouteFrame &&
-		(route->isFollowingRetailGroupRoute() || otherRoute->isFollowingRetailGroupRoute());
+		(route->isFollowingRetailGroupRoute() || route->isIdle()) &&
+		(otherRoute->isFollowingRetailGroupRoute() || otherRoute->isIdle());
 }
 
 void AIUpdateInterface::endRetailGroupRoute(Bool arrived)
@@ -3836,11 +3843,11 @@ void AIUpdateInterface::setRetailGroupPacing(const std::vector<ObjectID>& peers,
 
 void AIUpdateInterface::updateRetailGroupPacing(Real distance)
 {
-	const Real MIN_PACE = 1.0f / 3.0f;
-	m_retailGroupRemainingDistance = distance;
 	if (m_retailGroupSpeed >= FAST_AS_POSSIBLE || distance <= 0.0f)
 		return;
-	Real longestDistance = distance;
+	const Real formationScale = hordeFormationSpeedScale();
+	m_retailGroupRemainingDistance = formationScale > 0.0f ? distance / formationScale : distance;
+	Real longestDistance = m_retailGroupRemainingDistance;
 	for (ObjectID id : m_retailGroupPeers)
 	{
 		if (id == getObject()->getID())
@@ -3854,7 +3861,8 @@ void AIUpdateInterface::updateRetailGroupPacing(Real distance)
 			continue;
 		longestDistance = std::max(longestDistance, ai->m_retailGroupRemainingDistance);
 	}
-	setDesiredSpeed(m_retailGroupSpeed * std::max(MIN_PACE, distance / longestDistance));
+	const Real minimumSpeed = std::min(m_retailGroupSpeed, PATHFIND_CELL_SIZE_F / LOGICFRAMES_PER_SECOND);
+	setDesiredSpeed(std::max(minimumSpeed, m_retailGroupSpeed * (m_retailGroupRemainingDistance / longestDistance)));
 }
 
 //----------------------------------------------------------------------------------------

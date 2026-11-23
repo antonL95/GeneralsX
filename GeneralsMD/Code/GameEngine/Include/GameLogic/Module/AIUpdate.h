@@ -271,7 +271,7 @@ protected:
 	virtual void privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction );///< follow the path defined by the given array of points
 	void startFollowPath(std::vector<Coord3D>* path, Object* ignoreObject, CommandSourceType cmdSource,
 		Bool exitProduction, ObjectID retailGroupLeader);
-	Bool isRetailGroupHordePeer(const Object* other) const;
+	Bool ignoreRetailGroupAnchorContact(const Object* other) const;
 	virtual void privateFollowPathAppend( const Coord3D *pos, CommandSourceType cmdSource );
 	virtual void privateAttackObject( Object *victim, Int maxShotsToFire, CommandSourceType cmdSource );					///< attack given object
 	void privateRetailHordeAttack(const AICommandParms& parms);
