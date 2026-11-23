@@ -53,6 +53,11 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/GameWindowTransitions.h"
 #include "GameClient/DisconnectMenu.h"
+#include "GameClient/Display.h"
+#include "GameClient/DisplayString.h"
+#include "GameClient/DisplayStringManager.h"
+#include "GameClient/GameFont.h"
+#include "GameClient/Keyboard.h"
 #include "GameLogic/ScriptEngine.h"
 
 
@@ -79,6 +84,219 @@ static NameKeyType buttonRestart = NAMEKEY_INVALID;
 static NameKeyType buttonReturn = NAMEKEY_INVALID;
 static NameKeyType buttonOptions = NAMEKEY_INVALID;
 static NameKeyType buttonSaveLoad = NAMEKEY_INVALID;
+
+namespace
+{
+enum class PauseChoice { None, Resume, Leave };
+
+GameWindow *retailPauseMenu = nullptr;
+Bool retailMenuPausedGame = FALSE;
+Bool confirmLeave = FALSE;
+Bool leaveQueued = FALSE;
+PauseChoice pauseSelection = PauseChoice::Resume;
+PauseChoice pausePress = PauseChoice::None;
+
+struct PauseCard
+{
+	Int x;
+	Int y;
+	Int width;
+	Int height;
+
+	Bool contains(Int px, Int py) const
+	{
+		return px >= x && px < x + width && py >= y && py < y + height;
+	}
+};
+
+constexpr Int pauseDesignHeight = 768;
+constexpr PauseCard pausePanel{360, 312, 304, 170};
+constexpr PauseCard resumeButton{376, 370, 272, 42};
+constexpr PauseCard leaveButton{376, 421, 272, 42};
+
+PauseCard pauseCardOnScreen(PauseCard card)
+{
+	const Real scale = TheDisplay->getHeight() / static_cast<Real>(pauseDesignHeight);
+	return {Int(TheDisplay->getWidth()) / 2 + Int((card.x - 512) * scale), Int(card.y * scale),
+		Int(card.width * scale), Int(card.height * scale)};
+}
+
+void drawPauseLabel(DisplayString *text, PauseCard card, const char *key, const WideChar *fallback)
+{
+	text->setText(TheGameText->fetchOrSubstitute(key, fallback));
+	Int width, height;
+	text->getSize(&width, &height);
+	text->draw(card.x + (card.width - width) / 2, card.y + (card.height - height) / 2, 0xFFF5F6F7, 0);
+}
+
+void drawRetailPauseMenu(GameWindow *window, WinInstanceData *)
+{
+	const Int width = TheDisplay->getWidth();
+	const Int height = TheDisplay->getHeight();
+	Int oldWidth, oldHeight;
+	window->winGetSize(&oldWidth, &oldHeight);
+	if (oldWidth != width || oldHeight != height)
+		window->winSetSize(width, height);
+	TheDisplay->drawFillRect(0, 0, width, height, 0x98000000);
+	const PauseCard panel = pauseCardOnScreen(pausePanel);
+	TheDisplay->drawFillRect(panel.x, panel.y, panel.width, panel.height, 0xFF14212A);
+	TheDisplay->drawOpenRect(panel.x, panel.y, panel.width, panel.height, 1.0f, 0xFF7897A8);
+
+	const PauseCard resume = pauseCardOnScreen(resumeButton);
+	const PauseCard leave = pauseCardOnScreen(leaveButton);
+	TheDisplay->drawFillRect(resume.x, resume.y, resume.width, resume.height,
+		pauseSelection == PauseChoice::Resume ? 0xFF365665 : 0xFF233741);
+	TheDisplay->drawFillRect(leave.x, leave.y, leave.width, leave.height,
+		pauseSelection == PauseChoice::Leave ? 0xFF365665 : 0xFF233741);
+
+	GameFont *font = TheFontLibrary->getFontPixels("Albertus MT", 18 * height / pauseDesignHeight, FALSE);
+	if (!font)
+		return;
+	DisplayString *text = TheDisplayStringManager->newDisplayString();
+	text->setFont(font);
+	const PauseCard title = pauseCardOnScreen({376, 323, 272, 35});
+	if (confirmLeave)
+	{
+		drawPauseLabel(text, title, "GUI:LeaveMatch", L"Leave this match?");
+		drawPauseLabel(text, resume, "GUI:Cancel", L"Cancel");
+		drawPauseLabel(text, leave, "GUI:LeaveForMainMenu", L"Return to Main Menu");
+	}
+	else
+	{
+		drawPauseLabel(text, title, "GUI:MatchMenu", L"Match Menu");
+		drawPauseLabel(text, resume, "GUI:Resume", L"Resume");
+		drawPauseLabel(text, leave, "GUI:LeaveForMainMenu", L"Return to Main Menu");
+	}
+	TheDisplayStringManager->freeDisplayString(text);
+}
+
+WindowMsgHandledType retailPauseSystem(GameWindow *window, UnsignedInt message, WindowMsgData state, WindowMsgData data)
+{
+	if (message == GWM_INPUT_FOCUS && state == TRUE)
+	{
+		*reinterpret_cast<Bool *>(data) = TRUE;
+		return MSG_HANDLED;
+	}
+	if (message == GWM_DESTROY && window == retailPauseMenu)
+	{
+		retailPauseMenu = nullptr;
+		if (TheInGameUI)
+			TheInGameUI->setQuitMenuVisible(FALSE);
+	}
+	return MSG_IGNORED;
+}
+
+void closeRetailPauseMenu()
+{
+	TheWindowManager->winDestroy(retailPauseMenu);
+	retailPauseMenu = nullptr;
+	TheInGameUI->setQuitMenuVisible(FALSE);
+	if (retailMenuPausedGame && TheGameLogic->isGamePaused())
+		TheGameLogic->setGamePaused(FALSE);
+	retailMenuPausedGame = FALSE;
+}
+
+void activatePauseChoice(PauseChoice choice)
+{
+	if (leaveQueued)
+		return;
+	switch (choice)
+	{
+		case PauseChoice::Resume:
+			if (confirmLeave)
+			{
+				confirmLeave = FALSE;
+				pauseSelection = PauseChoice::Resume;
+			}
+			else
+				HideQuitMenu();
+			break;
+		case PauseChoice::Leave:
+			if (confirmLeave)
+			{
+				leaveQueued = TRUE;
+				TheGameLogic->quit(FALSE);
+			}
+			else
+			{
+				confirmLeave = TRUE;
+				pauseSelection = PauseChoice::Resume;
+			}
+			break;
+		case PauseChoice::None:
+			break;
+	}
+}
+
+WindowMsgHandledType retailPauseInput(GameWindow *, UnsignedInt message, WindowMsgData point, WindowMsgData state)
+{
+	if (message == GWM_CHAR && (state & KEY_STATE_UP))
+	{
+		if (point == KEY_ESC)
+			activatePauseChoice(PauseChoice::Resume);
+		else if (point == KEY_ENTER)
+			activatePauseChoice(pauseSelection);
+		else if (point == KEY_UP || point == KEY_DOWN || point == KEY_TAB)
+			pauseSelection = pauseSelection == PauseChoice::Resume ? PauseChoice::Leave : PauseChoice::Resume;
+	}
+	if (message == GWM_MOUSE_POS || message == GWM_LEFT_DOWN || message == GWM_LEFT_UP)
+	{
+		const Int x = point & 0xFFFF;
+		const Int y = point >> 16;
+		PauseChoice at = PauseChoice::None;
+		if (pauseCardOnScreen(resumeButton).contains(x, y))
+			at = PauseChoice::Resume;
+		else if (pauseCardOnScreen(leaveButton).contains(x, y))
+			at = PauseChoice::Leave;
+		if (at != PauseChoice::None)
+			pauseSelection = at;
+		if (message == GWM_LEFT_DOWN)
+			pausePress = at;
+		else if (message == GWM_LEFT_UP)
+		{
+			const PauseChoice pressed = pausePress;
+			pausePress = PauseChoice::None;
+			if (at == pressed)
+				activatePauseChoice(at);
+		}
+	}
+	return MSG_HANDLED;
+}
+
+void openRetailPauseMenu()
+{
+	WinInstanceData data;
+	data.m_style = GWS_USER_WINDOW;
+	retailPauseMenu = TheWindowManager->winCreate(nullptr, WIN_STATUS_ENABLED | WIN_STATUS_ABOVE, 0, 0,
+		TheDisplay->getWidth(), TheDisplay->getHeight(), nullptr, &data);
+	if (!retailPauseMenu)
+		return;
+	retailPauseMenu->winSetDrawFunc(drawRetailPauseMenu);
+	retailPauseMenu->winSetInputFunc(retailPauseInput);
+	retailPauseMenu->winSetSystemFunc(retailPauseSystem);
+	confirmLeave = FALSE;
+	leaveQueued = FALSE;
+	pauseSelection = PauseChoice::Resume;
+	pausePress = PauseChoice::None;
+	HideDiplomacy();
+	HideInGameChat();
+	TheControlBar->hidePurchaseScience();
+	TheMouse->setCursor(Mouse::ARROW);
+	if (GameWindow *grab = TheWindowManager->winGetGrabWindow())
+	{
+		grab->winClearStatus(WIN_STATUS_ACTIVE);
+		TheWindowManager->winSetGrabWindow(nullptr);
+	}
+	if (GameWindow *capture = TheWindowManager->winGetCapture())
+		TheWindowManager->winRelease(capture);
+	TheWindowManager->winSetModal(retailPauseMenu);
+	TheWindowManager->winSetFocus(retailPauseMenu);
+	TheInGameUI->setQuitMenuVisible(TRUE);
+	retailMenuPausedGame = !TheGameLogic->isInMultiplayerGame() && !TheGameLogic->isGamePaused();
+	if (retailMenuPausedGame)
+		TheGameLogic->setGamePaused(TRUE);
+}
+}
 
 static void initGadgetsFullQuit()
 {
@@ -113,6 +331,8 @@ static void initGadgetsNoSaveQuit()
 
 void destroyQuitMenu()
 {
+	if (retailPauseMenu)
+		closeRetailPauseMenu();
   // destroy the quit menu
 	quitConfirmationWindow = nullptr;
 	if(fullQuitMenuLayout)
@@ -233,6 +453,11 @@ static void restartMissionMenu()
 //-------------------------------------------------------------------------------------------------
 void HideQuitMenu()
 {
+	if (retailPauseMenu)
+	{
+		closeRetailPauseMenu();
+		return;
+	}
 	// Note: This is called as a safety a lot, without checking for the presence of the quit menu.
 	// So don't do anything that counts on that menu actually being here.
 	if(!isVisible)
@@ -268,6 +493,11 @@ Bool canOpenQuitMenu()
 //-------------------------------------------------------------------------------------------------
 void ToggleQuitMenu()
 {
+	if (retailPauseMenu)
+	{
+		activatePauseChoice(PauseChoice::Resume);
+		return;
+	}
 	if (!isVisible && !canOpenQuitMenu())
 		return;
 
@@ -276,6 +506,13 @@ void ToggleQuitMenu()
 		if (TheDisconnectMenu->isScreenVisible() == TRUE) {
 			return;
 		}
+	}
+
+	if (RetailFileLayers::enabled())
+	{
+		if (TheGameLogic->isInGame() && !TheGameLogic->isInShellGame() && !TheShell->isShellActive())
+			openRetailPauseMenu();
+		return;
 	}
 
 	// BGC- this is kind of hackish, but its the safest way to do it I think.

@@ -1569,10 +1569,12 @@ Bool createRetailReturnMenu(WindowLayout &layout)
 	window->winSetInputFunc(menuInput);
 	layout.addWindow(window);
 	layout.setInit([](WindowLayout *screen, void *) {
+		GameWindow *window = screen->getFirstWindow();
+		static_cast<ReturnMenu *>(window->winGetUserData())->setup = FALSE;
 		TheWritableGlobalData->m_breakTheMovie = FALSE;
 		TheMouse->setVisibility(TRUE);
 		screen->hide(FALSE);
-		TheWindowManager->winSetFocus(screen->getFirstWindow());
+		TheWindowManager->winSetFocus(window);
 	});
 	layout.setShutdown([](WindowLayout *screen, void *) {
 		screen->hide(TRUE);

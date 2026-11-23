@@ -50,12 +50,14 @@
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "Common/MessageStream.h"
+#include "Common/RetailFileLayers.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/WindowXlat.h"
 #include "GameClient/Shell.h"
 #include "GameClient/Display.h"
 #include "GameClient/ControlBar.h"
+#include "GameLogic/GameLogic.h"
 
 
 // DEFINES ////////////////////////////////////////////////////////////////////
@@ -214,7 +216,8 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 		// ------------------------------------------------------------------------
 		case GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP:
 		{
-			if( TheInGameUI && TheInGameUI->isPlacementAnchored() )
+			if (TheInGameUI && TheInGameUI->isPlacementAnchored() &&
+				(!RetailFileLayers::enabled() || !TheInGameUI->isQuitMenuVisible()))
 			{
 				//If we release the button outside
 				forceKeepMessage = TRUE;
@@ -340,6 +343,17 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 					returnCode = WIN_INPUT_USED;
 				}
 			}
+
+#if !RTS_GENERALS
+			if (returnCode != WIN_INPUT_USED && key == KEY_ESC && RetailFileLayers::enabled() &&
+				TheGameLogic && TheGameLogic->isInGame() && !TheGameLogic->isInShellGame() &&
+				TheShell && !TheShell->isShellActive())
+			{
+				if (BitIsSet(state, KEY_STATE_UP))
+					TheMessageStream->appendMessage(GameMessage::MSG_META_OPTIONS);
+				returnCode = WIN_INPUT_USED;
+			}
+#endif
 
 			// TheSuperHackers @bugfix If the input is disabled, then only allow the ESC button to get through.
 			// Otherwise it would be possible to call user camera actions during scripted camera scenes.

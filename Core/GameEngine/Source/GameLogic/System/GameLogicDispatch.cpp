@@ -1196,7 +1196,7 @@ bool GameLogic::onNewGame(MAYBE_UNUSED GameMessage *msg)
 	return true;
 }
 
-bool GameLogic::onClearGameData(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
+bool GameLogic::onClearGameData(GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 #if defined(RTS_DEBUG)
 	if (TheDisplay && TheGlobalData->m_dumpAssetUsage)
@@ -1212,7 +1212,13 @@ bool GameLogic::onClearGameData(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curre
 #endif
 	}
 	currentlySelectedGroup = nullptr;
-	clearGameData();
+	const Bool returnToMainMenu = RetailFileLayers::enabled() && msg->getArgumentCount() == 1 &&
+		msg->getArgumentDataType(0) == ARGUMENTDATATYPE_BOOLEAN && msg->getArgument(0)->boolean;
+	if (returnToMainMenu)
+		TheWritableGlobalData->m_initialFile.clear();
+	clearGameData(!returnToMainMenu);
+	if (returnToMainMenu && !TheGameEngine->getQuitting())
+		TheShell->showShell(TRUE);
 
 	return true;
 }

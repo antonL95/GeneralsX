@@ -4768,6 +4768,11 @@ void GameLogic::quit(Bool toDesktop)
 				}
 			}
 		}
+		else if (RetailFileLayers::enabled() && TheInGameUI && TheInGameUI->isQuitMenuVisible())
+		{
+			GameMessage *clear = TheMessageStream->appendMessage(GameMessage::MSG_CLEAR_GAME_DATA);
+			clear->appendBooleanArgument(TRUE);
+		}
 		else
 		{
 			exitGame();
