@@ -1,0 +1,18 @@
+206 create Player_1 TrollSpinFixtureUnit 0 3268,2558,0
+206 create Player_1 TrollSpinFixtureBuilding 0 3252,2562,0
+206 create PlyrCreeps GoblinCaveTroll 0 3260,2560,0
+206 troll-spin-state PlyrCreeps GoblinCaveTroll 0
+206 troll-spin-trigger PlyrCreeps GoblinCaveTroll 0
+216 troll-spin-stop PlyrCreeps GoblinCaveTroll 0
+220 troll-spin-hit PlyrCreeps GoblinCaveTroll 0
+250 troll-spin-hit PlyrCreeps GoblinCaveTroll 0
+357 create PlyrCreeps TrollSpinFixtureVulnerable 0 3340,2560,0
+357 troll-spin-trigger PlyrCreeps TrollSpinFixtureVulnerable 0
+358 troll-spin-state PlyrCreeps TrollSpinFixtureVulnerable 0
+358 troll-spin-hit PlyrCreeps TrollSpinFixtureVulnerable 0
+359 troll-spin-state PlyrCreeps TrollSpinFixtureVulnerable 0
+359 destroy PlyrCreeps TrollSpinFixtureVulnerable 0
+360 create PlyrCreeps TrollSpinFixtureVulnerable 0 3340,2560,0
+360 troll-spin-hit PlyrCreeps TrollSpinFixtureVulnerable 0
+361 troll-spin-state PlyrCreeps TrollSpinFixtureVulnerable 0
+361 destroy PlyrCreeps TrollSpinFixtureVulnerable 0

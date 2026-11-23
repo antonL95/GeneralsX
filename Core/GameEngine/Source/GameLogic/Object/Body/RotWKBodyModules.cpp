@@ -2,8 +2,11 @@
 
 #include "GameLogic/Module/RotWKBodyModules.h"
 
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
+#include "GameLogic/Damage.h"
+#include "GameLogic/Object.h"
 #include "GameLogic/Weapon.h"
 
 void DelayedDeathBodyModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -26,6 +29,19 @@ DelayedDeathBody::DelayedDeathBody(Thing* thing, const ModuleData* moduleData) :
 }
 
 DelayedDeathBody::~DelayedDeathBody() = default;
+
+void DelayedDeathBody::attemptDamage(DamageInfo* damageInfo)
+{
+	if (damageInfo && RetailFileLayers::enabled() &&
+		getDelayedDeathBodyModuleData()->m_immortalUntilDeathTime &&
+		getObject()->testStatus(OBJECT_STATUS_RAMPAGING))
+	{
+		damageInfo->out.m_actualDamageDealt = 0.0f;
+		damageInfo->out.m_actualDamageClipped = 0.0f;
+		return;
+	}
+	RespawnBody::attemptDamage(damageInfo);
+}
 
 void DelayedDeathBody::crc(Xfer* xfer)
 {

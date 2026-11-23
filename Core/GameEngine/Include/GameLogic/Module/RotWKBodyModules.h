@@ -12,7 +12,7 @@ class DelayedDeathBodyModuleData : public RespawnBodyModuleData
 {
 public:
 	UnsignedInt m_delayedDeathTime = 0;
-	Bool m_immortalUntilDeathTime = FALSE;
+	Bool m_immortalUntilDeathTime = TRUE;
 	Bool m_doHealthCheck = FALSE;
 	const FXList* m_invulnerableFX = nullptr;
 	AsciiString m_delayedDeathPrerequisiteUpgrade;
@@ -27,6 +27,7 @@ class DelayedDeathBody : public RespawnBody
 
 public:
 	DelayedDeathBody(Thing* thing, const ModuleData* moduleData);
+	void attemptDamage(DamageInfo* damageInfo) override;
 };
 
 class PorcupineFormationBodyModuleData : public ActiveBodyModuleData

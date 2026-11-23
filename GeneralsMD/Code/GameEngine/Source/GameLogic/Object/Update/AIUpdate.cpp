@@ -39,6 +39,7 @@
 #include "Common/ModuleFactory.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
+#include "Common/RotwkDuration.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
@@ -1206,25 +1207,57 @@ UpdateSleepTime AIUpdateInterface::update()
 		}
 		subMachineSleep = UPDATE_SLEEP_NONE;
 	}
-	if (m_rampageUntil)
+	if (RetailFileLayers::enabled() && m_rampageUntil)
 	{
 		Object* object = getObject();
-		if (m_burningDeathUntil || object->isEffectivelyDead() || TheGameLogic->getFrame() >= m_rampageUntil)
+		const UnsignedInt frame = TheGameLogic->getFrame();
+		const Bool dying = m_burningDeathUntil || object->isEffectivelyDead();
+		constexpr UnsignedInt tick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+		if (!dying && frame <= m_rampageUntil && (m_rampageUntil - frame) % tick == 0)
+		{
+			if (const Weapon* weapon = object->getCurrentWeapon())
+			{
+				const WeaponStatus status = weapon->getStatus();
+				const UnsignedInt lastShot = weapon->getLastShotFrame();
+				if (status != PRE_ATTACK && lastShot &&
+					frame - lastShot < weapon->getTemplate()->getFiringDuration())
+					m_rampageWeaponPrimed = FALSE;
+				else if (status == READY_TO_FIRE)
+				{
+					if (m_rampageWeaponPrimed)
+						object->fireCurrentWeapon(object->getPosition());
+					m_rampageWeaponPrimed = TRUE;
+				}
+			}
+		}
+		if (dying || frame >= m_rampageUntil)
 		{
 			m_rampageUntil = 0;
+			m_rampageWeaponPrimed = FALSE;
 			object->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_RAMPAGING));
 			WeaponSetFlags flags;
 			flags.set(WEAPONSET_RAMPAGE);
 			object->setWeaponSetFlags(flags, FALSE);
-			if (!m_burningDeathUntil && !object->isEffectivelyDead())
+			if (!dying)
+			{
 				if (auto* runOff = RunOffMapBehavior::find(object))
 					runOff->trigger();
+				else
+				{
+					const BodyModuleInterface* body = object->getBodyModule();
+					DamageInfo damage;
+					if (const DamageInfo* lastDamage = body->getLastDamageInfo())
+						damage.in.m_sourceID = lastDamage->in.m_sourceID;
+					damage.in.m_damageType = DAMAGE_UNRESISTABLE;
+					damage.in.m_deathType = DEATH_NORMAL;
+					damage.in.m_amount = body->getHealth();
+					damage.in.m_kill = TRUE;
+					object->attemptDamage(&damage);
+				}
+			}
 		}
 		else
-		{
-			object->fireCurrentWeapon(object->getPosition());
 			subMachineSleep = UPDATE_SLEEP_NONE;
-		}
 	}
 	if (m_fearUntil || m_crushWarningUntil)
 	{
@@ -5990,6 +6023,11 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_retailGroupPeers.clear();
 			m_retailGroupRemainingDistance = 0.0f;
 			m_retailGroupSpeed = FAST_AS_POSSIBLE;
+		} },
+		{ "rampage-weapon", [this](Xfer* x) {
+			x->xferBool(&m_rampageWeaponPrimed);
+		}, [this] {
+			m_rampageWeaponPrimed = FALSE;
 		} }
 	});
 }
@@ -6022,7 +6060,8 @@ void AIUpdateInterface::enterRetailRampage()
 	const auto* data = getAIUpdateModuleData();
 	const UnsignedInt duration = data->m_rampageTime;
 	if (!RetailFileLayers::enabled() || !duration || m_rampageUntil ||
-		object->isEffectivelyDead() || object->getEnclosingContainedBy())
+		object->isEffectivelyDead() || object->getBodyModule()->getHealth() <= 0.0f ||
+		object->getEnclosingContainedBy())
 		return;
 
 	if (data->m_rampageRequiresAflame && !object->testStatus(OBJECT_STATUS_AFLAME))
@@ -6039,7 +6078,9 @@ void AIUpdateInterface::enterRetailRampage()
 		return;
 
 	privateIdle(CMD_FROM_AI);
+	TheGameLogic->deselectObject(object, PLAYERMASK_ALL, TRUE);
 	m_rampageUntil = TheGameLogic->getFrame() + duration;
+	m_rampageWeaponPrimed = FALSE;
 	object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_RAMPAGING));
 	object->setWeaponSetFlags(flags, TRUE);
 	wakeUpNow();
