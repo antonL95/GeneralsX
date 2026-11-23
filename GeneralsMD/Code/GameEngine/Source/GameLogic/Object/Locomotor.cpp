@@ -3156,8 +3156,9 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 	const Real lateral = fabs(Sin(remainingAngle));
 	if (m_template->m_fastTurnRadius > 0.0f && lateral > 0.0f)
 	{
-		const Real pursuitTurnRate = std::min(turnRate, maxSpeed / m_template->m_fastTurnRadius);
-		speed = std::min(speed, pursuitTurnRate * toGoal / (2.0f * lateral));
+		speed = std::min(speed, maxSpeed * toGoal / (2.0f * m_template->m_fastTurnRadius * lateral));
+		if (m_template->m_appearance == LOCO_HORDE && distance < PATHFIND_CELL_SIZE_F)
+			speed = std::min(speed, turnRate * toGoal / (2.0f * lateral));
 	}
 	steerVelocity(obj, physics, *obj->getUnitDirectionVector2D(), distance, speed);
 }
