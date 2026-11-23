@@ -72,6 +72,23 @@ Int findFaction(const char* name)
 	std::exit(2);
 }
 
+UnsignedInt parseFrame(const char* text)
+{
+	char* end = nullptr;
+	const unsigned long frame = std::strtoul(text, &end, 10);
+	if (!*text || *end || frame == 0 || frame > 54000)
+		invalidConfig();
+	return static_cast<UnsignedInt>(frame);
+}
+
+void activate(UnsignedInt limit)
+{
+	frameLimit = limit;
+	active = TRUE;
+	TheFramePacer->enableLogicTimeScale(FALSE);
+	TheFramePacer->enableFramesPerSecondLimit(FALSE);
+}
+
 Bool isCompetitor(const Player* player)
 {
 	return player && player->isPlayableSide() && player->getPlayerType() == PLAYER_COMPUTER;
@@ -467,9 +484,8 @@ Bool configure(SkirmishGameInfo& game)
 	const char* factionA = std::getenv("GENERALSX_SKIRMISH_PROBE_A");
 	const char* factionB = std::getenv("GENERALSX_SKIRMISH_PROBE_B");
 	const char* difficulty = std::getenv("GENERALSX_SKIRMISH_PROBE_DIFFICULTY");
-	char* end = nullptr;
-	const unsigned long limit = std::strtoul(frames, &end, 10);
-	if (!factionA || !factionB || !difficulty || !*frames || *end || limit == 0 || limit > 54000)
+	const UnsignedInt limit = parseFrame(frames);
+	if (!factionA || !factionB || !difficulty)
 		invalidConfig();
 
 	SlotState state;
@@ -519,13 +535,57 @@ Bool configure(SkirmishGameInfo& game)
 		game.setLocalIP(observer.getIP());
 	}
 
-	frameLimit = static_cast<UnsignedInt>(limit);
-	active = TRUE;
-	TheFramePacer->enableLogicTimeScale(FALSE);
-	TheFramePacer->enableFramesPerSecondLimit(FALSE);
+	activate(limit);
 	std::fprintf(stderr, "SKIRMISH_SETUP\t%s\t%s\t%s\t%u\n", factionA, factionB, difficulty, frameLimit);
 	std::fflush(stderr);
 	return TRUE;
+}
+
+void configureResume()
+{
+	const char* frames = std::getenv("GENERALSX_SKIRMISH_PROBE_FRAMES");
+	if (frames && TheGlobalData->m_headless && RetailFileLayers::enabled())
+		activate(parseFrame(frames));
+}
+
+void checkpoint(UnsignedInt frame)
+{
+	static const UnsignedInt checkpointFrame = [] {
+		const char* text = std::getenv("GENERALSX_SKIRMISH_PROBE_CHECKPOINT");
+		return text ? parseFrame(text) : 0u;
+	}();
+	if (frame != checkpointFrame || checkpointFrame == 0 || TheGameLogic->getGameMode() != GAME_SKIRMISH)
+		return;
+
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		const Player* player = ThePlayerList->getNthPlayer(i);
+		if (!isCompetitor(player))
+			continue;
+		Int buildings = 0;
+		Int queued = 0;
+		Int movingAttackers = 0;
+		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		{
+			if (object->getControllingPlayer() != player || object->isEffectivelyDead())
+				continue;
+			if (object->isKindOf(KINDOF_STRUCTURE) && !object->isKindOf(KINDOF_BASE_FOUNDATION) &&
+				!object->isKindOf(KINDOF_INERT) && !object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+				++buildings;
+			if (const auto* producer = object->getProductionUpdateInterface())
+			{
+				const ProductionEntry* entry = producer->firstProduction();
+				if (entry && entry->getProductionType() == PRODUCTION_UNIT)
+					++queued;
+			}
+			const AIUpdateInterface* ai = object->getAIUpdateInterface();
+			if (ai && ai->getModuleNameKey() == NAMEKEY("HordeAIUpdate") &&
+				ai->isMoving() && static_cast<const HordeAIUpdate*>(ai)->hasAttackOrder())
+				++movingAttackers;
+		}
+		std::fprintf(stderr, "SKIRMISH_CHECKPOINT\t%u\t%d\t%s\t%d\t%d\t%d\n",
+			frame, i, player->getPlayerTemplate()->getName().str(), buildings, queued, movingAttackers);
+	}
 }
 
 void crc(UnsignedInt frame, UnsignedInt value)
@@ -592,9 +652,15 @@ void structureDamage(const Object& object, const DamageInfo& damage)
 
 void cast(Int player, const AsciiString& power, ObjectID source)
 {
-	if (isCompetitor(ThePlayerList->getNthPlayer(player)))
+	const Player* owner = ThePlayerList->getNthPlayer(player);
+	if (isCompetitor(owner))
+	{
 		std::fprintf(stderr, "SKIRMISH_CAST\t%u\t%d\t%s\t%u\n", TheGameLogic->getFrame(),
 			player, power.str(), static_cast<unsigned>(source));
+		const Object* caster = TheGameLogic->findObjectByID(source);
+		if (caster && caster->isKindOf(KINDOF_SPELL_BOOK))
+			std::fprintf(stderr, "SKIRMISH_SPELLBOOK\t%u\t%d\t%s\n", TheGameLogic->getFrame(), player, power.str());
+	}
 }
 
 void purchase(const Player& player, const AsciiString& science)

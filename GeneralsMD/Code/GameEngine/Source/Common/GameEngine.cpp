@@ -1027,6 +1027,8 @@ void GameEngine::init()
 		}
 
 		TheFramePacer->setFramesPerSecondLimit(TheGlobalData->m_framesPerSecondLimit);
+		if (TheGlobalData->m_loadSaveGame.isNotEmpty())
+			RetailSkirmishProbe::configureResume();
 
 		TheAudio->setOn(TheGlobalData->m_audioOn && TheGlobalData->m_musicOn, AudioAffect_Music);
 		TheAudio->setOn(TheGlobalData->m_audioOn && TheGlobalData->m_soundsOn, AudioAffect_Sound);
@@ -1318,6 +1320,8 @@ void GameEngine::update()
 		// TheSuperHackers @info Ignores frozen time because the script engine needs updating in the logic update regardless.
 		if (canUpdateGameLogic(FramePacer::IgnoreFrozenTime))
 		{
+			if (RetailSkirmishProbe::enabled())
+				RetailSkirmishProbe::checkpoint(TheGameLogic->getFrame());
 			RetailTestCommands::saveCheckpoint(TheGameLogic->getFrame());
 			TheGameLogic->UPDATE();
 
