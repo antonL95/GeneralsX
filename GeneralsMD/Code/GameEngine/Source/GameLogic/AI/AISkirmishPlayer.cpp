@@ -104,6 +104,7 @@ struct RetailArmy
 	AsciiString name;
 	AsciiString side;
 	AsciiString farm;
+	AsciiString wallNode;
 	std::vector<RetailArmyMember> members;
 	std::vector<AsciiString> heroes;
 	std::vector<AsciiString> scavengedBuildings;
@@ -167,6 +168,7 @@ struct RetailAITuning
 	Bool disableUnitBuilding = FALSE;
 	Bool disableUnitUpgrading = FALSE;
 	Bool disableTacticalAI = FALSE;
+	Bool disableWallBuilding = FALSE;
 	Real defenseTreeNodeRadius = 300.0f;
 };
 
@@ -201,12 +203,6 @@ RetailSkirmishPolicy retailPolicy(const Player& player)
 				policy.difficulty = &difficulty;
 	}
 	return policy;
-}
-
-void skipRetailAISection(INI* ini, void*, void*, const void* section)
-{
-	ini->recordSkipped("subblock", static_cast<const char*>(section));
-	ini->readRawBlock(INI::getEndToken());
 }
 
 void parseCombatChainTargets(INI* ini, void*, void* store, const void*)
@@ -278,7 +274,7 @@ void parseTacticalTeamLimits(INI* ini, void*, void* store, const void*)
 	*static_cast<std::vector<Int>*>(store) = std::move(limits);
 }
 
-void parseFarmAssignment(INI* ini, void*, void* store, const void*)
+void parseRetailTemplateAssignment(INI* ini, void*, void* store, const void*)
 {
 	ini->getNextToken();
 	static const FieldParse fields[] = {
@@ -509,13 +505,20 @@ void chooseRetailDwarvenEra(Player& player, Object& keep)
 	}
 }
 
-Bool placeRetailBuilding(Object& builder, const ThingTemplate& type, const Coord3D& center)
+Object* constructRetailBuildingAt(Object& builder, const ThingTemplate& type, Coord3D point)
 {
-	DozerAIInterface* dozer = builder.getAI()->getDozerAIInterface();
 	Player* player = builder.getControllingPlayer();
 	const Real angle = type.getPlacementViewAngle();
 	const UnsignedInt flags = BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP |
 		BuildAssistant::CLEAR_PATH | BuildAssistant::USE_QUICK_PATHFIND | BuildAssistant::SUPPRESS_BUILD_BIBS;
+	if (TheBuildAssistant->isLocationLegalToBuild(&point, &type, angle, flags, &builder, player) != LBC_OK)
+		return nullptr;
+	point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+	return builder.getAI()->getDozerAIInterface()->construct(&type, &point, angle, player, FALSE);
+}
+
+Bool placeRetailBuilding(Object& builder, const ThingTemplate& type, const Coord3D& center)
+{
 	static const Coord2D directions[] = {
 		{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}
 	};
@@ -523,15 +526,56 @@ Bool placeRetailBuilding(Object& builder, const ThingTemplate& type, const Coord
 	{
 		for (const Coord2D& direction : directions)
 		{
-			Coord3D point = {center.x + direction.x * distance, center.y + direction.y * distance, 0.0f};
-			if (TheBuildAssistant->isLocationLegalToBuild(&point, &type, angle, flags, &builder, player) != LBC_OK)
-				continue;
-			point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
-			if (dozer->construct(&type, &point, angle, player, FALSE))
+			const Coord3D point = {center.x + direction.x * distance, center.y + direction.y * distance, 0.0f};
+			if (constructRetailBuildingAt(builder, type, point))
 				return TRUE;
 		}
 	}
 	return FALSE;
+}
+
+Coord2D retailWallFacing(const Player& player, const Coord3D& center)
+{
+	const Object* nearest = nullptr;
+	Real distance = 0.0f;
+	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		const Player* owner = object->getControllingPlayer();
+		if (!owner || !owner->isPlayableSide() || !owner->isPlayerActive() || object->isEffectivelyDead() ||
+			!isRetailFortressKeep(*object->getTemplate()) || player.getRelationship(object->getTeam()) != ENEMIES)
+			continue;
+		const Real candidate = tacticalDistanceSquared(*object->getPosition(), center);
+		if (!nearest || std::make_pair(candidate, object->getID()) < std::make_pair(distance, nearest->getID()))
+		{
+			nearest = object;
+			distance = candidate;
+		}
+	}
+	if (!nearest)
+		return {};
+	const Coord3D delta = *nearest->getPosition() - center;
+	const Real length = WWMath::SqrtfOrigin(sqr(delta.x) + sqr(delta.y));
+	return length > 0.0f ? Coord2D{delta.x / length, delta.y / length} : Coord2D{};
+}
+
+Object* placeRetailWallNode(Object& builder, const ThingTemplate& type, const Coord3D& center, const Coord2D& forward, size_t node)
+{
+	static const Real diagonal = WWMath::SqrtfOrigin(0.5f);
+	static const Coord2D angles[] = {
+		{1, 0}, {diagonal, -diagonal}, {diagonal, diagonal}, {0, -1},
+		{0, 1}, {-diagonal, -diagonal}, {-diagonal, diagonal}, {-1, 0}
+	};
+	const Coord2D direction{
+		forward.x * angles[node].x - forward.y * angles[node].y,
+		forward.x * angles[node].y + forward.y * angles[node].x
+	};
+	for (Real distance = 400.0f; distance <= 660.0f; distance += 20.0f)
+	{
+		const Coord3D point{center.x + direction.x * distance, center.y + direction.y * distance, 0.0f};
+		if (Object* hub = constructRetailBuildingAt(builder, type, point))
+			return hub;
+	}
+	return nullptr;
 }
 }
 
@@ -561,8 +605,8 @@ void AISkirmishPlayer::parseRetailArmy(INI* ini)
 	army.name = name;
 	static const FieldParse fields[] = {
 		{ "Side", INI::parseAsciiString, nullptr, offsetof(RetailArmy, side) },
-		{ "AIEconomyAssigment", parseFarmAssignment, nullptr, offsetof(RetailArmy, farm) },
-		{ "AIWallNodeAssignment", skipRetailAISection, "AIWallNodeAssignment", 0 },
+		{ "AIEconomyAssigment", parseRetailTemplateAssignment, nullptr, offsetof(RetailArmy, farm) },
+		{ "AIWallNodeAssignment", parseRetailTemplateAssignment, nullptr, offsetof(RetailArmy, wallNode) },
 		{ "ArmyMemberDefinition", parseArmyMember, nullptr, 0 },
 		{ "HeroBuildOrder", INI::parseAsciiStringVector, nullptr, offsetof(RetailArmy, heroes) },
 		{ "PhaseDuration_Rush", INI::parseReal, nullptr, offsetof(RetailArmy, rushSeconds) },
@@ -621,6 +665,7 @@ void AISkirmishPlayer::parseRetailTuning(INI* ini)
 		{ "DisableUnitBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableUnitBuilding) },
 		{ "DisableUnitUpgrading", INI::parseBool, nullptr, offsetof(RetailAITuning, disableUnitUpgrading) },
 		{ "DisableTacticalAI", INI::parseBool, nullptr, offsetof(RetailAITuning, disableTacticalAI) },
+		{ "DisableWallBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableWallBuilding) },
 		{ "DefenseTreeNodeRadius", INI::parseReal, nullptr, offsetof(RetailAITuning, defenseTreeNodeRadius) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -2025,6 +2070,58 @@ void AISkirmishPlayer::updateRetail()
 
 	if (retailTuning.disableTacticalAI)
 		return;
+	if (keep && !retailTuning.disableWallBuilding && phase == 2 && m_player->getCanBuildBase() &&
+		rules->wallNode.isNotEmpty() && money->countMoney() + m_retailSavings >= 2500)
+	{
+		const ThingTemplate* type = TheThingFactory->findTemplate(rules->wallNode, FALSE);
+		const auto builder = std::find_if(builders.begin(), builders.end(), [](Object* object) {
+			return object->getAI()->isIdle() && !object->getAI()->getDozerAIInterface()->isAnyTaskPending();
+		});
+		if (type && type->isKindOf(KINDOF_WALL_HUB) && builder != builders.end())
+		{
+			auto& plan = m_retailWallPlan;
+			const auto stillOwned = [&](ObjectID id) {
+				const Object* object = TheGameLogic->findObjectByID(id);
+				return object && !object->isEffectivelyDead() && object->getControllingPlayer() == m_player;
+			};
+			if (plan.defendedStructure != INVALID_ID && !stillOwned(plan.defendedStructure))
+				plan = {};
+			const Bool newPlan = plan.defendedStructure == INVALID_ID;
+			const Coord3D center = newPlan ? *keep->getPosition() : plan.center;
+			const Coord2D forward = newPlan ? retailWallFacing(*m_player, center) : plan.forward;
+			ObjectID defended = plan.defendedStructure;
+			if (newPlan)
+			{
+				const auto target = std::find_if(m_retailTargets.begin(), m_retailTargets.end(), [&](const auto& target) {
+					return !target.retiring && stillOwned(target.defendedStructure);
+				});
+				defended = target == m_retailTargets.end() ? keep->getID() : target->defendedStructure;
+			}
+			Bool attempted = FALSE;
+			Object* hub = nullptr;
+			for (size_t i = 0; i < plan.nodes.size(); ++i)
+			{
+				if (stillOwned(plan.nodes[i]))
+					continue;
+				attempted = TRUE;
+				if ((forward.x != 0.0f || forward.y != 0.0f) &&
+					spendWithSavings(type->calcCostToBuild(m_player), [&] {
+						hub = placeRetailWallNode(**builder, *type, center, forward, i);
+						return hub != nullptr;
+					}))
+				{
+					plan.defendedStructure = defended;
+					plan.center = center;
+					plan.forward = forward;
+					plan.nodes[i] = hub->getID();
+					break;
+				}
+			}
+			if (trace && attempted)
+				std::fprintf(stderr, "AI_WALL_NODE\t%u\t%d\t%d\t%d\t%s\n", frame, playerIndex,
+					defended, hub ? hub->getID() : INVALID_ID, hub ? "assigned" : "unavailable");
+		}
+	}
 	const UnsignedInt routeRevision = TheAI->pathfinder()->getRetailRouteRevision();
 	using ObjectiveKey = std::pair<ObjectID, UnsignedInt>;
 	std::map<ObjectiveKey, std::set<UnsignedInt>> activeTeams;
@@ -2479,6 +2576,7 @@ void AISkirmishPlayer::newMap()
 {
 	m_retailObjectives.clear();
 	m_retailTargets.clear();
+	m_retailWallPlan = {};
 	m_retailLastFarmFrame = 0;
 	m_retailSavings = 0;
 	m_retailScavengedBuilding = -1;
@@ -2695,6 +2793,15 @@ void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
 			}
 		}, [this] {
 			m_retailTargets.clear();
+		}},
+		{"skirmish-wall-nodes", [this](Xfer* x) {
+			x->xferObjectID(&m_retailWallPlan.defendedStructure);
+			x->xferCoord3D(&m_retailWallPlan.center);
+			x->xferCoord2D(&m_retailWallPlan.forward);
+			for (ObjectID& node : m_retailWallPlan.nodes)
+				x->xferObjectID(&node);
+		}, [this] {
+			m_retailWallPlan = {};
 		}}
 	});
 }

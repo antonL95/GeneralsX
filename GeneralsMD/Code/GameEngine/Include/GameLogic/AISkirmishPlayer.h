@@ -31,6 +31,7 @@
 #include "Common/GameMemory.h"
 #include "GameLogic/AIPlayer.h"
 
+#include <array>
 #include <map>
 #include <tuple>
 #include <set>
@@ -139,6 +140,14 @@ protected:
 		Bool retiring = FALSE;
 	};
 	std::vector<RetailTacticalTarget> m_retailTargets;
+	struct RetailWallPlan
+	{
+		ObjectID defendedStructure = INVALID_ID;
+		Coord3D center{};
+		Coord2D forward{};
+		std::array<ObjectID, 8> nodes{};
+	};
+	RetailWallPlan m_retailWallPlan;
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	UnsignedInt m_retailLastFarmFrame = 0;
 	UnsignedInt m_retailSavings = 0;
