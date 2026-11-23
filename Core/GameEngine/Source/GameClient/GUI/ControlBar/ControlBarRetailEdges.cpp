@@ -33,13 +33,11 @@
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/HotKey.h"
 #include "GameClient/Image.h"
-#include "GameClient/Keyboard.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/RetailHudExtras.h"
 #include "GameClient/RetailHudSettings.h"
 #include "GameClient/UiHudRules.h"
 #include "GameClient/UiScale.h"
-#include "GameClient/View.h"
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
@@ -253,23 +251,6 @@ void collectSpells()
 			hasSciences(player, power) && TheDisplay->hasImageTexture(command->getButtonImage()))
 			s_edges.spells.push_back(SpellEntry{command});
 	}
-}
-
-std::array<ViewLocation, 4> s_cameraViews;
-
-Bool isCameraView(const CommandButton *command)
-{
-	const SpecialPowerTemplate *power = command ? command->getSpecialPowerTemplate() : nullptr;
-	return power && power->getSpecialPowerType() == SPECIAL_GENERAL_TARGETLESS;
-}
-
-Int cameraSlot(Int spellIndex)
-{
-	Int slot = 0;
-	for (Int i = 0; i < spellIndex; ++i)
-		if (isCameraView(s_edges.spells[i].command))
-			++slot;
-	return slot;
 }
 
 Box spellButton(Real scale, Int slot)
@@ -638,21 +619,7 @@ Bool handleInput(UnsignedInt msg, Int x, Int y)
 		{
 			const Bool used = spell >= 0 || s_edges.pressed >= 0;
 			if (spell >= 0 && spell == s_edges.pressed)
-			{
-				if (isCameraView(s_edges.spells[spell].command) && TheTacticalView)
-				{
-					const Int slot = cameraSlot(spell);
-					if (slot < static_cast<Int>(s_cameraViews.size()))
-					{
-						if (TheKeyboard && TheKeyboard->isCtrl())
-							TheTacticalView->getLocation(&s_cameraViews[slot]);
-						else if (s_cameraViews[slot].isValid())
-							TheTacticalView->userSetLocation(&s_cameraViews[slot]);
-					}
-				}
-				else
-					TheControlBar->clickRetailSpellButton(s_edges.spells[spell].command);
-			}
+				TheControlBar->clickRetailSpellButton(s_edges.spells[spell].command);
 			s_edges.pressed = -1;
 			return used;
 		}
