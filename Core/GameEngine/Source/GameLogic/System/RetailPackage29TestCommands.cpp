@@ -4,6 +4,9 @@
 #if RTS_ZEROHOUR
 #include "Common/ActionManager.h"
 #include "Common/MessageStream.h"
+#include "Common/Player.h"
+#include "Common/PlayerList.h"
+#include "Common/ThingTemplate.h"
 #include "Common/SpecialPower.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/InGameUI.h"
@@ -12,13 +15,16 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/SpecialPowerUpdateModule.h"
+#include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 
 #include <cstdio>
 
 namespace
 {
-void handleArrowStorm(const RetailTestCommands::Context& ctx)
+void handleLocationAbility(const RetailTestCommands::Context& ctx)
 {
 	Object* source = ctx.requireObject();
 	if (!source)
@@ -50,18 +56,19 @@ void handleArrowStorm(const RetailTestCommands::Context& ctx)
 	const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
 	if (!power)
 		return;
+	const Bool poultry = ctx.action.starts_with("pkg29-poultry-");
 	const Coord3D position = ctx.hasPosition ? ctx.groundLocation() : *source->getPosition();
-	if (ctx.action == "pkg29-arrow-probe")
+	if (ctx.action.ends_with("-probe"))
 	{
 		ctx.selectObject(source);
 		TheInGameUI->setGUICommand(button);
 		const Bool valid = TheInGameUI->canSelectedObjectsDoSpecialPower(button, nullptr, &position,
 			InGameUI::SELECTION_ANY, button->getOptions(), source);
-		std::fprintf(stderr, "TEST pkg29 arrow cursor frame=%u armed=%d valid=%d cursor=%s\n",
-			ctx.frame, TheInGameUI->getGUICommand() == button, valid,
+		std::fprintf(stderr, "TEST pkg29 %s cursor frame=%u armed=%d valid=%d cursor=%s\n",
+			poultry ? "poultry" : "arrow", ctx.frame, TheInGameUI->getGUICommand() == button, valid,
 			(valid ? button->getCursorName() : button->getInvalidCursorName()).str());
 	}
-	else if (ctx.action == "pkg29-arrow-cast")
+	else if (ctx.action.ends_with("-cast"))
 	{
 		ctx.selectObject(source);
 		GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION);
@@ -72,18 +79,65 @@ void handleArrowStorm(const RetailTestCommands::Context& ctx)
 		message->appendIntegerArgument(button->getOptions());
 		message->appendObjectIDArgument(source->getID());
 	}
-	else if (ctx.action == "pkg29-arrow-script")
+	else if (ctx.action.ends_with("-script"))
 	{
 		source->doCommandButtonAtPosition(button, &position, CMD_FROM_SCRIPT);
 	}
-	else if (ctx.action == "pkg29-arrow-state")
+	else if (ctx.action == "pkg29-poultry-ai")
+	{
+		const UnsignedInt options = button->getOptions() | COMMAND_OPTION_INTERNAL_AUTO;
+		if (TheActionManager->canDoSpecialPowerAtLocation(source, &position, CMD_FROM_AI, power, nullptr, options))
+			source->doSpecialPowerAtLocation(power, &position, INVALID_ANGLE, options);
+	}
+	else if (ctx.action.ends_with("-state"))
 	{
 		const SpecialPowerModuleInterface* module = source->getSpecialPowerModule(power);
 		const Bool casting = source->getLogicModelConditions().test(MODELCONDITION_PREPARING);
-		std::fprintf(stderr, "TEST pkg29 arrow frame=%u ready=%d accepted=%d firing=%d paralyzed=%d\n",
-			ctx.frame, module && module->isReady(), module && module->wasLastCastAccepted(), casting,
-			source->isDisabledByType(DISABLED_PARALYZED));
+		if (poultry)
+		{
+			Bool active = FALSE;
+			for (BehaviorModule** behavior = source->getBehaviorModules(); *behavior; ++behavior)
+			{
+				const auto* update = (*behavior)->getSpecialPowerUpdateInterface();
+				active = active || (update && update->isActive());
+			}
+			std::fprintf(stderr, "TEST pkg29 poultry frame=%u ready=%d accepted=%d active=%d\n",
+				ctx.frame, module && module->isReady(), module && module->wasLastCastAccepted(), active);
+		}
+		else
+			std::fprintf(stderr, "TEST pkg29 arrow frame=%u ready=%d accepted=%d firing=%d paralyzed=%d\n",
+				ctx.frame, module && module->isReady(), module && module->wasLastCastAccepted(), casting,
+				source->isDisabledByType(DISABLED_PARALYZED));
 	}
+}
+
+void handlePoultry(const RetailTestCommands::Context& ctx)
+{
+	if (ctx.action != "pkg29-poultry-count")
+	{
+		handleLocationAbility(ctx);
+		return;
+	}
+	Int living = 0;
+	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if (object->isEffectivelyDead() || object->isDestroyed())
+			continue;
+		const std::string_view name = object->getTemplate()->getName().str();
+		if (name != ctx.argument && (std::string_view(ctx.argument) != "animals" || !name.ends_with("_Replacement")))
+			continue;
+		const Player* player = object->getControllingPlayer();
+		if (ctx.playerName != "*" && player != ctx.findPlayer())
+			continue;
+		++living;
+		std::fprintf(stderr, "TEST pkg29 poultry object frame=%u name=%s neutral=%d x=%.1f y=%.1f angle=%.3f hp=%.1f/%.1f xp=%.1f upgrades=%d\n",
+			ctx.frame, name.data(), player == ThePlayerList->getNeutralPlayer(),
+			object->getPosition()->x, object->getPosition()->y, object->getOrientation(), object->getBodyModule()->getHealth(),
+			object->getBodyModule()->getMaxHealth(), object->getExperienceTracker()->getRetailExperience(),
+			object->getObjectCompletedUpgradeMask().any());
+	}
+	std::fprintf(stderr, "TEST pkg29 poultry count frame=%u object=%s player=%.*s living=%d\n",
+		ctx.frame, ctx.argument, static_cast<Int>(ctx.playerName.size()), ctx.playerName.data(), living);
 }
 
 void handlePackage29(const RetailTestCommands::Context& ctx)
@@ -152,7 +206,8 @@ void registerRetailPackage29TestCommands()
 {
 #if RTS_ZEROHOUR
 	registerPrefix("pkg29-", handlePackage29);
-	registerPrefix("pkg29-arrow-", handleArrowStorm);
+	registerPrefix("pkg29-arrow-", handleLocationAbility);
+	registerPrefix("pkg29-poultry-", handlePoultry);
 #endif
 }
 }

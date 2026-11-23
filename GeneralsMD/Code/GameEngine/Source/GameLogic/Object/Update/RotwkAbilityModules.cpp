@@ -11,10 +11,12 @@
 
 #include "Common/AbilityRules.h"
 #include "Common/ActionManager.h"
+#include "Common/BuildAssistant.h"
 #include "Common/GameAudio.h"
 #include "Common/INIAudit.h"
 #include "Common/INIException.h"
 #include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
@@ -38,6 +40,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/AnimalAIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
@@ -261,6 +264,144 @@ void ArrowStormUpdate::loadPostProcess()
 	SpecialAbilityUpdate::loadPostProcess();
 	if (usesRotwkRules() && isActive() && getObject()->getLogicModelConditions().test(MODELCONDITION_PREPARING))
 		startPreparationSound();
+}
+
+void ReplaceObjectUpdateModuleData::parseRule(INI* ini, void* instance, void*, const void*)
+{
+	static const FieldParse fields[] = {
+		{ "TargetObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(Rule, filter) },
+		{ "ReplacementObjectName", INI::parseAsciiStringVector, nullptr, offsetof(Rule, replacements) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	auto* data = static_cast<ReplaceObjectUpdateModuleData*>(instance);
+	ini->initFromINI(&data->m_rules.emplace_back(), fields);
+}
+
+void ReplaceObjectUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	SpecialAbilityUpdateModuleData::buildFieldParse(p);
+	static const FieldParse fields[] = {
+		{ "ReplaceObject", parseRule, nullptr, 0, true },
+		{ "ReplaceRadius", INI::parseReal, nullptr, offsetof(ReplaceObjectUpdateModuleData, m_replaceRadius) },
+		{ "ReplaceFX", INI::parseFXList, nullptr, offsetof(ReplaceObjectUpdateModuleData, m_replaceFX) },
+		{ "Scatter", INI::parseBool, nullptr, offsetof(ReplaceObjectUpdateModuleData, m_scatter) },
+		{ "SkipContinue", INI::parseBool, nullptr, offsetof(ReplaceObjectUpdateModuleData, m_skipContinue) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+ReplaceObjectUpdate::~ReplaceObjectUpdate() = default;
+
+const ReplaceObjectUpdate* ReplaceObjectUpdate::find(const Object* source, const SpecialPowerTemplate* power)
+{
+	for (BehaviorModule** module = source->getBehaviorModules(); *module; ++module)
+	{
+		const auto* replacement = dynamic_cast<const ReplaceObjectUpdate*>(*module);
+		if (replacement && replacement->getTemplate() == power)
+			return replacement;
+	}
+	return nullptr;
+}
+
+Bool ReplaceObjectUpdate::acceptsIntent(const Object* target, const Coord3D* location) const
+{
+	return location && !target && !isActive() && getObject()->getAI() &&
+		!getReplaceObjectUpdateModuleData()->m_rules.empty() &&
+		SpecialAbilityUpdate::acceptsIntent(target, location);
+}
+
+Bool ReplaceObjectUpdate::initiateIntentToDoSpecialPower(const SpecialPowerTemplate* power, const Object* target,
+	const Coord3D* location, const Waypoint* waypoint, UnsignedInt options)
+{
+	if (!usesRotwkRules() || power != getTemplate() || !acceptsIntent(target, location))
+		return FALSE;
+	const CommandSourceType source = options & COMMAND_FIRED_BY_SCRIPT ? CMD_FROM_SCRIPT :
+		options & COMMAND_OPTION_INTERNAL_AUTO ? CMD_FROM_AI : CMD_FROM_PLAYER;
+	const auto* starter = getMySPM();
+	if (source != CMD_FROM_SCRIPT && (!starter || !starter->isReady()))
+		return FALSE;
+	if (!power->isValidRetailTarget(getObject(), nullptr, location, source))
+		return FALSE;
+	return SpecialAbilityUpdate::initiateIntentToDoSpecialPower(power, nullptr, location, waypoint, options);
+}
+
+void ReplaceObjectUpdate::replace(Object* victim, const ReplaceObjectUpdateModuleData::Rule& rule)
+{
+	Object* caster = getObject();
+	const auto* data = getReplaceObjectUpdateModuleData();
+	const Int index = GameLogicRandomValue(0, static_cast<Int>(rule.replacements.size()) - 1);
+	const ThingTemplate* replacement = TheThingFactory->findTemplate(rule.replacements[index], FALSE);
+	Player* neutral = ThePlayerList->getNeutralPlayer();
+	Object* animal = TheBuildAssistant->buildObjectNow(nullptr, replacement, victim->getPosition(),
+		victim->getOrientation(), neutral, victim);
+	if (animal)
+	{
+		animal->setProducer(caster);
+		FXList::doFXObj(data->m_replaceFX, animal);
+		if (data->m_scatter)
+		{
+			if (auto* ai = dynamic_cast<AnimalAIUpdate*>(animal->getAI()))
+				ai->fleeFrom(*caster);
+		}
+	}
+	DamageInfo damage;
+	damage.in.m_sourceID = caster->getID();
+	damage.in.m_damageType = DAMAGE_UNRESISTABLE;
+	damage.in.m_amount = victim->getBodyModule()->getMaxHealth();
+	damage.in.m_kill = TRUE;
+	victim->attemptDamage(&damage);
+	TheGameLogic->destroyObject(victim);
+}
+
+void ReplaceObjectUpdate::triggerAbilityEffect()
+{
+	SpecialAbilityUpdate::triggerAbilityEffect();
+	const auto* data = getReplaceObjectUpdateModuleData();
+	const Coord3D& center = getAbilityTargetPos();
+	Object* self = getObject();
+	PartitionFilterAlive alive;
+	PartitionFilter* filters[] = { &alive, nullptr };
+	for (const auto& rule : data->m_rules)
+	{
+		if (rule.replacements.empty())
+			continue;
+		SimpleObjectIterator* nearby = ThePartitionManager->iterateObjectsInRange(
+			&center, data->m_replaceRadius, FROM_CENTER_2D, filters);
+		MemoryPoolObjectHolder holder(nearby);
+		std::vector<ObjectID> victims;
+		for (Object* target = nearby->first(); target; target = nearby->next())
+		{
+			const Object* container = target->getContainedBy();
+			if (target != self && (!container || HordeContain::get(container)) &&
+				rule.filter.matchesObject(self, target))
+				victims.push_back(target->getID());
+		}
+		std::sort(victims.begin(), victims.end());
+		for (ObjectID id : victims)
+		{
+			Object* victim = TheGameLogic->findObjectByID(id);
+			if (victim && !victim->isDestroyed() && !victim->isEffectivelyDead())
+				replace(victim, rule);
+		}
+	}
+}
+
+void ReplaceObjectUpdate::crc(Xfer* xfer)
+{
+	SpecialAbilityUpdate::crc(xfer);
+	if (usesRotwkRules())
+		crcRetailAbilityPhase(xfer);
+}
+
+void ReplaceObjectUpdate::xfer(Xfer* xfer)
+{
+	SpecialAbilityUpdate::xfer(xfer);
+}
+
+void ReplaceObjectUpdate::loadPostProcess()
+{
+	SpecialAbilityUpdate::loadPostProcess();
 }
 
 void CurseSpecialPowerModuleData::buildFieldParse(MultiIniFieldParse& p)

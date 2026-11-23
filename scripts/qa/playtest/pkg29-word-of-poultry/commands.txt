@@ -1,0 +1,9 @@
+20 create Player_1 CreateAHero 0 3170,630,0
+21 objupgrade Player_1 CreateAHero 0 Upgrade_CreateAHero_ClassIstariWizard
+21 objupgrade Player_1 CreateAHero 0 Upgrade_CreateAHeroWordOfPoultry_Level1
+22 reveal Player_1 CreateAHero 0
+35 create PlyrCreeps MordorFighterHorde 0 3250,630,180
+44 select Player_1 CreateAHero 0
+52 pkg29-poultry-script Player_1 CreateAHero 0 Command_CreateAHero_WordOfPoultry_Level1 3250 630
+59 pkg29-poultry-state Player_1 CreateAHero 0 Command_CreateAHero_WordOfPoultry_Level1
+110 pkg29-poultry-count * - 0 animals

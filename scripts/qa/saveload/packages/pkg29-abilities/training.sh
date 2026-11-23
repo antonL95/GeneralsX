@@ -41,4 +41,34 @@ check() {
 		expect 'TEST pkg29 arrow frame=1217 ready=1 accepted=0 firing=0 paralyzed=0'
 		grep -E '^TEST mods 1280 object .*\(ArnorFarm\) .* production=3\.000 .*lists=.*MalbethPreparations' "$log"
 	fi
+	if covers 220; then
+		expect 'TEST pkg29 poultry cursor frame=220 armed=1 valid=0 cursor=GenericInvalid'
+		expect 'TEST pkg29 poultry frame=222 ready=1 accepted=0 active=0'
+		expect 'TEST pkg29 poultry cursor frame=236 armed=1 valid=1 cursor=Bombard'
+	fi
+	if covers 244; then
+		grep -E '^TEST pkg29 poultry frame=244 ready=1 accepted=[01] active=1$' "$log"
+		expect 'TEST pkg29 poultry count frame=244 object=animals player=* living=0'
+	fi
+	if covers 290; then
+		expect 'TEST pkg29 poultry count frame=290 object=animals player=* living=1'
+		expect 'TEST pkg29 poultry count frame=290 object=Pkg29PoultryTarget player=PlyrCreeps living=0'
+		expect 'TEST pkg29 poultry count frame=290 object=Pkg29PoultryTarget player=Player_1 living=1'
+		grep -E '^TEST pkg29 poultry object frame=290 name=[A-Za-z0-9]+_Replacement neutral=1 .* xp=0\.0 upgrades=0$' "$log"
+		grep -E '^TEST pkg29 poultry frame=295 ready=0 accepted=[01] active=0$' "$log"
+	fi
+	if covers 580; then
+		expect 'TEST pkg29 poultry count frame=580 object=animals player=* living=0'
+		expect 'TEST pkg29 poultry count frame=580 object=Pkg29PoultryTarget player=PlyrCreeps living=0'
+	fi
+	if covers 670; then
+		expect 'TEST pkg29 poultry frame=636 ready=1 accepted=1 active=1'
+		expect 'TEST pkg29 poultry count frame=670 object=Pkg29PoultryTarget player=PlyrCreeps living=0'
+		expect 'TEST pkg29 poultry count frame=670 object=animals player=* living=1'
+		expect 'TEST pkg29 poultry frame=675 ready=0 accepted=1 active=0'
+	fi
+	if covers 1000; then
+		expect 'TEST pkg29 poultry frame=965 ready=1 accepted=1 active=1'
+		expect 'TEST pkg29 poultry count frame=1000 object=Pkg29PoultryTarget player=PlyrCreeps living=0'
+	fi
 }

@@ -59,6 +59,46 @@ private:
 	Bool m_volleyComplete = FALSE;
 };
 
+class ReplaceObjectUpdateModuleData : public SpecialAbilityUpdateModuleData
+{
+public:
+	struct Rule
+	{
+		SpecialPowerObjectFilter filter;
+		std::vector<AsciiString> replacements;
+	};
+
+	static void buildFieldParse(MultiIniFieldParse& p);
+	static void parseRule(INI* ini, void* instance, void*, const void*);
+
+	std::vector<Rule> m_rules;
+	Real m_replaceRadius = 0.0f;
+	const FXList* m_replaceFX = nullptr;
+	Bool m_scatter = FALSE;
+	Bool m_skipContinue = FALSE;
+};
+
+class ReplaceObjectUpdate final : public SpecialAbilityUpdate
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(ReplaceObjectUpdate, "ReplaceObjectUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(ReplaceObjectUpdate, ReplaceObjectUpdateModuleData)
+
+public:
+	using SpecialAbilityUpdate::SpecialAbilityUpdate;
+	static const ReplaceObjectUpdate* find(const Object* source, const SpecialPowerTemplate* power);
+	Bool allowsLocation(const Coord3D* location) const { return acceptsIntent(nullptr, location); }
+	Bool initiateIntentToDoSpecialPower(const SpecialPowerTemplate* power, const Object* target,
+		const Coord3D* location, const Waypoint* waypoint, UnsignedInt options) override;
+
+protected:
+	Bool acceptsIntent(const Object* target, const Coord3D* location) const override;
+	Bool skipsContinue() const override { return getReplaceObjectUpdateModuleData()->m_skipContinue; }
+	void triggerAbilityEffect() override;
+
+private:
+	void replace(Object* victim, const ReplaceObjectUpdateModuleData::Rule& rule);
+};
+
 class CurseSpecialPowerModuleData : public SpecialAbilityUpdateModuleData
 {
 public:

@@ -1621,9 +1621,11 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 		{
 			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
 			const UnsignedInt options = button ? button->getOptions() : commandOptions;
+			const auto* replacement = ReplaceObjectUpdate::find(obj, spTemplate);
 			return (!button || (button->isMountStateAllowed(obj) && button->isModelConditionAllowed(obj) &&
 				button->isValidContainerForCommand(obj) && (options & NEED_TARGET_POS))) &&
 				retailPowerLocationAllowed(obj, loc, spTemplate) &&
+				(!replacement || replacement->allowsLocation(loc)) &&
 				(spTemplate->getSpecialPowerType() != SPECIAL_ARROW_STORM || ArrowStormUpdate::allowsLocation(obj, spTemplate, loc)) &&
 				(commandSource == CMD_FROM_AI ? !spTemplate->hasForbiddenRetailObjects(obj, loc, objectInWay) :
 					spTemplate->isValidRetailTarget(obj, nullptr, loc, commandSource));

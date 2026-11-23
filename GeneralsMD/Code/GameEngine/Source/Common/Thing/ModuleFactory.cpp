@@ -602,6 +602,7 @@ void ModuleFactory::init()
 		addModule( GiantBirdAIUpdate );
 		addModule( CommandPointsUpgrade );
 		addModule( ArrowStormUpdate );
+		addModule( ReplaceObjectUpdate );
 		addModule( WeaponFireSpecialAbilityUpdate );
 		addModule( ModelConditionSpecialAbilityUpdate );
 		addModule( CurseSpecialPower );

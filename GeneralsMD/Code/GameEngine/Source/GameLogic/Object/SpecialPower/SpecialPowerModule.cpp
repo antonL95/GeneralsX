@@ -45,6 +45,7 @@
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
@@ -539,6 +540,12 @@ void SpecialPowerModule::startPowerRecharge()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+static Bool startsAttackInUpdate(const SpecialPowerModule& module, const Object* source)
+{
+	return module.getPowerModuleData()->m_updateModuleStartsAttack ||
+		(RetailFileLayers::enabled() && ReplaceObjectUpdate::find(source, module.getSpecialPowerTemplate()));
+}
+
 Bool SpecialPowerModule::initiateIntentToDoSpecialPower( const Object *targetObj, const Coord3D *targetPos, const Waypoint *way, UnsignedInt commandOptions )
 {
 	Bool valid = false;
@@ -576,7 +583,7 @@ Bool SpecialPowerModule::initiateIntentToDoSpecialPower( const Object *targetObj
 		return false;
 	}
 
-	if (!valid && getSpecialPowerModuleData()->m_updateModuleStartsAttack &&
+	if (!valid && startsAttackInUpdate(*this, getObject()) &&
 		ModuleFactory::registersRotwkModules() && getModuleNameKey() == NAMEKEY("SpecialPowerModule"))
 		return FALSE;
 
@@ -584,7 +591,7 @@ Bool SpecialPowerModule::initiateIntentToDoSpecialPower( const Object *targetObj
 
 	//If we depend on our update module to trigger the special power, make sure we have the
 	//appropriate update module!
-	if( !valid && getSpecialPowerModuleData()->m_updateModuleStartsAttack )
+	if( !valid && startsAttackInUpdate(*this, getObject()) )
 	{
 		DEBUG_CRASH( ("Object does not contain a special power module to execute.  Did you forget to add it to the object INI?"));
 		//DEBUG_CRASH(( "Object does not contain special power module (%s) to execute.  Did you forget to add it to the object INI?",
@@ -836,7 +843,7 @@ void SpecialPowerModule::doSpecialPower( UnsignedInt commandOptions )
 
 	const Bool initiated = initiateIntentToDoSpecialPower( nullptr, nullptr, nullptr, commandOptions );
 
-	if( !getSpecialPowerModuleData()->m_updateModuleStartsAttack )
+	if( !startsAttackInUpdate(*this, getObject()) )
 	{
 		triggerSpecialPower( nullptr );
 		m_lastCastAccepted = TRUE;
@@ -858,7 +865,7 @@ void SpecialPowerModule::doSpecialPowerAtObject( Object *obj, UnsignedInt comman
 
 	const Bool initiated = initiateIntentToDoSpecialPower( obj, nullptr, nullptr, commandOptions );
 
-	if( !getSpecialPowerModuleData()->m_updateModuleStartsAttack )
+	if( !startsAttackInUpdate(*this, getObject()) )
 	{
 		triggerSpecialPower( obj->getPosition() );
 		m_lastCastAccepted = TRUE;
@@ -881,7 +888,7 @@ void SpecialPowerModule::doSpecialPowerAtLocation( const Coord3D *loc, Real angl
 	if (m_availableOnFrame == 0xFFFFFFFF)
 		return;
 
-	if( !getSpecialPowerModuleData()->m_updateModuleStartsAttack )
+	if( !startsAttackInUpdate(*this, getObject()) )
 	{
 		triggerSpecialPower( loc );
 		m_lastCastAccepted = TRUE;
@@ -901,7 +908,7 @@ void SpecialPowerModule::doSpecialPowerUsingWaypoints( const Waypoint *way, Unsi
 
 	const Bool initiated = initiateIntentToDoSpecialPower( nullptr, nullptr, way, commandOptions );
 
-	if( !getSpecialPowerModuleData()->m_updateModuleStartsAttack )
+	if( !startsAttackInUpdate(*this, getObject()) )
 	{
 		triggerSpecialPower( nullptr );
 		m_lastCastAccepted = TRUE;

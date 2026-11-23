@@ -25,11 +25,11 @@ class AnimalAIUpdate final : public AIUpdateInterface
 public:
 	AnimalAIUpdate(Thing* thing, const ModuleData* data);
 	UpdateSleepTime update() override;
+	void fleeFrom(const Object& threat);
 
 private:
 	void xferAnimalState(Xfer* xfer);
 	Object* findThreat(Real range) const;
-	void fleeFrom(const Object& threat);
 	void wander();
 
 	Coord3D m_home = {};

@@ -40,3 +40,37 @@
 1217 pkg29-arrow-state Player_1 ArnorMalbeth 0 Command_SpecialAbilityMalbethPreparations
 1218 pkg29-arrow-script Player_1 ArnorMalbeth 0 Command_SpecialAbilityMalbethPreparations 3040 1420
 1280 mods Player_1 ArnorFarm 0
+217 create Player_1 Pkg29Wizard 0 480,1900,0
+218 objupgrade Player_1 Pkg29Wizard 0 Upgrade_CreateAHero_ClassIstariWizard
+218 objupgrade Player_1 Pkg29Wizard 0 Upgrade_CreateAHeroWordOfPoultry_Level1
+218 objupgrade Player_1 Pkg29Wizard 0 Upgrade_CreateAHeroWordOfPoultry_Level2
+219 reveal Player_1 Pkg29Wizard 0
+220 pkg29-poultry-probe Player_1 Pkg29Wizard 0 Command_CreateAHero_WordOfPoultry_Level1 -50 -50
+221 pkg29-poultry-script Player_1 Pkg29Wizard 0 Command_CreateAHero_WordOfPoultry_Level1 -50 -50
+222 pkg29-poultry-state Player_1 Pkg29Wizard 0 Command_CreateAHero_WordOfPoultry_Level1
+229 create PlyrCreeps Pkg29PoultryTarget 0 550,1900,45
+229 create Player_1 Pkg29PoultryTarget 0 550,1930,90
+230 damage PlyrCreeps Pkg29PoultryTarget 0 50000
+236 pkg29-poultry-probe Player_1 Pkg29Wizard 0 Command_CreateAHero_WordOfPoultry_Level1 550 1900
+237 pkg29-poultry-cast Player_1 Pkg29Wizard 0 Command_CreateAHero_WordOfPoultry_Level1 550 1900
+244 pkg29-poultry-state Player_1 Pkg29Wizard 0 Command_CreateAHero_WordOfPoultry_Level1
+244 pkg29-poultry-count * - 0 animals
+290 pkg29-poultry-count * - 0 animals
+290 pkg29-poultry-count PlyrCreeps - 0 Pkg29PoultryTarget
+290 pkg29-poultry-count Player_1 - 0 Pkg29PoultryTarget
+295 pkg29-poultry-state Player_1 Pkg29Wizard 0 Command_CreateAHero_WordOfPoultry_Level1
+580 pkg29-poultry-count * - 0 animals
+580 pkg29-poultry-count PlyrCreeps - 0 Pkg29PoultryTarget
+631 create PlyrCreeps Pkg29PoultryTarget 0 670,1890,0
+632 pkg29-poultry-script Player_1 Pkg29Wizard 0 Command_CreateAHero_WordOfPoultry_Level2 550 1900
+636 pkg29-poultry-state Player_1 Pkg29Wizard 0 Command_CreateAHero_WordOfPoultry_Level2
+670 pkg29-poultry-count PlyrCreeps - 0 Pkg29PoultryTarget
+670 pkg29-poultry-count * - 0 animals
+675 pkg29-poultry-state Player_1 Pkg29Wizard 0 Command_CreateAHero_WordOfPoultry_Level2
+945 create Player_1 Pkg29Wizard 0 480,1870,0
+946 objupgrade Player_1 Pkg29Wizard 1 Upgrade_CreateAHero_ClassIstariWizard
+946 objupgrade Player_1 Pkg29Wizard 1 Upgrade_CreateAHeroWordOfPoultry_Level1
+960 create PlyrCreeps Pkg29PoultryTarget 0 550,1890,0
+961 pkg29-poultry-ai Player_1 Pkg29Wizard 1 Command_CreateAHero_WordOfPoultry_Level1 550 1900
+965 pkg29-poultry-state Player_1 Pkg29Wizard 1 Command_CreateAHero_WordOfPoultry_Level1
+1000 pkg29-poultry-count PlyrCreeps - 0 Pkg29PoultryTarget
