@@ -1,0 +1,19 @@
+215 create Player_1 GondorBoromir 0 2700,2250,0
+215 create Player_1 MordorBalrog 0 2870,2460,0
+216 objupgrade Player_1 GondorBoromir 0 Upgrade_ObjectLevel4
+225 which-special-power-state Player_1 GondorBoromir 0
+225 which-special-power-state Player_1 MordorBalrog 0
+230 power Player_1 GondorBoromir 0 SpecialAbilityHornOfGondor
+231 power Player_1 MordorBalrog 0 SpecialAbilityBalrogScream
+243 which-special-power-state Player_1 GondorBoromir 0
+243 which-special-power-state Player_1 MordorBalrog 0
+244 which-special-power-state Player_1 GondorBoromir 0
+244 which-special-power-state Player_1 MordorBalrog 0
+246 create PlyrCreeps WhichSpecialPowerHostile 0 2720,2250,180
+247 attack PlyrCreeps WhichSpecialPowerHostile 0 Player_1:GondorBoromir:0
+278 which-special-power-state Player_1 GondorBoromir 0
+279 destroy PlyrCreeps WhichSpecialPowerHostile 0
+400 which-special-power-state Player_1 GondorBoromir 0
+400 which-special-power-state Player_1 MordorBalrog 0
+401 destroy Player_1 GondorBoromir 0
+401 destroy Player_1 MordorBalrog 0
