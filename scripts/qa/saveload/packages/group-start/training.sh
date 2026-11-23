@@ -1,12 +1,26 @@
+frame_offset() {
+    if [ "$end" -ge 1451 ]; then
+        printf '1117\n'
+    else
+        printf '0\n'
+    fi
+}
+
 prepare() {
-    frame=239
-    while [ "$frame" -le 332 ]; do
+    offset=$(frame_offset)
+    awk -v offset="$offset" -v end="$end" '
+        $2 == "create" && offset { $1 = 220 }
+        { $1 += offset; if ($1 <= end) print }
+    ' "$package_dir/commands.txt"
+
+    frame=$((239 + offset))
+    while [ "$frame" -le "$((332 + offset))" ]; do
         for layout in 0 1; do
             for horde in Guard Archers Knights; do
                 printf '%s steering-reaction Player_1 GroupStart%s %s\n' "$frame" "$horde" "$layout"
             done
         done
-        if [ "$frame" -eq 248 ]; then
+        if [ "$frame" -eq "$((248 + offset))" ]; then
             for layout in 0 1; do
                 for actor in Guard Archers Knights Hero; do
                     printf '%s steering-path Player_1 GroupStart%s %s\n' "$frame" "$actor" "$layout"
@@ -18,10 +32,11 @@ prepare() {
 }
 
 check() {
-    if ! covers 332 || ! covers 230; then
-        return
+    offset=$(frame_offset)
+    if ! covers "$((332 + offset))" || ! covers "$((230 + offset))"; then
+        return 0
     fi
-    awk -v track_frame=230 -f "$package_dir/measure.awk" "$log" | awk '
+    awk -v track_frame="$((230 + offset))" -v order_frame="$((240 + offset))" -f "$package_dir/measure.awk" "$log" | awk '
         $1 == "cohort" && $3 == "actors=44" {
             ++cohorts
         }

@@ -2,6 +2,11 @@ function abs(value) {
     return value < 0 ? -value : value
 }
 
+BEGIN {
+    if (!order_frame)
+        order_frame = 240
+}
+
 $1 == "TEST" && $2 == "track" && $3 == track_frame && $5 ~ /^GroupStart(Guard|Archers|Knights|Hero)$/ {
     layout = seen[$5]++
     if (layout < 2) {
@@ -17,7 +22,7 @@ $1 == "TEST" && $2 == "pos" {
         next
     layout = anchorLayout[anchor]
     frame = $3
-    order = layout ? 242 : 240
+    order = order_frame + layout * 2
     elapsed = frame - order
     if (elapsed < 0 || elapsed > 90)
         next
