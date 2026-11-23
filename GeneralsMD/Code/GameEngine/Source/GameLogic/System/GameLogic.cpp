@@ -2712,6 +2712,7 @@ static void findAndSelectCommandCenter(Object *obj, void* alreadyFound)
 // ------------------------------------------------------------------------------------------------
 void GameLogic::loadMapINI( AsciiString mapName )
 {
+	RetailTerrainFire::restoreSettings();
 	if (RetailFileLayers::enabled())
 		RetailSkirmishSpending::resetMapPolicies();
 

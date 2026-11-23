@@ -2274,6 +2274,7 @@ static void findAndSelectCommandCenter(Object *obj, void* alreadyFound)
 // ------------------------------------------------------------------------------------------------
 void GameLogic::loadMapINI( AsciiString mapName )
 {
+	RetailTerrainFire::restoreSettings();
 
 	if (!TheMapCache) {
 		// Need the map cache to get the map and user map directories.

@@ -48,6 +48,7 @@ public:
 	static constexpr Int CELL_SIZE = 10;
 
 	static void loadSettings(Xfer* xfer);
+	static void restoreSettings();
 	static void parseLogicSettings(INI* ini);
 	static void parseVisualSettings(INI* ini);
 	static AsciiString fireSystem();
@@ -56,7 +57,7 @@ public:
 	void initialize(Int width, Int height, std::vector<UnsignedByte> types);
 	void reset();
 	void clearState();
-	void apply(TerrainLogic& terrain, const Coord3D& impact, const Coord3D& facing, const Edit& edit);
+	void apply(TerrainLogic& terrain, const Coord3D& impact, const Coord3D* facing, const Edit& edit);
 	void update();
 	void xfer(Xfer* xfer);
 

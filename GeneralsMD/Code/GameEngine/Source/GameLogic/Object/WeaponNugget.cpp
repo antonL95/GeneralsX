@@ -726,10 +726,10 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 			edit.amount = nugget.m_damage;
 			edit.radius = nugget.m_radius;
 			edit.arc = nugget.m_damageArc * PI / 180.0f;
-			Coord3D direction{1.0f, 0.0f, 0.0f};
+			Coord3D direction{};
 			if (source)
 				source->getUnitDirectionVector3D(direction);
-			TheTerrainLogic->retailFire().apply(*TheTerrainLogic, *pos, direction, edit);
+			TheTerrainLogic->retailFire().apply(*TheTerrainLogic, *pos, source ? &direction : nullptr, edit);
 		}
 		return;
 	}

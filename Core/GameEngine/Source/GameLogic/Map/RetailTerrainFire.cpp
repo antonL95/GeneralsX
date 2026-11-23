@@ -43,7 +43,7 @@ struct LogicSettings
 {
 	UnsignedInt maxBurning = 0x7fffffff;
 	std::array<CellType, 4> types;
-} logicSettings;
+} logicSettings, defaultLogicSettings;
 
 struct VisualSettings
 {
@@ -53,7 +53,7 @@ struct VisualSettings
 	GameClientRandomVariable scorchFrequency;
 	GameClientRandomVariable scorchSize;
 	Real scorchIntensity = 0.0f;
-} visualSettings;
+} visualSettings, defaultVisualSettings;
 
 Int gridCoordinate(Real position, Real offset)
 {
@@ -88,6 +88,17 @@ void RetailTerrainFire::loadSettings(Xfer* xfer)
 	{
 		if (TheFileSystem->doesFileExist(path))
 			ini.load(path, INI_LOAD_OVERWRITE, xfer);
+	}
+	defaultLogicSettings = logicSettings;
+	defaultVisualSettings = visualSettings;
+}
+
+void RetailTerrainFire::restoreSettings()
+{
+	if (RetailFileLayers::enabled())
+	{
+		logicSettings = defaultLogicSettings;
+		visualSettings = defaultVisualSettings;
 	}
 }
 
@@ -198,7 +209,7 @@ void RetailTerrainFire::setCell(Int index, const Cell& value)
 		m_modified[index] = value;
 }
 
-void RetailTerrainFire::apply(TerrainLogic& terrain, const Coord3D& impact, const Coord3D& facing, const Edit& edit)
+void RetailTerrainFire::apply(TerrainLogic& terrain, const Coord3D& impact, const Coord3D* facing, const Edit& edit)
 {
 	const Int amount = limitedAmount(edit.amount, -MAX_FUEL, MAX_FUEL);
 	if (m_types.empty() || !(edit.radius > 0.0f) || !std::isfinite(edit.radius) || amount == 0)
@@ -208,7 +219,8 @@ void RetailTerrainFire::apply(TerrainLogic& terrain, const Coord3D& impact, cons
 	const Bool existingOnly = edit.action == INCREASE_BURN_RATE_ON_EXISTING_FIRE || edit.action == INCREASE_FUEL_ON_EXISTING_FIRE;
 	const Int rateChange = edit.action == DECREASE_BURN_RATE ? -amount : amount;
 	const Bool directional = edit.action == INCREASE_BURN_RATE && edit.arc > 0.0f && edit.arc < PI;
-	const Real cosine = directional ? WWMath::CosTrig(edit.arc) : 0.0f;
+	const Coord3D normal = facing ? *facing : Coord3D{1.0f, 0.0f, 0.0f};
+	const Real threshold = directional && facing ? WWMath::CosTrig(edit.arc) : 1.0f;
 	const Int cx = gridCoordinate(impact.x, 0.5f);
 	const Int cy = gridCoordinate(impact.y, 0.5f);
 
@@ -237,8 +249,8 @@ void RetailTerrainFire::apply(TerrainLogic& terrain, const Coord3D& impact, cons
 		{
 			const Real dx = point.x - impact.x;
 			const Real dy = point.y - impact.y;
-			const Real dot = facing.x * dx + facing.y * dy - facing.z * impact.z;
-			if (dot < cosine)
+			const Real dot = normal.z * -impact.z + normal.y * dy + normal.x * dx;
+			if (dot < threshold)
 				return;
 		}
 
