@@ -115,7 +115,7 @@ ProductionUpdateModuleData::ProductionUpdateModuleData()
 	m_doorClosingTime = 0;
 	m_constructionCompleteDuration = 0;
 	m_quantityModifiers.clear();
-	m_maxQueueEntries = 9;
+	m_maxQueueEntries = RetailFileLayers::enabled() ? 20 : 9;
 	m_disabledTypesToProcess = MAKE_DISABLED_MASK(DISABLED_HELD);
 }
 
@@ -795,38 +795,52 @@ UpdateSleepTime ProductionUpdate::update()
 
 	}
 
-	if (!RetailFileLayers::enabled() || !us->isKindOf(KINDOF_CASTLE_KEEP))
+	if (!RetailFileLayers::enabled())
 	{
 		if (advanceProduction(production, player))
 			finishProduction(production, player, now);
 		return UPDATE_SLEEP_NONE;
 	}
 
-	Bool advancedSerial = FALSE;
-	ProductionEntry *ready = nullptr;
-	Bool readyHasReservedDoor = FALSE;
+	const auto isHero = [player](const ProductionEntry *entry) {
+		return entry->m_type == PRODUCTION_UNIT && HeroRoster::findIndex(player, entry->m_objectToProduce) >= 0;
+	};
+	ProductionEntry *readyHero = nullptr;
 	for (ProductionEntry *entry = production; entry; )
 	{
 		ProductionEntry *next = entry->m_next;
-		const Bool hero = entry->m_type == PRODUCTION_UNIT && HeroRoster::findIndex(player, entry->m_objectToProduce) >= 0;
-		if (hero || !advancedSerial)
-		{
-			advancedSerial |= !hero;
-			if (advanceProduction(entry, player))
-			{
-				const Bool hasReservedDoor = entry->m_type == PRODUCTION_UNIT && entry->m_exitDoor != DOOR_NONE_AVAILABLE;
-				if (!ready || (hasReservedDoor && !readyHasReservedDoor))
-				{
-					ready = entry;
-					readyHasReservedDoor = hasReservedDoor;
-				}
-			}
-		}
+		if (isHero(entry) && advanceProduction(entry, player) && !readyHero)
+			readyHero = entry;
 		entry = next;
 	}
 
+	ProductionEntry *delivering = nullptr;
+	ProductionEntry *builder = nullptr;
+	for (ProductionEntry *entry = m_productionQueue; entry; entry = entry->m_next)
+	{
+		if (entry->m_type != PRODUCTION_UNIT)
+			continue;
+		if (entry->m_productionQuantityProduced > 0)
+		{
+			delivering = entry;
+			break;
+		}
+		if (!delivering && entry->m_exitDoor >= DOOR_1 && entry->m_percentComplete >= 100.0f &&
+			player->hasEnoughCommandPoints(entry->m_objectToProduce))
+			delivering = entry;
+		if (!builder && entry->m_objectToProduce->isKindOf(KINDOF_DOZER))
+			builder = entry;
+	}
+
+	ProductionEntry *scheduled = delivering ? delivering : builder;
+	if (!scheduled)
+		scheduled = readyHero ? readyHero : m_productionQueue;
+	if (!scheduled)
+		return UPDATE_SLEEP_NONE;
+	const Bool ready = isHero(scheduled) ? scheduled->m_percentComplete >= 100.0f &&
+		player->hasEnoughCommandPoints(scheduled->m_objectToProduce) : advanceProduction(scheduled, player);
 	if (ready)
-		finishProduction(ready, player, now);
+		finishProduction(scheduled, player, now);
 	return UPDATE_SLEEP_NONE;
 }
 
