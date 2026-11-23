@@ -41,6 +41,7 @@
 #include "Common/INIBlockStructure.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/ExperienceLevelStore.h"
+#include "GameLogic/RetailTerrainFire.h"
 #if !RTS_GENERALS
 #include "Common/Team.h"
 #include "GameLogic/TerrainLogic.h"

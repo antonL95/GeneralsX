@@ -113,6 +113,7 @@
 #include "GameLogic/Module/DestroyModule.h"
 #include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/RetailTerrainFire.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptConditions.h"
