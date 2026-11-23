@@ -1,0 +1,9 @@
+10 create Player_1 RivendellGreyCompanyHorde 0 2320,1100,0
+11 reveal Player_1 RivendellGreyCompanyHorde 0
+32 move Player_1 RivendellGreyCompanyHorde 0 - 2650 1100
+125 move Player_1 RivendellGreyCompanyHorde 0 - 2540 900
+205 move Player_1 RivendellGreyCompanyHorde 0 - 2580 1230
+267 select Player_1 RivendellGreyCompanyHorde 0
+267 steering-stop - - 0
+278 button Player_1 RivendellGreyCompanyHorde 0 2
+293 move Player_1 RivendellGreyCompanyHorde 0 - 2330 1040
