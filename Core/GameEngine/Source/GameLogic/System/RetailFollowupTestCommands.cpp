@@ -2,6 +2,7 @@
 #include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
+#include <algorithm>
 #include <cstdio>
 #include <string_view>
 
@@ -68,7 +69,7 @@ void auditRecruitSet(const PlayerTemplate& faction, const ThingTemplate& buildin
 		return;
 	std::fprintf(stderr, "TEST followup-recruit-audit faction=%s building=%s set=%s",
 		faction.getName().str(), building.getName().str(), setName.str());
-	for (Int entry = 0; entry < MAX_COMMANDS_PER_SET; ++entry)
+	for (Int entry = 0; entry < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++entry)
 	{
 		const Int slot = HeroRoster::reviveSlotForEntry(set, entry);
 		if (slot < 0 || slot >= static_cast<Int>(heroes.size()))
@@ -96,10 +97,22 @@ void auditRecruitSets(const RetailTestCommands::Context&)
 		if (!faction || !faction->isPlayableSide())
 			continue;
 		const auto heroes = HeroRules::rosterOrder(faction->getBuildableRingHeroesMP(), faction->getBuildableHeroesMP());
+		std::vector<AsciiString> sides{faction->getSide()};
+		const ThingTemplate* startingBuilding = TheThingFactory->findTemplate(faction->getStartingBuilding(), FALSE);
+		if (startingBuilding)
+			sides.push_back(startingBuilding->getDefaultOwningSide());
+		for (Int slot = 0; slot < MAX_MP_STARTING_UNITS; ++slot)
+		{
+			const ThingTemplate* unit = TheThingFactory->findTemplate(faction->getStartingUnit(slot), FALSE);
+			if (unit && unit->isKindOf(KINDOF_DOZER))
+				sides.push_back(unit->getDefaultOwningSide());
+		}
 		for (const ThingTemplate* building = TheThingFactory->firstTemplate(); building;
 			building = building->friend_getNextTemplate())
 		{
-			if (!building->isKindOf(KINDOF_STRUCTURE) || building->getDefaultOwningSide() != faction->getSide())
+			const AsciiString& side = building->getDefaultOwningSide();
+			if (!building->isKindOf(KINDOF_STRUCTURE) || side.isEmpty() ||
+				std::none_of(sides.begin(), sides.end(), [&](const AsciiString& valid) { return side.compareNoCase(valid) == 0; }))
 				continue;
 			auditRecruitSet(*faction, *building, building->friend_getCommandSetString(), heroes);
 			const ModuleInfo& modules = building->getBehaviorModuleInfo();
