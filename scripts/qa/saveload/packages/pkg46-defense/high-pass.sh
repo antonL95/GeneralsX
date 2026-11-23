@@ -1,4 +1,22 @@
 check() {
+    if covers 304; then
+        awk '
+            $1 == "AI_FORWARD_BUILD" && $2 >= 184 && $2 <= 304 && $3 == 4 && $4 == "MordorBattleTower" {
+                dx = $7 - $10
+                dy = $8 - $11
+                dz = $9 - $12
+                distance = sqrt(dx * dx + dy * dy + dz * dz)
+                if (distance <= 0 || distance > 1500) next
+                ex = $13 - ($10 + 200 * dx / distance)
+                ey = $14 - ($11 + 200 * dy / distance)
+                if (ex * ex + ey * ey < 0.001) found = 1
+            }
+            END {
+                if (!found) print "Missing targetless forward building 200 units toward home"
+                exit !found
+            }
+        ' "$log" || return 1
+    fi
     if covers 64; then
         awk '
             /^TEST frame 45: create GondorFarm for Player_1 .*2180.0, 3050.0/ {

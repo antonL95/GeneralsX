@@ -1685,6 +1685,15 @@ void AISkirmishPlayer::updateRetail()
 			return scavenged && type.isEquivalentTo(scavenged);
 		});
 	};
+	std::vector<const ThingTemplate*> offensiveBuildings;
+	for (const AsciiString& name : rules->offensiveBuildings)
+		if (const ThingTemplate* type = TheThingFactory->findTemplate(name, FALSE); type && type->isKindOf(KINDOF_STRUCTURE))
+			offensiveBuildings.push_back(type);
+	const auto isOffensiveBuilding = [&](const ThingTemplate& type) {
+		return std::any_of(offensiveBuildings.begin(), offensiveBuildings.end(), [&](const ThingTemplate* offensive) {
+			return type.isEquivalentTo(offensive);
+		});
+	};
 	const auto isFarm = [&](const ThingTemplate& type) -> Bool {
 		if (isScavengedBuilding(type))
 			return FALSE;
@@ -2060,7 +2069,7 @@ void AISkirmishPlayer::updateRetail()
 				if (!button || button->getCommandType() != (plot ? GUI_COMMAND_FOUNDATION_CONSTRUCT : GUI_COMMAND_DOZER_CONSTRUCT))
 					continue;
 				const ThingTemplate* type = button->getThingTemplate();
-				if (!type || button->getRequiredRank() > builder.getExperienceTracker()->getRank() ||
+				if (!type || isOffensiveBuilding(*type) || button->getRequiredRank() > builder.getExperienceTracker()->getRank() ||
 					!HeroRoster::buttonUpgradesMet(button, m_player, &builder))
 					continue;
 				const Bool economy = isFarm(*type);
@@ -2375,6 +2384,83 @@ void AISkirmishPlayer::updateRetail()
 		if (missing || (target.retiring && teamCount(target) == 0))
 			target = {};
 	}
+	const auto slotLimit = [&](size_t i) {
+		return i < rules->maxTeamsPerTarget.size() ? rules->maxTeamsPerTarget[i] : 1;
+	};
+	const auto buildForward = [&] {
+		if (!keep || offensiveBuildings.empty() || builders.empty() || retailTuning.disableBaseBuilding ||
+			!m_player->getCanBuildBase() || money->countMoney() + m_retailSavings < 1000)
+			return;
+		const auto start = std::find(rules->tacticalTargets.begin(), rules->tacticalTargets.end(), RETAIL_TARGET_TARGETLESS);
+		if (start == rules->tacticalTargets.end() || slotLimit(start - rules->tacticalTargets.begin()) <= 0)
+			return;
+		const auto defense = std::find_if(m_retailTargets.begin(), m_retailTargets.end(), [&](const auto& target) {
+			return target.defendedStructure != INVALID_ID && teamCount(target) > 0;
+		});
+		if (defense == m_retailTargets.end())
+			return;
+		const Object* threat = TheGameLogic->findObjectByID(defense->object);
+		if (!threat)
+			return;
+		const Coord3D center = *threat->getPosition();
+		const Coord3D home = *keep->getPosition();
+		const Coord3D towardHome = home - center;
+		const Real distance = sqr(towardHome.x) + sqr(towardHome.y) + sqr(towardHome.z);
+		if (distance > sqr(1500.0f))
+			return;
+		Int nearby = 0;
+		for (const Object* object : owned)
+		{
+			if (!isOffensiveBuilding(*object->getTemplate()))
+				continue;
+			if (object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+				return;
+			if (tacticalDistanceSquared(*object->getPosition(), center) <= sqr(600.0f) && ++nearby >= 2)
+				return;
+		}
+		const Real scale = distance > 0.0f ? 200.0f / WWMath::SqrtfOrigin(distance) : 0.0f;
+		const Coord3D position{center.x + towardHome.x * scale, center.y + towardHome.y * scale, 0.0f};
+		for (const ThingTemplate* type : offensiveBuildings)
+		{
+			Object* selected = nullptr;
+			for (Object* builder : builders)
+			{
+				if (!builder->getAI()->isIdle() || builder->getAI()->getDozerAIInterface()->isAnyTaskPending())
+					continue;
+				const CommandSet* set = retailCommands(*builder);
+				if (!set)
+					continue;
+				const auto rank = [&](const Object& object) {
+					return std::make_pair(tacticalDistanceSquared(*object.getPosition(), center), object.getID());
+				};
+				if (selected && rank(*selected) <= rank(*builder))
+					continue;
+				for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+				{
+					const CommandButton* button = set->getCommandButton(slot);
+					if (button && button->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT && button->getThingTemplate() == type &&
+						button->getRequiredRank() <= builder->getExperienceTracker()->getRank() &&
+						HeroRoster::buttonUpgradesMet(button, m_player, builder))
+					{
+						selected = builder;
+						break;
+					}
+				}
+			}
+			if (!selected || GameLogicRandomValueReal(0.0f, 1.0f) >= 0.75f)
+				continue;
+			const CanMakeType canMake = TheBuildAssistant->canMakeUnit(selected, type);
+			if ((canMake == CANMAKE_OK || canMake == CANMAKE_NO_MONEY) &&
+				spendWithSavings(type->calcCostToBuild(m_player), [&] {
+					return constructRetailBuildingAt(*selected, *type, position) != nullptr;
+				}) && trace)
+				std::fprintf(stderr, "AI_FORWARD_BUILD\t%u\t%d\t%s\t%d\t%d\t%.9g\t%.9g\t%.9g\t%.9g\t%.9g\t%.9g\t%.9g\t%.9g\n",
+					frame, playerIndex, type->getName().str(), defense->defendedStructure, selected->getID(),
+					home.x, home.y, home.z, center.x, center.y, center.z, position.x, position.y);
+			return;
+		}
+	};
+	buildForward();
 	std::vector<std::pair<Object*, Bool>> wave;
 	for (Object* unit : soldiers)
 	{
@@ -2459,11 +2545,7 @@ void AISkirmishPlayer::updateRetail()
 			if (!object->isKindOf(KINDOF_STRUCTURE) || object->isKindOf(KINDOF_INERT) ||
 				object->isKindOf(KINDOF_BASE_FOUNDATION) || object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 				continue;
-			const auto isOffensiveStructure = [&](const AsciiString& name) {
-				const ThingTemplate* offensive = TheThingFactory->findTemplate(name, FALSE);
-				return offensive && object->getTemplate()->isEquivalentTo(offensive);
-			};
-			if (std::none_of(rules->offensiveBuildings.begin(), rules->offensiveBuildings.end(), isOffensiveStructure))
+			if (!isOffensiveBuilding(*object->getTemplate()))
 				defensesToRegister.push_back(object);
 		}
 		defenseClusters = makeDefenseClusters(std::move(defensesToRegister), retailTuning.defenseTreeNodeRadius);
@@ -2533,7 +2615,7 @@ void AISkirmishPlayer::updateRetail()
 				: kind == RETAIL_TARGET_DEFENSIVE ? &defenses
 				: kind == RETAIL_TARGET_EXPANSION ? &expansions : nullptr;
 			auto& target = m_retailTargets[i];
-			const Int limit = i < rules->maxTeamsPerTarget.size() ? rules->maxTeamsPerTarget[i] : 1;
+			const Int limit = slotLimit(i);
 			const Int teams = teamCount(target);
 			if (!candidates || target.retiring || teams >= limit || (requireEmpty && teams != 0))
 				continue;
