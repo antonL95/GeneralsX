@@ -54,7 +54,7 @@ check() {
 		expect 'TEST pkg29 poultry count frame=290 object=animals player=* living=1'
 		expect 'TEST pkg29 poultry count frame=290 object=Pkg29PoultryTarget player=PlyrCreeps living=0'
 		expect 'TEST pkg29 poultry count frame=290 object=Pkg29PoultryTarget player=Player_1 living=1'
-		grep -E '^TEST pkg29 poultry object frame=290 name=[A-Za-z0-9]+_Replacement neutral=1 .* xp=0\.0 upgrades=0$' "$log"
+		grep -E '^TEST pkg29 poultry object frame=290 name=Chicken_Replacement neutral=1 .* hp=1\.0/1\.0 xp=0\.0 upgrades=0$' "$log"
 		grep -E '^TEST pkg29 poultry frame=295 ready=0 accepted=[01] active=0$' "$log"
 	fi
 	if covers 580; then
@@ -64,11 +64,37 @@ check() {
 	if covers 670; then
 		expect 'TEST pkg29 poultry frame=636 ready=1 accepted=1 active=1'
 		expect 'TEST pkg29 poultry count frame=670 object=Pkg29PoultryTarget player=PlyrCreeps living=0'
-		expect 'TEST pkg29 poultry count frame=670 object=animals player=* living=1'
+		grep -E '^TEST pkg29 poultry count frame=670 object=animals player=\* living=[01]$' "$log"
 		expect 'TEST pkg29 poultry frame=675 ready=0 accepted=1 active=0'
 	fi
 	if covers 1000; then
 		expect 'TEST pkg29 poultry frame=965 ready=1 accepted=1 active=1'
 		expect 'TEST pkg29 poultry count frame=1000 object=Pkg29PoultryTarget player=PlyrCreeps living=0'
+	fi
+	if covers 225; then
+		expect 'TEST pkg29 swoop object frame=225 valid=0 accepted=0'
+		expect 'TEST pkg29 swoop location frame=227 valid=0 accepted=0'
+		expect 'TEST pkg29 swoop object frame=230 valid=1 accepted=1'
+		expect 'TEST pkg29 swoop state frame=234 active=1 attacking=0 victim=0 hp=100000.0'
+	fi
+	if covers 244; then
+		expect 'TEST pkg29 swoop state frame=244 active=1 attacking=1 victim=1 hp=100000.0'
+	fi
+	if covers 260; then
+		expect 'TEST pkg29 swoop state frame=260 active=1 attacking=1 victim=1 hp=100000.0'
+		expect 'TEST pkg29 swoop object frame=262 valid=0 accepted=0'
+	fi
+	if covers 420; then
+		grep -E '^TEST pkg29 swoop state frame=420 active=1 attacking=1 victim=1 hp=[1-9][0-9]{0,4}\.0$' "$log"
+	fi
+	if covers 480; then
+		expect 'TEST pkg29 swoop location frame=455 valid=1 accepted=1'
+		expect 'TEST pkg29 swoop state frame=457 active=1 attacking=0 victim=0 hp=100000.0'
+		grep -E '^TEST pkg29 swoop state frame=480 active=0 attacking=[01] victim=0 hp=100000\.0$' "$log"
+	fi
+	if covers 555; then
+		expect 'TEST pkg29 swoop script frame=520 accepted=0'
+		expect 'TEST pkg29 swoop script frame=535 accepted=1'
+		grep -E '^TEST pkg29 swoop state frame=555 active=1 attacking=1 victim=1 hp=[0-9]+\.0$' "$log"
 	fi
 }

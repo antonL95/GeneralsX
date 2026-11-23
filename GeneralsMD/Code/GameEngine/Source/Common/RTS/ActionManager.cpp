@@ -1622,10 +1622,12 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
 			const UnsignedInt options = button ? button->getOptions() : commandOptions;
 			const auto* replacement = ReplaceObjectUpdate::find(obj, spTemplate);
+			const auto* swoop = FellBeastSwoopPower::find(obj, spTemplate);
 			return (!button || (button->isMountStateAllowed(obj) && button->isModelConditionAllowed(obj) &&
 				button->isValidContainerForCommand(obj) && (options & NEED_TARGET_POS))) &&
 				retailPowerLocationAllowed(obj, loc, spTemplate) &&
 				(!replacement || replacement->allowsLocation(loc)) &&
+				(!swoop || swoop->allowsTarget(nullptr, loc)) &&
 				(spTemplate->getSpecialPowerType() != SPECIAL_ARROW_STORM || ArrowStormUpdate::allowsLocation(obj, spTemplate, loc)) &&
 				(commandSource == CMD_FROM_AI ? !spTemplate->hasForbiddenRetailObjects(obj, loc, objectInWay) :
 					spTemplate->isValidRetailTarget(obj, nullptr, loc, commandSource));
@@ -1803,8 +1805,10 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 		if( RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2 )
 		{
 			const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(obj, spTemplate) : nullptr;
+			const auto* swoop = FellBeastSwoopPower::find(obj, spTemplate);
 			return (!button || (button->isMountStateAllowed(obj) && button->isModelConditionAllowed(obj) &&
 				button->isValidContainerForCommand(obj))) &&
+				(!swoop || swoop->allowsTarget(target, nullptr)) &&
 				retailPowerObjectAllowed(obj, target, spTemplate, button, button ? button->getOptions() : commandOptions) &&
 				(commandSource == CMD_FROM_AI || spTemplate->isValidRetailTarget(obj, target, nullptr, commandSource));
 		}
@@ -2070,6 +2074,7 @@ Bool ActionManager::canDoSpecialPower( const Object *obj, const SpecialPowerTemp
 			return (!button || (button->isMountStateAllowed(obj) && button->isModelConditionAllowed(obj) &&
 				button->isValidContainerForCommand(obj))) && !(options & (COMMAND_OPTION_NEED_OBJECT_TARGET | NEED_TARGET_POS)) &&
 				!spTemplate->hasRetailFlag(SpecialPowerTemplate::RETAIL_NEEDS_TARGET) &&
+				!FellBeastSwoopPower::find(obj, spTemplate) &&
 				spTemplate->isValidRetailTarget(obj, nullptr, nullptr, commandSource);
 		}
 

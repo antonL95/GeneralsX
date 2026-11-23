@@ -45,6 +45,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
+#include "GameLogic/Module/GiantBirdAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
@@ -400,6 +401,103 @@ void ReplaceObjectUpdate::xfer(Xfer* xfer)
 }
 
 void ReplaceObjectUpdate::loadPostProcess()
+{
+	SpecialAbilityUpdate::loadPostProcess();
+}
+
+FellBeastSwoopPower::~FellBeastSwoopPower() = default;
+
+const FellBeastSwoopPower* FellBeastSwoopPower::find(const Object* source, const SpecialPowerTemplate* power)
+{
+	for (BehaviorModule** module = source->getBehaviorModules(); *module; ++module)
+	{
+		const auto* swoop = dynamic_cast<const FellBeastSwoopPower*>(*module);
+		if (swoop && swoop->getTemplate() == power)
+			return swoop;
+	}
+	return nullptr;
+}
+
+Bool FellBeastSwoopPower::canAttackTarget(const Object* target) const
+{
+	const Object* source = getObject();
+	return target && !target->isDestroyed() && source->getRelationship(target) == ENEMIES &&
+		TheActionManager->getCanAttackObject(source, target, CMD_FROM_AI, ATTACK_NEW_TARGET) != ATTACKRESULT_NOT_POSSIBLE;
+}
+
+Bool FellBeastSwoopPower::acceptsIntent(const Object* target, const Coord3D* location) const
+{
+	return !isActive() && dynamic_cast<const GiantBirdAIUpdate*>(getObject()->getAI()) &&
+		(target ? canAttackTarget(target) : location != nullptr) &&
+		SpecialAbilityUpdate::acceptsIntent(target, location);
+}
+
+Bool FellBeastSwoopPower::initiateIntentToDoSpecialPower(const SpecialPowerTemplate* power, const Object* target,
+	const Coord3D* location, const Waypoint* waypoint, UnsignedInt options)
+{
+	if (!usesRotwkRules() || power != getTemplate() || !acceptsIntent(target, location))
+		return FALSE;
+	const CommandSourceType source = options & COMMAND_FIRED_BY_SCRIPT ? CMD_FROM_SCRIPT : CMD_FROM_AI;
+	const auto* starter = getMySPM();
+	if (source != CMD_FROM_SCRIPT && (!starter || !starter->isReady()))
+		return FALSE;
+	if (!power->isValidRetailTarget(getObject(), target, location, source))
+		return FALSE;
+	return SpecialAbilityUpdate::initiateIntentToDoSpecialPower(power, target, location, waypoint, options);
+}
+
+void FellBeastSwoopPower::onAbilityExit()
+{
+	if (!hasTriggeredAbility() || getObject()->isEffectivelyDead())
+		return;
+
+	Object* target = TheGameLogic->findObjectByID(getAbilityTargetID());
+	if (canAttackTarget(target))
+	{
+		AIUpdateInterface* ai = getObject()->getAI();
+		ai->aiAttackObject(target, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
+		m_attackInProgress = ai->isAttacking();
+	}
+}
+
+UpdateSleepTime FellBeastSwoopPower::update()
+{
+	if (m_attackInProgress)
+	{
+		const AIUpdateInterface* ai = getObject()->getAI();
+		const Object* target = ai->getCurrentVictim();
+		m_attackInProgress = ai->isAttacking() && target && !target->isEffectivelyDead();
+	}
+	const UpdateSleepTime sleep = SpecialAbilityUpdate::update();
+	return m_attackInProgress ? UPDATE_SLEEP_NONE : sleep;
+}
+
+void FellBeastSwoopPower::xferRetailBlocks(Xfer* xfer)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, TRUE, {
+		{ "swoop-attack-order", [this](Xfer* block) { block->xferBool(&m_attackInProgress); },
+			[this] { m_attackInProgress = FALSE; } }
+	});
+}
+
+void FellBeastSwoopPower::crc(Xfer* xfer)
+{
+	SpecialAbilityUpdate::crc(xfer);
+	if (usesRotwkRules())
+	{
+		crcRetailAbilityPhase(xfer);
+		xferRetailBlocks(xfer);
+	}
+}
+
+void FellBeastSwoopPower::xfer(Xfer* xfer)
+{
+	SpecialAbilityUpdate::xfer(xfer);
+	if (usesRotwkRules())
+		xferRetailBlocks(xfer);
+}
+
+void FellBeastSwoopPower::loadPostProcess()
 {
 	SpecialAbilityUpdate::loadPostProcess();
 }

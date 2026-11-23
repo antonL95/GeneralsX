@@ -14,6 +14,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
+#include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/ExperienceTracker.h"
@@ -140,6 +141,49 @@ void handlePoultry(const RetailTestCommands::Context& ctx)
 		ctx.frame, ctx.argument, static_cast<Int>(ctx.playerName.size()), ctx.playerName.data(), living);
 }
 
+void handleSwoop(const RetailTestCommands::Context& ctx)
+{
+	Object* source = ctx.requireObject(TRUE);
+	const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate("SpecialAbilityLevelAttack");
+	if (!source || !power)
+		return;
+	const auto* starter = source->getSpecialPowerModule(power);
+	Object* target = ctx.findTarget();
+	const UnsignedInt options = COMMAND_OPTION_INTERNAL_AUTO;
+	if (ctx.action == "pkg29-swoop-object")
+	{
+		const Bool allowed = target && TheActionManager->canDoSpecialPowerAtObject(source, target, CMD_FROM_AI, power, options);
+		if (allowed)
+			source->doSpecialPowerAtObject(power, target, options);
+		std::fprintf(stderr, "TEST pkg29 swoop object frame=%u valid=%d accepted=%d\n",
+			ctx.frame, allowed, allowed && starter && starter->wasLastCastAccepted());
+	}
+	else if (ctx.action == "pkg29-swoop-location")
+	{
+		const Coord3D point = ctx.groundLocation();
+		const Bool allowed = TheActionManager->canDoSpecialPowerAtLocation(source, &point, CMD_FROM_AI, power, nullptr, options);
+		if (allowed)
+			source->doSpecialPowerAtLocation(power, &point, INVALID_ANGLE, options);
+		std::fprintf(stderr, "TEST pkg29 swoop location frame=%u valid=%d accepted=%d\n",
+			ctx.frame, allowed, allowed && starter && starter->wasLastCastAccepted());
+	}
+	else if (ctx.action == "pkg29-swoop-script" && target)
+	{
+		source->doSpecialPowerAtObject(power, target, COMMAND_FIRED_BY_SCRIPT, TRUE);
+		std::fprintf(stderr, "TEST pkg29 swoop script frame=%u accepted=%d\n",
+			ctx.frame, starter && starter->wasLastCastAccepted());
+	}
+	else if (ctx.action == "pkg29-swoop-state")
+	{
+		const auto* update = source->findSpecialAbilityUpdate(SPECIAL_LEVEL_ATTACK);
+		const auto* ai = source->getAI();
+		const Object* victim = ai ? ai->getCurrentVictim() : nullptr;
+		std::fprintf(stderr, "TEST pkg29 swoop state frame=%u active=%d attacking=%d victim=%d hp=%.1f\n",
+			ctx.frame, update && update->isActive(), ai && ai->isAttacking(), target && victim == target,
+			target ? target->getBodyModule()->getHealth() : 0.0f);
+	}
+}
+
 void handlePackage29(const RetailTestCommands::Context& ctx)
 {
 	Object* source = ctx.requireObject();
@@ -208,6 +252,7 @@ void registerRetailPackage29TestCommands()
 	registerPrefix("pkg29-", handlePackage29);
 	registerPrefix("pkg29-arrow-", handleLocationAbility);
 	registerPrefix("pkg29-poultry-", handlePoultry);
+	registerPrefix("pkg29-swoop-", handleSwoop);
 #endif
 }
 }

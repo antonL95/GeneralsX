@@ -99,6 +99,31 @@ private:
 	void replace(Object* victim, const ReplaceObjectUpdateModuleData::Rule& rule);
 };
 
+class FellBeastSwoopPower final : public SpecialAbilityUpdate
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(FellBeastSwoopPower, "FellBeastSwoopPower")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(FellBeastSwoopPower, SpecialAbilityUpdateModuleData)
+
+public:
+	using SpecialAbilityUpdate::SpecialAbilityUpdate;
+	static const FellBeastSwoopPower* find(const Object* source, const SpecialPowerTemplate* power);
+	Bool allowsTarget(const Object* target, const Coord3D* location) const { return acceptsIntent(target, location); }
+	Bool isActive() const override { return SpecialAbilityUpdate::isActive() || m_attackInProgress; }
+	UpdateSleepTime update() override;
+	Bool initiateIntentToDoSpecialPower(const SpecialPowerTemplate* power, const Object* target,
+		const Coord3D* location, const Waypoint* waypoint, UnsignedInt options) override;
+
+protected:
+	Bool acceptsIntent(const Object* target, const Coord3D* location) const override;
+	void onAbilityExit() override;
+
+private:
+	Bool canAttackTarget(const Object* target) const;
+	void xferRetailBlocks(Xfer* xfer);
+
+	Bool m_attackInProgress = FALSE;
+};
+
 class CurseSpecialPowerModuleData : public SpecialAbilityUpdateModuleData
 {
 public:

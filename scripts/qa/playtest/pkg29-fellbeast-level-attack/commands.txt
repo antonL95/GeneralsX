@@ -1,0 +1,8 @@
+20 create Player_1 MordorFellBeastInterface 0 3000,1080,0
+21 reveal Player_1 MordorFellBeastInterface 0
+52 create PlyrCreeps MordorFighterHorde 0 3260,1080,180
+58 pkg29-swoop-object Player_1 MordorFellBeastInterface 0 PlyrCreeps:MordorFighterHorde:0
+62 pkg29-swoop-state Player_1 MordorFellBeastInterface 0 PlyrCreeps:MordorFighterHorde:0
+68 select Player_1 MordorFellBeastInterface 0
+85 flight Player_1 MordorFellBeastInterface 0
+140 flight Player_1 MordorFellBeastInterface 0

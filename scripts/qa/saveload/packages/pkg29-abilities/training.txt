@@ -74,3 +74,23 @@
 961 pkg29-poultry-ai Player_1 Pkg29Wizard 1 Command_CreateAHero_WordOfPoultry_Level1 550 1900
 965 pkg29-poultry-state Player_1 Pkg29Wizard 1 Command_CreateAHero_WordOfPoultry_Level1
 1000 pkg29-poultry-count PlyrCreeps - 0 Pkg29PoultryTarget
+221 create Player_1 MordorFellBeastInterface 0 860,1900,0
+221 create Player_1 Pkg29SwoopTarget 0 860,2020,0
+223 reveal Player_1 MordorFellBeastInterface 0
+225 pkg29-swoop-object Player_1 MordorFellBeastInterface 0 Player_1:Pkg29SwoopTarget:0
+227 pkg29-swoop-location Player_1 MordorFellBeastInterface 0 - -50 -50
+229 create PlyrCreeps Pkg29SwoopTarget 0 1100,1900,0
+230 pkg29-swoop-object Player_1 MordorFellBeastInterface 0 PlyrCreeps:Pkg29SwoopTarget:0
+234 pkg29-swoop-state Player_1 MordorFellBeastInterface 0 PlyrCreeps:Pkg29SwoopTarget:0
+244 pkg29-swoop-state Player_1 MordorFellBeastInterface 0 PlyrCreeps:Pkg29SwoopTarget:0
+260 pkg29-swoop-state Player_1 MordorFellBeastInterface 0 PlyrCreeps:Pkg29SwoopTarget:0
+262 pkg29-swoop-object Player_1 MordorFellBeastInterface 0 PlyrCreeps:Pkg29SwoopTarget:0
+420 pkg29-swoop-state Player_1 MordorFellBeastInterface 0 PlyrCreeps:Pkg29SwoopTarget:0
+440 kill PlyrCreeps Pkg29SwoopTarget 0
+455 pkg29-swoop-location Player_1 MordorFellBeastInterface 0 - 1100 1900
+457 pkg29-swoop-state Player_1 MordorFellBeastInterface 0 Player_1:Pkg29SwoopTarget:0
+480 pkg29-swoop-state Player_1 MordorFellBeastInterface 0 Player_1:Pkg29SwoopTarget:0
+520 pkg29-swoop-script Player_1 MordorFellBeastInterface 0 Player_1:Pkg29SwoopTarget:0
+525 create PlyrCreeps Pkg29SwoopTarget 0 1050,1920,0
+535 pkg29-swoop-script Player_1 MordorFellBeastInterface 0 PlyrCreeps:Pkg29SwoopTarget:0
+555 pkg29-swoop-state Player_1 MordorFellBeastInterface 0 PlyrCreeps:Pkg29SwoopTarget:0

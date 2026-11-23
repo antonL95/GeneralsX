@@ -603,6 +603,7 @@ void ModuleFactory::init()
 		addModule( CommandPointsUpgrade );
 		addModule( ArrowStormUpdate );
 		addModule( ReplaceObjectUpdate );
+		addModule( FellBeastSwoopPower );
 		addModule( WeaponFireSpecialAbilityUpdate );
 		addModule( ModelConditionSpecialAbilityUpdate );
 		addModule( CurseSpecialPower );
