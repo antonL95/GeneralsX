@@ -597,7 +597,10 @@ void AIUpdateInterface::requestAttackPath( ObjectID victimID, const Coord3D* vic
 	m_isApproachPath = FALSE;
 	m_isSafePath = FALSE;
 	m_waitingForPath = TRUE;
-	if (m_pathTimestamp > TheGameLogic->getFrame()-3) {
+	const Bool usesRetailFlightPath = RetailFileLayers::enabled() && getObject()->isAboveTerrain() && canComputeQuickPath();
+	if (usesRetailFlightPath && m_queueForPathFrame != 0)
+		setQueueForPathTime(0);
+	if (!usesRetailFlightPath && m_pathTimestamp > TheGameLogic->getFrame()-3) {
 		/* Requesting path very quickly.  Can cause a spin. */
 		//DEBUG_LOG(("%d Pathfind - repathing in less than 3 frames.  Waiting 2 second",TheGameLogic->getFrame()));
 		setQueueForPathTime(2*LOGICFRAMES_PER_SECOND);
