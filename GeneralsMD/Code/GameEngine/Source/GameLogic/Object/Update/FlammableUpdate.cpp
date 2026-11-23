@@ -32,13 +32,58 @@
 
 #include "Common/AudioEventRTS.h"
 #include "Common/GameAudio.h"
+#include "Common/INIAudit.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
+#include "Common/RotwkDuration.h"
+#include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 
+#include "GameClient/ClientRandomValue.h"
+#include "GameClient/Drawable.h"
+#include "GameClient/FXList.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/RetailTestCommands.h"
+#include "GameLogic/TerrainLogic.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/FlammableUpdate.h"
 #include "GameLogic/Module/FireSpreadUpdate.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <cstdio>
+#include <limits>
+
+namespace
+{
+constexpr UnsignedInt retailTick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+constexpr UnsignedInt waterQuenchDelay = 3 * LOGICFRAMES_PER_SECOND;
+
+void parseFireFX(INI* ini, void*, void* store, const void*)
+{
+	FlammableUpdateModuleData::FireFX entry;
+	entry.effect = ini->getNextSubToken("FX");
+	if (const char* key = ini->getNextTokenOrNull(INI::getSepsColon()))
+	{
+		if (stricmp(key, "BONE") != 0)
+			throw INI_INVALID_DATA;
+		entry.bone = ini->getNextToken(INI::getSepsColon());
+	}
+	static_cast<std::vector<FlammableUpdateModuleData::FireFX>*>(store)->push_back(entry);
+}
+
+Bool isInWater(const Object* object)
+{
+	const Coord3D* pos = object->getPosition();
+	return !object->isKindOf(KINDOF_SHIP) && !object->isAirborneTarget() &&
+		TheTerrainLogic->isUnderwater(pos->x, pos->y);
+}
+}
 
 //-------------------------------------------------------------------------------------------------
 FlammableUpdateModuleData::FlammableUpdateModuleData()
@@ -49,7 +94,7 @@ FlammableUpdateModuleData::FlammableUpdateModuleData()
 	m_aflameDamageAmount = 0;
 	m_burningSoundName.clear();
 	m_flameDamageLimitData = 20.0f;
-	m_flameDamageExpirationDelay = LOGICFRAMES_PER_SECOND * 2;
+	m_flameDamageExpirationDelay = LOGICFRAMES_PER_SECOND * (RetailFileLayers::enabled() ? 5 : 2);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -69,6 +114,28 @@ FlammableUpdateModuleData::FlammableUpdateModuleData()
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	{
+		static const FieldParse retailFields[] =
+		{
+			{ "FireFXList", parseFireFX, nullptr, offsetof(FlammableUpdateModuleData, m_fireFX) },
+			{ "CustomAnimAndDuration", SpecialPowerAnimation::parse, nullptr, offsetof(FlammableUpdateModuleData, m_burnAnimation) },
+			{ "DamageType", DamageTypeFlags::parseSingleBitFromINI, nullptr, offsetof(FlammableUpdateModuleData, m_ignitionDamage) },
+			{ "RunToWaterDepth", INI::parseReal, nullptr, offsetof(FlammableUpdateModuleData, m_waterDepth) },
+			{ "RunToWaterSearchRadius", INI::parseInt, nullptr, offsetof(FlammableUpdateModuleData, m_waterSearchRadius) },
+			{ "RunToWaterSearchIncrement", INI::parseInt, nullptr, offsetof(FlammableUpdateModuleData, m_waterSearchIncrement) },
+			{ "SetBurnedStatus", INI::parseBool, nullptr, offsetof(FlammableUpdateModuleData, m_setBurnedStatus) },
+			{ "SwapModelWhenAflame", INI::parseBool, nullptr, offsetof(FlammableUpdateModuleData, m_swapModelWhenAflame) },
+			{ "SwapModelWhenQuenched", INI::parseBool, nullptr, offsetof(FlammableUpdateModuleData, m_swapModelWhenQuenched) },
+			{ "SwapTextureWhenAflame", INI::parseBool, nullptr, offsetof(FlammableUpdateModuleData, m_swapTextureWhenAflame) },
+			{ "SwapTextureWhenQuenched", INI::parseBool, nullptr, offsetof(FlammableUpdateModuleData, m_swapTextureWhenQuenched) },
+			{ "BurnContained", INI::parseBool, nullptr, offsetof(FlammableUpdateModuleData, m_burnContained) },
+			{ "RunToWater", INI::parseBool, nullptr, offsetof(FlammableUpdateModuleData, m_runToWater) },
+			{ "PanicLocomotorWhileAflame", INI::parseBool, nullptr, offsetof(FlammableUpdateModuleData, m_panicLocomotor) },
+			{ nullptr, nullptr, nullptr, 0 }
+		};
+		p.add(retailFields);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -99,6 +166,12 @@ FlammableUpdate::~FlammableUpdate()
 //-------------------------------------------------------------------------------------------------
 void FlammableUpdate::onDamage( DamageInfo *damageInfo )
 {
+	if (RetailFileLayers::enabled())
+	{
+		onRetailDamage(damageInfo);
+		return;
+	}
+
 	if( damageInfo->in.m_damageType == DAMAGE_FLAME || damageInfo->in.m_damageType == DAMAGE_PARTICLE_BEAM )
 	{
 		UnsignedInt now = TheGameLogic->getFrame();
@@ -132,6 +205,9 @@ void FlammableUpdate::onDamage( DamageInfo *damageInfo )
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime FlammableUpdate::update()
 {
+	if (RetailFileLayers::enabled())
+		return updateRetailBurn();
+
 	Object *me = getObject();
 	DEBUG_ASSERTCRASH(m_status == FS_AFLAME, ("hmm, should be aflame"));
 
@@ -197,7 +273,8 @@ UpdateSleepTime FlammableUpdate::calcSleepTime()
 //-------------------------------------------------------------------------------------------------
 void FlammableUpdate::tryToIgnite()
 {
-	if( m_status == FS_NORMAL )
+	const Bool retail = RetailFileLayers::enabled();
+	if (retail ? wouldIgnite() : m_status == FS_NORMAL)
 	{
 		Object *me = getObject();
 		me->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_AFLAME ) );
@@ -217,11 +294,17 @@ void FlammableUpdate::tryToIgnite()
 
 		const FlammableUpdateModuleData *data = getFlammableUpdateModuleData();
 		UnsignedInt now = TheGameLogic->getFrame();
-		m_aflameEndFrame = now + data->m_aflameDuration;
+		m_aflameEndFrame = retail && !data->m_aflameDuration ? UPDATE_SLEEP_FOREVER : now + data->m_aflameDuration;
 		m_burnedEndFrame = data->m_burnedDelay ? now + data->m_burnedDelay : 0;
 		m_damageEndFrame = data->m_aflameDamageDelay ? now + data->m_aflameDamageDelay : 0;
 
-		setWakeFrame(getObject(), calcSleepTime());
+		if (retail)
+		{
+			startRetailBurn();
+			setWakeFrame(me, UPDATE_SLEEP(retailTick));
+		}
+		else
+			setWakeFrame(me, calcSleepTime());
 	}
 }
 
@@ -265,10 +348,299 @@ void FlammableUpdate::stopBurningSound()
 //-------------------------------------------------------------------------------------------------
 Bool FlammableUpdate::wouldIgnite()
 {
+	if (RetailFileLayers::enabled())
+	{
+		const Object* me = getObject();
+		return m_status == FS_NORMAL && !me->isEffectivelyDead() &&
+			!me->testStatus(OBJECT_STATUS_BURNED) && !isInWater(me);
+	}
+
 	if( m_status == FS_NORMAL )
 		return TRUE;
 
 	return FALSE;
+}
+
+DisabledMaskType FlammableUpdate::getDisabledTypesToProcess() const
+{
+	return RetailFileLayers::enabled() ? MAKE_DISABLED_MASK(DISABLED_PARALYZED) : DISABLEDMASK_NONE;
+}
+
+void FlammableUpdate::onRetailDamage(DamageInfo* damageInfo)
+{
+	const auto* data = getFlammableUpdateModuleData();
+	const Real applied = damageInfo->out.m_actualDamageDealt;
+	if (applied <= 0.0f)
+		return;
+	if (damageInfo->in.m_sourceID != getObject()->getID())
+		m_flameSource = damageInfo->in.m_sourceID;
+	if ((data->m_ignitionDamage != DAMAGE_FORCE && damageInfo->in.m_damageType != data->m_ignitionDamage) ||
+		!wouldIgnite())
+		return;
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (now - m_lastFlameDamageDealt > data->m_flameDamageExpirationDelay)
+		m_flameDamageLimit = data->m_flameDamageLimitData;
+	m_lastFlameDamageDealt = now;
+	m_flameDamageLimit -= applied;
+	if (m_flameDamageLimit <= 0.0f)
+	{
+		m_flameDamageLimit = 0.0f;
+		tryToIgnite();
+		if (m_status == FS_AFLAME && data->m_burnContained)
+			burnPassengers();
+	}
+}
+
+void FlammableUpdate::onHealing(DamageInfo* damageInfo)
+{
+	if (!RetailFileLayers::enabled() || m_status != FS_AFLAME)
+		return;
+	const Real threshold = getFlammableUpdateModuleData()->m_flameDamageLimitData;
+	if (m_flameDamageLimit >= threshold)
+		return;
+	m_flameDamageLimit = std::min(threshold, m_flameDamageLimit + damageInfo->in.m_amount);
+	if (m_flameDamageLimit >= threshold)
+		finishRetailBurn();
+}
+
+void FlammableUpdate::startRetailBurn()
+{
+	Object* me = getObject();
+	const auto* data = getFlammableUpdateModuleData();
+	if (data->m_swapModelWhenAflame)
+		me->setModelConditionState(MODELCONDITION_BURNT_MODEL);
+	if (data->m_swapTextureWhenAflame)
+		me->setModelConditionState(MODELCONDITION_BURNT_TEXTURE);
+
+	for (const auto& entry : data->m_fireFX)
+	{
+		const FXList* effect = TheFXListStore->findFXList(entry.effect.str());
+		if (!effect)
+			continue;
+		if (RetailTestCommands::tracesCombat())
+			std::fprintf(stderr, "TEST flammable fx frame=%u source=%s effect=%s bone=%s\n",
+				TheGameLogic->getFrame(), me->getTemplate()->getName().str(), entry.effect.str(), entry.bone.str());
+
+		const ScopedVisualRandom random(TRUE);
+		Matrix3D transform;
+		const Drawable* drawable = me->getDrawable();
+		if (drawable && entry.bone.isNotEmpty() &&
+			drawable->getCurrentWorldspaceClientBonePositions(entry.bone.str(), transform))
+		{
+			const Vector3 translation = transform.Get_Translation();
+			const Coord3D origin{translation.X, translation.Y, translation.Z};
+			FXList::doFXPos(effect, &origin, &transform);
+		}
+		else
+			FXList::doFXObj(effect, me);
+	}
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const auto& animation = data->m_burnAnimation;
+	const UnsignedInt duration = RotwkDuration::engineFrames(
+		RotwkDuration::retailFrames(animation.m_duration), LOGICFRAMES_PER_SECOND);
+	m_burnAnimationEndFrame = now + duration;
+	if (animation.m_condition >= 0 && duration > 0)
+	{
+		me->setTimedModelCondition(static_cast<ModelConditionFlagType>(animation.m_condition), duration);
+		if (!me->isDisabledByType(DISABLED_PARALYZED))
+			me->setDisabledUntil(DISABLED_PARALYZED, m_burnAnimationEndFrame - 1);
+	}
+}
+
+void FlammableUpdate::burnPassengers()
+{
+	Object* me = getObject();
+	const auto* contain = me->getContain();
+	const auto* contained = contain ? contain->getContainedItemsList() : nullptr;
+	if (!contained)
+		return;
+
+	std::vector<ObjectID> passengers;
+	for (const Object* passenger : *contained)
+		passengers.push_back(passenger->getID());
+	for (ObjectID id : passengers)
+	{
+		Object* passenger = TheGameLogic->findObjectByID(id);
+		if (!passenger || passenger->getContainedBy() != me || passenger->isEffectivelyDead())
+			continue;
+		DamageInfo damage;
+		damage.in.m_amount = static_cast<Real>(std::max(1, getFlammableUpdateModuleData()->m_aflameDamageAmount / 2));
+		damage.in.m_sourceID = me->getID();
+		damage.in.m_damageType = DAMAGE_FLAME;
+		damage.in.m_deathType = DEATH_BURNED;
+		passenger->attemptDamage(&damage);
+	}
+}
+
+void FlammableUpdate::runToWater()
+{
+	Object* me = getObject();
+	AIUpdateInterface* ai = me->getAI();
+	const auto* data = getFlammableUpdateModuleData();
+	const Int increment = data->m_waterSearchIncrement;
+	const Int radius = data->m_waterSearchRadius;
+	if (!ai || increment <= 0 || radius <= 0 || isInWater(me))
+		return;
+
+	const Coord3D position = *me->getPosition();
+	Region3D extent;
+	TheTerrainLogic->getExtent(&extent);
+	const auto firstSample = [radius, increment](Real center, Real lowerBound) {
+		const std::int64_t origin = static_cast<std::int64_t>(center - static_cast<Real>(radius));
+		const std::int64_t shift = static_cast<std::int64_t>(WWMath::Ceil(lowerBound)) - origin;
+		return origin + (shift > 0 ? ((shift + increment - 1) / increment) * increment : 0);
+	};
+	const auto lastSample = [radius](Real center, Real upperBound) {
+		return std::min(center + static_cast<Real>(radius), upperBound);
+	};
+	const auto endX = lastSample(position.x, extent.hi.x);
+	const auto endY = lastSample(position.y, extent.hi.y);
+	const auto startY = firstSample(position.y, extent.lo.y);
+	Coord3D best{};
+	Real bestDistance = std::numeric_limits<Real>::max();
+	for (auto x = firstSample(position.x, extent.lo.x); x <= endX; x += increment)
+		for (auto y = startY; y <= endY; y += increment)
+		{
+			Coord3D candidate{static_cast<Real>(x), static_cast<Real>(y), position.z};
+			const Real dx = candidate.x - position.x;
+			const Real dy = candidate.y - position.y;
+			const Real distance = dx * dx + dy * dy;
+			if (distance >= bestDistance)
+				continue;
+			Real water, ground;
+			if (!TheTerrainLogic->isUnderwater(candidate.x, candidate.y, &water, &ground) ||
+				water - ground <= data->m_waterDepth)
+				continue;
+			candidate.z = ground;
+			if (!TheAI->pathfinder()->clientSafeQuickDoesPathExist(ai->getLocomotorSet(), &position, &candidate))
+				continue;
+			best = candidate;
+			bestDistance = distance;
+		}
+	if (bestDistance == std::numeric_limits<Real>::max())
+		return;
+
+	const LocomotorSetType previous = ai->getCurLocomotorSetType();
+	if (data->m_panicLocomotor && previous != LOCOMOTORSET_PANIC && ai->chooseLocomotorSet(LOCOMOTORSET_PANIC))
+		m_previousLocomotorSet = previous;
+	m_runningToWater = TRUE;
+	ai->aiMoveToPositionEvenIfSleeping(&best, CMD_FROM_SCRIPT);
+	if (RetailTestCommands::tracesCombat())
+		std::fprintf(stderr, "TEST flammable water run frame=%u source=%s to=%.1f,%.1f\n",
+			TheGameLogic->getFrame(), me->getTemplate()->getName().str(), best.x, best.y);
+}
+
+void FlammableUpdate::markBurned()
+{
+	if (getFlammableUpdateModuleData()->m_setBurnedStatus)
+	{
+		getObject()->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_BURNED));
+		getObject()->setModelConditionState(MODELCONDITION_SMOLDERING);
+	}
+}
+
+void FlammableUpdate::finishRetailBurn()
+{
+	Object* me = getObject();
+	const auto* data = getFlammableUpdateModuleData();
+	markBurned();
+	m_status = me->testStatus(OBJECT_STATUS_BURNED) ? FS_BURNED : FS_NORMAL;
+	m_aflameEndFrame = 0;
+	m_damageEndFrame = 0;
+	m_burnedEndFrame = 0;
+	m_burnAnimationEndFrame = 0;
+	m_flameDamageLimit = data->m_flameDamageLimitData;
+	stopBurningSound();
+	me->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_AFLAME));
+	me->clearModelConditionState(MODELCONDITION_AFLAME);
+	if (data->m_swapModelWhenQuenched)
+		me->clearModelConditionState(MODELCONDITION_BURNT_MODEL);
+	if (data->m_swapTextureWhenQuenched)
+		me->clearModelConditionState(MODELCONDITION_BURNT_TEXTURE);
+	me->getBodyModule()->setAflame(FALSE);
+
+	if (AIUpdateInterface* ai = me->getAI(); ai && !me->isEffectivelyDead())
+	{
+		if (m_runningToWater)
+			ai->aiIdle(CMD_FROM_SCRIPT);
+		if (m_previousLocomotorSet != LOCOMOTORSET_INVALID && ai->getCurLocomotorSetType() == LOCOMOTORSET_PANIC)
+		{
+			const auto previous = static_cast<LocomotorSetType>(m_previousLocomotorSet);
+			if (previous == LOCOMOTORSET_NORMAL_UPGRADED || !ai->chooseLocomotorSet(previous))
+				ai->chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+		}
+	}
+	m_previousLocomotorSet = LOCOMOTORSET_INVALID;
+	m_runningToWater = FALSE;
+}
+
+UpdateSleepTime FlammableUpdate::updateRetailBurn()
+{
+	Object* me = getObject();
+	if (m_status != FS_AFLAME || me->isEffectivelyDead())
+		return UPDATE_SLEEP_FOREVER;
+
+	const auto* data = getFlammableUpdateModuleData();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (m_burnAnimationEndFrame)
+	{
+		if (now < m_burnAnimationEndFrame)
+			return UPDATE_SLEEP(retailTick);
+		m_burnAnimationEndFrame = 0;
+		if (data->m_runToWater)
+			runToWater();
+	}
+
+	AIUpdateInterface* ai = me->getAI();
+	const Bool checksWater = ai && !me->isKindOf(KINDOF_SHIP);
+	if (checksWater && isInWater(me))
+	{
+		m_aflameEndFrame = std::min(m_aflameEndFrame, now + waterQuenchDelay);
+		if (m_runningToWater)
+		{
+			ai->aiIdle(CMD_FROM_SCRIPT);
+			m_runningToWater = FALSE;
+		}
+	}
+
+	if (m_damageEndFrame && now >= m_damageEndFrame)
+	{
+		m_damageEndFrame = now + data->m_aflameDamageDelay;
+		doAflameDamage();
+		if (m_status != FS_AFLAME || me->isEffectivelyDead())
+			return UPDATE_SLEEP_FOREVER;
+	}
+	if (m_burnedEndFrame && now >= m_burnedEndFrame)
+	{
+		m_burnedEndFrame = 0;
+		markBurned();
+	}
+	if (now >= m_aflameEndFrame)
+	{
+		finishRetailBurn();
+		return UPDATE_SLEEP_FOREVER;
+	}
+	if (checksWater)
+		return UPDATE_SLEEP(retailTick);
+	return frameToSleepTime(m_aflameEndFrame, m_damageEndFrame ? m_damageEndFrame : FOREVER,
+		m_burnedEndFrame ? m_burnedEndFrame : FOREVER);
+}
+
+void FlammableUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"burn-animation-and-water", [this](Xfer* block) {
+			block->xferUnsignedInt(&m_burnAnimationEndFrame);
+			block->xferInt(&m_previousLocomotorSet);
+			block->xferBool(&m_runningToWater);
+		}, [this] {
+			m_burnAnimationEndFrame = 0;
+			m_previousLocomotorSet = LOCOMOTORSET_INVALID;
+			m_runningToWater = FALSE;
+		}}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -280,6 +652,17 @@ void FlammableUpdate::crc( Xfer *xfer )
 	// extend base class
 	UpdateModule::crc( xfer );
 
+	if (RetailFileLayers::enabled())
+	{
+		xfer->xferUser(&m_status, sizeof(m_status));
+		xfer->xferUnsignedInt(&m_aflameEndFrame);
+		xfer->xferUnsignedInt(&m_burnedEndFrame);
+		xfer->xferUnsignedInt(&m_damageEndFrame);
+		xfer->xferReal(&m_flameDamageLimit);
+		xfer->xferUnsignedInt(&m_lastFlameDamageDealt);
+		xfer->xferObjectID(&m_flameSource);
+		xferRetailBlocks(xfer, TRUE);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -294,10 +677,13 @@ void FlammableUpdate::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	XferVersion currentVersion = 1;
+	constexpr XferVersion classicVersion = 1;
 #else
-	XferVersion currentVersion = 2;
+	constexpr XferVersion classicVersion = 2;
 #endif
+	constexpr XferVersion retailVersion = 3;
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion currentVersion = retail ? retailVersion : classicVersion;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -326,6 +712,9 @@ void FlammableUpdate::xfer( Xfer *xfer )
 	{
 		xfer->xferObjectID(&m_flameSource);
 	}
+
+	if (retail)
+		xferRetailBlocks(xfer, version >= retailVersion);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -337,4 +726,6 @@ void FlammableUpdate::loadPostProcess()
 	// extend base class
 	UpdateModule::loadPostProcess();
 
+	if (RetailFileLayers::enabled() && m_status == FS_AFLAME && !getObject()->isEffectivelyDead())
+		startBurningSound();
 }

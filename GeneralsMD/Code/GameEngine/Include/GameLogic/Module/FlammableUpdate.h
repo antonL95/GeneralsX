@@ -31,6 +31,8 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/AudioEventRTS.h"
+#include "Common/SpecialPowerINI.h"
+#include "GameLogic/Damage.h"
 #include "GameLogic/Module/DamageModule.h"
 #include "GameLogic/Module/UpdateModule.h"
 
@@ -57,6 +59,25 @@ public:
 	AsciiString		m_burningSoundName;			///< Sound to loop-play while burning (Not an AudioEventRTS here, since that belongs to the module)
 	Real					m_flameDamageLimitData;
 	UnsignedInt		m_flameDamageExpirationDelay;
+	struct FireFX
+	{
+		AsciiString effect;
+		AsciiString bone;
+	};
+	std::vector<FireFX> m_fireFX;
+	SpecialPowerAnimation m_burnAnimation;
+	DamageType m_ignitionDamage = DAMAGE_FLAME;
+	Real m_waterDepth = 0.0f;
+	Int m_waterSearchRadius = 200;
+	Int m_waterSearchIncrement = 60;
+	Bool m_setBurnedStatus = TRUE;
+	Bool m_swapModelWhenAflame = FALSE;
+	Bool m_swapModelWhenQuenched = FALSE;
+	Bool m_swapTextureWhenAflame = FALSE;
+	Bool m_swapTextureWhenQuenched = FALSE;
+	Bool m_burnContained = FALSE;
+	Bool m_runToWater = FALSE;
+	Bool m_panicLocomotor = FALSE;
 
 	FlammableUpdateModuleData();
 
@@ -87,10 +108,11 @@ public:
 
 	//UpdateModuleInterface
 	virtual UpdateSleepTime update() override;
+	DisabledMaskType getDisabledTypesToProcess() const override;
 
 	//DamageModuleInterface
 	virtual void onDamage( DamageInfo *damageInfo ) override;
-	virtual void onHealing( DamageInfo *damageInfo ) override { }
+	virtual void onHealing(DamageInfo* damageInfo) override;
 	virtual void onBodyDamageStateChange( const DamageInfo *damageInfo,
 																				BodyDamageType oldState,
 																				BodyDamageType newState ) override { }
@@ -110,4 +132,18 @@ protected:
 	Real										m_flameDamageLimit;
 	ObjectID								m_flameSource;
 	UnsignedInt							m_lastFlameDamageDealt;
+
+private:
+	void onRetailDamage(DamageInfo* damageInfo);
+	UpdateSleepTime updateRetailBurn();
+	void startRetailBurn();
+	void finishRetailBurn();
+	void markBurned();
+	void runToWater();
+	void burnPassengers();
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+
+	UnsignedInt m_burnAnimationEndFrame = 0;
+	Int m_previousLocomotorSet = -1;
+	Bool m_runningToWater = FALSE;
 };
