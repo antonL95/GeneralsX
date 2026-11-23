@@ -5,6 +5,7 @@
 #include "Common/AsciiString.h"
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Damage.h"
+#include "GameLogic/RetailTerrainFire.h"
 #include "GameLogic/WeaponSetType.h"
 
 class INI;
@@ -26,6 +27,7 @@ enum WeaponNuggetType CPP_11(: Int)
 	WEAPON_NUGGET_HORDE_ATTACK,
 	WEAPON_NUGGET_DAMAGE_FIELD,
 	WEAPON_NUGGET_GRAB,
+	WEAPON_NUGGET_FIRE_LOGIC,
 };
 
 struct WeaponNuggetScalar
@@ -41,7 +43,7 @@ struct WeaponNugget
 	Bool isEnabledFor(const Object* attacker) const;
 	Bool affects(const Object* attacker, const Object* victim) const;
 	Real scalarFor(const Object* attacker, const Object* victim) const;
-	Bool isImpactNugget() const { return dealsDamage() || m_type == WEAPON_NUGGET_OCL || m_type == WEAPON_NUGGET_META_IMPACT || m_type == WEAPON_NUGGET_DAMAGE_FIELD || m_type == WEAPON_NUGGET_GRAB; }
+	Bool isImpactNugget() const { return dealsDamage() || m_type == WEAPON_NUGGET_OCL || m_type == WEAPON_NUGGET_META_IMPACT || m_type == WEAPON_NUGGET_DAMAGE_FIELD || m_type == WEAPON_NUGGET_GRAB || m_type == WEAPON_NUGGET_FIRE_LOGIC; }
 	Bool dealsDamage() const { return m_type == WEAPON_NUGGET_DAMAGE || m_type == WEAPON_NUGGET_DOT; }
 	void postProcessLoad();
 
@@ -55,6 +57,7 @@ struct WeaponNugget
 	static void parseHordeAttackNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseDamageFieldNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseGrabNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseFireLogicNugget(INI* ini, void* instance, void* store, const void* userData);
 
 	WeaponNuggetType m_type;
 	std::vector<AsciiString> m_requiredUpgradeNames;
@@ -128,6 +131,7 @@ struct WeaponNugget
 	std::vector<AsciiString> m_antiCategories;
 	Bool m_affectHordeMembers = FALSE;
 	WeaponSlotType m_lockWeaponSlot = PRIMARY_WEAPON;
+	RetailTerrainFire::Edit m_fireEdit;
 };
 
 Bool objectFilterMatches(const SpecialPowerObjectFilter& filter, const Object* source, const Object* target);

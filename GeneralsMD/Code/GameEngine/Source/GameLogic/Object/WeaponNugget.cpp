@@ -236,6 +236,25 @@ const FieldParse s_hordeAttackFields[] =
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
+const char* s_fireActions[] =
+{
+	"INCREASE_BURN_RATE",
+	"DECREASE_BURN_RATE",
+	"INCREASE_FUEL",
+	"INCREASE_BURN_RATE_ON_EXISTING_FIRE",
+	"INCREASE_FUEL_ON_EXISTING_FIRE",
+	nullptr
+};
+
+const FieldParse s_fireFields[] =
+{
+	{ "LogicType", INI::parseIndexList, s_fireActions, offsetof(WeaponNugget, m_fireEdit.action) },
+	{ "MinMaxBurnRate", INI::parseReal, nullptr, offsetof(WeaponNugget, m_fireEdit.minMaxBurnRate) },
+	{ "MinDecay", INI::parseReal, nullptr, offsetof(WeaponNugget, m_fireEdit.minDecay) },
+	{ "MaxResistance", INI::parseReal, nullptr, offsetof(WeaponNugget, m_fireEdit.maxResistance) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
 void parseNugget(INI* ini, void* store, WeaponNuggetType type, const FieldParse* fields, const FieldParse* extraFields = nullptr)
 {
 	WeaponNugget nugget(type);
@@ -263,6 +282,7 @@ const char* nuggetTypeName(WeaponNuggetType type)
 		case WEAPON_NUGGET_HORDE_ATTACK: return "HordeAttackNugget";
 		case WEAPON_NUGGET_DAMAGE_FIELD: return "DamageFieldNugget";
 		case WEAPON_NUGGET_GRAB: return "GrabNugget";
+		case WEAPON_NUGGET_FIRE_LOGIC: return "FireLogicNugget";
 	}
 	return "Nugget";
 }
@@ -329,6 +349,11 @@ void WeaponNugget::parseDamageFieldNugget(INI* ini, void*, void* store, const vo
 void WeaponNugget::parseGrabNugget(INI* ini, void*, void* store, const void*)
 {
 	parseNugget(ini, store, WEAPON_NUGGET_GRAB, s_grabFields);
+}
+
+void WeaponNugget::parseFireLogicNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_FIRE_LOGIC, s_damageFields, s_fireFields);
 }
 
 void WeaponNugget::postProcessLoad()
@@ -693,6 +718,21 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 {
 	const WeaponNugget& nugget = m_nuggets[nuggetIndex];
 	Object* source = TheGameLogic->findObjectByID(sourceID);
+	if (nugget.m_type == WEAPON_NUGGET_FIRE_LOGIC)
+	{
+		if (RetailFileLayers::enabled() && TheTerrainLogic && pos)
+		{
+			auto edit = nugget.m_fireEdit;
+			edit.amount = nugget.m_damage;
+			edit.radius = nugget.m_radius;
+			edit.arc = nugget.m_damageArc * PI / 180.0f;
+			Coord3D direction{1.0f, 0.0f, 0.0f};
+			if (source)
+				source->getUnitDirectionVector3D(direction);
+			TheTerrainLogic->retailFire().apply(*TheTerrainLogic, *pos, direction, edit);
+		}
+		return;
+	}
 	Object* primaryVictim = victimID ? TheGameLogic->findObjectByID(victimID) : nullptr;
 	if (primaryVictim)
 	{

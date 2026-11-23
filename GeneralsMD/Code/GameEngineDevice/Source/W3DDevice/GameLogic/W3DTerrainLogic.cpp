@@ -28,6 +28,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Common/GameMemory.h"
+#include "Common/RetailFileLayers.h"
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameLogic/W3DTerrainLogic.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
@@ -139,6 +140,20 @@ Bool W3DTerrainLogic::loadMap( AsciiString filename , Bool query )
 		// now, get all the boundaries, and set the current active boundary to boundary 0.
 		m_boundaries = terrainHeightMap->getAllBoundaries();
 		m_activeBoundary = 0;
+
+		if (!query && RetailFileLayers::enabled())
+		{
+			Region3D extent{};
+			getMaximumPathfindExtent(&extent);
+			const Int width = static_cast<Int>(extent.hi.x) / RetailTerrainFire::CELL_SIZE + 1;
+			const Int height = static_cast<Int>(extent.hi.y) / RetailTerrainFire::CELL_SIZE + 1;
+			const Int border = terrainHeightMap->getBorderSizeInline();
+			std::vector<UnsignedByte> types(width * height);
+			for (Int x = 0; x < width; ++x)
+				for (Int y = 0; y < height; ++y)
+					types[x * height + y] = terrainHeightMap->getFlammability(x + border, y + border);
+			retailFire().initialize(width, height, std::move(types));
+		}
 
 		Int i, j, minHt, maxHt;
 

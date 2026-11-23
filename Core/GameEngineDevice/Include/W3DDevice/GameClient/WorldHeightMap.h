@@ -306,6 +306,11 @@ public:  // height map info.
 
 	Int getXExtent() const {return m_width;}	///<number of vertices in x
 	Int getYExtent() const {return m_height;}	///<number of vertices in y
+	UnsignedByte getFlammability(Int x, Int y) const
+	{
+		return m_flammability.empty() || x < 0 || x >= m_width || y < 0 || y >= m_height
+			? 0 : m_flammability[y * m_width + x];
+	}
 
 	IRegion2D getLogicalBounds() const
 	{

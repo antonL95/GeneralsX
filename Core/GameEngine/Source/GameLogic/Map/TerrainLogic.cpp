@@ -37,6 +37,8 @@
 #include "Common/MapObject.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
+#include "Common/RotwkDuration.h"
 #include "Common/SpecialPowerINI.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -976,6 +978,7 @@ void TerrainLogic::init()
 void TerrainLogic::reset()
 {
 	m_mapTrees.clear();
+	m_retailFire.reset();
 
 	deleteWaypoints();
 	deleteBridges();
@@ -989,6 +992,8 @@ void TerrainLogic::reset()
 //-------------------------------------------------------------------------------------------------
 void TerrainLogic::update()
 {
+	if (RetailFileLayers::enabled() && TheGameLogic->getFrame() % RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND) == 0)
+		m_retailFire.update();
 
 	// bridge damage states have not changed this frame now
 	m_bridgeDamageStatesChanged = false;
@@ -3054,7 +3059,17 @@ std::uint64_t TerrainLogic::harvestMapTrees(const Coord3D& origin, Real radius, 
 void TerrainLogic::crc( Xfer *xfer )
 {
 	if (RetailFileLayers::enabled())
+	{
 		xferMapTrees(xfer);
+		xferRetailBlocks(xfer, TRUE);
+	}
+}
+
+void TerrainLogic::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"terrain-fire", [this](Xfer* block) { m_retailFire.xfer(block); }, [this] { m_retailFire.clearState(); }}
+	});
 }
 
 void TerrainLogic::xferMapTrees(Xfer* xfer)
@@ -3082,7 +3097,7 @@ void TerrainLogic::xfer( Xfer *xfer )
 
 	// version
 	const Bool retail = RetailFileLayers::enabled();
-	const XferVersion currentVersion = retail ? 4 : 2;
+	const XferVersion currentVersion = retail ? 5 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -3183,6 +3198,8 @@ void TerrainLogic::xfer( Xfer *xfer )
 		xferMapTrees(xfer);
 	else if (!retail && xfer->getXferMode() == XFER_LOAD)
 		m_mapTrees.clear();
+	if (retail)
+		xferRetailBlocks(xfer, version >= 5);
 }
 
 // ------------------------------------------------------------------------------------------------

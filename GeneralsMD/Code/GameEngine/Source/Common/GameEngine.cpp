@@ -42,6 +42,7 @@
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
 #include "Common/INI.h"
+#include "GameLogic/RetailTerrainFire.h"
 #include "Common/INIAudit.h"
 #include "Common/INIException.h"
 #include "Common/MessageStream.h"
@@ -748,6 +749,7 @@ void GameEngine::init()
 		// read the water settings from INI (must do prior to initing GameClient, apparently)
 		ini.loadFileDirectory( "Data\\INI\\Default\\Water", INI_LOAD_OVERWRITE, &xferCRC );
 		ini.loadFileDirectory( "Data\\INI\\Water", INI_LOAD_OVERWRITE, &xferCRC );
+	RetailTerrainFire::loadSettings(&xferCRC);
 		ini.loadFileDirectory( "Data\\INI\\Default\\Weather", INI_LOAD_OVERWRITE, &xferCRC );
 		ini.loadFileDirectory( "Data\\INI\\Weather", INI_LOAD_OVERWRITE, &xferCRC );
 

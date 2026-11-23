@@ -518,6 +518,13 @@ void INI::unPrepFile()
 //-------------------------------------------------------------------------------------------------
 static INIBlockParse findBlockParse(const char* token)
 {
+	if (RetailFileLayers::enabled())
+	{
+		if (strcmp(token, "FireLogicSystem") == 0)
+			return RetailTerrainFire::parseLogicSettings;
+		if (strcmp(token, "Fire") == 0)
+			return RetailTerrainFire::parseVisualSettings;
+	}
 	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
 	{
 		if (strcmp(token, "NewEvaEvent") == 0 || strcmp(token, "PredefinedEvaEvent") == 0)

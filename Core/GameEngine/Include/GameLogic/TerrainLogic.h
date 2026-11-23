@@ -33,6 +33,7 @@
 #include "Common/Snapshot.h"
 #include "Common/STLTypedefs.h"
 #include "GameClient/TerrainRoads.h"
+#include "GameLogic/RetailTerrainFire.h"
 
 typedef std::vector<ICoord2D> VecICoord2D;
 
@@ -245,6 +246,8 @@ public:
 
 	virtual Bool isUnderwater( Real x, Real y, Real *waterZ = nullptr, Real *terrainZ = nullptr );			///< is point under water
 	virtual Bool isCliffCell( Real x, Real y) const;			///< is point cliff cell
+	RetailTerrainFire& retailFire() { return m_retailFire; }
+	const RetailTerrainFire& retailFire() const { return m_retailFire; }
 	virtual const WaterHandle* getWaterHandle( Real x, Real y );					///< get water handle at this location
 	virtual const WaterHandle* getWaterHandleByName( AsciiString name );	///< get water handle by name
 	virtual Real getWaterHeight( const WaterHandle *water );							///< get height of water table
@@ -336,6 +339,8 @@ protected:
 	virtual void loadPostProcess() override;
 
 	void xferMapTrees(Xfer* xfer);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+	RetailTerrainFire m_retailFire;
 
 	/// Chunk parser callback.
  	static Bool parseWaypointDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
