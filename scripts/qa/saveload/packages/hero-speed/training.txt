@@ -1,0 +1,26 @@
+192 create Player_1 ArnorHalbarad 0 2300,1450,0
+193 create Player_1 RohanMerry 0 2300,1520,0
+194 create Player_1 ElvenAragorn 0 2300,1590,0
+211 move Player_1 ArnorHalbarad 0 - 2680 1450
+212 move Player_1 RohanMerry 0 - 2680 1520
+213 move Player_1 ElvenAragorn 0 - 2680 1590
+235 hero-speed Player_1 ArnorHalbarad 0 bow
+236 hero-speed Player_1 RohanMerry 0 comparison
+237 hero-speed Player_1 ElvenAragorn 0 comparison
+265 hero-speed Player_1 ArnorHalbarad 0 bow
+266 hero-speed Player_1 RohanMerry 0 comparison
+267 hero-speed Player_1 ElvenAragorn 0 comparison
+295 hero-speed Player_1 ArnorHalbarad 0 bow
+296 hero-speed Player_1 RohanMerry 0 comparison
+297 hero-speed Player_1 ElvenAragorn 0 comparison
+298 destroy Player_1 RohanMerry 0
+299 destroy Player_1 ElvenAragorn 0
+315 hero-speed-rank Player_1 ArnorHalbarad 0 5
+330 hero-speed Player_1 ArnorHalbarad 0 bow-high
+350 hero-speed-toggle Player_1 ArnorHalbarad 0
+371 hero-speed Player_1 ArnorHalbarad 0 sword
+401 hero-speed Player_1 ArnorHalbarad 0 sword
+405 hero-speed-toggle Player_1 ArnorHalbarad 0
+420 hero-speed Player_1 ArnorHalbarad 0 bow-again
+475 hero-speed Player_1 ArnorHalbarad 0 arrival
+490 destroy Player_1 ArnorHalbarad 0
