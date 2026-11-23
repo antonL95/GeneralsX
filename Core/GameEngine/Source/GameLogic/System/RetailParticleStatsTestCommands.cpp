@@ -47,9 +47,10 @@ void sampleParticles(const RetailTestCommands::Context& ctx)
 			"TEST particle-stats frame=%u name=%s count=%u youngest=%u oldest=%u peak-alpha=%.4f total-alpha=%.4f\n",
 			ctx.frame, ctx.argument, system->getParticleCount(), youngest, oldest, peakAlpha, totalAlpha);
 	}
-	std::fprintf(stderr, "TEST particle-budget frame=%u count=%u limit=%d skip-priority=%d\n",
+	std::fprintf(stderr, "TEST particle-budget frame=%u count=%u limit=%d skip-priority=%d dynamic-lod=%s\n",
 		ctx.frame, TheParticleSystemManager->getParticleCount(), TheGlobalData->m_maxParticleCount,
-		TheGameLODManager->getMinDynamicParticleSkipPriority());
+		TheGameLODManager->getMinDynamicParticleSkipPriority(),
+		TheGameLODManager->getDynamicGameLODLevelName(TheGameLODManager->getDynamicLODLevel()));
 }
 }
 

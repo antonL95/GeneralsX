@@ -4,6 +4,9 @@ import sys
 from PIL import Image, ImageChops, ImageFilter
 
 
+render_variants = {"pinned-very-high": {"PLAYTEST_PIN_DYNAMIC_LOD": "1"}}
+
+
 def check(log):
     samples = {int(frame): (int(count), int(youngest), int(oldest), float(alpha))
                for frame, count, youngest, oldest, alpha in re.findall(

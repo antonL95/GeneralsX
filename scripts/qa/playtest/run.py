@@ -128,6 +128,8 @@ def render(build, output, state, map_path, frames, camera_frames, end_frame, com
             or "Python Exception" in log_text or "Traceback (most recent call last)" in log_text):
         print("\n".join(log_text.splitlines()[-40:]), file=sys.stderr)
         raise RuntimeError(f"Engine session failed (exit {status}, expected quit frame {end_frame})")
+    if env.get("PLAYTEST_PIN_DYNAMIC_LOD") == "1" and "TEST dynamic-lod-pinned VeryHigh skip-mask=0" not in log_text:
+        raise RuntimeError("Dynamic LOD was not pinned to VeryHigh with particle skipping disabled")
     for camera_frame in camera_frames:
         if f"TEST frame {camera_frame}: camera at " not in log_text:
             raise RuntimeError(f"Camera command did not run at frame {camera_frame}")
@@ -159,22 +161,35 @@ def make_media(output, frames):
 
 def main():
     build = Path(sys.argv[1])
-    map_path, frames, camera_frames, end_frame, commands, render_from = read_scenario(sys.argv[2])
+    scenario = read_scenario(sys.argv[2])
+    _, frames, _, end_frame, _, _ = scenario
     check_path = ROOT / sys.argv[2] / "check.py"
     checks = runpy.run_path(str(check_path)) if check_path.is_file() else {}
     with tempfile.TemporaryDirectory(prefix="playtest-", dir=build) as temp:
         state = Path(temp)
         output = state / "results"
         output.mkdir()
-        render(build, output, state, map_path, frames, camera_frames, end_frame, commands, render_from, checks)
-        if "check_captures" in checks:
-            checks["check_captures"](output, frames)
-        make_media(output, frames)
+        render_variant(build, output, state, scenario, checks)
+        for name, overrides in checks.get("render_variants", {}).items():
+            variant_output = output / name
+            variant_output.mkdir()
+            variant_state = state / name
+            variant_state.mkdir()
+            variant_checks = dict(checks, render_env={**checks.get("render_env", {}), **overrides})
+            render_variant(build, variant_output, variant_state, scenario, variant_checks)
         (output / "frames.txt").write_text("\n".join(map(str, frames)) + "\n")
         (output / "frame-count.txt").write_text(f"{end_frame}\n")
         with tarfile.open(fileobj=sys.stdout.buffer, mode="w|") as archive:
             for path in sorted(output.iterdir()):
                 archive.add(path, arcname=path.name)
+
+
+def render_variant(build, output, state, scenario, checks):
+    render(build, output, state, *scenario, checks)
+    frames = scenario[1]
+    if "check_captures" in checks:
+        checks["check_captures"](output, frames)
+    make_media(output, frames)
 
 
 if __name__ == "__main__":

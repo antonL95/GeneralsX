@@ -46,5 +46,23 @@ class Capture(gdb.Breakpoint):
         raise gdb.GdbError(f"Missing capture path for frame {frame}")
 
 
+class PinDynamicLOD(gdb.Breakpoint):
+    checked_mask = False
+
+    def stop(self):
+        if not self.checked_mask:
+            mask = gdb.parse_and_eval(
+                "TheGameLODManager->m_dynamicGameLODInfo[DYNAMIC_GAME_LOD_VERY_HIGH].m_dynamicParticleSkipMask"
+            )
+            if int(mask) != 0:
+                raise gdb.GdbError(f"VeryHigh has particle skip mask {mask}, expected zero")
+            gdb.write("TEST dynamic-lod-pinned VeryHigh skip-mask=0\n")
+            self.checked_mask = True
+        gdb.execute("return DYNAMIC_GAME_LOD_VERY_HIGH", to_string=True)
+        return False
+
+
 Draw("W3DDisplay::draw", internal=True)
 Capture()
+if os.environ.get("PLAYTEST_PIN_DYNAMIC_LOD") == "1":
+    PinDynamicLOD("GameLODManager::findDynamicLODLevel", internal=True)
