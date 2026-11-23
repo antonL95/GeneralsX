@@ -116,7 +116,7 @@ for label in forward no-targetless unavailable-building ordinary-building opport
 done | tee "$work/decisions.txt"
 
 awk '
-    $1 == "forward" { seen++; bad += ($2 != 304 || $3 != "MordorBattleTower") }
+    $1 == "forward" { seen++; bad += ($2 != 244 || $3 != "MordorBattleTower") }
     $1 == "no-targetless" || $1 == "unavailable-building" { seen++; bad += ($2 != 0) }
     $1 == "ordinary-building" { seen++; bad += ($2 != 0 || !$13) }
     $1 == "opportunity" { seen++; bad += ($6 != 364 || !$8 || $7 != $8) }

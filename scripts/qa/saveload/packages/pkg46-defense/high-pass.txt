@@ -9,7 +9,7 @@
 95 create Player_2 Pkg46DefenseFootSoldier 1 2440,2570,0
 95 create Player_2 Pkg46DefenseFootSoldier 2 2430,2720,0
 95 create Player_2 Pkg46DefenseFootSoldier 3 2420,2900,0
-100 create Player_1 Pkg46DefenseAttacker 0 2050,2840,180
-101 attack Player_1 Pkg46DefenseAttacker 0 Player_2:Pkg46DefenseAnchor:0
+100 create Player_1 Pkg46DefenseArcherHorde 0 2050,2840,180
+101 attack Player_1 Pkg46DefenseArcherHorde 0 Player_2:Pkg46DefenseAnchor:0
 125 create Player_2 Pkg46ForwardBuilder 0 1990,3050,0
 125 cash Player_2 - 0 1800

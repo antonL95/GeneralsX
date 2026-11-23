@@ -67,7 +67,7 @@ compare() {
                 split($8, id, "=")
                 anchor[id[2]] = 1
             }
-            FILENAME == prefix && /^TEST frame 100: create Pkg46DefenseAttacker/ {
+            FILENAME == prefix && /^TEST frame 100: create Pkg46DefenseArcherHorde/ {
                 split($8, id, "=")
                 attacker = id[2]
             }
