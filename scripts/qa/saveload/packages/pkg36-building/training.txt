@@ -10,13 +10,13 @@
 745 pkg36-site Player_1 Pkg36Farm 0
 746 destroy Player_1 Pkg36Farm 0
 747 destroy Player_1 Pkg36Porter 0
-810 create Player_1 ArnorPeasantAdult 0 2440,1120,0
+810 create Player_1 Pkg36Peasant 0 2440,1120,0
 810 create Player_1 Pkg36PeasantControl 0 2460,1120,0
-812 pkg36-lua Player_1 ArnorPeasantAdult 0
+812 pkg36-lua Player_1 Pkg36Peasant 0
 812 pkg36-lua Player_1 Pkg36PeasantControl 0
-812 pkg36-attackinfo Player_1 ArnorPeasantAdult 0
+812 pkg36-attackinfo Player_1 Pkg36Peasant 0
 812 pkg36-attackinfo Player_1 Pkg36PeasantControl 0
-813 destroy Player_1 ArnorPeasantAdult 0
+813 destroy Player_1 Pkg36Peasant 0
 813 destroy Player_1 Pkg36PeasantControl 0
 820 create Player_1 Pkg36RepairClock 0 2300,1140,0
 820 create Player_1 Pkg36RepairDisabled 0 2450,1140,0
@@ -53,14 +53,14 @@
 1052 repair Player_1 Pkg36DaleControl 0 Pkg36ContactTarget
 1053 pkg36-dock Player_1 Pkg36DaleControl 0
 1054 destroy Player_1 Pkg36DaleControl 0
-1060 create Player_1 ArnorBreelandPeasantHorde 0 2380,1200,0
+1060 create Player_1 Pkg36RepairHorde 0 2380,1200,0
 1060 create Player_1 Pkg36HordeControl 0 2350,1240,0
-1070 power Player_1 ArnorBreelandPeasantHorde 0 SpecialRepairStructure
-1071 aim Player_1 ArnorBreelandPeasantHorde 0 Player_1:Pkg36ContactTarget:0
-1075 pkg36-horde Player_1 ArnorBreelandPeasantHorde 0
+1070 power Player_1 Pkg36RepairHorde 0 SpecialRepairStructure
+1071 aim Player_1 Pkg36RepairHorde 0 Player_1:Pkg36ContactTarget:0
+1075 pkg36-horde Player_1 Pkg36RepairHorde 0
 1075 pkg36-horde Player_1 Pkg36HordeControl 0
 1090 pkg36-site Player_1 Pkg36ContactTarget 0
-1091 destroy Player_1 ArnorBreelandPeasantHorde 0
+1091 destroy Player_1 Pkg36RepairHorde 0
 1091 destroy Player_1 Pkg36HordeControl 0
 1091 destroy Player_1 Pkg36ContactTarget 0
 1120 create Player_1 Pkg36Porter 0 2440,1120,0

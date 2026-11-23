@@ -22,9 +22,9 @@ check() {
         site 745 Pkg36Farm '.* under=0 .* loop=-$'
     fi
     if covers 812; then
-        expect "TEST pkg36 lua frame=812 object=ArnorPeasantAdult list=RohanPeasant2Functions"
+        expect "TEST pkg36 lua frame=812 object=Pkg36Peasant list=RohanPeasant2Functions"
         expect "TEST pkg36 lua frame=812 object=Pkg36PeasantControl list="
-        expect "TEST pkg36 attackinfo frame=812 object=ArnorPeasantAdult resolved=1"
+        expect "TEST pkg36 attackinfo frame=812 object=Pkg36Peasant resolved=1"
         expect "TEST pkg36 attackinfo frame=812 object=Pkg36PeasantControl resolved=0"
     fi
     if covers 890; then
@@ -57,7 +57,7 @@ check() {
         [ "$contact" != "$control" ]
     fi
     if covers 1075; then
-        grep -E '^TEST pkg36 horde frame=1075 name=ArnorBreelandPeasantHorde repairing=[1-9][0-9]*$' "$log"
+        grep -E '^TEST pkg36 horde frame=1075 name=Pkg36RepairHorde repairing=[1-9][0-9]*$' "$log"
         expect "TEST pkg36 horde frame=1075 name=Pkg36HordeControl repairing=0"
     fi
 }
