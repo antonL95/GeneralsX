@@ -652,9 +652,9 @@ void drawHero(const HeroSlot &slot, Int index, const ICoord2D &origin, Real scal
 		TheDisplay->drawImage(image, portrait.x0, portrait.y0, portrait.x1, portrait.y1, tint,
 			slot.alive || deadArt ? Display::DRAW_IMAGE_ALPHA : Display::DRAW_IMAGE_GRAYSCALE);
 	}
-	if (slot.attacked)
+	if (!slot.alive || slot.attacked)
 	{
-		const Real flicker = static_cast<Real>(UiHudRules::pulse(now, FlickerMs));
+		const Real flicker = slot.alive ? static_cast<Real>(UiHudRules::pulse(now, FlickerMs)) : 1.0f;
 		TheDisplay->drawFillRect(portrait.x0, portrait.y0, portrait.width(), portrait.height(), withAlpha(220, 30, 20, 0.15f + 0.35f * flicker));
 	}
 	if (hovered)
