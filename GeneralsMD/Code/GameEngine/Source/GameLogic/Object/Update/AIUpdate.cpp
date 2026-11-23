@@ -3823,33 +3823,24 @@ void AIUpdateInterface::endRetailGroupRoute(Bool arrived)
 	m_waitingForPath = FALSE;
 	TheAI->pathfinder()->removeGoal(getObject());
 	m_retailGroupPeers.clear();
-	m_retailGroupReadyFrame = 0;
-	m_retailGroupArrivalDistance = 0.0f;
-	m_retailGroupArrivalSpeed = FAST_AS_POSSIBLE;
+	m_retailGroupRemainingDistance = 0.0f;
+	m_retailGroupSpeed = FAST_AS_POSSIBLE;
 }
 
-void AIUpdateInterface::setRetailGroupArrival(const std::vector<ObjectID>& peers, Real speed)
+void AIUpdateInterface::setRetailGroupPacing(const std::vector<ObjectID>& peers, Real speed, Real distance)
 {
 	m_retailGroupPeers = peers;
-	m_retailGroupArrivalSpeed = speed;
+	m_retailGroupSpeed = speed;
+	m_retailGroupRemainingDistance = distance;
 }
 
-Bool AIUpdateInterface::stageRetailGroupArrival(const Coord3D& destination)
+void AIUpdateInterface::updateRetailGroupPacing(Real distance)
 {
-	if (m_retailGroupPeers.size() < 2)
-		return FALSE;
-	const Coord3D& from = *getObject()->getPosition();
-	m_retailGroupArrivalDistance = WWMath::SqrtfOrigin(sqr(destination.x - from.x) + sqr(destination.y - from.y));
-	m_retailGroupReadyFrame = TheGameLogic->getFrame();
-	setLocomotorGoalNone();
-	setPathExtraDistance(0.0f);
-	return TRUE;
-}
-
-Bool AIUpdateInterface::releaseRetailGroupArrival()
-{
-	UnsignedInt latestReadyFrame = m_retailGroupReadyFrame;
-	Real longestDistance = m_retailGroupArrivalDistance;
+	const Real MIN_PACE = 1.0f / 3.0f;
+	m_retailGroupRemainingDistance = distance;
+	if (m_retailGroupSpeed >= FAST_AS_POSSIBLE || distance <= 0.0f)
+		return;
+	Real longestDistance = distance;
 	for (ObjectID id : m_retailGroupPeers)
 	{
 		if (id == getObject()->getID())
@@ -3861,16 +3852,9 @@ Bool AIUpdateInterface::releaseRetailGroupArrival()
 		if (!ai || !ai->isFollowingRetailGroupRoute() || ai->m_retailGroupRouteLeader != m_retailGroupRouteLeader ||
 			ai->m_retailGroupRouteFrame != m_retailGroupRouteFrame)
 			continue;
-		if (!ai->isStagedForRetailGroupArrival())
-			return FALSE;
-		latestReadyFrame = std::max(latestReadyFrame, ai->m_retailGroupReadyFrame);
-		longestDistance = std::max(longestDistance, ai->m_retailGroupArrivalDistance);
+		longestDistance = std::max(longestDistance, ai->m_retailGroupRemainingDistance);
 	}
-	if (TheGameLogic->getFrame() <= latestReadyFrame)
-		return FALSE;
-	if (m_retailGroupArrivalSpeed < FAST_AS_POSSIBLE && longestDistance > 0.0f && m_retailGroupArrivalDistance > 0.0f)
-		setDesiredSpeed(m_retailGroupArrivalSpeed * (m_retailGroupArrivalDistance / longestDistance));
-	return TRUE;
+	setDesiredSpeed(m_retailGroupSpeed * std::max(MIN_PACE, distance / longestDistance));
 }
 
 //----------------------------------------------------------------------------------------
@@ -5976,16 +5960,14 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_retailGroupRouteLeader = INVALID_ID;
 			m_retailGroupRouteFrame = 0;
 		} },
-		{ "group-arrival", [this](Xfer* x) {
+		{ "group-pacing", [this](Xfer* x) {
 			x->xferSTLObjectIDVector(&m_retailGroupPeers);
-			x->xferUnsignedInt(&m_retailGroupReadyFrame);
-			x->xferReal(&m_retailGroupArrivalDistance);
-			x->xferReal(&m_retailGroupArrivalSpeed);
+			x->xferReal(&m_retailGroupRemainingDistance);
+			x->xferReal(&m_retailGroupSpeed);
 		}, [this] {
 			m_retailGroupPeers.clear();
-			m_retailGroupReadyFrame = 0;
-			m_retailGroupArrivalDistance = 0.0f;
-			m_retailGroupArrivalSpeed = FAST_AS_POSSIBLE;
+			m_retailGroupRemainingDistance = 0.0f;
+			m_retailGroupSpeed = FAST_AS_POSSIBLE;
 		} }
 	});
 }

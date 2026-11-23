@@ -458,7 +458,7 @@ UpdateSleepTime HordeAIUpdate::update()
 		if (RetailFileLayers::enabled() && isMoving() && locomotor && locomotor->getAppearance() == LOCO_HORDE &&
 			locomotor->getWaitForFormation() && fabs(turn) > locomotor->getMaxTurnWithoutReform() &&
 			horde->isKindOf(KINDOF_INFANTRY) && !horde->isKindOf(KINDOF_CAVALRY) &&
-			!contain->isAlternateFormation() && !isReforming(this))
+			!contain->isAlternateFormation() && !isReforming(this) && !isFollowingRetailGroupRoute())
 		{
 			const Real turnRate = locomotor->getMaxTurnRate(horde->getBodyModule()->getDamageState());
 			if (turnRate > 0.0f)
@@ -468,7 +468,8 @@ UpdateSleepTime HordeAIUpdate::update()
 #endif
 	}
 #if RTS_ZEROHOUR
-	if (m_reformUntil && (contain->isAlternateFormation() || contain->getFormationReformTravelFrames() == 0))
+	if (m_reformUntil && (isFollowingRetailGroupRoute() || contain->isAlternateFormation() ||
+		contain->getFormationReformTravelFrames() == 0))
 		m_reformUntil = 0;
 #endif
 	if (m_reformUntil && (!isMoving() || m_reformUntil <= TheGameLogic->getFrame()))

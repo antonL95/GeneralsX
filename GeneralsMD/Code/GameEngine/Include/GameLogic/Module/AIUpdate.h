@@ -712,10 +712,8 @@ public:
 	void friend_setCurrentGoalPathIndex( Int index ) { m_nextGoalPathIndex = index; }
 	Bool isFollowingRetailGroupRoute() const;
 	void endRetailGroupRoute(Bool arrived);
-	void setRetailGroupArrival(const std::vector<ObjectID>& peers, Real speed);
-	Bool stageRetailGroupArrival(const Coord3D& destination);
-	Bool isStagedForRetailGroupArrival() const { return m_retailGroupReadyFrame != 0; }
-	Bool releaseRetailGroupArrival();
+	void setRetailGroupPacing(const std::vector<ObjectID>& peers, Real speed, Real distance);
+	void updateRetailGroupPacing(Real distance);
 #ifdef DEBUG_LOGGING
 	inline const Coord3D *friend_getRequestedDestination() const { return &m_requestedDestination; }
 	inline const Coord3D *friend_getRequestedDestination2() const { return &m_requestedDestination2; }
@@ -863,9 +861,8 @@ private:
 	ObjectID m_retailGroupRouteLeader = INVALID_ID;
 	UnsignedInt m_retailGroupRouteFrame = 0;
 	std::vector<ObjectID> m_retailGroupPeers;
-	UnsignedInt m_retailGroupReadyFrame = 0;
-	Real m_retailGroupArrivalDistance = 0.0f;
-	Real m_retailGroupArrivalSpeed = FAST_AS_POSSIBLE;
+	Real m_retailGroupRemainingDistance = 0.0f;
+	Real m_retailGroupSpeed = FAST_AS_POSSIBLE;
 	UnsignedInt m_retailPlannerIssuedFrame = 0;
 	UnsignedInt m_retailPlannerPathRevision = 0;
 	UnsignedInt m_retailPlannerBlockedRevision = 0;

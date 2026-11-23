@@ -3399,17 +3399,23 @@ StateReturnType AIFollowPathState::update()
 	Object *obj = getMachineOwner();
 	AIUpdateInterface *ai = obj->getAI();
 	const Bool groupRoute = ai->isFollowingRetailGroupRoute();
-	const Coord3D* arrival = groupRoute ? ai->friend_getGoalPathPosition(m_index + 1) : nullptr;
-	const Bool atStagingWaypoint = arrival && !ai->friend_getGoalPathPosition(m_index + 2);
-	const Bool staged = atStagingWaypoint && ai->isStagedForRetailGroupArrival();
-	if (staged && !ai->releaseRetailGroupArrival())
-		return STATE_CONTINUE;
+	if (groupRoute)
+	{
+		const Coord3D* from = obj->getPosition();
+		Real remainingDistance = 0.0f;
+		for (Int index = m_index; const Coord3D* point = ai->friend_getGoalPathPosition(index); ++index)
+		{
+			remainingDistance += WWMath::SqrtfOrigin(sqr(point->x - from->x) + sqr(point->y - from->y));
+			from = point;
+		}
+		ai->updateRetailGroupPacing(remainingDistance);
+	}
 	// do movement
-	StateReturnType status = staged ? STATE_SUCCESS : AIInternalMoveToState::update();
+	StateReturnType status = AIInternalMoveToState::update();
 	// if move to has finished, move to next point on path
 	if (status == STATE_SUCCESS || status == STATE_FAILURE)
 	{
-		if (groupRoute && !staged &&
+		if (groupRoute &&
 			(status == STATE_FAILURE || sqr(obj->getPosition()->x - m_goalPosition.x) +
 				sqr(obj->getPosition()->y - m_goalPosition.y) >= sqr(PATHFIND_CELL_SIZE_F)))
 		{
@@ -3419,8 +3425,6 @@ StateReturnType AIFollowPathState::update()
 			computePath();
 			return STATE_CONTINUE;
 		}
-		if (status == STATE_SUCCESS && atStagingWaypoint && !staged && ai->stageRetailGroupArrival(*arrival))
-			return STATE_CONTINUE;
 		if (status == STATE_FAILURE && m_retryCount>0) {
 			// If we failed, & haven't reached retry limit, try again.  jba.
 			m_retryCount--;
@@ -3431,8 +3435,6 @@ StateReturnType AIFollowPathState::update()
 
 		Bool tooClose=true;
 		while (pos && tooClose) {
-			if (groupRoute && ai->friend_getGoalPathPosition(m_index + 1) && !ai->friend_getGoalPathPosition(m_index + 2))
-				break;
 			Real dx = pos->x - obj->getPosition()->x;
 			Real dy = pos->y - obj->getPosition()->y;
 			tooClose = false;
@@ -3475,6 +3477,8 @@ StateReturnType AIFollowPathState::update()
 		}
 		else
 		{
+			if (groupRoute)
+				ai->setPathExtraDistance(0.0f);
 			setAdjustsDestination(m_adjustFinal && (m_adjustFinalOverride || ai->isDoingGroundMovement()));
 			if (getAdjustsDestination() && !groupRoute)
 			{

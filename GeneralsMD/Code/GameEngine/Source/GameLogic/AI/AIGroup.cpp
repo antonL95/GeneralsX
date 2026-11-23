@@ -1857,7 +1857,7 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 			if (ai->isFollowingRetailGroupRoute())
 			{
 				pathfinder->updateGoal(obj, &move.destination, layer);
-				ai->setRetailGroupArrival(routePeers, speed);
+				ai->setRetailGroupPacing(routePeers, speed, move.distance);
 			}
 		}
 		else
