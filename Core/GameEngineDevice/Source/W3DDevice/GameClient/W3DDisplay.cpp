@@ -164,6 +164,7 @@ static Int theFlashCount = 0;
 
 #include <chrono>
 #include <cstdarg>
+#include <ctime>
 
 class StatDumpClass
 {
@@ -2719,6 +2720,7 @@ AGAIN:
 
 	do {
 		const auto renderStart = timeRender ? RenderClock::now() : RenderClock::time_point();
+		const std::clock_t renderCpuStart = timeRender ? std::clock() : 0;
 
 		if (DX8Wrapper::_Get_D3D_Device8() && (DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel()) == D3D_OK)
 		{
@@ -2889,8 +2891,10 @@ AGAIN:
 				{
 					const auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
 						RenderClock::now() - renderStart).count();
-					std::fprintf(stderr, "TEST render-time frame=%u us=%lld\n",
-						TheGameLogic->getFrame(), static_cast<long long>(microseconds));
+					const auto cpuMicroseconds = static_cast<long long>(
+						(std::clock() - renderCpuStart) * (1000000.0 / CLOCKS_PER_SEC));
+					std::fprintf(stderr, "TEST render-time frame=%u us=%lld cpu_us=%lld\n",
+						TheGameLogic->getFrame(), static_cast<long long>(microseconds), cpuMicroseconds);
 				}
 				if (uiTestCapture)
 				{
