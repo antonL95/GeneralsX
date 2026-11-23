@@ -609,6 +609,7 @@ void ModuleFactory::init()
 		addModule( CommandPointsUpgrade );
 		addModule( ArrowStormUpdate );
 		addModule( SpecialDisguiseUpdate );
+		addModule( StrafeAreaUpdate );
 		addModule( ReplaceObjectUpdate );
 		addModule( FellBeastSwoopPower );
 		addModule( WeaponFireSpecialAbilityUpdate );

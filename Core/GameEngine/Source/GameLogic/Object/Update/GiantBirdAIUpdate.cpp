@@ -194,6 +194,12 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 	if (!locomotor || locomotor->getAppearance() != LOCO_GIANT_BIRD || bird->isEffectivelyDead())
 		return AIUpdateInterface::doLocomotor();
 
+#if !RTS_GENERALS
+	if (RetailFileLayers::enabled() && getCurLocomotorSetType() == LOCOMOTORSET_SUPERSONIC &&
+		bird->findUpdateModule(NAMEKEY("StrafeAreaUpdate")))
+		return AIUpdateInterface::doLocomotor();
+#endif
+
 	if (m_swooping)
 	{
 		for (Int slot = PRIMARY_WEAPON; slot < WEAPONSLOT_COUNT; ++slot)

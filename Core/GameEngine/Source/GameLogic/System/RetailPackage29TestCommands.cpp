@@ -27,6 +27,41 @@
 
 namespace
 {
+void handleStrafe(const RetailTestCommands::Context& ctx)
+{
+	if (ctx.action == "pkg29-strafe-state")
+	{
+		const Object* dragon = ctx.findObject(TRUE);
+		const auto* ai = dragon ? dragon->getAI() : nullptr;
+		std::fprintf(stderr, "TEST pkg29 strafe frame=%u alive=%d attacking=%d idle=%d x=%.1f y=%.1f\n",
+			ctx.frame, dragon != nullptr, dragon && dragon->getLogicModelConditions().test(MODELCONDITION_ATTACKING),
+			ai && ai->isIdle(), dragon ? dragon->getPosition()->x : 0.0f, dragon ? dragon->getPosition()->y : 0.0f);
+		return;
+	}
+
+	Player* player = ctx.findPlayer();
+	Object* book = player ? player->getRetailSpellBook() : nullptr;
+	const CommandButton* button = TheRetailCommandCatalog->findCommandButton("Command_SpellBookDragonStrike");
+	if (!book || !button)
+		return;
+	const auto* power = book->getSpecialPowerModule(button->getSpecialPowerTemplate());
+	if (ctx.action == "pkg29-strafe-restore")
+	{
+		std::fprintf(stderr, "TEST pkg29 strafe reload frame=%u ready=%d\n", ctx.frame, power && power->isReady());
+		book->setCommandSetStringOverride(AsciiString::TheEmptyString);
+		return;
+	}
+	book->setCommandSetStringOverride("Pkg29StrafeCommands");
+	const Coord3D point = ctx.groundLocation();
+	std::fprintf(stderr, "TEST pkg29 strafe cast frame=%u valid=%d ready=%d\n", ctx.frame,
+		button->canCastRetailSpell(book, nullptr, &point), power && power->isReady());
+	GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPELLBOOK_SPECIAL_POWER);
+	message->friend_setPlayerIndex(player->getPlayerIndex());
+	message->appendIntegerArgument(0);
+	message->appendLocationArgument(point);
+	message->appendObjectIDArgument(INVALID_ID);
+}
+
 void handleDisguise(const RetailTestCommands::Context& ctx)
 {
 	Object* source = ctx.requireObject(TRUE);
@@ -320,6 +355,7 @@ void registerRetailPackage29TestCommands()
 	registerPrefix("pkg29-swoop-", handleSwoop);
 	registerPrefix("pkg29-deflect-", handleDeflect);
 	registerPrefix("pkg29-disguise-", handleDisguise);
+	registerPrefix("pkg29-strafe-", handleStrafe);
 #endif
 }
 }

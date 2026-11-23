@@ -308,6 +308,184 @@ void SpecialDisguiseUpdate::loadPostProcess()
 		syncDrawable();
 }
 
+EMPTY_DTOR(StrafeAreaUpdate)
+
+void StrafeAreaUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	UpdateModuleData::buildFieldParse(p);
+	static const FieldParse fields[] = {
+		{ "WeaponName", INI::parseWeaponTemplate, nullptr, offsetof(StrafeAreaUpdateModuleData, m_weapon) },
+		{ "StrafeAreaRadius", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_radius) },
+		{ "SweepFrequency", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_sweepFrequency) },
+		{ "SweepAmplitude", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_sweepAmplitude) },
+		{ "Slope", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_slope) },
+		{ "InitialSweepPhase", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_initialSweepPhase) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+StrafeAreaUpdate::StrafeAreaUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data)
+{
+	setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
+}
+
+Bool StrafeAreaUpdate::startForObject(Object* object, const Coord3D& center)
+{
+	if (!RetailFileLayers::enabled() || !object->getAI())
+		return FALSE;
+	auto* module = static_cast<StrafeAreaUpdate*>(object->findUpdateModule(NAMEKEY("StrafeAreaUpdate")));
+	if (!module)
+		return FALSE;
+	module->start(center);
+	return TRUE;
+}
+
+void StrafeAreaUpdate::start(const Coord3D& center)
+{
+	Object* self = getObject();
+	m_phase = APPROACH;
+	m_origin = *self->getPosition();
+	m_center = center;
+	m_sweepPhase = getStrafeAreaUpdateModuleData()->m_initialSweepPhase;
+	m_firstShotFrame = 0;
+	m_departureOrdered = FALSE;
+	const Real dx = center.x - m_origin.x;
+	const Real dy = center.y - m_origin.y;
+	if (dx != 0.0f || dy != 0.0f)
+		self->setOrientation(WWMath::Atan2Origin(dy, dx));
+	AIUpdateInterface* ai = self->getAI();
+	ai->chooseLocomotorSet(LOCOMOTORSET_SUPERSONIC);
+	ai->aiMoveToPosition(&m_center, CMD_FROM_AI);
+	setWakeFrame(self, UPDATE_SLEEP(RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND)));
+}
+
+void StrafeAreaUpdate::fireAtSweepPoint()
+{
+	const auto* data = getStrafeAreaUpdateModuleData();
+	Object* self = getObject();
+	Coord3D direction{};
+	self->getUnitDirectionVector2D(direction);
+	m_sweepPhase += data->m_sweepFrequency;
+	const Real lateral = WWMath::SinTrig(m_sweepPhase) * data->m_sweepAmplitude;
+	Coord3D aim = *self->getPosition();
+	aim.x += direction.x * data->m_slope + direction.y * lateral;
+	aim.y += direction.y * data->m_slope - direction.x * lateral;
+	aim.z = TheTerrainLogic->getGroundHeight(aim.x, aim.y);
+	TheWeaponStore->createAndFireTempWeapon(data->m_weapon, self, &aim, TRUE);
+}
+
+void StrafeAreaUpdate::orderDeparture(AIUpdateInterface* ai)
+{
+	Coord3D direction{m_center.x - m_origin.x, m_center.y - m_origin.y, 0.0f};
+	if (direction.x == 0.0f && direction.y == 0.0f)
+		getObject()->getUnitDirectionVector2D(direction);
+	else
+		direction.normalize();
+	Region3D extent;
+	TheTerrainLogic->getExtent(&extent);
+	Coord3D exit = {
+		std::clamp(m_center.x + direction.x * 500.0f, extent.lo.x, extent.hi.x),
+		std::clamp(m_center.y + direction.y * 500.0f, extent.lo.y, extent.hi.y),
+		0.0f
+	};
+	exit.z = TheTerrainLogic->getGroundHeight(exit.x, exit.y);
+	ai->aiMoveToPosition(&exit, CMD_FROM_AI);
+	m_departureOrdered = TRUE;
+}
+
+UpdateSleepTime StrafeAreaUpdate::update()
+{
+	Object* self = getObject();
+	AIUpdateInterface* ai = self->getAI();
+	if (!RetailFileLayers::enabled() || m_phase == IDLE || !ai || self->isEffectivelyDead())
+		return UPDATE_SLEEP_FOREVER;
+
+	const auto* data = getStrafeAreaUpdateModuleData();
+	const Real dx = m_center.x - self->getPosition()->x;
+	const Real dy = m_center.y - self->getPosition()->y;
+	const Real distance = WWMath::SqrtfOrigin(dx * dx + dy * dy);
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const UnsignedInt tick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+	switch (m_phase)
+	{
+		case APPROACH:
+			if (distance <= data->m_radius + 2.0f * data->m_slope)
+				self->setModelConditionState(MODELCONDITION_ATTACKING);
+			if (distance <= data->m_radius + data->m_slope)
+			{
+				ai->chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+				m_phase = STRAFE;
+				m_firstShotFrame = now + RotwkDuration::engineFrames(12, LOGICFRAMES_PER_SECOND);
+			}
+			break;
+		case STRAFE:
+			if (now >= m_firstShotFrame)
+				fireAtSweepPoint();
+			self->setModelConditionState(MODELCONDITION_ATTACKING);
+			if (m_departureOrdered && distance > data->m_radius - data->m_slope)
+			{
+				m_phase = DEPART;
+				ai->chooseLocomotorSet(LOCOMOTORSET_SUPERSONIC);
+				self->clearModelConditionState(MODELCONDITION_ATTACKING);
+			}
+			else if (!m_departureOrdered && now >= m_firstShotFrame && distance < data->m_radius * (1.0f / 12.0f))
+				orderDeparture(ai);
+			break;
+		case DEPART:
+			if (distance > data->m_radius && ai->isIdle())
+			{
+				m_phase = IDLE;
+				self->kill(DAMAGE_UNRESISTABLE, DEATH_FADED);
+				return UPDATE_SLEEP_FOREVER;
+			}
+			break;
+		default:
+			return UPDATE_SLEEP_FOREVER;
+	}
+	return UPDATE_SLEEP(tick);
+}
+
+void StrafeAreaUpdate::xferRetailBlocks(Xfer* xfer)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, TRUE, {
+		{ "strafe-flight", [this](Xfer* block) {
+			block->xferUnsignedByte(&m_phase);
+			block->xferCoord3D(&m_origin);
+			block->xferCoord3D(&m_center);
+			block->xferReal(&m_sweepPhase);
+			block->xferUnsignedInt(&m_firstShotFrame);
+			block->xferBool(&m_departureOrdered);
+		}, [this] {
+			m_phase = IDLE;
+			m_origin.zero();
+			m_center.zero();
+			m_sweepPhase = 0.0f;
+			m_firstShotFrame = 0;
+			m_departureOrdered = FALSE;
+		} }
+	});
+}
+
+void StrafeAreaUpdate::crc(Xfer* xfer)
+{
+	UpdateModule::crc(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer);
+}
+
+void StrafeAreaUpdate::xfer(Xfer* xfer)
+{
+	UpdateModule::xfer(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer);
+}
+
+void StrafeAreaUpdate::loadPostProcess()
+{
+	UpdateModule::loadPostProcess();
+}
+
 void ArrowStormUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
 	static const FieldParse fields[] = {

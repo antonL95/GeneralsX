@@ -42,6 +42,44 @@ public:
 	Bool m_forceMounted = FALSE;
 };
 
+class StrafeAreaUpdateModuleData : public UpdateModuleData
+{
+public:
+	static void buildFieldParse(MultiIniFieldParse& p);
+
+	const WeaponTemplate* m_weapon = nullptr;
+	Real m_radius = 150.0f;
+	Real m_sweepFrequency = 0.4f;
+	Real m_sweepAmplitude = 100.0f;
+	Real m_slope = 50.0f;
+	Real m_initialSweepPhase = 0.0f;
+};
+
+class StrafeAreaUpdate final : public UpdateModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(StrafeAreaUpdate, "StrafeAreaUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(StrafeAreaUpdate, StrafeAreaUpdateModuleData)
+
+public:
+	StrafeAreaUpdate(Thing* thing, const ModuleData* data);
+	static Bool startForObject(Object* object, const Coord3D& center);
+	UpdateSleepTime update() override;
+
+private:
+	enum Phase : UnsignedByte { IDLE, APPROACH, STRAFE, DEPART };
+	void start(const Coord3D& center);
+	void fireAtSweepPoint();
+	void orderDeparture(AIUpdateInterface* ai);
+	void xferRetailBlocks(Xfer* xfer);
+
+	UnsignedByte m_phase = IDLE;
+	Coord3D m_origin{};
+	Coord3D m_center{};
+	Real m_sweepPhase = 0.0f;
+	UnsignedInt m_firstShotFrame = 0;
+	Bool m_departureOrdered = FALSE;
+};
+
 class SpecialDisguiseUpdate final : public SpecialAbilityUpdate
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(SpecialDisguiseUpdate, "SpecialDisguiseUpdate")

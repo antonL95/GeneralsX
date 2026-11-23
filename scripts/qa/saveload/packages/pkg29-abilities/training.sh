@@ -1,4 +1,25 @@
 check() {
+	if covers 196; then
+		expect 'TEST pkg29 strafe cast frame=196 valid=0 ready=1'
+		expect 'TEST pkg29 strafe frame=197 alive=0 attacking=0 idle=0 x=0.0 y=0.0'
+		expect 'TEST pkg29 strafe cast frame=198 valid=1 ready=1'
+		expect 'TEST pkg29 strafe reload frame=209 ready=0'
+	fi
+	if covers 244; then
+		grep -E '^TEST pkg29 strafe frame=244 alive=1 ' "$log" || return 1
+	fi
+	if covers 800; then
+		grep -E '^TEST pkg29 strafe frame=310 alive=1 attacking=1 ' "$log" || return 1
+		expect 'TEST pkg29 strafe frame=800 alive=0 attacking=0 idle=0 x=0.0 y=0.0'
+		grep -E '^TEST health 800 PlyrCreeps Pkg29StrafeInside 0 id=[0-9]+ health=[1-9][0-9]{0,4}\.[0-9]+ ' "$log" || return 1
+		grep -E '^TEST health 800 Player_1 Pkg29StrafeOutside 0 id=[0-9]+ health=100000\.00 ' "$log" || return 1
+		awk '/^TEST cooldown frame=[0-9]+ weapon=DragonStrikeStrafeWeapon .*phase=between / {
+			frame = substr($3, 7) + 0
+			if (shots++ && frame - previous != 6) bad = 1
+			previous = frame
+		}
+		END { if (shots < 3 || bad) exit 1 }' "$log" || return 1
+	fi
 	if covers 213; then
 		expect 'TEST pkg29 disguise frame=213 active=0 mounted=0 disguised=0 opacity=1.000'
 	fi

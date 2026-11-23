@@ -73,6 +73,7 @@
 #include "GameLogic/Module/LifetimeUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RadiusDecalUpdate.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
@@ -940,6 +941,7 @@ public:
 			{ "ForbiddenUpgrades", INI::parseAsciiStringVectorAppend, nullptr, offsetof(GenericObjectCreationNugget, m_forbiddenUpgrades) },
 			{ "IgnoreAllObjects", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_ignoreAllObjects) },
 			{ "IssueMoveAfterCreation", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_issueMoveAfterCreation) },
+			{ "MoveUsesStrafeUpdate", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_moveUsesStrafeUpdate) },
 			{ "OffsetInLocalSpace", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_offsetInLocalSpace) },
 			{ "OrientationOffset", INI::parseAngleReal, nullptr, offsetof(GenericObjectCreationNugget, m_orientationOffset) },
 			{ "OrientInPrimaryDirection", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_orientInPrimaryDirection) },
@@ -1713,7 +1715,7 @@ protected:
 				continue;
 			if (hasSpawnOrders && obj != container && !obj->getContainedBy())
 			{
-				if (m_issueMoveAfterCreation)
+				if (m_issueMoveAfterCreation && (!m_moveUsesStrafeUpdate || !StrafeAreaUpdate::startForObject(obj, *secondary)))
 				{
 					if (AIUpdateInterface* ai = obj->getAIUpdateInterface())
 						ai->aiMoveToPosition(secondary, CMD_FROM_PLAYER);
@@ -1813,6 +1815,7 @@ private:
 	std::vector<AsciiString> m_forbiddenUpgrades;
 	Bool m_ignoreAllObjects = FALSE;
 	Bool m_issueMoveAfterCreation = TRUE;
+	Bool m_moveUsesStrafeUpdate = FALSE;
 	Bool m_offsetInLocalSpace = FALSE;
 	Real m_orientationOffset = 0.0f;
 	Bool m_orientInPrimaryDirection = FALSE;
