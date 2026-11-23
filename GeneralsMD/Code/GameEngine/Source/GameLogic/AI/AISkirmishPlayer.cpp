@@ -100,6 +100,20 @@ const char* const retailTacticalKindNames[] = {
 	"ENEMY_STRUCTURE", "DEFENSIVE", "OPPORTUNITY", "EXPANSION", "TARGETLESS", nullptr
 };
 
+Bool screensRetailOpportunity(const Object& object)
+{
+	if (!object.isKindOf(KINDOF_STRUCTURE) || !object.isKindOf(KINDOF_IMMOBILE) ||
+		object.isEffectivelyDead() || object.getContainedBy() || object.isKindOf(KINDOF_INERT))
+		return FALSE;
+	if (object.isKindOf(KINDOF_DOZER_FACTORY))
+		return TRUE;
+	return !object.isKindOf(KINDOF_LINKED_TO_FLAG) && !object.isKindOf(KINDOF_WALK_ON_TOP_OF_WALL) &&
+		!object.isKindOf(KINDOF_DEFENSIVE_WALL) && !object.isKindOf(KINDOF_BASE_FOUNDATION) &&
+		!object.isKindOf(KINDOF_IGNORE_FOR_VICTORY) && !object.isKindOf(KINDOF_WALL_UPGRADE) &&
+		!object.isKindOf(KINDOF_WALL_HUB) && !object.isKindOf(KINDOF_WALL_SEGMENT) &&
+		!object.isKindOf(KINDOF_WALL_GATE);
+}
+
 struct RetailPriorityRange
 {
 	Real low;
@@ -2383,6 +2397,8 @@ void AISkirmishPlayer::updateRetail()
 		}
 		if (missing || (target.retiring && teamCount(target) == 0))
 			target = {};
+		else if (trace && rules->tacticalTargets[i] == RETAIL_TARGET_OPPORTUNITY && teamCount(target) > 0)
+			std::fprintf(stderr, "AI_OPPORTUNITY_HELD\t%u\t%d\t%d\t%d\n", frame, playerIndex, target.object, teamCount(target));
 	}
 	const auto slotLimit = [&](size_t i) {
 		return i < rules->maxTeamsPerTarget.size() ? rules->maxTeamsPerTarget[i] : 1;
@@ -2536,6 +2552,7 @@ void AISkirmishPlayer::updateRetail()
 	std::vector<TacticalCandidate> structures;
 	std::vector<TacticalCandidate> expansions;
 	std::vector<TacticalCandidate> defenses;
+	std::vector<TacticalCandidate> opportunities;
 	std::vector<RetailDefenseCluster> defenseClusters;
 	if (hasKind(RETAIL_TARGET_DEFENSIVE) && retailTuning.defenseTreeNodeRadius > 0.0f)
 	{
@@ -2585,6 +2602,44 @@ void AISkirmishPlayer::updateRetail()
 				candidate.distance += sqr(RETAIL_DEFENDED_TARGET_DISTANCE);
 			structures.push_back(candidate);
 		}
+	if (hasKind(RETAIL_TARGET_OPPORTUNITY))
+	{
+		std::set<Int> screenedOpponents;
+		std::vector<Object*> enemyBuilders;
+		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		{
+			const Player* owner = object->getControllingPlayer();
+			if (!owner || !owner->isPlayableSide() || !owner->isPlayerActive() ||
+				m_player->getRelationship(object->getTeam()) != ENEMIES)
+				continue;
+			if (screensRetailOpportunity(*object))
+				screenedOpponents.insert(owner->getPlayerIndex());
+			else if (object->isKindOf(KINDOF_DOZER) && !object->getContainedBy() && visibleEnemy(*object))
+				enemyBuilders.push_back(object);
+		}
+		std::map<Int, TacticalCandidate> available;
+		for (Object* object : enemyBuilders)
+		{
+			TacticalCandidate candidate{object, object->getPosition(), object->getTeam()->getID(), object->getShroudedStatus(playerIndex)};
+			const Bool held = std::any_of(m_retailTargets.begin(), m_retailTargets.end(), [&](const auto& target) {
+				return target.selectedFrame != 0 && target.object == candidate.id() && target.owner == candidate.owner;
+			});
+			const Int opponent = object->getControllingPlayer()->getPlayerIndex();
+			if ((!held && screenedOpponents.contains(opponent)) ||
+				!objectiveDistance(object, candidate.owner, *candidate.position, RETAIL_ATTACK_WAVE_MIN_UNITS, candidate.distance))
+				continue;
+			if (held)
+				opportunities.push_back(candidate);
+			else
+			{
+				auto& newest = available[opponent];
+				if (!newest.object || candidate.id() > newest.id())
+					newest = candidate;
+			}
+		}
+		for (const auto& [opponent, candidate] : available)
+			opportunities.push_back(candidate);
+	}
 	if (hasKind(RETAIL_TARGET_EXPANSION))
 		for (UnsignedInt i = 0; i < static_cast<UnsignedInt>(ThePlayerList->getPlayerCount()); ++i)
 		{
@@ -2613,6 +2668,7 @@ void AISkirmishPlayer::updateRetail()
 			const Int kind = rules->tacticalTargets[i];
 			const auto* candidates = kind == RETAIL_TARGET_ENEMY_STRUCTURE ? &structures
 				: kind == RETAIL_TARGET_DEFENSIVE ? &defenses
+				: kind == RETAIL_TARGET_OPPORTUNITY ? &opportunities
 				: kind == RETAIL_TARGET_EXPANSION ? &expansions : nullptr;
 			auto& target = m_retailTargets[i];
 			const Int limit = slotLimit(i);
@@ -2658,7 +2714,8 @@ void AISkirmishPlayer::updateRetail()
 	}
 	if (!chosen)
 		return;
-	if (rules->tacticalTargets[chosenSlot] == RETAIL_TARGET_ENEMY_STRUCTURE)
+	const Int chosenKind = rules->tacticalTargets[chosenSlot];
+	if (chosenKind == RETAIL_TARGET_ENEMY_STRUCTURE || chosenKind == RETAIL_TARGET_OPPORTUNITY)
 	{
 		const Int* chance = policy.difficulty ? policy.difficulty->offensiveTacticChance : nullptr;
 		if ((difficulty == DIFFICULTY_EASY && phase == 0) ||
@@ -2716,8 +2773,9 @@ void AISkirmishPlayer::updateRetail()
 			chosen->defendedID(), target->getID(), defenseSize, recruitAll, committed);
 	if (trace && !chosen->defense && committed >= RETAIL_ATTACK_WAVE_MIN_UNITS)
 	{
+		const char* tactic = chosenKind == RETAIL_TARGET_OPPORTUNITY ? "opportunity" : target ? "structure" : "enemy-start";
 		std::fprintf(stderr, "AI_WAVE\t%u\t%d\t%s\t%d\t%d\t%a\t%a\n", frame, playerIndex,
-			target ? "structure" : "enemy-start", committed, target ? target->getID() : 0, destination->x, destination->y);
+			tactic, committed, target ? target->getID() : 0, destination->x, destination->y);
 		std::fflush(stderr);
 	}
 }

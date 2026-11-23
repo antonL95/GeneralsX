@@ -1,0 +1,9 @@
+340 create Player_1 SkirmishOpportunitySurvivor 0 2200,1000,0
+341 destroy Player_1 MenFortressCitadel 0
+341 destroy Player_1 GondorBarracks 0
+341 destroy Player_1 GondorFarm 0
+342 create Player_1 SkirmishOpportunityBuilder 0 2720,2960,0
+342 create Player_1 SkirmishOpportunityBuilder 1 2740,3070,0
+342 create Player_2 SkirmishOpportunitySoldier 0 2510,2910,0
+342 create Player_2 SkirmishOpportunitySoldier 1 2530,2960,0
+342 create Player_2 SkirmishOpportunitySoldier 2 2550,3030,0

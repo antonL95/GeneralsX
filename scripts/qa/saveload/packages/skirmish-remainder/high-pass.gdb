@@ -1,0 +1,2 @@
+set environment GENERALSX_RETAIL_SKIRMISH_AI brutal
+set environment GENERALSX_SKIRMISH_AI_TRACE 1
