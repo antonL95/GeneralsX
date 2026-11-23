@@ -1,0 +1,1 @@
+set environment GENERALSX_SKIRMISH_AI_TRACE 1
