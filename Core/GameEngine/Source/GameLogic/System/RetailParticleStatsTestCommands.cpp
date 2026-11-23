@@ -52,6 +52,26 @@ void sampleParticles(const RetailTestCommands::Context& ctx)
 		TheGameLODManager->getMinDynamicParticleSkipPriority(),
 		TheGameLODManager->getDynamicGameLODLevelName(TheGameLODManager->getDynamicLODLevel()));
 }
+
+void sampleParticleSystems(const RetailTestCommands::Context& ctx)
+{
+	for (ParticleSystem* system : TheParticleSystemManager->getAllParticleSystems())
+	{
+		const auto* definition = system->getTemplate();
+		Particle* first = system->getFirstParticle();
+		if (!definition || !first)
+			continue;
+
+		const auto* color = first->getColor();
+		const auto* position = first->getPosition();
+		std::fprintf(stderr,
+			"TEST particle-live frame=%u id=%u name=%s shader=%d texture=%s count=%u age=%u rgb=%.5f,%.5f,%.5f alpha=%.5f xyz=%.2f,%.2f,%.2f size=%.2f\n",
+			ctx.frame, static_cast<UnsignedInt>(system->getSystemID()), definition->getName().str(),
+			system->getShaderType(), system->getParticleTypeName().str(), system->getParticleCount(),
+			first->getElapsedFrames(), color->red, color->green, color->blue, first->getAlpha(),
+			position->x, position->y, position->z, first->getSize());
+	}
+}
 }
 
 namespace RetailTestCommands
@@ -60,5 +80,6 @@ void registerRetailParticleStatsTestCommands()
 {
 	registerAction("particle-stats", sampleParticles);
 	registerAction("particle-budget-breakdown", sampleBudget);
+	registerAction("particle-live", sampleParticleSystems);
 }
 }

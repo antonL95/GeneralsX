@@ -6,8 +6,11 @@
 80 army-of-the-dead-trace Player_1 - 0 start 3250 780
 86 army-of-the-dead-trace Player_1 - 0 spawn 3250 780
 93 army-of-the-dead-trace Player_1 - 0 before 3250 780
+93 particle-live Player_1 - 0
 94 army-of-the-dead-trace Player_1 - 0 resumed 3250 780
 110 army-of-the-dead-trace Player_1 - 0 moving 3250 780
 140 army-of-the-dead-trace Player_1 - 0 moving 3250 780
+140 particle-live Player_1 - 0
 170 army-of-the-dead-trace Player_1 - 0 moving 3250 780
 200 army-of-the-dead-trace Player_1 - 0 moving 3250 780
+200 particle-live Player_1 - 0
