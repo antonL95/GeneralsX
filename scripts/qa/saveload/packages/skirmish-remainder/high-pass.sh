@@ -1,4 +1,5 @@
 check() {
+    checkPendingPriority || return 1
     if covers 364; then
         awk '
             /^TEST frame 342: create SkirmishOpportunityBuilder for Player_1 .*2740.0, 3070.0/ {
@@ -33,4 +34,20 @@ compare() {
             }
         ' "$out/continue.log" "$out/$phase.log" || return 1
     done
+}
+
+checkPendingPriority() {
+    if ! covers 664; then
+        return
+    fi
+    awk '
+        $1 == "AI_UNIT_REQUEST" && $2 == 664 && $3 == 4 && $4 == "SkirmishPendingHorde" && $6 > $5 && $7 > $6 {
+            accumulated = 1
+        }
+        $1 == "AI_TRAIN" && $2 == 664 && $3 == 4 && $5 == "SkirmishPendingHorde" { trained = 1 }
+        END {
+            if (!accumulated || !trained) print "Missing accumulated priority and train order for the pending horde"
+            exit (!accumulated || !trained)
+        }
+    ' "$log"
 }

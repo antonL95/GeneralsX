@@ -155,6 +155,7 @@ protected:
 	Int m_retailScavengedBuilding = -1;
 	Real m_retailFarmPriority = 0.0f;
 	std::set<AsciiString> m_retailBuiltStructures;
+	std::map<AsciiString, Real> m_retailUnitPriorities;
 	struct RetailUpgradePlan
 	{
 		Real priority = 0.0f;

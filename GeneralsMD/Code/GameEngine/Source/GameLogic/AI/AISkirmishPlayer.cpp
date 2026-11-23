@@ -1841,41 +1841,114 @@ void AISkirmishPlayer::updateRetail()
 	const Real commandPointUsage = commandPointTotal > 0
 		? INT_TO_REAL(m_player->getCommandPointsUsed()) / INT_TO_REAL(commandPointTotal) : 0.0f;
 	const Real baseUnitPriority = phase == 0 ? 500.0f : rules->defaultPriority;
-	const Real adjustedUnitPriority = baseUnitPriority +
-		(rules->mustUseCommandPoints[phase] - commandPointUsage) * rules->lowUnitPriority[phase];
-	const Real unitPriority = owned.size() > 1
-		? std::max(baseUnitPriority,
-			std::min(std::max(rules->defaultPriority, adjustedUnitPriority), 1800.0f + (1.0f - commandPointUsage) * 300.0f))
-		: baseUnitPriority;
-	const auto chooseArmyUnit = [&](Object& producer, const CommandSet& set) {
+	const Real priorityGrowth = (rules->mustUseCommandPoints[phase] - commandPointUsage) * rules->lowUnitPriority[phase];
+	const Real unitPriorityCap = 1800.0f + (1.0f - commandPointUsage) * 300.0f;
+	const auto adjustUnitPriority = [&](Real current) {
+		return std::min(std::max(rules->defaultPriority, current + priorityGrowth), unitPriorityCap);
+	};
+	const auto isOrdinaryArmyUnit = [](const ThingTemplate& type) {
+		return !type.isKindOf(KINDOF_HERO) && !type.isKindOf(KINDOF_SHIP);
+	};
+	const auto unitPriority = [&](const ThingTemplate& unit) {
+		const auto pending = m_retailUnitPriorities.find(unit.getName());
+		return pending == m_retailUnitPriorities.end() ? baseUnitPriority : std::max(baseUnitPriority, pending->second);
+	};
+	const auto armyRecipe = [&](Object& producer, const CommandButton* button) -> const ThingTemplate* {
+		if (!button || button->getCommandType() != GUI_COMMAND_UNIT_BUILD ||
+			button->getRequiredRank() > producer.getExperienceTracker()->getRank() ||
+			!HeroRoster::buttonUpgradesMet(button, m_player, &producer))
+			return nullptr;
+		return button->getThingTemplate();
+	};
+	const auto chooseArmyUnit = [&](Object& producer, const CommandSet& set, Bool request) {
 		const CommandButton* selected = nullptr;
+		Real bestPriority = baseUnitPriority;
 		Real bestWeight = 0.0f;
 		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 		{
 			const CommandButton* button = set.getCommandButton(slot);
-			const ThingTemplate* unit = button ? button->getThingTemplate() : nullptr;
-			if (!unit || button->getCommandType() != GUI_COMMAND_UNIT_BUILD)
+			const ThingTemplate* unit = armyRecipe(producer, button);
+			if (!unit)
 				continue;
 			const Real weight = armyWeight(*unit, FALSE);
 			if (weight <= 0.0f)
 				continue;
 			const Real score = weight / INT_TO_REAL(1 + countType(unit));
-			if (score > bestWeight && button->getRequiredRank() <= producer.getExperienceTracker()->getRank() &&
-				HeroRoster::buttonUpgradesMet(button, m_player, &producer) && TheBuildAssistant->canMakeUnit(&producer, unit) == CANMAKE_OK)
-			{
-				bestWeight = score;
-				selected = button;
-			}
+			const Real priority = request ? baseUnitPriority : unitPriority(*unit);
+			if (priority < bestPriority || (priority == bestPriority && score <= bestWeight))
+				continue;
+			const CanMakeType status = TheBuildAssistant->canMakeUnit(&producer, unit);
+			if (status != CANMAKE_OK && (!request || (status != CANMAKE_NO_MONEY && status != CANMAKE_NO_COMMAND_POINTS)))
+				continue;
+			bestPriority = priority;
+			bestWeight = score;
+			selected = button;
 		}
 		return selected;
 	};
-	const auto canTrainArmy = [&]() {
-		if (retailTuning.disableUnitBuilding || !m_player->getCanBuildUnits())
-			return FALSE;
-		return std::any_of(producers.begin(), producers.end(), [&](Object* producer) {
+	const Bool canBuildArmy = !retailTuning.disableUnitBuilding && m_player->getCanBuildUnits();
+	std::set<AsciiString> supportedUnitRequests;
+	if (canBuildArmy)
+	{
+		for (Object* producer : producers)
+		{
 			const CommandSet* set = retailCommands(*producer);
-			return set && producer->getProductionUpdateInterface()->getProductionCount() == 0 && chooseArmyUnit(*producer, *set);
-		}) ? TRUE : FALSE;
+			if (!set)
+				continue;
+			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			{
+				const ThingTemplate* unit = armyRecipe(*producer, set->getCommandButton(slot));
+				if (unit && isOrdinaryArmyUnit(*unit) && armyWeight(*unit, TRUE) > 0.0f)
+					supportedUnitRequests.insert(unit->getName());
+			}
+			if (producer->getProductionUpdateInterface()->getProductionCount() != 0)
+				continue;
+			for (Bool request : {TRUE, FALSE})
+			{
+				const CommandButton* button = chooseArmyUnit(*producer, *set, request);
+				const ThingTemplate* unit = button ? button->getThingTemplate() : nullptr;
+				if (unit && isOrdinaryArmyUnit(*unit))
+					m_retailUnitPriorities.try_emplace(unit->getName(), 0.0f);
+			}
+		}
+	}
+	std::erase_if(m_retailUnitPriorities, [&](const auto& pending) {
+		return !supportedUnitRequests.contains(pending.first);
+	});
+	for (auto& [name, adjustment] : m_retailUnitPriorities)
+	{
+		const Real previous = std::max(baseUnitPriority, adjustment);
+		if (owned.size() > 1)
+			adjustment = adjustUnitPriority(previous);
+		if (trace)
+			std::fprintf(stderr, "AI_UNIT_REQUEST\t%u\t%d\t%s\t%.9g\t%.9g\t%.9g\n",
+				frame, playerIndex, name.str(), baseUnitPriority, previous, std::max(baseUnitPriority, adjustment));
+	}
+	struct ArmyOrder
+	{
+		Object* producer = nullptr;
+		const CommandButton* button = nullptr;
+		Real priority = -std::numeric_limits<Real>::infinity();
+	};
+	const auto prioritizedArmyOrder = [&] {
+		ArmyOrder order;
+		if (!canBuildArmy)
+			return order;
+		for (Object* producer : producers)
+		{
+			const CommandSet* set = retailCommands(*producer);
+			if (!set || producer->getProductionUpdateInterface()->getProductionCount() != 0)
+				continue;
+			const CommandButton* button = chooseArmyUnit(*producer, *set, FALSE);
+			const ThingTemplate* unit = button ? button->getThingTemplate() : nullptr;
+			if (unit)
+			{
+				const Real priority = unitPriority(*unit);
+				if (priority > order.priority)
+					order = {producer, button, priority};
+			}
+		}
+		return order;
 	};
 
 	struct UpgradeOrder
@@ -2000,7 +2073,8 @@ void AISkirmishPlayer::updateRetail()
 	};
 	if (trace && !producers.empty())
 		std::fprintf(stderr, "AI_UNIT_PRIORITY\t%u\t%d\t%d\t%g\t%g\t%g\t%g\t%g\n", frame, playerIndex, phase,
-			commandPointUsage, rules->mustUseCommandPoints[phase], rules->lowUnitPriority[phase], rules->defaultPriority, unitPriority);
+			commandPointUsage, rules->mustUseCommandPoints[phase], rules->lowUnitPriority[phase], rules->defaultPriority,
+			owned.size() > 1 ? std::max(baseUnitPriority, adjustUnitPriority(baseUnitPriority)) : baseUnitPriority);
 	Bool deferBuildingForUnit = FALSE;
 	UnsignedInt openingUnitReserve = 0;
 	if (needsArmy && farms >= 2 && farmLimit > farms &&
@@ -2146,8 +2220,8 @@ void AISkirmishPlayer::updateRetail()
 			if (!selected)
 				return FALSE;
 			if (!upgrades.empty())
-				buyUpgradesAbove(canTrainArmy() ? std::max(unitPriority, priority) : priority);
-			if (unitPriority > priority && canTrainArmy())
+				buyUpgradesAbove(std::max(prioritizedArmyOrder().priority, priority));
+			if (prioritizedArmyOrder().priority > priority)
 			{
 				deferBuildingForUnit = TRUE;
 				return FALSE;
@@ -2189,8 +2263,8 @@ void AISkirmishPlayer::updateRetail()
 	}
 
 	if (!upgrades.empty())
-		buyUpgradesAbove(canTrainArmy() ? unitPriority : -std::numeric_limits<Real>::infinity());
-	deferBuildingForUnit = deferBuildingForUnit && canTrainArmy();
+		buyUpgradesAbove(prioritizedArmyOrder().priority);
+	ArmyOrder deferredArmy = deferBuildingForUnit ? prioritizedArmyOrder() : ArmyOrder{};
 	for (Object* producer : producers)
 	{
 		ProductionUpdateInterface* production = producer->getProductionUpdateInterface();
@@ -2201,6 +2275,7 @@ void AISkirmishPlayer::updateRetail()
 			if (!unit || TheBuildAssistant->canMakeUnit(producer, unit) != CANMAKE_OK ||
 				!production->queueCreateUnit(unit, production->requestUniqueUnitID()))
 				return FALSE;
+			m_retailUnitPriorities.erase(unit->getName());
 			if (trace)
 			{
 				std::fprintf(stderr, "AI_TRAIN\t%u\t%d\t%s\t%s\t%d\n", frame, playerIndex,
@@ -2210,10 +2285,13 @@ void AISkirmishPlayer::updateRetail()
 			}
 			return TRUE;
 		};
-		if (deferBuildingForUnit)
+		if (deferredArmy.producer)
 		{
-			if (const CommandButton* unit = chooseArmyUnit(*producer, *set); unit && train(unit->getThingTemplate(), unit))
-				deferBuildingForUnit = FALSE;
+			if (deferredArmy.producer == producer)
+			{
+				train(deferredArmy.button->getThingTemplate(), deferredArmy.button);
+				deferredArmy = {};
+			}
 			continue;
 		}
 		const auto unlocksArmy = [&](const UpgradeTemplate* upgrade) {
@@ -2268,7 +2346,7 @@ void AISkirmishPlayer::updateRetail()
 			}
 		if (production->getProductionCount() != 0)
 			continue;
-		if (const CommandButton* selected = chooseArmyUnit(*producer, *set))
+		if (const CommandButton* selected = chooseArmyUnit(*producer, *set, FALSE))
 			train(selected->getThingTemplate(), selected);
 	}
 
@@ -2904,6 +2982,7 @@ void AISkirmishPlayer::newMap()
 	m_retailScavengedBuilding = -1;
 	m_retailFarmPriority = 0.0f;
 	m_retailBuiltStructures.clear();
+	m_retailUnitPriorities.clear();
 	m_retailUpgradePlans.clear();
 
 	/* Get our proper build list. */
@@ -3116,6 +3195,34 @@ void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
 			}
 		}, [this] {
 			m_retailTargets.clear();
+		}},
+		{"skirmish-unit-requests", [this, loading](Xfer* x) {
+			UnsignedInt count = static_cast<UnsignedInt>(m_retailUnitPriorities.size());
+			x->xferUnsignedInt(&count);
+			if (loading)
+			{
+				m_retailUnitPriorities.clear();
+				for (UnsignedInt i = 0; i < count; ++i)
+				{
+					AsciiString name;
+					Real priority = 0.0f;
+					x->xferAsciiString(&name);
+					x->xferReal(&priority);
+					m_retailUnitPriorities.emplace(name, priority);
+				}
+			}
+			else
+			{
+				for (const auto& [name, adjustment] : m_retailUnitPriorities)
+				{
+					AsciiString type = name;
+					Real priority = adjustment;
+					x->xferAsciiString(&type);
+					x->xferReal(&priority);
+				}
+			}
+		}, [this] {
+			m_retailUnitPriorities.clear();
 		}},
 		{"skirmish-wall-nodes", [this](Xfer* x) {
 			x->xferObjectID(&m_retailWallPlan.defendedStructure);

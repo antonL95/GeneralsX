@@ -7,3 +7,6 @@
 342 create Player_2 SkirmishOpportunitySoldier 0 2510,2910,0
 342 create Player_2 SkirmishOpportunitySoldier 1 2530,2960,0
 342 create Player_2 SkirmishOpportunitySoldier 2 2550,3030,0
+530 pkg23-set-cash Player_2 - 0 0
+530 create Player_2 SkirmishPriorityProducer 0 2940,3520,0
+650 pkg23-set-cash Player_2 - 0 3000
