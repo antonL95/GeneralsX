@@ -1,0 +1,18 @@
+5 cash Player_1 - 0 10000
+6 create Player_1 RivendellBreeLandEncampment 0 1500,2880,0
+7 objupgrade Player_1 RivendellBreeLandEncampment 0 Upgrade_ArnorArcheryRangeLevel3
+12 queue Player_1 RivendellBreeLandEncampment 0 ArnorFarmerMaggot
+470 heroes Player_1 - 0
+494 track Player_1 ArnorFarmerMaggot 0
+
+495 move Player_1 ArnorFarmerMaggot 0 - 1750 2880
+558 maggot-dogs-trace Player_1 ArnorFarmerMaggot 0
+575 maggot-dogs-trace Player_1 ArnorFarmerMaggot 0
+580 create PlyrCreeps MaggotDogsTarget 0 1780,2890,180
+582 orderattack Player_1 ArnorFarmerMaggot 0 PlyrCreeps:MaggotDogsTarget:0
+590 maggot-dogs-trace Player_1 ArnorFarmerMaggot 0 PlyrCreeps:MaggotDogsTarget:0
+610 maggot-dogs-trace Player_1 ArnorFarmerMaggot 0 PlyrCreeps:MaggotDogsTarget:0
+630 maggot-dogs-trace Player_1 ArnorFarmerMaggot 0 PlyrCreeps:MaggotDogsTarget:0
+650 maggot-dogs-trace Player_1 ArnorFarmerMaggot 0 PlyrCreeps:MaggotDogsTarget:0
+675 maggot-dogs-trace Player_1 ArnorFarmerMaggot 0 PlyrCreeps:MaggotDogsTarget:0
+700 maggot-dogs-trace Player_1 ArnorFarmerMaggot 0 PlyrCreeps:MaggotDogsTarget:0
