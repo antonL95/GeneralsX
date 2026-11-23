@@ -1,0 +1,19 @@
+11 reveal Player_1 MenPorter 0
+42 select Player_1 MenPorter 0
+55 select Player_1 MenFortressCitadel 0
+71 create Player_1 GondorGandalf 0 920,575,0
+74 select Player_1 GondorGandalf 0
+88 create Player_1 GondorFountainGuardHorde 0 1020,575,0
+92 select Player_1 GondorFountainGuardHorde 0
+104 create Player_1 GondorFarm 0 1030,510,0
+104 create Player_1 GondorFarm 0 1130,610,0
+109 select Player_1 MenPorter 0
+111 startplace Player_1 MenPorter 0 GondorFarm
+112 cursor-point Player_1 MenPorter 0 - 1060 440
+129 cursor-cancel Player_1 MenPorter 0
+130 construct Player_1 MenPorter 0 GondorFarm 960 380
+144 select Player_1 GondorFarm 2
+153 science Player_1 - 0 SCIENCE_SpawnTrebuchet
+154 power-cast Player_1 - 6 at 760 750
+225 select Player_1 GondorBigTrebuchet_Summoned 0
+265 select Player_1 MenPorter 0

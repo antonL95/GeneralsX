@@ -199,14 +199,6 @@ void drawRetailPortrait(GameWindow *window, WinInstanceData *)
 	TheDisplay->setCircularClip(x + width / 2, y + height / 2, MIN(width, height) / 2);
 	TheDisplay->drawImage(image, x, y, x + width, y + height);
 	TheDisplay->setCircularClip(0, 0, 0);
-	const Drawable* selection = TheInGameUI->getFirstSelectedDrawable();
-	const Object* object = selection ? selection->getObject() : nullptr;
-	if (object && object->isLocallyControlled())
-	{
-		const Real remaining = RetailWorldUI::remainingLifetime(*object);
-		if (remaining > 0.0f)
-			RetailWorldUI::drawLifetimeBar(x + width / 5, y + height * 4 / 5, width * 3 / 5, std::max(2, height / 30), remaining);
-	}
 }
 
 void drawShadowedText(DisplayString *text, Int x, Int y, Int width, Int height, Int align, Color color)
@@ -521,20 +513,23 @@ void ControlBar::drawRetailTexts() const
 	if (!m_retailPortrait->winIsHidden())
 	{
 		const Object* object = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+		const Real remaining = object && object->isLocallyControlled() ? RetailWorldUI::remainingLifetime(*object) : 0.0f;
+		const Bool timed = remaining > 0.0f;
 		const Int maximumRank = ExperienceLevelStore::maximumRank(object);
-		if (maximumRank > 1)
+		if (timed || maximumRank > 1)
 		{
 			const auto* tracker = object->getExperienceTracker();
-			const Int rank = tracker->getRank();
+			const Int rank = timed ? -1 : tracker->getRank();
 			Int x, y, width, height;
 			windowRect(m_retailPortrait, x, y, width, height);
 			const Int barWidth = std::max(8, width / 2);
 			const Int barHeight = std::max(4, height / 24);
 			const Int left = x + (width - barWidth) / 2;
 			const Int top = y + height * 4 / 5;
-			const Int fill = static_cast<Int>((barWidth - 2) * tracker->getLevelProgress());
-			if (rank < maximumRank)
+			if (timed || rank < maximumRank)
 			{
+				const Real progress = timed ? remaining : tracker->getLevelProgress();
+				const Int fill = static_cast<Int>((barWidth - 2) * progress);
 				TheDisplay->setCircularClip(x + width / 2, y + height / 2, MIN(width, height) / 2);
 				TheDisplay->drawFillRect(left, top, barWidth, barHeight, GameMakeColor(29, 21, 10, 240));
 				if (fill > 0)
@@ -550,7 +545,10 @@ void ControlBar::drawRetailTexts() const
 			if (m_retailLabelRank != rank)
 			{
 				UnicodeString level;
-				level.format(TheGameText->fetchOrSubstitute("APT:RankLabel", L"Level: %d"), rank);
+				if (timed)
+					level = TheGameText->fetchOrSubstitute("APT:PalantirTimeRemaining", L"Time Remaining");
+				else
+					level.format(TheGameText->fetchOrSubstitute("APT:RankLabel", L"Level: %d"), rank);
 				m_retailLevelLabel->setText(level);
 				m_retailLabelRank = rank;
 			}
