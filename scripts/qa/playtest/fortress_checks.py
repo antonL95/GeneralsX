@@ -32,13 +32,14 @@ def check_purchases(log, faction, fortress, purchases, draw=True):
             states[frame] = upgrade, drawable.removeprefix("id="), queued, complete
         elif draw and line.startswith("TEST draw frame "):
             match = re.fullmatch(
-                rf"TEST draw frame (\d+) id (\d+) {fortress} module \S+ model (\S+) .* flags (\S*) subobjects .+",
+                rf"TEST draw frame (\d+) id (\d+) {fortress} module \S+ model (\S+) .* flags (\S*) subobjects (.+)",
                 line,
             )
             if match:
-                frame, drawable, model, flags = match.groups()
+                frame, drawable, model, flags, subobjects = match.groups()
                 draws.setdefault((frame, drawable), set()).update(
-                    [f"model={model}", *(f"flag={flag}" for flag in flags.split(","))]
+                    [f"model={model}", *(f"flag={flag}" for flag in flags.split(",")),
+                     *(f"mesh={mesh.split('.', 1)[-1]}" for mesh in subobjects.split(","))]
                 )
 
     failures = []
@@ -58,7 +59,9 @@ def check_purchases(log, faction, fortress, purchases, draw=True):
                 art = draws.get((frame, state[1]))
                 if not art:
                     failures.append(f"{upgrade} {phase} at {frame}: missing fortress draw")
-                elif row["art"] != "-" and (row["art"] in art) != bool(complete):
-                    failures.append(f"{upgrade} {phase} at {frame}: unexpected state for {row['art']}")
+                elif row["art"] != "-":
+                    for expected in row["art"].split(","):
+                        if (expected in art) != bool(complete):
+                            failures.append(f"{upgrade} {phase} at {frame}: unexpected state for {expected}")
     if failures:
         raise RuntimeError("\n".join(failures))

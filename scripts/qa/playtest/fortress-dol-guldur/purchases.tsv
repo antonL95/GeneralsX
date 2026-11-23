@@ -1,7 +1,7 @@
 button	upgrade	build_frames	before	order	during	after	art
-Command_PurchaseUpgradeGuldurFortressBatCloud	Upgrade_GuldurFortressBatCloud	450	30	33	63	492	-
-Command_PurchaseUpgradeGuldurFortressPalantir	Upgrade_GuldurFortressPalantir	450	497	500	530	959	-
-Command_PurchaseUpgradeGuldurFortressEncroachment	Upgrade_GuldurFortressEncroachment	450	964	967	997	1426	-
-Command_PurchaseUpgradeGuldurFortressFireArrows	Upgrade_GuldurFortressFireArrowsTrigger	900	1431	1434	1464	2343	-
-Command_PurchaseUpgradeGuldurFortressBlight	Upgrade_GuldurFortressBlight	900	2348	2351	2381	3260	-
-Command_PurchaseUpgradeGuldurFortressSorcery	Upgrade_GuldurFortressSorcery	1800	3265	3268	3298	5077	-
+Command_PurchaseUpgradeGuldurFortressBatCloud	Upgrade_GuldurFortressBatCloud	450	30	33	63	492	flag=FORTRESS_IMPROVEMENT_1,model=bats_skn
+Command_PurchaseUpgradeGuldurFortressPalantir	Upgrade_GuldurFortressPalantir	450	497	500	530	959	mesh=PALANTIR:shown
+Command_PurchaseUpgradeGuldurFortressEncroachment	Upgrade_GuldurFortressEncroachment	450	964	967	997	1426	mesh=ENCROACH:shown
+Command_PurchaseUpgradeGuldurFortressFireArrows	Upgrade_GuldurFortressFireArrowsTrigger	900	1431	1434	1464	2343	flag=FORTRESS_IMPROVEMENT_2,mesh=TORCHES:shown
+Command_PurchaseUpgradeGuldurFortressBlight	Upgrade_GuldurFortressBlight	900	2348	2351	2381	3260	flag=FORTRESS_IMPROVEMENT_8
+Command_PurchaseUpgradeGuldurFortressSorcery	Upgrade_GuldurFortressSorcery	1800	3265	3268	3298	5077	mesh=SORCERY:shown

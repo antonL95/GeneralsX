@@ -1,7 +1,7 @@
 button	upgrade	build_frames	before	order	during	after	art
-Command_PurchaseUpgradeMordorFortressDoomPyres	Upgrade_MordorFortressDoomPyres	450	30	33	63	492	-
-Command_PurchaseUpgradeMordorFortressLavaMoat	Upgrade_MordorFortressLavaMoat	450	497	500	530	959	-
-Command_PurchaseUpgradeMordorFortressMagmaCauldrons	Upgrade_MordorFortressMagmaCauldrons	900	964	967	997	1876	-
+Command_PurchaseUpgradeMordorFortressDoomPyres	Upgrade_MordorFortressDoomPyres	450	30	33	63	492	mesh=BANNERS:shown
+Command_PurchaseUpgradeMordorFortressLavaMoat	Upgrade_MordorFortressLavaMoat	450	497	500	530	959	mesh=LAVAMOATA:shown,mesh=LAVAMOATB:shown,mesh=LAVAMOATC:shown
+Command_PurchaseUpgradeMordorFortressMagmaCauldrons	Upgrade_MordorFortressMagmaCauldrons	900	964	967	997	1876	flag=FORTRESS_IMPROVEMENT_3,mesh=STACKSA:shown,mesh=STACKSB:shown
 Command_PurchaseUpgradeMordorFortressFireArrows	Upgrade_MordorFortressFireArrowsTrigger	900	1881	1884	1914	2793	-
-Command_PurchaseUpgradeMordorFortressMorgulSorcery	Upgrade_MordorFortressMorgulSorceryTrigger	900	2798	2801	2831	3710	-
-Command_PurchaseUpgradeMordorFortressGorgorothSpire	Upgrade_MordorFortressGorgorothSpire	1350	3715	3718	3748	5077	-
+Command_PurchaseUpgradeMordorFortressMorgulSorcery	Upgrade_MordorFortressMorgulSorceryTrigger	900	2798	2801	2831	3710	mesh=MORGULGLOW:shown
+Command_PurchaseUpgradeMordorFortressGorgorothSpire	Upgrade_MordorFortressGorgorothSpire	1350	3715	3718	3748	5077	flag=UPGRADE_FORTRESS_MONUMENT,mesh=MORGULTOWER:shown,mesh=TOWERGLOW:shown,mesh=TOWER:hidden

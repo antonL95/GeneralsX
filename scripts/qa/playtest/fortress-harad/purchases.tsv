@@ -1,6 +1,6 @@
 button	upgrade	build_frames	before	order	during	after	art
-Command_PurchaseUpgradeHaradFortressMordorBanners	Upgrade_AngmarFortressBanners	450	30	33	63	492	-
-Command_PurchaseUpgradeHaradFortressNafarat	Upgrade_AngmarFortressHouseOfLamentation	450	497	500	530	959	-
-Command_PurchaseUpgradeHaradFortressHarondor	Upgrade_AngmarFortressSpikes	450	964	967	997	1426	-
-Command_PurchaseUpgradeHaradFortressMahud	Upgrade_AngmarFortressIceMunitionsTrigger	900	1431	1434	1464	2343	-
-Command_PurchaseUpgradeHaradFortressHegemony	Upgrade_AngmarFortressSanctum	1350	2348	2351	2381	3710	-
+Command_PurchaseUpgradeHaradFortressMordorBanners	Upgrade_AngmarFortressBanners	450	30	33	63	492	mesh=THREATA:shown,mesh=THREATB:shown
+Command_PurchaseUpgradeHaradFortressNafarat	Upgrade_AngmarFortressHouseOfLamentation	450	497	500	530	959	mesh=NAFARATA:shown,mesh=NAFARATB:shown,mesh=NAFARATC:shown
+Command_PurchaseUpgradeHaradFortressHarondor	Upgrade_AngmarFortressSpikes	450	964	967	997	1426	mesh=HARONDOR:shown
+Command_PurchaseUpgradeHaradFortressMahud	Upgrade_AngmarFortressIceMunitionsTrigger	900	1431	1434	1464	2343	mesh=MAHUD:shown
+Command_PurchaseUpgradeHaradFortressHegemony	Upgrade_AngmarFortressSanctum	1350	2348	2351	2381	3710	mesh=HEGEMONY:shown
