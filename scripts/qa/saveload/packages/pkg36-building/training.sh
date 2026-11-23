@@ -8,18 +8,18 @@ health() {
 
 check() {
     if covers 243; then
-        site 243 GondorFarm 'builder=GondorWorkerNoSelect producer=Pkg36Porter progress=[1-9][0-9]*\.[0-9] under=1 '
-        site 243 GondorFarm 'builder=Pkg36Porter producer=Pkg36Porter progress=0\.0 under=1 '
+        site 243 Pkg36Farm 'builder=GondorWorkerNoSelect producer=Pkg36Porter progress=[1-9][0-9]*\.[0-9] under=1 '
+        site 243 Pkg36Farm 'builder=Pkg36Porter producer=Pkg36Porter progress=0\.0 under=1 '
     fi
     if covers 320; then
-        site 320 GondorFarm 'builder=GondorWorkerNoSelect producer=Pkg36Porter progress=[1-9][0-9]*\.[0-9] under=1 '
-        site 320 GondorFarm 'builder=Pkg36Porter producer=Pkg36Porter progress=0\.0 under=1 '
+        site 320 Pkg36Farm 'builder=GondorWorkerNoSelect producer=Pkg36Porter progress=[1-9][0-9]*\.[0-9] under=1 '
+        site 320 Pkg36Farm 'builder=Pkg36Porter producer=Pkg36Porter progress=0\.0 under=1 '
     fi
     if covers 321; then
-        grep -E '^TEST frame 321: cancelbuild GondorFarm id=[0-9]+ ' "$log"
+        grep -E '^TEST frame 321: cancelbuild Pkg36Farm id=[0-9]+ ' "$log"
     fi
     if covers 745; then
-        site 745 GondorFarm '.* under=0 .* loop=-$'
+        site 745 Pkg36Farm '.* under=0 .* loop=-$'
     fi
     if covers 812; then
         expect "TEST pkg36 lua frame=812 object=ArnorPeasantAdult list=RohanPeasant2Functions"

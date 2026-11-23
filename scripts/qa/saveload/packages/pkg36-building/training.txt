@@ -1,13 +1,14 @@
-55 create Player_1 Pkg36Porter 0 2440,1120,0
-60 construct Player_1 Pkg36Porter 0 GondorFarm 2540 1120 0
-225 pkg08-queue Player_1 Pkg36Porter 0 GondorFarm 2380 1250
-243 pkg36-site Player_1 GondorFarm 1
-243 pkg36-site Player_1 GondorFarm 0
-320 pkg36-site Player_1 GondorFarm 0
-320 pkg36-site Player_1 GondorFarm 1
-321 cancelbuild Player_1 GondorFarm 1
-745 pkg36-site Player_1 GondorFarm 0
-746 destroy Player_1 GondorFarm 0
+55 create Player_1 Pkg36Porter 0 1800,1240,0
+60 construct Player_1 Pkg36Porter 0 Pkg36Farm 1900 1240 0
+224 placecheck Player_1 Pkg36Porter 0 Pkg36Farm 1710 1280 0
+225 pkg08-queue Player_1 Pkg36Porter 0 Pkg36Farm 2220 1430
+243 pkg36-site Player_1 Pkg36Farm 1
+243 pkg36-site Player_1 Pkg36Farm 0
+320 pkg36-site Player_1 Pkg36Farm 0
+320 pkg36-site Player_1 Pkg36Farm 1
+321 cancelbuild Player_1 Pkg36Farm 1
+745 pkg36-site Player_1 Pkg36Farm 0
+746 destroy Player_1 Pkg36Farm 0
 747 destroy Player_1 Pkg36Porter 0
 810 create Player_1 ArnorPeasantAdult 0 2440,1120,0
 810 create Player_1 Pkg36PeasantControl 0 2460,1120,0
