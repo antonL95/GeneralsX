@@ -40,6 +40,7 @@
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Locomotor.h"
@@ -1225,6 +1226,12 @@ Bool Locomotor::usesCavalrySteering(const Object* obj) const
 			(m_template->m_appearance == LOCO_WHEELS_FOUR && HordeContain::get(obj->getContainedBy())));
 }
 
+Real Locomotor::getRetailTurnRadius(Real speed, Real maxSpeed) const
+{
+	const Real fraction = maxSpeed > 0.0f ? std::min(speed / maxSpeed, 1.0f) : 0.0f;
+	return m_template->m_slowTurnRadius + (m_template->m_fastTurnRadius - m_template->m_slowTurnRadius) * fraction;
+}
+
 void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle)
 {
 	setFlag(MAINTAIN_POS_IS_VALID, false);
@@ -1489,6 +1496,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	}
 
 	Bool wasBraking = obj->getStatusBits().test( OBJECT_STATUS_BRAKING );
+	Bool usedRetailGroundSteering = FALSE;
 
 	physics->setTurning(TURN_NONE);
 	if (getAllowMotiveForceWhileAirborne() || !treatAsAirborne)
@@ -1500,6 +1508,13 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		switch (appearance)
 		{
 			case LOCO_LEGS_TWO:
+				if (RetailFileLayers::enabled() && !obj->getContainedBy() && m_template->m_wanderWidthFactor == 0.0f)
+				{
+					moveRetailGroundTowardsPosition(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
+					usedRetailGroundSteering = TRUE;
+					break;
+				}
+				[[fallthrough]];
 			case LOCO_FOUR_LEGS_HUGE:
 			case LOCO_HUGE_TWO_LEGS:
 					moveTowardsPositionLegs(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
@@ -1508,6 +1523,13 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 					moveTowardsPositionClimb(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
 			case LOCO_WHEELS_FOUR:
+				if (RetailFileLayers::enabled() && !obj->getContainedBy() && !m_template->m_canMoveBackward &&
+					obj->getAI() && obj->getAI()->getCurLocomotorSetType() == LOCOMOTORSET_MOUNTED)
+				{
+					moveRetailGroundTowardsPosition(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
+					usedRetailGroundSteering = TRUE;
+					break;
+				}
 				if (usesCavalrySteering(obj))
 				{
 					moveCavalryForward(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
@@ -1539,14 +1561,14 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		}
 	}
 
-	if (m_template->m_appearance != LOCO_HORDE && m_template->m_appearance != LOCO_WHEELS_FOUR &&
+	if (!usedRetailGroundSteering && m_template->m_appearance != LOCO_HORDE && m_template->m_appearance != LOCO_WHEELS_FOUR &&
 		m_template->m_appearance != LOCO_MOTORCYCLE)
 		updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), getFlag(IS_BRAKING));
 	handleBehaviorZ(obj, physics, goalPos, birdPullUp);
 	// Objects that are braking don't follow the normal physics, so they end up at their destination exactly.
 	obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ), getFlag(IS_BRAKING) );
 
-	if (wasBraking && !usesCavalrySteering(obj))
+	if (wasBraking && !usedRetailGroundSteering && !usesCavalrySteering(obj))
 	{
 	#define MIN_VEL (PATHFIND_CELL_SIZE_F/(static_cast<float>(LOGICFRAMES_PER_SECOND)))
 
@@ -2065,6 +2087,79 @@ Real Locomotor::rotwkLegsTurnSlowdown(const Object* obj, const Coord3D& goalPos,
 	const Real dy = goalPos.y - obj->getPosition()->y;
 	const Real orbitDistance = 2.0f * turnRadius;
 	return dx * dx + dy * dy < orbitDistance * orbitDistance ? angleCoeff : 0.0f;
+}
+
+void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* physics, const Coord3D& goalPos,
+	Real onPathDistToGoal, Real desiredSpeed)
+{
+	const Coord3D& position = *obj->getPosition();
+	if (getIsDownhillOnly() && position.z < goalPos.z)
+		return;
+
+	setFlag(IS_BRAKING, false);
+	const Real dx = goalPos.x - position.x;
+	const Real dy = goalPos.y - position.y;
+	const Real distance = WWMath::SqrtfOrigin(sqr(dx) + sqr(dy));
+	const Coord3D& velocity = *physics->getVelocity();
+	const Real speed = WWMath::SqrtfOrigin(sqr(velocity.x) + sqr(velocity.y));
+	const UnsignedInt framesPerRetailStep = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+	const BodyDamageType damage = obj->getBodyModule()->getDamageState();
+	const Real acceleration = getMaxAcceleration(damage);
+	const Bool mounted = m_template->m_appearance == LOCO_WHEELS_FOUR;
+	const Real facing = obj->getOrientation();
+	const Real maxSpeed = getMaxSpeedForCondition(damage, obj);
+	const Real radius = mounted ? getRetailTurnRadius(speed, maxSpeed) : 0.0f;
+	if (mounted && distance > 0.0f)
+	{
+		const Real angle = fabs(stdAngleDiff(WWMath::Atan2Origin(dy, dx), facing));
+		if (speed <= 0.25f * maxSpeed)
+		{
+			const Real adjustedAngle = speed <= acceleration * framesPerRetailStep ? 2.0f * angle : angle;
+			desiredSpeed *= std::max(0.0f, 1.0f - adjustedAngle / (PI / 4.0f));
+		}
+		const Real lateral = fabs(Sin(angle));
+		if (m_template->m_fastTurnRadius > 0.0f && lateral > 0.0f)
+			desiredSpeed = std::min(desiredSpeed, maxSpeed * distance / (2.0f * m_template->m_fastTurnRadius * lateral));
+	}
+	const Bool steeringStep = TheGameLogic->getFrame() % framesPerRetailStep == 0;
+	Coord3D direction{0.0f, 0.0f, 0.0f};
+	if (steeringStep)
+	{
+		if (distance > 0.0f)
+		{
+			Real turnRate = getMaxTurnRate(damage) * framesPerRetailStep;
+			if (radius > 0.0f && speed > 0.0f)
+				turnRate = std::min(turnRate, speed * framesPerRetailStep / radius);
+			physics->setTurning(rotateObjAroundLocoPivot(obj, goalPos, turnRate));
+			if (mounted)
+			{
+				const Real turn = stdAngleDiff(obj->getOrientation(), facing);
+				const Real travelHeading = facing + turn * 0.5f;
+				direction = {Cos(travelHeading), Sin(travelHeading), 0.0f};
+			}
+			else
+			{
+				direction = {dx / distance, dy / distance, 0.0f};
+			}
+		}
+		else
+			updateRetailTurnConditions(obj, 0.0f);
+	}
+	else if (speed > 0.0f)
+		direction = {velocity.x / speed, velocity.y / speed, 0.0f};
+	else
+		return;
+
+	const Real braking = getBraking();
+	if (!getFlag(NO_SLOW_DOWN_AS_APPROACHING_DEST) &&
+		onPathDistToGoal < calcSlowDownDist(speed, getMinSpeed(), braking))
+		desiredSpeed = getMinSpeed();
+
+	const Real nextSpeed = std::min(distance, speed + std::clamp(desiredSpeed - speed, -braking, acceleration));
+	physics->scrubVelocity2D(0.0f);
+	direction.scale(physics->getMass() * nextSpeed);
+	physics->applyMotiveForce(&direction);
+	updateRetailGait(obj, onPathDistToGoal, speed, desiredSpeed + MIN_GAIT_SPEED < speed, nextSpeed);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3011,9 +3106,7 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 	const auto damage = obj->getBodyModule()->getDamageState();
 	const Real maxSpeed = getMaxSpeedForCondition(damage, obj);
 	const Real forwardSpeed = std::max(0.0f, physics->getForwardSpeed2D());
-	const Real fraction = maxSpeed > 0.0f ? std::min(forwardSpeed / maxSpeed, 1.0f) : 0.0f;
-	const Real radius = m_template->m_slowTurnRadius +
-		(m_template->m_fastTurnRadius - m_template->m_slowTurnRadius) * fraction;
+	const Real radius = getRetailTurnRadius(forwardSpeed, maxSpeed);
 	Real turnRate = getMaxTurnRate(damage);
 	if (radius > 0.0f && forwardSpeed > 0.0f)
 		turnRate = std::min(turnRate, forwardSpeed / radius);

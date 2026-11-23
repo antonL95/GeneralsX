@@ -436,12 +436,14 @@ protected:
 	Real getMaxSpeedOverride() const;
 
 	void moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
+	void moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionClimb(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	Bool usesCavalrySteering(const Object* obj) const;
+	Real getRetailTurnRadius(Real speed, Real maxSpeed) const;
 	void moveCavalryForward(Object* obj, PhysicsBehavior* physics, const Coord3D& goal, Real distance, Real speed);
 	void steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord3D& dirToApplyForce, Real onPathDistToGoal,
 		Real goalSpeed, Bool backing = FALSE);
