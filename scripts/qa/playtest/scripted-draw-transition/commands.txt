@@ -1,0 +1,5 @@
+5 create Player_1 PlaytestDrawTransitionSoldier 0 2980,650,0
+6 reveal Player_1 PlaytestDrawTransitionSoldier 0
+35 builderscriptmove Player_1 PlaytestDrawTransitionSoldier 0 - 3200 650
+69 select Player_1 PlaytestDrawTransitionSoldier 0
+70 key - stop 0

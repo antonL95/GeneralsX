@@ -392,10 +392,11 @@ void W3DScriptedModelDrawModuleData::parseRandomTexture(INI* ini, void*, void* s
 
 auto W3DScriptedModelDrawModuleData::readTransitionRequest(const std::string& script) -> TransitionRequest
 {
-	if (script.find("CurDrawableSetTransitionAnimState") == std::string::npos)
+	if (script.find("CurDrawableSetTransitionAnimState") == std::string::npos &&
+		script.find("CurDrawableAllowToContinue") == std::string::npos)
 		return {};
 
-	static const std::string call = R"fx(CurDrawableSetTransitionAnimState\s*\(\s*"([^"]+)"\s*\))fx";
+	static const std::string call = R"fx((?:CurDrawableSetTransitionAnimState\s*\(\s*"([^"]+)"\s*\)|CurDrawableAllowToContinue\s*\(\s*\))(?:\s+return)?)fx";
 	static const std::regex direct("\\s*" + call + "\\s*");
 	static const std::string prefix = R"fx(\s*([A-Za-z_][A-Za-z_0-9]*)\s*=\s*CurDrawablePrevAnimationState\s*\(\s*\)\s*if\s+()fx";
 	static const std::string suffix = ")\\s*then\\s+" + call + "\\s*end\\s*";
@@ -410,14 +411,14 @@ auto W3DScriptedModelDrawModuleData::readTransitionRequest(const std::string& sc
 
 	std::smatch match;
 	if (std::regex_match(script, match, direct))
-		return {stateKey(match[1].str().c_str()), {}, FALSE};
+		return {stateKey(match[1].str().c_str()), {}, FALSE, !match[1].matched};
 	const Bool excluded = std::regex_match(script, match, exclude);
 	if (!excluded && !std::regex_match(script, match, allow))
 		return {};
 
 	const std::string variable = match[1].str();
 	const std::string conditions = match[2].str();
-	TransitionRequest request{stateKey(match[3].str().c_str()), {}, excluded};
+	TransitionRequest request{stateKey(match[3].str().c_str()), {}, excluded, !match[3].matched};
 	for (auto it = std::sregex_iterator(conditions.begin(), conditions.end(), comparison); it != std::sregex_iterator(); ++it)
 	{
 		const NameKeyType previous = stateKey((*it)[2].str().c_str());
@@ -430,12 +431,12 @@ auto W3DScriptedModelDrawModuleData::readTransitionRequest(const std::string& sc
 
 void W3DScriptedModelDrawModuleData::finishParsing()
 {
-	if (RetailFileLayers::enabled() && !m_namedTransitions.empty())
+	if (RetailFileLayers::enabled())
 	{
 		for (const AnimationState& state : m_animationStates)
 		{
 			auto request = readTransitionRequest(state.script);
-			if (request.target != NAMEKEY_INVALID)
+			if (request.continuePrevious || (request.target != NAMEKEY_INVALID && !m_namedTransitions.empty()))
 				m_transitionRequests.emplace(&state.draw, std::move(request));
 		}
 	}
@@ -518,7 +519,7 @@ const ModelConditionInfo* W3DScriptedModelDrawModuleData::combineState(const Mod
 }
 
 const ModelConditionInfo* W3DScriptedModelDrawModuleData::findNamedTransition(
-	const ModelConditionInfo* previous, const ModelConditionInfo* destination) const
+	const ModelConditionInfo* previous, const ModelConditionInfo* destination, Bool& continuePrevious) const
 {
 	const auto entry = m_transitionRequests.find(destination->m_animationState);
 	if (entry == m_transitionRequests.end() || previous->m_animationState == destination->m_animationState)
@@ -529,6 +530,9 @@ const ModelConditionInfo* W3DScriptedModelDrawModuleData::findNamedTransition(
 	if (!states.empty() && (std::find(states.begin(), states.end(), previous->m_transitionKey) != states.end()) == request.excludePreviousStates)
 		return nullptr;
 
+	continuePrevious = request.continuePrevious;
+	if (continuePrevious)
+		return nullptr;
 	const auto transition = m_namedTransitions.find(request.target);
 	return transition != m_namedTransitions.end() ? combineState(destination->m_modelState, transition->second) : nullptr;
 }

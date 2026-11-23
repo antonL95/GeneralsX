@@ -352,7 +352,7 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
  	AsciiString getBestModelNameForWB(const ModelConditionFlags& c) const;
 	virtual const ModelConditionInfo* findBestInfo(const ModelConditionFlags& c) const;
-	virtual const ModelConditionInfo* findNamedTransition(const ModelConditionInfo*, const ModelConditionInfo*) const { return nullptr; }
+	virtual const ModelConditionInfo* findNamedTransition(const ModelConditionInfo*, const ModelConditionInfo*, Bool&) const { return nullptr; }
 	void preloadAssets( TimeOfDay timeOfDay, Real scale ) const;
 #ifdef CACHE_ATTACH_BONE
 	const Vector3* getAttachToDrawableBoneOffset(const Drawable* draw) const;

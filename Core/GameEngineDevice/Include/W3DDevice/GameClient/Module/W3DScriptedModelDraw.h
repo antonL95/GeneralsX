@@ -99,7 +99,8 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 	void finishParsing();
 	const ModelConditionInfo* findBestInfo(const ModelConditionFlags& flags) const override;
-	const ModelConditionInfo* findNamedTransition(const ModelConditionInfo* previous, const ModelConditionInfo* destination) const override;
+	const ModelConditionInfo* findNamedTransition(const ModelConditionInfo* previous, const ModelConditionInfo* destination,
+		Bool& continuePrevious) const override;
 	const ModelState* findPlacementDecal(const ModelConditionFlags& flags) const;
 
 private:
@@ -110,6 +111,7 @@ private:
 		NameKeyType target = NAMEKEY_INVALID;
 		std::vector<NameKeyType> previousStates;
 		Bool excludePreviousStates = FALSE;
+		Bool continuePrevious = FALSE;
 	};
 
 	static void parseModelState(INI*, void*, void*, const void*);

@@ -2203,6 +2203,30 @@ static Bool isAnimationComplete(RenderObjClass* r)
 	return true;
 }
 
+static Bool finishCurrentScriptedAnimation(RenderObjClass* renderObject)
+{
+	if (!renderObject || renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD)
+		return FALSE;
+
+	auto* model = static_cast<HLodClass*>(renderObject);
+	Real frame = 0.0f;
+	Int frames = 0;
+	Int mode = 0;
+	Real speed = 0.0f;
+	HAnimClass* animation = model->Peek_Animation_And_Info(frame, frames, mode, speed);
+	if (!animation || speed <= 0.0f)
+		return FALSE;
+
+	if (mode == RenderObjClass::ANIM_MODE_LOOP || mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS)
+	{
+		mode = mode == RenderObjClass::ANIM_MODE_LOOP ? RenderObjClass::ANIM_MODE_ONCE : RenderObjClass::ANIM_MODE_ONCE_BACKWARDS;
+		model->Set_Animation(animation, frame, mode);
+		model->Set_Animation_Frame_Rate_Multiplier(speed);
+	}
+	return (mode == RenderObjClass::ANIM_MODE_ONCE || mode == RenderObjClass::ANIM_MODE_ONCE_BACKWARDS) &&
+		!model->Is_Animation_Complete();
+}
+
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::adjustAnimSpeedToMovementSpeed()
 {
@@ -3812,7 +3836,16 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		{
 			const ModelConditionInfo* transState = nullptr;
 			if (!(TheGameState && TheGameState->isInLoadGame()))
-				transState = getW3DModelDrawModuleData()->findNamedTransition(m_curState, newState);
+			{
+				Bool continuePrevious = FALSE;
+				transState = getW3DModelDrawModuleData()->findNamedTransition(m_curState, newState, continuePrevious);
+				if (continuePrevious && finishCurrentScriptedAnimation(m_renderObject))
+				{
+					m_nextState = newState;
+					m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
+					return;
+				}
+			}
 			if (!transState && m_curState->m_transitionKey != NAMEKEY_INVALID && newState->m_transitionKey != NAMEKEY_INVALID)
 				transState = findTransitionForSig(buildTransitionSig(m_curState->m_transitionKey, newState->m_transitionKey));
 			if (transState != nullptr)
