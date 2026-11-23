@@ -32,15 +32,22 @@
 
 #include "Common/RetailFileLayers.h"
 #include "Common/INIAudit.h"
+#include "Common/Player.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/RotwkDuration.h"
+#include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "Common/Xfer.h"
+#include "GameClient/ClientRandomValue.h"
+#include "GameClient/FXList.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/FireWeaponUpdate.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/WeaponStatus.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/AI.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/WeaponSlotSelectionRules.h"
 
@@ -333,6 +340,183 @@ void FireWeaponUpdate::loadPostProcess()
 	// extend base class
 	UpdateModule::loadPostProcess();
 
+}
+
+void DamageFieldUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	FireWeaponUpdateModuleData::buildFieldParse(p);
+	static const FieldParse fields[] =
+	{
+		{ "Radius", INI::parseReal, nullptr, offsetof(DamageFieldUpdateModuleData, m_radius) },
+		{ "ObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(DamageFieldUpdateModuleData, m_filter) },
+		{ "RequiredUpgrade", INI::parseAsciiString, nullptr, offsetof(DamageFieldUpdateModuleData, m_requiredUpgrade) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+DamageFieldUpdate::~DamageFieldUpdate() = default;
+
+UpdateSleepTime DamageFieldUpdate::update()
+{
+	Object* self = getObject();
+	const auto* data = getDamageFieldUpdateModuleData();
+	if (!RetailFileLayers::enabled() || self->isEffectivelyDead() || self->isDestroyed() || data->m_radius <= 0.0f)
+		return UPDATE_SLEEP_FOREVER;
+
+	if (data->m_requiredUpgrade.isNotEmpty())
+	{
+		const auto* upgrade = TheUpgradeCenter->findUpgrade(data->m_requiredUpgrade);
+		if (!upgrade || (!self->hasUpgrade(upgrade) && !self->getControllingPlayer()->hasUpgradeComplete(upgrade)))
+		{
+			m_previousTargets.clear();
+			return UPDATE_SLEEP(retailTick);
+		}
+	}
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	std::vector<ObjectID> targets;
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(self->getPosition(), data->m_radius, FROM_CENTER_2D);
+	MemoryPoolObjectHolder holder(iter);
+	for (const Object* target = iter->first(); target; target = iter->next())
+		if (target != self && !target->isEffectivelyDead() && !target->isDestroyed() &&
+			data->m_filter.matchesObject(self, target))
+			targets.push_back(target->getID());
+	std::sort(targets.begin(), targets.end());
+	for (ObjectID id : targets)
+	{
+		if (std::binary_search(m_previousTargets.begin(), m_previousTargets.end(), id))
+			continue;
+		Object* target = TheGameLogic->findObjectByID(id);
+		if (!target || target->isEffectivelyDead() || target->isDestroyed())
+			continue;
+		for (size_t index = 0; index < m_payloads.size(); ++index)
+		{
+			Payload& payload = m_payloads[index];
+			if (payload.weapon && !payload.spent && now > payload.startFrame && payload.weapon->getStatus() == READY_TO_FIRE)
+			{
+				payload.weapon->fireRetailFieldWeapon(self, target);
+				payload.spent = data->m_nuggets[index].oneShot;
+				if (self->isEffectivelyDead() || self->isDestroyed())
+					return UPDATE_SLEEP_FOREVER;
+			}
+		}
+	}
+	m_previousTargets.swap(targets);
+	UnsignedInt deadline = UPDATE_SLEEP_FOREVER;
+	for (const Payload& payload : m_payloads)
+		if (payload.weapon && !payload.spent)
+			deadline = std::min(deadline, std::max(payload.startFrame, payload.weapon->getPossibleNextShotFrame()));
+	return sleepUntilRetailFrame(now, deadline);
+}
+
+void DamageFieldUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"damage-field-targets", [this](Xfer* block) { block->xferSTLObjectIDVector(&m_previousTargets); },
+			[this] { m_previousTargets.clear(); }}
+	});
+}
+
+void DamageFieldUpdate::crc(Xfer* xfer)
+{
+	FireWeaponUpdate::crc(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
+}
+
+void DamageFieldUpdate::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	FireWeaponUpdate::xfer(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 1);
+}
+
+void DamageFieldUpdate::loadPostProcess()
+{
+	FireWeaponUpdate::loadPostProcess();
+}
+
+void OilSpillUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	FireWeaponUpdateModuleData::buildFieldParse(p);
+	static const FieldParse fields[] =
+	{
+		{ "BreadcrumbName", INI::parseAsciiString, nullptr, offsetof(OilSpillUpdateModuleData, m_breadcrumbName) },
+		{ "IgnitionWeaponSpacing", INI::parseReal, nullptr, offsetof(OilSpillUpdateModuleData, m_spacing) },
+		{ "OilSpillFX", INI::parseFXList, nullptr, offsetof(OilSpillUpdateModuleData, m_spillFX) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
+OilSpillUpdate::~OilSpillUpdate() = default;
+
+UpdateSleepTime OilSpillUpdate::update()
+{
+	if (!RetailFileLayers::enabled())
+		return UPDATE_SLEEP_FOREVER;
+	FireWeaponUpdate::updateRetail();
+	Object* self = getObject();
+	const auto* data = getOilSpillUpdateModuleData();
+	if (self->isDestroyed() || (data->m_aliveOnly && self->isEffectivelyDead()))
+		return UPDATE_SLEEP_FOREVER;
+	if (data->m_breadcrumbName.isEmpty())
+		return UPDATE_SLEEP(retailTick);
+
+	const Coord3D pos = *self->getPosition();
+	const Real dx = pos.x - m_lastBreadcrumb.x;
+	const Real dy = pos.y - m_lastBreadcrumb.y;
+	if (m_hasBreadcrumb && dx * dx + dy * dy < data->m_spacing * data->m_spacing)
+		return UPDATE_SLEEP(retailTick);
+
+	const ThingTemplate* breadcrumb = TheThingFactory->findTemplate(data->m_breadcrumbName, FALSE);
+	if (breadcrumb)
+	{
+		Object* drop = TheThingFactory->newObject(breadcrumb, self->getTeam());
+		drop->setPosition(&pos);
+		const ScopedVisualRandom random(TRUE);
+		FXList::doFXPos(data->m_spillFX, &pos);
+	}
+	m_lastBreadcrumb = pos;
+	m_hasBreadcrumb = TRUE;
+	return UPDATE_SLEEP(retailTick);
+}
+
+void OilSpillUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"oil-spill-breadcrumb", [this](Xfer* block) {
+			block->xferBool(&m_hasBreadcrumb);
+			block->xferCoord3D(&m_lastBreadcrumb);
+		}, [this] {
+			m_hasBreadcrumb = FALSE;
+			m_lastBreadcrumb = {};
+		}}
+	});
+}
+
+void OilSpillUpdate::crc(Xfer* xfer)
+{
+	FireWeaponUpdate::crc(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
+}
+
+void OilSpillUpdate::xfer(Xfer* xfer)
+{
+	XferVersion version = 1;
+	xfer->xferVersion(&version, 1);
+	FireWeaponUpdate::xfer(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 1);
+}
+
+void OilSpillUpdate::loadPostProcess()
+{
+	FireWeaponUpdate::loadPostProcess();
 }
 
 AimWeaponBehavior::~AimWeaponBehavior() = default;

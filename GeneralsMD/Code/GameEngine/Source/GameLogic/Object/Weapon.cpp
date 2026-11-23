@@ -3366,6 +3366,12 @@ Object* Weapon::forceFireWeapon( const Object *source, const Coord3D *pos, Bool 
 }
 
 //-------------------------------------------------------------------------------------------------
+void Weapon::fireRetailFieldWeapon(const Object* source, Object* target)
+{
+	if (RetailFileLayers::enabled())
+		privateFireWeapon(source, target, nullptr, FALSE, TRUE, 0, nullptr, TRUE);
+}
+
 UnsignedInt Weapon::getPossibleNextShotFrame() const
 {
 	if (m_lastFireFrame && m_template->getIdleAfterFiringDelay())

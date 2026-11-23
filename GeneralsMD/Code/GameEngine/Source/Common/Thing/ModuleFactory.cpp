@@ -489,6 +489,11 @@ void ModuleFactory::init()
 	addModule( NeutronMissileUpdate );
 	addModule( FireSpreadUpdate );
 	addModule( FireWeaponUpdate );
+	if (registersRotwkModules())
+	{
+		addModule( DamageFieldUpdate );
+		addModule( OilSpillUpdate );
+	}
 	addModule( FlammableUpdate );
 	addModule( FloatUpdate );
 	addModule( TensileFormationUpdate );

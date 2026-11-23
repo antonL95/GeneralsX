@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "Common/SpecialPowerINI.h"
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Weapon.h"
@@ -86,9 +87,7 @@ protected:
 	Weapon* m_weapon;
   UnsignedInt m_initialDelayFrame;
 
-private:
 	UpdateSleepTime updateRetail();
-
 	struct Payload
 	{
 		Weapon* weapon;
@@ -98,6 +97,56 @@ private:
 
 	std::vector<Payload> m_payloads;
 };
+
+class DamageFieldUpdateModuleData : public FireWeaponUpdateModuleData
+{
+public:
+	Real m_radius = 0.0f;
+	SpecialPowerObjectFilter m_filter;
+	AsciiString m_requiredUpgrade;
+
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
+class DamageFieldUpdate final : public FireWeaponUpdate
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(DamageFieldUpdate, "DamageFieldUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(DamageFieldUpdate, DamageFieldUpdateModuleData)
+
+public:
+	DamageFieldUpdate(Thing* thing, const ModuleData* data) : FireWeaponUpdate(thing, data) {}
+	UpdateSleepTime update() override;
+
+private:
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+	std::vector<ObjectID> m_previousTargets;
+};
+
+class OilSpillUpdateModuleData : public FireWeaponUpdateModuleData
+{
+public:
+	AsciiString m_breadcrumbName;
+	Real m_spacing = 0.0f;
+	const FXList* m_spillFX = nullptr;
+
+	static void buildFieldParse(MultiIniFieldParse& p);
+};
+
+class OilSpillUpdate final : public FireWeaponUpdate
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(OilSpillUpdate, "OilSpillUpdate")
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(OilSpillUpdate, OilSpillUpdateModuleData)
+
+public:
+	OilSpillUpdate(Thing* thing, const ModuleData* data) : FireWeaponUpdate(thing, data) {}
+	UpdateSleepTime update() override;
+
+private:
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+	Bool m_hasBreadcrumb = FALSE;
+	Coord3D m_lastBreadcrumb{};
+};
+
 class AimWeaponBehaviorModuleData : public UpdateModuleData
 {
 public:
