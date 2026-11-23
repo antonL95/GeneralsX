@@ -1,0 +1,27 @@
+4 cash Player_1 - 0 50000
+10 create Player_1 RivendellDunedainGathering 0 1300,900,0
+10 create Player_1 RivendellBreeLandEncampment 0 1600,900,0
+11 camera Player_1 RivendellDunedainGathering 0 at 1300 900
+12 select Player_1 RivendellDunedainGathering 0
+14 followup-recruit-list Player_1 RivendellDunedainGathering 0
+15 grant Player_1 - 0 Upgrade_SonsOfElrond
+16 queue Player_1 RivendellFortressCitadel 0 ElvenArwen
+16 queue Player_1 RivendellFortressCitadel 0 ElvenGildor
+16 queue Player_1 RivendellFortressCitadel 0 ArnorHalbarad
+16 queue Player_1 RivendellFortressCitadel 0 ElvenAragorn
+16 queue Player_1 RivendellFortressCitadel 0 ElvenGlorfindel
+16 queue Player_1 RivendellFortressCitadel 0 ElvenElrond
+19 followup-recruit-list Player_1 RivendellDunedainGathering 0
+20 queue Player_1 RivendellDunedainGathering 0 ElvenElladan
+20 queue Player_1 RivendellDunedainGathering 0 ElvenElrohir
+22 followup-recruit-list Player_1 RivendellDunedainGathering 0
+23 camera Player_1 RivendellBreeLandEncampment 0 at 1600 900
+24 select Player_1 RivendellBreeLandEncampment 0
+27 followup-recruit-list Player_1 RivendellBreeLandEncampment 0
+28 objupgrade Player_1 RivendellBreeLandEncampment 0 Upgrade_DwarvenBarracksLevel2
+33 followup-recruit-list Player_1 RivendellBreeLandEncampment 0
+35 camera Player_1 RivendellFortressCitadel 0 at 828 545
+36 select Player_1 RivendellFortressCitadel 0
+39 followup-left Player_1 - 0 Command_SelectRevivablesArnorFortress
+43 followup-recruit-list Player_1 RivendellFortressCitadel 0
+45 quit - - 0

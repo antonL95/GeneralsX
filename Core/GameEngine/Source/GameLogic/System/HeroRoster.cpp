@@ -79,8 +79,10 @@ Entry *entryOf(const Player *player, Int index)
 struct Census
 {
 	const ThingTemplate *hero = nullptr;
+	const Object *producer = nullptr;
 	Int alive = 0;
 	Int queued = 0;
+	Bool queuedHere = FALSE;
 };
 
 void countHero(Object *obj, void *userData)
@@ -90,13 +92,19 @@ void countHero(Object *obj, void *userData)
 		++census.alive;
 	ProductionUpdateInterface *production = obj->getProductionUpdateInterface();
 	if (production)
-		census.queued += production->countUnitTypeInQueue(census.hero);
+	{
+		const Int queued = production->countUnitTypeInQueue(census.hero);
+		census.queued += queued;
+		if (obj == census.producer)
+			census.queuedHere = queued > 0;
+	}
 }
 
-Census takeCensus(const Player *player, const ThingTemplate *hero)
+Census takeCensus(const Player *player, const ThingTemplate *hero, const Object *producer = nullptr)
 {
 	Census census;
 	census.hero = hero;
+	census.producer = producer;
 	if (player && hero)
 		player->iterateObjects(countHero, &census);
 	return census;
@@ -355,8 +363,11 @@ Bool isReviveTemplateInSet(const CommandSet *commandSet, const Player *player, c
 HeroRules::Slot slotFor(const Player *player, const Object *producer, const CommandButton *button, Int heroIndex)
 {
 	const ThingTemplate *hero = heroAt(player, heroIndex);
+	if (!hero)
+		return HeroRules::Slot::Hidden;
 	const Bool upgradesMet = !BitIsSet(button->getOptions(), NEED_UPGRADE) || buttonUpgradesMet(button, player, producer);
-	const Census census = takeCensus(player, hero);
-	return HeroRules::slotFor(hero != nullptr, upgradesMet, stateAt(player, heroIndex), census.alive > 0, census.queued > 0);
+	const Census census = takeCensus(player, hero, producer);
+	return HeroRules::slotFor(true, upgradesMet, stateAt(player, heroIndex),
+		census.alive > 0 || census.queued > 0, upgradesMet && census.queuedHere);
 }
 }
