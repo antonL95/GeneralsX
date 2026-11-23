@@ -92,16 +92,16 @@
 420 destroy Player_1 Pkg58NoHoldAfterUnit 0
 420 destroy PlyrCreeps Pkg58Target 0
 420 destroy PlyrCreeps Pkg58Target 1
-430 create Player_1 Pkg58TrollAimHold 0 1150,1260,0
-430 create Player_1 Pkg58TrollControl 0 1150,1340,0
-430 create PlyrCreeps Pkg58Target 0 1250,1260,180
-430 create PlyrCreeps Pkg58Target 1 1250,1340,180
+430 create Player_1 Pkg58TrollAimHold 0 1150,840,0
+430 create Player_1 Pkg58TrollControl 0 1150,920,0
+430 create PlyrCreeps Pkg58Target 0 1250,840,180
+430 create PlyrCreeps Pkg58Target 1 1250,920,180
 432 orderattack Player_1 Pkg58TrollAimHold 0 PlyrCreeps:Pkg58Target:0
 432 orderattack Player_1 Pkg58TrollControl 0 PlyrCreeps:Pkg58Target:1
 440 pkg58-state Player_1 Pkg58TrollAimHold 0 aim-yes
 440 pkg58-state Player_1 Pkg58TrollControl 0 aim-no
-456 move Player_1 Pkg58TrollAimHold 0 1050,1260,0
-456 move Player_1 Pkg58TrollControl 0 1050,1340,0
+456 move Player_1 Pkg58TrollAimHold 0 1050,840,0
+456 move Player_1 Pkg58TrollControl 0 1050,920,0
 475 pkg58-state Player_1 Pkg58TrollAimHold 0 hold-reload-yes
 475 pkg58-state Player_1 Pkg58TrollControl 0 hold-reload-no
 540 destroy Player_1 Pkg58TrollAimHold 0
