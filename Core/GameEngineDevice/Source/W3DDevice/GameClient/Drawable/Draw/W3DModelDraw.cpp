@@ -2393,7 +2393,7 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 #if !RTS_GENERALS
 	applyRetailSubObjectFades();
 #endif
-	traceAnimationState();
+	traceAnimationState(*transformMtx);
 
 	// update whether or not we should be animating.
 	setPauseAnimation( !getDrawable()->getShouldAnimate(getW3DModelDrawModuleData()->m_animationsRequirePower) );
@@ -4884,7 +4884,7 @@ void W3DModelDraw::applyWeaponTiming()
 	hlod->Set_Animation_Frame_Rate_Multiplier(naturalMsec / desiredMsec);
 }
 
-void W3DModelDraw::traceAnimationState() const
+void W3DModelDraw::traceAnimationState(const Matrix3D& drawTransform) const
 {
 	static const std::vector<AsciiString> traced = []
 	{
@@ -4910,6 +4910,15 @@ void W3DModelDraw::traceAnimationState() const
 	const AsciiString& name = draw->getTemplate()->getName();
 	if (std::none_of(traced.begin(), traced.end(), [&](const AsciiString& entry) { return entry.compareNoCase(name) == 0; }))
 		return;
+
+	if (const Object* object = draw->getObject(); object && m_renderObject)
+	{
+		const Vector3 drawn = drawTransform.Get_Translation();
+		const Coord3D& logic = *object->getPosition();
+		std::fprintf(stderr, "TEST draw-position frame=%u id=%u template=%s drawn=%.6f,%.6f,%.6f logic=%.6f,%.6f,%.6f\n",
+			TheGameLogic->getFrame(), static_cast<unsigned>(draw->getID()), name.str(),
+			drawn.X, drawn.Y, drawn.Z, logic.x, logic.y, logic.z);
+	}
 
 	const auto flagNames = [](const ModelConditionFlags& conditions)
 	{

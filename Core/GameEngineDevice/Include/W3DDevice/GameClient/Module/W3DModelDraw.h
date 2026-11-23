@@ -596,7 +596,7 @@ private:
 	void dispatchAnimationFXEvents();
 	void stopTimedAnimationParticles();
 	void applyWeaponTiming();
-	void traceAnimationState() const;
+	void traceAnimationState(const Matrix3D& drawTransform) const;
 	Real getCurrentAnimFraction() const;
 	void applyCorrectModelStateAnimation();
 	const ModelConditionInfo* findTransitionForSig(TransitionSig sig) const;

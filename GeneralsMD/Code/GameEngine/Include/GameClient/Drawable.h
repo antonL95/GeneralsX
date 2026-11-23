@@ -414,6 +414,7 @@ public:
 	void setInstanceScale(Real value) { m_instanceScale = value;}	///< set scale that will be applied to instance matrix before rendering.
 
 	const Matrix3D *getTransformMatrix() const;	///< return the world transform
+	void interpolateRetailPosition(const Coord3D& previous, const Coord3D& destination, UnsignedInt duration);
 
 	void draw();													///< render the drawable to the given view
 	void updateDrawable(Real timeScale);														///< update the drawable
@@ -777,6 +778,14 @@ private:
 	// --------- BYTE-SIZED THINGS GO HERE
 	Byte m_selected;						///< drawable is selected or not
 	std::vector<RetailSubObjectFade> m_retailSubObjectFades;
+	struct RetailPositionInterpolation
+	{
+		Vector3 previous;
+		Vector3 destination;
+		UnsignedInt start = 0;
+		UnsignedInt duration = 0;
+	};
+	RetailPositionInterpolation m_retailPositionInterpolation;
 	Bool m_hidden;							///< drawable is "hidden" or not (overrides stealth effects)
 	Bool m_hiddenByStealth;			///< drawable is hidden due to stealth
 	Bool m_instanceIsIdentity;	///< If true, instance matrix can be skipped

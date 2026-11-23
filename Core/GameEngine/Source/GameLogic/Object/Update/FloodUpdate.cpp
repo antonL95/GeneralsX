@@ -13,6 +13,7 @@
 #include "Common/RotwkDuration.h"
 #include "Common/ThingFactory.h"
 #include "Common/Xfer.h"
+#include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
@@ -124,6 +125,7 @@ UpdateSleepTime FloodUpdate::update()
 {
 	if (!RetailFileLayers::enabled())
 		return UPDATE_SLEEP_FOREVER;
+	constexpr UnsignedInt tickFrames = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
 	if (m_sample == 0)
 		spawnMembers();
 
@@ -145,6 +147,7 @@ UpdateSleepTime FloodUpdate::update()
 
 		Coord3D position = route.point(m_sample);
 		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+		const Coord3D previous = *member->getPosition();
 		member->setPosition(&position);
 		if (m_sample + 1 < route.samples)
 		{
@@ -152,10 +155,12 @@ UpdateSleepTime FloodUpdate::update()
 			if (next.x != position.x || next.y != position.y)
 				member->setOrientation(WWMath::Atan2(next.y - position.y, next.x - position.x));
 		}
+		if (Drawable* draw = member->getDrawable())
+			draw->interpolateRetailPosition(previous, *member->getPosition(), tickFrames);
 		moving = TRUE;
 	}
 
-	return moving ? UPDATE_SLEEP(RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND)) : UPDATE_SLEEP_FOREVER;
+	return moving ? UPDATE_SLEEP(tickFrames) : UPDATE_SLEEP_FOREVER;
 }
 
 void FloodUpdate::xferRetailBlocks(Xfer* xfer)

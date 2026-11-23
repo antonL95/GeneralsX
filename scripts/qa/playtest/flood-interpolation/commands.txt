@@ -1,0 +1,7 @@
+20 create Player_1 GondorElessar 0 3130,780,0
+21 reveal Player_1 GondorElessar 0
+22 science Player_1 - 0 SCIENCE_BruinenFlood
+24 powerstate Player_1 - 0
+26 power Player_1 GondorElessar 0 SpecialAbilityPersonalFlood
+26 aim Player_1 GondorElessar 0 120,0
+60 power-cast Player_1 - 12 at 3210 910

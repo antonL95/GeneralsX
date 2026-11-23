@@ -2739,6 +2739,23 @@ void Drawable::draw()
 
 	// call the database defined draw action method
 	Matrix3D transformMtx = *getTransformMatrix();
+	auto& movement = m_retailPositionInterpolation;
+	if (movement.duration && RetailFileLayers::enabled())
+	{
+		const UnsignedInt elapsed = TheGameLogic->getFrame() - movement.start;
+		if (elapsed > movement.duration || transformMtx.Get_Translation() != movement.destination)
+			movement.duration = 0;
+		else if (elapsed > 0)
+		{
+			const Real progress = (elapsed - 1 + TheFramePacer->getLogicFramePhase()) / movement.duration;
+			if (progress < 1.0f)
+			{
+				Vector3 position;
+				Vector3::Lerp(movement.previous, movement.destination, progress, &position);
+				transformMtx.Set_Translation(position);
+			}
+		}
+	}
 	if (!isInstanceIdentity())
 	{
 #ifdef ALLOW_TEMPORARIES
@@ -4256,8 +4273,10 @@ DrawableID Drawable::getID() const
 }
 
 //-------------------------------------------------------------------------------------------------
-void Drawable::friend_bindToObject( Object *obj ) ///< bind this drawable to an object ID
+void Drawable::friend_bindToObject( Object *obj )
 {
+	if (m_object != obj)
+		m_retailPositionInterpolation.duration = 0;
 	m_object = obj;
 	if (getObject())
 	{
@@ -4419,6 +4438,16 @@ const Matrix3D *Drawable::getTransformMatrix() const
 		return obj->getTransformMatrix();
 	else
 		return Thing::getTransformMatrix();
+}
+
+void Drawable::interpolateRetailPosition(const Coord3D& previous, const Coord3D& destination, UnsignedInt duration)
+{
+	m_retailPositionInterpolation = {
+		{previous.x, previous.y, previous.z},
+		{destination.x, destination.y, destination.z},
+		TheGameLogic->getFrame(),
+		duration,
+	};
 }
 
 //-------------------------------------------------------------------------------------------------
