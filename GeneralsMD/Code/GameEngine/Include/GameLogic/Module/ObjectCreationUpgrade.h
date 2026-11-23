@@ -52,6 +52,7 @@ public:
 	const ObjectCreationList *m_ocl;			///< the object creation list to make
 	AsciiString m_grantUpgrade;
 	UnsignedInt m_delay = 0;
+	UnsignedInt m_fadeInFrames = 0;
 	AsciiString m_spawnTemplate;
 	Coord3D m_spawnOffset{0, 0, 0};
 	Bool m_destroyWhenSold = FALSE;

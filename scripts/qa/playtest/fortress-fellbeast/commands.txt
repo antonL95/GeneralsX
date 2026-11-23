@@ -1,0 +1,8 @@
+5 sweep-setup Player_1 - 0
+10 player Player_1 - 0
+30 fortress-sample Player_1 MordorFortressCitadel 0 Upgrade_MordorFortressFireArrowsTrigger
+33 fortress-purchase Player_1 MordorFortressCitadel 0 Command_PurchaseUpgradeMordorFortressFireArrows
+63 fortress-sample Player_1 MordorFortressCitadel 0 Upgrade_MordorFortressFireArrowsTrigger
+932 fortress-sample Player_1 MordorFortressCitadel 0 Upgrade_MordorFortressFireArrowsTrigger
+942 fortress-sample Player_1 MordorFortressCitadel 0 Upgrade_MordorFortressFireArrowsTrigger
+942 list Player_1 - 0

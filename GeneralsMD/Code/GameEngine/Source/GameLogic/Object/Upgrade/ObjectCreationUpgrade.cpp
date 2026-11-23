@@ -39,6 +39,7 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/Upgrade.h"
+#include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/Object.h"
@@ -72,6 +73,7 @@ ObjectCreationUpgradeModuleData::ObjectCreationUpgradeModuleData()
 		{
 			{ "GrantUpgrade", INI::parseAsciiString, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_grantUpgrade) },
 			{ "Delay", INI::parseDurationUnsignedInt, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_delay) },
+			{ "FadeInTime", INI::parseDurationUnsignedInt, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_fadeInFrames) },
 			{ "ThingToSpawn", INI::parseAsciiString, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_spawnTemplate) },
 			{ "Offset", INI::parseCoord3D, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_spawnOffset) },
 			{ "DestroyWhenSold", INI::parseBool, nullptr, offsetof(ObjectCreationUpgradeModuleData, m_destroyWhenSold) },
@@ -283,6 +285,9 @@ UpdateSleepTime RetailObjectCreationUpgrade::update()
 			}
 			if (auto* watcher = directSpawnWatcher(object))
 				watcher->shareUpgrades(*spawned);
+			if (data->m_fadeInFrames)
+				if (Drawable* drawable = spawned->getDrawable())
+					drawable->startRetailOclFade(data->m_fadeInFrames, TRUE, FALSE, FALSE);
 			setWakeFrame(object, UPDATE_SLEEP(15));
 		}
 	}
