@@ -11,3 +11,8 @@ def check(log):
         re.M,
     ):
         raise RuntimeError("The shield did not activate during combat")
+    gondor_hud = [line for line in log.splitlines() if line.startswith("TEST hud 25 ")]
+    if not gondor_hud or any("Command_GondorShieldBubble " in line for line in gondor_hud):
+        raise RuntimeError("Gandalf's HUD must omit Shield Bubble")
+    if not re.search(r"^TEST hud 141 slot=3 Command_BladeofWesternessePassive type=\d+ disabled ", log, re.M):
+        raise RuntimeError("Pippin's passive Blade of Westernesse must be visible and disabled for input")

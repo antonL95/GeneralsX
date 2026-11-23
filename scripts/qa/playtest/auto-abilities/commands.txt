@@ -2,7 +2,12 @@
 5 reveal Player_1 GondorGandalf 0
 20 select Player_1 GondorGandalf 0
 25 auto-ability-state Player_1 GondorGandalf 0 SpecialPowerShieldBubbleGondor
+25 hud - - 0
 30 create PlyrCreeps MordorCaveTroll 0 2350,1185,0
 31 attack PlyrCreeps MordorCaveTroll 0 Player_1:GondorGandalf:0
 78 auto-ability-state Player_1 GondorGandalf 0 SpecialPowerShieldBubbleGondor
 130 auto-ability-state Player_1 GondorGandalf 0 SpecialPowerShieldBubbleGondor
+135 create Player_1 GondorPippin 0 2220,1160,0
+136 pkg18-award-xp Player_1 GondorPippin 0 100000
+137 select Player_1 GondorPippin 0
+141 hud - - 0

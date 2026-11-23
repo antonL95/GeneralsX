@@ -13,7 +13,9 @@
 221 auto-ability-state Player_1 GondorGandalf 0 SpecialPowerShieldBubbleGondor
 221 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield
 230 auto-ability-hit PlyrCreeps AutoAbilitiesFastCaster 0 Player_1:AutoAbilitiesAttacker:0 10 0
+244 auto-ability-state Player_1 GondorGandalf 0 SpecialPowerShieldBubbleGondor
 244 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield
+246 auto-ability-state Player_1 GondorGandalf 0 SpecialPowerShieldBubbleGondor
 246 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield
 369 auto-ability-hit PlyrCreeps AutoAbilitiesFastCaster 0 Player_1:AutoAbilitiesAttacker:0 10 0
 369 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield

@@ -13,6 +13,7 @@ check() {
 	fi
 	for frame in 244 246; do
 		if covers "$frame"; then
+			expect "TEST auto state frame=$frame power=SpecialPowerShieldBubbleGondor ready=0 next=2470 dead=0 disabled=0 bubble=1"
 			expect "TEST auto state frame=$frame power=AutoAbilitiesFastShield ready=0 next=370 dead=0 disabled=0 bubble=0"
 		fi
 	done
