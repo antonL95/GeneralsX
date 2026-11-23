@@ -174,8 +174,15 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 	GameMessageDisposition disp = KEEP_MESSAGE;
 	Bool forceKeepMessage = FALSE;
 	WinInputReturnCode returnCode = WIN_INPUT_NOT_USED;
+#if !RTS_GENERALS
+	const Bool retailEscape = (msg->getType() == GameMessage::MSG_RAW_KEY_DOWN ||
+		msg->getType() == GameMessage::MSG_RAW_KEY_UP) && msg->getArgument(0)->integer == KEY_ESC &&
+		RetailFileLayers::enabled();
+#else
+	const Bool retailEscape = FALSE;
+#endif
 
-	if (TheTacticalView && TheTacticalView->isMouseLocked())
+	if (TheTacticalView && TheTacticalView->isMouseLocked() && !retailEscape)
 	{
 		//Kris: Aug 15, 2003
 		//Added the scrolling check that will not return KEEP_MESSAGE if we happen
@@ -345,11 +352,11 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 			}
 
 #if !RTS_GENERALS
-			if (returnCode != WIN_INPUT_USED && key == KEY_ESC && RetailFileLayers::enabled() &&
+			if (returnCode != WIN_INPUT_USED && retailEscape &&
 				TheGameLogic && TheGameLogic->isInGame() && !TheGameLogic->isInShellGame() &&
 				TheShell && !TheShell->isShellActive())
 			{
-				if (BitIsSet(state, KEY_STATE_UP))
+				if (BitIsSet(state, KEY_STATE_UP) && (!TheControlBar || !TheControlBar->showRetailPowers(FALSE)))
 					TheMessageStream->appendMessage(GameMessage::MSG_META_OPTIONS);
 				returnCode = WIN_INPUT_USED;
 			}

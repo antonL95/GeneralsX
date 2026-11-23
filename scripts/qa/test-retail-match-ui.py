@@ -44,14 +44,14 @@ def key(value):
     sync(display, 0)
 
 
-def click(x, y):
+def click(x, y, settle=0.8):
     motion(display, 0, x, y, 0)
     sync(display, 0)
     time.sleep(0.12)
     button(display, 1, 1, 0)
     button(display, 1, 0, 80)
     sync(display, 0)
-    time.sleep(0.8)
+    time.sleep(settle)
 
 
 def pixel(x, y):
@@ -82,7 +82,7 @@ def capture(name, x, y, width, height):
     )
 
 
-def wait_for(label, predicate, timeout=30):
+def wait_for(label, predicate, timeout=30, interval=0.2):
     end = time.monotonic() + timeout
     while time.monotonic() < end:
         if predicate():
@@ -90,7 +90,7 @@ def wait_for(label, predicate, timeout=30):
             return
         if game.poll() is not None:
             break
-        time.sleep(0.2)
+        time.sleep(interval)
     capture("failed", 0, 0, 1024, 768)
     print("\n".join((out / "game.log").read_text(errors="replace").splitlines()[-12:]), flush=True)
     sys.exit(f"FAIL {label}")
@@ -134,6 +134,84 @@ def skirmish_label_pixels():
     }
 
 
+def power_points():
+    log = (out / "game.log").read_text(errors="replace")
+    return [int(points) for points in re.findall(r"TEST powerstate \d+ Player_1 .*? points=(\d+)", log)]
+
+
+def spellbook_flames():
+    return {
+        index for index, color in enumerate(title_signature(352, 188, 69, 22))
+        if (color >> 8 & 0xFF) > 165 and (color & 0xFF) > 170
+        and (color & 0xFF) > (color >> 16 & 0xFF) + 40
+    }
+
+
+def owned_check_visible():
+    expected = (154, 202, 164)
+    image = get_image(display, root, 371, 257, 30, 36, 0xFFFFFFFF, 2)
+    try:
+        columns = [
+            x for x in range(30) for y in range(36)
+            if all(abs(actual - target) <= 3
+                   for actual, target in zip(get_pixel(image, x, y).to_bytes(4, "big")[1:], expected))
+        ]
+        return bool(columns) and max(columns) - min(columns) >= 10
+    finally:
+        destroy_image(image)
+
+
+def connector_brightness():
+    signature = title_signature(337, 274, 48, 54)
+    return sum(color & 0xFF for color in signature) / len(signature)
+
+
+def check_spellbook():
+    arena = title_signature(380, 110, 264, 72)
+    click(128, 553, settle=0)
+    wait_for("the spellbook opening becomes visible",
+             lambda: sum(abs((before & 0xFF) - (after & 0xFF)) > 24
+                         for before, after in zip(arena, title_signature(380, 110, 264, 72)))
+                         > len(arena) // 4, interval=0.02)
+    capture("spellbook-opening", 247, 65, 530, 340)
+    time.sleep(0.65)
+    observations = len(power_points())
+    click(320, 362)
+    click(568, 684)
+    wait_for("unavailable power leaves fifteen points unspent",
+             lambda: len(power_points()) > observations and power_points()[-1] == 15, 60)
+    capture("spellbook-available", 285, 185, 455, 201)
+    wait_for("available power shows flames", spellbook_flames, 4)
+    initial_flames = spellbook_flames()
+    wait_for("available power flames animate", lambda: spellbook_flames() != initial_flames, 4)
+    baseline_connector = connector_brightness()
+    click(386, 246)
+    click(568, 684)
+    wait_for("available power can be purchased for five points", lambda: power_points()[-1] == 10, 60)
+    wait_for("purchased power displays its check mark", owned_check_visible)
+    wait_for("purchased power fills its outgoing connector",
+             lambda: connector_brightness() > baseline_connector + 8)
+    key(0xFF1B)
+    wait_for("Escape closes the spellbook", lambda: not owned_check_visible() and not menu_visible())
+    click(128, 553)
+    wait_for("purchased power keeps its check mark after reopening", owned_check_visible)
+    capture("spellbook-purchased", 285, 185, 455, 201)
+    key(0xFF1B)
+    wait_for("the spellbook closes again", lambda: not owned_check_visible() and not menu_visible())
+    right = keycode(display, 0xFF53)
+    key_event(display, right, 1, 0)
+    sync(display, 0)
+    try:
+        click(128, 553)
+        wait_for("the spellbook opens with the camera key held", owned_check_visible)
+        key(0xFF1B)
+        wait_for("Escape closes the spellbook with the camera key held",
+                 lambda: not owned_check_visible() and not menu_visible())
+    finally:
+        key_event(display, right, 0, 0)
+        sync(display, 0)
+
+
 def check():
     wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
     time.sleep(2)
@@ -143,6 +221,9 @@ def check():
     start_match(1)
     wait_for("first skirmish is running", lambda: len(faction_history()) == 1, 100)
     wait_for("first skirmish reaches frame 60", lambda: log_count("TEST powerstate 60 Player_1") >= 1, 60)
+    if "--spellbook" in sys.argv:
+        check_spellbook()
+        return
     key(0xFF1B)
     wait_for("Escape opens the in-game menu", menu_visible)
     capture("pause-menu", 360, 312, 304, 170)
@@ -189,7 +270,8 @@ print(f"Run directory {out}", flush=True)
 runtime = out / "runtime"
 runtime.mkdir(mode=0o700)
 commands = out / "commands.txt"
-commands.write_text("30 player Player_1 - 0\n" + "".join(
+commands.write_text(("15 pkg44-points Player_1 - 0 10\n" if "--spellbook" in sys.argv else "") +
+                    "30 player Player_1 - 0\n" + "".join(
     f"{frame} powerstate Player_1 - 0\n" for frame in range(60, 3600, 30)
 ))
 env = os.environ | {

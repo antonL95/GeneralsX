@@ -1136,7 +1136,7 @@ public:
 	void initRetailPowers(GameWindow* palantir);
 	void destroyRetailPowers();
 	void updateRetailPowers();
-	void showRetailPowers(Bool show);
+	Bool showRetailPowers(Bool show);
 	void drawRetailPowers(GameWindow* window) const;
 	void inputRetailPowers(Int x, Int y, Bool click);
 	void clickRetailSpellButton(const CommandButton* button);
