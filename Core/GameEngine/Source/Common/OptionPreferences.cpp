@@ -270,6 +270,22 @@ Real OptionPreferences::getScrollFactor()
 	return factor/100.0f;
 }
 
+void OptionPreferences::applyScrollFactor()
+{
+	TheWritableGlobalData->m_keyboardScrollFactor = getScrollFactor();
+	if (!RetailFileLayers::enabled())
+		return;
+
+	const auto setting = find("ScrollFactor");
+	Real factor = TheGlobalData->m_retailDefaultScrollFactor;
+	if (setting != end())
+	{
+		const long value = std::strtol(setting->second.str(), nullptr, 10);
+		factor = (value < 0 ? 1 : std::min(value, 100L)) * 0.02f;
+	}
+	TheWritableGlobalData->m_retailScrollFactor = factor;
+}
+
 Bool OptionPreferences::getDrawScrollAnchor()
 {
 	OptionPreferences::const_iterator it = find("DrawScrollAnchor");

@@ -74,6 +74,7 @@ public:
 	Bool getDoubleClickAttackMoveEnabled();
 	Int getJpegQuality() const;
 	Real getScrollFactor();
+	void applyScrollFactor();
 	Bool getDrawScrollAnchor();
 	Bool getMoveScrollAnchor();
 	Bool getCursorCaptureEnabledInWindowedGame() const;

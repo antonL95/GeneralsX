@@ -163,6 +163,12 @@ void View::scrollBy( const Coord2D *delta )
 	m_pos.y += delta->y;
 }
 
+void View::scrollAtScreenEdge(ScreenEdgeScrollStep step)
+{
+	const Coord2D delta{step.offset.x * step.seconds, -step.offset.y * step.seconds};
+	View::scrollBy(&delta);
+}
+
 /**
  * Rotate the view around the vertical axis to the given angle.
  */

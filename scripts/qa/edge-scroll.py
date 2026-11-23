@@ -51,6 +51,7 @@ class EdgeScroll(gdb.Breakpoint):
         self.height = int(os.environ["EDGE_SCROLL_HEIGHT"])
         self.client_frame = None
         self.samples = {}
+        self.sustained = {}
 
     def stop(self):
         logic = gdb.parse_and_eval("TheGameLogic")
@@ -71,11 +72,11 @@ class EdgeScroll(gdb.Breakpoint):
         corner_end = corner_start + self.fps
         if frame == start - 2:
             self.pointer.move(self.width - 1, self.height // 2)
-        elif frame == end:
+        elif frame == end - 1:
             self.pointer.move(self.width // 2, self.height // 2)
         elif frame == corner_start - 2:
             self.pointer.move(self.width - 1, 0)
-        elif frame == corner_end:
+        elif frame == corner_end - 1:
             self.pointer.move(self.width // 2, self.height // 2)
 
         view = gdb.parse_and_eval("TheTacticalView")
@@ -86,10 +87,20 @@ class EdgeScroll(gdb.Breakpoint):
                           f"{x:.6f} {y:.6f}\n")
                 if frame == first:
                     self.samples[name] = x, y
+                if frame == first + self.fps // 2:
+                    self.sustained[name] = x, y
                 if frame == last:
                     start_x, start_y = self.samples[name]
+                    mid_x, mid_y = self.sustained[name]
                     gdb.write(f"EDGE_SCROLL_RESULT {self.fps} {self.width}x{self.height} {name} "
                               f"{x - start_x:.6f} {y - start_y:.6f}\n")
+                    gdb.write(f"EDGE_SCROLL_SUSTAINED {self.fps} {self.width}x{self.height} {name} "
+                              f"{2 * (x - mid_x):.6f} {2 * (y - mid_y):.6f}\n")
+                    self.samples[name] = x, y
+            if frame == last + 2:
+                stopped_x, stopped_y = self.samples[name]
+                gdb.write(f"EDGE_SCROLL_STOP {self.fps} {self.width}x{self.height} {name} "
+                          f"{x - stopped_x:.6f} {y - stopped_y:.6f}\n")
         if frame == corner_end + 2:
             gdb.write("EDGE_SCROLL_COMPLETE\n")
             gdb.execute("set variable TheGameEngine->m_quitting = true", to_string=True)

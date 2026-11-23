@@ -164,10 +164,10 @@ static void saveExtras()
 
 	val = GadgetSliderGetPosition(sliderScrollSpeed);
 	if (val > 0) {
-		TheWritableGlobalData->m_keyboardScrollFactor = val / 100.0f;
 		AsciiString prefString;
 		prefString.format("%d", val);
 		(*pref)["ScrollFactor"] = prefString;
+		pref->applyScrollFactor();
 	}
 
 	val = GadgetSliderGetPosition(sliderDrawDistance);

@@ -36,7 +36,7 @@ run() {
         cp "$asset" "$map/$name"
     done
     printf 'ScrollFactor = 50\nResolution = %s %s\n' "$2" "$3" > "$userdata/Options.ini"
-    printf '30 camera Player_1 MenFortressCitadel 0 - 1200 1200 1\n1000 quit - - 0\n' > "$GENERALSX_TEST_COMMANDS"
+    printf '30 camera Player_1 MenFortressCitadel 0 - 750 1750 1\n1000 quit - - 0\n' > "$GENERALSX_TEST_COMMANDS"
     log="$HOME/session.log"
     if ! timeout --signal=INT --kill-after=10 180 xvfb-run -a -s "-screen 0 ${2}x${3}x24" \
         gdb -q -nx -batch -return-child-result -x "$qa/playtest/start.gdb" \
@@ -51,7 +51,7 @@ run() {
         tail -35 "$log" >&2
         return 1
     fi
-    grep '^EDGE_SCROLL_RESULT ' "$log" | tee -a "$out/results.txt"
+    grep -E '^EDGE_SCROLL_(RESULT|SUSTAINED|STOP) ' "$log" | tee -a "$out/results.txt"
 }
 
 run 30 1280 720
@@ -60,12 +60,27 @@ run 60 1024 768
 
 if [ "$mode" != --measure ]; then
     awk '
-        $4 == "right" && ($5 < 1 || $6 < -5 || $6 > 5) {
-            print "Expected rightward movement: " $0
-            failed = 1
+        function outside(value, expected) {
+            return value < expected - 3 || value > expected + 3
         }
-        $4 == "upper-right" && ($5 < 1 || $6 < 1) {
-            print "Expected upper-right movement: " $0
+        $1 == "EDGE_SCROLL_SUSTAINED" {
+            if (outside($5, 333.33) || outside($6, $4 == "right" ? 0 : 416.67)) {
+                print "Unexpected sustained world speed: " $0
+                failed = 1
+            }
+            sustained[$4]++
+            next
+        }
+        $1 == "EDGE_SCROLL_STOP" {
+            if ($5 < -1 || $5 > 1 || $6 < -1 || $6 > 1) {
+                print "Camera moved after the pointer returned to the interior: " $0
+                failed = 1
+            }
+            stopped[$4]++
+            next
+        }
+        outside($5, 291.67) || outside($6, $4 == "right" ? 0 : 364.58) {
+            print "Unexpected one-second displacement: " $0
             failed = 1
         }
         !seen[$4]++ {
@@ -77,7 +92,9 @@ if [ "$mode" != --measure ]; then
             failed = 1
         }
         END {
-            if (seen["right"] != 3 || seen["upper-right"] != 3)
+            if (seen["right"] != 3 || seen["upper-right"] != 3 ||
+                sustained["right"] != 3 || sustained["upper-right"] != 3 ||
+                stopped["right"] != 3 || stopped["upper-right"] != 3)
                 failed = 1
             if (!failed)
                 print "EDGE SCROLL PASS"

@@ -82,12 +82,14 @@ private:
 	ViewLocation m_viewLocation[ MAX_VIEW_LOCS ];
 	ScrollType m_scrollType;
 	ScreenEdgeScrollMode m_screenEdgeScrollMode;
+	Real m_edgeScrollElapsed = 0.0f;
 	UnsignedInt m_lastMouseMoveTimeMsec;				// real-time in milliseconds when mouse last moved
 
 	void setScrolling( ScrollType scrollType );
 	void stopScrolling();
 	Bool canScrollAtScreenEdge() const;
 	ICoord2D getScreenEdgeScrollDirection() const;
+	void scrollRetailScreenEdge(const ICoord2D& direction);
 };
 
 extern LookAtTranslator *TheLookAtTranslator;

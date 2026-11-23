@@ -165,6 +165,7 @@ public:
 	virtual void setOrigin( Int x, Int y) override;			///< Sets location of top-left view corner on display
 
 	virtual void scrollBy( const Coord2D *delta ) override;  ///< Shift the view by the given delta
+	void scrollAtScreenEdge(ScreenEdgeScrollStep step) override;
 
 	virtual void forceRedraw() override;
 	virtual void onHeightMapChanged() override { m_lastScreenToTerrainValid = false; }
@@ -308,6 +309,8 @@ private:
 	Real getDesiredZoom(Real x, Real y) const;
 	Real getMaxHeight(Real x, Real y) const;
 	Real getMaxZoom(Real x, Real y) const;
+	void applyScroll(Real x, Real y);
+	Real m_retailCameraScrollSpeedScalar = 1.0f;
 	void updateCameraTransform(); ///< update the transform matrix of m_3DCamera, based on m_pos & m_angle
 	void updateCameraClipPlanes(const Matrix3D &transform);
 	void setCameraTransform(const Matrix3D &transform);

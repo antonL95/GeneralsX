@@ -592,11 +592,11 @@ static void saveOptions()
 	val = GadgetSliderGetPosition(sliderScrollSpeed);
 	if(val > 0)
 	{
-		TheWritableGlobalData->m_keyboardScrollFactor = val/100.0f;
-		DEBUG_LOG(("Scroll Speed val %d, keyboard scroll factor %f", val, TheGlobalData->m_keyboardScrollFactor));
 		AsciiString prefString;
 		prefString.format("%d", val);
 		(*pref)["ScrollFactor"] = prefString;
+		pref->applyScrollFactor();
+		DEBUG_LOG(("Scroll Speed val %d, keyboard scroll factor %f", val, TheGlobalData->m_keyboardScrollFactor));
 	}
 
 	//-------------------------------------------------------------------------------------------------

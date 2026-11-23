@@ -436,6 +436,11 @@ public:
 	// GeneralsX @feature Gabriel Petry 30/09/2026 Add configurable mouse scrolling speed.
 	Real m_mouseScrollFactor;				///< Factor applied to game scrolling speed via mouse scrolling
 	Real m_keyboardDefaultScrollFactor;			///< Factor applied to game scrolling speed via keyboard scrolling
+	Real m_retailDefaultScrollFactor = 1.0f;
+	Real m_retailScrollFactor = 1.0f;
+	Real m_retailScreenEdgeScrollSpeedFactor = 1.0f;
+	Real m_retailScreenEdgeScrollRampTime = 0.3f;
+	Real m_retailDefaultCameraScrollSpeedScalar = 1.0f;
 	Bool m_drawScrollAnchor;					///< Set that the scroll anchor should be enabled
 	Bool m_moveScrollAnchor;					///< set that the scroll anchor should move
 

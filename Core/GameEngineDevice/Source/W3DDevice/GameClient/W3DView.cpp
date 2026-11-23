@@ -2180,23 +2180,34 @@ void W3DView::scrollBy( const Coord2D *delta )
 		world.Y = worldEnd.Y - worldStart.Y;
 		world.Z = worldEnd.Z - worldStart.Z;
 
-		// scroll by delta
-		Coord2D pos = getPosition2D();
-		pos.x += world.X;
-		pos.y += world.Y;
-		//DEBUG_LOG(("Delta %.2f, %.2f", world.X, world.Z));
-		setPosition2D(pos);
-
-		//m_cameraConstraintValid = false;	// pos change does NOT invalidate cam constraints
-
-		removeScriptedState(Scripted_Rotate);
-		m_recalcCamera = true;
+		applyScroll(world.X, world.Y);
 	}
 	else
 	{
 		m_scrollAmount.x = 0;
 		m_scrollAmount.y = 0;
 	}
+}
+
+void W3DView::scrollAtScreenEdge(ScreenEdgeScrollStep step)
+{
+	m_scrollAmount = step.offset;
+	if ((!step.offset.x && !step.offset.y) || m_maxHeightAboveGround <= 0.0f)
+		return;
+
+	const Real zoom = getCameraOffsetZ() * getZoom() / m_maxHeightAboveGround;
+	const Real scale = 0.25f * BaseFps * step.seconds * zoom * m_retailCameraScrollSpeedScalar;
+	Vector3 displacement(step.offset.x * scale, -step.offset.y * scale, 0.0f);
+	displacement.Rotate_Z(m_3DCamera->Get_Transform().Get_Z_Rotation());
+	applyScroll(displacement.X, displacement.Y);
+}
+
+void W3DView::applyScroll(Real x, Real y)
+{
+	const Coord2D delta{x, y};
+	View::scrollBy(&delta);
+	removeScriptedState(Scripted_Rotate);
+	m_recalcCamera = true;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2810,6 +2821,12 @@ void W3DView::initHeightForMap()
 {
 	if (RetailFileLayers::enabled())
 	{
+		m_retailCameraScrollSpeedScalar = TheGlobalData->m_retailDefaultCameraScrollSpeedScalar;
+		Bool hasScrollSpeed = false;
+		const Real authoredScrollSpeed = MapObject::getWorldDict()->getReal(NAMEKEY("cameraScrollSpeedScalar"), &hasScrollSpeed);
+		if (hasScrollSpeed && std::isfinite(authoredScrollSpeed))
+			m_retailCameraScrollSpeedScalar = authoredScrollSpeed;
+
 		Real pitch = TheGlobalData->m_cameraPitch;
 		if (TheGameLogic && TheGameLogic->getGameMode() == GAME_SKIRMISH)
 		{

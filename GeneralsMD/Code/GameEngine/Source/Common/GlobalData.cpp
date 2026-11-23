@@ -453,7 +453,12 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "KeyboardScrollSpeedFactor",	INI::parseReal,				nullptr,			offsetof( GlobalData, m_keyboardScrollFactor ) },
 	// GeneralsX @feature Gabriel Petry 30/09/2026 Load configurable mouse scrolling speed.
 	{ "MouseScrollSpeedFactor",		INI::parseReal,				nullptr,			offsetof( GlobalData, m_mouseScrollFactor ) },
-	{ "KeyboardDefaultScrollSpeedFactor",	INI::parseReal,				nullptr,			offsetof( GlobalData, m_keyboardDefaultScrollFactor ) },
+	{ "KeyboardDefaultScrollSpeedFactor", [](INI* ini, void* instance, void* store, const void* userData)
+		{
+			INI::parseReal(ini, instance, store, userData);
+			auto* data = static_cast<GlobalData*>(instance);
+			data->m_retailDefaultScrollFactor = data->m_keyboardDefaultScrollFactor;
+		}, nullptr, offsetof(GlobalData, m_keyboardDefaultScrollFactor) },
 	{ "KeyboardCameraRotateSpeed", INI::parseReal, nullptr, offsetof( GlobalData, m_keyboardCameraRotateSpeed ) },
 	{ "MovementPenaltyDamageState",	INI::parseIndexList,	TheBodyDamageTypeNames,	 offsetof( GlobalData, m_movementPenaltyDamageState ) },
 
@@ -1294,6 +1299,9 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	};
 	static const FieldParse retailFields[] =
 	{
+		{ "ScreenEdgeScrollSpeedFactor", INI::parseReal, nullptr, offsetof(GlobalData, m_retailScreenEdgeScrollSpeedFactor) },
+		{ "ScreenEdgeScrollRampTime", INI::parseReal, nullptr, offsetof(GlobalData, m_retailScreenEdgeScrollRampTime) },
+		{ "DefaultCameraScrollSpeedScalar", INI::parseReal, nullptr, offsetof(GlobalData, m_retailDefaultCameraScrollSpeedScalar) },
 		{ "VeterancyPipDrawObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(GlobalData, m_veterancyPipDrawFilter) },
 		{ "DefaultCameraPitchAngle", INI::parseReal, nullptr, offsetof(GlobalData, m_cameraPitch) },
 		{ "DefaultCameraYawAngle", INI::parseReal, nullptr, offsetof(GlobalData, m_cameraYaw) },
@@ -1357,7 +1365,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_clientRetaliationModeEnabled = optionPref.getRetaliationModeEnabled();
 	TheWritableGlobalData->m_doubleClickAttackMove = optionPref.getDoubleClickAttackMoveEnabled();
 	TheWritableGlobalData->m_jpegQuality = optionPref.getJpegQuality();
-	TheWritableGlobalData->m_keyboardScrollFactor = optionPref.getScrollFactor();
+	optionPref.applyScrollFactor();
 	TheWritableGlobalData->m_drawScrollAnchor = optionPref.getDrawScrollAnchor();
 	TheWritableGlobalData->m_moveScrollAnchor = optionPref.getMoveScrollAnchor();
 	TheWritableGlobalData->m_defaultIP = optionPref.getLANIPAddress();

@@ -35,6 +35,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/Recorder.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/StatsCollector.h"
 #include "Common/OptionPreferences.h"
 #include "GameLogic/Object.h"
@@ -92,6 +93,7 @@ void LookAtTranslator::setScrolling(ScrollType scrollType)
 	TheInGameUI->setScrolling( TRUE );
 	TheTacticalView->setMouseLock( TRUE );
 	m_scrollType = scrollType;
+	m_edgeScrollElapsed = 0.0f;
 	if(TheStatsCollector)
 		TheStatsCollector->startScrollTime();
 }
@@ -148,6 +150,33 @@ ICoord2D LookAtTranslator::getScreenEdgeScrollDirection() const
 		(position.x >= width - edgeScrollSize) - (position.x < edgeScrollSize),
 		(position.y >= height - edgeScrollSize) - (position.y < edgeScrollSize)
 	};
+}
+
+void LookAtTranslator::scrollRetailScreenEdge(const ICoord2D& direction)
+{
+	const Real seconds = TheFramePacer->getUpdateTime();
+	if (!(seconds > 0.0f))
+		return;
+
+	const Real rampTime = TheGlobalData->m_retailScreenEdgeScrollRampTime;
+	Real ramp = 1.0f;
+	if (m_edgeScrollElapsed < rampTime)
+	{
+		const Real rampStep = std::min(seconds, rampTime - m_edgeScrollElapsed);
+		const Real next = m_edgeScrollElapsed + rampStep;
+		const Real rampMidpoint = (m_edgeScrollElapsed + next) * 0.5f;
+		ramp -= (rampStep / seconds) * (1.0f - rampMidpoint / rampTime);
+		m_edgeScrollElapsed = next;
+	}
+
+	const Real speed = 100.0f * ramp * TheGlobalData->m_retailScreenEdgeScrollSpeedFactor *
+		TheGlobalData->m_retailScrollFactor;
+	const Coord2D offset = {
+		direction.x * speed * TheGlobalData->m_horizontalScrollSpeedFactor,
+		direction.y * speed * TheGlobalData->m_verticalScrollSpeedFactor
+	};
+	TheInGameUI->setScrollAmount(offset);
+	TheTacticalView->userScrollAtScreenEdge({offset, seconds});
 }
 
 //-----------------------------------------------------------------------------
@@ -462,6 +491,10 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				TheInGameUI->setScrollAmount(offset);
 				TheTacticalView->scrollBy(&offset);
 				stopScrolling();
+			}
+			else if (m_isScrolling && m_scrollType == SCROLL_SCREENEDGE && RetailFileLayers::enabled())
+			{
+				scrollRetailScreenEdge(edgeDirection);
 			}
 			else if (m_isScrolling)
 			{
