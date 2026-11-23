@@ -18,7 +18,7 @@ constexpr uint32_t expressionList = 0x434c5846;
 constexpr uint32_t preshaderInfo = 0x49535250;
 constexpr size_t maxDecodedProgramBytes = 512 * 1024;
 
-enum class ShaderStage { Vertex11, Vertex20, Pixel20 };
+enum class ShaderStage { Vertex11, Vertex20, Vertex30, Pixel20, Pixel30 };
 
 enum class RegisterClass : uint32_t
 {
@@ -39,10 +39,21 @@ unsigned floatRegisterCount(ShaderStage stage)
 	switch (stage)
 	{
 		case ShaderStage::Vertex11: return 96;
-		case ShaderStage::Vertex20: return 256;
+		case ShaderStage::Vertex20: case ShaderStage::Vertex30: return 256;
 		case ShaderStage::Pixel20: return 32;
+		case ShaderStage::Pixel30: return 224;
 	}
 	return 0;
+}
+
+bool isPixel(ShaderStage stage)
+{
+	return stage == ShaderStage::Pixel20 || stage == ShaderStage::Pixel30;
+}
+
+bool isShaderModelThree(ShaderStage stage)
+{
+	return stage == ShaderStage::Vertex30 || stage == ShaderStage::Pixel30;
 }
 
 uint32_t readWord(std::span<const uint8_t> bytes)
@@ -81,8 +92,8 @@ bool readBindings(Words table, std::vector<Binding> &bindings, size_t &remaining
 		const unsigned limit = binding.bank == 2 ? (stage ? floatRegisterCount(*stage) : 256) : 16;
 		if (binding.name.empty() || binding.bank > 3 || !binding.count ||
 			binding.first + binding.count > limit || binding.bank == 1 ||
-			(stage == ShaderStage::Pixel20 && binding.bank == 0) ||
-			(stage && stage != ShaderStage::Pixel20 && binding.bank == 3) ||
+			(stage && isPixel(*stage) && binding.bank == 0) ||
+			(stage && !isPixel(*stage) && binding.bank == 3) ||
 			!spend(remaining, binding.name.capacity() + 1))
 			return false;
 		if (entry[4] && binding.bank != 3)
@@ -116,7 +127,7 @@ size_t shaderOperands(uint32_t opcode)
 		case 0x00: case 0x27: case 0x2a: case 0x2b: return 0;
 		case 0x26: case 0x28: return 1;
 		case 0x01: case 0x06: case 0x07: case 0x0e: case 0x0f: case 0x10:
-		case 0x13: case 0x1f: case 0x24: case 0x2e: return 2;
+		case 0x13: case 0x1f: case 0x24: case 0x29: case 0x2e: return 2;
 		case 0x02: case 0x03: case 0x05: case 0x08: case 0x09: case 0x0a:
 		case 0x0b: case 0x0c: case 0x0d: case 0x11: case 0x20: case 0x42:
 			return 3;
@@ -139,16 +150,16 @@ unsigned registerIndex(uint32_t token)
 bool validSource(uint32_t token, ShaderStage stage)
 {
 	const auto index = registerIndex(token);
-	const bool pixel = stage == ShaderStage::Pixel20;
+	const bool pixel = isPixel(stage);
 	const unsigned modifier = (token >> 24) & 0xfu;
 	if (modifier > (pixel ? 12u : 1u))
 		return false;
 	switch (registerClass(token))
 	{
-		case RegisterClass::Temporary: return index < 12;
-		case RegisterClass::Input: return index < (pixel ? 2u : 16u);
+		case RegisterClass::Temporary: return index < (isShaderModelThree(stage) ? 32u : 12u);
+		case RegisterClass::Input: return index < (stage == ShaderStage::Pixel30 ? 10u : pixel ? 2u : 16u);
 		case RegisterClass::Constant: return index < floatRegisterCount(stage);
-		case RegisterClass::Texture: return pixel && index < 8;
+		case RegisterClass::Texture: return stage == ShaderStage::Pixel20 && index < 8;
 		default: return false;
 	}
 }
@@ -158,13 +169,13 @@ bool validDestination(uint32_t token, ShaderStage stage)
 	if (!(token & 0x000f0000u))
 		return false;
 	const auto index = registerIndex(token);
-	const bool pixel = stage == ShaderStage::Pixel20;
+	const bool pixel = isPixel(stage);
 	switch (registerClass(token))
 	{
-		case RegisterClass::Temporary: return index < 12;
-		case RegisterClass::RasterOutput: return !pixel && index < 3;
-		case RegisterClass::AttributeOutput: return !pixel && index < 2;
-		case RegisterClass::TexcoordOutput: return !pixel && index < 8;
+		case RegisterClass::Temporary: return index < (isShaderModelThree(stage) ? 32u : 12u);
+		case RegisterClass::RasterOutput: return !pixel && stage != ShaderStage::Vertex30 && index < 3;
+		case RegisterClass::AttributeOutput: return !pixel && stage != ShaderStage::Vertex30 && index < 2;
+		case RegisterClass::TexcoordOutput: return !pixel && index < (stage == ShaderStage::Vertex30 ? 12u : 8u);
 		case RegisterClass::ColorOutput: return pixel && index < 4;
 		case RegisterClass::DepthOutput: return pixel && index == 0;
 		default: return false;
@@ -176,13 +187,14 @@ bool validDeclaration(uint32_t declaration, uint32_t token, ShaderStage stage)
 	const auto index = registerIndex(token);
 	if (!(declaration & 0x80000000u) || !(token & 0x000f0000u))
 		return false;
-	if (stage != ShaderStage::Pixel20)
-		return registerClass(token) == RegisterClass::Input && index < 16 &&
-			(declaration & 0xfu) <= 13;
+	const auto semantic = (declaration & 0xfu) <= 13;
+	if (!isPixel(stage))
+		return semantic && ((registerClass(token) == RegisterClass::Input && index < 16) ||
+			(stage == ShaderStage::Vertex30 && registerClass(token) == RegisterClass::TexcoordOutput && index < 12));
 	switch (registerClass(token))
 	{
-		case RegisterClass::Input: return index < 2;
-		case RegisterClass::Texture: return index < 8;
+		case RegisterClass::Input: return stage == ShaderStage::Pixel30 ? semantic && index < 10 : index < 2;
+		case RegisterClass::Texture: return stage == ShaderStage::Pixel20 && index < 8;
 		case RegisterClass::Sampler:
 		{
 			const unsigned type = (declaration >> 27) & 0xfu;
@@ -197,15 +209,20 @@ bool validShaderInstruction(Words words, ShaderStage stage, size_t &length)
 	const auto token = words.front();
 	const auto opcode = token & 0xffffu;
 	const bool legacy = stage == ShaderStage::Vertex11;
-	const bool vertex = stage != ShaderStage::Pixel20;
+	const bool vertex = !isPixel(stage);
 	const unsigned control = (token >> 16) & 0xffu;
-	const size_t operands = shaderOperands(opcode);
+	const size_t operands = opcode == 0x25 && stage == ShaderStage::Vertex30 ? 2 : shaderOperands(opcode);
 	const size_t encoded = (token >> 24) & 0xfu;
 	length = legacy ? operands : encoded;
 	if (operands >= 16 || length < operands || length >= words.size() - 1 ||
-		(legacy && encoded) || (token & 0xf0000000u) || control > (opcode == 0x42 ? 2u : 0u))
+		(legacy && encoded) || (token & 0xf0000000u) ||
+		control > (opcode == 0x29 ? 6u : opcode == 0x42 ? 2u : 0u))
 		return false;
 	const auto direct = [](uint32_t word) { return (word & 0x80002000u) == 0x80000000u; };
+	const auto scalarSource = [&](uint32_t word) {
+		const auto swizzle = (word >> 16) & 0xffu;
+		return direct(word) && validSource(word, stage) && swizzle == (swizzle & 3u) * 0x55u;
+	};
 	if (operands && !direct(words[opcode == 0x1f ? 2 : 1]))
 		return false;
 	switch (opcode)
@@ -214,16 +231,17 @@ bool validShaderInstruction(Words words, ShaderStage stage, size_t &length)
 		case 0x1f: return length == operands && validDeclaration(words[1], words[2], stage);
 		case 0x25:
 		{
-			if (length != operands || stage != ShaderStage::Vertex20 ||
+			if (length != operands || (stage != ShaderStage::Vertex20 && stage != ShaderStage::Vertex30) ||
 				registerClass(words[1]) != RegisterClass::Temporary || !validDestination(words[1], stage) ||
-				(words[1] & 0x000c0000u) || !direct(words[2]) || !validSource(words[2], stage))
+				(words[1] & 0x000c0000u) || !scalarSource(words[2]))
 				return false;
-			const auto swizzle = (words[2] >> 16) & 0xffu;
+			if (stage == ShaderStage::Vertex30)
+				return true;
 			const auto polynomial = [&](uint32_t word) {
 				return direct(word) && registerClass(word) == RegisterClass::Constant &&
 					((word >> 16) & 0xfffu) == 0xe4u && validSource(word, stage);
 			};
-			return swizzle == (swizzle & 3u) * 0x55u && polynomial(words[3]) && polynomial(words[4]) &&
+			return polynomial(words[3]) && polynomial(words[4]) &&
 				registerIndex(words[3]) != registerIndex(words[4]);
 		}
 		case 0x26: return length == operands && stage == ShaderStage::Vertex20 &&
@@ -231,7 +249,11 @@ bool validShaderInstruction(Words words, ShaderStage stage, size_t &length)
 			((words[1] >> 16) & 0xfffu) == 0xe4u;
 		case 0x28: return length == operands && stage == ShaderStage::Vertex20 &&
 			registerClass(words[1]) == RegisterClass::Boolean && registerIndex(words[1]) < 16;
-		case 0x27: case 0x2a: case 0x2b: return length == operands && stage == ShaderStage::Vertex20;
+		case 0x29: return length == operands && stage == ShaderStage::Vertex30 && control > 0 &&
+			scalarSource(words[1]) && scalarSource(words[2]);
+		case 0x27: return length == operands && stage == ShaderStage::Vertex20;
+		case 0x2a: case 0x2b: return length == operands &&
+			(stage == ShaderStage::Vertex20 || stage == ShaderStage::Vertex30);
 		case 0x30: return length == operands && stage == ShaderStage::Vertex20 &&
 			registerClass(words[1]) == RegisterClass::Integer && registerIndex(words[1]) < 16;
 		case 0x42: return length == operands && !vertex && direct(words[2]) && direct(words[3]) &&
@@ -424,10 +446,14 @@ std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 	for (; !bytes.empty(); bytes = bytes.subspan(4))
 		program.tokens.push_back(readWord(bytes));
 	auto words = Words(program.tokens);
-	const bool legacy = vertex && words.front() == 0xfffe0101u;
-	if (!legacy && words.front() != (vertex ? 0xfffe0200u : 0xffff0200u))
+	const auto version = words.front();
+	const bool legacy = vertex && version == 0xfffe0101u;
+	const bool modelThree = version == (vertex ? 0xfffe0300u : 0xffff0300u);
+	if (!legacy && !modelThree && version != (vertex ? 0xfffe0200u : 0xffff0200u))
 		return std::nullopt;
-	const auto stage = legacy ? ShaderStage::Vertex11 : vertex ? ShaderStage::Vertex20 : ShaderStage::Pixel20;
+	const auto stage = legacy ? ShaderStage::Vertex11 :
+		vertex ? (modelThree ? ShaderStage::Vertex30 : ShaderStage::Vertex20) :
+		(modelThree ? ShaderStage::Pixel30 : ShaderStage::Pixel20);
 	words = words.subspan(1);
 	bool constantsSeen = false, preshaderSeen = false;
 	std::array<bool, 24> elseSeen{};
@@ -479,7 +505,7 @@ std::optional<Program> readProgram(std::span<const uint8_t> bytes, bool vertex)
 					return std::nullopt;
 				repeating = false;
 			}
-			if (opcode == 0x28)
+			if (opcode == 0x28 || opcode == 0x29)
 			{
 				if (nesting == elseSeen.size())
 					return std::nullopt;

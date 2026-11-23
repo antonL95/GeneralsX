@@ -212,6 +212,38 @@ TEST(RetailFxTest, ValidatesVertexShaderSineCosineOperands)
 	EXPECT_FALSE(accepts(0xfffe0200, 0x80030001, 0x80ff0004, 0xa0e40058, 0xa0e40100));
 }
 
+TEST(RetailFxTest, ValidatesShaderModelThreeWaterInstructions)
+{
+	const auto accepts = [](bool vertex, std::initializer_list<uint32_t> instructions) {
+		const uint32_t version = vertex ? 0xfffe0300 : 0xffff0300;
+		std::vector<uint32_t> words = {
+			version, 0x0008fffe, 0x42415443, 28, 0, version, 0, 0, 0, 0
+		};
+		words.insert(words.end(), instructions);
+		words.push_back(0x0000ffff);
+		return RetailFX::readProgram(encodeWords(words), vertex).has_value();
+	};
+	EXPECT_TRUE(accepts(true, {
+		0x0200001f, 0x80000000, 0xe00f0000,
+		0x02050029, 0x80ff0000, 0x81ff0000,
+		0x02000025, 0x80030001, 0x80000002,
+		0x0000002b,
+		0x02000001, 0xe00f0000, 0x80e40000
+	}));
+	EXPECT_TRUE(accepts(false, {
+		0x0200001f, 0x80060005, 0x900f0007,
+		0x0200001f, 0x90000000, 0xa00f0800,
+		0x03000042, 0x800f0000, 0x90e40007, 0xa0e40800,
+		0x02000001, 0x800f0800, 0x80e40000
+	}));
+	EXPECT_FALSE(accepts(true, {0x0200001f, 0x80000000, 0xe00f000c}));
+	EXPECT_FALSE(accepts(true, {0x02000025, 0x80030001, 0x80e40002}));
+	EXPECT_FALSE(accepts(true, {0x02070029, 0x80ff0000, 0x81ff0000, 0x0000002b}));
+	EXPECT_FALSE(accepts(true, {0x02050029, 0x80ff0000, 0x81ff0000}));
+	EXPECT_FALSE(accepts(false, {0x0200001f, 0x80060005, 0x900f000a}));
+	EXPECT_FALSE(accepts(false, {0x03000042, 0x800f0000, 0xb0e40000, 0xa0e40800}));
+}
+
 TEST(RetailFxTest, EvaluatesParticlePreshaderComparisons)
 {
 	const uint32_t words[] = {
