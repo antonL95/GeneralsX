@@ -571,7 +571,8 @@ void Path::computePointOnPath(
 	const Object* obj,
 	const LocomotorSet& locomotorSet,
 	const Coord3D& pos,
-	ClosestPointOnPathInfo& out
+	ClosestPointOnPathInfo& out,
+	Bool updateCache
 )
 {
 	CRCDEBUG_LOG(("Path::computePointOnPath() for %s", DebugDescribeObject(obj).str()));
@@ -582,7 +583,8 @@ void Path::computePointOnPath(
 
 	if (m_path == nullptr)
 	{
-		m_cpopValid = false;
+		if (updateCache)
+			m_cpopValid = false;
 		return;
 	}
 	out.layer = m_path->getLayer();
@@ -590,11 +592,13 @@ void Path::computePointOnPath(
 	if (m_cpopValid && m_cpopCountdown>0 && isReallyClose(pos, m_cpopIn))
 	{
 		out = m_cpopOut;
-		m_cpopCountdown--;
+		if (updateCache)
+			m_cpopCountdown--;
 		CRCDEBUG_LOG(("Path::computePointOnPath() end because we're really close"));
 		return;
 	}
-	m_cpopCountdown = MAX_CPOP;
+	if (updateCache)
+		m_cpopCountdown = MAX_CPOP;
 
 	// default pathPos to end of the path
 	out.posOnPath = *getLastNode()->getPosition();
@@ -820,7 +824,8 @@ void Path::computePointOnPath(
 		}
 	}
 
-	TheAI->pathfinder()->setDebugPathPosition( &out.posOnPath );
+	if (updateCache)
+		TheAI->pathfinder()->setDebugPathPosition( &out.posOnPath );
 
 	out.distAlongPath = totalPathLength - lengthAlongPathToPos;
 
@@ -834,9 +839,12 @@ void Path::computePointOnPath(
 		out.distAlongPath = lenDelta;
 	}
 
-	m_cpopIn = pos;
-	m_cpopOut = out;
-	m_cpopValid = true;
+	if (updateCache)
+	{
+		m_cpopIn = pos;
+		m_cpopOut = out;
+		m_cpopValid = true;
+	}
 	CRCDEBUG_LOG(("Path::computePointOnPath() end"));
 
 }
@@ -847,7 +855,7 @@ void Path::computePointOnPath(
 	Returns the goal position in goalPos.  This is intended for use with flying paths, that go
 	directly to the goal and don't consider obstacles.  jba.
  */
-Real Path::computeFlightDistToGoal( const Coord3D *pos, Coord3D& goalPos )
+Real Path::computeFlightDistToGoal( const Coord3D *pos, Coord3D& goalPos, Bool updateCache )
 {
 	if (m_path == nullptr)
 	{
@@ -859,7 +867,7 @@ Real Path::computeFlightDistToGoal( const Coord3D *pos, Coord3D& goalPos )
 	const PathNode *curNode = getFirstNode();
 	if (m_cpopRecentStart) {
 		curNode = m_cpopRecentStart;
-	} else {
+	} else if (updateCache) {
 		m_cpopRecentStart = curNode;
 	}
 	const PathNode *nextNode = curNode->getNextOptimized();
@@ -893,7 +901,7 @@ Real Path::computeFlightDistToGoal( const Coord3D *pos, Coord3D& goalPos )
 		if (dotProduct>=0) {
 			distance += dotProduct;
 			useNext = false;
-		}	else if (useNext) {
+		}	else if (useNext && updateCache) {
 			m_cpopRecentStart = nextNode;
 		}
 		curNode = nextNode;

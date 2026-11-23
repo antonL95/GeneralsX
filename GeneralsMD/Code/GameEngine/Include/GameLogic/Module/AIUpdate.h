@@ -447,7 +447,7 @@ public:
 	Bool isValidLocomotorPosition(const Coord3D* pos) const;
 	Bool isAircraftThatAdjustsDestination() const;  ///< True if is aircraft that doesn't stack destinations (missles for example do stack destinations.)
 	Real getCurLocomotorSpeed() const;
-	Real getLocomotorDistanceToGoal();
+	Real getLocomotorDistanceToGoal(Bool updatePathCache = TRUE);
 	const Locomotor *getCurLocomotor() const {return m_curLocomotor;}
 	Locomotor *getCurLocomotor() { return m_curLocomotor; }
 	LocomotorSetType getCurLocomotorSetType() const { return m_curLocomotorSet; }
@@ -750,6 +750,8 @@ public:
 	virtual void friend_notifyStateMachineChanged();
 
 private:
+	UpdateSleepTime updateRetailEngaged();
+	Bool isRetailAttackingBeyondEngagedDistance();
 	// this should only be called by load/save, or by chooseLocomotorSet.
 	// it does no sanity checking; it just jams it in.
 	Bool chooseLocomotorSetExplicit(LocomotorSetType wst);
@@ -874,6 +876,7 @@ private:
 	UnsignedInt m_retailPlannerIssuedFrame = 0;
 	UnsignedInt m_retailPlannerPathRevision = 0;
 	UnsignedInt m_retailPlannerBlockedRevision = 0;
+	UnsignedInt m_retailEngagedUntil = 0;
 	UnsignedInt m_weaponMovementHoldUntil = 0;
 	Bool m_fadedInPortal = FALSE;
 	UnsignedInt m_rampageUntil = 0;

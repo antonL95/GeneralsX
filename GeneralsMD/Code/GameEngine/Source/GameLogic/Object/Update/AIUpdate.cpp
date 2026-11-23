@@ -1155,6 +1155,76 @@ void AIUpdateInterface::friend_notifyStateMachineChanged()
 	wakeUpNow();
 }
 
+Bool AIUpdateInterface::isRetailAttackingBeyondEngagedDistance()
+{
+	const Object* object = getObject();
+	if (object->isEffectivelyDead())
+		return FALSE;
+	if (!object->getLogicModelConditions().test(MODELCONDITION_ATTACKING))
+	{
+		const auto* horde = dynamic_cast<const HordeAIUpdate*>(this);
+		if (!horde || !horde->hasActiveAttack())
+			return FALSE;
+	}
+
+	Real distance = 0.0f;
+	if (m_locomotorGoalType == POSITION_EXPLICIT)
+	{
+		const Coord3D* position = object->getPosition();
+		const Real dx = m_locomotorGoalData.x - position->x;
+		const Real dy = m_locomotorGoalData.y - position->y;
+		const Real dz = m_locomotorGoalData.z - position->z;
+		distance = WWMath::SqrtfOrigin(dx * dx + dy * dy + dz * dz);
+	}
+	else if (m_locomotorGoalType == POSITION_ON_PATH)
+	{
+		distance = m_path ? getLocomotorDistanceToGoal(FALSE) : 100.0f;
+	}
+	return distance > object->getTemplate()->getRotWKObjectData().maxDistanceForEngaged;
+}
+
+UpdateSleepTime AIUpdateInterface::updateRetailEngaged()
+{
+	Object* object = getObject();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const auto& flags = object->getLogicModelConditions();
+	const Bool engaged = flags.test(MODELCONDITION_ENGAGED);
+	if (object->isEffectivelyDead() || m_fearUntil > now)
+	{
+		if (engaged)
+			object->clearModelConditionState(MODELCONDITION_ENGAGED);
+		return UPDATE_SLEEP_FOREVER;
+	}
+
+	static const auto usingWeapons = MAKE_MODELCONDITION_MASK3(
+		MODELCONDITION_USING_WEAPON_A, MODELCONDITION_USING_WEAPON_B, MODELCONDITION_USING_WEAPON_C);
+	const Bool usingWeapon = flags.testForAny(usingWeapons);
+	if (!engaged)
+	{
+		if (usingWeapon)
+			object->setModelConditionState(MODELCONDITION_ENGAGED);
+		return UPDATE_SLEEP_FOREVER;
+	}
+
+	const UnsignedInt timeout = object->getTemplate()->getRotWKObjectData().engagedStateTimeout;
+	constexpr UnsignedInt framesPerTick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+	const UnsignedInt poll = RotwkDuration::engineFrames(timeout / framesPerTick / 2 + 1, LOGICFRAMES_PER_SECOND);
+	Object* anchor = HordeContain::getAnchor(object);
+	AIUpdateInterface* anchorAI = anchor ? anchor->getAI() : nullptr;
+	if (usingWeapon || isRetailAttackingBeyondEngagedDistance() ||
+		(anchorAI && anchorAI->isRetailAttackingBeyondEngagedDistance()))
+	{
+		m_retailEngagedUntil = now + timeout;
+		return UPDATE_SLEEP(poll);
+	}
+
+	if (now < m_retailEngagedUntil)
+		return UPDATE_SLEEP(std::min(poll, m_retailEngagedUntil - now));
+
+	object->clearModelConditionState(MODELCONDITION_ENGAGED);
+	return UPDATE_SLEEP_FOREVER;
+}
+
 //-------------------------------------------------------------------------------------------------
 /**
  * The "main loop" of the AI subsystem
@@ -1382,6 +1452,8 @@ UpdateSleepTime AIUpdateInterface::update()
 	UpdateSleepTime tmp = doLocomotor();
 	if (tmp < subMachineSleep)
 		subMachineSleep = tmp;
+	if (RetailFileLayers::enabled())
+		subMachineSleep = std::min(subMachineSleep, updateRetailEngaged());
 
 #ifdef ALLOW_DEMORALIZE
 	RELEASE_CRASH(("If ALLOW_DEMORALIZE is ever defined, this code must be redone to do proper SLEEPY updates. (srj)"));
@@ -2794,7 +2866,7 @@ Bool AIUpdateInterface::getTreatAsAircraftForLocoDistToGoal() const
 }
 
 //-------------------------------------------------------------------------------------------------
-Real AIUpdateInterface::getLocomotorDistanceToGoal()
+Real AIUpdateInterface::getLocomotorDistanceToGoal(Bool updatePathCache)
 {
 	switch (m_locomotorGoalType)
 	{
@@ -2831,12 +2903,12 @@ Real AIUpdateInterface::getLocomotorDistanceToGoal()
 				if (treatAsAircraft)
 				{
 					// airborne locomotor.  Get the goal and distance direct to the goal, don't consider obstacles.
-					dist =  getPath()->computeFlightDistToGoal(getObject()->getPosition(), goalPos);
+					dist = getPath()->computeFlightDistToGoal(getObject()->getPosition(), goalPos, updatePathCache);
 				}	else {
 					// Ground based locomotor.
 					ClosestPointOnPathInfo info;
 					CRCDEBUG_LOG(("AIUpdateInterface::getLocomotorDistanceToGoal() - calling computePointOnPath() for object %d", getObject()->getID()));
-					getPath()->computePointOnPath(getObject(), m_locomotorSet, *getObject()->getPosition(), info);
+					getPath()->computePointOnPath(getObject(), m_locomotorSet, *getObject()->getPosition(), info, updatePathCache);
 					goalPos = info.posOnPath;
 					dist = info.distAlongPath;
 				}
@@ -6027,6 +6099,11 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferBool(&m_rampageWeaponPrimed);
 		}, [this] {
 			m_rampageWeaponPrimed = FALSE;
+		} },
+		{ "engaged-deadline", [this](Xfer* x) {
+			x->xferUnsignedInt(&m_retailEngagedUntil);
+		}, [this] {
+			m_retailEngagedUntil = 0;
 		} }
 	});
 }
@@ -6129,6 +6206,8 @@ Bool AIUpdateInterface::fleeFromFear(const Object* source, UnsignedInt duration,
 	const auto previous = m_curLocomotorSet == LOCOMOTORSET_SCARED ? m_preFearLocomotorSet : m_curLocomotorSet;
 	const auto beginFear = [&]() {
 		m_fearUntil = now + duration;
+		if (retail)
+			self->clearModelConditionState(MODELCONDITION_ENGAGED);
 		if (retail && chooseLocomotorSet(LOCOMOTORSET_SCARED))
 			m_preFearLocomotorSet = previous;
 		self->setModelConditionState(condition);

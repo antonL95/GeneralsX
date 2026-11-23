@@ -490,6 +490,8 @@ public:
 		Real visionBonusTestRadius = 100.0f;
 		Real evaEventSecondDamageFarFromFirstScanRange = 0;
 		Real emotionRange = 0;
+		Real maxDistanceForEngaged = 0;
+		UnsignedInt engagedStateTimeout = 0;
 		Real crushKnockback = 0;
 		Real crushZFactor = 0;
 		Real pathfindDiameter = 0;

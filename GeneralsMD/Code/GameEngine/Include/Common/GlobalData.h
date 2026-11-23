@@ -444,6 +444,8 @@ public:
 	Real m_retailScrollFactor = 1.0f;
 	Real m_retailScreenEdgeScrollSpeedFactor = 1.0f;
 	Real m_retailScreenEdgeScrollRampTime = 0.3f;
+	Real m_defaultMaxDistanceForEngaged = 30.0f;
+	UnsignedInt m_defaultEngagedStateTimeout = 2 * LOGICFRAMES_PER_SECOND;
 	Real m_retailDefaultCameraScrollSpeedScalar = 1.0f;
 	Bool m_drawScrollAnchor;					///< Set that the scroll anchor should be enabled
 	Bool m_moveScrollAnchor;					///< set that the scroll anchor should move

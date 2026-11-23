@@ -367,6 +367,11 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "DisplayNameStrategic", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.displayNameStrategic) },
 	{ "DisplayRangedDamage", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.displayRangedDamage) },
 	{ "EmotionRange", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.emotionRange) },
+	{ "EngagedStateTimeout", [](INI* ini, void*, void* store, const void*) {
+		if (!RetailFileLayers::enabled() && !INIAudit::isEnabled())
+			throw INI_UNKNOWN_TOKEN;
+		INI::parseDurationUnsignedInt(ini, nullptr, store, nullptr);
+	}, nullptr, offsetof(ThingTemplate, m_rotwk.engagedStateTimeout) },
 	{ "EquivalentTo", INI::parseAsciiStringVector, nullptr, offsetof(ThingTemplate, m_rotwk.equivalentTo) },
 	{ "EvaEnemyObjectSightedAfterRespawnEvent", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEnemyObjectSightedAfterRespawnEvent) },
 	{ "EvaEnemyObjectSightedEvent", INI::parseAsciiString, nullptr, offsetof(ThingTemplate, m_rotwk.evaEnemyObjectSightedEvent) },
@@ -411,6 +416,11 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "LiveCameraOffset", INI::parseCoord3D, nullptr, offsetof(ThingTemplate, m_rotwk.liveCameraOffset) },
 	{ "LiveCameraPitch", INI::parseReal, nullptr, offsetof(ThingTemplate, m_rotwk.liveCameraPitch) },
 	{ "LocomotorSet", parseRotWKLocomotorSet, nullptr, offsetof(ThingTemplate, m_rotwk.locomotorSets) },
+	{ "MaxDistanceForEngaged", [](INI* ini, void*, void* store, const void*) {
+		if (!RetailFileLayers::enabled() && !INIAudit::isEnabled())
+			throw INI_UNKNOWN_TOKEN;
+		INI::parseReal(ini, nullptr, store, nullptr);
+	}, nullptr, offsetof(ThingTemplate, m_rotwk.maxDistanceForEngaged) },
 	{ "MaxVisionBonusPercent", INI::parsePercentToReal, nullptr, offsetof(ThingTemplate, m_rotwk.maxVisionBonusPercent) },
 	{ "MinCrushVelocityPercent", INI::parsePercentToReal, nullptr, offsetof(ThingTemplate, m_rotwk.minCrushVelocityPercent) },
 	{ "MinVisionBonusPercent", INI::parsePercentToReal, nullptr, offsetof(ThingTemplate, m_rotwk.minVisionBonusPercent) },
@@ -1523,6 +1533,12 @@ ThingTemplate::ThingTemplate() :
 	m_shadowOffsetX = 0.0f;
 	m_shadowOffsetY = 0.0f;
 	m_occlusionDelay = TheGlobalData->m_defaultOcclusionDelay;
+
+	if (RetailFileLayers::enabled())
+	{
+		m_rotwk.maxDistanceForEngaged = TheGlobalData->m_defaultMaxDistanceForEngaged;
+		m_rotwk.engagedStateTimeout = TheGlobalData->m_defaultEngagedStateTimeout;
+	}
 
 	m_structureRubbleHeight = 0;
 	m_instanceScaleFuzziness = 0;
