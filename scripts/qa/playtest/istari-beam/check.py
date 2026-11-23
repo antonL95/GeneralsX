@@ -8,17 +8,24 @@ render_env = {"GENERALSX_TEST_PARTICLE_MODEL": "1", "PLAYTEST_STATIC_CAPTURES": 
 
 
 def check(log):
-    traces = [(int(frame), name, float(x), float(y)) for frame, name, x, y in re.findall(
-        r"TEST particle-model (\d+) (\S+) y-axis=([\d.-]+),([\d.-]+),[\d.-]+",
-        log,
-    )]
-    for first, last, particle, target in (
-        (40, 146, "GandalfIstariLightRays", (110, 0)),
-        (160, 238, "EvilEyeLightRaysAotR", (110, 0)),
-        (245, 312, "GandalfIstariLightRays", (0, 110)),
+    vector = r"([\d.-]+,[\d.-]+,[\d.-]+)"
+    targets = {system: tuple(map(float, direction.split(","))) for system, direction in re.findall(
+        rf"TEST particle-aim id=(\d+) direction={vector}", log
+    )}
+    traces = [(int(frame), name, system, tuple(map(float, axis.split(","))))
+              for frame, name, system, axis in re.findall(
+                  rf"TEST particle-model (\d+) (\S+) id=(\d+) y-axis={vector}", log
+              )]
+    for first, last, particle in (
+        (40, 146, "GandalfIstariLightRays"),
+        (160, 238, "EvilEyeLightRaysAotR"),
+        (245, 312, "GandalfIstariLightRays"),
     ):
-        scores = [-(x * target[0] + y * target[1]) / (math.hypot(x, y) * math.hypot(*target))
-                  for frame, name, x, y in traces if first <= frame <= last and name == particle]
+        scores = []
+        for frame, name, system, axis in traces:
+            if first <= frame <= last and name == particle:
+                target = targets[system]
+                scores.append(-sum(a * b for a, b in zip(axis, target)) / (math.hypot(*axis) * math.hypot(*target)))
         if not scores:
             raise RuntimeError(f"{particle} emitted no drawable shaft in frames {first}–{last}")
         if min(scores) < 0.9:

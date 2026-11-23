@@ -104,9 +104,9 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 			transform.Scale(size.x, size.y, size.z);
 			transform.Set_Translation(Vector3(position->x, position->y, position->z));
 			if (target && traceTargetMatrices)
-				std::fprintf(stderr, "TEST particle-model %u %s y-axis=%.5f,%.5f,%.5f\n",
+				std::fprintf(stderr, "TEST particle-model %u %s id=%d y-axis=%.5f,%.5f,%.5f\n",
 					TheGameClient->getFrame(), system->getTemplate()->getName().str(),
-					transform[0][1], transform[1][1], transform[2][1]);
+					system->getSystemID(), transform[0][1], transform[1][1], transform[2][1]);
 			model->Set_Transform(transform);
 			model->Set_Animation_Opacity(opacity);
 			unsigned tint = 0xFFFFFFFF;

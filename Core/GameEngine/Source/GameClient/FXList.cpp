@@ -1379,6 +1379,13 @@ protected:
 							aim.Rotate_Y(DEG_TO_RADF(180.0f) - WWMath::Atan2Origin(delta.z + 10.0f,
 								WWMath::Sqrt(delta.x * delta.x + delta.y * delta.y)));
 							sys->setRetailTargetMatrix(&aim);
+							if (std::getenv("GENERALSX_TEST_PARTICLE_MODEL"))
+							{
+								const Coord3D& source = thingToAttachTo ? *thingToAttachTo->getPosition() : *primary;
+								const Coord3D direction = *aimPosition - source;
+								std::fprintf(stderr, "TEST particle-aim id=%d direction=%.5f,%.5f,%.5f\n",
+									sys->getSystemID(), direction.x, direction.y, direction.z);
+							}
 						}
 						else
 							sys->setLocalTransform(mtx);
