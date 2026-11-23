@@ -70,3 +70,21 @@
 391 pkg67-power Player_2 Pkg67SoSCaster 0 Pkg67SoS4Power
 395 objupgrade Player_2 Pkg67HotWCaster 0 Pkg67HotW4Permit
 430 pkg67-power Player_2 Pkg67HotWCaster 0 Pkg67HotW4Power
+433 destroy Player_2 HaradNafaratiMarauderHorde 0
+433 destroy Player_2 HaradCaranLambar 0
+433 destroy Player_2 CreateAHero 0
+433 destroy Player_2 Pkg67BindingCaster 0
+433 destroy Player_2 Pkg67UnresolvedCaster 0
+433 destroy Player_2 Pkg67HotWCaster 0
+433 destroy Player_2 Pkg67SoSCaster 0
+433 destroy Player_2 Pkg67PoisonCaster 0
+433 destroy Player_2 Pkg67SelfBuffCaster 0
+433 destroy Player_1 Pkg67HeroTarget 3
+433 destroy Player_1 Pkg67HeroTarget 2
+433 destroy Player_1 Pkg67HeroTarget 1
+433 destroy Player_1 Pkg67HeroTarget 0
+433 destroy Player_1 Pkg67InfantryTarget 3
+433 destroy Player_1 Pkg67InfantryTarget 2
+433 destroy Player_1 Pkg67InfantryTarget 1
+433 destroy Player_1 Pkg67InfantryTarget 0
+433 destroy Player_1 Pkg67MachineTarget 0
