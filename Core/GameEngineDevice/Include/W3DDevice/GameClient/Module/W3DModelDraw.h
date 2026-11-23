@@ -109,6 +109,7 @@ private:
 	Int m_playbackMode = -1;
 	Real m_minSpeed = 1.0f;
 	Real m_maxSpeed = 1.0f;
+	Real m_blendFrames = 0.0f;
 	Bool m_useWeaponTiming = FALSE;
 	Int m_priority = 1;
 
@@ -124,10 +125,11 @@ public:
 	Bool isIdleAnim() const { return m_isIdleAnim; }
 	Real getDistanceCovered() const { return m_distanceCovered; }
 	Real getNaturalDurationInMsec() const { return m_naturalDurationInMsec; }
-	void setPlayback(RenderObjClass::AnimMode mode, Real minSpeed, Real maxSpeed);
+	void setPlayback(RenderObjClass::AnimMode mode, Real minSpeed, Real maxSpeed, Real blendFrames);
 	Int getPlaybackMode(Int stateMode) const { return m_playbackMode < 0 ? stateMode : m_playbackMode; }
 	Real getMinSpeed(Real stateSpeed) const { return m_playbackMode < 0 ? stateSpeed : m_minSpeed; }
 	Real getMaxSpeed(Real stateSpeed) const { return m_playbackMode < 0 ? stateSpeed : m_maxSpeed; }
+	Real getBlendFrames() const { return m_blendFrames; }
 	void setUseWeaponTiming(Bool useWeaponTiming) { m_useWeaponTiming = useWeaponTiming; }
 	Bool usesWeaponTiming() const { return m_useWeaponTiming; }
 	void setPriority(Int priority) { m_priority = priority; }

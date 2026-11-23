@@ -345,6 +345,7 @@ W3DAnimationInfo::W3DAnimationInfo( const W3DAnimationInfo &r ) :
 	m_playbackMode(r.m_playbackMode),
 	m_minSpeed(r.m_minSpeed),
 	m_maxSpeed(r.m_maxSpeed),
+	m_blendFrames(r.m_blendFrames),
 	m_useWeaponTiming(r.m_useWeaponTiming),
 	m_priority(r.m_priority)
 {
@@ -364,6 +365,7 @@ W3DAnimationInfo& W3DAnimationInfo::operator=(const W3DAnimationInfo &r)
 	m_playbackMode = r.m_playbackMode;
 	m_minSpeed = r.m_minSpeed;
 	m_maxSpeed = r.m_maxSpeed;
+	m_blendFrames = r.m_blendFrames;
 	m_useWeaponTiming = r.m_useWeaponTiming;
 	m_priority = r.m_priority;
 
@@ -378,11 +380,12 @@ W3DAnimationInfo& W3DAnimationInfo::operator=(const W3DAnimationInfo &r)
 }
 
 
-void W3DAnimationInfo::setPlayback(RenderObjClass::AnimMode mode, Real minSpeed, Real maxSpeed)
+void W3DAnimationInfo::setPlayback(RenderObjClass::AnimMode mode, Real minSpeed, Real maxSpeed, Real blendFrames)
 {
 	m_playbackMode = mode;
 	m_minSpeed = minSpeed;
 	m_maxSpeed = maxSpeed;
+	m_blendFrames = blendFrames;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2611,6 +2614,13 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 				{
 					m_animationMode = mode;
 					m_renderObject->Set_Animation(animHandle, startFrame, RenderObjClass::ANIM_MODE_MANUAL);
+				}
+				else if (RetailFileLayers::enabled() && !restartCurrent && !m_pauseAnimation &&
+					animInfo.getBlendFrames() > 0.0f && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD &&
+					!(TheGameState && TheGameState->isInLoadGame()))
+				{
+					static_cast<HLodClass*>(m_renderObject)->Set_Animation_With_Blend(animHandle, startFrame, mode,
+						animInfo.getBlendFrames());
 				}
 				else
 					m_renderObject->Set_Animation(animHandle, startFrame, mode);
@@ -4901,17 +4911,21 @@ void W3DModelDraw::traceAnimationState() const
 	if (std::none_of(traced.begin(), traced.end(), [&](const AsciiString& entry) { return entry.compareNoCase(name) == 0; }))
 		return;
 
-	const ModelConditionFlags& conditions = draw->getModelConditionFlags();
-	std::string flags;
-	for (Int i = 0; i < conditions.size(); ++i)
+	const auto flagNames = [](const ModelConditionFlags& conditions)
 	{
-		const char* bit = conditions.getBitNameIfSet(i);
-		if (bit == nullptr)
-			continue;
-		if (!flags.empty())
-			flags += ',';
-		flags += bit;
-	}
+		std::string flags;
+		for (Int i = 0; i < conditions.size(); ++i)
+		{
+			const char* bit = conditions.getBitNameIfSet(i);
+			if (bit == nullptr)
+				continue;
+			if (!flags.empty())
+				flags += ',';
+			flags += bit;
+		}
+		return flags;
+	};
+	const std::string flags = flagNames(draw->getModelConditionFlags());
 	const char* clip = "-";
 	if (m_curState != nullptr && m_whichAnimInCurState >= 0)
 		clip = m_curState->m_animations[m_whichAnimInCurState].getName().str();
@@ -4919,8 +4933,37 @@ void W3DModelDraw::traceAnimationState() const
 	Int numFrames = 0;
 	Int mode = 0;
 	Real multiplier = 1.0f;
-	if (m_renderObject && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD)
-		static_cast<HLodClass*>(m_renderObject)->Peek_Animation_And_Info(frame, numFrames, mode, multiplier);
+	auto* hlod = m_renderObject && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD
+		? static_cast<HLodClass*>(m_renderObject) : nullptr;
+	HAnimClass* animation = hlod ? hlod->Peek_Animation_And_Info(frame, numFrames, mode, multiplier) : nullptr;
+	static const Bool gaitTrace = std::getenv("GENERALSX_TEST_GAITTRACE") != nullptr;
+	if (gaitTrace)
+	{
+		if (!animation)
+			return;
+
+		const ModelConditionInfo* state = m_curState ? m_curState->m_animationState : nullptr;
+		const auto required = state && !state->m_conditionsYesVec.empty() ? flagNames(state->m_conditionsYesVec.front()) : "";
+		const AsciiString stateName = state && state->m_transitionKey != NAMEKEY_INVALID
+			? TheNameKeyGenerator->keyToName(state->m_transitionKey) : AsciiString();
+		const Coord3D& position = *draw->getPosition();
+		std::string logicFlags = flags;
+#if !RTS_GENERALS
+		if (const Object* object = draw->getObject())
+			logicFlags = flagNames(object->getLogicModelConditions());
+#endif
+		float blendWeight;
+		float blendDuration;
+		const HAnimClass* blendSource = hlod->Peek_Animation_Blend_Source(blendWeight, blendDuration);
+		std::fprintf(stderr, "TEST gait frame=%u id=%u actor=%s module=%s state=%s requires=%s flags=%s clip=%s mode=%d pose=%.3f length=%d fps=%.3f rate=%.5f authored=%.5f distance=%.3f x=%.4f y=%.4f blend=%.4f blend_frames=%.3f blend_from=%s logic=%s\n",
+			TheGameLogic->getFrame(), static_cast<unsigned>(draw->getID()), name.str(),
+			TheNameKeyGenerator->keyToName(getModuleTagNameKey()).str(),
+			stateName.isEmpty() ? "-" : stateName.str(), required.empty() ? "-" : required.c_str(),
+			flags.empty() ? "-" : flags.c_str(), clip, mode, frame, numFrames, animation->Get_Frame_Rate(),
+			multiplier, m_authoredAnimationSpeed, getCurAnimDistanceCovered(), position.x, position.y,
+			blendWeight, blendDuration, blendSource ? blendSource->Get_Name() : "-", logicFlags.empty() ? "-" : logicFlags.c_str());
+		return;
+	}
 	std::string subObjects;
 	if (m_renderObject)
 	{

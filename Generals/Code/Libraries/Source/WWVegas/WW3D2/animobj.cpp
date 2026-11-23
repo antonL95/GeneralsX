@@ -67,6 +67,8 @@
 #include "WWDebug/wwmemlog.h"
 #include "animatedsoundmgr.h"
 
+#include <algorithm>
+
 
 /***********************************************************************************************
  * Animatable3DObjClass::Animatable3DObjClass -- constructor                                   *
@@ -237,6 +239,7 @@ Animatable3DObjClass & Animatable3DObjClass::operator = (const Animatable3DObjCl
  *=============================================================================================*/
 void Animatable3DObjClass::Release()
 {
+	REF_PTR_RELEASE(BlendSource.Motion);
 	switch (CurMotionMode) {
 
 		case BASE_POSE:
@@ -498,6 +501,32 @@ void Animatable3DObjClass::Set_Animation(HAnimClass * motion, float frame, int m
 	Set_Hierarchy_Valid(false);
 }
 
+
+void Animatable3DObjClass::Set_Animation_With_Blend(HAnimClass* motion, float frame, int mode, float blendFrames)
+{
+	if (CurMotionMode != SINGLE_ANIM || !ModeAnim.Motion || !motion || !(blendFrames > 0.0f) ||
+		motion->Get_Num_Frames() <= 1 || stricmp(ModeAnim.Motion->Get_HName(), motion->Get_HName()) != 0)
+	{
+		Set_Animation(motion, frame, mode);
+		return;
+	}
+
+	AnimationTrack source = BlendSource.Motion && BlendRemainingFrames >= BlendTotalFrames * 0.5f
+		? BlendSource : ModeAnim;
+	source.Motion->Add_Ref();
+	Set_Animation(motion, frame, mode);
+	source.LastSyncTime = ModeAnim.LastSyncTime;
+	BlendSource = source;
+	BlendTotalFrames = std::min(blendFrames, static_cast<float>(motion->Get_Num_Frames() - 1));
+	BlendRemainingFrames = BlendTotalFrames;
+}
+
+const HAnimClass* Animatable3DObjClass::Peek_Animation_Blend_Source(float& weight, float& duration) const
+{
+	weight = BlendSource.Motion ? 1.0f - BlendRemainingFrames / BlendTotalFrames : 1.0f;
+	duration = BlendSource.Motion ? BlendTotalFrames : 0.0f;
+	return BlendSource.Motion;
+}
 
 /***********************************************************************************************
  * Animatable3DObjClass::Set_Animation -- set the animation state to a blend of two anims      *
@@ -791,10 +820,14 @@ void Animatable3DObjClass::Update_Sub_Object_Transforms()
 
 		case SINGLE_ANIM:
 
-			if ( ModeAnim.AnimMode != ANIM_MODE_MANUAL ) {
+			if ( ModeAnim.AnimMode != ANIM_MODE_MANUAL || BlendSource.Motion ) {
 				Single_Anim_Progress();
 			}
-			Anim_Update(Transform,ModeAnim.Motion,ModeAnim.Frame);
+			if (BlendSource.Motion)
+				Blend_Update(Transform, BlendSource.Motion, BlendSource.Frame, ModeAnim.Motion, ModeAnim.Frame,
+					1.0f - BlendRemainingFrames / BlendTotalFrames);
+			else
+				Anim_Update(Transform, ModeAnim.Motion, ModeAnim.Frame);
 
 			/*
 			**	Play any sounds that are triggered by this frame of animation
@@ -932,34 +965,35 @@ bool Animatable3DObjClass::Simple_Evaluate_Bone(int boneindex, float frame, Matr
  * HISTORY:                                                                                    *
  *   04/13/2000    PDS : Created.                                                              *
  *=============================================================================================*/
-float Animatable3DObjClass::Compute_Current_Frame(float *newDirection) const
+float Animatable3DObjClass::Compute_Current_Frame(float *newDirection, const AnimationTrack* track) const
 {
+	const AnimationTrack& animation = track ? *track : ModeAnim;
 	float frame = 0;
-	float direction = ModeAnim.animDirection;
+	float direction = animation.animDirection;
 
 	switch (CurMotionMode)
 	{
 		case SINGLE_ANIM:
 		{
-			frame = ModeAnim.Frame;
+			frame = animation.Frame;
 
-			if (ModeAnim.AnimMode != ANIM_MODE_MANUAL) {
+			if (animation.AnimMode != ANIM_MODE_MANUAL) {
 				//
 				//	Compute the current frame based on elapsed time.
 				//	TheSuperHackers @info Is using elapsed time because frame computation is not guaranteed to be called every render frame!
 				//
 				// TheSuperHackers @tweak The animation render update is now decoupled from the logic step.
-				const float syncMilliseconds = WW3D::Get_Logic_Time_Milliseconds() - ModeAnim.LastSyncTime;
-				const float animMilliseconds = ModeAnim.Motion->Get_Frame_Rate() * ModeAnim.frameRateMultiplier * ModeAnim.animDirection * syncMilliseconds;
+				const float syncMilliseconds = WW3D::Get_Logic_Time_Milliseconds() - animation.LastSyncTime;
+				const float animMilliseconds = animation.Motion->Get_Frame_Rate() * animation.frameRateMultiplier * animation.animDirection * syncMilliseconds;
 				const float animSeconds = animMilliseconds * 0.001f;
 				frame += animSeconds;
 
 				//
 				//	Wrap the frame
 				//
-				const int numFrames = ModeAnim.Motion->Get_Num_Frames() - 1;
+				const int numFrames = animation.Motion->Get_Num_Frames() - 1;
 
-				switch (ModeAnim.AnimMode)
+				switch (animation.AnimMode)
 				{
 					case ANIM_MODE_ONCE:
 						if (frame >= numFrames) {
@@ -990,7 +1024,7 @@ float Animatable3DObjClass::Compute_Current_Frame(float *newDirection) const
 						}
 						break;
 					case ANIM_MODE_LOOP_PINGPONG:
-						if (ModeAnim.animDirection >= 1.0f)
+						if (animation.animDirection >= 1.0f)
 						{
 							//playing forwards, reverse direction
 							if (frame >= numFrames)
@@ -1000,7 +1034,7 @@ float Animatable3DObjClass::Compute_Current_Frame(float *newDirection) const
 								// If it is still too far out, reset
 								if ( frame >= numFrames - 1 )
 									frame = numFrames;
-								direction = ModeAnim.animDirection * -1.0f;
+								direction = animation.animDirection * -1.0f;
 							}
 						}
 						else
@@ -1013,7 +1047,7 @@ float Animatable3DObjClass::Compute_Current_Frame(float *newDirection) const
 								// If it is still too far out, reset
 								if ( frame >= numFrames )
 										frame = 0;
-								direction = ModeAnim.animDirection * -1.0f;
+								direction = animation.animDirection * -1.0f;
 							}
 						}
 						break;
@@ -1047,6 +1081,23 @@ void Animatable3DObjClass::Single_Anim_Progress ()
 	//
 	WWASSERT(CurMotionMode == SINGLE_ANIM);
 
+	if (BlendSource.Motion)
+	{
+		const int time = WW3D::Get_Logic_Time_Milliseconds();
+		const float elapsed = (time - ModeAnim.LastSyncTime) * 0.001f;
+		BlendRemainingFrames -= elapsed * ModeAnim.Motion->Get_Frame_Rate() * ModeAnim.frameRateMultiplier;
+		if (BlendRemainingFrames > 0.0f)
+		{
+			BlendSource.frameRateMultiplier = ModeAnim.frameRateMultiplier;
+			BlendSource.Frame = Compute_Current_Frame(&BlendSource.animDirection, &BlendSource);
+			BlendSource.LastSyncTime = time;
+		}
+		else
+		{
+			REF_PTR_RELEASE(BlendSource.Motion);
+		}
+	}
+
 	//
 	// Update the frame number and sync time
 	//
@@ -1070,6 +1121,8 @@ void Animatable3DObjClass::Single_Anim_Progress ()
  *=============================================================================================*/
 bool	Animatable3DObjClass::Is_Animation_Complete() const
 {
+	if (BlendSource.Motion)
+		return false;
 	if (CurMotionMode == SINGLE_ANIM) {
 
 		if ( ModeAnim.AnimMode == ANIM_MODE_ONCE ) {

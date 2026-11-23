@@ -221,7 +221,7 @@ void W3DScriptedModelDrawModuleData::parseAnimationState(INI* ini, void* instanc
 		name.toLower();
 		state.draw.m_animations.emplace_back(name, type == StateType::Idle, animation.distance);
 		state.draw.m_animations.back().setPlayback(static_cast<RenderObjClass::AnimMode>(animation.mode),
-			animation.minSpeed, animation.maxSpeed);
+			animation.minSpeed, animation.maxSpeed, animation.blendTime < 0.0f ? Animation::DEFAULT_BLEND_FRAMES : animation.blendTime);
 		state.draw.m_animations.back().setUseWeaponTiming(animation.useWeaponTiming);
 		state.draw.m_animations.back().setPriority(animation.priority);
 	}
@@ -244,7 +244,7 @@ void W3DScriptedModelDrawModuleData::parseAnimation(INI* ini, void* instance, vo
 		{ "AnimationMode", INI::parseIndexList, TheAnimModeNames, offsetof(Animation, mode) },
 		{ "AnimationName", INI::parseAsciiString, nullptr, offsetof(Animation, name) },
 		{ "AnimationPriority", INI::parseInt, nullptr, offsetof(Animation, priority) },
-		{ "AnimationBlendTime", INI::parseInt, nullptr, offsetof(Animation, blendTime) },
+		{ "AnimationBlendTime", INI::parseReal, nullptr, offsetof(Animation, blendTime) },
 		{ "Distance", INI::parseReal, nullptr, offsetof(Animation, distance) },
 		{ "FadeBeginFrame", INI::parseReal, nullptr, offsetof(Animation, fadeBeginFrame) },
 		{ "FadeEndFrame", INI::parseReal, nullptr, offsetof(Animation, fadeEndFrame) },

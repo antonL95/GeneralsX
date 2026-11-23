@@ -1,0 +1,10 @@
+10 create Player_1 GondorKnightHorde 0 2320,1100,0
+11 reveal Player_1 GondorKnightHorde 0
+32 move Player_1 GondorKnightHorde 0 - 2820 1100
+96 move Player_1 GondorKnightHorde 0 - 2520 835
+146 move Player_1 GondorKnightHorde 0 - 2520 1200
+204 steering-path Player_1 GondorKnightHorde 0
+205 select Player_1 GondorKnightHorde 0
+205 steering-stop - - 0
+210 steering-path Player_1 GondorKnightHorde 0
+225 steering-path Player_1 GondorKnightHorde 0

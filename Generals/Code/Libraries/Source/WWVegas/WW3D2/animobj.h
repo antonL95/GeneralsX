@@ -93,6 +93,9 @@ public:
 
 	virtual HAnimClass *	Peek_Animation_And_Info(float& frame, int& numFrames, int& mode, float& mult);	// 020710 srj -- added
 
+	void Set_Animation_With_Blend(HAnimClass* motion, float frame, int mode, float blendFrames);
+	const HAnimClass* Peek_Animation_Blend_Source(float& weight, float& duration) const;
+
 	virtual HAnimClass *			Peek_Animation() override;
 	virtual bool					Is_Animation_Complete() const;
 	virtual int						Get_Num_Bones() override;
@@ -122,8 +125,18 @@ public:
 
 protected:
 
+	struct AnimationTrack {
+		HAnimClass* Motion;
+		float Frame;
+		float PrevFrame;
+		int AnimMode;
+		int LastSyncTime;
+		float animDirection;
+		float frameRateMultiplier;
+	};
+
 	// internally used to compute the current frame if the object is in ANIM_MODE_MANUAL
-	float								Compute_Current_Frame(float *newDirection=nullptr) const;
+	float								Compute_Current_Frame(float *newDirection=nullptr, const AnimationTrack* track=nullptr) const;
 
 	// Update the sub-object transforms according to the current anim state and root transform.
 	virtual	void					Update_Sub_Object_Transforms() override;
@@ -178,17 +191,13 @@ protected:
 
 	int								CurMotionMode;
 
+	AnimationTrack BlendSource{};
+	float BlendTotalFrames = 0.0f;
+	float BlendRemainingFrames = 0.0f;
+
 	union {
 		// CurMotionMode == SINGLE_ANIM
-    struct {
-			HAnimClass *			Motion;
-			float		  				Frame;
-			float						PrevFrame;
-			int						AnimMode;
-			int								LastSyncTime;
-			float							animDirection;
-			float							frameRateMultiplier;	// 020607 srj -- added
-		} ModeAnim;
+		AnimationTrack ModeAnim;
 
 		// CurMotionMode == DOUBLE_ANIM
 		struct {

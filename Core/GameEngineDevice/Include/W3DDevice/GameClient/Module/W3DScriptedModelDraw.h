@@ -65,6 +65,8 @@ public:
 
 	struct Animation
 	{
+		static constexpr Real DEFAULT_BLEND_FRAMES = 5.0f;
+
 		AsciiString label;
 		AsciiString name;
 		Int mode = RenderObjClass::ANIM_MODE_ONCE;
@@ -72,7 +74,7 @@ public:
 		Real maxSpeed = 1.0f;
 		Real distance = 0.0f;
 		Int priority = 1;
-		Int blendTime = 0;
+		Real blendTime = DEFAULT_BLEND_FRAMES;
 		Real fadeBeginFrame = 0.0f;
 		Real fadeEndFrame = 0.0f;
 		Bool fadingIn = FALSE;
