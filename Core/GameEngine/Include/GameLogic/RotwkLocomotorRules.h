@@ -15,6 +15,8 @@ struct Authored
 	float chargeSpeedFraction = 1.0f;
 	float walkDistance = 0.0f;
 	float accelDecelTrigger = -1.0f;
+	float turnThreshold = FULL_TURN / 24.0f;
+	bool enableHighSpeedTurnModelConditions = true;
 	bool burningDeathIsCavalry = false;
 	bool chargeAvailable = false;
 	bool chargeIgnoresCondition = false;

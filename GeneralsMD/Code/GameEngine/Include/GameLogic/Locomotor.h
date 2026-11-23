@@ -459,6 +459,7 @@ protected:
 	void maintainCurrentPositionWings(Object* obj, PhysicsBehavior *physics);
 
 	PhysicsTurningType rotateTowardsPosition(Object* obj, const Coord3D& goalPos, Real *relAngle=nullptr);
+	void updateRetailTurnConditions(Object* obj, Real requestedTurn) const;
 
 	/*
 		return true if we can maintain the position without being called every frame (eg, we are

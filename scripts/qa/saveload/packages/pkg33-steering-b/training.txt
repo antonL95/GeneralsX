@@ -1,0 +1,13 @@
+160 create Player_1 GondorPippin 0 3150,950,0
+175 move Player_1 GondorPippin 0 - 3390 950
+239 move Player_1 GondorPippin 0 - 3260 1160
+279 select Player_1 GondorPippin 0
+279 steering-stop - - 0
+292 move Player_1 GondorPippin 0 - 3050 1010
+340 move Player_1 GondorPippin 0 - 3175 1240
+344 select Player_1 GondorPippin 0
+344 steering-stop - - 0
+360 move Player_1 GondorPippin 0 - 3400 980
+381 create Player_1 MordorAttackTroll 0 3150,1350,0
+392 move Player_1 MordorAttackTroll 0 - 3390 1350
+449 move Player_1 MordorAttackTroll 0 - 3260 1170

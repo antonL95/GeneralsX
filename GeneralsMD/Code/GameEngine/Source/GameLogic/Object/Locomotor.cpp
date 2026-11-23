@@ -738,6 +738,8 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "ChargeSpeed", parseRotwkField<INI::parsePercentToReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeSpeedFraction) },
 		{ "WalkDistance", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.walkDistance) },
 		{ "AccDecTrigger", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.accelDecelTrigger) },
+		{ "TurnThreshold", parseRotwkField<INI::parseAngleReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.turnThreshold) },
+		{ "EnableHighSpeedTurnModelconditions", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.enableHighSpeedTurnModelConditions) },
 
 		{ "RudderCorrectionDegree",		 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionDegree) }, // Added in Zero Hour
 		{ "RudderCorrectionRate",			 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionRate) }, // Added in Zero Hour
@@ -1195,18 +1197,25 @@ Real Locomotor::getMaxLift(BodyDamageType condition) const
 }
 
 //-------------------------------------------------------------------------------------------------
-static void setCavalryTurning(Object* obj, PhysicsBehavior* physics, Real turn)
+void Locomotor::updateRetailTurnConditions(Object* obj, Real requestedTurn) const
 {
-	const Real animationThreshold = 0.02f;
-	physics->setTurning(turn > 0.0f ? TURN_POSITIVE : turn < 0.0f ? TURN_NEGATIVE : TURN_NONE);
-	if (turn > animationThreshold)
-		obj->setModelConditionState(MODELCONDITION_TURN_LEFT);
-	else
-		obj->clearModelConditionState(MODELCONDITION_TURN_LEFT);
-	if (turn < -animationThreshold)
-		obj->setModelConditionState(MODELCONDITION_TURN_RIGHT);
-	else
-		obj->clearModelConditionState(MODELCONDITION_TURN_RIGHT);
+	if (!RetailFileLayers::enabled())
+		return;
+
+	static const ModelConditionFlags turnMask = MAKE_MODELCONDITION_MASK4(MODELCONDITION_TURN_LEFT,
+		MODELCONDITION_TURN_RIGHT, MODELCONDITION_TURN_LEFT_HIGH_SPEED, MODELCONDITION_TURN_RIGHT_HIGH_SPEED);
+	ModelConditionFlags conditions;
+	if (requestedTurn != 0.0f && fabs(requestedTurn) > m_template->m_rotwk.turnThreshold)
+	{
+		const Real halfSpeed = 0.5f * getMaxSpeedForCondition(obj->getBodyModule()->getDamageState(), obj);
+		const Coord3D& velocity = *obj->getPhysics()->getVelocity();
+		const Bool highSpeed = sqr(velocity.x) + sqr(velocity.y) > sqr(halfSpeed);
+		if (highSpeed && m_template->m_rotwk.enableHighSpeedTurnModelConditions)
+			conditions.set(requestedTurn > 0.0f ? MODELCONDITION_TURN_LEFT_HIGH_SPEED : MODELCONDITION_TURN_RIGHT_HIGH_SPEED);
+		else if (!highSpeed)
+			conditions.set(requestedTurn > 0.0f ? MODELCONDITION_TURN_LEFT : MODELCONDITION_TURN_RIGHT);
+	}
+	obj->clearAndSetModelConditionFlags(turnMask, conditions);
 }
 
 Bool Locomotor::usesCavalrySteering(const Object* obj) const
@@ -1233,6 +1242,7 @@ void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle)
 	// Skip moveTowardsAngle if physics say you're stunned
 	if(physics->getIsStunned())
 	{
+		updateRetailTurnConditions(obj, 0.0f);
 		return;
 	}
 
@@ -1370,6 +1380,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	// Skip moveTowardsPosition if physics say you're stunned
 	if(physics->getIsStunned())
 	{
+		updateRetailTurnConditions(obj, 0.0f);
 		return;
 	}
 
@@ -2627,9 +2638,14 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 		Real dx =goalPos.x - turnPos.x;
 		Real dy = goalPos.y - turnPos.y;
 		// If we are very close to the goal, we twitch due to rounding error.  So just return. jba.
-		if (fabs(dx)<0.1f && fabs(dy)<0.1f) return TURN_NONE;
+		if (fabs(dx)<0.1f && fabs(dy)<0.1f)
+		{
+			updateRetailTurnConditions(obj, 0.0f);
+			return TURN_NONE;
+		}
 		Real desiredAngle = WWMath::Atan2Origin(dy, dx);
 		Real amount = stdAngleDiff(desiredAngle, angle);
+		updateRetailTurnConditions(obj, amount);
 		if (relAngle) *relAngle = amount;
 		if (amount>maxTurnRate) {
 			amount = maxTurnRate;
@@ -2668,6 +2684,7 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 	{
 		Real desiredAngle = WWMath::Atan2Origin(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 		Real amount = stdAngleDiff(desiredAngle, angle);
+		updateRetailTurnConditions(obj, amount);
 		if (relAngle) *relAngle = amount;
 		if (amount>maxTurnRate) {
 			amount = maxTurnRate;
@@ -2924,6 +2941,7 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 	if (HordeAIUpdate::isReforming(obj->getAI()))
 	{
 		physics->setTurning(TURN_NONE);
+		updateRetailTurnConditions(obj, 0.0f);
 		steerVelocity(obj, physics, *obj->getUnitDirectionVector2D(), 0.0f, 0.0f);
 		return;
 	}
@@ -2935,7 +2953,10 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 	dirToApplyForce.z = 0.0f;
 	const Real distToGoal = dirToApplyForce.length();
 	if (distToGoal < SLIDE_IN_PLACE_DISTANCE)
+	{
 		dirToApplyForce = *obj->getUnitDirectionVector2D();
+		updateRetailTurnConditions(obj, 0.0f);
+	}
 	else
 	{
 		dirToApplyForce.x /= distToGoal;
@@ -2956,11 +2977,14 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 		{
 			obj->setOrientation(desiredAngle);
 			physics->setTurning(TURN_NONE);
+			updateRetailTurnConditions(obj, 0.0f);
 			if (m_template->m_waitForFormation && formation)
 				desiredSpeed = 0.0f;
 		}
 		else if (m_template->m_turnWhileMoving)
 			physics->setTurning(rotateTowardsPosition(obj, goalPos));
+		else
+			updateRetailTurnConditions(obj, 0.0f);
 	}
 
 	steerVelocity(obj, physics, dirToApplyForce, onPathDistToGoal, desiredSpeed);
@@ -2970,7 +2994,8 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 {
 	if (physics->getIsStunned())
 	{
-		setCavalryTurning(obj, physics, 0.0f);
+		physics->setTurning(TURN_NONE);
+		updateRetailTurnConditions(obj, 0.0f);
 		return;
 	}
 
@@ -3007,6 +3032,7 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 		}
 	}
 	Real turn = std::clamp(angle, -turnRate, turnRate);
+	updateRetailTurnConditions(obj, angle);
 	if (m_template->m_appearance == LOCO_HORDE && distance > 20.0f && fabs(angle) > m_template->m_maxTurnWithoutReform)
 	{
 		physics->scrubVelocity2D(0.0f);
@@ -3014,7 +3040,7 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 		speed = 0.0f;
 	}
 	obj->setOrientation(facing + turn);
-	setCavalryTurning(obj, physics, turn);
+	physics->setTurning(turn > 0.0f ? TURN_POSITIVE : turn < 0.0f ? TURN_NEGATIVE : TURN_NONE);
 
 	const Real remainingAngle = angle - turn;
 	speed = std::min(maxSpeed, speed) * std::max(0.0f, Cos(remainingAngle));
@@ -3038,7 +3064,7 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 			moveCavalryForward(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 			return;
 		}
-		setCavalryTurning(obj, physics, 0.0f);
+		physics->setTurning(TURN_NONE);
 	}
 	const Real maxSpeed = getMaxSpeedForCondition(obj->getBodyModule()->getDamageState(), !backing && RetailFileLayers::enabled() ? obj : nullptr);
 	if (desiredSpeed > maxSpeed)
@@ -3052,6 +3078,7 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 	{
 		dir = *obj->getUnitDirectionVector2D();
 		physics->setTurning(TURN_NONE);
+		updateRetailTurnConditions(obj, 0.0f);
 	}
 	else
 	{
@@ -3071,6 +3098,8 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 			}
 			if (!physics->getIsStunned())
 				physics->setTurning(rotateTowardsPosition(obj, face));
+			else
+				updateRetailTurnConditions(obj, 0.0f);
 		}
 		else
 		{
@@ -3163,7 +3192,8 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 #endif
 
 	if (usesCavalrySteering(obj))
-		setCavalryTurning(obj, physics, 0.0f);
+		physics->setTurning(TURN_NONE);
+	updateRetailTurnConditions(obj, 0.0f);
 
 	const Bool stopping = RetailFileLayers::enabled() && m_retailWasRunning && physics->getVelocityMagnitude() > MIN_GAIT_SPEED;
 	if (stopping)
