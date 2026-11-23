@@ -35,4 +35,5 @@ void underAttack(Object &object, const DamageInfo &damage);
 #endif
 void destroyed(const Object &object);
 void watchRecharge(const Object &object, const SpecialPowerTemplate &power);
+Bool getLastPlayed(const AsciiString &name, UnsignedInt &frame, Coord3D *position = nullptr);
 }

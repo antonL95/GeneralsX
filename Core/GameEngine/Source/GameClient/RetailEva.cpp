@@ -70,10 +70,18 @@ struct Settings
 	Real jumpDistance = 0;
 };
 
+struct PlayedEvent
+{
+	UnsignedInt frame;
+	Coord3D position;
+	Bool positioned;
+};
+
 Event s_defaults;
 std::map<AsciiString, Event> s_events;
 std::vector<Pending> s_pending;
 std::map<AsciiString, UnsignedInt> s_lastPlayed;
+std::map<AsciiString, PlayedEvent> s_playedEvents;
 AudioEventRTS s_speech;
 UnsignedInt s_quietUntil = 0;
 std::map<std::pair<ObjectID, UnsignedInt>, const SpecialPowerTemplate *> s_recharging;
@@ -188,6 +196,7 @@ void reset()
 {
 	s_pending.clear();
 	s_lastPlayed.clear();
+	s_playedEvents.clear();
 	s_recharging.clear();
 	s_seenRings.clear();
 	s_seenEnemies.clear();
@@ -229,6 +238,17 @@ void queue(const Player *recipient, const AsciiString &name, const Coord3D *posi
 	if (std::any_of(s_pending.begin(), s_pending.end(), [&event](const Pending &pending) { return pending.event == &event; }))
 		return;
 	s_pending.push_back({&event, name, frame, position ? *position : Coord3D{}, position != nullptr});
+}
+
+Bool getLastPlayed(const AsciiString &name, UnsignedInt &frame, Coord3D *position)
+{
+	const auto found = s_playedEvents.find(eventKey(name));
+	if (found == s_playedEvents.end() || (position && !found->second.positioned))
+		return FALSE;
+	frame = found->second.frame;
+	if (position)
+		*position = found->second.position;
+	return TRUE;
 }
 
 void markFirstSighted(const Object& object)
@@ -333,6 +353,10 @@ void update()
 		std::erase_if(s_pending, [&blocked](const Pending &other) { return other.event == &blocked->second; });
 	}
 
+	Coord3D position = pending.position;
+	const Bool positioned = event.fromBase ? player->getAiBaseCenter(&position) : pending.positioned;
+	s_playedEvents.insert_or_assign(eventKey(pending.name), PlayedEvent{frame, position, positioned});
+
 	const SideSound *side = findSound(event, *player);
 	if (!side || side->sounds.empty())
 		return;
@@ -342,8 +366,7 @@ void update()
 
 	AudioEventRTS speech(sound);
 	speech.setPlayerIndex(player->getPlayerIndex());
-	Coord3D position = pending.position;
-	if (event.fromBase ? player->getAiBaseCenter(&position) : pending.positioned)
+	if (positioned)
 		speech.setPosition(&position);
 	const Bool valid = TheAudio->isValidAudioEvent(&speech);
 	if (valid)

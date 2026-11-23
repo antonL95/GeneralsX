@@ -30,6 +30,7 @@
 #pragma once
 
 class ScriptAction;
+class Object;
 class GameWindow;
 class	Team;
 class View;
@@ -57,6 +58,7 @@ public:
 	virtual void doEnableOrDisableObjectDifficultyBonuses(Bool enableBonuses) = 0;
 };
 extern ScriptActionsInterface *TheScriptActions;   ///< singleton definition
+Object* findRetailScriptHome(PlayerMaskType players, Bool insideMap);
 
 
 //-----------------------------------------------------------------------------

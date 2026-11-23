@@ -46,6 +46,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailMusicScripts.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -599,6 +600,7 @@ void GameClient::update()
 
 	// Update the Eva stuff
 	TheEva->UPDATE();
+	RetailMusicScripts::update();
 
 	// update the mouse
 	if( TheMouse )

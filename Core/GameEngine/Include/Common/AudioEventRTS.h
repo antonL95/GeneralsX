@@ -136,6 +136,8 @@ public:
 
 	void setShouldFade( Bool shouldFade );
 	Bool getShouldFade() const;
+	void setPlayMusicOnce() { m_playMusicOnce = TRUE; }
+	Bool getPlayMusicOnce() const { return m_playMusicOnce; }
 
 	void setIsLogicalAudio( Bool isLogicalAudio );
 	Bool getIsLogicalAudio() const;
@@ -195,6 +197,7 @@ protected:
 	OwnerType m_ownerType;
 
 	Bool m_shouldFade;							///< This should fade in or out (if it is starting or stopping)
+	Bool m_playMusicOnce = FALSE;
 	Bool m_isLogicalAudio;					///< Should probably only be true for scripted sounds
 	Bool m_uninterruptible;
 	Bool m_ambient = FALSE;

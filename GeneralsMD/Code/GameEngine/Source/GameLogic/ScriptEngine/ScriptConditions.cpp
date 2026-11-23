@@ -177,6 +177,31 @@ void ScriptConditions::update()
 /** Finds the player by the name in the parameter, and if found caches the player mask in the
 parameter so we don't have to do a name search.  May return null if the player doesn't exist.*/
 //-------------------------------------------------------------------------------------------------
+namespace
+{
+template<class Predicate>
+Bool anyRetailScriptPlayer(const AsciiString& name, const Predicate& matches)
+{
+	const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(name);
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+		if (Player* player = ThePlayerList->getNthPlayer(i); player && (players & player->getPlayerMask()) && matches(*player))
+			return TRUE;
+	return FALSE;
+}
+
+Bool retailScriptPlayersHaveUnitsInArea(PlayerMaskType players, PolygonTrigger* trigger)
+{
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		const Player* owner = object->getControllingPlayer();
+		if (owner && (players & owner->getPlayerMask()) && !object->isEffectivelyDead() &&
+			!object->isKindOf(KINDOF_INERT) && !object->isKindOf(KINDOF_PROJECTILE) && object->isInside(trigger))
+			return TRUE;
+	}
+	return FALSE;
+}
+}
+
 Player *ScriptConditions::playerFromParam(Parameter *pSideParm)
 {
 	DEBUG_ASSERTCRASH(Parameter::SIDE == pSideParm->getParameterType(), ("Wrong parameter type."));
@@ -445,6 +470,38 @@ Bool ScriptConditions::evaluatePlayerHasUnitTypeInArea(Condition *pCondition, Pa
 {
 	PolygonTrigger *pTrig = TheScriptEngine->getQualifiedTriggerAreaByName(pTriggerParm->getString());
 	if (pTrig == nullptr) return false;
+
+	if (RetailFileLayers::enabled())
+	{
+		const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pPlayerParm->getString());
+		if (!players)
+			return FALSE;
+		const UpgradeTemplate* upgrade = nullptr;
+		if (pCondition->getConditionType() == Condition::PLAYER_HAS_COMPARISON_UNIT_TYPE_IN_TRIGGER_AREA_WITH_UPGRADE)
+		{
+			upgrade = TheUpgradeCenter->findUpgrade(pCondition->getParameter(5)->getString());
+			if (!upgrade)
+				return FALSE;
+		}
+		const Bool finished = pCondition->getConditionType() == Condition::PLAYER_HAS_COMPARISON_UNIT_TYPE_IN_TRIGGER_AREA_COMPLETELY_BUILT;
+		ObjectTypesTemp types;
+		objectTypesFromParam(pTypeParm, types.m_types);
+		Int counts[MAX_PLAYER_COUNT]{};
+		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		{
+			const Player* owner = object->getControllingPlayer();
+			if (!owner || !(players & owner->getPlayerMask()) || !types.m_types->isInSet(object->getTemplate()) ||
+				((object->isEffectivelyDead() || object->isKindOf(KINDOF_INERT)) && !object->isKindOf(KINDOF_CRATE)) ||
+				(finished && object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)) ||
+				(upgrade && !object->hasUpgrade(upgrade)) || !object->isInside(pTrig))
+				continue;
+			++counts[owner->getPlayerIndex()];
+		}
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+			if ((players & (1u << i)) && BfmeScriptRules::compare(pComparisonParm->getInt(), counts[i], pCountParm->getInt()))
+				return TRUE;
+		return FALSE;
+	}
 
 	Player* pPlayer = playerFromParam(pPlayerParm);
 	if (!pPlayer) {
@@ -819,6 +876,12 @@ Bool ScriptConditions::evaluateNamedAttackedByPlayer(Parameter *pUnitParm, Param
 
 	ObjectID id = lastDamageInfo->in.m_sourceID;
 	Object* pAttacker = TheGameLogic->findObjectByID(id);
+	if (RetailFileLayers::enabled())
+	{
+		const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pPlayerParm->getString());
+		const Player* owner = pAttacker ? pAttacker->getControllingPlayer() : nullptr;
+		return (players & lastDamageInfo->in.m_sourcePlayerMask) || (owner && (players & owner->getPlayerMask()));
+	}
 	Player *pPlayer = nullptr;
 	if (lastDamageInfo->in.m_sourcePlayerMask) {
 		pPlayer = ThePlayerList->getPlayerFromMask(lastDamageInfo->in.m_sourcePlayerMask);
@@ -843,6 +906,8 @@ Bool ScriptConditions::evaluateTeamAttackedByPlayer(Parameter *pTeamParm, Parame
 	if (!theTeam) {
 		return false;
 	}
+	const Bool retail = RetailFileLayers::enabled();
+	const PlayerMaskType players = retail ? TheScriptEngine->getRetailScriptPlayers(pPlayerParm->getString()) : 0;
 
 	for (DLINK_ITERATOR<Object> iter = theTeam->iterate_TeamMemberList(); !iter.done(); iter.advance()) {
 		Object *pCur = iter.cur();
@@ -862,6 +927,13 @@ Bool ScriptConditions::evaluateTeamAttackedByPlayer(Parameter *pTeamParm, Parame
 
 		ObjectID id = lastDamageInfo->in.m_sourceID;
 		Object* pAttacker = TheGameLogic->findObjectByID(id);
+		if (retail)
+		{
+			const Player* owner = pAttacker ? pAttacker->getControllingPlayer() : nullptr;
+			if ((players & lastDamageInfo->in.m_sourcePlayerMask) || (owner && (players & owner->getPlayerMask())))
+				return TRUE;
+			continue;
+		}
 		if (!pAttacker) {
 			continue;
 		}
@@ -879,6 +951,19 @@ Bool ScriptConditions::evaluateTeamAttackedByPlayer(Parameter *pTeamParm, Parame
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateBuiltByPlayer(Condition *pCondition, Parameter* pTypeParm, Parameter* pPlayerParm)
 {
+	if (RetailFileLayers::enabled())
+	{
+		ObjectTypesTemp types;
+		objectTypesFromParam(pTypeParm, types.m_types);
+		std::vector<Int> counts;
+		std::vector<const ThingTemplate*> templates;
+		const Int typeCount = types.m_types->prepForPlayerCounting(templates, counts);
+		return typeCount > 0 && anyRetailScriptPlayer(pPlayerParm->getString(), [&](Player& player) {
+			std::fill(counts.begin(), counts.end(), 0);
+			player.countObjectsByThingTemplate(typeCount, templates.data(), FALSE, counts.data());
+			return rts::sum(counts) > 0;
+		});
+	}
 	if (pCondition->getCustomData()!=0) {
 		// We have a cached value.
 		if (TheScriptEngine->getFrameObjectCountChanged() == pCondition->getCustomFrame()) {
@@ -1480,7 +1565,6 @@ Bool ScriptConditions::evaluateAudioHasCompleted(Parameter *pAudioParm)
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluatePlayerSpecialPowerFromUnitTriggered(Parameter *pPlayerParm, Parameter *pSpecialPowerParm, Parameter* pUnitParm)
 {
-	Player *pPlayer = playerFromParam(pPlayerParm);
 	ObjectID sourceID = INVALID_ID;
 	if (pUnitParm)
 	{
@@ -1493,7 +1577,11 @@ Bool ScriptConditions::evaluatePlayerSpecialPowerFromUnitTriggered(Parameter *pP
 		sourceID = pUnit->getID();
 	}
 
-	if (pPlayer)
+	if (RetailFileLayers::enabled())
+		return anyRetailScriptPlayer(pPlayerParm->getString(), [&](const Player& player) {
+			return TheScriptEngine->isSpecialPowerTriggered(player.getPlayerIndex(), pSpecialPowerParm->getString(), TRUE, sourceID);
+		});
+	if (Player* pPlayer = playerFromParam(pPlayerParm))
 	{
 		return TheScriptEngine->isSpecialPowerTriggered(pPlayer->getPlayerIndex(), pSpecialPowerParm->getString(), TRUE, sourceID);
 	}
@@ -2243,6 +2331,10 @@ Bool ScriptConditions::evaluateSkirmishValueInArea(Condition *pCondition, Parame
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateSkirmishPlayerIsFaction(Parameter *pSkirmishPlayerParm, Parameter *pFactionParm)
 {
+	if (RetailFileLayers::enabled())
+		return anyRetailScriptPlayer(pSkirmishPlayerParm->getString(), [&](const Player& player) {
+			return player.getSide() == pFactionParm->getString();
+		});
 	Player *player = playerFromParam(pSkirmishPlayerParm);
 	if (!player) {
 		return false;
@@ -2554,6 +2646,11 @@ Bool ScriptConditions::evaluateSkirmishPlayerHasUnitsInArea(Condition *pConditio
 {
 	PolygonTrigger *pTrig = TheScriptEngine->getQualifiedTriggerAreaByName(pTriggerParm->getString());
 	if (pTrig == nullptr) return false;
+	if (RetailFileLayers::enabled())
+	{
+		const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pSkirmishPlayerParm->getString());
+		return players && retailScriptPlayersHaveUnitsInArea(players, pTrig);
+	}
 
 	Player* pPlayer = playerFromParam(pSkirmishPlayerParm);
 	if (!pPlayer) {
@@ -2670,6 +2767,12 @@ Bool ScriptConditions::evaluateSkirmishStartPosition(Parameter *pSkirmishPlayerP
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateSkirmishPlayerHasBeenAttackedByPlayer(Parameter *pSkirmishPlayerParm, Parameter *pAttackedByParm )
 {
+	if (RetailFileLayers::enabled())
+		return anyRetailScriptPlayer(pSkirmishPlayerParm->getString(), [&](Player& victim) {
+			return anyRetailScriptPlayer(pAttackedByParm->getString(), [&](const Player& attacker) {
+				return victim.getAttackedBy(attacker.getPlayerIndex());
+			});
+		});
 	Player *player = playerFromParam(pSkirmishPlayerParm);
 	if (!player) {
 		return FALSE;
@@ -2686,6 +2789,12 @@ Bool ScriptConditions::evaluateSkirmishPlayerHasBeenAttackedByPlayer(Parameter *
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateSkirmishPlayerIsOutsideArea(Condition *pCondition, Parameter *pSkirmishPlayerParm, Parameter *pTriggerParm )
 {
+	if (RetailFileLayers::enabled())
+	{
+		const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pSkirmishPlayerParm->getString());
+		PolygonTrigger* trigger = TheScriptEngine->getQualifiedTriggerAreaByName(pTriggerParm->getString());
+		return players && trigger && !retailScriptPlayersHaveUnitsInArea(players, trigger);
+	}
 	// Even though these will be prechecked in the other function, we want to preflight here as well.
 	Player *player = playerFromParam(pSkirmishPlayerParm);
 	if (!player) {
@@ -2750,10 +2859,11 @@ Bool ScriptConditions::evaluateMusicHasCompleted(Parameter *pMusicParm, Paramete
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluatePlayerLostObjectType(Parameter *pPlayerParm, Parameter *pTypeParm)
 {
-	Player *player = playerFromParam(pPlayerParm);
-	if (!player) {
+	const Bool retail = RetailFileLayers::enabled();
+	Player* player = retail ? nullptr : playerFromParam(pPlayerParm);
+	const PlayerMaskType players = retail ? TheScriptEngine->getRetailScriptPlayers(pPlayerParm->getString()) : 0;
+	if (!player && !players)
 		return FALSE;
-	}
 
 	ObjectTypesTemp objs;
 	objectTypesFromParam(pTypeParm, objs.m_types);
@@ -2761,21 +2871,25 @@ Bool ScriptConditions::evaluatePlayerLostObjectType(Parameter *pPlayerParm, Para
 	std::vector<Int> counts;
 	std::vector<const ThingTemplate *> templates;
 
-	Int numTemplates = objs.m_types->prepForPlayerCounting(templates, counts);
-	if (numTemplates > 0) {
-		player->countObjectsByThingTemplate(numTemplates, &(*templates.begin()), true, &(*counts.begin()));
-	} else {
+	const Int numTemplates = objs.m_types->prepForPlayerCounting(templates, counts);
+	if (numTemplates <= 0)
 		return FALSE;
-	}
-
-	Int sumOfObjs = rts::sum(counts);
-	Int currentCount = TheScriptEngine->getObjectCount(player->getPlayerIndex(), pTypeParm->getString());
-
-	if (sumOfObjs != currentCount) {
-		TheScriptEngine->setObjectCount(player->getPlayerIndex(), pTypeParm->getString(), sumOfObjs);
-	}
-
-	return (sumOfObjs < currentCount);
+	const auto check = [&](Player& member) {
+		std::fill(counts.begin(), counts.end(), 0);
+		member.countObjectsByThingTemplate(numTemplates, templates.data(), TRUE, counts.data());
+		const Int sum = rts::sum(counts);
+		const Int previous = TheScriptEngine->getObjectCount(member.getPlayerIndex(), pTypeParm->getString());
+		if (sum != previous)
+			TheScriptEngine->setObjectCount(member.getPlayerIndex(), pTypeParm->getString(), sum);
+		return sum < previous;
+	};
+	if (player)
+		return check(*player);
+	Bool lost = FALSE;
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+		if (Player* member = ThePlayerList->getNthPlayer(i); member && (players & member->getPlayerMask()) && check(*member))
+			lost = TRUE;
+	return lost;
 }
 
 namespace
@@ -2840,6 +2954,76 @@ Real ScriptConditions::getRetailTeamThreat(Team* team, Real radius)
 			!object->getContainedBy() && !object->isKindOf(KINDOF_INERT))
 			threat += object->getTemplate()->getThreatValue();
 	return threat;
+}
+
+namespace
+{
+template<class Predicate>
+Int countRetailScriptObjects(PlayerMaskType players, const Predicate& matches)
+{
+	Int count = 0;
+	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		const Player* owner = object->getControllingPlayer();
+		if (owner && (owner->getPlayerMask() & players) && !object->isEffectivelyDead() && matches(*object))
+			++count;
+	}
+	return count;
+}
+
+Bool isRetailScriptUnit(const Object& object)
+{
+	return !object.isKindOf(KINDOF_HORDE) && (object.isKindOf(KINDOF_INFANTRY) || object.isKindOf(KINDOF_VEHICLE) ||
+		object.isKindOf(KINDOF_MONSTER) || object.isKindOf(KINDOF_CAVALRY) || object.isKindOf(KINDOF_HERO));
+}
+
+Real distanceSquared2D(const Coord3D& a, const Coord3D& b)
+{
+	const Real dx = a.x - b.x;
+	const Real dy = a.y - b.y;
+	return dx * dx + dy * dy;
+}
+
+const Coord3D* estimateRetailTeamPosition(const Team* team)
+{
+	if (!team)
+		return nullptr;
+	const Object* first = nullptr;
+	for (auto it = team->iterate_TeamMemberList(); !it.done(); it.advance())
+	{
+		const Object* object = it.cur();
+		if (!object->isEffectivelyDead() && (!first || object->getID() < first->getID()))
+			first = object;
+	}
+	return first ? first->getPosition() : nullptr;
+}
+}
+
+Bool evaluateRetailUnitsFarFromObject(Condition& condition, const Object* anchor)
+{
+	const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(condition.getParameter(0)->getString());
+	const Real distance = condition.getParameter(3)->getReal();
+	if (!players || !anchor || anchor->isEffectivelyDead() || distance < 0)
+		return FALSE;
+	const Coord3D center = *anchor->getPosition();
+	const Real radiusSquared = distance * distance;
+	const Int count = countRetailScriptObjects(players, [&](const Object& object) {
+		return isRetailScriptUnit(object) && distanceSquared2D(center, *object.getPosition()) >= radiusSquared;
+	});
+	return BfmeScriptRules::compare(condition.getParameter(1)->getInt(), count, condition.getParameter(2)->getInt());
+}
+
+Bool evaluateRetailUnitsNearPosition(Condition& condition, const Coord3D& position)
+{
+	const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(condition.getParameter(0)->getString());
+	const Real distance = condition.getParameter(1)->getReal();
+	if (!players || distance < 0)
+		return FALSE;
+	const Real radiusSquared = distance * distance;
+	const Int count = countRetailScriptObjects(players, [&](const Object& object) {
+		return isRetailScriptUnit(object) && distanceSquared2D(position, *object.getPosition()) <= radiusSquared;
+	});
+	return BfmeScriptRules::compare(condition.getParameter(3)->getInt(), count, condition.getParameter(4)->getInt());
 }
 
 Bool ScriptConditions::evaluateCondition( Condition *pCondition )
@@ -2963,32 +3147,43 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 					++count;
 			return count < pCondition->getParameter(1)->getInt();
 		}
+		case Condition::PLAYER_HAS_NUMBER_OBJECTS_WITH_MODELCONDITION:
+		{
+			if (!RetailFileLayers::enabled())
+				return FALSE;
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pCondition->getParameter(0)->getString());
+			const Int flag = ModelConditionFlags::getSingleBitFromName(pCondition->getParameter(1)->getString().str());
+			if (!players || flag < 0 || flag >= MODELCONDITION_COUNT)
+				return FALSE;
+			const Int count = countRetailScriptObjects(players, [&](const Object& object) {
+				return object.getLogicModelConditions().test(static_cast<ModelConditionFlagType>(flag));
+			});
+			return BfmeScriptRules::compare(pCondition->getParameter(2)->getInt(), count, pCondition->getParameter(3)->getInt());
+		}
+		case Condition::PLAYER_HAS_NUMBER_UNITS_DISTANCE_FROM_OBJECT:
+			return RetailFileLayers::enabled() && evaluateRetailUnitsFarFromObject(*pCondition,
+				TheScriptEngine->getUnitNamed(pCondition->getParameter(4)->getString()));
+		case Condition::HAS_EVA_EVENT_PLAYED_IN_LAST_N_SECONDS:
+		case Condition::IS_NUM_OF_UNITS_BELONGING_TO_PLAYER_NEAR_EVA_EVENT_LAST_PLAYED_LOCATION_COMPARISON_INT:
+			return FALSE;
 		case Condition::PLAYER_HAS_NUM_UNITS_WITH_UPGRADE:
 		{
-			const Player* player = playerFromParam(pCondition->getParameter(0));
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pCondition->getParameter(0)->getString());
 			const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(pCondition->getParameter(2)->getString());
-			if (!player || !upgrade)
+			if (!players || !upgrade)
 				return FALSE;
-			Int remaining = pCondition->getParameter(1)->getInt();
-			for (const Object* object = TheGameLogic->getFirstObject(); remaining > 0 && object; object = object->getNextObject())
-				if (object->getControllingPlayer() == player && !object->isEffectivelyDead() && object->hasUpgrade(upgrade))
-					--remaining;
-			return remaining <= 0;
+			const Int count = countRetailScriptObjects(players, [&](const Object& object) { return object.hasUpgrade(upgrade); });
+			return count >= pCondition->getParameter(1)->getInt();
 		}
 		case Condition::PLAYER_HAS_N_OR_FEWER_BASES:
 		{
-			const Player* player = playerFromParam(pCondition->getParameter(0));
-			if (!player)
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pCondition->getParameter(0)->getString());
+			if (!players)
 				return FALSE;
-			Int count = 0;
-			for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
-			{
-				if (object->getControllingPlayer() != player)
-					continue;
-				const CastleBehavior* castle = CastleBehavior::find(object);
-				if (castle && castle->isUnpacked() && castle->getKeep())
-					++count;
-			}
+			const Int count = countRetailScriptObjects(players, [](const Object& object) {
+				const CastleBehavior* castle = CastleBehavior::find(&object);
+				return castle && castle->isUnpacked() && castle->getKeep();
+			});
 			return count <= pCondition->getParameter(1)->getInt();
 		}
 
@@ -3012,11 +3207,25 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 				pCondition->getParameter(1)->getInt());
 		case Condition::DISTANCE_BETWEEN_OBJ:
 			return evaluateDistanceBetween(pCondition);
+		case Condition::DISTANCE_BETWEEN_TEAM:
+		{
+			const Coord3D* a = estimateRetailTeamPosition(TheScriptEngine->getTeamNamed(pCondition->getParameter(0)->getString()));
+			const Coord3D* b = estimateRetailTeamPosition(TheScriptEngine->getTeamNamed(pCondition->getParameter(1)->getString()));
+			if (!a || !b)
+				return FALSE;
+			const Int comparison = pCondition->getParameter(2)->getInt();
+			const Real distance = pCondition->getParameter(3)->getReal();
+			return distance < 0 ? BfmeScriptRules::compare(comparison, 0.0f, distance) :
+				BfmeScriptRules::compare(comparison, distanceSquared2D(*a, *b), distance * distance);
+		}
 		case Condition::PLAYER_HAS_REACHED_LEVEL_CAP:
 		{
-			const Player *player = playerFromParam(pCondition->getParameter(0));
-			return player && BfmeScriptRules::levelCapReached(player->getRankLevel(),
-				TheGameLogic->getRankLevelLimit(), TheRankInfoStore->getRankLevelCount());
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pCondition->getParameter(0)->getString());
+			for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+				if (const Player* player = ThePlayerList->getNthPlayer(i); player && (players & player->getPlayerMask()) &&
+					BfmeScriptRules::levelCapReached(player->getRankLevel(), TheGameLogic->getRankLevelLimit(), TheRankInfoStore->getRankLevelCount()))
+					return TRUE;
+			return FALSE;
 		}
 		case Condition::PLAYER_ALL_DESTROYED:
 			return evaluateAllDestroyed(pCondition->getParameter(0));
@@ -3180,6 +3389,10 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 
 			return evaluatePlayerHasUnitTypeInArea(pCondition, pCondition->getParameter(0), pCondition->getParameter(1), pCondition->getParameter(2), pCondition->getParameter(3), pCondition->getParameter(4));
 		}
+		case Condition::PLAYER_HAS_COMPARISON_UNIT_TYPE_IN_TRIGGER_AREA_WITH_UPGRADE:
+		case Condition::PLAYER_HAS_COMPARISON_UNIT_TYPE_IN_TRIGGER_AREA_COMPLETELY_BUILT:
+			return RetailFileLayers::enabled() && evaluatePlayerHasUnitTypeInArea(pCondition, pCondition->getParameter(0),
+				pCondition->getParameter(1), pCondition->getParameter(2), pCondition->getParameter(3), pCondition->getParameter(4));
 		case Condition::PLAYER_HAS_COMPARISON_UNIT_KIND_IN_TRIGGER_AREA:
 		{
 			Int numParameters = pCondition->getNumParameters();

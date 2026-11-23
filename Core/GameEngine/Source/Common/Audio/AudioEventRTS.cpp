@@ -226,6 +226,7 @@ AudioEventRTS::AudioEventRTS( const AudioEventRTS& right )
 	m_timeOfDay						= right.m_timeOfDay;
 	m_ownerType						= right.m_ownerType;
 	m_shouldFade					= right.m_shouldFade;
+	m_playMusicOnce					= right.m_playMusicOnce;
 	m_isLogicalAudio			= right.m_isLogicalAudio;
 	m_pitchShift					= right.m_pitchShift;
 	m_volumeShift					= right.m_volumeShift;
@@ -269,6 +270,7 @@ AudioEventRTS& AudioEventRTS::operator=( const AudioEventRTS& right )
 	m_timeOfDay						= right.m_timeOfDay;
 	m_ownerType						= right.m_ownerType;
 	m_shouldFade					= right.m_shouldFade;
+	m_playMusicOnce					= right.m_playMusicOnce;
 	m_isLogicalAudio			= right.m_isLogicalAudio;
 	m_pitchShift					= right.m_pitchShift;
 	m_volumeShift					= right.m_volumeShift;

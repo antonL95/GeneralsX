@@ -94,6 +94,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptActions.h"
+#include "GameClient/RetailMusicScripts.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/VictoryConditions.h"
@@ -3189,6 +3190,20 @@ void ScriptActions::doRevealMapEntire(const AsciiString& playerName)
 
 void ScriptActions::doRevealMapEntirePermanently( Bool reveal, const AsciiString& playerName )
 {
+	if (RetailFileLayers::enabled() && playerName.isNotEmpty())
+	{
+		const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(playerName);
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+		{
+			if (!(players & (1u << i)))
+				continue;
+			if (reveal)
+				ThePartitionManager->revealMapForPlayerPermanently(i);
+			else
+				ThePartitionManager->undoRevealMapForPlayerPermanently(i);
+		}
+		return;
+	}
 	Player* player = TheScriptEngine->getPlayerFromAsciiString(playerName);
 	if (player && playerName.isNotEmpty())
 	{
@@ -3219,6 +3234,14 @@ void ScriptActions::doRevealMapEntirePermanently( Bool reveal, const AsciiString
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doShroudMapEntire(const AsciiString& playerName)
 {
+	if (RetailFileLayers::enabled() && playerName.isNotEmpty())
+	{
+		const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(playerName);
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+			if (players & (1u << i))
+				ThePartitionManager->shroudMapForPlayer(i);
+		return;
+	}
 	Player* player = TheScriptEngine->getPlayerFromAsciiString(playerName);
 	if (player && playerName.isNotEmpty())
 	{
@@ -4123,6 +4146,24 @@ void ScriptActions::doSetMoney(const AsciiString& playerName, Int money)
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doGiveMoney(const AsciiString& playerName, Int money)
 {
+	if (RetailFileLayers::enabled())
+	{
+		const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(playerName);
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+		{
+			Player* member = ThePlayerList->getNthPlayer(i);
+			if (!member || !(players & member->getPlayerMask()))
+				continue;
+			if (Money* balance = member->getMoney())
+			{
+				if (money < 0)
+					balance->withdraw(0u - static_cast<UnsignedInt>(money));
+				else
+					balance->deposit(money);
+			}
+		}
+		return;
+	}
 	Player* player = TheScriptEngine->getPlayerFromAsciiString(playerName);
 
 	if (!player) {
@@ -6679,16 +6720,23 @@ Bool matchesRetailScriptType(const Object& object, const AsciiString& type, cons
 Object* findRetailScriptTarget(Team& team, PlayerMaskType players,
 	const AsciiString& type, Int kind, Bool unnamed)
 {
-	if (!team.getFirstItemIn_TeamMemberList() || kind >= KINDOF_COUNT)
+	if (!players || kind >= KINDOF_COUNT)
 		return nullptr;
-	AIGroupPtr group = TheAI->createGroup();
-#if RETAIL_COMPATIBLE_AIGROUP
-	team.getTeamAsAIGroup(group);
-#else
-	team.getTeamAsAIGroup(group.Peek());
-#endif
-	Coord3D center;
-	group->getCenter(&center);
+	std::vector<const Object*> members;
+	for (auto it = team.iterate_TeamMemberList(); !it.done(); it.advance())
+		if (!it.cur()->isEffectivelyDead())
+			members.push_back(it.cur());
+	if (members.empty())
+		return nullptr;
+	std::sort(members.begin(), members.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
+	Coord3D center{};
+	for (const Object* member : members)
+	{
+		center.x += member->getPosition()->x;
+		center.y += member->getPosition()->y;
+	}
+	center.x /= static_cast<Real>(members.size());
+	center.y /= static_cast<Real>(members.size());
 	const ObjectTypes* list = type.isEmpty() ? nullptr : TheScriptEngine->getObjectTypes(type);
 	Object* nearest = nullptr;
 	Real distance = 0.0f;
@@ -6725,6 +6773,34 @@ void orderRetailTeam(Team& team, const Coord3D& position, Bool attack)
 }
 }
 
+Object* findRetailScriptHome(PlayerMaskType players, Bool insideMap)
+{
+	if (!players)
+		return nullptr;
+	Region3D extent{};
+	if (insideMap)
+		TheTerrainLogic->getExtent(&extent);
+	Object* home = nullptr;
+	Object* fallback = nullptr;
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		const Player* player = object->getControllingPlayer();
+		if (!player || !(players & player->getPlayerMask()) || object->isEffectivelyDead())
+			continue;
+		const CastleBehavior* castle = CastleBehavior::find(object);
+		Object* keep = castle ? castle->getKeep() : object->isKindOf(KINDOF_CASTLE_KEEP) ? object : nullptr;
+		if (!keep || keep->isEffectivelyDead())
+			continue;
+		const Coord3D& position = *keep->getPosition();
+		if (insideMap && !extent.contains(Coord2D{position.x, position.y}))
+			continue;
+		Object*& candidate = castle ? home : fallback;
+		if (!candidate || keep->getID() < candidate->getID())
+			candidate = keep;
+	}
+	return home ? home : fallback;
+}
+
 void ScriptActions::executeAction( ScriptAction *pAction )
 {
 	switch (pAction->getActionType()) {
@@ -6756,6 +6832,16 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				static_cast<Real>(pAction->getParameter(2)->getInt()), object ? object->getButtonImage() : nullptr);
 			return;
 		}
+		case ScriptAction::AUDIO_POP_MUSIC:
+		case ScriptAction::MUSIC_SCRIPT_POP_MUSIC:
+		case ScriptAction::MUSIC_RETURN_TO_MUSIC_SCRIPTING:
+		case ScriptAction::MUSIC_PLAY_TRACK_FINITE_TIMES:
+		case ScriptAction::MUSIC_PLAY_TRACK_FINITE_TIMES_AND_NOTIFY:
+		case ScriptAction::MUSIC_PUSH_TRACK_FINITE_TIMES_AND_NOTIFY:
+		case ScriptAction::MUSIC_SCRIPT_PLAY_TRACK_FINITE_TIMES_AND_NOTIFY:
+		case ScriptAction::MUSIC_SCRIPT_PUSH_TRACK_FINITE_TIMES_AND_NOTIFY:
+			RetailMusicScripts::enqueue(*pAction);
+			return;
 		default:
 			if (pAction->getActionType() >= ScriptAction::FIRST_ROTWK)
 			{
@@ -6992,11 +7078,12 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			return;
 		}
 		case ScriptAction::UNIT_SET_MODELCONDITION_FOR_DURATION:
+		case ScriptAction::TEAM_SET_MODELCONDITION_FOR_DURATION:
 		{
-			Object* object = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			const Bool affectsTeam = pAction->getActionType() == ScriptAction::TEAM_SET_MODELCONDITION_FOR_DURATION;
 			const Int condition = ModelConditionFlags::getSingleBitFromName(pAction->getParameter(1)->getString().str());
 			const Real seconds = pAction->getParameter(2)->getReal();
-			if (!object || condition < 0 || condition >= MODELCONDITION_COUNT ||
+			if (condition < 0 || condition >= MODELCONDITION_COUNT ||
 				!std::isfinite(seconds) || seconds < 0.0f)
 				return;
 			const Real duration = seconds * LOGICFRAMES_PER_SECOND;
@@ -7009,9 +7096,30 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 					unit->setTimedModelCondition(static_cast<ModelConditionFlagType>(condition),
 						std::max<UnsignedInt>(1, static_cast<UnsignedInt>(duration)));
 			};
+			const Real requestedFraction = pAction->getParameter(3)->getReal();
+			if (!std::isfinite(requestedFraction))
+				return;
+			const Real fraction = std::clamp(requestedFraction, 0.0f, 1.0f);
+			if (affectsTeam)
+			{
+				Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+				if (!team)
+					return;
+				std::vector<Object*> members;
+				for (auto it = team->iterate_TeamMemberList(); !it.done(); it.advance())
+					if (!it.cur()->isEffectivelyDead())
+						members.push_back(it.cur());
+				std::sort(members.begin(), members.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
+				const size_t count = static_cast<size_t>(members.size() * fraction);
+				for (size_t i = 0; i < count; ++i)
+					applyCondition(members[i]);
+				return;
+			}
+			Object* object = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			if (!object)
+				return;
 			applyCondition(object);
 			const HordeContain* horde = HordeContain::get(object);
-			const Real fraction = std::clamp(pAction->getParameter(3)->getReal(), 0.0f, 1.0f);
 			if (horde && fraction > 0.0f)
 			{
 				const auto& members = *horde->getContainedItemsList();
@@ -7026,19 +7134,19 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			}
 			return;
 		}
+		case ScriptAction::TEAM_SET_PLAYERS_NEAREST_UNIT_OF_TYPE_TO_REFERENCE:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(1)->getString());
+			const Player* owner = team ? team->getControllingPlayer() : nullptr;
+			Object* nearest = owner ? findRetailScriptTarget(*team, owner->getPlayerMask(),
+				pAction->getParameter(0)->getString(), -1, FALSE) : nullptr;
+			TheScriptEngine->setRetailUnitReference(pAction->getParameter(2)->getString(), nearest);
+			return;
+		}
 		case ScriptAction::FIND_HOME_BASE_OF_PLAYER:
 		{
-			const Player* player = TheScriptEngine->getPlayerFromAsciiString(pAction->getParameter(0)->getString());
-			Object* home = nullptr;
-			for (Object* object = TheGameLogic->getFirstObject(); player && object; object = object->getNextObject())
-			{
-				if (object->getControllingPlayer() != player)
-					continue;
-				const CastleBehavior* castle = CastleBehavior::find(object);
-				Object* keep = castle ? castle->getKeep() : nullptr;
-				if (keep && (!home || keep->getID() < home->getID()))
-					home = keep;
-			}
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pAction->getParameter(0)->getString());
+			Object* home = findRetailScriptHome(players, pAction->getParameter(2)->getInt() != 0);
 			TheScriptEngine->setRetailUnitReference(pAction->getParameter(1)->getString(), home);
 			return;
 		}
@@ -7876,6 +7984,11 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::TEAM_IDLE_FOR_SECONDS:
 			doTeamIdleForFramecount(pAction->getParameter(0)->getString(),
 				BfmeScriptRules::secondsToFrames(pAction->getParameter(1)->getInt(), LOGICFRAMES_PER_SECOND));
+			return;
+
+		case ScriptAction::TEAM_GUARD_FOR_SECONDS:
+			doTeamGuardForFramecount(pAction->getParameter(0)->getString(), BfmeScriptRules::secondsToFrames(
+				std::clamp(pAction->getParameter(1)->getInt(), 0, INT_MAX / LOGICFRAMES_PER_SECOND), LOGICFRAMES_PER_SECOND));
 			return;
 
 		case ScriptAction::SET_CAMERA_CLIP_DEPTH_MULTIPLIER:

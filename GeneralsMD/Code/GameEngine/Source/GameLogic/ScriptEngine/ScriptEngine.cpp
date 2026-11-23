@@ -58,6 +58,7 @@
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptConditions.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameClient/RetailMusicScripts.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/MapPlayerRoster.h"
 
@@ -5272,6 +5273,7 @@ void ScriptEngine::init()
 //-------------------------------------------------------------------------------------------------
 void ScriptEngine::reset()
 {
+	RetailMusicScripts::reset();
 	// setting FPS limit in case a script had changed it
 	if (TheFramePacer && TheGlobalData)
 		TheFramePacer->setFramesPerSecondLimit(TheGlobalData->m_framesPerSecondLimit);
@@ -5441,6 +5443,7 @@ void ScriptEngine::reset()
 //-------------------------------------------------------------------------------------------------
 void ScriptEngine::newMap()
 {
+	RetailMusicScripts::reset();
 	m_numCounters = 1;
 	Int i;
 	for (i=0; i<MAX_COUNTERS; i++) {
@@ -5483,10 +5486,13 @@ void ScriptEngine::newMap()
 		if (pSL == nullptr) continue;
 		Script *pScr;
 		for (pScr = pSL->getScript(); pScr; pScr=pScr->getNext()) {
-			checkConditionsForTeamNames(pScr);
+			if (!TheSidesList->isRetailMusicScript(pSL, pScr->getBfmeOrder()))
+				checkConditionsForTeamNames(pScr);
 		}
 		ScriptGroup *pGroup;
 		for (pGroup = pSL->getScriptGroup(); pGroup; pGroup=pGroup->getNext()) {
+			if (TheSidesList->isRetailMusicScript(pSL, pGroup->getBfmeOrder()))
+				continue;
 			for (pScr = pGroup->getScript(); pScr; pScr=pScr->getNext()) {
 				checkConditionsForTeamNames(pScr);
 			}
@@ -5591,7 +5597,7 @@ void ScriptEngine::update()
 		if (pSL->hasBfmeOrder())
 		{
 			ScriptGroup *group = pSL->getScriptGroup();
-			executeBfmeScripts(pSL->getScript(), group, 1, true);
+			executeBfmeScripts(pSL->getScript(), group, 1, true, pSL);
 			m_currentPlayer = nullptr;
 			continue;
 		}
@@ -5893,15 +5899,15 @@ PlayerMaskType ScriptEngine::getRetailScriptPlayers(const AsciiString& name)
 	Player* reference = nullptr;
 	if (text.starts_with("<This Player's "))
 		reference = m_currentPlayer;
-	else if (text.starts_with("<Local Player's "))
-		reference = ThePlayerList->getLocalPlayer();
+	else if (text == LOCAL_PLAYER || text.starts_with("<Local Player's "))
+		reference = RetailMusicScripts::isEvaluating() ? ThePlayerList->getLocalPlayer() : getRetailSynchronizedScriptPlayer(LOCAL_PLAYER);
 	const Bool everyone = text == "<All Players>";
 	const Bool enemies = text.ends_with(" Enemies>");
 	const Bool allies = text.ends_with(" Allies>");
 	const Bool alliesWithSelf = text.ends_with(" Allies incl Self>");
 	if (!everyone && !enemies && !allies && !alliesWithSelf)
 	{
-		const Player* single = getPlayerFromAsciiString(name);
+		const Player* single = text == LOCAL_PLAYER ? reference : getPlayerFromAsciiString(name);
 		return single ? single->getPlayerMask() : 0;
 	}
 	if (!everyone && !reference)
@@ -6412,6 +6418,8 @@ ScriptGroup  *ScriptEngine::findGroup(const AsciiString& name)
 		if (pSL==nullptr) continue;
 		ScriptGroup *pGroup;
 		for (pGroup = pSL->getScriptGroup(); pGroup; pGroup=pGroup->getNext()) {
+			if (TheSidesList->isRetailMusicScript(pSL, pGroup->getBfmeOrder()))
+				continue;
 			if (pGroup->getName() == name) {
 				return pGroup;
 			}
@@ -6431,12 +6439,16 @@ Script  *ScriptEngine::findScript(const AsciiString& name)
 		if (pSL==nullptr) continue;
 		Script *pScr;
 		for (pScr = pSL->getScript(); pScr; pScr=pScr->getNext()) {
+			if (TheSidesList->isRetailMusicScript(pSL, pScr->getBfmeOrder()))
+				continue;
 			if ((name==pScr->getName())) {
 				return pScr;
 			}
 		}
 		ScriptGroup *pGroup;
 		for (pGroup = pSL->getScriptGroup(); pGroup; pGroup=pGroup->getNext()) {
+			if (TheSidesList->isRetailMusicScript(pSL, pGroup->getBfmeOrder()))
+				continue;
 			for (pScr = pGroup->getScript(); pScr; pScr=pScr->getNext()) {
 				if ((name==pScr->getName())) {
 					return pScr;
@@ -6879,7 +6891,7 @@ void ScriptEngine::setTimer( ScriptAction *pAction, Bool millisecondTimer, Bool 
 	m_counters[counterNdx].isCountdownTimer = true;
 }
 
-void ScriptEngine::setRandomCounter(ScriptAction *pAction, Bool clientSide)
+void ScriptEngine::setRandomCounter(ScriptAction *pAction)
 {
 	Int counterNdx = pAction->getParameter(0)->getInt();
 	if (counterNdx == 0) {
@@ -6888,7 +6900,7 @@ void ScriptEngine::setRandomCounter(ScriptAction *pAction, Bool clientSide)
 	}
 	const Int lo = pAction->getParameter(1)->getInt();
 	const Int hi = pAction->getParameter(2)->getInt();
-	m_counters[counterNdx].value = clientSide ? GameClientRandomValue(lo, hi) : GameLogicRandomValue(lo, hi);
+	m_counters[counterNdx].value = GameLogicRandomValue(lo, hi);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -7383,6 +7395,7 @@ void ScriptEngine::notifyOfCompletedVideo( const AsciiString& completedVideo )
 void ScriptEngine::notifyOfTriggeredSpecialPower( Int playerIndex, const AsciiString& completedPower, ObjectID sourceObj )
 {
 	m_triggeredSpecialPowers[playerIndex].push_back(AsciiStringObjectIDPair(completedPower, sourceObj));
+	RetailMusicScripts::recordSpecialPower(playerIndex, completedPower);
 	if (RetailSkirmishProbe::enabled())
 		RetailSkirmishProbe::cast(playerIndex, completedPower, sourceObj);
 }
@@ -7813,8 +7826,8 @@ void ScriptEngine::executeActions( ScriptAction *pActionHead )
 			case ScriptAction::SET_RANDOM_TIMER: setTimer(pCurAction, false, true);break;
 			case ScriptAction::SET_RANDOM_MSEC_TIMER: setTimer(pCurAction, true, true);break;
 			case ScriptAction::SET_COUNTER_IN_SECONDS: setTimer(pCurAction, true, false); break;
-			case ScriptAction::SET_RANDOM_COUNTER: setRandomCounter(pCurAction, false); break;
-			case ScriptAction::SET_COUNTER_TO_CLIENT_RANDOM_VALUE: setRandomCounter(pCurAction, true); break;
+			case ScriptAction::SET_RANDOM_COUNTER: setRandomCounter(pCurAction); break;
+			case ScriptAction::SET_COUNTER_TO_CLIENT_RANDOM_VALUE: break;
 			case ScriptAction::ADD_TO_MSEC_TIMER: adjustTimer(pCurAction, true, true);break;
 			case ScriptAction::SUB_FROM_MSEC_TIMER: adjustTimer(pCurAction, true, false);break;
 			case ScriptAction::ENABLE_SCRIPT: enableScript(pCurAction);break;
@@ -7839,8 +7852,7 @@ void ScriptEngine::executeActions( ScriptAction *pActionHead )
 		if (type >= ScriptAction::FIRST_ROTWK || type == ScriptAction::NAMED_RECEIVE_UPGRADE)
 		{
 			Int value = 0;
-			if (type == ScriptAction::SET_COUNTER_IN_SECONDS || type == ScriptAction::SET_RANDOM_COUNTER ||
-				type == ScriptAction::SET_COUNTER_TO_CLIENT_RANDOM_VALUE)
+			if (type == ScriptAction::SET_COUNTER_IN_SECONDS || type == ScriptAction::SET_RANDOM_COUNTER)
 				value = m_counters[pCurAction->getParameter(0)->getInt()].value;
 			else if (type == ScriptAction::SET_CAMERA_CLIP_DEPTH_MULTIPLIER && TheTacticalView)
 				value = REAL_TO_INT_FLOOR(TheTacticalView->getClipDepthMultiplier() * 100.0f + 0.5f);
@@ -10648,7 +10660,7 @@ static void _cleanUpVTune()
 #endif	// VTUNE
 
 
-void ScriptEngine::executeBfmeScripts(Script *script, ScriptGroup *&group, Int depth, Bool active)
+void ScriptEngine::executeBfmeScripts(Script *script, ScriptGroup *&group, Int depth, Bool active, const ScriptList *list)
 {
 	while (script || (group && group->getBfmeDepth() == depth))
 	{
@@ -10658,11 +10670,12 @@ void ScriptEngine::executeBfmeScripts(Script *script, ScriptGroup *&group, Int d
 			ScriptGroup *current = group;
 			group = group->getNext();
 			executeBfmeScripts(current->getScript(), group, depth + 1,
-				active && current->isActive() && !current->isSubroutine());
+				active && !TheSidesList->isRetailMusicScript(list, current->getBfmeOrder()) &&
+					current->isActive() && !current->isSubroutine(), list);
 		}
 		else
 		{
-			if (active && !script->isSubroutine())
+			if (active && !TheSidesList->isRetailMusicScript(list, script->getBfmeOrder()) && !script->isSubroutine())
 				executeScript(script);
 			script = script->getNext();
 		}

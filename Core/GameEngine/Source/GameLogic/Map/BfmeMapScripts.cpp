@@ -852,11 +852,23 @@ void BfmeMapScripts::loadLibraries(SidesList &sides, Bool multiplayer)
 
 	if (neutral && TheAudio && (sides.m_mapSidesVersion < 6 || sides.m_mapSideFlag))
 	{
+#if !RTS_GENERALS
+		const ScriptList *neutralScripts = neutral->getScriptList();
+		sides.m_musicOrderBegin = neutralScripts ? neutralScripts->m_bfmeNextOrder + 1 : 1;
+		sides.m_retailMusicSide.getDict()->setAsciiString(TheKey_playerName, AsciiString::TheEmptyString);
+#endif
 		std::set<std::string> musicSeen;
 		libraries.walk({TheAudio->getAudioSettings()->m_musicScriptLibraryName}, musicSeen, [&](SidesList &library, SidesInfo &from) {
 			mergeSide(*neutral, from, AsciiString::TheEmptyString);
+#if !RTS_GENERALS
+			mergeSide(sides.m_retailMusicSide, from, AsciiString::TheEmptyString);
+#endif
 			mergeTeams(sides, library, from.getDict()->getAsciiString(TheKey_playerName), AsciiString::TheEmptyString, false);
 		});
+#if !RTS_GENERALS
+		sides.m_musicCompatibilityList = neutral->getScriptList();
+		sides.m_musicOrderEnd = sides.m_musicCompatibilityList ? sides.m_musicCompatibilityList->m_bfmeNextOrder + 1 : 1;
+#endif
 	}
 #if !RTS_GENERALS
 	if (!multiplayer || !RetailFileLayers::enabled() || INIAudit::isEnabled())

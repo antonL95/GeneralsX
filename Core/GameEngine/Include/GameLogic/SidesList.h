@@ -150,6 +150,11 @@ public:
 	static Bool ParseSidesDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseMapTeamsDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	Bool getMapSideFlag() const { return m_mapSideFlag; }
+	ScriptList *getRetailMusicScripts() { return m_retailMusicSide.getScriptList(); }
+	Bool isRetailMusicScript(const ScriptList *list, Int order) const
+	{
+		return list == m_musicCompatibilityList && order >= m_musicOrderBegin && order < m_musicOrderEnd;
+	}
 	void setScriptDump(std::function<void(const char *, const AsciiString &, Int)> dump) { m_scriptDump = dump; }
 	Bool usesRotwkRoster() const;
 	AsciiString getSlotPlayerName(Int slot, Int startPosition, Bool observer) const;
@@ -217,6 +222,10 @@ protected:
 	};
 	std::vector<SideScriptLibraries> m_scriptLibraries;
 	std::map<std::string, AsciiString> m_playerAILibraries;
+	SidesInfo m_retailMusicSide;
+	const ScriptList *m_musicCompatibilityList = nullptr;
+	Int m_musicOrderBegin = 0;
+	Int m_musicOrderEnd = 0;
 
 	Int					m_numSkirmishSides;
 	// GeneralsX @bugfix fbraz3 05/10/2026 Size skirmish sides array with MAX_SKIRMISH_SIDES to prevent buffer overflow (#335).

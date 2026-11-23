@@ -518,7 +518,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		}
 		// GeneralsX @bugfix elmeriniemela 17/10/2026 Like the Miles backend (INFINITE_LOOP_COUNT), music
 		// tracks repeat until they are stopped.
-		if (info->m_soundType == AT_Music) {
+		if (info->m_soundType == AT_Music && !event->getPlayMusicOnce()) {
 			ma_sound_set_looping(sound, MA_TRUE);
 		}
 		break;
@@ -552,6 +552,11 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 
 	// GeneralsX @bugfix Mr. Meeseeks 19/06/2026 - Initialize volume using adjustPlayingVolume
 	adjustPlayingVolume(audio);
+	if (event->getPlayMusicOnce() && event->getShouldFade())
+	{
+		const auto duration = static_cast<ma_uint64>(getAudioSettings()->m_fadeAudioFrames) * MSEC_PER_SECOND / LOGICFRAMES_PER_SECOND;
+		ma_sound_set_fade_in_milliseconds(sound, 0.0f, 1.0f, duration);
+	}
 
 	result = ma_sound_start(sound);
 	if (result != MA_SUCCESS) {
@@ -958,7 +963,7 @@ void MiniAudioManager::notifyOfAudioCompletion(UnsignedInt audioCompleted, Unsig
 	if (getDisallowSpeech() && playing->m_audioEventRTS->getAudioEventInfo()->m_soundType == AT_Streaming)
 		setDisallowSpeech(FALSE);
 
-	if (playing->m_audioEventRTS->getAudioEventInfo()->m_control & AC_LOOP) {
+	if (!playing->m_audioEventRTS->getPlayMusicOnce() && (playing->m_audioEventRTS->getAudioEventInfo()->m_control & AC_LOOP)) {
 		if (playing->m_audioEventRTS->getNextPlayPortion() == PP_Attack)
 			playing->m_audioEventRTS->setNextPlayPortion(PP_Sound);
 		if (playing->m_audioEventRTS->getNextPlayPortion() == PP_Sound) {

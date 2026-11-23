@@ -737,6 +737,10 @@ void SidesList::emptySides()
 	m_mapSideFlag = false;
 	m_mapSidesVersion = 0;
 	m_scriptLibraries.clear();
+	m_retailMusicSide.clear();
+	m_musicCompatibilityList = nullptr;
+	m_musicOrderBegin = 0;
+	m_musicOrderEnd = 0;
 	for (i = 0; i < MAX_MAP_SIDES; i++) {
 		m_sides[i].clear();
 	}

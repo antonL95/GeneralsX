@@ -30,6 +30,8 @@
 #pragma once
 
 class Condition;
+class Object;
+struct Coord3D;
 class ObjectTypes;
 class Parameter;
 class Player;
@@ -53,6 +55,9 @@ public:
 
 };
 extern ScriptConditionsInterface *TheScriptConditions;   ///< singleton definition
+
+Bool evaluateRetailUnitsFarFromObject(Condition& condition, const Object* anchor);
+Bool evaluateRetailUnitsNearPosition(Condition& condition, const Coord3D& position);
 
 
 //-----------------------------------------------------------------------------

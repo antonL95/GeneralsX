@@ -603,6 +603,25 @@ void parseMultiSound(INI* ini)
 	multiSounds.insert_or_assign(name, std::move(multi));
 }
 
+AsciiString chooseMultiSoundTrack(const AsciiString& event)
+{
+	AsciiString track = event;
+	std::vector<AsciiString> parents;
+	while (true)
+	{
+		const AsciiString key = lower(track);
+		const auto multi = multiSounds.find(key);
+		if (multi == multiSounds.end())
+			return track;
+		const auto& [children, playOne] = multi->second;
+		if (children.empty() || (!playOne && children.size() != 1) ||
+			std::find(parents.begin(), parents.end(), key) != parents.end())
+			return AsciiString();
+		parents.push_back(key);
+		track = children[GameAudioRandomValue(0, static_cast<Int>(children.size() - 1))];
+	}
+}
+
 void parseUnusedKeys(INI* ini)
 {
 	static const FieldParse fields[] = {

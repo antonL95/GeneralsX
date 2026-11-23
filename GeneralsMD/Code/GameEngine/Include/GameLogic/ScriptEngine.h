@@ -384,7 +384,7 @@ protected:
 	Int allocateCounter( const AsciiString& name);
 	Int allocateFlag( const AsciiString& name);
 	void executeScripts( Script *pScriptHead );
-	void executeBfmeScripts(Script *script, ScriptGroup *&group, Int depth, Bool active);
+	void executeBfmeScripts(Script *script, ScriptGroup *&group, Int depth, Bool active, const ScriptList *list = nullptr);
 	void executeGroupScripts(ScriptGroup *group);
 	void executeScript( Script *pScript );
 	Script *findScript(const AsciiString& name);
@@ -398,7 +398,7 @@ protected:
 	void pauseTimer( ScriptAction *pAction );
 	void restartTimer( ScriptAction *pAction );
 	void setTimer( ScriptAction *pAction, Bool millisecondTimer, Bool random);
-	void setRandomCounter(ScriptAction *pAction, Bool clientSide);
+	void setRandomCounter(ScriptAction *pAction);
 	void initRotwkTemplates();
 	void dumpTemplates();
 	void adjustTimer( ScriptAction *pAction, Bool millisecondTimer, Bool add);
