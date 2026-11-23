@@ -25,7 +25,11 @@ check() {
         expect "WEAPON-UPGRADE result frame=325 actor=HaradBlackNumenoranWarriorsHorde set=HaradDarkNumenoreanWarriorsHordeCommandSet rank=1 banner=0 button=1 queued=1 complete=0" || return
     fi
     if covers 650; then
-        grep -E '^WEAPON-UPGRADE result frame=650 actor=HaradBlackNumenoranWarriorsHorde set=HaradDarkNumenoreanWarriorsHordeCommandSet rank=2 banner=[01] button=1 queued=0 complete=1$' "$log" || return
+        harad_set=HaradDarkNumenoreanWarriorsHordeCommandSet
+        if grep -Fxq 'TEST frame 403: grant Player_1 Upgrade_ObjectUnderAIControl' "$log"; then
+            harad_set=${harad_set}_ForAI
+        fi
+        grep -E "^WEAPON-UPGRADE result frame=650 actor=HaradBlackNumenoranWarriorsHorde set=$harad_set rank=2 banner=[01] button=1 queued=0 complete=1$" "$log" || return
     fi
     if covers 233; then
         expect "WEAPON-UPGRADE button frame=233 actor=ElvenRivendellKnightHorde slot=5 name=Command_PurchaseUpgradeArnorForgedBlades upgrade=Upgrade_ArnorForgedBlades state=enabled prerequisite=1 affected=1 offered=1 affordable=1" || return
