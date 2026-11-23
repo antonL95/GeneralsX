@@ -1,0 +1,2 @@
+20 create Player_1 CINEfireMedium 0 2520,1010,0
+21 reveal Player_1 CINEfireMedium 0
