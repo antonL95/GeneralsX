@@ -547,6 +547,8 @@ void INI::unPrepFile()
 //-------------------------------------------------------------------------------------------------
 static INIBlockParse findBlockParse(const char* token)
 {
+	if (strcmp(token, "MissionObjectiveList") == 0)
+		return RetailObjectives::parse;
 	if (RetailFileLayers::enabled())
 	{
 		if (strcmp(token, "FireLogicSystem") == 0)

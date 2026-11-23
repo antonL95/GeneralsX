@@ -1294,6 +1294,7 @@ ControlBar::~ControlBar()
 			TheDisplayStringManager->freeDisplayString(m_retailBuildingDetails);
 	}
 	destroyRetailPowers();
+	RetailObjectives::close();
 
 	if(m_scienceLayout)
 	{
@@ -1607,6 +1608,7 @@ void ControlBar::init()
 void ControlBar::reset()
 {
 	showRetailPowers(FALSE);
+	RetailObjectives::reset();
 	hideSpecialPowerShortcut();
 	// do not destroy the rally drawable, it will get destroyed with everything else during a reset
 	m_rallyPointDrawableID = INVALID_DRAWABLE_ID;

@@ -6,6 +6,7 @@
 #include "Common/GameEngine.h"
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
+#include "Common/INI.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -20,9 +21,11 @@
 #include "GameClient/GameText.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Image.h"
+#include "GameClient/InGameUI.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/MapUtil.h"
 #include "GameClient/Mouse.h"
+#include "GameClient/RetailHudExtras.h"
 #include "GameClient/Shell.h"
 #include "GameClient/UiFrame.h"
 #include "GameClient/WindowLayout.h"
@@ -208,6 +211,254 @@ namespace
 			return -1;
 		return row - '0';
 	}
+
+	struct ObjectiveEntry
+	{
+		AsciiString text;
+		Bool visible = FALSE;
+		Bool completed = FALSE;
+		Bool bonus = FALSE;
+	};
+
+	std::vector<ObjectiveEntry> objectiveEntries;
+	GameWindow *objectivesWindow = nullptr;
+	std::unique_ptr<AptScene> objectivesScene;
+	std::unique_ptr<AptScene> objectiveChecks;
+	Bool objectivesEnabled = TRUE;
+	Bool objectivesPausedGame = FALSE;
+	Bool playerStatusMode = FALSE;
+	Bool resumePressed = FALSE;
+	constexpr const char *playerStatusClose = "_root.OuterFrame.Pages.Cancel";
+
+	template<Bool Bonus>
+	void parseObjective(INI *ini, void *instance, void *, const void *)
+	{
+		auto &entries = *static_cast<std::vector<ObjectiveEntry> *>(instance);
+		entries.push_back({ini->getNextToken(), FALSE, FALSE, Bonus});
+	}
+
+	ObjectiveEntry *objectiveByNumber(Int number)
+	{
+		return number >= 1 && size_t(number) <= objectiveEntries.size() ? &objectiveEntries[number - 1] : nullptr;
+	}
+
+	std::unique_ptr<AptScene> readPlayerStatusScene()
+	{
+		return std::make_unique<AptScene>("PlayerTribute", "#5",
+			std::initializer_list<std::pair<const char *, const char *>>{
+				{"_root.OuterFrame", "#27"},
+				{"_root.OuterFrame.Pages", "#11"},
+				{"_root.OuterFrame.Pages.Cancel", "#19"},
+				{"_root.OuterFrame.Pages.StatusPage.Table", "#2"}
+			});
+	}
+
+	void drawPlayerStatus(const AptScene &scene, const Painter &painter)
+	{
+		const GameInfo *game = TheGameLogic->isInSkirmishGame() ? TheSkirmishGameInfo : TheGameInfo;
+		scene.draw([](const std::string &path) {
+			return !childOf(path, "_root.OuterFrame.Pages.TributePage");
+		}, [&](const std::string &path, const AptScene::Text &label) {
+			const Int row = rowAt(path, "_root.OuterFrame.Pages.StatusPage.Table.");
+			if (row < 0)
+			{
+				if (childOf(path, "_root.OuterFrame.Pages.Cancel"))
+					painter.label(localize("APT:Cancel", "Cancel"), label, white);
+				else if (childOf(path, "_root.OuterFrame.Pages.@1.Tab1"))
+					painter.label(localize("APT:StatusTab", "Status"), label, white);
+				else if (childOf(path, "_root.OuterFrame.Pages.@1.Tab2"))
+					painter.label(localize("APT:TributeTab", "Tribute"), label, muted);
+				else if (label.value == "$TributeScreenTitle")
+					painter.label(localize("APT:TributeScreenTitle", "Players"), label, white);
+				else if (label.value.starts_with("$Header"))
+					painter.label(aptText(label.value), label, white);
+				return;
+			}
+
+			Player *player = ThePlayerList->getPlayerFromSlotIndex(row);
+			const GameSlot *slot = game ? game->getConstSlot(row) : nullptr;
+			if (!player || !slot || !slot->isOccupied() || slot->getPlayerTemplate() == PLAYERTEMPLATE_OBSERVER)
+				return;
+			UnicodeString value;
+			if (path.ends_with(".Name"))
+			{
+				value = player->getPlayerDisplayName();
+				if (value.isEmpty() && slot->isAI())
+					value = localize(aiLabel(*slot), "Computer");
+			}
+			else if (path.ends_with(".@2"))
+				value = slot->getApparentPlayerTemplateDisplayName();
+			else if (path.ends_with(".@3"))
+				value = slot->getTeamNumber() < 0 ? localize("APT:None", "None") : number(slot->getTeamNumber() + 1);
+			else if (path.ends_with(".@4"))
+				value = player->isPlayerDead() ? localize("APT:Defeated", "Defeated") : localize("APT:Playing", "Playing");
+			painter.label(value, label, player->getPlayerColor() | 0xFF000000);
+		});
+	}
+
+	void drawCampaignObjectives(const AptScene &scene, const Painter &painter)
+	{
+		scene.draw([](const std::string &path) {
+			return !childOf(path, "_root.objectives");
+		}, [&](const std::string &path, const AptScene::Text &label) {
+			if (childOf(path, "_root.Resume"))
+				painter.label(localize("APT:ResumeGame", "Resume Game"), label, white);
+			else if (label.value == "$PAGETITLE")
+				painter.label(localize("APT:Objectives", "Objectives"), label, white);
+		});
+
+		Int row = 0;
+		for (const ObjectiveEntry &entry : objectiveEntries)
+		{
+			if (!entry.visible)
+				continue;
+			const std::string path = "_root.objectives.Objective" + std::to_string(++row);
+			const Box text = scene.bounds(path + ".Text.textClip.textField");
+			if (!text.valid())
+				break;
+			painter.text(TheGameText->fetch(entry.text), text, 14, entry.bonus ? muted : white, "Albertus MT", FALSE, TRUE);
+			const Box icon = scene.bounds(path + ".Icon");
+			if (entry.completed && objectiveChecks && objectiveChecks->valid())
+			{
+				const Box iconArt = objectiveChecks->bounds("objective_checked");
+				objectiveChecks->drawFrameAt(0, (icon.left - iconArt.left) * painter.sx,
+					(icon.top - iconArt.top) * painter.sy, painter.sx, painter.sy);
+			}
+			else
+				scene.drawAt([&](const std::string &element) { return childOf(element, path + ".Icon"); },
+					0, 0, painter.sx, painter.sy, 1.0f);
+		}
+	}
+
+	void drawObjectives(GameWindow *window, WinInstanceData *)
+	{
+		window->winSetSize(TheDisplay->getWidth(), TheDisplay->getHeight());
+		const AptScene &scene = *objectivesScene;
+		const Painter painter(scene);
+		if (playerStatusMode)
+			drawPlayerStatus(scene, painter);
+		else
+			drawCampaignObjectives(scene, painter);
+	}
+
+	WindowMsgHandledType objectivesInput(GameWindow *, UnsignedInt message, WindowMsgData point, WindowMsgData state)
+	{
+		if (message == GWM_CHAR && point == KEY_ESC && (state & KEY_STATE_UP))
+			RetailObjectives::close();
+		if (message == GWM_LEFT_DOWN || message == GWM_LEFT_UP)
+		{
+			const AptScene &scene = *objectivesScene;
+			const Box resume = scene.bounds(playerStatusMode ? playerStatusClose : "_root.Resume");
+			const Bool overResume = resume.contains((point & 0xFFFF) / scene.xScale(), (point >> 16) / scene.yScale());
+			if (message == GWM_LEFT_DOWN)
+				resumePressed = overResume;
+			else if (resumePressed && overResume)
+				RetailObjectives::close();
+		}
+		return MSG_HANDLED;
+	}
+
+	WindowMsgHandledType objectivesSystem(GameWindow *window, UnsignedInt message, WindowMsgData state, WindowMsgData result)
+	{
+		if (message == GWM_INPUT_FOCUS && state)
+		{
+			*reinterpret_cast<Bool *>(result) = TRUE;
+			return MSG_HANDLED;
+		}
+		if (message == GWM_DESTROY && window == objectivesWindow)
+			objectivesWindow = nullptr;
+		return MSG_IGNORED;
+	}
+}
+
+namespace RetailObjectives
+{
+void parse(INI *ini)
+{
+	static const FieldParse fields[] = {
+		{"MissionObjectiveTag", parseObjective<FALSE>, nullptr, 0},
+		{"BonusMissionObjectiveTag", parseObjective<TRUE>, nullptr, 0},
+		{nullptr, nullptr, nullptr, 0}
+	};
+	ini->initFromINI(&objectiveEntries, fields);
+}
+
+void show()
+{
+	if (!objectivesEnabled || objectivesWindow || !TheGameLogic->isInGame() || TheInGameUI->isQuitMenuVisible())
+		return;
+	playerStatusMode = TheGameLogic->isInSkirmishGame() || TheGameLogic->isInMultiplayerGame();
+	objectivesScene = playerStatusMode ? readPlayerStatusScene() : std::make_unique<AptScene>("Objectives");
+	const char *closePath = playerStatusMode ? playerStatusClose : "_root.Resume";
+	if (!objectivesScene->valid() || !objectivesScene->bounds(closePath).valid())
+	{
+		DEBUG_LOG(("RetailObjectives: missing %s in %s", closePath, playerStatusMode ? "PlayerTribute" : "Objectives"));
+		objectivesScene.reset();
+		return;
+	}
+	if (!playerStatusMode)
+		objectiveChecks = std::make_unique<AptScene>("MenuExport", AptScene::AnimatedExport{"objective_checked"});
+	objectivesWindow = fullScreen();
+	if (!objectivesWindow)
+	{
+		objectivesScene.reset();
+		objectiveChecks.reset();
+		return;
+	}
+	objectivesWindow->winSetInputFunc(objectivesInput);
+	objectivesWindow->winSetSystemFunc(objectivesSystem);
+	objectivesWindow->winSetDrawFunc(drawObjectives);
+	TheInGameUI->setGUICommand(nullptr);
+	if (GameWindow *grab = TheWindowManager->winGetGrabWindow())
+	{
+		grab->winClearStatus(WIN_STATUS_ACTIVE);
+		TheWindowManager->winSetGrabWindow(nullptr);
+	}
+	TheWindowManager->winSetModal(objectivesWindow);
+	TheWindowManager->winSetFocus(objectivesWindow);
+	resumePressed = FALSE;
+	objectivesPausedGame = !playerStatusMode && !TheGameLogic->isGamePaused();
+	if (objectivesPausedGame)
+		TheGameLogic->setGamePaused(TRUE);
+}
+
+void close()
+{
+	if (objectivesWindow)
+		TheWindowManager->winDestroy(objectivesWindow);
+	objectivesWindow = nullptr;
+	objectivesScene.reset();
+	objectiveChecks.reset();
+	if (objectivesPausedGame && TheGameLogic && TheGameLogic->isGamePaused())
+		TheGameLogic->setGamePaused(FALSE);
+	objectivesPausedGame = FALSE;
+}
+
+void reset()
+{
+	close();
+	objectiveEntries.clear();
+	objectivesEnabled = TRUE;
+}
+
+void setEnabled(Bool enabled)
+{
+	objectivesEnabled = enabled;
+	if (!enabled)
+		close();
+}
+
+void setVisible(Int objective, Bool visible)
+{
+	if (ObjectiveEntry *entry = objectiveByNumber(objective))
+		entry->visible = visible;
+}
+
+void setCompleted(Int objective, Bool completed)
+{
+	if (ObjectiveEntry *entry = objectiveByNumber(objective))
+		entry->completed = completed;
+}
 }
 
 class RetailLoadingScreen::Data

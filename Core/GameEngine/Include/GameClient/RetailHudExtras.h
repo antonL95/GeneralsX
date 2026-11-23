@@ -44,3 +44,14 @@ void showType(const AsciiString &type, const UnicodeString &message, Real second
 void showHero(HeroEvent event, const ThingTemplate *hero, const UnicodeString *award = nullptr, const Image *awardIcon = nullptr);
 Bool handleInput(UnsignedInt msg, Int x, Int y);
 }
+
+namespace RetailObjectives
+{
+void parse(INI *ini);
+void reset();
+void show();
+void close();
+void setEnabled(Bool enabled);
+void setVisible(Int objective, Bool visible);
+void setCompleted(Int objective, Bool completed);
+}

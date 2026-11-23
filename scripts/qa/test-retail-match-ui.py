@@ -166,6 +166,26 @@ def connector_brightness():
     return sum(color & 0xFF for color in signature) / len(signature)
 
 
+def check_hud_actions():
+    area = (436, 421, 154, 39)
+    baseline = title_signature(*area)
+    click(171, 559)
+    wait_for("the Palantir banner opens Player Status",
+             lambda: sum(abs((before & 0xFF) - (after & 0xFF)) > 24
+                         for before, after in zip(baseline, title_signature(*area))) > len(baseline) // 3)
+    visible = title_signature(*area)
+    count = log_count("TEST powerstate ")
+    wait_for("Player Status leaves the match running", lambda: log_count("TEST powerstate ") > count)
+    capture("player-status", 240, 75, 550, 395)
+    click(514, 440)
+    wait_for("Cancel closes Player Status",
+             lambda: sum(abs((before & 0xFF) - (after & 0xFF)) > 24
+                         for before, after in zip(visible, title_signature(*area))) > len(visible) // 3)
+    click(85, 559)
+    wait_for("the Palantir key opens Pause", menu_visible)
+    capture("palantir-pause", 360, 312, 304, 170)
+
+
 def check_spellbook():
     arena = title_signature(380, 110, 264, 72)
     click(128, 553, settle=0)
@@ -335,6 +355,9 @@ def check():
     wait_for("first skirmish reaches frame 60", lambda: log_count("TEST powerstate 60 Player_1") >= 1, 60)
     if "--spellbook" in sys.argv:
         check_spellbook()
+        return
+    if "--hud-actions" in sys.argv:
+        check_hud_actions()
         return
     key(0xFF1B)
     wait_for("Escape opens the in-game menu", menu_visible)

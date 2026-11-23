@@ -6728,6 +6728,21 @@ void orderRetailTeam(Team& team, const Coord3D& position, Bool attack)
 void ScriptActions::executeAction( ScriptAction *pAction )
 {
 	switch (pAction->getActionType()) {
+		case ScriptAction::SHOW_MISSION_OBJECTIVE:
+		case ScriptAction::HIDE_MISSION_OBJECTIVE:
+			RetailObjectives::setVisible(pAction->getParameter(0)->getInt(), pAction->getActionType() == ScriptAction::SHOW_MISSION_OBJECTIVE);
+			return;
+		case ScriptAction::MARK_MISSION_OBJECTIVE_COMPLETED:
+		case ScriptAction::MARK_MISSION_OBJECTIVE_NOT_COMPLETED:
+			RetailObjectives::setCompleted(pAction->getParameter(0)->getInt(), pAction->getActionType() == ScriptAction::MARK_MISSION_OBJECTIVE_COMPLETED);
+			return;
+		case ScriptAction::ENABLE_OBJECTIVES_SCREEN:
+		case ScriptAction::DISABLE_OBJECTIVES_SCREEN:
+			RetailObjectives::setEnabled(pAction->getActionType() == ScriptAction::ENABLE_OBJECTIVES_SCREEN);
+			return;
+		case ScriptAction::CLOSE_OBJECTIVES_SCREEN:
+			RetailObjectives::close();
+			return;
 		default:
 			if (pAction->getActionType() >= ScriptAction::FIRST_ROTWK)
 			{

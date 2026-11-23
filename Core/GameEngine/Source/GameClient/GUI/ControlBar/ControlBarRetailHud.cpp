@@ -283,34 +283,51 @@ Bool isMouseMessage(UnsignedInt msg)
 		|| msg == GWM_MIDDLE_DOWN || msg == GWM_MIDDLE_UP || msg == GWM_MOUSE_POS;
 }
 
+Bool handleRimInput(GameWindow *palantir, UnsignedInt msg, Int px, Int py)
+{
+	if (msg == GWM_MOUSE_LEAVING)
+		s_rimButton = RimNone;
+	if (msg == GWM_LEFT_DRAG)
+		return s_rimButton != RimNone;
+	if (msg != GWM_LEFT_DOWN && msg != GWM_LEFT_UP)
+		return FALSE;
+	Int x, y, width, height;
+	windowRect(palantir, x, y, width, height);
+	const Real scale = width / PalantirDesignWidth;
+	const Bool overOptions = insideRect(px, py, x, y, scale, OptionsKey);
+	const Bool overObjectives = insideRect(px, py, x, y, scale, Objectives);
+	if (msg == GWM_LEFT_DOWN)
+	{
+		s_rimButton = overOptions ? RimOptions : overObjectives ? RimObjectives : RimNone;
+		return s_rimButton != RimNone;
+	}
+	const Int pressed = s_rimButton;
+	s_rimButton = RimNone;
+	if (pressed == RimOptions && overOptions)
+		ToggleQuitMenu();
+	else if (pressed == RimObjectives && overObjectives)
+		RetailObjectives::show();
+	return pressed != RimNone || overOptions || overObjectives;
+}
+
+WindowMsgHandledType retailRadarInput(GameWindow *window, UnsignedInt msg, WindowMsgData point, WindowMsgData state)
+{
+	if (handleRimInput(window->winGetParent(), msg, point & 0xFFFF, point >> 16))
+		return MSG_HANDLED;
+	return LeftHUDInput(window, msg, point, state);
+}
+
 WindowMsgHandledType retailPalantirInput(GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData buttonEvent)
 {
+	const Int px = mData1 & 0xFFFF;
+	const Int py = mData1 >> 16;
+	if (handleRimInput(window, msg, px, py))
+		return MSG_HANDLED;
 	if (!isMouseMessage(msg))
 		return MSG_IGNORED;
 	Int x, y, width, height;
 	windowRect(window, x, y, width, height);
 	const Real scale = width / PalantirDesignWidth;
-	const Int px = mData1 & 0xFFFF;
-	const Int py = mData1 >> 16;
-	const Bool overOptions = insideRect(px, py, x, y, scale, OptionsKey);
-	const Bool overObjectives = insideRect(px, py, x, y, scale, Objectives);
-	if (msg == GWM_LEFT_DOWN && (overOptions || overObjectives))
-	{
-		s_rimButton = overOptions ? RimOptions : RimObjectives;
-		return MSG_HANDLED;
-	}
-	if (msg == GWM_LEFT_UP)
-	{
-		const Int pressed = s_rimButton;
-		s_rimButton = RimNone;
-		if (pressed == RimOptions && overOptions)
-		{
-			ToggleQuitMenu();
-			return MSG_HANDLED;
-		}
-		if (pressed == RimObjectives && overObjectives)
-			return MSG_HANDLED;
-	}
 	const Bool inside = insideCircle(px, py, x, y, scale, 125.85f, 172.0f, 118.0f)
 		|| insideCircle(px, py, x, y, scale, 285.7f, 191.4f, 92.0f)
 		|| insideRect(px, py, x, y, scale, PlaqueArea) || insideRect(px, py, x, y, scale, TopPlate)
@@ -977,6 +994,7 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 
 void ControlBar::initRetailHud()
 {
+	s_rimButton = RimNone;
 	GameWindow *master = m_contextParent[CP_MASTER];
 	m_contextParent[CP_COMMAND] = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:CommandWindow"));
 	m_retailPortrait = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:CameoWindow"));
@@ -993,6 +1011,9 @@ void ControlBar::initRetailHud()
 	palantir->winSetDrawFunc(drawRetailPalantirBack);
 	radarBack->winSetDrawFunc(drawRetailRadarBack);
 	palantir->winSetInputFunc(retailPalantirInput);
+	GameWindow *radar = TheWindowManager->winGetWindowFromId(palantir, NAMEKEY("ControlBar.wnd:LeftHUD"));
+	if (radar)
+		radar->winSetInputFunc(retailRadarInput);
 	GameWindow *sideBar = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:SideBar"));
 	if (!sideBar)
 		throw INIException("RetailHud.wnd is missing the side bar");
