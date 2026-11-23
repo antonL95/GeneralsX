@@ -1,31 +1,35 @@
-174 create Player_1 ArnorSpellBook 0 3300,1720,0
-175 science Player_1 - 0 SCIENCE_HallOfFire
-220 create PlyrCreeps HallFireEnemy 0 3310,1720,0
-237 hall-cast Player_1 ArnorSpellBook 0 cast 3300 1720
-243 hall-residents Player_1 RivendellHallOfFire 0
-243 hall-probe PlyrCreeps HallFireEnemy 0 enemy-before 3310 1720
-264 hall-residents Player_1 RivendellHallOfFire 0
-264 hall-probe PlyrCreeps HallFireEnemy 0 enemy-launch 3310 1720
-330 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnTurinDummy 3370 1540
-332 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnGilGaladDummy 3370 1540
-345 create Player_1 RivendellHallOfFire 0 3370,1860,0
-350 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnGilGaladDummy 3120 1870
-416 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 3120 1870
-425 hall-probe Player_1 RivendellTurin 0 turin 3370 1540
-446 hall-probe Player_1 RivendellGilGalad 0 gil-galad 3120 1870
-450 destroy Player_1 RivendellHallOfFire 1
-458 create Player_1 RivendellHallOfFire 0 3370,1860,0
-464 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnFingolfinDummy 3150 1550
-561 hall-probe Player_1 RivendellFingolfin 0 fingolfin 3150 1550
-565 destroy Player_1 RivendellHallOfFire 1
-570 create Player_1 RivendellHallOfFire 0 3370,1860,0
-575 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnCelebrimborDummy 3370 1450
-672 hall-probe Player_1 RivendellCelebrimbor 0 celebrimbor 3370 1450
-678 destroy Player_1 RivendellHallOfFire 1
-681 create Player_1 RivendellHallOfFire 0 3370,1860,0
-685 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnElendilDummy 3270 1910
-782 hall-probe Player_1 RivendellElendil 0 elendil 3270 1910
-785 destroy Player_1 RivendellHallOfFire 1
-790 create Player_1 RivendellHallOfFire 0 3370,1860,0
-794 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnAmrothDummy 3240 1450
-891 hall-probe Player_1 RivendellAmroth 0 amroth 3240 1450
+805 create Player_1 ArnorSpellBook 0 3300,1720,0
+806 science Player_1 - 0 SCIENCE_HallOfFire
+810 create PlyrCreeps HallFireEnemy 0 3310,1720,0
+812 hall-cast Player_1 ArnorSpellBook 0 cast 3300 1720
+818 hall-residents Player_1 RivendellHallOfFire 0
+818 hall-probe PlyrCreeps HallFireEnemy 0 enemy-before 3310 1720
+839 hall-residents Player_1 RivendellHallOfFire 0
+839 hall-probe PlyrCreeps HallFireEnemy 0 enemy-launch 3310 1720
+902 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnTurinDummy 3370 1540
+904 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnGilGaladDummy 3370 1540
+910 create Player_1 RivendellHallOfFire 0 3200,1850,0
+915 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnGilGaladDummy 3390 1910
+920 create Player_1 RivendellHallOfFire 0 3240,1450,0
+925 hall-summon Player_1 RivendellHallOfFire 2 Command_SpawnFingolfinDummy 3150 1550
+967 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 3390 1910
+980 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 3390 1910
+993 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 3390 1910
+1006 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 3390 1910
+1008 hall-probe Player_1 RivendellTurin 0 turin 3370 1540
+1019 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 3390 1910
+1021 hall-probe Player_1 RivendellGilGalad 0 gil-galad 3390 1910
+1025 destroy Player_1 RivendellHallOfFire 1
+1031 create Player_1 RivendellHallOfFire 0 3200,1850,0
+1036 hall-summon Player_1 RivendellHallOfFire 2 Command_SpawnCelebrimborDummy 3370 1450
+1038 hall-probe Player_1 RivendellFingolfin 0 fingolfin 3150 1550
+1041 destroy Player_1 RivendellHallOfFire 1
+1047 create Player_1 RivendellHallOfFire 0 3240,1450,0
+1052 hall-summon Player_1 RivendellHallOfFire 2 Command_SpawnElendilDummy 3270 1910
+1142 hall-probe Player_1 RivendellCelebrimbor 0 celebrimbor 3370 1450
+1148 destroy Player_1 RivendellHallOfFire 1
+1158 hall-probe Player_1 RivendellElendil 0 elendil 3270 1910
+1161 destroy Player_1 RivendellHallOfFire 1
+1167 create Player_1 RivendellHallOfFire 0 3200,1850,0
+1172 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnAmrothDummy 3240 1450
+1278 hall-probe Player_1 RivendellAmroth 0 amroth 3240 1450
