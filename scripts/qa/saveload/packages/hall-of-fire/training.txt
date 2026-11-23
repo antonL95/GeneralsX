@@ -1,35 +1,35 @@
-805 create Player_1 ArnorSpellBook 0 250,1080,0
+805 create Player_1 ArnorSpellBook 0 230,1940,0
 806 science Player_1 - 0 SCIENCE_HallOfFire
-810 create PlyrCreeps HallFireEnemy 0 260,1080,0
-812 hall-cast Player_1 ArnorSpellBook 0 cast 250 1080
+810 create PlyrCreeps HallFireEnemy 0 240,1940,0
+812 hall-cast Player_1 ArnorSpellBook 0 cast 230 1940
 818 hall-residents Player_1 RivendellHallOfFire 0
-818 hall-probe PlyrCreeps HallFireEnemy 0 enemy-before 260 1080
+818 hall-probe PlyrCreeps HallFireEnemy 0 enemy-before 240 1940
 839 hall-residents Player_1 RivendellHallOfFire 0
-839 hall-probe PlyrCreeps HallFireEnemy 0 enemy-launch 260 1080
-902 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnTurinDummy 320 900
-904 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnGilGaladDummy 320 900
-910 create Player_1 RivendellHallOfFire 0 150,1210,0
-915 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnGilGaladDummy 340 1270
-920 create Player_1 RivendellHallOfFire 0 190,810,0
-925 hall-summon Player_1 RivendellHallOfFire 2 Command_SpawnFingolfinDummy 100 910
-967 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 340 1270
-980 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 340 1270
-993 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 340 1270
-1006 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 340 1270
-1008 hall-probe Player_1 RivendellTurin 0 turin 320 900
-1019 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 340 1270
-1021 hall-probe Player_1 RivendellGilGalad 0 gil-galad 340 1270
+839 hall-probe PlyrCreeps HallFireEnemy 0 enemy-launch 240 1940
+902 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnTurinDummy 300 1760
+904 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnGilGaladDummy 300 1760
+910 create Player_1 RivendellHallOfFire 0 130,2070,0
+915 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnGilGaladDummy 320 2130
+920 create Player_1 RivendellHallOfFire 0 170,1670,0
+925 hall-summon Player_1 RivendellHallOfFire 2 Command_SpawnFingolfinDummy 80 1770
+967 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 320 2130
+980 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 320 2130
+993 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 320 2130
+1006 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 320 2130
+1008 hall-probe Player_1 RivendellTurin 0 turin 300 1760
+1019 hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 320 2130
+1021 hall-probe Player_1 RivendellGilGalad 0 gil-galad 320 2130
 1025 destroy Player_1 RivendellHallOfFire 1
-1031 create Player_1 RivendellHallOfFire 0 150,1210,0
-1036 hall-summon Player_1 RivendellHallOfFire 2 Command_SpawnCelebrimborDummy 320 810
-1038 hall-probe Player_1 RivendellFingolfin 0 fingolfin 100 910
+1031 create Player_1 RivendellHallOfFire 0 130,2070,0
+1036 hall-summon Player_1 RivendellHallOfFire 2 Command_SpawnCelebrimborDummy 300 1670
+1038 hall-probe Player_1 RivendellFingolfin 0 fingolfin 80 1770
 1041 destroy Player_1 RivendellHallOfFire 1
-1047 create Player_1 RivendellHallOfFire 0 190,810,0
-1052 hall-summon Player_1 RivendellHallOfFire 2 Command_SpawnElendilDummy 220 1270
-1142 hall-probe Player_1 RivendellCelebrimbor 0 celebrimbor 320 810
+1047 create Player_1 RivendellHallOfFire 0 170,1670,0
+1052 hall-summon Player_1 RivendellHallOfFire 2 Command_SpawnElendilDummy 200 2130
+1142 hall-probe Player_1 RivendellCelebrimbor 0 celebrimbor 300 1670
 1148 destroy Player_1 RivendellHallOfFire 1
-1158 hall-probe Player_1 RivendellElendil 0 elendil 220 1270
+1158 hall-probe Player_1 RivendellElendil 0 elendil 200 2130
 1161 destroy Player_1 RivendellHallOfFire 1
-1167 create Player_1 RivendellHallOfFire 0 150,1210,0
-1172 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnAmrothDummy 190 810
-1278 hall-probe Player_1 RivendellAmroth 0 amroth 190 810
+1167 create Player_1 RivendellHallOfFire 0 130,2070,0
+1172 hall-summon Player_1 RivendellHallOfFire 1 Command_SpawnAmrothDummy 170 1670
+1278 hall-probe Player_1 RivendellAmroth 0 amroth 170 1670
