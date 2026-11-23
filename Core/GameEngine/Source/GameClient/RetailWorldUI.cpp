@@ -89,7 +89,7 @@ void drawRank(const Object& object, Int rank, Int center, Int barTop)
 		return;
 
 	constexpr Int ranksPerStar = 5;
-	constexpr Real rankBottomAboveHealthBar = 5.0f;
+	constexpr Real rankBottomAboveHealthBar = 2.0f;
 	const Real zoom = TheTacticalView->getZoom();
 	if (zoom <= 0.0f)
 		return;
