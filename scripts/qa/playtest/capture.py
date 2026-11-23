@@ -78,7 +78,19 @@ class PinDynamicLOD(gdb.Breakpoint):
         return False
 
 
+class PinClientUpdateDelta(gdb.Breakpoint):
+    def __init__(self, fps):
+        super().__init__("GameClient::update", internal=True)
+        self.delta = 1.0 / fps
+
+    def stop(self):
+        gdb.execute(f"set variable TheFramePacer->m_updateTime = {self.delta:.12g}", to_string=True)
+        return False
+
+
 Draw("W3DDisplay::draw", internal=True)
 Capture()
 if os.environ.get("PLAYTEST_PIN_DYNAMIC_LOD") == "1":
     PinDynamicLOD("GameLODManager::findDynamicLODLevel", internal=True)
+if "PLAYTEST_FIXED_UPDATE_FPS" in os.environ:
+    PinClientUpdateDelta(int(os.environ["PLAYTEST_FIXED_UPDATE_FPS"]))
