@@ -1,0 +1,28 @@
+218 create Player_1 CreepEntryHero 0 450,1940,0
+218 create PlyrCreeps CreepEntryTroll 0 535,1940,0
+219 reveal Player_1 CreepEntryHero 0
+219 damage PlyrCreeps CreepEntryTroll 0 3250
+228 creep-entry-check Player_1 CreepEntryHero 0 PlyrCreeps:CreepEntryTroll:0
+228 creep-entry-check Player_1 CreepEntryHero 0 PlyrCreeps:NeutralWarg:0
+228 creep-entry-check Player_1 CreepEntryHero 0 PlyrCreeps:MinorSpider:0
+230 pkg31-msg-enter Player_1 CreepEntryHero 0 PlyrCreeps:CreepEntryTroll:0
+231 select Player_1 CreepEntryHero 0
+232 creep-entry-state Player_1 CreepEntryHero 0 PlyrCreeps:CreepEntryTroll:0
+238 select Player_1 CreepEntryHero 0
+238 creep-entry-hover Player_1 CreepEntryHero 0 PlyrCreeps:CreepEntryTroll:0
+238 creep-entry-order Player_1 CreepEntryHero 0 PlyrCreeps:CreepEntryTroll:0
+242 creep-entry-state Player_1 CreepEntryHero 0 PlyrCreeps:CreepEntryTroll:0
+249 creep-entry-state Player_1 CreepEntryHero 0 PlyrCreeps:CreepEntryTroll:0
+425 creep-entry-state Player_1 CreepEntryHero 0 PlyrCreeps:CreepEntryTroll:0
+425 creep-entry-state PlyrCreeps CreepEntryTroll 0
+
+450 create Player_1 CreepEntryKeep 0 515,1880,0
+451 creep-entry-check Player_1 CreepEntryHero 0 Player_1:CreepEntryKeep:0
+451 pkg31-msg-enter Player_1 CreepEntryHero 0 Player_1:CreepEntryKeep:0
+600 creep-entry-state Player_1 CreepEntryHero 0 Player_1:CreepEntryKeep:0
+
+450 create Player_1 CreepEntryGrabber 0 685,1920,0
+450 create PlyrCreeps CreepEntryGrabVictim 0 700,1920,0
+451 creep-entry-check Player_1 CreepEntryHero 0 Player_1:CreepEntryGrabber:0
+451 pkg20-grab Player_1 CreepEntryGrabber 0 PlyrCreeps:CreepEntryGrabVictim:0
+485 creep-entry-state PlyrCreeps CreepEntryGrabVictim 0 Player_1:CreepEntryGrabber:0

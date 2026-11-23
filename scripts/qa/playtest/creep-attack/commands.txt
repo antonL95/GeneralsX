@@ -1,0 +1,11 @@
+20 create Player_1 GondorGandalf 0 450,1940,0
+20 create PlyrCreeps CaveTroll_Slaved 0 535,1940,0
+21 reveal Player_1 GondorGandalf 0
+21 damage PlyrCreeps CaveTroll_Slaved 0 3250
+30 select Player_1 GondorGandalf 0
+36 cursor-point PlyrCreeps CaveTroll_Slaved 0
+39 creep-entry-cursor Player_1 GondorGandalf 0 PlyrCreeps:CaveTroll_Slaved:0
+45 creep-entry-click Player_1 GondorGandalf 0 PlyrCreeps:CaveTroll_Slaved:0
+55 creep-entry-state Player_1 GondorGandalf 0 PlyrCreeps:CaveTroll_Slaved:0
+220 creep-entry-state Player_1 GondorGandalf 0 PlyrCreeps:CaveTroll_Slaved:0
+220 creep-entry-state PlyrCreeps CaveTroll_Slaved 0
