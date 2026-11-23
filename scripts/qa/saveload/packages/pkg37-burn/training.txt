@@ -1,0 +1,95 @@
+225 create Player_1 Pkg37Entwife 0 150,650,0
+225 create Player_1 Pkg37EntPanicResume 0 250,400,0
+225 create Player_1 EvilShip_Interface 0 110,410,0
+225 create Player_1 Pkg37MarketPlace 0 110,810,0
+225 create Player_1 HaradMumakilMatriarch 0 240,790,0
+225 create Player_1 CreateAHeroOilDrum_Level1 0 100,760,0
+225 create Player_1 Pkg37Fort 0 160,980,0
+225 pkg37-hold-fire Player_1 Pkg37Fort 0
+226 create PlyrCreeps Pkg37FieldTarget 0 220,980,0
+226 create Player_1 Pkg37FieldTarget 0 215,985,0
+226 terrain-fire-state Player_1 CreateAHeroOilDrum_Level1 0 - 105 765 0
+229 pkg37-state Player_1 HaradMumakilMatriarch 0
+230 pkg37-fire Player_1 Pkg37Entwife 0 200
+230 pkg37-fire Player_1 Pkg37EntPanicResume 0 200
+230 pkg37-hit Player_1 EvilShip_Interface 0 1250
+230 pkg37-fire Player_1 Pkg37MarketPlace 0 200
+230 pkg37-fire Player_1 HaradMumakilMatriarch 0 330000
+231 pkg37-state PlyrCreeps Pkg37FieldTarget 0
+232 pkg37-state Player_1 Pkg37Entwife 0
+232 pkg37-state Player_1 EvilShip_Interface 0
+232 pkg37-state Player_1 Pkg37MarketPlace 0
+232 pkg37-state Player_1 HaradMumakilMatriarch 0
+235 objupgrade Player_1 Pkg37Fort 0 Upgrade_RohanFortressHastyFortifications
+240 pkg37-count Player_1 CreateAHeroBreadCrumb_Level1 0
+243 pkg37-state Player_1 Pkg37EntPanicResume 0
+245 terrain-fire-state Player_1 CreateAHeroOilDrum_Level1 0 - 105 765 0
+246 pkg37-state Player_1 Pkg37EntPanicResume 0
+250 pkg37-count Player_1 CreateAHeroBreadCrumb_Level1 0
+250 pkg37-state PlyrCreeps Pkg37FieldTarget 0
+250 pkg37-state Player_1 Pkg37FieldTarget 0
+255 pkg37-state Player_1 Pkg37Entwife 0
+255 pkg37-state Player_1 EvilShip_Interface 0
+255 pkg37-state Player_1 Pkg37MarketPlace 0
+255 pkg37-state Player_1 HaradMumakilMatriarch 0
+255 pkg37-place Player_1 CreateAHeroOilDrum_Level1 0 - 110 760 0
+265 pkg37-heal Player_1 EvilShip_Interface 0 1250
+266 pkg37-state Player_1 EvilShip_Interface 0
+270 pkg37-count Player_1 CreateAHeroBreadCrumb_Level1 0
+275 pkg37-place Player_1 CreateAHeroOilDrum_Level1 0 - 125 760 0
+275 pkg37-state PlyrCreeps Pkg37FieldTarget 0
+284 pkg37-heal Player_1 HaradMumakilMatriarch 0 3250
+285 pkg37-state Player_1 HaradMumakilMatriarch 0
+290 pkg37-count Player_1 CreateAHeroBreadCrumb_Level1 0
+295 destroy Player_1 CreateAHeroOilDrum_Level1 0
+297 destroy Player_1 CreateAHeroBreadCrumb_Level1 1
+298 destroy Player_1 CreateAHeroBreadCrumb_Level1 0
+300 pkg37-place PlyrCreeps Pkg37FieldTarget 0 - 100 1080 0
+320 pkg37-place PlyrCreeps Pkg37FieldTarget 0 - 220 980 0
+335 pkg37-state Player_1 Pkg37Entwife 0
+336 destroy Player_1 EvilShip_Interface 0
+336 destroy Player_1 Pkg37MarketPlace 0
+336 destroy Player_1 HaradMumakilMatriarch 0
+345 pkg37-state PlyrCreeps Pkg37FieldTarget 0
+348 destroy PlyrCreeps Pkg37FieldTarget 0
+348 destroy Player_1 Pkg37FieldTarget 0
+349 destroy Player_1 Pkg37Fort 0
+350 create Player_1 Pkg37MatriarchControl 0 240,790,0
+355 pkg37-fire Player_1 Pkg37MatriarchControl 0 330000
+356 pkg37-state Player_1 Pkg37MatriarchControl 0
+365 pkg37-state Player_1 Pkg37Entwife 0
+370 destroy Player_1 Pkg37MatriarchControl 0
+380 pkg37-state Player_1 Pkg37EntPanicResume 0
+382 destroy Player_1 Pkg37EntPanicResume 0
+465 pkg37-state Player_1 Pkg37Entwife 0
+470 destroy Player_1 Pkg37Entwife 0
+610 create Player_1 Pkg37EntShortSearch 0 150,650,0
+610 create Player_1 Pkg37EntDeepSearch 0 150,750,0
+610 create Player_1 Pkg37EntSparseSearch 0 120,830,0
+610 create Player_1 Pkg37EntNoSearch 0 120,900,0
+615 pkg37-fire Player_1 Pkg37EntShortSearch 0 200
+615 pkg37-fire Player_1 Pkg37EntDeepSearch 0 200
+615 pkg37-fire Player_1 Pkg37EntSparseSearch 0 200
+615 pkg37-fire Player_1 Pkg37EntNoSearch 0 200
+650 pkg37-state Player_1 Pkg37EntShortSearch 0
+650 pkg37-state Player_1 Pkg37EntDeepSearch 0
+650 pkg37-state Player_1 Pkg37EntSparseSearch 0
+650 pkg37-state Player_1 Pkg37EntNoSearch 0
+655 pkg37-place Player_1 Pkg37EntShortSearch 0 - 200 650 0
+655 pkg37-place Player_1 Pkg37EntNoSearch 0 - 220 620 0
+760 pkg37-state Player_1 Pkg37EntShortSearch 0
+760 pkg37-state Player_1 Pkg37EntNoSearch 0
+765 destroy Player_1 Pkg37EntShortSearch 0
+765 destroy Player_1 Pkg37EntDeepSearch 0
+765 destroy Player_1 Pkg37EntSparseSearch 0
+765 destroy Player_1 Pkg37EntNoSearch 0
+775 create Player_1 Pkg37SpreadSource 0 140,790,0
+775 create Player_1 Pkg37SpreadTarget 0 175,790,0
+775 create Player_1 Pkg37SpreadControl 0 240,790,0
+780 pkg37-fire Player_1 Pkg37SpreadSource 0 12
+910 pkg37-state Player_1 Pkg37SpreadSource 0
+910 pkg37-state Player_1 Pkg37SpreadTarget 0
+910 pkg37-state Player_1 Pkg37SpreadControl 0
+912 destroy Player_1 Pkg37SpreadSource 0
+912 destroy Player_1 Pkg37SpreadTarget 0
+912 destroy Player_1 Pkg37SpreadControl 0
