@@ -12,6 +12,10 @@ check() {
 		expect 'TEST pkg29 disguise frame=1010 active=1 mounted=1 disguised=1 opacity=0.977'
 		expect 'TEST pkg29 disguise frame=1170 active=0 mounted=0 disguised=0 opacity=1.000'
 	fi
+	if covers 1110; then
+		expect 'TEST pkg29 disguise frame=1030 active=0 mounted=1 disguised=1 opacity=1.000'
+		expect 'TEST pkg29 disguise frame=1110 active=0 mounted=1 disguised=0 opacity=1.000'
+	fi
 	if covers 229; then
 		expect 'TEST pkg29 deflect frame=229 module=1 active=0 hp=150.0'
 		grep -E '^TEST projectile frame=241 weapon=Pkg29MarkedShot .*projectile=GoodFactionFireArrow .*warhead=Pkg29DeflectWarhead ' "$log" || return 1

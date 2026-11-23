@@ -48,6 +48,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/StealthDetectorUpdate.h"
 #include "Common/BitFlagsIO.h"
@@ -133,6 +134,9 @@ Bool PartitionFilterStealthedOrStealthGarrisoned::allow( Object *objOther)
 	if( objOther->getStatusBits().test( OBJECT_STATUS_STEALTHED ) )
 		return TRUE;
 
+	if (RetailFileLayers::enabled() && objOther->getLogicModelConditions().test(MODELCONDITION_DISGUISED))
+		return TRUE;
+
 	ContainModuleInterface *contain = objOther->getContain();
 	if( contain && contain->isGarrisonable() && contain->getStealthUnitsContained() )
 		return TRUE;
@@ -213,6 +217,7 @@ UpdateSleepTime StealthDetectorUpdate::update()
 		if ( them->isEffectivelyDead() )
 			continue;
 
+		SpecialDisguiseUpdate::reveal(them, FALSE);
 		StealthUpdate* stealth = them->getStealth();
 		const Bool powerInvisible = RetailFileLayers::enabled() && them->hasPowerInvisibility();
 		if (stealth && (!powerInvisible || stealth->isLegacyStealthed()))

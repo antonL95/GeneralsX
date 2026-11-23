@@ -123,7 +123,13 @@
 345 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
 580 pkg29-disguise-script Player_1 Pkg29DisguiseHero 0
 670 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
+907 create Player_1 Pkg29DisguiseHero 1 850,320,0
+912 objupgrade Player_1 Pkg29DisguiseHero 1 Upgrade_ObjectLevel1
 930 pkg29-disguise-ai Player_1 Pkg29DisguiseHero 0
+930 pkg29-disguise-script Player_1 Pkg29DisguiseHero 1
 1010 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
 1012 power Player_1 Pkg29DisguiseHero 0 SpecialAbilityToggleMountedTwo
+1030 pkg29-disguise-state Player_1 Pkg29DisguiseHero 1
+1040 create PlyrCreeps Pkg29DisguiseDetector 0 880,320,0
+1110 pkg29-disguise-state Player_1 Pkg29DisguiseHero 1
 1170 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
