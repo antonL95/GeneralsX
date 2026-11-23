@@ -58,7 +58,7 @@ Utilities for large-scale code refactoring and fixes:
 
 ### `qa/` - Quality Assurance & Testing
 
-- `test-skirmish-save-load.sh` compares every logic CRC and the planner and power traces across a live AI save and resume. Run it in the BFME engine container with a build directory, map mode, two playable faction template names, difficulty, save frame and final frame. Set `SKIRMISH_SAVE_KEEP_STATE=1` to keep logs from passing runs.
+- `test-skirmish-save-load.sh` compares logic CRCs and planner and power traces across a live AI save and resume. Run it in the BFME engine container with a build directory, map mode, two playable faction template names, difficulty, save frame and final frame. It samples every frame by default. Set `SKIRMISH_SAVE_CRC_INTERVAL` to sample less often and `SKIRMISH_SAVE_KEEP_STATE=1` to keep passing logs. The gate uses `--opening` to check observer restoration before the AI fields attack waves.
 - `sweep_power_cases.py` prepares an attributed High Pass power replay and classifies its logs. Run it in the BFME tools container from the BFME project root with `prepare BASELINE OUTPUT` before the replay and `report BASELINE OUTPUT` after collecting the logs.
 - After generating fresh power sweep commands, run `verify_power_fixes.py prepare OUTPUT` in the BFME tools container. Replay the augmented sessions, run `WildAllegiance.commands` with the Wild faction, and repeat the Dwarves session with its log saved as `Dwarves-repeat.log`. Run `verify_power_fixes.py verify OUTPUT` to check recruitment, both Mahud weapons, the weather timer, passive upgrade evidence, and repeat-run determinism.
 

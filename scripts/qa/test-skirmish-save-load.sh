@@ -3,10 +3,15 @@ set -eu
 export LC_ALL=C
 
 usage() {
-    printf '%s\n' "Usage: $0 BUILD_DIR {high-pass|lithlad} FACTION_A FACTION_B {medium|hard} SAVE_FRAME END_FRAME" >&2
+    printf '%s\n' "Usage: $0 [--opening] BUILD_DIR {high-pass|lithlad} FACTION_A FACTION_B {medium|hard} SAVE_FRAME END_FRAME" >&2
     exit 2
 }
 
+opening=0
+if [ "${1:-}" = --opening ]; then
+    opening=1
+    shift
+fi
 [ "$#" -eq 7 ] || usage
 build=$(cd "$1" && pwd)
 case "$2" in
@@ -19,10 +24,11 @@ case "$5" in medium|hard) ;; *) usage ;; esac
 export GENERALSX_SKIRMISH_PROBE_DIFFICULTY="$5"
 first=$6
 last=$7
-for frame in "$first" "$last"; do
+interval=${SKIRMISH_SAVE_CRC_INTERVAL:-1}
+for frame in "$first" "$last" "$interval"; do
     case "$frame" in ''|0*|*[!0-9]*) usage ;; esac
 done
-[ "$first" -lt "$last" ] && [ "$last" -le 54000 ] || usage
+[ "$first" -lt "$last" ] && [ "$last" -le 54000 ] && [ "$interval" -le 54000 ] || usage
 export GENERALSX_SKIRMISH_PROBE_FRAMES="$last" GENERALSX_SKIRMISH_AI_TRACE=1
 export GENERALSX_SKIRMISH_PROBE_CHECKPOINT="$first"
 unset GENERALSX_SKIRMISH_PROBE_FIXTURE
@@ -41,7 +47,10 @@ printf '%s snapshot-save - - 0 parity.sav\n%s quit - - 0\n' "$first" "$((first +
 {
     printf '%s\n' "${SKIRMISH_SAVE_DIAGNOSTICS:-$first,$((first + 1))}" | tr ',' '\n' |
         awk -v first="$first" -v last="$last" '/^[0-9]+$/ && $1 >= first && $1 <= last { print $1, "snapshot-crc - - 0" }'
-    seq "$first" "$last" | awk '{ print $1, "xpcrc - - 0" }'
+    awk -v first="$first" -v last="$last" -v step="$interval" 'BEGIN {
+        for (frame = first; frame < last; frame += step) print frame, "xpcrc - - 0"
+        print last, "xpcrc - - 0"
+    }'
 } | sort -sn > "$out/compare.txt"
 
 cd "${PKGS1_ROTWK_DATA:-/game-install/rotwk}"
@@ -68,13 +77,15 @@ for phase in save continue resume; do
     [ "$phase" != save ] || continue
     awk -F '\t' -v last="$last" '$1 == "SKIRMISH_END" && $2 == last { seen++ } END { exit (seen != 1) }' "$out/$phase.log" ||
         { printf '%s did not reach skirmish frame %s\n' "$phase" "$last" >&2; exit 1; }
-    awk -v first="$first" -v last="$last" '
+    awk -v first="$first" -v last="$last" -v step="$interval" '
+        BEGIN { nextFrame = first }
         /^TEST xp-crc frame=[0-9]+ crc=[0-9A-F]+$/ {
             split($3, f, "=")
-            if (f[2] != first + count++ || length($4) != 12) exit 1
+            if (f[2] != nextFrame || nextFrame > last || length($4) != 12) exit 1
             print f[2], $4
+            nextFrame = nextFrame == last ? last + 1 : (nextFrame + step < last ? nextFrame + step : last)
         }
-        END { if (count != last - first + 1) exit 1 }
+        END { if (nextFrame != last + 1) exit 1 }
     ' "$out/$phase.log" > "$out/$phase.crc" ||
         { printf '%s has missing, repeated or out of order CRC frames\n' "$phase" >&2; exit 1; }
     awk -F '\t' -v first="$first" -v last="$last" '
@@ -100,7 +111,7 @@ for phase in continue resume; do
         result=1
     fi
 done
-awk -F '\t' -v first="$first" -v a="$3" -v b="$4" '
+awk -F '\t' -v first="$first" -v a="$3" -v b="$4" -v opening="$opening" '
     $1 == "SKIRMISH_CHECKPOINT" && $2 == first {
         print
         factions[$4]++
@@ -114,7 +125,8 @@ awk -F '\t' -v first="$first" -v a="$3" -v b="$4" '
     END {
         printf "Checkpoint coverage: %d buildings, %d active unit queues, %d moving attackers, %d waves issued, %d spellbook casts\n",
             buildings, queued, moving, waves, casts
-        exit (players != 2 || !factions[a] || !factions[b] || !buildings || !queued || moving < 2 || !waves || !casts)
+        exit (players != 2 || !factions[a] || !factions[b] ||
+            (!opening && (!buildings || !queued || moving < 2 || !waves || !casts)))
     }
 ' "$out/save.log" || result=1
 if [ "$result" -eq 0 ] && [ "${SKIRMISH_SAVE_KEEP_STATE:-0}" = 0 ]; then

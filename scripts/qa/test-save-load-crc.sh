@@ -94,6 +94,7 @@ fi
 printf '%s\n' "$out"
 
 export XDG_DATA_HOME="$out/data" XDG_CONFIG_HOME="$out/config"
+export PKGS1_BUILD_DIR="$build"
 export XDG_CACHE_HOME="$out/cache" XDG_RUNTIME_DIR="$out/runtime" SDL_AUDIO_DRIVER=dummy
 export LD_LIBRARY_PATH=$(find "$build" -name '*.so*' -printf '%h\n' | sort -u | paste -sd :)
 mkdir -p -m 700 "$XDG_RUNTIME_DIR"
