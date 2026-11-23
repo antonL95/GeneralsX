@@ -72,6 +72,7 @@ void HordeWorkerAIUpdate::loadPostProcess()
 	HordeAIUpdate::loadPostProcess();
 }
 
+#if RTS_GENERALS
 RepairSpecialPower::RepairSpecialPower(Thing* thing, const ModuleData* data) : SpecialPowerModule(thing, data)
 {
 }
@@ -105,3 +106,4 @@ void RepairSpecialPower::loadPostProcess()
 {
 	SpecialPowerModule::loadPostProcess();
 }
+#endif

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "GameLogic/Module/HordeAIUpdate.h"
+#if RTS_GENERALS
 #include "GameLogic/Module/SpecialPowerModule.h"
+#endif
 
 class HordeWorkerAIUpdateModuleData final : public HordeAIUpdateModuleData
 {
@@ -23,6 +25,7 @@ public:
 	static const HordeWorkerAIUpdate* find(const Object* object);
 };
 
+#if RTS_GENERALS
 class RepairSpecialPower final : public SpecialPowerModule
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(RepairSpecialPower, "RepairSpecialPower")
@@ -33,3 +36,4 @@ public:
 	static ModuleData* friend_newModuleData(INI* ini);
 	void doSpecialPowerAtObject(Object* target, UnsignedInt options) override;
 };
+#endif

@@ -476,8 +476,8 @@ UnsignedInt GettingBuiltBehavior::getRebuildFrames() const
 
 UnsignedInt GettingBuiltBehavior::getSpawnDelayFrames() const
 {
-	const double frames = static_cast<double>(getGettingBuiltBehaviorModuleData()->m_spawnTimer) * LOGICFRAMES_PER_SECOND;
-	if (!(frames >= 0.0 && frames < UPDATE_SLEEP_FOREVER))
+	const Real frames = getGettingBuiltBehaviorModuleData()->m_spawnTimer * LOGICFRAMES_PER_SECOND;
+	if (!(frames >= 0.0f && static_cast<double>(frames) < UPDATE_SLEEP_FOREVER))
 		return UPDATE_SLEEP_FOREVER;
 	return static_cast<UnsignedInt>(frames);
 }
@@ -600,7 +600,11 @@ Bool GettingBuiltBehavior::takeOverConstruction(Object& structure)
 	if (!RetailFileLayers::enabled())
 		return FALSE;
 	auto* behavior = findMutable(structure);
-	if (!behavior || behavior->m_workerSpawned || behavior->m_running)
+	if (!behavior)
+		return FALSE;
+	if (behavior->m_rebuildingFromRubble)
+		return TRUE;
+	if (behavior->m_workerSpawned || behavior->m_running)
 		return FALSE;
 	behavior->m_workerSpawned = TRUE;
 	if (!behavior->spawnBuilder(FALSE) && !structure.testStatus(OBJECT_STATUS_RECONSTRUCTING))
