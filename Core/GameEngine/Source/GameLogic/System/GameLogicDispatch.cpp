@@ -1635,7 +1635,16 @@ bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 
 bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
-	const Bool hasAngle = msg->getArgumentCount() >= 6;
+	const Bool retail = RetailFileLayers::enabled();
+	const Int argumentCount = msg->getArgumentCount();
+	if (retail && (argumentCount < 5 || argumentCount > 7))
+		return false;
+	const Bool hasAngle = retail ? msg->getArgumentDataType(2) == ARGUMENTDATATYPE_REAL : argumentCount >= 6;
+	const Int baseArguments = hasAngle ? 6 : 5;
+	const Bool hasSlot = retail && argumentCount == baseArguments + 1;
+	if (retail && argumentCount != baseArguments &&
+		(!hasSlot || msg->getArgumentDataType(baseArguments) != ARGUMENTDATATYPE_INTEGER))
+		return false;
 	Int argumentIndex = 0;
 	UnsignedInt specialPowerID = msg->getArgument( argumentIndex++ )->integer;
 	Coord3D targetCoord = msg->getArgument( argumentIndex++ )->location;
@@ -1645,6 +1654,33 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 	UnsignedInt options = msg->getArgument( argumentIndex++ )->integer;
 	ObjectID sourceID = msg->getArgument( argumentIndex++ )->objectID;
 	Object* source = findObjectByID( sourceID );
+	const Int slot = hasSlot ? msg->getArgument(baseArguments)->integer : -1;
+	const auto castRetail = [&](Object* member)
+	{
+		if (!member)
+			return;
+		const CommandButton* selectedButton = nullptr;
+		if (hasSlot)
+		{
+			if (!TheRetailCommandCatalog || slot < 0 || slot >= CommandButtonRules::RETAIL_COMMANDS_PER_SET ||
+				member->getControllingPlayer() != getMessagePlayer(msg))
+				return;
+			const CommandSet* set = TheRetailCommandCatalog->findCommandSet(member->getCommandSetString());
+			selectedButton = set ? set->getCommandButton(slot) : nullptr;
+			const SpecialPowerTemplate* power = selectedButton ? selectedButton->getSpecialPowerTemplate() : nullptr;
+			if (!power || power->getID() != specialPowerID || selectedButton->getOptions() != options ||
+				selectedButton->getCommandTriggers().empty() || !selectedButton->isRetailButtonUsable() ||
+				!selectedButton->isModelConditionAllowed(member) || !selectedButton->isValidContainerForCommand(member) ||
+				!HeroRoster::buttonUpgradesMet(selectedButton, member->getControllingPlayer(), member))
+				return;
+		}
+		if (!executeRetailPower(member, specialPowerID, RETAIL_POWER_LOCATION, nullptr, &targetCoord, angle, objectInWay, options))
+			return;
+		if (selectedButton)
+			runRetailCommandTriggers(member, selectedButton, objectInWay, &targetCoord);
+		else
+			runRetailPowerTriggers(member, specialPowerID, objectInWay, &targetCoord);
+	};
 	if (source != nullptr)
 	{
 #if !RETAIL_COMPATIBLE_CRC
@@ -1658,10 +1694,9 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 			return false;
 		}
 #endif
-		if (RetailFileLayers::enabled())
+		if (retail)
 		{
-			if (executeRetailPower(source, specialPowerID, RETAIL_POWER_LOCATION, nullptr, &targetCoord, angle, objectInWay, options))
-				runRetailPowerTriggers(source, specialPowerID, objectInWay, &targetCoord);
+			castRetail(source);
 		}
 		else
 		{
@@ -1679,15 +1714,11 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 	{
 		if( currentlySelectedGroup )
 		{
-			if (RetailFileLayers::enabled())
+			if (retail)
 			{
 				const VecObjectID memberIDs = currentlySelectedGroup->getAllIDs();
 				for (const ObjectID id : memberIDs)
-				{
-					Object* member = findObjectByID(id);
-					if (member && executeRetailPower(member, specialPowerID, RETAIL_POWER_LOCATION, nullptr, &targetCoord, angle, objectInWay, options))
-						runRetailPowerTriggers(member, specialPowerID, objectInWay, &targetCoord);
-				}
+					castRetail(findObjectByID(id));
 			}
 			else
 			{

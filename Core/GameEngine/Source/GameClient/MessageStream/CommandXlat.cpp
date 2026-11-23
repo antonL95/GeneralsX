@@ -1293,6 +1293,19 @@ GameMessage::Type CommandTranslator::issueSpecialPowerCommand( const CommandButt
 			msg->appendObjectIDArgument( targetID );
 			msg->appendIntegerArgument( command->getOptions() );
 			msg->appendObjectIDArgument( specificSource );
+			if (RetailFileLayers::enabled() && !command->getCommandTriggers().empty() &&
+				TheRetailCommandCatalog && sourceDraw && sourceDraw->getObject())
+			{
+				const CommandSet* set = TheRetailCommandCatalog->findCommandSet(sourceDraw->getObject()->getCommandSetString());
+				for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+				{
+					if (set->getCommandButton(slot) == command)
+					{
+						msg->appendIntegerArgument(slot);
+						break;
+					}
+				}
+			}
 
 			// say   something like " I think I'll put a timed charge on the ground, here."
 			PickAndPlayInfo info;
