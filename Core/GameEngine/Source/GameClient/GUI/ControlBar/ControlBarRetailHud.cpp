@@ -1,5 +1,7 @@
 #include "PreRTS.h"
 
+#include <map>
+#include <string>
 #include <vector>
 
 #include "Common/INIException.h"
@@ -16,6 +18,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 
+#include "GameClient/AptScene.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Display.h"
 #include "GameClient/DisplayString.h"
@@ -81,6 +84,7 @@ constexpr DesignRect GlobeArt = { 16.35f, 62.5f, 219.0f, 219.0f };
 constexpr DesignRect CommandDisc = { 202.2f, 107.9f, 167.0f, 167.0f };
 constexpr DesignRect RingSockets = { 253.55f, 91.55f, 128.0f, 198.0f };
 constexpr DesignRect Frame = { 0.0f, 44.0f, 384.0f, 256.0f };
+constexpr Coord2D FrameExportOrigin = { 192.0f, 172.0f };
 constexpr DesignRect TopPlate = { 51.0f, 60.0f, 155.0f, 64.0f };
 constexpr DesignRect OptionsKey = { 70.0f, 76.0f, 31.0f, 31.0f };
 constexpr DesignRect Objectives = { 156.0f, 76.0f, 31.0f, 31.0f };
@@ -165,11 +169,37 @@ void drawRetailPalantirBack(GameWindow *window, WinInstanceData *)
 	Int x, y, width, height;
 	windowRect(window, x, y, width, height);
 	const Real scale = width / PalantirDesignWidth;
-	drawDesignImage("UiRetailGlobe", GlobeArt, x, y, scale);
 	const Int discX = x + static_cast<Int>(std::floor(CommandDisc.x * scale + 0.5f));
 	const Int discY = y + static_cast<Int>(std::floor(CommandDisc.y * scale + 0.5f));
 	const Int discSize = static_cast<Int>(std::floor(CommandDisc.width * scale + 0.5f));
 	drawFilledCircle(discX, discY, discSize, discSize, GameMakeColor(10, 9, 8, 255));
+}
+
+void drawRetailRadarBack(GameWindow *window, WinInstanceData *)
+{
+	Int x, y, width, height;
+	windowRect(window->winGetParent(), x, y, width, height);
+	const Real scale = width / PalantirDesignWidth;
+	const Int left = x + static_cast<Int>(std::floor(GlobeArt.x * scale + 0.5f));
+	const Int top = y + static_cast<Int>(std::floor(GlobeArt.y * scale + 0.5f));
+	const Int size = static_cast<Int>(std::floor(GlobeArt.width * scale + 0.5f));
+	drawFilledCircle(left, top, size, size, GameMakeColor(0, 0, 0, 255));
+	drawDesignImage("UiRetailGlobe", GlobeArt, x, y, scale);
+}
+
+const AptScene *findFactionFrame(const Player *player)
+{
+	if (!player)
+		return nullptr;
+	AsciiString side = player->getSide();
+	if (side == "Men")
+		side = "Gondor";
+	else if (side == "Elves")
+		side = "Lothlorien";
+	const std::string name = std::string("PalantirFrame_") + side.str();
+	static std::map<std::string, AptScene> frames;
+	const auto entry = frames.try_emplace(name, "PalantirExport", AptScene::AnimatedExport{name.c_str()}).first;
+	return entry->second.valid() ? &entry->second : nullptr;
 }
 
 void drawRetailPalantirFrame(GameWindow *window, WinInstanceData *)
@@ -178,8 +208,11 @@ void drawRetailPalantirFrame(GameWindow *window, WinInstanceData *)
 	window->winGetParent()->winGetScreenPosition(&x, &y);
 	window->winGetParent()->winGetSize(&width, &height);
 	const Real scale = width / PalantirDesignWidth;
-	const Bool evil = playerIsEvil(ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr);
-	drawDesignImage(evil ? "UiRetailFrameEvil" : "UiRetailFrameGood", Frame, x, y, scale);
+	const Player *player = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
+	if (const AptScene *frame = findFactionFrame(player))
+		frame->drawFrameAt(0, x + FrameExportOrigin.x * scale, y + FrameExportOrigin.y * scale, scale, scale);
+	else
+		drawDesignImage(playerIsEvil(player) ? "UiRetailFrameEvil" : "UiRetailFrameGood", Frame, x, y, scale);
 	TheControlBar->drawRetailSocketFills();
 	drawDesignImage("UiRetailRingSockets", RingSockets, x, y, scale);
 	drawDesignImage("UiRetailTopPlate", TopPlate, x, y, scale);
@@ -919,12 +952,14 @@ void ControlBar::initRetailHud()
 	m_retailResources = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:Resources"));
 	m_retailCommandPoints = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:CommandPoints"));
 	GameWindow *palantir = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:Palantir"));
+	GameWindow *radarBack = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:RadarBackground"));
 	GameWindow *frame = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:PalantirFrame"));
 	if (!m_contextParent[CP_COMMAND] || !m_retailPortrait || !m_retailSelectionName || !m_retailResources
-		|| !m_retailCommandPoints || !palantir || !frame)
+		|| !m_retailCommandPoints || !palantir || !radarBack || !frame)
 		throw INIException("RetailHud.wnd is missing a required window");
 
 	palantir->winSetDrawFunc(drawRetailPalantirBack);
+	radarBack->winSetDrawFunc(drawRetailRadarBack);
 	palantir->winSetInputFunc(retailPalantirInput);
 	GameWindow *sideBar = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:SideBar"));
 	if (!sideBar)

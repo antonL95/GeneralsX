@@ -424,12 +424,21 @@ public:
 			for (std::string line; std::getline(lines, line); )
 			{
 				const auto arrow = line.find("->");
-				if (arrow == std::string::npos)
-					continue;
-				Int image, page;
-				if (std::istringstream(line.substr(0, arrow)) >> image &&
-					std::istringstream(line.substr(arrow + 2)) >> page && image >= 0 && page > 0)
-					movie.atlasPages.emplace(image, page);
+				Int image;
+				if (arrow != std::string::npos)
+				{
+					Int page;
+					if (std::istringstream(line.substr(0, arrow)) >> image &&
+						std::istringstream(line.substr(arrow + 2)) >> page && image >= 0 && page > 0)
+						movie.atlasPages.emplace(image, page);
+				}
+				else if (const auto equals = line.find('='); equals != std::string::npos)
+				{
+					Int left, top, right, bottom;
+					if (std::istringstream(line.substr(0, equals)) >> image && image > 0 &&
+						std::istringstream(line.substr(equals + 1)) >> left >> top >> right >> bottom)
+						movie.atlasPages.emplace(image, image);
+				}
 			}
 			movie.root = root;
 			return &movie;
