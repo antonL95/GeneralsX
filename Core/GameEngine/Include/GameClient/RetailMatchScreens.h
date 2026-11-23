@@ -36,9 +36,11 @@ struct RetailMatchResults
 	std::vector<PlayerResult> players;
 	Bool hasLocalResult = FALSE;
 	Bool localVictory = FALSE;
+	Bool returnToSkirmishLobby = FALSE;
 };
 
-RetailMatchResults collectRetailMatchResults();
+RetailMatchResults collectRetailMatchResults(Bool recordOutcome = TRUE);
 Bool showRetailMatchResults(RetailMatchResults results);
+void showRetailResultsDestination(Bool skirmishLobby);
 Bool createRetailReturnMenu(WindowLayout &layout);
 void updateRetailShellLoad();

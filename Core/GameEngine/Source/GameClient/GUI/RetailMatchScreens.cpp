@@ -703,7 +703,7 @@ void RetailLoadingScreen::draw() const
 	m_data->draw();
 }
 
-RetailMatchResults collectRetailMatchResults()
+RetailMatchResults collectRetailMatchResults(Bool recordOutcome)
 {
 	RetailMatchResults results;
 	Player *local = ThePlayerList->getLocalPlayer();
@@ -721,7 +721,7 @@ RetailMatchResults collectRetailMatchResults()
 			score.getTotalUnitsLost(), score.getTotalUnitsDestroyed(), score.getTotalBuildingsBuilt(),
 			score.getTotalBuildingsLost(), score.getTotalBuildingsDestroyed(), score.getTotalMoneyEarned(),
 			score.calculateScore()}, player->isPlayerDead()});
-		if (player == local && !local->isPlayerObserver())
+		if (recordOutcome && player == local && !local->isPlayerObserver())
 		{
 			results.hasLocalResult = TRUE;
 			results.localVictory = TheCampaignManager ? TheCampaignManager->isVictorious() : !player->isPlayerDead();
@@ -865,8 +865,13 @@ namespace
 		static_cast<ResultsScreen *>(window->winGetUserData())->draw();
 	}
 
-	WindowMsgHandledType resultsSystem(GameWindow *window, UnsignedInt message, WindowMsgData, WindowMsgData)
+	WindowMsgHandledType resultsSystem(GameWindow *window, UnsignedInt message, WindowMsgData state, WindowMsgData result)
 	{
+		if (message == GWM_INPUT_FOCUS && state == TRUE)
+		{
+			*reinterpret_cast<Bool *>(result) = TRUE;
+			return MSG_HANDLED;
+		}
 		if (message == GWM_DESTROY)
 		{
 			delete static_cast<ResultsScreen *>(window->winGetUserData());
@@ -878,12 +883,13 @@ namespace
 	WindowMsgHandledType resultsInput(GameWindow *window, UnsignedInt message, WindowMsgData point, WindowMsgData state)
 	{
 		auto *screen = static_cast<ResultsScreen *>(window->winGetUserData());
-		const Bool keyboard = message == GWM_CHAR && (state & KEY_STATE_DOWN) && (point == KEY_ENTER || point == KEY_ESC);
+		const Bool keyboard = message == GWM_CHAR && (state & KEY_STATE_UP) && (point == KEY_ENTER || point == KEY_ESC);
 		if (keyboard || (message == GWM_LEFT_UP && screen->click((point & 0xFFFF) / screen->scene.xScale(),
 			(point >> 16) / screen->scene.yScale())))
 		{
+			const Bool skirmishLobby = screen->results.returnToSkirmishLobby;
 			TheWindowManager->winDestroy(window);
-			TheShell->showShell(TRUE);
+			showRetailResultsDestination(skirmishLobby);
 		}
 		return MSG_HANDLED;
 	}
@@ -1153,6 +1159,29 @@ namespace
 			const auto it = std::find_if(maps.begin(), maps.end(), [&](const SetupMap &map) { return map.path == selected; });
 			mapIndex = Int(it - maps.begin());
 			mapScroll = std::clamp(mapScroll, std::max(0, mapIndex - visibleMaps + 1), mapIndex);
+		}
+
+		void restoreSetup(const SkirmishGameInfo &game)
+		{
+			openSetup();
+			const auto map = std::find_if(maps.begin(), maps.end(), [&](const SetupMap &entry) {
+				return entry.path.compareNoCase(game.getMap()) == 0;
+			});
+			if (map == maps.end())
+				return;
+			selectMap(Int(map - maps.begin()));
+			resources = game.getStartingCash().countMoney();
+			rules = game.getRetailSkirmishRules();
+			for (Int i = 0; i < slotCount(); ++i)
+			{
+				const GameSlot *slot = game.getConstSlot(i);
+				if (!slot->isOccupied())
+					continue;
+				const Bool original = slot->hasSavedOriginalSetup();
+				slots[i] = {slot->getState(), original ? slot->getOriginalPlayerTemplate() : slot->getPlayerTemplate(),
+					slot->getTeamNumber(), original ? slot->getOriginalColor() : slot->getColor(),
+					original ? slot->getOriginalStartPos() : slot->getStartPos()};
+			}
 		}
 
 		const MapMetaData *currentMap() const
@@ -2083,6 +2112,21 @@ Bool showRetailMatchResults(RetailMatchResults results)
 	window->winSetInputFunc(resultsInput);
 	TheWindowManager->winSetFocus(window);
 	return TRUE;
+}
+
+void showRetailResultsDestination(Bool skirmishLobby)
+{
+	TheShell->showShell(TRUE);
+	WindowLayout *layout = TheShell->top();
+	GameWindow *window = layout ? layout->getFirstWindow() : nullptr;
+	if (skirmishLobby && window && window->winGetDrawFunc() == drawReturnMenu)
+	{
+		auto &menu = *static_cast<ReturnMenu *>(window->winGetUserData());
+		if (TheSkirmishGameInfo)
+			menu.restoreSetup(*TheSkirmishGameInfo);
+		else
+			menu.openSetup();
+	}
 }
 
 Bool createRetailReturnMenu(WindowLayout &layout)

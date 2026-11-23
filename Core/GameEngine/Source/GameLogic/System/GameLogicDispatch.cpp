@@ -1217,13 +1217,22 @@ bool GameLogic::onClearGameData(GameMessage *msg, AIGroupPtr &currentlySelectedG
 #endif
 	}
 	currentlySelectedGroup = nullptr;
-	const Bool returnToMainMenu = RetailFileLayers::enabled() && msg->getArgumentCount() == 1 &&
+	const Bool leaveRetailMatch = RetailFileLayers::enabled() && msg->getArgumentCount() == 1 &&
 		msg->getArgumentDataType(0) == ARGUMENTDATATYPE_BOOLEAN && msg->getArgument(0)->boolean;
-	if (returnToMainMenu)
+	if (leaveRetailMatch)
+	{
+		const Bool skirmish = isInSkirmishGame();
+		RetailMatchResults results;
+		if (skirmish && !TheGlobalData->m_headless)
+			results = collectRetailMatchResults(FALSE);
+		results.returnToSkirmishLobby = skirmish;
 		TheWritableGlobalData->m_initialFile.clear();
-	clearGameData(!returnToMainMenu);
-	if (returnToMainMenu && !TheGameEngine->getQuitting())
-		TheShell->showShell(TRUE);
+		clearGameData(FALSE);
+		if (!TheGameEngine->getQuitting() && !showRetailMatchResults(std::move(results)))
+			showRetailResultsDestination(skirmish);
+	}
+	else
+		clearGameData(TRUE);
 
 	return true;
 }
