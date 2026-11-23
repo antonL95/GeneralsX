@@ -179,7 +179,7 @@ UpdateSleepTime FireWeaponUpdate::update()
 				std::fprintf(stderr, "TEST timed weapon frame=%u source=%u(%s) weapon=%s target=%.1f,%.1f,%.1f\n",
 					frame, static_cast<UnsignedInt>(object->getID()), object->getTemplate()->getName().str(),
 					payload.weapon->getName().str(), target.x, target.y, target.z);
-			payload.weapon->forceFireWeapon(object, &target);
+			payload.weapon->forceFireWeapon(object, &target, TRUE);
 			payload.spent = nugget.oneShot;
 			if (object->isDestroyed() || (data->m_aliveOnly && object->isEffectivelyDead()))
 				break;
@@ -189,7 +189,7 @@ UpdateSleepTime FireWeaponUpdate::update()
 	// If my weapon is ready, shoot it.
 	if( isOkayToFire() )
 	{
-		m_weapon->forceFireWeapon( getObject(), getObject()->getPosition() );
+		m_weapon->forceFireWeapon( getObject(), getObject()->getPosition(), TRUE );
 	}
 	return UPDATE_SLEEP_NONE;
 }

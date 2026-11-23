@@ -993,7 +993,8 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	Weapon *firingWeapon,
 	ObjectID* projectileID,
 	Bool inflictDamage,
-	ObjectID detonationVictimID
+	ObjectID detonationVictimID,
+	Bool playFireFX
 ) const
 {
 
@@ -1115,9 +1116,9 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	if (!isProjectileDetonation && m_holdAfterFiringDelay)
 		sourceObj->holdForWeaponUntil(TheGameLogic->getFrame() + m_holdAfterFiringDelay);
 
-	const Bool flank = !isProjectileDetonation && m_fireFlankFX && HordeContain::isFlanked(victimObj, sourceObj, FALSE);
+	const Bool flank = playFireFX && !isProjectileDetonation && m_fireFlankFX && HordeContain::isFlanked(victimObj, sourceObj, FALSE);
 	// call this even if FXList is null, because this also handles stuff like Gun Barrel Recoil
-	if (sourceObj && sourceObj->getDrawable())
+	if (playFireFX && sourceObj && sourceObj->getDrawable())
 	{
 		Coord3D targetPos;
 		if( victimObj )
@@ -1192,7 +1193,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		}
 	}
 
-	if (!isProjectileDetonation && RetailTestCommands::tracesCombat() &&
+	if (playFireFX && !isProjectileDetonation && RetailTestCommands::tracesCombat() &&
 		(m_fxTrigger.isNotEmpty() || m_fireFlankFX))
 	{
 		std::fprintf(stderr, "TEST weapon-fx frame=%u weapon=%s trigger=%s flank=%d\n",
@@ -2976,7 +2977,8 @@ Bool Weapon::privateFireWeapon(
 	WeaponBonusConditionFlags extraBonusFlags,
 	ObjectID* projectileID,
 	Bool inflictDamage,
-	ObjectID detonationVictimID
+	ObjectID detonationVictimID,
+	Bool playFireFX
 )
 {
 	//CRCDEBUG_LOG(("Weapon::privateFireWeapon() for %s", DescribeObject(sourceObj).str()));
@@ -3123,7 +3125,7 @@ Bool Weapon::privateFireWeapon(
 					pos.y = origin.y + sine * target.offset.x + cosine * target.offset.y;
 					pos.z = TheTerrainLogic->getGroundHeight(pos.x, pos.y);
 					m_template->fireWeaponTemplate(sourceObj, m_wslot, m_curBarrel, nullptr, &pos, bonus,
-						FALSE, ignoreRanges, this, projectileID, inflictDamage);
+						FALSE, ignoreRanges, this, projectileID, inflictDamage, INVALID_ID, playFireFX);
 				}
 				if (linearDelay > 0)
 					break;
@@ -3155,11 +3157,13 @@ Bool Weapon::privateFireWeapon(
 			// To erase from a vector, put the last on the one you used and pop the back.
 			m_scatterTargetsUnused[randomPick] = m_scatterTargetsUnused.back();
 			m_scatterTargetsUnused.pop_back();
-			m_template->fireWeaponTemplate(sourceObj, m_wslot, m_curBarrel, victimObj, &targetPos, bonus, isProjectileDetonation, ignoreRanges, this, projectileID, inflictDamage );
+			m_template->fireWeaponTemplate(sourceObj, m_wslot, m_curBarrel, victimObj, &targetPos, bonus,
+				isProjectileDetonation, ignoreRanges, this, projectileID, inflictDamage, INVALID_ID, playFireFX);
 		}
 		else
 		{
-			m_template->fireWeaponTemplate(sourceObj, m_wslot, m_curBarrel, victimObj, victimPos, bonus, isProjectileDetonation, ignoreRanges, this, projectileID, inflictDamage, detonationVictimID );
+			m_template->fireWeaponTemplate(sourceObj, m_wslot, m_curBarrel, victimObj, victimPos, bonus,
+				isProjectileDetonation, ignoreRanges, this, projectileID, inflictDamage, detonationVictimID, playFireFX);
 		}
 
 		m_lastFireFrame = now;
@@ -3302,7 +3306,7 @@ void Weapon::fireProjectileDetonationWeapon(const Object *source, const Coord3D*
 //-------------------------------------------------------------------------------------------------
 //Currently, this function was added to allow a script to force fire a weapon,
 //and immediately gain control of the weapon that was fired to give it special orders...
-Object* Weapon::forceFireWeapon( const Object *source, const Coord3D *pos)
+Object* Weapon::forceFireWeapon( const Object *source, const Coord3D *pos, Bool retailTimedFX )
 {
 	//CRCDEBUG_LOG(("Weapon::forceFireWeapon() for %s", DescribeObject(source).str()));
 	//Force the ammo to load instantly.
@@ -3310,7 +3314,10 @@ Object* Weapon::forceFireWeapon( const Object *source, const Coord3D *pos)
 	//Fire the weapon at the position. Internally, it'll store the weapon projectile ID if so created.
 	ObjectID projectileID = INVALID_ID;
 	const Bool ignoreRange = true;
-	privateFireWeapon(source, nullptr, pos, false, ignoreRange, 0, &projectileID, TRUE );
+	constexpr UnsignedInt framesPerTick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+	const Bool playFireFX = !retailTimedFX || !RetailFileLayers::enabled() || !m_lastFireFrame ||
+		m_lastFireFrame / framesPerTick != TheGameLogic->getFrame() / framesPerTick;
+	privateFireWeapon(source, nullptr, pos, false, ignoreRange, 0, &projectileID, TRUE, INVALID_ID, playFireFX);
 	return TheGameLogic->findObjectByID( projectileID );
 }
 
