@@ -1,0 +1,5 @@
+20 create Player_1 WizardBlastCaster 0 2460,910,0
+20 create PlyrCreeps WizardBlastTarget 0 2710,910,180
+21 reveal Player_1 WizardBlastCaster 0
+40 power Player_1 WizardBlastCaster 0 SpecialAbilityWizardBlastGondor
+41 aim Player_1 WizardBlastCaster 0 PlyrCreeps:WizardBlastTarget:0

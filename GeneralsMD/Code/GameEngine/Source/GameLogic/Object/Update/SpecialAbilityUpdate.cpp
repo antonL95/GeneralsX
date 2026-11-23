@@ -564,10 +564,8 @@ Bool SpecialAbilityUpdate::initiateIntentToDoSpecialPower( const SpecialPowerTem
   {
     m_rotwkTriggers = 0;
     m_holdFrames = 0;
-    ModelConditionFlags conditions;
-    addAbilityConditions( conditions );
-    getObject()->clearAndSetModelConditionFlags( m_rotwkConditions, conditions );
-    m_rotwkConditions = conditions;
+    getObject()->clearModelConditionFlags( m_rotwkConditions );
+    m_rotwkConditions.clear();
     if( data->m_instant )
       m_withinStartAbilityRange = true;
   }
@@ -908,6 +906,8 @@ void SpecialAbilityUpdate::startUnpacking()
         MAKE_MODELCONDITION_MASK( MODELCONDITION_PACKING ),
         MAKE_MODELCONDITION_MASK( MODELCONDITION_UNPACKING ) );
 
+  if (usesRotwkRules())
+    applyAbilityConditions();
 
   AudioEventRTS sound = data->m_unpackSound;
   sound.setObjectID( getObject()->getID() );
@@ -1214,7 +1214,10 @@ void SpecialAbilityUpdate::startPreparation()
   {
     getObject()->setModelConditionState( MODELCONDITION_PREPARING );
     if (data->m_unpackTime == 0 || (m_noTargetCommand && data->m_skipPackingWithNoTarget))
+    {
+      applyAbilityConditions();
       onStartWindup();
+    }
   }
 
   startPreparationSound();
@@ -2309,6 +2312,11 @@ void SpecialAbilityUpdate::loadPostProcess()
 	// extend base class
 	UpdateModule::loadPostProcess();
 
+	if (usesRotwkRules() && m_active && !m_withinStartAbilityRange && m_rotwkConditions.any())
+	{
+		getObject()->clearModelConditionFlags(m_rotwkConditions);
+		m_rotwkConditions.clear();
+	}
 }
 
 Bool SpecialAbilityUpdate::usesRotwkRules()
@@ -2345,6 +2353,12 @@ UnsignedInt SpecialAbilityUpdate::holdFramesAfterTrigger() const
 	if( !skipsContinue() && data->m_persistentCount == 0 )
 		hold = data->m_persistentPrepFrames;
 	return std::max( hold, data->m_freezeAfterTriggerDuration );
+}
+
+void SpecialAbilityUpdate::applyAbilityConditions()
+{
+	addAbilityConditions(m_rotwkConditions);
+	getObject()->setModelConditionFlags(m_rotwkConditions);
 }
 
 void SpecialAbilityUpdate::addAbilityConditions( ModelConditionFlags &flags ) const

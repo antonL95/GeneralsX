@@ -341,6 +341,8 @@ protected:
 
 private:
 
+	void applyAbilityConditions();
+
 	enum PackingState
 	{
 		STATE_NONE,
