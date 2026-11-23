@@ -18,7 +18,7 @@ check() {
                 anchors[frame]++
             else
                 riders[frame, horde]++
-            expected = member == -1 || frame >= 474 ? 1 : (frame - 234) / 240
+            expected = member == -1 || frame >= 274 ? 1 : (frame - 234) / 40
             if ((frame < 235 || abs(opacity - expected) > 0.000001) && !failed++) {
                 print "ocl-fade: unexpected hatch or opacity (expected " expected "):", $0 > "/dev/stderr"
             }

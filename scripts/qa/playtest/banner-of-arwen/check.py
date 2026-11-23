@@ -24,11 +24,11 @@ def check(log):
         r"^TEST ocl-fade (\d+) 0 -1 ([\d.]+) 3240\.000 690\.000 ", log, re.MULTILINE,
     )}
     first = 87
-    duration = 19 * 30
-    for frame in (100, 140, 200, 230, 350, 658, 670):
+    duration = 19 * 5
+    for frame in (100, 140, 181, 182, 200, 207, 230, 237, 350, 658, 670):
         expected = min((frame - first) / duration, 1.0)
         if not math.isclose(opacity.get(frame, -1.0), expected, abs_tol=1e-6):
-            raise RuntimeError(f"Expected the authored banner fade at frame {frame}, got {opacity.get(frame)}")
+            raise RuntimeError(f"Expected banner opacity {expected:.6f} at frame {frame}, got {opacity.get(frame)}")
 
 
 def check_captures(output, frames):

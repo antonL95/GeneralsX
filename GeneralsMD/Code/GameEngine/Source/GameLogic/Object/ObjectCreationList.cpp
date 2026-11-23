@@ -1653,7 +1653,8 @@ protected:
 				const HordeContain* horde = HordeContain::get(debris);
 				if (Drawable* drawable = debris->getDrawable())
 				{
-					drawable->startRetailOclFade(m_fadeFrames, m_fadeIn, m_fadeOut, horde != nullptr);
+					const UnsignedInt fadeClientFrames = m_fadeFrames / RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+					drawable->startRetailOclFade(fadeClientFrames, m_fadeIn, m_fadeOut, horde != nullptr);
 					if (horde && m_fadeIn)
 						for (Object* member : *horde->getContainedItemsList())
 							if (Drawable* memberDrawable = member->getDrawable())

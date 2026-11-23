@@ -6,9 +6,13 @@
 85 ocl-fade-trace Player_1 BannerOfArwen 0
 100 ocl-fade-trace Player_1 BannerOfArwen 0
 140 ocl-fade-trace Player_1 BannerOfArwen 0
-200 ocl-fade-trace Player_1 BannerOfArwen 0
 150 move Player_1 ArnorHalbarad 0 155,45
+181 ocl-fade-trace Player_1 BannerOfArwen 0
+182 ocl-fade-trace Player_1 BannerOfArwen 0
+200 ocl-fade-trace Player_1 BannerOfArwen 0
+207 ocl-fade-trace Player_1 BannerOfArwen 0
 230 ocl-fade-trace Player_1 BannerOfArwen 0
+237 ocl-fade-trace Player_1 BannerOfArwen 0
 350 ocl-fade-trace Player_1 BannerOfArwen 0
 658 ocl-fade-trace Player_1 BannerOfArwen 0
 670 ocl-fade-trace Player_1 BannerOfArwen 0
