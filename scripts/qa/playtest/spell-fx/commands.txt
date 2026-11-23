@@ -1,0 +1,29 @@
+5 create Player_1 GondorElessar 0 3050,520,0
+5 create Player_1 GondorTowerShieldGuard 0 3150,690,0
+5 create Player_1 GondorFaramir 0 3300,850,0
+5 create Player_1 GondorBoromir 0 2520,1010,0
+5 create Player_1 GondorGandalf 0 2260,1180,0
+5 create Player_1 GondorFighter 0 3155,690,0
+6 reveal Player_1 GondorElessar 0
+6 reveal Player_1 GondorGandalf 0
+7 objupgrade Player_1 GondorFaramir 0 Upgrade_ObjectLevel5
+7 objupgrade Player_1 GondorBoromir 0 Upgrade_ObjectLevel4
+7 objupgrade Player_1 GondorElessar 0 Upgrade_ObjectLevel10
+10 science Player_1 - 0 SCIENCE_Heal
+10 science Player_1 - 0 SCIENCE_RallyingCallMPG
+10 science Player_1 - 0 SCIENCE_SpawnLoneTower
+10 science Player_1 - 0 SCIENCE_SpawnTrebuchet
+45 power Player_1 GondorElessar 0 SpecialAbility202ElessarAthelas
+46 ability Player_1 GondorElessar 0
+100 damage Player_1 GondorTowerShieldGuard 0 175
+105 power-cast Player_1 - 1 at 3150 690
+160 power Player_1 GondorFaramir 0 SpecialAbilityFaramirAmbush2
+165 aim Player_1 GondorFaramir 0 80,0
+166 ability Player_1 GondorFaramir 0
+255 power Player_1 GondorBoromir 0 SpecialAbilityHornOfGondor
+256 ability Player_1 GondorBoromir 0
+365 power Player_1 GondorGandalf 0 SpecialPowerShieldBubbleGondor
+366 ability Player_1 GondorGandalf 0
+435 power-cast Player_1 - 3 at 3150 690
+490 power-cast Player_1 - 4 at 2765 980
+620 power-cast Player_1 - 6 at 3260 970
