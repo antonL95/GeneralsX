@@ -45,8 +45,10 @@ def check(log):
         r"^TEST timed weapon frame=(\d+) source=(\d+)\(FloodOathbreakerCOM\) ", log, re.MULTILINE
     ):
         shots[owner].append(int(frame))
-    if len(shots) != 5 or not all(any(b == a + 1 for a, b in pairwise(frames)) for frames in shots.values()):
-        raise RuntimeError("Expected all five commanders to fire their continuous weapon")
+    if len(shots) != 5 or not all(
+        len(frames) >= 2 and all(b - a == 6 for a, b in pairwise(frames)) for frames in shots.values()
+    ):
+        raise RuntimeError("Expected all five commanders to fire once per retail tick")
 
     effects = defaultdict(list)
     for owner, frame in re.findall(
@@ -55,11 +57,10 @@ def check(log):
         re.MULTILINE,
     ):
         if owner in shots:
-            effects[owner].append(int(frame) // 6)
-    for owner in shots:
-        ticks = effects[owner]
-        if len(ticks) < 2 or len(ticks) != len(set(ticks)):
-            raise RuntimeError(f"Expected one weapon FX playback per retail tick for commander {owner}")
+            effects[owner].append(int(frame))
+    for owner, frames in shots.items():
+        if effects[owner] != frames:
+            raise RuntimeError(f"Expected one weapon FX playback per shot for commander {owner}")
 
 
 def crop(output, frame, area):

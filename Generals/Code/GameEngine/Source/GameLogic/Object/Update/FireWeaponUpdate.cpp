@@ -31,6 +31,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/AI.h"
@@ -40,6 +41,10 @@
 #include "GameLogic/WeaponSlotSelectionRules.h"
 #include "GameLogic/WeaponStatus.h"
 
+namespace
+{
+constexpr UpdateSleepTime retailTick = UPDATE_SLEEP(RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND));
+}
 
 //-------------------------------------------------------------------------------------------------
 FireWeaponUpdateModuleData::FireWeaponUpdateModuleData()
@@ -72,6 +77,8 @@ FireWeaponUpdate::FireWeaponUpdate( Thing *thing, const ModuleData* moduleData )
 		m_weapon = TheWeaponStore->allocateNewWeapon(tmpl, PRIMARY_WEAPON);
 		m_weapon->loadAmmoNow( getObject() );
 	}
+	if (RetailFileLayers::enabled())
+		setWakeFrame(getObject(), retailTick);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -85,12 +92,16 @@ FireWeaponUpdate::~FireWeaponUpdate()
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime FireWeaponUpdate::update()
 {
+	const Bool retail = RetailFileLayers::enabled();
+	if (retail && (!m_weapon || getObject()->isDestroyed()))
+		return UPDATE_SLEEP_FOREVER;
+
 	// If my weapon is ready, shoot it.
 	if( isOkayToFire() )
 	{
 		m_weapon->forceFireWeapon( getObject(), getObject()->getPosition(), TRUE );
 	}
-	return UPDATE_SLEEP_NONE;
+	return retail ? retailTick : UPDATE_SLEEP_NONE;
 }
 
 //-------------------------------------------------------------------------------------------------

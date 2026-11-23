@@ -1,0 +1,25 @@
+213 create Player_1 CadenceFixtureDelayed 0 3000,2600,0
+225 create PlyrCreeps CadenceFixtureTarget 0 2900,2610,0
+225 create PlyrCreeps CadenceFixtureTarget 1 3000,2610,0
+225 create PlyrCreeps CadenceFixtureTarget 2 3100,2610,0
+225 create Player_1 CadenceFixtureZero 0 2900,2600,0
+225 create Player_1 CadenceFixtureEgg 0 3100,2600,0
+225 kill Player_1 CadenceFixtureEgg 0
+225 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 0 zero
+225 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 1 delayed
+225 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 2 death
+244 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 0 zero
+244 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 1 delayed
+244 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 2 death
+255 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 0 zero
+255 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 1 delayed
+255 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 2 death
+285 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 0 zero
+285 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 1 delayed
+285 fireweapon-cadence-health PlyrCreeps CadenceFixtureTarget 2 death
+285 destroy Player_1 CadenceFixtureZero 0
+285 destroy Player_1 CadenceFixtureDelayed 0
+285 destroy Player_1 CadenceFixtureDeathSpawn 0
+285 destroy PlyrCreeps CadenceFixtureTarget 2
+285 destroy PlyrCreeps CadenceFixtureTarget 1
+285 destroy PlyrCreeps CadenceFixtureTarget 0

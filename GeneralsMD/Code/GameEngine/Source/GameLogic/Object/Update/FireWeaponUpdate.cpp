@@ -32,6 +32,7 @@
 
 #include "Common/RetailFileLayers.h"
 #include "Common/INIAudit.h"
+#include "Common/RotwkDuration.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Object.h"
@@ -43,7 +44,20 @@
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/WeaponSlotSelectionRules.h"
 
+#include <algorithm>
 #include <cstdio>
+
+namespace
+{
+constexpr UnsignedInt retailTick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+
+UpdateSleepTime sleepUntilRetailFrame(UnsignedInt now, UnsignedInt deadline)
+{
+	if (deadline >= UPDATE_SLEEP_FOREVER)
+		return UPDATE_SLEEP_FOREVER;
+	return UPDATE_SLEEP(deadline > now ? std::max(retailTick, deadline - now) : retailTick);
+}
+}
 
 
 
@@ -125,6 +139,8 @@ FireWeaponUpdate::FireWeaponUpdate( Thing *thing, const ModuleData* moduleData )
 			m_payloads.push_back({weapon, TheGameLogic->getFrame() + nugget.delay});
 		}
 	}
+	if (RetailFileLayers::enabled())
+		setWakeFrame(getObject(), UPDATE_SLEEP(retailTick));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -141,35 +157,55 @@ void FireWeaponUpdate::setRetailDamageFieldWeapon(const WeaponTemplate* weapon)
 	deleteInstance(m_weapon);
 	m_weapon = TheWeaponStore->allocateNewWeapon(weapon, PRIMARY_WEAPON);
 	m_weapon->loadAmmoNow(getObject());
-	m_initialDelayFrame = TheGameLogic->getFrame() + 1;
+	m_initialDelayFrame = TheGameLogic->getFrame() + retailTick;
+	setWakeFrame(getObject(), UPDATE_SLEEP(retailTick));
 }
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime FireWeaponUpdate::update()
 {
+	if (RetailFileLayers::enabled())
+		return updateRetail();
 
   if ( TheGameLogic->getFrame() < m_initialDelayFrame )
     return UPDATE_SLEEP_NONE;
 
-	if (RetailFileLayers::enabled())
+	if( isOkayToFire() )
 	{
-		const auto* data = getFireWeaponUpdateModuleData();
-		const Object* object = getObject();
-		const auto& conditions = object->getLogicModelConditions();
-		if (object->isDestroyed() || (data->m_aliveOnly && object->isEffectivelyDead()) ||
-			(data->m_chargingModeTrigger && !conditions.test(MODELCONDITION_CHARGING)) ||
-			(data->m_heroModeTrigger && !conditions.test(MODELCONDITION_HERO)))
-			return UPDATE_SLEEP_NONE;
+		m_weapon->forceFireWeapon( getObject(), getObject()->getPosition(), TRUE );
+	}
+	return UPDATE_SLEEP_NONE;
+}
 
-		const UnsignedInt frame = TheGameLogic->getFrame();
-		for (size_t index = 0; !m_weapon && index < m_payloads.size(); ++index)
+UpdateSleepTime FireWeaponUpdate::updateRetail()
+{
+	const Object* object = getObject();
+	if (object->isDestroyed())
+		return UPDATE_SLEEP_FOREVER;
+
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	if (frame < m_initialDelayFrame)
+		return sleepUntilRetailFrame(frame, m_initialDelayFrame);
+
+	const auto* data = getFireWeaponUpdateModuleData();
+	const auto& conditions = object->getLogicModelConditions();
+	Bool canFire = (!data->m_aliveOnly || !object->isEffectivelyDead()) &&
+		(!data->m_chargingModeTrigger || conditions.test(MODELCONDITION_CHARGING)) &&
+		(!data->m_heroModeTrigger || conditions.test(MODELCONDITION_HERO));
+
+	if (m_weapon && canFire && isOkayToFire())
+		m_weapon->forceFireWeapon(object, object->getPosition(), TRUE);
+
+	UnsignedInt deadline = m_weapon && data->m_weaponTemplate ? m_weapon->getPossibleNextShotFrame() : UPDATE_SLEEP_FOREVER;
+	for (size_t index = 0; index < m_payloads.size(); ++index)
+	{
+		Payload& payload = m_payloads[index];
+		if (payload.spent || !payload.weapon)
+			continue;
+
+		if (!m_weapon && canFire && frame > payload.startFrame && payload.weapon->getStatus() == READY_TO_FIRE)
 		{
-			Payload& payload = m_payloads[index];
-			if (payload.spent || frame <= payload.startFrame || !payload.weapon ||
-				payload.weapon->getStatus() != READY_TO_FIRE)
-				continue;
-
 			const auto& nugget = data->m_nuggets[index];
 			const Coord3D& forward = *object->getUnitDirectionVector2D();
 			Coord3D target = *object->getPosition();
@@ -181,17 +217,15 @@ UpdateSleepTime FireWeaponUpdate::update()
 					payload.weapon->getName().str(), target.x, target.y, target.z);
 			payload.weapon->forceFireWeapon(object, &target, TRUE);
 			payload.spent = nugget.oneShot;
-			if (object->isDestroyed() || (data->m_aliveOnly && object->isEffectivelyDead()))
-				break;
+			if (object->isDestroyed())
+				return UPDATE_SLEEP_FOREVER;
+			if (data->m_aliveOnly && object->isEffectivelyDead())
+				canFire = FALSE;
 		}
+		if (!payload.spent)
+			deadline = std::min(deadline, std::max(payload.startFrame, payload.weapon->getPossibleNextShotFrame()));
 	}
-
-	// If my weapon is ready, shoot it.
-	if( isOkayToFire() )
-	{
-		m_weapon->forceFireWeapon( getObject(), getObject()->getPosition(), TRUE );
-	}
-	return UPDATE_SLEEP_NONE;
+	return sleepUntilRetailFrame(frame, deadline);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -87,6 +87,8 @@ protected:
   UnsignedInt m_initialDelayFrame;
 
 private:
+	UpdateSleepTime updateRetail();
+
 	struct Payload
 	{
 		Weapon* weapon;
