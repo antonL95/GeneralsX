@@ -33,11 +33,13 @@
 #include <string>
 
 #include "Common/Debug.h"
+#include "Common/FileSystem.h"
 #include "Common/MessageStream.h"
 #include "Common/GameEngine.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/OptionPreferences.h"
+#include "Common/RetailFileLayers.h"
 
 #include "GameClient/Display.h"
 #include "GameClient/DisplayStringManager.h"
@@ -583,7 +585,11 @@ the Win32 version of the mouse (by preloading resources before D3D device is cre
 void Mouse::parseIni()
 {
 	INI ini;
-	ini.loadFileDirectory( "Data\\INI\\Mouse", INI_LOAD_OVERWRITE, nullptr );
+	const char* retailMouseIni = "Data\\INI\\Mouse.ini";
+	if (RetailFileLayers::enabled() && TheFileSystem->doesFileExist(retailMouseIni))
+		ini.load(retailMouseIni, INI_LOAD_OVERWRITE, nullptr);
+	else
+		ini.loadFileDirectory("Data\\INI\\Mouse", INI_LOAD_OVERWRITE, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1626,9 +1632,22 @@ Int Mouse::getCursorIndex(const AsciiString& name)
 		"Hack",
 		"ParticleUplinkCannon",
 
+		"Axe",
+		"EvilAbilityObj",
+		"LivingWorldZoom",
+		"WeaponUpgrade",
+		"ArmorUpgrade",
+		"JoinHorde",
+		"Beam",
+		"Bombard",
+		"PickUp",
+		"SendToDeath",
+		"DeliverRing",
+		"Patrol",
 	};
 
-	for (Int i=0; i<NUM_MOUSE_CURSORS; ++i)
+	const Int cursorCount = RetailFileLayers::enabled() ? NUM_MOUSE_CURSORS : AXE;
+	for (Int i = 0; i < cursorCount; ++i)
 	{
 		if (name.compareNoCase(CursorININames[i]) == 0)
 			return i;

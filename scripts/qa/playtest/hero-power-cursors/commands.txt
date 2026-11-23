@@ -1,0 +1,17 @@
+5 create Player_1 GondorForlongNew 0 2220,1180,0
+5 create Player_1 GondorGandalf 0 2280,1180,0
+5 create PlyrCreeps MordorCaveTroll 0 2450,1190,0
+5 reveal Player_1 GondorGandalf 0
+6 objupgrade Player_1 GondorForlongNew 0 Upgrade_ObjectLevel7
+6 objupgrade Player_1 GondorGandalf 0 Upgrade_GandalfWhite
+29 power Player_1 GondorForlongNew 0 SpecialAbilityForlongTrueFriend
+31 cursor-point Player_1 GondorGandalf 0
+34 cursor-selected - - 0 Bombard
+36 cursor-point - - 0 - 2230 1240
+39 cursor-selected - - 0 GenericInvalid
+41 cursor-cancel - - 0
+46 power Player_1 GondorGandalf 0 SpecialAbilityIstariLight
+48 cursor-point PlyrCreeps MordorCaveTroll 0
+51 cursor-selected - - 0 Bombard
+53 cursor-point Player_1 GondorForlongNew 0
+56 cursor-selected - - 0 GenericInvalid

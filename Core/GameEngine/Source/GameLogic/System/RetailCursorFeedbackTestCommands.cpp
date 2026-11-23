@@ -89,6 +89,15 @@ void handleCursorFeedback(const RetailTestCommands::Context& ctx)
 		if (Object* object = ctx.requireObject())
 			std::fprintf(stderr, "TEST cursor name frame=%u label=%ls\n", ctx.frame, object->getDisplayName().str());
 	}
+	else if (ctx.action == "cursor-selected")
+	{
+		const CommandButton* button = TheInGameUI->getGUICommand();
+		const Int actual = TheMouse->getMouseCursor();
+		const Int expected = TheMouse->getCursorIndex(AsciiString(ctx.argument));
+		std::fprintf(stderr, "TEST cursor selected frame=%u button=%s expected=%s actual=%d matched=%d\n",
+			ctx.frame, button ? button->getName().str() : "-", ctx.argument, actual,
+			expected != Mouse::INVALID_MOUSE_CURSOR && actual == expected);
+	}
 	else if (ctx.action == "cursor-status")
 	{
 		const CommandButton* button = TheInGameUI->getGUICommand();
