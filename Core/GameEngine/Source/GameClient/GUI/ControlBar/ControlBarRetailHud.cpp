@@ -349,6 +349,14 @@ void retailPalantirTooltip(GameWindow *, WinInstanceData *, UnsignedInt mouse)
 		RetailEdges::showTooltip(x, y);
 }
 
+void drawRetailCommandGlass(CommandAvailability availability, Bool highlighted, const DesignRect &rect, Int x, Int y)
+{
+	if (availability == COMMAND_PASSIVE)
+		drawDesignImage("UiRetailPassiveGlass", rect, x, y, 1.0f);
+	else
+		drawDesignImage("UiRetailGlass", rect, x, y, 1.0f, highlighted ? 0xFFFFFFFF : 0xD0FFFFFF);
+}
+
 void setRetailRightClick(GameWindow *window, Bool enabled)
 {
 	if (enabled)
@@ -456,7 +464,7 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	}
 	else
 	{
-		drawDesignImage("UiRetailGlass", whole, x, y, 1.0f, highlight ? 0xFFFFFFFF : 0xD0FFFFFF);
+		drawRetailCommandGlass(availability, highlight, whole, x, y);
 	}
 	if (!queued && TheControlBar->isRetailAutoAbilityOn(window))
 		drawProductionRing(x, y, width, height);
