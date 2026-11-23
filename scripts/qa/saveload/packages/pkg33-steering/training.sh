@@ -17,16 +17,16 @@ check() {
     if covers 1200; then
         awk '
             BEGIN {
-                x["Pkg33Guard"] = 2675; y["Pkg33Guard"] = 965
-                x["Pkg33Archers"] = 2655; y["Pkg33Archers"] = 1055
-                x["Pkg33Knights"] = 2705; y["Pkg33Knights"] = 1155
+                x["Pkg33Guard"] = 1265; y["Pkg33Guard"] = 465
+                x["Pkg33Archers"] = 1245; y["Pkg33Archers"] = 555
+                x["Pkg33Knights"] = 1295; y["Pkg33Knights"] = 655
             }
             $1 == "TEST" && $2 == "track" && $3 == 246 && ($5 in x) {
                 anchor[$4] = $5
             }
             $1 == "TEST" && $2 == "pos" && ($4 in anchor) {
-                if ($6 >= 2460 && !($4 in crossing))
-                    crossing[$4] = $7 < 1000 ? -1 : ($7 > 1100 ? 1 : 0)
+                if ($6 >= 1050 && !($4 in crossing))
+                    crossing[$4] = $7 < 500 ? -1 : ($7 > 500 ? 1 : 0)
                 if ($3 == 1200 && $9 == 0 && $10 == 0) {
                     name = anchor[$4]
                     dx = $6 - x[name]
@@ -46,9 +46,11 @@ check() {
         awk '
             $1 == "TEST" && $2 == "steering" && $4 ~ /^Pkg33(Guard|Archers|Knights)$/ {
                 split($7, goal, /[=,]/)
-                if ($3 == 1220 && $0 ~ /moving=1/ && goal[2] < 2600)
+                split($NF, waypoint, ",")
+                goalX = $NF == "itinerary:" ? goal[2] : waypoint[1]
+                if ($3 == 1220 && $0 ~ /moving=1/ && goalX < 1100)
                     reversed[$4] = 1
-                if ($3 == 1248 && $0 ~ /moving=1/ && goal[2] > 2700 && $0 ~ /itinerary:$/)
+                if ($3 == 1248 && $0 ~ /moving=1/ && goalX > 1300)
                     replaced[$4] = 1
                 if ($3 == 1270 && $0 ~ /moving=0/ && $0 ~ /itinerary:$/)
                     stopped[$4] = 1
