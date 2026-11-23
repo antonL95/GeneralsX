@@ -343,6 +343,20 @@ WindowMsgHandledType retailPortraitInput(GameWindow *window, UnsignedInt msg, Wi
 	return retailPalantirInput(window->winGetParent(), msg, mData1, mData2);
 }
 
+WindowMsgHandledType retailMenuButtonInput(GameWindow *window, UnsignedInt msg, WindowMsgData, WindowMsgData)
+{
+	if (msg == GWM_LEFT_UP && TheWindowManager->winGetGrabWindow() == window)
+		TheMessageStream->appendMessage(GameMessage::MSG_META_OPTIONS);
+	return isMouseMessage(msg) ? MSG_HANDLED : MSG_IGNORED;
+}
+
+void retailMenuButtonTooltip(GameWindow *, WinInstanceData *, UnsignedInt)
+{
+	Mouse::RetailTooltip tooltip;
+	tooltip.title = TheGameText->fetchOrSubstitute("GUI:MatchMenu", L"Match Menu");
+	TheMouse->setRetailTooltip(tooltip);
+}
+
 WindowMsgHandledType retailSideBarInput(GameWindow *, UnsignedInt msg, WindowMsgData mData1, WindowMsgData)
 {
 	if (!isMouseMessage(msg))
@@ -1004,8 +1018,9 @@ void ControlBar::initRetailHud()
 	GameWindow *palantir = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:Palantir"));
 	GameWindow *radarBack = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:RadarBackground"));
 	GameWindow *frame = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:PalantirFrame"));
+	GameWindow *menuButton = TheWindowManager->winGetWindowFromId(palantir, NAMEKEY("ControlBar.wnd:RetailMenuButton"));
 	if (!m_contextParent[CP_COMMAND] || !m_retailPortrait || !m_retailSelectionName || !m_retailResources
-		|| !m_retailCommandPoints || !palantir || !radarBack || !frame)
+		|| !m_retailCommandPoints || !palantir || !radarBack || !frame || !menuButton)
 		throw INIException("RetailHud.wnd is missing a required window");
 
 	palantir->winSetDrawFunc(drawRetailPalantirBack);
@@ -1014,6 +1029,8 @@ void ControlBar::initRetailHud()
 	GameWindow *radar = TheWindowManager->winGetWindowFromId(palantir, NAMEKEY("ControlBar.wnd:LeftHUD"));
 	if (radar)
 		radar->winSetInputFunc(retailRadarInput);
+	menuButton->winSetInputFunc(retailMenuButtonInput);
+	menuButton->winSetTooltipFunc(retailMenuButtonTooltip);
 	GameWindow *sideBar = TheWindowManager->winGetWindowFromId(master, NAMEKEY("ControlBar.wnd:SideBar"));
 	if (!sideBar)
 		throw INIException("RetailHud.wnd is missing the side bar");
