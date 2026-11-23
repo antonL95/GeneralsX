@@ -480,6 +480,14 @@ public:
 		aiDoCommand(&parms);
 	}
 
+	void aiMoveToRetailGroupSlot(const Coord3D* pos, Object* leader, CommandSourceType cmdSource)
+	{
+		AICommandParms parms(AICMD_MOVE_TO_POSITION, cmdSource);
+		parms.m_pos = *pos;
+		parms.m_obj = leader;
+		aiDoCommand(&parms);
+	}
+
 	void aiMoveToPositionEvenIfSleeping( const Coord3D *pos, CommandSourceType cmdSource )
 	{
 		AICommandParms parms(AICMD_MOVE_TO_POSITION_EVEN_IF_SLEEPING, cmdSource);

@@ -213,7 +213,7 @@ public:
 
 	Bool isLinePassable( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfaces,
 		PathfindLayerEnum layer, const Coord3D& startWorld, const Coord3D& endWorld,
-		Bool blocked, Bool allowPinched );	///< Return true if the straight line between the given points is passable
+		Bool blocked, Bool allowPinched, const std::set<ObjectID>* departingGroup = nullptr );
 
 	Bool isMovementSegmentPassable( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfaces,
 		PathfindLayerEnum layer, const Coord3D& startWorld, const Coord3D& endWorld, Bool terrainOnly );

@@ -715,6 +715,8 @@ public:
 	// this is intended for use ONLY by AIFollowPathState.
 	void friend_setCurrentGoalPathIndex( Int index ) { m_nextGoalPathIndex = index; }
 	Bool isFollowingRetailGroupRoute() const;
+	Bool isMovingWithRetailGroup() const;
+	void clearRetailGroupIdentity();
 	void endRetailGroupRoute(Bool arrived);
 	void setRetailGroupPacing(const std::vector<ObjectID>& peers, Real speed, Real distance);
 	void updateRetailGroupPacing(Real distance);

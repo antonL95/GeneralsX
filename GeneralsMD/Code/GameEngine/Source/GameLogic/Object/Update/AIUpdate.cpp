@@ -2956,10 +2956,7 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
 	if (parms->m_cmdSource != CMD_FROM_AI && !isFollowingRetailGroupRoute())
-	{
-		m_retailGroupRouteLeader = INVALID_ID;
-		m_retailGroupRouteFrame = 0;
-	}
+		clearRetailGroupIdentity();
 	m_retailPlannerAttackTarget = INVALID_ID;
 	m_retailPlannerOrderActive = FALSE;
 
@@ -3000,6 +2997,11 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 		case AICMD_MOVE_TO_POSITION:
 		case AICMD_MOVE_TO_POSITION_EVEN_IF_SLEEPING:
 			privateMoveToPosition(&parms->m_pos, parms->m_cmdSource);
+			if (RetailFileLayers::enabled() && parms->m_obj && getAIStateType() == AI_MOVE_TO)
+			{
+				m_retailGroupRouteLeader = parms->m_obj->getID();
+				m_retailGroupRouteFrame = TheGameLogic->getFrame();
+			}
 			break;
 		case AICMD_MOVE_TO_OBJECT:
 			privateMoveToObject(parms->m_obj, parms->m_cmdSource);
@@ -3800,6 +3802,18 @@ Bool AIUpdateInterface::isFollowingRetailGroupRoute() const
 	return m_retailGroupRouteLeader != INVALID_ID && getStateMachine()->getCurrentStateID() == AI_FOLLOW_PATH;
 }
 
+Bool AIUpdateInterface::isMovingWithRetailGroup() const
+{
+	const StateID state = getStateMachine()->getCurrentStateID();
+	return m_retailGroupRouteLeader != INVALID_ID && (state == AI_MOVE_TO || state == AI_FOLLOW_PATH);
+}
+
+void AIUpdateInterface::clearRetailGroupIdentity()
+{
+	m_retailGroupRouteLeader = INVALID_ID;
+	m_retailGroupRouteFrame = 0;
+}
+
 Bool AIUpdateInterface::ignoreRetailGroupAnchorContact(const Object* other) const
 {
 	const Object* object = getObject();
@@ -3826,10 +3840,7 @@ void AIUpdateInterface::endRetailGroupRoute(Bool arrived)
 	if (m_retailGroupRouteLeader == INVALID_ID)
 		return;
 	if (!arrived)
-	{
-		m_retailGroupRouteLeader = INVALID_ID;
-		m_retailGroupRouteFrame = 0;
-	}
+		clearRetailGroupIdentity();
 	m_waitingForPath = FALSE;
 	TheAI->pathfinder()->removeGoal(getObject());
 	m_retailGroupPeers.clear();

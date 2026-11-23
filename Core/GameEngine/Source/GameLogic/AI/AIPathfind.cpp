@@ -112,6 +112,7 @@ struct TCheckMovementInfo
 	Bool							centerInCell;
 	Bool							considerTransient;
 	LocomotorSurfaceTypeMask acceptableSurfaces;
+	const std::set<ObjectID>* departingGroup = nullptr;
 	// Output
 	Int								allyFixedCount;
 	Bool							enemyFixed;
@@ -1597,6 +1598,13 @@ Bool Pathfinder::checkForMovement(const Object *obj, TCheckMovementInfo &info)
 			}
 			if (isSameHorde(obj, unit)) {
 				continue;
+			}
+			if (info.departingGroup && obj->getRelationship(unit) == ALLIES)
+			{
+				const Object* anchor = HordeContain::getAnchor(unit);
+				if (info.departingGroup->contains(unit->getID()) ||
+					(anchor && info.departingGroup->contains(anchor->getID())))
+					continue;
 			}
 
 #ifdef INFANTRY_MOVES_THROUGH_INFANTRY
@@ -6117,6 +6125,7 @@ struct LinePassableStruct
 	Bool centerInCell;
 	Bool blocked;
 	Bool allowPinched;
+	const std::set<ObjectID>* departingGroup;
 };
 
 /*static*/ Int Pathfinder::linePassableCallback(Pathfinder* pathfinder, PathfindCell* from, PathfindCell* to, Int to_x, Int to_y, void* userData)
@@ -6132,6 +6141,7 @@ struct LinePassableStruct
 	info.radius = d->radius;
 	info.considerTransient = d->blocked;
 	info.acceptableSurfaces = d->acceptableSurfaces;
+	info.departingGroup = d->departingGroup;
 	if (!pathfinder->checkForMovement(d->obj, info))
 	{
 		return 1;	// bail out
@@ -6190,7 +6200,7 @@ struct GroundPathPassableStruct
 Bool Pathfinder::isLinePassable( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfaces,
 																PathfindLayerEnum layer, const Coord3D& startWorld,
 																const Coord3D& endWorld, Bool blocked,
-																Bool allowPinched)
+																Bool allowPinched, const std::set<ObjectID>* departingGroup)
 {
 	LinePassableStruct info;
 	//CRCDEBUG_LOG(("Pathfinder::isLinePassable(): %d %d %d ", m_ignoreObstacleID, m_isMapReady, m_isTunneling));
@@ -6200,6 +6210,7 @@ Bool Pathfinder::isLinePassable( const Object *obj, LocomotorSurfaceTypeMask acc
 	getRadiusAndCenter(obj, info.radius, info.centerInCell);
 	info.blocked = blocked;
 	info.allowPinched = allowPinched;
+	info.departingGroup = departingGroup;
 
 	Int ret = iterateCellsAlongLine(startWorld, endWorld, layer, linePassableCallback, (void*)&info);
 	return ret == 0;

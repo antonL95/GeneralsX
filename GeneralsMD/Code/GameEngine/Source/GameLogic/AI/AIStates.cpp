@@ -2106,6 +2106,9 @@ StateReturnType AIMoveToState::onEnter()
 //----------------------------------------------------------------------------------------------------------
 void AIMoveToState::onExit( StateExitType status )
 {
+	AIUpdateInterface* ai = getMachineOwner()->getAI();
+	if (ai && getID() == AI_MOVE_TO && ai->isMovingWithRetailGroup())
+		ai->clearRetailGroupIdentity();
 	AIInternalMoveToState::onExit( status );
 }
 
