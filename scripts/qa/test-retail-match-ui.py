@@ -240,12 +240,13 @@ def check():
     wait_for("Escape reopens the menu in the same match", menu_visible)
     pause_title = title_signature(376, 323, 272, 35)
     click(512, 442)
+    wait_for("Leave opens the confirmation", lambda: title_signature(376, 323, 272, 35) != pause_title)
     capture("leave-confirmation", 360, 312, 304, 170)
     key(0xFF1B)
     wait_for("Escape cancels the leave confirmation",
              lambda: title_signature(376, 323, 272, 35) == pause_title)
     click(512, 442)
-    wait_for("Leave opens the confirmation", lambda: title_signature(376, 323, 272, 35) != pause_title)
+    wait_for("Leave opens the confirmation again", lambda: title_signature(376, 323, 272, 35) != pause_title)
     click(512, 442)
     wait_for("repeating the Leave click returns to the pause menu",
              lambda: title_signature(376, 323, 272, 35) == pause_title)
