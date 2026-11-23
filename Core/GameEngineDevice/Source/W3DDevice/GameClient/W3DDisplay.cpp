@@ -162,6 +162,7 @@ static Int theFlashCount = 0;
 
 #ifdef DUMP_PERF_STATS
 
+#include <chrono>
 #include <cstdarg>
 
 class StatDumpClass
@@ -2712,7 +2713,12 @@ AGAIN:
 
 	Bool viewsUpdated = TRUE;
 
+	static const bool traceRenderTime = std::getenv("GENERALSX_TEST_RENDER_TIME") != nullptr;
+	using RenderClock = std::chrono::steady_clock;
+	const bool timeRender = traceRenderTime && RetailFileLayers::enabled();
+
 	do {
+		const auto renderStart = timeRender ? RenderClock::now() : RenderClock::time_point();
 
 		if (DX8Wrapper::_Get_D3D_Device8() && (DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel()) == D3D_OK)
 		{
@@ -2879,6 +2885,13 @@ AGAIN:
 				// render is all done!
 				const char* uiTestCapture = UiTest::capturePath();
 				WW3D::End_Render(uiTestCapture == nullptr);
+				if (timeRender)
+				{
+					const auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
+						RenderClock::now() - renderStart).count();
+					std::fprintf(stderr, "TEST render-time frame=%u us=%lld\n",
+						TheGameLogic->getFrame(), static_cast<long long>(microseconds));
+				}
 				if (uiTestCapture)
 				{
 					W3D_TakeCompressedScreenshot(SCREENSHOT_PNG, DEFAULT_JPEG_QUALITY, true, uiTestCapture);

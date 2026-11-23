@@ -2564,6 +2564,8 @@ static Int pickRetailAnimation(const W3DAnimationVector& animations, Int previou
 
 void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction, Bool restartCurrent)
 {
+	static const bool disableBlend = std::getenv("GENERALSX_TEST_DISABLE_ANIMATION_BLEND") != nullptr;
+
 	if (!m_curState)
 		return;
 
@@ -2639,7 +2641,7 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 					m_animationMode = mode;
 					m_renderObject->Set_Animation(animHandle, startFrame, RenderObjClass::ANIM_MODE_MANUAL);
 				}
-				else if (RetailFileLayers::enabled() && !restartCurrent && !m_pauseAnimation &&
+				else if (RetailFileLayers::enabled() && !disableBlend && !restartCurrent && !m_pauseAnimation &&
 					animInfo.getBlendFrames() > 0.0f && m_renderObject->Class_ID() == RenderObjClass::CLASSID_HLOD &&
 					!(TheGameState && TheGameState->isInLoadGame()))
 				{
