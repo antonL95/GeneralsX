@@ -1,0 +1,9 @@
+55 create PlyrCivilian FortressTimingFixture 0 3100,2400,0
+58 conditions PlyrCivilian FortressTimingFixture 0
+60 objupgrade PlyrCivilian FortressTimingFixture 0 Upgrade_FortressTimingFixture
+70 conditions PlyrCivilian FortressTimingFixture 0
+80 conditions PlyrCivilian FortressTimingFixture 0
+81 conditions PlyrCivilian FortressTimingFixture 0
+250 conditions PlyrCivilian FortressTimingFixture 0
+340 conditions PlyrCivilian FortressTimingFixture 0
+341 destroy PlyrCivilian FortressTimingFixture 0
