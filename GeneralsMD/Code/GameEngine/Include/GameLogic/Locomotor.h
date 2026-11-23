@@ -514,7 +514,7 @@ private:
 	Bool getFlag(LocoFlag f) const { return (m_flags & (1 << f)) != 0; }
 	void setFlag(LocoFlag f, Bool b) { if (b) m_flags |= (1<<f); else m_flags &= ~(1<<f); }
 
-	void updateRetailGait(Object* object, Real distance, Real speed, Bool braking);
+	void updateRetailGait(Object* object, Real distance, Real speedBefore, Bool braking, Real speedAfter = -1.0f);
 
 	LocomotorTemplateOverride m_template;		///< the kind of Locomotor this is
 	Coord3D			m_maintainPos;

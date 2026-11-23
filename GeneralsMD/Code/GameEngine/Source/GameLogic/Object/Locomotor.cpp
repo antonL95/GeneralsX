@@ -1323,19 +1323,24 @@ void Locomotor::clearRetailGait(Object* object)
 	object->clearModelConditionState(MODELCONDITION_DECELERATE);
 }
 
-void Locomotor::updateRetailGait(Object* object, Real distance, Real speed, Bool braking)
+void Locomotor::updateRetailGait(Object* object, Real distance, Real speedBefore, Bool braking, Real speedAfter)
 {
 	const auto& data = m_template->m_rotwk;
 	if (!RetailFileLayers::enabled() || (data.walkDistance <= 0.0f && data.accelDecelTrigger < 0.0f))
 		return;
 
-	const Real threshold = getMaxSpeedForCondition(object->getBodyModule()->getDamageState(), object) *
-		(data.accelDecelTrigger >= 0.0f ? data.accelDecelTrigger : 0.5f);
+	const auto damage = object->getBodyModule()->getDamageState();
+	const Bool authoredTrigger = data.accelDecelTrigger >= 0.0f;
+	const Real threshold = getMaxSpeedForCondition(damage, object) * (authoredTrigger ? data.accelDecelTrigger : 0.5f);
+	const Bool hasSteeredSpeed = speedAfter >= 0.0f;
 	const Bool decelerating = m_retailWasRunning && braking &&
-		(data.accelDecelTrigger < 0.0f || speed < threshold);
+		(!authoredTrigger || (hasSteeredSpeed ? speedAfter : speedBefore) < threshold);
 	const Bool walking = !m_retailWasRunning && data.walkDistance > 0.0f && distance < data.walkDistance && !braking;
-	const Bool accelerating = !walking && !braking && !m_retailWasRunning && speed < threshold;
-	if (!walking && !accelerating && !braking)
+	const Real minimumAccelerationFraction = 0.4f;
+	const Bool accelerating = !walking && !braking && speedBefore < threshold &&
+		(authoredTrigger && hasSteeredSpeed ? speedAfter - speedBefore > minimumAccelerationFraction * getMaxAcceleration(damage) :
+			!m_retailWasRunning);
+	if (!walking && !braking && speedBefore >= threshold)
 		m_retailWasRunning = TRUE;
 
 	if (walking)
@@ -3140,29 +3145,34 @@ void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord
 			goalSpeed = arrivalSpeed > getMinSpeed() ? arrivalSpeed : getMinSpeed();
 	}
 
-	if (goalSpeed <= MIN_GAIT_SPEED && actualSpeed <= MIN_GAIT_SPEED)
-		clearRetailGait(obj);
-	else
-		updateRetailGait(obj, onPathDistToGoal, actualSpeed, backing || goalSpeed + MIN_GAIT_SPEED < actualSpeed);
-
 	Coord3D velocityDelta;
 	velocityDelta.x = dirToApplyForce.x * goalSpeed - velocity->x;
 	velocityDelta.y = dirToApplyForce.y * goalSpeed - velocity->y;
 	velocityDelta.z = 0.0f;
 	const Real deltaLength = backing ? WWMath::SqrtfOrigin(sqr(velocityDelta.x) + sqr(velocityDelta.y))
 		: velocityDelta.length();
+	Real speedAfter = actualSpeed;
 	if (deltaLength > 0.0f)
 	{
 		const Real limit = goalSpeed > actualSpeed ? getMaxAcceleration(bdt) : getBraking();
-		Real scale = physics->getMass();
-		if (deltaLength > limit)
-			scale *= limit / deltaLength;
+		const Real impulseScale = deltaLength > limit ? limit / deltaLength : 1.0f;
+		const Real scale = physics->getMass() * impulseScale;
+		if (RetailFileLayers::enabled() && m_template->m_rotwk.accelDecelTrigger >= 0.0f)
+		{
+			const Real nextX = velocity->x + impulseScale * velocityDelta.x;
+			const Real nextY = velocity->y + impulseScale * velocityDelta.y;
+			speedAfter = WWMath::SqrtfOrigin(sqr(nextX) + sqr(nextY));
+		}
 		Coord3D force;
 		force.x = velocityDelta.x * scale;
 		force.y = velocityDelta.y * scale;
 		force.z = 0.0f;
 		physics->applyMotiveForce(&force);
 	}
+	if (goalSpeed <= MIN_GAIT_SPEED && actualSpeed <= MIN_GAIT_SPEED)
+		clearRetailGait(obj);
+	else
+		updateRetailGait(obj, onPathDistToGoal, actualSpeed, backing || goalSpeed + MIN_GAIT_SPEED < actualSpeed, speedAfter);
 }
 
 //-------------------------------------------------------------------------------------------------

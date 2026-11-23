@@ -1,0 +1,46 @@
+10 create Player_1 GondorFountainGuardHorde 0 2320,1010,0
+10 create Player_1 GondorKnightHorde 0 2320,1190,0
+10 create Player_1 GondorPippin 0 2320,1350,0
+11 reveal Player_1 GondorFountainGuardHorde 0
+11 track Player_1 GondorFountainGuardHorde 0
+11 track Player_1 GondorKnightHorde 0
+11 track Player_1 GondorPippin 0
+31 steering-path Player_1 GondorFountainGuardHorde 0
+31 steering-path Player_1 GondorKnightHorde 0
+31 steering-path Player_1 GondorPippin 0
+32 move Player_1 GondorFountainGuardHorde 0 - 2680 1010
+32 move Player_1 GondorKnightHorde 0 - 2680 1190
+32 move Player_1 GondorPippin 0 - 2680 1350
+45 steering-path Player_1 GondorKnightHorde 0
+46 steering-path Player_1 GondorKnightHorde 0
+47 steering-path Player_1 GondorKnightHorde 0
+48 steering-path Player_1 GondorKnightHorde 0
+49 steering-path Player_1 GondorKnightHorde 0
+50 steering-path Player_1 GondorKnightHorde 0
+51 steering-path Player_1 GondorKnightHorde 0
+52 steering-path Player_1 GondorKnightHorde 0
+53 steering-path Player_1 GondorKnightHorde 0
+62 steering-path Player_1 GondorFountainGuardHorde 0
+62 steering-path Player_1 GondorKnightHorde 0
+62 steering-path Player_1 GondorPippin 0
+145 steering-path Player_1 GondorKnightHorde 0
+146 steering-path Player_1 GondorKnightHorde 0
+147 steering-path Player_1 GondorKnightHorde 0
+148 steering-path Player_1 GondorKnightHorde 0
+149 steering-path Player_1 GondorKnightHorde 0
+150 steering-path Player_1 GondorKnightHorde 0
+151 steering-path Player_1 GondorKnightHorde 0
+152 steering-path Player_1 GondorKnightHorde 0
+153 steering-path Player_1 GondorKnightHorde 0
+280 move Player_1 GondorFountainGuardHorde 0 - 2300 1010
+280 move Player_1 GondorKnightHorde 0 - 2300 1190
+280 move Player_1 GondorPippin 0 - 2300 1350
+362 select Player_1 GondorFountainGuardHorde 0
+362 steering-stop - - 0
+362 select Player_1 GondorKnightHorde 0
+362 steering-stop - - 0
+362 select Player_1 GondorPippin 0
+362 steering-stop - - 0
+363 steering-path Player_1 GondorFountainGuardHorde 0
+363 steering-path Player_1 GondorKnightHorde 0
+363 steering-path Player_1 GondorPippin 0
