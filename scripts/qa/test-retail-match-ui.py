@@ -164,7 +164,13 @@ def check():
     wait_for("Escape cancels the leave confirmation",
              lambda: title_signature(376, 323, 272, 35) == pause_title)
     click(512, 442)
+    wait_for("Leave opens the confirmation", lambda: title_signature(376, 323, 272, 35) != pause_title)
     click(512, 442)
+    wait_for("repeating the Leave click returns to the pause menu",
+             lambda: title_signature(376, 323, 272, 35) == pause_title)
+    click(512, 442)
+    wait_for("Leave reopens the confirmation", lambda: title_signature(376, 323, 272, 35) != pause_title)
+    click(512, 391)
     wait_for("Quit returns to the main menu",
              lambda: len(skirmish_label & skirmish_label_pixels()) >= len(skirmish_label) * 0.8)
     capture("main-menu-return", 425, 265, 174, 170)

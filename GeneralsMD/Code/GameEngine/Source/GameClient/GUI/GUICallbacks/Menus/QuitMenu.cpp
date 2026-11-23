@@ -121,6 +121,12 @@ PauseCard pauseCardOnScreen(PauseCard card)
 		Int(card.width * scale), Int(card.height * scale)};
 }
 
+PauseCard pauseButtonOnScreen(PauseChoice choice)
+{
+	const Bool topButton = (choice == PauseChoice::Resume) != confirmLeave;
+	return pauseCardOnScreen(topButton ? resumeButton : leaveButton);
+}
+
 void drawPauseLabel(DisplayString *text, PauseCard card, const char *key, const WideChar *fallback)
 {
 	text->setText(TheGameText->fetchOrSubstitute(key, fallback));
@@ -142,8 +148,8 @@ void drawRetailPauseMenu(GameWindow *window, WinInstanceData *)
 	TheDisplay->drawFillRect(panel.x, panel.y, panel.width, panel.height, 0xFF14212A);
 	TheDisplay->drawOpenRect(panel.x, panel.y, panel.width, panel.height, 1.0f, 0xFF7897A8);
 
-	const PauseCard resume = pauseCardOnScreen(resumeButton);
-	const PauseCard leave = pauseCardOnScreen(leaveButton);
+	const PauseCard resume = pauseButtonOnScreen(PauseChoice::Resume);
+	const PauseCard leave = pauseButtonOnScreen(PauseChoice::Leave);
 	TheDisplay->drawFillRect(resume.x, resume.y, resume.width, resume.height,
 		pauseSelection == PauseChoice::Resume ? 0xFF365665 : 0xFF233741);
 	TheDisplay->drawFillRect(leave.x, leave.y, leave.width, leave.height,
@@ -159,14 +165,16 @@ void drawRetailPauseMenu(GameWindow *window, WinInstanceData *)
 	{
 		drawPauseLabel(text, title, "GUI:LeaveMatch", L"Leave this match?");
 		drawPauseLabel(text, resume, "GUI:Cancel", L"Cancel");
-		drawPauseLabel(text, leave, "GUI:LeaveForMainMenu", L"Return to Main Menu");
 	}
 	else
 	{
 		drawPauseLabel(text, title, "GUI:MatchMenu", L"Match Menu");
 		drawPauseLabel(text, resume, "GUI:Resume", L"Resume");
-		drawPauseLabel(text, leave, "GUI:LeaveForMainMenu", L"Return to Main Menu");
 	}
+	if (TheGameLogic->isInMultiplayerGame())
+		drawPauseLabel(text, leave, "GUI:LeaveMultiplayerMatch", L"Leave Match");
+	else
+		drawPauseLabel(text, leave, "GUI:LeaveForMainMenu", L"Return to Main Menu");
 	TheDisplayStringManager->freeDisplayString(text);
 }
 
@@ -207,6 +215,7 @@ void activatePauseChoice(PauseChoice choice)
 			{
 				confirmLeave = FALSE;
 				pauseSelection = PauseChoice::Resume;
+				pausePress = PauseChoice::None;
 			}
 			else
 				HideQuitMenu();
@@ -221,6 +230,7 @@ void activatePauseChoice(PauseChoice choice)
 			{
 				confirmLeave = TRUE;
 				pauseSelection = PauseChoice::Resume;
+				pausePress = PauseChoice::None;
 			}
 			break;
 		case PauseChoice::None:
@@ -244,9 +254,9 @@ WindowMsgHandledType retailPauseInput(GameWindow *, UnsignedInt message, WindowM
 		const Int x = point & 0xFFFF;
 		const Int y = point >> 16;
 		PauseChoice at = PauseChoice::None;
-		if (pauseCardOnScreen(resumeButton).contains(x, y))
+		if (pauseButtonOnScreen(PauseChoice::Resume).contains(x, y))
 			at = PauseChoice::Resume;
-		else if (pauseCardOnScreen(leaveButton).contains(x, y))
+		else if (pauseButtonOnScreen(PauseChoice::Leave).contains(x, y))
 			at = PauseChoice::Leave;
 		if (at != PauseChoice::None)
 			pauseSelection = at;
