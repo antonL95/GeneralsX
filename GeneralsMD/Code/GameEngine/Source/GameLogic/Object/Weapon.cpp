@@ -1951,7 +1951,15 @@ void WeaponStore::update()
 		{
 			// we never do projectile-detonation-damage via this code path.
 			const Bool isProjectileDetonation = false;
-			if (ddi->m_nuggetIndex >= 0)
+			if (RetailFileLayers::enabled() && ddi->m_metaImpactAmount > 0.0f)
+			{
+				const WeaponNugget& nugget = ddi->m_delayedWeapon->m_nuggets[ddi->m_nuggetIndex];
+				Object* victim = TheGameLogic->findObjectByID(ddi->m_delayIntendedVictimID);
+				if (victim && !victim->isDestroyed() && (!victim->isEffectivelyDead() || nugget.m_onlyWhenJustDied))
+					if (PhysicsBehavior* physics = victim->getPhysics())
+						physics->launchFromImpact(ddi->m_metaImpactDirection, ddi->m_metaImpactAmount, nugget.m_shockWaveZMult);
+			}
+			else if (ddi->m_nuggetIndex >= 0)
 				ddi->m_delayedWeapon->dealNuggetDamage(ddi->m_nuggetIndex, ddi->m_delaySourceID, ddi->m_delayIntendedVictimID,
 					&ddi->m_delayDamagePos, ddi->m_bonus, ddi->m_dotTick, ddi->m_contactHit,
 					ddi->m_hasImpactVelocity ? &ddi->m_impactVelocity : nullptr, ddi->m_launchTrigger, ddi->m_launchWeapon);
@@ -2028,6 +2036,21 @@ void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* 
 	m_weaponDDI.push_back(wi);
 }
 
+void WeaponStore::setDelayedMetaImpact(const WeaponTemplate* weapon, Int index, UnsignedInt frame, ObjectID victimID,
+	const Coord3D& direction, Real amount)
+{
+	WeaponDelayedDamageInfo& hit = m_weaponDDI.emplace_back();
+	hit.m_delayedWeapon = weapon;
+	hit.m_delayDamagePos = {};
+	hit.m_delayDamageFrame = frame;
+	hit.m_delaySourceID = INVALID_ID;
+	hit.m_delayIntendedVictimID = victimID;
+	hit.m_nuggetIndex = index;
+	hit.m_launchTrigger = RETAIL_DAMAGE_FX_NONE;
+	hit.m_metaImpactDirection = direction;
+	hit.m_metaImpactAmount = amount;
+}
+
 void WeaponStore::xferRetailDelayedDamage(Xfer* xfer)
 {
 	const Bool loading = xfer->getXferMode() == XFER_LOAD;
@@ -2095,8 +2118,22 @@ void WeaponStore::xferRetailBlocks(Xfer* xfer, Bool present)
 		}, [this] {
 			for (WeaponDelayedDamageInfo& hit : m_weaponDDI)
 				hit.m_launchWeapon = nullptr;
-		}
-		}
+		}},
+		{ "delayed-meta-impact", [this, loading](Xfer* x) {
+			for (WeaponDelayedDamageInfo& hit : m_weaponDDI)
+			{
+				x->xferReal(&hit.m_metaImpactAmount);
+				if (hit.m_metaImpactAmount <= 0.0f)
+					continue;
+				if (loading && (hit.m_nuggetIndex < 0 ||
+					hit.m_delayedWeapon->m_nuggets[hit.m_nuggetIndex].m_type != WEAPON_NUGGET_META_IMPACT))
+					throw SC_INVALID_DATA;
+				x->xferCoord3D(&hit.m_metaImpactDirection);
+			}
+		}, [this] {
+			for (WeaponDelayedDamageInfo& hit : m_weaponDDI)
+				hit.m_metaImpactAmount = 0.0f;
+		}}
 	});
 }
 

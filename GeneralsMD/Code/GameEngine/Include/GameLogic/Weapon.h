@@ -546,6 +546,8 @@ protected:
 	void dealDamageInternal(ObjectID sourceID, ObjectID victimID, const Coord3D *pos, const WeaponBonus& bonus, Bool isProjectileDetonation) const;
 	static const Object* getNuggetAttacker(const Object* source);
 	void dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus, Bool contactHit) const;
+	void applyMetaImpactNugget(Int index, const Object* source, Object* primaryVictim, const Coord3D& pos,
+		const WeaponBonus& bonus, UnsignedInt impactFrame) const;
 	void applyModifierNugget(const WeaponNugget& nugget, const Object* attacker, ObjectID victimID, const Coord3D* pos) const;
 	void orderNuggetSlaves(const Object* source, Object* victim, const Coord3D* position) const;
 	void orderNuggetHorde(const Object* source, Object* victim, const Coord3D* position) const;
@@ -1034,6 +1036,8 @@ protected:
 		const WeaponBonus& bonus, Int nuggetIndex = -1, Bool dotTick = FALSE, Bool contactHit = FALSE,
 		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE, const Coord3D* impactVelocity = nullptr,
 		const WeaponTemplate* launchWeapon = nullptr);
+	void setDelayedMetaImpact(const WeaponTemplate* weapon, Int index, UnsignedInt frame, ObjectID victimID,
+		const Coord3D& direction, Real amount);
 
 private:
 
@@ -1059,6 +1063,8 @@ private:
 		const WeaponTemplate* m_launchWeapon = nullptr;
 		Bool m_hasImpactVelocity = FALSE;
 		Coord3D m_impactVelocity{};
+		Coord3D m_metaImpactDirection{};
+		Real m_metaImpactAmount = 0.0f;
 	};
 
 	std::vector<WeaponTemplate*> m_weaponTemplateVector;

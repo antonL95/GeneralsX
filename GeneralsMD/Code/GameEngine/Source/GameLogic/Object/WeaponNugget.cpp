@@ -714,10 +714,75 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 			continue;
 		if (nugget.m_delayFrames == 0)
 			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit, &velocity, launchTrigger, launchWeapon);
+		else if (RetailFileLayers::enabled() && TheWeaponStore && nugget.m_type == WEAPON_NUGGET_META_IMPACT)
+			applyMetaImpactNugget(static_cast<Int>(index), attacker, TheGameLogic->findObjectByID(victimID), *pos,
+				bonus, TheGameLogic->getFrame() + nugget.m_delayFrames);
 		else if (TheWeaponStore)
 			TheWeaponStore->setDelayedDamage(this, pos, TheGameLogic->getFrame() + nugget.m_delayFrames, nuggetSourceID, victimID,
 				bonus, static_cast<Int>(index), FALSE, contactHit, launchTrigger, &velocity, launchWeapon);
 	}
+}
+
+void WeaponTemplate::applyMetaImpactNugget(Int nuggetIndex, const Object* source, Object* primaryVictim,
+	const Coord3D& pos, const WeaponBonus& bonus, UnsignedInt impactFrame) const
+{
+	const WeaponNugget& nugget = m_nuggets[nuggetIndex];
+	const Real radius = nugget.m_shockWaveRadius * bonus.getField(WeaponBonus::RADIUS);
+	const Coord3D& origin = source ? *source->getPosition() : pos;
+	Coord3D axis{pos.x - origin.x, pos.y - origin.y, 0.0f};
+	if (axis.x == 0.0f && axis.y == 0.0f)
+		axis = source ? *source->getUnitDirectionVector2D() : Coord3D{1.0f, 0.0f, 0.0f};
+	const Bool fullArc = nugget.m_shockWaveArc <= 0.0f || nugget.m_shockWaveArc >= 360.0f;
+	const Real cosHalfArc = fullArc ? -1.0f : WWMath::CosTrig(nugget.m_shockWaveArc * (PI / 360.0f));
+	SimpleObjectIterator* iter = radius > 0.0f ? ThePartitionManager->iterateObjectsInRange(&pos, radius, FROM_CENTER_2D) : nullptr;
+	MemoryPoolObjectHolder hold(iter);
+	const auto affect = [&](Object* victim)
+	{
+		auto* physics = victim->getPhysics();
+		if (!physics || HordeContain::get(victim) || victim->isKindOf(KINDOF_PROJECTILE) ||
+			(victim->isEffectivelyDead() && (!nugget.m_onlyWhenJustDied || victim != primaryVictim)) ||
+			(nugget.m_onlyWhenJustDied && !victim->isEffectivelyDead()) ||
+			judgeRadiusDamageVictim(source, victim, primaryVictim, m_affectsMask) != RADIUS_DAMAGE_AFFECT ||
+			!nugget.affects(source, victim))
+			return;
+
+		const Coord3D& targetPos = *victim->getPosition();
+		const Real dx = targetPos.x - pos.x;
+		const Real dy = targetPos.y - pos.y;
+		if (victim != primaryVictim && !WeaponNuggetRules::withinArc(axis.x, axis.y, dx, dy, cosHalfArc, fullArc, nugget.m_shockWaveArcInverted))
+			return;
+		const Real falloff = radius > 0.0f ?
+			std::clamp(1.0f - nugget.m_shockWaveTaperOff * WWMath::SqrtfOrigin(dx * dx + dy * dy) / radius, 0.0f, 1.0f) : 1.0f;
+		const Real amount = nugget.m_shockWaveAmount * falloff;
+		if (!(amount > victim->getTemplate()->getRotWKObjectData().shockwaveResistance))
+			return;
+
+		Coord3D direction{targetPos.x - origin.x, targetPos.y - origin.y, 0.0f};
+		const Real distance = WWMath::SqrtfOrigin(direction.x * direction.x + direction.y * direction.y);
+		if (distance > 0.0f)
+		{
+			direction.x /= distance;
+			direction.y /= distance;
+		}
+		else
+			direction = source ? *source->getUnitDirectionVector2D() : Coord3D{1.0f, 0.0f, 0.0f};
+		if (nugget.m_invertShockWave != nugget.m_flipDirection)
+		{
+			direction.x = -direction.x;
+			direction.y = -direction.y;
+		}
+		if (impactFrame)
+			TheWeaponStore->setDelayedMetaImpact(this, nuggetIndex, impactFrame, victim->getID(), direction, amount);
+		else
+			physics->launchFromImpact(direction, amount, nugget.m_shockWaveZMult);
+	};
+	if (iter)
+	{
+		for (Object* victim = iter->first(); victim; victim = iter->next())
+			affect(victim);
+	}
+	else if (primaryVictim)
+		affect(primaryVictim);
 }
 
 void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
@@ -843,54 +908,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 
 	if (nugget.m_type == WEAPON_NUGGET_META_IMPACT)
 	{
-		const Real radius = nugget.m_shockWaveRadius * bonus.getField(WeaponBonus::RADIUS);
-		Coord3D axis{1.0f, 0.0f, 0.0f};
-		if (source)
-		{
-			axis = { pos->x - source->getPosition()->x, pos->y - source->getPosition()->y, 0.0f };
-			if (axis.x == 0.0f && axis.y == 0.0f)
-				axis = *source->getUnitDirectionVector2D();
-		}
-		const Bool fullArc = nugget.m_shockWaveArc <= 0.0f || nugget.m_shockWaveArc >= 360.0f;
-		const Real cosHalfArc = fullArc ? -1.0f : WWMath::CosTrig(nugget.m_shockWaveArc * (PI / 360.0f));
-		SimpleObjectIterator* iter = radius > 0.0f ? ThePartitionManager->iterateObjectsInRange(pos, radius, FROM_CENTER_2D) : nullptr;
-		MemoryPoolObjectHolder hold(iter);
-		for (Object* victim = iter ? iter->first() : primaryVictim; victim; victim = iter ? iter->next() : nullptr)
-		{
-			auto* physics = victim->getPhysics();
-			if (!physics || HordeContain::get(victim) || victim->isKindOf(KINDOF_PROJECTILE) ||
-				(victim->isEffectivelyDead() && (!nugget.m_onlyWhenJustDied || victim != primaryVictim)) ||
-				(nugget.m_onlyWhenJustDied && !victim->isEffectivelyDead()) ||
-				judgeRadiusDamageVictim(source, victim, primaryVictim, m_affectsMask) != RADIUS_DAMAGE_AFFECT ||
-				!nugget.affects(source, victim))
-				continue;
-
-			const Coord3D& targetPos = *victim->getPosition();
-			const Coord3D& origin = source ? *source->getPosition() : *pos;
-			const Real dx = targetPos.x - pos->x;
-			const Real dy = targetPos.y - pos->y;
-			if (victim != primaryVictim && !WeaponNuggetRules::withinArc(axis.x, axis.y, dx, dy, cosHalfArc, fullArc, nugget.m_shockWaveArcInverted))
-				continue;
-			Coord3D direction{targetPos.x - origin.x, targetPos.y - origin.y, 0.0f};
-			const Real distance = WWMath::SqrtfOrigin(direction.x * direction.x + direction.y * direction.y);
-			if (distance > 0.0f)
-			{
-				direction.x /= distance;
-				direction.y /= distance;
-			}
-			else
-				direction = source ? *source->getUnitDirectionVector2D() : Coord3D{1.0f, 0.0f, 0.0f};
-			if (nugget.m_invertShockWave != nugget.m_flipDirection)
-			{
-				direction.x = -direction.x;
-				direction.y = -direction.y;
-			}
-			const Real falloff = radius > 0.0f ?
-				std::clamp(1.0f - nugget.m_shockWaveTaperOff * WWMath::SqrtfOrigin(dx * dx + dy * dy) / radius, 0.0f, 1.0f) : 1.0f;
-			const Real amount = nugget.m_shockWaveAmount * falloff;
-			if (amount > victim->getTemplate()->getRotWKObjectData().shockwaveResistance)
-				physics->launchFromImpact(direction, amount, nugget.m_shockWaveZMult);
-		}
+		applyMetaImpactNugget(nuggetIndex, source, primaryVictim, *pos, bonus, 0);
 		return;
 	}
 
