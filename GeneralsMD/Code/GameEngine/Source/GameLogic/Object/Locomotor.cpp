@@ -1504,7 +1504,8 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	if (getAllowMotiveForceWhileAirborne() || !treatAsAirborne)
 	{
 		LocomotorAppearance appearance = m_template->m_appearance;
-		const Bool retailHero = RetailFileLayers::enabled() && obj->isKindOf(KINDOF_HERO) && !obj->getContainedBy();
+		const Bool retailIndependent = RetailFileLayers::enabled() && !obj->getContainedBy();
+		const Bool retailHero = retailIndependent && obj->isKindOf(KINDOF_HERO);
 		if ((appearance == LOCO_HORDE || appearance == LOCO_FOUR_LEGS_HUGE || appearance == LOCO_HUGE_TWO_LEGS) &&
 			!RetailFileLayers::enabled())
 			appearance = LOCO_OTHER;
@@ -1513,7 +1514,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 			case LOCO_LEGS_TWO:
 				if (retailHero && m_template->m_wanderWidthFactor == 0.0f)
 				{
-					moveRetailGroundTowardsPosition(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
+					moveRetailGroundTowardsPosition(obj, physics, goalPos, onPathDistToGoal, desiredSpeed, FALSE);
 					usedRetailGroundSteering = TRUE;
 					break;
 				}
@@ -1526,10 +1527,13 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 					moveTowardsPositionClimb(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
 			case LOCO_WHEELS_FOUR:
-				if (retailHero && !m_template->m_canMoveBackward &&
-					obj->getAI() && obj->getAI()->getCurLocomotorSetType() == LOCOMOTORSET_MOUNTED)
+			{
+				const Bool mountedHero = retailHero && obj->getAI() &&
+					obj->getAI()->getCurLocomotorSetType() == LOCOMOTORSET_MOUNTED;
+				const Bool independentCavalry = retailIndependent && !retailHero && obj->isKindOf(KINDOF_CAVALRY);
+				if (!m_template->m_canMoveBackward && (mountedHero || independentCavalry))
 				{
-					moveRetailGroundTowardsPosition(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
+					moveRetailGroundTowardsPosition(obj, physics, goalPos, onPathDistToGoal, desiredSpeed, independentCavalry);
 					usedRetailGroundSteering = TRUE;
 					break;
 				}
@@ -1539,6 +1543,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 					break;
 				}
 				[[fallthrough]];
+			}
 			case LOCO_MOTORCYCLE:
 					moveTowardsPositionWheels(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
@@ -2093,7 +2098,7 @@ Real Locomotor::rotwkLegsTurnSlowdown(const Object* obj, const Coord3D& goalPos,
 }
 
 void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* physics, const Coord3D& goalPos,
-	Real onPathDistToGoal, Real desiredSpeed)
+	Real onPathDistToGoal, Real desiredSpeed, Bool travelTowardGoal)
 {
 	const Coord3D& position = *obj->getPosition();
 	if (getIsDownhillOnly() && position.z < goalPos.z)
@@ -2117,7 +2122,7 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 	const Real headingError = stdAngleDiff(goalHeading, facing);
 	const Real angle = fabs(headingError);
 	const Real maxSpeed = getMaxSpeedForCondition(damage, obj);
-	const Real radius = mounted ? getRetailTurnRadius(speed, maxSpeed) : 0.0f;
+	const Real radius = mounted && !travelTowardGoal ? getRetailTurnRadius(speed, maxSpeed) : 0.0f;
 	Real travelHeading = facing;
 	if (distance > 0.0f)
 	{
@@ -2135,11 +2140,16 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 				const Real adjustedAngle = startingMountedTurn ? 2.0f * fabs(stdAngleDiff(goalHeading, newFacing)) : angle;
 				desiredSpeed *= std::max(0.0f, 1.0f - adjustedAngle / (PI / 4.0f));
 			}
-			const Real lateral = fabs(Sin(angle));
-			if (m_template->m_fastTurnRadius > 0.0f && lateral > 0.0f)
-				desiredSpeed = std::min(desiredSpeed, maxSpeed * distance / (2.0f * m_template->m_fastTurnRadius * lateral));
-			const Real settleFrames = std::max(1.0f, 0.5f * framesPerRetailStep);
-			travelHeading = previousTravel + stdAngleDiff(newFacing, previousTravel) / settleFrames;
+			if (travelTowardGoal)
+				travelHeading = goalHeading;
+			else
+			{
+				const Real lateral = fabs(Sin(angle));
+				if (m_template->m_fastTurnRadius > 0.0f && lateral > 0.0f)
+					desiredSpeed = std::min(desiredSpeed, maxSpeed * distance / (2.0f * m_template->m_fastTurnRadius * lateral));
+				const Real settleFrames = std::max(1.0f, 0.5f * framesPerRetailStep);
+				travelHeading = previousTravel + stdAngleDiff(newFacing, previousTravel) / settleFrames;
+			}
 		}
 		else
 		{
