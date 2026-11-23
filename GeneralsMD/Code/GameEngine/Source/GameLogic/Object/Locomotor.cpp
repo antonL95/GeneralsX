@@ -3155,7 +3155,10 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 	speed = std::min(maxSpeed, speed) * std::max(0.0f, Cos(remainingAngle));
 	const Real lateral = fabs(Sin(remainingAngle));
 	if (m_template->m_fastTurnRadius > 0.0f && lateral > 0.0f)
-		speed = std::min(speed, maxSpeed * toGoal / (2.0f * m_template->m_fastTurnRadius * lateral));
+	{
+		const Real pursuitTurnRate = std::min(turnRate, maxSpeed / m_template->m_fastTurnRadius);
+		speed = std::min(speed, pursuitTurnRate * toGoal / (2.0f * lateral));
+	}
 	steerVelocity(obj, physics, *obj->getUnitDirectionVector2D(), distance, speed);
 }
 
