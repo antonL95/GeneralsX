@@ -94,8 +94,15 @@ TrollVoxFindTastyOrc'
     expect_request start 302 "$voice_control" BelfalasMarineVoiceSelectMS
     expect_request start 303 "$always" DeadArnorVoiceUnique
     if covers 305; then
-        first_voice=$(sed -n 's/^RETAIL AUDIO start frame=304 \(owner='"$voice_control"' sound=.*\)$/\1/p' "$log" | head -n 1)
-        [ -n "$first_voice" ]
+        restless=$(find_id 300 GuldurRestlessWarrior Player_1)
+        first_voice=$(awk -v marine="owner=$voice_control" -v warrior="owner=$restless" '
+            $1 == "RETAIL" && $2 == "AUDIO" && $3 == "start" && $4 == "frame=304" &&
+                ($5 == marine || $5 == warrior) { print $5, $6 }
+        ' "$log")
+        case "$first_voice" in
+            "owner=$voice_control sound=BelfalasMarineVoiceSelectMS"|"owner=$restless sound=DeadArnorVoiceUnique") ;;
+            *) printf 'Unexpected package 49 voice selection in %s: %s\n' "$phase" "$first_voice" >&2; return 1 ;;
+        esac
         expect "RETAIL AUDIO start frame=305 $first_voice"
     fi
 
