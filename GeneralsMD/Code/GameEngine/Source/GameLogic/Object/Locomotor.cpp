@@ -2107,28 +2107,20 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 	const BodyDamageType damage = obj->getBodyModule()->getDamageState();
 	const Real acceleration = getMaxAcceleration(damage);
 	const Bool mounted = m_template->m_appearance == LOCO_WHEELS_FOUR;
+	const Real retailTravelFloor = PATHFIND_CELL_SIZE_F / static_cast<Real>(LOGICFRAMES_PER_SECOND);
+	const Real minimumTravelSpeed = mounted ? std::min(desiredSpeed, retailTravelFloor) : 0.0f;
+	const Bool startingMountedTurn = mounted && speed <= acceleration * framesPerRetailStep;
 	const Real facing = obj->getOrientation();
 	const Real goalHeading = distance > 0.0f ? WWMath::Atan2Origin(dy, dx) : facing;
 	const Real headingError = stdAngleDiff(goalHeading, facing);
 	const Real angle = fabs(headingError);
 	const Real maxSpeed = getMaxSpeedForCondition(damage, obj);
 	const Real radius = mounted ? getRetailTurnRadius(speed, maxSpeed) : 0.0f;
-	if (mounted && distance > 0.0f)
-	{
-		if (speed <= 0.25f * maxSpeed)
-		{
-			const Real adjustedAngle = speed <= acceleration * framesPerRetailStep ? 2.0f * angle : angle;
-			desiredSpeed *= std::max(0.0f, 1.0f - adjustedAngle / (PI / 4.0f));
-		}
-		const Real lateral = fabs(Sin(angle));
-		if (m_template->m_fastTurnRadius > 0.0f && lateral > 0.0f)
-			desiredSpeed = std::min(desiredSpeed, maxSpeed * distance / (2.0f * m_template->m_fastTurnRadius * lateral));
-	}
 	Real travelHeading = facing;
 	if (distance > 0.0f)
 	{
 		Real turnRate = getMaxTurnRate(damage);
-		if (radius > 0.0f && speed > 0.0f)
+		if (radius > 0.0f && speed > 0.0f && !startingMountedTurn)
 			turnRate = std::min(turnRate, speed / radius);
 		physics->setTurning(rotateObjAroundLocoPivot(obj, goalPos, turnRate));
 
@@ -2136,6 +2128,14 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 		const Real previousTravel = speed > 0.0f ? WWMath::Atan2Origin(velocity.y, velocity.x) : facing;
 		if (mounted)
 		{
+			if (speed <= 0.25f * maxSpeed)
+			{
+				const Real adjustedAngle = startingMountedTurn ? 2.0f * fabs(stdAngleDiff(goalHeading, newFacing)) : angle;
+				desiredSpeed *= std::max(0.0f, 1.0f - adjustedAngle / (PI / 4.0f));
+			}
+			const Real lateral = fabs(Sin(angle));
+			if (m_template->m_fastTurnRadius > 0.0f && lateral > 0.0f)
+				desiredSpeed = std::min(desiredSpeed, maxSpeed * distance / (2.0f * m_template->m_fastTurnRadius * lateral));
 			const Real settleFrames = std::max(1.0f, 0.5f * framesPerRetailStep);
 			travelHeading = previousTravel + stdAngleDiff(newFacing, previousTravel) / settleFrames;
 		}
@@ -2165,7 +2165,10 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 		onPathDistToGoal < calcSlowDownDist(speed, getMinSpeed(), braking))
 		desiredSpeed = getMinSpeed();
 
-	const Real nextSpeed = std::min(distance, speed + std::clamp(desiredSpeed - speed, -braking, acceleration));
+	const Real steeredSpeed = speed + std::clamp(desiredSpeed - speed, -braking, acceleration);
+	const Real nextSpeed = std::min(distance, std::max(minimumTravelSpeed, steeredSpeed));
+	if (steeredSpeed < minimumTravelSpeed)
+		travelHeading = goalHeading;
 	physics->scrubVelocity2D(0.0f);
 	Coord3D direction{Cos(travelHeading), Sin(travelHeading), 0.0f};
 	direction.scale(physics->getMass() * nextSpeed);
@@ -3313,18 +3316,6 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 		physics->setTurning(TURN_NONE);
 	updateRetailTurnConditions(obj, 0.0f);
 
-	const Bool stopping = RetailFileLayers::enabled() && m_retailWasRunning && physics->getVelocityMagnitude() > MIN_GAIT_SPEED;
-	if (stopping)
-	{
-		updateRetailGait(obj, 0.0f, physics->getVelocityMagnitude(), TRUE);
-		obj->setModelConditionState(MODELCONDITION_MOVING);
-	}
-	else
-	{
-		if (m_retailWasRunning && obj->getLogicModelConditions().test(MODELCONDITION_DECELERATE))
-			obj->clearModelConditionState(MODELCONDITION_MOVING);
-		clearRetailGait(obj);
-	}
 	Bool requiresConstantCalling = TRUE;	// assume the worst.
 	switch (m_template->m_appearance)
 	{
@@ -3364,11 +3355,29 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 			break;
 	}
 
+	if (RetailFileLayers::enabled())
+	{
+		const Real speed = m_retailWasRunning ? physics->getVelocityMagnitude() : 0.0f;
+		if (speed > MIN_GAIT_SPEED)
+		{
+			updateRetailGait(obj, 0.0f, speed, TRUE);
+			obj->setModelConditionState(MODELCONDITION_MOVING);
+			requiresConstantCalling = TRUE;
+		}
+		else
+		{
+			const AIUpdateInterface* ai = obj->getAI();
+			if (m_retailWasRunning && (!ai || !ai->isMoving() || obj->getLogicModelConditions().test(MODELCONDITION_DECELERATE)))
+				obj->clearModelConditionState(MODELCONDITION_MOVING);
+			clearRetailGait(obj);
+		}
+	}
+
 	// but we do need to do this even if not moving, for hovering/Thrusting things.
 	if (handleBehaviorZ(obj, physics, m_maintainPos))
 		requiresConstantCalling = TRUE;
 
-	return requiresConstantCalling || stopping;
+	return requiresConstantCalling;
 }
 
 //-------------------------------------------------------------------------------------------------
