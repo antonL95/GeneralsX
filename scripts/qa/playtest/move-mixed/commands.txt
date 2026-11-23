@@ -1,0 +1,17 @@
+10 create Player_1 GondorFountainGuardHorde 0 2330,1000,0
+10 create Player_1 BlackrootValeArcherHorde 0 2300,1090,0
+10 create Player_1 GondorKnightHorde 0 2370,1190,0
+11 reveal Player_1 GondorFountainGuardHorde 0
+11 track Player_1 GondorFountainGuardHorde 0
+11 track Player_1 BlackrootValeArcherHorde 0
+11 track Player_1 GondorKnightHorde 0
+20 select Player_1 GondorFountainGuardHorde 0
+21 selectadd Player_1 BlackrootValeArcherHorde 0
+21 selectadd Player_1 GondorKnightHorde 0
+32 movesel - - 0 - 2600 1100
+44 steering-path Player_1 GondorFountainGuardHorde 0
+44 steering-path Player_1 BlackrootValeArcherHorde 0
+44 steering-path Player_1 GondorKnightHorde 0
+160 steering-path Player_1 GondorFountainGuardHorde 0
+160 steering-path Player_1 BlackrootValeArcherHorde 0
+160 steering-path Player_1 GondorKnightHorde 0

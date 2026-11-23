@@ -1,0 +1,22 @@
+10 create Player_1 GondorFountainGuardHorde 0 2320,970,0
+10 create Player_1 GondorKnightHorde 0 2350,1090,0
+10 create Player_1 GondorPippin 0 2320,1250,0
+11 reveal Player_1 GondorFountainGuardHorde 0
+11 track Player_1 GondorFountainGuardHorde 0
+11 track Player_1 GondorKnightHorde 0
+11 track Player_1 GondorPippin 0
+30 move Player_1 GondorFountainGuardHorde 0 - 2680 970
+31 move Player_1 GondorKnightHorde 0 - 2680 1090
+32 move Player_1 GondorPippin 0 - 2680 1250
+58 move Player_1 GondorFountainGuardHorde 0 - 2370 800
+59 move Player_1 GondorKnightHorde 0 - 2450 1025
+60 move Player_1 GondorPippin 0 - 2380 1130
+79 steering-path Player_1 GondorFountainGuardHorde 0
+79 steering-path Player_1 GondorKnightHorde 0
+79 steering-path Player_1 GondorPippin 0
+103 move Player_1 GondorFountainGuardHorde 0 - 2340 1010
+104 move Player_1 GondorKnightHorde 0 - 2375 1190
+105 move Player_1 GondorPippin 0 - 2340 1300
+117 steering-path Player_1 GondorFountainGuardHorde 0
+117 steering-path Player_1 GondorKnightHorde 0
+117 steering-path Player_1 GondorPippin 0

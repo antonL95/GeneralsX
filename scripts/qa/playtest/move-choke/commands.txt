@@ -1,0 +1,23 @@
+10 create Player_1 GondorFountainGuardHorde 0 2320,1000,0
+10 create Player_1 BlackrootValeArcherHorde 0 2300,1090,0
+10 create Player_1 GondorKnightHorde 0 2350,1190,0
+10 create Player_1 MenFortressCitadel 0 2460,1000,0
+10 create Player_1 GondorArcherRange 0 2465,1150,0
+10 create Player_1 GondorStable 0 2610,1175,0
+11 reveal Player_1 GondorFountainGuardHorde 0
+11 track Player_1 GondorFountainGuardHorde 0
+11 track Player_1 BlackrootValeArcherHorde 0
+11 track Player_1 GondorKnightHorde 0
+20 select Player_1 GondorFountainGuardHorde 0
+21 selectadd Player_1 BlackrootValeArcherHorde 0
+21 selectadd Player_1 GondorKnightHorde 0
+32 movesel - - 0 - 2680 1060
+42 steering-path Player_1 GondorFountainGuardHorde 0
+42 steering-path Player_1 BlackrootValeArcherHorde 0
+42 steering-path Player_1 GondorKnightHorde 0
+90 steering-path Player_1 GondorFountainGuardHorde 0
+90 steering-path Player_1 BlackrootValeArcherHorde 0
+90 steering-path Player_1 GondorKnightHorde 0
+165 steering-path Player_1 GondorFountainGuardHorde 0
+165 steering-path Player_1 BlackrootValeArcherHorde 0
+165 steering-path Player_1 GondorKnightHorde 0

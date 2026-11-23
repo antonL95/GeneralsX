@@ -1,0 +1,14 @@
+10 create Player_1 GondorFountainGuardHorde 0 2320,1010,0
+10 create Player_1 GondorKnightHorde 0 2320,1190,0
+11 reveal Player_1 GondorFountainGuardHorde 0
+11 track Player_1 GondorFountainGuardHorde 0
+11 track Player_1 GondorKnightHorde 0
+30 move Player_1 GondorFountainGuardHorde 0 - 2640 1010
+31 move Player_1 GondorKnightHorde 0 - 2640 1190
+40 steering-path Player_1 GondorFountainGuardHorde 0
+40 steering-path Player_1 GondorKnightHorde 0
+45 select Player_1 GondorFountainGuardHorde 0
+54 steering-stop - - 0
+55 horde-turn Player_1 GondorFountainGuardHorde 0
+65 button Player_1 GondorFountainGuardHorde 0 2
+72 horde-turn Player_1 GondorFountainGuardHorde 0
