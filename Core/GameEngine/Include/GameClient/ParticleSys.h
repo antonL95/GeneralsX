@@ -850,8 +850,7 @@ protected:
 
 	struct VisibilityState
 	{
-		VisibilityState() : isShrouded(false) {}
-		Bool isShrouded;
+		Bool blocksEmission = FALSE;
 	};
 
 	// snapshot methods
@@ -913,6 +912,9 @@ protected:
 	ParticleSystemID	m_masterSystemID;								///< master system id (if present);
 
 	AsciiString m_retailAttachmentBone;
+#if !RTS_GENERALS
+	UnsignedInt m_retailParticleGenerations = 0;
+#endif
 	Bool m_retailHasTargetMatrix = FALSE;
 	Bool m_retailHasTargetEndpoint = FALSE;
 	Coord3D m_retailTargetEndpoint{};

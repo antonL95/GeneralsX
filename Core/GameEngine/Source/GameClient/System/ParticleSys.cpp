@@ -49,6 +49,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/Smudge.h"
+#include "GameClient/View.h"
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -1980,10 +1981,21 @@ Particle *ParticleSystem::createParticle( const ParticleInfo *info,
 		// all particles are being skipped (excluding special fps independent particles at
 		// getMinDynamicParticleSkipPriority())
 		//
-		if( priority < TheGameLODManager->getMinDynamicParticlePriority() ||
-				(priority < TheGameLODManager->getMinDynamicParticleSkipPriority() &&
-				 TheGameLODManager->isParticleSkipped()) )
+		if (priority < TheGameLODManager->getMinDynamicParticlePriority())
 			return nullptr;
+
+		if (priority < TheGameLODManager->getMinDynamicParticleSkipPriority())
+		{
+#if !RTS_GENERALS
+			const Bool skipped = RetailFileLayers::enabled()
+				? TheGameLODManager->isParticleGenerationSkipped(++m_retailParticleGenerations)
+				: TheGameLODManager->isParticleSkipped();
+#else
+			const Bool skipped = TheGameLODManager->isParticleSkipped();
+#endif
+			if (skipped)
+				return nullptr;
+		}
 
 		if ( getParticleCount() > 0 && priority == AREA_EFFECT && isFieldParticle() && TheParticleSystemManager->getFieldParticleCount() > (UnsignedInt)TheGlobalData->m_maxFieldParticleCount )
 			return nullptr;
@@ -2265,7 +2277,7 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 	{
 		if (m_isForever || m_systemLifetimeLeft > 0)
 		{
-			if (!visibilityState.isShrouded && m_isStopped == false && m_masterSystem == nullptr)
+			if (!visibilityState.blocksEmission && m_isStopped == false && m_masterSystem == nullptr)
 			{
 				if (m_burstDelayLeft == 0)
 				{
@@ -2524,12 +2536,14 @@ void ParticleSystem::applyLocalTransform()
 ParticleSystem::VisibilityState ParticleSystem::updateVisibility( Int localPlayerIndex )
 {
 	VisibilityState visibilityState;
+	const Drawable* drawable = nullptr;
 
 	if (m_attachedToDrawableID)
 	{
 		if (Drawable *attachedTo = TheGameClient->findDrawableByID( m_attachedToDrawableID ))
 		{
-			visibilityState.isShrouded = attachedTo->getFullyObscuredByShroud();
+			visibilityState.blocksEmission = attachedTo->getFullyObscuredByShroud();
+			drawable = attachedTo;
 		}
 		else
 		{
@@ -2547,10 +2561,11 @@ ParticleSystem::VisibilityState ParticleSystem::updateVisibility( Int localPlaye
 			if (RetailFileLayers::enabled())
 			{
 				const PartitionData* partition = objectAttachedTo->friend_getPartitionData();
-				visibilityState.isShrouded = !objectAttachedTo->isKindOf(KINDOF_ALWAYS_VISIBLE) && partition && !partition->hasClearCell(localPlayerIndex);
+				visibilityState.blocksEmission = !objectAttachedTo->isKindOf(KINDOF_ALWAYS_VISIBLE) && partition && !partition->hasClearCell(localPlayerIndex);
+				drawable = objectAttachedTo->getDrawable();
 			}
 			else
-				visibilityState.isShrouded = objectAttachedTo->getShroudedStatus(localPlayerIndex) >= OBJECTSHROUD_FOGGED;
+				visibilityState.blocksEmission = objectAttachedTo->getShroudedStatus(localPlayerIndex) >= OBJECTSHROUD_FOGGED;
 		}
 		else
 		{
@@ -2560,6 +2575,12 @@ ParticleSystem::VisibilityState ParticleSystem::updateVisibility( Int localPlaye
 			// destroy ourselves
 			destroy();
 		}
+	}
+
+	if (RetailFileLayers::enabled() && drawable && !visibilityState.blocksEmission)
+	{
+		visibilityState.blocksEmission = drawable->isDrawableEffectivelyHidden() ||
+			(TheTacticalView && !TheTacticalView->isParticleAttachmentInView(*drawable));
 	}
 
 	return visibilityState;

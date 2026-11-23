@@ -222,6 +222,7 @@ public:
 	virtual void setClipDepthMultiplier(Real multiplier) override;
 
   virtual WorldToScreenReturn worldToScreenTriReturn( const Coord3D *w, ICoord2D *s ) override;	///< Transform world coordinate "w" into screen coordinate "s"
+	Bool isParticleAttachmentInView(const Drawable& drawable) const override;
 	virtual Bool screenToTerrain( const ICoord2D *screen, Coord3D *world ) override;
 	virtual PlaneClass::IntersectionResType screenToWorldAtZ( const ICoord2D *screen, Coord3D *world, Real z ) override;
 

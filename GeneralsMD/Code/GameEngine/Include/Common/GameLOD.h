@@ -194,6 +194,11 @@ public:
 	Int getStaticGameLODIndex(AsciiString name);
 	Int getDynamicGameLODIndex(AsciiString name);
 	inline Bool isParticleSkipped();
+	Bool isParticleGenerationSkipped(UnsignedInt generation) const
+	{
+		const auto mask = static_cast<UnsignedInt>(m_dynamicParticleSkipMask);
+		return (generation & mask) != mask;
+	}
 	inline Bool isDebrisSkipped();
 	inline Real getSlowDeathScale();
 	ParticlePriorityType getMinDynamicParticlePriority();

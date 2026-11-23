@@ -2437,6 +2437,24 @@ View::WorldToScreenReturn W3DView::worldToScreenTriReturn( const Coord3D *w, ICo
   return WTS_INVALID;
 }
 
+Bool W3DView::isParticleAttachmentInView(const Drawable& drawable) const
+{
+	if (!m_3DCamera)
+		return TRUE;
+
+	constexpr Real retailFrustumPadding = 25.0f;
+	const Coord3D& position = *drawable.getPosition();
+	const SphereClass bounds(Vector3(position.x, position.y, position.z),
+		drawable.getDrawableGeometryInfo().getBoundingSphereRadius() + retailFrustumPadding);
+	const FrustumClass& frustum = m_3DCamera->Get_Frustum();
+	for (Int plane = 1; plane < 5; ++plane)
+	{
+		if (frustum.Planes[plane].In_Front(bounds))
+			return FALSE;
+	}
+	return TRUE;
+}
+
 //-------------------------------------------------------------------------------------------------
 /** all the drawables in the view, that fall within the 2D screen region
 	* will call the callback function.  The number of drawables that passed

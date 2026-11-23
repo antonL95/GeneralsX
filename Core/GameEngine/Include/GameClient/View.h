@@ -247,6 +247,7 @@ public:
 
   Bool worldToScreen( const Coord3D *w, ICoord2D *s ) { return worldToScreenTriReturn( w, s ) == WTS_INSIDE_FRUSTUM; }	///< Transform world coordinate "w" into screen coordinate "s"
   virtual WorldToScreenReturn worldToScreenTriReturn(const Coord3D *w, ICoord2D *s ) = 0; ///< Like worldToScreen(), but with a more informative return value
+	virtual Bool isParticleAttachmentInView(const Drawable&) const { return TRUE; }
 
 	/// Transform screen point to the viewed world position on the 3D terrain. Returns true when intersection exists.
 	virtual Bool screenToTerrain( const ICoord2D *screen, Coord3D *world ) = 0;
