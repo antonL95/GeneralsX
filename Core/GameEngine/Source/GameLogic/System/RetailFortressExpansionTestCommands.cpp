@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
@@ -19,17 +20,17 @@ void unpackTestFortress(const RetailTestCommands::Context& ctx)
 		return;
 
 	const AsciiString name("FortressExpansionFixturePacked");
-	const AsciiString keepName("FortressExpansionFixtureKeep");
 	packed->setName(name);
 	TheScriptEngine->addObjectToCache(packed);
 	auto* unpack = newInstance(ScriptAction)(ScriptAction::NAMED_BASE_UNPACK_FREE);
 	unpack->setNextAction(nullptr);
 	unpack->getParameter(0)->friend_setString(name);
-	unpack->getParameter(1)->friend_setString(keepName);
+	unpack->getParameter(1)->friend_setString("FortressExpansionFixtureKeep");
 	TheScriptEngine->friend_executeAction(unpack, packed->getTeam());
 	deleteInstance(unpack);
-	if (Object* keep = TheScriptEngine->getUnitNamed(keepName))
-		keep->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_ATTACK));
+	if (const CastleBehavior* castle = CastleBehavior::find(packed))
+		if (Object* keep = castle->getKeep())
+			keep->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_ATTACK));
 }
 
 void logExpansionState(const RetailTestCommands::Context& ctx)
