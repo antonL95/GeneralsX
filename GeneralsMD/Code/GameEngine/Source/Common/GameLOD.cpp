@@ -321,7 +321,8 @@ void GameLODManager::initStaticLODLevels()
 	veryhigh.m_sampleCount2D = 6;
 	veryhigh.m_sampleCount3D = 24;
 	veryhigh.m_streamCount = 2;
-	veryhigh.m_maxParticleCount = 5000;
+	if (!RetailFileLayers::enabled())
+		veryhigh.m_maxParticleCount = 5000;
 	veryhigh.m_useShadowVolumes = TRUE;
 	veryhigh.m_useShadowDecals = TRUE;
 	veryhigh.m_useCloudMap = TRUE;
@@ -371,6 +372,11 @@ LODPresetInfo *GameLODManager::newLODPreset(StaticGameLODLevel index)
 void GameLODManager::init()
 {
 	INI ini;
+	if (RetailFileLayers::enabled())
+	{
+		for (auto& preset : m_staticGameLODInfo)
+			preset.m_maxParticleCount = TheGlobalData->m_maxParticleCount;
+	}
 	//Get Presets for each LOD level.
 	ini.loadFileDirectory( "Data\\INI\\GameLOD", INI_LOAD_OVERWRITE, nullptr );
 
