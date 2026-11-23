@@ -1,0 +1,8 @@
+5 create Player_1 GondorFaramir 0 3090,535,0
+6 reveal Player_1 GondorFaramir 0
+7 objupgrade Player_1 GondorFaramir 0 Upgrade_ObjectLevel5
+16 power Player_1 GondorFaramir 0 SpecialAbilityFaramirAmbush2
+21 aim Player_1 GondorFaramir 0 80,0
+22 ability Player_1 GondorFaramir 0
+81 particle-live - - 0
+171 particle-live - - 0
