@@ -1,0 +1,8 @@
+10 create Player_1 TreeCoverPorter 0 1243,2420,0
+10 create Player_1 TreeCoverRemovedProbe 0 1200,2474,0
+10 create Player_1 TreeCoverStandingProbe 0 145,2295,0
+30 pkg09-state Player_1 TreeCoverRemovedProbe 0
+30 pkg09-state Player_1 TreeCoverStandingProbe 0
+35 construct Player_1 TreeCoverPorter 0 TreeCoverFarm 1243 2474 0
+220 pkg09-state Player_1 TreeCoverRemovedProbe 0
+220 pkg09-state Player_1 TreeCoverStandingProbe 0
