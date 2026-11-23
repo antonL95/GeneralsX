@@ -615,6 +615,7 @@ public:
 	Bool isRenderable() const { return m_isRenderable; }
 	Bool usesModelOpacityOnly() const { return m_modelOpacityOnly; }
 	Bool usesGpuDraw() const { return m_hasGpuDraw || m_isGpuParticle; }
+	Bool usesTerrainFire() const { return m_isTerrainFire && m_hasTerrainFireEmission; }
 	Bool canDrawGpuParticles() const;
 	UnsignedInt getGpuFramesPerRow() const { return m_gpuFramesPerRow; }
 	UnsignedInt getGpuTotalFrames() const { return m_gpuTotalFrames; }
@@ -701,6 +702,10 @@ protected:
 	Bool m_modelOpacityOnly = FALSE;
 	Bool m_isGpuParticle = FALSE;
 	Bool m_hasGpuDraw = FALSE;
+	Bool m_isTerrainFire = FALSE;
+	Bool m_hasTerrainFireEmission = FALSE;
+	GameClientRandomVariable m_terrainFireOffsets[3];
+	Real m_terrainFireChance = 0.0f;
 	UnsignedInt m_gpuFramesPerRow = 1;
 	UnsignedInt m_gpuTotalFrames = 1;
 	Real m_gpuSpeedMultiplier = 1.0f;
@@ -755,6 +760,8 @@ public:
 
 	virtual Bool update( Int localPlayerIndex );								///< update this particle system, return false if dead
 	void updateWindMotion();							///< update wind motion
+
+	void emitRetailTerrainFire(Int passes, Int localPlayerIndex);
 
 	void draw( Real timeScale ); ///< render update
 
@@ -1034,12 +1041,14 @@ protected:
 	virtual void loadPostProcess() override;
 
 	void completeLogicFrameDrawUpdate(); ///< render update for the rest of the current logic frame
+	void ensureRetailTerrainFireSystems();
 	void drawSystems( Real timeScale ); ///< render update for all particle systems
 
 	Particle *m_allParticlesHead[ NUM_PARTICLE_PRIORITIES ];
 	Particle *m_allParticlesTail[ NUM_PARTICLE_PRIORITIES ];
 
 	ParticleSystemID m_uniqueSystemID;					///< unique system ID to assign to each system created
+	std::array<ParticleSystemID, 2> m_terrainFireSystems{};
 
 	ParticleSystemList m_allParticleSystemList;
 

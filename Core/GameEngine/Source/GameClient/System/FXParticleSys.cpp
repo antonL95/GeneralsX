@@ -83,7 +83,7 @@ const FXNamedValue fxTypes[] =
 	{ "SMUDGE",           ParticleSystemInfo::SMUDGE,          TRUE },
 	{ "TERRAIN_PARTICLE", ParticleSystemInfo::PARTICLE,        FALSE },
 	{ "GPU_PARTICLE",     ParticleSystemInfo::PARTICLE,        TRUE },
-	{ "GPU_TERRAINFIRE",  ParticleSystemInfo::PARTICLE,        FALSE },
+	{ "GPU_TERRAINFIRE",  ParticleSystemInfo::PARTICLE,        TRUE },
 	{ nullptr,            0,                                   FALSE }
 };
 
@@ -139,6 +139,11 @@ void ParticleSystemTemplate::resetForFXDefinition()
 	m_modelOpacityOnly = FALSE;
 	m_isGpuParticle = FALSE;
 	m_hasGpuDraw = FALSE;
+	m_isTerrainFire = FALSE;
+	m_hasTerrainFireEmission = FALSE;
+	for (auto& offset : m_terrainFireOffsets)
+		setZero(offset);
+	m_terrainFireChance = 0.0f;
 	m_gpuFramesPerRow = 1;
 	m_gpuTotalFrames = 1;
 	m_gpuSpeedMultiplier = 1.0f;
@@ -197,7 +202,7 @@ void ParticleSystemTemplate::parseFXModule( INI* ini, void *instance, void *, co
 		{ "EmissionVolume",   "SphereEmissionVolume",          m_fxSphereVolumeFieldParseTable,        FX_MODULE_VOLUME,        SPHERE },
 		{ "EmissionVolume",   "CylinderEmissionVolume",        m_fxCylinderVolumeFieldParseTable,      FX_MODULE_VOLUME,        CYLINDER },
 		{ "EmissionVolume",   "LightningEmission",             m_fxLightningVolumeFieldParseTable,     FX_MODULE_KEEP,          0 },
-		{ "EmissionVolume",   "TerrainFireEmission",           m_fxTerrainFireVolumeFieldParseTable,   FX_MODULE_UNRENDERED,    0 },
+		{ "EmissionVolume",   "TerrainFireEmission",           m_fxTerrainFireVolumeFieldParseTable,   FX_MODULE_KEEP,          0 },
 		{ "Draw",             "DefaultDraw",                   m_fxDefaultDrawFieldParseTable,         FX_MODULE_DRAW_PARTICLE, 0 },
 		{ "Draw",             "StreakDraw",                    m_fxDefaultDrawFieldParseTable,         FX_MODULE_DRAW_STREAK,   0 },
 		{ "Draw",             "RenderObjectDraw",              m_fxRenderObjectDrawFieldParseTable,    FX_MODULE_DRAW_MODEL,    0 },
@@ -247,7 +252,10 @@ void ParticleSystemTemplate::parseFXModule( INI* ini, void *instance, void *, co
 	if (strcmp(section, "Alpha") == 0)
 		self->m_modelHasAlpha = TRUE;
 	else if (strcmp(section, "EmissionVolume") == 0)
+	{
 		self->m_hasLightningEmission = choice->table == m_fxLightningVolumeFieldParseTable;
+		self->m_hasTerrainFireEmission = choice->table == m_fxTerrainFireVolumeFieldParseTable;
+	}
 	ini->initFromINI( instance, choice->table );
 }
 
@@ -274,7 +282,8 @@ void ParticleSystemTemplate::parseFXType( INI* ini, void *instance, void *store,
 	const FXNamedValue *value = findNamedValue(fxTypes, token);
 	*static_cast<ParticleType *>(store) = static_cast<ParticleType>(value->value);
 	auto *self = static_cast<ParticleSystemTemplate *>(instance);
-	self->m_isGpuParticle = stricmp(token, "GPU_PARTICLE") == 0;
+	self->m_isTerrainFire = stricmp(token, "GPU_TERRAINFIRE") == 0;
+	self->m_isGpuParticle = self->m_isTerrainFire || stricmp(token, "GPU_PARTICLE") == 0;
 	if (!value->renderable)
 		self->m_isRenderable = FALSE;
 }
@@ -291,6 +300,7 @@ void ParticleSystemTemplate::parseFXUnrendered( INI* ini, void *, void *, const 
 Bool ParticleSystemTemplate::canDrawGpuParticles() const
 {
 	return m_isRenderable && m_isGpuParticle && m_hasGpuDraw &&
+		(!m_isTerrainFire || m_hasTerrainFireEmission) &&
 		(m_shaderType == ADDITIVE || m_shaderType == ALPHA) && m_particleAlignment == PARTICLE_ALIGNMENT_BILLBOARD &&
 		m_gpuFramesPerRow > 0 && m_gpuFramesPerRow <= 256 && m_gpuTotalFrames > 0 &&
 		m_gpuTotalFrames <= m_gpuFramesPerRow * m_gpuFramesPerRow &&
@@ -546,10 +556,10 @@ const FieldParse ParticleSystemTemplate::m_fxLightningVolumeFieldParseTable[] =
 const FieldParse ParticleSystemTemplate::m_fxTerrainFireVolumeFieldParseTable[] =
 {
 	{ "IsHollow",           ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Xoffset",            ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Yoffset",            ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Zoffset",            ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "CellEmissionChance", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "Xoffset",            INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_terrainFireOffsets[0]) },
+	{ "Yoffset",            INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_terrainFireOffsets[1]) },
+	{ "Zoffset",            INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_terrainFireOffsets[2]) },
+	{ "CellEmissionChance", INI::parseReal, nullptr, offsetof(ParticleSystemTemplate, m_terrainFireChance) },
 	{ nullptr,              nullptr,                                   nullptr, 0 }
 };
 

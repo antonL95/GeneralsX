@@ -1,0 +1,6 @@
+20 create Player_1 TerrainFireFixtureObserver 0 2441,451,0
+21 reveal Player_1 TerrainFireFixtureObserver 0
+35 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2605 455 0
+40 create Player_1 TerrainFireFixtureLauncher 0 2511,451,0
+66 destroy Player_1 TerrainFireFixtureLauncher 0
+120 terrain-fire-state Player_1 TerrainFireFixtureObserver 0 - 2605 455 0

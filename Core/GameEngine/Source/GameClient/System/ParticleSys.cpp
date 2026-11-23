@@ -2234,9 +2234,36 @@ const ParticleInfo *ParticleSystem::generateParticleInfo(Int particleNum, Int pa
 	return &info;
 }
 
-// ------------------------------------------------------------------------------------------------
-/** Update this particle system, potentially generating new particles */
-// ------------------------------------------------------------------------------------------------
+void ParticleSystem::emitRetailTerrainFire(Int passes, Int localPlayerIndex)
+{
+	if (!TheTerrainLogic)
+		return;
+
+	const RetailTerrainFire& terrainFire = TheTerrainLogic->retailFire();
+	const auto& offsets = m_template->m_terrainFireOffsets;
+	for (Int pass = 0; pass < passes; ++pass)
+	{
+		for (Int index : terrainFire.burning())
+		{
+			if (TheParticleSystemManager->getGpuParticleCount() >= maxGpuParticles)
+				return;
+			if (GameClientRandomValueReal(0.0f, 1.0f) > m_template->m_terrainFireChance)
+				continue;
+
+			const Coord2D point = terrainFire.center(index);
+			Coord3D spawn{point.x + offsets[0].getValue(), point.y + offsets[1].getValue(),
+				TheTerrainLogic->getGroundHeight(point.x, point.y) + offsets[2].getValue()};
+			if (ThePartitionManager && ThePartitionManager->getShroudStatusForPlayer(localPlayerIndex, &spawn) != CELLSHROUD_CLEAR)
+				continue;
+			if (m_isEmitAboveGroundOnly && spawn.z < TheTerrainLogic->getGroundHeight(spawn.x, spawn.y))
+				continue;
+
+			const ParticleInfo* info = generateParticleInfo(pass, passes, &spawn);
+			createParticle(info, getPriority());
+		}
+	}
+}
+
 Bool ParticleSystem::update( Int localPlayerIndex  )
 {
 	if (TheGlobalData->m_useFX == FALSE)
@@ -2309,7 +2336,10 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 					std::array<Coord3D, maxLightningPoints> lightningPoints;
 					if (lightning && count > 0)
 						generateRetailLightningBurst(std::span(lightningPoints).first(static_cast<std::size_t>(count)));
-					for( Int i=0; i<count; i++ )
+					const Bool terrainFire = gpu && RetailFileLayers::enabled() && m_template->usesTerrainFire();
+					if (terrainFire)
+						emitRetailTerrainFire(count, localPlayerIndex);
+					for( Int i=0; !terrainFire && i<count; i++ )
 					{
 						if (gpu && TheParticleSystemManager->getGpuParticleCount() >= maxGpuParticles)
 							break;
@@ -3446,6 +3476,7 @@ void ParticleSystemManager::init()
 // ------------------------------------------------------------------------------------------------
 void ParticleSystemManager::reset()
 {
+	m_terrainFireSystems.fill(INVALID_PARTICLE_SYSTEM_ID);
 	while (!m_allParticleSystemList.empty())
 	{
 		DEBUG_ASSERTCRASH(m_allParticleSystemList.front() != nullptr, ("ParticleSystemManager::reset: ParticleSystem is null"));
@@ -3480,10 +3511,26 @@ void ParticleSystemManager::reset()
 	// leave templates as-is
 }
 
-// ------------------------------------------------------------------------------------------------
-/** Update all particle systems */
-// ------------------------------------------------------------------------------------------------
-//DECLARE_PERF_TIMER(ParticleSystemManager)
+void ParticleSystemManager::ensureRetailTerrainFireSystems()
+{
+	if (!RetailFileLayers::enabled() || TheGlobalData->m_headless || !TheGlobalData->m_useFX ||
+		!TheTerrainLogic || TheTerrainLogic->retailFire().burning().empty())
+		return;
+
+	const std::array names{RetailTerrainFire::fireSystem(), RetailTerrainFire::smokeSystem()};
+	for (size_t index = 0; index < names.size(); ++index)
+	{
+		if (names[index].isEmpty() || findParticleSystem(m_terrainFireSystems[index]))
+			continue;
+		const ParticleSystemTemplate* definition = findTemplate(names[index]);
+		if (!definition || !definition->usesTerrainFire() || !definition->canDrawGpuParticles())
+			continue;
+		ParticleSystem* system = createParticleSystem(definition, FALSE);
+		system->setSaveable(FALSE);
+		m_terrainFireSystems[index] = system->getSystemID();
+	}
+}
+
 void ParticleSystemManager::update()
 {
 	const ScopedVisualRandom random(RetailFileLayers::enabled());
@@ -3492,6 +3539,7 @@ void ParticleSystemManager::update()
 	// TheSuperHackers @tweak Complete the render update of the previous logic frame before the logic update
 	// changes the rates, so that every logic frame integrates exactly one logic time step.
 	completeLogicFrameDrawUpdate();
+	ensureRetailTerrainFireSystems();
 
 	ParticleSystemListIt it = m_allParticleSystemList.begin();
 	while( it != m_allParticleSystemList.end() )
