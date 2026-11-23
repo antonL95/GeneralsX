@@ -1,0 +1,13 @@
+44 power-reveal - - 0
+45 create Player_1 GondorFarm 0 2180,3050,0
+45 create Player_2 MordorFighterHorde 0 1940,3100,0
+45 create Player_2 MordorFighterHorde 1 1950,3150,0
+45 create Player_2 MordorFighterHorde 2 1950,3200,0
+95 create Player_2 Pkg46DefenseAnchor 0 1450,2760,0
+95 create Player_2 Pkg46DefenseAnchor 1 1450,2940,0
+95 create Player_2 Pkg46DefenseFootSoldier 0 1850,2450,0
+95 create Player_2 Pkg46DefenseFootSoldier 1 1990,2570,0
+95 create Player_2 Pkg46DefenseFootSoldier 2 1980,2720,0
+95 create Player_2 Pkg46DefenseFootSoldier 3 1970,2900,0
+100 create Player_1 Pkg46DefenseAttacker 0 1600,2840,180
+101 attack Player_1 Pkg46DefenseAttacker 0 Player_2:Pkg46DefenseAnchor:0

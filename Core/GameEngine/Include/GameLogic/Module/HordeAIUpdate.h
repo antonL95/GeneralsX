@@ -26,6 +26,10 @@ public:
 	static void memberCollided(Object* member, Object* target);
 	Bool hasRecentContact() const;
 	Bool isOnPlannerAdvance() const { return m_plannerOrder && m_order == AICMD_ATTACKMOVE_TO_POSITION; }
+	Bool isExecutingPlannerOrder(ObjectID target, UnsignedInt issuedFrame) const
+	{
+		return m_plannerOrder && m_plannerOrderFrame == issuedFrame && m_attackTarget == target && hasAttackOrder();
+	}
 	UnsignedInt blockedPlannerRevision(UnsignedInt issuedFrame) const
 	{
 		return issuedFrame == m_plannerOrderFrame ? m_blockedPlannerRevision : 0;

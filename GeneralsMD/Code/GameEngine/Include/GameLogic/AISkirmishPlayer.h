@@ -130,6 +130,15 @@ protected:
 		UnsignedInt blockedRevision = 0;
 	};
 	std::map<std::tuple<ObjectID, ObjectID, UnsignedInt>, RetailObjective> m_retailObjectives;
+	struct RetailTacticalTarget
+	{
+		ObjectID object = INVALID_ID;
+		ObjectID defendedStructure = INVALID_ID;
+		UnsignedInt owner = 0;
+		UnsignedInt selectedFrame = 0;
+		Bool retiring = FALSE;
+	};
+	std::vector<RetailTacticalTarget> m_retailTargets;
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	UnsignedInt m_retailLastFarmFrame = 0;
 	UnsignedInt m_retailSavings = 0;

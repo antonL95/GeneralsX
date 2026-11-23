@@ -47,6 +47,7 @@
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/AISkirmishPlayer.h"
@@ -85,6 +86,19 @@ struct RetailArmyMember
 constexpr Int RETAIL_ATTACK_WAVE_MIN_UNITS = 3;
 constexpr Real RETAIL_DEFENDED_TARGET_DISTANCE = 350.0f;
 
+enum RetailTacticalKind
+{
+	RETAIL_TARGET_ENEMY_STRUCTURE,
+	RETAIL_TARGET_DEFENSIVE,
+	RETAIL_TARGET_OPPORTUNITY,
+	RETAIL_TARGET_EXPANSION,
+	RETAIL_TARGET_TARGETLESS
+};
+
+const char* const retailTacticalKindNames[] = {
+	"ENEMY_STRUCTURE", "DEFENSIVE", "OPPORTUNITY", "EXPANSION", "TARGETLESS", nullptr
+};
+
 struct RetailArmy
 {
 	AsciiString name;
@@ -94,6 +108,15 @@ struct RetailArmy
 	std::vector<AsciiString> heroes;
 	std::vector<AsciiString> scavengedBuildings;
 	std::vector<AsciiString> offensiveBuildings;
+	std::vector<Int> tacticalTargets;
+	std::vector<Int> maxTeamsPerTarget;
+	Real targetLifetimeSeconds = 90.0f;
+	Real targetRetentionChance = 0.5f;
+	Real defenseRecruitAllChance[3] = {0.0f, 0.0f, 0.5f};
+	Int smallDefenseBuildings = 1;
+	Int mediumDefenseBuildings = 4;
+	Int maxRecruitsPerDefenseType = 0;
+	Int maxOpportunityThreat = 0;
 	Real rushSeconds = 120.0f;
 	Real midgameSeconds = 420.0f;
 	Int minimumFarms = 2;
@@ -108,14 +131,17 @@ struct RetailArmy
 	Real lowUnitPriority[3] = {};
 	Real mustUseCommandPoints[3] = {};
 	Int attackRecruitDepth = 0;
+	Int defenseRecruitDepth = 0;
 	Int exploreRecruitDepth = 0;
 };
 
 struct RetailDifficulty
 {
+	AsciiString definition;
 	AsciiString name;
 	Int farmLimit = -1;
 	Int farmChance[2] = {1, 1};
+	Int offensiveTacticChance[2] = {1, 1};
 };
 
 struct RetailBrutalCheats
@@ -141,6 +167,7 @@ struct RetailAITuning
 	Bool disableUnitBuilding = FALSE;
 	Bool disableUnitUpgrading = FALSE;
 	Bool disableTacticalAI = FALSE;
+	Real defenseTreeNodeRadius = 300.0f;
 };
 
 std::vector<RetailArmy> retailArmies;
@@ -235,6 +262,22 @@ void parseArmyMember(INI* ini, void* instance, void*, const void*)
 		army.members.push_back(member);
 }
 
+void parseTacticalTargetKinds(INI* ini, void*, void* store, const void*)
+{
+	std::vector<Int> targets;
+	for (const char* token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+		targets.push_back(INI::scanIndexList(token, retailTacticalKindNames));
+	*static_cast<std::vector<Int>*>(store) = std::move(targets);
+}
+
+void parseTacticalTeamLimits(INI* ini, void*, void* store, const void*)
+{
+	std::vector<Int> limits;
+	for (const char* token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+		limits.push_back(INI::scanInt(token));
+	*static_cast<std::vector<Int>*>(store) = std::move(limits);
+}
+
 void parseFarmAssignment(INI* ini, void*, void* store, const void*)
 {
 	ini->getNextToken();
@@ -245,7 +288,7 @@ void parseFarmAssignment(INI* ini, void*, void* store, const void*)
 	ini->initFromINI(store, fields);
 }
 
-void parseEconomyProbability(INI* ini, void*, void* store, const void*)
+void parseDifficultyProbability(INI* ini, void*, void* store, const void*)
 {
 	const Int numerator = INI::scanInt(ini->getNextToken(ini->getSepsColon()));
 	const Int denominator = INI::scanInt(ini->getNextToken(ini->getSepsColon()));
@@ -258,18 +301,25 @@ void parseEconomyProbability(INI* ini, void*, void* store, const void*)
 
 void parseDifficultyTuning(INI* ini, void* instance, void*, const void*)
 {
-	ini->getNextToken();
-	auto& tuning = *static_cast<RetailAITuning*>(instance);
-	RetailDifficulty difficulty;
+	const AsciiString definition = ini->getNextToken();
+	auto& difficulties = static_cast<RetailAITuning*>(instance)->difficulties;
+	const auto existing = std::find_if(difficulties.begin(), difficulties.end(), [&](const RetailDifficulty& current) {
+		return current.definition.compareNoCase(definition) == 0;
+	});
+	RetailDifficulty difficulty = existing == difficulties.end() ? RetailDifficulty{} : *existing;
+	difficulty.definition = definition;
 	static const FieldParse fields[] = {
 		{ "Difficulty", INI::parseAsciiString, nullptr, offsetof(RetailDifficulty, name) },
 		{ "EconomyMaxFarms", INI::parseInt, nullptr, offsetof(RetailDifficulty, farmLimit) },
-		{ "EconomyUpgradeProbability", parseEconomyProbability, nullptr, offsetof(RetailDifficulty, farmChance) },
+		{ "EconomyUpgradeProbability", parseDifficultyProbability, nullptr, offsetof(RetailDifficulty, farmChance) },
+		{ "OffensiveTacticActivationProbability", parseDifficultyProbability, nullptr, offsetof(RetailDifficulty, offensiveTacticChance) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	ini->initFromINI(&difficulty, fields);
-	if (difficulty.name.isNotEmpty())
-		tuning.difficulties.push_back(difficulty);
+	if (existing != difficulties.end())
+		*existing = std::move(difficulty);
+	else if (difficulty.name.isNotEmpty())
+		difficulties.push_back(std::move(difficulty));
 }
 
 void parseBrutalCheats(INI* ini, void*, void* store, const void*)
@@ -297,6 +347,79 @@ Bool matchesArmyType(const ThingTemplate& actual, const ThingTemplate& planned)
 		});
 	};
 	return actual.isEquivalentTo(&planned) || names(actual, planned.getName()) || names(planned, actual.getName());
+}
+
+Real tacticalDistanceSquared(const Coord3D& a, const Coord3D& b)
+{
+	const Coord3D delta = a - b;
+	return sqr(delta.x) + sqr(delta.y) + sqr(delta.z);
+}
+
+struct RetailDefenseCluster
+{
+	Coord3D center{};
+	Real radius = 0.0f;
+	std::vector<Object*> buildings;
+
+	void add(Object& building, Real nodeRadius)
+	{
+		const Coord3D& point = *building.getPosition();
+		if (buildings.empty())
+		{
+			center = point;
+			radius = nodeRadius;
+		}
+		else
+		{
+			const Real distance = WWMath::SqrtfOrigin(tacticalDistanceSquared(point, center));
+			if (distance > radius - nodeRadius)
+			{
+				const Real nextRadius = (radius + distance + nodeRadius) * 0.5f;
+				const Real fraction = (nextRadius - radius) / distance;
+				center.x += (point.x - center.x) * fraction;
+				center.y += (point.y - center.y) * fraction;
+				center.z += (point.z - center.z) * fraction;
+				radius = nextRadius;
+			}
+		}
+		buildings.push_back(&building);
+	}
+};
+
+std::vector<RetailDefenseCluster> makeDefenseClusters(std::vector<Object*> structures, Real nodeRadius)
+{
+	std::sort(structures.begin(), structures.end(), [](const Object* a, const Object* b) {
+		return a->getID() < b->getID();
+	});
+	std::vector<RetailDefenseCluster> clusters;
+	const Real joinDistanceSquared = 2.0f * sqr(nodeRadius);
+	for (Object* building : structures)
+	{
+		const auto connected = [&](const RetailDefenseCluster& cluster) {
+			return std::any_of(cluster.buildings.begin(), cluster.buildings.end(), [&](const Object* member) {
+				return tacticalDistanceSquared(*building->getPosition(), *member->getPosition()) < joinDistanceSquared;
+			});
+		};
+		const auto first = std::find_if(clusters.begin(), clusters.end(), connected);
+		if (first == clusters.end())
+		{
+			clusters.emplace_back().add(*building, nodeRadius);
+			continue;
+		}
+		first->add(*building, nodeRadius);
+		for (auto it = first + 1; it != clusters.end();)
+		{
+			if (!connected(*it))
+			{
+				++it;
+				continue;
+			}
+			for (Object* member : it->buildings)
+				first->add(*member, nodeRadius);
+			it = clusters.erase(it);
+		}
+	}
+	return clusters;
 }
 
 Bool isRetailFortressKeep(const ThingTemplate& type)
@@ -462,9 +585,21 @@ void AISkirmishPlayer::parseRetailArmy(INI* ini)
 		{ "MustUseCommandPointPercentage_Phase2", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, mustUseCommandPoints) + sizeof(Real) },
 		{ "MustUseCommandPointPercentage_Phase3", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, mustUseCommandPoints) + 2 * sizeof(Real) },
 		{ "CombatChainSearchDepthForTeamRecruits_AttackTeams", INI::parseInt, nullptr, offsetof(RetailArmy, attackRecruitDepth) },
+		{ "CombatChainSearchDepthForTeamRecruits_DefenseTeams", INI::parseInt, nullptr, offsetof(RetailArmy, defenseRecruitDepth) },
 		{ "CombatChainSearchDepthForTeamRecruits_ExploreTeams", INI::parseInt, nullptr, offsetof(RetailArmy, exploreRecruitDepth) },
 		{ "OffensiveBuildings", INI::parseAsciiStringVector, nullptr, offsetof(RetailArmy, offensiveBuildings) },
 		{ "ScavangedResourceBuildings", INI::parseAsciiStringVector, nullptr, offsetof(RetailArmy, scavengedBuildings) },
+		{ "TacticalAITargets", parseTacticalTargetKinds, nullptr, offsetof(RetailArmy, tacticalTargets) },
+		{ "MaxTeamsPerTarget", parseTacticalTeamLimits, nullptr, offsetof(RetailArmy, maxTeamsPerTarget) },
+		{ "SecondsTillTargetsCanExpire", INI::parseReal, nullptr, offsetof(RetailArmy, targetLifetimeSeconds) },
+		{ "ChanceForTargetToExpire", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, targetRetentionChance) },
+		{ "MaxBuildingsToBeDefensiveTarget_Small", INI::parseInt, nullptr, offsetof(RetailArmy, smallDefenseBuildings) },
+		{ "MaxBuildingsToBeDefensiveTarget_Med", INI::parseInt, nullptr, offsetof(RetailArmy, mediumDefenseBuildings) },
+		{ "ChanceToUseAllUnitsForDefenseTarget_Small", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, defenseRecruitAllChance) },
+		{ "ChanceToUseAllUnitsForDefenseTarget_Med", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, defenseRecruitAllChance) + sizeof(Real) },
+		{ "ChanceToUseAllUnitsForDefenseTarget_Large", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, defenseRecruitAllChance) + 2 * sizeof(Real) },
+		{ "ValueToSetForMaxOnDefenseTeam", INI::parseInt, nullptr, offsetof(RetailArmy, maxRecruitsPerDefenseType) },
+		{ "MaxThreatForOpportunityTargets", INI::parseInt, nullptr, offsetof(RetailArmy, maxOpportunityThreat) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	ini->initFromINI(&army, fields);
@@ -486,6 +621,7 @@ void AISkirmishPlayer::parseRetailTuning(INI* ini)
 		{ "DisableUnitBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableUnitBuilding) },
 		{ "DisableUnitUpgrading", INI::parseBool, nullptr, offsetof(RetailAITuning, disableUnitUpgrading) },
 		{ "DisableTacticalAI", INI::parseBool, nullptr, offsetof(RetailAITuning, disableTacticalAI) },
+		{ "DefenseTreeNodeRadius", INI::parseReal, nullptr, offsetof(RetailAITuning, defenseTreeNodeRadius) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	ini->initFromINI(&retailTuning, fields);
@@ -1890,6 +2026,8 @@ void AISkirmishPlayer::updateRetail()
 	if (retailTuning.disableTacticalAI)
 		return;
 	const UnsignedInt routeRevision = TheAI->pathfinder()->getRetailRouteRevision();
+	using ObjectiveKey = std::pair<ObjectID, UnsignedInt>;
+	std::map<ObjectiveKey, std::set<UnsignedInt>> activeTeams;
 	for (auto it = m_retailObjectives.begin(); it != m_retailObjectives.end();)
 	{
 		const auto [unitID, targetID, owner] = it->first;
@@ -1903,17 +2041,60 @@ void AISkirmishPlayer::updateRetail()
 			continue;
 		}
 		auto& order = it->second;
+		const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
+		const AIUpdateInterface* ai = unit->getAI();
 		if (order.issuedFrame && !order.blockedRevision)
 		{
-			if (const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate"))))
+			if (horde)
 				order.blockedRevision = horde->blockedPlannerRevision(order.issuedFrame);
-			else if (const auto* ai = unit->getAI())
+			else if (ai)
 				order.blockedRevision = ai->blockedRetailPlannerRevision(order.issuedFrame);
 		}
 		if (order.blockedRevision && order.blockedRevision != routeRevision)
 			it = m_retailObjectives.erase(it);
 		else
+		{
+			if (horde ? horde->isExecutingPlannerOrder(targetID, order.issuedFrame)
+				: ai && ai->isExecutingRetailPlannerOrder(targetID, order.issuedFrame))
+				activeTeams[{targetID, owner}].insert(order.issuedFrame);
 			++it;
+		}
+	}
+	const auto teamCount = [&](const RetailTacticalTarget& target) {
+		const auto teams = activeTeams.find({target.object, target.owner});
+		return teams == activeTeams.end() ? 0 : static_cast<Int>(teams->second.size());
+	};
+	m_retailTargets.resize(rules->tacticalTargets.size());
+	for (size_t i = 0; i < m_retailTargets.size(); ++i)
+	{
+		auto& target = m_retailTargets[i];
+		if (target.selectedFrame == 0)
+			continue;
+		const Object* object = TheGameLogic->findObjectByID(target.object);
+		const Object* defended = TheGameLogic->findObjectByID(target.defendedStructure);
+		const Bool lostStructure = target.defendedStructure != INVALID_ID &&
+			(!defended || defended->isEffectivelyDead() || defended->getControllingPlayer() != m_player);
+		const Player* scoutOpponent = target.object == INVALID_ID && target.owner < static_cast<UnsignedInt>(ThePlayerList->getPlayerCount())
+			? ThePlayerList->getNthPlayer(target.owner) : nullptr;
+		const Bool lostOpponent = target.object == INVALID_ID && (!scoutOpponent || !scoutOpponent->isPlayerActive() ||
+			m_player->getRelationship(scoutOpponent->getDefaultTeam()) != ENEMIES);
+		const Bool missing = lostStructure || lostOpponent || (target.object != INVALID_ID &&
+			(!object || object->isEffectivelyDead() || object->getTeam()->getID() != target.owner ||
+				m_player->getRelationship(object->getTeam()) != ENEMIES));
+		if (!target.retiring && !missing &&
+			INT_TO_REAL(frame - target.selectedFrame) >= rules->targetLifetimeSeconds * LOGICFRAMES_PER_SECOND)
+		{
+			if (GameLogicRandomValueReal(0.0f, 1.0f) < rules->targetRetentionChance)
+				target.selectedFrame = frame;
+			else
+			{
+				target.retiring = TRUE;
+				if (trace)
+					std::fprintf(stderr, "AI_TARGET_EXPIRE\t%u\t%d\t%zu\t%d\n", frame, playerIndex, i, target.object);
+			}
+		}
+		if (missing || (target.retiring && teamCount(target) == 0))
+			target = {};
 	}
 	std::vector<std::pair<Object*, Bool>> wave;
 	for (Object* unit : soldiers)
@@ -1933,7 +2114,7 @@ void AISkirmishPlayer::updateRetail()
 		if (ready || scouting)
 			wave.emplace_back(unit, ready);
 	}
-	if (wave.size() < RETAIL_ATTACK_WAVE_MIN_UNITS)
+	if (wave.empty())
 		return;
 	const auto eligible = [&](const Object& unit, const Object* objective, UnsignedInt owner, const Coord3D& point) -> Bool {
 		if (!unit.getAI()->canAcceptRetailPlannerOrder(objective != nullptr) ||
@@ -1947,7 +2128,7 @@ void AISkirmishPlayer::updateRetail()
 		const Coord3D delta = point - *unit.getPosition();
 		return delta.x * delta.x + delta.y * delta.y > sqr(unit.getGeometryInfo().getBoundingCircleRadius());
 	};
-	const auto objectiveDistance = [&](const Object* objective, UnsignedInt owner, const Coord3D& point, Real& result) {
+	const auto objectiveDistance = [&](const Object* objective, UnsignedInt owner, const Coord3D& point, Int minimum, Real& result) {
 		Int count = 0;
 		Real total = 0.0f;
 		for (const auto& [unit, ready] : wave)
@@ -1958,47 +2139,93 @@ void AISkirmishPlayer::updateRetail()
 			total += delta.x * delta.x + delta.y * delta.y;
 			++count;
 		}
-		if (count < RETAIL_ATTACK_WAVE_MIN_UNITS)
+		if (count < minimum)
 			return FALSE;
 		result = total / INT_TO_REAL(count);
 		return TRUE;
 	};
-	Object* target = nullptr;
-	ObjectShroudStatus targetShroud = OBJECTSHROUD_INVALID;
-	UnsignedInt objectiveOwner = 0;
-	Real distance = 0.0f;
-	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	struct TacticalCandidate
 	{
-		const Player* owner = object->getControllingPlayer();
-		if (!owner || !owner->isPlayableSide() || !owner->isPlayerActive() || !object->isKindOf(KINDOF_STRUCTURE) ||
-			!object->isKindOf(KINDOF_IMMOBILE) ||
-			object->isEffectivelyDead() || object->isKindOf(KINDOF_INERT) || object->isKindOf(KINDOF_UNATTACKABLE) ||
-			object->isKindOf(KINDOF_BASE_FOUNDATION) ||
-			m_player->getRelationship(object->getTeam()) != ENEMIES)
-			continue;
-		const ObjectShroudStatus shroud = object->getShroudedStatus(playerIndex);
-		if (shroud != OBJECTSHROUD_CLEAR && shroud != OBJECTSHROUD_PARTIAL_CLEAR)
-			continue;
-		if (object->testStatus(OBJECT_STATUS_STEALTHED) && !object->testStatus(OBJECT_STATUS_DETECTED))
-			continue;
-		Real candidateDistance;
-		const UnsignedInt team = object->getTeam()->getID();
-		if (!objectiveDistance(object, team, *object->getPosition(), candidateDistance))
-			continue;
-		if (object->isKindOf(KINDOF_COMMANDCENTER) || object->isKindOf(KINDOF_FS_BASE_DEFENSE))
-			candidateDistance += sqr(RETAIL_DEFENDED_TARGET_DISTANCE);
-		if (!target || candidateDistance < distance || (candidateDistance == distance && object->getID() < target->getID()))
+		Object* object = nullptr;
+		const Coord3D* position = nullptr;
+		UnsignedInt owner = 0;
+		ObjectShroudStatus shroud = OBJECTSHROUD_INVALID;
+		Real distance = 0.0f;
+		const RetailDefenseCluster* defense = nullptr;
+		ObjectID id() const { return object ? object->getID() : INVALID_ID; }
+		ObjectID defendedID() const { return defense ? defense->buildings.front()->getID() : INVALID_ID; }
+	};
+	const auto hasKind = [&](RetailTacticalKind kind) {
+		return std::find(rules->tacticalTargets.begin(), rules->tacticalTargets.end(), kind) != rules->tacticalTargets.end();
+	};
+	const auto visibleEnemy = [&](const Object& object) {
+		const Player* owner = object.getControllingPlayer();
+		if (!owner || !owner->isPlayableSide() || !owner->isPlayerActive() || object.isEffectivelyDead() ||
+			object.isKindOf(KINDOF_INERT) || object.isKindOf(KINDOF_UNATTACKABLE) ||
+			object.isKindOf(KINDOF_BASE_FOUNDATION) || m_player->getRelationship(object.getTeam()) != ENEMIES)
+			return false;
+		const ObjectShroudStatus shroud = object.getShroudedStatus(playerIndex);
+		return (shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR) &&
+			(!object.testStatus(OBJECT_STATUS_STEALTHED) || object.testStatus(OBJECT_STATUS_DETECTED));
+	};
+	std::vector<TacticalCandidate> structures;
+	std::vector<TacticalCandidate> expansions;
+	std::vector<TacticalCandidate> defenses;
+	std::vector<RetailDefenseCluster> defenseClusters;
+	if (hasKind(RETAIL_TARGET_DEFENSIVE) && retailTuning.defenseTreeNodeRadius > 0.0f)
+	{
+		std::vector<Object*> defensesToRegister;
+		for (Object* object : owned)
 		{
-			target = object;
-			targetShroud = shroud;
-			objectiveOwner = team;
-			distance = candidateDistance;
+			if (!object->isKindOf(KINDOF_STRUCTURE) || object->isKindOf(KINDOF_INERT) ||
+				object->isKindOf(KINDOF_BASE_FOUNDATION) || object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+				continue;
+			const auto isOffensiveStructure = [&](const AsciiString& name) {
+				const ThingTemplate* offensive = TheThingFactory->findTemplate(name, FALSE);
+				return offensive && object->getTemplate()->isEquivalentTo(offensive);
+			};
+			if (std::none_of(rules->offensiveBuildings.begin(), rules->offensiveBuildings.end(), isOffensiveStructure))
+				defensesToRegister.push_back(object);
+		}
+		defenseClusters = makeDefenseClusters(std::move(defensesToRegister), retailTuning.defenseTreeNodeRadius);
+		for (const RetailDefenseCluster& cluster : defenseClusters)
+		{
+			TacticalCandidate nearest;
+			Real nearestDistance = 0.0f;
+			for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+			{
+				if (object->getContainedBy() || !object->isMobile() || !object->isAbleToAttack() || !visibleEnemy(*object))
+					continue;
+				const Real distance = tacticalDistanceSquared(*object->getPosition(), cluster.center);
+				if (distance > sqr(cluster.radius) ||
+					(nearest.object && std::make_pair(distance, object->getID()) >= std::make_pair(nearestDistance, nearest.id())))
+					continue;
+				TacticalCandidate candidate{object, object->getPosition(), object->getTeam()->getID(),
+					object->getShroudedStatus(playerIndex), 0.0f, &cluster};
+				if (objectiveDistance(object, candidate.owner, *candidate.position, 1, candidate.distance))
+				{
+					nearest = candidate;
+					nearestDistance = distance;
+				}
+			}
+			if (nearest.object)
+				defenses.push_back(nearest);
 		}
 	}
-	const Coord3D* destination = target ? target->getPosition() : nullptr;
-	if (!destination)
-	{
-		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	if (hasKind(RETAIL_TARGET_ENEMY_STRUCTURE))
+		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		{
+			if (!object->isKindOf(KINDOF_STRUCTURE) || !object->isKindOf(KINDOF_IMMOBILE) || !visibleEnemy(*object))
+				continue;
+			TacticalCandidate candidate{object, object->getPosition(), object->getTeam()->getID(), object->getShroudedStatus(playerIndex)};
+			if (!objectiveDistance(object, candidate.owner, *candidate.position, RETAIL_ATTACK_WAVE_MIN_UNITS, candidate.distance))
+				continue;
+			if (object->isKindOf(KINDOF_COMMANDCENTER) || object->isKindOf(KINDOF_FS_BASE_DEFENSE))
+				candidate.distance += sqr(RETAIL_DEFENDED_TARGET_DISTANCE);
+			structures.push_back(candidate);
+		}
+	if (hasKind(RETAIL_TARGET_EXPANSION))
+		for (UnsignedInt i = 0; i < static_cast<UnsignedInt>(ThePlayerList->getPlayerCount()); ++i)
 		{
 			Player* opponent = ThePlayerList->getNthPlayer(i);
 			if (!opponent || !opponent->isPlayableSide() || !opponent->isPlayerActive() ||
@@ -2012,19 +2239,90 @@ void AISkirmishPlayer::updateRetail()
 			const Waypoint* start = TheTerrainLogic->getWaypointByName(name);
 			if (!start)
 				continue;
-			Real candidateDistance;
-			if (!objectiveDistance(nullptr, i, *start->getLocation(), candidateDistance))
+			TacticalCandidate candidate{nullptr, start->getLocation(), i};
+			if (objectiveDistance(nullptr, i, *candidate.position, RETAIL_ATTACK_WAVE_MIN_UNITS, candidate.distance))
+				expansions.push_back(candidate);
+		}
+	const TacticalCandidate* chosen = nullptr;
+	size_t chosenSlot = 0;
+	for (Bool requireEmpty : {TRUE, FALSE})
+	{
+		for (size_t i = 0; i < m_retailTargets.size(); ++i)
+		{
+			const Int kind = rules->tacticalTargets[i];
+			const auto* candidates = kind == RETAIL_TARGET_ENEMY_STRUCTURE ? &structures
+				: kind == RETAIL_TARGET_DEFENSIVE ? &defenses
+				: kind == RETAIL_TARGET_EXPANSION ? &expansions : nullptr;
+			auto& target = m_retailTargets[i];
+			const Int limit = i < rules->maxTeamsPerTarget.size() ? rules->maxTeamsPerTarget[i] : 1;
+			const Int teams = teamCount(target);
+			if (!candidates || target.retiring || teams >= limit || (requireEmpty && teams != 0))
 				continue;
-			if (!destination || candidateDistance < distance)
+			std::vector<const TacticalCandidate*> defenseChoices;
+			for (const auto& candidate : *candidates)
 			{
-				destination = start->getLocation();
-				objectiveOwner = i;
-				distance = candidateDistance;
+				if (target.selectedFrame != 0)
+				{
+					if (target.object != candidate.id() || target.owner != candidate.owner ||
+						target.defendedStructure != candidate.defendedID())
+						continue;
+				}
+				else if (std::any_of(m_retailTargets.begin(), m_retailTargets.end(), [&](const RetailTacticalTarget& other) {
+					return other.selectedFrame != 0 && other.object == candidate.id() && other.owner == candidate.owner;
+				}))
+					continue;
+				if (candidate.defense && target.selectedFrame == 0)
+				{
+					defenseChoices.push_back(&candidate);
+					continue;
+				}
+				if (!chosen || std::make_tuple(candidate.distance, candidate.id(), candidate.owner) <
+					std::make_tuple(chosen->distance, chosen->id(), chosen->owner))
+					chosen = &candidate;
+			}
+			if (!defenseChoices.empty())
+			{
+				chosen = defenseChoices[GameLogicRandomValue(0, static_cast<Int>(defenseChoices.size()) - 1)];
+				if (chosen->defense->buildings.size() == 1 && GameLogicRandomValue(0, 100) <= 29)
+					chosen = nullptr;
+			}
+			if (chosen)
+			{
+				chosenSlot = i;
+				break;
 			}
 		}
+		if (chosen)
+			break;
 	}
-	if (!destination)
+	if (!chosen)
 		return;
+	if (rules->tacticalTargets[chosenSlot] == RETAIL_TARGET_ENEMY_STRUCTURE)
+	{
+		const Int* chance = policy.difficulty ? policy.difficulty->offensiveTacticChance : nullptr;
+		if ((difficulty == DIFFICULTY_EASY && phase == 0) ||
+			(chance && chance[0] < chance[1] && GameLogicRandomValue(0, chance[1] - 1) >= chance[0]))
+			return;
+	}
+	Object* target = chosen->object;
+	const Coord3D* destination = chosen->position;
+	const UnsignedInt objectiveOwner = chosen->owner;
+	size_t defenseSize = 0;
+	size_t recruitLimit = wave.size();
+	Bool recruitAll = FALSE;
+	if (chosen->defense)
+	{
+		defenseSize = chosen->defense->buildings.size();
+		const size_t category = std::min<size_t>(defenseSize, 3) - 1;
+		recruitAll = GameLogicRandomValueReal(0.0f, 1.0f) < rules->defenseRecruitAllChance[category];
+		recruitLimit = recruitAll ? 4 : category == 0 ? 1 : category == 1 ? 3 : wave.size();
+		std::sort(wave.begin(), wave.end(), [&](const auto& a, const auto& b) {
+			const auto rank = [&](const Object* unit) {
+				return std::make_pair(tacticalDistanceSquared(*unit->getPosition(), *destination), unit->getID());
+			};
+			return rank(a.first) < rank(b.first);
+		});
+	}
 	Int committed = 0;
 	for (const auto& [unit, ready] : wave)
 	{
@@ -2045,9 +2343,17 @@ void AISkirmishPlayer::updateRetail()
 		++committed;
 		if (trace)
 			std::fprintf(stderr, "AI_TARGET\t%u\t%d\t%s\t%d\t%d\t%d\n", frame, playerIndex,
-				target ? "attack" : "scout", unit->getID(), target ? target->getID() : 0, targetShroud);
+				chosen->defense ? "defend" : target ? "attack" : "scout", unit->getID(), target ? target->getID() : 0, chosen->shroud);
+		if (static_cast<size_t>(committed) >= recruitLimit)
+			break;
 	}
-	if (trace && committed >= RETAIL_ATTACK_WAVE_MIN_UNITS)
+	auto& assigned = m_retailTargets[chosenSlot];
+	if (committed > 0 && assigned.selectedFrame == 0)
+		assigned = {chosen->id(), chosen->defendedID(), objectiveOwner, frame, FALSE};
+	if (trace && committed > 0 && chosen->defense)
+		std::fprintf(stderr, "AI_DEFENSE\t%u\t%d\t%d\t%d\t%zu\t%d\t%d\n", frame, playerIndex,
+			chosen->defendedID(), target->getID(), defenseSize, recruitAll, committed);
+	if (trace && !chosen->defense && committed >= RETAIL_ATTACK_WAVE_MIN_UNITS)
 	{
 		std::fprintf(stderr, "AI_WAVE\t%u\t%d\t%s\t%d\t%d\t%a\t%a\n", frame, playerIndex,
 			target ? "structure" : "enemy-start", committed, target ? target->getID() : 0, destination->x, destination->y);
@@ -2172,6 +2478,7 @@ void AISkirmishPlayer::adjustBuildList(BuildListInfo *list)
 void AISkirmishPlayer::newMap()
 {
 	m_retailObjectives.clear();
+	m_retailTargets.clear();
 	m_retailLastFarmFrame = 0;
 	m_retailSavings = 0;
 	m_retailScavengedBuilding = -1;
@@ -2371,6 +2678,23 @@ void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_retailScavengedBuilding = -1;
 			m_retailFarmPriority = 0.0f;
 			m_retailBuiltStructures.clear();
+		}},
+		{"skirmish-targets", [this, loading](Xfer* x) {
+			UnsignedInt count = static_cast<UnsignedInt>(m_retailTargets.size());
+			x->xferUnsignedInt(&count);
+			if (loading)
+				m_retailTargets.clear();
+			for (UnsignedInt i = 0; i < count; ++i)
+			{
+				auto& target = loading ? m_retailTargets.emplace_back() : m_retailTargets[i];
+				x->xferObjectID(&target.object);
+				x->xferObjectID(&target.defendedStructure);
+				x->xferUnsignedInt(&target.owner);
+				x->xferUnsignedInt(&target.selectedFrame);
+				x->xferBool(&target.retiring);
+			}
+		}, [this] {
+			m_retailTargets.clear();
 		}}
 	});
 }

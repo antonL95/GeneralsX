@@ -555,6 +555,10 @@ public:
 	Bool canAcceptRetailPlannerOrder(Bool attackObject) const;
 	Bool hasRetailPlannerAttack(const Object* target) const;
 	Bool hasRetailPlannerAdvance() const { return m_retailPlannerOrderActive && m_retailPlannerAttackTarget == INVALID_ID; }
+	Bool isExecutingRetailPlannerOrder(ObjectID target, UnsignedInt issuedFrame) const
+	{
+		return m_retailPlannerOrderActive && m_retailPlannerAttackTarget == target && m_retailPlannerIssuedFrame == issuedFrame;
+	}
 	void noteBlockedRetailPlannerPath();
 	UnsignedInt blockedRetailPlannerRevision(UnsignedInt issuedFrame) const
 	{
