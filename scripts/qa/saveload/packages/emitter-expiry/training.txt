@@ -1,0 +1,5 @@
+225 create Player_1 BreezeofManwe 0 589.3,573.7,0
+244 health Player_1 BreezeofManwe 0
+435 health Player_1 BreezeofManwe 0
+435 health PlyrCreeps SpiderLair 1
+436 health Player_1 BreezeofManwe 0

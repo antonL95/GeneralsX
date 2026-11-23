@@ -3519,6 +3519,7 @@ void GameLogic::update()
 #endif
 
 	{
+		const Bool retail = RetailFileLayers::enabled();
 		while (!m_sleepyUpdates.empty())
 		{
 			UpdateModulePtr u = peekSleepyUpdate();
@@ -3565,7 +3566,7 @@ void GameLogic::update()
 
 			// else defer it till next frame and re-push it
 			u->friend_setNextCallFrame(now + sleepLen);
-			rebalanceSleepyUpdate(0);
+			rebalanceSleepyUpdate(retail ? u->friend_getIndexInLogic() : 0);
 		}
 	}
 
