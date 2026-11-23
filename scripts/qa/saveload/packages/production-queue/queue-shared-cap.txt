@@ -1,0 +1,24 @@
+4 cash Player_1 - 0 50000
+20 fortress-purchase Player_1 MenFortressCitadel 0 Command_PurchaseUpgradeMenFortressBanners
+21 fortress-purchase Player_1 MenFortressCitadel 0 Command_PurchaseUpgradeMenFortressHouseOfHealing
+22 fortress-purchase Player_1 MenFortressCitadel 0 Command_PurchaseUpgradeMenFortressBoilingOil
+23 fortress-purchase Player_1 MenFortressCitadel 0 Command_PurchaseUpgradeMenFortressFlamingMunitions
+24 fortress-purchase Player_1 MenFortressCitadel 0 Command_PurchaseUpgradeMenFortressNumenorStonework
+26 queue Player_1 MenFortressCitadel 0 GondorPippin
+28 queue Player_1 MenFortressCitadel 0 GondorForlongNew
+30 queue Player_1 MenFortressCitadel 0 GondorBeregond
+32 queue Player_1 MenFortressCitadel 0 GondorDenethor
+34 queue Player_1 MenFortressCitadel 0 GondorFaramir
+36 queue Player_1 MenFortressCitadel 0 GondorBoromir
+38 queue Player_1 MenFortressCitadel 0 GondorGandalf
+40 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+41 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+42 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+43 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+44 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+45 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+46 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+47 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+48 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+79 heroes Player_1 - 0
+81 heroes Player_1 - 0

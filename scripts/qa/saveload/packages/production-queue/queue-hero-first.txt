@@ -1,0 +1,7 @@
+4 cash Player_1 - 0 50000
+20 queue Player_1 MenFortressCitadel 0 GondorPippin
+22 fortress-purchase Player_1 MenFortressCitadel 0 Command_PurchaseUpgradeMenFortressBanners
+25 heroes Player_1 - 0
+79 heroes Player_1 - 0
+81 heroes Player_1 - 0
+750 heroes Player_1 - 0

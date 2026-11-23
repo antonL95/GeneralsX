@@ -1,0 +1,37 @@
+4 cash Player_1 - 0 50000
+13 objupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressBanners
+14 objupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressHouseOfHealing
+15 objupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressBoilingOil
+16 objupgrade Player_1 MenFortressCitadel 0 Upgrade_GoodFortressFlamingMunitionsTrigger
+17 objupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressNumenorStoneworkTrigger
+18 objupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressIvoryTower
+19 checkobjupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressBanners
+19 checkobjupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressHouseOfHealing
+19 checkobjupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressBoilingOil
+19 checkobjupgrade Player_1 MenFortressCitadel 0 Upgrade_GoodFortressFlamingMunitionsTrigger
+19 checkobjupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressNumenorStoneworkTrigger
+19 checkobjupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressIvoryTower
+20 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+22 queue Player_1 MenFortressCitadel 0 GondorPippin
+24 queue Player_1 MenFortressCitadel 0 GondorForlongNew
+26 queue Player_1 MenFortressCitadel 0 GondorBeregond
+28 queue Player_1 MenFortressCitadel 0 GondorDenethor
+30 queue Player_1 MenFortressCitadel 0 GondorFaramir
+32 queue Player_1 MenFortressCitadel 0 GondorBoromir
+34 queue Player_1 MenFortressCitadel 0 GondorGandalf
+36 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+38 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+39 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+40 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+41 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+42 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+43 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+44 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+45 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+46 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+47 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+48 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+49 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+50 queuebutton Player_1 MenFortressCitadel 0 Command_ConstructMenPorter
+79 heroes Player_1 - 0
+81 heroes Player_1 - 0

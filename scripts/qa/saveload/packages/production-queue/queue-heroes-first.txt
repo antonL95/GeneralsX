@@ -1,0 +1,14 @@
+4 cash Player_1 - 0 50000
+10 create Player_1 RivendellDunedainGathering 0 1400,900,0
+11 production-queue-science-points Player_1 - 20
+12 pw-purchase Player_1 - 0 SCIENCE_HealRivendell
+14 production-queue-player-upgrade Player_1 - 0 Upgrade_SonsOfElrond
+15 pw-purchase Player_1 - 0 SCIENCE_SonsOfElrond
+18 production-queue-player-upgrade Player_1 - 0 Upgrade_SonsOfElrond
+20 queue Player_1 RivendellDunedainGathering 0 ElvenElladan
+50 queue Player_1 RivendellDunedainGathering 0 ElvenElrohir
+52 queue Player_1 RivendellDunedainGathering 0 ArnorRangerHorde
+79 heroes Player_1 - 0
+81 heroes Player_1 - 0
+1535 heroes Player_1 - 0
+1630 heroes Player_1 - 0
