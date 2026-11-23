@@ -49,6 +49,12 @@ void logSteering(const RetailTestCommands::Context& ctx)
 	logPathNodes(first, FALSE);
 	std::fputs(" optimized:", stderr);
 	logPathNodes(first, TRUE);
+	std::fputs(" itinerary:", stderr);
+	if (ai->getAIStateType() == AI_FOLLOW_PATH)
+	{
+		for (Int index = 0; const Coord3D* point = ai->friend_getGoalPathPosition(index); ++index)
+			std::fprintf(stderr, " %.2f,%.2f", point->x, point->y);
+	}
 	std::fputc('\n', stderr);
 }
 
