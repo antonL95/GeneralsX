@@ -1,0 +1,12 @@
+174 create Player_1 ArnorSpellBook 0 3300,1720,0
+175 science Player_1 - 0 SCIENCE_HallOfFire
+220 create PlyrCreeps HallFireEnemy 0 3310,1720,0
+237 hall-cast Player_1 ArnorSpellBook 0 cast 3300 1720
+243 hall-probe Player_1 RivendellTownsman 0 ambient-before 3300 1720
+243 hall-probe PlyrCreeps HallFireEnemy 0 enemy-before 3310 1720
+249 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnTurinDummy 3490 1720
+251 hall-summon Player_1 RivendellHallOfFire 0 Command_SpawnGilGaladDummy 3490 1720
+263 hall-probe Player_1 RivendellTownsman 0 ambient-after 3300 1720
+263 hall-probe PlyrCreeps HallFireEnemy 0 enemy-after 3310 1720
+330 hall-probe Player_1 RivendellTurin 0 turin 3490 1720
+330 hall-probe Player_1 RivendellGilGalad 0 gil-galad 3490 1720
