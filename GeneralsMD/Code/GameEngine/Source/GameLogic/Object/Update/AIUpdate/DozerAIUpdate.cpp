@@ -703,20 +703,30 @@ StateReturnType DozerActionDoActionState::update()
 			{
 				if( ai->isIdle() )
 				{
-					if (RetailFileLayers::enabled() && GettingBuiltBehavior::takeOverConstruction(*goalObject))
+					const Bool delegated = RetailFileLayers::enabled() && GettingBuiltBehavior::takeOverConstruction(*goalObject);
+					if (delegated && !usesRetailBuilder(ai))
 						return STATE_SUCCESS;
 					dozerAI->setBuildSubTask( DOZER_DO_BUILD_AT_DOCK );
-					if( usesRetailBuilder(ai) )
+					if (usesRetailBuilder(ai) && !GettingBuiltBehavior::isAuthoredWorker(*goalObject, *dozer))
 						enterStructure( goalObject );
 					// Get the audio sound and start playing the construction sound (get the sound
 					// from the building itself)
-					dozerAI->startBuildingSound( goalObject->getTemplate()->getPerUnitSound( "UnderConstruction" ), goalObject->getID() );
+					if (!delegated)
+						dozerAI->startBuildingSound( goalObject->getTemplate()->getPerUnitSound( "UnderConstruction" ), goalObject->getID() );
 				}
 			}
 
 			// only do the build if we've moved into the dock position
 			if( dozerAI->getBuildSubTask() == DOZER_DO_BUILD_AT_DOCK )
 			{
+				if (m_builderInside && RetailFileLayers::enabled())
+				{
+					if (!goalObject->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+						return STATE_SUCCESS;
+					const auto* building = GettingBuiltBehavior::find(*goalObject);
+					if (building && building->managesConstruction() && !GettingBuiltBehavior::isAuthoredWorker(*goalObject, *dozer))
+						return STATE_CONTINUE;
+				}
 
 				// the builder is now actively constructing something
 				dozer->setModelConditionState( MODELCONDITION_ACTIVELY_CONSTRUCTING );

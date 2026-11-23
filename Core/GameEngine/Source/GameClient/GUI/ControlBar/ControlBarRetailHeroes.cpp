@@ -238,6 +238,8 @@ void collectHero(Object *obj, void *userData)
 		return;
 	if (obj->isKindOf(KINDOF_DOZER))
 	{
+		if (!obj->isSelectable())
+			return;
 		AIUpdateInterface *ai = obj->getAI();
 		DozerAIInterface *dozer = ai ? ai->getDozerAIInterface() : nullptr;
 		if (!ai || !ai->isIdle() || (dozer && dozer->isAnyTaskPending()))
@@ -436,7 +438,7 @@ Int hitTest(Int px, Int py)
 void selectObject(Object *obj, Bool center)
 {
 	Drawable *drawable = obj ? obj->getDrawable() : nullptr;
-	if (!drawable || !TheInGameUI)
+	if (!drawable || !obj->isSelectable() || !TheInGameUI)
 		return;
 	TheInGameUI->deselectAllDrawables();
 	TheInGameUI->selectDrawable(drawable);
@@ -455,7 +457,8 @@ struct BuilderCensus
 
 void collectBuilder(Object *obj, void *userData)
 {
-	if (!obj->isKindOf(KINDOF_DOZER) || obj->isEffectivelyDead() || obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
+	if (!obj->isKindOf(KINDOF_DOZER) || !obj->isSelectable() || obj->isEffectivelyDead() ||
+		obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 		return;
 	BuilderCensus &census = *static_cast<BuilderCensus *>(userData);
 	const Coord3D *position = obj->getPosition();
