@@ -46,6 +46,7 @@ public:
 	const AttributeModifierRules::Stack& getStack() const { return m_stack; }
 	const AttributeModifierRules::Totals& getTotals() const;
 	Bool hasAnyModifier() const;
+	const std::vector<Int>& getAppliedModelConditions() const { return m_appliedConditions; }
 	UnsignedInt getVersion() const { return m_version; }
 	void refreshDerived();
 	TransferState getTransferState() const;

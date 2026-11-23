@@ -223,7 +223,7 @@ private:
 	void iterateSaveFiles( IterateSaveFileCallback callback, void *userData );	///< iterate save files on disk
 
 	void xferSimulationState(Xfer *xfer);
-	void xferSaveData( Xfer *xfer, SnapshotType which );				///< save/load the file data
+	void xferSaveData( Xfer *xfer, SnapshotType which, Bool* hasHordeConditions = nullptr );
 
 	void gameStatePostProcessLoad();											///< post process entry point after a game load
 

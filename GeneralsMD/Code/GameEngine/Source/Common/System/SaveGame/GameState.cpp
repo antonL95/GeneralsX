@@ -62,6 +62,7 @@
 #include "GameLogic/GhostObject.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/TerrainLogic.h"
@@ -81,6 +82,7 @@ static const Int MAX_SAVE_FILE_NUMBER  =  99999999;
 #define GAME_STATE_BLOCK_STRING "CHUNK_GameState"  // block of save game data with game info data
 #define CAMPAIGN_BLOCK_STRING "CHUNK_Campaign"		 // block of game data that has campaign info
 static const char simulationBlockName[] = "CHUNK_SimulationState";
+static const char hordeConditionsBlockName[] = "CHUNK_HordeConditionUpgrades";
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
@@ -702,11 +704,12 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 
 	// load the save data
 	Bool error = FALSE;
+	Bool hasHordeConditions = FALSE;
 	try
 	{
 
 		// load file
-		xferSaveData( &xferLoad, SNAPSHOT_SAVELOAD );
+		xferSaveData( &xferLoad, SNAPSHOT_SAVELOAD, &hasHordeConditions );
 
 	}
 	catch( ... )
@@ -738,6 +741,8 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 			setGameLogicRandomState(*m_loadedRandomState);
 			m_loadedRandomState.reset();
 		}
+		if (!error && RetailFileLayers::enabled() && !hasHordeConditions && getSaveGameInfo()->saveFileType != SAVE_FILE_TYPE_MISSION)
+			RetailBuildingEvents::restoreHordeConditionUpgrades();
 	}
 	catch (...)
 	{
@@ -1540,7 +1545,7 @@ void GameState::friend_xferSaveDataForCRC( Xfer *xfer, SnapshotType which )
 // ------------------------------------------------------------------------------------------------
 /** Save game to xfer or load game using xfer */
 // ------------------------------------------------------------------------------------------------
-void GameState::xferSaveData( Xfer *xfer, SnapshotType which )
+void GameState::xferSaveData( Xfer *xfer, SnapshotType which, Bool* hasHordeConditions )
 {
 
 	// sanity
@@ -1613,6 +1618,11 @@ void GameState::xferSaveData( Xfer *xfer, SnapshotType which )
 			xfer->beginBlock();
 			xferSimulationState(xfer);
 			xfer->endBlock();
+
+			blockName = hordeConditionsBlockName;
+			xfer->xferAsciiString(&blockName);
+			xfer->beginBlock();
+			xfer->endBlock();
 		}
 
 		// write an end of file token
@@ -1645,6 +1655,15 @@ void GameState::xferSaveData( Xfer *xfer, SnapshotType which )
 			}
 			else
 			{
+
+				if (which == SNAPSHOT_SAVELOAD && RetailFileLayers::enabled() && token.compareNoCase(hordeConditionsBlockName) == 0)
+				{
+					xfer->skip(xfer->beginBlock());
+					xfer->endBlock();
+					if (hasHordeConditions)
+						*hasHordeConditions = TRUE;
+					continue;
+				}
 
 				if (which == SNAPSHOT_SAVELOAD && RetailFileLayers::enabled() && token.compareNoCase(simulationBlockName) == 0)
 				{

@@ -1,5 +1,11 @@
 #include "PreRTS.h"
 
+#if !RTS_GENERALS
+#define DEFINE_WEAPONCONDITIONMAP
+#include "GameLogic/WeaponSet.h"
+#undef DEFINE_WEAPONCONDITIONMAP
+#endif
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -25,6 +31,9 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/RetailBuildingEvents.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/AttributeModifierHelper.h"
+#endif
 
 namespace
 {
@@ -312,7 +321,9 @@ const BuildingEvents& buildingEvents()
 	return events;
 }
 
-void dispatch(Object& object, const char* event, bool modelConditionChange = false)
+enum class DispatchMode { Direct, ModelCondition, Restore };
+
+void dispatch(Object& object, const char* event, DispatchMode mode = DispatchMode::Direct)
 {
 	if (!RetailFileLayers::enabled() || !object.getAIUpdateInterface())
 		return;
@@ -332,9 +343,15 @@ void dispatch(Object& object, const char* event, bool modelConditionChange = fal
 		const auto found = events.programs.find(handler->second);
 		if (found == events.programs.end())
 			return;
-		if (modelConditionChange && !std::all_of(found->second.begin(), found->second.end(), [](const Operation& operation)
+		if (mode != DispatchMode::Direct && !std::all_of(found->second.begin(), found->second.end(), [](const Operation& operation)
 		{
 			return operation.action == Action::Grant || operation.action == Action::Remove;
+		}))
+			return;
+		if (mode == DispatchMode::Restore && std::none_of(found->second.begin(), found->second.end(), [&object](const Operation& operation)
+		{
+			const auto* upgrade = TheUpgradeCenter->findUpgrade(operation.name.c_str());
+			return upgrade && object.hasUpgrade(upgrade) != (operation.action == Action::Grant);
 		}))
 			return;
 		const std::string_view eventName(event);
@@ -435,21 +452,64 @@ void RetailBuildingEvents::trollEatingChanged(Object& object, bool enabled)
 }
 
 #if !RTS_GENERALS
-void RetailBuildingEvents::modelConditionsChanged(Object& object, const ModelConditionFlags& previous)
+namespace
+{
+void dispatchModelConditions(Object& object, const ModelConditionFlags& previous, DispatchMode mode)
 {
 	if (!RetailFileLayers::enabled() || !object.areModulesReady() || !object.isKindOf(KINDOF_HORDE) ||
 		object.isEffectivelyDead() || !object.getAIUpdateInterface() ||
-		object.getAIUpdateInterface()->getRetailLuaEventsList().isEmpty() || (TheGameState && TheGameState->isInLoadGame()))
+		object.getAIUpdateInterface()->getRetailLuaEventsList().isEmpty())
 		return;
 	const ModelConditionFlags current = object.getLogicModelConditions();
+	if (previous == current)
+		return;
 	for (const auto& event : buildingEvents().modelConditions)
 	{
 		if (!current.testSetAndClear(event.required, event.forbidden) ||
 			previous.testSetAndClear(event.required, event.forbidden))
 			continue;
-		dispatch(object, event.name.c_str(), true);
+		dispatch(object, event.name.c_str(), mode);
 		if (object.isDestroyed() || object.isEffectivelyDead())
 			return;
+	}
+}
+}
+
+void RetailBuildingEvents::modelConditionsChanged(Object& object, const ModelConditionFlags& previous)
+{
+	if (!TheGameState || !TheGameState->isInLoadGame())
+		dispatchModelConditions(object, previous, DispatchMode::ModelCondition);
+}
+
+void RetailBuildingEvents::restoreHordeConditionUpgrades()
+{
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if (!object->isKindOf(KINDOF_HORDE))
+			continue;
+		ModelConditionFlags previous = object->getLogicModelConditions();
+		for (const WeaponSetType flag : { WEAPONSET_TOGGLE_1, WEAPONSET_TOGGLE_2, WEAPONSET_TOGGLE_3 })
+		{
+			const auto condition = TheWeaponSetTypeToModelConditionTypeMap[flag];
+			const Bool active = object->testWeaponSetFlag(flag);
+			if (active)
+			{
+				if (!previous.test(condition))
+					object->setModelConditionState(condition);
+				previous.set(condition, FALSE);
+			}
+			else if (previous.test(condition))
+				object->clearModelConditionState(condition);
+		}
+		if (const auto* modifiers = object->getAttributeModifierHelper())
+			for (Int condition : modifiers->getAppliedModelConditions())
+				if (condition >= MODELCONDITION_FIRST && condition < MODELCONDITION_COUNT)
+				{
+					if (!object->getLogicModelConditions().test(condition))
+						object->setModelConditionState(static_cast<ModelConditionFlagType>(condition));
+					previous.set(condition, FALSE);
+				}
+		dispatchModelConditions(*object, previous, DispatchMode::Restore);
 	}
 }
 #endif
