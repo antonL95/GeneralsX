@@ -1,0 +1,8 @@
+236 create Player_1 SkirmishOpcodeFixtureUnit 0 350,145,0
+236 create PlyrCreeps SkirmishOpcodeFixtureUnit 0 430,145,0
+237 skirmish-opcode-arm Player_1 SkirmishOpcodeFixtureUnit 0
+242 skirmish-opcode-check Player_1 SkirmishOpcodeFixtureUnit 0
+245 skirmish-opcode-check Player_1 SkirmishOpcodeFixtureUnit 0
+310 skirmish-opcode-check Player_1 SkirmishOpcodeFixtureUnit 0
+310 destroy Player_1 SkirmishOpcodeFixtureUnit 0
+310 destroy PlyrCreeps SkirmishOpcodeFixtureUnit 0
