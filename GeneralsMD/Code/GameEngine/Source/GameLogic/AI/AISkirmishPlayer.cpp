@@ -155,7 +155,7 @@ struct RetailArmy
 	Real fortressRebuildPriority = 1950.0f;
 	Real structureRebuildModifier = 0.5f;
 	Real defaultPriority = 100.0f;
-	Real unitUpgradeChance = 30.0f;
+	Real unitUpgradeChance = 0.3f;
 	RetailPriorityRange unitUpgradePriority = {100.0f, 200.0f};
 	RetailPriorityRange normalResearchPriority = {85.0f, 150.0f};
 	RetailPriorityRange importantResearchPriority = {200.0f, 250.0f};
