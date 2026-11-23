@@ -408,18 +408,32 @@ UpdateSleepTime SlavedUpdate::update()
 		return UPDATE_SLEEP_NONE;
 	}
 
-	// update our "pinned" location based on where our master is
-	Coord3D pinnedPosition = retail ? retailPinned : *master->getPosition();
-	const Bool hasOffset = data->m_guardPositionOffset.x != 0.0f ||
-		data->m_guardPositionOffset.y != 0.0f || data->m_guardPositionOffset.z != 0.0f;
-	if (!retail || !hasOffset)
+	if (retail)
 	{
-		pinnedPosition.x += m_guardPointOffset.x;
-		pinnedPosition.y += m_guardPointOffset.y;
+		const Real guardRange = data->m_guardMaxRange;
+		const Bool hasOffset = data->m_guardPositionOffset.x != 0.0f ||
+			data->m_guardPositionOffset.y != 0.0f || data->m_guardPositionOffset.z != 0.0f;
+		const Bool outsideGuardRange = guardRange > 0 &&
+			ThePartitionManager->getDistanceSquared(me, master, FROM_CENTER_3D) > sqr(guardRange);
+		const Bool needsGuardOrder = myAI->isIdle()
+			? (guardRange > 0 || hasOffset) &&
+				(ThePartitionManager->getDistanceSquared(me, &retailPinned, FROM_CENTER_3D) > CLOSE_ENOUGH_SQR ||
+					outsideGuardRange)
+			: outsideGuardRange && myAI->getCurrentVictim();
+		if (needsGuardOrder)
+		{
+			endRepair();
+			doGuardLogic(&retailPinned);
+		}
+		return UPDATE_SLEEP_NONE;
 	}
+
+	Coord3D pinnedPosition = *master->getPosition();
+	pinnedPosition.x += m_guardPointOffset.x;
+	pinnedPosition.y += m_guardPointOffset.y;
 	m_guardPointOffset.z = TheTerrainLogic->getGroundHeight( pinnedPosition.x, pinnedPosition.y );
 
-	if( data->m_guardMaxRange || (retail && hasOffset))
+	if( data->m_guardMaxRange )
 	{
 		//3RD PRIORITY: Guard the master's area.
 		if( myAI->isIdle() && ThePartitionManager->getDistanceSquared(me, &pinnedPosition, FROM_CENTER_3D) > CLOSE_ENOUGH_SQR )
@@ -428,7 +442,7 @@ UpdateSleepTime SlavedUpdate::update()
 			endRepair();
 			doGuardLogic( &pinnedPosition );
 		}
-		else if( data->m_guardMaxRange && ThePartitionManager->getDistanceSquared( me, master, FROM_CENTER_3D ) > sqr(STRAY_MULTIPLIER * data->m_guardMaxRange ) )
+		else if( ThePartitionManager->getDistanceSquared( me, master, FROM_CENTER_3D ) > sqr(STRAY_MULTIPLIER * data->m_guardMaxRange ) )
 		{
 			//I'm too far away, no matter what I'm doing.
 			endRepair();
@@ -568,11 +582,13 @@ void SlavedUpdate::doGuardLogic( Coord3D *pinnedPosition )
 
 	if( data->m_guardWanderRange )
 	{
-		// recalc where we want to be if we wander around
-		Real randomDirection = GameLogicRandomValue( 0, 2*PI );
+		const Bool retail = RetailFileLayers::enabled();
+		const Real radius = retail ? data->m_guardWanderRange : data->m_guardMaxRange;
+		const Real randomDirection = retail ? GameLogicRandomValueReal(0.0f, 2 * PI) :
+			static_cast<Real>(GameLogicRandomValue(0, 2 * PI));
 		m_guardPointOffset.zero();
-		m_guardPointOffset.x += data->m_guardMaxRange * Cos( randomDirection );
-		m_guardPointOffset.y += data->m_guardMaxRange * Sin( randomDirection );
+		m_guardPointOffset.x += radius * Cos( randomDirection );
+		m_guardPointOffset.y += radius * Sin( randomDirection );
 
 		pinnedPosition->x += m_guardPointOffset.x;
 		pinnedPosition->y += m_guardPointOffset.y;
