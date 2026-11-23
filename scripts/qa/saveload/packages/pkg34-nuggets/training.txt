@@ -1,0 +1,63 @@
+230 create Player_1 Pkg34Attacker 0 1010,125,0
+230 create PlyrCreeps Pkg34Victim 0 1060,125,180
+230 create PlyrCreeps Pkg34Control 0 1010,175,270
+231 stance Player_1 Pkg34Attacker 0 HoldGround
+232 damage Player_1 Pkg34Attacker 0 30
+232 pkg34-probe Player_1 Pkg34Attacker 0 source-before
+232 pkg34-probe PlyrCreeps Pkg34Victim 0 victim-before
+232 pkg34-probe PlyrCreeps Pkg34Control 0 control-before
+233 orderattack Player_1 Pkg34Attacker 0 PlyrCreeps:Pkg34Victim:0
+240 create PlyrCreeps Pkg34ShockFar 0 1010,210,180
+242 pkg34-probe Player_1 Pkg34Attacker 0 source-after
+242 pkg34-probe PlyrCreeps Pkg34Victim 0 victim-after
+243 firetestweapon Player_1 Pkg34Attacker 0 Pkg34ShockStrike,PlyrCreeps:Pkg34Control:0
+244 pkg34-probe PlyrCreeps Pkg34Control 0 shock-center
+244 pkg34-probe PlyrCreeps Pkg34ShockFar 0 shock-early
+246 pkg34-probe PlyrCreeps Pkg34Victim 0 victim-resumed
+251 stance Player_1 Pkg34Attacker 0 Battle
+252 firetestweapon Player_1 Pkg34Attacker 0 Pkg34FilteredStrike,PlyrCreeps:Pkg34Control:0
+253 pkg34-probe PlyrCreeps Pkg34Control 0 control-after
+270 pkg34-probe PlyrCreeps Pkg34Control 0 shock-near-arrived
+276 pkg34-probe PlyrCreeps Pkg34ShockFar 0 shock-far-waiting
+286 pkg34-probe PlyrCreeps Pkg34ShockFar 0 shock-far-arrived
+311 pkg34-probe PlyrCreeps Pkg34Victim 0 victim-expired
+350 destroy PlyrCreeps Pkg34Victim 0
+350 destroy PlyrCreeps Pkg34Control 0
+350 destroy PlyrCreeps Pkg34ShockFar 0
+351 create PlyrCreeps Pkg34Gate 0 1060,125,0
+352 pkg34-probe PlyrCreeps Pkg34Gate 0 gate-before
+353 firetestweapon Player_1 Pkg34Attacker 0 CreateAHeroSapper_Level1,PlyrCreeps:Pkg34Gate:0
+354 pkg34-probe PlyrCreeps Pkg34Gate 0 gate-after
+355 pkg34-probe Player_1 Pkg34Attacker 0 money-source-before
+355 pkg34-probe PlyrCreeps Pkg34Gate 0 money-victim-before
+356 firetestweapon Player_1 Pkg34Attacker 0 Pkg34StealStrike,PlyrCreeps:Pkg34Gate:0
+357 pkg34-probe Player_1 Pkg34Attacker 0 money-source-after
+357 pkg34-probe PlyrCreeps Pkg34Gate 0 money-victim-after
+380 destroy PlyrCreeps Pkg34Gate 0
+380 destroy Player_1 Pkg34Attacker 0
+390 create Player_1 Pkg34Attacker 0 1010,125,0
+390 create PlyrCreeps Pkg34FearVictim 0 1060,125,180
+390 create Player_1 Pkg34FearVictim 0 1060,175,180
+391 firetestweapon Player_1 Pkg34Attacker 0 Pkg34LuaStrike,PlyrCreeps:Pkg34FearVictim:0
+392 pkg34-probe PlyrCreeps Pkg34FearVictim 0 lua-victim
+392 pkg34-probe Player_1 Pkg34FearVictim 0 lua-ally
+395 firetestweapon Player_1 Pkg34Attacker 0 Pkg34TerrorStrike,Player_1:Pkg34FearVictim:0
+396 pkg34-probe Player_1 Pkg34FearVictim 0 terror-same-side
+398 destroy PlyrCreeps Pkg34FearVictim 0
+398 destroy Player_1 Pkg34FearVictim 0
+400 create PlyrCreeps Pkg34FearVictim 0 1060,125,180
+401 firetestweapon Player_1 Pkg34Attacker 0 Pkg34TerrorStrike,PlyrCreeps:Pkg34FearVictim:0
+402 pkg34-probe PlyrCreeps Pkg34FearVictim 0 terror-victim
+470 pkg34-probe PlyrCreeps Pkg34FearVictim 0 terror-expired
+471 destroy PlyrCreeps Pkg34FearVictim 0
+471 destroy Player_1 Pkg34Attacker 0
+473 create Player_1 GondorGwaihirHero_Summoned 0 1010,125,0
+473 create PlyrCreeps Pkg34GrabVictim 0 1030,125,180
+473 create PlyrCreeps Pkg34GrabControl 0 1010,145,270
+474 firetestweapon Player_1 GondorGwaihirHero_Summoned 0 EagleGrabAttack,PlyrCreeps:Pkg34GrabControl:0
+475 pkg34-probe PlyrCreeps Pkg34GrabControl 0 grab-control
+476 firetestweapon Player_1 GondorGwaihirHero_Summoned 0 EagleGrabAttack,PlyrCreeps:Pkg34GrabVictim:0
+477 pkg34-probe PlyrCreeps Pkg34GrabVictim 0 grab-victim
+478 destroy Player_1 GondorGwaihirHero_Summoned 0
+478 destroy PlyrCreeps Pkg34GrabVictim 0
+478 destroy PlyrCreeps Pkg34GrabControl 0

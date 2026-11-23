@@ -48,6 +48,8 @@ const char* const DisabledMaskType::s_bitNameList[] =
 
 	"DISABLED_SCRIPT_DISABLED",
 	"DISABLED_SCRIPT_UNDERPOWERED",
+	"DISABLED_USER_PARALYZED",
+	"DISABLED_USER_FROZEN",
 
 	nullptr
 };

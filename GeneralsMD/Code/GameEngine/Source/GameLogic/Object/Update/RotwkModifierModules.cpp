@@ -702,6 +702,11 @@ void EmotionTrackerUpdate::clearEmotionNuggets()
 	emotionNuggets.clear();
 }
 
+void EmotionTrackerUpdate::parseEmotionType(INI* ini, void* instance, void* store, const void*)
+{
+	INI::parseIndexList(ini, instance, store, emotionTypes);
+}
+
 void EmotionTrackerUpdate::parseEmotionNugget(INI* ini)
 {
 	static const FieldParse fields[] = {
@@ -956,6 +961,21 @@ void EmotionTrackerUpdate::force(Object* victim, Int type, Real seconds)
 	}
 }
 
+Bool EmotionTrackerUpdate::signalWeaponEmotion(Object* victim, EmotionType type, const Object* source, UnsignedInt duration)
+{
+	for (; victim && !victim->isEffectivelyDead() && !victim->isDestroyed(); victim = victim->getContainedBy())
+	{
+		auto* tracker = static_cast<EmotionTrackerUpdate*>(victim->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
+		if (!tracker)
+			continue;
+		if (!tracker->startEmotion(type, source, -1.0f, 0, duration))
+			return FALSE;
+		tracker->setWakeFrame(victim, UPDATE_SLEEP_NONE);
+		return TRUE;
+	}
+	return FALSE;
+}
+
 Bool EmotionTrackerUpdate::blocksPlayerCommands(const Object* object)
 {
 	const auto* tracker = static_cast<const EmotionTrackerUpdate*>(object->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
@@ -993,12 +1013,12 @@ static Int emotionPriority(Int type)
 	}
 }
 
-Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, Real enemyThreat, UnsignedInt forcedDuration)
+Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, Real enemyThreat, UnsignedInt forcedDuration, UnsignedInt weaponDuration)
 {
 	Object* self = getObject();
 	const auto* data = getEmotionTrackerUpdateModuleData();
 	const UnsignedInt now = TheGameLogic->getFrame();
-	if (m_activeEntry >= 0 && now < m_endFrame)
+	if (!weaponDuration && m_activeEntry >= 0 && now < m_endFrame)
 	{
 		const auto& active = data->m_emotions[m_activeEntry];
 		const auto* current = findEmotionNugget(active.m_name);
@@ -1008,7 +1028,7 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 		if (emotionPriority(type) <= emotionPriority(activeType))
 			return FALSE;
 	}
-	else if (!forcedDuration && now < m_recheckFrame && emotionPriority(type) < 2)
+	else if (!forcedDuration && !weaponDuration && now < m_recheckFrame && emotionPriority(type) < 2)
 		return FALSE;
 
 	Object* anchor = HordeContain::getAnchor(self);
@@ -1043,7 +1063,9 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 
 		const UnsignedInt aiLock = entry.m_aiLock >= 0 ? static_cast<UnsignedInt>(entry.m_aiLock) : nugget->m_aiLock;
 		UnsignedInt duration = entry.m_duration >= 0 ? static_cast<UnsignedInt>(entry.m_duration) : nugget->m_duration;
-		if (!duration)
+		if (weaponDuration)
+			duration = weaponDuration;
+		else if (!duration)
 			duration = std::max(aiLock, interval);
 		if (forcedDuration)
 			duration = forcedDuration;
@@ -1051,7 +1073,7 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 		{
 			const Int resistance = type == EMOTION_TERROR ? AttributeModifierRules::RESIST_TERROR : AttributeModifierRules::RESIST_FEAR;
 			const Real scale = 1.0f - std::clamp(AttributeModifiers::value(subject, resistance), -1.0f, 1.0f);
-			const UnsignedInt movementDuration = aiLock ? aiLock : duration;
+			const UnsignedInt movementDuration = aiLock && !weaponDuration ? aiLock : duration;
 			duration = static_cast<UnsignedInt>(duration * scale);
 			if (!duration)
 				continue;

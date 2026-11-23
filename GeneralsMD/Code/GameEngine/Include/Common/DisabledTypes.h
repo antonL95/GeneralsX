@@ -55,6 +55,8 @@ enum DisabledType CPP_11(: Int)
 	DISABLED_SCRIPT_DISABLED,
 	DISABLED_SCRIPT_UNDERPOWERED,
 
+	DISABLED_USER_PARALYZED,
+	DISABLED_USER_FROZEN,
 	DISABLED_COUNT,
 
 	DISABLED_ANY = 65535		///< Do not use this value for setting disabled types (read-only)

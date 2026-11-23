@@ -6,14 +6,17 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <set>
 
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "GameClient/FXList.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -27,11 +30,14 @@
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/ObjectCreationUpgrade.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/RetailGate.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/Module/SpawnBehavior.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/WeaponNuggetRules.h"
@@ -270,6 +276,54 @@ const FieldParse s_fireFields[] =
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
+const FieldParse s_emotionFields[] =
+{
+	{ "EmotionType", EmotionTrackerUpdate::parseEmotionType, nullptr, offsetof(WeaponNugget, m_emotionType) },
+	{ "Radius", INI::parseReal, nullptr, offsetof(WeaponNugget, m_radius) },
+	{ "Duration", INI::parseUnsignedInt, nullptr, offsetof(WeaponNugget, m_emotionSeconds) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
+const FieldParse s_luaEventFields[] =
+{
+	{ "LuaEvent", INI::parseAsciiString, nullptr, offsetof(WeaponNugget, m_luaEvent) },
+	{ "Radius", INI::parseReal, nullptr, offsetof(WeaponNugget, m_radius) },
+	{ "SendToEnemies", INI::parseBool, nullptr, offsetof(WeaponNugget, m_sendToEnemies) },
+	{ "SendToAllies", INI::parseBool, nullptr, offsetof(WeaponNugget, m_sendToAllies) },
+	{ "SendToNeutral", INI::parseBool, nullptr, offsetof(WeaponNugget, m_sendToNeutral) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
+const FieldParse s_openGateFields[] =
+{
+	{ "Radius", INI::parseReal, nullptr, offsetof(WeaponNugget, m_radius) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
+const FieldParse s_paralyzeFields[] =
+{
+	{ "Radius", INI::parseReal, nullptr, offsetof(WeaponNugget, m_radius) },
+	{ "Duration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponNugget, m_effectDuration) },
+	{ "DamageArc", INI::parseAngleReal, nullptr, offsetof(WeaponNugget, m_paralyzeArc) },
+	{ "ParalyzeFX", INI::parseFXList, nullptr, offsetof(WeaponNugget, m_paralyzeFX) },
+	{ "FreezeAnimation", INI::parseBool, nullptr, offsetof(WeaponNugget, m_freezeAnimation) },
+	{ "AffectHordeMembers", INI::parseBool, nullptr, offsetof(WeaponNugget, m_affectHordeMembers) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
+const FieldParse s_modelConditionFields[] =
+{
+	{ "ModelConditionNames", ModelConditionFlags::parseFromINI, nullptr, offsetof(WeaponNugget, m_effectConditions) },
+	{ "ModelConditionDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(WeaponNugget, m_effectDuration) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
+const FieldParse s_stealMoneyFields[] =
+{
+	{ "AmountStolenPerAttack", INI::parseReal, nullptr, offsetof(WeaponNugget, m_amountStolen) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
 void parseNugget(INI* ini, void* store, WeaponNuggetType type, const FieldParse* fields, const FieldParse* extraFields = nullptr)
 {
 	WeaponNugget nugget(type);
@@ -299,6 +353,12 @@ const char* nuggetTypeName(WeaponNuggetType type)
 		case WEAPON_NUGGET_GRAB: return "GrabNugget";
 		case WEAPON_NUGGET_FIRE_LOGIC: return "FireLogicNugget";
 		case WEAPON_NUGGET_SPAWN_AND_FADE: return "SpawnAndFadeNugget";
+		case WEAPON_NUGGET_EMOTION_WEAPON: return "EmotionWeaponNugget";
+		case WEAPON_NUGGET_LUA_EVENT: return "LuaEventNugget";
+		case WEAPON_NUGGET_OPEN_GATE: return "OpenGateNugget";
+		case WEAPON_NUGGET_PARALYZE: return "ParalyzeNugget";
+		case WEAPON_NUGGET_SPECIAL_MODEL_CONDITION: return "SpecialModelConditionNugget";
+		case WEAPON_NUGGET_STEAL_MONEY: return "StealMoneyNugget";
 	}
 	return "Nugget";
 }
@@ -375,6 +435,52 @@ void WeaponNugget::parseFireLogicNugget(INI* ini, void*, void* store, const void
 void WeaponNugget::parseSpawnAndFadeNugget(INI* ini, void*, void* store, const void*)
 {
 	parseNugget(ini, store, WEAPON_NUGGET_SPAWN_AND_FADE, s_spawnAndFadeFields);
+}
+
+void WeaponNugget::parseEmotionWeaponNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_EMOTION_WEAPON, s_emotionFields);
+}
+
+void WeaponNugget::parseLuaEventNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_LUA_EVENT, s_luaEventFields);
+}
+
+void WeaponNugget::parseOpenGateNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_OPEN_GATE, s_openGateFields);
+}
+
+void WeaponNugget::parseParalyzeNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_PARALYZE, s_paralyzeFields);
+}
+
+void WeaponNugget::parseSpecialModelConditionNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_SPECIAL_MODEL_CONDITION, s_modelConditionFields);
+}
+
+void WeaponNugget::parseStealMoneyNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_STEAL_MONEY, s_stealMoneyFields);
+}
+
+Bool WeaponNugget::isUtilityNugget() const
+{
+	switch (m_type)
+	{
+		case WEAPON_NUGGET_EMOTION_WEAPON:
+		case WEAPON_NUGGET_LUA_EVENT:
+		case WEAPON_NUGGET_OPEN_GATE:
+		case WEAPON_NUGGET_PARALYZE:
+		case WEAPON_NUGGET_SPECIAL_MODEL_CONDITION:
+		case WEAPON_NUGGET_STEAL_MONEY:
+			return TRUE;
+		default:
+			return FALSE;
+	}
 }
 
 void WeaponNugget::postProcessLoad()
@@ -700,6 +806,115 @@ void WeaponTemplate::applyModifierNugget(const WeaponNugget& nugget, const Objec
 	}
 }
 
+void WeaponTemplate::applyUtilityNugget(const WeaponNugget& nugget, const Object* source, Object* primary,
+	const Coord3D* pos) const
+{
+	if (!source || !pos)
+		return;
+
+	const auto kind = nugget.m_type;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const Coord3D origin = *source->getPosition();
+	const Coord3D facing = *source->getUnitDirectionVector2D();
+	std::set<ObjectID> paralyzed;
+	const auto paralyze = [&](const auto& visit, Object* victim) -> void
+	{
+		if (!victim || victim->isEffectivelyDead() || victim->isDestroyed() ||
+			victim->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE) ||
+			!paralyzed.insert(victim->getID()).second)
+			return;
+
+		if (nugget.m_affectHordeMembers)
+			if (const auto* horde = HordeContain::get(victim))
+				if (const auto* members = horde->getContainedItemsList())
+					for (Object* member : *members)
+						visit(visit, member);
+
+		const Coord3D& target = *victim->getPosition();
+		if (nugget.m_paralyzeArc < PI &&
+			!WeaponNuggetRules::withinArc(facing.x, facing.y, target.x - origin.x, target.y - origin.y,
+				WWMath::CosTrig(nugget.m_paralyzeArc), FALSE, FALSE))
+			return;
+
+		const DisabledType disabled = nugget.m_freezeAnimation ? DISABLED_USER_FROZEN : DISABLED_USER_PARALYZED;
+		if (nugget.m_effectDuration)
+			victim->setDisabledUntil(disabled, now + nugget.m_effectDuration);
+		if (nugget.m_paralyzeFX)
+			FXList::doFXObj(nugget.m_paralyzeFX, victim);
+	};
+
+	const auto affect = [&](Object* victim)
+	{
+		if (victim->isEffectivelyDead() || victim->isDestroyed() || !nugget.affects(source, victim))
+			return;
+		if (kind != WEAPON_NUGGET_LUA_EVENT &&
+			judgeRadiusDamageVictim(source, victim, primary, m_affectsMask) != RADIUS_DAMAGE_AFFECT)
+			return;
+
+		switch (kind)
+		{
+			case WEAPON_NUGGET_EMOTION_WEAPON:
+				if (nugget.m_emotionType >= 0 && nugget.m_emotionSeconds)
+					EmotionTrackerUpdate::signalWeaponEmotion(victim, static_cast<EmotionType>(nugget.m_emotionType),
+						source, nugget.m_emotionSeconds * LOGICFRAMES_PER_SECOND);
+				break;
+			case WEAPON_NUGGET_LUA_EVENT:
+			{
+				const Relationship relation = victim->getRelationship(source);
+				if ((relation == ENEMIES && nugget.m_sendToEnemies) ||
+					(relation == ALLIES && nugget.m_sendToAllies) ||
+					(relation == NEUTRAL && nugget.m_sendToNeutral))
+					RetailBuildingEvents::weaponEvent(*victim, nugget.m_luaEvent.str(), source);
+				break;
+			}
+			case WEAPON_NUGGET_OPEN_GATE:
+				if (auto* gate = GateOpenAndCloseBehavior::resolveForControl(victim))
+					gate->request(TRUE);
+				break;
+			case WEAPON_NUGGET_PARALYZE:
+				paralyze(paralyze, victim);
+				break;
+			case WEAPON_NUGGET_SPECIAL_MODEL_CONDITION:
+				for (Int condition = MODELCONDITION_FIRST; condition < MODELCONDITION_COUNT; ++condition)
+					if (nugget.m_effectConditions.test(condition))
+						victim->setTimedModelCondition(static_cast<ModelConditionFlagType>(condition), nugget.m_effectDuration);
+				break;
+			case WEAPON_NUGGET_STEAL_MONEY:
+			{
+				auto* from = victim->getControllingPlayer();
+				auto* to = source->getControllingPlayer();
+				if (!from || !to || from == to || !(nugget.m_amountStolen > 0.0f))
+					break;
+				const UnsignedInt balance = from->getMoney()->countMoney();
+				const UnsignedInt amount = nugget.m_amountStolen >= static_cast<double>(balance) ?
+					balance : static_cast<UnsignedInt>(nugget.m_amountStolen);
+				to->getMoney()->deposit(from->getMoney()->withdraw(amount));
+				break;
+			}
+			default:
+				break;
+		}
+	};
+
+	if (primary && kind != WEAPON_NUGGET_LUA_EVENT)
+		affect(primary);
+	if (kind == WEAPON_NUGGET_STEAL_MONEY || kind == WEAPON_NUGGET_SPECIAL_MODEL_CONDITION)
+		return;
+	if (primary && nugget.m_radius <= 0.0f)
+	{
+		if (kind == WEAPON_NUGGET_LUA_EVENT)
+			affect(primary);
+		return;
+	}
+	const Real radius = kind == WEAPON_NUGGET_LUA_EVENT ? nugget.m_radius : std::max(1.0f, nugget.m_radius);
+	const DistanceCalculationType distance = kind == WEAPON_NUGGET_LUA_EVENT ? FROM_CENTER_3D : FROM_BOUNDINGSPHERE_3D;
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(pos, radius, distance);
+	MemoryPoolObjectHolder holder(iter);
+	for (Object* victim = iter->first(); victim; victim = iter->next())
+		if (victim != primary || kind == WEAPON_NUGGET_LUA_EVENT)
+			affect(victim);
+}
+
 const Object* WeaponTemplate::getNuggetAttacker(const Object* source)
 {
 	const ObjectID launcherID = launcherOf(source);
@@ -799,8 +1014,23 @@ void WeaponTemplate::applyMetaImpactNugget(Int nuggetIndex, const Object* source
 			direction.x = -direction.x;
 			direction.y = -direction.y;
 		}
-		if (impactFrame)
-			TheWeaponStore->setDelayedMetaImpact(this, nuggetIndex, impactFrame, victim->getID(), direction, amount, trigger);
+		UnsignedInt arrivalFrame = impactFrame;
+		const Real height = targetPos.z - origin.z;
+		if (TheWeaponStore && nugget.m_shockWaveSpeed > 0.0f && (distance > 0.0f || height != 0.0f))
+		{
+			const Real pathLength = WWMath::SqrtfOrigin(distance * distance + height * height);
+			const UnsignedInt tick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+			const Real travelTicks = WWMath::Ceil(pathLength / (nugget.m_shockWaveSpeed * tick));
+			if (travelTicks > 0.0f)
+			{
+				const UnsignedInt baseFrame = impactFrame ? impactFrame : TheGameLogic->getFrame();
+				if (baseFrame >= FOREVER || travelTicks >= static_cast<Real>((FOREVER - baseFrame) / tick))
+					return;
+				arrivalFrame = baseFrame + static_cast<UnsignedInt>(travelTicks) * tick;
+			}
+		}
+		if (arrivalFrame)
+			TheWeaponStore->setDelayedMetaImpact(this, nuggetIndex, arrivalFrame, victim->getID(), direction, amount, trigger);
 		else
 			physics->launchFromWeaponImpact(direction, amount, nugget.m_shockWaveZMult, trigger);
 	};
@@ -835,6 +1065,11 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		return;
 	}
 	Object* primaryVictim = victimID ? TheGameLogic->findObjectByID(victimID) : nullptr;
+	if (nugget.isUtilityNugget())
+	{
+		applyUtilityNugget(nugget, source, primaryVictim, primaryVictim ? primaryVictim->getPosition() : pos);
+		return;
+	}
 	if (primaryVictim)
 	{
 		if (const HordeContain* enemy = HordeContain::get(primaryVictim))
@@ -970,6 +1205,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 
 		DamageInfo damageInfo;
 		damageInfo.in.m_damageType = nugget.m_damageType;
+		damageInfo.in.m_damageFXOverride = nugget.m_damageFXType;
 		damageInfo.in.m_deathType = nugget.m_deathType;
 		damageInfo.in.m_sourceID = sourceID;
 		damageInfo.in.m_sourcePlayerMask = source && source->getControllingPlayer() ? source->getControllingPlayer()->getPlayerMask() : 0;
@@ -986,6 +1222,12 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 			damageInfo.impactVelocity = *source->getPhysics()->getVelocity();
 		const Real healthBefore = victim->getBodyModule() ? victim->getBodyModule()->getHealth() : 0.0f;
 		HordeContain::applyWeaponDamage(victim, damageInfo, contactHit);
+		if (nugget.m_drainLife && source && !source->isEffectivelyDead() && !source->isKindOf(KINDOF_PROJECTILE))
+		{
+			const Real healing = damageInfo.out.m_actualDamageDealt * nugget.m_drainLifeMultiplier;
+			if (healing > 0.0f)
+				source->attemptHealing(healing, nullptr, TRUE);
+		}
 
 		if (RetailTestCommands::tracesCombat())
 			std::fprintf(stderr, "TEST damage frame=%u weapon=%s nugget=%d kind=%s type=%s death=%s source=%u victim=%u(%s) base=%.2f scalar=%.3f amount=%.2f dealt=%.2f health=%.2f->%.2f\n",

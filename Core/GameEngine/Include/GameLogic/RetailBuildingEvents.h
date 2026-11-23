@@ -18,4 +18,7 @@ void aflame(Object& object);
 #endif
 void reallyDamaged(Object& object);
 int enrageAction(const Object& object, const char* event);
+#if !RTS_GENERALS
+void weaponEvent(Object& recipient, const char* event, const Object* source);
+#endif
 }

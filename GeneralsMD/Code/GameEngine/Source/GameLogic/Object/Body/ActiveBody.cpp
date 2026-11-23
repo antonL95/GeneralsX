@@ -1071,7 +1071,8 @@ void ActiveBody::attemptHealing( DamageInfo *damageInfo )
 	damageInfo->out.m_actualDamageDealt = 0.0f;
 	damageInfo->out.m_actualDamageClipped = 0.0f;
 
-	Real amount = m_curArmor.adjustDamage(damageInfo->in.m_damageType, damageInfo->in.m_amount);
+	Real amount = damageInfo->ignoreArmorForHealing ? damageInfo->in.m_amount :
+		m_curArmor.adjustDamage(damageInfo->in.m_damageType, damageInfo->in.m_amount);
 
 	// sanity check the damage value -- can't apply negative healing
 	if( amount > 0.0f )

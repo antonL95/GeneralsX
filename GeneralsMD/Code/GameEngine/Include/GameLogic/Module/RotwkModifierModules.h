@@ -169,10 +169,12 @@ class EmotionTrackerUpdate final : public UpdateModule
 public:
 	EmotionTrackerUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
 	static void parseEmotionNugget(INI* ini);
+	static void parseEmotionType(INI* ini, void* instance, void* store, const void* userData);
 	static void clearEmotionNuggets();
 	static Bool signal(Object* victim, EmotionType type, const Object* source);
 	static void queuePromotionEmotion(Object* object, const AsciiString& name);
 	static void force(Object* victim, Int type, Real seconds);
+	static Bool signalWeaponEmotion(Object* victim, EmotionType type, const Object* source, UnsignedInt duration);
 	static Bool ownsCrushBraceCondition(const Object* object);
 	static Bool blocksPlayerCommands(const Object* object);
 	UpdateSleepTime update() override;
@@ -182,7 +184,7 @@ public:
 	void clearPromotionEmotions() { m_promotionEmotions = 0; }
 
 private:
-	Bool startEmotion(EmotionType type, const Object* source, Real enemyThreat, UnsignedInt forcedDuration = 0);
+	Bool startEmotion(EmotionType type, const Object* source, Real enemyThreat, UnsignedInt forcedDuration = 0, UnsignedInt weaponDuration = 0);
 	void finishEmotion();
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 

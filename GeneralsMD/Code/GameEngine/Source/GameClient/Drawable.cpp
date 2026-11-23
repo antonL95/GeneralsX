@@ -651,6 +651,9 @@ Bool Drawable::getShouldAnimate( Bool considerPower ) const
 		if (considerPower && obj->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED))
 			return FALSE;
 
+		if (obj->isDisabledByType(DISABLED_USER_FROZEN))
+			return FALSE;
+
 		if (obj->isDisabled())
 		{
 			if(

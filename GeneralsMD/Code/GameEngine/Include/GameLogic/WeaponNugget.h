@@ -3,12 +3,14 @@
 #include <vector>
 
 #include "Common/AsciiString.h"
+#include "Common/ModelState.h"
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/RetailTerrainFire.h"
 #include "GameLogic/WeaponSetType.h"
 
 class INI;
+class FXList;
 class Object;
 class ObjectCreationList;
 class ThingTemplate;
@@ -29,6 +31,12 @@ enum WeaponNuggetType CPP_11(: Int)
 	WEAPON_NUGGET_GRAB,
 	WEAPON_NUGGET_FIRE_LOGIC,
 	WEAPON_NUGGET_SPAWN_AND_FADE,
+	WEAPON_NUGGET_EMOTION_WEAPON,
+	WEAPON_NUGGET_LUA_EVENT,
+	WEAPON_NUGGET_OPEN_GATE,
+	WEAPON_NUGGET_PARALYZE,
+	WEAPON_NUGGET_SPECIAL_MODEL_CONDITION,
+	WEAPON_NUGGET_STEAL_MONEY,
 };
 
 struct WeaponNuggetScalar
@@ -44,7 +52,8 @@ struct WeaponNugget
 	Bool isEnabledFor(const Object* attacker) const;
 	Bool affects(const Object* attacker, const Object* victim) const;
 	Real scalarFor(const Object* attacker, const Object* victim) const;
-	Bool isImpactNugget() const { return dealsDamage() || m_type == WEAPON_NUGGET_OCL || m_type == WEAPON_NUGGET_META_IMPACT || m_type == WEAPON_NUGGET_DAMAGE_FIELD || m_type == WEAPON_NUGGET_GRAB || m_type == WEAPON_NUGGET_FIRE_LOGIC || m_type == WEAPON_NUGGET_SPAWN_AND_FADE; }
+	Bool isUtilityNugget() const;
+	Bool isImpactNugget() const { return dealsDamage() || isUtilityNugget() || m_type == WEAPON_NUGGET_OCL || m_type == WEAPON_NUGGET_META_IMPACT || m_type == WEAPON_NUGGET_DAMAGE_FIELD || m_type == WEAPON_NUGGET_GRAB || m_type == WEAPON_NUGGET_FIRE_LOGIC || m_type == WEAPON_NUGGET_SPAWN_AND_FADE; }
 	Bool dealsDamage() const { return m_type == WEAPON_NUGGET_DAMAGE || m_type == WEAPON_NUGGET_DOT; }
 	void postProcessLoad();
 
@@ -60,6 +69,12 @@ struct WeaponNugget
 	static void parseGrabNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseFireLogicNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseSpawnAndFadeNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseEmotionWeaponNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseLuaEventNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseOpenGateNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseParalyzeNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseSpecialModelConditionNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseStealMoneyNugget(INI* ini, void* instance, void* store, const void* userData);
 
 	WeaponNuggetType m_type;
 	std::vector<AsciiString> m_requiredUpgradeNames;
@@ -73,7 +88,7 @@ struct WeaponNugget
 	Real m_radius = 0.0f;
 	UnsignedInt m_delayFrames = 0;
 	DamageType m_damageType = DAMAGE_EXPLOSION;
-	DamageType m_damageFXType = DAMAGE_EXPLOSION;
+	DamageType m_damageFXType = DAMAGE_UNRESISTABLE;
 	DeathType m_deathType = DEATH_NORMAL;
 	AsciiString m_damageSubType;
 	Real m_damageArc = 0.0f;
@@ -89,7 +104,7 @@ struct WeaponNugget
 	Real m_minRadius = 0.0f;
 	Bool m_cylinderAOE = FALSE;
 	Bool m_drainLife = FALSE;
-	Real m_drainLifeMultiplier = 0.0f;
+	Real m_drainLifeMultiplier = 1.0f;
 	SpecialPowerObjectFilter m_forceKillObjectFilter;
 	Bool m_hasForceKillObjectFilter = FALSE;
 	UnsignedInt m_damageIntervalFrames = 0;
@@ -139,6 +154,18 @@ struct WeaponNugget
 	Bool m_affectHordeMembers = FALSE;
 	WeaponSlotType m_lockWeaponSlot = PRIMARY_WEAPON;
 	RetailTerrainFire::Edit m_fireEdit;
+	Int m_emotionType = -1;
+	UnsignedInt m_effectDuration = 0;
+	UnsignedInt m_emotionSeconds = 0;
+	AsciiString m_luaEvent;
+	Bool m_sendToEnemies = FALSE;
+	Bool m_sendToAllies = FALSE;
+	Bool m_sendToNeutral = FALSE;
+	const FXList* m_paralyzeFX = nullptr;
+	Bool m_freezeAnimation = FALSE;
+	Real m_paralyzeArc = PI;
+	ModelConditionFlags m_effectConditions;
+	Real m_amountStolen = 0.0f;
 };
 
 Bool objectFilterMatches(const SpecialPowerObjectFilter& filter, const Object* source, const Object* target);

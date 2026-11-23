@@ -551,6 +551,7 @@ protected:
 	void applyModifierNugget(const WeaponNugget& nugget, const Object* attacker, ObjectID victimID, const Coord3D* pos) const;
 	void orderNuggetSlaves(const Object* source, Object* victim, const Coord3D* position) const;
 	void orderNuggetHorde(const Object* source, Object* victim, const Coord3D* position) const;
+	void applyUtilityNugget(const WeaponNugget& nugget, const Object* source, Object* primary, const Coord3D* pos) const;
 	void dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
 		Bool dotTick, Bool contactHit, const Coord3D* impactVelocity = nullptr,
 		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE, const WeaponTemplate* launchWeapon = nullptr) const;

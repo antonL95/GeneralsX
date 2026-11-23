@@ -2429,7 +2429,7 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 }
 
 //-------------------------------------------------------------------------------------------------
-void Object::attemptHealing(Real amount, const Object* source)
+void Object::attemptHealing(Real amount, const Object* source, Bool ignoreArmor)
 {
 	BodyModuleInterface* body = getBodyModule();
 	if (body)
@@ -2439,6 +2439,7 @@ void Object::attemptHealing(Real amount, const Object* source)
 		damageInfo.in.m_deathType = DEATH_NONE;
 		damageInfo.in.m_sourceID = source ? source->getID() : INVALID_ID;
 		damageInfo.in.m_amount = amount;
+		damageInfo.ignoreArmorForHealing = ignoreArmor;
 		body->attemptHealing( &damageInfo );
 	}
 }
@@ -5000,7 +5001,9 @@ void Object::xfer( Xfer *xfer )
 		static_assert(DISABLED_SUBDUED             == 10, "Unexpected enum value");
 		static_assert(DISABLED_SCRIPT_DISABLED     == 11, "Unexpected enum value");
 		static_assert(DISABLED_SCRIPT_UNDERPOWERED == 12, "Unexpected enum value");
-		static_assert(DISABLED_COUNT               == 13, "Unexpected enum value");
+		static_assert(DISABLED_USER_PARALYZED      == 13, "Unexpected enum value");
+		static_assert(DISABLED_USER_FROZEN         == 14, "Unexpected enum value");
+		static_assert(DISABLED_COUNT               == 15, "Unexpected enum value");
 
 		xfer->xferUnsignedInt(&m_disabledTillFrame[DISABLED_DEFAULT]);
 		xfer->xferUnsignedInt(&m_disabledTillFrame[DISABLED_HACKED]);
@@ -5345,7 +5348,8 @@ void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 	static const NameKeyType emotionKey = NAMEKEY("EmotionTrackerUpdate");
 	auto* emotion = static_cast<EmotionTrackerUpdate*>(findUpdateModule(emotionKey));
 	if (!loading && m_domination.deadline == 0 && m_timedModelConditions.empty() &&
-		(!emotion || !emotion->hasPromotionEmotions()))
+		(!emotion || !emotion->hasPromotionEmotions()) &&
+		m_disabledTillFrame[DISABLED_USER_PARALYZED] == NEVER && m_disabledTillFrame[DISABLED_USER_FROZEN] == NEVER)
 	{
 		RetailSaveBlocks::transferSection<Xfer>(xfer, FALSE, present, {});
 		return;
@@ -5377,6 +5381,13 @@ void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 		}, [emotion] {
 			if (emotion)
 				emotion->clearPromotionEmotions();
+		}},
+		{"weapon-paralysis", [this](Xfer* x) {
+			x->xferUnsignedInt(&m_disabledTillFrame[DISABLED_USER_PARALYZED]);
+			x->xferUnsignedInt(&m_disabledTillFrame[DISABLED_USER_FROZEN]);
+		}, [this] {
+			m_disabledTillFrame[DISABLED_USER_PARALYZED] = NEVER;
+			m_disabledTillFrame[DISABLED_USER_FROZEN] = NEVER;
 		}},
 	});
 }

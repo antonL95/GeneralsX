@@ -22,6 +22,11 @@
 #include "Common/FileSystem.h"
 #include "Common/GameState.h"
 #include "Common/Player.h"
+#if !RTS_GENERALS
+#include "Common/AudioEventRTS.h"
+#include "Common/GameAudio.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
+#endif
 #include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
@@ -72,6 +77,7 @@ struct EventList
 	std::string parent;
 	std::map<std::string, std::string> handlers;
 	std::map<std::string, std::string> stateHandlers;
+	std::map<std::string, std::string> scriptedHandlers;
 };
 
 std::string readData(const char* path)
@@ -183,6 +189,8 @@ std::map<std::string, EventList> readEventLists(std::string xml, std::vector<Mod
 			else if (event == "OnAflame" || event == "OnQuenched" || event == "ReallyDamaged" ||
 				event == "User45IsActive" || event == "User45IsNotActive")
 				entry.stateHandlers[event] = attribute(fields, "ScriptFunctionName");
+			else if (!event.empty())
+				entry.scriptedHandlers[event] = attribute(fields, "ScriptFunctionName");
 		}
 		start = listEnd + 12;
 	}
@@ -636,6 +644,94 @@ void RetailBuildingEvents::aflame(Object& object)
 			ai->enterRetailRampage();
 			return;
 		}
+	}
+}
+
+namespace
+{
+std::map<std::string, std::string> readWeaponCallbacks(std::string script)
+{
+	const std::regex definition(R"(^\s*function\s+(\w+)\s*\(\s*self\s*,\s*other\s*\)\s*$)");
+	const std::regex cower(
+		R"(^\s*if\s+not\s+ObjectTestCanSufferFear\(\s*self\s*\)\s+then\s+return\s+end\s+ObjectEnterUncontrollableCowerState\(\s*self\s*,\s*other\s*\)\s+end\s*$)");
+	const std::regex withSound(
+		R"re(^\s*local\s+(\w+)\s*=\s*ObjectTestModelCondition\(\s*self\s*,\s*"EMOTION_AFRAID"\s*\)\s+(\w+)\(\s*self\s*,\s*other\s*\)\s+if\s*\(\s*not\s+\1\s*\)\s+and\s+ObjectTestModelCondition\(\s*self\s*,\s*"EMOTION_AFRAID"\s*\)\s+then\s+ObjectPlaySound\(\s*self\s*,\s*"(\w+)"\s*\)\s+end\s+end\s*$)re");
+	std::map<std::string, std::string> result;
+	std::map<std::string, std::pair<std::string, std::string>> wrappers;
+	std::string callback;
+	std::string body;
+	const auto finish = [&]
+	{
+		if (callback.empty())
+			return;
+		std::smatch match;
+		if (std::regex_match(body, cower))
+			result[callback] = {};
+		else if (std::regex_match(body, match, withSound))
+			wrappers[callback] = {match[2].str(), match[3].str()};
+	};
+
+	std::istringstream lua(std::move(script));
+	for (std::string line; std::getline(lua, line);)
+	{
+		line.resize(std::min(line.size(), line.find("--")));
+		const auto first = line.find_first_not_of(" \t\r");
+		if (first == std::string::npos)
+			continue;
+		if (line.compare(first, 9, "function ") == 0)
+		{
+			finish();
+			std::smatch match;
+			callback = std::regex_match(line, match, definition) ? match[1].str() : std::string();
+			body.clear();
+		}
+		else if (!callback.empty())
+		{
+			if (body.size() + line.size() > 1024)
+				callback.clear();
+			else
+				body.append(line).append("\n");
+		}
+	}
+	finish();
+
+	for (const auto& [name, wrapper] : wrappers)
+		if (const auto base = result.find(wrapper.first); base != result.end() && base->second.empty())
+			result.emplace(name, wrapper.second);
+	return result;
+}
+}
+
+void RetailBuildingEvents::weaponEvent(Object& recipient, const char* event, const Object* source)
+{
+	auto* ai = recipient.getAIUpdateInterface();
+	if (!ai || !event[0])
+		return;
+
+	static const auto lists = readEventLists(readData("Data\\Scripts\\ScriptEvents.xml"));
+	static const auto callbacks = readWeaponCallbacks(readData("Data\\Scripts\\Scripts.lua"));
+	auto list = lists.find(ai->getRetailLuaEventsList().str());
+	for (std::size_t depth = 0; list != lists.end() && depth < lists.size(); ++depth)
+	{
+		const auto handler = list->second.scriptedHandlers.find(event);
+		if (handler == list->second.scriptedHandlers.end() || handler->second.empty())
+		{
+			list = lists.find(list->second.parent);
+			continue;
+		}
+		const auto callback = callbacks.find(handler->second);
+		if (callback == callbacks.end())
+			return;
+		const auto isAfraid = [&] { return recipient.getLogicModelConditions().test(MODELCONDITION_EMOTION_AFRAID); };
+		const Bool wasAfraid = isAfraid();
+		EmotionTrackerUpdate::signalWeaponEmotion(&recipient, EMOTION_UNCONTROLLABLE_FEAR, source, 0);
+		if (TheAudio && !wasAfraid && isAfraid() && !callback->second.empty())
+		{
+			AudioEventRTS sound(callback->second.c_str());
+			sound.setObjectID(recipient.getID());
+			TheAudio->addAudioEvent(&sound);
+		}
+		return;
 	}
 }
 

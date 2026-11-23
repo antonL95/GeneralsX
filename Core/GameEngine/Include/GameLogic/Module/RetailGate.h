@@ -45,6 +45,14 @@ public:
 	const Object* getGateObject() const { return getObject(); }
 	Bool wantsOpen() const { return m_wantsOpen; }
 	const AsciiString& getProxyName() const { return getGateOpenAndCloseBehaviorModuleData()->m_proxy; }
+	DisabledMaskType getDisabledTypesToProcess() const override
+	{
+#if !RTS_GENERALS
+		return MAKE_DISABLED_MASK2(DISABLED_USER_PARALYZED, DISABLED_USER_FROZEN);
+#else
+		return DISABLEDMASK_NONE;
+#endif
+	}
 	UpdateSleepTime update() override;
 
 private:

@@ -226,7 +226,7 @@ public:
 
 	// health and damage
 	void attemptDamage( DamageInfo *damageInfo );			///< damage object as specified by the info
-	void attemptHealing(Real amount, const Object* source);		///< heal object as specified by the info
+	void attemptHealing(Real amount, const Object* source, Bool ignoreArmor = FALSE);
 	Bool attemptHealingFromSoleBenefactor ( Real amount, const Object* source, UnsignedInt duration );///< for the non-stacking healers like ambulance and propaganda
 	ObjectID getSoleHealingBenefactor() const;
 

@@ -439,6 +439,7 @@ public:
 	AsciiString retailWeaponName;
 	AsciiString retailDamageSubType;
 	Bool shouldPlayUnderAttackEvaEvent = TRUE;
+	Bool ignoreArmorForHealing = FALSE;
 
 protected:
 
