@@ -2014,13 +2014,17 @@ Bool HordeContain::splitHorde()
 	struct SplitGroup
 	{
 		const ThingTemplate* type = nullptr;
-		const ThingTemplate* unitType = nullptr;
-		const HordeLayout* layout = nullptr;
 		std::vector<Object*> members;
 		Object* result = nullptr;
 		HordeContain* contain = nullptr;
 	};
-	const auto matchesUnit = [](const ThingTemplate* member, const ThingTemplate* unit) -> bool
+	struct SplitCohort
+	{
+		const ThingTemplate* type;
+		Int rank;
+		std::vector<Object*> members;
+	};
+	const auto matchesUnit = [](const ThingTemplate* member, const ThingTemplate* unit) -> Bool
 	{
 		if (!unit)
 			return FALSE;
@@ -2033,20 +2037,8 @@ Bool HordeContain::splitHorde()
 		return member->isEquivalentTo(unit) || hasAlias(member, unit->getName()) || hasAlias(unit, member->getName()) ||
 			std::any_of(aliases.begin(), aliases.end(), [&](const AsciiString& alias) { return hasAlias(unit, alias); });
 	};
-	std::vector<SplitGroup> groups(definitions.size());
-	for (std::size_t index = 0; index < definitions.size(); ++index)
-	{
-		auto& group = groups[index];
-		group.type = TheThingFactory->findTemplate(definitions[index].result.c_str(), FALSE);
-		if (!group.type || !group.type->isKindOf(KINDOF_HORDE))
-			return FALSE;
-		group.unitType = TheThingFactory->findTemplate(definitions[index].unitType.c_str(), FALSE);
-		const ModuleInfo& modules = group.type->getBehaviorModuleInfo();
-		for (Int module = 0; module < modules.getCount() && !group.layout; ++module)
-			group.layout = modules.getNthData(module)->getAsHordeLayout();
-	}
 	Object* banner = nullptr;
-	std::vector<Object*> unmatched;
+	std::vector<SplitCohort> cohorts;
 	for (Object* member : getContainList())
 	{
 		if (member->isEffectivelyDead())
@@ -2057,59 +2049,36 @@ Bool HordeContain::splitHorde()
 			continue;
 		}
 		const Int slot = getMemberSlot(member->getID());
-		const Int rank = slot >= 0 ? formation->m_layout.slots()[slot].rank : 0;
+		const Int rank = formation->m_rankSplit && slot >= 0 ? formation->m_layout.slots()[slot].rank : 0;
 		const ThingTemplate* memberType = member->getTemplate();
-		SplitGroup* match = nullptr;
-		Int best = 0;
-		for (std::size_t index = 0; index < definitions.size(); ++index)
+		const auto cohort = std::find_if(cohorts.begin(), cohorts.end(), [&](const SplitCohort& candidate)
 		{
-			const auto& def = definitions[index];
-			if (def.rankNumber > 0 && def.rankNumber != rank)
-				continue;
-			auto& group = groups[index];
-			Int priority = 0;
-			if (memberType->getName().compareNoCase(def.unitType.c_str()) == 0)
-				priority = 3;
-			else if (matchesUnit(memberType, group.unitType))
-				priority = 2;
-			else if (group.layout && std::any_of(group.layout->payloads().begin(), group.layout->payloads().end(),
-				[&](const HordePayload& payload)
-				{ return matchesUnit(memberType, TheThingFactory->findTemplate(payload.name.c_str(), FALSE)); }))
-				priority = 1;
-			if (priority > best)
-			{
-				match = &group;
-				best = priority;
-			}
-		}
-		if (match)
-			match->members.push_back(member);
+			return candidate.rank == rank && matchesUnit(candidate.type, memberType);
+		});
+		if (cohort != cohorts.end())
+			cohort->members.push_back(member);
 		else
-			unmatched.push_back(member);
+			cohorts.push_back({ memberType, rank, { member } });
 	}
-	if (std::none_of(groups.begin(), groups.end(), [](const SplitGroup& group) { return !group.members.empty(); }))
-		return FALSE;
-	if (!unmatched.empty())
+	std::vector<SplitGroup> groups(definitions.size());
+	for (std::size_t index = 0; index < definitions.size(); ++index)
 	{
-		SplitGroup* remaining = nullptr;
-		for (std::size_t index = 0; index < definitions.size(); ++index)
-		{
-			if (!groups[index].members.empty() || definitions[index].rankNumber > 0)
-				continue;
-			if (remaining)
-				return FALSE;
-			remaining = &groups[index];
-		}
-		const ThingTemplate* type = unmatched.front()->getTemplate();
-		if (!remaining || std::any_of(unmatched.begin(), unmatched.end(),
-			[&](const Object* member) { return !matchesUnit(member->getTemplate(), type); }))
+		const auto& def = definitions[index];
+		auto& group = groups[index];
+		group.type = TheThingFactory->findTemplate(def.result.c_str(), FALSE);
+		if (!group.type || !group.type->isKindOf(KINDOF_HORDE))
 			return FALSE;
-		remaining->members = std::move(unmatched);
+		const ThingTemplate* unitType = TheThingFactory->findTemplate(def.unitType.c_str(), FALSE);
+		const Int rank = formation->m_rankSplit ? def.rankNumber : 0;
+		const auto cohort = std::find_if(cohorts.begin(), cohorts.end(), [&](const SplitCohort& candidate)
+		{
+			return !candidate.members.empty() && candidate.rank == rank && matchesUnit(candidate.type, unitType);
+		});
+		if (cohort != cohorts.end())
+			group.members.swap(cohort->members);
 	}
 	for (auto& group : groups)
 	{
-		if (group.members.empty())
-			continue;
 		group.result = TheThingFactory->newObject(group.type, anchor->getTeam());
 		group.contain = const_cast<HordeContain*>(get(group.result));
 		if (!group.contain || group.members.size() > static_cast<std::size_t>(group.contain->getContainMax()))
@@ -2126,10 +2095,25 @@ Bool HordeContain::splitHorde()
 	const AsciiString recoveringBanner = m_replenishmentBanner;
 	const UnsignedInt bannerRespawnFrame = m_bannerRespawnFrame;
 	const UnsignedInt unitSpawnFrame = m_unitSpawnFrame;
+	for (const auto& cohort : cohorts)
+	{
+		for (Object* member : cohort.members)
+		{
+			if (auto* ai = member->getAI())
+				ai->aiIdle(CMD_FROM_SCRIPT);
+			removeFromContain(member);
+			auto* tracker = member->getExperienceTracker();
+			if (tracker->getExperienceSink() == anchor->getID())
+				tracker->setExperienceSink(INVALID_ID);
+		}
+	}
 	for (auto& group : groups)
 	{
-		if (!group.result)
+		if (group.members.empty())
+		{
+			TheGameLogic->destroyObject(group.result);
 			continue;
+		}
 		Coord3D center{};
 		for (const Object* member : group.members)
 		{
