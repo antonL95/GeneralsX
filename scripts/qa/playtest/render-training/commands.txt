@@ -1,2 +1,2 @@
 11 reveal Player_1 MenPorter 0
-40 create Player_1 GondorGandalf 0 2958,807,0
+40 create Player_1 GondorGandalf 0 3085,900,0
