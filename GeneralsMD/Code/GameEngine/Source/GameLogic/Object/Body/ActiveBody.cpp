@@ -450,7 +450,7 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 	if( obj->isEffectivelyDead() )
 		return;
 
-	if (RetailFileLayers::enabled() &&
+	if (RetailFileLayers::enabled() && !damageInfo->in.m_kill &&
 		obj->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE))
 		return;
 
