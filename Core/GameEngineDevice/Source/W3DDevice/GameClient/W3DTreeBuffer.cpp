@@ -81,6 +81,7 @@ enum
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameClient/ClientRandomValue.h"
 #include "GameClient/FXList.h"
 #include "W3DDevice/GameClient/TerrainTex.h"
@@ -2297,6 +2298,9 @@ void W3DTreeBuffer::xfer( Xfer *xfer )
 	Int numTrees = m_numTrees;
 	xfer->xferInt(&numTrees);
 	const Bool retail = RetailFileLayers::enabled();
+	const Bool restoreLegacyCover = retail && xfer->getXferMode() == XFER_LOAD &&
+		TheTerrainLogic && TheTerrainLogic->hasLegacyMapTreesToRestore();
+	std::vector<Coord3D> deletedTrees;
 	if (xfer->getXferMode() == XFER_LOAD)	{
 		m_numTrees = 0;
 		if (retail)
@@ -2342,6 +2346,8 @@ void W3DTreeBuffer::xfer( Xfer *xfer )
 		xfer->xferReal(&tree.location.X);
 		xfer->xferReal(&tree.location.Y);
 		xfer->xferReal(&tree.location.Z);
+		if (restoreLegacyCover && modelName.isEmpty() && modelTexture.isEmpty())
+			deletedTrees.push_back({tree.location.X, tree.location.Y, tree.location.Z});
 
 		xfer->xferReal(&tree.scale);	///< Scale at location.
 		xfer->xferReal(&tree.sin);	///< Sine of the rotation angle at location.
@@ -2393,6 +2399,8 @@ void W3DTreeBuffer::xfer( Xfer *xfer )
 		}
 	}
 
+	if (restoreLegacyCover)
+		TheTerrainLogic->restoreLegacyMapTrees(deletedTrees);
 }
 
 // ------------------------------------------------------------------------------------------------

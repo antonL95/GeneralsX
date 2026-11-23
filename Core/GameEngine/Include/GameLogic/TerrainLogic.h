@@ -321,6 +321,8 @@ public:
   void createCraterInTerrain(Object *obj);  ///< Flatten the terrain under a building.
 
 	void registerMapTree(const ThingTemplate& thing, const Coord3D& pos);
+	Bool hasLegacyMapTreesToRestore() const { return !m_mapTreesBeforeLegacyLoad.empty(); }
+	void restoreLegacyMapTrees(const std::vector<Coord3D>& deletedTrees);
 	const ThingTemplate* findNearestGrabbableMapTree(const Coord3D& origin, Real distanceSquared,
 		const SpecialPowerObjectFilter& filter, Coord3D& position, Real& angle) const;
 	void removeMapTreeAt(const Coord3D& position);
@@ -371,6 +373,7 @@ protected:
 		Int boxes;
 	};
 	std::vector<MapTree> m_mapTrees;
+	std::vector<MapTree> m_mapTreesBeforeLegacyLoad;
 
 	Waypoint *m_waypointListHead;
 	Bridge *m_bridgeListHead;
