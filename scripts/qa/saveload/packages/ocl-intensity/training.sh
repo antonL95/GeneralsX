@@ -23,66 +23,53 @@ check() {
         }
         BEGIN {
             launch = 244
-            gravity = -64 / (30 * 30)
-            epsilon = 0.002
+            velocityTolerance = 0.00001
+            finalSample = last < 420 ? last : 420
             split("Chunk Out Up Flying", cases, " ")
+            expectedVelocity["Chunk"] = "0.400000 0.000000 -0.071111"
+            expectedVelocity["Out"] = "-2.771648 3.254879 -0.000001"
+            expectedVelocity["Up"] = "-0.145121 -0.013962 3.846504"
+            expectedVelocity["Flying"] = "-0.290242 -0.027924 2.763296"
+            expectedContact["Chunk"] = 258
+            expectedContact["Out"] = 244
+            expectedContact["Up"] = 353
+            expectedContact["Flying"] = 323
         }
         $1 == "TEST" && $2 == "ocl-intensity" && $3 >= launch && $4 ~ /^OclIntensity(Chunk|Out|Up|Flying)$/ {
             frame = $3
             kind = substr($4, length("OclIntensity") + 1)
-            height = $7
-            vx = $8
-            vy = $9
-            vz = $10
-            ground = $11
+            if (NF != 11 || $7 !~ /^-?[0-9]+\.[0-9]+$/) {
+                fail("invalid " kind " trace at frame " frame ": " $0)
+                next
+            }
+            height = $7 + 0
+            if (height < 0)
+                fail(kind " below ground at frame " frame ": " $0)
+            expectedFrame = kind in previousFrame ? previousFrame[kind] + 1 : launch
+            if (frame != expectedFrame)
+                fail("expected " kind " sample at frame " expectedFrame ", got " frame)
             if (frame == launch) {
-                launched[kind] = 1
-                horizontal = kind == "Up" ? 2 : 4
-                if (kind == "Chunk") {
-                    if (abs(vx - 0.4) > epsilon || abs(vy) > epsilon || abs(vz - gravity) > epsilon)
-                        fail("unexpected chunk launch at frame " frame ": " $0)
-                } else if (abs(vx) > horizontal + epsilon || abs(vy) > horizontal + epsilon || (vx == 0 && vy == 0)) {
-                    fail("unexpected " kind " horizontal launch at frame " frame ": " $0)
-                }
-                if (kind == "Out") {
-                    if (height > epsilon || abs(vz) > epsilon)
-                        fail("outward launch left the ground at frame " frame ": " $0)
-                    landing[kind] = launch
-                } else {
-                    if (height <= epsilon)
-                        fail(kind " was grounded at the checkpoint: " $0)
-                    if (kind == "Up" || kind == "Flying") {
-                        low = kind == "Up" ? 3 : 0.99
-                        high = kind == "Up" ? 4 : 3
-                        impulse = vz - gravity
-                        if (impulse < low - epsilon || impulse > high + epsilon)
-                            fail("unexpected " kind " vertical launch at frame " frame ": " $0)
+                split(expectedVelocity[kind], velocity)
+                for (axis = 1; axis <= 3; ++axis) {
+                    component = $(7 + axis)
+                    if (component !~ /^-?[0-9]+\.[0-9]+$/ || abs(component - velocity[axis]) > velocityTolerance) {
+                        fail("expected " kind " launch velocity " expectedVelocity[kind] " at frame " frame ": " $0)
+                        break
                     }
                 }
-            } else if (!(kind in landing)) {
-                if (previousFrame[kind] != frame - 1)
-                    fail("missing " kind " flight sample before frame " frame)
-                predicted = previousHeight[kind] + previousVz[kind] + gravity + previousGround[kind] - ground
-                if (height <= epsilon) {
-                    if (predicted > epsilon)
-                        fail(kind " landed early at frame " frame ": " $0)
-                    landing[kind] = frame
-                } else if (predicted < -epsilon) {
-                    fail(kind " missed ground contact at frame " frame ": " $0)
-                }
+                print "ocl-intensity", kind, "launch velocity", $8, $9, $10
             }
+            if (height == 0 && !(kind in landing))
+                landing[kind] = frame
             previousFrame[kind] = frame
-            previousHeight[kind] = height
-            previousVz[kind] = vz
-            previousGround[kind] = ground
         }
         END {
             for (i = 1; i <= 4; ++i) {
                 kind = cases[i]
-                if (!launched[kind])
-                    fail("missing " kind " launch at frame " launch)
-                if (last >= 420 && !(kind in landing))
-                    fail("missing " kind " first ground contact")
+                if (previousFrame[kind] != finalSample)
+                    fail("missing " kind " sample at frame " finalSample)
+                if ((kind in landing || finalSample >= expectedContact[kind]) && landing[kind] != expectedContact[kind])
+                    fail("expected " kind " first ground contact at frame " expectedContact[kind] ", got " (kind in landing ? landing[kind] : "none"))
                 if (kind in landing)
                     print "ocl-intensity", kind, "first ground contact", landing[kind]
             }
