@@ -4278,9 +4278,6 @@ void Player::crc( Xfer *xfer )
 		xfer->xferUnsignedInt(&forbiddenCount);
 		for (AsciiString& name : m_forbiddenBuildings)
 			xfer->xferAsciiString(&name);
-		xfer->xferBool(&m_hasCommandPointOverride);
-		xfer->xferInt(&m_commandPointOverrideTotal);
-		xfer->xferInt(&m_commandPointOverrideMaximum);
 		Bool hasPlanner = m_ai && m_ai->isSkirmishAI();
 		xfer->xferBool(&hasPlanner);
 		if (hasPlanner)
@@ -4858,17 +4855,23 @@ void Player::xfer( Xfer *xfer )
 		for (AsciiString& name : m_forbiddenBuildings)
 			xfer->xferAsciiString(&name);
 	}
-	if (version >= 12)
+	if (RetailFileLayers::enabled())
 	{
-		xfer->xferBool(&m_hasCommandPointOverride);
-		xfer->xferInt(&m_commandPointOverrideTotal);
-		xfer->xferInt(&m_commandPointOverrideMaximum);
-	}
-	else if (xfer->getXferMode() == XFER_LOAD)
-	{
-		m_hasCommandPointOverride = FALSE;
-		m_commandPointOverrideTotal = 0;
-		m_commandPointOverrideMaximum = 0;
+		Bool legacyOverride = FALSE;
+		Int legacyTotal = 0;
+		Int legacyMaximum = 0;
+		if (version >= 12)
+		{
+			xfer->xferBool(&legacyOverride);
+			xfer->xferInt(&legacyTotal);
+			xfer->xferInt(&legacyMaximum);
+		}
+		if (xfer->getXferMode() == XFER_LOAD)
+		{
+			m_hasCommandPointOverride = legacyOverride;
+			m_commandPointOverrideTotal = legacyTotal;
+			m_commandPointOverrideMaximum = legacyMaximum;
+		}
 	}
 	if (version >= 13)
 		CreateAHeroSystem::xferPlayer(this, xfer);
@@ -4885,7 +4888,13 @@ void Player::xfer( Xfer *xfer )
 
 void Player::xferRetailBlocks(Xfer* xfer, Bool present)
 {
-	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"command-point-override", [this](Xfer* x) {
+			x->xferBool(&m_hasCommandPointOverride);
+			x->xferInt(&m_commandPointOverrideTotal);
+			x->xferInt(&m_commandPointOverrideMaximum);
+		}, {}},
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
