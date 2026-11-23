@@ -2882,6 +2882,7 @@ AGAIN:
 				if (uiTestCapture)
 				{
 					W3D_TakeCompressedScreenshot(SCREENSHOT_PNG, DEFAULT_JPEG_QUALITY, true, uiTestCapture);
+					DX8Wrapper::Present();
 					UiTest::markCaptured();
 				}
 				static const bool captureAssetSmoke = std::getenv("GENERALSX_ASSET_SMOKE") != nullptr;

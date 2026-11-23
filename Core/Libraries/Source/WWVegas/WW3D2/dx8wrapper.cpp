@@ -2144,6 +2144,46 @@ void DX8_Assert()
 	DX8_THREAD_ASSERT();
 }
 
+void DX8Wrapper::Present()
+{
+	DX8_Assert();
+	HRESULT hr;
+	{
+		WWPROFILE("DX8Device::Present()");
+		hr=_Get_D3D_Device8()->Present(nullptr, nullptr, nullptr, nullptr);
+	}
+
+	DX8_RECORD_DX8_CALLS();
+
+	if (SUCCEEDED(hr)) {
+#ifdef EXTENDED_STATS
+		if (stats.m_sleepTime) {
+			::Sleep(stats.m_sleepTime);
+		}
+#endif
+		IsDeviceLost=false;
+		FrameCount++;
+	}
+	else {
+		IsDeviceLost=true;
+	}
+
+	if (hr==D3DERR_DEVICELOST) {
+		hr=_Get_D3D_Device8()->TestCooperativeLevel();
+		if (hr==D3DERR_DEVICENOTRESET) {
+			WWDEBUG_SAY(("DX8Wrapper::End_Scene is resetting the device."));
+			Reset_Device();
+		}
+		else {
+			ThreadClass::Sleep_Ms(200);
+		}
+	}
+	else {
+		DX8_ErrorCode(hr);
+	}
+}
+
+
 void DX8Wrapper::Begin_Scene()
 {
 	DX8_THREAD_ASSERT();
@@ -2177,45 +2217,8 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 	DX8WebBrowser::Render(0);
 #endif
 
-	if (flip_frames) {
-		DX8_Assert();
-		HRESULT hr;
-		{
-			WWPROFILE("DX8Device::Present()");
-			hr=_Get_D3D_Device8()->Present(nullptr, nullptr, nullptr, nullptr);
-		}
-
-		DX8_RECORD_DX8_CALLS();
-
-		if (SUCCEEDED(hr)) {
-#ifdef EXTENDED_STATS
-			if (stats.m_sleepTime) {
-				::Sleep(stats.m_sleepTime);
-			}
-#endif
-			IsDeviceLost=false;
-			FrameCount++;
-		}
-		else {
-			IsDeviceLost=true;
-		}
-
-		// If the device was lost we need to check for cooperative level and possibly reset the device
-		if (hr==D3DERR_DEVICELOST) {
-			hr=_Get_D3D_Device8()->TestCooperativeLevel();
-			if (hr==D3DERR_DEVICENOTRESET) {
-				WWDEBUG_SAY(("DX8Wrapper::End_Scene is resetting the device."));
-				Reset_Device();
-			}
-			else {
-				// Sleep it not active
-				ThreadClass::Sleep_Ms(200);
-			}
-		}
-		else {
-			DX8_ErrorCode(hr);
-		}
-	}
+	if (flip_frames)
+		Present();
 
 	// Each frame, release all of the buffers and textures.
 	Set_Vertex_Buffer(nullptr);

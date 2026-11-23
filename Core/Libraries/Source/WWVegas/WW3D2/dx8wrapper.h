@@ -312,6 +312,7 @@ public:
 	*/
 	static void Begin_Scene();
 	static void End_Scene(bool flip_frame = true);
+	static void Present();
 
 	// Flip until the primary buffer is visible.
 	static void Flip_To_Primary();
