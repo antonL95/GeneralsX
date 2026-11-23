@@ -588,6 +588,9 @@ Bool ActionManager::canEnterObject( const Object *obj, const Object *objectToEnt
 	if( objectToEnter->isEffectivelyDead() )
 		return FALSE;
 
+	if (RetailFileLayers::enabled() && objectToEnter->isKindOf(KINDOF_NO_FREEWILL_ENTER))
+		return FALSE;
+
 	// if the target is in the shroud, we can't do anything
 	if (isObjectShroudedForAction(obj, objectToEnter, commandSource))
 		return FALSE;
