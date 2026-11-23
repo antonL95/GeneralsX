@@ -110,6 +110,7 @@ private:
 	Real m_minSpeed = 1.0f;
 	Real m_maxSpeed = 1.0f;
 	Bool m_useWeaponTiming = FALSE;
+	Int m_priority = 1;
 
 public:
 	W3DAnimationInfo(const AsciiString& name, Bool isIdle, Real distanceCovered);
@@ -129,6 +130,8 @@ public:
 	Real getMaxSpeed(Real stateSpeed) const { return m_playbackMode < 0 ? stateSpeed : m_maxSpeed; }
 	void setUseWeaponTiming(Bool useWeaponTiming) { m_useWeaponTiming = useWeaponTiming; }
 	Bool usesWeaponTiming() const { return m_useWeaponTiming; }
+	void setPriority(Int priority) { m_priority = priority; }
+	Int getPriority() const { return m_priority; }
 
 };
 typedef std::vector<W3DAnimationInfo>	W3DAnimationVector;

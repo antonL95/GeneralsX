@@ -66,6 +66,7 @@
 #endif
 #include "W3DDevice/GameClient/BaseHeightMap.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
+#include <climits>
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/W3DScene.h"
@@ -344,7 +345,8 @@ W3DAnimationInfo::W3DAnimationInfo( const W3DAnimationInfo &r ) :
 	m_playbackMode(r.m_playbackMode),
 	m_minSpeed(r.m_minSpeed),
 	m_maxSpeed(r.m_maxSpeed),
-	m_useWeaponTiming(r.m_useWeaponTiming)
+	m_useWeaponTiming(r.m_useWeaponTiming),
+	m_priority(r.m_priority)
 {
 #ifdef RETAIN_ANIM_HANDLES
 	if (m_handle)
@@ -363,6 +365,7 @@ W3DAnimationInfo& W3DAnimationInfo::operator=(const W3DAnimationInfo &r)
 	m_minSpeed = r.m_minSpeed;
 	m_maxSpeed = r.m_maxSpeed;
 	m_useWeaponTiming = r.m_useWeaponTiming;
+	m_priority = r.m_priority;
 
 #ifdef RETAIN_ANIM_HANDLES
 	REF_PTR_RELEASE(m_handle);
@@ -2478,6 +2481,32 @@ Real W3DModelDraw::getCurrentAnimFraction() const
 }
 
 //-------------------------------------------------------------------------------------------------
+static Int pickRetailAnimation(const W3DAnimationVector& animations, Int previous)
+{
+	const auto weight = [&](Int index)
+	{
+		const Int priority = animations[index].getPriority();
+		return priority > 0 ? priority - (index == previous) : 0;
+	};
+	long long total = 0;
+	const Int count = static_cast<Int>(animations.size());
+	for (Int i = 0; i < count; ++i)
+		total += weight(i);
+	if (total == 0)
+		return 0;
+
+	const ScopedVisualRandom random(TRUE);
+	long long roll = total <= INT_MAX ? GameClientRandomValue(0, static_cast<Int>(total - 1)) :
+		std::min(total - 1, static_cast<long long>(GameClientRandomValueReal(0.0f, 1.0f) * static_cast<double>(total)));
+	for (Int i = 0; i < count; ++i)
+	{
+		roll -= weight(i);
+		if (roll < 0)
+			return i;
+	}
+	return 0;
+}
+
 void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction, Bool restartCurrent)
 {
 	if (!m_curState)
@@ -2495,6 +2524,11 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 		else if (numAnims == 1)
 		{
 			m_whichAnimInCurState = 0;
+		}
+		else if (RetailFileLayers::enabled())
+		{
+			m_whichAnimInCurState = pickRetailAnimation(m_curState->m_animations,
+				prevState == m_curState ? m_whichAnimInCurState : -1);
 		}
 		else if (prevState == m_curState)
 		{

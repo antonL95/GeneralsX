@@ -223,6 +223,7 @@ void W3DScriptedModelDrawModuleData::parseAnimationState(INI* ini, void* instanc
 		state.draw.m_animations.back().setPlayback(static_cast<RenderObjClass::AnimMode>(animation.mode),
 			animation.minSpeed, animation.maxSpeed);
 		state.draw.m_animations.back().setUseWeaponTiming(animation.useWeaponTiming);
+		state.draw.m_animations.back().setPriority(animation.priority);
 	}
 	if (type == StateType::Transition)
 	{
