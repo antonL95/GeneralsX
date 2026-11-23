@@ -55,6 +55,7 @@
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
+#include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/RetailBuildingEvents.h"
 #include "GameClient/InGameUI.h"
@@ -331,7 +332,10 @@ static Bool claimConstructionSite( Object *dozer, Object *site )
 	if( owner == nullptr )
 		return TRUE;
 
-	if( owner->getPlayerType() != PLAYER_COMPUTER && !site->testStatus( OBJECT_STATUS_RECONSTRUCTING ) &&
+	const Object *producer = TheGameLogic->findObjectByID( site->getProducerID() );
+	const FoundationAIUpdate *foundation = producer ? FoundationAIUpdate::find( *producer ) : nullptr;
+	const Bool reservedPlot = foundation && foundation->getStructure() == site;
+	if( !reservedPlot && owner->getPlayerType() != PLAYER_COMPUTER && !site->testStatus( OBJECT_STATUS_RECONSTRUCTING ) &&
 			TheBuildAssistant->isLocationLegalToBuild( site->getPosition(), site->getTemplate(), site->getOrientation(),
 				BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP, dozer, nullptr, site ) != LBC_OK )
 	{

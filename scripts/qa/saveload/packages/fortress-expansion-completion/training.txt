@@ -1,1 +1,5 @@
-30 build Player_1 MenFortressExpansionPadSide 0 MenArrowTowerExpansion
+36 create Player_1 MenFortress 1 3800,3300,-45
+37 fortress-expansion-unpack Player_1 MenFortress 1
+45 build Player_1 MenFortressExpansionPadSide 2 MenArrowTowerExpansion
+244 fortress-expansion-state Player_1 MenArrowTowerExpansion 0
+1000 fortress-expansion-state Player_1 MenArrowTowerExpansion 0
