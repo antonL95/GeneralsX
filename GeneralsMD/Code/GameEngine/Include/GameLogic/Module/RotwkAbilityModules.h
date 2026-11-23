@@ -63,6 +63,7 @@ class StrafeAreaUpdate final : public UpdateModule
 public:
 	StrafeAreaUpdate(Thing* thing, const ModuleData* data);
 	static Bool startForObject(Object* object, const Coord3D& center);
+	static Bool controlsAttackFlight(const Object& object);
 	UpdateSleepTime update() override;
 
 private:

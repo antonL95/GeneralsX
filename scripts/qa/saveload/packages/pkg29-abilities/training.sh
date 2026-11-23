@@ -6,7 +6,7 @@ check() {
 		expect 'TEST pkg29 strafe reload frame=209 ready=0'
 	fi
 	if covers 244; then
-		grep -E '^TEST pkg29 strafe frame=244 alive=1 ' "$log" || return 1
+		grep -E '^TEST pkg29 strafe frame=244 alive=1 attacking=1 idle=0 ' "$log" || return 1
 	fi
 	if covers 800; then
 		grep -E '^TEST pkg29 strafe frame=310 alive=1 attacking=1 ' "$log" || return 1
@@ -15,7 +15,9 @@ check() {
 		grep -E '^TEST health 800 Player_1 Pkg29StrafeOutside 0 id=[0-9]+ health=100000\.00 ' "$log" || return 1
 		awk '/^TEST cooldown frame=[0-9]+ weapon=DragonStrikeStrafeWeapon .*phase=between / {
 			frame = substr($3, 7) + 0
-			if (shots++ && frame - previous != 6) bad = 1
+			if (shots == 0 && frame != 277) bad = 1
+			if (shots > 0 && frame - previous != 6) bad = 1
+			shots++
 			previous = frame
 		}
 		END { if (shots < 3 || bad) exit 1 }' "$log" || return 1

@@ -53,6 +53,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Module/RetailSiegeContain.h"
 
@@ -1501,7 +1502,9 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	Bool usedRetailGroundSteering = FALSE;
 
 	physics->setTurning(TURN_NONE);
-	if (getAllowMotiveForceWhileAirborne() || !treatAsAirborne)
+	if (getAllowMotiveForceWhileAirborne() || !treatAsAirborne ||
+		(RetailFileLayers::enabled() && getAppearance() == LOCO_HOVER &&
+			getLegalSurfaces() == LOCOMOTORSURFACE_AIR && StrafeAreaUpdate::controlsAttackFlight(*obj)))
 	{
 		LocomotorAppearance appearance = m_template->m_appearance;
 		const Bool retailIndependent = RetailFileLayers::enabled() && !obj->getContainedBy();

@@ -133,7 +133,7 @@
 1040 create PlyrCreeps Pkg29DisguiseDetector 0 880,320,0
 1110 pkg29-disguise-state Player_1 Pkg29DisguiseHero 1
 1170 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
-193 create PlyrCreeps Pkg29StrafeInside 0 2480,3200,0
+193 create PlyrCreeps Pkg29StrafeInside 0 2480,3020,0
 193 create Player_1 Pkg29StrafeOutside 0 2260,3200,0
 195 science Player_1 - 0 SCIENCE_DragonStrike
 196 pkg29-strafe-cast Player_1 - 0 - -50 -50

@@ -316,7 +316,7 @@ void StrafeAreaUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 	static const FieldParse fields[] = {
 		{ "WeaponName", INI::parseWeaponTemplate, nullptr, offsetof(StrafeAreaUpdateModuleData, m_weapon) },
 		{ "StrafeAreaRadius", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_radius) },
-		{ "SweepFrequency", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_sweepFrequency) },
+		{ "Sweepfrequency", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_sweepFrequency) },
 		{ "SweepAmplitude", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_sweepAmplitude) },
 		{ "Slope", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_slope) },
 		{ "InitialSweepPhase", INI::parseReal, nullptr, offsetof(StrafeAreaUpdateModuleData, m_initialSweepPhase) },
@@ -339,6 +339,12 @@ Bool StrafeAreaUpdate::startForObject(Object* object, const Coord3D& center)
 		return FALSE;
 	module->start(center);
 	return TRUE;
+}
+
+Bool StrafeAreaUpdate::controlsAttackFlight(const Object& object)
+{
+	const auto* module = static_cast<const StrafeAreaUpdate*>(object.findUpdateModule(NAMEKEY("StrafeAreaUpdate")));
+	return module && module->m_phase == STRAFE && !object.isEffectivelyDead();
 }
 
 void StrafeAreaUpdate::start(const Coord3D& center)
@@ -429,7 +435,7 @@ UpdateSleepTime StrafeAreaUpdate::update()
 				ai->chooseLocomotorSet(LOCOMOTORSET_SUPERSONIC);
 				self->clearModelConditionState(MODELCONDITION_ATTACKING);
 			}
-			else if (!m_departureOrdered && now >= m_firstShotFrame && distance < data->m_radius * (1.0f / 12.0f))
+			else if (distance < data->m_radius * (1.0f / 12.0f) && ai->isIdle())
 				orderDeparture(ai);
 			break;
 		case DEPART:
