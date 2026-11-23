@@ -30,6 +30,16 @@ void handleUpgrade(const RetailTestCommands::Context& ctx)
 	for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 	{
 		const CommandButton* button = set->getCommandButton(slot);
+		if (button && ctx.action == "weapon-upgrade-toggle" && button->getCommandType() == GUI_COMMAND_TOGGLE_WEAPONSET &&
+			button->getName().compareNoCase(ctx.argument) == 0)
+		{
+			ctx.selectObject(source);
+			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_HORDE_COMMAND);
+			msg->appendObjectIDArgument(source->getID());
+			msg->appendIntegerArgument(slot);
+			msg->appendIntegerArgument(-1);
+			return;
+		}
 		if (!button || (button->getCommandType() != GUI_COMMAND_OBJECT_UPGRADE &&
 			button->getCommandType() != GUI_COMMAND_PLAYER_UPGRADE))
 			continue;
@@ -84,6 +94,7 @@ void registerRetailWeaponSwitchUpgradeTestCommands()
 #if !RTS_GENERALS
 	registerAction("weapon-upgrade-trace", handleUpgrade);
 	registerAction("weapon-upgrade-buy", handleUpgrade);
+	registerAction("weapon-upgrade-toggle", handleUpgrade);
 #endif
 }
 }

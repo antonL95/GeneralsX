@@ -3579,6 +3579,7 @@ Bool Object::isMassSelectable() const
 //-------------------------------------------------------------------------------------------------
 void Object::setWeaponSetFlags(const WeaponSetFlags& flags, Bool enabled)
 {
+	const ModelConditionFlags previousConditions = m_logicModelConditions;
 	Bool changed = FALSE;
 	for (Int i = 0; i < WEAPONSET_COUNT; ++i)
 	{
@@ -3595,7 +3596,11 @@ void Object::setWeaponSetFlags(const WeaponSetFlags& flags, Bool enabled)
 			clearModelConditionState(condition);
 	}
 	if (changed)
+	{
 		m_weaponSet.updateWeaponSet(this);
+		if (RetailFileLayers::enabled() && previousConditions != m_logicModelConditions)
+			RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
+	}
 }
 
 ModelConditionFlags CommandButton::getRetailCommandModelConditions(const Object* source)
