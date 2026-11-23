@@ -1,0 +1,10 @@
+5 cash Player_1 - 0 20000
+6 create Player_1 MenFortressCitadel 0 3150,480,0
+7 reveal Player_1 MenFortressCitadel 1
+30 buttons Player_1 MenFortressCitadel 1
+40 pkg16-queue-upgrade Player_1 MenFortressCitadel 1 Upgrade_MenFortressBanners
+55 buttons Player_1 MenFortressCitadel 1
+510 buttons Player_1 MenFortressCitadel 1
+520 pkg16-queue-upgrade Player_1 MenFortressCitadel 1 Upgrade_MenFortressHouseOfHealing
+550 buttons Player_1 MenFortressCitadel 1
+1440 buttons Player_1 MenFortressCitadel 1

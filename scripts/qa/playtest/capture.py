@@ -6,6 +6,11 @@ import gdb
 class Draw(gdb.Breakpoint):
     last_frame = None
     render_from = int(os.environ["PLAYTEST_RENDER_FROM"])
+    capture_windows = set()
+    if os.environ.get("PLAYTEST_STATIC_CAPTURES") == "1":
+        for capture in os.environ["PLAYTEST_FRAMES"].split():
+            frame = int(capture)
+            capture_windows.update(range(frame - 2, frame + 1))
 
     def stop(self):
         frame = logic_frame()
@@ -14,7 +19,8 @@ class Draw(gdb.Breakpoint):
         if self.last_frame is None:
             gdb.execute("set variable TheFramePacer->m_enableLogicTimeScale = 0", to_string=True)
             gdb.execute("set variable TheFramePacer->m_enableFpsLimit = 0", to_string=True)
-        if frame == self.last_frame or 28 <= frame < self.render_from:
+        skip_static_frame = self.capture_windows and frame >= 28 and frame not in self.capture_windows
+        if frame == self.last_frame or 28 <= frame < self.render_from or skip_static_frame:
             gdb.execute("return", to_string=True)
         self.last_frame = frame
         return False
