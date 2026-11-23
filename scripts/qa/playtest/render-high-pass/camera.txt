@@ -1,0 +1,3 @@
+21 Player_1 MenFortressCitadel 828 545 0.70
+74 Player_1 MenPorter 1060 450 0.85
+104 Player_1 MenPorter 1420 960 0.85
