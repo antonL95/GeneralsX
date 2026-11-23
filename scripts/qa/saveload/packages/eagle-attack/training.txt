@@ -1,0 +1,5 @@
+110 create Player_1 GondorGwaihirHero_Summoned 0 3230,1250,0
+185 create PlyrCreeps EagleAttackTarget 0 3460,1250,0
+186 orderattack Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackTarget:0
+371 destroy Player_1 GondorGwaihirHero_Summoned 0
+371 destroy PlyrCreeps EagleAttackTarget 0
