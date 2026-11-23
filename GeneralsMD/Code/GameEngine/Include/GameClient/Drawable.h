@@ -780,6 +780,7 @@ private:
 	std::vector<RetailSubObjectFade> m_retailSubObjectFades;
 	struct RetailPositionInterpolation
 	{
+		Vector3 earlier;
 		Vector3 previous;
 		Vector3 destination;
 		UnsignedInt start = 0;

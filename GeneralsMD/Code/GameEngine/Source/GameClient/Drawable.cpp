@@ -2750,8 +2750,17 @@ void Drawable::draw()
 			const Real progress = (elapsed - 1 + TheFramePacer->getLogicFramePhase()) / movement.duration;
 			if (progress < 1.0f)
 			{
+				const Real remaining = 1.0f - progress;
+				const Real blend = progress * progress * (3.0f - 2.0f * progress);
+				const Real startTangentWeight = 0.5f * progress * remaining * remaining;
+				const Real endTangentWeight = -0.5f * progress * progress * remaining;
 				Vector3 position;
-				Vector3::Lerp(movement.previous, movement.destination, progress, &position);
+				for (Int axis = 0; axis < 3; ++axis)
+				{
+					position[axis] = WWMath::Lerp(movement.previous[axis], movement.destination[axis], blend) +
+						startTangentWeight * (movement.destination[axis] - movement.earlier[axis]) +
+						endTangentWeight * (movement.destination[axis] - movement.previous[axis]);
+				}
 				transformMtx.Set_Translation(position);
 			}
 		}
@@ -4442,10 +4451,15 @@ const Matrix3D *Drawable::getTransformMatrix() const
 
 void Drawable::interpolateRetailPosition(const Coord3D& previous, const Coord3D& destination, UnsignedInt duration)
 {
-	m_retailPositionInterpolation = {
-		{previous.x, previous.y, previous.z},
+	const Vector3 from(previous.x, previous.y, previous.z);
+	const UnsignedInt now = TheGameLogic->getFrame();
+	auto& movement = m_retailPositionInterpolation;
+	const Bool consecutive = movement.duration && now - movement.start == movement.duration && movement.destination == from;
+	movement = {
+		consecutive ? movement.previous : from,
+		from,
 		{destination.x, destination.y, destination.z},
-		TheGameLogic->getFrame(),
+		now,
 		duration,
 	};
 }
