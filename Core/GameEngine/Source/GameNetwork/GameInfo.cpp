@@ -1913,7 +1913,8 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 			m_slot[slot]->setTeamNumber(teamNumber);
 			m_slot[slot]->setColor(color);
 			m_slot[slot]->setStartPos(startPos);
-			m_slot[slot]->setPlayerTemplate(playerTemplate);
+			m_slot[slot]->setPlayerTemplate(RetailFileLayers::enabled() && origPlayerTemplate == PLAYERTEMPLATE_OBSERVER
+				? PLAYERTEMPLATE_OBSERVER : playerTemplate);
 		}
 	}
 
