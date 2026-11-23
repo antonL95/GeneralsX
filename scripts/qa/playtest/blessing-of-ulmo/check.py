@@ -1,10 +1,13 @@
 import re
+from operator import sub
 from pathlib import Path
+from statistics import median
 
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageStat
 
 
 CAST_FRAME = 37
+PRECAST_FRAME = 35
 FIRST_RAIN_DRAW = CAST_FRAME + 1
 RAIN_END = CAST_FRAME + 180 * 30
 DRY_FRAME = RAIN_END + 103
@@ -83,6 +86,32 @@ def changed_pixels(sample, controls):
     ))
 
 
+def check_terrain_brightness(output):
+    baseline = terrain_crop(output, PRECAST_FRAME).convert("L").get_flattened_data()
+    phases = {
+        "before": (PRECAST_FRAME,),
+        "cast": (CAST_FRAME,),
+        "ramp in": (FIRST_RAIN_DRAW, 66, 96, 136),
+        "steady rain (streaks hidden)": HIDDEN_FRAMES,
+        "steady rain": (186, 936, RAIN_END - 1),
+        "ramp out": (RAIN_END, 5487),
+        "after": (DRY_FRAME,),
+    }
+    rows = [f"Terrain crop {TERRAIN_CROP}, luma on a 0–255 scale", "Phase | Frame | Mean | Median change"]
+    deviations = []
+    for phase, frames in phases.items():
+        for frame in frames:
+            luminance = terrain_crop(output, frame).convert("L")
+            mean = ImageStat.Stat(luminance).mean[0]
+            median_change = median(map(sub, luminance.get_flattened_data(), baseline))
+            rows.append(f"{phase} | {frame} | {mean:.2f} | {median_change:+g}")
+            if abs(median_change) > 2:
+                deviations.append(f"{phase} frame {frame}: {median_change:+g}")
+    (output / "terrain-brightness.txt").write_text("\n".join(rows) + "\n")
+    if deviations:
+        raise RuntimeError("Unexpected terrain lighting change: " + ", ".join(deviations))
+
+
 def check_captures(output, _frames):
     before, hidden_before, rainy, hidden_after, after = [terrain_crop(output, frame) for frame in range(184, 189)]
     wet = changed_pixels(rainy, (before, hidden_before, hidden_after, after))
@@ -98,3 +127,4 @@ def check_captures(output, _frames):
     )
     if wet <= max(20, dry * 2):
         raise RuntimeError(f"No visible rain in the terrain crop: {wet} vs hidden control {dry}")
+    check_terrain_brightness(output)
