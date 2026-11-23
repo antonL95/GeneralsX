@@ -366,6 +366,7 @@ public:
 	virtual StateReturnType onEnter() override;
 	virtual void onExit( StateExitType status ) override;
 	virtual StateReturnType update() override;
+	void resumeAfterYield() { m_waitingForPath = FALSE; }
 };
 EMPTY_DTOR(AIMoveToState)
 

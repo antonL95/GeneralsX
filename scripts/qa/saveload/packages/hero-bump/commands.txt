@@ -1,0 +1,9 @@
+15 create Player_1 HeroBumpKnights 0 2275,1340,180
+15 create Player_1 HeroBumpMount 0 2050,1340,0
+16 stance Player_1 HeroBumpKnights 0 HoldGround
+20 stance Player_1 HeroBumpMount 0 HoldGround
+25 power Player_1 HeroBumpMount 0 SpecialAbilityToggleMounted
+190 track Player_1 HeroBumpMount 0
+190 track Player_1 HeroBumpKnights 0
+190 move Player_1 HeroBumpMount 0 - 2335 1340
+196 builderscriptmove Player_1 HeroBumpKnights 0 - 2010 1340
