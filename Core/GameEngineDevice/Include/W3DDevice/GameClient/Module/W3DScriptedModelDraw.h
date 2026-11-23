@@ -32,7 +32,6 @@ public:
 		AsciiString persist;
 		Coord3D offset{};
 		Int persistId = 0;
-		Bool followBone = FALSE;
 		Bool houseColor = FALSE;
 		Bool onlyIfOnWater = FALSE;
 		Bool onlyIfOnLand = FALSE;

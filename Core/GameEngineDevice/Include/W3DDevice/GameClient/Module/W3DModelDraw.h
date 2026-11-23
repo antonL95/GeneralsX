@@ -144,6 +144,7 @@ struct ParticleSysBoneInfo
 	AsciiString boneName;
 	const ParticleSystemTemplate* particleSystemTemplate;
 	AsciiString fxTrigger;
+	Bool followBone = FALSE;
 };
 
 typedef std::vector<ParticleSysBoneInfo> ParticleSysBoneInfoVector;

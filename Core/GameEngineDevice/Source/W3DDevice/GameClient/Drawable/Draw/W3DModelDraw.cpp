@@ -2462,9 +2462,8 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	recalcBonesForClientParticleSystems();
 
   const W3DModelDrawModuleData *modData = getW3DModelDrawModuleData();
-  if ( modData->m_particlesAttachedToAnimatedBones )
-    updateBonesForClientParticleSystems();// LORENZEN ADDED THIS
-                                          // IT REPOSITIONS PARTICLESYSTEMS TO TSTAY IN SYNC WITH ANIMATED BONES
+  if (modData->m_particlesAttachedToAnimatedBones || (!m_particleSystemIDs.empty() && RetailFileLayers::enabled()))
+    updateBonesForClientParticleSystems();
 
   handleClientRecoil();
 
@@ -3175,7 +3174,9 @@ void W3DModelDraw::recalcBonesForClientParticleSystems()
 
 						ParticleSysTrackerType tracker;
 						tracker.id = sys->getSystemID();
-						tracker.boneIndex = boneIndex;
+						const Bool followsBone = getW3DModelDrawModuleData()->m_particlesAttachedToAnimatedBones ||
+							(RetailFileLayers::enabled() && it->followBone);
+						tracker.boneIndex = followsBone ? boneIndex : 0;
 
 						m_particleSystemIDs.push_back( tracker );
 					}
@@ -3208,29 +3209,16 @@ Bool W3DModelDraw::updateBonesForClientParticleSystems()
 	const Drawable* drawable = getDrawable();
 	if (drawable != nullptr && m_curState != nullptr && m_renderObject != nullptr )
 	{
-		for (std::vector<ParticleSysTrackerType>::const_iterator it = m_particleSystemIDs.begin(); it != m_particleSystemIDs.end(); ++it)
+		for (const ParticleSysTrackerType& tracker : m_particleSystemIDs)
 		{
-			ParticleSystem *sys = TheParticleSystemManager->findParticleSystem((*it).id);
-			Int boneIndex = (*it).boneIndex;
-			if ( (sys != nullptr) && (boneIndex != 0)  )
+			if (tracker.boneIndex == 0)
+				continue;
+
+			if (ParticleSystem* sys = TheParticleSystemManager->findParticleSystem(tracker.id))
 			{
-    		const Matrix3D& boneTransform = m_renderObject->Get_Bone_Transform(boneIndex);// just a little worried about state changes
-
-        Vector3 vpos = boneTransform.Get_Translation();
-
-        Coord3D pos;
-				pos.x = vpos.X;
-				pos.y = vpos.Y;
-				pos.z = vpos.Z;
-
-				sys->setPosition(&pos);
-
-        Real orientation = boneTransform.Get_Z_Rotation();
-				sys->rotateLocalTransformZ(orientation);
-
-        sys->setLocalTransform(&boneTransform);
-        sys->setSkipParentXfrm(true);
-
+				const Matrix3D& boneTransform = m_renderObject->Get_Bone_Transform(tracker.boneIndex);
+				sys->setLocalTransform(&boneTransform);
+				sys->setSkipParentXfrm(true);
 			}
 		}
 

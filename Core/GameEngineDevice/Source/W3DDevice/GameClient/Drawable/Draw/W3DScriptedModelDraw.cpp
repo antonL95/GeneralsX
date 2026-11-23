@@ -285,7 +285,7 @@ void W3DScriptedModelDrawModuleData::parseParticleBone(INI* ini, void*, void* st
 	while (const char* option = ini->getNextTokenOrNull(INI::getSepsColon()))
 	{
 		if (stricmp(option, "FollowBone") == 0)
-			particle.followBone = INI::scanBool(ini->getNextToken());
+			particle.draw.followBone = INI::scanBool(ini->getNextToken());
 		else if (stricmp(option, "HouseColor") == 0)
 			particle.houseColor = INI::scanBool(ini->getNextToken());
 		else if (stricmp(option, "FXTrigger") == 0)
@@ -301,7 +301,7 @@ void W3DScriptedModelDrawModuleData::parseParticleBone(INI* ini, void*, void* st
 		else if (stricmp(option, "Offset") == 0)
 			INI::parseCoord3D(ini, nullptr, &particle.offset, nullptr);
 		else if (stricmp(option, "No") == 0)
-			particle.followBone = FALSE;
+			particle.draw.followBone = FALSE;
 		else
 			throw INI_INVALID_DATA;
 	}
