@@ -1,0 +1,37 @@
+8 create Player_1 DolAmrothPorter 0 2390,840,0
+10 create Player_1 GondorFountainGuardHorde 0 2320,1000,0
+10 create Player_1 BlackrootValeArcherHorde 0 2300,1090,0
+10 create Player_1 GondorKnightHorde 0 2350,1190,0
+10 create Player_1 MenFortressCitadel 0 2460,1000,0
+11 reveal Player_1 GondorFountainGuardHorde 0
+11 track Player_1 GondorFountainGuardHorde 0
+11 track Player_1 BlackrootValeArcherHorde 0
+11 track Player_1 GondorKnightHorde 0
+20 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothGuardhouse 2450 1040
+23 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothFarm 2440 520
+26 pkg08-queue Player_1 DolAmrothPorter 0 DolAmrothBattleTower 2400 620
+30 cancelbuild Player_1 DolAmrothFarm 0
+32 select Player_1 GondorFountainGuardHorde 0
+32 selectadd Player_1 BlackrootValeArcherHorde 0
+32 selectadd Player_1 GondorKnightHorde 0
+32 movesel - - 0 - 2680 1060
+42 steering-path Player_1 GondorFountainGuardHorde 0
+42 steering-path Player_1 BlackrootValeArcherHorde 0
+42 steering-path Player_1 GondorKnightHorde 0
+114 create Player_1 GondorCastleWallSegment 0 2660,1110,0
+122 create Player_1 GondorCastleWallSegment 0 2270,1120,0
+122 create Player_1 GondorCastleWallSegment 0 2480,1280,0
+229 create Player_1 DolAmrothFortressCitadel 0 2380,900,0
+238 objupgrade Player_1 DolAmrothFortressCitadel 0 Upgrade_MenFortressHouseOfHealing
+240 steering-path Player_1 GondorFountainGuardHorde 0
+240 steering-path Player_1 BlackrootValeArcherHorde 0
+240 steering-path Player_1 GondorKnightHorde 0
+390 create Player_1 DolAmrothFortressCitadel 1 2440,975,0
+398 objupgrade Player_1 DolAmrothFortressCitadel 1 Upgrade_MenFortressHouseOfHealing
+408 kill Player_1 DolAmrothFortressCitadel 1
+430 steering-path Player_1 GondorFountainGuardHorde 0
+430 steering-path Player_1 BlackrootValeArcherHorde 0
+430 steering-path Player_1 GondorKnightHorde 0
+780 steering-path Player_1 GondorFountainGuardHorde 0
+780 steering-path Player_1 BlackrootValeArcherHorde 0
+780 steering-path Player_1 GondorKnightHorde 0
