@@ -1,0 +1,28 @@
+15 create Player_1 GondorFountainGuardHorde 0 1630,170,-90
+15 create Player_1 BlackrootValeArcherHorde 0 1600,260,-90
+15 create Player_1 GondorKnightHorde 0 1670,360,-90
+15 create Player_1 GondorBoromir 0 1570,325,-90
+15 create Player_1 GondorFountainGuardHorde 1 2830,180,-90
+15 create Player_1 BlackrootValeArcherHorde 1 2800,270,-90
+15 create Player_1 GondorKnightHorde 1 2870,370,-90
+15 create Player_1 GondorBoromir 1 2770,335,-90
+15 create Player_1 GondorBarracks 0 2950,190,0
+16 reveal Player_1 GondorFountainGuardHorde 0
+21 track Player_1 GondorFountainGuardHorde 0
+21 track Player_1 BlackrootValeArcherHorde 0
+21 track Player_1 GondorKnightHorde 0
+21 track Player_1 GondorBoromir 0
+21 track Player_1 GondorFountainGuardHorde 1
+21 track Player_1 BlackrootValeArcherHorde 1
+21 track Player_1 GondorKnightHorde 1
+21 track Player_1 GondorBoromir 1
+35 select Player_1 GondorFountainGuardHorde 0
+35 selectadd Player_1 BlackrootValeArcherHorde 0
+35 selectadd Player_1 GondorKnightHorde 0
+35 selectadd Player_1 GondorBoromir 0
+35 movesel - - 0 - 1950 280
+101 select Player_1 GondorFountainGuardHorde 1
+101 selectadd Player_1 BlackrootValeArcherHorde 1
+101 selectadd Player_1 GondorKnightHorde 1
+101 selectadd Player_1 GondorBoromir 1
+101 movesel - - 0 - 3150 290

@@ -1,0 +1,44 @@
+15 create Player_1 GroupStartGuard 0 1630,170,-90
+15 create Player_1 GroupStartArchers 0 1600,260,-90
+15 create Player_1 GroupStartKnights 0 1670,360,-90
+15 create Player_1 GroupStartHero 0 1570,325,-90
+15 create Player_1 GroupStartGuard 1 2830,180,-90
+15 create Player_1 GroupStartArchers 1 2800,270,-90
+15 create Player_1 GroupStartKnights 1 2870,370,-90
+15 create Player_1 GroupStartHero 1 2770,335,-90
+15 create Player_1 GroupStartBarracks 0 2950,190,0
+230 track Player_1 GroupStartGuard 0
+230 track Player_1 GroupStartArchers 0
+230 track Player_1 GroupStartKnights 0
+230 track Player_1 GroupStartHero 0
+230 track Player_1 GroupStartGuard 1
+230 track Player_1 GroupStartArchers 1
+230 track Player_1 GroupStartKnights 1
+230 track Player_1 GroupStartHero 1
+240 select Player_1 GroupStartGuard 0
+240 selectadd Player_1 GroupStartArchers 0
+240 selectadd Player_1 GroupStartKnights 0
+240 selectadd Player_1 GroupStartHero 0
+240 movesel - - 0 - 1950 280
+242 select Player_1 GroupStartGuard 1
+242 selectadd Player_1 GroupStartArchers 1
+242 selectadd Player_1 GroupStartKnights 1
+242 selectadd Player_1 GroupStartHero 1
+242 movesel - - 0 - 3150 290
+245 track Player_1 GroupStartGuard 0
+245 track Player_1 GroupStartArchers 0
+245 track Player_1 GroupStartKnights 0
+245 track Player_1 GroupStartHero 0
+245 track Player_1 GroupStartGuard 1
+245 track Player_1 GroupStartArchers 1
+245 track Player_1 GroupStartKnights 1
+245 track Player_1 GroupStartHero 1
+333 destroy Player_1 GroupStartGuard 0
+333 destroy Player_1 GroupStartGuard 1
+333 destroy Player_1 GroupStartArchers 0
+333 destroy Player_1 GroupStartArchers 1
+333 destroy Player_1 GroupStartKnights 0
+333 destroy Player_1 GroupStartKnights 1
+333 destroy Player_1 GroupStartHero 0
+333 destroy Player_1 GroupStartHero 1
+333 destroy Player_1 GroupStartBarracks 0
