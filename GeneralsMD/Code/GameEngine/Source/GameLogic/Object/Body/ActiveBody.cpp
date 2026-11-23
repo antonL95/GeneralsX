@@ -792,15 +792,17 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 
 			const auto* data = getActiveBodyModuleData();
 			AIUpdateInterface* ai = obj->getAI();
+			Bool deferredDeath = FALSE;
 			if (RetailFileLayers::enabled() && data->m_burningDeathBehavior && ai &&
-				(damageInfo->in.m_damageType == DAMAGE_FLAME || damageInfo->in.m_deathType == DEATH_BURNED) &&
-				ai->enterRetailBurningDeath())
+				(damageInfo->in.m_damageType == DAMAGE_FLAME || damageInfo->in.m_damageType == DAMAGE_LOGICAL_FIRE) &&
+				obj->isMobile() && !obj->getEnclosingContainedBy())
 			{
 				damageInfo->in.m_deathType = DEATH_BURNED;
 				m_lastDamageInfo = *damageInfo;
+				deferredDeath = ai->enterRetailBurningDeath();
 				FXList::doFXObj(data->m_burningDeathFX, obj);
 			}
-			else
+			if (!deferredDeath)
 				obj->onDie(damageInfo);
 		}
 	}

@@ -1200,6 +1200,7 @@ UpdateSleepTime AIUpdateInterface::update()
 		{
 			m_burningDeathUntil = 0;
 			Object* object = getObject();
+			object->clearModelConditionState(MODELCONDITION_BURNINGDEATH);
 			DamageInfo damage = *object->getBodyModule()->getLastDamageInfo();
 			m_isInUpdate = FALSE;
 			object->onDie(&damage);
@@ -6043,8 +6044,7 @@ Bool AIUpdateInterface::enterRetailBurningDeath()
 {
 	Object* object = getObject();
 	const UnsignedInt duration = getAIUpdateModuleData()->m_burningDeathTime;
-	if (!RetailFileLayers::enabled() || !duration || !object->isMobile() || object->getEnclosingContainedBy() ||
-		!object->getTemplate()->findRotWKLocomotor(LOCOMOTORSET_BURNINGDEATH))
+	if (!RetailFileLayers::enabled() || !duration || !object->isMobile() || object->getEnclosingContainedBy())
 		return FALSE;
 
 	m_burningDeathUntil = TheGameLogic->getFrame() + duration;

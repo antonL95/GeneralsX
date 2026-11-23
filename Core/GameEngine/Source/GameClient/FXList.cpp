@@ -1410,7 +1410,17 @@ protected:
 								m_name.str(), attachmentBone->str(), newPos.x, newPos.y, newPos.z);
 					}
 					else if (m_attachToObject && thingToAttachTo)
+					{
+						if (RetailFileLayers::enabled())
+						{
+							const Vector3 worldPosition(newPos.x, newPos.y, newPos.z);
+							Vector3 objectPosition;
+							Matrix3D::Inverse_Transform_Vector(*thingToAttachTo->getTransformMatrix(), worldPosition, &objectPosition);
+							const Coord3D local = {objectPosition.X, objectPosition.Y, objectPosition.Z};
+							sys->setPosition(&local);
+						}
 						sys->attachToObject(thingToAttachTo);
+					}
 					else
 						sys->setPosition( &newPos );
 
