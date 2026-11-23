@@ -1,0 +1,7 @@
+11 reveal Player_1 MenPorter 0
+20 create Player_1 GondorGandalf 0 3085,900,0
+20 create Player_1 LamedonClansmenHorde 0 3300,670,0
+24 deselect - - 0
+32 select Player_1 GondorGandalf 0
+40 deselect - - 0
+40 select Player_1 LamedonClansmenHorde 0

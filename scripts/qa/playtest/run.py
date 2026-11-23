@@ -65,7 +65,8 @@ def read_scenario(name):
     return map_path, frames, camera_frames, end_frame, commands, render_from, fixture / "map.ini"
 
 
-def render(build, output, state, map_path, frames, camera_frames, end_frame, commands, render_from, map_additions, checks):
+def render(build, output, state, map_path, frames, camera_frames, end_frame, commands, render_from, map_additions, checks, resolution):
+    width, height = resolution
     configured = build / "CMakeCache.txt"
     source = ROOT.parents[2]
     if f"CMAKE_HOME_DIRECTORY:INTERNAL={source}" not in configured.read_text().splitlines():
@@ -76,7 +77,7 @@ def render(build, output, state, map_path, frames, camera_frames, end_frame, com
     userdata.mkdir(parents=True)
     (userdata / "Options.ini").write_text(
         "RetailStaticGameLOD = UltraHigh\nRetailIdealStaticGameLOD = UltraHigh\n"
-        "UseShadowVolumes = Yes\nBrightness = 50\nResolution = 1280 720\n"
+        f"UseShadowVolumes = Yes\nBrightness = 50\nResolution = {width} {height}\n"
     )
     map_dir = userdata / "Maps" / map_path.stem.lower()
     map_dir.mkdir(parents=True)
@@ -115,11 +116,11 @@ def render(build, output, state, map_path, frames, camera_frames, end_frame, com
         env[f"PLAYTEST_PNG_{frame}"] = str(output / f"frame-{frame:04d}.png")
     argv = [
         "timeout", "--signal=INT", "--kill-after=10", "225", "xvfb-run", "-a",
-        "-s", f"-screen 0 {WIDTH}x{HEIGHT}x24",
+        "-s", f"-screen 0 {width}x{height}x24",
         "gdb", "-q", "-nx", "-batch", "-return-child-result",
         "-x", str(ROOT / "start.gdb"), "-ex", f"source {ROOT / 'capture.py'}", "-ex", "run",
-        "--args", str(build / "GeneralsMD/GeneralsXZH"), "-win", "-xres", str(WIDTH),
-        "-yres", str(HEIGHT), "-noFPSLimit", "-noaudio", "-nomusic", "-novideo", "-noshellmap",
+        "--args", str(build / "GeneralsMD/GeneralsXZH"), "-win", "-xres", str(width),
+        "-yres", str(height), "-noFPSLimit", "-noaudio", "-nomusic", "-novideo", "-noshellmap",
         "-mod", str(INSTALL / "aotr"), "-bfme2", str(INSTALL / "bfme2"), "-file", str(map_path),
     ]
     log = output / "session.log"
@@ -140,16 +141,21 @@ def render(build, output, state, map_path, frames, camera_frames, end_frame, com
         checks["check"](log_text)
 
 
-def make_media(output, frames):
+def make_media(output, frames, resolution):
     tile_width, tile_height = CLIP_SIZE
     rows = (len(frames) + COLUMNS - 1) // COLUMNS
     sheet = Image.new("RGB", (tile_width * min(COLUMNS, len(frames)), tile_height * rows))
     clip = []
     for index, frame in enumerate(frames):
         with Image.open(output / f"frame-{frame:04d}.png") as source:
-            if source.size != (WIDTH, HEIGHT):
+            if source.size != resolution:
                 raise ValueError(f"Unexpected capture size at frame {frame}: {source.size}")
-            image = source.convert("RGB").resize(CLIP_SIZE, Image.Resampling.LANCZOS)
+            image = source.convert("RGB")
+            image.thumbnail(CLIP_SIZE, Image.Resampling.LANCZOS)
+        if image.size != CLIP_SIZE:
+            tile = Image.new("RGB", CLIP_SIZE)
+            tile.paste(image, ((tile_width - image.width) // 2, (tile_height - image.height) // 2))
+            image = tile
         draw = ImageDraw.Draw(image)
         draw.rectangle((8, 8, 92, 31), fill="#111111")
         draw.text((13, 11), f"Frame {frame}", fill="white", font_size=15)
@@ -166,6 +172,16 @@ def main():
     build = Path(sys.argv[1])
     scenario = read_scenario(sys.argv[2])
     frames, end_frame = scenario[1], scenario[3]
+    resolutions_path = ROOT / sys.argv[2] / "resolutions.txt"
+    resolutions = [(WIDTH, HEIGHT)]
+    if resolutions_path.is_file():
+        for line in resolutions_path.read_text().splitlines():
+            if not line.strip():
+                continue
+            width, height = map(int, line.split())
+            if not 0 < width <= 8192 or not 0 < height <= 8192 or (width, height) in resolutions:
+                raise ValueError(f"Invalid or repeated capture resolution: {line}")
+            resolutions.append((width, height))
     check_path = ROOT / sys.argv[2] / "check.py"
     checks = runpy.run_path(str(check_path)) if check_path.is_file() else {}
     with tempfile.TemporaryDirectory(prefix="playtest-", dir=build) as temp:
@@ -173,13 +189,15 @@ def main():
         output = state / "results"
         output.mkdir()
         render_variant(build, output, state, scenario, checks)
-        for name, overrides in checks.get("render_variants", {}).items():
+        variants = [(name, dict(checks, render_env={**checks.get("render_env", {}), **overrides}),
+                     resolutions[0]) for name, overrides in checks.get("render_variants", {}).items()]
+        variants.extend((f"{width}x{height}", checks, (width, height)) for width, height in resolutions[1:])
+        for name, variant_checks, resolution in variants:
             variant_output = output / name
             variant_output.mkdir()
             variant_state = state / name
             variant_state.mkdir()
-            variant_checks = dict(checks, render_env={**checks.get("render_env", {}), **overrides})
-            render_variant(build, variant_output, variant_state, scenario, variant_checks)
+            render_variant(build, variant_output, variant_state, scenario, variant_checks, resolution)
         (output / "frames.txt").write_text("\n".join(map(str, frames)) + "\n")
         (output / "frame-count.txt").write_text(f"{end_frame}\n")
         with tarfile.open(fileobj=sys.stdout.buffer, mode="w|") as archive:
@@ -187,12 +205,12 @@ def main():
                 archive.add(path, arcname=path.name)
 
 
-def render_variant(build, output, state, scenario, checks):
-    render(build, output, state, *scenario, checks)
+def render_variant(build, output, state, scenario, checks, resolution=(WIDTH, HEIGHT)):
+    render(build, output, state, *scenario, checks, resolution)
     frames = scenario[1]
     if "check_captures" in checks:
         checks["check_captures"](output, frames)
-    make_media(output, frames)
+    make_media(output, frames, resolution)
 
 
 if __name__ == "__main__":
