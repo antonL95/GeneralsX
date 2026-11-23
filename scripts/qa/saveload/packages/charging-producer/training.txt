@@ -1,0 +1,8 @@
+218 create Player_1 MordorMumakil 0 3420,420,0
+223 power Player_1 MordorMumakil 0 SpecialAbilityChargeNoAim
+226 move Player_1 MordorMumakil 0 120,0
+411 destroy Player_1 MordorMumakil 0
+415 create Player_1 HaradMumakilMatriarch 0 3600,680,90
+418 move Player_1 HaradMumakilMatriarch 0 0,100
+428 power Player_1 HaradMumakilMatriarch 0 SpecialAbilityMumakilGloriousCharge
+531 destroy Player_1 HaradMumakilMatriarch 0
