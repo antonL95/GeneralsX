@@ -27,3 +27,30 @@
 995 move Player_1 GondorGandalf 0 - 2820 1000
 1081 move Player_1 GondorGandalf 0 - 2250 1000
 1085 steering-path Player_1 GondorGandalf 0
+1150 destroy Player_1 GondorGandalf 0
+1152 create Player_1 GondorImrahil 0 2440,1080,82.5
+1152 create Player_1 GondorPippin 0 2440,1320,0
+1158 steering-path Player_1 GondorImrahil 0
+1158 steering-path Player_1 GondorPippin 0
+1160 move Player_1 GondorImrahil 0 - 2525 1020
+1160 move Player_1 GondorPippin 0 - 2525 1260
+1188 steering-path Player_1 GondorImrahil 0
+1188 steering-path Player_1 GondorPippin 0
+1232 steering-path Player_1 GondorImrahil 0
+1232 steering-path Player_1 GondorPippin 0
+1250 move Player_1 GondorImrahil 0 - 2820 1020
+1290 steering-path Player_1 GondorImrahil 0
+1290 select Player_1 GondorImrahil 0
+1290 steering-stop - - 0
+1291 steering-path Player_1 GondorImrahil 0
+1292 steering-path Player_1 GondorImrahil 0
+1293 steering-path Player_1 GondorImrahil 0
+1294 steering-path Player_1 GondorImrahil 0
+1295 steering-path Player_1 GondorImrahil 0
+1296 steering-path Player_1 GondorImrahil 0
+1297 steering-path Player_1 GondorImrahil 0
+1298 steering-path Player_1 GondorImrahil 0
+1299 steering-path Player_1 GondorImrahil 0
+1300 steering-path Player_1 GondorImrahil 0
+1301 steering-path Player_1 GondorImrahil 0
+1302 steering-path Player_1 GondorImrahil 0

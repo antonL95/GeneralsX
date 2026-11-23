@@ -37,13 +37,15 @@ void logSteering(const RetailTestCommands::Context& ctx)
 	const PhysicsBehavior* physics = object->getPhysics();
 	Path* path = ai->getPath();
 	const auto& flags = object->getLogicModelConditions();
-	std::fprintf(stderr, "TEST steering %u %s pos=%.3f,%.3f facing=%.5f goal=%.3f,%.3f moving=%d velocity=%.4f loco=%s left=%d right=%d leftHS=%d rightHS=%d accel=%d decel=%d",
+	const Coord3D velocity = physics ? *physics->getVelocity() : Coord3D{};
+	std::fprintf(stderr, "TEST steering %u %s pos=%.3f,%.3f facing=%.5f goal=%.3f,%.3f moving=%d velocity=%.4f loco=%s left=%d right=%d leftHS=%d rightHS=%d accel=%d decel=%d objectMoving=%d planar=%.5f,%.5f",
 		ctx.frame, object->getTemplate()->getName().str(), pos.x, pos.y, object->getOrientation(), goal.x, goal.y,
 		static_cast<int>(ai->isMoving()), physics ? physics->getForwardSpeed2D() : 0.0f,
 		locomotor ? locomotor->getTemplateName().str() : "none",
 		static_cast<int>(flags.test(MODELCONDITION_TURN_LEFT)), static_cast<int>(flags.test(MODELCONDITION_TURN_RIGHT)),
 		static_cast<int>(flags.test(MODELCONDITION_TURN_LEFT_HIGH_SPEED)), static_cast<int>(flags.test(MODELCONDITION_TURN_RIGHT_HIGH_SPEED)),
-		static_cast<int>(flags.test(MODELCONDITION_ACCELERATE)), static_cast<int>(flags.test(MODELCONDITION_DECELERATE)));
+		static_cast<int>(flags.test(MODELCONDITION_ACCELERATE)), static_cast<int>(flags.test(MODELCONDITION_DECELERATE)),
+		static_cast<int>(flags.test(MODELCONDITION_MOVING)), velocity.x, velocity.y);
 	const PathNode* first = path ? path->getFirstNode() : nullptr;
 	std::fputs(" raw:", stderr);
 	logPathNodes(first, FALSE);

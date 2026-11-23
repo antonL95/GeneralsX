@@ -2,3 +2,4 @@
 240 Player_1 GondorGandalf 2430 1070 0.75
 575 Player_1 GondorGandalf 2560 1080 0.75
 980 Player_1 GondorGandalf 2560 1050 0.75
+1155 Player_1 GondorImrahil 2490 1150 0.75
