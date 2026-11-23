@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <set>
+
 #include "Common/GameType.h"
 #include "Common/Snapshot.h"
 //#include "GameLogic/Locomotor.h"	// no, do not include this, unless you like long recompiles
@@ -45,6 +47,7 @@
 
 class Bridge;
 class Object;
+class Thing;
 class Weapon;
 class PathfindZoneManager;
 class PathfindCell;
@@ -162,6 +165,8 @@ public:
 
 	void addObjectToPathfindMap( class Object *obj );				///< Classify the given object's cells in the map
 	void removeObjectFromPathfindMap( class Object *obj );	///< De-classify the given object's cells in the map
+	static Object* detachRetailFootprintForTransform(Thing* thing);
+	static void reattachRetailFootprintAfterTransform(Object* obj);
 
 	void removeUnitFromPathfindMap( Object *obj );	///< De-classify the given mobile unit's cells in the map
 	void updateGoal( Object *obj, const Coord3D *newGoalPos, PathfindLayerEnum layer);		///< Update the given mobile unit's cells in the map
@@ -390,6 +395,7 @@ private:
 
 	ObjectID			m_wallPieces[MAX_WALL_PIECES];
 	std::vector<ObjectID> m_retailWallPieces;
+	std::set<ObjectID> m_retailTrackedFootprints;
 	void refreshRetailWallLayer();
 	Int						m_numWallPieces;
 	Real					m_wallHeight;

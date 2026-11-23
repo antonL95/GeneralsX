@@ -45,6 +45,7 @@
 #include "Common/Team.h"
 #include "Common/Xfer.h"
 #include "Lib/trig.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/TerrainLogic.h"
 
 
@@ -146,6 +147,7 @@ void Thing::setPositionZ( Real z )
 		Coord3D oldPos = m_cachedPos;
 		Matrix3D oldMtx = m_transform;
 
+		Object* footprint = z != oldPos.z ? Pathfinder::detachRetailFootprintForTransform(this) : nullptr;
 		m_transform.Set_Z_Translation( z );
 		m_cachedPos.z = z;
 
@@ -158,6 +160,8 @@ void Thing::setPositionZ( Real z )
 			m_cachedAltitudeAboveTerrainOrWater += (z - oldPos.z);
 		}
 
+		if (footprint)
+			Pathfinder::reattachRetailFootprintAfterTransform(footprint);
 		reactToTransformChange(&oldMtx, &oldPos, oldAngle);
 	}
 	else
@@ -183,12 +187,16 @@ void Thing::setPosition( const Coord3D *pos )
 		Matrix3D oldMtx = m_transform;
 
 		//DEBUG_ASSERTCRASH(!(_isnan(pos->x) || _isnan(pos->y) || _isnan(pos->z)), ("Drawable/Object position NAN! '%s'", m_template->getName().str() ));
+		Object* footprint = pos->x != oldPos.x || pos->y != oldPos.y || pos->z != oldPos.z
+			? Pathfinder::detachRetailFootprintForTransform(this) : nullptr;
 		m_transform.Set_X_Translation( pos->x );
 		m_transform.Set_Y_Translation( pos->y );
 		m_transform.Set_Z_Translation( pos->z );
 		m_cachedPos = *pos;
 		m_cacheFlags &= ~(VALID_ALTITUDE_TERRAIN | VALID_ALTITUDE_SEALEVEL);	// but don't clear the dir flags.
 
+		if (footprint)
+			Pathfinder::reattachRetailFootprintAfterTransform(footprint);
 		reactToTransformChange(&oldMtx, &oldPos, oldAngle);
 	}
 	else
@@ -218,6 +226,8 @@ void Thing::setOrientation( Real angle )
 	pos.x = m_transform.Get_X_Translation();
 	pos.y = m_transform.Get_Y_Translation();
 	pos.z = m_transform.Get_Z_Translation();
+	const Real newAngle = normalizeAngle(angle);
+	Object* footprint = newAngle != oldAngle ? Pathfinder::detachRetailFootprintForTransform(this) : nullptr;
 	if( m_template->isKindOf( KINDOF_STICK_TO_TERRAIN_SLOPE) )
 	{
 		Matrix3D mtx;
@@ -243,10 +253,12 @@ void Thing::setOrientation( Real angle )
 	}
 
 	//DEBUG_ASSERTCRASH(-PI <= angle && angle <= PI, ("Please pass only normalized (-PI..PI) angles to setOrientation (%f).", angle));
-	m_cachedAngle = normalizeAngle(angle);
+	m_cachedAngle = newAngle;
 	m_cachedPos = pos;
 	m_cacheFlags &= ~VALID_DIRVECTOR;	// but don't clear the altitude flags.
 
+	if (footprint)
+		Pathfinder::reattachRetailFootprintAfterTransform(footprint);
 	reactToTransformChange(&oldMtx, &oldPos, oldAngle);
 	DEBUG_ASSERTCRASH(!(_isnan(getPosition()->x) || _isnan(getPosition()->y) || _isnan(getPosition()->z)), ("Drawable/Object position NAN! '%s'", m_template->getName().str() ));
 }
@@ -261,13 +273,17 @@ void Thing::setTransformMatrix( const Matrix3D *mx )
 	Coord3D oldPos = m_cachedPos;
 	Matrix3D oldMtx = m_transform;
 
+	const Coord3D newPos = {mx->Get_X_Translation(), mx->Get_Y_Translation(), mx->Get_Z_Translation()};
+	const Real newAngle = mx->Get_Z_Rotation();
+	Object* footprint = newPos.x != oldPos.x || newPos.y != oldPos.y || newPos.z != oldPos.z || newAngle != oldAngle
+		? Pathfinder::detachRetailFootprintForTransform(this) : nullptr;
 	m_transform = *mx;
-	m_cachedPos.x = m_transform.Get_X_Translation();
-	m_cachedPos.y = m_transform.Get_Y_Translation();
-	m_cachedPos.z = m_transform.Get_Z_Translation();
-	m_cachedAngle = m_transform.Get_Z_Rotation();
+	m_cachedPos = newPos;
+	m_cachedAngle = newAngle;
 	m_cacheFlags = 0;
 
+	if (footprint)
+		Pathfinder::reattachRetailFootprintAfterTransform(footprint);
 	reactToTransformChange(&oldMtx, &oldPos, oldAngle);
 	DEBUG_ASSERTCRASH(!(_isnan(getPosition()->x) || _isnan(getPosition()->y) || _isnan(getPosition()->z)), ("Drawable/Object position NAN! '%s'", m_template->getName().str() ));
 }

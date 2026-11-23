@@ -173,6 +173,7 @@ Pathfinder::~Pathfinder()
 
 void Pathfinder::reset()
 {
+	m_retailTrackedFootprints.clear();
 	frameToShowObstacles = 0;
 	DEBUG_LOG(("Pathfind cell is %d bytes, PathfindCellInfo is %d bytes", sizeof(PathfindCell), sizeof(PathfindCellInfo)));
 
@@ -531,6 +532,32 @@ void Pathfinder::classifyFence( Object *obj, Bool insert )
 #endif
 }
 
+Object* Pathfinder::detachRetailFootprintForTransform(Thing* thing)
+{
+	if (!RetailFileLayers::enabled() || !TheAI || (TheGameState && TheGameState->isInLoadGame()))
+		return nullptr;
+	Object* obj = AsObject(thing);
+	Pathfinder* pathfinder = TheAI->pathfinder();
+	if (!obj || !pathfinder)
+		return nullptr;
+	const ObjectID id = obj->getID();
+	if (!pathfinder->m_retailTrackedFootprints.contains(id) &&
+		!std::binary_search(pathfinder->m_retailWallPieces.begin(), pathfinder->m_retailWallPieces.end(), id))
+		return nullptr;
+	if (obj->isKindOf(KINDOF_BLAST_CRATER))
+		return nullptr;
+	pathfinder->classifyObjectFootprint(obj, FALSE);
+	return obj;
+}
+
+void Pathfinder::reattachRetailFootprintAfterTransform(Object* obj)
+{
+	const Coord3D& position = *obj->getPosition();
+	if (std::isfinite(position.x) && std::isfinite(position.y) && std::isfinite(position.z) &&
+		std::isfinite(obj->getOrientation()))
+		TheAI->pathfinder()->classifyObjectFootprint(obj, TRUE);
+}
+
 /**
  * Classify the cells under the given object
  * If 'insert' is true, object is being added
@@ -540,20 +567,23 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 {
 	if (m_map == nullptr)
 		return;
+	const Bool retail = RetailFileLayers::enabled();
+	if (retail && !insert)
+		m_retailTrackedFootprints.erase(obj->getID());
 	if (insert && obj->getStatusBits().test(OBJECT_STATUS_MASKED) && ModuleFactory::registersRotwkModules())
 	{
 		const auto* castle = static_cast<const CastleBehavior*>(obj->findUpdateModule(NAMEKEY("CastleBehavior")));
 		if (castle && castle->isUnpacked())
 			return;
 	}
-	if (RetailFileLayers::enabled() && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
+	if (retail && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL))
 	{
 		if (insert)
 			addWallPiece(obj);
 		else if (obj->isDestroyed() || obj->isEffectivelyDead())
 			removeWallPiece(obj);
 	}
-	if (insert && RetailFileLayers::enabled() && obj->isEffectivelyDead() &&
+	if (insert && retail && obj->isEffectivelyDead() &&
 		(obj->isKindOf(KINDOF_WALL_SEGMENT) || obj->isKindOf(KINDOF_WALL_GATE) ||
 		 obj->isKindOf(KINDOF_WALL_HUB) || obj->isKindOf(KINDOF_DEFENSIVE_WALL) ||
 		 obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
@@ -574,6 +604,8 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 	{
 		if (!obj->isKindOf(KINDOF_DEFENSIVE_WALL))
 		{
+			if (retail && insert)
+				m_retailTrackedFootprints.insert(obj->getID());
 			classifyFence(obj, insert);
 			return;
 		}
@@ -591,7 +623,6 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 
 		removeUnitFromPathfindMap(obj);
 		if (obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)) {
-			const Bool retail = RetailFileLayers::enabled();
 			const Bool checkFalling = retail
 				? !obj->isDestroyed() && obj->isEffectivelyDead() && !(TheGameState && TheGameState->isInLoadGame())
 				: !m_layers[LAYER_WALL].isUnused();
@@ -636,10 +667,12 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 	if (obj->getGeometryInfo().getIsSmall())
 	{
 		const ThingTemplate* definition = obj->getTemplate();
-		if (!RetailFileLayers::enabled() || definition->getRotWKObjectData().additionalGeometries.empty() ||
+		if (!retail || definition->getRotWKObjectData().additionalGeometries.empty() ||
 			definition->getTemplateGeometryInfo().getIsSmall())
 			return;
 	}
+	if (retail && insert)
+		m_retailTrackedFootprints.insert(obj->getID());
 
 #if RTS_GENERALS
 	if (obj->getHeightAboveTerrain() > PATHFIND_CELL_SIZE_F) {
@@ -1106,6 +1139,7 @@ void Pathfinder::newMap()
  */
 void Pathfinder::classifyMap()
 {
+	m_retailTrackedFootprints.clear();
 
 	Int i, j;
 	const Bool retail = RetailFileLayers::enabled();
