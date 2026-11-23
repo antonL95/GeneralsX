@@ -25,8 +25,9 @@ export GENERALSX_SKIRMISH_PROBE_DIFFICULTY="$5"
 first=$6
 last=$7
 interval=${SKIRMISH_SAVE_CRC_INTERVAL:-1}
-for frame in "$first" "$last" "$interval"; do
-    case "$frame" in ''|0*|*[!0-9]*) usage ;; esac
+phase_timeout=${SKIRMISH_SAVE_PHASE_TIMEOUT:-720}
+for number in "$first" "$last" "$interval" "$phase_timeout"; do
+    case "$number" in ''|0*|*[!0-9]*) usage ;; esac
 done
 [ "$first" -lt "$last" ] && [ "$last" -le 54000 ] && [ "$interval" -le 54000 ] || usage
 export GENERALSX_SKIRMISH_PROBE_FRAMES="$last" GENERALSX_SKIRMISH_AI_TRACE=1
@@ -60,11 +61,14 @@ run() {
     shift 2
     printf 'Running %s\n' "$phase"
     export GENERALSX_TEST_COMMANDS="$out/$commands.txt"
-    timeout --kill-after=10 360 "$engine" -headless -noFPSLimit -noaudio -nomusic -novideo -noshellmap \
-        -mod "$aotr" -bfme2 "$bfme2" "$@" > "$out/$phase.log" 2>&1 || {
+    status=0
+    timeout --kill-after=10 "$phase_timeout" "$engine" -headless -noFPSLimit -noaudio -nomusic -novideo -noshellmap \
+        -mod "$aotr" -bfme2 "$bfme2" "$@" > "$out/$phase.log" 2>&1 || status=$?
+    if [ "$status" -ne 0 ]; then
+        printf '%s exited with status %s. See %s.\n' "$phase" "$status" "$out/$phase.log" >&2
         tail -40 "$out/$phase.log" >&2
-        return 1
-    }
+        return "$status"
+    fi
 }
 
 run save save -file "maps/$map/$map.map"
