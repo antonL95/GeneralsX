@@ -154,21 +154,22 @@ void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, co
 		return;
 	}
 
-	if (object && object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+	if (object)
 	{
 		decal.clear();
-		RetailWorldUI::drawTerrainClaims(view, *player, object, radius);
+		if (object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+			RetailWorldUI::drawTerrainClaims(view, *player, object, radius);
+		else
+			RetailWorldUI::drawTerrainClaims(view, *player);
 		return;
 	}
 
-	AsciiString texture = TheInGameUI->getTerrainClaimDecal(placement != nullptr);
+	AsciiString texture = TheInGameUI->getTerrainClaimDecal(TRUE);
 	if (const Image* image = TheMappedImageCollection ? TheMappedImageCollection->findImageByName(texture) : nullptr)
 		texture = image->getFilename();
 	decal.set(texture, position, radius * 2.0f, radius * 2.0f, 108);
 	RetailWorldUI::drawTerrainClaims(view, *player);
 
-	if (object)
-		position.z += object->getGeometryInfo().getMaxHeightAbovePosition();
 	ICoord2D center;
 	if (!view.worldToScreen(&position, &center))
 		return;
@@ -183,7 +184,7 @@ void drawTerrainResourceIndicator(View& view, const ThingTemplate* placement, co
 	Int width, height;
 	label->getSize(&width, &height);
 	const Int x = center.x - width / 2;
-	const Int y = object ? center.y + 8 : center.y - height - 28;
+	const Int y = center.y - height - 28;
 	label->draw(x, y, GameMakeColor(131, 255, 94, 255), GameMakeColor(13, 25, 12, 240));
 }
 

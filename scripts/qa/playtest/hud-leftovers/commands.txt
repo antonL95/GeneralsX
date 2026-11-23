@@ -17,3 +17,4 @@
 154 power-cast Player_1 - 6 at 760 750
 225 select Player_1 GondorBigTrebuchet_Summoned 0
 265 select Player_1 MenPorter 0
+278 select Player_1 GondorFarm 0
