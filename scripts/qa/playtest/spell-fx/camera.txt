@@ -1,8 +1,9 @@
 96 Player_1 GondorTowerShieldGuard 3150 690 0.31
 155 Player_1 GondorFaramir 3340 850 0.55
-249 Player_1 GondorBoromir 2520 1010 0.31
-359 Player_1 GondorGandalf 2260 1180 0.31
-429 Player_1 GondorTowerShieldGuard 3150 690 0.31
-484 Player_1 GondorBoromir 2765 980 0.52
-614 Player_1 GondorFaramir 3260 970 0.52
-790 Player_1 GondorElessar 3050 520 0.31
+319 Player_1 GondorBoromir 2520 1010 0.31
+424 Player_1 GondorGandalf 2260 1180 0.31
+494 Player_1 GondorTowerShieldGuard 3150 690 0.31
+544 Player_1 GondorBoromir 2765 980 0.52
+669 Player_1 GondorFaramir 3260 970 0.52
+810 Player_1 GondorBoromir 2765 980 0.52
+835 Player_1 GondorElessar 3050 520 0.31
