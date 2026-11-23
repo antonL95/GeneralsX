@@ -119,8 +119,9 @@ def render(build, output, state, map_path, frames, camera_frames, end_frame, com
     env.update(checks.get("render_env", {}))
     for frame in frames:
         env[f"PLAYTEST_PNG_{frame}"] = str(output / f"frame-{frame:04d}.png")
+    timeout = env.get("PLAYTEST_TIMEOUT_SECONDS", str(checks.get("engine_timeout", 225)))
     argv = [
-        "timeout", "--signal=INT", "--kill-after=10", env.get("PLAYTEST_TIMEOUT_SECONDS", str(checks.get("engine_timeout", 225))), "xvfb-run", "-a",
+        "timeout", "--signal=INT", "--kill-after=10", timeout, "xvfb-run", "-a",
         "-s", f"-screen 0 {width}x{height}x24",
         "gdb", "-q", "-nx", "-batch", "-return-child-result",
         "-x", str(ROOT / "start.gdb"), "-ex", f"source {ROOT / 'capture.py'}", "-ex", "run",
@@ -135,7 +136,10 @@ def render(build, output, state, map_path, frames, camera_frames, end_frame, com
     log_text = log.read_text(errors="replace")
     if (status or f"TEST frame {end_frame}: quit" not in log_text
             or "Python Exception" in log_text or "Traceback (most recent call last)" in log_text):
-        print("\n".join(log_text.splitlines()[-40:]), file=sys.stderr)
+        lines = log_text.splitlines()
+        if env.get("GENERALSX_TEST_RENDER_TIME"):
+            print("\n".join(line for line in lines[:-40] if line.startswith("TEST render-time ")), file=sys.stderr)
+        print("\n".join(lines[-40:]), file=sys.stderr)
         raise RuntimeError(f"Engine session failed (exit {status}, expected quit frame {end_frame})")
     if env.get("PLAYTEST_PIN_DYNAMIC_LOD") == "1" and "TEST dynamic-lod-pinned VeryHigh skip-mask=0" not in log_text:
         raise RuntimeError("Dynamic LOD was not pinned to VeryHigh with particle skipping disabled")
