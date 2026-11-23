@@ -18,12 +18,22 @@
 245 pkg59-state Player_1 AngmarWolfRider 0 wolf-fire
 245 pkg59-state Player_1 HaradBeruthielCat 0 cat-fire
 245 pkg59-state Player_1 MordorVariag_Rhun 0 variag-fire
+250 create Player_1 CorsairPlunderChest 0 420,2280,0
+250 pkg60-recovery Player_1 CorsairPlunderChest 0
+251 pkg60-state Player_1 CorsairPlunderChest 0 recovery
+252 pkg60-hit Player_1 CorsairPlunderChest 0 recovery 260 0 0
+252 pkg60-state Player_1 CorsairPlunderChest 0 recovery
+279 pkg60-state Player_1 CorsairPlunderChest 0 recovery
+280 pkg60-heal Player_1 CorsairPlunderChest 0 recovery 190 0 0
+280 pkg60-state Player_1 CorsairPlunderChest 0 recovery
 317 pkg59-state Player_1 AngmarWolfRider 0 wolf-fire
 317 pkg59-state Player_1 HaradBeruthielCat 0 cat-fire
 319 pkg59-state Player_1 AngmarWolfRider 0 wolf-fire
 319 pkg59-state Player_1 HaradBeruthielCat 0 cat-fire
 389 pkg59-state Player_1 MordorVariag_Rhun 0 variag-fire
 391 pkg59-state Player_1 MordorVariag_Rhun 0 variag-fire
+402 pkg60-state Player_1 CorsairPlunderChest 0 recovery
+403 destroy Player_1 CorsairPlunderChest 0
 479 pkg59-state Player_1 AmazhirCamel 0 camel-fire
 479 pkg59-state PlyrCivilian AmazhirCamel 0 camel-control
 479 pkg59-state PlyrCivilian HaradBeruthielCat 0 cat-control
@@ -40,3 +50,108 @@
 751 pkg59-state PlyrCivilian AngmarWolfRider 0 wolf-control
 827 pkg59-state Player_1 AngmarWolfRider 0 wolf-fire
 829 pkg59-state Player_1 AngmarWolfRider 0 wolf-fire
+885 create Player_1 Pkg60Shooter 0 440,2200,0
+885 create PlyrCreeps HaradHasharinBlade 0 495,2200,0
+885 create PlyrCreeps HaradZigur 0 550,2200,0
+885 pkg60-dodge Player_1 Pkg60Shooter 0 PlyrCreeps:HaradHasharinBlade:0 64 0 0
+885 pkg60-undodgeable Player_1 Pkg60Shooter 0 PlyrCreeps:HaradHasharinBlade:0 64 0 0
+885 pkg60-dodge Player_1 Pkg60Shooter 0 PlyrCreeps:HaradZigur:0 64 0 0
+885 pkg60-undodgeable Player_1 Pkg60Shooter 0 PlyrCreeps:HaradZigur:0 64 0 0
+886 destroy PlyrCreeps HaradHasharinBlade 0
+886 destroy PlyrCreeps HaradZigur 0
+886 destroy Player_1 Pkg60Shooter 0
+903 create Player_1 AngmarWolfRider 0 450,2200,0
+903 create PlyrCreeps Pkg60CheerWitness 0 530,2200,0
+903 create PlyrCreeps Pkg60CheerWitness 1 560,2200,0
+903 create Player_1 Pkg60CheerWitness 0 450,2280,0
+903 create PlyrCreeps Pkg60Shooter 0 635,2200,0
+904 pkg60-state Player_1 AngmarWolfRider 0 radius
+904 pkg60-kill Player_1 AngmarWolfRider 0 PlyrCreeps:Pkg60Shooter:0
+904 pkg60-state PlyrCreeps Pkg60CheerWitness 0 near
+904 pkg60-state PlyrCreeps Pkg60CheerWitness 1 far
+904 pkg60-state Player_1 Pkg60CheerWitness 0 allied
+905 destroy Player_1 AngmarWolfRider 0
+905 destroy PlyrCreeps Pkg60CheerWitness 1
+905 destroy PlyrCreeps Pkg60CheerWitness 0
+905 destroy Player_1 Pkg60CheerWitness 0
+905 destroy PlyrCreeps Pkg60Shooter 0
+913 create Player_1 AngmarDarkDunedain 0 450,2200,0
+913 create PlyrCreeps Pkg60CheerWitness 0 530,2200,0
+913 create PlyrCreeps Pkg60CheerWitness 1 560,2200,0
+913 create Player_1 Pkg60CheerWitness 0 450,2280,0
+913 create PlyrCreeps Pkg60Shooter 0 635,2200,0
+914 pkg60-state Player_1 AngmarDarkDunedain 0 radius
+914 pkg60-kill Player_1 AngmarDarkDunedain 0 PlyrCreeps:Pkg60Shooter:0
+914 pkg60-state PlyrCreeps Pkg60CheerWitness 0 near
+914 pkg60-state PlyrCreeps Pkg60CheerWitness 1 far
+914 pkg60-state Player_1 Pkg60CheerWitness 0 allied
+915 destroy Player_1 AngmarDarkDunedain 0
+915 destroy PlyrCreeps Pkg60CheerWitness 1
+915 destroy PlyrCreeps Pkg60CheerWitness 0
+915 destroy Player_1 Pkg60CheerWitness 0
+915 destroy PlyrCreeps Pkg60Shooter 0
+923 create Player_1 MordorGrond 0 450,2200,0
+923 create PlyrCreeps Pkg60CheerWitness 0 530,2200,0
+923 create PlyrCreeps Pkg60CheerWitness 1 560,2200,0
+923 create Player_1 Pkg60CheerWitness 0 450,2280,0
+923 create PlyrCreeps Pkg60Shooter 0 635,2200,0
+924 pkg60-state Player_1 MordorGrond 0 radius
+924 pkg60-kill Player_1 MordorGrond 0 PlyrCreeps:Pkg60Shooter:0
+924 pkg60-state PlyrCreeps Pkg60CheerWitness 0 near
+924 pkg60-state PlyrCreeps Pkg60CheerWitness 1 far
+924 pkg60-state Player_1 Pkg60CheerWitness 0 allied
+925 destroy Player_1 MordorGrond 0
+925 destroy PlyrCreeps Pkg60CheerWitness 1
+925 destroy PlyrCreeps Pkg60CheerWitness 0
+925 destroy Player_1 Pkg60CheerWitness 0
+925 destroy PlyrCreeps Pkg60Shooter 0
+933 create Player_1 MordorDrummerTroll 0 450,2200,0
+933 create PlyrCreeps Pkg60CheerWitness 0 530,2200,0
+933 create PlyrCreeps Pkg60CheerWitness 1 560,2200,0
+933 create Player_1 Pkg60CheerWitness 0 450,2280,0
+933 create PlyrCreeps Pkg60Shooter 0 635,2200,0
+934 pkg60-state Player_1 MordorDrummerTroll 0 radius
+934 pkg60-kill Player_1 MordorDrummerTroll 0 PlyrCreeps:Pkg60Shooter:0
+934 pkg60-state PlyrCreeps Pkg60CheerWitness 0 near
+934 pkg60-state PlyrCreeps Pkg60CheerWitness 1 far
+934 pkg60-state Player_1 Pkg60CheerWitness 0 allied
+935 destroy Player_1 MordorDrummerTroll 0
+935 destroy PlyrCreeps Pkg60CheerWitness 1
+935 destroy PlyrCreeps Pkg60CheerWitness 0
+935 destroy Player_1 Pkg60CheerWitness 0
+935 destroy PlyrCreeps Pkg60Shooter 0
+943 create Player_1 MordorVariag_Rhun 0 450,2200,0
+943 create PlyrCreeps Pkg60CheerWitness 0 530,2200,0
+943 create PlyrCreeps Pkg60CheerWitness 1 560,2200,0
+943 create Player_1 Pkg60CheerWitness 0 450,2280,0
+943 create PlyrCreeps Pkg60Shooter 0 635,2200,0
+944 pkg60-state Player_1 MordorVariag_Rhun 0 radius
+944 pkg60-kill Player_1 MordorVariag_Rhun 0 PlyrCreeps:Pkg60Shooter:0
+944 pkg60-state PlyrCreeps Pkg60CheerWitness 0 near
+944 pkg60-state PlyrCreeps Pkg60CheerWitness 1 far
+944 pkg60-state Player_1 Pkg60CheerWitness 0 allied
+945 destroy Player_1 MordorVariag_Rhun 0
+945 destroy PlyrCreeps Pkg60CheerWitness 1
+945 destroy PlyrCreeps Pkg60CheerWitness 0
+945 destroy Player_1 Pkg60CheerWitness 0
+945 destroy PlyrCreeps Pkg60Shooter 0
+980 pkg59-load-fx - - 0
+980 create Player_1 HaradAicanaroc 0 450,2260,0
+980 create Player_1 Pkg60HealingAicanaroc 0 550,2260,0
+981 pkg60-heal Player_1 Pkg60HealingAicanaroc 0 full 100 0 0
+981 pkg60-hit Player_1 HaradAicanaroc 0 none 100 0 0
+981 pkg60-heal Player_1 HaradAicanaroc 0 none 100 0 0
+981 pkg60-hit Player_1 Pkg60HealingAicanaroc 0 configured 100 0 0
+981 pkg60-heal Player_1 Pkg60HealingAicanaroc 0 configured 100 0 0
+982 destroy Player_1 HaradAicanaroc 0
+982 destroy Player_1 Pkg60HealingAicanaroc 0
+1020 create PlyrCreeps MordorHaradrimPalace 0 474,2213,0
+1020 create Player_1 Pkg60Shooter 0 655,2213,0
+1021 pkg60-state PlyrCreeps MordorHaradrimPalace 0 undamaged
+1021 pkg60-siege-control Player_1 Pkg60Shooter 0 PlyrCreeps:MordorHaradrimPalace:0
+1022 pkg60-rock Player_1 Pkg60Shooter 0 PlyrCreeps:MordorHaradrimPalace:0
+1023 pkg60-rock Player_1 Pkg60Shooter 0 PlyrCreeps:MordorHaradrimPalace:0
+1024 pkg60-rock Player_1 Pkg60Shooter 0 PlyrCreeps:MordorHaradrimPalace:0
+1025 pkg60-rock Player_1 Pkg60Shooter 0 PlyrCreeps:MordorHaradrimPalace:0
+1030 destroy PlyrCreeps MordorHaradrimPalace 0
+1030 destroy Player_1 Pkg60Shooter 0
