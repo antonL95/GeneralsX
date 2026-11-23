@@ -1,0 +1,36 @@
+20 create Player_1 GondorFountainGuardHorde 0 3080,650,0
+21 reveal Player_1 GondorFountainGuardHorde 0
+25 select Player_1 GondorFountainGuardHorde 0
+35 formation-hover Player_1 GondorFountainGuardHorde 0 ring
+59 formation-hud Player_1 GondorFountainGuardHorde 0
+59 formation-state Player_1 GondorFountainGuardHorde 0
+60 formation-click Player_1 GondorFountainGuardHorde 0 ring
+62 formation-state Player_1 GondorFountainGuardHorde 0
+63 formation-hud Player_1 GondorFountainGuardHorde 0
+72 formation-hover Player_1 GondorFountainGuardHorde 0 ring
+100 keyw Player_1 GondorFountainGuardHorde 0
+102 formation-state Player_1 GondorFountainGuardHorde 0
+103 formation-hud Player_1 GondorFountainGuardHorde 0
+110 formation-click Player_1 GondorFountainGuardHorde 0 stance
+113 formation-hud Player_1 GondorFountainGuardHorde 0
+115 keyw Player_1 GondorFountainGuardHorde 0
+117 formation-state Player_1 GondorFountainGuardHorde 0
+118 formation-hud Player_1 GondorFountainGuardHorde 0
+125 formation-click Player_1 GondorFountainGuardHorde 0 ring
+127 formation-state Player_1 GondorFountainGuardHorde 0
+131 create Player_1 GondorTowerShieldGuardHorde 0 3230,650,0
+131 create Player_1 GondorRangerHorde 0 3380,650,0
+138 select Player_1 GondorFountainGuardHorde 0
+138 selectadd Player_1 GondorTowerShieldGuardHorde 0
+138 selectadd Player_1 GondorRangerHorde 0
+141 formation-hud Player_1 GondorFountainGuardHorde 0
+144 formation-state Player_1 GondorRangerHorde 0
+145 formation-click Player_1 GondorFountainGuardHorde 0 ring
+147 formation-state Player_1 GondorFountainGuardHorde 0
+147 formation-state Player_1 GondorTowerShieldGuardHorde 0
+147 formation-state Player_1 GondorRangerHorde 0
+148 formation-hud Player_1 GondorFountainGuardHorde 0
+170 keyw Player_1 GondorFountainGuardHorde 0
+172 formation-state Player_1 GondorFountainGuardHorde 0
+172 formation-state Player_1 GondorTowerShieldGuardHorde 0
+172 formation-state Player_1 GondorRangerHorde 0

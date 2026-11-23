@@ -1,0 +1,23 @@
+204 create Player_1 FormationButtonsGuard 0 3080,1230,0
+204 create Player_1 FormationButtonsPikes 0 3080,1370,0
+204 create Player_1 FormationButtonsControl 0 3080,1510,0
+230 formation-state Player_1 FormationButtonsGuard 0
+230 formation-state Player_1 FormationButtonsPikes 0
+230 formation-state Player_1 FormationButtonsControl 0
+234 select Player_1 FormationButtonsGuard 0
+234 selectadd Player_1 FormationButtonsPikes 0
+234 selectadd Player_1 FormationButtonsControl 0
+235 formation-message Player_1 FormationButtonsGuard 0 on
+237 formation-state Player_1 FormationButtonsGuard 0
+237 formation-state Player_1 FormationButtonsPikes 0
+237 formation-state Player_1 FormationButtonsControl 0
+245 formation-state Player_1 FormationButtonsGuard 0
+245 formation-state Player_1 FormationButtonsPikes 0
+245 formation-state Player_1 FormationButtonsControl 0
+248 select Player_1 FormationButtonsGuard 0
+248 selectadd Player_1 FormationButtonsPikes 0
+248 selectadd Player_1 FormationButtonsControl 0
+249 formation-message Player_1 FormationButtonsGuard 0 off
+251 formation-state Player_1 FormationButtonsGuard 0
+251 formation-state Player_1 FormationButtonsPikes 0
+251 formation-state Player_1 FormationButtonsControl 0

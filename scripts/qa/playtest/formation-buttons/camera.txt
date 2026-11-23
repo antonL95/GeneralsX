@@ -1,0 +1,2 @@
+24 Player_1 GondorFountainGuardHorde 3080 650 0.48
+135 Player_1 GondorFountainGuardHorde 3230 650 0.68
