@@ -1071,6 +1071,7 @@ protected:
 
 		const Bool retail = RetailFileLayers::enabled();
 		const Bool retailObject = retail && m_nameAreObjects;
+		const Real launchIntensity = retail ? ConvertVelocityInSecsToFrames(m_dispositionIntensity) : m_dispositionIntensity;
 		const Bool deferFootprint = retailObject &&
 			(obj->isKindOf(KINDOF_STRUCTURE) || obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL));
 		const GeometryUpgrade::ScopedPathfindDeferral placementFootprint(deferFootprint ? obj : nullptr);
@@ -1187,7 +1188,7 @@ protected:
 					const Real length = WWMath::SqrtfOrigin(offset.x * offset.x + offset.y * offset.y);
 					if (length > 0.0f)
 					{
-						const Real scale = m_dispositionIntensity * m_velocityScale / length;
+						const Real scale = launchIntensity * m_velocityScale / length;
 						impulse.x += offset.x * scale;
 						impulse.y += offset.y * scale;
 					}
@@ -1273,11 +1274,13 @@ protected:
 				objUp->setExtraFriction(m_extraFriction);
 
 				Coord3D force;
-				Real horizForce = 4.0f * m_dispositionIntensity;		// 2
+				const Real horizForce = 4.0f * launchIntensity;
 				force.x = GameLogicRandomValueReal( -horizForce, horizForce );
 				force.y = GameLogicRandomValueReal( -horizForce, horizForce );
 				force.z = 0;
 
+				if (retail)
+					force.scale(objUp->getMass());
 				objUp->applyForce(&force);
 				if (m_orientInForceDirection)
 					orientation = WWMath::Atan2Origin(force.y, force.x);
@@ -1335,8 +1338,8 @@ protected:
 				Coord3D force;
 				if( BitIsSet( m_disposition, SEND_IT_FLYING ) )
 				{
-					Real horizForce = 4.0f * m_dispositionIntensity;		// 2
-					Real vertForce = 3.0f * m_dispositionIntensity;		// 3
+					const Real horizForce = 4.0f * launchIntensity;
+					const Real vertForce = 3.0f * launchIntensity;
 					force.x = GameLogicRandomValueReal( -horizForce, horizForce );
 					force.y = GameLogicRandomValueReal( -horizForce, horizForce );
 					force.z = GameLogicRandomValueReal( vertForce * 0.33f, vertForce );
@@ -1346,8 +1349,8 @@ protected:
 				}
 				else if (BitIsSet(m_disposition, SEND_IT_UP) )
 				{
-					Real horizForce = 2.0f * m_dispositionIntensity;
-					Real vertForce = 4.0f * m_dispositionIntensity;
+					const Real horizForce = 2.0f * launchIntensity;
+					const Real vertForce = 4.0f * launchIntensity;
 
 					force.x = GameLogicRandomValueReal( -horizForce, horizForce );
 					force.y = GameLogicRandomValueReal( -horizForce, horizForce );
@@ -1365,6 +1368,8 @@ protected:
 					DUMPREAL(m_maxPitch);
 					DUMPCOORD3D(&force);
 				}
+				if (retail && BitIsSet(m_disposition, SEND_IT_FLYING | SEND_IT_UP))
+					force.scale(objUp->getMass());
 				objUp->applyForce(&force);
 				if (m_orientInForceDirection)
 				{
