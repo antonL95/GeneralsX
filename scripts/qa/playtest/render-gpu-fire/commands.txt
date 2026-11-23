@@ -1,2 +1,3 @@
-20 create Player_1 CINEfireMedium 0 2520,1010,0
+20 create Player_1 CINEfireMedium 0 3025,900,0
+20 create Player_1 CINE_ParticleSysProxy6 0 3145,900,0
 21 reveal Player_1 CINEfireMedium 0

@@ -290,7 +290,7 @@ void ParticleSystemTemplate::parseFXUnrendered( INI* ini, void *, void *, const 
 
 Bool ParticleSystemTemplate::canDrawGpuParticles() const
 {
-	return m_isRenderable && m_isGpuParticle && m_hasGpuDraw && m_gpuDetailTexture.isEmpty() &&
+	return m_isRenderable && m_isGpuParticle && m_hasGpuDraw &&
 		(m_shaderType == ADDITIVE || m_shaderType == ALPHA) && m_particleAlignment == PARTICLE_ALIGNMENT_BILLBOARD &&
 		m_gpuFramesPerRow > 0 && m_gpuFramesPerRow <= 256 && m_gpuTotalFrames > 0 &&
 		m_gpuTotalFrames <= m_gpuFramesPerRow * m_gpuFramesPerRow &&

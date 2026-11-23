@@ -1,1 +1,1 @@
-24 Player_1 CINEfireMedium 2520 1010 0.42
+24 Player_1 CINEfireMedium 3085 900 0.30

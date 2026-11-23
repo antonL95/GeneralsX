@@ -149,7 +149,9 @@ std::unique_ptr<GpuParticlePass> GpuParticlePass::make(void *handle, const Effec
 		if (item.type != ValueType::PixelShader || !item.object || *item.object >= effect.objects.size())
 			return {};
 		auto program = readProgram(effect.objects[*item.object], false);
-		if (!program)
+		if (!program || program->tokens.front() != 0xffff0200u ||
+			std::count_if(program->bindings.begin(), program->bindings.end(),
+				[](const auto &binding) { return binding.bank == 3; }) != data->samplers.size())
 			return {};
 		data->pixelPrograms[i] = std::move(*program);
 		data->pixels[i].reset(static_cast<IDirect3DPixelShader9 *>(createShader(false, data->pixelPrograms[i].tokens.data())));
