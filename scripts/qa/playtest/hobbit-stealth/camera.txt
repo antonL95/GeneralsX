@@ -1,0 +1,5 @@
+24 Player_1 GondorPippin 3100 875 0.36
+51 Player_1 GondorPippin 3135 875 0.36
+115 Player_1 GondorPippin 3210 875 0.36
+188 Player_1 GondorPippin 3180 875 0.36
+275 Player_1 GondorPippin 3318 917 0.37

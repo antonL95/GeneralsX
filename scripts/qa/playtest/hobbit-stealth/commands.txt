@@ -1,0 +1,25 @@
+20 create Player_1 GondorPippin 0 3100,860,0
+20 create Player_1 ArnorFattyBolger 0 3100,890,0
+20 hobbit-stealth Player_1 GondorPippin 0
+20 hobbit-stealth Player_1 ArnorFattyBolger 0
+21 reveal Player_1 GondorPippin 0
+30 hobbit-stealth Player_1 GondorPippin 0
+30 hobbit-stealth Player_1 ArnorFattyBolger 0
+42 move Player_1 GondorPippin 0 - 3210 860
+42 move Player_1 ArnorFattyBolger 0 - 3210 890
+65 hobbit-stealth Player_1 GondorPippin 0
+65 hobbit-stealth Player_1 ArnorFattyBolger 0
+135 hobbit-stealth Player_1 GondorPippin 0
+135 hobbit-stealth Player_1 ArnorFattyBolger 0
+150 power Player_1 GondorPippin 0 SpecialAbilityElfCloak
+160 hobbit-stealth Player_1 GondorPippin 0
+160 hobbit-stealth Player_1 ArnorFattyBolger 0
+180 move Player_1 GondorPippin 0 - 3100 860
+198 hobbit-stealth Player_1 GondorPippin 0
+198 hobbit-stealth Player_1 ArnorFattyBolger 0
+210 move Player_1 GondorPippin 0 - 3338 912
+210 move Player_1 ArnorFattyBolger 0 - 3338 940
+282 hobbit-stealth Player_1 GondorPippin 0
+282 hobbit-stealth Player_1 ArnorFattyBolger 0
+335 hobbit-stealth Player_1 GondorPippin 0
+335 hobbit-stealth Player_1 ArnorFattyBolger 0
