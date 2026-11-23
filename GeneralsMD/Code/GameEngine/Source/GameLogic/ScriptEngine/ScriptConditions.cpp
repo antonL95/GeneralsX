@@ -32,6 +32,7 @@
 #include "Common/GameEngine.h"
 #include "Common/MapObject.h"
 #include "Common/PlayerList.h"
+#include "Common/Recorder.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/Player.h"
 #include "Common/SpecialPower.h"
@@ -2973,8 +2974,14 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 		}
 
 		case Condition::IS_GAME_IN_SKIRMISH_OR_MULTIPLAYER:
-			return BfmeScriptRules::skirmishOrMultiplayerIs(TheGameLogic->isInSkirmishGame(),
-				TheGameLogic->isInMultiplayerGame(), pCondition->getParameter(0)->getInt() != 0);
+		{
+			GameMode mode = TheGameLogic->getGameMode();
+			if (RetailFileLayers::enabled() && TheGameLogic->isInReplayGame() &&
+				TheRecorder && TheRecorder->isPlaybackMode())
+				mode = TheRecorder->getGameMode();
+			return BfmeScriptRules::skirmishOrMultiplayerIs(rts::isSkirmishGame(mode),
+				rts::isMultiplayerGame(mode), pCondition->getParameter(0)->getInt() != 0);
+		}
 		case Condition::IS_GAME_MODE_ACTIVE:
 			return RetailFileLayers::enabled() && TheGameInfo &&
 				TheGameInfo->getRetailSkirmishRules().commandPointFactor > 0 && TheGameInfo->getRetailSkirmishRules().ringHeroes &&
