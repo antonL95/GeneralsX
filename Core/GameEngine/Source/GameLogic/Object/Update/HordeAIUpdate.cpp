@@ -12,6 +12,7 @@
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -425,6 +426,11 @@ UpdateSleepTime HordeAIUpdate::update()
 		setRetailComboLocomotor(useComboForTarget(target));
 #endif
 	const Real facingBefore = horde->getOrientation();
+#if RTS_ZEROHOUR
+	const PhysicsBehavior* anchorPhysics = RetailFileLayers::enabled() ? horde->getPhysics() : nullptr;
+	const Coord3D* anchorVelocity = anchorPhysics ? anchorPhysics->getVelocity() : nullptr;
+	const Bool wasTranslating = anchorVelocity && (anchorVelocity->x != 0.0f || anchorVelocity->y != 0.0f);
+#endif
 	Path* path = getPath();
 	const PathNode* end = path ? path->getLastNode() : nullptr;
 	const Locomotor* locomotor = getCurLocomotor();
@@ -462,7 +468,7 @@ UpdateSleepTime HordeAIUpdate::update()
 	{
 		const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
 #if RTS_ZEROHOUR
-		if (RetailFileLayers::enabled() && isMoving() && locomotor && locomotor->getAppearance() == LOCO_HORDE &&
+		if (wasTranslating && isMoving() && locomotor && locomotor->getAppearance() == LOCO_HORDE &&
 			locomotor->getWaitForFormation() && fabs(turn) > locomotor->getMaxTurnWithoutReform() &&
 			horde->isKindOf(KINDOF_INFANTRY) && !horde->isKindOf(KINDOF_CAVALRY) &&
 			!contain->isAlternateFormation() && !isReforming(this) && !isFollowingRetailGroupRoute())
