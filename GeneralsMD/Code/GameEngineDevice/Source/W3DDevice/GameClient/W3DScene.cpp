@@ -116,6 +116,7 @@ RTS3DScene::RTS3DScene()
 
 	m_maskMaterialPass = NEW_REF(W3DMaskMaterialPassClass,());
 	m_customPassMode = SCENE_PASS_DEFAULT;
+	m_hasVisibleGlowObjects = FALSE;
 
 	m_heatVisionMaterialPass = NEW_REF(MaterialPassClass,());
 	m_heatVisionOnlyPass = NEW_REF(MaterialPassClass,());
@@ -620,7 +621,7 @@ void RTS3DScene::renderSpecificDrawables(RenderInfoClass &rinfo, Int numDrawable
 //=============================================================================
 /** Renders a single drawable entity. */
 //=============================================================================
-void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, Int localPlayerIndex)
+void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, Int localPlayerIndex, Bool glowOnly)
 {
 	Drawable *draw = nullptr;
 	DrawableInfo *drawInfo = nullptr;
@@ -696,6 +697,9 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			}
 		}
 
+		if (glowOnly && ss >= OBJECTSHROUD_FOGGED)
+			return;
+
 		if (draw->isKindOf(KINDOF_INFANTRY))
 		{
 			//ambient = m_infantryAmbient;  //has no effect - see comment on m_infantryAmbient
@@ -754,7 +758,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		}
 
 		//Apply custom render pass for any drawables with heatvision enabled
-		if (draw->getSecondMaterialPassOpacity() != 0 )
+		if (!glowOnly && draw->getSecondMaterialPassOpacity() != 0)
 		{
 			rinfo.materialPassEmissiveOverride = draw->getSecondMaterialPassOpacity();
 
@@ -790,6 +794,8 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		//Render object without a drawable.  Must be either some fluff/debug object or a ghostObject.
 		if (ss == OBJECTSHROUD_FOGGED)
 		{
+			if (glowOnly)
+				return;
 			//Must be ghost object because we don't fog normal things.  Fogged objects always have a predefined
 			//lighting environment applied which emulates the look of fog.
 			rinfo.light_environment = &m_foggedLightEnv;
@@ -880,6 +886,39 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		rinfo.Pop_Material_Pass();
 	if (doExtraFlagsPop)
 		rinfo.Pop_Override_Flags();	//flags used to disable base pass and only render custom heat vision pass.
+}
+
+void RTS3DScene::renderGlow(CameraClass &camera)
+{
+	if (!RetailFileLayers::enabled())
+		return;
+
+	RenderInfoClass rinfo(camera);
+	TheDX8MeshRenderer.Set_Camera(&camera);
+	const Int localPlayerIndex = rts::getObservedOrLocalPlayerIndex_Safe();
+
+	RefRenderObjListIterator it(&RenderList);
+	for (it.First(); !it.Is_Done();)
+	{
+		RenderObjClass *object = it.Peek_Obj();
+		it.Next();
+		if (!object->Is_Glow_Enabled() || !object->Is_Really_Visible())
+			continue;
+
+		if (object->Is_Glow_Emissive())
+		{
+			WW3D::Flush(rinfo);
+			DX8TextureCategoryClass::Set_Glow_Emissive_Only(true);
+			renderOneObject(rinfo, object, localPlayerIndex, TRUE);
+			WW3D::Flush(rinfo);
+			DX8TextureCategoryClass::Set_Glow_Emissive_Only(false);
+		}
+		else
+		{
+			renderOneObject(rinfo, object, localPlayerIndex, TRUE);
+		}
+	}
+	WW3D::Flush(rinfo);
 }
 
 //DECLARE_PERF_TIMER(translucentRender)
@@ -1151,6 +1190,10 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 	RenderObjClass *terrainObject=nullptr,*robj;
 	m_translucentObjectsCount = 0;	//start of new frame so no translucent objects
 	m_occludedObjectsCount = 0;
+	const Bool recordGlow = m_customPassMode == SCENE_PASS_DEFAULT && RetailFileLayers::enabled();
+	if (recordGlow)
+		m_hasVisibleGlowObjects = FALSE;
+
 
 	const Int localPlayerIndex = rts::getObservedOrLocalPlayerIndex_Safe();
 
@@ -1227,6 +1270,8 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 			continue;	//we already rendered terrain
 
 		if (robj->Is_Really_Visible()) {
+			if (recordGlow && robj->Is_Glow_Enabled())
+				m_hasVisibleGlowObjects = TRUE;
 			DrawableInfo *drawInfo = (DrawableInfo *)robj->Get_User_Data();
 			Drawable *draw=nullptr;
 			if (drawInfo)

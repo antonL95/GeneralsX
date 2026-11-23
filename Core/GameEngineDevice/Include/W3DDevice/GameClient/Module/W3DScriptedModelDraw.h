@@ -104,6 +104,8 @@ public:
 	const ModelConditionInfo* findNamedTransition(const ModelConditionInfo* previous, const ModelConditionInfo* destination,
 		Bool& continuePrevious) const override;
 	const ModelState* findPlacementDecal(const ModelConditionFlags& flags) const;
+	Bool isGlowEnabled() const override { return m_glowEnabled; }
+	Bool isGlowEmissive() const override { return m_glowEmissive; }
 
 private:
 	enum class StateType { DefaultModel, Model, Idle, Animation, Transition };

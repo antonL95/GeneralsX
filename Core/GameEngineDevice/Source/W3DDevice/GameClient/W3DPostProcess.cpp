@@ -26,18 +26,25 @@
 #include "W3DDevice/GameClient/RetailEffectInput.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
+#include "W3DDevice/GameClient/W3DScene.h"
 #include "Common/BfmeAssetPath.h"
+#include "Common/File.h"
+#include "Common/FileSystem.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/GlobalData.h"
 #include "GameClient/Display.h"
 #include "GameClient/Water.h"
+#include "WW3D2/camera.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/ww3d.h"
 #include "WWLib/TARGA.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
+#include <sstream>
 #include <stdio.h>
+#include <string>
 
 W3DPostProcess *TheW3DPostProcess = nullptr;
 
@@ -142,6 +149,7 @@ void W3DPostProcess::ReleaseResources()
 {
 	releaseResources();
 	releaseRetailLookup();
+	releaseRetailGlowResources();
 }
 
 void W3DPostProcess::releaseRetailLookup()
@@ -669,7 +677,7 @@ bool W3DPostProcess::endSceneAndApply()
 }
 
 void W3DPostProcess::renderQuad(IDirect3DTexture8 *tex0, DWORD pixelShader, int width, int height,
-                               IDirect3DTexture8 *tex1)
+                               IDirect3DTexture8 *tex1, const D3DVIEWPORT8 *glowViewport)
 {
 	LPDIRECT3DDEVICE8 pDev = DX8Wrapper::_Get_D3D_Device8();
 	if (!pDev || !tex0)
@@ -680,6 +688,17 @@ void W3DPostProcess::renderQuad(IDirect3DTexture8 *tex0, DWORD pixelShader, int 
 	float y0 = -0.5f;
 	float x1 = (float)width - 0.5f;
 	float y1 = (float)height - 0.5f;
+	if (glowViewport)
+	{
+		x0 += glowViewport->X;
+		x1 += glowViewport->X;
+		y0 += glowViewport->Y;
+		y1 += glowViewport->Y;
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_ONE);
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVSRCCOLOR);
+	}
 
 	pDev->SetTexture(0, tex0);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
@@ -706,7 +725,7 @@ void W3DPostProcess::renderQuad(IDirect3DTexture8 *tex0, DWORD pixelShader, int 
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_LIGHTING, FALSE);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, glowViewport != nullptr);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_CULLMODE, D3DCULL_NONE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
@@ -818,4 +837,270 @@ void W3DPostProcess::renderQuad4Tap(IDirect3DTexture8 *tex, DWORD pixelShader, i
 	pDev->SetPixelShader(0);
 	for (int stage = 0; stage < 4; ++stage)
 		pDev->SetTexture(stage, nullptr);
+}
+
+void W3DPostProcess::loadRetailGlowConfig(const D3DCAPS8 &caps)
+{
+	m_retailGlowLoaded = true;
+	for (const char *filename : {"Data/INI/Default/Environment.ini", "Data/INI/Environment.ini"})
+	{
+		File *file = TheFileSystem->openFile(filename, File::READ);
+		if (!file)
+			continue;
+		const Int size = std::max(0, file->size());
+		std::string content(size, '\0');
+		const Int bytes = file->read(content.data(), size);
+		file->close();
+		if (bytes <= 0)
+			continue;
+		content.resize(bytes);
+
+		std::istringstream input(content);
+		bool inGlow = false;
+		for (std::string line; std::getline(input, line);)
+		{
+			line = line.substr(0, line.find(';'));
+			if (const auto equals = line.find('='); equals != std::string::npos)
+				line[equals] = ' ';
+			std::istringstream row(line);
+			std::string key;
+			row >> key;
+			if (!inGlow)
+			{
+				inGlow = _stricmp(key.c_str(), "GlowEffect") == 0;
+				continue;
+			}
+			if (_stricmp(key.c_str(), "End") == 0)
+				break;
+			if (_stricmp(key.c_str(), "GlowEnabled") == 0)
+			{
+				std::string value;
+				row >> value;
+				m_retailGlow.enabled = _stricmp(value.c_str(), "Yes") == 0;
+			}
+			else if (_stricmp(key.c_str(), "GlowDiameter") == 0)
+				row >> m_retailGlow.diameter;
+			else if (_stricmp(key.c_str(), "GlowIntensity") == 0)
+				row >> m_retailGlow.intensity;
+			else if (_stricmp(key.c_str(), "GlowTextureWidth") == 0)
+				row >> m_retailGlow.textureWidth;
+			else if (_stricmp(key.c_str(), "RadiusScale1") == 0)
+				row >> m_retailGlow.radiusScale1;
+			else if (_stricmp(key.c_str(), "Amplitude1") == 0)
+				row >> m_retailGlow.amplitude1;
+			else if (_stricmp(key.c_str(), "RadiusScale2") == 0)
+				row >> m_retailGlow.radiusScale2;
+			else if (_stricmp(key.c_str(), "Amplitude2") == 0)
+				row >> m_retailGlow.amplitude2;
+		}
+	}
+
+	if (m_retailGlow.enabled && m_retailGlow.textureWidth > 0 &&
+		static_cast<DWORD>(m_retailGlow.textureWidth) <= std::min(caps.MaxTextureWidth, caps.MaxTextureHeight))
+		buildRetailGlowKernel();
+}
+
+void W3DPostProcess::buildRetailGlowKernel()
+{
+	const Int diameter = m_retailGlow.diameter;
+	if (diameter < 1 || diameter > m_retailGlow.textureWidth)
+		return;
+
+	const Real scale = 15.0f / diameter;
+	const Real amplitudeScale = scale > 1.0f ? (1.0f + scale) * 0.5f : scale;
+	const Real half = (diameter - 1) * 0.5f;
+	for (Int i = 0; i < diameter; ++i)
+	{
+		const Real offset = i - half - 0.1f;
+		const Real distance = half > 0 ? offset / half : 0.0f;
+		const Real squared = distance * distance;
+		const Real weight = amplitudeScale *
+			(m_retailGlow.amplitude1 / std::exp(squared * m_retailGlow.radiusScale1) +
+			 m_retailGlow.amplitude2 / std::exp(squared * m_retailGlow.radiusScale2));
+		if (weight > 0.01f)
+			m_retailGlowTaps.push_back({offset, weight * m_retailGlow.intensity});
+	}
+	m_retailGlowTaps.resize((m_retailGlowTaps.size() + 3) / 4 * 4);
+}
+
+void W3DPostProcess::releaseRetailGlowResources()
+{
+	for (int i = 0; i < 2; ++i)
+	{
+		if (m_glowSurface[i])
+			m_glowSurface[i]->Release();
+		if (m_glowTexture[i])
+			m_glowTexture[i]->Release();
+		m_glowSurface[i] = nullptr;
+		m_glowTexture[i] = nullptr;
+	}
+	if (m_glowDepthSurface)
+		m_glowDepthSurface->Release();
+	m_glowDepthSurface = nullptr;
+
+	if (m_psGlowBlur4Tap)
+	{
+		if (auto *device = DX8Wrapper::_Get_D3D_Device8())
+			device->DeletePixelShader(m_psGlowBlur4Tap);
+		m_psGlowBlur4Tap = 0;
+	}
+}
+
+bool W3DPostProcess::ensureRetailGlowResources(D3DFORMAT depthFormat)
+{
+	if (m_glowDepthSurface)
+		return true;
+
+	auto *device = DX8Wrapper::_Get_D3D_Device8();
+	const int size = m_retailGlow.textureWidth;
+	for (int i = 0; i < 2; ++i)
+	{
+		if (FAILED(device->CreateTexture(size, size, 1, D3DUSAGE_RENDERTARGET,
+			D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &m_glowTexture[i])) ||
+			FAILED(m_glowTexture[i]->GetSurfaceLevel(0, &m_glowSurface[i])))
+		{
+			releaseRetailGlowResources();
+			return false;
+		}
+	}
+	if (FAILED(device->CreateDepthStencilSurface(size, size, depthFormat,
+		D3DMULTISAMPLE_NONE, &m_glowDepthSurface)) ||
+		FAILED(device->CreatePixelShader(W3DPostProcessShaders::GlowBlur4Tap, &m_psGlowBlur4Tap)))
+	{
+		releaseRetailGlowResources();
+		return false;
+	}
+	return true;
+}
+
+bool W3DPostProcess::renderGlowBlurPass(IDirect3DTexture8 *srcTex, IDirect3DSurface8 *dstSurf, bool vertical)
+{
+	auto *device = DX8Wrapper::_Get_D3D_Device8();
+	const float size = m_retailGlow.textureWidth;
+	if (FAILED(device->SetRenderTarget(dstSurf, nullptr)))
+		return false;
+
+	const DWORD states[][2] = {
+		{D3DRS_ZENABLE, FALSE}, {D3DRS_ZWRITEENABLE, FALSE}, {D3DRS_LIGHTING, FALSE},
+		{D3DRS_ALPHATESTENABLE, FALSE}, {D3DRS_CULLMODE, D3DCULL_NONE},
+		{D3DRS_FOGENABLE, FALSE}, {D3DRS_STENCILENABLE, FALSE}, {D3DRS_COLORWRITEENABLE, 0xF},
+		{D3DRS_SRCBLEND, D3DBLEND_ONE}, {D3DRS_DESTBLEND, D3DBLEND_INVSRCCOLOR}
+	};
+	for (const auto &state : states)
+		DX8Wrapper::Set_DX8_Render_State(static_cast<D3DRENDERSTATETYPE>(state[0]), state[1]);
+
+	for (int stage = 0; stage < 4; ++stage)
+	{
+		device->SetTexture(stage, srcTex);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MIPFILTER, D3DTEXF_NONE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, stage);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+	}
+
+	device->SetPixelShader(m_psGlowBlur4Tap);
+	device->SetVertexShader(D3DFVF_XYZRHW | D3DFVF_TEX4);
+
+	bool drawn = true;
+	for (size_t i = 0; i < m_retailGlowTaps.size() && drawn; i += 4)
+	{
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, i != 0);
+		float weights[4][4];
+		float offsets[4];
+		for (size_t k = 0; k < 4; ++k)
+		{
+			const auto &tap = m_retailGlowTaps[i + k];
+			std::fill_n(weights[k], 4, tap.weight);
+			offsets[k] = tap.offset / size;
+		}
+		device->SetPixelShaderConstant(0, weights, 4);
+
+		PostQuadVertex4 quad[4];
+		for (int vertex = 0; vertex < 4; ++vertex)
+		{
+			const float u = vertex % 2;
+			const float v = vertex / 2;
+			const float *uOff = offsets;
+			const float *vOff = offsets;
+			const float zero[4] = {};
+			if (vertical)
+				uOff = zero;
+			else
+				vOff = zero;
+			quad[vertex] = {u * size - 0.5f, v * size - 0.5f, 0.0f, 1.0f,
+				u + uOff[0], v + vOff[0], u + uOff[1], v + vOff[1],
+				u + uOff[2], v + vOff[2], u + uOff[3], v + vOff[3]};
+		}
+		drawn = SUCCEEDED(device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, quad, sizeof(PostQuadVertex4)));
+	}
+
+	device->SetPixelShader(0);
+	for (int stage = 0; stage < 4; ++stage)
+		device->SetTexture(stage, nullptr);
+	return drawn;
+}
+
+void W3DPostProcess::applyRetailGlow(RTS3DScene &scene, CameraClass &camera)
+{
+	if (!RetailFileLayers::enabled() || !TheFileSystem)
+		return;
+	auto *device = DX8Wrapper::_Get_D3D_Device8();
+	if (!device || device->TestCooperativeLevel() != D3D_OK)
+		return;
+	if (!m_retailGlowLoaded)
+	{
+		D3DCAPS8 caps;
+		if (FAILED(device->GetDeviceCaps(&caps)))
+			return;
+		loadRetailGlowConfig(caps);
+	}
+	if (m_retailGlowTaps.empty())
+		return;
+
+	IDirect3DSurface8 *target = nullptr;
+	IDirect3DSurface8 *depth = nullptr;
+	D3DVIEWPORT8 viewport;
+	D3DSURFACE_DESC depthDesc;
+	if (FAILED(device->GetViewport(&viewport)) || FAILED(device->GetRenderTarget(&target)))
+		return;
+	if (SUCCEEDED(device->GetDepthStencilSurface(&depth)) && depth &&
+		SUCCEEDED(depth->GetDesc(&depthDesc)) && ensureRetailGlowResources(depthDesc.Format))
+	{
+		DX8Wrapper::Invalidate_Cached_Render_States();
+		camera.Apply();
+		const DWORD size = m_retailGlow.textureWidth;
+		const D3DVIEWPORT8 glowViewport = {0, 0, size, size, viewport.MinZ, viewport.MaxZ};
+		bool drawn = false;
+		if (SUCCEEDED(device->SetRenderTarget(m_glowSurface[0], m_glowDepthSurface)) &&
+			SUCCEEDED(device->SetViewport(&glowViewport)) &&
+			SUCCEEDED(device->Clear(0, nullptr, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0, 1.0f, 0)))
+		{
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0xF);
+			scene.renderGlow(camera);
+			drawn = renderGlowBlurPass(m_glowTexture[0], m_glowSurface[1], false) &&
+				renderGlowBlurPass(m_glowTexture[1], m_glowSurface[0], true);
+		}
+
+		const bool restored = SUCCEEDED(device->SetRenderTarget(target, depth)) &&
+			SUCCEEDED(device->SetViewport(&viewport));
+		if (drawn && restored)
+		{
+			renderQuad(m_glowTexture[0], 0, viewport.Width, viewport.Height, nullptr, &viewport);
+			if (!m_tracedRetailGlow && std::getenv("GENERALSX_TRACE_RETAIL_EFFECTS"))
+			{
+				std::fprintf(stderr, "[RetailFX] Drew GlowEffect (%ux%u, taps=%zu)\n",
+					size, size, m_retailGlowTaps.size());
+				m_tracedRetailGlow = true;
+			}
+		}
+		DX8Wrapper::Invalidate_Cached_Render_States();
+	}
+	if (depth)
+		depth->Release();
+	target->Release();
 }

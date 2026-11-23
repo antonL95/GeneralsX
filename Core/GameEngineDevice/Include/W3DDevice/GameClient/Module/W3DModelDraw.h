@@ -363,6 +363,8 @@ public:
 	// ugh, hack
 	virtual const W3DModelDrawModuleData* getAsW3DModelDrawModuleData() const override { return this; }
 	virtual StaticGameLODLevel getMinimumRequiredGameLOD() const override { return m_minLODRequired;}
+	virtual Bool isGlowEnabled() const { return FALSE; }
+	virtual Bool isGlowEmissive() const { return FALSE; }
 
 protected:
 	static const FieldParse* conditionStateParseTable();

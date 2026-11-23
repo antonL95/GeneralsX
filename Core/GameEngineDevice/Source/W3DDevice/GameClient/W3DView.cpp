@@ -90,6 +90,7 @@
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
+#include "W3DDevice/GameClient/W3DPostProcess.h"
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DView.h"
 #include "d3dx8math.h"
@@ -1908,6 +1909,12 @@ void W3DView::draw()
 		if (m_isWireFrameEnabled)
 			W3DDisplay::m_3DScene->Set_Extra_Pass_Polygon_Mode(SceneClass::EXTRA_PASS_CLEAR_LINE);
 		W3DDisplay::m_3DScene->doRender( m_3DCamera );
+		if (customScenePassMode == SCENE_PASS_DEFAULT && !m_isWireFrameEnabled &&
+			RetailFileLayers::enabled() && TheW3DPostProcess &&
+			W3DDisplay::m_3DScene->hasVisibleGlowObjects())
+		{
+			TheW3DPostProcess->applyRetailGlow(*W3DDisplay::m_3DScene, *m_3DCamera);
+		}
 		W3DDisplay::m_3DScene->Set_Extra_Pass_Polygon_Mode(SceneClass::EXTRA_PASS_DISABLE);
 		m_isWireFrameEnabled = m_nextWireFrameEnabled;
 	}

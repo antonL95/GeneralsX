@@ -1756,8 +1756,27 @@ void DX8TextureCategoryClass::Set_Effect_Draw(EffectDraw draw)
 	meshEffectDraw = draw;
 }
 
+static bool glowEmissiveOnly = false;
+
+void DX8TextureCategoryClass::Set_Glow_Emissive_Only(bool enabled)
+{
+	glowEmissiveOnly = enabled;
+}
+
 void DX8TextureCategoryClass::Render()
 {
+	if (glowEmissiveOnly)
+	{
+		Vector3 emissive(0, 0, 0);
+		if (const auto *material = Peek_Material())
+			material->Get_Emissive(&emissive);
+		if (emissive.X < 0.1f && emissive.Y < 0.1f && emissive.Z < 0.1f)
+		{
+			Clear_Render_List();
+			return;
+		}
+	}
+
 	#ifdef WWDEBUG
 	if (!WW3D::Expose_Prelit()) {
 	#endif

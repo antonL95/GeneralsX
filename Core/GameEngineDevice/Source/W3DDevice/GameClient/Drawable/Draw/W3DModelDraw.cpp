@@ -4060,6 +4060,8 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 
 		if( m_renderObject )
 		{
+			if (RetailFileLayers::enabled() && getW3DModelDrawModuleData()->isGlowEnabled())
+				m_renderObject->Enable_Glow(getW3DModelDrawModuleData()->isGlowEmissive());
 			// set collision type for render object.  Used by WW3D2 collision code.
 			// @fix Accumulate pick types instead of replacing sequentially,
 			// so that objects with multiple KindOf flags (e.g. SELECTABLE + FORCEATTACKABLE)

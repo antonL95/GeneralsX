@@ -80,6 +80,8 @@ public:
 
 	void setCustomPassMode (CustomScenePassModes mode) {m_customPassMode = mode;}
 	CustomScenePassModes getCustomPassMode ()	{return m_customPassMode;}
+	Bool hasVisibleGlowObjects() const { return m_hasVisibleGlowObjects; }
+	void renderGlow(CameraClass &camera);
 
 	void Flush(RenderInfoClass & rinfo);	//draw queued up models.
 	/// Drawing control method
@@ -107,7 +109,7 @@ public:
 
 protected:
 	std::vector<RenderObjClass*> m_floorsDrawnFirst;
-	void renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, Int localPlayerIndex);
+	void renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, Int localPlayerIndex, Bool glowOnly = FALSE);
 	void updateFixedLightEnvironments(RenderInfoClass & rinfo);
 	void flushTranslucentObjects(RenderInfoClass & rinfo);
 	void flushOccludedObjects(RenderInfoClass & rinfo);
@@ -132,6 +134,7 @@ protected:
 	MaterialPassClass *m_heatVisionOnlyPass;					///< Custom render pass applied in place of regular pass on objects with heat vision effect.
 	///Custom rendering passes for each possible player color on the map
 	MaterialPassClass *m_occludedMaterialPass[MAX_PLAYER_COUNT];
+	Bool m_hasVisibleGlowObjects;
 	CustomScenePassModes m_customPassMode;					///< flag used to force a non-standard rendering of scene.
 	Int m_translucentObjectsCount;	///< number of translucent objects to render this frame.
 	RenderObjClass **m_translucentObjectsBuffer;	///< queue of current frame's translucent objects.

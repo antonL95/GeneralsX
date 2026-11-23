@@ -30,6 +30,10 @@
 #include "WW3D2/dx8wrapper.h"
 
 #include <memory>
+#include <vector>
+
+class CameraClass;
+class RTS3DScene;
 
 namespace RetailFX
 {
@@ -58,15 +62,39 @@ public:
 
 	// Called in W3DDisplay::draw() right after drawViews(), before TheInGameUI->DRAW()
 	bool endSceneAndApply();
+	void applyRetailGlow(RTS3DScene &scene, CameraClass &camera);
 
 	bool isPostProcessActive() const { return m_isSceneActive; }
 
 private:
+	struct RetailGlowConfig
+	{
+		Bool enabled = FALSE;
+		Int diameter = 17;
+		Real intensity = 1.0f;
+		Int textureWidth = 256;
+		Real radiusScale1 = 0.0f;
+		Real amplitude1 = 0.0f;
+		Real radiusScale2 = 0.0f;
+		Real amplitude2 = 0.0f;
+	};
+
+	struct RetailGlowTap
+	{
+		Real offset = 0.0f;
+		Real weight = 0.0f;
+	};
+
 	bool initShaders();
 	bool prepareRetailLookup();
 	void releaseRetailLookup();
+	void loadRetailGlowConfig(const D3DCAPS8 &caps);
+	void buildRetailGlowKernel();
+	bool ensureRetailGlowResources(D3DFORMAT depthFormat);
+	void releaseRetailGlowResources();
+	bool renderGlowBlurPass(IDirect3DTexture8 *srcTex, IDirect3DSurface8 *dstSurf, bool vertical);
 	void renderQuad(IDirect3DTexture8 *tex0, DWORD pixelShader, int width, int height,
-	                IDirect3DTexture8 *tex1 = nullptr);
+	                IDirect3DTexture8 *tex1 = nullptr, const D3DVIEWPORT8 *glowViewport = nullptr);
 	void renderQuad4Tap(IDirect3DTexture8 *tex, DWORD pixelShader, int width, int height,
 	                    float offsetU, float offsetV);
 
@@ -105,6 +133,14 @@ private:
 	AsciiString m_retailLookupName;
 	Real m_retailLookupBlend = 0.0f;
 	bool m_tracedRetailLookup = false;
+	bool m_retailGlowLoaded = false;
+	bool m_tracedRetailGlow = false;
+	RetailGlowConfig m_retailGlow;
+	std::vector<RetailGlowTap> m_retailGlowTaps;
+	IDirect3DTexture8 *m_glowTexture[2] = { nullptr, nullptr };
+	IDirect3DSurface8 *m_glowSurface[2] = { nullptr, nullptr };
+	IDirect3DSurface8 *m_glowDepthSurface = nullptr;
+	DWORD m_psGlowBlur4Tap = 0;
 };
 
 extern W3DPostProcess *TheW3DPostProcess;

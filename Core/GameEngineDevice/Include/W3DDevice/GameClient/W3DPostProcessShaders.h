@@ -118,6 +118,19 @@ namespace W3DPostProcessShaders
 		0x0000FFFF                                                               // end
 	};
 
+	static const DWORD GlowBlur4Tap[] = {
+		0xFFFF0101,
+		0x00000042, 0xB00F0000,
+		0x00000042, 0xB00F0001,
+		0x00000042, 0xB00F0002,
+		0x00000042, 0xB00F0003,
+		0x00000005, 0x800F0000, 0xB0E40000, 0xA0E40000,
+		0x00000004, 0x800F0000, 0xB0E40001, 0xA0E40001, 0x80E40000,
+		0x00000004, 0x800F0000, 0xB0E40002, 0xA0E40002, 0x80E40000,
+		0x00000004, 0x800F0000, 0xB0E40003, 0xA0E40003, 0x80E40000,
+		0x0000FFFF
+	};
+
 	//-------------------------------------------------------------------------
 	// Bloom Composite Shader (Additive blend with clamp, without HDR)
 	// ps.1.1

@@ -451,6 +451,12 @@ public:
 
 	virtual int						Is_Hidden() const														{ return !(Bits & IS_NOT_HIDDEN); }
 	virtual void					Set_Hidden(int onoff)														{ if (onoff) { Bits &= ~IS_NOT_HIDDEN; } else { Bits |= IS_NOT_HIDDEN; } }
+	bool Is_Glow_Enabled() const { return (Bits & IS_GLOW_ENABLED) != 0; }
+	bool Is_Glow_Emissive() const { return (Bits & IS_GLOW_EMISSIVE) != 0; }
+	void Enable_Glow(bool emissive)
+	{
+		Bits = (Bits & ~IS_GLOW_EMISSIVE) | IS_GLOW_ENABLED | (emissive ? IS_GLOW_EMISSIVE : 0);
+	}
 	virtual int						Is_Animation_Hidden() const											{ return !(Bits & IS_NOT_ANIMATION_HIDDEN); }
 	virtual void					Set_Animation_Hidden(int onoff)											{ if (onoff) { Bits &= ~IS_NOT_ANIMATION_HIDDEN; } else { Bits |= IS_NOT_ANIMATION_HIDDEN; } }
 	void Set_Animation_Opacity(float opacity)
@@ -535,6 +541,8 @@ protected:
 		IS_ADDITIVE = 0x00100000,	//added for Generals so we quickly determine what type of blending is on the mesh. -MW
 		IS_SELF_SHADOWED =			0x00080000,			// the mesh is self shadowed
 		IS_CHEATER =            0x00100000,// the new cheat spy code uses these bits, since nothing else now does
+		IS_GLOW_ENABLED = 0x00200000,
+		IS_GLOW_EMISSIVE = 0x00400000,
 		IS_REALLY_VISIBLE =			IS_VISIBLE | IS_NOT_HIDDEN | IS_NOT_ANIMATION_HIDDEN,
       IS_NOT_HIDDEN_AT_ALL =     IS_NOT_HIDDEN | IS_NOT_ANIMATION_HIDDEN,
 		DEFAULT_BITS =					COLL_TYPE_ALL | IS_NOT_HIDDEN | IS_NOT_ANIMATION_HIDDEN,
