@@ -1,9 +1,16 @@
 #include "W3DDevice/GameClient/Module/W3DStreakDraw.h"
 
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/GameLogic.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "WW3D2/assetmgr.h"
@@ -85,31 +92,41 @@ void W3DStreakDraw::addPoint(const Vector3& location)
 
 void W3DStreakDraw::updateTrail(const Vector3& head)
 {
-	const W3DStreakDrawModuleData* data = getW3DStreakDrawModuleData();
-	if (m_points.size() < 2)
+	if (m_points.empty())
 	{
 		addPoint(head);
 		return;
 	}
+	if (m_points.back() == head)
+		return;
 
-	const std::size_t last = m_points.size() - 1;
-	const Real step = (head - m_points[last - 1]).Length();
-	const Real total = m_distances[last - 1] + step;
-	m_points[last] = head;
-	m_distances[last] = total;
-
-	const Real segmentLength = data->m_length / static_cast<Real>(data->m_numSegments > 0 ? data->m_numSegments : 1);
-	if (step > segmentLength)
+	if (m_points.size() == 1)
 	{
-		m_points.push_back(head);
-		m_distances.push_back(total);
+		addPoint(head);
 	}
-
-	while (m_points.size() > 2 && m_distances[1] < total - data->m_length)
+	else
 	{
-		m_points.erase(m_points.begin());
-		m_distances.erase(m_distances.begin());
+		const std::size_t last = m_points.size() - 1;
+		const Real step = (head - m_points[last - 1]).Length();
+		const Real total = m_distances[last - 1] + step;
+		m_points[last] = head;
+		m_distances[last] = total;
+
+		const W3DStreakDrawModuleData* data = getW3DStreakDrawModuleData();
+		const Real segmentLength = data->m_length / static_cast<Real>(std::max(1, data->m_numSegments));
+		if (step > segmentLength)
+		{
+			m_points.push_back(head);
+			m_distances.push_back(total);
+		}
+
+		while (m_points.size() > 2 && m_distances[1] < total - data->m_length)
+		{
+			m_points.erase(m_points.begin());
+			m_distances.erase(m_distances.begin());
+		}
 	}
+	m_line->Set_Points(static_cast<unsigned int>(m_points.size()), m_points.data());
 }
 
 void W3DStreakDraw::updateLine()
@@ -126,7 +143,6 @@ void W3DStreakDraw::updateLine()
 	}
 
 	const W3DStreakDrawModuleData* data = getW3DStreakDrawModuleData();
-	m_line->Set_Points(static_cast<unsigned int>(m_points.size()), m_points.data());
 	const Real opacity = getDrawable()->getEffectiveOpacity();
 	const Vector3 color(data->m_color.red, data->m_color.green, data->m_color.blue);
 	if (data->m_additive)
@@ -143,10 +159,33 @@ void W3DStreakDraw::updateLine()
 		W3DDisplay::m_3DScene->Add_Render_Object(m_line);
 }
 
+void W3DStreakDraw::reactToTransformChange(const Matrix3D*, const Coord3D*, Real)
+{
+	if (m_points.empty() || !RetailFileLayers::enabled())
+		return;
+
+	const Drawable* draw = getDrawable();
+	Matrix3D transform = *draw->getTransformMatrix();
+	if (!draw->isInstanceIdentity())
+		transform.postMul(*draw->getInstanceMatrix());
+	updateTrail(transform.Get_Translation());
+}
+
 void W3DStreakDraw::doDrawModule(const Matrix3D* transformMtx)
 {
 	updateTrail(transformMtx->Get_Translation());
 	updateLine();
+
+	static const char* const traced = std::getenv("GENERALSX_TEST_STREAKTRACE");
+	const Drawable* draw = getDrawable();
+	if (traced && TheGameLogic && draw->getTemplate()->getName().compareNoCase(traced) == 0)
+	{
+		Real longest = 0.0f;
+		for (std::size_t i = 1; i < m_distances.size(); ++i)
+			longest = std::max(longest, m_distances[i] - m_distances[i - 1]);
+		std::fprintf(stderr, "TEST streak frame %u id %u %s longest %.3f\n", TheGameLogic->getFrame(),
+			static_cast<UnsignedInt>(draw->getID()), draw->getTemplate()->getName().str(), longest);
+	}
 }
 
 void W3DStreakDraw::crc(Xfer* xfer)

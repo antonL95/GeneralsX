@@ -41,7 +41,7 @@ public:
 	virtual void allocateShadows() override {}
 	virtual void setShadowsEnabled(Bool) override {}
 	virtual void setFullyObscuredByShroud(Bool fullyObscured) override;
-	virtual void reactToTransformChange(const Matrix3D*, const Coord3D*, Real) override {}
+	virtual void reactToTransformChange(const Matrix3D*, const Coord3D*, Real) override;
 	virtual void reactToGeometryChange() override {}
 
 private:

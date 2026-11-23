@@ -1,0 +1,5 @@
+4 pkg61-resolve - - 0 PlaytestStreakWeapon
+5 create Player_1 PlaytestStreakShooter 0 2050,620,0
+6 reveal Player_1 PlaytestStreakShooter 0
+28 create PlyrCreeps PlaytestStreakTarget 0 2250,620,180
+28 orderattack Player_1 PlaytestStreakShooter 0 PlyrCreeps:PlaytestStreakTarget:0
