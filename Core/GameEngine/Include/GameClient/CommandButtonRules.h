@@ -141,6 +141,8 @@ struct VisibleRange
 	bool active() const { return start >= 0 && count > 0; }
 };
 
+inline constexpr int RETAIL_PALANTIR_SLOTS = 6;
+
 inline bool inSideColumn(int entry, const VisibleRange& range, int initialVisible)
 {
 	if (range.active())

@@ -2393,6 +2393,8 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 			TheRadar->tryUnderAttackEvent(this);
 	}
 
+	if (retail && body && damageInfo->out.m_actualDamageClipped > 0.0f)
+		RetailBuildingEvents::damaged(*this);
 }
 
 //-------------------------------------------------------------------------------------------------

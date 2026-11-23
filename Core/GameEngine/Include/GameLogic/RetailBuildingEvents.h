@@ -8,6 +8,7 @@ namespace RetailBuildingEvents
 {
 void created(Object& object);
 void complete(Object& object);
+void damaged(Object& object);
 void riderChanged(Object& object, bool mounted);
 void trollEatingChanged(Object& object, bool enabled);
 #if !RTS_GENERALS

@@ -1,0 +1,26 @@
+210 create Player_1 GondorGandalf 0 3150,2390,0
+210 create PlyrCreeps AutoAbilitiesFastCaster 0 3450,2600,0
+210 create Player_1 AutoAbilitiesAttacker 0 3000,2850,0
+210 create PlyrCreeps AutoAbilitiesAttacker 0 3050,2830,0
+219 auto-ability-state Player_1 GondorGandalf 0 SpecialPowerShieldBubbleGondor
+219 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield
+219 auto-ability-slot - - 0 GondorGandalfCommandSet 7
+219 auto-ability-slot - - 0 GondorGandalfMountedCommandSet 7
+219 auto-ability-slot - - 0 GondorBarracksCommandSet 4
+219 auto-ability-slot - - 0 GondorBarracksCommandSet 7
+220 auto-ability-hit Player_1 GondorGandalf 0 PlyrCreeps:AutoAbilitiesAttacker:0 10 0
+220 auto-ability-hit PlyrCreeps AutoAbilitiesFastCaster 0 Player_1:AutoAbilitiesAttacker:0 10 0
+221 auto-ability-state Player_1 GondorGandalf 0 SpecialPowerShieldBubbleGondor
+221 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield
+230 auto-ability-hit PlyrCreeps AutoAbilitiesFastCaster 0 Player_1:AutoAbilitiesAttacker:0 10 0
+244 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield
+246 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield
+369 auto-ability-hit PlyrCreeps AutoAbilitiesFastCaster 0 Player_1:AutoAbilitiesAttacker:0 10 0
+369 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield
+370 auto-ability-hit PlyrCreeps AutoAbilitiesFastCaster 0 Player_1:AutoAbilitiesAttacker:0 10 0
+371 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield
+520 auto-ability-disable PlyrCreeps AutoAbilitiesFastCaster 0
+520 auto-ability-hit PlyrCreeps AutoAbilitiesFastCaster 0 Player_1:AutoAbilitiesAttacker:0 10 0
+520 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield
+530 auto-ability-hit PlyrCreeps AutoAbilitiesFastCaster 0 Player_1:AutoAbilitiesAttacker:0 50000 0
+530 auto-ability-state PlyrCreeps AutoAbilitiesFastCaster 0 AutoAbilitiesFastShield

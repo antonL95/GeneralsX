@@ -398,6 +398,7 @@ public:
 	CommandButtonMappedBorderType getCommandButtonMappedBorderType() const { return m_commandButtonBorder; }
 	Bool isInPalantir() const { return m_inPalantir; }
 	Bool isRadial() const { return m_radial; }
+	Bool isRetailSideColumnEligible() const { return m_radial || !m_inPalantir; }
 	UnsignedInt getRotwkOptions() const { return m_rotwkOptions; }
 	Int getRequiredRank() const { return m_requiredRank; }
 	Bool hasRotwkOption(UnsignedInt option) const { return (m_rotwkOptions & option) != 0; }

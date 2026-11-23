@@ -53,6 +53,7 @@
 #include "Common/RetailSaveBlocks.h"
 #include "GameLogic/Module/RetailEconomy.h"
 #include "GameClient/RetailEva.h"
+#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
@@ -1894,6 +1895,8 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 			TheRadar->tryUnderAttackEvent(this);
 	}
 
+	if (RetailFileLayers::enabled() && body && damageInfo->out.m_actualDamageClipped > 0.0f)
+		RetailBuildingEvents::damaged(*this);
 }
 
 //-------------------------------------------------------------------------------------------------

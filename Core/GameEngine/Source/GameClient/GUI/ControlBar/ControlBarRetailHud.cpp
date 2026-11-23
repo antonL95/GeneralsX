@@ -66,7 +66,7 @@
 
 namespace
 {
-constexpr Int RetailRingSlots = 6;
+constexpr Int RetailRingSlots = CommandButtonRules::RETAIL_PALANTIR_SLOTS;
 constexpr Int RetailTraySlots = 3;
 constexpr Int RetailTrayAnchors = 4;
 constexpr Real PalantirDesignWidth = 470.0f;
@@ -1295,7 +1295,7 @@ void ControlBar::collectRetailPlacements(const CommandSet *commandSet, Object *o
 		if (i < RetailRingSlots && command->isInPalantir() && !m_retailRange.active())
 			slot = i;
 		else if (command->getCommandType() != GUI_COMMAND_NONE
-			&& (command->isRadial() || !command->isInPalantir() || (i >= RetailRingSlots && i < 11))
+			&& command->isRetailSideColumnEligible()
 			&& CommandButtonRules::inSideColumn(i, commandSet ? m_retailRange : CommandButtonRules::VisibleRange(), initialVisible) && side < MAX_COMMANDS_PER_SET
 			&& retailEntryShown(commandSet, i, command, obj, hero))
 			slot = side++;

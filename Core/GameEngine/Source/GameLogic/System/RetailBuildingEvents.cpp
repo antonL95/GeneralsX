@@ -12,6 +12,7 @@
 #include <locale>
 #include <map>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -29,6 +30,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/RetailBuildingEvents.h"
 #if !RTS_GENERALS
@@ -99,7 +101,7 @@ std::string attribute(const std::string& tag, const char* key)
 
 bool isDirectEvent(std::string_view event)
 {
-	return event == "OnBuildingComplete" || event == "Rider8IsActive" || event == "Rider8IsNotActive" ||
+	return event == "OnBuildingComplete" || event == "OnDamaged" || event == "Rider8IsActive" || event == "Rider8IsNotActive" ||
 		event == "UserSixIsActive" || event == "UserSixIsNotActive";
 }
 
@@ -269,6 +271,7 @@ struct BuildingEvents
 	{
 		std::map<std::string, std::vector<std::string>> bodies;
 		std::map<std::string, bool> establishedHandlers;
+		std::set<std::string> damageHandlers;
 		for (const auto& [name, list] : lists)
 			for (const auto& [event, handler] : list.handlers)
 				if (!handler.empty())
@@ -276,10 +279,13 @@ struct BuildingEvents
 					bodies.try_emplace(handler);
 					if (isDirectEvent(event))
 						establishedHandlers[handler] = true;
+					if (event == "OnDamaged")
+						damageHandlers.insert(handler);
 				}
 
 		std::istringstream lua(readData("Data\\Scripts\\Scripts.lua"));
 		const std::regex definition(R"(^\s*function\s+(\w+)\s*\(([^)]*)\).*)");
+		const std::regex damageParameters(R"(^\s*self(?:\s*,\s*\w+)*\s*$)");
 		std::vector<std::string>* body = nullptr;
 		for (std::string line; std::getline(lua, line);)
 		{
@@ -294,7 +300,9 @@ struct BuildingEvents
 			else if (std::regex_match(line, match, definition))
 			{
 				const auto found = bodies.find(match[1].str());
-				body = found != bodies.end() && match[2] == "self" ? &found->second : nullptr;
+				const bool supportedParameters = match[2] == "self" ||
+					(found != bodies.end() && damageHandlers.contains(found->first) && std::regex_match(match[2].str(), damageParameters));
+				body = found != bodies.end() && supportedParameters ? &found->second : nullptr;
 				if (body)
 					body->clear();
 			}
@@ -314,6 +322,20 @@ struct BuildingEvents
 			std::fprintf(stderr, "BPARITY building callbacks %zu/%zu\n", programs.size(), bodies.size());
 	}
 };
+
+void castDamageResponse(Object& object, const SpecialPowerTemplate& requested)
+{
+	for (BehaviorModule** module = object.getBehaviorModules(); *module; ++module)
+	{
+		const auto* caster = (*module)->getSpecialPower();
+		const auto* power = caster ? caster->getSpecialPowerTemplate() : nullptr;
+		if (!power || power->getSpecialPowerType() != requested.getSpecialPowerType())
+			continue;
+		if (caster->isReady())
+			object.doSpecialPower(power, COMMAND_OPTION_INTERNAL_AUTO, TRUE);
+		return;
+	}
+}
 
 const BuildingEvents& buildingEvents()
 {
@@ -404,7 +426,12 @@ void dispatch(Object& object, const char* event, DispatchMode mode = DispatchMod
 				break;
 			case Action::Power:
 				if (const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate(operation.name.c_str()))
-					object.doSpecialPower(power, COMMAND_OPTION_INTERNAL_AUTO, TRUE);
+				{
+					if (eventName == "OnDamaged")
+						castDamageResponse(object, *power);
+					else
+						object.doSpecialPower(power, COMMAND_OPTION_INTERNAL_AUTO, TRUE);
+				}
 				break;
 			case Action::Visibility:
 				if (operation.hide)
@@ -439,6 +466,12 @@ void RetailBuildingEvents::created(Object& object)
 void RetailBuildingEvents::complete(Object& object)
 {
 	dispatch(object, "OnBuildingComplete");
+}
+
+void RetailBuildingEvents::damaged(Object& object)
+{
+	if (!object.isEffectivelyDead() && !object.isDestroyed())
+		dispatch(object, "OnDamaged");
 }
 
 void RetailBuildingEvents::riderChanged(Object& object, bool mounted)
