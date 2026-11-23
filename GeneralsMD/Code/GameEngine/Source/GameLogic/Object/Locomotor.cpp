@@ -683,6 +683,10 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "PreferredHeight", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredHeight) },
 		{ "PreferredAttackHeight", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredAttackHeight) },
 		{ "PreferredHeightDamping", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredHeightDamping) },
+		{ "SwoopStandoffRadius", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_swoopStandoffRadius) },
+		{ "SwoopStandoffHeight", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_swoopStandoffHeight) },
+		{ "SwoopTerminalVelocity", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_swoopTerminalVelocity) },
+		{ "SwoopAccelerationRate", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_swoopAccelerationRate) },
 		{ "CirclingRadius", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_circlingRadius) },
 		{ "Extra2DFriction", parseFrictionPerSec, nullptr, offsetof(LocomotorTemplate, m_extra2DFriction) },
 		{ "SpeedLimitZ", INI::parseVelocityReal, nullptr, offsetof(LocomotorTemplate, m_speedLimitZ) },
@@ -1339,7 +1343,7 @@ void Locomotor::updateRetailGait(Object* object, Real distance, Real speed, Bool
 }
 
 void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalPos,
-																							 Real onPathDistToGoal, Real desiredSpeed, Bool *blocked)
+	Real onPathDistToGoal, Real desiredSpeed, Bool *blocked, Bool birdPullUp)
 {
 	setFlag(MAINTAIN_POS_IS_VALID, false);
 
@@ -1443,7 +1447,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		if (usesCavalrySteering(obj))
 		{
 			moveCavalryForward(obj, physics, goalPos, 0.0f, 0.0f);
-			handleBehaviorZ(obj, physics, goalPos);
+			handleBehaviorZ(obj, physics, goalPos, birdPullUp);
 			return;
 		}
 		updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), TRUE);
@@ -1455,7 +1459,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		}
 
 		// it is very important to be sure to call this in all situations, even if not moving in 2d space.
-		handleBehaviorZ(obj, physics, goalPos);
+		handleBehaviorZ(obj, physics, goalPos, birdPullUp);
 		return;
 	}
 
@@ -1522,7 +1526,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	if (m_template->m_appearance != LOCO_HORDE && m_template->m_appearance != LOCO_WHEELS_FOUR &&
 		m_template->m_appearance != LOCO_MOTORCYCLE)
 		updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), getFlag(IS_BRAKING));
-	handleBehaviorZ(obj, physics, goalPos);
+	handleBehaviorZ(obj, physics, goalPos, birdPullUp);
 	// Objects that are braking don't follow the normal physics, so they end up at their destination exactly.
 	obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ), getFlag(IS_BRAKING) );
 
@@ -2478,7 +2482,7 @@ Real Locomotor::getSurfaceHtAtPt(Real x, Real y)
 }
 
 //-------------------------------------------------------------------------------------------------
-Real Locomotor::calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real curZ, Real surfaceAtPt, Real preferredHeight)
+Real Locomotor::calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real curZ, Real surfaceAtPt, Real preferredHeight, Bool birdPullUp)
 {
 	/*
 		take the classic equation:
@@ -2493,8 +2497,32 @@ Real Locomotor::calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real cu
 		maxGrossLift > 0.0f && !obj->isEffectivelyDead())
 	{
 		const Real maxVerticalSpeed = min(m_template->m_speedLimitZ, maxGrossLift);
-		const Real desiredVerticalSpeed = clamp(-maxVerticalSpeed, (preferredHeight - curZ) * 0.25f, maxVerticalSpeed);
-		const Real correction = clamp(-maxGrossLift, desiredVerticalSpeed - physics->getVelocity()->z, maxGrossLift);
+		Real maxDescentSpeed = maxVerticalSpeed;
+		Real maxClimbSpeed = maxVerticalSpeed;
+		const Coord3D& velocity = *physics->getVelocity();
+		Real maxDownwardAcceleration = maxGrossLift;
+		if (getAppearance() == LOCO_GIANT_BIRD)
+		{
+			if (obj->getLogicModelConditions().test(MODELCONDITION_SWOOPING))
+			{
+				const Real frameScale = static_cast<Real>(LOGICFRAMES_PER_SECOND);
+				if (m_template->m_swoopTerminalVelocity > 0.0f)
+					maxDescentSpeed = min(m_template->m_speedLimitZ, m_template->m_swoopTerminalVelocity * frameScale);
+				if (m_template->m_swoopAccelerationRate > 0.0f)
+					maxDownwardAcceleration = min(maxDownwardAcceleration, m_template->m_swoopAccelerationRate * frameScale);
+			}
+			else if (preferredHeight > curZ && getSwoopStandoffRadius() > 0.0f)
+			{
+				const Real planarSpeed = WWMath::SqrtfOrigin(velocity.x * velocity.x + velocity.y * velocity.y);
+				if (planarSpeed > 0.0f)
+				{
+					const Real gradient = WWMath::TanTrig((birdPullUp ? 77.0f : 31.0f) * (PI / 180.0f));
+					maxClimbSpeed = min(maxClimbSpeed, planarSpeed * gradient);
+				}
+			}
+		}
+		const Real desiredVerticalSpeed = clamp(-maxDescentSpeed, (preferredHeight - curZ) * 0.25f, maxClimbSpeed);
+		const Real correction = clamp(-maxDownwardAcceleration, desiredVerticalSpeed - velocity.z, maxGrossLift);
 		return correction - TheGlobalData->m_gravity;
 	}
 	Real maxNetLift = maxGrossLift + TheGlobalData->m_gravity;	// note that gravity is always negative.
@@ -2660,7 +2688,7 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 	return true if we can maintain the position without being called every frame (eg, we are
 	resting on the ground), false if not (eg, we are hovering or circling)
 */
-Bool Locomotor::handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos)
+Bool Locomotor::handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Bool birdPullUp)
 {
 	Bool requiresConstantCalling = TRUE;
 
@@ -2742,7 +2770,7 @@ Bool Locomotor::handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coo
 					delta *= getPreferredHeightDamping();
 					preferredHeight = pos.z + delta;
 
-					Real liftToUse = calcLiftToUseAtPt(obj, physics, pos.z, surfaceHt, preferredHeight);
+					Real liftToUse = calcLiftToUseAtPt(obj, physics, pos.z, surfaceHt, preferredHeight, birdPullUp);
 
 					//DEBUG_LOG(("HandleBZ %d LiftToUse %f",TheGameLogic->getFrame(),liftToUse));
 					if (liftToUse != 0.0f)
@@ -2775,7 +2803,7 @@ Bool Locomotor::handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coo
 					delta *= getPreferredHeightDamping();
 					preferredHeight = pos.z + delta;
 
-					Real liftToUse = calcLiftToUseAtPt(obj, physics, pos.z, surfaceHt, preferredHeight);
+					Real liftToUse = calcLiftToUseAtPt(obj, physics, pos.z, surfaceHt, preferredHeight, birdPullUp);
 
 					//DEBUG_LOG(("HandleBZ %d LiftToUse %f",TheGameLogic->getFrame(),liftToUse));
 					if (liftToUse != 0.0f)

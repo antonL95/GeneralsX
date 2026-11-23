@@ -24,6 +24,9 @@ namespace
 {
 constexpr Real CONTACT_HEIGHT_TOLERANCE = 12.0f;
 constexpr Real FOLLOW_THROUGH_ARRIVAL_DISTANCE = 6.0f;
+#if !RTS_GENERALS
+constexpr Real PULL_UP_DISTANCE = 7.0f;
+#endif
 
 Real planarDistanceSquared(const Coord3D& a, const Coord3D& b)
 {
@@ -61,7 +64,10 @@ GiantBirdAIUpdate::~GiantBirdAIUpdate() = default;
 void GiantBirdAIUpdate::aiDoCommand(const AICommandParms* parms)
 {
 	if (parms->m_cmdSource != CMD_FROM_AI)
+	{
 		m_followingThrough = FALSE;
+		m_pullUpActive = FALSE;
+	}
 	AIUpdateInterface::aiDoCommand(parms);
 }
 
@@ -163,6 +169,11 @@ void GiantBirdAIUpdate::startFollowThrough()
 	}
 	m_followingThrough = planarDistanceSquared(origin, m_followThroughGoal) >
 		FOLLOW_THROUGH_ARRIVAL_DISTANCE * FOLLOW_THROUGH_ARRIVAL_DISTANCE;
+	if (RetailFileLayers::enabled() && m_followingThrough)
+	{
+		m_pullUpOrigin = origin;
+		m_pullUpActive = TRUE;
+	}
 }
 
 UpdateSleepTime GiantBirdAIUpdate::update()
@@ -214,12 +225,18 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 				locomotor->setPhysicsOptions(bird);
 				const Real speed = getCurLocomotorSpeed();
 				Bool blocked = FALSE;
+#if RTS_GENERALS
 				locomotor->locoUpdate_moveTowardsPosition(bird, m_followThroughGoal, WWMath::Sqrt(remaining), speed, &blocked);
+#else
+				m_pullUpActive = m_pullUpActive && planarDistanceSquared(at, m_pullUpOrigin) < PULL_UP_DISTANCE * PULL_UP_DISTANCE;
+				locomotor->locoUpdate_moveTowardsPosition(bird, m_followThroughGoal, WWMath::Sqrt(remaining), speed, &blocked, m_pullUpActive);
+#endif
 				updateAirborneTargetStatus();
 				return UPDATE_SLEEP_NONE;
 			}
 		}
 		m_followingThrough = FALSE;
+		m_pullUpActive = FALSE;
 	}
 
 	const Object* victim = isAttacking() ? getCurrentVictim() : nullptr;
@@ -235,7 +252,17 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 	const Real range = weapon ? weapon->getAttackRange(bird, strike) : 0.0f;
 #endif
 	const Real approach = range + std::max(40.0f, locomotor->getPreferredAttackHeight());
-	const Bool swooping = strike && canSwoop && (victim
+	Bool standoffLimitsEntry = FALSE;
+#if !RTS_GENERALS
+	Bool withinStandoff = FALSE;
+	if (RetailFileLayers::enabled() && strike && canSwoop)
+	{
+		const Real radius = locomotor->getSwoopStandoffRadius();
+		withinStandoff = radius > 0.0f && planarDistanceSquared(at, *strike) <= radius * radius;
+		standoffLimitsEntry = radius > 0.0f && !withinStandoff && !m_swooping;
+	}
+#endif
+	const Bool swooping = strike && canSwoop && !standoffLimitsEntry && (victim
 		? ThePartitionManager->getDistanceSquared(bird, victim, FROM_BOUNDINGSPHERE_2D)
 		: ThePartitionManager->getDistanceSquared(bird, strike, FROM_BOUNDINGSPHERE_2D)) <= approach * approach;
 	setSwooping(swooping);
@@ -255,7 +282,13 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 	{
 		chooseLocomotorSet(LOCOMOTORSET_NORMAL);
 		if (Locomotor* normalLoco = getCurLocomotor())
+		{
 			normalLoco->restorePreferredHeightFromTemplate();
+#if !RTS_GENERALS
+			if (withinStandoff && normalLoco->getSwoopStandoffHeight() > 0.0f)
+				normalLoco->setPreferredHeight(normalLoco->getSwoopStandoffHeight());
+#endif
+		}
 	}
 	return AIUpdateInterface::doLocomotor();
 }
@@ -265,6 +298,23 @@ void GiantBirdAIUpdate::xferFlightState(Xfer* xfer)
 	xfer->xferCoord3D(&m_followThroughGoal);
 	xfer->xferBool(&m_followingThrough);
 	xfer->xferBool(&m_swooping);
+}
+
+void GiantBirdAIUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{ "grabbed-passenger", [this](Xfer* x) { x->xferObjectID(&m_grabbedPassenger); },
+			[this] { m_grabbedPassenger = INVALID_ID; } },
+		{ "swoop-pull-up", [this](Xfer* x)
+		{
+			x->xferCoord3D(&m_pullUpOrigin);
+			x->xferBool(&m_pullUpActive);
+		}, [this]
+		{
+			m_pullUpOrigin = {};
+			m_pullUpActive = FALSE;
+		} }
+	});
 }
 
 void GiantBirdAIUpdate::crc(Xfer* xfer)
@@ -284,14 +334,6 @@ void GiantBirdAIUpdate::xfer(Xfer* xfer)
 	xferFlightState(xfer);
 	if (RetailFileLayers::enabled())
 		xferRetailBlocks(xfer, version >= 2);
-}
-
-void GiantBirdAIUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
-{
-	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
-		{ "grabbed-passenger", [this](Xfer* x) { x->xferObjectID(&m_grabbedPassenger); },
-			[this] { m_grabbedPassenger = INVALID_ID; } }
-	});
 }
 
 void GiantBirdAIUpdate::loadPostProcess()
