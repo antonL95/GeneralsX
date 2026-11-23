@@ -84,9 +84,9 @@ expect_target() {
 
 compare() {
     if [ "$save_frame" -eq 244 ] && covers 430; then
-        expect_target Pkg67HotW3Power 245 1325 299 || return 1
+        expect_target Pkg67HotW3Power 245 1545 299 || return 1
         expect_target Pkg67SoS3Power 245 1675 299 || return 1
-        expect_target Pkg67HotW4Power 245 1325 419 || return 1
+        expect_target Pkg67HotW4Power 245 1545 419 || return 1
         expect_target Pkg67SoS4Power 245 1675 359 || return 1
         expect_target Pkg67PoisonPower 245 1980 299 || return 1
         expect_target Pkg67SelfBuffPower 121 1940 299 || return 1

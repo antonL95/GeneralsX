@@ -11,13 +11,13 @@
 114 pkg67-binding Player_2 CreateAHero 0 CrippleStrikeMeleeHotWL4AI
 114 pkg67-binding Player_2 CreateAHero 0 CrippleStrikeMeleeSoSL3AI
 114 pkg67-binding Player_2 CreateAHero 0 CrippleStrikeMeleeSoSL4AI
-119 create Player_2 Pkg67HotWCaster 0 1280,2240,0
+119 create Player_2 Pkg67HotWCaster 0 1500,1800,0
 119 create Player_2 Pkg67SoSCaster 0 1630,2240,0
 119 create Player_2 Pkg67PoisonCaster 0 1950,2110,0
 119 create Player_2 Pkg67SelfBuffCaster 0 1910,1870,0
 120 pw-rank Player_2 Pkg67HotWCaster 0 2
 120 pw-rank Player_2 Pkg67SoSCaster 0 2
-121 create Player_1 Pkg67HeroTarget 0 1312,2240,0
+121 create Player_1 Pkg67HeroTarget 0 1532,1800,0
 121 create Player_1 Pkg67HeroTarget 1 1662,2240,0
 121 create Player_1 Pkg67MachineTarget 0 1980,2110,0
 121 create Player_1 Pkg67InfantryTarget 2 1940,1870,0
@@ -29,7 +29,7 @@
 185 pkg67-power Player_2 Pkg67HotWCaster 0 Pkg67HotW4Power
 185 pkg67-power Player_2 Pkg67SoSCaster 0 Pkg67SoS3Power
 185 pkg67-power Player_2 Pkg67SoSCaster 0 Pkg67SoS4Power
-188 create Player_1 Pkg67InfantryTarget 0 1308,2248,0
+188 create Player_1 Pkg67InfantryTarget 0 1528,1808,0
 188 create Player_1 Pkg67InfantryTarget 1 1658,2248,0
 189 attack Player_2 Pkg67HotWCaster 0 Player_1:Pkg67InfantryTarget:1
 189 attack Player_2 Pkg67SoSCaster 0 Player_1:Pkg67InfantryTarget:2
@@ -46,8 +46,8 @@
 243 pkg67-power Player_2 Pkg67PoisonCaster 0 Pkg67PoisonPower
 243 pkg67-power Player_2 Pkg67SelfBuffCaster 0 Pkg67SelfBuffPower
 245 pkg67-set-commands Player_2 Pkg67BindingCaster 0 Pkg67ActiveCommands
-245 create Player_1 Pkg67HeroTarget 0 1318,2240,0
-245 create Player_1 Pkg67HeroTarget 1 1325,2224,0
+245 create Player_1 Pkg67HeroTarget 0 1538,1800,0
+245 create Player_1 Pkg67HeroTarget 1 1545,1784,0
 245 create Player_1 Pkg67HeroTarget 2 1668,2240,0
 245 create Player_1 Pkg67HeroTarget 3 1675,2224,0
 245 create Player_1 Pkg67InfantryTarget 3 1980,2122,0
