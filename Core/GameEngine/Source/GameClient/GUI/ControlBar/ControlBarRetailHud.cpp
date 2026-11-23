@@ -337,6 +337,24 @@ void setRetailRightClick(GameWindow *window, Bool enabled)
 	}
 }
 
+Bool isRetailPurchase(GUICommandType type)
+{
+	switch (type)
+	{
+		case GUI_COMMAND_DOZER_CONSTRUCT:
+		case GUI_COMMAND_FOUNDATION_CONSTRUCT:
+		case GUI_COMMAND_UNIT_BUILD:
+		case GUI_COMMAND_SECONDARY_UNIT_BUILD:
+		case GUI_COMMAND_PLAYER_UPGRADE:
+		case GUI_COMMAND_OBJECT_UPGRADE:
+		case GUI_COMMAND_CASTLE_UPGRADE:
+		case GUI_COMMAND_REVIVE:
+			return TRUE;
+		default:
+			return FALSE;
+	}
+}
+
 void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 {
 	Int x, y, width, height;
@@ -417,7 +435,7 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 	if (!queued && TheControlBar->isRetailAutoAbilityOn(window))
 		drawProductionRing(x, y, width, height);
 
-	if (availability == COMMAND_RESTRICTED)
+	if (availability == COMMAND_RESTRICTED && command && !isRetailPurchase(command->getCommandType()))
 	{
 		const Int size = MAX(3, width / 4);
 		const Int left = cx - size / 2;

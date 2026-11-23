@@ -1,0 +1,19 @@
+6 pw-override Player_1 - 0 -
+7 camera Player_1 MenFortressCitadel 0 at 828 545
+9 select Player_1 MenFortressCitadel 0
+14 followup-button-state Player_1 - 0 Command_ConstructGondorFountainGuardHorde
+15 pkg23-set-cash Player_1 - 0 0
+17 followup-button-state Player_1 - 0 Command_ConstructMenPorter
+18 pkg23-set-cash Player_1 - 0 4000
+20 followup-left Player_1 - 0 Command_SelectUpgradesMenFortress
+22 followup-left Player_1 - 0 Command_PurchaseUpgradeMenFortressBanners
+36 followup-button-state Player_1 - 0 Command_PurchaseUpgradeMenFortressBanners
+37 followup-right Player_1 - 0 Command_PurchaseUpgradeMenFortressBanners
+38 followup-left Player_1 - 0 Command_RadialBack
+39 objupgrade Player_1 MenFortressCitadel 0 Upgrade_MenFortressIvoryTower
+40 create Player_1 GondorFountainGuardHorde 0 1400,1000,0
+40 create Player_1 GondorFountainGuardHorde 0 1500,1000,0
+43 followup-button-state Player_1 - 0 Command_ConstructGondorFountainGuardHorde
+44 followup-left Player_1 - 0 Command_SpecialAbilityIvoryTowerVision
+50 followup-button-state Player_1 - 0 Command_SpecialAbilityIvoryTowerVision
+53 quit - - 0
