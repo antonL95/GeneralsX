@@ -33,7 +33,7 @@
 #include "Common/AudioEventRTS.h"
 #include "Common/Module.h"
 #include "Common/Science.h"
-#include "GameLogic/Module/BehaviorModule.h"
+#include "GameLogic/Module/UpdateModule.h"
 #include "Common/SpecialPowerINI.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
@@ -130,7 +130,7 @@ public:
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-class SpecialPowerModule : public BehaviorModule,
+class SpecialPowerModule : public UpdateModule,
 													 public SpecialPowerModuleInterface
 {
 	friend class WeaponModeSpecialPowerUpdate;
@@ -149,6 +149,9 @@ public:
 	SpecialPowerModule( Thing* thing, const ModuleData* moduleData );
 
 	static Int getInterfaceMask() { return MODULEINTERFACE_SPECIAL_POWER; }
+
+	UpdateModuleInterface* getUpdate() override { return nullptr; }
+	UpdateSleepTime update() override { return UPDATE_SLEEP_FOREVER; }
 
 	// BehaviorModule
 	virtual SpecialPowerModuleInterface* getSpecialPower() override { return this; }

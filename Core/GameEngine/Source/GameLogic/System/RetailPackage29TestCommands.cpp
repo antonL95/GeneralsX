@@ -20,11 +20,47 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Weapon.h"
 
 #include <cstdio>
 
 namespace
 {
+void handleDeflect(const RetailTestCommands::Context& ctx)
+{
+	Object* source = ctx.requireObject(TRUE);
+	if (source && (ctx.action == "pkg29-deflect-shoot-marked" || ctx.action == "pkg29-deflect-shoot-unmarked"))
+	{
+		Object* target = ctx.findTarget(TRUE);
+		const AsciiString name = ctx.action == "pkg29-deflect-shoot-marked" ? "Pkg29MarkedShot" : "Pkg29PlainShot";
+		auto* weapon = const_cast<WeaponTemplate*>(TheWeaponStore->findWeaponTemplate(name));
+		if (target && weapon)
+		{
+			weapon->postProcessLoad();
+			TheWeaponStore->createAndFireTempWeapon(weapon, source, target);
+		}
+		return;
+	}
+	const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate("SpecialAbilityDeflectProjectiles");
+	if (!source || !power)
+		return;
+	const auto* module = source->getSpecialPowerModule(power);
+	if (ctx.action == "pkg29-deflect-state")
+	{
+		std::fprintf(stderr, "TEST pkg29 deflect frame=%u module=%d active=%d hp=%.1f\n", ctx.frame,
+			module != nullptr, source->getLogicModelConditions().test(MODELCONDITION_DEFLECT_SPECIAL_POWER),
+			source->getBodyModule()->getHealth());
+	}
+	else if (ctx.action == "pkg29-deflect-script")
+		source->doSpecialPower(power, COMMAND_FIRED_BY_SCRIPT, TRUE);
+	else if (ctx.action == "pkg29-deflect-ai")
+	{
+		const UnsignedInt options = COMMAND_OPTION_INTERNAL_AUTO;
+		if (TheActionManager->canDoSpecialPower(source, power, CMD_FROM_AI, options))
+			source->doSpecialPower(power, options);
+	}
+}
+
 void handleLocationAbility(const RetailTestCommands::Context& ctx)
 {
 	Object* source = ctx.requireObject();
@@ -253,6 +289,7 @@ void registerRetailPackage29TestCommands()
 	registerPrefix("pkg29-arrow-", handleLocationAbility);
 	registerPrefix("pkg29-poultry-", handlePoultry);
 	registerPrefix("pkg29-swoop-", handleSwoop);
+	registerPrefix("pkg29-deflect-", handleDeflect);
 #endif
 }
 }

@@ -760,6 +760,7 @@ void ModuleFactory::init()
 		addModule( AISpecialPowerUpdate );
 		addModule( PlayerHealSpecialPower );
 		addModule( RepairSpecialPower );
+		addModule( DeflectSpecialPower );
 		addModule( SplitHordeSpecialPower );
 
 	}

@@ -491,7 +491,7 @@ private:
 		loc will be filled in to the collision location, and normal will be
 		filled in to the normal to the surface of 'this' at the collide location.
 	*/
-	Bool collidesWith(const PartitionData *that, CollideLocAndNormal *cinfo) const;
+	Bool collidesWith(const PartitionData *that, CollideLocAndNormal *cinfo, Bool includeNonColliding = FALSE) const;
 
 public:
 
@@ -553,7 +553,10 @@ public:
 	void friend_removeAllTouchedCells() { removeAllTouchedCells(); }	///< this is only for use by PartitionManager
 	void friend_updateCellsTouched()	{ updateCellsTouched(); } ///< this is only for use by PartitionManager
 	Int friend_getCoiInUseCount() { return m_coiInUseCount; } ///< this is only for use by PartitionManager
-	Bool friend_collidesWith(const PartitionData *that, CollideLocAndNormal *cinfo) const { return collidesWith(that, cinfo); }	///< this is only for use by PartitionContactList
+	Bool friend_collidesWith(const PartitionData *that, CollideLocAndNormal *cinfo, Bool includeNonColliding = FALSE) const
+	{
+		return collidesWith(that, cinfo, includeNonColliding);
+	}
 
 	// these are only for use by getClosestObjects.
 	// (note, if we ever use other bits in this, smarten this up...)

@@ -1,4 +1,21 @@
 check() {
+	if covers 229; then
+		expect 'TEST pkg29 deflect frame=229 module=1 active=0 hp=150.0'
+		grep -E '^TEST projectile frame=241 weapon=Pkg29MarkedShot .*projectile=GoodFactionFireArrow .*warhead=Pkg29DeflectWarhead ' "$log" || return 1
+	fi
+	if covers 244; then
+		expect 'TEST pkg29 deflect frame=244 module=1 active=1 hp=150.0'
+	fi
+	if covers 280; then
+		expect 'TEST pkg29 deflect frame=280 module=1 active=1 hp=150.0'
+		grep -E '^TEST projectile frame=281 weapon=Pkg29PlainShot .*projectile=Pkg29PlainProjectile .*warhead=Pkg29DeflectWarhead ' "$log" || return 1
+		expect 'TEST pkg29 deflect frame=320 module=1 active=1 hp=130.0'
+		expect 'TEST pkg29 deflect frame=335 module=1 active=0 hp=130.0'
+		expect 'TEST pkg29 deflect frame=430 module=1 active=0 hp=110.0'
+		expect 'TEST pkg29 deflect frame=444 module=1 active=1 hp=110.0'
+		expect 'TEST pkg29 deflect frame=464 module=1 active=0 hp=110.0'
+		expect 'TEST pkg29 deflect frame=534 module=1 active=1 hp=110.0'
+	fi
 	if covers 197; then
 		expect 'TEST pkg29 arrow cursor frame=197 armed=1 valid=0 cursor=GenericInvalid'
 		expect 'TEST pkg29 arrow frame=199 ready=1 accepted=0 firing=0 paralyzed=0'

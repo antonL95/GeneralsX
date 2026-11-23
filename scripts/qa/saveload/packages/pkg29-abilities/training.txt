@@ -94,3 +94,22 @@
 525 create PlyrCreeps Pkg29SwoopTarget 0 1050,1920,0
 535 pkg29-swoop-script Player_1 MordorFellBeastInterface 0 PlyrCreeps:Pkg29SwoopTarget:0
 555 pkg29-swoop-state Player_1 MordorFellBeastInterface 0 PlyrCreeps:Pkg29SwoopTarget:0
+220 create Player_1 Pkg29DeflectLossoth 0 3460,3150,0
+220 create PlyrCreeps Pkg29DeflectShooter 0 3350,3150,0
+229 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0
+236 pkg29-deflect-script Player_1 Pkg29DeflectLossoth 0
+241 pkg29-deflect-shoot-marked PlyrCreeps Pkg29DeflectShooter 0 Player_1:Pkg29DeflectLossoth:0
+244 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0
+280 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0
+281 pkg29-deflect-shoot-unmarked PlyrCreeps Pkg29DeflectShooter 0 Player_1:Pkg29DeflectLossoth:0
+320 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0
+321 move Player_1 Pkg29DeflectLossoth 0 go 3460 3180
+335 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0
+390 pkg29-deflect-shoot-marked PlyrCreeps Pkg29DeflectShooter 0 Player_1:Pkg29DeflectLossoth:0
+430 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0
+431 power Player_1 Pkg29DeflectLossoth 0 SpecialAbilityDeflectProjectiles
+444 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0
+450 move Player_1 Pkg29DeflectLossoth 0 go 3460 3150
+464 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0
+520 pkg29-deflect-ai Player_1 Pkg29DeflectLossoth 0
+534 pkg29-deflect-state Player_1 Pkg29DeflectLossoth 0

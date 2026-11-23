@@ -497,6 +497,27 @@ public:
 	static Bool canRepairTarget(const Object* repairer, const Object* target, CommandSourceType source);
 };
 
+class DeflectSpecialPower final : public SpecialPowerModule
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(DeflectSpecialPower, "DeflectSpecialPower")
+	MAKE_STANDARD_MODULE_MACRO(DeflectSpecialPower)
+
+public:
+	DeflectSpecialPower(Thing* thing, const ModuleData* data);
+	static Int getInterfaceMask() { return MODULEINTERFACE_UPDATE | MODULEINTERFACE_SPECIAL_POWER; }
+	UpdateModuleInterface* getUpdate() override { return this; }
+	UpdateSleepTime update() override;
+	static Bool canDeflect(const Object* defender, const Object* projectile);
+
+protected:
+	void applyPowerEffect(const Coord3D* position) override;
+
+private:
+	void xferRetailBlocks(Xfer* xfer);
+	Bool m_arming = FALSE;
+	Bool m_active = FALSE;
+};
+
 class MonitorConditionUpdateModuleData : public UpdateModuleData
 {
 public:

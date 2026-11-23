@@ -165,7 +165,7 @@ ModuleData* SpecialPowerModule::friend_newModuleData(INI* ini)
 }
 
 SpecialPowerModule::SpecialPowerModule( Thing *thing, const ModuleData *moduleData )
-									: BehaviorModule( thing, moduleData )
+									: UpdateModule( thing, moduleData )
 {
 
 	// TheSuperHackers @bugfix fbraz 13/07/2026: Always initialize to 0.

@@ -76,6 +76,7 @@
 #include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/GeometryUpgrade.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
@@ -2014,13 +2015,13 @@ static Bool collideParts(const CollideInfo& first, const CollideInfo& second, Co
 	return test(&first, &second, contact);
 }
 
-Bool PartitionData::collidesWith(const PartitionData *that, CollideLocAndNormal *cinfo) const
+Bool PartitionData::collidesWith(const PartitionData *that, CollideLocAndNormal *cinfo, Bool includeNonColliding) const
 {
 	const Object *thisObj = this->getObject();
 	const Object *thatObj = that->getObject();
 
-	if( thisObj->isKindOf( KINDOF_NO_COLLIDE )  ||  thatObj->isKindOf( KINDOF_NO_COLLIDE ) )
-		return FALSE; // A collision extent of zero size is still a point and can collide, but we don't always want to.
+	if (!includeNonColliding && (thisObj->isKindOf(KINDOF_NO_COLLIDE) || thatObj->isKindOf(KINDOF_NO_COLLIDE)))
+		return FALSE;
 
 	CollideInfo thisInfo(thisObj->getPosition(), thisObj->getGeometryInfo(), thisObj->getOrientation());
 	CollideInfo thatInfo(thatObj->getPosition(), thatObj->getGeometryInfo(), thatObj->getOrientation());
@@ -2615,14 +2616,22 @@ void PartitionContactList::processContactList()
 		if (cd->m_obj == nullptr || cd->m_other == nullptr)
 			continue;
 
+		Object* obj = cd->m_obj->getObject();
+		Object* other = cd->m_other->getObject();
+		Object* deflected = nullptr;
+		if (RetailFileLayers::enabled())
+		{
+			if (DeflectSpecialPower::canDeflect(obj, other))
+				deflected = other;
+			else if (DeflectSpecialPower::canDeflect(other, obj))
+				deflected = obj;
+		}
+
 		// we know that their partitions overlap; determine if they REALLY collide
 		// before proceeding...
 		CollideLocAndNormal cinfo;
-		if (!cd->m_obj->friend_collidesWith(cd->m_other, &cinfo))
+		if (!cd->m_obj->friend_collidesWith(cd->m_other, &cinfo, deflected != nullptr))
 			continue;
-
-		Object* obj = cd->m_obj->getObject();
-		Object* other = cd->m_other->getObject();
 
 		if( obj->getStatusBits().test( OBJECT_STATUS_NO_COLLISIONS ) ||
 				other->getStatusBits().test( OBJECT_STATUS_NO_COLLISIONS ) )
@@ -2636,6 +2645,12 @@ void PartitionContactList::processContactList()
 		// so we won't be tempted to use 'em (since they might be bogus).
 		cd->m_obj = nullptr;
 		cd->m_other = nullptr;
+
+		if (deflected)
+		{
+			deflected->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
+			continue;
+		}
 
 		obj->onCollide(other, &cinfo.loc, &cinfo.normal);
 		flipCoord3D(&cinfo.normal);

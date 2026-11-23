@@ -20,6 +20,7 @@
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
+#include "Common/RotwkDuration.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -47,8 +48,93 @@
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/GiantBirdAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
+
+EMPTY_DTOR(DeflectSpecialPower)
+
+DeflectSpecialPower::DeflectSpecialPower(Thing* thing, const ModuleData* data) : SpecialPowerModule(thing, data)
+{
+	setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
+}
+
+void DeflectSpecialPower::applyPowerEffect(const Coord3D*)
+{
+	if (!RetailFileLayers::enabled() || m_active || m_arming)
+		return;
+	m_arming = TRUE;
+	setWakeFrame(getObject(), UPDATE_SLEEP(RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND)));
+}
+
+UpdateSleepTime DeflectSpecialPower::update()
+{
+	if (!RetailFileLayers::enabled() || (!m_active && !m_arming))
+		return UPDATE_SLEEP_FOREVER;
+
+	Object* self = getObject();
+	const PhysicsBehavior* physics = self->getPhysics();
+	const UnsignedInt tick = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
+	const Bool moving = physics && physics->getVelocityMagnitude() * tick > 0.1f;
+	if (moving && m_active)
+	{
+		m_active = FALSE;
+		self->clearModelConditionState(MODELCONDITION_DEFLECT_SPECIAL_POWER);
+		return UPDATE_SLEEP_FOREVER;
+	}
+	if (!moving && m_arming)
+	{
+		m_arming = FALSE;
+		m_active = TRUE;
+		self->setModelConditionState(MODELCONDITION_DEFLECT_SPECIAL_POWER);
+	}
+	return UPDATE_SLEEP(tick);
+}
+
+Bool DeflectSpecialPower::canDeflect(const Object* defender, const Object* projectile)
+{
+	if (!defender->getLogicModelConditions().test(MODELCONDITION_DEFLECT_SPECIAL_POWER) ||
+		!projectile->isKindOf(KINDOF_DEFLECT_BY_SPECIAL_POWER) || !projectile->getProjectileUpdateInterface() ||
+		defender->isEffectivelyDead() || projectile->isEffectivelyDead())
+		return FALSE;
+	const auto* module = static_cast<const DeflectSpecialPower*>(defender->findUpdateModule(NAMEKEY("DeflectSpecialPower")));
+	return module && module->m_active;
+}
+
+void DeflectSpecialPower::xferRetailBlocks(Xfer* xfer)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, TRUE, {
+		{ "deflect-stance", [this](Xfer* block) {
+			block->xferBool(&m_arming);
+			block->xferBool(&m_active);
+			UnsignedInt nextTick = friend_getNextCallFrame();
+			block->xferUnsignedInt(&nextTick);
+			if (block->getXferMode() == XFER_LOAD)
+				friend_setNextCallFrame(nextTick);
+		}, [this] { m_arming = m_active = FALSE; } }
+	});
+}
+
+void DeflectSpecialPower::crc(Xfer* xfer)
+{
+	SpecialPowerModule::crc(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer);
+}
+
+void DeflectSpecialPower::xfer(Xfer* xfer)
+{
+	SpecialPowerModule::xfer(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer);
+}
+
+void DeflectSpecialPower::loadPostProcess()
+{
+	SpecialPowerModule::loadPostProcess();
+	if (RetailFileLayers::enabled() && m_active)
+		getObject()->setModelConditionState(MODELCONDITION_DEFLECT_SPECIAL_POWER);
+}
 
 void ArrowStormUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
