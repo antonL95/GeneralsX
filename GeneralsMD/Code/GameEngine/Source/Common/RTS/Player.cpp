@@ -4855,23 +4855,17 @@ void Player::xfer( Xfer *xfer )
 		for (AsciiString& name : m_forbiddenBuildings)
 			xfer->xferAsciiString(&name);
 	}
-	if (RetailFileLayers::enabled())
+	if (version >= 12)
 	{
-		Bool legacyOverride = FALSE;
-		Int legacyTotal = 0;
-		Int legacyMaximum = 0;
-		if (version >= 12)
-		{
-			xfer->xferBool(&legacyOverride);
-			xfer->xferInt(&legacyTotal);
-			xfer->xferInt(&legacyMaximum);
-		}
-		if (xfer->getXferMode() == XFER_LOAD)
-		{
-			m_hasCommandPointOverride = legacyOverride;
-			m_commandPointOverrideTotal = legacyTotal;
-			m_commandPointOverrideMaximum = legacyMaximum;
-		}
+		xfer->xferBool(&m_hasCommandPointOverride);
+		xfer->xferInt(&m_commandPointOverrideTotal);
+		xfer->xferInt(&m_commandPointOverrideMaximum);
+	}
+	else if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_hasCommandPointOverride = FALSE;
+		m_commandPointOverrideTotal = 0;
+		m_commandPointOverrideMaximum = 0;
 	}
 	if (version >= 13)
 		CreateAHeroSystem::xferPlayer(this, xfer);
