@@ -117,7 +117,7 @@ check() {
             if (!leftFast)
                 print "Pippin did not have a remaining high speed turn at the frame 244 checkpoint"
             if (first <= 238 && (yawJump || yawSteps < 2))
-                print "Pippin's high speed turn did not advance in bounded render frame steps"
+                print "Pippin high speed turn did not advance in bounded render frame steps"
             if (checkArcher && first <= 504 && !(archerStationary && archerDisplaced))
                 print "Idle archer horde did not start its independent sharp move by frame 518"
             exit !(gait && (first > 238 || (aligned && translatedTowardGoal && !yawJump && yawSteps >= 2)) &&
