@@ -1,15 +1,15 @@
-195 create Player_1 ElvenRivendellInfHorde 0 2800,1520,0
-195 create Player_1 GondorFighterHorde 0 2800,1680,0
-199 weapon-upgrade-trace Player_1 ElvenRivendellInfHorde 0 Upgrade_ArnorBasicTraining
-199 weapon-upgrade-trace Player_1 GondorFighterHorde 0 Upgrade_GondorBasicTraining
-200 grant Player_1 - 0 Upgrade_TechnologyArnorBasicTraining
-200 grant Player_1 - 0 Upgrade_TechnologyGondorBasicTraining
-201 weapon-upgrade-trace Player_1 ElvenRivendellInfHorde 0 Upgrade_ArnorBasicTraining
-201 weapon-upgrade-trace Player_1 GondorFighterHorde 0 Upgrade_GondorBasicTraining
-202 weapon-upgrade-buy Player_1 ElvenRivendellInfHorde 0 Upgrade_ArnorBasicTraining
-203 weapon-upgrade-buy Player_1 GondorFighterHorde 0 Upgrade_GondorBasicTraining
-208 weapon-upgrade-trace Player_1 ElvenRivendellInfHorde 0 Upgrade_ArnorBasicTraining
-208 weapon-upgrade-trace Player_1 GondorFighterHorde 0 Upgrade_GondorBasicTraining
+135 create Player_1 ElvenRivendellInfHorde 0 2800,1520,0
+135 create Player_1 GondorFighterHorde 0 2800,1680,0
+139 weapon-upgrade-trace Player_1 ElvenRivendellInfHorde 0 Upgrade_ArnorBasicTraining
+139 weapon-upgrade-trace Player_1 GondorFighterHorde 0 Upgrade_GondorBasicTraining
+140 grant Player_1 - 0 Upgrade_TechnologyArnorBasicTraining
+140 grant Player_1 - 0 Upgrade_TechnologyGondorBasicTraining
+141 weapon-upgrade-trace Player_1 ElvenRivendellInfHorde 0 Upgrade_ArnorBasicTraining
+141 weapon-upgrade-trace Player_1 GondorFighterHorde 0 Upgrade_GondorBasicTraining
+142 weapon-upgrade-buy Player_1 ElvenRivendellInfHorde 0 Upgrade_ArnorBasicTraining
+143 weapon-upgrade-buy Player_1 GondorFighterHorde 0 Upgrade_GondorBasicTraining
+148 weapon-upgrade-trace Player_1 ElvenRivendellInfHorde 0 Upgrade_ArnorBasicTraining
+148 weapon-upgrade-trace Player_1 GondorFighterHorde 0 Upgrade_GondorBasicTraining
 211 create Player_1 TradeCaravan 0 3330,1730,0
 212 create Player_1 HaradBlackNumenoranWarriorsHorde 0 3440,1730,0
 216 create Player_1 ElvenRivendellKnightHorde 0 2910,1940,0
@@ -26,11 +26,11 @@
 320 weapon-upgrade-trace Player_1 HaradBlackNumenoranWarriorsHorde 0 Upgrade_AngmarBasicTraining
 321 weapon-upgrade-buy Player_1 HaradBlackNumenoranWarriorsHorde 0 Upgrade_AngmarBasicTraining
 325 weapon-upgrade-trace Player_1 HaradBlackNumenoranWarriorsHorde 0 Upgrade_AngmarBasicTraining
+490 weapon-upgrade-trace Player_1 ElvenRivendellInfHorde 0 Upgrade_ArnorBasicTraining
+490 weapon-upgrade-trace Player_1 GondorFighterHorde 0 Upgrade_GondorBasicTraining
+491 destroy Player_1 ElvenRivendellInfHorde 0
+491 destroy Player_1 GondorFighterHorde 0
 540 weapon-upgrade-trace Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorForgedBlades
-550 weapon-upgrade-trace Player_1 ElvenRivendellInfHorde 0 Upgrade_ArnorBasicTraining
-550 weapon-upgrade-trace Player_1 GondorFighterHorde 0 Upgrade_GondorBasicTraining
-551 destroy Player_1 ElvenRivendellInfHorde 0
-551 destroy Player_1 GondorFighterHorde 0
 650 weapon-upgrade-trace Player_1 HaradBlackNumenoranWarriorsHorde 0 Upgrade_AngmarBasicTraining
 651 destroy Player_1 HaradBlackNumenoranWarriorsHorde 0
 651 destroy Player_1 TradeCaravan 0
