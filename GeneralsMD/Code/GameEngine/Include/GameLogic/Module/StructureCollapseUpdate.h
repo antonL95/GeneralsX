@@ -147,5 +147,7 @@ protected:
 	StructureCollapseStateType	m_collapseState;
 	Real												m_collapseVelocity;
 	Real												m_currentHeight;
+	Real											m_retailCollapseBaseZ = 0.0f;
 
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 };

@@ -1,0 +1,1 @@
+set environment GENERALSX_TEST_BUILDING_DEATH=1

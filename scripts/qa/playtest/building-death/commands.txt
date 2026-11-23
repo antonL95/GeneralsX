@@ -1,0 +1,9 @@
+20 create Player_1 GondorFarmMultiplayer 0 2500,455,0
+20 create Player_1 MordorOrcPit 0 2670,455,0
+20 create Player_1 MenWallHubSmallExpansion 0 2840,455,0
+21 reveal Player_1 GondorFarmMultiplayer 0
+40 list Player_1 - 0
+60 kill Player_1 GondorFarmMultiplayer 0
+60 kill Player_1 MordorOrcPit 0
+60 kill Player_1 MenWallHubSmallExpansion 0
+183 list Player_1 - 0

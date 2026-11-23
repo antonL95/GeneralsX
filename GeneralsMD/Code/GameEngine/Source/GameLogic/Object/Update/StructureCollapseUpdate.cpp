@@ -35,6 +35,8 @@
 #include "Common/INI.h"
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
+#include "Common/RotwkDuration.h"
 #include "Common/GlobalData.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
@@ -147,6 +149,8 @@ void StructureCollapseUpdate::beginStructureCollapse(const DamageInfo *damageInf
 
 	Object *building = getObject();
 	UnsignedInt now = TheGameLogic->getFrame();
+	if (RetailFileLayers::enabled())
+		m_retailCollapseBaseZ = building->getPosition()->z;
 	// This has to use a game logic random value since the bursts can spawn debris, and debris is sync'd.
 	m_collapseFrame = now + GameLogicRandomValue(d->m_minCollapseDelay, d->m_maxCollapseDelay);
 
@@ -182,6 +186,17 @@ UpdateSleepTime StructureCollapseUpdate::update()
 {
 	static const Real COLLAPSE_ACCELERATION_FACTOR = 0.02f;
 	const StructureCollapseUpdateModuleData *d = getStructureCollapseUpdateModuleData();
+	const Bool retail = RetailFileLayers::enabled();
+	static const Bool trace = std::getenv("GENERALSX_TEST_BUILDING_DEATH") != nullptr;
+	if (trace && RetailFileLayers::enabled() && getObject()->isKindOf(KINDOF_STRUCTURE))
+	{
+		Drawable* draw = getObject()->getDrawable();
+		std::fprintf(stderr, "TEST structure-collapse frame=%u id=%u actor=%s state=%d collapse=%u burst=%u height=%.3f velocity=%.3f hidden=%d shroud=%d opacity=%.3f\n",
+			TheGameLogic->getFrame(), static_cast<UnsignedInt>(getObject()->getID()), getObject()->getTemplate()->getName().str(),
+			static_cast<Int>(m_collapseState), m_collapseFrame, m_burstFrame, m_currentHeight, m_collapseVelocity,
+			draw ? draw->isDrawableEffectivelyHidden() : -1, draw ? draw->getFullyObscuredByShroud() : -1,
+			draw ? draw->getEffectiveOpacity() : 0.0f);
+	}
 
 	if (m_collapseState == COLLAPSESTATE_STANDING)
 	{
@@ -221,13 +236,15 @@ UpdateSleepTime StructureCollapseUpdate::update()
 	{
 		Object *building = getObject();
 		UnsignedInt now = TheGameLogic->getFrame();
-		const Real previousHeight = m_currentHeight;
 		m_currentHeight -= m_collapseVelocity;
 		m_collapseVelocity -= TheGlobalData->m_gravity * (1.0 - d->m_collapseDamping);
 
+		if (retail)
+			building->setPositionZ(m_retailCollapseBaseZ + m_currentHeight);
 		const Coord3D *currentPosition = building->getPosition();
 		Vector3 shudder;
-		shudder.Set(GameClientRandomValueReal(-(d->m_maxShudder), d->m_maxShudder), GameClientRandomValueReal(-(d->m_maxShudder), d->m_maxShudder), m_currentHeight);
+		shudder.Set(GameClientRandomValueReal(-(d->m_maxShudder), d->m_maxShudder), GameClientRandomValueReal(-(d->m_maxShudder), d->m_maxShudder),
+			retail ? 0.0f : m_currentHeight);
 		const Matrix3D *instMatrix = building->getDrawable()->getInstanceMatrix();
 		Matrix3D newInstMatrix;
 		newInstMatrix = *instMatrix;
@@ -250,9 +267,9 @@ UpdateSleepTime StructureCollapseUpdate::update()
 		}
 
 		const Real geometryHeight = building->getTemplate()->getTemplateGeometryInfo().getMaxHeightAbovePosition();
-		const Real collapseHeight = d->m_destroyObjectWhenDone || d->m_collapseHeight < 0.0f
-			? max(d->m_collapseHeight, geometryHeight)
-			: d->m_collapseHeight;
+		Real collapseHeight = geometryHeight;
+		if (retail && d->m_collapseHeight >= 0.0f)
+			collapseHeight = d->m_destroyObjectWhenDone ? max(d->m_collapseHeight, geometryHeight) : d->m_collapseHeight;
 		if ((m_currentHeight + collapseHeight) <= 0)
 		{
 			m_collapseState = COLLAPSESTATE_DONE;
@@ -261,7 +278,7 @@ UpdateSleepTime StructureCollapseUpdate::update()
 
 			doCollapseDoneStuff();
 
-			if (d->m_destroyObjectWhenDone)
+			if (retail && d->m_destroyObjectWhenDone)
 			{
 				TheGameLogic->destroyObject(building);
 				return UPDATE_SLEEP_FOREVER;
@@ -288,8 +305,8 @@ UpdateSleepTime StructureCollapseUpdate::update()
 			return UPDATE_SLEEP_FOREVER;
 		}
 
-		if (RetailFileLayers::enabled() && previousHeight + collapseHeight * 0.7f > 0.0f &&
-			m_currentHeight + collapseHeight * 0.7f <= 0.0f)
+		if (retail && m_currentHeight + collapseHeight * 0.7f <= 0.0f &&
+			(now - m_collapseFrame) % RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND) == 0)
 		{
 			doPhaseStuff(SCPHASE_ALMOST_FINAL, currentPosition);
 			building->getBodyModule()->updateBodyParticleSystems();
@@ -336,6 +353,12 @@ void StructureCollapseUpdate::doPhaseStuff(StructureCollapsePhaseType scphase, c
 	const StructureCollapseUpdateModuleData* d = getStructureCollapseUpdateModuleData();
 	Int i, idx, count, listSize;
 	Int idxList[MAX_IDX];
+	static const Bool trace = std::getenv("GENERALSX_TEST_BUILDING_DEATH") != nullptr;
+	if (trace && RetailFileLayers::enabled() && getObject()->isKindOf(KINDOF_STRUCTURE))
+		std::fprintf(stderr, "TEST collapse-phase frame=%u id=%u actor=%s phase=%s fx=%zu ocl=%zu world=%.2f,%.2f,%.2f\n",
+			TheGameLogic->getFrame(), static_cast<UnsignedInt>(getObject()->getID()), getObject()->getTemplate()->getName().str(),
+			TheStructureCollapsePhaseNames[scphase], d->m_fxs[scphase].size(), d->m_ocls[scphase].size(),
+			target->x, target->y, target->z);
 
 	listSize = d->m_fxs[scphase].size();
 	if (listSize > 0)
@@ -388,6 +411,8 @@ void StructureCollapseUpdate::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 
 }
 
@@ -400,7 +425,8 @@ void StructureCollapseUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	const Bool retail = RetailFileLayers::enabled();
+	const XferVersion currentVersion = retail ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -422,8 +448,20 @@ void StructureCollapseUpdate::xfer( Xfer *xfer )
 	// current height
 	xfer->xferReal( &m_currentHeight );
 
+	if (retail)
+		xferRetailBlocks(xfer, version >= 2);
 }
 
+void StructureCollapseUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"collapse-origin", [this](Xfer* block) {
+			block->xferReal(&m_retailCollapseBaseZ);
+		}, [this] {
+			m_retailCollapseBaseZ = m_collapseState == COLLAPSESTATE_STANDING ? 0.0f : getObject()->getPosition()->z;
+		}}
+	});
+}
 // ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------

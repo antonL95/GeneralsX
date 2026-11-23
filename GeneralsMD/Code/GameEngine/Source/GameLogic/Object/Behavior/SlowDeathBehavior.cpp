@@ -537,6 +537,17 @@ UpdateSleepTime SlowDeathBehavior::update()
 		}
 	}
 
+	static const Bool trace = std::getenv("GENERALSX_TEST_BUILDING_DEATH") != nullptr;
+	if (trace && RetailFileLayers::enabled() && obj->isKindOf(KINDOF_STRUCTURE))
+	{
+		Drawable* draw = obj->getDrawable();
+		std::fprintf(stderr, "TEST slow-death frame=%u id=%u actor=%s flags=%u sink=%u midpoint=%u fade=%u fadetime=%u destroy=%u scale=%.3f hidden=%d shroud=%d opacity=%.3f\n",
+			now, static_cast<UnsignedInt>(obj->getID()), obj->getTemplate()->getName().str(), m_flags,
+			m_sinkFrame, m_midpointFrame, m_fadeFrame, d->m_fadeTime, m_destructionFrame, m_acceleratedTimeScale,
+			draw ? draw->isDrawableEffectivelyHidden() : -1, draw ? draw->getFullyObscuredByShroud() : -1,
+			draw ? draw->getEffectiveOpacity() : 0.0f);
+	}
+
 	if ( (now >= m_sinkFrame && d->m_sinkRate > 0.0f) )
 	{
 		// disable Physics (if any) so that we can control the sink...

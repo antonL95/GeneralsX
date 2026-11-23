@@ -35,6 +35,7 @@
 #include "Common/ModuleFactory.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
@@ -123,6 +124,12 @@ void CreateObjectDie::onDie( const DamageInfo * damageInfo )
 	Object *damageDealer = TheGameLogic->findObjectByID( damageInfo->in.m_sourceID );
 
 	Object *newObject = ObjectCreationList::create( data->m_ocl, getObject(), damageDealer );
+	static const Bool trace = std::getenv("GENERALSX_TEST_BUILDING_DEATH") != nullptr;
+	if (trace && RetailFileLayers::enabled() && getObject()->isKindOf(KINDOF_STRUCTURE))
+		std::fprintf(stderr, "TEST create-object-die frame=%u parent=%s tag=%s ocl=%d created=%s\n",
+			TheGameLogic->getFrame(), getObject()->getTemplate()->getName().str(),
+			TheNameKeyGenerator->keyToName(getModuleTagNameKey()).str(), data->m_ocl != nullptr,
+			newObject ? newObject->getTemplate()->getName().str() : "-");
 	if (!newObject)
 		return;
 

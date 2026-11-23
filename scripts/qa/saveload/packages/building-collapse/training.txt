@@ -1,0 +1,13 @@
+150 create Player_1 CollapseFixtureSink 0 1320,2890,0
+150 create Player_1 CollapseFixtureKeep 0 1420,2890,0
+150 create Player_1 CollapseFixtureAttacker 0 1370,2890,0
+151 collapse-site Player_1 CollapseFixtureSink 0 Player_1:CollapseFixtureAttacker:0 1320 2890
+155 kill Player_1 CollapseFixtureKeep 0
+171 kill Player_1 CollapseFixtureSink 0
+200 collapse-site Player_1 CollapseFixtureSink 0 Player_1:CollapseFixtureAttacker:0 1320 2890
+244 collapse-site Player_1 CollapseFixtureSink 0 Player_1:CollapseFixtureAttacker:0 1320 2890
+254 collapse-site Player_1 CollapseFixtureSink 0 Player_1:CollapseFixtureAttacker:0 1320 2890
+255 collapse-site Player_1 CollapseFixtureSink 0 Player_1:CollapseFixtureAttacker:0 1320 2890
+257 list Player_1 CollapseFixtureDebris 0
+263 log Player_1 CollapseFixtureKeep 0
+263 collapse-site Player_1 CollapseFixtureKeep 0 Player_1:CollapseFixtureAttacker:0 1420 2890
