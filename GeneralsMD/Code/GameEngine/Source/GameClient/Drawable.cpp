@@ -1228,6 +1228,7 @@ void Drawable::updateDrawable(Real timeScale)
 
 	UnsignedInt now = TheGameLogic->getFrame();
 	Object *obj = getObject();
+	m_shipRollStepPending = TRUE;
 
 	if (RetailFileLayers::enabled())
 	{
@@ -1474,6 +1475,27 @@ void Drawable::flashAsSelected( const RGBColor *color ) ///< drawable takes care
 //-------------------------------------------------------------------------------------------------
 void Drawable::applyPhysicsXform(Matrix3D* mtx)
 {
+	const Object* object = getObject();
+	if (const AIUpdateInterface* ai = object->getAIUpdateInterface())
+	{
+		const Locomotor* active = ai->getCurLocomotor();
+		const LocomotorTemplate* locomotor = active ? active->getTemplate()
+			: object->getTemplate()->findRotWKLocomotor(ai->getCurLocomotorSetType());
+		if (locomotor && locomotor->getAppearance() == LOCO_SHIP)
+		{
+			if (m_shipRollStepPending)
+			{
+				const Real step = min(1.0f, TheFramePacer->getBaseOverUpdateFpsRatio());
+				m_shipRollPhase = WWMath::Normalize_Angle(m_shipRollPhase + locomotor->getAeleronCorrectionRate() * step);
+				m_shipRollStepPending = FALSE;
+			}
+			const Real roll = locomotor->getAeleronCorrectionDegree() * WWMath::SinTrig(m_shipRollPhase);
+			if (roll != 0.0f)
+				mtx->Rotate_X(-roll);
+			return;
+		}
+	}
+
 	if (m_physicsXform != nullptr)
 	{
 		// TheSuperHackers @tweak Advance physics only on WW Sync frames.

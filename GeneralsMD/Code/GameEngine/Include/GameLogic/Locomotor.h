@@ -157,6 +157,10 @@ public:
 	void validate();
 	void applyRotwkSetSpeed(Real speedPerSecond);
 
+	LocomotorAppearance getAppearance() const { return m_appearance; }
+	Real getAeleronCorrectionDegree() const { return m_aeleronCorrectionDegree; }
+	Real getAeleronCorrectionRate() const { return m_aeleronCorrectionRate; }
+
 	static void parseRotwkSpeedDamaged(INI* ini, void* instance, void* store, const void* userData);
 	static void parseRotwkMinSpeed(INI* ini, void* instance, void* store, const void* userData);
 	static void parseRotwkMinTurnSpeed(INI* ini, void* instance, void* store, const void* userData);
@@ -260,6 +264,8 @@ private:
 	Real											m_rudderCorrectionRate;
 	Real											m_elevatorCorrectionDegree;
 	Real											m_elevatorCorrectionRate;
+	Real m_aeleronCorrectionDegree = 0.0f;
+	Real m_aeleronCorrectionRate = 0.0f;
 
 	RotwkLocomotorRules::Authored	m_rotwk;
 	Real m_swoopStandoffRadius = 0.0f;
@@ -312,6 +318,7 @@ public:
 	void restorePreferredHeightFromTemplate() { m_preferredHeight = m_template->m_preferredHeight; };
 	Real getPreferredHeightDamping() const { return m_preferredHeightDamping;}
 	LocomotorAppearance getAppearance() const { return m_template->m_appearance; }
+	const LocomotorTemplate* getTemplate() const { return m_template; }
 	LocomotorPriority getMovePriority() const { return m_template->m_movePriority; }
 	LocomotorSurfaceTypeMask getLegalSurfaces() const { return m_template->m_surfaces; }
 

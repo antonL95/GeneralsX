@@ -684,6 +684,8 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "PreferredHeight", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredHeight) },
 		{ "PreferredAttackHeight", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredAttackHeight) },
 		{ "PreferredHeightDamping", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_preferredHeightDamping) },
+		{ "AeleronCorrectionDegree", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_aeleronCorrectionDegree) },
+		{ "AeleronCorrectionRate", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_aeleronCorrectionRate) },
 		{ "SwoopStandoffRadius", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_swoopStandoffRadius) },
 		{ "SwoopStandoffHeight", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_swoopStandoffHeight) },
 		{ "SwoopTerminalVelocity", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_swoopTerminalVelocity) },

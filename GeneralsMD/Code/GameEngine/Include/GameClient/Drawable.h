@@ -748,6 +748,8 @@ private:
 	DrawableLocoInfo*	m_locoInfo;	// lazily allocated
 
 	PhysicsXformInfo* m_physicsXform;
+	Real m_shipRollPhase = 0.0f;
+	Bool m_shipRollStepPending = FALSE;
 
 	RefCountPtr<DynamicAudioEventRTS> m_ambientSound;		///< sound module for ambient sound (lazily allocated)
 	std::unique_ptr<RetailClientAudio::Loops> m_retailConditionAudio;
