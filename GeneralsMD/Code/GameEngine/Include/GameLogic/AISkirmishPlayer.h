@@ -53,6 +53,7 @@ public:	 // AISkirmish specific methods.
 	static void loadRetailData();
 	static void parseRetailArmy(INI* ini);
 	static void parseRetailTuning(INI* ini);
+	static Bool rollRetailSpecialPowerActivation(const Player& player);
 	static Bool hasRetailCombatChain(const ThingTemplate& attacker);
 	static Real getRetailCombatChainModifier(const ThingTemplate& attacker, const ThingTemplate& target);
 	virtual Bool computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord3D *pos, Int playerNdx, Real weaponRadius) override; ///< Calculates best pos for weapon given radius.
@@ -154,5 +155,11 @@ protected:
 	Int m_retailScavengedBuilding = -1;
 	Real m_retailFarmPriority = 0.0f;
 	std::set<AsciiString> m_retailBuiltStructures;
+	struct RetailUpgradePlan
+	{
+		Real priority = 0.0f;
+		Bool admitted = FALSE;
+	};
+	std::map<std::pair<ObjectID, AsciiString>, RetailUpgradePlan> m_retailUpgradePlans;
 
 };

@@ -1,0 +1,14 @@
+44 power-reveal - - 0
+55 create Player_2 Pkg44Caster 0 1950,3360,0
+56 create PlyrCreeps Pkg44FarCreep 0 2120,3360,0
+75 pkg44-power Player_2 Pkg44Caster 0 Pkg44CapturePower
+84 create PlyrCreeps Pkg44Creep 0 1980,3360,0
+137 pkg44-capture Player_2 Pkg44Creep 0
+137 pkg44-capture PlyrCreeps Pkg44FarCreep 0
+137 pkg44-power Player_2 Pkg44Caster 0 Pkg44CapturePower
+181 create Player_2 Pkg44ArmoredUnit 0 2000,3410,0
+181 create Player_2 Pkg44ResearchHall 0 2050,3420,0
+230 pkg44-upgrade Player_2 Pkg44ArmoredUnit 0 Pkg44UnitArmor
+230 pkg44-upgrade Player_2 - 0 Pkg44ImportantResearch
+230 pkg44-upgrade Player_2 - 0 Pkg44NormalResearch
+295 pkg44-upgrade Player_2 - 0 Pkg44NormalResearch

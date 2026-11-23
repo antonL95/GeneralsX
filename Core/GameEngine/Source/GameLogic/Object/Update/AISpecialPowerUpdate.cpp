@@ -15,6 +15,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #if RTS_ZEROHOUR
+#include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/Module/AutoPickUpUpdate.h"
 #endif
 #include "GameLogic/Module/BodyModule.h"
@@ -134,6 +135,8 @@ void scoutWithPower(Object& source, const CommandButton& button, const SpecialPo
 			if (!button.isValidToUseOn(&source, nullptr, &position, CMD_FROM_AI) ||
 				!power.isValidRetailTarget(&source, nullptr, &position, CMD_FROM_AI))
 				return FALSE;
+			if (!AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
+				return TRUE;
 
 			static const Bool trace = std::getenv("GENERALSX_SKIRMISH_AI_TRACE") != nullptr;
 			if (trace)
@@ -255,8 +258,9 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		policy == "AI_SPECIAL_POWER_RANGED_AOE_ATTACK" || policy == "AI_SPECIAL_POWER_RANGED_AOE_ATTACK_UNITS" ||
 		policy == "AI_SPECIAL_POWER_ENEMY_TYPE_KILLER" || policy == "AI_SPECIAL_POWER_ENEMY_TYPE_KILLER_RANGED";
 	const Bool reveal = policy == "AI_SPELLBOOK_SHROUD_REVEAL";
+	const Bool captureCreep = policy == "AI_SPELLBOOK_CAPTURE_CREEP";
 	const Bool selfBattle = policy == "AI_SPECIAL_POWER_BASIC_SELF_BUFF" || policy == "AI_SPECIAL_POWER_BASIC_SELF_DEBUFF";
-	if (!(always || allyBattle || repair || heal || allyEconomy || enemyStructure || enemyArmy || reveal || selfBattle))
+	if (!(always || allyBattle || repair || heal || allyEconomy || enemyStructure || enemyArmy || reveal || captureCreep || selfBattle))
 		return checkAgain;
 
 	const UnsignedInt options = button->getOptions();
@@ -265,12 +269,14 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 	if (!objectTarget && !positionTarget && (always ||
 		(selfBattle && source->getAI() && source->getAI()->isAttacking())))
 	{
-		if (button->isValidToUseOn(source, nullptr, nullptr, CMD_FROM_AI))
+		if (button->isValidToUseOn(source, nullptr, nullptr, CMD_FROM_AI) &&
+			AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 			source->doSpecialPower(power, options);
 		return checkAgain;
 	}
 
-	const Real range = data->m_specialPowerRange > 0.0f ? data->m_specialPowerRange : data->m_specialPowerRadius;
+	const Real range = data->m_specialPowerRange > 0.0f || (book && captureCreep)
+		? data->m_specialPowerRange : data->m_specialPowerRadius;
 	if (reveal && positionTarget && !objectTarget)
 	{
 		scoutWithPower(*source, *button, *power, book ? 0.0f : range);
@@ -294,7 +300,13 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		const Bool building = target->isKindOf(KINDOF_STRUCTURE);
 		AIUpdateInterface* ai = target->getAI();
 		Real score = 0.0f;
-		if (relationship == ALLIES)
+		if (captureCreep)
+		{
+			if (building && relationship == ENEMIES && !target->getControllingPlayer()->isPlayableSide() &&
+				module->isValidPowerTarget(target))
+				score = 1.0f;
+		}
+		else if (relationship == ALLIES)
 		{
 			if ((heal && !building) || (repair && building))
 			{
@@ -316,7 +328,7 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		{
 			score = 1.0f + target->getTemplate()->getThreatValue();
 		}
-		if (score <= 0.0f || (!book && range > 0.0f && target != source &&
+		if (score <= 0.0f || ((!book || captureCreep) && range > 0.0f && target != source &&
 			ThePartitionManager->getDistanceSquared(source, target, FROM_CENTER_2D) > range * range))
 			continue;
 		if (best && (score < bestScore || (score == bestScore && target->getID() > best->getID())))
@@ -331,7 +343,7 @@ UpdateSleepTime AISpecialPowerUpdate::update()
 		bestShroud = shroud;
 		bestScore = score;
 	}
-	if (best)
+	if (best && AISkirmishPlayer::rollRetailSpecialPowerActivation(*player))
 	{
 		static const Bool trace = std::getenv("GENERALSX_SKIRMISH_AI_TRACE") != nullptr;
 		if (trace && (objectTarget || positionTarget))

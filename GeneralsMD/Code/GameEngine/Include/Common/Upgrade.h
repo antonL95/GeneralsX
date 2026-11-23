@@ -155,6 +155,12 @@ enum UpgradeType CPP_11(: Int)
 };
 extern const char *const TheUpgradeTypeNames[]; //Change above, change this!
 
+enum class SkirmishUpgradeHeuristic
+{
+	Normal = -1,
+	Important = 0
+};
+
 //-------------------------------------------------------------------------------------------------
 /** A single upgrade template definition */
 //-------------------------------------------------------------------------------------------------
@@ -179,6 +185,7 @@ public:
 	const AsciiString& getDisplayNameLabel() const { return m_displayNameLabel; }
 	const UpgradeMaskType& getUpgradeMask() const { return m_upgradeMask; }
 	UpgradeType getUpgradeType() const { return m_type; }
+	SkirmishUpgradeHeuristic getSkirmishAIHeuristic() const { return static_cast<SkirmishUpgradeHeuristic>(m_skirmishAIHeuristic); }
 	const AudioEventRTS* getResearchCompleteSound() const { return &m_researchSound; }
 	const AsciiString &getResearchCompleteEvaEvent() const { return m_researchCompleteEvaEvent; }
 	const AudioEventRTS* getUnitSpecificSound() const { return &m_unitSpecificSound; }

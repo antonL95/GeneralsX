@@ -73,6 +73,7 @@
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/ControlBar.h"
 
+#include <cmath>
 #include <limits>
 
 namespace
@@ -98,6 +99,31 @@ enum RetailTacticalKind
 const char* const retailTacticalKindNames[] = {
 	"ENEMY_STRUCTURE", "DEFENSIVE", "OPPORTUNITY", "EXPANSION", "TARGETLESS", nullptr
 };
+
+struct RetailPriorityRange
+{
+	Real low;
+	Real high;
+};
+
+Bool usesRetailUpgradePriority(const UpgradeTemplate& upgrade, Bool research)
+{
+	const auto heuristic = upgrade.getSkirmishAIHeuristic();
+	return heuristic == SkirmishUpgradeHeuristic::Normal ||
+		(research && heuristic == SkirmishUpgradeHeuristic::Important);
+}
+
+Real rollRetailUpgradePriority(const RetailPriorityRange& range, Bool research)
+{
+	const auto [low, high] = std::minmax(range.low, range.high);
+	if (!std::isfinite(low) || !std::isfinite(high))
+		return 0.0f;
+	if (research)
+		return GameLogicRandomValueReal(low, high);
+	const Int maxBound = std::numeric_limits<Int>::max() / 2;
+	return GameLogicRandomValue(static_cast<Int>(std::clamp<double>(low, -maxBound, maxBound)),
+		static_cast<Int>(std::clamp<double>(high, -maxBound, maxBound)));
+}
 
 struct RetailArmy
 {
@@ -129,6 +155,10 @@ struct RetailArmy
 	Real fortressRebuildPriority = 1950.0f;
 	Real structureRebuildModifier = 0.5f;
 	Real defaultPriority = 100.0f;
+	Real unitUpgradeChance = 30.0f;
+	RetailPriorityRange unitUpgradePriority = {100.0f, 200.0f};
+	RetailPriorityRange normalResearchPriority = {85.0f, 150.0f};
+	RetailPriorityRange importantResearchPriority = {200.0f, 250.0f};
 	Real lowUnitPriority[3] = {};
 	Real mustUseCommandPoints[3] = {};
 	Int attackRecruitDepth = 0;
@@ -143,6 +173,7 @@ struct RetailDifficulty
 	Int farmLimit = -1;
 	Int farmChance[2] = {1, 1};
 	Int offensiveTacticChance[2] = {1, 1};
+	Int specialPowerChance[2] = {1, 1};
 };
 
 struct RetailBrutalCheats
@@ -167,6 +198,7 @@ struct RetailAITuning
 	Bool disableEconomyBuilding = FALSE;
 	Bool disableUnitBuilding = FALSE;
 	Bool disableUnitUpgrading = FALSE;
+	Bool disableScienceUpgrading = FALSE;
 	Bool disableTacticalAI = FALSE;
 	Bool disableWallBuilding = FALSE;
 	Real defenseTreeNodeRadius = 300.0f;
@@ -309,6 +341,7 @@ void parseDifficultyTuning(INI* ini, void* instance, void*, const void*)
 		{ "EconomyMaxFarms", INI::parseInt, nullptr, offsetof(RetailDifficulty, farmLimit) },
 		{ "EconomyUpgradeProbability", parseDifficultyProbability, nullptr, offsetof(RetailDifficulty, farmChance) },
 		{ "OffensiveTacticActivationProbability", parseDifficultyProbability, nullptr, offsetof(RetailDifficulty, offensiveTacticChance) },
+		{ "SpecialPowerActivationProbability", parseDifficultyProbability, nullptr, offsetof(RetailDifficulty, specialPowerChance) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	ini->initFromINI(&difficulty, fields);
@@ -595,6 +628,17 @@ void RetailSkirmishSpending::resetMapPolicies()
 	retailTuning = baseRetailTuning;
 }
 
+Bool AISkirmishPlayer::rollRetailSpecialPowerActivation(const Player& player)
+{
+	if (!RetailFileLayers::enabled())
+		return TRUE;
+	const RetailDifficulty* difficulty = retailPolicy(player).difficulty;
+	if (!difficulty)
+		return TRUE;
+	const Int* chance = difficulty->specialPowerChance;
+	return chance[0] >= chance[1] || GameLogicRandomValue(0, chance[1] - 1) < chance[0];
+}
+
 void AISkirmishPlayer::parseRetailArmy(INI* ini)
 {
 	const AsciiString name = ini->getNextToken();
@@ -622,6 +666,13 @@ void AISkirmishPlayer::parseRetailArmy(INI* ini)
 		{ "FortressRebuildPriority", INI::parseReal, nullptr, offsetof(RetailArmy, fortressRebuildPriority) },
 		{ "StructureRebuildPriorityModifier", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, structureRebuildModifier) },
 		{ "DefaultUnitPriority", INI::parseReal, nullptr, offsetof(RetailArmy, defaultPriority) },
+		{ "ChanceForUnitsToUpgrade", INI::parsePercentToReal, nullptr, offsetof(RetailArmy, unitUpgradeChance) },
+		{ "UnitUpgradePriorityLow", INI::parseReal, nullptr, offsetof(RetailArmy, unitUpgradePriority) + offsetof(RetailPriorityRange, low) },
+		{ "UnitUpgradePriorityHigh", INI::parseReal, nullptr, offsetof(RetailArmy, unitUpgradePriority) + offsetof(RetailPriorityRange, high) },
+		{ "UpgradeSciencePriorityNormalLow", INI::parseReal, nullptr, offsetof(RetailArmy, normalResearchPriority) + offsetof(RetailPriorityRange, low) },
+		{ "UpgradeSciencePriorityNormalHigh", INI::parseReal, nullptr, offsetof(RetailArmy, normalResearchPriority) + offsetof(RetailPriorityRange, high) },
+		{ "UpgradeSciencePriorityImportantLow", INI::parseReal, nullptr, offsetof(RetailArmy, importantResearchPriority) + offsetof(RetailPriorityRange, low) },
+		{ "UpgradeSciencePriorityImportantHigh", INI::parseReal, nullptr, offsetof(RetailArmy, importantResearchPriority) + offsetof(RetailPriorityRange, high) },
 		{ "LowUnitPriorityModifier_Rush", INI::parseReal, nullptr, offsetof(RetailArmy, lowUnitPriority) },
 		{ "LowUnitPriorityModifier_MidGame", INI::parseReal, nullptr, offsetof(RetailArmy, lowUnitPriority) + sizeof(Real) },
 		{ "LowUnitPriorityModifier_EndGame", INI::parseReal, nullptr, offsetof(RetailArmy, lowUnitPriority) + 2 * sizeof(Real) },
@@ -664,6 +715,7 @@ void AISkirmishPlayer::parseRetailTuning(INI* ini)
 		{ "DisableEconomyBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableEconomyBuilding) },
 		{ "DisableUnitBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableUnitBuilding) },
 		{ "DisableUnitUpgrading", INI::parseBool, nullptr, offsetof(RetailAITuning, disableUnitUpgrading) },
+		{ "DisableScienceUpgrading", INI::parseBool, nullptr, offsetof(RetailAITuning, disableScienceUpgrading) },
 		{ "DisableTacticalAI", INI::parseBool, nullptr, offsetof(RetailAITuning, disableTacticalAI) },
 		{ "DisableWallBuilding", INI::parseBool, nullptr, offsetof(RetailAITuning, disableWallBuilding) },
 		{ "DefenseTreeNodeRadius", INI::parseReal, nullptr, offsetof(RetailAITuning, defenseTreeNodeRadius) },
@@ -1802,6 +1854,127 @@ void AISkirmishPlayer::updateRetail()
 			return set && producer->getProductionUpdateInterface()->getProductionCount() == 0 && chooseArmyUnit(*producer, *set);
 		}) ? TRUE : FALSE;
 	};
+
+	struct UpgradeOrder
+	{
+		Object* producer = nullptr;
+		const UpgradeTemplate* upgrade = nullptr;
+		Real priority = 0.0f;
+		UnsignedInt cost = 0;
+	};
+	std::vector<UpgradeOrder> upgrades;
+	Int researchSlots = 0;
+	if (phase > 0)
+	{
+		const auto upgradeComplete = [&](const Object& producer, const UpgradeTemplate& upgrade) {
+			return upgrade.getUpgradeType() == UPGRADE_TYPE_PLAYER ? m_player->hasUpgradeComplete(&upgrade) :
+				producer.hasUpgrade(&upgrade);
+		};
+		std::erase_if(m_retailUpgradePlans, [&](const auto& entry) {
+			const Object* producer = TheGameLogic->findObjectByID(entry.first.first);
+			const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(entry.first.second);
+			return !producer || producer->isEffectivelyDead() || producer->getControllingPlayer() != m_player ||
+				!upgrade || upgradeComplete(*producer, *upgrade);
+		});
+		auto orderedProducers = producers;
+		std::sort(orderedProducers.begin(), orderedProducers.end(), [](const Object* a, const Object* b) {
+			return a->getID() < b->getID();
+		});
+		Int activeResearch = 0;
+		for (Object* producer : orderedProducers)
+		{
+			if (!producer->isKindOf(KINDOF_STRUCTURE))
+				continue;
+			const ProductionUpdateInterface* production = producer->getProductionUpdateInterface();
+			for (const ProductionEntry* entry = production->firstProduction(); entry; entry = production->nextProduction(entry))
+				if (entry->getProductionType() == PRODUCTION_UPGRADE && usesRetailUpgradePriority(*entry->getProductionUpgrade(), TRUE))
+					++activeResearch;
+		}
+		researchSlots = (phase == 1 ? 1 : 3) - activeResearch;
+		UpgradeOrder researchRequest;
+		Int pendingResearch = 0;
+		for (Object* producer : orderedProducers)
+		{
+			const Bool research = producer->isKindOf(KINDOF_STRUCTURE);
+			if (research ? (retailTuning.disableScienceUpgrading || researchSlots <= 0) :
+				retailTuning.disableUnitUpgrading)
+				continue;
+			const CommandSet* set = retailCommands(*producer);
+			if (!set || producer->getProductionUpdateInterface()->getProductionCount() != 0)
+				continue;
+			for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+			{
+				const CommandButton* button = set->getCommandButton(slot);
+				const UpgradeTemplate* upgrade = button ? button->getUpgradeTemplate() : nullptr;
+				if (!upgrade || !usesRetailUpgradePriority(*upgrade, research) ||
+					(button->getCommandType() != GUI_COMMAND_OBJECT_UPGRADE &&
+						(!research || button->getCommandType() != GUI_COMMAND_PLAYER_UPGRADE)) ||
+					button->getRequiredRank() > producer->getExperienceTracker()->getRank() ||
+					!HeroRoster::buttonUpgradesMet(button, m_player, producer) || upgradeComplete(*producer, *upgrade))
+					continue;
+				if (upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && !producer->affectedByUpgrade(upgrade))
+					continue;
+				if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER && m_player->hasUpgradeInProduction(upgrade))
+					continue;
+				const auto cost = static_cast<UnsignedInt>(std::max(0, upgrade->calcCostToBuild(m_player)));
+				const auto key = std::make_pair(producer->getID(), upgrade->getUpgradeName());
+				if (research)
+				{
+					if (const auto plan = m_retailUpgradePlans.find(key); plan != m_retailUpgradePlans.end())
+					{
+						++pendingResearch;
+						upgrades.push_back({producer, upgrade, plan->second.priority, cost});
+					}
+					else if (cost <= money->countMoney() / (activeResearch + 1) &&
+						(!researchRequest.producer || cost < researchRequest.cost))
+						researchRequest = {producer, upgrade, 0.0f, cost};
+				}
+				else
+				{
+					auto [plan, inserted] = m_retailUpgradePlans.try_emplace(key);
+					if (inserted)
+					{
+						plan->second.priority = rollRetailUpgradePriority(rules->unitUpgradePriority, FALSE);
+						const Real roll = GameLogicRandomValueReal(0.0f, 1.0f);
+						plan->second.admitted = rules->unitUpgradeChance > 0.0f && roll <= rules->unitUpgradeChance;
+					}
+					if (plan->second.admitted)
+						upgrades.push_back({producer, upgrade, plan->second.priority, cost});
+				}
+			}
+		}
+		if (researchRequest.producer && pendingResearch < researchSlots)
+		{
+			const auto* upgrade = researchRequest.upgrade;
+			const auto& range = upgrade->getSkirmishAIHeuristic() == SkirmishUpgradeHeuristic::Important
+				? rules->importantResearchPriority : rules->normalResearchPriority;
+			researchRequest.priority = rollRetailUpgradePriority(range, TRUE);
+			m_retailUpgradePlans.emplace(std::make_pair(researchRequest.producer->getID(), upgrade->getUpgradeName()),
+				RetailUpgradePlan{researchRequest.priority, TRUE});
+			upgrades.push_back(researchRequest);
+		}
+		std::stable_sort(upgrades.begin(), upgrades.end(), [](const UpgradeOrder& a, const UpgradeOrder& b) {
+			return a.priority > b.priority;
+		});
+	}
+	const auto buyUpgradesAbove = [&](Real priority) {
+		for (const UpgradeOrder& order : upgrades)
+		{
+			if (order.priority <= priority)
+				break;
+			const Bool research = order.producer->isKindOf(KINDOF_STRUCTURE);
+			auto* production = order.producer->getProductionUpdateInterface();
+			if ((research && researchSlots <= 0) || production->getProductionCount() != 0 || money->countMoney() < order.cost ||
+				!production->queueUpgrade(order.upgrade))
+				continue;
+			if (research)
+				--researchSlots;
+			if (trace)
+				std::fprintf(stderr, "AI_UPGRADE\t%u\t%d\t%s\t%s\t%s\t%g\n", frame, playerIndex,
+					research ? "research" : "unit", order.producer->getTemplate()->getName().str(),
+					order.upgrade->getUpgradeName().str(), order.priority);
+		}
+	};
 	if (trace && !producers.empty())
 		std::fprintf(stderr, "AI_UNIT_PRIORITY\t%u\t%d\t%d\t%g\t%g\t%g\t%g\t%g\n", frame, playerIndex, phase,
 			commandPointUsage, rules->mustUseCommandPoints[phase], rules->lowUnitPriority[phase], rules->defaultPriority, unitPriority);
@@ -1949,6 +2122,8 @@ void AISkirmishPlayer::updateRetail()
 			}
 			if (!selected)
 				return FALSE;
+			if (!upgrades.empty())
+				buyUpgradesAbove(canTrainArmy() ? std::max(unitPriority, priority) : priority);
 			if (unitPriority > priority && canTrainArmy())
 			{
 				deferBuildingForUnit = TRUE;
@@ -1990,6 +2165,8 @@ void AISkirmishPlayer::updateRetail()
 				break;
 	}
 
+	if (!upgrades.empty())
+		buyUpgradesAbove(canTrainArmy() ? unitPriority : -std::numeric_limits<Real>::infinity());
 	deferBuildingForUnit = deferBuildingForUnit && canTrainArmy();
 	for (Object* producer : producers)
 	{
@@ -2039,7 +2216,11 @@ void AISkirmishPlayer::updateRetail()
 				if (!upgrade || (button->getCommandType() != GUI_COMMAND_PLAYER_UPGRADE &&
 					button->getCommandType() != GUI_COMMAND_OBJECT_UPGRADE))
 					continue;
-				if (needsArmy && !unlocksArmy(upgrade))
+				const Bool research = producer->isKindOf(KINDOF_STRUCTURE);
+				const Bool unlock = unlocksArmy(upgrade);
+				if ((research && retailTuning.disableScienceUpgrading) ||
+					(usesRetailUpgradePriority(*upgrade, research) && (!research || phase != 0 || !unlock)) ||
+					(needsArmy && !unlock))
 					continue;
 				if (m_player->getMoney()->countMoney() >= static_cast<UnsignedInt>(std::max(0, upgrade->calcCostToBuild(m_player))) &&
 					button->getRequiredRank() <= producer->getExperienceTracker()->getRank() &&
@@ -2068,6 +2249,7 @@ void AISkirmishPlayer::updateRetail()
 			train(selected->getThingTemplate(), selected);
 	}
 
+	buyUpgradesAbove(-std::numeric_limits<Real>::infinity());
 	if (retailTuning.disableTacticalAI)
 		return;
 	if (keep && !retailTuning.disableWallBuilding && phase == 2 && m_player->getCanBuildBase() &&
@@ -2582,6 +2764,7 @@ void AISkirmishPlayer::newMap()
 	m_retailScavengedBuilding = -1;
 	m_retailFarmPriority = 0.0f;
 	m_retailBuiltStructures.clear();
+	m_retailUpgradePlans.clear();
 
 	/* Get our proper build list. */
 	AsciiString mySide = m_player->getSide();
@@ -2802,6 +2985,38 @@ void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
 				x->xferObjectID(&node);
 		}, [this] {
 			m_retailWallPlan = {};
+		}},
+		{"skirmish-upgrade-requests", [this, loading](Xfer* x) {
+			UnsignedInt count = static_cast<UnsignedInt>(m_retailUpgradePlans.size());
+			x->xferUnsignedInt(&count);
+			const auto transfer = [x](ObjectID& object, AsciiString& name, RetailUpgradePlan& plan) {
+				x->xferObjectID(&object);
+				x->xferAsciiString(&name);
+				x->xferReal(&plan.priority);
+				x->xferBool(&plan.admitted);
+			};
+			if (loading)
+			{
+				m_retailUpgradePlans.clear();
+				for (UnsignedInt i = 0; i < count; ++i)
+				{
+					std::pair<ObjectID, AsciiString> key;
+					RetailUpgradePlan plan;
+					transfer(key.first, key.second, plan);
+					m_retailUpgradePlans.emplace(std::move(key), plan);
+				}
+			}
+			else
+			{
+				for (auto [key, plan] : m_retailUpgradePlans)
+				{
+					ObjectID object = key.first;
+					AsciiString name = key.second;
+					transfer(object, name, plan);
+				}
+			}
+		}, [this] {
+			m_retailUpgradePlans.clear();
 		}}
 	});
 }
