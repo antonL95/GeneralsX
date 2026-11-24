@@ -9,6 +9,21 @@ expect_sample() {
     fi
 }
 
+expect_displacement() {
+    sample_frame=$1
+    if covers "$sample_frame"; then
+        awk -v sample="frame=$sample_frame $2 busy=$3" '
+            /^TEST container-fields busy / && index($0, sample) {
+                split($NF, position, "[=,]");
+                dx = position[2] - 430; dy = position[3] - 3200;
+                displaced = dx * dx + dy * dy > 25;
+                print;
+            }
+            END { if (!displaced) print "Missing displacement at " sample > "/dev/stderr"; exit !displaced }
+        ' "$log"
+    fi
+}
+
 check() {
     expect_sample 228 'structure-rejected count=0 attached=0 bone=-'
     expect_sample 234 'chariot-created-three count=3'
@@ -50,14 +65,8 @@ check() {
     if covers 270; then
         expect 'TEST container-fields busy frame=270 before-clearance busy=1 position=430.00,3200.00'
     fi
-    if covers 320; then
-        awk '/TEST container-fields busy frame=320 after-clearance busy=0 / {
-            split($NF, position, "[=,]");
-            dx = position[2] - 430; dy = position[3] - 3200;
-            displaced = dx * dx + dy * dy > 25;
-            print;
-        } END { if (!displaced) print "Busy summon stayed in the construction footprint" > "/dev/stderr"; exit !displaced }' "$log"
-    fi
+    expect_displacement 292 displaced-before-deadline 0
+    expect_displacement 320 after-clearance 0
 }
 
 compare() {

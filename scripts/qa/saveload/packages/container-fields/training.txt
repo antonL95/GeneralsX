@@ -61,5 +61,6 @@
 265 container-fields-sample Player_1 Slot7Rider 0 released
 270 container-fields-busy Player_1 AngmarShadeWolf 0 before-clearance
 271 placement-ocl Player_1 Slot7Devourer 0 Slot7ClearBusySummon
+292 container-fields-busy Player_1 AngmarShadeWolf 0 displaced-before-deadline
 294 container-fields-sample Player_1 Slot7Rider 0 release-complete
 320 container-fields-busy Player_1 AngmarShadeWolf 0 after-clearance
