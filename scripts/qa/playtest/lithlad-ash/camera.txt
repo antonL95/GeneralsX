@@ -1,0 +1,2 @@
+24 Player_1 RohanFortressCitadel 677.5 642.8 1.00
+190 Player_1 RohanFortressCitadel 677.5 642.8 1.25
