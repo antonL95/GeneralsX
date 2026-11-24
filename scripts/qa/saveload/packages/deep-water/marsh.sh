@@ -28,6 +28,9 @@ check() {
             END { exit !(bombard && large && transport) }
         ' "$log" || return 1
     fi
+    if covers 231; then
+        expect 'TEST deep-water-zone-labels 231 last=17640 unique=1 roundTrip=1' || return 1
+    fi
     if covers 255; then
         expect 'TEST deep-water-route 255 DeepWaterTransportProbe exists=1 src=7 dst=1 goal=1895.0,1825.0' || return 1
         expect 'TEST deep-water-route 255 DeepWaterBeachProbe exists=1 src=7 dst=0 goal=475.0,1145.0' || return 1
@@ -65,5 +68,11 @@ check() {
             }
             END { exit !(bombard && large && transport && beach) }
         ' "$log" || return 1
+    fi
+    if covers 374; then
+        expect 'TEST deep-water-stun-drop 373 DeepWaterShallowLandingProbe cell=1' || return 1
+        expect 'TEST deep-water-stun-drop 373 DeepWaterDeepLandingProbe cell=7' || return 1
+        expect 'TEST deep-water-stun-survival 374 DeepWaterShallowLandingProbe alive=0 bounced=0' || return 1
+        expect 'TEST deep-water-stun-survival 374 DeepWaterDeepLandingProbe alive=1 bounced=1' || return 1
     fi
 }

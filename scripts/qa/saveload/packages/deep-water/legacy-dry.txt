@@ -1,0 +1,21 @@
+12 create Player_1 DeepWaterDryLongWall 0 2205,955,0
+12 create Player_1 DeepWaterDryLongWall 1 2205,1055,0
+12 create Player_1 DeepWaterDryShortWall 0 2115,1005,90
+12 create Player_1 DeepWaterDryShortWall 1 2295,1005,90
+13 create Player_1 DeepWaterDryRubble 0 2255,1095,0
+14 deep-water-test-rubble Player_1 DeepWaterDryRubble 0
+15 create Player_1 DeepWaterDryLandProbe 0 2155,1005,0
+15 create Player_1 DeepWaterDryRubbleProbe 0 2225,1095,0
+20 deep-water-route Player_1 DeepWaterDryRubbleProbe 0 - 2255 1095
+21 move Player_1 DeepWaterDryRubbleProbe 0 - 2255 1095
+85 deep-water-sample Player_1 DeepWaterDryRubbleProbe 0
+86 destroy Player_1 DeepWaterDryRubbleProbe 0
+348 deep-water-route Player_1 DeepWaterDryLandProbe 0 - 2255 1005
+349 create Player_1 DeepWaterDryDivider 0 2205,1005,90
+350 deep-water-route Player_1 DeepWaterDryLandProbe 0 - 2255 1005
+351 snapshot-save - - 0 legacy-dry.sav
+352 deep-water-route Player_1 DeepWaterDryLandProbe 0 - 2255 1005
+355 move Player_1 DeepWaterDryLandProbe 0 - 2255 1005
+645 deep-water-route Player_1 DeepWaterDryLandProbe 0 - 2255 1005
+655 deep-water-route Player_1 DeepWaterDryLandProbe 0 - 2255 1005
+655 deep-water-sample Player_1 DeepWaterDryLandProbe 0

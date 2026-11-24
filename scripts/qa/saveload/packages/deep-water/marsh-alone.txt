@@ -34,3 +34,10 @@
 370 destroy Player_1 DeepWaterLargeProbe 0
 370 destroy Player_1 DeepWaterTransportProbe 0
 370 destroy Player_1 DeepWaterBeachProbe 0
+231 deep-water-zone-labels - - 0 /tmp/deep-water-zone-labels.dat
+371 create Player_1 DeepWaterShallowLandingProbe 0 1895,1825,0
+371 create Player_1 DeepWaterDeepLandingProbe 0 1905,1825,0
+373 deep-water-stun-drop Player_1 DeepWaterShallowLandingProbe 0
+373 deep-water-stun-drop Player_1 DeepWaterDeepLandingProbe 0
+374 deep-water-stun-survival Player_1 DeepWaterShallowLandingProbe 0
+374 deep-water-stun-survival Player_1 DeepWaterDeepLandingProbe 0

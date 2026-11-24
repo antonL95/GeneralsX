@@ -3,8 +3,11 @@
 
 #if !RTS_GENERALS
 #include <cstdio>
+#include <vector>
 
 #include "Common/ThingTemplate.h"
+#include "Common/XferLoad.h"
+#include "Common/XferSave.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Locomotor.h"
@@ -14,6 +17,8 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
 #include "GameLogic/Pathfinder/Path.h"
+#include "GameLogic/Pathfinder/PathfindLayer.h"
+#include "GameLogic/Pathfinder/PathfindZoneManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/TerrainLogic.h"
 
@@ -85,6 +90,92 @@ void probeHierarchy(const RetailTestCommands::Context& ctx)
 		ctx.frame, object->getTemplate()->getName().str(), path ? 1 : 0, ctx.position.x, ctx.position.y);
 	deleteInstance(path);
 }
+
+void probeZoneLabels(const RetailTestCommands::Context& ctx)
+{
+	constexpr Int side = 420;
+	constexpr Int oldZoneLimit = 1 << 14;
+	constexpr Int expected = side * side / PathfindZoneManager::ZONE_BLOCK_SIZE;
+	constexpr auto deepWaterCell = static_cast<PathfindCell::CellType>(7);
+	const IRegion2D bounds{{0, 0}, {side - 1, side - 1}};
+	std::vector<PathfindCell> cells(side * side);
+	std::vector<PathfindCell*> map(side);
+	for (Int x = 0; x < side; ++x)
+	{
+		map[x] = &cells[x * side];
+		for (Int y = 0; y < side; ++y)
+			map[x][y].setType(x % 2 ? deepWaterCell : PathfindCell::CELL_WATER);
+	}
+	PathfindLayer layers[LAYER_LAST + 1];
+	PathfindZoneManager zones;
+	zones.allocateBlocks(bounds);
+	zones.calculateZones(map.data(), layers, bounds);
+	const zoneStorageType last = map.back()[side - 1].getZone();
+	const Bool unique = last == expected && last > oldZoneLimit &&
+		map[side - 2][side - 1].getZone() == last - 1;
+	Bool roundTrip = FALSE;
+	if (unique && ctx.argument[0])
+	{
+		XferSave save;
+		save.open(ctx.argument);
+		zones.xferConnectivity(&save, map.data(), layers, bounds);
+		save.close();
+		map.back()[side - 1].setZone(0);
+		PathfindZoneManager loaded;
+		loaded.allocateBlocks(bounds);
+		XferLoad load;
+		load.open(ctx.argument);
+		loaded.xferConnectivity(&load, map.data(), layers, bounds);
+		load.close();
+		std::remove(ctx.argument);
+		roundTrip = map.back()[side - 1].getZone() == last &&
+			loaded.getBlockZone(LOCOMOTORSURFACE_DEEP_WATER, FALSE, side - 1, side - 1, map.data()) == last;
+	}
+	std::fprintf(stderr, "TEST deep-water-zone-labels %u last=%u unique=%d roundTrip=%d\n",
+		ctx.frame, static_cast<unsigned>(last), unique, roundTrip);
+}
+
+void dropStunnedShip(const RetailTestCommands::Context& ctx)
+{
+	Object* object = ctx.requireObject();
+	PhysicsBehavior* physics = object ? object->getPhysics() : nullptr;
+	if (!physics)
+		return;
+	Coord3D pos = *object->getPosition();
+	const PathfindCell* cell = TheAI->pathfinder()->getCell(object->getLayer(), &pos);
+	if (!cell)
+		return;
+	pos.z = TheTerrainLogic->getLayerHeight(pos.x, pos.y, object->getLayer()) + 30.0f;
+	object->setPosition(&pos);
+	physics->setAllowToFall(TRUE);
+	physics->setAllowBouncing(TRUE);
+	physics->setImmuneToFallingDamage(TRUE);
+	physics->setStunned(TRUE);
+	const Coord3D force{0.0f, 0.0f, -60.0f * physics->getMass()};
+	physics->applyForce(&force);
+	std::fprintf(stderr, "TEST deep-water-stun-drop %u %s cell=%d\n",
+		ctx.frame, object->getTemplate()->getName().str(), static_cast<Int>(cell->getType()));
+}
+
+void probeStunSurvival(const RetailTestCommands::Context& ctx)
+{
+	const Object* object = ctx.findObject();
+	const PhysicsBehavior* physics = object ? object->getPhysics() : nullptr;
+	const Bool alive = object && !object->isEffectivelyDead() && !object->isDestroyed();
+	const Bool bounced = physics && physics->getIsStunned() &&
+		(object->getHeightAboveTerrain() <= 0.01f || physics->getVelocity()->z > 0.0f);
+	std::fprintf(stderr, "TEST deep-water-stun-survival %u %s alive=%d bounced=%d\n",
+		ctx.frame, ctx.targetName, alive, bounced);
+}
+
+void setDryRubble(const RetailTestCommands::Context& ctx)
+{
+	Object* object = ctx.requireObject();
+	if (!object)
+		return;
+	object->getBodyModule()->setDamageState(BODY_RUBBLE);
+	TheAI->pathfinder()->forceMapRecalculation();
+}
 }
 #endif
 
@@ -96,6 +187,10 @@ void registerRetailDeepWaterTestCommands()
 	registerAction("deep-water-sample", sampleShip);
 	registerAction("deep-water-route", probeRoute);
 	registerAction("deep-water-hierarchy", probeHierarchy);
+	registerAction("deep-water-zone-labels", probeZoneLabels);
+	registerAction("deep-water-stun-drop", dropStunnedShip);
+	registerAction("deep-water-stun-survival", probeStunSurvival);
+	registerAction("deep-water-test-rubble", setDryRubble);
 #endif
 }
 }
