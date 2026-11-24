@@ -3,7 +3,15 @@
 30 particle-fx Player_1 - 0 FX_TestParticleFields 2520 1010 0
 30 particle-fx Player_1 - 0 FX_TestParticleRadius 2520 1010 0
 30 particle-fx Player_1 GondorGandalf 0 FX_TestParticleSwirl
+30 particle-fx Player_1 - 0 FX_TestParticleRotation 2520 1010 0
+
 
 
 40 particle-live Player_1 - 0
 50 particle-live Player_1 - 0
+40 particle-rotation Player_1 - 0 TestParticleRotationX
+40 particle-rotation Player_1 - 0 TestParticleRotationY
+40 particle-rotation Player_1 - 0 TestParticleRotationV
+50 particle-rotation Player_1 - 0 TestParticleRotationX
+50 particle-rotation Player_1 - 0 TestParticleRotationY
+50 particle-rotation Player_1 - 0 TestParticleRotationV

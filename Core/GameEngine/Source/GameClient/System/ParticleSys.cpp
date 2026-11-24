@@ -38,6 +38,7 @@
 #include "Common/PerfTimer.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailINIStartup.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/PartitionManager.h"
 #include "Common/ThingFactory.h"
 #include "Common/GameLOD.h"
@@ -501,6 +502,7 @@ Bool Particle::update()
 	m_angularRateY *= m_angularDamping;
 #endif
 	m_angularRateZ *= m_angularDamping;
+	m_angularRateXY *= m_angularDampingXY;
 
 	m_sizeRate *= m_sizeRateDamping;
 	const Bool usesModel = RetailFileLayers::enabled() && m_system->isUsingDrawables();
@@ -617,6 +619,7 @@ void Particle::draw(Real timeScale)
 	m_angleY += m_angularRateY * timeScale;
 #endif
 	m_angleZ += m_angularRateZ * timeScale;
+	m_angleXY += m_angularRateXY * timeScale;
 
 	if (m_particleUpTowardsEmitter)
 	{
@@ -834,7 +837,7 @@ void Particle::xfer( Xfer *xfer )
 	XferVersion currentVersion = 2;
 #endif
 	if (RetailFileLayers::enabled())
-		currentVersion = 3;
+		currentVersion = 4;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -897,6 +900,14 @@ void Particle::xfer( Xfer *xfer )
 			xfer->xferReal(&m_gpuSeed);
 		}
 	}
+	if (RetailFileLayers::enabled())
+		RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, version >= 4, {
+			{"particle-xy-rotation", [this](Xfer *block) {
+				block->xferReal(&m_angleXY);
+				block->xferReal(&m_angularRateXY);
+				block->xferReal(&m_angularDampingXY);
+			}, [this] { m_angleXY = 0.0f; m_angularRateXY = 0.0f; m_angularDampingXY = 1.0f; }}
+		});
 	if (xfer->getXferMode() == XFER_LOAD && usesGpuDraw())
 	{
 		if (m_lifetime == 0)
@@ -2053,10 +2064,19 @@ Particle *ParticleSystem::createParticle( const ParticleInfo *info,
 	}
 
 	Particle *p = newInstance(Particle)( this, info );
+	if (!forceCreate && m_template && m_template->hasFXUpdate() && isUsingDrawables())
+		p->initializeFXRotation(*m_template);
 	if (!forceCreate && m_template && m_template->canDrawGpuParticles())
 		p->setGpuSeed(GameClientRandomValueReal(0.0f, 15.0f));
 	return p;
 
+}
+
+void Particle::initializeFXRotation(const ParticleSystemTemplate &definition)
+{
+	m_angleXY = definition.sampleAngleXY();
+	m_angularRateXY = definition.sampleAngularRateXY();
+	m_angularDampingXY = definition.sampleAngularDampingXY();
 }
 
 // ------------------------------------------------------------------------------------------------

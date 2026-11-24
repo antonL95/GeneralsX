@@ -47,6 +47,7 @@
 
 class Particle;
 class ParticleSystem;
+class ParticleSystemTemplate;
 class ParticleSystemManager;
 class Drawable;
 class Object;
@@ -201,6 +202,8 @@ public:
 	Real getSize() { return m_size; }
 	const Coord3D& getModelSize() const { return m_modelSize; }
 	Real getAngle() { return m_angleZ; }
+	Real getAngleXY() const { return m_angleXY; }
+	void initializeFXRotation(const ParticleSystemTemplate &definition);
 	Real getAlpha() { return m_alpha; }
 	const RGBColor *getColor() { return &m_color; }
 	void setColor( RGBColor *color ) { m_color = *color; }
@@ -265,6 +268,9 @@ protected:
 	Coord3D m_gpuSpawnPosition{};
 	Coord3D m_gpuSpawnVelocity{};
 	Real m_gpuSeed = 0.0f;
+	Real m_angleXY = 0.0f;
+	Real m_angularRateXY = 0.0f;
+	Real m_angularDampingXY = 1.0f;
 public:
 	Bool							m_inSystemList;
 	Bool							m_inOverallList;
@@ -614,6 +620,7 @@ public:
 	void resetForFXDefinition();
 	Bool isRenderable() const { return m_isRenderable; }
 	enum class ModelMaterialMode { Authored, Diffuse, Opacity, Emissive };
+	enum FXRotation { ROTATION_NONE, ROTATION_OFF, ROTATION_X, ROTATION_Y, ROTATION_Z, ROTATION_VIEW };
 	ModelMaterialMode getModelMaterialMode() const { return m_modelMaterialMode; }
 	Bool usesGpuDraw() const { return m_hasGpuDraw || m_isGpuParticle; }
 	Bool usesTerrainFire() const { return m_isTerrainFire && m_hasTerrainFireEmission; }
@@ -634,6 +641,11 @@ public:
 	Real getTurbulenceFrequency() const { return m_turbulenceFrequency; }
 	Real getCylinderRadiusRate() const { return m_cylinderRadiusRate; }
 	Bool isSwirly() const { return m_swirly; }
+	Int getFXRotation() const { return m_fxRotation; }
+	Bool hasFXUpdate() const { return m_hasFXUpdate; }
+	Real sampleAngleXY() const { return m_gpuAngleXY.getValue(); }
+	Real sampleAngularRateXY() const { return m_gpuAngularRateXY.getValue(); }
+	Real sampleAngularDampingXY() const { return m_gpuAngularDampingXY.getValue(); }
 	Real getWindFullStrengthDistance() const { return m_windFullStrengthDistance; }
 	Real getWindZeroStrengthDistance() const { return m_windZeroStrengthDistance; }
 	const Coord3D *getCylinderOffset() const { return &m_cylinderOffset; }
@@ -693,6 +705,8 @@ protected:
 	Real m_turbulenceFrequency = 0.0f;
 	Real m_cylinderRadiusRate = 0.0f;
 	Bool m_swirly = FALSE;
+	Int m_fxRotation = ROTATION_Z;
+	Bool m_hasFXUpdate = FALSE;
 	struct LightningWave
 	{
 		GameClientRandomVariable amplitude;

@@ -71,6 +71,7 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 	if (!W3DDisplay::m_assetManager)
 		return;
 	const bool traceTargetMatrices = std::getenv("GENERALSX_TEST_PARTICLE_MODEL") != nullptr;
+	const bool traceOrientation = std::getenv("GENERALSX_TEST_PARTICLE_ORIENTATION") != nullptr;
 	using MaterialMode = ParticleSystemTemplate::ModelMaterialMode;
 	std::vector<RenderObjClass*> drawn;
 	for (ParticleSystem* system : systems)
@@ -103,9 +104,21 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 			if (target)
 				transform = *target;
 			const Real angle = particle->getAngle();
-			transform.Rotate_Z(target ? -angle : angle);
+			const Real xy = particle->getAngleXY();
+			if (xy != 0.0f)
+				transform.Rotate_X(xy);
+			const Int rotation = definition ? definition->getFXRotation() : ParticleSystemTemplate::ROTATION_Z;
+			if (rotation == ParticleSystemTemplate::ROTATION_X)
+				transform.Rotate_X(angle);
+			else if (rotation == ParticleSystemTemplate::ROTATION_Y)
+				transform.Rotate_Y(angle);
+			else if (rotation == ParticleSystemTemplate::ROTATION_Z || rotation == ParticleSystemTemplate::ROTATION_VIEW)
+				transform.Rotate_Z(target ? -angle : angle);
 			transform.Scale(size.x, size.y, size.z);
 			transform.Set_Translation(Vector3(position->x, position->y, position->z));
+			if (traceOrientation && definition)
+				std::fprintf(stderr, "TEST particle-orientation frame=%u name=%s x-axis=%.5f,%.5f,%.5f\n",
+					TheGameClient->getFrame(), definition->getName().str(), transform[0][0], transform[1][0], transform[2][0]);
 			if (target && traceTargetMatrices)
 				std::fprintf(stderr, "TEST particle-model %u %s id=%d y-axis=%.5f,%.5f,%.5f\n",
 					TheGameClient->getFrame(), system->getTemplate()->getName().str(),

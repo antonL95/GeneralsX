@@ -1,6 +1,6 @@
 import re
 
-render_env = {"PLAYTEST_PIN_DYNAMIC_LOD": "1"}
+render_env = {"PLAYTEST_PIN_DYNAMIC_LOD": "1", "GENERALSX_TEST_PARTICLE_ORIENTATION": "1"}
 
 
 def check(log):
@@ -17,6 +17,12 @@ def check(log):
     turbulent = samples[(50, "TestParticleTurbulence")][0] - samples[(40, "TestParticleTurbulence")][0]
     if abs(control) > 0.1 or turbulent < 1.0:
         raise RuntimeError(f"Unexpected particle displacement: control={control}, turbulence={turbulent}")
+    frequency = re.search(
+        r"^TEST particle-live frame=40 id=\d+ name=TestParticleFrequency .* xyz=([-\d.]+),[-\d.]+,[-\d.]+",
+        log, re.MULTILINE
+    )
+    if not frequency or float(frequency.group(1)) - samples[(40, "TestParticleTurbulence")][0] < 10:
+        raise RuntimeError("Turbulence frequency did not change particle motion")
     radius = {}
     for frame, name, x, y in re.findall(
         r"^TEST particle-live frame=(40|50) id=\d+ name=(TestParticleRadiusControl|TestParticleRadiusGrowth) .* xyz=([-\d.]+),([-\d.]+),[-\d.]+",
@@ -38,3 +44,22 @@ def check(log):
         swirl[name] = float(y)
     if len(swirl) != 2 or abs(swirl["TestParticleSwirl"] - swirl["TestParticleSwirlControl"]) < 1:
         raise RuntimeError(f"Swirly particle did not move sideways relative to its control: {swirl}")
+    rotations = {}
+    for frame, name, xy, z in re.findall(
+        r"^TEST particle-rotation frame=(40|50) name=(TestParticleRotation[XYV]) xy=([-\d.]+) z=([-\d.]+)$",
+        log, re.MULTILINE
+    ):
+        rotations[(int(frame), name)] = (float(xy), float(z))
+    for axis in "XYV":
+        first = rotations.get((40, f"TestParticleRotation{axis}"))
+        last = rotations.get((50, f"TestParticleRotation{axis}"))
+        if not first or not last or last[0] - first[0] < 0.4 or last[1] - first[1] < 0.9:
+            raise RuntimeError(f"Particle angles did not advance for {axis}: {rotations}")
+    axes = {}
+    for name, x, y, z in re.findall(
+        r"^TEST particle-orientation frame=40 name=(TestParticleRotation[XYV]) x-axis=([-\d.]+),([-\d.]+),([-\d.]+)$",
+        log, re.MULTILINE
+    ):
+        axes[name[-1]] = (float(x), float(y), float(z))
+    if len(axes) != 3 or abs(axes["X"][0] - 1) > 0.01 or abs(axes["Y"][2]) < 0.1 or abs(axes["V"][1]) < 0.1:
+        raise RuntimeError(f"Drawable rotation axes did not render as expected: {axes}")

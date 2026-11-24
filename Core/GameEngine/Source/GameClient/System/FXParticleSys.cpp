@@ -59,6 +59,8 @@ const FXNamedValue fxPriorities[] =
 	{ nullptr,             0,                FALSE }
 };
 
+const char *const fxRotationNames[] = { "NONE", "ROTATION_OFF", "ROTATE_X", "ROTATE_Y", "ROTATE_Z", "ROTATE_V", nullptr };
+
 const FXNamedValue fxShaders[] =
 {
 	{ "ADDITIVE",                ParticleSystemInfo::ADDITIVE,   TRUE },
@@ -173,6 +175,8 @@ void ParticleSystemTemplate::resetForFXDefinition()
 	m_turbulenceFrequency = 0.0f;
 	m_cylinderRadiusRate = 0.0f;
 	m_swirly = FALSE;
+	m_fxRotation = ROTATION_Z;
+	m_hasFXUpdate = TRUE;
 	m_windFullStrengthDistance = DEFAULT_WIND_FULL_STRENGTH_DISTANCE;
 	m_windZeroStrengthDistance = DEFAULT_WIND_ZERO_STRENGTH_DISTANCE;
 	m_cylinderOffset.zero();
@@ -409,7 +413,7 @@ const FieldParse ParticleSystemTemplate::m_fxDefaultUpdateFieldParseTable[] =
 	{ "AngleZ",           INI::parseGameClientRandomVariable,        nullptr, offsetof( ParticleSystemTemplate, m_angleZ ) },
 	{ "AngularRateZ",     INI::parseGameClientRandomVariable,        nullptr, offsetof( ParticleSystemTemplate, m_angularRateZ ) },
 	{ "AngularDamping",   INI::parseGameClientRandomVariable,        nullptr, offsetof( ParticleSystemTemplate, m_angularDamping ) },
-	{ "Rotation",         ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "Rotation",         INI::parseIndexList, fxRotationNames, offsetof(ParticleSystemTemplate, m_fxRotation) },
 	{ "AngleXY",          INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_gpuAngleXY) },
 	{ "AngularRateXY",    INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_gpuAngularRateXY) },
 	{ "AngularDampingXY", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_gpuAngularDampingXY) },
