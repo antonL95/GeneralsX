@@ -5,6 +5,7 @@
 #include "GameLogic/Module/RotwkAbilityModules.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <memory>
 #include <string>
@@ -31,6 +32,7 @@
 #include "GameClient/FXList.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/AI.h"
@@ -1531,6 +1533,9 @@ void GameLogic::processMountedTemplateSwaps()
 		AsciiString originalTeamName;
 		Matrix3D transform;
 		AsciiString name;
+		AsciiString profileCommandSet;
+		AsciiString profileName;
+		std::array<Color, 3> profileColors;
 		UpgradeMaskType upgrades;
 		Real healthRatio;
 		Real experience;
@@ -1584,8 +1589,12 @@ void GameLogic::processMountedTemplateSwaps()
 		}
 		const StancesBehavior* stances = StancesBehavior::find(source);
 		const AttributeModifierHelper* modifiers = source->getAttributeModifierHelper();
+		const AsciiString& overrideSet = source->m_commandSetStringOverride;
+		const Bool profile = std::string_view(overrideSet.str()).starts_with(CreateAHeroSystem::COMMAND_SET_PREFIX);
 		Swap& swap = swaps.emplace_back(Swap{id, source->m_producerID, source->m_builderID, target,
 			source->getHeroIdentityTemplate(), source->getTeam(), source->m_originalTeamName, transform, source->getName(),
+			profile ? overrideSet : AsciiString::TheEmptyString, source->m_createAHeroDisplayName,
+			{source->m_createAHeroColors[0], source->m_createAHeroColors[1], source->m_createAHeroColors[2]},
 			source->getObjectCompletedUpgradeMask(), healthRatio, tracker->getRetailExperience(), tracker->getRank(),
 			tracker->getRetailStartingRank(), draw && draw->isSelected(), source->m_indicatorColor,
 			std::move(source->m_mountedPowerTimers), std::move(source->m_mountedExecutedCommands),
@@ -1638,6 +1647,11 @@ void GameLogic::processMountedTemplateSwaps()
 		replacement->m_builderID = swap.builder;
 		replacement->m_originalTeamName = swap.originalTeamName;
 		TheScriptEngine->transferObjectName(swap.name, replacement);
+		if (swap.profileCommandSet.isNotEmpty())
+			replacement->setCommandSetStringOverride(swap.profileCommandSet);
+		if (swap.profileName.isNotEmpty() || swap.profileColors[0])
+			replacement->setCreateAHeroAppearance(swap.profileName,
+				swap.profileColors[0], swap.profileColors[1], swap.profileColors[2]);
 		if (swap.indicatorColor)
 			replacement->setCustomIndicatorColor(swap.indicatorColor);
 

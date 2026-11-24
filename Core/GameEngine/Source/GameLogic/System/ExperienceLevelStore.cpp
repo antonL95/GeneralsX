@@ -182,7 +182,10 @@ const std::vector<std::size_t>* levelsFor(const Object* obj)
 		return nullptr;
 	if (!s_indexed)
 		buildIndex();
-	const auto found = s_levelsByTarget.find(obj->getTemplate()->getName().str());
+	const ThingTemplate* type = obj->getTemplate();
+	auto found = s_levelsByTarget.find(type->getName().str());
+	if (found == s_levelsByTarget.end() && obj->isKindOf(KINDOF_CREATE_A_HERO) && obj->getHeroIdentityTemplate() != type)
+		found = s_levelsByTarget.find(obj->getHeroIdentityTemplate()->getName().str());
 	return found == s_levelsByTarget.end() ? nullptr : &found->second;
 }
 
@@ -576,15 +579,15 @@ void xferPendingLevels(Xfer* xfer)
 
 const SelectionDecal* findSelectionDecal(const Object& object)
 {
-	const auto found = s_levelsByTarget.find(object.getTemplate()->getName().str());
-	if (found == s_levelsByTarget.end())
+	const auto* indices = levelsFor(&object);
+	if (!indices)
 		return nullptr;
 
 	const ExperienceTracker* tracker = object.getExperienceTracker();
 	const Int rank = tracker ? tracker->getRank() : 1;
 	const Bool multiplayer = isMultiplayer();
 	const Level* best = nullptr;
-	for (std::size_t index : found->second)
+	for (std::size_t index : *indices)
 	{
 		const Level& level = s_levels[index];
 		if (level.selectionDecal.texture.isEmpty() || level.rank > rank ||

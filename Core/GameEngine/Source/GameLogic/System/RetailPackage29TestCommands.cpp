@@ -19,9 +19,11 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Weapon.h"
+#include "GameLogic/TerrainLogic.h"
 
 #include <cstdio>
 
@@ -123,6 +125,93 @@ void handleDeflect(const RetailTestCommands::Context& ctx)
 		if (TheActionManager->canDoSpecialPower(source, power, CMD_FROM_AI, options))
 			source->doSpecialPower(power, options);
 	}
+}
+
+void handleCreateAHeroSwap(const RetailTestCommands::Context& ctx)
+{
+	if (ctx.action == "pkg29-cah-profile")
+	{
+		Player* player = ctx.findPlayer();
+		CreateAHeroRules::SelectionData profile;
+		if (!player || !CreateAHeroSystem::buildDefaultSelection("Upgrade_CreateAHero_ClassWraith",
+			"Upgrade_CreateAHero_SubClass_0", profile))
+			return;
+		profile.heroName = "Fixture Wraith";
+		profile.powerButtons = {"Command_SpecialAbilityHarrowingStrike1",
+			"Command_SpecialAbilityFrigidHands1", "Command_SpecialAbilityDreadPlagueLevel1"};
+		const Bool valid = CreateAHeroSystem::setPlayerSelectionEncoded(player->getPlayerIndex(),
+			CreateAHeroSystem::encodeSelectionCompact(profile), "Mordor");
+		std::fprintf(stderr, "TEST cah profile frame=%u valid=%d\n", ctx.frame, valid);
+		return;
+	}
+	if (ctx.action == "pkg29-cah-reset")
+	{
+		if (Player* player = ctx.findPlayer())
+			CreateAHeroSystem::resetPlayer(player->getPlayerIndex());
+		return;
+	}
+	Object* source = ctx.requireObject(TRUE);
+	if (!source)
+		return;
+	auto* tracker = source->getExperienceTracker();
+	if (ctx.action == "pkg29-cah-prepare")
+	{
+		tracker->setMinRetailRank(7, FALSE);
+		tracker->advanceRetailLevel(tracker->getRetailExperience() + 0.5f, FALSE);
+		ctx.selectObject(source);
+	}
+
+	const CommandSet* set = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
+	const CommandButton* button = nullptr;
+	for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+	{
+		const CommandButton* candidate = set->getCommandButton(slot);
+		if (candidate && candidate->getName() == "Command_SpecialAbilityDreadPlagueLevel1")
+		{
+			button = candidate;
+			break;
+		}
+	}
+	const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
+	const SpecialPowerModuleInterface* module = power ? source->getSpecialPowerModule(power) : nullptr;
+	if (ctx.action == "pkg29-cah-cast")
+	{
+		if (!module || !module->isReady())
+			return;
+		const Coord3D position = ctx.groundLocation();
+		const Bool valid = TheActionManager->canDoSpecialPowerAtLocation(source, &position, CMD_FROM_PLAYER,
+			power, nullptr, button->getOptions());
+		std::fprintf(stderr, "TEST cah cast frame=%u valid=%d disabled=%d\n", ctx.frame, valid, source->isDisabled());
+		if (!valid)
+		{
+			Region3D map;
+			TheTerrainLogic->getExtent(&map);
+			std::fprintf(stderr, "TEST cah targeting x=%.0f y=%.0f onMap=%d water=%d\n",
+				position.x, position.y, map.containsWithin(position.asCoord2D()),
+				TheTerrainLogic->isUnderwater(position.x, position.y));
+			return;
+		}
+		ctx.selectObject(source);
+		GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION);
+		message->appendIntegerArgument(power->getID());
+		message->appendLocationArgument(position);
+		message->appendRealArgument(INVALID_ANGLE);
+		message->appendObjectIDArgument(INVALID_ID);
+		message->appendIntegerArgument(button->getOptions());
+		message->appendObjectIDArgument(source->getID());
+		return;
+	}
+	const auto* profile = CreateAHeroSystem::getPlayerSelection(source->getControllingPlayer()->getPlayerIndex());
+	AsciiString expectedSet(CreateAHeroSystem::COMMAND_SET_PREFIX.data());
+	if (profile)
+		expectedSet.concat(CreateAHeroSystem::encodeSelectionCompact(*profile));
+	UnicodeString expectedName;
+	expectedName.translate("Fixture Wraith");
+	const Bool appearance = source->getDisplayName() == expectedName && source->getCreateAHeroColors();
+	std::fprintf(stderr, "TEST cah state frame=%u template=%s profile=%d appearance=%d button=%d rank=%d xp=%.1f ready=%d selected=%d\n",
+		ctx.frame, source->getTemplate()->getName().str(), source->getCommandSetString() == expectedSet,
+		appearance, button != nullptr, tracker->getRank(), tracker->getRetailExperience(),
+		module && module->isReady(), source->getDrawable() && source->getDrawable()->isSelected());
 }
 
 void handleLocationAbility(const RetailTestCommands::Context& ctx)
@@ -356,6 +445,7 @@ void registerRetailPackage29TestCommands()
 	registerPrefix("pkg29-deflect-", handleDeflect);
 	registerPrefix("pkg29-disguise-", handleDisguise);
 	registerPrefix("pkg29-strafe-", handleStrafe);
+	registerPrefix("pkg29-cah-", handleCreateAHeroSwap);
 #endif
 }
 }

@@ -1,0 +1,12 @@
+239 pkg29-cah-profile Player_1 - 0
+239 create Player_1 CreateAHero 0 1400,2660,0
+239 objupgrade Player_1 CreateAHero 0 Upgrade_CreateAHeroLightBlast_Level1
+239 pkg29-cah-prepare Player_1 CreateAHero 0
+243 pkg29-cah-state Player_1 CreateAHeroScaled 0
+247 pkg29-cah-state Player_1 CreateAHeroScaled 0
+248 pw-rank Player_1 CreateAHeroScaled 0 10
+250 pkg29-cah-cast Player_1 CreateAHeroScaled 0 - 1480 2700
+251 pkg29-cah-state Player_1 CreateAHeroScaled 0
+260 destroy Player_1 DreadPlague1 0
+260 destroy Player_1 CreateAHeroScaled 0
+260 pkg29-cah-reset Player_1 - 0
