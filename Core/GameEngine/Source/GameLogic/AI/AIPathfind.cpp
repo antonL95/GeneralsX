@@ -395,7 +395,7 @@ Real Pathfinder::getWallHeightAt(const Coord3D& position)
 		{
 			const Object* wall = TheGameLogic->findObjectByID(id);
 			const auto* authored = wall ? RetailWallMesh::forObject(*wall) : nullptr;
-			Bool authoredCell = FALSE;
+			Bool authoredCell = authored && RetailWallMesh::contains(*authored, position);
 			if (authored && !authored->wall.empty())
 			{
 				Coord3D corner = position;
@@ -5725,6 +5725,12 @@ void Pathfinder::prependCells( Path *path, const Coord3D *fromPos,
 				layer = prevCell->getLayer();
 			}
 			DEBUG_ASSERTCRASH(layer!=LAYER_GROUND, ("Should have at 1 non-ground layer. jba"));
+			if (path->getFirstNode()->getLayer() != layer)
+			{
+				Coord3D nodePosition = *path->getFirstNode()->getPosition();
+				nodePosition.z = TheTerrainLogic->getLayerHeight(nodePosition.x, nodePosition.y, layer);
+				path->getFirstNode()->setPosition(&nodePosition);
+			}
 			path->getFirstNode()->setLayer(layer);
 			continue;
 		}
