@@ -57,9 +57,8 @@
 #include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
 #define HAVE_NGMP_PREFS 1
 #endif
-#if !defined(_MSC_VER) || (_MSC_VER >= 1914)
+#include <chrono>
 #include <filesystem>
-#endif
 
 
 //-----------------------------------------------------------------------------
@@ -183,29 +182,47 @@ Bool UserPreferences::write()
 	if (m_filename.isEmpty())
 		return false;
 
-#if !defined(_MSC_VER) || (_MSC_VER >= 1914)
-	// GeneralsX @feature fbraz3 03/09/2026 Ensure parent directory exists before writing preferences
 	std::filesystem::path filePath(m_filename.str());
-	std::filesystem::path parentDir = filePath.parent_path();
+	std::error_code error;
+	if (std::filesystem::is_symlink(filePath, error))
+	{
+		filePath = std::filesystem::canonical(filePath, error);
+		if (error)
+			return false;
+	}
+	const auto previous = std::filesystem::status(filePath, error);
+	const std::filesystem::path parentDir = filePath.parent_path();
+	error.clear();
 	if (!parentDir.empty())
 	{
-		std::error_code ec;
-		std::filesystem::create_directories(parentDir, ec);
+		std::filesystem::create_directories(parentDir, error);
+		if (error)
+			return false;
 	}
-#endif
-
-	FILE *fp = fopen(m_filename.str(), "w");
-	if (fp)
+	const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+	const std::string temporary = filePath.string() + "." + std::to_string(timestamp) + ".tmp";
+	FILE *fp = fopen(temporary.c_str(), "wx");
+	if (!fp)
+		return false;
+	Bool written = true;
+	for (const auto &[key, value] : *this)
 	{
-		PreferenceMap::const_iterator it = begin();
-		while (it != end())
+		if (fprintf(fp, "%s = %s\n", key.str(), value.str()) < 0)
 		{
-			fprintf(fp, "%s = %s\n", it->first.str(), it->second.str());
-			++it;
+			written = false;
+			break;
 		}
-		fclose(fp);
-		return true;
 	}
+	if (fclose(fp) == 0 && written)
+	{
+		if (std::filesystem::is_regular_file(previous))
+			std::filesystem::permissions(temporary, previous.permissions(), error);
+		if (!error)
+			std::filesystem::rename(temporary, filePath, error);
+		if (!error)
+			return true;
+	}
+	std::filesystem::remove(temporary, error);
 	return false;
 }
 
