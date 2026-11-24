@@ -238,7 +238,7 @@ static void setDefaults()
 	// LOD
 	if ((TheGameLogic->isInGame() == FALSE) || (TheGameLogic->isInShellGame() == TRUE))
 	{
-		GadgetComboBoxSetSelectedPos(comboBoxDetail, (Int)TheGameLODManager->getRecommendedStaticLODLevel());
+		GadgetComboBoxSetSelectedPos(comboBoxDetail, (Int)TheGameLODManager->getRecommendedStaticLODLevel() - STATIC_GAME_LOD_LOW);
 	}
 
 	//-------------------------------------------------------------------------------------------------
@@ -403,7 +403,7 @@ static void saveOptions()
 	//-------------------------------------------------------------------------------------------------
 	// Custom game detail settings.
 	GadgetComboBoxGetSelectedPos( comboBoxDetail, &index );
-	if (index == STATIC_GAME_LOD_CUSTOM)
+	if (index == STATIC_GAME_LOD_CUSTOM - STATIC_GAME_LOD_LOW)
 	{
  		//-------------------------------------------------------------------------------------------------
  		// Texture resolution slider
@@ -472,7 +472,8 @@ static void saveOptions()
 	if (comboBoxDetail && comboBoxDetail->winGetEnabled())
 	{
 		GadgetComboBoxGetSelectedPos( comboBoxDetail, &index );
-		const Bool levelChanged = TheGameLODManager->setStaticLODLevel((StaticGameLODLevel)index);
+		const Bool levelChanged = index >= 0 &&
+			TheGameLODManager->setStaticLODLevel(StaticGameLODLevel(index + STATIC_GAME_LOD_LOW));
 
 		if (levelChanged)
 			(*pref)[RetailFileLayers::enabled() ? "RetailStaticGameLOD" : "StaticGameLOD"] =
@@ -915,7 +916,7 @@ static void acceptAdvancedOptions()
 static void cancelAdvancedOptions()
 {
 	//restore the detail selection back to initial state
-	GadgetComboBoxSetSelectedPos(comboBoxDetail, (Int)TheGameLODManager->getStaticLODLevel());
+	GadgetComboBoxSetSelectedPos(comboBoxDetail, MAX(0, Int(TheGameLODManager->getStaticLODLevel()) - STATIC_GAME_LOD_LOW));
 
 	WinAdvancedDisplay->winHide(TRUE);
 }
@@ -1262,7 +1263,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	GadgetComboBoxAddEntry(comboBoxDetail, TheGameText->fetch("GUI:High"), color);
 	GadgetComboBoxAddEntry(comboBoxDetail, TheGameText->FETCH_OR_SUBSTITUTE("GUI:VeryHigh", L"Very High"), color);
 	GadgetComboBoxAddEntry(comboBoxDetail, TheGameText->fetch("GUI:Custom"), color);
-	static_assert(STATIC_GAME_LOD_COUNT == 5, "Wrong combo box count");
+	static_assert(STATIC_GAME_LOD_COUNT - STATIC_GAME_LOD_LOW == 5, "Wrong combo box count");
 
 	//Check if level was never set and default to setting most suitable for system.
 	if (TheGameLODManager->getStaticLODLevel() == STATIC_GAME_LOD_UNKNOWN)
@@ -1270,7 +1271,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 		TheGameLODManager->setStaticLODLevel(TheGameLODManager->getRecommendedStaticLODLevel());
 	}
 
-	GadgetComboBoxSetSelectedPos(comboBoxDetail, (Int)TheGameLODManager->getStaticLODLevel());
+	GadgetComboBoxSetSelectedPos(comboBoxDetail, MAX(0, Int(TheGameLODManager->getStaticLODLevel()) - STATIC_GAME_LOD_LOW));
 
 	GadgetSliderSetPosition( sliderTextureResolution, 2-WW3D::Get_Texture_Reduction());
 
@@ -1587,7 +1588,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 				{
 					Int index;
 					GadgetComboBoxGetSelectedPos( comboBoxDetail, &index );
-					if(index != STATIC_GAME_LOD_CUSTOM)
+					if(index != STATIC_GAME_LOD_CUSTOM - STATIC_GAME_LOD_LOW)
 						break;
 
 					showAdvancedOptions();

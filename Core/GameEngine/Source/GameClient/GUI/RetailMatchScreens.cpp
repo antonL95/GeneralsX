@@ -905,6 +905,7 @@ namespace
 
 	enum class MenuChoice { None, Resources, Factor, Slot, Faction, Team, Color, StartPosition, StartAt, Profile, SelectProfile, DeleteProfile };
 	enum class ProfilePage { None, Create, Stats };
+	enum HomeLink { HomeSkirmish, HomeRematch, HomeExit, HomeSettings, HomeLoad, HomeLinkCount };
 
 	struct Choice
 	{
@@ -996,6 +997,8 @@ namespace
 		UnicodeString description;
 		ShellLoadPage loadPage;
 		Bool setup = FALSE;
+		Int homeFocus = -1;
+		Bool settingsPressed = FALSE;
 		Bool rulesTab = FALSE;
 		Bool sortByPlayers = FALSE;
 		Bool sandboxConfirmed = FALSE;
@@ -1317,7 +1320,9 @@ namespace
 	constexpr Box skirmishButton{412, 272, 612, 320};
 	constexpr Box rematchButton{412, 328, 612, 376};
 	constexpr Box exitButton{412, 384, 612, 432};
+#if !RTS_GENERALS
 	constexpr Box settingsButton{412, 442, 612, 490};
+#endif
 	constexpr Box mapTab{104, 144, 225, 179};
 	constexpr Box rulesTab{231, 144, 352, 179};
 	constexpr Box mapPanel{104, 185, 920, 395};
@@ -1935,12 +1940,15 @@ namespace
 			drawSetup(menu, painter);
 			return;
 		}
-		painter.text(localize("APT:Skirmish", "Skirmish"), skirmishButton, 22);
+		const auto color = [&](HomeLink link) { return menu.homeFocus == link ? 0xFFC8AE77u : white; };
+		painter.text(localize("APT:Skirmish", "Skirmish"), skirmishButton, 22, color(HomeSkirmish));
 		if (menu.canRematch())
-			painter.text(localize("GUI:PlayAgain", "Play Again"), rematchButton, 22);
-		painter.text(localize("APT:ExitGame", "Exit Game"), exitButton, 22);
-		painter.text(localize("APT:Load", "Load"), loadMenuButton, 22);
-		painter.text(localize("APT:Settings", "Settings"), settingsButton, 22);
+			painter.text(localize("GUI:PlayAgain", "Play Again"), rematchButton, 22, color(HomeRematch));
+		painter.text(localize("APT:ExitGame", "Exit Game"), exitButton, 22, color(HomeExit));
+#if !RTS_GENERALS
+		painter.text(localize("APT:Settings", "Settings"), settingsButton, 22, color(HomeSettings));
+#endif
+		painter.text(localize("APT:Load", "Load"), loadMenuButton, 22, color(HomeLoad));
 	}
 
 	WindowMsgHandledType menuSystem(GameWindow *window, UnsignedInt message, WindowMsgData state, WindowMsgData result)
@@ -1952,7 +1960,9 @@ namespace
 		}
 		if (message == GWM_DESTROY)
 		{
+#if !RTS_GENERALS
 			closeRetailOptionsFor(window);
+#endif
 			delete static_cast<ReturnMenu *>(window->winGetUserData());
 			window->winSetUserData(nullptr);
 		}
@@ -1982,15 +1992,42 @@ namespace
 				BitClear(window->winGetInstanceData()->m_style, GWS_ENTRY_FIELD);
 			return MSG_HANDLED;
 		}
-		if ((key && point == KEY_ESC) || (click && exitButton.contains(x, y)))
-			TheGameEngine->setQuitting(TRUE);
-		else if (click && skirmishButton.contains(x, y))
-			menu.openSetup();
-		else if ((key && point == KEY_L) || (click && loadMenuButton.contains(x, y)))
-			menu.loadPage.show();
-		else if (click && settingsButton.contains(x, y))
+#if !RTS_GENERALS
+		const Bool navigate = message == GWM_CHAR && (state & KEY_STATE_UP);
+		if (navigate && (point == KEY_UP || point == KEY_DOWN || point == KEY_TAB))
+		{
+			const Int step = point == KEY_UP ? -1 : 1;
+			Int focus = menu.homeFocus < 0 ? (step < 0 ? HomeSkirmish : HomeLoad) : menu.homeFocus;
+			do
+				focus = (focus + step + HomeLinkCount) % HomeLinkCount;
+			while (focus == HomeRematch && !menu.canRematch());
+			menu.homeFocus = focus;
+			return MSG_HANDLED;
+		}
+		if (message == GWM_LEFT_DOWN)
+		{
+			menu.homeFocus = -1;
+			menu.settingsPressed = settingsButton.contains(x, y);
+		}
+		const Bool openSettings = (navigate && point == KEY_ENTER && menu.homeFocus == HomeSettings) ||
+			(click && menu.settingsPressed && settingsButton.contains(x, y));
+		if (click)
+			menu.settingsPressed = FALSE;
+		if (openSettings)
+		{
 			openRetailOptions(window, FALSE);
-		else if (menu.canRematch() && ((key && point == KEY_ENTER) || (click && rematchButton.contains(x, y))))
+			return MSG_HANDLED;
+		}
+#endif
+		const Bool activate = message == GWM_CHAR && (state & KEY_STATE_UP) && point == KEY_ENTER;
+		if ((key && point == KEY_ESC) || (activate && menu.homeFocus == HomeExit) || (click && exitButton.contains(x, y)))
+			TheGameEngine->setQuitting(TRUE);
+		else if ((activate && menu.homeFocus == HomeSkirmish) || (click && skirmishButton.contains(x, y)))
+			menu.openSetup();
+		else if ((key && point == KEY_L) || (activate && menu.homeFocus == HomeLoad) || (click && loadMenuButton.contains(x, y)))
+			menu.loadPage.show();
+		else if (menu.canRematch() && ((activate && (menu.homeFocus < 0 || menu.homeFocus == HomeRematch)) ||
+			(click && rematchButton.contains(x, y))))
 			menu.startRematch();
 		return MSG_HANDLED;
 	}
@@ -2078,6 +2115,14 @@ Bool createRetailReturnMenu(WindowLayout &layout)
 		TheMouse->setVisibility(TRUE);
 		screen->hide(FALSE);
 		TheWindowManager->winSetFocus(window);
+	});
+	layout.setUpdate([](WindowLayout *screen, void *) {
+		if (!TheWindowManager->winGetFocus() && TheShell->getScreenLayout(TheShell->getScreenCount() - 1) == screen)
+		{
+			GameWindow *window = screen->getFirstWindow();
+			if (window && !window->winIsHidden())
+				TheWindowManager->winSetFocus(window);
+		}
 	});
 	layout.setShutdown([](WindowLayout *screen, void *) {
 		screen->hide(TRUE);

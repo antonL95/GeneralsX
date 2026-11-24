@@ -78,6 +78,8 @@ struct AudioSettings
 	Real m_default3DSoundVolume;
 	Real m_defaultSpeechVolume;
 	Real m_defaultMusicVolume;
+	Real m_defaultAmbientVolume = -1.0f;
+	Real m_defaultMovieVolume = 1.0f;
 	Real m_defaultMoneyTransactionVolume;
 	UnsignedInt m_defaultSpeakerType2D;
 	UnsignedInt m_defaultSpeakerType3D;

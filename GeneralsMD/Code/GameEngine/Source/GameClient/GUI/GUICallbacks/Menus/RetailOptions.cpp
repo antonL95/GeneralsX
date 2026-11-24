@@ -8,21 +8,20 @@
 #include "Common/GameLOD.h"
 #include "Common/GlobalData.h"
 #include "Common/OptionPreferences.h"
+#include "Common/RetailGraphicsOptions.h"
 #include "GameClient/Display.h"
 #include "GameClient/DisplayString.h"
 #include "GameClient/DisplayStringManager.h"
 #include "GameClient/GameFont.h"
 #include "GameClient/GameText.h"
 #include "GameClient/GameWindowManager.h"
-#include "GameClient/HeaderTemplate.h"
-#include "GameClient/InGameUI.h"
 #include "GameClient/Keyboard.h"
-#include "GameClient/Mouse.h"
 #include "GameClient/RetailWorldUI.h"
-#include "GameClient/Shell.h"
+#include "GameClient/UiResolution.h"
 
 #include <algorithm>
 #include <array>
+#include <optional>
 #include <tuple>
 #include <vector>
 
@@ -78,6 +77,21 @@ constexpr Label titles[] = {
 	{"GUI:GameplayOptions", L"Gameplay"}, {"APT:Controls", L"Controls"}
 };
 
+constexpr Label qualityLabels[] = {
+	{"APT:VeryLow", L"Very Low"}, {"APT:Low", L"Low"}, {"APT:Medium", L"Medium"},
+	{"APT:High", L"High"}, {"APT:UltraHigh", L"Ultra High"}, {"APT:Custom", L"Custom"}
+};
+static_assert(std::size(qualityLabels) == STATIC_GAME_LOD_COUNT);
+
+constexpr Label detailLabels[] = {
+	{"APT:ModelDetail", L"Model detail"}, {"APT:AnimationDetail", L"Animation detail"},
+	{"APT:VFXDetail", L"VFX detail"}, {"APT:Shadows", L"Shadows"},
+	{"APT:TerrainDetail", L"Terrain detail"}, {"APT:WaterDetail", L"Water detail"},
+	{"APT:TextureQuality", L"Texture quality"}, {"APT:ShaderDetail", L"Shader detail"},
+	{"APT:DecalDetail", L"Decal detail"}
+};
+static_assert(std::size(detailLabels) == RetailGraphicsOptions::Count);
+
 constexpr Row rows[] = {
 	{Video, Brightness, {"APT:Brightness", L"Brightness"}, Slider},
 	{Video, Resolution, {"APT:Resolution", L"Resolution"}, Stepper},
@@ -101,15 +115,23 @@ constexpr Box panel{132, 104, 760, 560};
 constexpr Box resetButton{160, 600, 190, 42};
 constexpr Box cancelButton{457, 600, 128, 42};
 constexpr Box acceptButton{738, 600, 140, 42};
+constexpr Box customButton{369, 391, 205, 42};
+constexpr Box presetsRow{369, 234, 497, 48};
 
 Box tabBox(Int page) { return {136, 196 + 54 * page, 201, 46}; }
 Box rowBox(Int row) { return {369, 234 + 52 * row, 497, 48}; }
 Box sliderBox(Box row) { return {610, row.y + 17, 201, 18}; }
+Box detailBox(Int index) { return {369 + 252 * (index / 5), 294 + 52 * (index % 5), 245, 48}; }
 
 using Values = std::array<Int, SettingCount>;
 using Mode = std::tuple<Int, Int, Int>;
 
-Int percent(Real value) { return std::clamp(Int(value + 0.5f), 0, 100); }
+Mode currentMode()
+{
+	return {TheDisplay->getWidth(), TheDisplay->getHeight(), TheDisplay->getBitDepth()};
+}
+
+Int percent(Real value) { return value >= 0.0f ? Int(std::min(value, 100.0f) + 0.5f) : 0; }
 
 void setBrightness(Real gamma)
 {
@@ -129,12 +151,17 @@ struct Options
 	Page page = Video;
 	Setting dragging = SettingCount;
 	Int focus = 0;
+	Int pressedX = -1;
+	Int pressedY = -1;
 	Bool keyboard = FALSE;
 	Bool previewing = FALSE;
 	Bool saveFailed = FALSE;
 	Values values{};
 	Values original{};
 	std::vector<Mode> modes;
+	std::optional<RetailGraphicsOptions::Draft> custom;
+	std::optional<RetailGraphicsOptions::Draft> originalCustom;
+	std::optional<RetailGraphicsOptions::Draft> advanced;
 	std::array<Real, 4> originalVolumes{};
 	const Real originalAmbient = TheAudio->getAmbientVolume();
 	const Real originalMovie = TheAudio->getMovieVolume();
@@ -142,7 +169,7 @@ struct Options
 
 	Options(GameWindow *parent, Bool match) : returnWindow(parent), inMatch(match)
 	{
-		const Mode current{TheDisplay->getWidth(), TheDisplay->getHeight(), TheDisplay->getBitDepth()};
+		const Mode current = currentMode();
 		modes.push_back(current);
 		if (!inMatch)
 		{
@@ -167,6 +194,9 @@ struct Options
 		values[HealthBars] = RetailWorldUI::showAllHealthBars;
 		values[Scroll] = percent(TheGlobalData->m_retailScrollFactor * 50.0f);
 		original = values;
+		RetailGraphicsOptions::Draft draft;
+		if (RetailGraphicsOptions::load(prefs, draft))
+			originalCustom = custom = draft;
 		originalVolumes = {TheAudio->getVolume(systemSetting(AudioAffect_Music)),
 			TheAudio->getVolume(systemSetting(AudioAffect_Sound)), TheAudio->getVolume(systemSetting(AudioAffect_Sound3D)),
 			TheAudio->getVolume(systemSetting(AudioAffect_Speech))};
@@ -174,9 +204,27 @@ struct Options
 
 	Bool enabled(Setting setting) const
 	{
+#ifndef SAGE_USE_MINIAUDIO
+		if (setting == Ambient || setting == Movie)
+			return FALSE;
+#endif
 		return (!inMatch || (setting != Resolution && setting != Quality)) &&
 			(setting != Resolution || modes.size() > 1) &&
 			(setting != Quality || TheGlobalData->m_enableStaticLOD);
+	}
+
+	void syncResolution()
+	{
+		const Mode current = currentMode();
+		if (current == modes[original[Resolution]])
+			return;
+		const Bool edited = values[Resolution] != original[Resolution];
+		const auto found = std::ranges::find(modes, current);
+		original[Resolution] = Int(found - modes.begin());
+		if (found == modes.end())
+			modes.push_back(current);
+		if (!edited)
+			values[Resolution] = original[Resolution];
 	}
 
 	Real effectsVolume(AudioAffect channel) const
@@ -218,13 +266,17 @@ struct Options
 	{
 		if (!previewing)
 			return;
-		setBrightness(originalGamma);
-		TheAudio->setVolume(originalVolumes[0], systemSetting(AudioAffect_Music));
-		TheAudio->setVolume(originalVolumes[1], systemSetting(AudioAffect_Sound));
-		TheAudio->setVolume(originalVolumes[2], systemSetting(AudioAffect_Sound3D));
-		TheAudio->setVolume(originalVolumes[3], systemSetting(AudioAffect_Speech));
-		TheAudio->setAmbientVolume(originalAmbient);
-		TheAudio->setMovieVolume(originalMovie);
+		if (TheWritableGlobalData && TheDisplay)
+			setBrightness(originalGamma);
+		if (TheAudio)
+		{
+			TheAudio->setVolume(originalVolumes[0], systemSetting(AudioAffect_Music));
+			TheAudio->setVolume(originalVolumes[1], systemSetting(AudioAffect_Sound));
+			TheAudio->setVolume(originalVolumes[2], systemSetting(AudioAffect_Sound3D));
+			TheAudio->setVolume(originalVolumes[3], systemSetting(AudioAffect_Speech));
+			TheAudio->setAmbientVolume(originalAmbient);
+			TheAudio->setMovieVolume(originalMovie);
+		}
 		previewing = FALSE;
 	}
 
@@ -235,16 +287,61 @@ struct Options
 		values[Music] = percent(audio->m_defaultMusicVolume * 100.0f);
 		values[Sound] = percent(std::max(audio->m_defaultSoundVolume, audio->m_default3DSoundVolume) * 100.0f);
 		values[Voice] = percent(audio->m_defaultSpeechVolume * 100.0f);
-		values[Ambient] = values[Sound];
-		values[Movie] = 100;
+		if (enabled(Ambient))
+			values[Ambient] = audio->m_defaultAmbientVolume < 0.0f ? values[Sound] : percent(audio->m_defaultAmbientVolume * 100.0f);
+		if (enabled(Movie))
+			values[Movie] = percent(audio->m_defaultMovieVolume * 100.0f);
 		values[HealthBars] = FALSE;
 		values[Scroll] = percent(TheGlobalData->m_retailDefaultScrollFactor * 50.0f);
+		if (enabled(Resolution))
+		{
+			values[Resolution] = original[Resolution];
+			for (Int i = 0; i < Int(modes.size()); ++i)
+				if (std::get<0>(modes[i]) == DEFAULT_DISPLAY_WIDTH && std::get<1>(modes[i]) == DEFAULT_DISPLAY_HEIGHT)
+					values[Resolution] = i;
+		}
+		if (enabled(Quality))
+		{
+			const Int suggestedQuality = TheGameLODManager->getIdealStaticLODLevel();
+			values[Quality] = suggestedQuality >= 0 && suggestedQuality < STATIC_GAME_LOD_CUSTOM
+				? suggestedQuality : STATIC_GAME_LOD_LOW;
+		}
 		for (Setting setting : {Brightness, Music, Sound, Voice, Ambient, Movie})
-			preview(setting);
+			if (enabled(setting))
+				preview(setting);
+	}
+
+	void openCustom()
+	{
+		if (!enabled(Quality))
+			return;
+		const auto selected = StaticGameLODLevel(values[Quality]);
+		if (selected == STATIC_GAME_LOD_CUSTOM && custom)
+			advanced = custom;
+		else
+			advanced = RetailGraphicsOptions::fromPreset(selected == STATIC_GAME_LOD_CUSTOM ? STATIC_GAME_LOD_LOW : selected);
+		focus = 0;
+	}
+
+	void closeCustom(Bool done)
+	{
+		if (done)
+		{
+			if (*advanced == RetailGraphicsOptions::fromPreset(advanced->preset))
+				values[Quality] = advanced->preset;
+			else
+			{
+				custom = advanced;
+				values[Quality] = STATIC_GAME_LOD_CUSTOM;
+			}
+		}
+		advanced.reset();
+		focus = 0;
 	}
 
 	Bool accept()
 	{
+		syncResolution();
 		OptionPreferences prefs;
 		const auto changed = [&](Setting setting) { return values[setting] != original[setting]; };
 		if (changed(Brightness)) prefs.setInt("Gamma", values[Brightness]);
@@ -259,32 +356,43 @@ struct Options
 		if (changed(Movie)) prefs.setInt("MovieVolume", values[Movie]);
 		if (changed(HealthBars)) prefs.setBool("ShowAllHealthBars", values[HealthBars]);
 		if (changed(Scroll)) prefs.setInt("ScrollFactor", values[Scroll]);
+		const Bool writeCustom = values[Quality] == STATIC_GAME_LOD_CUSTOM && custom && custom != originalCustom;
 		if (changed(Quality))
 			prefs.setAsciiString("RetailStaticGameLOD",
 				TheGameLODManager->getStaticGameLODLevelName(StaticGameLODLevel(values[Quality])));
+		if (writeCustom)
+			RetailGraphicsOptions::save(prefs, *custom);
 
 		const Bool resize = changed(Resolution);
+		const Bool wasWindowed = TheDisplay->getWindowed();
+		const Mode previousMode = currentMode();
 		if (resize)
 		{
 			const auto [width, height, depth] = modes[values[Resolution]];
-			if (!TheDisplay->setDisplayMode(width, height, depth, TheDisplay->getWindowed()))
+			if (!TheDisplay->setDisplayMode(width, height, depth, wasWindowed))
 				return FALSE;
 			AsciiString resolution;
 			resolution.format("%d %d", width, height);
 			prefs.setAsciiString("Resolution", resolution);
 		}
-		if (values != original && !prefs.write())
+		if ((values != original || writeCustom) && !prefs.write())
 		{
 			if (resize)
 			{
-				const auto [width, height, depth] = modes[original[Resolution]];
-				TheDisplay->setDisplayMode(width, height, depth, TheDisplay->getWindowed());
+				const auto [width, height, depth] = previousMode;
+				TheDisplay->setDisplayMode(width, height, depth, wasWindowed);
 			}
 			return FALSE;
 		}
 		if (changed(Scroll)) prefs.applyScrollFactor();
 		if (changed(HealthBars)) RetailWorldUI::showAllHealthBars = values[HealthBars];
-		if (changed(Quality)) TheGameLODManager->setStaticLODLevel(StaticGameLODLevel(values[Quality]));
+		if (values[Quality] == STATIC_GAME_LOD_CUSTOM && custom && (writeCustom || changed(Quality)))
+		{
+			const auto settings = RetailGraphicsOptions::apply(*custom);
+			TheGameLODManager->setStaticLODLevel(STATIC_GAME_LOD_CUSTOM, &settings);
+		}
+		else if (changed(Quality))
+			TheGameLODManager->setStaticLODLevel(StaticGameLODLevel(values[Quality]));
 		previewing = FALSE;
 		return TRUE;
 	}
@@ -334,16 +442,70 @@ UnicodeString rowValue(const Options &options, Setting setting)
 		value.format(L"%d × %d", width, height);
 	}
 	else if (setting == Quality)
-	{
-		constexpr Label quality[] = {
-			{"GUI:Low", L"Low"}, {"GUI:Medium", L"Medium"}, {"GUI:High", L"High"},
-			{"GUI:VeryHigh", L"Ultra High"}, {"GUI:Custom", L"Custom"}
-		};
-		value = quality[options.values[Quality]].text();
-	}
+		value = qualityLabels[options.values[Quality]].text();
 	else
 		value.format(L"%d%%", options.values[setting]);
 	return value;
+}
+
+void drawButton(const Painter &p, Box box, Label label, Bool primary = FALSE, Bool focused = FALSE)
+{
+	p.fill(box, primary ? gold : rowColor);
+	if (focused)
+		p.fill({box.x, box.y, box.width, 2}, primary ? textColor : gold);
+	p.text(box, label.text(), 17, primary ? sidebarColor : textColor, TRUE);
+}
+
+UnicodeString detailValue(RetailGraphicsOptions::Control control, Int value)
+{
+	using namespace RetailGraphicsOptions;
+	switch (control)
+	{
+		case Texture:
+		case Terrain: return qualityLabels[value + 1].text();
+		case Decals:
+			if (value != 0)
+				return qualityLabels[value == 2 ? 3 : 1].text();
+			[[fallthrough]];
+		case Shadows:
+			if (value == 0)
+				return Label{"GUI:Off", L"Off"}.text();
+			[[fallthrough]];
+		default: return qualityLabels[value].text();
+	}
+}
+
+void drawCustom(const Painter &p, const Options &options)
+{
+	using namespace RetailGraphicsOptions;
+	p.text({369, 175, 497, 43}, Label{"APT:CustomSettings", L"Custom settings"}.text(), 26);
+	p.fill(presetsRow, rowColor);
+	p.text({383, presetsRow.y, 158, presetsRow.height}, Label{"GUI:GraphicsPreset", L"Preset"}.text(), 17);
+	for (Int i = STATIC_GAME_LOD_VERY_LOW; i <= STATIC_GAME_LOD_LAST; ++i)
+	{
+		const Box button{520 + 66 * i, 240, 64, 36};
+		if (options.advanced->preset == i)
+			p.fill(button, sidebarColor);
+		p.text(button, qualityLabels[i].text(), 14, options.advanced->preset == i ? gold : textColor, TRUE);
+	}
+	if (options.keyboard && options.focus == 0)
+		p.fill({presetsRow.x, presetsRow.y, 2, presetsRow.height}, gold);
+	for (Int i = 0; i < Count; ++i)
+	{
+		const auto control = Control(i);
+		const Box box = detailBox(i);
+		const Int value = options.advanced->values[i];
+		const Range bounds = range(control);
+		p.fill(box, rowColor);
+		if (options.keyboard && options.focus == i + 1)
+			p.fill({box.x, box.y, 2, box.height}, gold);
+		p.text({box.x + 12, box.y, 117, box.height}, detailLabels[i].text(), 15);
+		if (value > bounds.minimum)
+			p.text({box.x + 130, box.y, 19, box.height}, UnicodeString(L"‹"), 21, gold, TRUE);
+		if (value < bounds.maximum)
+			p.text({box.x + 221, box.y, 19, box.height}, UnicodeString(L"›"), 21, gold, TRUE);
+		p.text({box.x + 150, box.y, 70, box.height}, detailValue(control, value), 14, muted, TRUE);
+	}
 }
 
 void drawRow(const Painter &p, const Options &options, const Row &row, Box box, Bool focused)
@@ -357,10 +519,11 @@ void drawRow(const Painter &p, const Options &options, const Row &row, Box box, 
 	{
 		const Box track = sliderBox(box);
 		const Int length = (track.width - 1) * options.values[row.setting] / 100;
+		const Color handle = enabled ? gold : muted;
 		p.fill({track.x, track.y + 7, track.width, 4}, sidebarColor);
 		if (length > 0)
-			p.fill({track.x, track.y + 7, length, 4}, gold);
-		p.fill({track.x + length - 3, track.y + 1, 7, 16}, gold);
+			p.fill({track.x, track.y + 7, length, 4}, handle);
+		p.fill({track.x + length - 3, track.y + 1, 7, 16}, handle);
 		p.text({821, box.y, 43, box.height}, rowValue(options, row.setting), 14, muted, TRUE);
 	}
 	else if (row.widget == Toggle)
@@ -384,13 +547,16 @@ void drawRow(const Painter &p, const Options &options, const Row &row, Box box, 
 
 void drawOptions(GameWindow *window, WinInstanceData *)
 {
-	const auto &options = *static_cast<Options *>(window->winGetUserData());
+	auto &options = *static_cast<Options *>(window->winGetUserData());
 	const Int width = TheDisplay->getWidth();
 	const Int height = TheDisplay->getHeight();
 	Int previousWidth, previousHeight;
 	window->winGetSize(&previousWidth, &previousHeight);
 	if (previousWidth != width || previousHeight != height)
+	{
 		window->winSetSize(width, height);
+		options.syncResolution();
+	}
 	TheDisplay->drawFillRect(0, 0, width, height, 0xAE060C10);
 	const Painter p(Layout{});
 	p.fill(panel, panelColor);
@@ -408,27 +574,41 @@ void drawOptions(GameWindow *window, WinInstanceData *)
 		p.text({tab.x + 22, tab.y, tab.width - 22, tab.height}, titles[i].text(),
 			18, options.page == i ? textColor : muted);
 	}
-	p.text({369, 175, 497, 43}, titles[options.page].text(), 26);
 	Int index = 0;
-	for (const Row &row : rows)
-		if (row.page == options.page)
+	if (options.advanced)
+	{
+		drawCustom(p, options);
+		index = RetailGraphicsOptions::Count + 1;
+	}
+	else
+	{
+		p.text({369, 175, 497, 43}, titles[options.page].text(), 26);
+		for (const Row &row : rows)
+			if (row.page == options.page)
+			{
+				drawRow(p, options, row, rowBox(index), options.keyboard && options.focus == index);
+				++index;
+			}
+		if (options.page == Video)
 		{
-			drawRow(p, options, row, rowBox(index), options.keyboard && options.focus == index);
-			++index;
+			if (options.inMatch)
+				p.text({383, 391, 473, 38}, Label{"GUI:DisplayChangeShellOnly", L"Change resolution and graphics quality from the main menu."}.text(), 15, muted);
+			else if (options.enabled(Quality))
+			{
+				drawButton(p, customButton, {"APT:CustomSettings", L"Custom settings"}, FALSE, options.keyboard && options.focus == index);
+				++index;
+			}
 		}
-	if (options.page == Video && options.inMatch)
-		p.text({383, 391, 473, 38}, Label{"GUI:DisplayChangeShellOnly", L"Change resolution and graphics quality from the main menu."}.text(), 15, muted);
-	if (options.page == Audio)
-		p.text({383, 500, 473, 38}, Label{"GUI:LegacyAudioUnavailable", L"EAX3 and High Audio Quality require the original audio driver."}.text(), 15, muted);
-	if (options.saveFailed)
-		p.text({370, 523, 493, 45}, Label{"GUI:SettingsApplyFailed", L"Could not apply settings."}.text(), 16, gold);
+		if (options.page == Audio)
+			p.text({383, 500, 473, 38}, Label{"GUI:LegacyAudioUnavailable", L"EAX3 and High Audio Quality require the original audio driver."}.text(), 15, muted);
+		if (options.saveFailed)
+			p.text({370, 535, 493, 40}, Label{"GUI:SettingsApplyFailed", L"Could not apply settings."}.text(), 16, gold);
+	}
 	p.fill({152, 579, 720, 1}, 0xFF4B5C60);
-	p.fill(resetButton, rowColor);
-	p.fill(cancelButton, rowColor);
-	p.fill(acceptButton, gold);
-	p.text(resetButton, Label{"APT:ResetToDefaults", L"Reset to defaults"}.text(), 16, textColor, TRUE);
-	p.text(cancelButton, Label{"APT:Cancel", L"Cancel"}.text(), 17, textColor, TRUE);
-	p.text(acceptButton, Label{"APT:Accept", L"Accept"}.text(), 17, sidebarColor, TRUE);
+	drawButton(p, resetButton, {"APT:ResetToDefaults", L"Reset to defaults"}, FALSE, options.keyboard && options.focus == index);
+	drawButton(p, cancelButton, {"APT:Cancel", L"Cancel"}, FALSE, options.keyboard && options.focus == index + 1);
+	drawButton(p, acceptButton, options.advanced ? Label{"APT:Done", L"Done"} : Label{"APT:Accept", L"Accept"},
+		TRUE, options.keyboard && options.focus == index + 2);
 }
 
 void closeOptions(GameWindow *window, Bool accepted, Bool restoreFocus)
@@ -460,15 +640,8 @@ void acceptOptions(GameWindow *window, Options &options)
 	}
 	const Bool resize = options.values[Resolution] != options.original[Resolution];
 	closeOptions(window, TRUE, TRUE);
-	if (!resize)
-		return;
-	TheWritableGlobalData->m_xResolution = TheDisplay->getWidth();
-	TheWritableGlobalData->m_yResolution = TheDisplay->getHeight();
-	TheHeaderTemplateManager->onResolutionChanged();
-	TheMouse->onResolutionChanged();
-	TheShell->onResolutionChanged();
-	TheInGameUI->recreateControlBar();
-	TheInGameUI->refreshCustomUiResources();
+	if (resize)
+		UiResolution::displayModeChanged(TheDisplay->getWidth(), TheDisplay->getHeight());
 }
 
 void adjust(Options &options, const Row &row, Int step)
@@ -482,8 +655,11 @@ void adjust(Options &options, const Row &row, Int step)
 		value = std::clamp(value + step, 0, 100);
 	else
 	{
-		const Int count = row.setting == Resolution ? Int(options.modes.size()) : Int(STATIC_GAME_LOD_COUNT);
-		value = (value + step + count) % count;
+		const Int count = row.setting == Resolution ? Int(options.modes.size()) : Int(STATIC_GAME_LOD_CUSTOM);
+		if (row.setting == Quality && value == STATIC_GAME_LOD_CUSTOM)
+			value = step < 0 ? STATIC_GAME_LOD_LAST : STATIC_GAME_LOD_VERY_LOW;
+		else
+			value = (value + step + count) % count;
 	}
 	options.preview(row.setting);
 }
@@ -499,47 +675,118 @@ void dragSlider(Options &options, Setting setting, Int x)
 	}
 }
 
+void adjustDetail(Options &options, Int index, Int step)
+{
+	using namespace RetailGraphicsOptions;
+	if (index == 0)
+	{
+		const Int preset = std::clamp(Int(options.advanced->preset) + step, 0, Int(STATIC_GAME_LOD_LAST));
+		if (preset != options.advanced->preset)
+			options.advanced = fromPreset(StaticGameLODLevel(preset));
+		return;
+	}
+	const auto control = Control(index - 1);
+	const Range bounds = range(control);
+	Int &value = options.advanced->values[control];
+	value = std::clamp(value + step, bounds.minimum, bounds.maximum);
+}
+
+void footerAction(GameWindow *window, Options &options, Int index)
+{
+	switch (index)
+	{
+		case 0:
+			if (options.advanced)
+				options.advanced = RetailGraphicsOptions::fromPreset(options.advanced->preset);
+			else
+				options.reset();
+			break;
+		case 1:
+			if (options.advanced)
+				options.closeCustom(FALSE);
+			else
+				closeOptions(window, FALSE, TRUE);
+			break;
+		case 2:
+			if (options.advanced)
+				options.closeCustom(TRUE);
+			else
+				acceptOptions(window, options);
+			break;
+	}
+}
+
+void optionsKey(GameWindow *window, Options &options, WindowMsgData key)
+{
+	options.keyboard = TRUE;
+	if (key == KEY_ESC)
+	{
+		footerAction(window, options, 1);
+		return;
+	}
+	if (key == KEY_TAB && !options.advanced)
+	{
+		options.page = Page((options.page + 1) % PageCount);
+		options.focus = 0;
+		return;
+	}
+	const Bool activate = key == KEY_ENTER || key == KEY_SPACE;
+	const Int step = key == KEY_LEFT ? -1 : key == KEY_RIGHT ? 1 : 0;
+	Int count = 0;
+	if (options.advanced)
+	{
+		count = RetailGraphicsOptions::Count + 1;
+		if (step && options.focus < count)
+			adjustDetail(options, options.focus, step);
+	}
+	else
+	{
+		for (const Row &row : rows)
+		{
+			if (row.page != options.page)
+				continue;
+			if (options.focus == count && (step || (activate && row.widget == Toggle)))
+				adjust(options, row, step ? step : 1);
+			++count;
+		}
+		if (options.page == Video && options.enabled(Quality))
+		{
+			if (activate && options.focus == count)
+			{
+				options.openCustom();
+				return;
+			}
+			++count;
+		}
+	}
+	if (activate && options.focus >= count)
+		footerAction(window, options, options.focus - count);
+	else if (key == KEY_DOWN || key == KEY_UP || key == KEY_TAB)
+	{
+		count += 3;
+		options.focus = (options.focus + (key == KEY_UP ? -1 : 1) + count) % count;
+	}
+}
+
 WindowMsgHandledType optionsInput(GameWindow *window, UnsignedInt message, WindowMsgData point, WindowMsgData state)
 {
 	auto &options = *static_cast<Options *>(window->winGetUserData());
 	if (message == GWM_CHAR && (state & KEY_STATE_UP))
 	{
-		options.keyboard = TRUE;
-		if (point == KEY_ESC)
-			closeOptions(window, FALSE, TRUE);
-		else if (point == KEY_ENTER)
-			acceptOptions(window, options);
-		else if (point == KEY_TAB)
-		{
-			options.page = Page((options.page + 1) % PageCount);
-			options.focus = 0;
-		}
-		else
-		{
-			Int count = 0;
-			for (const Row &row : rows)
-			{
-				if (row.page != options.page)
-					continue;
-				if (options.focus == count && (point == KEY_LEFT || point == KEY_RIGHT || point == KEY_SPACE))
-					adjust(options, row, point == KEY_LEFT ? -1 : 1);
-				++count;
-			}
-			if (point == KEY_DOWN || point == KEY_UP)
-				options.focus = (options.focus + (point == KEY_DOWN ? 1 : -1) + count) % count;
-		}
+		optionsKey(window, options, point);
 		return MSG_HANDLED;
 	}
 
 	const Layout layout;
-	const Int x = Int((Int(point & 0xFFFF) - layout.x) / layout.scale);
-	const Int y = Int((Int(point >> 16) - layout.y) / layout.scale);
+	const Int x = Int((Short(point & 0xFFFF) - layout.x) / layout.scale);
+	const Int y = Int((Short(point >> 16) - layout.y) / layout.scale);
 	if (options.dragging != SettingCount && (message == GWM_MOUSE_POS || message == GWM_LEFT_DRAG || message == GWM_LEFT_UP))
 	{
 		dragSlider(options, options.dragging, x);
 		if (message == GWM_LEFT_UP)
 		{
 			options.dragging = SettingCount;
+			options.pressedX = options.pressedY = -1;
 			TheWindowManager->winRelease(window);
 		}
 		return MSG_HANDLED;
@@ -547,12 +794,16 @@ WindowMsgHandledType optionsInput(GameWindow *window, UnsignedInt message, Windo
 	if (message == GWM_LEFT_DOWN)
 	{
 		options.keyboard = FALSE;
+		options.pressedX = x;
+		options.pressedY = y;
+		if (options.advanced)
+			return MSG_HANDLED;
 		Int index = 0;
 		for (const Row &row : rows)
 		{
 			if (row.page != options.page)
 				continue;
-			if (row.widget == Slider && sliderBox(rowBox(index)).contains(x, y))
+			if (row.widget == Slider && options.enabled(row.setting) && sliderBox(rowBox(index)).contains(x, y))
 			{
 				options.dragging = row.setting;
 				TheWindowManager->winCapture(window);
@@ -564,16 +815,40 @@ WindowMsgHandledType optionsInput(GameWindow *window, UnsignedInt message, Windo
 	}
 	else if (message == GWM_LEFT_UP)
 	{
-		if (acceptButton.contains(x, y))
-			acceptOptions(window, options);
-		else if (cancelButton.contains(x, y))
-			closeOptions(window, FALSE, TRUE);
-		else if (resetButton.contains(x, y))
-			options.reset();
+		const Int pressX = options.pressedX;
+		const Int pressY = options.pressedY;
+		options.pressedX = options.pressedY = -1;
+		const auto clicked = [&](Box box) { return box.contains(pressX, pressY) && box.contains(x, y); };
+		if (clicked(resetButton))
+			footerAction(window, options, 0);
+		else if (clicked(cancelButton))
+			footerAction(window, options, 1);
+		else if (clicked(acceptButton))
+			footerAction(window, options, 2);
+		else if (options.advanced)
+		{
+			using namespace RetailGraphicsOptions;
+			for (Int i = STATIC_GAME_LOD_VERY_LOW; i <= STATIC_GAME_LOD_LAST; ++i)
+				if (clicked({520 + 66 * i, 240, 64, 36}) && options.advanced->preset != i)
+					options.advanced = fromPreset(StaticGameLODLevel(i));
+			for (Int i = 0; i < Count; ++i)
+			{
+				const Box box = detailBox(i);
+				if (clicked({box.x + 130, box.y, 19, box.height}))
+					adjustDetail(options, i + 1, -1);
+				else if (clicked({box.x + 221, box.y, 19, box.height}))
+					adjustDetail(options, i + 1, 1);
+			}
+		}
 		else
 		{
+			if (options.page == Video && clicked(customButton))
+			{
+				options.openCustom();
+				return MSG_HANDLED;
+			}
 			for (Int i = 0; i < PageCount; ++i)
-				if (tabBox(i).contains(x, y))
+				if (clicked(tabBox(i)))
 				{
 					options.page = Page(i);
 					options.focus = 0;
@@ -581,8 +856,20 @@ WindowMsgHandledType optionsInput(GameWindow *window, UnsignedInt message, Windo
 				}
 			Int index = 0;
 			for (const Row &row : rows)
-				if (row.page == options.page && rowBox(index++).contains(x, y) && row.widget != Slider)
-					adjust(options, row, x < 714 ? -1 : 1);
+			{
+				if (row.page != options.page)
+					continue;
+				const Box box = rowBox(index++);
+				if (row.widget == Toggle && clicked(box))
+					adjust(options, row, 1);
+				else if (row.widget == Stepper)
+				{
+					if (clicked({594, box.y, 30, box.height}))
+						adjust(options, row, -1);
+					else if (clicked({817, box.y, 30, box.height}))
+						adjust(options, row, 1);
+				}
+			}
 		}
 	}
 	return MSG_HANDLED;

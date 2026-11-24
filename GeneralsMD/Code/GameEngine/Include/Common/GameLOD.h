@@ -43,6 +43,7 @@ enum StaticGameLODLevel CPP_11(: Int)
 {
 	STATIC_GAME_LOD_UNKNOWN=-1,
 
+	STATIC_GAME_LOD_VERY_LOW,
 	STATIC_GAME_LOD_LOW,
 	STATIC_GAME_LOD_MEDIUM,
 	STATIC_GAME_LOD_HIGH,
@@ -51,7 +52,7 @@ enum StaticGameLODLevel CPP_11(: Int)
 	STATIC_GAME_LOD_CUSTOM,	//make sure this remains last!
 
 	STATIC_GAME_LOD_COUNT,
-	STATIC_GAME_LOD_FIRST = 0,
+	STATIC_GAME_LOD_FIRST = STATIC_GAME_LOD_LOW,
 	STATIC_GAME_LOD_LAST = STATIC_GAME_LOD_CUSTOM - 1,
 };
 
@@ -181,8 +182,13 @@ public:
 	const char *getStaticGameLODLevelName(StaticGameLODLevel level);
 	const char *getDynamicGameLODLevelName(DynamicGameLODLevel level);
 	StaticGameLODLevel getRecommendedStaticLODLevel();	///< calculate the optimal static LOD level for this system.
-	Bool setStaticLODLevel(StaticGameLODLevel level);	///< set the current static LOD level.
+	Bool setStaticLODLevel(StaticGameLODLevel level, const StaticGameLODInfo *custom = nullptr);
 	StaticGameLODLevel getStaticLODLevel() { return m_currentStaticLOD;}
+	StaticGameLODLevel getIdealStaticLODLevel() const { return m_idealDetailLevel; }
+	StaticGameLODLevel getDrawModuleLODLevel() const
+	{
+		return m_hasCustomRetailDetail ? StaticGameLODLevel(m_staticGameLODInfo[m_currentStaticLOD].m_animationDetail) : m_currentStaticLOD;
+	}
 	const StaticGameLODInfo *getStaticRenderSettings() const
 	{
 		return m_currentStaticLOD == STATIC_GAME_LOD_UNKNOWN ? nullptr : &m_staticGameLODInfo[m_currentStaticLOD];
@@ -218,13 +224,14 @@ public:
 
 protected:
 	void initStaticLODLevels();
-	void applyStaticLODLevel(StaticGameLODLevel level);
+	void applyStaticLODLevel(StaticGameLODLevel level, const StaticGameLODInfo *custom);
 	void applyDynamicLODLevel(DynamicGameLODLevel level);
 	void refreshCustomStaticLODLevel();	///<grabs current globaldata values and makes them the custom detail setting.
 	StaticGameLODLevel getRecommendedTextureLODLevel();
 
 	static const FieldParse m_staticGameLODFieldParseTable[];
 	StaticGameLODLevel m_currentStaticLOD;		///< current value of static LOD.
+	Bool m_hasCustomRetailDetail = FALSE;
 	DynamicGameLODLevel m_currentDynamicLOD;		///< current value of dynamic LOD.
 	Int m_numParticleGenerations;	///<number of particles that have been generated since dynamic LOD reduction started.
 	Int m_dynamicParticleSkipMask;	///<mask used to enable rendering of every Nth particle.

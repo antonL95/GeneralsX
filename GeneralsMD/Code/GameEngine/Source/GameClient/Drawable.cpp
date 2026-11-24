@@ -477,7 +477,7 @@ Drawable::Drawable( const ThingTemplate *thingTemplate, DrawableStatusBits statu
 	{
 		const ModuleData* newModData = drawMI.getNthData(modIdx);
 		if (TheGlobalData->m_useDrawModuleLOD &&
-				newModData->getMinimumRequiredGameLOD() > TheGameLODManager->getStaticLODLevel())
+				newModData->getMinimumRequiredGameLOD() > TheGameLODManager->getDrawModuleLODLevel())
 			continue;
 		*m++ = TheModuleFactory->newModule(this, drawMI.getNthName(modIdx), newModData, MODULETYPE_DRAW);
 	}

@@ -16,7 +16,20 @@ namespace
 {
 StaticGameLODLevel floorLOD()
 {
-	return TheGameLODManager ? TheGameLODManager->getStaticLODLevel() : STATIC_GAME_LOD_UNKNOWN;
+	if (!TheGameLODManager)
+		return STATIC_GAME_LOD_UNKNOWN;
+	const auto level = TheGameLODManager->getStaticLODLevel();
+#if !RTS_GENERALS
+	if (level == STATIC_GAME_LOD_VERY_LOW)
+		return STATIC_GAME_LOD_LOW;
+	if (level == STATIC_GAME_LOD_CUSTOM)
+	{
+		const Int quality = TheGameLODManager->getStaticRenderSettings()->m_modelQuality;
+		if (quality != 0)
+			return StaticGameLODLevel(quality);
+	}
+#endif
+	return level;
 }
 
 void parseHideCondition(INI* ini, void*, void* store, const void*)

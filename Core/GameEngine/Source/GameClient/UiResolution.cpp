@@ -14,25 +14,22 @@
 
 #include <cstdio>
 
-namespace
+void UiResolution::displayModeChanged( Int width, Int height )
 {
-	void displayModeChanged( Int width, Int height )
+	TheWritableGlobalData->m_xResolution = width;
+	TheWritableGlobalData->m_yResolution = height;
+	if( TheHeaderTemplateManager )
+		TheHeaderTemplateManager->onResolutionChanged();
+	if( TheMouse )
+		TheMouse->onResolutionChanged();
+	if( TheShell )
+		TheShell->onResolutionChanged();
+	if( TheInGameUI )
 	{
-		TheWritableGlobalData->m_xResolution = width;
-		TheWritableGlobalData->m_yResolution = height;
-		if( TheHeaderTemplateManager )
-			TheHeaderTemplateManager->onResolutionChanged();
-		if( TheMouse )
-			TheMouse->onResolutionChanged();
-		if( TheShell )
-			TheShell->onResolutionChanged();
-		if( TheInGameUI )
-		{
-			TheInGameUI->recreateControlBar();
-			TheInGameUI->refreshCustomUiResources();
-		}
-		std::fprintf( stderr, "UI: display is now %d x %d\n", width, height );
+		TheInGameUI->recreateControlBar();
+		TheInGameUI->refreshCustomUiResources();
 	}
+	std::fprintf( stderr, "UI: display is now %d x %d\n", width, height );
 }
 
 Bool UiResolution::followsWindow()

@@ -292,6 +292,7 @@ set(GAMEENGINE_SRC
     Include/GameClient/LoadScreen.h
     Include/GameClient/AptScene.h
     Include/GameClient/RetailMatchScreens.h
+    Include/GameClient/RetailOptions.h
     Include/GameClient/LookAtXlat.h
     Include/GameClient/MapUtil.h
     Include/GameClient/MessageBox.h
@@ -995,7 +996,6 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/LoadScreen.cpp
     Source/GameClient/GUI/AptScene.cpp
     Source/GameClient/GUI/RetailMatchScreens.cpp
-    Source/GameClient/GUI/RetailOptions.cpp
     Source/GameClient/GUI/ProcessAnimateWindow.cpp
     Source/GameClient/GUI/Shell/Shell.cpp
     Source/GameClient/GUI/Shell/ShellMenuScheme.cpp

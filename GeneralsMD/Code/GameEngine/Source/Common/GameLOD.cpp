@@ -37,6 +37,7 @@
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/GameClient.h"
 #include "Common/OptionPreferences.h"
+#include "Common/RetailGraphicsOptions.h"
 #include "Common/RetailFileLayers.h"
 #include <algorithm>
 
@@ -77,6 +78,7 @@ static const FieldParse TheStaticGameLODFieldParseTable[] =
 
 static const char *const StaticGameLODNames[]=
 {
+	"VeryLow",
 	"Low",
 	"Medium",
 	"High",
@@ -84,12 +86,19 @@ static const char *const StaticGameLODNames[]=
 	"Custom"
 };
 static const char *const RetailQualityNames[] = { "VeryLow", "Low", "Medium", "High", "UltraHigh", nullptr };
+
+static void parseRetailQuality(INI *ini, void *, void *store, const void *)
+{
+	const char *name = ini->getNextToken();
+	*static_cast<Int *>(store) = stricmp(name, "Off") == 0 ? 0 : INI::scanIndexList(name, RetailQualityNames);
+}
+
 static const FieldParse RetailStaticLODFields[] =
 {
 	{ "ModelLOD", INI::parseIndexList, RetailQualityNames, offsetof(StaticGameLODInfo, m_modelQuality) },
 	{ "EffectsLOD", INI::parseIndexList, RetailQualityNames, offsetof(StaticGameLODInfo, m_effectQuality) },
 	{ "UseShadowMapping", INI::parseBool, nullptr, offsetof(StaticGameLODInfo, m_useShadowMapping) },
-	{ "ShadowLOD", INI::parseIndexList, RetailQualityNames, offsetof(StaticGameLODInfo, m_shadowQuality) },
+	{ "ShadowLOD", parseRetailQuality, nullptr, offsetof(StaticGameLODInfo, m_shadowQuality) },
 	{ "UseTerrainNormalMap", INI::parseBool, nullptr, offsetof(StaticGameLODInfo, m_useTerrainNormalMap) },
 	{ "UseDistanceDependantTerrainTextures", INI::parseBool, nullptr, offsetof(StaticGameLODInfo, m_useDistanceDependantTerrainTextures) },
 	{ "WaterLOD", INI::parseIndexList, RetailQualityNames, offsetof(StaticGameLODInfo, m_waterQuality) },
@@ -97,7 +106,7 @@ static const FieldParse RetailStaticLODFields[] =
 	{ "AnimationDetail", INI::parseIndexList, RetailQualityNames, offsetof(StaticGameLODInfo, m_animationDetail) },
 	{ "ShaderLOD", INI::parseIndexList, RetailQualityNames, offsetof(StaticGameLODInfo, m_shaderQuality) },
 	{ "ShaderMaterialReplacement", INI::parseBool, nullptr, offsetof(StaticGameLODInfo, m_shaderMaterialReplacement) },
-	{ "DecalLOD", INI::parseIndexList, RetailQualityNames, offsetof(StaticGameLODInfo, m_decalQuality) },
+	{ "DecalLOD", parseRetailQuality, nullptr, offsetof(StaticGameLODInfo, m_decalQuality) },
 	{ "MinParticlePriority", ParticleSystemTemplate::parseFXPriority, nullptr, offsetof(StaticGameLODInfo, m_minParticlePriority) },
 	{ "MinParticleSkipPriority", ParticleSystemTemplate::parseFXPriority, nullptr, offsetof(StaticGameLODInfo, m_minParticleSkipPriority) },
 	{ nullptr, nullptr, nullptr, 0 }
@@ -489,6 +498,13 @@ void GameLODManager::init()
 		TheWritableGlobalData->m_useDrawModuleLOD = optionPref.getExtraAnimationsDisabled();
 		TheWritableGlobalData->m_useTreeSway = !TheWritableGlobalData->m_useDrawModuleLOD;	//borrow same setting.
 		TheWritableGlobalData->m_useTrees = optionPref.getTreesEnabled();
+		RetailGraphicsOptions::Draft draft;
+		if (RetailGraphicsOptions::load(optionPref, draft))
+		{
+			const auto custom = RetailGraphicsOptions::apply(draft);
+			setStaticLODLevel(STATIC_GAME_LOD_CUSTOM, &custom);
+			return;
+		}
 	}
 
 	setStaticLODLevel(userSetDetail);
@@ -653,23 +669,26 @@ StaticGameLODLevel GameLODManager::getRecommendedStaticLODLevel()
 }
 
 /**Set all game systems to match the desired LOD level.*/
-Bool GameLODManager::setStaticLODLevel(StaticGameLODLevel level)
+Bool GameLODManager::setStaticLODLevel(StaticGameLODLevel level, const StaticGameLODInfo *custom)
 {
 	if (!TheGlobalData->m_enableStaticLOD)
-	{	m_currentStaticLOD = STATIC_GAME_LOD_CUSTOM;
+	{
+		m_currentStaticLOD = STATIC_GAME_LOD_CUSTOM;
+		m_hasCustomRetailDetail = FALSE;
 		return FALSE;
 	}
 
 	if (level == STATIC_GAME_LOD_UNKNOWN || (level != STATIC_GAME_LOD_CUSTOM && m_currentStaticLOD == level))
 		return FALSE;	//level is already applied.  Custom levels are always applied since random options could change.
 
-	applyStaticLODLevel(level);
+	applyStaticLODLevel(level, custom);
 	m_currentStaticLOD = level;
+	m_hasCustomRetailDetail = level == STATIC_GAME_LOD_CUSTOM && custom != nullptr;
 
 	return TRUE;
 }
 
-void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level)
+void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level, const StaticGameLODInfo *custom)
 {
 ///@todo: Still need to implement these settings:
 //	m_sampleCount2D=6;
@@ -682,7 +701,9 @@ void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level)
 	if (m_currentStaticLOD != STATIC_GAME_LOD_UNKNOWN)
 		prevLodBackup=m_staticGameLODInfo[m_currentStaticLOD];
 
-	if (level == STATIC_GAME_LOD_CUSTOM)
+	if (custom && level == STATIC_GAME_LOD_CUSTOM)
+		m_staticGameLODInfo[level] = *custom;
+	else if (level == STATIC_GAME_LOD_CUSTOM)
 		refreshCustomStaticLODLevel();	//store current settings into custom preset
 
 	StaticGameLODInfo *lodInfo=&m_staticGameLODInfo[level];
@@ -714,10 +735,10 @@ void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level)
 		TheWritableGlobalData->m_useShadowDecals=lodInfo->m_useShadowDecals;
 		if (RetailFileLayers::enabled())
 		{
-			const Bool useRetailShadowMapping = level == STATIC_GAME_LOD_CUSTOM
+			const Bool useRetailShadowMapping = level == STATIC_GAME_LOD_CUSTOM && !custom
 				? lodInfo->m_useShadowVolumes : lodInfo->m_useShadowMapping;
 			TheWritableGlobalData->m_retailShadowMapping = useRetailShadowMapping;
-			if (level != STATIC_GAME_LOD_CUSTOM)
+			if (level != STATIC_GAME_LOD_CUSTOM || custom)
 			{
 				TheWritableGlobalData->m_retailShadowMapSize = useRetailShadowMapping
 					? (1 << (7 + std::clamp(lodInfo->m_shadowQuality, 0, 4))) : 0;
@@ -756,7 +777,7 @@ void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level)
 		TheWritableGlobalData->m_maxTankTrackOpaqueEdges=lodInfo->m_maxTankTrackOpaqueEdges;
 		TheWritableGlobalData->m_maxTankTrackFadeDelay=lodInfo->m_maxTankTrackFadeDelay;
 		TheWritableGlobalData->m_useTreeSway=lodInfo->m_useTreeSway;
-		TheWritableGlobalData->m_useDrawModuleLOD = RetailFileLayers::enabled() && level != STATIC_GAME_LOD_CUSTOM
+		TheWritableGlobalData->m_useDrawModuleLOD = RetailFileLayers::enabled() && (level != STATIC_GAME_LOD_CUSTOM || custom)
 			? lodInfo->m_animationDetail < 4 : !lodInfo->m_useBuildupScaffolds;
 		TheWritableGlobalData->m_useHeatEffects=lodInfo->m_useHeatEffects;
 		TheWritableGlobalData->m_enableDynamicLOD = lodInfo->m_enableDynamicLOD;

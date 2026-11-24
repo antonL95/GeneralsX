@@ -35,6 +35,8 @@ button = bind(xtst, "XTestFakeButtonEvent", c.c_int, c.c_void_p, c.c_uint,
 key_event = bind(xtst, "XTestFakeKeyEvent", c.c_int, c.c_void_p, c.c_uint,
                  c.c_int, c.c_ulong)
 keycode = bind(x11, "XKeysymToKeycode", c.c_uint, c.c_void_p, c.c_ulong)
+get_focus = bind(x11, "XGetInputFocus", c.c_int, c.c_void_p, c.POINTER(c.c_ulong), c.POINTER(c.c_int))
+move_window = bind(x11, "XMoveWindow", c.c_int, c.c_void_p, c.c_ulong, c.c_int, c.c_int)
 
 
 def key(value):
@@ -412,16 +414,47 @@ def preferences():
                 if " = " in line.strip())
 
 
+def custom_visible():
+    return pixel(372, 508) == 0x1D2E36
+
+
+def move_game_to_origin():
+    window = c.c_ulong()
+    revert = c.c_int()
+    get_focus(display, c.byref(window), c.byref(revert))
+    if window.value in (0, 1, root):
+        return False
+    move_window(display, window.value, 0, 0)
+    sync(display, 0)
+    return True
+
+
 def check_options(restarted=False):
+    global custom_value
     wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
     time.sleep(2)
-    click(512, 466)
-    wait_for("Settings opens from the main menu", options_visible, 8)
+    wait_for("the game window can be positioned for input", move_game_to_origin)
+    if restarted:
+        key(0xFF52)
+        wait_for("the Settings entry receives keyboard focus",
+                 lambda: 0xC8AE77 in title_signature(412, 442, 200, 48))
+        key(0xFF0D)
+        wait_for("Settings opens from the main menu by keyboard", options_visible, 8)
+    else:
+        click(512, 466)
+        wait_for("Settings opens from the main menu", options_visible, 8)
     expected = {"Gamma": "75", "MusicVolume": "25", "AmbientVolume": "40", "MovieVolume": "60",
-                "ShowAllHealthBars": "1", "ScrollFactor": "75"}
+                "ShowAllHealthBars": "1", "ScrollFactor": "75", "RetailStaticGameLOD": "custom",
+                "RetailCustomGraphicsPreset": "ultrahigh", "RetailModelDetail": "3"}
     if restarted:
         wait_for("accepted options are present after restart",
                  lambda: all(preferences().get(k, "").lower() == v for k, v in expected.items()))
+        click(471, 411)
+        wait_for("Custom settings opens after restart", custom_visible)
+        wait_for("the selected detail displays its accepted value",
+                 lambda: title_signature(519, 298, 70, 41) == custom_value)
+        key(0xFF1B)
+        wait_for("Escape returns from Custom settings to Video", lambda: options_visible() and not custom_visible())
         for tab_y, name, value in ((219, "video", 75), (273, "audio", 25),
                                    (327, "gameplay", None), (381, "controls", 75)):
             click(237, tab_y)
@@ -431,6 +464,22 @@ def check_options(restarted=False):
             if name == "audio":
                 wait_for("ambient and movie controls display their accepted values",
                          lambda: pixel(690, 417) == 0xC8AE77 and pixel(730, 469) == 0xC8AE77)
+        click(237, 219)
+        initial_mode = title_signature(646, 293, 148, 35)
+        click(832, 312)
+        wait_for("the resolution draft selects another supported mode",
+                 lambda: title_signature(646, 293, 148, 35) != initial_mode)
+        click(809, 621)
+        wait_for("Accept applies the resolution",
+                 lambda: preferences().get("Resolution") not in (None, "1024 768") and log_count("UI: display is now ") > 0)
+        width, height = map(int, preferences()["Resolution"].split())
+        scale = min(width / 1024, height / 768)
+        x = (width - int(1024 * scale)) // 2
+        y = (height - int(768 * scale)) // 2
+        wait_for("the resized game window can be positioned for input", move_game_to_origin)
+        click(round(width / 2), round(height * 466 / 768))
+        wait_for("Settings reopens at the new resolution",
+                 lambda: pixel(x + int(132 * scale), y + int(116 * scale)) == 0x15232A)
         return
     original = preferences()
     initial_brightness = title_signature(604, 250, 213, 24)
@@ -443,6 +492,30 @@ def check_options(restarted=False):
     click(512, 466)
     wait_for("Settings can be reopened", options_visible)
     wait_for("Cancel restores the brightness slider", lambda: title_signature(604, 250, 213, 24) == initial_brightness)
+    initial_quality = title_signature(646, 343, 148, 35)
+    click(832, 361)
+    wait_for("the graphics preset changes", lambda: title_signature(646, 343, 148, 35) != initial_quality)
+    click(240, 621)
+    wait_for("Reset restores the graphics preset", lambda: title_signature(646, 343, 148, 35) == initial_quality)
+    click(471, 411)
+    wait_for("Custom settings opens from Video", custom_visible)
+    click(809, 255)
+    initial_model = title_signature(519, 298, 70, 41)
+    click(510, 318)
+    wait_for("a custom model detail changes", lambda: title_signature(519, 298, 70, 41) != initial_model)
+    key(0xFF1B)
+    wait_for("Cancel closes Custom settings", lambda: options_visible() and not custom_visible())
+    click(471, 411)
+    wait_for("Custom settings can be reopened", custom_visible)
+    click(809, 255)
+    wait_for("Cancel discards the custom draft", lambda: title_signature(519, 298, 70, 41) == initial_model)
+    click(510, 318)
+    custom_value = title_signature(519, 298, 70, 41)
+    capture("options-custom", 132, 104, 760, 560)
+    click(809, 621)
+    wait_for("Done keeps the main settings open", lambda: options_visible() and not custom_visible())
+    if preferences() != original:
+        sys.exit("FAIL Custom settings modified preferences before Accept")
     for tab_y, name in ((219, "video"), (273, "audio"), (327, "gameplay"), (381, "controls")):
         click(237, tab_y)
         wait_for(f"{name} page is selected", lambda: pixel(137, tab_y) == 0xC8AE77)
@@ -463,9 +536,24 @@ def check_options(restarted=False):
     progress = log_count("TEST powerstate ")
     click(512, 489)
     wait_for("Settings opens from the pause menu", options_visible)
+    click(471, 411)
+    if custom_visible():
+        sys.exit("FAIL Custom settings opens during a match")
     capture("options-pause", 132, 104, 760, 560)
     click(237, 381)
     click(660, 260)
+    saved = next((out / "data").rglob("Options.ini"))
+    previous_contents = saved.read_bytes()
+    permissions = saved.parent.stat().st_mode
+    saved.parent.chmod(0o555)
+    try:
+        click(809, 621)
+        wait_for("a rejected write keeps Settings open",
+                 lambda: 0xC8AE77 in title_signature(370, 535, 493, 40))
+        if saved.read_bytes() != previous_contents:
+            sys.exit("FAIL a rejected write changed Options.ini")
+    finally:
+        saved.parent.chmod(permissions)
     key(0xFF1B)
     wait_for("Escape returns to the pause menu", lambda: not options_visible() and menu_visible())
     if preferences().get("ScrollFactor") != "75":

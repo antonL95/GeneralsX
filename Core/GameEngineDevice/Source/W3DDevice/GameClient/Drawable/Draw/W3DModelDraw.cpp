@@ -1078,7 +1078,11 @@ W3DModelDrawModuleData::W3DModelDrawModuleData() :
 #ifdef CACHE_ATTACH_BONE
 	m_attachToDrawableBoneOffsetValid(false),
 #endif
+#if RTS_GENERALS
 	m_minLODRequired(STATIC_GAME_LOD_LOW),
+#else
+	m_minLODRequired(STATIC_GAME_LOD_VERY_LOW),
+#endif
 	m_defaultState(-1)
 {
 	const Real MAX_SHIFT = 3.0f;

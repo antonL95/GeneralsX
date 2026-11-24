@@ -130,6 +130,9 @@ static const FieldParse audioSettingsFieldParseTable[] =
 	{ "DefaultSoundVolume",		INI::parsePercentToReal,						nullptr,							offsetof( AudioSettings, m_defaultSoundVolume) },
 	{ "Default3DSoundVolume",	INI::parsePercentToReal,						nullptr,							offsetof( AudioSettings, m_default3DSoundVolume) },
 	{ "DefaultSpeechVolume",	INI::parsePercentToReal,						nullptr,							offsetof( AudioSettings, m_defaultSpeechVolume) },
+	{ "DefaultVoiceVolume", INI::parsePercentToReal, nullptr, offsetof(AudioSettings, m_defaultSpeechVolume) },
+	{ "DefaultAmbientVolume", INI::parsePercentToReal, nullptr, offsetof(AudioSettings, m_defaultAmbientVolume) },
+	{ "DefaultMovieVolume", INI::parsePercentToReal, nullptr, offsetof(AudioSettings, m_defaultMovieVolume) },
 	{ "DefaultMusicVolume",		INI::parsePercentToReal,						nullptr,							offsetof( AudioSettings, m_defaultMusicVolume) },
 	{ "DefaultMoneyTransactionVolume", INI::parsePercentToReal,		nullptr,							offsetof( AudioSettings, m_defaultMoneyTransactionVolume) },
 	{ "MicrophoneDesiredHeightAboveTerrain",	INI::parseReal,			nullptr,							offsetof( AudioSettings, m_microphoneDesiredHeightAboveTerrain ) },
@@ -244,9 +247,9 @@ void AudioManager::init()
 	m_systemSound3DVolume = m_audioSettings->m_preferred3DSoundVolume;
 	m_systemSpeechVolume = m_audioSettings->m_preferredSpeechVolume;
 	const OptionPreferences preferences;
-	const Int ambient = preferences.getInt("AmbientVolume", -1);
+	const Int ambient = preferences.getInt("AmbientVolume", Int(m_audioSettings->m_defaultAmbientVolume * 100.0f));
 	m_ambientVolume = ambient < 0 ? -1.0f : std::min(ambient, 100) * 0.01f;
-	m_movieVolume = std::clamp(preferences.getInt("MovieVolume", 100), 0, 100) * 0.01f;
+	m_movieVolume = std::clamp(preferences.getInt("MovieVolume", Int(m_audioSettings->m_defaultMovieVolume * 100.0f)), 0, 100) * 0.01f;
 
 	m_scriptMusicVolume = 1.0f;
 	m_scriptSoundVolume = 1.0f;
@@ -1141,6 +1144,7 @@ void AudioManager::muteAudio( MuteAudioReason reason )
 
 	// Now, set them all to 0.
 	setVolume(0.0f, (AudioAffect) (AudioAffect_All | AudioAffect_SystemSetting));
+	m_volumeHasChanged = TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1159,6 +1163,7 @@ void AudioManager::unmuteAudio( MuteAudioReason reason )
 	setVolume(m_savedValues[VOLUME_TYPE_SOUND], (AudioAffect) (AudioAffect_Sound | AudioAffect_SystemSetting));
 	setVolume(m_savedValues[VOLUME_TYPE_SOUND3D], (AudioAffect) (AudioAffect_Sound3D | AudioAffect_SystemSetting));
 	setVolume(m_savedValues[VOLUME_TYPE_SPEECH], (AudioAffect) (AudioAffect_Speech | AudioAffect_SystemSetting));
+	m_volumeHasChanged = TRUE;
 
 	// Now, blow away the old volumes.
 	delete [] m_savedValues;
