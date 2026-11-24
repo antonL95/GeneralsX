@@ -22,12 +22,16 @@ check() {
             END {
                 for (frame = 282; frame <= 310; frame++) {
                     if (!(frame in scalar)) continue
+                    if (!(frame in decel)) failed = 1
                     if (scalar[frame] >= 1.1 && decel[frame] != 0) failed = 1
                     if (scalar[frame] > 0 && scalar[frame] < 1.1) {
                         if (decel[frame] != 1) failed = 1
                         on = 1
                     }
-                    if (on && scalar[frame] == 0 && decel[frame] == 0) off = 1
+                    if (on && scalar[frame] == 0) {
+                        if (decel[frame] != 0) failed = 1
+                        off = 1
+                    }
                 }
                 exit !(on && off && !failed)
             }
