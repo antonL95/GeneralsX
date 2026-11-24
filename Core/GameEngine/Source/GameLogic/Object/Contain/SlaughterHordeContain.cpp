@@ -200,7 +200,23 @@ Bool CitadelSlaughterHordeContain::isValidContainerFor(const Object* passenger, 
 		return FALSE;
 	if (findRing(passenger))
 		return TRUE;
+	if (const auto* ai = passenger->getAI(); ai && ai->isReturningRetailRing())
+		return FALSE;
 	return SlaughterHordeContain::isValidContainerFor(passenger, checkCapacity);
+}
+
+Bool CitadelSlaughterHordeContain::canAcceptRingCarrier(const Object* passenger) const
+{
+	return canAcceptEntry(passenger) && findRing(passenger);
+}
+
+Bool CitadelSlaughterHordeContain::hasPlayerRingUpgrade(const Player& player) const
+{
+	const auto& names = getCitadelSlaughterHordeContainModuleData()->m_ringUpgrades;
+	return std::any_of(names.begin(), names.end(), [&](const AsciiString& name) {
+		const auto* upgrade = TheUpgradeCenter->findUpgrade(name);
+		return upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER && player.hasUpgradeComplete(upgrade);
+	});
 }
 
 void CitadelSlaughterHordeContain::addToContain(Object* passenger)
@@ -210,7 +226,9 @@ void CitadelSlaughterHordeContain::addToContain(Object* passenger)
 	Object* ring = findRing(passenger);
 	if (!ring)
 	{
-		SlaughterHordeContain::addToContain(passenger);
+		const auto* ai = passenger->getAI();
+		if (!ai || !ai->isReturningRetailRing())
+			SlaughterHordeContain::addToContain(passenger);
 		return;
 	}
 
@@ -371,9 +389,7 @@ UpdateSleepTime AttachUpdate::update()
 	Real bestDistanceSquared = data->m_scanRange * data->m_scanRange;
 	for (Object* candidate = iter->first(); candidate; candidate = iter->next())
 	{
-		if (candidate == self || candidate->isEffectivelyDead() || candidate->isDestroyed() ||
-			TEST_OBJECT_STATUS_MASK_ANY(candidate->getStatusBits(), data->m_parentStatus) ||
-			!data->m_filter.matchesObject(self, candidate))
+		if (!canAttachTo(*candidate))
 			continue;
 		const Real distanceSquared = ThePartitionManager->getDistanceSquared(candidate, self, FROM_CENTER_3D);
 		if (distanceSquared < bestDistanceSquared ||
@@ -402,6 +418,14 @@ UpdateSleepTime AttachUpdate::update()
 		followParent(parent);
 	}
 	return UPDATE_SLEEP_NONE;
+}
+
+Bool AttachUpdate::canAttachTo(const Object& parent) const
+{
+	const auto* data = getAttachUpdateModuleData();
+	return &parent != getObject() && !parent.isEffectivelyDead() && !parent.isDestroyed() &&
+		!TEST_OBJECT_STATUS_MASK_ANY(parent.getStatusBits(), data->m_parentStatus) &&
+		data->m_filter.matchesObject(getObject(), &parent);
 }
 
 void AttachUpdate::onDelete()

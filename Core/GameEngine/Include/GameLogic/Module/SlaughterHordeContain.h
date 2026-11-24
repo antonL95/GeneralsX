@@ -54,6 +54,8 @@ public:
 	CitadelSlaughterHordeContain(Thing* thing, const ModuleData* data) : SlaughterHordeContain(thing, data) {}
 	Bool isValidContainerFor(const Object* passenger, Bool checkCapacity) const override;
 	void addToContain(Object* passenger) override;
+	Bool canAcceptRingCarrier(const Object* passenger) const;
+	Bool hasPlayerRingUpgrade(const Player& player) const;
 
 private:
 	Object* findRing(const Object* passenger) const;
@@ -86,6 +88,7 @@ public:
 	void onDelete() override;
 	static void reconcileOwnershipChange(const Object* changed);
 	ObjectID getParentID() const { return m_parent; }
+	Bool canAttachTo(const Object& parent) const;
 
 private:
 	Object* reconcileParent();

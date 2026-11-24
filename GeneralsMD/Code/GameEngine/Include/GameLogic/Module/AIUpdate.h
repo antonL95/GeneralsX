@@ -554,6 +554,8 @@ public:
 	virtual CommandSourceType getLastCommandSource() const { return m_lastCommandSource; }
 	Bool issueRetailPlannerAttack(Object* target);
 	Bool issueRetailPlannerAdvance(const Coord3D& position);
+	Bool issueRetailRingReturn(Object* citadel);
+	Bool isReturningRetailRing() const { return m_retailRingReturn && getCurrentStateID() == AI_ENTER; }
 	Bool canAcceptRetailPlannerOrder(Bool attackObject) const;
 	Bool hasRetailPlannerAttack(const Object* target) const;
 	Bool hasRetailPlannerAdvance() const { return m_retailPlannerOrderActive && m_retailPlannerAttackTarget == INVALID_ID; }
@@ -868,6 +870,7 @@ private:
 	Coord3D m_autoAttackOrigin{};
 	ObjectID m_retailPlannerAttackTarget = INVALID_ID;
 	Bool m_retailPlannerOrderActive = FALSE;
+	Bool m_retailRingReturn = FALSE;
 	ObjectID m_retailGroupRouteLeader = INVALID_ID;
 	UnsignedInt m_retailGroupRouteFrame = 0;
 	std::vector<ObjectID> m_retailGroupPeers;

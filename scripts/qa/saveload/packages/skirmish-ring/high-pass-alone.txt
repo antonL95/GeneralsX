@@ -1,0 +1,6 @@
+44 power-reveal - - 0
+45 create Player_2 SkirmishRingCourier 0 3050,3450,0
+45 create Player_1 TheDroppedRing 0 2990,3450,0
+75 pkg05-ringstate Player_2 MordorFortressCitadel 0 Player_2:SkirmishRingCourier:0
+180 pkg05-ringstate Player_2 MordorFortressCitadel 0 Player_2:SkirmishRingCourier:0
+580 pkg05-ringstate Player_2 MordorFortressCitadel 0 Player_2:SkirmishRingCourier:0

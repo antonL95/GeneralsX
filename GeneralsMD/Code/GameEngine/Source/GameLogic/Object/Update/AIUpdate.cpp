@@ -3066,6 +3066,7 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 		clearRetailGroupIdentity();
 	m_retailPlannerAttackTarget = INVALID_ID;
 	m_retailPlannerOrderActive = FALSE;
+	m_retailRingReturn = FALSE;
 
 #ifdef ALLOW_SURRENDER
 	// surrendered items have very limited options, and only via AI cmds
@@ -6109,6 +6110,11 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferUnsignedInt(&m_retailEngagedUntil);
 		}, [this] {
 			m_retailEngagedUntil = 0;
+		} },
+		{ "skirmish-ring-return", [this](Xfer* x) {
+			x->xferBool(&m_retailRingReturn);
+		}, [this] {
+			m_retailRingReturn = FALSE;
 		} }
 	});
 }
@@ -6302,6 +6308,13 @@ Bool AIUpdateInterface::issueRetailPlannerAdvance(const Coord3D& position)
 	if (!accepted && hasRetailPlannerAdvance())
 		m_retailPlannerOrderActive = FALSE;
 	return accepted;
+}
+
+Bool AIUpdateInterface::issueRetailRingReturn(Object* citadel)
+{
+	aiEnter(citadel, CMD_FROM_AI);
+	m_retailRingReturn = getEnterTarget() == citadel;
+	return m_retailRingReturn;
 }
 
 void AIUpdateInterface::noteBlockedRetailPlannerPath()

@@ -29,6 +29,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 
+#include "Common/ActionManager.h"
 #include "Common/GameMemory.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
@@ -65,8 +66,10 @@
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/GrantUpgradeCreate.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RebuildHoleBehavior.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
+#include "GameLogic/Module/SlaughterHordeContain.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptEngine.h"
@@ -397,6 +400,44 @@ Real tacticalDistanceSquared(const Coord3D& a, const Coord3D& b)
 {
 	const Coord3D delta = a - b;
 	return sqr(delta.x) + sqr(delta.y) + sqr(delta.z);
+}
+
+const AttachUpdate* retailRingAttachment(const Object& object)
+{
+	return object.isKindOf(KINDOF_ONE_RING)
+		? static_cast<const AttachUpdate*>(object.findUpdateModule(NAMEKEY("AttachUpdate"))) : nullptr;
+}
+
+Bool canCollectRetailRing(const Object& unit, const AttachUpdate& ring)
+{
+	if (ring.canAttachTo(unit))
+		return TRUE;
+	const auto* horde = HordeContain::get(&unit);
+	return horde && std::any_of(horde->getContainedItemsList()->begin(), horde->getContainedItemsList()->end(),
+		[&](const Object* member) { return ring.canAttachTo(*member); });
+}
+
+Object* findRetailRingCitadel(Object& courier, const std::vector<Object*>& owned)
+{
+	std::vector<Object*> destinations;
+	for (Object* building : owned)
+	{
+		const auto* citadel = dynamic_cast<const CitadelSlaughterHordeContain*>(building->getContain());
+		if (citadel && citadel->canAcceptRingCarrier(&courier) &&
+			TheActionManager->canEnterObject(&courier, building, CMD_FROM_AI, CHECK_CAPACITY))
+			destinations.push_back(building);
+	}
+	if (destinations.size() < 2)
+		return destinations.empty() ? nullptr : destinations.front();
+
+	const auto rank = [&](const Object* object) {
+		return std::make_pair(tacticalDistanceSquared(*object->getPosition(), *courier.getPosition()), object->getID());
+	};
+	std::sort(destinations.begin(), destinations.end(), [&](const Object* a, const Object* b) { return rank(a) < rank(b); });
+	const auto reachable = std::find_if(destinations.begin(), destinations.end(), [&](const Object* destination) {
+		return TheAI->pathfinder()->slowDoesPathExist(&courier, courier.getPosition(), destination->getPosition(), destination->getID());
+	});
+	return reachable != destinations.end() ? *reachable : destinations.front();
 }
 
 Bool isRetailDefenseRecruit(const Object& object)
@@ -2417,16 +2458,23 @@ void AISkirmishPlayer::updateRetail()
 		}
 	}
 	const UnsignedInt routeRevision = TheAI->pathfinder()->getRetailRouteRevision();
+	const auto liveObjective = [&](const Object* target, UnsignedInt owner) {
+		if (!target || target->isEffectivelyDead() || target->isDestroyed() || target->getTeam()->getID() != owner)
+			return false;
+		if (const AttachUpdate* pickup = retailRingAttachment(*target))
+			return pickup->getParentID() == INVALID_ID;
+		return m_player->getRelationship(target->getTeam()) == ENEMIES;
+	};
 	using ObjectiveKey = std::pair<ObjectID, UnsignedInt>;
 	std::map<ObjectiveKey, std::set<UnsignedInt>> activeTeams;
+	std::set<ObjectID> collectingRing;
 	for (auto it = m_retailObjectives.begin(); it != m_retailObjectives.end();)
 	{
 		const auto [unitID, targetID, owner] = it->first;
 		const Object* unit = TheGameLogic->findObjectByID(unitID);
 		const Object* target = TheGameLogic->findObjectByID(targetID);
 		if (!unit || unit->isEffectivelyDead() || unit->getControllingPlayer() != m_player ||
-			(targetID != INVALID_ID && (!target || target->isEffectivelyDead() ||
-				target->getTeam()->getID() != owner || m_player->getRelationship(target->getTeam()) != ENEMIES)))
+			(targetID != INVALID_ID && !liveObjective(target, owner)))
 		{
 			it = m_retailObjectives.erase(it);
 			continue;
@@ -2434,6 +2482,10 @@ void AISkirmishPlayer::updateRetail()
 		auto& order = it->second;
 		const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
 		const AIUpdateInterface* ai = unit->getAI();
+		const Bool ring = target && retailRingAttachment(*target);
+		const Bool active = horde ? (ring ? horde->isOnPlannerAdvance(order.issuedFrame)
+			: horde->isExecutingPlannerOrder(targetID, order.issuedFrame))
+			: ai && ai->isExecutingRetailPlannerOrder(ring ? INVALID_ID : targetID, order.issuedFrame);
 		if (order.issuedFrame && !order.blockedRevision)
 		{
 			if (horde)
@@ -2441,13 +2493,16 @@ void AISkirmishPlayer::updateRetail()
 			else if (ai)
 				order.blockedRevision = ai->blockedRetailPlannerRevision(order.issuedFrame);
 		}
-		if (order.blockedRevision && order.blockedRevision != routeRevision)
+		if (order.blockedRevision ? order.blockedRevision != routeRevision : ring && !active)
 			it = m_retailObjectives.erase(it);
 		else
 		{
-			if (horde ? horde->isExecutingPlannerOrder(targetID, order.issuedFrame)
-				: ai && ai->isExecutingRetailPlannerOrder(targetID, order.issuedFrame))
+			if (active)
+			{
 				activeTeams[{targetID, owner}].insert(order.issuedFrame);
+				if (ring)
+					collectingRing.insert(unitID);
+			}
 			++it;
 		}
 	}
@@ -2469,9 +2524,7 @@ void AISkirmishPlayer::updateRetail()
 			? ThePlayerList->getNthPlayer(target.owner) : nullptr;
 		const Bool lostOpponent = target.object == INVALID_ID && (!scoutOpponent || !scoutOpponent->isPlayerActive() ||
 			m_player->getRelationship(scoutOpponent->getDefaultTeam()) != ENEMIES);
-		const Bool missing = lostStructure || lostOpponent || (target.object != INVALID_ID &&
-			(!object || object->isEffectivelyDead() || object->getTeam()->getID() != target.owner ||
-				m_player->getRelationship(object->getTeam()) != ENEMIES));
+		const Bool missing = lostStructure || lostOpponent || (target.object != INVALID_ID && !liveObjective(object, target.owner));
 		if (!target.retiring && !missing &&
 			INT_TO_REAL(frame - target.selectedFrame) >= rules->targetLifetimeSeconds * LOGICFRAMES_PER_SECOND)
 		{
@@ -2492,12 +2545,59 @@ void AISkirmishPlayer::updateRetail()
 	const auto slotLimit = [&](size_t i) {
 		return i < rules->maxTeamsPerTarget.size() ? rules->maxTeamsPerTarget[i] : 1;
 	};
+	const auto hasKind = [&](RetailTacticalKind kind) {
+		return std::find(rules->tacticalTargets.begin(), rules->tacticalTargets.end(), kind) != rules->tacticalTargets.end();
+	};
+	Object* ringOpportunity = nullptr;
+	const AttachUpdate* ringPickup = nullptr;
+	const Bool hasOpportunity = hasKind(RETAIL_TARGET_OPPORTUNITY);
+	const auto targetless = std::find(rules->tacticalTargets.begin(), rules->tacticalTargets.end(), RETAIL_TARGET_TARGETLESS);
+	const Bool canRunTargetless = targetless != rules->tacticalTargets.end() &&
+		slotLimit(targetless - rules->tacticalTargets.begin()) > 0;
+	const Bool canSeekRing = phase == 2 && hasOpportunity &&
+		std::none_of(owned.begin(), owned.end(), [&](const Object* object) {
+			const auto* citadel = dynamic_cast<const CitadelSlaughterHordeContain*>(object->getContain());
+			return citadel && citadel->hasPlayerRingUpgrade(*m_player);
+		});
+	if (canSeekRing || canRunTargetless)
+	{
+		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		{
+			if (object->isEffectivelyDead() || object->isDestroyed())
+				continue;
+			const AttachUpdate* pickup = retailRingAttachment(*object);
+			Object* carrier = pickup ? TheGameLogic->findObjectByID(pickup->getParentID()) : nullptr;
+			if (carrier && carrier->getControllingPlayer() == m_player)
+			{
+				if (!canRunTargetless)
+					continue;
+				Object* courier = HordeContain::getAnchor(carrier);
+				if (!courier)
+					courier = carrier;
+				if (AIUpdateInterface* ai = courier->getAI(); ai && ai->getEnterTarget() == nullptr)
+				{
+					if (Object* citadel = findRetailRingCitadel(*courier, owned))
+					{
+						if (ai->issueRetailRingReturn(citadel) && trace)
+							std::fprintf(stderr, "AI_RING_RETURN\t%u\t%d\t%d\t%d\n", frame, playerIndex, courier->getID(), citadel->getID());
+					}
+				}
+				continue;
+			}
+			if (canSeekRing && !ringOpportunity && (pickup || object->isKindOf(KINDOF_NEUTRALGOLLUM)))
+			{
+				ringOpportunity = carrier ? carrier : object;
+				if (Object* horde = HordeContain::getAnchor(carrier))
+					ringOpportunity = horde;
+				ringPickup = carrier ? nullptr : pickup;
+			}
+		}
+	}
 	const auto buildForward = [&] {
 		if (!keep || offensiveBuildings.empty() || builders.empty() || retailTuning.disableBaseBuilding ||
 			!m_player->getCanBuildBase() || money->countMoney() + m_retailSavings < 1000)
 			return;
-		const auto start = std::find(rules->tacticalTargets.begin(), rules->tacticalTargets.end(), RETAIL_TARGET_TARGETLESS);
-		if (start == rules->tacticalTargets.end() || slotLimit(start - rules->tacticalTargets.begin()) <= 0)
+		if (!canRunTargetless)
 			return;
 		const auto defense = std::find_if(m_retailTargets.begin(), m_retailTargets.end(), [&](const auto& target) {
 			return target.defendedStructure != INVALID_ID && teamCount(target) > 0;
@@ -2569,7 +2669,8 @@ void AISkirmishPlayer::updateRetail()
 	std::vector<std::pair<Object*, Bool>> wave;
 	for (Object* unit : soldiers)
 	{
-		if (unit->getTeam() != m_player->getDefaultTeam() || !unit->isMobile() || !unit->isAbleToAttack())
+		if (unit->getTeam() != m_player->getDefaultTeam() || !unit->isMobile() || !unit->isAbleToAttack() ||
+			collectingRing.contains(unit->getID()))
 			continue;
 		const AIUpdateInterface* ai = unit->getAI();
 		const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
@@ -2584,7 +2685,7 @@ void AISkirmishPlayer::updateRetail()
 		if (ready || scouting)
 			wave.emplace_back(unit, ready);
 	}
-	if (wave.empty())
+	if (wave.empty() && !ringPickup)
 		return;
 	const auto eligible = [&](const Object& unit, const Object* objective, UnsignedInt owner, const Coord3D& point) -> Bool {
 		if (!unit.getAI()->canAcceptRetailPlannerOrder(objective != nullptr) ||
@@ -2622,11 +2723,15 @@ void AISkirmishPlayer::updateRetail()
 		ObjectShroudStatus shroud = OBJECTSHROUD_INVALID;
 		Real distance = 0.0f;
 		const RetailDefenseCluster* defense = nullptr;
+		Object* collector = nullptr;
+		Bool ring = FALSE;
 		ObjectID id() const { return object ? object->getID() : INVALID_ID; }
 		ObjectID defendedID() const { return defense ? defense->buildings.front()->getID() : INVALID_ID; }
 	};
-	const auto hasKind = [&](RetailTacticalKind kind) {
-		return std::find(rules->tacticalTargets.begin(), rules->tacticalTargets.end(), kind) != rules->tacticalTargets.end();
+	const auto visibleToPlayer = [&](const Object& object) {
+		const ObjectShroudStatus shroud = object.getShroudedStatus(playerIndex);
+		return (shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR) &&
+			(!object.testStatus(OBJECT_STATUS_STEALTHED) || object.testStatus(OBJECT_STATUS_DETECTED));
 	};
 	const auto visibleEnemy = [&](const Object& object) {
 		const Player* owner = object.getControllingPlayer();
@@ -2634,9 +2739,7 @@ void AISkirmishPlayer::updateRetail()
 			object.isKindOf(KINDOF_INERT) || object.isKindOf(KINDOF_UNATTACKABLE) ||
 			object.isKindOf(KINDOF_BASE_FOUNDATION) || m_player->getRelationship(object.getTeam()) != ENEMIES)
 			return false;
-		const ObjectShroudStatus shroud = object.getShroudedStatus(playerIndex);
-		return (shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR) &&
-			(!object.testStatus(OBJECT_STATUS_STEALTHED) || object.testStatus(OBJECT_STATUS_DETECTED));
+		return visibleToPlayer(object);
 	};
 	std::vector<TacticalCandidate> structures;
 	std::vector<TacticalCandidate> expansions;
@@ -2691,8 +2794,36 @@ void AISkirmishPlayer::updateRetail()
 				candidate.distance += sqr(RETAIL_DEFENDED_TARGET_DISTANCE);
 			structures.push_back(candidate);
 		}
-	if (hasKind(RETAIL_TARGET_OPPORTUNITY))
+	if (hasOpportunity)
 	{
+		if (ringOpportunity && visibleToPlayer(*ringOpportunity) &&
+			(ringPickup || m_player->getRelationship(ringOpportunity->getTeam()) == ENEMIES))
+		{
+			TacticalCandidate candidate{ringOpportunity, ringOpportunity->getPosition(), ringOpportunity->getTeam()->getID(),
+				ringOpportunity->getShroudedStatus(playerIndex), 0.0f, nullptr, nullptr, TRUE};
+			if (ringPickup)
+			{
+				for (Object* unit : owned)
+				{
+					const AIUpdateInterface* ai = unit->getAI();
+					if (!ai || !ai->isIdle() || !ai->canAcceptRetailPlannerOrder(FALSE) || !unit->isMobile() ||
+						unit->isDisabled() || unit->getContainedBy() || unit->getTeam() != m_player->getDefaultTeam() ||
+						m_retailObjectives.contains({unit->getID(), candidate.id(), candidate.owner}) ||
+						collectingRing.contains(unit->getID()) || !canCollectRetailRing(*unit, *ringPickup))
+						continue;
+					const Real distance = tacticalDistanceSquared(*unit->getPosition(), *candidate.position);
+					if (!candidate.collector || std::make_pair(distance, unit->getID()) <
+						std::make_pair(candidate.distance, candidate.collector->getID()))
+					{
+						candidate.collector = unit;
+						candidate.distance = distance;
+					}
+				}
+			}
+			if (candidate.collector || (!ringPickup && objectiveDistance(candidate.object, candidate.owner, *candidate.position,
+				RETAIL_ATTACK_WAVE_MIN_UNITS, candidate.distance)))
+				opportunities.push_back(candidate);
+		}
 		std::set<Int> screenedOpponents;
 		std::vector<Object*> enemyBuilders;
 		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
@@ -2782,8 +2913,8 @@ void AISkirmishPlayer::updateRetail()
 					defenseChoices.push_back(&candidate);
 					continue;
 				}
-				if (!chosen || std::make_tuple(candidate.distance, candidate.id(), candidate.owner) <
-					std::make_tuple(chosen->distance, chosen->id(), chosen->owner))
+				if (!chosen || std::make_tuple(!candidate.ring, candidate.distance, candidate.id(), candidate.owner) <
+					std::make_tuple(!chosen->ring, chosen->distance, chosen->id(), chosen->owner))
 					chosen = &candidate;
 			}
 			if (!defenseChoices.empty())
@@ -2847,28 +2978,37 @@ void AISkirmishPlayer::updateRetail()
 		});
 	}
 	Int committed = 0;
-	for (const auto& [unit, ready] : wave)
-	{
-		if ((!ready && !target) || !eligible(*unit, target, objectiveOwner, *destination))
-			continue;
+	const auto issueOrder = [&](Object* unit, Bool collect) {
 		AIUpdateInterface* ai = unit->getAI();
 		Bool accepted;
 		if (auto* horde = static_cast<HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate"))))
-			accepted = horde->issuePlannerOrder(target, *destination);
-		else if (target)
+			accepted = horde->issuePlannerOrder(collect ? nullptr : target, *destination);
+		else if (target && !collect)
 			accepted = ai->issueRetailPlannerAttack(target);
 		else
 			accepted = ai->issueRetailPlannerAdvance(*destination);
 		if (!accepted)
-			continue;
+			return;
 		m_retailObjectives.emplace(std::make_tuple(unit->getID(), target ? target->getID() : INVALID_ID, objectiveOwner),
 			RetailObjective{frame, 0});
 		++committed;
 		if (trace)
 			std::fprintf(stderr, "AI_TARGET\t%u\t%d\t%s\t%d\t%d\t%d\n", frame, playerIndex,
-				chosen->defense ? "defend" : target ? "attack" : "scout", unit->getID(), target ? target->getID() : 0, chosen->shroud);
-		if (static_cast<size_t>(committed) >= recruitLimit)
-			break;
+				chosen->defense ? "defend" : collect ? "collect" : target ? "attack" : "scout",
+				unit->getID(), target ? target->getID() : 0, chosen->shroud);
+	};
+	if (chosen->collector)
+		issueOrder(chosen->collector, TRUE);
+	else
+	{
+		for (const auto& [unit, ready] : wave)
+		{
+			if ((!ready && !target) || !eligible(*unit, target, objectiveOwner, *destination))
+				continue;
+			issueOrder(unit, FALSE);
+			if (static_cast<size_t>(committed) >= recruitLimit)
+				break;
+		}
 	}
 	auto& assigned = m_retailTargets[chosenSlot];
 	if (committed > 0 && assigned.selectedFrame == 0)
