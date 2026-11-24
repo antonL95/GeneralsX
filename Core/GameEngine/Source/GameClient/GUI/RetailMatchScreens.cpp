@@ -3,6 +3,9 @@
 #include "GameClient/RetailMatchScreens.h"
 #include "GameClient/RetailOptions.h"
 
+#include "RetailHeroEditor.h"
+#include "RetailMenuPainter.h"
+
 #include "Common/FileSystem.h"
 #include "Common/GameEngine.h"
 #include "Common/GameState.h"
@@ -27,10 +30,12 @@
 #include "GameClient/MapUtil.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/RetailHudExtras.h"
+#include "GameClient/RetailHeroProfiles.h"
 #include "GameClient/Shell.h"
 #include "GameClient/UiFrame.h"
 #include "GameClient/WindowLayout.h"
 #include "GameNetwork/GameInfo.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/GameLogic.h"
 
 #include <algorithm>
@@ -41,30 +46,7 @@
 
 namespace
 {
-	using Box = AptScene::Box;
-	constexpr Color white = 0xFFFFFFFF;
-	constexpr Color muted = 0xFFB3CBD5;
-
-	UnicodeString translated(const char *text)
-	{
-		UnicodeString result;
-		result.translate(text);
-		return result;
-	}
-
-	UnicodeString localize(const char *key, const char *fallback)
-	{
-		Bool exists = FALSE;
-		UnicodeString text = TheGameText->fetch(key, &exists);
-		return exists ? text : translated(fallback);
-	}
-
-	UnicodeString number(Int n)
-	{
-		UnicodeString result;
-		result.format(L"%d", n);
-		return result;
-	}
+	using namespace RetailMenuPainter;
 
 	AsciiString profileStatKey(Bool victory, const AsciiString &name)
 	{
@@ -82,64 +64,6 @@ namespace
 		}
 		return translated(text.c_str());
 	}
-
-	class Painter
-	{
-	public:
-		explicit Painter(const AptScene &scene) : sx(scene.xScale()), sy(scene.yScale()),
-			m_text(TheDisplayStringManager->newDisplayString()) {}
-		~Painter() { TheDisplayStringManager->freeDisplayString(m_text); }
-
-		const Real sx, sy;
-
-		void picture(const Image *image, const Box &box) const
-		{
-			if (image && box.valid())
-				TheDisplay->drawImage(image, Int(box.left * sx), Int(box.top * sy), Int(box.right * sx), Int(box.bottom * sy));
-		}
-
-		void background(const Image *image) const
-		{
-			const Int width = TheDisplay->getWidth(), height = TheDisplay->getHeight();
-			TheDisplay->drawFillRect(0, 0, width, height, GameMakeColor(19, 29, 30, 255));
-			if (image)
-				TheDisplay->drawImage(image, 0, 0, width, height, GameMakeColor(70, 99, 97, 255));
-		}
-
-		void text(UnicodeString value, const Box &box, Real size, Color color = white,
-			const char *fontName = "Albertus MT", Bool centered = TRUE, Bool wrap = FALSE) const
-		{
-			if (value.isEmpty() || !box.valid())
-				return;
-
-			GameFont *font = TheFontLibrary->getFontPixels(fontName, std::max(1, Int(size * sy + 0.5f)), FALSE);
-			if (!font)
-				font = TheFontLibrary->getFontPixels("Albertus MT", std::max(1, Int(size * sy + 0.5f)), FALSE);
-			if (!font)
-				return;
-
-			m_text->setFont(font);
-			const Int maxWidth = std::max(1, Int((box.right - box.left) * sx));
-			m_text->setWordWrap(wrap ? maxWidth : 0);
-			m_text->setText(value);
-			Int width, height;
-			m_text->getSize(&width, &height);
-			const Int left = Int(box.left * sx);
-			const Int x = centered ? left + std::max(0, (maxWidth - width) / 2) : left;
-			const Int y = Int(box.top * sy) + (wrap ? 0 : std::max(0, (Int((box.bottom - box.top) * sy) - height) / 2));
-			IRegion2D clip{{left, Int(box.top * sy)}, {left + maxWidth, Int(box.bottom * sy)}};
-			m_text->setClipRegion(&clip);
-			m_text->draw(x, y, color, GameMakeColor(0, 0, 0, 230));
-		}
-
-		void label(UnicodeString value, const AptScene::Text &label, Color color) const
-		{
-			text(value, label.box, label.size, color, label.font.c_str(), label.alignment == 2);
-		}
-
-	private:
-		DisplayString *m_text;
-	};
 
 	struct ImageDeleter
 	{
@@ -196,11 +120,6 @@ namespace
 			if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9'))
 				key += ch;
 		return key;
-	}
-
-	Bool childOf(std::string_view path, std::string_view prefix)
-	{
-		return path.starts_with(prefix) && (path.size() == prefix.size() || path[prefix.size()] == '.');
 	}
 
 	Int rowAt(std::string_view path, std::string_view prefix)
@@ -909,7 +828,7 @@ namespace
 		{400, "VALUE:4X", "4x"}, {800, "VALUE:8X", "8x"}, {10000, "VALUE:100X", "100x"}
 	};
 
-	enum class MenuChoice { None, Resources, Factor, Slot, Faction, Team, Color, StartPosition, StartAt, Profile, SelectProfile, DeleteProfile };
+	enum class MenuChoice { None, Resources, Factor, Slot, Faction, Team, Color, Hero, StartPosition, StartAt, Profile, SelectProfile, DeleteProfile };
 	enum class ProfilePage { None, Create, Stats };
 	enum HomeLink { HomeSkirmish, HomeRematch, HomeExit, HomeSettings, HomeLoad, HomeLinkCount };
 
@@ -927,6 +846,7 @@ namespace
 		Int team = -1;
 		Int color = -1;
 		Int start = -1;
+		Int hero = -1;
 
 		Bool occupied() const { return state != SLOT_OPEN && state != SLOT_CLOSED; }
 	};
@@ -1010,6 +930,8 @@ namespace
 		Bool sandboxConfirmed = FALSE;
 		std::vector<SetupMap> maps;
 		std::vector<Int> factions;
+		std::vector<RetailHeroProfile> heroProfiles;
+		std::unique_ptr<RetailHeroEditor> heroEditor;
 		std::array<SetupSlot, MAX_SLOTS> slots{};
 		Int mapIndex = 0;
 		Int mapScroll = 0;
@@ -1068,6 +990,24 @@ namespace
 			return translated(profiles[activeProfile].str());
 		}
 
+		Bool heroAllowed(Int index, Int faction) const
+		{
+			const auto &selection = heroProfiles[index].selection;
+			const auto *heroClass = CreateAHeroSystem::findClassByUpgrade(selection.classUpgrade.c_str());
+			const auto *type = CreateAHeroSystem::findSubClassByUpgrade(heroClass, selection.subClassUpgrade.c_str());
+			if (!type)
+				return FALSE;
+			if (faction < 0)
+				return type->usableFactions.empty() || std::all_of(factions.begin(), factions.end(), [&](Int side) {
+					return heroAllowed(index, side);
+				});
+			const auto &side = ThePlayerTemplateStore->getNthPlayerTemplate(faction)->getSide();
+			return type->usableFactions.empty() ||
+				std::any_of(type->usableFactions.begin(), type->usableFactions.end(), [&](const auto &allowed) {
+					return allowed.compareNoCase(side) == 0;
+				});
+		}
+
 		void createProfile()
 		{
 			newProfile.trim();
@@ -1099,6 +1039,7 @@ namespace
 			profilePage = ProfilePage::None;
 			profileFeedback.clear();
 			loadProfiles();
+			heroProfiles = loadRetailHeroProfiles();
 			maps.clear();
 			factions.clear();
 			TheMapCache->updateCache();
@@ -1254,6 +1195,11 @@ namespace
 				slot.setColor(selection.color);
 				slot.setTeamNumber(selection.team);
 				slot.setStartPos(selection.start);
+				if (rules.customHeroes && selection.hero >= 0)
+				{
+					const auto encoded = CreateAHeroSystem::encodeSelectionCompact(heroProfiles[selection.hero].selection);
+					slot.setCreateAHeroConfig(CreateAHeroSystem::validateSetupSelection(encoded.str(), slot));
+				}
 				TheSkirmishGameInfo->setSlot(i, slot);
 				if (i == 0)
 					TheSkirmishGameInfo->setLocalIP(slot.getIP());
@@ -1294,7 +1240,12 @@ namespace
 					slot.state = state;
 					break;
 				}
-				case MenuChoice::Faction: slot.faction = value; break;
+				case MenuChoice::Faction:
+					slot.faction = value;
+					if (slot.hero >= 0 && !heroAllowed(slot.hero, value))
+						slot.hero = -1;
+					break;
+				case MenuChoice::Hero: slot.hero = value; break;
 				case MenuChoice::Team: slot.team = value; break;
 				case MenuChoice::Color: assignUnique(&SetupSlot::color, choiceRow, value); break;
 				case MenuChoice::StartPosition: assignUnique(&SetupSlot::start, choiceRow, value); break;
@@ -1369,11 +1320,12 @@ namespace
 	constexpr Box profilePanel{310, 264, 714, 460};
 	constexpr Box profileCancel{337, 405, 475, 442};
 	constexpr Box profileAccept{550, 405, 688, 442};
-	constexpr Real slotEdges[] = {104, 276, 463, 610, 696, 920};
+	constexpr Real slotEdges[] = {104, 276, 463, 610, 696, 808, 920};
 	constexpr Box mapNameSort{115, 194, 375, 222};
 	constexpr Box mapPlayersSort{376, 194, 462, 222};
 	constexpr Real choiceHeight = 25;
 	constexpr Box loadMenuButton{412, 498, 612, 542};
+	constexpr Box heroMenuButton{412, 554, 612, 598};
 	constexpr Box loadCard{122, 110, 902, 658};
 	constexpr Box saveList{144, 204, 602, 571};
 	constexpr Box saveDetails{622, 204, 880, 571};
@@ -1395,45 +1347,6 @@ namespace
 		return {115, top, 462, top + 24};
 	}
 
-	Box inset(Box box, Real left, Real right = 0)
-	{
-		box.left += left;
-		box.right -= right;
-		return box;
-	}
-
-	void fill(const Painter &p, const Box &box, Color color)
-	{
-		TheDisplay->drawFillRect(Int(box.left * p.sx), Int(box.top * p.sy),
-			Int((box.right - box.left) * p.sx), Int((box.bottom - box.top) * p.sy), color);
-	}
-
-	Bool moviePart(const Painter &p, const AptScene &scene, const std::string &path, const Box &box, Real opacity = 1.0f)
-	{
-		const Box source = scene.bounds(path);
-		if (!source.valid())
-			return FALSE;
-		const Real sx = p.sx * (box.right - box.left) / (source.right - source.left);
-		const Real sy = p.sy * (box.bottom - box.top) / (source.bottom - source.top);
-		scene.drawAt([&](const std::string &part) { return childOf(part, path); },
-			box.left * p.sx - source.left * sx, box.top * p.sy - source.top * sy, sx, sy, opacity);
-		return TRUE;
-	}
-
-	void frame(const Painter &p, const Box &box, const char *name)
-	{
-		const auto *art = TheUiFrameCollection ? TheUiFrameCollection->find(name) : nullptr;
-		if (art)
-			art->draw(Int(box.left * p.sx), Int(box.top * p.sy), Int(box.right * p.sx), Int(box.bottom * p.sy));
-	}
-
-	void button(const Painter &p, const Box &box, UnicodeString label)
-	{
-		fill(p, inset(box, 6, 6), 0xE6172F3C);
-		frame(p, box, "MenuButtonMed");
-		p.text(label, box, 16);
-	}
-
 	void checkbox(const Painter &p, const Box &box, Bool checked)
 	{
 		const auto *art = TheMappedImageCollection->findImageByName(checked ? "AptCheckboxCheckedEnabled" : "AptCheckboxUncheckedEnabled");
@@ -1441,26 +1354,6 @@ namespace
 			p.picture(art, box);
 		else
 			p.text(translated(checked ? "[X]" : "[ ]"), box, 16);
-	}
-
-	void control(const Painter &p, const Box &box, UnicodeString label, Bool selected = FALSE,
-		Bool dropdown = FALSE, Color color = 0)
-	{
-		fill(p, box, selected ? 0xFF294A59 : 0xE90A141B);
-		if (selected)
-			p.picture(TheMappedImageCollection->findImageByName("AptListBoxHiliteSelectedItem"), box);
-		if (color)
-			fill(p, {box.left + 9, box.top + 5, box.left + 31, box.bottom - 5}, color);
-		p.text(label, inset(box, color ? 38 : 9, dropdown ? 22 : 6), 16, white, "Albertus MT", !dropdown);
-		if (dropdown)
-		{
-			const auto *arrow = TheMappedImageCollection->findImageByName("AptVSliderDownButtonEnabled");
-			const Box arrowBox{box.right - 22, box.top, box.right, box.bottom};
-			if (arrow)
-				p.picture(arrow, arrowBox);
-			else
-				p.text(translated("v"), arrowBox, 14, muted);
-		}
 	}
 
 	Box saveRow(Int row)
@@ -1610,6 +1503,12 @@ namespace
 				options.push_back({-1, randomLabel()});
 				for (Int faction : menu.factions)
 					options.push_back({faction, factionName(faction)});
+				break;
+			case MenuChoice::Hero:
+				options.push_back({-1, localize("GUI:None", "None")});
+				for (Int i = 0; i < Int(menu.heroProfiles.size()); ++i)
+					if (menu.heroAllowed(i, menu.slots[row].faction))
+						options.push_back({i, translated(menu.heroProfiles[i].selection.heroName.c_str())});
 				break;
 			case MenuChoice::Team:
 				options.push_back({-1, localize("GUI:NoTeam", "None")});
@@ -1762,7 +1661,7 @@ namespace
 			drawMap(menu, p);
 
 		constexpr const char *headers[][2] = {{"APT:Player", "Player"}, {"APT:Army", "Army"},
-			{"GUI:StartPosition", "Start Position"}, {"APT:Team", "Team"}, {"APT:Color", "Color"}};
+			{"GUI:StartPosition", "Start Position"}, {"APT:Team", "Team"}, {"APT:Color", "Color"}, {"APT:HeaderHero", "Captain"}};
 		const Box table{slotEdges[0], 403, slotEdges[std::size(headers)], 624};
 		fill(p, table, 0xE908151D);
 		moviePart(p, menu.setupArt, settings + "@51.@2", {table.left, table.top, table.right, 430});
@@ -1788,6 +1687,10 @@ namespace
 			control(p, slotCell(row, 3), slot.team < 0 ? translated("-") : number(slot.team + 1), FALSE, TRUE);
 			const auto color = colorChoice(slot.color);
 			control(p, slotCell(row, 4), slot.color < 0 ? translated("?") : UnicodeString(), FALSE, TRUE, color.color);
+			const Bool chooseHero = row == 0 && menu.rules.customHeroes && !menu.heroProfiles.empty();
+			control(p, slotCell(row, 5),
+				chooseHero && slot.hero >= 0 ? translated(menu.heroProfiles[slot.hero].selection.heroName.c_str()) :
+					translated("-"), FALSE, chooseHero);
 		}
 		if (menu.sandboxConfirmed)
 			p.text(localize("GUI:SandboxWarning", "Play again to start without opponents."),
@@ -1938,10 +1841,12 @@ namespace
 			}
 
 			constexpr MenuChoice columns[] = {MenuChoice::Slot, MenuChoice::Faction, MenuChoice::StartPosition,
-				MenuChoice::Team, MenuChoice::Color};
+				MenuChoice::Team, MenuChoice::Color, MenuChoice::Hero};
 			for (Int i = 0, count = menu.slotCount(); i < count; ++i)
 				for (Int col = 0; col < Int(std::size(columns)); ++col)
-					if ((col == 0 ? i != 0 : menu.slots[i].occupied()) && slotCell(i, col).contains(x, y))
+					if ((col == 0 ? i != 0 : menu.slots[i].occupied()) &&
+						(columns[col] != MenuChoice::Hero || (i == 0 && menu.rules.customHeroes && !menu.heroProfiles.empty())) &&
+						slotCell(i, col).contains(x, y))
 						openChoices(menu, columns[col], slotCell(i, col), i);
 		}
 	}
@@ -1954,6 +1859,11 @@ namespace
 		if (menu.loadPage.open)
 		{
 			drawShellLoad(menu.loadPage, painter);
+			return;
+		}
+		if (menu.heroEditor)
+		{
+			menu.heroEditor->draw(painter);
 			return;
 		}
 		const auto &shellArt = menu.setup && menu.skirmishArt.bounds("_root.Title").valid() ? menu.skirmishArt : menu.scene;
@@ -1978,6 +1888,8 @@ namespace
 		painter.text(localize("APT:Settings", "Settings"), settingsButton, 22, color(HomeSettings));
 #endif
 		painter.text(localize("APT:Load", "Load"), loadMenuButton, 22, color(HomeLoad));
+		if (RetailHeroEditor::available())
+			painter.text(localize("APT:CreateAHero", "Create a Hero"), heroMenuButton, 22);
 	}
 
 	WindowMsgHandledType menuSystem(GameWindow *window, UnsignedInt message, WindowMsgData state, WindowMsgData result)
@@ -2010,6 +1922,16 @@ namespace
 		if (menu.loadPage.open)
 		{
 			shellLoadInput(menu.loadPage, message, point, key, x, y);
+			return MSG_HANDLED;
+		}
+		if (menu.heroEditor)
+		{
+			if (!menu.heroEditor->input(message, point, key, x, y))
+				menu.heroEditor.reset();
+			if (menu.heroEditor && menu.heroEditor->nameFocused())
+				BitSet(window->winGetInstanceData()->m_style, GWS_ENTRY_FIELD);
+			else
+				BitClear(window->winGetInstanceData()->m_style, GWS_ENTRY_FIELD);
 			return MSG_HANDLED;
 		}
 		if (menu.setup)
@@ -2055,6 +1977,8 @@ namespace
 			menu.openSetup();
 		else if ((key && point == KEY_L) || (activate && menu.homeFocus == HomeLoad) || (click && loadMenuButton.contains(x, y)))
 			menu.loadPage.show();
+		else if (click && heroMenuButton.contains(x, y) && RetailHeroEditor::available())
+			menu.heroEditor = std::make_unique<RetailHeroEditor>();
 		else if (menu.canRematch() && ((activate && (menu.homeFocus < 0 || menu.homeFocus == HomeRematch)) ||
 			(click && rematchButton.contains(x, y))))
 			menu.startRematch();
