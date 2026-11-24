@@ -36,6 +36,12 @@ def check(log):
             raise RuntimeError(f"Control cylinder radius changed: {radius}")
     if radius[(50, "TestParticleRadiusGrowth")] - radius[(40, "TestParticleRadiusGrowth")] < 8:
         raise RuntimeError(f"Cylinder radius did not grow: {radius}")
+    minimum = re.search(
+        r"^TEST particle-live frame=40 id=\d+ name=TestParticleRadiusMinimum .* xyz=([-\d.]+),([-\d.]+),[-\d.]+",
+        log, re.MULTILINE
+    )
+    if not minimum or not 0.08 <= ((float(minimum.group(1)) - 2520) ** 2 + (float(minimum.group(2)) - 1010) ** 2) ** 0.5 <= 0.12:
+        raise RuntimeError("Zero radius did not reach the retail minimum")
     swirl = {}
     for name, y in re.findall(
         r"^TEST particle-live frame=40 id=\d+ name=(TestParticleSwirlControl|TestParticleSwirl) .* xyz=[-\d.]+,([-\d.]+),[-\d.]+",
