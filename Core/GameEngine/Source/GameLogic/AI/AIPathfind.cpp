@@ -431,6 +431,16 @@ Real Pathfinder::getWallHeightAt(const Coord3D& position)
 Bool Pathfinder::isPointOnWall(const Coord3D *pos)
 {
 	if (RetailFileLayers::enabled() ? m_retailWallPieces.empty() : m_numWallPieces == 0) return false;
+	if (RetailFileLayers::enabled())
+	{
+		for (ObjectID id : m_retailWallPieces)
+		{
+			const Object* wall = TheGameLogic->findObjectByID(id);
+			const auto* authored = wall ? RetailWallMesh::forObject(*wall) : nullptr;
+			if (authored && !authored->wall.empty() && RetailWallMesh::contains(*authored, *pos))
+				return true;
+		}
+	}
 	if (m_layers[LAYER_WALL].isUnused()) return false;
 	PathfindLayerEnum layer = (PathfindLayerEnum)LAYER_WALL;
 	PathfindCell *cell = getCell(layer, pos);
