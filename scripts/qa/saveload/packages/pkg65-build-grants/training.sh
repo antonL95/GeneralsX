@@ -45,7 +45,7 @@ prepare() {
         printf '%s pkg65-grant Player_1 Pkg65SiegeMumak 0 Upgrade_SwitchToRockThrowing\n' "$frame"
     done
     for tech in HeavyArmor ForgedBlades FireArrows; do
-        for frame in 253 254 255 256; do
+        for frame in $(seq 253 299); do
             printf '%s pkg65-grant Player_1 HaradPatrolUpgrateGranter 0 Upgrade_TechnologyGondor%s\n' "$frame" "$tech"
         done
     done
@@ -135,8 +135,8 @@ check() {
     children 1300 Pkg65Harondor HaradWarlord_Slaved 1 || return 1
     for tech in HeavyArmor ForgedBlades FireArrows; do
         probe 252 HaradPatrolUpgrateGranter 0 "Upgrade_TechnologyGondor$tech" 'present=0 building=0 pending=0 granted=0' || return 1
-        probe 257 HaradPatrolUpgrateGranter 0 "Upgrade_TechnologyGondor$tech" 'present=1 building=0 pending=0 granted=1' || return 1
-        completion_frame HaradPatrolUpgrateGranter "Upgrade_TechnologyGondor$tech" 252 257 release || return 1
+        probe 300 HaradPatrolUpgrateGranter 0 "Upgrade_TechnologyGondor$tech" 'present=1 building=0 pending=0 granted=1' || return 1
+        completion_frame HaradPatrolUpgrateGranter "Upgrade_TechnologyGondor$tech" 252 300 release || return 1
     done
     if covers 250; then
         expect 'TEST pkg65 cancel production frame=250 object=Pkg65SiegePen' || return 1
