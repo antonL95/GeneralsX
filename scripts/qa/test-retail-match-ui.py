@@ -438,6 +438,8 @@ def check_options(restarted=False):
     wait_for("the game window can be positioned for input", move_game_to_origin)
     if restarted:
         key(0xFF52)
+        wait_for("Up from no focus selects Load",
+                 lambda: 0xC8AE77 in title_signature(412, 498, 200, 44))
         key(0xFF52)
         wait_for("the Settings entry receives keyboard focus",
                  lambda: 0xC8AE77 in title_signature(412, 442, 200, 48))
