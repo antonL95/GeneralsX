@@ -143,9 +143,9 @@
 244 pkg29-strafe-state Player_1 SpellBookDragonStrikeDragon 0
 310 pkg29-strafe-state Player_1 SpellBookDragonStrikeDragon 0
 430 pkg29-strafe-state Player_1 SpellBookDragonStrikeDragon 0
+430 health PlyrCreeps Pkg29StrafeInside 0
+430 health Player_1 Pkg29StrafeOutside 0
+431 destroy PlyrCreeps Pkg29StrafeInside 0
+431 destroy Player_1 Pkg29StrafeOutside 0
 650 pkg29-strafe-state Player_1 SpellBookDragonStrikeDragon 0
 800 pkg29-strafe-state Player_1 SpellBookDragonStrikeDragon 0
-800 health PlyrCreeps Pkg29StrafeInside 0
-800 health Player_1 Pkg29StrafeOutside 0
-801 destroy PlyrCreeps Pkg29StrafeInside 0
-801 destroy Player_1 Pkg29StrafeOutside 0
