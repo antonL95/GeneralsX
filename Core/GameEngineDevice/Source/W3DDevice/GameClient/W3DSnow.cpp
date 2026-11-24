@@ -42,13 +42,7 @@
 #define SNOW_BATCH_SIZE	2048	//we render at most this many particles per drawprimitive call.  This number * 6 must be less than 65536 to fit into index buffer.
 
 static constexpr Int RETAIL_CULL_BLOCK_SIZE = 128;
-
-static const Vector3 QUAD_CORNERS[4] = {
-	Vector3(-0.5f, 0.5f, 0.0f),
-	Vector3(-0.5f, -0.5f, 0.0f),
-	Vector3(0.5f, -0.5f, 0.0f),
-	Vector3(0.5f, 0.5f, 0.0f)
-};
+static constexpr Real RETAIL_QUAD_HALF_SCALE = 0.707f;
 
 static const Vector2 QUAD_UVS[4] = {
 	Vector2(0.0f, 0.0f),
@@ -57,11 +51,11 @@ static const Vector2 QUAD_UVS[4] = {
 	Vector2(1.0f, 0.0f)
 };
 
-static void writeSnowQuad(VertexFormatXYZNDUV2 *&verts, const Vector3 &center, Real size)
+static void writeSnowQuad(VertexFormatXYZNDUV2 *&verts, const Vector3 &center, const Vector3 (&corners)[4])
 {
 	for (Int i = 0; i < 4; i++)
 	{
-		*(Vector3 *)verts = center + QUAD_CORNERS[i] * size;
+		*(Vector3 *)verts = center + corners[i];
 		verts->nx = 0;
 		verts->ny = 0;
 		verts->nz = 0;
@@ -735,6 +729,12 @@ void W3DSnowManager::renderRetailQuads(RenderInfoClass &rinfo)
 	Matrix3D view;
 	rinfo.Camera.Get_View_Matrix(&view);
 
+	const Bool spellRain = isRetailSpellRainActive();
+	const Real halfSize = m_quadSize * (spellRain ? 0.5f : RETAIL_QUAD_HALF_SCALE);
+	const Vector3 right(halfSize, 0.0f, 0.0f);
+	const Vector3 up = spellRain ? Vector3(0.0f, halfSize, 0.0f) : view.Get_Z_Vector() * halfSize;
+	const Vector3 corners[4] = {up - right, -up - right, right - up, right + up};
+
 	Matrix4x4 identity(true);
 	DX8Wrapper::Set_Transform(D3DTS_VIEW, identity);
 	DX8Wrapper::Set_Index_Buffer(m_indexBuffer, 0);
@@ -756,7 +756,7 @@ void W3DSnowManager::renderRetailQuads(RenderInfoClass &rinfo)
 				const RetailBlock &block = m_retailBlocks[blockIndex];
 				Vector3 centerVS;
 				Matrix3D::Transform_Vector(view, retailParticleCenter(block.origin, x, y), &centerVS);
-				writeSnowQuad(verts, centerVS, m_quadSize);
+				writeSnowQuad(verts, centerVS, corners);
 
 				if (++x < block.lastX)
 					continue;

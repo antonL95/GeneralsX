@@ -119,6 +119,7 @@ class SnowManager : public SubsystemInterface
   protected :
 
 	Bool isPrecipitationEnabled() const;
+	Bool isRetailSpellRainActive() const { return m_spellRainActive || m_spellRainTicks > 0; }
 	void updateRetailSpellRain();
 
 	Bool				m_retailWeather;

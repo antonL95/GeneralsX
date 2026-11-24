@@ -115,7 +115,7 @@ Bool SnowManager::isPrecipitationEnabled() const
 		return FALSE;
 #endif
 	return TheWeatherSetting->m_snowEnabled &&
-		(!m_retailWeather || TheWeatherSetting->m_isSnowing || m_spellRainActive || m_spellRainTicks > 0);
+		(!m_retailWeather || TheWeatherSetting->m_isSnowing || isRetailSpellRainActive());
 }
 
 void SnowManager::setRetailFallParameters(Real spacing, Real velocity)
