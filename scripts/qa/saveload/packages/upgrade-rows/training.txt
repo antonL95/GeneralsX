@@ -1,0 +1,15 @@
+224 create PlyrCivilian UpgradeRowsTower 0 3550,2150,0
+225 objupgrade PlyrCivilian UpgradeRowsTower 0 UpgradeRowsActivate
+238 pkg28-observe PlyrCivilian UpgradeRowsTower 0
+240 pkg28-remove PlyrCivilian UpgradeRowsTower 0 UpgradeRowsActivate
+241 pkg28-observe PlyrCivilian UpgradeRowsTower 0
+246 pkg28-observe PlyrCivilian UpgradeRowsTower 0
+249 create PlyrCivilian UpgradeRowsChariot 0 3600,2150,0
+250 upgrade-rows-subframe PlyrCivilian UpgradeRowsChariot 0
+251 objupgrade PlyrCivilian UpgradeRowsChariot 0 Upgrade_ObjectLevel3
+251 upgrade-rows-subframe PlyrCivilian UpgradeRowsChariot 0
+253 upgrade-rows-subframe PlyrCivilian UpgradeRowsChariot 0
+254 pkg28-observe PlyrCivilian UpgradeRowsTower 0
+255 destroy PlyrCivilian UpgradeRowsChariot 0
+275 pkg28-observe PlyrCivilian UpgradeRowsTower 0
+276 destroy PlyrCivilian UpgradeRowsTower 0
