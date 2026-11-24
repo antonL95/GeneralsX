@@ -3297,6 +3297,7 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 			break;
 		}
 		case AICMD_GUARD_AREA:
+		case AICMD_GUARD_AREA_FROM_POSITION:
 		{
 			//Kris: Aug 18, 2003 -- If you were retaliating and ordered to enter guard mode,
 			//the state needs to be cleared before doing so or else we leave the state too
@@ -3308,7 +3309,8 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 				state->clear();
 			}
 
-			privateGuardArea(parms->m_polygon, (GuardMode)parms->m_intValue, parms->m_cmdSource);
+			privateGuardArea(parms->m_polygon, (GuardMode)parms->m_intValue, parms->m_cmdSource,
+				parms->m_cmd == AICMD_GUARD_AREA_FROM_POSITION ? &parms->m_pos : nullptr);
 			break;
 		}
 		case AICMD_HACK_INTERNET:
@@ -4823,7 +4825,8 @@ void AIUpdateInterface::privateGuardObject( Object *objectToGuard, GuardMode gua
 /**
  * Guard the given spot
  */
-void AIUpdateInterface::privateGuardArea( const PolygonTrigger *areaToGuard, GuardMode guardMode, CommandSourceType cmdSource )
+void AIUpdateInterface::privateGuardArea( const PolygonTrigger *areaToGuard, GuardMode guardMode, CommandSourceType cmdSource,
+	const Coord3D *origin )
 {
 	if (!areaToGuard || areaToGuard->isRetired())
 		return;
@@ -4842,9 +4845,10 @@ void AIUpdateInterface::privateGuardArea( const PolygonTrigger *areaToGuard, Gua
 	m_areaToGuard = areaToGuard;
 	m_guardMode = guardMode;
 
-	Coord3D pos;
-	m_areaToGuard->getCenterPoint(&pos);
-	m_locationToGuard = pos;
+	if (origin)
+		m_locationToGuard = *origin;
+	else
+		m_areaToGuard->getCenterPoint(&m_locationToGuard);
 	m_objectToGuard = INVALID_ID; //just in case.
 	getStateMachine()->clear();
 	setLastCommandSource( cmdSource );

@@ -708,12 +708,9 @@ StateReturnType AIGuardReturnState::onEnter()
 	Object* targetToGuard = getGuardMachine()->findTargetToGuardByID();
 	m_goalPosition = targetToGuard ? *targetToGuard->getPosition() : *getGuardMachine()->getPositionToGuard();
 
-	const PolygonTrigger *area = getGuardMachine()->getAreaToGuard();
-	if (area)
-	{
-		area->getCenterPoint(&m_goalPosition);
-	}
 	AIUpdateInterface *ai = getMachineOwner()->getAIUpdateInterface();
+	if (ai && getGuardMachine()->getAreaToGuard())
+		m_goalPosition = *ai->getGuardLocation();
 	if (ai && ai->isDoingGroundMovement())
 	{
 		TheAI->pathfinder()->adjustDestination(getMachineOwner(), ai->getLocomotorSet(), &m_goalPosition);

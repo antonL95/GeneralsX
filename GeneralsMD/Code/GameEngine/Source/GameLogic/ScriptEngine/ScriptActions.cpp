@@ -85,6 +85,7 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
 #include "GameLogic/Module/TransportContain.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/MobNexusContain.h"
 #include "GameLogic/Module/RailroadGuideAIUpdate.h"
@@ -7413,6 +7414,36 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::TEAM_GUARD_AREA:
 			doTeamGuardArea(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString());
 			return;
+		case ScriptAction::TEAM_GUARD_AREA_FROM_POSITION:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			const PolygonTrigger* area = TheScriptEngine->getQualifiedTriggerAreaByName(pAction->getParameter(1)->getString());
+			if (!team || !area)
+				return;
+			const Waypoint* waypoint = TheTerrainLogic->getWaypointByName(pAction->getParameter(2)->getString());
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+			{
+				Object* unit = member.cur();
+				if (auto* ai = unit->getAI())
+				{
+					unit->leaveGroup();
+					ai->aiGuardArea(area, GUARDMODE_NORMAL, CMD_FROM_SCRIPT, waypoint ? waypoint->getLocation() : nullptr);
+				}
+			}
+			return;
+		}
+		case ScriptAction::TEAM_FORCE_EMOTION:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			if (team)
+			{
+				const Int type = pAction->getParameter(1)->getInt();
+				const Real seconds = pAction->getParameter(2)->getReal();
+				for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+					EmotionTrackerUpdate::force(member.cur(), type, seconds);
+			}
+			return;
+		}
 		case ScriptAction::NAMED_HUNT:
 			doNamedHunt(pAction->getParameter(0)->getString());
 			return;

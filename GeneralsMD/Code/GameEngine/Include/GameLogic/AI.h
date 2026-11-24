@@ -415,6 +415,7 @@ enum AICommandType CPP_11(: Int)	// Stored in save file, do not reorder/renumber
 	AICMD_GUARD_RETALIATE,
 	AICMD_RETAIL_HORDE_ATTACK_OBJECT,
 	AICMD_RETAIL_HORDE_ATTACK_POSITION,
+	AICMD_GUARD_AREA_FROM_POSITION,
 };
 
 struct AICommandParms
@@ -797,11 +798,14 @@ public:
 		aiDoCommand(&parms);
 	}
 
-	void aiGuardArea( const PolygonTrigger *areaToGuard, GuardMode guardMode, CommandSourceType cmdSource )
+	void aiGuardArea( const PolygonTrigger *areaToGuard, GuardMode guardMode, CommandSourceType cmdSource,
+		const Coord3D *origin = nullptr )
 	{
-		AICommandParms parms(AICMD_GUARD_AREA, cmdSource);
+		AICommandParms parms(origin ? AICMD_GUARD_AREA_FROM_POSITION : AICMD_GUARD_AREA, cmdSource);
 		parms.m_polygon = areaToGuard;
 		parms.m_intValue = guardMode;
+		if (origin)
+			parms.m_pos = *origin;
 		aiDoCommand(&parms);
 	}
 

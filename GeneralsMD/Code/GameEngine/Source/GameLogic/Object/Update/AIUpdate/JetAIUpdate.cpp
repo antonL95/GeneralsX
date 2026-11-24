@@ -2622,6 +2622,7 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 			case AICMD_ATTACK_TEAM:
 			case AICMD_FORCE_ATTACK_OBJECT:
 			case AICMD_GUARD_AREA:
+			case AICMD_GUARD_AREA_FROM_POSITION:
 			case AICMD_GUARD_OBJECT:
 			case AICMD_GUARD_POSITION:
 			case AICMD_GUARD_RETALIATE:
@@ -2664,6 +2665,7 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 		case AICMD_GUARD_POSITION:
 		case AICMD_GUARD_OBJECT:
 		case AICMD_GUARD_AREA:
+		case AICMD_GUARD_AREA_FROM_POSITION:
 		case AICMD_HUNT:
 		case AICMD_GUARD_RETALIATE:
 			setFlag(ALLOW_INTERRUPT_AND_RESUME_OF_CUR_STATE_FOR_RELOAD, true);

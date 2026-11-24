@@ -70,9 +70,18 @@ Object* enemyHordeOrUnit(Object* target)
 	return target;
 }
 
+Bool isAreaGuardOrder(AICommandType order)
+{
+#if RTS_GENERALS
+	return order == AICMD_GUARD_AREA;
+#else
+	return order == AICMD_GUARD_AREA || order == AICMD_GUARD_AREA_FROM_POSITION;
+#endif
+}
+
 Bool isGuardOrder(AICommandType order)
 {
-	return order == AICMD_GUARD_POSITION || order == AICMD_GUARD_OBJECT || order == AICMD_GUARD_AREA;
+	return order == AICMD_GUARD_POSITION || order == AICMD_GUARD_OBJECT || isAreaGuardOrder(order);
 }
 
 class HordeGuardFilter final : public PartitionFilter
@@ -268,7 +277,7 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 		m_order = command;
 		m_orderPosition = parms->m_pos;
 		m_guardObject = command == AICMD_GUARD_OBJECT && parms->m_obj ? parms->m_obj->getID() : INVALID_ID;
-		m_guardArea = command == AICMD_GUARD_AREA && parms->m_polygon ? parms->m_polygon->getID() : -1;
+		m_guardArea = isAreaGuardOrder(command) && parms->m_polygon ? parms->m_polygon->getID() : -1;
 		m_guardMode = isGuardOrder(command) ? (GuardMode)parms->m_intValue : GUARDMODE_NORMAL;
 		m_attackSource = parms->m_cmdSource;
 		m_maxShots = isGuardOrder(command) || command == AICMD_HUNT ? NO_MAX_SHOTS_LIMIT : parms->m_intValue;
@@ -309,11 +318,10 @@ Object* HordeAIUpdate::updateOrder(Object* anchor, Object* target, Bool refresh)
 
 	Coord3D position = m_orderPosition;
 	const Bool guard = isGuardOrder(m_order);
-	const PolygonTrigger* area = m_order == AICMD_GUARD_AREA && m_guardArea >= 0
+	const PolygonTrigger* area = isAreaGuardOrder(m_order) && m_guardArea >= 0
 		? PolygonTrigger::getPolygonTriggerByID(m_guardArea) : nullptr;
 	const Object* guardObject = m_order == AICMD_GUARD_OBJECT ? liveTarget(m_guardObject) : nullptr;
-	if ((m_order == AICMD_GUARD_OBJECT && !guardObject) ||
-		(m_order == AICMD_GUARD_AREA && (!area || area->isRetired())))
+	if ((m_order == AICMD_GUARD_OBJECT && !guardObject) || (isAreaGuardOrder(m_order) && (!area || area->isRetired())))
 	{
 		m_order = NO_ORDER;
 		m_attackTarget = INVALID_ID;
@@ -321,7 +329,7 @@ Object* HordeAIUpdate::updateOrder(Object* anchor, Object* target, Bool refresh)
 		privateIdle(m_attackSource);
 		return nullptr;
 	}
-	if (area)
+	if (area && m_order == AICMD_GUARD_AREA)
 		area->getCenterPoint(&position);
 	else if (guardObject)
 		position = *guardObject->getPosition();
@@ -348,9 +356,12 @@ Object* HordeAIUpdate::updateOrder(Object* anchor, Object* target, Bool refresh)
 			break;
 		default:
 		{
+			Coord3D scanCenter = position;
+			if (area)
+				area->getCenterPoint(&scanCenter);
 			const Real range = area ? area->getRadius() : vision;
 			const Coord3D& origin = *anchor->getPosition();
-			const Real rangeFromAnchor = range + std::abs(origin.x - position.x) + std::abs(origin.y - position.y);
+			const Real rangeFromAnchor = range + std::abs(origin.x - scanCenter.x) + std::abs(origin.y - scanCenter.y);
 			UnsignedInt qualifiers = AI::CAN_ATTACK | AI::ATTACK_BUILDINGS;
 #if !RTS_GENERALS
 			if (!area && !guardObject && distanceSquared(origin, position) <= 16.0f)

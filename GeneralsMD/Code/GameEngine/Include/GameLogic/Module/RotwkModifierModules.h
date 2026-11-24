@@ -172,6 +172,7 @@ public:
 	static void clearEmotionNuggets();
 	static Bool signal(Object* victim, EmotionType type, const Object* source);
 	static void queuePromotionEmotion(Object* object, const AsciiString& name);
+	static void force(Object* victim, Int type, Real seconds);
 	static Bool ownsCrushBraceCondition(const Object* object);
 	static Bool blocksPlayerCommands(const Object* object);
 	UpdateSleepTime update() override;
@@ -181,8 +182,9 @@ public:
 	void clearPromotionEmotions() { m_promotionEmotions = 0; }
 
 private:
-	Bool startEmotion(EmotionType type, const Object* source, Real enemyThreat);
+	Bool startEmotion(EmotionType type, const Object* source, Real enemyThreat, UnsignedInt forcedDuration = 0);
 	void finishEmotion();
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 	Int m_activeEntry = -1;
 	UnsignedInt m_endFrame = 0;
@@ -190,6 +192,8 @@ private:
 	UnsignedInt m_modifierFrame = 0;
 	UnsignedInt m_promotionEmotions = 0;
 	ModelConditionFlags m_appliedConditions;
+	Int m_pendingForcedType = -1;
+	Bool m_forced = FALSE;
 };
 
 class LargeGroupBonusUpdateModuleData : public UpdateModuleData

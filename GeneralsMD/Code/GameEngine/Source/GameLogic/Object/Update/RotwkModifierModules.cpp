@@ -10,6 +10,8 @@
 #include "Common/Player.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
+#include "Common/RotwkDuration.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
@@ -38,6 +40,7 @@
 #include "WWMath/wwmath.h"
 
 #include <algorithm>
+#include <limits>
 #include <utility>
 
 namespace
@@ -772,6 +775,7 @@ void EmotionTrackerUpdate::finishEmotion()
 	m_appliedConditions.clear();
 	m_activeEntry = -1;
 	m_modifierFrame = 0;
+	m_forced = FALSE;
 }
 
 UpdateSleepTime EmotionTrackerUpdate::update()
@@ -783,7 +787,14 @@ UpdateSleepTime EmotionTrackerUpdate::update()
 		return UPDATE_SLEEP_FOREVER;
 
 	const UnsignedInt now = TheGameLogic->getFrame();
-	if (promotionEmotions && !self->isEffectivelyDead())
+	if (m_pendingForcedType >= 0)
+	{
+		const auto type = static_cast<EmotionType>(m_pendingForcedType);
+		m_pendingForcedType = -1;
+		m_forced = now < m_endFrame && !self->getContainedBy() && !self->isEffectivelyDead() &&
+			startEmotion(type, nullptr, -1.0f, m_endFrame - now);
+	}
+	else if (promotionEmotions && !self->isEffectivelyDead())
 	{
 		for (const auto& entry : data->m_emotions)
 		{
@@ -890,7 +901,8 @@ Bool EmotionTrackerUpdate::signal(Object* victim, EmotionType type, const Object
 	if (!RetailFileLayers::enabled() || !victim || victim->isEffectivelyDead() || victim->isDestroyed())
 		return FALSE;
 	auto* tracker = static_cast<EmotionTrackerUpdate*>(victim->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
-	if (!tracker || !tracker->startEmotion(type, source, -1.0f))
+	if (!tracker || (tracker->m_forced && TheGameLogic->getFrame() < tracker->m_endFrame) ||
+		!tracker->startEmotion(type, source, -1.0f))
 		return FALSE;
 	tracker->setWakeFrame(victim, UPDATE_SLEEP_NONE);
 	return TRUE;
@@ -909,6 +921,36 @@ void EmotionTrackerUpdate::queuePromotionEmotion(Object* object, const AsciiStri
 		if (name.compareNoCase(emotionTypes[type]) != 0)
 			continue;
 		tracker->m_promotionEmotions |= 1u << type;
+		tracker->setWakeFrame(object, UPDATE_SLEEP_NONE);
+		return;
+	}
+}
+
+void EmotionTrackerUpdate::force(Object* victim, Int type, Real seconds)
+{
+	if (type < EMOTION_TAUNT || type > EMOTION_PRE_CRUSH || !std::isfinite(seconds) || seconds <= 0.0f)
+		return;
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const UnsignedInt maxTicks = (std::numeric_limits<UnsignedInt>::max() - now) /
+		(LOGICFRAMES_PER_SECOND / RotwkDuration::FRAMES_PER_SECOND);
+	const Real ticks = seconds * RotwkDuration::FRAMES_PER_SECOND;
+	if (ticks >= static_cast<Real>(maxTicks))
+		return;
+	const UnsignedInt duration = RotwkDuration::engineFrames(
+		static_cast<UnsignedInt>(WWMath::Ceil(ticks)), LOGICFRAMES_PER_SECOND);
+	for (Object* object = victim; object; object = object->getContainedBy())
+	{
+		auto* tracker = static_cast<EmotionTrackerUpdate*>(object->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
+		if (!tracker)
+			continue;
+		if (object->isEffectivelyDead() || object->isDestroyed())
+			return;
+		if (tracker->m_activeEntry >= 0)
+			tracker->finishEmotion();
+		tracker->m_pendingForcedType = type;
+		tracker->m_endFrame = now + duration;
+		tracker->m_forced = TRUE;
 		tracker->setWakeFrame(object, UPDATE_SLEEP_NONE);
 		return;
 	}
@@ -951,7 +993,7 @@ static Int emotionPriority(Int type)
 	}
 }
 
-Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, Real enemyThreat)
+Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, Real enemyThreat, UnsignedInt forcedDuration)
 {
 	Object* self = getObject();
 	const auto* data = getEmotionTrackerUpdateModuleData();
@@ -966,7 +1008,7 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 		if (emotionPriority(type) <= emotionPriority(activeType))
 			return FALSE;
 	}
-	else if (now < m_recheckFrame && emotionPriority(type) < 2)
+	else if (!forcedDuration && now < m_recheckFrame && emotionPriority(type) < 2)
 		return FALSE;
 
 	Object* anchor = HordeContain::getAnchor(self);
@@ -981,9 +1023,9 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 		if (!nugget)
 			continue;
 		const Int configured = configuredEmotionType(entry, nugget);
-		if (configured != type || (idle && nugget->m_ignoreIdle) || (!idle && nugget->m_ignoreBusy))
+		if (configured != type || (!forcedDuration && ((idle && nugget->m_ignoreIdle) || (!idle && nugget->m_ignoreBusy))))
 			continue;
-		if (nugget->m_enemyThreatLimit >= 0.0f && enemyThreat < 0.0f)
+		if (!forcedDuration && nugget->m_enemyThreatLimit >= 0.0f && enemyThreat < 0.0f)
 		{
 			enemyThreat = 0.0f;
 			const Real radius = std::max({data->m_tauntRadius, data->m_fearRadius, data->m_heroRadius});
@@ -996,14 +1038,16 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 						enemyThreat = std::max(enemyThreat, other->getTemplate()->getRotWKObjectData().threatLevel);
 			}
 		}
-		if (nugget->m_enemyThreatLimit >= 0.0f && enemyThreat >= nugget->m_enemyThreatLimit)
+		if (!forcedDuration && nugget->m_enemyThreatLimit >= 0.0f && enemyThreat >= nugget->m_enemyThreatLimit)
 			continue;
 
 		const UnsignedInt aiLock = entry.m_aiLock >= 0 ? static_cast<UnsignedInt>(entry.m_aiLock) : nugget->m_aiLock;
 		UnsignedInt duration = entry.m_duration >= 0 ? static_cast<UnsignedInt>(entry.m_duration) : nugget->m_duration;
 		if (!duration)
 			duration = std::max(aiLock, interval);
-		if (type == EMOTION_FEAR || type == EMOTION_TERROR || type == EMOTION_UNCONTROLLABLE_FEAR)
+		if (forcedDuration)
+			duration = forcedDuration;
+		else if (type == EMOTION_FEAR || type == EMOTION_TERROR || type == EMOTION_UNCONTROLLABLE_FEAR)
 		{
 			const Int resistance = type == EMOTION_TERROR ? AttributeModifierRules::RESIST_TERROR : AttributeModifierRules::RESIST_FEAR;
 			const Real scale = 1.0f - std::clamp(AttributeModifiers::value(subject, resistance), -1.0f, 1.0f);
@@ -1062,14 +1106,31 @@ void EmotionTrackerUpdate::crc(Xfer* xfer)
 {
 	UpdateModule::crc(xfer);
 	xferEmotionState(xfer);
+	xferRetailBlocks(xfer, TRUE);
 }
 
 void EmotionTrackerUpdate::xfer(Xfer* xfer)
 {
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
 	UpdateModule::xfer(xfer);
 	xferEmotionState(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 2);
+}
+
+void EmotionTrackerUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"forced-emotion", [this](Xfer* x) {
+			x->xferInt(&m_pendingForcedType);
+			x->xferBool(&m_forced);
+		}, [this] {
+			m_pendingForcedType = -1;
+			m_forced = FALSE;
+		}}
+	});
 }
 
 void EmotionTrackerUpdate::loadPostProcess()
