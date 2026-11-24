@@ -78,6 +78,7 @@
 #include "Common/Upgrade.h"
 #include "GameClient/Water.h"
 #include "GameClient/Snow.h"
+#include "GameClient/RetailHudExtras.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
 #include "Common/WellKnownKeys.h"
@@ -4135,7 +4136,7 @@ Bool GameLogic::getObjectivesEnabled() const
 
 void GameLogic::setObjectiveVisible(Int objective, Bool visible)
 {
-	if (objective < 1)
+	if (objective < 1 || static_cast<UnsignedInt>(objective) > RetailObjectives::count())
 		return;
 	const size_t index = static_cast<size_t>(objective - 1);
 	if (index >= m_objectiveVisible.size())
@@ -4156,7 +4157,7 @@ Bool GameLogic::isObjectiveVisible(Int objective) const
 
 void GameLogic::setObjectiveCompleted(Int objective, Bool completed)
 {
-	if (objective < 1)
+	if (objective < 1 || static_cast<UnsignedInt>(objective) > RetailObjectives::count())
 		return;
 	const size_t index = static_cast<size_t>(objective - 1);
 	if (index >= m_objectiveCompleted.size())
@@ -5991,15 +5992,23 @@ void GameLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferBool(&m_objectivesEnabled);
 			UnsignedInt count = static_cast<UnsignedInt>(m_objectiveVisible.size());
 			x->xferUnsignedInt(&count);
-			if (x->getXferMode() == XFER_LOAD)
+			const Bool loading = x->getXferMode() == XFER_LOAD;
+			if (loading)
 			{
-				m_objectiveVisible.assign(count, 0);
-				m_objectiveCompleted.assign(count, 0);
+				m_objectiveVisible.clear();
+				m_objectiveCompleted.clear();
 			}
 			for (UnsignedInt i = 0; i < count; ++i)
 			{
-				x->xferUnsignedByte(&m_objectiveVisible[i]);
-				x->xferUnsignedByte(&m_objectiveCompleted[i]);
+				UnsignedByte visible = loading ? 0 : m_objectiveVisible[i];
+				UnsignedByte completed = loading ? 0 : m_objectiveCompleted[i];
+				x->xferUnsignedByte(&visible);
+				x->xferUnsignedByte(&completed);
+				if (loading)
+				{
+					m_objectiveVisible.push_back(visible);
+					m_objectiveCompleted.push_back(completed);
+				}
 			}
 		}, [this] {
 			m_objectivesEnabled = TRUE;

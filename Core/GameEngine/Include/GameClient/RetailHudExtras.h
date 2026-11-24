@@ -48,6 +48,7 @@ Bool handleInput(UnsignedInt msg, Int x, Int y);
 namespace RetailObjectives
 {
 void parse(INI *ini);
+UnsignedInt count();
 void reset();
 void show();
 void close();

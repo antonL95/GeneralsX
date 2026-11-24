@@ -297,6 +297,11 @@ void parse(INI *ini)
 	ini->initFromINI(&objectiveEntries, fields);
 }
 
+UnsignedInt count()
+{
+	return static_cast<UnsignedInt>(objectiveEntries.size());
+}
+
 void show()
 {
 	if (!TheGameLogic->getObjectivesEnabled() || objectivesWindow || !TheGameLogic->isInGame() || TheInGameUI->isQuitMenuVisible())
