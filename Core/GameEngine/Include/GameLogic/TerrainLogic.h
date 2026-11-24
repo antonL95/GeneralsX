@@ -374,6 +374,7 @@ protected:
 	};
 	std::vector<MapTree> m_mapTrees;
 	std::vector<MapTree> m_mapTreesBeforeLegacyLoad;
+	Bool m_legacyMapTreesHaveLedger = FALSE;
 
 	Waypoint *m_waypointListHead;
 	Bridge *m_bridgeListHead;

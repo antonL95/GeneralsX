@@ -980,6 +980,7 @@ void TerrainLogic::reset()
 	m_mapTrees.clear();
 	m_retailFire.reset();
 	m_mapTreesBeforeLegacyLoad.clear();
+	m_legacyMapTreesHaveLedger = FALSE;
 
 	deleteWaypoints();
 	deleteBridges();
@@ -1096,6 +1097,7 @@ void TerrainLogic::newMap( Bool saveGame )
 {
 	m_mapTrees.clear();
 	m_mapTreesBeforeLegacyLoad.clear();
+	m_legacyMapTreesHaveLedger = FALSE;
 
 	// Set waypoint's z value, now that the height map is loaded.
 	for( Waypoint *way = m_waypointListHead; way; way = way->getNext() )
@@ -3098,7 +3100,8 @@ void TerrainLogic::restoreLegacyMapTrees(const std::vector<Coord3D>& deletedTree
 			continue;
 		}
 
-		if (tree.boxes != 0 || std::find(deletedTrees.cbegin(), deletedTrees.cend(), tree.position) != deletedTrees.cend())
+		if ((m_legacyMapTreesHaveLedger && tree.boxes != 0) ||
+			std::find(deletedTrees.cbegin(), deletedTrees.cend(), tree.position) != deletedTrees.cend())
 			continue;
 
 		const auto samePosition = [&tree](const MapTree& saved) { return saved.position == tree.position; };
@@ -3108,6 +3111,7 @@ void TerrainLogic::restoreLegacyMapTrees(const std::vector<Coord3D>& deletedTree
 	restored.insert(restored.end(), nextSaved, m_mapTrees.cend());
 	m_mapTrees.swap(restored);
 	m_mapTreesBeforeLegacyLoad.clear();
+	m_legacyMapTreesHaveLedger = FALSE;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -3202,8 +3206,11 @@ void TerrainLogic::xfer( Xfer *xfer )
 
 	}
 
-	if (version == 3 && xfer->getXferMode() == XFER_LOAD)
+	if (retail && version <= 3 && xfer->getXferMode() == XFER_LOAD)
+	{
+		m_legacyMapTreesHaveLedger = version == 3;
 		m_mapTreesBeforeLegacyLoad = std::exchange(m_mapTrees, {});
+	}
 	if (version >= 3)
 		xferMapTrees(xfer);
 	else if (!retail && xfer->getXferMode() == XFER_LOAD)
