@@ -256,7 +256,7 @@ protected:
 	void applyGravitationalForces();
 	void startImpactFlight(const Coord3D& velocity, UnsignedInt frames, Real height);
 	void applyFrictionalForces();
-	Bool handleBounce(Real oldZ, Real newZ, Real groundZ, Coord3D* bounceForce);
+	Bool handleBounce(Real oldZ, const Coord3D& landing, Real groundZ, Coord3D* bounceForce);
 	void applyYPRDamping(Real factor);
 	UpdateSleepTime calcSleepTime() const;
 
@@ -265,7 +265,7 @@ protected:
 	Bool checkForOverlapCollision(Object *other);
 	Bool checkRetailCrushCollision(Object* victim);
 
-	void testStunnedUnitForDestruction();
+	void testStunnedUnitForDestruction(const Coord3D& landing);
 
 private:
 

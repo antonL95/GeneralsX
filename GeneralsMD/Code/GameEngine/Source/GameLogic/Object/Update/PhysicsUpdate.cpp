@@ -38,6 +38,8 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -520,9 +522,9 @@ void PhysicsBehavior::applyFrictionalForces()
 
 
 //-------------------------------------------------------------------------------------------------
-Bool PhysicsBehavior::handleBounce(Real oldZ, Real newZ, Real groundZ, Coord3D* bounceForce)
+Bool PhysicsBehavior::handleBounce(Real oldZ, const Coord3D& landing, Real groundZ, Coord3D* bounceForce)
 {
-	if (getFlag(ALLOW_BOUNCE) && newZ <= groundZ)
+	if (getFlag(ALLOW_BOUNCE) && landing.z <= groundZ)
 	{
 		const Real MIN_STIFF = 0.01f;
 		const Real MAX_STIFF = 0.99f;
@@ -556,7 +558,7 @@ Bool PhysicsBehavior::handleBounce(Real oldZ, Real newZ, Real groundZ, Coord3D* 
 
 		if(bounceForce->z > 0.0f)
 		{
-			testStunnedUnitForDestruction();
+			testStunnedUnitForDestruction(landing);
 			return true;
 		}
 		else
@@ -814,7 +816,8 @@ UpdateSleepTime PhysicsBehavior::update()
 		{
 			groundZ += obj->getCarrierDeckHeight();
 		}
-		gotBounceForce = !impactFlight && handleBounce(oldPosZ, mtx.Get_Z_Translation(), groundZ, &bounceForce);
+		const Coord3D landing{mtx.Get_X_Translation(), mtx.Get_Y_Translation(), mtx.Get_Z_Translation()};
+		gotBounceForce = !impactFlight && handleBounce(oldPosZ, landing, groundZ, &bounceForce);
 
 		// remember our z-vel prior to doing ground-slam adjustment
 		activeVelZ = m_vel.z;
@@ -2109,7 +2112,7 @@ Bool PhysicsBehavior::checkForOverlapCollision(Object *other)
 // ------------------------------------------------------------------------------------------------
 /** Test whether unit needs to die because of being on illegal cell, upside down, outside legal bounds **/
 // ------------------------------------------------------------------------------------------------
-void PhysicsBehavior::testStunnedUnitForDestruction()
+void PhysicsBehavior::testStunnedUnitForDestruction(const Coord3D& landing)
 {
 	// Only do test if unit is stunned
 	if (!getFlag(IS_STUNNED))
@@ -2144,9 +2147,12 @@ void PhysicsBehavior::testStunnedUnitForDestruction()
 		return;
 	}
 
-	if (TheTerrainLogic->isUnderwater(pos->x, pos->y) &&
-		!aiInt->hasLocomotorForSurface(LOCOMOTORSURFACE_WATER) &&
-		!aiInt->hasLocomotorForSurface(LOCOMOTORSURFACE_DEEP_WATER))
+	const PathfindCell* cell = TheAI->pathfinder()->getCell(obj->getLayer(), &landing);
+	if (!cell)
+		return;
+	const auto type = cell->getType();
+	if ((type == PathfindCell::CELL_WATER && !aiInt->hasLocomotorForSurface(LOCOMOTORSURFACE_WATER)) ||
+		(type == PathfindCell::CELL_DEEP_WATER && !aiInt->hasLocomotorForSurface(LOCOMOTORSURFACE_DEEP_WATER)))
 	{
 		obj->kill();
 		return;
