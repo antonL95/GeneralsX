@@ -116,8 +116,7 @@ Bool SiegeEngineContain::isValidContainerFor(const Object* rider, Bool checkCapa
 
 Real SiegeEngineContain::crewSpeedScale() const
 {
-	const Real perCrew = getSiegeEngineContainModuleData()->m_speedPercentPerCrew;
-	return perCrew > 0.0f ? perCrew * countCrew() : 1.0f;
+	return getSiegeEngineContainModuleData()->m_speedPercentPerCrew * static_cast<Real>(countCrew());
 }
 
 void SiegeEngineContain::releasePassengersOnWall()

@@ -40,6 +40,7 @@
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/RotwkDuration.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/PartitionManager.h"
@@ -761,6 +762,11 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "ChargeIgnoresCondition", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeIgnoresCondition) },
 		{ "ChargeSpeed", parseRotwkField<INI::parsePercentToReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeSpeedFraction) },
 		{ "BackingUpSpeed", parseRotwkField<INI::parsePercentToReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.backingUpSpeedFraction) },
+		{ "BackingUpStopWhenTurning", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.backingUpStopWhenTurning) },
+		{ "BackingUpDistanceMin", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.backingUpDistanceMin) },
+		{ "BackingUpDistanceMax", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.backingUpDistanceMax) },
+		{ "BackingUpAngle", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.backingUpAngle) },
+		{ "CrewPowered", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.crewPowered) },
 		{ "FormationPriority", parseRotwkField<INI::parseIndexList>, TheFormationPriorityNames, offsetof(LocomotorTemplate, m_rotwk.formationPriority) },
 		{ "WalkDistance", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.walkDistance) },
 		{ "AccDecTrigger", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.accelDecelTrigger) },
@@ -982,6 +988,8 @@ LocomotorTemplate *LocomotorStore::newOverride( LocomotorTemplate *locoTemplate 
 Locomotor::Locomotor(const LocomotorTemplate* tmpl)
 {
 	m_template = tmpl;
+	m_maintainPos.zero();
+	m_retailStartMovePos.zero();
 	m_brakingFactor = 1.0f;
 	m_maxLift = BIGNUM;
 	m_maxSpeed = BIGNUM;
@@ -1008,6 +1016,7 @@ Locomotor::Locomotor(const Locomotor& that)
 {
 	m_angleOffset = 0.0f;
 	m_maintainPos.zero();
+	m_retailStartMovePos = that.m_retailStartMovePos;
 	m_template = that.m_template;
 	m_brakingFactor = that.m_brakingFactor;
 	m_maxLift = that.m_maxLift;
@@ -1032,6 +1041,7 @@ Locomotor& Locomotor::operator=(const Locomotor& that)
 	if (this != &that)
 	{
 		m_template = that.m_template;
+		m_retailStartMovePos = that.m_retailStartMovePos;
 		m_brakingFactor = that.m_brakingFactor;
 		m_maxLift = that.m_maxLift;
 		m_maxSpeed = that.m_maxSpeed;
@@ -1057,21 +1067,27 @@ Locomotor::~Locomotor()
 // ------------------------------------------------------------------------------------------------
 /** CRC */
 // ------------------------------------------------------------------------------------------------
+void Locomotor::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{ "start-move-pos",
+			[this](Xfer* x) { x->xferCoord3D(&m_retailStartMovePos); },
+			[this] { m_retailStartMovePos.zero(); } },
+	});
+}
+
 void Locomotor::crc( Xfer *xfer )
 {
 	if (RetailFileLayers::enabled())
+	{
 		xfer->xferBool(&m_retailWasRunning);
+		xferRetailBlocks(xfer, TRUE);
+	}
 }
 
-// ------------------------------------------------------------------------------------------------
-/** Xfer method
-	* Version Info:
-	* 1: Initial version */
-// ------------------------------------------------------------------------------------------------
 void Locomotor::xfer( Xfer *xfer )
 {
-	// version
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1099,22 +1115,20 @@ void Locomotor::xfer( Xfer *xfer )
 		xfer->xferBool(&m_retailWasRunning);
 	else if (xfer->getXferMode() == XFER_LOAD)
 		m_retailWasRunning = FALSE;
-
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 4);
 }
 
-// ------------------------------------------------------------------------------------------------
-/** Load post process */
-// ------------------------------------------------------------------------------------------------
 void Locomotor::loadPostProcess()
 {
 
 }
 
-//-------------------------------------------------------------------------------------------------
-void Locomotor::startMove()
+void Locomotor::startMove(const Object* obj)
 {
-	// Reset the donut timer.
 	m_donutTimer = TheGameLogic->getFrame()+DONUT_TIME_DELAY_SECONDS*static_cast<float>(LOGICFRAMES_PER_SECOND);
+	if (obj)
+		m_retailStartMovePos = *obj->getPosition();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1166,7 +1180,7 @@ Real Locomotor::getMaxSpeedForCondition(BodyDamageType condition, const Object* 
 	if (obj && obj->getAttributeModifierHelper())
 		speed *= AttributeModifiers::speedFactor(obj);
 
-	if (RetailFileLayers::enabled() && obj)
+	if (m_template->m_rotwk.crewPowered && obj)
 		if (const auto* siege = SiegeEngineContain::find(obj))
 			speed *= siege->crewSpeedScale();
 
@@ -1613,6 +1627,12 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 					break;
 			case LOCO_WHEELS_FOUR:
 			{
+				if (m_template->m_canMoveBackward)
+				{
+					moveRetailBackwardsCapableWheels(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
+					usedRetailGroundSteering = TRUE;
+					break;
+				}
 				const Bool mountedHero = retailHero && obj->getAI() &&
 					obj->getAI()->getCurLocomotorSetType() == LOCOMOTORSET_MOUNTED;
 				const Bool independentCavalry = retailIndependent && !retailHero && obj->isKindOf(KINDOF_CAVALRY);
@@ -1633,7 +1653,13 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 					moveTowardsPositionWheels(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
 			case LOCO_TREADS:
-					moveTowardsPositionTreads(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
+					if (m_template->m_canMoveBackward)
+					{
+						moveRetailBackwardsCapableWheels(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
+						usedRetailGroundSteering = TRUE;
+					}
+					else
+						moveTowardsPositionTreads(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
 			case LOCO_HOVER:
 					moveTowardsPositionHover(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
@@ -1647,6 +1673,14 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 			case LOCO_HORDE:
 					moveTowardsPositionHorde(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
+			case LOCO_SHIP:
+					if (m_template->m_canMoveBackward)
+					{
+						moveRetailBackwardsCapableWheels(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
+						usedRetailGroundSteering = TRUE;
+						break;
+					}
+					[[fallthrough]];
 			case LOCO_OTHER:
 			default:
 					moveTowardsPositionOther(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
@@ -1658,10 +1692,9 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		m_template->m_appearance != LOCO_MOTORCYCLE)
 		updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), getFlag(IS_BRAKING));
 	handleBehaviorZ(obj, physics, goalPos, birdPullUp);
-	// Objects that are braking don't follow the normal physics, so they end up at their destination exactly.
 	obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ), getFlag(IS_BRAKING) );
 
-	if (wasBraking && !usedRetailGroundSteering && !usesCavalrySteering(obj))
+	if (wasBraking && !usedRetailGroundSteering && !usesCavalrySteering(obj) && maxSpeed > 0.0f)
 	{
 	#define MIN_VEL (PATHFIND_CELL_SIZE_F/(static_cast<float>(LOGICFRAMES_PER_SECOND)))
 
@@ -2271,6 +2304,99 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 	direction.scale(physics->getMass() * nextSpeed);
 	physics->applyMotiveForce(&direction);
 	updateRetailGait(obj, onPathDistToGoal, speed, desiredSpeed + MIN_GAIT_SPEED < speed, nextSpeed);
+}
+
+void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* physics, const Coord3D& goalPos,
+	Real onPathDistToGoal, Real desiredSpeed)
+{
+	const Coord3D& pos = *obj->getPosition();
+	if (getIsDownhillOnly() && pos.z < goalPos.z)
+		return;
+
+	const BodyDamageType bdt = obj->getBodyModule()->getDamageState();
+	const Real maxSpeed = getMaxSpeedForCondition(bdt, obj);
+	if (desiredSpeed > maxSpeed)
+		desiredSpeed = maxSpeed;
+
+	const Real dx = goalPos.x - pos.x;
+	const Real dy = goalPos.y - pos.y;
+	const Real dist = WWMath::SqrtfOrigin(sqr(dx) + sqr(dy));
+	const Real facing = obj->getOrientation();
+	const Real goalHeading = dist > 0.001f ? WWMath::Atan2Origin(dy, dx) : facing;
+	const Real relAngle = stdAngleDiff(goalHeading, facing);
+
+	Bool canBackUp = m_template->m_canMoveBackward;
+	if (canBackUp)
+	{
+		const Real startDx = m_retailStartMovePos.x - pos.x;
+		const Real startDy = m_retailStartMovePos.y - pos.y;
+		const Real distFromStart = WWMath::SqrtfOrigin(sqr(startDx) + sqr(startDy));
+		if (distFromStart > m_template->m_rotwk.backingUpDistanceMin &&
+			onPathDistToGoal > m_template->m_rotwk.backingUpDistanceMax)
+			canBackUp = FALSE;
+	}
+
+	const Real backingAngleThreshold = m_template->m_rotwk.backingUpAngle * PI;
+	const Bool moveBackwards = canBackUp && fabs(relAngle) > backingAngleThreshold;
+	setFlag(MOVING_BACKWARDS, moveBackwards);
+	if (moveBackwards)
+		obj->setModelConditionState(MODELCONDITION_BACKING_UP);
+	else
+		obj->clearModelConditionState(MODELCONDITION_BACKING_UP);
+
+	const Real turnHeading = moveBackwards ? normalizeAngle(goalHeading + PI) : goalHeading;
+	Coord3D turnTarget{pos.x + Cos(turnHeading) * 1000.0f, pos.y + Sin(turnHeading) * 1000.0f, pos.z};
+	physics->setTurning(rotateObjAroundLocoPivot(obj, turnTarget, getMaxTurnRate(bdt)));
+
+	setFlag(IS_BRAKING, FALSE);
+	if (maxSpeed <= 0.0f)
+	{
+		physics->scrubVelocity2D(0.0f);
+		obj->clearModelConditionState(MODELCONDITION_MOVING);
+		updateRetailGait(obj, onPathDistToGoal, 0.0f, FALSE, 0.0f);
+		return;
+	}
+
+	const Coord3D& velocity = *physics->getVelocity();
+	const Real curSpeed = WWMath::SqrtfOrigin(sqr(velocity.x) + sqr(velocity.y));
+	const Real accel = getMaxAcceleration(bdt);
+	const Real braking = getBraking();
+	Real targetSpeed = desiredSpeed;
+
+	if (moveBackwards)
+	{
+		if (m_template->m_rotwk.backingUpStopWhenTurning)
+		{
+			const ModelConditionFlags& conds = obj->getLogicModelConditions();
+			if (conds.test(MODELCONDITION_TURN_LEFT) || conds.test(MODELCONDITION_TURN_RIGHT))
+				targetSpeed = 0.0f;
+		}
+	}
+	else
+	{
+		Real angleForSlowdown = relAngle;
+		if (curSpeed <= accel)
+			angleForSlowdown = relAngle * 2.0f;
+		else if (curSpeed > maxSpeed * 0.25f)
+			angleForSlowdown = 0.0f;
+		const Real slowdown = std::min(1.0f, static_cast<Real>(fabs(angleForSlowdown)) * (4.0f / PI));
+		targetSpeed = (1.0f - slowdown) * desiredSpeed;
+	}
+
+	if (!getFlag(NO_SLOW_DOWN_AS_APPROACHING_DEST) &&
+		onPathDistToGoal < calcSlowDownDist(curSpeed, getMinSpeed(), braking))
+		targetSpeed = getMinSpeed();
+
+	Real nextSpeed = curSpeed + std::clamp(targetSpeed - curSpeed, -braking, accel);
+	nextSpeed = std::max(0.0f, std::min(nextSpeed, dist));
+
+	physics->scrubVelocity2D(0.0f);
+	if (nextSpeed > 0.0f && dist > 0.001f)
+	{
+		Coord3D force{(dx / dist) * physics->getMass() * nextSpeed, (dy / dist) * physics->getMass() * nextSpeed, 0.0f};
+		physics->applyMotiveForce(&force);
+	}
+	updateRetailGait(obj, onPathDistToGoal, curSpeed, targetSpeed + MIN_GAIT_SPEED < curSpeed, nextSpeed);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3402,6 +3528,11 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 
 	if (usesCavalrySteering(obj))
 		physics->setTurning(TURN_NONE);
+	if (getFlag(MOVING_BACKWARDS))
+	{
+		setFlag(MOVING_BACKWARDS, FALSE);
+		obj->clearModelConditionState(MODELCONDITION_BACKING_UP);
+	}
 	updateRetailTurnConditions(obj, 0.0f);
 
 	Bool requiresConstantCalling = TRUE;	// assume the worst.

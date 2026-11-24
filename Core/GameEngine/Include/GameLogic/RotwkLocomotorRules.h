@@ -17,7 +17,10 @@ struct Authored
 	float liftDamagedFraction = -1.0f;
 	float burningDeathRadius = 0.0f;
 	float chargeSpeedFraction = 1.0f;
-	float backingUpSpeedFraction = 0.003f;
+	float backingUpSpeedFraction = 0.75f;
+	float backingUpDistanceMin = 0.0f;
+	float backingUpDistanceMax = 0.0f;
+	float backingUpAngle = 0.5f;
 	float walkDistance = 0.0f;
 	float accelDecelTrigger = -1.0f;
 	float turnThreshold = FULL_TURN / 24.0f;
@@ -30,6 +33,8 @@ struct Authored
 	bool burningDeathIsCavalry = false;
 	bool chargeAvailable = false;
 	bool chargeIgnoresCondition = false;
+	bool backingUpStopWhenTurning = false;
+	bool crewPowered = false;
 	int formationPriority = DEFAULT_FORMATION_PRIORITY;
 	unsigned int accelerationFrames = 0;
 	unsigned int brakingFrames = 0;

@@ -1668,7 +1668,7 @@ StateReturnType AIInternalMoveToState::onEnter()
 	}
 
 	if (ai->getCurLocomotor()) {
-		ai->getCurLocomotor()->startMove();
+		ai->getCurLocomotor()->startMove(obj);
 		if (ai->getCurLocomotor()->isUltraAccurate())
 		{
 			setAdjustsDestination(false); // if we're being ultra accurate, we can't adjust the destination. jba.
@@ -1900,7 +1900,11 @@ StateReturnType AIInternalMoveToState::update()
 			obj->clearModelConditionState( MODELCONDITION_RAPPELLING );
 		}
 
-		obj->setModelConditionState(MODELCONDITION_MOVING);
+		const Locomotor* curLoco = ai->getCurLocomotor();
+		if (curLoco && curLoco->getMaxSpeedForCondition(obj->getBodyModule()->getDamageState(), obj) <= 0.0f)
+			obj->clearModelConditionState(MODELCONDITION_MOVING);
+		else
+			obj->setModelConditionState(MODELCONDITION_MOVING);
 
 		if (setConditionFlag!=MODELCONDITION_MOVING) {
 			obj->setModelConditionState( setConditionFlag );

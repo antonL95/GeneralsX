@@ -447,7 +447,7 @@ public:
 
 	Bool isMovingBackwards() const {return getFlag(MOVING_BACKWARDS);}
 
-	void startMove(); ///< Indicates that a move is starting, primarily to reset the donut timer. jba.
+	void startMove(const Object* obj = nullptr);
 
 protected:
 	Real getMaxSpeedOverride() const;
@@ -455,6 +455,7 @@ protected:
 	void moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* physics, const Coord3D& goalPos, Real onPathDistToGoal,
 		Real desiredSpeed, Bool travelTowardGoal);
+	void moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionClimb(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
@@ -535,9 +536,11 @@ private:
 	void setFlag(LocoFlag f, Bool b) { if (b) m_flags |= (1<<f); else m_flags &= ~(1<<f); }
 
 	void updateRetailGait(Object* object, Real distance, Real speedBefore, Bool braking, Real speedAfter = -1.0f);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
-	LocomotorTemplateOverride m_template;		///< the kind of Locomotor this is
+	LocomotorTemplateOverride m_template;
 	Coord3D			m_maintainPos;
+	Coord3D			m_retailStartMovePos;
 	Real				m_brakingFactor;
 	Real				m_maxLift;
 	Real				m_maxSpeed;

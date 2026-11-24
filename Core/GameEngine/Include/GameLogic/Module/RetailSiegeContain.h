@@ -11,7 +11,7 @@ public:
 	ObjectStatusMaskType m_crewStatus;
 	InitialPayload m_initialCrew{};
 	Int m_crewMax = 0;
-	Real m_speedPercentPerCrew = 0.0f;
+	Real m_speedPercentPerCrew = 1.0f;
 	Bool m_crewAllowedToFire = FALSE;
 
 private:
