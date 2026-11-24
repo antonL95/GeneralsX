@@ -1,22 +1,53 @@
 215 hordespawn Player_1 P33FieldsHorde 0 - 1600 2560 0
 215 create Player_1 P33FieldsThreat 0 1670,2560,0
+215 hordespawn Player_1 P33FieldsTinyHorde 0 - 1600 2535 0
+215 hordespawn Player_1 P33FieldsTinyHorde 0 - 1600 2510 0
+215 hordespawn Player_1 P33FieldsZeroHorde 0 - 1600 2590 0
+215 create Player_1 P33FieldsThreat 0 1670,2535,0
+215 create Player_1 P33FieldsThreat 0 1670,2570,0
+215 create Player_1 P33FieldsThreat 0 1670,2590,0
 225 create Player_1 P33FieldsForm 0 1600,2640,0
 225 create Player_1 P33FieldsSolo 0 1600,2690,0
+239 locomotor-fields-sample Player_1 P33FieldsZeroHorde 0
 240 locomotor-fields-back Player_1 P33FieldsHorde 0 Player_1:P33FieldsThreat:0
+240 locomotor-fields-back Player_1 P33FieldsTinyHorde 0 Player_1:P33FieldsThreat:1
+240 locomotor-fields-back Player_1 P33FieldsTinyHorde 1 Player_1:P33FieldsThreat:2
+240 locomotor-fields-back Player_1 P33FieldsZeroHorde 0 Player_1:P33FieldsThreat:3
 245 select Player_1 P33FieldsForm 0
 245 selectadd Player_1 P33FieldsSolo 0
 245 movesel - - 0 - 1730 2665
 250 locomotor-fields-sample Player_1 P33FieldsHorde 0
+250 locomotor-fields-sample Player_1 P33FieldsTinyHorde 0
+250 locomotor-fields-sample Player_1 P33FieldsTinyHorde 1
+250 locomotor-fields-sample Player_1 P33FieldsZeroHorde 0
+259 locomotor-fields-sample Player_1 P33FieldsTinyHorde 0
+259 locomotor-fields-sample Player_1 P33FieldsTinyHorde 1
+259 locomotor-fields-sample Player_1 P33FieldsZeroHorde 0
 270 locomotor-fields-sample Player_1 P33FieldsHorde 0
+270 locomotor-fields-sample Player_1 P33FieldsTinyHorde 0
+270 locomotor-fields-sample Player_1 P33FieldsTinyHorde 1
+270 locomotor-fields-sample Player_1 P33FieldsZeroHorde 0
 275 steering-path Player_1 P33FieldsForm 0
 275 steering-path Player_1 P33FieldsSolo 0
 300 locomotor-fields-sample Player_1 P33FieldsHorde 0
+300 locomotor-fields-sample Player_1 P33FieldsTinyHorde 0
+300 locomotor-fields-sample Player_1 P33FieldsTinyHorde 1
+300 locomotor-fields-sample Player_1 P33FieldsZeroHorde 0
 395 steering-path Player_1 P33FieldsForm 0
 395 steering-path Player_1 P33FieldsSolo 0
 405 create Player_1 P33FieldsSlow 0 1600,2720,0
 410 destroy Player_1 P33FieldsMember 0
 410 destroy Player_1 P33FieldsHorde 0
+410 destroy Player_1 P33FieldsTinyMember 1
+410 destroy Player_1 P33FieldsTinyMember 0
+410 destroy Player_1 P33FieldsTinyHorde 1
+410 destroy Player_1 P33FieldsTinyHorde 0
+410 destroy Player_1 P33FieldsZeroMember 0
+410 destroy Player_1 P33FieldsZeroHorde 0
 410 destroy Player_1 P33FieldsForm 0
+410 destroy Player_1 P33FieldsThreat 3
+410 destroy Player_1 P33FieldsThreat 2
+410 destroy Player_1 P33FieldsThreat 1
 410 destroy Player_1 P33FieldsThreat 0
 410 select Player_1 P33FieldsSolo 0
 410 selectadd Player_1 P33FieldsSlow 0

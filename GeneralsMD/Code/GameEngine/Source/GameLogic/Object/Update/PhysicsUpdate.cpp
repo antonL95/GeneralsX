@@ -686,9 +686,13 @@ UpdateSleepTime PhysicsBehavior::update()
 			m_vel.z += m_accel.z;
 		}
 
-		if (fabsf(m_vel.x) < MIN_VELOCITY_COMPONENT) m_vel.x = 0.0f;
-		if (fabsf(m_vel.y) < MIN_VELOCITY_COMPONENT) m_vel.y = 0.0f;
-		if (fabsf(m_vel.z) < MIN_VELOCITY_COMPONENT) m_vel.z = 0.0f;
+		const Real minVelocityComponent = 0.001f;
+		if (impactFlight || !obj->getLogicModelConditions().test(MODELCONDITION_BACKING_UP))
+		{
+			if (fabsf(m_vel.x) < minVelocityComponent) m_vel.x = 0.0f;
+			if (fabsf(m_vel.y) < minVelocityComponent) m_vel.y = 0.0f;
+		}
+		if (fabsf(m_vel.z) < minVelocityComponent) m_vel.z = 0.0f;
 
 		m_velMag = INVALID_VEL_MAG;
 

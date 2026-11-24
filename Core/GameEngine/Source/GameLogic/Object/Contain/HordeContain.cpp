@@ -967,8 +967,7 @@ Bool HordeContain::beginBacking(const Object* source, Bool uncontrollable)
 #else
 		const Locomotor* locomotor = ai->getCurLocomotor();
 		const Real speed = locomotor ? locomotor->getBackingUpSpeed() : 0.0f;
-		const Real largestComponent = (std::max(fabsf(dx), fabsf(dy)) / length) * speed;
-		if (!(largestComponent >= PhysicsBehavior::MIN_VELOCITY_COMPONENT))
+		if (!(speed > 0.0f))
 			continue;
 #endif
 		const double maxDeadline = std::numeric_limits<UnsignedInt>::max();

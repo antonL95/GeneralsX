@@ -93,8 +93,6 @@ class PhysicsBehavior : public UpdateModule,
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( PhysicsBehavior, PhysicsBehaviorModuleData )
 
 public:
-	static constexpr Real MIN_VELOCITY_COMPONENT = 0.001f;
-
 	PhysicsBehavior( Thing *thing, const ModuleData* moduleData );
 	// virtual destructor prototype defined by MemoryPoolObject
 
