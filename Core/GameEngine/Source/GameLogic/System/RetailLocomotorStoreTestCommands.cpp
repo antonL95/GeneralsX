@@ -54,8 +54,20 @@ void sampleRiver(const RetailTestCommands::Context& ctx)
 	const Bool river = water && water->m_polygon && water->m_polygon->isRiver();
 	const Locomotor* locomotor = activeLocomotor(object);
 	const Real cap = locomotor ? locomotor->getMaxSpeedForCondition(object->getBodyModule()->getDamageState(), object) : -1.0f;
-	std::fprintf(stderr, "TEST locomotor-store-water %u %s river=%d cap=%.4f\n",
-		ctx.frame, object->getTemplate()->getName().str(), river, cap);
+	const Real height = river ? TheTerrainLogic->getWaterHeight(water) : 0.0f;
+	std::fprintf(stderr, "TEST locomotor-store-water %u %s river=%d cap=%.4f height=%.0f\n",
+		ctx.frame, object->getTemplate()->getName().str(), river, cap, height);
+}
+
+void transitionRiver(const RetailTestCommands::Context& ctx)
+{
+	const Object* object = ctx.requireObject();
+	if (!object)
+		return;
+	const Coord3D& pos = *object->getPosition();
+	const WaterHandle* water = TheTerrainLogic->getWaterHandle(pos.x, pos.y);
+	if (water && water->m_polygon && water->m_polygon->isImportedRiver())
+		TheTerrainLogic->changeWaterHeightOverTime(water, ctx.angle, 1.0f, 0.0f);
 }
 }
 #endif
@@ -68,6 +80,7 @@ void registerRetailLocomotorStoreTestCommands()
 	registerAction("locomotor-store-sample", sampleLocomotor);
 	registerAction("locomotor-store-fields", sampleAuthoredFields);
 	registerAction("locomotor-store-water", sampleRiver);
+	registerAction("locomotor-store-water-rise", transitionRiver);
 #endif
 }
 }

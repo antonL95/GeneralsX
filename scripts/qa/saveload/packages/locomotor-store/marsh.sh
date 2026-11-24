@@ -7,8 +7,8 @@ check() {
     fi
     for frame in 280 290; do
         covers "$frame" || continue
-        expect "TEST locomotor-store-water $frame P63StoreBombard river=1 cap=0.5000" || return 1
-        expect "TEST locomotor-store-water $frame P63StoreFullSpeedShip river=1 cap=1.0000" || return 1
+        expect "TEST locomotor-store-water $frame P63StoreBombard river=1 cap=0.5000 height=246" || return 1
+        expect "TEST locomotor-store-water $frame P63StoreFullSpeedShip river=1 cap=1.0000 height=246" || return 1
         awk -v frame="$frame" '
             $1 == "TEST" && $2 == "steering" && $3 == frame {
                 print
@@ -22,4 +22,23 @@ check() {
             END { exit !(bombard && fullSpeed) }
         ' "$log" || return 1
     done
+    if covers 250; then
+        expect "TEST locomotor-store-water 250 P63StoreBankProbe river=0 cap=1.0000 height=0" || return 1
+    fi
+    if covers 260; then
+        expect "TEST locomotor-store-water 260 P63StoreBankProbe river=1 cap=0.5000 height=366" || return 1
+    fi
+    if covers 290; then
+        awk '
+            /^TEST locomotor-store-water 290 P63StoreBankProbe river=1 cap=0.5000 height=/ {
+                print
+                height = substr($7, 8) + 0
+                advancing = height > 376 && height < 396
+            }
+            END { exit !advancing }
+        ' "$log" || return 1
+    fi
+    if covers 315; then
+        expect "TEST locomotor-store-water 315 P63StoreBankProbe river=1 cap=0.5000 height=396" || return 1
+    fi
 }
