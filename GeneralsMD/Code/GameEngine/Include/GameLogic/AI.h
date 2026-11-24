@@ -217,6 +217,7 @@ public:
 	Int	 m_infantryPathfindDiameter; // Diameter of path in cells for infantry.
 	Int  m_vehiclePathfindDiameter;  // Diameter of path in cells for vehicles.
 	Real m_wadeWaterDepth = 5.0f;
+	Real m_deepWaterDepth = 50.0f;
 
 	Int  m_rebuildDelaySeconds;  // Seconds to delay rebuilding after a base building is destroyed or captured.
 

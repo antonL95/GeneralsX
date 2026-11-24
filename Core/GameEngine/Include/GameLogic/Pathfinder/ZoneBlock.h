@@ -41,6 +41,7 @@ public:
 	void blockCalculateZones(	PathfindCell **map, PathfindLayer layers[], const IRegion2D &bounds);	///< Does zone calculations.
 	zoneStorageType getEffectiveZone(LocomotorSurfaceTypeMask acceptableSurfaces, Bool crusher, zoneStorageType zone) const;
 	void xferConnectivity(Xfer* xfer, zoneStorageType maxZone);
+	void xferDeepWaterConnectivity(Xfer* xfer, zoneStorageType maxZone);
 
 	void clearMarkedPassable() {m_markedPassable = false;}
 	Bool isPassable() {return m_markedPassable;}
@@ -69,6 +70,8 @@ protected:
 	UnsignedShort m_zonesAllocated;
 	zoneStorageType *m_groundCliffZones;
 	zoneStorageType *m_groundWaterZones;
+	zoneStorageType *m_waterDeepWaterZones;
+	zoneStorageType *m_groundWaterDeepWaterZones;
 	zoneStorageType *m_groundRubbleZones;
 	zoneStorageType *m_crusherZones;
 	Bool					m_interactsWithBridge;

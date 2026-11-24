@@ -536,7 +536,8 @@ static void checkSampleBuildLocation( const Coord3D *samplePoint, void *userData
 		sampleData->terrainRestricted = TRUE;
 	}	else {
 		enum PathfindCell::CellType type = cell->getType();
-		if ( (type == PathfindCell::CELL_WATER) || (type == PathfindCell::CELL_CLIFF) ||
+		if ( (type == PathfindCell::CELL_WATER) || (type == PathfindCell::CELL_DEEP_WATER) ||
+			(type == PathfindCell::CELL_CLIFF) ||
 			(type == PathfindCell::CELL_IMPASSABLE)) {
 			sampleData->terrainRestricted = true;
 		}

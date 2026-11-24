@@ -55,6 +55,8 @@ public:
 	void updateZonesForModify( PathfindCell **map,  PathfindLayer layers[], const IRegion2D &structureBounds, const IRegion2D &globalBounds ) ; ///< Called to recalculate an area when a structure has been removed.
 	void calculateZones(	PathfindCell **map, PathfindLayer layers[], const IRegion2D &bounds);	///< Does zone calculations.
 	void xferConnectivity(Xfer* xfer, PathfindCell** map, PathfindLayer layers[], const IRegion2D& bounds);
+	void xferDeepWaterConnectivity(Xfer* xfer);
+	Bool hasZones() const { return m_zonesAllocated > 0 && m_waterDeepWaterZones != nullptr && m_groundWaterDeepWaterZones != nullptr; }
 	zoneStorageType getEffectiveZone(LocomotorSurfaceTypeMask acceptableSurfaces, Bool crusher, zoneStorageType zone) const;
 	zoneStorageType getEffectiveTerrainZone(zoneStorageType zone) const;
 
@@ -90,6 +92,8 @@ private:
 	UnsignedShort m_zonesAllocated;
 	zoneStorageType *m_groundCliffZones;
 	zoneStorageType *m_groundWaterZones;
+	zoneStorageType *m_waterDeepWaterZones;
+	zoneStorageType *m_groundWaterDeepWaterZones;
 	zoneStorageType *m_groundRubbleZones;
 	zoneStorageType *m_terrainZones;
 	zoneStorageType *m_crusherZones;

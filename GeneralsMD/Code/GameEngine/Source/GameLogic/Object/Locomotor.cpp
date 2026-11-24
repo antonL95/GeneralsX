@@ -1510,7 +1510,16 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 
 	Bool treatAsAirborne = false;
 	Coord3D pos = *obj->getPosition();
-	Real heightAboveSurface = pos.z - TheTerrainLogic->getLayerHeight(pos.x, pos.y, obj->getLayer());
+	Real surfaceHeight = TheTerrainLogic->getLayerHeight(pos.x, pos.y, obj->getLayer());
+	if (m_template->m_behaviorZ == Z_SEA_LEVEL)
+	{
+		Real waterZ = 0.0f;
+		if (getSeaLevelHeight(pos.x, pos.y, waterZ))
+			surfaceHeight = waterZ;
+		else
+			surfaceHeight += m_preferredHeight;
+	}
+	Real heightAboveSurface = pos.z - surfaceHeight;
 
 	if( obj->getStatusBits().test( OBJECT_STATUS_DECK_HEIGHT_OFFSET ) )
 	{
@@ -2902,6 +2911,14 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 	return turn;
 }
 
+Bool Locomotor::getSeaLevelHeight(Real x, Real y, Real& height) const
+{
+	if (m_template->m_behaviorZ != Z_SEA_LEVEL || !TheTerrainLogic->isUnderwater(x, y, &height))
+		return FALSE;
+	height += m_preferredHeight;
+	return TRUE;
+}
+
 //-------------------------------------------------------------------------------------------------
 /*
 	return true if we can maintain the position without being called every frame (eg, we are
@@ -2929,12 +2946,8 @@ Bool Locomotor::handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coo
 			if( !obj->isDisabledByType( DISABLED_HELD ) )
 			{
 				Coord3D pos = *obj->getPosition();
-				Real waterZ;
-				if (TheTerrainLogic->isUnderwater(pos.x, pos.y, &waterZ)) {
-					pos.z = waterZ;
-				} else {
-					pos.z = TheTerrainLogic->getLayerHeight(pos.x, pos.y, obj->getLayer());
-				}
+				if (!getSeaLevelHeight(pos.x, pos.y, pos.z))
+					pos.z = TheTerrainLogic->getLayerHeight(pos.x, pos.y, obj->getLayer()) + m_preferredHeight;
 				obj->setPosition(&pos);
 			}
 			break;

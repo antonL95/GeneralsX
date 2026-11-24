@@ -67,7 +67,8 @@ Bool isClaimableTerrain(const Coord3D& point)
 	if (!cell)
 		return FALSE;
 	const auto type = cell->getType();
-	return type != PathfindCell::CELL_WATER && type != PathfindCell::CELL_CLIFF &&
+	return type != PathfindCell::CELL_WATER && type != PathfindCell::CELL_DEEP_WATER &&
+		type != PathfindCell::CELL_CLIFF &&
 		type != PathfindCell::CELL_BRIDGE_IMPASSABLE &&
 		(type != PathfindCell::CELL_IMPASSABLE || cell->getObstacleID() != INVALID_ID);
 }

@@ -1045,23 +1045,26 @@ void Pathfinder::classifyMapCell( Int i, Int j , PathfindCell *cell)
 		type = PathfindCell::CELL_CLIFF;
 	}
 
-	const Bool retail = RetailFileLayers::enabled();
-	if (!retail || type == PathfindCell::CELL_CLEAR)
+	if (type == PathfindCell::CELL_CLEAR)
 	{
-		const Real wadeDepth = retail ? TheAI->getAiData()->m_wadeWaterDepth : 0.0f;
-		const auto blocksGround = [retail, wadeDepth](Real x, Real y)
+		const Real wadeDepth = TheAI->getAiData()->m_wadeWaterDepth;
+		const Real deepDepth = TheAI->getAiData()->m_deepWaterDepth;
+		const auto classifyWaterCorner = [wadeDepth, deepDepth, &type](Real x, Real y)
 		{
-			if (!retail)
-				return TheTerrainLogic->isUnderwater(x, y);
 			Real waterHeight, terrainHeight;
-			return TheTerrainLogic->isUnderwater(x, y, &waterHeight, &terrainHeight) &&
-				waterHeight - terrainHeight > wadeDepth;
+			if (TheTerrainLogic->isUnderwater(x, y, &waterHeight, &terrainHeight))
+			{
+				const Real depth = waterHeight - terrainHeight;
+				if (depth > wadeDepth)
+					type = PathfindCell::CELL_WATER;
+				if (depth > deepDepth)
+					type = PathfindCell::CELL_DEEP_WATER;
+			}
 		};
-		if (blocksGround(topLeftCorner.x, topLeftCorner.y) ||
-			blocksGround(topLeftCorner.x, bottomRightCorner.y) ||
-			blocksGround(bottomRightCorner.x, bottomRightCorner.y) ||
-			blocksGround(bottomRightCorner.x, topLeftCorner.y))
-			type = PathfindCell::CELL_WATER;
+		classifyWaterCorner(topLeftCorner.x, topLeftCorner.y);
+		classifyWaterCorner(topLeftCorner.x, bottomRightCorner.y);
+		classifyWaterCorner(bottomRightCorner.x, bottomRightCorner.y);
+		classifyWaterCorner(bottomRightCorner.x, topLeftCorner.y);
 	}
 
 	if (hasObstacle) {
@@ -1156,12 +1159,11 @@ void Pathfinder::classifyMap()
 		}
 	}
 #if 1
-	// Expand all cliff cells one step (mark pinched)
 	for( j=m_extent.lo.y; j<=m_extent.hi.y; j++ )
 	{
 		for( i=m_extent.lo.x; i<=m_extent.hi.x; i++ )
 		{
-			if (m_map[i][j].getType() & PathfindCell::CELL_CLIFF) {
+			if (m_map[i][j].getType() == PathfindCell::CELL_CLIFF) {
 				Int k, l;
 				for (k=i-1; k<i+2; k++) {
 					if (k<m_extent.lo.x || k> m_extent.hi.x) continue;
@@ -1176,7 +1178,6 @@ void Pathfinder::classifyMap()
 			}
 		}
 	}
-	// Convert pinched to cliff.
 	for( j=m_extent.lo.y; j<=m_extent.hi.y; j++ )
 	{
 		for( i=m_extent.lo.x; i<=m_extent.hi.x; i++ )
@@ -1188,12 +1189,11 @@ void Pathfinder::classifyMap()
 			}
 		}
 	}
-	// Add a border of pinched cells to cliffs.
 	for( j=m_extent.lo.y; j<=m_extent.hi.y; j++ )
 	{
 		for( i=m_extent.lo.x; i<=m_extent.hi.x; i++ )
 		{
-			if (m_map[i][j].getType() & PathfindCell::CELL_CLIFF) {
+			if (m_map[i][j].getType() == PathfindCell::CELL_CLIFF) {
 				Int k, l;
 				for (k=i-1; k<i+2; k++) {
 					if (k<m_extent.lo.x || k> m_extent.hi.x) continue;
@@ -1310,6 +1310,9 @@ Locomotor* Pathfinder::chooseBestLocomotorForPosition(PathfindLayerEnum layer, L
 
 		case PathfindCell::CELL_WATER:
 			return LOCOMOTORSURFACE_WATER | LOCOMOTORSURFACE_AIR;
+
+		case PathfindCell::CELL_DEEP_WATER:
+			return LOCOMOTORSURFACE_DEEP_WATER | LOCOMOTORSURFACE_AIR;
 
 		case PathfindCell::CELL_CLIFF:
 			return LOCOMOTORSURFACE_CLIFF | LOCOMOTORSURFACE_AIR;
@@ -1809,8 +1812,9 @@ Bool Pathfinder::checkForLanding(Int cellX, Int cellY, PathfindLayerEnum layer,
 	{
 		case PathfindCell::CELL_CLIFF:
 		case PathfindCell::CELL_WATER:
+		case PathfindCell::CELL_DEEP_WATER:
 		case PathfindCell::CELL_IMPASSABLE:
-			return false;  // no final destinations on cliffs, water, etc.
+			return false;
 	}
 	if (checkDestination(nullptr, cellX, cellY, layer, iRadius, center)) {
 		adjustCoordToCell(cellX, cellY,  center, adjustDest, cellP->getLayer());
@@ -2298,6 +2302,11 @@ void Pathfinder::doDebugIcons() {
 
 						case PathfindCell::CELL_WATER:
 							color.blue = 1;
+							empty = false;
+							break;
+
+						case PathfindCell::CELL_DEEP_WATER:
+							color = RGBColor{0.0f, 0.0f, 1.0f};
 							empty = false;
 							break;
 
@@ -3906,7 +3915,7 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord2D &delta, PathfindCell *parentCell,
 																				 PathfindCell *goalCell, zoneStorageType parentZone,
 																				 zoneStorageType *examinedZones, Int &numExZones,
-																				 Bool crusher, Int &cellCount)
+																				 LocomotorSurfaceTypeMask locomotorSurface, Bool crusher, Int &cellCount)
 {
 	if (scanCell.x<m_extent.lo.x || scanCell.x>m_extent.hi.x ||
 		scanCell.y<m_extent.lo.y || scanCell.y>m_extent.hi.y) {
@@ -3917,24 +3926,25 @@ void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord
 		return;
 	}
 #endif
-	if (parentZone == m_zoneManager.getBlockZone(LOCOMOTORSURFACE_GROUND,
+	const Bool usesDeepWater = (locomotorSurface & LOCOMOTORSURFACE_DEEP_WATER) != 0;
+	const LocomotorSurfaceTypeMask surfaces = usesDeepWater ? locomotorSurface : LOCOMOTORSURFACE_GROUND;
+	if (parentZone == m_zoneManager.getBlockZone(surfaces,
 		crusher, scanCell.x, scanCell.y, m_map)) {
 		PathfindCell *newCell = getCell(LAYER_GROUND, scanCell.x, scanCell.y);
-#if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
-		if (newCell->hasInfo() && (newCell->getOpen() || newCell->getClosed())) return; // already looked at this one.
-#else
-		if( !newCell->hasInfo() )
+		if (!usesDeepWater)
 		{
- 			return;
+#if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
+			if (newCell->hasInfo() && (newCell->getOpen() || newCell->getClosed()))
+				return;
+#else
+			if (!newCell->hasInfo() || newCell->getOpen() || newCell->getClosed())
+				return;
+#endif
+			if (parentZone != newCell->getZone())
+				return;
 		}
 
-		if( newCell->getOpen() || newCell->getClosed() )
-			return; // already looked at this one.
-#endif
-
 		ICoord2D adjacentCell = scanCell;
-		//DEBUG_ASSERTCRASH(parentZone==newCell->getZone(), ("Different zones?"));
-		if (parentZone!=newCell->getZone()) return;
 		adjacentCell.x += delta.x;
 		adjacentCell.y += delta.y;
 		if (adjacentCell.x<m_extent.lo.x || adjacentCell.x>m_extent.hi.x ||
@@ -3943,12 +3953,12 @@ void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord
 		}
 		PathfindCell *adjNewCell = getCell(LAYER_GROUND, adjacentCell.x, adjacentCell.y);
 		if (adjNewCell->hasInfo() && (adjNewCell->getOpen() || adjNewCell->getClosed())) return; // already looked at this one.
-		zoneStorageType parentGlobalZone = m_zoneManager.getEffectiveZone(LOCOMOTORSURFACE_GROUND, crusher, parentZone);
-
-		/// @todo - somehow out of bounds or bogus newZone.
-		zoneStorageType newZone = m_zoneManager.getBlockZone(LOCOMOTORSURFACE_GROUND,
+		const zoneStorageType newZone = m_zoneManager.getBlockZone(surfaces,
 							crusher, adjacentCell.x, adjacentCell.y, m_map);
-		zoneStorageType newGlobalZone = m_zoneManager.getEffectiveZone(LOCOMOTORSURFACE_GROUND, crusher, newZone);
+		const zoneStorageType parentGlobalZone = m_zoneManager.getEffectiveZone(surfaces,
+			crusher, usesDeepWater ? newCell->getZone() : parentZone);
+		const zoneStorageType newGlobalZone = m_zoneManager.getEffectiveZone(surfaces,
+			crusher, usesDeepWater ? adjNewCell->getZone() : newZone);
 		if (newGlobalZone != parentGlobalZone) {
 			return; // can't step over. jba.
 		}
@@ -3964,12 +3974,11 @@ void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord
 			return;
 		}
 
-#if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
-		// TheSuperHackers @bugfix Caball009 14/09/2026 Check newCell->m_info before accessing it to prevent a possible crash.
-		// The Zero Hour / non-retail compatible pathfinding code performs this check earlier in the function.
-		if (newCell->allocateInfo(scanCell) && !newCell->getOpen() && !newCell->getClosed())
-#endif
+		if (!usesDeepWater)
 		{
+#if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
+			if (newCell->allocateInfo(scanCell) && !newCell->getOpen() && !newCell->getClosed())
+#endif
 			newCell->putOnClosedList(m_closedList);
 		}
 
@@ -4191,6 +4200,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 
 	PathfindCell *closestCell = nullptr;
 	Real closestDistSqr = sqr(HUGE_DIST);
+	const Bool usesDeepWater = (locomotorSurface & LOCOMOTORSURFACE_DEEP_WATER) != 0;
 
 	//
 	// Continue search until "open" list is empty, or
@@ -4405,7 +4415,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 				if (!cell)
 					continue;
 
-				if ( cell->hasInfo() && (cell->getClosed() || cell->getOpen()) ) {
+				if (!usesDeepWater && cell->hasInfo() && (cell->getClosed() || cell->getOpen())) {
 					if (parentZone == m_zoneManager.getBlockZone(locomotorSurface, crusher, scanCell.x, scanCell.y, m_map))
 						break;
 				}
@@ -4414,7 +4424,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
 			}
 		}
 		// Right side.
@@ -4437,7 +4447,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 				if (!cell)
 					continue;
 
-				if ( cell->hasInfo() && (cell->getClosed() || cell->getOpen()) ) {
+				if (!usesDeepWater && cell->hasInfo() && (cell->getClosed() || cell->getOpen())) {
 					if (parentZone == m_zoneManager.getBlockZone(locomotorSurface, crusher, scanCell.x, scanCell.y, m_map))
 						break;
 				}
@@ -4446,7 +4456,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
 			}
 		}
 		// Top side.
@@ -4468,7 +4478,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 				if (!cell)
 					continue;
 
-				if ( cell->hasInfo() && (cell->getClosed() || cell->getOpen()) ) {
+				if (!usesDeepWater && cell->hasInfo() && (cell->getClosed() || cell->getOpen())) {
 					if (parentZone == m_zoneManager.getBlockZone(locomotorSurface, crusher, scanCell.x, scanCell.y, m_map))
 						break;
 				}
@@ -4477,7 +4487,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
 			}
 		}
 		// Bottom side.
@@ -4500,7 +4510,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 				if (!cell)
 					continue;
 
-				if ( cell->hasInfo() && (cell->getClosed() || cell->getOpen()) ) {
+				if (!usesDeepWater && cell->hasInfo() && (cell->getClosed() || cell->getOpen())) {
 					if (parentZone == m_zoneManager.getBlockZone(locomotorSurface, crusher, scanCell.x, scanCell.y, m_map))
 						break;
 				}
@@ -4509,7 +4519,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
 			}
 		}
 	}
@@ -7806,6 +7816,8 @@ void Pathfinder::crc( Xfer *xfer )
 		xfer->xferIRegion2D(&m_logicalExtent);
 		Real wadeDepth = TheAI->getAiData()->m_wadeWaterDepth;
 		xfer->xferReal(&wadeDepth);
+		Real deepWaterDepth = TheAI->getAiData()->m_deepWaterDepth;
+		xfer->xferReal(&deepWaterDepth);
 		xferRetailBlocks(xfer, TRUE);
 	}
 
@@ -7939,7 +7951,23 @@ void Pathfinder::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
 		{ "ignored-obstacle", [this](Xfer* x) { x->xferObjectID(&m_ignoreObstacleID); },
-			[this] { m_ignoreObstacleID = INVALID_ID; } }
+			[this] { m_ignoreObstacleID = INVALID_ID; } },
+		{ "deep-water-zones",
+			[this](Xfer* x)
+			{
+				const Bool mapHasZones = m_isMapReady && m_zoneManager.hasZones();
+				Bool hasZones = mapHasZones;
+				x->xferBool(&hasZones);
+				if (hasZones != mapHasZones)
+					throw XFER_INVALID_PARAMETERS;
+				if (hasZones)
+					m_zoneManager.xferDeepWaterConnectivity(x);
+			},
+			[this]
+			{
+				if (m_isMapReady)
+					m_zoneManager.calculateZones(m_map, m_layers, m_extent);
+			} }
 	});
 }
 

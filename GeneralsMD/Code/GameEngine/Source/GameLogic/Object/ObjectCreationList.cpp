@@ -1484,6 +1484,7 @@ protected:
 	  if( obj->isOffMap() ||
       (cellType == PathfindCell::CELL_CLIFF) ||
       (cellType == PathfindCell::CELL_WATER) ||
+      (cellType == PathfindCell::CELL_DEEP_WATER) ||
       (cellType == PathfindCell::CELL_IMPASSABLE) )
 	    {
 		    // We are sorry, for reasons beyond our control, we are experiencing technical difficulties. Please die.

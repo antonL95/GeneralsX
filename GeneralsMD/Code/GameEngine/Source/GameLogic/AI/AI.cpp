@@ -191,6 +191,7 @@ static const FieldParse TheAIFieldParseTable[] =
  	{ "InfantryPathfindDiameter",		INI::parseInt,nullptr,			offsetof( TAiData, m_infantryPathfindDiameter ) },
  	{ "VehiclePathfindDiameter",		INI::parseInt,nullptr,			offsetof( TAiData, m_vehiclePathfindDiameter ) },
 	{ "WadeWaterDepth",					INI::parseReal,nullptr,			offsetof( TAiData, m_wadeWaterDepth ) },
+	{ "DeepWaterDepth",					INI::parseReal,nullptr,			offsetof( TAiData, m_deepWaterDepth ) },
  	{ "RebuildDelayTimeSeconds",		INI::parseInt,nullptr,			offsetof( TAiData, m_rebuildDelaySeconds ) },
  	{ "SupplyCenterSafeRadius",			INI::parseReal,nullptr,			offsetof( TAiData, m_supplyCenterSafeRadius ) },
 

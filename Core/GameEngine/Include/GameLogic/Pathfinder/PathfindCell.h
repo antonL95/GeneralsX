@@ -47,8 +47,9 @@ public:
 		CELL_CLIFF		= 0x02,									///< steep altitude change
 		CELL_RUBBLE		= 0x03,									///< Cell is occupied by rubble.
 		CELL_OBSTACLE	= 0x04,									///< Occupied by a structure
-		CELL_BRIDGE_IMPASSABLE = 0x05,				///< Piece of a bridge that is impassable.
-		CELL_IMPASSABLE = 0x06								///< Just plain impassable except for aircraft.
+		CELL_BRIDGE_IMPASSABLE = 0x05,
+		CELL_IMPASSABLE = 0x06,
+		CELL_DEEP_WATER = 0x07
 	};
 
 	enum CellFlags
@@ -173,6 +174,8 @@ public:
 
 	static Bool typesMatch(const PathfindCell& targetCell, const PathfindCell& sourceCell);
 	static Bool waterGround(const PathfindCell& targetCell, const PathfindCell& sourceCell);
+	static Bool waterDeepWater(const PathfindCell& targetCell, const PathfindCell& sourceCell);
+	static Bool groundWaterDeepWater(const PathfindCell& targetCell, const PathfindCell& sourceCell);
 	static Bool groundRubble(const PathfindCell& targetCell, const PathfindCell& sourceCell);
 	static Bool terrain(const PathfindCell& targetCell, const PathfindCell& sourceCell);
 	static Bool crusherGround(const PathfindCell& targetCell, const PathfindCell& sourceCell);

@@ -39,6 +39,7 @@
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -728,6 +729,17 @@ UpdateSleepTime PhysicsBehavior::update()
 			_isnan(mtx.Get_Z_Translation())) {
 			DEBUG_CRASH(("Object position is NAN, deleting."));
 			TheGameLogic->destroyObject(obj);
+		}
+		else if (!impactFlight && !getIsStunned() && !obj->isEffectivelyDead())
+		{
+			const AIUpdateInterface* ai = obj->getAI();
+			const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+			Real seaLevelHeight;
+			if (locomotor && locomotor->getSeaLevelHeight(mtx.Get_X_Translation(), mtx.Get_Y_Translation(), seaLevelHeight))
+			{
+				mtx.Set_Z_Translation(seaLevelHeight);
+				m_vel.z = 0.0f;
+			}
 		}
 
 		// Check when to clear the stunned status
@@ -2132,8 +2144,9 @@ void PhysicsBehavior::testStunnedUnitForDestruction()
 		return;
 	}
 
-	// Check for object being stuck on water. If so kill it
-	if (TheTerrainLogic->isUnderwater(pos->x, pos->y) && !aiInt->hasLocomotorForSurface(LOCOMOTORSURFACE_WATER))
+	if (TheTerrainLogic->isUnderwater(pos->x, pos->y) &&
+		!aiInt->hasLocomotorForSurface(LOCOMOTORSURFACE_WATER) &&
+		!aiInt->hasLocomotorForSurface(LOCOMOTORSURFACE_DEEP_WATER))
 	{
 		obj->kill();
 		return;

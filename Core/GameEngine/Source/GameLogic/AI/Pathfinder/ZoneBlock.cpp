@@ -25,6 +25,8 @@ ZoneBlock::ZoneBlock() : m_firstZone(0),
 m_numZones(0),
 m_groundCliffZones(nullptr),
 m_groundWaterZones(nullptr),
+m_waterDeepWaterZones(nullptr),
+m_groundWaterDeepWaterZones(nullptr),
 m_groundRubbleZones(nullptr),
 m_crusherZones(nullptr),
 m_zonesAllocated(0),
@@ -65,6 +67,26 @@ void ZoneBlock::xferConnectivity(Xfer* xfer, zoneStorageType maxZone)
 	}
 }
 
+void ZoneBlock::xferDeepWaterConnectivity(Xfer* xfer, zoneStorageType maxZone)
+{
+	const Int end = m_firstZone + m_numZones;
+	if (m_numZones == 0 || m_firstZone > maxZone || end > maxZone + 1)
+		throw XFER_INVALID_PARAMETERS;
+	if (m_numZones == 1)
+		return;
+	if (!m_waterDeepWaterZones || !m_groundWaterDeepWaterZones)
+		throw XFER_INVALID_PARAMETERS;
+	for (auto* table : {m_waterDeepWaterZones, m_groundWaterDeepWaterZones})
+	{
+		for (Int i = 0; i < m_numZones; ++i)
+		{
+			xfer->xferUnsignedShort(&table[i]);
+			if (table[i] < m_firstZone || table[i] >= end)
+				throw XFER_INVALID_PARAMETERS;
+		}
+	}
+}
+
 void ZoneBlock::freeZones()
 {
 	delete [] m_groundCliffZones;
@@ -72,6 +94,12 @@ void ZoneBlock::freeZones()
 
 	delete [] m_groundWaterZones;
 	m_groundWaterZones = nullptr;
+
+	delete [] m_waterDeepWaterZones;
+	m_waterDeepWaterZones = nullptr;
+
+	delete [] m_groundWaterDeepWaterZones;
+	m_groundWaterDeepWaterZones = nullptr;
 
 	delete [] m_groundRubbleZones;
 	m_groundRubbleZones = nullptr;
@@ -104,10 +132,11 @@ void ZoneBlock::blockCalculateZones(PathfindCell **map, PathfindLayer layers[], 
 
 	if (m_numZones==1) return; // all zones are equivalent.
 
-	// Determine water/ground equivalent zones, and ground/cliff equivalent zones.
 	for (i=0; i<m_zonesAllocated; i++) {
 		m_groundCliffZones[i] = i+m_firstZone;
 		m_groundWaterZones[i] = i+m_firstZone;
+		m_waterDeepWaterZones[i] = i+m_firstZone;
+		m_groundWaterDeepWaterZones[i] = i+m_firstZone;
 		m_groundRubbleZones[i] = i+m_firstZone;
 		m_crusherZones[i] = i+m_firstZone;
 	}
@@ -118,6 +147,12 @@ void ZoneBlock::blockCalculateZones(PathfindCell **map, PathfindLayer layers[], 
 
 				if (PathfindCell::waterGround(map[i][j], map[i-1][j])) {
 					applyBlockZone(map[i][j], map[i-1][j], m_groundWaterZones, m_firstZone, m_numZones);
+				}
+				if (PathfindCell::waterDeepWater(map[i][j], map[i-1][j])) {
+					applyBlockZone(map[i][j], map[i-1][j], m_waterDeepWaterZones, m_firstZone, m_numZones);
+				}
+				if (PathfindCell::groundWaterDeepWater(map[i][j], map[i-1][j])) {
+					applyBlockZone(map[i][j], map[i-1][j], m_groundWaterDeepWaterZones, m_firstZone, m_numZones);
 				}
 				if (PathfindCell::groundRubble(map[i][j], map[i-1][j])) {
 					applyBlockZone(map[i][j], map[i-1][j], m_groundRubbleZones, m_firstZone, m_numZones);
@@ -132,6 +167,12 @@ void ZoneBlock::blockCalculateZones(PathfindCell **map, PathfindLayer layers[], 
 			if (j>bounds.lo.y && map[i][j].getZone()!=map[i][j-1].getZone()) {
 				if (PathfindCell::waterGround(map[i][j],map[i][j-1])) {
 					applyBlockZone(map[i][j], map[i][j-1], m_groundWaterZones, m_firstZone, m_numZones);
+				}
+				if (PathfindCell::waterDeepWater(map[i][j],map[i][j-1])) {
+					applyBlockZone(map[i][j], map[i][j-1], m_waterDeepWaterZones, m_firstZone, m_numZones);
+				}
+				if (PathfindCell::groundWaterDeepWater(map[i][j],map[i][j-1])) {
+					applyBlockZone(map[i][j], map[i][j-1], m_groundWaterDeepWaterZones, m_firstZone, m_numZones);
 				}
 				if (PathfindCell::groundRubble(map[i][j], map[i][j-1])) {
 					applyBlockZone(map[i][j], map[i][j-1], m_groundRubbleZones, m_firstZone, m_numZones);
@@ -163,14 +204,14 @@ zoneStorageType ZoneBlock::getEffectiveZone( LocomotorSurfaceTypeMask acceptable
 
 	if (acceptableSurfaces&LOCOMOTORSURFACE_AIR) return 1; // air is all zone 1.
 
-	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
-			(acceptableSurfaces&LOCOMOTORSURFACE_WATER) &&
-			(acceptableSurfaces&LOCOMOTORSURFACE_CLIFF)) {
-		// Locomotors can go on ground, water & cliff, so all is zone 1.
+	constexpr LocomotorSurfaceTypeMask allTerrain = LOCOMOTORSURFACE_GROUND |
+		LOCOMOTORSURFACE_CLIFF | LOCOMOTORSURFACE_WATER | LOCOMOTORSURFACE_DEEP_WATER |
+		LOCOMOTORSURFACE_RUBBLE | LOCOMOTORSURFACE_OBSTACLE | LOCOMOTORSURFACE_IMPASSABLE;
+	if ((acceptableSurfaces & allTerrain) == allTerrain) {
 		return 1;
 	}
 	if (m_numZones<2) {
-		return m_firstZone; // if we only got 1 zone, it's all the same zone.
+		return m_firstZone;
 	}
 	DEBUG_ASSERTCRASH(zone >=m_firstZone && zone < m_firstZone+m_numZones, ("Invalid range."));
 	if (zone<m_firstZone || zone >= m_firstZone+m_numZones) {
@@ -183,9 +224,23 @@ zoneStorageType ZoneBlock::getEffectiveZone( LocomotorSurfaceTypeMask acceptable
 		zone -= m_firstZone;
 	}
 
+	if ((acceptableSurfaces & LOCOMOTORSURFACE_GROUND) &&
+			(acceptableSurfaces & LOCOMOTORSURFACE_WATER) &&
+			(acceptableSurfaces & LOCOMOTORSURFACE_DEEP_WATER)) {
+		zone = m_groundWaterDeepWaterZones[zone];
+		DEBUG_ASSERTCRASH(zone >=m_firstZone && zone < m_firstZone+m_numZones, ("Invalid range."));
+		return zone;
+	}
+
+	if ((acceptableSurfaces & LOCOMOTORSURFACE_WATER) &&
+			(acceptableSurfaces & LOCOMOTORSURFACE_DEEP_WATER)) {
+		zone = m_waterDeepWaterZones[zone];
+		DEBUG_ASSERTCRASH(zone >=m_firstZone && zone < m_firstZone+m_numZones, ("Invalid range."));
+		return zone;
+	}
+
 	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
 			(acceptableSurfaces&LOCOMOTORSURFACE_CLIFF)) {
-		// Locomotors can go on ground & cliff, so use the ground cliff combiner.
 		zone = m_groundCliffZones[zone];
 		DEBUG_ASSERTCRASH(zone >=m_firstZone && zone < m_firstZone+m_numZones, ("Invalid range."));
 		return zone;
@@ -193,7 +248,6 @@ zoneStorageType ZoneBlock::getEffectiveZone( LocomotorSurfaceTypeMask acceptable
 
 	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
 			(acceptableSurfaces&LOCOMOTORSURFACE_WATER)) {
-		// Locomotors can go on ground & water, so use the ground water combiner.
 		zone = m_groundWaterZones[zone];
 		DEBUG_ASSERTCRASH(zone >=m_firstZone && zone < m_firstZone+m_numZones, ("Invalid range."));
 		return zone;
@@ -201,14 +255,12 @@ zoneStorageType ZoneBlock::getEffectiveZone( LocomotorSurfaceTypeMask acceptable
 
 	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
 			(acceptableSurfaces&LOCOMOTORSURFACE_RUBBLE)) {
-		// Locomotors can go on ground & rubble, so use the ground rubble combiner.
 		zone = m_groundRubbleZones[zone];
 		return zone;
 	}
 
 	if ( (acceptableSurfaces&LOCOMOTORSURFACE_CLIFF) &&
 			(acceptableSurfaces&LOCOMOTORSURFACE_WATER)) {
-		// Locomotors can go on ground & cliff, so use the ground cliff combiner.
 		DEBUG_CRASH(("Cliff water only locomotor sets not supported yet."));
 	}
 
@@ -226,7 +278,7 @@ void ZoneBlock::allocateZones()
 	freeZones();
 
 	if (m_numZones==1) {
-		return; // we don't need any zone equivalency tables.
+		return;
 	}
 
 	if (m_zonesAllocated == 0) {
@@ -235,9 +287,10 @@ void ZoneBlock::allocateZones()
 	while (m_zonesAllocated <= m_numZones) {
 		m_zonesAllocated *= 2;
 	}
-	// pool[]ify
 	m_groundCliffZones = MSGNEW("PathfindZoneInfo") zoneStorageType [m_zonesAllocated];
 	m_groundWaterZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
+	m_waterDeepWaterZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
+	m_groundWaterDeepWaterZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_groundRubbleZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_crusherZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 }

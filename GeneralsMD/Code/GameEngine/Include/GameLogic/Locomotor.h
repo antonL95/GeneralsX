@@ -354,6 +354,7 @@ public:
 	Real getUniformAxialDamping() const { return m_template->m_uniformAxialDamping;}			///< How much we roll in response to acceleration.
 	Real getTurnPivotOffset() const { return m_template->m_turnPivotOffset;}
 	Bool getApply2DFrictionWhenAirborne() const { return m_template->m_apply2DFrictionWhenAirborne; }
+	Bool getSeaLevelHeight(Real x, Real y, Real& height) const;
 	Bool getIsDownhillOnly() const { return m_template->m_downhillOnly; }
 	Bool getAllowMotiveForceWhileAirborne() const { return m_template->m_allowMotiveForceWhileAirborne; }
 	Int getAirborneTargetingHeight() const { return m_template->m_airborneTargetingHeight; }

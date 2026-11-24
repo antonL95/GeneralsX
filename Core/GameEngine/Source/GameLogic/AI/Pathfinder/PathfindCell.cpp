@@ -1139,18 +1139,41 @@ Bool PathfindCell::waterGround(const PathfindCell& targetCell, const PathfindCel
 {
 	CellType targetType = targetCell.getType();
 	CellType srcType = sourceCell.getType();
-	if ((targetType == CELL_CLEAR &&
-	     (srcType & CELL_WATER)))
+	const auto connectsToGround = [](CellType type)
+	{
+		return type == CELL_WATER || type == CELL_RUBBLE || type == CELL_BRIDGE_IMPASSABLE;
+	};
+	return (targetType == CELL_CLEAR && connectsToGround(srcType)) ||
+		(srcType == CELL_CLEAR && connectsToGround(targetType));
+}
+
+Bool PathfindCell::waterDeepWater(const PathfindCell& targetCell, const PathfindCell& sourceCell)
+{
+	CellType targetType = targetCell.getType();
+	CellType srcType = sourceCell.getType();
+	if (targetType == CELL_WATER && srcType == CELL_DEEP_WATER)
 	{
 		return true;
 	}
-	if ((srcType == CELL_CLEAR &&
-	     (targetType & CELL_WATER)))
+	if (srcType == CELL_WATER && targetType == CELL_DEEP_WATER)
 	{
 		return true;
 	}
 
 	return false;
+}
+
+Bool PathfindCell::groundWaterDeepWater(const PathfindCell& targetCell, const PathfindCell& sourceCell)
+{
+	CellType targetType = targetCell.getType();
+	CellType srcType = sourceCell.getType();
+	if (targetType == srcType)
+	{
+		return false;
+	}
+	const Bool targetValid = targetType == CELL_CLEAR || targetType == CELL_WATER || targetType == CELL_DEEP_WATER;
+	const Bool srcValid = srcType == CELL_CLEAR || srcType == CELL_WATER || srcType == CELL_DEEP_WATER;
+	return targetValid && srcValid;
 }
 
 Bool PathfindCell::groundRubble(const PathfindCell& targetCell, const PathfindCell& sourceCell)

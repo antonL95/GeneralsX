@@ -28,6 +28,8 @@ PathfindZoneManager::PathfindZoneManager() : m_maxZone(0),
 m_nextFrameToCalculateZones(0),
 m_groundCliffZones(nullptr),
 m_groundWaterZones(nullptr),
+m_waterDeepWaterZones(nullptr),
+m_groundWaterDeepWaterZones(nullptr),
 m_groundRubbleZones(nullptr),
 m_terrainZones(nullptr),
 m_crusherZones(nullptr),
@@ -53,6 +55,12 @@ void PathfindZoneManager::freeZones()
 
 	delete [] m_groundWaterZones;
 	m_groundWaterZones = nullptr;
+
+	delete [] m_waterDeepWaterZones;
+	m_waterDeepWaterZones = nullptr;
+
+	delete [] m_groundWaterDeepWaterZones;
+	m_groundWaterDeepWaterZones = nullptr;
 
 	delete [] m_groundRubbleZones;
 	m_groundRubbleZones = nullptr;
@@ -97,9 +105,10 @@ void PathfindZoneManager::allocateZones()
 		m_zonesAllocated *= 2;
 	}
 	DEBUG_LOG(("Allocating zone tables of size %d", m_zonesAllocated));
-	// pool[]ify
 	m_groundCliffZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_groundWaterZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
+	m_waterDeepWaterZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
+	m_groundWaterDeepWaterZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_groundRubbleZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_terrainZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_crusherZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
@@ -293,10 +302,11 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 		}
 	}
 
-	// Determine water/ground equivalent zones, and ground/cliff equivalent zones.
 	for (i=0; i<m_zonesAllocated; i++) {
 		m_groundCliffZones[i] = i;
 		m_groundWaterZones[i] = i;
+		m_waterDeepWaterZones[i] = i;
+		m_groundWaterDeepWaterZones[i] = i;
 		m_groundRubbleZones[i] = i;
 		m_terrainZones[i] = i;
 		m_crusherZones[i] = i;
@@ -323,6 +333,12 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 				if (PathfindCell::waterGround(r_thisCell, r_leftCell)) {
 					ZoneBlock::applyZone(r_thisCell, r_leftCell, m_groundWaterZones, m_maxZone);
 				}
+				if (PathfindCell::waterDeepWater(r_thisCell, r_leftCell)) {
+					ZoneBlock::applyZone(r_thisCell, r_leftCell, m_waterDeepWaterZones, m_maxZone);
+				}
+				if (PathfindCell::groundWaterDeepWater(r_thisCell, r_leftCell)) {
+					ZoneBlock::applyZone(r_thisCell, r_leftCell, m_groundWaterDeepWaterZones, m_maxZone);
+				}
 				if (PathfindCell::groundRubble(r_thisCell, r_leftCell)) {
 					ZoneBlock::applyZone(r_thisCell, r_leftCell, m_groundRubbleZones, m_maxZone);
 				}
@@ -336,11 +352,10 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 					ZoneBlock::applyZone(r_thisCell, r_leftCell, m_crusherZones, m_maxZone);
 				}
 #else
-				//if this is true, skip all the ones below
 				if (r_thisCell.getType() == r_leftCell.getType())
 					ZoneBlock::applyZone(r_thisCell, r_leftCell, m_hierarchicalZones, m_maxZone);
 				else {
-					Bool notTerrainOrCrusher = TRUE; // if this is false, skip the if-else-ladder below
+					Bool notTerrainOrCrusher = TRUE;
 
 					if (PathfindCell::terrain(r_thisCell, r_leftCell)) {
 						ZoneBlock::applyZone(r_thisCell, r_leftCell, m_terrainZones, m_maxZone);
@@ -359,6 +374,10 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 							ZoneBlock::applyZone(r_thisCell, r_leftCell, m_groundRubbleZones, m_maxZone);
 						else if (PathfindCell::groundCliff(r_thisCell, r_leftCell))
 							ZoneBlock::applyZone(r_thisCell, r_leftCell, m_groundCliffZones, m_maxZone);
+						if (PathfindCell::waterDeepWater(r_thisCell, r_leftCell))
+							ZoneBlock::applyZone(r_thisCell, r_leftCell, m_waterDeepWaterZones, m_maxZone);
+						if (PathfindCell::groundWaterDeepWater(r_thisCell, r_leftCell))
+							ZoneBlock::applyZone(r_thisCell, r_leftCell, m_groundWaterDeepWaterZones, m_maxZone);
 					}
 
 				}
@@ -376,6 +395,12 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 				if (PathfindCell::waterGround(r_thisCell, r_topCell)) {
 					ZoneBlock::applyZone(r_thisCell, r_topCell, m_groundWaterZones, m_maxZone);
 				}
+				if (PathfindCell::waterDeepWater(r_thisCell, r_topCell)) {
+					ZoneBlock::applyZone(r_thisCell, r_topCell, m_waterDeepWaterZones, m_maxZone);
+				}
+				if (PathfindCell::groundWaterDeepWater(r_thisCell, r_topCell)) {
+					ZoneBlock::applyZone(r_thisCell, r_topCell, m_groundWaterDeepWaterZones, m_maxZone);
+				}
 				if (PathfindCell::groundRubble(r_thisCell, r_topCell)) {
 					ZoneBlock::applyZone(r_thisCell, r_topCell, m_groundRubbleZones, m_maxZone);
 				}
@@ -389,11 +414,10 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 					ZoneBlock::applyZone(r_thisCell, r_topCell, m_crusherZones, m_maxZone);
 				}
 #else
-				//if this is true, skip all the ones below
 				if (r_thisCell.getType() == r_topCell.getType())
 					ZoneBlock::applyZone(r_thisCell, r_topCell, m_hierarchicalZones, m_maxZone);
 				else {
-					Bool notTerrainOrCrusher = TRUE; // if this is false, skip the if-else-ladder below
+					Bool notTerrainOrCrusher = TRUE;
 
 					if (PathfindCell::terrain(r_thisCell, r_topCell)) {
 						ZoneBlock::applyZone(r_thisCell, r_topCell, m_terrainZones, m_maxZone);
@@ -412,6 +436,10 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 							ZoneBlock::applyZone(r_thisCell, r_topCell, m_groundRubbleZones, m_maxZone);
 						else if (PathfindCell::groundCliff(r_thisCell, r_topCell))
 							ZoneBlock::applyZone(r_thisCell, r_topCell, m_groundCliffZones, m_maxZone);
+						if (PathfindCell::waterDeepWater(r_thisCell, r_topCell))
+							ZoneBlock::applyZone(r_thisCell, r_topCell, m_waterDeepWaterZones, m_maxZone);
+						if (PathfindCell::groundWaterDeepWater(r_thisCell, r_topCell))
+							ZoneBlock::applyZone(r_thisCell, r_topCell, m_groundWaterDeepWaterZones, m_maxZone);
 					}
 
 				}
@@ -422,15 +450,15 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 		}
 	}
 
-	//FLATTEN HIERARCHICAL ZONES
 	for (i=1; i<m_maxZone; i++) {
 		Int zone = m_hierarchicalZones[i];
 		m_hierarchicalZones[i] = m_hierarchicalZones[zone];
 	}
 
-	//THIS BLOCK IS 20%
 	ZoneBlock::flattenZones(m_groundCliffZones, m_hierarchicalZones, m_maxZone);
 	ZoneBlock::flattenZones(m_groundWaterZones, m_hierarchicalZones, m_maxZone);
+	ZoneBlock::flattenZones(m_waterDeepWaterZones, m_hierarchicalZones, m_maxZone);
+	ZoneBlock::flattenZones(m_groundWaterDeepWaterZones, m_hierarchicalZones, m_maxZone);
 	ZoneBlock::flattenZones(m_groundRubbleZones, m_hierarchicalZones, m_maxZone);
 	ZoneBlock::flattenZones(m_terrainZones, m_hierarchicalZones, m_maxZone);
 	ZoneBlock::flattenZones(m_crusherZones, m_hierarchicalZones, m_maxZone);
@@ -536,6 +564,24 @@ void PathfindZoneManager::xferConnectivity(Xfer* xfer, PathfindCell** map, Pathf
 	for (Int x = 0; x < m_zoneBlockExtent.x; ++x)
 		for (Int y = 0; y < m_zoneBlockExtent.y; ++y)
 			m_zoneBlocks[x][y].xferConnectivity(xfer, m_maxZone);
+}
+
+void PathfindZoneManager::xferDeepWaterConnectivity(Xfer* xfer)
+{
+	if (m_maxZone == 0 || m_maxZone > MAX_GROUND_ZONE_COUNT + LAYER_LAST + 1 || !hasZones())
+		throw XFER_INVALID_PARAMETERS;
+	for (auto* table : {m_waterDeepWaterZones, m_groundWaterDeepWaterZones})
+	{
+		for (Int i = 0; i <= m_maxZone; ++i)
+		{
+			xfer->xferUnsignedShort(&table[i]);
+			if (table[i] > m_maxZone)
+				throw XFER_INVALID_PARAMETERS;
+		}
+	}
+	for (Int x = 0; x < m_zoneBlockExtent.x; ++x)
+		for (Int y = 0; y < m_zoneBlockExtent.y; ++y)
+			m_zoneBlocks[x][y].xferDeepWaterConnectivity(xfer, m_maxZone);
 }
 
 /**
@@ -838,10 +884,10 @@ zoneStorageType PathfindZoneManager::getEffectiveZone( LocomotorSurfaceTypeMask 
 	}
 	if (acceptableSurfaces&LOCOMOTORSURFACE_AIR) return 1; // air is all zone 1.
 
-	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
-			(acceptableSurfaces&LOCOMOTORSURFACE_WATER) &&
-			(acceptableSurfaces&LOCOMOTORSURFACE_CLIFF)) {
-		// Locomotors can go on ground, water & cliff, so all is zone 1.
+	constexpr LocomotorSurfaceTypeMask allTerrain = LOCOMOTORSURFACE_GROUND |
+		LOCOMOTORSURFACE_CLIFF | LOCOMOTORSURFACE_WATER | LOCOMOTORSURFACE_DEEP_WATER |
+		LOCOMOTORSURFACE_RUBBLE | LOCOMOTORSURFACE_OBSTACLE | LOCOMOTORSURFACE_IMPASSABLE;
+	if ((acceptableSurfaces & allTerrain) == allTerrain) {
 		return 1;
 	}
 
@@ -849,30 +895,39 @@ zoneStorageType PathfindZoneManager::getEffectiveZone( LocomotorSurfaceTypeMask 
 		zone = m_crusherZones[zone];
 	}
 
+	if ((acceptableSurfaces & LOCOMOTORSURFACE_GROUND) &&
+			(acceptableSurfaces & LOCOMOTORSURFACE_WATER) &&
+			(acceptableSurfaces & LOCOMOTORSURFACE_DEEP_WATER)) {
+		zone = m_groundWaterDeepWaterZones[zone];
+		return zone;
+	}
+
+	if ((acceptableSurfaces & LOCOMOTORSURFACE_WATER) &&
+			(acceptableSurfaces & LOCOMOTORSURFACE_DEEP_WATER)) {
+		zone = m_waterDeepWaterZones[zone];
+		return zone;
+	}
+
 	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
 			(acceptableSurfaces&LOCOMOTORSURFACE_CLIFF)) {
-		// Locomotors can go on ground & cliff, so use the ground cliff combiner.
 		zone = m_groundCliffZones[zone];
 		return zone;
 	}
 
 	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
 			(acceptableSurfaces&LOCOMOTORSURFACE_WATER)) {
-		// Locomotors can go on ground & water, so use the ground water combiner.
 		zone = m_groundWaterZones[zone];
 		return zone;
 	}
 
 	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
 			(acceptableSurfaces&LOCOMOTORSURFACE_RUBBLE)) {
-		// Locomotors can go on ground & rubble, so use the ground rubble combiner.
 		zone = m_groundRubbleZones[zone];
 		return zone;
 	}
 
 	if ( (acceptableSurfaces&LOCOMOTORSURFACE_CLIFF) &&
 			(acceptableSurfaces&LOCOMOTORSURFACE_WATER)) {
-		// Locomotors can go on ground & cliff, so use the ground cliff combiner.
 		DEBUG_CRASH(("Cliff water only locomotor sets not supported yet."));
 	}
 	zone = m_hierarchicalZones[zone];

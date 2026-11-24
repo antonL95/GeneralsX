@@ -559,6 +559,7 @@ void ParachuteContain::onRemoving( Object *rider )
 	if( rider->isOffMap() ||
     (cellType == PathfindCell::CELL_CLIFF) ||
     (cellType == PathfindCell::CELL_WATER) ||
+    (cellType == PathfindCell::CELL_DEEP_WATER) ||
     (cellType == PathfindCell::CELL_IMPASSABLE) )
 	{
 		// The Paradrop command was legal, the parachute destination was legal, but the parachute
