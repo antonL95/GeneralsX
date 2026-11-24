@@ -136,6 +136,12 @@ public:
 	UnsignedInt getRetailWeatherEndFrame() const;
 	void setRetailWeatherModifier(const Object& source, const SpecialPowerModuleData& power);
 	void applyRetailWeatherModifier(Object& target);
+	void setObjectivesEnabled(Bool enabled);
+	Bool getObjectivesEnabled() const;
+	void setObjectiveVisible(Int objective, Bool visible);
+	Bool isObjectiveVisible(Int objective) const;
+	void setObjectiveCompleted(Int objective, Bool completed);
+	Bool isObjectiveCompleted(Int objective) const;
 	UnsignedInt getCRC( Int mode = CRC_CACHED, AsciiString deepCRCFileName = AsciiString::TheEmptyString );		///< Returns the CRC
 
 	void setObjectIDCounter( ObjectID nextObjID ) { m_nextObjID = nextObjID; }
@@ -399,6 +405,9 @@ private:
 	const SpecialPowerModuleData* getRetailWeatherModifierData() const;
 	void applyRetailWeatherModifier(Object& target, const SpecialPowerModuleData& power);
 	void clearRetailWeatherModifier();
+	Bool m_objectivesEnabled = TRUE;
+	std::vector<UnsignedByte> m_objectiveVisible;
+	std::vector<UnsignedByte> m_objectiveCompleted;
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 	// CRC cache system -----------------------------------------------------------------------------

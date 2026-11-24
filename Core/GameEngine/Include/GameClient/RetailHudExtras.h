@@ -51,7 +51,4 @@ void parse(INI *ini);
 void reset();
 void show();
 void close();
-void setEnabled(Bool enabled);
-void setVisible(Int objective, Bool visible);
-void setCompleted(Int objective, Bool completed);
 }

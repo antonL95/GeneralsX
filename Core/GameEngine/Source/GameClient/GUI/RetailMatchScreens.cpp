@@ -135,8 +135,6 @@ namespace
 	struct ObjectiveEntry
 	{
 		AsciiString text;
-		Bool visible = FALSE;
-		Bool completed = FALSE;
 		Bool bonus = FALSE;
 	};
 
@@ -144,7 +142,6 @@ namespace
 	GameWindow *objectivesWindow = nullptr;
 	std::unique_ptr<AptScene> objectivesScene;
 	std::unique_ptr<AptScene> objectiveChecks;
-	Bool objectivesEnabled = TRUE;
 	Bool objectivesPausedGame = FALSE;
 	Bool playerStatusMode = FALSE;
 	Bool resumePressed = FALSE;
@@ -154,12 +151,7 @@ namespace
 	void parseObjective(INI *ini, void *instance, void *, const void *)
 	{
 		auto &entries = *static_cast<std::vector<ObjectiveEntry> *>(instance);
-		entries.push_back({ini->getNextToken(), FALSE, FALSE, Bonus});
-	}
-
-	ObjectiveEntry *objectiveByNumber(Int number)
-	{
-		return number >= 1 && size_t(number) <= objectiveEntries.size() ? &objectiveEntries[number - 1] : nullptr;
+		entries.push_back({ini->getNextToken(), Bonus});
 	}
 
 	std::unique_ptr<AptScene> readPlayerStatusScene()
@@ -228,9 +220,11 @@ namespace
 		});
 
 		Int row = 0;
-		for (const ObjectiveEntry &entry : objectiveEntries)
+		for (size_t i = 0; i < objectiveEntries.size(); ++i)
 		{
-			if (!entry.visible)
+			const ObjectiveEntry &entry = objectiveEntries[i];
+			const Int number = static_cast<Int>(i + 1);
+			if (!TheGameLogic->isObjectiveVisible(number))
 				continue;
 			const std::string path = "_root.objectives.Objective" + std::to_string(++row);
 			const Box text = scene.bounds(path + ".Text.textClip.textField");
@@ -238,7 +232,7 @@ namespace
 				break;
 			painter.text(TheGameText->fetch(entry.text), text, 14, entry.bonus ? muted : white, "Albertus MT", FALSE, TRUE);
 			const Box icon = scene.bounds(path + ".Icon");
-			if (entry.completed && objectiveChecks && objectiveChecks->valid())
+			if (TheGameLogic->isObjectiveCompleted(number) && objectiveChecks && objectiveChecks->valid())
 			{
 				const Box iconArt = objectiveChecks->bounds("objective_checked");
 				objectiveChecks->drawFrameAt(0, (icon.left - iconArt.left) * painter.sx,
@@ -305,7 +299,7 @@ void parse(INI *ini)
 
 void show()
 {
-	if (!objectivesEnabled || objectivesWindow || !TheGameLogic->isInGame() || TheInGameUI->isQuitMenuVisible())
+	if (!TheGameLogic->getObjectivesEnabled() || objectivesWindow || !TheGameLogic->isInGame() || TheInGameUI->isQuitMenuVisible())
 		return;
 	playerStatusMode = TheGameLogic->isInSkirmishGame() || TheGameLogic->isInMultiplayerGame();
 	objectivesScene = playerStatusMode ? readPlayerStatusScene() : std::make_unique<AptScene>("Objectives");
@@ -358,27 +352,8 @@ void reset()
 {
 	close();
 	objectiveEntries.clear();
-	objectivesEnabled = TRUE;
 }
 
-void setEnabled(Bool enabled)
-{
-	objectivesEnabled = enabled;
-	if (!enabled)
-		close();
-}
-
-void setVisible(Int objective, Bool visible)
-{
-	if (ObjectiveEntry *entry = objectiveByNumber(objective))
-		entry->visible = visible;
-}
-
-void setCompleted(Int objective, Bool completed)
-{
-	if (ObjectiveEntry *entry = objectiveByNumber(objective))
-		entry->completed = completed;
-}
 }
 
 class RetailLoadingScreen::Data

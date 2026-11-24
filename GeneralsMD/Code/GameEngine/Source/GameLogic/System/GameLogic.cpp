@@ -79,6 +79,7 @@
 #include "GameClient/Water.h"
 #include "GameClient/Snow.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
 #include "Common/XferCRC.h"
@@ -477,6 +478,9 @@ void GameLogic::reset()
 	m_retailWeather = WEATHER_NONE;
 	m_retailWeatherEndFrame = 0;
 	m_weatherModifier = {};
+	m_objectivesEnabled = TRUE;
+	m_objectiveVisible.clear();
+	m_objectiveCompleted.clear();
 	CastleTemplates::reset();
 	ExperienceLevelStore::reset();
 	m_thingTemplateBuildableOverrides.clear();
@@ -4119,6 +4123,56 @@ void GameLogic::setRetailWeatherModifier(const Object& source, const SpecialPowe
 	}
 	if (power.m_changeWeather >= 0)
 		changeRetailWeather(power.m_changeWeather, power.m_weatherDuration);
+void GameLogic::setObjectivesEnabled(Bool enabled)
+{
+	m_objectivesEnabled = enabled;
+}
+
+Bool GameLogic::getObjectivesEnabled() const
+{
+	return m_objectivesEnabled;
+}
+
+void GameLogic::setObjectiveVisible(Int objective, Bool visible)
+{
+	if (objective < 1)
+		return;
+	const size_t index = static_cast<size_t>(objective - 1);
+	if (index >= m_objectiveVisible.size())
+	{
+		m_objectiveVisible.resize(index + 1, 0);
+		m_objectiveCompleted.resize(index + 1, 0);
+	}
+	m_objectiveVisible[index] = visible ? 1 : 0;
+}
+
+Bool GameLogic::isObjectiveVisible(Int objective) const
+{
+	if (objective < 1)
+		return FALSE;
+	const size_t index = static_cast<size_t>(objective - 1);
+	return index < m_objectiveVisible.size() && m_objectiveVisible[index] != 0;
+}
+
+void GameLogic::setObjectiveCompleted(Int objective, Bool completed)
+{
+	if (objective < 1)
+		return;
+	const size_t index = static_cast<size_t>(objective - 1);
+	if (index >= m_objectiveCompleted.size())
+	{
+		m_objectiveVisible.resize(index + 1, 0);
+		m_objectiveCompleted.resize(index + 1, 0);
+	}
+	m_objectiveCompleted[index] = completed ? 1 : 0;
+}
+
+Bool GameLogic::isObjectiveCompleted(Int objective) const
+{
+	if (objective < 1)
+		return FALSE;
+	const size_t index = static_cast<size_t>(objective - 1);
+	return index < m_objectiveCompleted.size() && m_objectiveCompleted[index] != 0;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -5932,7 +5986,26 @@ void GameLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 			block->xferAsciiString(&m_weatherModifier.objectTemplate);
 			block->xferAsciiString(&m_weatherModifier.moduleTag);
 			block->xferUnsignedInt(&m_weatherModifier.endFrame);
-		}, [this] { m_weatherModifier = {}; }}
+		}, [this] { m_weatherModifier = {}; }},
+		{"objective-state", [this](Xfer* x) {
+			x->xferBool(&m_objectivesEnabled);
+			UnsignedInt count = static_cast<UnsignedInt>(m_objectiveVisible.size());
+			x->xferUnsignedInt(&count);
+			if (x->getXferMode() == XFER_LOAD)
+			{
+				m_objectiveVisible.assign(count, 0);
+				m_objectiveCompleted.assign(count, 0);
+			}
+			for (UnsignedInt i = 0; i < count; ++i)
+			{
+				x->xferUnsignedByte(&m_objectiveVisible[i]);
+				x->xferUnsignedByte(&m_objectiveCompleted[i]);
+			}
+		}, [this] {
+			m_objectivesEnabled = TRUE;
+			m_objectiveVisible.clear();
+			m_objectiveCompleted.clear();
+		}},
 	});
 }
 
