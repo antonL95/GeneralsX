@@ -1440,20 +1440,17 @@ protected:
 
 		if (retailObject)
 		{
-			if (m_veterancyLevel > 0)
-			{
-				ExperienceLevelStore::applyPendingLevels(obj);
-				obj->getExperienceTracker()->gainRetailLevels(m_veterancyLevel);
-			}
 			if (m_useJustBuiltFlag)
 			{
 				const UnsignedInt duration = std::max(m_justBuiltDuration,
 					RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND));
 				obj->setTimedModelCondition(MODELCONDITION_JUST_BUILT, duration);
-				static const NameKeyType grantKey = NAMEKEY("GrantUpgradeCreate");
-				for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
-					if ((*module)->getModuleNameKey() == grantKey)
-						static_cast<GrantUpgradeCreate*>(*module)->onRetailOCLComplete();
+			}
+			GrantUpgradeCreate::completeInstantBuild(*obj);
+			if (m_veterancyLevel > 0)
+			{
+				ExperienceLevelStore::applyPendingLevels(obj);
+				obj->getExperienceTracker()->gainRetailLevels(m_veterancyLevel);
 			}
 		}
 

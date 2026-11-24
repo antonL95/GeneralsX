@@ -166,10 +166,15 @@ void GrantUpgradeCreate::onBuildComplete()
 	}
 }
 
-void GrantUpgradeCreate::onRetailOCLComplete()
+void GrantUpgradeCreate::completeInstantBuild(Object& object)
 {
-	if (getGrantUpgradeCreateModuleData()->m_giveOnBuildComplete)
-		onBuildComplete();
+	if (object.isDestroyed() || (TheGameState && TheGameState->isInLoadGame()))
+		return;
+
+	static const NameKeyType grantKey = NAMEKEY("GrantUpgradeCreate");
+	for (BehaviorModule** module = object.getBehaviorModules(); *module; ++module)
+		if ((*module)->getModuleNameKey() == grantKey)
+			(*module)->getCreate()->onBuildComplete();
 }
 
 void GrantUpgradeCreate::grantRetailUpgrade(Bool record)

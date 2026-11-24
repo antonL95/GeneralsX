@@ -71,7 +71,7 @@ public:
 	/// the create method
 	virtual void onCreate() override;
 	virtual void onBuildComplete() override;	///< This is called when you are a finished game object
-	void onRetailOCLComplete();
+	static void completeInstantBuild(Object& object);
 
 protected:
 

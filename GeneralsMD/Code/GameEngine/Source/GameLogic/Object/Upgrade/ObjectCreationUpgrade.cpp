@@ -41,6 +41,7 @@
 #include "Common/ThingFactory.h"
 #include "Common/Upgrade.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/GrantUpgradeCreate.h"
 #include "GameLogic/Module/SlavedUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -292,6 +293,7 @@ UpdateSleepTime RetailObjectCreationUpgrade::update()
 		const Coord3D position{world.X, world.Y, world.Z};
 		spawned->setPosition(&position);
 		spawned->setOrientation(object->getOrientation() + data->m_spawnAngle);
+		GrantUpgradeCreate::completeInstantBuild(*spawned);
 		const auto fadeFrames = static_cast<UnsignedInt>(
 			static_cast<UnsignedInt64>(data->m_fadeInMsecs) * LOGICFRAMES_PER_SECOND / 1000);
 		if (fadeFrames)
