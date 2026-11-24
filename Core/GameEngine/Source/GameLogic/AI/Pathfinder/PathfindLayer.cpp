@@ -646,7 +646,8 @@ void PathfindLayer::classifyLayerMapCell( Int i, Int j , PathfindCell *cell, Bri
 					const Real toX = center.x - info->to.x, toY = center.y - info->to.y;
 					const Coord3D& endpoint = fromX * fromX + fromY * fromY <= toX * toX + toY * toY ? info->from : info->to;
 					PathfindCell* wallCell = TheAI->pathfinder()->getCell(LAYER_WALL, i, j);
-					const Real wallHeight = TheAI->pathfinder()->getWallHeightAt(center);
+					const Coord3D& wallPoint = TheAI->pathfinder()->isPointOnWall(&endpoint) ? endpoint : center;
+					const Real wallHeight = TheAI->pathfinder()->getWallHeightAt(wallPoint);
 					if (wallCell && wallCell->getLayer() == LAYER_WALL && std::fabs(wallHeight - endpoint.z) < 15.0f)
 					{
 						target = LAYER_WALL;
