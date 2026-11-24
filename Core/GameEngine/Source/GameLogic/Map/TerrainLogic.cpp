@@ -2191,7 +2191,7 @@ const WaterHandle* TerrainLogic::getWaterHandle( Real x, Real y )
 			continue;
 
 		// See if point is in a water area
-		if( pTrig->pointInTrigger( iLoc ) )
+		if( pTrig->isImportedRiver() ? pTrig->pointInImportedRiver(x, y) : pTrig->pointInTrigger(iLoc) )
 		{
 
 			if( pTrig->getPoint( 0 )->z >= waterZ )
@@ -3201,10 +3201,124 @@ void TerrainLogic::xferRetailTaint(Xfer* xfer)
 
 void TerrainLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 {
-	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
-		{"terrain-fire", [this](Xfer* block) { m_retailFire.xfer(block); }, [this] { m_retailFire.prepareLegacyLoad(); }},
-		{"terrain-taint", [this](Xfer* block) { xferRetailTaint(block); }, [this] { m_retailTaint.clear(); }}
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	Bool hasRiverState = loading || hasImportedRiverUpdates();
+	for (const PolygonTrigger* river = PolygonTrigger::getFirstPolygonTrigger(); !hasRiverState && river; river = river->getNext())
+		hasRiverState = river->isImportedRiver() && river->getPoint(0)->z != river->getAuthoredRiverHeight();
+
+	const RetailSaveBlocks::Block<Xfer> fire{
+		"terrain-fire", [this](Xfer* block) { m_retailFire.xfer(block); }, [this] { m_retailFire.prepareLegacyLoad(); }
+	};
+	const RetailSaveBlocks::Block<Xfer> taint{
+		"terrain-taint", [this](Xfer* block) { xferRetailTaint(block); }, [this] { m_retailTaint.clear(); }
+	};
+	if (hasRiverState)
+	{
+		RetailSaveBlocks::transferSection(xfer, loading, present, {
+			fire,
+			taint,
+			{"river-water", [this](Xfer* block) { xferImportedRiverState(block); }, []
+				{
+					for (PolygonTrigger* river = PolygonTrigger::getFirstPolygonTrigger(); river; river = river->getNext())
+						if (river->isImportedRiver())
+							river->setImportedRiverHeight(river->getAuthoredRiverHeight());
+				}}
+		});
+	}
+	else
+	{
+		RetailSaveBlocks::transferSection(xfer, loading, present, {fire, taint});
+	}
+}
+
+Bool TerrainLogic::hasImportedRiverUpdates() const
+{
+	return std::any_of(m_waterToUpdate, m_waterToUpdate + m_numWaterToUpdate, [](const DynamicWaterEntry& entry)
+	{
+		const PolygonTrigger* polygon = entry.waterTable->m_polygon;
+		return polygon && polygon->isImportedRiver();
 	});
+}
+
+void TerrainLogic::xferImportedRiverState(Xfer* xfer)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	std::vector<PolygonTrigger*> changed;
+	UnsignedInt riverCount = 0;
+	for (PolygonTrigger* river = PolygonTrigger::getFirstPolygonTrigger(); river; river = river->getNext())
+	{
+		if (!river->isImportedRiver())
+			continue;
+		++riverCount;
+		if (loading)
+			river->setImportedRiverHeight(river->getAuthoredRiverHeight());
+		else if (river->getPoint(0)->z != river->getAuthoredRiverHeight())
+			changed.push_back(river);
+	}
+
+	UnsignedInt count = changed.size();
+	xfer->xferUnsignedInt(&count);
+	if (count > riverCount)
+		throw SC_INVALID_DATA;
+	for (UnsignedInt i = 0; i < count; ++i)
+	{
+		PolygonTrigger* river = loading ? nullptr : changed[i];
+		Int id = river ? river->getID() : 0;
+		Int height = river ? river->getPoint(0)->z : 0;
+		xfer->xferInt(&id);
+		xfer->xferInt(&height);
+		if (loading)
+		{
+			river = PolygonTrigger::getPolygonTriggerByID(id);
+			if (!river || !river->isImportedRiver())
+				throw SC_INVALID_DATA;
+			river->setImportedRiverHeight(height);
+		}
+	}
+
+	Bool hasUpdates = !loading && hasImportedRiverUpdates();
+	xfer->xferBool(&hasUpdates);
+	if (hasUpdates)
+		xferWaterUpdates(xfer, TRUE);
+}
+
+void TerrainLogic::xferWaterUpdates(Xfer* xfer, Bool includeRivers)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	const auto isRiver = [](const DynamicWaterEntry& entry)
+	{
+		const PolygonTrigger* polygon = entry.waterTable->m_polygon;
+		return polygon && polygon->isImportedRiver();
+	};
+	Int count = m_numWaterToUpdate;
+	if (!loading && !includeRivers)
+		count -= std::count_if(m_waterToUpdate, m_waterToUpdate + count, isRiver);
+	xfer->xferInt(&count);
+	if (count < 0 || count > MAX_DYNAMIC_WATER)
+		throw SC_INVALID_DATA;
+	if (loading)
+		m_numWaterToUpdate = count;
+
+	for (Int i = 0; i < m_numWaterToUpdate; ++i)
+	{
+		DynamicWaterEntry& entry = m_waterToUpdate[i];
+		if (!loading && !includeRivers && isRiver(entry))
+			continue;
+
+		Int id = loading ? 0 : entry.waterTable->m_polygon->getID();
+		xfer->xferInt(&id);
+		if (loading)
+		{
+			const PolygonTrigger* polygon = PolygonTrigger::getPolygonTriggerByID(id);
+			if (!polygon || !polygon->isWaterArea() || (!includeRivers && polygon->isImportedRiver()))
+				throw SC_INVALID_DATA;
+			entry.waterTable = polygon->getWaterHandle();
+		}
+		xfer->xferReal(&entry.changePerFrame);
+		xfer->xferReal(&entry.targetHeight);
+		xfer->xferReal(&entry.damageAmount);
+		xfer->xferReal(&entry.currentHeight);
+	}
 }
 
 void TerrainLogic::xferMapTrees(Xfer* xfer)
@@ -3272,75 +3386,8 @@ void TerrainLogic::xfer( Xfer *xfer )
 	if( xfer->getXferMode() == XFER_LOAD )
 		setActiveBoundary( activeBoundary );
 
-	// updatable water tables
-	if( version >= 2 )
-	{
-
-		// number of water entries in our update array
-		xfer->xferInt( &m_numWaterToUpdate );
-
-		// water update entry data
-		for( UnsignedInt i = 0; i < m_numWaterToUpdate; ++i )
-		{
-
-			// water handle
-			if( xfer->getXferMode() == XFER_SAVE )
-			{
-
-				// write ID of polygon trigger that this water handle is representing
-				Int triggerID = m_waterToUpdate[ i ].waterTable->m_polygon->getID();
-				xfer->xferInt( &triggerID );
-
-			}
-			else if (xfer->getXferMode() == XFER_LOAD)
-			{
-
-				// read trigger id
-				Int triggerID;
-				xfer->xferInt( &triggerID );
-
-				// find polygon trigger
-				PolygonTrigger *poly = PolygonTrigger::getPolygonTriggerByID( triggerID );
-
-				// sanity
-				if( poly == nullptr )
-				{
-
-					DEBUG_CRASH(( "TerrainLogic::xfer - Unable to find polygon trigger for water table with trigger ID '%d'",
-												triggerID ));
-					throw SC_INVALID_DATA;
-
-				}
-
-				// set water handle
-				m_waterToUpdate[ i ].waterTable = poly->getWaterHandle();
-
-				// sanity
-				if( m_waterToUpdate[ i ].waterTable == nullptr )
-				{
-
-					DEBUG_CRASH(( "TerrainLogic::xfer - Polygon trigger to use for water handle has no water handle!" ));
-					throw SC_INVALID_DATA;
-
-				}
-
-			}
-
-			// change per frame
-			xfer->xferReal( &m_waterToUpdate[ i ].changePerFrame );
-
-			// target height
-			xfer->xferReal( &m_waterToUpdate[ i ].targetHeight );
-
-			// damage amount
-			xfer->xferReal( &m_waterToUpdate[ i ].damageAmount );
-
-			// current height
-			xfer->xferReal( &m_waterToUpdate[ i ].currentHeight );
-
-		}
-
-	}
+	if (version >= 2)
+		xferWaterUpdates(xfer, FALSE);
 
 	if (retail && version <= 3 && xfer->getXferMode() == XFER_LOAD)
 	{

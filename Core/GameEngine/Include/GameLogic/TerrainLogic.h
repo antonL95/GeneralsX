@@ -352,6 +352,9 @@ protected:
 	void xferMapTrees(Xfer* xfer);
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	void xferRetailTaint(Xfer* xfer);
+	Bool hasImportedRiverUpdates() const;
+	void xferImportedRiverState(Xfer* xfer);
+	void xferWaterUpdates(Xfer* xfer, Bool includeRivers);
 	RetailTerrainFire m_retailFire;
 	std::map<std::pair<Int, Int>, ObjectID> m_retailTaint;
 

@@ -5693,7 +5693,7 @@ void GameLogic::xfer( Xfer *xfer )
 		// count the number of polygon triggers we have
 		UnsignedInt triggerCount = 0;
 		for( poly = PolygonTrigger::getFirstPolygonTrigger(); poly; poly = poly->getNext() )
-			if (!poly->isCastleArea())
+			if (!poly->isCastleArea() && !poly->isImportedRiver())
 				triggerCount++;
 
 		// sanity count
@@ -5722,7 +5722,7 @@ void GameLogic::xfer( Xfer *xfer )
 
 			for( poly = PolygonTrigger::getFirstPolygonTrigger(); poly; poly = poly->getNext() )
 			{
-				if (poly->isCastleArea())
+				if (poly->isCastleArea() || poly->isImportedRiver())
 					continue;
 
 				// write polygon ID
@@ -5750,7 +5750,7 @@ void GameLogic::xfer( Xfer *xfer )
 				poly = PolygonTrigger::getPolygonTriggerByID( triggerID );
 
 				// sanity
-				if( poly == nullptr )
+				if( poly == nullptr || poly->isImportedRiver() )
 				{
 
 					DEBUG_CRASH(( "GameLogic::xfer - Unable to find polygon trigger with id '%d'",

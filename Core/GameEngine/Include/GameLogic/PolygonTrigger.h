@@ -37,9 +37,11 @@
 #include "Common/GameType.h"
 #include "Common/Snapshot.h"
 #include "Common/STLTypedefs.h"
+#include "Lib/Region2D.h"
 #include <array>
 #include <memory>
 #include <optional>
+#include <vector>
 
 class DataChunkInput;
 class DataChunkOutput;
@@ -104,6 +106,9 @@ protected:
 	std::unique_ptr<StandingWaterSettings> m_standingWater;
 	std::optional<UnsignedInt> m_bfmeTriggerAreaId;
 	std::optional<ObjectID> m_castleAreaOwner;
+	std::vector<Coord2D> m_importedRiverBanks;
+	Region2D m_importedRiverBounds{};
+	Int m_authoredRiverHeight = 0;
 
 	static PolygonTrigger* ThePolygonTriggerListPtr;
 	static Int s_currentID; ///< Current id for new triggers.
@@ -138,10 +143,16 @@ public:
 	void setCastleAreaOwner(ObjectID owner) { m_castleAreaOwner = owner; }
 	Bool isCastleArea() const { return m_castleAreaOwner.has_value(); }
 	Bool isRetired() const { return m_castleAreaOwner == INVALID_ID; }
-	static void assignImportedIDs(const std::vector<PolygonTrigger *> &polygons);
+	static void assignImportedIDs(const std::vector<PolygonTrigger *> &polygons,
+		const std::vector<PolygonTrigger *> &rivers);
 	static void installImportedPolygons(const std::vector<PolygonTrigger *> &polygons);
 	void setStandingWater(StandingWaterSettings settings);
 	const StandingWaterSettings *getStandingWater() const { return m_standingWater.get(); }
+	void setImportedRiverBanks(std::vector<Coord2D> banks);
+	Bool isImportedRiver() const { return !m_importedRiverBanks.empty(); }
+	Bool pointInImportedRiver(Real x, Real y) const;
+	Int getAuthoredRiverHeight() const { return m_authoredRiverHeight; }
+	void setImportedRiverHeight(Int height);
 	void setBfmeTriggerAreaId(UnsignedInt id);
 	UnsignedInt getBfmeTriggerAreaId() const { return m_bfmeTriggerAreaId.value(); }
 	static void removePolygonTrigger(PolygonTrigger *pTrigger);

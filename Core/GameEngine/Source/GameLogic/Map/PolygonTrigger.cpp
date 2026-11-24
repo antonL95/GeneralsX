@@ -416,24 +416,73 @@ void PolygonTrigger::setBfmeTriggerAreaId(UnsignedInt id)
 	m_boundsNeedsUpdate = true;
 }
 
-void PolygonTrigger::assignImportedIDs(const std::vector<PolygonTrigger *> &polygons)
+void PolygonTrigger::setImportedRiverBanks(std::vector<Coord2D> banks)
+{
+	m_importedRiverBanks = std::move(banks);
+	m_importedRiverBounds = {m_importedRiverBanks.front(), m_importedRiverBanks.front()};
+	for (const Coord2D &bank : m_importedRiverBanks)
+		m_importedRiverBounds.uniteWith(bank);
+	m_authoredRiverHeight = m_points[0].z;
+	setWaterArea(TRUE);
+	setRiver(TRUE);
+}
+
+void PolygonTrigger::setImportedRiverHeight(Int height)
+{
+	for (Int i = 0; i < m_numPoints; ++i)
+		m_points[i].z = height;
+}
+
+Bool PolygonTrigger::pointInImportedRiver(Real x, Real y) const
+{
+	if (!m_importedRiverBounds.contains(x, y))
+		return FALSE;
+
+	Bool inside = FALSE;
+	const Coord2D *previous = &m_importedRiverBanks.back();
+	for (const Coord2D &current : m_importedRiverBanks)
+	{
+		const Coord2D *low = previous;
+		const Coord2D *high = &current;
+		previous = &current;
+		if (low->y > high->y)
+			std::swap(low, high);
+		if (y <= low->y || y > high->y || x > std::max(low->x, high->x))
+			continue;
+
+		const Real ray = (x - low->x) * (high->y - low->y);
+		const Real edge = (y - low->y) * (high->x - low->x);
+		if (ray <= edge)
+			inside = !inside;
+	}
+	return inside;
+}
+
+void PolygonTrigger::assignImportedIDs(const std::vector<PolygonTrigger *> &polygons,
+	const std::vector<PolygonTrigger *> &rivers)
 {
 	std::set<Int> used;
 	for (const PolygonTrigger *polygon = getFirstPolygonTrigger(); polygon; polygon = polygon->getNext())
 		used.insert(polygon->getID());
-	std::set<Int> reserved = used;
-	for (const PolygonTrigger *polygon : polygons)
-		reserved.insert(polygon->getID());
-
-	Int next = 1;
-	for (PolygonTrigger *polygon : polygons)
+	const auto assignGroup = [&used](const std::vector<PolygonTrigger *> &group)
 	{
-		if (used.insert(polygon->getID()).second)
-			continue;
-		while (reserved.count(next))
-			++next;
-		polygon->m_triggerID = next++;
-	}
+		std::set<Int> reserved = used;
+		for (const PolygonTrigger *polygon : group)
+			reserved.insert(polygon->getID());
+
+		Int next = 1;
+		for (PolygonTrigger *polygon : group)
+		{
+			if (used.insert(polygon->getID()).second)
+				continue;
+			while (reserved.count(next))
+				++next;
+			polygon->m_triggerID = next++;
+			used.insert(polygon->m_triggerID);
+		}
+	};
+	assignGroup(polygons);
+	assignGroup(rivers);
 }
 
 void PolygonTrigger::installImportedPolygons(const std::vector<PolygonTrigger *> &polygons)

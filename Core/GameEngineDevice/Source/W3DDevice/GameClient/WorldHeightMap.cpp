@@ -548,11 +548,14 @@ void WorldHeightMap::finalizeImportedPolygons(Bool install)
 		polygons.push_back(polygon.get());
 	for (const auto &polygon : m_triggerAreas)
 		polygons.push_back(polygon.get());
-	for (const auto &polygon : m_rivers)
-		polygons.push_back(polygon.get());
-	PolygonTrigger::assignImportedIDs(polygons);
+	std::vector<PolygonTrigger *> rivers;
+	rivers.reserve(m_rivers.size());
+	for (const auto &river : m_rivers)
+		rivers.push_back(river.get());
+	PolygonTrigger::assignImportedIDs(polygons, rivers);
 	if (install)
 	{
+		polygons.insert(polygons.end(), rivers.begin(), rivers.end());
 		std::rotate(polygons.begin(), polygons.begin() + m_standingWater.size(), polygons.end());
 		PolygonTrigger::installImportedPolygons(polygons);
 		for (auto &polygon : m_standingWater)
@@ -1388,14 +1391,20 @@ public:
 		return value;
 	}
 
-	ICoord3D readPoint()
+	Coord2D readPointXY()
 	{
 		const Real x = read<Real>();
 		const Real y = read<Real>();
 		const Real extent = MAX_MAP_DIMENSION * MAP_XY_FACTOR;
 		if (!(x >= -extent && x <= extent && y >= -extent && y <= extent))
 			throw ERROR_CORRUPT_FILE_FORMAT;
-		return {static_cast<Int>(x), static_cast<Int>(y), 0};
+		return {x, y};
+	}
+
+	ICoord3D readPoint()
+	{
+		const Coord2D point = readPointXY();
+		return {static_cast<Int>(point.x), static_cast<Int>(point.y), 0};
 	}
 };
 
@@ -1651,28 +1660,22 @@ Bool WorldHeightMap::ParseRiverAreas(DataChunkInput &file, DataChunkInfo *info, 
 				sections > std::numeric_limits<Int>::max() / 2 || sections > file.getChunkDataSizeLeft() / (4 * sizeof(Real)))
 				throw ERROR_CORRUPT_FILE_FORMAT;
 
-			std::vector<std::array<ICoord3D, 2>> banks;
-			banks.reserve(sections);
+			std::vector<Coord2D> banks(2 * sections);
 			for (UnsignedInt section = 0; section < sections; ++section)
 			{
-				ICoord3D left = reader.readPoint();
-				ICoord3D right = reader.readPoint();
-				left.z = right.z = static_cast<Int>(height);
-				banks.push_back({left, right});
+				banks[sections - 1 - section] = reader.readPointXY();
+				banks[sections + section] = reader.readPointXY();
 			}
-			if (banks.size() < 2)
+			if (sections < 2)
 				continue;
 
 			MapPolygon polygon(newInstance(PolygonTrigger)(2 * sections, id));
 			polygon->setTriggerName(name);
 			polygon->setLayerName(layer);
-			polygon->setWaterArea(TRUE);
-			polygon->setRiver(TRUE);
-			for (auto bank = banks.rbegin(); bank != banks.rend(); ++bank)
-				polygon->addPoint((*bank)[0]);
-			polygon->setRiverStart(polygon->getNumPoints() - 1);
 			for (const auto &bank : banks)
-				polygon->addPoint(bank[1]);
+				polygon->addPoint({static_cast<Int>(bank.x), static_cast<Int>(bank.y), static_cast<Int>(height)});
+			polygon->setRiverStart(sections - 1);
+			polygon->setImportedRiverBanks(std::move(banks));
 			rivers.push_back(std::move(polygon));
 		}
 		if (file.getChunkDataSizeLeft() != 0)
