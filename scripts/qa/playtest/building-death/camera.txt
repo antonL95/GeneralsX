@@ -1,1 +1,4 @@
 30 Player_1 GondorFarmMultiplayer 2670 455 0.65
+194 Player_1 GondorTrebuchet 3240 690 0.55
+414 Player_1 MordorCatapult 3240 1330 0.55
+645 Player_1 GondorTrebuchet 3240 690 0.55

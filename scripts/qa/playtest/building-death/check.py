@@ -1,7 +1,9 @@
 import re
 
 render_env = {
-    "GENERALSX_TEST_DRAWTRACE": "GondorFarmMultiplayer,MordorOrcPit,MenWallHubSmallExpansion",
+    "GENERALSX_TEST_DRAWTRACE": "GondorFarmMultiplayer,MordorOrcPit,MenWallHubSmallExpansion,GondorFarm,MordorTrollCage",
+    "GENERALSX_TRACE_RETAIL_EFFECTS": "1",
+    "GENERALSX_TRACE_RETAIL_PARTICLE_SPAWNS": "1",
     "PLAYTEST_PIN_DYNAMIC_LOD": "1",
     "GENERALSX_TEST_BUILDING_DEATH": "1",
 }
@@ -55,3 +57,27 @@ def check(log):
     if not re.search(r"^TEST slow-death frame=180 .* actor=MenWallHubSmallExpansion .* "
                      r"fadetime=0 destroy=180 scale=1\.000 hidden=0 shroud=0 opacity=1\.000$", log, re.MULTILINE):
         raise RuntimeError("The wall hub should remain visible until its authored slow-death cleanup")
+
+    siege_cases = (
+        ("GondorFarm", "GondorTrebuchetRockWarheadFlaming", "gbngran_d3", "USER_10"),
+        ("MordorTrollCage", "MordorCatapultRockWarhead", "mbtrollpit_d3", None),
+    )
+    for actor, weapon, rubble_model, level_flag in siege_cases:
+        lethal = re.search(rf"^TEST damage frame=(\d+) weapon={weapon} .* victim=\d+\({actor}\) "
+                           r".* health=[\d.]+->0\.00$", log, re.MULTILINE)
+        if not lethal:
+            raise RuntimeError(f"{actor} did not die to its siege projectile")
+        kill = int(lethal[1])
+        rubble = [(int(frame), model, float(pose), flags.split(","), meshes)
+                  for frame, _, name, model, pose, _, flags, meshes in draws
+                  if name == actor and int(frame) > kill]
+        if (not rubble or not any(pose > 0 for _, _, pose, _, _ in rubble)
+                or any(model != rubble_model or "RUBBLE" not in flags or ":shown" not in meshes
+                       or (level_flag and level_flag not in flags)
+                       for _, model, _, flags, meshes in rubble)):
+            raise RuntimeError(f"{actor} failed to draw its animated rubble after impact at {kill}")
+        if not any(name == actor and phase == "FINAL" and int(frame) > kill
+                   for frame, name, phase, _, _, _ in phases):
+            raise RuntimeError(f"{actor} did not finish its collapse")
+        if re.search(rf"^TEST list 640 Player_1 {actor} ", log, re.MULTILINE):
+            raise RuntimeError(f"{actor} remained after its collapse")

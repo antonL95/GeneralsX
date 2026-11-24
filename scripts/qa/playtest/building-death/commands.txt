@@ -7,3 +7,34 @@
 60 kill Player_1 MordorOrcPit 0
 60 kill Player_1 MenWallHubSmallExpansion 0
 183 list Player_1 - 0
+186 create Player_1 GondorFarm 0 3240,690,0
+186 create Player_1 GondorTrebuchet 0 3240,1020,0
+187 veterancy Player_1 GondorFarm 0 2
+187 objupgrade Player_1 GondorTrebuchet 0 Upgrade_GondorFireStones
+200 health Player_1 GondorFarm 0
+201 pkg11-damage Player_1 GondorTrebuchet 0 Player_1:GondorFarm:0 3100 0
+202 health Player_1 GondorFarm 0
+214 forceattackground Player_1 GondorTrebuchet 0 0,-330
+275 health Player_1 GondorFarm 0
+305 health Player_1 GondorFarm 0
+320 pkg11-debris Player_1 GondorTrebuchet 0 BuildingGBFarmBit
+320 pkg11-debris Player_1 GondorTrebuchet 0 BuildingDamageBits
+320 particle-live - - 0
+350 health Player_1 GondorFarm 0
+388 health Player_1 GondorFarm 0
+402 move Player_1 GondorTrebuchet 0 0,20
+406 create Player_1 MordorTrollCage 0 3240,1330,0
+406 create Player_1 MordorCatapult 0 3240,1560,0
+420 health Player_1 MordorTrollCage 0
+421 pkg11-damage Player_1 MordorCatapult 0 Player_1:MordorTrollCage:0 2850 0
+422 health Player_1 MordorTrollCage 0
+437 forceattackground Player_1 MordorCatapult 0 0,-230
+488 health Player_1 MordorTrollCage 0
+517 health Player_1 MordorTrollCage 0
+518 particle-live - - 0
+535 pkg11-debris Player_1 MordorCatapult 0 BuildingMBTrollPitBit
+535 pkg11-debris Player_1 MordorCatapult 0 BuildingDamageBits
+535 particle-live - - 0
+550 health Player_1 MordorTrollCage 0
+620 move Player_1 MordorCatapult 0 0,20
+640 list Player_1 - 0
