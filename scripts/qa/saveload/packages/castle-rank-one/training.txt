@@ -1,6 +1,12 @@
 10 create Player_1 CastleRankOnePacked 0 650,1800,0
 11 fortress-expansion-unpack Player_1 CastleRankOnePacked 0
+12 castle-rank-one-create-control Player_1 CastleRankOneControl 0 900,1800
+13 castle-rank-one-state Player_1 CastleRankOneControl 0
+14 castle-rank-one-finish Player_1 CastleRankOneControl 0
+20 castle-rank-one-state Player_1 CastleRankOneControl 0
 20 castle-rank-one-state Player_1 WildFortressCitadel 0
 33 fortress-purchase Player_1 WildFortressCitadel 0 Command_PurchaseUpgradeWildFortressGoblinTown
 244 castle-rank-one-state Player_1 WildFortressCitadel 0
 942 castle-rank-one-state Player_1 WildFortressCitadel 0
+946 snapshot-save - - 0 castle-rank-one-after.sav
+947 castle-rank-one-state Player_1 WildFortressCitadel 0
