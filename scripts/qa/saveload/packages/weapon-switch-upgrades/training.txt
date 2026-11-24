@@ -19,7 +19,7 @@
 221 grant Player_1 - 0 Upgrade_TechnologyHaradBannerCarrierPurchased
 233 weapon-upgrade-trace Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorFireArrows
 235 weapon-upgrade-buy Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorForgedBlades
-241 weapon-upgrade-toggle Player_1 ElvenRivendellKnightHorde 0 Command_ToggleRivendellKnightWeapon
+238 weapon-upgrade-toggle Player_1 ElvenRivendellKnightHorde 0 Command_ToggleRivendellKnightWeapon
 244 weapon-upgrade-trace Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorForgedBlades
 245 weapon-upgrade-buy Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorFireArrows
 251 weapon-upgrade-trace Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorFireArrows
