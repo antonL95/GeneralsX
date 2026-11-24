@@ -192,8 +192,7 @@ private:
 	UnsignedInt m_obstacleIsTransparent : 1;  ///< True if obstacle is transparent (undefined if obstacleid is invalid)
 	UnsignedInt m_hasSharedObstacles : 1;
 
-	zoneStorageType m_zone : 14;              ///< Zone. Each zone is a set of adjacent terrain type.  If from & to in the same zone, you can successfully pathfind.  If not,
-	                                          /// you still may be able to if you can cross multiple terrain types.
+	zoneStorageType m_zone;
 	UnsignedShort m_aircraftGoal : 1;         ///< This is an aircraft goal cell.
 	UnsignedShort m_pinched : 1;              ///< This cell is surrounded by obstacle cells.
 	UnsignedByte m_type : 4;                  ///< what type of cell terrain this is.

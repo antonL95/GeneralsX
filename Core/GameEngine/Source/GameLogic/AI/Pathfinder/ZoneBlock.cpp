@@ -87,6 +87,17 @@ void ZoneBlock::xferDeepWaterConnectivity(Xfer* xfer, zoneStorageType maxZone)
 	}
 }
 
+void ZoneBlock::initializeDryWaterConnectivity()
+{
+	if (m_numZones <= 1)
+		return;
+	for (Int i = 0; i < m_numZones; ++i)
+	{
+		m_waterDeepWaterZones[i] = m_firstZone + i;
+		m_groundWaterDeepWaterZones[i] = m_groundWaterZones[i];
+	}
+}
+
 void ZoneBlock::freeZones()
 {
 	delete [] m_groundCliffZones;

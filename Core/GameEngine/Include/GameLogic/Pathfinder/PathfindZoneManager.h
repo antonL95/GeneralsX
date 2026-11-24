@@ -56,6 +56,8 @@ public:
 	void calculateZones(	PathfindCell **map, PathfindLayer layers[], const IRegion2D &bounds);	///< Does zone calculations.
 	void xferConnectivity(Xfer* xfer, PathfindCell** map, PathfindLayer layers[], const IRegion2D& bounds);
 	void xferDeepWaterConnectivity(Xfer* xfer);
+	void initializeDryWaterConnectivity();
+	Bool hasDeepWater() const { return m_hasDeepWater; }
 	Bool hasZones() const { return m_zonesAllocated > 0 && m_waterDeepWaterZones != nullptr && m_groundWaterDeepWaterZones != nullptr; }
 	zoneStorageType getEffectiveZone(LocomotorSurfaceTypeMask acceptableSurfaces, Bool crusher, zoneStorageType zone) const;
 	zoneStorageType getEffectiveTerrainZone(zoneStorageType zone) const;
@@ -90,6 +92,7 @@ private:
 	UnsignedShort m_maxZone;								///< Max zone used.
 	UnsignedInt		m_nextFrameToCalculateZones;		///< When should I recalculate, next?.
 	UnsignedShort m_zonesAllocated;
+	Bool m_hasDeepWater = FALSE;
 	zoneStorageType *m_groundCliffZones;
 	zoneStorageType *m_groundWaterZones;
 	zoneStorageType *m_waterDeepWaterZones;

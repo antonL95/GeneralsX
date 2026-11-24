@@ -16,6 +16,9 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <algorithm>
+#include <stdexcept>
+
 #include "Common/Xfer.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
 #include "GameLogic/Pathfinder/PathfindConstants.h"
@@ -135,6 +138,7 @@ void PathfindZoneManager::reset()  ///< Called when the map is reset.
 {
 	freeZones();
 	freeBlocks();
+	m_hasDeepWater = FALSE;
 }
 
 
@@ -172,7 +176,8 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 #endif
 #endif
 
-	m_maxZone = 1;	// we start using zone 0 as a flag.
+	m_maxZone = 1;
+	m_hasDeepWater = FALSE;
 	constexpr Int maxZones = MAX_GROUND_ZONE_COUNT;
 	zoneStorageType zoneEquivalency[maxZones];
 	Int i, j;
@@ -205,6 +210,7 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 			for( j=bounds.lo.y; j<=bounds.hi.y; j++ )	{
 				for( i=bounds.lo.x; i<=bounds.hi.x; i++ )	{
 					PathfindCell *cell = &map[i][j];
+					m_hasDeepWater |= cell->getType() == PathfindCell::CELL_DEEP_WATER;
 					cell->setZone(0);
 
 					if (i>bounds.lo.x) {
@@ -218,14 +224,10 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 						}
 					}
 					if (cell->getZone()==0) {
+						if (m_maxZone >= maxZones)
+							throw std::length_error("Pathfinding ground zone limit exceeded");
 						cell->setZone(m_maxZone);
 						m_maxZone++;
-#if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
-						if (m_maxZone>= maxZones) {
-							DEBUG_CRASH(("Ran out of pathfind zones.  SERIOUS ERROR! jba."));
-							break;
-						}
-#endif
 					}
 					if (cell->getConnectLayer() > LAYER_GROUND) {
  						m_zoneBlocks[xBlock][yBlock].setInteractsWithBridge(true);
@@ -457,8 +459,12 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 
 	ZoneBlock::flattenZones(m_groundCliffZones, m_hierarchicalZones, m_maxZone);
 	ZoneBlock::flattenZones(m_groundWaterZones, m_hierarchicalZones, m_maxZone);
-	ZoneBlock::flattenZones(m_waterDeepWaterZones, m_hierarchicalZones, m_maxZone);
-	ZoneBlock::flattenZones(m_groundWaterDeepWaterZones, m_hierarchicalZones, m_maxZone);
+	if (m_hasDeepWater) {
+		ZoneBlock::flattenZones(m_waterDeepWaterZones, m_hierarchicalZones, m_maxZone);
+		ZoneBlock::flattenZones(m_groundWaterDeepWaterZones, m_hierarchicalZones, m_maxZone);
+	} else {
+		initializeDryWaterConnectivity();
+	}
 	ZoneBlock::flattenZones(m_groundRubbleZones, m_hierarchicalZones, m_maxZone);
 	ZoneBlock::flattenZones(m_terrainZones, m_hierarchicalZones, m_maxZone);
 	ZoneBlock::flattenZones(m_crusherZones, m_hierarchicalZones, m_maxZone);
@@ -541,7 +547,7 @@ void PathfindZoneManager::xferConnectivity(Xfer* xfer, PathfindCell** map, Pathf
 		{
 			zoneStorageType zone = map[x][y].getZone();
 			xfer->xferUnsignedShort(&zone);
-			if (zone > m_maxZone || zone >= (1u << 14))
+			if (zone > m_maxZone)
 				throw XFER_INVALID_PARAMETERS;
 			if (loading)
 				map[x][y].setZone(zone);
@@ -582,6 +588,15 @@ void PathfindZoneManager::xferDeepWaterConnectivity(Xfer* xfer)
 	for (Int x = 0; x < m_zoneBlockExtent.x; ++x)
 		for (Int y = 0; y < m_zoneBlockExtent.y; ++y)
 			m_zoneBlocks[x][y].xferDeepWaterConnectivity(xfer, m_maxZone);
+}
+
+void PathfindZoneManager::initializeDryWaterConnectivity()
+{
+	std::copy_n(m_hierarchicalZones, m_maxZone + 1, m_waterDeepWaterZones);
+	std::copy_n(m_groundWaterZones, m_maxZone + 1, m_groundWaterDeepWaterZones);
+	for (Int x = 0; x < m_zoneBlockExtent.x; ++x)
+		for (Int y = 0; y < m_zoneBlockExtent.y; ++y)
+			m_zoneBlocks[x][y].initializeDryWaterConnectivity();
 }
 
 /**

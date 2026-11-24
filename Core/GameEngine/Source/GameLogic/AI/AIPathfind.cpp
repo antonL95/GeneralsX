@@ -7816,8 +7816,11 @@ void Pathfinder::crc( Xfer *xfer )
 		xfer->xferIRegion2D(&m_logicalExtent);
 		Real wadeDepth = TheAI->getAiData()->m_wadeWaterDepth;
 		xfer->xferReal(&wadeDepth);
-		Real deepWaterDepth = TheAI->getAiData()->m_deepWaterDepth;
-		xfer->xferReal(&deepWaterDepth);
+		if (m_zoneManager.hasDeepWater())
+		{
+			Real deepWaterDepth = TheAI->getAiData()->m_deepWaterDepth;
+			xfer->xferReal(&deepWaterDepth);
+		}
 		xferRetailBlocks(xfer, TRUE);
 	}
 
@@ -7949,9 +7952,17 @@ void Pathfinder::xfer( Xfer *xfer )
 
 void Pathfinder::xferRetailBlocks(Xfer* xfer, Bool present)
 {
+	const RetailSaveBlocks::Block<Xfer> ignoredObstacle{
+		"ignored-obstacle", [this](Xfer* x) { x->xferObjectID(&m_ignoreObstacleID); },
+		[this] { m_ignoreObstacleID = INVALID_ID; }
+	};
+	if (xfer->getXferMode() == XFER_CRC && !m_zoneManager.hasDeepWater())
+	{
+		RetailSaveBlocks::transferSection(xfer, false, present, {ignoredObstacle});
+		return;
+	}
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
-		{ "ignored-obstacle", [this](Xfer* x) { x->xferObjectID(&m_ignoreObstacleID); },
-			[this] { m_ignoreObstacleID = INVALID_ID; } },
+		ignoredObstacle,
 		{ "deep-water-zones",
 			[this](Xfer* x)
 			{
@@ -7961,12 +7972,20 @@ void Pathfinder::xferRetailBlocks(Xfer* xfer, Bool present)
 				if (hasZones != mapHasZones)
 					throw XFER_INVALID_PARAMETERS;
 				if (hasZones)
+				{
 					m_zoneManager.xferDeepWaterConnectivity(x);
+					if (x->getXferMode() == XFER_LOAD && !m_zoneManager.hasDeepWater())
+						m_zoneManager.initializeDryWaterConnectivity();
+				}
 			},
 			[this]
 			{
-				if (m_isMapReady)
+				if (!m_isMapReady)
+					return;
+				if (m_zoneManager.hasDeepWater())
 					m_zoneManager.calculateZones(m_map, m_layers, m_extent);
+				else
+					m_zoneManager.initializeDryWaterConnectivity();
 			} }
 	});
 }

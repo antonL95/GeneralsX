@@ -42,6 +42,7 @@ public:
 	zoneStorageType getEffectiveZone(LocomotorSurfaceTypeMask acceptableSurfaces, Bool crusher, zoneStorageType zone) const;
 	void xferConnectivity(Xfer* xfer, zoneStorageType maxZone);
 	void xferDeepWaterConnectivity(Xfer* xfer, zoneStorageType maxZone);
+	void initializeDryWaterConnectivity();
 
 	void clearMarkedPassable() {m_markedPassable = false;}
 	Bool isPassable() {return m_markedPassable;}
