@@ -7,6 +7,7 @@
 
 #include "Common/MessageStream.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Object.h"
@@ -94,6 +95,13 @@ void handleContainerFields(const RetailTestCommands::Context& ctx)
 			ctx.frame, ctx.argument, contain ? static_cast<Int>(contain->getContainCount()) : 0,
 			carrier != nullptr, bone ? bone->str() : "-", object->getEnclosingContainedBy() != nullptr,
 			followsBone, body ? body->getHealth() : 0.0f, offset.Length());
+	}
+	else if (action == "container-fields-busy")
+	{
+		const auto* ai = object->getAI();
+		const Coord3D& pos = *object->getPosition();
+		std::fprintf(stderr, "TEST container-fields busy frame=%u %s busy=%d position=%.2f,%.2f\n",
+			ctx.frame, ctx.argument, ai && ai->isBusy(), pos.x, pos.y);
 	}
 }
 }

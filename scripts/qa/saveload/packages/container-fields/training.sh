@@ -41,6 +41,23 @@ check() {
     if covers 294; then
         grep -E 'TEST container-fields frame=294 release-complete .* render-offset=0.00$' "$log"
     fi
+    if covers 243; then
+        expect 'TEST container-fields busy frame=243 before-save busy=1 position=430.00,3200.00'
+    fi
+    if covers 248; then
+        expect 'TEST container-fields busy frame=248 after-save busy=1 position=430.00,3200.00'
+    fi
+    if covers 270; then
+        expect 'TEST container-fields busy frame=270 before-clearance busy=1 position=430.00,3200.00'
+    fi
+    if covers 320; then
+        awk '/TEST container-fields busy frame=320 after-clearance busy=0 / {
+            split($NF, position, "[=,]");
+            dx = position[2] - 430; dy = position[3] - 3200;
+            displaced = dx * dx + dy * dy > 25;
+            print;
+        } END { if (!displaced) print "Busy summon stayed in the construction footprint" > "/dev/stderr"; exit !displaced }' "$log"
+    fi
 }
 
 compare() {

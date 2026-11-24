@@ -27,6 +27,7 @@
 239 container-fields-grab Player_1 Slot7Devourer 0 Player_1:RetreatBeacon:0
 240 container-fields-turn Player_1 Slot7SeatFixed 0
 240 container-fields-turn Player_1 Slot7SeatFree 0
+240 placement-ocl Player_1 Slot7Devourer 0 OCL_ShadeofWolfSummoningFinish
 241 container-fields-flame Player_1 Slot7SeatFixed 0
 242 container-fields-sample PlyrCivilian Slot7Rider 0 foreign-rejected
 242 container-fields-sample Player_1 Slot7Rider 0 own-fixed-burned
@@ -38,6 +39,8 @@
 242 container-fields-sample Player_1 MordorArcherOnBeast 0 beast-seat
 242 container-fields-sample Player_1 HaradKhandishChariot 0 chariot-loaded
 242 container-fields-sample Player_1 IsengardBallista 0 mine-ammo-loaded
+243 destroy PlyrCivilian Slot7Rider 0
+243 container-fields-busy Player_1 AngmarShadeWolf 0 before-save
 247 container-fields-place Player_1 Slot7Rider 1 - 375 3200
 247 container-fields-sample Player_1 Slot7Rider 1 release-restored
 248 container-fields-sample Player_1 Slot7Rider 0 fixed-restored
@@ -45,6 +48,7 @@
 248 container-fields-sample Player_1 MordorGreatBeast 0 beast-restored
 248 container-fields-sample Player_1 MordorArcherOnBeast 0 beast-seat-restored
 248 container-fields-sample Player_1 HaradKhandishChariot 0 chariot-restored
+248 container-fields-busy Player_1 AngmarShadeWolf 0 after-save
 258 container-fields-sample Player_1 RetreatBeacon 0 thrown
 258 container-fields-kill Player_1 Slot7StructureGrab 0
 258 container-fields-kill Player_1 IsengardBallista 0
@@ -55,4 +59,7 @@
 261 container-fields-evacuate Player_1 Slot7SeatFixed 0
 265 container-fields-place Player_1 Slot7Rider 0 - 335 3200
 265 container-fields-sample Player_1 Slot7Rider 0 released
+270 container-fields-busy Player_1 AngmarShadeWolf 0 before-clearance
+271 placement-ocl Player_1 Slot7Devourer 0 Slot7ClearBusySummon
 294 container-fields-sample Player_1 Slot7Rider 0 release-complete
+320 container-fields-busy Player_1 AngmarShadeWolf 0 after-clearance
