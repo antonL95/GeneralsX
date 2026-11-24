@@ -902,4 +902,11 @@ void TransportContain::loadPostProcess()
 	// extend base class
 	OpenContain::loadPostProcess();
 
+	if (getTransportContainModuleData()->m_canGrabStructure)
+	{
+		m_extraSlotsInUse = 0;
+		for (const Object* rider : *getContainedItemsList())
+			m_extraSlotsInUse += getPassengerSlotCount(rider) - 1;
+	}
+
 }

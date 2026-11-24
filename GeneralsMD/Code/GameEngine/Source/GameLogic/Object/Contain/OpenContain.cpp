@@ -1514,6 +1514,11 @@ void OpenContain::putObjAtNextFirePoint( Object *obj )
 	//
 	if( m_noFirePointsInArt == TRUE )
 	{
+		if (RetailFileLayers::enabled() && !isEnclosingContainerFor(obj) && forcePassengerOrientation())
+		{
+			obj->setTransformMatrix(getObject()->getTransformMatrix());
+			return;
+		}
 		const Coord3D *pos = getObject()->getPosition();
 
 		obj->setPosition( pos );
@@ -1547,10 +1552,10 @@ void OpenContain::putObjAtNextFirePoint( Object *obj )
 	pos.set( vectorPos.X, vectorPos.Y, vectorPos.Z );
 
 	// set the object position
-	if( isEnclosingContainerFor( obj ) )
+	if (isEnclosingContainerFor(obj) || (RetailFileLayers::enabled() && !forcePassengerOrientation()))
 		obj->setPosition( &pos );
 	else
-		obj->setTransformMatrix( &matrix );//Only do everything if it matters
+		obj->setTransformMatrix(&matrix);
 
 	// increment the next firepoint to use ... make sure to wrap if we need to
 	m_firePointNext++;
@@ -2208,11 +2213,21 @@ void OpenContain::loadPostProcess()
 		addToContainList( obj );
 
 		// remove this object from the world if we need to
-		if (isEnclosingContainerFor(obj) || (RetailFileLayers::enabled() && us->getEnclosingContainedBy()))
+		const Bool enclosing = isEnclosingContainerFor(obj) ||
+			(RetailFileLayers::enabled() && us->getEnclosingContainedBy());
+		if (enclosing)
 			addOrRemoveObjFromWorld( obj, FALSE );
 
 		// record in the object who we are contained by
 		obj->friend_setContainedBy( us );
+
+		if (!enclosing && RetailFileLayers::enabled() &&
+			!getOpenContainModuleData()->m_passengerBonePrefixes.empty() && obj->testStatus(OBJECT_STATUS_MASKED))
+		{
+			obj->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_MASKED));
+			addOrRemoveObjFromWorld(obj, TRUE);
+			putObjAtNextFirePoint(obj);
+		}
 
 	}
 
