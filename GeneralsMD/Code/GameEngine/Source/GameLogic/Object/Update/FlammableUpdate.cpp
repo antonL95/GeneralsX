@@ -46,6 +46,7 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -302,6 +303,7 @@ void FlammableUpdate::tryToIgnite()
 		{
 			startRetailBurn();
 			setWakeFrame(me, UPDATE_SLEEP(retailTick));
+			RetailBuildingEvents::aflame(*me);
 		}
 		else
 			setWakeFrame(me, calcSleepTime());

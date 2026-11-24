@@ -14,6 +14,7 @@ void trollEatingChanged(Object& object, bool enabled);
 #if !RTS_GENERALS
 void modelConditionsChanged(Object& object, const ModelConditionFlags& previous);
 void restoreHordeConditionUpgrades();
+void aflame(Object& object);
 #endif
 void reallyDamaged(Object& object);
 int enrageAction(const Object& object, const char* event);

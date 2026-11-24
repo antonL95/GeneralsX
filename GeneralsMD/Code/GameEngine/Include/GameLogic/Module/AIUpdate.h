@@ -210,6 +210,7 @@ public:
 	UnsignedInt m_burningDeathTime = 0;
 	UnsignedInt m_rampageTime = 0;
 	Bool m_rampageRequiresAflame = FALSE;
+	UnsignedInt m_timeToEjectPassengersOnRampage = 0;
 	Real m_stopChaseDistance = 0.0f;
 	Bool m_fadeOnPortals = FALSE;
 	Real m_holdGroundCloseRangeDistance = 0.0f;
@@ -883,6 +884,7 @@ private:
 	UnsignedInt m_weaponMovementHoldUntil = 0;
 	Bool m_fadedInPortal = FALSE;
 	UnsignedInt m_rampageUntil = 0;
+	UnsignedInt m_rampageEjectFrame = 0;
 	Bool m_rampageWeaponPrimed = FALSE;
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.

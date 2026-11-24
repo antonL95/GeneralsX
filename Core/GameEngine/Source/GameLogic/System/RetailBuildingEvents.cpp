@@ -557,7 +557,7 @@ StateAction findStateAction(const Object& object, const char* event)
 {
 	if (!RetailFileLayers::enabled() || !object.getAIUpdateInterface())
 		return StateAction::None;
-	static const auto lists = readEventLists(readData("Data\\Scripts\\ScriptEvents.xml"));
+	const auto& lists = buildingEvents().lists;
 	static const auto actions = []
 	{
 		std::map<std::string, StateAction> result;
@@ -591,10 +591,12 @@ StateAction findStateAction(const Object& object, const char* event)
 	auto list = lists.find(object.getAIUpdateInterface()->getRetailLuaEventsList().str());
 	for (std::size_t depth = 0; list != lists.end() && depth < lists.size(); ++depth)
 	{
-		const auto handler = list->second.stateHandlers.find(event);
-		if (handler != list->second.stateHandlers.end())
+		const auto stateHandler = list->second.stateHandlers.find(event);
+		const auto handler = list->second.handlers.find(event);
+		if (stateHandler != list->second.stateHandlers.end() || handler != list->second.handlers.end())
 		{
-			const auto action = actions.find(handler->second);
+			const auto action = actions.find(stateHandler != list->second.stateHandlers.end() ?
+				stateHandler->second : handler->second);
 			return action == actions.end() ? StateAction::None : action->second;
 		}
 		list = lists.find(list->second.parent);
@@ -604,6 +606,23 @@ StateAction findStateAction(const Object& object, const char* event)
 }
 
 #if !RTS_GENERALS
+void RetailBuildingEvents::aflame(Object& object)
+{
+	auto* ai = object.getAIUpdateInterface();
+	if (!ai || ai->getRetailLuaEventsList().isEmpty() || object.isEffectivelyDead())
+		return;
+	const auto& conditions = object.getLogicModelConditions();
+	for (const auto& event : buildingEvents().modelConditions)
+	{
+		if (event.required.test(MODELCONDITION_AFLAME) && conditions.testSetAndClear(event.required, event.forbidden) &&
+			findStateAction(object, event.name.c_str()) == StateAction::StartRampage)
+		{
+			ai->enterRetailRampage();
+			return;
+		}
+	}
+}
+
 void RetailBuildingEvents::reallyDamaged(Object& object)
 {
 	if (findStateAction(object, "ReallyDamaged") == StateAction::StartRampage)

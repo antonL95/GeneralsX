@@ -166,6 +166,7 @@ const LocomotorTemplateVector* AIUpdateModuleData::findLocomotorTemplateVector(L
 			{ "BurningDeathTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_burningDeathTime) },
 			{ "RampageTime", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_rampageTime) },
 			{ "RampageRequiresAflame", INI::parseBool, nullptr, offsetof(AIUpdateModuleData, m_rampageRequiresAflame) },
+			{ "TimeToEjectPassengersOnRampage", INI::parseDurationUnsignedInt, nullptr, offsetof(AIUpdateModuleData, m_timeToEjectPassengersOnRampage) },
 			{ "HoldGroundCloseRangeDistance", INI::parseReal, nullptr, offsetof(AIUpdateModuleData, m_holdGroundCloseRangeDistance) },
 			{ "StopChaseDistance", INI::parseReal, nullptr, offsetof(AIUpdateModuleData, m_stopChaseDistance) },
 			{ "FadeOnPortals", INI::parseBool, nullptr, offsetof(AIUpdateModuleData, m_fadeOnPortals) },
@@ -1299,9 +1300,15 @@ UpdateSleepTime AIUpdateInterface::update()
 				}
 			}
 		}
+		if (!dying && m_rampageEjectFrame && frame >= m_rampageEjectFrame)
+		{
+			m_rampageEjectFrame = 0;
+			privateEvacuateInstantly(FALSE, CMD_FROM_SCRIPT);
+		}
 		if (dying || frame >= m_rampageUntil)
 		{
 			m_rampageUntil = 0;
+			m_rampageEjectFrame = 0;
 			m_rampageWeaponPrimed = FALSE;
 			object->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_RAMPAGING));
 			WeaponSetFlags flags;
@@ -6116,6 +6123,11 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferBool(&m_retailRingReturn);
 		}, [this] {
 			m_retailRingReturn = FALSE;
+		} },
+		{ "rampage-passenger-ejection", [this](Xfer* x) {
+			x->xferUnsignedInt(&m_rampageEjectFrame);
+		}, [this] {
+			m_rampageEjectFrame = 0;
 		} }
 	});
 }
@@ -6170,6 +6182,8 @@ void AIUpdateInterface::enterRetailRampage()
 
 	if (data->m_rampageRequiresAflame && !object->testStatus(OBJECT_STATUS_AFLAME))
 	{
+		if (data->m_timeToEjectPassengersOnRampage)
+			privateEvacuateInstantly(FALSE, CMD_FROM_SCRIPT);
 		if (auto* runOff = RunOffMapBehavior::find(object))
 			runOff->trigger();
 		return;
@@ -6182,8 +6196,12 @@ void AIUpdateInterface::enterRetailRampage()
 		return;
 
 	privateIdle(CMD_FROM_AI);
+	chooseLocomotorSet(LOCOMOTORSET_ENRAGED);
 	TheGameLogic->deselectObject(object, PLAYERMASK_ALL, TRUE);
-	m_rampageUntil = TheGameLogic->getFrame() + duration;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	m_rampageUntil = now + duration;
+	const UnsignedInt ejectDelay = data->m_timeToEjectPassengersOnRampage;
+	m_rampageEjectFrame = ejectDelay ? now + ejectDelay : 0;
 	m_rampageWeaponPrimed = FALSE;
 	object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_RAMPAGING));
 	object->setWeaponSetFlags(flags, TRUE);
