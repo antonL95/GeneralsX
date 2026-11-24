@@ -1,11 +1,11 @@
 prepare() {
     awk -v end="$end" 'BEGIN {
         for (frame = 185; frame <= 370 && frame <= end; ++frame) {
-            print frame, "eagle-trace Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackTarget:0"
-            print frame, "air-swoop-trace Player_1 GondorGwaihirHero_Summoned 0"
+            print frame, "eagle-trace Player_1 EagleAttackBird 0 PlyrCreeps:EagleAttackTarget:0"
+            print frame, "air-swoop-trace Player_1 EagleAttackBird 0"
         }
         for (frame = 447; frame <= 632 && frame <= end; ++frame)
-            print frame, "eagle-trace Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackOrc:0"
+            print frame, "eagle-trace Player_1 EagleAttackBird 0 PlyrCreeps:EagleAttackOrc:0"
     }'
 }
 
@@ -16,7 +16,7 @@ check_moving_contact() {
                 if ($i ~ /^fire0=/)
                     shot = substr($i, 7) + 0
         }
-        /^TEST air-swoop .* actor=GondorGwaihirHero_Summoned / {
+        /^TEST air-swoop .* actor=EagleAttackBird / {
             for (i = 5; i <= NF; ++i) {
                 split($i, field, "=")
                 sample[field[1]] = field[2]
@@ -56,7 +56,7 @@ check() {
                 shot = sample["fire0"] + 0
                 contact = shot == frame && swoop == 1 && inRange == 1 && sample["frame"] == shot + 1
                 damage = hp > sample["hp"] && sample["hp"] > 0
-                grab = sample["carrier"] == "GondorGwaihirHero_Summoned"
+                grab = sample["carrier"] == "EagleAttackBird"
             }
             if (grab && sample["frame"] > shot + 1 && sample["carrier"] == "-" && sample["hp"] > 0)
                 released = 1
@@ -86,7 +86,7 @@ check() {
                 plow = 1
             if (sample["fire0"] && !shot && !plow) {
                 shot = sample["fire0"] + 0
-                if (sample["target"] == "EagleAttackOrc" && sample["carrier"] == "GondorGwaihirHero_Summoned" && sample["hp"] > 0)
+                if (sample["target"] == "EagleAttackOrc" && sample["carrier"] == "EagleAttackBird" && sample["hp"] > 0)
                     grabbed = sample["frame"] + 0
             }
             if (grabbed && !released && sample["target"] == "EagleAttackOrc" && sample["carrier"] == "-" && sample["hp"] > 0)
@@ -104,7 +104,7 @@ compare() {
         awk -v frame="$save_frame" '/^TEST eagle frame=/ && substr($3, 7) + 0 > frame' \
             "$out/$eagle_phase.log" > "$out/eagle-$eagle_phase.trace"
         awk -v frame="$save_frame" '
-            /^TEST air-swoop .* actor=GondorGwaihirHero_Summoned / && substr($3, 7) + 0 > frame
+            /^TEST air-swoop .* actor=EagleAttackBird / && substr($3, 7) + 0 > frame
         ' "$out/$eagle_phase.log" > "$out/eagle-flight-$eagle_phase.trace"
     done
     cmp "$out/eagle-continue.trace" "$out/eagle-resume.trace"
