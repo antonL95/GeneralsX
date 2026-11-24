@@ -1,5 +1,4 @@
 import re
-from collections import Counter
 
 from PIL import Image
 
@@ -25,8 +24,7 @@ def check_captures(output, frames):
             overhead = image.convert("RGB").crop((600, 150, 900, 320))
             if frame == 120:
                 overhead.save(output / "heal-crop.png")
-            magenta = Counter((red, green, blue) for red, green, blue in overhead.get_flattened_data()
-                              if min(red, blue) - green >= 25)
-        solid_pixels = max(magenta.values(), default=0)
-        if solid_pixels >= 32 * 32 // 2:
-            raise RuntimeError(f"Frame {frame}: found {solid_pixels} solid magenta pixels above Elessar")
+            magenta = sum(min(red, blue) - green >= 25
+                          for red, green, blue in overhead.get_flattened_data())
+        if magenta >= 32:
+            raise RuntimeError(f"Frame {frame}: found {magenta} magenta pixels above Elessar")
