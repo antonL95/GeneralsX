@@ -84,7 +84,7 @@ TrollVoxFindTastyOrc'
     expect_request start 289 "$marines" BelfalasMarineVoiceAttackMelee
     expect_request start 290 "$marines" BelfalasMarineVoiceAttackRanged
 
-    hero=$(find_id 208 CreateAHero Player_1)
+    hero=$(find_id 208 Pkg49VoiceHero Player_1)
     reject_line "RETAIL AUDIO start frame=292 owner=$hero sound=HeroMenArcherVoiceSelectMS"
     reject_line "RETAIL AUDIO start frame=293 owner=$hero sound=HeroMenArcherVoiceSelectMS"
     expect_request start 294 "$hero" HeroMenArcherVoiceSelectMS
