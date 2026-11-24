@@ -1,0 +1,92 @@
+230 create Player_1 TcMountedCarrier 0 110,2515,0
+230 create Player_1 FellowshipPippin 0 120,2515,0
+230 create Player_1 TcBoneCarrier 0 140,2515,0
+230 create Player_1 DwarvenBattleWagonAxeThrower 0 145,2515,0
+230 create Player_1 DwarvenBattleWagonAxeThrower 1 150,2515,0
+230 create Player_1 TcPipsCarrier 0 170,2515,0
+230 create Player_1 DwarvenBattleWagonAxeThrower 2 175,2515,0
+230 create Player_1 TcTroll 0 200,2515,0
+230 create Player_1 TcOrc 0 210,2515,0
+230 create Player_1 TcClub 0 215,2515,0
+230 create Player_1 TcKaradd 0 235,2515,0
+230 create Player_1 TcClub 1 240,2515,0
+230 create Player_1 TcOrc 1 245,2515,0
+230 create Player_1 TcFadeCarrier 0 110,2575,0
+230 create Player_1 TcOrc 2 115,2575,0
+230 create Player_1 TcFadeMonster 0 120,2575,0
+232 tc-can-contain Player_1 TcMountedCarrier 0 Player_1:FellowshipPippin:0,unmounted
+233 tc-set-mounted Player_1 TcMountedCarrier 0
+234 tc-can-contain Player_1 TcMountedCarrier 0 Player_1:FellowshipPippin:0,mounted
+234 tc-board Player_1 TcMountedCarrier 0 Player_1:FellowshipPippin:0,mounted-board
+235 tc-board Player_1 TcBoneCarrier 0 Player_1:DwarvenBattleWagonAxeThrower:0,bone-slot1
+235 tc-board Player_1 TcBoneCarrier 0 Player_1:DwarvenBattleWagonAxeThrower:1,bone-slot2
+235 tc-can-contain Player_1 TcBoneCarrier 0 Player_1:DwarvenBattleWagonAxeThrower:2,wagon-full
+235 tc-board Player_1 TcPipsCarrier 0 Player_1:DwarvenBattleWagonAxeThrower:2,pips-board
+236 tc-probe Player_1 DwarvenBattleWagonAxeThrower 0 bone-slot1-before
+236 tc-probe Player_1 DwarvenBattleWagonAxeThrower 1 bone-slot2-before
+236 tc-probe Player_1 TcBoneCarrier 0 pips-off
+236 tc-probe Player_1 TcPipsCarrier 0 pips-on
+236 tc-manual-grab Player_1 TcTroll 0 Player_1:TcOrc:0,troll-orc
+236 tc-manual-grab Player_1 TcTroll 0 Player_1:TcClub:0,troll-club
+236 tc-cast-grab Player_1 TcTroll 0 Player_1:TcOrc:0,troll-orc
+236 tc-board Player_1 TcKaradd 0 Player_1:TcClub:1,karadd-club
+237 tc-probe Player_1 TcKaradd 0 karadd-club-state
+238 tc-eject Player_1 TcKaradd 0 Player_1:TcClub:1,karadd-eject-club
+239 tc-probe Player_1 TcKaradd 0 karadd-empty-state
+240 tc-board Player_1 TcKaradd 0 Player_1:TcOrc:1,karadd-orc
+241 tc-probe Player_1 TcKaradd 0 karadd-orc-before
+241 tc-board Player_1 TcFadeCarrier 0 Player_1:TcOrc:2,fade-enter-match
+241 tc-board Player_1 TcFadeCarrier 0 Player_1:TcFadeMonster:0,fade-enter-skip
+242 tc-probe Player_1 TcOrc 2 fade-enter-match-probe
+242 tc-probe Player_1 TcFadeMonster 0 fade-enter-skip-probe
+250 tc-probe Player_1 DwarvenBattleWagonAxeThrower 0 bone-slot1-after
+250 tc-probe Player_1 DwarvenBattleWagonAxeThrower 1 bone-slot2-after
+250 tc-probe Player_1 TcKaradd 0 karadd-orc-after
+251 tc-eject Player_1 TcBoneCarrier 0 Player_1:DwarvenBattleWagonAxeThrower:0,bone-eject1
+251 tc-eject Player_1 TcKaradd 0 Player_1:TcOrc:1,karadd-eject-orc
+251 tc-eject Player_1 TcFadeCarrier 0 Player_1:TcOrc:2,fade-exit-match
+252 tc-probe Player_1 DwarvenBattleWagonAxeThrower 0 bone-slot1-cleared
+252 tc-probe Player_1 TcKaradd 0 karadd-cleared
+252 tc-probe Player_1 TcOrc 2 fade-exit-match-probe
+255 create Player_1 TcGrabNoVictim 0 180,2585,0
+255 create PlyrCreeps TcOrc 0 180,2585,0
+255 create PlyrCreeps TcOrc 1 200,2585,0
+255 create Player_1 TcGrabHitVictim 0 295,2585,0
+255 create PlyrCreeps TcOrc 2 295,2585,0
+255 create PlyrCreeps TcOrc 3 315,2585,0
+256 tc-probe PlyrCreeps TcOrc 0 grab-no-victim-before
+256 tc-probe PlyrCreeps TcOrc 1 grab-no-bystander-before
+256 tc-probe PlyrCreeps TcOrc 2 grab-hit-victim-before
+256 tc-probe PlyrCreeps TcOrc 3 grab-hit-bystander-before
+257 tc-board Player_1 TcGrabNoVictim 0 PlyrCreeps:TcOrc:0,grab-no
+257 tc-board Player_1 TcGrabHitVictim 0 PlyrCreeps:TcOrc:2,grab-hit
+258 tc-probe PlyrCreeps TcOrc 0 grab-no-victim-after
+258 tc-probe PlyrCreeps TcOrc 1 grab-no-bystander-after
+258 tc-probe PlyrCreeps TcOrc 2 grab-hit-victim-after
+258 tc-probe PlyrCreeps TcOrc 3 grab-hit-bystander-after
+260 kill Player_1 TcPipsCarrier 0
+261 tc-eject Player_1 TcGrabNoVictim 0 PlyrCreeps:TcOrc:0,grab-release
+262 tc-probe PlyrCreeps TcOrc 0 grab-released
+264 tc-alive Player_1 DwarvenBattleWagonAxeThrower 2 captive-destroyed
+265 destroy Player_1 TcMountedCarrier 0
+265 destroy Player_1 FellowshipPippin 0
+265 destroy Player_1 TcBoneCarrier 0
+265 destroy Player_1 DwarvenBattleWagonAxeThrower 0
+265 destroy Player_1 DwarvenBattleWagonAxeThrower 1
+265 destroy Player_1 TcPipsCarrier 0
+265 destroy Player_1 DwarvenBattleWagonAxeThrower 2
+265 destroy Player_1 TcTroll 0
+265 destroy Player_1 TcOrc 0
+265 destroy Player_1 TcClub 0
+265 destroy Player_1 TcKaradd 0
+265 destroy Player_1 TcClub 1
+265 destroy Player_1 TcOrc 1
+265 destroy Player_1 TcFadeCarrier 0
+265 destroy Player_1 TcOrc 2
+265 destroy Player_1 TcFadeMonster 0
+265 destroy Player_1 TcGrabNoVictim 0
+265 destroy PlyrCreeps TcOrc 0
+265 destroy PlyrCreeps TcOrc 1
+265 destroy Player_1 TcGrabHitVictim 0
+265 destroy PlyrCreeps TcOrc 2
+265 destroy PlyrCreeps TcOrc 3
