@@ -1,0 +1,16 @@
+230 create Player_1 CastlePerimeterCamp 0 2500,2460,30
+231 castle-perimeter-unpack Player_1 CastlePerimeterCamp 0
+232 castle-perimeter-area Player_1 CastlePerimeterCamp 0
+232 castle-perimeter-plot Player_1 GondorBuildingFoundation 0 GondorBarracks
+232 castle-perimeter-plot Player_1 GondorBuildingFoundation 1 GondorArcherRange
+233 create Player_1 CastlePerimeterSentry 0 2500,2590,0
+236 castle-perimeter-guard Player_1 CastlePerimeterSentry 0
+236 fund Player_1 CastlePerimeterPorter 0
+236 shroudmap Player_1 CastlePerimeterPorter 0
+280 castle-perimeter-area Player_1 CastlePerimeterCamp 0
+280 castle-perimeter-guard-state Player_1 CastlePerimeterSentry 0
+320 castle-perimeter-area Player_1 CastlePerimeterCamp 0
+320 castle-perimeter-guard-state Player_1 CastlePerimeterSentry 0
+347 destroy Player_1 CastlePerimeterCamp 0
+348 castle-perimeter-area Player_1 CastlePerimeterSentry 0
+350 castle-perimeter-guard-state Player_1 CastlePerimeterSentry 0

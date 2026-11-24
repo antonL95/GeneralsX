@@ -1,0 +1,14 @@
+233 create Player_1 CastlePerimeterPorter 0 3440,3060,0
+237 construct Player_1 CastlePerimeterPorter 0 CastlePerimeterWall 3510 3060 0
+250 castle-perimeter-condition Player_1 CastlePerimeterWall 0 CAPTURED 3 0 0
+251 castle-perimeter-condition Player_1 CastlePerimeterWall 0 DOOR_1_OPENING 2 0 0
+280 castle-perimeter-wall Player_1 CastlePerimeterWall 0
+315 castle-perimeter-wall Player_1 CastlePerimeterWall 0
+320 castle-perimeter-wall Player_1 CastlePerimeterWall 0
+342 castle-perimeter-wall Player_1 CastlePerimeterWall 0
+345 castle-perimeter-money Player_1 CastlePerimeterWall 0
+345 cancelbuild Player_1 CastlePerimeterWall 0
+350 castle-perimeter-wall Player_1 CastlePerimeterWall 0
+350 castle-perimeter-money Player_1 CastlePerimeterPorter 0
+354 construct Player_1 CastlePerimeterPorter 0 CastlePerimeterWall 3510 3060 0
+780 castle-perimeter-wall Player_1 CastlePerimeterWall 0
