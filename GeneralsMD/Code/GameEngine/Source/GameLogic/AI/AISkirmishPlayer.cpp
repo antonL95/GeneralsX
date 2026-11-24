@@ -399,6 +399,13 @@ Real tacticalDistanceSquared(const Coord3D& a, const Coord3D& b)
 	return sqr(delta.x) + sqr(delta.y) + sqr(delta.z);
 }
 
+Bool isRetailDefenseRecruit(const Object& object)
+{
+	return !object.isKindOf(KINDOF_UNATTACKABLE) && !object.isKindOf(KINDOF_STRUCTURE) &&
+		(object.isKindOf(KINDOF_SHIP) || (!object.isKindOf(KINDOF_IMMOBILE) &&
+			(object.isKindOf(KINDOF_CAN_ATTACK) || object.isKindOf(KINDOF_HERO) || object.isKindOf(KINDOF_SUPPORT))));
+}
+
 struct RetailDefenseCluster
 {
 	Coord3D center{};
@@ -2821,7 +2828,17 @@ void AISkirmishPlayer::updateRetail()
 		defenseSize = chosen->defense->buildings.size();
 		const size_t category = std::min<size_t>(defenseSize, 3) - 1;
 		recruitAll = GameLogicRandomValueReal(0.0f, 1.0f) < rules->defenseRecruitAllChance[category];
-		recruitLimit = recruitAll ? 4 : category == 0 ? 1 : category == 1 ? 3 : wave.size();
+		if (recruitAll)
+			recruitLimit = 4;
+		else if (category < 2)
+			recruitLimit = category == 0 ? 1 : 3;
+		else
+		{
+			const size_t roster = std::count_if(owned.begin(), owned.end(),
+				[](const Object* object) { return isRetailDefenseRecruit(*object); });
+			if (roster > 1)
+				recruitLimit = roster / 2;
+		}
 		std::sort(wave.begin(), wave.end(), [&](const auto& a, const auto& b) {
 			const auto rank = [&](const Object* unit) {
 				return std::make_pair(tacticalDistanceSquared(*unit->getPosition(), *destination), unit->getID());
