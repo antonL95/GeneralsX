@@ -1,5 +1,7 @@
 import math
 import re
+from statistics import median
+import sys
 
 
 render_env = {
@@ -53,3 +55,12 @@ def check_captures(output, frames):
     full, late, gone = (light(frame) for frame in (218, 236, 238))
     if not (full >= 2000 and 0 < late < full / 3 and gone < full / 10):
         raise RuntimeError(f"Expected the additive silhouette to fade over the terrain, got {full=}, {late=}, {gone=}")
+
+    figure_area = (925, 81, 961, 126)
+    with Image.open(output / "frame-0040.png") as before, Image.open(output / "frame-0146.png") as sweep:
+        ground_light = before.crop(figure_area).convert("L").get_flattened_data()
+        figure_light = sweep.crop(figure_area).convert("L").get_flattened_data()
+    brightness = median(figure - ground for figure, ground in zip(figure_light, ground_light))
+    print(f"Frame 146 ghost crop median luma gain: {brightness:.1f}", file=sys.stderr)
+    if brightness < 10:
+        raise RuntimeError(f"Expected the mid-sweep figure to brighten the terrain, got luma gain {brightness:.1f}")

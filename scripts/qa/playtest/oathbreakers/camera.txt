@@ -1,3 +1,2 @@
 24 Player_1 GondorAragorn 3100 690 0.62
 206 Player_1 FloodOathbreaker 3310 850 0.34
-490 Player_1 GondorAragorn 3100 690 0.62

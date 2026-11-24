@@ -2028,18 +2028,38 @@ void W3DModelDraw::unregisterModelShadow(void)
 		TheTerrainRenderObject->removeModelShadow(draw->getID());
 }
 
+static Bool hasNonAdditiveMesh(const RenderObjClass &object)
+{
+	if (object.Class_ID() == RenderObjClass::CLASSID_MESH)
+		return !object.Is_Additive();
+
+	for (Int i = 0; i < object.Get_Num_Sub_Objects(); ++i)
+	{
+		RenderObjClass *child = object.Get_Sub_Object(i);
+		if (!child)
+			continue;
+		const Bool found = hasNonAdditiveMesh(*child);
+		child->Release_Ref();
+		if (found)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 /** Fill in the shadow this template asks for. A template that asks for nothing still gets one if it
 is a projectile: a missile or a bomb with no shadow slides over the ground with nothing tying it to
 the terrain. There can be dozens in the air at once, so it is always the cheap projected blob and
 never a volume; a zero decal size makes addShadow take the size from the model's own bounding box.
 Props with no shadows (fences, rubbish, shrubbery) get volume shadows (or decal fallback).
 Returns FALSE when this drawable gets no shadow at all. */
-static Bool fillShadowInfoFromTemplate(const ThingTemplate *tmplate, Shadow::ShadowTypeInfo *shadowInfo, Bool allowPropVolume = TRUE)
+static Bool fillShadowInfoFromTemplate(const ThingTemplate *tmplate, const RenderObjClass &object,
+	Shadow::ShadowTypeInfo *shadowInfo, Bool allowPropVolume = TRUE)
 {
 	if (tmplate->getShadowType() == SHADOW_NONE)
 	{
 		const Bool prop = TheGlobalData && TheGlobalData->m_shadowsForProps && tmplate->isKindOf(KINDOF_IMMOBILE) &&
-							!tmplate->isKindOf(KINDOF_PROJECTILE);
+							!tmplate->isKindOf(KINDOF_PROJECTILE) &&
+							(!object.Is_Additive() || hasNonAdditiveMesh(object));
 
 		if (prop && allowPropVolume && TheGlobalData->m_useShadowVolumes)
 		{
@@ -2093,7 +2113,7 @@ void W3DModelDraw::allocateShadows()
 	// A tree the buffer casts for us wants no decal of its own under it.
 	Shadow::ShadowTypeInfo shadowInfo;
 	if (!registerModelShadow() &&
-			m_shadow == nullptr && m_renderObject && TheW3DShadowManager && fillShadowInfoFromTemplate(tmplate, &shadowInfo))
+			m_shadow == nullptr && m_renderObject && TheW3DShadowManager && fillShadowInfoFromTemplate(tmplate, *m_renderObject, &shadowInfo))
 	{
 		// a projectile's decal is ours rather than the template's - never trade it for a volume
 		Bool promotedToVolume = tmplate->getShadowType() != SHADOW_NONE &&
@@ -2106,7 +2126,7 @@ void W3DModelDraw::allocateShadows()
 
 		if (m_shadow == nullptr && promotedToVolume)
 		{	// no usable shadow geometry in this model - fall back to the decal the template asked for
-			fillShadowInfoFromTemplate(tmplate, &shadowInfo, FALSE);
+			fillShadowInfoFromTemplate(tmplate, *m_renderObject, &shadowInfo, FALSE);
 			m_shadow = TheW3DShadowManager->addShadow(m_renderObject, &shadowInfo, draw);
 		}
 
@@ -4025,7 +4045,7 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		Shadow::ShadowTypeInfo shadowInfo;
 		// a tree the buffer casts for us wants no decal of its own under it
 		if (!registerModelShadow() &&
-				m_renderObject && TheW3DShadowManager && fillShadowInfoFromTemplate(tmplate, &shadowInfo))
+				m_renderObject && TheW3DShadowManager && fillShadowInfoFromTemplate(tmplate, *m_renderObject, &shadowInfo))
 		{
 			// a projectile's decal is ours rather than the template's - never trade it for a volume
 			Bool promotedToVolume = tmplate->getShadowType() != SHADOW_NONE &&
@@ -4039,7 +4059,7 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 
 			if (m_shadow == nullptr && promotedToVolume)
 			{	// no usable shadow geometry in this model - fall back to the decal the template asked for
-				fillShadowInfoFromTemplate(tmplate, &shadowInfo, FALSE);
+				fillShadowInfoFromTemplate(tmplate, *m_renderObject, &shadowInfo, FALSE);
 				m_shadow = TheW3DShadowManager->addShadow(m_renderObject, &shadowInfo, draw);
 			}
 
