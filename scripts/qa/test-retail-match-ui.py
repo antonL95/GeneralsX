@@ -212,6 +212,99 @@ def check_spellbook():
         sync(display, 0)
 
 
+def check_shell_load():
+    global game
+    wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
+    time.sleep(2)
+    click(512, 520)
+    wait_for("empty Load page opens", lambda: pixel(145, 130) == 0x233A48, 5)
+    capture("empty-load", 122, 110, 780, 548)
+    key(0xFF0D)
+    wait_for("Enter leaves the empty list open", lambda: pixel(145, 130) == 0x233A48)
+    key(0xFF1B)
+    wait_for("Escape returns to the main menu", lambda: len(skirmish_label_pixels()) >= 10)
+
+    click(512, 296)
+    click(219, 262)
+    click(410, 210)
+    click(219, 210)
+    click(290, 162)
+    click(454, 226)
+    click(454, 352)
+    click(159, 162)
+    click(360, 444)
+    click(360, 194)
+    click(170, 465)
+    click(170, 541)
+    click(360, 468)
+    click(360, 243)
+    click(643, 468)
+    click(643, 543)
+    click(510, 444)
+    click(510, 516)
+    click(510, 468)
+    click(510, 516)
+    capture("skirmish-setup", 101, 137, 822, 492)
+    click(833, 689)
+    wait_for("match reports both occupied slots", lambda: log_count("TEST shell-slot ") == 2, 100)
+    log = (out / "game.log").read_text(errors="replace")
+    slots = re.findall(r"^TEST shell-slot (\d+) (\S+) team=(\d+) start=(\d+) color=(\d+) easy=(\d+)$",
+                       log, re.MULTILINE)
+    actual = [slot[:4] + slot[5:] for slot in slots]
+    expected = [("0", "FactionMen", "0", "1", "0"), ("1", "FactionRohan", "1", "0", "1")]
+    if actual != expected or len({slot[4] for slot in slots}) != 2:
+        sys.exit(f"FAIL wrong skirmish roster: {slots}")
+    wait_for("chosen skirmish settings reach the match",
+             lambda: log_count("TEST shell-setup frame=30 cash=1400") == 1, 5)
+    wait_for("save is written at frame 90",
+             lambda: log_count("TEST snapshot-save frame=90 code=0") == 1, 60)
+    wait_for("original match reaches frame 91", lambda: log_count("TEST shell-crc 91 ") == 1, 60)
+    save = next(out.rglob("shell-qa.sav"), None)
+    if save is None:
+        sys.exit("FAIL the skirmish did not write the named save")
+
+    stop_game(game)
+    commands.write_text("89 shell-crc - - 0\n91 shell-crc - - 0\n")
+    shell_opens = log_count("Shell::doPush() completed successfully")
+    game = launch_game(log_file)
+    wait_for("restarting the game opens the main menu",
+             lambda: log_count("Shell::doPush() completed successfully") > shell_opens, 100)
+    time.sleep(2)
+    click(512, 520)
+    wait_for("main menu opens the saved games list", lambda: pixel(145, 130) == 0x233A48)
+    before = title_signature(635, 246, 245, 220)
+    click(258, 228)
+    wait_for("selecting the save fills the details card",
+             lambda: title_signature(635, 246, 245, 220) != before)
+    capture("selected-save", 122, 110, 780, 548)
+    contents = save.read_bytes()
+    token_end = 1 + contents[0]
+    block_size, = struct.unpack_from("<I", contents, token_end)
+    if contents[1:token_end] != b"CHUNK_GameState":
+        sys.exit("FAIL save fixture has no metadata block")
+    error_before = title_signature(294, 602, 434, 38)
+    save.write_bytes(contents[:token_end + 4 + block_size] + b"\x06SG_EOF")
+    try:
+        click(812, 620)
+        wait_for("an incomplete save returns to Load with an error",
+                 lambda: pixel(145, 130) == 0x233A48
+                 and title_signature(294, 602, 434, 38) != error_before, 60)
+    finally:
+        save.write_bytes(contents)
+
+    key(0xFF54)
+    wait_for("Down selects the save after the load error",
+             lambda: title_signature(635, 246, 245, 220) != before)
+    click(812, 620)
+    wait_for("main menu loads the save and returns to frame 91",
+             lambda: log_count("TEST shell-crc 91 ") == 2, 100)
+    log = (out / "game.log").read_text(errors="replace")
+    resumed = re.findall(r"^TEST shell-crc 91 ([A-F0-9]+)$", log, re.MULTILINE)
+    if len(resumed) != 2 or resumed[0] != resumed[1] or log_count("TEST shell-crc 89 ") != 1:
+        sys.exit(f"FAIL resumed frame 91 CRC differs from the original match: {resumed}")
+    print(f"PASS frame 91 CRC matches the original match ({resumed[0]})", flush=True)
+
+
 def check():
     wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
     time.sleep(2)
@@ -275,6 +368,8 @@ commands.write_text(("15 pkg44-points Player_1 - 0 10\n" if "--spellbook" in sys
                     "30 player Player_1 - 0\n" + "".join(
     f"{frame} powerstate Player_1 - 0\n" for frame in range(60, 3600, 30)
 ))
+if "--shell-load" in sys.argv:
+    commands.write_text("30 shell-setup - - 0\n89 shell-crc - - 0\n90 snapshot-save - - 0 shell-qa.sav\n91 shell-crc - - 0\n")
 env = os.environ | {
     "XDG_DATA_HOME": str(out / "data"),
     "XDG_CONFIG_HOME": str(out / "config"),
@@ -289,19 +384,30 @@ env = os.environ | {
     "LP_NUM_THREADS": "3",
     "GENERALSX_TEST_COMMANDS": str(commands),
 }
-with (out / "game.log").open("wb") as log:
-    game = subprocess.Popen(
+def launch_game(log):
+    return subprocess.Popen(
         [str(build / "GeneralsMD/GeneralsXZH"), "-win", "-xres", "1024", "-yres", "768",
          "-noaudio", "-nomusic", "-novideo", "-noshellmap",
          "-mod", "/game-install/aotr", "-bfme2", "/game-install/bfme2"],
         cwd="/game-install/rotwk", env=env, stdout=log, stderr=subprocess.STDOUT,
     )
+
+
+def stop_game(process):
+    process.terminate()
     try:
-        check()
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
+with (out / "game.log").open("wb") as log_file:
+    game = launch_game(log_file)
+    try:
+        if "--shell-load" in sys.argv:
+            check_shell_load()
+        else:
+            check()
     finally:
-        game.terminate()
-        try:
-            game.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            game.kill()
-            game.wait()
+        stop_game(game)
