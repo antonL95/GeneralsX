@@ -34,6 +34,7 @@
 #include "Common/RandomValue.h"
 #include "Common/ThingFactory.h"
 #include "Common/Xfer.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
@@ -193,9 +194,37 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 	{
 		case CREATE_AT_EDGE_NEAR_TARGET_AND_MOVE_TO_LOCATION:
 		case CREATE_CLOSEST_TO_SPAWN_POINT:
-		case USE_SECONDARY_OBJECT_LOCATION:
 		case OCL_CREATE_LOC_COUNT:
 			break;
+
+		case USE_SECONDARY_OBJECT_LOCATION:
+		{
+			const Object* source = getObject();
+			const auto& filter = modData->m_nearestSecondaryObjectFilter;
+			const Object* closest = nullptr;
+			Real closestDistance = 0.0f;
+			if (filter.m_rules || filter.m_includeKinds.any() || filter.m_excludeKinds.any() ||
+				!filter.m_includeObjects.empty() || !filter.m_excludeObjects.empty())
+			{
+				for (const Object* candidate = TheGameLogic->getFirstObject(); candidate; candidate = candidate->getNextObject())
+				{
+					if (candidate->isDestroyed() || candidate->isEffectivelyDead() || !filter.matchesObject(source, candidate))
+						continue;
+					const Coord3D& position = *candidate->getPosition();
+					const Real dx = targetCoord.x - position.x;
+					const Real dy = targetCoord.y - position.y;
+					const Real distance = dx * dx + dy * dy;
+					if (!closest || distance < closestDistance ||
+						(distance == closestDistance && candidate->getID() < closest->getID()))
+					{
+						closest = candidate;
+						closestDistance = distance;
+					}
+				}
+			}
+			ObjectCreationList::create(ocl, source, &targetCoord, closest ? closest->getPosition() : nullptr, angle);
+			break;
+		}
 
 		case CREATE_AT_EDGE_NEAR_SOURCE:
 			creationCoord = TheTerrainLogic->findClosestEdgePoint( getObject()->getPosition() );
@@ -211,9 +240,7 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 			ObjectCreationList::create( ocl, getObject(), &creationCoord, &targetCoord, angle );
 			break;
 		case CREATE_AT_LOCATION:
-			// this is the case where the special power stuff originates at the location of the mouse click
-			creationCoord = targetCoord;
-			ObjectCreationList::create( ocl, getObject(), &creationCoord, &targetCoord, angle );
+			ObjectCreationList::create(ocl, getObject(), &targetCoord, nullptr, angle);
 			break;
 		case USE_OWNER_OBJECT:
 			creationCoord.set( targetCoord );

@@ -198,6 +198,8 @@ public:
 	void xferTheSellList(Xfer *xfer );
 
 	void clearConstructionSite( const Object *site );
+	void clearConstructionSite(const ThingTemplate* definition, const Coord3D* position, Real angle,
+		Player* owner, const Object* site = nullptr);
 	void clearRemovableForConstruction(const ThingTemplate *whatToBuild, const Coord3D *pos,
 		Real angle, const Object* constructionSite = nullptr);
 

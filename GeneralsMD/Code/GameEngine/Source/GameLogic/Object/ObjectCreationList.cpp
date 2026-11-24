@@ -1411,9 +1411,6 @@ protected:
 
 		}
 
-		if (retailObject && m_clearRemovables && TheBuildAssistant && !obj->getContainedBy())
-			TheBuildAssistant->clearConstructionSite(obj);
-
 		if( m_containInsideSourceObject )
 		{
 			// The Obj has been totally made, so stuff it inside ourselves if desired.
@@ -1444,7 +1441,9 @@ protected:
 			}
 			if (m_useJustBuiltFlag)
 			{
-				obj->setPowerModelCondition(MODELCONDITION_JUST_BUILT, std::max<UnsignedInt>(1, m_justBuiltDuration));
+				const UnsignedInt duration = std::max(m_justBuiltDuration,
+					RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND));
+				obj->setTimedModelCondition(MODELCONDITION_JUST_BUILT, duration);
 				static const NameKeyType grantKey = NAMEKEY("GrantUpgradeCreate");
 				for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
 					if ((*module)->getModuleNameKey() == grantKey)
@@ -1508,15 +1507,15 @@ protected:
 		if (m_names.size() <= 0)
 			return nullptr;
 
-		if (RetailFileLayers::enabled() && (!m_requiredUpgrades.empty() || !m_forbiddenUpgrades.empty()))
+		if (RetailFileLayers::enabled() && sourceObj && (!m_requiredUpgrades.empty() || !m_forbiddenUpgrades.empty()))
 		{
-			const Player *owner = sourceObj ? sourceObj->getControllingPlayer() : nullptr;
+			const Player* owner = sourceObj->getControllingPlayer();
 			const auto hasUpgrade = [&](const AsciiString &name) {
-				const UpgradeTemplate *upgrade = TheUpgradeCenter->findUpgrade(name);
-				return upgrade && (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER
-					? owner && owner->hasUpgradeComplete(upgrade) : sourceObj && sourceObj->hasUpgrade(upgrade));
+				const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(name);
+				return upgrade && (sourceObj->hasUpgrade(upgrade) || (owner && owner->hasUpgradeComplete(upgrade)));
 			};
-			if (!std::all_of(m_requiredUpgrades.begin(), m_requiredUpgrades.end(), hasUpgrade) ||
+			if ((!m_requiredUpgrades.empty() &&
+					std::none_of(m_requiredUpgrades.begin(), m_requiredUpgrades.end(), hasUpgrade)) ||
 				std::any_of(m_forbiddenUpgrades.begin(), m_forbiddenUpgrades.end(), hasUpgrade))
 				return nullptr;
 		}
@@ -1543,6 +1542,7 @@ protected:
 		if (!owner || (retailObject && !owner->isPlayerActive()))
 			owner = ThePlayerList->getNeutralPlayer();
 		Team* debrisOwner = owner ? owner->getDefaultTeam() : nullptr;
+		const Bool clearRemovables = retailObject && m_clearRemovables && TheBuildAssistant;
 
 		Object* container = nullptr;
 		Object *firstObject = nullptr;
@@ -1551,6 +1551,8 @@ protected:
 			const ThingTemplate* containerTmpl = TheThingFactory->findTemplate(m_putInContainer);
 			if (containerTmpl)
 			{
+				if (clearRemovables)
+					TheBuildAssistant->clearConstructionSite(containerTmpl, pos, orientation, owner);
 				container = TheThingFactory->newObject( containerTmpl, debrisOwner );
 				if( !container )
 				{
@@ -1590,6 +1592,8 @@ protected:
 					continue;
 			}
 
+			if (clearRemovables)
+				TheBuildAssistant->clearConstructionSite(tmpl, pos, orientation, owner);
 			Object *debris = TheThingFactory->newObject( tmpl, debrisOwner );
 			if( !debris )
 			{
@@ -1719,8 +1723,8 @@ protected:
 					const Coord3D* spawnedPosition = obj->getPosition();
 					const Real dx = secondary->x - spawnedPosition->x;
 					const Real dy = secondary->y - spawnedPosition->y;
-					const Real facing = dx != 0.0f || dy != 0.0f ? WWMath::Atan2Origin(dy, dx) : orientation;
-					obj->setOrientation(facing + m_orientationOffset);
+					const Real facing = dx != 0.0f || dy != 0.0f ? WWMath::Atan2Origin(dy, dx) : 0.0f;
+					obj->setOrientation(facing);
 				}
 			}
 			if (hasSpawnBusyTime)

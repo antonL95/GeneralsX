@@ -1583,12 +1583,20 @@ void BuildAssistant::clearRemovableForConstruction( const ThingTemplate *whatToB
 
 void BuildAssistant::clearConstructionSite( const Object *site )
 {
-	if( site == nullptr || site->getControllingPlayer() == nullptr )
+	if (!site)
 		return;
 
-	clearRemovableForConstruction(site->getTemplate(), site->getPosition(), site->getOrientation(), site);
-	moveObjectsForConstruction( site->getTemplate(), site->getPosition(), site->getOrientation(),
-															site->getControllingPlayer(), site );
+	clearConstructionSite(site->getTemplate(), site->getPosition(), site->getOrientation(),
+		site->getControllingPlayer(), site);
+}
+
+void BuildAssistant::clearConstructionSite(const ThingTemplate* definition, const Coord3D* position,
+	Real angle, Player* owner, const Object* site)
+{
+	if (!owner)
+		return;
+	clearRemovableForConstruction(definition, position, angle, site);
+	moveObjectsForConstruction(definition, position, angle, owner, site);
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -1,0 +1,51 @@
+162 create Player_1 HaradEasterlingsSummonEgg 0 2700,2650,0
+180 create Player_1 AngmarSpellBook 0 1250,2700,0
+181 science Player_1 - 0 SCIENCE_Oasis
+181 science Player_1 - 0 SCIENCE_DrySpell
+182 create Player_1 AngmarSpellBook_WOTR 0 1540,2300,0
+183 science Player_1 - 0 SCIENCE_TribesofHarad
+190 create Player_1 Pkg64Keep 0 1610,2100,0
+190 create Player_1 Pkg64Keep 0 1300,1900,0
+190 create PlyrCreeps Pkg64Keep 0 1550,2240,0
+196 create PlyrCreeps Pkg64Removable 0 1300,2700,0
+196 create PlyrCreeps Pkg64Removable 0 1700,2700,0
+196 create Player_1 Pkg64Source 0 1700,2700,0
+199 pkg64-cast Player_1 AngmarSpellBook 0 Command_SpellBookHaradOasis 1300 2700
+201 pkg64-state Player_1 HaradSpellbookOasis 0 oasis
+201 pkg64-state PlyrCreeps Pkg64Removable 0 after-clear
+202 placement-ocl Player_1 Pkg64Source 0 Pkg64OasisNoClear
+203 pkg64-state PlyrCreeps Pkg64Removable 0 no-clear
+205 create Player_1 Pkg64Target 0 1250,3000,0
+206 pkg64-cast Player_1 AngmarSpellBook 0 Command_SpellBookHaradDrySpell 1250 3000
+208 pkg64-state Player_1 SpellBookDrySpell 0 dry-spell
+209 destroy Player_1 Pkg64Source 0
+211 pkg64-cast Player_1 AngmarSpellBook_WOTR 0 Command_SpellBookHaradWotRBarrage 1600 2300
+213 pkg64-barrage Player_1 AngmarSpellBook_WOTR 0 Player_1:Pkg64Keep:0 1600 2300
+213 create Player_1 Pkg64Source 0 1150,2600,0
+214 placement-ocl Player_1 Pkg64Source 0 OCL_NafaratiKnockbacker
+215 placement-ocl Player_1 Pkg64Source 0 Pkg64IgnoreBlocker
+216 placement-ocl Player_1 Pkg64Source 0 Pkg64AvoidBlocker
+217 destroy Player_1 Pkg64Source 0
+221 create PlyrCreeps Pkg64Source 0 2000,2750,0
+222 placement-ocl PlyrCreeps Pkg64Source 0 OCL_SpellBookFieryBarrageProjectile 2050 2750 0
+223 objupgrade PlyrCreeps Pkg64Source 0 Upgrade_GondorFaction
+224 placement-ocl PlyrCreeps Pkg64Source 0 OCL_SpellBookFieryBarrageProjectile 2050 2750 0
+225 placement-ocl PlyrCreeps Pkg64Source 0 Pkg64BarrageNoGate 2050 2750 0
+225 create Player_1 RisenCarrionFromDeathEgg_Real 0 2350,2650,0
+226 destroy PlyrCreeps Pkg64Source 0
+231 pkg64-state Player_1 HaradKhanofRhun_Summoned 0 khan-early
+235 pkg64-state Player_1 GuldurRisenDead_Skeleton 0 risen-early
+238 create Player_1 Pkg64Source 0 1750,2600,0
+238 create PlyrCreeps Pkg64Removable 0 1750,2600,0
+238 create PlyrCreeps Pkg64Removable 0 1750,2720,0
+239 placement-ocl Player_1 Pkg64Source 2 Pkg64ClearAtAnchor
+240 pkg64-state PlyrCreeps Pkg64Removable 1 anchor-control
+242 pkg64-overlay Player_1 GuldurRisenDead_Skeleton 0
+245 pkg64-state Player_1 GuldurRisenDead_Skeleton 0 risen-restored
+310 pkg64-state Player_1 GuldurRisenDead_Skeleton 0 risen-expired
+311 placement-ocl Player_1 AngmarSpellBook 0 Pkg64RisenNoFlag
+313 pkg64-state Player_1 GuldurRisenDead_Skeleton 1 risen-no-flag
+366 pkg64-state Player_1 HaradKhanofRhun_Summoned 0 khan-still-busy
+385 pkg64-state Player_1 HaradKhanofRhun_Summoned 0 khan-expired
+386 placement-ocl Player_1 AngmarSpellBook 0 Pkg64KhanNoBusy
+387 pkg64-state Player_1 HaradKhanofRhun_Summoned 1 khan-no-busy

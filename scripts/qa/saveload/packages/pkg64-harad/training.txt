@@ -1,0 +1,19 @@
+230 create Player_1 Pkg64Source 0 125,120,0
+230 create Player_1 Pkg64Source 0 125,170,0
+231 create PlyrCreeps Pkg64Source 0 180,120,0
+232 objupgrade PlyrCreeps Pkg64Source 0 Upgrade_GondorFaction
+233 placement-ocl PlyrCreeps Pkg64Source 0 Pkg64RequiredEither
+234 placement-ocl PlyrCreeps Pkg64Source 0 Pkg64FaceSecondary 180 165 0
+235 placement-ocl PlyrCreeps Pkg64Source 0 Pkg64FacePrimary 180 165 0
+236 placement-ocl Player_1 Pkg64Source 0 Pkg64Move 200 120 0
+237 placement-ocl Player_1 Pkg64Source 1 Pkg64Hold 200 170 0
+258 pkg64-state Player_1 Pkg64Mover 0 moved
+258 pkg64-state Player_1 Pkg64Mover 1 held
+260 destroy Player_1 Pkg64Mover 1
+260 destroy Player_1 Pkg64Mover 0
+260 destroy PlyrCreeps Pkg64Facing 2
+260 destroy PlyrCreeps Pkg64Facing 1
+260 destroy PlyrCreeps Pkg64Facing 0
+260 destroy PlyrCreeps Pkg64Source 0
+260 destroy Player_1 Pkg64Source 1
+260 destroy Player_1 Pkg64Source 0
