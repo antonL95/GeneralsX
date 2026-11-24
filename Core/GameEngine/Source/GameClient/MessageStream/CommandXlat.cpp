@@ -2494,16 +2494,24 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 		Coord3D treePosition;
 		Real treeAngle;
 		Object* proxy = TheGameLogic->findObjectByID(TerrainLogic::GRABBABLE_TREE_PROXY_ID);
-		Drawable* selected = TheInGameUI->getFirstSelectedDrawable();
-		Object* source = selected ? selected->getObject() : nullptr;
-		auto* grab = source ? dynamic_cast<GrabPassengerSpecialPower*>(source->getSpecialPowerModule(spell->getSpecialPowerTemplate())) : nullptr;
-		if (proxy && source && TheTerrainLogic->findGrabbableMapTreeAt(*pos, treePosition, treeAngle) &&
-			ThePartitionManager->getShroudStatusForPlayer(source->getControllingPlayer()->getPlayerIndex(), &treePosition) == CELLSHROUD_CLEAR &&
-			grab && grab->getPercentReady() >= 1.0f && grab->isValidPowerTarget(proxy) &&
-			TheSpecialPowerStore->canUseSpecialPower(source, spell->getSpecialPowerTemplate()) &&
-			(spell->getRequiredRank() <= 0 || source->getExperienceTracker()->getRank() >= spell->getRequiredRank()) &&
-			spell->isRetailButtonUsable() && spell->isMountStateAllowed(source) && spell->isModelConditionAllowed(source) &&
-			spell->isValidContainerForCommand(source))
+		Object* source = nullptr;
+		if (proxy && TheTerrainLogic->findGrabbableMapTreeAt(*pos, treePosition, treeAngle))
+			for (Drawable* selected : *TheInGameUI->getAllSelectedDrawables())
+			{
+				Object* candidate = selected ? selected->getObject() : nullptr;
+				auto* grab = candidate ? dynamic_cast<GrabPassengerSpecialPower*>(candidate->getSpecialPowerModule(spell->getSpecialPowerTemplate())) : nullptr;
+				if (candidate && grab && grab->getPercentReady() >= 1.0f && grab->isValidPowerTarget(proxy) &&
+					ThePartitionManager->getShroudStatusForPlayer(candidate->getControllingPlayer()->getPlayerIndex(), &treePosition) == CELLSHROUD_CLEAR &&
+					TheSpecialPowerStore->canUseSpecialPower(candidate, spell->getSpecialPowerTemplate()) &&
+					(spell->getRequiredRank() <= 0 || candidate->getExperienceTracker()->getRank() >= spell->getRequiredRank()) &&
+					spell->isRetailButtonUsable() && spell->isMountStateAllowed(candidate) && spell->isModelConditionAllowed(candidate) &&
+					spell->isValidContainerForCommand(candidate))
+				{
+					source = candidate;
+					break;
+				}
+			}
+		if (source)
 		{
 			if (type == DO_HINT)
 			{

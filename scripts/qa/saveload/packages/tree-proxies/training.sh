@@ -3,7 +3,7 @@ check() {
         expect 'TEST tree-proxies frame=18 held=- tree=0 standing=1 same=0'
     fi
     if covers 220; then
-        expect 'TEST tree-proxies direct order frame=220 sent=1'
+        expect 'TEST tree-proxies direct order frame=220 sent=1 blocked-first=1'
     fi
     for frame in 230 245 254; do
         if covers "$frame"; then
