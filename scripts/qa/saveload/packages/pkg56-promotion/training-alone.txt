@@ -1,0 +1,15 @@
+219 pkg56-creation Player_1 - 0
+220 create Player_1 GondorFaramir 0 2320,3370
+220 pkg56-creation Player_1 - 0
+221 create Player_1 GondorFighterHorde 0 2470,3370
+222 pkg56-taskmaster-configure Player_1 - 0
+223 create Player_1 CreateAHero 0 2650,3370
+234 pkg56-promote Player_1 GondorFaramir 0
+235 pkg56-promote Player_1 GondorFighterHorde 0
+236 pkg56-promote Player_1 CreateAHero 0
+242 pkg56-saved Player_1 GondorFaramir 0
+242 pkg56-saved Player_1 GondorFighterHorde 0
+242 pkg56-taskmaster-select Player_1 CreateAHero 0
+245 pkg56-saved Player_1 GondorFaramir 0
+245 pkg56-saved Player_1 GondorFighterHorde 0
+245 pkg56-taskmaster-select Player_1 CreateAHero 0

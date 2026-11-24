@@ -1,0 +1,14 @@
+216 pkg56-levels - - 0
+217 pkg56-parser - - 0
+231 create Player_1 Pkg56PromotionProbe 0 1660,3530
+242 pkg56-promotion Player_1 Pkg56PromotionProbe 0
+243 pkg56-promote-quiet Player_1 Pkg56PromotionProbe 0
+243 pkg56-promotion Player_1 Pkg56PromotionProbe 0
+244 pkg56-levels - - 0
+245 pkg56-promotion Player_1 Pkg56PromotionProbe 0
+249 pkg56-promotion Player_1 Pkg56PromotionProbe 0
+280 pkg56-promotion Player_1 Pkg56PromotionProbe 0
+281 pkg56-promote Player_1 Pkg56PromotionProbe 0
+282 pkg56-promotion Player_1 Pkg56PromotionProbe 0
+370 pkg56-promotion Player_1 Pkg56PromotionProbe 0
+372 pkg56-promotion Player_1 Pkg56PromotionProbe 0
