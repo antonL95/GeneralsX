@@ -1,7 +1,7 @@
 prepare() {
     awk -v end="$end" 'BEGIN {
         for (frame = 91; frame <= end && frame <= 1907; ++frame) {
-            print frame, "ambient-roam-sample Player_1 RivendellHallOfFire 0"
+            print frame, "ambient-roam-sample Player_1 AmbientRoamHall 0"
             if (frame >= 101)
                 print frame, "ambient-roam-sample Player_1 ElvenGreenPasture 0"
         }
