@@ -1,0 +1,81 @@
+200 create Player_1 Pkg65SiegePen 0 1900,3290,0
+200 create Player_1 Pkg65CitadelAnchor 0 2600,3220,0
+200 create Player_1 HaradPorterWotR 0 2660,3220,0
+201 create Player_1 AngmarFortressCitadel 0 2200,3240,0
+205 fund Player_1 Pkg65SiegePen 0
+205 create Player_1 Pkg65Porter 0 1050,2820,0
+205 create Player_1 Pkg65Porter 1 1050,3080,0
+206 shroudmap Player_1 Pkg65SiegePen 0
+209 create Player_1 Pkg65Plot 0 800,2700,0
+209 create Player_1 Pkg65Plot 1 800,2850,0
+209 create Player_1 Pkg65Plot 2 1250,2700,0
+209 create Player_1 Pkg65Plot 3 1250,2850,0
+209 create Player_1 Pkg65Plot 4 1700,2700,0
+209 create Player_1 Pkg65Plot 5 1700,2850,0
+209 create Player_1 Pkg65Plot 6 2160,2700,0
+209 create Player_1 Pkg65Plot 7 2160,2850,0
+209 create Player_1 Pkg65Plot 8 2710,2700,0
+209 create Player_1 Pkg65Plot 9 2710,2850,0
+209 create Player_1 Pkg65Plot 10 3140,2700,0
+209 create Player_1 Pkg65Plot 11 3140,2850,0
+209 create Player_1 Pkg65Plot 12 800,3050,0
+209 create Player_1 Pkg65Plot 13 800,3240,0
+209 create Player_1 Pkg65Plot 14 1450,3050,0
+209 create Player_1 Pkg65Plot 15 1450,3240,0
+209 pkg65-grant Player_1 Pkg65Porter 0 Upgrade_MiniHordeLvl10
+210 build Player_1 Pkg65Plot 0 Pkg65AngmarWall
+210 build Player_1 Pkg65Plot 1 Pkg65AngmarWall
+210 build Player_1 Pkg65Plot 2 Pkg65HaradExpansion
+210 build Player_1 Pkg65Plot 3 Pkg65HaradExpansion
+210 build Player_1 Pkg65Plot 4 Pkg65Sanctum
+210 build Player_1 Pkg65Plot 5 Pkg65Sanctum
+210 build Player_1 Pkg65Plot 6 Pkg65Umbar
+210 build Player_1 Pkg65Plot 7 Pkg65Umbar
+210 build Player_1 Pkg65Plot 8 Pkg65Pavillion
+210 build Player_1 Pkg65Plot 9 Pkg65Pavillion
+210 build Player_1 Pkg65Plot 10 Pkg65Mahud
+210 build Player_1 Pkg65Plot 11 Pkg65Mahud
+210 build Player_1 Pkg65Plot 12 Pkg65Bazaar
+210 build Player_1 Pkg65Plot 13 Pkg65Bazaar
+210 build Player_1 Pkg65Plot 14 Pkg65Harondor
+210 build Player_1 Pkg65Plot 15 Pkg65Harondor
+211 construct Player_1 Pkg65Porter 0 Pkg65DozerBazaar 1050 2900 0
+211 construct Player_1 Pkg65Porter 1 Pkg65DozerBazaar 1050 3160 0
+220 queue Player_1 Pkg65SiegePen 0 Pkg65SiegeMumak
+237 placement-ocl Player_1 Pkg65CitadelAnchor 0 OCL_WotRHaradCitadel
+237 pkg65-grant Player_1 WotRHaradCitadel 0 Upgrade_AngmarFortressAngmarStonework
+243 pkg65-grant Player_1 Pkg65DozerBazaar 0 Upgrade_MiniHordeLvl10
+243 pkg65-grant Player_1 Pkg65DozerBazaar 1 Upgrade_MiniHordeLvl10
+245 pkg65-grant Player_1 WotRHaradCitadel 0 Upgrade_AngmarFortressAngmarStonework
+247 pkg65-grant Player_1 Pkg65DozerBazaar 0 Upgrade_MiniHordeLvl10
+248 cancelbuild Player_1 Pkg65DozerBazaar 1
+250 cancelbuild Player_1 Pkg65AngmarWall 1
+250 cancelbuild Player_1 Pkg65HaradExpansion 1
+250 cancelbuild Player_1 Pkg65Sanctum 1
+250 cancelbuild Player_1 Pkg65Umbar 1
+250 cancelbuild Player_1 Pkg65Pavillion 1
+250 cancelbuild Player_1 Pkg65Mahud 1
+250 cancelbuild Player_1 Pkg65Bazaar 1
+250 cancelbuild Player_1 Pkg65Harondor 1
+250 pkg65-cancel-production Player_1 Pkg65SiegePen 0
+252 pkg65-grant Player_1 HaradPatrolUpgrateGranter 0 Upgrade_TechnologyGondorHeavyArmor
+252 pkg65-grant Player_1 HaradPatrolUpgrateGranter 0 Upgrade_TechnologyGondorForgedBlades
+252 pkg65-grant Player_1 HaradPatrolUpgrateGranter 0 Upgrade_TechnologyGondorFireArrows
+253 objupgrade Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressSanctum
+253 pkg65-grant Player_1 Pkg65SiegeMumak 0 Upgrade_SwitchToRockThrowing
+255 pkg65-grant Player_1 Pkg65DozerBazaar 1 Upgrade_MiniHordeLvl10
+256 queue Player_1 Pkg65SiegePen 0 Pkg65SiegeMumak
+257 pkg65-grant Player_1 HaradPatrolUpgrateGranter 0 Upgrade_TechnologyGondorHeavyArmor
+257 pkg65-grant Player_1 HaradPatrolUpgrateGranter 0 Upgrade_TechnologyGondorForgedBlades
+257 pkg65-grant Player_1 HaradPatrolUpgrateGranter 0 Upgrade_TechnologyGondorFireArrows
+309 create Player_1 Pkg65Plot 16 3140,3250,0
+310 pkg65-prebuild Player_1 Pkg65Plot 16 Pkg65Umbar
+310 pkg65-grant Player_1 Pkg65Umbar 1 Upgrade_MiniHordeLvl10
+319 research Player_1 Pkg65Harondor 0 Upgrade_HaradLiesAndThreats
+320 pkg65-grant Player_1 HaradPorterWotR 0 Upgrade_MenWallPosternGate
+321 objupgrade Player_1 Pkg65Bazaar 0 Upgrade_StructureLevel1
+391 objupgrade Player_1 Pkg65DozerBazaar 0 Upgrade_StructureLevel1
+450 pkg65-children Player_1 Pkg65DozerBazaar 0 HaradTrader_DeployedCaravan
+490 pkg65-grant Player_1 Pkg65SiegeMumak 0 Upgrade_SwitchToRockThrowing
+490 pkg65-grant Player_1 Pkg65SiegeMumak 1 Upgrade_SwitchToRockThrowing
+1300 pkg65-children Player_1 Pkg65Harondor 0 HaradWarlord_Slaved

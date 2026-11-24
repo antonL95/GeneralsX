@@ -1,0 +1,4 @@
+235 create Player_1 Pkg65Anchor 0 1150,3200,0
+240 placement-ocl Player_1 Pkg65Anchor 0 Pkg65OrdinaryOcl
+240 pkg65-grant Player_1 Pkg65OclGrant 0 Upgrade_MiniHordeLvl10
+245 pkg65-grant Player_1 Pkg65OclGrant 0 Upgrade_MiniHordeLvl10
