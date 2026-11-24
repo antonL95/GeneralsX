@@ -45,6 +45,7 @@
 #include "Common/ModelState.h"
 #include "Common/ObjectStatusTypes.h"
 #include "Common/SpecialPowerINI.h"
+#include <map>
 #include <vector>
 
 // ------------------------------------------------------------------------------------------------
@@ -79,7 +80,10 @@ public:
 	Bool m_showPips = TRUE;
 	Bool m_hasPassengerFilter = FALSE;
 	SpecialPowerObjectFilter m_passengerFilter;
+	Bool m_hasManualPickUpFilter = FALSE;
+	SpecialPowerObjectFilter m_manualPickUpFilter;
 	ObjectStatusMaskType m_objectStatusOfContained;
+	std::map<Int, ModelConditionFlags> m_boneSpecificConditionStates;
 	struct PassengerBonePrefix
 	{
 		AsciiString bonePrefix;
@@ -89,7 +93,9 @@ public:
 
 	OpenContainModuleData();
 	static void parsePassengerFilter(INI* ini, void* instance, void* store, const void* custom);
+	static void parseManualPickUpFilter(INI* ini, void* instance, void* store, const void* custom);
 	static void parsePassengerBonePrefix(INI* ini, void* instance, void* store, const void* custom);
+	static void parseBoneSpecificConditionState(INI* ini, void* instance, void* store, const void* custom);
 	static void buildFieldParse(MultiIniFieldParse& p);
 };
 
@@ -140,6 +146,8 @@ public:
 	// ContainModuleInterface
 	virtual OpenContain *asOpenContain() override { return this; }  ///< treat as open container
 	Bool isRetailEnabled() const { return getOpenContainModuleData()->m_enabled; }
+	Bool allowsManualPickUp(const Object* obj) const;
+	virtual Bool getContainerPipsToShow(Int& numTotal, Int& numFull) override;
 
 	// DamageModuleInterface
 	virtual void onDamage( DamageInfo *damageInfo ) override {};	///< damage callback
@@ -260,6 +268,8 @@ protected:
 
 	Bool allowsPassenger(const ThingTemplate& passenger, Relationship relationship, Bool ownPlayer = FALSE) const;
 	void addToContain(Object* rider, Bool validateAdmission);
+	void applyBoneSpecificConditionState(Object* rider, Int slot) const;
+	virtual void onPassengerBoarding(Object*) {}
 
 	virtual void monitorConditionChanges();				///< check to see if we need to update our occupant positions from a model change or anything else
 	virtual void putObjAtNextFirePoint( Object *obj );	///< place object at position of the next fire point to use

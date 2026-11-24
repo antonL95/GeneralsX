@@ -65,7 +65,14 @@ public:
 	Bool							m_isDelayExitInAir;
 
 	KindOfMaskType m_passengerTypeOne;
+	KindOfMaskType m_passengerTypeTwo;
+	KindOfMaskType m_passengerTypeOneForWeaponState;
+	KindOfMaskType m_passengerTypeTwoForWeaponState;
+	KindOfMaskType m_passengerTypeThreeForWeaponState;
 	Bool m_forceOrientationContainer = TRUE;
+	const WeaponTemplate* m_grabWeapon = nullptr;
+	Bool m_fireGrabWeaponOnVictim = TRUE;
+	Int m_conditionForEntry = -1;
 	SpecialPowerObjectFilter m_fadeFilter;
 	Bool m_fadePassengerOnEnter = FALSE;
 	Bool m_fadePassengerOnExit = FALSE;
@@ -78,12 +85,14 @@ public:
 	Real m_releaseSnappyness = 0.7f;
 	std::vector<UpgradePayload> m_upgradePayloads;
 	enum { MAX_UPGRADE_PAYLOADS = 4 };
+	Bool m_fadeReverse = FALSE;
 
 	TransportContainModuleData();
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 	static void parseInitialPayload( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parseUpgradePayload(INI* ini, void* instance, void* store, const void* custom);
+	static void parseConditionForEntry(INI* ini, void* instance, void* store, const void* custom);
 
 };
 
@@ -138,6 +147,11 @@ private:
 	void createUpgradePayloads();
 	void throwOutPassengers();
 	void xferRetailTransportBlocks(Xfer* xfer, Bool present);
+	void updatePassengerWeaponSet();
+	void updatePassengerWeaponState(const Object* rider);
+	void clearPassengerWeaponState();
+	void applyPassengerFade(Object* rider, Real timeMsec, Bool fadeOut) const;
+	void onPassengerBoarding(Object* rider) override;
 	Bool fitsPassenger(const ThingTemplate& passenger, const Player* owner, Int slots, Bool checkCapacity) const;
 	UnsignedByte m_consumedUpgradePayloads = 0;
 	UnsignedInt m_throwPassengersAt = 0;

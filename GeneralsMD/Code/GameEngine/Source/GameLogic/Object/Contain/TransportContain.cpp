@@ -45,6 +45,7 @@
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/TransportContain.h"
@@ -107,6 +108,15 @@ void TransportContainModuleData::parseUpgradePayload(INI* ini, void* instance, v
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+void TransportContainModuleData::parseConditionForEntry(INI* ini, void*, void* store, const void*)
+{
+	const char* prefix = ini->getNextToken(INI::getSepsColon());
+	if (!prefix || stricmp(prefix, "ModelConditionState") != 0)
+		throw INIException("ConditionForEntry requires ModelConditionState");
+	const char* flagName = ini->getNextToken();
+	*static_cast<Int*>(store) = INI::scanIndexList(flagName, ModelConditionFlags::getBitNames());
+}
+
 void TransportContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
   OpenContainModuleData::buildFieldParse(p);
@@ -136,7 +146,10 @@ void TransportContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 		static const FieldParse retailFields[] =
 		{
 			{ "TypeOneForWeaponSet", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeOne) },
-			{ "TypeOneForWeaponState", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeOne) },
+			{ "TypeTwoForWeaponSet", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeTwo) },
+			{ "TypeOneForWeaponState", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeOneForWeaponState) },
+			{ "TypeTwoForWeaponState", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeTwoForWeaponState) },
+			{ "TypeThreeForWeaponState", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeThreeForWeaponState) },
 			{ "ForceOrientationContainer", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_forceOrientationContainer) },
 			{ "CanGrabStructure", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_canGrabStructure) },
 			{ "ShouldThrowOutPassengers", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_shouldThrowOutPassengers) },
@@ -144,11 +157,15 @@ void TransportContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 			{ "ThrowOutPassengersVelocity", INI::parseCoord3D, nullptr, offsetof(TransportContainModuleData, m_throwOutPassengersVelocity) },
 			{ "ReleaseSnappyness", INI::parseReal, nullptr, offsetof(TransportContainModuleData, m_releaseSnappyness) },
 			{ "UpgradeCreationTrigger", parseUpgradePayload, nullptr, 0 },
+			{ "GrabWeapon", INI::parseWeaponTemplate, nullptr, offsetof(TransportContainModuleData, m_grabWeapon) },
+			{ "FireGrabWeaponOnVictim", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_fireGrabWeaponOnVictim) },
+			{ "ConditionForEntry", parseConditionForEntry, nullptr, offsetof(TransportContainModuleData, m_conditionForEntry) },
 			{ "FadeFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(TransportContainModuleData, m_fadeFilter) },
 			{ "FadePassengerOnEnter", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_fadePassengerOnEnter) },
 			{ "FadePassengerOnExit", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_fadePassengerOnExit) },
 			{ "EnterFadeTime", INI::parseReal, nullptr, offsetof(TransportContainModuleData, m_enterFadeTime) },
 			{ "ExitFadeTime", INI::parseReal, nullptr, offsetof(TransportContainModuleData, m_exitFadeTime) },
+			{ "FadeReverse", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_fadeReverse) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(retailFields);
@@ -205,9 +222,13 @@ Int TransportContain::getPassengerSlotCount(const Object* rider) const
 Bool TransportContain::isValidContainerFor(const Object* rider, Bool checkCapacity) const
 {
 
-	// sanity
 	if (!rider)
 		return false;
+
+	const TransportContainModuleData* data = getTransportContainModuleData();
+	if (data->m_conditionForEntry >= 0 &&
+		!getObject()->getLogicModelConditions().test(static_cast<ModelConditionFlagType>(data->m_conditionForEntry)))
+		return FALSE;
 
 	// The point of this new code is to determine when something is a "fake" container, to
 	// look at the object inside of it to use that as the valid check. There is a case, when a
@@ -244,10 +265,13 @@ Bool TransportContain::isValidContainerFor(const Object* rider, Bool checkCapaci
 Bool TransportContain::canCarryNewPassenger(const ThingTemplate& passenger, const Team& team) const
 {
 	const Object* carrier = getObject();
+	const TransportContainModuleData* data = getTransportContainModuleData();
+	if (data->m_conditionForEntry >= 0 &&
+		!carrier->getLogicModelConditions().test(static_cast<ModelConditionFlagType>(data->m_conditionForEntry)))
+		return FALSE;
 	const Relationship relationship = carrier->getIsUndetectedDefector() ? ALLIES : team.getRelationship(carrier->getTeam());
 	const Int rawSlots = passenger.getRawTransportSlotCount();
-	const Int slots = rawSlots == 0 && !passenger.isKindOf(KINDOF_STRUCTURE) &&
-		getTransportContainModuleData()->m_hasPassengerFilter ? 1 : rawSlots;
+	const Int slots = rawSlots == 0 && !passenger.isKindOf(KINDOF_STRUCTURE) && data->m_hasPassengerFilter ? 1 : rawSlots;
 	const Player* owner = team.getControllingPlayer();
 	return allowsPassenger(passenger, relationship, owner == carrier->getControllingPlayer()) &&
 		fitsPassenger(passenger, owner, slots, TRUE);
@@ -329,16 +353,111 @@ void TransportContain::letRidersUpgradeWeaponSet()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+void TransportContain::updatePassengerWeaponSet()
+{
+	const TransportContainModuleData* data = getTransportContainModuleData();
+	if (!data->m_passengerTypeOne.any() && !data->m_passengerTypeTwo.any())
+		return;
+
+	Bool hasTypeOne = FALSE;
+	Bool hasTypeTwo = FALSE;
+	for (const Object* passenger : getContainList())
+	{
+		if (passenger->isAnyKindOf(data->m_passengerTypeOne))
+			hasTypeOne = TRUE;
+		else if (passenger->isAnyKindOf(data->m_passengerTypeTwo))
+			hasTypeTwo = TRUE;
+	}
+
+	Object* carrier = getObject();
+	WeaponSetFlags enabled;
+	WeaponSetFlags disabled;
+	(hasTypeOne ? enabled : disabled).set(WEAPONSET_PASSENGER_TYPE_ONE);
+	(hasTypeTwo ? enabled : disabled).set(WEAPONSET_PASSENGER_TYPE_TWO);
+	carrier->setWeaponSetFlags(disabled, FALSE);
+	carrier->setWeaponSetFlags(enabled, TRUE);
+}
+
+void TransportContain::clearPassengerWeaponState()
+{
+	const TransportContainModuleData* data = getTransportContainModuleData();
+	if (!data->m_passengerTypeOneForWeaponState.any() && !data->m_passengerTypeTwoForWeaponState.any() &&
+		!data->m_passengerTypeThreeForWeaponState.any())
+		return;
+
+	ModelConditionFlags clearFlags;
+	clearFlags.set(MODELCONDITION_WEAPONSTATE_ONE);
+	clearFlags.set(MODELCONDITION_WEAPONSTATE_TWO);
+	clearFlags.set(MODELCONDITION_WEAPONSTATE_THREE);
+	getObject()->clearModelConditionFlags(clearFlags);
+}
+
+void TransportContain::updatePassengerWeaponState(const Object* rider)
+{
+	const TransportContainModuleData* data = getTransportContainModuleData();
+	if (rider->isAnyKindOf(data->m_passengerTypeOneForWeaponState))
+		getObject()->setModelConditionState(MODELCONDITION_WEAPONSTATE_ONE);
+	else if (rider->isAnyKindOf(data->m_passengerTypeTwoForWeaponState))
+		getObject()->setModelConditionState(MODELCONDITION_WEAPONSTATE_TWO);
+	else if (rider->isAnyKindOf(data->m_passengerTypeThreeForWeaponState))
+		getObject()->setModelConditionState(MODELCONDITION_WEAPONSTATE_THREE);
+}
+
+void TransportContain::applyPassengerFade(Object* rider, Real timeMsec, Bool fadeOut) const
+{
+	const TransportContainModuleData* data = getTransportContainModuleData();
+	if (!rider || timeMsec <= 0.0f || !data->m_fadeFilter.matchesObject(nullptr, rider))
+		return;
+
+	const UnsignedInt frames = static_cast<UnsignedInt>(REAL_TO_INT_FLOOR(ConvertDurationFromMsecsToFrames(timeMsec)));
+	const auto apply = [frames, fadeOut](Object* target)
+	{
+		Drawable* draw = target ? target->getDrawable() : nullptr;
+		if (!draw)
+			return;
+		if (fadeOut)
+			draw->fadeOut(frames);
+		else
+			draw->fadeIn(frames);
+	};
+
+	if (rider->isKindOf(KINDOF_HORDE))
+	{
+		if (const HordeContain* horde = HordeContain::get(rider))
+		{
+			for (Object* member : *horde->getContainedItemsList())
+				apply(member);
+			return;
+		}
+	}
+	apply(rider);
+}
+
+void TransportContain::onPassengerBoarding(Object* rider)
+{
+	const TransportContainModuleData* data = getTransportContainModuleData();
+	const Object* carrier = getObject();
+	if (!data->m_grabWeapon || carrier->getRelationship(rider) == ALLIES)
+		return;
+
+	const Bool protectVictim = !data->m_fireGrabWeaponOnVictim && !rider->testStatus(OBJECT_STATUS_UNATTACKABLE);
+	const ObjectStatusMaskType unattackable = MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNATTACKABLE);
+	if (protectVictim)
+		rider->setStatus(unattackable);
+	TheWeaponStore->createAndFireTempWeapon(data->m_grabWeapon, carrier, carrier->getPosition(), TRUE);
+	if (protectVictim)
+		rider->clearStatus(unattackable);
+}
+
 void TransportContain::onContaining( Object *rider, Bool wasSelected )
 {
 	OpenContain::onContaining( rider, wasSelected );
 	const auto* data = getTransportContainModuleData();
 	if (data->m_shouldThrowOutPassengers)
 		m_throwPassengersAt = TheGameLogic->getFrame() + data->m_throwOutPassengersDelay;
-	if (rider->isAnyKindOf(getTransportContainModuleData()->m_passengerTypeOne))
-		getObject()->setWeaponSetFlag(WEAPONSET_PASSENGER_TYPE_ONE);
+	updatePassengerWeaponSet();
+	updatePassengerWeaponState(rider);
 
-	// objects inside a transport are held
 	rider->setDisabled( DISABLED_HELD );
 
 	Int transportSlotCount = getPassengerSlotCount(rider);
@@ -349,10 +468,6 @@ void TransportContain::onContaining( Object *rider, Bool wasSelected )
 	DEBUG_ASSERTCRASH(data->m_canGrabStructure || (m_extraSlotsInUse >= 0 && m_extraSlotsInUse + getContainCount() <= getContainMax()),
 		("Hmm, bad slot count"));
 
-	//
-	// when we go from holding nothing to holding something we have a model condition
-	// to visually show the change
-	//
 	if( getContainCount() == 1 )
 	{
 		Drawable *draw = getObject()->getDrawable();
@@ -362,7 +477,10 @@ void TransportContain::onContaining( Object *rider, Bool wasSelected )
 
 	}
 
-  if ( getTransportContainModuleData()->m_armedRidersUpgradeWeaponSet )
+	if (data->m_fadePassengerOnEnter)
+		applyPassengerFade(rider, data->m_enterFadeTime, data->m_fadeReverse);
+
+  if ( d->m_armedRidersUpgradeWeaponSet )
     letRidersUpgradeWeaponSet();
 
 	//Kris: October 20, 2003 - Patch 1.01
@@ -392,22 +510,9 @@ void TransportContain::onRemoving( Object *rider )
 			draw->releaseRetailPassenger(*getObject(), *bone, forcePassengerOrientation(), d->m_releaseSnappyness);
 	}
 	OpenContain::onRemoving(rider);
-	if (rider->isAnyKindOf(getTransportContainModuleData()->m_passengerTypeOne))
-	{
-		Bool holdingTypeOne = FALSE;
-		for (const Object* other : getContainList())
-		{
-			if (other != rider && other->isAnyKindOf(getTransportContainModuleData()->m_passengerTypeOne))
-			{
-				holdingTypeOne = TRUE;
-				break;
-			}
-		}
-		if (!holdingTypeOne)
-			getObject()->clearWeaponSetFlag(WEAPONSET_PASSENGER_TYPE_ONE);
-	}
+	updatePassengerWeaponSet();
+	clearPassengerWeaponState();
 
-	// object is no longer held inside a transport
 	rider->clearDisabled( DISABLED_HELD );
 
 	if (!d->m_exitBone.isEmpty())
@@ -491,6 +596,8 @@ void TransportContain::onRemoving( Object *rider )
 
 	m_frameExitNotBusy = TheGameLogic->getFrame() + d->m_exitDelay;
 
+	if (d->m_fadePassengerOnExit)
+		applyPassengerFade(rider, d->m_exitFadeTime, FALSE);
 
   if ( d->m_armedRidersUpgradeWeaponSet )
     letRidersUpgradeWeaponSet();
@@ -618,7 +725,6 @@ UpdateSleepTime TransportContain::update()
 				removeFromContain(passenger);
 		}
 	}
-
 	if (m_payloadCreated == FALSE)
 	{
 #if RETAIL_COMPATIBLE_CRC

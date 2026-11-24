@@ -41,6 +41,7 @@
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/Module/WallHubBehavior.h"
 #include "GameLogic/Module/HordeWorkerAIUpdate.h"
+#include "GameLogic/Module/GrabPassengerSpecialPower.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/SpecialPower.h"
@@ -1802,8 +1803,18 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 				return FALSE;
 		}
 
-		if (RetailFileLayers::enabled() && (!mod->isRetailCastAllowed(commandOptions) || !mod->isValidPowerTarget(target)))
-			return FALSE;
+		if (RetailFileLayers::enabled())
+		{
+			if (!mod->isRetailCastAllowed(commandOptions))
+				return FALSE;
+			if (const auto* grab = dynamic_cast<const GrabPassengerSpecialPower*>(mod))
+			{
+				if (!grab->isValidPowerTarget(target, commandOptions))
+					return FALSE;
+			}
+			else if (!mod->isValidPowerTarget(target))
+				return FALSE;
+		}
 
 		if( RetailFileLayers::enabled() && spTemplate->getSpecialPowerType() >= SPECIAL_UP_FOR_GRABS_2 )
 		{

@@ -8,6 +8,7 @@
 #include "Common/RetailSaveBlocks.h"
 #include "Common/SpecialPower.h"
 #include "Common/Xfer.h"
+#include "GameClient/ControlBar.h"
 #include "GameClient/FXList.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
@@ -81,7 +82,7 @@ GrabPassengerSpecialPower* GrabPassengerSpecialPower::findUsable(Object* object,
 	return nullptr;
 }
 
-Bool GrabPassengerSpecialPower::canGrab(const Object* target) const
+Bool GrabPassengerSpecialPower::canGrab(const Object* target, Bool manualPickUp) const
 {
 	const Object* caster = getObject();
 	const auto* data = static_cast<const GrabPassengerSpecialPowerModuleData*>(getModuleData());
@@ -89,6 +90,11 @@ Bool GrabPassengerSpecialPower::canGrab(const Object* target) const
 	if (!target || target == caster || target->isEffectivelyDead() || !contain)
 		return FALSE;
 #if !RTS_GENERALS
+	if (manualPickUp)
+	{
+		if (const auto* open = dynamic_cast<const OpenContain*>(contain); open && !open->allowsManualPickUp(target))
+			return FALSE;
+	}
 	if (isGrabVendor(target, getSpecialPowerTemplate()->getSpecialPowerType()))
 	{
 		const auto* vendor = grabVendorData(target);
@@ -122,9 +128,10 @@ void GrabPassengerSpecialPower::doSpecialPowerAtLocation(const Coord3D* position
 	SimpleObjectIterator* objects = ThePartitionManager->iterateObjectsInRange(position, radius, FROM_CENTER_2D,
 		nullptr, ITER_SORTED_NEAR_TO_FAR);
 	MemoryPoolObjectHolder hold(objects);
+	const Bool manualPickUp = (commandOptions & OPTION_ONE) != 0;
 	for (Object* target = objects->first(); target; target = objects->next())
 	{
-		if (canGrab(target))
+		if (canGrab(target, manualPickUp))
 		{
 			doSpecialPowerAtObject(target, commandOptions);
 			return;
@@ -132,7 +139,7 @@ void GrabPassengerSpecialPower::doSpecialPowerAtLocation(const Coord3D* position
 	}
 }
 
-const Object* GrabPassengerSpecialPower::findGrabTarget(const Object* target) const
+const Object* GrabPassengerSpecialPower::findGrabTarget(const Object* target, Bool manualPickUp) const
 {
 	if (!target)
 		return nullptr;
@@ -146,7 +153,7 @@ const Object* GrabPassengerSpecialPower::findGrabTarget(const Object* target) co
 		{
 			for (Object* member : *members)
 			{
-				if (!canGrab(member))
+				if (!canGrab(member, manualPickUp))
 					continue;
 				const Real d = ThePartitionManager->getDistanceSquared(caster, member, FROM_CENTER_2D);
 				if (!target || d < distance)
@@ -157,12 +164,17 @@ const Object* GrabPassengerSpecialPower::findGrabTarget(const Object* target) co
 			}
 		}
 	}
-	return canGrab(target) ? target : nullptr;
+	return canGrab(target, manualPickUp) ? target : nullptr;
 }
 
 Bool GrabPassengerSpecialPower::isValidPowerTarget(const Object* target) const
 {
-	return findGrabTarget(target) != nullptr;
+	return isValidPowerTarget(target, COMMAND_OPTION_NONE);
+}
+
+Bool GrabPassengerSpecialPower::isValidPowerTarget(const Object* target, UnsignedInt commandOptions) const
+{
+	return findGrabTarget(target, (commandOptions & OPTION_ONE) != 0) != nullptr;
 }
 
 void GrabPassengerSpecialPower::doSpecialPowerAtObject(Object* requested, UnsignedInt commandOptions)
@@ -176,7 +188,7 @@ Bool GrabPassengerSpecialPower::requestGrab(Object* requested, UnsignedInt comma
 	Object* caster = getObject();
 	if (m_pausedCount > 0 || caster->isDisabled() || !isRetailCastAllowed(commandOptions))
 		return FALSE;
-	const Object* target = findGrabTarget(requested);
+	const Object* target = findGrabTarget(requested, (commandOptions & OPTION_ONE) != 0);
 	if (!target)
 		return FALSE;
 

@@ -100,6 +100,22 @@ void OpenContainModuleData::parsePassengerFilter(INI* ini, void* instance, void*
 	data->m_allowInsideKindOf.flip();
 }
 
+void OpenContainModuleData::parseManualPickUpFilter(INI* ini, void* instance, void* store, const void* custom)
+{
+	auto* data = static_cast<OpenContainModuleData*>(instance);
+	SpecialPowerObjectFilter::parse(ini, instance, store, custom);
+	data->m_hasManualPickUpFilter = TRUE;
+}
+
+void OpenContainModuleData::parseBoneSpecificConditionState(INI* ini, void* instance, void*, const void*)
+{
+	auto* data = static_cast<OpenContainModuleData*>(instance);
+	const Int index = INI::scanInt(ini->getNextToken());
+	ModelConditionFlags flags;
+	ModelConditionFlags::parseFromINI(ini, nullptr, &flags, nullptr);
+	data->m_boneSpecificConditionStates[index] = flags;
+}
+
 void OpenContainModuleData::parsePassengerBonePrefix(INI* ini, void* instance, void*, const void*)
 {
 	auto* data = static_cast<OpenContainModuleData*>(instance);
@@ -189,8 +205,10 @@ void OpenContain::assignPassengerBone(const Object* passenger)
 			{ "AllowOwnPlayerInsideOverride", INI::parseBool, nullptr, offsetof(OpenContainModuleData, m_allowOwnPlayerInsideOverride) },
 			{ "ShowPips", INI::parseBool, nullptr, offsetof(OpenContainModuleData, m_showPips) },
 			{ "PassengerFilter", parsePassengerFilter, nullptr, offsetof(OpenContainModuleData, m_passengerFilter) },
+			{ "ManualPickUpFilter", parseManualPickUpFilter, nullptr, offsetof(OpenContainModuleData, m_manualPickUpFilter) },
 			{ "ObjectStatusOfContained", ObjectStatusMaskType::parseFromINI, nullptr, offsetof(OpenContainModuleData, m_objectStatusOfContained) },
 			{ "PassengerBonePrefix", parsePassengerBonePrefix, nullptr, 0 },
+			{ "BoneSpecificConditionState", parseBoneSpecificConditionState, nullptr, 0 },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(retailFields);
@@ -459,6 +477,7 @@ void OpenContain::addToContain(Object* rider, [[maybe_unused]] Bool validateAdmi
 
 	m_playerEnteredMask = rider->getControllingPlayer()->getPlayerMask();
 
+	onPassengerBoarding(rider);
 	if (isEnclosingContainerFor( rider ))
 	{
 		addOrRemoveObjFromWorld(rider, false);
@@ -901,6 +920,51 @@ void OpenContain::scatterToNearbyPosition(Object* rider)
 }
 
 //-------------------------------------------------------------------------------------------------
+static ModelConditionFlags passengerVariationMask()
+{
+	ModelConditionFlags mask;
+	mask.set(MODELCONDITION_PASSENGER_VARIATION_1);
+	mask.set(MODELCONDITION_PASSENGER_VARIATION_2);
+	mask.set(MODELCONDITION_PASSENGER_VARIATION_3);
+	mask.set(MODELCONDITION_PASSENGER_VARIATION_4);
+	mask.set(MODELCONDITION_PASSENGER_VARIATION_5);
+	return mask;
+}
+
+Bool OpenContain::allowsManualPickUp(const Object* obj) const
+{
+	if (!obj)
+		return FALSE;
+	const OpenContainModuleData* data = getOpenContainModuleData();
+	if (!data->m_hasManualPickUpFilter)
+		return TRUE;
+	return data->m_manualPickUpFilter.matchesObject(getObject(), obj);
+}
+
+Bool OpenContain::getContainerPipsToShow(Int& numTotal, Int& numFull)
+{
+	if (!getOpenContainModuleData()->m_showPips)
+	{
+		numTotal = 0;
+		numFull = 0;
+		return FALSE;
+	}
+	return ContainModuleInterface::getContainerPipsToShow(numTotal, numFull);
+}
+
+void OpenContain::applyBoneSpecificConditionState(Object* rider, Int slot) const
+{
+	if (isHordeContain())
+		return;
+	const auto& states = getOpenContainModuleData()->m_boneSpecificConditionStates;
+	if (states.empty())
+		return;
+	rider->clearModelConditionFlags(passengerVariationMask());
+	const auto it = states.find(slot);
+	if (it != states.end())
+		rider->setModelConditionFlags(it->second);
+}
+
 void OpenContain::onContaining( Object *rider, Bool wasSelected )
 {
 	if( m_loadSoundsEnabled )
@@ -931,6 +995,8 @@ void OpenContain::onRemoving( Object *rider)
 		std::erase_if(m_passengerBones, [rider](const PassengerBone& attachment) {
 			return attachment.passenger == rider->getID();
 		});
+		if (!getOpenContainModuleData()->m_boneSpecificConditionStates.empty())
+			rider->clearModelConditionFlags(passengerVariationMask());
 		const ObjectStatusMaskType& status = getOpenContainModuleData()->m_objectStatusOfContained;
 		if (status.any())
 		{
@@ -1518,6 +1584,13 @@ void OpenContain::putObjAtNextFirePoint( Object *obj )
 			obj->setTransformMatrix(getObject()->getTransformMatrix());
 			return;
 		}
+		const auto& states = getOpenContainModuleData()->m_boneSpecificConditionStates;
+		if (!states.empty())
+		{
+			const auto& passengers = getContainList();
+			const auto seat = std::find(passengers.begin(), passengers.end(), obj);
+			applyBoneSpecificConditionState(obj, static_cast<Int>(std::distance(passengers.begin(), seat)) + 1);
+		}
 		const Coord3D *pos = getObject()->getPosition();
 
 		obj->setPosition( pos );
@@ -1555,6 +1628,7 @@ void OpenContain::putObjAtNextFirePoint( Object *obj )
 		obj->setPosition( &pos );
 	else
 		obj->setTransformMatrix(&matrix);
+	applyBoneSpecificConditionState(obj, m_firePointNext + 1);
 
 	// increment the next firepoint to use ... make sure to wrap if we need to
 	m_firePointNext++;
