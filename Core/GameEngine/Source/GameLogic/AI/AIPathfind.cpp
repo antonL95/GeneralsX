@@ -521,7 +521,7 @@ void Pathfinder::updateLayer(Object *obj, PathfindLayerEnum layer)
 {
 	if (layer != LAYER_GROUND) {
 		if (!TheTerrainLogic->objectInteractsWithBridgeLayer(obj, layer)) {
-			layer = LAYER_GROUND;
+			layer = TheTerrainLogic->objectInteractsWithBridgeLayer(obj, LAYER_WALL) ? LAYER_WALL : LAYER_GROUND;
 		}
 	}
 	//DEBUG_LOG(("Object layer is %d", layer));
