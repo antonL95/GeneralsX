@@ -537,6 +537,12 @@ void CastleBehavior::unpack(Bool charge)
 			CastleMemberBehavior::linkToCastle(*piece, packed->getID(), m_keep, id == m_keep, owned);
 		}
 	}
+	for (ObjectID id : m_members)
+	{
+		Object* piece = TheGameLogic->findObjectByID(id);
+		if (piece && piece->isKindOf(KINDOF_STRUCTURE))
+			piece->updateUpgradeModules();
+	}
 
 	Bool registeredArea = FALSE;
 	for (std::size_t i = 0; i < camp->perimeters.size(); ++i)

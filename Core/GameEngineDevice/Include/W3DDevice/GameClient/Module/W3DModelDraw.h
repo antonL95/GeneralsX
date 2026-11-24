@@ -471,6 +471,16 @@ public:
 
 	virtual void updateSubObjects() override;
 	virtual void showSubObject( const AsciiString& name, Bool show ) override;
+	Bool getSubObjectHidden(const AsciiString& name, Bool& hidden) const
+	{
+		for (const auto& entry : m_subObjectVec)
+			if (entry.subObjName.compareNoCase(name) == 0)
+			{
+				hidden = entry.hide;
+				return TRUE;
+			}
+		return FALSE;
+	}
 
 #ifdef ALLOW_ANIM_INQUIRIES
 // srj sez: not sure if this is a good idea, for net sync reasons...
