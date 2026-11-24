@@ -1,0 +1,43 @@
+215 create Player_1 P69GrondReverse 0 1000,880,0
+215 create Player_1 P69GrondFar 0 1020,920,0
+215 create Player_1 P69GrondNear 0 1020,945,0
+215 create Player_1 P69GrondAngle 0 920,850,0
+215 create Player_1 P69GrondStopTurn 0 960,820,0
+215 create Player_1 P69GrondKeepTurn 0 1010,820,0
+215 create Player_1 P69GrondCrew 0 700,900,0
+215 create Player_1 P69NoCrewPower 0 700,870,0
+225 move Player_1 P69GrondReverse 0 - 750 880
+225 move Player_1 P69GrondFar 0 - 760 920
+225 move Player_1 P69GrondNear 0 - 810 945
+225 move Player_1 P69GrondAngle 0 - 845 980
+225 move Player_1 P69GrondStopTurn 0 - 779 905
+225 move Player_1 P69GrondKeepTurn 0 - 829 905
+225 move Player_1 P69GrondCrew 0 - 900 900
+225 move Player_1 P69NoCrewPower 0 - 900 870
+235 pkg69-sample Player_1 P69GrondStopTurn 0
+235 pkg69-sample Player_1 P69GrondKeepTurn 0
+237 pkg69-sample Player_1 P69GrondCrew 0
+237 pkg69-sample Player_1 P69NoCrewPower 0
+238 pkg69-clear-crew Player_1 P69GrondCrew 0
+238 pkg69-clear-crew Player_1 P69NoCrewPower 0
+240 pkg69-sample Player_1 P69GrondReverse 0
+240 pkg69-sample Player_1 P69GrondFar 0
+240 pkg69-sample Player_1 P69GrondAngle 0
+242 pkg69-sample Player_1 P69GrondCrew 0
+242 pkg69-sample Player_1 P69NoCrewPower 0
+260 pkg69-sample Player_1 P69GrondReverse 0
+260 pkg69-sample Player_1 P69GrondCrew 0
+260 pkg69-sample Player_1 P69NoCrewPower 0
+278 pkg69-sample Player_1 P69GrondFar 0
+278 pkg69-sample Player_1 P69GrondNear 0
+280 pkg69-sample Player_1 P69GrondReverse 0
+280 pkg69-sample Player_1 P69GrondCrew 0
+280 pkg69-sample Player_1 P69NoCrewPower 0
+310 destroy Player_1 P69GrondReverse 0
+310 destroy Player_1 P69GrondFar 0
+310 destroy Player_1 P69GrondNear 0
+310 destroy Player_1 P69GrondAngle 0
+310 destroy Player_1 P69GrondStopTurn 0
+310 destroy Player_1 P69GrondKeepTurn 0
+310 destroy Player_1 P69GrondCrew 0
+310 destroy Player_1 P69NoCrewPower 0
