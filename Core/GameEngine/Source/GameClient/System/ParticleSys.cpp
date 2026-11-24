@@ -2395,6 +2395,8 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 
 		return true;
 	}
+	if (m_template && m_emissionVolumeType == CYLINDER && m_template->getCylinderRadiusRate() != 0.0f)
+		m_emissionVolume.cylinder.radius = std::max(0.1f, m_emissionVolume.cylinder.radius + m_template->getCylinderRadiusRate());
 
 	// update the wind motion
 	if (m_windMotion != ParticleSystemInfo::WIND_MOTION_NOT_USED )

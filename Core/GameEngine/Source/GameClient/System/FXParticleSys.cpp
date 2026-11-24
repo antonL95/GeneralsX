@@ -171,6 +171,7 @@ void ParticleSystemTemplate::resetForFXDefinition()
 	m_windStrength = DEFAULT_WIND_STRENGTH;
 	m_turbulenceAmplitude = 0.0f;
 	m_turbulenceFrequency = 0.0f;
+	m_cylinderRadiusRate = 0.0f;
 	m_windFullStrengthDistance = DEFAULT_WIND_FULL_STRENGTH_DISTANCE;
 	m_windZeroStrengthDistance = DEFAULT_WIND_ZERO_STRENGTH_DISTANCE;
 	m_cylinderOffset.zero();
@@ -541,7 +542,7 @@ const FieldParse ParticleSystemTemplate::m_fxCylinderVolumeFieldParseTable[] =
 	{ "Radius",     INI::parseReal,                            nullptr, offsetof( ParticleSystemTemplate, m_emissionVolume.cylinder.radius ) },
 	{ "Length",     INI::parseReal,                            nullptr, offsetof( ParticleSystemTemplate, m_emissionVolume.cylinder.length ) },
 	{ "Offset",     INI::parseCoord3D,                         nullptr, offsetof( ParticleSystemTemplate, m_cylinderOffset ) },
-	{ "RadiusRate", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "RadiusRate", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_cylinderRadiusRate ) },
 	{ nullptr,      nullptr,                                   nullptr, 0 }
 };
 
