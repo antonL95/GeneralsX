@@ -19,3 +19,9 @@
 181 wall-ramp-probe Player_1 WallRampUpgrade 0
 185 objupgrade Player_1 WallRampUpgrade 0 Upgrade_StructureLevel1
 186 wall-ramp-probe Player_1 WallRampUpgrade 0
+180 create Player_1 WallRampReset 0 3000,1430,0
+181 wall-ramp-footprint Player_1 WallRampReset 0
+185 objupgrade Player_1 WallRampReset 0 Upgrade_StructureLevel1
+186 wall-ramp-footprint Player_1 WallRampReset 0
+190 wall-ramp-revoke Player_1 WallRampReset 0 Upgrade_StructureLevel1
+191 wall-ramp-footprint Player_1 WallRampReset 0

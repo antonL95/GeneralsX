@@ -8,6 +8,10 @@ check() {
     if covers 186; then
         expect 'TEST wall-ramp-cell frame=186 inside=0 outside=0 height=-21.99'
         expect 'TEST wall-ramp-links frame=186 first=0 second=1'
+        expect 'TEST wall-ramp-footprint upgraded different=1'
+    fi
+    if covers 191; then
+        expect 'TEST wall-ramp-footprint reset equal=1'
     fi
     if covers 220; then
         awk '

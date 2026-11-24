@@ -6,6 +6,7 @@
 #include "Common/MessageStream.h"
 #include "Common/Module.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
@@ -16,6 +17,49 @@
 
 namespace
 {
+std::vector<ICoord2D> footprintBefore;
+
+void probeFootprint(const RetailTestCommands::Context& ctx)
+{
+	Object* object = ctx.requireObject(FALSE);
+	if (!object)
+		return;
+	ICoord2D center;
+	TheAI->pathfinder()->worldToCell(object->getPosition(), &center);
+	std::vector<ICoord2D> cells;
+	for (Int x = center.x - 20; x <= center.x + 20; ++x)
+		for (Int y = center.y - 20; y <= center.y + 20; ++y)
+		{
+			const PathfindCell* cell = TheAI->pathfinder()->getCell(LAYER_GROUND, x, y);
+			if (cell && cell->isSoleObstacle(object->getID()))
+				cells.push_back({x, y});
+		}
+	if (ctx.frame == 181)
+		footprintBefore = cells;
+	else if (ctx.frame == 186)
+	{
+		Bool different = cells.size() != footprintBefore.size();
+		for (size_t i = 0; !different && i < cells.size(); ++i)
+			different = cells[i].x != footprintBefore[i].x || cells[i].y != footprintBefore[i].y;
+		std::fprintf(stderr, "TEST wall-ramp-footprint upgraded different=%d\n", different);
+	}
+	else
+	{
+		Bool equal = cells.size() == footprintBefore.size();
+		for (size_t i = 0; equal && i < cells.size(); ++i)
+			equal = cells[i].x == footprintBefore[i].x && cells[i].y == footprintBefore[i].y;
+		std::fprintf(stderr, "TEST wall-ramp-footprint reset equal=%d\n", equal);
+	}
+}
+
+void revokeUpgrade(const RetailTestCommands::Context& ctx)
+{
+	Object* object = ctx.requireObject(FALSE);
+	const auto* upgrade = TheUpgradeCenter->findUpgrade(ctx.argument);
+	if (object && upgrade)
+		object->removeUpgrade(upgrade);
+}
+
 void probeUnit(const RetailTestCommands::Context& ctx)
 {
 	Object* object = ctx.requireObject(FALSE);
@@ -130,6 +174,8 @@ void registerRetailWallRampTestCommands()
 	registerAction("wall-ramp-probe", probeWallRamp);
 	registerAction("wall-ramp-move", moveToWall);
 	registerAction("wall-ramp-unit", probeUnit);
+	registerAction("wall-ramp-footprint", probeFootprint);
+	registerAction("wall-ramp-revoke", revokeUpgrade);
 #endif
 }
 }

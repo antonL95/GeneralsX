@@ -291,16 +291,18 @@ void GeometryUpgrade::upgradeImplementation()
 
 Bool GeometryUpgrade::resetUpgrade(const UpgradeMaskType& mask)
 {
-	if (!UpgradeModule::resetUpgrade(mask))
-		return FALSE;
 	const auto* data = getGeometryUpgradeModuleData();
-	if ((data->m_wallBoundsMesh.isNotEmpty() || data->m_rampMesh1.isNotEmpty() || data->m_rampMesh2.isNotEmpty()) &&
-		TheAI && !ScopedPathfindDeferral::contains(getObject()))
-	{
-		TheAI->pathfinder()->removeObjectFromPathfindMap(getObject());
-		TheAI->pathfinder()->addObjectToPathfindMap(getObject());
-	}
-	return TRUE;
+	UpgradeMaskType activation, conflicting;
+	getUpgradeActivationMasks(activation, conflicting);
+	const Bool changesMesh = data->m_wallBoundsMesh.isNotEmpty() || data->m_rampMesh1.isNotEmpty() || data->m_rampMesh2.isNotEmpty();
+	Pathfinder* pathfinder = changesMesh && !data->m_upgradeMuxData.m_permanent && isAlreadyUpgraded() &&
+		mask.testForAny(activation) && TheAI && !ScopedPathfindDeferral::contains(getObject()) ? TheAI->pathfinder() : nullptr;
+	if (pathfinder)
+		pathfinder->removeObjectFromPathfindMap(getObject());
+	const Bool reset = UpgradeModule::resetUpgrade(mask);
+	if (pathfinder)
+		pathfinder->addObjectToPathfindMap(getObject());
+	return reset;
 }
 
 void GeometryUpgrade::crc(Xfer* xfer)
