@@ -311,6 +311,10 @@ public:
 	Real getMaxSpeedForCondition(BodyDamageType condition, const Object* obj = nullptr) const;
 	Real getBackingUpSpeed() const;
 	Bool participatesInGroupFormation() const { return m_template->m_rotwk.formationPriority != RotwkLocomotorRules::NO_FORMATION_PRIORITY; }
+	Real getTurnThresholdHighSpeed() const { return m_template->m_rotwk.turnThresholdHighSpeed; }
+	Real getMaxOverlappedHeight() const { return m_template->m_rotwk.maxOverlappedHeight; }
+	Bool scalesWalls() const { return m_template->m_rotwk.scalesWalls; }
+	Bool usesTerrainSmoothing() const { return m_template->m_rotwk.useTerrainSmoothing; }
 	Real getMaxTurnRate(BodyDamageType condition) const;  ///< get max turning rate given condition
 	Real getMaxAcceleration(BodyDamageType condition) const;  ///< get acceleration given condition
 	Real getMaxLift(BodyDamageType condition) const;  ///< get acceleration given condition

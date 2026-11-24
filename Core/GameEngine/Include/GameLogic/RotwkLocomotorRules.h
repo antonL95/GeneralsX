@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits>
+
 namespace RotwkLocomotorRules
 {
 inline constexpr float FULL_TURN = 6.28318530718f;
@@ -19,6 +21,10 @@ struct Authored
 	float walkDistance = 0.0f;
 	float accelDecelTrigger = -1.0f;
 	float turnThreshold = FULL_TURN / 24.0f;
+	float turnThresholdHighSpeed = FULL_TURN / 2.0f;
+	float maxOverlappedHeight = std::numeric_limits<float>::max();
+	bool scalesWalls = false;
+	bool useTerrainSmoothing = false;
 	bool enableHighSpeedTurnModelConditions = true;
 	bool burningDeathIsCavalry = false;
 	bool chargeAvailable = false;

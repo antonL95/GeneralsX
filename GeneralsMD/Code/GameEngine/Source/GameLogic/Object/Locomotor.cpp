@@ -765,6 +765,10 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "AccDecTrigger", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.accelDecelTrigger) },
 		{ "TurnThreshold", parseRotwkField<INI::parseAngleReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.turnThreshold) },
 		{ "EnableHighSpeedTurnModelconditions", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.enableHighSpeedTurnModelConditions) },
+		{ "TurnThresholdHS", INI::parseAngleReal, nullptr, offsetof(LocomotorTemplate, m_rotwk.turnThresholdHighSpeed) },
+		{ "MaxOverlappedHeight", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rotwk.maxOverlappedHeight) },
+		{ "ScalesWalls", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_rotwk.scalesWalls) },
+		{ "UseTerrainSmoothing", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_rotwk.useTerrainSmoothing) },
 
 		{ "RudderCorrectionDegree",		 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionDegree) }, // Added in Zero Hour
 		{ "RudderCorrectionRate",			 INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rudderCorrectionRate) }, // Added in Zero Hour

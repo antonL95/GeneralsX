@@ -17,3 +17,19 @@
 470 destroy Player_1 P63StoreCached 0
 470 destroy Player_1 P63StoreControl 0
 470 destroy Player_1 P63StoreLate 0
+225 create Player_1 P63StoreKaradd 0 1560,2640,0
+225 create Player_1 P63StoreMumakil 0 1560,2660,0
+225 create Player_1 P63StoreClimber 0 1560,2680,0
+225 create Player_1 P63StoreScorpion 0 1560,2700,0
+250 locomotor-store-fields Player_1 P63StoreKaradd 0
+250 locomotor-store-fields Player_1 P63StoreMumakil 0
+250 locomotor-store-fields Player_1 P63StoreClimber 0
+250 locomotor-store-fields Player_1 P63StoreScorpion 0
+290 locomotor-store-fields Player_1 P63StoreKaradd 0
+290 locomotor-store-fields Player_1 P63StoreMumakil 0
+290 locomotor-store-fields Player_1 P63StoreClimber 0
+290 locomotor-store-fields Player_1 P63StoreScorpion 0
+470 destroy Player_1 P63StoreKaradd 0
+470 destroy Player_1 P63StoreMumakil 0
+470 destroy Player_1 P63StoreClimber 0
+470 destroy Player_1 P63StoreScorpion 0
