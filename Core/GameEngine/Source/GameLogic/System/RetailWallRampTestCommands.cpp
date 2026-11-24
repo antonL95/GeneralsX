@@ -3,15 +3,56 @@
 
 #if RTS_ZEROHOUR
 #include <cstdio>
+#include "Common/MessageStream.h"
 #include "Common/Module.h"
 #include "Common/ThingTemplate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Pathfinder/Path.h"
 #include "GameLogic/RetailWallMesh.h"
+#include "GameLogic/TerrainLogic.h"
 
 namespace
 {
+void probeUnit(const RetailTestCommands::Context& ctx)
+{
+	Object* object = ctx.requireObject(FALSE);
+	if (!object)
+		return;
+	const Coord3D& position = *object->getPosition();
+	std::fprintf(stderr, "TEST wall-ramp-unit frame=%u name=%s x=%.2f y=%.2f z=%.2f layer=%d\n",
+		ctx.frame, ctx.targetName, position.x, position.y, position.z, object->getLayer());
+	if (AIUpdateInterface* ai = object->getAIUpdateInterface())
+	{
+		const Coord3D* goal = ai->getGoalPosition();
+		if (goal)
+			std::fprintf(stderr, "TEST wall-ramp-goal frame=%u x=%.2f y=%.2f z=%.2f\n", ctx.frame, goal->x, goal->y, goal->z);
+		if (Path* path = ai->getPath())
+			for (const PathNode* node = path->getFirstNode(); node; node = node->getNext())
+				std::fprintf(stderr, "TEST wall-ramp-node frame=%u x=%.2f y=%.2f z=%.2f layer=%d\n",
+					ctx.frame, node->getPosition()->x, node->getPosition()->y, node->getPosition()->z, node->getLayer());
+	}
+}
+
+void moveToWall(const RetailTestCommands::Context& ctx)
+{
+	Object* object = ctx.requireObject(FALSE);
+	if (!object || !ctx.hasPosition)
+		return;
+	Coord3D point = ctx.groundLocation();
+	point.z = TheAI->pathfinder()->getWallHeightAt(point);
+	std::fprintf(stderr, "TEST wall-ramp-destination frame=%u x=%.2f y=%.2f z=%.2f wall=%d layer=%d\n",
+		ctx.frame, point.x, point.y, point.z, TheAI->pathfinder()->isPointOnWall(&point),
+		TheTerrainLogic->getLayerForDestination(&point));
+	if (const AIUpdateInterface* ai = object->getAIUpdateInterface())
+		std::fprintf(stderr, "TEST wall-ramp-path frame=%u possible=%d\n", ctx.frame,
+			TheAI->pathfinder()->clientSafeQuickDoesPathExist(ai->getLocomotorSet(), object->getPosition(), &point));
+	ctx.selectObject(object);
+	TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO)->appendLocationArgument(point);
+}
+
 void probeWallRamp(const RetailTestCommands::Context& ctx)
 {
 	const Object* object = ctx.requireObject();
@@ -45,6 +86,38 @@ void probeWallRamp(const RetailTestCommands::Context& ctx)
 	std::fprintf(stderr, "TEST wall-ramp-cell frame=%u inside=%d outside=%d height=%.2f\n", ctx.frame,
 		TheAI->pathfinder()->isPointOnWall(&onWall), TheAI->pathfinder()->isPointOnWall(&offWall),
 		TheAI->pathfinder()->getWallHeightAt(onWall) - object->getPosition()->z);
+	const auto* geometry = RetailWallMesh::forObject(*object);
+	Bool linked[2] = {FALSE, FALSE};
+	for (Int i = 0; geometry && i < 2; ++i)
+	{
+		if (!geometry->hasRamp[i])
+			continue;
+		const auto& ramp = geometry->ramps[i];
+		Coord3D point = {(ramp.from.x + ramp.to.x) * 0.5f, (ramp.from.y + ramp.to.y) * 0.5f,
+			(ramp.from.z + ramp.to.z) * 0.5f};
+		const Bridge* bridge = TheTerrainLogic->findBridgeAt(&point);
+		linked[i] = bridge && bridge->peekBridgeInfo()->bridgeObjectID == object->getID();
+		if (bridge)
+		{
+			ICoord2D lo, hi;
+			Coord3D a = {bridge->getBounds()->lo.x, bridge->getBounds()->lo.y, 0.0f};
+			Coord3D b = {bridge->getBounds()->hi.x, bridge->getBounds()->hi.y, 0.0f};
+			TheAI->pathfinder()->worldToCell(&a, &lo);
+			TheAI->pathfinder()->worldToCell(&b, &hi);
+			Int ground = 0, wall = 0;
+			for (Int x = lo.x - 1; x <= hi.x + 1; ++x)
+				for (Int y = lo.y - 1; y <= hi.y + 1; ++y)
+				{
+					const PathfindCell* cell = TheAI->pathfinder()->getCell(bridge->getLayer(), x, y);
+					if (!cell || cell->getLayer() != bridge->getLayer())
+						continue;
+					ground += cell->getConnectLayer() == LAYER_GROUND;
+					wall += cell->getConnectLayer() == LAYER_WALL;
+				}
+			std::fprintf(stderr, "TEST wall-ramp-connections index=%d ground=%d wall=%d\n", i, ground, wall);
+		}
+	}
+	std::fprintf(stderr, "TEST wall-ramp-links frame=%u first=%d second=%d\n", ctx.frame, linked[0], linked[1]);
 }
 }
 #endif
@@ -55,6 +128,8 @@ void registerRetailWallRampTestCommands()
 {
 #if RTS_ZEROHOUR
 	registerAction("wall-ramp-probe", probeWallRamp);
+	registerAction("wall-ramp-move", moveToWall);
+	registerAction("wall-ramp-unit", probeUnit);
 #endif
 }
 }

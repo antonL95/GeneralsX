@@ -1,2 +1,21 @@
 180 create Player_1 AotREdorasStairs01 0 2440,1430,0
 181 wall-ramp-probe Player_1 AotREdorasStairs01 0
+180 create Player_1 AotREdorasWall01 0 2440,1430,0
+180 create Player_1 WallRampClimber 0 2350,1500,0
+180 create Player_1 WallRampBlocker 0 2490,1380,0
+181 track Player_1 WallRampClimber 0
+181 track Player_1 WallRampBlocker 0
+190 wall-ramp-move Player_1 WallRampClimber 0 - 2440 1420
+190 move Player_1 WallRampBlocker 0 - 2490 1490
+220 track Player_1 WallRampClimber 0
+220 track Player_1 WallRampBlocker 0
+220 wall-ramp-unit Player_1 WallRampClimber 0
+244 wall-ramp-unit Player_1 WallRampClimber 0
+300 wall-ramp-unit Player_1 WallRampClimber 0
+400 wall-ramp-unit Player_1 WallRampClimber 0
+500 wall-ramp-unit Player_1 WallRampClimber 0
+500 wall-ramp-unit Player_1 WallRampBlocker 0
+180 create Player_1 WallRampUpgrade 0 2700,1430,0
+181 wall-ramp-probe Player_1 WallRampUpgrade 0
+185 objupgrade Player_1 WallRampUpgrade 0 Upgrade_StructureLevel1
+186 wall-ramp-probe Player_1 WallRampUpgrade 0
