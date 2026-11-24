@@ -60,9 +60,10 @@ check() {
             if ($3 == 1284) emptyAnchorRemoved = ($4 == "exists=0")
         }
         $1 == "TEST" && $2 == "production-exit-casualty" {
-            if ($4 == "removed=1" && $5 == "members=0") { casualtyRemoved = 1; casualtyFrame = $3 }
-            if (casualtyRemoved && $3 > casualtyFrame && $5 == "members=0") survivedLoss = 1
-            if (survivedLoss && $5 != "members=0") continuedRelease = 1
+            members = substr($5, 9) + 0
+            if (!casualtyRemoved && $4 == "removed=1") { casualtyRemoved = 1; casualtyFrame = $3; casualtyMembers = members }
+            if (casualtyRemoved && $3 > casualtyFrame) survivedLoss = 1
+            if (survivedLoss && members > casualtyMembers) continuedRelease = 1
         }
         END {
             expected["ShireShirriffsQuarters"] = 12
