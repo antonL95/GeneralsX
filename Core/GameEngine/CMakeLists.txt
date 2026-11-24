@@ -995,6 +995,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/LoadScreen.cpp
     Source/GameClient/GUI/AptScene.cpp
     Source/GameClient/GUI/RetailMatchScreens.cpp
+    Source/GameClient/GUI/RetailOptions.cpp
     Source/GameClient/GUI/ProcessAnimateWindow.cpp
     Source/GameClient/GUI/Shell/Shell.cpp
     Source/GameClient/GUI/Shell/ShellMenuScheme.cpp

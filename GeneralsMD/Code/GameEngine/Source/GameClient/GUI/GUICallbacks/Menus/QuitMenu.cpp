@@ -58,6 +58,7 @@
 #include "GameClient/DisplayStringManager.h"
 #include "GameClient/GameFont.h"
 #include "GameClient/Keyboard.h"
+#include "GameClient/RetailOptions.h"
 #include "GameLogic/ScriptEngine.h"
 
 
@@ -87,7 +88,7 @@ static NameKeyType buttonSaveLoad = NAMEKEY_INVALID;
 
 namespace
 {
-enum class PauseChoice { None, Resume, Leave };
+enum class PauseChoice { None, Resume, Leave, Settings };
 
 GameWindow *retailPauseMenu = nullptr;
 Bool retailMenuPausedGame = FALSE;
@@ -111,8 +112,10 @@ struct PauseCard
 
 constexpr Int pauseDesignHeight = 768;
 constexpr PauseCard pausePanel{360, 312, 304, 170};
+constexpr PauseCard extendedPausePanel{360, 312, 304, 220};
 constexpr PauseCard resumeButton{376, 370, 272, 42};
 constexpr PauseCard leaveButton{376, 421, 272, 42};
+constexpr PauseCard settingsButton{376, 472, 272, 42};
 
 PauseCard pauseCardOnScreen(PauseCard card)
 {
@@ -144,7 +147,7 @@ void drawRetailPauseMenu(GameWindow *window, WinInstanceData *)
 	if (oldWidth != width || oldHeight != height)
 		window->winSetSize(width, height);
 	TheDisplay->drawFillRect(0, 0, width, height, 0x98000000);
-	const PauseCard panel = pauseCardOnScreen(pausePanel);
+	const PauseCard panel = pauseCardOnScreen(confirmLeave ? pausePanel : extendedPausePanel);
 	TheDisplay->drawFillRect(panel.x, panel.y, panel.width, panel.height, 0xFF14212A);
 	TheDisplay->drawOpenRect(panel.x, panel.y, panel.width, panel.height, 1.0f, 0xFF7897A8);
 
@@ -175,6 +178,13 @@ void drawRetailPauseMenu(GameWindow *window, WinInstanceData *)
 		drawPauseLabel(text, leave, "GUI:LeaveMultiplayerMatch", L"Leave Match");
 	else
 		drawPauseLabel(text, leave, "GUI:LeaveForMainMenu", L"Return to Main Menu");
+	if (!confirmLeave)
+	{
+		const PauseCard settings = pauseCardOnScreen(settingsButton);
+		TheDisplay->drawFillRect(settings.x, settings.y, settings.width, settings.height,
+			pauseSelection == PauseChoice::Settings ? 0xFF365665 : 0xFF233741);
+		drawPauseLabel(text, settings, "APT:Settings", L"Settings");
+	}
 	TheDisplayStringManager->freeDisplayString(text);
 }
 
@@ -187,6 +197,7 @@ WindowMsgHandledType retailPauseSystem(GameWindow *window, UnsignedInt message, 
 	}
 	if (message == GWM_DESTROY && window == retailPauseMenu)
 	{
+		closeRetailOptionsFor(window);
 		retailPauseMenu = nullptr;
 		if (TheInGameUI)
 			TheInGameUI->setQuitMenuVisible(FALSE);
@@ -196,6 +207,7 @@ WindowMsgHandledType retailPauseSystem(GameWindow *window, UnsignedInt message, 
 
 void closeRetailPauseMenu()
 {
+	closeRetailOptionsFor(retailPauseMenu);
 	TheWindowManager->winDestroy(retailPauseMenu);
 	retailPauseMenu = nullptr;
 	TheInGameUI->setQuitMenuVisible(FALSE);
@@ -233,6 +245,9 @@ void activatePauseChoice(PauseChoice choice)
 				pausePress = PauseChoice::None;
 			}
 			break;
+		case PauseChoice::Settings:
+			openRetailOptions(retailPauseMenu, TRUE);
+			break;
 		case PauseChoice::None:
 			break;
 	}
@@ -247,7 +262,11 @@ WindowMsgHandledType retailPauseInput(GameWindow *, UnsignedInt message, WindowM
 		else if (point == KEY_ENTER)
 			activatePauseChoice(pauseSelection);
 		else if (point == KEY_UP || point == KEY_DOWN || point == KEY_TAB)
-			pauseSelection = pauseSelection == PauseChoice::Resume ? PauseChoice::Leave : PauseChoice::Resume;
+		{
+			const Int count = confirmLeave ? 2 : 3;
+			const Int index = Int(pauseSelection) - Int(PauseChoice::Resume);
+			pauseSelection = PauseChoice(Int(PauseChoice::Resume) + (index + (point == KEY_UP ? -1 : 1) + count) % count);
+		}
 	}
 	if (message == GWM_MOUSE_POS || message == GWM_LEFT_DOWN || message == GWM_LEFT_UP)
 	{
@@ -258,6 +277,8 @@ WindowMsgHandledType retailPauseInput(GameWindow *, UnsignedInt message, WindowM
 			at = PauseChoice::Resume;
 		else if (pauseButtonOnScreen(PauseChoice::Leave).contains(x, y))
 			at = PauseChoice::Leave;
+		else if (!confirmLeave && pauseCardOnScreen(settingsButton).contains(x, y))
+			at = PauseChoice::Settings;
 		if (at != PauseChoice::None)
 			pauseSelection = at;
 		if (message == GWM_LEFT_DOWN)

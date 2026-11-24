@@ -1,6 +1,7 @@
 #include "PreRTS.h"
 
 #include "GameClient/RetailMatchScreens.h"
+#include "GameClient/RetailOptions.h"
 
 #include "Common/FileSystem.h"
 #include "Common/GameEngine.h"
@@ -1316,6 +1317,7 @@ namespace
 	constexpr Box skirmishButton{412, 272, 612, 320};
 	constexpr Box rematchButton{412, 328, 612, 376};
 	constexpr Box exitButton{412, 384, 612, 432};
+	constexpr Box settingsButton{412, 442, 612, 490};
 	constexpr Box mapTab{104, 144, 225, 179};
 	constexpr Box rulesTab{231, 144, 352, 179};
 	constexpr Box mapPanel{104, 185, 920, 395};
@@ -1938,6 +1940,7 @@ namespace
 			painter.text(localize("GUI:PlayAgain", "Play Again"), rematchButton, 22);
 		painter.text(localize("APT:ExitGame", "Exit Game"), exitButton, 22);
 		painter.text(localize("APT:Load", "Load"), loadMenuButton, 22);
+		painter.text(localize("APT:Settings", "Settings"), settingsButton, 22);
 	}
 
 	WindowMsgHandledType menuSystem(GameWindow *window, UnsignedInt message, WindowMsgData state, WindowMsgData result)
@@ -1949,6 +1952,7 @@ namespace
 		}
 		if (message == GWM_DESTROY)
 		{
+			closeRetailOptionsFor(window);
 			delete static_cast<ReturnMenu *>(window->winGetUserData());
 			window->winSetUserData(nullptr);
 		}
@@ -1984,6 +1988,8 @@ namespace
 			menu.openSetup();
 		else if ((key && point == KEY_L) || (click && loadMenuButton.contains(x, y)))
 			menu.loadPage.show();
+		else if (click && settingsButton.contains(x, y))
+			openRetailOptions(window, FALSE);
 		else if (menu.canRematch() && ((key && point == KEY_ENTER) || (click && rematchButton.contains(x, y))))
 			menu.startRematch();
 		return MSG_HANDLED;

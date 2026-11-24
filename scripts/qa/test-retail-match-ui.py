@@ -400,6 +400,71 @@ def check():
     wait_for("Escape opens the in-game menu in the second match", menu_visible)
 
 
+def options_visible():
+    return pixel(132, 116) == 0x15232A
+
+
+def preferences():
+    files = list((out / "data").rglob("Options.ini"))
+    if not files:
+        return {}
+    return dict(line.strip().split(" = ", 1) for line in files[0].read_text().splitlines()
+                if " = " in line.strip())
+
+
+def check_options(restarted=False):
+    wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
+    time.sleep(2)
+    click(512, 466)
+    wait_for("Settings opens from the main menu", options_visible, 8)
+    expected = {"Gamma": "75", "MusicVolume": "25", "ShowAllHealthBars": "1", "ScrollFactor": "75"}
+    if restarted:
+        wait_for("accepted options are present after restart",
+                 lambda: all(preferences().get(k, "").lower() == v for k, v in expected.items()))
+        for tab_y, name, value in ((219, "video", 75), (273, "audio", 25),
+                                   (327, "gameplay", None), (381, "controls", 75)):
+            click(237, tab_y)
+            x = 606 if value is None else 610 + round(200 * value / 100)
+            wait_for(f"{name} control displays the accepted value",
+                     lambda: pixel(x, 261) == 0xC8AE77)
+        return
+    original = preferences()
+    initial_brightness = title_signature(604, 250, 213, 24)
+    click(760, 260)
+    wait_for("the brightness slider moves", lambda: title_signature(604, 250, 213, 24) != initial_brightness)
+    click(521, 621)
+    wait_for("Cancel returns to the main menu", lambda: not options_visible())
+    if preferences() != original:
+        sys.exit("FAIL Cancel changed options on disk")
+    click(512, 466)
+    wait_for("Settings can be reopened", options_visible)
+    wait_for("Cancel restores the brightness slider", lambda: title_signature(604, 250, 213, 24) == initial_brightness)
+    for tab_y, name in ((219, "video"), (273, "audio"), (327, "gameplay"), (381, "controls")):
+        click(237, tab_y)
+        wait_for(f"{name} page is selected", lambda: pixel(137, tab_y) == 0xC8AE77)
+        capture("options-" + name, 132, 104, 760, 560)
+        click(660 if name == "audio" else 760, 260)
+    click(809, 621)
+    wait_for("Accept persists changes from all pages",
+             lambda: all(preferences().get(k, "").lower() == v for k, v in expected.items()))
+    wait_for("Accept returns to the main menu", lambda: not options_visible())
+    start_match(1)
+    wait_for("a skirmish starts", lambda: len(faction_history()) == 1, 100)
+    wait_for("the skirmish reaches frame 60", lambda: log_count("TEST powerstate 60 Player_1") >= 1, 60)
+    key(0xFF1B)
+    wait_for("the pause menu opens", menu_visible)
+    click(512, 489)
+    wait_for("Settings opens from the pause menu", options_visible)
+    click(237, 381)
+    click(660, 260)
+    key(0xFF1B)
+    wait_for("Escape returns to the pause menu", lambda: not options_visible() and menu_visible())
+    if preferences().get("ScrollFactor") != "75":
+        sys.exit("FAIL cancelling from Pause changed scroll speed")
+    click(512, 391)
+    wait_for("Resume closes Pause", lambda: not menu_visible())
+
+
 build = Path(sys.argv[1]).resolve()
 out = Path(tempfile.mkdtemp(prefix="pause-qa.", dir=build))
 print(f"Run directory {out}", flush=True)
@@ -444,12 +509,20 @@ def stop_game(process):
         process.wait()
 
 
-with (out / "game.log").open("wb") as log_file:
-    game = launch_game(log_file)
-    try:
-        if "--shell-load" in sys.argv:
-            check_shell_load()
-        else:
-            check()
-    finally:
-        stop_game(game)
+def run(check_session):
+    global game, log_file
+    with (out / "game.log").open("wb") as log_file:
+        game = launch_game(log_file)
+        try:
+            check_session()
+        finally:
+            stop_game(game)
+
+
+if "--shell-load" in sys.argv:
+    run(check_shell_load)
+elif "--options" in sys.argv:
+    run(check_options)
+    run(lambda: check_options(restarted=True))
+else:
+    run(check)

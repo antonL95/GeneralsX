@@ -14,6 +14,7 @@ class WorldGroundDecal;
 
 namespace RetailWorldUI
 {
+extern Bool showAllHealthBars;
 void drawUnitStatus(Drawable& drawable);
 Real healthBarFraction(const Object& object);
 Real remainingLifetime(const Object& object);

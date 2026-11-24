@@ -419,6 +419,8 @@ Real RetailWorldUI::healthBarFraction(const Object& object)
 		? std::clamp(body->getHealth() / body->getMaxHealth(), 0.0f, 1.0f) : 0.0f;
 }
 
+Bool RetailWorldUI::showAllHealthBars = FALSE;
+
 void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 {
 	Object* obj = drawable.getObject();
@@ -432,8 +434,8 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 	if (!group)
 		return;
 	const DrawableID hover = TheInGameUI->getMousedOverDrawableID();
-	const Bool showBar = TheGlobalData->m_showObjectHealth &&
-		(group->isSelected() || drawable.getID() == hover);
+	const Bool showBar = showAllHealthBars || (TheGlobalData->m_showObjectHealth &&
+		(group->isSelected() || drawable.getID() == hover));
 	const Object& rankObject = anchor ? *anchor : *obj;
 	const ExperienceTracker* tracker = rankObject.getExperienceTracker();
 	const Int rank = tracker ? tracker->getRank() : 1;
