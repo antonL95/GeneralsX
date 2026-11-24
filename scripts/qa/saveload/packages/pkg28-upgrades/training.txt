@@ -45,3 +45,7 @@
 382 pkg28-observe Player_1 Pkg28OrcPit 0
 382 pkg28-observe Player_1 Pkg28Wall 0
 750 pkg28-observe Player_1 Pkg28Wall 0
+751 destroy Player_1 Pkg28SavedTower 0
+751 destroy Player_1 Pkg28ShortFade 0
+751 destroy Player_1 Pkg28OrcPit 0
+751 destroy Player_1 Pkg28Wall 0
