@@ -1,0 +1,28 @@
+6 hud-tribute-setup Player_1 Player_2 0
+6 hud-tribute-message Player_1 Player_2 0 125
+7 hud-tribute-balances Player_1 Player_2 0
+7 hud-tribute-ally Player_1 Player_2 0
+7 hud-tribute-message Player_1 Player_2 0 801
+8 hud-tribute-balances Player_1 Player_2 0
+8 hud-objective-show - - 1
+8 hud-objective-show - - 2
+8 hud-objective-show - - 100
+8 hud-objective-state - - 1
+8 hud-objective-state - - 100
+9 hud-objective-complete - - 1
+9 hud-objective-complete - - 2
+9 hud-objective-incomplete - - 2
+9 hud-objective-state - - 1
+9 hud-objective-state - - 2
+10 hud-tribute-panel-reset - - 0
+13 hud-tribute-balances Player_1 Player_2 0
+14 hud-tribute-panel-send - - 0
+18 hud-tribute-balances Player_1 Player_2 0
+19 hud-objective-disable - - 0
+19 hud-objective-state - - 1
+21 hud-objective-state - - 1
+21 hud-objective-state - - 2
+21 hud-tribute-balances Player_1 Player_2 0
+22 hud-objective-enable - - 0
+22 hud-objective-hide - - 2
+22 hud-objective-state - - 2
