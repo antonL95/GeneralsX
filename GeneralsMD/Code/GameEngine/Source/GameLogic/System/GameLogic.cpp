@@ -4124,6 +4124,8 @@ void GameLogic::setRetailWeatherModifier(const Object& source, const SpecialPowe
 	}
 	if (power.m_changeWeather >= 0)
 		changeRetailWeather(power.m_changeWeather, power.m_weatherDuration);
+}
+
 void GameLogic::setObjectivesEnabled(Bool enabled)
 {
 	m_objectivesEnabled = enabled;
