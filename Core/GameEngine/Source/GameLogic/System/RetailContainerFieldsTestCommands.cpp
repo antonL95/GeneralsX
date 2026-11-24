@@ -10,6 +10,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/OpenContain.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Weapon.h"
 
@@ -65,6 +66,13 @@ void handleContainerFields(const RetailTestCommands::Context& ctx)
 	else if (action == "container-fields-kill")
 	{
 		object->kill();
+	}
+	else if (action == "container-fields-toss")
+	{
+		const PhysicsBehavior* physics = object->getPhysics();
+		const Coord3D velocity = physics ? *physics->getVelocity() : Coord3D{0, 0, 0};
+		std::fprintf(stderr, "TEST container-fields toss frame=%u physics=%d velocity=%.3f,%.3f,%.3f dead=%d\n",
+			ctx.frame, physics != nullptr, velocity.x, velocity.y, velocity.z, object->isEffectivelyDead());
 	}
 	else if (action == "container-fields-turn")
 	{

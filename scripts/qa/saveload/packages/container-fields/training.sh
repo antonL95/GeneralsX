@@ -27,6 +27,11 @@ expect_displacement() {
 check() {
     expect_sample 228 'structure-rejected count=0 attached=0 bone=-'
     expect_sample 234 'chariot-created-three count=3'
+    expect_sample 234 'zero-payload count=1'
+    expect_sample 234 'structure-payload count=1'
+    expect_sample 234 'seat-first count=0 attached=1 bone=PASSENGER01'
+    expect_sample 234 'seat-second count=0 attached=1 bone=-'
+    expect_sample 234 'toss-loaded count=0 attached=1'
     expect_sample 242 'foreign-rejected count=0 attached=0 bone=-'
     expect_sample 242 'own-fixed-burned count=0 attached=1 bone=PASSENGER01 enclosed=0 follows-bone=1 health=90.0'
     expect_sample 242 'free count=0 attached=1 bone=PASSENGER01 enclosed=0 follows-bone=0'
@@ -45,6 +50,12 @@ check() {
     expect_sample 248 'beast-restored count=6'
     expect_sample 248 'beast-seat-restored count=0 attached=1 bone=B_GBPASS01'
     expect_sample 248 'chariot-restored count=2'
+    expect_sample 243 'unseated-before-save count=0 attached=1 bone=-'
+    expect_sample 248 'unseated-restored count=0 attached=1 bone=-'
+    if covers 259; then
+        grep -E '^TEST container-fields toss frame=259 physics=1 velocity=[^ ]+ dead=1$' "$log"
+        awk '/^TEST container-fields toss frame=259 / { split($6, v, "[=,]"); found = (v[2] != 0 || v[3] != 0 || v[4] != 0) } END { exit !found }' "$log"
+    fi
     expect_sample 258 'thrown count=0 attached=0'
     expect_sample 260 'grab-death alive=0'
     expect_sample 260 'mine-ammo-death alive=0'
@@ -73,9 +84,11 @@ compare() {
     grep -F 'TEST container-fields frame=247 release-restored ' "$out/continue.log" > "$out/container-fields-release-continued.txt"
     grep -F 'TEST container-fields frame=247 release-restored ' "$out/resume.log" > "$out/container-fields-release-resumed.txt"
     cmp "$out/container-fields-release-continued.txt" "$out/container-fields-release-resumed.txt"
-    if covers 292 && covers 320; then
-        grep -E '^TEST container-fields busy frame=(292|320) ' "$out/continue.log" > "$out/container-fields-busy-continued.txt"
-        grep -E '^TEST container-fields busy frame=(292|320) ' "$out/resume.log" > "$out/container-fields-busy-resumed.txt"
-        cmp "$out/container-fields-busy-continued.txt" "$out/container-fields-busy-resumed.txt"
-    fi
+    for sample_frame in 292 320; do
+        if covers "$sample_frame"; then
+            grep -F "TEST container-fields busy frame=$sample_frame " "$out/continue.log" > "$out/container-fields-busy-continued.txt"
+            grep -F "TEST container-fields busy frame=$sample_frame " "$out/resume.log" > "$out/container-fields-busy-resumed.txt"
+            cmp "$out/container-fields-busy-continued.txt" "$out/container-fields-busy-resumed.txt"
+        fi
+    done
 }

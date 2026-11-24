@@ -121,7 +121,7 @@ const AsciiString* OpenContain::getPassengerBone(ObjectID passenger) const
 
 void OpenContain::assignPassengerBone(const Object* passenger)
 {
-	if (getPassengerBone(passenger->getID()))
+	if (m_restoringPassengerBones || getPassengerBone(passenger->getID()))
 		return;
 	const Object* carrier = getObject();
 	const auto isInUse = [this](const AsciiString& name) {
@@ -1072,9 +1072,8 @@ void OpenContain::onDie( const DamageInfo * damageInfo )
 			removeFromContain(passenger);
 			if (PhysicsBehavior* physics = passenger->getPhysics())
 			{
-				const Real speed = GameLogicRandomValue(2, 5);
 				const Coord3D& heading = *passenger->getUnitDirectionVector2D();
-				physics->launchFromContainment({heading.x * speed, heading.y * speed, 0.0f});
+				physics->launchFromContainment({heading.x, heading.y, 0.0f});
 			}
 			if (const HordeContain* horde = HordeContain::get(passenger))
 			{
@@ -1974,6 +1973,7 @@ void OpenContain::xferRetailBlocks(Xfer* xfer, Bool present)
 			block->xferUnsignedInt(&count);
 			if (loading)
 			{
+				m_restoringPassengerBones = TRUE;
 				if (count > m_containListSize)
 					throw SC_INVALID_DATA;
 				m_passengerBones.resize(count);
@@ -1983,7 +1983,7 @@ void OpenContain::xferRetailBlocks(Xfer* xfer, Bool present)
 				block->xferObjectID(&attachment.passenger);
 				block->xferAsciiString(&attachment.bone);
 			}
-		}, [this] { m_passengerBones.clear(); }}
+		}, [this] { m_passengerBones.clear(); m_restoringPassengerBones = FALSE; }}
 	});
 }
 
@@ -2237,5 +2237,6 @@ void OpenContain::loadPostProcess()
 
 	// clear the list as we don't need it anymore
 	m_xferContainIDList.clear();
+	m_restoringPassengerBones = FALSE;
 
 }

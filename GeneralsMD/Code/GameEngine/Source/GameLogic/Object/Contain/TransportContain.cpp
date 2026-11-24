@@ -566,14 +566,11 @@ void TransportContain::createUpgradePayloads()
 			continue;
 		for (UnsignedInt count = 0; count < payload.count; ++count)
 		{
-			const Int slots = passenger->getRawTransportSlotCount();
-			if (slots <= 0 || m_extraSlotsInUse + static_cast<Int>(getContainCount()) + slots > getContainMax())
-				break;
 			Object* created = TheThingFactory->newObject(passenger, transport->getTeam());
 			if (!created)
 				break;
 			created->setPosition(transport->getPosition());
-			if (isValidContainerFor(created, FALSE))
+			if (isValidContainerFor(created, TRUE))
 				addToContain(created);
 			if (created->getContainedBy() != transport)
 			{

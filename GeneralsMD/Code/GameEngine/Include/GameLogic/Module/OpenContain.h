@@ -293,6 +293,7 @@ private:
 		AsciiString bone;
 	};
 	std::vector<PassengerBone> m_passengerBones;
+	Bool m_restoringPassengerBones = FALSE;
 
 	typedef std::map< ObjectID, ObjectEnterExitType, std::less<ObjectID>/**/> ObjectEnterExitMap;
 
