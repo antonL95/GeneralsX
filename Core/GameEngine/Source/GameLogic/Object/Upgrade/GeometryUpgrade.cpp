@@ -266,23 +266,41 @@ void GeometryUpgrade::upgradeImplementation()
 	addGeometry(primary, retail.primaryGeometry);
 	for (const auto& geometry : retail.additionalGeometries)
 		addGeometry(geometry.shape, geometry.details);
-	if (!affectsBounds)
+	const Bool affectsMeshes = data->m_wallBoundsMesh.isNotEmpty() || data->m_rampMesh1.isNotEmpty() || data->m_rampMesh2.isNotEmpty();
+	if (!affectsBounds && !affectsMeshes)
 		return;
 
 	Pathfinder* pathfinder = TheAI && !ScopedPathfindDeferral::contains(object) ? TheAI->pathfinder() : nullptr;
 	if (pathfinder)
 		pathfinder->removeObjectFromPathfindMap(object);
 
-	const GeometryInfo& current = object->getGeometryInfo();
-	if (bounds.major == current.getMajorRadius() && bounds.minor == current.getMinorRadius() &&
-		bounds.isSmall == current.getIsSmall() && current.getGeomType() == GEOMETRY_BOX)
-		object->setGeometryInfoZ(bounds.height);
-	else
-		object->setGeometryInfo(GeometryInfo(GEOMETRY_BOX, bounds.isSmall, bounds.height, bounds.major, bounds.minor));
+	if (affectsBounds)
+	{
+		const GeometryInfo& current = object->getGeometryInfo();
+		if (bounds.major == current.getMajorRadius() && bounds.minor == current.getMinorRadius() &&
+			bounds.isSmall == current.getIsSmall() && current.getGeomType() == GEOMETRY_BOX)
+			object->setGeometryInfoZ(bounds.height);
+		else
+			object->setGeometryInfo(GeometryInfo(GEOMETRY_BOX, bounds.isSmall, bounds.height, bounds.major, bounds.minor));
+	}
 
 	setUpgradeExecuted(TRUE);
 	if (pathfinder)
 		pathfinder->addObjectToPathfindMap(object);
+}
+
+Bool GeometryUpgrade::resetUpgrade(const UpgradeMaskType& mask)
+{
+	if (!UpgradeModule::resetUpgrade(mask))
+		return FALSE;
+	const auto* data = getGeometryUpgradeModuleData();
+	if ((data->m_wallBoundsMesh.isNotEmpty() || data->m_rampMesh1.isNotEmpty() || data->m_rampMesh2.isNotEmpty()) &&
+		TheAI && !ScopedPathfindDeferral::contains(getObject()))
+	{
+		TheAI->pathfinder()->removeObjectFromPathfindMap(getObject());
+		TheAI->pathfinder()->addObjectToPathfindMap(getObject());
+	}
+	return TRUE;
 }
 
 void GeometryUpgrade::crc(Xfer* xfer)

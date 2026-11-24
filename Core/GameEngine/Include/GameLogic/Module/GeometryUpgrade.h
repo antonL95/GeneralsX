@@ -56,6 +56,7 @@ public:
 	const GeometryUpgradeModuleData* getWallRampData() const { return getGeometryUpgradeModuleData(); }
 
 	Bool isSubObjectsUpgrade() override { return FALSE; }
+	Bool resetUpgrade(const UpgradeMaskType& mask) override;
 
 protected:
 	void upgradeImplementation() override;
