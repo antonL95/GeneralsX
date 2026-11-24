@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "Common/Player.h"
 #include "Common/ThingTemplate.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
@@ -57,9 +58,10 @@ struct GeometryBounds
 	}
 };
 
-Bool canOccupyConstructionFootprint(const ThingTemplate& definition, const ThingTemplate::GeometryDetails& details)
+Bool canOccupyConstructionFootprint(const ThingTemplate& definition, const ThingTemplate::GeometryDetails& details,
+	const std::vector<const GeometryUpgradeModuleData*>& activeUpgrades, const UpgradeMaskType* completed)
 {
-	if (details.active)
+	if (isActive(details, activeUpgrades))
 		return TRUE;
 	if (details.name.isEmpty())
 		return FALSE;
@@ -70,21 +72,29 @@ Bool canOccupyConstructionFootprint(const ThingTemplate& definition, const Thing
 		if (modules.getNthName(i).compareNoCase("GeometryUpgrade") != 0)
 			continue;
 		const auto* data = static_cast<const GeometryUpgradeModuleData*>(modules.getNthData(i));
-		if (data && containsGeometry(data->m_showGeometry, details.name))
+		if (!data || !containsGeometry(data->m_showGeometry, details.name) ||
+			std::find(activeUpgrades.begin(), activeUpgrades.end(), data) != activeUpgrades.end())
+			continue;
+		if (!completed || !completed->any())
+			return TRUE;
+		UpgradeMaskType activation, conflicting;
+		data->m_upgradeMuxData.getUpgradeActivationMasks(activation, conflicting);
+		if (!completed->testForAny(conflicting))
 			return TRUE;
 	}
 	return FALSE;
 }
 
 template<typename Predicate>
-Bool anyConstructionGeometry(const ThingTemplate& definition, const Coord3D& position, Real angle, const Predicate& overlaps)
+Bool anyConstructionGeometry(const ThingTemplate& definition, const Coord3D& position, Real angle, const Predicate& overlaps,
+	const std::vector<const GeometryUpgradeModuleData*>& activeUpgrades = {}, const UpgradeMaskType* completed = nullptr)
 {
 	const auto& data = definition.getRotWKObjectData();
 	const Real cosAngle = WWMath::CosTrig(angle);
 	const Real sinAngle = WWMath::SinTrig(angle);
 	const auto test = [&](const GeometryInfo& geometry, const ThingTemplate::GeometryDetails& details) -> Bool
 	{
-		if (!canOccupyConstructionFootprint(definition, details))
+		if (!canOccupyConstructionFootprint(definition, details, activeUpgrades, completed))
 			return FALSE;
 		const Coord3D center = {
 			position.x + details.offset.x * cosAngle - details.offset.y * sinAngle,
@@ -115,6 +125,10 @@ Bool GeometryUpgrade::constructionFootprintsOverlap(const ThingTemplate& build, 
 	if (!hasExtendedFootprint(buildData) && !hasExtendedFootprint(existingData))
 		return FALSE;
 
+	auto completed = obstacle.getObjectCompletedUpgradeMask();
+	if (const Player* owner = obstacle.getControllingPlayer())
+		completed.set(owner->getCompletedUpgradeMask());
+	const auto upgrades = activeUpgrades(obstacle, nullptr);
 	const Real obstacleAngle = obstacle.getOrientation();
 	return anyConstructionGeometry(build, position, angle, [&](const GeometryInfo& shape, const Coord3D& center)
 	{
@@ -122,7 +136,7 @@ Bool GeometryUpgrade::constructionFootprintsOverlap(const ThingTemplate& build, 
 			[&](const GeometryInfo& obstacleShape, const Coord3D& obstacleCenter)
 			{
 				return ThePartitionManager->geomCollidesWithGeom(&center, shape, angle, &obstacleCenter, obstacleShape, obstacleAngle);
-			});
+			}, upgrades, &completed);
 	});
 }
 
