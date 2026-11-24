@@ -29,7 +29,7 @@
 1303 kill Player_1 RivendellDunedainGathering 1
 1310 production-exit-retired Player_1 ArnorRangerHorde 1
 1320 move Player_1 ArnorRangerHorde 1 - 1100 2600
+1330 move Player_1 ShireBounderHorde 0 - 2050 2600
+1330 move Player_1 RivendellHobbitFriendsHorde 0 - 3550 2600
+1440 production-exit-retired Player_1 ArnorRangerHorde 1
 1450 production-exit-queue-state Player_1 RivendellDunedainGathering 0
-1600 production-exit-retired Player_1 ArnorRangerHorde 1
-1800 move Player_1 ShireBounderHorde 0 - 2050 2600
-1800 move Player_1 RivendellHobbitFriendsHorde 0 - 3550 2600

@@ -15,7 +15,7 @@ check() {
     sample state 227 'producer=MordorOrcPit index=1 model=1 unit=- progress=-1.000 speed=20.000'
     sample state 244 'producer=MordorOrcPit index=0 model=1 unit=MordorFighterHorde progress=63.889 speed=20.000'
     sample state 244 'producer=MordorOrcPit_WotR index=0 model=1 unit=MordorFighterHorde_WOTRBattle progress=3.067 speed=1.000'
-    sample state 270 'producer=MordorOrcPit index=0 model=1 unit=- progress=-1.000 speed=20.000'
+    sample state 400 'producer=MordorOrcPit index=0 model=1 unit=- progress=-1.000 speed=20.000'
     sample state 1665 'producer=MordorOrcPit index=1 model=1 unit=MordorFighterHorde progress=13.889 speed=20.000'
     sample state 1667 'producer=MordorOrcPit index=1 model=0 unit=MordorFighterHorde progress=0.933 speed=1.000'
 

@@ -34,7 +34,7 @@ check() {
             dot = ($6 - startX[id]) * directionX[id] + ($7 - startY[id]) * directionY[id]
             if (dot >= 10 * sqrt(directionX[id] * directionX[id] + directionY[id] * directionY[id]))
                 moved[id] = 1
-            if (producer == "ShireShirriffsQuarters" && $3 >= 2000 && dx * dx + dy * dy > 200 * 200)
+            if (producer == "ShireShirriffsQuarters" && $3 >= 1430 && dx * dx + dy * dy > 200 * 200)
                 escaped[id] = 1
         }
         $1 == "TEST" && $2 == "production-cavalry" {
@@ -46,7 +46,7 @@ check() {
         }
         $1 == "TEST" && $2 == "production-exit-retired" {
             if ($3 == 1310) { retiredX = $4; retiredY = $5; retiredBefore = ($6 == "selectable=1" && $7 == "collisions=1" && $8 != "members=0") }
-            if ($3 == 1600) {
+            if ($3 == 1440) {
                 dx = $4 - retiredX; dy = $5 - retiredY
                 retiredAfter = retiredBefore && $6 == "selectable=1" && $7 == "collisions=1" && dx * dx + dy * dy > 100 * 100
             }

@@ -27,7 +27,7 @@
 244 pkg68-protection PlyrCivilian Pkg68DisabledRecruit 0
 257 pkg68-spawn PlyrCivilian MordorOrcPit 0 MordorFighterHorde
 258 pkg68-spawn PlyrCivilian MordorOrcPit 0 MordorFighterHorde
-270 pkg68-state PlyrCivilian MordorOrcPit 0 MordorFighterHorde
+400 pkg68-state PlyrCivilian MordorOrcPit 0 MordorFighterHorde
 418 pkg68-hit PlyrCivilian Pkg68ProtectedRecruit 0 slash
 419 pkg68-hit PlyrCivilian Pkg68ProtectedRecruit 0 unresistable
 420 pkg68-hit PlyrCivilian Pkg68ProtectedRecruit 0 slash
