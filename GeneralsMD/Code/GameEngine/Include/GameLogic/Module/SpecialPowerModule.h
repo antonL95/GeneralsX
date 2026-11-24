@@ -109,7 +109,7 @@ public:
 	Real m_attributeModifierRange = 0;
 	Bool m_attributeModifierWeatherBased = FALSE;
 	Bool m_availableAtStart = TRUE;
-	Int m_changeWeather = 0;
+	Int m_changeWeather = -1;
 	Bool m_disableDuringAnimDuration = FALSE;
 	Real m_distanceFromCommandCenter = 0;
 	Int m_giveLevels = 0;

@@ -2099,13 +2099,14 @@ void CloudBreakSpecialPower::applyPowerEffect(const Coord3D*)
 		return;
 
 	const Int spacing = data->m_spacing;
+	Team* team = ThePlayerList->getNeutralPlayer()->getDefaultTeam();
 	for (Int y = static_cast<Int>(bounds.lo.y + spacing); y < bounds.hi.y - spacing; y += spacing)
 	{
 		for (Int x = static_cast<Int>(bounds.lo.x + spacing); x < bounds.hi.x - spacing; x += spacing)
 		{
 			Coord3D point{static_cast<Real>(x), static_cast<Real>(y), 0.0f};
 			point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
-			if (Object* beam = TheThingFactory->newObject(sunbeam, getObject()->getTeam()))
+			if (Object* beam = TheThingFactory->newObject(sunbeam, team))
 				beam->setPosition(&point);
 		}
 	}
@@ -2137,15 +2138,15 @@ void TaintSpecialPower::applyPowerEffect(const Coord3D* position)
 		return;
 
 	const ThingTemplate* land = TheThingFactory->findTemplate(data->m_land, FALSE);
-	if (!land)
-		return;
 
 	const Coord3D point = *position;
 	if (data->m_fx)
 		FXList::doFXPos(data->m_fx, &point);
 	ObjectCreationList::create(data->m_ocl, getObject(), &point, &point, INVALID_ANGLE);
-	if (Object* patch = TheThingFactory->newObject(land, getObject()->getControllingPlayer()->getDefaultTeam()))
+	Object* patch = land ? TheThingFactory->newObject(land, getObject()->getControllingPlayer()->getDefaultTeam()) : nullptr;
+	if (patch)
 		patch->setPosition(&point);
+	TheTerrainLogic->paintRetailTaint(point, data->m_radius, patch ? patch->getID() : INVALID_ID);
 }
 
 Bool UntamedAllegianceSpecialPower::isValidPowerTarget(const Object* target) const

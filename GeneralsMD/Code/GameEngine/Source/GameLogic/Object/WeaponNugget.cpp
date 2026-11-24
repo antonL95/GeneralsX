@@ -98,6 +98,13 @@ void parseSpecialObjectFilter(INI* ini, void* instance, void*, const void*)
 	nugget.m_hasSpecialObjectFilter = TRUE;
 }
 
+void parseForceKillObjectFilter(INI* ini, void* instance, void*, const void*)
+{
+	auto& nugget = *static_cast<WeaponNugget*>(instance);
+	SpecialPowerObjectFilter::parse(ini, nullptr, &nugget.m_forceKillObjectFilter, nullptr);
+	nugget.m_hasForceKillObjectFilter = TRUE;
+}
+
 Real cosHalfArc(Real degrees)
 {
 	return Cos(degrees * 0.5f * PI / 180.0f);
@@ -151,7 +158,7 @@ const FieldParse s_damageFields[] =
 	{ "CylinderAOE", INI::parseBool, nullptr, offsetof(WeaponNugget, m_cylinderAOE) },
 	{ "DrainLife", INI::parseBool, nullptr, offsetof(WeaponNugget, m_drainLife) },
 	{ "DrainLifeMultiplier", INI::parseReal, nullptr, offsetof(WeaponNugget, m_drainLifeMultiplier) },
-	{ "ForceKillObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(WeaponNugget, m_forceKillObjectFilter) },
+	{ "ForceKillObjectFilter", parseForceKillObjectFilter, nullptr, 0 },
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
@@ -920,9 +927,11 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 
 	const auto damage = [&](Object* victim, Bool killSelf)
 	{
+		const Bool forceKill = nugget.m_hasForceKillObjectFilter && !victim->isEffectivelyDead() &&
+			nugget.m_forceKillObjectFilter.matchesObject(source, victim);
 		const Real scalar = nugget.scalarFor(source, victim);
 		const Real amount = killSelf ? HUGE_DAMAGE_AMOUNT : nuggetDamage(nugget, scalar, bonus);
-		if (amount <= 0.0f)
+		if (amount <= 0.0f && !forceKill)
 			return;
 
 		DamageInfo damageInfo;
@@ -931,6 +940,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damageInfo.in.m_sourceID = sourceID;
 		damageInfo.in.m_sourcePlayerMask = source && source->getControllingPlayer() ? source->getControllingPlayer()->getPlayerMask() : 0;
 		damageInfo.in.m_amount = amount;
+		damageInfo.in.m_kill = forceKill;
 		damageInfo.retailFXTrigger = trigger;
 		if (RetailFileLayers::enabled())
 			damageInfo.retailWeaponName = launchWeapon ? launchWeapon->m_name : m_name;

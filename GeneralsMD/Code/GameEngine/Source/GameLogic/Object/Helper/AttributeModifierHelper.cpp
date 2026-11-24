@@ -7,6 +7,7 @@
 
 #include "Common/GlobalData.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/SpecialPowerINI.h"
 #include "Common/ThingTemplate.h"
@@ -197,6 +198,15 @@ void AttributeModifierHelper::clearAll()
 	m_pendingUpgrades.clear();
 	if (!removed.empty())
 		changed({}, removed);
+}
+
+void AttributeModifierHelper::setWeatherAntiMask( UnsignedInt mask )
+{
+	if (mask != m_stack.weatherAntiMask())
+	{
+		m_stack.setWeatherAntiMask(mask);
+		changed({}, {});
+	}
 }
 
 void AttributeModifierHelper::grantUpgrades( Int list )
@@ -412,14 +422,15 @@ void AttributeModifierHelper::crc( Xfer *xfer )
 			xfer->xferUnsignedInt( &holdEnd );
 		}
 	}
+	xferRetailBlocks(xfer, TRUE);
 }
 
 void AttributeModifierHelper::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = 2;
+	XferVersion currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
-	if (version != currentVersion)
+	if (version < 2)
 		throw XFER_INVALID_VERSION;
 	ObjectHelper::xfer( xfer );
 
@@ -482,11 +493,26 @@ void AttributeModifierHelper::xfer( Xfer *xfer )
 		m_appliedConditions.assign(conditions, -1);
 	for (UnsignedShort index = 0; index < conditions; ++index)
 		xfer->xferInt( &m_appliedConditions[index] );
+	xferRetailBlocks(xfer, version >= 3);
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		++m_version;
 		m_cacheValid = FALSE;
 	}
+}
+
+void AttributeModifierHelper::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection(xfer, loading, present, {
+		{"weather-anti-category", [this, loading](Xfer* block)
+		{
+			UnsignedInt mask = m_stack.weatherAntiMask();
+			block->xferUnsignedInt(&mask);
+			if (loading)
+				m_stack.setWeatherAntiMask(mask);
+		}, [this] { m_stack.setWeatherAntiMask(0); }}
+	});
 }
 
 void AttributeModifierHelper::loadPostProcess()
@@ -509,9 +535,14 @@ Int findList( const AsciiString& listName )
 	return TheAttributeModifierStore ? TheAttributeModifierStore->findIndex(listName) : -1;
 }
 
+Owner ownerOf( ObjectID objectID, NameKeyType moduleTag )
+{
+	return makeOwner(static_cast<UnsignedInt>(objectID), moduleTag);
+}
+
 Owner ownerOf( const Object* obj, NameKeyType moduleTag )
 {
-	return obj ? makeOwner(static_cast<UnsignedInt>(obj->getID()), moduleTag) : ANONYMOUS_OWNER;
+	return obj ? ownerOf(obj->getID(), moduleTag) : ANONYMOUS_OWNER;
 }
 
 Bool apply( Object* target, Int list, UnsignedInt durationFrames, UnsignedInt antiMask, Owner owner )

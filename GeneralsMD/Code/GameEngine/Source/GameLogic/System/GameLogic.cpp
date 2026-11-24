@@ -69,6 +69,7 @@
 #include "Common/RandomValue.h"
 #include "Common/Recorder.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/RetailSkirmishSpending.h"
 #include "Common/StatsCollector.h"
 #include "Common/ThingFactory.h"
@@ -114,11 +115,13 @@
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DestroyModule.h"
 #include "GameLogic/Module/OpenContain.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/RetailTerrainFire.h"
 #include "GameLogic/PolygonTrigger.h"
@@ -473,6 +476,7 @@ void GameLogic::reset()
 {
 	m_retailWeather = WEATHER_NONE;
 	m_retailWeatherEndFrame = 0;
+	m_weatherModifier = {};
 	CastleTemplates::reset();
 	ExperienceLevelStore::reset();
 	m_thingTemplateBuildableOverrides.clear();
@@ -4026,8 +4030,10 @@ extern __int64 Total_Load_3D_Assets;
 
 void GameLogic::changeRetailWeather(Int weather, UnsignedInt duration)
 {
+	if (weather == getRetailWeather())
+		return;
 	m_retailWeather = weather;
-	m_retailWeatherEndFrame = duration ? m_frame + duration : 0;
+	m_retailWeatherEndFrame = weather != WEATHER_NONE && duration ? m_frame + duration : 0;
 }
 
 Int GameLogic::getRetailWeather() const
@@ -4038,6 +4044,75 @@ Int GameLogic::getRetailWeather() const
 UnsignedInt GameLogic::getRetailWeatherEndFrame() const
 {
 	return getRetailWeather() != WEATHER_NONE ? m_retailWeatherEndFrame : 0;
+}
+
+const SpecialPowerModuleData* GameLogic::getRetailWeatherModifierData() const
+{
+	if (m_weatherModifier.objectTemplate.isEmpty())
+		return nullptr;
+	const ThingTemplate* thing = TheThingFactory->findTemplate(m_weatherModifier.objectTemplate, FALSE);
+	if (!thing)
+		return nullptr;
+
+	const ModuleInfo& modules = thing->getBehaviorModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+		if (modules.getNthTag(i) == m_weatherModifier.moduleTag)
+			return dynamic_cast<const SpecialPowerModuleData*>(modules.getNthData(i));
+	return nullptr;
+}
+
+void GameLogic::applyRetailWeatherModifier(Object& target, const SpecialPowerModuleData& power)
+{
+	const Player* player = ThePlayerList->getNthPlayer(m_weatherModifier.player);
+	const Object* source = findObjectByID(m_weatherModifier.source);
+	if (!player || !power.m_attributeModifierAffects.matchesObject(source, &target, player))
+		return;
+
+	const auto owner = AttributeModifiers::ownerOf(m_weatherModifier.source, power.getModuleTagNameKey());
+	AttributeModifiers::apply(&target, power.m_attributeModifier, AttributeModifierHelper::USE_LIST_DURATION, 0, owner);
+	if (auto* helper = target.getAttributeModifierHelper())
+		helper->setWeatherAntiMask(AttributeModifierRules::categoryBit(power.m_antiCategory));
+}
+
+void GameLogic::applyRetailWeatherModifier(Object& target)
+{
+	if (m_weatherModifier.endFrame && m_frame >= m_weatherModifier.endFrame)
+		return;
+	if (const auto* power = getRetailWeatherModifierData())
+		applyRetailWeatherModifier(target, *power);
+}
+
+void GameLogic::clearRetailWeatherModifier()
+{
+	if (const auto* power = getRetailWeatherModifierData())
+	{
+		const auto owner = AttributeModifiers::ownerOf(m_weatherModifier.source, power->getModuleTagNameKey());
+		for (Object* target = getFirstObject(); target; target = target->getNextObject())
+		{
+			AttributeModifiers::remove(target, power->m_attributeModifier, owner);
+			if (auto* helper = target->getAttributeModifierHelper())
+				helper->setWeatherAntiMask(0);
+		}
+	}
+	m_weatherModifier = {};
+}
+
+void GameLogic::setRetailWeatherModifier(const Object& source, const SpecialPowerModuleData& power)
+{
+	clearRetailWeatherModifier();
+	if (!power.m_reEnableAntiCategory &&
+		(power.m_attributeModifier.isNotEmpty() || AttributeModifierRules::categoryBit(power.m_antiCategory)))
+	{
+		m_weatherModifier.source = source.getID();
+		m_weatherModifier.player = source.getControllingPlayer()->getPlayerIndex();
+		m_weatherModifier.objectTemplate = source.getTemplate()->getName();
+		m_weatherModifier.moduleTag = KEYNAME(power.getModuleTagNameKey());
+		m_weatherModifier.endFrame = power.m_weatherDuration ? m_frame + power.m_weatherDuration : 0;
+		for (Object* target = getFirstObject(); target; target = target->getNextObject())
+			applyRetailWeatherModifier(*target, power);
+	}
+	if (power.m_changeWeather >= 0)
+		changeRetailWeather(power.m_changeWeather, power.m_weatherDuration);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -4160,6 +4235,8 @@ void GameLogic::update()
 		TheRecorder->UPDATE();
 	}
 
+	if (m_weatherModifier.endFrame && m_frame >= m_weatherModifier.endFrame)
+		clearRetailWeatherModifier();
 	RetailTestCommands::runFrame( m_frame );
 
 	// process client commands
@@ -4463,6 +4540,9 @@ void GameLogic::destroyObject( Object *obj )
 	if (!obj || obj->isDestroyed())
 		return;
 
+	if (obj->isKindOf(KINDOF_TAINT))
+		TheTerrainLogic->removeRetailTaint(obj->getID());
+
 	// run the object onDestroy event if provided
 	for (BehaviorModule** m = obj->getBehaviorModules(); *m; ++m)
 	{
@@ -4622,6 +4702,7 @@ UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 		UnsignedInt weatherEndFrame = getRetailWeatherEndFrame();
 		xferCRC->xferInt(&weather);
 		xferCRC->xferUnsignedInt(&weatherEndFrame);
+		xferRetailBlocks(xferCRC, TRUE);
 		if (TheGameInfo && TheGameInfo->getRetailSkirmishRules().commandPointFactor > 0)
 		{
 			auto rules = TheGameInfo->getRetailSkirmishRules();
@@ -5829,7 +5910,22 @@ void GameLogic::xfer( Xfer *xfer )
 		if (version >= 16)
 			TheWeaponStore->xferRetailDelayedDamage(xfer);
 		TheWeaponStore->xferRetailBlocks(xfer, version >= 17);
+		xferRetailBlocks(xfer, version >= 18);
 	}
+}
+
+void GameLogic::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"weather-modifier", [this](Xfer* block)
+		{
+			block->xferObjectID(&m_weatherModifier.source);
+			block->xferInt(&m_weatherModifier.player);
+			block->xferAsciiString(&m_weatherModifier.objectTemplate);
+			block->xferAsciiString(&m_weatherModifier.moduleTag);
+			block->xferUnsignedInt(&m_weatherModifier.endFrame);
+		}, [this] { m_weatherModifier = {}; }}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------

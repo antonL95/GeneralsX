@@ -32,6 +32,7 @@
 
 #include "Common/INI.h"
 #include "Common/ModelState.h"
+#include "Common/Player.h"
 #include "Common/SpecialPower.h"
 #include "Common/SpecialPowerINI.h"
 #include "Common/ThingTemplate.h"
@@ -51,14 +52,17 @@ constexpr UnsignedInt FILTER_ALL = 1u << 10;
 constexpr UnsignedInt FILTER_SAME_PLAYER = 1u << 13;
 }
 
-Bool SpecialPowerObjectFilter::matchesObject(const Object* source, const Object* target) const
+Bool SpecialPowerObjectFilter::matchesObject(const Object* source, const Object* target, const Player* sourcePlayer) const
 {
 	const AsciiString& name = target->getTemplate()->getName();
 	const auto named = [&name](const AsciiString& other)
 	{
 		return stricmp(name.str(), other.str()) == 0;
 	};
-	const Relationship relationship = source ? source->getRelationship(target) : NEUTRAL;
+	const Relationship relationship = sourcePlayer ? sourcePlayer->getRelationship(target->getTeam())
+		: source ? source->getRelationship(target) : NEUTRAL;
+	if (!sourcePlayer && source)
+		sourcePlayer = source->getControllingPlayer();
 	WeaponNuggetRules::FilterFacts facts{};
 	facts.ruleAll = (m_rules & FILTER_ALL) != 0;
 	facts.ruleNone = (m_rules & SpecialPowerObjectFilter::RULE_NONE) != 0;
@@ -71,7 +75,7 @@ Bool SpecialPowerObjectFilter::matchesObject(const Object* source, const Object*
 	facts.isAlly = relationship == ALLIES;
 	facts.isEnemy = relationship == ENEMIES;
 	facts.isNeutral = relationship == NEUTRAL;
-	facts.isSamePlayer = source && source->getControllingPlayer() == target->getControllingPlayer();
+	facts.isSamePlayer = sourcePlayer && sourcePlayer == target->getControllingPlayer();
 	facts.includedByName = std::any_of(m_includeObjects.begin(), m_includeObjects.end(), named);
 	facts.excludedByName = std::any_of(m_excludeObjects.begin(), m_excludeObjects.end(), named);
 	facts.hasIncludedKinds = m_includeKinds.any();

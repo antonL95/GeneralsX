@@ -232,6 +232,8 @@ public:
 		Owner owner = ANONYMOUS_OWNER)
 	{
 		const ListDef& def = defOf(list);
+		if (def.ignoreIfAnticategoryActive && isWeatherSuppressed(def))
+			return IGNORED;
 		for (Active& active : m_active)
 		{
 			if (active.list != list)
@@ -356,11 +358,15 @@ public:
 
 	unsigned blockedMask() const
 	{
-		unsigned mask = 0;
+		unsigned mask = m_weatherAntiMask;
 		for (const Active& active : m_active)
 			mask |= active.antiMask;
 		return mask;
 	}
+
+	unsigned weatherAntiMask() const { return m_weatherAntiMask; }
+	void setWeatherAntiMask(unsigned mask) { m_weatherAntiMask = mask; }
+	bool isWeatherSuppressed(const ListDef& def) const { return (m_weatherAntiMask & categoryBit(def.category)) != 0; }
 
 	const std::vector<Active>& active() const { return m_active; }
 	std::vector<Active>& mutableActive() { return m_active; }
@@ -390,6 +396,7 @@ private:
 	}
 
 	std::vector<Active> m_active;
+	unsigned m_weatherAntiMask = 0;
 };
 
 struct TypedArmor
@@ -487,10 +494,11 @@ Totals totalsOf(const std::vector<const Stack*>& stacks, const Lookup& defOf)
 			continue;
 		for (const Active& active : stack->active())
 		{
-			if (std::find(seen.begin(), seen.end(), active.list) != seen.end())
+			const ListDef& def = defOf(active.list);
+			if (stack->isWeatherSuppressed(def) || std::find(seen.begin(), seen.end(), active.list) != seen.end())
 				continue;
 			seen.push_back(active.list);
-			totals.add(defOf(active.list));
+			totals.add(def);
 		}
 	}
 	return totals;

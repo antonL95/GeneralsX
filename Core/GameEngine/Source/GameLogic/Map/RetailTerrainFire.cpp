@@ -1,5 +1,6 @@
 #include "PreRTS.h"
 #include "GameLogic/RetailTerrainFire.h"
+#include "GameLogic/RetailTerrainRaster.h"
 
 #include <algorithm>
 #include <cmath>
@@ -324,28 +325,7 @@ void RetailTerrainFire::apply(TerrainLogic& terrain, const Coord3D& impact, cons
 	const Int coverRadius = std::max(std::abs(cx), std::abs(m_width - 1 - cx)) +
 		std::max(std::abs(cy), std::abs(m_height - 1 - cy)) + 1;
 	const Int radius = static_cast<Int>(WWMath::Ceil(std::min(edit.radius * (1.0f / CELL_SIZE), static_cast<Real>(coverRadius))));
-	Int halfWidth = 0;
-	Int halfHeight = radius;
-	Int error = 2 - 2 * radius;
-	while (true)
-	{
-		if (error + halfHeight > 0)
-		{
-			if (halfHeight == 0 && radius == 1)
-				++halfWidth;
-			row(cy + halfHeight, halfWidth);
-			if (halfHeight == 0)
-				break;
-			row(cy - halfHeight, halfWidth);
-			--halfHeight;
-			error += 1 - 2 * halfHeight;
-		}
-		if (error < halfWidth)
-		{
-			++halfWidth;
-			error += 1 + 2 * halfWidth;
-		}
-	}
+	RetailTerrain::visitCircleRows(cy, radius, row);
 }
 
 void RetailTerrainFire::update(UnsignedInt frame)

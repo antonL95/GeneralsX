@@ -89,6 +89,7 @@ struct WeaponNugget
 	Bool m_drainLife = FALSE;
 	Real m_drainLifeMultiplier = 0.0f;
 	SpecialPowerObjectFilter m_forceKillObjectFilter;
+	Bool m_hasForceKillObjectFilter = FALSE;
 	UnsignedInt m_damageIntervalFrames = 0;
 	UnsignedInt m_damageDurationFrames = 0;
 

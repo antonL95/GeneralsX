@@ -389,9 +389,11 @@ void dispatch(Object& object, const char* event, DispatchMode mode = DispatchMod
 				return false;
 
 			static const NameKeyType productionBonus = NAMEKEY("ProductionSpeedBonus");
+			static const NameKeyType cloudBreak = NAMEKEY("CloudBreakSpecialPower");
 			for (BehaviorModule** module = object.getBehaviorModules(); *module; ++module)
 			{
-				if ((*module)->getModuleNameKey() == productionBonus && (*module)->getSpecialPower() == caster)
+				const NameKeyType key = (*module)->getModuleNameKey();
+				if ((key == productionBonus || key == cloudBreak) && (*module)->getSpecialPower() == caster)
 					return true;
 			}
 			return false;

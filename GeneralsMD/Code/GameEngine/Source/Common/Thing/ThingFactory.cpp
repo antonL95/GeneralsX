@@ -369,6 +369,7 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 	{
 		ExperienceLevelStore::onObjectCreated(obj);
 		RetailCreationUpgrades::onObjectCreated(obj);
+		TheGameLogic->applyRetailWeatherModifier(*obj);
 		RetailBuildingEvents::created(*obj);
 		CreateAHeroSystem::applyToHero(obj);
 	}

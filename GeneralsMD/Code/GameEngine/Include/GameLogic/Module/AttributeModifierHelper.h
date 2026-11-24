@@ -42,6 +42,7 @@ public:
 	void removeCategories( UnsignedInt mask );
 	void removeTimed();
 	void clearAll();
+	void setWeatherAntiMask( UnsignedInt mask );
 
 	const AttributeModifierRules::Stack& getStack() const { return m_stack; }
 	const AttributeModifierRules::Totals& getTotals() const;
@@ -59,6 +60,7 @@ private:
 	void revokeUpgrades( Int list );
 	const AttributeModifierHelper* hordeHelper() const;
 	void refreshMembers();
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 	AttributeModifierRules::Stack m_stack;
 	std::vector<PendingUpgrade> m_pendingUpgrades;
@@ -78,6 +80,7 @@ private:
 namespace AttributeModifiers
 {
 const AttributeModifierRules::Totals* totalsOf( const Object* obj );
+AttributeModifierRules::Owner ownerOf( ObjectID objectID, NameKeyType moduleTag );
 AttributeModifierRules::Owner ownerOf( const Object* obj, NameKeyType moduleTag );
 Bool apply( Object* target, Int list, UnsignedInt durationFrames = AttributeModifierHelper::USE_LIST_DURATION, UnsignedInt antiMask = 0,
 	AttributeModifierRules::Owner owner = AttributeModifierRules::ANONYMOUS_OWNER );

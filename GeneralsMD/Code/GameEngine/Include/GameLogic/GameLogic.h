@@ -66,6 +66,7 @@ class WindowLayout;
 class TerrainLogic;
 class GhostObjectManager;
 class CommandButton;
+class SpecialPowerModuleData;
 class ToggleMountedSpecialAbilityUpdateModuleData;
 enum BuildableStatus CPP_11(: Int);
 
@@ -133,6 +134,8 @@ public:
 	void changeRetailWeather(Int weather, UnsignedInt duration);
 	Int getRetailWeather() const;
 	UnsignedInt getRetailWeatherEndFrame() const;
+	void setRetailWeatherModifier(const Object& source, const SpecialPowerModuleData& power);
+	void applyRetailWeatherModifier(Object& target);
 	UnsignedInt getCRC( Int mode = CRC_CACHED, AsciiString deepCRCFileName = AsciiString::TheEmptyString );		///< Returns the CRC
 
 	void setObjectIDCounter( ObjectID nextObjID ) { m_nextObjID = nextObjID; }
@@ -384,6 +387,19 @@ private:
 	UnsignedInt m_frame;																		///< Simulation frame number
 	Int m_retailWeather = WEATHER_NONE;
 	UnsignedInt m_retailWeatherEndFrame = 0;
+	struct WeatherModifier
+	{
+		ObjectID source = INVALID_ID;
+		Int player = -1;
+		AsciiString objectTemplate;
+		AsciiString moduleTag;
+		UnsignedInt endFrame = 0;
+	};
+	WeatherModifier m_weatherModifier;
+	const SpecialPowerModuleData* getRetailWeatherModifierData() const;
+	void applyRetailWeatherModifier(Object& target, const SpecialPowerModuleData& power);
+	void clearRetailWeatherModifier();
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 	// CRC cache system -----------------------------------------------------------------------------
 	UnsignedInt	m_CRC;																			///< Cache of previous CRC value

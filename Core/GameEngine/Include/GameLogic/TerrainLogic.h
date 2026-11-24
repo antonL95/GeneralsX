@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <map>
+#include <utility>
+
 #include "Common/GameMemory.h"
 #include "Common/Snapshot.h"
 #include "Common/STLTypedefs.h"
@@ -332,6 +335,9 @@ public:
 		Coord3D& position) const;
 	Int takeMapTreeBoxes(const Coord3D& position, Int capacity);
 	std::uint64_t harvestMapTrees(const Coord3D& origin, Real radius, const FXList* fx);
+	void paintRetailTaint(const Coord3D& position, Real radius, ObjectID owner);
+	ObjectID retailTaintOwner(Real x, Real y) const;
+	void removeRetailTaint(ObjectID owner);
 
 protected:
 
@@ -342,7 +348,9 @@ protected:
 
 	void xferMapTrees(Xfer* xfer);
 	void xferRetailBlocks(Xfer* xfer, Bool present);
+	void xferRetailTaint(Xfer* xfer);
 	RetailTerrainFire m_retailFire;
+	std::map<std::pair<Int, Int>, ObjectID> m_retailTaint;
 
 	/// Chunk parser callback.
  	static Bool parseWaypointDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);

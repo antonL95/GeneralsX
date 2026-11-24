@@ -58,6 +58,7 @@
 #include "GameLogic/Scripts.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/RetailTerrainRaster.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/BridgeBehavior.h"
 #include "GameLogic/Module/BridgeTowerBehavior.h"
@@ -977,6 +978,7 @@ void TerrainLogic::init()
 void TerrainLogic::reset()
 {
 	m_mapTrees.clear();
+	m_retailTaint.clear();
 	m_retailFire.reset();
 	m_mapTreesBeforeLegacyLoad.clear();
 	m_legacyMapTreesHaveLedger = FALSE;
@@ -1097,6 +1099,7 @@ void TerrainLogic::newMap( Bool saveGame )
 	m_mapTrees.clear();
 	m_mapTreesBeforeLegacyLoad.clear();
 	m_legacyMapTreesHaveLedger = FALSE;
+	m_retailTaint.clear();
 
 	// Set waypoint's z value, now that the height map is loaded.
 	for( Waypoint *way = m_waypointListHead; way; way = way->getNext() )
@@ -3063,10 +3066,93 @@ void TerrainLogic::crc( Xfer *xfer )
 	}
 }
 
+void TerrainLogic::paintRetailTaint(const Coord3D& position, Real radius, ObjectID owner)
+{
+	const Real cellSize = TheGlobalData->m_partitionCellSize;
+	if (!(radius >= 0.0f) || !std::isfinite(radius) || !(cellSize > 0.0f) || !std::isfinite(cellSize))
+		return;
+
+	Region3D extent;
+	getExtent(&extent);
+	const Real inverseCellSize = 1.0f / cellSize;
+	const Int maxX = std::max(0, static_cast<Int>(WWMath::Ceil((extent.hi.x - extent.lo.x) * inverseCellSize)) - 1);
+	const Int maxY = std::max(0, static_cast<Int>(WWMath::Ceil((extent.hi.y - extent.lo.y) * inverseCellSize)) - 1);
+	const Int centerX = static_cast<Int>(WWMath::Floor((position.x - extent.lo.x) * inverseCellSize));
+	const Int centerY = static_cast<Int>(WWMath::Floor((position.y - extent.lo.y) * inverseCellSize));
+	const Real cover = static_cast<Real>(std::max(std::abs(centerX), std::abs(maxX - centerX)) +
+		std::max(std::abs(centerY), std::abs(maxY - centerY)) + 1);
+	const auto edit = [&](Real worldRadius, ObjectID cellOwner)
+	{
+		const Int cellRadius = static_cast<Int>(WWMath::Ceil(std::min(worldRadius * inverseCellSize, cover)));
+		RetailTerrain::visitCircleRows(centerY, cellRadius, [&](Int y, Int halfWidth)
+		{
+			if (y < 0 || y > maxY)
+				return;
+			for (Int x = std::max(0, centerX - halfWidth); x <= std::min(maxX, centerX + halfWidth); ++x)
+			{
+				if (cellOwner == INVALID_ID)
+					m_retailTaint.erase({x, y});
+				else
+					m_retailTaint.insert_or_assign({x, y}, cellOwner);
+			}
+		});
+	};
+	edit(radius * 1.25f, INVALID_ID);
+	if (owner != INVALID_ID)
+		edit(radius, owner);
+}
+
+ObjectID TerrainLogic::retailTaintOwner(Real x, Real y) const
+{
+	const Real cellSize = TheGlobalData->m_partitionCellSize;
+	if (m_retailTaint.empty() || !(cellSize > 0.0f) || !std::isfinite(cellSize))
+		return INVALID_ID;
+	Region3D extent;
+	getExtent(&extent);
+	const Real inverseCellSize = 1.0f / cellSize;
+	const auto cell = m_retailTaint.find({static_cast<Int>(WWMath::Floor((x - extent.lo.x) * inverseCellSize)),
+		static_cast<Int>(WWMath::Floor((y - extent.lo.y) * inverseCellSize))});
+	return cell != m_retailTaint.end() ? cell->second : INVALID_ID;
+}
+
+void TerrainLogic::removeRetailTaint(ObjectID owner)
+{
+	std::erase_if(m_retailTaint, [owner](const auto& cell) { return cell.second == owner; });
+}
+
+void TerrainLogic::xferRetailTaint(Xfer* xfer)
+{
+	UnsignedInt count = static_cast<UnsignedInt>(m_retailTaint.size());
+	xfer->xferUnsignedInt(&count);
+	if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_retailTaint.clear();
+		for (UnsignedInt i = 0; i < count; ++i)
+		{
+			std::pair<Int, Int> cell;
+			ObjectID owner = INVALID_ID;
+			xfer->xferInt(&cell.first);
+			xfer->xferInt(&cell.second);
+			xfer->xferObjectID(&owner);
+			m_retailTaint.emplace(cell, owner);
+		}
+		return;
+	}
+	for (auto [cell, owner] : m_retailTaint)
+	{
+		Int x = cell.first;
+		Int y = cell.second;
+		xfer->xferInt(&x);
+		xfer->xferInt(&y);
+		xfer->xferObjectID(&owner);
+	}
+}
+
 void TerrainLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
-		{"terrain-fire", [this](Xfer* block) { m_retailFire.xfer(block); }, [this] { m_retailFire.prepareLegacyLoad(); }}
+		{"terrain-fire", [this](Xfer* block) { m_retailFire.xfer(block); }, [this] { m_retailFire.prepareLegacyLoad(); }},
+		{"terrain-taint", [this](Xfer* block) { xferRetailTaint(block); }, [this] { m_retailTaint.clear(); }}
 	});
 }
 

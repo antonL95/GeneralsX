@@ -131,6 +131,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/RubbleRiseUpdate.h
     Include/GameLogic/Module/AnimalAIUpdate.h
     Include/GameLogic/Module/FloodUpdate.h
+    Include/GameLogic/RetailTerrainRaster.h
     Include/GameLogic/Module/GiantBirdAIUpdate.h
     Include/Common/RetailFileLayers.h
     Include/Common/RetailAIKindOf.h

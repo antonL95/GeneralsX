@@ -1058,14 +1058,14 @@ void SpecialPowerModule::applyRotwkTrigger( const Coord3D *location )
 		AutoPickUpUpdate::hasEatingButton(self))
 		self->setPowerModelCondition(data->m_setModelCondition,
 			std::max(1u, SpecialAbilityUpdate::secondsToFrames(data->m_setModelConditionTime)));
-	if (data->m_changeWeather != GameLogic::WEATHER_NONE)
-		TheGameLogic->changeRetailWeather(data->m_changeWeather, data->m_weatherDuration);
 	if( data->m_triggerFX.isNotEmpty() && TheFXListStore )
 	{
 		const FXList *fx = TheFXListStore->findFXList( data->m_triggerFX.str() );
 		FXList::doFXPos( fx, location ? location : self->getPosition() );
 	}
-	if( data->m_attributeModifier.isNotEmpty() )
+	if (data->m_attributeModifierWeatherBased)
+		TheGameLogic->setRetailWeatherModifier(*self, *data);
+	else if( data->m_attributeModifier.isNotEmpty() )
 	{
 		const AttributeModifiers::Sides sides = data->m_targetAllSides ? AttributeModifiers::SIDES_ALL
 			: data->m_targetEnemy ? AttributeModifiers::SIDES_ENEMIES : AttributeModifiers::SIDES_ALLIES;
