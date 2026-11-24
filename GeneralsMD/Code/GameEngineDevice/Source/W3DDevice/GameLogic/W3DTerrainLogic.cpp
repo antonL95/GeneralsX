@@ -342,6 +342,11 @@ Real W3DTerrainLogic::getLayerHeight( Real x, Real y, PathfindLayerEnum layer, C
 				return bridgeHeight;	// Don't return bridge height if it's in the ground.
 			}
 		}
+		else if (clip && (pBridge = findBridgeLayerAt(&loc, layer, FALSE)) != nullptr &&
+			pBridge->getAuthoredRampIndex() >= 0 && TheAI->pathfinder()->isPointOnWall(&loc))
+		{
+			return TheAI->pathfinder()->getWallHeightAt(loc);
+		}
 	}
 
 	return height;
