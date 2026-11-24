@@ -1,0 +1,5 @@
+44 power-reveal - - 0
+45 create Player_2 MordorGorbag 0 2580,1332,0
+620 neutralstate * CaptureFlag 0
+1100 neutralstate * CaptureFlag 0
+1100 neutralstate * SignalFire 0

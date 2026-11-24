@@ -70,6 +70,7 @@
 #include "GameLogic/Module/RebuildHoleBehavior.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Module/SlaughterHordeContain.h"
+#include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptEngine.h"
@@ -445,6 +446,61 @@ Bool isRetailDefenseRecruit(const Object& object)
 	return !object.isKindOf(KINDOF_UNATTACKABLE) && !object.isKindOf(KINDOF_STRUCTURE) &&
 		(object.isKindOf(KINDOF_SHIP) || (!object.isKindOf(KINDOF_IMMOBILE) &&
 			(object.isKindOf(KINDOF_CAN_ATTACK) || object.isKindOf(KINDOF_HERO) || object.isKindOf(KINDOF_SUPPORT))));
+}
+
+Bool updateRetailFlagCapture(const std::vector<Object*>& owned, UnsignedInt frame, Int playerIndex, Bool trace)
+{
+	Object* capturer = nullptr;
+	Object* flag = nullptr;
+	const CommandButton* capture = nullptr;
+	Real closest = 0.0f;
+	for (Object* unit : owned)
+	{
+		const auto* ability = unit->findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING);
+		if (!ability)
+			continue;
+		if (ability->isActive())
+			return TRUE;
+		if (!unit->getAI() || !unit->getAI()->isIdle() || !unit->isMobile() || unit->isDisabled() || unit->getContainedBy())
+			continue;
+		const CommandSet* commands = retailCommands(*unit);
+		if (!commands)
+			continue;
+		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+		{
+			const CommandButton* button = commands->getCommandButton(slot);
+			const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
+			if (!power || button->getCommandType() != GUI_COMMAND_SPECIAL_POWER ||
+				power->getSpecialPowerType() != SPECIAL_INFANTRY_CAPTURE_BUILDING ||
+				button->getRequiredRank() > unit->getExperienceTracker()->getRank() ||
+				!HeroRoster::buttonUpgradesMet(button, unit->getControllingPlayer(), unit))
+				continue;
+			for (Object* target = TheGameLogic->getFirstObject(); target; target = target->getNextObject())
+			{
+				if (!target->isKindOf(KINDOF_CAPTUREFLAG) || target->isDestroyed() || unit->getRelationship(target) == ALLIES)
+					continue;
+				const Coord3D delta = *target->getPosition() - *unit->getPosition();
+				const Real distance = sqr(delta.x) + sqr(delta.y);
+				if (flag && std::make_tuple(distance, target->getID(), unit->getID()) >=
+					std::make_tuple(closest, flag->getID(), capturer->getID()))
+					continue;
+				if (!TheActionManager->canDoSpecialPowerAtObject(unit, target, CMD_FROM_AI, power, button->getOptions()))
+					continue;
+				capturer = unit;
+				flag = target;
+				capture = button;
+				closest = distance;
+			}
+		}
+	}
+	if (!capturer)
+		return FALSE;
+	capturer->doCommandButtonAtObject(capture, flag, CMD_FROM_AI);
+	const auto* ability = capturer->findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING);
+	const Bool active = ability && ability->isActive();
+	if (active && trace)
+		std::fprintf(stderr, "AI_FLAG_CAPTURE\t%u\t%d\t%d\t%d\n", frame, playerIndex, capturer->getID(), flag->getID());
+	return active;
 }
 
 struct RetailDefenseCluster
@@ -2597,8 +2653,6 @@ void AISkirmishPlayer::updateRetail()
 		if (!keep || offensiveBuildings.empty() || builders.empty() || retailTuning.disableBaseBuilding ||
 			!m_player->getCanBuildBase() || money->countMoney() + m_retailSavings < 1000)
 			return;
-		if (!canRunTargetless)
-			return;
 		const auto defense = std::find_if(m_retailTargets.begin(), m_retailTargets.end(), [&](const auto& target) {
 			return target.defendedStructure != INVALID_ID && teamCount(target) > 0;
 		});
@@ -2665,7 +2719,8 @@ void AISkirmishPlayer::updateRetail()
 			return;
 		}
 	};
-	buildForward();
+	if (canRunTargetless && !updateRetailFlagCapture(owned, frame, playerIndex, trace))
+		buildForward();
 	std::vector<std::pair<Object*, Bool>> wave;
 	for (Object* unit : soldiers)
 	{
