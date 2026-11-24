@@ -4572,6 +4572,7 @@ UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 	{
 		TheWeaponStore->xferRetailDelayedDamage(xferCRC);
 		TheWeaponStore->xferRetailBlocks(xferCRC, TRUE);
+		PolygonTrigger::xferCastleAreas(xferCRC, TRUE);
 	}
 	UnsignedInt seed = GetGameLogicRandomSeedCRC();
 	if (isInGameLogicUpdate())
@@ -5439,9 +5440,9 @@ void GameLogic::xfer( Xfer *xfer )
 
 	// version
 #if RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 17 : 10;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 18 : 10;
 #else
-	const XferVersion currentVersion = RetailFileLayers::enabled() ? 17 : 11;
+	const XferVersion currentVersion = RetailFileLayers::enabled() ? 18 : 11;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -5466,6 +5467,9 @@ void GameLogic::xfer( Xfer *xfer )
 	// when loading, we need to clean up bridges and get them ready for a load
 	if( xfer->getXferMode() == XFER_LOAD )
 		prepareLogicForObjectLoad();
+
+	if (version >= 18)
+		PolygonTrigger::xferCastleAreas(xfer, TRUE);
 
 	// object count
 	UnsignedInt objectCount = getObjectCount();
@@ -5603,7 +5607,8 @@ void GameLogic::xfer( Xfer *xfer )
 		// count the number of polygon triggers we have
 		UnsignedInt triggerCount = 0;
 		for( poly = PolygonTrigger::getFirstPolygonTrigger(); poly; poly = poly->getNext() )
-			triggerCount++;
+			if (!poly->isCastleArea())
+				triggerCount++;
 
 		// sanity count
 		UnsignedInt sanityTriggerCount = triggerCount;
@@ -5631,6 +5636,8 @@ void GameLogic::xfer( Xfer *xfer )
 
 			for( poly = PolygonTrigger::getFirstPolygonTrigger(); poly; poly = poly->getNext() )
 			{
+				if (poly->isCastleArea())
+					continue;
 
 				// write polygon ID
 				triggerID = poly->getID();

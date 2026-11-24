@@ -291,7 +291,8 @@ Object* HordeAIUpdate::updateOrder(Object* anchor, Object* target, Bool refresh)
 	const PolygonTrigger* area = m_order == AICMD_GUARD_AREA && m_guardArea >= 0
 		? PolygonTrigger::getPolygonTriggerByID(m_guardArea) : nullptr;
 	const Object* guardObject = m_order == AICMD_GUARD_OBJECT ? liveTarget(m_guardObject) : nullptr;
-	if ((m_order == AICMD_GUARD_OBJECT && !guardObject) || (m_order == AICMD_GUARD_AREA && !area))
+	if ((m_order == AICMD_GUARD_OBJECT && !guardObject) ||
+		(m_order == AICMD_GUARD_AREA && (!area || area->isRetired())))
 	{
 		m_order = NO_ORDER;
 		m_attackTarget = INVALID_ID;

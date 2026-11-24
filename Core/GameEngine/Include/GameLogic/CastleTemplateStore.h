@@ -7,6 +7,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 class AsciiString;
@@ -24,7 +25,16 @@ struct Member
 
 using Members = std::vector<Member>;
 
+using Perimeter = std::vector<std::pair<float, float>>;
+
+struct Camp
+{
+	Members members;
+	std::vector<Perimeter> perimeters;
+};
+
 inline constexpr std::size_t MAX_BODY_SIZE = 16 * 1024 * 1024;
+inline constexpr float MAX_OFFSET = 8192.0f * 10.0f;
 
 namespace Detail
 {
@@ -82,7 +92,7 @@ private:
 };
 }
 
-inline std::optional<Members> parse(std::span<const std::uint8_t> bytes, unsigned version)
+inline std::optional<Camp> parse(std::span<const std::uint8_t> bytes, unsigned version)
 {
 	if (version < 1 || version > 5)
 		return std::nullopt;
@@ -92,21 +102,20 @@ inline std::optional<Members> parse(std::span<const std::uint8_t> bytes, unsigne
 		Detail::Reader reader(bytes);
 		reader.skip(4);
 		const auto count = reader.count(version >= 4 ? 28 : 20);
-		Members members;
-		members.reserve(count);
+		Camp camp;
+		camp.members.reserve(count);
 		for (std::uint32_t i = 0; i < count; ++i)
 		{
 			reader.text();
 			const auto name = reader.text();
-			constexpr float maxOffset = 8192.0f * 10.0f;
 			constexpr float maxAngle = 64.0f;
 			if (name.find('\0') != std::string_view::npos)
 				return std::nullopt;
 			const Member member{std::string(name), reader.real(), reader.real(), reader.real(), reader.real()};
-			if (std::abs(member.offsetX) > maxOffset || std::abs(member.offsetY) > maxOffset ||
-				std::abs(member.offsetZ) > maxOffset || std::abs(member.angle) > maxAngle)
+			if (std::abs(member.offsetX) > MAX_OFFSET || std::abs(member.offsetY) > MAX_OFFSET ||
+				std::abs(member.offsetZ) > MAX_OFFSET || std::abs(member.angle) > maxAngle)
 				return std::nullopt;
-			members.push_back(member);
+			camp.members.push_back(member);
 			if (version >= 4)
 				reader.skip(8);
 		}
@@ -119,11 +128,30 @@ inline std::optional<Members> parse(std::span<const std::uint8_t> bytes, unsigne
 				if (version >= 5)
 					reader.text();
 				const auto points = reader.count(pointSize);
-				reader.skip(points * pointSize);
+				auto& perimeter = camp.perimeters.emplace_back();
+				perimeter.reserve(points);
+				for (std::uint32_t j = 0; j < points; ++j)
+				{
+					float x, y;
+					if (version == 2)
+					{
+						x = static_cast<float>(std::bit_cast<std::int32_t>(reader.word()));
+						y = static_cast<float>(std::bit_cast<std::int32_t>(reader.word()));
+						reader.word();
+					}
+					else
+					{
+						x = reader.real();
+						y = reader.real();
+					}
+					if (std::abs(x) > MAX_OFFSET || std::abs(y) > MAX_OFFSET)
+						return std::nullopt;
+					perimeter.emplace_back(x, y);
+				}
 			}
 		}
 		if (reader.remaining() == 0)
-			return members;
+			return camp;
 	}
 	catch (const Detail::Reader::InvalidChunk&)
 	{
@@ -132,6 +160,6 @@ inline std::optional<Members> parse(std::span<const std::uint8_t> bytes, unsigne
 	return std::nullopt;
 }
 
-const Members* find(const AsciiString& camp);
+const Camp* find(const AsciiString& camp);
 void reset();
 }

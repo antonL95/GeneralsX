@@ -175,7 +175,7 @@ void AICommandParmsStorage::doXfer(Xfer *xfer)
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		if (triggerName.isNotEmpty()) {
-			m_polygon = TheTerrainLogic->getTriggerAreaByName(triggerName);
+			m_polygon = PolygonTrigger::findByName(triggerName, TRUE);
 		}
 	}
 
@@ -7032,6 +7032,8 @@ StateReturnType AIGuardState::update()
 	{
 		return STATE_FAILURE; // We actually already exited.
 	}
+	if (const auto* area = m_guardMachine->getAreaToGuard(); area && area->isRetired())
+		return STATE_SUCCESS;
 
 	// if all of our weapons are out of ammo, can't attack.
 	// (this can happen for units which never auto-reload, like the Raptor)
@@ -7655,12 +7657,13 @@ StateReturnType AIAttackAreaState::update()
 		m_nextEnemyScanTime = now + ENEMY_SCAN_RATE;
 
 		AIUpdateInterface *ai = owner->getAI();
-		if (ai->getAreaToGuard() == nullptr)
+		const PolygonTrigger* area = ai->getAreaToGuard();
+		if (!area || area->isRetired())
 			return STATE_FAILURE;
 
 		const AttackPriorityInfo *info = nullptr;
 		info = ai->getAttackInfo();
-		PartitionFilterPolygonTrigger polyFilter(ai->getAreaToGuard());
+		PartitionFilterPolygonTrigger polyFilter(area);
 
 		// do NOT do line of sight check - we want to find everything
 		Object *victim = TheAI->findClosestEnemy( owner, 9999.9f, AI::CAN_ATTACK, info, &polyFilter );

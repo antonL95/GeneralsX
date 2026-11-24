@@ -49,8 +49,8 @@ Bytes makeChunk(unsigned version, std::string_view second = "Pad")
 			if (version >= 5)
 				writeString(bytes, name);
 			writeWord(bytes, 1);
-			writeWord(bytes, 0);
-			writeWord(bytes, 0);
+			writeWord(bytes, version == 2 ? std::bit_cast<std::uint32_t>(std::int32_t{-4}) : std::bit_cast<std::uint32_t>(-4.0f));
+			writeWord(bytes, version == 2 ? 8u : std::bit_cast<std::uint32_t>(8.0f));
 			if (version == 2)
 				writeWord(bytes, 0);
 		}
@@ -65,14 +65,21 @@ TEST(CastleTemplateTest, ReadsAllVersionsAndPreservesMemberOrder)
 	{
 		const auto result = CastleTemplates::parse(makeChunk(version), version);
 		ASSERT_TRUE(result) << version;
-		ASSERT_EQ(result->size(), 2u);
-		EXPECT_EQ((*result)[0].templateName, "Keep");
-		const auto& pad = (*result)[1];
+		ASSERT_EQ(result->members.size(), 2u);
+		EXPECT_EQ(result->members[0].templateName, "Keep");
+		const auto& pad = result->members[1];
 		EXPECT_EQ(pad.templateName, "Pad");
 		EXPECT_EQ(pad.offsetX, 4.0f);
 		EXPECT_EQ(pad.offsetY, -8.0f);
 		EXPECT_EQ(pad.offsetZ, 2.0f);
 		EXPECT_EQ(pad.angle, 0.5f);
+		ASSERT_EQ(result->perimeters.size(), version == 1 ? 0u : 2u);
+		for (const auto& perimeter : result->perimeters)
+		{
+			ASSERT_EQ(perimeter.size(), 1u);
+			EXPECT_EQ(perimeter.front().first, -4.0f);
+			EXPECT_EQ(perimeter.front().second, 8.0f);
+		}
 	}
 }
 
@@ -103,8 +110,8 @@ TEST(CastleTemplateTest, KeepsEmptyTemplateNamesForTheUnpackToSkip)
 {
 	const auto result = CastleTemplates::parse(makeChunk(5, ""), 5);
 	ASSERT_TRUE(result);
-	ASSERT_EQ(result->size(), 2u);
-	EXPECT_EQ((*result)[0].templateName, "Keep");
-	EXPECT_TRUE((*result)[1].templateName.empty());
-	EXPECT_EQ((*result)[1].offsetY, -8.0f);
+	ASSERT_EQ(result->members.size(), 2u);
+	EXPECT_EQ(result->members[0].templateName, "Keep");
+	EXPECT_TRUE(result->members[1].templateName.empty());
+	EXPECT_EQ(result->members[1].offsetY, -8.0f);
 }

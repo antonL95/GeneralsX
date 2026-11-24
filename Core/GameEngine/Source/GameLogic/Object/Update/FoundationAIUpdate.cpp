@@ -136,7 +136,7 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player,
 {
 	Object* foundation = getObject();
 	if (!what || !canBuildOn(player) || !what->isKindOf(KINDOF_STRUCTURE) ||
-		(!prebuilt && !player->canBuild(what)) || !commandSetOffers(*foundation, *what))
+		(!prebuilt && (!player->canBuild(what) || !commandSetOffers(*foundation, *what))))
 		return nullptr;
 #if RTS_ZEROHOUR
 	if (!prebuilt && !player->canBuildMoreOfType(what))

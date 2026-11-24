@@ -4732,6 +4732,9 @@ void AIUpdateInterface::privateGuardObject( Object *objectToGuard, GuardMode gua
  */
 void AIUpdateInterface::privateGuardArea( const PolygonTrigger *areaToGuard, GuardMode guardMode, CommandSourceType cmdSource )
 {
+	if (!areaToGuard || areaToGuard->isRetired())
+		return;
+
 	if (getObject()->isMobile() == FALSE)
 		return;
 
@@ -5761,7 +5764,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		if (triggerName.isNotEmpty()) {
-			m_areaToGuard = TheTerrainLogic->getTriggerAreaByName(triggerName);
+			m_areaToGuard = PolygonTrigger::findByName(triggerName, TRUE);
 		}
 	}
 

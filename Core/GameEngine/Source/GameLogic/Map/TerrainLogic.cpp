@@ -1618,12 +1618,7 @@ Bool TerrainLogic::isPurposeOfPath( Waypoint *pWay, AsciiString label )
 //-------------------------------------------------------------------------------------------------
 PolygonTrigger *TerrainLogic::getTriggerAreaByName( AsciiString name )
 {
-	for (PolygonTrigger* pTrig = PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext()) {
-		const AsciiString& trigName = pTrig->getTriggerName();
-		if (name == trigName)
-			return pTrig;
-	}
-	return nullptr;
+	return PolygonTrigger::findByName(name);
 }
 
 

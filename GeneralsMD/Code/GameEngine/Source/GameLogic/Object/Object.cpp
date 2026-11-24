@@ -2894,7 +2894,7 @@ void Object::updateTriggerAreaFlags()
 	// Update the flags, and remove any trigger areas that this object isn't inside.
 	for (Int i=0; i<m_numTriggerAreasActive; i++)
 	{
-		if (!m_triggerInfo[j].isInside)
+		if (!m_triggerInfo[i].isInside)
 			continue;
 		m_triggerInfo[j].entered = false;
 		m_triggerInfo[j].exited = false;
@@ -3099,7 +3099,7 @@ ExitInterface *Object::getObjectExitInterface() const
 //-------------------------------------------------------------------------------------------------
 /** Checks the object against trigger areas when the position changes. */
 //-------------------------------------------------------------------------------------------------
-void Object::setTriggerAreaFlagsForChangeInPosition()
+void Object::setTriggerAreaFlagsForChangeInPosition(Bool refresh)
 {
 	// projectiles cannot trigger areas. (jkmcd)
 	// neither can inert objects, like the radar ping, etc. (jkmcd)
@@ -3111,18 +3111,18 @@ void Object::setTriggerAreaFlagsForChangeInPosition()
 	iPos.x = REAL_TO_INT(pos.x);
 	iPos.y = REAL_TO_INT(pos.y);
 	iPos.z = 0; // Trigger areas compare on xy only.
-	if (m_iPos.x == iPos.x && m_iPos.y == iPos.y)
+	if (!refresh && m_iPos.x == iPos.x && m_iPos.y == iPos.y)
 	{
 		return; // didn't move enough to change integer position.
 	}
 
-	if (!isKindOf(KINDOF_IMMOBILE)) {
+	if (!refresh && !isKindOf(KINDOF_IMMOBILE)) {
 		if (isKindOf(KINDOF_INFANTRY) || isKindOf(KINDOF_VEHICLE) ) {
 			TheGameClient->notifyTerrainObjectMoved(this);
 		}
 	}
 
-	if (getAIUpdateInterface())
+	if (!refresh && getAIUpdateInterface())
 	{
 		TheAI->pathfinder()->updatePos(this, getPosition());
 	}
@@ -3135,7 +3135,9 @@ void Object::setTriggerAreaFlagsForChangeInPosition()
 	Int i;
 	for (i=0; i<m_numTriggerAreasActive; i++)
 	{
-		if (!m_triggerInfo[i].pTrigger->pointInTrigger(m_iPos))
+		const PolygonTrigger* trigger = m_triggerInfo[i].pTrigger;
+		if (trigger && (!refresh || trigger->isCastleArea()) &&
+			!trigger->pointInTrigger(trigger->isCastleArea() ? iPos : m_iPos))
 		{
 			m_triggerInfo[i].isInside = false;
 			m_triggerInfo[i].exited = true;
@@ -3149,10 +3151,13 @@ void Object::setTriggerAreaFlagsForChangeInPosition()
 		}
 	}
 
-	m_iPos = iPos;
+	if (!refresh)
+		m_iPos = iPos;
 
 	for (const PolygonTrigger *pTrig = PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext())
 	{
+		if (pTrig->isRetired() || (refresh && !pTrig->isCastleArea()))
+			continue;
 		Bool skip = false;
 		for (i = 0; i < m_numTriggerAreasActive; i++)
 		{
@@ -3165,7 +3170,7 @@ void Object::setTriggerAreaFlagsForChangeInPosition()
 		}
 		if (skip)
 			continue;
-		if (pTrig->pointInTrigger(m_iPos))
+		if (pTrig->pointInTrigger(iPos))
 		{
 			if (m_numTriggerAreasActive < MAX_TRIGGER_AREA_INFOS)
 			{
@@ -5072,7 +5077,7 @@ void Object::xfer( Xfer *xfer )
 			// empty names, see John A. for more info
 			//
 			//if (triggerName.isNotEmpty())
-			  m_triggerInfo[i].pTrigger = TheTerrainLogic->getTriggerAreaByName(triggerName);
+			  m_triggerInfo[i].pTrigger = PolygonTrigger::findByName(triggerName, TRUE);
 		}
 		xfer->xferByte(&m_triggerInfo[i].entered);
 		xfer->xferByte(&m_triggerInfo[i].exited);

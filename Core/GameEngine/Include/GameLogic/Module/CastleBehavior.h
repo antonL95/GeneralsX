@@ -27,7 +27,7 @@ public:
 	struct PreBuiltEntry
 	{
 		AsciiString name;
-		Int count;
+		Int plotIndex;
 	};
 
 	CastleBehaviorModuleData();
@@ -74,6 +74,7 @@ public:
 
 	CreateModuleInterface* getCreate() override { return this; }
 	void onCreate() override;
+	void onDelete() override;
 	void onBuildComplete() override;
 	Bool shouldDoOnBuildComplete() const override { return !m_buildComplete; }
 	UpdateSleepTime update() override;

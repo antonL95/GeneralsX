@@ -703,7 +703,8 @@ protected:
 	virtual Real calculateHeightAboveTerrain() const override;		// Calculates the actual height above terrain.  Doesn't use cache.
 
 	void updateTriggerAreaFlags();
-	void setTriggerAreaFlagsForChangeInPosition();
+	friend class PolygonTrigger;
+	void setTriggerAreaFlagsForChangeInPosition(Bool refresh = FALSE);
 
 	/// Look and unlook are protected.  They should be called from Object::reasonToLook.  Like Capture, or death.
 	void look();

@@ -28,6 +28,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/ObjectIter.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/CastleUpgrade.h"
@@ -67,7 +68,7 @@ void CastleBehaviorModuleData::parsePreBuiltEntry(INI* ini, void*, void* store, 
 {
 	PreBuiltEntry entry;
 	entry.name = ini->getNextAsciiString();
-	entry.count = INI::scanInt(ini->getNextToken());
+	entry.plotIndex = INI::scanInt(ini->getNextToken());
 	static_cast<std::vector<PreBuiltEntry>*>(store)->push_back(std::move(entry));
 }
 
@@ -111,6 +112,12 @@ CastleBehavior::CastleBehavior(Thing* thing, const ModuleData* data) : UpdateMod
 }
 
 CastleBehavior::~CastleBehavior() = default;
+
+void CastleBehavior::onDelete()
+{
+	if (m_unpacked)
+		PolygonTrigger::retireCastleAreas(getObject()->getID());
+}
 
 void CastleBehavior::onCreate()
 {
@@ -368,6 +375,7 @@ void CastleBehavior::killEverything()
 void CastleBehavior::repack()
 {
 	Object* packed = getObject();
+	PolygonTrigger::retireCastleAreas(packed->getID());
 	const Object* keep = TheGameLogic->findObjectByID(m_keep);
 	if (keep && keep->getName().isNotEmpty())
 		TheScriptEngine->transferObjectName(keep->getName(), packed);
@@ -428,24 +436,25 @@ void CastleBehavior::unpack(Bool charge)
 	if (player->getMoney()->countMoney() < cost)
 		return;
 
-	const CastleTemplates::Members* members = nullptr;
+	const CastleTemplates::Camp* camp = nullptr;
 	try
 	{
-		members = CastleTemplates::find(faction->camp);
+		camp = CastleTemplates::find(faction->camp);
 	}
 	catch (ErrorCode)
 	{
 		std::fprintf(stderr, "Castle %s: cannot read the castle templates, nothing unpacked\n", faction->camp.str());
 		return;
 	}
-	if (!members || members->empty())
+	if (!camp || camp->members.empty())
 		return;
 
+	const auto& members = camp->members;
 	std::vector<const ThingTemplate*> templates;
-	templates.reserve(members->size());
-	for (std::size_t i = 0; i < members->size(); ++i)
+	templates.reserve(members.size());
+	for (std::size_t i = 0; i < members.size(); ++i)
 	{
-		const auto& member = (*members)[i];
+		const auto& member = members[i];
 		const ThingTemplate* definition = nullptr;
 		if (!member.templateName.empty() && member.templateName.size() < AsciiString::MAX_LEN)
 			definition = TheThingFactory->findTemplate(member.templateName.c_str(), FALSE);
@@ -469,20 +478,20 @@ void CastleBehavior::unpack(Bool charge)
 
 	const Matrix3D transform = *packed->getTransformMatrix();
 	const Real orientation = packed->getOrientation();
-	m_members.reserve(members->size());
+	m_members.reserve(members.size());
 	TheAI->pathfinder()->removeObjectFromPathfindMap(packed);
 	packed->setStatus(MAKE_OBJECT_STATUS_MASK3(OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_NO_COLLISIONS, OBJECT_STATUS_MASKED));
 	if (Drawable* drawable = packed->getDrawable())
 		drawable->setDrawableHidden(TRUE);
 	m_unpacked = TRUE;
 
-	for (std::size_t i = 0; i < members->size(); ++i)
+	for (std::size_t i = 0; i < members.size(); ++i)
 	{
 		const ThingTemplate* definition = templates[i];
 		if (!definition)
 			continue;
 
-		const auto& member = (*members)[i];
+		const auto& member = members[i];
 		Vector3 position;
 		Matrix3D::Transform_Vector(transform, Vector3(member.offsetX, member.offsetY, member.offsetZ), &position);
 		const Coord3D ground = {position.X, position.Y, TheTerrainLogic->getGroundHeight(position.X, position.Y)};
@@ -529,6 +538,30 @@ void CastleBehavior::unpack(Bool charge)
 		}
 	}
 
+	Bool registeredArea = FALSE;
+	for (std::size_t i = 0; i < camp->perimeters.size(); ++i)
+	{
+		const auto& points = camp->perimeters[i];
+		if (points.size() < 3)
+			continue;
+		auto* area = newInstance(PolygonTrigger)(static_cast<Int>(points.size()));
+		AsciiString name;
+		name.format("Dynamic_%s_of_id_%d_at_index_%d", packed->getTemplate()->getName().str(),
+			packed->getID(), static_cast<Int>(i));
+		area->setTriggerName(name);
+		area->setCastleAreaOwner(packed->getID());
+		for (const auto& [x, y] : points)
+		{
+			Vector3 world;
+			Matrix3D::Transform_Vector(transform, Vector3(x, y, 0.0f), &world);
+			area->addPoint({static_cast<Int>(world.X), static_cast<Int>(world.Y), 0});
+		}
+		PolygonTrigger::addPolygonTrigger(area);
+		registeredArea = TRUE;
+	}
+	if (registeredArea)
+		PolygonTrigger::refreshObjectMembership();
+
 	if (data->m_maxCastleRadius > 0.0f)
 	{
 		std::vector<ObjectID> tainted;
@@ -562,22 +595,38 @@ void CastleBehavior::unpack(Bool charge)
 			packed->setName(AsciiString::TheEmptyString);
 		}
 	}
-	if (!charge)
+	if (!charge && !data->m_preBuiltList.empty())
 	{
+		std::vector<FoundationAIUpdate*> plots;
+		std::vector<FoundationAIUpdate*> defensePlots;
+		for (ObjectID id : m_members)
+		{
+			const Object* member = TheGameLogic->findObjectByID(id);
+			if (auto* plot = member ? FoundationAIUpdate::find(*member) : nullptr)
+			{
+				auto& list = member->isKindOf(KINDOF_BASE_DEFENSE_FOUNDATION) ? defensePlots : plots;
+				list.push_back(plot);
+			}
+		}
+
 		for (const auto& entry : data->m_preBuiltList)
 		{
-			if (entry.count <= 0)
-				continue;
 			const ThingTemplate* type = TheThingFactory->findTemplate(entry.name, FALSE);
 			if (!type)
 				continue;
-			Int remaining = entry.count;
-			for (ObjectID id : m_members)
+			const auto& choices = type->isKindOf(KINDOF_FS_BASE_DEFENSE) && !defensePlots.empty() ? defensePlots : plots;
+			if (choices.empty())
+				continue;
+			if (entry.plotIndex == -2)
 			{
-				Object* member = TheGameLogic->findObjectByID(id);
-				FoundationAIUpdate* plot = member ? FoundationAIUpdate::find(*member) : nullptr;
-				if (plot && plot->construct(type, player, TRUE) && --remaining == 0)
-					break;
+				for (auto* plot : choices)
+					if (plot->construct(type, player, TRUE))
+						break;
+			}
+			else
+			{
+				const auto index = std::min(static_cast<std::size_t>(entry.plotIndex), choices.size() - 1);
+				choices[index]->construct(type, player, TRUE);
 			}
 		}
 	}

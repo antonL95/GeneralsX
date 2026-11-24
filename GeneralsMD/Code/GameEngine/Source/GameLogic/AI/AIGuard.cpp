@@ -349,7 +349,7 @@ void AIGuardMachine::xfer( Xfer *xfer )
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		if (triggerName.isNotEmpty()) {
-			m_areaToGuard = TheTerrainLogic->getTriggerAreaByName(triggerName);
+			m_areaToGuard = PolygonTrigger::findByName(triggerName, TRUE);
 		}
 	}
 

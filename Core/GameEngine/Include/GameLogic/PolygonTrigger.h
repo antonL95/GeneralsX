@@ -34,6 +34,7 @@
 #pragma once
 
 #include "Common/GameMemory.h"
+#include "Common/GameType.h"
 #include "Common/Snapshot.h"
 #include "Common/STLTypedefs.h"
 #include <array>
@@ -102,6 +103,7 @@ protected:
 	Bool				m_selected;
 	std::unique_ptr<StandingWaterSettings> m_standingWater;
 	std::optional<UnsignedInt> m_bfmeTriggerAreaId;
+	std::optional<ObjectID> m_castleAreaOwner;
 
 	static PolygonTrigger* ThePolygonTriggerListPtr;
 	static Int s_currentID; ///< Current id for new triggers.
@@ -122,6 +124,10 @@ public:
 public:
 	static PolygonTrigger *getFirstPolygonTrigger() {return ThePolygonTriggerListPtr;}
 	static PolygonTrigger *getPolygonTriggerByID(Int triggerID);
+	static PolygonTrigger* findByName(const AsciiString& name, Bool includeRetired = FALSE);
+	static void refreshObjectMembership();
+	static void retireCastleAreas(ObjectID owner);
+	static void xferCastleAreas(Xfer* xfer, Bool present);
 	static Bool ParsePolygonTriggersDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	/// Writes Triggers Info
 	static void WritePolygonTriggersDataChunk(DataChunkOutput &chunkWriter);
@@ -129,6 +135,9 @@ public:
 
 public:
 	static void addPolygonTrigger(PolygonTrigger *pTrigger);
+	void setCastleAreaOwner(ObjectID owner) { m_castleAreaOwner = owner; }
+	Bool isCastleArea() const { return m_castleAreaOwner.has_value(); }
+	Bool isRetired() const { return m_castleAreaOwner == INVALID_ID; }
 	static void assignImportedIDs(const std::vector<PolygonTrigger *> &polygons);
 	static void installImportedPolygons(const std::vector<PolygonTrigger *> &polygons);
 	void setStandingWater(StandingWaterSettings settings);

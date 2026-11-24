@@ -29,9 +29,14 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/DataChunk.h"
+#include "Common/Errors.h"
 #include "Common/MapObject.h"
 #include "Common/MapReaderWriterInfo.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/Xfer.h"
+#include "GameLogic/CastleTemplateStore.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/Object.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/TerrainLogic.h"
 #include <set>
@@ -291,7 +296,7 @@ void PolygonTrigger::updateBounds()	const
 	}
 	m_boundsNeedsUpdate = 0;
 	Real halfWidth = (m_bounds.hi.x - m_bounds.lo.x) / 2.0f;
-	Real halfHeight = (m_bounds.hi.y + m_bounds.lo.y) / 2.0f;
+	Real halfHeight = (m_bounds.hi.y + (isCastleArea() ? -m_bounds.lo.y : m_bounds.lo.y)) / 2.0f;
 
 	m_radius = WWMath::SqrtOrigin(halfHeight*halfHeight + halfWidth*halfWidth);
 }
@@ -308,8 +313,95 @@ void PolygonTrigger::addPolygonTrigger(PolygonTrigger *pTrigger)
 	}
 	pTrigger->m_nextPolygonTrigger = ThePolygonTriggerListPtr;
 	ThePolygonTriggerListPtr = pTrigger;
-	if (pTrigger->m_standingWater && pTrigger->m_triggerID >= s_currentID)
+	if ((pTrigger->m_standingWater || pTrigger->isCastleArea()) && pTrigger->m_triggerID >= s_currentID)
 		s_currentID = pTrigger->m_triggerID + 1;
+}
+
+PolygonTrigger* PolygonTrigger::findByName(const AsciiString& name, Bool includeRetired)
+{
+	for (auto* polygon = getFirstPolygonTrigger(); polygon; polygon = polygon->getNext())
+		if ((includeRetired || !polygon->isRetired()) && polygon->getTriggerName() == name)
+			return polygon;
+	return nullptr;
+}
+
+void PolygonTrigger::retireCastleAreas(ObjectID owner)
+{
+	Bool changed = FALSE;
+	for (auto* polygon = getFirstPolygonTrigger(); polygon; polygon = polygon->getNext())
+	{
+		if (polygon->m_castleAreaOwner == owner)
+		{
+			polygon->m_castleAreaOwner = INVALID_ID;
+			AsciiString retired;
+			retired.format("%s (retired %d)", polygon->getTriggerName().str(), polygon->getID());
+			polygon->setTriggerName(retired);
+			changed = TRUE;
+		}
+	}
+	if (changed)
+		refreshObjectMembership();
+}
+
+void PolygonTrigger::refreshObjectMembership()
+{
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		if (!object->isDestroyed())
+			object->setTriggerAreaFlagsForChangeInPosition(TRUE);
+}
+
+void PolygonTrigger::xferCastleAreas(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	std::vector<PolygonTrigger*> areas;
+	if (!loading)
+	{
+		for (auto* polygon = getFirstPolygonTrigger(); polygon; polygon = polygon->getNext())
+			if (polygon->isCastleArea())
+				areas.push_back(polygon);
+		if (areas.empty() && xfer->getXferMode() == XFER_CRC)
+			return;
+	}
+
+	RetailSaveBlocks::transferSection(xfer, loading, present,
+	{
+		{ "castle-perimeter-areas", [&](Xfer* x)
+		{
+			UnsignedInt count = static_cast<UnsignedInt>(areas.size());
+			x->xferUnsignedInt(&count);
+			if (count > CastleTemplates::MAX_BODY_SIZE / sizeof(ICoord3D))
+				throw ERROR_CORRUPT_FILE_FORMAT;
+			for (UnsignedInt i = 0; i < count; ++i)
+			{
+				PolygonTrigger* polygon = loading ? nullptr : areas[count - 1 - i];
+				Int id = polygon ? polygon->getID() : 0;
+				ObjectID owner = polygon ? *polygon->m_castleAreaOwner : INVALID_ID;
+				AsciiString name = polygon ? polygon->getTriggerName() : AsciiString::TheEmptyString;
+				Int points = polygon ? polygon->getNumPoints() : 0;
+				x->xferInt(&id);
+				x->xferObjectID(&owner);
+				x->xferAsciiString(&name);
+				x->xferInt(&points);
+				if (loading)
+				{
+					if (id <= 0 || id == INT_MAX || getPolygonTriggerByID(id) ||
+						points < 3 || static_cast<std::size_t>(points) > CastleTemplates::MAX_BODY_SIZE / sizeof(ICoord3D))
+						throw ERROR_CORRUPT_FILE_FORMAT;
+					polygon = newInstance(PolygonTrigger)(points, id);
+					polygon->setTriggerName(name);
+					polygon->setCastleAreaOwner(owner);
+					addPolygonTrigger(polygon);
+				}
+				for (Int j = 0; j < points; ++j)
+				{
+					ICoord3D point = loading ? ICoord3D{} : *polygon->getPoint(j);
+					x->xferICoord3D(&point);
+					if (loading)
+						polygon->addPoint(point);
+				}
+			}
+		}, {} }
+	});
 }
 
 void PolygonTrigger::setStandingWater(StandingWaterSettings settings)
@@ -503,6 +595,8 @@ Real PolygonTrigger::getRadius()	const
 */
 Bool PolygonTrigger::pointInTrigger(ICoord3D &point) const
 {
+	if (isRetired())
+		return FALSE;
 	if (m_boundsNeedsUpdate) {
 		updateBounds();
 	}
@@ -531,7 +625,7 @@ Bool PolygonTrigger::pointInTrigger(ICoord3D &point) const
 		Int dy = pt2.y-pt1.y;
 		Int dx = pt2.x-pt1.x;
 
-		const Real numerator = (m_standingWater || m_bfmeTriggerAreaId) ? static_cast<Real>(Int64(dx) * (point.y - pt1.y))
+		const Real numerator = (m_standingWater || m_bfmeTriggerAreaId || isCastleArea()) ? static_cast<Real>(Int64(dx) * (point.y - pt1.y))
 			: static_cast<Real>(dx * (point.y - pt1.y));
 		Real intersectionX = pt1.x + numerator / static_cast<Real>(dy);
 		if (intersectionX >= point.x) {

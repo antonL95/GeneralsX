@@ -13,14 +13,14 @@ namespace CastleTemplates
 {
 namespace
 {
-std::map<std::string, Members> s_camps;
+std::map<std::string, Camp> s_camps;
 
 Bool readTemplates(DataChunkInput& file, DataChunkInfo* info, void* userData)
 {
 	if (info->dataSize < 8 || static_cast<std::size_t>(info->dataSize) > MAX_BODY_SIZE)
 		return FALSE;
 
-	auto& result = *static_cast<std::optional<Members>*>(userData);
+	auto& result = *static_cast<std::optional<Camp>*>(userData);
 	if (result)
 		return FALSE;
 
@@ -30,7 +30,7 @@ Bool readTemplates(DataChunkInput& file, DataChunkInfo* info, void* userData)
 	return result.has_value();
 }
 
-std::optional<Members> load(const AsciiString& path)
+std::optional<Camp> load(const AsciiString& path)
 {
 	CachedFileInputStream stream;
 	if (!stream.open(path))
@@ -38,7 +38,7 @@ std::optional<Members> load(const AsciiString& path)
 
 	DataChunkInput file(&stream);
 	file.registerParser("CastleTemplates", AsciiString::TheEmptyString, readTemplates);
-	std::optional<Members> result;
+	std::optional<Camp> result;
 	if (!file.parse(&result))
 		return std::nullopt;
 
@@ -47,7 +47,7 @@ std::optional<Members> load(const AsciiString& path)
 	return result;
 }
 
-const Members* reportFailure(const AsciiString& path)
+const Camp* reportFailure(const AsciiString& path)
 {
 	if (!INIAudit::isEnabled())
 		throw ERROR_CORRUPT_FILE_FORMAT;
@@ -56,7 +56,7 @@ const Members* reportFailure(const AsciiString& path)
 }
 }
 
-const Members* find(const AsciiString& camp)
+const Camp* find(const AsciiString& camp)
 {
 	std::string key(camp.str());
 	if (key.empty() || key == "." || key == ".." || key.size() > 255 ||
@@ -73,7 +73,7 @@ const Members* find(const AsciiString& camp)
 
 	AsciiString path;
 	path.format("Bases\\%s\\%s.bse", camp.str(), camp.str());
-	std::optional<Members> result;
+	std::optional<Camp> result;
 	try
 	{
 		result = load(path);
