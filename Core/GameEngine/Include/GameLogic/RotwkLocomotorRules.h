@@ -17,10 +17,10 @@ struct Authored
 	float liftDamagedFraction = -1.0f;
 	float burningDeathRadius = 0.0f;
 	float chargeSpeedFraction = 1.0f;
-	float backingUpSpeedFraction = 0.75f;
+	float backingUpSpeedFraction = -1.0f;
 	float backingUpDistanceMin = 0.0f;
 	float backingUpDistanceMax = 0.0f;
-	float backingUpAngle = 0.5f;
+	float backingUpAngle = std::numeric_limits<float>::max();
 	float walkDistance = 0.0f;
 	float accelDecelTrigger = -1.0f;
 	float turnThreshold = FULL_TURN / 24.0f;

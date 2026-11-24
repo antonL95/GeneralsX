@@ -1209,7 +1209,9 @@ Real Locomotor::getMaxSpeedOverride() const
 
 Real Locomotor::getBackingUpSpeed() const
 {
-	return std::max(0.0f, m_template->getActualMaxSpeed() * m_template->m_rotwk.backingUpSpeedFraction);
+	const Real authoredFraction = m_template->m_rotwk.backingUpSpeedFraction;
+	const Real fraction = authoredFraction >= 0.0f ? authoredFraction : 0.003f;
+	return std::max(0.0f, m_template->getActualMaxSpeed() * fraction);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2325,37 +2327,33 @@ void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* p
 	const Real goalHeading = dist > 0.001f ? WWMath::Atan2Origin(dy, dx) : facing;
 	const Real relAngle = stdAngleDiff(goalHeading, facing);
 
-	Bool canBackUp = m_template->m_canMoveBackward;
-	if (canBackUp)
-	{
-		const Real startDx = m_retailStartMovePos.x - pos.x;
-		const Real startDy = m_retailStartMovePos.y - pos.y;
-		const Real distFromStart = WWMath::SqrtfOrigin(sqr(startDx) + sqr(startDy));
-		if (distFromStart > m_template->m_rotwk.backingUpDistanceMin &&
-			onPathDistToGoal > m_template->m_rotwk.backingUpDistanceMax)
-			canBackUp = FALSE;
-	}
-
-	const Real backingAngleThreshold = m_template->m_rotwk.backingUpAngle * PI;
-	const Bool moveBackwards = canBackUp && fabs(relAngle) > backingAngleThreshold;
+	const auto& rules = m_template->m_rotwk;
+	const Real startDx = std::abs(m_retailStartMovePos.x - pos.x);
+	const Real startDy = std::abs(m_retailStartMovePos.y - pos.y);
+	const Real distFromStart = std::max(startDx, startDy) + 0.25f * std::min(startDx, startDy);
+	const Bool insideDistanceWindow = distFromStart <= rules.backingUpDistanceMin ||
+		onPathDistToGoal <= rules.backingUpDistanceMax;
+	const Bool moveBackwards = insideDistanceWindow && rules.backingUpAngle < 1.0f &&
+		std::abs(relAngle) > rules.backingUpAngle * PI;
 	setFlag(MOVING_BACKWARDS, moveBackwards);
 	if (moveBackwards)
 		obj->setModelConditionState(MODELCONDITION_BACKING_UP);
 	else
 		obj->clearModelConditionState(MODELCONDITION_BACKING_UP);
 
-	const Real turnHeading = moveBackwards ? normalizeAngle(goalHeading + PI) : goalHeading;
-	Coord3D turnTarget{pos.x + Cos(turnHeading) * 1000.0f, pos.y + Sin(turnHeading) * 1000.0f, pos.z};
-	physics->setTurning(rotateObjAroundLocoPivot(obj, turnTarget, getMaxTurnRate(bdt)));
-
 	setFlag(IS_BRAKING, FALSE);
 	if (maxSpeed <= 0.0f)
 	{
 		physics->scrubVelocity2D(0.0f);
 		obj->clearModelConditionState(MODELCONDITION_MOVING);
+		updateRetailTurnConditions(obj, 0.0f);
 		updateRetailGait(obj, onPathDistToGoal, 0.0f, FALSE, 0.0f);
 		return;
 	}
+
+	const Real turnHeading = moveBackwards ? normalizeAngle(goalHeading + PI) : goalHeading;
+	Coord3D turnTarget{pos.x + Cos(turnHeading) * 1000.0f, pos.y + Sin(turnHeading) * 1000.0f, pos.z};
+	physics->setTurning(rotateObjAroundLocoPivot(obj, turnTarget, getMaxTurnRate(bdt)));
 
 	const Coord3D& velocity = *physics->getVelocity();
 	const Real curSpeed = WWMath::SqrtfOrigin(sqr(velocity.x) + sqr(velocity.y));
@@ -2363,16 +2361,7 @@ void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* p
 	const Real braking = getBraking();
 	Real targetSpeed = desiredSpeed;
 
-	if (moveBackwards)
-	{
-		if (m_template->m_rotwk.backingUpStopWhenTurning)
-		{
-			const ModelConditionFlags& conds = obj->getLogicModelConditions();
-			if (conds.test(MODELCONDITION_TURN_LEFT) || conds.test(MODELCONDITION_TURN_RIGHT))
-				targetSpeed = 0.0f;
-		}
-	}
-	else
+	if (!moveBackwards)
 	{
 		Real angleForSlowdown = relAngle;
 		if (curSpeed <= accel)
@@ -2386,6 +2375,16 @@ void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* p
 	if (!getFlag(NO_SLOW_DOWN_AS_APPROACHING_DEST) &&
 		onPathDistToGoal < calcSlowDownDist(curSpeed, getMinSpeed(), braking))
 		targetSpeed = getMinSpeed();
+
+	if (moveBackwards)
+	{
+		if (rules.backingUpSpeedFraction >= 0.0f)
+			targetSpeed = std::min(targetSpeed, getBackingUpSpeed());
+		const ModelConditionFlags& conds = obj->getLogicModelConditions();
+		if (rules.backingUpStopWhenTurning &&
+			(conds.test(MODELCONDITION_TURN_LEFT) || conds.test(MODELCONDITION_TURN_RIGHT)))
+			targetSpeed = 0.0f;
+	}
 
 	Real nextSpeed = curSpeed + std::clamp(targetSpeed - curSpeed, -braking, accel);
 	nextSpeed = std::max(0.0f, std::min(nextSpeed, dist));
