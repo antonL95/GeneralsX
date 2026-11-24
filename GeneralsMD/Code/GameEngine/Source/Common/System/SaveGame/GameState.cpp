@@ -1637,6 +1637,9 @@ void GameState::xferSaveData( Xfer *xfer, SnapshotType which, Bool* hasHordeCond
 		Int blockSize;
 		Bool done = FALSE;
 		SnapshotBlock *blockInfo;
+		Bool loadedInfo = FALSE;
+		Bool loadedMap = FALSE;
+		Bool loadedLogic = FALSE;
 
 		// read all data blocks in the file
 		while( done == FALSE )
@@ -1704,6 +1707,9 @@ void GameState::xferSaveData( Xfer *xfer, SnapshotType which, Bool* hasHordeCond
 
 					// read block end
 					xfer->endBlock();
+					loadedInfo |= blockInfo->snapshot == this;
+					loadedMap |= blockInfo->snapshot == TheGameStateMap;
+					loadedLogic |= blockInfo->snapshot == TheGameLogic;
 
 				}
 				catch( ... )
@@ -1719,6 +1725,9 @@ void GameState::xferSaveData( Xfer *xfer, SnapshotType which, Bool* hasHordeCond
 
 		}
 
+		if (which == SNAPSHOT_SAVELOAD && (!loadedInfo ||
+			(m_gameInfo.saveFileType == SAVE_FILE_TYPE_NORMAL && (!loadedMap || !loadedLogic))))
+			throw SC_INVALID_DATA;
 	}
 
 }
