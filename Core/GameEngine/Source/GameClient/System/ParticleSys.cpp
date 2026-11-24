@@ -715,6 +715,11 @@ void Particle::doWindMotion(Real timeScale)
 		// integrate the wind motion into the position
 		m_pos.x += (Cos( windAngle ) * windForceStrength);
 		m_pos.y += (Sin( windAngle ) * windForceStrength);
+		if (windTemplate && windTemplate->getTurbulenceAmplitude() > 0.0f)
+		{
+			const Real phase = static_cast<Real>(m_personality) + m_pos.z * windTemplate->getTurbulenceFrequency();
+			m_pos.x += (Cos(phase) + Sin(phase)) * windTemplate->getTurbulenceAmplitude() * m_size * timeScale;
+		}
 
 	}
 

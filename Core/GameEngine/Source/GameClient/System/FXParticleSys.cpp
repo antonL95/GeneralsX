@@ -169,6 +169,8 @@ void ParticleSystemTemplate::resetForFXDefinition()
 		m_modelSizeDamping[axis].setRange(1.0f, 1.0f, GameClientRandomVariable::CONSTANT);
 	}
 	m_windStrength = DEFAULT_WIND_STRENGTH;
+	m_turbulenceAmplitude = 0.0f;
+	m_turbulenceFrequency = 0.0f;
 	m_windFullStrengthDistance = DEFAULT_WIND_FULL_STRENGTH_DISTANCE;
 	m_windZeroStrengthDistance = DEFAULT_WIND_ZERO_STRENGTH_DISTANCE;
 	m_cylinderOffset.zero();
@@ -456,8 +458,8 @@ const FieldParse ParticleSystemTemplate::m_fxWindFieldParseTable[] =
 	{ "WindPingPongStartAngleMax", INI::parseReal,                            nullptr, offsetof( ParticleSystemTemplate, m_windMotionStartAngleMax ) },
 	{ "WindPingPongEndAngleMin",   INI::parseReal,                            nullptr, offsetof( ParticleSystemTemplate, m_windMotionEndAngleMin ) },
 	{ "WindPingPongEndAngleMax",   INI::parseReal,                            nullptr, offsetof( ParticleSystemTemplate, m_windMotionEndAngleMax ) },
-	{ "TurbulenceAmplitude",       ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "TurbulenceFrequency",       ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "TurbulenceAmplitude",       INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_turbulenceAmplitude ) },
+	{ "TurbulenceFrequency",       INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_turbulenceFrequency ) },
 	{ nullptr,                     nullptr,                                   nullptr, 0 }
 };
 

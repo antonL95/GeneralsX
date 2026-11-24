@@ -630,6 +630,8 @@ public:
 	};
 	GpuDrawSettings getGpuDrawSettings(const Particle &particle, Real sizeScale) const;
 	Real getWindStrength() const { return m_windStrength; }
+	Real getTurbulenceAmplitude() const { return m_turbulenceAmplitude; }
+	Real getTurbulenceFrequency() const { return m_turbulenceFrequency; }
 	Real getWindFullStrengthDistance() const { return m_windFullStrengthDistance; }
 	Real getWindZeroStrengthDistance() const { return m_windZeroStrengthDistance; }
 	const Coord3D *getCylinderOffset() const { return &m_cylinderOffset; }
@@ -685,6 +687,8 @@ protected:
 
 	Bool m_isRenderable;
 	Real m_windStrength;
+	Real m_turbulenceAmplitude = 0.0f;
+	Real m_turbulenceFrequency = 0.0f;
 	struct LightningWave
 	{
 		GameClientRandomVariable amplitude;
