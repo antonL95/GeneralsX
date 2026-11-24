@@ -1,0 +1,91 @@
+210 create Player_1 MordorSpellBook 0 3500,125,0
+210 create Player_1 AngmarSpellBook 0 3500,125,0
+210 create Player_1 IsengardSpellBook 0 3500,125,0
+210 create Player_1 RohanSpellBook 0 3500,125,0
+210 create Player_1 Pkg35Probe 0 2480,540,0
+215 pkg35-cast Player_1 MordorSpellBook 0 SpellBookDarkness 3500 125
+216 weatherstate - - 0
+230 pkg35-count Player_1 - 0 DarknessCaster
+231 modapply Player_1 Pkg35Probe 0 Pkg35Debuff
+231 pkg35-mods Player_1 Pkg35Probe 0 Pkg35Debuff
+232 pkg35-cast Player_1 AngmarSpellBook 0 SpellBookThreatOfMordor
+235 modapply Player_1 Pkg35Probe 0 Pkg35BlockedAttempt
+236 pkg35-mods Player_1 Pkg35Probe 0 SpellBookMarchToWar
+244 pkg35-mods Player_1 Pkg35Probe 0 SpellBookMarchToWar
+250 create Player_1 Pkg35Probe 1 2510,540,0
+251 pkg35-mods Player_1 Pkg35Probe 1 SpellBookMarchToWar
+275 create Player_1 Pkg35Ignition 0 2511,451,0
+280 pkg35-cast Player_1 IsengardSpellBook 0 SpellBookFreezingRain 3500 125
+283 weatherstate - - 0
+288 terrain-fire-state Player_1 Pkg35Ignition 0 - 2605 455 0
+310 pkg35-count Player_1 - 0 DarknessCaster
+310 pkg35-count Player_1 - 0 FreezingRainCaster
+310 pkg35-count Player_1 - 0 FreezingRainWeatherTrigger
+310 pkg35-count neutral - 0 RainFX
+310 pkg35-mods Player_1 Pkg35Probe 0 SpellBookMarchToWar
+310 terrain-fire-state Player_1 Pkg35Ignition 0 - 2605 455 0
+310 pkg35-mods Player_1 Pkg35Probe 0 Pkg35Debuff
+310 pkg35-mods Player_1 Pkg35Probe 0 Pkg35BlockedAttempt
+313 create PlyrCreeps Pkg35Probe 0 2540,540,0
+365 pkg35-mods PlyrCreeps Pkg35Probe 0 FreezingRainDebuff
+420 pkg35-cast Player_1 RohanSpellBook 0 SpellBookRohanCloudBreak 3500 125
+421 weatherstate - - 0
+430 pkg35-count Player_1 - 0 FreezingRainCaster
+430 pkg35-count neutral - 0 RainFX
+450 create Player_1 Pkg35FloodCaster 0 3130,780,0
+451 reveal Player_1 Pkg35FloodCaster 0
+460 power Player_1 Pkg35FloodCaster 0 SpecialAbilityPersonalFlood
+460 aim Player_1 Pkg35FloodCaster 0 120,0
+515 pkg35-mods PlyrCreeps Pkg35Probe 0 FreezingRainDebuff
+525 pkg35-count Player_1 - 0 ElessarOathbreakerFlood
+525 pkg35-count Player_1 - 0 FloodKotD
+550 create Player_1 PartTheHeavens 0 3520,160,0
+551 create Player_1 Pkg35EnvironmentControl 0 3530,160,0
+701 pkg35-present Player_1 - 0 PartTheHeavens
+763 pkg35-present Player_1 - 0 PartTheHeavens
+763 pkg35-present Player_1 - 0 Pkg35EnvironmentControl
+850 pkg35-count Player_1 - 0 ElessarOathbreakerFlood
+860 pkg35-present Player_1 - 0 PartTheHeavens
+1320 weatherstate - - 0
+1321 pkg35-count Player_1 - 0 DarknessCaster
+1330 pkg35-cast Player_1 AngmarSpellBook 0 SpellBookWhiteWinter 3500 125
+1355 pkg35-count Player_1 - 0 WhiteWinterCaster
+1355 pkg35-count Player_1 - 0 WhiteWinterWeatherTrigger
+1355 pkg35-count neutral - 0 WhiteWinterFX
+1390 pkg35-cast Player_1 AngmarSpellBook 0 SpellBookThreatOfMordor
+1391 pkg35-mods Player_1 Pkg35Probe 0 SpellBookMarchToWar
+1430 pkg35-cast Player_1 AngmarSpellBook 0 SpellBookHaradSunstroke 3500 125
+1431 weatherstate - - 0
+1431 pkg35-mods Player_1 Pkg35Probe 0 SpellBookMarchToWar
+1431 pkg35-mods Player_1 Pkg35Probe 0 Pkg35Debuff
+1440 pkg35-count Player_1 - 0 WhiteWinterCaster
+1440 pkg35-count neutral - 0 WhiteWinterFX
+1500 destroy Player_1 Pkg35Probe 1
+1500 destroy Player_1 Pkg35Probe 0
+1500 destroy PlyrCreeps Pkg35Probe 0
+2030 weatherstate - - 0
+2040 pkg35-cast Player_1 MordorSpellBook 0 SpellBookDarkness 3500 125
+2060 pkg35-count Player_1 - 0 DarknessCaster
+2065 pkg35-cast Player_1 RohanSpellBook 0 SpellBookRohanCloudBreak 3500 125
+2080 pkg35-count Player_1 - 0 DarknessCaster
+2965 weatherstate - - 0
+2966 pkg35-count Player_1 - 0 DarknessCaster
+2968 create Player_1 Pkg35LocalCall 0 3500,125,0
+2968 create Player_1 Pkg35NoWeatherBurningSands 0 3500,125,0
+2970 create Player_1 Pkg35Probe 0 2480,540,0
+2971 modapply Player_1 Pkg35Probe 0 Pkg35Debuff
+2975 pkg35-cast Player_1 AngmarSpellBook 0 SpellBookThreatOfMordor
+2976 weatherstate - - 0
+2976 pkg35-mods Player_1 Pkg35Probe 0 SpellBookMarchToWar
+2976 pkg35-mods Player_1 Pkg35Probe 0 Pkg35Debuff
+4774 pkg35-mods Player_1 Pkg35Probe 0 SpellBookMarchToWar
+4775 pkg35-mods Player_1 Pkg35Probe 0 SpellBookMarchToWar
+4775 pkg35-mods Player_1 Pkg35Probe 0 Pkg35Debuff
+4780 pkg35-cast Player_1 Pkg35LocalCall 0 SpellBookThreatOfMordor
+4781 pkg35-mods Player_1 Pkg35Probe 0 SpellBookMarchToWar
+4782 create Player_1 Pkg35Probe 1 2510,540,0
+4783 pkg35-mods Player_1 Pkg35Probe 1 SpellBookMarchToWar
+4790 pkg35-cast Player_1 Pkg35NoWeatherBurningSands 0 SpellBookHaradSunstroke 3500 125
+4791 weatherstate - - 0
+4791 pkg35-mods Player_1 Pkg35Probe 0 SpellBookMarchToWar
+4791 pkg35-present Player_1 - 0 SunflareSunbeam

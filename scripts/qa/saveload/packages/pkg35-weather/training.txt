@@ -1,0 +1,17 @@
+218 create Player_1 Pkg35TaintBook 0 3500,125,0
+218 create Player_1 Pkg35TaintBook 1 3600,125,0
+226 pkg35-cast Player_1 Pkg35TaintBook 0 SpellBookIsengardTaint 3500 125
+227 pkg35-taint - - 0 Player_1:IsengardTaintLand:0 3500 125
+227 pkg35-taint - - 0 - 3500 400
+232 pkg35-cast Player_1 Pkg35TaintBook 1 SpellBookIsengardTaint 3600 125
+236 pkg35-taint - - 0 Player_1:IsengardTaintLand:0 3310 125
+236 pkg35-taint - - 0 - 3360 125
+236 pkg35-taint - - 0 Player_1:IsengardTaintLand:1 3500 125
+244 pkg35-taint - - 0 Player_1:IsengardTaintLand:1 3500 125
+248 destroy Player_1 IsengardTaintLand 0
+249 pkg35-taint - - 0 - 3310 125
+249 pkg35-taint - - 0 Player_1:IsengardTaintLand:0 3500 125
+258 destroy Player_1 IsengardTaintLand 0
+259 pkg35-taint - - 0 - 3500 125
+259 destroy Player_1 Pkg35TaintBook 1
+259 destroy Player_1 Pkg35TaintBook 0
