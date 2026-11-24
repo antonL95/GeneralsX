@@ -31,4 +31,41 @@ check() {
             END { exit !(turn && overlap && scales && smoothing) }
         ' "$log" || return 1
     done
+    for frame in 325 345; do
+        covers "$frame" || continue
+        awk -v frame="$frame" '
+            $1 == "TEST" && $2 == "steering" && $3 == frame && $4 == "P63StoreScorpion" {
+                print
+                speed = substr($9, 10) + 0
+                if (frame == 325)
+                    measured = speed > 0 && speed < 1 && $15 == "accel=1"
+                else
+                    measured = speed > 1 && $15 == "accel=0"
+            }
+            END { exit !measured }
+        ' "$log" || return 1
+    done
+    if covers 353 && covers 355; then
+        awk '
+            $1 == "TEST" && $2 == "steering" && $3 >= 353 && $3 <= 355 {
+                print
+                speed = substr($9, 10) + 0
+                facing = substr($6, 8) + 0
+                if (speed <= 1.1 || (facing >= -0.12 && facing <= 0.12))
+                    next
+                highSpeedTurn = $13 == "leftHS=1" || $14 == "rightHS=1"
+                if ($4 == "P63StoreKaradd") {
+                    karadd = 1
+                    unexpected = unexpected || highSpeedTurn
+                }
+                if ($4 == "P63StoreTurnControl" && highSpeedTurn)
+                    control = 1
+                if ($4 == "P63StoreThresholdControl") {
+                    threshold = 1
+                    unexpected = unexpected || highSpeedTurn
+                }
+            }
+            END { exit !(karadd && control && threshold && !unexpected) }
+        ' "$log" || return 1
+    fi
 }
