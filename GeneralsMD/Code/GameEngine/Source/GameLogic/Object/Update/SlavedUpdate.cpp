@@ -415,11 +415,15 @@ UpdateSleepTime SlavedUpdate::update()
 			data->m_guardPositionOffset.y != 0.0f || data->m_guardPositionOffset.z != 0.0f;
 		const Bool outsideGuardRange = guardRange > 0 &&
 			ThePartitionManager->getDistanceSquared(me, master, FROM_CENTER_3D) > sqr(guardRange);
+		const Coord3D* goal = myAI->getGoalPosition();
+		const Real reach = guardRange + MAX(CLOSE_ENOUGH, data->m_guardWanderRange);
+		const Bool goalAwayFromPost = goal &&
+			sqr(goal->x - retailPinned.x) + sqr(goal->y - retailPinned.y) > sqr(reach);
 		const Bool needsGuardOrder = myAI->isIdle()
 			? (guardRange > 0 || hasOffset) &&
 				(ThePartitionManager->getDistanceSquared(me, &retailPinned, FROM_CENTER_3D) > CLOSE_ENOUGH_SQR ||
 					outsideGuardRange)
-			: outsideGuardRange && myAI->getCurrentVictim();
+			: outsideGuardRange && (myAI->getCurrentVictim() || goalAwayFromPost);
 		if (needsGuardOrder)
 		{
 			endRepair();
