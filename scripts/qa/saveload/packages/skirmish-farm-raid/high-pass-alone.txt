@@ -1,7 +1,7 @@
 44 power-reveal - - 0
-45 create Player_1 SkirmishRaidFarm 0 2180,3050,0
-45 create Player_2 SkirmishRaidHorde 0 1940,3100,0
-45 create Player_2 SkirmishRaidHorde 1 1950,3150,0
+45 create Player_1 SkirmishRaidFarm 0 2740,3070,0
+45 create Player_2 SkirmishRaidHorde 0 2510,2910,0
+45 create Player_2 SkirmishRaidHorde 1 2530,2960,0
 80 skirmish-tactic-attack Player_2 SkirmishRaidHorde 0 Player_1:SkirmishRaidFarm:0
 80 skirmish-tactic-attack Player_2 SkirmishRaidHorde 1 Player_1:SkirmishRaidFarm:0
 81 skirmish-tactic-attack Player_2 SkirmishRaidHorde 0 Player_1:SkirmishRaidFarm:0

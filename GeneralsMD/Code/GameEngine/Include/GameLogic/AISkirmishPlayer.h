@@ -155,6 +155,7 @@ protected:
 		std::array<ObjectID, 2> escorts = {INVALID_ID, INVALID_ID};
 	};
 	RetailFlagSquad m_retailFlagSquad;
+	UnsignedInt m_retailFlagRetryFrame = 0;
 	Bool updateRetailFlagCapture(const std::vector<Object*>& owned, UnsignedInt frame, Bool canStart, Bool trace);
 	struct RetailFarmRaid
 	{
@@ -167,6 +168,16 @@ protected:
 	RetailFarmRaid m_retailFarmRaid;
 	Bool updateRetailFarmRaid(const std::vector<Object*>& soldiers, const Object* keep, Int phase,
 		UnsignedInt frame, Bool canStart, Bool trace);
+	UnsignedInt m_retailRoamNextFrame = 0;
+	Bool updateRetailRoamingDefense(const std::vector<Object*>& soldiers, const std::vector<Object*>& resourceBuildings,
+		const Object& keep, UnsignedInt frame, Bool trace);
+	struct RetailLumberMill
+	{
+		ObjectID builder = INVALID_ID;
+		ObjectID site = INVALID_ID;
+		UnsignedInt nextFrame = 0;
+	};
+	RetailLumberMill m_retailLumberMill;
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	UnsignedInt m_retailLastFarmFrame = 0;
 	UnsignedInt m_retailSavings = 0;

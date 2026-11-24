@@ -1,0 +1,6 @@
+45 create Player_2 SkirmishRoamFarm 0 2740,3070,0
+45 create Player_2 SkirmishRoamFarm 1 1940,3100,0
+45 create Player_2 SkirmishRoamHorde 0 2510,2910,0
+124 skirmish-tactic-advance Player_2 SkirmishRoamHorde 0 Player_2:SkirmishRoamFarm:0
+200 skirmish-tactic-advance Player_2 SkirmishRoamHorde 0 Player_2:SkirmishRoamFarm:0
+201 skirmish-tactic-advance Player_2 SkirmishRoamHorde 0 Player_2:SkirmishRoamFarm:0

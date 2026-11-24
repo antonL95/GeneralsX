@@ -527,7 +527,7 @@ Int retailRaidWeight(const Object& building, const Coord3D& center, const Coord3
 	return std::max(5, static_cast<Int>((std::max(5000.0f, routeLength) + fromBase - fromTeam) * resourceWeight * 0.01f));
 }
 
-Object* chooseRetailRaidBuilding(std::vector<std::pair<Int, Object*>>& targets)
+Object* chooseRetailRaidBuilding(std::vector<std::pair<Int, Object*>>& targets, Bool weighted)
 {
 	if (targets.empty())
 		return nullptr;
@@ -536,6 +536,8 @@ Object* chooseRetailRaidBuilding(std::vector<std::pair<Int, Object*>>& targets)
 			return a.first > b.first;
 		return a.second->getID() < b.second->getID();
 	});
+	if (!weighted)
+		return targets[GameLogicRandomValue(0, static_cast<Int>(targets.size()) - 1)].second;
 	if (targets.size() == 1 || GameLogicRandomValue(0, 3) != 0)
 		return targets.front().second;
 	Int total = 0;
@@ -715,6 +717,121 @@ Object* constructRetailBuildingAt(Object& builder, const ThingTemplate& type, Co
 		return nullptr;
 	point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
 	return builder.getAI()->getDozerAIInterface()->construct(&type, &point, angle, player, FALSE);
+}
+
+struct RetailLumberGrove
+{
+	Coord3D anchor;
+	Coord3D tree;
+};
+
+std::vector<RetailLumberGrove> findRetailLumberGroves(const Coord3D* home, const std::vector<Object*>& farms,
+	const std::vector<Object*>& mills)
+{
+	std::vector<RetailLumberGrove> groves;
+	const auto addGrove = [&](const Coord3D& anchor, size_t minimumTrees) {
+		Coord3D tree{};
+		if (!TheTerrainLogic->findNearestHarvestTree(anchor, 400.0f, {}, tree) ||
+			std::any_of(mills.begin(), mills.end(), [&](const Object* mill) {
+				return tacticalDistanceSquared(tree, *mill->getPosition()) < sqr(300.0f);
+			}))
+			return;
+		std::vector<Coord3D> counted{tree};
+		Coord3D otherTree{};
+		while (counted.size() < minimumTrees && TheTerrainLogic->findNearestHarvestTree(tree, 300.0f, counted, otherTree))
+			counted.push_back(otherTree);
+		if (counted.size() == minimumTrees)
+			groves.push_back({anchor, tree});
+	};
+	if (home)
+	{
+		const Coord3D offsets[] = {{500.0f, 0, 0}, {-500.0f, 0, 0}, {0, 500.0f, 0}, {0, -500.0f, 0}};
+		for (const Coord3D& offset : offsets)
+			addGrove(*home + offset, 3);
+	}
+	if (groves.empty())
+		for (const Object* farm : farms)
+		{
+			const Coord3D& anchor = *farm->getPosition();
+			if (std::none_of(mills.begin(), mills.end(), [&](const Object* mill) {
+				return tacticalDistanceSquared(anchor, *mill->getPosition()) < sqr(300.0f);
+			}))
+				addGrove(anchor, 4);
+		}
+	return groves;
+}
+
+Object* placeRetailLumberMill(Object& builder, const ThingTemplate& mill, const RetailLumberGrove& grove, const Coord3D* home)
+{
+	Coord3D direction = grove.anchor - grove.tree;
+	const Real length = tacticalDistance(grove.anchor, grove.tree);
+	if (length > 0.0f)
+		direction.scale(1.0f / length);
+	Coord3D approach = direction;
+	approach.scale(50.0f - std::min(length, 300.0f));
+	Coord3D point = grove.anchor + approach;
+	constexpr Real baseClearance = 500.0f;
+	if (home && tacticalDistanceSquared(point, *home) < sqr(baseClearance))
+	{
+		direction = point - *home;
+		direction.z = 0.0f;
+		const Real distance = WWMath::SqrtfOrigin(direction.lengthSqr());
+		if (distance > 0.0f)
+		{
+			direction.scale(1.0f / distance);
+			Coord3D offset = direction;
+			offset.scale(550.0f);
+			point = *home + offset;
+		}
+	}
+	const auto trySite = [&](const Coord3D& position) -> Object* {
+		if (home && tacticalDistanceSquared(position, *home) < sqr(baseClearance))
+			return nullptr;
+		Coord3D tree{};
+		if (!TheTerrainLogic->findNearestHarvestTree(position, 300.0f, {}, tree))
+			return nullptr;
+		return constructRetailBuildingAt(builder, mill, position);
+	};
+	Coord3D step = direction;
+	step.scale(45.0f);
+	if (home && tacticalDistanceSquared(point + step, *home) < sqr(baseClearance))
+		step = -step;
+	if (!step.is(0.0f))
+	{
+		Coord3D candidate = point;
+		for (Int i = 0; i < 7; ++i)
+		{
+			candidate += step;
+			if (Object* site = trySite(candidate))
+				return site;
+		}
+	}
+	for (Int i = 0; i < 7; ++i)
+	{
+		const Real angle = GameLogicRandomValueReal(0.0f, 6.283185307f);
+		const Real radius = GameLogicRandomValueReal(40.0f, 200.0f);
+		const Coord3D candidate = {point.x + WWMath::CosTrig(angle) * radius, point.y + WWMath::SinTrig(angle) * radius, point.z};
+		if (Object* site = trySite(candidate))
+			return site;
+	}
+	return nullptr;
+}
+
+const ThingTemplate* retailLumberMillOffer(Object& builder, const ThingTemplate& planned)
+{
+	const CommandSet* set = retailCommands(builder);
+	if (!set)
+		return nullptr;
+	for (Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++i)
+	{
+		const CommandButton* button = set->getCommandButton(i);
+		const ThingTemplate* type = button ? button->getThingTemplate() : nullptr;
+		if (type && type->isEquivalentTo(&planned) && button->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT &&
+			button->getRequiredRank() <= builder.getExperienceTracker()->getRank() &&
+			HeroRoster::buttonUpgradesMet(button, builder.getControllingPlayer(), &builder))
+			return type;
+	}
+	return nullptr;
 }
 
 Bool placeRetailBuilding(Object& builder, const ThingTemplate& type, const Coord3D& center)
@@ -1852,8 +1969,9 @@ Bool AISkirmishPlayer::updateRetailFlagCapture(const std::vector<Object*>& owned
 				ai->aiIdle(CMD_FROM_AI);
 		}
 		m_retailFlagSquad = {};
+		m_retailFlagRetryFrame = frame + GameLogicRandomValue(20 * LOGICFRAMES_PER_SECOND, 90 * LOGICFRAMES_PER_SECOND);
 	}
-	if (!canStart)
+	if (!canStart || frame < m_retailFlagRetryFrame)
 		return FALSE;
 	Object* capturer = nullptr;
 	Object* flag = nullptr;
@@ -1945,18 +2063,26 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 		return FALSE;
 	};
 	const Object* previousTarget = TheGameLogic->findObjectByID(raid.target);
-	if (previousTarget && isRetailRaidBuilding(*previousTarget) && m_player->getRelationship(previousTarget->getTeam()) == ENEMIES)
+	const Bool targetHeld = previousTarget && isRetailRaidBuilding(*previousTarget) &&
+		m_player->getRelationship(previousTarget->getTeam()) == ENEMIES;
+	if (raid.issuedFrame != 0)
 	{
 		for (ObjectID id : raid.members)
 		{
-			const Object* unit = TheGameLogic->findObjectByID(id);
+			Object* unit = TheGameLogic->findObjectByID(id);
 			if (!unit || unit->isEffectivelyDead() || unit->getControllingPlayer() != m_player)
 				continue;
 			const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
-			const AIUpdateInterface* ai = unit->getAI();
-			if (horde ? horde->isExecutingPlannerOrder(raid.target, raid.issuedFrame)
-				: ai && ai->isExecutingRetailPlannerOrder(raid.target, raid.issuedFrame))
+			AIUpdateInterface* ai = unit->getAI();
+			const Bool executing = horde ? horde->isExecutingPlannerOrder(raid.target, raid.issuedFrame)
+				: ai && ai->isExecutingRetailPlannerOrder(raid.target, raid.issuedFrame);
+			if (!executing)
+				continue;
+			if (targetHeld)
 				return TRUE;
+			ai->aiIdle(CMD_FROM_AI);
+			if (previousTarget)
+				m_retailObjectives.erase({id, raid.target, previousTarget->getTeam()->getID()});
 		}
 	}
 	if ((!canStart && !raid.issuedFrame) || frame < raid.nextFrame)
@@ -2019,15 +2145,18 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 			candidates.push_back(object);
 	}
 	const Waypoint* start = retailPlayerStart(*enemy);
-	const Coord3D* enemyPosition = enemyBase && isRetailTacticVisible(*enemyBase, m_player->getPlayerIndex())
-		? enemyBase->getPosition() : start ? start->getLocation() : nullptr;
+	const Coord3D* enemyPosition = nullptr;
+	if (enemyBase)
+		enemyPosition = isRetailTacticVisible(*enemyBase, m_player->getPlayerIndex()) ? enemyBase->getPosition()
+			: start ? start->getLocation() : nullptr;
 	const RetailArmy* enemyRules = retailPolicy(*enemy).army;
 	const ThingTemplate* farm = enemyRules ? TheThingFactory->findTemplate(enemyRules->farm, FALSE) : nullptr;
 	std::vector<std::pair<Int, Object*>> farms;
 	std::vector<std::pair<Int, Object*>> otherBuildings;
 	for (Object* building : candidates)
 	{
-		const Bool economy = building->isKindOf(KINDOF_ECONOMY_STRUCTURE) || (farm && building->getTemplate()->isEquivalentTo(farm));
+		const Bool economy = building->isKindOf(KINDOF_ECONOMY_STRUCTURE) || building->isKindOf(KINDOF_SUPPLY_GATHERING_CENTER) ||
+			(farm && building->getTemplate()->isEquivalentTo(farm));
 		if (!economy && building->isKindOf(KINDOF_WALL_SEGMENT) && !building->isKindOf(KINDOF_CAN_ATTACK))
 			continue;
 		const Int weight = enemyPosition ? retailRaidWeight(*building, center, *enemyPosition) : 5;
@@ -2037,13 +2166,17 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 			return !m_retailObjectives.contains({unit->getID(), building->getID(), building->getTeam()->getID()}) &&
 				canRetailTacticAttack(*unit, *building);
 		};
-		if (static_cast<size_t>(std::count_if(roster.begin(), roster.end(), eligible)) >= minimum)
+		if (static_cast<size_t>(std::count_if(roster.begin(), roster.end(), eligible)) < minimum)
+			continue;
+		Object* lead = *std::find_if(roster.begin(), roster.end(), eligible);
+		if (!enemyPosition || TheAI->pathfinder()->clientSafeQuickDoesPathExistForUI(
+			lead->getAI()->getLocomotorSet(), lead->getPosition(), building->getPosition()))
 			(economy ? farms : otherBuildings).emplace_back(weight, building);
 	}
 	if (farms.empty() && otherBuildings.empty())
 		return endRaid();
 	const Bool preferFarm = !farms.empty() && (otherBuildings.empty() || GameLogicRandomValue(0, 4) != 0);
-	Object* target = chooseRetailRaidBuilding(preferFarm ? farms : otherBuildings);
+	Object* target = chooseRetailRaidBuilding(preferFarm ? farms : otherBuildings, enemyPosition != nullptr);
 	const size_t limit = raid.issuedFrame ? roster.size()
 		: GameLogicRandomValue(static_cast<Int>(minimum), static_cast<Int>(raid.members.size()));
 	const UnsignedInt owner = target->getTeam()->getID();
@@ -2066,6 +2199,47 @@ Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers
 	raid.issuedFrame = frame;
 	if (trace)
 		std::fprintf(stderr, "AI_FARM_RAID\t%u\t%d\t%d\t%zu\n", frame, m_player->getPlayerIndex(), raid.target, recruited);
+	return TRUE;
+}
+
+Bool AISkirmishPlayer::updateRetailRoamingDefense(const std::vector<Object*>& soldiers, const std::vector<Object*>& resourceBuildings,
+	const Object& keep, UnsignedInt frame, Bool trace)
+{
+	if (frame < m_retailRoamNextFrame)
+		return FALSE;
+	m_retailRoamNextFrame = frame + 5 * LOGICFRAMES_PER_SECOND;
+	const auto recruit = std::find_if(soldiers.begin(), soldiers.end(), [&](const Object* object) {
+		return object->isAbleToAttack() && isRetailTacticRecruit(*object, *m_player) &&
+			object->getAI()->canAcceptRetailPlannerOrder(FALSE);
+	});
+	if (recruit == soldiers.end())
+		return FALSE;
+	const Coord3D home = *keep.getPosition();
+	Coord3D point = home;
+	ObjectID destination = INVALID_ID;
+	if (resourceBuildings.empty())
+	{
+		const Real angle = INT_TO_REAL(GameLogicRandomValue(0, 6));
+		point.x += 400.0f * WWMath::CosTrig(angle);
+		point.y += 400.0f * WWMath::SinTrig(angle);
+		point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+	}
+	else
+	{
+		std::vector<Object*> nearby;
+		for (Object* building : resourceBuildings)
+			if ((*building->getPosition() - home).lengthSqr() < sqr(900.0f))
+				nearby.push_back(building);
+		if (nearby.empty())
+			return FALSE;
+		Object* building = nearby[GameLogicRandomValue(0, static_cast<Int>(nearby.size()) - 1)];
+		point = *building->getPosition();
+		destination = building->getID();
+	}
+	(*recruit)->getAI()->aiAttackMoveToPosition(&point, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
+	if (trace)
+		std::fprintf(stderr, "AI_ROAMING_DEFENSE\t%u\t%d\t%d\t%d\t%a\t%a\n",
+			frame, m_player->getPlayerIndex(), (*recruit)->getID(), destination, point.x, point.y);
 	return TRUE;
 }
 
@@ -2120,13 +2294,24 @@ void AISkirmishPlayer::updateRetail()
 	std::vector<Object*> producers;
 	std::vector<Object*> soldiers;
 	std::vector<Object*> owned;
+	std::vector<Object*> farmBuildings;
+	std::vector<Object*> roamBuildings;
 	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 	{
 		if (object->getControllingPlayer() != m_player || object->isEffectivelyDead())
 			continue;
 		owned.push_back(object);
-		if (isFarm(*object->getTemplate()))
+		const Bool ordinaryFarm = isFarm(*object->getTemplate());
+		const Bool finished = !object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
+		if (difficulty == DIFFICULTY_EASY && finished &&
+			(ordinaryFarm || object->isKindOf(KINDOF_SUPPLY_GATHERING_CENTER)) && !object->isKindOf(KINDOF_LINKED_TO_FLAG))
+			roamBuildings.push_back(object);
+		if (ordinaryFarm)
+		{
 			++farms;
+			if (finished)
+				farmBuildings.push_back(object);
+		}
 		else
 		{
 			fortressPresent = fortressPresent || isRetailFortressKeep(*object->getTemplate()) ||
@@ -2529,13 +2714,24 @@ void AISkirmishPlayer::updateRetail()
 			m_retailFarmPriority = std::min(2000.0f, m_retailFarmPriority + 2.0f * rate * (1.0f + 10.0f * usage));
 		}
 		const ThingTemplate* scavenged = nullptr;
+		Int scavengedIndex = -1;
 		const Int scavengedCount = static_cast<Int>(rules->scavengedBuildings.size());
 		if (!retailTuning.disableEconomyBuilding && scavengedCount > 0 &&
 			money->countMoney() + m_retailSavings > 599 && !builders.empty())
 		{
 			if (m_retailScavengedBuilding < 0 || m_retailScavengedBuilding >= scavengedCount)
 				m_retailScavengedBuilding = scavengedCount == 1 ? 0 : GameLogicRandomValue(0, scavengedCount - 1);
-			scavenged = TheThingFactory->findTemplate(rules->scavengedBuildings[m_retailScavengedBuilding], FALSE);
+			for (Int step = 0; step < scavengedCount; ++step)
+			{
+				const Int index = (m_retailScavengedBuilding + step) % scavengedCount;
+				const ThingTemplate* option = TheThingFactory->findTemplate(rules->scavengedBuildings[index], FALSE);
+				if (option && !option->isKindOf(KINDOF_SUPPLY_GATHERING_CENTER))
+				{
+					scavenged = option;
+					scavengedIndex = index;
+					break;
+				}
+			}
 		}
 		const auto buildFrom = [&](Object& builder, FoundationAIUpdate* plot) -> Bool {
 			const CommandSet* set = retailCommands(builder);
@@ -2634,7 +2830,7 @@ void AISkirmishPlayer::updateRetail()
 					m_retailFarmPriority = 0.0f;
 				}
 				else if (scavenged && type->isEquivalentTo(scavenged))
-					m_retailScavengedBuilding = (m_retailScavengedBuilding + 1) % scavengedCount;
+					m_retailScavengedBuilding = (scavengedIndex + 1) % scavengedCount;
 				else
 					m_retailBuiltStructures.insert(type->getName());
 				if (trace)
@@ -3005,14 +3201,112 @@ void AISkirmishPlayer::updateRetail()
 			return;
 		}
 	};
+	const auto updateLumberMill = [&](Bool canStart) -> Bool {
+		auto& plan = m_retailLumberMill;
+		const Coord3D* home = keep ? keep->getPosition() : nullptr;
+		if (plan.site != INVALID_ID)
+		{
+			Object* builder = TheGameLogic->findObjectByID(plan.builder);
+			const Object* site = TheGameLogic->findObjectByID(plan.site);
+			DozerAIInterface* dozer = builder && !builder->isEffectivelyDead() && builder->getControllingPlayer() == m_player &&
+				builder->getAI() ? builder->getAI()->getDozerAIInterface() : nullptr;
+			if (site && !site->isEffectivelyDead() && site->getControllingPlayer() == m_player)
+			{
+				if (site->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && dozer && dozer->getTaskTarget(DOZER_TASK_BUILD) == plan.site)
+					return TRUE;
+				if (!site->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && dozer && !dozer->isAnyTaskPending() && home)
+				{
+					const Coord3D origin = *builder->getPosition();
+					const Real distance = tacticalDistance(origin, *home);
+					if (distance > 0.0f)
+					{
+						Coord3D step = *home - origin;
+						step.scale(std::min(500.0f, distance) / distance);
+						const Coord3D destination = origin + step;
+						builder->getAI()->aiMoveToPosition(&destination, CMD_FROM_AI);
+					}
+				}
+			}
+			plan = {};
+			plan.nextFrame = frame + 5 * LOGICFRAMES_PER_SECOND;
+		}
+		const size_t count = rules->scavengedBuildings.size();
+		if (!canStart || frame < plan.nextFrame || count == 0 || builders.empty() ||
+			retailTuning.disableBaseBuilding || retailTuning.disableEconomyBuilding || !m_player->getCanBuildBase() ||
+			money->countMoney() + m_retailSavings <= 599)
+			return FALSE;
+		plan.nextFrame = frame + 2 * LOGICFRAMES_PER_SECOND;
+		std::vector<Object*> mills;
+		for (Object* object : owned)
+			if (object->isKindOf(KINDOF_SUPPLY_GATHERING_CENTER) && !object->isKindOf(KINDOF_LINKED_TO_FLAG))
+				mills.push_back(object);
+		if (mills.size() > 4 || farmBuildings.size() <= mills.size() + 1)
+			return FALSE;
+		const auto groves = findRetailLumberGroves(home, farmBuildings, mills);
+		if (groves.empty())
+			return FALSE;
+		if (m_retailScavengedBuilding < 0 || static_cast<size_t>(m_retailScavengedBuilding) >= count)
+			m_retailScavengedBuilding = GameLogicRandomValue(0, static_cast<Int>(count) - 1);
+		for (size_t i = 0; i < count; ++i)
+		{
+			const Int index = (m_retailScavengedBuilding + i) % count;
+			const ThingTemplate* planned = TheThingFactory->findTemplate(rules->scavengedBuildings[index], FALSE);
+			if (!planned || !planned->isKindOf(KINDOF_SUPPLY_GATHERING_CENTER))
+				continue;
+			for (const auto& grove : groves)
+			{
+				Object* porter = nullptr;
+				const ThingTemplate* mill = nullptr;
+				const auto rank = [&](const Object* builder) {
+					return std::make_pair(tacticalDistanceSquared(*builder->getPosition(), grove.tree), builder->getID());
+				};
+				for (Object* builder : builders)
+				{
+					if (builder->getTeam() != m_player->getDefaultTeam() || !builder->getAI()->isIdle() ||
+						builder->getAI()->getDozerAIInterface()->isAnyTaskPending() || (porter && rank(builder) >= rank(porter)))
+						continue;
+					const ThingTemplate* offer = retailLumberMillOffer(*builder, *planned);
+					if (!offer)
+						continue;
+					const CanMakeType canMake = TheBuildAssistant->canMakeUnit(builder, offer);
+					if (canMake == CANMAKE_OK || canMake == CANMAKE_NO_MONEY)
+					{
+						porter = builder;
+						mill = offer;
+					}
+				}
+				Object* site = nullptr;
+				if (porter && spendWithSavings(mill->calcCostToBuild(m_player), [&] {
+					site = placeRetailLumberMill(*porter, *mill, grove, home);
+					return site != nullptr;
+				}))
+				{
+					plan.builder = porter->getID();
+					plan.site = site->getID();
+					m_retailScavengedBuilding = (index + 1) % count;
+					if (trace)
+						std::fprintf(stderr, "AI_LUMBER_MILL\t%u\t%d\t%d\t%d\t%a\t%a\n",
+							frame, playerIndex, plan.builder, plan.site, site->getPosition()->x, site->getPosition()->y);
+					return TRUE;
+				}
+			}
+		}
+		return FALSE;
+	};
 	Bool raidActive = FALSE;
 	Bool flagActive = FALSE;
+	Bool millActive = FALSE;
 	if (canRunTargetless)
 	{
+		if (difficulty == DIFFICULTY_EASY && m_retailRoamNextFrame == 0)
+			m_retailRoamNextFrame = frame + 5 * LOGICFRAMES_PER_SECOND;
+		millActive = updateLumberMill(FALSE);
 		raidActive = updateRetailFarmRaid(soldiers, keep, phase, frame, FALSE, trace);
-		flagActive = updateRetailFlagCapture(owned, frame, targetlessLimit > static_cast<Int>(raidActive), trace);
-		if (!raidActive && !flagActive)
+		flagActive = updateRetailFlagCapture(owned, frame, targetlessLimit > static_cast<Int>(raidActive) + static_cast<Int>(millActive), trace);
+		if (!raidActive && !flagActive && !millActive)
 			buildForward();
+		if (!millActive && targetlessLimit > static_cast<Int>(flagActive) + static_cast<Int>(raidActive))
+			millActive = updateLumberMill(TRUE);
 	}
 	std::vector<std::pair<Object*, Bool>> wave;
 	for (Object* unit : soldiers)
@@ -3150,8 +3444,10 @@ void AISkirmishPlayer::updateRetail()
 				for (Object* unit : owned)
 				{
 					const AIUpdateInterface* ai = unit->getAI();
+					const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
 					if (!ai || !ai->isIdle() || !ai->canAcceptRetailPlannerOrder(FALSE) || !unit->isMobile() ||
 						unit->isDisabled() || unit->getContainedBy() || unit->getTeam() != m_player->getDefaultTeam() ||
+						(horde && horde->hasGuardOrder()) ||
 						m_retailObjectives.contains({unit->getID(), candidate.id(), candidate.owner}) ||
 						collectingRing.contains(unit->getID()) || !canCollectRetailRing(*unit, *ringPickup))
 						continue;
@@ -3225,9 +3521,19 @@ void AISkirmishPlayer::updateRetail()
 		for (size_t i = 0; i < m_retailTargets.size(); ++i)
 		{
 			const Int kind = rules->tacticalTargets[i];
-			if (kind == RETAIL_TARGET_TARGETLESS && !raidActive && slotLimit(i) > static_cast<Int>(flagActive) &&
-				(!flagActive) == requireEmpty && updateRetailFarmRaid(soldiers, keep, phase, frame, TRUE, trace))
-				return;
+			if (kind == RETAIL_TARGET_TARGETLESS)
+			{
+				const Int held = static_cast<Int>(raidActive) + static_cast<Int>(flagActive) + static_cast<Int>(millActive);
+				if (held < slotLimit(i) && (held == 0) == requireEmpty)
+				{
+					if (!raidActive && updateRetailFarmRaid(soldiers, keep, phase, frame, TRUE, trace))
+						return;
+					if (difficulty == DIFFICULTY_EASY && keep &&
+						updateRetailRoamingDefense(soldiers, roamBuildings, *keep, frame, trace))
+						return;
+				}
+				continue;
+			}
 			const auto* candidates = kind == RETAIL_TARGET_ENEMY_STRUCTURE ? &structures
 				: kind == RETAIL_TARGET_DEFENSIVE ? &defenses
 				: kind == RETAIL_TARGET_OPPORTUNITY ? &opportunities
@@ -3487,7 +3793,10 @@ void AISkirmishPlayer::newMap()
 	m_retailTargets.clear();
 	m_retailWallPlan = {};
 	m_retailFlagSquad = {};
+	m_retailFlagRetryFrame = 0;
 	m_retailFarmRaid = {};
+	m_retailRoamNextFrame = 0;
+	m_retailLumberMill = {};
 	m_retailLastFarmFrame = 0;
 	m_retailSavings = 0;
 	m_retailScavengedBuilding = -1;
@@ -3751,6 +4060,11 @@ void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
 		}, [this] {
 			m_retailFlagSquad = {};
 		}},
+		{"skirmish-flag-retry", [this](Xfer* x) {
+			x->xferUnsignedInt(&m_retailFlagRetryFrame);
+		}, [this] {
+			m_retailFlagRetryFrame = 0;
+		}},
 		{"skirmish-farm-raid", [this](Xfer* x) {
 			x->xferObjectID(&m_retailFarmRaid.target);
 			for (ObjectID& id : m_retailFarmRaid.members)
@@ -3760,6 +4074,18 @@ void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferInt(&m_retailFarmRaid.rushPolicy);
 		}, [this] {
 			m_retailFarmRaid = {};
+		}},
+		{"skirmish-roaming-defense", [this](Xfer* x) {
+			x->xferUnsignedInt(&m_retailRoamNextFrame);
+		}, [this] {
+			m_retailRoamNextFrame = 0;
+		}},
+		{"skirmish-lumber-mill", [this](Xfer* x) {
+			x->xferObjectID(&m_retailLumberMill.builder);
+			x->xferObjectID(&m_retailLumberMill.site);
+			x->xferUnsignedInt(&m_retailLumberMill.nextFrame);
+		}, [this] {
+			m_retailLumberMill = {};
 		}},
 		{"skirmish-upgrade-requests", [this, loading](Xfer* x) {
 			UnsignedInt count = static_cast<UnsignedInt>(m_retailUpgradePlans.size());
