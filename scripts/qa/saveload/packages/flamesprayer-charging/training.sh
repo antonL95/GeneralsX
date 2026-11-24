@@ -56,6 +56,6 @@ check_actor() {
 }
 
 check() {
-    check_actor RhunFlamesprayer FlamesprayerBoilerExceedSelfDamage 223 284 224 308 "228 258 288" &&
+    check_actor RhunFlamesprayer FlamesprayerBoilerExceedSelfDamage 224 284 225 309 "228 258 288" &&
         check_actor MorgulBurghash BurghashImmolationSelfDamage 229 290 230 314 "229 259 289"
 }
