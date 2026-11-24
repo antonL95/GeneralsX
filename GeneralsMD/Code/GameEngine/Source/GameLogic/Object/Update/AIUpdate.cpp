@@ -2500,8 +2500,7 @@ Bool AIUpdateInterface::steerInFormation()
 	obj->setModelConditionState(MODELCONDITION_MOVING);
 	if (goal.backing)
 		m_curLocomotor->locoUpdate_moveTowardsFormationSlot(obj, goal.position, goal.distance, goal.speed, TRUE, goal.backingSource);
-	else if (m_curLocomotor->getAppearance() == LOCO_LEGS_TWO &&
-		!HordeAIUpdate::isReforming(anchor ? anchor->getAI() : nullptr))
+	else if (m_curLocomotor->getAppearance() == LOCO_LEGS_TWO)
 	{
 		Bool blocked = FALSE;
 		m_curLocomotor->locoUpdate_moveTowardsPosition(obj, goal.position, goal.distance, goal.speed, &blocked);

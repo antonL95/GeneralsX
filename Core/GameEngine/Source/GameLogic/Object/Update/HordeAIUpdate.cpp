@@ -432,11 +432,6 @@ UpdateSleepTime HordeAIUpdate::update()
 		setRetailComboLocomotor(useComboForTarget(target));
 #endif
 	const Real facingBefore = horde->getOrientation();
-#if RTS_ZEROHOUR
-	const PhysicsBehavior* anchorPhysics = RetailFileLayers::enabled() ? horde->getPhysics() : nullptr;
-	const Coord3D* anchorVelocity = anchorPhysics ? anchorPhysics->getVelocity() : nullptr;
-	const Bool wasTranslating = anchorVelocity && (anchorVelocity->x != 0.0f || anchorVelocity->y != 0.0f);
-#endif
 	Path* path = getPath();
 	const PathNode* end = path ? path->getLastNode() : nullptr;
 	const Locomotor* locomotor = getCurLocomotor();
@@ -473,26 +468,7 @@ UpdateSleepTime HordeAIUpdate::update()
 	else if (fabs(turn) > FORMATION_REFORM_ANGLE)
 	{
 		const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
-#if RTS_ZEROHOUR
-		if (wasTranslating && isMoving() && locomotor && locomotor->getAppearance() == LOCO_HORDE &&
-			locomotor->getWaitForFormation() && fabs(turn) > locomotor->getMaxTurnWithoutReform() &&
-			horde->isKindOf(KINDOF_INFANTRY) && !horde->isKindOf(KINDOF_CAVALRY) &&
-			!contain->isAlternateFormation() && !isReforming(this) && !isMovingWithRetailGroup())
-		{
-			const Real turnRate = locomotor->getMaxTurnRate(horde->getBodyModule()->getDamageState());
-			if (turnRate > 0.0f)
-				m_reformUntil = TheGameLogic->getFrame() +
-					static_cast<UnsignedInt>(WWMath::Ceil(fabs(turn) / turnRate)) + contain->getFormationReformTravelFrames();
-		}
-#endif
 	}
-#if RTS_ZEROHOUR
-	if (m_reformUntil && (isMovingWithRetailGroup() || contain->isAlternateFormation() ||
-		contain->getFormationReformTravelFrames() == 0))
-		m_reformUntil = 0;
-#endif
-	if (m_reformUntil && (!isMoving() || m_reformUntil <= TheGameLogic->getFrame()))
-		m_reformUntil = 0;
 
 	target = liveTarget(m_attackTarget);
 	if (!target && m_attackTarget != INVALID_ID)

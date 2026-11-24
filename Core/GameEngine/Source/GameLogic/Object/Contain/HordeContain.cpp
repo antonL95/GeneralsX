@@ -1495,7 +1495,7 @@ Bool HordeContain::getFormationGoal(const Object* member, FormationGoal& goal) c
 
 	const AIUpdateInterface* hordeAI = horde->getAI();
 	const PhysicsBehavior* physics = horde->getPhysics();
-	goal.hordeMoving = hordeAI && hordeAI->isMoving() && physics && !HordeAIUpdate::isReforming(hordeAI);
+	goal.hordeMoving = hordeAI && hordeAI->isMoving() && physics;
 	if (!goal.hordeMoving)
 	{
 		goal.speed = FAST_AS_POSSIBLE;
@@ -1763,9 +1763,6 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 
 Real HordeContain::getFormationSpeedScale() const
 {
-	if (HordeAIUpdate::isReforming(getObject()->getAI()))
-		return 0.0f;
-
 	Real total = 0.0f;
 	Real worst = 0.0f;
 	Int count = 0;

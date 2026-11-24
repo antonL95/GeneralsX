@@ -3153,14 +3153,6 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 		moveCavalryForward(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 		return;
 	}
-	if (HordeAIUpdate::isReforming(obj->getAI()))
-	{
-		physics->setTurning(TURN_NONE);
-		updateRetailTurnConditions(obj, 0.0f);
-		steerVelocity(obj, physics, *obj->getUnitDirectionVector2D(), 0.0f, 0.0f);
-		return;
-	}
-
 	const Coord3D* pos = obj->getPosition();
 	Coord3D dirToApplyForce;
 	dirToApplyForce.x = goalPos.x - pos->x;
@@ -3178,23 +3170,11 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 		dirToApplyForce.y /= distToGoal;
 		const Real desiredAngle = WWMath::Atan2Origin(dirToApplyForce.y, dirToApplyForce.x);
 		const Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
-		const HordeContain* formation = HordeContain::get(obj);
-		if (formation && formation->isAlternateFormation() && m_template->m_waitForFormation)
-		{
-			const Real radius = m_template->m_fastTurnRadius;
-			const Real rate = std::min(getMaxTurnRate(bdt), formation->getFormationWheelRate(radius));
-			physics->setTurning(rotateObjAroundLocoPivot(obj, goalPos, rate));
-			if (radius > 0.0f && fabs(relAngle) > rate)
-				desiredSpeed = std::min(desiredSpeed, rate * radius);
-			desiredSpeed *= std::max(0.0f, Cos(stdAngleDiff(desiredAngle, obj->getOrientation())));
-		}
-		else if (fabs(relAngle) > m_template->m_maxTurnWithoutReform && onPathDistToGoal > REFORM_MIN_DISTANCE)
+		if (fabs(relAngle) > m_template->m_maxTurnWithoutReform && onPathDistToGoal > REFORM_MIN_DISTANCE)
 		{
 			obj->setOrientation(desiredAngle);
 			physics->setTurning(TURN_NONE);
 			updateRetailTurnConditions(obj, 0.0f);
-			if (m_template->m_waitForFormation && formation)
-				desiredSpeed = 0.0f;
 		}
 		else if (m_template->m_turnWhileMoving)
 			physics->setTurning(rotateTowardsPosition(obj, goalPos));
@@ -3322,17 +3302,12 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 		else
 		{
 			physics->setTurning(rotateTowardsPosition(obj, goalPos));
-			const auto* anchor = obj->getContainedBy();
-			const Bool reforming = m_template->m_appearance == LOCO_LEGS_TWO &&
-				HordeAIUpdate::isReforming(anchor ? anchor->getAI() : nullptr);
 			const Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
-			if (reforming || (turnRate > 0.0f && distToGoal < 2.0f * maxSpeed / turnRate))
+			if (turnRate > 0.0f && distToGoal < 2.0f * maxSpeed / turnRate)
 			{
 				const Coord3D* facing = obj->getUnitDirectionVector2D();
 				const Real alignment = facing->x * dir.x + facing->y * dir.y;
 				desiredSpeed *= alignment > 0.0f ? alignment : 0.0f;
-				if (reforming)
-					dir = *facing;
 			}
 		}
 	}
