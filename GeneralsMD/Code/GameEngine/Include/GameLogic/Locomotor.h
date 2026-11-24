@@ -487,7 +487,8 @@ protected:
 		resting on the ground), false if not (eg, we are hovering or circling)
 	*/
 	Bool handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Bool birdPullUp = FALSE);
-	PhysicsTurningType rotateObjAroundLocoPivot(Object* obj, const Coord3D& goalPos, Real maxTurnRate, Real *relAngle = nullptr);
+	PhysicsTurningType rotateObjAroundLocoPivot(Object* obj, const Coord3D& goalPos, Real maxTurnRate,
+		Real* relAngle = nullptr, Bool translateAroundPivot = TRUE);
 
 	Real getSurfaceHtAtPt(Real x, Real y);
 	Real calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real curZ, Real surfaceAtPt, Real preferredHeight, Bool birdPullUp);

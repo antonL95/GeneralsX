@@ -8,8 +8,7 @@ check() {
                     stop_turn = $6 == 1 && $7 == 1 && $9 == 1 && ($10 * $10 + $11 * $11) < 0.0004
                 if ($4 == "P69GrondKeepTurn")
                     keep_turn = $6 == 1 && $7 == 1 && $9 == 1 && $10 < 0 &&
-                        ($10 * $10 + $11 * $11) > 0.038 && ($10 * $10 + $11 * $11) < 0.042 &&
-                        $16 == 0.2
+                        ($10 * $10 + $11 * $11) > ($16 + 0.1) * ($16 + 0.1) && $16 == 0.2
             }
             END { exit !(stop_turn && keep_turn) }
         ' "$log" || status=1
@@ -59,14 +58,18 @@ check() {
                 x[$4, $3] = $13 + 0
                 if ($4 == "P69GrondReverse")
                     rev[$3] = $6 == 1 && $7 == 1 && $8 == 1 && $10 < -0.90 && $12 > 0.99
-                if ($4 == "P69GrondCrew")
-                    crew[$3] = $8 == 0 && ($10 * $10 + $11 * $11) < 0.0001 && $15 == 0
+                if ($4 == "P69GrondCrew") {
+                    crew[$3] = $8 == 0 && $9 == 1 && ($10 * $10 + $11 * $11) < 0.0001 && $15 == 0
+                    facing[$3] = $12 + 0
+                    crew_y[$3] = $14 + 0
+                }
                 if ($4 == "P69NoCrewPower")
                     nocrew[$3] = $8 == 1 && $10 > 0.80 && $15 > 0.95
             }
             END {
                 ok = rev[260] && rev[280] && x["P69GrondReverse", 280] < x["P69GrondReverse", 260] - 15 &&
                     crew[260] && crew[280] && x["P69GrondCrew", 280] == x["P69GrondCrew", 260] &&
+                    crew_y[280] == crew_y[260] && facing[280] < facing[260] - 0.002 &&
                     nocrew[260] && nocrew[280] && x["P69NoCrewPower", 280] > x["P69NoCrewPower", 260] + 15
                 exit !ok
             }

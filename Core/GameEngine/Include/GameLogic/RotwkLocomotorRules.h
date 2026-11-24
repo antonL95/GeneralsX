@@ -17,7 +17,7 @@ struct Authored
 	float liftDamagedFraction = -1.0f;
 	float burningDeathRadius = 0.0f;
 	float chargeSpeedFraction = 1.0f;
-	float backingUpSpeedFraction = -1.0f;
+	float backingUpSpeedFraction = 0.003f;
 	float backingUpDistanceMin = 0.0f;
 	float backingUpDistanceMax = 0.0f;
 	float backingUpAngle = std::numeric_limits<float>::max();

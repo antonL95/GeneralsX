@@ -1209,9 +1209,7 @@ Real Locomotor::getMaxSpeedOverride() const
 
 Real Locomotor::getBackingUpSpeed() const
 {
-	const Real authoredFraction = m_template->m_rotwk.backingUpSpeedFraction;
-	const Real fraction = authoredFraction >= 0.0f ? authoredFraction : 0.003f;
-	return std::max(0.0f, m_template->getActualMaxSpeed() * fraction);
+	return std::max(0.0f, m_template->getActualMaxSpeed() * m_template->m_rotwk.backingUpSpeedFraction);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1553,6 +1551,10 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	nullAccel.x = nullAccel.y = nullAccel.z = 0;
 	physics->applyMotiveForce(&nullAccel);
 
+	const auto authoredAppearance = m_template->m_appearance;
+	const Bool usesRetailWheelTurn = m_template->m_canMoveBackward &&
+		(authoredAppearance == LOCO_WHEELS_FOUR || authoredAppearance == LOCO_TREADS || authoredAppearance == LOCO_SHIP);
+
 	if (*blocked)
 	{
 		if (desiredSpeed > physics->getVelocityMagnitude())
@@ -1579,7 +1581,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
 		if (m_template->m_wanderWidthFactor == 0.0f)
 		{
-			*blocked = (TURN_NONE != rotateObjAroundLocoPivot(obj, goalPos, turnRate));
+			*blocked = (TURN_NONE != rotateObjAroundLocoPivot(obj, goalPos, turnRate, nullptr, !usesRetailWheelTurn));
 		}
 
 		// it is very important to be sure to call this in all situations, even if not moving in 2d space.
@@ -1604,7 +1606,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		(RetailFileLayers::enabled() && getAppearance() == LOCO_HOVER &&
 			getLegalSurfaces() == LOCOMOTORSURFACE_AIR && StrafeAreaUpdate::controlsAttackFlight(*obj)))
 	{
-		LocomotorAppearance appearance = m_template->m_appearance;
+		LocomotorAppearance appearance = authoredAppearance;
 		const Bool retailIndependent = RetailFileLayers::enabled() && !obj->getContainedBy();
 		const Bool retailHero = retailIndependent && obj->isKindOf(KINDOF_HERO);
 		if ((appearance == LOCO_HORDE || appearance == LOCO_FOUR_LEGS_HUGE || appearance == LOCO_HUGE_TWO_LEGS) &&
@@ -1629,7 +1631,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 					break;
 			case LOCO_WHEELS_FOUR:
 			{
-				if (m_template->m_canMoveBackward)
+				if (usesRetailWheelTurn)
 				{
 					moveRetailBackwardsCapableWheels(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					usedRetailGroundSteering = TRUE;
@@ -1655,7 +1657,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 					moveTowardsPositionWheels(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
 			case LOCO_TREADS:
-					if (m_template->m_canMoveBackward)
+					if (usesRetailWheelTurn)
 					{
 						moveRetailBackwardsCapableWheels(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 						usedRetailGroundSteering = TRUE;
@@ -1676,7 +1678,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 					moveTowardsPositionHorde(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 					break;
 			case LOCO_SHIP:
-					if (m_template->m_canMoveBackward)
+					if (usesRetailWheelTurn)
 					{
 						moveRetailBackwardsCapableWheels(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
 						usedRetailGroundSteering = TRUE;
@@ -2342,18 +2344,17 @@ void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* p
 		obj->clearModelConditionState(MODELCONDITION_BACKING_UP);
 
 	setFlag(IS_BRAKING, FALSE);
+	const Real turnHeading = moveBackwards ? normalizeAngle(goalHeading + PI) : goalHeading;
+	const Coord3D turnTarget{pos.x + Cos(turnHeading) * 1000.0f, pos.y + Sin(turnHeading) * 1000.0f, pos.z};
+	physics->setTurning(rotateObjAroundLocoPivot(obj, turnTarget, getMaxTurnRate(bdt), nullptr, FALSE));
+
 	if (maxSpeed <= 0.0f)
 	{
 		physics->scrubVelocity2D(0.0f);
 		obj->clearModelConditionState(MODELCONDITION_MOVING);
-		updateRetailTurnConditions(obj, 0.0f);
 		updateRetailGait(obj, onPathDistToGoal, 0.0f, FALSE, 0.0f);
 		return;
 	}
-
-	const Real turnHeading = moveBackwards ? normalizeAngle(goalHeading + PI) : goalHeading;
-	Coord3D turnTarget{pos.x + Cos(turnHeading) * 1000.0f, pos.y + Sin(turnHeading) * 1000.0f, pos.z};
-	physics->setTurning(rotateObjAroundLocoPivot(obj, turnTarget, getMaxTurnRate(bdt)));
 
 	const Coord3D& velocity = *physics->getVelocity();
 	const Real curSpeed = WWMath::SqrtfOrigin(sqr(velocity.x) + sqr(velocity.y));
@@ -2376,13 +2377,10 @@ void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* p
 		onPathDistToGoal < calcSlowDownDist(curSpeed, getMinSpeed(), braking))
 		targetSpeed = getMinSpeed();
 
-	if (moveBackwards)
+	if (moveBackwards && rules.backingUpStopWhenTurning)
 	{
-		if (rules.backingUpSpeedFraction >= 0.0f)
-			targetSpeed = std::min(targetSpeed, getBackingUpSpeed());
 		const ModelConditionFlags& conds = obj->getLogicModelConditions();
-		if (rules.backingUpStopWhenTurning &&
-			(conds.test(MODELCONDITION_TURN_LEFT) || conds.test(MODELCONDITION_TURN_RIGHT)))
+		if (conds.test(MODELCONDITION_TURN_LEFT) || conds.test(MODELCONDITION_TURN_RIGHT))
 			targetSpeed = 0.0f;
 	}
 
@@ -2953,14 +2951,14 @@ Real Locomotor::calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real cu
 
 //-------------------------------------------------------------------------------------------------
 PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3D& goalPos,
-																											 Real maxTurnRate, Real *relAngle)
+	Real maxTurnRate, Real* relAngle, Bool translateAroundPivot)
 {
 	Real angle = obj->getOrientation();
 	Real offset = getTurnPivotOffset();
 
 	PhysicsTurningType turn = TURN_NONE;
 
-	if (getFlag(IS_BRAKING)) offset = 0.0f; // When braking we do exact movement towards goal, instead of physics.
+	if (translateAroundPivot && getFlag(IS_BRAKING)) offset = 0.0f;
 	//Rotating about pivot moves the object, and can make us miss our goal, so it is disabled.  jba.
 	if (offset != 0.0f)
 	{
@@ -2991,6 +2989,12 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 			turn = TURN_NEGATIVE;
 		} else {
 			turn = TURN_NONE;
+		}
+
+		if (!translateAroundPivot)
+		{
+			obj->setOrientation(normalizeAngle(angle + amount));
+			return turn;
 		}
 
 #if 0
