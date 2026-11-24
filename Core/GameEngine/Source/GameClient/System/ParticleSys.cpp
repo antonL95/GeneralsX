@@ -2365,8 +2365,6 @@ void ParticleSystem::updateRetailSlaveEmission(Int localPlayerIndex, ParticlePri
 		const Vector3 position = slave->m_transform.Get_Translation();
 		slave->m_pos = {position.X, position.Y, position.Z};
 
-		if (slave->isWaitingForInitialDelay())
-			break;
 		if (!slave->m_isDestroyed && !slave->m_isStopped &&
 			(slave->m_isForever || slave->m_systemLifetimeLeft > 0))
 			slave->updateEmission(localPlayerIndex, priority, TRUE);
@@ -3599,11 +3597,8 @@ void ParticleSystemManager::update()
 
 		for (ParticleSystem *emitter = sys; emitter; emitter = emitter->getSlave())
 		{
-			const Bool delayed = emitter->isWaitingForInitialDelay();
 			if (!emitter->update(m_localPlayerIndex))
 				expired.push_back(emitter);
-			if (delayed)
-				break;
 		}
 	}
 	for (ParticleSystem *system : expired)

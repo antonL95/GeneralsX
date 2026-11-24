@@ -1,0 +1,9 @@
+20 create Player_1 PartTheHeavensTestGandalf 0 2520,1010,0
+21 reveal Player_1 PartTheHeavensTestGandalf 0
+35 power Player_1 PartTheHeavensTestGandalf 0 SuperweaponPartTheHeavens
+40 particle-fx Player_1 - 0 FX_FattyFireworksExplosionBlast 2480 970 0
+42 particle-live Player_1 - 0
+46 particle-live Player_1 - 0
+185 particle-live Player_1 - 0
+215 particle-live Player_1 - 0
+240 particle-live Player_1 - 0
