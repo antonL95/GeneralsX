@@ -1512,6 +1512,29 @@ void ToggleMountedSpecialAbilityUpdate::triggerAbilityEffect()
 			hasAbilityTargetPos() ? std::optional<Coord3D>(getAbilityTargetPos()) : std::nullopt);
 }
 
+void ToggleMountedSpecialAbilityUpdate::onPackingProgress(Bool packing, UnsignedInt remaining)
+{
+	if (getModuleNameKey() != ToggleMountedSpecialAbilityUpdate::getModuleNameKey())
+		return;
+
+	const auto* data = getToggleMountedSpecialAbilityUpdateModuleData();
+	const UnsignedInt duration = packing ? data->m_packTime : data->m_unpackTime;
+	Drawable* drawable = getObject()->getDrawable();
+	if (!drawable || !duration)
+		return;
+
+	const Real progress = 1.0f - static_cast<Real>(remaining) / duration;
+	const Real from = packing ? data->m_opacityTarget : 1.0f;
+	const Real to = packing ? 1.0f : data->m_opacityTarget;
+	drawable->setDrawableOpacity(from + (to - from) * progress);
+}
+
+void ToggleMountedSpecialAbilityUpdate::onAbilityExit()
+{
+	if (Drawable* drawable = getObject()->getDrawable())
+		drawable->setDrawableOpacity(1.0f);
+}
+
 void GameLogic::queueMountedTemplateSwap(ObjectID id, const ToggleMountedSpecialAbilityUpdateModuleData* data,
 	std::optional<Coord3D> landingPosition)
 {
@@ -1543,7 +1566,7 @@ void GameLogic::processMountedTemplateSwaps()
 		Int startingRank;
 		Bool selected;
 		Color indicatorColor;
-		std::vector<std::pair<AsciiString, UnsignedInt>> timers;
+		std::vector<std::pair<const SpecialPowerTemplate*, SpecialPowerModule::MountRecharge>> timers;
 		std::vector<AsciiString> executedCommands;
 		Int stance;
 		AsciiString stanceModifier;
@@ -1597,7 +1620,7 @@ void GameLogic::processMountedTemplateSwaps()
 			{source->m_createAHeroColors[0], source->m_createAHeroColors[1], source->m_createAHeroColors[2]},
 			source->getObjectCompletedUpgradeMask(), healthRatio, tracker->getRetailExperience(), tracker->getRank(),
 			tracker->getRetailStartingRank(), draw && draw->isSelected(), source->m_indicatorColor,
-			std::move(source->m_mountedPowerTimers), std::move(source->m_mountedExecutedCommands),
+			{}, std::move(source->m_mountedExecutedCommands),
 			stances ? stances->getStance() : source->m_mountedStance,
 			stances ? stances->getAppliedModifier() : AsciiString::TheEmptyString,
 			stances ? stances->getModuleTagNameKey() : NAMEKEY_INVALID,
@@ -1621,15 +1644,10 @@ void GameLogic::processMountedTemplateSwaps()
 		for (const AsciiString& name : data->m_synchronizeTimerOnSpecialPower)
 		{
 			const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate(name);
-			const auto* module = source->getSpecialPowerModule(power);
-			if (!module)
-				continue;
-			const auto match = [&name](const auto& timer) { return timer.first == name; };
-			const auto existing = std::find_if(swap.timers.begin(), swap.timers.end(), match);
-			if (existing == swap.timers.end())
-				swap.timers.emplace_back(name, module->getReadyFrame());
-			else
-				existing->second = module->getReadyFrame();
+			const auto* module = static_cast<const SpecialPowerModule*>(source->getSpecialPowerModule(power));
+			const auto recharge = module ? module->getMountRecharge() : std::nullopt;
+			if (recharge)
+				swap.timers.emplace_back(power, *recharge);
 		}
 		destroyObject(source);
 	}
@@ -1675,19 +1693,21 @@ void GameLogic::processMountedTemplateSwaps()
 		if (BodyModuleInterface* body = replacement->getBodyModule())
 			body->internalChangeHealth(body->getMaxHealth() * swap.healthRatio - body->getHealth());
 
-		replacement->m_mountedPowerTimers = std::move(swap.timers);
-		for (const auto& [name, readyFrame] : replacement->m_mountedPowerTimers)
+		for (const auto& [power, recharge] : swap.timers)
 		{
-			const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate(name);
-			if (auto* module = replacement->getSpecialPowerModule(power))
-				module->setReadyFrame(readyFrame);
+			if (auto* module = static_cast<SpecialPowerModule*>(replacement->getSpecialPowerModule(power)))
+				module->inheritMountRecharge(recharge);
 		}
 #if !RETAIL_COMPATIBLE_AIGROUP
 		if (swap.group)
 			swap.group->add(replacement);
 #endif
-		if (swap.selected && TheInGameUI && replacement->getDrawable())
-			TheInGameUI->selectDrawable(replacement->getDrawable());
+		if (Drawable* drawable = replacement->getDrawable())
+		{
+			drawable->startRetailOclFade(10, TRUE, FALSE, FALSE);
+			if (swap.selected && TheInGameUI)
+				TheInGameUI->selectDrawable(drawable);
+		}
 	}
 }
 

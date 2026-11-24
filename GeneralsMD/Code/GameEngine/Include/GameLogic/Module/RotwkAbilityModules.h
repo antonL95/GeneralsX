@@ -338,7 +338,7 @@ protected:
 class ToggleMountedSpecialAbilityUpdateModuleData : public SpecialAbilityUpdateModuleData
 {
 public:
-	Real m_opacityTarget = 1.0f;
+	Real m_opacityTarget = 0.0f;
 	Bool m_triggerInstantlyOnCreate = FALSE;
 	Bool m_cancelDisguiseWhenDismounting = FALSE;
 	AsciiString m_mountedTemplate;
@@ -362,6 +362,8 @@ public:
 
 protected:
 	virtual void triggerAbilityEffect() override;
+	void onPackingProgress(Bool packing, UnsignedInt remaining) override;
+	void onAbilityExit() override;
 };
 
 class SummonReplacementSpecialAbilityUpdate final : public ToggleMountedSpecialAbilityUpdate

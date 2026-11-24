@@ -311,6 +311,7 @@ protected:
 	static UnsignedInt abilityConditionsOf( const Object *obj );
 	virtual Bool skipsContinue() const { return FALSE; }
 	virtual void onStartWindup() {}
+	virtual void onPackingProgress(Bool packing, UnsignedInt remaining) {}
 	virtual void onAbilityExit() {}
 	virtual UnsignedInt holdFramesAfterTrigger() const;
 	virtual void addAbilityConditions( ModelConditionFlags &flags ) const;

@@ -812,7 +812,6 @@ private:
 	TemporarilyDefectUpdate* m_temporaryDefection = nullptr;
 	void setDominationState(const DominationState& state);
 	const ThingTemplate* m_mountedHeroIdentity = nullptr;
-	std::vector<std::pair<AsciiString, UnsignedInt>> m_mountedPowerTimers;
 	std::vector<AsciiString> m_mountedExecutedCommands;
 	Int m_mountedStance = 0;
 	void inheritMountedUpgradeCommands(std::vector<AsciiString> commands);

@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <optional>
+
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "Common/AudioEventRTS.h"
 #include "Common/Module.h"
@@ -218,6 +220,16 @@ public:
 	const SpecialPowerModuleData* getPowerModuleData() const { return getSpecialPowerModuleData(); }
 
 	void refreshPowerTimer() override;
+
+	struct MountRecharge
+	{
+		UnsignedInt readyFrame;
+		UnsignedInt pausedFrame;
+		Real pausedPercent;
+	};
+
+	std::optional<MountRecharge> getMountRecharge() const;
+	void inheritMountRecharge(const MountRecharge& recharge);
 
 protected:
 	virtual void applyPowerEffect(const Coord3D*) {}

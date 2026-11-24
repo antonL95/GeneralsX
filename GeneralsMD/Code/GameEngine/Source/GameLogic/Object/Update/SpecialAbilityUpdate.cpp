@@ -747,6 +747,7 @@ Bool SpecialAbilityUpdate::handlePackingProcessing()
   if( m_animFrames > 0 )
   {
     m_animFrames--;
+    onPackingProgress(m_packingState == STATE_PACKING, m_animFrames);
     if( m_animFrames == 0 )
     {
       // We're done, so clear the states.

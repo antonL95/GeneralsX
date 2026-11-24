@@ -5371,12 +5371,12 @@ void Object::xferMountedTemplateState(Xfer* xfer)
 	xfer->xferAsciiString(&identity);
 	if (loading)
 		m_mountedHeroIdentity = identity.isEmpty() ? nullptr : TheThingFactory->findTemplate(identity, FALSE);
-	UnsignedInt count = static_cast<UnsignedInt>(m_mountedPowerTimers.size());
-	xfer->xferUnsignedInt(&count);
-	if (loading)
-		m_mountedPowerTimers.resize(count);
-	for (auto& [power, readyFrame] : m_mountedPowerTimers)
+	UnsignedInt retiredTimerCount = 0;
+	xfer->xferUnsignedInt(&retiredTimerCount);
+	for (UnsignedInt i = 0; i < retiredTimerCount; ++i)
 	{
+		AsciiString power;
+		UnsignedInt readyFrame = 0;
 		xfer->xferAsciiString(&power);
 		xfer->xferUnsignedInt(&readyFrame);
 	}

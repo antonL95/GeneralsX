@@ -610,6 +610,23 @@ void SpecialPowerModule::refreshPowerTimer()
 		setReadyFrame(TheGameLogic->getFrame());
 }
 
+std::optional<SpecialPowerModule::MountRecharge> SpecialPowerModule::getMountRecharge() const
+{
+	if (getSpecialPowerTemplate()->isSharedNSync() || getObject()->isDisabled() ||
+		m_pausedCount > 0 || m_availableOnFrame == 0xFFFFFFFF)
+		return std::nullopt;
+
+	return MountRecharge{m_availableOnFrame, m_pausedOnFrame, m_pausedPercent};
+}
+
+void SpecialPowerModule::inheritMountRecharge(const MountRecharge& recharge)
+{
+	m_availableOnFrame = recharge.readyFrame;
+	m_pausedOnFrame = recharge.pausedFrame;
+	m_pausedPercent = recharge.pausedPercent;
+	m_pausedCount = 0;
+}
+
 void SpecialPowerModule::triggerSpecialPower( const Coord3D *location )
 {
 	if (RetailFileLayers::enabled() && getSpecialPowerModuleData()->m_specialPowerTemplate->getSpecialPowerType() == SPECIAL_HARVEST)
