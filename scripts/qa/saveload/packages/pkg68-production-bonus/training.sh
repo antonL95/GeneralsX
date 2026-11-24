@@ -47,8 +47,8 @@ check() {
         }
     fi
 
-    stock=$(sed -n 's/^TEST frame 211: create MordorOrcPit for Player_1 id=\([0-9]*\) at (980\.0, 1280\.0)$/\1/p' "$out/continue.log")
-    sound_only=$(sed -n 's/^TEST frame 200: create Pkg68ProtectedPit for Player_1 id=\([0-9]*\) .*/\1/p' "$out/continue.log")
+    stock=$(sed -n 's/^TEST frame 211: create MordorOrcPit for PlyrCivilian id=\([0-9]*\) at (980\.0, 1280\.0)$/\1/p' "$out/continue.log")
+    sound_only=$(sed -n 's/^TEST frame 200: create Pkg68ProtectedPit for PlyrCivilian id=\([0-9]*\) .*/\1/p' "$out/continue.log")
     if covers 227; then
         sample state 227 'producer=Pkg68ProtectedPit index=0 model=0 unit=Pkg68ProtectedRecruit progress=56.667 speed=20.000'
         loop_event start 227 "$stock"

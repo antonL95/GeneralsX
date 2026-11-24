@@ -7,6 +7,7 @@
 #include "Common/MessageStream.h"
 #include "Common/Player.h"
 #include "Common/SpecialPower.h"
+#include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/GameLogic.h"
@@ -17,6 +18,21 @@ namespace
 {
 void handlePackage68(const RetailTestCommands::Context& ctx)
 {
+	if (ctx.action == "pkg68-reserve")
+	{
+		Player* owner = ctx.findPlayer();
+		const Player* matchPlayer = ctx.findPlayer(ctx.argument);
+		if (owner && matchPlayer)
+		{
+			Int cap = 0;
+			matchPlayer->getCommandPointsTotal(&cap);
+			std::fprintf(stderr, "PKG68 reserve frame=%u used=%d total=%d reserve=%d\n",
+				ctx.frame, owner->getCommandPointsUsed(), owner->getCommandPointsTotal(), cap);
+			owner->overrideCommandPoints(cap, cap);
+		}
+		return;
+	}
+
 	Object* source = ctx.requireObject();
 	if (!source)
 		return;
@@ -27,9 +43,27 @@ void handlePackage68(const RetailTestCommands::Context& ctx)
 		if (!power)
 			return;
 		GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER);
+		message->friend_setPlayerIndex(source->getControllingPlayer()->getPlayerIndex());
 		message->appendIntegerArgument(power->getID());
 		message->appendIntegerArgument(0);
 		message->appendObjectIDArgument(source->getID());
+	}
+	else if (ctx.action == "pkg68-queue")
+	{
+		const auto* unit = TheThingFactory->findTemplate(ctx.argument, FALSE);
+		auto* production = source->getProductionUpdateInterface();
+		if (!unit || !production)
+			return;
+
+		const PlayerIndex player = source->getControllingPlayer()->getPlayerIndex();
+		GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+		select->friend_setPlayerIndex(player);
+		select->appendBooleanArgument(TRUE);
+		select->appendObjectIDArgument(source->getID());
+		GameMessage* queue = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
+		queue->friend_setPlayerIndex(player);
+		queue->appendIntegerArgument(unit->getTemplateID());
+		queue->appendIntegerArgument(production->requestUniqueUnitID());
 	}
 	else if (ctx.action == "pkg68-state")
 	{

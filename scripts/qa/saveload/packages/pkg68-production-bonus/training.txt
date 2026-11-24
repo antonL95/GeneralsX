@@ -1,57 +1,56 @@
-200 create Player_1 Pkg68ProtectedPit 0 1300,1280,0
-200 create Player_1 Pkg68DisabledPit 0 3500,3020,0
-209 queue Player_1 Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
-209 queue Player_1 Pkg68DisabledPit 0 Pkg68DisabledRecruit
-211 create Player_1 MordorOrcPit 0 660,1280,0
-211 create Player_1 MordorOrcPit 1 980,1280,0
-211 create Player_1 MordorOrcPit 2 1140,1280,0
+200 create PlyrCivilian Pkg68ProtectedPit 0 1300,1280,0
+200 create PlyrCivilian Pkg68DisabledPit 0 3500,3020,0
+201 cash PlyrCivilian - 0 402
+201 pkg68-reserve PlyrCivilian - 0 Player_1
+209 pkg68-queue PlyrCivilian Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
+209 pkg68-queue PlyrCivilian Pkg68DisabledPit 0 Pkg68DisabledRecruit
+211 create PlyrCivilian MordorOrcPit 0 660,1280,0
+211 create PlyrCivilian MordorOrcPit 1 980,1280,0
+211 create PlyrCivilian MordorOrcPit 2 1140,1280,0
 211 create PlyrCivilian MordorOrcPit_WotR 0 820,1280,0
-212 create Player_1 MordorSpellBook 0 660,1440,0
 212 create PlyrCivilian MordorSpellBook 0 660,1440,0
-216 science Player_1 - 0 SCIENCE_MordorCalltheHorde
 216 science PlyrCivilian - 0 SCIENCE_MordorCalltheHorde
-220 queue Player_1 MordorOrcPit 0 MordorFighterHorde
+220 pkg68-queue PlyrCivilian MordorOrcPit 0 MordorFighterHorde
 221 produce PlyrCivilian MordorOrcPit_WotR 0 MordorFighterHorde_WOTRBattle
-224 pkg68-state Player_1 MordorOrcPit 0 MordorFighterHorde
-225 pkg68-cast Player_1 MordorSpellBook 0 SpellBookMordorCalltheHorde
-226 pkg50-power PlyrCivilian MordorSpellBook 0 SpellBookMordorCalltheHorde
-227 pkg68-state Player_1 MordorOrcPit 1 MordorFighterHorde
-227 pkg68-state Player_1 Pkg68ProtectedPit 0 MordorFighterHorde
-239 pkg68-spawn Player_1 Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
-240 pkg68-spawn Player_1 Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
-241 pkg68-spawn Player_1 Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
-242 pkg68-spawn Player_1 Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
-242 pkg68-script-disable Player_1 Pkg68DisabledRecruit 0
-243 pkg68-state Player_1 MordorOrcPit 0 MordorFighterHorde
-244 pkg68-state Player_1 MordorOrcPit 0 MordorFighterHorde
+224 pkg68-state PlyrCivilian MordorOrcPit 0 MordorFighterHorde
+225 pkg68-cast PlyrCivilian MordorSpellBook 0 SpellBookMordorCalltheHorde
+227 pkg68-state PlyrCivilian MordorOrcPit 1 MordorFighterHorde
+227 pkg68-state PlyrCivilian Pkg68ProtectedPit 0 MordorFighterHorde
+239 pkg68-spawn PlyrCivilian Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
+240 pkg68-spawn PlyrCivilian Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
+241 pkg68-spawn PlyrCivilian Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
+242 pkg68-spawn PlyrCivilian Pkg68ProtectedPit 0 Pkg68ProtectedRecruit
+242 pkg68-script-disable PlyrCivilian Pkg68DisabledRecruit 0
+243 pkg68-state PlyrCivilian MordorOrcPit 0 MordorFighterHorde
+244 pkg68-state PlyrCivilian MordorOrcPit 0 MordorFighterHorde
 244 pkg68-state PlyrCivilian MordorOrcPit_WotR 0 MordorFighterHorde_WOTRBattle
-244 pkg68-protection Player_1 Pkg68DisabledRecruit 0
-257 pkg68-spawn Player_1 MordorOrcPit 0 MordorFighterHorde
-258 pkg68-spawn Player_1 MordorOrcPit 0 MordorFighterHorde
-270 pkg68-state Player_1 MordorOrcPit 0 MordorFighterHorde
-418 pkg68-hit Player_1 Pkg68ProtectedRecruit 0 slash
-419 pkg68-hit Player_1 Pkg68ProtectedRecruit 0 unresistable
-420 pkg68-hit Player_1 Pkg68ProtectedRecruit 0 slash
-420 pkg68-protection Player_1 Pkg68DisabledRecruit 0
-420 pkg68-hit Player_1 Pkg68DisabledRecruit 0 slash
-421 pkg68-hit Player_1 Pkg68ProtectedRecruit 0 slash
-421 pkg68-protection Player_1 Pkg68DisabledRecruit 0
-421 pkg68-hit Player_1 Pkg68DisabledRecruit 0 slash
-435 destroy Player_1 Pkg68ProtectedPit 0
-435 destroy Player_1 Pkg68DisabledPit 0
-435 destroy Player_1 Pkg68DisabledRecruit 0
+244 pkg68-protection PlyrCivilian Pkg68DisabledRecruit 0
+257 pkg68-spawn PlyrCivilian MordorOrcPit 0 MordorFighterHorde
+258 pkg68-spawn PlyrCivilian MordorOrcPit 0 MordorFighterHorde
+270 pkg68-state PlyrCivilian MordorOrcPit 0 MordorFighterHorde
+418 pkg68-hit PlyrCivilian Pkg68ProtectedRecruit 0 slash
+419 pkg68-hit PlyrCivilian Pkg68ProtectedRecruit 0 unresistable
+420 pkg68-hit PlyrCivilian Pkg68ProtectedRecruit 0 slash
+420 pkg68-protection PlyrCivilian Pkg68DisabledRecruit 0
+420 pkg68-hit PlyrCivilian Pkg68DisabledRecruit 0 slash
+421 pkg68-hit PlyrCivilian Pkg68ProtectedRecruit 0 slash
+421 pkg68-protection PlyrCivilian Pkg68DisabledRecruit 0
+421 pkg68-hit PlyrCivilian Pkg68DisabledRecruit 0 slash
+435 destroy PlyrCivilian Pkg68ProtectedPit 0
+435 destroy PlyrCivilian Pkg68DisabledPit 0
+435 destroy PlyrCivilian Pkg68DisabledRecruit 0
 971 pkg68-spawn PlyrCivilian MordorOrcPit_WotR 0 MordorFighterHorde_WOTRBattle
 972 pkg68-spawn PlyrCivilian MordorOrcPit_WotR 0 MordorFighterHorde_WOTRBattle
 973 pkg68-spawn PlyrCivilian MordorOrcPit_WotR 0 MordorFighterHorde_WOTRBattle
-1659 queue Player_1 MordorOrcPit 1 MordorFighterHorde
-1665 pkg68-state Player_1 MordorOrcPit 1 MordorFighterHorde
-1667 pkg68-state Player_1 MordorOrcPit 1 MordorFighterHorde
+1659 pkg68-queue PlyrCivilian MordorOrcPit 1 MordorFighterHorde
+1665 pkg68-state PlyrCivilian MordorOrcPit 1 MordorFighterHorde
+1667 pkg68-state PlyrCivilian MordorOrcPit 1 MordorFighterHorde
 1670 create PlyrCivilian MordorOrcPit_WotR 1 1460,1280,0
-1676 queue Player_1 MordorOrcPit 2 MordorFighterHorde
+1676 pkg68-queue PlyrCivilian MordorOrcPit 2 MordorFighterHorde
 1677 produce PlyrCivilian MordorOrcPit_WotR 1 MordorFighterHorde_WOTRBattle
-2427 pkg68-spawn Player_1 MordorOrcPit 2 MordorFighterHorde
+2427 pkg68-spawn PlyrCivilian MordorOrcPit 2 MordorFighterHorde
 2427 pkg68-spawn PlyrCivilian MordorOrcPit_WotR 1 MordorFighterHorde_WOTRBattle
-2428 pkg68-spawn Player_1 MordorOrcPit 2 MordorFighterHorde
+2428 pkg68-spawn PlyrCivilian MordorOrcPit 2 MordorFighterHorde
 2428 pkg68-spawn PlyrCivilian MordorOrcPit_WotR 1 MordorFighterHorde_WOTRBattle
-2429 pkg68-spawn Player_1 MordorOrcPit 2 MordorFighterHorde
+2429 pkg68-spawn PlyrCivilian MordorOrcPit 2 MordorFighterHorde
 2429 pkg68-spawn PlyrCivilian MordorOrcPit_WotR 1 MordorFighterHorde_WOTRBattle
