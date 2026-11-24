@@ -1,5 +1,5 @@
 check() {
-    for frame in 230 237 245 251; do
+    for frame in 230 237 245 249; do
         covers "$frame" || continue
         primary=15
         alternate=0

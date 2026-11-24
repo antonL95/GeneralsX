@@ -14,10 +14,10 @@
 245 formation-state Player_1 FormationButtonsGuard 0
 245 formation-state Player_1 FormationButtonsPikes 0
 245 formation-state Player_1 FormationButtonsControl 0
-248 select Player_1 FormationButtonsGuard 0
-248 selectadd Player_1 FormationButtonsPikes 0
-248 selectadd Player_1 FormationButtonsControl 0
-249 formation-message Player_1 FormationButtonsGuard 0 off
-251 formation-state Player_1 FormationButtonsGuard 0
-251 formation-state Player_1 FormationButtonsPikes 0
-251 formation-state Player_1 FormationButtonsControl 0
+246 select Player_1 FormationButtonsGuard 0
+246 selectadd Player_1 FormationButtonsPikes 0
+246 selectadd Player_1 FormationButtonsControl 0
+247 formation-message Player_1 FormationButtonsGuard 0 off
+249 formation-state Player_1 FormationButtonsGuard 0
+249 formation-state Player_1 FormationButtonsPikes 0
+249 formation-state Player_1 FormationButtonsControl 0
