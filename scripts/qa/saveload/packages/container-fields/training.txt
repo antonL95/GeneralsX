@@ -1,0 +1,58 @@
+226 create Player_1 Slot7SeatFixed 0 310,3200,0
+226 create Player_1 Slot7Rider 0 320,3200,0
+226 create PlyrCivilian Slot7Rider 0 315,3210,0
+226 create Player_1 Slot7SeatFree 0 350,3200,0
+226 create Player_1 Slot7Rider 1 360,3200,0
+226 create Player_1 Slot7StructureGrab 0 390,3200,0
+226 create Player_1 Slot7StructureReject 0 400,3210,0
+226 create Player_1 Slot7Structure 0 410,3200,0
+226 create Player_1 Slot7Devourer 0 430,3200,0
+226 create Player_1 RetreatBeacon 0 440,3200,0
+226 create Player_1 MordorGreatBeast 0 475,3200,0
+226 create Player_1 HaradKhandishChariot 0 540,3200,0
+226 create Player_1 IsengardBallista 0 585,3200,0
+226 create Player_1 Slot7Rider 2 597,3200,0
+
+227 container-fields-grab Player_1 Slot7SeatFixed 0 PlyrCivilian:Slot7Rider:0
+227 container-fields-grab Player_1 Slot7SeatFixed 0 Player_1:Slot7Rider:0
+227 container-fields-enter Player_1 Slot7Rider 1 Player_1:Slot7SeatFree:0
+227 container-fields-grab Player_1 Slot7StructureReject 0 Player_1:Slot7Structure:0
+228 container-fields-sample Player_1 Slot7Structure 0 structure-rejected
+228 container-fields-grab Player_1 Slot7StructureGrab 0 Player_1:Slot7Structure:0
+228 container-fields-grab Player_1 IsengardBallista 0 Player_1:Slot7Rider:2
+230 objupgrade Player_1 MordorGreatBeast 0 Upgrade_UnburiedWightlvl4
+230 objupgrade Player_1 HaradKhandishChariot 0 Upgrade_ObjectLevel3
+234 container-fields-sample Player_1 HaradKhandishChariot 0 chariot-created-three
+237 destroy Player_1 DwarvenBattleWagonIronHillsCrossbow 0
+239 container-fields-grab Player_1 Slot7Devourer 0 Player_1:RetreatBeacon:0
+240 container-fields-turn Player_1 Slot7SeatFixed 0
+240 container-fields-turn Player_1 Slot7SeatFree 0
+241 container-fields-flame Player_1 Slot7SeatFixed 0
+242 container-fields-sample PlyrCivilian Slot7Rider 0 foreign-rejected
+242 container-fields-sample Player_1 Slot7Rider 0 own-fixed-burned
+242 container-fields-sample Player_1 Slot7Rider 1 free
+242 container-fields-evacuate Player_1 Slot7SeatFree 0
+242 container-fields-sample Player_1 Slot7Structure 0 structure-caught
+242 container-fields-sample Player_1 RetreatBeacon 0 throw-pending
+242 container-fields-sample Player_1 MordorGreatBeast 0 beast-loaded
+242 container-fields-sample Player_1 MordorArcherOnBeast 0 beast-seat
+242 container-fields-sample Player_1 HaradKhandishChariot 0 chariot-loaded
+242 container-fields-sample Player_1 IsengardBallista 0 mine-ammo-loaded
+247 container-fields-place Player_1 Slot7Rider 1 - 375 3200
+247 container-fields-sample Player_1 Slot7Rider 1 release-restored
+248 container-fields-sample Player_1 Slot7Rider 0 fixed-restored
+248 container-fields-sample Player_1 RetreatBeacon 0 throw-restored
+248 container-fields-sample Player_1 MordorGreatBeast 0 beast-restored
+248 container-fields-sample Player_1 MordorArcherOnBeast 0 beast-seat-restored
+248 container-fields-sample Player_1 HaradKhandishChariot 0 chariot-restored
+258 container-fields-sample Player_1 RetreatBeacon 0 thrown
+258 container-fields-kill Player_1 Slot7StructureGrab 0
+258 container-fields-kill Player_1 IsengardBallista 0
+258 container-fields-kill Player_1 HaradKhandishChariot 0
+260 container-fields-alive Player_1 Slot7Structure 0 grab-death
+260 container-fields-alive Player_1 Slot7Rider 2 mine-ammo-death
+260 container-fields-alive Player_1 DwarvenBattleWagonIronHillsCrossbow 0 chariot-death
+261 container-fields-evacuate Player_1 Slot7SeatFixed 0
+265 container-fields-place Player_1 Slot7Rider 0 - 335 3200
+265 container-fields-sample Player_1 Slot7Rider 0 released
+294 container-fields-sample Player_1 Slot7Rider 0 release-complete
