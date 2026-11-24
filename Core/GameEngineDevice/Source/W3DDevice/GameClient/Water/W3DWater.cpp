@@ -2892,7 +2892,7 @@ Real WaterRenderObjClass::getWaterHeight(Real x, Real y)
 			continue;
 
 		// See if point is in a water area
-		if( pTrig->pointInTrigger( iLoc ) )
+		if( pTrig->isImportedRiver() ? pTrig->pointInImportedRiver(x, y) : pTrig->pointInTrigger(iLoc) )
 		{
 
 			if( pTrig->getPoint( 0 )->z >= waterZ )
@@ -2917,15 +2917,12 @@ Real WaterRenderObjClass::getWaterHeight(Real x, Real y)
 //-------------------------------------------------------------------------------------------------
 void WaterRenderObjClass::drawRiverWater(PolygonTrigger *pTrig)
 {
-	DX8Wrapper::Invalidate_Cached_Render_States();	///@todo: Figure out why rivers don't draw without reset of all states.
-
-	Int rectangleCount = pTrig->getNumPoints()/2;
-	rectangleCount--;
-
-	Real bumpFactor = 5;
-	static Bool doWobble = true;
-
-	if (m_disableRiver) return;
+	const Int pointCount = pTrig->getNumPoints();
+	const Int rectangleCount = pointCount / 2 - 1;
+	Int innerNdx = pTrig->getRiverStart();
+	if (m_disableRiver || rectangleCount <= 0 || innerNdx < 0 || innerNdx >= pointCount - 1)
+		return;
+	Int outerNdx = innerNdx + 1;
 
 	//allocate 2 triangles per side with 3 indices per triangle
 	const Int indexCount = (rectangleCount+1)*2*3;
@@ -2934,6 +2931,29 @@ void WaterRenderObjClass::drawRiverWater(PolygonTrigger *pTrig)
 	if (indexCount > DynamicIBAccessClass::MAX_INDEX_COUNT)
 		return;
 
+	const auto distance = [](const ICoord3D &a, const ICoord3D &b)
+	{
+		const Real dx = Real(a.x) - Real(b.x);
+		const Real dy = Real(a.y) - Real(b.y);
+		return sqrt(dx * dx + dy * dy);
+	};
+	const Real endWidth = distance(*pTrig->getPoint(innerNdx), *pTrig->getPoint(outerNdx));
+	Real textureWidth = endWidth;
+	for (Int section = 1; textureWidth == 0 && section <= rectangleCount; ++section)
+	{
+		const Int inner = (innerNdx + pointCount - section) % pointCount;
+		const Int outer = (outerNdx + section) % pointCount;
+		textureWidth = distance(*pTrig->getPoint(inner), *pTrig->getPoint(outer));
+	}
+	if (textureWidth == 0)
+		return;
+
+	Real totalLength = 0;
+	for (Int i = 1; i < pointCount; ++i)
+		totalLength += distance(*pTrig->getPoint(i - 1), *pTrig->getPoint(i));
+	const Real vScale = ((totalLength / 2) - endWidth) / textureWidth / rectangleCount;
+
+	DX8Wrapper::Invalidate_Cached_Render_States();
 	m_drawingRiver = true;
 
 	DynamicIBAccessClass ib_access(BUFFER_TYPE_DYNAMIC_DX8,indexCount);
@@ -3010,32 +3030,7 @@ void WaterRenderObjClass::drawRiverWater(PolygonTrigger *pTrig)
 	//Keep diffuse from lighting calculations but substitute custom alpha
 	diffuse |= m_settings[m_tod].waterDiffuse & 0xff000000;	//copy alpha/opacity from ini setting
 
-	Int innerNdx = pTrig->getRiverStart();
-	Int outerNdx = innerNdx+1;
-
-	Real endLen=0;
-	Real totalLen=0;
-	Int i;
-	for (i=0; i<pTrig->getNumPoints()-1; i++) {
-		ICoord3D innerPt = *pTrig->getPoint(i);
-		ICoord3D outerPt = *pTrig->getPoint(i+1);
-		Real dx = innerPt.x-outerPt.x;
-		Real dy = innerPt.y-outerPt.y;
-		Real curLen = sqrt(dx*dx+dy*dy);
-		totalLen += curLen;
-		if ( i==innerNdx) {
-			endLen = curLen;
-		}
-	}
-	bumpFactor = endLen/BUMP_SIZE;
-
-	Real lengthOfRiver = (totalLen/2)-endLen;
-	Real repeatCount = lengthOfRiver / (endLen);
-
-	Real vScale=(Real)repeatCount/(Real)rectangleCount;
-
 #define HEIGHT_TO_USE (0.5f)
-	if (innerNdx >= pTrig->getNumPoints()-1) return;
 	//allocate 2 vertices per side
 	DynamicVBAccessClass vb_access(BUFFER_TYPE_DYNAMIC_DX8,dynamic_fvf_type,(rectangleCount+1)*2);
 	{
@@ -3048,7 +3043,7 @@ void WaterRenderObjClass::drawRiverWater(PolygonTrigger *pTrig)
 		// at river borders.
 		W3DShroud *shroud = TheTerrainRenderObject ? TheTerrainRenderObject->getShroud() : nullptr;
 
-		for (i=0; i<(pTrig->getNumPoints()/2); i++)
+		for (Int i = 0; i < pointCount / 2; ++i)
 		{
 			Real x,y;
 			ICoord3D innerPt = *pTrig->getPoint(outerNdx);
