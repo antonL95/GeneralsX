@@ -189,6 +189,14 @@ Int ScriptEngine::findRotwkActionByRetailIndex(Int retailIndex)
 	return -1;
 }
 
+Int ScriptEngine::findRotwkConditionByRetailIndex(Int retailIndex)
+{
+	for (const RotwkTemplate &entry : s_conditions)
+		if (entry.retailIndex == retailIndex)
+			return entry.type;
+	return -1;
+}
+
 void ScriptEngine::reportRotwkUnimplemented(Bool condition, Int type)
 {
 	static Bool reportedActions[ScriptAction::NUM_ITEMS];

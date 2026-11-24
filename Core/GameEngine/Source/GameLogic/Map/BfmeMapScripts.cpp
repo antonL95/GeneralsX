@@ -299,6 +299,12 @@ Int BfmeMapScripts::readOpcode(DataChunkInput &file, BfmeScriptOpcode &opcode, P
 		Int mappedType = authoredType;
 		if (RetailFileLayers::enabled() && !named && !condition && authoredType >= ScriptAction::FIRST_ROTWK)
 			mappedType = ScriptEngine::findRotwkActionByRetailIndex(authoredType);
+		if (!named && condition)
+		{
+			const Int retailType = ScriptEngine::findRotwkConditionByRetailIndex(authoredType);
+			if (retailType >= 0)
+				mappedType = retailType;
+		}
 #endif
 		for (Int i = 0; i < limit; ++i)
 		{

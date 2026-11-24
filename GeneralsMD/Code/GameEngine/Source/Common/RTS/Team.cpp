@@ -2763,7 +2763,7 @@ void Team::loadPostProcess()
 		// check everything here to make sure that all the objects that should be on the team,
 		// are in fact on the team
 		//
-		if( isInList_TeamMemberList( obj ) == FALSE )
+		if (obj->getTeam() != this || !isInList_TeamMemberList(obj))
 		{
 
 			DEBUG_CRASH(( "Team::loadPostProcess - Object '%s'(%d) should be in team list but is not",

@@ -7,6 +7,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
+#include "GameLogic/TerrainLogic.h"
 
 namespace
 {
@@ -48,9 +49,16 @@ void waypointProbe(const RetailTestCommands::Context& ctx)
 	if (!unit)
 		return;
 	Team* team = unit->getTeam();
-	std::fprintf(stderr, "TEST skirmish-waypoint frame=%u first=%d reachable=%d missing=%d\n",
+	const char* cliff = "AOR_Random Waypoint_17";
+	const Int retailType = ScriptEngine::findRotwkConditionByRetailIndex(139);
+	const Template* definition = retailType >= 0 ? TheScriptEngine->getConditionTemplate(retailType) : nullptr;
+	const Bool signature = definition && definition->m_internalName == "TEAM_CAN_PATH_TO_WAYPOINT" &&
+		definition->getNumParameters() == 2 && definition->getParameterType(0) == Parameter::TEAM &&
+		definition->getParameterType(1) == Parameter::WAYPOINT;
+	std::fprintf(stderr, "TEST skirmish-waypoint frame=%u first=%d reachable=%d missing=%d cliff=%d signature=%d\n",
 		ctx.frame, team->getFirstItemIn_TeamMemberList() == unit,
-		canPath(team, "SpawnPoint_SkirmishGollum_3"), canPath(team, "SkirmishWaypointMissing"));
+		canPath(team, "SpawnPoint_SkirmishGollum_3"), canPath(team, "SkirmishWaypointMissing"),
+		TheTerrainLogic->getWaypointByName(cliff) && !canPath(team, cliff), signature);
 }
 }
 #endif

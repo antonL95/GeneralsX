@@ -1,8 +1,8 @@
-234 create Player_1 SkirmishWaypointWalker 0 1940,2865,0
-235 create Player_1 SkirmishWaypointStatic 0 1930,2865,0
-236 skirmish-waypoint-probe Player_1 SkirmishWaypointStatic 0
-240 skirmish-waypoint-promote Player_1 SkirmishWaypointWalker 0
-242 skirmish-waypoint-probe Player_1 SkirmishWaypointWalker 0
-246 skirmish-waypoint-probe Player_1 SkirmishWaypointWalker 0
-250 destroy Player_1 SkirmishWaypointWalker 0
-250 destroy Player_1 SkirmishWaypointStatic 0
+234 create PlyrCivilian SkirmishWaypointWalker 0 1940,2865,0
+235 create PlyrCivilian SkirmishWaypointStatic 0 1930,2865,0
+236 skirmish-waypoint-probe PlyrCivilian SkirmishWaypointStatic 0
+240 skirmish-waypoint-promote PlyrCivilian SkirmishWaypointWalker 0
+242 skirmish-waypoint-probe PlyrCivilian SkirmishWaypointWalker 0
+246 skirmish-waypoint-probe PlyrCivilian SkirmishWaypointWalker 0
+250 destroy PlyrCivilian SkirmishWaypointWalker 0
+250 destroy PlyrCivilian SkirmishWaypointStatic 0

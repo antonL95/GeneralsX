@@ -243,6 +243,7 @@ public:
 	virtual const ConditionTemplate *getConditionTemplate( Int ndx); ///< Get the template for a script Condition.
 	static Bool isRotwkImplemented(Bool condition, Int type);
 	static Int findRotwkActionByRetailIndex(Int retailIndex);
+	static Int findRotwkConditionByRetailIndex(Int retailIndex);
 	static void reportRotwkUnimplemented(Bool condition, Int type);
 	static void traceRotwk(Bool condition, Int type, Int value);
 	virtual void startEndGameTimer(); ///< Starts the end game timer after a mission is won or lost.
