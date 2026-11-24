@@ -769,6 +769,10 @@ class GenericObjectCreationNugget : public ObjectCreationNugget
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(GenericObjectCreationNugget, "GenericObjectCreationNugget")
 public:
+	Bool hasStrafeSpawnOrder() const override
+	{
+		return m_nameAreObjects && m_issueMoveAfterCreation && m_moveUsesStrafeUpdate;
+	}
 
 	GenericObjectCreationNugget() :
 		m_requiresLivePlayer(FALSE),
@@ -1857,6 +1861,12 @@ void ObjectCreationList::addObjectCreationNugget(ObjectCreationNugget* nugget)
 {
 	m_nuggets.push_back(nugget);
 	TheObjectCreationListStore->addObjectCreationNugget(nugget);
+}
+
+Bool ObjectCreationList::hasStrafeSpawnOrder() const
+{
+	return std::any_of(m_nuggets.begin(), m_nuggets.end(),
+		[](const ObjectCreationNugget* nugget) { return nugget->hasStrafeSpawnOrder(); });
 }
 
 //-------------------------------------------------------------------------------------------------

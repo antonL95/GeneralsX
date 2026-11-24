@@ -1777,6 +1777,11 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 	if (m_canPathThroughUnits)
 		return FALSE;
 
+	const Object* self = getObject();
+	if (self->isKindOf(KINDOF_PATH_THROUGH_EACH_OTHER) &&
+		other->isKindOf(KINDOF_PATH_THROUGH_EACH_OTHER) && self->getRelationship(other) == ALLIES)
+		return FALSE;
+
 	AIUpdateInterface* aiOther = other->getAI();
 	if (aiOther == nullptr)
 		return FALSE;

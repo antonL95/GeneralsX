@@ -84,6 +84,7 @@ public:
 	virtual Object* create( const Object* primaryObj, const Coord3D *primary, const Coord3D* secondary, Real angle, UnsignedInt lifetimeFrames = 0 ) const = 0;
 	virtual Object* createFromImpact(const Object* source, const Coord3D* position, const Coord3D* attackerPosition,
 		const Coord3D& velocity) const;
+	virtual Bool hasStrafeSpawnOrder() const { return FALSE; }
 
 	/**
 		the object-based version... by default, just call the location-based implementation.
@@ -133,6 +134,7 @@ public:
 	void clear();
 
 	void addObjectCreationNugget(ObjectCreationNugget* nugget);
+	Bool hasStrafeSpawnOrder() const;
 
 	// Kris: August 23, 2003
 	// All OCLs return the first object that is created (or null if not applicable).

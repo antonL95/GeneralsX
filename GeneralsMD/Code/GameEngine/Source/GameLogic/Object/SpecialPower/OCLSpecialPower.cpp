@@ -32,7 +32,6 @@
 
 #include "Common/Player.h"
 #include "Common/RandomValue.h"
-#include "Common/RetailFileLayers.h"
 #include "Common/ThingFactory.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
@@ -194,7 +193,7 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 	switch (modData->m_createLoc)
 	{
 		case CREATE_AT_EDGE_NEAR_TARGET_AND_MOVE_TO_LOCATION:
-			if (RetailFileLayers::enabled())
+			if (ocl && ocl->hasStrafeSpawnOrder())
 			{
 				creationCoord = TheTerrainLogic->findClosestEdgePoint(&targetCoord);
 				ObjectCreationList::create(ocl, getObject(), &creationCoord, &targetCoord, angle);
