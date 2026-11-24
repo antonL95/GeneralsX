@@ -360,6 +360,12 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	}
 
 	AsciiString fileToPlay = event->getFilename();
+	if (info->m_soundType == AT_SoundEffect) {
+		if (event->getNextPlayPortion() == PP_Attack)
+			fileToPlay = event->getAttackFilename();
+		else if (event->getNextPlayPortion() == PP_Decay)
+			fileToPlay = event->getDecayFilename();
+	}
 	DEBUG_LOG(("MINIAUDIO: playAudioEvent '%s' type=%d file='%s'\n",
 		event->getEventName().str(), info->m_soundType, fileToPlay.str()));
 
@@ -382,6 +388,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 			}
 		}
 	}
+	event->setHandleToKill(0);
 
 	ma_sound_group *groupToUse = NULL;
 	ma_uint32 flags = MA_SOUND_FLAG_NO_SPATIALIZATION | MA_SOUND_FLAG_NO_PITCH;
@@ -404,39 +411,8 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		break;
 	}
 
-	if (!m_deviceOpened)
-	{
-		if (!m_headlessVirtualPlayback)
-		{
-			releasePlayingAudio(audio);
-			return;
-		}
-		if (info->m_soundType == AT_Music || info->m_soundType == AT_Streaming)
-		{
-			audio->m_type = PAT_Stream;
-			if (info->m_soundType == AT_Music)
-			{
-				audio->m_targetLoopCount = event->getLoopCount();
-				audio->m_virtualDurationMs = 15000.0f;
-			}
-			else
-			{
-				audio->m_virtualDurationMs = 3000.0f;
-			}
-		}
-		else
-		{
-			audio->m_type = event->isPositionalAudio() ? PAT_3DSample : PAT_Sample;
-			audio->m_virtualDurationMs = (info->m_control & AC_LOOP) && info->m_loopCount == 0 ? 0.0f : 1500.0f;
-		}
-		audio->m_fadeIn = event->getShouldFade();
-		m_playingSounds.push_back(audio);
-		if (m_traceEnabled)
-		{
-			const ObjectID owner = event->getOwnerType() == OT_Object ? event->getObjectID() : INVALID_ID;
-			traceEvent("start", owner, event->getPlayingHandle(), event->getEventName(),
-				event->getLogicalTrackName().isNotEmpty() ? event->getLogicalTrackName().str() : nullptr);
-		}
+	if (!m_deviceOpened && !m_headlessVirtualPlayback) {
+		releasePlayingAudio(audio);
 		return;
 	}
 
@@ -444,6 +420,10 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	// This avoids miniaudio's built-in decoders which hang on MP3 via VFS.
 	File *file = TheFileSystem->openFile(fileToPlay.str());
 	if (!file) {
+		if (m_headlessVirtualPlayback) {
+			std::fprintf(stderr, "AUDIO TRACE missing file event=%s\n", event->getEventName().str());
+			std::abort();
+		}
 		DEBUG_LOG(("MiniAudio: Failed to open file: %s\n", fileToPlay.str()));
 		releasePlayingAudio(audio);
 		return;
@@ -451,6 +431,10 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 
 	FFmpegFile *ffmpegFile = NEW FFmpegFile();
 	if (!ffmpegFile->open(file)) {
+		if (m_headlessVirtualPlayback) {
+			std::fprintf(stderr, "AUDIO TRACE cannot decode event=%s\n", event->getEventName().str());
+			std::abort();
+		}
 		DEBUG_LOG(("MiniAudio: Failed to open FFmpeg file: %s\n", fileToPlay.str()));
 		delete ffmpegFile;
 		releasePlayingAudio(audio);
@@ -497,8 +481,39 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	ffmpegFile = NULL;
 
 	if (pcmData.empty() || sampleRate == 0 || bytesPerSample == 0) {
+		if (m_headlessVirtualPlayback) {
+			std::fprintf(stderr, "AUDIO TRACE unknown duration event=%s\n", event->getEventName().str());
+			std::abort();
+		}
 		DEBUG_LOG(("MiniAudio: No audio data decoded from: %s\n", fileToPlay.str()));
 		releasePlayingAudio(audio);
+		return;
+	}
+
+	if (m_headlessVirtualPlayback)
+	{
+		if (channels <= 0) {
+			std::fprintf(stderr, "AUDIO TRACE unknown duration event=%s\n", event->getEventName().str());
+			std::abort();
+		}
+		audio->m_virtualDurationMs = static_cast<Real>(pcmData.size()) * 1000.0f /
+			static_cast<Real>(sampleRate * channels * bytesPerSample);
+		audio->m_virtualLastFrame = TheGameLogic ? TheGameLogic->getFrame() : 0;
+		if (m_traceEnabled)
+			std::fprintf(stderr, "AUDIO DURATION handle=%u ms=%.3f bytes=%zu rate=%d channels=%d samplebytes=%d\n",
+				static_cast<UnsignedInt>(event->getPlayingHandle()), audio->m_virtualDurationMs,
+				pcmData.size(), sampleRate, channels, bytesPerSample);
+		audio->m_type = info->m_soundType == AT_Music || info->m_soundType == AT_Streaming ? PAT_Stream :
+			(event->isPositionalAudio() ? PAT_3DSample : PAT_Sample);
+		audio->m_fadeIn = event->getShouldFade();
+		m_playingSounds.push_back(audio);
+		if (m_traceEnabled) {
+			const ObjectID owner = event->getOwnerType() == OT_Object ? event->getObjectID() : INVALID_ID;
+			const char *portion = info->m_soundType != AT_SoundEffect ? nullptr :
+				(event->getNextPlayPortion() == PP_Attack ? "attack" :
+				(event->getNextPlayPortion() == PP_Decay ? "decay" : "sound"));
+			traceEvent(req->m_isContinuation ? "segment" : "start", owner, event->getPlayingHandle(), event->getEventName(), portion);
+		}
 		return;
 	}
 
@@ -610,8 +625,12 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	if (m_traceEnabled)
 	{
 		const ObjectID owner = event->getOwnerType() == OT_Object ? event->getObjectID() : INVALID_ID;
-		traceEvent("start", owner, event->getPlayingHandle(), event->getEventName(),
-			event->getLogicalTrackName().isNotEmpty() ? event->getLogicalTrackName().str() : nullptr);
+		const char *portion = info->m_soundType != AT_SoundEffect ?
+			(event->getLogicalTrackName().isNotEmpty() ? event->getLogicalTrackName().str() : nullptr) :
+			(event->getNextPlayPortion() == PP_Attack ? "attack" :
+			(event->getNextPlayPortion() == PP_Decay ? "decay" : "sound"));
+		traceEvent(req->m_isContinuation ? "segment" : "start", owner, event->getPlayingHandle(), event->getEventName(),
+			portion);
 	}
 }
 
@@ -639,6 +658,23 @@ void MiniAudioManager::stopAudioEvent(AudioHandle handle)
 				break;
 			}
 		}
+	}
+	for (auto request = m_audioRequests.begin(); request != m_audioRequests.end(); ++request) {
+		AudioRequest *pending = *request;
+		if (!pending || pending->m_request != AR_Play || !pending->m_pendingEvent ||
+			pending->m_pendingEvent->getPlayingHandle() != handle)
+			continue;
+		AudioEventRTS *event = pending->m_pendingEvent.Peek();
+		const AudioEventInfo *info = event->getAudioEventInfo();
+		if (pending->m_isContinuation && info && (info->m_control & AC_LOOP) &&
+			!event->getDecayFilename().isEmpty() && event->getNextPlayPortion() != PP_Decay) {
+			event->setNextPlayPortion(PP_Decay);
+			event->decrementDelay(event->getDelay());
+		} else {
+			deleteInstance(pending);
+			m_audioRequests.erase(request);
+		}
+		return;
 	}
 
 	// Find and mark the audio event for stopping
@@ -720,6 +756,11 @@ void MiniAudioManager::releaseMiniAudioHandles(PlayingAudio *release)
 void MiniAudioManager::releasePlayingAudio(PlayingAudio *release)
 {
 	if (!release) return;
+	if (m_traceEnabled && !release->m_continuationPending && release->m_audioEventRTS) {
+		AudioEventRTS *event = release->m_audioEventRTS.Peek();
+		const ObjectID owner = event->getOwnerType() == OT_Object ? event->getObjectID() : INVALID_ID;
+		traceEvent("stop", owner, event->getPlayingHandle(), event->getEventName());
+	}
 
 	const AudioEventInfo *releaseInfo = release->m_audioEventRTS
 		? release->m_audioEventRTS->getAudioEventInfo() : nullptr;
@@ -1003,7 +1044,6 @@ Bool MiniAudioManager::isCurrentlyPlaying(AudioHandle handle)
 //-------------------------------------------------------------------------------------------------
 void MiniAudioManager::notifyOfAudioCompletion(UnsignedInt audioCompleted, UnsignedInt flags)
 {
-	// GeneralsX @bugfix meerzulee 19/07/2026 FP env guard for audio entry point (see #215)
 	ScopedFPUGuard fpuGuard;
 	PlayingAudio *playing = findPlayingAudioFrom(audioCompleted, flags);
 	if (!playing) return;
@@ -1012,23 +1052,39 @@ void MiniAudioManager::notifyOfAudioCompletion(UnsignedInt audioCompleted, Unsig
 	if (getDisallowSpeech() && playing->m_audioEventRTS->getAudioEventInfo()->m_soundType == AT_Streaming)
 		setDisallowSpeech(FALSE);
 
-	if (!playing->m_audioEventRTS->getPlayMusicOnce() && (playing->m_audioEventRTS->getAudioEventInfo()->m_control & AC_LOOP)) {
-		if (playing->m_audioEventRTS->getNextPlayPortion() == PP_Attack)
-			playing->m_audioEventRTS->setNextPlayPortion(PP_Sound);
-		if (playing->m_audioEventRTS->getNextPlayPortion() == PP_Sound) {
-			playing->m_audioEventRTS->decreaseLoopCount();
-			if (startNextLoop(playing)) return;
-		}
+	AudioEventRTS *event = playing->m_audioEventRTS.Peek();
+	const AudioEventInfo *info = event->getAudioEventInfo();
+	if (info->m_soundType != AT_SoundEffect)
+		return;
+	if (playing->m_requestStop) {
+		if (!(info->m_control & AC_LOOP) || event->getDecayFilename().isEmpty() ||
+			event->getNextPlayPortion() == PP_Decay)
+			return;
+		event->setNextPlayPortion(PP_Decay);
+	} else if ((info->m_control & AC_LOOP) && event->getNextPlayPortion() == PP_Sound) {
+		event->decreaseLoopCount();
+		if (event->hasMoreLoops())
+			event->generateFilename();
+		else
+			event->advanceNextPlayPortion();
+	} else {
+		event->advanceNextPlayPortion();
 	}
+	if (event->getNextPlayPortion() == PP_Done)
+		return;
+	AudioRequest *req = allocateAudioRequest();
+	req->m_pendingEvent = playing->m_audioEventRTS;
+	req->m_isContinuation = TRUE;
+	appendAudioRequest(req);
+	playing->m_continuationPending = TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
-PlayingAudio *MiniAudioManager::findPlayingAudioFrom(UnsignedInt audioCompleted, UnsignedInt flags)
+PlayingAudio *MiniAudioManager::findPlayingAudioFrom(UnsignedInt audioCompleted, UnsignedInt)
 {
-	ma_sound *sound = (ma_sound *)audioCompleted;
 	for (auto it = m_playingSounds.begin(); it != m_playingSounds.end(); ++it) {
 		PlayingAudio *playing = *it;
-		if (playing && playing->m_sound == sound)
+		if (playing && playing->m_audioEventRTS && playing->m_audioEventRTS->getPlayingHandle() == audioCompleted)
 			return playing;
 	}
 	return NULL;
@@ -1376,17 +1432,37 @@ void MiniAudioManager::processPlayingList(void)
 			it = m_playingSounds.erase(it);
 			continue;
 		}
-
-		// Check if sound was explicitly marked to stop
-		if (playing->m_requestStop) {
-			if (playing->m_sound) ma_sound_stop(playing->m_sound);
-			it = m_playingSounds.erase(it);
-			releasePlayingAudio(playing);
-			continue;
+		const AudioEventInfo *info = playing->m_audioEventRTS ? playing->m_audioEventRTS->getAudioEventInfo() : nullptr;
+		Bool finished = FALSE;
+		if (info && !playing->m_paused && !playing->m_requestStop) {
+			if (!playing->m_sound && m_headlessVirtualPlayback) {
+				const UnsignedInt frame = TheGameLogic ? TheGameLogic->getFrame() : playing->m_virtualLastFrame;
+				if (frame >= playing->m_virtualLastFrame)
+					playing->m_virtualElapsedMs += (frame - playing->m_virtualLastFrame) * MSEC_PER_LOGICFRAME_REAL;
+				playing->m_virtualLastFrame = frame;
+				if (info->m_soundType == AT_Music) {
+					while (playing->m_virtualElapsedMs >= playing->m_virtualDurationMs) {
+						playing->m_virtualElapsedMs -= playing->m_virtualDurationMs;
+						++playing->m_completedLoops;
+					}
+				} else {
+					finished = playing->m_virtualElapsedMs >= playing->m_virtualDurationMs;
+				}
+			} else if (playing->m_sound && info->m_soundType == AT_Music) {
+				ma_uint64 cursor = 0;
+				if (ma_sound_get_cursor_in_pcm_frames(playing->m_sound, &cursor) == MA_SUCCESS) {
+					if (cursor < playing->m_lastCursor)
+						++playing->m_completedLoops;
+					playing->m_lastCursor = cursor;
+				}
+			}
 		}
 
-		// GeneralsX @bugfix elmeriniemela 17/10/2026 Paused sounds are stopped but not finished.
-		if (playing->m_sound && !playing->m_paused && !ma_sound_is_playing(playing->m_sound)) {
+		// Check if sound was explicitly marked to stop
+		if (playing->m_requestStop || finished || (playing->m_sound && !playing->m_paused && !ma_sound_is_playing(playing->m_sound))) {
+			if (playing->m_sound) ma_sound_stop(playing->m_sound);
+			if (playing->m_audioEventRTS)
+				notifyOfAudioCompletion(playing->m_audioEventRTS->getPlayingHandle(), playing->m_type);
 			it = m_playingSounds.erase(it);
 			releasePlayingAudio(playing);
 			continue;
@@ -1536,46 +1612,6 @@ void MiniAudioManager::closeAnySamplesUsingFile(const void *fileToClose)
 	// miniaudio manages file lifecycle internally after decoding
 }
 
-
-//-------------------------------------------------------------------------------------------------
-Bool MiniAudioManager::startNextLoop(PlayingAudio *looping)
-{
-	if (looping->m_requestStop) return false;
-	if (!looping->m_audioEventRTS->hasMoreLoops()) return false;
-
-	looping->m_audioEventRTS->generateFilename();
-
-	if (looping->m_audioEventRTS->getDelay() > MSEC_PER_LOGICFRAME_REAL) {
-		looping->m_requestStop = true;
-
-		AudioRequest *req = allocateAudioRequest();
-		req->m_pendingEvent = looping->m_audioEventRTS;
-		req->m_requiresCheckForSample = true;
-		appendAudioRequest(req);
-		return true;
-	}
-
-	// Re-initialize the sound from the new file
-	if (looping->m_sound) {
-		ma_sound_uninit(looping->m_sound);
-	}
-
-	AsciiString fileToPlay = looping->m_audioEventRTS->getFilename();
-	ma_uint32 flags = MA_SOUND_FLAG_NO_SPATIALIZATION | MA_SOUND_FLAG_NO_PITCH;
-	if (looping->m_type == PAT_3DSample) flags = 0;
-
-	ma_result result = ma_sound_init_from_file(&m_engine, fileToPlay.str(), flags,
-		(looping->m_type == PAT_3DSample) ? &m_sound3DGroup : &m_soundGroup,
-		NULL, looping->m_sound);
-
-	if (result == MA_SUCCESS) {
-		// GeneralsX @bugfix Mr. Meeseeks 19/06/2026 - Initialize loop volume using adjustPlayingVolume
-		adjustPlayingVolume(looping);
-		ma_sound_start(looping->m_sound);
-		return true;
-	}
-	return false;
-}
 
 //-------------------------------------------------------------------------------------------------
 void MiniAudioManager::playStream(AudioEventRTS *event, ma_sound *sound)

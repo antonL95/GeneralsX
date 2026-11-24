@@ -46,13 +46,15 @@ struct PlayingAudio
 	PlayingAudioType m_type;
 	RefCountPtr<DynamicAudioEventRTS> m_audioEventRTS;
 	Bool m_requestStop;
+	Bool m_continuationPending;
 	// GeneralsX @bugfix elmeriniemela 17/10/2026 Paused by pauseAudio(), not finished.
 	Bool m_paused;
 	Int m_framesFaded;
 	Bool m_fadeIn;
 	Int m_fadeInFrames;
 	Int m_completedLoops;
-	Int m_targetLoopCount;
+	ma_uint64 m_lastCursor;
+	UnsignedInt m_virtualLastFrame;
 	Real m_virtualDurationMs;
 	Real m_virtualElapsedMs;
 
@@ -62,12 +64,14 @@ struct PlayingAudio
 		m_type(PAT_INVALID),
 		m_audioEventRTS(NULL),
 		m_requestStop(false),
+		m_continuationPending(false),
 		m_paused(false),
 		m_framesFaded(0),
 		m_fadeIn(false),
 		m_fadeInFrames(0),
 		m_completedLoops(0),
-		m_targetLoopCount(0),
+		m_lastCursor(0),
+		m_virtualLastFrame(0),
 		m_virtualDurationMs(0.0f),
 		m_virtualElapsedMs(0.0f)
 	{ }
@@ -180,7 +184,6 @@ protected:
 	Real getEffectiveVolume(AudioEventRTS *event) const;
 
 	// Looping functions
-	Bool startNextLoop(PlayingAudio *looping);
 
 	void playStream(AudioEventRTS *event, ma_sound *sound);
 

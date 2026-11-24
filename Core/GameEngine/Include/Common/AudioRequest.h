@@ -52,6 +52,7 @@ public:
 		, m_handleToInteractOn(AHSV_Error)
 		, m_requiresCheckForSample(false)
 		, m_requestStop(false)
+		, m_isContinuation(false)
 	{}
 
 	RequestType m_request;
@@ -59,4 +60,5 @@ public:
 	AudioHandle m_handleToInteractOn;
 	Bool m_requiresCheckForSample;
 	Bool m_requestStop; // Let the audio play and finish but stop looping if it is looping
+	Bool m_isContinuation;
 };
