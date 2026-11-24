@@ -214,6 +214,7 @@ Bool RetailWallMesh::load(const AsciiString& model, const AsciiString& name, Mes
 					Real x, y, z;
 					if (!real(data, p, x) || !real(data, p + 4, y) || !real(data, p + 8, z))
 						return FALSE;
+					mesh.localVertices.push_back({x, y, z});
 					Vector3 transformed;
 					Matrix3D::Transform_Vector(pivots[bone], Vector3(x, y, z), &transformed);
 					mesh.vertices.push_back({transformed.X, transformed.Y, transformed.Z});
@@ -239,4 +240,135 @@ Bool RetailWallMesh::load(const AsciiString& model, const AsciiString& name, Mes
 		return !mesh.vertices.empty() && !mesh.faces.empty();
 	}
 	return FALSE;
+}
+
+namespace
+{
+Bool samePoint(const Coord3D& a, const Coord3D& b)
+{
+	return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+Real distanceSquared(const Coord3D& a, const Coord3D& b)
+{
+	const Real x = a.x - b.x;
+	const Real y = a.y - b.y;
+	const Real z = a.z - b.z;
+	return x * x + y * y + z * z;
+}
+
+Coord3D midpoint(const Coord3D& a, const Coord3D& b)
+{
+	return {(a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f, (a.z + b.z) * 0.5f};
+}
+}
+
+Bool RetailWallMesh::polygon(const Mesh& mesh, std::vector<Coord3D>& points)
+{
+	points.clear();
+	if (mesh.vertices.size() >= 100 || mesh.faces.size() >= 100)
+		return FALSE;
+	std::vector<UnsignedInt> canonical(mesh.vertices.size());
+	for (size_t i = 0; i < mesh.vertices.size(); ++i)
+	{
+		canonical[i] = static_cast<UnsignedInt>(i);
+		for (size_t j = 0; j < i; ++j)
+			if (samePoint(mesh.vertices[i], mesh.vertices[j]))
+			{
+				canonical[i] = canonical[j];
+				break;
+			}
+	}
+	struct Edge { UnsignedInt a, b, count; };
+	std::vector<Edge> edges;
+	for (const auto& face : mesh.faces)
+	{
+		for (Int i = 0; i < 3; ++i)
+		{
+			if (face[i] >= canonical.size() || face[(i + 1) % 3] >= canonical.size())
+				return FALSE;
+			const UnsignedInt a = canonical[face[i]], b = canonical[face[(i + 1) % 3]];
+			if (a == b)
+				continue;
+			auto found = std::find_if(edges.begin(), edges.end(), [&](const Edge& edge)
+			{
+				return (edge.a == a && edge.b == b) || (edge.a == b && edge.b == a);
+			});
+			if (found == edges.end())
+				edges.push_back({a, b, 1});
+			else
+				++found->count;
+		}
+	}
+	const auto first = std::find_if(edges.begin(), edges.end(), [](const Edge& edge) { return edge.count == 1; });
+	if (first == edges.end())
+		return FALSE;
+	const UnsignedInt start = first->a;
+	UnsignedInt current = first->b;
+	points.push_back(mesh.vertices[start]);
+	first->count = 0;
+	while (current != start)
+	{
+		if (points.size() >= mesh.vertices.size())
+			return FALSE;
+		points.push_back(mesh.vertices[current]);
+		auto next = std::find_if(edges.begin(), edges.end(), [&](const Edge& edge)
+		{
+			return edge.count == 1 && (edge.a == current || edge.b == current);
+		});
+		if (next == edges.end())
+			return FALSE;
+		current = next->a == current ? next->b : next->a;
+		next->count = 0;
+	}
+	return points.size() >= 3;
+}
+
+Bool RetailWallMesh::ramp(const Mesh& mesh, Ramp& result)
+{
+	if (mesh.vertices.size() < 4 || mesh.localVertices.size() != mesh.vertices.size())
+		return FALSE;
+	Real low = mesh.localVertices[0].z, high = low;
+	for (const auto& vertex : mesh.localVertices)
+	{
+		low = std::min(low, vertex.z);
+		high = std::max(high, vertex.z);
+	}
+	if (low == high)
+		return FALSE;
+	const Real band = (high - low) * 0.02f;
+	std::array<size_t, 2> lowPair{}, highPair{};
+	Real lowDistance = 0, highDistance = 0;
+	for (size_t i = 0; i < mesh.vertices.size(); ++i)
+	{
+		for (size_t j = i + 1; j < mesh.vertices.size(); ++j)
+		{
+			const Real distance = distanceSquared(mesh.localVertices[i], mesh.localVertices[j]);
+			if (mesh.localVertices[i].z < low + band && mesh.localVertices[j].z < low + band && distance > lowDistance)
+			{
+				lowPair = {i, j};
+				lowDistance = distance;
+			}
+			if (mesh.localVertices[i].z > high - band && mesh.localVertices[j].z > high - band && distance > highDistance)
+			{
+				highPair = {i, j};
+				highDistance = distance;
+			}
+		}
+	}
+	if (lowDistance == 0 || highDistance == 0)
+		return FALSE;
+	if (distanceSquared(mesh.vertices[lowPair[0]], mesh.vertices[highPair[0]]) +
+		distanceSquared(mesh.vertices[lowPair[1]], mesh.vertices[highPair[1]]) >
+		distanceSquared(mesh.vertices[lowPair[0]], mesh.vertices[highPair[1]]) +
+		distanceSquared(mesh.vertices[lowPair[1]], mesh.vertices[highPair[0]]))
+		std::swap(highPair[0], highPair[1]);
+	result.fromLeft = mesh.vertices[lowPair[0]];
+	result.fromRight = mesh.vertices[lowPair[1]];
+	result.toLeft = mesh.vertices[highPair[0]];
+	result.toRight = mesh.vertices[highPair[1]];
+	result.from = midpoint(result.fromLeft, result.fromRight);
+	result.to = midpoint(result.toLeft, result.toRight);
+	result.width = (WWMath::Sqrt(lowDistance) + WWMath::Sqrt(highDistance)) * 0.5f;
+	return TRUE;
 }

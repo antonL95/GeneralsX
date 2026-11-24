@@ -29,6 +29,13 @@ void probeWallRamp(const RetailTestCommands::Context& ctx)
 		a.faces.size(), b.faces.size(), c.faces.size(),
 		foundWall ? a.vertices[0].z : 0.0f, foundFirst ? b.vertices[0].z : 0.0f,
 		foundSecond ? c.vertices[0].z : 0.0f);
+	std::vector<Coord3D> points;
+	RetailWallMesh::Ramp first{}, second{};
+	const Bool hasPolygon = RetailWallMesh::polygon(a, points);
+	const Bool hasFirst = RetailWallMesh::ramp(b, first);
+	const Bool hasSecond = RetailWallMesh::ramp(c, second);
+	std::fprintf(stderr, "TEST wall-ramp-shape frame=%u polygon=%zu ramp1=%d ramp2=%d\n",
+		ctx.frame, hasPolygon ? points.size() : 0, hasFirst, hasSecond);
 }
 }
 #endif
