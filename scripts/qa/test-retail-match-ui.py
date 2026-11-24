@@ -305,12 +305,31 @@ def check_shell_load():
     print(f"PASS frame 91 CRC matches the original match ({resumed[0]})", flush=True)
 
 
+def check_loading():
+    wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
+    time.sleep(2)
+    click(512, 296)
+    click(360, 444)
+    click(360, 169 + 25)
+    click(170, 465)
+    click(170, 541)
+    click(833, 689, settle=0)
+    for frame in range(12):
+        capture(f"loading-{frame}", 0, 0, 1024, 768)
+        time.sleep(0.15)
+    wait_for("the match starts after the loading screen", lambda: len(faction_history()) == 1, 100)
+    print("PASS loading screen shown and match started", flush=True)
+
+
 def check():
     wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
     time.sleep(2)
     skirmish_label = skirmish_label_pixels()
     if len(skirmish_label) < 10:
         sys.exit("FAIL initial shell has no visible Skirmish label")
+    if "--loading" in sys.argv:
+        check_loading()
+        return
     start_match(1)
     wait_for("first skirmish is running", lambda: len(faction_history()) == 1, 100)
     wait_for("first skirmish reaches frame 60", lambda: log_count("TEST powerstate 60 Player_1") >= 1, 60)
