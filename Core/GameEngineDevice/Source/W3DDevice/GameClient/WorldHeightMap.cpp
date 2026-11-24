@@ -517,7 +517,7 @@ void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metada
 	file.registerVersionedParser("BuildLists", root, nullptr, 1);
 	file.registerVersionedParser("TriggerAreas", root, ParseTriggerAreas, 1);
 	file.registerVersionedParser("StandingWaterAreas", root, ParseStandingWaterAreas, 2);
-	file.registerVersionedParser("RiverAreas", root, nullptr, 2);
+	file.registerVersionedParser("RiverAreas", root, ParseRiverAreas, 2);
 	file.registerVersionedParser("StandingWaveAreas", root, nullptr, 2);
 	file.registerVersionedParser("PostEffectsChunk", root, nullptr, 1);
 	file.registerVersionedParser("EnvironmentData", root, nullptr, 3);
@@ -540,13 +540,15 @@ RefCountPtr<WorldHeightMap> WorldHeightMap::readAuditMap(DataChunkInput &file)
 
 void WorldHeightMap::finalizeImportedPolygons(Bool install)
 {
-	if (m_standingWater.empty() && m_triggerAreas.empty())
+	if (m_standingWater.empty() && m_triggerAreas.empty() && m_rivers.empty())
 		return;
 	std::vector<PolygonTrigger *> polygons;
-	polygons.reserve(m_standingWater.size() + m_triggerAreas.size());
+	polygons.reserve(m_standingWater.size() + m_triggerAreas.size() + m_rivers.size());
 	for (const auto &polygon : m_standingWater)
 		polygons.push_back(polygon.get());
 	for (const auto &polygon : m_triggerAreas)
+		polygons.push_back(polygon.get());
+	for (const auto &polygon : m_rivers)
 		polygons.push_back(polygon.get());
 	PolygonTrigger::assignImportedIDs(polygons);
 	if (install)
@@ -557,8 +559,11 @@ void WorldHeightMap::finalizeImportedPolygons(Bool install)
 			polygon.release();
 		for (auto &polygon : m_triggerAreas)
 			polygon.release();
+		for (auto &polygon : m_rivers)
+			polygon.release();
 		m_standingWater.clear();
 		m_triggerAreas.clear();
+		m_rivers.clear();
 	}
 }
 /**
@@ -1608,6 +1613,80 @@ Bool WorldHeightMap::ParseStandingWaterAreas(DataChunkInput &file, DataChunkInfo
 	}
 	for (auto &polygon : polygons)
 		map->m_standingWater.push_back(std::move(polygon));
+	return true;
+}
+
+Bool WorldHeightMap::ParseRiverAreas(DataChunkInput &file, DataChunkInfo *info, void *userData)
+{
+	auto *map = static_cast<WorldHeightMap *>(userData);
+	if (map->getHeightSampleBytes() != 2)
+		return true;
+
+	std::vector<MapPolygon> rivers;
+	try
+	{
+		BfmePolygonReader reader(file);
+		const UnsignedInt count = reader.read<UnsignedInt>();
+		const UnsignedInt strings = info->version >= 2 ? 7 : 6;
+		const UnsignedInt minAreaBytes = 6 * sizeof(UnsignedInt) + strings * sizeof(UnsignedShort) + sizeof(UnsignedByte);
+		if (count > file.getChunkDataSizeLeft() / minAreaBytes)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		for (UnsignedInt area = 0; area < count; ++area)
+		{
+			const UnsignedInt id = reader.read<UnsignedInt>();
+			const AsciiString name = reader.readString();
+			const AsciiString layer = reader.readString();
+			const Real scroll = reader.read<Real>();
+			const UnsignedByte additive = reader.read<UnsignedByte>();
+			for (Int texture = 0; texture < 4; ++texture)
+				reader.readString();
+			reader.read<UnsignedInt>();
+			const Real alpha = reader.read<Real>();
+			const UnsignedInt height = reader.read<UnsignedInt>();
+			if (info->version >= 2)
+				reader.readString();
+			const UnsignedInt sections = reader.read<UnsignedInt>();
+			if (id >= std::numeric_limits<Int>::max() || height > std::numeric_limits<Int>::max() ||
+				additive > 1 || !std::isfinite(scroll) || !std::isfinite(alpha) ||
+				sections > std::numeric_limits<Int>::max() / 2 || sections > file.getChunkDataSizeLeft() / (4 * sizeof(Real)))
+				throw ERROR_CORRUPT_FILE_FORMAT;
+
+			std::vector<std::array<ICoord3D, 2>> banks;
+			banks.reserve(sections);
+			for (UnsignedInt section = 0; section < sections; ++section)
+			{
+				ICoord3D left = reader.readPoint();
+				ICoord3D right = reader.readPoint();
+				left.z = right.z = static_cast<Int>(height);
+				banks.push_back({left, right});
+			}
+			if (banks.size() < 2)
+				continue;
+
+			MapPolygon polygon(newInstance(PolygonTrigger)(2 * sections, id));
+			polygon->setTriggerName(name);
+			polygon->setLayerName(layer);
+			polygon->setWaterArea(TRUE);
+			polygon->setRiver(TRUE);
+			for (auto bank = banks.rbegin(); bank != banks.rend(); ++bank)
+				polygon->addPoint((*bank)[0]);
+			polygon->setRiverStart(polygon->getNumPoints() - 1);
+			for (const auto &bank : banks)
+				polygon->addPoint(bank[1]);
+			rivers.push_back(std::move(polygon));
+		}
+		if (file.getChunkDataSizeLeft() != 0)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+	}
+	catch (ErrorCode)
+	{
+		if (!INIAudit::isEnabled())
+			throw;
+		INIAudit::record("error", "Invalid river map chunk", info->label.str(), 0);
+		return true;
+	}
+	for (auto &river : rivers)
+		map->m_rivers.push_back(std::move(river));
 	return true;
 }
 

@@ -23,6 +23,7 @@ struct Authored
 	float turnThreshold = FULL_TURN / 24.0f;
 	float turnThresholdHighSpeed = FULL_TURN / 2.0f;
 	float maxOverlappedHeight = std::numeric_limits<float>::max();
+	float riverModifier = 1.0f;
 	bool scalesWalls = false;
 	bool useTerrainSmoothing = false;
 	bool enableHighSpeedTurnModelConditions = true;

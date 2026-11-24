@@ -239,6 +239,7 @@ protected:	 // file reader callbacks.
 	static Bool ParseLogicalLightingDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseTriggerAreas(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseStandingWaterAreas(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	static Bool ParseRiverAreas(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	void releaseMapData();
 
 private:
@@ -261,6 +262,7 @@ private:
 	using MapPolygon = std::unique_ptr<PolygonTrigger, MapPolygonDeleter>;
 	std::vector<MapPolygon> m_standingWater;
 	std::vector<MapPolygon> m_triggerAreas;
+	std::vector<MapPolygon> m_rivers;
 	void finalizeImportedPolygons(Bool install);
 	Bool m_releaseAlphaTiles = true;
 	void readBfmeLighting(DataChunkInput &file, unsigned version);

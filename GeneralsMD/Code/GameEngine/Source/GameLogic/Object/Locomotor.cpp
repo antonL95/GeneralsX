@@ -43,6 +43,7 @@
 #include "Common/RotwkDuration.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
@@ -767,6 +768,7 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "EnableHighSpeedTurnModelconditions", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.enableHighSpeedTurnModelConditions) },
 		{ "TurnThresholdHS", INI::parseAngleReal, nullptr, offsetof(LocomotorTemplate, m_rotwk.turnThresholdHighSpeed) },
 		{ "MaxOverlappedHeight", INI::parseReal, nullptr, offsetof(LocomotorTemplate, m_rotwk.maxOverlappedHeight) },
+		{ "RiverModifier", INI::parsePercentToReal, nullptr, offsetof(LocomotorTemplate, m_rotwk.riverModifier) },
 		{ "ScalesWalls", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_rotwk.scalesWalls) },
 		{ "UseTerrainSmoothing", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_rotwk.useTerrainSmoothing) },
 
@@ -1167,6 +1169,16 @@ Real Locomotor::getMaxSpeedForCondition(BodyDamageType condition, const Object* 
 	if (RetailFileLayers::enabled() && obj)
 		if (const auto* siege = SiegeEngineContain::find(obj))
 			speed *= siege->crewSpeedScale();
+
+	const Real riverModifier = m_template->m_rotwk.riverModifier;
+	if (obj && riverModifier != 1.0f)
+	{
+		const Coord3D& pos = *obj->getPosition();
+		const WaterHandle* water = TheTerrainLogic->getWaterHandle(pos.x, pos.y);
+		if (water && water->m_polygon && water->m_polygon->isRiver() &&
+			TheTerrainLogic->getGroundHeight(pos.x, pos.y) < TheTerrainLogic->getWaterHeight(water))
+			speed *= riverModifier;
+	}
 
 	Real maxSpeed = getMaxSpeedOverride();
 	if (speed > maxSpeed)

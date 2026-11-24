@@ -1,0 +1,16 @@
+225 create Player_1 P63StoreBombard 0 375,1255,90
+225 create Player_1 P63StoreFullSpeedShip 0 385,1255,90
+230 marsh-route Player_1 P63StoreBombard 0 - 375 1315
+230 marsh-route Player_1 P63StoreFullSpeedShip 0 - 385 1315
+240 move Player_1 P63StoreBombard 0 - 375 1315
+241 move Player_1 P63StoreFullSpeedShip 0 - 385 1315
+280 steering-path Player_1 P63StoreBombard 0
+280 steering-path Player_1 P63StoreFullSpeedShip 0
+290 steering-path Player_1 P63StoreBombard 0
+290 steering-path Player_1 P63StoreFullSpeedShip 0
+320 destroy Player_1 P63StoreBombard 0
+320 destroy Player_1 P63StoreFullSpeedShip 0
+280 locomotor-store-water Player_1 P63StoreBombard 0
+280 locomotor-store-water Player_1 P63StoreFullSpeedShip 0
+290 locomotor-store-water Player_1 P63StoreBombard 0
+290 locomotor-store-water Player_1 P63StoreFullSpeedShip 0

@@ -625,7 +625,7 @@ Bool PolygonTrigger::pointInTrigger(ICoord3D &point) const
 		Int dy = pt2.y-pt1.y;
 		Int dx = pt2.x-pt1.x;
 
-		const Real numerator = (m_standingWater || m_bfmeTriggerAreaId || isCastleArea()) ? static_cast<Real>(Int64(dx) * (point.y - pt1.y))
+		const Real numerator = (m_standingWater || m_bfmeTriggerAreaId || isCastleArea() || m_isRiver) ? static_cast<Real>(Int64(dx) * (point.y - pt1.y))
 			: static_cast<Real>(dx * (point.y - pt1.y));
 		Real intersectionX = pt1.x + numerator / static_cast<Real>(dy);
 		if (intersectionX >= point.x) {
