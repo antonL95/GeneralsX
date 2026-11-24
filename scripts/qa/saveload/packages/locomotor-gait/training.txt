@@ -1,0 +1,4 @@
+225 create Player_1 GaitHorse 0 1600,2600,0
+230 move Player_1 GaitHorse 0 - 2100 2600
+280 select Player_1 GaitHorse 0
+281 steering-stop - - 0
