@@ -40,6 +40,7 @@
 #include "Common/SpecialPower.h"
 #include "Common/Upgrade.h"
 #include "Common/BuildAssistant.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/ExperienceTracker.h"
@@ -1067,7 +1068,8 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 
 	if (RetailFileLayers::enabled())
 	{
-		if (command->getRequiredRank() > obj->getExperienceTracker()->getRank())
+		if (std::max(command->getRequiredRank(), CreateAHeroSystem::selectedPowerRank(obj, command)) >
+			obj->getExperienceTracker()->getRank())
 			return COMMAND_RESTRICTED;
 		if (!command->isValidContainerForCommand(obj))
 			return COMMAND_HIDDEN;

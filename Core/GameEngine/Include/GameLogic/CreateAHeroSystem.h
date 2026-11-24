@@ -16,6 +16,7 @@ class CommandCatalog;
 class CommandSet;
 class GameInfo;
 class GameSlot;
+class ThingTemplate;
 
 struct CreateAHeroBlingDef
 {
@@ -120,6 +121,8 @@ namespace CreateAHeroSystem
 	const std::vector<CreateAHeroBlingDef>& getBlings();
 	const std::vector<CreateAHeroBlingBinderDef>& getBlingBinders();
 	const std::vector<CreateAHeroClassDef>& getClasses();
+	std::vector<const CommandButton*> getDesignerPowerButtons();
+	std::vector<AsciiString> getGroupUpgrades(const AsciiString& groupName);
 
 	const CreateAHeroClassDef* findClassByUpgrade(const AsciiString& classUpgrade);
 	const CreateAHeroSubClassDef* findSubClassByUpgrade(const CreateAHeroClassDef* heroClass, const AsciiString& subClassUpgrade);
@@ -129,6 +132,10 @@ namespace CreateAHeroSystem
 	Bool validateSelection(const CreateAHeroRules::SelectionData& sel, const AsciiString& factionName, CreateAHeroRules::SelectionData& normalized);
 	Bool isPowerButtonLegalForSelection(const CommandButton* button, const CreateAHeroRules::SelectionData& sel, Int selectedLevel, const std::vector<std::string>& chosenBefore);
 	Int effectivePowerCost(const CommandButton* button, Int selectedLevel);
+	Int selectionPowerCost(const CreateAHeroRules::SelectionData& selection);
+	Int selectedPowerRank(const Object* hero, const CommandButton* button);
+	const CreateAHeroRules::SelectionData* getTemplateSelection(const Player* player, const ThingTemplate* unit);
+	void grantPowerUpgrades(Object* hero, Int previousRank, Int rank);
 
 	AsciiString encodeSelectionCompact(const CreateAHeroRules::SelectionData& sel);
 	Bool decodeSelectionCompact(std::string_view encoded, CreateAHeroRules::SelectionData& out);

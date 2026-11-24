@@ -40,6 +40,7 @@
 #include "GameClient/RetailHudExtras.h"
 
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/HeroRoster.h"
@@ -912,8 +913,15 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 	const Int choice = formation ? getRetailFormationChoice(command) : getRetailTrayChoice(window);
 	if (hero)
 		unit = hero;
+	const Object* selected = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
 	if (hero)
-		text = hero->getDisplayName();
+	{
+		const auto *profile = CreateAHeroSystem::getTemplateSelection(selected ? selected->getControllingPlayer() : nullptr, hero);
+		if (profile)
+			text.translate(profile->heroName.c_str());
+		else
+			text = hero->getDisplayName();
+	}
 	else
 		text = TheGameText->fetchOrSubstitute(command->getRetailChoiceLabel(choice).str(), L"");
 	if (text.isEmpty() && unit)
@@ -946,8 +954,7 @@ void ControlBar::showRetailCommandTooltip(GameWindow *window) const
 	tooltip.cost = getRetailCommandCost(command, window);
 	const CommandAvailability availability = getRetailButtonAvailability(window);
 	UnicodeString reason;
-	const Object* selected = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
-	Int requiredRank = command->getRequiredRank();
+	Int requiredRank = std::max(command->getRequiredRank(), CreateAHeroSystem::selectedPowerRank(selected, command));
 	if (selected && (availability == COMMAND_RESTRICTED || availability == COMMAND_NOT_READY))
 	{
 		requiredRank = std::max(requiredRank, ExperienceLevelStore::rankForPower(selected, command->getSpecialPowerTemplate()));
@@ -1476,7 +1483,16 @@ void ControlBar::applyRetailHeroImage(GameWindow *window, Int hero) const
 	if (!heroTemplate)
 		return;
 	const Image *image = heroTemplate->getButtonImage();
-	if (HeroRoster::stateAt(player, hero) == HeroRules::State::Revivable)
+	const auto *profile = CreateAHeroSystem::getTemplateSelection(player, heroTemplate);
+	if (profile)
+	{
+		const auto *heroClass = CreateAHeroSystem::findClassByUpgrade(profile->classUpgrade.c_str());
+		const auto *type = CreateAHeroSystem::findSubClassByUpgrade(heroClass, profile->subClassUpgrade.c_str());
+		if (type)
+			if (const auto *portrait = TheMappedImageCollection->findImageByName(type->buttonImage))
+				image = portrait;
+	}
+	else if (HeroRoster::stateAt(player, hero) == HeroRules::State::Revivable)
 	{
 		if (const Image *revive = RetailHeroBar::reviveImage(heroTemplate))
 			image = revive;
@@ -1742,6 +1758,8 @@ Bool CommandButton::canUseRetailToggle(const Object* object, Int state) const
 		!m_isClickable ||
 		hasRotwkOption(CommandButtonRules::ROTWK_NONPRESSABLE) ||
 		!HeroRoster::buttonUpgradesMet(this, object->getControllingPlayer(), object))
+		return FALSE;
+	if (std::max(getRequiredRank(), CreateAHeroSystem::selectedPowerRank(object, this)) > object->getExperienceTracker()->getRank())
 		return FALSE;
 	if (!isModelConditionAllowed(object) || !isValidContainerForCommand(object))
 		return FALSE;

@@ -1869,12 +1869,15 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	{
 		Player *player = ThePlayerList->getPlayerFromSlotIndex(0);
 		const auto *faction = player ? player->getPlayerTemplate() : nullptr;
-		if (faction)
+		if (faction && CreateAHeroSystem::getPlayerSelection(player->getPlayerIndex()))
 		{
 			const auto &heroes = faction->getBuildableHeroesMP();
-			const auto hero = std::find(heroes.begin(), heroes.end(), AsciiString("CreateAHero"));
-			const auto *upgrade = TheUpgradeCenter->findUpgrade("Upgrade_AllowBuildCreateAHero");
-			if (hero != heroes.end() && upgrade && TheThingFactory->findTemplate(*hero, FALSE))
+			const auto hero = std::find_if(heroes.begin(), heroes.end(), [](const AsciiString &name) {
+				const auto *unit = TheThingFactory->findTemplate(name, FALSE);
+				return unit && unit->isKindOf(KINDOF_CREATE_A_HERO);
+			});
+			const auto *upgrade = TheUpgradeCenter->findUpgrade(CreateAHeroSystem::getCanBuildUpgradeName());
+			if (hero != heroes.end() && upgrade)
 				player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
 		}
 	}

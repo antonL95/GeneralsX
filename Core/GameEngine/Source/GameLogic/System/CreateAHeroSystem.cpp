@@ -3,6 +3,7 @@
 #include "GameLogic/CreateAHeroSystem.h"
 
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <set>
 
@@ -11,6 +12,7 @@
 #include "Common/INIAudit.h"
 #include "Common/INI.h"
 #include "Common/RetailINIStartup.h"
+#include "Common/NameKeyGenerator.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
@@ -20,6 +22,8 @@
 #include "Common/Xfer.h"
 #include "GameClient/Color.h"
 #include "GameClient/ControlBar.h"
+#include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/Module/UnpauseSpecialPowerUpgrade.h"
 #include "GameLogic/Object.h"
 #include "GameNetwork/GameInfo.h"
 
@@ -59,6 +63,7 @@ struct SystemData
 
 SystemData s_data;
 std::map<std::string, AsciiString> s_colorMasks;
+constexpr Int emptyPowerIndex = 255;
 CreateAHeroRules::SelectionData s_playerSelections[MAX_PLAYER_COUNT];
 Bool s_playerHasSelection[MAX_PLAYER_COUNT] = {};
 
@@ -297,6 +302,74 @@ void grantNamedUpgrade(Object* hero, const AsciiString& upgradeName)
 	}
 }
 
+bool isDesignUpgrade(const AsciiString& name)
+{
+	for (const auto &heroClass : s_data.classes)
+	{
+		if (heroClass.upgradeName == name)
+			return true;
+		for (const auto &type : heroClass.subClasses)
+			if (type.upgradeName == name)
+				return true;
+	}
+	return false;
+}
+
+void enableAuthoredPower(Object* hero, const SpecialPowerTemplate* power)
+{
+	if (!power)
+		return;
+	const NameKeyType unpauseKey = NAMEKEY("UnpauseSpecialPowerUpgrade");
+	for (BehaviorModule** module = hero->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != unpauseKey)
+			continue;
+		const auto* unpause = static_cast<const UnpauseSpecialPowerUpgrade*>(*module);
+		const auto* data = unpause->getUnpauseData();
+		if (data->m_specialPower != power)
+			continue;
+		if (unpause->isAlreadyUpgraded())
+			return;
+		const auto& triggers = data->m_upgradeMuxData;
+#if !RTS_GENERALS
+		const auto& names = triggers.m_activationUpgradeNames.empty() ? triggers.m_triggerUpgradeNames : triggers.m_activationUpgradeNames;
+#else
+		const auto& names = triggers.m_activationUpgradeNames;
+#endif
+		UpgradeMaskType owned = hero->getObjectCompletedUpgradeMask();
+		owned.set(hero->getControllingPlayer()->getCompletedUpgradeMask());
+		std::vector<const UpgradeTemplate*> grant;
+		for (const auto& name : names)
+			if (const auto* upgrade = TheUpgradeCenter->findUpgrade(name))
+				if (upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && !hero->hasUpgrade(upgrade) && !isDesignUpgrade(name))
+					grant.push_back(upgrade);
+		if (unpause->wouldUpgrade(owned))
+			return;
+		auto proposed = owned;
+		if (!triggers.m_requiresAllTriggers)
+		{
+			for (const auto* upgrade : grant)
+			{
+				proposed = owned;
+				proposed.set(upgrade->getUpgradeMask());
+				if (unpause->wouldUpgrade(proposed))
+				{
+					hero->giveUpgrade(upgrade);
+					return;
+				}
+			}
+			continue;
+		}
+		for (const auto* upgrade : grant)
+			proposed.set(upgrade->getUpgradeMask());
+		if (!unpause->wouldUpgrade(proposed))
+			continue;
+		for (const auto* upgrade : grant)
+			hero->giveUpgrade(upgrade);
+		return;
+	}
+}
+
 }
 
 void parseDefinition(INI* ini)
@@ -409,6 +482,8 @@ Int getSpecialPowerDiscountPerLevel() { return s_data.specialPowerDiscountPerLev
 const std::vector<CreateAHeroBlingDef>& getBlings() { return s_data.blings; }
 const std::vector<CreateAHeroBlingBinderDef>& getBlingBinders() { return s_data.blingBinders; }
 const std::vector<CreateAHeroClassDef>& getClasses() { return s_data.classes; }
+std::vector<const CommandButton*> getDesignerPowerButtons() { return collectDesignerPowerButtons(); }
+std::vector<AsciiString> getGroupUpgrades(const AsciiString& groupName) { return groupUpgrades(groupName); }
 
 const CreateAHeroClassDef* findClassByUpgrade(const AsciiString& classUpgrade)
 {
@@ -501,6 +576,36 @@ Int effectivePowerCost(const CommandButton* button, Int selectedLevel)
 		button->getCreateAHeroUIMinimumLevel(),
 		selectedLevel,
 		s_data.specialPowerDiscountPerLevel);
+}
+
+Int selectionPowerCost(const CreateAHeroRules::SelectionData& selection)
+{
+	int64_t cost = 0;
+	for (size_t i = 0; i < selection.powerButtons.size(); ++i)
+		if (!selection.powerButtons[i].empty())
+			cost += effectivePowerCost(findButtonByName(selection.powerButtons[i].c_str()), Int(i + 1));
+	return Int(std::min(cost, int64_t(std::numeric_limits<Int>::max())));
+}
+
+const CreateAHeroRules::SelectionData* getTemplateSelection(const Player* player, const ThingTemplate* unit)
+{
+#if !RTS_GENERALS
+	if (player && unit && unit->isKindOf(KINDOF_CREATE_A_HERO))
+		return getPlayerSelection(player->getPlayerIndex());
+#endif
+	return nullptr;
+}
+
+Int selectedPowerRank(const Object* hero, const CommandButton* button)
+{
+	if (!hero || !button)
+		return 0;
+	const auto *selection = getTemplateSelection(hero->getControllingPlayer(), hero->getHeroIdentityTemplate());
+	if (!selection)
+		return 0;
+	const auto &powers = selection->powerButtons;
+	const auto chosen = std::find(powers.begin(), powers.end(), button->getName().str());
+	return chosen == powers.end() ? 0 : Int(chosen - powers.begin() + 1);
 }
 
 Bool validateSelection(
@@ -611,6 +716,11 @@ Bool validateSelection(
 	std::vector<std::string> validatedPowers;
 	for (size_t i = 0; i < sel.powerButtons.size(); ++i)
 	{
+		if (sel.powerButtons[i].empty())
+		{
+			validatedPowers.emplace_back();
+			continue;
+		}
 		const CommandButton* btn = findButtonByName(AsciiString(sel.powerButtons[i].c_str()));
 		const Int levelSlot = static_cast<Int>(i) + 1;
 		if (!isPowerButtonLegalForSelection(btn, normalized, levelSlot, validatedPowers))
@@ -622,6 +732,8 @@ Bool validateSelection(
 		}
 		validatedPowers.emplace_back(btn->getName().str());
 	}
+	while (!validatedPowers.empty() && validatedPowers.back().empty())
+		validatedPowers.pop_back();
 	normalized.powerButtons = std::move(validatedPowers);
 	return TRUE;
 }
@@ -677,6 +789,11 @@ AsciiString encodeSelectionCompact(const CreateAHeroRules::SelectionData& sel)
 	const std::vector<const CommandButton*> designerPowers = collectDesignerPowerButtons();
 	for (const std::string& p : sel.powerButtons)
 	{
+		if (p.empty())
+		{
+			compact.powerIndices.push_back(emptyPowerIndex);
+			continue;
+		}
 		int found = -1;
 		for (size_t pi = 0; pi < designerPowers.size(); ++pi)
 		{
@@ -686,7 +803,7 @@ AsciiString encodeSelectionCompact(const CreateAHeroRules::SelectionData& sel)
 				break;
 			}
 		}
-		if (found < 0)
+		if (found < 0 || found >= emptyPowerIndex)
 			return AsciiString::TheEmptyString;
 		compact.powerIndices.push_back(found);
 	}
@@ -739,6 +856,11 @@ Bool decodeSelectionCompact(std::string_view encoded, CreateAHeroRules::Selectio
 	const std::vector<const CommandButton*> designerPowers = collectDesignerPowerButtons();
 	for (int pIdx : compact.powerIndices)
 	{
+		if (pIdx == emptyPowerIndex)
+		{
+			out.powerButtons.emplace_back();
+			continue;
+		}
 		if (pIdx < 0 || static_cast<size_t>(pIdx) >= designerPowers.size())
 			return FALSE;
 		out.powerButtons.emplace_back(designerPowers[pIdx]->getName().str());
@@ -868,9 +990,29 @@ Bool applyToHero(Object* hero)
 		grantNamedUpgrade(hero, AsciiString(bling.c_str()));
 	for (const std::string& attr : sel->attributeUpgrades)
 		grantNamedUpgrade(hero, AsciiString(attr.c_str()));
-	for (const std::string& powerBtnName : sel->powerButtons)
+	grantPowerUpgrades(hero, 0, hero->getExperienceTracker()->getRank());
+	const AsciiString encoded = encodeSelectionCompact(*sel);
+	if (!encoded.isEmpty())
 	{
-		const CommandButton* btn = findButtonByName(AsciiString(powerBtnName.c_str()));
+		AsciiString name(COMMAND_SET_PREFIX.data());
+		name.concat(encoded);
+		hero->setCommandSetStringOverride(name);
+	}
+	return TRUE;
+}
+
+void grantPowerUpgrades(Object* hero, Int previousRank, Int rank)
+{
+#if !RTS_GENERALS
+	if (!hero || !hero->getCreateAHeroColors() || !TheUpgradeCenter)
+		return;
+	const auto* sel = getTemplateSelection(hero->getControllingPlayer(), hero->getHeroIdentityTemplate());
+	if (!sel)
+		return;
+	for (Int i = std::max(0, previousRank); i < std::min(rank, Int(sel->powerButtons.size())); ++i)
+	{
+		const auto &power = sel->powerButtons[i];
+		const CommandButton* btn = power.empty() ? nullptr : findButtonByName(power.c_str());
 		if (!btn)
 			continue;
 		if (const UpgradeTemplate* upg = btn->getUpgradeTemplate())
@@ -883,15 +1025,9 @@ Bool applyToHero(Object* hero)
 			if (needed && needed->getUpgradeType() == UPGRADE_TYPE_OBJECT && !hero->hasUpgrade(needed))
 				hero->giveUpgrade(needed);
 		}
+		enableAuthoredPower(hero, btn->getSpecialPowerTemplate());
 	}
-	const AsciiString encoded = encodeSelectionCompact(*sel);
-	if (!encoded.isEmpty())
-	{
-		AsciiString name(COMMAND_SET_PREFIX.data());
-		name.concat(encoded);
-		hero->setCommandSetStringOverride(name);
-	}
-	return TRUE;
+#endif
 }
 
 Bool populateCommandSet(CommandCatalog& catalog, CommandSet& commands)
@@ -910,6 +1046,8 @@ Bool populateCommandSet(CommandCatalog& catalog, CommandSet& commands)
 		commands.setCommandButton(i, base->getCommandButton(i));
 	for (const std::string& power : selection.powerButtons)
 	{
+		if (power.empty())
+			continue;
 		while (nextPower >= 6 && nextPower < CommandButtonRules::RETAIL_COMMANDS_PER_SET && base->getCommandButton(nextPower))
 			++nextPower;
 		if (nextPower == CommandButtonRules::RETAIL_COMMANDS_PER_SET)

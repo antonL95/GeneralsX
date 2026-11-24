@@ -37,6 +37,8 @@
 #include "GameClient/ControlBar.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/CreateAHeroSystem.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "Common/BitFlagsIO.h"
 
 
@@ -507,6 +509,8 @@ Bool SpecialPowerStore::canUseSpecialPower( Object *obj, const SpecialPowerTempl
 	if (TheRetailCommandCatalog)
 	{
 		const CommandButton* button = TheRetailCommandCatalog->findPowerButton(obj, specialPowerTemplate);
+		if (CreateAHeroSystem::selectedPowerRank(obj, button) > obj->getExperienceTracker()->getRank())
+			return FALSE;
 		if (button && (!button->isMountStateAllowed(obj) ||
 			(RetailFileLayers::enabled() && (!button->isRetailButtonUsable() || !button->isModelConditionAllowed(obj) || !button->isValidContainerForCommand(obj)))))
 			return FALSE;

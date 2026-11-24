@@ -1,6 +1,7 @@
 #include "PreRTS.h"
 
 #include "GameLogic/ExperienceLevelStore.h"
+#include "GameLogic/CreateAHeroSystem.h"
 
 #include <algorithm>
 #include <cmath>
@@ -633,8 +634,10 @@ void ExperienceTracker::advanceRetailLevel(Real experience, Bool feedback)
 	{
 		if (m_retailExperience < static_cast<Real>(next))
 			break;
+		const Int previousRank = getRank();
 		m_retailThreshold = next;
 		ExperienceLevelStore::applyLevel(m_parent, next, feedback != FALSE);
+		CreateAHeroSystem::grantPowerUpgrades(m_parent, previousRank, getRank());
 		if (const HordeContain* horde = HordeContain::get(m_parent))
 			for (Object* member : *horde->getContainedItemsList())
 				if (!member->isEffectivelyDead())

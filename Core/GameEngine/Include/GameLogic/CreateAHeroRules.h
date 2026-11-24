@@ -168,8 +168,8 @@ inline int discountedPowerCost(int baseCost, int minimumLevel, int selectedLevel
 	if (baseCost <= 0)
 		return 0;
 	const int extraLevels = std::max(0, selectedLevel - std::max(1, minimumLevel));
-	const int totalDiscount = std::clamp(extraLevels * std::max(0, discountPercentPerLevel), 0, 100);
-	return (baseCost * (100 - totalDiscount)) / 100;
+	const int64_t totalDiscount = std::clamp(int64_t(extraLevels) * discountPercentPerLevel, int64_t(0), int64_t(100));
+	return baseCost - int(int64_t(baseCost) * totalDiscount / 100);
 }
 
 inline int discountedRevivalCost(int baseCost, int revivalDiscountPercent)

@@ -75,6 +75,7 @@
 #include "GameClient/Shadow.h"
 
 #include "GameLogic/Armor.h"
+#include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/RetailSiegeDocking.h"
@@ -2074,7 +2075,10 @@ Int ThingTemplate::calcCostToBuild( const Player* player) const
 	factionModifier *= player->getProductionCostChangeBasedOnKindOf( m_kindof );
 	if (RetailFileLayers::enabled())
 		factionModifier *= CostModifierUpgrade::retailBuildFactor(*player, *this);
-	const Real cost = getBuildCost() * factionModifier * player->getHandicap()->getHandicap(Handicap::BUILDCOST, this);
+	Real baseCost = getBuildCost();
+	if (const auto *hero = CreateAHeroSystem::getTemplateSelection(player, this))
+		baseCost += CreateAHeroSystem::selectionPowerCost(*hero);
+	const Real cost = baseCost * factionModifier * player->getHandicap()->getHandicap(Handicap::BUILDCOST, this);
 #if !RTS_GENERALS
 	if (RetailFileLayers::enabled())
 		return static_cast<Int>(static_cast<Int>(cost) * RetailSkirmishSpending::brutalFactor(*player, FALSE));
