@@ -251,6 +251,31 @@ check_package_step() {
     fi
 }
 
+rerun_alone() {
+    if PKGS1_STATE_DIR="$2" sh "$runner" --only "$1" "$build" "$mode" "$save_frame" "$count" > "$2/result.log" 2>&1; then
+        printf '0\n' > "$2/status"
+    else
+        printf '1\n' > "$2/status"
+    fi
+}
+
+rerun_all() {
+    limit=${PKGS1_RERUN_JOBS:-3}
+    running=
+    for name in $failed; do
+        mkdir -p "$out/only-$name"
+        rerun_alone "$name" "$out/only-$name" &
+        running="${running:+$running }$!"
+        set -- $running
+        if [ "$#" -ge "$limit" ]; then
+            wait "$1"
+            shift
+            running=$*
+        fi
+    done
+    wait
+}
+
 check_packages() {
     failed=
     diverged=
@@ -263,11 +288,14 @@ check_packages() {
             diverged="${diverged:+$diverged }$name"
         fi
     done
+    if [ -z "$only" ]; then
+        rerun_all
+    fi
     hard=
     for name in $failed; do
         if [ -z "$only" ]; then
-            isolated=$(mktemp -d "$out/only-$name.XXXXXX")
-            if PKGS1_STATE_DIR="$isolated" sh "$runner" --only "$name" "$build" "$mode" "$save_frame" "$count" > "$isolated/result.log" 2>&1; then
+            isolated=$out/only-$name
+            if [ "$(cat "$isolated/status")" = 0 ]; then
                 case " $diverged " in
                     *" $name "*)
                         printf 'Save divergence only when combined: %s (%s)\n' "$name" "$isolated" >&2
