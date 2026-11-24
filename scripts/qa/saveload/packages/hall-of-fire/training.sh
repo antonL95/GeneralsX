@@ -1,3 +1,11 @@
+prepare() {
+    awk -v end="$end" 'BEGIN {
+        for (frame = 968; frame < 1019 && frame <= end; ++frame)
+            if (frame != 980 && frame != 993 && frame != 1006)
+                print frame, "hall-probe Player_1 RivendellGilGalad 0 gil-galad-arrival 320 2130"
+    }'
+}
+
 check() {
     while read -r frame button accepted; do
         if covers "$frame"; then
