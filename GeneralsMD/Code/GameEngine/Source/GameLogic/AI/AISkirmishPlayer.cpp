@@ -2755,7 +2755,7 @@ void AISkirmishPlayer::updateRetail()
 			auto& target = m_retailTargets[i];
 			const Int limit = slotLimit(i);
 			const Int teams = teamCount(target);
-			if (!candidates || target.retiring || teams >= limit || (requireEmpty && teams != 0))
+			if (!candidates || target.retiring || teams >= limit || (teams == 0) != requireEmpty)
 				continue;
 			std::vector<const TacticalCandidate*> defenseChoices;
 			for (const auto& candidate : *candidates)
@@ -2782,8 +2782,14 @@ void AISkirmishPlayer::updateRetail()
 			if (!defenseChoices.empty())
 			{
 				chosen = defenseChoices[GameLogicRandomValue(0, static_cast<Int>(defenseChoices.size()) - 1)];
-				if (chosen->defense->buildings.size() == 1 && GameLogicRandomValue(0, 100) <= 29)
-					chosen = nullptr;
+				if (chosen->defense->buildings.size() == 1)
+				{
+					const Int roll = GameLogicRandomValue(0, 100);
+					if (trace)
+						std::fprintf(stderr, "AI_DEFENSE_ROLL\t%u\t%d\t%d\t%d\n", frame, playerIndex, chosen->defendedID(), roll);
+					if (roll >= 30)
+						chosen = nullptr;
+				}
 			}
 			if (chosen)
 			{

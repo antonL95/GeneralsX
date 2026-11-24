@@ -1,0 +1,8 @@
+44 power-reveal - - 0
+95 create Player_2 SkirmishDefenseRuleAnchor 0 1450,2760,0
+95 create Player_2 SkirmishDefenseRuleSoldier 0 1850,2450,0
+95 create Player_2 SkirmishDefenseRuleSoldier 1 1990,2570,0
+95 create Player_2 SkirmishDefenseRuleSoldier 2 1980,2720,0
+95 create Player_2 SkirmishDefenseRuleSoldier 3 1970,2900,0
+100 create Player_1 GondorFighterHorde 0 1600,2800,180
+101 attack Player_1 GondorFighterHorde 0 Player_2:SkirmishDefenseRuleAnchor:0
