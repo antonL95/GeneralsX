@@ -4,14 +4,20 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
 #include "Common/BfmeAssetPath.h"
 #include "Common/File.h"
 #include "Common/FileSystem.h"
+#include "Common/Module.h"
+#include "Common/ThingTemplate.h"
+#include "GameLogic/Object.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "WWMath/matrix3d.h"
 #include "WWMath/quat.h"
+#include "WWMath/wwmath.h"
 
 namespace
 {
@@ -371,4 +377,139 @@ Bool RetailWallMesh::ramp(const Mesh& mesh, Ramp& result)
 	result.to = midpoint(result.toLeft, result.toRight);
 	result.width = (WWMath::Sqrt(lowDistance) + WWMath::Sqrt(highDistance)) * 0.5f;
 	return TRUE;
+}
+
+namespace
+{
+struct CacheEntry
+{
+	AsciiString model, wall, first, second;
+	Coord3D position;
+	Real angle = 0.0f;
+	Real scale = 1.0f;
+	RetailWallMesh::Geometry geometry;
+};
+
+std::map<ObjectID, CacheEntry> wallGeometryCache;
+
+void transformPoint(Coord3D& point, const Coord3D& origin, Real scale, Real cosine, Real sine)
+{
+	const Real x = point.x * scale;
+	const Real y = point.y * scale;
+	point.x = origin.x + x * cosine - y * sine;
+	point.y = origin.y + x * sine + y * cosine;
+	point.z = origin.z + point.z * scale;
+}
+
+void transformRamp(RetailWallMesh::Ramp& ramp, const Coord3D& origin, Real scale, Real cosine, Real sine)
+{
+	transformPoint(ramp.from, origin, scale, cosine, sine);
+	transformPoint(ramp.to, origin, scale, cosine, sine);
+	transformPoint(ramp.fromLeft, origin, scale, cosine, sine);
+	transformPoint(ramp.fromRight, origin, scale, cosine, sine);
+	transformPoint(ramp.toLeft, origin, scale, cosine, sine);
+	transformPoint(ramp.toRight, origin, scale, cosine, sine);
+	ramp.width *= scale;
+}
+}
+
+const RetailWallMesh::Geometry* RetailWallMesh::forObject(const Object& object)
+{
+	AsciiString model, wall, first, second;
+	const ModuleInfo& draws = object.getTemplate()->getDrawModuleInfo();
+	for (Int i = 0; i < draws.getCount(); ++i)
+	{
+		const ModuleData* data = draws.getNthData(i);
+		AsciiString candidate, a, b, c;
+		if (!data || !data->getWallRampMeshes(candidate, a, b, c))
+			continue;
+		if (model.isEmpty() || a.isNotEmpty() || b.isNotEmpty() || c.isNotEmpty())
+		{
+			model = candidate;
+			wall = a;
+			first = b;
+			second = c;
+		}
+		if (a.isNotEmpty() || b.isNotEmpty() || c.isNotEmpty())
+			break;
+	}
+	static const NameKeyType upgradeKey = NAMEKEY("GeometryUpgrade");
+	for (BehaviorModule** module = object.getBehaviorModules(); module && *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() != upgradeKey)
+			continue;
+		const auto* upgrade = static_cast<const GeometryUpgrade*>(*module);
+		if (!upgrade->isAlreadyUpgraded())
+			continue;
+		const auto* data = upgrade->getWallRampData();
+		if (data->m_wallBoundsMesh.isNotEmpty()) wall = data->m_wallBoundsMesh;
+		if (data->m_rampMesh1.isNotEmpty()) first = data->m_rampMesh1;
+		if (data->m_rampMesh2.isNotEmpty()) second = data->m_rampMesh2;
+	}
+	if (model.isEmpty() || (wall.isEmpty() && first.isEmpty() && second.isEmpty()))
+		return nullptr;
+	const Coord3D& position = *object.getPosition();
+	const Real angle = object.getOrientation();
+	const Real scale = object.getTemplate()->getAssetScale();
+	const ObjectID id = object.getID();
+	auto found = wallGeometryCache.find(id);
+	if (found != wallGeometryCache.end())
+	{
+		const auto& entry = found->second;
+		if (entry.model == model && entry.wall == wall && entry.first == first && entry.second == second &&
+			entry.position.x == position.x && entry.position.y == position.y && entry.position.z == position.z &&
+			entry.angle == angle && entry.scale == scale)
+			return &entry.geometry;
+	}
+	CacheEntry entry;
+	entry.model = model;
+	entry.wall = wall;
+	entry.first = first;
+	entry.second = second;
+	entry.position = position;
+	entry.angle = angle;
+	entry.scale = scale;
+	Mesh mesh;
+	if (load(model, wall, mesh) && !polygon(mesh, entry.geometry.wall))
+		entry.geometry.wall.clear();
+	if (load(model, first, mesh))
+		entry.geometry.hasRamp[0] = ramp(mesh, entry.geometry.ramps[0]);
+	if (load(model, second, mesh))
+		entry.geometry.hasRamp[1] = ramp(mesh, entry.geometry.ramps[1]);
+	const Real cosine = WWMath::CosTrig(angle);
+	const Real sine = WWMath::SinTrig(angle);
+	for (auto& point : entry.geometry.wall)
+		transformPoint(point, position, scale, cosine, sine);
+	if (!entry.geometry.wall.empty())
+		entry.geometry.wallHeight = entry.geometry.wall.back().z;
+	for (Int i = 0; i < 2; ++i)
+		if (entry.geometry.hasRamp[i])
+			transformRamp(entry.geometry.ramps[i], position, scale, cosine, sine);
+	auto inserted = wallGeometryCache.insert_or_assign(id, std::move(entry));
+	return &inserted.first->second.geometry;
+}
+
+Bool RetailWallMesh::contains(const Geometry& geometry, const Coord3D& position)
+{
+	if (geometry.wall.size() < 3)
+		return FALSE;
+	Bool inside = FALSE;
+	for (size_t i = 0, j = geometry.wall.size() - 1; i < geometry.wall.size(); j = i++)
+	{
+		const Coord3D& a = geometry.wall[j];
+		const Coord3D& b = geometry.wall[i];
+		const Real cross = (position.x - a.x) * (b.y - a.y) - (position.y - a.y) * (b.x - a.x);
+		if (cross == 0.0f && position.x >= std::min(a.x, b.x) && position.x <= std::max(a.x, b.x) &&
+			position.y >= std::min(a.y, b.y) && position.y <= std::max(a.y, b.y))
+			return TRUE;
+		if ((a.y > position.y) != (b.y > position.y) &&
+			position.x < (b.x - a.x) * (position.y - a.y) / (b.y - a.y) + a.x)
+			inside = !inside;
+	}
+	return inside;
+}
+
+void RetailWallMesh::clearCache()
+{
+	wallGeometryCache.clear();
 }

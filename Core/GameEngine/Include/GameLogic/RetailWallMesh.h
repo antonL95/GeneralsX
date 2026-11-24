@@ -6,6 +6,8 @@
 #include "Common/AsciiString.h"
 #include "Lib/BaseType.h"
 
+class Object;
+
 namespace RetailWallMesh
 {
 struct Mesh
@@ -26,7 +28,18 @@ struct Ramp
 	Real width;
 };
 
+struct Geometry
+{
+	std::vector<Coord3D> wall;
+	Real wallHeight = 0.0f;
+	Ramp ramps[2]{};
+	Bool hasRamp[2] = {FALSE, FALSE};
+};
+
 Bool load(const AsciiString& model, const AsciiString& name, Mesh& mesh);
 Bool polygon(const Mesh& mesh, std::vector<Coord3D>& points);
 Bool ramp(const Mesh& mesh, Ramp& result);
+const Geometry* forObject(const Object& object);
+Bool contains(const Geometry& geometry, const Coord3D& position);
+void clearCache();
 }

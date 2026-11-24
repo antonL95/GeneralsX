@@ -111,7 +111,7 @@ public:
 		wall = m_wallBoundsMesh;
 		ramp1 = m_rampMesh1;
 		ramp2 = m_rampMesh2;
-		return wall.isNotEmpty() || ramp1.isNotEmpty() || ramp2.isNotEmpty();
+		return model.isNotEmpty();
 	}
 
 private:

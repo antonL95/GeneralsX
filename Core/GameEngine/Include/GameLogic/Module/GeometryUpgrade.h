@@ -53,6 +53,7 @@ public:
 	static Bool constructionFootprintsOverlap(const ThingTemplate& build, const Coord3D& position, Real angle, const Object& obstacle);
 	static Bool collectCollisionParts(const Object& object, std::vector<CollisionPart>& parts,
 		Bool includeAuthored = FALSE);
+	const GeometryUpgradeModuleData* getWallRampData() const { return getGeometryUpgradeModuleData(); }
 
 	Bool isSubObjectsUpgrade() override { return FALSE; }
 
