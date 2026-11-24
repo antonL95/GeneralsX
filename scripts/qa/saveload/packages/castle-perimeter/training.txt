@@ -10,5 +10,5 @@
 345 cancelbuild Player_1 CastlePerimeterWall 0
 350 castle-perimeter-wall Player_1 CastlePerimeterWall 0
 350 castle-perimeter-money Player_1 CastlePerimeterPorter 0
-354 construct Player_1 CastlePerimeterPorter 0 CastlePerimeterWall 3510 3060 0
+360 construct Player_1 CastlePerimeterPorter 0 CastlePerimeterWall 3510 3060 0
 780 castle-perimeter-wall Player_1 CastlePerimeterWall 0
