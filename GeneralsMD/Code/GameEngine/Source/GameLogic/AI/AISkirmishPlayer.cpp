@@ -61,9 +61,11 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/GrantUpgradeCreate.h"
 #include "GameLogic/Module/HordeAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -448,59 +450,105 @@ Bool isRetailDefenseRecruit(const Object& object)
 			(object.isKindOf(KINDOF_CAN_ATTACK) || object.isKindOf(KINDOF_HERO) || object.isKindOf(KINDOF_SUPPORT))));
 }
 
-Bool updateRetailFlagCapture(const std::vector<Object*>& owned, UnsignedInt frame, Int playerIndex, Bool trace)
+Bool isRetailTacticRecruit(const Object& object, const Player& owner)
 {
-	Object* capturer = nullptr;
-	Object* flag = nullptr;
-	const CommandButton* capture = nullptr;
-	Real closest = 0.0f;
-	for (Object* unit : owned)
-	{
-		const auto* ability = unit->findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING);
-		if (!ability)
-			continue;
-		if (ability->isActive())
-			return TRUE;
-		if (!unit->getAI() || !unit->getAI()->isIdle() || !unit->isMobile() || unit->isDisabled() || unit->getContainedBy())
-			continue;
-		const CommandSet* commands = retailCommands(*unit);
-		if (!commands)
-			continue;
-		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
-		{
-			const CommandButton* button = commands->getCommandButton(slot);
-			const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
-			if (!power || button->getCommandType() != GUI_COMMAND_SPECIAL_POWER ||
-				power->getSpecialPowerType() != SPECIAL_INFANTRY_CAPTURE_BUILDING ||
-				button->getRequiredRank() > unit->getExperienceTracker()->getRank() ||
-				!HeroRoster::buttonUpgradesMet(button, unit->getControllingPlayer(), unit))
-				continue;
-			for (Object* target = TheGameLogic->getFirstObject(); target; target = target->getNextObject())
-			{
-				if (!target->isKindOf(KINDOF_CAPTUREFLAG) || target->isDestroyed() || unit->getRelationship(target) == ALLIES)
-					continue;
-				const Coord3D delta = *target->getPosition() - *unit->getPosition();
-				const Real distance = sqr(delta.x) + sqr(delta.y);
-				if (flag && std::make_tuple(distance, target->getID(), unit->getID()) >=
-					std::make_tuple(closest, flag->getID(), capturer->getID()))
-					continue;
-				if (!TheActionManager->canDoSpecialPowerAtObject(unit, target, CMD_FROM_AI, power, button->getOptions()))
-					continue;
-				capturer = unit;
-				flag = target;
-				capture = button;
-				closest = distance;
-			}
-		}
-	}
-	if (!capturer)
+	const AIUpdateInterface* ai = object.getAI();
+	if (object.getTeam() != owner.getDefaultTeam() || !object.isMobile() || !ai || !ai->isIdle() ||
+		object.isDisabled() || object.getContainedBy() || !isRetailDefenseRecruit(object))
 		return FALSE;
-	capturer->doCommandButtonAtObject(capture, flag, CMD_FROM_AI);
-	const auto* ability = capturer->findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING);
-	const Bool active = ability && ability->isActive();
-	if (active && trace)
-		std::fprintf(stderr, "AI_FLAG_CAPTURE\t%u\t%d\t%d\t%d\n", frame, playerIndex, capturer->getID(), flag->getID());
-	return active;
+	const auto* horde = static_cast<const HordeAIUpdate*>(object.findUpdateModule(NAMEKEY("HordeAIUpdate")));
+	return !horde || (!horde->hasAttackOrder() && !horde->hasGuardOrder());
+}
+
+const Waypoint* retailPlayerStart(Player& player)
+{
+	const Int index = player.getMpStartIndex();
+	if (index < 0 || index >= MAX_PLAYER_COUNT)
+		return nullptr;
+	AsciiString name;
+	name.format("Player_%d_Start", index + 1);
+	return TheTerrainLogic->getWaypointByName(name);
+}
+
+Bool isRetailTacticVisible(const Object& object, Int playerIndex)
+{
+	const ObjectShroudStatus shroud = object.getShroudedStatus(playerIndex);
+	return (shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR) &&
+		(!object.testStatus(OBJECT_STATUS_STEALTHED) || object.testStatus(OBJECT_STATUS_DETECTED));
+}
+
+Bool canRetailTacticAttack(const Object& unit, const Object& target)
+{
+	if (!unit.getAI()->canAcceptRetailPlannerOrder(TRUE))
+		return FALSE;
+	const CanAttackResult result = unit.getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, &target, CMD_FROM_AI);
+	return result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING;
+}
+
+Bool issueRetailTacticAttack(Object& unit, Object& target)
+{
+	if (auto* horde = static_cast<HordeAIUpdate*>(unit.findUpdateModule(NAMEKEY("HordeAIUpdate"))))
+		return horde->issuePlannerOrder(&target, *target.getPosition());
+	return unit.getAI()->issueRetailPlannerAttack(&target);
+}
+
+Bool isRetailRaidBuilding(const Object& building)
+{
+	if (!building.isKindOf(KINDOF_STRUCTURE) || building.isKindOf(KINDOF_LINKED_TO_FLAG) ||
+		building.isKindOf(KINDOF_BASE_FOUNDATION) || building.isKindOf(KINDOF_INERT) ||
+		building.isKindOf(KINDOF_UNATTACKABLE) || building.isEffectivelyDead())
+		return FALSE;
+	const auto* gate = GateOpenAndCloseBehavior::find(&building);
+	return !gate || !gate->wantsOpen();
+}
+
+Real tacticalDistance(const Coord3D& a, const Coord3D& b)
+{
+	return WWMath::SqrtfOrigin(tacticalDistanceSquared(a, b) + sqr(a.z - b.z));
+}
+
+Int retailRaidWeight(const Object& building, const Coord3D& center, const Coord3D& enemyBase)
+{
+	const Coord3D point = *building.getPosition();
+	constexpr Real clearance = 275.0f;
+	const Real fromBase = tacticalDistance(point, enemyBase);
+	if (fromBase <= clearance)
+		return 0;
+	const Coord3D route = enemyBase - center;
+	const Coord3D offset = point - center;
+	const Real routeLength = tacticalDistance(center, enemyBase);
+	const Real projection = route.x * offset.x + route.y * offset.y + route.z * offset.z;
+	const Real fromTeam = tacticalDistance(point, center);
+	if (routeLength > 0.0f && projection >= sqr(routeLength) &&
+		sqr(fromTeam) - sqr(projection / routeLength) < sqr(clearance))
+		return 0;
+	const Real production = AttributeModifiers::productionFactor(&building);
+	const Real resourceWeight = production > 2.0f ? production * 0.5f : 1.0f;
+	return std::max(5, static_cast<Int>((std::max(5000.0f, routeLength) + fromBase - fromTeam) * resourceWeight * 0.01f));
+}
+
+Object* chooseRetailRaidBuilding(std::vector<std::pair<Int, Object*>>& targets)
+{
+	if (targets.empty())
+		return nullptr;
+	std::sort(targets.begin(), targets.end(), [](const auto& a, const auto& b) {
+		if (a.first != b.first)
+			return a.first > b.first;
+		return a.second->getID() < b.second->getID();
+	});
+	if (targets.size() == 1 || GameLogicRandomValue(0, 3) != 0)
+		return targets.front().second;
+	Int total = 0;
+	for (const auto& [weight, building] : targets)
+		total += weight;
+	Int roll = GameLogicRandomValue(1, total);
+	for (const auto& [weight, building] : targets)
+	{
+		roll -= weight;
+		if (roll <= 0)
+			return building;
+	}
+	return targets.back().second;
 }
 
 struct RetailDefenseCluster
@@ -1784,6 +1832,243 @@ void AISkirmishPlayer::update()
 	AIPlayer::update();
 }
 
+Bool AISkirmishPlayer::updateRetailFlagCapture(const std::vector<Object*>& owned, UnsignedInt frame, Bool canStart, Bool trace)
+{
+	if (m_retailFlagSquad.capturer != INVALID_ID)
+	{
+		const Object* leader = TheGameLogic->findObjectByID(m_retailFlagSquad.capturer);
+		const auto* ability = leader && !leader->isEffectivelyDead() && leader->getControllingPlayer() == m_player
+			? leader->findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING) : nullptr;
+		if (ability && ability->isActive())
+			return TRUE;
+		for (ObjectID id : m_retailFlagSquad.escorts)
+		{
+			Object* escort = TheGameLogic->findObjectByID(id);
+			AIUpdateInterface* ai = escort && !escort->isEffectivelyDead() && escort->getControllingPlayer() == m_player
+				? escort->getAI() : nullptr;
+			const auto* horde = ai ? static_cast<const HordeAIUpdate*>(escort->findUpdateModule(NAMEKEY("HordeAIUpdate"))) : nullptr;
+			if (ai && (horde || ai->getGuardTargetType() == GUARDTARGET_OBJECT) &&
+				ai->getGuardObject() == m_retailFlagSquad.capturer && ai->getLastCommandSource() == CMD_FROM_AI)
+				ai->aiIdle(CMD_FROM_AI);
+		}
+		m_retailFlagSquad = {};
+	}
+	if (!canStart)
+		return FALSE;
+	Object* capturer = nullptr;
+	Object* flag = nullptr;
+	const CommandButton* capture = nullptr;
+	Real closest = 0.0f;
+	for (Object* unit : owned)
+	{
+		const auto* ability = unit->findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING);
+		if (!ability)
+			continue;
+		if (ability->isActive())
+			return TRUE;
+		if (!isRetailTacticRecruit(*unit, *m_player))
+			continue;
+		const CommandSet* commands = retailCommands(*unit);
+		if (!commands)
+			continue;
+		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+		{
+			const CommandButton* button = commands->getCommandButton(slot);
+			const SpecialPowerTemplate* power = button ? button->getSpecialPowerTemplate() : nullptr;
+			if (!power || button->getCommandType() != GUI_COMMAND_SPECIAL_POWER ||
+				power->getSpecialPowerType() != SPECIAL_INFANTRY_CAPTURE_BUILDING ||
+				button->getRequiredRank() > unit->getExperienceTracker()->getRank() ||
+				!HeroRoster::buttonUpgradesMet(button, unit->getControllingPlayer(), unit))
+				continue;
+			for (Object* target = TheGameLogic->getFirstObject(); target; target = target->getNextObject())
+			{
+				if (!target->isKindOf(KINDOF_CAPTUREFLAG) || target->isDestroyed() || target->isEffectivelyDead() ||
+					unit->getRelationship(target) == ALLIES)
+					continue;
+				const Coord3D delta = *target->getPosition() - *unit->getPosition();
+				const Real distance = sqr(delta.x) + sqr(delta.y);
+				if (flag && std::make_tuple(distance, target->getID(), unit->getID()) >=
+					std::make_tuple(closest, flag->getID(), capturer->getID()))
+					continue;
+				if (!TheActionManager->canDoSpecialPowerAtObject(unit, target, CMD_FROM_AI, power, button->getOptions()))
+					continue;
+				capturer = unit;
+				flag = target;
+				capture = button;
+				closest = distance;
+			}
+		}
+	}
+	if (!capturer)
+		return FALSE;
+	capturer->doCommandButtonAtObject(capture, flag, CMD_FROM_AI);
+	const auto* ability = capturer->findSpecialAbilityUpdate(SPECIAL_INFANTRY_CAPTURE_BUILDING);
+	if (!ability || !ability->isActive())
+		return FALSE;
+
+	m_retailFlagSquad.capturer = capturer->getID();
+	std::vector<Object*> recruits;
+	for (Object* unit : owned)
+		if (unit != capturer && isRetailTacticRecruit(*unit, *m_player))
+			recruits.push_back(unit);
+	std::sort(recruits.begin(), recruits.end(), [&](const Object* a, const Object* b) {
+		const auto rank = [&](const Object* object) {
+			return std::make_pair(tacticalDistanceSquared(*object->getPosition(), *capturer->getPosition()), object->getID());
+		};
+		return rank(a) < rank(b);
+	});
+	const size_t count = std::min(recruits.size(), static_cast<size_t>(GameLogicRandomValue(1, 3) - 1));
+	for (size_t i = 0; i < count; ++i)
+	{
+		Object* recruit = recruits[i];
+		recruit->getAI()->aiGuardObject(capturer, GUARDMODE_GUARD_WITHOUT_PURSUIT, CMD_FROM_AI);
+		m_retailFlagSquad.escorts[i] = recruit->getID();
+	}
+	if (trace)
+		std::fprintf(stderr, "AI_FLAG_CAPTURE\t%u\t%d\t%d\t%d\t%zu\n",
+			frame, m_player->getPlayerIndex(), capturer->getID(), flag->getID(), count);
+	return TRUE;
+}
+
+Bool AISkirmishPlayer::updateRetailFarmRaid(const std::vector<Object*>& soldiers, const Object* keep, Int phase,
+	UnsignedInt frame, Bool canStart, Bool trace)
+{
+	auto& raid = m_retailFarmRaid;
+	const auto endRaid = [&] {
+		if (raid.issuedFrame != 0)
+		{
+			raid.target = INVALID_ID;
+			raid.members.fill(INVALID_ID);
+			raid.issuedFrame = 0;
+			raid.nextFrame = frame + GameLogicRandomValue(10 * LOGICFRAMES_PER_SECOND, 60 * LOGICFRAMES_PER_SECOND);
+		}
+		return FALSE;
+	};
+	const Object* previousTarget = TheGameLogic->findObjectByID(raid.target);
+	if (previousTarget && isRetailRaidBuilding(*previousTarget) && m_player->getRelationship(previousTarget->getTeam()) == ENEMIES)
+	{
+		for (ObjectID id : raid.members)
+		{
+			const Object* unit = TheGameLogic->findObjectByID(id);
+			if (!unit || unit->isEffectivelyDead() || unit->getControllingPlayer() != m_player)
+				continue;
+			const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
+			const AIUpdateInterface* ai = unit->getAI();
+			if (horde ? horde->isExecutingPlannerOrder(raid.target, raid.issuedFrame)
+				: ai && ai->isExecutingRetailPlannerOrder(raid.target, raid.issuedFrame))
+				return TRUE;
+		}
+	}
+	if ((!canStart && !raid.issuedFrame) || frame < raid.nextFrame)
+		return FALSE;
+
+	std::vector<Object*> roster;
+	for (Object* unit : soldiers)
+		if (unit->isAbleToAttack() && isRetailTacticRecruit(*unit, *m_player) &&
+			(!raid.issuedFrame || std::find(raid.members.begin(), raid.members.end(), unit->getID()) != raid.members.end()))
+			roster.push_back(unit);
+	const size_t minimum = raid.issuedFrame || phase == 0 ? 1 : 2;
+	if (roster.size() < minimum)
+		return endRaid();
+	const Coord3D home = keep ? *keep->getPosition() : *roster.front()->getPosition();
+	std::sort(roster.begin(), roster.end(), [&](const Object* a, const Object* b) {
+		const auto rank = [&](const Object* unit) {
+			return std::make_pair(tacticalDistanceSquared(*unit->getPosition(), home), unit->getID());
+		};
+		return rank(a) < rank(b);
+	});
+	if (roster.size() > raid.members.size())
+		roster.resize(raid.members.size());
+	Coord3D center{};
+	for (const Object* unit : roster)
+		center = center + *unit->getPosition();
+	center.scale(1.0f / static_cast<Real>(roster.size()));
+
+	Player* enemy = nullptr;
+	Real enemyDistance = std::numeric_limits<Real>::infinity();
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		Player* candidate = ThePlayerList->getNthPlayer(i);
+		if (!candidate || !candidate->isPlayableSide() || !candidate->isPlayerActive() ||
+			m_player->getRelationship(candidate->getDefaultTeam()) != ENEMIES)
+			continue;
+		const Waypoint* start = retailPlayerStart(*candidate);
+		const Real distance = start ? tacticalDistanceSquared(home, *start->getLocation()) : enemyDistance;
+		if (!enemy || distance < enemyDistance)
+		{
+			enemy = candidate;
+			enemyDistance = distance;
+		}
+	}
+	if (!enemy)
+		return endRaid();
+	if (phase == 0 && raid.rushPolicy == 0)
+		raid.rushPolicy = GameLogicRandomValue(1, 100) < 95 ? 1 : -1;
+	if (phase == 0 && raid.rushPolicy < 0)
+		return FALSE;
+
+	const Object* enemyBase = nullptr;
+	std::vector<Object*> candidates;
+	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if (object->getControllingPlayer() != enemy || !isRetailRaidBuilding(*object))
+			continue;
+		if (object->isKindOf(KINDOF_DOZER_FACTORY) && (!enemyBase || object->getID() < enemyBase->getID()))
+			enemyBase = object;
+		if (object != previousTarget && isRetailTacticVisible(*object, m_player->getPlayerIndex()))
+			candidates.push_back(object);
+	}
+	const Waypoint* start = retailPlayerStart(*enemy);
+	const Coord3D* enemyPosition = enemyBase && isRetailTacticVisible(*enemyBase, m_player->getPlayerIndex())
+		? enemyBase->getPosition() : start ? start->getLocation() : nullptr;
+	const RetailArmy* enemyRules = retailPolicy(*enemy).army;
+	const ThingTemplate* farm = enemyRules ? TheThingFactory->findTemplate(enemyRules->farm, FALSE) : nullptr;
+	std::vector<std::pair<Int, Object*>> farms;
+	std::vector<std::pair<Int, Object*>> otherBuildings;
+	for (Object* building : candidates)
+	{
+		const Bool economy = building->isKindOf(KINDOF_ECONOMY_STRUCTURE) || (farm && building->getTemplate()->isEquivalentTo(farm));
+		if (!economy && building->isKindOf(KINDOF_WALL_SEGMENT) && !building->isKindOf(KINDOF_CAN_ATTACK))
+			continue;
+		const Int weight = enemyPosition ? retailRaidWeight(*building, center, *enemyPosition) : 5;
+		if (weight == 0)
+			continue;
+		const auto eligible = [&](const Object* unit) {
+			return !m_retailObjectives.contains({unit->getID(), building->getID(), building->getTeam()->getID()}) &&
+				canRetailTacticAttack(*unit, *building);
+		};
+		if (static_cast<size_t>(std::count_if(roster.begin(), roster.end(), eligible)) >= minimum)
+			(economy ? farms : otherBuildings).emplace_back(weight, building);
+	}
+	if (farms.empty() && otherBuildings.empty())
+		return endRaid();
+	const Bool preferFarm = !farms.empty() && (otherBuildings.empty() || GameLogicRandomValue(0, 4) != 0);
+	Object* target = chooseRetailRaidBuilding(preferFarm ? farms : otherBuildings);
+	const size_t limit = raid.issuedFrame ? roster.size()
+		: GameLogicRandomValue(static_cast<Int>(minimum), static_cast<Int>(raid.members.size()));
+	const UnsignedInt owner = target->getTeam()->getID();
+	size_t recruited = 0;
+	raid.members.fill(INVALID_ID);
+	for (Object* unit : roster)
+	{
+		const auto key = std::make_tuple(unit->getID(), target->getID(), owner);
+		if (!m_retailObjectives.contains(key) && canRetailTacticAttack(*unit, *target) && issueRetailTacticAttack(*unit, *target))
+		{
+			m_retailObjectives.emplace(key, RetailObjective{frame, 0});
+			raid.members[recruited++] = unit->getID();
+			if (recruited == limit)
+				break;
+		}
+	}
+	if (recruited == 0)
+		return endRaid();
+	raid.target = target->getID();
+	raid.issuedFrame = frame;
+	if (trace)
+		std::fprintf(stderr, "AI_FARM_RAID\t%u\t%d\t%d\t%zu\n", frame, m_player->getPlayerIndex(), raid.target, recruited);
+	return TRUE;
+}
+
 void AISkirmishPlayer::updateRetail()
 {
 	const UnsignedInt frame = TheGameLogic->getFrame();
@@ -2608,8 +2893,9 @@ void AISkirmishPlayer::updateRetail()
 	const AttachUpdate* ringPickup = nullptr;
 	const Bool hasOpportunity = hasKind(RETAIL_TARGET_OPPORTUNITY);
 	const auto targetless = std::find(rules->tacticalTargets.begin(), rules->tacticalTargets.end(), RETAIL_TARGET_TARGETLESS);
-	const Bool canRunTargetless = targetless != rules->tacticalTargets.end() &&
-		slotLimit(targetless - rules->tacticalTargets.begin()) > 0;
+	const Int targetlessLimit = targetless != rules->tacticalTargets.end()
+		? slotLimit(targetless - rules->tacticalTargets.begin()) : 0;
+	const Bool canRunTargetless = targetlessLimit > 0;
 	const Bool canSeekRing = phase == 2 && hasOpportunity &&
 		std::none_of(owned.begin(), owned.end(), [&](const Object* object) {
 			const auto* citadel = dynamic_cast<const CitadelSlaughterHordeContain*>(object->getContain());
@@ -2719,8 +3005,15 @@ void AISkirmishPlayer::updateRetail()
 			return;
 		}
 	};
-	if (canRunTargetless && !updateRetailFlagCapture(owned, frame, playerIndex, trace))
-		buildForward();
+	Bool raidActive = FALSE;
+	Bool flagActive = FALSE;
+	if (canRunTargetless)
+	{
+		raidActive = updateRetailFarmRaid(soldiers, keep, phase, frame, FALSE, trace);
+		flagActive = updateRetailFlagCapture(owned, frame, targetlessLimit > static_cast<Int>(raidActive), trace);
+		if (!raidActive && !flagActive)
+			buildForward();
+	}
 	std::vector<std::pair<Object*, Bool>> wave;
 	for (Object* unit : soldiers)
 	{
@@ -2729,7 +3022,7 @@ void AISkirmishPlayer::updateRetail()
 			continue;
 		const AIUpdateInterface* ai = unit->getAI();
 		const auto* horde = static_cast<const HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate")));
-		const Bool ready = ai->isIdle() && (!horde || !horde->hasAttackOrder());
+		const Bool ready = ai->isIdle() && (!horde || (!horde->hasAttackOrder() && !horde->hasGuardOrder()));
 		Bool scouting = horde && horde->isOnPlannerAdvance() && !horde->isEngaging();
 		if (!horde && ai->getCurrentStateID() == AI_ATTACK_MOVE_TO && ai->getLastCommandSource() == CMD_FROM_AI)
 		{
@@ -2743,14 +3036,12 @@ void AISkirmishPlayer::updateRetail()
 	if (wave.empty() && !ringPickup)
 		return;
 	const auto eligible = [&](const Object& unit, const Object* objective, UnsignedInt owner, const Coord3D& point) -> Bool {
-		if (!unit.getAI()->canAcceptRetailPlannerOrder(objective != nullptr) ||
-			m_retailObjectives.contains({unit.getID(), objective ? objective->getID() : INVALID_ID, owner}))
+		if (m_retailObjectives.contains({unit.getID(), objective ? objective->getID() : INVALID_ID, owner}))
 			return FALSE;
 		if (objective)
-		{
-			const CanAttackResult result = unit.getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, objective, CMD_FROM_AI);
-			return result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING;
-		}
+			return canRetailTacticAttack(unit, *objective);
+		if (!unit.getAI()->canAcceptRetailPlannerOrder(FALSE))
+			return FALSE;
 		const Coord3D delta = point - *unit.getPosition();
 		return delta.x * delta.x + delta.y * delta.y > sqr(unit.getGeometryInfo().getBoundingCircleRadius());
 	};
@@ -2784,9 +3075,7 @@ void AISkirmishPlayer::updateRetail()
 		ObjectID defendedID() const { return defense ? defense->buildings.front()->getID() : INVALID_ID; }
 	};
 	const auto visibleToPlayer = [&](const Object& object) {
-		const ObjectShroudStatus shroud = object.getShroudedStatus(playerIndex);
-		return (shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR) &&
-			(!object.testStatus(OBJECT_STATUS_STEALTHED) || object.testStatus(OBJECT_STATUS_DETECTED));
+		return isRetailTacticVisible(object, playerIndex);
 	};
 	const auto visibleEnemy = [&](const Object& object) {
 		const Player* owner = object.getControllingPlayer();
@@ -2922,12 +3211,7 @@ void AISkirmishPlayer::updateRetail()
 			if (!opponent || !opponent->isPlayableSide() || !opponent->isPlayerActive() ||
 				m_player->getRelationship(opponent->getDefaultTeam()) != ENEMIES)
 				continue;
-			const Int index = opponent->getMpStartIndex();
-			if (index < 0 || index >= MAX_PLAYER_COUNT)
-				continue;
-			AsciiString name;
-			name.format("Player_%d_Start", index + 1);
-			const Waypoint* start = TheTerrainLogic->getWaypointByName(name);
+			const Waypoint* start = retailPlayerStart(*opponent);
 			if (!start)
 				continue;
 			TacticalCandidate candidate{nullptr, start->getLocation(), i};
@@ -2941,6 +3225,9 @@ void AISkirmishPlayer::updateRetail()
 		for (size_t i = 0; i < m_retailTargets.size(); ++i)
 		{
 			const Int kind = rules->tacticalTargets[i];
+			if (kind == RETAIL_TARGET_TARGETLESS && !raidActive && slotLimit(i) > static_cast<Int>(flagActive) &&
+				(!flagActive) == requireEmpty && updateRetailFarmRaid(soldiers, keep, phase, frame, TRUE, trace))
+				return;
 			const auto* candidates = kind == RETAIL_TARGET_ENEMY_STRUCTURE ? &structures
 				: kind == RETAIL_TARGET_DEFENSIVE ? &defenses
 				: kind == RETAIL_TARGET_OPPORTUNITY ? &opportunities
@@ -3036,10 +3323,10 @@ void AISkirmishPlayer::updateRetail()
 	const auto issueOrder = [&](Object* unit, Bool collect) {
 		AIUpdateInterface* ai = unit->getAI();
 		Bool accepted;
-		if (auto* horde = static_cast<HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate"))))
-			accepted = horde->issuePlannerOrder(collect ? nullptr : target, *destination);
-		else if (target && !collect)
-			accepted = ai->issueRetailPlannerAttack(target);
+		if (target && !collect)
+			accepted = issueRetailTacticAttack(*unit, *target);
+		else if (auto* horde = static_cast<HordeAIUpdate*>(unit->findUpdateModule(NAMEKEY("HordeAIUpdate"))))
+			accepted = horde->issuePlannerOrder(nullptr, *destination);
 		else
 			accepted = ai->issueRetailPlannerAdvance(*destination);
 		if (!accepted)
@@ -3199,6 +3486,8 @@ void AISkirmishPlayer::newMap()
 	m_retailObjectives.clear();
 	m_retailTargets.clear();
 	m_retailWallPlan = {};
+	m_retailFlagSquad = {};
+	m_retailFarmRaid = {};
 	m_retailLastFarmFrame = 0;
 	m_retailSavings = 0;
 	m_retailScavengedBuilding = -1;
@@ -3454,6 +3743,23 @@ void AISkirmishPlayer::xferRetailBlocks(Xfer* xfer, Bool present)
 				x->xferObjectID(&node);
 		}, [this] {
 			m_retailWallPlan = {};
+		}},
+		{"skirmish-flag-squad", [this](Xfer* x) {
+			x->xferObjectID(&m_retailFlagSquad.capturer);
+			for (ObjectID& id : m_retailFlagSquad.escorts)
+				x->xferObjectID(&id);
+		}, [this] {
+			m_retailFlagSquad = {};
+		}},
+		{"skirmish-farm-raid", [this](Xfer* x) {
+			x->xferObjectID(&m_retailFarmRaid.target);
+			for (ObjectID& id : m_retailFarmRaid.members)
+				x->xferObjectID(&id);
+			x->xferUnsignedInt(&m_retailFarmRaid.issuedFrame);
+			x->xferUnsignedInt(&m_retailFarmRaid.nextFrame);
+			x->xferInt(&m_retailFarmRaid.rushPolicy);
+		}, [this] {
+			m_retailFarmRaid = {};
 		}},
 		{"skirmish-upgrade-requests", [this, loading](Xfer* x) {
 			UnsignedInt count = static_cast<UnsignedInt>(m_retailUpgradePlans.size());

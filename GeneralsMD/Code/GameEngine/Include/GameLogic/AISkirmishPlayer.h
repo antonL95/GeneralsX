@@ -149,6 +149,24 @@ protected:
 		std::array<ObjectID, 8> nodes{};
 	};
 	RetailWallPlan m_retailWallPlan;
+	struct RetailFlagSquad
+	{
+		ObjectID capturer = INVALID_ID;
+		std::array<ObjectID, 2> escorts = {INVALID_ID, INVALID_ID};
+	};
+	RetailFlagSquad m_retailFlagSquad;
+	Bool updateRetailFlagCapture(const std::vector<Object*>& owned, UnsignedInt frame, Bool canStart, Bool trace);
+	struct RetailFarmRaid
+	{
+		ObjectID target = INVALID_ID;
+		std::array<ObjectID, 3> members = {INVALID_ID, INVALID_ID, INVALID_ID};
+		UnsignedInt issuedFrame = 0;
+		UnsignedInt nextFrame = 0;
+		Int rushPolicy = 0;
+	};
+	RetailFarmRaid m_retailFarmRaid;
+	Bool updateRetailFarmRaid(const std::vector<Object*>& soldiers, const Object* keep, Int phase,
+		UnsignedInt frame, Bool canStart, Bool trace);
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	UnsignedInt m_retailLastFarmFrame = 0;
 	UnsignedInt m_retailSavings = 0;

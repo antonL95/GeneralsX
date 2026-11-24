@@ -264,6 +264,11 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 	AIUpdateInterface::aiDoCommand(parms);
 }
 
+Bool HordeAIUpdate::hasGuardOrder() const
+{
+	return isGuardOrder(m_order);
+}
+
 Bool HordeAIUpdate::issuePlannerOrder(Object* target, const Coord3D& position)
 {
 	AICommandParms parms(target ? AICMD_ATTACK_OBJECT : AICMD_ATTACKMOVE_TO_POSITION, CMD_FROM_AI);

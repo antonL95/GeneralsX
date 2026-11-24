@@ -1,0 +1,12 @@
+44 power-reveal - - 0
+45 create Player_2 MordorGorbag 0 2580,1332,0
+45 create Player_2 MordorFighterHorde 0 2530,1350,0
+45 create Player_2 MordorFighterHorde 1 2490,1350,0
+80 skirmish-tactic-guard Player_2 MordorFighterHorde 0 Player_2:MordorFighterHorde:1
+80 skirmish-tactic-guard Player_2 MordorFighterHorde 1 Player_2:MordorFighterHorde:0
+81 skirmish-tactic-guard Player_2 MordorFighterHorde 0 Player_2:MordorFighterHorde:1
+81 skirmish-tactic-guard Player_2 MordorFighterHorde 1 Player_2:MordorFighterHorde:0
+620 neutralstate * CaptureFlag 0
+620 neutralstate * SignalFire 0
+620 skirmish-tactic-guard Player_2 MordorFighterHorde 0 Player_2:MordorFighterHorde:1
+620 skirmish-tactic-guard Player_2 MordorFighterHorde 1 Player_2:MordorFighterHorde:0

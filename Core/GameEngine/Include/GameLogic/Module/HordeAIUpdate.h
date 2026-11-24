@@ -24,6 +24,8 @@ public:
 	static void retaliate(Object* victim, Object* attacker);
 	Bool hasAttackOrder() const { return m_attackTarget != INVALID_ID || m_order == AICMD_ATTACKMOVE_TO_POSITION; }
 	Bool hasActiveAttack() const { return m_order == AICMD_ATTACK_POSITION || getAttackTarget() != nullptr; }
+	Bool hasGuardOrder() const;
+	ObjectID getGuardObject() const override { return m_order == AICMD_GUARD_OBJECT ? m_guardObject : INVALID_ID; }
 	Object* getAttackTarget() const;
 	static void memberCollided(Object* member, Object* target);
 	Bool hasRecentContact() const;
