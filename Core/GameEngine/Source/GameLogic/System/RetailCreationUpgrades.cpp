@@ -2,11 +2,6 @@
 
 #include "GameLogic/RetailCreationUpgrades.h"
 
-#include <map>
-#include <string>
-#include <string_view>
-#include <vector>
-
 #include "Common/FileSystem.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
@@ -18,7 +13,7 @@
 namespace
 {
 using Names = std::vector<std::string>;
-using GrantLists = std::map<std::string, Names, std::less<>>;
+using RetailCreationUpgrades::GrantLists;
 
 struct EventList
 {
@@ -223,16 +218,24 @@ const Names* resolve(const EventLists& lists, const GrantLists& functions, const
 }
 }
 
+RetailCreationUpgrades::GrantLists RetailCreationUpgrades::parse(std::string_view events, std::string_view script)
+{
+	const auto lists = readEvents(events);
+	const auto functions = readLeadingGrants(script);
+	GrantLists grantsByList;
+	for (const auto& [name, list] : lists)
+		if (const Names* grants = resolve(lists, functions, list); grants && !grants->empty())
+			grantsByList.emplace(name, *grants);
+	return grantsByList;
+}
+
 void RetailCreationUpgrades::load(Xfer* crc)
 {
 	s_grants.clear();
 	if (!RetailFileLayers::enabled())
 		return;
-	const auto lists = readEvents(readData("Data\\Scripts\\ScriptEvents.xml"));
-	const auto functions = readLeadingGrants(readData("Data\\Scripts\\Scripts.lua"));
-	for (const auto& [name, list] : lists)
-		if (const Names* grants = resolve(lists, functions, list); grants && !grants->empty())
-			s_grants.emplace(name, *grants);
+	const std::string events = readData("Data\\Scripts\\ScriptEvents.xml");
+	s_grants = parse(events, readData("Data\\Scripts\\Scripts.lua"));
 	Int count = static_cast<Int>(s_grants.size());
 	crc->xferInt(&count);
 	for (const auto& [eventList, grants] : s_grants)
@@ -262,7 +265,14 @@ void RetailCreationUpgrades::onObjectCreated(Object* object)
 	for (const auto& name : found->second)
 	{
 		const auto* upgrade = TheUpgradeCenter->findUpgrade(name.c_str());
-		if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER && !owner->hasUpgradeComplete(upgrade))
-			owner->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+		if (!upgrade)
+			continue;
+		if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+		{
+			if (!owner->hasUpgradeComplete(upgrade))
+				owner->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+		}
+		else if (!object->hasUpgrade(upgrade))
+			object->giveUpgrade(upgrade);
 	}
 }
