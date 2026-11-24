@@ -2,6 +2,7 @@ import ctypes as c
 import os
 from pathlib import Path
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -260,7 +261,6 @@ def check_spellbook():
 
 
 def check_shell_load():
-    global game
     wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
     time.sleep(2)
     wait_for("the game window can be positioned for input", move_game_to_origin)
@@ -311,10 +311,9 @@ def check_shell_load():
     if save is None:
         sys.exit("FAIL the skirmish did not write the named save")
 
-    stop_game(game)
     commands.write_text("89 shell-crc - - 0\n91 shell-crc - - 0\n")
     shell_opens = log_count("Shell::doPush() completed successfully")
-    game = launch_game(log_file)
+    restart_game(log_mode="ab")
     wait_for("restarting the game opens the main menu",
              lambda: log_count("Shell::doPush() completed successfully") > shell_opens, 100)
     time.sleep(2)
@@ -742,6 +741,117 @@ def check_settings():
     print("PASS Settings persists the edited ScrollFactor", flush=True)
 
 
+def check_create_a_hero():
+    wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully"), 100)
+    time.sleep(2)
+    before = title_signature(55, 152, 365, 500)
+    click(512, 576)
+    wait_for("Create a Hero opens from the main menu",
+             lambda: title_signature(55, 152, 365, 500) != before, 5)
+    initial_roster = title_signature(59, 185, 355, 422)
+    capture("hero-manager", 52, 150, 910, 525)
+    click(320, 641)
+    capture("hero-class", 595, 105, 405, 593)
+    click(873, 735)
+    click(801, 237)
+    for char in "slot three":
+        key(ord(char))
+    click(942, 304)
+    capture("hero-appearance", 577, 99, 427, 604)
+    click(873, 735)
+    capture("hero-attributes", 577, 99, 427, 604)
+    click(873, 735)
+    click(128, 193)
+    capture("hero-powers", 70, 142, 900, 545)
+    click(873, 735)
+    save_dir = out / "data/GeneralsX/GeneralsZH/Save"
+    wait_for("the hero is saved to the profile Save directory",
+             lambda: len(list(save_dir.glob("MyHero_*.cah"))) == 1)
+    record = next(save_dir.glob("MyHero_*.cah")).read_bytes()
+    if not record.startswith(b"ALAE2STR") or "slot three".encode("utf-16le") not in record or b"Command_CreateAHero_" not in record:
+        sys.exit("FAIL the saved hero record lacks its name or selected power")
+    click(152, 208)
+    saved_row = title_signature(59, 185, 355, 422)
+    if saved_row == initial_roster:
+        sys.exit("FAIL the new hero is missing from the roster")
+    restart_game()
+    wait_for("main menu opens after restart", lambda: log_count("Shell::doPush() completed successfully"), 100)
+    time.sleep(2)
+    click(512, 576)
+    wait_for("the same saved roster is displayed after restart",
+             lambda: title_signature(59, 185, 355, 422) == saved_row)
+    capture("hero-list-after-restart", 53, 151, 910, 525)
+    click(145, 735)
+    click(512, 296)
+    click(858, 444)
+    capture("hero-skirmish-choice", 765, 403, 157, 145)
+    click(858, 517)
+    click(833, 689)
+    click(833, 689)
+    wait_for("fortress recruitment uses the hero slot",
+             lambda: log_count("slot 21 Command_CreateAHeroReviveSlot type 53 enabled"), 75)
+    wait_for("the fortress queues the configured hero at the authored price",
+             lambda: re.search(r"TEST hero 50 Player_1 1 CreateAHero .*queued=1 .*cost=2125 frames=2100",
+                               (out / "game.log").read_text(errors="replace")))
+    wait_for("the queued recruitment saves", lambda: (save_dir / "hero-queued.sav").is_file() and
+             log_count("TEST snapshot-save frame=55 code=0"))
+    (out / "recruitment.log").write_text((out / "game.log").read_text(errors="replace"))
+    restart_game("-headless", "-noFPSLimit", "-loadsave", "hero-queued.sav")
+    wait_for("Berethor is recruited with his authored first power",
+             lambda: re.search(r"TEST pkg18 hero frame=2260 .*name=Berethor .*hasCheck=1 .*"
+                               r"firstPower=Command_CreateAHero_HotW_SummonAllies_Level1",
+                               (out / "game.log").read_text(errors="replace")), 100)
+    wait_for("the rank two power stays locked at rank one",
+             lambda: re.search(r"TEST pkg18 hero frame=2261 .*hasCheck=0 "
+                               r"checkName=Upgrade_CreateAHeroCreateAHeroTrainAllies_Level_1 .*rank=1 ",
+                               (out / "game.log").read_text(errors="replace")))
+    wait_for("the recruited hero match saves",
+             lambda: (save_dir / "hero-skirmish.sav").is_file() and log_count("TEST powercrc 2266 "))
+    original = (out / "game.log").read_text(errors="replace")
+    expected = re.search(r"TEST powercrc 2266 ([0-9A-F]{8})", original).group(1)
+    (out / "recruited.log").write_text(original)
+    restart_game("-loadsave", "hero-skirmish.sav")
+    wait_for("resumed match preserves the game CRC",
+             lambda: log_count(f"TEST powercrc 2266 {expected}"), 100)
+    wait_for("Berethor and his first power survive resume",
+             lambda: re.search(r"TEST pkg18 hero frame=2270 .*name=Berethor .*hasCheck=1 .*"
+                               r"firstPower=Command_CreateAHero_HotW_SummonAllies_Level1",
+                               (out / "game.log").read_text(errors="replace")))
+    capture("hero-recruited", 0, 480, 1024, 288)
+    wait_for("the selected rank two power unlocks when Berethor levels up",
+             lambda: re.search(r"TEST pkg18 hero frame=2285 .*hasCheck=1 "
+                               r"checkName=Upgrade_CreateAHeroCreateAHeroTrainAllies_Level_1 ",
+                               (out / "game.log").read_text(errors="replace")))
+
+
+def launch_game(*options, log_mode="wb"):
+    speed = ["-fps", "120"] if "--create-a-hero" in sys.argv else []
+    with (out / "game.log").open(log_mode) as log:
+        return subprocess.Popen(
+            ["timeout", "300", str(build / "GeneralsMD/GeneralsXZH"),
+             "-win", "-xres", "1024", "-yres", "768",
+             "-noaudio", "-nomusic", "-novideo", "-noshellmap",
+             "-mod", "/game-install/aotr", "-bfme2", "/game-install/bfme2", *speed, *options],
+            cwd="/game-install/rotwk", env=env, stdout=log, stderr=subprocess.STDOUT,
+        )
+
+
+def stop_game(process=None):
+    target = game if process is None else process
+    target.terminate()
+    try:
+        target.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        target.kill()
+        target.wait()
+
+
+def restart_game(*options, log_mode="wb"):
+    global game
+    stop_game()
+    game = launch_game(*options, log_mode=log_mode)
+
+
 build = Path(sys.argv[1]).resolve()
 out = Path(tempfile.mkdtemp(prefix="pause-qa.", dir=build))
 print(f"Run directory {out}", flush=True)
@@ -771,35 +881,41 @@ env = os.environ | {
     "LP_NUM_THREADS": "3",
     "GENERALSX_TEST_COMMANDS": str(commands),
 }
-def launch_game(log):
-    return subprocess.Popen(
-        [str(build / "GeneralsMD/GeneralsXZH"), "-win", "-xres", "1024", "-yres", "768",
-         "-noaudio", "-nomusic", "-novideo", "-noshellmap",
-         "-mod", "/game-install/aotr", "-bfme2", "/game-install/bfme2"],
-        cwd="/game-install/rotwk", env=env, stdout=log, stderr=subprocess.STDOUT,
+if "--create-a-hero" in sys.argv:
+    map_dir = out / "data/GeneralsX/GeneralsZH/Maps/aotr training grounds"
+    map_dir.mkdir(parents=True)
+    source = Path("/game/UserData/Maps/AotR Training Grounds")
+    for file in source.iterdir():
+        shutil.copy2(file, map_dir / (file.name.lower() if file.suffix.lower() == ".map" else file.name))
+    commands.write_text(
+        "10 cash Player_1 - 0 10000\n"
+        "20 select Player_1 MenFortressCitadel 0\n"
+        "30 slot - - 0 21\n"
+        "41 hud - - 0\n"
+        "42 slot - - 0 21\n"
+        "50 heroes Player_1 - 0\n"
+        "55 snapshot-save - - 0 hero-queued.sav\n"
+        "2260 pkg18-hero-state Player_1 CreateAHero 0 Upgrade_CreateAHeroHotWSummonAllies_Level1\n"
+        "2261 pkg18-hero-state Player_1 CreateAHero 0 Upgrade_CreateAHeroCreateAHeroTrainAllies_Level_1\n"
+        "2265 snapshot-save - - 0 hero-skirmish.sav\n"
+        "2266 powercrc - - 0\n"
+        "2268 select Player_1 CreateAHero 0\n"
+        "2270 pkg18-hero-state Player_1 CreateAHero 0 Upgrade_CreateAHeroHotWSummonAllies_Level1\n"
+        "2284 pkg18-award-xp Player_1 CreateAHero 0 100000\n"
+        "2285 pkg18-hero-state Player_1 CreateAHero 0 Upgrade_CreateAHeroCreateAHeroTrainAllies_Level_1\n"
     )
-
-
-def stop_game(process):
-    process.terminate()
-    try:
-        process.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
-
-
 def run(check_session):
-    global game, log_file
-    with (out / "game.log").open("wb") as log_file:
-        game = launch_game(log_file)
-        try:
-            check_session()
-        finally:
-            stop_game(game)
+    global game
+    game = launch_game()
+    try:
+        check_session()
+    finally:
+        stop_game(game)
 
 
-if "--shell-load" in sys.argv:
+if "--create-a-hero" in sys.argv:
+    run(check_create_a_hero)
+elif "--shell-load" in sys.argv:
     run(check_shell_load)
 elif "--options" in sys.argv:
     run(check_options)
