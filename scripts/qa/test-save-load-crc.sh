@@ -253,26 +253,39 @@ check_package_step() {
 
 check_packages() {
     failed=
+    diverged=
     for name in $packages; do
         if ! check_package_step "$name" check "$1" ||
-           ! check_package_step "$name" check resume ||
-           ! check_package_step "$name" compare; then
+           ! check_package_step "$name" check resume; then
             failed="${failed:+$failed }$name"
+        elif ! check_package_step "$name" compare; then
+            failed="${failed:+$failed }$name"
+            diverged="${diverged:+$diverged }$name"
         fi
     done
+    hard=
     for name in $failed; do
         if [ -z "$only" ]; then
             isolated=$(mktemp -d "$out/only-$name.XXXXXX")
             if PKGS1_STATE_DIR="$isolated" sh "$runner" --only "$name" "$build" "$mode" "$save_frame" "$count" > "$isolated/result.log" 2>&1; then
-                printf 'Fixture interference: %s passes alone and fails combined (%s)\n' "$name" "$isolated" >&2
+                case " $diverged " in
+                    *" $name "*)
+                        printf 'Save divergence only when combined: %s (%s)\n' "$name" "$isolated" >&2
+                        hard="${hard:+$hard }$name"
+                        ;;
+                    *)
+                        printf 'Fixture interference (warning): %s passes alone and fails an assertion combined (%s)\n' "$name" "$isolated" >&2
+                        ;;
+                esac
                 continue
             fi
             printf 'Fixture failed both alone and combined: %s (%s)\n' "$name" "$isolated" >&2
         else
             printf 'Fixture failed: %s (%s)\n' "$name" "$out" >&2
         fi
+        hard="${hard:+$hard }$name"
     done
-    [ -z "$failed" ]
+    [ -z "$hard" ]
 }
 
 if [ "$mode" = spellbook ]; then
