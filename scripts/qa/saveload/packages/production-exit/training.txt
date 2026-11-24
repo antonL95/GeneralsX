@@ -1,0 +1,35 @@
+200 create Player_1 ShireShirriffsQuarters 0 1800,2200,0
+200 create Player_1 RivendellDunedainGathering 0 2300,2200,0
+200 create Player_1 RivendellDunedainGathering 1 800,2300,0
+200 create Player_1 RivendellDunedainGathering 2 800,2800,0
+200 create Player_1 RivendellDormitory 0 2800,2200,0
+200 create Player_1 RivendellBreeLandEncampment 0 3300,2200,0
+200 create Player_1 GondorKnightHorde 0 1200,3100,0
+200 create Player_1 GondorStable 0 3700,1500,0
+201 cash Player_1 - 0 100000
+210 rally Player_1 ShireShirriffsQuarters 0 - 2050 2450
+210 rally Player_1 RivendellDunedainGathering 0 - 2550 2450
+210 rally Player_1 RivendellDormitory 0 - 3050 2450
+210 rally Player_1 RivendellBreeLandEncampment 0 - 3550 2450
+210 rally Player_1 GondorStable 0 - 3500 1750
+211 production-exit-queue Player_1 ShireShirriffsQuarters 0 ShireBounderHorde
+212 production-exit-queue Player_1 RivendellDunedainGathering 0 ArnorRangerHorde
+213 production-exit-queue Player_1 RivendellDormitory 0 ElvenRivendellInfHorde
+214 production-exit-queue Player_1 RivendellBreeLandEncampment 0 RivendellHobbitFriendsHorde
+215 production-exit-queue Player_1 RivendellDunedainGathering 1 ArnorRangerHorde
+216 production-exit-queue Player_1 RivendellDunedainGathering 2 ArnorRangerHorde
+217 production-exit-queue Player_1 GondorStable 0 GondorPinnathGelinRiderHorde
+250 production-exit-cavalry Player_1 GondorKnightHorde 0
+260 move Player_1 GondorKnightHorde 0 - 1600 3100
+500 production-exit-cavalry Player_1 GondorKnightHorde 0
+1273 production-exit-anchor Player_1 ArnorRangerHorde 2
+1274 destroy Player_1 RivendellDunedainGathering 2
+1284 production-exit-anchor Player_1 ArnorRangerHorde 2
+1285 production-exit-queue-state Player_1 RivendellDunedainGathering 0
+1303 kill Player_1 RivendellDunedainGathering 1
+1310 production-exit-retired Player_1 ArnorRangerHorde 1
+1320 move Player_1 ArnorRangerHorde 1 - 1100 2600
+1450 production-exit-queue-state Player_1 RivendellDunedainGathering 0
+1600 production-exit-retired Player_1 ArnorRangerHorde 1
+1800 move Player_1 ShireBounderHorde 0 - 2050 2600
+1800 move Player_1 RivendellHobbitFriendsHorde 0 - 3550 2600
