@@ -562,6 +562,8 @@ static INIBlockParse findBlockParse(const char* token)
 			return RetailEva::parseEvent;
 		if (strcmp(token, "MiscEvaData") == 0)
 			return RetailEva::parseSettings;
+		if (strcmp(token, "ScoredKillEvaAnnouncer") == 0)
+			return RetailEva::parseScoredKillAnnouncer;
 		if (strcmp(token, "LargeGroupAudioMap") == 0)
 			return RetailLargeGroupAudio::parseMap;
 		if (stricmp(token, "Multisound") == 0)

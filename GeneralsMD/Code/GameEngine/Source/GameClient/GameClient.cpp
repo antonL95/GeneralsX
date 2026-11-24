@@ -46,6 +46,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/RetailEva.h"
 #include "GameClient/RetailMusicScripts.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -1447,7 +1448,7 @@ void GameClient::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 3;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1674,7 +1675,8 @@ void GameClient::xfer( Xfer *xfer )
 			}
 		}
 	}
-
+	if (RetailFileLayers::enabled())
+		RetailEva::xferScoredKills(xfer, version >= 4);
 }
 
 // ------------------------------------------------------------------------------------------------

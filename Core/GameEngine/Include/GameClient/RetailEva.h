@@ -8,6 +8,7 @@ class INI;
 class Object;
 class Player;
 class SpecialPowerTemplate;
+class Xfer;
 struct Coord3D;
 
 namespace RetailEva
@@ -27,6 +28,9 @@ void reset();
 void update();
 void parseEvent(INI *ini);
 void parseSettings(INI *ini);
+void parseScoredKillAnnouncer(INI *ini);
+void scoredKill(const Object& killer, const Object& victim);
+void xferScoredKills(Xfer* xfer, Bool present);
 void queue(const Player *recipient, const AsciiString &name, const Coord3D *position = nullptr,
 	Ping ping = Ping::None, const Coord3D *radarPosition = nullptr);
 void markFirstSighted(const Object& object);

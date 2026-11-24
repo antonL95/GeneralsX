@@ -3,7 +3,9 @@
 #include "GameClient/RetailEva.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
+#include <deque>
 #include <map>
 #include <set>
 
@@ -18,9 +20,12 @@
 #include "Common/SpecialPower.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
+#include "Common/SpecialPowerINI.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/Damage.h"
+#include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
@@ -77,7 +82,33 @@ struct PlayedEvent
 	Bool positioned;
 };
 
+struct KillWindow
+{
+	std::deque<UnsignedInt> frames;
+	Coord3D position{};
+
+	void expire(UnsignedInt now, UnsignedInt duration)
+	{
+		while (!frames.empty() && now - frames.front() > duration)
+			frames.pop_front();
+	}
+};
+
+struct ScoredKillAnnouncer
+{
+	AsciiString name;
+	AsciiString event;
+	Bool byLocal = FALSE;
+	Bool againstLocal = FALSE;
+	UnsignedInt minimumCount = 0;
+	UnsignedInt maximumAge = 0;
+	SpecialPowerObjectFilter filter;
+	std::array<KillWindow, MAX_PLAYER_COUNT> kills;
+};
+
 Event s_defaults;
+std::vector<ScoredKillAnnouncer> s_defaultScoredKills;
+std::vector<ScoredKillAnnouncer> s_scoredKills;
 std::map<AsciiString, Event> s_events;
 std::vector<Pending> s_pending;
 std::map<AsciiString, UnsignedInt> s_lastPlayed;
@@ -140,6 +171,88 @@ AsciiString eventKey(AsciiString name)
 	name.toLower();
 	return name;
 }
+
+void resetScoredKills()
+{
+	for (auto& rule : s_scoredKills)
+		rule.kills = {};
+}
+
+void resetPlayback()
+{
+	s_pending.clear();
+	s_lastPlayed.clear();
+	s_playedEvents.clear();
+	s_recharging.clear();
+	s_seenRings.clear();
+	s_seenEnemies.clear();
+	s_viewer = nullptr;
+	s_speech.setPlayingHandle(0);
+	s_quietUntil = 0;
+}
+
+void updateScoredKills(const Player& player, UnsignedInt frame)
+{
+	for (auto& rule : s_scoredKills)
+	{
+		if (!rule.minimumCount)
+			continue;
+		UnsignedInt count = 0;
+		for (auto& window : rule.kills)
+		{
+			window.expire(frame, rule.maximumAge);
+			const UnsignedInt remaining = rule.minimumCount - count;
+			if (window.frames.size() >= remaining)
+			{
+				RetailEva::queue(&player, rule.event, &window.position);
+				break;
+			}
+			count += static_cast<UnsignedInt>(window.frames.size());
+		}
+	}
+}
+
+void transferKillWindows(Xfer* xfer, std::array<KillWindow, MAX_PLAYER_COUNT>& windows)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	for (auto& window : windows)
+	{
+		UnsignedInt count = static_cast<UnsignedInt>(window.frames.size());
+		xfer->xferUnsignedInt(&count);
+		if (!count)
+			continue;
+		xfer->xferCoord3D(&window.position);
+		if (loading)
+		{
+			for (UnsignedInt i = 0; i < count; ++i)
+			{
+				UnsignedInt frame;
+				xfer->xferUnsignedInt(&frame);
+				window.frames.push_back(frame);
+			}
+		}
+		else
+			for (auto& frame : window.frames)
+				xfer->xferUnsignedInt(&frame);
+	}
+}
+
+void transferScoredKillRule(Xfer* xfer, ScoredKillAnnouncer& rule)
+{
+	transferKillWindows(xfer, rule.kills);
+
+	const AsciiString key = eventKey(rule.event);
+	const auto last = s_lastPlayed.find(key);
+	Bool played = last != s_lastPlayed.end();
+	UnsignedInt frame = played ? last->second : 0;
+	xfer->xferBool(&played);
+	if (played)
+	{
+		xfer->xferUnsignedInt(&frame);
+		if (xfer->getXferMode() == XFER_LOAD)
+			s_lastPlayed[key] = frame;
+	}
+}
 }
 
 namespace RetailEva
@@ -149,6 +262,10 @@ void load()
 	INI ini;
 	ini.loadFileDirectory("Data\\INI\\Default\\Eva", INI_LOAD_OVERWRITE, nullptr, 0);
 	ini.loadFileDirectory("Data\\INI\\Eva", INI_LOAD_OVERWRITE, nullptr, 0);
+	s_scoredKills.clear();
+	ini.loadFileDirectory("Data\\INI\\Default\\ScoredKillEvaAnnouncer", INI_LOAD_OVERWRITE, nullptr, 0);
+	ini.loadFileDirectory("Data\\INI\\ScoredKillEvaAnnouncer", INI_LOAD_OVERWRITE, nullptr, 0);
+	s_defaultScoredKills = s_scoredKills;
 }
 
 void parseEvent(INI *ini)
@@ -194,15 +311,85 @@ void parseSettings(INI *ini)
 
 void reset()
 {
-	s_pending.clear();
-	s_lastPlayed.clear();
-	s_playedEvents.clear();
-	s_recharging.clear();
-	s_seenRings.clear();
-	s_seenEnemies.clear();
-	s_viewer = nullptr;
-	s_speech.setPlayingHandle(0);
-	s_quietUntil = 0;
+	resetPlayback();
+	s_scoredKills = s_defaultScoredKills;
+}
+
+void parseScoredKillAnnouncer(INI* ini)
+{
+	static const FieldParse fields[] = {
+		{ "EvaEvent", INI::parseAsciiString, nullptr, offsetof(ScoredKillAnnouncer, event) },
+		{ "CountOnlyKillsByLocalPlayer", INI::parseBool, nullptr, offsetof(ScoredKillAnnouncer, byLocal) },
+		{ "CountOnlyKillsAgainstLocalPlayer", INI::parseBool, nullptr, offsetof(ScoredKillAnnouncer, againstLocal) },
+		{ "MinimumCountForAnnouncement", INI::parseUnsignedInt, nullptr, offsetof(ScoredKillAnnouncer, minimumCount) },
+		{ "MaximumTimeForAnnouncementMS", INI::parseDurationUnsignedInt, nullptr, offsetof(ScoredKillAnnouncer, maximumAge) },
+		{ "ObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(ScoredKillAnnouncer, filter) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	const AsciiString name = ini->getNextToken();
+	auto rule = std::find_if(s_scoredKills.begin(), s_scoredKills.end(),
+		[&name](const ScoredKillAnnouncer& other) { return other.name.compareNoCase(name) == 0; });
+	if (rule == s_scoredKills.end())
+	{
+		s_scoredKills.emplace_back();
+		rule = s_scoredKills.end() - 1;
+		rule->name = name;
+	}
+	ini->initFromINI(&*rule, fields);
+}
+
+void scoredKill(const Object& killer, const Object& victim)
+{
+	const Player* local = ThePlayerList->getLocalPlayer();
+	const Player* owner = killer.getControllingPlayer();
+	if (!local || !owner || !TheGameLogic->isScoringEnabled() || killer.getRelationship(&victim) != ENEMIES ||
+		victim.testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || victim.isKindOf(KINDOF_CLICK_THROUGH))
+		return;
+
+	const Int index = owner->getPlayerIndex();
+	if (index < 0 || index >= MAX_PLAYER_COUNT)
+		return;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	for (auto& rule : s_scoredKills)
+	{
+		if (!rule.minimumCount || (rule.byLocal && owner != local) ||
+			(rule.againstLocal && victim.getControllingPlayer() != local) ||
+			!rule.filter.matchesObject(&killer, &victim))
+			continue;
+		auto& window = rule.kills[index];
+		window.expire(now, rule.maximumAge);
+		if (window.frames.size() >= rule.minimumCount)
+			window.frames.pop_front();
+		window.frames.push_back(now);
+		window.position = *victim.getPosition();
+	}
+}
+
+void xferScoredKills(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection<Xfer>(xfer, loading, present, {
+		{"scored-kill-announce", [loading](Xfer* x) {
+			if (loading)
+				resetScoredKills();
+			UnsignedInt count = static_cast<UnsignedInt>(s_scoredKills.size());
+			x->xferUnsignedInt(&count);
+			for (UnsignedInt i = 0; i < count; ++i)
+			{
+				AsciiString name = loading ? AsciiString() : s_scoredKills[i].name;
+				x->xferAsciiString(&name);
+				const Int size = x->beginBlock();
+				auto rule = loading ? std::find_if(s_scoredKills.begin(), s_scoredKills.end(),
+					[&name](const ScoredKillAnnouncer& other) { return other.name.compareNoCase(name) == 0; }) :
+					s_scoredKills.begin() + i;
+				if (rule == s_scoredKills.end())
+					x->skip(size);
+				else
+					transferScoredKillRule(x, *rule);
+				x->endBlock();
+			}
+		}, resetScoredKills}
+	});
 }
 
 void queue(const Player *recipient, const AsciiString &name, const Coord3D *position, Ping ping,
@@ -316,10 +503,12 @@ void update()
 	if (!player || !TheGameLogic->isInGame())
 		return;
 	if (s_viewer && s_viewer != player)
-		reset();
+		resetPlayback();
 	s_viewer = player;
 
 	const auto frame = TheGameLogic->getFrame();
+	if (player == ThePlayerList->getLocalPlayer())
+		updateScoredKills(*player, frame);
 	updateWorldEvents(*player, frame);
 	std::erase_if(s_pending, [frame](const Pending &pending)
 	{
