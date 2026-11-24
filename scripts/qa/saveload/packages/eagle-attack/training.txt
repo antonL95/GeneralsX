@@ -1,14 +1,14 @@
-110 create Player_1 GondorGwaihirHero_Summoned 0 1100,3150,0
+110 create Player_1 GondorGwaihirHero_Summoned 0 1840,3150,0
 110 stance Player_1 GondorGwaihirHero_Summoned 0 HoldGround
-185 create PlyrCreeps EagleAttackTarget 0 1330,3150,0
+185 create PlyrCreeps EagleAttackTarget 0 2070,3150,0
 186 orderattack Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackTarget:0
 187 orderattack Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackTarget:0
 189 stance Player_1 GondorGwaihirHero_Summoned 0 Battle
 371 destroy Player_1 GondorGwaihirHero_Summoned 0
 371 destroy PlyrCreeps EagleAttackTarget 0
-372 create Player_1 GondorGwaihirHero_Summoned 0 1100,3150,0
+372 create Player_1 GondorGwaihirHero_Summoned 0 1840,3150,0
 372 stance Player_1 GondorGwaihirHero_Summoned 0 HoldGround
-447 create PlyrCreeps EagleAttackOrcHorde 0 1330,3150,0
+447 create PlyrCreeps EagleAttackOrcHorde 0 2070,3150,0
 448 orderattack Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackOrcHorde:0
 449 orderattack Player_1 GondorGwaihirHero_Summoned 0 PlyrCreeps:EagleAttackOrcHorde:0
 451 stance Player_1 GondorGwaihirHero_Summoned 0 Battle
