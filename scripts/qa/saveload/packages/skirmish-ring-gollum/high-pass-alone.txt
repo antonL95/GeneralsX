@@ -1,0 +1,5 @@
+44 power-reveal - - 0
+45 create PlyrCreeps SkirmishRingBearer 0 2740,3070,0
+45 create Player_2 MordorFighterHorde 0 2510,2910,0
+45 create Player_2 MordorFighterHorde 1 2530,2960,0
+45 create Player_2 MordorFighterHorde 2 2550,3030,0
