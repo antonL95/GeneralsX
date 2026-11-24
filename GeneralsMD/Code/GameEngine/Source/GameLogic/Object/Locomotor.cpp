@@ -1033,6 +1033,7 @@ Locomotor::Locomotor(const Locomotor& that)
 	m_preferredHeightDamping = that.m_preferredHeightDamping;
 	m_angleOffset = that.m_angleOffset;
 	m_offsetIncrement = that.m_offsetIncrement;
+	m_retailScalarSpeed = that.m_retailScalarSpeed;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1055,6 +1056,7 @@ Locomotor& Locomotor::operator=(const Locomotor& that)
 #endif
 		m_preferredHeight = that.m_preferredHeight;
 		m_preferredHeightDamping = that.m_preferredHeightDamping;
+		m_retailScalarSpeed = that.m_retailScalarSpeed;
 	}
 	return *this;
 }
@@ -1073,6 +1075,9 @@ void Locomotor::xferRetailBlocks(Xfer* xfer, Bool present)
 		{ "start-move-pos",
 			[this](Xfer* x) { x->xferCoord3D(&m_retailStartMovePos); },
 			[this] { m_retailStartMovePos.zero(); } },
+		{ "locomotor-scalar-speed",
+			[this](Xfer* x) { x->xferReal(&m_retailScalarSpeed); },
+			[this] { m_retailScalarSpeed = 0.0f; } },
 	});
 }
 
@@ -1409,6 +1414,20 @@ void Locomotor::setPhysicsOptions(Object* obj)
 //-------------------------------------------------------------------------------------------------
 static constexpr Real MIN_GAIT_SPEED = 0.001f;
 
+void Locomotor::advanceRetailScalarSpeed(Object* object, Real goalSpeed)
+{
+	const Real acceleration = getMaxAcceleration(object->getBodyModule()->getDamageState());
+	const Real braking = getBraking();
+	goalSpeed = std::max(0.0f, goalSpeed);
+	const Real lowerSpeed = m_retailScalarSpeed - braking;
+	if (goalSpeed < lowerSpeed)
+		goalSpeed = std::max(lowerSpeed, braking);
+	if (m_retailScalarSpeed < goalSpeed && !getFlag(IS_BRAKING))
+		m_retailScalarSpeed += acceleration;
+	if (goalSpeed < m_retailScalarSpeed)
+		m_retailScalarSpeed = std::max(goalSpeed, m_retailScalarSpeed - braking);
+}
+
 void Locomotor::clearRetailGait(Object* object)
 {
 	if (!RetailFileLayers::enabled() ||
@@ -1482,6 +1501,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	// Skip moveTowardsPosition if physics say you're stunned
 	if(physics->getIsStunned())
 	{
+		advanceRetailScalarSpeed(obj, 0.0f);
 		updateRetailTurnConditions(obj, 0.0f);
 		return;
 	}
@@ -1576,6 +1596,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 			handleBehaviorZ(obj, physics, goalPos, birdPullUp);
 			return;
 		}
+		advanceRetailScalarSpeed(obj, 0.0f);
 		updateRetailGait(obj, onPathDistToGoal, physics->getForwardSpeed2D(), TRUE);
 		physics->scrubVelocity2D(desiredSpeed); // stop if we are about to run into the blocking object.
 		Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
@@ -1839,6 +1860,7 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 	//
 	// Maintain goal speed
 	//
+	advanceRetailScalarSpeed(obj, goalSpeed);
 	Real speedDelta = goalSpeed - actualSpeed;
 	if (speedDelta != 0.0f)
 	{
@@ -2071,6 +2093,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 	// Maintain goal speed
 	//
 	updateRetailGait(obj, onPathDistToGoal, actualSpeed, getFlag(IS_BRAKING) || goalSpeed + MIN_GAIT_SPEED < actualSpeed);
+	advanceRetailScalarSpeed(obj, goalSpeed);
 	Real speedDelta = goalSpeed - actualSpeed;
 	if (moveBackwards) {
 		speedDelta = -goalSpeed+actualSpeed;
@@ -2300,6 +2323,7 @@ void Locomotor::moveRetailGroundTowardsPosition(Object* obj, PhysicsBehavior* ph
 		desiredSpeed = getMinSpeed();
 
 	const Real steeredSpeed = speed + std::clamp(desiredSpeed - speed, -braking, acceleration);
+	advanceRetailScalarSpeed(obj, desiredSpeed);
 	const Real nextSpeed = std::min(distance, std::max(minimumTravelSpeed, steeredSpeed));
 	if (steeredSpeed < minimumTravelSpeed)
 		travelHeading = goalHeading;
@@ -2465,6 +2489,7 @@ void Locomotor::moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, c
 	//
 	// Maintain goal speed
 	//
+	advanceRetailScalarSpeed(obj, goalSpeed);
 	Real speedDelta = goalSpeed - actualSpeed;
 	if (speedDelta != 0.0f)
 	{
@@ -2590,6 +2615,7 @@ void Locomotor::moveTowardsPositionClimb(Object* obj, PhysicsBehavior *physics, 
 	//
 	// Maintain goal speed
 	//
+	advanceRetailScalarSpeed(obj, goalSpeed);
 	Real speedDelta = goalSpeed - actualSpeed;
 	if (moveBackwards) {
 		speedDelta = -goalSpeed+actualSpeed;
@@ -2712,6 +2738,7 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 			desiredSpeed = getMinSpeed();
 	}
 
+	advanceRetailScalarSpeed(obj, desiredSpeed);
 	Coord3D localGoalPos = goalPos;
 #ifdef USE_ZDIR_DAMPING
 	Real zDirDamping = 0.0f;
@@ -3240,6 +3267,7 @@ void Locomotor::moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, 
 	//
 	// Maintain goal speed
 	//
+	advanceRetailScalarSpeed(obj, goalSpeed);
 	Real speedDelta = goalSpeed - actualSpeed;
 	if (speedDelta != 0.0f)
 	{
@@ -3328,6 +3356,7 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 {
 	if (physics->getIsStunned())
 	{
+		advanceRetailScalarSpeed(obj, 0.0f);
 		physics->setTurning(TURN_NONE);
 		updateRetailTurnConditions(obj, 0.0f);
 		return;
@@ -3474,6 +3503,7 @@ void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord
 	}
 
 	Coord3D velocityDelta;
+	advanceRetailScalarSpeed(obj, goalSpeed);
 	velocityDelta.x = dirToApplyForce.x * goalSpeed - velocity->x;
 	velocityDelta.y = dirToApplyForce.y * goalSpeed - velocity->y;
 	velocityDelta.z = 0.0f;
@@ -3524,6 +3554,11 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 		DEBUG_CRASH(("you can only apply Locomotors to objects with Physics"));
 		return TRUE;
 	}
+	const Bool maintainingFlight = m_template->m_appearance == LOCO_WINGS &&
+		((RetailFileLayers::enabled() && obj->isKindOf(KINDOF_INERT) && !obj->isEffectivelyDead() &&
+			getMinSpeed() > 0.0f && getPreferredHeight() > 0.0f) || (physics->isMotive() && obj->isAboveTerrain()));
+	if (m_template->m_appearance != LOCO_THRUST && !maintainingFlight)
+		m_retailScalarSpeed = std::max(0.0f, m_retailScalarSpeed - getBraking());
 
 #ifdef DEBUG_OBJECT_ID_EXISTS
 //	DEBUG_ASSERTLOG(obj->getID() != TheObjectIDToDebug, ("locoUpdate_maintainCurrentPosition %f %f %f, speed %f (%f)",m_maintainPos.x,m_maintainPos.y,m_maintainPos.z,physics->getSpeed(),physics->getForwardSpeed2D()));
@@ -3577,6 +3612,8 @@ Bool Locomotor::locoUpdate_maintainCurrentPosition(Object* obj)
 			break;
 	}
 
+	if (m_retailScalarSpeed > 0.0f)
+		requiresConstantCalling = TRUE;
 	if (RetailFileLayers::enabled())
 	{
 		const Real speed = m_retailWasRunning ? physics->getVelocityMagnitude() : 0.0f;

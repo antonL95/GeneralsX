@@ -449,8 +449,7 @@ void Path::optimize( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfa
 			Region3D pathExtent;
 			TheTerrainLogic->getMaximumPathfindExtent(&pathExtent);
 			PathNode* firstTarget = m_path->getNextOptimized();
-			const Coord3D& velocity = *obj->getPhysics()->getVelocity();
-			const Real speed = WWMath::SqrtfOrigin(velocity.x * velocity.x + velocity.y * velocity.y);
+			const Real speed = locomotor->getRetailScalarSpeed();
 			const Bool fast = speed > ai->getCurLocomotorSpeed() * 0.25f;
 			Real radius = fast ? locomotor->getFastTurnRadius() : locomotor->getSlowTurnRadius();
 			Real maxTurn = locomotor->getMaxTurnWithoutReform();
@@ -512,17 +511,19 @@ void Path::optimize( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfa
 								point.x = cx + radius * (rx * cosine - ry * sine);
 								point.y = cy + radius * (rx * sine + ry * cosine);
 								if (!pathExtent.containsWithin(point.asCoord2D()) ||
-									!TheAI->pathfinder()->isLinePassable(obj, acceptableSurfaces, m_path->getLayer(),
-									previous, point, blocked, false))
+									!TheAI->pathfinder()->isArcSegmentPassable(obj, acceptableSurfaces, m_path->getLayer(),
+									previous, point, blocked))
 								{
 									passable = FALSE;
-									break;
+									if (!locomotor->usesFloatingZ())
+										break;
 								}
 								points.push_back(point);
 								previous = point;
 							}
-							if (passable && TheAI->pathfinder()->isLinePassable(obj, acceptableSurfaces, m_path->getLayer(),
-								previous, goal, blocked, false))
+							if (locomotor->usesFloatingZ() ||
+								(passable && TheAI->pathfinder()->isArcSegmentPassable(obj, acceptableSurfaces, m_path->getLayer(),
+								previous, goal, blocked)))
 							{
 								PathNode* tail = m_path;
 								for (const Coord3D& point : points)
@@ -594,8 +595,8 @@ void Path::optimize( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfa
 							points.push_back(entry);
 							Coord3D last = before;
 							Bool passable = pathExtent.containsWithin(entry.asCoord2D()) &&
-								TheAI->pathfinder()->isLinePassable(obj, acceptableSurfaces,
-								corner->getLayer(), last, entry, blocked, false);
+								TheAI->pathfinder()->isArcSegmentPassable(obj, acceptableSurfaces,
+								corner->getLayer(), last, entry, blocked);
 							last = entry;
 							for (Int i = 1; passable && i <= count; ++i)
 							{
@@ -606,13 +607,13 @@ void Path::optimize( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfa
 								point.x = centerX + radialX * cosine - radialY * sine;
 								point.y = centerY + radialX * sine + radialY * cosine;
 								passable = pathExtent.containsWithin(point.asCoord2D()) &&
-									TheAI->pathfinder()->isLinePassable(obj, acceptableSurfaces,
-									corner->getLayer(), last, point, blocked, false);
+									TheAI->pathfinder()->isArcSegmentPassable(obj, acceptableSurfaces,
+									corner->getLayer(), last, point, blocked);
 								points.push_back(point);
 								last = point;
 							}
-							if (passable && TheAI->pathfinder()->isLinePassable(obj, acceptableSurfaces,
-								corner->getLayer(), last, after, blocked, false))
+							if (passable && TheAI->pathfinder()->isArcSegmentPassable(obj, acceptableSurfaces,
+								corner->getLayer(), last, after, blocked))
 							{
 								for (const Coord3D& point : points)
 								{

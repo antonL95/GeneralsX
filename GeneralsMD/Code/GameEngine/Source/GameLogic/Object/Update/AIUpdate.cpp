@@ -1995,6 +1995,8 @@ Bool AIUpdateInterface::computeQuickPath( const Coord3D *destination )
 	destroyPath();
 	if (getObject()->isKindOf(KINDOF_AIRCRAFT) && !getObject()->isKindOf(KINDOF_PROJECTILE)) {
 		m_path = TheAI->pathfinder()->getAircraftPath(getObject(), destination);
+		if (m_path)
+			m_path->optimize(getObject(), m_locomotorSet.getValidSurfaces(), FALSE);
 	} else {
 		m_path = newInstance(Path);
 		m_path->prependNode( destination, LAYER_GROUND );

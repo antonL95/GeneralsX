@@ -314,6 +314,7 @@ public:
 	Real getTurnThresholdHighSpeed() const { return m_template->m_rotwk.turnThresholdHighSpeed; }
 	Real getSlowTurnRadius() const { return m_template->m_slowTurnRadius; }
 	Real getFastTurnRadius() const { return m_template->m_fastTurnRadius; }
+	Real getRetailScalarSpeed() const { return m_retailScalarSpeed; }
 	Bool usesFloatingZ() const { return m_template->m_behaviorZ == Z_FLOATING_Z; }
 	Real getMaxOverlappedHeight() const { return m_template->m_rotwk.maxOverlappedHeight; }
 	Bool scalesWalls() const { return m_template->m_rotwk.scalesWalls; }
@@ -503,6 +504,7 @@ protected:
 	virtual void crc( Xfer *xfer ) override;
 	virtual void xfer( Xfer *xfer ) override;
 	virtual void loadPostProcess() override;
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 protected:
 
@@ -541,6 +543,7 @@ private:
 
 	void updateRetailGait(Object* object, Real distance, Real speedBefore, Bool braking, Real speedAfter = -1.0f);
 	void xferRetailBlocks(Xfer* xfer, Bool present);
+	void advanceRetailScalarSpeed(Object* object, Real goalSpeed);
 
 	LocomotorTemplateOverride m_template;
 	Coord3D			m_maintainPos;
@@ -563,6 +566,7 @@ private:
 	Real				m_offsetIncrement;
 	UnsignedInt m_donutTimer;				///< Frame time to keep units from doing the donut. jba.
 	Bool m_retailWasRunning = FALSE;
+	Real m_retailScalarSpeed = 0.0f;
 
 
 };

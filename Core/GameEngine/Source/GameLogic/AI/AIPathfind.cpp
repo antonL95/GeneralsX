@@ -5739,7 +5739,7 @@ Int Pathfinder::iterateCellsAlongLine( const ICoord2D &start, const ICoord2D &en
 			return ret;
 
 		num += numadd;										// Increase the numerator by the top of the fraction
-		if (num >= den)										// Check if numerator >= denominator
+		if (den != 0 && num >= den)
 		{
 			num -= den;											// Calculate the new numerator value
 			x += xinc1;											// Change the x as appropriate
@@ -6253,6 +6253,45 @@ Bool Pathfinder::isMovementSegmentPassable( const Object *obj, LocomotorSurfaceT
 			return true;
 		from = to;
 
+		const double boundaryX = (current.x + (stepX > 0)) * static_cast<double>(PATHFIND_CELL_SIZE);
+		const double boundaryY = (current.y + (stepY > 0)) * static_cast<double>(PATHFIND_CELL_SIZE);
+		const double crossX = (boundaryX - startWorld.x) * stepX * lengthY;
+		const double crossY = (boundaryY - startWorld.y) * stepY * lengthX;
+		const Bool advanceX = current.x != end.x && (current.y == end.y || crossX <= crossY);
+		const Bool advanceY = current.y != end.y && (current.x == end.x || crossY <= crossX);
+		if (advanceX)
+			current.x += stepX;
+		if (advanceY)
+			current.y += stepY;
+	}
+}
+
+Bool Pathfinder::isArcSegmentPassable(const Object* obj, LocomotorSurfaceTypeMask acceptableSurfaces,
+	PathfindLayerEnum layer, const Coord3D& startWorld, const Coord3D& endWorld, Bool blocked)
+{
+	ICoord2D current, end;
+	if (worldToCell(&startWorld, &current) || worldToCell(&endWorld, &end))
+		return FALSE;
+	LinePassableStruct info;
+	info.obj = obj;
+	info.acceptableSurfaces = acceptableSurfaces;
+	getRadiusAndCenter(obj, info.radius, info.centerInCell);
+	info.blocked = blocked;
+	info.allowPinched = FALSE;
+	info.departingGroup = nullptr;
+	const Int stepX = endWorld.x >= startWorld.x ? 1 : -1;
+	const Int stepY = endWorld.y >= startWorld.y ? 1 : -1;
+	const double lengthX = (static_cast<double>(endWorld.x) - startWorld.x) * stepX;
+	const double lengthY = (static_cast<double>(endWorld.y) - startWorld.y) * stepY;
+	PathfindCell* from = nullptr;
+	for (;;)
+	{
+		PathfindCell* to = getCell(layer, current.x, current.y);
+		if (!to || linePassableCallback(this, from, to, current.x, current.y, &info))
+			return FALSE;
+		if (current.x == end.x && current.y == end.y)
+			return TRUE;
+		from = to;
 		const double boundaryX = (current.x + (stepX > 0)) * static_cast<double>(PATHFIND_CELL_SIZE);
 		const double boundaryY = (current.y + (stepY > 0)) * static_cast<double>(PATHFIND_CELL_SIZE);
 		const double crossX = (boundaryX - startWorld.x) * stepX * lengthY;

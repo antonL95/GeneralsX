@@ -16,12 +16,16 @@
 250 steering-path Player_1 GondorFountainGuardHorde 0
 250 steering-path Player_1 GondorFountainGuardHorde 2
 250 steering-path Player_1 GondorFountainGuardHorde 1
+250 corner-speed Player_1 GondorFountainGuardHorde 0
+250 corner-speed Player_1 GondorFountainGuardHorde 1
 250 builderscriptmove Player_1 GondorFountainGuardHorde 0 - 3200 430
 250 builderscriptmove Player_1 GondorFountainGuardHorde 1 - 3180 345
 260 steering-path Player_1 GondorFountainGuardHorde 0
 260 steering-path Player_1 GondorFountainGuardHorde 1
 250 steering-path Player_1 WildAzog 0
 250 steering-path Player_1 WildAzog 1
+269 corner-speed Player_1 RohanTreeBerd 0
+269 corner-speed Player_1 CornerRoundingTreeControl 0
 269 steering-path Player_1 RohanTreeBerd 0
 269 steering-path Player_1 CornerRoundingTreeControl 0
 270 builderscriptmove Player_1 RohanTreeBerd 0 - 2400 550
@@ -33,3 +37,28 @@
 330 steering-path Player_1 GondorFountainGuardHorde 2
 330 steering-path Player_1 RohanTreeBerd 0
 330 steering-path Player_1 CornerRoundingTreeControl 0
+220 create Player_1 CornerRoundingSlow 0 1800,1800,0
+220 create Player_1 CornerRoundingKnock 0 1800,2100,0
+220 create Player_1 CornerRoundingBlocker 1 1775,2100,0
+230 firetestweapon Player_1 CornerRoundingBlocker 1 CornerRoundingShock,Player_1:CornerRoundingKnock:0
+230 builderscriptmove Player_1 CornerRoundingSlow 0 - 2200 2030
+231 corner-speed Player_1 CornerRoundingKnock 0
+231 builderscriptmove Player_1 CornerRoundingKnock 0 - 2200 2330
+250 steering-path Player_1 CornerRoundingSlow 0
+250 steering-path Player_1 CornerRoundingKnock 0
+330 steering-path Player_1 CornerRoundingSlow 0
+330 steering-path Player_1 CornerRoundingKnock 0
+220 create Player_1 CornerRoundingRest 0 1800,2400,0
+220 create Player_1 CornerRoundingBlocker 2 1775,2400,0
+225 builderscriptmove Player_1 CornerRoundingRest 0 - 2200 2400
+260 corner-speed Player_1 CornerRoundingRest 0
+260 select Player_1 CornerRoundingRest 0
+260 steering-stop - - 0
+310 firetestweapon Player_1 CornerRoundingBlocker 2 CornerRoundingShock,Player_1:CornerRoundingRest:0
+311 corner-speed Player_1 CornerRoundingRest 0
+311 builderscriptmove Player_1 CornerRoundingRest 0 - 2200 2630
+320 steering-path Player_1 CornerRoundingRest 0
+330 steering-path Player_1 CornerRoundingRest 0
+310 create Player_1 CornerRoundingCellProbe 0 1805,1805,0
+310 create Player_1 CornerRoundingBlocker 3 1805,1815,0
+311 corner-cell Player_1 CornerRoundingCellProbe 0

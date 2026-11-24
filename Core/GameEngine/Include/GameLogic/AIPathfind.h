@@ -217,6 +217,8 @@ public:
 
 	Bool isMovementSegmentPassable( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfaces,
 		PathfindLayerEnum layer, const Coord3D& startWorld, const Coord3D& endWorld, Bool terrainOnly );
+	Bool isArcSegmentPassable(const Object* obj, LocomotorSurfaceTypeMask acceptableSurfaces,
+		PathfindLayerEnum layer, const Coord3D& startWorld, const Coord3D& endWorld, Bool blocked);
 
 	void moveAlliesAwayFromDestination( Object *obj,const Coord3D& destination);
 
