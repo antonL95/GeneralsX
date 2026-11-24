@@ -2394,7 +2394,7 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 			!isKindOf( KINDOF_NO_ATTACK_WARNING ) )
 	{
 		if (RetailFileLayers::enabled() && !isKindOf(KINDOF_INERT))
-			RetailEva::underAttack(*this);
+			RetailEva::underAttack(*this, *damageInfo);
 		else if (m_radarData && isLocallyControlled())
 			TheRadar->tryUnderAttackEvent(this);
 	}

@@ -19,11 +19,14 @@
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
+#include "GameClient/Drawable.h"
+#include "GameLogic/Damage.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #if !RTS_GENERALS
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/SlavedUpdate.h"
 #endif
 
@@ -203,7 +206,7 @@ void queue(const Player *recipient, const AsciiString &name, const Coord3D *posi
 	const Coord3D* location = radarPosition ? radarPosition : position;
 	if (location && TheRadar && ping != Ping::None)
 	{
-		const Bool jumpTo = it == s_events.end() || it->second.jumpTo;
+		const Bool jumpTo = ping == Ping::Attack || it == s_events.end() || it->second.jumpTo;
 		const RadarEventType type = radarType(ping);
 		if (ping == Ping::Generic || ping == Ping::Upgrade)
 			TheRadar->createEvent(location, type, 4.0f, jumpTo);
@@ -355,13 +358,38 @@ void update()
 	}
 }
 
-void underAttack(Object &object)
+#if !RTS_GENERALS
+void underAttack(Object &object, const DamageInfo &damage)
 {
-	const Bool structure = object.isKindOf(KINDOF_STRUCTURE);
-	const AsciiString &name = object.getTemplate()->getRotWKObjectData().evaEventDamagedOwner;
-	queue(object.getControllingPlayer(), name.isEmpty() ? AsciiString(structure ? "StructureUnderAttack" : "UnitUnderAttack") : name,
+	const Player *owner = object.getControllingPlayer();
+	if (!owner || !TheGameLogic || owner != rts::getObservedOrLocalPlayer_Safe())
+		return;
+
+	const auto &events = object.getTemplate()->getRotWKObjectData();
+	const Object *source = TheGameLogic->findObjectByID(damage.in.m_sourceID);
+	const Object *horde = HordeContain::getAnchor(&object);
+	const auto combat = MAKE_MODELCONDITION_MASK2(MODELCONDITION_EMOTION_ALERT, MODELCONDITION_ATTACKING);
+	const Bool canBeAmbushed = events.evaEventAmbushed.isNotEmpty() &&
+		!object.getLogicModelConditions().test(MODELCONDITION_ENGAGED) &&
+		!object.getLogicModelConditions().testForAny(combat) &&
+		(!horde || !horde->getLogicModelConditions().testForAny(combat));
+
+	const AsciiString *name = &events.evaEventDamagedOwner;
+	if (canBeAmbushed && source && object.getRelationship(source) == ENEMIES && !source->isLogicallyVisible())
+		name = &events.evaEventAmbushed;
+	else if (damage.in.m_damageType == DAMAGE_LOGICAL_FIRE)
+	{
+		if (events.evaEventDamagedByFireOwner.isNotEmpty())
+			name = &events.evaEventDamagedByFireOwner;
+	}
+	else if (events.evaEventDamagedFromShroudedSourceOwner.isNotEmpty() && source && source->getDrawable() &&
+		source->getDrawable()->getFullyObscuredByShroud())
+		name = &events.evaEventDamagedFromShroudedSourceOwner;
+
+	queue(owner, name->isEmpty() ? AsciiString(object.isKindOf(KINDOF_STRUCTURE) ? "StructureUnderAttack" : "UnitUnderAttack") : *name,
 		object.getPosition(), object.friend_getRadarData() ? Ping::Attack : Ping::None);
 }
+#endif
 
 void destroyed(const Object &object)
 {

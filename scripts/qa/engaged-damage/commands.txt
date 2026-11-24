@@ -1,0 +1,10 @@
+198 create Player_1 EngagedDamageVictim 0 75,1250,90
+202 create PlyrCreeps EngagedDamageTarget 0 75,1270,270
+202 orderattack Player_1 EngagedDamageVictim 0 PlyrCreeps:EngagedDamageTarget:0
+208 create PlyrCreeps EngagedDamageAttacker 0 100,1320,270
+220 engaged-relocate PlyrCreeps EngagedDamageTarget 0 75,1410
+240 destroy PlyrCreeps EngagedDamageTarget 0
+244 engaged-damage-hit PlyrCreeps EngagedDamageAttacker 0 Player_1:EngagedDamageVictim:0
+564 create Player_1 EngagedDamageVictim 1 115,1330,90
+584 engaged-damage-hit PlyrCreeps EngagedDamageAttacker 0 Player_1:EngagedDamageVictim:1
+730 quit - - 0

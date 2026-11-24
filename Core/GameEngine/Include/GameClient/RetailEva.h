@@ -3,6 +3,7 @@
 #include "Lib/BaseType.h"
 
 class AsciiString;
+class DamageInfo;
 class INI;
 class Object;
 class Player;
@@ -29,7 +30,9 @@ void parseSettings(INI *ini);
 void queue(const Player *recipient, const AsciiString &name, const Coord3D *position = nullptr,
 	Ping ping = Ping::None, const Coord3D *radarPosition = nullptr);
 void markFirstSighted(const Object& object);
-void underAttack(Object &object);
+#if !RTS_GENERALS
+void underAttack(Object &object, const DamageInfo &damage);
+#endif
 void destroyed(const Object &object);
 void watchRecharge(const Object &object, const SpecialPowerTemplate &power);
 }
