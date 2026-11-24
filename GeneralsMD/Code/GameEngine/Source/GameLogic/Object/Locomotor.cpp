@@ -80,6 +80,25 @@ static const char *const TheLocomotorPriorityNames[] =
 };
 static_assert(ARRAY_SIZE(TheLocomotorPriorityNames) == LOCOMOTOR_PRIORITY_COUNT + 1, "Array size");
 
+static const char *const TheFormationPriorityNames[] =
+{
+	"NO_FORMATION",
+	"CAVALRY1",
+	"CAVALRY2",
+	"CAVALRY3",
+	"MELEE1",
+	"MELEE2",
+	"MELEE3",
+	"RANGED1",
+	"RANGED2",
+	"RANGED3",
+	"ARTILLERY1",
+	"ARTILLERY2",
+	"ARTILLERY3",
+	"UNUSED",
+	nullptr
+};
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -740,6 +759,8 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "ChargeAvailable", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeAvailable) },
 		{ "ChargeIgnoresCondition", parseRotwkField<INI::parseBool>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeIgnoresCondition) },
 		{ "ChargeSpeed", parseRotwkField<INI::parsePercentToReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.chargeSpeedFraction) },
+		{ "BackingUpSpeed", parseRotwkField<INI::parsePercentToReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.backingUpSpeedFraction) },
+		{ "FormationPriority", parseRotwkField<INI::parseIndexList>, TheFormationPriorityNames, offsetof(LocomotorTemplate, m_rotwk.formationPriority) },
 		{ "WalkDistance", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.walkDistance) },
 		{ "AccDecTrigger", parseRotwkField<INI::parseReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.accelDecelTrigger) },
 		{ "TurnThreshold", parseRotwkField<INI::parseAngleReal>, nullptr, offsetof(LocomotorTemplate, m_rotwk.turnThreshold) },
@@ -1123,6 +1144,11 @@ Real Locomotor::getMaxSpeedForCondition(BodyDamageType condition, const Object* 
 Real Locomotor::getMaxSpeedOverride() const
 {
 	return m_template->scaleSpeed(m_maxSpeed);
+}
+
+Real Locomotor::getBackingUpSpeed() const
+{
+	return std::max(0.0f, m_template->getActualMaxSpeed() * m_template->m_rotwk.backingUpSpeedFraction);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3197,7 +3223,8 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 		}
 		physics->setTurning(TURN_NONE);
 	}
-	const Real maxSpeed = getMaxSpeedForCondition(obj->getBodyModule()->getDamageState(), !backing && RetailFileLayers::enabled() ? obj : nullptr);
+	const Real maxSpeed = backing ? getBackingUpSpeed() : getMaxSpeedForCondition(
+		obj->getBodyModule()->getDamageState(), RetailFileLayers::enabled() ? obj : nullptr);
 	if (desiredSpeed > maxSpeed)
 		desiredSpeed = maxSpeed;
 	Coord3D dir;
@@ -3262,13 +3289,14 @@ void Locomotor::steerVelocity(Object* obj, PhysicsBehavior *physics, const Coord
 
 	if (!getFlag(NO_SLOW_DOWN_AS_APPROACHING_DEST))
 	{
-		Real slowDownDist = calcSlowDownDist(actualSpeed, getMinSpeed(), getBraking());
+		const Real minSpeed = backing ? 0.0f : getMinSpeed();
+		const Real slowDownDist = calcSlowDownDist(actualSpeed, minSpeed, getBraking());
 		if (onPathDistToGoal < slowDownDist)
-			goalSpeed = getMinSpeed();
+			goalSpeed = minSpeed;
 		const Real arrivalSpeedSquared = 2.0f * getBraking() * onPathDistToGoal;
 		const Real arrivalSpeed = backing ? WWMath::SqrtfOrigin(arrivalSpeedSquared) : sqrtf(arrivalSpeedSquared);
 		if (goalSpeed > arrivalSpeed)
-			goalSpeed = arrivalSpeed > getMinSpeed() ? arrivalSpeed : getMinSpeed();
+			goalSpeed = std::max(arrivalSpeed, minSpeed);
 	}
 
 	Coord3D velocityDelta;

@@ -686,11 +686,9 @@ UpdateSleepTime PhysicsBehavior::update()
 			m_vel.z += m_accel.z;
 		}
 
-		// when vel gets tiny, just clamp to zero
-		const Real THRESH = 0.001f;
-		if (fabsf(m_vel.x) < THRESH) m_vel.x = 0.0f;
-		if (fabsf(m_vel.y) < THRESH) m_vel.y = 0.0f;
-		if (fabsf(m_vel.z) < THRESH) m_vel.z = 0.0f;
+		if (fabsf(m_vel.x) < MIN_VELOCITY_COMPONENT) m_vel.x = 0.0f;
+		if (fabsf(m_vel.y) < MIN_VELOCITY_COMPONENT) m_vel.y = 0.0f;
+		if (fabsf(m_vel.z) < MIN_VELOCITY_COMPONENT) m_vel.z = 0.0f;
 
 		m_velMag = INVALID_VEL_MAG;
 

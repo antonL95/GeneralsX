@@ -1757,7 +1757,7 @@ Bool tryRotwkGroupCorridor(std::vector<RotwkGroupMove>& movers, const Coord3D& f
 }
 }
 
-Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType cmdSource, Real speed )
+Bool AIGroup::friend_moveRotwkBlockToPos(const Coord3D* pos, CommandSourceType cmdSource, Real speed, Bool& useIndividualGroundOrders)
 {
 	const Real REARRANGE_ANGLE = PI / 4.0f;
 	const Real MAX_OFFSET_RADII = 6.0f;
@@ -1767,6 +1767,7 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 	center.zero();
 	Real facingX = 0.0f;
 	Real facingY = 0.0f;
+	Bool hasFormationMover = FALSE;
 	for (std::list<Object *>::iterator it = m_memberList.begin(); it != m_memberList.end(); ++it)
 	{
 		Object* obj = *it;
@@ -1774,12 +1775,15 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 		if (!ai || obj->isKindOf(KINDOF_IMMOBILE) || obj->isDisabledByType(DISABLED_HELD) || !ai->isDoingGroundMovement())
 			continue;
 		movers.push_back(RotwkGroupMove{obj});
+		const Locomotor* locomotor = ai->getCurLocomotor();
+		hasFormationMover |= locomotor && locomotor->participatesInGroupFormation();
 		center.x += obj->getPosition()->x;
 		center.y += obj->getPosition()->y;
 		facingX += obj->getUnitDirectionVector2D()->x;
 		facingY += obj->getUnitDirectionVector2D()->y;
 	}
-	if (movers.size() < 2)
+	useIndividualGroundOrders = movers.size() > 1 && !hasFormationMover;
+	if (movers.size() < 2 || useIndividualGroundOrders)
 		return FALSE;
 
 	center.x /= movers.size();
@@ -1814,6 +1818,9 @@ Bool AIGroup::friend_moveRotwkBlockToPos( const Coord3D *pos, CommandSourceType 
 		AIUpdateInterface* ai = obj->getAIUpdateInterface();
 		Real offsetX = obj->getPosition()->x - center.x;
 		Real offsetY = obj->getPosition()->y - center.y;
+		const Locomotor* locomotor = ai->getCurLocomotor();
+		if (locomotor && !locomotor->participatesInGroupFormation())
+			offsetX = offsetY = 0.0f;
 		const Real length = WWMath::SqrtfOrigin(offsetX * offsetX + offsetY * offsetY);
 		const Real maxLength = MAX_OFFSET_RADII * obj->getGeometryInfo().getBoundingCircleRadius();
 		if (length > maxLength && length > 0.0f)
@@ -1940,6 +1947,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 	Bool didInfantry = false;
 	Bool didVehicles = false;
 	Bool didRotwkBlock = false;
+	Bool useIndividualGroundOrders = FALSE;
 	// compute current centroid of the team
 	Coord3D center;
 	Coord2D min;
@@ -1958,7 +1966,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 	if (retailMove)
 	{
 		clampWaypointPosition( position, STD_WAYPOINT_CLAMP_MARGIN );
-		didRotwkBlock = friend_moveRotwkBlockToPos(pos, cmdSource, retailSpeed);
+		didRotwkBlock = friend_moveRotwkBlockToPos(pos, cmdSource, retailSpeed, useIndividualGroundOrders);
 	}
 
 
@@ -1971,7 +1979,8 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		recompute();
 
 	std::list<Object *>::iterator i;
-	if( !isFormation && !didRotwkBlock && cmdSource == CMD_FROM_PLAYER && TheGlobalData->m_groupMoveClickToGatherFactor > 0.0f )
+	if (!isFormation && !didRotwkBlock && !useIndividualGroundOrders && cmdSource == CMD_FROM_PLAYER &&
+		TheGlobalData->m_groupMoveClickToGatherFactor > 0.0f)
 	{
 		ScaleRect2D( &min, &max, TheGlobalData->m_groupMoveClickToGatherFactor );
 
@@ -2108,7 +2117,9 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 			}
 			firstUnit = false;
 		}
-		computeIndividualDestination( &dest, &goalPos, theUnit, &center, isFormation );
+		const Locomotor* locomotor = ai->getCurLocomotor();
+		const Bool noFormation = retailMove && ai->isDoingGroundMovement() && locomotor && !locomotor->participatesInGroupFormation();
+		computeIndividualDestination(&dest, &goalPos, theUnit, noFormation ? theUnit->getPosition() : &center, isFormation);
 
 		if( cmdSource == CMD_FROM_PLAYER && theUnit->getStatusBits().test( OBJECT_STATUS_CAN_STEALTH ) && ai->canAutoAcquire() )
 		{
@@ -2137,7 +2148,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		if( !addWaypoint )
 		{
 			ai->aiMoveToPosition( &dest, cmdSource );
-			if (retailMove)
+			if (retailMove && !useIndividualGroundOrders)
 				ai->setDesiredSpeed(retailSpeed);
 		}
 		else

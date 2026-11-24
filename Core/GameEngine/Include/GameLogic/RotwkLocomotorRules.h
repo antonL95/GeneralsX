@@ -3,6 +3,8 @@
 namespace RotwkLocomotorRules
 {
 inline constexpr float FULL_TURN = 6.28318530718f;
+inline constexpr int NO_FORMATION_PRIORITY = 0;
+inline constexpr int DEFAULT_FORMATION_PRIORITY = 7;
 
 struct Authored
 {
@@ -13,6 +15,7 @@ struct Authored
 	float liftDamagedFraction = -1.0f;
 	float burningDeathRadius = 0.0f;
 	float chargeSpeedFraction = 1.0f;
+	float backingUpSpeedFraction = 0.003f;
 	float walkDistance = 0.0f;
 	float accelDecelTrigger = -1.0f;
 	float turnThreshold = FULL_TURN / 24.0f;
@@ -20,6 +23,7 @@ struct Authored
 	bool burningDeathIsCavalry = false;
 	bool chargeAvailable = false;
 	bool chargeIgnoresCondition = false;
+	int formationPriority = DEFAULT_FORMATION_PRIORITY;
 	unsigned int accelerationFrames = 0;
 	unsigned int brakingFrames = 0;
 	unsigned int turnFrames = 0;

@@ -45,6 +45,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -961,9 +962,18 @@ Bool HordeContain::beginBacking(const Object* source, Bool uncontrollable)
 		Coord3D goal{position.x + dx * scale, position.y + dy * scale, position.z};
 		goal.z = TheTerrainLogic->getLayerHeight(goal.x, goal.y, member->getLayer());
 		const UnsignedInt start = frame + delay;
+#if RTS_GENERALS
 		const Real speed = std::max(0.1f, ai->getCurLocomotorSpeed());
-		const UnsignedInt travel = static_cast<UnsignedInt>(distance / speed) + LOGICFRAMES_PER_SECOND;
-		m_backingMoves.emplace(member->getID(), BackingMove{goal, start, start + travel});
+#else
+		const Locomotor* locomotor = ai->getCurLocomotor();
+		const Real speed = locomotor ? locomotor->getBackingUpSpeed() : 0.0f;
+		const Real largestComponent = (std::max(fabsf(dx), fabsf(dy)) / length) * speed;
+		if (!(largestComponent >= PhysicsBehavior::MIN_VELOCITY_COMPONENT))
+			continue;
+#endif
+		const double maxDeadline = std::numeric_limits<UnsignedInt>::max();
+		const double deadline = std::min(maxDeadline, static_cast<double>(start) + LOGICFRAMES_PER_SECOND + distance / speed);
+		m_backingMoves.emplace(member->getID(), BackingMove{goal, start, static_cast<UnsignedInt>(deadline)});
 	}
 	if (!m_backingMoves.empty())
 		m_backingSource = source->getID();
