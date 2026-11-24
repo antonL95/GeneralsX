@@ -54,6 +54,7 @@
 #include "Common/INILegacyLines.h"
 #include "Common/INIMath.h"
 #include "Common/INIPreprocessor.h"
+#include "Common/RetailINIStartup.h"
 #include "Common/INIRetailTolerance.h"
 
 #include <map>
@@ -430,6 +431,40 @@ static INIPreprocessor& getPreprocessor()
 	return preprocessor;
 }
 
+static const char* traceDefine()
+{
+	static const char* name = std::getenv("GENERALSX_INI_TRACE_DEFINE");
+	return name;
+}
+
+static std::string preprocessINI(const char* filename, const std::string& text)
+{
+	INIPreprocessor& preprocessor = getPreprocessor();
+	const char* tracedDefine = traceDefine();
+	const bool definedBefore = tracedDefine && preprocessor.hasDefine(tracedDefine);
+	std::string expanded = preprocessor.process(filename, text, RetailFileLayers::enabled() || INIAudit::isEnabled());
+	if (tracedDefine)
+		fprintf(stderr, "[INI define] %d %d %s\n", definedBefore, preprocessor.hasDefine(tracedDefine), filename);
+	for (const std::string& warning : preprocessor.getWarnings())
+		fprintf(stderr, "[INI] %s\n", warning.c_str());
+	fflush(stderr);
+	preprocessor.clearWarnings();
+	return expanded;
+}
+
+std::string INI::preprocessFile(const char* filename)
+{
+	std::string text;
+	if (!readIncludedFile(filename, text))
+		throw INI_CANT_OPEN_FILE;
+	return preprocessINI(filename, text);
+}
+
+void INI::resetPreprocessor()
+{
+	getPreprocessor().clearDefines();
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void INI::prepFile( AsciiString filename, INILoadType loadType )
@@ -474,14 +509,7 @@ void INI::prepText( AsciiString filename, const std::string& text, INILoadType l
 		throw INI_FILE_ALREADY_OPEN;
 	}
 
-	INIPreprocessor& preprocessor = getPreprocessor();
-	const std::string expanded = preprocessor.process(filename.str(), text, RetailFileLayers::enabled() || INIAudit::isEnabled());
-	for (const std::string& warning : preprocessor.getWarnings())
-	{
-		fprintf(stderr, "[INI] %s\n", warning.c_str());
-	}
-	fflush(stderr);
-	preprocessor.clearWarnings();
+	const std::string expanded = preprocessINI(filename.str(), text);
 
 	m_readBufferNext = 0;
 	m_lineStart = 0;
@@ -543,7 +571,8 @@ static INIBlockParse findBlockParse(const char* token)
 	}
 	if (RetailFileLayers::enabled() && strcmp(token, "ExperienceScalarTable") == 0)
 		return ExperienceLevelStore::parseScalarTable;
-	if (!INIAudit::isEnabled() && RetailFileLayers::enabled() && strcmp(token, "PlayerAIType") == 0)
+	if (RetailFileLayers::enabled() && strcmp(token, "PlayerAIType") == 0 &&
+		!RetailINIStartup::hasSubsystem("ThePlayerAITypeSet"))
 		return BfmeMapScripts::parsePlayerAIType;
 	if ((INIAudit::isEnabled() || RetailFileLayers::enabled()) && strcmp(token, "FXParticleSystem") == 0)
 		return INI::parseFXParticleSystemDefinition;
@@ -779,7 +808,11 @@ void INI::recordSkipped(const char* kind, const char* detail) const
 	if (INIAudit::isEnabled())
 		INIAudit::record(kind, detail, m_filename.str(), getLineNum());
 	else if (RetailFileLayers::enabled())
+	{
 		++retailSkips[{kind, detail}];
+		if (traceDefine())
+			fprintf(stderr, "[INI skipped] %s:%u %s %s\n", m_filename.str(), getLineNum(), kind, detail);
+	}
 }
 
 void INI::finishRetailStartupLoad()

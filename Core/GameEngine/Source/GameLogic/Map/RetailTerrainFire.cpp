@@ -5,11 +5,11 @@
 #include <cmath>
 #include <utility>
 
-#include "Common/FileSystem.h"
 #include "Common/GameCommon.h"
 #include "Common/GameState.h"
 #include "Common/INI.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailINIStartup.h"
 #include "Common/RotwkDuration.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -80,14 +80,24 @@ void RetailTerrainFire::loadSettings(Xfer* xfer)
 	if (!RetailFileLayers::enabled())
 		return;
 
+	loadVisualSettings(xfer);
+	loadLogicSettings(xfer);
+}
+
+void RetailTerrainFire::loadVisualSettings(Xfer* xfer)
+{
 	logicSettings = {};
 	visualSettings = {};
-	INI ini;
-	for (const char* path : {"Data\\INI\\Default\\Fire.ini", "Data\\INI\\Fire.ini",
-		"Data\\INI\\Default\\FireLogicSystem.ini", "Data\\INI\\FireLogicSystem.ini"})
+	RetailINIStartup::loadFile("Data\\INI\\Default\\Fire.ini", xfer);
+	RetailINIStartup::loadFile("Data\\INI\\Fire.ini", xfer);
+}
+
+void RetailTerrainFire::loadLogicSettings(Xfer* xfer)
+{
+	if (!RetailINIStartup::loadSubsystem("TheFireLogicSystem", xfer))
 	{
-		if (TheFileSystem->doesFileExist(path))
-			ini.load(path, INI_LOAD_OVERWRITE, xfer);
+		RetailINIStartup::loadFile("Data\\INI\\Default\\FireLogicSystem.ini", xfer);
+		RetailINIStartup::loadFile("Data\\INI\\FireLogicSystem.ini", xfer);
 	}
 	defaultLogicSettings = logicSettings;
 	defaultVisualSettings = visualSettings;

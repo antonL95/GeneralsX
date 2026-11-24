@@ -37,6 +37,7 @@
 #include "Common/INIAudit.h"
 #include "Common/PerfTimer.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailINIStartup.h"
 #include "GameLogic/PartitionManager.h"
 #include "Common/ThingFactory.h"
 #include "Common/GameLOD.h"
@@ -3463,7 +3464,8 @@ void ParticleSystemManager::init()
 	INI ini;
 	if (!RetailFileLayers::enabled())
 		ini.loadFileDirectory( "Data\\INI\\ParticleSystem", INI_LOAD_OVERWRITE, nullptr );
-	if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+	if ((RetailFileLayers::enabled() && !RetailINIStartup::loadSubsystem("TheFXParticleSystemManager")) ||
+		(!RetailFileLayers::enabled() && INIAudit::isEnabled()))
 		ini.loadFileDirectory( "Data\\INI\\FXParticleSystem", INI_LOAD_OVERWRITE, nullptr );
 
 	// sanity, our lists must be empty!!
@@ -4164,5 +4166,7 @@ void ParticleSystemManagerDummy::init()
 {
 	if (INIAudit::isEnabled())
 		ParticleSystemManager::init();
+	else if (RetailFileLayers::enabled())
+		RetailINIStartup::preprocessSubsystem("TheFXParticleSystemManager");
 }
 #endif

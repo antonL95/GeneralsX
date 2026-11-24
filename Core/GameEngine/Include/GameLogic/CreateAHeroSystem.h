@@ -104,6 +104,7 @@ struct CreateAHeroClassDef
 namespace CreateAHeroSystem
 {
 	void load();
+	void loadHouseColors();
 	void parseDefinition(INI* ini);
 	void resetAllPlayers();
 	AsciiString findColorMask(AsciiString baseTexture);

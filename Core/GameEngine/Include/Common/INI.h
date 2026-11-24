@@ -201,6 +201,9 @@ public:
 	UnsignedInt loadText( AsciiString name, const char *text, INILoadType loadType,
 		const char *extraBlockToken, INIBlockParse extraBlockParse );
 
+	static std::string preprocessFile(const char* filename);
+	static void resetPreprocessor();
+
 	static Bool isDeclarationOfType( AsciiString blockType, AsciiString blockName, char *bufferToCheck );
 	static Bool isEndOfBlock( char *bufferToCheck );
 

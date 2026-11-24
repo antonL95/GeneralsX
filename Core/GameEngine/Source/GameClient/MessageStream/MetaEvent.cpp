@@ -53,6 +53,7 @@
 
 #include "GameLogic/GameLogic.h" // for TheGameLogic->getFrame()
 
+#include <memory>
 
 #define dont_DUMP_ALL_KEYS_TO_LOG
 
@@ -739,6 +740,14 @@ MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
 		throw INI_INVALID_DATA;
 
 	ini->initFromINI(map, TheMetaMapFieldParseTable);
+}
+
+void MetaMap::parseDebugMetaMap(INI* ini)
+{
+	ini->getNextToken();
+	const auto release = [](MetaMapRec* map) { deleteInstance(map); };
+	const std::unique_ptr<MetaMapRec, decltype(release)> discarded(newInstance(MetaMapRec)(), release);
+	ini->initFromINI(discarded.get(), TheMetaMapFieldParseTable);
 }
 
 //-------------------------------------------------------------------------------------------------

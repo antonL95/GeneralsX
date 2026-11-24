@@ -37,6 +37,7 @@
 #include "Common/RandomValue.h"
 #include "Common/RetailAIKindOf.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailINIStartup.h"
 #include "Common/RetailSaveBlocks.h"
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
@@ -630,8 +631,11 @@ void AISkirmishPlayer::loadRetailData()
 {
 	retailArmies.clear();
 	retailTuning = {};
-	INI ini;
-	ini.load("Data\\INI\\Default\\SkirmishAIData.ini", INI_LOAD_OVERWRITE, nullptr);
+	if (!RetailINIStartup::loadSubsystem("TheBaseTemplateLibrary"))
+	{
+		INI ini;
+		ini.load("Data\\INI\\Default\\SkirmishAIData.ini", INI_LOAD_OVERWRITE, nullptr);
+	}
 	baseRetailArmies = retailArmies;
 	baseRetailTuning = retailTuning;
 }

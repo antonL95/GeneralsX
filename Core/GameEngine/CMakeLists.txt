@@ -138,6 +138,7 @@ set(GAMEENGINE_SRC
     Include/Common/INIMath.h
     Include/Common/RotwkDuration.h
     Include/Common/INIPreprocessor.h
+    Include/Common/RetailINIStartup.h
     Include/Common/BitFlagsCrc.h
     Include/Common/RetailConditionMatch.h
     Include/Common/BfmeAssetPath.h
@@ -724,6 +725,7 @@ set(GAMEENGINE_SRC
     Source/Common/INI/INIBlockStructure.cpp
     Source/Common/INI/INIRetailTolerance.cpp
     Source/Common/INI/INIPreprocessor.cpp
+    Source/Common/INI/RetailINIStartup.cpp
     Source/Common/INI/INIAiData.cpp
     Source/Common/INI/INIAnimation.cpp
     Source/Common/INI/INIAudioEventInfo.cpp

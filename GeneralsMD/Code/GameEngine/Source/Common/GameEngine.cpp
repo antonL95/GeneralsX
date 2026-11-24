@@ -37,6 +37,7 @@
 #include "Common/PlayerTemplate.h"
 #include "Common/Team.h"
 #include "GameLogic/AISkirmishPlayer.h"
+#include "GameLogic/BfmeMapScripts.h"
 #include "Common/PlayerList.h"
 #include "Common/Player.h"
 #include "Common/GameAudio.h"
@@ -52,6 +53,7 @@
 #include "Common/ArchiveFileSystem.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailINIStartup.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailLargeGroupAudio.h"
 #include "GameClient/RetailHudExtras.h"
@@ -95,6 +97,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/RetailSkirmishProbe.h"
+#include <algorithm>
 #include <stdexcept>
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/BattlePlanUpdate.h"
@@ -318,7 +321,13 @@ void initSubsystem(
 	const char* path2 = nullptr)
 {
 	sysref = sys;
-	TheSubsystemList->initSubsystem(sys, path1, path2, pXfer, name);
+	if (sys && (path1 || path2) && RetailFileLayers::enabled() && RetailINIStartup::hasSubsystem(name.str()))
+	{
+		TheSubsystemList->initSubsystem(sys, nullptr, nullptr, pXfer, name);
+		RetailINIStartup::loadSubsystem(name.str(), pXfer);
+	}
+	else
+		TheSubsystemList->initSubsystem(sys, path1, path2, pXfer, name);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -625,16 +634,16 @@ void GameEngine::init()
 		// Mods must be mounted before GameData.ini is loaded, or the mod's GameData.ini is ignored.
 		CommandLine::parseCommandLineForModInit();
 		TheArchiveFileSystem->loadMods();
+		const Bool retailINI = RetailFileLayers::enabled();
+		if (retailINI)
+			RetailINIStartup::loadLegend();
 
 		DEBUG_ASSERTCRASH(TheWritableGlobalData,("TheWritableGlobalData expected to be created"));
-	initSubsystem(TheWritableGlobalData, "TheWritableGlobalData", TheWritableGlobalData, &xferCRC, "Data\\INI\\Default\\GameData", "Data\\INI\\GameData");
-	TheWritableGlobalData->parseCustomDefinition();
 
 	// GeneralsX @feature felipebraz 08/06/2026 Auto-create SagePatch.ini in user data dir with defaults.
 	// This replaces the run.sh copy approach with engine-managed defaults.
+	const auto loadSagePatch = [&ini]() -> bool
 	{
-		static const char *const USER_GAME_DATA_INI_PATH = "Data\\INI\\GameData.ini";
-
 		AsciiString sagePatchPath = TheWritableGlobalData->getPath_UserData();
 		sagePatchPath.concat("SagePatch.ini");
 
@@ -704,17 +713,45 @@ void GameEngine::init()
 			}
 
 			ini.load(sagePatchPath, INI_LOAD_OVERWRITE, nullptr);
-
-			// GeneralsX @bugfix kumait 13/08/2026 SagePatch defaults must not clobber a user-authored
-			// Data/INI/GameData.ini. That loose file shadows the BIG-archived one when the engine loads
-			// GameData above, so replaying it here restores user precedence over SagePatch. Installs
-			// without a loose GameData.ini are unaffected, and the archived original is never reloaded.
-			if (TheLocalFileSystem->doesFileExist(USER_GAME_DATA_INI_PATH) ||
-				RetailFileLayers::hasLooseOverride(USER_GAME_DATA_INI_PATH))
-			{
-				ini.load(USER_GAME_DATA_INI_PATH, INI_LOAD_OVERWRITE, nullptr);
-			}
+			return true;
 		}
+		return false;
+	};
+
+	const char* const gameDataPath = "Data\\INI\\GameData.ini";
+	const bool hasLooseGameData = TheLocalFileSystem->doesFileExist(gameDataPath) ||
+		RetailFileLayers::hasLooseOverride(gameDataPath);
+	if (retailINI && RetailINIStartup::hasSubsystem("TheWritableGlobalData"))
+	{
+		initSubsystem(TheWritableGlobalData, "TheWritableGlobalData", TheWritableGlobalData, nullptr);
+		bool appliedSagePatch = false;
+		RetailINIStartup::visitSubsystemFiles("TheWritableGlobalData", [&](const char* path) {
+			std::string iniPath(path);
+			std::replace(iniPath.begin(), iniPath.end(), '/', '\\');
+			if (hasLooseGameData && !appliedSagePatch && stricmp(iniPath.c_str(), gameDataPath) == 0)
+			{
+				loadSagePatch();
+				appliedSagePatch = true;
+			}
+			ini.load(path, INI_LOAD_OVERWRITE, &xferCRC);
+		});
+		TheWritableGlobalData->parseCustomDefinition();
+		if (!appliedSagePatch)
+			loadSagePatch();
+	}
+	else
+	{
+		initSubsystem(TheWritableGlobalData, "TheWritableGlobalData", TheWritableGlobalData, &xferCRC, "Data\\INI\\Default\\GameData", "Data\\INI\\GameData");
+		TheWritableGlobalData->parseCustomDefinition();
+		if (loadSagePatch() && hasLooseGameData)
+			ini.load(gameDataPath, INI_LOAD_OVERWRITE, nullptr);
+	}
+	if (retailINI)
+	{
+		RetailINIStartup::loadFile("Data\\INI\\Default\\Water.ini", &xferCRC);
+		RetailINIStartup::loadFile("Data\\INI\\Water.ini", &xferCRC);
+		RetailTerrainFire::loadVisualSettings(&xferCRC);
+		RetailINIStartup::loadEnvironment();
 	}
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
@@ -728,7 +765,8 @@ void GameEngine::init()
 
 	#if defined(RTS_DEBUG)
 		// If we're in Debug, load the Debug settings as well.
-		ini.loadFileDirectory( "Data\\INI\\GameDataDebug", INI_LOAD_OVERWRITE, nullptr );
+		if (!RetailINIStartup::hasSubsystem("TheWritableGlobalData"))
+			ini.loadFileDirectory("Data\\INI\\GameDataDebug", INI_LOAD_OVERWRITE, nullptr);
 	#endif
 
 		// special-case: parse command-line parameters after loading global data
@@ -747,11 +785,13 @@ void GameEngine::init()
 		}
 
 		// read the water settings from INI (must do prior to initing GameClient, apparently)
-		ini.loadFileDirectory( "Data\\INI\\Default\\Water", INI_LOAD_OVERWRITE, &xferCRC );
-		ini.loadFileDirectory( "Data\\INI\\Water", INI_LOAD_OVERWRITE, &xferCRC );
-	RetailTerrainFire::loadSettings(&xferCRC);
-		ini.loadFileDirectory( "Data\\INI\\Default\\Weather", INI_LOAD_OVERWRITE, &xferCRC );
-		ini.loadFileDirectory( "Data\\INI\\Weather", INI_LOAD_OVERWRITE, &xferCRC );
+		if (!retailINI)
+		{
+			ini.loadFileDirectory("Data\\INI\\Default\\Water", INI_LOAD_OVERWRITE, &xferCRC);
+			ini.loadFileDirectory("Data\\INI\\Water", INI_LOAD_OVERWRITE, &xferCRC);
+			ini.loadFileDirectory("Data\\INI\\Default\\Weather", INI_LOAD_OVERWRITE, &xferCRC);
+			ini.loadFileDirectory("Data\\INI\\Weather", INI_LOAD_OVERWRITE, &xferCRC);
+		}
 
 
 
@@ -766,8 +806,26 @@ void GameEngine::init()
 #ifdef DEBUG_CRC
 		initSubsystem(TheDeepCRCSanityCheck, "TheDeepCRCSanityCheck", MSGNEW("GameEngineSubystem") DeepCRCSanityCheck, nullptr);
 #endif // DEBUG_CRC
+		const auto initLanguage = [] {
+			initSubsystem(TheGlobalLanguageData,"TheGlobalLanguageData", MSGNEW("GameEngineSubsystem") GlobalLanguage, nullptr);
+			TheGlobalLanguageData->parseCustomDefinition();
+		};
+		const auto initAudio = [this] {
+			initSubsystem(TheAudio,"TheAudio", createAudioManager(TheGlobalData->m_headless), nullptr);
+			if (!TheAudio->isMusicAlreadyLoaded())
+				setQuitting(TRUE);
+		};
+		if (retailINI)
+			initLanguage();
 		initSubsystem(TheGameText, "TheGameText", CreateGameTextInterface(), nullptr);
 		updateWindowTitle();
+		if (retailINI)
+		{
+			RetailINIStartup::loadSubsystem("TheGameText");
+			initAudio();
+			RetailEva::load();
+			RetailLargeGroupAudio::load();
+		}
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
 	GetPrecisionTimer(&endTime64);//////////////////////////////////////////////////////////////////
@@ -783,20 +841,26 @@ void GameEngine::init()
 #endif
 
 		initSubsystem(TheScienceStore,"TheScienceStore", MSGNEW("GameEngineSubsystem") ScienceStore(), &xferCRC, "Data\\INI\\Default\\Science", "Data\\INI\\Science");
+		if (retailINI)
+			initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
 		initSubsystem(TheMultiplayerSettings,"TheMultiplayerSettings", MSGNEW("GameEngineSubsystem") MultiplayerSettings(), &xferCRC, "Data\\INI\\Default\\Multiplayer", "Data\\INI\\Multiplayer");
 		initSubsystem(TheTerrainTypes,"TheTerrainTypes", MSGNEW("GameEngineSubsystem") TerrainTypeCollection(), &xferCRC, "Data\\INI\\Default\\Terrain", "Data\\INI\\Terrain");
 		initSubsystem(TheTerrainRoads,"TheTerrainRoads", MSGNEW("GameEngineSubsystem") TerrainRoadCollection(), &xferCRC, "Data\\INI\\Default\\Roads", "Data\\INI\\Roads");
-		initSubsystem(TheGlobalLanguageData,"TheGlobalLanguageData",MSGNEW("GameEngineSubsystem") GlobalLanguage, nullptr); // must be before the game text
-		TheGlobalLanguageData->parseCustomDefinition();
+		if (retailINI && !RetailINIStartup::loadSubsystem("TheGlobalWeatherSystem", &xferCRC))
+		{
+			ini.loadFileDirectory("Data\\INI\\Default\\Weather", INI_LOAD_OVERWRITE, &xferCRC);
+			ini.loadFileDirectory("Data\\INI\\Weather", INI_LOAD_OVERWRITE, &xferCRC);
+		}
+		if (!retailINI)
+			initLanguage();
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
 	GetPrecisionTimer(&endTime64);//////////////////////////////////////////////////////////////////
 	sprintf(Buf,"----------------------------------------------------------------------------After TheGlobalLanguageData = %f seconds",((double)(endTime64-startTime64)/(double)(freq64)));
   startTime64 = endTime64;//Reset the clock ////////////////////////////////////////////////////////
 	DEBUG_LOG(("%s", Buf));////////////////////////////////////////////////////////////////////////////
 	#endif/////////////////////////////////////////////////////////////////////////////////////////////
-		initSubsystem(TheAudio,"TheAudio", createAudioManager(TheGlobalData->m_headless), nullptr);
-		if (!TheAudio->isMusicAlreadyLoaded())
-			setQuitting(TRUE);
+		if (!retailINI)
+			initAudio();
 
 #if RTS_ZEROHOUR && RETAIL_COMPATIBLE_CRC
 		TheNameKeyGenerator->syncNameKeyID();
@@ -817,6 +881,8 @@ void GameEngine::init()
 		initSubsystem(TheSidesList,"TheSidesList", MSGNEW("GameEngineSubsystem") SidesList(), nullptr);
 		initSubsystem(TheCaveSystem,"TheCaveSystem", MSGNEW("GameEngineSubsystem") CaveSystem(), nullptr);
 		initSubsystem(TheRankInfoStore,"TheRankInfoStore", MSGNEW("GameEngineSubsystem") RankInfoStore(), &xferCRC, nullptr, "Data\\INI\\Rank");
+		if (retailINI)
+			RetailINIStartup::loadSubsystem("ThePlayerAITypeSet", &xferCRC, "PlayerAIType", BfmeMapScripts::parsePlayerAIType);
 		initSubsystem(ThePlayerTemplateStore,"ThePlayerTemplateStore", MSGNEW("GameEngineSubsystem") PlayerTemplateStore(), &xferCRC, "Data\\INI\\Default\\PlayerTemplate", "Data\\INI\\PlayerTemplate");
 		initSubsystem(TheParticleSystemManager,"TheParticleSystemManager", createParticleSystemManager(TheGlobalData->m_headless), nullptr);
 
@@ -866,18 +932,36 @@ void GameEngine::init()
 
 
 
-		if (RetailFileLayers::enabled())
+		if (retailINI)
 		{
+			for (const char* name : {
+				"TheCrowdResponseStore",
+				"TheLivingWorldAutoResolveArmorStore",
+				"TheLivingWorldAutoResolveWeaponStore",
+				"TheLivingWorldAutoResolveBodyStore",
+				"TheLivingWorldAutoResolveLeadershipStore",
+				"TheLivingWorldAutoResolveCombatChainStore",
+				"TheLivingWorldAutoResolveHandicapStore",
+				"TheMissionObjectiveTracker"})
+				RetailINIStartup::preprocessSubsystem(name);
 			EmotionTrackerUpdate::clearEmotionNuggets();
-			if (TheFileSystem->doesFileExist("Data\\INI\\Emotions.ini"))
-				ini.load("Data\\INI\\Emotions.ini", INI_LOAD_OVERWRITE, &xferCRC);
+			if (!RetailINIStartup::loadSubsystem("TheEmotionSystem", &xferCRC))
+				RetailINIStartup::loadFile("Data\\INI\\Emotions.ini", &xferCRC);
 		}
 		initSubsystem(TheThingFactory,"TheThingFactory", createThingFactory(), &xferCRC, "Data\\INI\\Default\\Object", "Data\\INI\\Object");
-		if (RetailFileLayers::enabled())
+		if (retailINI)
 		{
-			initSubsystem(TheAttributeModifierStore, "TheAttributeModifierStore", MSGNEW("GameEngineSubsystem") AttributeModifierStore(), &xferCRC, nullptr, "Data\\INI\\AttributeModifier");
-			ini.loadFileDirectory("Data\\INI\\Stances", INI_LOAD_OVERWRITE, &xferCRC);
-			TheAttributeModifierStore->markDefaults();
+			initSubsystem(TheAttributeModifierStore, "TheAttributeModifierStore", MSGNEW("GameEngineSubsystem") AttributeModifierStore(), nullptr);
+			RetailINIStartup::loadFile("Data\\INI\\Stances.ini", &xferCRC);
+			RetailINIStartup::preprocessSubsystem("TheLightPointSystem");
+			ExperienceLevelStore::load();
+			for (const char* name : {
+				"TheLivingWorldPlayerTemplateStore",
+				"TheLivingWorldAITemplateStore",
+				"TheLivingWorldRegionEffectsManagerStore",
+				"TheLivingWorldManager",
+				"TheLivingWorldLogic"})
+				RetailINIStartup::preprocessSubsystem(name);
 		}
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
@@ -894,15 +978,18 @@ void GameEngine::init()
 #endif
 
 		TheNameKeyGenerator->dumpIfRequested("thingFactory");
-		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
-		ExperienceLevelStore::load();
+		if (!retailINI)
+			initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
 		RetailCreationUpgrades::load(&xferCRC);
-		if (RetailFileLayers::enabled() || INIAudit::isEnabled())
+		if (retailINI || INIAudit::isEnabled())
 		{
-			RetailEva::load();
-			RetailLargeGroupAudio::load();
+			if (!retailINI)
+			{
+				RetailEva::load();
+				RetailLargeGroupAudio::load();
+				CreateAHeroSystem::load();
+			}
 			RetailNotification::load();
-			CreateAHeroSystem::load();
 		}
 		if (RetailFileLayers::enabled())
 			initSubsystem(TheRetailCommandCatalog, "TheRetailCommandCatalog", NEW CommandCatalog, nullptr);
@@ -925,10 +1012,18 @@ void GameEngine::init()
 	#endif/////////////////////////////////////////////////////////////////////////////////////////////
 
 
-		initSubsystem(TheAI,"TheAI", MSGNEW("GameEngineSubsystem") AI(), &xferCRC,  "Data\\INI\\Default\\AIData", "Data\\INI\\AIData");
-		if (RetailFileLayers::enabled())
-			AISkirmishPlayer::loadRetailData();
+		if (retailINI)
+			RetailINIStartup::preprocessSubsystem("TheLinearCampaignManager");
+		initSubsystem(TheAI,"TheAI", MSGNEW("GameEngineSubsystem") AI(), &xferCRC, "Data\\INI\\Default\\AIData", "Data\\INI\\AIData");
+		if (retailINI)
+		{
+			if (!RetailINIStartup::loadSubsystem("TheAttributeModifierStore", &xferCRC))
+				ini.loadFileDirectory("Data\\INI\\AttributeModifier", INI_LOAD_OVERWRITE, &xferCRC);
+			TheAttributeModifierStore->markDefaults();
+		}
 		initSubsystem(TheGameLogic,"TheGameLogic", createGameLogic(), nullptr);
+		if (retailINI)
+			RetailINIStartup::loadSubsystem("TheScriptEngine", &xferCRC);
 		initSubsystem(TheTeamFactory,"TheTeamFactory", MSGNEW("GameEngineSubsystem") TeamFactory(), nullptr);
 		initSubsystem(TheCrateSystem,"TheCrateSystem", MSGNEW("GameEngineSubsystem") CrateSystem(), &xferCRC, "Data\\INI\\Default\\Crate", "Data\\INI\\Crate");
 		initSubsystem(ThePlayerList,"ThePlayerList", MSGNEW("GameEngineSubsystem") PlayerList(), nullptr);
@@ -946,15 +1041,23 @@ void GameEngine::init()
 	#endif/////////////////////////////////////////////////////////////////////////////////////////////
 
 
-		AsciiString fname;
-		if (RetailFileLayers::enabled())
-			fname = "CommandMap";
+		if (retailINI && RetailINIStartup::hasSubsystem("TheMetaMap"))
+		{
+			initSubsystem(TheMetaMap,"TheMetaMap", MSGNEW("GameEngineSubsystem") MetaMap(), nullptr);
+			RetailINIStartup::loadFile("CommandMap.ini");
+			RetailINIStartup::loadSubsystem("TheMetaMap", nullptr, "DebugCommandMap", MetaMap::parseDebugMetaMap);
+		}
 		else
-			fname.format("Data\\%s\\CommandMap", GetRegistryLanguage().str());
-		initSubsystem(TheMetaMap,"TheMetaMap", MSGNEW("GameEngineSubsystem") MetaMap(), nullptr, fname.str(), "Data\\INI\\CommandMap");
+		{
+			AsciiString fname = "CommandMap";
+			if (!retailINI)
+				fname.format("Data\\%s\\CommandMap", GetRegistryLanguage().str());
+			initSubsystem(TheMetaMap,"TheMetaMap", MSGNEW("GameEngineSubsystem") MetaMap(), nullptr, fname.str(), "Data\\INI\\CommandMap");
+		}
 
 #if defined(RTS_DEBUG)
-		ini.loadFileDirectory("Data\\INI\\CommandMapDebug", INI_LOAD_MULTIFILE, nullptr);
+		if (!RetailINIStartup::hasSubsystem("TheMetaMap"))
+			ini.loadFileDirectory("Data\\INI\\CommandMapDebug", INI_LOAD_MULTIFILE, nullptr);
 #endif
 
 #if defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
@@ -964,6 +1067,17 @@ void GameEngine::init()
 		TheMetaMap->generateMetaMap();
 		TheMetaMap->verifyMetaMap();
 
+		if (retailINI)
+		{
+			CreateAHeroSystem::loadHouseColors();
+			for (const char* name : {
+				"TheMeshInstancingManager",
+				"TheLivingWorldCampaignManager",
+				"TheVictorySystem"})
+				RetailINIStartup::preprocessSubsystem(name);
+			RetailTerrainFire::loadLogicSettings(&xferCRC);
+			AISkirmishPlayer::loadRetailData();
+		}
 
 		initSubsystem(TheActionManager,"TheActionManager", MSGNEW("GameEngineSubsystem") ActionManager(), nullptr);
 		//initSubsystem((CComObject<WebBrowser> *)TheWebBrowser,"(CComObject<WebBrowser> *)TheWebBrowser", (CComObject<WebBrowser> *)createWebBrowser(), nullptr);
@@ -972,6 +1086,17 @@ void GameEngine::init()
 
 		// Create the interface for sending game results
 		initSubsystem(TheGameResultsQueue,"TheGameResultsQueue", GameResultsInterface::createNewGameResultsInterface(), nullptr);
+		if (retailINI)
+		{
+			RetailINIStartup::preprocessSubsystem("TheLivingWorldBuildingTemplateStore");
+			CreateAHeroSystem::load();
+			for (const char* name : {
+				"TheScoredKillEvaAnnouncerController",
+				"TheLivingWorldAutoResolveReinforcementScheduleStore",
+				"TheLivingWorldAutoResolveResourceBonusScheduleStore",
+				"TheLivingWorldAutoResolveSciencePurchasePointBonusScheduleStore"})
+				RetailINIStartup::preprocessSubsystem(name);
+		}
 
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////

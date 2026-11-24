@@ -48,6 +48,8 @@ public:
 	static constexpr Int CELL_SIZE = 10;
 
 	static void loadSettings(Xfer* xfer);
+	static void loadVisualSettings(Xfer* xfer);
+	static void loadLogicSettings(Xfer* xfer);
 	static void restoreSettings();
 	static void parseLogicSettings(INI* ini);
 	static void parseVisualSettings(INI* ini);

@@ -28,8 +28,7 @@
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "Common/BfmeAssetPath.h"
-#include "Common/File.h"
-#include "Common/FileSystem.h"
+#include "Common/RetailINIStartup.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/GlobalData.h"
 #include "GameClient/Display.h"
@@ -842,19 +841,8 @@ void W3DPostProcess::renderQuad4Tap(IDirect3DTexture8 *tex, DWORD pixelShader, i
 void W3DPostProcess::loadRetailGlowConfig(const D3DCAPS8 &caps)
 {
 	m_retailGlowLoaded = true;
-	for (const char *filename : {"Data/INI/Default/Environment.ini", "Data/INI/Environment.ini"})
+	for (const std::string& content : RetailINIStartup::environment())
 	{
-		File *file = TheFileSystem->openFile(filename, File::READ);
-		if (!file)
-			continue;
-		const Int size = std::max(0, file->size());
-		std::string content(size, '\0');
-		const Int bytes = file->read(content.data(), size);
-		file->close();
-		if (bytes <= 0)
-			continue;
-		content.resize(bytes);
-
 		std::istringstream input(content);
 		bool inGlow = false;
 		for (std::string line; std::getline(input, line);)
@@ -1045,7 +1033,7 @@ bool W3DPostProcess::renderGlowBlurPass(IDirect3DTexture8 *srcTex, IDirect3DSurf
 
 void W3DPostProcess::applyRetailGlow(RTS3DScene &scene, CameraClass &camera)
 {
-	if (!RetailFileLayers::enabled() || !TheFileSystem)
+	if (!RetailFileLayers::enabled())
 		return;
 	auto *device = DX8Wrapper::_Get_D3D_Device8();
 	if (!device || device->TestCooperativeLevel() != D3D_OK)

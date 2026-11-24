@@ -1,8 +1,7 @@
 #include "W3DDevice/GameClient/RetailTerrainShadow.h"
 
 #include "Common/GlobalData.h"
-#include "Common/File.h"
-#include "Common/FileSystem.h"
+#include "Common/RetailINIStartup.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
@@ -135,44 +134,32 @@ RGBColor terrainLightWithoutSun()
 RetailTerrainShadow::RetailTerrainShadow()
 {
 	DX8Wrapper::AddCleanupHook(this);
-	for (const char *filename : {"Data/INI/Default/Environment.ini", "Data/INI/Environment.ini"})
+	for (const std::string& content : RetailINIStartup::environment())
 	{
-		File *file = TheFileSystem->openFile(filename, File::READ);
-		if (!file)
-			continue;
-		const Int size = file->seek(0, File::END);
-		if (size > 0 && size <= 1024 * 1024 && file->seek(0, File::START) == 0)
+		std::istringstream input(content);
+		bool shadowBlock = false;
+		for (std::string line; std::getline(input, line); )
 		{
-			std::string content(size, '\0');
-			if (file->read(content.data(), size) == size)
+			std::istringstream row(line);
+			std::string name;
+			row >> name;
+			if (stricmp(name.c_str(), "ShadowMap") == 0)
+				shadowBlock = true;
+			else if (shadowBlock && stricmp(name.c_str(), "End") == 0)
+				break;
+			else if (shadowBlock)
 			{
-				std::istringstream input(content);
-				bool shadowBlock = false;
-				for (std::string line; std::getline(input, line); )
+				char separator = 0;
+				Real value = 0;
+				if (row >> separator >> value && separator == '=' && std::isfinite(value))
 				{
-					std::istringstream row(line);
-					std::string name;
-					row >> name;
-					if (stricmp(name.c_str(), "ShadowMap") == 0)
-						shadowBlock = true;
-					else if (shadowBlock && stricmp(name.c_str(), "End") == 0)
-						break;
-					else if (shadowBlock)
-					{
-						char separator = 0;
-						Real value = 0;
-						if (row >> separator >> value && separator == '=' && std::isfinite(value))
-						{
-							if (stricmp(name.c_str(), "MapSize") == 0 && value >= 256 && value <= 4096)
-								m_authoredSize = static_cast<Int>(value);
-							else if (stricmp(name.c_str(), "MaxViewDistance") == 0 && value > 0.0f)
-								m_viewDistance = value;
-						}
-					}
+					if (stricmp(name.c_str(), "MapSize") == 0 && value >= 256 && value <= 4096)
+						m_authoredSize = static_cast<Int>(value);
+					else if (stricmp(name.c_str(), "MaxViewDistance") == 0 && value > 0.0f)
+						m_viewDistance = value;
 				}
 			}
 		}
-		file->close();
 	}
 }
 

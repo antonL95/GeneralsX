@@ -10,6 +10,7 @@
 #include "Common/GameCommon.h"
 #include "Common/INIAudit.h"
 #include "Common/INI.h"
+#include "Common/RetailINIStartup.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
@@ -49,7 +50,6 @@ struct SystemData
 	AsciiString examineSelfAnimName;
 	Int examineAnimTweakValue = 0;
 	Real specialAnimPercentChance = 0.0f;
-	std::map<std::string, AsciiString> colorMasks;
 	Int heroRevivalDiscount = 0;
 	Int specialPowerDiscountPerLevel = 0;
 	std::vector<CreateAHeroBlingDef> blings;
@@ -58,6 +58,7 @@ struct SystemData
 };
 
 SystemData s_data;
+std::map<std::string, AsciiString> s_colorMasks;
 CreateAHeroRules::SelectionData s_playerSelections[MAX_PLAYER_COUNT];
 Bool s_playerHasSelection[MAX_PLAYER_COUNT] = {};
 
@@ -349,14 +350,27 @@ static void parseColorMask(INI* ini)
 	ini->initFromINI(&mask, fields);
 	mask.base.toLower();
 	if (!mask.base.isEmpty() && !mask.texture.isEmpty())
-		s_data.colorMasks[mask.base.str()] = mask.texture;
+		s_colorMasks[mask.base.str()] = mask.texture;
 }
 
 AsciiString findColorMask(AsciiString baseTexture)
 {
 	baseTexture.toLower();
-	const auto found = s_data.colorMasks.find(baseTexture.str());
-	return found != s_data.colorMasks.end() ? found->second : AsciiString::TheEmptyString;
+	const auto found = s_colorMasks.find(baseTexture.str());
+	return found != s_colorMasks.end() ? found->second : AsciiString::TheEmptyString;
+}
+
+void loadHouseColors()
+{
+	s_colorMasks.clear();
+	if (RetailINIStartup::loadSubsystem("TheHouseColorSystem", nullptr, "HouseColor", parseColorMask))
+		return;
+	const char* path = "Data\\INI\\HouseColor.ini";
+	if (TheFileSystem->doesFileExist(path))
+	{
+		INI ini;
+		ini.load(path, INI_LOAD_OVERWRITE, nullptr, "HouseColor", parseColorMask);
+	}
 }
 
 void load()
@@ -369,12 +383,6 @@ void load()
 		return;
 	INI ini;
 	ini.load(AsciiString(path), INI_LOAD_OVERWRITE, nullptr, "CreateAHeroSystem", parseDefinition);
-	const char* maskPath = "Data\\INI\\HouseColor.ini";
-	if (RetailFileLayers::enabled() && TheFileSystem->doesFileExist(maskPath))
-	{
-		INI masks;
-		masks.load(AsciiString(maskPath), INI_LOAD_OVERWRITE, nullptr, "HouseColor", parseColorMask);
-	}
 }
 
 void resetAllPlayers()

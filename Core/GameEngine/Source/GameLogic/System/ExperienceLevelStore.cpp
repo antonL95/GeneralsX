@@ -19,6 +19,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailINIStartup.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
@@ -266,8 +267,11 @@ void load()
 		return;
 	try
 	{
-		INI ini;
-		ini.load("Data\\INI\\ExperienceLevels.ini", INI_LOAD_OVERWRITE, nullptr, "ExperienceLevel", parseDefinition);
+		if (!RetailINIStartup::loadSubsystem("TheExperienceLevelSystem", nullptr, "ExperienceLevel", parseDefinition))
+		{
+			INI ini;
+			ini.load("Data\\INI\\ExperienceLevels.ini", INI_LOAD_OVERWRITE, nullptr, "ExperienceLevel", parseDefinition);
+		}
 	}
 	catch (...)
 	{

@@ -394,6 +394,7 @@ public:
 	virtual void update() override { }
 
 	static void parseMetaMap(INI* ini);
+	static void parseDebugMetaMap(INI* ini);
 
 	// TheSuperHackers @feature Function to generate default key mappings
 	// for actions that were not found in a CommandMap.ini

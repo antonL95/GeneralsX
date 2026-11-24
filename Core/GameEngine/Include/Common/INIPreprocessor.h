@@ -19,6 +19,7 @@ public:
 
 	void clearDefines();
 	std::size_t getDefineCount() const;
+	bool hasDefine(const std::string& name) const { return m_defines.find(name) != m_defines.end(); }
 
 	const std::vector<std::string>& getWarnings() const;
 	void clearWarnings();

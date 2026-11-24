@@ -12,6 +12,7 @@
 #include "Common/MapReaderWriterInfo.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailINIStartup.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/WellKnownKeys.h"
 #include "GameLogic/BfmeScriptRules.h"
@@ -855,9 +856,12 @@ void BfmeMapScripts::loadLibraries(SidesList &sides, Bool multiplayer)
 	if (!multiplayer || !RetailFileLayers::enabled() || INIAudit::isEnabled())
 		return;
 
-	INI ini;
-	sides.m_playerAILibraries.clear();
-	ini.loadFileDirectory("Data\\INI\\PlayerAITypes", INI_LOAD_OVERWRITE, nullptr, INI::LoadFlags_SearchSubDirs);
+	if (!RetailINIStartup::hasSubsystem("ThePlayerAITypeSet"))
+	{
+		INI ini;
+		sides.m_playerAILibraries.clear();
+		ini.loadFileDirectory("Data\\INI\\PlayerAITypes", INI_LOAD_OVERWRITE, nullptr, INI::LoadFlags_SearchSubDirs);
+	}
 	std::map<std::string, std::set<std::string>> seenByTemplate;
 	for (Int i = 0; i < sides.getNumSides(); ++i)
 	{
