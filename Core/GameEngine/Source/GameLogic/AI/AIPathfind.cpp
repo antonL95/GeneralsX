@@ -695,6 +695,39 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 		 obj->isKindOf(KINDOF_WALL_HUB) || obj->isKindOf(KINDOF_DEFENSIVE_WALL) ||
 		 obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
 		return;
+	const auto* authored = retail && obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL) ? RetailWallMesh::forObject(*obj) : nullptr;
+	if (authored && !authored->wall.empty())
+	{
+		Region2D bounds;
+		bounds.lo = authored->wall.front().asCoord2D();
+		bounds.hi = bounds.lo;
+		for (const auto& point : authored->wall)
+			bounds.uniteWith(point.asCoord2D());
+		const Int left = MAX(m_extent.lo.x, REAL_TO_INT_FLOOR(bounds.lo.x / PATHFIND_CELL_SIZE_F));
+		const Int right = MIN(m_extent.hi.x, REAL_TO_INT_FLOOR(bounds.hi.x / PATHFIND_CELL_SIZE_F));
+		const Int bottom = MAX(m_extent.lo.y, REAL_TO_INT_FLOOR(bounds.lo.y / PATHFIND_CELL_SIZE_F));
+		const Int top = MIN(m_extent.hi.y, REAL_TO_INT_FLOOR(bounds.hi.y / PATHFIND_CELL_SIZE_F));
+		m_zoneManager.markZonesDirty();
+		for (Int x = left; x <= right; ++x)
+			for (Int y = bottom; y <= top; ++y)
+			{
+				Bool covered = FALSE;
+				for (Int corner = 0; corner < 4 && !covered; ++corner)
+				{
+					Coord3D point = {Real(x + (corner & 1)) * PATHFIND_CELL_SIZE_F,
+						Real(y + ((corner >> 1) & 1)) * PATHFIND_CELL_SIZE_F, 0.0f};
+					covered = RetailWallMesh::contains(*authored, point);
+				}
+				if (!covered)
+					continue;
+				PathfindCell& cell = m_map[x][y];
+				const Bool changed = insert ? cell.setTypeAsObstacle(obj, FALSE, {x, y}) : cell.removeObstacle(obj);
+				if (changed)
+					cell.setZone(PathfindZoneManager::UNINITIALIZED_ZONE);
+			}
+		if (insert)
+			m_retailTrackedFootprints.insert(obj->getID());
+	}
 	if (obj->isKindOf(KINDOF_MINE)) {
 		return;  // don't pathfind around mines.
 	}
