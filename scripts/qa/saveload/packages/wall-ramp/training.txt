@@ -1,0 +1,2 @@
+180 create Player_1 AotREdorasStairs01 0 2440,1430,0
+181 wall-ramp-probe Player_1 AotREdorasStairs01 0

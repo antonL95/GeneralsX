@@ -105,6 +105,14 @@ public:
 	const ModelState* findPlacementDecal(const ModelConditionFlags& flags) const;
 	Bool isGlowEnabled() const override { return m_glowEnabled; }
 	Bool isGlowEmissive() const override { return m_glowEmissive; }
+	Bool getWallRampMeshes(AsciiString& model, AsciiString& wall, AsciiString& ramp1, AsciiString& ramp2) const override
+	{
+		model = m_defaultModel.draw.m_modelName;
+		wall = m_wallBoundsMesh;
+		ramp1 = m_rampMesh1;
+		ramp2 = m_rampMesh2;
+		return wall.isNotEmpty() || ramp1.isNotEmpty() || ramp2.isNotEmpty();
+	}
 
 private:
 	enum class StateType { DefaultModel, Model, Idle, Animation, Transition };

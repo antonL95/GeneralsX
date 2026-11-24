@@ -111,6 +111,7 @@ public:
 
 	// ugh, hack
 	virtual const W3DModelDrawModuleData* getAsW3DModelDrawModuleData() const { return nullptr; }
+	virtual Bool getWallRampMeshes(AsciiString&, AsciiString&, AsciiString&, AsciiString&) const { return FALSE; }
 	// ugh, hack
 	virtual const W3DTreeDrawModuleData* getAsW3DTreeDrawModuleData() const { return nullptr; }
 	virtual const HordeLayout* getAsHordeLayout() const { return nullptr; }

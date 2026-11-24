@@ -91,6 +91,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/ExperienceLevelRules.h
     Include/GameLogic/ExperienceLevelStore.h
     Include/GameLogic/RetailCreationUpgrades.h
+    Include/GameLogic/RetailWallMesh.h
     Include/GameLogic/RetailSpawnFootprint.h
     Include/GameLogic/WeaponNuggetRules.h
     Include/GameLogic/WeaponSlotSelectionRules.h
@@ -768,6 +769,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/ExperienceLevelStore.cpp
     Source/GameLogic/System/RetailCreationUpgrades.cpp
     Source/GameLogic/System/RetailLogicBenchmark.cpp
+    Source/GameLogic/System/RetailWallMesh.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
     Source/GameLogic/System/RetailBuildingEvents.cpp
     Source/GameLogic/Object/Behavior/RetailConstruction.cpp
