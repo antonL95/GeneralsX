@@ -1,0 +1,21 @@
+5 cash Player_1 - 0 25000
+5 power-reveal - - 0
+10 create Player_1 MirkwoodPorter 0 522.6,762.7,0
+10 create Player_1 MirkwoodPorter 0 920,320,0
+10 create Player_2 IsengardSpellBook 0 2800,600,0
+10 create Player_1 IsengardFurnace 0 2590,3420,0
+12 placecheck Player_1 MirkwoodPorter 1 MirkwoodStatue 1010 381.3 0
+14 create Player_1 GondorCastleUpgrade 0 956,381.3,0
+20 placecheck Player_1 MirkwoodPorter 1 MirkwoodStatue 1010 381.3 0
+21 pkg26-order-upgrade Player_1 GondorCastleUpgrade 0 Upgrade_PosternGate
+30 placecheck Player_1 MirkwoodPorter 1 MirkwoodStatue 1010 381.3 0
+30 buttons Player_1 GondorCastleUpgrade 0
+31 construct Player_1 MirkwoodPorter 1 MirkwoodStatue 1010 381.3 0
+36 log Player_1 MirkwoodStatue 0
+50 science Player_2 - 0 SCIENCE_Devastation
+70 snapshot-devastation Player_2 IsengardSpellBook 0 - 2650 3420
+81 snapshot-devastation Player_2 IsengardSpellBook 0 recharge 2650 3420
+82 snapshot-devastation Player_2 IsengardSpellBook 0 recharge
+83 log Player_1 MirkwoodStatue 0
+100 log Player_1 MirkwoodPorter 0
+100 construct Player_1 MirkwoodPorter 0 MirkwoodFortress 282.6 522.7 0
