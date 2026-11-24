@@ -34,14 +34,17 @@ check() {
     check_state 266 EvilShip_Interface '.* aflame=0 burned=0 ' || return 1
     check_state 255 Pkg37MarketPlace '.* aflame=1 burned=0 ' || return 1
     check_state 229 HaradMumakilMatriarch '.* aflame=0 .* passengers=5 burnedPassengers=0 ' || return 1
-    check_state 232 HaradMumakilMatriarch '.* aflame=1 .* passengers=5 burnedPassengers=5 ' || return 1
-    check_state 285 HaradMumakilMatriarch '.* aflame=0 burned=1 .* passengers=5 burnedPassengers=5 ' || return 1
-    check_state 356 Pkg37MatriarchControl '.* aflame=1 .* passengers=5 burnedPassengers=0 ' || return 1
+    check_state 232 HaradMumakilMatriarch '.* aflame=1 .* passengers=5 burnedPassengers=0 ' || return 1
+    check_state 285 HaradMumakilMatriarch '.* aflame=0 burned=1 .* passengers=5 burnedPassengers=0 ' || return 1
+    check_state 354 Pkg37MatriarchDamageableCrew '.* aflame=0 .* passengers=5 burnedPassengers=0 ' || return 1
+    check_state 356 Pkg37MatriarchDamageableCrew '.* aflame=1 .* passengers=5 burnedPassengers=5 ' || return 1
+    check_state 391 Pkg37MatriarchControl '.* aflame=1 .* passengers=5 burnedPassengers=0 ' || return 1
     check_fx 230 Pkg37Entwife 1 || return 1
     check_fx 230 Pkg37MarketPlace 8 || return 1
     check_fx 230 HaradMumakilMatriarch 1 || return 1
     check_fx 284 HaradMumakilMatriarch 0 || return 1
-    check_fx 355 Pkg37MatriarchControl 0 || return 1
+    check_fx 355 Pkg37MatriarchDamageableCrew 1 || return 1
+    check_fx 390 Pkg37MatriarchControl 0 || return 1
     if covers 332 && ! grep -Eq '^TEST flammable water run frame=332 source=Pkg37Entwife ' "$log"; then
         echo 'Entwife did not select a water destination at the end of its animation'
         return 1

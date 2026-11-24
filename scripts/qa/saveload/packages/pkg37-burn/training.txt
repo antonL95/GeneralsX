@@ -54,13 +54,18 @@
 348 destroy PlyrCreeps Pkg37FieldTarget 0
 348 destroy Player_1 Pkg37FieldTarget 0
 349 destroy Player_1 Pkg37Fort 0
-350 create Player_1 Pkg37MatriarchControl 0 240,790,0
-355 pkg37-fire Player_1 Pkg37MatriarchControl 0 330000
-356 pkg37-state Player_1 Pkg37MatriarchControl 0
+350 create Player_1 Pkg37MatriarchDamageableCrew 0 240,790,0
+354 pkg37-state Player_1 Pkg37MatriarchDamageableCrew 0
+355 pkg37-fire Player_1 Pkg37MatriarchDamageableCrew 0 330000
+356 pkg37-state Player_1 Pkg37MatriarchDamageableCrew 0
 365 pkg37-state Player_1 Pkg37Entwife 0
-370 destroy Player_1 Pkg37MatriarchControl 0
+370 destroy Player_1 Pkg37MatriarchDamageableCrew 0
 380 pkg37-state Player_1 Pkg37EntPanicResume 0
 382 destroy Player_1 Pkg37EntPanicResume 0
+385 create Player_1 Pkg37MatriarchControl 0 240,790,0
+390 pkg37-fire Player_1 Pkg37MatriarchControl 0 330000
+391 pkg37-state Player_1 Pkg37MatriarchControl 0
+405 destroy Player_1 Pkg37MatriarchControl 0
 465 pkg37-state Player_1 Pkg37Entwife 0
 470 destroy Player_1 Pkg37Entwife 0
 610 create Player_1 Pkg37EntShortSearch 0 150,650,0

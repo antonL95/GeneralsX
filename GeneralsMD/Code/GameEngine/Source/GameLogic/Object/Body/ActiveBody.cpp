@@ -450,6 +450,9 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 	if( obj->isEffectivelyDead() )
 		return;
 
+	if (obj->testStatus(OBJECT_STATUS_UNATTACKABLE) && damageInfo->in.m_damageType != DAMAGE_UNRESISTABLE)
+		return;
+
 	if (RetailFileLayers::enabled() && !damageInfo->in.m_kill &&
 		obj->getLogicModelConditions().test(MODELCONDITION_INVULNERABLE))
 		return;
