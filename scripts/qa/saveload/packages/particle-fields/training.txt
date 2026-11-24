@@ -1,3 +1,0 @@
-200 particle-fx Player_1 - 0 FX_TestParticleRadius 2520 1010 0
-240 particle-live Player_1 - 0
-250 particle-live Player_1 - 0
