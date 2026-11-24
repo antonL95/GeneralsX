@@ -4,10 +4,10 @@
 232 create PlyrCivilian AmazhirCamel 0 750,1100,0
 232 create Player_1 HaradBeruthielCat 0 850,1400,0
 232 create PlyrCivilian HaradBeruthielCat 0 950,1100,0
-232 create Player_1 MordorVariag_Rhun 0 1050,1400,0
+232 create Player_1 MordorVariag_Rhun 0 170,1720,0
 232 create PlyrCivilian MordorVariag_Rhun 0 840,1000,0
 239 pkg59-load-fx - - 0
-239 create PlyrCreeps Pkg59Attacker 0 1050,1350,0
+239 create PlyrCreeps Pkg59Attacker 0 170,1670,0
 240 pkg59-flame Player_1 AngmarWolfRider 0 wolf-fire
 240 pkg59-unlit PlyrCivilian AngmarWolfRider 0 wolf-control
 240 pkg59-flame Player_1 AmazhirCamel 0 camel-fire

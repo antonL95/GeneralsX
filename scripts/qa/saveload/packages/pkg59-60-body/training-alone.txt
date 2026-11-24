@@ -1,2 +1,2 @@
-246 create PlyrCivilian Pkg59HealCrate 0 1050,1275,0
+246 create PlyrCivilian Pkg59HealCrate 0 170,1595,0
 246 pkg59-pickup Player_1 MordorVariag_Rhun 0 PlyrCivilian:Pkg59HealCrate:0
