@@ -364,6 +364,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/MobMemberSlavedUpdate.h
     Include/GameLogic/Module/MobNexusContain.h
     Include/GameLogic/Module/ModelConditionUpgrade.h
+    Include/GameLogic/Module/RemoveUpgradeUpgrade.h
     Include/GameLogic/Module/MoneyCrateCollide.h
     Include/GameLogic/Module/NeutronBlastBehavior.h
     Include/GameLogic/Module/NeutronMissileSlowDeathUpdate.h
@@ -1081,6 +1082,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Upgrade/LocomotorSetUpgrade.cpp
     Source/GameLogic/Object/Upgrade/MaxHealthUpgrade.cpp
     Source/GameLogic/Object/Upgrade/ModelConditionUpgrade.cpp
+    Source/GameLogic/Object/Upgrade/RemoveUpgradeUpgrade.cpp
     Source/GameLogic/Object/Upgrade/ObjectCreationUpgrade.cpp
     Source/GameLogic/Object/Upgrade/PassengersFireUpgrade.cpp
     Source/GameLogic/Object/Upgrade/PowerPlantUpgrade.cpp

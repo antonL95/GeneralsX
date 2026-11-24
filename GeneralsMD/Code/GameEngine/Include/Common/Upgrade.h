@@ -188,6 +188,10 @@ public:
 	SkirmishUpgradeHeuristic getSkirmishAIHeuristic() const { return static_cast<SkirmishUpgradeHeuristic>(m_skirmishAIHeuristic); }
 	const AudioEventRTS* getResearchCompleteSound() const { return &m_researchSound; }
 	const AsciiString &getResearchCompleteEvaEvent() const { return m_researchCompleteEvaEvent; }
+	const AsciiString& getGroupName() const { return m_groupName; }
+	const AsciiString& getLocalPlayerLosesUpgradeEvaEvent() const { return m_localPlayerLosesUpgradeEvaEvent; }
+	const AsciiString& getAlliedPlayerLosesUpgradeEvaEvent() const { return m_alliedPlayerLosesUpgradeEvaEvent; }
+	const AsciiString& getEnemyPlayerLosesUpgradeEvaEvent() const { return m_enemyPlayerLosesUpgradeEvaEvent; }
 	const AudioEventRTS* getUnitSpecificSound() const { return &m_unitSpecificSound; }
 	AcademyClassificationType getAcademyClassificationType() const { return m_academyClassificationType; }
 

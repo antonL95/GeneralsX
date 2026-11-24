@@ -238,6 +238,7 @@
 #include "GameLogic/Module/PowerPlantUpgrade.h"
 #include "GameLogic/Module/ReplaceObjectUpgrade.h"
 #include "GameLogic/Module/ModelConditionUpgrade.h"
+#include "GameLogic/Module/RemoveUpgradeUpgrade.h"
 #include "GameLogic/Module/StatusBitsUpgrade.h"
 #include "GameLogic/Module/SubObjectsUpgrade.h"
 #include "GameLogic/Module/StealthUpgrade.h"
@@ -673,6 +674,7 @@ void ModuleFactory::init()
 		addModule( ObjectCreationUpgrade );
 	addModule( ReplaceObjectUpgrade );
 	addModule( ModelConditionUpgrade );
+	addModule(RemoveUpgradeUpgrade);
 	addModule( UnpauseSpecialPowerUpgrade );
 	addModule( WeaponBonusUpgrade );
 	addModule( WeaponSetUpgrade );
