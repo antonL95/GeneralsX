@@ -30,6 +30,8 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <algorithm>
+
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/FileSystem.h"
@@ -321,7 +323,8 @@ Object *ThingFactory::newObject( const ThingTemplate *tmplate, Team *team, Objec
 	const std::vector<AsciiString>& asv = tmplate->getBuildVariations();
 	if (!asv.empty())
 	{
-		Int which = GameLogicRandomValue(0, asv.size()-1);
+		const Int last = static_cast<Int>(asv.size()) - 1;
+		const Int which = std::min(last, GameLogicRandomValue(0, std::max(last, 1)));
 		const ThingTemplate* tmp = findTemplate( asv[which] );
 		if (tmp != nullptr)
 			tmplate = tmp;
