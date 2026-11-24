@@ -289,7 +289,7 @@ namespace
 			else if (path.ends_with(".@2"))
 				value = slot->getApparentPlayerTemplateDisplayName();
 			else if (path.ends_with(".@3"))
-				value = slot->getTeamNumber() < 0 ? localize("APT:None", "None") : number(slot->getTeamNumber() + 1);
+				value = slot->getTeamNumber() < 0 ? localize("APT:None", "-") : number(slot->getTeamNumber() + 1);
 			else if (path.ends_with(".@4"))
 				value = player->isPlayerDead() ? localize("APT:Defeated", "Defeated") : localize("APT:Playing", "Playing");
 			painter.label(value, label, player->getPlayerColor() | 0xFF000000);
