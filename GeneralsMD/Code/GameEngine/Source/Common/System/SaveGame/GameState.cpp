@@ -1258,6 +1258,13 @@ static void addGameToAvailableList( AsciiString filename, void *userData )
 
 }
 
+AvailableGameInfo *GameState::refreshAvailableGames()
+{
+	clearAvailableGames();
+	iterateSaveFiles(addGameToAvailableList, &m_availableGames);
+	return m_availableGames;
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Populate the listbox passed in with a list of the save games present on the hard drive */
 // ------------------------------------------------------------------------------------------------
@@ -1283,22 +1290,13 @@ void GameState::populateSaveGameListbox( GameWindow *listbox, SaveLoadLayoutType
 
 	}
 
-	// clear the available games
-	clearAvailableGames();
-
-	// iterate all the save files in the directory and populate the listbox
-	iterateSaveFiles( addGameToAvailableList, &m_availableGames );
-
 	// add all games found to the list box
-	AvailableGameInfo *info;
-	SaveGameInfo *saveGameInfo;
 	SYSTEMTIME systemTime;
 	UnsignedInt count = 0;
-	for( info = m_availableGames; info; info = info->next, count++ )
+	for( AvailableGameInfo *info = refreshAvailableGames(); info; info = info->next, count++ )
 	{
 
-		// get save game info
-		saveGameInfo = &info->saveGameInfo;
+		const SaveGameInfo *saveGameInfo = &info->saveGameInfo;
 
 		// setup a system time structure given the data we saved in the file
 		systemTime.wYear = saveGameInfo->date.year;

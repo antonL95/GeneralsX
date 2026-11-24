@@ -190,6 +190,7 @@ public:
 
 	// manipulating files
 	Bool doesSaveGameExist( AsciiString filename );							///< does the save file exist
+	AvailableGameInfo *refreshAvailableGames();
 	void populateSaveGameListbox( GameWindow *listbox, SaveLoadLayoutType layoutType );	///< populate listbox with available save games
 	void getSaveGameInfoFromFile( AsciiString filename, SaveGameInfo *saveGameInfo );		///< get save game info from file
 

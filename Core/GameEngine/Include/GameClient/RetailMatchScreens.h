@@ -41,3 +41,4 @@ struct RetailMatchResults
 RetailMatchResults collectRetailMatchResults();
 Bool showRetailMatchResults(RetailMatchResults results);
 Bool createRetailReturnMenu(WindowLayout &layout);
+void updateRetailShellLoad();

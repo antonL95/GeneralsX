@@ -70,6 +70,7 @@
 #include "Common/Debug.h"
 #include "Common/GameState.h"
 #include "Common/GameStateMap.h"
+#include "GameClient/RetailMatchScreens.h"
 #include "Common/Science.h"
 #include "Common/FunctionLexicon.h"
 #include "Common/CommandLine.h"
@@ -1415,6 +1416,8 @@ DECLARE_PERF_TIMER(GameEngine_update)
  */
 void GameEngine::update()
 {
+	updateRetailShellLoad();
+
 	USE_PERF_TIMER(GameEngine_update)
 	{
 		{

@@ -4,6 +4,7 @@
 
 #include "Common/FileSystem.h"
 #include "Common/GameEngine.h"
+#include "Common/GameState.h"
 #include "Common/GlobalData.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/Player.h"
@@ -31,6 +32,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <optional>
 #include <string_view>
 
 namespace
@@ -649,7 +651,7 @@ namespace
 		{400, "VALUE:4X", "4x"}, {800, "VALUE:8X", "8x"}, {10000, "VALUE:100X", "100x"}
 	};
 
-	enum class MenuChoice { None, Resources, Factor, Slot, Faction, Team, Color, StartAt, Profile, SelectProfile, DeleteProfile };
+	enum class MenuChoice { None, Resources, Factor, Slot, Faction, Team, Color, StartPosition, StartAt, Profile, SelectProfile, DeleteProfile };
 	enum class ProfilePage { None, Create, Stats };
 
 	struct Choice
@@ -674,6 +676,7 @@ namespace
 	{
 		AsciiString path;
 		UnicodeString name;
+		Int players;
 		Bool official;
 	};
 
@@ -690,6 +693,45 @@ namespace
 		}
 	}
 
+	std::optional<AvailableGameInfo> pendingShellLoad;
+	Bool reopenShellLoad = FALSE;
+
+	struct ShellLoadPage
+	{
+		static constexpr Int visibleRows = 9;
+
+		std::vector<AvailableGameInfo> saves;
+		Int first = 0;
+		Int selected = -1;
+		Bool open = FALSE;
+		Bool failed = FALSE;
+
+		void show()
+		{
+			open = TRUE;
+			failed = FALSE;
+			first = 0;
+			selected = -1;
+			saves.clear();
+			for (const auto *save = TheGameState->refreshAvailableGames(); save; save = save->next)
+				saves.push_back({save->filename, save->saveGameInfo, nullptr, nullptr});
+		}
+
+		void moveSelection(Int direction)
+		{
+			if (saves.empty())
+				return;
+			selected = selected < 0 ? first : std::clamp(selected + direction, 0, Int(saves.size()) - 1);
+			first = std::clamp(first, std::max(0, selected - visibleRows + 1), selected);
+			failed = FALSE;
+		}
+
+		void scroll(Int direction)
+		{
+			first = std::clamp(first + direction, 0, std::max(0, Int(saves.size()) - visibleRows));
+		}
+	};
+
 	class ReturnMenu
 	{
 	public:
@@ -700,8 +742,10 @@ namespace
 		OwnedImage previewFile;
 		const Image *preview = nullptr;
 		UnicodeString description;
+		ShellLoadPage loadPage;
 		Bool setup = FALSE;
 		Bool rulesTab = FALSE;
+		Bool sortByPlayers = FALSE;
 		Bool sandboxConfirmed = FALSE;
 		std::vector<SetupMap> maps;
 		std::vector<Int> factions;
@@ -805,21 +849,18 @@ namespace
 					if (map.m_nameLookupTag.isEmpty())
 						name = localize(mapCatalogueKey(path).c_str(), "");
 					if (name.isEmpty())
-						name = map.m_displayName;
-					else if (map.m_numPlayers >= 2)
 					{
+						name = map.m_displayName;
 						UnicodeString count;
 						count.format(L" (%d)", map.m_numPlayers);
-						name.concat(count);
+						if (name.endsWith(count))
+							name.truncateBy(count.getLength());
 					}
-					maps.push_back({path, name, map.m_isOfficial});
+					maps.push_back({path, name, map.m_numPlayers, map.m_isOfficial});
 				}
 			}
-			std::stable_sort(maps.begin(), maps.end(), [](const SetupMap &a, const SetupMap &b) {
-				if (a.official != b.official)
-					return !a.official;
-				return a.name.compareNoCase(b.name) < 0;
-			});
+			sortByPlayers = FALSE;
+			sortMaps();
 			for (Int i = 0; i < ThePlayerTemplateStore->getPlayerTemplateCount(); ++i)
 			{
 				const auto *faction = ThePlayerTemplateStore->getNthPlayerTemplate(i);
@@ -833,6 +874,30 @@ namespace
 					slots[0].faction = faction;
 			mapScroll = 0;
 			selectMap(0);
+		}
+
+		void sortMaps()
+		{
+			std::sort(maps.begin(), maps.end(), [this](const SetupMap &a, const SetupMap &b) {
+				if (a.official != b.official)
+					return !a.official;
+				if (sortByPlayers && a.players != b.players)
+					return a.players < b.players;
+				const Int byName = a.name.compareNoCase(b.name);
+				return byName != 0 ? byName < 0 : a.path.compareNoCase(b.path) < 0;
+			});
+		}
+
+		void setMapSort(Bool byPlayers)
+		{
+			if (maps.empty() || byPlayers == sortByPlayers)
+				return;
+			const AsciiString selected = maps[mapIndex].path;
+			sortByPlayers = byPlayers;
+			sortMaps();
+			const auto it = std::find_if(maps.begin(), maps.end(), [&](const SetupMap &map) { return map.path == selected; });
+			mapIndex = Int(it - maps.begin());
+			mapScroll = std::clamp(mapScroll, std::max(0, mapIndex - visibleMaps + 1), mapIndex);
 		}
 
 		const MapMetaData *currentMap() const
@@ -855,9 +920,10 @@ namespace
 			sandboxConfirmed = FALSE;
 			const auto *map = currentMap();
 			const Int count = slotCount();
-			for (auto &slot : slots)
-				if (slot.start >= count)
-					slot.start = -1;
+			for (Int i = 0; i < count; ++i)
+				if (slots[i].start >= count)
+					slots[i].start = -1;
+			std::fill(slots.begin() + count, slots.end(), SetupSlot{});
 
 			AsciiString stem = map->m_fileName;
 			stem.truncateBy(4);
@@ -947,6 +1013,7 @@ namespace
 				case MenuChoice::Faction: slot.faction = value; break;
 				case MenuChoice::Team: slot.team = value; break;
 				case MenuChoice::Color: assignUnique(&SetupSlot::color, choiceRow, value); break;
+				case MenuChoice::StartPosition: assignUnique(&SetupSlot::start, choiceRow, value); break;
 				case MenuChoice::StartAt:
 					if (value >= 0)
 						assignUnique(&SetupSlot::start, value, choiceRow);
@@ -1015,8 +1082,19 @@ namespace
 	constexpr Box profilePanel{310, 264, 714, 460};
 	constexpr Box profileCancel{337, 405, 475, 442};
 	constexpr Box profileAccept{550, 405, 688, 442};
-	constexpr Real slotEdges[] = {104, 276, 463, 610, 696, 808, 920};
+	constexpr Real slotEdges[] = {104, 276, 463, 610, 696, 920};
+	constexpr Box mapNameSort{115, 194, 375, 222};
+	constexpr Box mapPlayersSort{376, 194, 462, 222};
 	constexpr Real choiceHeight = 25;
+	constexpr Box loadMenuButton{412, 498, 612, 542};
+	constexpr Box loadCard{122, 110, 902, 658};
+	constexpr Box saveList{144, 204, 602, 571};
+	constexpr Box saveDetails{622, 204, 880, 571};
+	constexpr Box previousSaves{522, 170, 558, 198};
+	constexpr Box nextSaves{566, 170, 602, 198};
+	constexpr Box closeLoad{144, 598, 278, 642};
+	constexpr Box confirmLoad{746, 598, 880, 642};
+	constexpr Real saveRowHeight = 40;
 
 	Box slotCell(Int row, Int column)
 	{
@@ -1026,8 +1104,8 @@ namespace
 
 	Box mapLine(Int row)
 	{
-		const Real top = 197.0f + 31.0f * row;
-		return {115, top, 462, top + 29};
+		const Real top = 225.0f + 26.0f * row;
+		return {115, top, 462, top + 24};
 	}
 
 	Box inset(Box box, Real left, Real right = 0)
@@ -1098,6 +1176,99 @@ namespace
 		}
 	}
 
+	Box saveRow(Int row)
+	{
+		const Real top = saveList.top + saveRowHeight * row;
+		return {saveList.left, top, saveList.right, top + saveRowHeight - 2};
+	}
+
+	UnicodeString saveName(const AvailableGameInfo &save)
+	{
+		return save.saveGameInfo.description.isEmpty() ? translated(save.filename.str()) : save.saveGameInfo.description;
+	}
+
+	void drawShellLoad(const ShellLoadPage &page, const Painter &p)
+	{
+		fill(p, loadCard, 0xFF233A48);
+		p.text(localize("APT:LoadSavedGame", "Load Saved Game"), {144, 118, 880, 166}, 28);
+		p.text(localize("APT:SavedFiles", "Saved Games"), {144, 170, 502, 198}, 18, muted, "Albertus MT", FALSE);
+		fill(p, saveList, 0xFF0A141B);
+		fill(p, saveDetails, 0xFF12232D);
+		if (page.first > 0)
+			control(p, previousSaves, translated("▲"));
+		if (page.first + page.visibleRows < Int(page.saves.size()))
+			control(p, nextSaves, translated("▼"));
+		for (Int row = 0; row < page.visibleRows && page.first + row < Int(page.saves.size()); ++row)
+		{
+			const Int index = page.first + row;
+			const auto &save = page.saves[index];
+			const Box box = saveRow(row);
+			fill(p, box, index == page.selected ? 0xFF365665 : 0xFF182A35);
+			p.text(saveName(save), inset(box, 12, 12), 17, white, "Albertus MT", FALSE);
+		}
+		if (page.saves.empty())
+			p.text(localize("GUI:NoSavedGames", "No saved games"), saveList, 18, muted);
+		if (page.selected >= 0)
+		{
+			const auto &save = page.saves[page.selected].saveGameInfo;
+			const SaveDate &date = save.date;
+			const SYSTEMTIME time{date.year, date.month, date.dayOfWeek, date.day, date.hour,
+				date.minute, date.second, date.milliseconds};
+			UnicodeString map = localize(save.mapLabel.str(), "");
+			if (map.isEmpty() && save.mapLabel.endsWithNoCase(".map"))
+				map = localize(mapCatalogueKey(save.mapLabel).c_str(), "");
+			if (map.isEmpty())
+				map = translated(save.mapLabel.str());
+			p.text(saveName(page.saves[page.selected]), {638, 224, 864, 280}, 21, white, "Albertus MT", FALSE, TRUE);
+			p.text(localize("APT:Map", "Map"), {638, 293, 864, 318}, 16, muted, "Albertus MT", FALSE);
+			p.text(map, {638, 319, 864, 384}, 18, white, "Albertus MT", FALSE, TRUE);
+			p.text(localize("GUI:SaveDate", "Saved on"), {638, 398, 864, 424}, 16, muted, "Albertus MT", FALSE);
+			UnicodeString timestamp = getUnicodeDateBuffer(time);
+			timestamp.concat(L"  ");
+			timestamp.concat(getUnicodeTimeBuffer(time));
+			p.text(timestamp, {638, 424, 864, 461}, 18, white, "Albertus MT", FALSE);
+		}
+		else if (!page.saves.empty())
+			p.text(localize("GUI:ChooseSavedGame", "Select a saved game"), saveDetails, 18, muted);
+		if (page.failed)
+			p.text(localize("GUI:SaveGameLoadFailed", "Could not load the saved game."),
+				{292, 598, 730, 642}, 17, 0xFFFFC6A2);
+		control(p, closeLoad, localize("APT:Cancel", "Cancel"), TRUE);
+		if (page.selected >= 0)
+			control(p, confirmLoad, localize("APT:Load", "Load"), TRUE);
+	}
+
+	void shellLoadInput(ShellLoadPage &page, UnsignedInt message, WindowMsgData point, Bool key, Real x, Real y)
+	{
+		if (pendingShellLoad)
+			return;
+		const Bool click = message == GWM_LEFT_UP;
+		if ((key && point == KEY_ESC) || (click && closeLoad.contains(x, y)))
+			page.open = FALSE;
+		else if ((key && point == KEY_ENTER) || (click && confirmLoad.contains(x, y)))
+		{
+			if (page.selected >= 0)
+				pendingShellLoad = page.saves[page.selected];
+		}
+		else if (key && (point == KEY_UP || point == KEY_DOWN))
+			page.moveSelection(point == KEY_UP ? -1 : 1);
+		else if (message == GWM_WHEEL_UP || (click && previousSaves.contains(x, y) && page.first > 0))
+			page.scroll(-1);
+		else if (message == GWM_WHEEL_DOWN ||
+			(click && nextSaves.contains(x, y) && page.first + page.visibleRows < Int(page.saves.size())))
+			page.scroll(1);
+		else if (click)
+		{
+			for (Int row = 0; row < page.visibleRows && page.first + row < Int(page.saves.size()); ++row)
+				if (saveRow(row).contains(x, y))
+				{
+					page.selected = page.first + row;
+					page.failed = FALSE;
+					break;
+				}
+		}
+	}
+
 	const Factor &selectedFactor(Int percent)
 	{
 		for (const auto &factor : factors)
@@ -1108,6 +1279,8 @@ namespace
 
 	Choice colorChoice(Int i)
 	{
+		if (i < 0)
+			return {i, UnicodeString()};
 		const auto *definition = TheMultiplayerSettings->getColor(i);
 		return {i, definition ? localize(definition->getTooltipName().str(), "") : UnicodeString(),
 			definition ? static_cast<Color>(definition->getColor() | 0xFF000000) : 0};
@@ -1122,6 +1295,8 @@ namespace
 	{
 		return faction < 0 ? randomLabel() : ThePlayerTemplateStore->getNthPlayerTemplate(faction)->getDisplayName();
 	}
+
+	Box startMarker(const MapMetaData &map, Int index);
 
 	void openChoices(ReturnMenu &menu, MenuChoice kind, const Box &anchor, Int row = 0)
 	{
@@ -1158,6 +1333,13 @@ namespace
 				options.push_back({-1, randomLabel()});
 				for (Int i = 0, count = TheMultiplayerSettings->getNumColors(); i < count; ++i)
 					options.push_back(colorChoice(i));
+				break;
+			case MenuChoice::StartPosition:
+				options.push_back({-1, randomLabel()});
+				if (const auto *map = menu.currentMap())
+					for (Int i = 0; i < menu.slotCount(); ++i)
+						if (startMarker(*map, i).valid())
+							options.push_back({i, number(i + 1)});
 				break;
 			case MenuChoice::StartAt:
 				options.push_back({-1, localize("GUI:Open", "Open")});
@@ -1216,10 +1398,17 @@ namespace
 			p.text(localize("GUI:CantFindMap", "No skirmish maps"), mapPanel, 20);
 			return;
 		}
+		control(p, mapNameSort, localize("APT:MapName", "Map Name"), !menu.sortByPlayers);
+		control(p, mapPlayersSort, localize("APT:Players", "Players"), menu.sortByPlayers);
 		for (Int row = 0; row < ReturnMenu::visibleMaps && menu.mapScroll + row < Int(menu.maps.size()); ++row)
 		{
 			const Int index = menu.mapScroll + row;
-			control(p, mapLine(row), menu.maps[index].name, index == menu.mapIndex);
+			const Box box = mapLine(row);
+			const auto &entry = menu.maps[index];
+			control(p, box, UnicodeString(), index == menu.mapIndex);
+			p.text(entry.name, {box.left + 9, box.top, mapNameSort.right - 6, box.bottom},
+				16, white, "Albertus MT", FALSE);
+			p.text(number(entry.players), {mapPlayersSort.left, box.top, box.right, box.bottom}, 16);
 		}
 		p.picture(TheMappedImageCollection->findImageByName("AptVSliderUpButtonEnabled"), mapUp);
 		p.picture(TheMappedImageCollection->findImageByName("AptVSliderDownButtonEnabled"), mapDown);
@@ -1286,11 +1475,11 @@ namespace
 			drawMap(menu, p);
 
 		constexpr const char *headers[][2] = {{"APT:Player", "Player"}, {"APT:Army", "Army"},
-			{"APT:HeaderHero", "Captain"}, {"APT:Team", "Team"}, {"APT:Color", "Color"}, {"APT:HdrHandicap", "Handicap"}};
-		const Box table{slotEdges[0], 403, slotEdges[6], 624};
+			{"GUI:StartPosition", "Start Position"}, {"APT:Team", "Team"}, {"APT:Color", "Color"}};
+		const Box table{slotEdges[0], 403, slotEdges[std::size(headers)], 624};
 		fill(p, table, 0xE908151D);
 		moviePart(p, menu.setupArt, settings + "@51.@2", {table.left, table.top, table.right, 430});
-		for (Int column = 0; column < 6; ++column)
+		for (Int column = 0; column < Int(std::size(headers)); ++column)
 		{
 			const Box header{slotEdges[column], 403, slotEdges[column + 1] - 3, 430};
 			p.text(localize(headers[column][0], headers[column][1]), header, 17, muted);
@@ -1303,16 +1492,15 @@ namespace
 				FALSE, available && row > 0);
 			if (!available || !slot.occupied())
 			{
-				for (Int column = 1; column < 6; ++column)
-					control(p, slotCell(row, column), translated(column == 5 ? "0%" : "-"));
+				for (Int column = 1; column < Int(std::size(headers)); ++column)
+					control(p, slotCell(row, column), translated("-"));
 				continue;
 			}
 			control(p, slotCell(row, 1), factionName(slot.faction), FALSE, TRUE);
-			control(p, slotCell(row, 2), translated("-"));
+			control(p, slotCell(row, 2), slot.start < 0 ? randomLabel() : number(slot.start + 1), FALSE, TRUE);
 			control(p, slotCell(row, 3), slot.team < 0 ? translated("-") : number(slot.team + 1), FALSE, TRUE);
 			const auto color = colorChoice(slot.color);
 			control(p, slotCell(row, 4), slot.color < 0 ? translated("?") : UnicodeString(), FALSE, TRUE, color.color);
-			control(p, slotCell(row, 5), translated("0%"));
 		}
 		if (menu.sandboxConfirmed)
 			p.text(localize("GUI:SandboxWarning", "Play again to start without opponents."),
@@ -1442,6 +1630,11 @@ namespace
 			}
 			else
 			{
+				if (mapNameSort.contains(x, y) || mapPlayersSort.contains(x, y))
+				{
+					menu.setMapSort(mapPlayersSort.contains(x, y));
+					return;
+				}
 				for (Int i = 0; i < ReturnMenu::visibleMaps; ++i)
 					if (mapLine(i).contains(x, y))
 						menu.selectMap(menu.mapScroll + i);
@@ -1457,11 +1650,11 @@ namespace
 					}
 			}
 
-			constexpr MenuChoice columns[] = {MenuChoice::Slot, MenuChoice::Faction, MenuChoice::None,
+			constexpr MenuChoice columns[] = {MenuChoice::Slot, MenuChoice::Faction, MenuChoice::StartPosition,
 				MenuChoice::Team, MenuChoice::Color};
 			for (Int i = 0, count = menu.slotCount(); i < count; ++i)
 				for (Int col = 0; col < Int(std::size(columns)); ++col)
-					if (columns[col] != MenuChoice::None && (col == 0 ? i != 0 : menu.slots[i].occupied()) && slotCell(i, col).contains(x, y))
+					if ((col == 0 ? i != 0 : menu.slots[i].occupied()) && slotCell(i, col).contains(x, y))
 						openChoices(menu, columns[col], slotCell(i, col), i);
 		}
 	}
@@ -1471,6 +1664,11 @@ namespace
 		const auto &menu = *static_cast<ReturnMenu *>(window->winGetUserData());
 		const Painter painter(menu.scene);
 		painter.background(menu.background.get());
+		if (menu.loadPage.open)
+		{
+			drawShellLoad(menu.loadPage, painter);
+			return;
+		}
 		const auto &shellArt = menu.setup && menu.skirmishArt.bounds("_root.Title").valid() ? menu.skirmishArt : menu.scene;
 		shellArt.draw([](const std::string &path) {
 			return childOf(path, "_root.Title") || childOf(path, "_root.patternShell");
@@ -1488,6 +1686,7 @@ namespace
 		if (menu.canRematch())
 			painter.text(localize("GUI:PlayAgain", "Play Again"), rematchButton, 22);
 		painter.text(localize("APT:ExitGame", "Exit Game"), exitButton, 22);
+		painter.text(localize("APT:Load", "Load"), loadMenuButton, 22);
 	}
 
 	WindowMsgHandledType menuSystem(GameWindow *window, UnsignedInt message, WindowMsgData state, WindowMsgData result)
@@ -1514,6 +1713,11 @@ namespace
 		const Bool click = message == GWM_LEFT_UP;
 		if (click && TheWindowManager->winGetFocus() != window)
 			TheWindowManager->winSetFocus(window);
+		if (menu.loadPage.open)
+		{
+			shellLoadInput(menu.loadPage, message, point, key, x, y);
+			return MSG_HANDLED;
+		}
 		if (menu.setup)
 		{
 			setupInput(menu, message, point, key, x, y);
@@ -1527,10 +1731,44 @@ namespace
 			TheGameEngine->setQuitting(TRUE);
 		else if (click && skirmishButton.contains(x, y))
 			menu.openSetup();
+		else if ((key && point == KEY_L) || (click && loadMenuButton.contains(x, y)))
+			menu.loadPage.show();
 		else if (menu.canRematch() && ((key && point == KEY_ENTER) || (click && rematchButton.contains(x, y))))
 			menu.startRematch();
 		return MSG_HANDLED;
 	}
+}
+
+void updateRetailShellLoad()
+{
+	if (!pendingShellLoad)
+		return;
+	AvailableGameInfo save = std::move(*pendingShellLoad);
+	pendingShellLoad.reset();
+	if (!TheShell->isShellActive())
+		return;
+
+	TheGameLogic->prepareNewGame(GAME_SINGLE_PLAYER, DIFFICULTY_NORMAL, 0);
+	SaveCode result = SC_ERROR;
+	try
+	{
+		result = TheGameState->loadGame(save);
+	}
+	catch (...)
+	{
+		result = SC_INVALID_DATA;
+	}
+	if (result == SC_OK)
+		return;
+
+	TheGameLogic->setLoadingSave(FALSE);
+	TheGameLogic->setLoadingMap(FALSE);
+	if (TheGameLogic->isInGame())
+		TheGameLogic->clearGameData(FALSE);
+	TheGameEngine->reset();
+	TheGameEngine->setQuitting(FALSE);
+	reopenShellLoad = TRUE;
+	TheShell->showShell(TRUE);
 }
 
 Bool showRetailMatchResults(RetailMatchResults results)
@@ -1570,7 +1808,15 @@ Bool createRetailReturnMenu(WindowLayout &layout)
 	layout.addWindow(window);
 	layout.setInit([](WindowLayout *screen, void *) {
 		GameWindow *window = screen->getFirstWindow();
-		static_cast<ReturnMenu *>(window->winGetUserData())->setup = FALSE;
+		auto &menu = *static_cast<ReturnMenu *>(window->winGetUserData());
+		menu.setup = FALSE;
+		menu.loadPage.open = FALSE;
+		if (reopenShellLoad)
+		{
+			reopenShellLoad = FALSE;
+			menu.loadPage.show();
+			menu.loadPage.failed = TRUE;
+		}
 		TheWritableGlobalData->m_breakTheMovie = FALSE;
 		TheMouse->setVisibility(TRUE);
 		screen->hide(FALSE);
