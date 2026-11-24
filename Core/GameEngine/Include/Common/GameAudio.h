@@ -227,6 +227,16 @@ class AudioManager : public SubsystemInterface
 		virtual Bool isPlayingLowerPriority( AudioEventRTS *event ) const = 0;
 		virtual Bool isPlayingAlready( AudioEventRTS *event ) const = 0;
 		virtual Bool isObjectPlayingVoice( UnsignedInt objID ) const = 0;
+		virtual void stopObjectVoice( UnsignedInt objID ) {}
+		virtual Int getMusicTrackCompletionCount( AudioHandle handle ) const { return 0; }
+		virtual void advanceVirtualMusic( Real ms ) {}
+		virtual void dumpAudioTraceStatus() const {}
+
+		void setTraceEnabled( Bool enabled ) { m_traceEnabled = enabled; }
+		Bool isTraceEnabled() const { return m_traceEnabled; }
+		void setHeadlessVirtualPlayback( Bool enabled ) { m_headlessVirtualPlayback = enabled; }
+		Bool isHeadlessVirtualPlayback() const { return m_headlessVirtualPlayback; }
+		void traceEvent( const char *kind, ObjectID owner, AudioHandle handle, const AsciiString& eventName, const char *detail = nullptr ) const;
 
 		virtual void adjustVolumeOfPlayingAudio(AsciiString eventName, Real newVolume) = 0;
 		virtual void removePlayingAudio( AsciiString eventName ) = 0;
@@ -385,6 +395,9 @@ class AudioManager : public SubsystemInterface
 		Bool m_hardwareAccel			: 1;
 		Bool m_surroundSpeakers		: 1;
 		Bool m_disallowSpeech			: 1;
+		Bool m_traceEnabled = FALSE;
+		Bool m_headlessVirtualPlayback = FALSE;
+		std::map<AsciiString, Int> m_lastMultiSoundChoice;
 };
 
 extern AudioManager *TheAudio;

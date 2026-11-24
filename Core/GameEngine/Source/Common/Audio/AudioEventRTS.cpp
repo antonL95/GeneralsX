@@ -216,6 +216,8 @@ AudioEventRTS::AudioEventRTS( const AudioEventRTS& right )
 {
 	m_retailEmitter = right.m_retailEmitter;
 	m_ambient = right.m_ambient;
+	m_loopCountOverride = right.m_loopCountOverride;
+	m_logicalTrackName = right.m_logicalTrackName;
 	m_filenameToLoad			= right.m_filenameToLoad;
 	m_eventInfo						= right.m_eventInfo;
 	m_playingHandle				= right.m_playingHandle;
@@ -260,6 +262,8 @@ AudioEventRTS& AudioEventRTS::operator=( const AudioEventRTS& right )
 {
 	m_retailEmitter = right.m_retailEmitter;
 	m_ambient = right.m_ambient;
+	m_loopCountOverride = right.m_loopCountOverride;
+	m_logicalTrackName = right.m_logicalTrackName;
 	m_filenameToLoad			= right.m_filenameToLoad;
 	m_eventInfo						= right.m_eventInfo;
 	m_playingHandle				= right.m_playingHandle;
@@ -384,8 +388,9 @@ AsciiString AudioEventRTS::getFilename()
 void AudioEventRTS::generatePlayInfo()
 {
 	m_pitchShift = GameAudioRandomValueReal(m_eventInfo->m_pitchShiftMin, m_eventInfo->m_pitchShiftMax);
-	m_volumeShift = GameAudioRandomValueReal(1.0f + m_eventInfo->m_volumeShift, 1.0f);	// volume shifts are between 0 and 1
-	m_loopCount = m_eventInfo->m_loopCount;
+	m_volumeShift = GameAudioRandomValueReal(1.0f + m_eventInfo->m_volumeShift, 1.0f);
+	if (!m_loopCountOverride)
+		m_loopCount = m_eventInfo->m_loopCount;
 
 	m_portionToPlayNext = PP_Attack;
 	Int attackSize = m_eventInfo->m_attackSounds.size();

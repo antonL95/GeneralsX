@@ -49,6 +49,12 @@ struct PlayingAudio
 	// GeneralsX @bugfix elmeriniemela 17/10/2026 Paused by pauseAudio(), not finished.
 	Bool m_paused;
 	Int m_framesFaded;
+	Bool m_fadeIn;
+	Int m_fadeInFrames;
+	Int m_completedLoops;
+	Int m_targetLoopCount;
+	Real m_virtualDurationMs;
+	Real m_virtualElapsedMs;
 
 	PlayingAudio() :
 		m_sound(NULL),
@@ -57,7 +63,13 @@ struct PlayingAudio
 		m_audioEventRTS(NULL),
 		m_requestStop(false),
 		m_paused(false),
-		m_framesFaded(0)
+		m_framesFaded(0),
+		m_fadeIn(false),
+		m_fadeInFrames(0),
+		m_completedLoops(0),
+		m_targetLoopCount(0),
+		m_virtualDurationMs(0.0f),
+		m_virtualElapsedMs(0.0f)
 	{ }
 };
 
@@ -129,6 +141,10 @@ public:
 	virtual Bool isPlayingLowerPriority(AudioEventRTS *event) const;
 	virtual Bool isPlayingAlready(AudioEventRTS *event) const;
 	virtual Bool isObjectPlayingVoice(UnsignedInt objID) const;
+	virtual void stopObjectVoice(UnsignedInt objID) override;
+	virtual Int getMusicTrackCompletionCount(AudioHandle handle) const override;
+	virtual void advanceVirtualMusic(Real ms) override;
+	virtual void dumpAudioTraceStatus() const override;
 	Bool killLowestPrioritySoundImmediately(AudioEventRTS *event);
 	AudioEventRTS *findLowestPrioritySound(AudioEventRTS *event);
 
@@ -225,6 +241,9 @@ protected:
 	// in the sound engine
 	std::list<PlayingAudio *> m_stoppedAudio;
 
+	Bool m_deviceOpened = FALSE;
+	std::map<AudioHandle, Int> m_completedMusicByHandle;
+	std::map<AsciiString, Int> m_completedMusicByName;
 	void *m_binkHandle;
 
 #if defined(_DEBUG) || defined(_INTERNAL)

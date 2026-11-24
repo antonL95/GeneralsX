@@ -413,26 +413,25 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 
 	const AudioType soundType = eventToAdd->getAudioEventInfo()->m_soundType;
 
-	// Check if audio type is on
-	// TheSuperHackers @info Zero audio volume is not a fail condition, because music, speech and sounds
-	// still need to be in flight in case the user raises the volume on runtime after the audio was already triggered.
-	switch (soundType)
+	if (!m_headlessVirtualPlayback)
 	{
-		case AT_Music:
-			if (!isOn(AudioAffect_Music))
-				return AHSV_NoSound;
-			break;
-		case AT_SoundEffect:
-			if (!isOn(AudioAffect_Sound) || !isOn(AudioAffect_Sound3D))
-				return AHSV_NoSound;
-			break;
-		case AT_Streaming:
-			// if we're currently playing uninterruptable speech, then disallow the addition of this sample
-			if (getDisallowSpeech())
-				return AHSV_NoSound;
-			if (!isOn(AudioAffect_Speech))
-				return AHSV_NoSound;
-			break;
+		switch (soundType)
+		{
+			case AT_Music:
+				if (!isOn(AudioAffect_Music))
+					return AHSV_NoSound;
+				break;
+			case AT_SoundEffect:
+				if (!isOn(AudioAffect_Sound) || !isOn(AudioAffect_Sound3D))
+					return AHSV_NoSound;
+				break;
+			case AT_Streaming:
+				if (getDisallowSpeech())
+					return AHSV_NoSound;
+				if (!isOn(AudioAffect_Speech))
+					return AHSV_NoSound;
+				break;
+		}
 	}
 
 	// TheSuperHackers @info Scripted audio events are logical, i.e. synchronized across clients.
@@ -494,9 +493,31 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 
 	if( audioEvent != nullptr )
 	{
+		if (m_traceEnabled)
+		{
+			const ObjectID owner = audioEvent->getOwnerType() == OT_Object ? audioEvent->getObjectID() : INVALID_ID;
+			const char* kind = (soundType == AT_Music) ? "music-queue" :
+				((audioEvent->getAudioEventInfo()->m_type & ST_VOICE) ? "voice-queue" : "sound-queue");
+			traceEvent(kind, owner, audioEvent->getPlayingHandle(), audioEvent->getEventName(),
+				audioEvent->getLogicalTrackName().isNotEmpty() ? audioEvent->getLogicalTrackName().str() : nullptr);
+		}
 		return audioEvent->getPlayingHandle();
 	}
 	return AHSV_NoSound;
+}
+
+void AudioManager::traceEvent(const char *kind, ObjectID owner, AudioHandle handle, const AsciiString& eventName, const char *detail) const
+{
+	if (!m_traceEnabled)
+		return;
+	const UnsignedInt frame = TheGameLogic ? TheGameLogic->getFrame() : 0u;
+	if (detail && *detail)
+		std::fprintf(stderr, "AUDIO TRACE frame=%u kind=%s owner=%u handle=%u event=%s detail=%s\n",
+			frame, kind, static_cast<UnsignedInt>(owner), static_cast<UnsignedInt>(handle), eventName.str(), detail);
+	else
+		std::fprintf(stderr, "AUDIO TRACE frame=%u kind=%s owner=%u handle=%u event=%s\n",
+			frame, kind, static_cast<UnsignedInt>(owner), static_cast<UnsignedInt>(handle), eventName.str());
+	std::fflush(stderr);
 }
 
 //-------------------------------------------------------------------------------------------------

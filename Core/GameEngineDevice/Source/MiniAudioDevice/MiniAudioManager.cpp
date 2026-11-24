@@ -212,9 +212,11 @@ void MiniAudioManager::reset()
 	// load even if a group was stopped some other way. Guarded by the per-type *On flags: if the
 	// device never opened (openDevice bailed out), the groups were never ma_sound_group_init'd, so
 	// touching them would be unsafe.
-	if (m_soundOn || m_sound3DOn || m_speechOn || m_musicOn) {
+	if (m_deviceOpened && (m_soundOn || m_sound3DOn || m_speechOn || m_musicOn)) {
 		resumeAudio(AudioAffect_All);
 	}
+	m_completedMusicByHandle.clear();
+	m_completedMusicByName.clear();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -316,14 +318,17 @@ void MiniAudioManager::resumeAudio(AudioAffect which)
 		playing->m_paused = false;
 	}
 
-	if (BitIsSet(which, AudioAffect_Sound))
-		ma_sound_group_start(&m_soundGroup);
-	if (BitIsSet(which, AudioAffect_Sound3D))
-		ma_sound_group_start(&m_sound3DGroup);
-	if (BitIsSet(which, AudioAffect_Speech))
-		ma_sound_group_start(&m_speechGroup);
-	if (BitIsSet(which, AudioAffect_Music))
-		ma_sound_group_start(&m_musicGroup);
+	if (m_deviceOpened)
+	{
+		if (BitIsSet(which, AudioAffect_Sound))
+			ma_sound_group_start(&m_soundGroup);
+		if (BitIsSet(which, AudioAffect_Sound3D))
+			ma_sound_group_start(&m_sound3DGroup);
+		if (BitIsSet(which, AudioAffect_Speech))
+			ma_sound_group_start(&m_speechGroup);
+		if (BitIsSet(which, AudioAffect_Music))
+			ma_sound_group_start(&m_musicGroup);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -397,6 +402,42 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 			groupToUse = &m_soundGroup;
 		}
 		break;
+	}
+
+	if (!m_deviceOpened)
+	{
+		if (!m_headlessVirtualPlayback)
+		{
+			releasePlayingAudio(audio);
+			return;
+		}
+		if (info->m_soundType == AT_Music || info->m_soundType == AT_Streaming)
+		{
+			audio->m_type = PAT_Stream;
+			if (info->m_soundType == AT_Music)
+			{
+				audio->m_targetLoopCount = event->getLoopCount();
+				audio->m_virtualDurationMs = 15000.0f;
+			}
+			else
+			{
+				audio->m_virtualDurationMs = 3000.0f;
+			}
+		}
+		else
+		{
+			audio->m_type = event->isPositionalAudio() ? PAT_3DSample : PAT_Sample;
+			audio->m_virtualDurationMs = (info->m_control & AC_LOOP) && info->m_loopCount == 0 ? 0.0f : 1500.0f;
+		}
+		audio->m_fadeIn = event->getShouldFade();
+		m_playingSounds.push_back(audio);
+		if (m_traceEnabled)
+		{
+			const ObjectID owner = event->getOwnerType() == OT_Object ? event->getObjectID() : INVALID_ID;
+			traceEvent("start", owner, event->getPlayingHandle(), event->getEventName(),
+				event->getLogicalTrackName().isNotEmpty() ? event->getLogicalTrackName().str() : nullptr);
+		}
+		return;
 	}
 
 	// Use FFmpeg to decode the file into PCM, then feed to miniaudio.
@@ -566,6 +607,12 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	}
 
 	m_playingSounds.push_back(audio);
+	if (m_traceEnabled)
+	{
+		const ObjectID owner = event->getOwnerType() == OT_Object ? event->getObjectID() : INVALID_ID;
+		traceEvent("start", owner, event->getPlayingHandle(), event->getEventName(),
+			event->getLogicalTrackName().isNotEmpty() ? event->getLogicalTrackName().str() : nullptr);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -727,9 +774,9 @@ void MiniAudioManager::stopAllAudioImmediately(void)
 //-------------------------------------------------------------------------------------------------
 void MiniAudioManager::freeAllMiniAudioHandles(void)
 {
-	// GeneralsX @bugfix meerzulee 19/07/2026 FP env guard for audio entry point (see #215)
 	ScopedFPUGuard fpuGuard;
-	ma_engine_stop(&m_engine);
+	if (m_deviceOpened)
+		ma_engine_stop(&m_engine);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -908,6 +955,7 @@ void MiniAudioManager::openDevice(void)
 	ma_sound_group_init(&m_engine, 0, NULL, &m_soundGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_sound3DGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_speechGroup);
+	m_deviceOpened = TRUE;
 
 	fprintf(stderr, "AUDIO: MiniAudio backend loaded - version %s, device: %s, playback devices: %d\n",
 		ma_version_string(),
@@ -920,10 +968,11 @@ void MiniAudioManager::openDevice(void)
 //-------------------------------------------------------------------------------------------------
 void MiniAudioManager::closeDevice(void)
 {
-	// GeneralsX @bugfix meerzulee 19/07/2026 FP env guard for audio entry point (see #215)
 	ScopedFPUGuard fpuGuard;
-	// Stop all audio first to prevent use-after-free in audio callbacks
 	stopAllAudioImmediately();
+	if (!m_deviceOpened)
+		return;
+	m_deviceOpened = FALSE;
 
 	ma_sound_group_uninit(&m_speechGroup);
 	ma_sound_group_uninit(&m_sound3DGroup);
@@ -1119,6 +1168,65 @@ Bool MiniAudioManager::isObjectPlayingVoice(UnsignedInt objID) const
 			return true;
 	}
 	return false;
+}
+
+void MiniAudioManager::stopObjectVoice(UnsignedInt)
+{
+}
+
+Int MiniAudioManager::getMusicTrackCompletionCount(AudioHandle handle) const
+{
+	const auto it = m_completedMusicByHandle.find(handle);
+	return it != m_completedMusicByHandle.end() ? it->second : 0;
+}
+
+void MiniAudioManager::advanceVirtualMusic(Real ms)
+{
+	if (!m_headlessVirtualPlayback || ms <= 0.0f)
+		return;
+	for (PlayingAudio *playing : m_playingSounds)
+	{
+		if (!playing || playing->m_sound || playing->m_paused || playing->m_requestStop || !playing->m_audioEventRTS)
+			continue;
+		const AudioEventInfo *info = playing->m_audioEventRTS->getAudioEventInfo();
+		if (info && info->m_soundType == AT_Music)
+			playing->m_virtualElapsedMs += ms;
+	}
+}
+
+void MiniAudioManager::dumpAudioTraceStatus() const
+{
+	if (!m_traceEnabled)
+		return;
+	Int activeVoices = 0;
+	Int activeLoops = 0;
+	AsciiString musicName;
+	Int musicLoops = 0;
+	for (const PlayingAudio *playing : m_playingSounds)
+	{
+		if (!playing || playing->m_requestStop || !playing->m_audioEventRTS)
+			continue;
+		const AudioEventInfo *info = playing->m_audioEventRTS->getAudioEventInfo();
+		if (!info)
+			continue;
+		if (info->m_soundType == AT_Music)
+		{
+			musicName = playing->m_audioEventRTS->getEventName();
+			musicLoops = playing->m_completedLoops;
+		}
+		else if (info->m_type & ST_VOICE)
+		{
+			++activeVoices;
+		}
+		else if (info->m_control & AC_LOOP)
+		{
+			++activeLoops;
+		}
+	}
+	const UnsignedInt frame = TheGameLogic ? TheGameLogic->getFrame() : 0u;
+	std::fprintf(stderr, "AUDIO STATUS frame=%u voices=%d loops=%d music=%s completed=%d\n",
+		frame, activeVoices, activeLoops, musicName.isEmpty() ? "none" : musicName.str(), musicLoops);
+	std::fflush(stderr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1478,6 +1586,8 @@ void MiniAudioManager::playStream(AudioEventRTS *event, ma_sound *sound)
 //-------------------------------------------------------------------------------------------------
 void MiniAudioManager::setDeviceListenerPosition(void)
 {
+	if (!m_deviceOpened)
+		return;
 	ma_engine_listener_set_position(&m_engine, 0,
 		m_listenerPosition.x, m_listenerPosition.y, m_listenerPosition.z);
 	ma_engine_listener_set_direction(&m_engine, 0,

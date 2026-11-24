@@ -109,6 +109,10 @@ public:
 
 	void decreaseLoopCount();
 	Bool hasMoreLoops() const;
+	void setLoopCount(Int count) { m_loopCount = count; m_loopCountOverride = TRUE; }
+	Int getLoopCount() const { return m_loopCount; }
+	void setLogicalTrackName(const AsciiString& name) { m_logicalTrackName = name; }
+	const AsciiString& getLogicalTrackName() const { return m_logicalTrackName; }
 
 	void setAudioEventInfo( const AudioEventInfo *eventInfo ) const; // is mutable
 	const AudioEventInfo *getAudioEventInfo() const;
@@ -201,6 +205,8 @@ protected:
 	Bool m_isLogicalAudio;					///< Should probably only be true for scripted sounds
 	Bool m_uninterruptible;
 	Bool m_ambient = FALSE;
+	Bool m_loopCountOverride = FALSE;
+	AsciiString m_logicalTrackName;
 
 	// Playing attributes
 	Real m_pitchShift;							///< Pitch shift that should occur on this piece of audio
