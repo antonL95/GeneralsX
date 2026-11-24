@@ -95,6 +95,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/WeaponNuggetRules.h
     Include/GameLogic/WeaponSlotSelectionRules.h
     Include/GameLogic/RetailTestCommands.h
+    Include/GameLogic/RetailTribute.h
     Include/GameLogic/RetailBuildingEvents.h
     Include/GameLogic/Module/RetailConstruction.h
     Include/GameLogic/Module/CastleBehavior.h

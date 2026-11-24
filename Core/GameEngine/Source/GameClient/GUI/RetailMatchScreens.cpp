@@ -11,6 +11,7 @@
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
+#include "Common/MessageStream.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -37,6 +38,7 @@
 #include "GameNetwork/GameInfo.h"
 #include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/RetailTribute.h"
 
 #include <algorithm>
 #include <array>
@@ -144,8 +146,16 @@ namespace
 	std::unique_ptr<AptScene> objectiveChecks;
 	Bool objectivesPausedGame = FALSE;
 	Bool playerStatusMode = FALSE;
-	Bool resumePressed = FALSE;
+	Bool tributePage = FALSE;
+	enum class PlayersButton { None, Close, Status, Tribute, Reset, Send };
+	PlayersButton pressedButton = PlayersButton::None;
+	std::array<UnsignedInt, MAX_SLOTS> tributeAmounts{};
+	Int tributeDragSlot = -1;
+	Box tributeDragBox{};
 	constexpr const char *playerStatusClose = "_root.OuterFrame.Pages.Cancel";
+	constexpr const char *statusPagePath = "_root.OuterFrame.Pages.StatusPage";
+	constexpr const char *statusTabPath = "_root.OuterFrame.Pages.@1.Tab1";
+	constexpr const char *tributeTabPath = "_root.OuterFrame.Pages.@1.Tab2";
 
 	template<Bool Bonus>
 	void parseObjective(INI *ini, void *instance, void *, const void *)
@@ -165,21 +175,160 @@ namespace
 			});
 	}
 
-	void drawPlayerStatus(const AptScene &scene, const Painter &painter)
+	struct TributeLayout
+	{
+		Box area;
+
+		Real x(Real fraction) const { return area.left + (area.right - area.left) * fraction; }
+
+		Box row(Int index) const
+		{
+			const Real rowsTop = area.top + 24.0f;
+			const Real height = (area.bottom - 41.0f - rowsTop) / (MAX_SLOTS - 1);
+			const Real top = rowsTop + index * height;
+			return {area.left, top, area.right, top + height};
+		}
+
+		Box slider(Int index) const
+		{
+			const Box line = row(index);
+			return {x(0.36f), line.top, x(0.78f), line.bottom};
+		}
+
+		Box button(PlayersButton action) const
+		{
+			const Bool reset = action == PlayersButton::Reset;
+			return {x(reset ? 0.24f : 0.66f), area.bottom - 41.0f,
+				x(reset ? 0.52f : 0.96f), area.bottom - 9.0f};
+		}
+	};
+
+	Player *tributeAlly(const Player &sender, Int slot)
+	{
+		Player *recipient = ThePlayerList->getPlayerFromSlotIndex(slot);
+		return RetailTribute::isEligible(sender, recipient) ? recipient : nullptr;
+	}
+
+	UnsignedInt availableTribute(const Player &sender, const Player &recipient, Int slot)
+	{
+		uint64_t reserved = 0;
+		for (Int i = 0; i < MAX_SLOTS; ++i)
+		{
+			if (i != slot && tributeAmounts[i] && tributeAlly(sender, i))
+				reserved += tributeAmounts[i];
+		}
+		const UnsignedInt balance = sender.getMoney()->countMoney();
+		const UnsignedInt available = reserved < balance ? balance - static_cast<UnsignedInt>(reserved) : 0;
+		return std::min(available, RetailTribute::amountLimit(sender, recipient));
+	}
+
+	Bool canSendTribute(const Player &sender)
+	{
+		if (RetailTribute::secondsUntilAvailable(TheGameLogic->getFrame()))
+			return FALSE;
+		Bool pending = FALSE;
+		for (Int slot = 0; slot < MAX_SLOTS; ++slot)
+		{
+			if (!tributeAmounts[slot])
+				continue;
+			if (const Player *ally = tributeAlly(sender, slot))
+			{
+				if (tributeAmounts[slot] > availableTribute(sender, *ally, slot))
+					return FALSE;
+				pending = TRUE;
+			}
+		}
+		return pending;
+	}
+
+	void sendTribute(const Player &sender)
+	{
+		if (!canSendTribute(sender))
+			return;
+		for (Int slot = 0; slot < MAX_SLOTS; ++slot)
+		{
+			if (!tributeAmounts[slot])
+				continue;
+			if (tributeAlly(sender, slot))
+			{
+				GameMessage *message = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_TRIBUTE);
+				message->appendIntegerArgument(slot);
+				message->appendIntegerArgument(static_cast<Int>(tributeAmounts[slot]));
+			}
+		}
+		tributeAmounts.fill(0);
+	}
+
+	void drawTributePage(const AptScene &scene, const Painter &painter, const Player &sender)
+	{
+		const TributeLayout layout{scene.bounds(statusPagePath)};
+		if (!layout.area.valid())
+			return;
+		const auto fill = [&](const Box &box, Color color) {
+			TheDisplay->drawFillRect(Int(box.left * painter.sx), Int(box.top * painter.sy),
+				Int((box.right - box.left) * painter.sx), Int((box.bottom - box.top) * painter.sy), color);
+		};
+		fill(layout.area, 0xFF182126);
+		const std::uint64_t wait = RetailTribute::secondsUntilAvailable(TheGameLogic->getFrame());
+		if (wait)
+		{
+			UnicodeString countdown;
+			countdown.format(L"Tribute opens in %u:%02u", static_cast<UnsignedInt>(wait / 60),
+				static_cast<UnsignedInt>(wait % 60));
+			painter.text(countdown, layout.area, 14);
+			return;
+		}
+		UnicodeString balance;
+		balance.format(L"Available resources  %u", sender.getMoney()->countMoney());
+		painter.text(balance, {layout.x(0.04f), layout.area.top, layout.area.right, layout.area.top + 24.0f},
+			13, white, "Albertus MT", FALSE);
+		Int row = 0;
+		for (Int slot = 0; slot < MAX_SLOTS; ++slot)
+		{
+			Player *ally = tributeAlly(sender, slot);
+			if (!ally)
+				continue;
+			const Box line = layout.row(row);
+			const Box slider = layout.slider(row++);
+			const Real middle = (slider.top + slider.bottom) / 2.0f;
+			const Box track{slider.left, middle - 3.0f, slider.right, middle + 3.0f};
+			fill(track, 0xFF536A72);
+			const UnsignedInt limit = availableTribute(sender, *ally, slot);
+			const Real fraction = limit ? std::min(1.0f, Real(tributeAmounts[slot]) / Real(limit)) : 0.0f;
+			const Real thumb = track.left + fraction * (track.right - track.left);
+			fill({thumb - 4.0f, middle - 7.0f, thumb + 4.0f, middle + 7.0f}, limit ? 0xFFDBBA6A : 0xFF819197);
+			UnicodeString name = ally->getPlayerDisplayName();
+			if (name.isEmpty() && ally->getPlayerTemplate())
+				name = ally->getPlayerTemplate()->getDisplayName();
+			painter.text(name, {layout.x(0.04f), line.top, layout.x(0.34f), line.bottom},
+				13, white, "Albertus MT", FALSE);
+			UnicodeString amount;
+			amount.format(L"%u", tributeAmounts[slot]);
+			painter.text(amount, {layout.x(0.81f), line.top, layout.x(0.97f), line.bottom}, 13);
+		}
+		if (!row)
+			painter.text(translated("No allies available to receive resources."), layout.row(0), 13, muted);
+		const Box reset = layout.button(PlayersButton::Reset);
+		const Box send = layout.button(PlayersButton::Send);
+		const Bool canSend = canSendTribute(sender);
+		fill(reset, 0xFF324951);
+		fill(send, canSend ? 0xFF4B6254 : 0xFF29353A);
+		painter.text(translated("Reset amounts"), reset, 14);
+		painter.text(translated("Send resources"), send, 14, canSend ? white : muted);
+	}
+
+	void drawPlayers(const AptScene &scene, const Painter &painter)
 	{
 		const GameInfo *game = TheGameLogic->isInSkirmishGame() ? TheSkirmishGameInfo : TheGameInfo;
 		scene.draw([](const std::string &path) {
-			return !childOf(path, "_root.OuterFrame.Pages.TributePage");
+			return !childOf(path, "_root.OuterFrame.Pages.TributePage") &&
+				(!tributePage || !childOf(path, statusPagePath));
 		}, [&](const std::string &path, const AptScene::Text &label) {
 			const Int row = rowAt(path, "_root.OuterFrame.Pages.StatusPage.Table.");
 			if (row < 0)
 			{
 				if (childOf(path, "_root.OuterFrame.Pages.Cancel"))
 					painter.label(localize("APT:Cancel", "Cancel"), label, white);
-				else if (childOf(path, "_root.OuterFrame.Pages.@1.Tab1"))
-					painter.label(localize("APT:StatusTab", "Status"), label, white);
-				else if (childOf(path, "_root.OuterFrame.Pages.@1.Tab2"))
-					painter.label(localize("APT:TributeTab", "Tribute"), label, muted);
 				else if (label.value == "$TributeScreenTitle")
 					painter.label(localize("APT:TributeScreenTitle", "Players"), label, white);
 				else if (label.value.starts_with("$Header"))
@@ -206,6 +355,10 @@ namespace
 				value = player->isPlayerDead() ? localize("APT:Defeated", "Defeated") : localize("APT:Playing", "Playing");
 			painter.label(value, label, player->getPlayerColor() | 0xFF000000);
 		});
+		painter.text(localize("APT:StatusTab", "Status"), scene.bounds(statusTabPath), 14, tributePage ? muted : white);
+		painter.text(localize("APT:TributeTab", "Tribute"), scene.bounds(tributeTabPath), 14, tributePage ? white : muted);
+		if (tributePage)
+			drawTributePage(scene, painter, *ThePlayerList->getLocalPlayer());
 	}
 
 	void drawCampaignObjectives(const AptScene &scene, const Painter &painter)
@@ -250,24 +403,112 @@ namespace
 		const AptScene &scene = *objectivesScene;
 		const Painter painter(scene);
 		if (playerStatusMode)
-			drawPlayerStatus(scene, painter);
+			drawPlayers(scene, painter);
 		else
 			drawCampaignObjectives(scene, painter);
 	}
 
-	WindowMsgHandledType objectivesInput(GameWindow *, UnsignedInt message, WindowMsgData point, WindowMsgData state)
+	PlayersButton playersButtonAt(const AptScene &scene, Real x, Real y)
+	{
+		if (scene.bounds(playerStatusMode ? playerStatusClose : "_root.Resume").contains(x, y))
+			return PlayersButton::Close;
+		if (playerStatusMode)
+		{
+			if (scene.bounds(statusTabPath).contains(x, y))
+				return PlayersButton::Status;
+			if (scene.bounds(tributeTabPath).contains(x, y))
+				return PlayersButton::Tribute;
+			const TributeLayout layout{scene.bounds(statusPagePath)};
+			if (tributePage && layout.area.valid() && !RetailTribute::secondsUntilAvailable(TheGameLogic->getFrame()))
+			{
+				if (layout.button(PlayersButton::Reset).contains(x, y))
+					return PlayersButton::Reset;
+				if (layout.button(PlayersButton::Send).contains(x, y))
+					return PlayersButton::Send;
+			}
+		}
+		return PlayersButton::None;
+	}
+
+	void updateTributeDrag(const Player &sender, Real x)
+	{
+		const Player *ally = tributeAlly(sender, tributeDragSlot);
+		const UnsignedInt limit = ally ? availableTribute(sender, *ally, tributeDragSlot) : 0;
+		const double fraction = std::clamp(double((x - tributeDragBox.left) / (tributeDragBox.right - tributeDragBox.left)), 0.0, 1.0);
+		tributeAmounts[tributeDragSlot] = static_cast<UnsignedInt>(limit * fraction + 0.5);
+	}
+
+	void beginTributeDrag(const AptScene &scene, const Player &sender, Real x, Real y)
+	{
+		const TributeLayout layout{scene.bounds(statusPagePath)};
+		if (!layout.area.valid() || RetailTribute::secondsUntilAvailable(TheGameLogic->getFrame()))
+			return;
+		Int row = 0;
+		for (Int slot = 0; slot < MAX_SLOTS; ++slot)
+		{
+			if (!tributeAlly(sender, slot))
+				continue;
+			const Box slider = layout.slider(row++);
+			if (slider.contains(x, y))
+			{
+				tributeDragSlot = slot;
+				tributeDragBox = slider;
+				updateTributeDrag(sender, x);
+				return;
+			}
+		}
+	}
+
+	WindowMsgHandledType objectivesInput(GameWindow *window, UnsignedInt message, WindowMsgData point, WindowMsgData state)
 	{
 		if (message == GWM_CHAR && point == KEY_ESC && (state & KEY_STATE_UP))
-			RetailObjectives::close();
-		if (message == GWM_LEFT_DOWN || message == GWM_LEFT_UP)
 		{
-			const AptScene &scene = *objectivesScene;
-			const Box resume = scene.bounds(playerStatusMode ? playerStatusClose : "_root.Resume");
-			const Bool overResume = resume.contains((point & 0xFFFF) / scene.xScale(), (point >> 16) / scene.yScale());
-			if (message == GWM_LEFT_DOWN)
-				resumePressed = overResume;
-			else if (resumePressed && overResume)
-				RetailObjectives::close();
+			RetailObjectives::close();
+			return MSG_HANDLED;
+		}
+		if (message != GWM_LEFT_DOWN && message != GWM_LEFT_UP && message != GWM_LEFT_DRAG)
+			return MSG_HANDLED;
+		const AptScene &scene = *objectivesScene;
+		const Real x = (point & 0xFFFF) / scene.xScale();
+		const Real y = (point >> 16) / scene.yScale();
+		const Player &sender = *ThePlayerList->getLocalPlayer();
+		if (tributeDragSlot >= 0)
+		{
+			if (message != GWM_LEFT_DOWN)
+				updateTributeDrag(sender, x);
+			if (message == GWM_LEFT_DRAG)
+				return MSG_HANDLED;
+			tributeDragSlot = -1;
+			TheWindowManager->winRelease(window);
+			if (message == GWM_LEFT_UP)
+				return MSG_HANDLED;
+		}
+		const PlayersButton button = playersButtonAt(scene, x, y);
+		if (message == GWM_LEFT_DOWN)
+		{
+			pressedButton = button;
+			if (button == PlayersButton::None && tributePage)
+			{
+				beginTributeDrag(scene, sender, x, y);
+				if (tributeDragSlot >= 0)
+					TheWindowManager->winCapture(window);
+			}
+		}
+		else if (message == GWM_LEFT_UP)
+		{
+			const PlayersButton pressed = pressedButton;
+			pressedButton = PlayersButton::None;
+			if (pressed != button)
+				return MSG_HANDLED;
+			switch (button)
+			{
+				case PlayersButton::Close: RetailObjectives::close(); break;
+				case PlayersButton::Status: tributePage = FALSE; break;
+				case PlayersButton::Tribute: tributePage = TRUE; break;
+				case PlayersButton::Reset: tributeAmounts.fill(0); break;
+				case PlayersButton::Send: sendTribute(sender); break;
+				case PlayersButton::None: break;
+			}
 		}
 		return MSG_HANDLED;
 	}
@@ -335,7 +576,10 @@ void show()
 	}
 	TheWindowManager->winSetModal(objectivesWindow);
 	TheWindowManager->winSetFocus(objectivesWindow);
-	resumePressed = FALSE;
+	tributePage = FALSE;
+	pressedButton = PlayersButton::None;
+	tributeDragSlot = -1;
+	tributeAmounts.fill(0);
 	objectivesPausedGame = !playerStatusMode && !TheGameLogic->isGamePaused();
 	if (objectivesPausedGame)
 		TheGameLogic->setGamePaused(TRUE);

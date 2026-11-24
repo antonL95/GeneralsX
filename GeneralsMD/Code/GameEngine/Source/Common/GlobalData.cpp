@@ -1305,6 +1305,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 		{ "ScreenEdgeScrollSpeedFactor", INI::parseReal, nullptr, offsetof(GlobalData, m_retailScreenEdgeScrollSpeedFactor) },
 		{ "ScreenEdgeScrollRampTime", INI::parseReal, nullptr, offsetof(GlobalData, m_retailScreenEdgeScrollRampTime) },
 		{ "DefaultCameraScrollSpeedScalar", INI::parseReal, nullptr, offsetof(GlobalData, m_retailDefaultCameraScrollSpeedScalar) },
+		{ "NumMinutesBeforePlayersCanTransferMoney", INI::parseUnsignedInt, nullptr, offsetof(GlobalData, m_tributeDelayMinutes) },
 		{ "VeterancyPipDrawObjectFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(GlobalData, m_veterancyPipDrawFilter) },
 		{ "DefaultCameraPitchAngle", INI::parseReal, nullptr, offsetof(GlobalData, m_cameraPitch) },
 		{ "DefaultCameraYawAngle", INI::parseReal, nullptr, offsetof(GlobalData, m_cameraYaw) },

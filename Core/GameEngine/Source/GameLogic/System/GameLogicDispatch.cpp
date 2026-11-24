@@ -61,6 +61,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/ObjectIter.h"
+#include "GameLogic/RetailTribute.h"
 //#include "GameLogic/PartitionManager.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -109,7 +110,32 @@
 #include "GameLogic/Module/RotwkModifierModules.h"
 #endif
 
+#include <algorithm>
+#include <limits>
 
+std::uint64_t RetailTribute::secondsUntilAvailable(UnsignedInt frame)
+{
+	constexpr UnsignedInt secondsPerMinute = 60;
+	const std::uint64_t delay = std::uint64_t(TheGlobalData->m_tributeDelayMinutes) * secondsPerMinute;
+	const UnsignedInt elapsed = frame / LOGICFRAMES_PER_SECOND;
+	return elapsed < delay ? delay - elapsed : 0;
+}
+
+Bool RetailTribute::isEligible(const Player& sender, const Player* recipient)
+{
+	return recipient && recipient != &sender &&
+		sender.isPlayerActive() && recipient->isPlayerActive() &&
+		sender.isPlayableSide() && recipient->isPlayableSide() &&
+		sender.getRelationship(recipient->getDefaultTeam()) == ALLIES &&
+		recipient->getRelationship(sender.getDefaultTeam()) == ALLIES;
+}
+
+UnsignedInt RetailTribute::amountLimit(const Player& sender, const Player& recipient)
+{
+	return std::min({sender.getMoney()->countMoney(),
+		std::numeric_limits<UnsignedInt>::max() - recipient.getMoney()->countMoney(),
+		static_cast<UnsignedInt>(std::numeric_limits<Int>::max())});
+}
 
 
 #define MAX_PATH_SUBJECTS 64
@@ -556,6 +582,38 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 				break;
 			if (auto* brawl = BloodthirstyUpdate::find(source))
 				brawl->orderSacrifice(donor);
+			break;
+		}
+		case GameMessage::MSG_RETAIL_TRIBUTE:
+		{
+			if (!(isInSkirmishGame() || isInMultiplayerGame() || isInReplayGame()) ||
+				RetailTribute::secondsUntilAvailable(getFrame()) ||
+				msg->getArgumentCount() != 2 ||
+				msg->getArgumentDataType(0) != ARGUMENTDATATYPE_INTEGER ||
+				msg->getArgumentDataType(1) != ARGUMENTDATATYPE_INTEGER)
+				break;
+			const Int recipientSlot = msg->getArgument(0)->integer;
+			const Int requested = msg->getArgument(1)->integer;
+			if (requested <= 0)
+				break;
+			Player* recipient = ThePlayerList->getPlayerFromSlotIndex(recipientSlot);
+			const UnsignedInt amount = static_cast<UnsignedInt>(requested);
+			const Bool showMessage = !TheGlobalData->m_headless && TheInGameUI && !isInReplayGame();
+			if (!RetailTribute::isEligible(*msgPlayer, recipient) ||
+				amount > RetailTribute::amountLimit(*msgPlayer, *recipient) ||
+				msgPlayer->getMoney()->withdraw(amount, FALSE) != amount)
+			{
+				if (showMessage && msgPlayer == ThePlayerList->getLocalPlayer())
+					TheInGameUI->messageNoFormat(UnicodeString(L"Tribute could not be sent."));
+				break;
+			}
+			recipient->getMoney()->deposit(amount, FALSE, FALSE);
+			if (showMessage && recipient == ThePlayerList->getLocalPlayer())
+			{
+				UnicodeString message;
+				message.format(L"%ls sent you %u resources.", msgPlayer->getPlayerDisplayName().str(), amount);
+				TheInGameUI->messageNoFormat(message);
+			}
 			break;
 		}
 		case GameMessage::MSG_RETAIL_AUTO_ABILITY:

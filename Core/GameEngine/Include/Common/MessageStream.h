@@ -614,6 +614,7 @@ public:
 		MSG_RETAIL_CASTLE_UNPACK = 1895,
 		MSG_RETAIL_CANCEL_WALL_SPAN = 1896,
 		MSG_RETAIL_BLOODTHIRSTY = 1897,
+		MSG_RETAIL_TRIBUTE = 1898,
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 
