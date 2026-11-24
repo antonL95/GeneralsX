@@ -322,7 +322,7 @@ void runActions(ScriptAction* action)
 				}
 				const Real frames = seconds * LOGICFRAMES_PER_SECOND;
 				if (frames >= 0 && frames < static_cast<Real>(std::numeric_limits<Int>::max()))
-					s_counters[parameter(0)->getString()] = {REAL_TO_INT_CEIL(frames), TRUE};
+					s_counters[parameter(0)->getString()] = {static_cast<Int>(REAL_TO_INT_CEIL(frames)), TRUE};
 				break;
 			}
 			case ScriptAction::FIND_HOME_BASE_OF_PLAYER:
