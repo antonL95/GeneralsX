@@ -49,7 +49,7 @@ void handleAudioLoop(const RetailTestCommands::Context& ctx)
 	if (cmd == "advance-music")
 	{
 		if (TheAudio)
-			TheAudio->advanceVirtualMusic(static_cast<Real>(std::atof(ctx.argument.c_str())));
+			TheAudio->advanceVirtualMusic(static_cast<Real>(std::atof(ctx.argument)));
 		return;
 	}
 	if (cmd == "select")
