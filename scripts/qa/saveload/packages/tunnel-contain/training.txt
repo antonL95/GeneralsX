@@ -1,0 +1,48 @@
+180 create PlyrCivilian Slot8TunnelControl 0 3500,3400,180
+180 create PlyrCivilian Slot8TunnelTimed 0 3500,3260,180
+181 create PlyrCivilian Slot8TunnelRider 0 3422,3397,0
+181 create PlyrCivilian Slot8TunnelRider 1 3422,3405,0
+181 create PlyrCivilian Slot8TunnelBlocked 0 3350,3240,0
+181 create Player_1 Slot8TunnelRider 0 3405,3305,0
+182 tunnel-check PlyrCivilian Slot8TunnelRider 0 PlyrCivilian:Slot8TunnelControl:0
+182 tunnel-check PlyrCivilian Slot8TunnelBlocked 0 PlyrCivilian:Slot8TunnelTimed:0
+182 tunnel-check Player_1 Slot8TunnelRider 0 PlyrCivilian:Slot8TunnelControl:0
+182 tunnel-geometry PlyrCivilian Slot8TunnelControl 0 stock-geometry
+182 tunnel-geometry PlyrCivilian Slot8TunnelTimed 0 timed-geometry
+183 tunnel-enter PlyrCivilian Slot8TunnelBlocked 0 PlyrCivilian:Slot8TunnelTimed:0
+184 tunnel-enter PlyrCivilian Slot8TunnelRider 0 PlyrCivilian:Slot8TunnelControl:0
+189 tunnel-enter PlyrCivilian Slot8TunnelRider 1 PlyrCivilian:Slot8TunnelControl:0
+239 tunnel-state PlyrCivilian Slot8TunnelRider 0 first-inside
+239 tunnel-state PlyrCivilian Slot8TunnelRider 1 second-inside
+239 tunnel-state PlyrCivilian Slot8TunnelBlocked 0 blocked-outside
+239 tunnel-count PlyrCivilian Slot8TunnelControl 0 stock-pips
+239 tunnel-count PlyrCivilian Slot8TunnelTimed 0 timed-pips
+239 tunnel-evacuate PlyrCivilian Slot8TunnelTimed 0
+240 destroy PlyrCivilian Slot8TunnelBlocked 0
+243 destroy PlyrCivilian Slot8TunnelControl 0
+244 tunnel-count PlyrCivilian Slot8TunnelTimed 0 pending-at-save
+244 tunnel-bone PlyrCivilian Slot8TunnelRider 1 PlyrCivilian:Slot8TunnelTimed:0
+246 tunnel-count PlyrCivilian Slot8TunnelTimed 0 pending-after-save
+246 tunnel-state PlyrCivilian Slot8TunnelRider 0 first-exiting
+246 tunnel-state PlyrCivilian Slot8TunnelRider 1 second-waiting
+246 tunnel-bone PlyrCivilian Slot8TunnelRider 1 PlyrCivilian:Slot8TunnelTimed:0
+259 tunnel-count PlyrCivilian Slot8TunnelTimed 0 between-exits
+277 tunnel-count PlyrCivilian Slot8TunnelTimed 0 delay-elapsed
+352 tunnel-state PlyrCivilian Slot8TunnelRider 0 first-exited
+352 tunnel-state PlyrCivilian Slot8TunnelRider 1 second-exited
+353 destroy PlyrCivilian Slot8TunnelRider 1
+353 destroy PlyrCivilian Slot8TunnelRider 0
+353 destroy Player_1 Slot8TunnelRider 0
+355 create PlyrCivilian Slot8TunnelVictim 0 3422,3260,0
+356 tunnel-enter PlyrCivilian Slot8TunnelVictim 0 PlyrCivilian:Slot8TunnelTimed:0
+395 tunnel-state PlyrCivilian Slot8TunnelVictim 0 before-death
+395 tunnel-bone PlyrCivilian Slot8TunnelVictim 0 PlyrCivilian:Slot8TunnelTimed:0
+396 tunnel-kill PlyrCivilian Slot8TunnelTimed 0
+410 tunnel-state PlyrCivilian Slot8TunnelVictim 0 after-death
+419 create PlyrCivilian Slot8TunnelControl 0 3500,3400,180
+420 create PlyrCivilian Slot8TunnelSurvivor 0 3422,3400,0
+421 tunnel-enter PlyrCivilian Slot8TunnelSurvivor 0 PlyrCivilian:Slot8TunnelControl:0
+460 tunnel-state PlyrCivilian Slot8TunnelSurvivor 0 before-stock-death
+461 tunnel-kill PlyrCivilian Slot8TunnelControl 0
+474 tunnel-state PlyrCivilian Slot8TunnelSurvivor 0 after-stock-death
+475 destroy PlyrCivilian Slot8TunnelSurvivor 0
