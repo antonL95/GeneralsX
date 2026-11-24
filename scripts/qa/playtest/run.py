@@ -19,14 +19,19 @@ COLUMNS = 4
 CLIP_SIZE = (640, 360)
 
 
-def read_scenario(name):
-    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name):
-        raise ValueError(f"Invalid scenario name: {name}")
+def read_scenario(name, checks):
     fixture = ROOT / name
+    generated = checks["scenario_text"]() if "scenario_text" in checks else {}
+
+    def fixture_text(filename):
+        if filename in generated:
+            return generated[filename]
+        return (fixture / filename).read_text()
+
     map_path = (INSTALL / (fixture / "map.txt").read_text().strip()).resolve()
     if not map_path.is_relative_to(INSTALL) or map_path.suffix != ".map" or not map_path.is_file():
         raise ValueError(f"Expected an installed map under {INSTALL}: {map_path}")
-    frames = [int(field) for field in (fixture / "frames.txt").read_text().split()]
+    frames = [int(field) for field in fixture_text("frames.txt").split()]
     if not frames or frames[0] < 20 or frames != sorted(set(frames)):
         raise ValueError("Capture frames must be unique, increasing integers starting at 20 or later")
     render_from_file = fixture / "render-from.txt"
@@ -34,12 +39,12 @@ def read_scenario(name):
     if render_from_file.exists() and not 28 <= render_from <= frames[0]:
         raise ValueError("render-from.txt must be between frame 28 and the first capture")
     end_frame = frames[-1] + 2
-    commands = [line for line in (fixture / "commands.txt").read_text().splitlines() if line.strip()]
+    commands = [line for line in fixture_text("commands.txt").splitlines() if line.strip()]
     for line in commands:
         command_frame, action, *_ = line.split()
         if not 0 < int(command_frame) < end_frame or action in ("quit", "camera"):
             raise ValueError(f"Invalid scenario command: {line}")
-    camera_lines = [line for line in (fixture / "camera.txt").read_text().splitlines() if line.strip()]
+    camera_lines = [line for line in fixture_text("camera.txt").splitlines() if line.strip()]
     if not camera_lines:
         raise ValueError("Expected at least one FRAME PLAYER OBJECT X Y ZOOM line in camera.txt")
     camera_frames = []
@@ -115,7 +120,7 @@ def render(build, output, state, map_path, frames, camera_frames, end_frame, com
     for frame in frames:
         env[f"PLAYTEST_PNG_{frame}"] = str(output / f"frame-{frame:04d}.png")
     argv = [
-        "timeout", "--signal=INT", "--kill-after=10", "225", "xvfb-run", "-a",
+        "timeout", "--signal=INT", "--kill-after=10", str(checks.get("engine_timeout", 225)), "xvfb-run", "-a",
         "-s", f"-screen 0 {width}x{height}x24",
         "gdb", "-q", "-nx", "-batch", "-return-child-result",
         "-x", str(ROOT / "start.gdb"), "-ex", f"source {ROOT / 'capture.py'}", "-ex", "run",
@@ -170,7 +175,12 @@ def make_media(output, frames, resolution):
 
 def main():
     build = Path(sys.argv[1])
-    scenario = read_scenario(sys.argv[2])
+    name = sys.argv[2]
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name):
+        raise ValueError(f"Invalid scenario name: {name}")
+    check_path = ROOT / name / "check.py"
+    checks = runpy.run_path(str(check_path)) if check_path.is_file() else {}
+    scenario = read_scenario(name, checks)
     frames, end_frame = scenario[1], scenario[3]
     resolutions_path = ROOT / sys.argv[2] / "resolutions.txt"
     resolutions = [(WIDTH, HEIGHT)]
@@ -182,8 +192,6 @@ def main():
             if not 0 < width <= 8192 or not 0 < height <= 8192 or (width, height) in resolutions:
                 raise ValueError(f"Invalid or repeated capture resolution: {line}")
             resolutions.append((width, height))
-    check_path = ROOT / sys.argv[2] / "check.py"
-    checks = runpy.run_path(str(check_path)) if check_path.is_file() else {}
     with tempfile.TemporaryDirectory(prefix="playtest-", dir=build) as temp:
         state = Path(temp)
         output = state / "results"

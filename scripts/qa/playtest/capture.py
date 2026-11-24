@@ -11,6 +11,10 @@ class Draw(gdb.Breakpoint):
     render_from = int(os.environ["PLAYTEST_RENDER_FROM"])
     capture_windows = set()
     static_captures = os.environ.get("PLAYTEST_STATIC_CAPTURES")
+    render_windows = tuple(
+        tuple(int(frame) for frame in interval.split(":"))
+        for interval in os.environ.get("PLAYTEST_RENDER_WINDOWS", "").split()
+    )
     if static_captures in ("1", "exact"):
         warmup = 2 if static_captures == "1" else 0
         for capture in os.environ["PLAYTEST_FRAMES"].split():
@@ -25,7 +29,10 @@ class Draw(gdb.Breakpoint):
             gdb.execute("set variable TheFramePacer->m_enableLogicTimeScale = 0", to_string=True)
             gdb.execute("set variable TheFramePacer->m_enableFpsLimit = 0", to_string=True)
         skip_static_frame = self.capture_windows and frame >= 28 and frame not in self.capture_windows
-        if frame == self.last_frame or 28 <= frame < self.render_from or skip_static_frame:
+        skip_window_frame = self.render_windows and frame >= 28 and not any(
+            first <= frame <= last for first, last in self.render_windows
+        )
+        if frame == self.last_frame or 28 <= frame < self.render_from or skip_static_frame or skip_window_frame:
             gdb.execute("return", to_string=True)
         elif self.hidden_weather_frames:
             hide_weather = frame in self.hidden_weather_frames
