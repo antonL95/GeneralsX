@@ -631,12 +631,23 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 	if( amount > 0.0f || damageInfo->in.m_kill )
 	{
 		BodyDamageType oldState = m_curDamageState;
+		AIUpdateInterface* ai = obj->getAI();
+		const Bool burning = ai && ai->getRetailBurningDeathDeadline();
+		const Bool burnCanScore = !burning || m_lastDamageInfo.in.m_sourceID == INVALID_ID;
+		const auto* data = getActiveBodyModuleData();
+		const Bool burningHit = !alreadyHandled && data->m_burningDeathBehavior && ai &&
+			(damageInfo->in.m_damageType == DAMAGE_FLAME || damageInfo->in.m_damageType == DAMAGE_LOGICAL_FIRE) &&
+			obj->isMobile() && !obj->getEnclosingContainedBy();
 
 		//If the object is going to die, make sure we damage all remaining health.
 		if( damageInfo->in.m_kill )
 		{
 			amount = m_currentHealth;
 		}
+
+		const Bool startBurning = burningHit && ai->getRetailBurningDeathDuration() && amount > m_currentHealth - 1.0f;
+		if (startBurning)
+			amount = m_currentHealth - 1.0f;
 
 		if (!alreadyHandled)
 		{
@@ -784,29 +795,25 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 			}
 		}
 
-		// check to see if we died
-		if( m_currentHealth <= 0 && m_prevHealth > 0 )
+		if (startBurning || (m_currentHealth <= 0 && m_prevHealth > 0))
 		{
-			// Give our killer credit for killing us, if there is one.
-			if( damager )
-			{
+			if (damager && burnCanScore)
 				damager->scoreTheKill( obj );
-			}
 
-			const auto* data = getActiveBodyModuleData();
-			AIUpdateInterface* ai = obj->getAI();
-			Bool deferredDeath = FALSE;
-			if (RetailFileLayers::enabled() && data->m_burningDeathBehavior && ai &&
-				(damageInfo->in.m_damageType == DAMAGE_FLAME || damageInfo->in.m_damageType == DAMAGE_LOGICAL_FIRE) &&
-				obj->isMobile() && !obj->getEnclosingContainedBy())
+			if (burningHit)
 			{
 				damageInfo->in.m_deathType = DEATH_BURNED;
 				m_lastDamageInfo = *damageInfo;
-				deferredDeath = ai->enterRetailBurningDeath();
+				if (startBurning)
+					ai->enterRetailBurningDeath();
 				FXList::doFXObj(data->m_burningDeathFX, obj);
 			}
-			if (!deferredDeath)
+			if (!startBurning)
+			{
+				if (burning)
+					ai->finishRetailBurningDeath();
 				obj->onDie(damageInfo);
+			}
 		}
 	}
 
@@ -1038,6 +1045,10 @@ void ActiveBody::attemptHealing( DamageInfo *damageInfo )
 	}
 
 	Object* obj = getObject();
+
+	if (getActiveBodyModuleData()->m_burningDeathBehavior &&
+		obj->getLogicModelConditions().test(MODELCONDITION_BURNINGDEATH))
+		return;
 
 	// srj sez: sorry, once yer dead, yer dead.
 	// Special case for bridges, cause the system now things they're dead

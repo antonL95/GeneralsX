@@ -1198,12 +1198,8 @@ UpdateSleepTime AIUpdateInterface::update()
 	{
 		if (TheGameLogic->getFrame() >= m_burningDeathUntil)
 		{
-			m_burningDeathUntil = 0;
-			Object* object = getObject();
-			object->clearModelConditionState(MODELCONDITION_BURNINGDEATH);
-			DamageInfo damage = *object->getBodyModule()->getLastDamageInfo();
 			m_isInUpdate = FALSE;
-			object->onDie(&damage);
+			getObject()->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
 			return UPDATE_SLEEP_NONE;
 		}
 		subMachineSleep = UPDATE_SLEEP_NONE;
@@ -5124,8 +5120,7 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 	if (horde && horde->getContain()->isHordeContain())
 		return nullptr;
 
-	// if we're dead, we can't attack
-	if (obj->isEffectivelyDead())
+	if (obj->isEffectivelyDead() || obj->testStatus(OBJECT_STATUS_NO_AUTO_ACQUIRE))
 		return nullptr;
 
 	if (obj->testStatus(OBJECT_STATUS_IS_USING_ABILITY)) {
@@ -6040,18 +6035,35 @@ const AttackPriorityInfo* AIUpdateInterface::getAttackInfo()
 	return TheScriptEngine->getAttackInfo(getAIUpdateModuleData()->m_attackPriority);
 }
 
+static void applyBurningDeathStatus(Object* object)
+{
+	object->setStatus(MAKE_OBJECT_STATUS_MASK4(OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_NO_ATTACK,
+		OBJECT_STATUS_NO_AUTO_ACQUIRE, OBJECT_STATUS_UNATTACKABLE));
+}
+
 Bool AIUpdateInterface::enterRetailBurningDeath()
 {
 	Object* object = getObject();
-	const UnsignedInt duration = getAIUpdateModuleData()->m_burningDeathTime;
-	if (!RetailFileLayers::enabled() || !duration || !object->isMobile() || object->getEnclosingContainedBy())
+	const UnsignedInt duration = getRetailBurningDeathDuration();
+	if (!duration || m_burningDeathUntil || !object->isMobile() || object->getEnclosingContainedBy())
 		return FALSE;
 
+	BodyModuleInterface* body = object->getBodyModule();
+	if (body->getHealth() != 1.0f)
+		body->internalChangeHealth(1.0f - body->getHealth());
 	m_burningDeathUntil = TheGameLogic->getFrame() + duration;
 	object->setModelConditionState(MODELCONDITION_BURNINGDEATH);
+	applyBurningDeathStatus(object);
+	TheGameLogic->deselectObject(object, PLAYERMASK_ALL, TRUE);
 	privateWanderInPlace(CMD_FROM_AI);
 	wakeUpNow();
 	return TRUE;
+}
+
+void AIUpdateInterface::finishRetailBurningDeath()
+{
+	m_burningDeathUntil = 0;
+	getObject()->clearModelConditionState(MODELCONDITION_BURNINGDEATH);
 }
 
 void AIUpdateInterface::enterRetailRampage()
@@ -6271,6 +6283,12 @@ Bool AIUpdateInterface::stanceAllowsChase(const Object* target) const
 void AIUpdateInterface::loadPostProcess()
 {
 	UpdateModule::loadPostProcess();
+
+	if (m_burningDeathUntil && getObject()->getBodyModule()->getHealth() == 0.0f)
+	{
+		getObject()->getBodyModule()->internalChangeHealth(1.0f);
+		applyBurningDeathStatus(getObject());
+	}
 
 	if (m_fixLocoInPostProcess && m_curLocomotorSet!=LOCOMOTORSET_INVALID)
 	{

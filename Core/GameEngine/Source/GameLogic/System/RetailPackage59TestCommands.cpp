@@ -4,17 +4,26 @@
 #if !RTS_GENERALS
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
+#include <sstream>
 
 #include "Common/INI.h"
+#include "Common/Player.h"
 #include "Common/RandomValue.h"
+#include "Common/ScoreKeeper.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/FXList.h"
 #include "GameClient/ParticleSys.h"
+#include "GameClient/RetailWorldUI.h"
 #include "GameLogic/Damage.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/ExperienceLevelStore.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/ActiveBody.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/Weapon.h"
 
 namespace
@@ -28,6 +37,17 @@ void loadBurningDeathParticles(const RetailTestCommands::Context&)
 	}
 }
 
+void loadBurningTestLevels(const RetailTestCommands::Context& ctx)
+{
+	std::ifstream input(ctx.argument);
+	if (!input)
+		return;
+	std::ostringstream text;
+	text << input.rdbuf();
+	INI ini;
+	ini.loadText(ctx.argument, text.str().c_str(), INI_LOAD_OVERWRITE, "ExperienceLevel", ExperienceLevelStore::parseDefinition);
+}
+
 void probeBurningDeath(const RetailTestCommands::Context& ctx)
 {
 	Object* victim = ctx.findObject();
@@ -39,10 +59,13 @@ void probeBurningDeath(const RetailTestCommands::Context& ctx)
 
 	const auto* body = dynamic_cast<const ActiveBody*>(victim->getBodyModule());
 	const auto* ai = victim->getAI();
-	std::fprintf(stderr, "TEST pkg59 frame=%u label=%s hp=%.0f dead=%d burning=%u model=%d\n",
+	std::fprintf(stderr, "TEST pkg59 frame=%u label=%s hp=%.9g dead=%d burning=%u model=%d\n",
 		ctx.frame, ctx.argument, body ? body->getHealth() : -1.0f, victim->isEffectivelyDead(),
 		ai ? ai->getRetailBurningDeathDeadline() : 0,
 		victim->getLogicModelConditions().test(MODELCONDITION_BURNINGDEATH));
+	if (body && victim->isEffectivelyDead())
+		if (const UnsignedInt* timestamp = body->getLastDamageTimestamp())
+			std::fprintf(stderr, "TEST pkg59 death frame=%u label=%s hit=%u\n", ctx.frame, ctx.argument, *timestamp);
 }
 
 void hitBurningDeathVictim(const RetailTestCommands::Context& ctx)
@@ -56,13 +79,18 @@ void hitBurningDeathVictim(const RetailTestCommands::Context& ctx)
 		return;
 
 	DamageInfo damage;
-	damage.in.m_amount = body->getMaxHealth();
-	damage.in.m_kill = true;
 	const std::string_view action = ctx.action;
+	damage.in.m_amount = body->getMaxHealth() * 2.0f;
+	damage.in.m_kill = action == "pkg59-unlit";
 	damage.in.m_damageType = action == "pkg59-flame" ? DAMAGE_FLAME :
 		action == "pkg59-logical-fire" ? DAMAGE_LOGICAL_FIRE : DAMAGE_UNRESISTABLE;
 	damage.in.m_deathType = DEATH_NORMAL;
+	if (std::string_view(ctx.argument) == "variag-fire")
+		if (const Object* attacker = ctx.findTarget(std::string_view("PlyrCreeps:Pkg59Attacker:0")))
+			damage.in.m_sourceID = attacker->getID();
 	victim->attemptDamage(&damage);
+	std::fprintf(stderr, "TEST pkg59 damage frame=%u label=%s clipped=%.9g max=%.9g\n",
+		ctx.frame, ctx.argument, damage.out.m_actualDamageClipped, body->getMaxHealth());
 
 	const auto* fx = body->getRetailBodyData()->m_burningDeathFX;
 	const char* choice = !fx ? "none" :
@@ -82,6 +110,60 @@ void hitBurningDeathVictim(const RetailTestCommands::Context& ctx)
 	std::fprintf(stderr, "TEST pkg59 FX frame=%u label=%s choice=%s flames=%d offset=%.0f,%.0f,%.0f\n",
 		ctx.frame, ctx.argument, choice, flames, offset.x, offset.y, offset.z);
 	probeBurningDeath(ctx);
+}
+
+void probeBurningConsumers(const RetailTestCommands::Context& ctx)
+{
+	Object* victim = ctx.requireObject();
+	Object* attacker = ctx.findTarget(std::string_view("PlyrCreeps:Pkg59Attacker:0"));
+	if (!victim || !attacker)
+		return;
+
+	PartitionFilterAlive alive;
+	const Bool targetable = attacker->getAbleToAttackSpecificObject(
+		ATTACK_NEW_TARGET, victim, CMD_FROM_PLAYER) != ATTACKRESULT_NOT_POSSIBLE;
+	const Bool acquired = TheAI->findClosestEnemy(attacker, 120.0f, AI::CAN_ATTACK, nullptr) == victim;
+	std::fprintf(stderr, "TEST pkg59 consumers frame=%u label=%s alive=%d selectable=%d attack=%d target=%d acquire=%d fraction=%.6f\n",
+		ctx.frame, ctx.argument, static_cast<PartitionFilter&>(alive).allow(victim), victim->isSelectable(),
+		victim->isAbleToAttack(), targetable,
+		acquired, RetailWorldUI::healthBarFraction(*victim));
+}
+
+void probeBurningCredit(const RetailTestCommands::Context& ctx)
+{
+	Object* attacker = ctx.requireObject();
+	if (!attacker)
+		return;
+	std::fprintf(stderr, "TEST pkg59 credit frame=%u label=%s xp=%.0f kills=%d\n", ctx.frame, ctx.argument,
+		attacker->getExperienceTracker()->getRetailExperience(),
+		attacker->getControllingPlayer()->getScoreKeeper()->getTotalUnitsDestroyed());
+}
+
+void probeBurningHealing(const RetailTestCommands::Context& ctx)
+{
+	Object* victim = ctx.requireObject();
+	if (!victim)
+		return;
+	BodyModuleInterface* body = victim->getBodyModule();
+	DamageInfo damage;
+	damage.in.m_damageType = DAMAGE_SLASH;
+	damage.in.m_amount = body->getMaxHealth();
+	victim->attemptDamage(&damage);
+	const Real before = body->getHealth();
+	victim->attemptHealing(body->getMaxHealth(), nullptr);
+	std::fprintf(stderr, "TEST pkg59 healing frame=%u damage=%.9g before=%.9g after=%.9g\n",
+		ctx.frame, damage.out.m_actualDamageClipped, before, body->getHealth());
+}
+
+void collectBurningHealCrate(const RetailTestCommands::Context& ctx)
+{
+	Object* victim = ctx.requireObject();
+	Object* crate = ctx.findTarget(false);
+	if (!victim || !crate)
+		return;
+	crate->onCollide(victim, victim->getPosition(), nullptr);
+	std::fprintf(stderr, "TEST pkg59 pickup frame=%u collected=%d hp=%.9g\n",
+		ctx.frame, crate->isDestroyed(), victim->getBodyModule()->getHealth());
 }
 
 void probeReaction(const RetailTestCommands::Context& ctx)
@@ -218,9 +300,14 @@ void registerRetailPackage59TestCommands()
 #if !RTS_GENERALS
 	registerAction("pkg59-state", probeBurningDeath);
 	registerAction("pkg59-load-fx", loadBurningDeathParticles);
+	registerAction("pkg59-load-levels", loadBurningTestLevels);
 	registerAction("pkg59-flame", hitBurningDeathVictim);
 	registerAction("pkg59-logical-fire", hitBurningDeathVictim);
 	registerAction("pkg59-unlit", hitBurningDeathVictim);
+	registerAction("pkg59-consumers", probeBurningConsumers);
+	registerAction("pkg59-credit", probeBurningCredit);
+	registerAction("pkg59-healing", probeBurningHealing);
+	registerAction("pkg59-pickup", collectBurningHealCrate);
 	registerAction("pkg60-state", probeReaction);
 	registerAction("pkg60-kill", applyReactionDamage);
 	registerAction("pkg60-hit", applyReactionDamage);

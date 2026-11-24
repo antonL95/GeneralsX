@@ -7,17 +7,25 @@
 232 create Player_1 MordorVariag_Rhun 0 1050,1400,0
 232 create PlyrCivilian MordorVariag_Rhun 0 840,1000,0
 239 pkg59-load-fx - - 0
+239 create PlyrCreeps Pkg59Attacker 0 1050,1350,0
 240 pkg59-flame Player_1 AngmarWolfRider 0 wolf-fire
 240 pkg59-unlit PlyrCivilian AngmarWolfRider 0 wolf-control
 240 pkg59-flame Player_1 AmazhirCamel 0 camel-fire
 240 pkg59-unlit PlyrCivilian AmazhirCamel 0 camel-control
 240 pkg59-flame Player_1 HaradBeruthielCat 0 cat-fire
 240 pkg59-unlit PlyrCivilian HaradBeruthielCat 0 cat-control
+240 pkg59-consumers Player_1 MordorVariag_Rhun 0 before
+240 pkg59-credit PlyrCreeps Pkg59Attacker 0 before
 240 pkg59-logical-fire Player_1 MordorVariag_Rhun 0 variag-fire
+240 pkg59-consumers Player_1 MordorVariag_Rhun 0 burning
+240 pkg59-credit PlyrCreeps Pkg59Attacker 0 burning
 240 pkg59-unlit PlyrCivilian MordorVariag_Rhun 0 variag-control
+244 pkg59-consumers Player_1 MordorVariag_Rhun 0 checkpoint
+244 pkg59-credit PlyrCreeps Pkg59Attacker 0 checkpoint
 245 pkg59-state Player_1 AngmarWolfRider 0 wolf-fire
 245 pkg59-state Player_1 HaradBeruthielCat 0 cat-fire
 245 pkg59-state Player_1 MordorVariag_Rhun 0 variag-fire
+245 pkg59-healing Player_1 MordorVariag_Rhun 0
 250 create Player_1 CorsairPlunderChest 0 420,2280,0
 250 pkg60-recovery Player_1 CorsairPlunderChest 0
 251 pkg60-state Player_1 CorsairPlunderChest 0 recovery
@@ -28,10 +36,16 @@
 280 pkg60-state Player_1 CorsairPlunderChest 0 recovery
 317 pkg59-state Player_1 AngmarWolfRider 0 wolf-fire
 317 pkg59-state Player_1 HaradBeruthielCat 0 cat-fire
+318 pkg59-state Player_1 AngmarWolfRider 0 wolf-fire
+318 pkg59-state Player_1 HaradBeruthielCat 0 cat-fire
 319 pkg59-state Player_1 AngmarWolfRider 0 wolf-fire
 319 pkg59-state Player_1 HaradBeruthielCat 0 cat-fire
 389 pkg59-state Player_1 MordorVariag_Rhun 0 variag-fire
+390 pkg59-state Player_1 MordorVariag_Rhun 0 variag-fire
 391 pkg59-state Player_1 MordorVariag_Rhun 0 variag-fire
+391 pkg59-consumers Player_1 MordorVariag_Rhun 0 dead
+391 pkg59-credit PlyrCreeps Pkg59Attacker 0 dead
+392 destroy PlyrCreeps Pkg59Attacker 0
 402 pkg60-state Player_1 CorsairPlunderChest 0 recovery
 403 destroy Player_1 CorsairPlunderChest 0
 479 pkg59-state Player_1 AmazhirCamel 0 camel-fire

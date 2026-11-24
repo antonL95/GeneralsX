@@ -15,6 +15,7 @@ class WorldGroundDecal;
 namespace RetailWorldUI
 {
 void drawUnitStatus(Drawable& drawable);
+Real healthBarFraction(const Object& object);
 Real remainingLifetime(const Object& object);
 void drawLifetimeBar(Int x, Int y, Int width, Int height, Real remaining);
 void showPayout(const Object& source, Int amount, Bool bounty);

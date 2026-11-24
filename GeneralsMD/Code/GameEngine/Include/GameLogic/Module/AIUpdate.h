@@ -510,7 +510,9 @@ public:
 	Bool fleeFromFear(const Object* source, UnsignedInt duration, ModelConditionFlagType condition, Real durationScale = 1.0f,
 		Bool backAway = TRUE);
 	UnsignedInt getRetailFearDeadline() const { return m_fearUntil; }
+	UnsignedInt getRetailBurningDeathDuration() const { return getAIUpdateModuleData()->m_burningDeathTime; }
 	Bool enterRetailBurningDeath();
+	void finishRetailBurningDeath();
 	UnsignedInt getRetailBurningDeathDeadline() const { return m_burningDeathUntil; }
 	void crcRetailAttackState(Xfer* xfer);
 	void crcRetailLocomotion(Xfer* xfer);

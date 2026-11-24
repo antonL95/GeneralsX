@@ -722,7 +722,7 @@ CanAttackResult WeaponSet::getAbleToAttackSpecificObject( AbleToAttackType attac
 	// valid targets when we really really really don't want anything in the world
 	// being able to attack stuff
 	//
-	if (victim->testStatus(OBJECT_STATUS_MASKED))
+	if (victim->testStatus(OBJECT_STATUS_MASKED) || victim->testStatus(OBJECT_STATUS_UNATTACKABLE))
 		return ATTACKRESULT_NOT_POSSIBLE;
 
 	// And this is the KINDOF version, for things that aren't really game objects, but need to have "life"

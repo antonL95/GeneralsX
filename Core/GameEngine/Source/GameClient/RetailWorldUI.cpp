@@ -412,6 +412,13 @@ void RetailWorldUI::drawLifetimeBar(Int x, Int y, Int width, Int height, Real re
 		TheDisplay->drawFillRect(x, y, filled, height, GameMakeColor(120, 192, 245, 255));
 }
 
+Real RetailWorldUI::healthBarFraction(const Object& object)
+{
+	const BodyModuleInterface* body = object.getBodyModule();
+	return body && body->getMaxHealth() > 0.0f
+		? std::clamp(body->getHealth() / body->getMaxHealth(), 0.0f, 1.0f) : 0.0f;
+}
+
 void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 {
 	Object* obj = drawable.getObject();
@@ -461,10 +468,9 @@ void RetailWorldUI::drawUnitStatus(Drawable& drawable)
 	const Int height = std::max(4 * edge + 3, static_cast<Int>(7 * scale + 0.5f));
 	const Int clearance = static_cast<Int>((structure ? 11.0f : 10.0f) * scale + 0.5f);
 	const Int barTop = screen.y - clearance - height / 2;
-	const BodyModuleInterface* body = obj->getBodyModule();
-	if (showBar && body && body->getHealth() > 0.0f && body->getMaxHealth() > 0.0f)
+	const Real health = showBar ? healthBarFraction(*obj) : 0.0f;
+	if (health > 0.0f)
 	{
-		const Real health = std::clamp(body->getHealth() / body->getMaxHealth(), 0.0f, 1.0f);
 		const Real fraction = building ? std::clamp(obj->getConstructionPercent() * 0.01f, 0.0f, 1.0f) : health;
 		const Int x = screen.x - width / 2;
 		const Int y = barTop;

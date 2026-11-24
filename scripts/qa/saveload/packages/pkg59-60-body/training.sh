@@ -1,13 +1,34 @@
 check_burning() {
     if covers 240; then
-        expect "TEST pkg59 frame=240 label=wolf-fire hp=0 dead=1 burning=318 model=1"
+        expect "TEST pkg59 frame=240 label=wolf-fire hp=1 dead=0 burning=318 model=1"
         expect "TEST pkg59 frame=240 label=wolf-control hp=0 dead=1 burning=0 model=0"
         expect "TEST pkg59 frame=240 label=camel-fire hp=0 dead=1 burning=0 model=0"
         expect "TEST pkg59 frame=240 label=camel-control hp=0 dead=1 burning=0 model=0"
-        expect "TEST pkg59 frame=240 label=cat-fire hp=0 dead=1 burning=318 model=1"
+        expect "TEST pkg59 frame=240 label=cat-fire hp=1 dead=0 burning=318 model=1"
         expect "TEST pkg59 frame=240 label=cat-control hp=0 dead=1 burning=0 model=0"
-        expect "TEST pkg59 frame=240 label=variag-fire hp=0 dead=1 burning=390 model=1"
+        expect "TEST pkg59 frame=240 label=variag-fire hp=1 dead=0 burning=390 model=1"
         expect "TEST pkg59 frame=240 label=variag-control hp=0 dead=1 burning=0 model=0"
+        awk '
+            $1 == "TEST" && $2 == "pkg59" && $3 == "credit" && $4 == "frame=240" {
+                split($7, kills, "=")
+                if ($5 == "label=before" && $6 == "xp=1") {
+                    before = kills[2]
+                    baseline = 1
+                }
+                if ($5 == "label=burning" && $6 == "xp=7")
+                    awarded = baseline && kills[2] == before + 1
+            }
+            END { exit !awarded }
+        ' "$log"
+        grep -Eq '^TEST pkg59 consumers frame=240 label=before alive=1 selectable=1 attack=[01] target=1 acquire=1 fraction=1.000000$' "$log"
+        awk '
+            $1 == "TEST" && $2 == "pkg59" && $3 == "damage" && $4 == "frame=240" && $5 == "label=variag-fire" {
+                split($6, clipped, "=")
+                split($7, maximum, "=")
+                found = clipped[2] == maximum[2] - 1
+            }
+            END { exit !found }
+        ' "$log"
         for actor in wolf cat; do
             expect "TEST pkg59 FX frame=240 label=$actor-fire choice=cavalry flames=1 offset=0,0,10"
             expect "TEST pkg59 FX frame=240 label=$actor-control choice=cavalry flames=0 offset=0,0,0"
@@ -17,24 +38,61 @@ check_burning() {
             expect "TEST pkg59 FX frame=240 label=$actor-control choice=infantry flames=0 offset=0,0,0"
         done
     fi
+    for row in 240:burning 244:checkpoint; do
+        frame=${row%:*}
+        label=${row#*:}
+        if covers "$frame"; then
+            awk -v frame="frame=$frame" -v label="label=$label" '
+                $1 == "TEST" && $2 == "pkg59" && $3 == "consumers" && $4 == frame && $5 == label &&
+                    $6 == "alive=1" && $7 == "selectable=0" && $8 == "attack=0" &&
+                    $9 == "target=0" && $10 == "acquire=0" {
+                    split($11, health, "=")
+                    found = health[2] > 0 && health[2] < 0.01
+                }
+                END { exit !found }
+            ' "$log"
+        fi
+    done
+    for row in 244:checkpoint 391:dead; do
+        frame=${row%:*}
+        if covers "$frame"; then
+            grep -E "^TEST pkg59 credit frame=$frame label=${row#*:} xp=7 kills=[0-9]+$" "$log"
+            if grep -q '^246 pkg59-pickup ' "$out/commands.txt"; then
+                expect "TEST pkg59 credit frame=$frame label=${row#*:} xp=7 kills=1"
+            fi
+        fi
+    done
     if covers 245; then
-        expect "TEST pkg59 frame=245 label=wolf-fire hp=0 dead=1 burning=318 model=1"
-        expect "TEST pkg59 frame=245 label=cat-fire hp=0 dead=1 burning=318 model=1"
-        expect "TEST pkg59 frame=245 label=variag-fire hp=0 dead=1 burning=390 model=1"
+        expect "TEST pkg59 frame=245 label=wolf-fire hp=1 dead=0 burning=318 model=1"
+        expect "TEST pkg59 frame=245 label=cat-fire hp=1 dead=0 burning=318 model=1"
+        expect "TEST pkg59 frame=245 label=variag-fire hp=1 dead=0 burning=390 model=1"
+        expect 'TEST pkg59 healing frame=245 damage=0 before=1 after=1'
+    fi
+    if covers 246 && grep -q '^246 pkg59-pickup ' "$out/commands.txt"; then
+        expect 'TEST pkg59 pickup frame=246 collected=1 hp=1'
     fi
     for actor in wolf cat; do
         if covers 317; then
-            expect "TEST pkg59 frame=317 label=$actor-fire hp=0 dead=1 burning=318 model=1"
+            expect "TEST pkg59 frame=317 label=$actor-fire hp=1 dead=0 burning=318 model=1"
+        fi
+        if covers 318; then
+            expect "TEST pkg59 frame=318 label=$actor-fire hp=1 dead=0 burning=318 model=1"
         fi
         if covers 319; then
             expect "TEST pkg59 frame=319 label=$actor-fire hp=0 dead=1 burning=0 model=0"
+            expect "TEST pkg59 death frame=319 label=$actor-fire hit=318"
         fi
     done
     if covers 389; then
-        expect "TEST pkg59 frame=389 label=variag-fire hp=0 dead=1 burning=390 model=1"
+        expect "TEST pkg59 frame=389 label=variag-fire hp=1 dead=0 burning=390 model=1"
+    fi
+    if covers 390; then
+        expect "TEST pkg59 frame=390 label=variag-fire hp=1 dead=0 burning=390 model=1"
     fi
     if covers 391; then
         expect "TEST pkg59 frame=391 label=variag-fire hp=0 dead=1 burning=0 model=0"
+        expect "TEST pkg59 death frame=391 label=variag-fire hit=390"
+        expect 'TEST pkg59 consumers frame=391 label=dead alive=0 selectable=0 attack=0 target=0 acquire=0 fraction=0.000000'
     fi
     for pair in camel-fire:481 camel-control:481 cat-control:481 cat-fire:559 variag-control:541 variag-fire:691 wolf-control:751 wolf-fire:829; do
         frame=${pair#*:}
@@ -119,6 +177,10 @@ check_reactions() {
     if covers 1025; then
         expect 'TEST pkg60 debris frame=1025 hp=338 state=2 bits=7 chunks=1 front=0'
     fi
+}
+
+prepare() {
+    printf "%s pkg59-load-levels - - 0 %s/levels.ini\n" 238 "$package_dir" "$save_frame" "$package_dir"
 }
 
 check() {
