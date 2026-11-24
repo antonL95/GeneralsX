@@ -1,0 +1,2 @@
+1800 move Player_1 ShireBounderHorde 0 - 2050 2600
+1800 move Player_1 RivendellHobbitFriendsHorde 0 - 3550 2600

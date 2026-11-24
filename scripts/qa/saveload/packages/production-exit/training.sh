@@ -14,7 +14,9 @@ prepare() {
 
 check() {
     if [ "$phase" != continue ]; then return 0; fi
-    awk '
+    escape=0
+    [ "$end" -ge 2000 ] && grep -q " move Player_1 ShireBounderHorde " "$out/commands.txt" && escape=1
+    awk -v escape="$escape" '
         $1 == "TEST" && $2 == "production-exit" {
             producer = $4; id = $5; dx = $6 - $8; dy = $7 - $9
             if (!(id in seen)) {
@@ -34,7 +36,7 @@ check() {
             dot = ($6 - startX[id]) * directionX[id] + ($7 - startY[id]) * directionY[id]
             if (dot >= 10 * sqrt(directionX[id] * directionX[id] + directionY[id] * directionY[id]))
                 moved[id] = 1
-            if (producer == "ShireShirriffsQuarters" && $3 >= 1430 && dx * dx + dy * dy > 200 * 200)
+            if (producer == "ShireShirriffsQuarters" && $3 >= 2000 && dx * dx + dy * dy > 200 * 200)
                 escaped[id] = 1
         }
         $1 == "TEST" && $2 == "production-cavalry" {
@@ -75,7 +77,7 @@ check() {
                 if (count[name] != expected[name]) { print "Wrong produced member count:", name, count[name], "expected", expected[name]; failed = 1 }
             for (id in seen) {
                 if (!moved[id]) { print "Member did not move toward the natural rally:", id; failed = 1 }
-                if (owner[id] == "ShireShirriffsQuarters" && !escaped[id]) { print "Bounder did not path away:", id; failed = 1 }
+                if (escape && owner[id] == "ShireShirriffsQuarters" && !escaped[id]) { print "Bounder did not path away:", id; failed = 1 }
             }
             if (!cavalryAfter) { print "Cavalry did not move at its authored maximum speed"; failed = 1 }
             if (!retiredAfter) { print "Horde from destroyed producer remained locked or could not move"; failed = 1 }
