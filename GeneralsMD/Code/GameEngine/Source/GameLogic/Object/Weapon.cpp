@@ -3411,7 +3411,8 @@ Bool Weapon::isInFollowThrough(UnsignedInt frame) const
 
 Bool Weapon::isHoldingMovementForReload(UnsignedInt frame) const
 {
-	return m_template->holdsDuringReload() && m_status == RELOADING_CLIP && frame < m_whenWeCanFireAgain;
+	return m_template->holdsDuringReload() && m_lastFireFrame != 0 && m_status == RELOADING_CLIP &&
+		frame < m_whenWeCanFireAgain;
 }
 
 Bool Weapon::hasCommittedAttack() const
