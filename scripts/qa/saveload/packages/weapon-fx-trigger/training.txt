@@ -1,20 +1,20 @@
 237 create Player_1 WeaponFXTriggerLauncher 0 2260,3085,0
-237 create PlyrCreeps WeaponFXTriggerBuilding 0 2490,2985,0
-237 create PlyrCreeps WeaponFXTriggerBuilding 0 2680,3175,0
-237 create PlyrCreeps WeaponFXTriggerInfantry 0 2370,3085,0
+237 create PlyrCivilian WeaponFXTriggerBuilding 0 2490,2985,0
+237 create PlyrCivilian WeaponFXTriggerBuilding 0 2680,3175,0
+237 create PlyrCivilian WeaponFXTriggerInfantry 0 2370,3085,0
 238 pkg61-elevation Player_1 WeaponFXTriggerLauncher 0 Player_1:WeaponFXTriggerLauncher:0 40 0
-239 log PlyrCreeps WeaponFXTriggerInfantry 0
-240 firetestweapon Player_1 WeaponFXTriggerLauncher 0 MordorCatapultRock,PlyrCreeps:WeaponFXTriggerBuilding:0
-240 firetestweapon Player_1 WeaponFXTriggerLauncher 0 GondorTrebuchetRock,PlyrCreeps:WeaponFXTriggerBuilding:1
-242 firetestweapon Player_1 WeaponFXTriggerLauncher 0 WeaponFXTriggerShock,PlyrCreeps:WeaponFXTriggerInfantry:0
+239 log PlyrCivilian WeaponFXTriggerInfantry 0
+240 firetestweapon Player_1 WeaponFXTriggerLauncher 0 MordorCatapultRock,PlyrCivilian:WeaponFXTriggerBuilding:0
+240 firetestweapon Player_1 WeaponFXTriggerLauncher 0 GondorTrebuchetRock,PlyrCivilian:WeaponFXTriggerBuilding:1
+242 firetestweapon Player_1 WeaponFXTriggerLauncher 0 WeaponFXTriggerShock,PlyrCivilian:WeaponFXTriggerInfantry:0
 244 weapon-fx-drawable Player_1 WeaponFXTriggerLauncher 0 launcher
-244 weapon-fx-drawable PlyrCreeps WeaponFXTriggerInfantry 0 infantry
-273 log PlyrCreeps WeaponFXTriggerInfantry 0
-281 weapon-fx-drawable PlyrCreeps WeaponFXTriggerInfantry 0 infantry
-299 weapon-fx-drawable PlyrCreeps WeaponFXTriggerInfantry 0 infantry
-300 firetestweapon Player_1 WeaponFXTriggerLauncher 0 WeaponFXTriggerReset,PlyrCreeps:WeaponFXTriggerInfantry:0
-301 weapon-fx-drawable PlyrCreeps WeaponFXTriggerInfantry 0 infantry
-361 destroy PlyrCreeps WeaponFXTriggerBuilding 1
-361 destroy PlyrCreeps WeaponFXTriggerBuilding 0
-361 destroy PlyrCreeps WeaponFXTriggerInfantry 0
+244 weapon-fx-drawable PlyrCivilian WeaponFXTriggerInfantry 0 infantry
+273 log PlyrCivilian WeaponFXTriggerInfantry 0
+281 weapon-fx-drawable PlyrCivilian WeaponFXTriggerInfantry 0 infantry
+299 weapon-fx-drawable PlyrCivilian WeaponFXTriggerInfantry 0 infantry
+300 firetestweapon Player_1 WeaponFXTriggerLauncher 0 WeaponFXTriggerReset,PlyrCivilian:WeaponFXTriggerInfantry:0
+301 weapon-fx-drawable PlyrCivilian WeaponFXTriggerInfantry 0 infantry
+361 destroy PlyrCivilian WeaponFXTriggerBuilding 1
+361 destroy PlyrCivilian WeaponFXTriggerBuilding 0
+361 destroy PlyrCivilian WeaponFXTriggerInfantry 0
 361 destroy Player_1 WeaponFXTriggerLauncher 0

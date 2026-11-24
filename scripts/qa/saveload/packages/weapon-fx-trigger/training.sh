@@ -1,7 +1,7 @@
 prepare() {
     for frame in $(seq 244 360); do
-        printf '%s weapon-fx-impact PlyrCreeps WeaponFXTriggerBuilding 0 catapult\n' "$frame"
-        printf '%s weapon-fx-impact PlyrCreeps WeaponFXTriggerBuilding 1 trebuchet\n' "$frame"
+        printf '%s weapon-fx-impact PlyrCivilian WeaponFXTriggerBuilding 0 catapult\n' "$frame"
+        printf '%s weapon-fx-impact PlyrCivilian WeaponFXTriggerBuilding 1 trebuchet\n' "$frame"
     done
 }
 
