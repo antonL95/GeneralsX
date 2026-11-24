@@ -67,6 +67,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DamageModule.h"
 #include "GameLogic/Module/DieModule.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
 
 
@@ -806,7 +807,15 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 				m_lastDamageInfo = *damageInfo;
 				if (startBurning)
 					ai->enterRetailBurningDeath();
-				FXList::doFXObj(data->m_burningDeathFX, obj);
+				if (data->m_burningDeathFX && !obj->testStatus(OBJECT_STATUS_INSIDE_GARRISON) && !obj->testStatus(OBJECT_STATUS_ENCLOSED) &&
+					!obj->testStatus(OBJECT_STATUS_IS_LEAVING_FACTORY))
+				{
+					const auto& conditions = obj->getLogicModelConditions();
+					const PhysicsBehavior* physics = obj->getPhysics();
+					if (!conditions.test(MODELCONDITION_CLIMBING) && !conditions.test(MODELCONDITION_RAPPELLING) &&
+						!conditions.test(MODELCONDITION_STUNNED) && (!physics || !physics->getIsStunned()))
+						FXList::doFXObj(data->m_burningDeathFX, obj);
+				}
 			}
 			if (!startBurning)
 			{
