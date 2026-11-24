@@ -1,0 +1,4 @@
+30 create Player_1 BuildVariationEntMoot 0 250,3500,0
+35 queuebutton Player_1 BuildVariationEntMoot 0 Command_ConstructEntGeneric
+1420 build-variations-product Player_1 BuildVariationEntMoot 0
+1421 build-variations-singleton Player_1 BuildVariationEntMoot 0 BuildVariationSingleton

@@ -1,8 +1,6 @@
-30 create Player_1 BuildVariationEntMoot 0 1390,3400,0
-35 queuebutton Player_1 BuildVariationEntMoot 0 Command_ConstructEntGeneric
-180 create Player_1 BuildVariationGuldurPad 0 1630,3470,0
+180 create Player_1 BuildVariationGuldurPad 0 430,3520,0
 181 build Player_1 BuildVariationGuldurPad 0 GuldurBarricadeExpansion
-207 create Player_1 BuildVariationMine 0 1840,3480,0
+207 create Player_1 BuildVariationMine 0 610,3530,0
 209 queuebutton Player_1 BuildVariationMine 0 Command_ConstructTrollDestroyer_They
 243 build-variations-plot Player_1 BuildVariationGuldurPad 0
 243 build-variations-product Player_1 BuildVariationMine 0
@@ -12,5 +10,3 @@
 275 build-variations-hatch Player_1 BuildVariationMine 0 MoriaTrollDestroyer_They
 276 build-variations-hatch Player_1 BuildVariationMine 0 MoriaTrollDestroyer_They
 1000 build-variations-plot Player_1 BuildVariationGuldurPad 0
-1420 build-variations-product Player_1 BuildVariationEntMoot 0
-1421 build-variations-singleton Player_1 BuildVariationEntMoot 0 BuildVariationSingleton

@@ -18,8 +18,10 @@ check() {
     expect_probe 275 'build-variations-hatch count=0 ' || return 1
     expect_probe 276 'build-variations-hatch count=1 template=MoriaTrollDestroyer_They model=mucavdestr_skn scale=1\.150 .* under=0 dead=0$' || return 1
     expect_probe 1000 'build-variations-plot count=1 template=GuldurBarricadeExpansion(A model=ubforttwr_skn|B model=ubforttwrB_skn) scale=1\.000 .* under=0 dead=0$' || return 1
-    expect_probe 1420 'build-variations-product count=1 template=RohanEnt(Fir model=RUEntFir_SKN|Birch model=RUEntBirch_SKN|Oak model=RUEntOak_SKN) scale=1\.000 .* under=0 dead=0$' || return 1
-    expect_probe 1421 'singleton template=BuildVariationSingleChoice logic-sample=1$' || return 1
+    if grep -q "^TEST build-variations 1420 " "$log"; then
+        expect_probe 1420 'build-variations-product count=1 template=RohanEnt(Fir model=RUEntFir_SKN|Birch model=RUEntBirch_SKN|Oak model=RUEntOak_SKN) scale=1\.000 .* under=0 dead=0$' || return 1
+        expect_probe 1421 'singleton template=BuildVariationSingleChoice logic-sample=1$' || return 1
+    fi
 
     if covers 245 && covers 276; then
         awk '
