@@ -633,6 +633,7 @@ public:
 	Real getTurbulenceAmplitude() const { return m_turbulenceAmplitude; }
 	Real getTurbulenceFrequency() const { return m_turbulenceFrequency; }
 	Real getCylinderRadiusRate() const { return m_cylinderRadiusRate; }
+	Bool isSwirly() const { return m_swirly; }
 	Real getWindFullStrengthDistance() const { return m_windFullStrengthDistance; }
 	Real getWindZeroStrengthDistance() const { return m_windZeroStrengthDistance; }
 	const Coord3D *getCylinderOffset() const { return &m_cylinderOffset; }
@@ -691,6 +692,7 @@ protected:
 	Real m_turbulenceAmplitude = 0.0f;
 	Real m_turbulenceFrequency = 0.0f;
 	Real m_cylinderRadiusRate = 0.0f;
+	Bool m_swirly = FALSE;
 	struct LightningWave
 	{
 		GameClientRandomVariable amplitude;

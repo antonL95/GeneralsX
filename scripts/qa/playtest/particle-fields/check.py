@@ -30,3 +30,11 @@ def check(log):
             raise RuntimeError(f"Control cylinder radius changed: {radius}")
     if radius[(50, "TestParticleRadiusGrowth")] - radius[(40, "TestParticleRadiusGrowth")] < 8:
         raise RuntimeError(f"Cylinder radius did not grow: {radius}")
+    swirl = {}
+    for name, y in re.findall(
+        r"^TEST particle-live frame=40 id=\d+ name=(TestParticleSwirlControl|TestParticleSwirl) .* xyz=[-\d.]+,([-\d.]+),[-\d.]+",
+        log, re.MULTILINE
+    ):
+        swirl[name] = float(y)
+    if len(swirl) != 2 or abs(swirl["TestParticleSwirl"] - swirl["TestParticleSwirlControl"]) < 1:
+        raise RuntimeError(f"Swirly particle did not move sideways relative to its control: {swirl}")

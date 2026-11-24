@@ -2,6 +2,8 @@
 21 reveal Player_1 GondorGandalf 0
 30 particle-fx Player_1 - 0 FX_TestParticleFields 2520 1010 0
 30 particle-fx Player_1 - 0 FX_TestParticleRadius 2520 1010 0
+30 particle-fx Player_1 GondorGandalf 0 FX_TestParticleSwirl
+
 
 40 particle-live Player_1 - 0
 50 particle-live Player_1 - 0

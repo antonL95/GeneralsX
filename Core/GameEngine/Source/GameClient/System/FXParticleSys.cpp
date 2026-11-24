@@ -172,6 +172,7 @@ void ParticleSystemTemplate::resetForFXDefinition()
 	m_turbulenceAmplitude = 0.0f;
 	m_turbulenceFrequency = 0.0f;
 	m_cylinderRadiusRate = 0.0f;
+	m_swirly = FALSE;
 	m_windFullStrengthDistance = DEFAULT_WIND_FULL_STRENGTH_DISTANCE;
 	m_windZeroStrengthDistance = DEFAULT_WIND_ZERO_STRENGTH_DISTANCE;
 	m_cylinderOffset.zero();
@@ -443,7 +444,7 @@ const FieldParse ParticleSystemTemplate::m_fxPhysicsFieldParseTable[] =
 	{ "VelocityDamping",       INI::parseGameClientRandomVariable,        nullptr, offsetof( ParticleSystemTemplate, m_velDamping ) },
 	{ "DriftVelocity",         INI::parseCoord3D,                         nullptr, offsetof( ParticleSystemTemplate, m_driftVelocity ) },
 	{ "ParticlesAttachToBone", ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "Swirly",                ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "Swirly",                INI::parseBool, nullptr, offsetof(ParticleSystemTemplate, m_swirly) },
 	{ nullptr,                 nullptr,                                   nullptr, 0 }
 };
 

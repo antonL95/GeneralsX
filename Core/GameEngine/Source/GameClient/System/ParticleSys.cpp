@@ -586,6 +586,30 @@ void Particle::draw(Real timeScale)
 	// see if we should even do anything
 	if( windMotion != ParticleSystemInfo::WIND_MOTION_NOT_USED )
 		doWindMotion(timeScale);
+	const ParticleSystemTemplate *definition = m_system->getTemplate();
+	if (definition && definition->isSwirly())
+	{
+		Drawable *owner = nullptr;
+		if (ObjectID id = m_system->getAttachedObject())
+		{
+			Object *object = TheGameLogic->findObjectByID(id);
+			owner = object ? object->getDrawable() : nullptr;
+		}
+		else if (DrawableID id = m_system->getAttachedDrawable())
+			owner = TheGameClient->findDrawableByID(id);
+		if (owner)
+		{
+			const Coord3D *center = owner->getPosition();
+			Coord3D radial = {m_pos.x - center->x, m_pos.y - center->y, 0.0f};
+			const Real distance = radial.length();
+			if (distance > 0.0f)
+			{
+				const Real motion = 4.0f * m_vel.length() * timeScale / distance;
+				m_pos.x -= radial.y * motion;
+				m_pos.y += radial.x * motion;
+			}
+		}
+	}
 
 	// update orientation
 #if PARTICLE_USE_XY_ROTATION
