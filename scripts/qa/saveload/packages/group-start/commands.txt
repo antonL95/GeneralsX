@@ -1,7 +1,7 @@
-15 create Player_1 GroupStartGuard 0 1630,170,-90
-15 create Player_1 GroupStartArchers 0 1600,260,-90
-15 create Player_1 GroupStartKnights 0 1670,360,-90
-15 create Player_1 GroupStartHero 0 1570,325,-90
+15 create Player_1 GroupStartGuard 0 1420,390,-90
+15 create Player_1 GroupStartArchers 0 1390,480,-90
+15 create Player_1 GroupStartKnights 0 1460,580,-90
+15 create Player_1 GroupStartHero 0 1360,545,-90
 15 create Player_1 GroupStartGuard 1 2830,180,-90
 15 create Player_1 GroupStartArchers 1 2800,270,-90
 15 create Player_1 GroupStartKnights 1 2870,370,-90
@@ -19,7 +19,7 @@
 240 selectadd Player_1 GroupStartArchers 0
 240 selectadd Player_1 GroupStartKnights 0
 240 selectadd Player_1 GroupStartHero 0
-240 movesel - - 0 - 1950 280
+240 movesel - - 0 - 1740 500
 242 select Player_1 GroupStartGuard 1
 242 selectadd Player_1 GroupStartArchers 1
 242 selectadd Player_1 GroupStartKnights 1
