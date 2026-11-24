@@ -843,13 +843,41 @@ const LocomotorTemplate* LocomotorStore::findOrCreateRotwkVariant(const AsciiStr
 		return nullptr;
 
 	LocomotorTemplate* variant = newInstance(LocomotorTemplate);
-	*variant = *static_cast<const LocomotorTemplate*>(base->getFinalOverride());
-	variant->setNextOverride(nullptr);
-	variant->markAsOverride(false);
 	variant->friend_setName(variantName);
-	variant->applyRotwkSetSpeed(speedPerSecond);
+	variant->m_rotwkVariantBase = base;
+	variant->m_rotwkVariantSpeed = speedPerSecond;
+	applyRotwkVariantSource(variant, base);
+	if (const auto* effective = static_cast<const LocomotorTemplate*>(base->getFinalOverride()); effective != base)
+		applyRotwkVariantSource(newOverride(variant), effective);
 	m_locomotorTemplates[variantKey] = variant;
 	return variant;
+}
+
+void LocomotorStore::applyRotwkVariantSource(LocomotorTemplate* variant, const LocomotorTemplate* source)
+{
+	const AsciiString name = variant->m_name;
+	const LocomotorTemplate* base = variant->m_rotwkVariantBase;
+	const Real speed = variant->m_rotwkVariantSpeed;
+	Overridable* next = variant->friend_getNextOverride();
+	*variant = *source;
+	variant->setNextOverride(next);
+	variant->friend_setName(name);
+	variant->m_rotwkVariantBase = base;
+	variant->m_rotwkVariantSpeed = speed;
+	variant->applyRotwkSetSpeed(speed);
+}
+
+void LocomotorStore::refreshRotwkVariants(const LocomotorTemplate* base, const LocomotorTemplate* effective)
+{
+	for (const auto& entry : m_locomotorTemplates)
+	{
+		LocomotorTemplate* variant = entry.second;
+		if (variant->m_rotwkVariantBase != base)
+			continue;
+		if (effective != base)
+			variant = newOverride(static_cast<LocomotorTemplate*>(variant->friend_getFinalOverride()));
+		applyRotwkVariantSource(variant, effective);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -906,7 +934,8 @@ LocomotorTemplate *LocomotorStore::newOverride( LocomotorTemplate *locoTemplate 
 	const char* token = ini->getNextToken();
 	NameKeyType namekey = NAMEKEY(token);
 
-	LocomotorTemplate *loco = TheLocomotorStore->findLocomotorTemplate(namekey);
+	LocomotorTemplate *base = TheLocomotorStore->findLocomotorTemplate(namekey);
+	LocomotorTemplate *loco = base;
 	if (loco) {
 		if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES) {
 			loco = TheLocomotorStore->newOverride((LocomotorTemplate*) loco->friend_getFinalOverride());
@@ -927,6 +956,8 @@ LocomotorTemplate *LocomotorStore::newOverride( LocomotorTemplate *locoTemplate 
 	// to the override, so don't add it to the map.
 	if (!isOverride)
 		TheLocomotorStore->m_locomotorTemplates[namekey] = loco;
+	else
+		TheLocomotorStore->refreshRotwkVariants(base, loco);
 }
 
 //-------------------------------------------------------------------------------------------------

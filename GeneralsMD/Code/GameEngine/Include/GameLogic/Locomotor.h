@@ -144,6 +144,7 @@ class LocomotorTemplate : public Overridable
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( LocomotorTemplate, "LocomotorTemplate"  )
 	friend class Locomotor;
+	friend class LocomotorStore;
 
 public:
 
@@ -268,6 +269,8 @@ private:
 	Real m_aeleronCorrectionRate = 0.0f;
 
 	RotwkLocomotorRules::Authored	m_rotwk;
+	const LocomotorTemplate* m_rotwkVariantBase = nullptr;
+	Real m_rotwkVariantSpeed = 0.0f;
 	Real m_swoopStandoffRadius = 0.0f;
 	Real m_swoopStandoffHeight = 0.0f;
 	Real m_swoopTerminalVelocity = 0.0f;
@@ -592,6 +595,9 @@ public:
 protected:
 
 private:
+
+	static void applyRotwkVariantSource(LocomotorTemplate* variant, const LocomotorTemplate* source);
+	void refreshRotwkVariants(const LocomotorTemplate* base, const LocomotorTemplate* effective);
 
 	typedef std::map< NameKeyType, LocomotorTemplate*, std::less<NameKeyType>/**/> LocomotorTemplateMap;
 
