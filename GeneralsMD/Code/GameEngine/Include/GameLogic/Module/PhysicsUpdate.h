@@ -121,6 +121,7 @@ public:
 	void applyShock( const Coord3D *force );					///< apply a shockwave force against the object's CG
 	Bool launchFromImpact(const Coord3D& direction, Real amount, Real zFactor, Bool ram = FALSE);
 	void launchFromWeaponImpact(const Coord3D& direction, Real amount, Real zFactor, RetailDamageFXTrigger trigger);
+	void launchFromContainment(const Coord3D& velocity);
 	Bool isInRetailImpact() const { return m_impactFlightFrames != 0 || m_impactEndFrame != 0; }
 	void applyRandomRotation();											  ///< apply a random rotation at the object's CG
 	void addVelocityTo(const Coord3D* vel) ;
@@ -253,6 +254,7 @@ protected:
 	Real getZFriction() const;
 
 	void applyGravitationalForces();
+	void startImpactFlight(const Coord3D& velocity, UnsignedInt frames, Real height);
 	void applyFrictionalForces();
 	Bool handleBounce(Real oldZ, Real newZ, Real groundZ, Coord3D* bounceForce);
 	void applyYPRDamping(Real factor);

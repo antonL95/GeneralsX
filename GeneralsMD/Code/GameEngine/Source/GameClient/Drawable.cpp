@@ -67,6 +67,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/StickyBombUpdate.h"
@@ -2787,6 +2788,8 @@ void Drawable::draw()
 			}
 		}
 	}
+	if (RetailFileLayers::enabled())
+		applyRetailPassengerTransform(transformMtx);
 	if (!isInstanceIdentity())
 	{
 #ifdef ALLOW_TEMPORARIES
@@ -4478,6 +4481,49 @@ void Drawable::interpolateRetailPosition(const Coord3D& previous, const Coord3D&
 	};
 }
 
+static void applyPassengerBone(const Object& carrier, const AsciiString& bone, Bool forceOrientation, Matrix3D& transform)
+{
+	const Drawable* draw = carrier.getDrawable();
+	Matrix3D boneTransform;
+	if (!draw || !draw->getCurrentWorldspaceClientBonePositions(bone.str(), boneTransform))
+		return;
+	if (forceOrientation)
+		transform = boneTransform;
+	else
+		transform.Set_Translation(boneTransform.Get_Translation());
+}
+
+void Drawable::releaseRetailPassenger(const Object& carrier, const AsciiString& bone, Bool forceOrientation, Real snappyness)
+{
+	m_passengerReleaseSnap = std::clamp(snappyness, 0.0f, 1.0f);
+	if (m_passengerReleaseSnap >= 1.0f)
+		return;
+	m_passengerReleaseTransform = *getTransformMatrix();
+	applyPassengerBone(carrier, bone, forceOrientation, m_passengerReleaseTransform);
+	m_passengerReleaseFrame = TheGameLogic->getFrame();
+}
+
+void Drawable::applyRetailPassengerTransform(Matrix3D& transform) const
+{
+	const Object* object = getObject();
+	if (!object)
+		return;
+	if (const Object* carrier = object->getContainedBy())
+	{
+		ContainModuleInterface* contain = carrier->getContain();
+		const OpenContain* open = contain ? contain->asOpenContain() : nullptr;
+		if (const AsciiString* bone = open ? open->getPassengerBone(object->getID()) : nullptr)
+			applyPassengerBone(*carrier, *bone, open->forcePassengerOrientation(), transform);
+		return;
+	}
+	if (m_passengerReleaseSnap >= 1.0f)
+		return;
+	const Real elapsed = static_cast<Real>(TheGameLogic->getFrame() - m_passengerReleaseFrame);
+	const Real blend = m_passengerReleaseSnap + elapsed * SECONDS_PER_LOGICFRAME_REAL;
+	if (blend < 1.0f)
+		Matrix3D::Lerp(m_passengerReleaseTransform, transform, blend, transform);
+}
+
 //-------------------------------------------------------------------------------------------------
 /**
  * Set and clear the drawable's caption text
@@ -5665,6 +5711,14 @@ void Drawable::xferRetailBlocks(Xfer* xfer, Bool present)
 				block->xferBool(&fade.show);
 			}
 		}, [this] { m_retailSubObjectFades.clear(); }},
+		{"passenger-release", [this](Xfer* block) {
+			block->xferReal(&m_passengerReleaseSnap);
+			if (m_passengerReleaseSnap < 1.0f)
+			{
+				block->xferUnsignedInt(&m_passengerReleaseFrame);
+				block->xferMatrix3D(&m_passengerReleaseTransform);
+			}
+		}, [this] { m_passengerReleaseSnap = 1.0f; }},
 	});
 }
 

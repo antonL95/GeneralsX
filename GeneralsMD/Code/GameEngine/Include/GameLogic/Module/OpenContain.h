@@ -114,6 +114,8 @@ public:
 
 	virtual ContainModuleInterface* getContain() override { return this; }
 	const OpenContainModuleData* getRetailOpenContainData() const { return getOpenContainModuleData(); }
+	const AsciiString* getPassengerBone(ObjectID passenger) const;
+	virtual Bool forcePassengerOrientation() const { return TRUE; }
 	virtual CollideModuleInterface* getCollide() override { return this; }
 	virtual DieModuleInterface* getDie() override { return this; }
 	virtual DamageModuleInterface* getDamage() override { return this; }
@@ -256,7 +258,7 @@ public:
   virtual void setEvacDisposition( EvacDisposition disp ) override {};
 protected:
 
-	Bool allowsPassenger(const ThingTemplate& passenger, Relationship relationship) const;
+	Bool allowsPassenger(const ThingTemplate& passenger, Relationship relationship, Bool ownPlayer = FALSE) const;
 	void addToContain(Object* rider, Bool validateAdmission);
 
 	virtual void monitorConditionChanges();				///< check to see if we need to update our occupant positions from a model change or anything else
@@ -283,6 +285,14 @@ protected:
 	ContainedItemsList	m_containList;						///< the list of contained objects
 	UnsignedInt					m_containListSize;							///< size of contained list
 private:
+	void assignPassengerBone(const Object* passenger);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+	struct PassengerBone
+	{
+		ObjectID passenger;
+		AsciiString bone;
+	};
+	std::vector<PassengerBone> m_passengerBones;
 
 	typedef std::map< ObjectID, ObjectEnterExitType, std::less<ObjectID>/**/> ObjectEnterExitMap;
 

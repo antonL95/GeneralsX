@@ -42,6 +42,12 @@ public:
 		AsciiString name;
 		Int count;
 	};
+	struct UpgradePayload
+	{
+		AsciiString upgrade;
+		AsciiString object;
+		UnsignedInt count;
+	};
 
 	Int								m_slotCapacity;								///< max units that can be inside us
 	Real							m_exitPitchRate;
@@ -65,11 +71,19 @@ public:
 	Bool m_fadePassengerOnExit = FALSE;
 	Real m_enterFadeTime = 0.0f;
 	Real m_exitFadeTime = 0.0f;
+	Bool m_canGrabStructure = FALSE;
+	Bool m_shouldThrowOutPassengers = FALSE;
+	UnsignedInt m_throwOutPassengersDelay = 0;
+	Coord3D m_throwOutPassengersVelocity{};
+	Real m_releaseSnappyness = 0.7f;
+	std::vector<UpgradePayload> m_upgradePayloads;
+	enum { MAX_UPGRADE_PAYLOADS = 4 };
 
 	TransportContainModuleData();
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 	static void parseInitialPayload( INI* ini, void *instance, void *store, const void* /*userData*/ );
+	static void parseUpgradePayload(INI* ini, void* instance, void* store, const void* custom);
 
 };
 
@@ -88,6 +102,7 @@ public:
 	virtual Bool isValidContainerFor( const Object* obj, Bool checkCapacity) const override;
 	Int getPassengerSlotCount(const Object* rider) const;
 	Bool canCarryNewPassenger(const ThingTemplate& passenger, const Team& team) const;
+	Bool forcePassengerOrientation() const override { return getTransportContainModuleData()->m_forceOrientationContainer; }
 
 	virtual void onCapture( Player *oldOwner, Player *newOwner ) override; // have to kick everyone out on capture.
 	virtual void onContaining( Object *obj, Bool wasSelected ) override;		///< object now contains 'obj'
@@ -120,7 +135,12 @@ protected:
 
 private:
 
+	void createUpgradePayloads();
+	void throwOutPassengers();
+	void xferRetailTransportBlocks(Xfer* xfer, Bool present);
 	Bool fitsPassenger(const ThingTemplate& passenger, const Player* owner, Int slots, Bool checkCapacity) const;
+	UnsignedByte m_consumedUpgradePayloads = 0;
+	UnsignedInt m_throwPassengersAt = 0;
 	Int m_extraSlotsInUse;
 	UnsignedInt m_frameExitNotBusy;
 

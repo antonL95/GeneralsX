@@ -36,6 +36,7 @@
 #include "Common/BitFlagsIO.h"
 #include "Common/GameAudio.h"
 #include "Common/GameState.h"
+#include "Common/INIException.h"
 #include "Common/Module.h"
 #include "Common/Player.h"
 #include "Common/RandomValue.h"
@@ -48,9 +49,11 @@
 
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Module/OpenContain.h"
 #include "Common/ModuleFactory.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/RetailHordeTransport.h"
@@ -101,33 +104,54 @@ void OpenContainModuleData::parsePassengerBonePrefix(INI* ini, void* instance, v
 {
 	auto* data = static_cast<OpenContainModuleData*>(instance);
 	PassengerBonePrefix entry;
-	const char* const* kindNames = KindOfMaskType::getBitNames();
-	while (const char* token = ini->getNextTokenOrNull())
+	entry.bonePrefix.set(ini->getNextSubToken("PassengerBone"));
+	if (stricmp(ini->getNextToken(INI::getSepsColon()), "KindOf") != 0)
+		throw INIException("PassengerBonePrefix requires KindOf");
+	KindOfMaskType::parseFromINI(ini, nullptr, &entry.kindOf, nullptr);
+	data->m_passengerBonePrefixes.push_back(entry);
+}
+
+const AsciiString* OpenContain::getPassengerBone(ObjectID passenger) const
+{
+	for (const PassengerBone& attachment : m_passengerBones)
+		if (attachment.passenger == passenger)
+			return &attachment.bone;
+	return nullptr;
+}
+
+void OpenContain::assignPassengerBone(const Object* passenger)
+{
+	if (getPassengerBone(passenger->getID()))
+		return;
+	const Object* carrier = getObject();
+	const auto isInUse = [this](const AsciiString& name) {
+		for (const PassengerBone& attachment : m_passengerBones)
+			if (stricmp(attachment.bone.str(), name.str()) == 0)
+				return TRUE;
+		return FALSE;
+	};
+	for (const auto& entry : getOpenContainModuleData()->m_passengerBonePrefixes)
 	{
-		if (strncasecmp(token, "PassengerBone:", 14) == 0)
+		if (!passenger->isAnyKindOf(entry.kindOf))
+			continue;
+		const Int count = carrier->getMultiLogicalBonePosition(entry.bonePrefix.str(), MAX_FIRE_POINTS, nullptr, nullptr, FALSE);
+		if (count == 0 && carrier->getSingleLogicalBonePosition(entry.bonePrefix.str(), nullptr, nullptr) &&
+			!isInUse(entry.bonePrefix))
 		{
-			const char* value = token[14] ? token + 14 : ini->getNextTokenOrNull();
-			if (value)
-				entry.bonePrefix.set(value);
+			m_passengerBones.push_back({passenger->getID(), entry.bonePrefix});
+			return;
 		}
-		else if (strncasecmp(token, "KindOf:", 7) == 0)
+		for (Int slot = 1; slot <= count; ++slot)
 		{
-			const char* value = token[7] ? token + 7 : ini->getNextTokenOrNull();
-			if (value && kindNames)
+			AsciiString name;
+			name.format("%s%02d", entry.bonePrefix.str(), slot);
+			if (!isInUse(name))
 			{
-				for (Int bit = 0; kindNames[bit]; ++bit)
-				{
-					if (strcasecmp(kindNames[bit], value) == 0)
-					{
-						entry.kindOf.set(bit, TRUE);
-						break;
-					}
-				}
+				m_passengerBones.push_back({passenger->getID(), name});
+				return;
 			}
 		}
 	}
-	if (!entry.bonePrefix.isEmpty())
-		data->m_passengerBonePrefixes.push_back(entry);
 }
 
 /*static*/ void OpenContainModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -477,6 +501,8 @@ void OpenContain::addToContainList( Object *rider )
 {
 	m_containList.push_back(rider);
 	m_containListSize++;
+	if (RetailFileLayers::enabled() && !isHordeContain())
+		assignPassengerBone(rider);
 	if( rider->isKindOf( KINDOF_STEALTH_GARRISON ) )
 	{
 		m_stealthUnitsContained++;
@@ -902,6 +928,9 @@ void OpenContain::onRemoving( Object *rider)
 {
 	if (RetailFileLayers::enabled() && rider && !isHordeContain())
 	{
+		std::erase_if(m_passengerBones, [rider](const PassengerBone& attachment) {
+			return attachment.passenger == rider->getID();
+		});
 		const ObjectStatusMaskType& status = getOpenContainModuleData()->m_objectStatusOfContained;
 		if (status.any())
 		{
@@ -1027,12 +1056,26 @@ void OpenContain::onDie( const DamageInfo * damageInfo )
 	if (!data->m_dieMuxData.isDieApplicable(getObject(), damageInfo))
 		return;
 
-	if (RetailFileLayers::enabled() && data->m_killPassengersOnDeath)
+	if (!data->m_ejectPassengersOnDeath)
+	{
+		const ContainedItemsList passengers = m_containList;
+		for (Object* passenger : passengers)
+			TheGameLogic->destroyObject(passenger);
+		return;
+	}
+
+	if (RetailFileLayers::enabled() && data->m_killPassengersOnDeath && getDamagePercentageToUnits() > 0)
 	{
 		const ContainedItemsList passengers = m_containList;
 		for (Object* passenger : passengers)
 		{
 			removeFromContain(passenger);
+			if (PhysicsBehavior* physics = passenger->getPhysics())
+			{
+				const Real speed = GameLogicRandomValue(2, 5);
+				const Coord3D& heading = *passenger->getUnitDirectionVector2D();
+				physics->launchFromContainment({heading.x * speed, heading.y * speed, 0.0f});
+			}
 			if (const HordeContain* horde = HordeContain::get(passenger))
 			{
 				const ContainedItemsList members = *horde->getContainedItemsList();
@@ -1049,14 +1092,6 @@ void OpenContain::onDie( const DamageInfo * damageInfo )
 				passenger->kill(DAMAGE_UNRESISTABLE, DEATH_NORMAL);
 			}
 		}
-		return;
-	}
-
-	if (!data->m_ejectPassengersOnDeath)
-	{
-		const ContainedItemsList passengers = m_containList;
-		for (Object* passenger : passengers)
-			TheGameLogic->destroyObject(passenger);
 		return;
 	}
 
@@ -1116,7 +1151,7 @@ Bool OpenContain::isValidContainerFor(const Object* obj, Bool checkCapacity) con
 	return TRUE;
 }
 
-Bool OpenContain::allowsPassenger(const ThingTemplate& passenger, Relationship relationship) const
+Bool OpenContain::allowsPassenger(const ThingTemplate& passenger, Relationship relationship, Bool ownPlayer) const
 {
 	const auto* data = getOpenContainModuleData();
 	if (!passenger.isAnyKindOf(data->m_allowInsideKindOf) || passenger.isAnyKindOf(data->m_forbidInsideKindOf))
@@ -1124,7 +1159,7 @@ Bool OpenContain::allowsPassenger(const ThingTemplate& passenger, Relationship r
 
 	switch (relationship)
 	{
-		case ALLIES: return data->m_allowAlliesInside;
+		case ALLIES: return data->m_allowAlliesInside || (ownPlayer && data->m_allowOwnPlayerInsideOverride);
 		case ENEMIES: return data->m_allowEnemiesInside;
 		case NEUTRAL: return data->m_allowNeutralInside;
 		default:
@@ -1433,6 +1468,26 @@ void OpenContain::redeployOccupants()
 //-------------------------------------------------------------------------------------------------
 void OpenContain::putObjAtNextFirePoint( Object *obj )
 {
+	if (RetailFileLayers::enabled())
+	{
+		if (!getOpenContainModuleData()->m_passengerBonePrefixes.empty())
+			assignPassengerBone(obj);
+		if (const AsciiString* name = getPassengerBone(obj->getID()))
+		{
+			Coord3D position;
+			Matrix3D bone;
+			getObject()->getSingleLogicalBonePosition(name->str(), &position, &bone);
+			if (forcePassengerOrientation() && !isEnclosingContainerFor(obj))
+			{
+				obj->setTransformMatrix(&bone);
+				return;
+			}
+			Matrix3D transform = *obj->getTransformMatrix();
+			transform.Set_Translation(Vector3(position.x, position.y, position.z));
+			obj->setTransformMatrix(&transform);
+			return;
+		}
+	}
 
 	//
 	// first, if we need to load the 3D point data from the art do so, if we've already
@@ -1788,8 +1843,14 @@ Real OpenContain::getDamagePercentageToUnits()
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool OpenContain::isEnclosingContainerFor( const Object * ) const
+Bool OpenContain::isEnclosingContainerFor(const Object* passenger) const
 {
+	const auto* data = getOpenContainModuleData();
+	if (!passenger || data->m_objectStatusOfContained.test(OBJECT_STATUS_ENCLOSED))
+		return TRUE;
+	for (const auto& entry : data->m_passengerBonePrefixes)
+		if (passenger->isAnyKindOf(entry.kindOf))
+			return FALSE;
 	return TRUE;
 }
 
@@ -1894,7 +1955,31 @@ void OpenContain::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
+	if (RetailFileLayers::enabled() && !getOpenContainModuleData()->m_passengerBonePrefixes.empty())
+		xferRetailBlocks(xfer, TRUE);
 
+}
+
+void OpenContain::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection<Xfer>(xfer, loading, present, {
+		{"passenger-bones", [this, loading](Xfer* block) {
+			UnsignedInt count = static_cast<UnsignedInt>(m_passengerBones.size());
+			block->xferUnsignedInt(&count);
+			if (loading)
+			{
+				if (count > m_containListSize)
+					throw SC_INVALID_DATA;
+				m_passengerBones.resize(count);
+			}
+			for (PassengerBone& attachment : m_passengerBones)
+			{
+				block->xferObjectID(&attachment.passenger);
+				block->xferAsciiString(&attachment.bone);
+			}
+		}, [this] { m_passengerBones.clear(); }}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1908,7 +1993,8 @@ void OpenContain::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 2;
+	const Bool retail = RetailFileLayers::enabled();
+	XferVersion currentVersion = retail ? 3 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2073,6 +2159,8 @@ void OpenContain::xfer( Xfer *xfer )
     xfer->xferBool( &m_passengerAllowedToFire );
   }
 
+	if (retail)
+		xferRetailBlocks(xfer, version >= 3);
 
 }
 

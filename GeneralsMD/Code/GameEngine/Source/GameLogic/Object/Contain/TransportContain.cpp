@@ -30,10 +30,14 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/INIException.h"
 #include "Common/Player.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
+#include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/AI.h"
@@ -89,6 +93,18 @@ void TransportContainModuleData::parseInitialPayload( INI* ini, void *instance, 
 	self->m_initialPayload.count = count;
 }
 
+void TransportContainModuleData::parseUpgradePayload(INI* ini, void* instance, void*, const void*)
+{
+	auto& payloads = static_cast<TransportContainModuleData*>(instance)->m_upgradePayloads;
+	if (payloads.size() == MAX_UPGRADE_PAYLOADS)
+		throw INIException("Too many UpgradeCreationTrigger entries");
+	UpgradePayload payload;
+	payload.upgrade.set(ini->getNextToken());
+	payload.object.set(ini->getNextToken());
+	payload.count = INI::scanUnsignedInt(ini->getNextToken());
+	payloads.push_back(payload);
+}
+
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 void TransportContainModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -122,6 +138,12 @@ void TransportContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 			{ "TypeOneForWeaponSet", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeOne) },
 			{ "TypeOneForWeaponState", KindOfMaskType::parseFromINI, nullptr, offsetof(TransportContainModuleData, m_passengerTypeOne) },
 			{ "ForceOrientationContainer", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_forceOrientationContainer) },
+			{ "CanGrabStructure", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_canGrabStructure) },
+			{ "ShouldThrowOutPassengers", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_shouldThrowOutPassengers) },
+			{ "ThrowOutPassengersDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(TransportContainModuleData, m_throwOutPassengersDelay) },
+			{ "ThrowOutPassengersVelocity", INI::parseCoord3D, nullptr, offsetof(TransportContainModuleData, m_throwOutPassengersVelocity) },
+			{ "ReleaseSnappyness", INI::parseReal, nullptr, offsetof(TransportContainModuleData, m_releaseSnappyness) },
+			{ "UpgradeCreationTrigger", parseUpgradePayload, nullptr, 0 },
 			{ "FadeFilter", SpecialPowerObjectFilter::parse, nullptr, offsetof(TransportContainModuleData, m_fadeFilter) },
 			{ "FadePassengerOnEnter", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_fadePassengerOnEnter) },
 			{ "FadePassengerOnExit", INI::parseBool, nullptr, offsetof(TransportContainModuleData, m_fadePassengerOnExit) },
@@ -155,6 +177,7 @@ TransportContain::TransportContain( Thing *thing, const ModuleData *moduleData )
 {
 	m_extraSlotsInUse = 0;
 	m_frameExitNotBusy = 0;
+	m_payloadCreated = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -173,7 +196,10 @@ TransportContain::~TransportContain()
 Int TransportContain::getPassengerSlotCount(const Object* rider) const
 {
 	const Int slots = rider->getTransportSlotCount();
-	return slots == 0 && getTransportContainModuleData()->m_hasPassengerFilter ? 1 : slots;
+	const auto* data = getTransportContainModuleData();
+	if (rider->isKindOf(KINDOF_STRUCTURE))
+		return slots;
+	return slots == 0 && data->m_hasPassengerFilter ? 1 : slots;
 }
 
 Bool TransportContain::isValidContainerFor(const Object* rider, Bool checkCapacity) const
@@ -220,17 +246,22 @@ Bool TransportContain::canCarryNewPassenger(const ThingTemplate& passenger, cons
 	const Object* carrier = getObject();
 	const Relationship relationship = carrier->getIsUndetectedDefector() ? ALLIES : team.getRelationship(carrier->getTeam());
 	const Int rawSlots = passenger.getRawTransportSlotCount();
-	const Int slots = rawSlots == 0 && getTransportContainModuleData()->m_hasPassengerFilter ? 1 : rawSlots;
-	return allowsPassenger(passenger, relationship) && fitsPassenger(passenger, team.getControllingPlayer(), slots, TRUE);
+	const Int slots = rawSlots == 0 && !passenger.isKindOf(KINDOF_STRUCTURE) &&
+		getTransportContainModuleData()->m_hasPassengerFilter ? 1 : rawSlots;
+	const Player* owner = team.getControllingPlayer();
+	return allowsPassenger(passenger, relationship, owner == carrier->getControllingPlayer()) &&
+		fitsPassenger(passenger, owner, slots, TRUE);
 }
 
 Bool TransportContain::fitsPassenger(const ThingTemplate& passenger, const Player* owner, Int slots, Bool checkCapacity) const
 {
 	const auto* data = getTransportContainModuleData();
+	const Bool grabStructure = data->m_canGrabStructure && passenger.isKindOf(KINDOF_STRUCTURE);
 	if (data->m_hasPassengerFilter ? !data->m_passengerFilter.matchesTemplate(passenger) :
-		owner != getObject()->getControllingPlayer())
+		!grabStructure && owner != getObject()->getControllingPlayer())
 		return FALSE;
-
+	if (grabStructure)
+		return static_cast<Int>(getContainCount()) < getContainMax();
 	return slots != 0 && (!checkCapacity || m_extraSlotsInUse + static_cast<Int>(getContainCount()) + slots <= getContainMax());
 }
 
@@ -301,6 +332,9 @@ void TransportContain::letRidersUpgradeWeaponSet()
 void TransportContain::onContaining( Object *rider, Bool wasSelected )
 {
 	OpenContain::onContaining( rider, wasSelected );
+	const auto* data = getTransportContainModuleData();
+	if (data->m_shouldThrowOutPassengers)
+		m_throwPassengersAt = TheGameLogic->getFrame() + data->m_throwOutPassengersDelay;
 	if (rider->isAnyKindOf(getTransportContainModuleData()->m_passengerTypeOne))
 		getObject()->setWeaponSetFlag(WEAPONSET_PASSENGER_TYPE_ONE);
 
@@ -309,9 +343,11 @@ void TransportContain::onContaining( Object *rider, Bool wasSelected )
 
 	Int transportSlotCount = getPassengerSlotCount(rider);
 
-	DEBUG_ASSERTCRASH(transportSlotCount > 0, ("Hmm, this object isnt transportable"));
+	DEBUG_ASSERTCRASH(transportSlotCount > 0 || (data->m_canGrabStructure && rider->isKindOf(KINDOF_STRUCTURE)),
+		("Hmm, this object isnt transportable"));
 	m_extraSlotsInUse += transportSlotCount - 1;
-	DEBUG_ASSERTCRASH(m_extraSlotsInUse >= 0 && m_extraSlotsInUse + getContainCount() <= getContainMax(), ("Hmm, bad slot count"));
+	DEBUG_ASSERTCRASH(data->m_canGrabStructure || (m_extraSlotsInUse >= 0 && m_extraSlotsInUse + getContainCount() <= getContainMax()),
+		("Hmm, bad slot count"));
 
 	//
 	// when we go from holding nothing to holding something we have a model condition
@@ -349,6 +385,12 @@ void TransportContain::onContaining( Object *rider, Bool wasSelected )
 //-------------------------------------------------------------------------------------------------
 void TransportContain::onRemoving( Object *rider )
 {
+	const TransportContainModuleData* d = getTransportContainModuleData();
+	if (const AsciiString* bone = getPassengerBone(rider->getID()))
+	{
+		if (Drawable* draw = rider->getDrawable(); draw && !isEnclosingContainerFor(rider))
+			draw->releaseRetailPassenger(*getObject(), *bone, forcePassengerOrientation(), d->m_releaseSnappyness);
+	}
 	OpenContain::onRemoving(rider);
 	if (rider->isAnyKindOf(getTransportContainModuleData()->m_passengerTypeOne))
 	{
@@ -367,8 +409,6 @@ void TransportContain::onRemoving( Object *rider )
 
 	// object is no longer held inside a transport
 	rider->clearDisabled( DISABLED_HELD );
-
-	const TransportContainModuleData* d = getTransportContainModuleData();
 
 	if (!d->m_exitBone.isEmpty())
 	{
@@ -408,13 +448,16 @@ void TransportContain::onRemoving( Object *rider )
 	}
 
 	Int transportSlotCount = getPassengerSlotCount(rider);
-	DEBUG_ASSERTCRASH(transportSlotCount > 0, ("Hmm, this object isnt transportable"));
+	DEBUG_ASSERTCRASH(transportSlotCount > 0 || (d->m_canGrabStructure && rider->isKindOf(KINDOF_STRUCTURE)),
+		("Hmm, this object isnt transportable"));
 	m_extraSlotsInUse -= transportSlotCount - 1;
-	DEBUG_ASSERTCRASH(m_extraSlotsInUse >= 0 && m_extraSlotsInUse + getContainCount() <= getContainMax(), ("Hmm, bad slot count"));
+	DEBUG_ASSERTCRASH(d->m_canGrabStructure || (m_extraSlotsInUse >= 0 && m_extraSlotsInUse + getContainCount() <= getContainMax()),
+		("Hmm, bad slot count"));
 
 	// when we are empty again, clear the model condition for loaded
 	if( getContainCount() == 0 )
 	{
+		m_throwPassengersAt = 0;
 		Drawable *draw = getObject()->getDrawable();
 
 		if( draw )
@@ -502,11 +545,70 @@ void TransportContain::createPayload()
 
 }
 
+void TransportContain::createUpgradePayloads()
+{
+	Object* transport = getObject();
+	if (transport->isEffectivelyDead())
+		return;
+	const auto& payloads = getTransportContainModuleData()->m_upgradePayloads;
+	for (UnsignedInt index = 0; index < payloads.size(); ++index)
+	{
+		const UnsignedByte bit = 1u << index;
+		if (m_consumedUpgradePayloads & bit)
+			continue;
+		const auto& payload = payloads[index];
+		const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(payload.upgrade);
+		if (!upgrade || !(transport->hasUpgrade(upgrade) || transport->getControllingPlayer()->hasUpgradeComplete(upgrade)))
+			continue;
+		m_consumedUpgradePayloads |= bit;
+		const ThingTemplate* passenger = TheThingFactory->findTemplate(payload.object, FALSE);
+		if (!passenger)
+			continue;
+		for (UnsignedInt count = 0; count < payload.count; ++count)
+		{
+			const Int slots = passenger->getRawTransportSlotCount();
+			if (slots <= 0 || m_extraSlotsInUse + static_cast<Int>(getContainCount()) + slots > getContainMax())
+				break;
+			Object* created = TheThingFactory->newObject(passenger, transport->getTeam());
+			if (!created)
+				break;
+			created->setPosition(transport->getPosition());
+			if (isValidContainerFor(created, FALSE))
+				addToContain(created);
+			if (created->getContainedBy() != transport)
+			{
+				TheGameLogic->destroyObject(created);
+				break;
+			}
+		}
+	}
+}
+
+void TransportContain::throwOutPassengers()
+{
+	const Object* transport = getObject();
+	const Coord3D& velocity = getTransportContainModuleData()->m_throwOutPassengersVelocity;
+	const Vector3 impulse = transport->getTransformMatrix()->Rotate_Vector(Vector3(velocity.x, velocity.y, velocity.z));
+	const Coord3D worldVelocity{impulse.X, impulse.Y, impulse.Z};
+	const ContainedItemsList passengers = getContainList();
+	for (Object* passenger : passengers)
+	{
+		removeFromContain(passenger);
+		if (PhysicsBehavior* physics = passenger->getPhysics())
+			physics->launchFromContainment(worldVelocity);
+	}
+}
+
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 UpdateSleepTime TransportContain::update()
 {
 	const TransportContainModuleData *moduleData = getTransportContainModuleData();
+
+	if (moduleData->m_shouldThrowOutPassengers && getContainCount() && TheGameLogic->getFrame() >= m_throwPassengersAt)
+		throwOutPassengers();
+	if (!moduleData->m_upgradePayloads.empty())
+		createUpgradePayloads();
 
 	if (moduleData->m_passengerTypeOne.any())
 	{
@@ -742,7 +844,22 @@ void TransportContain::crc( Xfer *xfer )
 
 	// extend base class
 	OpenContain::crc( xfer );
+	const auto* data = getTransportContainModuleData();
+	if (RetailFileLayers::enabled() && (data->m_shouldThrowOutPassengers || !data->m_upgradePayloads.empty()))
+		xferRetailTransportBlocks(xfer, TRUE);
 
+}
+
+void TransportContain::xferRetailTransportBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"upgrade-creation-triggers", [this](Xfer* block) {
+			block->xferUnsignedByte(&m_consumedUpgradePayloads);
+		}, [this] { m_consumedUpgradePayloads = 0; }},
+		{"throw-passengers", [this](Xfer* block) {
+			block->xferUnsignedInt(&m_throwPassengersAt);
+		}, [this] { m_throwPassengersAt = 0; }}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -754,7 +871,8 @@ void TransportContain::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	const Bool retail = RetailFileLayers::enabled();
+	XferVersion currentVersion = retail ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -769,6 +887,9 @@ void TransportContain::xfer( Xfer *xfer )
 
 	// frame exit not busy
 	xfer->xferUnsignedInt( &m_frameExitNotBusy );
+
+	if (retail)
+		xferRetailTransportBlocks(xfer, version >= 2);
 
 }
 

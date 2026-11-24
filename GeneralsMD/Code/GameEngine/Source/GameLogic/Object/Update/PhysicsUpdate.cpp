@@ -1165,25 +1165,8 @@ Bool PhysicsBehavior::launchFromImpact(const Coord3D& direction, Real amount, Re
 	const Real lift = std::max(0.0f, speed * zFactor);
 	const Real flightGravity = gravity > 0.0f ? gravity : baseGravity;
 	const Real flight = flightGravity > 0.0f ? 2.0f * lift / flightGravity : 0.0f;
-	m_impactFlightDuration = static_cast<UnsignedInt>(WWMath::Ceil(std::clamp(flight, 2.0f, 360.0f)));
-	m_impactFlightFrames = m_impactFlightDuration;
-	m_impactHeight = lift * Real(m_impactFlightDuration) * 0.25f;
-	m_impactStart = *victim->getPosition();
-	m_impactEnd = { m_impactStart.x + direction.x * speed * Real(m_impactFlightDuration),
-		m_impactStart.y + direction.y * speed * Real(m_impactFlightDuration), 0.0f };
-	m_impactEnd.z = TheTerrainLogic->getLayerHeight(m_impactEnd.x, m_impactEnd.y, victim->getLayer());
-	m_impactStandFrame = 0;
-	m_impactEndFrame = 0;
-	m_vel.x = direction.x * speed;
-	m_vel.y = direction.y * speed;
-	m_vel.z = lift;
-	m_velMag = INVALID_VEL_MAG;
-	setAllowToFall(TRUE);
-	setStunned(TRUE);
-	victim->clearModelConditionState(MODELCONDITION_STUNNED);
-	victim->clearModelConditionState(MODELCONDITION_STUNNED_STANDING_UP);
-	victim->setModelConditionState(MODELCONDITION_STUNNED_FLAILING);
-	setWakeFrame(victim, UPDATE_SLEEP_NONE);
+	const UnsignedInt frames = static_cast<UnsignedInt>(WWMath::Ceil(std::clamp(flight, 2.0f, 360.0f)));
+	startImpactFlight({direction.x * speed, direction.y * speed, lift}, frames, lift * Real(frames) * 0.25f);
 	if (RetailTestCommands::tracesCombat())
 	{
 		std::fprintf(stderr, "TEST launch frame=%u victim=%u velocity=%.3f,%.3f,%.3f\n",
@@ -1191,6 +1174,62 @@ Bool PhysicsBehavior::launchFromImpact(const Coord3D& direction, Real amount, Re
 		std::fflush(stderr);
 	}
 	return TRUE;
+}
+
+void PhysicsBehavior::launchFromContainment(const Coord3D& velocity)
+{
+	Object* victim = getObject();
+	if (victim->getEnclosingContainedBy())
+		return;
+	const Coord3D& position = *victim->getPosition();
+	const Real ground = TheTerrainLogic->getLayerHeight(position.x, position.y, victim->getLayer());
+	Real remainingHeight = position.z - ground;
+	constexpr Real framesPerTick = LOGICFRAMES_PER_SECOND / RotwkDuration::FRAMES_PER_SECOND;
+	const Real gravity = std::abs(TheGlobalData->m_gravity) * getPhysicsBehaviorModuleData()->m_gravityMult *
+		framesPerTick * framesPerTick;
+	if (!(gravity > 0.0f))
+	{
+		setAllowToFall(TRUE);
+		return;
+	}
+	UnsignedInt fallTicks = 0;
+	while (remainingHeight > 0.0f && fallTicks < 3 * RotwkDuration::FRAMES_PER_SECOND)
+	{
+		remainingHeight -= gravity * Real(fallTicks);
+		++fallTicks;
+	}
+	const Real lift = fallTicks < 2
+		? std::max(velocity.z, WWMath::SqrtfOrigin(velocity.x * velocity.x + velocity.y * velocity.y +
+			velocity.z * velocity.z) * 0.25f)
+		: velocity.z;
+	const Real flight = std::abs(2.0f * lift / gravity);
+	const UnsignedInt airTicks = static_cast<UnsignedInt>(std::clamp(flight, 1.0f, 360.0f / framesPerTick));
+	const UnsignedInt ticks = fallTicks + airTicks;
+	const UnsignedInt frames = RotwkDuration::engineFrames(ticks, LOGICFRAMES_PER_SECOND);
+	startImpactFlight({velocity.x / framesPerTick, velocity.y / framesPerTick, lift / framesPerTick},
+		frames, std::max(0.0f, lift * Real(ticks) * 0.25f));
+}
+
+void PhysicsBehavior::startImpactFlight(const Coord3D& velocity, UnsignedInt frames, Real height)
+{
+	Object* victim = getObject();
+	m_impactFlightDuration = frames;
+	m_impactFlightFrames = frames;
+	m_impactHeight = height;
+	m_impactStart = *victim->getPosition();
+	m_impactEnd = {m_impactStart.x + velocity.x * Real(frames),
+		m_impactStart.y + velocity.y * Real(frames), 0.0f};
+	m_impactEnd.z = TheTerrainLogic->getLayerHeight(m_impactEnd.x, m_impactEnd.y, victim->getLayer());
+	m_impactStandFrame = 0;
+	m_impactEndFrame = 0;
+	m_vel = velocity;
+	m_velMag = INVALID_VEL_MAG;
+	setAllowToFall(TRUE);
+	setStunned(TRUE);
+	victim->clearModelConditionState(MODELCONDITION_STUNNED);
+	victim->clearModelConditionState(MODELCONDITION_STUNNED_STANDING_UP);
+	victim->setModelConditionState(MODELCONDITION_STUNNED_FLAILING);
+	setWakeFrame(victim, UPDATE_SLEEP_NONE);
 }
 
 void PhysicsBehavior::launchFromWeaponImpact(const Coord3D& direction, Real amount, Real zFactor, RetailDamageFXTrigger trigger)

@@ -416,6 +416,8 @@ public:
 
 	const Matrix3D *getTransformMatrix() const;	///< return the world transform
 	void interpolateRetailPosition(const Coord3D& previous, const Coord3D& destination, UnsignedInt duration);
+	void releaseRetailPassenger(const Object& carrier, const AsciiString& bone, Bool forceOrientation, Real snappyness);
+	void applyRetailPassengerTransform(Matrix3D& transform) const;
 
 	void draw();													///< render the drawable to the given view
 	void updateDrawable(Real timeScale);														///< update the drawable
@@ -792,6 +794,9 @@ private:
 		UnsignedInt duration = 0;
 	};
 	RetailPositionInterpolation m_retailPositionInterpolation;
+	Matrix3D m_passengerReleaseTransform{true};
+	UnsignedInt m_passengerReleaseFrame = 0;
+	Real m_passengerReleaseSnap = 1.0f;
 	Bool m_hidden;							///< drawable is "hidden" or not (overrides stealth effects)
 	Bool m_hiddenByStealth;			///< drawable is hidden due to stealth
 	Bool m_instanceIsIdentity;	///< If true, instance matrix can be skipped
