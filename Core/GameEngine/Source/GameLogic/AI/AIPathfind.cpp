@@ -395,7 +395,22 @@ Real Pathfinder::getWallHeightAt(const Coord3D& position)
 		{
 			const Object* wall = TheGameLogic->findObjectByID(id);
 			const auto* authored = wall ? RetailWallMesh::forObject(*wall) : nullptr;
-			if (authored && !authored->wall.empty() && RetailWallMesh::contains(*authored, position))
+			Bool authoredCell = FALSE;
+			if (authored && !authored->wall.empty())
+			{
+				Coord3D corner = position;
+				corner.x = REAL_TO_INT_FLOOR(position.x / PATHFIND_CELL_SIZE_F) * PATHFIND_CELL_SIZE_F;
+				corner.y = REAL_TO_INT_FLOOR(position.y / PATHFIND_CELL_SIZE_F) * PATHFIND_CELL_SIZE_F;
+				for (Int x = 0; x < 2 && !authoredCell; ++x)
+					for (Int y = 0; y < 2 && !authoredCell; ++y)
+					{
+						Coord3D sample = corner;
+						sample.x += x * PATHFIND_CELL_SIZE_F;
+						sample.y += y * PATHFIND_CELL_SIZE_F;
+						authoredCell = RetailWallMesh::contains(*authored, sample);
+					}
+			}
+			if (authoredCell)
 			{
 				if (!found || authored->wallHeight > height)
 					height = authored->wallHeight;
