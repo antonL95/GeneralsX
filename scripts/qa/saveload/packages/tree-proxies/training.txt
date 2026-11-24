@@ -1,0 +1,8 @@
+10 create Player_1 MordorMountainTroll 0 145,2295,0
+15 select Player_1 MordorMountainTroll 0
+18 tree-proxies-state Player_1 MordorMountainTroll 0
+
+20 tree-proxies-order Player_1 MordorMountainTroll 0
+200 tree-proxies-state Player_1 MordorMountainTroll 0
+245 tree-proxies-state Player_1 MordorMountainTroll 0
+254 tree-proxies-state Player_1 MordorMountainTroll 0
