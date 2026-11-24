@@ -171,10 +171,14 @@ public:
 	static void parseEmotionNugget(INI* ini);
 	static void clearEmotionNuggets();
 	static Bool signal(Object* victim, EmotionType type, const Object* source);
+	static void queuePromotionEmotion(Object* object, const AsciiString& name);
 	static Bool ownsCrushBraceCondition(const Object* object);
 	static Bool blocksPlayerCommands(const Object* object);
 	UpdateSleepTime update() override;
 	void xferEmotionState(Xfer* xfer);
+	Bool hasPromotionEmotions() const { return m_promotionEmotions != 0; }
+	void xferPromotionEmotions(Xfer* xfer);
+	void clearPromotionEmotions() { m_promotionEmotions = 0; }
 
 private:
 	Bool startEmotion(EmotionType type, const Object* source, Real enemyThreat);
@@ -184,6 +188,7 @@ private:
 	UnsignedInt m_endFrame = 0;
 	UnsignedInt m_recheckFrame = 0;
 	UnsignedInt m_modifierFrame = 0;
+	UnsignedInt m_promotionEmotions = 0;
 	ModelConditionFlags m_appliedConditions;
 };
 

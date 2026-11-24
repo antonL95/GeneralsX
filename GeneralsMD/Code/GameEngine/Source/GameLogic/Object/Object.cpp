@@ -5311,7 +5311,10 @@ void Object::setDominationState(const DominationState& state)
 void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	const Bool loading = xfer->getXferMode() == XFER_LOAD;
-	if (!loading && m_domination.deadline == 0 && m_timedModelConditions.empty())
+	static const NameKeyType emotionKey = NAMEKEY("EmotionTrackerUpdate");
+	auto* emotion = static_cast<EmotionTrackerUpdate*>(findUpdateModule(emotionKey));
+	if (!loading && m_domination.deadline == 0 && m_timedModelConditions.empty() &&
+		(!emotion || !emotion->hasPromotionEmotions()))
 	{
 		RetailSaveBlocks::transferSection<Xfer>(xfer, FALSE, present, {});
 		return;
@@ -5334,6 +5337,16 @@ void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 				x->xferUnsignedInt(&expiry);
 			}
 		}, [this] { m_timedModelConditions.clear(); }},
+		{"promotion-emotions", [emotion](Xfer* x) {
+			UnsignedInt empty = 0;
+			if (emotion)
+				emotion->xferPromotionEmotions(x);
+			else
+				x->xferUnsignedInt(&empty);
+		}, [emotion] {
+			if (emotion)
+				emotion->clearPromotionEmotions();
+		}},
 	});
 }
 

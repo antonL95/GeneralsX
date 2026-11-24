@@ -38,6 +38,7 @@
 #include "WWMath/wwmath.h"
 
 #include <algorithm>
+#include <utility>
 
 namespace
 {
@@ -87,6 +88,22 @@ const EmotionNugget* findEmotionNugget(const AsciiString& name)
 		if (nugget.m_name.compareNoCase(name) == 0)
 			return &nugget;
 	return nullptr;
+}
+
+Int configuredEmotionType(const RetailEmotionEntry& entry, const EmotionNugget* nugget)
+{
+	if (entry.m_type >= 0 && entry.m_type != EMOTION_OVERRIDE)
+		return entry.m_type;
+	return nugget ? nugget->m_type : -1;
+}
+
+void applyEmotionConditions(Object* object, const ModelConditionFlags& clear, const ModelConditionFlags& set)
+{
+	object->clearAndSetModelConditionFlags(clear, set);
+	if (const auto* horde = HordeContain::get(object))
+		for (Object* member : *horde->getContainedItemsList())
+			if (!member->isEffectivelyDead())
+				member->clearAndSetModelConditionFlags(clear, set);
 }
 
 void parseEmotionDurationOverride(INI* ini, void*, void* store, const void*)
@@ -751,7 +768,7 @@ void EmotionTrackerUpdate::finishEmotion()
 		if (nugget->m_endFX && !self->isEffectivelyDead())
 			FXList::doFXObj(nugget->m_endFX, self);
 	}
-	self->clearModelConditionFlags(m_appliedConditions);
+	applyEmotionConditions(self, m_appliedConditions, {});
 	m_appliedConditions.clear();
 	m_activeEntry = -1;
 	m_modifierFrame = 0;
@@ -761,10 +778,22 @@ UpdateSleepTime EmotionTrackerUpdate::update()
 {
 	Object* self = getObject();
 	const auto* data = getEmotionTrackerUpdateModuleData();
+	const UnsignedInt promotionEmotions = std::exchange(m_promotionEmotions, 0);
 	if (!RetailFileLayers::enabled() || data->m_emotions.empty() || emotionNuggets.empty() || self->isDestroyed())
 		return UPDATE_SLEEP_FOREVER;
 
 	const UnsignedInt now = TheGameLogic->getFrame();
+	if (promotionEmotions && !self->isEffectivelyDead())
+	{
+		for (const auto& entry : data->m_emotions)
+		{
+			const auto* nugget = findEmotionNugget(entry.m_name);
+			const Int type = configuredEmotionType(entry, nugget);
+			if (type >= 0 && (promotionEmotions & (1u << type)) &&
+				startEmotion(static_cast<EmotionType>(type), nullptr, -1.0f))
+				break;
+		}
+	}
 	if (m_activeEntry >= 0)
 	{
 		if (now >= m_endFrame || self->isEffectivelyDead())
@@ -867,6 +896,24 @@ Bool EmotionTrackerUpdate::signal(Object* victim, EmotionType type, const Object
 	return TRUE;
 }
 
+void EmotionTrackerUpdate::queuePromotionEmotion(Object* object, const AsciiString& name)
+{
+	while (Object* anchor = HordeContain::getAnchor(object))
+		object = anchor;
+	static const NameKeyType emotionKey = NAMEKEY("EmotionTrackerUpdate");
+	auto* tracker = static_cast<EmotionTrackerUpdate*>(object->findUpdateModule(emotionKey));
+	if (!tracker || object->isEffectivelyDead() || object->isDestroyed())
+		return;
+	for (Int type = 0; emotionTypes[type]; ++type)
+	{
+		if (name.compareNoCase(emotionTypes[type]) != 0)
+			continue;
+		tracker->m_promotionEmotions |= 1u << type;
+		tracker->setWakeFrame(object, UPDATE_SLEEP_NONE);
+		return;
+	}
+}
+
 Bool EmotionTrackerUpdate::blocksPlayerCommands(const Object* object)
 {
 	const auto* tracker = static_cast<const EmotionTrackerUpdate*>(object->findUpdateModule(NAMEKEY("EmotionTrackerUpdate")));
@@ -913,8 +960,7 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 	{
 		const auto& active = data->m_emotions[m_activeEntry];
 		const auto* current = findEmotionNugget(active.m_name);
-		const Int activeType = active.m_type >= 0 && active.m_type != EMOTION_OVERRIDE ?
-			active.m_type : (current ? current->m_type : -1);
+		const Int activeType = configuredEmotionType(active, current);
 		if (type == EMOTION_BRACE && activeType == EMOTION_BRACE)
 			return TRUE;
 		if (emotionPriority(type) <= emotionPriority(activeType))
@@ -934,7 +980,7 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 		const auto* nugget = findEmotionNugget(entry.m_name);
 		if (!nugget)
 			continue;
-		const Int configured = entry.m_type >= 0 && entry.m_type != EMOTION_OVERRIDE ? entry.m_type : nugget->m_type;
+		const Int configured = configuredEmotionType(entry, nugget);
 		if (configured != type || (idle && nugget->m_ignoreIdle) || (!idle && nugget->m_ignoreBusy))
 			continue;
 		if (nugget->m_enemyThreatLimit >= 0.0f && enemyThreat < 0.0f)
@@ -984,7 +1030,7 @@ Bool EmotionTrackerUpdate::startEmotion(EmotionType type, const Object* source, 
 		m_recheckFrame = m_endFrame + std::max({interval, nugget->m_inactive, nugget->m_inactiveSameObject, nugget->m_inactiveSameType});
 		m_appliedConditions = nugget->m_conditions;
 		m_appliedConditions.clear(self->getLogicModelConditions());
-		self->clearAndSetModelConditionFlags(nugget->m_clearConditions, nugget->m_conditions);
+		applyEmotionConditions(self, nugget->m_clearConditions, nugget->m_conditions);
 		if (nugget->m_startFX)
 			FXList::doFXObj(nugget->m_startFX, self);
 		if (entry.m_modifier.isNotEmpty() && nugget->m_modifierDelay < duration)
@@ -1005,6 +1051,11 @@ void EmotionTrackerUpdate::xferEmotionState(Xfer* xfer)
 	xfer->xferUnsignedInt(&m_recheckFrame);
 	xfer->xferUnsignedInt(&m_modifierFrame);
 	m_appliedConditions.xfer(xfer);
+}
+
+void EmotionTrackerUpdate::xferPromotionEmotions(Xfer* xfer)
+{
+	xfer->xferUnsignedInt(&m_promotionEmotions);
 }
 
 void EmotionTrackerUpdate::crc(Xfer* xfer)

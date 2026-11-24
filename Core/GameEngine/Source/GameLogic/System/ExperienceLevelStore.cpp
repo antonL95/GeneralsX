@@ -30,6 +30,7 @@
 #include "GameLogic/GameLogic.h"
 #if !RTS_GENERALS
 #include "GameLogic/Module/AttributeModifierHelper.h"
+#include "GameLogic/Module/RotwkModifierModules.h"
 #endif
 #include "GameLogic/Module/ExperienceModules.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -242,15 +243,21 @@ void apply(Object* obj, const Level& level, bool feedback)
 #endif
 	if (level.conditions.any())
 		obj->setModelConditionFlags(level.conditions);
-	if (feedback && TheGameLogic->getFrame() >= 10 && TheFXListStore && level.levelUpFx.isNotEmpty())
+	if (feedback && TheGameLogic->getFrame() >= 10)
 	{
-		const char* fx = level.levelUpFx.str();
-		if (strncmp(fx, "FX:", 3) == 0)
-			fx += 3;
-		FXList::doFXObj(TheFXListStore->findFXList(fx), obj);
+		if (TheFXListStore && level.levelUpFx.isNotEmpty())
+		{
+			const char* fx = level.levelUpFx.str();
+			if (strncmp(fx, "FX:", 3) == 0)
+				fx += 3;
+			FXList::doFXObj(TheFXListStore->findFXList(fx), obj);
+		}
+		if (TheObjectCreationListStore && level.levelUpOcl.isNotEmpty())
+			ObjectCreationList::create(TheObjectCreationListStore->findObjectCreationList(level.levelUpOcl.str()), obj, nullptr);
+#if !RTS_GENERALS
+		obj->setTimedModelCondition(MODELCONDITION_LEVELED, 3 * LOGICFRAMES_PER_SECOND);
+#endif
 	}
-	if (feedback && TheObjectCreationListStore && level.levelUpOcl.isNotEmpty())
-		ObjectCreationList::create(TheObjectCreationListStore->findObjectCreationList(level.levelUpOcl.str()), obj, nullptr);
 	if (tracing())
 	{
 		std::fprintf(stderr, "TEST level %u object %u %s level %s granted %s\n", TheGameLogic->getFrame(),
@@ -446,6 +453,10 @@ void applyLevel(Object* obj, int threshold, bool feedback)
 		if (level->informUpdateModule && level->rank > 1)
 			if (auto* horde = const_cast<HordeContain*>(HordeContain::get(obj)))
 				horde->onRankAdvanced(level->rank, feedback);
+#if !RTS_GENERALS
+		if (level->emotionType.isNotEmpty())
+			EmotionTrackerUpdate::queuePromotionEmotion(obj, level->emotionType);
+#endif
 	}
 }
 
