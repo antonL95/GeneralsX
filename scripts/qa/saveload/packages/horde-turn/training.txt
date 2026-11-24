@@ -1,4 +1,4 @@
 1010 create Player_1 GondorFountainGuardHorde 0 3150,950,0
 1020 builderscriptmove Player_1 GondorFountainGuardHorde 0 - 3390 950
 1085 builderscriptmove Player_1 GondorFountainGuardHorde 0 - 3245 1140
-1195 horde-turn Player_1 GondorFountainGuardHorde 0
+1300 horde-turn Player_1 GondorFountainGuardHorde 0
