@@ -1,0 +1,21 @@
+234 create Player_1 TeamScriptOpsFixtureUnit 0 1970,2920,0
+234 create PlyrCreeps TeamScriptOpsFixtureUnit 0 2080,2970,0
+234 create PlyrCreeps TeamScriptOpsFixtureTarget 0 2030,2950,0
+234 create PlyrCreeps TeamScriptOpsFixtureTarget 1 2030,2960,0
+234 create Player_1 TeamScriptOpsFixtureTarget 0 2060,2950,0
+234 create Player_1 TeamScriptOpsFixtureTarget 1 2060,2960,0
+237 team-script-ops-emotion Player_1 TeamScriptOpsFixtureUnit 0
+239 team-script-ops-score Player_1 TeamScriptOpsFixtureUnit 0 PlyrCreeps:TeamScriptOpsFixtureTarget:0
+239 team-script-ops-score PlyrCreeps TeamScriptOpsFixtureUnit 0 Player_1:TeamScriptOpsFixtureTarget:0
+242 team-script-ops-emotion-probe Player_1 TeamScriptOpsFixtureUnit 0
+242 team-script-ops-path-probe Player_1 TeamScriptOpsFixtureUnit 0
+242 team-script-ops-score-probe Player_1 TeamScriptOpsFixtureUnit 0
+246 team-script-ops-emotion-probe Player_1 TeamScriptOpsFixtureUnit 0
+246 team-script-ops-path-probe Player_1 TeamScriptOpsFixtureUnit 0
+250 team-script-ops-score Player_1 TeamScriptOpsFixtureUnit 0 PlyrCreeps:TeamScriptOpsFixtureTarget:0
+250 team-script-ops-score PlyrCreeps TeamScriptOpsFixtureUnit 0 Player_1:TeamScriptOpsFixtureTarget:0
+254 team-script-ops-score-probe Player_1 TeamScriptOpsFixtureUnit 0
+258 team-script-ops-guard Player_1 TeamScriptOpsFixtureUnit 0
+300 team-script-ops-emotion-probe Player_1 TeamScriptOpsFixtureUnit 0
+310 destroy Player_1 TeamScriptOpsFixtureUnit 0
+310 destroy PlyrCreeps TeamScriptOpsFixtureUnit 0
