@@ -1,0 +1,14 @@
+1 ElvenMallornTreeBarracks_ForAI Barracks ElvenBarracks 2250 1950 0 plot
+2 ElvenMallornTreeBarracks_ForAI Pasture ElvenGreenPasture 2700 2250 0 order
+3 ElvenMallornTreeBarracks_ForAI Storage EregionForge 2050 1100 0 order
+4 ElvenMallornTreeBarracks_ForAI Niphredil ElvenNiphredilMallornTree 2200 1450 0 order
+5 ElvenMallornTreePasture_ForAI Barracks ElvenBarracks 2550 2000 0 order
+6 ElvenMallornTreePasture_ForAI Pasture ElvenGreenPasture 1950 1900 0 plot
+7 ElvenMallornTreePasture_ForAI Storage EregionForge 2950 2050 0 order
+8 ElvenMallornTreePasture_ForAI Niphredil ElvenNiphredilMallornTree 2900 1650 0 order
+9 ElvenMallornTreeStoreHouse_ForAI Barracks ElvenBarracks 3400 2750 0 order
+10 ElvenMallornTreeStoreHouse_ForAI Pasture ElvenGreenPasture 1250 700 0 order
+11 ElvenMallornTreeStoreHouse_ForAI Storage EregionForge 400 400 0 plot
+12 ElvenMallornTreeStoreHouse_ForAI Niphredil ElvenNiphredilMallornTree 1900 1350 0 order
+13 MenWallUpgradeNodeSmall Men GondorCastleWall 2750 1200 0 wall
+14 ArnorWallUpgradeNodeSmall Arnor ArnorCastleWall 1750 1650 90 wall

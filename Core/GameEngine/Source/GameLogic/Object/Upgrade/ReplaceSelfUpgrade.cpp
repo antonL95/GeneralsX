@@ -11,6 +11,7 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/CreateModule.h"
+#include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Module/ReplaceSelfUpgrade.h"
 #include "GameLogic/Object.h"
@@ -79,6 +80,7 @@ Bool ReplaceSelfUpgrade::findSites(std::vector<Site>& sites) const
 	if (sites.size() == 1 && isWallPiece(source))
 		return !RetailFileLayers::enabled() || !sites.front().type->isKindOf(KINDOF_BLOCKING_GATE) || fitsWallGate(*source, *sites.front().type);
 
+	const Object* plot = FoundationAIUpdate::findPlotFor(*source);
 	const Vector3 axis = source->getTransformMatrix()->Get_Y_Vector();
 	for (Site& site : sites)
 	{
@@ -98,7 +100,8 @@ Bool ReplaceSelfUpgrade::findSites(std::vector<Site>& sites) const
 		MemoryPoolObjectHolder hold(collisions);
 		for (const Object* other = collisions->first(); other; other = collisions->next())
 		{
-			if (other != source && other->isKindOf(KINDOF_STRUCTURE) && !other->isDestroyed() && !other->isEffectivelyDead())
+			if (other != source && other != plot && other->isKindOf(KINDOF_STRUCTURE) &&
+				!other->isDestroyed() && !other->isEffectivelyDead())
 				return FALSE;
 		}
 	}
@@ -176,6 +179,8 @@ void ReplaceSelfUpgrade::upgradeImplementation()
 	const Matrix3D transform = *source->getTransformMatrix();
 	const Real angle = source->getOrientation();
 	const Bool inPlace = sites.size() == 1 && isWallPiece(source);
+	Object* plot = FoundationAIUpdate::findPlotFor(*source);
+	FoundationAIUpdate* foundation = plot ? FoundationAIUpdate::find(*plot) : nullptr;
 	Team* team = source->getTeam();
 	TheAI->pathfinder()->removeObjectFromPathfindMap(source);
 	TheGameLogic->destroyObject(source);
@@ -201,7 +206,11 @@ void ReplaceSelfUpgrade::upgradeImplementation()
 			replacement->setOrientation(angle);
 		}
 		if (&site == &sites.front())
+		{
 			replacement->setName(name);
+			if (foundation)
+				foundation->replaceStructure(*replacement);
+		}
 		for (BehaviorModule** module = replacement->getBehaviorModules(); *module; ++module)
 		{
 			CreateModuleInterface* create = (*module)->getCreate();

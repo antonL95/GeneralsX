@@ -227,6 +227,8 @@ CastleBehavior* CastleBehavior::findForMember(const Object& member)
 				return castle;
 		}
 	}
+	if (const Object* plot = FoundationAIUpdate::findPlotFor(member))
+		return findForMember(*plot);
 	const NameKeyType key = NAMEKEY("CastleBehavior");
 	for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 	{

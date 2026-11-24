@@ -82,9 +82,37 @@ FoundationAIUpdate* FoundationAIUpdate::find(const Object& object)
 	return static_cast<FoundationAIUpdate*>(object.findUpdateModule(NAMEKEY("FoundationAIUpdate")));
 }
 
+Object* FoundationAIUpdate::findPlotFor(const Object& structure)
+{
+	if (structure.getProducerID() == INVALID_ID)
+		return nullptr;
+	Object* plot = TheGameLogic->findObjectByID(structure.getProducerID());
+	const auto* foundation = plot && !plot->isDestroyed() ? find(*plot) : nullptr;
+	return foundation && foundation->m_structure == structure.getID() ? plot : nullptr;
+}
+
 Object* FoundationAIUpdate::getStructure() const
 {
 	return m_structure == INVALID_ID ? nullptr : TheGameLogic->findObjectByID(m_structure);
+}
+
+void FoundationAIUpdate::replaceStructure(Object& replacement)
+{
+	m_structure = replacement.getID();
+	replacement.setProducer(getObject());
+	linkStructureToCastle(replacement);
+}
+
+void FoundationAIUpdate::linkStructureToCastle(Object& structure) const
+{
+	const Object* foundation = getObject();
+	if (const CastleBehavior* castle = CastleBehavior::findForMember(*foundation))
+	{
+		const Object* keep = castle->getKeep();
+		CastleMemberBehavior::linkToCastle(structure, castle->getCastleObjectID(),
+			keep ? keep->getID() : INVALID_ID, FALSE, castle->isOwnedMemberTemplate(*foundation->getTemplate()));
+		castle->applyKeepUpgrades(structure);
+	}
 }
 
 Bool FoundationAIUpdate::canBuildOn(const Player* player) const
@@ -148,13 +176,7 @@ Object* FoundationAIUpdate::construct(const ThingTemplate* what, Player* player,
 		structure->setModelConditionState(MODELCONDITION_BUILD_VARIATION_TWO);
 
 	m_structure = structure->getID();
-	if (const CastleBehavior* castle = CastleBehavior::findForMember(*foundation))
-	{
-		castle->applyKeepUpgrades(*structure);
-		const Object* keep = castle->getKeep();
-		CastleMemberBehavior::linkToCastle(*structure, castle->getCastleObjectID(),
-			keep ? keep->getID() : INVALID_ID, FALSE, castle->isOwnedMemberTemplate(*foundation->getTemplate()));
-	}
+	linkStructureToCastle(*structure);
 	showFoundation(FALSE);
 	if (prebuilt)
 	{

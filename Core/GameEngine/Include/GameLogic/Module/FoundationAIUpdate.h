@@ -22,14 +22,17 @@ public:
 	FoundationAIUpdate(Thing* thing, const ModuleData* data);
 
 	static FoundationAIUpdate* find(const Object& object);
+	static Object* findPlotFor(const Object& structure);
 
 	UpdateSleepTime update() override;
 	Object* construct(const ThingTemplate* what, Player* player, Bool prebuilt = FALSE);
 	Bool canBuildOn(const Player* player) const;
 	static void advanceConstruction(Object& structure, Object* builder, Int overrideFrames = 0, Bool isRebuild = FALSE);
 	Object* getStructure() const;
+	void replaceStructure(Object& replacement);
 
 private:
+	void linkStructureToCastle(Object& structure) const;
 	void showFoundation(Bool show);
 
 	ObjectID m_structure = INVALID_ID;
