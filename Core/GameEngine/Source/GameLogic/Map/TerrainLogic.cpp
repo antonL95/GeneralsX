@@ -38,7 +38,6 @@
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
-#include "Common/RotwkDuration.h"
 #include "Common/SpecialPowerINI.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -994,8 +993,8 @@ void TerrainLogic::reset()
 //-------------------------------------------------------------------------------------------------
 void TerrainLogic::update()
 {
-	if (RetailFileLayers::enabled() && TheGameLogic->getFrame() % RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND) == 0)
-		m_retailFire.update();
+	if (RetailFileLayers::enabled())
+		m_retailFire.update(TheGameLogic->getFrame());
 
 	// bridge damage states have not changed this frame now
 	m_bridgeDamageStatesChanged = false;
@@ -3067,7 +3066,7 @@ void TerrainLogic::crc( Xfer *xfer )
 void TerrainLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
-		{"terrain-fire", [this](Xfer* block) { m_retailFire.xfer(block); }, [this] { m_retailFire.clearState(); }}
+		{"terrain-fire", [this](Xfer* block) { m_retailFire.xfer(block); }, [this] { m_retailFire.prepareLegacyLoad(); }}
 	});
 }
 
@@ -3225,7 +3224,10 @@ void TerrainLogic::xfer( Xfer *xfer )
 void TerrainLogic::loadPostProcess()
 {
 	if (RetailFileLayers::enabled())
+	{
 		restoreLegacyMapTrees({});
+		m_retailFire.restoreLegacySlice(TheGameLogic->getFrame());
+	}
 
 	Bridge* pBridge = getFirstBridge();
 	Bridge* pNext;

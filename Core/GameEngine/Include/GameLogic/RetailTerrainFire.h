@@ -59,8 +59,10 @@ public:
 	void initialize(Int width, Int height, std::vector<UnsignedByte> types);
 	void reset();
 	void clearState();
+	void prepareLegacyLoad();
+	void restoreLegacySlice(UnsignedInt frame);
 	void apply(TerrainLogic& terrain, const Coord3D& impact, const Coord3D* facing, const Edit& edit);
-	void update();
+	void update(UnsignedInt frame);
 	void xfer(Xfer* xfer);
 
 	Int cellIndex(Int x, Int y) const { return x * m_height + y; }
@@ -79,6 +81,7 @@ private:
 	Int m_width = 0;
 	Int m_height = 0;
 	Int m_slice = 0;
+	Bool m_legacyLoadPending = FALSE;
 	std::vector<UnsignedByte> m_types;
 	std::map<Int, Cell> m_modified;
 	std::set<Int> m_burning;

@@ -24,6 +24,7 @@
 namespace
 {
 constexpr Int SLICE_COUNT = 10;
+constexpr UnsignedInt UPDATE_INTERVAL = RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND);
 constexpr Int MAX_FUEL = 65535;
 constexpr Int MAX_DECAY = 1023;
 constexpr Int MAX_BURN_RATE = 4095;
@@ -181,8 +182,25 @@ void RetailTerrainFire::reset()
 void RetailTerrainFire::clearState()
 {
 	m_slice = 0;
+	m_legacyLoadPending = FALSE;
 	m_modified.clear();
 	m_burning.clear();
+}
+
+void RetailTerrainFire::prepareLegacyLoad()
+{
+	clearState();
+	m_legacyLoadPending = TRUE;
+}
+
+void RetailTerrainFire::restoreLegacySlice(UnsignedInt frame)
+{
+	if (m_legacyLoadPending && !m_types.empty())
+	{
+		const UnsignedInt elapsedTicks = frame / UPDATE_INTERVAL + (frame % UPDATE_INTERVAL != 0);
+		m_slice = elapsedTicks % SLICE_COUNT;
+	}
+	m_legacyLoadPending = FALSE;
 }
 
 Coord2D RetailTerrainFire::center(Int index) const
@@ -330,9 +348,9 @@ void RetailTerrainFire::apply(TerrainLogic& terrain, const Coord3D& impact, cons
 	}
 }
 
-void RetailTerrainFire::update()
+void RetailTerrainFire::update(UnsignedInt frame)
 {
-	if (m_types.empty())
+	if (m_types.empty() || frame % UPDATE_INTERVAL != 0)
 		return;
 	const Int begin = m_slice * m_width / SLICE_COUNT;
 	const Int end = (m_slice + 1) * m_width / SLICE_COUNT;
