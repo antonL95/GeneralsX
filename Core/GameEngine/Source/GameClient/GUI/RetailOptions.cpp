@@ -62,7 +62,7 @@ struct Label
 };
 
 enum Page { Video, Audio, Gameplay, Controls, PageCount };
-enum Setting { Brightness, Resolution, Quality, Music, Sound, Voice, HealthBars, Scroll, SettingCount };
+enum Setting { Brightness, Resolution, Quality, Music, Sound, Voice, Ambient, Movie, HealthBars, Scroll, SettingCount };
 enum Widget { Slider, Toggle, Stepper };
 
 struct Row
@@ -85,6 +85,8 @@ constexpr Row rows[] = {
 	{Audio, Music, {"APT:Music", L"Music"}, Slider},
 	{Audio, Sound, {"APT:SoundFX", L"Sound effects"}, Slider},
 	{Audio, Voice, {"APT:Voice", L"Voice"}, Slider},
+	{Audio, Ambient, {"APT:Ambient", L"Ambient"}, Slider},
+	{Audio, Movie, {"APT:Movie", L"Movie"}, Slider},
 	{Gameplay, HealthBars, {"APT:ShowAllHealthBars", L"Show all health bars"}, Toggle},
 	{Controls, Scroll, {"APT:ScrollSpeed", L"Scroll speed"}, Slider}
 };
@@ -134,6 +136,8 @@ struct Options
 	Values original{};
 	std::vector<Mode> modes;
 	std::array<Real, 4> originalVolumes{};
+	const Real originalAmbient = TheAudio->getAmbientVolume();
+	const Real originalMovie = TheAudio->getMovieVolume();
 	const Real originalGamma = TheGlobalData->m_displayGamma;
 
 	Options(GameWindow *parent, Bool match) : returnWindow(parent), inMatch(match)
@@ -158,6 +162,8 @@ struct Options
 		values[Music] = percent(prefs.getMusicVolume());
 		values[Sound] = percent(std::max(prefs.getSoundVolume(), prefs.get3DSoundVolume()));
 		values[Voice] = percent(prefs.getSpeechVolume());
+		values[Ambient] = originalAmbient < 0.0f ? values[Sound] : percent(originalAmbient * 100.0f);
+		values[Movie] = percent(originalMovie * 100.0f);
 		values[HealthBars] = RetailWorldUI::showAllHealthBars;
 		values[Scroll] = percent(TheGlobalData->m_retailScrollFactor * 50.0f);
 		original = values;
@@ -201,6 +207,8 @@ struct Options
 			case Voice:
 				TheAudio->setVolume(edited ? values[Voice] * 0.01f : originalVolumes[3], systemSetting(AudioAffect_Speech));
 				break;
+			case Ambient: TheAudio->setAmbientVolume(edited ? values[Ambient] * 0.01f : originalAmbient); break;
+			case Movie: TheAudio->setMovieVolume(edited ? values[Movie] * 0.01f : originalMovie); break;
 			default: return;
 		}
 		previewing = TRUE;
@@ -215,6 +223,8 @@ struct Options
 		TheAudio->setVolume(originalVolumes[1], systemSetting(AudioAffect_Sound));
 		TheAudio->setVolume(originalVolumes[2], systemSetting(AudioAffect_Sound3D));
 		TheAudio->setVolume(originalVolumes[3], systemSetting(AudioAffect_Speech));
+		TheAudio->setAmbientVolume(originalAmbient);
+		TheAudio->setMovieVolume(originalMovie);
 		previewing = FALSE;
 	}
 
@@ -225,9 +235,11 @@ struct Options
 		values[Music] = percent(audio->m_defaultMusicVolume * 100.0f);
 		values[Sound] = percent(std::max(audio->m_defaultSoundVolume, audio->m_default3DSoundVolume) * 100.0f);
 		values[Voice] = percent(audio->m_defaultSpeechVolume * 100.0f);
+		values[Ambient] = values[Sound];
+		values[Movie] = 100;
 		values[HealthBars] = FALSE;
 		values[Scroll] = percent(TheGlobalData->m_retailDefaultScrollFactor * 50.0f);
-		for (Setting setting : {Brightness, Music, Sound, Voice})
+		for (Setting setting : {Brightness, Music, Sound, Voice, Ambient, Movie})
 			preview(setting);
 	}
 
@@ -243,6 +255,8 @@ struct Options
 			prefs.setInt("SFX3DVolume", percent(effectsVolume(AudioAffect_Sound3D) * 100.0f));
 		}
 		if (changed(Voice)) prefs.setInt("VoiceVolume", values[Voice]);
+		if (changed(Ambient)) prefs.setInt("AmbientVolume", values[Ambient]);
+		if (changed(Movie)) prefs.setInt("MovieVolume", values[Movie]);
 		if (changed(HealthBars)) prefs.setBool("ShowAllHealthBars", values[HealthBars]);
 		if (changed(Scroll)) prefs.setInt("ScrollFactor", values[Scroll]);
 		if (changed(Quality))
@@ -404,6 +418,8 @@ void drawOptions(GameWindow *window, WinInstanceData *)
 		}
 	if (options.page == Video && options.inMatch)
 		p.text({383, 391, 473, 38}, Label{"GUI:DisplayChangeShellOnly", L"Change resolution and graphics quality from the main menu."}.text(), 15, muted);
+	if (options.page == Audio)
+		p.text({383, 500, 473, 38}, Label{"GUI:LegacyAudioUnavailable", L"EAX3 and High Audio Quality require the original audio driver."}.text(), 15, muted);
 	if (options.saveFailed)
 		p.text({370, 523, 493, 45}, Label{"GUI:SettingsApplyFailed", L"Could not apply settings."}.text(), 16, gold);
 	p.fill({152, 579, 720, 1}, 0xFF4B5C60);

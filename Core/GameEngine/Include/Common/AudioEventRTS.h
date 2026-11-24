@@ -95,6 +95,8 @@ public:
 	};
 	void setRetailEmitter(const std::shared_ptr<RetailEmitter>& emitter) { m_retailEmitter = emitter; }
 	Bool hasRetailEmitter() const { return m_retailEmitter != nullptr; }
+	void setAmbient() { m_ambient = TRUE; }
+	Bool isAmbient() const { return m_ambient; }
 	AsciiString getAttackFilename() const;
 	AsciiString getDecayFilename() const;
 	Real getDelay() const;
@@ -195,6 +197,7 @@ protected:
 	Bool m_shouldFade;							///< This should fade in or out (if it is starting or stopping)
 	Bool m_isLogicalAudio;					///< Should probably only be true for scripted sounds
 	Bool m_uninterruptible;
+	Bool m_ambient = FALSE;
 
 	// Playing attributes
 	Real m_pitchShift;							///< Pitch shift that should occur on this piece of audio

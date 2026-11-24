@@ -215,6 +215,7 @@ AudioEventRTS::AudioEventRTS( const AsciiString& eventName, const Coord3D *posit
 AudioEventRTS::AudioEventRTS( const AudioEventRTS& right )
 {
 	m_retailEmitter = right.m_retailEmitter;
+	m_ambient = right.m_ambient;
 	m_filenameToLoad			= right.m_filenameToLoad;
 	m_eventInfo						= right.m_eventInfo;
 	m_playingHandle				= right.m_playingHandle;
@@ -257,6 +258,7 @@ AudioEventRTS::AudioEventRTS( const AudioEventRTS& right )
 AudioEventRTS& AudioEventRTS::operator=( const AudioEventRTS& right )
 {
 	m_retailEmitter = right.m_retailEmitter;
+	m_ambient = right.m_ambient;
 	m_filenameToLoad			= right.m_filenameToLoad;
 	m_eventInfo						= right.m_eventInfo;
 	m_playingHandle				= right.m_playingHandle;

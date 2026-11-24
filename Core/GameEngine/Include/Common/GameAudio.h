@@ -240,6 +240,11 @@ class AudioManager : public SubsystemInterface
 		virtual void setVolume( Real volume, AudioAffect whichToAffect );
 		virtual Real getVolume( AudioAffect whichToGet );
 		Real getScriptVolume( AudioAffect whichToGet ) const;
+		Real getAmbientVolume() const { return m_ambientVolume; }
+		Real getMovieVolume() const { return m_movieVolume; }
+		Real getMoviePlaybackVolume() const { return m_muteReasonBits ? 0.0f : m_movieVolume; }
+		void setAmbientVolume(Real volume);
+		void setMovieVolume(Real volume);
 
 		// To get a more 3-D feeling from the universe, we adjust the volume of the 3-D samples based
 		// on zoom.
@@ -343,6 +348,8 @@ class AudioManager : public SubsystemInterface
 		Real m_soundVolume;
 		Real m_sound3DVolume;
 		Real m_speechVolume;
+		Real m_ambientVolume = -1.0f;
+		Real m_movieVolume = 1.0f;
 
 		Real m_scriptMusicVolume;
 		Real m_scriptSoundVolume;

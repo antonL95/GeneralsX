@@ -4676,6 +4676,7 @@ void Drawable::startAmbientSound(BodyDamageType dt, TimeOfDay tod, Bool onlyIfPe
 
 	if( trySound && m_ambientSound )
 	{
+		m_ambientSound->setAmbient();
 		const AudioEventInfo *info = m_ambientSound->getAudioEventInfo();
 		if( info )
 		{

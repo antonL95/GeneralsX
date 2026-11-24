@@ -243,6 +243,10 @@ void AudioManager::init()
 	m_systemSoundVolume = m_audioSettings->m_preferredSoundVolume;
 	m_systemSound3DVolume = m_audioSettings->m_preferred3DSoundVolume;
 	m_systemSpeechVolume = m_audioSettings->m_preferredSpeechVolume;
+	const OptionPreferences preferences;
+	const Int ambient = preferences.getInt("AmbientVolume", -1);
+	m_ambientVolume = ambient < 0 ? -1.0f : std::min(ambient, 100) * 0.01f;
+	m_movieVolume = std::clamp(preferences.getInt("MovieVolume", 100), 0, 100) * 0.01f;
 
 	m_scriptMusicVolume = 1.0f;
 	m_scriptSoundVolume = 1.0f;
@@ -782,6 +786,18 @@ Real AudioManager::getVolume( AudioAffect whichToGet )
 
 	// Speech
 	return system ? m_systemSpeechVolume : m_speechVolume;
+}
+
+void AudioManager::setAmbientVolume(Real volume)
+{
+	m_volumeHasChanged |= m_ambientVolume != volume;
+	m_ambientVolume = volume;
+}
+
+void AudioManager::setMovieVolume(Real volume)
+{
+	m_volumeHasChanged |= m_movieVolume != volume;
+	m_movieVolume = volume;
 }
 
 Real AudioManager::getScriptVolume( AudioAffect whichToGet ) const

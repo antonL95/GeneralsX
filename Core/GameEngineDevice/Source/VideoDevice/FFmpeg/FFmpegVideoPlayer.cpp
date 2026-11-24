@@ -290,6 +290,14 @@ void FFmpegVideoPlayer::notifyVideoPlayerOfNewProvider( Bool nowHasValid )
 
 //============================================================================
 //============================================================================
+void FFmpegVideoPlayer::setVolume(Real volume)
+{
+#ifdef SAGE_USE_MINIAUDIO
+	if (m_firstStream && TheAudio)
+		static_cast<MiniAudioStream *>(TheAudio->getHandleForBink())->setVolume(volume);
+#endif
+}
+
 void FFmpegVideoPlayer::initializeBinkWithMiles()
 {
 	Int retVal = 0;
@@ -330,7 +338,7 @@ FFmpegVideoStream::FFmpegVideoStream(FFmpegFile* file)
 		m_good = m_ffmpegFile->decodePacket();
 
 #ifdef SAGE_USE_MINIAUDIO
-	audioStream->setVolume(1.0f);
+	audioStream->setVolume(TheAudio->getMoviePlaybackVolume());
 	audioStream->play();
 #elif defined(SAGE_USE_OPENAL)
 	// Start audio playback

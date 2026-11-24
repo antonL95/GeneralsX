@@ -731,21 +731,7 @@ void MiniAudioManager::freeAllMiniAudioHandles(void)
 void MiniAudioManager::adjustPlayingVolume(PlayingAudio *audio)
 {
 	if (!audio || !audio->m_audioEventRTS || !audio->m_sound) return;
-
-	Real desiredVolume = audio->m_audioEventRTS->getVolume() * audio->m_audioEventRTS->getVolumeShift();
-	if (audio->m_type == PAT_Sample) {
-		ma_sound_set_volume(audio->m_sound, m_soundVolume * desiredVolume);
-	}
-	else if (audio->m_type == PAT_3DSample) {
-		ma_sound_set_volume(audio->m_sound, m_sound3DVolume * desiredVolume);
-	}
-	else if (audio->m_type == PAT_Stream) {
-		const AudioEventInfo *info = audio->m_audioEventRTS->getAudioEventInfo();
-		if (info && info->m_soundType == AT_Music)
-			ma_sound_set_volume(audio->m_sound, m_musicVolume * desiredVolume);
-		else
-			ma_sound_set_volume(audio->m_sound, m_speechVolume * desiredVolume);
-	}
+	ma_sound_set_volume(audio->m_sound, getEffectiveVolume(audio->m_audioEventRTS.Peek()));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1311,9 +1297,8 @@ void MiniAudioManager::processPlayingList(void)
 	if (m_volumeHasChanged) {
 		m_volumeHasChanged = false;
 
-		// GeneralsX @bugfix Push speech volume changes because movie audio bypasses the audio mixer
 		if (TheVideoPlayer) {
-			TheVideoPlayer->setVolume(getVolume(AudioAffect_Speech));
+			TheVideoPlayer->setVolume(getMoviePlaybackVolume());
 		}
 	}
 }
@@ -1511,14 +1496,18 @@ Bool MiniAudioManager::isOnScreen(const Coord3D *pos) const
 //-------------------------------------------------------------------------------------------------
 Real MiniAudioManager::getEffectiveVolume(AudioEventRTS *event) const
 {
-	if (!event) return 0.0f;
-	Real volume = event->getVolume() * event->getVolumeShift();
-	const AudioEventInfo *evInfo = event->getAudioEventInfo();
-	if (evInfo && evInfo->m_soundType == AT_Music)           volume *= m_musicVolume;
-	else if (evInfo && evInfo->m_soundType == AT_Streaming)  volume *= m_speechVolume;
-	else if (event->isPositionalAudio())                     volume *= m_sound3DVolume;
-	else                                                     volume *= m_soundVolume;
-	return volume;
+	if (!event || m_muteReasonBits)
+		return 0.0f;
+	const AudioEventInfo *info = event->getAudioEventInfo();
+	const Real gain = event->getVolume() * event->getVolumeShift();
+	if (info && info->m_soundType == AT_Music)
+		return gain * m_musicVolume;
+	if (info && (info->m_soundType == AT_Streaming || (info->m_type & ST_VOICE)))
+		return gain * m_speechVolume;
+	const Bool positional = event->isPositionalAudio();
+	if (event->isAmbient() && m_ambientVolume >= 0.0f)
+		return gain * m_ambientVolume * (positional ? m_scriptSound3DVolume : m_scriptSoundVolume);
+	return gain * (positional ? m_sound3DVolume : m_soundVolume);
 }
 
 //-------------------------------------------------------------------------------------------------

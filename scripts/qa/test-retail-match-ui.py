@@ -417,7 +417,8 @@ def check_options(restarted=False):
     time.sleep(2)
     click(512, 466)
     wait_for("Settings opens from the main menu", options_visible, 8)
-    expected = {"Gamma": "75", "MusicVolume": "25", "ShowAllHealthBars": "1", "ScrollFactor": "75"}
+    expected = {"Gamma": "75", "MusicVolume": "25", "AmbientVolume": "40", "MovieVolume": "60",
+                "ShowAllHealthBars": "1", "ScrollFactor": "75"}
     if restarted:
         wait_for("accepted options are present after restart",
                  lambda: all(preferences().get(k, "").lower() == v for k, v in expected.items()))
@@ -427,6 +428,9 @@ def check_options(restarted=False):
             x = 606 if value is None else 610 + round(200 * value / 100)
             wait_for(f"{name} control displays the accepted value",
                      lambda: pixel(x, 261) == 0xC8AE77)
+            if name == "audio":
+                wait_for("ambient and movie controls display their accepted values",
+                         lambda: pixel(690, 417) == 0xC8AE77 and pixel(730, 469) == 0xC8AE77)
         return
     original = preferences()
     initial_brightness = title_signature(604, 250, 213, 24)
@@ -444,6 +448,9 @@ def check_options(restarted=False):
         wait_for(f"{name} page is selected", lambda: pixel(137, tab_y) == 0xC8AE77)
         capture("options-" + name, 132, 104, 760, 560)
         click(660 if name == "audio" else 760, 260)
+        if name == "audio":
+            click(690, 416)
+            click(730, 468)
     click(809, 621)
     wait_for("Accept persists changes from all pages",
              lambda: all(preferences().get(k, "").lower() == v for k, v in expected.items()))
@@ -453,16 +460,22 @@ def check_options(restarted=False):
     wait_for("the skirmish reaches frame 60", lambda: log_count("TEST powerstate 60 Player_1") >= 1, 60)
     key(0xFF1B)
     wait_for("the pause menu opens", menu_visible)
+    progress = log_count("TEST powerstate ")
     click(512, 489)
     wait_for("Settings opens from the pause menu", options_visible)
+    capture("options-pause", 132, 104, 760, 560)
     click(237, 381)
     click(660, 260)
     key(0xFF1B)
     wait_for("Escape returns to the pause menu", lambda: not options_visible() and menu_visible())
     if preferences().get("ScrollFactor") != "75":
         sys.exit("FAIL cancelling from Pause changed scroll speed")
+    if log_count("TEST powerstate ") != progress:
+        sys.exit("FAIL simulation advances while Settings is open")
     click(512, 391)
     wait_for("Resume closes Pause", lambda: not menu_visible())
+    wait_for("Resume advances the same skirmish",
+             lambda: len(faction_history()) == 1 and log_count("TEST powerstate ") > progress, 45)
 
 
 build = Path(sys.argv[1]).resolve()
