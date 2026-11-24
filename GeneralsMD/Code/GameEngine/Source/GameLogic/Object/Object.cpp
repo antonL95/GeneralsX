@@ -1665,7 +1665,10 @@ UnsignedInt Object::nextSpecialModelConditionFrame() const
 void Object::scheduleSMCHelper()
 {
 	if (m_smcHelper)
-		m_smcHelper->sleepUntil(nextSpecialModelConditionFrame());
+	{
+		const UnsignedInt nextFrame = nextSpecialModelConditionFrame();
+		m_smcHelper->sleepUntil(nextFrame == NEVER ? NEVER : std::max(nextFrame, TheGameLogic->getFrame() + 1));
+	}
 }
 
 void Object::setSpecialModelConditionState( ModelConditionFlagType set, UnsignedInt frames )

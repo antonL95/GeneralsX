@@ -1,0 +1,27 @@
+239 create PlyrCivilian HaradKhandishChariot 0 3600,2075,0
+239 create PlyrCivilian TimedModelUpgradeLongChariot 0 3550,2075,0
+241 timed-model-upgrade PlyrCivilian TimedModelUpgradeLongChariot 0 checkpoint
+242 objupgrade PlyrCivilian TimedModelUpgradeLongChariot 0 Upgrade_ObjectLevel3
+242 timed-model-upgrade PlyrCivilian TimedModelUpgradeLongChariot 0 checkpoint
+244 timed-model-upgrade PlyrCivilian TimedModelUpgradeLongChariot 0 checkpoint
+249 timed-model-upgrade PlyrCivilian HaradKhandishChariot 0 authored
+250 objupgrade PlyrCivilian HaradKhandishChariot 0 Upgrade_ObjectLevel3
+250 timed-model-upgrade PlyrCivilian HaradKhandishChariot 0 authored
+251 timed-model-upgrade PlyrCivilian HaradKhandishChariot 0 authored
+252 timed-model-upgrade PlyrCivilian HaradKhandishChariot 0 authored
+253 destroy PlyrCivilian HaradKhandishChariot 0
+271 timed-model-upgrade PlyrCivilian TimedModelUpgradeLongChariot 0 checkpoint
+272 timed-model-upgrade PlyrCivilian TimedModelUpgradeLongChariot 0 checkpoint
+273 timed-model-upgrade PlyrCivilian TimedModelUpgradeLongChariot 0 checkpoint
+274 destroy PlyrCivilian TimedModelUpgradeLongChariot 0
+280 create PlyrCivilian AngmarDarkDunedain 0 3550,2000,0
+280 create PlyrCivilian AngmarDarkDunedain 0 3600,2000,0
+280 create PlyrCivilian AngmarDarkDunedain 0 3550,2040,0
+280 create PlyrCivilian AngmarDarkDunedain 0 3600,2040,0
+280 create PlyrCivilian AngmarDarkDunedain 0 3575,2020,0
+281 burning-death-load-particles - - 0
+282 burning-death-visual PlyrCivilian AngmarDarkDunedain 0 fire
+282 burning-death-visual PlyrCivilian AngmarDarkDunedain 1 logical-fire
+282 burning-death-visual PlyrCivilian AngmarDarkDunedain 2 unlit
+282 burning-death-visual PlyrCivilian AngmarDarkDunedain 3 aflame
+282 burning-death-visual PlyrCivilian AngmarDarkDunedain 4 burned-death-type
