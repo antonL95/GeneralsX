@@ -30,6 +30,7 @@
 #pragma once
 
 #include "Common/Module.h"
+#include "Common/SpecialPowerINI.h"
 #include "Common/STLTypedefs.h"
 #include "Common/Upgrade.h"
 
@@ -156,6 +157,7 @@ struct UpgradeModuleData : public BehaviorModuleData
 {
 public:
 	UpgradeMuxData				m_upgradeMuxData;
+	SpecialPowerAnimation m_upgradeAnimation;
 
 	static void buildFieldParse(MultiIniFieldParse& p)
 	{
@@ -182,10 +184,12 @@ public:
 
 	// BehaviorModule
 	virtual UpgradeModuleInterface* getUpgrade() override { return this; }
+	Bool resetUpgrade(const UpgradeMaskType& keyMask) override;
 
 	bool isTriggeredBy(const std::string & upgrade) const { return getUpgradeModuleData()->m_upgradeMuxData.isTriggeredBy(upgrade); }
 
 protected:
+	void setUpgradeAnimation(Bool active);
 
 	virtual void processUpgradeRemoval() override
 	{

@@ -31,6 +31,7 @@
 #include "PreRTS.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Module/UpgradeModule.h"
+#include "GameLogic/Object.h"
 
 
 // ------------------------------------------------------------------------------------------------
@@ -85,6 +86,20 @@ void UpgradeModule::loadPostProcess()
 UpgradeMux::UpgradeMux() : m_upgradeExecuted(false)
 {
 
+}
+
+Bool UpgradeModule::resetUpgrade(const UpgradeMaskType& keyMask)
+{
+	return !getUpgradeModuleData()->m_upgradeMuxData.m_permanent && UpgradeMux::resetUpgrade(keyMask);
+}
+
+void UpgradeModule::setUpgradeAnimation(Bool active)
+{
+	const SpecialPowerAnimation& animation = getUpgradeModuleData()->m_upgradeAnimation;
+	if (active)
+		getObject()->applyUpgradeAnimation(animation);
+	else if (animation.m_condition != MODELCONDITION_INVALID)
+		getObject()->clearModelConditionState(static_cast<ModelConditionFlagType>(animation.m_condition));
 }
 
 // ------------------------------------------------------------------------------------------------

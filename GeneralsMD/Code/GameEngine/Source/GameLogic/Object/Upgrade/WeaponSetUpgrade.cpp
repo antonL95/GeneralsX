@@ -34,6 +34,18 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/WeaponSetUpgrade.h"
 
+void WeaponSetUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+	UpgradeModuleData::buildFieldParse(p);
+	static const FieldParse fields[] =
+	{
+		{ "CustomAnimAndDuration", SpecialPowerAnimation::parse, nullptr, offsetof(WeaponSetUpgradeModuleData, m_upgradeAnimation) },
+		{ "WeaponCondition", WeaponSetFlags::parseFromINI, nullptr, offsetof(WeaponSetUpgradeModuleData, m_weaponConditions) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	p.add(fields);
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 WeaponSetUpgrade::WeaponSetUpgrade( Thing *thing, const ModuleData* moduleData ) : UpgradeModule( thing, moduleData )
@@ -50,10 +62,18 @@ WeaponSetUpgrade::~WeaponSetUpgrade()
 //-------------------------------------------------------------------------------------------------
 void WeaponSetUpgrade::upgradeImplementation()
 {
-	// Very simple; just need to flag the Object as having the player upgrade, and the WeaponSet chooser
-	// will do the work of picking the right one from ini.  This comment is as long as the code.
-	Object *obj = getObject();
-	obj->setWeaponSetFlag( WEAPONSET_PLAYER_UPGRADE );
+	setUpgradeAnimation(TRUE);
+	getObject()->setWeaponSetFlags(getWeaponSetUpgradeModuleData()->m_weaponConditions, TRUE);
+}
+
+Bool WeaponSetUpgrade::resetUpgrade(const UpgradeMaskType& keyMask)
+{
+	if (!UpgradeModule::resetUpgrade(keyMask))
+		return FALSE;
+
+	getObject()->setWeaponSetFlags(getWeaponSetUpgradeModuleData()->m_weaponConditions, FALSE);
+	setUpgradeAnimation(FALSE);
+	return TRUE;
 }
 
 // ------------------------------------------------------------------------------------------------

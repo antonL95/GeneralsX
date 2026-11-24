@@ -92,6 +92,7 @@ void SubObjectsUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 			{ "SkipFadeOnCreate", INI::parseBool, nullptr, offsetof(SubObjectsUpgradeModuleData, m_skipFadeOnCreate) },
 			{ "HideSubObjectsOnRemove", INI::parseBool, nullptr, offsetof(SubObjectsUpgradeModuleData, m_hideSubObjectsOnRemove) },
 			{ "UnHideSubObjectsOnRemove", INI::parseBool, nullptr, offsetof(SubObjectsUpgradeModuleData, m_unHideSubObjectsOnRemove) },
+			{ "CustomAnimAndDuration", SpecialPowerAnimation::parse, nullptr, offsetof(SubObjectsUpgradeModuleData, m_upgradeAnimation) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(retailFields);
@@ -143,10 +144,11 @@ Bool SubObjectsUpgrade::canFade() const
 //-------------------------------------------------------------------------------------------------
 void SubObjectsUpgrade::upgradeImplementation()
 {
-	applyUpgrade(!isAlreadyUpgraded() && canFade());
+	if (applyUpgrade(!isAlreadyUpgraded() && canFade()))
+		setUpgradeAnimation(TRUE);
 }
 
-void SubObjectsUpgrade::applyUpgrade(Bool animate)
+Bool SubObjectsUpgrade::applyUpgrade(Bool animate)
 {
 	const SubObjectsUpgradeModuleData *data = getSubObjectsUpgradeModuleData();
 	UpgradeMaskType activation, conflicting;
@@ -157,12 +159,12 @@ void SubObjectsUpgrade::applyUpgrade(Bool animate)
 	if( getObject()->getObjectCompletedUpgradeMask().testForAny( conflicting ) )
 	{
 		//If it has ANY of the conflicting OBJECT upgrades, then don't do it!
-		return;
+		return FALSE;
 	}
 	if( getObject()->getControllingPlayer()->getCompletedUpgradeMask().testForAny( conflicting ) )
 	{
 		//If it has ANY of the conflicting PLAYER upgrades, then don't do it!
-		return;
+		return FALSE;
 	}
 
 	Object *obj = getObject();
@@ -199,6 +201,7 @@ void SubObjectsUpgrade::applyUpgrade(Bool animate)
 			draw->updateSubObjects();
 		}
 	}
+	return TRUE;
 }
 
 //------------------------------------------------------------------------------------------------
@@ -226,6 +229,7 @@ Bool SubObjectsUpgrade::resetUpgrade(const UpgradeMaskType& keyMask)
 		if (data->m_hideSubObjectsOnRemove || data->m_unHideSubObjectsOnRemove || !data->m_upgradeTextures.empty())
 			draw->updateSubObjects();
 	}
+	setUpgradeAnimation(FALSE);
 	return TRUE;
 }
 

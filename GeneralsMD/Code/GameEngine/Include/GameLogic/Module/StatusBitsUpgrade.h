@@ -88,6 +88,7 @@ class StatusBitsUpgrade : public UpgradeModule
 public:
 
 	StatusBitsUpgrade( Thing *thing, const ModuleData* moduleData );
+	Bool resetUpgrade(const UpgradeMaskType& keyMask) override;
 	// virtual destructor prototype defined by MemoryPoolObject
 
 protected:

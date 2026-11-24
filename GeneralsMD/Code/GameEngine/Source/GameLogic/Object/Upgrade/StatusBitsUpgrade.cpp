@@ -81,6 +81,7 @@ void StatusBitsUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 	{
 		{ "StatusToSet",		ObjectStatusMaskType::parseFromINI,	nullptr, offsetof( StatusBitsUpgradeModuleData, m_statusToSet ) },
 		{ "StatusToClear",	ObjectStatusMaskType::parseFromINI,	nullptr, offsetof( StatusBitsUpgradeModuleData, m_statusToClear ) },
+		{ "CustomAnimAndDuration", SpecialPowerAnimation::parse, nullptr, offsetof(StatusBitsUpgradeModuleData, m_upgradeAnimation) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
@@ -105,6 +106,19 @@ void StatusBitsUpgrade::upgradeImplementation()
 	Object *obj = getObject();
 	obj->setStatus( getStatusBitsUpgradeModuleData()->m_statusToSet );
 	obj->clearStatus( getStatusBitsUpgradeModuleData()->m_statusToClear );
+	setUpgradeAnimation(TRUE);
+}
+
+Bool StatusBitsUpgrade::resetUpgrade(const UpgradeMaskType& keyMask)
+{
+	if (!UpgradeModule::resetUpgrade(keyMask))
+		return FALSE;
+
+	const auto* data = getStatusBitsUpgradeModuleData();
+	getObject()->clearStatus(data->m_statusToSet);
+	getObject()->setStatus(data->m_statusToClear);
+	setUpgradeAnimation(FALSE);
+	return TRUE;
 }
 
 // ------------------------------------------------------------------------------------------------

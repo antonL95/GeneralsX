@@ -1706,9 +1706,9 @@ void Object::setTempInvulnerable(UnsignedInt frames)
 
 void Object::setTimedModelCondition(ModelConditionFlagType condition, UnsignedInt frames)
 {
-	if (!RetailFileLayers::enabled() || condition == MODELCONDITION_INVALID || frames == 0)
+	if (!RetailFileLayers::enabled() || condition == MODELCONDITION_INVALID)
 		return;
-	const UnsignedInt expiry = TheGameLogic->getFrame() + frames;
+	const UnsignedInt expiry = TheGameLogic->getFrame() + std::max(frames, 1u);
 	const auto existing = std::find_if(m_timedModelConditions.begin(), m_timedModelConditions.end(),
 		[&](const auto& entry) { return entry.first == condition; });
 	if (existing == m_timedModelConditions.end())
@@ -2962,13 +2962,6 @@ void Object::updateUpgradeModules()
 	if( getControllingPlayer() == nullptr )
 		return;  // This can only happen in game teardown.  No upgrades for you without a player.  Weird crashes are bad.
 
-	const UpgradeMaskType& playerMask = getControllingPlayer()->getCompletedUpgradeMask();
-	const UpgradeMaskType& objectMask = getObjectCompletedUpgradeMask();
-	UpgradeMaskType maskToCheck = playerMask;
-	maskToCheck.set( objectMask );
-	// We need to add in all of the already owned upgrades to handle "AND" requiring upgrades.
-	// We combine all the masks in case someone has a Object AND Player combination
-
 	for (BehaviorModule** module = m_behaviors; *module; ++module)
 	{
 		UpgradeModuleInterface* upgrade = (*module)->getUpgrade();
@@ -2977,7 +2970,9 @@ void Object::updateUpgradeModules()
 
 		if( !upgrade->isAlreadyUpgraded() )
 		{
-			upgrade->attemptUpgrade( maskToCheck );
+			UpgradeMaskType mask = getControllingPlayer()->getCompletedUpgradeMask();
+			mask.set(getObjectCompletedUpgradeMask());
+			upgrade->attemptUpgrade(mask);
 		}
 	}
 }

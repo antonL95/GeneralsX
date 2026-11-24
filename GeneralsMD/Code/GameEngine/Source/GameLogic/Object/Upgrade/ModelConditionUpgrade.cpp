@@ -34,10 +34,31 @@
 
 #include "Common/ModuleFactory.h"
 #include "Common/ModelState.h"
-#include "Common/RetailFileLayers.h"
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Object.h"
 
+namespace
+{
+void parseConditionRange(INI* ini, void*, void* store, const void*)
+{
+	ModelConditionFlags endpoints;
+	ModelConditionFlags::parseFromINI(ini, nullptr, &endpoints, nullptr);
+	if (endpoints.count() != 2)
+		throw INI_INVALID_DATA;
+
+	ModelConditionFlags range;
+	Bool insideRange = FALSE;
+	for (Int flag = 0; flag < MODELCONDITION_COUNT; ++flag)
+	{
+		const Bool endpoint = endpoints.test(flag);
+		if (insideRange || endpoint)
+			range.set(flag);
+		if (endpoint)
+			insideRange = !insideRange;
+	}
+	*static_cast<ModelConditionFlags*>(store) = range;
+}
+}
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 ModelConditionUpgradeModuleData::ModelConditionUpgradeModuleData()
@@ -63,6 +84,7 @@ void ModelConditionUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{
 			{ "AddConditionFlags", ModelConditionFlags::parseFromINI, nullptr, offsetof(ModelConditionUpgradeModuleData, m_addConditions) },
 			{ "RemoveConditionFlags", ModelConditionFlags::parseFromINI, nullptr, offsetof(ModelConditionUpgradeModuleData, m_removeConditions) },
+			{ "RemoveConditionFlagsInRange", parseConditionRange, nullptr, offsetof(ModelConditionUpgradeModuleData, m_removeConditions) },
 			{ "AddTempConditionFlag", parseSpecialPowerModelCondition, nullptr, offsetof(ModelConditionUpgradeModuleData, m_tempCondition) },
 			{ "TempConditionTime", INI::parseReal, nullptr, offsetof(ModelConditionUpgradeModuleData, m_tempConditionTime) },
 			{ nullptr, nullptr, nullptr, 0 }
@@ -95,12 +117,24 @@ void ModelConditionUpgrade::upgradeImplementation()
 		me->setModelConditionState(data->m_conditionFlag);
 	if (data->m_addConditions.any() || data->m_removeConditions.any())
 		me->clearAndSetModelConditionFlags(data->m_removeConditions, data->m_addConditions);
-	if (RetailFileLayers::enabled() && data->m_tempCondition != MODELCONDITION_INVALID)
+	if (data->m_tempCondition != MODELCONDITION_INVALID && data->m_tempConditionTime > 0.0f)
 	{
 		const Real frames = data->m_tempConditionTime * LOGICFRAMES_PER_SECONDS_REAL;
-		if (frames >= 1.0f && frames < static_cast<Real>(std::numeric_limits<UnsignedInt>::max()))
+		if (frames < static_cast<Real>(std::numeric_limits<UnsignedInt>::max()))
 			me->setTimedModelCondition(static_cast<ModelConditionFlagType>(data->m_tempCondition), static_cast<UnsignedInt>(frames));
 	}
+}
+
+Bool ModelConditionUpgrade::resetUpgrade(const UpgradeMaskType& keyMask)
+{
+	if (!UpgradeModule::resetUpgrade(keyMask))
+		return FALSE;
+
+	const auto* data = getModelConditionUpgradeModuleData();
+	ModelConditionFlags flags = data->m_removeConditions;
+	flags.set(data->m_addConditions);
+	getObject()->clearModelConditionFlags(flags);
+	return TRUE;
 }
 
 // ------------------------------------------------------------------------------------------------

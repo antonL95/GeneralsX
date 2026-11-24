@@ -101,7 +101,7 @@ protected:
 	virtual Bool isSubObjectsUpgrade() override { return true; }
 
 private:
-	void applyUpgrade(Bool animate);
+	Bool applyUpgrade(Bool animate);
 	Bool canFade() const;
 	UnsignedInt m_creationFrame = 0;
 };
