@@ -73,4 +73,9 @@ compare() {
     grep -F 'TEST container-fields frame=247 release-restored ' "$out/continue.log" > "$out/container-fields-release-continued.txt"
     grep -F 'TEST container-fields frame=247 release-restored ' "$out/resume.log" > "$out/container-fields-release-resumed.txt"
     cmp "$out/container-fields-release-continued.txt" "$out/container-fields-release-resumed.txt"
+    if covers 292 && covers 320; then
+        grep -E '^TEST container-fields busy frame=(292|320) ' "$out/continue.log" > "$out/container-fields-busy-continued.txt"
+        grep -E '^TEST container-fields busy frame=(292|320) ' "$out/resume.log" > "$out/container-fields-busy-resumed.txt"
+        cmp "$out/container-fields-busy-continued.txt" "$out/container-fields-busy-resumed.txt"
+    fi
 }

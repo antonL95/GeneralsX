@@ -1636,6 +1636,8 @@ Bool BuildAssistant::moveObjectsForConstruction( const ThingTemplate *whatToBuil
 				obstacles.push_back(them);
 	});
 
+	if (retail)
+		std::sort(obstacles.begin(), obstacles.end(), [](const Object* a, const Object* b) { return a->getID() < b->getID(); });
 	for (Object* them : obstacles)
 	{
 		//ignore land mines, cluster mines and demo traps, since you can build on them
