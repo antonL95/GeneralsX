@@ -175,6 +175,7 @@ public:
 
 private:
 
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	Bool shouldTryToSpawn(); ///< For my own use, should I even think of spawning
 	Bool createSpawn();										///< Actual work of creating a guy
 

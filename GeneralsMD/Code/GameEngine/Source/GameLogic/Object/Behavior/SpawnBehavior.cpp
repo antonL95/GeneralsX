@@ -35,6 +35,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/INIAudit.h"
 #include "GameClient/Drawable.h"
 #include "Common/Xfer.h"
@@ -1182,6 +1183,8 @@ void SpawnBehavior::crc( Xfer *xfer )
 
 	// extend base class
 	BehaviorModule::crc( xfer );
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 
 }
 
@@ -1203,6 +1206,8 @@ void SpawnBehavior::xfer( Xfer *xfer )
 #else
 	XferVersion currentVersion = 3;
 #endif
+	if (RetailFileLayers::enabled())
+		currentVersion = 4;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1270,6 +1275,24 @@ void SpawnBehavior::xfer( Xfer *xfer )
 	// self tasking spawn count
 	xfer->xferUnsignedInt( &m_selfTaskingSpawnCount );
 
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 4);
+}
+
+void SpawnBehavior::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	const auto& names = getSpawnBehaviorModuleData()->m_spawnTemplateNameData;
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection(xfer, loading, present, {
+		{"spawn-template-cursor", [this, &names, loading](Xfer* x) {
+			UnsignedInt index = static_cast<UnsignedInt>(m_templateNameIterator - names.begin());
+			x->xferUnsignedInt(&index);
+			if (loading)
+				m_templateNameIterator = index < names.size() ? names.begin() + index : names.begin();
+		}, [this, &names] {
+			m_templateNameIterator = names.begin();
+		}},
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
