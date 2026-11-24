@@ -91,6 +91,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/TunnelContain.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/StealthUpdate.h"
@@ -4948,8 +4949,12 @@ Bool InGameUI::canSelectedObjectsDoAction( ActionType action, const Object *obje
 				success = TheActionManager->canEnterObject( other->getObject(), objectToInteractWith, CMD_FROM_PLAYER, COMBATDROP_INTO );
 				break;
 			case ACTIONTYPE_ENTER_OBJECT:
-				//additionalChecking is TRUE only if we want to check if transport is full first.
 				success = TheActionManager->canEnterObject( other->getObject(), objectToInteractWith, CMD_FROM_PLAYER, additionalChecking ? CHECK_CAPACITY : DONT_CHECK_CAPACITY );
+				if (success && RetailFileLayers::enabled())
+				{
+					if (const auto* tunnel = TunnelContain::find(objectToInteractWith))
+						success = tunnel->canReachEntrance(other->getObject());
+				}
 				break;
 			case ACTIONTYPE_ATTACK_OBJECT:
 				DEBUG_CRASH( ("Called InGameUI::canSelectedObjectsDoAction() with ACTIONTYPE_ATTACK_OBJECT. You must use InGameUI::getCanSelectedObjectsAttack() instead.") );

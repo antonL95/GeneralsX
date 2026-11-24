@@ -31,6 +31,7 @@
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
 #include "Common/KindOf.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/TunnelTracker.h"
 #include "Common/Xfer.h"
 
@@ -117,6 +118,9 @@ void TunnelTracker::swapContainedItemsList(ContainedItemsList& newList)
 {
 	m_containList.swap(newList);
 	m_containListSize = (Int)m_containList.size();
+	m_heroUnitsContained = std::count_if(m_containList.begin(), m_containList.end(), [](const Object* obj) {
+		return obj->isKindOf(KINDOF_HERO);
+	});
 }
 
 // ------------------------------------------------------------------------
@@ -277,7 +281,7 @@ void TunnelTracker::onTunnelDestroyed( const Object *deadTunnel )
 			Object* obj = *it;
 			++it;
 			if( obj->getContainedBy() == deadTunnel )
-				obj->onContainedBy( tunnel );
+				TunnelContain::rebindPassenger(obj, deadTunnel, tunnel);
 		}
 	}
 
@@ -314,7 +318,7 @@ void TunnelTracker::onTunnelDestroyed( const Object *deadTunnel )
 			Object* obj = *it;
 			++it;
 			if( obj->getContainedBy() == deadTunnel )
-				obj->onContainedBy( validTunnel );
+				TunnelContain::rebindPassenger(obj, deadTunnel, validTunnel);
 		}
 	}
 
@@ -540,6 +544,9 @@ void TunnelTracker::loadPostProcess()
 
 		// push on the back of the contain list
 		addToContainList( obj );
+
+		if (RetailFileLayers::enabled() && !obj->testStatus(OBJECT_STATUS_ENCLOSED))
+			continue;
 
 		// Crap.  This is in OpenContain as a fix, but not here.
 		{

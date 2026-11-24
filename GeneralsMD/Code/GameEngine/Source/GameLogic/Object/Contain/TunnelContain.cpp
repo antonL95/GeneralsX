@@ -31,17 +31,28 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/GameState.h"
 #include "Common/Player.h"
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
+#include "Common/RotwkDuration.h"
 #include "Common/ThingTemplate.h"
 #include "Common/TunnelTracker.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/LogicRandomValue.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/OpenContain.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/TunnelContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/TerrainLogic.h"
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,6 +73,180 @@ TunnelContain::~TunnelContain()
 {
 }
 
+const TunnelContain* TunnelContain::find(const Object* object)
+{
+	const ContainModuleInterface* contain = object ? object->getContain() : nullptr;
+	return contain && contain->isTunnelContain() ? static_cast<const TunnelContain*>(contain) : nullptr;
+}
+
+Coord3D TunnelContain::toWorld(const Coord3D& offset) const
+{
+	Vector3 world;
+	Matrix3D::Transform_Vector(*getObject()->getTransformMatrix(), Vector3(offset.x, offset.y, offset.z), &world);
+	return {world.X, world.Y, world.Z};
+}
+
+Coord3D TunnelContain::getEntryPosition() const
+{
+	return toWorld(getTunnelContainModuleData()->m_entryPosition);
+}
+
+Coord3D TunnelContain::getEntryOffset() const
+{
+	return toWorld(getTunnelContainModuleData()->m_entryOffset);
+}
+
+Bool TunnelContain::canReachEntrance(const Object* passenger) const
+{
+	const AIUpdateInterface* ai = passenger ? passenger->getAI() : nullptr;
+	if (!ai)
+		return FALSE;
+
+	const Coord3D approach = getEntryOffset();
+	Pathfinder* pathfinder = TheAI->pathfinder();
+	const Coord3D* source = passenger->getPosition();
+	const PathfindCell* sourceCell = pathfinder->getCell(passenger->getLayer(), source);
+	const auto reachable = [&](const Coord3D& position) -> Bool {
+		const PathfindLayerEnum layer = TheTerrainLogic->getLayerForDestination(&position);
+		const PathfindCell* destination = pathfinder->getCell(layer, &position);
+		if (!destination)
+			return FALSE;
+		if (destination->getType() == PathfindCell::CELL_OBSTACLE ||
+			(sourceCell && sourceCell->getType() == PathfindCell::CELL_OBSTACLE))
+			return pathfinder->clientSafeQuickDoesPathExistForUI(ai->getLocomotorSet(), source, &position);
+		return pathfinder->clientSafeQuickDoesPathExist(ai->getLocomotorSet(), source, &position);
+	};
+	if (reachable(approach))
+		return TRUE;
+
+	const Object* tunnel = getObject();
+	const Coord3D& center = *tunnel->getPosition();
+	const PathfindCell* cell = pathfinder->getCell(tunnel->getLayer(), &center);
+	if (!cell || cell->getType() != PathfindCell::CELL_OBSTACLE)
+		return reachable(center);
+
+	const Real radius = tunnel->getGeometryInfo().getBoundingCircleRadius();
+	const Int edge = static_cast<Int>(radius / PATHFIND_CELL_SIZE_F) + 2;
+	const auto reachableEdge = [&](Real dx, Real dy) -> Bool {
+		for (Int step = 1; step <= edge; ++step)
+		{
+			const Coord3D point{center.x + dx * step, center.y + dy * step, center.z};
+			const PathfindCell* edgeCell = pathfinder->getCell(tunnel->getLayer(), &point);
+			if (!edgeCell || edgeCell->getType() != PathfindCell::CELL_OBSTACLE)
+				return reachable(point);
+		}
+		return FALSE;
+	};
+	return reachableEdge(PATHFIND_CELL_SIZE_F, 0.0f) ||
+		reachableEdge(-PATHFIND_CELL_SIZE_F, 0.0f) ||
+		reachableEdge(0.0f, PATHFIND_CELL_SIZE_F) ||
+		reachableEdge(0.0f, -PATHFIND_CELL_SIZE_F);
+}
+
+Bool TunnelContain::isExitBusy() const
+{
+	return TheGameLogic->getFrame() < m_nextExitFrame;
+}
+
+Bool TunnelContain::getNaturalRallyPoint(Coord3D& position, Bool offset) const
+{
+	if (!RetailFileLayers::enabled())
+		return OpenContain::getNaturalRallyPoint(position, offset);
+	position = toWorld(getTunnelContainModuleData()->m_exitOffset);
+	return TRUE;
+}
+
+void TunnelContain::exitObjectViaDoor(Object* obj, ExitDoorType exitDoor)
+{
+	if (RetailFileLayers::enabled())
+		exitToOffset(obj, FALSE);
+	else
+		OpenContain::exitObjectViaDoor(obj, exitDoor);
+}
+
+void TunnelContain::exitObjectInAHurry(Object* obj)
+{
+	if (RetailFileLayers::enabled())
+		exitToOffset(obj, TRUE);
+	else
+		OpenContain::exitObjectInAHurry(obj);
+}
+
+void TunnelContain::exitToOffset(Object* obj, Bool quick)
+{
+	if (!obj || !isContained(obj))
+		return;
+
+	removeFromContain(obj);
+	if (obj->getContainedBy())
+		return;
+
+	const Object* tunnel = getObject();
+	const Real angle = tunnel->getOrientation();
+	AIUpdateInterface* ai = obj->getAI();
+	Pathfinder* pathfinder = TheAI->pathfinder();
+	Coord3D start = getEntryPosition();
+	if (const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr)
+	{
+		const PathfindLayerEnum layer = tunnel->getLayer();
+		if (!pathfinder->validMovementTerrain(layer, locomotor, &start))
+		{
+			const Real radius = tunnel->getGeometryInfo().getMajorRadius();
+			const Real dx = radius * Cos(angle);
+			const Real dy = radius * Sin(angle);
+			start.x -= dx;
+			start.y -= dy;
+			if (!pathfinder->validMovementTerrain(layer, locomotor, &start))
+			{
+				start.x += dx + dx;
+				start.y += dy + dy;
+				if (!pathfinder->validMovementTerrain(layer, locomotor, &start))
+					start = *tunnel->getPosition();
+			}
+		}
+	}
+	obj->setPosition(&start);
+	obj->setOrientation(angle);
+	obj->setLayer(tunnel->getLayer());
+	pathfinder->addObjectToPathfindMap(obj);
+	if (!ai)
+		return;
+
+	Coord3D end = toWorld(getTunnelContainModuleData()->m_exitOffset);
+	pathfinder->adjustToPossibleDestination(obj, ai->getLocomotorSet(), &end);
+	std::vector<Coord3D> path{end, end};
+	if (const Coord3D* rally = getRallyPoint())
+		path.back() = *rally;
+
+	if (quick)
+		ai->doQuickExit(&path);
+	else
+		ai->aiFollowPath(&path, getObject(), CMD_FROM_AI);
+	pathfinder->updateGoal(obj, &end, TheTerrainLogic->getLayerForDestination(&end));
+}
+
+Bool TunnelContain::getContainerPipsToShow(Int& numTotal, Int& numFull)
+{
+	if (getTunnelContainModuleData()->m_showPips)
+		return OpenContain::getContainerPipsToShow(numTotal, numFull);
+	numTotal = numFull = 0;
+	return FALSE;
+}
+
+Bool TunnelContain::isEnclosingContainerFor(const Object*) const
+{
+	return !RetailFileLayers::enabled() ||
+		getTunnelContainModuleData()->m_objectStatusOfContained.test(OBJECT_STATUS_ENCLOSED);
+}
+
+void TunnelContain::addToContain(Object* obj)
+{
+	if (!RetailFileLayers::enabled())
+		OpenContain::addToContain(obj);
+	else if (isValidContainerFor(obj, TRUE))
+		OpenContain::addToContain(obj, FALSE);
+}
+
 void TunnelContain::addToContainList( Object *obj )
 {
 	Player *owningPlayer = getObject()->getControllingPlayer();
@@ -79,6 +264,18 @@ void TunnelContain::addToContainList( Object *obj )
 //-------------------------------------------------------------------------------------------------
 void TunnelContain::removeFromContain( Object *obj, Bool exposeStealthUnits )
 {
+	if (RetailFileLayers::enabled())
+	{
+		const TunnelContain* source = obj ? find(obj->getContainedBy()) : nullptr;
+		Player* owner = getObject()->getControllingPlayer();
+		TunnelTracker* tracker = owner ? owner->getTunnelSystem() : nullptr;
+		if (!source || !tracker || source->getObject()->getControllingPlayer() != owner)
+			return;
+		tracker->removeFromContain(obj, exposeStealthUnits);
+		onRemoving(obj);
+		obj->onRemovedFrom(getObject());
+		return;
+	}
 
 	// sanity
 	if( obj == nullptr )
@@ -218,6 +415,9 @@ void TunnelContain::onContaining( Object *obj, Bool wasSelected )
 {
 	OpenContain::onContaining( obj, wasSelected );
 
+	if (RetailFileLayers::enabled())
+		obj->setPosition(getObject()->getPosition());
+
 	// objects inside a building are held
 	obj->setDisabled( DISABLED_HELD );
 
@@ -234,6 +434,21 @@ void TunnelContain::onContaining( Object *obj, Bool wasSelected )
 //-------------------------------------------------------------------------------------------------
 void TunnelContain::onRemoving( Object *obj )
 {
+	if (RetailFileLayers::enabled())
+	{
+		const TunnelContain* source = find(obj->getContainedBy());
+		const Bool enclosed = source && source->isEnclosingContainerFor(obj);
+		if (source)
+			const_cast<TunnelContain*>(source)->OpenContain::onRemoving(obj);
+		obj->clearDisabled(DISABLED_HELD);
+		obj->setPosition(getObject()->getPosition());
+		obj->setSafeOcclusionFrame(TheGameLogic->getFrame() + obj->getTemplate()->getOcclusionDelay());
+		if (enclosed)
+			addOrRemoveObjFromWorld(obj, TRUE);
+		m_nextExitFrame = TheGameLogic->getFrame() + getTunnelContainModuleData()->m_exitDelay;
+		return;
+	}
+
 	OpenContain::onRemoving(obj);
 
 	// object is no longer held inside a garrisoned building
@@ -302,11 +517,12 @@ Bool TunnelContain::isContained( const Object *obj ) const
 Bool TunnelContain::isValidContainerFor(const Object* obj, Bool checkCapacity) const
 {
 	Player *owningPlayer = getObject()->getControllingPlayer();
-	if( owningPlayer && owningPlayer->getTunnelSystem() )
-	{
-		return owningPlayer->getTunnelSystem()->isValidContainerFor( obj, checkCapacity );
-	}
-	return false;
+	if (!owningPlayer || !owningPlayer->getTunnelSystem())
+		return FALSE;
+	if (RetailFileLayers::enabled() && (!m_isCurrentlyRegistered || getObject()->isEffectivelyDead() ||
+		!OpenContain::isValidContainerFor(obj, checkCapacity)))
+		return FALSE;
+	return owningPlayer->getTunnelSystem()->isValidContainerFor(obj, checkCapacity);
 }
 
 UnsignedInt TunnelContain::getContainCount() const
@@ -414,43 +630,96 @@ void TunnelContain::scatterToNearbyPosition(Object* obj)
 //-------------------------------------------------------------------------------------------------
 /** The die callback. */
 //-------------------------------------------------------------------------------------------------
-void TunnelContain::onDie( const DamageInfo * damageInfo )
+void TunnelContain::onDie(const DamageInfo* damageInfo)
 {
-	// override the onDie we inherit from OpenContain. no super call.
-	if (!getTunnelContainModuleData()->m_dieMuxData.isDieApplicable(getObject(), damageInfo))
-		return;
-
-	if( !m_isCurrentlyRegistered )
-		return;//it isn't registered as a tunnel
-
-	Player *owningPlayer = getObject()->getControllingPlayer();
-	if( owningPlayer == nullptr )
-		return;
-	TunnelTracker *tunnelTracker = owningPlayer->getTunnelSystem();
-	if( tunnelTracker == nullptr )
-		return;
-
-	tunnelTracker->onTunnelDestroyed( getObject() );
-	m_isCurrentlyRegistered = FALSE;
+	if (getTunnelContainModuleData()->m_dieMuxData.isDieApplicable(getObject(), damageInfo))
+		unregisterTunnel(TRUE);
 }
 
 //-------------------------------------------------------------------------------------------------
 void TunnelContain::onDelete()
 {
-	// Being sold is a straight up delete.  no death
+	unregisterTunnel(FALSE);
+}
 
-	if( !m_isCurrentlyRegistered )
-		return;//it isn't registered as a tunnel
+void TunnelContain::rebindPassenger(Object* passenger, const Object* former, Object* replacement)
+{
+	const TunnelContain* previous = find(former);
+	auto* next = const_cast<TunnelContain*>(find(replacement));
+	if (RetailFileLayers::enabled() && previous && next)
+	{
+		const auto& incoming = next->getTunnelContainModuleData()->m_objectStatusOfContained;
+		ObjectStatusMaskType outgoing = previous->getTunnelContainModuleData()->m_objectStatusOfContained;
+		outgoing.clear(incoming);
+		passenger->clearStatus(outgoing);
+		passenger->setStatus(incoming);
+		if (const HordeContain* horde = HordeContain::get(passenger))
+		{
+			outgoing.clear(horde->getActiveFormation()->m_objectStatusOfContained);
+			outgoing.set(OBJECT_STATUS_UNSELECTABLE, FALSE);
+			for (Object* member : *horde->getContainedItemsList())
+			{
+				member->clearStatus(outgoing);
+				member->setStatus(incoming);
+			}
+		}
 
-	Player *owningPlayer = getObject()->getControllingPlayer();
-	if( owningPlayer == nullptr )
+		const Bool enclosed = next->isEnclosingContainerFor(passenger);
+		if (enclosed != previous->isEnclosingContainerFor(passenger))
+			next->addOrRemoveObjFromWorld(passenger, !enclosed);
+	}
+	passenger->onContainedBy(replacement);
+}
+
+void TunnelContain::unregisterTunnel(Bool died)
+{
+	if (!m_isCurrentlyRegistered)
 		return;
-	TunnelTracker *tunnelTracker = owningPlayer->getTunnelSystem();
-	if( tunnelTracker == nullptr )
+	Player* owner = getObject()->getControllingPlayer();
+	TunnelTracker* tracker = owner ? owner->getTunnelSystem() : nullptr;
+	if (!tracker)
 		return;
 
-	tunnelTracker->onTunnelDestroyed( getObject() );
 	m_isCurrentlyRegistered = FALSE;
+	ContainedItemsList passengers;
+	if (RetailFileLayers::enabled() && tracker->friend_getTunnelCount() == 1)
+		tracker->swapContainedItemsList(passengers);
+	tracker->onTunnelDestroyed(getObject());
+
+	const auto* data = getTunnelContainModuleData();
+	const Bool kill = died && (data->m_killPassengersOnDeath || !data->m_ejectPassengersOnDeath);
+	for (Object* passenger : passengers)
+	{
+		const Bool destroy = !data->m_ejectPassengersOnDeath || passenger->testStatus(OBJECT_STATUS_ENCLOSED);
+		const Coord3D previousPosition = *passenger->getPosition();
+		removeFromContain(passenger);
+		if (!kill || passenger->isEffectivelyDead())
+			continue;
+
+		const auto killRider = [destroy](Object* rider) {
+			if (destroy)
+			{
+				TheGameLogic->destroyObject(rider);
+				return;
+			}
+			if (PhysicsBehavior* physics = rider->getPhysics())
+			{
+				const Real speed = GameLogicRandomValue(2, 5) * RotwkDuration::FRAMES_PER_SECOND;
+				physics->launchFromImpact(*rider->getUnitDirectionVector2D(), speed, 0.25f, TRUE);
+			}
+			rider->kill();
+		};
+		if (!destroy)
+			passenger->setPosition(&previousPosition);
+		if (const HordeContain* horde = HordeContain::get(passenger))
+		{
+			const ContainedItemsList members = *horde->getContainedItemsList();
+			for (Object* member : members)
+				killRider(member);
+		}
+		if (!passenger->isEffectivelyDead())
+			killRider(passenger);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -555,6 +824,8 @@ UpdateSleepTime TunnelContain::update()
 {
 	// extending functionality to heal the units within the tunnel system
 	OpenContain::update();
+	if (RetailFileLayers::enabled())
+		updatePassengerBones();
 
 	Object *obj = getObject();
 	Player *controllingPlayer = nullptr;
@@ -585,7 +856,7 @@ UpdateSleepTime TunnelContain::update()
 					Object *attacker = TheGameLogic->findObjectByID(attackerID);
 					if( attacker )
 					{
-						if (obj->getRelationship(attacker) == ENEMIES) {
+						if (tunnelSystem && obj->getRelationship(attacker) == ENEMIES) {
 							tunnelSystem->updateNemesis(attacker);
 						}
 					}
@@ -597,15 +868,164 @@ UpdateSleepTime TunnelContain::update()
 
 }
 
+Bool TunnelContain::getPassengerBonePosition(ObjectID passenger, Coord3D& position) const
+{
+	for (const auto& bone : m_passengerBones)
+		if (bone.passenger == passenger)
+			return getObject()->getSingleLogicalBonePosition(bone.name.str(), &position, nullptr);
+	return FALSE;
+}
+
+void TunnelContain::positionPassengerAtBone(Object* passenger)
+{
+	if (passenger->isEffectivelyDead())
+		return;
+	const ObjectID id = passenger->getID();
+	const AIUpdateInterface* ai = passenger->getAI();
+	const Object* victim = ai ? ai->getCurrentVictim() : nullptr;
+	const Bool enclosed = passenger->testStatus(OBJECT_STATUS_ENCLOSED);
+	if (enclosed && (!passenger->testStatus(OBJECT_STATUS_CAN_ATTACK) || !victim))
+	{
+		if (std::erase_if(m_passengerBones, [id](const PassengerBone& bone) { return bone.passenger == id; }))
+			passenger->setPosition(getObject()->getPosition());
+		return;
+	}
+
+	Coord3D position;
+	const Bool hasBone = getPassengerBonePosition(id, position);
+	if (hasBone && !victim)
+	{
+		const Coord3D& current = *passenger->getPosition();
+		if (position.x != current.x || position.y != current.y || position.z != current.z)
+			passenger->setPosition(&position);
+		return;
+	}
+
+	const Object* tunnel = getObject();
+	Real bestDistance = 0.0f;
+	AsciiString bestBone;
+	Coord3D bestPosition{};
+	const Coord3D& target = victim ? *victim->getPosition() : *passenger->getPosition();
+	const auto distanceTo = [&target](const Coord3D& pivot) {
+		const Real dx = pivot.x - target.x;
+		const Real dy = pivot.y - target.y;
+		return dx * dx + dy * dy;
+	};
+	auto assigned = std::find_if(m_passengerBones.begin(), m_passengerBones.end(),
+		[id](const PassengerBone& bone) { return bone.passenger == id; });
+	if (hasBone)
+	{
+		bestBone = assigned->name;
+		bestPosition = position;
+		bestDistance = distanceTo(position);
+	}
+	const auto considerBone = [&](const AsciiString& name) {
+		for (const auto& bone : m_passengerBones)
+			if (bone.passenger != id && stricmp(name.str(), bone.name.str()) == 0)
+				return;
+		Coord3D pivot;
+		if (!tunnel->getSingleLogicalBonePosition(name.str(), &pivot, nullptr))
+			return;
+		const Real distance = distanceTo(pivot);
+		if (bestBone.isEmpty() || distance < bestDistance)
+		{
+			bestBone = name;
+			bestPosition = pivot;
+			bestDistance = distance;
+		}
+	};
+
+	for (const auto& prefix : getTunnelContainModuleData()->m_passengerBonePrefixes)
+	{
+		if (!passenger->isAnyKindOf(prefix.kindOf))
+			continue;
+		const Int count = tunnel->getMultiLogicalBonePosition(prefix.bonePrefix.str(), MAX_BONES_PER_PREFIX, nullptr, nullptr, FALSE);
+		if (count == 0)
+			considerBone(prefix.bonePrefix);
+		for (Int slot = 1; slot <= count; ++slot)
+		{
+			AsciiString name;
+			name.format("%s%02d", prefix.bonePrefix.str(), slot);
+			considerBone(name);
+		}
+	}
+	if (bestBone.isNotEmpty())
+	{
+		if (assigned == m_passengerBones.end())
+			m_passengerBones.push_back({id, bestBone});
+		else
+			assigned->name = bestBone;
+		const Coord3D& current = *passenger->getPosition();
+		if (bestPosition.x != current.x || bestPosition.y != current.y || bestPosition.z != current.z)
+			passenger->setPosition(&bestPosition);
+	}
+	else if (assigned != m_passengerBones.end())
+		m_passengerBones.erase(assigned);
+}
+
+void TunnelContain::updatePassengerBones()
+{
+	if (getTunnelContainModuleData()->m_passengerBonePrefixes.empty())
+		return;
+	const Object* tunnel = getObject();
+	std::erase_if(m_passengerBones, [tunnel](const PassengerBone& bone) {
+		const Object* passenger = TheGameLogic->findObjectByID(bone.passenger);
+		if (!passenger || passenger->isEffectivelyDead())
+			return true;
+		const Object* anchor = passenger->getContainedBy();
+		return anchor != tunnel && (!anchor || anchor->getContainedBy() != tunnel);
+	});
+
+	const ContainedItemsList* passengers = getContainedItemsList();
+	if (!passengers)
+		return;
+	for (Object* passenger : *passengers)
+	{
+		if (passenger->getContainedBy() != tunnel)
+			continue;
+		if (const HordeContain* horde = HordeContain::get(passenger))
+		{
+			for (Object* member : *horde->getContainedItemsList())
+				positionPassengerAtBone(member);
+		}
+		else
+			positionPassengerAtBone(passenger);
+	}
+}
+
 // ------------------------------------------------------------------------------------------------
 /** CRC */
 // ------------------------------------------------------------------------------------------------
 void TunnelContain::crc( Xfer *xfer )
 {
+	OpenContain::crc(xfer);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
+}
 
-	// extend base class
-	OpenContain::crc( xfer );
-
+void TunnelContain::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	RetailSaveBlocks::transferSection<Xfer>(xfer, loading, present, {
+		{"exit-delay", [this](Xfer* block) {
+			block->xferUnsignedInt(&m_nextExitFrame);
+		}, [this] { m_nextExitFrame = 0; }},
+		{"passenger-bones", [this, loading](Xfer* block) {
+			UnsignedInt count = static_cast<UnsignedInt>(m_passengerBones.size());
+			block->xferUnsignedInt(&count);
+			if (loading)
+			{
+				if (count > getTunnelContainModuleData()->m_passengerBonePrefixes.size() * MAX_BONES_PER_PREFIX)
+					throw SC_INVALID_DATA;
+				m_passengerBones.resize(count);
+			}
+			for (auto& bone : m_passengerBones)
+			{
+				block->xferObjectID(&bone.passenger);
+				block->xferAsciiString(&bone.name);
+			}
+		}, [this] { m_passengerBones.clear(); }}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -616,8 +1036,8 @@ void TunnelContain::crc( Xfer *xfer )
 void TunnelContain::xfer( Xfer *xfer )
 {
 
-	// version
-	XferVersion currentVersion = 1;
+	const Bool retail = RetailFileLayers::enabled();
+	XferVersion currentVersion = retail ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -630,6 +1050,8 @@ void TunnelContain::xfer( Xfer *xfer )
 	// Currently registered with owning player
 	xfer->xferBool( &m_isCurrentlyRegistered );
 
+	if (retail)
+		xferRetailBlocks(xfer, version >= 2);
 }
 
 // ------------------------------------------------------------------------------------------------

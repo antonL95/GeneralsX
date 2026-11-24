@@ -76,6 +76,7 @@
 #include "GameLogic/Module/JetAIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
+#include "GameLogic/Module/TunnelContain.h"
 
 
 static Bool cannotPossiblyAttackObject( State *thisState, void* userData );
@@ -6499,10 +6500,14 @@ StateReturnType AIEnterState::onEnter()
 		if( !TheActionManager->canEnterObject( obj, goal, obj->getAI()->getLastCommandSource(), CHECK_CAPACITY ) )
 			return STATE_FAILURE;
 
-		m_goalPosition = *goal->getPosition();
-
 		ContainModuleInterface* contain = goal->getContain();
-		SiegeAIUpdate::getClimbEntryPosition(goal, obj, m_goalPosition);
+		if (const auto* tunnel = RetailFileLayers::enabled() ? TunnelContain::find(goal) : nullptr)
+			m_goalPosition = tunnel->getEntryPosition();
+		else
+		{
+			m_goalPosition = *goal->getPosition();
+			SiegeAIUpdate::getClimbEntryPosition(goal, obj, m_goalPosition);
+		}
 		if (contain)
 		{
 			contain->onObjectWantsToEnterOrExit(obj, WANTS_TO_ENTER);
@@ -6575,6 +6580,7 @@ StateReturnType AIEnterState::update()
 	// update the goal position to coincide with the GoalObject
 	Object* obj = getMachineOwner();
 	Object* goal = getMachineGoalObject();
+	const auto* tunnel = RetailFileLayers::enabled() ? TunnelContain::find(goal) : nullptr;
 	if (goal)
 	{
 		// if our goal is contained by something else, give up. this is for the following bug:
@@ -6587,9 +6593,18 @@ StateReturnType AIEnterState::update()
 			return STATE_FAILURE;
 		}
 
-		m_goalPosition = *goal->getPosition();
 		obj->getAI()->friend_setGoalObject(goal);
-		SiegeAIUpdate::getClimbEntryPosition(goal, obj, m_goalPosition);
+		if (tunnel)
+		{
+			if (obj->getContainedBy() == goal)
+				return STATE_SUCCESS;
+			m_goalPosition = tunnel->getEntryPosition();
+		}
+		else
+		{
+			m_goalPosition = *goal->getPosition();
+			SiegeAIUpdate::getClimbEntryPosition(goal, obj, m_goalPosition);
+		}
 		if (!TheActionManager->canEnterObject(obj, goal, obj->getAI()->getLastCommandSource(), CHECK_CAPACITY))
 		{
 			/*
@@ -6653,8 +6668,9 @@ StateReturnType AIEnterState::update()
 			if (goal)
 			{
 				// we didn't enter.  See if we're close.
-				Real dx = (obj->getPosition()->x - goal->getPosition()->x);
-				Real dy = (obj->getPosition()->y - goal->getPosition()->y);
+				const Coord3D& entry = tunnel ? m_goalPosition : *goal->getPosition();
+				Real dx = obj->getPosition()->x - entry.x;
+				Real dy = obj->getPosition()->y - entry.y;
 				Real radius = goal->getGeometryInfo().getMinorRadius();
 				if (goal->getGeometryInfo().getGeomType()!=GEOMETRY_BOX) {
 					radius = goal->getGeometryInfo().getMajorRadius();

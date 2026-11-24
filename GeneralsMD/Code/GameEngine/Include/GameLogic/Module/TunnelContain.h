@@ -51,12 +51,7 @@ public:
 		// by default, takes no time to heal ppl
 		m_framesForFullHeal = 1.0f;
 
-		//
-		// by default we say that transports can have infantry inside them, this will be totally
-		// overwritten by any data provided from the INI entry tho
-		//
-		m_allowInsideKindOf = MAKE_KINDOF_MASK(KINDOF_INFANTRY);
-
+		m_objectStatusOfContained = MAKE_OBJECT_STATUS_MASK2(OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_ENCLOSED);
 	}
 
 	static void buildFieldParse(MultiIniFieldParse& p)
@@ -66,10 +61,19 @@ public:
 		static const FieldParse dataFieldParse[] =
 		{
 			{ "TimeForFullHeal", INI::parseDurationReal, nullptr, offsetof( TunnelContainModuleData, m_framesForFullHeal ) },
+			{ "ExitDelay", INI::parseDurationUnsignedInt, nullptr, offsetof(TunnelContainModuleData, m_exitDelay) },
+			{ "EntryPosition", INI::parseCoord3D, nullptr, offsetof(TunnelContainModuleData, m_entryPosition) },
+			{ "EntryOffset", INI::parseCoord3D, nullptr, offsetof(TunnelContainModuleData, m_entryOffset) },
+			{ "ExitOffset", INI::parseCoord3D, nullptr, offsetof(TunnelContainModuleData, m_exitOffset) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
 	}
+
+	Coord3D m_entryPosition{0.0f, 0.0f, 0.0f};
+	Coord3D m_entryOffset{0.0f, 0.0f, 0.0f};
+	Coord3D m_exitOffset{0.0f, 0.0f, 0.0f};
+	UnsignedInt m_exitDelay = 0;
 };
 
 class TunnelContain : public OpenContain, public CreateModuleInterface
@@ -91,6 +95,11 @@ public:
 	virtual Bool isBustable() const override { return TRUE; }	///< can this container get busted by a bunkerbuster
 	virtual Bool isHealContain() const override { return false; } ///< true when container only contains units while healing (not a transport!)
 	virtual Bool isTunnelContain() const override { return TRUE; }
+	static const TunnelContain* find(const Object* object);
+	Coord3D getEntryPosition() const;
+	Coord3D getEntryOffset() const;
+	Bool canReachEntrance(const Object* passenger) const;
+	Bool getPassengerBonePosition(ObjectID passenger, Coord3D& position) const;
 	virtual Bool isImmuneToClearBuildingAttacks() const override { return true; }
   virtual Bool isSpecialOverlordStyleContainer() const override {return FALSE;}
 
@@ -105,6 +114,13 @@ public:
 	virtual void orderAllPassengersToIdle( CommandSourceType commandSource ) override; ///< Just like it sounds
 
 	virtual Bool isValidContainerFor(const Object* obj, Bool checkCapacity) const override;
+	virtual void addToContain(Object* obj) override;
+	virtual Bool isEnclosingContainerFor(const Object* obj) const override;
+	virtual Bool getContainerPipsToShow(Int& numTotal, Int& numFull) override;
+	virtual Bool isExitBusy() const override;
+	virtual void exitObjectViaDoor(Object* obj, ExitDoorType exitDoor) override;
+	virtual void exitObjectInAHurry(Object* obj) override;
+	virtual Bool getNaturalRallyPoint(Coord3D& position, Bool offset) const override;
 	virtual void addToContainList( Object *obj ) override;		///< The part of AddToContain that inheritors can override (Can't do whole thing because of all the private stuff involved)
 	virtual void removeFromContain( Object *obj, Bool exposeStealthUnits = FALSE ) override;	///< remove 'obj' from contain list
 	virtual void removeAllContained( Bool exposeStealthUnits = FALSE ) override;				///< remove all objects on contain list
@@ -140,4 +156,25 @@ protected:
 	Bool m_needToRunOnBuildComplete;
 	Bool m_isCurrentlyRegistered; ///< Keeps track if this is registered with the player, so we don't double remove and mess up
 
+private:
+	friend class TunnelTracker;
+
+	static constexpr Int MAX_BONES_PER_PREFIX = 40;
+
+	struct PassengerBone
+	{
+		ObjectID passenger = INVALID_ID;
+		AsciiString name;
+	};
+
+	Coord3D toWorld(const Coord3D& offset) const;
+	static void rebindPassenger(Object* passenger, const Object* former, Object* replacement);
+	void exitToOffset(Object* obj, Bool quick);
+	void unregisterTunnel(Bool died);
+	void updatePassengerBones();
+	void positionPassengerAtBone(Object* passenger);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+
+	UnsignedInt m_nextExitFrame = 0;
+	std::vector<PassengerBone> m_passengerBones;
 };
