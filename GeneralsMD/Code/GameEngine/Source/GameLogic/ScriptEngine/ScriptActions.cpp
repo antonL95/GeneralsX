@@ -6978,7 +6978,8 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				if (seconds == 0.0f)
 					unit->setModelConditionState(static_cast<ModelConditionFlagType>(condition));
 				else
-					unit->setPowerModelCondition(condition, std::max<UnsignedInt>(1, static_cast<UnsignedInt>(duration)));
+					unit->setTimedModelCondition(static_cast<ModelConditionFlagType>(condition),
+						std::max<UnsignedInt>(1, static_cast<UnsignedInt>(duration)));
 			};
 			applyCondition(object);
 			const HordeContain* horde = HordeContain::get(object);
