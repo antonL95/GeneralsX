@@ -1097,6 +1097,7 @@ void TerrainLogic::update()
 void TerrainLogic::newMap( Bool saveGame )
 {
 	m_mapTrees.clear();
+	m_retailTaint.clear();
 	m_mapTreesBeforeLegacyLoad.clear();
 	m_legacyMapTreesHaveLedger = FALSE;
 	m_retailTaint.clear();
