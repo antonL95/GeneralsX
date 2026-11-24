@@ -1,0 +1,35 @@
+220 hordespawn Player_1 GondorFountainGuardHorde 0 - 2700 180 0
+220 hordespawn Player_1 GondorFountainGuardHorde 1 - 2700 90 0
+220 hordespawn Player_1 GondorFountainGuardHorde 2 - 2700 1000 0
+220 create Player_1 GondorBarracks 0 2950,1000,0
+220 create Player_1 CornerRoundingBlocker 0 1515,1415,0
+220 create Player_1 WildAzog 0 1500,1400,0
+220 create Player_1 WildAzog 1 1500,1700,0
+220 create Player_1 RohanTreeBerd 0 2700,300,0
+220 create Player_1 CornerRoundingTreeControl 0 2700,420,0
+230 builderscriptmove Player_1 GondorFountainGuardHorde 0 - 3180 435
+230 builderscriptmove Player_1 GondorFountainGuardHorde 2 - 3180 1000
+230 builderscriptmove Player_1 WildAzog 0 - 1200 1400
+230 builderscriptmove Player_1 WildAzog 1 - 1200 1700
+230 builderscriptmove Player_1 RohanTreeBerd 0 - 3180 300
+230 builderscriptmove Player_1 CornerRoundingTreeControl 0 - 3180 420
+250 steering-path Player_1 GondorFountainGuardHorde 0
+250 steering-path Player_1 GondorFountainGuardHorde 2
+250 steering-path Player_1 GondorFountainGuardHorde 1
+250 builderscriptmove Player_1 GondorFountainGuardHorde 0 - 3200 430
+250 builderscriptmove Player_1 GondorFountainGuardHorde 1 - 3180 345
+260 steering-path Player_1 GondorFountainGuardHorde 0
+260 steering-path Player_1 GondorFountainGuardHorde 1
+250 steering-path Player_1 WildAzog 0
+250 steering-path Player_1 WildAzog 1
+269 steering-path Player_1 RohanTreeBerd 0
+269 steering-path Player_1 CornerRoundingTreeControl 0
+270 builderscriptmove Player_1 RohanTreeBerd 0 - 2400 550
+270 builderscriptmove Player_1 CornerRoundingTreeControl 0 - 2400 670
+280 steering-path Player_1 RohanTreeBerd 0
+280 steering-path Player_1 CornerRoundingTreeControl 0
+330 steering-path Player_1 GondorFountainGuardHorde 0
+330 steering-path Player_1 GondorFountainGuardHorde 1
+330 steering-path Player_1 GondorFountainGuardHorde 2
+330 steering-path Player_1 RohanTreeBerd 0
+330 steering-path Player_1 CornerRoundingTreeControl 0

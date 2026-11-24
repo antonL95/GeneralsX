@@ -2002,6 +2002,7 @@ Bool AIUpdateInterface::computeQuickPath( const Coord3D *destination )
 		pos.z = destination->z;
 		m_path->prependNode( &pos, getObject()->getLayer() );
 		m_path->getFirstNode()->setNextOptimized(m_path->getFirstNode()->getNext());
+		m_path->optimize(getObject(), m_locomotorSet.getValidSurfaces(), FALSE);
 
 		if (TheGlobalData->m_debugAI==AI_DEBUG_PATHS)
 		{

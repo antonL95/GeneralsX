@@ -18,14 +18,19 @@
 
 #include "Common/CRCDebug.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Locomotor.h"
+#include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
 #include "GameLogic/Pathfinder/Path.h"
 #include "GameLogic/Pathfinder/PathNode.h"
 #include "GameLogic/TerrainLogic.h"
 #include "WWMath/wwmath.h"
+#include <vector>
 
 //-----------------------------------------------------------------------------------
 Path::Path():
@@ -60,6 +65,33 @@ Path::~Path()
 // ------------------------------------------------------------------------------------------------
 void Path::crc( Xfer *xfer )
 {
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
+}
+
+void Path::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"path-generated-arcs", [this](Xfer* transfer) {
+			Int count = 0;
+			for (PathNode* node = m_path; node; node = node->getNext())
+				++count;
+			Int savedCount = count;
+			transfer->xferInt(&savedCount);
+			if (savedCount != count)
+				throw XFER_INVALID_PARAMETERS;
+			for (PathNode* node = m_path; node; node = node->getNext())
+			{
+				Bool generated = node->isGeneratedArc();
+				transfer->xferBool(&generated);
+				if (transfer->getXferMode() == XFER_LOAD)
+					node->setGeneratedArc(generated);
+			}
+		}, [this] {
+			for (PathNode* node = m_path; node; node = node->getNext())
+				node->setGeneratedArc(FALSE);
+		}}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -68,7 +100,7 @@ void Path::crc( Xfer *xfer )
 void Path::xfer( Xfer *xfer )
 {
   // version
-  const XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+  const XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 1;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -170,6 +202,8 @@ void Path::xfer( Xfer *xfer )
 		}
 	}
 
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 3);
 
 #if defined(RTS_DEBUG)
 	if (TheGlobalData->m_debugAI == AI_DEBUG_PATHS)
@@ -403,6 +437,203 @@ void Path::optimize( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfa
 			// for some reason, there is no clear LOS between the anchor node and the very next node
 			anchor->setNextOptimized( anchor->getNext() );
 			anchor = anchor->getNext();
+		}
+	}
+
+	if (obj && obj->getAI() && obj->getPhysics() && m_path && m_path->getNextOptimized())
+	{
+		const AIUpdateInterface* ai = obj->getAI();
+		const Locomotor* locomotor = ai->getCurLocomotor();
+		if (locomotor)
+		{
+			Region3D pathExtent;
+			TheTerrainLogic->getMaximumPathfindExtent(&pathExtent);
+			PathNode* firstTarget = m_path->getNextOptimized();
+			const Coord3D& velocity = *obj->getPhysics()->getVelocity();
+			const Real speed = WWMath::SqrtfOrigin(velocity.x * velocity.x + velocity.y * velocity.y);
+			const Bool fast = speed > ai->getCurLocomotorSpeed() * 0.25f;
+			Real radius = fast ? locomotor->getFastTurnRadius() : locomotor->getSlowTurnRadius();
+			Real maxTurn = locomotor->getMaxTurnWithoutReform();
+			if (fast && locomotor->getTurnThresholdHighSpeed() < maxTurn)
+				maxTurn = locomotor->getTurnThresholdHighSpeed();
+			PathNode* next = m_path->getNextOptimized();
+			const Coord3D start = *m_path->getPosition();
+			const Coord3D goal = *next->getPosition();
+			const Real dx = goal.x - start.x;
+			const Real dy = goal.y - start.y;
+			const Real length = WWMath::SqrtfOrigin(dx * dx + dy * dy);
+			const Real heading = obj->getOrientation();
+			const Real turn = WWMath::Atan2Origin(dy, dx) - heading;
+			const Real angle = WWMath::Atan2Origin(WWMath::Sin(turn), WWMath::Cos(turn));
+			if (radius > 0.0f && length > 0.0f && fabs(angle) >= PI / 16.0f && fabs(angle) <= maxTurn &&
+				m_path->getLayer() == next->getLayer())
+			{
+				if (radius > length * 0.5f)
+					radius = length * 0.5f;
+				for (Int attempt = 0; attempt < 2; ++attempt)
+				{
+					if (attempt && (fabs(angle) < PI / 2.0f || locomotor->usesFloatingZ()))
+						break;
+					const Real direction = (angle > 0.0f ? 1.0f : -1.0f) * (attempt ? -1.0f : 1.0f);
+					const Real hx = WWMath::Cos(heading);
+					const Real hy = WWMath::Sin(heading);
+					const Real cx = start.x - direction * hy * radius;
+					const Real cy = start.y + direction * hx * radius;
+					const Real gx = goal.x - cx;
+					const Real gy = goal.y - cy;
+					const Real distance = WWMath::SqrtfOrigin(gx * gx + gy * gy);
+					if (distance > radius)
+					{
+						const Real ratio = radius / distance;
+						const Real tangent = WWMath::SqrtfOrigin(1.0f - ratio * ratio);
+						const Real tx = gx / distance * ratio + direction * gy / distance * tangent;
+						const Real ty = gy / distance * ratio - direction * gx / distance * tangent;
+						const Real rx = direction * hy;
+						const Real ry = -direction * hx;
+						Real sweep = WWMath::Atan2Origin(rx * ty - ry * tx, rx * tx + ry * ty);
+						if (sweep * direction < 0.0f)
+							sweep += direction * 2.0f * PI;
+						Int count = static_cast<Int>(WWMath::Ceil(radius * (1.0f / 30.0f) * fabs(sweep) * 5.092958f));
+						if (count > 128)
+							count = 128;
+						if (count <= 1)
+							break;
+						if (count > 1)
+						{
+							std::vector<Coord3D> points;
+							Coord3D previous = start;
+							Bool passable = TRUE;
+							for (Int i = 1; i <= count; ++i)
+							{
+								const Real step = sweep * static_cast<Real>(i) / static_cast<Real>(count);
+								const Real cosine = WWMath::Cos(step);
+								const Real sine = WWMath::Sin(step);
+								Coord3D point = start;
+								point.x = cx + radius * (rx * cosine - ry * sine);
+								point.y = cy + radius * (rx * sine + ry * cosine);
+								if (!pathExtent.containsWithin(point.asCoord2D()) ||
+									!TheAI->pathfinder()->isLinePassable(obj, acceptableSurfaces, m_path->getLayer(),
+									previous, point, blocked, false))
+								{
+									passable = FALSE;
+									break;
+								}
+								points.push_back(point);
+								previous = point;
+							}
+							if (passable && TheAI->pathfinder()->isLinePassable(obj, acceptableSurfaces, m_path->getLayer(),
+								previous, goal, blocked, false))
+							{
+								PathNode* tail = m_path;
+								for (const Coord3D& point : points)
+								{
+									PathNode* inserted = newInstance(PathNode);
+									inserted->setPosition(&point);
+									inserted->setLayer(m_path->getLayer());
+									inserted->setGeneratedArc(TRUE);
+									tail->append(inserted);
+									tail->setNextOptimized(inserted);
+									tail = inserted;
+								}
+								tail->setNextOptimized(next);
+								break;
+							}
+						}
+					}
+				}
+			}
+			PathNode* previous = m_path;
+			while (previous->getNextOptimized() && previous->getNextOptimized() != firstTarget)
+				previous = previous->getNextOptimized();
+			PathNode* corner = firstTarget;
+			while (corner && corner->getNextOptimized())
+			{
+				PathNode* following = corner->getNextOptimized();
+				const Coord3D before = *previous->getPosition();
+				const Coord3D middle = *corner->getPosition();
+				const Coord3D after = *following->getPosition();
+				const Real inX = middle.x - before.x;
+				const Real inY = middle.y - before.y;
+				const Real outX = after.x - middle.x;
+				const Real outY = after.y - middle.y;
+				const Real inLength = WWMath::SqrtfOrigin(inX * inX + inY * inY);
+				const Real outLength = WWMath::SqrtfOrigin(outX * outX + outY * outY);
+				Real cornerRadius = locomotor->getFastTurnRadius();
+				if (inLength > 0.0f && outLength > 0.0f && cornerRadius > 0.0f && corner->getCanOptimize() &&
+					previous->getLayer() == corner->getLayer() && corner->getLayer() == following->getLayer())
+				{
+					const Real ux = inX / inLength;
+					const Real uy = inY / inLength;
+					const Real vx = outX / outLength;
+					const Real vy = outY / outLength;
+					const Real turnAngle = WWMath::Atan2Origin(ux * vy - uy * vx, ux * vx + uy * vy);
+					const Real absTurn = fabs(turnAngle);
+					const Real limit = 0.75f * (inLength < outLength ? inLength : outLength);
+					if (cornerRadius > limit)
+						cornerRadius = limit;
+					if (absTurn < 0.72256633f)
+						cornerRadius *= 1.75f;
+					const Real halfCosine = WWMath::Cos(absTurn * 0.5f);
+					if (absTurn > 0.0f && absTurn <= 1.7278761f && halfCosine > 0.0f)
+					{
+						const Real offset = cornerRadius * WWMath::Sin(absTurn * 0.5f) / halfCosine;
+						Int count = static_cast<Int>(WWMath::Ceil(cornerRadius * (1.0f / 30.0f) * absTurn * 5.092958f));
+						if (count > 128)
+							count = 128;
+						if (offset < inLength && offset < outLength && count > 1)
+						{
+							const Real side = turnAngle > 0.0f ? 1.0f : -1.0f;
+							Coord3D entry = middle;
+							entry.x -= ux * offset;
+							entry.y -= uy * offset;
+							const Real centerX = entry.x - side * uy * cornerRadius;
+							const Real centerY = entry.y + side * ux * cornerRadius;
+							const Real radialX = side * uy * cornerRadius;
+							const Real radialY = -side * ux * cornerRadius;
+							std::vector<Coord3D> points;
+							points.push_back(entry);
+							Coord3D last = before;
+							Bool passable = pathExtent.containsWithin(entry.asCoord2D()) &&
+								TheAI->pathfinder()->isLinePassable(obj, acceptableSurfaces,
+								corner->getLayer(), last, entry, blocked, false);
+							last = entry;
+							for (Int i = 1; passable && i <= count; ++i)
+							{
+								const Real step = turnAngle * static_cast<Real>(i) / static_cast<Real>(count);
+								const Real cosine = WWMath::Cos(step);
+								const Real sine = WWMath::Sin(step);
+								Coord3D point = middle;
+								point.x = centerX + radialX * cosine - radialY * sine;
+								point.y = centerY + radialX * sine + radialY * cosine;
+								passable = pathExtent.containsWithin(point.asCoord2D()) &&
+									TheAI->pathfinder()->isLinePassable(obj, acceptableSurfaces,
+									corner->getLayer(), last, point, blocked, false);
+								points.push_back(point);
+								last = point;
+							}
+							if (passable && TheAI->pathfinder()->isLinePassable(obj, acceptableSurfaces,
+								corner->getLayer(), last, after, blocked, false))
+							{
+								for (const Coord3D& point : points)
+								{
+									PathNode* inserted = newInstance(PathNode);
+									inserted->setPosition(&point);
+									inserted->setLayer(corner->getLayer());
+									inserted->setGeneratedArc(TRUE);
+									previous->append(inserted);
+									previous->setNextOptimized(inserted);
+									previous = inserted;
+								}
+								previous->setNextOptimized(following);
+								corner = following;
+								continue;
+							}
+						}
+					}
+				}
+				previous = corner;
+				corner = following;
+			}
 		}
 	}
 

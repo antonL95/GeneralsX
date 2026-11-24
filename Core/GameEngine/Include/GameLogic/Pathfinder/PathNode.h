@@ -65,6 +65,8 @@ public:
 
 	void setCanOptimize(Bool canOpt) { m_canOptimize = canOpt;}
 	Bool getCanOptimize() const { return m_canOptimize;}
+	void setGeneratedArc(Bool generated) { m_generatedArc = generated; }
+	Bool isGeneratedArc() const { return m_generatedArc; }
 
 	/// given a list, prepend this node, return new list
 	PathNode *prependToList( PathNode *list );
@@ -76,6 +78,7 @@ public:
 	mutable Int					m_id; // Used in Path::xfer() to save & recreate the path list.
 
 private:
+	Bool m_generatedArc = FALSE;
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( PathNode, "PathNodePool"  );		///< @todo Set real numbers for mem alloc
 
 	PathNode*						m_nextOpti;													///< next node in the optimized path

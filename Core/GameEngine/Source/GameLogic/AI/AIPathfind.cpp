@@ -7063,6 +7063,8 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 	Coord3D goalPos = *originalPath->getLastNode()->getPosition();
 	Real goalDeltaSqr = sqr(goalPos.x-currentPosition.x) + sqr(goalPos.y - currentPosition.y);
 	for( startNode = originalPath->getLastNode(); startNode != originalPath->getFirstNode(); startNode = startNode->getPrevious() )	{
+		if (startNode->isGeneratedArc())
+			continue;
 		ICoord2D cellCoord;
 		worldToCell(startNode->getPosition(), &cellCoord);
 		TCheckMovementInfo info;
@@ -7134,6 +7136,8 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 		PathNode *matchNode;
 		Bool found = false;
 		for( matchNode = originalPath->getLastNode(); matchNode != startNode; matchNode = matchNode->getPrevious() )	{
+			if (matchNode->isGeneratedArc())
+				continue;
 			if (cellCenter.x == matchNode->getPosition()->x && cellCenter.y == matchNode->getPosition()->y)	{
 				found = true;
 				break;
@@ -7148,7 +7152,8 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 			Path *path = newInstance(Path);
 			PathNode *node;
 			for( node = originalPath->getLastNode(); node != matchNode; node = node->getPrevious() )	{
-				path->prependNode(node->getPosition(), node->getLayer());
+				if (!node->isGeneratedArc())
+					path->prependNode(node->getPosition(), node->getLayer());
 			}
 			prependCells(path, obj->getPosition(), parentCell, centerInCell);
 

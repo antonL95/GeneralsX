@@ -312,6 +312,9 @@ public:
 	Real getBackingUpSpeed() const;
 	Bool participatesInGroupFormation() const { return m_template->m_rotwk.formationPriority != RotwkLocomotorRules::NO_FORMATION_PRIORITY; }
 	Real getTurnThresholdHighSpeed() const { return m_template->m_rotwk.turnThresholdHighSpeed; }
+	Real getSlowTurnRadius() const { return m_template->m_slowTurnRadius; }
+	Real getFastTurnRadius() const { return m_template->m_fastTurnRadius; }
+	Bool usesFloatingZ() const { return m_template->m_behaviorZ == Z_FLOATING_Z; }
 	Real getMaxOverlappedHeight() const { return m_template->m_rotwk.maxOverlappedHeight; }
 	Bool scalesWalls() const { return m_template->m_rotwk.scalesWalls; }
 	Bool usesTerrainSmoothing() const { return m_template->m_rotwk.useTerrainSmoothing; }

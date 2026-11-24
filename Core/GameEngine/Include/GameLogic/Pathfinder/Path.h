@@ -72,6 +72,7 @@ protected:
 	virtual void crc( Xfer *xfer ) override;
 	virtual void xfer( Xfer *xfer ) override;
 	virtual void loadPostProcess() override;
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 protected:
 	enum {MAX_CPOP=20};			///< Max times we will return the cached cpop.
