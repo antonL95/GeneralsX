@@ -61,6 +61,7 @@
 
 #include <cmath>
 #include <limits>
+#include <vector>
 
 namespace
 {
@@ -1449,6 +1450,8 @@ ParticleSystem::~ParticleSystem()
 	{
 
 		DEBUG_ASSERTCRASH( m_slaveSystem->getMaster() == this, ("~ParticleSystem: Our slave doesn't have us as a master!") );
+		if (RetailFileLayers::enabled())
+			m_slaveSystem->destroy();
 		m_slaveSystem->setMaster( nullptr );
 		setSlave( nullptr );
 
@@ -2276,6 +2279,102 @@ void ParticleSystem::emitRetailTerrainFire(Int passes, Int localPlayerIndex)
 	}
 }
 
+void ParticleSystem::updateEmission(Int localPlayerIndex, ParticlePriorityType priority, Bool retail)
+{
+	if (m_burstDelayLeft != 0)
+	{
+		--m_burstDelayLeft;
+		return;
+	}
+
+	const Real burstCount = m_burstCount.getValue();
+	const Bool gpu = m_template && m_template->usesGpuDraw();
+	const Bool lightning = !gpu && m_template && m_template->m_hasLightningEmission && retail;
+	Int count;
+	if (gpu)
+	{
+		const Real scaledCount = burstCount * m_countCoeff;
+		const auto remaining = maxGpuParticles - TheParticleSystemManager->getGpuParticleCount();
+		count = std::isfinite(scaledCount) && scaledCount > 0.0f
+			? static_cast<Int>(std::min(scaledCount, static_cast<Real>(remaining))) : 0;
+	}
+	else if (lightning)
+	{
+		const Real scaledCount = burstCount * m_countCoeff;
+		count = std::isfinite(scaledCount) && scaledCount > 0.0f
+			? static_cast<Int>(std::min(scaledCount, static_cast<Real>(maxLightningPoints))) : 0;
+	}
+	else
+	{
+		count = REAL_TO_INT(burstCount);
+		count *= m_countCoeff;
+	}
+
+	std::array<Coord3D, maxLightningPoints> lightningPoints;
+	if (lightning && count > 0)
+		generateRetailLightningBurst(std::span(lightningPoints).first(static_cast<std::size_t>(count)));
+	const Bool terrainFire = gpu && retail && m_template->usesTerrainFire();
+	if (terrainFire)
+		emitRetailTerrainFire(count, localPlayerIndex);
+	for (Int i = 0; !terrainFire && i < count; ++i)
+	{
+		if (gpu && TheParticleSystemManager->getGpuParticleCount() >= maxGpuParticles)
+			break;
+
+		const ParticleInfo *info = generateParticleInfo(i, count, lightning ? &lightningPoints[i] : nullptr);
+		if (m_isEmitAboveGroundOnly &&
+			!(info->m_pos.z >= TheTerrainLogic->getGroundHeight(info->m_pos.x, info->m_pos.y)))
+			continue;
+		Particle *particle = createParticle(info, priority);
+		if (particle == nullptr)
+			continue;
+
+		if (!m_attachedSystemName.isEmpty())
+		{
+			const ParticleSystemTemplate *definition = TheParticleSystemManager->findTemplate(m_attachedSystemName);
+			if (definition)
+			{
+				ParticleSystem *attached = TheParticleSystemManager->createParticleSystem(definition, TRUE);
+				attached->setControlParticle(particle);
+				particle->controlParticleSystem(attached);
+			}
+		}
+
+		if (!retail && m_slaveSystem)
+		{
+			const ParticleInfo merged = mergeRelatedParticleSystems(this, m_slaveSystem, false);
+			m_slaveSystem->createParticle(&merged, priority);
+		}
+	}
+
+	m_burstDelayLeft = static_cast<UnsignedInt>(m_burstDelay.getValue());
+	m_burstDelayLeft *= m_delayCoeff;
+}
+
+void ParticleSystem::updateRetailSlaveEmission(Int localPlayerIndex, ParticlePriorityType priority)
+{
+	const ParticleSystem *parent = this;
+	for (ParticleSystem *slave = m_slaveSystem; slave; slave = slave->m_slaveSystem)
+	{
+		slave->m_transform = parent->m_transform;
+		const Coord3D& offset = slave->m_slavePosOffset;
+		slave->m_transform.Adjust_Translation(Vector3(offset.x, offset.y, offset.z));
+		slave->setLocalTransform(&slave->m_transform);
+		slave->m_isIdentity = FALSE;
+		slave->m_lastPos = slave->m_pos;
+		const Vector3 position = slave->m_transform.Get_Translation();
+		slave->m_pos = {position.X, position.Y, position.Z};
+
+		if (slave->isWaitingForInitialDelay())
+			break;
+		if (!slave->m_isDestroyed && !slave->m_isStopped &&
+			(slave->m_isForever || slave->m_systemLifetimeLeft > 0))
+			slave->updateEmission(localPlayerIndex, priority, TRUE);
+
+		parent = slave;
+	}
+}
+
 Bool ParticleSystem::update( Int localPlayerIndex  )
 {
 	if (TheGlobalData->m_useFX == FALSE)
@@ -2308,95 +2407,14 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 	//
 	updateTransform();
 
-	//
-	// Generate new particles if the system hasn't been 'stopped' or 'destroyed'
-	// If we are a slave system, do not generate particles ourselves - our master will force us to
-	//
-	if (m_isDestroyed == false)
+	const Bool retail = RetailFileLayers::enabled();
+	if (!visibilityState.blocksEmission && !m_isStopped && !m_masterSystem && !m_isDestroyed &&
+		(m_isForever || m_systemLifetimeLeft > 0))
 	{
-		if (m_isForever || m_systemLifetimeLeft > 0)
-		{
-			if (!visibilityState.blocksEmission && m_isStopped == false && m_masterSystem == nullptr)
-			{
-				if (m_burstDelayLeft == 0)
-				{
-					ParticlePriorityType priority = getPriority();
-
-					// emit a burst of particles
-					const Real burstCount = m_burstCount.getValue();
-					const Bool gpu = m_template && m_template->usesGpuDraw();
-					const Bool lightning = !gpu && m_template && m_template->m_hasLightningEmission && RetailFileLayers::enabled();
-					Int count;
-					if (gpu)
-					{
-						const Real scaledCount = burstCount * m_countCoeff;
-						const auto remaining = maxGpuParticles - TheParticleSystemManager->getGpuParticleCount();
-						count = std::isfinite(scaledCount) && scaledCount > 0.0f
-							? static_cast<Int>(std::min(scaledCount, static_cast<Real>(remaining))) : 0;
-					}
-					else if (lightning)
-					{
-						const Real scaledCount = burstCount * m_countCoeff;
-						count = std::isfinite(scaledCount) && scaledCount > 0.0f
-							? static_cast<Int>(std::min(scaledCount, static_cast<Real>(maxLightningPoints))) : 0;
-					}
-					else
-					{
-						count = REAL_TO_INT(burstCount);
-						count *= m_countCoeff;
-					}
-					std::array<Coord3D, maxLightningPoints> lightningPoints;
-					if (lightning && count > 0)
-						generateRetailLightningBurst(std::span(lightningPoints).first(static_cast<std::size_t>(count)));
-					const Bool terrainFire = gpu && RetailFileLayers::enabled() && m_template->usesTerrainFire();
-					if (terrainFire)
-						emitRetailTerrainFire(count, localPlayerIndex);
-					for( Int i=0; !terrainFire && i<count; i++ )
-					{
-						if (gpu && TheParticleSystemManager->getGpuParticleCount() >= maxGpuParticles)
-							break;
-						// generate this particle's unique attributes
-						const ParticleInfo *info = generateParticleInfo(i, count, lightning ? &lightningPoints[i] : nullptr);
-						if (!m_isEmitAboveGroundOnly || (info->m_pos.z >= TheTerrainLogic->getGroundHeight(info->m_pos.x, info->m_pos.y)))
-						{
-							// actually create a particle
-							Particle *p = createParticle( info, priority );
-							if (p == nullptr)
-								continue;
-
-							if (m_attachedSystemName.isEmpty() == false)
-							{
-								const ParticleSystemTemplate *tmp = TheParticleSystemManager->findTemplate( m_attachedSystemName );
-								if (tmp)
-								{
-									ParticleSystem *sys = TheParticleSystemManager->createParticleSystem( tmp, TRUE );
-									sys->setControlParticle( p );
-									p->controlParticleSystem( sys );
-								}
-							}
-
-							// create a slave particle, if necessary
-							if (m_slaveSystem)
-							{
-								ParticleInfo mergeInfo = ParticleSystem::mergeRelatedParticleSystems(this, m_slaveSystem, false);
-
-								// create slaved particle
-								m_slaveSystem->createParticle( &mergeInfo, priority );
-							}
-						}
-					}
-
-					// compute next burst delay
-					m_burstDelayLeft = (UnsignedInt)m_burstDelay.getValue();
-					m_burstDelayLeft *= m_delayCoeff;
-				}
-				else
-				{
-					m_burstDelayLeft--;
-				}
-
-			}
-		}
+		const ParticlePriorityType priority = getPriority();
+		updateEmission(localPlayerIndex, priority, retail);
+		if (retail)
+			updateRetailSlaveEmission(localPlayerIndex, priority);
 	}
 
 	//
@@ -2456,7 +2474,10 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 		if (m_systemLifetimeLeft == 0)
 		{
 			if (m_slaveSystem && !m_slaveSystem->isSystemForever())
-				m_isDestroyed = true;
+			{
+				if (!retail)
+					m_isDestroyed = true;
+			}
 			else
 				return false;
 		}
@@ -3546,7 +3567,8 @@ void ParticleSystemManager::ensureRetailTerrainFireSystems()
 
 void ParticleSystemManager::update()
 {
-	const ScopedVisualRandom random(RetailFileLayers::enabled());
+	const Bool retail = RetailFileLayers::enabled();
+	const ScopedVisualRandom random(retail);
 	//USE_PERF_TIMER(ParticleSystemManager)
 
 	// TheSuperHackers @tweak Complete the render update of the previous logic frame before the logic update
@@ -3554,6 +3576,7 @@ void ParticleSystemManager::update()
 	completeLogicFrameDrawUpdate();
 	ensureRetailTerrainFireSystems();
 
+	std::vector<ParticleSystem*> expired;
 	ParticleSystemListIt it = m_allParticleSystemList.begin();
 	while( it != m_allParticleSystemList.end() )
 	{
@@ -3565,11 +3588,26 @@ void ParticleSystemManager::update()
 			continue;
 		}
 
-		if (sys->update(m_localPlayerIndex) == false)
+		if (!retail)
 		{
-			deleteInstance(sys);
+			if (!sys->update(m_localPlayerIndex))
+				deleteInstance(sys);
+			continue;
+		}
+		if (sys->getMaster())
+			continue;
+
+		for (ParticleSystem *emitter = sys; emitter; emitter = emitter->getSlave())
+		{
+			const Bool delayed = emitter->isWaitingForInitialDelay();
+			if (!emitter->update(m_localPlayerIndex))
+				expired.push_back(emitter);
+			if (delayed)
+				break;
 		}
 	}
+	for (ParticleSystem *system : expired)
+		deleteInstance(system);
 
 	// GeneralsX @bugfix fbraz 04/05/2026 Skip smudge rendering path in headless replay simulation.
 	const Bool drawSmudge = !TheGlobalData->m_headless && TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;

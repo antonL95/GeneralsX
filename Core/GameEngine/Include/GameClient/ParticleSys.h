@@ -788,6 +788,7 @@ public:
 	void trigger () { m_burstDelayLeft = 0; m_delayLeft = 0;}
 
 	void setInitialDelay( UnsignedInt delay ) { m_delayLeft = delay; }
+	Bool isWaitingForInitialDelay() const { return m_delayLeft != 0; }
 
 	const AsciiString& getParticleTypeName() const { return m_particleTypeName; }	///< return the name of the particles
 	Bool isUsingParticles() const { return m_particleType == PARTICLE; }
@@ -871,6 +872,8 @@ protected:
 																		Bool forceCreate = FALSE );	///< factory method for particles
 
 	void updateTransform();
+	void updateEmission(Int localPlayerIndex, ParticlePriorityType priority, Bool retail);
+	void updateRetailSlaveEmission(Int localPlayerIndex, ParticlePriorityType priority);
 	void applyParentTransform(const Matrix3D &parentXfrm);
 	void applyLocalTransform();
 

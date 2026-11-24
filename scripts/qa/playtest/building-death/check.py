@@ -9,6 +9,18 @@ render_env = {
 }
 
 
+def check_fire_emitters(log):
+    for name, max_count, max_size in (("LargeFlare", 5, 50), ("MediumFlare", 5, 43),
+                                      ("LargeSmoke", 18, None), ("MediumSmoke", 18, None)):
+        samples = [tuple(map(float, sample)) for sample in re.findall(
+            rf"^TEST particle-live frame=518 .* name=FireBuilding{name} .* count=(\d+) "
+            r".* xyz=([-\d.]+),([-\d.]+),[-\d.]+ size=([-\d.]+)$", log, re.MULTILINE)]
+        if not samples or any(count > max_count or abs(x - 3240) > 100 or abs(y - 1330) > 100
+                              or (max_size is not None and size > max_size)
+                              for count, x, y, size in samples):
+            raise RuntimeError(f"Building fire {name} live count, location or size was unexpected: {samples}")
+
+
 def check(log):
     buildings = (
         ("GondorFarmMultiplayer", "gbngran_skn", "gbngran_d3", 166, (156, 162), True),
@@ -81,3 +93,5 @@ def check(log):
             raise RuntimeError(f"{actor} did not finish its collapse")
         if re.search(rf"^TEST list 640 Player_1 {actor} ", log, re.MULTILINE):
             raise RuntimeError(f"{actor} remained after its collapse")
+
+    check_fire_emitters(log)
