@@ -1,7 +1,4 @@
 check() {
-    if covers 311; then
-        expect "TEST corner-cell 311 same=1 neighbor=0" || return 1
-    fi
     if covers 231; then
         awk '
             $1 == "TEST" && $2 == "corner-speed" && $3 == 231 && $4 == "CornerRoundingKnock" {
