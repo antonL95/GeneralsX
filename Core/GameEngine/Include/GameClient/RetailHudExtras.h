@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common/GameType.h"
 #include "Lib/BaseType.h"
 
 class AsciiString;
@@ -18,6 +19,9 @@ void update();
 Bool executeHotKey(const AsciiString &key);
 Bool handleInput(UnsignedInt msg, Int x, Int y);
 Bool showTooltip(Int x, Int y);
+Bool hasHeroSlot(ObjectID id);
+Bool selectHeroSlot(ObjectID id);
+Bool selectAllHeroes();
 }
 
 namespace RetailEdges

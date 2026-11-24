@@ -404,7 +404,8 @@ const Image *selectHeroesImage()
 Bool isAvailableHero(const Object* obj)
 {
 	const Drawable* draw = obj ? obj->getDrawable() : nullptr;
-	return draw && obj->isKindOf(KINDOF_HERO) && obj->isMassSelectable() && !obj->isEffectivelyDead() &&
+	return draw && obj->isKindOf(KINDOF_HERO) && !obj->isKindOf(KINDOF_IGNORES_SELECT_ALL) &&
+		obj->isMassSelectable() && !obj->isEffectivelyDead() &&
 		obj->isLogicallyVisible() && !draw->isDrawableEffectivelyHidden();
 }
 
@@ -535,6 +536,13 @@ void activate(Int button, Bool center)
 AsciiString builderHotKey()
 {
 	AsciiString key = TheHotKeyManager ? TheHotKeyManager->searchHotKey(AsciiString("CONTROLBAR:SelectNearestBuilder")) : AsciiString::TheEmptyString;
+	key.toLower();
+	return key;
+}
+
+AsciiString selectHeroesHotKey()
+{
+	AsciiString key = TheHotKeyManager ? TheHotKeyManager->searchHotKey(AsciiString("CONTROLBAR:SelectAllHeroes")) : AsciiString::TheEmptyString;
 	key.toLower();
 	return key;
 }
@@ -895,9 +903,46 @@ Bool showTooltip(Int x, Int y)
 
 Bool executeHotKey(const AsciiString &key)
 {
-	if (!s_bar.bar || s_bar.bar->winIsHidden() || key.isEmpty() || key.compareNoCase(builderHotKey()) != 0)
+	if (!s_bar.bar || s_bar.bar->winIsHidden() || key.isEmpty())
 		return FALSE;
-	selectNearestBuilder();
+	if (key.compareNoCase(builderHotKey()) == 0)
+	{
+		selectNearestBuilder();
+		return TRUE;
+	}
+	if (hasAvailableHeroes() && key.compareNoCase(selectHeroesHotKey()) == 0)
+	{
+		activate(ButtonSelectHeroes, FALSE);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+Bool hasHeroSlot(ObjectID id)
+{
+	const Player *player = localPlayer();
+	if (id == INVALID_ID || !player)
+		return FALSE;
+	HeroSlot builders;
+	for (const HeroSlot &slot : collectHeroes(player, builders))
+		if (!slot.builder && slot.alive && slot.id == id)
+			return TRUE;
+	return FALSE;
+}
+
+Bool selectHeroSlot(ObjectID id)
+{
+	if (!hasHeroSlot(id) || !TheGameLogic)
+		return FALSE;
+	selectObject(TheGameLogic->findObjectByID(id), FALSE);
+	return TRUE;
+}
+
+Bool selectAllHeroes()
+{
+	if (!hasAvailableHeroes())
+		return FALSE;
+	activate(ButtonSelectHeroes, FALSE);
 	return TRUE;
 }
 }

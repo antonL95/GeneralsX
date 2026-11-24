@@ -1,0 +1,21 @@
+220 create Player_1 CirdanSummonFortress 0 2000,3540,0
+220 create Player_1 CirdanSummonControlHero 0 2060,3540,0
+222 objupgrade Player_1 CirdanSummonFortress 0 Upgrade_ArnorFortressIvoryTower
+225 power Player_1 CirdanSummonFortress 0 CallofBelegaer
+235 cirdan-state Player_1 ElvenCirdan 0
+236 cirdan-select-all-heroes Player_1 - 0
+237 cirdan-selection Player_1 ElvenCirdan 0 CirdanSummonControlHero
+238 selectall Player_1 - 0
+239 cirdan-selection Player_1 ElvenCirdan 0 CirdanSummonControlHero
+240 cirdan-roster-select Player_1 ElvenCirdan 0
+241 cirdan-selection Player_1 ElvenCirdan 0 CirdanSummonControlHero
+242 select Player_1 CirdanSummonControlHero 0
+243 select Player_1 ElvenCirdan 0
+246 cirdan-state Player_1 ElvenCirdan 0
+247 cirdan-select-all-heroes Player_1 - 0
+248 cirdan-selection Player_1 ElvenCirdan 0 CirdanSummonControlHero
+249 cirdan-roster-select Player_1 ElvenCirdan 0
+250 cirdan-selection Player_1 ElvenCirdan 0 CirdanSummonControlHero
+252 destroy Player_1 ElvenCirdan 0
+252 destroy Player_1 CirdanSummonControlHero 0
+252 destroy Player_1 CirdanSummonFortress 0

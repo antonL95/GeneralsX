@@ -1035,7 +1035,7 @@ void amIAHero(Object* obj, void* heroHolder)
 		return;
 	}
 
-	if (obj->isKindOf( KINDOF_HERO ))
+	if (obj->isKindOf( KINDOF_HERO ) && !obj->isKindOf( KINDOF_IGNORES_SELECT_ALL ))
 	{
 		((HeroHolder*)heroHolder)->hero = obj;
 	}

@@ -34,6 +34,7 @@
 #include "Common/RandomValue.h"
 #include "Common/ThingFactory.h"
 #include "Common/Xfer.h"
+#include "GameClient/ControlBar.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -183,7 +184,9 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 	// call the base class action cause we are *EXTENDING* functionality
 	SpecialPowerModule::doSpecialPowerAtLocation( &targetCoord, angle, commandOptions );
 
-	if (m_availableOnFrame == 0xFFFFFFFF || !wasLastCastAccepted())
+	const Bool internalPausedBypass = (commandOptions & COMMAND_OPTION_INTERNAL_AUTO) != 0 &&
+		m_pausedCount > 0 && !getSpecialPowerModuleData()->m_updateModuleStartsAttack;
+	if (m_availableOnFrame == 0xFFFFFFFF || (!wasLastCastAccepted() && !internalPausedBypass))
 		return;
 
 	const ObjectCreationList* ocl = findOCL();
@@ -285,7 +288,9 @@ void OCLSpecialPower::doSpecialPower( UnsignedInt commandOptions )
 
 	SpecialPowerModule::doSpecialPowerAtLocation( &creationCoord, INVALID_ANGLE, commandOptions );
 
-	if (m_availableOnFrame == 0xFFFFFFFF || !wasLastCastAccepted())
+	const Bool internalPausedBypass = (commandOptions & COMMAND_OPTION_INTERNAL_AUTO) != 0 &&
+		m_pausedCount > 0 && !getSpecialPowerModuleData()->m_updateModuleStartsAttack;
+	if (m_availableOnFrame == 0xFFFFFFFF || (!wasLastCastAccepted() && !internalPausedBypass))
 		return;
 
 	const ObjectCreationList* ocl = findOCL();
