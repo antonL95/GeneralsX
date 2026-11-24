@@ -21,7 +21,7 @@
 235 weapon-upgrade-buy Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorForgedBlades
 241 weapon-upgrade-toggle Player_1 ElvenRivendellKnightHorde 0 Command_ToggleRivendellKnightWeapon
 244 weapon-upgrade-trace Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorForgedBlades
-246 weapon-upgrade-buy Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorFireArrows
+245 weapon-upgrade-buy Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorFireArrows
 251 weapon-upgrade-trace Player_1 ElvenRivendellKnightHorde 0 Upgrade_ArnorFireArrows
 320 weapon-upgrade-trace Player_1 HaradBlackNumenoranWarriorsHorde 0 Upgrade_AngmarBasicTraining
 321 weapon-upgrade-buy Player_1 HaradBlackNumenoranWarriorsHorde 0 Upgrade_AngmarBasicTraining
