@@ -1,0 +1,7 @@
+20 create Player_1 SpawnAnglePorter 0 550,2450,0
+20 create Player_1 SpawnAnglePorter 1 550,2800,0
+21 fund Player_1 SpawnAnglePorter 0
+22 construct Player_1 SpawnAnglePorter 0 SpawnAngleMordorFoundation 650 2450 1.5707963
+23 construct Player_1 SpawnAnglePorter 1 SpawnAngleMirkwoodFoundation 650 2800 0.7853982
+400 fortress-purchase Player_1 MordorFortressCitadel 0 Command_PurchaseUpgradeMordorFortressFireArrows
+401 fortress-purchase Player_1 MirkwoodCitadel 0 Command_PurchaseUpgradeMirkwoodFortressGarrison
