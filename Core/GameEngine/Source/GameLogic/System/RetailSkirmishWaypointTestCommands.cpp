@@ -3,7 +3,10 @@
 
 #if RTS_ZEROHOUR
 #include <cstdio>
+#include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/Team.h"
+#include "Common/ThingFactory.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
@@ -11,6 +14,16 @@
 
 namespace
 {
+void createProbe(const RetailTestCommands::Context& ctx)
+{
+	const auto* type = TheThingFactory->findTemplate(ctx.targetName, FALSE);
+	if (!type || !ctx.hasPosition)
+		return;
+	auto* unit = TheThingFactory->newObject(type, ThePlayerList->getNeutralPlayer()->getDefaultTeam());
+	const Coord3D position = ctx.groundLocation();
+	unit->setPosition(&position);
+}
+
 Bool canPath(Team* team, const char* waypoint)
 {
 	for (Int i = 0; i < Condition::NUM_ITEMS; ++i)
@@ -57,7 +70,7 @@ void waypointProbe(const RetailTestCommands::Context& ctx)
 		definition->getParameterType(1) == Parameter::WAYPOINT;
 	std::fprintf(stderr, "TEST skirmish-waypoint frame=%u first=%d reachable=%d missing=%d cliff=%d signature=%d\n",
 		ctx.frame, team->getFirstItemIn_TeamMemberList() == unit,
-		canPath(team, "SpawnPoint_SkirmishGollum_3"), canPath(team, "SkirmishWaypointMissing"),
+		canPath(team, "SpawnPoint_SkirmishGollum_8"), canPath(team, "SkirmishWaypointMissing"),
 		TheTerrainLogic->getWaypointByName(cliff) && !canPath(team, cliff), signature);
 }
 }
@@ -68,6 +81,7 @@ namespace RetailTestCommands
 void registerRetailSkirmishWaypointTestCommands()
 {
 #if RTS_ZEROHOUR
+	registerAction("skirmish-waypoint-create", createProbe);
 	registerAction("skirmish-waypoint-promote", promoteMember);
 	registerAction("skirmish-waypoint-probe", waypointProbe);
 #endif
