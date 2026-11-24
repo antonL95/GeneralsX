@@ -1,0 +1,36 @@
+225 create Player_1 DeepWaterBombardProbe 0 1915,1835,0
+225 create Player_1 DeepWaterLargeProbe 0 1925,1845,180
+225 create Player_1 DeepWaterTransportProbe 0 1905,1825,180
+225 create Player_1 DeepWaterBeachProbe 0 445,1145,0
+230 deep-water-sample Player_1 DeepWaterBombardProbe 0
+230 deep-water-sample Player_1 DeepWaterLargeProbe 0
+230 deep-water-sample Player_1 DeepWaterTransportProbe 0
+230 deep-water-sample Player_1 DeepWaterBeachProbe 0
+230 deep-water-route Player_1 DeepWaterBombardProbe 0 - 1925 1835
+230 deep-water-route Player_1 DeepWaterBombardProbe 0 - 1905 1845
+230 deep-water-route Player_1 DeepWaterLargeProbe 0 - 1915 1845
+230 deep-water-route Player_1 DeepWaterTransportProbe 0 - 1895 1825
+230 deep-water-route Player_1 DeepWaterTransportProbe 0 - 1895 1835
+230 deep-water-route Player_1 DeepWaterBeachProbe 0 - 465 1145
+230 deep-water-route Player_1 DeepWaterBeachProbe 0 - 475 1145
+230 deep-water-hierarchy Player_1 DeepWaterTransportProbe 0 - 1895 1825
+235 move Player_1 DeepWaterBombardProbe 0 - 1925 1835
+235 move Player_1 DeepWaterLargeProbe 0 - 1915 1845
+235 move Player_1 DeepWaterTransportProbe 0 - 1895 1825
+235 move Player_1 DeepWaterBeachProbe 0 - 475 1145
+245 deep-water-sample Player_1 DeepWaterBombardProbe 0
+255 deep-water-sample Player_1 DeepWaterBombardProbe 0
+255 deep-water-sample Player_1 DeepWaterLargeProbe 0
+255 deep-water-sample Player_1 DeepWaterTransportProbe 0
+255 deep-water-sample Player_1 DeepWaterBeachProbe 0
+255 deep-water-route Player_1 DeepWaterTransportProbe 0 - 1895 1825
+255 deep-water-route Player_1 DeepWaterBeachProbe 0 - 475 1145
+255 deep-water-hierarchy Player_1 DeepWaterTransportProbe 0 - 1895 1825
+365 deep-water-sample Player_1 DeepWaterBombardProbe 0
+365 deep-water-sample Player_1 DeepWaterLargeProbe 0
+365 deep-water-sample Player_1 DeepWaterTransportProbe 0
+365 deep-water-sample Player_1 DeepWaterBeachProbe 0
+370 destroy Player_1 DeepWaterBombardProbe 0
+370 destroy Player_1 DeepWaterLargeProbe 0
+370 destroy Player_1 DeepWaterTransportProbe 0
+370 destroy Player_1 DeepWaterBeachProbe 0
