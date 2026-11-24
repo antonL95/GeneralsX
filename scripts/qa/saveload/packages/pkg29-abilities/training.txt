@@ -133,12 +133,12 @@
 1040 create PlyrCreeps Pkg29DisguiseDetector 0 880,320,0
 1110 pkg29-disguise-state Player_1 Pkg29DisguiseHero 1
 1170 pkg29-disguise-state Player_1 Pkg29DisguiseHero 0
-193 create PlyrCreeps Pkg29StrafeInside 0 2480,3020,0
-193 create Player_1 Pkg29StrafeOutside 0 2260,3200,0
+193 create PlyrCreeps Pkg29StrafeInside 0 2250,230,0
+193 create Player_1 Pkg29StrafeOutside 0 2470,50,0
 195 science Player_1 - 0 SCIENCE_DragonStrike
 196 pkg29-strafe-cast Player_1 - 0 - -50 -50
 197 pkg29-strafe-state Player_1 SpellBookDragonStrikeDragon 0
-198 pkg29-strafe-cast Player_1 - 0 - 2480 3200
+198 pkg29-strafe-cast Player_1 - 0 - 2250 50
 209 pkg29-strafe-restore Player_1 - 0
 244 pkg29-strafe-state Player_1 SpellBookDragonStrikeDragon 0
 310 pkg29-strafe-state Player_1 SpellBookDragonStrikeDragon 0
@@ -147,3 +147,5 @@
 800 pkg29-strafe-state Player_1 SpellBookDragonStrikeDragon 0
 800 health PlyrCreeps Pkg29StrafeInside 0
 800 health Player_1 Pkg29StrafeOutside 0
+801 destroy PlyrCreeps Pkg29StrafeInside 0
+801 destroy Player_1 Pkg29StrafeOutside 0
