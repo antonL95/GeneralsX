@@ -397,7 +397,7 @@ class AudioManager : public SubsystemInterface
 		Bool m_disallowSpeech			: 1;
 		Bool m_traceEnabled = FALSE;
 		Bool m_headlessVirtualPlayback = FALSE;
-		std::map<AsciiString, Int> m_lastMultiSoundChoice;
+		std::map<AudioHandle, std::vector<AudioHandle>> m_multiAudioHandles;
 };
 
 extern AudioManager *TheAudio;

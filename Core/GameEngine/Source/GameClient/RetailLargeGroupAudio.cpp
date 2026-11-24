@@ -47,6 +47,7 @@ struct MultiSound
 {
 	std::vector<AsciiString> sounds;
 	Bool playOne = FALSE;
+	Bool loop = FALSE;
 };
 
 struct AudioMap
@@ -281,29 +282,19 @@ void trace(const AsciiString& group, const Sound& sound, const char* kind, CellI
 	std::fflush(stderr);
 }
 
-void queueEvent(Loop& loop, const AsciiString& event, Int playerIndex, std::vector<AsciiString>& parents)
+void queueEvent(Loop& loop, const AsciiString& event, Int playerIndex)
 {
-	const AsciiString key = lower(event);
-	if (const auto multi = multiSounds.find(key); multi != multiSounds.end())
-	{
-		const auto& [children, playOne] = multi->second;
-		if (children.empty() || std::find(parents.begin(), parents.end(), key) != parents.end())
-			return;
-		parents.push_back(key);
-		if (playOne)
-			queueEvent(loop, children[GameAudioRandomValue(0, children.size() - 1)], playerIndex, parents);
-		else
-			for (const AsciiString& child : children)
-				queueEvent(loop, child, playerIndex, parents);
-		parents.pop_back();
-		return;
+	std::vector<AsciiString> events;
+	if (!RetailLargeGroupAudio::expandMultiSound(event, events))
+		events.push_back(event);
+	for (const AsciiString& child : events) {
+		AudioEventRTS audio(child, &loop.emitter->position);
+		audio.setPlayerIndex(playerIndex);
+		audio.setRetailEmitter(loop.emitter);
+		const AudioHandle handle = TheAudio->addAudioEvent(&audio);
+		if (handle >= AHSV_FirstHandle)
+			loop.handles.push_back(handle);
 	}
-	AudioEventRTS audio(event, &loop.emitter->position);
-	audio.setPlayerIndex(playerIndex);
-	audio.setRetailEmitter(loop.emitter);
-	const AudioHandle handle = TheAudio->addAudioEvent(&audio);
-	if (handle >= AHSV_FirstHandle)
-		loop.handles.push_back(handle);
 }
 
 Loop start(const Sound& sound, const Cell& cell, const Coord3D& position)
@@ -314,8 +305,7 @@ Loop start(const Sound& sound, const Cell& cell, const Coord3D& position)
 	if (TheAudio)
 	{
 		const Player* player = cell.owner->getControllingPlayer();
-		std::vector<AsciiString> parents;
-		queueEvent(loop, sound.event, player ? player->getPlayerIndex() : -1, parents);
+		queueEvent(loop, sound.event, player ? player->getPlayerIndex() : -1);
 	}
 	return loop;
 }
@@ -592,7 +582,9 @@ void parseMultiSound(INI* ini)
 				{
 					if (stricmp(flag, "PLAY_ONE") == 0)
 						static_cast<MultiSound*>(instance)->playOne = TRUE;
-					else if (stricmp(flag, "LOOP") != 0)
+					else if (stricmp(flag, "LOOP") == 0)
+						static_cast<MultiSound*>(instance)->loop = TRUE;
+					else
 						throw INI_INVALID_DATA;
 				}
 			}, nullptr, 0 },
@@ -613,13 +605,47 @@ AsciiString chooseMultiSoundTrack(const AsciiString& event)
 		const auto multi = multiSounds.find(key);
 		if (multi == multiSounds.end())
 			return track;
-		const auto& [children, playOne] = multi->second;
-		if (children.empty() || (!playOne && children.size() != 1) ||
+		const MultiSound& found = multi->second;
+		const auto& children = found.sounds;
+		if (children.empty() || (!found.playOne && children.size() != 1) ||
 			std::find(parents.begin(), parents.end(), key) != parents.end())
 			return AsciiString();
 		parents.push_back(key);
 		track = children[GameAudioRandomValue(0, static_cast<Int>(children.size() - 1))];
 	}
+}
+
+Bool expandMultiSound(const AsciiString& name, std::vector<AsciiString>& events)
+{
+	if (multiSounds.find(lower(name)) == multiSounds.end())
+		return FALSE;
+	std::vector<AsciiString> parents;
+	const auto expand = [&](const auto& self, const AsciiString& event) -> void {
+		const AsciiString key = lower(event);
+		const auto found = multiSounds.find(key);
+		if (found == multiSounds.end()) {
+			events.push_back(event);
+			return;
+		}
+		const MultiSound& multi = found->second;
+		if (multi.sounds.empty() || std::find(parents.begin(), parents.end(), key) != parents.end())
+			return;
+		parents.push_back(key);
+		if (multi.playOne)
+			self(self, multi.sounds[GameAudioRandomValue(0, static_cast<Int>(multi.sounds.size() - 1))]);
+		else
+			for (const AsciiString& child : multi.sounds)
+				self(self, child);
+		parents.pop_back();
+	};
+	expand(expand, name);
+	return TRUE;
+}
+
+Bool isMultiSound(const AsciiString& name)
+{
+	const auto found = multiSounds.find(lower(name));
+	return found != multiSounds.end() && !found->second.sounds.empty();
 }
 
 void parseUnusedKeys(INI* ini)

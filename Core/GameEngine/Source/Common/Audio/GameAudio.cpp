@@ -65,6 +65,7 @@
 
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
+#include "GameClient/RetailLargeGroupAudio.h"
 #include "GameClient/View.h"
 
 #include "GameLogic/GameLogic.h"
@@ -271,6 +272,7 @@ void AudioManager::postProcessLoad()
 //-------------------------------------------------------------------------------------------------
 void AudioManager::reset()
 {
+	m_multiAudioHandles.clear();
 	// clear out any adjusted volumes we might have set.
 	m_adjustedVolumes.clear();
 
@@ -292,6 +294,15 @@ void AudioManager::reset()
 //-------------------------------------------------------------------------------------------------
 void AudioManager::update()
 {
+	for (auto it = m_multiAudioHandles.begin(); it != m_multiAudioHandles.end();) {
+		Bool playing = FALSE;
+		for (const AudioHandle child : it->second)
+			playing = playing || isCurrentlyPlaying(child);
+		if (playing)
+			++it;
+		else
+			it = m_multiAudioHandles.erase(it);
+	}
 	if (!TheTacticalView)
 		return;
 	Coord3D cameraPivot = TheTacticalView->getPosition();
@@ -397,6 +408,22 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 {
 	if (eventToAdd->getEventName().isEmpty() || eventToAdd->getEventName() == "NoSound") {
 		return AHSV_NoSound;
+	}
+	std::vector<AsciiString> children;
+	if (RetailLargeGroupAudio::expandMultiSound(eventToAdd->getEventName(), children)) {
+		std::vector<AudioHandle> handles;
+		for (const AsciiString& name : children) {
+			AudioEventRTS child(*eventToAdd);
+			child.setEventName(name);
+			const AudioHandle handle = addAudioEvent(&child);
+			if (handle >= AHSV_FirstHandle)
+				handles.push_back(handle);
+		}
+		if (handles.empty())
+			return AHSV_NoSound;
+		const AudioHandle group = allocateNewHandle();
+		m_multiAudioHandles.emplace(group, std::move(handles));
+		return group;
 	}
 
 #ifdef INTENSIVE_AUDIO_DEBUG
@@ -527,6 +554,8 @@ Bool AudioManager::isValidAudioEvent(const AudioEventRTS *eventToCheck) const
 		return false;
 	}
 
+	if (RetailLargeGroupAudio::isMultiSound(eventToCheck->getEventName()))
+		return TRUE;
 	getInfoForAudioEvent(eventToCheck);
 
 	return (eventToCheck->getAudioEventInfo() != nullptr);
@@ -540,6 +569,8 @@ Bool AudioManager::isValidAudioEvent( AudioEventRTS *eventToCheck ) const
 		return false;
 	}
 
+	if (RetailLargeGroupAudio::isMultiSound(eventToCheck->getEventName()))
+		return TRUE;
 	getInfoForAudioEvent( eventToCheck );
 
 	return( eventToCheck->getAudioEventInfo() );
@@ -602,6 +633,13 @@ AsciiString AudioManager::prevTrackName(const AsciiString& currentTrack )
 //-------------------------------------------------------------------------------------------------
 void AudioManager::removeAudioEvent(AudioHandle audioEvent)
 {
+	if (const auto found = m_multiAudioHandles.find(audioEvent); found != m_multiAudioHandles.end()) {
+		const std::vector<AudioHandle> children = found->second;
+		m_multiAudioHandles.erase(found);
+		for (const AudioHandle child : children)
+			removeAudioEvent(child);
+		return;
+	}
 	if (audioEvent == AHSV_StopTheMusic || audioEvent == AHSV_StopTheMusicFade) {
 		m_music->removeAudioEvent(audioEvent);
 		return;

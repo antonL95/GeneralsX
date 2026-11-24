@@ -58,6 +58,7 @@
 #include "GameClient/View.h"
 
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 // GeneralsX @bugfix fbraz3 24/06/2026 Save and restore FPU precision mode when calling audio manager entrypoints.
 #include "GameLogic/FPUControl.h"
@@ -82,6 +83,20 @@ static ma_result vfsFileInfo(ma_vfs *pVFS, ma_vfs_file file, ma_file_info *pInfo
 static ma_result vfsFileRead(ma_vfs *pVFS, ma_vfs_file file, void *pBuffer, size_t bytesToRead, size_t *pBytesRead);
 static ma_result vfsFileTell(ma_vfs *pVFS, ma_vfs_file file, ma_int64 *pCursor);
 static ma_result vfsFileSeek(ma_vfs *pVFS, ma_vfs_file file, ma_int64 offset, ma_seek_origin origin);
+
+static ObjectID audioOwnerObject(AudioEventRTS *event)
+{
+	if (!event)
+		return INVALID_ID;
+	if (event->getOwnerType() == OT_Object)
+		return event->getObjectID();
+	if (event->getOwnerType() == OT_Drawable && TheGameClient) {
+		Drawable *drawable = TheGameClient->findDrawableByID(event->getDrawableID());
+		if (drawable && drawable->getObject())
+			return drawable->getObject()->getID();
+	}
+	return INVALID_ID;
+}
 
 //-------------------------------------------------------------------------------------------------
 MiniAudioManager::MiniAudioManager() :
@@ -215,8 +230,6 @@ void MiniAudioManager::reset()
 	if (m_deviceOpened && (m_soundOn || m_sound3DOn || m_speechOn || m_musicOn)) {
 		resumeAudio(AudioAffect_All);
 	}
-	m_completedMusicByHandle.clear();
-	m_completedMusicByName.clear();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -357,6 +370,15 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	const AudioEventInfo *info = event->getAudioEventInfo();
 	if (!info) {
 		return;
+	}
+	const ObjectID voiceOwner = audioOwnerObject(event);
+	if ((info->m_type & ST_VOICE) && voiceOwner != INVALID_ID && isObjectPlayingVoice(voiceOwner)) {
+		if (!(info->m_control & AC_INTERRUPT)) {
+			if (m_traceEnabled)
+				traceEvent("voice-suppress", voiceOwner, event->getPlayingHandle(), event->getEventName());
+			return;
+		}
+		stopObjectVoice(voiceOwner);
 	}
 
 	AsciiString fileToPlay = event->getFilename();
@@ -693,6 +715,13 @@ void MiniAudioManager::killAudioEventImmediately(AudioHandle audioEvent)
 {
 	// GeneralsX @bugfix meerzulee 19/07/2026 FP env guard for audio entry point (see #215)
 	ScopedFPUGuard fpuGuard;
+	if (const auto found = m_multiAudioHandles.find(audioEvent); found != m_multiAudioHandles.end()) {
+		const std::vector<AudioHandle> children = found->second;
+		m_multiAudioHandles.erase(found);
+		for (const AudioHandle child : children)
+			killAudioEventImmediately(child);
+		return;
+	}
 	// First look for it in the request list.
 	std::list<AudioRequest *>::iterator ait;
 	for (ait = m_audioRequests.begin(); ait != m_audioRequests.end(); ait++)
@@ -903,6 +932,13 @@ Bool MiniAudioManager::isMusicPlaying(void) const
 //-------------------------------------------------------------------------------------------------
 Bool MiniAudioManager::hasMusicTrackCompleted(const AsciiString &trackName, Int numberOfTimes) const
 {
+	for (const PlayingAudio *playing : m_playingSounds) {
+		if (playing && !playing->m_requestStop && playing->m_audioEventRTS &&
+			playing->m_audioEventRTS->getEventName().compareNoCase(trackName) == 0 &&
+			playing->m_audioEventRTS->getAudioEventInfo()->m_soundType == AT_Music &&
+			playing->m_completedLoops >= numberOfTimes)
+			return TRUE;
+	}
 	return FALSE;
 }
 
@@ -1028,6 +1064,12 @@ void MiniAudioManager::closeDevice(void)
 //-------------------------------------------------------------------------------------------------
 Bool MiniAudioManager::isCurrentlyPlaying(AudioHandle handle)
 {
+	if (const auto found = m_multiAudioHandles.find(handle); found != m_multiAudioHandles.end()) {
+		for (const AudioHandle child : found->second)
+			if (isCurrentlyPlaying(child))
+				return TRUE;
+		return FALSE;
+	}
 	for (auto it = m_playingSounds.begin(); it != m_playingSounds.end(); ++it) {
 		PlayingAudio *playing = *it;
 		if (playing && playing->m_audioEventRTS && playing->m_audioEventRTS->getPlayingHandle() == handle)
@@ -1177,7 +1219,7 @@ Bool MiniAudioManager::doesViolateLimit(AudioEventRTS *event) const
 	}
 	for (auto arIt = m_audioRequests.begin(); arIt != m_audioRequests.end(); ++arIt) {
 		AudioRequest *req = (*arIt);
-		if (req && req->m_pendingEvent &&
+		if (req && req->m_pendingEvent && req->m_pendingEvent.Peek() != event &&
 			req->m_pendingEvent->getEventName() == event->getEventName()) {
 			totalRequestCount++;
 			totalCount++;
@@ -1220,14 +1262,27 @@ Bool MiniAudioManager::isObjectPlayingVoice(UnsignedInt objID) const
 	for (auto it = m_playingSounds.begin(); it != m_playingSounds.end(); ++it) {
 		if (!(*it)->m_audioEventRTS) continue;
 		const AudioEventInfo *info = (*it)->m_audioEventRTS->getAudioEventInfo();
-		if (info && (*it)->m_audioEventRTS->getObjectID() == objID && (info->m_type & ST_VOICE))
+		if (info && audioOwnerObject((*it)->m_audioEventRTS.Peek()) == objID && (info->m_type & ST_VOICE))
 			return true;
 	}
 	return false;
 }
 
-void MiniAudioManager::stopObjectVoice(UnsignedInt)
+void MiniAudioManager::stopObjectVoice(UnsignedInt objID)
 {
+	for (auto it = m_playingSounds.begin(); it != m_playingSounds.end();) {
+		PlayingAudio *playing = *it;
+		AudioEventRTS *event = playing && playing->m_audioEventRTS ? playing->m_audioEventRTS.Peek() : nullptr;
+		const AudioEventInfo *info = event ? event->getAudioEventInfo() : nullptr;
+		if (info && (info->m_type & ST_VOICE) && audioOwnerObject(event) == objID) {
+			if (m_traceEnabled)
+				traceEvent("interrupt", static_cast<ObjectID>(objID), event->getPlayingHandle(), event->getEventName());
+			it = m_playingSounds.erase(it);
+			releasePlayingAudio(playing);
+		} else {
+			++it;
+		}
+	}
 }
 
 Int MiniAudioManager::getMusicTrackCompletionCount(AudioHandle handle) const
