@@ -6754,6 +6754,19 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 					return;
 				}
 
+			case GUI_COMMAND_TOGGLE_WEAPONSET:
+				{
+					const WeaponSetFlags& flags = commandButton->getFlagsUsedForToggle();
+					if (!flags.any())
+						return;
+					const Bool enabled = !getWeaponSetFlags().testForAll(flags);
+					if (auto* horde = const_cast<HordeContain*>(HordeContain::get(this)))
+						horde->toggleWeaponSet(flags, enabled);
+					else
+						setWeaponSetFlags(flags, enabled);
+					return;
+				}
+
 			case GUI_COMMAND_FIRE_WEAPON:
 				if( ai )
 				{
