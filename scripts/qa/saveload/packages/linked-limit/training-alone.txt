@@ -1,0 +1,32 @@
+240 create Player_1 RivendellDormitory 0 2700,3400,0
+240 create Player_1 RivendellDormitory 1 2900,3400,0
+241 cash Player_1 - 0 10000
+241 pw-override Player_1 - 0 -
+242 objupgrade Player_1 RivendellDormitory 0 Upgrade_ArnorBarracksLevel3
+242 objupgrade Player_1 RivendellDormitory 1 Upgrade_ArnorBarracksLevel3
+250 queuebutton Player_1 RivendellDormitory 0 Command_ConstructNoldorWarriorHordeRivendell
+255 grant Player_1 - 0 Upgrade_TechnologyRivendellDagorlad
+255 objupgrade Player_1 RivendellDormitory 1 Upgrade_TechnologyRivendellDagorlad
+263 pkg16-button Player_1 RivendellDormitory 1 Command_ConstructNoldorWarriorHordeRivendellGilGalad
+265 queuebutton Player_1 RivendellDormitory 1 Command_ConstructNoldorWarriorHordeRivendellGilGalad
+270 select Player_1 RivendellDormitory 1
+275 pkg16-button Player_1 RivendellDormitory 1 Command_ConstructNoldorWarriorHordeRivendellGilGalad
+276 produce Player_1 RivendellDormitory 1 NoldorWarriorHordeGilGalad
+280 heroes Player_1 - 0
+2400 pkg16-button Player_1 RivendellDormitory 1 Command_ConstructNoldorWarriorHordeRivendellGilGalad
+2401 produce Player_1 RivendellDormitory 1 NoldorWarriorHordeGilGalad
+2420 select Player_1 NoldorWarriorHorde 0
+2422 key Player_1 matching 0
+2425 hordelog Player_1 NoldorWarriorHorde 0
+2425 hordelog Player_1 NoldorWarriorHordeGilGalad 0
+2460 select Player_1 NoldorWarriorHordeGilGalad 0
+2462 key Player_1 matching 0
+2465 hordelog Player_1 NoldorWarriorHorde 0
+2465 hordelog Player_1 NoldorWarriorHordeGilGalad 0
+2480 create Player_1 NoldorWarriorHorde_WOTR 0 2700,3200,0
+2480 create Player_1 NoldorWarriorHorde_Arthedain 0 2900,3200,0
+2490 select Player_1 NoldorWarriorHorde_WOTR 0
+2492 key Player_1 matching 0
+2495 key Player_1 matching 0
+2498 hordelog Player_1 NoldorWarriorHorde_WOTR 0
+2498 hordelog Player_1 NoldorWarriorHorde_Arthedain 0

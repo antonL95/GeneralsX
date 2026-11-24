@@ -3144,8 +3144,15 @@ static void countExisting( Object *obj, void *userData )
     ProductionUpdateInterface *pui = ProductionUpdate::getProductionUpdateInterfaceFromObject( obj );
     if( pui )
     {
-      // add the count of this type that are in the queue
-      typeCountData->count += pui->countUnitTypeInQueue( typeCountData->type );
+      for (const ProductionEntry *entry = pui->firstProduction(); entry; entry = pui->nextProduction(entry))
+      {
+        if (entry->getProductionType() != PRODUCTION_UNIT)
+          continue;
+        const ThingTemplate *queued = entry->getProductionObject();
+        if (queued && (typeCountData->type->isEquivalentTo(queued) ||
+            (typeCountData->linkKey != NAMEKEY_INVALID && typeCountData->linkKey == queued->getMaxSimultaneousLinkKey())))
+          ++typeCountData->count;
+      }
     }
   }
 }

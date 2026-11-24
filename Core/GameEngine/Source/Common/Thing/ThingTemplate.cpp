@@ -2024,6 +2024,18 @@ Bool ThingTemplate::isEquivalentTo(const ThingTemplate* tt) const
 	if( this->m_reskinnedFrom && this->m_reskinnedFrom == tt->m_reskinnedFrom )
 		return true;
 
+	for (const AsciiString& name : m_rotwk.equivalentTo)
+	{
+		if (name.compareNoCase(tt->getName()) == 0)
+			return true;
+		for (const AsciiString& other : tt->m_rotwk.equivalentTo)
+			if (name.compareNoCase(other) == 0)
+				return true;
+	}
+	for (const AsciiString& name : tt->m_rotwk.equivalentTo)
+		if (name.compareNoCase(getName()) == 0)
+			return true;
+
 	// Is this thing a build variation of that thing or vice versa
 	Int i;
 
