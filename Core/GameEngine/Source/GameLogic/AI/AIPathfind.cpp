@@ -5725,7 +5725,10 @@ void Pathfinder::prependCells( Path *path, const Coord3D *fromPos,
 				layer = prevCell->getLayer();
 			}
 			DEBUG_ASSERTCRASH(layer!=LAYER_GROUND, ("Should have at 1 non-ground layer. jba"));
-			if (path->getFirstNode()->getLayer() != layer)
+			Bridge* transitionBridge = TheTerrainLogic->findBridgeLayerAt(&pos, cell->getLayer(), FALSE);
+			if (!transitionBridge)
+				transitionBridge = TheTerrainLogic->findBridgeLayerAt(&pos, prevCell->getLayer(), FALSE);
+			if (path->getFirstNode()->getLayer() != layer && transitionBridge && transitionBridge->getAuthoredRampIndex() >= 0)
 			{
 				Coord3D nodePosition = *path->getFirstNode()->getPosition();
 				nodePosition.z = TheTerrainLogic->getLayerHeight(nodePosition.x, nodePosition.y, layer);
