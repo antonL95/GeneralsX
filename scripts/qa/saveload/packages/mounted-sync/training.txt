@@ -1,0 +1,53 @@
+100 create Player_1 ShireMeriadoc 0 3460,3520,0
+101 mounted-sync-rank Player_1 ShireMeriadoc 0 5
+102 objupgrade Player_1 ShireMeriadoc 0 MountedSyncCarryUpgrade
+119 mounted-sync-ready Player_1 ShireMeriadoc 0 SpecialAbilityHornOfGondor
+120 mounted-sync-state Player_1 ShireMeriadoc 0 SpecialAbilityHornOfGondor
+121 power Player_1 ShireMeriadoc 0 SpecialAbilityHornOfGondor
+122 mounted-sync-state Player_1 ShireMeriadoc 0 SpecialAbilityHornOfGondor
+220 mounted-sync-pause-recharge Player_1 ShireMeriadoc 0 SpecialAbilityMerryBlade
+225 mounted-sync-max-health Player_1 ShireMeriadoc 0 2900
+226 damage Player_1 ShireMeriadoc 0 350
+227 mounted-sync-state Player_1 ShireMeriadoc 0 SpecialAbilityHornOfGondor
+228 power Player_1 ShireMeriadoc 0 SpecialAbilityToggleMounted
+244 mounted-sync-state Player_1 ShireMeriadoc 0 SpecialAbilityHornOfGondor
+265 mounted-sync-state Player_1 ShireMeriadoc 0 SpecialAbilityHornOfGondor
+265 mounted-sync-state Player_1 ShireMeriadoc 0 SpecialAbilityMerryBlade
+266 select Player_1 ShireMeriadoc 0
+292 mounted-sync-state Player_1 ShireMeriadocMounted 0 SpecialAbilityHornOfGondor
+293 mounted-sync-state Player_1 ShireMeriadocMounted 0 SpecialAbilityMerryBlade
+310 mounted-sync-state Player_1 ShireMeriadocMounted 0 SpecialAbilityHornOfGondor
+312 power Player_1 ShireMeriadocMounted 0 SpecialAbilityToggleMounted
+382 mounted-sync-state Player_1 ShireMeriadoc 0 SpecialAbilityHornOfGondor
+400 destroy Player_1 ShireMeriadoc 0
+410 create Player_1 GondorFaramir 0 3460,3520,0
+411 mounted-sync-rank Player_1 GondorFaramir 0 5
+419 mounted-sync-state Player_1 GondorFaramir 0 SpecialAbilityGlorfindelBladeOfPurity
+419 power Player_1 GondorFaramir 0 SpecialAbilityGlorfindelBladeOfPurity
+420 power Player_1 GondorFaramir 0 SpecialAbilityToggleMounted
+443 mounted-sync-state Player_1 GondorFaramir 0 SpecialAbilityGlorfindelBladeOfPurity
+492 mounted-sync-state Player_1 GondorFaramir 0 SpecialAbilityToggleMountedTwo
+510 mounted-sync-state Player_1 GondorFaramir 0 SpecialAbilityGlorfindelBladeOfPurity
+562 mounted-sync-state Player_1 GondorFaramir 0 SpecialAbilityGlorfindelBladeOfPurity
+563 mounted-sync-state Player_1 GondorFaramir 0 SpecialAbilityToggleMountedTwo
+564 mounted-sync-ready Player_1 GondorFaramir 0 SpecialAbilityGlorfindelBladeOfPurity
+565 power Player_1 GondorFaramir 0 SpecialAbilityGlorfindelBladeOfPurity
+600 mounted-sync-state Player_1 GondorFaramir 0 SpecialAbilityGlorfindelBladeOfPurity
+630 destroy Player_1 GondorFaramir 0
+640 create Player_1 GondorImrahil 0 3460,3520,0
+641 mounted-sync-rank Player_1 GondorImrahil 0 7
+649 mounted-sync-ready Player_1 GondorImrahil 0 SpecialAbilityGlorfindelBladeOfPurity
+650 mounted-sync-state Player_1 GondorImrahil 0 SpecialAbilityGlorfindelBladeOfPurity
+651 power Player_1 GondorImrahil 0 SpecialAbilityGlorfindelBladeOfPurity
+690 mounted-sync-state Player_1 GondorImrahil 0 SpecialAbilityGlorfindelBladeOfPurity
+691 mounted-sync-ready Player_1 GondorImrahil 0 SpecialAbilityNotTheodenGloriousCharge
+693 power Player_1 GondorImrahil 0 SpecialAbilityNotTheodenGloriousCharge
+740 mounted-sync-state Player_1 GondorImrahil 0 SpecialAbilityNotTheodenGloriousCharge
+750 destroy Player_1 GondorImrahil 0
+760 create Player_1 GondorElessar 0 3460,3520,0
+770 power Player_1 GondorElessar 0 SpecialAbilityToggleMounted
+909 mounted-sync-ready Player_1 GondorElessar 0 SpecialAbilityElessarBladeMaster
+910 mounted-sync-state Player_1 GondorElessar 0 SpecialAbilityElessarBladeMaster
+911 power Player_1 GondorElessar 0 SpecialAbilityElessarBladeMaster
+950 mounted-sync-state Player_1 GondorElessar 0 SpecialAbilityElessarBladeMaster
+970 destroy Player_1 GondorElessar 0
