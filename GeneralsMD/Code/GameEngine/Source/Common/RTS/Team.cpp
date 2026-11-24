@@ -2744,8 +2744,7 @@ void Team::loadPostProcess()
 	// real object pointers
 	//
 	Object *obj;
-	std::list< ObjectID >::const_iterator it;
-	for( it = m_xferMemberIDList.begin(); it != m_xferMemberIDList.end(); ++it )
+	for (auto it = m_xferMemberIDList.rbegin(); it != m_xferMemberIDList.rend(); ++it)
 	{
 
 		// find object
@@ -2773,10 +2772,9 @@ void Team::loadPostProcess()
 
 		}
 
+		removeFrom_TeamMemberList(obj);
+		prependTo_TeamMemberList(obj);
 	}
-
-	// since we prepended the object member pointers, reverse that list so it's just like before
-//	reverse_TeamMemberList();
 
 	// we're done with the xfer list now
 	m_xferMemberIDList.clear();

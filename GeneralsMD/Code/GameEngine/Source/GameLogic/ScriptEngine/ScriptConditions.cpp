@@ -48,6 +48,7 @@
 #include "GameClient/View.h"
 #include "GameNetwork/GameInfo.h"
 
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/BfmeScriptRules.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/GameLogic.h"
@@ -66,6 +67,7 @@
 #include "GameLogic/ScriptConditions.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/VictoryConditions.h"
 
 
@@ -2929,6 +2931,23 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 			const Object* unit = TheScriptEngine->getUnitNamed(pCondition->getParameter(0)->getString());
 			const ContainModuleInterface* contain = unit ? unit->getContain() : nullptr;
 			return contain && contain->getContainCount() != 0;
+		}
+		case Condition::TEAM_CAN_PATH_TO_WAYPOINT:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pCondition->getParameter(0)->getString());
+			const Object* unit = team ? team->getFirstItemIn_TeamMemberList() : nullptr;
+			const Waypoint* waypoint = TheTerrainLogic->getWaypointByName(pCondition->getParameter(1)->getString());
+			if (!unit || !waypoint || unit->isKindOf(KINDOF_CAPTURABLE))
+				return FALSE;
+			const AIUpdateInterface* ai = unit->getAI();
+			if (!ai)
+				return FALSE;
+			const auto& locomotors = ai->getLocomotorSet();
+			const auto surfaces = locomotors.getValidSurfaces();
+			if (surfaces == 0)
+				return FALSE;
+			return surfaces == LOCOMOTORSURFACE_AIR ||
+				TheAI->pathfinder()->clientSafeQuickDoesPathExist(locomotors, unit->getPosition(), waypoint->getLocation());
 		}
 		case Condition::TEAM_HAS_FEWER_THAN_X_UNITS_WITH_KINDOF:
 		{
