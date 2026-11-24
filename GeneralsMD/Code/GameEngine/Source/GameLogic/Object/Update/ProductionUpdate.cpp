@@ -846,6 +846,8 @@ UpdateSleepTime ProductionUpdate::update()
 
 Bool ProductionUpdate::advanceProduction(ProductionEntry *production, Player *player)
 {
+	if (production->m_type == PRODUCTION_UNIT && production->getProductionQuantityRemaining() == 0)
+		return TRUE;
 	//
 	// you can disallow types of units on the fly in scripts, so if there is something
 	// in the queue that suddenly can't be build then get rid of it
@@ -1070,7 +1072,7 @@ void ProductionUpdate::finishProduction(ProductionEntry *production, Player *pla
 
 			}
 
-			if( production->getProductionQuantityRemaining() == 0 )
+			if( production->getProductionQuantityRemaining() == 0 && !exitInterface->isProductionExitPending() )
 			{
 				// remove this production entry so we can go on to the next if we are totally finished
 				removeFromProductionQueue( production );
@@ -1404,6 +1406,8 @@ UnsignedInt ProductionUpdate::countUnitTypeInQueue( const ThingTemplate *unitTyp
 // ------------------------------------------------------------------------------------------------
 void ProductionUpdate::onDie( const DamageInfo *damageInfo )
 {
+	if (ExitInterface* exit = getObject()->getObjectExitInterface())
+		exit->abortProductionExit();
 	// we need to cancel all of our production on death
 	cancelAndRefundAllProduction();
 }

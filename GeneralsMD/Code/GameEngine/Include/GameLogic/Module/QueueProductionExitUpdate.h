@@ -87,6 +87,8 @@ public:
 	virtual const Coord3D *getRallyPoint() const override;			///< define a "rally point" for units to move towards
 	virtual Bool getExitPosition( Coord3D& exitPosition ) const override;					///< access to the "Door" position of the production object
 	virtual Bool getNaturalRallyPoint( Coord3D& rallyPoint, Bool offset = TRUE ) const override;			///< get the natural "rally point" for units to move towards
+	virtual Bool isProductionExitPending() const override { return m_currentHordeID != INVALID_ID; }
+	virtual void abortProductionExit() override { if (isProductionExitPending()) finishHordeExit(); }
 
 	virtual UpdateSleepTime update() override;
 
@@ -97,8 +99,16 @@ protected:
 	Bool				m_rallyPointExists;					///< Only move to the rally point if this is true
 	Real				m_creationClearDistance;		///< I can think of myself as ready when the previous guy is this far away.
 	UnsignedInt m_currentBurstCount;				///< how many times must I still override the delay timer
+	ObjectID m_currentHordeID;
+	Int m_hordeMemberIndex;
+	Int m_hordeMembersRemaining;
+	Bool m_hordeWasUnselectable;
+	Bool m_hordeHadNoCollisions;
 
 	Bool isFreeToExit() const;
+	void spawnNextHordeMember();
+	void finishHordeExit();
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 };
 
 inline void QueueProductionExitUpdate::setRallyPoint( const Coord3D *pos )

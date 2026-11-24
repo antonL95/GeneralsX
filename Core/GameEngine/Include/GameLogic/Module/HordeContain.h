@@ -176,6 +176,12 @@ public:
 	static Bool allowsBannerSpawn(const Object* anchor);
 #endif
 	static const HordeContain* get(const Object* object);
+	Bool isPayloadCreated() const { return m_payloadCreated; }
+	void suppressInitialPayload();
+	void finishInitialPayload();
+	Int getInitialPayloadCount() const;
+	const ThingTemplate* getInitialPayloadTemplate(Int index) const;
+	void addProducedMember(Object* member);
 	UnsignedInt getLastMemberDamageFrame() const { return m_lastMemberDamageFrame; }
 	void recordMemberDamage(UnsignedInt frame) { m_lastMemberDamageFrame = frame; }
 	const HordeContainModuleData* getActiveFormation() const;
@@ -214,6 +220,7 @@ private:
 	std::vector<Coord2D> m_slotOffsets;
 	const HordeContainModuleData* m_formationOverride = nullptr;
 	Bool m_hadMembers = FALSE;
+	Bool m_initialPayloadPending = FALSE;
 	Bool m_restoreHadMembers = FALSE;
 	Bool m_restoreBaseFormation = FALSE;
 	AsciiString m_replenishmentBanner;

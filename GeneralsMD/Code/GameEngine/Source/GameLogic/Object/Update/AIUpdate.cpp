@@ -933,11 +933,13 @@ Bool AIUpdateInterface::chooseLocomotorSet(LocomotorSetType wst)
 	if (wst == LOCOMOTORSET_NORMAL && RetailFileLayers::enabled())
 	{
 		const Object* object = getObject();
+		const Object* container = object->getContainedBy();
 		const auto* tmpl = object->getTemplate();
 		if (object->getLogicModelConditions().test(MODELCONDITION_USING_COMBO_LOCOMOTOR) &&
 			tmpl->findRotWKLocomotor(LOCOMOTORSET_COMBO))
 			wst = LOCOMOTORSET_COMBO;
-		else if (object->getContainedBy() && tmpl->findRotWKLocomotor(LOCOMOTORSET_CONTAINED))
+		else if (container && (!HordeContain::get(container) || container->getContainedBy()) &&
+			tmpl->findRotWKLocomotor(LOCOMOTORSET_CONTAINED))
 			wst = LOCOMOTORSET_CONTAINED;
 	}
 	if (wst == LOCOMOTORSET_NORMAL && RetailFileLayers::enabled() && getObject()->testWeaponSetFlag(WEAPONSET_MOUNTED) &&

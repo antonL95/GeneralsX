@@ -431,6 +431,50 @@ void HordeContain::createPayload()
 	}
 }
 
+void HordeContain::suppressInitialPayload()
+{
+#if !RTS_GENERALS
+	RotwkModifierModules::applyHordeFormationModifiers(getObject());
+#endif
+	m_payloadCreated = TRUE;
+	m_initialPayloadPending = TRUE;
+}
+
+void HordeContain::finishInitialPayload()
+{
+	m_initialPayloadPending = FALSE;
+}
+
+Int HordeContain::getInitialPayloadCount() const
+{
+	const Int availableSlots = std::max(0, getContainMax()) - static_cast<Int>(getContainCount());
+	return static_cast<Int>(getActiveFormation()->m_layout.initialMembers(availableSlots).size());
+}
+
+const ThingTemplate* HordeContain::getInitialPayloadTemplate(Int index) const
+{
+	if (index < 0)
+		return nullptr;
+	const HordeLayout& layout = getActiveFormation()->m_layout;
+	const auto members = layout.initialMembers(std::max(0, getContainMax()));
+	if (static_cast<std::size_t>(index) >= members.size())
+		return nullptr;
+	return TheThingFactory->findTemplate(layout.payloads()[members[index].payload].name.c_str());
+}
+
+void HordeContain::addProducedMember(Object* member)
+{
+	if (!member)
+		return;
+	enableLoadSounds(FALSE);
+#if RTS_GENERALS
+	OpenContain::addToContain(member);
+#else
+	OpenContain::addToContain(member, FALSE);
+#endif
+	enableLoadSounds(TRUE);
+}
+
 void HordeContain::addToContainList( Object *rider )
 {
 	TransportContain::addToContainList( rider );
@@ -626,7 +670,10 @@ void HordeContain::crc( Xfer *xfer )
 
 void HordeContain::xferRetailBlocks(Xfer* xfer, Bool present)
 {
-	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {});
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"initial-payload-pending", [this](Xfer* x) { x->xferBool(&m_initialPayloadPending); },
+			[this] { m_initialPayloadPending = FALSE; }}
+	});
 }
 
 void HordeContain::xferRetailFormationCombat(Xfer* xfer, Bool includeBackingSource)
@@ -2191,6 +2238,8 @@ UpdateSleepTime HordeContain::update()
 		if (member->isEffectivelyDead())
 			removeFromContain(member);
 	}
+	if (m_initialPayloadPending)
+		return sleep;
 	if (m_hadMembers && getContainCount() == 0)
 	{
 		Object* horde = getObject();

@@ -34,12 +34,17 @@
 #include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
+#include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/ExperienceTracker.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/QueueProductionExitUpdate.h"
 
@@ -78,6 +83,11 @@ QueueProductionExitUpdate::QueueProductionExitUpdate( Thing *thing, const Module
 	// no rally point has been set
 	m_rallyPointExists = false;
 	m_currentBurstCount = 0;
+	m_currentHordeID = INVALID_ID;
+	m_hordeMemberIndex = 0;
+	m_hordeMembersRemaining = 0;
+	m_hordeWasUnselectable = FALSE;
+	m_hordeHadNoCollisions = FALSE;
 	const QueueProductionExitUpdateModuleData* md = getQueueProductionExitUpdateModuleData();
 	if (md) //sanity
 	{
@@ -88,6 +98,8 @@ QueueProductionExitUpdate::QueueProductionExitUpdate( Thing *thing, const Module
 //-------------------------------------------------------------------------------------------------
 QueueProductionExitUpdate::~QueueProductionExitUpdate()
 {
+	if (TheGameLogic && m_currentHordeID != INVALID_ID)
+		finishHordeExit();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -143,6 +155,27 @@ void QueueProductionExitUpdate::exitObjectViaDoor( Object *newObj, ExitDoorType 
 
 		newObj->setPosition( &createPoint );
 		newObj->setOrientation( exitAngle );
+		HordeContain* horde = const_cast<HordeContain*>(HordeContain::get(newObj));
+		if (horde && !horde->isPayloadCreated())
+		{
+			horde->suppressInitialPayload();
+			m_currentHordeID = newObj->getID();
+			m_hordeMemberIndex = 0;
+			m_hordeMembersRemaining = horde->getInitialPayloadCount();
+			m_hordeWasUnselectable = newObj->testStatus(OBJECT_STATUS_UNSELECTABLE);
+			m_hordeHadNoCollisions = newObj->testStatus(OBJECT_STATUS_NO_COLLISIONS);
+			newObj->setStatus(MAKE_OBJECT_STATUS_MASK2(OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_NO_COLLISIONS));
+			Coord3D anchor;
+			getNaturalRallyPoint(anchor);
+			TheAI->pathfinder()->snapPosition(newObj, &anchor);
+			newObj->setPosition(&anchor);
+			m_currentDelay = md->m_exitDelayData;
+			if (m_currentBurstCount)
+				--m_currentBurstCount;
+			if (!m_hordeMembersRemaining)
+				finishHordeExit();
+			return;
+		}
 
 		//
 		// Objects that are created in the air from producers that are in the air get
@@ -247,6 +280,8 @@ void QueueProductionExitUpdate::unreserveDoorForExit( ExitDoorType exitDoor )
 //-------------------------------------------------------------------------------------------------
 Bool QueueProductionExitUpdate::isFreeToExit() const
 {
+	if (m_currentHordeID != INVALID_ID)
+		return FALSE;
 	Bool stillBursting = (m_currentBurstCount > 0);
 	Bool stillDelaying = (m_currentDelay != 0);
 
@@ -261,6 +296,18 @@ Bool QueueProductionExitUpdate::isFreeToExit() const
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime QueueProductionExitUpdate::update()
 {
+	if (m_currentHordeID != INVALID_ID)
+	{
+		if (m_currentDelay && !m_currentBurstCount)
+			--m_currentDelay;
+		else
+		{
+			do
+				spawnNextHordeMember();
+			while (m_currentHordeID != INVALID_ID && m_currentBurstCount);
+		}
+		return UPDATE_SLEEP_NONE;
+	}
 	// This update needs to decide when we are again free to exit something
 	if (isFreeToExit())
 	{
@@ -270,6 +317,85 @@ UpdateSleepTime QueueProductionExitUpdate::update()
 
 	m_currentDelay--;
 	return UPDATE_SLEEP_NONE;
+}
+
+void QueueProductionExitUpdate::spawnNextHordeMember()
+{
+	Object* anchor = TheGameLogic->findObjectByID(m_currentHordeID);
+	HordeContain* horde = const_cast<HordeContain*>(HordeContain::get(anchor));
+	if (!anchor || !horde || anchor->isEffectivelyDead())
+	{
+		finishHordeExit();
+		return;
+	}
+	const ThingTemplate* type = horde->getInitialPayloadTemplate(m_hordeMemberIndex);
+	if (!type)
+	{
+		finishHordeExit();
+		return;
+	}
+	Object* member = TheThingFactory->newObject(type, anchor->getTeam());
+	member->setProducer(getObject());
+	horde->addProducedMember(member);
+	if (member->getContainedBy() != anchor)
+	{
+		TheGameLogic->destroyObject(member);
+		finishHordeExit();
+		return;
+	}
+	Coord3D createPoint;
+	getExitPosition(createPoint);
+	if (TheTerrainLogic && !getQueueProductionExitUpdateModuleData()->m_allowAirborneCreationData)
+		createPoint.z = TheTerrainLogic->getGroundHeight(createPoint.x, createPoint.y);
+	member->setPosition(&createPoint);
+	member->setOrientation(anchor->getOrientation());
+	member->setLayer(getObject()->getLayer());
+	TheAI->pathfinder()->addObjectToPathfindMap(member);
+	Coord3D midpoint;
+	getNaturalRallyPoint(midpoint, FALSE);
+	midpoint.x = (midpoint.x + createPoint.x) * 0.5f;
+	midpoint.y = (midpoint.y + createPoint.y) * 0.5f;
+	midpoint.z = (midpoint.z + createPoint.z) * 0.5f;
+	const Coord3D slot = horde->getMemberPosition(member->getID(), FALSE);
+	std::vector<Coord3D> path{midpoint, slot, slot};
+	if (AIUpdateInterface* ai = member->getAI())
+		ai->aiFollowExitProductionPath(&path, getObject(), CMD_FROM_AI);
+	++m_hordeMemberIndex;
+	--m_hordeMembersRemaining;
+	m_currentDelay = getQueueProductionExitUpdateModuleData()->m_exitDelayData;
+	if (m_currentBurstCount)
+		--m_currentBurstCount;
+	if (!m_hordeMembersRemaining)
+		finishHordeExit();
+}
+
+void QueueProductionExitUpdate::finishHordeExit()
+{
+	Object* anchor = TheGameLogic->findObjectByID(m_currentHordeID);
+	if (anchor)
+	{
+		if (!m_hordeWasUnselectable)
+			anchor->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
+		if (!m_hordeHadNoCollisions)
+			anchor->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_COLLISIONS));
+		if (HordeContain* horde = const_cast<HordeContain*>(HordeContain::get(anchor)))
+		{
+			horde->finishInitialPayload();
+			if (m_hordeMembersRemaining > 0 && horde->getContainCount() == 0)
+			{
+				TheGameLogic->destroyObject(anchor);
+				m_currentHordeID = INVALID_ID;
+				m_hordeMembersRemaining = 0;
+				return;
+			}
+			horde->onRankAdvanced(anchor->getExperienceTracker()->getRank());
+		}
+		if (m_rallyPointExists)
+			if (AIUpdateInterface* ai = anchor->getAI())
+				ai->aiMoveToPosition(&m_rallyPoint, CMD_FROM_AI);
+	}
+	m_currentHordeID = INVALID_ID;
+	m_hordeMembersRemaining = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -347,6 +473,8 @@ void QueueProductionExitUpdate::crc( Xfer *xfer )
 
 	// extend base class
 	UpdateModule::crc( xfer );
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 
 }
 
@@ -359,7 +487,7 @@ void QueueProductionExitUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -380,7 +508,28 @@ void QueueProductionExitUpdate::xfer( Xfer *xfer )
 
 	// current burst count
 	xfer->xferUnsignedInt( &m_currentBurstCount );
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 2);
 
+}
+
+void QueueProductionExitUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"horde-production-exit", [this](Xfer* x) {
+			x->xferObjectID(&m_currentHordeID);
+			x->xferInt(&m_hordeMemberIndex);
+			x->xferInt(&m_hordeMembersRemaining);
+			x->xferBool(&m_hordeWasUnselectable);
+			x->xferBool(&m_hordeHadNoCollisions);
+		}, [this] {
+			m_currentHordeID = INVALID_ID;
+			m_hordeMemberIndex = 0;
+			m_hordeMembersRemaining = 0;
+			m_hordeWasUnselectable = FALSE;
+			m_hordeHadNoCollisions = FALSE;
+		}}
+	});
 }
 
 // ------------------------------------------------------------------------------------------------

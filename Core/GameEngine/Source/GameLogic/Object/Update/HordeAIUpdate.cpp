@@ -596,6 +596,8 @@ UpdateSleepTime HordeAIUpdate::update()
 		AIUpdateInterface* ai = member->getAI();
 		if (!ai || member->isEffectivelyDead())
 			continue;
+		if (RetailFileLayers::enabled() && ai->getCurrentStateID() == AI_FOLLOW_EXITPRODUCTION_PATH)
+			continue;
 #if RTS_ZEROHOUR
 		if (comboEnabled)
 		{
