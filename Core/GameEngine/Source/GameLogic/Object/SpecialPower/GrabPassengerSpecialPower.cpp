@@ -5,14 +5,17 @@
 #include "Common/INI.h"
 #include "Common/INIException.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "Common/SpecialPower.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
+#include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/TerrainLogic.h"
 #if !RTS_GENERALS
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -202,10 +205,61 @@ Bool GrabPassengerSpecialPower::requestGrab(Object* requested, UnsignedInt comma
 	return m_lastCastAccepted;
 }
 
+Bool GrabPassengerSpecialPower::requestTreeGrab(const Coord3D& position, UnsignedInt commandOptions)
+{
+	m_lastCastAccepted = FALSE;
+	Object* caster = getObject();
+	Object* proxy = TheGameLogic->findObjectByID(TerrainLogic::GRABBABLE_TREE_PROXY_ID);
+	if (m_pausedCount > 0 || caster->isDisabled() || !meetsRequiredRank() || getPercentReady() < 1.0f ||
+		!isRetailCastAllowed(commandOptions) || !canGrab(proxy) ||
+		!TheSpecialPowerStore->canUseSpecialPower(caster, getSpecialPowerTemplate()))
+		return FALSE;
+	const ObjectID oldTarget = m_target;
+	const Coord3D oldPosition = m_treePosition;
+	m_target = TerrainLogic::GRABBABLE_TREE_PROXY_ID;
+	m_treePosition = position;
+	const Bool accepted = initiateIntentToDoSpecialPower(nullptr, &position, nullptr, commandOptions);
+	if (getPowerModuleData()->m_updateModuleStartsAttack)
+	{
+		if (!accepted)
+		{
+			m_target = oldTarget;
+			m_treePosition = oldPosition;
+		}
+	}
+	else
+		triggerSpecialPower(&position);
+	m_lastCastAccepted = accepted || !getPowerModuleData()->m_updateModuleStartsAttack;
+	return m_lastCastAccepted;
+}
+
 void GrabPassengerSpecialPower::applyPowerEffect(const Coord3D*)
 {
 	Object* caster = getObject();
 	Object* target = TheGameLogic->findObjectByID(m_target);
+	if (m_target == TerrainLogic::GRABBABLE_TREE_PROXY_ID)
+	{
+		Coord3D position;
+		Real angle;
+		Real scale;
+		const ThingTemplate* tree = TheTerrainLogic->findGrabbableMapTreeAt(m_treePosition, position, angle, &scale);
+		target = tree ? TheThingFactory->newObjectFromExactTemplate(tree, ThePlayerList->getNeutralPlayer()->getDefaultTeam(), OBJECT_STATUS_MASK_NONE) : nullptr;
+		m_treePosition.zero();
+		if (target)
+		{
+			target->setPosition(&position);
+			target->setOrientation(angle);
+			if (target->getDrawable())
+				target->getDrawable()->setInstanceScale(scale);
+			if (canGrab(target))
+				TheTerrainLogic->removeMapTreeAt(position);
+			else
+			{
+				TheGameLogic->destroyObject(target);
+				target = nullptr;
+			}
+		}
+	}
 	m_target = INVALID_ID;
 	if (!canGrab(target))
 		return;
@@ -261,14 +315,26 @@ void GrabPassengerSpecialPower::crc(Xfer* xfer)
 {
 	SpecialPowerModule::crc(xfer);
 	xfer->xferObjectID(&m_target);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
+}
+
+void GrabPassengerSpecialPower::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"tree-target", [this](Xfer* block) { block->xferCoord3D(&m_treePosition); }, [this] { m_treePosition.zero(); }}
+	});
 }
 
 void GrabPassengerSpecialPower::xfer(Xfer* xfer)
 {
-	XferVersion version = 1;
-	xfer->xferVersion(&version, 1);
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 2 : 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion(&version, currentVersion);
 	SpecialPowerModule::xfer(xfer);
 	xfer->xferObjectID(&m_target);
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 2);
 }
 
 void GrabPassengerSpecialPower::loadPostProcess()

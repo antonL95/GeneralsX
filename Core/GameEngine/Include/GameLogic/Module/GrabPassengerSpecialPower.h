@@ -28,6 +28,7 @@ public:
 	void doSpecialPowerAtObject(Object* target, UnsignedInt commandOptions) override;
 	void doSpecialPowerAtLocation(const Coord3D* position, Real angle, UnsignedInt commandOptions) override;
 	Bool requestGrab(Object* target, UnsignedInt commandOptions);
+	Bool requestTreeGrab(const Coord3D& position, UnsignedInt commandOptions);
 
 protected:
 	void applyPowerEffect(const Coord3D*) override;
@@ -36,4 +37,6 @@ private:
 	Bool canGrab(const Object* target) const;
 	const Object* findGrabTarget(const Object* target) const;
 	ObjectID m_target = INVALID_ID;
+	Coord3D m_treePosition{};
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 };

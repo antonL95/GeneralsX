@@ -56,6 +56,7 @@
 
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -71,11 +72,15 @@
 #include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/GrabPassengerSpecialPower.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/VictoryConditions.h"
 #include "GameLogic/Weapon.h"
+#include "GameLogic/TerrainLogic.h"
+#include <cmath>
 
 #include "GameClient/CommandXlat.h"
 #include "GameClient/ControlBar.h"
@@ -1749,6 +1754,47 @@ bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupP
 	UnsignedInt options = msg->getArgument( 2 )->integer;
 	ObjectID sourceID = msg->getArgument(3)->objectID;
 	Object* source = findObjectByID(sourceID);
+	const Bool treeProxy = targetID == TerrainLogic::GRABBABLE_TREE_PROXY_ID;
+	if (treeProxy && (msg->getArgumentCount() < 5 || msg->getArgumentDataType(4) != ARGUMENTDATATYPE_LOCATION))
+		return false;
+	const SpecialPowerTemplate* treePower = treeProxy ? TheSpecialPowerStore->findSpecialPowerTemplateByID(specialPowerID) : nullptr;
+	if (treeProxy && (!treePower || treePower->getSpecialPowerType() != SPECIAL_GRAB_PASSENGER))
+		return false;
+	auto castTree = [&](Object* caster) -> Bool
+	{
+		if (!caster || caster->getControllingPlayer() != getMessagePlayer(msg))
+			return FALSE;
+		const Coord3D& point = msg->getArgument(4)->location;
+		if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z))
+			return FALSE;
+		Coord3D treePosition;
+		Real treeAngle;
+		if (!TheTerrainLogic->findGrabbableMapTreeAt(point, treePosition, treeAngle) ||
+			ThePartitionManager->getShroudStatusForPlayer(caster->getControllingPlayer()->getPlayerIndex(), &treePosition) != CELLSHROUD_CLEAR)
+			return FALSE;
+		const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findPowerButton(caster, treePower) : nullptr;
+		if (!BitIsSet(options, NEED_TARGET_NEUTRAL_OBJECT) || !BitIsSet(options, ALLOW_SHRUBBERY_TARGET) ||
+			(button && (!BitIsSet(button->getOptions(), NEED_TARGET_NEUTRAL_OBJECT) ||
+				!BitIsSet(button->getOptions(), ALLOW_SHRUBBERY_TARGET) || !button->isMountStateAllowed(caster) || !button->isModelConditionAllowed(caster) ||
+				(button->getRequiredRank() > 0 && caster->getExperienceTracker()->getRank() < button->getRequiredRank()) ||
+				!button->isValidContainerForCommand(caster) || !button->matchesRetailObjectTarget(target))))
+			return FALSE;
+		auto* grab = dynamic_cast<GrabPassengerSpecialPower*>(caster->getSpecialPowerModule(treePower));
+		if (!grab || !grab->requestTreeGrab(treePosition, options))
+			return FALSE;
+		runRetailPowerTriggers(caster, specialPowerID, target, &treePosition);
+		return TRUE;
+	};
+	if (treeProxy)
+	{
+		if (source)
+			return castTree(source);
+		if (currentlySelectedGroup)
+			for (const ObjectID id : currentlySelectedGroup->getAllIDs())
+				if (castTree(findObjectByID(id)))
+					return true;
+		return false;
+	}
 	if (source != nullptr)
 	{
 #if !RETAIL_COMPATIBLE_CRC

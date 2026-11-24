@@ -35,6 +35,8 @@
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
 #include "Common/MapObject.h"
+#include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
@@ -2932,6 +2934,54 @@ void TerrainLogic::registerMapTree(const ThingTemplate& thing, const Coord3D& po
 
 	const Int boxes = tree.supplyOverride > 0 ? tree.supplyOverride : TheGlobalData->m_supplyBoxesPerTree;
 	m_mapTrees.push_back({pos, tree.isHarvestable ? std::max(0, boxes) : 0});
+}
+
+void TerrainLogic::ensureGrabbableTreeProxy()
+{
+	Object* proxy = TheGameLogic->findObjectByID(GRABBABLE_TREE_PROXY_ID);
+	if (!proxy)
+	{
+		const ThingTemplate* type = TheThingFactory->findTemplate("TheGrabbableTree", FALSE);
+		if (!type || !ThePlayerList || !ThePlayerList->getNeutralPlayer())
+			return;
+		proxy = TheThingFactory->newObjectFromExactTemplate(type,
+			ThePlayerList->getNeutralPlayer()->getDefaultTeam(), OBJECT_STATUS_MASK_NONE, GRABBABLE_TREE_PROXY_ID);
+	}
+	if (proxy && proxy->friend_getPartitionData())
+		ThePartitionManager->unRegisterObject(proxy);
+}
+
+const ThingTemplate* TerrainLogic::findGrabbableMapTreeAt(const Coord3D& origin, Coord3D& position, Real& angle, Real* scale) const
+{
+	const ThingTemplate* result = nullptr;
+	Real best = 100.0f;
+	for (const MapTree& tree : m_mapTrees)
+	{
+		const Real distance = sqr(tree.position.x - origin.x) + sqr(tree.position.y - origin.y) + sqr(tree.position.z - origin.z);
+		if (distance >= best)
+			continue;
+		for (MapObject* mapObject = MapObject::getFirstMapObject(); mapObject; mapObject = mapObject->getNext())
+		{
+			const Coord3D& point = *mapObject->getLocation();
+			const ThingTemplate* thing = mapObject->getThingTemplate();
+			if (tree.position.x != point.x || tree.position.y != point.y || !thing ||
+				!thing->isKindOf(KINDOF_TREE) || !thing->getRotWKObjectData().isGrabbable)
+				continue;
+			Bool hasScale = FALSE;
+			const Real mapScale = mapObject->getProperties()->getReal(NAMEKEY("objectPrototypeScale"), &hasScale);
+			const Real instanceScale = thing->getAssetScale() * (hasScale ? mapScale : 1.0f);
+			if (!std::isfinite(instanceScale) || instanceScale <= 0.0f)
+				continue;
+			best = distance;
+			position = tree.position;
+			angle = normalizeAngle(mapObject->getAngle());
+			if (scale)
+				*scale = instanceScale;
+			result = thing;
+			break;
+		}
+	}
+	return result;
 }
 
 const ThingTemplate* TerrainLogic::findNearestGrabbableMapTree(const Coord3D& origin, Real distanceSquared,

@@ -87,6 +87,7 @@
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/SpawnBehavior.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/GrabPassengerSpecialPower.h"
 
 
 #include "Common/ThingFactory.h"
@@ -2485,6 +2486,43 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 
 	const CommandButton* spell = TheInGameUI->getGUICommand();
 #if !RTS_GENERALS
+	if (!draw && pos && spell && spell->getCommandType() == GUI_COMMAND_SPECIAL_POWER &&
+		spell->getSpecialPowerTemplate() && spell->getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_PASSENGER &&
+		BitIsSet(spell->getOptions(), NEED_TARGET_NEUTRAL_OBJECT) && BitIsSet(spell->getOptions(), ALLOW_SHRUBBERY_TARGET) &&
+		TheInGameUI->areSelectedObjectsControllable())
+	{
+		Coord3D treePosition;
+		Real treeAngle;
+		Object* proxy = TheGameLogic->findObjectByID(TerrainLogic::GRABBABLE_TREE_PROXY_ID);
+		Drawable* selected = TheInGameUI->getFirstSelectedDrawable();
+		Object* source = selected ? selected->getObject() : nullptr;
+		auto* grab = source ? dynamic_cast<GrabPassengerSpecialPower*>(source->getSpecialPowerModule(spell->getSpecialPowerTemplate())) : nullptr;
+		if (proxy && source && TheTerrainLogic->findGrabbableMapTreeAt(*pos, treePosition, treeAngle) &&
+			ThePartitionManager->getShroudStatusForPlayer(source->getControllingPlayer()->getPlayerIndex(), &treePosition) == CELLSHROUD_CLEAR &&
+			grab && grab->getPercentReady() >= 1.0f && grab->isValidPowerTarget(proxy) &&
+			TheSpecialPowerStore->canUseSpecialPower(source, spell->getSpecialPowerTemplate()) &&
+			(spell->getRequiredRank() <= 0 || source->getExperienceTracker()->getRank() >= spell->getRequiredRank()) &&
+			spell->isRetailButtonUsable() && spell->isMountStateAllowed(source) && spell->isModelConditionAllowed(source) &&
+			spell->isValidContainerForCommand(source))
+		{
+			if (type == DO_HINT)
+			{
+				TheMessageStream->appendMessage(GameMessage::MSG_VALID_GUICOMMAND_HINT)->appendObjectIDArgument(proxy->getID());
+				return GameMessage::MSG_VALID_GUICOMMAND_HINT;
+			}
+			if (type == DO_COMMAND)
+			{
+				GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT);
+				msg->appendIntegerArgument(spell->getSpecialPowerTemplate()->getID());
+				msg->appendObjectIDArgument(proxy->getID());
+				msg->appendIntegerArgument(spell->getOptions());
+				msg->appendObjectIDArgument(source->getID());
+				msg->appendLocationArgument(treePosition);
+				TheInGameUI->setGUICommand(nullptr);
+			}
+			return GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT;
+		}
+	}
 	if (spell && spell->getCommandType() == GUI_COMMAND_BLOODTHIRSTY && RetailFileLayers::enabled())
 	{
 		const Drawable* selected = TheInGameUI->getFirstSelectedDrawable();

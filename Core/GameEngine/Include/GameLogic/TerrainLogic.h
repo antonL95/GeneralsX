@@ -324,6 +324,9 @@ public:
   void createCraterInTerrain(Object *obj);  ///< Flatten the terrain under a building.
 
 	void registerMapTree(const ThingTemplate& thing, const Coord3D& pos);
+	static constexpr ObjectID GRABBABLE_TREE_PROXY_ID = static_cast<ObjectID>(99999996);
+	void ensureGrabbableTreeProxy();
+	const ThingTemplate* findGrabbableMapTreeAt(const Coord3D& origin, Coord3D& position, Real& angle, Real* scale = nullptr) const;
 	Bool hasLegacyMapTreesToRestore() const { return !m_mapTreesBeforeLegacyLoad.empty(); }
 	void restoreLegacyMapTrees(const std::vector<Coord3D>& deletedTrees);
 	const ThingTemplate* findNearestGrabbableMapTree(const Coord3D& origin, Real distanceSquared,

@@ -2194,6 +2194,9 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	DEBUG_LOG(("%s", Buf));
 	#endif
 
+	if (retail && !loadingSaveGame)
+		TheTerrainLogic->ensureGrabbableTreeProxy();
+
 	// place initial network buildings/units
 	if (TheGameInfo && !loadingSaveGame)
 	{
@@ -4416,6 +4419,8 @@ Object *GameLogic::getFirstObject()
 // ------------------------------------------------------------------------------------------------
 ObjectID GameLogic::allocateObjectID()
 {
+	if (RetailFileLayers::enabled() && m_nextObjID == TerrainLogic::GRABBABLE_TREE_PROXY_ID)
+		m_nextObjID = static_cast<ObjectID>(static_cast<UnsignedInt>(m_nextObjID) + 1);
 	if (RetailFileLayers::enabled() && TheGameState && TheGameState->isInLoadGame())
 	{
 		while (findObjectByID(m_nextObjID))
@@ -5946,8 +5951,10 @@ void GameLogic::loadPostProcess()
 		m_nextObjID = INVALID_ID;
 	Object *obj;
 	for( obj = getFirstObject(); obj; obj = obj->getNextObject() )
-		if( obj->getID() >= m_nextObjID )
+		if( (!RetailFileLayers::enabled() || obj->getID() != TerrainLogic::GRABBABLE_TREE_PROXY_ID) && obj->getID() >= m_nextObjID )
 			m_nextObjID = (ObjectID)((UnsignedInt)obj->getID() + 1);
+	if (RetailFileLayers::enabled())
+		TheTerrainLogic->ensureGrabbableTreeProxy();
 
 	// blow away the sleepy update and normal update module lists
 	for (std::vector<UpdateModulePtr>::iterator it = m_sleepyUpdates.begin(); it != m_sleepyUpdates.end(); ++it)

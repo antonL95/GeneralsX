@@ -731,7 +731,7 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 		{
 			ObjectID nextID = *m_loadedObjectIDCounter;
 			for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
-				if (object->getID() >= nextID)
+				if ((!RetailFileLayers::enabled() || object->getID() != TerrainLogic::GRABBABLE_TREE_PROXY_ID) && object->getID() >= nextID)
 					nextID = static_cast<ObjectID>(static_cast<UnsignedInt>(object->getID()) + 1);
 			TheGameLogic->setObjectIDCounter(nextID);
 			m_loadedObjectIDCounter.reset();
