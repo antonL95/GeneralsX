@@ -20,6 +20,7 @@
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/RetailWallMesh.h"
 #include "GameLogic/Pathfinder/PathfindCell.h"
 #include "GameLogic/Pathfinder/PathfindConstants.h"
 #include "GameLogic/Pathfinder/PathfindLayer.h"
@@ -247,7 +248,16 @@ void PathfindLayer::allocateCellsForWallLayer(const IRegion2D *extent, const Obj
 		Object *obj = TheGameLogic->findObjectByID(wallPieces[i]);
 		Region2D objBounds;
 		if (obj==nullptr) continue;
-		obj->getGeometryInfo().get2DBounds(*obj->getPosition(), obj->getOrientation(), objBounds);
+		const auto* authored = RetailWallMesh::forObject(*obj);
+		if (authored && !authored->wall.empty())
+		{
+			objBounds.lo = authored->wall[0].asCoord2D();
+			objBounds.hi = objBounds.lo;
+			for (const auto& point : authored->wall)
+				objBounds.uniteWith(point.asCoord2D());
+		}
+		else
+			obj->getGeometryInfo().get2DBounds(*obj->getPosition(), obj->getOrientation(), objBounds);
 		if (first) {
 			bridgeBounds = objBounds;
 			first = false;
@@ -407,6 +417,29 @@ void PathfindLayer::classifyCells()
 /**
  * Classifies the pathfind cells for the wall bridge layer.
  */
+static Bool isAuthoredWallCell(Int x, Int y, const ObjectID* wallPieces, Int numPieces)
+{
+	for (Int corner = 0; corner < 4; ++corner)
+	{
+		Coord3D point = {Real(x + (corner & 1)) * PATHFIND_CELL_SIZE_F,
+			Real(y + ((corner >> 1) & 1)) * PATHFIND_CELL_SIZE_F, 0.0f};
+		Bool found = FALSE;
+		for (Int i = 0; i < numPieces; ++i)
+		{
+			const Object* object = TheGameLogic->findObjectByID(wallPieces[i]);
+			const auto* geometry = object ? RetailWallMesh::forObject(*object) : nullptr;
+			if (geometry && RetailWallMesh::contains(*geometry, point))
+			{
+				found = TRUE;
+				break;
+			}
+		}
+		if (!found)
+			return FALSE;
+	}
+	return TRUE;
+}
+
 void PathfindLayer::classifyWallCells(const ObjectID *wallPieces, Int numPieces)
 {
 	DEBUG_ASSERTCRASH(m_layer==LAYER_WALL, ("Wrong layer for wall."));
@@ -459,7 +492,8 @@ void PathfindLayer::classifyWallCells(const ObjectID *wallPieces, Int numPieces)
 	for (i=0; i<m_width; i++) {
 		for (j=0; j<m_height; j++) {
 			PathfindCell *cell = &m_layerCells[i][j];
-			if (cell->getPinched() && cell->getType() == PathfindCell::CELL_CLEAR) {
+			if (cell->getPinched() && cell->getType() == PathfindCell::CELL_CLEAR &&
+				!isAuthoredWallCell(i + m_xOrigin, j + m_yOrigin, wallPieces, numPieces)) {
 				cell->setType(PathfindCell::CELL_CLIFF);
 			}
 			cell->setPinched(false);
@@ -637,6 +671,13 @@ Bool PathfindLayer::isPointOnWall(const ObjectID *wallPieces, Int numPieces, con
 	for (i=0; i<numPieces; i++) {
 		Object *obj = TheGameLogic->findObjectByID(wallPieces[i]);
 		if (obj==nullptr) continue;
+		const auto* authored = RetailWallMesh::forObject(*obj);
+		if (authored && !authored->wall.empty())
+		{
+			if (RetailWallMesh::contains(*authored, *pt))
+				return true;
+			continue;
+		}
 		Real major = obj->getGeometryInfo().getMajorRadius();
 		Real minor = (obj->getGeometryInfo().getGeomType() == GEOMETRY_SPHERE) ? obj->getGeometryInfo().getMajorRadius() : obj->getGeometryInfo().getMinorRadius();
 

@@ -6,6 +6,8 @@
 #include "Common/Module.h"
 #include "Common/ThingTemplate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/RetailWallMesh.h"
 
 namespace
@@ -36,6 +38,13 @@ void probeWallRamp(const RetailTestCommands::Context& ctx)
 	const Bool hasSecond = RetailWallMesh::ramp(c, second);
 	std::fprintf(stderr, "TEST wall-ramp-shape frame=%u polygon=%zu ramp1=%d ramp2=%d\n",
 		ctx.frame, hasPolygon ? points.size() : 0, hasFirst, hasSecond);
+	Coord3D onWall = *object->getPosition();
+	onWall.y += 86.0f;
+	Coord3D offWall = *object->getPosition();
+	offWall.y += 50.0f;
+	std::fprintf(stderr, "TEST wall-ramp-cell frame=%u inside=%d outside=%d height=%.2f\n", ctx.frame,
+		TheAI->pathfinder()->isPointOnWall(&onWall), TheAI->pathfinder()->isPointOnWall(&offWall),
+		TheAI->pathfinder()->getWallHeightAt(onWall) - object->getPosition()->z);
 }
 }
 #endif

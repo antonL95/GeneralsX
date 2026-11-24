@@ -58,6 +58,7 @@ static Bool isSameHorde(const Object* obj, const Object* unit);
 #include "GameLogic/Module/RetailSiegeDocking.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/RetailWallMesh.h"
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/RetailLogicBenchmark.h"
@@ -175,6 +176,7 @@ Pathfinder::~Pathfinder()
 
 void Pathfinder::reset()
 {
+	RetailWallMesh::clearCache();
 	m_retailTrackedFootprints.clear();
 	frameToShowObstacles = 0;
 	DEBUG_LOG(("Pathfind cell is %d bytes, PathfindCellInfo is %d bytes", sizeof(PathfindCell), sizeof(PathfindCellInfo)));
@@ -251,10 +253,25 @@ void Pathfinder::reset()
 /**
  * Adds a piece of a wall.
  */
+static Bool isInactiveAuthoredWall(const Object* object)
+{
+	if (!object || !object->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL) || !object->isEffectivelyDead())
+		return FALSE;
+	const auto* geometry = RetailWallMesh::forObject(*object);
+	if (!geometry || (geometry->wall.empty() && !geometry->hasRamp[0] && !geometry->hasRamp[1]))
+		return FALSE;
+	static const NameKeyType inactiveBody = NAMEKEY("InactiveBody");
+	for (BehaviorModule** module = object->getBehaviorModules(); module && *module; ++module)
+		if ((*module)->getModuleNameKey() == inactiveBody && (*module)->getBody() == object->getBodyModule())
+			return TRUE;
+	return FALSE;
+}
+
 static Bool isRetailWalkableWall(const Object* object)
 {
 	return object->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL) && !object->isDestroyed() &&
-		!object->isEffectivelyDead() && !object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
+		(!object->isEffectivelyDead() || isInactiveAuthoredWall(object)) &&
+		!object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION);
 }
 
 void Pathfinder::refreshRetailWallLayer()
@@ -363,6 +380,14 @@ Real Pathfinder::getWallHeightAt(const Coord3D& position)
 		for (ObjectID id : m_retailWallPieces)
 		{
 			const Object* wall = TheGameLogic->findObjectByID(id);
+			const auto* authored = wall ? RetailWallMesh::forObject(*wall) : nullptr;
+			if (authored && !authored->wall.empty() && RetailWallMesh::contains(*authored, position))
+			{
+				if (!found || authored->wallHeight > height)
+					height = authored->wallHeight;
+				found = TRUE;
+				continue;
+			}
 			if (!SiegeDockingBehavior::find(wall) || !m_layers[LAYER_WALL].isPointOnWall(&id, 1, &position))
 				continue;
 			const Real top = wall->getPosition()->z + wall->getGeometryInfo().getMaxHeightAbovePosition();
@@ -585,7 +610,7 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 		else if (obj->isDestroyed() || obj->isEffectivelyDead())
 			removeWallPiece(obj);
 	}
-	if (insert && retail && obj->isEffectivelyDead() &&
+	if (insert && retail && obj->isEffectivelyDead() && !isInactiveAuthoredWall(obj) &&
 		(obj->isKindOf(KINDOF_WALL_SEGMENT) || obj->isKindOf(KINDOF_WALL_GATE) ||
 		 obj->isKindOf(KINDOF_WALL_HUB) || obj->isKindOf(KINDOF_DEFENSIVE_WALL) ||
 		 obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)))
@@ -626,7 +651,7 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 		removeUnitFromPathfindMap(obj);
 		if (obj->isKindOf(KINDOF_WALK_ON_TOP_OF_WALL)) {
 			const Bool checkFalling = retail
-				? !obj->isDestroyed() && obj->isEffectivelyDead() && !(TheGameState && TheGameState->isInLoadGame())
+				? !obj->isDestroyed() && obj->isEffectivelyDead() && !isInactiveAuthoredWall(obj) && !(TheGameState && TheGameState->isInLoadGame())
 				: !m_layers[LAYER_WALL].isUnused();
 			if (checkFalling) {
 				Int i;
