@@ -238,6 +238,7 @@ def check_shell_load():
     global game
     wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
     time.sleep(2)
+    wait_for("the game window can be positioned for input", move_game_to_origin)
     click(512, 520)
     wait_for("empty Load page opens", lambda: pixel(145, 130) == 0x233A48, 5)
     capture("empty-load", 122, 110, 780, 548)
@@ -292,6 +293,7 @@ def check_shell_load():
     wait_for("restarting the game opens the main menu",
              lambda: log_count("Shell::doPush() completed successfully") > shell_opens, 100)
     time.sleep(2)
+    wait_for("the restarted game window can be positioned for input", move_game_to_origin)
     click(512, 520)
     wait_for("main menu opens the saved games list", lambda: pixel(145, 130) == 0x233A48)
     before = title_signature(635, 246, 245, 220)
@@ -435,6 +437,7 @@ def check_options(restarted=False):
     time.sleep(2)
     wait_for("the game window can be positioned for input", move_game_to_origin)
     if restarted:
+        key(0xFF52)
         key(0xFF52)
         wait_for("the Settings entry receives keyboard focus",
                  lambda: 0xC8AE77 in title_signature(412, 442, 200, 48))
