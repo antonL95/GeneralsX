@@ -26,6 +26,7 @@
 #include "GameLogic/Pathfinder/PathfindLayer.h"
 #include "GameLogic/Pathfinder/PathfindZoneManager.h"
 #include "GameLogic/TerrainLogic.h"
+#include <cmath>
 
 PathfindLayer::PathfindLayer() : m_blockOfMapCells(nullptr), m_layerCells(nullptr), m_bridge(nullptr),
 m_destroyed(FALSE),
@@ -635,9 +636,34 @@ void PathfindLayer::classifyLayerMapCell( Int i, Int j , PathfindCell *cell, Bri
 			}
 			if (m_bridge->isCellEntryPoint(&cellBounds)) {
 				cell->setType(PathfindCell::CELL_CLEAR);
-				cell->setConnectLayer(LAYER_GROUND);
-				PathfindCell *groundCell = TheAI->pathfinder()->getCell(LAYER_GROUND, i, j );
-				groundCell->setConnectLayer(cell->getLayer());
+				PathfindLayerEnum target = LAYER_GROUND;
+				if (m_bridge->getAuthoredRampIndex() >= 0)
+				{
+					const BridgeInfo* info = m_bridge->peekBridgeInfo();
+					Coord3D center = {(topLeftCorner.x + bottomRightCorner.x) * 0.5f,
+						(topLeftCorner.y + bottomRightCorner.y) * 0.5f, 0.0f};
+					const Real fromX = center.x - info->from.x, fromY = center.y - info->from.y;
+					const Real toX = center.x - info->to.x, toY = center.y - info->to.y;
+					const Coord3D& endpoint = fromX * fromX + fromY * fromY <= toX * toX + toY * toY ? info->from : info->to;
+					PathfindCell* wallCell = TheAI->pathfinder()->getCell(LAYER_WALL, i, j);
+					const Real wallHeight = TheAI->pathfinder()->getWallHeightAt(center);
+					if (wallCell && wallCell->getLayer() == LAYER_WALL && std::fabs(wallHeight - endpoint.z) < 15.0f)
+					{
+						target = LAYER_WALL;
+						wallCell->setType(PathfindCell::CELL_CLEAR);
+					}
+					else if (std::fabs(TheTerrainLogic->getGroundHeight(endpoint.x, endpoint.y) - endpoint.z) >= 15.0f)
+						target = LAYER_INVALID;
+				}
+				if (target != LAYER_INVALID)
+				{
+					PathfindCell* other = TheAI->pathfinder()->getCell(target, i, j);
+					if (other && other->getLayer() == target)
+					{
+						cell->setConnectLayer(target);
+						other->setConnectLayer(cell->getLayer());
+					}
+				}
 			}
 		}
 #endif

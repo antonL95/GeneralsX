@@ -55,6 +55,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/RetailWallMesh.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/Scripts.h"
@@ -324,6 +325,16 @@ m_bridgeInfo(theInfo)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+Bridge::Bridge(const BridgeInfo& info, Int authoredRampIndex) :
+	m_next(nullptr), m_bridgeInfo(info), m_layer(LAYER_INVALID), m_authoredRampIndex(authoredRampIndex)
+{
+	m_bounds.lo = m_bridgeInfo.fromLeft.asCoord2D();
+	m_bounds.hi = m_bounds.lo;
+	m_bounds.uniteWith(m_bridgeInfo.fromRight.asCoord2D());
+	m_bounds.uniteWith(m_bridgeInfo.toLeft.asCoord2D());
+	m_bounds.uniteWith(m_bridgeInfo.toRight.asCoord2D());
+}
+
 Bridge::Bridge(Object *bridgeObj)
 {
 
@@ -1544,6 +1555,70 @@ void TerrainLogic::addLandmarkBridgeToLogic(Object *bridgeObj)
 	}
 }
 
+void TerrainLogic::syncAuthoredRamps(Object* object)
+{
+	const auto* geometry = RetailWallMesh::forObject(*object);
+	const auto samePoint = [](const Coord3D& a, const Coord3D& b)
+	{
+		return a.x == b.x && a.y == b.y && a.z == b.z;
+	};
+	for (Int i = 0; i < 2; ++i)
+	{
+		Bridge* existing = nullptr;
+		for (Bridge* bridge = m_bridgeListHead; bridge; bridge = bridge->getNext())
+			if (bridge->getAuthoredRampIndex() == i && bridge->peekBridgeInfo()->bridgeObjectID == object->getID())
+			{
+				existing = bridge;
+				break;
+			}
+		const Bool present = geometry && geometry->hasRamp[i];
+		if (existing && present)
+		{
+			const auto& ramp = geometry->ramps[i];
+			const auto* info = existing->peekBridgeInfo();
+			if (samePoint(info->fromLeft, ramp.fromLeft) && samePoint(info->fromRight, ramp.fromRight) &&
+				samePoint(info->toLeft, ramp.toLeft) && samePoint(info->toRight, ramp.toRight))
+				continue;
+		}
+		if (existing)
+			deleteBridge(existing);
+		if (!present)
+			continue;
+		const auto& ramp = geometry->ramps[i];
+		BridgeInfo info;
+		info.from = ramp.from;
+		info.to = ramp.to;
+		info.fromLeft = ramp.fromLeft;
+		info.fromRight = ramp.fromRight;
+		info.toLeft = ramp.toLeft;
+		info.toRight = ramp.toRight;
+		info.bridgeWidth = ramp.width;
+		info.bridgeObjectID = object->getID();
+		Bridge* bridge = newInstance(Bridge)(info, i);
+		const PathfindLayerEnum layer = TheAI->pathfinder()->addAuthoredRamp(bridge);
+		if (layer == LAYER_INVALID)
+		{
+			deleteInstance(bridge);
+			continue;
+		}
+		bridge->setLayer(layer);
+		bridge->setNext(m_bridgeListHead);
+		m_bridgeListHead = bridge;
+	}
+}
+
+void TerrainLogic::removeAuthoredRamps(ObjectID owner)
+{
+	Bridge* bridge = m_bridgeListHead;
+	while (bridge)
+	{
+		Bridge* next = bridge->getNext();
+		if (bridge->getAuthoredRampIndex() >= 0 && bridge->peekBridgeInfo()->bridgeObjectID == owner)
+			deleteBridge(bridge);
+		bridge = next;
+	}
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Given a name, return the associated waypoint. */
 //-------------------------------------------------------------------------------------------------
@@ -2030,6 +2105,12 @@ void TerrainLogic::deleteBridge( Bridge *bridge )
 	// delete object associated with bridge if present
 	BridgeInfo bridgeInfo;
 	bridge->getBridgeInfo( &bridgeInfo );
+	if (bridge->getAuthoredRampIndex() >= 0)
+	{
+		TheAI->pathfinder()->removeAuthoredRamp(bridge);
+		deleteInstance(bridge);
+		return;
+	}
 	TheAI->pathfinder()->changeBridgeState(bridge->getLayer(), false);
 
 	Object *bridgeObj = TheGameLogic->findObjectByID( bridgeInfo.bridgeObjectID );

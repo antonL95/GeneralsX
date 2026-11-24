@@ -173,6 +173,7 @@ public:
 public: // ctor/dtor.
 	Bridge(BridgeInfo &theInfo, Dict *props, AsciiString bridgeTemplateName);
 	Bridge(Object *bridgeObj);
+	Bridge(const BridgeInfo& info, Int authoredRampIndex);
 	//~Bridge();
 
 protected:
@@ -181,6 +182,7 @@ protected:
 	BridgeInfo				m_bridgeInfo;
 	Region2D					m_bounds; /// 2d bounds for quick screening.
 	PathfindLayerEnum	m_layer;  ///< Pathfind layer for this bridge.
+	Int m_authoredRampIndex = -1;
 
 public:
 	// should be protected, but friendly access needed (srj)
@@ -203,6 +205,7 @@ public:
 	void updateDamageState(); ///< Updates a bridge's damage info.
 	const BridgeInfo *peekBridgeInfo() const {return &m_bridgeInfo;}
 	PathfindLayerEnum getLayer() const {return m_layer;}
+	Int getAuthoredRampIndex() const { return m_authoredRampIndex; }
 	void setLayer(PathfindLayerEnum layer) {m_layer = layer;}
 	const Region2D *getBounds() const {return &m_bounds;}
 	Bool isCellOnEnd(const Region2D *cell);	 // Is pathfind cell on the sides of the bridge
@@ -299,6 +302,8 @@ public:
 
 	virtual void addBridgeToLogic(BridgeInfo *pInfo, Dict *props, AsciiString bridgeTemplateName); ///< Adds a bridge's logical info.
 	virtual void addLandmarkBridgeToLogic(Object *bridgeObj); ///< Adds a bridge's logical info.
+	void syncAuthoredRamps(Object* object);
+	void removeAuthoredRamps(ObjectID owner);
 	virtual void deleteBridge( Bridge *bridge );	///< remove a bridge
 
 	virtual void updateBridgeDamageStates(); ///< Updates bridge's damage info.

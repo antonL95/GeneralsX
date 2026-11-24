@@ -314,6 +314,25 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 		m_crusherZones[i] = i;
 		m_hierarchicalZones[i] = i;
 	}
+	for (Bridge* bridge = TheTerrainLogic->getFirstBridge(); bridge; bridge = bridge->getNext())
+	{
+		const Int layer = bridge->getLayer();
+		if (bridge->getAuthoredRampIndex() < 0 || layer <= LAYER_GROUND || layer >= LAYER_WALL)
+			continue;
+		const Region2D* bounds = bridge->getBounds();
+		const Int left = MAX(globalBounds.lo.x, REAL_TO_INT_FLOOR(bounds->lo.x / PATHFIND_CELL_SIZE_F) - 1);
+		const Int right = MIN(globalBounds.hi.x, REAL_TO_INT_CEIL(bounds->hi.x / PATHFIND_CELL_SIZE_F) + 1);
+		const Int bottom = MAX(globalBounds.lo.y, REAL_TO_INT_FLOOR(bounds->lo.y / PATHFIND_CELL_SIZE_F) - 1);
+		const Int top = MIN(globalBounds.hi.y, REAL_TO_INT_CEIL(bounds->hi.y / PATHFIND_CELL_SIZE_F) + 1);
+		for (Int x = left; x <= right; ++x)
+			for (Int y = bottom; y <= top; ++y)
+			{
+				PathfindCell* ramp = layers[layer].getCell(x, y);
+				PathfindCell* wall = layers[LAYER_WALL].getCell(x, y);
+				if (ramp && wall && ramp->getConnectLayer() == LAYER_WALL && wall->getConnectLayer() == layer)
+					ZoneBlock::resolveZones(ramp->getZone(), wall->getZone(), m_hierarchicalZones, m_maxZone);
+			}
+	}
 
 	for( j=globalBounds.lo.y; j<=globalBounds.hi.y; j++ ) {
 		for( i=globalBounds.lo.x; i<=globalBounds.hi.x; i++ ) {

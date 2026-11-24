@@ -255,6 +255,8 @@ public:
 	Bool goalPosition(Object *obj, Coord3D *pos); // Returns the goal position on the grid.
 
 	PathfindLayerEnum addBridge(Bridge *theBridge); // Adds a bridge layer, and returns the layer id.
+	PathfindLayerEnum addAuthoredRamp(Bridge* bridge);
+	void removeAuthoredRamp(Bridge* bridge);
 
 	void addWallPiece(Object *wallPiece); // Adds a wall piece.
 	void removeWallPiece(Object *wallPiece);  // Removes a wall piece.

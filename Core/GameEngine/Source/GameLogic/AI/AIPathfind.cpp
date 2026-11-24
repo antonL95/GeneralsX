@@ -277,7 +277,18 @@ static Bool isRetailWalkableWall(const Object* object)
 void Pathfinder::refreshRetailWallLayer()
 {
 	if (m_isMapReady && !(TheGameState && TheGameState->isInLoadGame()))
+	{
 		m_layers[LAYER_WALL].rebuildWallCells(m_extent, m_retailWallPieces);
+		for (Bridge* bridge = TheTerrainLogic->getFirstBridge(); bridge; bridge = bridge->getNext())
+		{
+			const Int layer = bridge->getLayer();
+			if (bridge->getAuthoredRampIndex() >= 0 && layer > LAYER_GROUND && layer < LAYER_WALL)
+			{
+				m_layers[layer].classifyCells();
+				m_zoneManager.setZoneUpdateFrame(TheGameLogic->getFrame());
+			}
+		}
+	}
 }
 
 void Pathfinder::addWallPiece(Object *wallPiece)
@@ -291,6 +302,8 @@ void Pathfinder::addWallPiece(Object *wallPiece)
 		if (pos == m_retailWallPieces.end() || *pos != id)
 			m_retailWallPieces.insert(pos, id);
 		refreshRetailWallLayer();
+		if (RetailWallMesh::forObject(*wallPiece))
+			TheTerrainLogic->syncAuthoredRamps(wallPiece);
 		return;
 	}
 	if (m_numWallPieces<MAX_WALL_PIECES-1) {
@@ -315,6 +328,7 @@ void Pathfinder::removeWallPiece(Object *wallPiece)
 		const auto pos = std::lower_bound(m_retailWallPieces.begin(), m_retailWallPieces.end(), id);
 		if (pos != m_retailWallPieces.end() && *pos == id)
 		{
+			TheTerrainLogic->removeAuthoredRamps(id);
 			m_retailWallPieces.erase(pos);
 			refreshRetailWallLayer();
 		}
@@ -432,6 +446,57 @@ PathfindLayerEnum Pathfinder::addBridge(Bridge *theBridge)
 	}
 	DEBUG_CRASH(("Ran out of bridge layers."));
 	return LAYER_GROUND;
+}
+
+PathfindLayerEnum Pathfinder::addAuthoredRamp(Bridge* bridge)
+{
+	for (Int i = LAYER_GROUND + 1; i < LAYER_WALL; ++i)
+	{
+		if (!m_layers[i].isUnused())
+			continue;
+		const auto layer = static_cast<PathfindLayerEnum>(i);
+		if (!m_layers[i].init(bridge, layer))
+			return LAYER_INVALID;
+		bridge->setLayer(layer);
+		if (m_map)
+		{
+			m_layers[i].allocateCells(&m_extent);
+			m_layers[i].classifyCells();
+			if (m_isMapReady && !(TheGameState && TheGameState->isInLoadGame()))
+				m_zoneManager.setZoneUpdateFrame(TheGameLogic->getFrame());
+		}
+		return layer;
+	}
+	return LAYER_INVALID;
+}
+
+void Pathfinder::removeAuthoredRamp(Bridge* bridge)
+{
+	const Int layer = bridge->getLayer();
+	if (layer <= LAYER_GROUND || layer >= LAYER_WALL)
+		return;
+	if (m_map)
+	{
+		const Region2D* bounds = bridge->getBounds();
+		const Int left = MAX(m_extent.lo.x, REAL_TO_INT_FLOOR(bounds->lo.x / PATHFIND_CELL_SIZE_F) - 1);
+		const Int right = MIN(m_extent.hi.x, REAL_TO_INT_CEIL(bounds->hi.x / PATHFIND_CELL_SIZE_F) + 1);
+		const Int bottom = MAX(m_extent.lo.y, REAL_TO_INT_FLOOR(bounds->lo.y / PATHFIND_CELL_SIZE_F) - 1);
+		const Int top = MIN(m_extent.hi.y, REAL_TO_INT_CEIL(bounds->hi.y / PATHFIND_CELL_SIZE_F) + 1);
+		for (Int x = left; x <= right; ++x)
+			for (Int y = bottom; y <= top; ++y)
+			{
+				PathfindCell* cell = m_layers[layer].getCell(x, y);
+				if (!cell || cell->getConnectLayer() == LAYER_INVALID)
+					continue;
+				const Int target = cell->getConnectLayer();
+				PathfindCell* other = target == LAYER_GROUND ? &m_map[x][y] : m_layers[target].getCell(x, y);
+				if (other && other->getConnectLayer() == layer)
+					other->setConnectLayer(LAYER_INVALID);
+			}
+	}
+	m_layers[layer].reset();
+	if (m_isMapReady && !(TheGameState && TheGameState->isInLoadGame()))
+		m_zoneManager.setZoneUpdateFrame(TheGameLogic->getFrame());
 }
 
 /**
