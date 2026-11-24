@@ -71,22 +71,28 @@ def check(log):
         raise RuntimeError("The wall hub should remain visible until its authored slow-death cleanup")
 
     siege_cases = (
-        ("GondorFarm", "GondorTrebuchetRockWarheadFlaming", "gbngran_d3", "USER_10"),
-        ("MordorTrollCage", "MordorCatapultRockWarhead", "mbtrollpit_d3", None),
+        ("GondorFarm", "GondorTrebuchetRockWarheadFlaming", "gbngran_d3", "USER_10", 105),
+        ("MordorTrollCage", "MordorCatapultRockWarhead", "mbtrollpit_d3", None, 72),
     )
-    for actor, weapon, rubble_model, level_flag in siege_cases:
+    for actor, weapon, rubble_model, level_flag, visible_frames in siege_cases:
         lethal = re.search(rf"^TEST damage frame=(\d+) weapon={weapon} .* victim=\d+\({actor}\) "
                            r".* health=[\d.]+->0\.00$", log, re.MULTILINE)
         if not lethal:
             raise RuntimeError(f"{actor} did not die to its siege projectile")
         kill = int(lethal[1])
-        rubble = [(int(frame), model, float(pose), flags.split(","), meshes)
-                  for frame, _, name, model, pose, _, flags, meshes in draws
-                  if name == actor and int(frame) > kill]
-        if (not rubble or not any(pose > 0 for _, _, pose, _, _ in rubble)
-                or any(model != rubble_model or "RUBBLE" not in flags or ":shown" not in meshes
-                       or (level_flag and level_flag not in flags)
-                       for _, model, _, flags, meshes in rubble)):
+        samples = {int(frame): (actor_id, model, float(pose), flags.split(","), meshes)
+                   for frame, actor_id, name, model, pose, _, flags, meshes in draws if name == actor}
+        last = kill + visible_frames
+        if kill not in samples or max(samples) != last:
+            raise RuntimeError(f"{actor} did not draw at impact {kill} and finish at {last}")
+        drawable = samples[kill][0]
+        for frame in range(kill + 1, last + 1):
+            sample = samples.get(frame)
+            if (not sample or sample[:2] != (drawable, rubble_model)
+                    or "RUBBLE" not in sample[3] or ":shown" not in sample[4]
+                    or (level_flag and level_flag not in sample[3])):
+                raise RuntimeError(f"{actor} lost its rubble model at frame {frame}: {sample}")
+        if not any(samples[frame][2] > 0 for frame in range(kill + 1, last + 1)):
             raise RuntimeError(f"{actor} failed to draw its animated rubble after impact at {kill}")
         if not any(name == actor and phase == "FINAL" and int(frame) > kill
                    for frame, name, phase, _, _, _ in phases):
