@@ -1159,8 +1159,6 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		}
 		else
 		{
-			if (!isProjectileDetonation && !suspended && m_fxTrigger.isNotEmpty() && !m_fxTrigger.isNone())
-				sourceObj->getDrawable()->handleWeaponFXTrigger(m_fxTrigger);
 			const AIUpdateInterface* ai = sourceObj->getAIUpdateInterface();
 			const Bool rotatingFX = RetailFileLayers::enabled() && m_rotatingTurret && fx && !isProjectileDetonation &&
 				ai && ai->getWhichTurretForWeaponSlot(wslot, nullptr, nullptr) != TURRET_INVALID;
@@ -1957,7 +1955,8 @@ void WeaponStore::update()
 				Object* victim = TheGameLogic->findObjectByID(ddi->m_delayIntendedVictimID);
 				if (victim && !victim->isDestroyed() && (!victim->isEffectivelyDead() || nugget.m_onlyWhenJustDied))
 					if (PhysicsBehavior* physics = victim->getPhysics())
-						physics->launchFromImpact(ddi->m_metaImpactDirection, ddi->m_metaImpactAmount, nugget.m_shockWaveZMult);
+						physics->launchFromWeaponImpact(ddi->m_metaImpactDirection, ddi->m_metaImpactAmount,
+							nugget.m_shockWaveZMult, ddi->m_launchTrigger);
 			}
 			else if (ddi->m_nuggetIndex >= 0)
 				ddi->m_delayedWeapon->dealNuggetDamage(ddi->m_nuggetIndex, ddi->m_delaySourceID, ddi->m_delayIntendedVictimID,
@@ -2037,7 +2036,7 @@ void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* 
 }
 
 void WeaponStore::setDelayedMetaImpact(const WeaponTemplate* weapon, Int index, UnsignedInt frame, ObjectID victimID,
-	const Coord3D& direction, Real amount)
+	const Coord3D& direction, Real amount, RetailDamageFXTrigger trigger)
 {
 	WeaponDelayedDamageInfo& hit = m_weaponDDI.emplace_back();
 	hit.m_delayedWeapon = weapon;
@@ -2046,7 +2045,7 @@ void WeaponStore::setDelayedMetaImpact(const WeaponTemplate* weapon, Int index, 
 	hit.m_delaySourceID = INVALID_ID;
 	hit.m_delayIntendedVictimID = victimID;
 	hit.m_nuggetIndex = index;
-	hit.m_launchTrigger = RETAIL_DAMAGE_FX_NONE;
+	hit.m_launchTrigger = trigger;
 	hit.m_metaImpactDirection = direction;
 	hit.m_metaImpactAmount = amount;
 }

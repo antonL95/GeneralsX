@@ -50,6 +50,7 @@
 #include "Common/GameLOD.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/Damage.h"
 #include "GameClient/ClientRandomValue.h"
 #include "GameClient/FXList.h"
 #include "GameClient/Shadow.h"
@@ -3144,8 +3145,11 @@ void W3DModelDraw::recalcBonesForClientParticleSystems()
 			{
 				for (std::vector<ParticleSysBoneInfo>::const_iterator it = m_curState->m_particleSysBones.begin(); it != m_curState->m_particleSysBones.end(); ++it)
 				{
-					if (it->fxTrigger.isNotEmpty() && !it->fxTrigger.isNone())
+#if !RTS_GENERALS
+					if (it->fxTrigger.isNotEmpty() && !it->fxTrigger.isNone() &&
+						it->fxTrigger.compareNoCase(RetailDamageFXTriggerNames[drawable->getRetailImpactFXTrigger()]) != 0)
 						continue;
+#endif
 					ParticleSystem *sys = TheParticleSystemManager->createParticleSystem(it->particleSystemTemplate);
 					if (sys != nullptr)
 					{
@@ -4687,31 +4691,6 @@ Int W3DModelDraw::getBarrelCount(WeaponSlotType wslot) const
 }
 
 //-------------------------------------------------------------------------------------------------
-#if !RTS_GENERALS
-void W3DModelDraw::handleWeaponFXTrigger(const AsciiString& trigger)
-{
-	const Drawable* drawable = getDrawable();
-	const ModelConditionInfo* state = drawable ? findBestInfo(drawable->getModelConditionFlags()) : nullptr;
-	if (!state || !TheParticleSystemManager || drawable->isDrawableEffectivelyHidden() ||
-		m_fullyObscuredByShroud || drawable->testDrawableStatus(DRAWABLE_STATUS_NO_STATE_PARTICLES))
-		return;
-
-	for (const ParticleSysBoneInfo& particle : state->m_particleSysBones)
-	{
-		if (!particle.particleSystemTemplate || particle.fxTrigger.compareNoCase(trigger) != 0)
-			continue;
-
-		Matrix3D transform = *drawable->getTransformMatrix();
-		getCurrentWorldspaceClientBonePositions(particle.boneName.str(), transform);
-		if (ParticleSystem* system = TheParticleSystemManager->createParticleSystem(particle.particleSystemTemplate))
-		{
-			system->setLocalTransform(&transform);
-			system->setSaveable(FALSE);
-		}
-	}
-}
-#endif
-
 Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius, const Object* target)
 {
 	DEBUG_ASSERTCRASH(specificBarrelToUse >= 0, ("specificBarrelToUse should now always be explicit"));

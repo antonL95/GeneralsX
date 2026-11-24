@@ -4391,14 +4391,6 @@ void Drawable::reactToGeometryChange()
 	}
 }
 
-//-------------------------------------------------------------------------------------------------
-void Drawable::handleWeaponFXTrigger(const AsciiString& trigger)
-{
-	for (DrawModule** module = getDrawModules(); *module; ++module)
-		if (ObjectDrawInterface* draw = (*module)->getObjectDrawInterface())
-			draw->handleWeaponFXTrigger(trigger);
-}
-
 Bool Drawable::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, Real recoilAmount, Real recoilAngle, const Coord3D* victimPos, Real damageRadius, const Object* target)
 {
 	if (recoilAmount != 0.0f)
@@ -5639,6 +5631,13 @@ void Drawable::xfer( Xfer *xfer )
 void Drawable::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"impact-fx-trigger", [this](Xfer* block) {
+			Int trigger = m_retailImpactFXTrigger;
+			block->xferInt(&trigger);
+			if (trigger < RETAIL_DAMAGE_FX_NONE || trigger > RETAIL_DAMAGE_FX_TREBUCHET_ROCK)
+				throw SC_INVALID_DATA;
+			m_retailImpactFXTrigger = static_cast<RetailDamageFXTrigger>(trigger);
+		}, [this] { m_retailImpactFXTrigger = RETAIL_DAMAGE_FX_NONE; }},
 		{"ocl-fade", [this](Xfer* block) {
 			block->xferUnsignedInt(&m_oclFadeStartFrame);
 			block->xferUnsignedInt(&m_oclFadeFrames);

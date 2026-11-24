@@ -439,9 +439,6 @@ public:
 	virtual void setHidden(Bool h) override;
 	virtual void replaceModelConditionState(const ModelConditionFlags& c) override;
 	virtual void replaceIndicatorColor(Color color) override;
-#if !RTS_GENERALS
-	virtual void handleWeaponFXTrigger(const AsciiString& trigger) override;
-#endif
 	virtual Bool handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius, const Object* target) override;
 	virtual Int getBarrelCount(WeaponSlotType wslot) const override;
 	virtual void setSelectable(Bool selectable) override; // Change the selectability of the model.

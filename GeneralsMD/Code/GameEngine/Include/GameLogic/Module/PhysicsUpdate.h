@@ -37,6 +37,7 @@
 #include "GameLogic/Module/CollideModule.h"
 
 enum ObjectID CPP_11(: Int);
+enum RetailDamageFXTrigger : Int;
 
 enum PhysicsTurningType CPP_11(: Int)
 {
@@ -118,7 +119,8 @@ public:
 
 	void applyForce( const Coord3D *force );		///< apply a force at the object's CG
 	void applyShock( const Coord3D *force );					///< apply a shockwave force against the object's CG
-	void launchFromImpact(const Coord3D& direction, Real amount, Real zFactor, Bool ram = FALSE);
+	Bool launchFromImpact(const Coord3D& direction, Real amount, Real zFactor, Bool ram = FALSE);
+	void launchFromWeaponImpact(const Coord3D& direction, Real amount, Real zFactor, RetailDamageFXTrigger trigger);
 	Bool isInRetailImpact() const { return m_impactFlightFrames != 0 || m_impactEndFrame != 0; }
 	void applyRandomRotation();											  ///< apply a random rotation at the object's CG
 	void addVelocityTo(const Coord3D* vel) ;

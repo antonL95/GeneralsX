@@ -2332,6 +2332,10 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 	if (RetailSkirmishProbe::enabled() && body && isKindOf(KINDOF_STRUCTURE))
 		RetailSkirmishProbe::structureDamage(*this, *damageInfo);
 
+	Drawable* impactDrawable = retail ? getDrawable() : nullptr;
+	if (impactDrawable)
+		impactDrawable->setRetailImpactFXTrigger(RETAIL_DAMAGE_FX_NONE);
+
 	// Process any shockwave forces that might affect this object due to the incurred damage
 	if (damageInfo->in.m_shockWaveAmount > 0.0f && damageInfo->in.m_shockWaveRadius > 0.0f)
 	{
@@ -2367,6 +2371,8 @@ void Object::attemptDamage( DamageInfo *damageInfo )
       behavior->setStunned(true);
 
       setModelConditionState(MODELCONDITION_STUNNED_FLAILING);
+			if (impactDrawable)
+				impactDrawable->setRetailImpactFXTrigger(damageInfo->retailFXTrigger);
 		}
 	}
 

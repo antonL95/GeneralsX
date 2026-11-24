@@ -715,8 +715,12 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 		if (nugget.m_delayFrames == 0)
 			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit, &velocity, launchTrigger, launchWeapon);
 		else if (RetailFileLayers::enabled() && TheWeaponStore && nugget.m_type == WEAPON_NUGGET_META_IMPACT)
+		{
+			const RetailDamageFXTrigger warheadTrigger = damageFXTrigger(m_fxTrigger);
 			applyMetaImpactNugget(static_cast<Int>(index), attacker, TheGameLogic->findObjectByID(victimID), *pos,
-				bonus, TheGameLogic->getFrame() + nugget.m_delayFrames);
+				bonus, TheGameLogic->getFrame() + nugget.m_delayFrames,
+				warheadTrigger != RETAIL_DAMAGE_FX_NONE ? warheadTrigger : launchTrigger);
+		}
 		else if (TheWeaponStore)
 			TheWeaponStore->setDelayedDamage(this, pos, TheGameLogic->getFrame() + nugget.m_delayFrames, nuggetSourceID, victimID,
 				bonus, static_cast<Int>(index), FALSE, contactHit, launchTrigger, &velocity, launchWeapon);
@@ -724,7 +728,7 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 }
 
 void WeaponTemplate::applyMetaImpactNugget(Int nuggetIndex, const Object* source, Object* primaryVictim,
-	const Coord3D& pos, const WeaponBonus& bonus, UnsignedInt impactFrame) const
+	const Coord3D& pos, const WeaponBonus& bonus, UnsignedInt impactFrame, RetailDamageFXTrigger trigger) const
 {
 	const WeaponNugget& nugget = m_nuggets[nuggetIndex];
 	const Real radius = nugget.m_shockWaveRadius * bonus.getField(WeaponBonus::RADIUS);
@@ -772,9 +776,9 @@ void WeaponTemplate::applyMetaImpactNugget(Int nuggetIndex, const Object* source
 			direction.y = -direction.y;
 		}
 		if (impactFrame)
-			TheWeaponStore->setDelayedMetaImpact(this, nuggetIndex, impactFrame, victim->getID(), direction, amount);
+			TheWeaponStore->setDelayedMetaImpact(this, nuggetIndex, impactFrame, victim->getID(), direction, amount, trigger);
 		else
-			physics->launchFromImpact(direction, amount, nugget.m_shockWaveZMult);
+			physics->launchFromWeaponImpact(direction, amount, nugget.m_shockWaveZMult, trigger);
 	};
 	if (iter)
 	{
@@ -906,13 +910,14 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		return;
 	}
 
+	const RetailDamageFXTrigger warheadTrigger = damageFXTrigger(m_fxTrigger);
+	const RetailDamageFXTrigger trigger = warheadTrigger != RETAIL_DAMAGE_FX_NONE ? warheadTrigger : launchTrigger;
 	if (nugget.m_type == WEAPON_NUGGET_META_IMPACT)
 	{
-		applyMetaImpactNugget(nuggetIndex, source, primaryVictim, *pos, bonus, 0);
+		applyMetaImpactNugget(nuggetIndex, source, primaryVictim, *pos, bonus, 0, trigger);
 		return;
 	}
 
-	const RetailDamageFXTrigger warheadTrigger = damageFXTrigger(m_fxTrigger);
 	const auto damage = [&](Object* victim, Bool killSelf)
 	{
 		const Real scalar = nugget.scalarFor(source, victim);
@@ -926,7 +931,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damageInfo.in.m_sourceID = sourceID;
 		damageInfo.in.m_sourcePlayerMask = source && source->getControllingPlayer() ? source->getControllingPlayer()->getPlayerMask() : 0;
 		damageInfo.in.m_amount = amount;
-		damageInfo.retailFXTrigger = warheadTrigger != RETAIL_DAMAGE_FX_NONE ? warheadTrigger : launchTrigger;
+		damageInfo.retailFXTrigger = trigger;
 		if (RetailFileLayers::enabled())
 			damageInfo.retailWeaponName = launchWeapon ? launchWeapon->m_name : m_name;
 		damageInfo.shouldPlayUnderAttackEvaEvent = m_shouldPlayUnderAttackEvaEvent;

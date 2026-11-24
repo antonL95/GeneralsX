@@ -37,6 +37,7 @@
 #include "Common/RotwkDuration.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
+#include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
@@ -1149,14 +1150,14 @@ void PhysicsBehavior::addVelocityTo( const Coord3D *vel)
 		m_vel.add( *vel );
 }
 
-void PhysicsBehavior::launchFromImpact(const Coord3D& direction, Real amount, Real zFactor, Bool ram)
+Bool PhysicsBehavior::launchFromImpact(const Coord3D& direction, Real amount, Real zFactor, Bool ram)
 {
 	if (!RetailFileLayers::enabled())
-		return;
+		return FALSE;
 	Object* victim = getObject();
 	amount *= std::clamp(1.0f - AttributeModifiers::value(victim, AttributeModifierRules::RESIST_KNOCKBACK), 0.0f, 2.0f);
 	if (!(amount > 0.0f) || victim->isKindOf(KINDOF_IMMOBILE) || victim->isAirborneTarget())
-		return;
+		return FALSE;
 
 	const Real baseGravity = std::abs(TheGlobalData->m_gravity);
 	const Real gravity = baseGravity * getPhysicsBehaviorModuleData()->m_gravityMult;
@@ -1189,6 +1190,14 @@ void PhysicsBehavior::launchFromImpact(const Coord3D& direction, Real amount, Re
 			TheGameLogic->getFrame(), unsigned(victim->getID()), m_vel.x, m_vel.y, m_vel.z);
 		std::fflush(stderr);
 	}
+	return TRUE;
+}
+
+void PhysicsBehavior::launchFromWeaponImpact(const Coord3D& direction, Real amount, Real zFactor, RetailDamageFXTrigger trigger)
+{
+	const Bool launched = launchFromImpact(direction, amount, zFactor);
+	if (Drawable* drawable = getObject()->getDrawable())
+		drawable->setRetailImpactFXTrigger(launched ? trigger : RETAIL_DAMAGE_FX_NONE);
 }
 
 void PhysicsBehavior::finishImpactFlight()

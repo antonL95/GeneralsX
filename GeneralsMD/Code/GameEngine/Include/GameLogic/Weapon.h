@@ -547,7 +547,7 @@ protected:
 	static const Object* getNuggetAttacker(const Object* source);
 	void dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus, Bool contactHit) const;
 	void applyMetaImpactNugget(Int index, const Object* source, Object* primaryVictim, const Coord3D& pos,
-		const WeaponBonus& bonus, UnsignedInt impactFrame) const;
+		const WeaponBonus& bonus, UnsignedInt impactFrame, RetailDamageFXTrigger trigger) const;
 	void applyModifierNugget(const WeaponNugget& nugget, const Object* attacker, ObjectID victimID, const Coord3D* pos) const;
 	void orderNuggetSlaves(const Object* source, Object* victim, const Coord3D* position) const;
 	void orderNuggetHorde(const Object* source, Object* victim, const Coord3D* position) const;
@@ -1038,7 +1038,7 @@ protected:
 		RetailDamageFXTrigger launchTrigger = RETAIL_DAMAGE_FX_NONE, const Coord3D* impactVelocity = nullptr,
 		const WeaponTemplate* launchWeapon = nullptr);
 	void setDelayedMetaImpact(const WeaponTemplate* weapon, Int index, UnsignedInt frame, ObjectID victimID,
-		const Coord3D& direction, Real amount);
+		const Coord3D& direction, Real amount, RetailDamageFXTrigger trigger);
 
 private:
 

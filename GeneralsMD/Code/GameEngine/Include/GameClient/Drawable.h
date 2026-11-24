@@ -58,6 +58,7 @@ class Anim2DTemplate;
 class Image;
 class DynamicAudioEventInfo;
 enum BodyDamageType CPP_11(: Int);
+enum RetailDamageFXTrigger : Int;
 
 // this is a very worthwhile performance win. left conditionally defined for now, just
 // in case, but probably should be made permanent soon. (srj)
@@ -449,7 +450,8 @@ public:
 	void clearAndSetModelConditionFlags( const ModelConditionFlags& clr, const ModelConditionFlags& set );
 	void replaceModelConditionFlags( const ModelConditionFlags &flags, Bool forceReplace = FALSE );
 
-	void handleWeaponFXTrigger(const AsciiString& trigger);
+	void setRetailImpactFXTrigger(RetailDamageFXTrigger trigger) { m_retailImpactFXTrigger = trigger; }
+	RetailDamageFXTrigger getRetailImpactFXTrigger() const { return m_retailImpactFXTrigger; }
 	Bool handleWeaponFireFX(
 							WeaponSlotType wslot,
 							Int specificBarrelToUse,
@@ -767,6 +769,7 @@ private:
 	DrawableInfo				m_drawableInfo;		///< structure pointed to by W3D render objects so they know which drawable they belong to.
 
 	UnsignedInt m_retailHitReactionRestart = 0;
+	RetailDamageFXTrigger m_retailImpactFXTrigger{};
 	ModelConditionFlags	m_conditionState;				///< The Drawables current behavior state
 	Real								m_lastConstructDisplayed;						///< last construct percent used to make the string
 	DisplayString*			m_constructDisplayString;  ///< string to display construction % complete
