@@ -1,0 +1,47 @@
+216 create Player_1 Pkg28SavedTower 0 1490,230,0
+217 objupgrade Player_1 Pkg28SavedTower 0 Pkg28Enable
+222 create Player_1 Pkg28Tower 0 1490,130,90
+223 objupgrade Player_1 Pkg28Tower 0 Pkg28Obsolete
+224 pkg28-observe Player_1 Pkg28Tower 0
+226 grant Player_1 - 0 Pkg28Preowned
+228 create Player_1 Pkg28Control 0 1560,230,90
+235 pkg28-observe Player_1 Pkg28Control 0
+240 objupgrade Player_1 Pkg28Tower 0 Pkg28Enable
+243 pkg28-observe Player_1 Pkg28SavedTower 0
+243 pkg28-observe Player_1 Pkg28Tower 0
+245 pkg28-observe Player_1 Pkg28SavedTower 0
+246 pkg28-remove Player_1 Pkg28SavedTower 0 Pkg28Enable
+248 pkg28-observe Player_1 Pkg28SavedTower 0
+251 pkg28-observe Player_1 Pkg28Tower 0
+257 pkg28-observe Player_1 Pkg28Tower 0
+260 create Player_1 Pkg28ShortFade 0 1560,130,90
+268 pkg28-observe Player_1 Pkg28Tower 0
+269 objupgrade Player_1 Pkg28Control 0 Pkg28Obsolete
+270 objupgrade Player_1 Pkg28Tower 0 Pkg28Enable
+270 pkg28-observe Player_1 Pkg28ShortFade 0
+270 pkg28-observe Player_1 Pkg28Control 0
+271 objupgrade Player_1 Pkg28Control 0 Pkg28Enable
+272 pkg28-observe Player_1 Pkg28Tower 0
+279 pkg28-observe Player_1 Pkg28Control 0
+286 pkg28-observe Player_1 Pkg28Tower 0
+290 pkg28-remove Player_1 Pkg28Tower 0 Pkg28Enable
+292 pkg28-observe Player_1 Pkg28Tower 0
+304 pkg28-observe Player_1 Pkg28Tower 0
+324 pkg28-observe Player_1 Pkg28Tower 0
+325 objupgrade Player_1 Pkg28Tower 0 Pkg28Enable
+344 pkg28-sell Player_1 Pkg28Control 0
+347 pkg28-observe Player_1 Pkg28Control 0
+355 pkg28-observe Player_1 Pkg28Tower 0
+359 pkg28-sell Player_1 Pkg28Tower 0
+360 create Player_1 Pkg28OrcPit 0 1500,355,0
+360 create Player_1 Pkg28Wall 0 1640,230,0
+361 pkg28-observe Player_1 Pkg28Tower 0
+365 objupgrade Player_1 Pkg28OrcPit 0 Upgrade_MordorOrcPitLevel3
+365 objupgrade Player_1 Pkg28Wall 0 Upgrade_TrebuchetTurret
+379 pkg28-observe Player_1 Pkg28OrcPit 0
+379 pkg28-observe Player_1 Pkg28Wall 0
+380 pkg28-remove Player_1 Pkg28OrcPit 0 Upgrade_MordorOrcPitLevel3
+380 pkg28-remove Player_1 Pkg28Wall 0 Upgrade_TrebuchetTurret
+382 pkg28-observe Player_1 Pkg28OrcPit 0
+382 pkg28-observe Player_1 Pkg28Wall 0
+750 pkg28-observe Player_1 Pkg28Wall 0

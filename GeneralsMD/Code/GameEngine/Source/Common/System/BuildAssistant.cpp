@@ -59,6 +59,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/GeometryUpgrade.h"
+#include "GameLogic/Module/ObjectCreationUpgrade.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
 #include "GameLogic/HeroRoster.h"
@@ -1758,6 +1759,7 @@ void BuildAssistant::sellObject( Object *obj )
 	//
 	obj->setStatus( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_SOLD, OBJECT_STATUS_UNSELECTABLE ) );
 #endif
+	RetailObjectCreationUpgrade::onProducerSold(obj);
 
 	//
 	// set the animation durations so that the regular build up loop animations can be

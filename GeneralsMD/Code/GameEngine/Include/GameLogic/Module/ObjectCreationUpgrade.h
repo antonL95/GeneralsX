@@ -30,6 +30,7 @@
 #pragma once
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
+#include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/UpgradeModule.h"
 #include "GameLogic/Module/UpdateModule.h"
 
@@ -50,12 +51,15 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 
 	const ObjectCreationList *m_ocl;			///< the object creation list to make
+	AsciiString m_removeUpgrade;
 	AsciiString m_grantUpgrade;
 	UnsignedInt m_delay = 0;
-	UnsignedInt m_fadeInFrames = 0;
+	UnsignedInt m_fadeInMsecs = 0;
 	AsciiString m_spawnTemplate;
 	Coord3D m_spawnOffset{0, 0, 0};
+	Real m_spawnAngle = 0.0f;
 	Bool m_destroyWhenSold = FALSE;
+	SpecialPowerAnimation m_deathAnimation;
 
 };
 
@@ -72,10 +76,13 @@ public:
 	Bool resetUpgrade(const UpgradeMaskType& mask) override;
 	void onDelete() override;
 	void onCapture(Player* oldOwner, Player* newOwner) override;
+	static void onProducerSold(Object* producer);
 	Bool getSpawnDeckHeight(ObjectID child, Real& height) const;
 	Object* getSlavedSpawn() const;
 
 private:
+	friend class SlaveWatcherBehavior;
+	void destroySpawn(Bool selling);
 	void upgradeImplementation() override;
 	void getUpgradeActivationMasks(UpgradeMaskType& activation, UpgradeMaskType& conflicting) const override;
 	void performUpgradeFX() override;
@@ -105,8 +112,15 @@ class SlaveWatcherBehavior final : public BehaviorModule
 public:
 	SlaveWatcherBehavior(Thing* thing, const ModuleData* data);
 	static Int getInterfaceMask() { return 0; }
-	void onSpawnGone();
+	ObjectID getWatchedSpawn() const { return m_watchedSpawn; }
+	void onSpawnCreated(Object& child);
+	void onSpawnGone(ObjectID child);
 	void shareUpgrades(Object& child) const;
+
+private:
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+	ObjectID m_watchedSpawn = INVALID_ID;
+	Bool m_restoreLegacySpawn = FALSE;
 };
 
 //-------------------------------------------------------------------------------------------------
