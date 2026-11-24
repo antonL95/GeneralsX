@@ -37,9 +37,9 @@
 293 pkg49-select-voice Player_1 CreateAHero 0
 294 objupgrade Player_1 CreateAHero 0 Upgrade_CreateAHero_SubClass_0
 294 pkg49-select-voice Player_1 CreateAHero 0
-299 create Player_1 Pkg49RestlessAlways 0 2250,842,0
-299 create Player_1 Pkg49RestlessNever 0 2258,842,0
-300 create Player_1 GuldurRestlessWarrior 0 2266,842,0
+299 create Player_1 Pkg49RestlessAlways 0 105,500,0
+299 create Player_1 Pkg49RestlessNever 0 113,500,0
+300 create Player_1 GuldurRestlessWarrior 0 121,500,0
 302 pkg49-select-voice Player_1 Pkg49MarineVoiceControl 0 Player_1:Pkg49RestlessNever:0
 303 pkg49-select-voice Player_1 Pkg49MarineVoiceControl 0 Player_1:Pkg49RestlessAlways:0
 304 pkg49-select-voice Player_1 Pkg49MarineVoiceControl 0 Player_1:GuldurRestlessWarrior:0
@@ -49,7 +49,7 @@
 317 create PlyrCivilian RingHeroFrodo 0 2258,850,0
 324 pkg49-alliance - - 0 off
 327 kill Player_1 RingHeroFrodo 0
-298 create Player_1 Pkg49MarineVoiceControl 0 2245,865,0
+298 create Player_1 Pkg49MarineVoiceControl 0 100,523,0
 390 create Player_1 Pkg49CitadelDeath 0 2440,975,0
 398 objupgrade Player_1 Pkg49CitadelDeath 0 Upgrade_MenFortressHouseOfHealing
 408 kill Player_1 Pkg49CitadelDeath 0
