@@ -44,6 +44,7 @@
 // Includes
 #include "Lib/BaseType.h"
 #include "Common/STLTypedefs.h"
+#include <memory>
 #include "Common/SubsystemInterface.h"
 
 
@@ -397,7 +398,14 @@ class AudioManager : public SubsystemInterface
 		Bool m_disallowSpeech			: 1;
 		Bool m_traceEnabled = FALSE;
 		Bool m_headlessVirtualPlayback = FALSE;
-		std::map<AudioHandle, std::vector<AudioHandle>> m_multiAudioHandles;
+		struct MultiAudioGroup
+		{
+			std::vector<AudioHandle> children;
+			std::shared_ptr<AudioEventRTS> event;
+			Bool loop = FALSE;
+		};
+		std::vector<AudioHandle> startMultiAudioChildren(const AudioEventRTS *source, const std::vector<AsciiString>& names, Bool loop);
+		std::map<AudioHandle, MultiAudioGroup> m_multiAudioHandles;
 };
 
 extern AudioManager *TheAudio;

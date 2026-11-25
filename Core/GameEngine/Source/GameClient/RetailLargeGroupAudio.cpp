@@ -285,7 +285,8 @@ void trace(const AsciiString& group, const Sound& sound, const char* kind, CellI
 void queueEvent(Loop& loop, const AsciiString& event, Int playerIndex)
 {
 	std::vector<AsciiString> events;
-	if (!RetailLargeGroupAudio::expandMultiSound(event, events))
+	Bool playlist = FALSE;
+	if (!RetailLargeGroupAudio::expandMultiSound(event, events, playlist))
 		events.push_back(event);
 	for (const AsciiString& child : events) {
 		AudioEventRTS audio(child, &loop.emitter->position);
@@ -615,10 +616,12 @@ AsciiString chooseMultiSoundTrack(const AsciiString& event)
 	}
 }
 
-Bool expandMultiSound(const AsciiString& name, std::vector<AsciiString>& events)
+Bool expandMultiSound(const AsciiString& name, std::vector<AsciiString>& events, Bool& loop)
 {
-	if (multiSounds.find(lower(name)) == multiSounds.end())
+	const auto top = multiSounds.find(lower(name));
+	if (top == multiSounds.end())
 		return FALSE;
+	loop = top->second.loop;
 	std::vector<AsciiString> parents;
 	const auto expand = [&](const auto& self, const AsciiString& event) -> void {
 		const AsciiString key = lower(event);

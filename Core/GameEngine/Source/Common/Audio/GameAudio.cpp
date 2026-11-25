@@ -292,16 +292,43 @@ void AudioManager::reset()
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<AudioHandle> AudioManager::startMultiAudioChildren(const AudioEventRTS *source, const std::vector<AsciiString>& names, Bool loop)
+{
+	std::vector<AudioHandle> handles;
+	for (const AsciiString& name : names) {
+		AudioEventRTS child(*source);
+		child.setEventName(name);
+		if (loop && isValidAudioEvent(&child) && child.getAudioEventInfo()->m_soundType == AT_Music)
+			child.setPlayMusicOnce();
+		const AudioHandle handle = addAudioEvent(&child);
+		if (handle >= AHSV_FirstHandle)
+			handles.push_back(handle);
+	}
+	return handles;
+}
+
+//-------------------------------------------------------------------------------------------------
 void AudioManager::update()
 {
 	for (auto it = m_multiAudioHandles.begin(); it != m_multiAudioHandles.end();) {
+		MultiAudioGroup& group = it->second;
 		Bool playing = FALSE;
-		for (const AudioHandle child : it->second)
+		for (const AudioHandle child : group.children)
 			playing = playing || isCurrentlyPlaying(child);
-		if (playing)
+		if (playing) {
 			++it;
+			continue;
+		}
+		std::vector<AsciiString> names;
+		Bool loop = FALSE;
+		if (group.loop && RetailLargeGroupAudio::expandMultiSound(group.event->getEventName(), names, loop))
+			group.children = startMultiAudioChildren(group.event.get(), names, loop);
 		else
+			group.children.clear();
+		if (group.children.empty())
 			it = m_multiAudioHandles.erase(it);
+		else
+			++it;
 	}
 	if (!TheTacticalView)
 		return;
@@ -410,19 +437,13 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 		return AHSV_NoSound;
 	}
 	std::vector<AsciiString> children;
-	if (RetailLargeGroupAudio::expandMultiSound(eventToAdd->getEventName(), children)) {
-		std::vector<AudioHandle> handles;
-		for (const AsciiString& name : children) {
-			AudioEventRTS child(*eventToAdd);
-			child.setEventName(name);
-			const AudioHandle handle = addAudioEvent(&child);
-			if (handle >= AHSV_FirstHandle)
-				handles.push_back(handle);
-		}
+	Bool loopPlaylist = FALSE;
+	if (RetailLargeGroupAudio::expandMultiSound(eventToAdd->getEventName(), children, loopPlaylist)) {
+		std::vector<AudioHandle> handles = startMultiAudioChildren(eventToAdd, children, loopPlaylist);
 		if (handles.empty())
 			return AHSV_NoSound;
 		const AudioHandle group = allocateNewHandle();
-		m_multiAudioHandles.emplace(group, std::move(handles));
+		m_multiAudioHandles.emplace(group, MultiAudioGroup{std::move(handles), std::make_shared<AudioEventRTS>(*eventToAdd), loopPlaylist});
 		return group;
 	}
 
@@ -634,7 +655,7 @@ AsciiString AudioManager::prevTrackName(const AsciiString& currentTrack )
 void AudioManager::removeAudioEvent(AudioHandle audioEvent)
 {
 	if (const auto found = m_multiAudioHandles.find(audioEvent); found != m_multiAudioHandles.end()) {
-		const std::vector<AudioHandle> children = found->second;
+		const std::vector<AudioHandle> children = found->second.children;
 		m_multiAudioHandles.erase(found);
 		for (const AudioHandle child : children)
 			removeAudioEvent(child);
