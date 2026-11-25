@@ -92,6 +92,8 @@ constexpr DesignRect TopPlate = { 51.0f, 60.0f, 155.0f, 64.0f };
 constexpr DesignRect OptionsKey = { 70.0f, 76.0f, 31.0f, 31.0f };
 constexpr DesignRect Objectives = { 156.0f, 76.0f, 31.0f, 31.0f };
 constexpr DesignRect PlaqueArea = { 20.0f, 240.0f, 210.0f, 50.0f };
+constexpr DesignRect RankLabel = { 206.53f, 220.95f, 148.03f, 15.98f };
+constexpr DesignRect RankBar = { 256.80f, 236.58f, 51.20f, 4.48f };
 
 enum { RimNone = -1, RimOptions = 0, RimObjectives = 1 };
 Int s_rimButton = RimNone;
@@ -619,10 +621,15 @@ void ControlBar::drawRetailTexts() const
 			const Int rank = timed ? -1 : tracker->getRank();
 			Int x, y, width, height;
 			windowRect(m_retailPortrait, x, y, width, height);
-			const Int barWidth = std::max(8, width / 2);
-			const Int barHeight = std::max(4, height / 24);
-			const Int left = x + (width - barWidth) / 2;
-			const Int top = y + height * 4 / 5;
+			Int px, py, pwidth, pheight;
+			windowRect(m_retailPortrait->winGetParent(), px, py, pwidth, pheight);
+			const Real scale = pwidth / PalantirDesignWidth;
+			const Int left = px + static_cast<Int>(std::floor(RankBar.x * scale + 0.5f));
+			const Int top = py + static_cast<Int>(std::floor(RankBar.y * scale + 0.5f));
+			const Int right = px + static_cast<Int>(std::floor((RankBar.x + RankBar.width) * scale + 0.5f));
+			const Int bottom = py + static_cast<Int>(std::floor((RankBar.y + RankBar.height) * scale + 0.5f));
+			const Int barWidth = std::max(8, right - left);
+			const Int barHeight = std::max(4, bottom - top);
 			if (timed || rank < maximumRank)
 			{
 				const Real progress = timed ? remaining : tracker->getLevelProgress();
@@ -649,7 +656,11 @@ void ControlBar::drawRetailTexts() const
 				m_retailLevelLabel->setText(level);
 				m_retailLabelRank = rank;
 			}
-			drawShadowedText(m_retailLevelLabel, x, top - height / 5, width, height / 5, 2, text);
+			const Int labelX = px + static_cast<Int>(std::floor(RankLabel.x * scale + 0.5f));
+			const Int labelY = py + static_cast<Int>(std::floor(RankLabel.y * scale + 0.5f));
+			const Int labelW = std::max(1, px + static_cast<Int>(std::floor((RankLabel.x + RankLabel.width) * scale + 0.5f)) - labelX);
+			const Int labelH = std::max(1, py + static_cast<Int>(std::floor((RankLabel.y + RankLabel.height) * scale + 0.5f)) - labelY);
+			drawShadowedText(m_retailLevelLabel, labelX, labelY, labelW, labelH, 2, text);
 		}
 		else
 			drawTextWindow(m_retailSelectionName, 2, GameMakeColor(255, 255, 255, 255));
