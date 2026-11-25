@@ -8,6 +8,8 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Pathfinder/Path.h"
+#include "GameLogic/Pathfinder/PathNode.h"
 #include "WWMath/wwmath.h"
 
 namespace
@@ -21,7 +23,7 @@ Real distanceBetween(const Coord3D& a, const Coord3D& b)
 
 void probeYieldStall(const RetailTestCommands::Context& ctx)
 {
-	const Object* anchor = ctx.requireObject();
+	Object* anchor = ctx.requireObject();
 	if (!anchor)
 		return;
 
@@ -29,7 +31,7 @@ void probeYieldStall(const RetailTestCommands::Context& ctx)
 	if (std::sscanf(ctx.argument, "%f,%f", &destination.x, &destination.y) != 2)
 		return;
 
-	const AIUpdateInterface* ai = anchor->getAI();
+	AIUpdateInterface* ai = anchor->getAI();
 	const HordeContain* horde = HordeContain::get(anchor);
 	unsigned int members = 0;
 	unsigned int idleShort = 0;
@@ -56,13 +58,17 @@ void probeYieldStall(const RetailTestCommands::Context& ctx)
 		members = 1;
 		worstDestination = distanceBetween(*anchor->getPosition(), destination);
 	}
+	const PathNode* lastNode = ai && ai->getPath() ? ai->getPath()->getLastNode() : nullptr;
+	const Coord3D* pathEnd = lastNode ? lastNode->getPosition() : nullptr;
 	const Bool idle = ai && ai->isIdle();
 	if (idle && distanceBetween(*anchor->getPosition(), destination) > 40.0f)
 		idleShort = 1;
-	std::fprintf(stderr, "TEST yield-stall %u %s %s members=%u anchor=%.3f slot=%.3f far=%.3f idle=%d idleshort=%u state=%d\n",
+	std::fprintf(stderr, "TEST yield-stall %u %s %s members=%u anchor=%.3f slot=%.3f far=%.3f idle=%d idleshort=%u state=%d pos=%.1f,%.1f goal=%.1f,%.1f end=%.1f,%.1f\n",
 		ctx.frame, anchor->getTemplate()->getName().str(), ctx.argument, members,
 		distanceBetween(*anchor->getPosition(), destination), worstSlot, worstDestination,
-		static_cast<int>(idle), idleShort, ai ? static_cast<int>(ai->getCurrentStateID()) : -1);
+		static_cast<int>(idle), idleShort, ai ? static_cast<int>(ai->getCurrentStateID()) : -1,
+		anchor->getPosition()->x, anchor->getPosition()->y, ai ? ai->getGoalPosition()->x : 0.0f, ai ? ai->getGoalPosition()->y : 0.0f,
+		pathEnd ? pathEnd->x : 0.0f, pathEnd ? pathEnd->y : 0.0f);
 }
 }
 #endif

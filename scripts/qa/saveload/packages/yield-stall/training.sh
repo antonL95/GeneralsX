@@ -1,10 +1,10 @@
 prepare() {
     frame=20
     while [ "$frame" -le 700 ] && [ "$frame" -le "$end" ]; do
-        printf '%s yield-stall-probe Player_1 YieldStallCavalry 0 2500,1700\n' "$frame"
+        printf '%s yield-stall-probe Player_1 YieldStallCavalryYield 0 2500,2600\n' "$frame"
+        printf '%s yield-stall-probe Player_1 YieldStallCavalryAway 0 2500,2900\n' "$frame"
         printf '%s yield-stall-probe Player_1 YieldStallInfantry 0 2500,2000\n' "$frame"
         printf '%s yield-stall-probe Player_1 YieldStallSingle 0 2500,2300\n' "$frame"
-        printf "%s yield-stall-probe Player_1 YieldStallCavalryFree 0 2500,2600\n" "$frame"
         frame=$((frame + 5))
     done
 }
