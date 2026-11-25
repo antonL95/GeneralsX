@@ -1,24 +1,25 @@
 prepare() {
     frame=20
-    while [ "$frame" -le 400 ] && [ "$frame" -le "$end" ]; do
+    while [ "$frame" -le 700 ] && [ "$frame" -le "$end" ]; do
         printf '%s yield-stall-probe Player_1 YieldStallCavalry 0 2500,1700\n' "$frame"
         printf '%s yield-stall-probe Player_1 YieldStallInfantry 0 2500,2000\n' "$frame"
         printf '%s yield-stall-probe Player_1 YieldStallSingle 0 2500,2300\n' "$frame"
+        printf "%s yield-stall-probe Player_1 YieldStallCavalryFree 0 2500,2600\n" "$frame"
         frame=$((frame + 5))
     done
 }
 
 check() {
-    covers 400 || return 0
+    covers 700 || return 0
     awk '
-        $1 == "TEST" && $2 == "yield-stall" && $3 == 400 {
-            split($6, anchor, "="); split($7, slot, "="); split($8, far, "=")
+        $1 == "TEST" && $2 == "yield-stall" && $3 == 700 {
+            split($7, anchor, "="); split($8, slot, "="); split($9, far, "=")
             seen++
-            if (anchor[2] > 60 || slot[2] > 60 || far[2] > 140 || $10 != "idleshort=0") {
-                printf "%s stalled at frame 400: %s %s %s %s\n", $4, $6, $7, $8, $10
+            if (anchor[2] > 15 || slot[2] > 80 || far[2] > 90 || $11 != "idleshort=0") {
+                printf "%s stalled at frame 700: %s %s %s %s\n", $4, $7, $8, $9, $11
                 failed = 1
             }
         }
-        END { exit (seen != 3 || failed) }
+        END { exit (seen != 4 || failed) }
     ' "$log"
 }
