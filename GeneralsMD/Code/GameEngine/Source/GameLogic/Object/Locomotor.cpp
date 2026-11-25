@@ -1301,6 +1301,8 @@ void Locomotor::updateRetailTurnConditions(Object* obj, Real requestedTurn) cons
 	static const ModelConditionFlags turnMask = MAKE_MODELCONDITION_MASK4(MODELCONDITION_TURN_LEFT,
 		MODELCONDITION_TURN_RIGHT, MODELCONDITION_TURN_LEFT_HIGH_SPEED, MODELCONDITION_TURN_RIGHT_HIGH_SPEED);
 	ModelConditionFlags conditions;
+	if (requestedTurn != 0.0f && m_retailArcTurn != 0.0f)
+		requestedTurn = m_retailArcTurn;
 	if (requestedTurn != 0.0f && fabs(requestedTurn) > m_template->m_rotwk.turnThreshold)
 	{
 		const Real halfSpeed = 0.5f * getMaxSpeedForCondition(obj->getBodyModule()->getDamageState(), obj);

@@ -2605,6 +2605,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 						}
 						Coord3D goalPos;
 						Real onPathDistToGoal;
+						Real arcTurn = 0.0f;
 						if (!isDoingGroundMovement())
 						{
 							// airborne locomotor.  Get the goal and distance direct to the goal, don't consider obstacles.
@@ -2620,6 +2621,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							getPath()->computePointOnPath(getObject(), m_locomotorSet, *getObject()->getPosition(), info);
 							onPathDistToGoal = info.distAlongPath;
 							goalPos = info.posOnPath;
+							arcTurn = info.arcTurn;
 							if (RetailFileLayers::enabled() && getObject()->isKindOf(KINDOF_HORDE))
 							{
 								const Coord3D delta = goalPos - *getObject()->getPosition();
@@ -2666,8 +2668,10 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							}
 						}
 
+						m_curLocomotor->setRetailArcTurn(arcTurn);
 						m_curLocomotor->locoUpdate_moveTowardsPosition(getObject(), goalPos,
 							onPathDistToGoal+getPathExtraDistance(), speed, &blocked);
+						m_curLocomotor->setRetailArcTurn(0.0f);
 
 						m_doFinalPosition = FALSE;
 					}

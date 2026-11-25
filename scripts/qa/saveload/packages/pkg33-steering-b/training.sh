@@ -41,6 +41,12 @@ check() {
             if ($3 >= 127 && $3 <= 180 && previousSpeed >= threshold && speed < threshold && /accel=0 decel=1/)
                 cavBrakedAtThreshold = 1
             previousSpeed = speed
+            knightFast = /leftHS=1|rightHS=1/
+            if (knightFast && !knightWasFast)
+                knightRises++
+            if (!knightFast && knightWasFast)
+                knightFalls++
+            knightWasFast = knightFast
         }
         $1 == "TEST" && $2 == "steering" && $4 == "GondorPippin" {
             if ($3 == 238 && /left=0 right=0 leftHS=0 rightHS=0/)
@@ -54,6 +60,12 @@ check() {
             if ($3 >= 361 && $3 <= 372 && /left=0 right=1 leftHS=0 rightHS=0/)
                 rightSlow = 1
             if ($3 >= 238 && $3 <= 249) {
+                pippinFast = /leftHS=1|rightHS=1/
+                if (pippinFast && !pippinWasFast)
+                    pippinRises++
+                if (!pippinFast && pippinWasFast)
+                    pippinFalls++
+                pippinWasFast = pippinFast
                 split(substr($5, 5), position, ",")
                 split(substr($7, 6), goal, ",")
                 facing = substr($6, 8)
@@ -78,8 +90,15 @@ check() {
                 }
                 dx = position[1] - previousX
                 dy = position[2] - previousY
-                toX = goal[1] - previousX
-                toY = goal[2] - previousY
+                route[1] = goal[1]
+                route[2] = goal[2]
+                for (field = 1; field <= NF; ++field)
+                    if ($field == "raw:") {
+                        split($(field + 2), route, ",")
+                        break
+                    }
+                toX = route[1] - previousX
+                toY = route[2] - previousY
                 if ($3 > 240 && $3 <= 244 && /leftHS=1/ && dx * dx + dy * dy > 0) {
                     along = dx * toX + dy * toY
                     forward = dx * cos(facing) + dy * sin(facing)
@@ -114,13 +133,15 @@ check() {
             gait = first > 35 || (cavAccelerated && cavBrakedAtThreshold)
             if (first <= 238 && !translatedTowardGoal)
                 print "Pippin did not translate toward the route during the high speed turn at the checkpoint"
+            if (knightRises > 1 || knightFalls > 1 || pippinRises > 1 || pippinFalls > 1)
+                print "A high speed turn condition toggled more than once on and once off within a corner"
             if (!leftFast)
                 print "Pippin did not have a remaining high speed turn at the frame 244 checkpoint"
             if (first <= 238 && (yawJump || yawSteps < 2))
                 print "Pippin high speed turn did not advance in bounded render frame steps"
             if (checkArcher && first <= 504 && !(archerStationary && archerDisplaced))
                 print "Idle archer horde did not start its independent sharp move by frame 518"
-            exit !(gait && (first > 238 || (aligned && translatedTowardGoal && !yawJump && yawSteps >= 2)) &&
+            exit !(gait && knightRises <= 1 && knightFalls <= 1 && pippinRises <= 1 && pippinFalls <= 1 && (first > 238 || (aligned && translatedTowardGoal && !yawJump && yawSteps >= 2)) &&
                 leftFast && leftSlow && rightFast && stopped && rightSlow && trollReady && trollTurned && !trollFast &&
                 (!checkArcher || first > 504 || (archerStationary && archerDisplaced)))
         }
