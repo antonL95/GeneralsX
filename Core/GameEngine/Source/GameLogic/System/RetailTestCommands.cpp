@@ -3624,6 +3624,7 @@ void runFrame(unsigned int frame)
 	}
 	if (!s_tracked.empty())
 		logTracked(frame);
+	runStallWatch(frame);
 }
 
 void saveCheckpoint(unsigned int frame)

@@ -43,6 +43,7 @@ void registerAllCommands();
 
 bool configurePackage18Match(GameInfo& game);
 void runFrame(unsigned int frame);
+void runStallWatch(unsigned int frame);
 void saveCheckpoint(unsigned int frame);
 bool tracesCombat();
 void logHordeDeath(const Object* object, const DamageInfo* damage);
