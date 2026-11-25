@@ -2,21 +2,6 @@ fixture_active() {
     grep -q ' hud-tribute-setup ' "$out/commands.txt"
 }
 
-prepare() {
-    fixture_active || return 0
-    for debugger in "$out/start.gdb" "$out/resume.gdb"; do
-        cat >> "$debugger" <<'GDB'
-set confirm off
-set print thread-events off
-break GameEngine::~GameEngine
-commands
-    silent
-    quit 0
-end
-GDB
-    done
-}
-
 check() {
     fixture_active || return 0
     if covers 7; then expect "TEST hud-tribute 7 800 40"; fi
