@@ -650,9 +650,7 @@ void drawHero(const HeroSlot &slot, Int index, const ICoord2D &origin, Real scal
 	if (slot.selected)
 		drawImageBox(findImage("UiRetailHeroHalo"), centeredHeroBox(origin, scale, index, HaloSize));
 
-	fillCircle(portrait, GameMakeColor(6, 6, 6, 255));
 	const Image *image = heroImage(slot);
-	TheDisplay->setCircularClip(portrait.centerX(), portrait.centerY(), portrait.width() / 2);
 	if (TheDisplay->hasImageTexture(image))
 	{
 		const Bool deadArt = !slot.alive && image != slot.appearance->getButtonImage();
@@ -660,14 +658,18 @@ void drawHero(const HeroSlot &slot, Int index, const ICoord2D &origin, Real scal
 		TheDisplay->drawImage(image, portrait.x0, portrait.y0, portrait.x1, portrait.y1, tint,
 			slot.alive || deadArt ? Display::DRAW_IMAGE_ALPHA : Display::DRAW_IMAGE_GRAYSCALE);
 	}
-	if (!slot.alive || slot.attacked)
+	if (!slot.alive || slot.attacked || hovered)
 	{
-		const Real flicker = slot.alive ? static_cast<Real>(UiHudRules::pulse(now, FlickerMs)) : 1.0f;
-		TheDisplay->drawFillRect(portrait.x0, portrait.y0, portrait.width(), portrait.height(), withAlpha(220, 30, 20, 0.15f + 0.35f * flicker));
+		TheDisplay->setCircularClip(portrait.centerX(), portrait.centerY(), portrait.width() / 2);
+		if (!slot.alive || slot.attacked)
+		{
+			const Real flicker = slot.alive ? static_cast<Real>(UiHudRules::pulse(now, FlickerMs)) : 1.0f;
+			TheDisplay->drawFillRect(portrait.x0, portrait.y0, portrait.width(), portrait.height(), withAlpha(220, 30, 20, 0.15f + 0.35f * flicker));
+		}
+		if (hovered)
+			TheDisplay->drawFillRect(portrait.x0, portrait.y0, portrait.width(), portrait.height(), GameMakeColor(255, 236, 170, 40));
+		TheDisplay->setCircularClip(0, 0, 0);
 	}
-	if (hovered)
-		TheDisplay->drawFillRect(portrait.x0, portrait.y0, portrait.width(), portrait.height(), GameMakeColor(255, 236, 170, 40));
-	TheDisplay->setCircularClip(0, 0, 0);
 
 	if (slot.reviving)
 		drawImageBox(findImage("UiRetailHeroRevive"), centeredHeroBox(origin, scale, index, HeroSize));
