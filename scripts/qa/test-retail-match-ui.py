@@ -875,13 +875,24 @@ def check_palantir_bars():
     time.sleep(2)
     start_match(0)
     wait_for("Aragorn is selected for level bar check", lambda: log_count("TEST hud 40 ") >= 1, 100)
-    time.sleep(0.5)
+    wait_for("level bar frame is presented", lambda: len(measure_palantir_bar()) >= 40, 15)
     capture("palantir-level-bar", 200, 580, 185, 185)
     assert_bar_layout("level-bar")
     wait_for("summoned horde is selected for timer bar check", lambda: log_count("TEST hud 90 ") >= 1, 100)
-    time.sleep(0.5)
+    wait_for("timer bar frame is presented", lambda: len(measure_palantir_bar()) >= 40, 15)
     capture("palantir-timer-bar", 200, 580, 185, 185)
     assert_bar_layout("timer-bar")
+
+
+def hero_roster_samples():
+    image = get_image(display, root, 474, 699, 56, 56, 0xFFFFFFFF, 2)
+    try:
+        return [
+            rgb_tuple(get_pixel(image, dx, dy))
+            for dx, dy in ((8, 22), (8, 28), (10, 18), (46, 22), (46, 28), (44, 18))
+        ]
+    finally:
+        destroy_image(image)
 
 
 def check_hero_roster():
@@ -889,20 +900,9 @@ def check_hero_roster():
     time.sleep(2)
     start_match(0)
     wait_for("Haldir is spawned on the hero roster", lambda: log_count("TEST hud 45 ") >= 1, 100)
-    time.sleep(0.5)
+    wait_for("hero roster backing has no opaque black disc",
+             lambda: any(r > 10 or g > 10 or b > 10 for r, g, b in hero_roster_samples()), 15)
     capture("hero-roster", 360, 680, 220, 88)
-    image = get_image(display, root, 474, 699, 56, 56, 0xFFFFFFFF, 2)
-    try:
-        samples = [
-            rgb_tuple(get_pixel(image, dx, dy))
-            for dx, dy in ((8, 22), (8, 28), (10, 18), (46, 22), (46, 28), (44, 18))
-        ]
-    finally:
-        destroy_image(image)
-    black_disc = sum(1 for r, g, b in samples if r <= 10 and g <= 10 and b <= 10)
-    if black_disc == len(samples):
-        sys.exit(f"FAIL hero roster portrait still has opaque black disc: samples={samples}")
-    print(f"PASS hero roster backing has no opaque black disc: samples={samples}", flush=True)
 
 
 def hud_slots_at(frame):
@@ -916,7 +916,7 @@ def check_multi_select():
     start_match(0)
 
     wait_for("all-heroes multi-select hud logged", lambda: log_count("TEST hud 50 ") >= 1, 100)
-    time.sleep(0.5)
+    wait_for("all-heroes bar frame is presented", lambda: len(measure_palantir_bar()) >= 40, 15)
     capture("multi-all-heroes", 200, 580, 185, 185)
     slots_heroes = hud_slots_at(50)
     ring_heroes = [s for s in slots_heroes if int(s[0]) < 6]
@@ -926,7 +926,7 @@ def check_multi_select():
     print(f"PASS all-heroes multi-select buttons={[s[1] for s in ring_heroes]}", flush=True)
 
     wait_for("mixed hero+battalion multi-select hud logged", lambda: log_count("TEST hud 90 ") >= 1, 100)
-    time.sleep(0.5)
+    wait_for("mixed hero+battalion bar frame is presented", lambda: len(measure_palantir_bar()) >= 40, 15)
     capture("multi-mixed-hero", 200, 580, 185, 185)
     slots_mixed_hero = hud_slots_at(90)
     ring_mixed_hero = [s for s in slots_mixed_hero if int(s[0]) < 6]
@@ -936,7 +936,7 @@ def check_multi_select():
     print(f"PASS mixed hero+battalion multi-select shows hero buttons and level", flush=True)
 
     wait_for("same-type battalions multi-select hud logged", lambda: log_count("TEST hud 130 ") >= 1, 100)
-    time.sleep(0.5)
+    wait_for("same-type battalions bar frame is presented", lambda: len(measure_palantir_bar()) >= 40, 15)
     capture("multi-same-battalions", 200, 580, 185, 185)
     slots_same = hud_slots_at(130)
     ring_same = [s for s in slots_same if int(s[0]) < 6]
@@ -946,7 +946,7 @@ def check_multi_select():
     print(f"PASS same-type battalions multi-select buttons={[s[1] for s in ring_same]}", flush=True)
 
     wait_for("mixed non-hero battalions multi-select hud logged", lambda: log_count("TEST hud 170 ") >= 1, 100)
-    time.sleep(0.5)
+    wait_for("mixed battalions bar frame is presented", lambda: len(measure_palantir_bar()) >= 40, 15)
     capture("multi-mixed-battalions", 200, 580, 185, 185)
     slots_mixed = hud_slots_at(170)
     ring_mixed = [s for s in slots_mixed if int(s[0]) < 6]
@@ -955,12 +955,8 @@ def check_multi_select():
     assert_bar_layout("multi-mixed-battalions")
     print(f"PASS mixed battalions multi-select buttons={[s[1] for s in ring_mixed]}", flush=True)
 
-    wait_for("mixed battalion+porter multi-select hides mismatched level", lambda: log_count("TEST hud 210 ") >= 1, 100)
-    time.sleep(0.5)
-    if len(measure_palantir_bar()) >= 20:
-        capture("failed-multi-mismatch", 200, 580, 185, 185)
-        sys.exit("FAIL mixed battalion+porter still drew a level bar")
-    print("PASS mixed battalion+porter hides level bar", flush=True)
+    wait_for("mixed battalion+porter multi-select hud logged", lambda: log_count("TEST hud 210 ") >= 1, 100)
+    wait_for("mixed battalion+porter hides level bar", lambda: len(measure_palantir_bar()) < 20, 15)
 
 
 def launch_game(*options, log_mode="wb"):
@@ -1028,6 +1024,7 @@ if "--multi-select" in sys.argv:
         "22 spawn Player_1 GondorFighterHorde 0\n"
         "23 spawn Player_1 GondorFighterHorde 0\n"
         "24 spawn Player_1 GondorArcherHorde 0\n"
+        "25 spawn Player_1 MenPorter 0\n"
         "35 select Player_1 GondorAragorn 0\n"
         "36 selectadd Player_1 GondorBoromir 0\n"
         "50 hud - - 0\n"
