@@ -5196,7 +5196,7 @@ Bool AIUpdateInterface::canAutoAcquireWhileStealthed() const
 /**
  * Return the next object that our mood suggests we should attack.
  */
-Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuringIdle )
+Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuringIdle, Bool pursueBeyondWeaponRange )
 {
 	if (m_rampageUntil || m_fearUntil > TheGameLogic->getFrame())
 		return nullptr;
@@ -5346,7 +5346,7 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 	const auto* stances = RetailFileLayers::enabled() ? StancesBehavior::findForUnit(obj) : nullptr;
 	const Bool holdsGround = stances && StancesBehavior::holdsGround(stances->getStance());
 	if (holdsGround ||
-		(!stances && calledByAI && obj->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN))
+		(!stances && calledByAI && !pursueBeyondWeaponRange && obj->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN))
 	{
 		flags |= AI::WITHIN_ATTACK_RANGE;
 	}

@@ -1,0 +1,64 @@
+200 create Player_1 AttackMoveUnit 0 3100,2060,90
+200 create Player_1 AttackMoveHorde 0 3100,2280,90
+200 create PlyrCreeps AttackMoveUnitMid 0 3160,2110,0
+200 create PlyrCreeps AttackMoveUnitEnd 0 3300,2060,0
+200 create PlyrCreeps AttackMoveHordeMid 0 3160,2330,0
+200 create PlyrCreeps AttackMoveHordeEnd 0 3300,2280,0
+205 attackmove Player_1 AttackMoveUnit 0 200,0
+205 attackmove Player_1 AttackMoveHorde 0 200,0
+230 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+230 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+244 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+244 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+245 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+245 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+270 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+270 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+300 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+300 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+330 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+330 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+360 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+360 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+400 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+400 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+440 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+440 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+480 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+480 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+520 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+520 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+560 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+560 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+600 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+600 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+650 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+650 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+700 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+700 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+705 destroy Player_1 AttackMoveUnit 0
+705 destroy Player_1 AttackMoveHorde 0
+705 destroy PlyrCreeps AttackMoveUnitMid 0
+705 destroy PlyrCreeps AttackMoveUnitEnd 0
+705 destroy PlyrCreeps AttackMoveHordeMid 0
+705 destroy PlyrCreeps AttackMoveHordeEnd 0
+710 create Player_1 AttackMoveUnit 0 3100,2060,90
+710 create Player_1 AttackMoveHorde 0 3100,2280,90
+710 create PlyrCreeps AttackMoveUnitMid 0 3160,2110,0
+710 create PlyrCreeps AttackMoveUnitEnd 0 3300,2060,0
+710 create PlyrCreeps AttackMoveHordeMid 0 3160,2330,0
+710 create PlyrCreeps AttackMoveHordeEnd 0 3300,2280,0
+715 move Player_1 AttackMoveUnit 0 200,0
+715 move Player_1 AttackMoveHorde 0 200,0
+800 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+800 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+900 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+900 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+960 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0
+960 attack-move-probe Player_1 AttackMoveHorde 0 PlyrCreeps:AttackMoveHordeMid:0,PlyrCreeps:AttackMoveHordeEnd:0
+965 destroy Player_1 AttackMoveUnit 0
+965 destroy Player_1 AttackMoveHorde 0
+965 destroy PlyrCreeps AttackMoveUnitMid 0
+965 destroy PlyrCreeps AttackMoveUnitEnd 0
+965 destroy PlyrCreeps AttackMoveHordeMid 0
+965 destroy PlyrCreeps AttackMoveHordeEnd 0

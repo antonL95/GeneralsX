@@ -3770,7 +3770,7 @@ StateReturnType AIAttackMoveToState::update()
 		}
 
 		Object* nextObjectToAttack;
-		nextObjectToAttack = ai->getNextMoodTarget( !forceRetargetThisFrame, false );
+		nextObjectToAttack = ai->getNextMoodTarget( !forceRetargetThisFrame, false, true );
 		if (nextObjectToAttack != nullptr)
 		{
 			ai->friend_endingMove();
@@ -4625,7 +4625,7 @@ StateReturnType AIAttackFollowWaypointPathState::update()
 		Object* nextObjectToAttack;
 		{
 
-			nextObjectToAttack = ai->getNextMoodTarget( !forceRetargetThisFrame, false );
+			nextObjectToAttack = ai->getNextMoodTarget( !forceRetargetThisFrame, false, true );
 		}
 		if (nextObjectToAttack != nullptr)
 		{
