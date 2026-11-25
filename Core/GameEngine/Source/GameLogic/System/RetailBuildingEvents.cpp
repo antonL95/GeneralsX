@@ -21,6 +21,7 @@
 #include "Common/File.h"
 #include "Common/FileSystem.h"
 #include "Common/GameState.h"
+#include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
@@ -420,7 +421,13 @@ void dispatch(Object& object, const char* event, DispatchMode mode = DispatchMod
 				break;
 			case Action::Grant:
 				if (const auto* upgrade = TheUpgradeCenter->findUpgrade(operation.name.c_str()))
-					object.giveUpgrade(upgrade);
+				{
+					Player* owner = upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER ? object.getControllingPlayer() : nullptr;
+					if (!owner)
+						object.giveUpgrade(upgrade);
+					else if (!owner->hasUpgradeComplete(upgrade))
+						owner->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+				}
 				break;
 			case Action::Remove:
 				if (const auto* upgrade = TheUpgradeCenter->findUpgrade(operation.name.c_str()))
