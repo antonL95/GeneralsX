@@ -32,7 +32,7 @@ def inner_pixels(image, box):
     return list(crop.getdata())
 
 
-def annulus_luma(image, box):
+def ring_pixels(image, box, min_ratio, max_ratio):
     x, y, width, height = box
     cx, cy = x + width / 2, y + height / 2
     pixels = image.convert("RGB")
@@ -40,8 +40,8 @@ def annulus_luma(image, box):
     for py in range(int(cy - width), int(cy + width)):
         for px in range(int(cx - width), int(cx + width)):
             distance = ((px - cx) ** 2 + (py - cy) ** 2) ** 0.5
-            if width * 0.52 <= distance <= width * 0.95:
-                values[(px, py)] = luma(pixels.getpixel((px, py)))
+            if width * min_ratio <= distance <= width * max_ratio:
+                values[(px, py)] = pixels.getpixel((px, py))
     return values
 
 
@@ -61,15 +61,26 @@ def check_captures(output, _frames):
             raise RuntimeError(f"Unavailable button {slot} is tinted, colour spread {spread:.1f}")
 
     box = state[(50, 2)]["box"]
-    before = annulus_luma(load(40), box)
-    shots = [annulus_luma(load(frame), box) for frame in (54, 68, 82)]
+    before_center = ring_pixels(load(40), box, 0.0, 0.30)
+    before_rim = ring_pixels(load(40), box, 0.38, 0.72)
+    rim_shots = []
+    for frame in (54, 68, 82):
+        image = load(frame)
+        center = ring_pixels(image, box, 0.0, 0.30)
+        center_delta = sum(luma(center[k]) - luma(before_center[k]) for k in center) / len(center)
+        if center_delta > 30:
+            raise RuntimeError(f"Autocast overlay obscures button center on frame {frame}: delta {center_delta:.1f}")
+        rim = ring_pixels(image, box, 0.38, 0.72)
+        rim_shots.append(rim)
+        bright = [rim[k] for k in rim if luma(rim[k]) - luma(before_rim[k]) > 40]
+        if len(bright) < 100:
+            raise RuntimeError(f"Too few brightened rim pixels on frame {frame}: {len(bright)}")
+        mean_r = sum(p[0] for p in bright) / len(bright)
+        mean_g = sum(p[1] for p in bright) / len(bright)
+        mean_b = sum(p[2] for p in bright) / len(bright)
+        if mean_g < mean_r or (mean_r - mean_b) > 45:
+            raise RuntimeError(f"Autocast rim glow has wrong colour on frame {frame}: ({mean_r:.0f},{mean_g:.0f},{mean_b:.0f})")
 
-    def bright(values):
-        return sum(v > 170 for v in values.values())
-
-    counts = [bright(shot) for shot in shots]
-    if max(counts) < bright(before) + 40:
-        raise RuntimeError(f"No sparkles around the autocast button: before {bright(before)}, after {counts}")
-    moved = sum(abs(shots[0][k] - shots[1][k]) > 40 for k in shots[0])
-    if moved < 8:
-        raise RuntimeError(f"The autocast overlay is not animated, {moved} changed pixels")
+    moved = sum(abs(luma(rim_shots[0][k]) - luma(rim_shots[1][k])) > 40 for k in rim_shots[0])
+    if moved < 40:
+        raise RuntimeError(f"The autocast rim sparkles are not orbiting, {moved} changed pixels")
