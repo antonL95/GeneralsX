@@ -1,0 +1,12 @@
+20 create Player_1 YieldStallCavalry 0 2000,1700,0
+20 create Player_1 YieldStallCavalryBlocker 0 2250,1700,0
+20 create Player_1 YieldStallInfantry 0 2000,2000,0
+20 create Player_1 YieldStallInfantryBlocker 0 2250,2000,0
+20 create Player_1 YieldStallSingle 0 2000,2300,0
+20 create Player_1 YieldStallSingleBlocker 0 2250,2300,0
+30 move Player_1 YieldStallCavalry 0 - 2500 1700
+30 move Player_1 YieldStallInfantry 0 - 2500 2000
+30 move Player_1 YieldStallSingle 0 - 2500 2300
+70 move Player_1 YieldStallCavalryBlocker 0 - 2250 1500
+70 move Player_1 YieldStallInfantryBlocker 0 - 2250 1800
+70 move Player_1 YieldStallSingleBlocker 0 - 2250 2100
