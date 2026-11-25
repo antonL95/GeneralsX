@@ -291,7 +291,6 @@ void AudioManager::reset()
 	m_disallowSpeech = FALSE;
 }
 
-//-------------------------------------------------------------------------------------------------
 std::vector<AudioHandle> AudioManager::startMultiAudioChildren(const AudioEventRTS *source, const std::vector<AsciiString>& names, Bool loop)
 {
 	std::vector<AudioHandle> handles;
