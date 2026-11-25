@@ -202,7 +202,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 	// select context
 	//
 	Object *obj = nullptr;
-	if( m_currContext != CB_CONTEXT_MULTI_SELECT &&
+	if( (m_currContext != CB_CONTEXT_MULTI_SELECT || (m_retailSelectionName && m_currentSelectedDrawable)) &&
 			commandButton->getCommandType() != GUI_COMMAND_PURCHASE_SCIENCE &&
 			commandButton->getCommandType() != GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT &&
 			commandButton->getCommandType() != GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT &&

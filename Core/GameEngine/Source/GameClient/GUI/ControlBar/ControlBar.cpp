@@ -2629,7 +2629,9 @@ void ControlBar::switchToContext( ControlBarContext context, Drawable *draw )
 		else if (context == CB_CONTEXT_MULTI_SELECT)
 		{
 			populateMultiSelect();
-			assignRetailSlots(nullptr, nullptr, 0);
+			Object *heroObj = m_currentSelectedDrawable ? m_currentSelectedDrawable->getObject() : nullptr;
+			const CommandSet *commandSet = heroObj ? findCommandSet(heroObj->getCommandSetString()) : nullptr;
+			assignRetailSlots(commandSet, heroObj, commandSet ? commandSet->getInitialVisible() : 0);
 		}
 		else if (context == CB_CONTEXT_UNDER_CONSTRUCTION)
 			populateRetailUnderConstruction(obj);

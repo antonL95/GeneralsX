@@ -94,6 +94,84 @@ constexpr DesignRect Objectives = { 156.0f, 76.0f, 31.0f, 31.0f };
 constexpr DesignRect PlaqueArea = { 20.0f, 240.0f, 210.0f, 50.0f };
 constexpr DesignRect RankLabel = { 206.53f, 220.95f, 148.03f, 15.98f };
 constexpr DesignRect RankBar = { 256.80f, 236.58f, 51.20f, 4.48f };
+constexpr Real MultiSelectProgressEpsilon = 0.1f;
+
+enum class RetailRankMode
+{
+	None,
+	Ranked,
+	Timed,
+};
+
+struct RetailRankInfo
+{
+	RetailRankMode mode = RetailRankMode::None;
+	Int rank = 0;
+	Int maximumRank = 0;
+	Real progress = 0.0f;
+};
+
+RetailRankInfo rankInfoForObject(const Object *object)
+{
+	RetailRankInfo info;
+	if (!object)
+		return info;
+	const Real remaining = object->isLocallyControlled() ? RetailWorldUI::remainingLifetime(*object) : 0.0f;
+	if (remaining > 0.0f)
+	{
+		info.mode = RetailRankMode::Timed;
+		info.rank = -1;
+		info.progress = remaining;
+		return info;
+	}
+	const Int maximumRank = ExperienceLevelStore::maximumRank(object);
+	const Bool hero = object->isKindOf(KINDOF_HERO);
+	if (hero ? maximumRank > 0 : maximumRank > 1)
+	{
+		if (const auto *tracker = object->getExperienceTracker())
+		{
+			info.mode = RetailRankMode::Ranked;
+			info.rank = tracker->getRank();
+			info.maximumRank = maximumRank;
+			info.progress = info.rank < maximumRank ? tracker->getLevelProgress() : 1.0f;
+		}
+	}
+	return info;
+}
+
+RetailRankInfo resolveRetailRankInfo(const Object *portraitObject, ControlBarContext context, const Drawable *currentSelected)
+{
+	if (context != CB_CONTEXT_MULTI_SELECT || currentSelected)
+		return rankInfoForObject(portraitObject);
+	if (!TheInGameUI)
+		return RetailRankInfo{};
+	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+	if (!selected || selected->empty())
+		return RetailRankInfo{};
+	Bool haveFirst = FALSE;
+	RetailRankInfo first;
+	for (const Drawable *drawable : *selected)
+	{
+		const Object *object = drawable ? drawable->getObject() : nullptr;
+		if (!object || object->isEffectivelyDead() || object->isKindOf(KINDOF_IGNORED_IN_GUI) ||
+			object->testStatus(OBJECT_STATUS_SOLD))
+			continue;
+		const RetailRankInfo candidate = rankInfoForObject(object);
+		if (!haveFirst)
+		{
+			first = candidate;
+			haveFirst = TRUE;
+			if (first.mode == RetailRankMode::None)
+				return RetailRankInfo{};
+		}
+		else if (candidate.mode != first.mode || candidate.rank != first.rank ||
+			std::fabs(candidate.progress - first.progress) >= MultiSelectProgressEpsilon)
+		{
+			return RetailRankInfo{};
+		}
+	}
+	return haveFirst ? first : RetailRankInfo{};
+}
 
 enum { RimNone = -1, RimOptions = 0, RimObjectives = 1 };
 Int s_rimButton = RimNone;
@@ -610,15 +688,12 @@ void ControlBar::drawRetailTexts() const
 	if (!m_retailPortrait->winIsHidden())
 	{
 		const Object* object = getRetailPortraitObject();
-		const Real remaining = object && object->isLocallyControlled() ? RetailWorldUI::remainingLifetime(*object) : 0.0f;
-		const Bool timed = remaining > 0.0f;
-		const Int maximumRank = ExperienceLevelStore::maximumRank(object);
-		const Bool hero = object && object->isKindOf(KINDOF_HERO);
-		const Bool ranked = hero ? maximumRank > 0 : m_currContext != CB_CONTEXT_MULTI_SELECT && maximumRank > 1;
+		const RetailRankInfo rankInfo = resolveRetailRankInfo(object, m_currContext, m_currentSelectedDrawable);
+		const Bool timed = rankInfo.mode == RetailRankMode::Timed;
+		const Bool ranked = rankInfo.mode == RetailRankMode::Ranked;
 		if (timed || ranked)
 		{
-			const auto* tracker = object->getExperienceTracker();
-			const Int rank = timed ? -1 : tracker->getRank();
+			const Int rank = rankInfo.rank;
 			Int x, y, width, height;
 			windowRect(m_retailPortrait, x, y, width, height);
 			Int px, py, pwidth, pheight;
@@ -630,9 +705,9 @@ void ControlBar::drawRetailTexts() const
 			const Int bottom = py + static_cast<Int>(std::floor((RankBar.y + RankBar.height) * scale + 0.5f));
 			const Int barWidth = std::max(8, right - left);
 			const Int barHeight = std::max(4, bottom - top);
-			if (timed || rank < maximumRank)
+			if (timed || rank < rankInfo.maximumRank)
 			{
-				const Real progress = timed ? remaining : tracker->getLevelProgress();
+				const Real progress = rankInfo.progress;
 				const Int fill = static_cast<Int>((barWidth - 2) * progress);
 				TheDisplay->setCircularClip(x + width / 2, y + height / 2, MIN(width, height) / 2);
 				TheDisplay->drawFillRect(left, top, barWidth, barHeight, GameMakeColor(29, 21, 10, 240));
@@ -795,7 +870,7 @@ CBCommandStatus ControlBar::cancelRetailProduction(GameWindow *window) const
 CommandAvailability ControlBar::getRetailButtonAvailability(GameWindow *window) const
 {
 	const Int slot = getRetailSlot(window);
-	if (slot < 0 || slot >= MAX_COMMANDS_PER_SET || m_currContext == CB_CONTEXT_MULTI_SELECT)
+	if (slot < 0 || slot >= MAX_COMMANDS_PER_SET || (m_currContext == CB_CONTEXT_MULTI_SELECT && !m_currentSelectedDrawable))
 		return BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 	return m_retailAvailability[slot];
 }
@@ -857,14 +932,13 @@ Bool ControlBar::toggleRetailAutoAbility(const GameWindow* window)
 void ControlBar::showRetailLevelTooltip() const
 {
 	const Object* object = getRetailPortraitObject();
-	const Int maximum = ExperienceLevelStore::maximumRank(object);
-	if (!TheMouse || !object || maximum == 0 ||
-		(!object->isKindOf(KINDOF_HERO) && (maximum == 1 || m_currContext == CB_CONTEXT_MULTI_SELECT)))
+	const RetailRankInfo rankInfo = resolveRetailRankInfo(object, m_currContext, m_currentSelectedDrawable);
+	if (!TheMouse || !object || rankInfo.mode != RetailRankMode::Ranked)
 		return;
 	Mouse::RetailTooltip tooltip;
 	tooltip.title = object->getDisplayName();
 	tooltip.body.format(TheGameText->fetchOrSubstitute("TOOLTIP:Rank", L"Level: %d / Maximum Level: %d"),
-		object->getExperienceTracker()->getRank(), maximum);
+		rankInfo.rank, rankInfo.maximumRank);
 	TheMouse->setRetailTooltip(tooltip);
 }
 
@@ -1452,7 +1526,7 @@ void ControlBar::assignRetailSlots(const CommandSet *commandSet, Object *obj, In
 
 void ControlBar::checkRetailPlacements()
 {
-	if (m_currContext != CB_CONTEXT_COMMAND || !m_currentSelectedDrawable)
+	if ((m_currContext != CB_CONTEXT_COMMAND && m_currContext != CB_CONTEXT_MULTI_SELECT) || !m_currentSelectedDrawable)
 		return;
 	Object *obj = m_currentSelectedDrawable->getObject();
 	if (!obj)

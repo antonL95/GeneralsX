@@ -44,29 +44,40 @@
 
 namespace
 {
-Object* chooseRetailMultiPortrait(const DrawableList& selected)
+Drawable* chooseRetailMultiHero(const DrawableList& selected)
 {
-	Object* first = nullptr;
-	Object* hero = nullptr;
+	Drawable* hero = nullptr;
 	Int rank = 0;
 	for (Drawable* drawable : selected)
 	{
-		Object* object = drawable->getObject();
+		Object* object = drawable ? drawable->getObject() : nullptr;
 		if (!object || object->isEffectivelyDead() || object->isKindOf(KINDOF_IGNORED_IN_GUI) ||
 			object->testStatus(OBJECT_STATUS_SOLD))
 			continue;
-		if (!first)
-			first = object;
 		if (!object->isKindOf(KINDOF_HERO) || ExperienceLevelStore::maximumRank(object) == 0)
 			continue;
 		const Int candidateRank = object->getExperienceTracker()->getRank();
-		if (!hero || candidateRank > rank || (candidateRank == rank && object->getID() < hero->getID()))
+		if (!hero || candidateRank > rank || (candidateRank == rank && object->getID() < hero->getObject()->getID()))
 		{
-			hero = object;
+			hero = drawable;
 			rank = candidateRank;
 		}
 	}
-	return hero ? hero : first;
+	return hero;
+}
+
+Object* chooseRetailMultiPortrait(const DrawableList& selected)
+{
+	if (Drawable* hero = chooseRetailMultiHero(selected))
+		return hero->getObject();
+	for (Drawable* drawable : selected)
+	{
+		Object* object = drawable ? drawable->getObject() : nullptr;
+		if (object && !object->isEffectivelyDead() && !object->isKindOf(KINDOF_IGNORED_IN_GUI) &&
+			!object->testStatus(OBJECT_STATUS_SOLD))
+			return object;
+	}
+	return nullptr;
 }
 }
 
@@ -263,6 +274,17 @@ void ControlBar::populateMultiSelect()
 	// sanity
 	DEBUG_ASSERTCRASH( selectedDrawables->empty() == FALSE, ("populateMultiSelect: Drawable list is empty") );
 
+	if (m_retailSelectionName)
+	{
+		if (Drawable* hero = chooseRetailMultiHero(*selectedDrawables))
+		{
+			m_currentSelectedDrawable = hero;
+			populateCommand(hero->getObject());
+			setPortraitByObject(hero->getObject());
+			return;
+		}
+	}
+
 	// loop through all the selected drawables
 	for( DrawableListCIt it = selectedDrawables->begin();
 			 it != selectedDrawables->end(); ++it )
@@ -364,6 +386,17 @@ void ControlBar::updateContextMultiSelect()
 	const DrawableList *selectedDrawables = TheInGameUI->getAllSelectedDrawables();
 	if (m_retailSelectionName)
 	{
+		Drawable* hero = chooseRetailMultiHero(*selectedDrawables);
+		if (hero != m_currentSelectedDrawable)
+		{
+			markUIDirty();
+			return;
+		}
+		if (hero)
+		{
+			updateContextCommand();
+			return;
+		}
 		Object* portrait = chooseRetailMultiPortrait(*selectedDrawables);
 		if (portrait != getRetailPortraitObject())
 			setPortraitByObject(portrait);
