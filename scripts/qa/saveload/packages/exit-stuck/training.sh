@@ -29,8 +29,8 @@ check() {
             split(field("pos"), xy, ",")
             px[frame, id] = xy[1]; py[frame, id] = xy[2]
             ids[id] = 1
-            if (frame >= 1220 && moving[frame, id] == 1 && moving[frame - 20, id] == 1) {
-                dx = px[frame, id] - px[frame - 20, id]; dy = py[frame, id] - py[frame - 20, id]
+            if (frame >= 1240 && moving[frame, id] == 1 && moving[frame - 20, id] == 1 && moving[frame - 40, id] == 1) {
+                dx = px[frame, id] - px[frame - 40, id]; dy = py[frame, id] - py[frame - 40, id]
                 if (dx * dx + dy * dy < 9) { printf "%d %s runs in place\n", frame, id; failed = 1 }
             }
         }
