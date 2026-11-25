@@ -1,0 +1,10 @@
+5 create Player_1 GondorPippin 0 2290,1180,0
+5 create Player_1 EreborElegost 0 2310,1180,0
+5 reveal Player_1 GondorPippin 0
+20 select Player_1 GondorPippin 0
+30 autocast-art-state Player_1 GondorPippin 0 3
+30 autocast-art-state Player_1 GondorPippin 0 4
+36 select Player_1 EreborElegost 0
+38 autocast-art-state Player_1 EreborElegost 0 2
+42 autocast-art-right Player_1 EreborElegost 0 2
+50 autocast-art-state Player_1 EreborElegost 0 2
