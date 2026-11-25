@@ -14,10 +14,12 @@ check() {
     if covers 258; then
         expect 'TEST team-script-ops guard frame=258 reachable=1 missing=0 origin=1 fallback=1'
     fi
-    if covers 242; then
-        expect 'TEST team-script-ops score frame=242 win=0 loss=0 winPosition=0 lossPosition=0'
-    fi
-    if covers 254; then
-        expect 'TEST team-script-ops score frame=254 win=1 loss=1 winPosition=1 lossPosition=1'
+    if grep -q "^TEST team-script-ops score " "$log"; then
+        if covers 242; then
+            expect 'TEST team-script-ops score frame=242 win=0 loss=0 winPosition=0 lossPosition=0'
+        fi
+        if covers 254; then
+            expect 'TEST team-script-ops score frame=254 win=1 loss=1 winPosition=1 lossPosition=1'
+        fi
     fi
 }

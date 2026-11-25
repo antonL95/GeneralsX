@@ -99,8 +99,11 @@ void pathProbe(const RetailTestCommands::Context& ctx)
 {
 	Object* unit = ctx.requireObject();
 	if (unit)
+	{
+		FixtureTeam team(*unit);
 		std::fprintf(stderr, "TEST team-script-ops path frame=%u first=%d reachable=%d\n", ctx.frame,
-			unit->getTeam()->getFirstItemIn_TeamMemberList() == unit, canPath(unit->getTeam(), rally));
+			team.get()->getFirstItemIn_TeamMemberList() == unit, canPath(team.get(), rally));
+	}
 }
 
 Bool guardFrom(Team* team, const char* waypoint)
@@ -125,10 +128,10 @@ void guardAndPath(const RetailTestCommands::Context& ctx)
 
 	auto* area = newInstance(PolygonTrigger)(4);
 	area->setTriggerName(guardArea);
-	area->addPoint({1980, 2880, 0});
-	area->addPoint({2040, 2880, 0});
-	area->addPoint({2040, 2940, 0});
-	area->addPoint({1980, 2940, 0});
+	area->addPoint({980, 3480, 0});
+	area->addPoint({1040, 3480, 0});
+	area->addPoint({1040, 3540, 0});
+	area->addPoint({980, 3540, 0});
 	PolygonTrigger::addPolygonTrigger(area);
 
 	FixtureTeam team(*unit);
@@ -170,8 +173,8 @@ void scoreProbe(const RetailTestCommands::Context& ctx)
 	const Bool win = RetailEva::getLastPlayed("TeamScriptOpsFixtureWin", frame, &winPosition);
 	const Bool loss = RetailEva::getLastPlayed("TeamScriptOpsFixtureLoss", frame, &lossPosition);
 	std::fprintf(stderr, "TEST team-script-ops score frame=%u win=%d loss=%d winPosition=%d lossPosition=%d\n",
-		ctx.frame, win, loss, win && winPosition.x == 2030.0f && winPosition.y == 2960.0f,
-		loss && lossPosition.x == 2060.0f && lossPosition.y == 2960.0f);
+		ctx.frame, win, loss, win && winPosition.x == 1030.0f && winPosition.y == 3560.0f,
+		loss && lossPosition.x == 1060.0f && lossPosition.y == 3560.0f);
 }
 }
 #endif
