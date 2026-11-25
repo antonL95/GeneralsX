@@ -542,7 +542,6 @@ private:
 	void setFlag(LocoFlag f, Bool b) { if (b) m_flags |= (1<<f); else m_flags &= ~(1<<f); }
 
 	void updateRetailGait(Object* object, Real distance, Real speedBefore, Bool braking, Real speedAfter = -1.0f);
-	void xferRetailBlocks(Xfer* xfer, Bool present);
 	void advanceRetailScalarSpeed(Object* object, Real goalSpeed);
 
 	LocomotorTemplateOverride m_template;
