@@ -1,0 +1,45 @@
+3 cash Player_1 - 0 90000
+5 hero-unlock-native Player_1 - 0
+6 create Player_1 WOR_CarasGaladhon 0 650,1800,0
+8 camera Player_1 WOR_CarasGaladhon 0 at 650 1800
+9 select Player_1 WOR_CarasGaladhon 0
+12 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+12 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+12 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGalion
+20 queue Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+24 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+30 queue Player_1 WOR_CarasGaladhon 0 MirkwoodGalion
+34 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGalion
+1000 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+1000 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+1100 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+1100 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+1200 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+1200 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+1300 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+1300 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+1400 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+1400 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+1500 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+1500 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+1600 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+1600 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+1700 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+1700 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+1800 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+1800 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+1900 hero-unlock-upgrade Player_1 - 0 Upgrade_Arkenstone
+1900 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+2000 queue Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+2004 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+2400 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+2600 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+2800 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+3000 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+3200 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+3400 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+3600 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+3800 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+4000 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+4200 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
+4400 hero-unlock-state Player_1 WOR_CarasGaladhon 0 MirkwoodGrimbeorn
