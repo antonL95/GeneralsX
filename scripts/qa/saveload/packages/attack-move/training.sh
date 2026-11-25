@@ -20,9 +20,9 @@ check() {
             bad = 0
             if (midHealth["AttackMoveUnit", 330] != -1 || endHealth["AttackMoveUnit", 330] != 100) bad = 1
             if (endHealth["AttackMoveUnit", 700] != -1) bad = 1
-            if (midHealth["AttackMoveHorde", 330] != -1 || endHealth["AttackMoveHorde", 700] != -1) bad = 1
+            if (midHealth["AttackMoveHorde", 330] != -1 || endHealth["AttackMoveHorde", 700] != -1 || x["AttackMoveHorde", 700] < 1600) bad = 1
             if (midHealth["AttackMoveUnit", 800] != 100 || x["AttackMoveUnit", 800] < 3180) bad = 1
-            if (midHealth["AttackMoveHorde", 960] != 100) bad = 1
+            if (midHealth["AttackMoveHorde", 960] != 100 || x["AttackMoveHorde", 960] < 1600) bad = 1
             if (midHealth["AttackMoveUnit", 960] != 100) bad = 1
             exit bad
         }
