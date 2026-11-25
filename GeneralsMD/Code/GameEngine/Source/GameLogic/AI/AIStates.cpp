@@ -1633,6 +1633,9 @@ Bool AIInternalMoveToState::getAdjustsDestination() const
 	if (ai && !ai->isAllowedToAdjustDestination())
 		return false;
 
+	if (RetailFileLayers::enabled() && HordeContain::get(obj->getContainedBy()))
+		return false;
+
 	return m_adjustDestinations;
 }
 

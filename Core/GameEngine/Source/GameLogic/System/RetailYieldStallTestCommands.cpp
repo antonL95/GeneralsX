@@ -37,9 +37,10 @@ void probeYieldStall(const RetailTestCommands::Context& ctx)
 	unsigned int idleShort = 0;
 	Real worstSlot = 0.0f;
 	Real worstDestination = 0.0f;
+	Object* worstMember = nullptr;
 	if (horde)
 	{
-		for (const Object* member : *horde->getContainedItemsList())
+		for (Object* member : *horde->getContainedItemsList())
 		{
 			if (member->isEffectivelyDead() || horde->getMemberSlot(member->getID()) < 0)
 				continue;
@@ -48,7 +49,10 @@ void probeYieldStall(const RetailTestCommands::Context& ctx)
 			const Real slotError = distanceBetween(*member->getPosition(), slot);
 			const Real destinationError = distanceBetween(*member->getPosition(), destination);
 			if (slotError > worstSlot)
+			{
 				worstSlot = slotError;
+				worstMember = member;
+			}
 			if (destinationError > worstDestination)
 				worstDestination = destinationError;
 		}
@@ -60,6 +64,24 @@ void probeYieldStall(const RetailTestCommands::Context& ctx)
 	}
 	const PathNode* lastNode = ai && ai->getPath() ? ai->getPath()->getLastNode() : nullptr;
 	const Coord3D* pathEnd = lastNode ? lastNode->getPosition() : nullptr;
+	if (worstMember)
+	{
+		AIUpdateInterface* mai = worstMember->getAI();
+		const Coord3D slot = horde->getMemberPosition(worstMember->getID(), FALSE);
+		Path* mpath = mai ? mai->getPath() : nullptr;
+		const PathNode* mfirst = mpath ? mpath->getFirstNode() : nullptr;
+		const PathNode* mnextNode = mfirst ? mfirst->getNextOptimized() : nullptr;
+		const Coord3D* mnext = mnextNode ? mnextNode->getPosition() : nullptr;
+		const PathNode* mlast = mpath ? mpath->getLastNode() : nullptr;
+		const Coord3D* mend = mlast ? mlast->getPosition() : nullptr;
+		std::fprintf(stderr, "TEST yield-stall-member %u %s id=%u pos=%.1f,%.1f slot=%.1f,%.1f state=%d blocked=%d stuck=%d waiting=%d moving=%d desired=%.2f away=%d goal=%.1f,%.1f path=%d next=%.1f,%.1f end=%.1f,%.1f\n",
+			ctx.frame, ctx.argument, static_cast<unsigned>(worstMember->getID()), worstMember->getPosition()->x, worstMember->getPosition()->y,
+			slot.x, slot.y, mai ? static_cast<int>(mai->getCurrentStateID()) : -1, mai ? mai->getNumFramesBlocked() : 0,
+			mai ? static_cast<int>(mai->isBlockedAndStuck()) : 0, mai ? static_cast<int>(mai->isWaitingForPath()) : 0,
+			mai ? static_cast<int>(mai->isMoving()) : 0, mai ? mai->getDesiredSpeed() : 0.0f, 0,
+			mai ? mai->getGoalPosition()->x : 0.0f, mai ? mai->getGoalPosition()->y : 0.0f,
+			mpath ? 1 : 0, mnext ? mnext->x : 0.0f, mnext ? mnext->y : 0.0f, mend ? mend->x : 0.0f, mend ? mend->y : 0.0f);
+	}
 	const Bool idle = ai && ai->isIdle();
 	if (idle && distanceBetween(*anchor->getPosition(), destination) > 40.0f)
 		idleShort = 1;

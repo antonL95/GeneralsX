@@ -6,3 +6,4 @@
 30 selectadd Player_1 YieldStallGroupInfantry 0
 30 selectadd Player_1 YieldStallGroupSingle 0
 30 movesel - - 0 - 2500 3450
+150 move Player_1 YieldStallGroupBlocker 0 - 2250 3700
