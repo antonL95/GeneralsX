@@ -2850,10 +2850,9 @@ Bool ScriptConditions::evaluateSkirmishPlayerHasDiscoveredPlayer(Parameter *pSki
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool ScriptConditions::evaluateMusicHasCompleted(Parameter *pMusicParm, Parameter *pIntParm)
+Bool ScriptConditions::evaluateMusicHasCompleted(Parameter *, Parameter *)
 {
-	const AsciiString &str = pMusicParm->getString();
-	return TheAudio->hasMusicTrackCompleted(str, pIntParm->getInt());
+	return FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------

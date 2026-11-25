@@ -217,6 +217,8 @@ void MiniAudioManager::reset()
 #endif
 
 	AudioManager::reset();
+	m_completedMusicByHandle.clear();
+	m_completedMusicByName.clear();
 	stopAllAudioImmediately();
 	// GeneralsX @bugfix coolswood 18/07/2026 Restart sound groups in reset() to fix silent audio after loadGame.
 	// stopAllAudioImmediately() releases individual PlayingAudio entries but does not touch the four
@@ -716,7 +718,7 @@ void MiniAudioManager::killAudioEventImmediately(AudioHandle audioEvent)
 	// GeneralsX @bugfix meerzulee 19/07/2026 FP env guard for audio entry point (see #215)
 	ScopedFPUGuard fpuGuard;
 	if (const auto found = m_multiAudioHandles.find(audioEvent); found != m_multiAudioHandles.end()) {
-		const std::vector<AudioHandle> children = found->second;
+		const std::vector<AudioHandle> children = found->second.children;
 		m_multiAudioHandles.erase(found);
 		for (const AudioHandle child : children)
 			killAudioEventImmediately(child);
@@ -932,14 +934,19 @@ Bool MiniAudioManager::isMusicPlaying(void) const
 //-------------------------------------------------------------------------------------------------
 Bool MiniAudioManager::hasMusicTrackCompleted(const AsciiString &trackName, Int numberOfTimes) const
 {
+	AsciiString key = trackName;
+	key.toLower();
+	Int completions = 0;
+	const auto done = m_completedMusicByName.find(key);
+	if (done != m_completedMusicByName.end())
+		completions = done->second;
 	for (const PlayingAudio *playing : m_playingSounds) {
-		if (playing && !playing->m_requestStop && playing->m_audioEventRTS &&
+		if (playing && !playing->m_requestStop && playing->m_audioEventRTS && playing->m_audioEventRTS->getAudioEventInfo() &&
 			playing->m_audioEventRTS->getEventName().compareNoCase(trackName) == 0 &&
-			playing->m_audioEventRTS->getAudioEventInfo()->m_soundType == AT_Music &&
-			playing->m_completedLoops >= numberOfTimes)
-			return TRUE;
+			playing->m_audioEventRTS->getAudioEventInfo()->m_soundType == AT_Music)
+			completions += playing->m_completedLoops;
 	}
-	return FALSE;
+	return completions > 0 && completions >= numberOfTimes;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1065,7 +1072,7 @@ void MiniAudioManager::closeDevice(void)
 Bool MiniAudioManager::isCurrentlyPlaying(AudioHandle handle)
 {
 	if (const auto found = m_multiAudioHandles.find(handle); found != m_multiAudioHandles.end()) {
-		for (const AudioHandle child : found->second)
+		for (const AudioHandle child : found->second.children)
 			if (isCurrentlyPlaying(child))
 				return TRUE;
 		return FALSE;
@@ -1495,7 +1502,7 @@ void MiniAudioManager::processPlayingList(void)
 				if (frame >= playing->m_virtualLastFrame)
 					playing->m_virtualElapsedMs += (frame - playing->m_virtualLastFrame) * MSEC_PER_LOGICFRAME_REAL;
 				playing->m_virtualLastFrame = frame;
-				if (info->m_soundType == AT_Music) {
+				if (info->m_soundType == AT_Music && !playing->m_audioEventRTS->getPlayMusicOnce()) {
 					while (playing->m_virtualElapsedMs >= playing->m_virtualDurationMs) {
 						playing->m_virtualElapsedMs -= playing->m_virtualDurationMs;
 						++playing->m_completedLoops;
@@ -1514,7 +1521,15 @@ void MiniAudioManager::processPlayingList(void)
 		}
 
 		// Check if sound was explicitly marked to stop
+		const Bool ended = !playing->m_requestStop && (finished || (playing->m_sound && !playing->m_paused && !ma_sound_is_playing(playing->m_sound)));
 		if (playing->m_requestStop || finished || (playing->m_sound && !playing->m_paused && !ma_sound_is_playing(playing->m_sound))) {
+			if (ended && info && info->m_soundType == AT_Music && playing->m_audioEventRTS) {
+				const Int completions = playing->m_completedLoops + 1;
+				AsciiString key = playing->m_audioEventRTS->getEventName();
+				key.toLower();
+				m_completedMusicByName[key] += completions;
+				m_completedMusicByHandle[playing->m_audioEventRTS->getPlayingHandle()] = completions;
+			}
 			if (playing->m_sound) ma_sound_stop(playing->m_sound);
 			if (playing->m_audioEventRTS)
 				notifyOfAudioCompletion(playing->m_audioEventRTS->getPlayingHandle(), playing->m_type);
