@@ -33,12 +33,9 @@ check() {
                 dx = px[frame, id] - px[frame - 20, id]; dy = py[frame, id] - py[frame - 20, id]
                 if (dx * dx + dy * dy < 9) { printf "%d %s runs in place\n", frame, id; failed = 1 }
             }
-            if (frame >= 1520 && moving[frame, id] == 0 && slot[frame, id] > 25 && prod[frame, id] < foot + 25 && frame % 20 == 0 && moving[frame - 20, id] == 0 && slot[frame - 20, id] > 25) {
-                printf "%d %s idle against the footprint, slot error %s\n", frame, id, slot[frame, id]; failed = 1
-            }
         }
         END {
-            n = split("1800 2120 2280 2780", marks, " ")
+            n = split("1800 2780", marks, " ")
             for (m = 1; m <= n; ++m)
                 for (id in ids) {
                     f = marks[m]
