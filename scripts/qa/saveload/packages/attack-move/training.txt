@@ -4,6 +4,7 @@
 200 create PlyrCreeps AttackMoveUnitEnd 0 3300,2060,0
 200 create PlyrCreeps AttackMoveHordeMid 0 3160,2330,0
 200 create PlyrCreeps AttackMoveHordeEnd 0 3300,2280,0
+203 attack-move-hotkey Player_1 AttackMoveUnit 0 Command_AttackMove
 205 attackmove Player_1 AttackMoveUnit 0 200,0
 205 attackmove Player_1 AttackMoveHorde 0 200,0
 230 attack-move-probe Player_1 AttackMoveUnit 0 PlyrCreeps:AttackMoveUnitMid:0,PlyrCreeps:AttackMoveUnitEnd:0

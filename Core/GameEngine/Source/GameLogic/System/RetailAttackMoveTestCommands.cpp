@@ -5,6 +5,9 @@
 #include <cstdio>
 #include <string>
 
+#include "GameClient/ControlBar.h"
+#include "GameClient/HotKey.h"
+#include "GameClient/InGameUI.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "Common/ThingTemplate.h"
@@ -37,6 +40,21 @@ void probe(const RetailTestCommands::Context& ctx)
 		static_cast<int>(position->x), static_cast<int>(position->y), ai->isAttacking(), static_cast<int>(ai->getCurrentStateID()), ai->getGoalPosition() ? static_cast<int>(ai->getGoalPosition()->x) : -1,
 		healthPercent(ctx, mid), healthPercent(ctx, end));
 }
+
+void hotkey(const RetailTestCommands::Context& ctx)
+{
+	Object* unit = ctx.requireObject();
+	const CommandButton* button = TheControlBar ? TheControlBar->findCommandButton(AsciiString(ctx.argument)) : nullptr;
+	if (!unit || !button || !TheHotKeyManager || !TheInGameUI)
+	{
+		std::fprintf(stderr, "TEST attack-move-hotkey frame=%u missing=1\n", ctx.frame);
+		return;
+	}
+	const AsciiString key = TheHotKeyManager->searchHotKey(button->getTextLabel());
+	std::fprintf(stderr, "TEST attack-move-hotkey frame=%u key=%s attack-move=%d needs-target=%d\n", ctx.frame,
+		key.isNotEmpty() ? key.str() : "-", button->getCommandType() == GUI_COMMAND_ATTACK_MOVE,
+		BitIsSet(button->getOptions(), COMMAND_OPTION_NEED_TARGET));
+}
 }
 #endif
 
@@ -46,6 +64,7 @@ void registerRetailAttackMoveTestCommands()
 {
 #if !RTS_GENERALS
 	registerAction("attack-move-probe", probe);
+	registerAction("attack-move-hotkey", hotkey);
 #endif
 }
 }

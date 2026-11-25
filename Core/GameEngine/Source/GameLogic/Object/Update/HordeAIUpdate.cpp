@@ -368,7 +368,9 @@ void HordeAIUpdate::advance(const Coord3D& position)
 {
 	if (isWaitingForPath())
 		return;
-	if (m_order == AICMD_ATTACKMOVE_TO_POSITION || m_plannerOrder)
+	if (m_attackTarget != INVALID_ID)
+		m_advanceAttempts = 0;
+	else if (m_order == AICMD_ATTACKMOVE_TO_POSITION || m_plannerOrder)
 	{
 		const Coord3D& origin = *getObject()->getPosition();
 		const UnsignedInt revision = TheAI->pathfinder()->getRetailRouteRevision();

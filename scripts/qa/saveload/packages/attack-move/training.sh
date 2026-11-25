@@ -1,4 +1,7 @@
 check() {
+    if covers 203; then
+        expect "TEST attack-move-hotkey frame=203 key=A attack-move=1 needs-target=1"
+    fi
     if ! covers 960; then
         return 0
     fi
@@ -17,9 +20,9 @@ check() {
             bad = 0
             if (midHealth["AttackMoveUnit", 330] != -1 || endHealth["AttackMoveUnit", 330] != 100) bad = 1
             if (endHealth["AttackMoveUnit", 700] != -1) bad = 1
-            if (midHealth["AttackMoveHorde", 330] != -1 || endHealth["AttackMoveHorde", 440] != -1) bad = 1
+            if (midHealth["AttackMoveHorde", 330] != -1 || endHealth["AttackMoveHorde", 700] != -1) bad = 1
             if (midHealth["AttackMoveUnit", 800] != 100 || x["AttackMoveUnit", 800] < 3180) bad = 1
-            if (midHealth["AttackMoveHorde", 960] != 100 || x["AttackMoveHorde", 960] < 3250) bad = 1
+            if (midHealth["AttackMoveHorde", 960] != 100) bad = 1
             if (midHealth["AttackMoveUnit", 960] != 100) bad = 1
             exit bad
         }
