@@ -824,6 +824,145 @@ def check_create_a_hero():
                                (out / "game.log").read_text(errors="replace")))
 
 
+def rgb_tuple(value):
+    return (value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF
+
+
+def near_color(rgb, target, tol=16):
+    return all(abs(a - b) <= tol for a, b in zip(rgb, target))
+
+
+def measure_palantir_bar():
+    image = get_image(display, root, 240, 700, 100, 16, 0xFFFFFFFF, 2)
+    try:
+        border = (199, 164, 94)
+        fill = (232, 183, 51)
+        hits = []
+        for dy in range(16):
+            for dx in range(100):
+                rgb = rgb_tuple(get_pixel(image, dx, dy))
+                if near_color(rgb, border, 18) or near_color(rgb, fill, 18):
+                    hits.append((240 + dx, 700 + dy))
+        return hits
+    finally:
+        destroy_image(image)
+
+
+def assert_bar_layout(label):
+    hits = measure_palantir_bar()
+    if len(hits) < 40:
+        capture("failed-bar-" + label, 200, 580, 185, 185)
+        sys.exit(f"FAIL {label}: expected palantir bar pixels, found {len(hits)}")
+    xs = [p[0] for p in hits]
+    ys = [p[1] for p in hits]
+    min_x, max_x, min_y, max_y = min(xs), max(xs), min(ys), max(ys)
+    overflow = [p for p in hits if p[0] >= 311]
+    if overflow or min_x < 254 or max_x > 310 or min_y < 703 or max_y > 711:
+        capture("failed-bar-" + label, 200, 580, 185, 185)
+        sys.exit(f"FAIL {label}: bar bounds x={min_x}..{max_x} y={min_y}..{max_y} overflow={len(overflow)}")
+    for px, py in ((min_x, min_y), (max_x, min_y), (min_x, max_y), (max_x, max_y)):
+        if (px - 288) ** 2 + (py - 662) ** 2 > 76 ** 2:
+            sys.exit(f"FAIL {label}: bar corner ({px},{py}) outside portrait circle")
+    if (max_x - 329) ** 2 + (max_y - 726) ** 2 <= 21 ** 2:
+        sys.exit(f"FAIL {label}: bar overlaps RingButton5 socket")
+    if max_y >= 717:
+        sys.exit(f"FAIL {label}: bar overlaps RingButton6 socket")
+    print(f"PASS {label}: bar x={min_x}..{max_x} y={min_y}..{max_y} clear of buttons", flush=True)
+
+
+def check_palantir_bars():
+    wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully"), 100)
+    time.sleep(2)
+    start_match(0)
+    wait_for("Aragorn is selected for level bar check", lambda: log_count("TEST hud 40 ") >= 1, 100)
+    time.sleep(0.5)
+    capture("palantir-level-bar", 200, 580, 185, 185)
+    assert_bar_layout("level-bar")
+    wait_for("summoned horde is selected for timer bar check", lambda: log_count("TEST hud 90 ") >= 1, 100)
+    time.sleep(0.5)
+    capture("palantir-timer-bar", 200, 580, 185, 185)
+    assert_bar_layout("timer-bar")
+
+
+def check_hero_roster():
+    wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully"), 100)
+    time.sleep(2)
+    start_match(0)
+    wait_for("Haldir is spawned on the hero roster", lambda: log_count("TEST hud 45 ") >= 1, 100)
+    time.sleep(0.5)
+    capture("hero-roster", 360, 680, 220, 88)
+    image = get_image(display, root, 474, 699, 56, 56, 0xFFFFFFFF, 2)
+    try:
+        samples = [
+            rgb_tuple(get_pixel(image, dx, dy))
+            for dx, dy in ((8, 22), (8, 28), (10, 18), (46, 22), (46, 28), (44, 18))
+        ]
+    finally:
+        destroy_image(image)
+    black_disc = sum(1 for r, g, b in samples if r <= 10 and g <= 10 and b <= 10)
+    if black_disc == len(samples):
+        sys.exit(f"FAIL hero roster portrait still has opaque black disc: samples={samples}")
+    print(f"PASS hero roster backing has no opaque black disc: samples={samples}", flush=True)
+
+
+def hud_slots_at(frame):
+    log = (out / "game.log").read_text(errors="replace")
+    return re.findall(rf"^TEST hud {frame} slot=(\d+) (\S+) type=(\d+) (\S+)", log, re.MULTILINE)
+
+
+def check_multi_select():
+    wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully"), 100)
+    time.sleep(2)
+    start_match(0)
+
+    wait_for("all-heroes multi-select hud logged", lambda: log_count("TEST hud 50 ") >= 1, 100)
+    time.sleep(0.5)
+    capture("multi-all-heroes", 200, 580, 185, 185)
+    slots_heroes = hud_slots_at(50)
+    ring_heroes = [s for s in slots_heroes if int(s[0]) < 6]
+    if len(ring_heroes) < 2:
+        sys.exit(f"FAIL all-heroes multi-select showed too few ring buttons: {slots_heroes}")
+    assert_bar_layout("multi-all-heroes")
+    print(f"PASS all-heroes multi-select buttons={[s[1] for s in ring_heroes]}", flush=True)
+
+    wait_for("mixed hero+battalion multi-select hud logged", lambda: log_count("TEST hud 90 ") >= 1, 100)
+    time.sleep(0.5)
+    capture("multi-mixed-hero", 200, 580, 185, 185)
+    slots_mixed_hero = hud_slots_at(90)
+    ring_mixed_hero = [s for s in slots_mixed_hero if int(s[0]) < 6]
+    if [s[1] for s in ring_mixed_hero] != [s[1] for s in ring_heroes]:
+        sys.exit(f"FAIL mixed hero+battalion buttons {ring_mixed_hero} != hero buttons {ring_heroes}")
+    assert_bar_layout("multi-mixed-hero")
+    print(f"PASS mixed hero+battalion multi-select shows hero buttons and level", flush=True)
+
+    wait_for("same-type battalions multi-select hud logged", lambda: log_count("TEST hud 130 ") >= 1, 100)
+    time.sleep(0.5)
+    capture("multi-same-battalions", 200, 580, 185, 185)
+    slots_same = hud_slots_at(130)
+    ring_same = [s for s in slots_same if int(s[0]) < 6]
+    if len(ring_same) < 3:
+        sys.exit(f"FAIL same-type battalions multi-select showed too few ring buttons: {slots_same}")
+    assert_bar_layout("multi-same-battalions")
+    print(f"PASS same-type battalions multi-select buttons={[s[1] for s in ring_same]}", flush=True)
+
+    wait_for("mixed non-hero battalions multi-select hud logged", lambda: log_count("TEST hud 170 ") >= 1, 100)
+    time.sleep(0.5)
+    capture("multi-mixed-battalions", 200, 580, 185, 185)
+    slots_mixed = hud_slots_at(170)
+    ring_mixed = [s for s in slots_mixed if int(s[0]) < 6]
+    if not any("Stance" in s[1] for s in ring_mixed):
+        sys.exit(f"FAIL mixed battalions multi-select missing common stance button: {slots_mixed}")
+    assert_bar_layout("multi-mixed-battalions")
+    print(f"PASS mixed battalions multi-select buttons={[s[1] for s in ring_mixed]}", flush=True)
+
+    wait_for("mixed battalion+porter multi-select hides mismatched level", lambda: log_count("TEST hud 210 ") >= 1, 100)
+    time.sleep(0.5)
+    if len(measure_palantir_bar()) >= 20:
+        capture("failed-multi-mismatch", 200, 580, 185, 185)
+        sys.exit("FAIL mixed battalion+porter still drew a level bar")
+    print("PASS mixed battalion+porter hides level bar", flush=True)
+
+
 def launch_game(*options, log_mode="wb"):
     speed = ["-fps", "120"] if "--create-a-hero" in sys.argv else []
     with (out / "game.log").open(log_mode) as log:
@@ -867,6 +1006,44 @@ commands.write_text(("15 pkg44-points Player_1 - 0 10\n" if "--spellbook" in sys
      if "--save-load" in sys.argv or "--all" in sys.argv else ""))
 if "--shell-load" in sys.argv:
     commands.write_text("30 shell-setup - - 0\n89 shell-crc - - 0\n90 snapshot-save - - 0 shell-qa.sav\n91 shell-crc - - 0\n")
+if "--palantir-bars" in sys.argv:
+    commands.write_text(
+        "20 spawn Player_1 GondorAragorn 0\n"
+        "30 select Player_1 GondorAragorn 0\n"
+        "40 hud - - 0\n"
+        "70 spawn Player_1 DwarvenPhalanxHorde_Summoned 0\n"
+        "80 select Player_1 DwarvenPhalanxHorde_Summoned 0\n"
+        "90 hud - - 0\n"
+    )
+if "--hero-roster" in sys.argv:
+    commands.write_text(
+        "20 spawn Player_1 ElvenHaldir 0\n"
+        "30 select Player_1 ElvenHaldir 0\n"
+        "45 hud - - 0\n"
+    )
+if "--multi-select" in sys.argv:
+    commands.write_text(
+        "20 spawn Player_1 GondorAragorn 0\n"
+        "21 spawn Player_1 GondorBoromir 0\n"
+        "22 spawn Player_1 GondorFighterHorde 0\n"
+        "23 spawn Player_1 GondorFighterHorde 0\n"
+        "24 spawn Player_1 GondorArcherHorde 0\n"
+        "35 select Player_1 GondorAragorn 0\n"
+        "36 selectadd Player_1 GondorBoromir 0\n"
+        "50 hud - - 0\n"
+        "75 select Player_1 GondorFighterHorde 0\n"
+        "76 selectadd Player_1 GondorAragorn 0\n"
+        "90 hud - - 0\n"
+        "115 select Player_1 GondorFighterHorde 0\n"
+        "116 selectadd Player_1 GondorFighterHorde 1\n"
+        "130 hud - - 0\n"
+        "155 select Player_1 GondorFighterHorde 0\n"
+        "156 selectadd Player_1 GondorArcherHorde 0\n"
+        "170 hud - - 0\n"
+        "195 select Player_1 GondorFighterHorde 0\n"
+        "196 selectadd Player_1 MenPorter 0\n"
+        "210 hud - - 0\n"
+    )
 env = os.environ | {
     "XDG_DATA_HOME": str(out / "data"),
     "XDG_CONFIG_HOME": str(out / "config"),
@@ -915,6 +1092,12 @@ def run(check_session):
 
 if "--create-a-hero" in sys.argv:
     run(check_create_a_hero)
+elif "--palantir-bars" in sys.argv:
+    run(check_palantir_bars)
+elif "--hero-roster" in sys.argv:
+    run(check_hero_roster)
+elif "--multi-select" in sys.argv:
+    run(check_multi_select)
 elif "--shell-load" in sys.argv:
     run(check_shell_load)
 elif "--options" in sys.argv:
