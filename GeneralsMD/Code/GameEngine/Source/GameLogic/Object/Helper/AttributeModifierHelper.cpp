@@ -9,7 +9,6 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
 #include "Common/NameKeyGenerator.h"
-#include "Common/Player.h"
 #include "Common/SpecialPowerINI.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
@@ -47,22 +46,6 @@ AttributeModifierHelper* helperOf(const Object* obj)
 const UpgradeTemplate* upgradeNamed(const AsciiString& name)
 {
 	return TheUpgradeCenter ? TheUpgradeCenter->findUpgrade(name) : nullptr;
-}
-
-void grantNamedUpgrade(Object* object, const AsciiString& name)
-{
-	const UpgradeTemplate* upgrade = upgradeNamed(name);
-	if (!upgrade)
-		return;
-	if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
-	{
-		Player* player = object->getControllingPlayer();
-		if (player && !player->hasUpgradeComplete(upgrade))
-			player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
-		return;
-	}
-	if (!object->hasUpgrade(upgrade))
-		object->giveUpgrade(upgrade);
 }
 
 Owner makeOwner(UnsignedInt objectID, NameKeyType moduleKey)
@@ -237,7 +220,11 @@ void AttributeModifierHelper::grantUpgrades( Int list )
 		return;
 	}
 	for (const AsciiString& name : tmpl->m_upgradeNames)
-		grantNamedUpgrade(getObject(), name);
+	{
+		const UpgradeTemplate* upgrade = upgradeNamed(name);
+		if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && !getObject()->hasUpgrade(upgrade))
+			getObject()->giveUpgrade(upgrade);
+	}
 }
 
 void AttributeModifierHelper::revokeUpgrades( Int list )
@@ -394,7 +381,11 @@ UpdateSleepTime AttributeModifierHelper::update()
 		if (!tmpl || !m_stack.contains(pending.list))
 			continue;
 		for (const AsciiString& name : tmpl->m_upgradeNames)
-			grantNamedUpgrade(getObject(), name);
+		{
+			const UpgradeTemplate* upgrade = upgradeNamed(name);
+			if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && !getObject()->hasUpgrade(upgrade))
+				getObject()->giveUpgrade(upgrade);
+		}
 	}
 
 	const std::vector<int> expired = m_stack.expire(now);
