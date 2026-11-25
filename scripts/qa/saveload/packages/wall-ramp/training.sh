@@ -31,6 +31,16 @@ check() {
             END { if (!supported) { print "Climber fell at the ramp and wall join"; exit 1 } }
         ' "$log"
     fi
+    if covers 245; then
+        awk '
+            $1 == "TEST" && $2 == "wall-ramp-pinched" && $3 == "frame=245" {
+                split($5, own, "="); split($6, stale, "=")
+                if (own[2] > 0) stamped = 1
+                if (stale[2] > 0) old = 1
+            }
+            END { if (!stamped || old) { print "Wall footprint left stale pinched cells"; exit 1 } }
+        ' "$log"
+    fi
     if covers 300; then
         awk '
             $1 == "TEST" && $2 == "wall-ramp-unit" && $3 == "frame=300" && $4 == "name=WallRampClimber" {

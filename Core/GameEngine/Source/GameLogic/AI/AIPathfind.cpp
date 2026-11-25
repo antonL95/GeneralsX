@@ -675,6 +675,81 @@ void Pathfinder::reattachRetailFootprintAfterTransform(Object* obj)
 		TheAI->pathfinder()->classifyObjectFootprint(obj, TRUE);
 }
 
+void Pathfinder::classifyPinchedCells( const IRegion2D &cellBounds )
+{
+	Int i, j;
+
+	for( j=cellBounds.lo.y; j<=cellBounds.hi.y; j++ )
+	{
+		for( i=cellBounds.lo.x; i<=cellBounds.hi.x; i++ )
+		{
+			m_map[i][j].setPinched(false);
+			if (m_map[i][j].getType() == PathfindCell::CELL_CLEAR) {
+				Int totalCount = 0;
+				Int orthogonalCount = 0;
+				Int k, l;
+				for (k=i-1; k<i+2; k++) {
+					if (k<m_extent.lo.x || k> m_extent.hi.x) continue;
+					for (l=j-1; l<j+2; l++) {
+						if (l<m_extent.lo.y || l> m_extent.hi.y) continue;
+						if ((k==i) && (j==l)) continue;
+						if (m_map[k][l].getType() == PathfindCell::CELL_CLEAR) {
+							totalCount++;
+							if ((k==i) || (l==j)) {
+								orthogonalCount++;
+							}
+						}
+
+					}
+				}
+				if (orthogonalCount<2 || totalCount<4) {
+					m_map[i][j].setPinched(true);
+				}
+			}
+		}
+	}
+
+#if RETAIL_COMPATIBLE_PATHFINDING
+	for( j=cellBounds.lo.y; j<=cellBounds.hi.y; j++ )
+	{
+		for( i=cellBounds.lo.x; i<=cellBounds.hi.x; i++ )
+		{
+			if (m_map[i][j].getPinched() && (m_map[i][j].getType() == PathfindCell::CELL_CLEAR)) {
+				m_map[i][j].setType(PathfindCell::CELL_IMPASSABLE);
+				m_map[i][j].setPinched(false);
+			}
+		}
+	}
+#endif
+
+	for( j=cellBounds.lo.y; j<=cellBounds.hi.y; j++ )
+	{
+		for( i=cellBounds.lo.x; i<=cellBounds.hi.x; i++ )
+		{
+			if (m_map[i][j].getType() == PathfindCell::CELL_CLEAR) {
+				Bool objectAdjacent = false;
+				Int k, l;
+				for (k=i-1; k<i+2; k++) {
+					if (k<m_extent.lo.x || k> m_extent.hi.x) continue;
+					for (l=j-1; l<j+2; l++) {
+						if (l<m_extent.lo.y || l> m_extent.hi.y) continue;
+						if ((k==i) && (l==j)) continue;
+						if ((k!=i) && (l!=j)) continue;
+						if (m_map[k][l].getType() == PathfindCell::CELL_OBSTACLE) {
+							objectAdjacent = true;
+							break;
+						}
+
+					}
+				}
+				if (objectAdjacent) {
+					m_map[i][j].setPinched(true);
+				}
+			}
+		}
+	}
+}
+
 /**
  * Classify the cells under the given object
  * If 'insert' is true, object is being added
@@ -735,6 +810,9 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 				if (changed)
 					cell.setZone(PathfindZoneManager::UNINITIALIZED_ZONE);
 			}
+		IRegion2D pinchBounds = {{left - 2, bottom - 2}, {right + 2, top + 2}};
+		pinchBounds.intersectWith(m_extent);
+		classifyPinchedCells(pinchBounds);
 		if (insert)
 			m_retailTrackedFootprints.insert(obj->getID());
 	}
@@ -1092,79 +1170,7 @@ void Pathfinder::internal_classifyObjectFootprint( Object *obj, Bool insert )
 			}
 		}
 	}
-	// Check for pinched cells, and close them off.
-
-	for( j=cellBounds.lo.y; j<=cellBounds.hi.y; j++ )
-	{
-		for( i=cellBounds.lo.x; i<=cellBounds.hi.x; i++ )
-		{
-			m_map[i][j].setPinched(false);
-			if (m_map[i][j].getType() == PathfindCell::CELL_CLEAR) {
-				Int totalCount = 0;
-				Int orthogonalCount = 0;
-				Int k, l;
-				for (k=i-1; k<i+2; k++) {
-					if (k<m_extent.lo.x || k> m_extent.hi.x) continue;
-					for (l=j-1; l<j+2; l++) {
-						if (l<m_extent.lo.y || l> m_extent.hi.y) continue;
-						if ((k==i) && (j==l)) continue;
-						if (m_map[k][l].getType() == PathfindCell::CELL_CLEAR) {
-							totalCount++;
-							if ((k==i) || (l==j)) {
-								orthogonalCount++;
-							}
-						}
-
-					}
-				}
-				// If the total open cells are < 2 or total cells < 4, we are pinched.
-				if (orthogonalCount<2 || totalCount<4) {
-					m_map[i][j].setPinched(true);
-				}
-			}
-		}
-	}
-
-#if RETAIL_COMPATIBLE_PATHFINDING
-	for( j=cellBounds.lo.y; j<=cellBounds.hi.y; j++ )
-	{
-		for( i=cellBounds.lo.x; i<=cellBounds.hi.x; i++ )
-		{
-			if (m_map[i][j].getPinched() && (m_map[i][j].getType() == PathfindCell::CELL_CLEAR)) {
-				m_map[i][j].setType(PathfindCell::CELL_IMPASSABLE);
-				m_map[i][j].setPinched(false);
-			}
-		}
-	}
-#endif
-
-	// Expand building bounds 1 cell.
-	for( j=cellBounds.lo.y; j<=cellBounds.hi.y; j++ )
-	{
-		for( i=cellBounds.lo.x; i<=cellBounds.hi.x; i++ )
-		{
-			if (m_map[i][j].getType() == PathfindCell::CELL_CLEAR) {
-				Bool objectAdjacent = false;
-				Int k, l;
-				for (k=i-1; k<i+2; k++) {
-					if (k<m_extent.lo.x || k> m_extent.hi.x) continue;
-					for (l=j-1; l<j+2; l++) {
-						if (l<m_extent.lo.y || l> m_extent.hi.y) continue;
-						if ((k==i) && (l==j)) continue;
-						if ((k!=i) && (l!=j)) continue;
-						if (m_map[k][l].getType() == PathfindCell::CELL_OBSTACLE) {
-							objectAdjacent = true;
-							break;
-						}
-
-					}
-				}
-				if (objectAdjacent) {
-					m_map[i][j].setPinched(true);
-				}
-			}
-		}
-	}
+	classifyPinchedCells(cellBounds);
 }
 
 /**

@@ -336,6 +336,7 @@ protected:
 	void classifyObjectFootprint( Object *obj, Bool insert );	/** Classify the cells under the given object
 																																If 'insert' is true, object is being added
 																																If 'insert' is false, object is being removed */
+	void classifyPinchedCells( const IRegion2D &cellBounds );
 	void internal_classifyObjectFootprint( Object *obj, Bool insert );	/** Classify the cells under the given object
 																																If 'insert' is true, object is being added
 																																If 'insert' is false, object is being removed */

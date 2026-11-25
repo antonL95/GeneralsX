@@ -10,6 +10,8 @@
 220 track Player_1 WallRampClimber 0
 220 track Player_1 WallRampBlocker 0
 220 wall-ramp-unit Player_1 WallRampClimber 0
+245 wall-ramp-pinched Player_1 AotREdorasStairs01 0
+245 wall-ramp-pinched Player_1 AotREdorasWall01 0
 244 wall-ramp-unit Player_1 WallRampClimber 0
 300 wall-ramp-unit Player_1 WallRampClimber 0
 400 wall-ramp-unit Player_1 WallRampClimber 0

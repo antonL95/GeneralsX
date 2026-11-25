@@ -52,6 +52,35 @@ void probeFootprint(const RetailTestCommands::Context& ctx)
 	}
 }
 
+void probePinched(const RetailTestCommands::Context& ctx)
+{
+	Object* object = ctx.requireObject(FALSE);
+	if (!object)
+		return;
+	ICoord2D center;
+	TheAI->pathfinder()->worldToCell(object->getPosition(), &center);
+	const ICoord2D sides[] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+	Int own = 0, stale = 0;
+	for (Int x = center.x - 20; x <= center.x + 20; ++x)
+		for (Int y = center.y - 20; y <= center.y + 20; ++y)
+		{
+			const PathfindCell* cell = TheAI->pathfinder()->getCell(LAYER_GROUND, x, y);
+			if (!cell || !cell->isSoleObstacle(object->getID()))
+				continue;
+			++own;
+			if (cell->getPinched())
+				++stale;
+			for (const ICoord2D& side : sides)
+			{
+				const PathfindCell* next = TheAI->pathfinder()->getCell(LAYER_GROUND, x + side.x, y + side.y);
+				if (next && next->getType() == PathfindCell::CELL_CLEAR && !next->getPinched())
+					++stale;
+			}
+		}
+	std::fprintf(stderr, "TEST wall-ramp-pinched frame=%u name=%s own=%d stale=%d\n",
+		ctx.frame, object->getTemplate()->getName().str(), own, stale);
+}
+
 void revokeUpgrade(const RetailTestCommands::Context& ctx)
 {
 	Object* object = ctx.requireObject(FALSE);
@@ -176,6 +205,7 @@ void registerRetailWallRampTestCommands()
 	registerAction("wall-ramp-unit", probeUnit);
 	registerAction("wall-ramp-footprint", probeFootprint);
 	registerAction("wall-ramp-revoke", revokeUpgrade);
+	registerAction("wall-ramp-pinched", probePinched);
 #endif
 }
 }
