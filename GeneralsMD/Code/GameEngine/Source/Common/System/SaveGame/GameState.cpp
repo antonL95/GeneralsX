@@ -773,7 +773,7 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	// check for error
 	if( error == TRUE )
 	{
-		// clear it out, again
+		TheGameLogic->discardSleepyUpdates();
 		if (TheGameLogic->isInGame())
 			TheGameLogic->clearGameData( FALSE );
 		TheGameEngine->reset();
