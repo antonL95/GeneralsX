@@ -1,30 +1,19 @@
-205 create Player_1 GondorFighter 0 1830,3260,0
-205 create Player_1 GondorFighter 0 1900,3260,0
-205 create Player_1 GondorFighter 0 1970,3260,0
-205 create Player_1 GondorFighter 0 1830,3330,0
-205 create Player_1 GondorFighter 0 1970,3330,0
-205 create Player_1 GondorFighter 0 1830,3400,0
-205 create Player_1 GondorFighter 0 1900,3400,0
-205 create Player_1 GondorFighter 0 1970,3400,0
-205 create Player_1 GondorFighter 0 2330,3250,0
-205 create Player_1 GondorFighter 0 2360,3250,0
-205 create Player_1 GondorFighter 0 2345,3225,0
-205 create Player_1 GondorFighter 0 2345,3275,0
-200 create Player_1 ShireShirriffsQuarters 0 1900,3330,0
-200 create Player_1 RivendellDunedainGathering 0 2200,3330,0
-200 create Player_1 GondorStable 0 2500,3330,0
+200 create Player_1 ElvenBarracks 0 1800,3050,0
+200 create Player_1 ElvenBarracks 0 1500,2950,0
 201 cash Player_1 - 0 100000
-210 rally Player_1 ShireShirriffsQuarters 0 - 1900 3450
-210 rally Player_1 RivendellDunedainGathering 0 - 2200 3350
-210 rally Player_1 GondorStable 0 - 2500 3250
-211 production-exit-queue Player_1 ShireShirriffsQuarters 0 ShireBounderHorde
-212 production-exit-queue Player_1 ShireShirriffsQuarters 0 ShireBounderHorde
-213 production-exit-queue Player_1 ShireShirriffsQuarters 0 ShireBounderHorde
-214 production-exit-queue Player_1 RivendellDunedainGathering 0 ArnorRangerHorde
-215 production-exit-queue Player_1 RivendellDunedainGathering 0 ArnorRangerHorde
-216 production-exit-queue Player_1 RivendellDunedainGathering 0 ArnorRangerHorde
-217 production-exit-queue Player_1 GondorStable 0 GondorPinnathGelinRiderHorde
-218 production-exit-queue Player_1 GondorStable 0 GondorPinnathGelinRiderHorde
-219 production-exit-queue Player_1 GondorStable 0 GondorPinnathGelinRiderHorde
-1250 exit-stuck-move Player_1 ShireShirriffsQuarters 0 1700,3330
-1250 exit-stuck-move Player_1 GondorStable 0 2500,3150
+203 grant Player_1 - 0 Upgrade_ElvenBarracksLevel2
+204 grant Player_1 - 0 Upgrade_ElvenBarracksLevel3
+210 production-exit-queue Player_1 ElvenBarracks 0 LorienStalkerHorde
+211 production-exit-queue Player_1 ElvenBarracks 1 GaladhrimWarriorHorde
+1500 exit-stuck-move Player_1 ElvenBarracks 0 1620,3052,LorienStalkerHorde
+1500 exit-stuck-move Player_1 ElvenBarracks 1 1350,2955,GaladhrimWarriorHorde
+1900 exit-stuck-move Player_1 ElvenBarracks 0 2000,2850,LorienStalkerHorde
+1900 exit-stuck-move Player_1 ElvenBarracks 1 1700,2750,GaladhrimWarriorHorde
+2050 exit-stuck-laggard Player_1 ElvenBarracks 0 60,0,LorienStalkerHorde
+2050 exit-stuck-laggard Player_1 ElvenBarracks 1 60,0,GaladhrimWarriorHorde
+2200 exit-stuck-move Player_1 ElvenBarracks 0 1620,3052,LorienStalkerHorde
+2200 exit-stuck-move Player_1 ElvenBarracks 1 1350,2955,GaladhrimWarriorHorde
+2395 destroy Player_1 LorienStalkerHorde 0
+2395 destroy Player_1 GaladhrimWarriorHorde 0
+2396 destroy Player_1 ElvenBarracks 0
+2396 destroy Player_1 ElvenBarracks 1

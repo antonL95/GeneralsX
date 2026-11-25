@@ -1,2 +1,0 @@
-1800 exit-stuck-move Player_1 ShireShirriffsQuarters 0 1700,3330
-2300 exit-stuck-move Player_1 ShireShirriffsQuarters 0 1700,3330
