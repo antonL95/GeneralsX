@@ -238,7 +238,7 @@ void drawFilledCircle(Int x, Int y, Int width, Int height, Color color)
 
 void drawAutoAbilitySparkles(Int x, Int y, Int width, Int height)
 {
-	static AptScene sparkles("Palantir", AptScene::LabeledLoop{"_loop"});
+	static AptScene sparkles("Palantir", AptScene::AnimatedPath{{"AutoAbilityOverlays", "0"}, "_loop"});
 	const Int frames = sparkles.frameCount();
 	if (frames <= 0 || !TheGameLogic)
 		return;

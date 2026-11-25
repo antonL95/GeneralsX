@@ -597,24 +597,108 @@ public:
 		return box;
 	}
 
-	size_t labeledSprite(const Movie &movie, const char *label) const
+	std::optional<size_t> labeledFrame(const Movie &movie, size_t sprite, const char *label) const
+	{
+		if (!sprite || !label)
+			return {};
+		const Reader &r = movie.apt;
+		const std::string wanted = lowerName(label);
+		const auto [count, table] = r.list(sprite + 8, 8);
+		for (size_t frame = 0; frame < count; ++frame)
+		{
+			const auto [items, itemTable] = r.list(table + 8 * frame, 4);
+			for (size_t i = 0; i < items; ++i)
+			{
+				const size_t q = r.number(itemTable + 4 * i);
+				if (q && r.number(q) == 2 && lowerName(r.string(q + 4)) == wanted)
+					return frame;
+			}
+		}
+		return {};
+	}
+
+	size_t loopEndFrame(const Movie &movie, size_t sprite, size_t startFrame, const char *label) const
 	{
 		const Reader &r = movie.apt;
-		for (size_t index = 1; index < movie.characters.size(); ++index)
+		const auto [count, table] = r.list(sprite + 8, 8);
+		if (!label)
+			return count;
+		const std::string wanted = lowerName(label);
+		for (size_t frame = startFrame; frame < count; ++frame)
 		{
-			const size_t p = movie.characters[index];
-			if (!p || r.number(p) != 5 || r.number(p + 4) != 0x09876543)
-				continue;
-			const auto [count, table] = r.list(p + 8, 8);
-			for (size_t frame = 0; frame < count; ++frame)
+			const auto [items, itemTable] = r.list(table + 8 * frame, 4);
+			for (size_t i = 0; i < items; ++i)
 			{
-				const auto [items, itemTable] = r.list(table + 8 * frame, 4);
-				for (size_t i = 0; i < items; ++i)
+				const size_t q = r.number(itemTable + 4 * i);
+				if (!q || r.number(q) != 1)
+					continue;
+				const size_t action = r.number(q + 4);
+				if (action < r.bytes.size() && r.bytes[action] == 0x8C)
 				{
-					const size_t q = r.number(itemTable + 4 * i);
-					if (q && r.number(q) == 2 && lowerName(r.string(q + 4)) == label)
-						return p;
+					const size_t target = (action + 4) & ~size_t(3);
+					if (lowerName(r.string(target)) == wanted)
+						return frame + 1;
 				}
+			}
+		}
+		return count;
+	}
+
+	size_t namedChildSprite(const Movie &movie, size_t container, const char *name) const
+	{
+		if (!container || !name)
+			return 0;
+		const Reader &r = movie.apt;
+		const std::string wanted = lowerName(name);
+		const auto [count, table] = r.list(container + 8, 8);
+		for (size_t frame = 0; frame < count; ++frame)
+		{
+			const auto [items, itemTable] = r.list(table + 8 * frame, 4);
+			for (size_t i = 0; i < items; ++i)
+			{
+				const size_t q = r.number(itemTable + 4 * i);
+				if (!q || r.number(q) != 3)
+					continue;
+				const uint32_t flags = r.number(q + 4);
+				if ((flags & 2) && (flags & 32) && lowerName(r.string(q + 52)) == wanted)
+				{
+					const size_t index = r.number(q + 12);
+					if (index < movie.characters.size())
+					{
+						const size_t child = movie.characters[index];
+						if (child && r.number(child) == 5 && r.number(child + 4) == 0x09876543)
+							return child;
+					}
+				}
+			}
+		}
+		return 0;
+	}
+
+	size_t descendantLoopSprite(const Movie &movie, size_t sprite, const char *label, Int depth) const
+	{
+		if (!sprite || depth > 4)
+			return 0;
+		if (!label || labeledFrame(movie, sprite, label))
+			return sprite;
+		const Reader &r = movie.apt;
+		const auto [count, table] = r.list(sprite + 8, 8);
+		for (size_t frame = 0; frame < count; ++frame)
+		{
+			const auto [items, itemTable] = r.list(table + 8 * frame, 4);
+			for (size_t i = 0; i < items; ++i)
+			{
+				const size_t q = r.number(itemTable + 4 * i);
+				if (!q || r.number(q) != 3 || !(r.number(q + 4) & 2))
+					continue;
+				const size_t index = r.number(q + 12);
+				if (index >= movie.characters.size())
+					continue;
+				const size_t child = movie.characters[index];
+				if (!child || r.number(child) != 5 || r.number(child + 4) != 0x09876543)
+					continue;
+				if (const size_t found = descendantLoopSprite(movie, child, label, depth + 1))
+					return found;
 			}
 		}
 		return 0;
@@ -760,15 +844,16 @@ AptScene::~AptScene() = default;
 
 AptScene::AptScene(const char *movie, AnimatedExport exported)
 {
-	loadAnimated(movie, exported.name, nullptr, 120);
+	loadAnimated(movie, exported.name, {}, nullptr, 120);
 }
 
-AptScene::AptScene(const char *movie, LabeledLoop loop)
+AptScene::AptScene(const char *movie, AnimatedPath target)
 {
-	loadAnimated(movie, nullptr, loop.label, 256);
+	loadAnimated(movie, nullptr, target.path, target.loopLabel, 256);
 }
 
-void AptScene::loadAnimated(const char *movie, const char *exportName, const char *loopLabel, size_t maxFrames)
+void AptScene::loadAnimated(const char *movie, const char *exportName, std::initializer_list<const char *> path,
+	const char *loopLabel, size_t maxFrames)
 {
 	try
 	{
@@ -786,18 +871,26 @@ void AptScene::loadAnimated(const char *movie, const char *exportName, const cha
 		}
 		else
 		{
-			character = data->labeledSprite(*root, loopLabel);
+			size_t node = root->root;
+			for (const char *segment : path)
+				node = data->namedChildSprite(*root, node, segment);
+			character = data->descendantLoopSprite(*root, node, loopLabel, 0);
 		}
 		if (!character || root->apt.number(character) != 5 || root->apt.number(character + 4) != 0x09876543)
 			return;
-		const size_t count = root->apt.list(character + 8, 8).first;
-		if (!count || count > maxFrames)
+		const size_t total = root->apt.list(character + 8, 8).first;
+		if (!total || total > maxFrames)
+			return;
+		const size_t startFrame = data->labeledFrame(*root, character, loopLabel).value_or(0);
+		const size_t endFrame = data->loopEndFrame(*root, character, startFrame, loopLabel);
+		if (endFrame <= startFrame)
 			return;
 
 		Bool hasArt = FALSE;
-		for (size_t frame = 1; frame <= count; ++frame)
+		const char *rootName = exportName ? exportName : (loopLabel ? loopLabel : "_anim");
+		for (size_t frame = startFrame + 1; frame <= endFrame; ++frame)
 		{
-			data->timeline(*root, character + 8, {}, {}, exportName ? exportName : loopLabel, 0, nullptr, frame);
+			data->timeline(*root, character + 8, {}, {}, rootName, 0, nullptr, frame);
 			hasArt = hasArt || !data->art.empty();
 			data->frames.emplace_back(std::move(data->art));
 			data->art.clear();
