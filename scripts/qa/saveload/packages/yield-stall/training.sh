@@ -1,10 +1,9 @@
 prepare() {
     frame=20
     while [ "$frame" -le 700 ] && [ "$frame" -le "$end" ]; do
-        printf '%s yield-stall-probe Player_1 YieldStallCavalryYield 0 2500,2600\n' "$frame"
-        printf '%s yield-stall-probe Player_1 YieldStallCavalryAway 0 2500,2900\n' "$frame"
-        printf '%s yield-stall-probe Player_1 YieldStallInfantry 0 2500,2000\n' "$frame"
-        printf '%s yield-stall-probe Player_1 YieldStallSingle 0 2500,2300\n' "$frame"
+        printf '%s yield-stall-probe Player_1 YieldStallGroupCavalry 0 2500,3300\n' "$frame"
+        printf '%s yield-stall-probe Player_1 YieldStallGroupInfantry 0 2500,3450\n' "$frame"
+        printf '%s yield-stall-probe Player_1 YieldStallGroupSingle 0 2500,3600\n' "$frame"
         frame=$((frame + 5))
     done
 }
@@ -20,6 +19,6 @@ check() {
                 failed = 1
             }
         }
-        END { exit (seen != 4 || failed) }
+        END { exit (seen != 3 || failed) }
     ' "$log"
 }

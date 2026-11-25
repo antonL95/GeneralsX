@@ -63,12 +63,13 @@ void probeYieldStall(const RetailTestCommands::Context& ctx)
 	const Bool idle = ai && ai->isIdle();
 	if (idle && distanceBetween(*anchor->getPosition(), destination) > 40.0f)
 		idleShort = 1;
-	std::fprintf(stderr, "TEST yield-stall %u %s %s members=%u anchor=%.3f slot=%.3f far=%.3f idle=%d idleshort=%u state=%d pos=%.1f,%.1f goal=%.1f,%.1f end=%.1f,%.1f\n",
+	std::fprintf(stderr, "TEST yield-stall %u %s %s members=%u anchor=%.3f slot=%.3f far=%.3f idle=%d idleshort=%u state=%d pos=%.1f,%.1f goal=%.1f,%.1f end=%.1f,%.1f desired=%.2f scale=%.3f blocked=%d\n",
 		ctx.frame, anchor->getTemplate()->getName().str(), ctx.argument, members,
 		distanceBetween(*anchor->getPosition(), destination), worstSlot, worstDestination,
 		static_cast<int>(idle), idleShort, ai ? static_cast<int>(ai->getCurrentStateID()) : -1,
 		anchor->getPosition()->x, anchor->getPosition()->y, ai ? ai->getGoalPosition()->x : 0.0f, ai ? ai->getGoalPosition()->y : 0.0f,
-		pathEnd ? pathEnd->x : 0.0f, pathEnd ? pathEnd->y : 0.0f);
+		pathEnd ? pathEnd->x : 0.0f, pathEnd ? pathEnd->y : 0.0f,
+		ai ? ai->getDesiredSpeed() : 0.0f, horde ? horde->getFormationSpeedScale() : 1.0f, ai ? ai->getNumFramesBlocked() : 0);
 }
 }
 #endif
