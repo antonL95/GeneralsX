@@ -222,7 +222,7 @@ void AttributeModifierHelper::grantUpgrades( Int list )
 	for (const AsciiString& name : tmpl->m_upgradeNames)
 	{
 		const UpgradeTemplate* upgrade = upgradeNamed(name);
-		if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && !getObject()->hasUpgrade(upgrade))
+		if (upgrade && !getObject()->hasUpgrade(upgrade))
 			getObject()->giveUpgrade(upgrade);
 	}
 }
@@ -383,7 +383,7 @@ UpdateSleepTime AttributeModifierHelper::update()
 		for (const AsciiString& name : tmpl->m_upgradeNames)
 		{
 			const UpgradeTemplate* upgrade = upgradeNamed(name);
-			if (upgrade && upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT && !getObject()->hasUpgrade(upgrade))
+			if (upgrade && !getObject()->hasUpgrade(upgrade))
 				getObject()->giveUpgrade(upgrade);
 		}
 	}
