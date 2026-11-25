@@ -72,6 +72,7 @@ constexpr Int RetailRingSlots = CommandButtonRules::RETAIL_PALANTIR_SLOTS;
 constexpr Int RetailTraySlots = 3;
 constexpr Int RetailTrayAnchors = 4;
 constexpr Real PalantirDesignWidth = 470.0f;
+constexpr Real RingButtonDesignDiameter = 36.0f;
 constexpr UnsignedInt CounterInterval = 15;
 
 struct DesignRect
@@ -155,13 +156,15 @@ void drawFilledCircle(Int x, Int y, Int width, Int height, Color color)
 	TheDisplay->setCircularClip(0, 0, 0);
 }
 
-void drawProductionRing(Int x, Int y, Int width, Int height)
+void drawAutoAbilitySparkles(Int x, Int y, Int width, Int height)
 {
-	const Image *ring = findImage("UiRetailProductionRing");
-	if (!TheDisplay->hasImageTexture(ring))
+	static AptScene sparkles("Palantir", AptScene::LabeledLoop{"_loop"});
+	const Int frames = sparkles.frameCount();
+	if (frames <= 0 || !TheGameLogic)
 		return;
-	const Int grow = MAX(1, width * 13 / 108);
-	TheDisplay->drawImage(ring, x - grow, y - grow, x + width + grow, y + height + grow);
+	const Real scale = width / RingButtonDesignDiameter;
+	sparkles.drawFrameAt(static_cast<Int>(TheGameLogic->getFrame() % static_cast<UnsignedInt>(frames)),
+		x + width * 0.5f, y + height * 0.5f, scale, scale);
 }
 
 void windowRect(const GameWindow *window, Int &x, Int &y, Int &width, Int &height)
@@ -485,14 +488,8 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 		Display::DrawImageMode mode = Display::DRAW_IMAGE_ALPHA;
 		if (!colored)
 			mode = Display::DRAW_IMAGE_GRAYSCALE;
-		Color tint = 0xFFFFFFFF;
-		if (!colored)
-			tint = availability == COMMAND_CANT_AFFORD ? GameMakeColor(142, 142, 142, 255) : GameMakeColor(92, 92, 92, 255);
-		TheDisplay->drawImage(image, x + inset, y + inset, x + width - inset, y + height - inset, tint, mode);
+		TheDisplay->drawImage(image, x + inset, y + inset, x + width - inset, y + height - inset, 0xFFFFFFFF, mode);
 	}
-	if (!colored)
-		TheDisplay->drawFillRect(x, y, width, height, GameMakeColor(0, 0, 0, availability == COMMAND_CANT_AFFORD ? 60 : 130));
-
 	if (count > 0)
 	{
 		const Int percent = static_cast<Int>(progress * 100.0f + 0.5f);
@@ -523,7 +520,7 @@ void drawRetailCommand(GameWindow *window, WinInstanceData *instance)
 		drawRetailCommandGlass(availability, highlight, whole, x, y);
 	}
 	if (!queued && TheControlBar->isRetailAutoAbilityOn(window))
-		drawProductionRing(x, y, width, height);
+		drawAutoAbilitySparkles(x, y, width, height);
 
 	if (availability == COMMAND_RESTRICTED && command && !isRetailPurchase(command->getCommandType()))
 	{

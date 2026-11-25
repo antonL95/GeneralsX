@@ -597,6 +597,29 @@ public:
 		return box;
 	}
 
+	size_t labeledSprite(const Movie &movie, const char *label) const
+	{
+		const Reader &r = movie.apt;
+		for (size_t index = 1; index < movie.characters.size(); ++index)
+		{
+			const size_t p = movie.characters[index];
+			if (!p || r.number(p) != 5 || r.number(p + 4) != 0x09876543)
+				continue;
+			const auto [count, table] = r.list(p + 8, 8);
+			for (size_t frame = 0; frame < count; ++frame)
+			{
+				const auto [items, itemTable] = r.list(table + 8 * frame, 4);
+				for (size_t i = 0; i < items; ++i)
+				{
+					const size_t q = r.number(itemTable + 4 * i);
+					if (q && r.number(q) == 2 && lowerName(r.string(q + 4)) == label)
+						return p;
+				}
+			}
+		}
+		return 0;
+	}
+
 	Box timeline(Movie &movie, size_t p, const Transform &m, const Tint &tint,
 		const std::string &path, Int depth, const char *target, size_t frameLimit = 0)
 	{
@@ -737,26 +760,44 @@ AptScene::~AptScene() = default;
 
 AptScene::AptScene(const char *movie, AnimatedExport exported)
 {
+	loadAnimated(movie, exported.name, nullptr, 120);
+}
+
+AptScene::AptScene(const char *movie, LabeledLoop loop)
+{
+	loadAnimated(movie, nullptr, loop.label, 256);
+}
+
+void AptScene::loadAnimated(const char *movie, const char *exportName, const char *loopLabel, size_t maxFrames)
+{
 	try
 	{
 		auto data = std::make_unique<Data>();
 		Movie *root = data->load(movie);
 		if (!root)
 			return;
-		const auto entry = root->exports.find(exported.name);
-		if (entry == root->exports.end() || entry->second >= root->characters.size())
-			return;
-		const size_t character = root->characters[entry->second];
+		size_t character = 0;
+		if (exportName)
+		{
+			const auto entry = root->exports.find(exportName);
+			if (entry == root->exports.end() || entry->second >= root->characters.size())
+				return;
+			character = root->characters[entry->second];
+		}
+		else
+		{
+			character = data->labeledSprite(*root, loopLabel);
+		}
 		if (!character || root->apt.number(character) != 5 || root->apt.number(character + 4) != 0x09876543)
 			return;
 		const size_t count = root->apt.list(character + 8, 8).first;
-		if (!count || count > 120)
+		if (!count || count > maxFrames)
 			return;
 
 		Bool hasArt = FALSE;
 		for (size_t frame = 1; frame <= count; ++frame)
 		{
-			data->timeline(*root, character + 8, {}, {}, exported.name, 0, nullptr, frame);
+			data->timeline(*root, character + 8, {}, {}, exportName ? exportName : loopLabel, 0, nullptr, frame);
 			hasArt = hasArt || !data->art.empty();
 			data->frames.emplace_back(std::move(data->art));
 			data->art.clear();

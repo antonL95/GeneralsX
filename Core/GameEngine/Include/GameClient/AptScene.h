@@ -3,6 +3,7 @@
 #include "Lib/BaseType.h"
 #include "Lib/Coord2D.h"
 
+#include <cstddef>
 #include <functional>
 #include <initializer_list>
 #include <memory>
@@ -36,6 +37,8 @@ public:
 		std::initializer_list<std::pair<const char*, const char*>> nestedFrames = {});
 	struct AnimatedExport { const char *name; };
 	AptScene(const char *movie, AnimatedExport exported);
+	struct LabeledLoop { const char *label; };
+	AptScene(const char *movie, LabeledLoop loop);
 	~AptScene();
 	Bool valid() const;
 	Box bounds(const std::string &path) const;
@@ -48,6 +51,7 @@ public:
 	Real yScale() const;
 
 private:
+	void loadAnimated(const char *movie, const char *exportName, const char *loopLabel, size_t maxFrames);
 	void drawArt(const Visibility &visible, const HorizontalScale &scale, Real x, Real y, Real sx, Real sy, Real opacity, Int frame = -1) const;
 	class Data;
 	std::unique_ptr<Data> m_data;
