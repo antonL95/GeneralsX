@@ -31,6 +31,7 @@
 
 #ifndef _WIN32
 #include <fenv.h>
+#include <execinfo.h>
 #if defined(__SSE__) || defined(__x86_64__)
 #include <xmmintrin.h>
 #endif
@@ -359,8 +360,12 @@ Bool GameLogic::isInSinglePlayerGame() const
 //-------------------------------------------------------------------------------------------------
 /** Destroy all objects immediately */
 //-------------------------------------------------------------------------------------------------
+static Bool s_verifyEach = FALSE;
+
 void GameLogic::destroyAllObjectsImmediate()
 {
+	verifySleepyUpdates("reset");
+	s_verifyEach = TRUE;
 	m_mountedTemplateSwaps.clear();
 	Object *obj;
 	Object *nextObj;
@@ -382,6 +387,7 @@ void GameLogic::destroyAllObjectsImmediate()
 
 	// process the destroy list immediately
 	processDestroyList();
+	s_verifyEach = FALSE;
 	DEBUG_ASSERTCRASH( m_objList == nullptr, ("destroyAllObjectsImmediate: Object list not cleared") );
 
 	m_objHash.clear();
@@ -2878,13 +2884,16 @@ void GameLogic::processDestroyList()
 		// remove object from lookup table
 		removeObjectFromLookupTable( currentObject );
 
+		if (s_verifyEach) verifySleepyUpdates("pre-delete");
 		Object::friend_deleteInstance(currentObject);//actual delete
+		if (s_verifyEach) verifySleepyUpdates("post-delete");
 
 #if RTS_ZEROHOUR && RETAIL_COMPATIBLE_CRC
 		TheAI->pathfinder()->m_classifyFenceZeroInit = false;
 #endif
 	}
 
+	verifySleepyUpdates("destroy");
 	m_objectsToDestroy.clear();//list full of bad pointers now, clear it.  If anyone's deletion resulted
 	//in the request for a new deletion (sub-object), the new object was added to the end of this list.
 }
@@ -3219,6 +3228,37 @@ inline void GameLogic::validateSleepyUpdate() const
 		}
 	}
 #endif
+}
+
+void GameLogic::verifySleepyUpdates(const char* phase) const
+{
+	const Int sz = (Int)m_sleepyUpdates.size();
+	for (Int i = 0; i < sz; ++i)
+	{
+		UpdateModulePtr u = m_sleepyUpdates[i];
+		if (u->friend_getIndexInLogic() != i)
+		{
+			const Object* o = u->friend_getObject();
+			fprintf(stderr, "[SleepyHeap] frame=%u phase=%s slot=%d stored=%d obj=%u tmpl=%s module=%s\n", m_frame, phase, i, u->friend_getIndexInLogic(), (UnsignedInt)o->getID(), o->getTemplate()->getName().str(), TheNameKeyGenerator->keyToName(static_cast<const UpdateModule*>(u)->getModuleTagNameKey()).str());
+			{ void* bt[40]; int n = backtrace(bt, 40); backtrace_symbols_fd(bt, n, 2); }
+			RELEASE_CRASH("sleepy heap broken");
+		}
+	}
+	for (Object* obj = m_objList; obj; obj = obj->getNextObject())
+	{
+		for (BehaviorModule** b = obj->getBehaviorModules(); *b; ++b)
+		{
+			UpdateModulePtr u = (UpdateModulePtr)((*b)->getUpdate());
+			if (!u)
+				continue;
+			const Int idx = u->friend_getIndexInLogic();
+			if (idx < 0 || idx >= sz || m_sleepyUpdates[idx] != u)
+			{
+				fprintf(stderr, "[SleepyHeap] frame=%u phase=%s missing idx=%d obj=%u tmpl=%s module=%s\n", m_frame, phase, idx, (UnsignedInt)obj->getID(), obj->getTemplate()->getName().str(), TheNameKeyGenerator->keyToName(static_cast<const UpdateModule*>(u)->getModuleTagNameKey()).str());
+				RELEASE_CRASH("sleepy heap broken");
+			}
+		}
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -4230,6 +4270,7 @@ void GameLogic::update()
 	#endif
 	}
 
+	verifySleepyUpdates("frame-start");
 	// send the current time to the GameClient
 	UnsignedInt now = getFrame();
 	TheGameClient->setFrame(now);
@@ -4240,6 +4281,7 @@ void GameLogic::update()
 	{
 		TheScriptEngine->UPDATE();
 	}
+	verifySleepyUpdates("script");
 
 	// TheSuperHackers @info Updates the frozen time status because it may have changed after the script engine update.
 	TheFramePacer->setTimeFrozen(TheGameEngine->isTimeFrozen());
@@ -4394,6 +4436,7 @@ void GameLogic::update()
 		}
 	}
 
+	verifySleepyUpdates("sleepy");
 	validateSleepyUpdate();
 
 	// update the Artificial Intelligence system
@@ -4420,6 +4463,7 @@ void GameLogic::update()
 	// reset the command list, destroying all messages
 	TheCommandList->reset();
 
+	verifySleepyUpdates("endframe");
 	TheWeaponStore->UPDATE();
 	TheLocomotorStore->UPDATE();
 	TheVictoryConditions->UPDATE();
@@ -4442,6 +4486,7 @@ void GameLogic::update()
 
 
 
+	verifySleepyUpdates("tail");
 	// increment world time
 	if (!m_startNewGame)
 	{
@@ -6100,6 +6145,7 @@ void GameLogic::loadPostProcess()
 
 	// re-sort the priority queue all at once now that all modules are on it
 	remakeSleepyUpdate();
+	verifySleepyUpdates("loaded");
 
 	if (RetailFileLayers::enabled())
 		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)

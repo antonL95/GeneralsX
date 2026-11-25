@@ -297,6 +297,7 @@ private:
 	Int rebalanceChildSleepyUpdate(Int i);
 	void remakeSleepyUpdate();
 	void validateSleepyUpdate() const;
+	void verifySleepyUpdates(const char* phase) const;
 
 	bool onNewGame(GameMessage *msg);
 	bool onClearGameData(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
