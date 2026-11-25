@@ -8,6 +8,14 @@
 25 audio-loop-move Player_1 GondorEarnur 0 2520,1060,0
 29 audio-loop-select Player_1 GondorEarnur 0
 30 audio-loop-status - - 0
+40 audio-loop-music - - 0 aotr_campaigndefeatAMONHEN
+41 audio-loop-status - - 0
+45 audio-loop-advance-music - - 0 1000
+60 audio-loop-status - - 0
+61 audio-loop-advance-music - - 0 60000
+62 audio-loop-status - - 0
+63 audio-loop-advance-music - - 0 20000
+70 audio-loop-status - - 0
 85 kill Player_1 AudioLoopProbe 0
 105 audio-loop-condition Player_1 AudioConditionProbe 0 raising-on
 135 audio-loop-condition Player_1 AudioConditionProbe 0 raising-off

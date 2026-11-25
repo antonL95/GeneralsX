@@ -53,3 +53,26 @@ def check(log):
         raise RuntimeError("Multisound did not start its voice child")
     if not any(event[1] == "start" and event[4] == "HeroVoiceSelect2" for event in events):
         raise RuntimeError("Multisound did not start its second child")
+    playlist = "aotr_campaigndefeatamonhen"
+    music = [event for event in events if event[4].lower().startswith(playlist) and event[4].lower() != playlist]
+    music_starts = [event for event in music if event[1] == "start"]
+    music_stops = [event for event in music if event[1] == "stop"]
+    if len(music_starts) < 2:
+        raise RuntimeError(f"Playlist did not move on to a second entry: {music}")
+    first_start = music_starts[0][0]
+    first_stop = music_stops[0][0] if music_stops else None
+    if first_stop is None or not 64 <= first_stop <= 66:
+        raise RuntimeError(f"First track must end when its length has elapsed after 1000 + 60000 + 20000 ms of a track under 70000 ms, saw {first_stop}")
+    if first_start >= 45:
+        raise RuntimeError(f"First track started late at frame {first_start}")
+    if not first_stop <= music_starts[1][0] <= first_stop + 3:
+        raise RuntimeError(f"Second track did not follow the first at frame {first_stop}: {music_starts[1]}")
+    statuses = [(int(m.group(1)), m.group(2), int(m.group(3))) for m in
+                re.finditer(r"AUDIO STATUS frame=(\d+) .*? music=(\S+) completed=(\d+)", log)]
+    by_frame = {frame: (name, done) for frame, name, done in statuses}
+    if by_frame.get(41, ("none", 0))[0] == "none":
+        raise RuntimeError("No music playing at frame 41")
+    if by_frame.get(62, ("none", 0))[0] != by_frame[41][0] or by_frame.get(60, ("none", 0))[0] != by_frame[41][0]:
+        raise RuntimeError("Track changed before its length elapsed")
+    if by_frame.get(70, ("none", 0))[0] == "none":
+        raise RuntimeError("Music went silent after the first track ended")

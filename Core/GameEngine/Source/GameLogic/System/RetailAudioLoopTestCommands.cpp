@@ -3,6 +3,7 @@
 #include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
+#include "Common/AudioEventRTS.h"
 #include "Common/GameAudio.h"
 #include "Common/MessageStream.h"
 #include "GameClient/CommandXlat.h"
@@ -44,6 +45,14 @@ void handleAudioLoop(const RetailTestCommands::Context& ctx)
 	{
 		if (TheAudio)
 			TheAudio->dumpAudioTraceStatus();
+		return;
+	}
+	if (cmd == "music")
+	{
+		if (!TheAudio)
+			return;
+		AudioEventRTS event{AsciiString(ctx.argument)};
+		TheAudio->addAudioEvent(&event);
 		return;
 	}
 	if (cmd == "advance-music")
