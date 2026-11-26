@@ -2,6 +2,7 @@
 #include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
+#include "Common/MapObject.h"
 #include "Common/MessageStream.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -9,12 +10,15 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
+#include "GameClient/CommandXlat.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GadgetPushButton.h"
+#include "GameClient/GameClient.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Keyboard.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/ExperienceTracker.h"
@@ -22,6 +26,8 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
@@ -31,16 +37,25 @@
 #include <cstdlib>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
 {
-constexpr Int ACTOR_COUNT = 4;
+constexpr Int ACTOR_COUNT = 6;
 constexpr Int CASTER = 0;
 constexpr Int ALLY = 1;
 constexpr Int ENEMY = 2;
 constexpr Int STRUCTURE = 3;
-const char* const ACTOR_NAMES[ACTOR_COUNT] = { "caster", "ally", "enemy", "structure" };
+constexpr Int HERO = 4;
+constexpr Int CAPTURE = 5;
+const char* const ACTOR_NAMES[ACTOR_COUNT] = { "caster", "ally", "enemy", "structure", "hero", "capture" };
+
+class IdleKeyboard final : public Keyboard
+{
+	Bool getCapsState() override { return FALSE; }
+	void getKey(KeyboardIO* key) override { key->key = KEY_NONE; }
+};
 
 struct Actor
 {
@@ -73,6 +88,7 @@ struct Case
 	Actor actors[ACTOR_COUNT];
 	Bool noWindow = FALSE;
 	ObjectID previous = INVALID_ID;
+	const ThingTemplate* templateAtClick = nullptr;
 	ModelConditionFlags conditions;
 	WeaponSetFlags weaponSet;
 	AsciiString commandSet;
@@ -181,19 +197,22 @@ void setup(const RetailTestCommands::Context& ctx)
 	s_case.id = ctx.ordinal;
 	s_case.templateName = ctx.targetName;
 	Player* opponent = ctx.findPlayer(enemyPlayer);
+	Player* neutral = ThePlayerList->getNeutralPlayer();
 	const Real x = ctx.position.x;
 	const Real y = ctx.position.y;
 	Object* objects[ACTOR_COUNT] = {
 		createActor(ctx.targetName, ctx.player, x, y),
 		createActor(ally, ctx.player, x - 50.0f, y),
 		createActor(enemy, opponent, x + 80.0f, y),
-		createActor(structure, opponent, x + 80.0f, y + 90.0f)
+		createActor(structure, opponent, x + 80.0f, y + 90.0f),
+		createActor("AbilitySweepHero", opponent, x + 90.0f, y - 35.0f),
+		createActor("AbilitySweepCapturable", neutral, x + 55.0f, y + 55.0f)
 	};
 	for (Int i = 0; i < ACTOR_COUNT; ++i)
 		if (objects[i])
 		{
 			s_case.actors[i].id = objects[i]->getID();
-			if (i == ENEMY || i == STRUCTURE)
+			if (i == ENEMY || i == STRUCTURE || i == HERO)
 				objects[i]->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_ATTACK_FROM_AI));
 		}
 	if (Object* caster = objects[CASTER])
@@ -213,14 +232,18 @@ void setup(const RetailTestCommands::Context& ctx)
 	}
 }
 
-const CommandButton* findInCommandSet(const Object* caster, const char* name)
+const CommandButton* findInCommandSet(const Object* caster, const char* name, Int* outSlot = nullptr)
 {
 	const CommandSet* set = TheControlBar->findCommandSet(caster->getCommandSetString());
 	for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
 	{
 		const CommandButton* button = set->getCommandButton(slot);
 		if (button && button->getName().compareNoCase(name) == 0)
+		{
+			if (outSlot)
+				*outSlot = slot;
 			return button;
+		}
 	}
 	return nullptr;
 }
@@ -229,7 +252,8 @@ void grantRequirements(Object* caster, const CommandButton* button)
 {
 	Player* player = caster->getControllingPlayer();
 	std::vector<const UpgradeTemplate*> upgrades = button->getNeededUpgrades();
-	if (BitIsSet(button->getOptions(), NEED_UPGRADE) && button->getUpgradeTemplate())
+	if (BitIsSet(button->getOptions(), NEED_UPGRADE) && button->getUpgradeTemplate() &&
+		button->getCommandType() != GUI_COMMAND_OBJECT_UPGRADE && button->getCommandType() != GUI_COMMAND_PLAYER_UPGRADE)
 		upgrades.push_back(button->getUpgradeTemplate());
 	for (const UpgradeTemplate* upgrade : upgrades)
 	{
@@ -245,6 +269,36 @@ void grantRequirements(Object* caster, const CommandButton* button)
 		player->grantScience(power->getRequiredScience());
 }
 
+void grantCommandSetUpgrades(Object* caster)
+{
+	const CommandSet* set = TheControlBar->findCommandSet(caster->getCommandSetString());
+	for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+	{
+		const CommandButton* button = set->getCommandButton(slot);
+		if (button && button->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE && button->getUpgradeTemplate())
+		{
+			grantRequirements(caster, button);
+			if (!caster->hasUpgrade(button->getUpgradeTemplate()))
+				caster->giveUpgrade(button->getUpgradeTemplate());
+		}
+	}
+}
+
+const CommandButton* findSamePower(const Object* caster, const char* name)
+{
+	const CommandButton* wanted = TheControlBar->findCommandButton(name);
+	const CommandSet* set = TheControlBar->findCommandSet(caster->getCommandSetString());
+	if (!wanted || !wanted->getSpecialPowerTemplate())
+		return nullptr;
+	for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+	{
+		const CommandButton* button = set->getCommandButton(slot);
+		if (button && button->getSpecialPowerTemplate() == wanted->getSpecialPowerTemplate())
+			return button;
+	}
+	return nullptr;
+}
+
 void prepare(const RetailTestCommands::Context& ctx)
 {
 	Object* caster = TheGameLogic->findObjectByID(s_case.actors[CASTER].id);
@@ -252,6 +306,16 @@ void prepare(const RetailTestCommands::Context& ctx)
 		return;
 	s_case.button = ctx.argument;
 	const CommandButton* button = findInCommandSet(caster, ctx.argument);
+	if (!button && (button = findSamePower(caster, ctx.argument)))
+	{
+		s_case.button = button->getName().str();
+		s_case.flags.insert(std::string("level_button.") + s_case.button);
+	}
+	if (!button)
+	{
+		grantCommandSetUpgrades(caster);
+		button = findInCommandSet(caster, ctx.argument);
+	}
 	if (!button)
 	{
 		s_case.result = "rejected:not_in_command_set";
@@ -384,6 +448,7 @@ void recordBaseline(Object* caster, UnsignedInt frame)
 		snapshot(actor);
 	s_case.conditions = conditionsOf(caster);
 	s_case.weaponSet = caster->getWeaponSetFlags();
+	s_case.templateAtClick = caster->getTemplate();
 	s_case.commandSet = caster->getCommandSetString();
 	s_case.previous = highestObjectId();
 	s_case.clickFrame = frame;
@@ -399,7 +464,7 @@ std::string aim(Object* caster, const CommandButton* pending)
 		return "rejected:unsupported_target_command";
 	Object* target = nullptr;
 	if (BitIsSet(options, COMMAND_OPTION_NEED_OBJECT_TARGET))
-		for (const Int candidate : { ENEMY, ALLY, STRUCTURE, CASTER })
+		for (const Int candidate : { ENEMY, HERO, ALLY, STRUCTURE, CASTER })
 		{
 			Object* object = TheGameLogic->findObjectByID(s_case.actors[candidate].id);
 			if (object && pending->isValidObjectTarget(caster, object) &&
@@ -446,14 +511,117 @@ std::string aim(Object* caster, const CommandButton* pending)
 	return "accepted";
 }
 
+Bool triggerDoCommandUpgrade(Object* caster, const CommandButton* button)
+{
+	Player* player = caster->getControllingPlayer();
+	const ModuleInfo& modules = caster->getTemplate()->getBehaviorModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		if (modules.getNthName(i) != "DoCommandUpgrade")
+			continue;
+		const auto* data = static_cast<const DoCommandUpgradeModuleData*>(modules.getNthData(i));
+		if (data->m_grantCommand.compareNoCase(button->getName()) != 0)
+			continue;
+		const auto& mux = data->m_upgradeMuxData;
+		Bool granted = FALSE;
+		for (const AsciiString& name : mux.m_activationUpgradeNames.empty() ? mux.m_triggerUpgradeNames : mux.m_activationUpgradeNames)
+		{
+			const UpgradeTemplate* upgrade = TheUpgradeCenter->findUpgrade(name);
+			if (!upgrade)
+				continue;
+			if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+				player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+			else if (!caster->hasUpgrade(upgrade))
+				caster->giveUpgrade(upgrade);
+			granted = TRUE;
+		}
+		if (granted)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+std::string triggerHiddenSlot(Object* caster, const CommandButton* button)
+{
+	if (triggerDoCommandUpgrade(caster, button))
+	{
+		s_case.flags.insert("trigger.docommandupgrade");
+		return "accepted";
+	}
+	const SpecialPowerTemplate* power = button->getSpecialPowerTemplate();
+	const SpecialPowerType spType = power ? power->getSpecialPowerType() : SPECIAL_INVALID;
+	if (spType == SPECIAL_INFANTRY_CAPTURE_BUILDING || spType == SPECIAL_BLACKLOTUS_CAPTURE_BUILDING)
+	{
+		Object* target = TheGameLogic->findObjectByID(s_case.actors[CAPTURE].id);
+		if (!target || !target->getDrawable())
+			return "rejected:no_capture_target";
+		s_case.flags.insert("trigger.context");
+		TheInGameUI->setGUICommand(nullptr);
+		IdleKeyboard idleKeyboard;
+		Keyboard* keyboard = std::exchange(TheKeyboard, TheKeyboard ? TheKeyboard : &idleKeyboard);
+		const auto order = TheGameClient->evaluateContextCommand(target->getDrawable(), target->getPosition(),
+			CommandTranslator::DO_COMMAND);
+		TheKeyboard = keyboard;
+		return order == GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT ? "accepted" : "rejected:context_capture_failed";
+	}
+	if (spType == SPECIAL_GRAB_PASSENGER && BitIsSet(button->getOptions(), ALLOW_SHRUBBERY_TARGET))
+	{
+		const MapObject* closest = nullptr;
+		Real best = 900.0f * 900.0f;
+		for (const MapObject* map = MapObject::getFirstMapObject(); map; map = map->getNext())
+		{
+			const ThingTemplate* type = map->getThingTemplate();
+			const Coord3D* pos = map->getLocation();
+			if (!type || !type->isKindOf(KINDOF_TREE) || !type->isKindOf(KINDOF_CLUB) ||
+				!type->getRotWKObjectData().isGrabbable || !TheTerrainLogic->isNearMapTree(*pos, 0.0f))
+				continue;
+			const Real dx = pos->x - caster->getPosition()->x;
+			const Real dy = pos->y - caster->getPosition()->y;
+			const Real distance = dx * dx + dy * dy;
+			if (distance < best)
+			{
+				best = distance;
+				closest = map;
+			}
+		}
+		if (!closest)
+			return "rejected:no_grabbable_tree";
+		Coord3D pos = *closest->getLocation();
+		pos.z += TheTerrainLogic->getGroundHeight(pos.x, pos.y);
+		s_case.flags.insert("trigger.context");
+		TheInGameUI->setGUICommand(nullptr);
+		IdleKeyboard idleKeyboard;
+		Keyboard* keyboard = std::exchange(TheKeyboard, TheKeyboard ? TheKeyboard : &idleKeyboard);
+		const auto order = TheGameClient->evaluateContextCommand(nullptr, &pos, CommandTranslator::DO_COMMAND);
+		TheKeyboard = keyboard;
+		return order == GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT ? "accepted" : "rejected:context_grab_tree_failed";
+	}
+	return "hidden_by_design";
+}
+
+void describeNotReady(Object* caster)
+{
+	s_case.flags.insert("rank." + std::to_string(caster->getExperienceTracker()->getRank()));
+	if (s_case.powerTemplate)
+		if (const SpecialPowerModuleInterface* module = caster->getSpecialPowerModule(s_case.powerTemplate))
+			s_case.flags.insert(module->isReady() ? "power_ready" : "power_paused");
+	for (const UpgradeTemplate* upgrade = TheUpgradeCenter->firstUpgradeTemplate(); upgrade; upgrade = upgrade->friend_getNext())
+		if (upgrade->getUpgradeType() != UPGRADE_TYPE_PLAYER && caster->hasUpgrade(upgrade))
+			s_case.flags.insert(std::string("has.") + upgrade->getUpgradeName().str());
+}
+
 void click(const RetailTestCommands::Context& ctx)
 {
 	Object* caster = TheGameLogic->findObjectByID(s_case.actors[CASTER].id);
 	if (!caster || s_case.result != "no_click")
 		return;
-	const CommandButton* button = findInCommandSet(caster, ctx.argument);
+	Int slot = -1;
+	const CommandButton* button = findInCommandSet(caster, s_case.button.c_str(), &slot);
 	if (!button)
 		return;
+	for (const Int idx : { ENEMY, STRUCTURE, HERO })
+		if (Object* target = TheGameLogic->findObjectByID(s_case.actors[idx].id))
+			target->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_ATTACK_FROM_AI));
 	s_case.type = button->getCommandType();
 	const CommandButton* effective = button->resolveRetailToggleButton(caster);
 	s_case.powerTemplate = effective ? effective->getSpecialPowerTemplate() : nullptr;
@@ -468,7 +636,7 @@ void click(const RetailTestCommands::Context& ctx)
 		else
 			s_case.flags.insert("no_power_module");
 	}
-	GameWindow* window = findButtonWindow(ctx.argument);
+	GameWindow* window = findButtonWindow(s_case.button.c_str());
 	if (!window || window->winIsHidden())
 	{
 		const Bool mounted = caster->testWeaponSetFlag(WEAPONSET_MOUNTED);
@@ -480,11 +648,21 @@ void click(const RetailTestCommands::Context& ctx)
 			return;
 		}
 		s_case.noWindow = TRUE;
+		if (slot >= 6 && button->isInPalantir())
+		{
+			recordBaseline(caster, ctx.frame);
+			s_case.result = triggerHiddenSlot(caster, button);
+			if (s_case.result != "accepted")
+				s_case.clicked = FALSE;
+			return;
+		}
 	}
 	const CommandAvailability availability = s_case.noWindow
 		? TheControlBar->queryRetailCommandAvailability(button, caster) : TheControlBar->getRetailButtonAvailability(window);
 	if (availability != COMMAND_AVAILABLE && availability != COMMAND_ACTIVE)
 	{
+		if (availability == COMMAND_NOT_READY)
+			describeNotReady(caster);
 		s_case.result = availability == COMMAND_PASSIVE ? "passive" : std::string("rejected:") + availabilityName(availability);
 		return;
 	}
@@ -549,6 +727,8 @@ void watchActor(Actor& actor, Bool& active, const char* label, UnsignedInt frame
 
 void watch(const RetailTestCommands::Context& ctx)
 {
+	if (ctx.frame % 60 == 0)
+		std::fprintf(stderr, "TEST ability-heartbeat frame=%u case=%d\n", ctx.frame, s_case.id);
 	if (!s_case.clicked || s_case.result != "accepted")
 		return;
 	Bool active = FALSE;
@@ -576,6 +756,8 @@ void watch(const RetailTestCommands::Context& ctx)
 			s_case.remaining += (s_case.remaining.empty() ? "" : ",") + std::string("anim.") + name;
 			active = TRUE;
 		}
+		if (caster->getTemplate() != s_case.templateAtClick)
+			s_case.flags.insert(std::string("replaced.") + caster->getTemplate()->getName().str());
 		if (caster->getWeaponSetFlags() != s_case.weaponSet)
 			s_case.flags.insert("weaponset");
 		if (caster->getCommandSetString() != s_case.commandSet)
@@ -621,6 +803,15 @@ std::string describeActor(const Actor& actor)
 	return result.empty() ? "-" : result;
 }
 
+std::string combineActorDescriptions(const std::string& first, const std::string& second)
+{
+	if (second == "-")
+		return first;
+	if (first == "-")
+		return second;
+	return first + second;
+}
+
 void finish(const RetailTestCommands::Context& ctx)
 {
 	if (!s_case.active)
@@ -632,12 +823,24 @@ void finish(const RetailTestCommands::Context& ctx)
 		ended = "running";
 	for (const std::string& name : s_case.persisting)
 		s_case.flags.insert("persists." + name);
+	if (const Object* caster = TheGameLogic->findObjectByID(s_case.actors[CASTER].id))
+	{
+		if (s_case.templateAtClick && caster->getTemplate() != s_case.templateAtClick)
+		{
+			const ContainModuleInterface* contain = caster->getContain();
+			s_case.flags.insert("final_members." + std::to_string(contain ? contain->getContainCount() : 0));
+		}
+	}
+	else if (s_case.clicked)
+		s_case.flags.insert("caster_gone");
+	const std::string enemyDesc = combineActorDescriptions(describeActor(s_case.actors[ENEMY]), describeActor(s_case.actors[HERO]));
+	const std::string structureDesc = combineActorDescriptions(describeActor(s_case.actors[STRUCTURE]), describeActor(s_case.actors[CAPTURE]));
 	std::fprintf(stderr, "TEST ability-sweep case=%d\ttemplate=%s\tbutton=%s\ttype=%d\tpower=%s\tresult=%s\tanimation=%s\tobjects=%s\t"
 		"caster=%s\tally=%s\tenemy=%s\tstructure=%s\tflags=%s\trecharge=%s\tended=%s\tremaining=%s\tno_window=%d\n",
 		s_case.id, s_case.templateName.c_str(), s_case.button.c_str(), s_case.type, s_case.power.empty() ? "-" : s_case.power.c_str(),
 		s_case.result.c_str(), joined(s_case.animation).c_str(), joined(s_case.objects).c_str(),
 		describeActor(s_case.actors[CASTER]).c_str(), describeActor(s_case.actors[ALLY]).c_str(),
-		describeActor(s_case.actors[ENEMY]).c_str(), describeActor(s_case.actors[STRUCTURE]).c_str(),
+		enemyDesc.c_str(), structureDesc.c_str(),
 		joined(s_case.flags).c_str(), s_case.powerTemplate ? (s_case.recharged ? "yes" : "no") : "n/a", ended.c_str(),
 		ended == "never" && !s_case.remaining.empty() ? s_case.remaining.c_str() : "-", s_case.noWindow ? 1 : 0);
 	TheInGameUI->setGUICommand(nullptr);

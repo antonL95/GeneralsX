@@ -9,7 +9,7 @@ fi
 worktree=$1
 build=${2#/build/}
 shift 2
-[ "$#" -gt 0 ] || set -- Mordor Guldur Wild
+[ "$#" -gt 0 ] || set -- Mordor Guldur Wild Reported
 
 cd "${BFME_ROOT:-$HOME/Developer/bfme}"
 cases=game/analysis/ability-sweep-cases.tsv

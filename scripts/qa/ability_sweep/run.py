@@ -1,6 +1,7 @@
 import csv
 import os
 from pathlib import Path
+import re
 import runpy
 import signal
 import sys
@@ -20,11 +21,14 @@ PREPARE_AT = 3
 CLICK_AT = 90
 SETTLE_FRAMES = 30
 SESSION_SECONDS = 600
-FACTION_SECONDS = 1800
-SESSION_CASES = 30
+FACTION_SECONDS = 2400
+SESSION_CASES = 20
 STALL_SECONDS = 120
+FRAME_STALL_SECONDS = 90
+REPEAT_LIMIT = 1000
+FRAME_RE = re.compile(r"^TEST ability-heartbeat frame=(\d+)")
 RESULT_FIELDS = "animation objects caster ally enemy structure flags recharge ended remaining no_window".split()
-TABLE_FIELDS = "faction unit hero command_set button command power verdict problems result".split() + RESULT_FIELDS
+TABLE_FIELDS = "faction unit hero command_set button command power verdict problems result".split() + RESULT_FIELDS + ["todo"]
 
 
 def schedule(cases):
@@ -63,6 +67,8 @@ def judge(values):
         return "passive", []
     if result == "not_shown":
         return "not shown", []
+    if result == "hidden_by_design":
+        return "hidden by design", []
     if result != "accepted":
         return "rejected", ["rejected"]
     reactions = [values["caster"].replace("moved;", ""), values["ally"], values["enemy"], values["structure"]]
@@ -89,13 +95,53 @@ def kill_engine():
             continue
 
 
-def watch_for_stall(log, finished, stalled):
+def watch_for_stall(log, finished, stalled, reason):
     size, changed = -1, time.monotonic()
+    pos = 0
+    max_frame = None
+    frame_changed = time.monotonic()
+    last_line = ""
+    repeat_count = 0
     while not finished.wait(5):
+        now = time.monotonic()
         current = log.stat().st_size if log.exists() else -1
         if current != size:
-            size, changed = current, time.monotonic()
-        elif time.monotonic() - changed > STALL_SECONDS:
+            size, changed = current, now
+            if current > pos:
+                try:
+                    with log.open("rb") as handle:
+                        handle.seek(pos)
+                        chunk = handle.read(min(current - pos, 1024 * 1024))
+                    pos = current
+                    for raw in chunk.decode(errors="replace").splitlines():
+                        line = raw.strip()
+                        if not line:
+                            continue
+                        match = FRAME_RE.search(line)
+                        if match:
+                            frame = int(match.group(1))
+                            if max_frame is None or frame > max_frame:
+                                max_frame = frame
+                                frame_changed = now
+                        if line == last_line:
+                            repeat_count += 1
+                            if repeat_count >= REPEAT_LIMIT:
+                                reason.append(f"frame={max_frame} repeat={repeat_count} {line[:180]}")
+                                stalled.set()
+                                kill_engine()
+                                return
+                        else:
+                            last_line = line
+                            repeat_count = 1
+                except OSError:
+                    pass
+        if max_frame is not None and now - frame_changed > FRAME_STALL_SECONDS:
+            reason.append(f"frame_stalled={max_frame} {last_line[:180]}")
+            stalled.set()
+            kill_engine()
+            return
+        if now - changed > STALL_SECONDS:
+            reason.append(f"log_stalled {last_line[:180]}")
             stalled.set()
             kill_engine()
             return
@@ -112,7 +158,8 @@ def session(build, cases, seconds):
         failure = None
         log = output / "session.log"
         finished, stalled = threading.Event(), threading.Event()
-        watcher = threading.Thread(target=watch_for_stall, args=(log, finished, stalled))
+        reason = []
+        watcher = threading.Thread(target=watch_for_stall, args=(log, finished, stalled, reason))
         watcher.start()
         try:
             PLAYTEST["render"](build, output, state, map_path, [30], [], end_frame, commands, 28,
@@ -122,26 +169,27 @@ def session(build, cases, seconds):
         finally:
             finished.set()
             watcher.join()
-        hung = stalled.is_set() or bool(failure and ("exit 124" in failure or "exit 137" in failure))
-        return (log.read_text(errors="replace") if log.exists() else ""), failure, hung
+        timed_out = bool(failure and ("exit 124" in failure or "exit 137" in failure))
+        return (log.read_text(errors="replace") if log.exists() else ""), failure, timed_out, (reason[0] if reason else "")
 
 
 def result_row(case, values):
     verdict, problems = judge(values)
     return [case[key] for key in TABLE_FIELDS[:6]] + [
         values["power"], verdict, ",".join(problems) or "-", values["result"],
-        *[values[key] for key in RESULT_FIELDS]]
+        *[values[key] for key in RESULT_FIELDS], case.get("todo", "-")]
 
 
 def unfinished_row(case, verdict, reason):
-    return [case[key] for key in TABLE_FIELDS[:6]] + ["-", verdict, verdict, reason, *["-"] * len(RESULT_FIELDS)]
+    return [case[key] for key in TABLE_FIELDS[:6]] + [
+        "-", verdict, verdict, reason, *["-"] * len(RESULT_FIELDS), case.get("todo", "-")]
 
 
 def run_faction(build, faction, pending, writer):
     deadline = time.monotonic() + FACTION_SECONDS
     while pending and time.monotonic() < deadline:
         batch = pending[:SESSION_CASES]
-        log, failure, hung = session(build, batch, min(SESSION_SECONDS, int(deadline - time.monotonic()) + 1))
+        log, failure, timed_out, stall_reason = session(build, batch, min(SESSION_SECONDS, int(deadline - time.monotonic()) + 1))
         results = parse(log)
         finished = 0
         for case in batch:
@@ -150,9 +198,11 @@ def run_faction(build, faction, pending, writer):
             writer.writerow(result_row(case, results[case["id"]]))
             finished += 1
         print(f"{faction}: {finished}/{len(batch)} cases, {failure or 'completed'}", file=sys.stderr)
-        if finished < len(batch):
-            last = next((line for line in reversed(log.splitlines()) if line.startswith("TEST ")), "no log line")
-            writer.writerow(unfinished_row(batch[finished], "hang" if hung else "session failed", last[:200]))
+        out_of_time = timed_out and not stall_reason and finished > 0
+        if finished < len(batch) and not out_of_time:
+            last = stall_reason or next((line for line in reversed(log.splitlines()) if line.startswith("TEST ")), "no log line")
+            verdict = "hang" if stall_reason or timed_out else "session failed"
+            writer.writerow(unfinished_row(batch[finished], verdict, last[:200]))
             print("\n".join(log.splitlines()[-30:]), file=sys.stderr)
             finished += 1
         pending = pending[finished:]
@@ -174,6 +224,7 @@ def main():
     writer.writerow(TABLE_FIELDS)
     for faction in dict.fromkeys(case["faction"] for case in cases):
         run_faction(build, faction, [case for case in cases if case["faction"] == faction], writer)
+
 
 if __name__ == "__main__":
     main()
