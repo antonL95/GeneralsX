@@ -1,0 +1,8 @@
+20 create Player_1 GondorGandalf 0 2520,1010,0
+21 power-reveal Player_1 - 0
+30 science Player_1 - 0 SCIENCE_GuldurFearForest
+30 science Player_1 - 0 SCIENCE_UnrelentingSun
+35 power-cast Player_1 - 4 at 2460 1120
+110 particle-live Player_1 - 0
+240 create Player_1 UnrelentingSun_SpeedBonus 0 2460,1120,0
+310 particle-live Player_1 - 0
