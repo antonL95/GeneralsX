@@ -3619,7 +3619,21 @@ Bool Object::isMassSelectable() const
 	return isSelectable() && !isKindOf(KINDOF_STRUCTURE);
 }
 
-//-------------------------------------------------------------------------------------------------
+static ModelConditionFlagType swappingModelConditionFor(ModelConditionFlagType condition)
+{
+	switch (condition)
+	{
+		case MODELCONDITION_WEAPONSET_TOGGLE_1:
+			return MODELCONDITION_SWAPPING_TO_WEAPONSET_1;
+		case MODELCONDITION_WEAPONSET_TOGGLE_2:
+			return MODELCONDITION_SWAPPING_TO_WEAPONSET_2;
+		case MODELCONDITION_WEAPONSET_TOGGLE_3:
+			return MODELCONDITION_SWAPPING_TO_WEAPONSET_3;
+		default:
+			return MODELCONDITION_INVALID;
+	}
+}
+
 void Object::setWeaponSetFlags(const WeaponSetFlags& flags, Bool enabled)
 {
 	const ModelConditionFlags previousConditions = m_logicModelConditions;
@@ -3637,6 +3651,9 @@ void Object::setWeaponSetFlags(const WeaponSetFlags& flags, Bool enabled)
 			setModelConditionState(condition);
 		else
 			clearModelConditionState(condition);
+		const ModelConditionFlagType swapping = swappingModelConditionFor(condition);
+		if (swapping != MODELCONDITION_INVALID)
+			setTimedModelCondition(swapping, LOGICFRAMES_PER_SECOND);
 	}
 	if (changed)
 	{
@@ -3669,20 +3686,28 @@ void Object::setWeaponSetFlag(WeaponSetType wst)
 {
 	m_curWeaponSetFlags.set(wst);
 	m_weaponSet.updateWeaponSet(this);
+	const ModelConditionFlagType condition = TheWeaponSetTypeToModelConditionTypeMap[wst];
 	if (m_drawable)
 	{
-		m_drawable->setModelConditionState(TheWeaponSetTypeToModelConditionTypeMap[wst]);
+		m_drawable->setModelConditionState(condition);
 	}
+	const ModelConditionFlagType swapping = swappingModelConditionFor(condition);
+	if (swapping != MODELCONDITION_INVALID)
+		setTimedModelCondition(swapping, LOGICFRAMES_PER_SECOND);
 }
 
 void Object::clearWeaponSetFlag(WeaponSetType wst)
 {
 	m_curWeaponSetFlags.set(wst, 0);
 	m_weaponSet.updateWeaponSet(this);
+	const ModelConditionFlagType condition = TheWeaponSetTypeToModelConditionTypeMap[wst];
 	if (m_drawable)
 	{
-		m_drawable->clearModelConditionState(TheWeaponSetTypeToModelConditionTypeMap[wst]);
+		m_drawable->clearModelConditionState(condition);
 	}
+	const ModelConditionFlagType swapping = swappingModelConditionFor(condition);
+	if (swapping != MODELCONDITION_INVALID)
+		setTimedModelCondition(swapping, LOGICFRAMES_PER_SECOND);
 }
 
 //-------------------------------------------------------------------------------------------------
