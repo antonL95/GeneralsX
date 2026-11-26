@@ -32,12 +32,17 @@
 #include "GameClient/View.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailINIStartup.h"
 #if !RTS_GENERALS
 #include "GameLogic/GameLogic.h"
 #endif
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
+#include <sstream>
+#include <string>
 
 
 SnowManager *TheSnowManager=nullptr;
@@ -60,9 +65,103 @@ void SnowManager::init()
 	updateIniSettings();
 }
 
+static void loadRetailCloudEffect(WeatherSetting &weather)
+{
+	if (!weather.m_darkCloudTexture.isEmpty() || !weather.m_cloudEffectTexture.isEmpty())
+		return;
+	for (const std::string &content : RetailINIStartup::environment())
+	{
+		std::istringstream input(content);
+		bool inBlock = false;
+		for (std::string line; std::getline(input, line); )
+		{
+			const std::size_t semi = line.find(';');
+			if (semi != std::string::npos)
+				line.erase(semi);
+			const std::size_t slash = line.find("//");
+			if (slash != std::string::npos)
+				line.erase(slash);
+			std::istringstream row(line);
+			std::string name;
+			if (!(row >> name))
+				continue;
+			if (stricmp(name.c_str(), "CloudEffect") == 0)
+			{
+				inBlock = true;
+				continue;
+			}
+			if (inBlock && stricmp(name.c_str(), "End") == 0)
+			{
+				inBlock = false;
+				continue;
+			}
+			if (!inBlock)
+				continue;
+			char separator = 0;
+			if (!(row >> separator) || separator != '=')
+				continue;
+			if (stricmp(name.c_str(), "CloudTexture") == 0)
+			{
+				std::string value;
+				if (row >> value)
+					weather.m_cloudEffectTexture = value.c_str();
+			}
+			else if (stricmp(name.c_str(), "DarkCloudTexture") == 0)
+			{
+				std::string value;
+				if (row >> value)
+					weather.m_darkCloudTexture = value.c_str();
+			}
+			else if (stricmp(name.c_str(), "DarkeningFactor") == 0)
+			{
+				RGBColor color = weather.m_cloudDarkeningFactor;
+				std::string token;
+				while (row >> token)
+				{
+					if (token.size() > 2 && token[1] == ':')
+					{
+						char *end = nullptr;
+						const Real channel = std::strtof(token.c_str() + 2, &end);
+						if (end != token.c_str() + 2 && std::isfinite(channel))
+						{
+							const Real scaled = std::clamp(channel / 255.0f, 0.0f, 1.0f);
+							const int key = std::toupper(static_cast<unsigned char>(token[0]));
+							if (key == 'R')
+								color.red = scaled;
+							else if (key == 'G')
+								color.green = scaled;
+							else if (key == 'B')
+								color.blue = scaled;
+						}
+					}
+				}
+				weather.m_cloudDarkeningFactor = color;
+			}
+			else if (stricmp(name.c_str(), "DarkeningRate") == 0)
+			{
+				Real value = 0.0f;
+				if ((row >> value) && std::isfinite(value) && value >= 1.0f)
+					weather.m_cloudDarkeningRate = value;
+			}
+			else if (stricmp(name.c_str(), "LighteningRate") == 0)
+			{
+				Real value = 0.0f;
+				if ((row >> value) && std::isfinite(value) && value >= 1.0f)
+					weather.m_cloudLighteningRate = value;
+			}
+		}
+	}
+}
+
 void SnowManager::updateIniSettings()
 {
 	m_retailWeather = RetailFileLayers::enabled();
+	if (m_retailWeather && TheWeatherSetting != nullptr)
+	{
+		WeatherSetting *weatherSet = (WeatherSetting *)(TheWeatherSetting.getNonOverloadedPointer());
+		weatherSet = (WeatherSetting *)(weatherSet->friend_getFinalOverride());
+		loadRetailCloudEffect(*weatherSet);
+	}
 	m_boxDimensions = m_retailWeather ? TheWeatherSetting->m_snowBoxHeight : TheWeatherSetting->m_snowBoxDimensions;
 
 	Real *dst=m_startingHeights;
