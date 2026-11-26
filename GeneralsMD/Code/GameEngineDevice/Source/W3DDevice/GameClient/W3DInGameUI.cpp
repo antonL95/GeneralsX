@@ -433,6 +433,8 @@ void W3DInGameUI::reset()
 	m_terrainResourceDecal.clear();
 	m_placementDecal.clear();
 	m_selectionDecals.clear();
+	m_formationPreviewDecals.clear();
+	clearFormationDragPreview();
 
 	// call base
 	InGameUI::reset();
@@ -476,6 +478,7 @@ void W3DInGameUI::draw()
 					RetailWorldUI::drawSelection(*view, m_isDragSelecting ? &m_dragSelectRegion : nullptr, m_selectionDecals);
 				else
 					m_selectionDecals.clear();
+				RetailWorldUI::drawFormationPreview(m_formationPreviewDecals);
 				W3DScriptedModelDraw::updatePlacementDecal(m_pendingPlaceType ? m_placeIcon[0] : nullptr, m_placementDecal);
 				drawTerrainResourceIndicator(*view, m_pendingPlaceType,
 					getSelectCount() == 1 ? getFirstSelectedDrawable() : nullptr, m_terrainResourceLabel,

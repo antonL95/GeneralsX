@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <deque>
 #include <set>
 #include <string_view>
 #include <vector>
@@ -13,8 +14,10 @@
 #include "Common/GlobalData.h"
 #include "Common/MessageStream.h"
 #include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/PlayerTemplate.h"
+#include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "GameClient/Display.h"
 #include "GameClient/RadiusDecal.h"
@@ -22,6 +25,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/Image.h"
 #include "GameClient/View.h"
+#include "GameLogic/FormationAssistant.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/ExperienceLevelStore.h"
@@ -33,6 +37,7 @@
 #include "GameLogic/Module/TerrainResourceBehavior.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
+#include "Lib/trig.h"
 #include "WWMath/wwmath.h"
 
 namespace
@@ -656,4 +661,154 @@ void RetailWorldUI::drawTerrainClaims(View& view, const Player& player, const Ob
 	if (site && siteRadius > 0.0f)
 		circles.push_back({*site->getPosition(), siteRadius});
 	drawMergedCircles(view, circles, player.getPlayerColor(), 130);
+}
+
+void RetailWorldUI::drawFormationPreview(std::deque<WorldGroundDecal>& decals)
+{
+#if !RTS_GENERALS
+	if (!TheInGameUI || !TheThingFactory || !ThePlayerList || !TheTerrainLogic)
+	{
+		decals.clear();
+		return;
+	}
+	const InGameUI::FormationDragPreview& preview = TheInGameUI->getFormationDragPreview();
+	if (!preview.active || preview.templateIndex < 0)
+	{
+		decals.clear();
+		return;
+	}
+
+	std::vector<Object*> units;
+	for (const Drawable* drawable : *TheInGameUI->getAllSelectedDrawables())
+	{
+		Object* object = drawable ? drawable->getObject() : nullptr;
+		if (!object || !object->getAI() || object->isKindOf(KINDOF_IMMOBILE))
+			continue;
+		if (HordeContain::get(object->getContainedBy()))
+			continue;
+		units.push_back(object);
+	}
+	if (units.empty())
+	{
+		decals.clear();
+		return;
+	}
+
+	const FormationAssistant& assistant = FormationAssistant::get();
+	const std::vector<FormationSlot> slots = assistant.layout(preview.templateIndex, std::move(units),
+		preview.anchor, preview.angle);
+	if (slots.empty())
+	{
+		decals.clear();
+		return;
+	}
+
+	const Player* localPlayer = ThePlayerList->getLocalPlayer();
+	const Color tint = localPlayer ? (localPlayer->getPlayerColor() | 0xFF000000) : 0xFFFFFFFF;
+	size_t used = 0;
+	const auto pushDecal = [&](const AsciiString& texture, const Coord3D& position, Real width, Real height, Real angle)
+	{
+		if (texture.isEmpty() || width <= 0.0f || height <= 0.0f)
+			return;
+		if (used == decals.size())
+			decals.emplace_back();
+		Coord3D ground = position;
+		ground.z = TheTerrainLogic->getGroundHeight(ground.x, ground.y);
+		decals[used].set(texture, ground, width, height, 255, tint, FALSE, angle);
+		++used;
+	};
+	const auto findPreviewDecal = [](const ThingTemplate* definition) -> const ThingTemplate::FormationDecal*
+	{
+		if (!definition)
+			return nullptr;
+		const auto& data = definition->getRotWKObjectData();
+		if (data.formationPreviewDecal.texture.isNotEmpty())
+			return &data.formationPreviewDecal;
+		if (data.formationPreviewItemDecal.texture.isNotEmpty())
+			return &data.formationPreviewItemDecal;
+		return nullptr;
+	};
+
+	const Real decalAngle = preview.angle - PI / 2.0f;
+	for (const FormationSlot& slot : slots)
+	{
+		const ThingTemplate::FormationDecal* decal = findPreviewDecal(slot.m_unit->getTemplate());
+		if (!decal && slot.m_definition >= 0 && static_cast<size_t>(slot.m_definition) < assistant.m_definitions.size())
+		{
+			const AsciiString& previewName = assistant.m_definitions[slot.m_definition].m_previewObject;
+			if (previewName.isNotEmpty())
+				decal = findPreviewDecal(TheThingFactory->findTemplate(previewName));
+		}
+		if (decal)
+			pushDecal(decal->texture, slot.m_position, static_cast<Real>(decal->width),
+				static_cast<Real>(decal->height), decalAngle);
+	}
+
+	const ThingTemplate::FormationDecal* headDecal = assistant.m_facingArrowHeadTemplate.isNotEmpty()
+		? findPreviewDecal(TheThingFactory->findTemplate(assistant.m_facingArrowHeadTemplate)) : nullptr;
+	const ThingTemplate::FormationDecal* bodyDecal = assistant.m_facingArrowBodyTemplate.isNotEmpty()
+		? findPreviewDecal(TheThingFactory->findTemplate(assistant.m_facingArrowBodyTemplate)) : nullptr;
+	const ThingTemplate::FormationDecal* baseDecal = assistant.m_facingArrowBaseTemplate.isNotEmpty()
+		? findPreviewDecal(TheThingFactory->findTemplate(assistant.m_facingArrowBaseTemplate)) : nullptr;
+
+	const Real fwdX = Cos(preview.angle);
+	const Real fwdY = Sin(preview.angle);
+	const Real sideX = -fwdY;
+	const Real sideY = fwdX;
+	const Real bodyWidth = bodyDecal ? static_cast<Real>(bodyDecal->width) : 0.0f;
+	const Real bodyHeight = bodyDecal ? static_cast<Real>(bodyDecal->height) : 0.0f;
+	const Real baseWidth = baseDecal ? static_cast<Real>(baseDecal->width) : 0.0f;
+	const Real baseHeight = baseDecal ? static_cast<Real>(baseDecal->height) : 0.0f;
+	const Real headWidth = headDecal ? static_cast<Real>(headDecal->width) : 0.0f;
+	const Real headHeight = headDecal ? static_cast<Real>(headDecal->height) : 0.0f;
+
+	const Real minHalfWidth = (bodyWidth + baseWidth) * 0.5f;
+	const Real sideLength = std::max(preview.dragLength, minHalfWidth);
+	constexpr Real arrowOffset = 30.0f;
+	constexpr Real wingInset = 10.0f;
+	const Real bodyCenterDist = bodyHeight * 0.5f + arrowOffset;
+	const Real headBaseDist = bodyHeight + arrowOffset;
+	const Coord3D bodyPos = {
+		preview.anchor.x + fwdX * bodyCenterDist,
+		preview.anchor.y + fwdY * bodyCenterDist,
+		preview.anchor.z
+	};
+
+	if (bodyDecal)
+	{
+		const Real stretchedWidth = std::max(bodyWidth, 2.0f * sideLength - baseWidth);
+		pushDecal(bodyDecal->texture, bodyPos, stretchedWidth, bodyHeight, decalAngle);
+	}
+	if (baseDecal)
+	{
+		const Real wingDist = std::max(0.0f, sideLength - wingInset);
+		const Coord3D wingPositive = {
+			bodyPos.x + sideX * wingDist,
+			bodyPos.y + sideY * wingDist,
+			preview.anchor.z
+		};
+		const Coord3D wingNegative = {
+			bodyPos.x - sideX * wingDist,
+			bodyPos.y - sideY * wingDist,
+			preview.anchor.z
+		};
+		pushDecal(baseDecal->texture, wingPositive, baseWidth, baseHeight, preview.angle + PI / 2.0f);
+		pushDecal(baseDecal->texture, wingNegative, baseWidth, baseHeight, decalAngle);
+	}
+	if (headDecal)
+	{
+		const Real headDist = headHeight * 0.5f + headBaseDist;
+		const Coord3D headPos = {
+			preview.anchor.x + fwdX * headDist,
+			preview.anchor.y + fwdY * headDist,
+			preview.anchor.z
+		};
+		pushDecal(headDecal->texture, headPos, headWidth, headHeight, decalAngle);
+	}
+
+	while (decals.size() > used)
+		decals.pop_back();
+#else
+	decals.clear();
+#endif
 }

@@ -44,6 +44,9 @@ struct FormationAssistant
 	Real m_rowPadding = 0.0f;
 	Real m_columnPadding = 0.0f;
 	Real m_activationDragDistance = 0.0f;
+	AsciiString m_facingArrowHeadTemplate;
+	AsciiString m_facingArrowBodyTemplate;
+	AsciiString m_facingArrowBaseTemplate;
 	std::vector<FormationUnitDefinition> m_definitions;
 	std::vector<FormationTemplate> m_templates;
 	std::vector<FormationSelection> m_selections;

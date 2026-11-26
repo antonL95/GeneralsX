@@ -560,6 +560,18 @@ public:  // ********************************************************************
 	Bool isInAttackMoveToMode() const		{ return m_attackMoveToMode; }
 	void clearAttackMoveToMode()				{ m_attackMoveToMode = FALSE; }
 
+	struct FormationDragPreview
+	{
+		Bool active = FALSE;
+		Coord3D anchor = {0.0f, 0.0f, 0.0f};
+		Real angle = 0.0f;
+		Real dragLength = 0.0f;
+		Int templateIndex = -1;
+	};
+	void setFormationDragPreview(const FormationDragPreview& preview) { m_formationDragPreview = preview; }
+	void clearFormationDragPreview() { m_formationDragPreview = FormationDragPreview(); }
+	const FormationDragPreview& getFormationDragPreview() const { return m_formationDragPreview; }
+
 	void setCameraRotateLeft( Bool set )		{ m_cameraRotatingLeft = set; }
 	void setCameraRotateRight( Bool set )		{ m_cameraRotatingRight = set; }
 	void setCameraZoomIn( Bool set )				{ m_cameraZoomingIn = set; }
@@ -973,6 +985,7 @@ protected:
 
  	Bool												m_waypointMode;			///< are we in waypoint plotting mode?
 	Bool												m_forceAttackMode;		///< are we in force attack mode?
+	FormationDragPreview								m_formationDragPreview;
 	Bool												m_forceMoveToMode;		///< are we in force move mode?
 	Bool												m_attackMoveToMode;	///< are we in attack move mode?
 	Bool												m_preferSelection;		///< the shift key has been depressed.

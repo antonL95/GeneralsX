@@ -14,11 +14,6 @@
 
 namespace
 {
-void skipName(INI* ini, void*, void*, const void*)
-{
-	ini->getNextToken();
-}
-
 void parseUnitDefinition(INI* ini, void* instance, void*, const void*)
 {
 	static const FieldParse fields[] =
@@ -271,9 +266,9 @@ void FormationAssistant::parseDefinition(INI* ini)
 	{
 		{ "RowPadding", INI::parseReal, nullptr, offsetof(FormationAssistant, m_rowPadding) },
 		{ "ColumnPadding", INI::parseReal, nullptr, offsetof(FormationAssistant, m_columnPadding) },
-		{ "FacingArrowHeadTemplate", skipName, nullptr, 0 },
-		{ "FacingArrowBodyTemplate", skipName, nullptr, 0 },
-		{ "FacingArrowBaseTemplate", skipName, nullptr, 0 },
+		{ "FacingArrowHeadTemplate", INI::parseAsciiString, nullptr, offsetof(FormationAssistant, m_facingArrowHeadTemplate) },
+		{ "FacingArrowBodyTemplate", INI::parseAsciiString, nullptr, offsetof(FormationAssistant, m_facingArrowBodyTemplate) },
+		{ "FacingArrowBaseTemplate", INI::parseAsciiString, nullptr, offsetof(FormationAssistant, m_facingArrowBaseTemplate) },
 		{ "ActivationDragDistance", INI::parseReal, nullptr, offsetof(FormationAssistant, m_activationDragDistance) },
 		{ "UnitDefinition", parseUnitDefinition, nullptr, 0 },
 		{ "FormationTemplate", parseTemplate, nullptr, 0 },

@@ -17,16 +17,14 @@ void FormationDragTranslator::begin(const ICoord2D& pixel)
 	m_swallowClicks = TRUE;
 	m_start = pixel;
 	m_current = pixel;
+	updatePreview();
 }
 
-void FormationDragTranslator::finish()
+Bool FormationDragTranslator::computeDrag(Coord3D& anchor, Real& angle, Real& dragLength, Int& templateIndex) const
 {
-	m_dragging = FALSE;
-
-	Coord3D anchor;
 	Coord3D end;
 	if (!TheTacticalView->screenToTerrain(&m_start, &anchor) || !TheTacticalView->screenToTerrain(&m_current, &end))
-		return;
+		return FALSE;
 
 	UnsignedInt count = 0;
 	Coord2D fromUnits = {0.0f, 0.0f};
@@ -40,20 +38,48 @@ void FormationDragTranslator::finish()
 		fromUnits.y += anchor.y - object->getPosition()->y;
 	}
 	if (count == 0)
-		return;
+		return FALSE;
 
 	Coord2D direction = {end.x - anchor.x, end.y - anchor.y};
-	const Real length = direction.length();
-	if (length == 0.0f)
+	dragLength = direction.length();
+	if (dragLength == 0.0f)
 		direction = fromUnits;
 
-	const Int templateIndex = FormationAssistant::get().chooseTemplate(length, count);
+	templateIndex = FormationAssistant::get().chooseTemplate(dragLength, count);
 	if (templateIndex < 0)
+		return FALSE;
+
+	angle = direction.toAngle();
+	return TRUE;
+}
+
+void FormationDragTranslator::updatePreview()
+{
+	InGameUI::FormationDragPreview preview;
+	if (computeDrag(preview.anchor, preview.angle, preview.dragLength, preview.templateIndex))
+	{
+		preview.active = TRUE;
+		TheInGameUI->setFormationDragPreview(preview);
+		return;
+	}
+	TheInGameUI->clearFormationDragPreview();
+}
+
+void FormationDragTranslator::finish()
+{
+	m_dragging = FALSE;
+	TheInGameUI->clearFormationDragPreview();
+
+	Coord3D anchor;
+	Real angle = 0.0f;
+	Real dragLength = 0.0f;
+	Int templateIndex = -1;
+	if (!computeDrag(anchor, angle, dragLength, templateIndex))
 		return;
 
 	GameMessage* move = TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO_FORMATION);
 	move->appendLocationArgument(anchor);
-	move->appendRealArgument(direction.toAngle());
+	move->appendRealArgument(angle);
 	move->appendIntegerArgument(templateIndex);
 	move->appendBooleanArgument(TheInGameUI->isInAttackMoveToMode());
 }
@@ -90,6 +116,7 @@ GameMessageDisposition FormationDragTranslator::translateGameMessage(const GameM
 			if (!m_dragging)
 				return KEEP_MESSAGE;
 			m_current = msg->getArgument(0)->pixel;
+			updatePreview();
 			return DESTROY_MESSAGE;
 		}
 		case GameMessage::MSG_RAW_MOUSE_LEFT_DRAG:

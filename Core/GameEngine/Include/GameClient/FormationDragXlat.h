@@ -10,6 +10,8 @@ public:
 
 private:
 	void begin(const ICoord2D& pixel);
+	Bool computeDrag(Coord3D& anchor, Real& angle, Real& dragLength, Int& templateIndex) const;
+	void updatePreview();
 	void finish();
 
 	Bool m_leftDown = FALSE;

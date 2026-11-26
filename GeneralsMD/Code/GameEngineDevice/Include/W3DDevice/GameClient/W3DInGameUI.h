@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <deque>
 #include <map>
 
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
@@ -92,6 +93,7 @@ protected:
 	WorldGroundDecal m_terrainResourceDecal;
 	WorldGroundDecal m_placementDecal;
 	std::map<DrawableID, WorldGroundDecal> m_selectionDecals;
+	std::deque<WorldGroundDecal> m_formationPreviewDecals;
 	RenderObjClass *m_retailAttackModel = nullptr;
 	Bool m_retailAttackModelChecked = FALSE;
 
