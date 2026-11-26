@@ -10,20 +10,36 @@ namespace
 struct RecordingHost : DrawScript::Host
 {
 	std::string previous;
+	std::string previousAnimation;
+	std::string targetKind;
 	double fraction = 0.0;
 	std::string transition;
 	bool allowed = false;
+	std::vector<std::string> subObjectLog;
+	DrawScript::Value returned;
 
 	DrawScript::Value call(const std::string& function, const std::vector<DrawScript::Value>& arguments) override
 	{
 		if (function == "CurDrawablePrevAnimationState")
 			return previous.empty() ? DrawScript::Value() : DrawScript::Value::of(previous);
+		if (function == "CurDrawablePrevAnimation")
+			return previousAnimation.empty() ? DrawScript::Value() : DrawScript::Value::of(previousAnimation);
 		if (function == "CurDrawablePrevAnimFraction")
 			return DrawScript::Value::of(fraction);
 		if (function == "CurDrawableAllowToContinue")
 			allowed = true;
 		if (function == "CurDrawableSetTransitionAnimState" && !arguments.empty())
 			transition = arguments.front().text;
+		if (function == "CurDrawableHideSubObject" && !arguments.empty())
+			subObjectLog.push_back("hide:" + arguments.front().text);
+		if (function == "CurDrawableShowSubObject" && !arguments.empty())
+			subObjectLog.push_back("show:" + arguments.front().text);
+		if (function == "CurDrawableHideSubObjectPermanently" && !arguments.empty())
+			subObjectLog.push_back("hide_perm:" + arguments.front().text);
+		if (function == "CurDrawableShowSubObjectPermanently" && !arguments.empty())
+			subObjectLog.push_back("show_perm:" + arguments.front().text);
+		if (function == "CurDrawableIsCurrentTargetKindof" && !arguments.empty())
+			return DrawScript::Value::of(!targetKind.empty() && arguments.front().text == targetKind);
 		return {};
 	}
 };
@@ -36,7 +52,7 @@ RecordingHost run(const char* source, const char* previous, double fraction = 0.
 	const auto script = DrawScript::compile(source);
 	EXPECT_NE(script, nullptr) << source;
 	if (script)
-		script->run(host);
+		host.returned = script->run(host);
 	return host;
 }
 
@@ -105,4 +121,114 @@ TEST(DrawScript, RejectsWhatLuaRejects)
 	for (int i = 0; i < 10000; ++i)
 		deep += "(";
 	EXPECT_EQ(DrawScript::compile("x = " + deep), nullptr);
+}
+
+TEST(DrawScript, ReturnsAnimationLabelFromBranches)
+{
+	const char* source =
+		"if CurDrawablePrevAnimationState() == \"A\" then return \"Bow\" "
+		"else return (\"Sword\") end";
+	const RecordingHost first = run(source, "A");
+	EXPECT_EQ(first.returned.type, DrawScript::Value::Type::String);
+	EXPECT_EQ(first.returned.text, "Bow");
+
+	const RecordingHost second = run(source, "B");
+	EXPECT_EQ(second.returned.type, DrawScript::Value::Type::String);
+	EXPECT_EQ(second.returned.text, "Sword");
+
+	const RecordingHost empty = run("if true then return end", "");
+	EXPECT_EQ(empty.returned.type, DrawScript::Value::Type::Nil);
+}
+
+TEST(DrawScript, SubObjectActionsFollowControlFlow)
+{
+	const char* source =
+		"Prev = CurDrawablePrevAnimationState()\n"
+		"if Prev == \"Bow\" then\n"
+		"  CurDrawableShowSubObject(\"arrow\")\n"
+		"  CurDrawableHideSubObjectPermanently(\"sword\")\n"
+		"  return \"WantSword\"\n"
+		"end\n"
+		"CurDrawableHideSubObject(\"arrow\")\n"
+		"CurDrawableShowSubObjectPermanently(\"sword\")\n"
+		"return \"Sword\"\n";
+
+	const RecordingHost bow = run(source, "Bow");
+	EXPECT_EQ(bow.returned.text, "WantSword");
+	ASSERT_EQ(bow.subObjectLog.size(), 2u);
+	EXPECT_EQ(bow.subObjectLog[0], "show:arrow");
+	EXPECT_EQ(bow.subObjectLog[1], "hide_perm:sword");
+
+	const RecordingHost idle = run(source, "Idle");
+	EXPECT_EQ(idle.returned.text, "Sword");
+	ASSERT_EQ(idle.subObjectLog.size(), 2u);
+	EXPECT_EQ(idle.subObjectLog[0], "hide:arrow");
+	EXPECT_EQ(idle.subObjectLog[1], "show_perm:sword");
+}
+
+TEST(DrawScript, GlobalsPersistAcrossExecutionsInEnvironment)
+{
+	DrawScript::Environment globals;
+	const auto writer = DrawScript::compile("Prev = CurDrawablePrevAnimationState()");
+	const auto reader = DrawScript::compile(
+		"if Prev == \"STATE_Idle\" then CurDrawableSetTransitionAnimState(\"TRANS_FromSaved\") end");
+	ASSERT_NE(writer, nullptr);
+	ASSERT_NE(reader, nullptr);
+
+	RecordingHost firstHost;
+	firstHost.previous = "STATE_Idle";
+	writer->run(firstHost, globals);
+
+	RecordingHost secondHost;
+	secondHost.previous = "STATE_Other";
+	reader->run(secondHost, globals);
+	EXPECT_EQ(secondHost.transition, "TRANS_FromSaved");
+
+	DrawScript::Environment isolated;
+	RecordingHost thirdHost;
+	reader->run(thirdHost, isolated);
+	EXPECT_EQ(thirdHost.transition, "");
+}
+
+TEST(DrawScript, TargetKindofSelectsReturnedAnimation)
+{
+	const char* source =
+		"if CurDrawableIsCurrentTargetKindof(\"STRUCTURE\") or CurDrawableIsCurrentTargetKindof(\"MONSTER\") then\n"
+		"  return (\"FrontKick\")\n"
+		"else\n"
+		"  return (\"StickSwipe\")\n"
+		"end";
+	const auto script = DrawScript::compile(source);
+	ASSERT_NE(script, nullptr);
+
+	RecordingHost structureHost;
+	structureHost.targetKind = "STRUCTURE";
+	EXPECT_EQ(script->run(structureHost).text, "FrontKick");
+
+	RecordingHost monsterHost;
+	monsterHost.targetKind = "MONSTER";
+	EXPECT_EQ(script->run(monsterHost).text, "FrontKick");
+
+	RecordingHost infantryHost;
+	infantryHost.targetKind = "INFANTRY";
+	EXPECT_EQ(script->run(infantryHost).text, "StickSwipe");
+
+	RecordingHost noTargetHost;
+	EXPECT_EQ(script->run(noTargetHost).text, "StickSwipe");
+}
+
+TEST(DrawScript, SameStateReentryReadsPreviousAnimationWithNilState)
+{
+	const char* source =
+		"if CurDrawablePrevAnimationState() == nil and CurDrawablePrevAnimation() == \"IdleA\" then\n"
+		"  return \"IdleB\"\n"
+		"end\n"
+		"return \"IdleA\"";
+	const auto script = DrawScript::compile(source);
+	ASSERT_NE(script, nullptr);
+
+	RecordingHost reentryHost;
+	reentryHost.previous = "";
+	reentryHost.previousAnimation = "IdleA";
+	EXPECT_EQ(script->run(reentryHost).text, "IdleB");
 }

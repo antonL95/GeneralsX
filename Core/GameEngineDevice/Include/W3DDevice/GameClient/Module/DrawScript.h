@@ -66,6 +66,8 @@ public:
 		~Host() = default;
 	};
 
+	using Environment = std::map<std::string, Value>;
+
 	static std::shared_ptr<const DrawScript> compile(std::string_view source)
 	{
 		Parser parser(source);
@@ -75,10 +77,17 @@ public:
 		return script;
 	}
 
-	void run(Host& host) const
+	Value run(Host& host, Environment& variables) const
 	{
-		std::map<std::string, Value> variables;
-		Machine{host, variables}.execute(m_body);
+		Machine machine{host, variables, {}, false};
+		machine.execute(m_body);
+		return machine.result;
+	}
+
+	Value run(Host& host) const
+	{
+		Environment variables;
+		return run(host, variables);
 	}
 
 private:
@@ -390,7 +399,15 @@ private:
 						variables[statement.name] = evaluate(statement.expressions.front(), ok);
 						break;
 					case Statement::Kind::Return:
+					{
+						if (!statement.expressions.empty())
+						{
+							const Value returned = evaluate(statement.expressions.front(), ok);
+							if (ok)
+								result = returned;
+						}
 						return Flow::Stop;
+					}
 					case Statement::Kind::If:
 					{
 						std::size_t branch = 0;
@@ -472,6 +489,7 @@ private:
 			return ok ? Value::of(left.number / right.number) : Value();
 		}
 
+		Value result;
 		bool failed = false;
 	};
 
