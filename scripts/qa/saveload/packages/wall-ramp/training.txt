@@ -27,3 +27,6 @@
 186 wall-ramp-footprint Player_1 WallRampReset 0
 190 wall-ramp-revoke Player_1 WallRampReset 0 Upgrade_StructureLevel1
 191 wall-ramp-footprint Player_1 WallRampReset 0
+180 create PlyrCivilian WallRampTarget 0 3850,1050,0
+182 create PlyrCivilian WallRampTarget 0 3852,1050,0
+250 wall-ramp-weapon Player_1 WallRampClimber 0 ZigurSacrificialRitesWeapon 3850 1050

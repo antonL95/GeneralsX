@@ -14,6 +14,7 @@
 #include "GameLogic/Pathfinder/Path.h"
 #include "GameLogic/RetailWallMesh.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/Weapon.h"
 
 namespace
 {
@@ -87,6 +88,16 @@ void revokeUpgrade(const RetailTestCommands::Context& ctx)
 	const auto* upgrade = TheUpgradeCenter->findUpgrade(ctx.argument);
 	if (object && upgrade)
 		object->removeUpgrade(upgrade);
+}
+
+void fireWeaponAt(const RetailTestCommands::Context& ctx)
+{
+	const Object* source = ctx.requireObject(FALSE);
+	const WeaponTemplate* weapon = TheWeaponStore->findWeaponTemplate(ctx.argument);
+	const Bool fired = source && weapon && ctx.hasPosition;
+	if (fired)
+		TheWeaponStore->createAndFireTempWeapon(weapon, source, &ctx.position, TRUE);
+	std::fprintf(stderr, "TEST wall-ramp-weapon frame=%u fired=%d\n", ctx.frame, fired);
 }
 
 void probeUnit(const RetailTestCommands::Context& ctx)
@@ -206,6 +217,7 @@ void registerRetailWallRampTestCommands()
 	registerAction("wall-ramp-footprint", probeFootprint);
 	registerAction("wall-ramp-revoke", revokeUpgrade);
 	registerAction("wall-ramp-pinched", probePinched);
+	registerAction("wall-ramp-weapon", fireWeaponAt);
 #endif
 }
 }
