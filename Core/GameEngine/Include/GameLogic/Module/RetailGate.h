@@ -178,6 +178,7 @@ public:
 	Bool permits(const Object& unit) const;
 	Bool getAboveWallPosition(Coord3D& position) const;
 	Bool getClimbEntryPosition(Coord3D& position) const;
+	Bool getClimbWaypoints(std::vector<Coord3D>& positions) const;
 	Bool getTopAttackPosition(Coord3D& position) const;
 	Bool isWithinTopAttackRange(const Object& attacker) const;
 	Bool allowsClimber(const Object& unit) const;

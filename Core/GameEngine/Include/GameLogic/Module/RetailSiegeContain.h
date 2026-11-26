@@ -29,6 +29,8 @@ public:
 	Int getContainMax() const override;
 	Bool isValidContainerFor(const Object* rider, Bool checkCapacity) const override;
 	Bool isCrew(const Object* rider) const;
+	Bool isClimbing(ObjectID id) const;
+	Bool getClimbProgress(ObjectID id, Real& distance, Int& segmentIndex) const;
 	Real crewSpeedScale() const;
 	void releasePassengersOnWall();
 	void exitObjectViaDoor(Object* rider, ExitDoorType door) override;
@@ -48,9 +50,21 @@ protected:
 	Bool isSpecificRiderFreeToExit(Object* rider) override;
 
 private:
+	struct ClimbingRider
+	{
+		ObjectID riderId = INVALID_ID;
+		Real distance = 0.0f;
+	};
+
 	Int countCrew() const;
+	void startClimb(Object* rider, const Coord3D& landing);
+	void updateClimbers();
+	void positionClimber(Object* rider, const std::vector<Coord3D>& waypoints, Real distance) const;
 	void releaseOnWall(Object* rider, const Coord3D& landing);
 	void positionSingleOccupants();
+	void xferRetailBlocks(Xfer* xfer, Bool present);
+
+	std::vector<ClimbingRider> m_climbers;
 };
 
 class HordeSiegeEngineContain final : public SiegeEngineContain

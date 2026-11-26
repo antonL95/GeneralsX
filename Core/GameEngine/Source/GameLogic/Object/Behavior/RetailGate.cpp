@@ -649,6 +649,56 @@ Bool DynamicPortalBehaviour::getClimbEntryPosition(Coord3D& position) const
 		getObject()->getMultiLogicalBonePosition(data->m_bonePrefix.str(), 1, &position, nullptr) == 1;
 }
 
+Bool DynamicPortalBehaviour::getClimbWaypoints(std::vector<Coord3D>& positions) const
+{
+	positions.clear();
+	const auto* data = getDynamicPortalBehaviourModuleData();
+	if (data->m_numberOfBones <= 0 || data->m_bonePrefix.isEmpty())
+		return FALSE;
+	std::vector<Coord3D> bones(static_cast<size_t>(data->m_numberOfBones));
+	const Int found = getObject()->getMultiLogicalBonePosition(data->m_bonePrefix.str(),
+		data->m_numberOfBones, bones.data(), nullptr);
+	if (found <= 0)
+		return FALSE;
+	const auto appendWaypoint = [&](Int wpIndex)
+	{
+		if (wpIndex < 0 || static_cast<size_t>(wpIndex) >= data->m_wayPoints.size())
+			return;
+		const Int boneIndex = data->m_wayPoints[static_cast<size_t>(wpIndex)].index;
+		if (boneIndex < 0 || boneIndex >= found)
+			return;
+		const Coord3D& pt = bones[static_cast<size_t>(boneIndex)];
+		if (!positions.empty())
+		{
+			const Coord3D& prev = positions.back();
+			if (prev.x == pt.x && prev.y == pt.y && prev.z == pt.z)
+				return;
+		}
+		positions.push_back(pt);
+	};
+	for (const auto& link : data->m_links)
+	{
+		if (link.to != data->m_aboveWall)
+			continue;
+		appendWaypoint(link.from);
+		for (Int via : link.vias)
+			appendWaypoint(via);
+		appendWaypoint(link.to);
+		if (positions.size() >= 2)
+			return TRUE;
+		positions.clear();
+	}
+	Coord3D entry;
+	Coord3D above;
+	if (getClimbEntryPosition(entry) && getAboveWallPosition(above))
+	{
+		positions.push_back(entry);
+		positions.push_back(above);
+		return TRUE;
+	}
+	return FALSE;
+}
+
 Bool DynamicPortalBehaviour::getTopAttackPosition(Coord3D& position) const
 {
 	const Object* self = getObject();
