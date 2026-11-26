@@ -1,0 +1,11 @@
+180 create Player_1 AotREdorasWall01 0 2000,2410,0
+181 scales-walls-probe Player_1 AotREdorasWall01 0
+180 create Player_1 ScalesWallsUnit 0 1980,2490,0
+180 create Player_1 ScalesWallsControl 0 2020,2490,0
+190 scales-walls-move Player_1 ScalesWallsUnit 0 - 1980 2410
+190 scales-walls-move Player_1 ScalesWallsControl 0 - 2020 2410
+220 scales-walls-sample Player_1 ScalesWallsUnit 0
+220 scales-walls-sample Player_1 ScalesWallsControl 0
+244 scales-walls-sample Player_1 ScalesWallsUnit 0
+300 scales-walls-sample Player_1 ScalesWallsUnit 0
+300 scales-walls-sample Player_1 ScalesWallsControl 0
