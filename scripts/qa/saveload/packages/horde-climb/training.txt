@@ -4,8 +4,8 @@
 153 aim Player_1 HordeClimbLadder 0 PlyrCivilian:HordeClimbWall:0
 220 horde-climb-probe Player_1 HordeClimbLadder 0 -
 220 create Player_1 HordeClimbHorde 0 800,2500,60
-225 power Player_1 HordeClimbHorde 0 SpecialAbilitySiegeDeploy
-226 aim Player_1 HordeClimbHorde 0 PlyrCivilian:HordeClimbWall:0
+222 power Player_1 HordeClimbHorde 0 SpecialAbilitySiegeDeploy
+223 aim Player_1 HordeClimbHorde 0 PlyrCivilian:HordeClimbWall:0
 228 horde-climb-probe Player_1 HordeClimbHorde 0 -
 250 horde-climb-probe Player_1 HordeClimbHorde 0 -
 270 horde-climb-probe Player_1 HordeClimbHorde 0 -
