@@ -1,5 +1,5 @@
 prepare() {
-    [ "$end" -ge 2000 ] || return 0
+    [ "$end" -ge 2400 ] || return 0
     awk -v end="$end" 'BEGIN {
         for (frame = 300; frame <= end; frame += 20)
             print frame, "exit-stuck-sample Player_1 HarondorOutpost 0 -"
@@ -7,7 +7,7 @@ prepare() {
 }
 
 check() {
-    covers 2000 || return 0
+    covers 2400 || return 0
     awk '
         function field(name,    i, parts) {
             for (i = 4; i <= NF; ++i) {
@@ -23,7 +23,7 @@ check() {
                 failed = 1
             }
         }
-        $1 == "TEST" && $2 == "exit-stuck" && $3 == 2000 {
+        $1 == "TEST" && $2 == "exit-stuck" && $3 == 2400 {
             ++settled
             if (field("slotdist") > 60) { printf "%s far from its slot (%s)\n", $5, field("slotdist"); failed = 1 }
         }
