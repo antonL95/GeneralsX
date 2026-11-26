@@ -1,0 +1,11 @@
+230 create Player_1 EjectionCarrier 0 1300,3500,0
+230 create Player_1 EjectionRider 0 1310,3500,0
+230 create Player_1 EjectionRider 1 1320,3500,0
+231 passenger-ejection-grab Player_1 EjectionCarrier 0 Player_1:EjectionRider:0
+232 passenger-ejection-grab Player_1 EjectionCarrier 0 Player_1:EjectionRider:1
+243 passenger-ejection-sample Player_1 EjectionRider 0 loaded-a
+243 passenger-ejection-sample Player_1 EjectionRider 1 loaded-b
+250 passenger-ejection-turn Player_1 EjectionRider 1
+251 passenger-ejection-kill Player_1 EjectionCarrier 0
+251 passenger-ejection-sample Player_1 EjectionRider 0 launched-a
+251 passenger-ejection-sample Player_1 EjectionRider 1 launched-b

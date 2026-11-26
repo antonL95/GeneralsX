@@ -1149,7 +1149,8 @@ void OpenContain::onDie( const DamageInfo * damageInfo )
 			if (PhysicsBehavior* physics = passenger->getPhysics())
 			{
 				const Coord3D& heading = *passenger->getUnitDirectionVector2D();
-				physics->launchFromContainment({heading.x, heading.y, 0.0f});
+				const Real speed = static_cast<Real>(GameLogicRandomValue(2, 5));
+				physics->launchFromContainment({heading.x * speed, heading.y * speed, speed});
 			}
 			if (const HordeContain* horde = HordeContain::get(passenger))
 			{
