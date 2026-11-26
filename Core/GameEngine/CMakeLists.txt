@@ -90,14 +90,12 @@ set(GAMEENGINE_SRC
     Include/GameLogic/CastleTemplateStore.h
     Include/GameLogic/ExperienceLevelRules.h
     Include/GameLogic/ExperienceLevelStore.h
-    Include/GameLogic/RetailCreationUpgrades.h
     Include/GameLogic/RetailWallMesh.h
     Include/GameLogic/RetailSpawnFootprint.h
     Include/GameLogic/WeaponNuggetRules.h
     Include/GameLogic/WeaponSlotSelectionRules.h
     Include/GameLogic/RetailTestCommands.h
     Include/GameLogic/RetailTribute.h
-    Include/GameLogic/RetailBuildingEvents.h
     Include/GameLogic/Module/RetailConstruction.h
     Include/GameLogic/Module/CastleBehavior.h
     Include/GameLogic/Module/CastleUpgrade.h
@@ -767,12 +765,10 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/HeroRoster.cpp
     Source/GameLogic/Map/CastleTemplateStore.cpp
     Source/GameLogic/System/ExperienceLevelStore.cpp
-    Source/GameLogic/System/RetailCreationUpgrades.cpp
     Source/GameLogic/System/RetailLogicBenchmark.cpp
     Source/GameLogic/System/RetailWallMesh.cpp
     Source/GameLogic/AI/FormationAssistant.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
-    Source/GameLogic/System/RetailBuildingEvents.cpp
     Source/GameLogic/Object/Behavior/RetailConstruction.cpp
     Source/GameLogic/Object/Behavior/CastleBehavior.cpp
     Source/GameLogic/Object/Upgrade/CastleUpgrade.cpp

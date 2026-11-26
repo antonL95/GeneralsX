@@ -41,8 +41,6 @@
 #include "Common/RandomValue.h"
 #include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceLevelStore.h"
-#include "GameLogic/RetailCreationUpgrades.h"
-#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -372,13 +370,9 @@ Object *ThingFactory::newObjectFromExactTemplate( const ThingTemplate *tmplate, 
 		if (lua)
 			lua->registerObject(*obj);
 		ExperienceLevelStore::onObjectCreated(obj);
-		if (!lua)
-			RetailCreationUpgrades::onObjectCreated(obj);
 		TheGameLogic->applyRetailWeatherModifier(*obj);
 		if (lua)
 			lua->dispatch(*obj, "OnCreated");
-		else
-			RetailBuildingEvents::created(*obj);
 		CreateAHeroSystem::applyToHero(obj);
 	}
 

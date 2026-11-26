@@ -90,7 +90,6 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/HeroRoster.h"
 #include "GameLogic/Locomotor.h"
-#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/LuaScriptEngine.h"
 
 #include "GameLogic/Module/AIUpdate.h"
@@ -1607,50 +1606,26 @@ void Object::setFiringConditionForCurrentWeapon()
 //=============================================================================
 void Object::setModelConditionState( ModelConditionFlagType a )
 {
-	const Bool constructionStarted = (a == MODELCONDITION_ACTIVELY_CONSTRUCTING || a == MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED) &&
-		RetailFileLayers::enabled() && !m_logicModelConditions.test(a);
 	const ModelConditionFlags previousConditions = m_logicModelConditions;
-	const Bool userSixStarted = a == MODELCONDITION_USER_6 && RetailFileLayers::enabled() &&
-		!m_logicModelConditions.test(a);
 	if (RetailFileLayers::enabled() && a != MODELCONDITION_INVALID)
 		m_logicModelConditions.set(a);
 	if (m_drawable)
 	{
 		m_drawable->setModelConditionState(a);
 	}
-	if (auto* lua = LuaScriptEngine::active())
-		lua->modelConditionsChanged(*this, previousConditions);
-	else
-	{
-		if (userSixStarted && (!TheGameState || !TheGameState->isInLoadGame()))
-			RetailBuildingEvents::trollEatingChanged(*this, true);
-		if (constructionStarted)
-			RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
-	}
+	notifyLuaModelConditionChange(previousConditions);
 }
 
 void Object::clearModelConditionState( ModelConditionFlagType a )
 {
-	const Bool constructionStopped = (a == MODELCONDITION_ACTIVELY_CONSTRUCTING || a == MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED) &&
-		RetailFileLayers::enabled() && m_logicModelConditions.test(a);
 	const ModelConditionFlags previousConditions = m_logicModelConditions;
-	const Bool userSixStopped = a == MODELCONDITION_USER_6 && RetailFileLayers::enabled() &&
-		m_logicModelConditions.test(a);
 	if (RetailFileLayers::enabled() && a != MODELCONDITION_INVALID)
 		m_logicModelConditions.set(a, FALSE);
 	if (m_drawable)
 	{
 		m_drawable->clearModelConditionState(a);
 	}
-	if (auto* lua = LuaScriptEngine::active())
-		lua->modelConditionsChanged(*this, previousConditions);
-	else
-	{
-		if (userSixStopped && (!TheGameState || !TheGameState->isInLoadGame()))
-			RetailBuildingEvents::trollEatingChanged(*this, false);
-		if (constructionStopped)
-			RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
-	}
+	notifyLuaModelConditionChange(previousConditions);
 }
 
 void Object::clearAndSetModelConditionState( ModelConditionFlagType clr, ModelConditionFlagType set )
@@ -1667,16 +1642,18 @@ void Object::clearAndSetModelConditionState( ModelConditionFlagType clr, ModelCo
 	{
 		m_drawable->clearAndSetModelConditionState(clr, set);
 	}
-	notifyConstructionConditionChange(previousConditions);
+	notifyLuaModelConditionChange(previousConditions);
 }
 
-void Object::notifyConstructionConditionChange( const ModelConditionFlags& previous )
+void Object::notifyLuaModelConditionChange(const ModelConditionFlags& previous)
 {
 	if (auto* lua = LuaScriptEngine::active())
 		lua->modelConditionsChanged(*this, previous);
-	else if (previous.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) ||
-		previous.test(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED))
-		RetailBuildingEvents::modelConditionsChanged(*this, previous);
+	const Bool constructionChanged = previous.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) ||
+		previous.test(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED);
+	if (constructionChanged && (!TheGameState || !TheGameState->isInLoadGame()))
+		if (CastleMemberBehavior* member = CastleMemberBehavior::find(this))
+			member->onModelConditionChanged(previous, m_logicModelConditions);
 }
 
 //=============================================================================
@@ -1689,7 +1666,7 @@ void Object::clearModelConditionFlags( const ModelConditionFlags& clr )
 	{
 		m_drawable->clearModelConditionFlags(clr);
 	}
-	notifyConstructionConditionChange(previousConditions);
+	notifyLuaModelConditionChange(previousConditions);
 }
 
 //=============================================================================
@@ -1702,7 +1679,7 @@ void Object::setModelConditionFlags( const ModelConditionFlags& set )
 	{
 		m_drawable->setModelConditionFlags(set);
 	}
-	notifyConstructionConditionChange(previousConditions);
+	notifyLuaModelConditionChange(previousConditions);
 }
 
 //=============================================================================
@@ -1715,7 +1692,7 @@ void Object::clearAndSetModelConditionFlags( const ModelConditionFlags& clr, con
 	{
 		m_drawable->clearAndSetModelConditionFlags(clr, set);
 	}
-	notifyConstructionConditionChange(previousConditions);
+	notifyLuaModelConditionChange(previousConditions);
 }
 
 //=============================================================================
@@ -2477,12 +2454,8 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 	}
 
 	if (retail && body && damageInfo->out.m_actualDamageClipped > 0.0f)
-	{
 		if (auto* lua = LuaScriptEngine::active())
 			lua->dispatch(*this, "OnDamaged", TheGameLogic->findObjectByID(damageInfo->in.m_sourceID));
-		else
-			RetailBuildingEvents::damaged(*this);
-	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3707,7 +3680,6 @@ static ModelConditionFlagType swappingModelConditionFor(ModelConditionFlagType c
 
 void Object::setWeaponSetFlags(const WeaponSetFlags& flags, Bool enabled)
 {
-	const ModelConditionFlags previousConditions = m_logicModelConditions;
 	Bool changed = FALSE;
 	for (Int i = 0; i < WEAPONSET_COUNT; ++i)
 	{
@@ -3727,11 +3699,7 @@ void Object::setWeaponSetFlags(const WeaponSetFlags& flags, Bool enabled)
 			setTimedModelCondition(swapping, LOGICFRAMES_PER_SECOND);
 	}
 	if (changed)
-	{
 		m_weaponSet.updateWeaponSet(this);
-		if (RetailFileLayers::enabled() && !LuaScriptEngine::active() && previousConditions != m_logicModelConditions)
-			RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
-	}
 }
 
 ModelConditionFlags CommandButton::getRetailCommandModelConditions(const Object* source)
@@ -5890,7 +5858,7 @@ void Object::onDie( DamageInfo *damageInfo )
 	if (RetailFileLayers::enabled())
 	{
 		Object* killer = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID);
-		if (damageInfo->in.m_deathType == DEATH_SLAUGHTERED)
+		if (damageInfo->in.m_deathType == DEATH_SLAUGHTERED && killer)
 			if (auto* lua = LuaScriptEngine::active())
 				lua->dispatch(*this, "OnSlaughtered", killer);
 #if !RTS_GENERALS
@@ -6154,8 +6122,7 @@ void Object::adjustModelConditionForWeaponStatus()
 					m_drawable->setWeaponTimingDuration(timed ? weaponTimingFrames(w, conditionToSet, now) : 0);
 				}
 			}
-			if (auto* lua = LuaScriptEngine::active())
-				lua->modelConditionsChanged(*this, previous);
+			notifyLuaModelConditionChange(previous);
 		}
 		else if (m_drawable)
 		{

@@ -127,11 +127,13 @@ LuaState::~LuaState()
 		lua_close(m_state);
 }
 
-void LuaState::bind(const char* name, Binding binding)
+void LuaState::bind(const char* name, Binding binding, void* context)
 {
 	if (!m_state)
 		return;
-	lua_pushcfunction(m_state, binding);
+	if (context)
+		lua_pushlightuserdata(m_state, context);
+	lua_pushcclosure(m_state, binding, context ? 1 : 0);
 	lua_setglobal(m_state, name);
 }
 

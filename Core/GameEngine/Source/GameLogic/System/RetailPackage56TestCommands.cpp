@@ -11,66 +11,11 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Object.h"
-#include "GameLogic/RetailCreationUpgrades.h"
 
 #include <cstdio>
 
 namespace
 {
-void checkCreationParser(const RetailTestCommands::Context& ctx)
-{
-	const auto actual = RetailCreationUpgrades::parse(R"(
-<EventLists>
-	<!-- <EventList Name="Comment" Inherit="Parent" /> -->
-	<EventList Name="Parent">
-		<EventHandler EventName="OnDestroyed" ScriptFunctionName="Ignored" />
-		<EventHandler EventName="OnCreated" ScriptFunctionName="Created" />
-	</EventList>
-	<EventList Name='Child' Inherit='Parent' />
-	<EventList Name="Override" Inherit="Child">
-		<EventHandler EventName="OnCreated" ScriptFunctionName="Other" />
-	</EventList>
-	<EventList Name="Missing" Inherit="Parent">
-		<EventHandler EventName="OnCreated" ScriptFunctionName="Undefined" />
-	</EventList>
-	<EventList Name="Conditional">
-		<EventHandler EventName="OnCreated" ScriptFunctionName="Guarded" />
-	</EventList>
-	<EventList Name="CycleA" Inherit="CycleB" />
-	<EventList Name="CycleB" Inherit="CycleA" />
-</EventLists>
-)", R"(
-function Created(unit)
-	-- ObjectGrantUpgrade(unit, "Commented")
-	--[[
-	ObjectGrantUpgrade(unit, "BlockCommented")
-	]]
-	ObjectGrantUpgrade(unit, "First"); -- keep this grant
-	ObjectGrantUpgrade(unit, 'Second')
-	ObjectGrantUpgrade(other, 'WrongObject')
-	ObjectGrantUpgrade(unit, 'AfterWrongObject')
-end
-
-function Other(self)
-	ObjectGrantUpgrade(self, "Replacement")
-	ObjectGrantUpgrade(self, computedName)
-	ObjectGrantUpgrade(self, "AfterComputed")
-end
-
-function Guarded(self)
-	if condition then
-		ObjectGrantUpgrade(self, "ConditionalGrant")
-	end
-end
-)");
-	const RetailCreationUpgrades::GrantLists expected = {
-		{"Child", {"First", "Second"}},
-		{"Override", {"Replacement"}},
-		{"Parent", {"First", "Second"}},
-	};
-	std::fprintf(stderr, "PKG56 parser %u match=%d\n", ctx.frame, actual == expected);
-}
-
 void loadFixtureLevels(const RetailTestCommands::Context&)
 {
 	INI ini;
@@ -215,7 +160,6 @@ namespace RetailTestCommands
 void registerRetailPackage56TestCommands()
 {
 #if RTS_ZEROHOUR
-	registerAction("pkg56-parser", checkCreationParser);
 	registerAction("pkg56-levels", loadFixtureLevels);
 	registerAction("pkg56-promote", promote);
 	registerAction("pkg56-promote-quiet", promote);

@@ -28,8 +28,6 @@ public:
 private:
 	void xferState(Xfer* xfer);
 	UnsignedInt m_end = 0;
-	Bool m_user45 = FALSE;
-	Bool m_aflame = FALSE;
 };
 
 class EntEnragedUpdateModuleData : public UpdateModuleData

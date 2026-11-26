@@ -64,7 +64,7 @@
 #include "GameLogic/GhostObject.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
-#include "GameLogic/RetailBuildingEvents.h"
+#include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/TerrainLogic.h"
@@ -763,7 +763,8 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 			m_loadedRandomState.reset();
 		}
 		if (!error && RetailFileLayers::enabled() && !hasHordeConditions && getSaveGameInfo()->saveFileType != SAVE_FILE_TYPE_MISSION)
-			RetailBuildingEvents::restoreHordeConditionUpgrades();
+			if (auto* lua = LuaScriptEngine::active())
+				lua->restoreHordeConditions();
 	}
 	catch (...)
 	{

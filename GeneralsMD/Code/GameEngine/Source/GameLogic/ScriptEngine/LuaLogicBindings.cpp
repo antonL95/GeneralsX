@@ -84,35 +84,22 @@ int hideSubObject(lua_State* state)
 	return 0;
 }
 
-int grantUpgrade(lua_State* state)
+template<bool grant, bool restoring = false>
+int changeUpgrade(lua_State* state)
 {
-	Object* object = getObject(state, 1);
+	const Object* object = getObject(state, 1);
 	const auto* upgrade = getUpgrade(state);
-	if (!object || !upgrade || object->isEffectivelyDead())
-		return 0;
-	if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+	if (object && upgrade)
 	{
-		if (auto* player = getPlayer(object); player && !player->hasUpgradeComplete(upgrade))
-			player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+		const LuaUpgradeChange change{object->getID(), upgrade, grant};
+		if constexpr (restoring)
+		{
+			auto& changes = *static_cast<std::vector<LuaUpgradeChange>*>(lua_touserdata(state, lua_upvalueindex(1)));
+			changes.push_back(change);
+		}
+		else
+			applyLuaUpgrade(change);
 	}
-	else if (!object->hasUpgrade(upgrade))
-		object->giveUpgrade(upgrade);
-	return 0;
-}
-
-int removeUpgrade(lua_State* state)
-{
-	Object* object = getObject(state, 1);
-	const auto* upgrade = getUpgrade(state);
-	if (!object || !upgrade)
-		return 0;
-	if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
-	{
-		if (auto* player = getPlayer(object); player && player->hasUpgradeComplete(upgrade))
-			player->removeUpgrade(upgrade);
-	}
-	else if (object->hasUpgrade(upgrade))
-		object->removeUpgrade(upgrade);
 	return 0;
 }
 
@@ -342,14 +329,45 @@ int setChanting(lua_State* state)
 }
 }
 
+void applyLuaUpgrade(const LuaUpgradeChange& change)
+{
+	Object* object = TheGameLogic->findObjectByID(change.object);
+	if (!object || object->isDestroyed() || (change.grant && object->isEffectivelyDead()))
+		return;
+	const auto* upgrade = change.upgrade;
+	if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+	{
+		auto* player = getPlayer(object);
+		if (!player || player->hasUpgradeComplete(upgrade) == change.grant)
+			return;
+		if (change.grant)
+			player->addUpgrade(upgrade, UPGRADE_STATUS_COMPLETE);
+		else
+			player->removeUpgrade(upgrade);
+	}
+	else if (object->hasUpgrade(upgrade) != change.grant)
+	{
+		if (change.grant)
+			object->giveUpgrade(upgrade);
+		else
+			object->removeUpgrade(upgrade);
+	}
+}
+
+void bindRestoringLua(LuaState& state, std::vector<LuaUpgradeChange>& changes)
+{
+	state.bind("ObjectGrantUpgrade", changeUpgrade<true, true>, &changes);
+	state.bind("ObjectRemoveUpgrade", changeUpgrade<false, true>, &changes);
+}
+
 void bindLogicLua(LuaState& state)
 {
 	const luaL_Reg bindings[] = {
 		{ "GetRandomNumber", getRandomNumber },
 		{ "ObjectHideSubObjectPermanently", hideSubObjectPermanently },
 		{ "ObjectHideSubObject", hideSubObject },
-		{ "ObjectGrantUpgrade", grantUpgrade },
-		{ "ObjectRemoveUpgrade", removeUpgrade },
+		{ "ObjectGrantUpgrade", changeUpgrade<true> },
+		{ "ObjectRemoveUpgrade", changeUpgrade<false> },
 		{ "ObjectHasUpgrade", hasUpgrade },
 		{ "ObjectDoSpecialPower", doSpecialPower },
 		{ "ObjectSetGeometryActive", setGeometryActive },

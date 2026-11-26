@@ -33,7 +33,6 @@
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
-#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/TerrainLogic.h"
@@ -288,22 +287,6 @@ UpdateSleepTime EnragedBehavior::update()
 	const Object* self = getObject();
 	if (!RetailFileLayers::enabled() || self->isEffectivelyDead())
 		return UPDATE_SLEEP_FOREVER;
-	const Bool user45 = self->getLogicModelConditions().test(MODELCONDITION_USER_45);
-	const Bool aflame = self->testStatus(OBJECT_STATUS_AFLAME);
-	if (user45 != m_user45 && !LuaScriptEngine::active())
-	{
-		m_user45 = user45;
-		const Int action = RetailBuildingEvents::enrageAction(*self, user45 ? "User45IsActive" : "User45IsNotActive");
-		if (action >= 0)
-			setEnraged(action != 0);
-	}
-	if (aflame != m_aflame && !LuaScriptEngine::active())
-	{
-		m_aflame = aflame;
-		const Int action = RetailBuildingEvents::enrageAction(*self, aflame ? "OnAflame" : "OnQuenched");
-		if (action >= 0)
-			setEnraged(action != 0);
-	}
 	if (m_end && TheGameLogic->getFrame() >= m_end)
 		setEnraged(FALSE);
 	return UPDATE_SLEEP_NONE;
@@ -312,8 +295,10 @@ UpdateSleepTime EnragedBehavior::update()
 void EnragedBehavior::xferState(Xfer* xfer)
 {
 	xfer->xferUnsignedInt(&m_end);
-	xfer->xferBool(&m_user45);
-	xfer->xferBool(&m_aflame);
+	Bool legacyUserCondition = FALSE;
+	Bool legacyFireCondition = FALSE;
+	xfer->xferBool(&legacyUserCondition);
+	xfer->xferBool(&legacyFireCondition);
 }
 
 void EnragedBehavior::crc(Xfer* xfer)
@@ -664,6 +649,8 @@ UpdateSleepTime BloodthirstyUpdate::update()
 		const auto* tracker = member->getExperienceTracker();
 		experience += tracker->getRetailExperience() +
 			static_cast<Real>(ExperienceLevelStore::award(member, tracker->getRetailThreshold()));
+		if (auto* lua = LuaScriptEngine::active())
+			lua->dispatch(*member, "OnSlaughtered", self);
 		member->kill(DAMAGE_UNRESISTABLE, DEATH_SLAUGHTERED);
 		if (++count == data->m_numToSacrifice)
 			break;

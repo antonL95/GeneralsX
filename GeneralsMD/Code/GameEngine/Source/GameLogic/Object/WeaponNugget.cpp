@@ -37,7 +37,6 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
-#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/Weapon.h"
@@ -865,12 +864,8 @@ void WeaponTemplate::applyUtilityNugget(const WeaponNugget& nugget, const Object
 				if ((relation == ENEMIES && nugget.m_sendToEnemies) ||
 					(relation == ALLIES && nugget.m_sendToAllies) ||
 					(relation == NEUTRAL && nugget.m_sendToNeutral))
-				{
 					if (auto* lua = LuaScriptEngine::active())
 						lua->dispatchScripted(*victim, nugget.m_luaEvent.str(), source);
-					else
-						RetailBuildingEvents::weaponEvent(*victim, nugget.m_luaEvent.str(), source);
-				}
 				break;
 			}
 			case WEAPON_NUGGET_OPEN_GATE:

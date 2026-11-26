@@ -17,6 +17,13 @@ int pushObservation(lua_State* state, void* data)
 	lua_pushlightuserdata(state, data);
 	return 1;
 }
+
+int observeContext(lua_State* state)
+{
+	auto* value = static_cast<int*>(lua_touserdata(state, lua_upvalueindex(1)));
+	*value = static_cast<int>(lua_tonumber(state, 1));
+	return 0;
+}
 }
 
 TEST(LuaDialect, RejectsPostRetailOperatorsAndKeywords)
@@ -72,4 +79,14 @@ TEST(LuaState, RejectsChunkErrorsAndRecoversFromHandlerErrors)
 	EXPECT_FALSE(state.call("bad"));
 	EXPECT_FALSE(state.call("missing"));
 	EXPECT_TRUE(state.call("good"));
+}
+
+TEST(LuaState, PassesNativeContextToTheBinding)
+{
+	LuaState state;
+	int observed = 0;
+	state.bind("observe", observeContext, &observed);
+	ASSERT_TRUE(state.load("function write() observe(21) end", "context"));
+	EXPECT_TRUE(state.call("write"));
+	EXPECT_EQ(observed, 21);
 }

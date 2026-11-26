@@ -14,9 +14,6 @@ check_saved_state() {
 }
 
 check() {
-    if covers 217; then
-        expect 'PKG56 parser 217 match=1' || return
-    fi
     if grep -q '^219 pkg56-creation ' "$out/continue.txt"; then
         if covers 219; then
             expect 'PKG56 creation 219 0' || return

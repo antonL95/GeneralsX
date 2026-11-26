@@ -46,7 +46,6 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
-#include "GameLogic/RetailBuildingEvents.h"
 #include "GameLogic/LuaScriptEngine.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/TerrainLogic.h"
@@ -308,8 +307,6 @@ void FlammableUpdate::tryToIgnite()
 			setWakeFrame(me, UPDATE_SLEEP(retailTick));
 			if (auto* lua = LuaScriptEngine::active())
 				lua->dispatch(*me, "OnAflame");
-			else
-				RetailBuildingEvents::aflame(*me);
 		}
 		else
 			setWakeFrame(me, calcSleepTime());

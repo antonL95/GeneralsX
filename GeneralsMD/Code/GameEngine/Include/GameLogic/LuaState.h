@@ -18,7 +18,7 @@ public:
 	LuaState(const LuaState&) = delete;
 	LuaState& operator=(const LuaState&) = delete;
 
-	void bind(const char* name, Binding binding);
+	void bind(const char* name, Binding binding, void* context = nullptr);
 	bool load(std::string_view script, const char* chunkName);
 	bool hasFunction(const std::string& name) const;
 	bool call(const std::string& name, PushArguments push = nullptr, void* data = nullptr);

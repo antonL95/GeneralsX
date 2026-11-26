@@ -327,7 +327,6 @@ private:
 	void releaseConstructionQueue();
 	void startQueuedConstruction();
 	std::list<ObjectID> m_constructionQueue;
-	UnsignedByte m_riderEventState = 0;
 	Bool m_restoreRebuildFromSite = FALSE;
 
 	void createMachines();		///< create our behavior machines we need

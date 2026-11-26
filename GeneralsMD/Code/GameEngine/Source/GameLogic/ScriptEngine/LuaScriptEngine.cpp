@@ -1,5 +1,9 @@
 #include "Precompiled/PreRTS.h"
 
+#define DEFINE_WEAPONCONDITIONMAP
+#include "GameLogic/WeaponSet.h"
+#undef DEFINE_WEAPONCONDITIONMAP
+
 #include "GameLogic/LuaScriptEngine.h"
 
 #include "Common/File.h"
@@ -13,10 +17,10 @@
 #include "GameLogic/LuaLogicBindings.h"
 #include "GameLogic/LuaState.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Object.h"
 
 #include <cstdio>
-#include <cstdlib>
 #include <lua.hpp>
 #include <locale>
 #include <sstream>
@@ -143,8 +147,10 @@ public:
 	bool dispatch(Object& object, std::string_view event, Argument second, Argument third) override;
 	bool dispatchScripted(Object& object, std::string_view event, Argument second, Argument third) override;
 	void modelConditionsChanged(Object& object, const ModelConditionFlags& previous) override;
+	void restoreHordeConditions() override;
 
 private:
+	const EventList* registeredList(const Object& object) const;
 	const EventList* getList(const Object& object) const;
 	bool invoke(Object& object, const EventList& list, std::string_view event, Argument second, Argument third);
 
@@ -158,8 +164,6 @@ private:
 
 bool LogicLua::load(Xfer& crc)
 {
-	if (!std::getenv("GENERALSX_LUA_LOGIC"))
-		return false;
 	m_source = readData(scriptPath);
 	std::string xml = readData(eventsPath);
 	if (m_source.empty() || xml.empty())
@@ -237,12 +241,17 @@ void LogicLua::registerObject(Object& object)
 		m_objects.emplace(object.getID(), list != m_lists.end() ? &list->second : nullptr);
 }
 
+const EventList* LogicLua::registeredList(const Object& object) const
+{
+	const auto registered = m_objects.find(object.getID());
+	return registered != m_objects.end() ? registered->second : nullptr;
+}
+
 const EventList* LogicLua::getList(const Object& object) const
 {
 	if (!m_state || object.isDestroyed() || (TheGameState && TheGameState->isInLoadGame()))
 		return nullptr;
-	const auto registered = m_objects.find(object.getID());
-	return registered != m_objects.end() ? registered->second : nullptr;
+	return registeredList(object);
 }
 
 bool LogicLua::dispatch(Object& object, std::string_view event, Argument second, Argument third)
@@ -278,11 +287,11 @@ bool LogicLua::dispatchScripted(Object& object, std::string_view event, Argument
 
 void LogicLua::modelConditionsChanged(Object& object, const ModelConditionFlags& previous)
 {
-	const EventList* list = getList(object);
-	if (!list || object.isEffectivelyDead())
-		return;
 	const ModelConditionFlags current = object.getLogicModelConditions();
 	if (previous == current)
+		return;
+	const EventList* list = getList(object);
+	if (!list || object.isEffectivelyDead())
 		return;
 	for (const ModelEvent* event : list->modelEvents)
 	{
@@ -290,6 +299,69 @@ void LogicLua::modelConditionsChanged(Object& object, const ModelConditionFlags&
 			dispatch(object, event->name, {}, {});
 		if (object.isDestroyed() || object.isEffectivelyDead())
 			return;
+	}
+}
+
+void LogicLua::restoreHordeConditions()
+{
+	setFPMode();
+	ScopedFPUGuard fpuGuard;
+	std::vector<LuaUpgradeChange> changes;
+	LuaState restoreState;
+	const bool canRestoreUpgrades = restoreState.load(m_source, scriptPath);
+	if (canRestoreUpgrades)
+		bindRestoringLua(restoreState, changes);
+
+	std::vector<ObjectID> hordes;
+	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+		if (object->isKindOf(KINDOF_HORDE))
+			hordes.push_back(object->getID());
+
+	for (const auto id : hordes)
+	{
+		Object* object = TheGameLogic->findObjectByID(id);
+		if (!object || object->isEffectivelyDead() || object->isDestroyed())
+			continue;
+		ModelConditionFlags previous = object->getLogicModelConditions();
+		for (const auto flag : { WEAPONSET_TOGGLE_1, WEAPONSET_TOGGLE_2, WEAPONSET_TOGGLE_3 })
+		{
+			const auto condition = TheWeaponSetTypeToModelConditionTypeMap[flag];
+			if (object->testWeaponSetFlag(flag))
+			{
+				if (!previous.test(condition))
+					object->setModelConditionState(condition);
+				previous.set(condition, FALSE);
+			}
+			else if (previous.test(condition))
+				object->clearModelConditionState(condition);
+		}
+		if (const auto* modifiers = object->getAttributeModifierHelper())
+			for (const auto condition : modifiers->getAppliedModelConditions())
+			{
+				if (condition < MODELCONDITION_FIRST || condition >= MODELCONDITION_COUNT)
+					continue;
+				if (!object->getLogicModelConditions().test(condition))
+					object->setModelConditionState(static_cast<ModelConditionFlagType>(condition));
+				previous.set(condition, FALSE);
+			}
+		const EventList* list = registeredList(*object);
+		if (!canRestoreUpgrades || !list)
+			continue;
+		const ModelConditionFlags current = object->getLogicModelConditions();
+		for (const ModelEvent* event : list->modelEvents)
+		{
+			if (event->matches(previous) || !event->matches(current))
+				continue;
+			if (object->isEffectivelyDead() || object->isDestroyed())
+				break;
+			const auto handler = list->handlers.find(event->name);
+			changes.clear();
+			DispatchArguments args{*object, {}, {}};
+			setFPMode();
+			if (restoreState.call(handler->second, pushArguments, &args))
+				for (const auto& change : changes)
+					applyLuaUpgrade(change);
+		}
 	}
 }
 }

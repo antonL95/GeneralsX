@@ -16,6 +16,9 @@
 #include "GameClient/RetailWorldUI.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
+#if !RTS_GENERALS
+#include "GameLogic/LuaScriptEngine.h"
+#endif
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CostModifierUpgrade.h"
@@ -105,6 +108,10 @@ void SlaughterHordeContain::slaughter(Object* passenger)
 	damage.in.m_deathType = DEATH_SLAUGHTERED;
 	damage.in.m_amount = passenger->getBodyModule()->getMaxHealth();
 	damage.in.m_kill = TRUE;
+#if !RTS_GENERALS
+	if (auto* lua = LuaScriptEngine::active())
+		lua->dispatch(*passenger, "OnSlaughtered", getObject());
+#endif
 	passenger->attemptDamage(&damage);
 }
 

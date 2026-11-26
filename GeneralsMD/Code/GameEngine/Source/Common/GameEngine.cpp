@@ -61,7 +61,6 @@
 #include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/CreateAHeroSystem.h"
 #include "GameLogic/ExperienceLevelStore.h"
-#include "GameLogic/RetailCreationUpgrades.h"
 #include "GameLogic/LuaScriptEngine.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
@@ -986,8 +985,6 @@ void GameEngine::init()
 			initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
 		if (m_luaScriptEngine && !m_luaScriptEngine->load(xferCRC))
 			m_luaScriptEngine.reset();
-		if (!m_luaScriptEngine)
-			RetailCreationUpgrades::load(&xferCRC);
 		if (retailINI || INIAudit::isEnabled())
 		{
 			if (!retailINI)

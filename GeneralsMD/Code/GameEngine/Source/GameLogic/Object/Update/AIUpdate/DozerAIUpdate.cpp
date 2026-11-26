@@ -56,8 +56,6 @@
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/WallHubBehavior.h"
-#include "GameLogic/RetailBuildingEvents.h"
-#include "GameLogic/LuaScriptEngine.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/TerrainVisual.h"
 
@@ -1849,18 +1847,6 @@ UpdateSleepTime DozerAIUpdate::update()
 		return UPDATE_SLEEP_NONE;
 	}
 
-	if (usesRetailBuilder(this) && getRetailLuaEventsList().isNotEmpty())
-	{
-		const Bool mounted = getObject()->getLogicModelConditions().test(MODELCONDITION_RIDER8) ||
-			getObject()->testWeaponSetFlag(WEAPONSET_RIDER8);
-		const UnsignedByte state = mounted ? 2 : 1;
-		if (state != m_riderEventState)
-		{
-			m_riderEventState = state;
-			if (!LuaScriptEngine::active())
-				RetailBuildingEvents::riderChanged(*getObject(), mounted);
-		}
-	}
 
 	// get and validate our current task
 	DozerTask currentTask = getCurrentTask();
@@ -2906,7 +2892,6 @@ void DozerAIUpdate::crc( Xfer *xfer )
 void DozerAIUpdate::crcRetailState(Xfer* xfer)
 {
 	xfer->xferSTLObjectIDList(&m_constructionQueue);
-	xfer->xferUnsignedByte(&m_riderEventState);
 	xfer->xferBool(&m_isRebuild);
 }
 
@@ -2969,7 +2954,6 @@ void DozerAIUpdate::xfer( Xfer *xfer )
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
 		m_constructionQueue.clear();
-		m_riderEventState = 0;
 		m_restoreRebuildFromSite = version < 5 && usesRetailBuilder(this);
 		if (m_restoreRebuildFromSite)
 			m_isRebuild = FALSE;
@@ -2977,7 +2961,10 @@ void DozerAIUpdate::xfer( Xfer *xfer )
 	if (version >= 3)
 		xfer->xferSTLObjectIDList(&m_constructionQueue);
 	if (version >= 4)
-		xfer->xferUnsignedByte(&m_riderEventState);
+	{
+		UnsignedByte legacyRiderEventState = 0;
+		xfer->xferUnsignedByte(&legacyRiderEventState);
+	}
 	if (version >= 5)
 		xfer->xferBool(&m_isRebuild);
 

@@ -25,6 +25,7 @@ public:
 	virtual bool dispatch(Object& object, std::string_view event, Argument second = {}, Argument third = {}) = 0;
 	virtual bool dispatchScripted(Object& object, std::string_view event, Argument second = {}, Argument third = {}) = 0;
 	virtual void modelConditionsChanged(Object& object, const ModelConditionFlags& previous) = 0;
+	virtual void restoreHordeConditions() = 0;
 };
 
 std::unique_ptr<LuaScriptEngine> createLuaScriptEngine();

@@ -731,7 +731,7 @@ protected:
 #endif
 
 private:
-	void notifyConstructionConditionChange(const ModelConditionFlags& previous);
+	void notifyLuaModelConditionChange(const ModelConditionFlags& previous);
 
 	// yes, private. No, really. Private. Don't expose.
 	enum ObjectPrivateStatusBits
