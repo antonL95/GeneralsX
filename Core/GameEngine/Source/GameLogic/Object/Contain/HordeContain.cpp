@@ -1171,7 +1171,7 @@ void HordeContain::updateReplenishment()
 Object* HordeContain::replenishMember(const BannerCarrierUpdateModuleData& banner)
 {
 	Object* horde = getObject();
-	if (!m_payloadCreated || horde->isEffectivelyDead())
+	if (!m_payloadCreated || m_initialPayloadPending || horde->isEffectivelyDead())
 		return nullptr;
 	const Int soldiers = std::count_if(getContainList().begin(), getContainList().end(), [this](const Object* member)
 	{
