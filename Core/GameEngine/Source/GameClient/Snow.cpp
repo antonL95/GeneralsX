@@ -30,6 +30,9 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the Game
 #include "GameClient/Snow.h"
 #include "GameClient/View.h"
+#include "Common/AudioEventRTS.h"
+#include "Common/AudioHandleSpecialValues.h"
+#include "Common/GameAudio.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailINIStartup.h"
@@ -39,6 +42,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <sstream>
@@ -149,6 +153,30 @@ static void loadRetailCloudEffect(WeatherSetting &weather)
 				if ((row >> value) && std::isfinite(value) && value >= 1.0f)
 					weather.m_cloudLighteningRate = value;
 			}
+			else if (stricmp(name.c_str(), "LightningChance") == 0)
+			{
+				Real value = 0.0f;
+				if ((row >> value) && std::isfinite(value))
+					weather.m_cloudLightningChance = std::clamp(value, 0.0f, 1.0f);
+			}
+			else if (stricmp(name.c_str(), "LightningDuration") == 0 ||
+				stricmp(name.c_str(), "LightningIntensity") == 0)
+			{
+				Real low = 0.0f;
+				Real high = 0.0f;
+				if ((row >> low >> high) && std::isfinite(low) && std::isfinite(high) && low >= 0.0f && high >= low)
+				{
+					auto& range = stricmp(name.c_str(), "LightningDuration") == 0 ?
+						weather.m_cloudLightningDuration : weather.m_cloudLightningIntensity;
+					range.setRange(low, high);
+				}
+			}
+			else if (stricmp(name.c_str(), "JitterLightningLightIntensity") == 0)
+			{
+				std::string value;
+				if (row >> value)
+					weather.m_jitterCloudLightningIntensity = stricmp(value.c_str(), "Yes") == 0;
+			}
 		}
 	}
 }
@@ -232,15 +260,85 @@ void SnowManager::resetRetailSpellRain()
 	setRetailFallParameters(TheWeatherSetting->m_snowSpacing, TheWeatherSetting->m_snowSpeed);
 }
 
+void SnowManager::stopRetailWeatherSound()
+{
+	if (TheAudio && m_weatherSoundHandle >= AHSV_FirstHandle)
+		TheAudio->removeAudioEvent(m_weatherSoundHandle);
+	m_weatherSoundHandle = AHSV_NoSound;
+}
+
+void SnowManager::updateRetailWeatherPresentation(Int state, UnsignedInt frame)
+{
+	const WeatherSetting& weather = **TheWeatherSetting;
+	if (state < 0 || static_cast<std::size_t>(state) >= weather.m_retailPresets.size())
+		return;
+	const auto& preset = weather.m_retailPresets[state];
+	static const Bool traceWeather = std::getenv("GENERALSX_TEST_WEATHER_DRAW") != nullptr;
+	if (m_weatherPreset != state)
+	{
+		stopRetailWeatherSound();
+		if (TheAudio && preset.sound.isNotEmpty() && preset.sound.isNotNone())
+		{
+			AudioEventRTS start(preset.sound);
+			m_weatherSoundHandle = TheAudio->addAudioEvent(&start);
+		}
+		m_weatherPreset = state;
+		if (traceWeather)
+			std::fprintf(stderr, "TEST weather-preset state=%d lightning=%d sound=%s\n",
+				state, preset.hasLightning, preset.sound.isEmpty() ? "-" : preset.sound.str());
+	}
+
+	if (!preset.hasLightning)
+	{
+		m_lightningTicks = 0;
+		m_lightningRolls = 0;
+		m_lightningIntensity = 0.0f;
+		return;
+	}
+
+	if (frame == m_lastWeatherPresentationFrame)
+		return;
+	m_lastWeatherPresentationFrame = frame;
+	ScopedVisualRandom random(TRUE);
+	if (m_lightningTicks > 0)
+	{
+		--m_lightningTicks;
+		if (m_lightningTicks == 0)
+		{
+			m_lightningRolls = 0;
+			m_lightningIntensity = 0.0f;
+		}
+		else if (weather.m_jitterCloudLightningIntensity)
+			m_lightningIntensity = weather.m_cloudLightningIntensity.getValue();
+		return;
+	}
+
+	const UnsignedInt retailLightningTriggerRolls = 4;
+	if (!(weather.m_cloudLightningChance > 0.0f) ||
+		GameClientRandomValueReal(0.0f, 1.0f) >= weather.m_cloudLightningChance ||
+		++m_lightningRolls < retailLightningTriggerRolls)
+		return;
+	m_lightningRolls = 0;
+	const Real ticks = weather.m_cloudLightningDuration.getValue();
+	if (!std::isfinite(ticks) || ticks < 1.0f || ticks >= static_cast<Real>(std::numeric_limits<UnsignedInt>::max()))
+		return;
+	m_lightningTicks = static_cast<UnsignedInt>(ticks);
+	m_lightningIntensity = weather.m_cloudLightningIntensity.getValue();
+	if (traceWeather)
+		std::fprintf(stderr, "TEST weather-lightning frame=%u duration=%u intensity=%.3f\n",
+			frame, m_lightningTicks, m_lightningIntensity);
+}
+
 RGBColor SnowManager::getRetailCloudyLightScale() const
 {
 	RGBColor scale = { 1.0f, 1.0f, 1.0f };
-	if (!m_retailWeather || !(m_cloudyDarkness > 0.0f) || !TheWeatherSetting)
+	if (!m_retailWeather || !TheWeatherSetting)
 		return scale;
 	const RGBColor &factor = TheWeatherSetting->m_cloudDarkeningFactor;
-	scale.red = std::clamp(1.0f - m_cloudyDarkness * factor.red, 0.0f, 1.0f);
-	scale.green = std::clamp(1.0f - m_cloudyDarkness * factor.green, 0.0f, 1.0f);
-	scale.blue = std::clamp(1.0f - m_cloudyDarkness * factor.blue, 0.0f, 1.0f);
+	const Real lightning = std::isfinite(m_lightningIntensity) ? std::clamp(m_lightningIntensity, 0.0f, 1.0f) : 0.0f;
+	scale.red = std::clamp(1.0f - m_cloudyDarkness * factor.red, 0.0f, 1.0f) + lightning;
+	scale.green = std::clamp(1.0f - m_cloudyDarkness * factor.green, 0.0f, 1.0f) + lightning;
+	scale.blue = std::clamp(1.0f - m_cloudyDarkness * factor.blue, 0.0f, 1.0f) + lightning;
 	return scale;
 }
 
@@ -249,6 +347,8 @@ void SnowManager::updateRetailCloudy()
 	const WeatherSetting &weather = **TheWeatherSetting;
 #if !RTS_GENERALS
 	const Int state = TheGameLogic ? TheGameLogic->getRetailWeather() : GameLogic::WEATHER_NONE;
+	if (TheGameLogic)
+		updateRetailWeatherPresentation(state, TheGameLogic->getFrame());
 	const Bool cloudy = state == GameLogic::WEATHER_CLOUDY || state == GameLogic::WEATHER_CLOUDYRAINY;
 #else
 	const Bool cloudy = FALSE;
@@ -317,6 +417,12 @@ void SnowManager::setVisible(Bool showWeather)
 
 void SnowManager::reset()
 {
+	stopRetailWeatherSound();
+	m_weatherPreset = -1;
+	m_lastWeatherPresentationFrame = 0;
+	m_lightningTicks = 0;
+	m_lightningRolls = 0;
+	m_lightningIntensity = 0.0f;
 	m_isVisible = TRUE;	//default to showing if it's enabled via INI.
 	if (m_retailWeather)
 		resetRetailSpellRain();
@@ -324,6 +430,7 @@ void SnowManager::reset()
 
 SnowManager::~SnowManager()
 {
+	stopRetailWeatherSound();
 	delete [] m_startingHeights;
 	m_startingHeights=nullptr;
 
@@ -436,13 +543,24 @@ void INI::parseWeatherDefinition( INI *ini )
 		TheSnowManager->updateIniSettings();
 }
 
+template<auto Member, INIFieldParseProc Parse>
+static void parseCloudEffectField(INI* ini, void* instance, void*, const void*)
+{
+	auto* weather = static_cast<WeatherSetting*>(instance);
+	Parse(ini, instance, &(weather->*Member), nullptr);
+}
+
 static const FieldParse retailCloudEffectFields[] =
 {
-	{ "CloudTexture", INI::parseAsciiString, nullptr, offsetof(WeatherSetting, m_cloudEffectTexture) },
-	{ "DarkCloudTexture", INI::parseAsciiString, nullptr, offsetof(WeatherSetting, m_darkCloudTexture) },
-	{ "DarkeningFactor", INI::parseRGBColor, nullptr, offsetof(WeatherSetting, m_cloudDarkeningFactor) },
-	{ "DarkeningRate", INI::parseReal, nullptr, offsetof(WeatherSetting, m_cloudDarkeningRate) },
-	{ "LighteningRate", INI::parseReal, nullptr, offsetof(WeatherSetting, m_cloudLighteningRate) },
+	{ "CloudTexture", parseCloudEffectField<&WeatherSetting::m_cloudEffectTexture, INI::parseAsciiString>, nullptr, 0 },
+	{ "DarkCloudTexture", parseCloudEffectField<&WeatherSetting::m_darkCloudTexture, INI::parseAsciiString>, nullptr, 0 },
+	{ "DarkeningFactor", parseCloudEffectField<&WeatherSetting::m_cloudDarkeningFactor, INI::parseRGBColor>, nullptr, 0 },
+	{ "DarkeningRate", parseCloudEffectField<&WeatherSetting::m_cloudDarkeningRate, INI::parseReal>, nullptr, 0 },
+	{ "LighteningRate", parseCloudEffectField<&WeatherSetting::m_cloudLighteningRate, INI::parseReal>, nullptr, 0 },
+	{ "LightningChance", parseCloudEffectField<&WeatherSetting::m_cloudLightningChance, INI::parseReal>, nullptr, 0 },
+	{ "LightningDuration", parseCloudEffectField<&WeatherSetting::m_cloudLightningDuration, INI::parseGameClientRandomVariable>, nullptr, 0 },
+	{ "LightningIntensity", parseCloudEffectField<&WeatherSetting::m_cloudLightningIntensity, INI::parseGameClientRandomVariable>, nullptr, 0 },
+	{ "JitterLightningLightIntensity", parseCloudEffectField<&WeatherSetting::m_jitterCloudLightningIntensity, INI::parseBool>, nullptr, 0 },
 	{ nullptr, nullptr, nullptr, 0 },
 };
 
@@ -456,4 +574,21 @@ void INI::parseCloudEffectDefinition( INI *ini )
 	MultiIniFieldParse fields;
 	fields.add(retailCloudEffectFields);
 	ini->initFromINIMulti(weatherSet, fields);
+}
+
+void WeatherSetting::parseRetailPreset(INI* ini)
+{
+	static const char* const names[] = {"NONE", "CLOUDY", "RAINY", "CLOUDYRAINY", "SUNNY", nullptr};
+	static const FieldParse fields[] = {
+		{ "WeatherSound", INI::parseAsciiString, nullptr, offsetof(RetailWeatherPreset, sound) },
+		{ "HasLightning", INI::parseBool, nullptr, offsetof(RetailWeatherPreset, hasLightning) },
+		{ nullptr, nullptr, nullptr, 0 },
+	};
+	if (ini->getLoadType() != INI_LOAD_OVERWRITE)
+		throw INI_INVALID_DATA;
+	const Int state = INI::scanIndexList(ini->getNextToken(), names);
+	if (TheWeatherSetting == nullptr)
+		TheWeatherSetting = newInstance(WeatherSetting);
+	auto* weather = const_cast<WeatherSetting*>(TheWeatherSetting.getNonOverloadedPointer());
+	ini->initFromINI(&weather->m_retailPresets[state], fields);
 }

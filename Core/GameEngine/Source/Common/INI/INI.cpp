@@ -37,6 +37,7 @@
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailLargeGroupAudio.h"
 #include "GameClient/RetailHudExtras.h"
+#include "GameClient/Snow.h"
 #include "GameLogic/BfmeMapScripts.h"
 #include "Common/INIAudit.h"
 #include "Common/INIBlockStructure.h"
@@ -197,6 +198,7 @@ static const BlockParse theTypeTable[] =
 	{ "Campaign",                       INI::parseCampaignDefinition },
 	{ "ChallengeGenerals",              INI::parseChallengeModeDefinition },
 	{ "CloudEffect",                    INI::parseCloudEffectDefinition },
+	{ "WeatherData",                    WeatherSetting::parseRetailPreset },
 	{ "CommandButton",                  INI::parseCommandButtonDefinition },
 	{ "CommandMap",                     INI::parseMetaMapDefinition },
 	{ "CommandSet",                     INI::parseCommandSetDefinition },

@@ -23,10 +23,21 @@
 #include "Common/SubsystemInterface.h"
 #include "Common/Overridable.h"
 #include "Common/Override.h"
+#include "GameClient/ClientRandomValue.h"
 #include "Lib/Coord2D.h"
 #include "Lib/RGBColor.h"
 #include "WWMath/vector3.h"
 #include "WWMath/vector4.h"
+
+#include <array>
+
+class INI;
+
+struct RetailWeatherPreset
+{
+	AsciiString sound;
+	Bool hasLightning = FALSE;
+};
 
 //-------------------------------------------------------------------------------------------------
 /** This structure keeps the transparency and vertex settings, which are the same regardless of the
@@ -76,6 +87,13 @@ class WeatherSetting : public Overridable
 		RGBColor m_cloudDarkeningFactor = {};
 		Real	m_cloudDarkeningRate = 255.0f;
 		Real	m_cloudLighteningRate = 255.0f;
+		std::array<RetailWeatherPreset, 5> m_retailPresets{};
+		Real m_cloudLightningChance = 0.0f;
+		GameClientRandomVariable m_cloudLightningDuration{};
+		GameClientRandomVariable m_cloudLightningIntensity{};
+		Bool m_jitterCloudLightningIntensity = FALSE;
+
+		static void parseRetailPreset(INI* ini);
 
 	public:
 		WeatherSetting()
@@ -151,9 +169,17 @@ class SnowManager : public SubsystemInterface
  private:
 	void resetRetailSpellRain();
 	void setRetailFallParameters(Real spacing, Real velocity);
+	void updateRetailWeatherPresentation(Int state, UnsignedInt frame);
+	void stopRetailWeatherSound();
 
 	Bool m_spellRainActive = FALSE;
 	Int m_spellRainTicks = 0;
+	Int m_weatherPreset = -1;
+	UnsignedInt m_weatherSoundHandle = 0;
+	UnsignedInt m_lastWeatherPresentationFrame = 0;
+	UnsignedInt m_lightningTicks = 0;
+	UnsignedInt m_lightningRolls = 0;
+	Real m_lightningIntensity = 0.0f;
 };
 
 extern SnowManager *TheSnowManager;  ///< the ray effects singleton external
