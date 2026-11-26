@@ -1,0 +1,9 @@
+235 create Player_1 AIGroupSaveProbe 0 2300,180,0
+235 create Player_1 AIGroupSaveProbe 1 2310,195,0
+235 create Player_1 AIGroupSaveTarget 0 2420,180,0
+240 aigroup-save-order Player_1 AIGroupSaveProbe 0 Player_1:AIGroupSaveProbe:1
+244 aigroup-save-probe Player_1 AIGroupSaveProbe 0
+248 destroy Player_1 AIGroupSaveProbe 1
+249 aigroup-save-probe Player_1 AIGroupSaveProbe 0
+250 destroy Player_1 AIGroupSaveProbe 0
+250 destroy Player_1 AIGroupSaveTarget 0
