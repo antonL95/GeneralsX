@@ -138,6 +138,8 @@ private:
 	static void parseRandomTexture(INI*, void*, void*, const void*);
 	static void parseAnimationRange(INI*, void*, void*, const void*);
 	static TransitionRequest readTransitionRequest(const std::string& script);
+	static void readScriptSubObjectActions(const std::string& script,
+		std::vector<ModelConditionInfo::HideShowSubObjInfo>& actions);
 
 	const ModelConditionInfo* combineState(const ModelConditionInfo* model, const AnimationState& animation) const;
 

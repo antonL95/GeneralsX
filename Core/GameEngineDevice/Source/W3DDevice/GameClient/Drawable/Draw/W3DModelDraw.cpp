@@ -2926,24 +2926,7 @@ void W3DModelDraw::doHideShowSubObjs(const std::vector<ModelConditionInfo::HideS
 	{
 		for (std::vector<ModelConditionInfo::HideShowSubObjInfo>::const_iterator it = vec->begin(); it != vec->end(); ++it)
 		{
-			Int objIndex;
-			RenderObjClass* subObj;
-
-			if ((subObj = m_renderObject->Get_Sub_Object_By_Name(it->subObjName.str(), &objIndex)) != nullptr)
-			{
-				subObj->Set_Hidden(it->hide);
-
-				const HTreeClass *htree = m_renderObject->Get_HTree();
-				if (htree)
-				{
-					//get the bone of this subobject so we can hide all other child objects that use this bone
-					//as a parent.
-					Int boneIdx = m_renderObject->Get_Sub_Object_Bone_Index(0, objIndex);
-					doHideShowBoneSubObjs(it->hide, m_renderObject->Get_Num_Sub_Objects(), boneIdx, m_renderObject, htree);
-				}
-				subObj->Release_Ref();
-			}
-			else
+			if (!setSubObjectHidden(it->subObjName, it->hide) && !RetailFileLayers::enabled())
 			{
 				DEBUG_CRASH(("*** ASSET ERROR: SubObject %s not found (%s)!",it->subObjName.str(),getDrawable()->getTemplate()->getName().str()));
 			}

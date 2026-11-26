@@ -15,8 +15,10 @@
 #include "GameLogic/WeaponSet.h"
 
 #include <algorithm>
+#include <cctype>
 #include <memory>
 #include <regex>
+#include <string_view>
 #include <utility>
 
 namespace
@@ -432,16 +434,111 @@ auto W3DScriptedModelDrawModuleData::readTransitionRequest(const std::string& sc
 	return request;
 }
 
+void W3DScriptedModelDrawModuleData::readScriptSubObjectActions(const std::string& script,
+	std::vector<ModelConditionInfo::HideShowSubObjInfo>& actions)
+{
+	if (script.find("SubObject") == std::string::npos)
+		return;
+
+	const auto isIdentStart = [](unsigned char c) { return std::isalpha(c) || c == '_'; };
+	const auto isIdentChar = [](unsigned char c) { return std::isalnum(c) || c == '_'; };
+
+	Int depth = 0;
+	const std::size_t length = script.size();
+	std::size_t i = 0;
+	while (i < length)
+	{
+		if (script[i] == '-' && i + 1 < length && script[i + 1] == '-')
+		{
+			while (i < length && script[i] != '\n')
+				++i;
+			continue;
+		}
+		if (script[i] == '"' || script[i] == '\'')
+		{
+			const char quote = script[i++];
+			while (i < length && script[i] != quote)
+			{
+				if (script[i] == '\\' && i + 1 < length)
+					++i;
+				++i;
+			}
+			if (i < length)
+				++i;
+			continue;
+		}
+		if (!isIdentStart(static_cast<unsigned char>(script[i])))
+		{
+			++i;
+			continue;
+		}
+		const std::size_t start = i;
+		while (i < length && isIdentChar(static_cast<unsigned char>(script[i])))
+			++i;
+		const std::string_view token(script.data() + start, i - start);
+		if (token == "if" || token == "function" || token == "for" || token == "while" || token == "repeat")
+		{
+			++depth;
+			continue;
+		}
+		if (token == "end" || token == "until")
+		{
+			if (depth > 0)
+				--depth;
+			continue;
+		}
+		if (depth != 0)
+			continue;
+
+		const Bool isHide = token == "CurDrawableHideSubObject" || token == "CurDrawableHideSubObjectPermanently";
+		const Bool isShow = token == "CurDrawableShowSubObject" || token == "CurDrawableShowSubObjectPermanently";
+		if (!isHide && !isShow)
+			continue;
+
+		std::size_t cursor = i;
+		while (cursor < length && std::isspace(static_cast<unsigned char>(script[cursor])))
+			++cursor;
+		if (cursor >= length || script[cursor] != '(')
+			continue;
+		++cursor;
+		while (cursor < length && std::isspace(static_cast<unsigned char>(script[cursor])))
+			++cursor;
+		if (cursor >= length || (script[cursor] != '"' && script[cursor] != '\''))
+			continue;
+		const char quote = script[cursor++];
+		const std::size_t nameStart = cursor;
+		while (cursor < length && script[cursor] != quote)
+			++cursor;
+		if (cursor >= length || cursor == nameStart)
+			continue;
+		const std::string name = script.substr(nameStart, cursor - nameStart);
+		++cursor;
+		while (cursor < length && std::isspace(static_cast<unsigned char>(script[cursor])))
+			++cursor;
+		if (cursor >= length || script[cursor] != ')')
+			continue;
+		i = cursor + 1;
+
+		ModelConditionInfo::HideShowSubObjInfo info;
+		info.subObjName.set(name.c_str());
+		info.hide = isHide;
+		actions.push_back(std::move(info));
+	}
+}
+
 void W3DScriptedModelDrawModuleData::finishParsing()
 {
 	if (RetailFileLayers::enabled())
 	{
-		for (const AnimationState& state : m_animationStates)
+		for (AnimationState& state : m_animationStates)
 		{
+			readScriptSubObjectActions(state.script, state.draw.m_hideShowVec);
 			auto request = readTransitionRequest(state.script);
 			if (request.continuePrevious || (request.target != NAMEKEY_INVALID && !m_namedTransitions.empty()))
 				m_transitionRequests.emplace(&state.draw, std::move(request));
 		}
+		for (auto& [key, state] : m_namedTransitions)
+			readScriptSubObjectActions(state.script, state.draw.m_hideShowVec);
 	}
 
 	for (const ModelConditionInfo& model : m_conditionStates)
@@ -517,6 +614,8 @@ const ModelConditionInfo* W3DScriptedModelDrawModuleData::combineState(const Mod
 		combined.m_validStuff &= ModelConditionInfo::HAS_PROJECTILE_BONES | ModelConditionInfo::PUBLIC_BONES_VALID;
 		combined.m_particleSysBones.insert(combined.m_particleSysBones.end(),
 			animation.draw.m_particleSysBones.begin(), animation.draw.m_particleSysBones.end());
+		combined.m_hideShowVec.insert(combined.m_hideShowVec.end(),
+			animation.draw.m_hideShowVec.begin(), animation.draw.m_hideShowVec.end());
 	}
 	return &entry->second;
 }

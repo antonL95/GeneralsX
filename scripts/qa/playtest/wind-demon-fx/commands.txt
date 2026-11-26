@@ -1,0 +1,5 @@
+20 create Player_1 GondorElessar 0 3130,780,0
+21 reveal Player_1 GondorElessar 0
+22 science Player_1 - 0 SCIENCE_WindDemonCurse
+24 powerstate Player_1 - 0
+30 power-cast Player_1 - 5 at 3210 860
