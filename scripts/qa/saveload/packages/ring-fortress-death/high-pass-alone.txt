@@ -1,0 +1,21 @@
+3 cash Player_1 - 0 90000
+45 ringchain-gollum Player_1 RingFortressGollum 0
+60 ringchain-state Player_1 - 0
+75 ringchain-kill-gollum Player_1 RingFortressGollum 0
+100 ringchain-state Player_1 - 0
+105 ringchain-carrier Player_1 RingFortressCarrier 0
+110 ringchain-pickup Player_1 RingFortressCarrier 0
+240 ringchain-state Player_1 - 0
+245 ringchain-kill-carrier Player_1 - 0
+270 ringchain-state Player_1 - 0
+275 ringchain-carrier Player_1 RingFortressCarrier 0
+280 ringchain-pickup Player_1 RingFortressCarrier 0
+400 ringchain-state Player_1 - 0
+730 ringchain-state Player_1 - 0
+759 select Player_1 RingFortressCarrier 0
+760 ringchain-deliver Player_1 - 0
+1300 ringchain-state Player_1 - 0
+1305 logall - - 0
+1310 pkg11-damage Player_1 MordorFortressCitadel 0 Player_1:MordorFortressCitadel:0 10000000 0
+1350 ringchain-state Player_1 - 0
+1350 logall - - 0
