@@ -11,10 +11,11 @@
 600 ringchain-carrier Player_1 RingChainCarrier 0
 605 ringchain-pickup Player_1 RingChainCarrier 0
 730 ringchain-state Player_1 - 0
+759 select Player_1 RingChainCarrier 0
 760 ringchain-deliver Player_1 - 0
 1300 ringchain-state Player_1 - 0
 1310 ringchain-recruit Player_1 - 0
-1320 ringchain-eva Player_1 DiscoveredRing 0
-1320 ringchain-eva Player_1 RingPickedUpLocal 0
-1320 ringchain-eva Player_1 LocalPlayerLosesRing 0
+730 ringchain-eva Player_1 DiscoveredRing 0
+730 ringchain-eva Player_1 RingPickedUpLocal 0
+730 ringchain-eva Player_1 LocalPlayerLosesRing 0
 1320 ringchain-eva Player_1 LocalPlayerGainsRing 0

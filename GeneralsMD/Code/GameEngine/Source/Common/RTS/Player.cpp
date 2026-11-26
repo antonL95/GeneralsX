@@ -3308,8 +3308,6 @@ Bool Player::hasUpgradeInProduction( const UpgradeTemplate *upgradeTemplate )
 	return m_upgradesInProgress.testForAll( testMask );
 }
 
-//=================================================================================================
-/** Give the player an upgrade or change status on an existing upgrade entry */
 namespace
 {
 void announceRetailUpgradeGain(const Player& owner, const UpgradeTemplate& upgrade)
@@ -3326,7 +3324,6 @@ void announceRetailUpgradeGain(const Player& owner, const UpgradeTemplate& upgra
 }
 }
 
-//=================================================================================================
 Upgrade *Player::addUpgrade( const UpgradeTemplate *upgradeTemplate, UpgradeStatusType status )
 {
 	Upgrade *u = findUpgrade( upgradeTemplate );
