@@ -31,6 +31,7 @@
 #include "Common/SubsystemInterface.h"
 
 class Player;
+class Xfer;
 
 /*
  * bitfield for specifying which victory conditions will apply in multiplayer games
@@ -67,7 +68,9 @@ public:
 	virtual Bool isLocalAlliedDefeat() = 0;									///< convenience function
 	virtual Bool isLocalDefeat() = 0;												///< convenience function
 	virtual Bool amIObserver() = 0;													///< Am I an observer?( need this for scripts )
-	virtual UnsignedInt getEndFrame() = 0;									///< on which frame was the game effectively over?
+	virtual UnsignedInt getEndFrame() = 0;
+	virtual void xferRetailState(Xfer* xfer) = 0;
+	virtual void resetRetailState() = 0;
 protected:
 	Int m_victoryConditions;
 };

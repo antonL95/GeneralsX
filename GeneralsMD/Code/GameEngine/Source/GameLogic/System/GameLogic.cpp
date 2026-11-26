@@ -6099,6 +6099,13 @@ void GameLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_objectiveVisible.clear();
 			m_objectiveCompleted.clear();
 		}},
+		{"victory-conditions", [](Xfer* x) {
+			if (TheVictoryConditions)
+				TheVictoryConditions->xferRetailState(x);
+		}, [] {
+			if (TheVictoryConditions)
+				TheVictoryConditions->resetRetailState();
+		}},
 	});
 }
 

@@ -43,6 +43,7 @@
 #include "Common/Recorder.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Xfer.h"
 
 #include "GameClient/InGameUI.h"
 #include "GameClient/Diplomacy.h"
@@ -145,7 +146,9 @@ public:
 	virtual Bool isLocalAlliedDefeat() override;									///< convenience function
 	virtual Bool isLocalDefeat() override;												///< convenience function
 	virtual Bool amIObserver() override { return m_isObserver;} 	///< Am I an observer?( need this for scripts )
-	virtual UnsignedInt getEndFrame() override { return m_endFrame; }	///< on which frame was the game effectively over?
+	virtual UnsignedInt getEndFrame() override { return m_endFrame; }
+	virtual void xferRetailState(Xfer* xfer) override;
+	virtual void resetRetailState() override;
 private:
 	Player* findFirstUndefeatedPlayer(); ///< Find the first player that has not been defeated.
 	void markAllianceVictorious(Player* victoriousPlayer); ///< Mark the victorious player and his allies as victorious.
@@ -506,6 +509,31 @@ Bool VictoryConditions::isLocalDefeat()
 		return FALSE;
 
 	return (m_localPlayerDefeated);
+}
+
+void VictoryConditions::xferRetailState(Xfer* xfer)
+{
+	xfer->xferInt(&m_victoryConditions);
+	xfer->xferUnsignedInt(&m_endFrame);
+	for (Int i = 0; i < MAX_PLAYER_COUNT; ++i)
+	{
+		xfer->xferBool(&m_isDefeated[i]);
+		xfer->xferBool(&m_isVictorious[i]);
+	}
+	xfer->xferBool(&m_localPlayerDefeated);
+	xfer->xferBool(&m_singleAllianceRemaining);
+}
+
+void VictoryConditions::resetRetailState()
+{
+	m_endFrame = 0;
+	for (Int i = 0; i < MAX_PLAYER_COUNT; ++i)
+	{
+		m_isDefeated[i] = false;
+		m_isVictorious[i] = false;
+	}
+	m_localPlayerDefeated = m_isObserver;
+	m_singleAllianceRemaining = false;
 }
 
 
