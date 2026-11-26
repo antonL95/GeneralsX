@@ -1,0 +1,14 @@
+10 audio-loop-trace - - 0 on
+12 create Player_1 DwarvenFortressCitadel 0 2520,1010,0
+12 create Player_1 MirkwoodCitadel 0 2700,1010,0
+13 objupgrade Player_1 DwarvenFortressCitadel 0 Upgrade_HobbitErebor
+13 objupgrade Player_1 DwarvenFortressCitadel 0 Upgrade_DwarvenHornsoftheGate
+13 objupgrade Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressOromeTribute
+30 power Player_1 DwarvenFortressCitadel 0 SpecialAbilityFortressHornOfErebor
+35 particle-systems - - 0 CastleHornDust
+80 power Player_1 MirkwoodCitadel 0 SpecialAbilityFortressHornOfErebor
+85 particle-systems - - 0 GreenwoodTauronHorn
+12 create Player_1 RohanFortressCitadel 0 2900,1010,0
+13 objupgrade Player_1 RohanFortressCitadel 0 Upgrade_RohanFortressHornsOfHammerhand
+130 power Player_1 RohanFortressCitadel 0 SpecialAbilityFortressHornOfErebor
+135 particle-systems - - 0 RohanHammerhandHorn
