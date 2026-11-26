@@ -9,6 +9,7 @@
 #include "Common/INIAudit.h"
 #include "Common/RetailConditionMatch.h"
 #include "Common/RetailFileLayers.h"
+#include "GameClient/ClientRandomValue.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/RadiusDecal.h"
 #include "GameClient/ParticleSys.h"
@@ -17,7 +18,6 @@
 #include <algorithm>
 #include <cctype>
 #include <memory>
-#include <regex>
 #include <string_view>
 #include <utility>
 
@@ -62,6 +62,83 @@ void copyParticles(ModelConditionInfo& draw, const std::vector<W3DScriptedModelD
 	for (const auto& particle : particles)
 		draw.m_particleSysBones.push_back(particle.draw);
 }
+
+class ScriptHost final : public DrawScript::Host
+{
+public:
+	ScriptHost(const W3DScriptedModelDrawModuleData::AnimationState* previous, const TransitionContext& context)
+		: m_previous(previous), m_context(context)
+	{
+	}
+
+	const std::string& transition() const { return m_transition; }
+	Bool allowsToContinue() const { return m_continue; }
+
+	DrawScript::Value call(const std::string& function, const std::vector<DrawScript::Value>& arguments) override
+	{
+		using Value = DrawScript::Value;
+		const char* argument = !arguments.empty() && arguments.front().type == Value::Type::String ?
+			arguments.front().text.c_str() : nullptr;
+		if (function == "CurDrawableSetTransitionAnimState")
+		{
+			if (argument)
+				m_transition = argument;
+		}
+		else if (function == "CurDrawableAllowToContinue")
+		{
+			m_continue = TRUE;
+		}
+		else if (function == "CurDrawablePrevAnimationState")
+		{
+			if (m_previous && m_previous->stateName.isNotEmpty())
+				return Value::of(std::string(m_previous->stateName.str()));
+		}
+		else if (function == "CurDrawablePrevAnimation")
+		{
+			const AsciiString label = previousLabel();
+			if (label.isNotEmpty())
+				return Value::of(std::string(label.str()));
+		}
+		else if (function == "CurDrawablePrevAnimFraction")
+		{
+			return Value::of(static_cast<double>(m_context.previousFraction));
+		}
+		else if (function == "CurDrawableModelcondition")
+		{
+			const Int bit = argument ? ModelConditionFlags::getSingleBitFromName(argument) : -1;
+			if (bit >= 0 && m_context.drawable && m_context.drawable->getModelConditionFlags().test(bit))
+				return Value::of(1.0);
+		}
+		else if (function == "GetClientRandomNumberReal")
+		{
+			if (arguments.size() == 2 && arguments[0].type == Value::Type::Number && arguments[1].type == Value::Type::Number)
+				return Value::of(static_cast<double>(GameClientRandomValueReal(
+					static_cast<Real>(arguments[0].number), static_cast<Real>(arguments[1].number))));
+		}
+		return {};
+	}
+
+private:
+	AsciiString previousLabel() const
+	{
+		Int index = m_context.previousAnimation;
+		if (!m_previous || index < 0)
+			return AsciiString::TheEmptyString;
+		for (const auto& animation : m_previous->animations)
+		{
+			if (animation.name.isEmpty() || animation.name.isNone())
+				continue;
+			if (index-- == 0)
+				return animation.label;
+		}
+		return AsciiString::TheEmptyString;
+	}
+
+	const W3DScriptedModelDrawModuleData::AnimationState* m_previous;
+	const TransitionContext m_context;
+	std::string m_transition;
+	Bool m_continue = FALSE;
+};
 }
 
 void W3DScriptedModelDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -395,45 +472,6 @@ void W3DScriptedModelDrawModuleData::parseRandomTexture(INI* ini, void*, void* s
 	static_cast<std::vector<RandomTexture>*>(store)->push_back(std::move(texture));
 }
 
-auto W3DScriptedModelDrawModuleData::readTransitionRequest(const std::string& script) -> TransitionRequest
-{
-	if (script.find("CurDrawableSetTransitionAnimState") == std::string::npos &&
-		script.find("CurDrawableAllowToContinue") == std::string::npos)
-		return {};
-
-	static const std::string call = R"fx((?:CurDrawableSetTransitionAnimState\s*\(\s*"([^"]+)"\s*\)|CurDrawableAllowToContinue\s*\(\s*\))(?:\s+return)?)fx";
-	static const std::regex direct("\\s*" + call + "\\s*");
-	static const std::string prefix = R"fx(\s*([A-Za-z_][A-Za-z_0-9]*)\s*=\s*CurDrawablePrevAnimationState\s*\(\s*\)\s*if\s+()fx";
-	static const std::string suffix = ")\\s*then\\s+" + call + "\\s*end\\s*";
-	static const auto conditionsPattern = [](const char* comparison, const char* join)
-	{
-		const std::string test = std::string(R"fx([A-Za-z_][A-Za-z_0-9]*\s*)fx") + comparison + R"fx(\s*"[^"]+")fx";
-		return prefix + test + "(?:\\s*" + join + "\\s+" + test + ")*" + suffix;
-	};
-	static const std::regex allow(conditionsPattern("==", "or"));
-	static const std::regex exclude(conditionsPattern("~=", "and"));
-	static const std::regex comparison(R"fx(([A-Za-z_][A-Za-z_0-9]*)\s*(?:==|~=)\s*"([^"]+)")fx");
-
-	std::smatch match;
-	if (std::regex_match(script, match, direct))
-		return {stateKey(match[1].str().c_str()), {}, FALSE, !match[1].matched};
-	const Bool excluded = std::regex_match(script, match, exclude);
-	if (!excluded && !std::regex_match(script, match, allow))
-		return {};
-
-	const std::string variable = match[1].str();
-	const std::string conditions = match[2].str();
-	TransitionRequest request{stateKey(match[3].str().c_str()), {}, excluded, !match[3].matched};
-	for (auto it = std::sregex_iterator(conditions.begin(), conditions.end(), comparison); it != std::sregex_iterator(); ++it)
-	{
-		const NameKeyType previous = stateKey((*it)[2].str().c_str());
-		if ((*it)[1].str() != variable || previous == NAMEKEY_INVALID)
-			return {};
-		request.previousStates.push_back(previous);
-	}
-	return request;
-}
-
 void W3DScriptedModelDrawModuleData::readScriptSubObjectActions(const std::string& script,
 	std::vector<ModelConditionInfo::HideShowSubObjInfo>& actions)
 {
@@ -533,12 +571,13 @@ void W3DScriptedModelDrawModuleData::finishParsing()
 		for (AnimationState& state : m_animationStates)
 		{
 			readScriptSubObjectActions(state.script, state.draw.m_hideShowVec);
-			auto request = readTransitionRequest(state.script);
-			if (request.continuePrevious || (request.target != NAMEKEY_INVALID && !m_namedTransitions.empty()))
-				m_transitionRequests.emplace(&state.draw, std::move(request));
+			addScriptedState(state);
 		}
 		for (auto& [key, state] : m_namedTransitions)
+		{
 			readScriptSubObjectActions(state.script, state.draw.m_hideShowVec);
+			m_scriptedStates.emplace(&state.draw, &state);
+		}
 	}
 
 	for (const ModelConditionInfo& model : m_conditionStates)
@@ -620,23 +659,39 @@ const ModelConditionInfo* W3DScriptedModelDrawModuleData::combineState(const Mod
 	return &entry->second;
 }
 
-const ModelConditionInfo* W3DScriptedModelDrawModuleData::findNamedTransition(
-	const ModelConditionInfo* previous, const ModelConditionInfo* destination, Bool& continuePrevious) const
+void W3DScriptedModelDrawModuleData::addScriptedState(const AnimationState& state)
 {
-	const auto entry = m_transitionRequests.find(destination->m_animationState);
-	if (entry == m_transitionRequests.end() || previous->m_animationState == destination->m_animationState)
+	m_scriptedStates.emplace(&state.draw, &state);
+	if (state.script.find("CurDrawableSetTransitionAnimState") == std::string::npos &&
+		state.script.find("CurDrawableAllowToContinue") == std::string::npos)
+		return;
+
+	std::shared_ptr<const DrawScript> script = DrawScript::compile(state.script);
+	if (script)
+		m_transitionScripts.emplace(&state.draw, std::move(script));
+	else
+		DEBUG_LOG(("Draw script of state %s does not compile", state.stateName.str()));
+}
+
+const ModelConditionInfo* W3DScriptedModelDrawModuleData::findNamedTransition(const ModelConditionInfo* previous,
+	const ModelConditionInfo* destination, const TransitionContext& context, Bool& continuePrevious) const
+{
+	const auto entry = m_transitionScripts.find(destination->m_animationState);
+	if (entry == m_transitionScripts.end() || previous->m_animationState == destination->m_animationState)
 		return nullptr;
 
-	const TransitionRequest& request = entry->second;
-	const auto& states = request.previousStates;
-	if (!states.empty() && (std::find(states.begin(), states.end(), previous->m_transitionKey) != states.end()) == request.excludePreviousStates)
-		return nullptr;
+	const auto scripted = m_scriptedStates.find(previous->m_animationState);
+	ScriptHost host(scripted == m_scriptedStates.end() ? nullptr : scripted->second, context);
+	entry->second->run(host);
 
-	continuePrevious = request.continuePrevious;
-	if (continuePrevious)
-		return nullptr;
-	const auto transition = m_namedTransitions.find(request.target);
-	return transition != m_namedTransitions.end() ? combineState(destination->m_modelState, transition->second) : nullptr;
+	if (!host.transition().empty())
+	{
+		const auto transition = m_namedTransitions.find(stateKey(host.transition().c_str()));
+		if (transition != m_namedTransitions.end())
+			return combineState(destination->m_modelState, transition->second);
+	}
+	continuePrevious = host.allowsToContinue();
+	return nullptr;
 }
 
 W3DScriptedModelDraw::W3DScriptedModelDraw(Thing* thing, const ModuleData* data)

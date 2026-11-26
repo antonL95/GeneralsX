@@ -2256,6 +2256,21 @@ static Bool isAnimationComplete(RenderObjClass* r)
 	return true;
 }
 
+static Real scriptedAnimationFraction(RenderObjClass* renderObject)
+{
+	if (!renderObject || renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD)
+		return 0.0f;
+
+	Real frame = 0.0f;
+	Int frames = 0;
+	Int mode = 0;
+	Real speed = 0.0f;
+	HAnimClass* animation = static_cast<HLodClass*>(renderObject)->Peek_Animation_And_Info(frame, frames, mode, speed);
+	if (!animation || frames <= 1)
+		return 0.0f;
+	return clamp(0.0f, frame / static_cast<Real>(frames - 1), 1.0f);
+}
+
 static Bool finishCurrentScriptedAnimation(RenderObjClass* renderObject)
 {
 	if (!renderObject || renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD)
@@ -3964,7 +3979,8 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 			if (!(TheGameState && TheGameState->isInLoadGame()))
 			{
 				Bool continuePrevious = FALSE;
-				transState = getW3DModelDrawModuleData()->findNamedTransition(m_curState, newState, continuePrevious);
+				const TransitionContext context{getDrawable(), m_whichAnimInCurState, scriptedAnimationFraction(m_renderObject)};
+				transState = getW3DModelDrawModuleData()->findNamedTransition(m_curState, newState, context, continuePrevious);
 				if (continuePrevious && finishCurrentScriptedAnimation(m_renderObject))
 				{
 					m_nextState = newState;
