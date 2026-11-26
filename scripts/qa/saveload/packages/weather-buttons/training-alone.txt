@@ -1,0 +1,17 @@
+25 weather-buttons-setup Player_1 - 0
+25 weather-buttons-state Player_1 WhiteWinterWeatherTrigger 1 Command_SpecialAbilityWhiteWinterFX
+25 weather-buttons-state Player_1 FreezingRainWeatherTrigger 2 Command_SpecialAbilityFreezingRainFX
+26 science Player_1 - 0 SCIENCE_WarChant
+27 pw-purchase Player_1 - 0 SCIENCE_WhiteWinter
+27 pw-purchase Player_1 - 0 SCIENCE_FreezingRain
+35 weather-buttons-state Player_1 WhiteWinterWeatherTrigger 1 Command_SpecialAbilityWhiteWinterFX
+35 weather-buttons-state Player_1 FreezingRainWeatherTrigger 2 Command_SpecialAbilityFreezingRainFX
+40 weather-buttons-cast Player_1 - 1
+140 weather-buttons-state Player_1 WhiteWinterWeatherTrigger 1 Command_SpecialAbilityWhiteWinterFX
+200 weather-buttons-cast Player_1 - 2
+300 weather-buttons-state Player_1 FreezingRainWeatherTrigger 2 Command_SpecialAbilityFreezingRainFX
+5700 weatherstate - - 0
+5700 weather-buttons-state Player_1 WhiteWinterWeatherTrigger 1 Command_SpecialAbilityWhiteWinterFX
+5700 weather-buttons-state Player_1 FreezingRainWeatherTrigger 2 Command_SpecialAbilityFreezingRainFX
+11200 weather-buttons-state Player_1 WhiteWinterWeatherTrigger 1 Command_SpecialAbilityWhiteWinterFX
+11200 weather-buttons-state Player_1 FreezingRainWeatherTrigger 2 Command_SpecialAbilityFreezingRainFX
