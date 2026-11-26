@@ -2,6 +2,7 @@
 
 #include "GameClient/UiFrame.h"
 
+#include "Common/FileSystem.h"
 #include "Common/INI.h"
 #include "GameClient/Display.h"
 #include "GameClient/Image.h"
@@ -116,12 +117,20 @@ void UiFrame::parseDefinition(INI* ini)
 
 void UiFrame::parseImageName(INI* ini, void* instance, void*, const void*)
 {
-	frameOf(instance)->m_imageName = ini->getNextToken();
+	UiFrame* frame = frameOf(instance);
+	if (frame->m_image)
+	{
+		deleteInstance(frame->m_image);
+		frame->m_image = nullptr;
+	}
+	frame->m_imageName = ini->getNextToken();
 }
 
 void UiFrame::parseTexture(INI* ini, void* instance, void*, const void*)
 {
-	frameOf(instance)->ownImage()->setFilename(ini->getNextToken());
+	UiFrame* frame = frameOf(instance);
+	frame->m_imageName.clear();
+	frame->ownImage()->setFilename(ini->getNextToken());
 }
 
 void UiFrame::parseTextureWidth(INI* ini, void* instance, void*, const void*)
@@ -182,6 +191,8 @@ void UiFrameCollection::load()
 {
 	INI ini;
 	ini.loadText("GeneralsX\\UiFrames.ini", UiFramesIniText, INI_LOAD_OVERWRITE, "UiFrame", UiFrame::parseDefinition);
+	if (TheFileSystem && TheFileSystem->doesFileExist("Data\\INI\\UiFrames.ini"))
+		ini.load("Data\\INI\\UiFrames.ini", INI_LOAD_OVERWRITE, nullptr, "UiFrame", UiFrame::parseDefinition);
 }
 
 UiFrame* UiFrameCollection::findOrCreate(const AsciiString& name)

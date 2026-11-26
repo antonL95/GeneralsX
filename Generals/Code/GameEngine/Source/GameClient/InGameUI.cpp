@@ -4206,7 +4206,11 @@ void InGameUI::createControlBar()
 {
 
 	if (RetailFileLayers::enabled() && !TheGlobalData->m_headless)
-		m_controlBarWindow = TheWindowManager->winCreateFromEmbeddedScript("RetailHud.wnd", RetailHudWndText);
+	{
+		m_controlBarWindow = TheWindowManager->winCreateFromScript("Data\\Window\\RetailHud.wnd");
+		if (m_controlBarWindow == nullptr)
+			m_controlBarWindow = TheWindowManager->winCreateFromEmbeddedScript("RetailHud.wnd", RetailHudWndText);
+	}
 	else
 		m_controlBarWindow = TheWindowManager->winCreateFromScript("ControlBar.wnd");
 	HideControlBar();
