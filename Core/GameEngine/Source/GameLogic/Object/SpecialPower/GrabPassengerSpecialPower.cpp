@@ -254,7 +254,7 @@ void GrabPassengerSpecialPower::applyPowerEffect(const Coord3D*)
 		Coord3D position;
 		Real angle;
 		Real scale;
-		const ThingTemplate* tree = TheTerrainLogic->findGrabbableMapTreeAt(m_treePosition, position, angle, &scale);
+		const ThingTemplate* tree = TheTerrainLogic->findGrabbableMapTreeAt(m_treePosition, position, angle, &scale, 5.0f);
 		target = tree ? TheThingFactory->newObjectFromExactTemplate(tree, ThePlayerList->getNeutralPlayer()->getDefaultTeam(), OBJECT_STATUS_MASK_NONE) : nullptr;
 		m_treePosition.zero();
 		if (target)

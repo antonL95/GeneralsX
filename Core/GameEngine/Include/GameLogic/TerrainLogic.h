@@ -331,11 +331,11 @@ public:
 	void registerMapTree(const ThingTemplate& thing, const Coord3D& pos, Real angle = 0.0f, Real scale = 1.0f);
 	static constexpr ObjectID GRABBABLE_TREE_PROXY_ID = static_cast<ObjectID>(99999996);
 	void ensureGrabbableTreeProxy();
-	const ThingTemplate* findGrabbableMapTreeAt(const Coord3D& origin, Coord3D& position, Real& angle, Real* scale = nullptr) const;
+	const ThingTemplate* findGrabbableMapTreeAt(const Coord3D& origin, Coord3D& position, Real& angle, Real* scale = nullptr, Real requestedRadius = 10.0f) const;
 	Bool hasLegacyMapTreesToRestore() const { return !m_mapTreesBeforeLegacyLoad.empty(); }
 	void restoreLegacyMapTrees(const std::vector<Coord3D>& deletedTrees);
-	const ThingTemplate* findNearestGrabbableMapTree(const Coord3D& origin, Real distanceSquared,
-		const SpecialPowerObjectFilter& filter, Coord3D& position, Real& angle) const;
+	const ThingTemplate* findNearestGrabbableMapTree(const Coord3D& origin, Real range, Real maxDist2DSquared,
+		const SpecialPowerObjectFilter& filter, Coord3D& position, Real& angle, Real* scale = nullptr) const;
 	Object* materializeFlammableMapTree(const Coord3D& origin, Real radius);
 	void notifyObjectMoved(Object* unit);
 	void removeMapTreeAt(const Coord3D& position);
@@ -407,6 +407,8 @@ protected:
 		Bool doTopple = FALSE;
 	};
 	void populateMapTreeMetadata();
+	size_t findBestMapTreeIndex(const Coord3D& origin, Real requestedRadius, Real maxDist2DSquared,
+		Bool onlyUpright, Bool grabbableOnly, Bool requireClub, const SpecialPowerObjectFilter* filter) const;
 	const MapTree* findMapTree(const Coord3D& position) const;
 	std::vector<MapTree> m_mapTrees;
 	std::vector<MapTree> m_mapTreesBeforeLegacyLoad;

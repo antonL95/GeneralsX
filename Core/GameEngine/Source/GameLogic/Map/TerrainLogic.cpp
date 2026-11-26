@@ -3087,18 +3087,38 @@ void TerrainLogic::populateMapTreeMetadata()
 	}
 }
 
-Object* TerrainLogic::materializeFlammableMapTree(const Coord3D& origin, Real radius)
+size_t TerrainLogic::findBestMapTreeIndex(const Coord3D& origin, Real requestedRadius, Real maxDist2DSquared,
+	Bool onlyUpright, Bool grabbableOnly, Bool requireClub, const SpecialPowerObjectFilter* filter) const
 {
-	if (!(radius > 0.0f) || !std::isfinite(radius) || !ThePlayerList || !ThePlayerList->getNeutralPlayer())
-		return nullptr;
+	if (!(requestedRadius >= 0.0f) || !std::isfinite(requestedRadius) || m_mapTrees.empty())
+		return m_mapTrees.size();
 
-	const Real searchRadiusSqr = sqr(radius + 7.0f);
+	Region3D extent;
+	getExtent(&extent);
+	const Real spanX = extent.hi.x - extent.lo.x;
+	const Real spanY = extent.hi.y - extent.lo.y;
+	const auto bucketOf = [&](const Coord3D& point) -> std::pair<Int, Int>
+	{
+		const Real clampedX = std::clamp(point.x, extent.lo.x, extent.hi.x);
+		const Real clampedY = std::clamp(point.y, extent.lo.y, extent.hi.y);
+		const Int ix = spanX > 0.0f ? REAL_TO_INT_FLOOR(((clampedX - extent.lo.x) / spanX) * 49.9f) : 0;
+		const Int iy = spanY > 0.0f ? REAL_TO_INT_FLOOR(((clampedY - extent.lo.y) / spanY) * 49.9f) : 0;
+		return {std::clamp(ix, 0, 49), std::clamp(iy, 0, 49)};
+	};
+
+	const Real searchRadiusSqr = sqr(requestedRadius + 7.0f);
 	size_t bestIndex = m_mapTrees.size();
 	Real bestDist2DSqr = 0.0f;
+	Int bestBucketX = 0;
+	Int bestBucketY = 0;
 	for (size_t i = 0; i < m_mapTrees.size(); ++i)
 	{
 		const MapTree& tree = m_mapTrees[i];
-		if (tree.toppled || !tree.thing)
+		if (!tree.thing || (onlyUpright && tree.toppled) || (grabbableOnly && !tree.grabbable))
+			continue;
+		if (requireClub && !tree.thing->isKindOf(KINDOF_CLUB))
+			continue;
+		if (filter && !filter->matchesTemplate(*tree.thing))
 			continue;
 		const Real dx = tree.position.x - origin.x;
 		const Real dy = tree.position.y - origin.y;
@@ -3106,12 +3126,28 @@ Object* TerrainLogic::materializeFlammableMapTree(const Coord3D& origin, Real ra
 		const Real dist2DSqr = dx * dx + dy * dy;
 		if (dist2DSqr + dz * dz >= searchRadiusSqr)
 			continue;
-		if (bestIndex == m_mapTrees.size() || dist2DSqr < bestDist2DSqr)
+		if (maxDist2DSquared >= 0.0f && dist2DSqr >= maxDist2DSquared)
+			continue;
+		const auto [bx, by] = bucketOf(tree.position);
+		const Bool better = bestIndex == m_mapTrees.size() || dist2DSqr < bestDist2DSqr ||
+			(dist2DSqr == bestDist2DSqr && (bx < bestBucketX || (bx == bestBucketX && (by < bestBucketY || (by == bestBucketY && i > bestIndex)))));
+		if (better)
 		{
 			bestIndex = i;
 			bestDist2DSqr = dist2DSqr;
+			bestBucketX = bx;
+			bestBucketY = by;
 		}
 	}
+	return bestIndex;
+}
+
+Object* TerrainLogic::materializeFlammableMapTree(const Coord3D& origin, Real radius)
+{
+	if (!(radius > 0.0f) || !std::isfinite(radius) || !ThePlayerList || !ThePlayerList->getNeutralPlayer())
+		return nullptr;
+
+	const size_t bestIndex = findBestMapTreeIndex(origin, radius, -1.0f, TRUE, FALSE, FALSE, nullptr);
 	if (bestIndex == m_mapTrees.size())
 		return nullptr;
 
@@ -3177,67 +3213,33 @@ void TerrainLogic::ensureGrabbableTreeProxy()
 		ThePartitionManager->unRegisterObject(proxy);
 }
 
-const ThingTemplate* TerrainLogic::findGrabbableMapTreeAt(const Coord3D& origin, Coord3D& position, Real& angle, Real* scale) const
+const ThingTemplate* TerrainLogic::findGrabbableMapTreeAt(const Coord3D& origin, Coord3D& position, Real& angle, Real* scale, Real requestedRadius) const
 {
-	const ThingTemplate* result = nullptr;
-	Real best = 100.0f;
-	for (const MapTree& tree : m_mapTrees)
-	{
-		const Real distance = sqr(tree.position.x - origin.x) + sqr(tree.position.y - origin.y) + sqr(tree.position.z - origin.z);
-		if (distance >= best)
-			continue;
-		for (MapObject* mapObject = MapObject::getFirstMapObject(); mapObject; mapObject = mapObject->getNext())
-		{
-			const Coord3D& point = *mapObject->getLocation();
-			const ThingTemplate* thing = mapObject->getThingTemplate();
-			if (tree.position.x != point.x || tree.position.y != point.y || !thing ||
-				!thing->isKindOf(KINDOF_TREE) || !thing->getRotWKObjectData().isGrabbable)
-				continue;
-			Bool hasScale = FALSE;
-			const Real mapScale = mapObject->getProperties()->getReal(NAMEKEY("objectPrototypeScale"), &hasScale);
-			const Real instanceScale = thing->getAssetScale() * (hasScale ? mapScale : 1.0f);
-			if (!std::isfinite(instanceScale) || instanceScale <= 0.0f)
-				continue;
-			best = distance;
-			position = tree.position;
-			angle = normalizeAngle(mapObject->getAngle());
-			if (scale)
-				*scale = instanceScale;
-			result = thing;
-			break;
-		}
-	}
-	return result;
+	const size_t bestIndex = findBestMapTreeIndex(origin, requestedRadius, -1.0f, TRUE, TRUE, FALSE, nullptr);
+	if (bestIndex == m_mapTrees.size())
+		return nullptr;
+
+	const MapTree& tree = m_mapTrees[bestIndex];
+	position = tree.position;
+	angle = tree.angle;
+	if (scale)
+		*scale = tree.scale;
+	return tree.thing;
 }
 
-const ThingTemplate* TerrainLogic::findNearestGrabbableMapTree(const Coord3D& origin, Real distanceSquared,
-	const SpecialPowerObjectFilter& filter, Coord3D& position, Real& angle) const
+const ThingTemplate* TerrainLogic::findNearestGrabbableMapTree(const Coord3D& origin, Real range, Real maxDist2DSquared,
+	const SpecialPowerObjectFilter& filter, Coord3D& position, Real& angle, Real* scale) const
 {
-	const ThingTemplate* result = nullptr;
-	for (const MapObject* mapObject = MapObject::getFirstMapObject(); mapObject; mapObject = mapObject->getNext())
-	{
-		const ThingTemplate* thing = mapObject->getThingTemplate();
-		if (!thing || !thing->isKindOf(KINDOF_TREE) || !thing->isKindOf(KINDOF_CLUB) ||
-			!thing->getRotWKObjectData().isGrabbable || !filter.matchesTemplate(*thing))
-			continue;
+	const size_t bestIndex = findBestMapTreeIndex(origin, range, maxDist2DSquared, TRUE, TRUE, TRUE, &filter);
+	if (bestIndex == m_mapTrees.size())
+		return nullptr;
 
-		const Coord3D& point = *mapObject->getLocation();
-		const Real distance = sqr(point.x - origin.x) + sqr(point.y - origin.y);
-		if (distance >= distanceSquared)
-			continue;
-		const auto registered = [&point](const MapTree& tree)
-		{
-			return tree.position.x == point.x && tree.position.y == point.y;
-		};
-		const auto tree = std::find_if(m_mapTrees.begin(), m_mapTrees.end(), registered);
-		if (tree == m_mapTrees.end())
-			continue;
-		position = tree->position;
-		angle = normalizeAngle(mapObject->getAngle());
-		result = thing;
-		distanceSquared = distance;
-	}
-	return result;
+	const MapTree& tree = m_mapTrees[bestIndex];
+	position = tree.position;
+	angle = tree.angle;
+	if (scale)
+		*scale = tree.scale;
+	return tree.thing;
 }
 
 void TerrainLogic::removeMapTreeAt(const Coord3D& position)

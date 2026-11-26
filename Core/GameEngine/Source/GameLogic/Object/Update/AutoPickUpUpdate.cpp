@@ -15,6 +15,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/ControlBar.h"
+#include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -179,16 +180,23 @@ void AutoPickUpUpdate::scan()
 
 	Coord3D treePosition;
 	Real treeAngle;
+	Real treeScale = 1.0f;
 	const ThingTemplate* tree = data->m_pickUpFilter.m_includeKinds.test(KINDOF_TREE)
-		? TheTerrainLogic->findNearestGrabbableMapTree(*self->getPosition(), best, data->m_pickUpFilter, treePosition, treeAngle)
+		? TheTerrainLogic->findNearestGrabbableMapTree(*self->getPosition(), data->m_range, best, data->m_pickUpFilter, treePosition, treeAngle, &treeScale)
 		: nullptr;
 	if (tree)
 	{
-		Object* materialized = TheThingFactory->newObject(tree, ThePlayerList->getNeutralPlayer()->getDefaultTeam());
+		Object* proxy = TheGameLogic->findObjectByID(TerrainLogic::GRABBABLE_TREE_PROXY_ID);
+		if (auto* treeGrab = proxy ? GrabPassengerSpecialPower::findUsable(self, proxy) : nullptr;
+			treeGrab && treeGrab->requestTreeGrab(treePosition, 0))
+			return;
+		Object* materialized = TheThingFactory->newObjectFromExactTemplate(tree, ThePlayerList->getNeutralPlayer()->getDefaultTeam(), OBJECT_STATUS_MASK_NONE);
 		if (!materialized)
 			return;
 		materialized->setPosition(&treePosition);
 		materialized->setOrientation(treeAngle);
+		if (materialized->getDrawable())
+			materialized->getDrawable()->setInstanceScale(treeScale);
 		auto* treeGrab = GrabPassengerSpecialPower::findUsable(self, materialized);
 		if (treeGrab && treeGrab->requestGrab(materialized, 0))
 		{

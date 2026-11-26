@@ -67,6 +67,7 @@
 #include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "Common/AbilityRules.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/StickyBombUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
@@ -95,6 +96,7 @@ SpecialAbilityUpdate::SpecialAbilityUpdate( Thing *thing, const ModuleData* modu
   m_animFrames = 0;
   m_targetID = INVALID_ID;
   m_targetPos.zero();
+  m_hasTargetPos = FALSE;
   m_locationCount = 0;
   m_specialObjectEntries = 0;
   m_noTargetCommand = false;
@@ -523,6 +525,7 @@ Bool SpecialAbilityUpdate::initiateIntentToDoSpecialPower( const SpecialPowerTem
   //Clear target values
   m_targetID = INVALID_ID;
   m_targetPos.zero();
+  m_hasTargetPos = FALSE;
   m_locationCount = 0;
   m_prepFrames = 0;
   m_animFrames = 0;
@@ -543,8 +546,8 @@ Bool SpecialAbilityUpdate::initiateIntentToDoSpecialPower( const SpecialPowerTem
   }
   else if( targetPos )
   {
-    //Get the position!
     m_targetPos = *targetPos;
+    m_hasTargetPos = TRUE;
   }
 
   //Clear any old AI before starting this special ability.
@@ -964,7 +967,7 @@ Bool SpecialAbilityUpdate::isWithinStartAbilityRange() const
       fDistSquared = ThePartitionManager->getDistanceSquared( self, target, FROM_BOUNDINGSPHERE_2D );
     }
   }
-  else if( m_targetPos.x || m_targetPos.y || m_targetPos.z ) //It's zero if not used...
+  else if( hasAbilityTargetPos() )
   {
     fDistSquared = ThePartitionManager->getDistanceSquared( self, &m_targetPos, FROM_BOUNDINGSPHERE_2D );
   }
@@ -1041,7 +1044,7 @@ Bool SpecialAbilityUpdate::isWithinAbilityAbortRange() const
       fDistSquared = ThePartitionManager->getDistanceSquared( self, target, FROM_BOUNDINGSPHERE_2D );
     }
   }
-  else if( m_targetPos.x || m_targetPos.y || m_targetPos.z ) //It's zero if not used...
+  else if( hasAbilityTargetPos() )
   {
     fDistSquared = ThePartitionManager->getDistanceSquared( self, &m_targetPos, FROM_BOUNDINGSPHERE_2D );
   }
@@ -1093,7 +1096,7 @@ Bool SpecialAbilityUpdate::approachTarget()
       }
     }
   }
-  else if( m_targetPos.x || m_targetPos.y || m_targetPos.z ) //It's zero if not used...
+  else if( hasAbilityTargetPos() )
   {
     AIUpdateInterface *ai = self->getAIUpdateInterface();
     if( ai )
@@ -1756,7 +1759,7 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
       }
 
       static NameKeyType key_StickyBombUpdate = NAMEKEY( "StickyBombUpdate" );
-      if( m_targetID == INVALID_ID && !m_targetPos.x && !m_targetPos.y && !m_targetPos.z )
+      if( m_targetID == INVALID_ID && !hasAbilityTargetPos() )
       {
         //If there is no target object nor position, then we are detonating the existing charges.
         std::list<ObjectID>::iterator i;
@@ -1980,7 +1983,7 @@ void SpecialAbilityUpdate::finishAbility()
   //If we don't have a valid target, then we don't flee -- the specific example is when Colonel Burton
   //uses his remote charge special ability. With a target, he will plant the charge then flee. Without
   //a target, he simply detonates it without fleeing.
-  Bool validTarget = m_targetPos.x || m_targetPos.y || m_targetPos.z || m_targetID != INVALID_ID;
+  Bool validTarget = hasAbilityTargetPos() || m_targetID != INVALID_ID;
   if( data->m_fleeRangeAfterCompletion && validTarget )
   {
     Coord3D pos;
@@ -2132,7 +2135,7 @@ void SpecialAbilityUpdate::startFacing()
 	{
 		ai->aiFaceObject( target, CMD_FROM_AI );
 	}
-	else if( m_targetPos.x || m_targetPos.y || m_targetPos.z ) //It's zero if not used...
+	else if( hasAbilityTargetPos() )
 	{
 		ai->aiFacePosition( &m_targetPos, CMD_FROM_AI );
 	}
@@ -2240,6 +2243,7 @@ void SpecialAbilityUpdate::crcRetailAbilityPhase(Xfer* xfer)
 		xfer->xferUnsignedInt(&m_animFrames);
 		xfer->xferObjectID(&m_targetID);
 		xfer->xferCoord3D(&m_targetPos);
+		xfer->xferBool(&m_hasTargetPos);
 		xfer->xferInt(&m_rotwkTriggers);
 		xfer->xferUnsignedInt(&m_holdFrames);
 	}
@@ -2253,10 +2257,17 @@ void SpecialAbilityUpdate::crcRetailAbilityPhase(Xfer* xfer)
 	* Version Info:
 	* 1: Initial version */
 // ------------------------------------------------------------------------------------------------
+void SpecialAbilityUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{"target-pos-flag", [this](Xfer* block) { block->xferBool(&m_hasTargetPos); }, [this] { m_hasTargetPos = FALSE; }}
+	});
+}
+
 void SpecialAbilityUpdate::xfer( Xfer *xfer )
 {
 
-	const XferVersion currentVersion = usesRotwkRules() ? 2 : 1;
+	const XferVersion currentVersion = usesRotwkRules() ? 3 : 1;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2316,6 +2327,8 @@ void SpecialAbilityUpdate::xfer( Xfer *xfer )
 		xfer->xferInt(&m_timedCondition);
 		xfer->xferUnsignedInt(&m_timedConditionEndFrame);
 	}
+	if (usesRotwkRules())
+		xferRetailBlocks(xfer, version >= 3);
 }
 
 // ------------------------------------------------------------------------------------------------

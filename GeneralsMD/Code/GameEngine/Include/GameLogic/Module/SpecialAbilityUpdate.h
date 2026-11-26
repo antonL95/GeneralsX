@@ -328,7 +328,7 @@ protected:
 	UnsignedInt animationFramesRemaining() const { return m_animFrames; }
 	ObjectID getAbilityTargetID() const { return m_targetID; }
 	const Coord3D& getAbilityTargetPos() const { return m_targetPos; }
-	Bool hasAbilityTargetPos() const { return m_targetPos.x || m_targetPos.y || m_targetPos.z; }
+	Bool hasAbilityTargetPos() const { return m_hasTargetPos || m_targetPos.x || m_targetPos.y || m_targetPos.z; }
 
   // Lorenzen added this additional flag to support the NapalmBombDrop
   // It causes this update to force a recharge of the SPM between drops
@@ -346,6 +346,7 @@ protected:
 private:
 
 	void applyAbilityConditions(Bool includeAbilityAnimation);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 
 	enum PackingState
 	{
@@ -377,4 +378,5 @@ private:
 	UnsignedInt m_holdFrames = 0;
 	Int m_timedCondition = -1;
 	UnsignedInt m_timedConditionEndFrame = 0;
+	Bool m_hasTargetPos = FALSE;
 };
