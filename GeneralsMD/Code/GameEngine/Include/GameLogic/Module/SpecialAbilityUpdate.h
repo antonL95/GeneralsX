@@ -238,6 +238,7 @@ public:
 	Real getStartAbilityRangeFor(const SpecialPowerTemplate* power) const;
 	const SpecialPowerAnimation& getGrabPassengerAnimation() const { return getSpecialAbilityUpdateModuleData()->m_grabPassengerAnimAndDuration; }
 	Real getGrabPassengerHealFraction() const { return getSpecialAbilityUpdateModuleData()->m_grabPassengerHealGainPercent; }
+	Bool hasAbilityTargetPos() const { return m_hasTargetPos || m_targetPos.x || m_targetPos.y || m_targetPos.z; }
 	// virtual destructor prototype provided by memory pool declaration
 
 	// SpecialPowerUpdateInterface
@@ -328,7 +329,6 @@ protected:
 	UnsignedInt animationFramesRemaining() const { return m_animFrames; }
 	ObjectID getAbilityTargetID() const { return m_targetID; }
 	const Coord3D& getAbilityTargetPos() const { return m_targetPos; }
-	Bool hasAbilityTargetPos() const { return m_hasTargetPos || m_targetPos.x || m_targetPos.y || m_targetPos.z; }
 
   // Lorenzen added this additional flag to support the NapalmBombDrop
   // It causes this update to force a recharge of the SPM between drops

@@ -1,0 +1,9 @@
+15 tree-buffer-state Player_1 TreeBufferGrabber 0
+20 tree-buffer-setup Player_1 - 0
+25 tree-buffer-grab Player_1 TreeBufferGrabber 0
+25 create Player_1 TreeBufferOriginProbe 0 2100,1200,0
+30 tree-buffer-origin Player_1 TreeBufferOriginProbe 0
+200 tree-buffer-state Player_1 TreeBufferGrabber 0
+220 tree-buffer-ignite Player_1 - 0
+245 tree-buffer-state Player_1 TreeBufferGrabber 0
+260 tree-buffer-state Player_1 TreeBufferGrabber 0
