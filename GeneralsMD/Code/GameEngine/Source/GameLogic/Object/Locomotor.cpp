@@ -3359,21 +3359,19 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 		dirToApplyForce.x /= distToGoal;
 		dirToApplyForce.y /= distToGoal;
 		const Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
-		const HordeContain* formation = HordeContain::get(obj);
-		if (formation && formation->isAlternateFormation() && m_template->m_waitForFormation)
-		{
-			const Real radius = m_template->m_fastTurnRadius;
-			const Real rate = std::min(getMaxTurnRate(bdt), formation->getFormationWheelRate(radius));
-			physics->setTurning(rotateObjAroundLocoPivot(obj, goalPos, rate));
-			if (radius > 0.0f && fabs(relAngle) > rate)
-				desiredSpeed = std::min(desiredSpeed, rate * radius);
-			desiredSpeed *= std::max(0.0f, Cos(stdAngleDiff(desiredAngle, obj->getOrientation())));
-		}
-		else if (fabs(relAngle) > m_template->m_maxTurnWithoutReform && onPathDistToGoal > REFORM_MIN_DISTANCE)
+		if (fabs(relAngle) > m_template->m_maxTurnWithoutReform && onPathDistToGoal > REFORM_MIN_DISTANCE)
 		{
 			obj->setOrientation(desiredAngle);
 			physics->setTurning(TURN_NONE);
 			updateRetailTurnConditions(obj, 0.0f);
+			const Coord3D* vel = physics->getVelocity();
+			const Real speed2D = WWMath::SqrtfOrigin(vel->x * vel->x + vel->y * vel->y);
+			if (speed2D > 0.0f)
+			{
+				physics->scrubVelocity2D(0.0f);
+				Coord3D alignedVel{dirToApplyForce.x * speed2D, dirToApplyForce.y * speed2D, 0.0f};
+				physics->addVelocityTo(&alignedVel);
+			}
 		}
 		else if (m_template->m_turnWhileMoving)
 			physics->setTurning(rotateTowardsPosition(obj, goalPos));
@@ -3428,6 +3426,8 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 	updateRetailTurnConditions(obj, angle);
 	if (m_template->m_appearance == LOCO_HORDE && distance > 20.0f && fabs(angle) > m_template->m_maxTurnWithoutReform)
 	{
+		if (m_retailScalarSpeed > 0.0f)
+			m_retailScalarSpeed = 0.0f;
 		physics->scrubVelocity2D(0.0f);
 		turn = angle;
 		speed = 0.0f;
@@ -3443,6 +3443,13 @@ void Locomotor::moveCavalryForward(Object* obj, PhysicsBehavior* physics, const 
 		speed = std::min(speed, maxSpeed * toGoal / (2.0f * m_template->m_fastTurnRadius * lateral));
 		if (m_template->m_appearance == LOCO_HORDE && distance < PATHFIND_CELL_SIZE_F)
 			speed = std::min(speed, turnRate * toGoal / (2.0f * lateral));
+	}
+	if (m_template->m_appearance == LOCO_HORDE && obj->isKindOf(KINDOF_CAVALRY) &&
+		m_retailScalarSpeed <= maxSpeed * 0.25f)
+	{
+		if (const HordeContain* formation = HordeContain::get(obj);
+			formation && !formation->isHeadingAligned(obj->getOrientation()))
+			speed *= 0.1f;
 	}
 	steerVelocity(obj, physics, *obj->getUnitDirectionVector2D(), distance, speed);
 }

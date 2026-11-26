@@ -490,7 +490,7 @@ UpdateSleepTime HordeAIUpdate::update()
 		}
 #endif
 	}
-	else if (fabs(turn) > FORMATION_REFORM_ANGLE)
+	else if (fabs(turn) > (locomotor ? locomotor->getMaxTurnWithoutReform() : FORMATION_REFORM_ANGLE))
 	{
 		const_cast<HordeContain*>(contain)->reassignSlotsByPosition();
 	}

@@ -1,0 +1,26 @@
+200 create Player_1 KnightHordeTurnHorde 0 3450,2000,0
+210 select Player_1 KnightHordeTurnHorde 0
+211 move Player_1 KnightHordeTurnHorde 0 - 3750 2000
+240 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+260 select Player_1 KnightHordeTurnHorde 0
+261 move Player_1 KnightHordeTurnHorde 0 - 3650 2300
+262 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+265 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+270 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+280 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+300 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+330 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+360 select Player_1 KnightHordeTurnHorde 0
+361 move Player_1 KnightHordeTurnHorde 0 - 3650 1900
+362 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+363 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+364 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+365 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+366 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+367 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+368 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+370 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+375 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+390 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+440 knight-turn-probe Player_1 KnightHordeTurnHorde 0
+540 knight-turn-probe Player_1 KnightHordeTurnHorde 0

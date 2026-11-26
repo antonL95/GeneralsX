@@ -135,7 +135,7 @@ HordeContainModuleData::HordeContainModuleData()
 	m_leaderRank = 0;
 	m_splitHordeNumber = 0;
 	m_forcedLocomotorSet = -1;
-	m_bannerCarrierMinLevel = 2;
+	m_bannerCarrierMinLevel = 1;
 	m_showPips = FALSE;
 	m_thisFormationIsTheMainFormation = FALSE;
 	m_bannerCarrierDestroyHordeOnDeath = FALSE;
@@ -1109,7 +1109,7 @@ void HordeContain::onRankAdvanced(Int rank, Bool feedback)
 {
 	const auto* data = getHordeContainModuleData();
 	if (RetailFileLayers::enabled() && m_payloadCreated && getContainCount() > 0 && !m_bannerRespawnFrame &&
-		rank >= data->m_bannerCarrierMinLevel)
+		rank > data->m_bannerCarrierMinLevel)
 		addBannerCarrier(feedback);
 }
 
@@ -2017,7 +2017,7 @@ void HordeContain::setAlternateFormation(Bool alternate)
 	m_slotMembers.swap(members);
 	m_slotOffsets.swap(offsets);
 	rebuildMemberSlots();
-	if (RetailFileLayers::enabled() && alternate)
+	if (RetailFileLayers::enabled())
 		reassignSlotsByPosition();
 	else
 		for (Object* member : getContainList())
