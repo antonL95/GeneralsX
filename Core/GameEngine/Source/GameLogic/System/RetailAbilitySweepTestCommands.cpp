@@ -278,7 +278,7 @@ void grantRequirements(Object* caster, const CommandButton* button)
 		player->grantScience(power->getRequiredScience());
 }
 
-void grantCommandSetUpgrades(Object* caster)
+void grantCommandSetUpgrades(Object* caster, const char* wantedButton)
 {
 	const CommandSet* set = TheControlBar->findCommandSet(caster->getCommandSetString());
 	for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
@@ -289,6 +289,8 @@ void grantCommandSetUpgrades(Object* caster)
 			grantRequirements(caster, button);
 			if (!caster->hasUpgrade(button->getUpgradeTemplate()))
 				caster->giveUpgrade(button->getUpgradeTemplate());
+			if (findInCommandSet(caster, wantedButton))
+				return;
 		}
 	}
 }
@@ -305,6 +307,17 @@ const CommandButton* findSamePower(const Object* caster, const char* name)
 		if (button && button->getSpecialPowerTemplate() == wanted->getSpecialPowerTemplate())
 			return button;
 	}
+	const CommandSet* base = TheControlBar->findCommandSet(caster->getTemplate()->friend_getCommandSetString());
+	if (base && set && base != set)
+		for (Int slot = 0; slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+		{
+			if (base->getCommandButton(slot) != wanted)
+				continue;
+			const CommandButton* replacement = set->getCommandButton(slot);
+			if (replacement && replacement->getSpecialPowerTemplate() &&
+				replacement->getSpecialPowerTemplate()->getSpecialPowerType() == wanted->getSpecialPowerTemplate()->getSpecialPowerType())
+				return replacement;
+		}
 	return nullptr;
 }
 
@@ -322,7 +335,7 @@ void prepare(const RetailTestCommands::Context& ctx)
 	}
 	if (!button)
 	{
-		grantCommandSetUpgrades(caster);
+		grantCommandSetUpgrades(caster, ctx.argument);
 		button = findInCommandSet(caster, ctx.argument);
 	}
 	if (!button)
@@ -487,6 +500,7 @@ std::string aim(Object* caster, const CommandButton* pending)
 	const Object* enemy = TheGameLogic->findObjectByID(s_case.actors[ENEMY].id);
 	const Object* filtered = nullptr;
 	if (!target && power && power->hasRetailFlag(SpecialPowerTemplate::RETAIL_NEEDS_OBJECT_FILTER))
+	{
 		for (const Int candidate : { ENEMY, STRUCTURE, HERO, CAPTURE, ALLY })
 			if (const Object* object = TheGameLogic->findObjectByID(s_case.actors[candidate].id);
 				object && power->getObjectFilter().matchesObject(caster, object))
@@ -494,6 +508,9 @@ std::string aim(Object* caster, const CommandButton* pending)
 				filtered = object;
 				break;
 			}
+		if (!filtered)
+			return "rejected:no_valid_target";
+	}
 	const Coord3D point = target ? *target->getPosition() : filtered ? *filtered->getPosition() :
 		enemy ? *enemy->getPosition() : *caster->getPosition();
 	GameMessage* message = nullptr;

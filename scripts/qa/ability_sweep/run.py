@@ -14,7 +14,7 @@ PLAYTEST = runpy.run_path(str(ROOT.parent / "playtest" / "run.py"))
 
 OWNER = "Player_1"
 DUMMIES = "AbilitySweepInfantry,AbilitySweepInfantry,AbilitySweepStructure,PlyrCreeps"
-LANES = ((3090, 535), (3150, 690), (2260, 1180), (2520, 1010))
+LANES = ((2260, 1180), (2520, 1010), (2260, 1010), (2390, 1095))
 FIRST_FRAME = 44
 WATCH_FRAMES = 600
 PREPARE_AT = 3
