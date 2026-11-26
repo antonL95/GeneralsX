@@ -1,0 +1,62 @@
+210 fortress-horn-ally Player_1 FortressHornTarget 0 on
+210 create Player_1 DwarvenFortressCitadel 0 2700,2200,0
+210 create Player_1 FortressHornTarget 0 2800,2200,0
+210 create PlyrCivilian FortressHornTarget 0 2700,2300,0
+210 create PlyrCreeps FortressHornTarget 0 2600,2200,0
+210 create PlyrCreeps FortressHornTarget 1 2400,2200,0
+210 create Player_1 MirkwoodCitadel 0 1600,2200,0
+210 create Player_1 FortressHornTarget 1 1700,2200,0
+210 create PlyrCivilian FortressHornTarget 1 1600,2300,0
+210 create PlyrCreeps FortressHornTarget 2 1500,2200,0
+210 create PlyrCreeps FortressHornTarget 3 1250,2200,0
+211 objupgrade Player_1 DwarvenFortressCitadel 0 Upgrade_HobbitErebor
+211 objupgrade Player_1 DwarvenFortressCitadel 0 Upgrade_DwarvenHornsoftheGate
+211 objupgrade Player_1 MirkwoodCitadel 0 Upgrade_MirkwoodFortressOromeTribute
+225 power Player_1 DwarvenFortressCitadel 0 SpecialAbilityFortressHornOfErebor
+235 power Player_1 MirkwoodCitadel 0 SpecialAbilityFortressHornOfErebor
+230 fortress-horn-probe Player_1 FortressHornTarget 0 BoromirGondorHornAntiCategory
+230 fortress-horn-probe PlyrCivilian FortressHornTarget 0 BoromirGondorHornAntiCategory
+230 fortress-horn-probe PlyrCreeps FortressHornTarget 0 BoromirGondorHornAntiCategory
+230 fortress-horn-probe PlyrCreeps FortressHornTarget 1 BoromirGondorHornAntiCategory
+240 fortress-horn-probe Player_1 FortressHornTarget 1 HornOfTauronDebuff
+240 fortress-horn-probe PlyrCivilian FortressHornTarget 1 HornOfTauronDebuff
+240 fortress-horn-probe PlyrCreeps FortressHornTarget 2 HornOfTauronDebuff
+240 fortress-horn-probe PlyrCreeps FortressHornTarget 3 HornOfTauronDebuff
+244 fortress-horn-probe Player_1 FortressHornTarget 0 BoromirGondorHornAntiCategory
+244 fortress-horn-probe PlyrCivilian FortressHornTarget 0 BoromirGondorHornAntiCategory
+244 fortress-horn-probe PlyrCreeps FortressHornTarget 0 BoromirGondorHornAntiCategory
+244 fortress-horn-probe PlyrCreeps FortressHornTarget 1 BoromirGondorHornAntiCategory
+244 fortress-horn-probe Player_1 FortressHornTarget 1 HornOfTauronDebuff
+244 fortress-horn-probe PlyrCivilian FortressHornTarget 1 HornOfTauronDebuff
+244 fortress-horn-probe PlyrCreeps FortressHornTarget 2 HornOfTauronDebuff
+244 fortress-horn-probe PlyrCreeps FortressHornTarget 3 HornOfTauronDebuff
+400 fortress-horn-probe Player_1 FortressHornTarget 0 BoromirGondorHornAntiCategory
+400 fortress-horn-probe PlyrCivilian FortressHornTarget 0 BoromirGondorHornAntiCategory
+400 fortress-horn-probe PlyrCreeps FortressHornTarget 0 BoromirGondorHornAntiCategory
+400 fortress-horn-probe PlyrCreeps FortressHornTarget 1 BoromirGondorHornAntiCategory
+850 fortress-horn-probe Player_1 FortressHornTarget 1 HornOfTauronDebuff
+850 fortress-horn-probe PlyrCivilian FortressHornTarget 1 HornOfTauronDebuff
+850 fortress-horn-probe PlyrCreeps FortressHornTarget 2 HornOfTauronDebuff
+850 fortress-horn-probe PlyrCreeps FortressHornTarget 3 HornOfTauronDebuff
+224 ability Player_1 DwarvenFortressCitadel 0
+230 ability Player_1 DwarvenFortressCitadel 0
+240 ability Player_1 MirkwoodCitadel 0
+260 ability Player_1 DwarvenFortressCitadel 0
+260 ability Player_1 MirkwoodCitadel 0
+255 fortress-horn-probe Player_1 FortressHornTarget 1 HornOfTauronDebuff
+255 fortress-horn-probe PlyrCivilian FortressHornTarget 1 HornOfTauronDebuff
+255 fortress-horn-probe PlyrCreeps FortressHornTarget 2 HornOfTauronDebuff
+255 fortress-horn-probe PlyrCreeps FortressHornTarget 3 HornOfTauronDebuff
+244 fortress-horn-caster Player_1 DwarvenFortressCitadel 0 SpecialAbilityFortressHornOfErebor
+255 fortress-horn-caster Player_1 MirkwoodCitadel 0 SpecialAbilityFortressHornOfErebor
+860 fortress-horn-ally Player_1 FortressHornTarget 0 off
+861 destroy Player_1 DwarvenFortressCitadel 0
+861 destroy Player_1 MirkwoodCitadel 0
+861 destroy Player_1 FortressHornTarget 1
+861 destroy Player_1 FortressHornTarget 0
+861 destroy PlyrCivilian FortressHornTarget 1
+861 destroy PlyrCivilian FortressHornTarget 0
+861 destroy PlyrCreeps FortressHornTarget 3
+861 destroy PlyrCreeps FortressHornTarget 2
+861 destroy PlyrCreeps FortressHornTarget 1
+861 destroy PlyrCreeps FortressHornTarget 0
