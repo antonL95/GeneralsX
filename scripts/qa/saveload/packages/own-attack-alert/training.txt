@@ -1,6 +1,8 @@
 220 create Player_1 OwnAttackAlertCaster 0 2511,451,0
 220 create Player_1 OwnAttackAlertVictim 0 2605,455,0
+220 create Player_1 OwnAttackAlertFriendlyCaster 0 2520,480,0
 230 own-attack-cast Player_1 OwnAttackAlertCaster 0 - 2605 455
+250 own-attack-cast Player_1 OwnAttackAlertFriendlyCaster 0 - 2605 455
 320 own-attack-probe Player_1 OwnAttackAlertVictim 0 own
 330 create PlyrCreeps OwnAttackAlertStatusEnemy 0 2690,455,0
 335 attack PlyrCreeps OwnAttackAlertStatusEnemy 0 Player_1:OwnAttackAlertVictim:0

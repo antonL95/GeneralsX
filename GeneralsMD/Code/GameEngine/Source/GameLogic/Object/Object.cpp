@@ -2337,7 +2337,6 @@ ObjectShroudStatus Object::getShroudedStatus(Int playerIndex) const
 void Object::attemptDamage( DamageInfo *damageInfo )
 {
 	BodyModuleInterface* body = getBodyModule();
-	const Real healthBeforeDamage = body ? body->getHealth() : 0.0f;
 	const Bool retail = RetailFileLayers::enabled();
 	const Object* anchor = retail && body ? HordeContain::getAnchor(this) : nullptr;
 	const ObjectID anchorID = anchor ? anchor->getID() : INVALID_ID;
@@ -2411,14 +2410,12 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 	// to do radar events for DAMAGE_PENALTY as that damage type is a type of damage
 	// that occurs with explicit player knowledge
 	//
-	const Object* attackSource = TheGameLogic->findObjectByID(damageInfo->in.m_sourceID);
-	if( body && body->getHealth() < healthBeforeDamage &&
-			damageInfo->out.m_actualDamageDealt > 0.0f &&
-			attackSource && getRelationship(attackSource) == ENEMIES &&
+	if( damageInfo->out.m_actualDamageDealt > 0.0f &&
 			damageInfo->shouldPlayUnderAttackEvaEvent &&
 			damageInfo->in.m_damageType != DAMAGE_PENALTY &&
 			damageInfo->in.m_damageType != DAMAGE_HEALING &&
 			getControllingPlayer() &&
+			!BitIsSet(damageInfo->in.m_sourcePlayerMask, getControllingPlayer()->getPlayerMask()) &&
 			!isKindOf( KINDOF_NO_ATTACK_WARNING ) )
 	{
 		if (RetailFileLayers::enabled() && !isKindOf(KINDOF_INERT))
