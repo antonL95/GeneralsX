@@ -8,6 +8,8 @@
 #include "Common/Money.h"
 #include "Common/Player.h"
 #include "Common/SpecialPower.h"
+#include "Common/ThingTemplate.h"
+#include "GameClient/Drawable.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
@@ -53,6 +55,14 @@ void handleTreeDepletion(const RetailTestCommands::Context& ctx)
 	if (ctx.action == "tree-depletion-devastate")
 	{
 		castDevastation(ctx);
+		return;
+	}
+	if (ctx.action == "tree-depletion-selectable")
+	{
+		if (const Object* object = ctx.requireObject())
+			std::fprintf(stderr, "TEST tree-depletion selectable frame=%u %s object=%d drawable=%d\n", ctx.frame,
+				object->getTemplate()->getName().str(), object->isSelectable(),
+				object->getDrawable() && object->getDrawable()->isSelectable());
 		return;
 	}
 	Coord3D tree;

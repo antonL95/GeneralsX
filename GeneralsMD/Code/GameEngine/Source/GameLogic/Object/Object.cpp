@@ -3569,6 +3569,9 @@ Bool Object::isSelectable() const
 //						);
 
 
+	if (RetailFileLayers::enabled() && isKindOf(KINDOF_TREE) && isKindOf(KINDOF_SHRUBBERY))
+		return FALSE;
+
 	if (getTemplate()->isKindOf(KINDOF_ALWAYS_SELECTABLE))
     return TRUE;
 

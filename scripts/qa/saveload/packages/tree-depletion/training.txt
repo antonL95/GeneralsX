@@ -195,3 +195,8 @@
 790 tree-depletion-state PlyrCreeps - 0 6 1824 41
 790 tree-depletion-state PlyrCreeps - 0 7 1890 39
 300 tree-depletion-devastate PlyrCreeps TreeDepletionDevastator 0 - 1850 45
+15 create PlyrCreeps TreeLothlorienBase08 0 1850,350,0
+260 tree-depletion-selectable PlyrCreeps TreeLothlorienBase08 0
+260 tree-depletion-selectable PlyrCreeps TreeDepletionMill 0
+800 tree-depletion-selectable PlyrCreeps TreeLothlorienBase08 0
+800 tree-depletion-selectable PlyrCreeps TreeDepletionMill 0

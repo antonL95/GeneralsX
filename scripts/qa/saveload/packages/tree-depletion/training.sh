@@ -16,6 +16,12 @@ check() {
     expect_tree 910 3 2 1
     expect_tree 990 3 0 0
     expect_tree 1430 0 1 1
+    for frame in 260 800; do
+        if covers "$frame"; then
+            expect "TEST tree-depletion selectable frame=$frame TreeLothlorienBase08 object=0 drawable=0"
+            expect "TEST tree-depletion selectable frame=$frame TreeDepletionMill object=1 drawable=1"
+        fi
+    done
     expect_tree 290 5 90 0
     expect_tree 330 5 0 0
     expect_tree 330 6 0 0
