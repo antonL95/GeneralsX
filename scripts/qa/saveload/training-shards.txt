@@ -131,3 +131,4 @@
 3 hc-combat-flanking-armor
 3 map-script-special-powers
 3 hc-stances-melee
+3 hc-crush-knockback

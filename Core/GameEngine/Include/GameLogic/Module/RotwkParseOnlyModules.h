@@ -58,16 +58,19 @@ public:
 	const LargeGroupAudioUpdateModuleData* audioData() const { return getLargeGroupAudioUpdateModuleData(); }
 };
 
-struct HordeNotifyTargetsOfImminentProbableCrushingUpdateModuleData : public UpdateModuleData
+struct CrushWarningModuleData : public UpdateModuleData
 {
-	Real m_scanWidth = 0.0f;
+	UnsignedInt m_updateFrames = 2 * LOGICFRAMES_PER_SECOND;
+	UnsignedInt m_scanAheadFrames = 2 * LOGICFRAMES_PER_SECOND;
+	Real m_scanHeight = -1.0f;
+	Real m_scanWidth = -1.0f;
 	static void buildFieldParse(MultiIniFieldParse& p);
 };
 
 class HordeNotifyTargetsOfImminentProbableCrushingUpdate final : public UpdateModule
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(HordeNotifyTargetsOfImminentProbableCrushingUpdate, "HordeNotifyTargetsOfImminentProbableCrushingUpdate")
-	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(HordeNotifyTargetsOfImminentProbableCrushingUpdate, HordeNotifyTargetsOfImminentProbableCrushingUpdateModuleData)
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(HordeNotifyTargetsOfImminentProbableCrushingUpdate, CrushWarningModuleData)
 
 public:
 	HordeNotifyTargetsOfImminentProbableCrushingUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}
@@ -77,7 +80,7 @@ public:
 class NotifyTargetsOfImminentProbableCrushingUpdate final : public UpdateModule
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(NotifyTargetsOfImminentProbableCrushingUpdate, "NotifyTargetsOfImminentProbableCrushingUpdate")
-	MAKE_STANDARD_MODULE_MACRO(NotifyTargetsOfImminentProbableCrushingUpdate)
+	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA(NotifyTargetsOfImminentProbableCrushingUpdate, CrushWarningModuleData)
 
 public:
 	NotifyTargetsOfImminentProbableCrushingUpdate(Thing* thing, const ModuleData* data) : UpdateModule(thing, data) {}

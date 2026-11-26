@@ -12,7 +12,9 @@ struct AODCrushCollideModuleData : public CollideModuleData
 	const FXList* m_smallFX = nullptr;
 	const FXList* m_mediumFX = nullptr;
 	const FXList* m_largeFX = nullptr;
+	const ObjectCreationList* m_smallOCL = nullptr;
 	const ObjectCreationList* m_mediumOCL = nullptr;
+	const ObjectCreationList* m_largeOCL = nullptr;
 	SpecialPowerObjectFilter m_specialObject{.m_rules = SpecialPowerObjectFilter::RULE_NONE};
 	Real m_damage = 0.0f;
 	Real m_specialDamage = 0.0f;

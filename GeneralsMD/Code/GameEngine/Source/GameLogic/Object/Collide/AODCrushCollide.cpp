@@ -21,7 +21,9 @@ void AODCrushCollideModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "SmallFXList", INI::parseFXList, nullptr, offsetof(AODCrushCollideModuleData, m_smallFX) },
 		{ "MediumFXList", INI::parseFXList, nullptr, offsetof(AODCrushCollideModuleData, m_mediumFX) },
 		{ "LargeFXList", INI::parseFXList, nullptr, offsetof(AODCrushCollideModuleData, m_largeFX) },
+		{ "SmallObjectCreationList", INI::parseObjectCreationList, nullptr, offsetof(AODCrushCollideModuleData, m_smallOCL) },
 		{ "MediumObjectCreationList", INI::parseObjectCreationList, nullptr, offsetof(AODCrushCollideModuleData, m_mediumOCL) },
+		{ "LargeObjectCreationList", INI::parseObjectCreationList, nullptr, offsetof(AODCrushCollideModuleData, m_largeOCL) },
 		{ "SpecialObject", SpecialPowerObjectFilter::parse, nullptr, offsetof(AODCrushCollideModuleData, m_specialObject) },
 		{ "Damage", INI::parseReal, nullptr, offsetof(AODCrushCollideModuleData, m_damage) },
 		{ "SpecialDamage", INI::parseReal, nullptr, offsetof(AODCrushCollideModuleData, m_specialDamage) },
@@ -39,6 +41,13 @@ void AODCrushCollideModuleData::buildFieldParse(MultiIniFieldParse& p)
 
 namespace
 {
+enum DeadContactSize
+{
+	DEAD_CONTACT_SMALL,
+	DEAD_CONTACT_MEDIUM,
+	DEAD_CONTACT_LARGE
+};
+
 void dealContactDamage(Object* source, Object* victim, Real amount, DamageType type, DeathType death)
 {
 	DamageInfo info;
@@ -73,11 +82,11 @@ void AODCrushCollide::onCollide(Object* other, const Coord3D*, const Coord3D*)
 	if (special && data->m_selfDamage > 0.0f)
 		dealContactDamage(other, self, data->m_selfDamage, data->m_selfDamageType, data->m_selfDeathType);
 
-	const Bool large = other->isKindOf(KINDOF_STRUCTURE);
-	const Bool small = other->getGeometryInfo().getIsSmall();
-	FXList::doFXObj(large ? data->m_largeFX : small ? data->m_smallFX : data->m_mediumFX, other, self);
-	if (!large && !small)
-		ObjectCreationList::create(data->m_mediumOCL, other, self);
+	const Byte authoredSize = other->getTemplate()->getRotWKObjectData().deadCollideSize;
+	const Bool medium = authoredSize == DEAD_CONTACT_MEDIUM;
+	const Bool large = authoredSize == DEAD_CONTACT_LARGE;
+	FXList::doFXObj(large ? data->m_largeFX : medium ? data->m_mediumFX : data->m_smallFX, other, self);
+	ObjectCreationList::create(large ? data->m_largeOCL : medium ? data->m_mediumOCL : data->m_smallOCL, other, self);
 }
 
 AODCrushCollide::~AODCrushCollide() = default;

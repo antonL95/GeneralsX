@@ -16,7 +16,9 @@
 #include "GameLogic/Object.h"
 #if !RTS_GENERALS
 #include "Common/Player.h"
+#include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "Common/ThingTemplate.h"
 #include "GameLogic/AttributeModifierStore.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -447,11 +449,14 @@ void OathbreakersFadeAwayBehavior::loadPostProcess() { UpdateModule::loadPostPro
 #endif
 
 #if !RTS_GENERALS
-void HordeNotifyTargetsOfImminentProbableCrushingUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
+void CrushWarningModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
 	static const FieldParse fields[] =
 	{
-		{ "ScanWidth", INI::parseReal, nullptr, offsetof(HordeNotifyTargetsOfImminentProbableCrushingUpdateModuleData, m_scanWidth) },
+		{ "TimeBetweenUpdatesMS", INI::parseDurationUnsignedInt, nullptr, offsetof(CrushWarningModuleData, m_updateFrames) },
+		{ "ScanAheadTimeMS", INI::parseDurationUnsignedInt, nullptr, offsetof(CrushWarningModuleData, m_scanAheadFrames) },
+		{ "ScanHeight", INI::parseReal, nullptr, offsetof(CrushWarningModuleData, m_scanHeight) },
+		{ "ScanWidth", INI::parseReal, nullptr, offsetof(CrushWarningModuleData, m_scanWidth) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	UpdateModuleData::buildFieldParse(p);
@@ -460,7 +465,8 @@ void HordeNotifyTargetsOfImminentProbableCrushingUpdateModuleData::buildFieldPar
 
 namespace
 {
-constexpr UnsignedInt crushScanFrames = 10;
+constexpr UnsignedInt crushBraceFrames = 20;
+constexpr UnsignedInt framesPerCrushTick = LOGICFRAMES_PER_SECOND / RotwkDuration::FRAMES_PER_SECOND;
 
 struct CrushWarningTarget
 {
@@ -468,50 +474,52 @@ struct CrushWarningTarget
 	Real distance = 0.0f;
 };
 
-void warnCrushTargets(const Object* crusher, Real scanWidth, CrushWarningTarget& nearest)
+Bool warnCrushTargets(const Object* crusher, const CrushWarningModuleData& data, CrushWarningTarget& nearest, UpdateSleepTime& sleep)
 {
+	const Int ticks = data.m_updateFrames / framesPerCrushTick;
+	const Int delay = GameLogicRandomValue(ticks, ticks * 3 / 2) * framesPerCrushTick;
+	sleep = UPDATE_SLEEP(std::max(1, delay));
 	const auto* physics = crusher->getPhysics();
 	if (!physics || physics->getIsStunned() || crusher->isEffectivelyDead() || crusher->isAirborneTarget())
-		return;
+		return FALSE;
+	if (crusher->getCrusherLevel() + AttributeModifiers::value(crusher, AttributeModifierRules::CRUSHER_LEVEL) <= 0.0f)
+		return FALSE;
 
 	const Coord3D& velocity = *physics->getVelocity();
 	const Real speed = WWMath::SqrtfOrigin(velocity.x * velocity.x + velocity.y * velocity.y);
 	const auto* ai = crusher->getAI();
 	const Real threshold = crusher->getTemplate()->getRotWKObjectData().minCrushVelocityPercent *
 		AttributeModifiers::value(crusher, AttributeModifierRules::MINIMUM_CRUSH_VELOCITY);
-	const Real ahead = speed * crushScanFrames;
+	const Real ahead = speed * data.m_scanAheadFrames;
 	if (ahead < 1.0f || (ai && speed < threshold * ai->getCurLocomotorSpeed()))
-		return;
+		return FALSE;
 
 	const auto& geometry = crusher->getGeometryInfo();
-	const Real halfWidth = scanWidth > 0.0f ? scanWidth * 0.5f : geometry.getBoundingCircleRadius();
-	const Real halfLength = ahead * 0.5f + geometry.getBoundingCircleRadius();
-	const Real dirX = velocity.x / speed;
-	const Real dirY = velocity.y / speed;
+	const Real angle = WWMath::Atan2Origin(velocity.y, velocity.x);
+	Region2D bounds;
+	geometry.get2DBounds({}, crusher->getOrientation() - angle, bounds);
+	const Real width = data.m_scanWidth > 0.0f ? data.m_scanWidth : bounds.hi.y - bounds.lo.y;
+	const Real height = data.m_scanHeight > 0.0f ? data.m_scanHeight : 3.0f * geometry.getMaxHeightAbovePosition();
+	const Real length = ahead + bounds.hi.x - bounds.lo.x;
+	const GeometryInfo corridor(GEOMETRY_BOX, FALSE, height, length * 0.5f, width * 0.5f);
 	const Coord3D& start = *crusher->getPosition();
-	const Coord3D center = { start.x + dirX * ahead * 0.5f, start.y + dirY * ahead * 0.5f, start.z };
-	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(&center,
-		WWMath::SqrtfOrigin(halfLength * halfLength + halfWidth * halfWidth), FROM_BOUNDINGSPHERE_2D);
+	const Real halfTime = data.m_scanAheadFrames * 0.5f;
+	const Coord3D center = {start.x + velocity.x * halfTime, start.y + velocity.y * halfTime,
+		start.z + velocity.z * halfTime - height / 3.0f};
+	SimpleObjectIterator* iter = ThePartitionManager->iteratePotentialCollisions(&center, corridor, angle);
 	MemoryPoolObjectHolder holder(iter);
 	for (Object* victim = iter->first(); victim; victim = iter->next())
 	{
 		auto* victimAI = victim->getAI();
 		if (victim == crusher || !victimAI || !crusher->canCrushOrSquish(victim))
 			continue;
-		const Real dx = victim->getPosition()->x - center.x;
-		const Real dy = victim->getPosition()->y - center.y;
-		const Real along = dx * dirX + dy * dirY;
-		const Real across = dx * dirY - dy * dirX;
-		const auto& victimGeometry = victim->getGeometryInfo();
-		const Real radius = victimGeometry.getBoundingCircleRadius();
-		const Real dz = victim->getPosition()->z - start.z;
-		const Real distance = along + ahead * 0.5f;
-		if (distance <= 0.0f || std::abs(along) > halfLength + radius ||
-			std::abs(across) > halfWidth + radius || dz > geometry.getMaxHeightAbovePosition() ||
-			dz < -victimGeometry.getMaxHeightAbovePosition())
+		const Real dx = victim->getPosition()->x - start.x;
+		const Real dy = victim->getPosition()->y - start.y;
+		const Real distance = (dx * velocity.x + dy * velocity.y) / speed;
+		if (distance <= 0.0f)
 			continue;
 		if (!EmotionTrackerUpdate::signal(victim, EMOTION_BRACE, crusher))
-			victimAI->braceForCrush(TheGameLogic->getFrame() + 2 * crushScanFrames);
+			victimAI->braceForCrush(TheGameLogic->getFrame() + crushBraceFrames);
 		if (!nearest.object || distance < nearest.distance ||
 			(distance == nearest.distance && victim->getID() < nearest.object->getID()))
 			nearest = { victim, distance };
@@ -520,6 +528,7 @@ void warnCrushTargets(const Object* crusher, Real scanWidth, CrushWarningTarget&
 				TheGameLogic->getFrame(), unsigned(crusher->getID()), crusher->getTemplate()->getName().str(),
 				unsigned(victim->getID()), victim->getTemplate()->getName().str());
 	}
+	return TRUE;
 }
 }
 
@@ -530,13 +539,22 @@ UpdateSleepTime HordeNotifyTargetsOfImminentProbableCrushingUpdate::update()
 	const HordeContain* horde = HordeContain::get(getObject());
 	if (!horde)
 		return UPDATE_SLEEP_FOREVER;
-	const Real width = getHordeNotifyTargetsOfImminentProbableCrushingUpdateModuleData()->m_scanWidth;
+	const auto& data = *getCrushWarningModuleData();
+	const auto& contents = *horde->getContainedItemsList();
+	std::vector<const Object*> members(contents.begin(), contents.end());
+	const Coord3D& origin = *getObject()->getPosition();
+	std::stable_sort(members.begin(), members.end(), [&](const Object* a, const Object* b) {
+		return ThePartitionManager->getDistanceSquared(a, &origin, FROM_CENTER_2D) <
+			ThePartitionManager->getDistanceSquared(b, &origin, FROM_CENTER_2D);
+	});
 	CrushWarningTarget nearest;
-	for (const Object* member : *horde->getContainedItemsList())
-		warnCrushTargets(member, width, nearest);
+	UpdateSleepTime sleep = UPDATE_SLEEP(std::max(1u, data.m_updateFrames));
+	for (const Object* member : members)
+		if (warnCrushTargets(member, data, nearest, sleep))
+			break;
 	if (nearest.object)
 		EmotionTrackerUpdate::signal(getObject(), EMOTION_PRE_CRUSH, nearest.object);
-	return UPDATE_SLEEP(crushScanFrames);
+	return sleep;
 }
 
 UpdateSleepTime NotifyTargetsOfImminentProbableCrushingUpdate::update()
@@ -544,10 +562,11 @@ UpdateSleepTime NotifyTargetsOfImminentProbableCrushingUpdate::update()
 	if (!RetailFileLayers::enabled())
 		return UPDATE_SLEEP_FOREVER;
 	CrushWarningTarget nearest;
-	warnCrushTargets(getObject(), 0.0f, nearest);
+	UpdateSleepTime sleep;
+	warnCrushTargets(getObject(), *getCrushWarningModuleData(), nearest, sleep);
 	if (nearest.object)
 		EmotionTrackerUpdate::signal(getObject(), EMOTION_PRE_CRUSH, nearest.object);
-	return UPDATE_SLEEP(crushScanFrames);
+	return sleep;
 }
 #endif
 

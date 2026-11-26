@@ -1,0 +1,33 @@
+228 create Player_1 CrushCoverageScanner 0 2900,1900,0
+228 create PlyrCreeps CrushCoverageVictim 0 2936,1900,180
+228 create PlyrCreeps CrushCoverageVictim 0 2936,1924,180
+228 create PlyrCreeps CrushCoverageVictim 0 2980,1900,180
+228 create Player_1 CrushCoverageContact 0 2870,1920,0
+228 create PlyrCreeps CrushCoverageUnit 0 2880,1970,0
+228 create PlyrCreeps CrushCoverageMedium 0 2890,1970,0
+228 create PlyrCreeps CrushCoverageLarge 0 2900,1970,0
+240 crush-knockback-scan Player_1 CrushCoverageScanner 0
+240 crush-knockback-brace PlyrCreeps CrushCoverageVictim 0 ahead
+240 crush-knockback-brace PlyrCreeps CrushCoverageVictim 1 sideways
+240 crush-knockback-brace PlyrCreeps CrushCoverageVictim 2 beyond
+242 crush-knockback-contact Player_1 CrushCoverageContact 0 PlyrCreeps:CrushCoverageUnit:0
+243 crush-knockback-marker * CrushCoverageSmallMarker 0
+243 crush-knockback-marker * CrushCoverageMediumMarker 0
+243 crush-knockback-marker * CrushCoverageLargeMarker 0
+247 crush-knockback-marker * CrushCoverageSmallMarker 0
+248 crush-knockback-contact Player_1 CrushCoverageContact 0 PlyrCreeps:CrushCoverageMedium:0
+249 crush-knockback-marker * CrushCoverageMediumMarker 0
+249 crush-knockback-marker * CrushCoverageLargeMarker 0
+250 crush-knockback-contact Player_1 CrushCoverageContact 0 PlyrCreeps:CrushCoverageLarge:0
+251 crush-knockback-marker * CrushCoverageLargeMarker 0
+254 destroy * CrushCoverageSmallMarker 0
+254 destroy * CrushCoverageMediumMarker 0
+254 destroy * CrushCoverageLargeMarker 0
+254 destroy Player_1 CrushCoverageScanner 0
+254 destroy Player_1 CrushCoverageContact 0
+254 destroy PlyrCreeps CrushCoverageVictim 2
+254 destroy PlyrCreeps CrushCoverageVictim 1
+254 destroy PlyrCreeps CrushCoverageVictim 0
+254 destroy PlyrCreeps CrushCoverageUnit 0
+254 destroy PlyrCreeps CrushCoverageMedium 0
+254 destroy PlyrCreeps CrushCoverageLarge 0
