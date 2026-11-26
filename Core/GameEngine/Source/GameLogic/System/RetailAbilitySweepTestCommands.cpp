@@ -27,6 +27,7 @@
 #include "GameLogic/Module/AttributeModifierHelper.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
@@ -182,6 +183,9 @@ Object* createActor(const char* templateName, Player* player, Real x, Real y)
 	Coord3D position;
 	position.set(x, y, TheTerrainLogic->getGroundHeight(x, y));
 	object->setPosition(&position);
+	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+		if (CreateModuleInterface* create = (*module)->getCreate())
+			create->onBuildComplete();
 	return object;
 }
 

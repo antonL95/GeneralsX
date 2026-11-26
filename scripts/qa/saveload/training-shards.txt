@@ -104,3 +104,4 @@
 3 giant-bird-swoop
 3 attack-move-resume
 3 power-targets
+3 smaug-levels

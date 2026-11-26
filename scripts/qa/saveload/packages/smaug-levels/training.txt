@@ -1,0 +1,14 @@
+225 smaug-levels-build Player_1 WildSmaug 0 - 2100 2560
+225 create PlyrCreeps MordorFighter2 0 2150,2560,0
+226 reveal Player_1 WildSmaug 0
+
+235 smaug-levels-probe Player_1 WildSmaug 0 Command_DrogothWingBlast,PlyrCreeps:MordorFighter2:0 2340 1180
+235 smaug-levels-probe Player_1 WildSmaug 0 Command_DrogothFireflight,PlyrCreeps:MordorFighter2:0
+244 smaug-levels-probe Player_1 WildSmaug 0 Command_DrogothWingBlast,PlyrCreeps:MordorFighter2:0 2340 1180
+244 smaug-levels-probe Player_1 WildSmaug 0 Command_DrogothFireflight,PlyrCreeps:MordorFighter2:0
+250 smaug-levels-cast Player_1 WildSmaug 0 Command_DrogothWingBlast,PlyrCreeps:MordorFighter2:0 2340 1180
+395 create PlyrCreeps MordorFighter2 0 2150,2560,0
+
+400 smaug-levels-cast Player_1 WildSmaug 0 Command_DrogothFireflight,PlyrCreeps:MordorFighter2:0
+600 destroy Player_1 WildSmaug 0
+600 destroy PlyrCreeps MordorFighter2 0
