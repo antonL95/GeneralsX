@@ -7,6 +7,7 @@ class AsciiString;
 class GameWindow;
 class INI;
 class Image;
+class Object;
 class ThingTemplate;
 class UnicodeString;
 
@@ -22,6 +23,12 @@ Bool showTooltip(Int x, Int y);
 Bool hasHeroSlot(ObjectID id);
 Bool selectHeroSlot(ObjectID id);
 Bool selectAllHeroes();
+void dump(UnsignedInt frame);
+}
+
+namespace RetailWorldHover
+{
+Bool showHelpBox(const Object &object, const UnicodeString &name, const AsciiString &descriptionLabel);
 }
 
 namespace RetailEdges

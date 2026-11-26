@@ -29,7 +29,9 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <string>
 
 #include "Common/Debug.h"
@@ -961,7 +963,7 @@ void Mouse::setRetailWorldTooltip(const UnicodeString& tooltip)
 	m_retailWorldTooltip = TRUE;
 }
 
-void Mouse::setRetailTooltip(const RetailTooltip &tooltip)
+void Mouse::setRetailTooltip(const RetailTooltip &tooltip, Int delay)
 {
 	if (tooltip.title.compare(m_retailTooltip.title) != 0 || tooltip.shortcut.compare(m_retailTooltip.shortcut) != 0
 		|| tooltip.cost != m_retailTooltip.cost || tooltip.body.compare(m_retailTooltip.body) != 0)
@@ -969,8 +971,30 @@ void Mouse::setRetailTooltip(const RetailTooltip &tooltip)
 		m_retailTooltip = tooltip;
 		m_retailLayoutDirty = TRUE;
 	}
-	setCursorTooltip(tooltip.title, -1, nullptr, 1.0f);
+	setCursorTooltip(tooltip.title, delay, nullptr, 1.0f);
 	m_retailCommandTooltip = TRUE;
+}
+
+void Mouse::dumpTooltip(UnsignedInt frame) const
+{
+	UnicodeString text;
+	if (m_retailCommandTooltip)
+	{
+		text = m_retailTooltip.title;
+		if (!m_retailTooltip.body.isEmpty())
+		{
+			text.concat(L"\n");
+			text.concat(m_retailTooltip.body);
+		}
+	}
+	else if (m_tooltipDisplayString)
+		text = m_tooltipDisplayString->getText();
+	AsciiString line;
+	line.translate(text);
+	std::string flat(line.str());
+	std::replace(flat.begin(), flat.end(), '\n', '|');
+	std::fprintf(stderr, "TEST tooltip %u shown=%d kind=%s text=%s\n", frame, m_displayTooltip && !m_isTooltipEmpty ? 1 : 0,
+		m_retailCommandTooltip ? "box" : "label", m_isTooltipEmpty ? "" : flat.c_str());
 }
 
 void Mouse::freeRetailTooltip()

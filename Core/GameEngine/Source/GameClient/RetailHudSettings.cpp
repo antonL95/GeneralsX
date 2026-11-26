@@ -30,6 +30,7 @@ const FieldParse RetailHudFieldParse[] =
 	RETAIL_NOTIFICATION_FIELDS("HeroDeathNotification", heroDeath),
 	RETAIL_NOTIFICATION_FIELDS("HeroEarnedAwardNotification", heroEarnedAward),
 	{ "SelectNearestBuilderCycleTimeOut", INI::parseUnsignedInt, nullptr, offsetof(RetailHudSettings, selectNearestBuilderCycleTimeOut) },
+	{ "UnitHelpTextDelay", INI::parseReal, nullptr, offsetof(RetailHudSettings, unitHelpTextDelay) },
 	{ nullptr, nullptr, nullptr, 0 }
 };
 

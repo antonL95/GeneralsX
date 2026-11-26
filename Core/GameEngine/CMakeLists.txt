@@ -923,6 +923,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/RetailLargeGroupAudio.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailEdges.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailHeroes.cpp
+    Source/GameClient/RetailWorldHover.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailPowers.cpp
     Source/GameClient/GUI/ControlBar/ControlBarRetailRadial.cpp
 #    Source/GameClient/GUI/DisconnectMenu/DisconnectMenu.cpp

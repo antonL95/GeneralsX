@@ -183,6 +183,7 @@ public:
 	void setUpgradeNameKey( NameKeyType key ) { m_nameKey = key; }
 	NameKeyType getUpgradeNameKey() const { return m_nameKey; }
 	const AsciiString& getDisplayNameLabel() const { return m_displayNameLabel; }
+	const AsciiString& getTooltipLabel() const { return m_tooltip; }
 	const UpgradeMaskType& getUpgradeMask() const { return m_upgradeMask; }
 	UpgradeType getUpgradeType() const { return m_type; }
 	SkirmishUpgradeHeuristic getSkirmishAIHeuristic() const { return static_cast<SkirmishUpgradeHeuristic>(m_skirmishAIHeuristic); }

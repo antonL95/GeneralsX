@@ -30,6 +30,7 @@ struct RetailHudSettings
 	Notification heroDeath;
 	Notification heroEarnedAward;
 	UnsignedInt selectNearestBuilderCycleTimeOut = 3500;
+	Real unitHelpTextDelay = 1.0f;
 
 	static const FieldParse *getFieldParse();
 };

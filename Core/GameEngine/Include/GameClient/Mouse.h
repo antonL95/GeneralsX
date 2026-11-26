@@ -319,7 +319,8 @@ public:
 		Int cost = -1;
 		UnicodeString body;
 	};
-	void setRetailTooltip(const RetailTooltip &tooltip);
+	void setRetailTooltip(const RetailTooltip &tooltip, Int delay = -1);
+	void dumpTooltip(UnsignedInt frame) const;
 	void setRetailWorldTooltip(const UnicodeString& tooltip);
 	void setMouseText( UnicodeString text, const RGBAColorInt *color, const RGBAColorInt *dropColor );					///< set the cursor text, *NOT* the tooltip text
 	virtual void setMouseLimits();					///< update the limit extents the mouse can move in

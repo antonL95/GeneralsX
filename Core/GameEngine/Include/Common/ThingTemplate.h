@@ -483,8 +483,8 @@ public:
 		Int shadowOpacityStart = 0;
 		Int shadowOpacityPeak = 0;
 		Int shadowOpacityEnd = 0;
-		Int displayMeleeDamage = 0;
-		Int displayRangedDamage = 0;
+		Int displayMeleeDamage = -1;
+		Int displayRangedDamage = -1;
 		Int supplyOverride = 0;
 		Real threatLevel = 0;
 		Real visionBonusTestRadius = 100.0f;

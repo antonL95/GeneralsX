@@ -70,6 +70,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/VideoPlayer.h"
 #include "GameClient/Mouse.h"
+#include "GameClient/RetailHudExtras.h"
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/View.h"
 #include "GameClient/TerrainVisual.h"
@@ -2939,9 +2940,12 @@ void InGameUI::createMouseoverHint( const GameMessage *msg )
 
 					//Object:Prop is a blank string... but we don't want to show
 					//any popup box at all if that is the case!
-					if (RetailFileLayers::enabled() && player->getRelationship(rts::getObservedOrLocalPlayer()->getDefaultTeam()) == ENEMIES)
+					const Bool shown = displayName.compare(TheGameText->fetch("OBJECT:Prop")) != 0;
+					const Bool boxed = shown && RetailFileLayers::enabled() && !disguised && RetailWorldHover::showHelpBox(*obj, displayName,
+						tooltipLabels ? tooltipLabels->description : AsciiString::TheEmptyString);
+					if (!boxed && RetailFileLayers::enabled() && player->getRelationship(rts::getObservedOrLocalPlayer()->getDefaultTeam()) == ENEMIES)
 						TheMouse->setRetailWorldTooltip(str);
-					else if( displayName.compare( TheGameText->fetch( "OBJECT:Prop" ) ) )
+					else if( !boxed && shown )
 					{
 	  				TheMouse->setCursorTooltip(tooltip, -1, &rgb );
 					}
