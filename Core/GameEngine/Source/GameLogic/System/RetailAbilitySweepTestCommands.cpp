@@ -30,6 +30,7 @@
 #include "GameLogic/Module/DoCommandUpgrade.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 
@@ -711,7 +712,7 @@ void watchActor(Actor& actor, Bool& active, const char* label, UnsignedInt frame
 			if (!list || actor.modifiers.count(list->m_name.str()))
 				continue;
 			actor.newModifiers.insert(list->m_name.str());
-			const Bool running = applied.endFrame > frame ||
+			const Bool running = !applied.endFrame || applied.endFrame > frame ||
 				frame - s_case.clickFrame < TheAttributeModifierStore->def(applied.list).durationFrames;
 			if (running)
 			{
@@ -748,10 +749,6 @@ void watch(const RetailTestCommands::Context& ctx)
 	if (Object* caster = TheGameLogic->findObjectByID(s_case.actors[CASTER].id))
 	{
 		const ModelConditionFlags current = conditionsOf(caster);
-		std::set<Int> modifierConditions;
-		if (const AttributeModifierHelper* helper = caster->getAttributeModifierHelper())
-			for (const Int condition : helper->getAppliedModelConditions())
-				modifierConditions.insert(condition);
 		for (Int bit = 0; bit < current.size(); ++bit)
 		{
 			if (!current.test(bit) || s_case.conditions.test(bit))
@@ -760,10 +757,6 @@ void watch(const RetailTestCommands::Context& ctx)
 			if (name == "SELECTED" || name == "MOVING" || name.rfind("TURN_", 0) == 0 || name == "ACCELERATE" || name == "DECELERATE" || name == "ENGAGED" || name.rfind("EMOTION_", 0) == 0)
 				continue;
 			s_case.animation.insert(name);
-			if (modifierConditions.count(bit))
-				continue;
-			s_case.remaining += (s_case.remaining.empty() ? "" : ",") + std::string("anim.") + name;
-			active = TRUE;
 		}
 		if (caster->getTemplate() != s_case.templateAtClick)
 			s_case.flags.insert(std::string("replaced.") + caster->getTemplate()->getName().str());
@@ -772,8 +765,12 @@ void watch(const RetailTestCommands::Context& ctx)
 		if (caster->getCommandSetString() != s_case.commandSet)
 			s_case.flags.insert("commandset");
 		if (s_case.powerTemplate)
+		{
 			if (const SpecialPowerModuleInterface* module = caster->getSpecialPowerModule(s_case.powerTemplate))
 				s_case.recharged = s_case.recharged || !module->isReady();
+			if (const SpecialAbilityUpdate* ability = caster->findSpecialAbilityUpdate(s_case.powerTemplate->getSpecialPowerType()))
+				s_case.running = s_case.running || ability->isActive();
+		}
 	}
 	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
 		if (!s_case.previous.count(object->getID()))
@@ -850,7 +847,7 @@ void finish(const RetailTestCommands::Context& ctx)
 		s_case.result.c_str(), joined(s_case.animation).c_str(), joined(s_case.objects).c_str(),
 		describeActor(s_case.actors[CASTER]).c_str(), describeActor(s_case.actors[ALLY]).c_str(),
 		enemyDesc.c_str(), structureDesc.c_str(),
-		joined(s_case.flags).c_str(), s_case.powerTemplate ? (s_case.recharged ? "yes" : "no") : "n/a", ended.c_str(),
+		joined(s_case.flags).c_str(), !s_case.powerTemplate ? "n/a" : !s_case.powerTemplate->getReloadTime() ? "n/a:zero_reload" : s_case.recharged ? "yes" : s_case.running ? "pending" : "no", ended.c_str(),
 		ended == "never" && !s_case.remaining.empty() ? s_case.remaining.c_str() : "-", s_case.noWindow ? 1 : 0);
 	TheInGameUI->setGUICommand(nullptr);
 	TheControlBar->closeRetailTray();

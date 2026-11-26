@@ -64,13 +64,13 @@ def parse(log):
 def judge(values):
     result = values["result"]
     if result == "passive":
-        return "passive", []
+        return "passive", ["passive command"]
     if result == "not_shown":
-        return "not shown", []
+        return "not shown", ["command not shown"]
     if result == "hidden_by_design":
-        return "hidden by design", []
+        return "hidden by design", ["command is outside visible palantir slots"]
     if result != "accepted":
-        return "rejected", ["rejected"]
+        return "rejected", [f"command result: {result}"]
     reactions = [values["caster"].replace("moved;", ""), values["ally"], values["enemy"], values["structure"]]
     effect = (values["objects"] != "-" or any(text not in ("-", "") for text in reactions)
               or "weaponset" in values["flags"] or "commandset" in values["flags"])
@@ -83,15 +83,29 @@ def judge(values):
         problems.append("no recharge")
     if values["ended"] == "never":
         problems.append("never ends")
-    return problems[0] if problems else "ok", problems
+    reasons = {"no effect": "no observed effect", "no animation state": "no animation state observed",
+               "no recharge": "authored reload did not start", "never ends": "ability state exceeded authored duration"}
+    if problems:
+        return problems[0], [reasons[problem] for problem in problems]
+    recharge = {"n/a:zero_reload": "recharge not required (zero reload)",
+                "pending": "recharge pending while effect is active", "yes": "recharge observed",
+                "n/a": "no power recharge applies"}.get(values["recharge"], "recharge unknown")
+    return "ok", [f"effect observed; {recharge}"]
 
 
 def kill_engine():
     for entry in Path("/proc").iterdir():
         try:
-            if entry.name.isdigit() and b"GeneralsMD/GeneralsXZH" in (entry / "cmdline").read_bytes() and int(entry.name) != os.getpid():
-                os.kill(int(entry.name), signal.SIGKILL)
-        except OSError:
+            if not entry.name.isdigit() or not (entry / "cmdline").read_bytes().split(b"\0", 1)[0].endswith(b"/GeneralsMD/GeneralsXZH"):
+                continue
+            pid = int(entry.name)
+            parent = pid
+            while parent > 1 and parent != os.getpid():
+                stat = Path(f"/proc/{parent}/stat").read_text()
+                parent = int(stat[stat.rfind(")") + 2:].split()[1])
+            if parent == os.getpid():
+                os.kill(pid, signal.SIGKILL)
+        except (OSError, ValueError, IndexError):
             continue
 
 
@@ -101,40 +115,43 @@ def watch_for_stall(log, finished, stalled, reason):
     max_frame = None
     frame_changed = time.monotonic()
     last_line = ""
+    partial = b""
     repeat_count = 0
     while not finished.wait(5):
         now = time.monotonic()
         current = log.stat().st_size if log.exists() else -1
         if current != size:
             size, changed = current, now
-            if current > pos:
-                try:
-                    with log.open("rb") as handle:
-                        handle.seek(pos)
-                        chunk = handle.read(min(current - pos, 1024 * 1024))
-                    pos = current
-                    for raw in chunk.decode(errors="replace").splitlines():
-                        line = raw.strip()
-                        if not line:
-                            continue
-                        match = FRAME_RE.search(line)
-                        if match:
-                            frame = int(match.group(1))
-                            if max_frame is None or frame > max_frame:
-                                max_frame = frame
-                                frame_changed = now
-                        if line == last_line:
-                            repeat_count += 1
-                            if repeat_count >= REPEAT_LIMIT:
-                                reason.append(f"frame={max_frame} repeat={repeat_count} {line[:180]}")
-                                stalled.set()
-                                kill_engine()
-                                return
-                        else:
-                            last_line = line
-                            repeat_count = 1
-                except OSError:
-                    pass
+        if current > pos:
+            try:
+                with log.open("rb") as handle:
+                    handle.seek(pos)
+                    chunk = handle.read(min(current - pos, 1024 * 1024))
+                pos += len(chunk)
+                lines = (partial + chunk).split(b"\n")
+                partial = lines.pop()
+                for raw in lines:
+                    line = raw.decode(errors="replace").strip()
+                    if not line:
+                        continue
+                    match = FRAME_RE.search(line)
+                    if match:
+                        frame = int(match.group(1))
+                        if max_frame is None or frame > max_frame:
+                            max_frame = frame
+                            frame_changed = now
+                    if line == last_line:
+                        repeat_count += 1
+                        if repeat_count >= REPEAT_LIMIT:
+                            reason.append(f"frame={max_frame} repeat={repeat_count} {line[:180]}")
+                            stalled.set()
+                            kill_engine()
+                            return
+                    else:
+                        last_line = line
+                        repeat_count = 1
+            except OSError:
+                pass
         if max_frame is not None and now - frame_changed > FRAME_STALL_SECONDS:
             reason.append(f"frame_stalled={max_frame} {last_line[:180]}")
             stalled.set()
