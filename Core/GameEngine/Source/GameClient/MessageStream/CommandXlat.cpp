@@ -2258,7 +2258,7 @@ GameMessage::Type CommandTranslator::handleCaptureBuildingCommand( Drawable *dra
 	const CommandSet *set = TheControlBar->findCommandSet( source->getCommandSetString() );
 	if( set )
 	{
-		for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+		for( Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; i++ )
 		{
 			// get command button
 			const CommandButton *command = set->getCommandButton(i);
@@ -2485,6 +2485,24 @@ GameMessage::Type CommandTranslator::handleDefaultMoveCommand( Drawable *draw, D
 	return msgType;
 }
 
+#if !RTS_GENERALS
+static Bool isTreeGrabButton(const CommandButton* button)
+{
+	return button && button->getCommandType() == GUI_COMMAND_SPECIAL_POWER && button->getSpecialPowerTemplate() &&
+		button->getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_PASSENGER &&
+		BitIsSet(button->getOptions(), NEED_TARGET_NEUTRAL_OBJECT) && BitIsSet(button->getOptions(), ALLOW_SHRUBBERY_TARGET);
+}
+
+static const CommandButton* findTreeGrabButton(const Object* source)
+{
+	const CommandSet* set = source ? TheControlBar->findCommandSet(source->getCommandSetString()) : nullptr;
+	for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+		if (const CommandButton* button = set->getCommandButton(slot); isTreeGrabButton(button))
+			return button;
+	return nullptr;
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 /** This method and the order of operations in the check here, determine what command would
 	* actually happen (if type parameter == DO_COMMAND) if the user clicked on the drawable
@@ -2503,28 +2521,30 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 
 	const CommandButton* spell = TheInGameUI->getGUICommand();
 #if !RTS_GENERALS
-	if (!draw && pos && spell && spell->getCommandType() == GUI_COMMAND_SPECIAL_POWER &&
-		spell->getSpecialPowerTemplate() && spell->getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_GRAB_PASSENGER &&
-		BitIsSet(spell->getOptions(), NEED_TARGET_NEUTRAL_OBJECT) && BitIsSet(spell->getOptions(), ALLOW_SHRUBBERY_TARGET) &&
-		TheInGameUI->areSelectedObjectsControllable())
+	const Bool contextTreeGrab = !spell && RetailFileLayers::enabled() && !TheInGameUI->isInForceAttackMode() &&
+		!TheInGameUI->isInForceMoveToMode() && !TheInGameUI->isInWaypointMode();
+	if (!draw && pos && (contextTreeGrab || isTreeGrabButton(spell)) && TheInGameUI->areSelectedObjectsControllable())
 	{
 		Coord3D treePosition;
 		Real treeAngle;
 		Object* proxy = TheGameLogic->findObjectByID(TerrainLogic::GRABBABLE_TREE_PROXY_ID);
 		Object* source = nullptr;
+		const CommandButton* grabButton = nullptr;
 		if (proxy && TheTerrainLogic->findGrabbableMapTreeAt(*pos, treePosition, treeAngle))
 			for (Drawable* selected : *TheInGameUI->getAllSelectedDrawables())
 			{
 				Object* candidate = selected ? selected->getObject() : nullptr;
-				auto* grab = candidate ? dynamic_cast<GrabPassengerSpecialPower*>(candidate->getSpecialPowerModule(spell->getSpecialPowerTemplate())) : nullptr;
-				if (candidate && grab && grab->getPercentReady() >= 1.0f && grab->isValidPowerTarget(proxy) &&
+				const CommandButton* button = spell ? spell : findTreeGrabButton(candidate);
+				auto* grab = candidate && button ? dynamic_cast<GrabPassengerSpecialPower*>(candidate->getSpecialPowerModule(button->getSpecialPowerTemplate())) : nullptr;
+				if (grab && grab->getPercentReady() >= 1.0f && grab->isValidPowerTarget(proxy) &&
 					ThePartitionManager->getShroudStatusForPlayer(candidate->getControllingPlayer()->getPlayerIndex(), &treePosition) == CELLSHROUD_CLEAR &&
-					TheSpecialPowerStore->canUseSpecialPower(candidate, spell->getSpecialPowerTemplate()) &&
-					(spell->getRequiredRank() <= 0 || candidate->getExperienceTracker()->getRank() >= spell->getRequiredRank()) &&
-					spell->isRetailButtonUsable() && spell->isMountStateAllowed(candidate) && spell->isModelConditionAllowed(candidate) &&
-					spell->isValidContainerForCommand(candidate))
+					TheSpecialPowerStore->canUseSpecialPower(candidate, button->getSpecialPowerTemplate()) &&
+					(button->getRequiredRank() <= 0 || candidate->getExperienceTracker()->getRank() >= button->getRequiredRank()) &&
+					button->isRetailButtonUsable() && button->isMountStateAllowed(candidate) && button->isModelConditionAllowed(candidate) &&
+					button->isValidContainerForCommand(candidate))
 				{
 					source = candidate;
+					grabButton = button;
 					break;
 				}
 			}
@@ -2538,9 +2558,9 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 			if (type == DO_COMMAND)
 			{
 				GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT);
-				msg->appendIntegerArgument(spell->getSpecialPowerTemplate()->getID());
+				msg->appendIntegerArgument(grabButton->getSpecialPowerTemplate()->getID());
 				msg->appendObjectIDArgument(proxy->getID());
-				msg->appendIntegerArgument(spell->getOptions());
+				msg->appendIntegerArgument(grabButton->getOptions());
 				msg->appendObjectIDArgument(source->getID());
 				msg->appendLocationArgument(treePosition);
 				TheInGameUI->setGUICommand(nullptr);
@@ -3155,7 +3175,7 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 			const CommandSet *set = TheControlBar->findCommandSet( source->getCommandSetString() );
 			if( set )
 			{
-				for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+				for( Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; i++ )
 				{
 					// get command button
 					const CommandButton *command = set->getCommandButton(i);
