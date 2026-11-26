@@ -2683,6 +2683,9 @@ void TerrainLogic::setActiveBoundary(Int newActiveBoundary)
 		obj = obj->getNextObject();
 	}
 
+#if RTS_ZEROHOUR
+	ThePartitionManager->suspendTriggerReveals(partitionStore);
+#endif
 	//Store permanently revealed cells.
 	ThePartitionManager->storeFoggedCells(partitionStore, FALSE);
 

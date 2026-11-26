@@ -50,6 +50,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include <algorithm>
+#include "Common/RetailSaveBlocks.h"
 
 #include "Common/ActionManager.h"
 #include "Common/DiscreteCircle.h"
@@ -2831,6 +2832,7 @@ void PartitionManager::shutdown()
 	m_updatedSinceLastReset = false;
 	removeAllDirtyModules();
 	m_loadedCollisionChecks.clear();
+	m_triggerReveals.clear();
 
 #ifdef RTS_DEBUG
 	// the above *should* remove all the touched cells (via unRegisterObject), but let's check:
@@ -3149,6 +3151,69 @@ void PartitionManager::revealMapForPlayerPermanently( Int playerIndex )
 	{
 		m_cells[i].addLooker( playerIndex );
 	}
+}
+
+ICoord2D PartitionManager::getTriggerRevealGridSize()
+{
+	Region3D maximum{};
+	TheTerrainLogic->getMaximumPathfindExtent(&maximum);
+	return {worldToCellDist(maximum.width()), worldToCellDist(maximum.height())};
+}
+
+void PartitionManager::adjustTriggerReveal(const RetailTriggerReveal& reveal, Bool add)
+{
+	for (const ICoord2D& point : reveal.cells)
+	{
+		PartitionCell* cell = getCellAt(point.x, point.y);
+		if (!cell)
+			continue;
+		for (Int i = 0; i < MAX_PLAYER_COUNT; ++i)
+		{
+			if (!(reveal.players & (PlayerMaskType{1} << i)))
+				continue;
+			if (add)
+				cell->addLooker(i);
+			else
+				cell->removeLooker(i);
+		}
+	}
+}
+
+void PartitionManager::revealTriggerPermanently(const PolygonTrigger& area, PlayerMaskType players, const AsciiString& name)
+{
+	if (!players || name.isEmpty() || area.getNumPoints() < 3 || !m_cells ||
+		std::any_of(m_triggerReveals.begin(), m_triggerReveals.end(), [&name](const RetailTriggerReveal& reveal) { return reveal.name == name; }))
+		return;
+
+	RetailTriggerReveal reveal{name, players, {}};
+	const IRegion2D& bounds = area.getBounds();
+	ICoord2D lo, hi;
+	worldToCell(bounds.lo.x, bounds.lo.y, &lo.x, &lo.y);
+	worldToCell(bounds.hi.x, bounds.hi.y, &hi.x, &hi.y);
+	const ICoord2D grid = getTriggerRevealGridSize();
+	for (Int y = std::max(0, lo.y); y <= std::min(grid.y - 1, hi.y); ++y)
+	{
+		for (Int x = std::max(0, lo.x); x <= std::min(grid.x - 1, hi.x); ++x)
+		{
+			Real wx, wy;
+			getCellCenterPos(x, y, wx, wy);
+			ICoord3D point{static_cast<Int>(REAL_TO_INT_FLOOR(wx)), static_cast<Int>(REAL_TO_INT_FLOOR(wy)), 0};
+			if (area.pointInTrigger(point))
+				reveal.cells.push_back({x, y});
+		}
+	}
+	m_triggerReveals.push_back(std::move(reveal));
+	adjustTriggerReveal(m_triggerReveals.back(), TRUE);
+}
+
+void PartitionManager::undoTriggerReveal(const AsciiString& name)
+{
+	const auto reveal = std::find_if(m_triggerReveals.begin(), m_triggerReveals.end(),
+		[&name](const RetailTriggerReveal& active) { return active.name == name; });
+	if (reveal == m_triggerReveals.end())
+		return;
+	adjustTriggerReveal(*reveal, FALSE);
+	m_triggerReveals.erase(reveal);
 }
 
 /**
@@ -4856,6 +4921,8 @@ void PartitionManager::crc( Xfer *xfer )
 	{
 		m_cells[i].crc(xfer);
 	}
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, TRUE);
 
 }
 
@@ -4870,7 +4937,7 @@ void PartitionManager::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = RetailFileLayers::enabled() ? 3 : 2;
+	XferVersion currentVersion = RetailFileLayers::enabled() ? 4 : 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -5005,6 +5072,47 @@ void PartitionManager::xfer( Xfer *xfer )
 		}
 	}
 
+	if (RetailFileLayers::enabled())
+		xferRetailBlocks(xfer, version >= 4);
+}
+
+void PartitionManager::xferRetailBlocks(Xfer* xfer, Bool present)
+{
+	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
+		{ "trigger-reveals",
+			[this](Xfer* x)
+			{
+				const Bool loading = x->getXferMode() == XFER_LOAD;
+				UnsignedInt count = static_cast<UnsignedInt>(m_triggerReveals.size());
+				x->xferUnsignedInt(&count);
+				if (loading)
+					m_triggerReveals.clear();
+				if (!count)
+					return;
+				const ICoord2D grid = getTriggerRevealGridSize();
+				for (UnsignedInt i = 0; i < count; ++i)
+				{
+					RetailTriggerReveal& reveal = loading ? m_triggerReveals.emplace_back() : m_triggerReveals[i];
+					x->xferAsciiString(&reveal.name);
+					x->xferUnsignedShort(&reveal.players);
+					UnsignedInt size = static_cast<UnsignedInt>(reveal.cells.size());
+					x->xferUnsignedInt(&size);
+					if (size > static_cast<Int64>(grid.x) * grid.y)
+						throw SC_INVALID_DATA;
+					reveal.cells.resize(size);
+					ICoord2D previous{-1, -1};
+					for (ICoord2D& cell : reveal.cells)
+					{
+						x->xferICoord2D(&cell);
+						if (cell.x < 0 || cell.x >= grid.x || cell.y < previous.y || cell.y >= grid.y ||
+							(cell.y == previous.y && cell.x <= previous.x) || cell.y < 0)
+							throw SC_INVALID_DATA;
+						previous = cell;
+					}
+				}
+			},
+			[this] { m_triggerReveals.clear(); } }
+	});
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -5186,6 +5294,13 @@ void PartitionManager::storeFoggedCells(ShroudStatusStoreRestore &outPartitionSt
 }
 
 //-------------------------------------------------------------------------------------------------
+void PartitionManager::suspendTriggerReveals(ShroudStatusStoreRestore& out)
+{
+	for (const RetailTriggerReveal& reveal : m_triggerReveals)
+		adjustTriggerReveal(reveal, FALSE);
+	out.m_triggerReveals = std::move(m_triggerReveals);
+}
+
 void PartitionManager::restoreFoggedCells(const ShroudStatusStoreRestore &inPartitionStore, Bool restoreToFog)
 {
 	Int i, j, p;
@@ -5194,18 +5309,8 @@ void PartitionManager::restoreFoggedCells(const ShroudStatusStoreRestore &inPart
 	Int storeHeight = inPartitionStore.m_foggedOrRevealed[0].size() / storeWidth;
 
 	for (p = 0; p < MAX_PLAYER_COUNT; ++p) {
-		for (j = 0; j < storeHeight; ++j) {
-			if (j >= m_cellCountY) {
-				// All done.
-				return;
-			}
-
-			for (i = 0; i < storeWidth; ++i) {
-				if (i >= m_cellCountX) {
-					// Skip to the next line. This info will be thrown away.
-					break;
-				}
-
+		for (j = 0; j < std::min(storeHeight, m_cellCountY); ++j) {
+			for (i = 0; i < std::min(storeWidth, m_cellCountX); ++i) {
 				UnsignedByte byteToRestore = inPartitionStore.m_foggedOrRevealed[p][j * storeWidth + i];
 				if (byteToRestore == STORE_DONTTOUCH) {
 					continue;
@@ -5223,6 +5328,12 @@ void PartitionManager::restoreFoggedCells(const ShroudStatusStoreRestore &inPart
 				}
 			}
 		}
+	}
+	if (!restoreToFog)
+	{
+		m_triggerReveals = inPartitionStore.m_triggerReveals;
+		for (const RetailTriggerReveal& reveal : m_triggerReveals)
+			adjustTriggerReveal(reveal, TRUE);
 	}
 }
 

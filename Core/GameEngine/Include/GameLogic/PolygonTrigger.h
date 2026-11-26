@@ -190,6 +190,7 @@ public:
 
 	void getCenterPoint(Coord3D* pOutCoord) const;
 	Real getRadius() const;
+	const IRegion2D& getBounds() const;
 
 public:
 	const ICoord3D *getPoint(Int ndx) const {if (ndx<0) ndx=0; if (ndx>=m_numPoints) ndx=m_numPoints-1; return m_points+ndx;} ///< Get a point.

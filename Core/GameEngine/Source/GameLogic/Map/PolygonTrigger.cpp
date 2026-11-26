@@ -301,6 +301,13 @@ void PolygonTrigger::updateBounds()	const
 	m_radius = WWMath::SqrtOrigin(halfHeight*halfHeight + halfWidth*halfWidth);
 }
 
+const IRegion2D& PolygonTrigger::getBounds() const
+{
+	if (m_boundsNeedsUpdate)
+		updateBounds();
+	return m_bounds;
+}
+
 
 /**
  PolygonTrigger::addPolygonTrigger adds a trigger to the list of triggers.

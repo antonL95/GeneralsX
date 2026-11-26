@@ -51,6 +51,7 @@ class Thing;
 class Weapon;
 class PathfindZoneManager;
 class PathfindCell;
+class PolygonTrigger;
 
 // How close is close enough when moving.
 
@@ -157,6 +158,7 @@ public:
 	Bool hasLoadedReservations() const { return m_hasLoadedReservations; }
 	UnsignedInt getRetailRouteRevision() const { return m_retailRouteRevision; }
 	void noteRetailRouteOpening() { ++m_retailRouteRevision; }
+	void setHumanImpassable(const PolygonTrigger& area, Bool blocked);
 	void forceMapRecalculation();	///< Force pathfind map recomputation. If region is given, only that area is recomputed
 
 	/** Returns an aircraft path to the goal.  */
@@ -401,6 +403,9 @@ private:
 	Bool m_hasLoadedReservations = FALSE;
 	UnsignedInt m_savedZoneUpdateFrame = 0;
 	UnsignedInt m_retailRouteRevision = 1;
+	std::set<std::pair<Int, Int>> m_humanImpassableCells;
+	void clearHumanImpassable();
+	void xferHumanImpassable(Xfer* xfer);
 	Bool m_isTunneling;														///< True if path started in an obstacle
 
 	Int m_frameToShowObstacles;										///< Time to redraw obstacles.  For debug output.

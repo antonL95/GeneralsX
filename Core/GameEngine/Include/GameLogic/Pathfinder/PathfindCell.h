@@ -149,6 +149,8 @@ public:
 	Bool startPathfind( PathfindCell *goalCell );
 	Bool getPinched() const {return m_pinched;}
 	void setPinched(Bool pinch) {m_pinched = pinch;	}
+	Bool isHumanImpassable() const { return m_humanImpassable; }
+	void setHumanImpassable(Bool blocked) { m_humanImpassable = blocked; }
 
 	Bool allocateInfo(const ICoord2D &pos);
 	void releaseInfo();
@@ -195,6 +197,7 @@ private:
 	UnsignedInt m_obstacleIsFence : 1;        ///< True if occupied by a fence.
 	UnsignedInt m_obstacleIsTransparent : 1;  ///< True if obstacle is transparent (undefined if obstacleid is invalid)
 	UnsignedInt m_hasSharedObstacles : 1;
+	UnsignedInt m_humanImpassable : 1 = FALSE;
 
 	zoneStorageType m_zone;
 	UnsignedShort m_aircraftGoal : 1;         ///< This is an aircraft goal cell.

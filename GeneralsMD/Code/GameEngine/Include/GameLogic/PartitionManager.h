@@ -281,10 +281,18 @@ enum
 	STORE_PERMANENTLY_REVEALED = 2
 };
 
+struct RetailTriggerReveal
+{
+	AsciiString name;
+	PlayerMaskType players;
+	std::vector<ICoord2D> cells;
+};
+
 struct ShroudStatusStoreRestore
 {
 	std::vector<UnsignedByte> m_foggedOrRevealed[MAX_PLAYER_COUNT];
 	Int m_cellsWide;	// m_cellsHigh is computed by m_foggedOrRevealed[0].size() / m_cellsWide
+	std::vector<RetailTriggerReveal> m_triggerReveals;
 };
 
 //=====================================
@@ -1258,6 +1266,10 @@ private:
 	PartitionCell*	m_cells;					///< array of cells
 	PartitionData*	m_dirtyModules;
 	std::vector<ObjectID> m_loadedCollisionChecks;
+	std::vector<RetailTriggerReveal> m_triggerReveals;
+	ICoord2D getTriggerRevealGridSize();
+	void adjustTriggerReveal(const RetailTriggerReveal& reveal, Bool add);
+	void xferRetailBlocks(Xfer* xfer, Bool present);
 	Bool						m_updatedSinceLastReset;	///< Used to force a return of OBJECTSHROUD_INVALID before update has been called.
 
 	std::queue<SightingInfo *> m_pendingUndoShroudReveals;	///< Anything can queue up an Undo to happen later. This is a queue, because "later" is a constant
@@ -1357,6 +1369,8 @@ public:
 	/// A convenience function to reveal shroud at some location
 	// Queuing does not give you control of the timestamp to enforce the queue.  I own the delay, you don't.
 	void doShroudReveal( Real centerX, Real centerY, Real radius, PlayerMaskType playerMask);
+	void revealTriggerPermanently(const PolygonTrigger& area, PlayerMaskType players, const AsciiString& name);
+	void undoTriggerReveal(const AsciiString& name);
 	void undoShroudReveal( Real centerX, Real centerY, Real radius, PlayerMaskType playerMask);
 	void queueUndoShroudReveal( Real centerX, Real centerY, Real radius, PlayerMaskType playerMask );
 	void doShroudRevealDirectional( Real centerX, Real centerY, Real frontRange, Real sideRange, Real rearRange, Real orientation, PlayerMaskType playerMask );
@@ -1544,6 +1558,7 @@ public:
 	// If saveToFog is true, then we are writing STORE_FOG.
 	// If saveToFog is false, then we are writing STORE_PERMENANT_REVEAL
 	void storeFoggedCells(ShroudStatusStoreRestore &outPartitionStore, Bool storeToFog) const;
+	void suspendTriggerReveals(ShroudStatusStoreRestore& out);
 	void restoreFoggedCells(const ShroudStatusStoreRestore &inPartitionStore, Bool restoreToFog);
 };
 

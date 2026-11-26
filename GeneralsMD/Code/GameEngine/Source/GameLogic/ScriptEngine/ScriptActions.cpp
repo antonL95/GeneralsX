@@ -8630,6 +8630,18 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::MAP_UNDO_REVEAL_PERMANENTLY_AT_WAYPOINT:
 			doUndoRevealMapAtWaypointPermanent(pAction->getParameter(0)->getString());
 			return;
+		case ScriptAction::MAP_REVEAL_PERMANENTLY_IN_TRIGGER:
+			if (const PolygonTrigger* area = TheScriptEngine->getQualifiedTriggerAreaByName(pAction->getParameter(0)->getString()))
+				ThePartitionManager->revealTriggerPermanently(*area,
+					TheScriptEngine->getRetailScriptPlayers(pAction->getParameter(1)->getString()), pAction->getParameter(2)->getString());
+			return;
+		case ScriptAction::MAP_UNDO_REVEAL_PERMANENTLY_IN_TRIGGER:
+			ThePartitionManager->undoTriggerReveal(pAction->getParameter(0)->getString());
+			return;
+		case ScriptAction::HUMAN_IMPASSABLE_AREA:
+			if (const PolygonTrigger* area = TheScriptEngine->getQualifiedTriggerAreaByName(pAction->getParameter(0)->getString()))
+				TheAI->pathfinder()->setHumanImpassable(*area, pAction->getParameter(1)->getInt() != 0);
+			return;
 		case ScriptAction::EVA_SET_ENABLED_DISABLED:
 			doEvaEnabledDisabled(pAction->getParameter(0)->getInt());
 			return;

@@ -1,0 +1,16 @@
+233 create Player_1 MapScriptShroudFixtureUnit 0 650,263,0
+233 create PlyrCreeps MapScriptShroudFixtureUnit 0 650,284,0
+236 map-script-shroud-probe Player_1 MapScriptShroudFixtureUnit 0
+237 map-script-shroud-areas - - 0
+237 map-script-shroud-reveal - - 0
+237 map-script-shroud-cleanup - - 0
+242 map-script-shroud-probe Player_1 MapScriptShroudFixtureUnit 0
+246 map-script-shroud-probe Player_1 MapScriptShroudFixtureUnit 0
+247 map-script-shroud-undo-first - - 0
+247 map-script-shroud-probe Player_1 MapScriptShroudFixtureUnit 0
+248 map-script-shroud-areas - - 0
+248 map-script-shroud-undo-second - - 0
+248 map-script-shroud-cleanup - - 0
+249 map-script-shroud-probe Player_1 MapScriptShroudFixtureUnit 0
+251 destroy Player_1 MapScriptShroudFixtureUnit 0
+251 destroy PlyrCreeps MapScriptShroudFixtureUnit 0

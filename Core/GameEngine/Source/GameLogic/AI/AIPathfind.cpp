@@ -61,6 +61,7 @@ static Bool isSameHorde(const Object* obj, const Object* unit);
 #include "GameLogic/RetailWallMesh.h"
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/RetailLogicBenchmark.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
@@ -178,6 +179,7 @@ void Pathfinder::reset()
 {
 	RetailWallMesh::clearCache();
 	m_retailTrackedFootprints.clear();
+	m_humanImpassableCells.clear();
 	frameToShowObstacles = 0;
 	DEBUG_LOG(("Pathfind cell is %d bytes, PathfindCellInfo is %d bytes", sizeof(PathfindCell), sizeof(PathfindCellInfo)));
 
@@ -1617,10 +1619,18 @@ static LocomotorSurfaceTypeMask routingSurfaces(const LocomotorSet& locomotors, 
 	return surfaces;
 }
 
+static Bool isBlockedForHuman(const PathfindCell& cell, const Object* unit)
+{
+	if (!cell.isHumanImpassable() || !unit)
+		return FALSE;
+	const Player* owner = unit->getControllingPlayer();
+	return owner && owner->getPlayerType() == PLAYER_HUMAN;
+}
+
 Bool Pathfinder::validMovementPosition( Bool isCrusher, LocomotorSurfaceTypeMask acceptableSurfaces,
 																			 PathfindCell *toCell, PathfindCell *fromCell, const Object *unit )
 {
-	if (!toCell || crossesWallHeightBand(fromCell, toCell))
+	if (!toCell || crossesWallHeightBand(fromCell, toCell) || isBlockedForHuman(*toCell, unit))
 		return false;
 
 	// check if the destination cell is classified as an obstacle,
@@ -1679,6 +1689,9 @@ Bool Pathfinder::checkDestination(const Object *obj, Int cellX, Int cellY, Pathf
 				}
 				return false;
 			}
+
+			if (isBlockedForHuman(*cell, obj))
+				return FALSE;
 
 			if (cell->getType()==PathfindCell::CELL_OBSTACLE) {
 				if (cell->isSoleObstacle( ignoreId ))
@@ -1779,6 +1792,8 @@ Bool Pathfinder::checkForMovement(const Object *obj, TCheckMovementInfo &info)
 			if (!cell) {
 				return false; // off the map, so can't move here.
 			}
+			if (isBlockedForHuman(*cell, obj))
+				return FALSE;
 
 			PathfindCell::CellFlags flags = cell->getFlags();
 			if ((flags == PathfindCell::UNIT_GOAL) || (flags == PathfindCell::UNIT_GOAL_OTHER_MOVING)) {
@@ -3033,7 +3048,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 
 			// check if cell is on the map
 			if (!newCell || crossesWallHeightBand(parentCell, newCell) ||
-				(parentCell->getWallHeightBand() && newCell->getLayer() != LAYER_WALL))
+				(parentCell->getWallHeightBand() && newCell->getLayer() != LAYER_WALL) || isBlockedForHuman(*newCell, obj))
 				continue;
 
 			Bool notZonePassable = false;
@@ -6636,7 +6651,7 @@ Bool Pathfinder::isMovementSegmentPassable( const Object *obj, LocomotorSurfaceT
 	{
 		PathfindCell* to = getCell(layer, current.x, current.y);
 		if (!validMovementTerrainCell(to, acceptableSurfaces) || crossesWallHeightBand(from, to) ||
-			(layer == LAYER_WALL && to->getLayer() != LAYER_WALL))
+			(layer == LAYER_WALL && to->getLayer() != LAYER_WALL) || isBlockedForHuman(*to, obj))
 			return false;
 		if (!terrainOnly && !validMovementPosition(isCrusher, acceptableSurfaces, to, from, obj))
 			return false;
@@ -8390,19 +8405,89 @@ void Pathfinder::xfer( Xfer *xfer )
 		xferRetailBlocks(xfer, version >= 9);
 }
 
+void Pathfinder::setHumanImpassable(const PolygonTrigger& area, Bool blocked)
+{
+	if (!m_map || area.getNumPoints() < 3)
+		return;
+	const IRegion2D& bounds = area.getBounds();
+	const Int minX = std::max<Int>(m_extent.lo.x, REAL_TO_INT_FLOOR(bounds.lo.x / PATHFIND_CELL_SIZE_F));
+	const Int maxX = std::min<Int>(m_extent.hi.x, REAL_TO_INT_FLOOR(bounds.hi.x / PATHFIND_CELL_SIZE_F));
+	const Int minY = std::max<Int>(m_extent.lo.y, REAL_TO_INT_FLOOR(bounds.lo.y / PATHFIND_CELL_SIZE_F));
+	const Int maxY = std::min<Int>(m_extent.hi.y, REAL_TO_INT_FLOOR(bounds.hi.y / PATHFIND_CELL_SIZE_F));
+	const Int cellSize = PATHFIND_CELL_SIZE;
+	Bool changed = FALSE;
+	for (Int x = minX; x <= maxX; ++x)
+	{
+		for (Int y = minY; y <= maxY; ++y)
+		{
+			PathfindCell& cell = m_map[x][y];
+			if (cell.isHumanImpassable() == blocked)
+				continue;
+			ICoord3D center{x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, 0};
+			if (!area.pointInTrigger(center))
+				continue;
+			if (blocked)
+				m_humanImpassableCells.emplace(x, y);
+			else
+				m_humanImpassableCells.erase({x, y});
+			cell.setHumanImpassable(blocked);
+			changed = TRUE;
+		}
+	}
+	if (changed)
+		++m_retailRouteRevision;
+}
+
+void Pathfinder::clearHumanImpassable()
+{
+	if (m_map)
+		for (const auto& [x, y] : m_humanImpassableCells)
+			m_map[x][y].setHumanImpassable(FALSE);
+	m_humanImpassableCells.clear();
+}
+
+void Pathfinder::xferHumanImpassable(Xfer* xfer)
+{
+	UnsignedInt size = static_cast<UnsignedInt>(m_humanImpassableCells.size());
+	xfer->xferUnsignedInt(&size);
+	if (xfer->getXferMode() == XFER_LOAD)
+	{
+		clearHumanImpassable();
+		for (UnsignedInt i = 0; i < size; ++i)
+		{
+			ICoord2D point;
+			xfer->xferICoord2D(&point);
+			PathfindCell* cell = m_map ? getCell(LAYER_GROUND, point.x, point.y) : nullptr;
+			if (!cell || !m_humanImpassableCells.emplace(point.x, point.y).second)
+				throw XFER_INVALID_PARAMETERS;
+			cell->setHumanImpassable(TRUE);
+		}
+		return;
+	}
+	for (const auto& [x, y] : m_humanImpassableCells)
+	{
+		ICoord2D point{x, y};
+		xfer->xferICoord2D(&point);
+	}
+}
+
 void Pathfinder::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	const RetailSaveBlocks::Block<Xfer> ignoredObstacle{
 		"ignored-obstacle", [this](Xfer* x) { x->xferObjectID(&m_ignoreObstacleID); },
 		[this] { m_ignoreObstacleID = INVALID_ID; }
 	};
+	const RetailSaveBlocks::Block<Xfer> humanImpassable{
+		"human-impassable", [this](Xfer* x) { xferHumanImpassable(x); }, [this] { clearHumanImpassable(); }
+	};
 	if (xfer->getXferMode() == XFER_CRC && !m_zoneManager.hasDeepWater())
 	{
-		RetailSaveBlocks::transferSection(xfer, false, present, {ignoredObstacle});
+		RetailSaveBlocks::transferSection(xfer, false, present, {ignoredObstacle, humanImpassable});
 		return;
 	}
 	RetailSaveBlocks::transferSection(xfer, xfer->getXferMode() == XFER_LOAD, present, {
 		ignoredObstacle,
+		humanImpassable,
 		{ "deep-water-zones",
 			[this](Xfer* x)
 			{
