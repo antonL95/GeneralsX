@@ -346,7 +346,7 @@ void AudioEventRTS::generateFilename()
 
 
 
-		if (BitIsSet(m_eventInfo->m_control, AC_RANDOM))
+		if (!BitIsSet(m_eventInfo->m_control, AC_SEQUENTIAL) || BitIsSet(m_eventInfo->m_control, AC_RANDOM))
 		{
 			if (m_isLogicalAudio)
 			{

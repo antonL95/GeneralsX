@@ -243,6 +243,7 @@ void MiniAudioManager::update()
 	setDeviceListenerPosition();
 	processRequestList();
 	processPlayingList();
+	playReadyContinuations();
 	processFadingList();
 	processStoppedList();
 }
@@ -1480,6 +1481,20 @@ void MiniAudioManager::processRequestList(void)
 		if (!req->m_requiresCheckForSample || checkForSample(req))
 			processRequest(req);
 
+		deleteInstance(req);
+		it = m_audioRequests.erase(it);
+	}
+}
+
+void MiniAudioManager::playReadyContinuations(void)
+{
+	for (auto it = m_audioRequests.begin(); it != m_audioRequests.end(); ) {
+		AudioRequest *req = *it;
+		if (!req || !req->m_isContinuation || req->m_requiresCheckForSample || !shouldProcessRequestThisFrame(req)) {
+			++it;
+			continue;
+		}
+		processRequest(req);
 		deleteInstance(req);
 		it = m_audioRequests.erase(it);
 	}

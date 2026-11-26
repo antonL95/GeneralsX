@@ -159,6 +159,7 @@ public:
 
 	virtual void processRequestList(void);
 	virtual void processPlayingList(void);
+	void playReadyContinuations(void);
 	virtual void processFadingList(void);
 	virtual void processStoppedList(void);
 
