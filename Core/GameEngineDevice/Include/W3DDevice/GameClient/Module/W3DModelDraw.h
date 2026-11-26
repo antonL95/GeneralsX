@@ -325,6 +325,21 @@ struct TransitionContext
 	Real previousFraction = 0.0f;
 };
 
+struct ScriptSubObjectAction
+{
+	AsciiString subObjName;
+	Bool hide = FALSE;
+	Bool permanent = FALSE;
+};
+
+struct ScriptedStateResult
+{
+	const ModelConditionInfo* transition = nullptr;
+	Bool continuePrevious = FALSE;
+	Int animationIndex = -1;
+	std::vector<ScriptSubObjectAction> subObjects;
+};
+
 class W3DModelDrawModuleData : public ModuleData
 {
 public:
@@ -365,7 +380,6 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
  	AsciiString getBestModelNameForWB(const ModelConditionFlags& c) const;
 	virtual const ModelConditionInfo* findBestInfo(const ModelConditionFlags& c) const;
-	virtual const ModelConditionInfo* findNamedTransition(const ModelConditionInfo*, const ModelConditionInfo*, const TransitionContext&, Bool&) const { return nullptr; }
 	void preloadAssets( TimeOfDay timeOfDay, Real scale ) const;
 #ifdef CACHE_ATTACH_BONE
 	const Vector3* getAttachToDrawableBoneOffset(const Drawable* draw) const;
@@ -509,6 +523,8 @@ public:
 protected:
 
 	virtual void onRenderObjRecreated(){};
+	virtual ScriptedStateResult evaluateStateScript(const ModelConditionInfo*, const ModelConditionInfo*,
+		Int, Real, Bool) { return {}; }
 
 	const ModelConditionInfo* getCurState() const { return m_curState; }
 
@@ -616,7 +632,10 @@ private:
 	Real m_distancePerFrame = 0.0f;
 	Real m_authoredAnimationSpeed = 1.0f;
 
-	void adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction, Bool restartCurrent = FALSE);
+	void adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction, Bool restartCurrent = FALSE, Int forcedAnimIndex = -1);
+	void applyScriptSubObjects(const std::vector<ScriptSubObjectAction>& actions);
+	void resolveTransitionChain(ScriptedStateResult& result, const ModelConditionInfo*& newState, const ModelConditionInfo*& nextState);
+	void reenterCurrentState();
 	void dispatchAnimationFXEvents();
 	void startAnimationFX(Real frame);
 	void stopTimedAnimationParticles();

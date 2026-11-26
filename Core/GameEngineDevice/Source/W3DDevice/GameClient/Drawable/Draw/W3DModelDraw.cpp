@@ -2496,17 +2496,10 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 					m_curState != nullptr &&
 					m_whichAnimInCurState != -1)
 		{
-			if (m_curState->m_animations[m_whichAnimInCurState].isIdleAnim())
+			if (m_curState->m_animations[m_whichAnimInCurState].isIdleAnim() ||
+				testFlagBit(m_curState->m_flags, RESTART_ANIM_WHEN_COMPLETE))
 			{
-				//DEBUG_LOG(("randomly switching to new idle state!"));
-
-				// state hasn't changed, if it's been awhile, switch the idle anim
-				// (yes, that's right: pass curState for prevState)
-				adjustAnimation(m_curState, -1.0);
-			}
-			else if (testFlagBit(m_curState->m_flags, RESTART_ANIM_WHEN_COMPLETE))
-			{
-				adjustAnimation(m_curState, -1.0);
+				reenterCurrentState();
 			}
 		}
 	}
@@ -2602,14 +2595,13 @@ static Int pickRetailAnimation(const W3DAnimationVector& animations, Int previou
 	return 0;
 }
 
-void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction, Bool restartCurrent)
+void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction, Bool restartCurrent, Int forcedAnimIndex)
 {
 	static const bool disableBlend = std::getenv("GENERALSX_TEST_DISABLE_ANIMATION_BLEND") != nullptr;
 
 	if (!m_curState)
 		return;
 
-	// if the current state has m_animations associated, do the right thing
 	Int numAnims = m_curState->m_animations.size();
 	if (numAnims > 0)
 	{
@@ -2617,6 +2609,10 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 		{
 			DEBUG_ASSERTCRASH(m_whichAnimInCurState >= 0 && m_whichAnimInCurState < numAnims,
 				("Hit reaction restart requires a selected animation"));
+		}
+		else if (forcedAnimIndex >= 0 && forcedAnimIndex < numAnims)
+		{
+			m_whichAnimInCurState = forcedAnimIndex;
 		}
 		else if (numAnims == 1)
 		{
@@ -3910,6 +3906,76 @@ static Bool turretNamesDiffer(const ModelConditionInfo* a, const ModelConditionI
 /** Change the model for this drawable. If color is non-zero, it will also apply team color to the
 	model */
 //-------------------------------------------------------------------------------------------------
+void W3DModelDraw::applyScriptSubObjects(const std::vector<ScriptSubObjectAction>& actions)
+{
+	for (const ScriptSubObjectAction& action : actions)
+	{
+		if (action.permanent)
+			showSubObject(action.subObjName, !action.hide);
+		if (m_renderObject)
+			setSubObjectHidden(action.subObjName, action.hide);
+	}
+}
+
+void W3DModelDraw::resolveTransitionChain(ScriptedStateResult& result, const ModelConditionInfo*& newState,
+	const ModelConditionInfo*& nextState)
+{
+	constexpr Int MAX_TRANSITION_HOPS = 4;
+	const ModelConditionInfo* previousForTransition = newState;
+	nextState = newState->m_transitionSig == NO_TRANSITION ? newState : nullptr;
+	newState = result.transition;
+	result.transition = nullptr;
+
+	for (Int hop = 0; hop < MAX_TRANSITION_HOPS; ++hop)
+	{
+		ScriptedStateResult transitionResult = evaluateStateScript(previousForTransition, newState, -1, 0.0f, TRUE);
+		result.subObjects.insert(result.subObjects.end(),
+			transitionResult.subObjects.begin(), transitionResult.subObjects.end());
+		result.animationIndex = transitionResult.animationIndex;
+		if (!transitionResult.transition)
+			break;
+		nextState = nullptr;
+		previousForTransition = newState;
+		newState = transitionResult.transition;
+	}
+}
+
+void W3DModelDraw::reenterCurrentState()
+{
+	if (!m_curState)
+		return;
+
+	Int forcedAnimIndex = -1;
+	if (!(TheGameState && TheGameState->isInLoadGame()))
+	{
+		ScriptedStateResult result = evaluateStateScript(m_curState, m_curState, m_whichAnimInCurState, 0.0f,
+			m_curState->m_transitionSig != NO_TRANSITION);
+		if (result.transition != nullptr)
+		{
+			const ModelConditionInfo* targetState = m_curState;
+			const ModelConditionInfo* nextState = nullptr;
+			resolveTransitionChain(result, targetState, nextState);
+			doHideShowSubObjs(&targetState->m_hideShowVec);
+			applyScriptSubObjects(result.subObjects);
+			const ModelConditionInfo* prevState = m_curState;
+			m_curState = targetState;
+			m_nextState = nextState;
+			m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
+			adjustAnimation(prevState, -1.0f, FALSE, result.animationIndex);
+			if (targetState->m_animationState != m_enteredAnimationState)
+			{
+				m_enteredAnimationState = targetState->m_animationState;
+				if (targetState->m_enteringStateFX != nullptr)
+					FXList::doFXFromDrawable(targetState->m_enteringStateFX, *getDrawable());
+			}
+			return;
+		}
+		applyScriptSubObjects(result.subObjects);
+		forcedAnimIndex = result.animationIndex;
+	}
+	adjustAnimation(m_curState, -1.0f, FALSE, forcedAnimIndex);
+}
+
 void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 {
 	DEBUG_ASSERTCRASH(newState, ("invalid state in W3DModelDraw::setModelState"));
@@ -3921,27 +3987,9 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 	}
 #endif
 	const ModelConditionInfo* nextState = nullptr;
+	ScriptedStateResult scriptResult;
 	if (m_curState != nullptr && newState != nullptr)
 	{
-		// if the requested state is the current state (and nothing is pending),
-		// or if the requested state is pending, just punt.
-		//
-		// note that if the requested state matches the current state AND
-		// we also have a pending state, then we nuke both of 'em. This sounds
-		// weird, but is deliberate: nextState and newState will always be "real" states (or null),
-		// leaving us these possibilities:
-		//
-		// -- curState is a transition state
-		//		--in this case, new state should take precedence (unless there's a wait-to-finish marking,
-		//		which would be handled by the else clause)
-		//
-		// -- curState is a real state, nextState is a real state with a wait-to-finish clause
-		//		-- if curState == newState, presume that we should restart curState, thus punting thepending nextState
-		//		-- if curState != newState, presume we should switch to it, thus punting curState and nextState
-		//
-		// -- curState is a real state, nextState is a real state without a wait-to-finish clause
-		//		-- should be impossible!
-
 		if ((m_curState == newState && m_nextState == nullptr) ||
 				(m_curState != nullptr && m_nextState == newState))
 		{
@@ -3951,11 +3999,8 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 				DEBUG_LOG(("IGNORE duplicate state %s for obj %s %d",newState->m_description.str(),getDrawable()->getObject()->getTemplate()->getName().str(),getDrawable()->getObject()->getID()));
 			}
 #endif
-			// I don't think he'll be interested...
-			// he's already got one, you see
 			return;
 		}
-		// check for allow-to-finish implicit transitions
 		else if (newState != m_curState &&
 							newState->m_allowToFinishKey != NAMEKEY_INVALID &&
 							newState->m_allowToFinishKey == m_curState->m_transitionKey &&
@@ -3972,35 +4017,37 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 			m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
 			return;
 		}
-		// check for a normal->normal state transition
-		else if (newState != m_curState && m_curState->m_transitionSig == NO_TRANSITION)
+	}
+
+	const Bool enteringAnimationState = newState != nullptr &&
+		(m_curState == nullptr || m_curState->m_animationState != newState->m_animationState);
+	if (enteringAnimationState && !(TheGameState && TheGameState->isInLoadGame()))
+	{
+		scriptResult = evaluateStateScript(m_curState, newState, m_whichAnimInCurState,
+			scriptedAnimationFraction(m_renderObject), newState->m_transitionSig != NO_TRANSITION);
+		if (scriptResult.transition != nullptr)
 		{
-			const ModelConditionInfo* transState = nullptr;
-			if (!(TheGameState && TheGameState->isInLoadGame()))
-			{
-				Bool continuePrevious = FALSE;
-				const TransitionContext context{getDrawable(), m_whichAnimInCurState, scriptedAnimationFraction(m_renderObject)};
-				transState = getW3DModelDrawModuleData()->findNamedTransition(m_curState, newState, context, continuePrevious);
-				if (continuePrevious && finishCurrentScriptedAnimation(m_renderObject))
-				{
-					m_nextState = newState;
-					m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
-					return;
-				}
-			}
-			if (!transState && m_curState->m_transitionKey != NAMEKEY_INVALID && newState->m_transitionKey != NAMEKEY_INVALID)
-				transState = findTransitionForSig(buildTransitionSig(m_curState->m_transitionKey, newState->m_transitionKey));
-			if (transState != nullptr)
-			{
-#ifdef DEBUG_OBJECT_ID_EXISTS
-				if (getDrawable() && getDrawable()->getObject() && getDrawable()->getObject()->getID() == TheObjectIDToDebug)
-				{
-					DEBUG_LOG(("using TRANSITION state %s before requested state %s for obj %s %d",transState->m_description.str(),newState->m_description.str(),getDrawable()->getObject()->getTemplate()->getName().str(),getDrawable()->getObject()->getID()));
-				}
-#endif
-				nextState = newState;
-				newState = transState;
-			}
+			resolveTransitionChain(scriptResult, newState, nextState);
+		}
+		else if (scriptResult.continuePrevious && m_curState != nullptr && finishCurrentScriptedAnimation(m_renderObject))
+		{
+			applyScriptSubObjects(scriptResult.subObjects);
+			m_nextState = newState;
+			m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
+			return;
+		}
+	}
+
+	if (nextState == nullptr && m_curState != nullptr && newState != nullptr &&
+		newState != m_curState && m_curState->m_transitionSig == NO_TRANSITION &&
+		m_curState->m_transitionKey != NAMEKEY_INVALID && newState->m_transitionKey != NAMEKEY_INVALID)
+	{
+		const ModelConditionInfo* transState = findTransitionForSig(buildTransitionSig(m_curState->m_transitionKey, newState->m_transitionKey));
+		if (transState != nullptr)
+		{
+			nextState = newState;
+			newState = transState;
+			scriptResult.animationIndex = -1;
 		}
 	}
 
@@ -4235,14 +4282,15 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 
 		doHideShowSubObjs(&newState->m_hideShowVec);
 	}
+	applyScriptSubObjects(scriptResult.subObjects);
 	hideAllHeadlights(m_hideHeadlights);
 
-	const ModelConditionInfo* prevState = m_curState;	// save, to pass to adjustAnimation (could be null)
+	const ModelConditionInfo* prevState = m_curState;
 	m_curState = newState;
 	m_nextState = nextState;
 	m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
 	if (!keepAnimation)
-		adjustAnimation(prevState, prevAnimFraction);
+		adjustAnimation(prevState, prevAnimFraction, FALSE, scriptResult.animationIndex);
 
 	if (newState->m_animationState == m_enteredAnimationState)
 		return;
@@ -4948,7 +4996,7 @@ void W3DModelDraw::setWeaponTimingDuration(UnsignedInt numFrames)
 		const Real remainingFrames = backwards ? frame : static_cast<Real>(clipFrames - 1) - frame;
 		if (once && remainingFrames < 1.0f)
 		{
-			adjustAnimation(m_curState, -1.0f);
+			reenterCurrentState();
 			return;
 		}
 	}

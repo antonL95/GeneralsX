@@ -101,8 +101,8 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 	void finishParsing();
 	const ModelConditionInfo* findBestInfo(const ModelConditionFlags& flags) const override;
-	const ModelConditionInfo* findNamedTransition(const ModelConditionInfo* previous, const ModelConditionInfo* destination,
-		const TransitionContext& context, Bool& continuePrevious) const override;
+	ScriptedStateResult runStateScript(const ModelConditionInfo* previous, const ModelConditionInfo* destination,
+		const TransitionContext& context, DrawScript::Environment& globals, Bool inTransition) const;
 	const ModelState* findPlacementDecal(const ModelConditionFlags& flags) const;
 	Bool isGlowEnabled() const override { return m_glowEnabled; }
 	Bool isGlowEmissive() const override { return m_glowEmissive; }
@@ -130,8 +130,6 @@ private:
 	static void parseScript(INI*, void*, void*, const void*);
 	static void parseRandomTexture(INI*, void*, void*, const void*);
 	static void parseAnimationRange(INI*, void*, void*, const void*);
-	static void readScriptSubObjectActions(const std::string& script,
-		std::vector<ModelConditionInfo::HideShowSubObjInfo>& actions);
 
 	const ModelConditionInfo* combineState(const ModelConditionInfo* model, const AnimationState& animation) const;
 	void addScriptedState(const AnimationState& state);
@@ -141,7 +139,7 @@ private:
 	std::vector<AnimationState> m_animationStates;
 	std::multimap<NameKeyType, AnimationState> m_namedTransitions;
 	std::map<const ModelConditionInfo*, const AnimationState*> m_scriptedStates;
-	std::map<const ModelConditionInfo*, std::shared_ptr<const DrawScript>> m_transitionScripts;
+	std::map<const ModelConditionInfo*, std::shared_ptr<const DrawScript>> m_stateScripts;
 	mutable std::map<std::pair<std::size_t, const ModelConditionInfo*>, ModelConditionInfo> m_combinedStates;
 
 	std::vector<RandomTexture> m_randomTextures;
@@ -181,4 +179,11 @@ public:
 	W3DScriptedModelDraw(Thing* thing, const ModuleData* data);
 	static void updatePlacementDecal(const Drawable* ghost, WorldGroundDecal& decal);
 	static ModuleData* friend_newModuleData(INI* ini);
+
+protected:
+	ScriptedStateResult evaluateStateScript(const ModelConditionInfo* previous, const ModelConditionInfo* destination,
+		Int previousAnimation, Real previousFraction, Bool inTransition) override;
+
+private:
+	DrawScript::Environment m_scriptGlobals;
 };
