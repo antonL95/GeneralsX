@@ -34,6 +34,7 @@
 
 248 map-unit-ops-xp Player_1 MapScriptUnitOpsXP 0
 248 map-unit-ops-team-xp Player_1 MapScriptUnitOpsXP 0
+248 map-unit-ops-guard-from Player_1 MapScriptUnitOpsProbe 0
 248 create PlyrCreeps MapScriptScoreTarget 0 2050,140,0
 248 map-unit-ops-kill Player_1 MapScriptVeterancyProbe 0 PlyrCreeps:MapScriptScoreTarget:0
 249 map-unit-ops-veterancy Player_1 MapScriptVeterancyProbe 0

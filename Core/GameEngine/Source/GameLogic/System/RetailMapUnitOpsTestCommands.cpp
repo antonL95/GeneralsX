@@ -177,24 +177,45 @@ void guardAreaProbe(const RetailTestCommands::Context& ctx)
 	PolygonTrigger* area = PolygonTrigger::getFirstPolygonTrigger();
 	while (area && (area->isRetired() || area->getTriggerName().isEmpty()))
 		area = area->getNext();
-	const Int type = ScriptEngine::findRotwkActionByRetailIndex(454);
+	const Bool fromPosition = ctx.action == "map-unit-ops-guard-from";
+	const Int type = ScriptEngine::findRotwkActionByRetailIndex(fromPosition ? 486 : 454);
 	const Template* definition = type >= 0 ? TheScriptEngine->getActionTemplate(type) : nullptr;
+	const char* actionName = fromPosition ? "UNIT_GUARD_AREA_FROM_POSITION" : "UNIT_GUARD_AREA";
+	const AsciiString waypoint = "SpawnPoint_SkirmishGollum_3";
+	const Waypoint* origin = fromPosition ? TheTerrainLogic->getWaypointByName(waypoint) : nullptr;
 	Bool matched = FALSE;
-	if (area && definition && definition->m_internalName == "UNIT_GUARD_AREA" && definition->getNumParameters() == 2 &&
+	Bool fallback = FALSE;
+	if (area && definition && definition->m_internalName == actionName &&
+		definition->getNumParameters() == (fromPosition ? 3 : 2) &&
 		definition->getParameterType(0) == Parameter::UNIT && definition->getParameterType(1) == Parameter::TRIGGER_AREA)
 	{
 		auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
 		action->getParameter(0)->friend_setString(unit->getName());
 		action->getParameter(1)->friend_setString(area->getTriggerName());
+		if (fromPosition)
+			action->getParameter(2)->friend_setString(waypoint);
 		TheScriptEngine->friend_executeAction(action, nullptr);
-		deleteInstance(action);
 		Coord3D center;
 		area->getCenterPoint(&center);
-		const Coord3D* goal = ai->getGuardLocation();
-		matched = ai->getCurrentStateID() == AI_GUARD && ai->getGuardTargetType() == GUARDTARGET_AREA &&
-			goal->x == center.x && goal->y == center.y;
+		const auto guards = [&](const Coord3D& expected) {
+			const Coord3D* goal = ai->getGuardLocation();
+			return ai->getCurrentStateID() == AI_GUARD && ai->getGuardTargetType() == GUARDTARGET_AREA &&
+				goal->x == expected.x && goal->y == expected.y;
+		};
+		matched = fromPosition ? origin && guards(*origin->getLocation()) : guards(center);
+		if (fromPosition)
+		{
+			action->getParameter(2)->friend_setString("MapScriptMissingWaypoint");
+			TheScriptEngine->friend_executeAction(action, nullptr);
+			fallback = guards(center);
+		}
+		deleteInstance(action);
 	}
-	std::fprintf(stderr, "TEST map-unit-ops guard area frame=%u area=%d matched=%d\n", ctx.frame, area != nullptr, matched);
+	if (fromPosition)
+		std::fprintf(stderr, "TEST map-unit-ops guard from frame=%u area=%d matched=%d fallback=%d\n",
+			ctx.frame, area != nullptr, matched, fallback);
+	else
+		std::fprintf(stderr, "TEST map-unit-ops guard area frame=%u area=%d matched=%d\n", ctx.frame, area != nullptr, matched);
 }
 
 void forcePlayerEmotion(const RetailTestCommands::Context& ctx)
@@ -600,6 +621,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-threat", threatProbe);
 	registerAction("map-unit-ops-named-path", namedAttackPathProbe);
 	registerAction("map-unit-ops-guard-area", guardAreaProbe);
+	registerAction("map-unit-ops-guard-from", guardAreaProbe);
 	registerAction("map-unit-ops-force-emotion", forcePlayerEmotion);
 	registerAction("map-unit-ops-emotion-probe", playerEmotionProbe);
 	registerAction("map-unit-ops-team-path", teamAttackPathProbe);

@@ -1,4 +1,7 @@
 check() {
+    if covers 248; then
+        expect "TEST map-unit-ops guard from frame=248 area=1 matched=1 fallback=1"
+    fi
     if grep -q ' map-unit-ops-force-emotion ' "$out/commands.txt"; then
         for frame in 243 245; do
             if covers "$frame"; then
