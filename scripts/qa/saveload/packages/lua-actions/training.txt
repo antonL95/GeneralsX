@@ -1,0 +1,7 @@
+246 lua-action-camera - - 0
+247 lua-action-probe - - 0 Begin
+248 lua-action-probe - - 0 End
+249 create Player_1 LuaActionVictim 0 2320,2830,0
+250 lua-action-probe Player_1 LuaActionVictim 0 Kill
+257 create Player_1 LuaActionPing 0 2340,2830,0
+258 lua-action-camera - - 0

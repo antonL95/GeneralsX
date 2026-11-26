@@ -270,7 +270,8 @@ int executeAction(lua_State* state)
 	const char* name = getName(state, 1);
 	if (!name || !TheScriptEngine || !TheScriptActions)
 		return 0;
-	for (const auto type : { ScriptAction::NAMED_KILL, ScriptAction::CAMERA_LETTERBOX_BEGIN, ScriptAction::CAMERA_LETTERBOX_END })
+	for (const auto type : { ScriptAction::NAMED_KILL, ScriptAction::CAMERA_LETTERBOX_BEGIN,
+		ScriptAction::CAMERA_LETTERBOX_END, ScriptAction::SET_CAMERA_CLIP_DEPTH_MULTIPLIER })
 	{
 		const auto* actionTemplate = TheScriptEngine->getActionTemplate(type);
 		if (!actionTemplate || actionTemplate->m_internalName != name)
@@ -282,6 +283,17 @@ int executeAction(lua_State* state)
 			return 0;
 		}
 		auto* action = newInstance(ScriptAction)(type);
+		if (type == ScriptAction::SET_CAMERA_CLIP_DEPTH_MULTIPLIER)
+		{
+			const lua_Number multiplier = lua_tonumber(state, 2);
+			const lua_Number limit = std::numeric_limits<Real>::max();
+			if (lua_type(state, 2) != LUA_TNUMBER || !(multiplier >= -limit && multiplier <= limit))
+			{
+				deleteInstance(action);
+				return luaL_argerror(state, 2, "expected a finite camera clip depth multiplier");
+			}
+			action->getParameter(0)->friend_setReal(static_cast<Real>(multiplier));
+		}
 		TheScriptActions->executeAction(action);
 		deleteInstance(action);
 		return 0;
