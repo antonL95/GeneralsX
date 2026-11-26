@@ -929,6 +929,8 @@ public:
 #endif
 
 	void groupMoveToPosition( const Coord3D *pos, Bool addWaypoint, CommandSourceType cmdSource );
+
+	void groupMoveToFormation(const Coord3D* position, Real angle, Int templateIndex, Bool attackMove, CommandSourceType cmdSource);
 	void groupMoveToAndEvacuate( const Coord3D *pos, CommandSourceType cmdSource );			///< move to given position(s)
 	void groupMoveToAndEvacuateAndExit( const Coord3D *pos, CommandSourceType cmdSource );			///< move to given position & unload transport.
 	void groupIdle(CommandSourceType cmdSource);						///< Enter idle state.

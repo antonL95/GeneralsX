@@ -33,6 +33,7 @@
 
 #include "WWMath/wwmath.h"
 #include "Common/INI.h"
+#include "GameLogic/FormationAssistant.h"
 #include "GameClient/RetailEva.h"
 #include "GameClient/RetailLargeGroupAudio.h"
 #include "GameClient/RetailHudExtras.h"
@@ -184,6 +185,7 @@ struct BlockParse
 static const BlockParse theTypeTable[] =
 {
 	{ "AIData",                         INI::parseAIDataDefinition },
+	{ "FormationAssistant",             FormationAssistant::parseDefinition },
 	{ "Animation",                      INI::parseAnim2DDefinition },
 	{ "Armor",                          INI::parseArmorDefinition },
 	{ "AudioEvent",                     INI::parseAudioEventDefinition },

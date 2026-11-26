@@ -802,6 +802,17 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onDoMoveto(msg, currentlySelectedGroup);
 			break;
 		}
+		case GameMessage::MSG_DO_MOVETO_FORMATION:
+		{
+			if (currentlySelectedGroup)
+			{
+				const Coord3D destination = msg->getArgument(0)->location;
+				currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);
+				currentlySelectedGroup->groupMoveToFormation(&destination, msg->getArgument(1)->real, msg->getArgument(2)->integer,
+					msg->getArgument(3)->boolean, CMD_FROM_PLAYER);
+			}
+			break;
+		}
 		case GameMessage::MSG_ADD_WAYPOINT:
 		{
 			onAddWaypoint(msg, currentlySelectedGroup);

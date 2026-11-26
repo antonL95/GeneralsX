@@ -770,6 +770,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/RetailCreationUpgrades.cpp
     Source/GameLogic/System/RetailLogicBenchmark.cpp
     Source/GameLogic/System/RetailWallMesh.cpp
+    Source/GameLogic/AI/FormationAssistant.cpp
     Source/GameLogic/System/RetailTestCommands.cpp
     Source/GameLogic/System/RetailBuildingEvents.cpp
     Source/GameLogic/Object/Behavior/RetailConstruction.cpp
@@ -1022,6 +1023,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/MapUtil.cpp
     Source/GameClient/MessageStream/CommandXlat.cpp
     Source/GameClient/MessageStream/GUICommandTranslator.cpp
+    Source/GameClient/MessageStream/FormationDragXlat.cpp
     Source/GameClient/MessageStream/HintSpy.cpp
     Source/GameClient/MessageStream/HotKey.cpp
     Source/GameClient/MessageStream/LookAtXlat.cpp

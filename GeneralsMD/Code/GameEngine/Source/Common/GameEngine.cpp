@@ -954,6 +954,7 @@ void GameEngine::init()
 		{
 			initSubsystem(TheAttributeModifierStore, "TheAttributeModifierStore", MSGNEW("GameEngineSubsystem") AttributeModifierStore(), nullptr);
 			RetailINIStartup::loadFile("Data\\INI\\Stances.ini", &xferCRC);
+			RetailINIStartup::loadFile("Data\\INI\\FormationAssistant.ini", &xferCRC);
 			RetailINIStartup::preprocessSubsystem("TheLightPointSystem");
 			ExperienceLevelStore::load();
 			for (const char* name : {

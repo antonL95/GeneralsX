@@ -2485,6 +2485,29 @@ DECLARE_PERF_TIMER(doLocomotor)
 /**
  * Compute drive forces
  */
+void AIUpdateInterface::setArrivalFacing(Real angle)
+{
+	m_arrivalFacing = angle;
+	m_hasArrivalFacing = TRUE;
+	wakeUpNow();
+}
+
+Bool AIUpdateInterface::turnToArrivalFacing()
+{
+	if (!m_hasArrivalFacing || !isIdle())
+		return FALSE;
+	const Real FACING_TOLERANCE = 0.05f;
+	Object* object = getObject();
+	if (fabs(stdAngleDiff(m_arrivalFacing, object->getOrientation())) <= FACING_TOLERANCE)
+	{
+		object->setOrientation(m_arrivalFacing);
+		m_hasArrivalFacing = FALSE;
+		return FALSE;
+	}
+	m_curLocomotor->locoUpdate_moveTowardsAngle(object, m_arrivalFacing);
+	return TRUE;
+}
+
 Bool AIUpdateInterface::steerInFormation()
 {
 	if (!RetailFileLayers::enabled() || !isIdle())
@@ -2684,7 +2707,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 					{
 						if (m_curLocomotor && m_curLocomotor->isScalingWall())
 							m_curLocomotor->stopScalingWall(getObject());
-						if (!m_doFinalPosition && steerInFormation())
+						if (!m_doFinalPosition && (steerInFormation() || turnToArrivalFacing()))
 							break;
 						if (m_doFinalPosition)
 						{
@@ -3082,6 +3105,8 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 	m_retailPlannerAttackTarget = INVALID_ID;
 	m_retailPlannerOrderActive = FALSE;
 	m_retailRingReturn = FALSE;
+	if (parms->m_cmdSource != CMD_FROM_AI)
+		m_hasArrivalFacing = FALSE;
 
 #ifdef ALLOW_SURRENDER
 	// surrendered items have very limited options, and only via AI cmds
@@ -6096,6 +6121,13 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferUnsignedInt(&m_rampageEjectFrame);
 		}, [this] {
 			m_rampageEjectFrame = 0;
+		} },
+		{ "arrival-facing", [this](Xfer* x) {
+			x->xferBool(&m_hasArrivalFacing);
+			x->xferReal(&m_arrivalFacing);
+		}, [this] {
+			m_hasArrivalFacing = FALSE;
+			m_arrivalFacing = 0.0f;
 		} }
 	});
 }

@@ -44,9 +44,13 @@
 #include "GameClient/Line2D.h"
 
 #include "GameLogic/AI.h"
+#include "GameLogic/FormationAssistant.h"
+#include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/AIPathfind.h"
 #include "Common/RetailFileLayers.h"
 #include "GameLogic/Locomotor.h"
+#include "GameLogic/TerrainLogic.h"
+#include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -2109,6 +2113,42 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 //-------------------------------------------------------------------------------------------------
 // AI Command Interface implementation for AIGroup
 //
+
+void AIGroup::groupMoveToFormation(const Coord3D* position, Real angle, Int templateIndex, Bool attackMove, CommandSourceType cmdSource)
+{
+	if (templateIndex < 0)
+	{
+		groupMoveToPosition(position, FALSE, cmdSource);
+		return;
+	}
+	if (m_dirty)
+		recompute();
+
+	std::vector<Object*> units;
+	for (Object* member : m_memberList)
+	{
+		if (member->isDisabledByType(DISABLED_HELD) || member->isKindOf(KINDOF_IMMOBILE) || !member->getAI())
+			continue;
+		if (HordeContain::get(member->getContainedBy()))
+			continue;
+		units.push_back(member);
+	}
+
+	Coord3D anchor = *position;
+	clampWaypointPosition(anchor, STD_WAYPOINT_CLAMP_MARGIN);
+	for (FormationSlot& slot : FormationAssistant::get().layout(templateIndex, std::move(units), anchor, angle))
+	{
+		clampWaypointPosition(slot.m_position, STD_WAYPOINT_CLAMP_MARGIN);
+		slot.m_position.z = TheTerrainLogic->getGroundHeight(slot.m_position.x, slot.m_position.y);
+		slot.m_unit->setFormationID(NO_FORMATION_ID);
+		AIUpdateInterface* ai = slot.m_unit->getAIUpdateInterface();
+		if (attackMove)
+			ai->aiAttackMoveToPosition(&slot.m_position, NO_MAX_SHOTS_LIMIT, cmdSource);
+		else
+			ai->aiMoveToPosition(&slot.m_position, cmdSource);
+		ai->setArrivalFacing(angle);
+	}
+}
 
 /**
  * Scatter

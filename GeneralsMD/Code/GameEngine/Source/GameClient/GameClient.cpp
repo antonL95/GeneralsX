@@ -81,6 +81,7 @@
 #include "GameLogic/RetailLogicBenchmark.h"
 #include "GameClient/PlaceEventTranslator.h"
 #include "GameClient/RayEffect.h"
+#include "GameClient/FormationDragXlat.h"
 #include "GameClient/SelectionXlat.h"
 #include "GameClient/Shell.h"
 #include "GameClient/Snow.h"
@@ -315,6 +316,7 @@ void GameClient::init()
 		// since we only allocate one of each, don't bother pooling 'em
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") WindowTranslator,     10 );
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") MetaEventTranslator,	20 );
+		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") FormationDragTranslator,	22 );
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") HotKeyTranslator,	25 );
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") PlaceEventTranslator,	30 );
 		m_translators[ m_numTranslators++ ] = TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") GUICommandTranslator, 40 );

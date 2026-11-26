@@ -557,6 +557,7 @@ public:
 	Bool issueRetailPlannerAttack(Object* target);
 	Bool issueRetailPlannerAdvance(const Coord3D& position);
 	Bool issueRetailRingReturn(Object* citadel);
+	void setArrivalFacing(Real angle);
 	Bool isReturningRetailRing() const { return m_retailRingReturn && getCurrentStateID() == AI_ENTER; }
 	Bool canAcceptRetailPlannerOrder(Bool attackObject) const;
 	Bool hasRetailPlannerAttack(const Object* target) const;
@@ -685,6 +686,7 @@ protected:
 
 	virtual UpdateSleepTime doLocomotor();	// virtual so subclasses can override
 	Bool steerInFormation();
+	Bool turnToArrivalFacing();
 	void updateAirborneTargetStatus();
 	void chooseGoodLocomotorFromCurrentSet();
 
@@ -876,6 +878,8 @@ private:
 	UnsignedInt m_retailPlannerPathRevision = 0;
 	UnsignedInt m_retailPlannerBlockedRevision = 0;
 	UnsignedInt m_retailEngagedUntil = 0;
+	Real m_arrivalFacing = 0.0f;
+	Bool m_hasArrivalFacing = FALSE;
 	UnsignedInt m_weaponMovementHoldUntil = 0;
 	Bool m_fadedInPortal = FALSE;
 	UnsignedInt m_rampageUntil = 0;
