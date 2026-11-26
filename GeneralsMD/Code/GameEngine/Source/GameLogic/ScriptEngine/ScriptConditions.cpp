@@ -62,6 +62,7 @@
 #include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/FoundationAIUpdate.h"
 #include "GameLogic/ObjectTypes.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptConditions.h"
@@ -3145,6 +3146,20 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 				if (!member.cur()->isEffectivelyDead() && member.cur()->isKindOf(static_cast<KindOfType>(kind)))
 					++count;
 			return count < pCondition->getParameter(1)->getInt();
+		}
+		case Condition::PLAYER_HAS_OBJECT_OF_VETERANCY:
+		{
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pCondition->getParameter(0)->getString());
+			if (!players)
+				return FALSE;
+			ObjectTypesTemp types;
+			objectTypesFromParam(pCondition->getParameter(1), types.m_types);
+			const Int comparison = pCondition->getParameter(2)->getInt();
+			const Int rank = pCondition->getParameter(3)->getInt();
+			return countRetailScriptObjects(players, [&](const Object& object) {
+				return types.m_types->isInSet(object.getTemplate()) &&
+					BfmeScriptRules::compare(comparison, object.getExperienceTracker()->getRank(), rank);
+			}) > 0;
 		}
 		case Condition::PLAYER_HAS_NUMBER_OBJECTS_WITH_MODELCONDITION:
 		{

@@ -1,4 +1,9 @@
 check() {
+    for frame in 243 249; do
+        if covers "$frame"; then
+            expect "TEST map-unit-ops veterancy frame=$frame match=1 reject=1"
+        fi
+    done
     for frame in 239 248; do
         if covers "$frame"; then
             expect "TEST map-unit-ops xp frame=$frame sink=1 amount=1 negative=1"

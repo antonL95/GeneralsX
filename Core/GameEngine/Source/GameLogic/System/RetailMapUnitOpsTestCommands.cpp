@@ -38,6 +38,60 @@ Bool attack(Team* team, Object* unit, const char* waypoint)
 	return FALSE;
 }
 
+Bool veteranCondition(const char* owner, const char* type, Int comparison, Int rank)
+{
+	for (Int i = 0; i < Condition::NUM_ITEMS; ++i)
+	{
+		const Template* definition = TheScriptEngine->getConditionTemplate(i);
+		if (definition->m_internalName != "PLAYER_HAS_OBJECT_OF_VETERANCY" ||
+			ScriptEngine::findRotwkConditionByRetailIndex(146) != i || definition->getNumParameters() != 4 ||
+			definition->getParameterType(0) != Parameter::SIDE || definition->getParameterType(1) != Parameter::OBJECT_TYPE ||
+			definition->getParameterType(2) != Parameter::COMPARISON || definition->getParameterType(3) != Parameter::INT)
+			continue;
+		auto* condition = newInstance(Condition)(static_cast<Condition::ConditionType>(i));
+		condition->getParameter(0)->friend_setString(owner);
+		condition->getParameter(1)->friend_setString(type);
+		condition->getParameter(2)->friend_setInt(comparison);
+		condition->getParameter(3)->friend_setInt(rank);
+		auto* clause = newInstance(OrCondition);
+		clause->setFirstAndCondition(condition);
+		auto* script = newInstance(Script);
+		script->setOrCondition(clause);
+		const Bool result = TheScriptEngine->evaluateConditions(script, nullptr);
+		deleteInstance(script);
+		return result;
+	}
+	return FALSE;
+}
+
+void veterancyProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* unit = ctx.requireObject();
+	if (!unit)
+		return;
+	INI ini;
+	ini.loadText("map-unit-ops-veterancy", R"(
+ExperienceLevel MapScriptVeterancyFirst
+    TargetNames = MapScriptVeterancyProbe
+    RequiredExperience = 1
+    Rank = 1
+End
+ExperienceLevel MapScriptVeterancySecond
+    TargetNames = MapScriptVeterancyProbe
+    RequiredExperience = 20
+    Rank = 2
+End
+)", INI_LOAD_OVERWRITE, "ExperienceLevel", ExperienceLevelStore::parseDefinition);
+	unit->getExperienceTracker()->setTrainable(TRUE);
+	unit->getExperienceTracker()->setMinRetailRank(2);
+	const Bool match = veteranCondition("Player_1", "MapScriptVeterancyProbe", 2, 2) &&
+		veteranCondition("Player_1", "MapScriptVeterancyProbe", 3, 2);
+	const Bool reject = !veteranCondition("Player_1", "MapScriptVeterancyProbe", 0, 2) &&
+		!veteranCondition("Player_1", "MapScriptVeterancyMissing", 2, 2) &&
+		!veteranCondition("PlyrCreeps", "MapScriptVeterancyProbe", 2, 2);
+	std::fprintf(stderr, "TEST map-unit-ops veterancy frame=%u match=%d reject=%d\n", ctx.frame, match, reject);
+}
+
 void experienceProbe(const RetailTestCommands::Context& ctx)
 {
 	Object* source = ctx.requireObject();
@@ -167,6 +221,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-attack", probe);
 	registerAction("map-unit-ops-teleport", teleportProbe);
 	registerAction("map-unit-ops-xp", experienceProbe);
+	registerAction("map-unit-ops-veterancy", veterancyProbe);
 #endif
 }
 }
