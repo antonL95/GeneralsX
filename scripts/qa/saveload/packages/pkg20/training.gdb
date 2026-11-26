@@ -1,4 +1,4 @@
-break *'FXList::doFXObj(Object const*, Object const*, bool) const' if TheGameLogic && ((TheGameLogic->m_frame >= 188 && TheGameLogic->m_frame <= 192) || TheGameLogic->m_frame == 195)
+break *'FXList::doFXObj(Object const*, Object const*, bool) const' if TheGameLogic && ((TheGameLogic->m_frame >= 888 && TheGameLogic->m_frame <= 892) || TheGameLogic->m_frame == 895)
 commands
   silent
   if primary != 0
@@ -7,7 +7,7 @@ commands
   continue
 end
 
-break *'FXList::doFXPos(Coord3D const*, Matrix3D const*, float, Coord3D const*, float, Object const*, Object const*, bool) const' if TheGameLogic && TheGameLogic->m_frame == 190
+break *'FXList::doFXPos(Coord3D const*, Matrix3D const*, float, Coord3D const*, float, Object const*, Object const*, bool) const' if TheGameLogic && TheGameLogic->m_frame == 890
 commands
   silent
   if primary != 0

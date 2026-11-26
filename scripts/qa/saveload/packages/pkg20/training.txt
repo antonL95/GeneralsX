@@ -1,151 +1,120 @@
-180 create PlyrCreeps Pkg20Source 0 1560,850,0
-180 create Player_1 Pkg20Horde 0 920,850,0
-180 create Player_1 Pkg20Stacking 0 980,850,0
-180 create Player_1 Pkg20Radius 0 920,790,0
-180 create Player_1 Pkg20RadiusControl 0 1220,790,0
-180 create Player_1 Pkg20Infantry 0 930,790,0
-180 create Player_1 Pkg20InfantryControl 0 1230,790,0
-180 create Player_1 Pkg20Captain 0 1020,850,0
-180 create Player_1 Pkg20CaptainControl 0 1340,850,0
-180 create Player_1 Pkg20Hero 0 1360,850,0
-180 create Player_1 Pkg20Barrow 0 1060,790,0
-180 create Player_1 Pkg20BarrowControl 0 1140,790,0
-180 create Player_1 Pkg20Statue 0 1430,790,0
-180 create Player_1 Pkg20StatueControl 0 1560,790,0
-180 create PlyrCreeps Pkg20Cheerer 0 1400,790,0
-180 create PlyrCreeps Pkg20Cheerer 1 1590,790,0
-180 create Player_1 Pkg20ImmediateEnt 0 1420,850,0
-180 create Player_1 Pkg20ImmediateEnt 1 1470,850,90
-180 create Player_1 Pkg20ImmediateEnt 2 1520,850,0
-180 create PlyrCreeps Pkg20Ruins 0 1540,850,180
-180 create Player_1 Pkg20ImmediateEnt 3 1570,850,90
-180 create PlyrCreeps Pkg20RuinsControl 0 1590,850,180
-180 create PlyrCreeps Pkg20Rock 0 1440,850,0
-180 create PlyrCreeps Pkg20RockVendor 0 1490,850,0
-180 create Player_1 Pkg20EntOak 0 1300,790,0
-180 create PlyrCreeps Pkg20ThrowableRock 0 1320,790,0
-181 pkg20-fx-list Player_1 Pkg20Captain 0 FX_SpellHealUnitHealBuff
-181 pkg20-fx-list Player_1 Pkg20Captain 0 FX_AragornAthelas
-181 pkg20-fx-list Player_1 Pkg20Captain 0 FX_WallGrab
-182 pkg20-grab Player_1 Pkg20EntOak 0 PlyrCreeps:Pkg20ThrowableRock:0
-188 pkg11-hurt-members Player_1 Pkg20Horde 0 - 100 0
-188 pkg11-hurt-members Player_1 Pkg20Stacking 0 - 100 0
-188 objupgrade Player_1 Pkg20Horde 0 Upgrade_TechnologyRivendellMedicine
-188 objupgrade Player_1 Pkg20Stacking 0 Upgrade_TechnologyRivendellMedicine
-188 pkg20-pulse Player_1 Pkg20Horde 0
-190 log Player_1 Pkg20ImmediateEnt 1
-190 log Player_1 Pkg20ImmediateEnt 2
-190 pkg20-grab Player_1 Pkg20ImmediateEnt 0 PlyrCreeps:Pkg20Rock:0
-190 pkg20-grab Player_1 Pkg20ImmediateEnt 1 PlyrCreeps:Pkg20RockVendor:0
-190 pkg20-grab Player_1 Pkg20ImmediateEnt 2 PlyrCreeps:Pkg20Ruins:0 1 0
-190 pkg20-grab Player_1 Pkg20ImmediateEnt 3 PlyrCreeps:Pkg20RuinsControl:0 1 0
-190 pkg20-held Player_1 Pkg20ImmediateEnt 0
-190 pkg20-held Player_1 Pkg20ImmediateEnt 1
-190 pkg20-state Player_1 Pkg20Infantry 0
-190 pkg20-state Player_1 Pkg20Hero 0
-192 pkg11-state Player_1 Pkg20Horde 0
-192 pkg11-state Player_1 Pkg20Stacking 0
-192 pkg20-pulse Player_1 Pkg20Horde 0 - 2 0
-192 pkg20-pulse Player_1 Pkg20Stacking 0 - 2 0
-192 pkg11-state Player_1 Pkg20Horde 0
-192 pkg11-state Player_1 Pkg20Stacking 0
-194 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Captain:0 200 0
-194 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20CaptainControl:0 200 0
-194 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Hero:0 200 0
-195 pkg20-pulse Player_1 Pkg20Captain 0
-195 pkg20-pulse Player_1 Pkg20CaptainControl 0
-195 pkg20-state Player_1 Pkg20Captain 0
-195 pkg20-state Player_1 Pkg20CaptainControl 0
-195 pkg20-state Player_1 Pkg20Hero 0
-197 destroy Player_1 Pkg20Captain 0
-197 destroy Player_1 Pkg20CaptainControl 0
-197 destroy Player_1 Pkg20Hero 0
-204 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Barrow:0 300 0
-204 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20BarrowControl:0 300 0
-205 pkg20-state Player_1 Pkg20Barrow 0
-205 pkg20-state Player_1 Pkg20BarrowControl 0
-206 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Barrow:0 500 0
-206 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20BarrowControl:0 500 0
-207 pkg20-state Player_1 Pkg20Barrow 0
-207 pkg20-state Player_1 Pkg20BarrowControl 0
-208 pkg11-heal Player_1 Pkg20Barrow 0 - 2500 0
-208 pkg11-heal Player_1 Pkg20BarrowControl 0 - 2500 0
-209 pkg20-state Player_1 Pkg20Barrow 0
-209 pkg20-state Player_1 Pkg20BarrowControl 0
-214 pkg20-state PlyrCreeps Pkg20Rock 0
-214 pkg11-state PlyrCreeps Pkg20Rock 0
-214 pkg11-state PlyrCreeps Pkg20RockVendor 0
-221 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Statue:0 10000 0
-221 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20StatueControl:0 10000 0
-222 pkg20-state PlyrCreeps Pkg20Cheerer 0
-222 pkg20-state PlyrCreeps Pkg20Cheerer 1
-224 destroy Player_1 Pkg20Statue 0
-224 destroy Player_1 Pkg20StatueControl 0
-224 destroy PlyrCreeps Pkg20Cheerer 0
-224 destroy PlyrCreeps Pkg20Cheerer 1
-238 pkg20-hit-member PlyrCreeps Pkg20Source 0 Player_1:Pkg20Horde:0 10 0
-239 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Infantry:0 100 0
-239 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20InfantryControl:0 100 0
-240 pkg20-hit-member PlyrCreeps Pkg20Source 0 Player_1:Pkg20Radius:0 10 0
-240 pkg20-hit-member PlyrCreeps Pkg20Source 0 Player_1:Pkg20RadiusControl:0 10 0
-241 pkg20-state Player_1 Pkg20Radius 0
-241 pkg20-state Player_1 Pkg20RadiusControl 0
-242 pkg20-pulse Player_1 Pkg20Horde 0
-242 pkg11-state Player_1 Pkg20Horde 0
-243 pkg20-held Player_1 Pkg20ImmediateEnt 0
-243 pkg20-held Player_1 Pkg20ImmediateEnt 1
-243 pkg20-held Player_1 Pkg20EntOak 0
-243 pkg20-held Player_1 Pkg20ImmediateEnt 2
-243 pkg20-held Player_1 Pkg20ImmediateEnt 3
-243 pkg11-state PlyrCreeps Pkg20Ruins 0
-243 pkg11-state PlyrCreeps Pkg20RuinsControl 0
-243 pkg20-ownership Player_1 Pkg20ImmediateEnt 0 PlyrCreeps:Pkg20Rock:0
-245 pkg20-held Player_1 Pkg20ImmediateEnt 0
-245 pkg20-held Player_1 Pkg20ImmediateEnt 2
-245 pkg20-ownership Player_1 Pkg20ImmediateEnt 0 PlyrCreeps:Pkg20Rock:0
-245 pkg20-state Player_1 Pkg20Radius 0
-245 pkg20-state Player_1 Pkg20RadiusControl 0
-246 pkg20-pulse Player_1 Pkg20Radius 0
-246 pkg20-pulse Player_1 Pkg20RadiusControl 0
-246 pkg20-state Player_1 Pkg20Infantry 0
-246 pkg20-state Player_1 Pkg20InfantryControl 0
-247 destroy Player_1 Pkg20Horde 0
-247 destroy Player_1 Pkg20Stacking 0
-247 destroy Player_1 Pkg20ImmediateEnt 0
-247 destroy Player_1 Pkg20ImmediateEnt 1
-247 destroy Player_1 Pkg20ImmediateEnt 2
-247 destroy Player_1 Pkg20ImmediateEnt 3
-247 destroy Player_1 Pkg20EntOak 0
-247 destroy PlyrCreeps Pkg20Rock 0
-247 destroy PlyrCreeps Pkg20RockVendor 0
-247 destroy PlyrCreeps Pkg20Ruins 0
-247 destroy PlyrCreeps Pkg20RuinsControl 0
-247 destroy PlyrCreeps Pkg20ThrowableRock 0
-269 pkg20-pulse Player_1 Pkg20Radius 0
-269 pkg20-state Player_1 Pkg20Infantry 0
-270 pkg20-pulse Player_1 Pkg20Radius 0
-270 pkg20-state Player_1 Pkg20Infantry 0
-272 destroy Player_1 Pkg20Radius 0
-272 destroy Player_1 Pkg20RadiusControl 0
-272 destroy Player_1 Pkg20Infantry 0
-272 destroy Player_1 Pkg20InfantryControl 0
-280 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Barrow:0 10000 0
-280 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20BarrowControl:0 10000 2
-281 pkg20-state Player_1 Pkg20Barrow 0
-281 pkg20-state Player_1 Pkg20BarrowControl 0
-283 destroy Player_1 Pkg20Barrow 0
-283 destroy Player_1 Pkg20BarrowControl 0
-310 create Player_1 Pkg20Troll 0 960,820,0
-310 create PlyrCreeps Pkg20Rock 1 1010,820,0
-310 create Player_1 Pkg20FindRockEnt 0 1160,820,0
-310 create PlyrCreeps Pkg20Rock 2 1210,820,0
-315 pkg20-check-grab Player_1 Pkg20Troll 0 PlyrCreeps:Pkg20Rock:1
-315 pkg12-pickup-order Player_1 Pkg20FindRockEnt 0 Command_SpecialAbilityEntFindRock
-316 pkg12-pickup-state Player_1 Pkg20FindRockEnt 0
-440 pkg20-held Player_1 Pkg20Troll 0
-440 pkg20-ownership Player_1 Pkg20FindRockEnt 0 PlyrCreeps:Pkg20Rock:2
-442 destroy Player_1 Pkg20Troll 0
-442 destroy Player_1 Pkg20FindRockEnt 0
-442 destroy PlyrCreeps Pkg20Rock 1
-442 destroy PlyrCreeps Pkg20Rock 2
-442 destroy PlyrCreeps Pkg20Source 0
+880 create PlyrCreeps Pkg20Source 0 1560,850,0
+880 create Player_1 Pkg20Horde 0 920,850,0
+880 create Player_1 Pkg20Stacking 0 980,850,0
+880 create Player_1 Pkg20Radius 0 920,790,0
+880 create Player_1 Pkg20RadiusControl 0 1220,790,0
+880 create Player_1 Pkg20Infantry 0 930,790,0
+880 create Player_1 Pkg20InfantryControl 0 1230,790,0
+880 create Player_1 Pkg20Captain 0 1020,850,0
+880 create Player_1 Pkg20CaptainControl 0 1340,850,0
+880 create Player_1 Pkg20Hero 0 1360,850,0
+880 create Player_1 Pkg20Barrow 0 1060,790,0
+880 create Player_1 Pkg20BarrowControl 0 1140,790,0
+880 create Player_1 Pkg20ImmediateEnt 0 1420,850,0
+880 create Player_1 Pkg20ImmediateEnt 1 1470,850,90
+880 create Player_1 Pkg20ImmediateEnt 2 1520,850,0
+880 create PlyrCreeps Pkg20Ruins 0 1540,850,180
+880 create Player_1 Pkg20ImmediateEnt 3 1570,850,90
+880 create PlyrCreeps Pkg20RuinsControl 0 1590,850,180
+880 create PlyrCreeps Pkg20Rock 0 1440,850,0
+880 create PlyrCreeps Pkg20RockVendor 0 1490,850,0
+881 pkg20-fx-list Player_1 Pkg20Captain 0 FX_SpellHealUnitHealBuff
+881 pkg20-fx-list Player_1 Pkg20Captain 0 FX_AragornAthelas
+881 pkg20-fx-list Player_1 Pkg20Captain 0 FX_WallGrab
+888 pkg11-hurt-members Player_1 Pkg20Horde 0 - 100 0
+888 pkg11-hurt-members Player_1 Pkg20Stacking 0 - 100 0
+888 objupgrade Player_1 Pkg20Horde 0 Upgrade_TechnologyRivendellMedicine
+888 objupgrade Player_1 Pkg20Stacking 0 Upgrade_TechnologyRivendellMedicine
+888 pkg20-pulse Player_1 Pkg20Horde 0
+890 log Player_1 Pkg20ImmediateEnt 1
+890 log Player_1 Pkg20ImmediateEnt 2
+890 pkg20-grab Player_1 Pkg20ImmediateEnt 0 PlyrCreeps:Pkg20Rock:0
+890 pkg20-grab Player_1 Pkg20ImmediateEnt 1 PlyrCreeps:Pkg20RockVendor:0
+890 pkg20-grab Player_1 Pkg20ImmediateEnt 2 PlyrCreeps:Pkg20Ruins:0 1 0
+890 pkg20-grab Player_1 Pkg20ImmediateEnt 3 PlyrCreeps:Pkg20RuinsControl:0 1 0
+890 pkg20-held Player_1 Pkg20ImmediateEnt 0
+890 pkg20-held Player_1 Pkg20ImmediateEnt 1
+890 pkg20-state Player_1 Pkg20Infantry 0
+890 pkg20-state Player_1 Pkg20Hero 0
+892 pkg11-state Player_1 Pkg20Horde 0
+892 pkg11-state Player_1 Pkg20Stacking 0
+892 pkg20-pulse Player_1 Pkg20Horde 0 - 2 0
+892 pkg20-pulse Player_1 Pkg20Stacking 0 - 2 0
+892 pkg11-state Player_1 Pkg20Horde 0
+892 pkg11-state Player_1 Pkg20Stacking 0
+894 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Captain:0 200 0
+894 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20CaptainControl:0 200 0
+894 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Hero:0 200 0
+895 pkg20-pulse Player_1 Pkg20Captain 0
+895 pkg20-pulse Player_1 Pkg20CaptainControl 0
+895 pkg20-state Player_1 Pkg20Captain 0
+895 pkg20-state Player_1 Pkg20CaptainControl 0
+895 pkg20-state Player_1 Pkg20Hero 0
+897 destroy Player_1 Pkg20Captain 0
+897 destroy Player_1 Pkg20CaptainControl 0
+897 destroy Player_1 Pkg20Hero 0
+904 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Barrow:0 300 0
+904 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20BarrowControl:0 300 0
+906 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Barrow:0 500 0
+906 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20BarrowControl:0 500 0
+908 pkg11-heal Player_1 Pkg20Barrow 0 - 2500 0
+908 pkg11-heal Player_1 Pkg20BarrowControl 0 - 2500 0
+914 pkg20-state PlyrCreeps Pkg20Rock 0
+914 pkg11-state PlyrCreeps Pkg20Rock 0
+914 pkg11-state PlyrCreeps Pkg20RockVendor 0
+938 pkg20-hit-member PlyrCreeps Pkg20Source 0 Player_1:Pkg20Horde:0 10 0
+939 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Infantry:0 100 0
+939 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20InfantryControl:0 100 0
+940 pkg20-hit-member PlyrCreeps Pkg20Source 0 Player_1:Pkg20Radius:0 10 0
+940 pkg20-hit-member PlyrCreeps Pkg20Source 0 Player_1:Pkg20RadiusControl:0 10 0
+941 pkg20-state Player_1 Pkg20Radius 0
+941 pkg20-state Player_1 Pkg20RadiusControl 0
+942 pkg20-pulse Player_1 Pkg20Horde 0
+942 pkg11-state Player_1 Pkg20Horde 0
+943 pkg20-held Player_1 Pkg20ImmediateEnt 0
+943 pkg20-held Player_1 Pkg20ImmediateEnt 1
+943 pkg20-held Player_1 Pkg20ImmediateEnt 2
+943 pkg20-held Player_1 Pkg20ImmediateEnt 3
+943 pkg11-state PlyrCreeps Pkg20Ruins 0
+943 pkg11-state PlyrCreeps Pkg20RuinsControl 0
+943 pkg20-ownership Player_1 Pkg20ImmediateEnt 0 PlyrCreeps:Pkg20Rock:0
+945 pkg20-held Player_1 Pkg20ImmediateEnt 0
+945 pkg20-held Player_1 Pkg20ImmediateEnt 2
+945 pkg20-ownership Player_1 Pkg20ImmediateEnt 0 PlyrCreeps:Pkg20Rock:0
+945 pkg20-state Player_1 Pkg20Radius 0
+945 pkg20-state Player_1 Pkg20RadiusControl 0
+946 pkg20-pulse Player_1 Pkg20Radius 0
+946 pkg20-pulse Player_1 Pkg20RadiusControl 0
+946 pkg20-state Player_1 Pkg20Infantry 0
+946 pkg20-state Player_1 Pkg20InfantryControl 0
+947 destroy Player_1 Pkg20Horde 0
+947 destroy Player_1 Pkg20Stacking 0
+947 destroy Player_1 Pkg20ImmediateEnt 0
+947 destroy Player_1 Pkg20ImmediateEnt 1
+947 destroy Player_1 Pkg20ImmediateEnt 2
+947 destroy Player_1 Pkg20ImmediateEnt 3
+947 destroy PlyrCreeps Pkg20Rock 0
+947 destroy PlyrCreeps Pkg20RockVendor 0
+947 destroy PlyrCreeps Pkg20Ruins 0
+947 destroy PlyrCreeps Pkg20RuinsControl 0
+969 pkg20-pulse Player_1 Pkg20Radius 0
+969 pkg20-state Player_1 Pkg20Infantry 0
+970 pkg20-pulse Player_1 Pkg20Radius 0
+970 pkg20-state Player_1 Pkg20Infantry 0
+972 destroy Player_1 Pkg20Radius 0
+972 destroy Player_1 Pkg20RadiusControl 0
+972 destroy Player_1 Pkg20Infantry 0
+972 destroy Player_1 Pkg20InfantryControl 0
+980 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20Barrow:0 10000 0
+980 pkg11-damage PlyrCreeps Pkg20Source 0 Player_1:Pkg20BarrowControl:0 10000 2
+981 pkg20-state Player_1 Pkg20Barrow 0
+981 pkg20-state Player_1 Pkg20BarrowControl 0
+983 destroy Player_1 Pkg20Barrow 0
+983 destroy Player_1 Pkg20BarrowControl 0
+1010 create Player_1 Pkg20Troll 0 960,820,0
+1010 create PlyrCreeps Pkg20Rock 0 1010,820,0
+1015 pkg20-check-grab Player_1 Pkg20Troll 0 PlyrCreeps:Pkg20Rock:0
+1140 pkg20-held Player_1 Pkg20Troll 0
+1142 destroy Player_1 Pkg20Troll 0
+1142 destroy PlyrCreeps Pkg20Rock 0
+1142 destroy PlyrCreeps Pkg20Source 0
