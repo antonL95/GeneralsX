@@ -71,6 +71,7 @@
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
 #include "GameLogic/RetailSkirmishSpending.h"
+#include "GameLogic/RetailLogicBenchmark.h"
 #include "Common/StatsCollector.h"
 #include "Common/ThingFactory.h"
 #include "Common/Team.h"
@@ -123,6 +124,7 @@
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DestroyModule.h"
 #include "GameLogic/Module/OpenContain.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/RetailTerrainFire.h"
@@ -4282,6 +4284,8 @@ void GameLogic::update()
 	if (TheFramePacer->isTimeFrozen())
 		return;
 
+	RetailLogicBenchmark::FrameScope benchmarkFrameScope;
+
 	// Note - TerrainLogic update needs to happen after ScriptEngine update, but before object updates.  jba.
 	// This way changes in bridges are noted in the script engine before being cleared in TerrainLogic->update
 	{
@@ -4414,7 +4418,33 @@ void GameLogic::update()
 				//DEBUG_LOG(("calling update %08lx (%d %d)...",update,update->friend_getNextCallFrame(),update->friend_getNextCallPhase()));
 				m_curUpdateModule = u;
 
-				sleepLen = u->update();
+				if (RetailLogicBenchmark::active())
+				{
+					const Object* owner = u->friend_getObject();
+					if (u->getProjectileUpdateInterface() != nullptr)
+					{
+						RetailLogicBenchmark::Scope scope(RetailLogicBenchmark::Subsystem::Weapons);
+						sleepLen = u->update();
+					}
+					else if (u->getAIUpdateInterface() != nullptr)
+					{
+						RetailLogicBenchmark::Scope scope(RetailLogicBenchmark::Subsystem::AI);
+						sleepLen = u->update();
+					}
+					else if (owner && owner->getPhysics() == u)
+					{
+						RetailLogicBenchmark::Scope scope(RetailLogicBenchmark::Subsystem::Partition);
+						sleepLen = u->update();
+					}
+					else
+					{
+						sleepLen = u->update();
+					}
+				}
+				else
+				{
+					sleepLen = u->update();
+				}
 				DEBUG_ASSERTCRASH(sleepLen > 0, ("you may not return 0 from update"));
 				if (sleepLen < 1)
 					sleepLen = UPDATE_SLEEP_NONE;
@@ -4443,33 +4473,39 @@ void GameLogic::update()
 
 	// update partition info
 	{
+		RetailLogicBenchmark::Scope scope(RetailLogicBenchmark::Subsystem::Partition);
 		ThePartitionManager->UPDATE();
 	}
 
-	//
-	// End of frame clean-up
-	//
-
 	processMountedTemplateSwaps();
 
-	// reset the command list, destroying all messages
 	TheCommandList->reset();
 
-	TheWeaponStore->UPDATE();
+	{
+		RetailLogicBenchmark::Scope scope(RetailLogicBenchmark::Subsystem::Weapons);
+		TheWeaponStore->UPDATE();
+	}
 	TheLocomotorStore->UPDATE();
 	TheVictoryConditions->UPDATE();
 	if (RetailSkirmishProbe::enabled() && getGameMode() == GAME_SKIRMISH)
 		RetailSkirmishProbe::update(m_frame);
 
 	{
-		//Handle disabled statii (and re-enable objects once frame matches)
+		UnsignedInt objectCount = 0;
 		for( Object *obj = m_objList; obj; obj = obj->getNextObject() )
 		{
+			++objectCount;
 			if( obj->isDisabled() )
 			{
 				obj->checkDisabledStatus();
 			}
 			obj->updateRotwkPowerState();
+		}
+		if (RetailLogicBenchmark::active())
+		{
+			RetailLogicBenchmark::recordCounts(
+				objectCount,
+				TheParticleSystemManager ? TheParticleSystemManager->getParticleCount() : 0);
 		}
 	}
 

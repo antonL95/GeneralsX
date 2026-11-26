@@ -60,6 +60,7 @@ static Bool isSameHorde(const Object* obj, const Object* unit);
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/RetailLogicBenchmark.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 #if RETAIL_COMPATIBLE_PATHFINDING
@@ -2937,6 +2938,7 @@ Path *Pathfinder::findPath( Object *obj, const LocomotorSet& locomotorSet, const
 Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 													 const Coord3D *rawTo)
 {
+	RetailLogicBenchmark::Scope benchmarkScope(RetailLogicBenchmark::Subsystem::Pathfinding);
 	//CRCDEBUG_LOG(("Pathfinder::findPath()"));
 #ifdef INTENSE_DEBUG
 	DEBUG_LOG(("internal find path..."));
@@ -5140,6 +5142,7 @@ Int Pathfinder::checkPathCost(Object *obj, const LocomotorSet& locomotorSet, con
 Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 																	Coord3D *rawTo, Bool blocked, Real pathCostMultiplier, Bool moveAllies)
 {
+	RetailLogicBenchmark::Scope benchmarkScope(RetailLogicBenchmark::Subsystem::Pathfinding);
 	//CRCDEBUG_LOG(("Pathfinder::findClosestPath()"));
 #ifdef DEBUG_LOGGING
 	Int startTimeMS = ::GetTickCount();
@@ -7210,6 +7213,7 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 Path *Pathfinder::findAttackPath( const Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 		const Object *victim, const Coord3D* victimPos, const Weapon *weapon )
 {
+	RetailLogicBenchmark::Scope benchmarkScope(RetailLogicBenchmark::Subsystem::Pathfinding);
 	if (!m_isMapReady)
 		return nullptr; // Should always be ok.
 

@@ -77,6 +77,7 @@
 #include "GameClient/MetaEvent.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/ParticleSys.h"
+#include "GameLogic/RetailLogicBenchmark.h"
 #include "GameClient/PlaceEventTranslator.h"
 #include "GameClient/RayEffect.h"
 #include "GameClient/SelectionXlat.h"
@@ -759,6 +760,7 @@ void GameClient::update()
 	if( !freezeTime && TheGameLogic->hasUpdated() )
 	{
 		TheParticleSystemManager->setLocalPlayerIndex(localPlayerIndex);
+		RetailLogicBenchmark::ParticleScope benchmarkParticleScope;
 		TheParticleSystemManager->UPDATE();
 	}
 
@@ -796,10 +798,7 @@ void GameClient::step()
 
 void GameClient::updateHeadless()
 {
-	// TheSuperHackers @info helmutbuhler 03/05/2025 bobtista 02/02/2026
-	// Update particles to prevent accumulation in headless mode. Particles are generated
-	// during GameLogic and only cleaned up during rendering. update() lets particles finish
-	// their lifecycle naturally instead of abruptly removing them with reset().
+	RetailLogicBenchmark::ParticleScope benchmarkParticleScope;
 	TheParticleSystemManager->update();
 }
 

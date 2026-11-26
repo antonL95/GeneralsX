@@ -62,6 +62,7 @@
 #include "GameLogic/Damage.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/RetailLogicBenchmark.h"
 #include "GameLogic/RetailTestCommands.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/BehaviorModule.h"
@@ -3020,8 +3021,7 @@ Bool Weapon::privateFireWeapon(
 	Bool playFireFX
 )
 {
-	//CRCDEBUG_LOG(("Weapon::privateFireWeapon() for %s", DescribeObject(sourceObj).str()));
-	//USE_PERF_TIMER(fireWeapon)
+	RetailLogicBenchmark::Scope benchmarkScope(RetailLogicBenchmark::Subsystem::Weapons);
 	if (projectileID)
 		*projectileID = INVALID_ID;
 

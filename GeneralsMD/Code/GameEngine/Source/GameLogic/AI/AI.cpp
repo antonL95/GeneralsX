@@ -46,6 +46,7 @@
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/RetailLogicBenchmark.h"
 #include "GameLogic/Weapon.h"
 
 extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -360,11 +361,13 @@ void AI::reset()
  */
 void AI::update()
 {
-	// Do pathfinding.
-	m_pathfinder->processPathfindQueue();
-
-	// run player updates
 	{
+		RetailLogicBenchmark::Scope scope(RetailLogicBenchmark::Subsystem::Pathfinding);
+		m_pathfinder->processPathfindQueue();
+	}
+
+	{
+		RetailLogicBenchmark::Scope scope(RetailLogicBenchmark::Subsystem::AI);
 		ThePlayerList->UPDATE();
 	}
 
