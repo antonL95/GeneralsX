@@ -7166,6 +7166,27 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::DAMAGE_MEMBERS_OF_TEAM:
 			doDamageTeamMembers(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getReal());
 			return;
+		case ScriptAction::ATTACK_MOVE_TEAM_TO:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			const Waypoint* waypoint = TheTerrainLogic->getWaypointByName(pAction->getParameter(1)->getString());
+			if (team && waypoint)
+			{
+				for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+				{
+					Object* unit = member.cur();
+					if (auto* ai = unit->getAIUpdateInterface())
+					{
+						unit->leaveGroup();
+						if (unit->isAbleToAttack())
+							ai->aiAttackMoveToPosition(waypoint->getLocation(), NO_MAX_SHOTS_LIMIT, CMD_FROM_SCRIPT);
+						else
+							ai->aiMoveToPosition(waypoint->getLocation(), CMD_FROM_SCRIPT);
+					}
+				}
+			}
+			return;
+		}
 		case ScriptAction::MOVE_TEAM_TO:
 			doMoveToWaypoint(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString());
 			return;
