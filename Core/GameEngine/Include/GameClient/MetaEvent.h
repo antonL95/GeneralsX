@@ -401,6 +401,7 @@ public:
 	void generateMetaMap();
 
 	void verifyMetaMap();
+	Bool matchesKey(GameMessage::Type type, Int key, Int state) const;
 
 	const MetaMapRec *getFirstMetaMapRec() const { return m_metaMaps; }
 };

@@ -18,6 +18,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/Image.h"
 #include "GameClient/Keyboard.h"
+#include "GameClient/MetaEvent.h"
 #include "GameClient/Mouse.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/GameLogic.h"
@@ -693,6 +694,15 @@ WindowMsgHandledType counterInput(GameWindow*, UnsignedInt msg, WindowMsgData, W
 }
 
 void drawScreen(GameWindow* window, WinInstanceData*) { TheControlBar->drawRetailPowers(window); }
+}
+
+Bool dispatchFocusedRetailPowersHotkey(GameWindow *focus, Int key, Int state)
+{
+	if (!focus || focus->winGetInputFunc() != overlayInput || !TheMetaMap ||
+		!TheMetaMap->matchesKey(GameMessage::MSG_META_SPELL_STORE, key, state))
+		return FALSE;
+	TheMessageStream->appendMessage(GameMessage::MSG_META_SPELL_STORE);
+	return TRUE;
 }
 
 void ControlBar::initRetailPowers(GameWindow* palantir)

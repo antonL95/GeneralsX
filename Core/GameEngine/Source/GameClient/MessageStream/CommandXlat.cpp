@@ -39,6 +39,7 @@
 
 #include "Common/AudioAffect.h"
 #include "Common/ActionManager.h"
+#include "Common/AttributeModifierRules.h"
 #include "Common/FramePacer.h"
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
@@ -4599,6 +4600,28 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		case GameMessage::MSG_META_TOGGLE_ATTACKMOVE:
 			TheInGameUI->toggleAttackMoveToMode();
 			break;
+
+		case GameMessage::MSG_META_SPELL_STORE:
+			if (TheControlBar && !TheControlBar->showRetailPowers(FALSE))
+				TheControlBar->showRetailPowers(TRUE);
+			return DESTROY_MESSAGE;
+
+		case GameMessage::MSG_META_STANCE_AGGRESSIVE:
+		case GameMessage::MSG_META_STANCE_BATTLE:
+		case GameMessage::MSG_META_STANCE_HOLDGROUND:
+		{
+			using namespace AttributeModifierRules;
+			const Stance stance = t == GameMessage::MSG_META_STANCE_AGGRESSIVE ? STANCE_AGGRESSIVE :
+				t == GameMessage::MSG_META_STANCE_BATTLE ? STANCE_BATTLE : STANCE_HOLD_GROUND;
+			TheMessageStream->appendMessage(GameMessage::MSG_SET_STANCE)->appendIntegerArgument(stance);
+			return DESTROY_MESSAGE;
+		}
+
+		case GameMessage::MSG_META_SELL:
+			if (TheGameLogic->isInMultiplayerGame() && !TheGameLogic->isInReplayGame())
+				TheMessageStream->appendMessage(GameMessage::MSG_REMOVE_BEACON);
+			TheMessageStream->appendMessage(GameMessage::MSG_SELL);
+			return DESTROY_MESSAGE;
 
 		case GameMessage::MSG_META_BEGIN_CAMERA_ROTATE_LEFT:
 			DEBUG_ASSERTCRASH(!TheInGameUI->isCameraRotatingLeft(), ("Setting rotate camera left, but it's already set!"));

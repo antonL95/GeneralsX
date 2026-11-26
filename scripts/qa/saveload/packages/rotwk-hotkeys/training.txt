@@ -1,0 +1,22 @@
+48 create Player_1 GondorKingsGuard 0 350,145,0
+49 rotwk-hotkey-select Player_1 GondorKingsGuard 0
+50 rotwk-hotkey-attack - - 0
+51 rotwk-hotkey-aggressive - - 0
+52 rotwk-hotkey-waypoint - - 0
+54 rotwk-hotkey-check Player_1 GondorKingsGuard 0
+55 rotwk-hotkey-immediate - - 0
+56 rotwk-hotkey-attack - - 0
+57 rotwk-hotkey-hold-ground - - 0
+59 rotwk-hotkey-check Player_1 GondorKingsGuard 0
+62 rotwk-hotkey-check Player_1 GondorKingsGuard 0
+63 rotwk-hotkey-select Player_1 GondorKingsGuard 0
+64 rotwk-hotkey-battle - - 0
+66 rotwk-hotkey-check Player_1 GondorKingsGuard 0
+67 create Player_1 RotwkHotkeyNoSell 0 350,440,0
+67 create Player_1 RotwkHotkeyFarm 0 650,440,0
+68 rotwk-hotkey-select Player_1 RotwkHotkeyNoSell 0
+69 rotwk-hotkey-sell - - 0
+71 rotwk-hotkey-sold Player_1 RotwkHotkeyNoSell 0
+72 rotwk-hotkey-select Player_1 RotwkHotkeyFarm 0
+73 rotwk-hotkey-sell - - 0
+75 rotwk-hotkey-sold Player_1 RotwkHotkeyFarm 0

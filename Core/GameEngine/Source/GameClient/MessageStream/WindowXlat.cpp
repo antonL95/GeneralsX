@@ -59,6 +59,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameLogic/GameLogic.h"
 
+Bool dispatchFocusedRetailPowersHotkey(GameWindow *focus, Int key, Int state);
 
 // DEFINES ////////////////////////////////////////////////////////////////////
 
@@ -325,16 +326,18 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 		case GameMessage::MSG_RAW_KEY_DOWN:
 		case GameMessage::MSG_RAW_KEY_UP:
 		{
-			// get key and state from args
-			UnsignedByte key		= msg->getArgument( 0 )->integer;
-			UnsignedByte state	= msg->getArgument( 1 )->integer;
+			const UnsignedByte key = msg->getArgument(0)->integer;
+			const Int state = msg->getArgument(1)->integer;
+
+			if (TheWindowManager && dispatchFocusedRetailPowersHotkey(TheWindowManager->winGetFocus(), key, state))
+				return DESTROY_MESSAGE;
 
 			if (key == KEY_ESC && BitIsSet(state, KEY_STATE_UP) && TheControlBar && TheControlBar->closeRetailTray())
 				return DESTROY_MESSAGE;
 
 			// process event through window system
 			if( TheWindowManager )
-				returnCode = TheWindowManager->winProcessKey( key, state );
+				returnCode = TheWindowManager->winProcessKey(key, static_cast<UnsignedByte>(state));
 
 
 			// If we're in a movie, we want to be able to escape out of it

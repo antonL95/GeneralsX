@@ -193,6 +193,22 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "STEP_FRAME",																GameMessage::MSG_META_STEP_FRAME },
 	{ "STEP_FRAME_ALT",														GameMessage::MSG_META_STEP_FRAME_ALT },
 	{ "DEMO_INSTANT_QUIT",												GameMessage::MSG_META_DEMO_INSTANT_QUIT },
+	{ "VIEW_HOME_BASE", GameMessage::MSG_META_VIEW_COMMAND_CENTER },
+	{ "TOGGLE_ATTACKMOVE", GameMessage::MSG_META_TOGGLE_ATTACKMOVE },
+	{ "AUTO_SAVE", GameMessage::MSG_META_AUTO_SAVE },
+	{ "CHAT_BUDDIES", GameMessage::MSG_META_CHAT_BUDDIES },
+	{ "SPELL_STORE", GameMessage::MSG_META_SPELL_STORE },
+	{ "TOGGLE_FAST_FORWARD_MODE", GameMessage::MSG_META_TOGGLE_FAST_FORWARD_REPLAY },
+	{ "ORDERMODE_WAYPOINT", GameMessage::MSG_META_BEGIN_WAYPOINTS },
+	{ "ORDERMODE_IMMEDIATE", GameMessage::MSG_META_END_WAYPOINTS },
+	{ "STANCE_AGGRESSIVE", GameMessage::MSG_META_STANCE_AGGRESSIVE },
+	{ "STANCE_BATTLE", GameMessage::MSG_META_STANCE_BATTLE },
+	{ "STANCE_HOLDGROUND", GameMessage::MSG_META_STANCE_HOLDGROUND },
+	{ "DEBUG_TOGGLE_STRINGTAGS", GameMessage::MSG_META_DEBUG_TOGGLE_STRINGTAGS },
+	{ "TOGGLE_PLANNING_MODE", GameMessage::MSG_META_TOGGLE_PLANNING_MODE },
+	{ "SELL", GameMessage::MSG_META_SELL },
+	{ "RELOAD_RAPID_ITERATION_FEATURE", GameMessage::MSG_META_RELOAD_RAPID_ITERATION_FEATURE },
+	{ "REFRESH_RAPID_ITERATION_FEATURE", GameMessage::MSG_META_REFRESH_RAPID_ITERATION_FEATURE },
 
 #if defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)//may be defined in GameCommon.h
 	{ "CHEAT_RUNSCRIPT1",								        	GameMessage::MSG_CHEAT_RUNSCRIPT1 },
@@ -538,44 +554,51 @@ void MetaEventTranslator::onMouseEvent(const GameMessage *msg)
 	}
 }
 
-//-------------------------------------------------------------------------------------------------
-// GeneralsX @refactor fbraz3 06/05/2026 — adopt upstream's structural split (#2758)
-// into a single onKeyEvent() helper while keeping GeneralsX's pre-existing
-// input semantics: a "mods-only-changed" branch using m_lastModState and a
-// m_lastKeyDown-tracking normal key-transition branch. We do not adopt
-// upstream's m_keyDownInfos / KeyDownInfo bit-array (introduced for the
-// "ignore order of modifier release" fix in #2577) because that fix is not
-// part of GeneralsX's behavior, and the bit-array member is not declared
-// in MetaEvent.h.
+static Bool isBoundMetaMessage(GameMessage::Type type)
+{
+	switch (type)
+	{
+		case GameMessage::MSG_META_AUTO_SAVE:
+		case GameMessage::MSG_META_CHAT_BUDDIES:
+		case GameMessage::MSG_META_DEBUG_TOGGLE_STRINGTAGS:
+		case GameMessage::MSG_META_TOGGLE_PLANNING_MODE:
+		case GameMessage::MSG_META_RELOAD_RAPID_ITERATION_FEATURE:
+		case GameMessage::MSG_META_REFRESH_RAPID_ITERATION_FEATURE:
+			return FALSE;
+		default:
+			return TRUE;
+	}
+}
+
+static Int keyModifiers(Int state)
+{
+	Int modifiers = NONE;
+	if (state & KEY_STATE_CONTROL)
+		modifiers |= CTRL;
+	if (state & KEY_STATE_SHIFT)
+		modifiers |= SHIFT;
+	if (state & KEY_STATE_ALT)
+		modifiers |= ALT;
+	return modifiers;
+}
+
+static Bool matchesKeyTransition(const MetaMapRec &map, Int key, Int modifiers, Int state)
+{
+	return map.m_key == key && map.m_modState == modifiers &&
+		((map.m_transition == UP && (state & KEY_STATE_UP)) ||
+		 (map.m_transition == DOWN && (state & KEY_STATE_DOWN)));
+}
+
 void MetaEventTranslator::onKeyEvent(const GameMessage *msg, GameMessageDisposition &disp)
 {
 	const Int systemKey = msg->getArgument(0)->integer;
 	const Int systemKeyState = msg->getArgument(1)->integer;
-
 	const MappableKeyType key = (MappableKeyType)systemKey;
-
-	// for our purposes here, we don't care to distinguish between right and left keys,
-	// so just fudge a little to simplify things.
-	Int newModState = 0;
-
-	if (systemKeyState & KEY_STATE_CONTROL)
-	{
-		newModState |= CTRL;
-	}
-
-	if (systemKeyState & KEY_STATE_SHIFT)
-	{
-		newModState |= SHIFT;
-	}
-
-	if (systemKeyState & KEY_STATE_ALT)
-	{
-		newModState |= ALT;
-	}
+	const Int newModState = keyModifiers(systemKeyState);
 
 	for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
 	{
-		if (!isMessageUsable(map->m_usableIn))
+		if (!isBoundMetaMessage(map->m_meta) || !isMessageUsable(map->m_usableIn))
 			continue;
 
 		// check for the special case of mods-only-changed.
@@ -594,16 +617,7 @@ void MetaEventTranslator::onKeyEvent(const GameMessage *msg, GameMessageDisposit
 			break;
 		}
 
-		// ok, now check for "normal" key transitions.
-		if (
-				map->m_key == key &&
-				map->m_modState == newModState &&
-				(
-					(map->m_transition == UP && (systemKeyState & KEY_STATE_UP)) ||
-					(map->m_transition == DOWN && (systemKeyState & KEY_STATE_DOWN)) //||
-					//(map->m_transition == DOUBLEDOWN && (systemKeyState & KEY_STATE_DOWN) && m_lastKeyDown == key)
-				)
-			)
+		if (matchesKeyTransition(*map, key, newModState, systemKeyState))
 		{
 
 			if (systemKeyState & KEY_STATE_AUTOREPEAT)
@@ -687,6 +701,19 @@ MetaMap::~MetaMap()
 		deleteInstance(m_metaMaps);
 		m_metaMaps = next;
 	}
+}
+
+Bool MetaMap::matchesKey(GameMessage::Type type, Int key, Int state) const
+{
+	if (key == MK_NONE || (state & KEY_STATE_AUTOREPEAT))
+		return FALSE;
+	const Int modifiers = keyModifiers(state);
+	for (const MetaMapRec *map = m_metaMaps; map; map = map->m_next)
+	{
+		if (map->m_meta == type && matchesKeyTransition(*map, key, modifiers, state) && isMessageUsable(map->m_usableIn))
+			return TRUE;
+	}
+	return FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
