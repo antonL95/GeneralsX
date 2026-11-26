@@ -1,0 +1,7 @@
+705 create Player_1 GondorKnightHorde 0 1500,3300,0
+705 create Player_1 GondorFighterHorde 0 1500,3400,0
+730 move Player_1 GondorKnightHorde 0 - 3100 3300
+731 move Player_1 GondorFighterHorde 0 - 3100 3400
+732 deselect - - 0
+1196 destroy Player_1 GondorKnightHorde 0
+1196 destroy Player_1 GondorFighterHorde 0
