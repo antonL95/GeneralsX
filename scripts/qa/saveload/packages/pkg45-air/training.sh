@@ -9,20 +9,16 @@ check_flight_sample() {
                 value[field[1]] = field[2]
             }
             speed = sqrt(value["vx"] ^ 2 + value["vy"] ^ 2)
-            if (station == "dive") {
-                passed = value["swoop"] == 1 && speed > 0 && value["vz"] < 0 && value["vz"] >= -5.401
-            } else if (station == "terminal") {
-                passed = value["swoop"] == 1 && speed > 0 && value["vz"] == -5.400
+            if (station == "approach") {
+                passed = value["swoop"] == 1 && speed > 0 && value["vz"] > 0 && value["shot"] == 0
+            } else if (station == "follow-through") {
+                passed = value["swoop"] == 0 && speed > 0 && value["shot"] > 0 && value["height"] > value["preferred"]
             } else if (station == "straight") {
                 passed = value["swoop"] == 0 && value["vx"] > 0 && value["vy"] ^ 2 < value["vx"] ^ 2
             } else if (station == "turn") {
-                passed = value["swoop"] == 0 && value["vy"] > 0 && value["vx"] ^ 2 < value["vy"] ^ 2
-            } else if (station == "stop") {
-                passed = value["swoop"] == 0 && speed == 0
+                passed = value["swoop"] == 0 && value["vy"] > 0 && value["yaw"] > 0
             } else {
-                passed = value["swoop"] == 0 && speed > 0 && value["vz"] > 0 && value["vz"] < speed * 0.65
-                preferred = station == "staging" ? 119 : 121
-                passed = passed && value["preferred"] == preferred
+                passed = value["swoop"] == 0 && speed == 0
             }
             print
         }
@@ -31,29 +27,14 @@ check_flight_sample() {
 }
 
 check() {
-    check_flight_sample 197 staging
-    check_flight_sample 244 dive
-    check_flight_sample 245 dive
-    check_flight_sample 253 terminal
-    check_flight_sample 299 climb
+    check_flight_sample 197 approach
+    check_flight_sample 244 approach
+    check_flight_sample 245 approach
+    check_flight_sample 253 approach
+    check_flight_sample 299 follow-through
     check_flight_sample 328 straight
     check_flight_sample 346 turn
     check_flight_sample 357 stop
-    if covers 244 && covers 245; then
-        awk '
-            /^TEST air-swoop frame=(244|245) actor=Pkg45Eagle / {
-                for (i = 5; i <= NF; ++i) {
-                    split($i, field, "=")
-                    if (field[1] == "vz")
-                        vz[$3] = field[2]
-                }
-            }
-            END {
-                acceleration = vz["frame=244"] - vz["frame=245"]
-                exit !(acceleration >= 0.359 && acceleration <= 0.361)
-            }
-        ' "$log"
-    fi
 }
 
 compare() {

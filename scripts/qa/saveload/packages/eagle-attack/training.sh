@@ -34,15 +34,14 @@ check_moving_contact() {
 
 check() {
     if [ "$phase" = continue ]; then
-        grep -E "^TEST eagle frame=$save_frame .*swoop=1 .*victim=EagleAttackTarget .*fire0=0 " "$log"
+        grep -E "^TEST eagle frame=$save_frame .*swoop=0 .*target=EagleAttackTarget .*carrier=EagleAttackBird .*fire0=[1-9][0-9]* " "$log"
     fi
     if ! covers 370; then
         return
     fi
     if [ "$phase" = continue ]; then
         check_moving_contact || return
-    fi
-    awk '
+        awk '
         /^TEST eagle / && substr($3, 7) + 0 <= 370 {
             for (i = 3; i <= NF; ++i) {
                 split($i, field, "=")
@@ -69,7 +68,8 @@ check() {
             printf "eagle shot=%u contact=%u damage=%u grab=%u released=%u\n", shot, contact, damage, grab, released
             exit !(contact && damage && grab && released && !interference)
         }
-    ' "$log" || return
+        ' "$log" || return
+    fi
     if ! covers 632; then
         return
     fi

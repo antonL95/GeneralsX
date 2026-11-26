@@ -5,7 +5,10 @@
 #include <cstdio>
 
 #include "Common/ThingTemplate.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/GiantBirdAIUpdate.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
@@ -13,6 +16,23 @@
 
 namespace
 {
+void traceGiantBirdRoute(const RetailTestCommands::Context& ctx)
+{
+	const Object* bird = ctx.requireObject();
+	if (!bird)
+		return;
+	const auto* ai = static_cast<const GiantBirdAIUpdate*>(bird->findUpdateModule(NAMEKEY("GiantBirdAIUpdate")));
+	const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+	if (!locomotor)
+		return;
+
+	const Coord3D& pos = *bird->getPosition();
+	const Real ground = TheTerrainLogic->getGroundHeight(pos.x, pos.y);
+	std::fprintf(stderr, "TEST giant-bird-route frame=%u x=%.4f y=%.4f z=%.4f ground=%.4f distance=%.5f speed=%.5f slope=%.5f limit=%.5f next=%u\n",
+		ctx.frame, pos.x, pos.y, pos.z, ground, ai->getFlightPathDistance(), ai->getFlightPathSpeed(), ai->getFlightPathSlope(),
+		locomotor->getMaxSpeedForCondition(bird->getBodyModule()->getDamageState(), bird), ai->getFlightPathSpeedUpdateFrame());
+}
+
 void traceGiantBirdSwoop(const RetailTestCommands::Context& ctx)
 {
 	const Object* bird = ctx.requireObject();
@@ -66,6 +86,7 @@ void registerRetailGiantBirdSwoopTestCommands()
 {
 #if !RTS_GENERALS
 	registerAction("giant-bird-swoop-trace", traceGiantBirdSwoop);
+	registerAction("giant-bird-route-trace", traceGiantBirdRoute);
 #endif
 }
 }

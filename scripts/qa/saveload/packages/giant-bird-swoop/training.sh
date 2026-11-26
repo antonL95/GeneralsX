@@ -2,6 +2,8 @@ prepare() {
     awk -v end="$end" 'BEGIN {
         for (frame = 185; frame <= 430 && frame <= end; ++frame)
             print frame, "giant-bird-swoop-trace Player_1 SwoopTestEagle 0 PlyrCreeps:SwoopTestTarget:0"
+        for (frame = 225; frame <= 419 && frame <= end; ++frame)
+            print frame, "giant-bird-route-trace Player_1 SwoopTestRouteBird 0"
         for (frame = 507; frame <= 752 && frame <= end; ++frame)
             print frame, "giant-bird-swoop-trace Player_1 SwoopTestFellBeast 0 PlyrCreeps:SwoopTestTarget:0"
         for (frame = 829; frame <= 1040 && frame <= end; ++frame)
@@ -53,11 +55,52 @@ check_swoop_toss() {
     ' "$log"
 }
 
+check_route() {
+    awk -v save_frame="$save_frame" '
+        /^TEST giant-bird-route / {
+            for (i = 3; i <= NF; ++i) {
+                split($i, field, "=")
+                sample[field[1]] = field[2] + 0
+            }
+            if (!started) {
+                initial_ground = sample["ground"]
+                started = 1
+            }
+            if (sample["frame"] == save_frame)
+                saved_in_motion = sample["distance"] > 0 && sample["speed"] > 0
+            if (sample["next"] != previous_update && sample["slope"] > 0.002 && sample["slope"] <= 1.0 &&
+                sample["ground"] > initial_ground && sample["distance"] > previous_distance) {
+                expected = sample["limit"] * (1.0 - 0.4 * sample["slope"])
+                error = sample["speed"] - expected
+                if (error >= -0.0001 && error <= 0.0001 && !uphill_frame) {
+                    uphill_frame = sample["frame"]
+                    uphill_speed = sample["speed"]
+                    uphill_slope = sample["slope"]
+                }
+            }
+            previous_update = sample["next"]
+            previous_distance = sample["distance"]
+            if (sample["ground"] > highest_ground)
+                highest_ground = sample["ground"]
+            if (sample["y"] >= 2238)
+                arrived = 1
+        }
+        END {
+            printf "bird route active at save=%u uphill frame=%u slope=%.5f speed=%.5f ground=%.3f to %.3f arrival=%u\n",
+                saved_in_motion, uphill_frame, uphill_slope, uphill_speed, initial_ground, highest_ground, arrived
+            exit !(saved_in_motion && uphill_frame && highest_ground > initial_ground && arrived)
+        }
+    ' "$log"
+}
+
 check() {
-    if covers 430; then
+    if [ "$phase" = continue ] && covers 419; then
+        check_route || return
+    fi
+    if covers 185 && covers 430; then
         check_swoop_toss "eagle" "SwoopTestEagle" 185 430 || return
     fi
-    if covers 752; then
+    if covers 507 && covers 752; then
         check_swoop_toss "fellbeast" "SwoopTestFellBeast" 507 752 || return
     fi
     if covers 1040; then
@@ -92,5 +135,10 @@ compare() {
         awk -v frame="$save_frame" '/^TEST giant-bird-swoop frame=/ && substr($3, 7) + 0 > frame' \
             "$out/$phase_name.log" > "$out/giant-bird-swoop-$phase_name.trace"
     done
-    cmp "$out/giant-bird-swoop-continue.trace" "$out/giant-bird-swoop-resume.trace"
+    cmp "$out/giant-bird-swoop-continue.trace" "$out/giant-bird-swoop-resume.trace" || return
+    for phase_name in continue resume; do
+        awk -v frame="$save_frame" '/^TEST giant-bird-route frame=/ && substr($3, 7) + 0 > frame' \
+            "$out/$phase_name.log" > "$out/giant-bird-route-$phase_name.trace"
+    done
+    cmp "$out/giant-bird-route-continue.trace" "$out/giant-bird-route-resume.trace"
 }

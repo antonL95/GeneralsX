@@ -640,6 +640,16 @@ void PhysicsBehavior::setBounceSound(const AudioEventRTS* bounceSound)
  */
 
 DECLARE_PERF_TIMER(PhysicsBehavior)
+
+void PhysicsBehavior::setFlightPathVelocity(const Coord3D& velocity)
+{
+	m_flightPathFrame = TheGameLogic->getFrame();
+	m_vel = velocity;
+	m_velMag = INVALID_VEL_MAG;
+	m_accel.zero();
+	setWakeFrame(getObject(), UPDATE_SLEEP_NONE);
+}
+
 UpdateSleepTime PhysicsBehavior::update()
 {
 	USE_PERF_TIMER(PhysicsBehavior)
@@ -648,6 +658,8 @@ UpdateSleepTime PhysicsBehavior::update()
 	const PhysicsBehaviorModuleData*	d = getPhysicsBehaviorModuleData();
 	const Bool retail = RetailFileLayers::enabled();
 	const Bool impactFlight = retail && m_impactFlightFrames != 0;
+	const Bool pathFlight = !impactFlight && !getIsStunned() && !obj->isEffectivelyDead() &&
+		m_flightPathFrame != 0 && m_flightPathFrame == TheGameLogic->getFrame();
 	const AIUpdateInterface* scalingAI = obj->getAI();
 	const Locomotor* scalingLocomotor = scalingAI ? scalingAI->getCurLocomotor() : nullptr;
 	const Bool scalingWall = scalingLocomotor && scalingLocomotor->isScalingWall();
@@ -683,7 +695,7 @@ UpdateSleepTime PhysicsBehavior::update()
 			m_vel.z = m_impactStart.z * u + m_impactEnd.z * t +
 				3.0f * t * u * m_impactHeight * (u * d->m_firstHeight + t * d->m_secondHeight) - prevPos.z;
 		}
-		else
+		else if (!pathFlight)
 		{
 			if (!scalingWall)
 				applyGravitationalForces();
@@ -694,19 +706,19 @@ UpdateSleepTime PhysicsBehavior::update()
 		}
 
 		const Real minVelocityComponent = 0.001f;
-		if (impactFlight || !obj->getLogicModelConditions().test(MODELCONDITION_BACKING_UP))
+		if (!pathFlight && (impactFlight || !obj->getLogicModelConditions().test(MODELCONDITION_BACKING_UP)))
 		{
 			if (fabsf(m_vel.x) < minVelocityComponent) m_vel.x = 0.0f;
 			if (fabsf(m_vel.y) < minVelocityComponent) m_vel.y = 0.0f;
 		}
-		if (fabsf(m_vel.z) < minVelocityComponent) m_vel.z = 0.0f;
+		if (!pathFlight && fabsf(m_vel.z) < minVelocityComponent) m_vel.z = 0.0f;
 
 		m_velMag = INVALID_VEL_MAG;
 
 		Real oldPosZ = mtx.Get_Z_Translation();
 
 		// integrate velocity into position
-		if (impactFlight)
+		if (impactFlight || pathFlight)
 		{
 			mtx.Adjust_X_Translation(m_vel.x);
 			mtx.Adjust_Y_Translation(m_vel.y);
@@ -1716,6 +1728,8 @@ static Bool perpsLogicallyEqual( Real perpOne, Real perpTwo )
 //-------------------------------------------------------------------------------------------------
 Bool PhysicsBehavior::checkRetailCrushCollision(Object* victim)
 {
+	if (m_flightPathFrame != 0 && m_flightPathFrame == TheGameLogic->getFrame())
+		return FALSE;
 	Object* crusher = getObject();
 	if (!crusher->canCrushOrSquish(victim))
 		return FALSE;

@@ -122,6 +122,7 @@ public:
 	Bool launchFromImpact(const Coord3D& direction, Real amount, Real zFactor, Bool ram = FALSE);
 	void launchFromWeaponImpact(const Coord3D& direction, Real amount, Real zFactor, RetailDamageFXTrigger trigger);
 	void launchFromContainment(const Coord3D& velocity);
+	void setFlightPathVelocity(const Coord3D& velocity);
 	Bool isInRetailImpact() const { return m_impactFlightFrames != 0 || m_impactEndFrame != 0; }
 	void applyRandomRotation();											  ///< apply a random rotation at the object's CG
 	void addVelocityTo(const Coord3D* vel) ;
@@ -310,6 +311,7 @@ private:
 	std::vector<ObjectID> m_crushContacts;
 	std::vector<ObjectID> m_previousCrushContacts;
 	UnsignedInt m_impactFlightFrames = 0;
+	UnsignedInt m_flightPathFrame = 0;
 	UnsignedInt m_impactFlightDuration = 0;
 	UnsignedInt m_impactStandFrame = 0;
 	UnsignedInt m_impactEndFrame = 0;

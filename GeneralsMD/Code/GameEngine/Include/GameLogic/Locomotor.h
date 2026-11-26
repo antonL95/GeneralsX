@@ -275,6 +275,7 @@ private:
 	Real m_swoopStandoffHeight = 0.0f;
 	Real m_swoopTerminalVelocity = 0.0f;
 	Real m_swoopAccelerationRate = 0.0f;
+	Real m_lookAheadMult = 1.0f;
 	Real m_slowTurnRadius = 0.0f;
 	Real m_fastTurnRadius = 0.0f;
 	Bool											m_waitForFormation;
@@ -298,7 +299,7 @@ public:
 	void locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed,
 		Bool backing = FALSE, ObjectID backingSource = INVALID_ID);
 	void locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalPos,
-		Real onPathDistToGoal, Real desiredSpeed, Bool *blocked, Bool birdPullUp = FALSE);
+		Real onPathDistToGoal, Real desiredSpeed, Bool *blocked);
 	void locoUpdate_moveTowardsAngle(Object* obj, Real angle);
 	/**
 		Kill any current (2D) velocity (but stay at current position, or as close as possible)
@@ -330,8 +331,7 @@ public:
 	Real getBraking() const;  ///< get braking given condition
 
 	Real getPreferredAttackHeight() const { return m_template->m_preferredAttackHeight; }
-	Real getSwoopStandoffRadius() const { return m_template->m_swoopStandoffRadius; }
-	Real getSwoopStandoffHeight() const { return m_template->m_swoopStandoffHeight; }
+	Real getLookAheadMult() const { return m_template->m_lookAheadMult; }
 	Real getPreferredHeight() const { return m_preferredHeight;} ///< Just return preferredheight, no damage consideration
 	void restorePreferredHeightFromTemplate() { m_preferredHeight = m_template->m_preferredHeight; };
 	Real getPreferredHeightDamping() const { return m_preferredHeightDamping;}
@@ -495,12 +495,12 @@ protected:
 		return true if we can maintain the position without being called every frame (eg, we are
 		resting on the ground), false if not (eg, we are hovering or circling)
 	*/
-	Bool handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Bool birdPullUp = FALSE);
+	Bool handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos);
 	PhysicsTurningType rotateObjAroundLocoPivot(Object* obj, const Coord3D& goalPos, Real maxTurnRate,
 		Real* relAngle = nullptr, Bool translateAroundPivot = TRUE);
 
 	Real getSurfaceHtAtPt(Real x, Real y);
-	Real calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real curZ, Real surfaceAtPt, Real preferredHeight, Bool birdPullUp);
+	Real calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real curZ, Real surfaceAtPt, Real preferredHeight);
 
 	Bool fixInvalidPosition(Object* obj, PhysicsBehavior *physics);
 

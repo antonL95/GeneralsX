@@ -1,11 +1,15 @@
 110 create Player_1 SwoopTestEagle 0 1840,3150,0
 110 stance Player_1 SwoopTestEagle 0 HoldGround
+125 create Player_1 SwoopTestRouteBird 0 1500,1800,0
+125 stance Player_1 SwoopTestRouteBird 0 HoldGround
 185 create PlyrCreeps SwoopTestTarget 0 2070,3150,0
 186 orderattack Player_1 SwoopTestEagle 0 PlyrCreeps:SwoopTestTarget:0
 187 orderattack Player_1 SwoopTestEagle 0 PlyrCreeps:SwoopTestTarget:0
 189 stance Player_1 SwoopTestEagle 0 Battle
+225 move Player_1 SwoopTestRouteBird 0 - 1500 2240
 315 stance Player_1 SwoopTestEagle 0 HoldGround
 315 move Player_1 SwoopTestEagle 0 - 1840 3150
+420 destroy Player_1 SwoopTestRouteBird 0
 431 destroy Player_1 SwoopTestEagle 0
 431 destroy PlyrCreeps SwoopTestTarget 0
 432 create Player_1 SwoopTestFellBeast 0 1840,3150,0
