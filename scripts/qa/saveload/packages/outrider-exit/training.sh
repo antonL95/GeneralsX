@@ -1,7 +1,7 @@
 prepare() {
     [ "$end" -ge 1450 ] || return 0
     awk -v end="$end" 'BEGIN {
-        for (frame = 1270; frame <= end && frame <= 1450; frame += 30)
+        for (frame = 1120; frame <= end && frame <= 1450; frame += 30)
             print frame, "outrider-exit-sample Player_1 MirkwoodTrainingGrounds 0 -"
     }'
 }
