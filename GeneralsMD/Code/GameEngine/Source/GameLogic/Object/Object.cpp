@@ -1568,6 +1568,9 @@ void Object::setFiringConditionForCurrentWeapon() const
 //=============================================================================
 void Object::setModelConditionState( ModelConditionFlagType a )
 {
+	const Bool constructionStarted = a == MODELCONDITION_ACTIVELY_CONSTRUCTING && RetailFileLayers::enabled() &&
+		!m_logicModelConditions.test(a);
+	const ModelConditionFlags previousConditions = m_logicModelConditions;
 	const Bool userSixStarted = a == MODELCONDITION_USER_6 && RetailFileLayers::enabled() &&
 		!m_logicModelConditions.test(a);
 	if (RetailFileLayers::enabled() && a != MODELCONDITION_INVALID)
@@ -1578,11 +1581,16 @@ void Object::setModelConditionState( ModelConditionFlagType a )
 	}
 	if (userSixStarted && (!TheGameState || !TheGameState->isInLoadGame()))
 		RetailBuildingEvents::trollEatingChanged(*this, true);
+	if (constructionStarted)
+		RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
 }
 
 //=============================================================================
 void Object::clearModelConditionState( ModelConditionFlagType a )
 {
+	const Bool constructionStopped = a == MODELCONDITION_ACTIVELY_CONSTRUCTING && RetailFileLayers::enabled() &&
+		m_logicModelConditions.test(a);
+	const ModelConditionFlags previousConditions = m_logicModelConditions;
 	const Bool userSixStopped = a == MODELCONDITION_USER_6 && RetailFileLayers::enabled() &&
 		m_logicModelConditions.test(a);
 	if (RetailFileLayers::enabled() && a != MODELCONDITION_INVALID)
@@ -1593,6 +1601,8 @@ void Object::clearModelConditionState( ModelConditionFlagType a )
 	}
 	if (userSixStopped && (!TheGameState || !TheGameState->isInLoadGame()))
 		RetailBuildingEvents::trollEatingChanged(*this, false);
+	if (constructionStopped)
+		RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
 }
 
 //=============================================================================

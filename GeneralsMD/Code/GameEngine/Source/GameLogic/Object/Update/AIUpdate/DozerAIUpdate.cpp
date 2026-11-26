@@ -725,7 +725,10 @@ StateReturnType DozerActionDoActionState::update()
 						return STATE_SUCCESS;
 					const auto* building = GettingBuiltBehavior::find(*goalObject);
 					if (building && building->managesConstruction() && !GettingBuiltBehavior::isAuthoredWorker(*goalObject, *dozer))
+					{
+						dozer->setModelConditionState( MODELCONDITION_ACTIVELY_CONSTRUCTING );
 						return STATE_CONTINUE;
+					}
 				}
 
 				// the builder is now actively constructing something

@@ -40,7 +40,7 @@
 
 namespace
 {
-enum class Action { Grant, Remove, Power, Visibility, Roll };
+enum class Action { Grant, Remove, Power, Visibility, Roll, Kill };
 
 struct Condition
 {
@@ -194,6 +194,7 @@ bool compile(const std::vector<std::string>& lines, Program& program)
 	static const std::regex roll(R"(local\s+(\w+)\s*=\s*GetRandomNumber\(\s*\))");
 	static const std::regex branch(R"((if|elseif)\s+(\w+)\s*<=\s*([0-9]+(?:\.[0-9]+)?)\s+then)");
 	static const std::regex call(R"re((ObjectGrantUpgrade|ObjectRemoveUpgrade|ObjectDoSpecialPower|ObjectHideSubObjectPermanently)\(\s*self\s*,\s*"([A-Za-z0-9_]+)"(?:\s*,\s*(true|false))?\s*\))re");
+	static const std::regex kill(R"re(ExecuteAction\(\s*"NAMED_KILL"\s*,\s*self\s*\);?)re");
 	std::map<std::string, std::size_t> rolls;
 	std::vector<Condition> conditions;
 	std::vector<std::size_t> levels;
@@ -247,6 +248,8 @@ bool compile(const std::vector<std::string>& lines, Program& program)
 				levels.pop_back();
 			}
 		}
+		else if (std::regex_match(line, kill))
+			program.push_back({Action::Kill, {}, false, 0, conditions});
 		else if (std::regex_match(line, token, call))
 		{
 			const Action action = token[1] == "ObjectGrantUpgrade" ? Action::Grant :
@@ -366,9 +369,10 @@ void dispatch(Object& object, const char* event, DispatchMode mode = DispatchMod
 		const auto found = events.programs.find(handler->second);
 		if (found == events.programs.end())
 			return;
-		if (mode != DispatchMode::Direct && !std::all_of(found->second.begin(), found->second.end(), [](const Operation& operation)
+		if (mode != DispatchMode::Direct && !std::all_of(found->second.begin(), found->second.end(), [mode](const Operation& operation)
 		{
-			return operation.action == Action::Grant || operation.action == Action::Remove;
+			return operation.action == Action::Grant || operation.action == Action::Remove ||
+				(operation.action == Action::Kill && mode == DispatchMode::ModelCondition);
 		}))
 			return;
 		if (mode == DispatchMode::Restore && std::none_of(found->second.begin(), found->second.end(), [&object](const Operation& operation)
@@ -442,6 +446,11 @@ void dispatch(Object& object, const char* event, DispatchMode mode = DispatchMod
 						object.doSpecialPower(power, COMMAND_OPTION_INTERNAL_AUTO, TRUE);
 				}
 				break;
+			case Action::Kill:
+				object.kill();
+				if (object.isDestroyed())
+					return;
+				continue;
 			case Action::Visibility:
 				if (operation.hide)
 					++hidden;
