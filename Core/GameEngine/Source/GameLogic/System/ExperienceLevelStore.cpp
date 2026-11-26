@@ -130,6 +130,13 @@ const FieldParse s_levelFields[] =
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
+Bool redefines(const Level& later, const Level& earlier)
+{
+	return later.targetNames.empty() || earlier.targetNames.empty() ||
+		std::find_first_of(later.targetNames.begin(), later.targetNames.end(),
+			earlier.targetNames.begin(), earlier.targetNames.end()) != later.targetNames.end();
+}
+
 void buildIndex()
 {
 	s_levelsByTarget.clear();
@@ -295,18 +302,12 @@ void parseDefinition(INI* ini)
 {
 	const char* token = ini->getNextToken();
 	AsciiString name = token;
-	std::size_t index = s_levels.size();
-	for (std::size_t i = 0; i < s_levels.size(); ++i)
-	{
-		if (s_levels[i].name == name)
-		{
-			index = i;
-			break;
-		}
-	}
 	Level level;
 	level.name = name;
 	ini->initFromINI(&level, s_levelFields);
+	std::size_t index = 0;
+	while (index < s_levels.size() && !(s_levels[index].name == name && redefines(level, s_levels[index])))
+		++index;
 	if (index == s_levels.size())
 		s_levels.push_back(std::move(level));
 	else
