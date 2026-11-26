@@ -44,6 +44,9 @@
 #include "Common/RandomValue.h"
 #include "Common/RetailConditionMatch.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailSaveBlocks.h"
+
+#include <limits>
 #include "Common/ThingTemplate.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -2353,7 +2356,7 @@ void W3DModelDraw::adjustRetailDistanceAnimation(Real distance)
 	}
 
 	constexpr Real RETAIL_MIN_DISTANCE_SPEED = 0.05f;
-	if (m_authoredAnimationSpeed > 0.0f && m_distancePerFrame * LOGICFRAMES_PER_SECOND > RETAIL_MIN_DISTANCE_SPEED)
+	if (m_authoredAnimationSpeed > 0.0f && m_distancePerFrame * static_cast<Real>(LOGICFRAMES_PER_SECOND) > RETAIL_MIN_DISTANCE_SPEED)
 		setCurAnimDurationInMsec(distance / m_distancePerFrame * MSEC_PER_LOGICFRAME_REAL / m_authoredAnimationSpeed);
 	else
 		static_cast<HLodClass*>(m_renderObject)->Set_Animation_Frame_Rate_Multiplier(m_authoredAnimationSpeed);
@@ -5447,8 +5450,8 @@ void W3DModelDraw::xfer( Xfer *xfer )
 	const Bool extendedSlots = !m_weaponRecoilInfoVec[QUATERNARY_WEAPON].empty() ||
 		!m_weaponRecoilInfoVec[QUINARY_WEAPON].empty();
 	const Bool retail = RetailFileLayers::enabled();
-	XferVersion version = retail ? 4 : (extendedSlots ? 3 : 2);
-	xfer->xferVersion(&version, retail ? 4 : 3);
+	XferVersion version = retail ? 5 : (extendedSlots ? 3 : 2);
+	xfer->xferVersion(&version, retail ? 5 : 3);
 
 	// extend base class
 	DrawModule::xfer( xfer );
@@ -5513,50 +5516,19 @@ void W3DModelDraw::xfer( Xfer *xfer )
 
 	}
 
-	// sub object vector
-	UnsignedByte subObjectCount = m_subObjectVec.size();
-	xfer->xferUnsignedByte( &subObjectCount );
-	ModelConditionInfo::HideShowSubObjInfo hideShowSubObjInfo;
-	if( xfer->getXferMode() == XFER_SAVE )
+	const Bool loading = xfer->getXferMode() == XFER_LOAD;
+	UnsignedByte subObjectCount = static_cast<UnsignedByte>(std::min<std::size_t>(m_subObjectVec.size(),
+		std::numeric_limits<UnsignedByte>::max()));
+	xfer->xferUnsignedByte(&subObjectCount);
+	if (loading)
+		m_subObjectVec.resize(subObjectCount);
+	const auto xferSubObject = [](Xfer* x, ModelConditionInfo::HideShowSubObjInfo& entry)
 	{
-
-		std::vector<ModelConditionInfo::HideShowSubObjInfo>::const_iterator it;
-		for( it = m_subObjectVec.begin(); it != m_subObjectVec.end(); ++it )
-		{
-
-			// sub object name
-			hideShowSubObjInfo.subObjName = (*it).subObjName;
-			xfer->xferAsciiString( &hideShowSubObjInfo.subObjName );
-
-			// hide
-			hideShowSubObjInfo.hide = (*it).hide;
-			xfer->xferBool( &hideShowSubObjInfo.hide );
-
-		}
-
-	}
-	else
-	{
-
-		// the vector must be empty
-		m_subObjectVec.clear();
-
-		// read each data item
-		for( UnsignedByte i = 0; i < subObjectCount; ++i )
-		{
-
-			// name
-			xfer->xferAsciiString( &hideShowSubObjInfo.subObjName );
-
-			// hide
-			xfer->xferBool( &hideShowSubObjInfo.hide );
-
-			// stuff in vector
-			m_subObjectVec.push_back( hideShowSubObjInfo );
-
-		}
-
-	}
+		x->xferAsciiString(&entry.subObjName);
+		x->xferBool(&entry.hide);
+	};
+	for (std::size_t i = 0; i < subObjectCount; ++i)
+		xferSubObject(xfer, m_subObjectVec[i]);
 
 	// animation
 	if( version >= 2 )
@@ -5681,8 +5653,28 @@ void W3DModelDraw::xfer( Xfer *xfer )
 
 	}
 
-	// when loading, update the sub objects if we have any
-	if( xfer->getXferMode() == XFER_LOAD && m_subObjectVec.empty() == FALSE )
+	if (retail)
+	{
+		if (!loading && m_subObjectVec.size() == subObjectCount)
+			RetailSaveBlocks::transferSection<Xfer>(xfer, FALSE, version >= 5, {});
+		else
+			RetailSaveBlocks::transferSection<Xfer>(xfer, loading, version >= 5, {
+				{"extended-subobjects", [&](Xfer* x) {
+					UnsignedInt count = loading ? 0 : static_cast<UnsignedInt>(m_subObjectVec.size() - subObjectCount);
+					x->xferUnsignedInt(&count);
+					for (UnsignedInt i = 0; i < count; ++i)
+						if (loading)
+						{
+							ModelConditionInfo::HideShowSubObjInfo entry;
+							xferSubObject(x, entry);
+							m_subObjectVec.push_back(std::move(entry));
+						}
+						else
+							xferSubObject(x, m_subObjectVec[subObjectCount + i]);
+				}, {}},
+			});
+	}
+	if (loading && !m_subObjectVec.empty())
 		updateSubObjects();
 
 }
