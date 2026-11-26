@@ -336,9 +336,24 @@ void HorseHordeContain::loadPostProcess()
 }
 
 AODHordeContain::~AODHordeContain() = default;
-void AODHordeContain::crc(Xfer* xfer) { BehaviorModule::crc(xfer); }
-void AODHordeContain::xfer(Xfer* xfer) { BehaviorModule::xfer(xfer); }
-void AODHordeContain::loadPostProcess() { BehaviorModule::loadPostProcess(); }
+void AODHordeContain::crc(Xfer* xfer) { HordeContain::crc(xfer); }
+void AODHordeContain::xfer(Xfer* xfer)
+{
+	XferVersion version = 2;
+	xfer->xferVersion(&version, 2);
+	m_legacySnapshot = version == 1;
+	if (m_legacySnapshot)
+		ObjectModule::xfer(xfer);
+	else
+		HordeContain::xfer(xfer);
+}
+
+void AODHordeContain::loadPostProcess()
+{
+	if (m_legacySnapshot)
+		m_payloadCreated = TRUE;
+	HordeContain::loadPostProcess();
+}
 
 HordeContain::HordeContain( Thing *thing, const ModuleData *moduleData ) : TransportContain( thing, moduleData )
 {
@@ -1908,7 +1923,8 @@ const HordeContainModuleData* HordeContain::findAlternateFormation() const
 	for (Int i = 0; i < modules.getCount(); ++i)
 	{
 		const AsciiString module = modules.getNthName(i);
-		if (module.compareNoCase("HordeContain") == 0 || module.compareNoCase("HorseHordeContain") == 0)
+		if (module.compareNoCase("HordeContain") == 0 || module.compareNoCase("HorseHordeContain") == 0 ||
+			module.compareNoCase("AODHordeContain") == 0)
 		{
 			const auto* data = static_cast<const HordeContainModuleData*>(modules.getNthData(i));
 			if (!data->m_layout.slots().empty())

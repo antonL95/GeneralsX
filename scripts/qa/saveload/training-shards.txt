@@ -96,4 +96,5 @@
 3 default-states
 3 powers-fire
 3 summon-rules
+3 aod-payload
 4 pkg34-nuggets

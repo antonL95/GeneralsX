@@ -323,11 +323,14 @@ private:
 	Bool m_legacySnapshot = FALSE;
 };
 
-class AODHordeContain final : public BehaviorModule
+class AODHordeContain final : public HordeContain
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( AODHordeContain, "AODHordeContain" )
 	MAKE_STANDARD_MODULE_MACRO_WITH_MODULE_DATA( AODHordeContain, AODHordeContainModuleData )
 
 public:
-	AODHordeContain(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data) {}
+	AODHordeContain(Thing* thing, const ModuleData* data) : HordeContain(thing, data) {}
+
+private:
+	Bool m_legacySnapshot = FALSE;
 };

@@ -1,0 +1,7 @@
+200 create Player_1 RohanOathbreakerHordeSmall 0 1600,3200,0
+220 aod-payload-horde Player_1 RohanOathbreakerHordeSmall 0
+220 aod-payload-count Player_1 - 0 RohanOathbreaker
+244 aod-payload-horde Player_1 RohanOathbreakerHordeSmall 0
+244 aod-payload-count Player_1 - 0 RohanOathbreaker
+260 aod-payload-horde Player_1 RohanOathbreakerHordeSmall 0
+260 aod-payload-count Player_1 - 0 RohanOathbreaker
