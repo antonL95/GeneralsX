@@ -3142,6 +3142,8 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 	}
 #endif
 
+	if (parms->m_cmdSource != CMD_FROM_AI)
+		StancesBehavior::onExplicitOrder(getObject());
 
 	if (parms->m_retailPlannerOrder)
 	{

@@ -601,6 +601,14 @@ const StancesBehavior* StancesBehavior::findForUnit(const Object* obj)
 	return find(HordeContain::get(container) ? container : obj);
 }
 
+void StancesBehavior::onExplicitOrder(const Object* obj)
+{
+	if (!RetailFileLayers::enabled())
+		return;
+	if (StancesBehavior* stance = find(obj); stance && stance->getStance() == AttributeModifierRules::STANCE_HOLD_GROUND)
+		stance->setStance(AttributeModifierRules::STANCE_HOLD_GROUND_MOVING);
+}
+
 void StancesBehavior::setStance(Int stance)
 {
 	if (stance <= AttributeModifierRules::STANCE_UNINITIALIZED || stance >= AttributeModifierRules::STANCE_COUNT)

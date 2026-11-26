@@ -530,18 +530,6 @@ inline unsigned endFrameFor(unsigned now, unsigned durationFrames)
 	return durationFrames == 0 ? 0u : now + durationFrames;
 }
 
-inline int nextStance(const std::vector<int>& cycle, int current)
-{
-	if (cycle.empty())
-		return current;
-	for (size_t index = 0; index < cycle.size(); ++index)
-	{
-		if (cycle[index] == current)
-			return cycle[(index + 1) % cycle.size()];
-	}
-	return cycle.front();
-}
-
 inline int stanceImageIndex(const std::vector<int>& cycle, int current)
 {
 	for (size_t index = 0; index < cycle.size(); ++index)
@@ -549,7 +537,17 @@ inline int stanceImageIndex(const std::vector<int>& cycle, int current)
 		if (cycle[index] == current)
 			return static_cast<int>(index);
 	}
+	if (current == STANCE_HOLD_GROUND_MOVING)
+		return stanceImageIndex(cycle, STANCE_HOLD_GROUND);
 	return -1;
+}
+
+inline int nextStance(const std::vector<int>& cycle, int current)
+{
+	if (cycle.empty())
+		return current;
+	const int index = stanceImageIndex(cycle, current);
+	return index >= 0 ? cycle[(static_cast<size_t>(index) + 1) % cycle.size()] : cycle.front();
 }
 
 inline float maxHealthAfter(float currentMax, float appliedAdd, float appliedMult, float add, float mult)

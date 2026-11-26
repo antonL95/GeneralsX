@@ -292,6 +292,8 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 			(m_order != NO_ORDER && m_order != AICMD_ATTACKMOVE_TO_POSITION)))
 			return;
 
+		if (parms->m_cmdSource != CMD_FROM_AI)
+			StancesBehavior::onExplicitOrder(getObject());
 		Object* target = m_updatingAnchor ? enemyHordeOrUnit(parms->m_obj) : parms->m_obj;
 		if (!m_updatingAnchor || m_order == NO_ORDER)
 		{
@@ -319,6 +321,8 @@ void HordeAIUpdate::aiDoCommand(const AICommandParms* parms)
 	if (isGuardOrder(command) || command == AICMD_ATTACKMOVE_TO_POSITION ||
 		command == AICMD_ATTACK_POSITION || command == AICMD_HUNT)
 	{
+		if (parms->m_cmdSource != CMD_FROM_AI)
+			StancesBehavior::onExplicitOrder(getObject());
 		m_order = command;
 		m_orderPosition = parms->m_pos;
 		m_guardObject = command == AICMD_GUARD_OBJECT && parms->m_obj ? parms->m_obj->getID() : INVALID_ID;

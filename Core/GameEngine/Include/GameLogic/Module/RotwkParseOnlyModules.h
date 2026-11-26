@@ -29,6 +29,7 @@ public:
 	const HordeContainModuleData::MeleeBehavior* getMeleeBehavior(Int stance) const;
 #endif
 	static const StancesBehavior* findForUnit(const Object* obj);
+	static void onExplicitOrder(const Object* obj);
 	void setStance(Int stance);
 	void inheritStance(Int stance, const AsciiString& modifier, NameKeyType moduleTag);
 	static StancesBehavior* find(const Object* obj);

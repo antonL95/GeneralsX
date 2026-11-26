@@ -1,0 +1,9 @@
+224 create Player_1 GondorFighterHorde 0 2900,1900,0
+231 stance Player_1 GondorFighterHorde 0 HoldGround
+233 stance-coverage Player_1 GondorFighterHorde 0
+238 move Player_1 GondorFighterHorde 0 150,0
+243 stance-coverage Player_1 GondorFighterHorde 0
+250 stance-coverage Player_1 GondorFighterHorde 0
+390 stance Player_1 GondorFighterHorde 0 HoldGround
+392 stance-coverage Player_1 GondorFighterHorde 0
+405 destroy Player_1 GondorFighterHorde 0
