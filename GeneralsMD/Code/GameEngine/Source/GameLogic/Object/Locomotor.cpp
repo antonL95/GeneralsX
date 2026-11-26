@@ -3448,6 +3448,8 @@ void Locomotor::locoUpdate_moveTowardsFormationSlot(Object* obj, const Coord3D& 
 		}
 		physics->setTurning(TURN_NONE);
 	}
+	setFlag(IS_BRAKING, false);
+	obj->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_BRAKING));
 	const Real maxSpeed = backing ? getBackingUpSpeed() : getMaxSpeedForCondition(
 		obj->getBodyModule()->getDamageState(), RetailFileLayers::enabled() ? obj : nullptr);
 	if (desiredSpeed > maxSpeed)
