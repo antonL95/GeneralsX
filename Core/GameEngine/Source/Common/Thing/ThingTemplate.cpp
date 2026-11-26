@@ -486,6 +486,7 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "VoiceMoveToHigherGround", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceMoveToHigherGround]) },
 	{ "VoiceMoveWhileAttacking", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceMoveWhileAttacking]) },
 	{ "VoicePriority", INI::parseInt, nullptr, offsetof(ThingTemplate, m_rotwk.voicePriority) },
+	{ "VoiceAttackChargeTimeout", INI::parseDurationUnsignedInt, nullptr, offsetof(ThingTemplate, m_rotwk.voiceAttackChargeTimeout) },
 	{ "VoiceRetreatToCastle", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceRetreatToCastle]) },
 	{ "VoiceSelectBattle", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceSelectBattle]) },
 	{ "VoiceSelectUnderConstruction", parseRotWKAudio, nullptr, offsetof(ThingTemplate, m_audioarray.m_audio[TTAUDIO_voiceSelectUnderConstruction]) },
@@ -1539,6 +1540,9 @@ ThingTemplate::ThingTemplate() :
 	{
 		m_rotwk.maxDistanceForEngaged = TheGlobalData->m_defaultMaxDistanceForEngaged;
 		m_rotwk.engagedStateTimeout = TheGlobalData->m_defaultEngagedStateTimeout;
+#if !RTS_GENERALS
+		m_rotwk.voiceAttackChargeTimeout = TheGlobalData->m_defaultVoiceAttackChargeTimeout;
+#endif
 	}
 
 	m_structureRubbleHeight = 0;

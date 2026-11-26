@@ -41,6 +41,7 @@
 #include "Common/PlayerList.h"
 #include "Common/Player.h"
 #include "Common/GameAudio.h"
+#include "GameClient/RetailClientAudio.h"
 #include "Common/GameEngine.h"
 #include "Common/INI.h"
 #include "GameLogic/RetailTerrainFire.h"
@@ -936,8 +937,8 @@ void GameEngine::init()
 
 		if (retailINI)
 		{
+			RetailClientAudio::loadCrowdResponses();
 			for (const char* name : {
-				"TheCrowdResponseStore",
 				"TheLivingWorldAutoResolveArmorStore",
 				"TheLivingWorldAutoResolveWeaponStore",
 				"TheLivingWorldAutoResolveBodyStore",

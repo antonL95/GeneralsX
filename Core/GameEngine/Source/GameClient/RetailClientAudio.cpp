@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
 #include <random>
 #include <set>
 #include <utility>
@@ -14,11 +15,13 @@
 #include "Common/INI.h"
 #include "Common/Player.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RetailINIStartup.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Upgrade.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/ContainModule.h"
 
 #if !RTS_GENERALS
 #include "GameLogic/Module/ProductionUpdate.h"
@@ -27,6 +30,86 @@
 namespace
 {
 using namespace RetailClientAudio;
+
+using CrowdSounds = std::map<AsciiString, AsciiString>;
+
+struct CrowdResponse
+{
+	Int weight = 100;
+	std::map<Int, CrowdSounds> thresholds;
+};
+
+struct ChargeCooldown
+{
+	UnsignedInt start;
+	UnsignedInt duration;
+};
+
+std::map<AsciiString, CrowdResponse> crowdResponses;
+std::map<ObjectID, ChargeCooldown> chargeCooldowns;
+
+void parseCrowdSound(INI* ini, void* instance, void*, const void* field)
+{
+	const char* sound = ini->getNextToken();
+	if (strnicmp(sound, "EVA:", 4) == 0)
+		throw INI_INVALID_DATA;
+	static_cast<CrowdSounds*>(instance)->insert_or_assign(static_cast<const char*>(field), sound);
+}
+
+const FieldParse crowdSpecificSounds[] = {
+	{nullptr, parseCrowdSound, nullptr, 0},
+	{nullptr, nullptr, nullptr, 0}
+};
+
+void parseCrowdSpecificSounds(INI* ini, void* instance, void*, const void*)
+{
+	ini->initFromINI(instance, crowdSpecificSounds);
+}
+
+void parseCrowdThreshold(INI* ini, void* instance, void*, const void*)
+{
+	static const FieldParse fields[] = {
+		{"UnitSpecificSounds", parseCrowdSpecificSounds, nullptr, 0},
+		{nullptr, parseCrowdSound, nullptr, 0},
+		{nullptr, nullptr, nullptr, 0}
+	};
+	const Int minimum = ini->scanInt(ini->getNextToken());
+	CrowdSounds sounds;
+	ini->initFromINI(&sounds, fields);
+	if (!static_cast<CrowdResponse*>(instance)->thresholds.emplace(minimum, std::move(sounds)).second)
+		throw INI_INVALID_DATA;
+}
+
+void parseCrowdWeight(INI* ini, void* instance, void*, const void*)
+{
+	static_cast<CrowdResponse*>(instance)->weight = ini->scanInt(ini->getNextToken());
+}
+
+void parseCrowdResponse(INI* ini)
+{
+	static const FieldParse fields[] = {
+		{"Weight", parseCrowdWeight, nullptr, 0},
+		{"Threshold", parseCrowdThreshold, nullptr, 0},
+		{nullptr, nullptr, nullptr, 0}
+	};
+	const AsciiString name(ini->getNextToken());
+	CrowdResponse response;
+	ini->initFromINI(&response, fields);
+	if (!crowdResponses.emplace(name, std::move(response)).second)
+		throw INI_INVALID_DATA;
+}
+
+const char* crowdSoundKey(CrowdOrder order)
+{
+	switch (order)
+	{
+		case CrowdOrder::Select: return "VoiceSelect";
+		case CrowdOrder::Move: return "VoiceMove";
+		case CrowdOrder::Attack: return "VoiceAttack";
+		case CrowdOrder::Garrison: return "VoiceGarrison";
+	}
+	return "";
+}
 
 using Attribute = std::pair<AsciiString, std::vector<AsciiString>>;
 
@@ -277,6 +360,105 @@ void trace(const char* action, ObjectID owner, const AsciiString& sound)
 	if (enabled && TheGameLogic && sound.isNotEmpty() && sound.isNotNone() && sound.compareNoCase("NoSound") != 0)
 		std::fprintf(stderr, "RETAIL AUDIO %s frame=%u owner=%u sound=%s\n", action,
 			TheGameLogic->getFrame(), static_cast<UnsignedInt>(owner), sound.str());
+}
+
+void loadCrowdResponses()
+{
+	crowdResponses.clear();
+	RetailINIStartup::loadSubsystem("TheCrowdResponseStore", nullptr, "CrowdResponse", parseCrowdResponse);
+}
+
+void resetCrowdVoiceCooldowns()
+{
+	chargeCooldowns.clear();
+}
+
+void playCrowdResponse(const std::list<Drawable*>& selection, CrowdOrder order, const Object* voiceOwner)
+{
+	if (crowdResponses.empty() || !TheGameLogic || !TheAudio)
+		return;
+
+	struct WeightedKey
+	{
+		const CrowdResponse* response;
+		const Object* firstMember;
+		std::int64_t weight;
+	};
+
+	std::set<ObjectID> counted;
+	std::vector<const Object*> members;
+	std::vector<WeightedKey> totals;
+	const auto count = [&](const Object* object)
+	{
+		if (!object || !object->getTemplate() || object->isEffectivelyDead() ||
+			object->isKindOf(KINDOF_IGNORED_IN_GUI) || !object->isLocallyControlled() ||
+			!counted.insert(object->getID()).second)
+			return;
+		members.push_back(object);
+		const auto key = crowdResponses.find(object->getTemplate()->getRotWKObjectData().crowdResponseKey);
+		if (key == crowdResponses.end())
+			return;
+		const auto total = std::ranges::find(totals, &key->second, &WeightedKey::response);
+		if (total == totals.end())
+			totals.push_back({&key->second, object, key->second.weight});
+		else
+			total->weight += key->second.weight;
+	};
+
+	for (const Drawable* drawable : selection)
+	{
+		const Object* object = drawable ? drawable->getObject() : nullptr;
+		if (!object || object->isKindOf(KINDOF_IGNORED_IN_GUI) || !object->isLocallyControlled())
+			continue;
+		const ContainModuleInterface* contain = object->getContain();
+		const auto* contained = contain && contain->isHordeContain() ? contain->getContainedItemsList() : nullptr;
+		if (contained)
+		{
+			for (const Object* member : *contained)
+				count(member);
+		}
+		else
+		{
+			count(object);
+		}
+	}
+
+	const auto winner = std::ranges::max_element(totals, {}, &WeightedKey::weight);
+	if (winner == totals.end() || winner->weight <= 0)
+		return;
+
+	const auto& thresholds = winner->response->thresholds;
+	const auto upper = thresholds.upper_bound(static_cast<Int>(members.size()));
+	if (upper == thresholds.begin())
+		return;
+	const auto& sounds = std::prev(upper)->second;
+	const Object* owner = voiceOwner ? voiceOwner : winner->firstMember;
+	if (order == CrowdOrder::Attack)
+	{
+		const UnsignedInt frame = TheGameLogic->getFrame();
+		std::erase_if(chargeCooldowns, [frame](const auto& entry)
+		{
+			return frame - entry.second.start >= entry.second.duration;
+		});
+		const auto charge = sounds.find("VoiceAttackCharge");
+		const Bool canCharge = std::any_of(members.begin(), members.end(), [&](const Object* member)
+		{
+			return !member->testStatus(OBJECT_STATUS_CONTESTED) && !chargeCooldowns.contains(member->getID());
+		});
+		if (charge != sounds.end() && canCharge && charge->second.isNotEmpty() && charge->second.isNotNone() &&
+			charge->second.compareNoCase("NoSound") != 0)
+		{
+			start(*owner, charge->second);
+			for (const Object* member : members)
+				chargeCooldowns.insert_or_assign(member->getID(), ChargeCooldown{
+					frame, member->getTemplate()->getRotWKObjectData().voiceAttackChargeTimeout});
+			return;
+		}
+	}
+
+	const auto sound = sounds.find(crowdSoundKey(order));
+	if (sound != sounds.end())
+		start(*owner, sound->second);
 }
 
 AudioHandle start(const Object& owner, const AsciiString& sound)

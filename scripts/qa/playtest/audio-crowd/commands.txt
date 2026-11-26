@@ -1,0 +1,19 @@
+10 audio-loop-trace - - 0 virtual
+12 create Player_1 AudioCrowdProbe 0 2500,1010,0
+12 create Player_1 AudioCrowdProbe 0 2520,1010,0
+12 create Player_1 AudioCrowdProbe 0 2540,1010,0
+12 create Player_1 AudioCrowdProbe 0 2500,1030,0
+12 create Player_1 AudioCrowdProbe 0 2520,1030,0
+12 create Player_1 AudioCrowdHeavyProbe 0 2450,1030,0
+12 create Player_1 AudioCrowdHeavyProbe 0 2470,1030,0
+12 create Player_1 MordorFighterHorde 0 2370,1010,0
+14 reveal Player_1 AudioCrowdProbe 0
+20 audio-loop-group-select Player_1 AudioCrowdProbe 0 4
+35 audio-loop-group-select Player_1 AudioCrowdProbe 0 5
+70 audio-loop-group-move Player_1 AudioCrowdProbe 0 - 2520 1070
+126 create PlyrCreeps GondorFarm 0 2650,1120,0
+130 audio-loop-group-attack Player_1 AudioCrowdProbe 0 PlyrCreeps:GondorFarm:0
+140 audio-loop-group-attack Player_1 AudioCrowdProbe 0 PlyrCreeps:GondorFarm:0
+154 audio-loop-group-select Player_1 AudioCrowdProbe 0 3
+158 audio-loop-group-add Player_1 AudioCrowdHeavyProbe 0 2
+178 audio-loop-group-select Player_1 MordorFighterHorde 0 1

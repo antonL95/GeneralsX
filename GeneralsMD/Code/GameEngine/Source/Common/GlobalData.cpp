@@ -1324,6 +1324,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	{
 		{ "DefaultMaxDistanceForEngaged", INI::parseReal, nullptr, offsetof(GlobalData, m_defaultMaxDistanceForEngaged) },
 		{ "DefaultEngagedStateTimeout", INI::parseDurationUnsignedInt, nullptr, offsetof(GlobalData, m_defaultEngagedStateTimeout) },
+		{ "DefaultVoiceAttackChargeTimeout", INI::parseDurationUnsignedInt, nullptr, offsetof(GlobalData, m_defaultVoiceAttackChargeTimeout) },
 		{ "ScreenEdgeScrollSpeedFactor", INI::parseReal, nullptr, offsetof(GlobalData, m_retailScreenEdgeScrollSpeedFactor) },
 		{ "ScreenEdgeScrollRampTime", INI::parseReal, nullptr, offsetof(GlobalData, m_retailScreenEdgeScrollRampTime) },
 		{ "DefaultCameraScrollSpeedScalar", INI::parseReal, nullptr, offsetof(GlobalData, m_retailDefaultCameraScrollSpeedScalar) },

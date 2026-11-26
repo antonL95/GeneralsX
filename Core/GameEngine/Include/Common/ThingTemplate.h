@@ -471,6 +471,7 @@ public:
 	struct RotWKObjectData
 	{
 		Int voicePriority = 0;
+		UnsignedInt voiceAttackChargeTimeout = 0;
 		Int evaEventSecondDamageFarFromFirstTimeoutMS = 0;
 		Int commandPoints = 0;
 		Int bountyValue = 0;

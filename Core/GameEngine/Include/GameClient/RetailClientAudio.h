@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include <map>
 #include <memory>
 #include <optional>
@@ -14,6 +15,18 @@ class Drawable;
 
 namespace RetailClientAudio
 {
+enum class CrowdOrder
+{
+	Select,
+	Move,
+	Attack,
+	Garrison
+};
+
+void loadCrowdResponses();
+void resetCrowdVoiceCooldowns();
+void playCrowdResponse(const std::list<Drawable*>& selection, CrowdOrder order, const Object* voiceOwner);
+
 struct Condition
 {
 	ModelConditionFlags required;

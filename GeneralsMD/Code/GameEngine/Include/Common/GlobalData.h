@@ -457,6 +457,7 @@ public:
 	Real m_retailScreenEdgeScrollRampTime = 0.3f;
 	Real m_defaultMaxDistanceForEngaged = 30.0f;
 	UnsignedInt m_defaultEngagedStateTimeout = 2 * LOGICFRAMES_PER_SECOND;
+	UnsignedInt m_defaultVoiceAttackChargeTimeout = 0;
 	Real m_retailDefaultCameraScrollSpeedScalar = 1.0f;
 	Bool m_useHelpTextSystem = TRUE;
 	UnsignedInt m_tributeDelayMinutes = 0;

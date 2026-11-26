@@ -44,6 +44,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/GameAudio.h"
+#include "GameClient/RetailClientAudio.h"
 
 #include "Common/AudioAffect.h"
 #include "Common/AudioEventInfo.h"
@@ -277,6 +278,7 @@ void AudioManager::postProcessLoad()
 //-------------------------------------------------------------------------------------------------
 void AudioManager::reset()
 {
+	RetailClientAudio::resetCrowdVoiceCooldowns();
 	m_multiAudioHandles.clear();
 	// clear out any adjusted volumes we might have set.
 	m_adjustedVolumes.clear();

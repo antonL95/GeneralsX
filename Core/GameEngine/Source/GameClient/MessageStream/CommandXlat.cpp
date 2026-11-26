@@ -45,6 +45,7 @@
 #include "Common/GameType.h"
 #include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
+#include "Common/LatchRestore.h"
 #include "Common/MessageStream.h"
 #include "Common/MiscAudio.h"
 #include "Common/MultiplayerSettings.h"
@@ -470,6 +471,8 @@ static CanAttackResult canAnyForceAttack(const DrawableList *allSelected, const 
 }
 
 //-------------------------------------------------------------------------------------------------
+static thread_local UnsignedInt* s_contextCrowdResponses = nullptr;
+
 void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type msgType, PickAndPlayInfo *info )
 {
 	if (!list)
@@ -489,6 +492,7 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 	}
 
 	const Bool retail = RetailFileLayers::enabled();
+	const DrawableList* originalSelection = list;
 	DrawableList ordered;
 	if (retail && list->size() > 1)
 	{
@@ -917,14 +921,9 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 
 
 
-	if (!soundToPlayPtr)
-		return;
-
-	AudioEventRTS soundToPlay = *soundToPlayPtr;
-
-	// to prevent voice stepping.
-	if( objectWithSound )
+	if (soundToPlayPtr && objectWithSound)
 	{
+		AudioEventRTS soundToPlay = *soundToPlayPtr;
 		soundToPlay.setObjectID( objectWithSound->getID() );
 		if (retail)
 			RetailClientAudio::trace("start", objectWithSound->getID(), soundToPlay.getEventName());
@@ -974,6 +973,52 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 					break;
 			}
 		}
+	}
+
+	using RetailClientAudio::CrowdOrder;
+	const auto playCrowd = [&](CrowdOrder order)
+	{
+		if (s_contextCrowdResponses)
+		{
+			const UnsignedInt bit = 1u << static_cast<UnsignedInt>(order);
+			if (*s_contextCrowdResponses & bit)
+				return;
+			*s_contextCrowdResponses |= bit;
+		}
+		RetailClientAudio::playCrowdResponse(*originalSelection, order, objectWithSound);
+	};
+	switch (msgType)
+	{
+		case GameMessage::MSG_SELECT_TEAM0:
+		case GameMessage::MSG_SELECT_TEAM1:
+		case GameMessage::MSG_SELECT_TEAM2:
+		case GameMessage::MSG_SELECT_TEAM3:
+		case GameMessage::MSG_SELECT_TEAM4:
+		case GameMessage::MSG_SELECT_TEAM5:
+		case GameMessage::MSG_SELECT_TEAM6:
+		case GameMessage::MSG_SELECT_TEAM7:
+		case GameMessage::MSG_SELECT_TEAM8:
+		case GameMessage::MSG_SELECT_TEAM9:
+		case GameMessage::MSG_CREATE_SELECTED_GROUP:
+			playCrowd(CrowdOrder::Select);
+			break;
+		case GameMessage::MSG_DO_ATTACKMOVETO:
+		case GameMessage::MSG_DO_FORCEMOVETO:
+		case GameMessage::MSG_DO_MOVETO:
+			playCrowd(CrowdOrder::Move);
+			break;
+		case GameMessage::MSG_DO_FORCE_ATTACK_GROUND:
+		case GameMessage::MSG_DO_FORCE_ATTACK_OBJECT:
+		case GameMessage::MSG_DO_ATTACK_OBJECT:
+		case GameMessage::MSG_DO_WEAPON_AT_OBJECT:
+			playCrowd(CrowdOrder::Attack);
+			break;
+		case GameMessage::MSG_ENTER:
+			if (objectWithSound && target && target->isKindOf(KINDOF_STRUCTURE) && objectWithSound->getRelationship(target) == ALLIES)
+				playCrowd(CrowdOrder::Garrison);
+			break;
+		default:
+			break;
 	}
 }
 
@@ -2515,6 +2560,8 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 																														 const Coord3D *pos,
 																														 CommandEvaluateType type )
 {
+	UnsignedInt crowdResponses = 0;
+	const LatchRestore<UnsignedInt*> scope(s_contextCrowdResponses, &crowdResponses);
 	Object *obj = draw ? draw->getObject() : nullptr;
 	Drawable *drawableInWay = draw;
 	resolveContextTarget( draw, obj, drawableInWay );

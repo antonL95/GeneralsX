@@ -158,6 +158,44 @@ void handleAudioLoop(const RetailTestCommands::Context& ctx)
 		TheMessageStream->appendMessage(GameMessage::MSG_PLACE_BEACON)->appendLocationArgument(ctx.groundLocation());
 		return;
 	}
+	if (cmd == "group-select" || cmd == "group-add")
+	{
+		if (!TheInGameUI || !TheMessageStream)
+			return;
+		const Bool replace = cmd == "group-select";
+		if (replace)
+			TheInGameUI->deselectAllDrawables();
+		GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+		message->appendBooleanArgument(replace);
+		const int count = std::atoi(ctx.argument);
+		for (int index = 0; index < count; ++index)
+		{
+			auto member = ctx;
+			member.ordinal = index;
+			Object* unit = member.requireObject(true);
+			if (!unit || !unit->getDrawable())
+				continue;
+			TheInGameUI->selectDrawable(unit->getDrawable());
+			message->appendObjectIDArgument(unit->getID());
+		}
+		std::fprintf(stderr, "AUDIO GROUP frame=%u selected=%zu\n", ctx.frame,
+			TheInGameUI->getAllSelectedDrawables()->size());
+		return;
+	}
+	if (cmd == "group-move" || cmd == "group-attack")
+	{
+		if (!TheGameClient)
+			return;
+		Object* target = cmd == "group-attack" ? ctx.findTarget(true) : nullptr;
+		if (cmd == "group-attack" && (!target || !target->getDrawable()))
+			return;
+		const Coord3D destination = target ? *target->getPosition() : ctx.groundLocation();
+		const auto order = TheGameClient->evaluateContextCommand(target ? target->getDrawable() : nullptr,
+			&destination, CommandTranslator::DO_COMMAND);
+		const bool accepted = target ? order == GameMessage::MSG_DO_ATTACK_OBJECT : order == GameMessage::MSG_DO_MOVETO;
+		std::fprintf(stderr, "AUDIO GROUP frame=%u %s=%d\n", ctx.frame, target ? "attack" : "move", accepted);
+		return;
+	}
 	if (cmd == "advance-music")
 	{
 		if (TheAudio)
