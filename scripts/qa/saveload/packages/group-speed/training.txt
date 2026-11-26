@@ -1,0 +1,11 @@
+206 create Player_1 GroupSpeedFoot 0 1500,3300,0
+206 create Player_1 GroupSpeedRider 0 1500,3390,0
+236 track Player_1 GroupSpeedFoot 0
+236 track Player_1 GroupSpeedRider 0
+240 select Player_1 GroupSpeedFoot 0
+240 selectadd Player_1 GroupSpeedRider 0
+240 movesel - - 0 - 2300 3345
+392 track Player_1 GroupSpeedFoot 0
+392 track Player_1 GroupSpeedRider 0
+700 destroy Player_1 GroupSpeedFoot 0
+700 destroy Player_1 GroupSpeedRider 0

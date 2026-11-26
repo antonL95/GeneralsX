@@ -20,6 +20,7 @@
 1 pkg65-build-grants
 1 ambient-roam
 1 group-start
+1 group-speed
 1 linked-limit
 1 scripts-economy
 2 pkg68-production-bonus
