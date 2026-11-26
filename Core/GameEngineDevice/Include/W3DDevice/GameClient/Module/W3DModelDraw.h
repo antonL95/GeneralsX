@@ -295,6 +295,7 @@ struct ModelConditionInfo
 	const Matrix3D* findPristineBone(NameKeyType boneName, Int* boneIndex) const;
 	Bool findPristineBonePos(NameKeyType boneName, Coord3D& pos) const;
 	void addPublicBone(const AsciiString& boneName) const;
+	void requirePublicBone(const AsciiString& boneName, Real scale) const;
 	Bool matchesMode(Bool night, Bool snowy) const;
 
 	void validateStuff(RenderObjClass* robj, Real scale, const std::vector<AsciiString>& extraPublicBones) const;

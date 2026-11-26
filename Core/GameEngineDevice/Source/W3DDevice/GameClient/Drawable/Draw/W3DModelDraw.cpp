@@ -464,6 +464,19 @@ void ModelConditionInfo::addPublicBone(const AsciiString& boneName) const
 	}
 }
 
+void ModelConditionInfo::requirePublicBone(const AsciiString& boneName, Real scale) const
+{
+	AsciiString name = boneName;
+	name.toLower();
+	if (!isValidTimeToCalcLogicStuff() || std::find(m_publicBones.begin(), m_publicBones.end(), name) != m_publicBones.end())
+		return;
+	addPublicBone(name);
+	if (findPristineBone(NAMEKEY(name), nullptr))
+		return;
+	m_validStuff &= ~PRISTINE_BONES_VALID;
+	validateCachedBones(nullptr, scale);
+}
+
 //-------------------------------------------------------------------------------------------------
 Bool ModelConditionInfo::matchesMode(Bool night, Bool snowy) const
 {
@@ -720,9 +733,7 @@ void ModelConditionInfo::validateCachedBones(RenderObjClass* robj, Real scale) c
 		animToUse = nullptr;
 	}
 
-	Matrix3D tmp(true);
-	tmp.Scale(scale);
-	robj->Set_Transform(tmp);					// set to identity transform
+	robj->Set_Transform(Matrix3D(true));
 
 	if (TheGlobalData)
 	{
@@ -1221,6 +1232,7 @@ const Vector3* W3DModelDrawModuleData::getAttachToDrawableBoneOffset(const Drawa
 			if (draw->getPristineBonePositions(m_attachToDrawableBone.str(), 0, nullptr, &boneMtx, 1) == 1)
 			{
 				m_attachToDrawableBoneOffset = boneMtx.Get_Translation();
+				m_attachToDrawableBoneOffsetValid = true;
 			}
 			else
 			{
@@ -1228,7 +1240,6 @@ const Vector3* W3DModelDrawModuleData::getAttachToDrawableBoneOffset(const Drawa
 				m_attachToDrawableBoneOffset.Y = 0;
 				m_attachToDrawableBoneOffset.Z = 0;
 			}
-			m_attachToDrawableBoneOffsetValid = true;
 		}
 		return &m_attachToDrawableBoneOffset;
 	}
@@ -4471,6 +4482,15 @@ Int W3DModelDraw::getPristineBonePositionsForConditionState(
 		getDrawable()->getScale(),
 		getW3DModelDrawModuleData()->m_extraPublicBones);
 
+	const ModuleInfo& drawModules = getDrawable()->getTemplate()->getDrawModuleInfo();
+	for (Int module = 0; startIndex == 0 && module < drawModules.getCount(); ++module)
+	{
+		const ModuleData* data = drawModules.getNthData(module);
+		const W3DModelDrawModuleData* sibling = data ? data->getAsW3DModelDrawModuleData() : nullptr;
+		if (sibling && sibling != getW3DModelDrawModuleData() && sibling->m_attachToDrawableBone.compareNoCase(boneNamePrefix) == 0)
+			stateToUse->requirePublicBone(sibling->m_attachToDrawableBone, getDrawable()->getScale());
+	}
+
 	const int MAX_BONE_GET = 64;
 	Matrix3D tmpMtx[MAX_BONE_GET];
 
@@ -4521,6 +4541,18 @@ Int W3DModelDraw::getPristineBonePositionsForConditionState(
 		if (posCount >= maxBones)
 			break;
 	}
+
+#ifdef CACHE_ATTACH_BONE
+	const W3DModelDrawModuleData* moduleData = getW3DModelDrawModuleData();
+	if (posCount > 0 && moduleData->m_attachToDrawableBone.compareNoCase(boneNamePrefix) != 0)
+	{
+		if (const Vector3* offset = moduleData->getAttachToDrawableBoneOffset(getDrawable()))
+		{
+			for (i = 0; i < posCount; ++i)
+				transforms[i].Set_Translation(transforms[i].Get_Translation() + *offset);
+		}
+	}
+#endif
 
 	if (positions && transforms)
 	{
