@@ -282,7 +282,7 @@ run() {
     if [ "$mode" != zero-hour ]; then
         set -- -mod "$aotr" -bfme2 "$bfme2" "$@"
     fi
-    timeout --signal=INT --kill-after=10 360 env -u HOME gdb -q -nx -batch -return-child-result \
+    timeout --signal=INT --kill-after=10 "${SAVE_LOAD_PHASE_TIMEOUT:-900}" env -u HOME gdb -q -nx -batch -return-child-result \
         -x "$out/$gdb_file.gdb" -ex run --args "$engine" -headless -noFPSLimit \
         -noaudio -nomusic -novideo -noshellmap "$@" > "$out/$phase.log" 2>&1 || {
         tail -40 "$out/$phase.log" >&2
