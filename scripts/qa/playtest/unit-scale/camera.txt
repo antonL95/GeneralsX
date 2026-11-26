@@ -1,0 +1,2 @@
+29 Player_1 GondorFighter 3210 850 0.7
+110 Player_1 GondorFighter 3210 850 0.45
