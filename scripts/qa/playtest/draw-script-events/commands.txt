@@ -1,0 +1,15 @@
+5 create Player_1 GoblinCaveTroll 0 2930,650,0
+5 create Player_1 DrawEntryProbe 0 2930,730,0
+5 create Player_1 DrawCaptureProbe 0 3220,880,0
+5 create PlyrCreeps DrawCaptureFlagProbe 0 3230,880,0
+5 create PlyrCreeps DrawCaptureLinkProbe 0 3290,880,0
+6 reveal Player_1 GoblinCaveTroll 0
+7 radar-neutralize PlyrCreeps DrawCaptureFlagProbe 0
+7 radar-neutralize PlyrCreeps DrawCaptureLinkProbe 0
+10 audio-loop-trace - - 0 virtual
+35 audio-loop-condition Player_1 DrawEntryProbe 0 raising-on
+40 weapon-upgrade-toggle Player_1 GoblinCaveTroll 0 Command_ToggleCaveTrollRockThrow
+45 audio-loop-condition Player_1 DrawEntryProbe 0 raising-off
+50 radar-capture Player_1 DrawCaptureProbe 0 *:DrawCaptureFlagProbe:0
+145 create PlyrCreeps GondorFarm 0 3080,650,0
+150 orderattack Player_1 GoblinCaveTroll 0 PlyrCreeps:GondorFarm:0

@@ -12,6 +12,8 @@ struct RecordingHost : DrawScript::Host
 	std::string previous;
 	std::string previousAnimation;
 	std::string targetKind;
+	std::string objectSide;
+	std::string capturingSide;
 	DrawScript::Value targetBearing;
 	double fraction = 0.0;
 	std::string transition;
@@ -44,6 +46,10 @@ struct RecordingHost : DrawScript::Host
 			return DrawScript::Value::of(!targetKind.empty() && arguments.front().text == targetKind);
 		if (function == "CurDrawableGetCurrentTargetBearing")
 			return targetBearing;
+		if (function == "ObjectPlayerSide")
+			return DrawScript::Value::of(objectSide);
+		if (function == "ObjectCapturingObjectPlayerSide")
+			return capturingSide.empty() ? DrawScript::Value() : DrawScript::Value::of(capturingSide);
 		if (function == "CurDrawablePlaySound" || function == "CurDrawableHideModule" || function == "CurDrawableShowModule")
 		{
 			if (arguments.size() == 1 && arguments.front().type == DrawScript::Value::Type::String)
@@ -279,4 +285,38 @@ TEST(DrawScript, SignedBearingSelectsAnAnimation)
 	EXPECT_EQ(script->run(host).text, "Left");
 	host.targetBearing = DrawScript::Value::of(0.0);
 	EXPECT_EQ(script->run(host).text, "Straight");
+}
+
+TEST(DrawScript, FrameEventPayloadSelectsSubObjectAction)
+{
+	const auto script = DrawScript::compile(
+		"local event = tostring(data) "
+		"if event == \"conceal\" then CurDrawableHideSubObject(\"prop\") "
+		"elseif event == \"reveal\" then CurDrawableShowSubObject(\"prop\") end");
+	ASSERT_NE(script, nullptr);
+
+	RecordingHost host;
+	DrawScript::Environment arguments{{"data", DrawScript::Value::of(std::string("conceal"))}};
+	script->run(host, arguments);
+	arguments["data"] = DrawScript::Value::of(std::string("reveal"));
+	script->run(host, arguments);
+	arguments.clear();
+	script->run(host, arguments);
+	EXPECT_EQ(host.subObjectLog, (std::vector<std::string>{"hide:prop", "show:prop"}));
+	EXPECT_EQ(arguments.count("event"), 0u);
+}
+
+TEST(DrawScript, StateEntryUsesCapturingSideBeforeOwnerSide)
+{
+	const auto script = DrawScript::compile(
+		"local side = ObjectCapturingObjectPlayerSide(self) "
+		"if side == nil then side = ObjectPlayerSide(self) end "
+		"return side");
+	ASSERT_NE(script, nullptr);
+
+	RecordingHost host;
+	host.objectSide = "Owner";
+	EXPECT_EQ(script->run(host).text, "Owner");
+	host.capturingSide = "Captor";
+	EXPECT_EQ(script->run(host).text, "Captor");
 }

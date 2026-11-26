@@ -19,6 +19,9 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/WeaponSet.h"
+#if !RTS_GENERALS
+#include "Common/MessageStream.h"
+#endif
 
 #include <algorithm>
 #include <cctype>
@@ -234,6 +237,7 @@ Int findAnimationByLabel(const W3DScriptedModelDrawModuleData::AnimationState& s
 	}
 	return -1;
 }
+
 }
 
 void W3DScriptedModelDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
@@ -541,7 +545,10 @@ void W3DScriptedModelDrawModuleData::parseLuaEvent(INI* ini, void*, void* store,
 	while (const char* attribute = ini->getNextTokenOrNull(INI::getSepsColon()))
 	{
 		if (stricmp(attribute, "Frame") == 0)
+		{
 			event.frame = INI::scanInt(ini->getNextToken());
+			event.onStateEnter = FALSE;
+		}
 		else if (stricmp(attribute, "Data") == 0)
 			event.data = ini->getNextQuotedAsciiString();
 		else if (stricmp(attribute, "OnStateEnter") == 0)
@@ -643,6 +650,7 @@ const ModelConditionInfo* W3DScriptedModelDrawModuleData::combineState(const Mod
 		combined.m_transitionSig = animation.draw.m_transitionSig;
 		combined.m_pristineBoneFrame = animation.draw.m_pristineBoneFrame;
 		combined.m_animationState = &animation.draw;
+		combined.m_animationLuaEvents = animation.luaEvents.empty() ? nullptr : &animation.luaEvents;
 		combined.m_modelState = model;
 		combined.m_enteringStateFX = animation.enteringStateFX.isEmpty() || TheFXListStore == nullptr ? nullptr : TheFXListStore->findFXList(animation.enteringStateFX.str());
 		if (!animation.fxEvents.empty())
@@ -751,6 +759,23 @@ ModuleData* W3DScriptedModelDraw::friend_newModuleData(INI* ini)
 	data->finishParsing();
 	return data.release();
 }
+
+#if !RTS_GENERALS
+void W3DScriptedModelDraw::dispatchDrawScriptEvent(const AsciiString& data)
+{
+	Drawable* drawable = getDrawable();
+	const Object* object = drawable ? drawable->getObject() : nullptr;
+	if (!object)
+		return;
+
+	if (TheMessageStream)
+	{
+		GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_SCRIPT_EVENT);
+		message->appendObjectIDArgument(object->getID());
+		message->appendAsciiStringArgument(data);
+	}
+}
+#endif
 
 void W3DScriptedModelDraw::crc(Xfer* xfer)
 {

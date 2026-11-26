@@ -2547,7 +2547,7 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	}
 
 	handleClientTurretPositioning();
-	dispatchAnimationFXEvents();
+	dispatchAnimationEvents();
 	recalcBonesForClientParticleSystems();
 
   const W3DModelDrawModuleData *modData = getW3DModelDrawModuleData();
@@ -2743,7 +2743,10 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 	{
 		m_whichAnimInCurState = -1;
 		if (!m_queuedAnimation)
+		{
 			m_playingAnimationFXEvents = m_curState->m_animationFXEvents;
+			m_playingAnimationLuaEvents = nullptr;
+		}
 	}
 
 }
@@ -2754,14 +2757,24 @@ void W3DModelDraw::startAnimationFX(Real frame)
 	m_previousAnimationFXFrame = frame;
 	m_animationFXFirstSample = TRUE;
 	m_playingAnimationFXEvents = m_curState->m_animationFXEvents;
+	m_playingAnimationLuaEvents = m_curState->m_animationLuaEvents;
 }
 
 //-------------------------------------------------------------------------------------------------
-void W3DModelDraw::dispatchAnimationFXEvents()
+void W3DModelDraw::dispatchAnimationEvents()
 {
-	if (!m_curState || !RetailFileLayers::enabled() ||
-		!m_renderObject || m_renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD ||
-		(TheGameState && TheGameState->isInLoadGame()))
+	const auto* events = m_curState ? m_curState->m_animationLuaEvents : nullptr;
+	const Bool entered = events != m_lastAnimationLuaEvents;
+	m_lastAnimationLuaEvents = events;
+	if (!m_curState || (TheGameState && TheGameState->isInLoadGame()))
+		return;
+
+	if (entered && events)
+		for (const auto& event : *events)
+			if (event.onStateEnter)
+				dispatchDrawScriptEvent(event.data);
+
+	if (!RetailFileLayers::enabled() || !m_renderObject || m_renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD)
 		return;
 
 	Real frame = 0.0f;
@@ -2786,11 +2799,18 @@ void W3DModelDraw::dispatchAnimationFXEvents()
 	m_previousAnimationFXFrame = frame;
 	m_animationFXFirstSample = FALSE;
 	RetailClientAudio::animate(*getDrawable(), animation->Get_Name(), previous, frame, frameCount, first, backwards, loop);
-	if (!m_playingAnimationFXEvents || !TheFXListStore)
+	if (!m_playingAnimationLuaEvents && (!m_playingAnimationFXEvents || !TheFXListStore))
 		return;
 	const Int sample = static_cast<Int>(frame);
 	const Int previousSample = static_cast<Int>(previous);
 	const Bool newSample = first || sample != previousSample;
+	if (m_playingAnimationLuaEvents && newSample && sample >= 0 && sample < frameCount)
+		for (const auto& event : *m_playingAnimationLuaEvents)
+			if (!event.onStateEnter && event.frame == sample)
+				dispatchDrawScriptEvent(event.data);
+
+	if (!m_playingAnimationFXEvents || !TheFXListStore)
+		return;
 	const Bool trace = TheGameLogic && std::getenv("GENERALSX_TEST_DRAWTRACE");
 	if (newSample && TheParticleSystemManager)
 	{

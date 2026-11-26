@@ -82,7 +82,7 @@ void W3DLightDraw::doDrawModule(const Matrix3D* transformMtx)
 		return;
 
 	Real intensity = data->m_intensity;
-	const Real elapsed = TheGameLogic ? static_cast<Real>(TheGameLogic->getFrame()) / LOGICFRAMES_PER_SECOND : 0.0f;
+	const Real elapsed = TheGameLogic ? static_cast<Real>(TheGameLogic->getFrame()) / static_cast<Real>(LOGICFRAMES_PER_SECOND) : 0.0f;
 	if (data->m_flickerAmplitude > 0.0f && data->m_flickerFrequency > 0.0f)
 	{
 		Real progress = (elapsed - m_flickerStartTime) * data->m_flickerFrequency;

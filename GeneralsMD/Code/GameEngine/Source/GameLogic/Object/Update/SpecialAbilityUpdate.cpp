@@ -645,45 +645,6 @@ Bool SpecialAbilityUpdate::isPowerCurrentlyInUse( const CommandButton *command )
 }
 
 //-------------------------------------------------------------------------------------------------
-static void showRetailCaptureFlag(Object* flag, const Player* player)
-{
-	Drawable* draw = flag->getDrawable();
-	if (!draw)
-		return;
-
-	struct FlagArt
-	{
-		const char* side;
-		const char* mesh;
-	};
-	static const FlagArt art[] = {
-		{ "Isengard", "FLAG_ISENGARD" }, { "WhiteHand", "FLAG_ISENGARD" }, { "Ruffian", "FLAG_ISENGARD" },
-		{ "Mordor", "FLAG_MORDOR" }, { "Morgul", "FLAG_MORDOR" }, { "Rhun", "FLAG_MORDOR" },
-		{ "Men", "FLAG_MEN" }, { "Arthedain", "FLAG_MEN" }, { "Ithilien", "FLAG_MEN" }, { "DolAmroth", "FLAG_MEN" },
-		{ "Arnor", "FLAG_ARNOR" }, { "Shire", "FLAG_ARNOR" },
-		{ "Dwarves", "FLAG_DWARVES" }, { "BotFA", "FLAG_DWARVES" }, { "DurinsFolk", "FLAG_DWARVES" },
-		{ "Elves", "FLAG_ELVES" },
-		{ "Wild", "FLAG_WILD" }, { "SaF", "FLAG_WILD" },
-		{ "Rohan", "FLAG_ROHAN" }, { "Dunharrow", "FLAG_ROHAN" },
-		{ "Angmar", "Cylinder01" },
-		{ "Guldur", "FLAG_DG" }, { "Rhudaur", "FLAG_DG" },
-		{ "Mirkwood", "FLAG_WR" }, { "Dorwinion", "FLAG_WR" }
-	};
-
-	const AsciiString side = player->getSide();
-	const char* visible = "FLAG_NEUTRAL";
-	for (const FlagArt& entry : art)
-	{
-		if (side == entry.side)
-			visible = entry.mesh;
-		draw->showSubObject(entry.mesh, FALSE);
-	}
-	draw->showSubObject("FLAG_ANGMAR", FALSE);
-	draw->showSubObject("FLAG_NEUTRAL", FALSE);
-	draw->showSubObject(visible, TRUE);
-	draw->updateSubObjects();
-}
-
 void SpecialAbilityUpdate::onExit( Bool cleanup )
 {
 	if (m_active)
@@ -700,7 +661,6 @@ void SpecialAbilityUpdate::onExit( Bool cleanup )
 			flag->getDrawable()->getModelConditionFlags().test(MODELCONDITION_START_CAPTURE))
 		{
 			flag->clearAndSetModelConditionState(MODELCONDITION_START_CAPTURE, MODELCONDITION_CANCEL_CAPTURE);
-			showRetailCaptureFlag(flag, flag->getControllingPlayer());
 		}
 	}
 
@@ -1143,7 +1103,6 @@ void SpecialAbilityUpdate::startPreparation()
 			if (target && RetailFileLayers::enabled() && target->isKindOf(KINDOF_CAPTUREFLAG))
 			{
 				target->clearAndSetModelConditionState(MODELCONDITION_CANCEL_CAPTURE, MODELCONDITION_START_CAPTURE);
-				showRetailCaptureFlag(target, getObject()->getControllingPlayer());
 			}
       if (target)
       {
@@ -1661,7 +1620,6 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
 				{
 					target->clearModelConditionFlags(MAKE_MODELCONDITION_MASK2(MODELCONDITION_START_CAPTURE, MODELCONDITION_CANCEL_CAPTURE));
 					target->setModelConditionState(MODELCONDITION_CAPTURED);
-					showRetailCaptureFlag(target, target->getControllingPlayer());
 					linked->defect(newTeam, 0);
 					if (linked->getTeam() == newTeam)
 					{

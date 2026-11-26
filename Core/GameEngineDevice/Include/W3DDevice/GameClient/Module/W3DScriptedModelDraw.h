@@ -18,13 +18,7 @@ public:
 	};
 
 	using FXEvent = ModelConditionInfo::AnimationFXEvent;
-
-	struct LuaEvent
-	{
-		Int frame = 0;
-		AsciiString data;
-		Bool onStateEnter = FALSE;
-	};
+	using LuaEvent = ModelConditionInfo::AnimationLuaEvent;
 
 	struct ParticleAttachment
 	{
@@ -182,6 +176,9 @@ public:
 protected:
 	ScriptedStateResult evaluateStateScript(const ModelConditionInfo* previous, const ModelConditionInfo* destination,
 		Int previousAnimation, Real previousFraction, Bool inTransition) override;
+#if !RTS_GENERALS
+	void dispatchDrawScriptEvent(const AsciiString& data) override;
+#endif
 
 private:
 	DrawScript::Environment m_scriptGlobals;

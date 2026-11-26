@@ -1,0 +1,3 @@
+20 Player_1 GoblinCaveTroll 3010 680 0.7
+55 Player_1 DrawCaptureProbe 3230 880 0.7
+115 Player_1 GoblinCaveTroll 3010 680 0.7

@@ -246,6 +246,10 @@ public:
 	virtual Bool isSpecialAbility() const override { return true; }
 	virtual Bool isSpecialPower() const override { return false; }
 	virtual Bool isActive() const override { return m_active; }
+	ObjectID getCaptureTargetID() const
+	{
+		return m_active && m_withinStartAbilityRange ? m_targetID : INVALID_ID;
+	}
 	const SpecialAbilityUpdateModuleData* getAuthoredAbilityData() const { return getSpecialAbilityUpdateModuleData(); }
 	Bool isChargeAttack() const { return m_active && getSpecialAbilityUpdateModuleData()->m_chargeAttackSpeedBoost; }
 	virtual Bool doesSpecialPowerHaveOverridableDestinationActive() const override { return false; } //Is it active now?

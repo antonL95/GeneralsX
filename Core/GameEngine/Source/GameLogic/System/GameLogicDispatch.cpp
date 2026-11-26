@@ -437,6 +437,8 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 #ifdef RTS_DEBUG
 	DEBUG_ASSERTCRASH(msg != nullptr && msg != (GameMessage*)0xdeadbeef, ("bad msg"));
 #endif
+	if (msg->getType() == GameMessage::MSG_RETAIL_SCRIPT_EVENT)
+		return;
 
 	Player *msgPlayer = getMessagePlayer(msg);
 	if (msgPlayer == nullptr)

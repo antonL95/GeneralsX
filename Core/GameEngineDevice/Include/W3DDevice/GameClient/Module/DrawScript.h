@@ -1,5 +1,6 @@
 #pragma once
 
+#include <charconv>
 #include <cstddef>
 #include <cstdlib>
 #include <map>
@@ -77,6 +78,25 @@ public:
 		return script;
 	}
 
+	static std::shared_ptr<const DrawScript> compileCallback(std::string_view source)
+	{
+		Parser parser(source);
+		std::shared_ptr<DrawScript> script(new DrawScript);
+		if (!parser.tokenize() || !parser.callback(script->m_parameters, script->m_body) || !parser.atEnd())
+			return nullptr;
+		return script;
+	}
+
+	void runCallback(Host& host, const Value& self, const Value& data) const
+	{
+		Environment arguments;
+		if (!m_parameters.empty())
+			arguments.emplace(m_parameters[0], self);
+		if (m_parameters.size() > 1)
+			arguments.insert_or_assign(m_parameters[1], data);
+		run(host, arguments);
+	}
+
 	Value run(Host& host, Environment& variables) const
 	{
 		Machine machine{host, variables, {}, false};
@@ -105,7 +125,7 @@ private:
 
 	struct Statement
 	{
-		enum class Kind { Call, Assign, If, Return };
+		enum class Kind { Call, Assign, Local, If, Return };
 
 		Kind kind = Kind::Call;
 		std::string name;
@@ -182,6 +202,25 @@ private:
 
 		bool atEnd() const { return peek().kind == Token::Kind::End; }
 
+		bool callback(std::vector<std::string>& parameters, std::vector<Statement>& statements)
+		{
+			if (!accept("function") || peek().kind != Token::Kind::Name || isReserved(peek().text))
+				return false;
+			take();
+			if (!accept("("))
+				return false;
+			if (!isWord(")"))
+			{
+				do
+				{
+					if (peek().kind != Token::Kind::Name || isReserved(peek().text))
+						return false;
+					parameters.push_back(take().text);
+				} while (accept(","));
+			}
+			return accept(")") && block(statements, 0) && accept("end");
+		}
+
 		bool block(std::vector<Statement>& statements, int depth)
 		{
 			if (depth > MAX_DEPTH)
@@ -224,14 +263,16 @@ private:
 				}
 				else
 				{
+					const bool local = accept("local");
 					if (peek().kind != Token::Kind::Name || isReserved(peek().text))
 						return false;
 					statement.name = take().text;
-					if (accept("="))
+					const bool assign = accept("=");
+					if (local || assign)
 					{
-						statement.kind = Statement::Kind::Assign;
+						statement.kind = local ? Statement::Kind::Local : Statement::Kind::Assign;
 						statement.expressions.emplace_back();
-						if (!expression(statement.expressions.back(), 0, depth))
+						if (assign && !expression(statement.expressions.back(), 0, depth))
 							return false;
 					}
 					else if (!arguments(statement.expressions, depth))
@@ -382,27 +423,54 @@ private:
 	{
 		enum class Flow { Next, Stop };
 
+		struct Scope
+		{
+			Scope* parent;
+			Environment values;
+
+			Value* find(const std::string& name)
+			{
+				for (Scope* scope = this; scope; scope = scope->parent)
+				{
+					const auto found = scope->values.find(name);
+					if (found != scope->values.end())
+						return &found->second;
+				}
+				return nullptr;
+			}
+		};
+
 		Host& host;
 		std::map<std::string, Value>& variables;
 
-		Flow execute(const std::vector<Statement>& statements)
+		Flow execute(const std::vector<Statement>& statements, Scope* parent = nullptr)
 		{
+			Scope scope{parent, {}};
 			for (const Statement& statement : statements)
 			{
 				bool ok = true;
 				switch (statement.kind)
 				{
 					case Statement::Kind::Call:
-						call(statement.name, statement.expressions, ok);
+						call(statement.name, statement.expressions, ok, scope);
 						break;
 					case Statement::Kind::Assign:
-						variables[statement.name] = evaluate(statement.expressions.front(), ok);
+					{
+						Value value = evaluate(statement.expressions.front(), ok, scope);
+						if (Value* local = scope.find(statement.name))
+							*local = std::move(value);
+						else
+							variables[statement.name] = std::move(value);
+						break;
+					}
+					case Statement::Kind::Local:
+						scope.values[statement.name] = evaluate(statement.expressions.front(), ok, scope);
 						break;
 					case Statement::Kind::Return:
 					{
 						if (!statement.expressions.empty())
 						{
-							const Value returned = evaluate(statement.expressions.front(), ok);
+							const Value returned = evaluate(statement.expressions.front(), ok, scope);
 							if (ok)
 								result = returned;
 						}
@@ -411,9 +479,9 @@ private:
 					case Statement::Kind::If:
 					{
 						std::size_t branch = 0;
-						while (branch < statement.expressions.size() && !evaluate(statement.expressions[branch], ok).truthy() && ok)
+						while (branch < statement.expressions.size() && !evaluate(statement.expressions[branch], ok, scope).truthy() && ok)
 							++branch;
-						if (ok && branch < statement.blocks.size() && execute(statement.blocks[branch]) == Flow::Stop)
+						if (ok && branch < statement.blocks.size() && execute(statement.blocks[branch], &scope) == Flow::Stop)
 							return Flow::Stop;
 						break;
 					}
@@ -427,15 +495,33 @@ private:
 			return Flow::Next;
 		}
 
-		Value call(const std::string& name, const std::vector<Expression>& expressions, bool& ok)
+		Value call(const std::string& name, const std::vector<Expression>& expressions, bool& ok, Scope& scope)
 		{
 			std::vector<Value> arguments;
 			for (const Expression& expression : expressions)
-				arguments.push_back(evaluate(expression, ok));
-			return ok ? host.call(name, arguments) : Value();
+				arguments.push_back(evaluate(expression, ok, scope));
+			if (!ok)
+				return {};
+			if (name == "tostring" && !arguments.empty())
+			{
+				const Value& value = arguments.front();
+				switch (value.type)
+				{
+					case Value::Type::String: return value;
+					case Value::Type::Boolean: return Value::of(std::string(value.boolean ? "true" : "false"));
+					case Value::Type::Nil: return Value::of(std::string("nil"));
+					case Value::Type::Number:
+					{
+						char buffer[64];
+						const auto result = std::to_chars(buffer, buffer + sizeof(buffer), value.number);
+						return result.ec == std::errc{} ? Value::of(std::string(buffer, result.ptr)) : Value();
+					}
+				}
+			}
+			return host.call(name, arguments);
 		}
 
-		Value evaluate(const Expression& expression, bool& ok)
+		Value evaluate(const Expression& expression, bool& ok, Scope& scope)
 		{
 			switch (expression.kind)
 			{
@@ -443,16 +529,18 @@ private:
 					return expression.constant;
 				case Expression::Kind::Variable:
 				{
+					if (const Value* local = scope.find(expression.name))
+						return *local;
 					const auto found = variables.find(expression.name);
 					return found == variables.end() ? Value() : found->second;
 				}
 				case Expression::Kind::Call:
-					return call(expression.name, expression.operands, ok);
+					return call(expression.name, expression.operands, ok, scope);
 				case Expression::Kind::Not:
-					return Value::of(!evaluate(expression.operands.front(), ok).truthy());
+					return Value::of(!evaluate(expression.operands.front(), ok, scope).truthy());
 				case Expression::Kind::Negate:
 				{
-					const Value operand = evaluate(expression.operands.front(), ok);
+					const Value operand = evaluate(expression.operands.front(), ok, scope);
 					ok = ok && operand.type == Value::Type::Number;
 					return Value::of(-operand.number);
 				}
@@ -460,12 +548,12 @@ private:
 					break;
 			}
 			const std::string& op = expression.name;
-			const Value left = evaluate(expression.operands.front(), ok);
+			const Value left = evaluate(expression.operands.front(), ok, scope);
 			if (op == "and")
-				return left.truthy() ? evaluate(expression.operands.back(), ok) : left;
+				return left.truthy() ? evaluate(expression.operands.back(), ok, scope) : left;
 			if (op == "or")
-				return left.truthy() ? left : evaluate(expression.operands.back(), ok);
-			const Value right = evaluate(expression.operands.back(), ok);
+				return left.truthy() ? left : evaluate(expression.operands.back(), ok, scope);
+			const Value right = evaluate(expression.operands.back(), ok, scope);
 			if (op == "==")
 				return Value::of(left == right);
 			if (op == "~=")
@@ -496,4 +584,5 @@ private:
 	DrawScript() = default;
 
 	std::vector<Statement> m_body;
+	std::vector<std::string> m_parameters;
 };

@@ -265,6 +265,13 @@ struct ModelConditionInfo
 	Int m_pristineBoneFrame;
 	const FXList* m_enteringStateFX = nullptr;
 	const std::vector<AnimationFXEvent>* m_animationFXEvents = nullptr;
+	struct AnimationLuaEvent
+	{
+		Int frame = 0;
+		AsciiString data;
+		Bool onStateEnter = FALSE;
+	};
+	const std::vector<AnimationLuaEvent>* m_animationLuaEvents = nullptr;
 	const ModelConditionInfo* m_animationState = nullptr;
 	const ModelConditionInfo* m_modelState = nullptr;
 	Bool m_retainSubObjects = FALSE;
@@ -531,6 +538,7 @@ protected:
 	virtual void onRenderObjRecreated(){};
 	virtual ScriptedStateResult evaluateStateScript(const ModelConditionInfo*, const ModelConditionInfo*,
 		Int, Real, Bool) { return {}; }
+	virtual void dispatchDrawScriptEvent(const AsciiString&) {}
 
 	const ModelConditionInfo* getCurState() const { return m_curState; }
 
@@ -627,6 +635,8 @@ private:
 	Real m_previousAnimationFXFrame = 0.0f;
 	Bool m_animationFXFirstSample = TRUE;
 	const std::vector<ModelConditionInfo::AnimationFXEvent>* m_playingAnimationFXEvents = nullptr;
+	const std::vector<ModelConditionInfo::AnimationLuaEvent>* m_playingAnimationLuaEvents = nullptr;
+	const std::vector<ModelConditionInfo::AnimationLuaEvent>* m_lastAnimationLuaEvents = nullptr;
 	Real m_queuedAnimationStartFrame = 0.0f;
 	const HAnimClass* m_queuedAnimation = nullptr;
 	struct TimedAnimationParticle
@@ -645,7 +655,7 @@ private:
 	void applyScriptSubObjects(const std::vector<ScriptSubObjectAction>& actions);
 	void resolveTransitionChain(ScriptedStateResult& result, const ModelConditionInfo*& newState, const ModelConditionInfo*& nextState);
 	void reenterCurrentState();
-	void dispatchAnimationFXEvents();
+	void dispatchAnimationEvents();
 	void startAnimationFX(Real frame);
 	void stopTimedAnimationParticles();
 	void applyWeaponTiming();
