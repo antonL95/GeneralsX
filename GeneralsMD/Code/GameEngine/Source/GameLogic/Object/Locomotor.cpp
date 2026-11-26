@@ -3954,4 +3954,10 @@ Locomotor* LocomotorSet::findLocomotor(LocomotorSurfaceTypeMask t)
 	return nullptr;
 }
 
-
+Bool LocomotorSet::scalesWalls() const
+{
+	for (const Locomotor* locomotor : m_locomotors)
+		if (locomotor && locomotor->scalesWalls())
+			return TRUE;
+	return FALSE;
+}

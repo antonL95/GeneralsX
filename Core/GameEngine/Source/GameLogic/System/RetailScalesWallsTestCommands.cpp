@@ -7,6 +7,9 @@
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Pathfinder/Path.h"
+#include "GameLogic/Pathfinder/PathNode.h"
 #include "GameLogic/RetailWallMesh.h"
 
 namespace
@@ -36,11 +39,18 @@ void moveToWall(const RetailTestCommands::Context& ctx)
 
 void sample(const RetailTestCommands::Context& ctx)
 {
-    const Object* object = ctx.requireObject(FALSE);
+    Object* object = ctx.requireObject(FALSE);
     if (!object)
         return;
-    std::fprintf(stderr, "TEST scales-walls frame=%u name=%s z=%.2f layer=%d\n", ctx.frame,
-        ctx.targetName, object->getPosition()->z, object->getLayer());
+    std::fprintf(stderr, "TEST scales-walls frame=%u name=%s z=%.2f layer=%d x=%.2f y=%.2f\n", ctx.frame,
+        ctx.targetName, object->getPosition()->z, object->getLayer(), object->getPosition()->x, object->getPosition()->y);
+    AIUpdateInterface* ai = object->getAIUpdateInterface();
+    std::fprintf(stderr, "TEST scales-walls-capability name=%s value=%d\n", ctx.targetName,
+        ai && ai->getLocomotorSet().scalesWalls());
+    if (ai && ai->getPath())
+        for (const PathNode* node = ai->getPath()->getFirstNode(); node; node = node->getNext())
+            std::fprintf(stderr, "TEST scales-walls-node name=%s x=%.2f y=%.2f z=%.2f layer=%d\n",
+                ctx.targetName, node->getPosition()->x, node->getPosition()->y, node->getPosition()->z, node->getLayer());
 }
 }
 #endif

@@ -9,3 +9,7 @@
 244 scales-walls-sample Player_1 ScalesWallsUnit 0
 300 scales-walls-sample Player_1 ScalesWallsUnit 0
 300 scales-walls-sample Player_1 ScalesWallsControl 0
+400 move Player_1 ScalesWallsUnit 0 - 1980 2330
+400 move Player_1 ScalesWallsControl 0 - 2020 2330
+600 scales-walls-sample Player_1 ScalesWallsUnit 0
+600 scales-walls-sample Player_1 ScalesWallsControl 0
