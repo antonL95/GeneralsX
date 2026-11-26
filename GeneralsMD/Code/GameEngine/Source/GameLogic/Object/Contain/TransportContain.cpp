@@ -378,29 +378,35 @@ void TransportContain::updatePassengerWeaponSet()
 	carrier->setWeaponSetFlags(enabled, TRUE);
 }
 
-void TransportContain::clearPassengerWeaponState()
+void TransportContain::refreshPassengerWeaponState()
 {
 	const TransportContainModuleData* data = getTransportContainModuleData();
 	if (!data->m_passengerTypeOneForWeaponState.any() && !data->m_passengerTypeTwoForWeaponState.any() &&
 		!data->m_passengerTypeThreeForWeaponState.any())
 		return;
 
-	ModelConditionFlags clearFlags;
-	clearFlags.set(MODELCONDITION_WEAPONSTATE_ONE);
-	clearFlags.set(MODELCONDITION_WEAPONSTATE_TWO);
-	clearFlags.set(MODELCONDITION_WEAPONSTATE_THREE);
-	getObject()->clearModelConditionFlags(clearFlags);
-}
+	ModelConditionFlags setFlags;
+	if (const ContainedItemsList* passengers = getContainedItemsList())
+	{
+		for (const Object* passenger : *passengers)
+		{
+			if (passenger->isAnyKindOf(data->m_passengerTypeOneForWeaponState))
+				setFlags.set(MODELCONDITION_WEAPONSTATE_ONE);
+			else if (passenger->isAnyKindOf(data->m_passengerTypeTwoForWeaponState))
+				setFlags.set(MODELCONDITION_WEAPONSTATE_TWO);
+			else if (passenger->isAnyKindOf(data->m_passengerTypeThreeForWeaponState))
+				setFlags.set(MODELCONDITION_WEAPONSTATE_THREE);
+		}
+	}
 
-void TransportContain::updatePassengerWeaponState(const Object* rider)
-{
-	const TransportContainModuleData* data = getTransportContainModuleData();
-	if (rider->isAnyKindOf(data->m_passengerTypeOneForWeaponState))
-		getObject()->setModelConditionState(MODELCONDITION_WEAPONSTATE_ONE);
-	else if (rider->isAnyKindOf(data->m_passengerTypeTwoForWeaponState))
-		getObject()->setModelConditionState(MODELCONDITION_WEAPONSTATE_TWO);
-	else if (rider->isAnyKindOf(data->m_passengerTypeThreeForWeaponState))
-		getObject()->setModelConditionState(MODELCONDITION_WEAPONSTATE_THREE);
+	ModelConditionFlags clearFlags;
+	if (!setFlags.test(MODELCONDITION_WEAPONSTATE_ONE))
+		clearFlags.set(MODELCONDITION_WEAPONSTATE_ONE);
+	if (!setFlags.test(MODELCONDITION_WEAPONSTATE_TWO))
+		clearFlags.set(MODELCONDITION_WEAPONSTATE_TWO);
+	if (!setFlags.test(MODELCONDITION_WEAPONSTATE_THREE))
+		clearFlags.set(MODELCONDITION_WEAPONSTATE_THREE);
+	getObject()->clearAndSetModelConditionFlags(clearFlags, setFlags);
 }
 
 void TransportContain::applyPassengerFade(Object* rider, Real timeMsec, Bool fadeOut) const
@@ -459,7 +465,7 @@ void TransportContain::onContaining( Object *rider, Bool wasSelected )
 	if (data->m_shouldThrowOutPassengers)
 		m_throwPassengersAt = TheGameLogic->getFrame() + data->m_throwOutPassengersDelay;
 	updatePassengerWeaponSet();
-	updatePassengerWeaponState(rider);
+	refreshPassengerWeaponState();
 
 	rider->setDisabled( DISABLED_HELD );
 
@@ -514,7 +520,7 @@ void TransportContain::onRemoving( Object *rider )
 	}
 	OpenContain::onRemoving(rider);
 	updatePassengerWeaponSet();
-	clearPassengerWeaponState();
+	refreshPassengerWeaponState();
 
 	rider->clearDisabled( DISABLED_HELD );
 

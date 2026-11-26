@@ -148,8 +148,7 @@ private:
 	void throwOutPassengers();
 	void xferRetailTransportBlocks(Xfer* xfer, Bool present);
 	void updatePassengerWeaponSet();
-	void updatePassengerWeaponState(const Object* rider);
-	void clearPassengerWeaponState();
+	void refreshPassengerWeaponState();
 	void applyPassengerFade(Object* rider, Real timeMsec, Bool fadeOut) const;
 	void onPassengerBoarding(Object* rider) override;
 	Bool fitsPassenger(const ThingTemplate& passenger, const Player* owner, Int slots, Bool checkCapacity) const;
