@@ -43,6 +43,7 @@
 250 tc-probe Player_1 DwarvenBattleWagonAxeThrower 0 bone-slot1-after
 250 tc-probe Player_1 DwarvenBattleWagonAxeThrower 1 bone-slot2-after
 250 tc-probe Player_1 TcKaradd 0 karadd-orc-after
+250 tc-seats Player_1 TcKaradd 0 karadd-seat
 250 tc-seats Player_1 HaradMumakilMatriarch 0 howdah
 251 tc-eject Player_1 TcBoneCarrier 0 Player_1:DwarvenBattleWagonAxeThrower:0,bone-eject1
 251 tc-eject Player_1 TcKaradd 0 Player_1:TcOrc:1,karadd-eject-orc

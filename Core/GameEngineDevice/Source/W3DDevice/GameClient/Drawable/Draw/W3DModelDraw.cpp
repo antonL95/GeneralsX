@@ -60,6 +60,7 @@
 #include "GameLogic/WeaponSet.h"
 #include "GameLogic/FPUControl.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/SubObjectsUpgrade.h"
 #if !RTS_GENERALS
@@ -554,6 +555,15 @@ static Bool findSingleSubObj(RenderObjClass* robj, const AsciiString& boneName, 
 	{
 		return false;
 	}
+}
+
+static Bool isPassengerSeatBone(const AsciiString& prefix, const char* boneName)
+{
+	const size_t length = prefix.getLength();
+	if (length == 0 || strnicmp(boneName, prefix.str(), length) != 0)
+		return FALSE;
+	const char* suffix = boneName + length;
+	return suffix[strspn(suffix, "0123456789")] == 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4489,6 +4499,17 @@ Int W3DModelDraw::getPristineBonePositionsForConditionState(
 		const W3DModelDrawModuleData* sibling = data ? data->getAsW3DModelDrawModuleData() : nullptr;
 		if (sibling && sibling != getW3DModelDrawModuleData() && sibling->m_attachToDrawableBone.compareNoCase(boneNamePrefix) == 0)
 			stateToUse->requirePublicBone(sibling->m_attachToDrawableBone, getDrawable()->getScale());
+	}
+
+	const ModuleInfo& behaviors = getDrawable()->getTemplate()->getBehaviorModuleInfo();
+	for (Int module = 0; module < behaviors.getCount(); ++module)
+	{
+		const auto* contain = dynamic_cast<const OpenContainModuleData*>(behaviors.getNthData(module));
+		if (!contain)
+			continue;
+		for (const auto& passenger : contain->m_passengerBonePrefixes)
+			if (isPassengerSeatBone(passenger.bonePrefix, boneNamePrefix))
+				stateToUse->requirePublicBone(passenger.bonePrefix, getDrawable()->getScale());
 	}
 
 	const int MAX_BONE_GET = 64;
