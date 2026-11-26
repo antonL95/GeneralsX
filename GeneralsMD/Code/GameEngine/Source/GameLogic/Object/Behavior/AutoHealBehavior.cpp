@@ -31,6 +31,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/AttributeModifierRules.h"
+#include "GameLogic/Module/AttributeModifierHelper.h"
 #include "Common/Thing.h"
 #include "Common/ThingTemplate.h"
 #include "Common/INI.h"
@@ -366,10 +367,12 @@ void AutoHealBehavior::pulseHealObject( Object *obj, Bool contained )
 			return;
 	}
 
+	const Real adjusted = data->m_healingAmount + AttributeModifiers::value(getObject(), AttributeModifierRules::AUTO_HEAL);
+	const Int amount = !(adjusted > 0.0f) ? 0 : adjusted >= static_cast<Real>(INT_MAX) ? INT_MAX : static_cast<Int>(adjusted);
 	if ( (!contained || RetailFileLayers::enabled()) && data->m_radius == 0.0f )
-		obj->attemptHealing(data->m_healingAmount, getObject());
+		obj->attemptHealing(amount, getObject());
 	else
-		obj->attemptHealingFromSoleBenefactor( data->m_healingAmount, getObject(), data->m_healingDelay );
+		obj->attemptHealingFromSoleBenefactor(amount, getObject(), data->m_healingDelay);
 
 	if (data->m_unitHealPulseFX && (!contained || !obj->getEnclosingContainedBy()))
 		FXList::doFXObj(data->m_unitHealPulseFX, obj);

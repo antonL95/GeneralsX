@@ -133,7 +133,6 @@ inline bool isMultiplicative(int kind)
 		case RECHARGE_TIME:
 		case PRODUCTION:
 		case HEALTH_MULT:
-		case BOUNTY_PERCENTAGE:
 		case MINIMUM_CRUSH_VELOCITY:
 		case RATE_OF_FIRE:
 		case CRUSHED_DECELERATE:

@@ -48,6 +48,14 @@ struct WeaponNuggetScalar
 	SpecialPowerObjectFilter m_filter;
 };
 
+struct WeaponNuggetDamage
+{
+	Real scalar;
+	Real amount;
+	UnsignedInt sourcePlayerMask;
+	Bool forceKill;
+};
+
 struct WeaponNugget
 {
 	explicit WeaponNugget(WeaponNuggetType type = WEAPON_NUGGET_DAMAGE) : m_type(type) {}

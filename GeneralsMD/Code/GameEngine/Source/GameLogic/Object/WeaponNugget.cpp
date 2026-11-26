@@ -1030,7 +1030,7 @@ void WeaponTemplate::dealNuggetsAtImpact(ObjectID sourceID, ObjectID victimID, c
 		}
 		if (!nugget.isImpactNugget() || !nugget.isEnabledFor(attacker))
 			continue;
-		if (nugget.m_delayFrames == 0)
+		if (nugget.m_delayFrames == 0 || nugget.dealsDamage())
 			dealNuggetDamage(static_cast<Int>(index), nuggetSourceID, victimID, pos, bonus, FALSE, contactHit, &velocity, launchTrigger, launchWeapon);
 		else if (RetailFileLayers::enabled() && TheWeaponStore && nugget.m_type == WEAPON_NUGGET_META_IMPACT)
 		{
@@ -1125,7 +1125,7 @@ void WeaponTemplate::applyMetaImpactNugget(Int nuggetIndex, const Object* source
 
 void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, ObjectID victimID, const Coord3D* pos, const WeaponBonus& bonus,
 	Bool dotTick, Bool contactHit, const Coord3D* impactVelocity, RetailDamageFXTrigger launchTrigger,
-	const WeaponTemplate* launchWeapon) const
+	const WeaponTemplate* launchWeapon, const WeaponNuggetDamage* capturedDamage, Bool fromQueue) const
 {
 	const WeaponNugget& nugget = m_nuggets[nuggetIndex];
 	Object* source = TheGameLogic->findObjectByID(sourceID);
@@ -1161,7 +1161,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 	}
 	if (primaryVictim)
 		pos = primaryVictim->getPosition();
-	if (!pos || (dotTick && (!primaryVictim || primaryVictim->isEffectivelyDead())))
+	if (!pos || ((dotTick || capturedDamage) && (!primaryVictim || primaryVictim->isEffectivelyDead() || primaryVictim->isDestroyed())))
 		return;
 
 	if (nugget.m_type == WEAPON_NUGGET_SPAWN_AND_FADE)
@@ -1274,13 +1274,21 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		return;
 	}
 
-	const auto damage = [&](Object* victim, Bool killSelf)
+	const auto capture = [&](const Object* victim, Bool killSelf) -> WeaponNuggetDamage
 	{
 		const Bool forceKill = nugget.m_hasForceKillObjectFilter && !victim->isEffectivelyDead() &&
 			nugget.m_forceKillObjectFilter.matchesObject(source, victim);
 		const Real scalar = nugget.scalarFor(source, victim);
-		const Real amount = killSelf ? HUGE_DAMAGE_AMOUNT : nuggetDamage(nugget, scalar, bonus);
-		if (amount <= 0.0f && !forceKill)
+		Real amount = killSelf ? HUGE_DAMAGE_AMOUNT : nuggetDamage(nugget, scalar, bonus);
+		if (!killSelf && nugget.m_flankingBonus != 0.0f && HordeContain::isFlanked(victim, source, FALSE))
+			amount *= 1.0f + nugget.m_flankingBonus;
+		const Player* player = source ? source->getControllingPlayer() : nullptr;
+		return {scalar, amount, player ? player->getPlayerMask() : 0, forceKill};
+	};
+
+	const auto damage = [&](Object* victim, const WeaponNuggetDamage& hit)
+	{
+		if (hit.amount <= 0.0f && !hit.forceKill)
 			return;
 
 		DamageInfo damageInfo;
@@ -1288,9 +1296,9 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damageInfo.in.m_damageFXOverride = nugget.m_damageFXType;
 		damageInfo.in.m_deathType = nugget.m_deathType;
 		damageInfo.in.m_sourceID = sourceID;
-		damageInfo.in.m_sourcePlayerMask = source && source->getControllingPlayer() ? source->getControllingPlayer()->getPlayerMask() : 0;
-		damageInfo.in.m_amount = amount;
-		damageInfo.in.m_kill = forceKill;
+		damageInfo.in.m_sourcePlayerMask = hit.sourcePlayerMask;
+		damageInfo.in.m_amount = hit.amount;
+		damageInfo.in.m_kill = hit.forceKill;
 		damageInfo.retailFXTrigger = trigger;
 		if (RetailFileLayers::enabled())
 			damageInfo.retailWeaponName = launchWeapon ? launchWeapon->m_name : m_name;
@@ -1314,13 +1322,13 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 				TheGameLogic->getFrame(), m_name.str(), nuggetIndex, nuggetTypeName(nugget.m_type),
 				DamageTypeFlags::getNameFromSingleBit(nugget.m_damageType), TheDeathNames[nugget.m_deathType],
 				static_cast<unsigned>(sourceID), static_cast<unsigned>(victim->getID()), victim->getTemplate()->getName().str(),
-				nugget.m_damage, scalar, amount, damageInfo.out.m_actualDamageDealt, healthBefore,
+				nugget.m_damage, hit.scalar, hit.amount, damageInfo.out.m_actualDamageDealt, healthBefore,
 				victim->getBodyModule() ? victim->getBodyModule()->getHealth() : 0.0f);
 	};
 
-	if (dotTick)
+	if (dotTick || capturedDamage)
 	{
-		damage(primaryVictim, FALSE);
+		damage(primaryVictim, capturedDamage ? *capturedDamage : capture(primaryVictim, FALSE));
 		return;
 	}
 
@@ -1362,9 +1370,16 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 				continue;
 		}
 
-		damage(curVictim, verdict == RADIUS_DAMAGE_KILL_SELF);
+		const WeaponNuggetDamage hit = capture(curVictim, verdict == RADIUS_DAMAGE_KILL_SELF);
+		const UnsignedInt delay = fromQueue ? 0 : nugget.m_delayFrames;
+		const UnsignedInt damageFrame = TheGameLogic->getFrame() + delay;
+		if (delay && TheWeaponStore)
+			TheWeaponStore->setDelayedDamage(this, curVictim->getPosition(), damageFrame, sourceID,
+				curVictim->getID(), bonus, nuggetIndex, FALSE, contactHit, launchTrigger, impactVelocity, launchWeapon, &hit);
+		else
+			damage(curVictim, hit);
 		for (size_t tick = 1; tick < dotTicks.size() && TheWeaponStore; ++tick)
-			TheWeaponStore->setDelayedDamage(this, curVictim->getPosition(), TheGameLogic->getFrame() + dotTicks[tick], sourceID,
-				curVictim->getID(), bonus, nuggetIndex, TRUE, FALSE, launchTrigger, impactVelocity, launchWeapon);
+			TheWeaponStore->setDelayedDamage(this, curVictim->getPosition(), damageFrame + dotTicks[tick], sourceID,
+				curVictim->getID(), bonus, nuggetIndex, TRUE, FALSE, launchTrigger, impactVelocity, launchWeapon, &hit);
 	}
 }

@@ -128,3 +128,4 @@
 3 lua-handler-effects
 3 lua-creation-bulk
 3 pkg-ini-combat-fields
+3 hc-combat-flanking-armor

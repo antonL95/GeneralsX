@@ -1,0 +1,41 @@
+230 create Player_1 CombatCoverageTarget 0 2660,2310,0
+230 create PlyrCreeps CombatCoverageTarget 0 2710,2280,180
+230 create PlyrCreeps CombatCoverageTarget 1 2710,2330,180
+232 firetestweapon Player_1 CombatCoverageTarget 0 CombatCoverageDelayed,PlyrCreeps:CombatCoverageTarget:0
+233 firetestweapon Player_1 CombatCoverageTarget 0 CombatCoverageDot,PlyrCreeps:CombatCoverageTarget:1
+235 destroy Player_1 CombatCoverageTarget 0
+237 fireweapon-cadence-health PlyrCreeps CombatCoverageTarget 1 flanking-dot-first
+271 fireweapon-cadence-health PlyrCreeps CombatCoverageTarget 0 flanking-delay
+271 fireweapon-cadence-health PlyrCreeps CombatCoverageTarget 1 flanking-dot
+272 destroy PlyrCreeps CombatCoverageTarget 1
+272 destroy PlyrCreeps CombatCoverageTarget 0
+310 create Player_1 CombatCoverageHorde 0 2660,2310,0
+310 create PlyrCreeps CombatCoverageHorde 0 2740,2310,0
+314 combat-coverage-horde PlyrCreeps CombatCoverageHorde 0 flank-before
+315 firetestweapon Player_1 CombatCoverageHorde 0 CombatCoverageFlank,PlyrCreeps:CombatCoverageHorde:0
+316 combat-coverage-horde PlyrCreeps CombatCoverageHorde 0 flank-after
+317 destroy Player_1 CombatCoverageHorde 0
+317 destroy PlyrCreeps CombatCoverageHorde 0
+400 create PlyrCreeps CombatCoverageTarget 0 2660,2310,0
+400 create Player_1 CombatCoverageTarget 0 2710,2280,180
+400 create Player_1 CombatCoverageHealTarget 0 2710,2330,180
+400 create Player_1 CombatCoverageOverrideTarget 0 2730,2310,180
+400 create Player_1 CombatCoverageStructure 0 2710,2250,180
+401 modapply PlyrCreeps CombatCoverageTarget 0 CombatCoverageBounty
+401 modapply PlyrCreeps CombatCoverageTarget 0 CombatCoverageBountyBonus
+401 modapply Player_1 CombatCoverageHealTarget 0 CombatCoverageHeal
+402 combat-coverage-cash PlyrCreeps - 0 bounty-before
+403 firetestweapon PlyrCreeps CombatCoverageTarget 0 CombatCoverageFatal,Player_1:CombatCoverageTarget:0
+404 combat-coverage-cash PlyrCreeps - 0 bounty-after
+405 firetestweapon PlyrCreeps CombatCoverageTarget 0 CombatCoverageWound,Player_1:CombatCoverageHealTarget:0
+406 fireweapon-cadence-health Player_1 CombatCoverageHealTarget 0 heal-damaged
+408 firetestweapon PlyrCreeps CombatCoverageTarget 0 BerethorSword,Player_1:CombatCoverageOverrideTarget:0
+409 fireweapon-cadence-health Player_1 CombatCoverageOverrideTarget 0 override-hit
+410 modapply PlyrCreeps CombatCoverageTarget 0 CombatCoverageStructureBounty
+411 firetestweapon PlyrCreeps CombatCoverageTarget 0 CombatCoverageWound,Player_1:CombatCoverageStructure:0
+412 combat-coverage-cash PlyrCreeps - 0 structure-bounty
+439 fireweapon-cadence-health Player_1 CombatCoverageHealTarget 0 heal-pulsed
+440 destroy Player_1 CombatCoverageHealTarget 0
+440 destroy Player_1 CombatCoverageOverrideTarget 0
+440 destroy Player_1 CombatCoverageStructure 0
+440 destroy PlyrCreeps CombatCoverageTarget 0

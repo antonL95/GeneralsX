@@ -1938,15 +1938,18 @@ WeaponTemplate *WeaponStore::newWeaponTemplate(AsciiString name)
 //-------------------------------------------------------------------------------------------------
 WeaponTemplate *WeaponStore::newOverride(WeaponTemplate *weaponTemplate)
 {
-	if (!weaponTemplate)
-		return nullptr;
+	if (!weaponTemplate || weaponTemplate->isOverride())
+		return weaponTemplate;
 
-	// allocate a new weapon
-	WeaponTemplate *wt = newInstance(WeaponTemplate);
-	(*wt) = (*weaponTemplate);
-	(wt)->friend_setNextTemplate(weaponTemplate);
-
-	return wt;
+	WeaponTemplate* original = newInstance(WeaponTemplate);
+	*original = *weaponTemplate;
+	if (original->m_extraBonus)
+	{
+		weaponTemplate->m_extraBonus = newInstance(WeaponBonusSet);
+		*weaponTemplate->m_extraBonus = *original->m_extraBonus;
+	}
+	weaponTemplate->friend_setNextTemplate(original);
+	return weaponTemplate;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1971,7 +1974,8 @@ void WeaponStore::update()
 			else if (ddi->m_nuggetIndex >= 0)
 				ddi->m_delayedWeapon->dealNuggetDamage(ddi->m_nuggetIndex, ddi->m_delaySourceID, ddi->m_delayIntendedVictimID,
 					&ddi->m_delayDamagePos, ddi->m_bonus, ddi->m_dotTick, ddi->m_contactHit,
-					ddi->m_hasImpactVelocity ? &ddi->m_impactVelocity : nullptr, ddi->m_launchTrigger, ddi->m_launchWeapon);
+					ddi->m_hasImpactVelocity ? &ddi->m_impactVelocity : nullptr, ddi->m_launchTrigger, ddi->m_launchWeapon,
+					ddi->m_capturedDamage ? &*ddi->m_capturedDamage : nullptr, TRUE);
 			else
 				ddi->m_delayedWeapon->dealDamageInternal(ddi->m_delaySourceID, ddi->m_delayIntendedVictimID, &ddi->m_delayDamagePos, ddi->m_bonus, isProjectileDetonation);
 			ddi = m_weaponDDI.erase(ddi);
@@ -2010,9 +2014,11 @@ void WeaponStore::reset()
 		WeaponTemplate *wt = m_weaponTemplateVector[i];
 		if (wt->isOverride())
 		{
-			WeaponTemplate *overrideData = wt;
-			wt = wt->friend_clearNextTemplate();
-			deleteInstance(overrideData);
+			WeaponTemplate* original = wt->friend_clearNextTemplate();
+			deleteInstance(wt->m_extraBonus);
+			*wt = *original;
+			original->m_extraBonus = nullptr;
+			deleteInstance(original);
 		}
 	}
 
@@ -2023,7 +2029,7 @@ void WeaponStore::reset()
 //-------------------------------------------------------------------------------------------------
 void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* pos, UnsignedInt whichFrame, ObjectID sourceID, ObjectID victimID,
 	const WeaponBonus& bonus, Int nuggetIndex, Bool dotTick, Bool contactHit, RetailDamageFXTrigger launchTrigger,
-	const Coord3D* impactVelocity, const WeaponTemplate* launchWeapon)
+	const Coord3D* impactVelocity, const WeaponTemplate* launchWeapon, const WeaponNuggetDamage* capturedDamage)
 {
 	WeaponDelayedDamageInfo wi;
 	wi.m_delayedWeapon = weapon;
@@ -2037,6 +2043,8 @@ void WeaponStore::setDelayedDamage(const WeaponTemplate *weapon, const Coord3D* 
 	wi.m_contactHit = contactHit;
 	wi.m_launchTrigger = launchTrigger;
 	wi.m_launchWeapon = launchWeapon;
+	if (capturedDamage)
+		wi.m_capturedDamage = *capturedDamage;
 	if (impactVelocity)
 	{
 		wi.m_hasImpactVelocity = TRUE;
@@ -2142,6 +2150,33 @@ void WeaponStore::xferRetailBlocks(Xfer* xfer, Bool present)
 		}, [this] {
 			for (WeaponDelayedDamageInfo& hit : m_weaponDDI)
 				hit.m_metaImpactAmount = 0.0f;
+		}},
+		{ "delayed-nugget-damage", [this, loading](Xfer* x) {
+			for (WeaponDelayedDamageInfo& hit : m_weaponDDI)
+			{
+				Bool hasDamage = hit.m_capturedDamage.has_value();
+				x->xferBool(&hasDamage);
+				if (!hasDamage)
+				{
+					if (loading)
+						hit.m_capturedDamage.reset();
+					continue;
+				}
+				if (loading)
+				{
+					if (hit.m_nuggetIndex < 0 || !hit.m_delayedWeapon->m_nuggets[hit.m_nuggetIndex].dealsDamage())
+						throw SC_INVALID_DATA;
+					hit.m_capturedDamage.emplace();
+				}
+				auto& damage = *hit.m_capturedDamage;
+				x->xferReal(&damage.scalar);
+				x->xferReal(&damage.amount);
+				x->xferUnsignedInt(&damage.sourcePlayerMask);
+				x->xferBool(&damage.forceKill);
+			}
+		}, [this] {
+			for (WeaponDelayedDamageInfo& hit : m_weaponDDI)
+				hit.m_capturedDamage.reset();
 		}}
 	});
 }

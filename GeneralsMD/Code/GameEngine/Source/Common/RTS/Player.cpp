@@ -2554,11 +2554,15 @@ void Player::doBountyForKill(const Object* killer, const Object* victim)
 		return;
 
 	Int costToBuild = victim->getTemplate()->calcCostToBuild(victim->getControllingPlayer());
+	const Real modifier = AttributeModifiers::value(killer, AttributeModifierRules::BOUNTY_PERCENTAGE);
+	const Real bountyPercent = modifier != 0.0f ? modifier : m_cashBountyPercent;
+	const Real payout = costToBuild * bountyPercent;
+	if (!(payout > 0.0f))
+		return;
 #if RETAIL_COMPATIBLE_CRC
-	Int bounty = REAL_TO_INT_CEIL(costToBuild * m_cashBountyPercent);
+	Int bounty = payout >= static_cast<Real>(INT_MAX) ? INT_MAX : REAL_TO_INT_CEIL(payout);
 #else
-	// TheSuperHackers @bugfix Stubbjax 20/02/2026 Subtract epsilon to ensure bounty is rounded up correctly.
-	Int bounty = WWMath::Ceil((costToBuild * m_cashBountyPercent) - WWMATH_EPSILON);
+	Int bounty = payout >= static_cast<Real>(INT_MAX) ? INT_MAX : WWMath::Ceil(payout - WWMATH_EPSILON);
 #endif
 
 	if( bounty )
