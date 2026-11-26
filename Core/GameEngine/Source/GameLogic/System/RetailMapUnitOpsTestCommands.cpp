@@ -35,6 +35,46 @@ Bool attack(Team* team, Object* unit, const char* waypoint)
 	return FALSE;
 }
 
+void teleportProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* unit = ctx.requireObject();
+	if (!unit)
+		return;
+	if (unit->getName().isEmpty())
+	{
+		unit->setName("MapScriptUnitOpsNamed");
+		TheScriptEngine->addObjectToCache(unit);
+	}
+	const Coord3D origin = *unit->getPosition();
+	const Waypoint* destination = TheTerrainLogic->getWaypointByName("SpawnPoint_SkirmishGollum_3");
+	Bool moved = FALSE;
+	Bool missing = FALSE;
+	for (Int i = 0; i < ScriptEngine::getActionTemplateCount(); ++i)
+	{
+		const Template* definition = TheScriptEngine->getActionTemplate(i);
+		if (definition->m_internalName != "UNIT_TELEPORT_TO_WAYPOINT" ||
+			ScriptEngine::findRotwkActionByRetailIndex(502) != i || definition->getNumParameters() != 2 ||
+			definition->getParameterType(0) != Parameter::UNIT || definition->getParameterType(1) != Parameter::WAYPOINT)
+			continue;
+		auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(i));
+		action->getParameter(0)->friend_setString("MapScriptUnitOpsNamed");
+		action->getParameter(1)->friend_setString("MapUnitOpsMissingWaypoint");
+		TheScriptEngine->friend_executeAction(action, nullptr);
+		missing = unit->getPosition()->x == origin.x && unit->getPosition()->y == origin.y;
+		action->getParameter(0)->friend_setString("MapUnitOpsMissingUnit");
+		action->getParameter(1)->friend_setString("SpawnPoint_SkirmishGollum_3");
+		TheScriptEngine->friend_executeAction(action, nullptr);
+		missing = missing && unit->getPosition()->x == origin.x && unit->getPosition()->y == origin.y;
+		action->getParameter(0)->friend_setString("MapScriptUnitOpsNamed");
+		TheScriptEngine->friend_executeAction(action, nullptr);
+		deleteInstance(action);
+		const Coord3D* position = unit->getPosition();
+		moved = destination && position->x == destination->getLocation()->x && position->y == destination->getLocation()->y;
+		unit->setPosition(&origin);
+	}
+	std::fprintf(stderr, "TEST map-unit-ops teleport frame=%u moved=%d missing=%d\n", ctx.frame, moved, missing);
+}
+
 void probe(const RetailTestCommands::Context& ctx)
 {
 	Object* unit = ctx.requireObject();
@@ -59,6 +99,7 @@ void registerRetailMapUnitOpsTestCommands()
 {
 #if RTS_ZEROHOUR
 	registerAction("map-unit-ops-attack", probe);
+	registerAction("map-unit-ops-teleport", teleportProbe);
 #endif
 }
 }

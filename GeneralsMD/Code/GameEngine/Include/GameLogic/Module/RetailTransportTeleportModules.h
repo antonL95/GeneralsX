@@ -10,6 +10,8 @@
 class FXList;
 class WeaponTemplate;
 
+void retailTeleportObjectWithMembers(Object* unit, const Coord3D& destination);
+
 class TemporarilyDefectUpdateModuleData : public ModuleData
 {
 public:

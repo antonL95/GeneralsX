@@ -1,5 +1,9 @@
 234 create Player_1 MapScriptUnitOpsProbe 0 2000,150,0
 240 map-unit-ops-attack Player_1 MapScriptUnitOpsProbe 0
+241 map-unit-ops-teleport Player_1 MapScriptUnitOpsProbe 0
+
 
 246 map-unit-ops-attack Player_1 MapScriptUnitOpsProbe 0
+247 map-unit-ops-teleport Player_1 MapScriptUnitOpsProbe 0
+
 250 destroy Player_1 MapScriptUnitOpsProbe 0

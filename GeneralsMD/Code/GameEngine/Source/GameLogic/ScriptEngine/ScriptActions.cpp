@@ -74,6 +74,7 @@
 #include "GameLogic/BfmeScriptRules.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/RetailTransportTeleportModules.h"
 #include "GameLogic/Module/CaveContain.h"
 #include "GameLogic/Module/CommandButtonHuntUpdate.h"
 #include "GameLogic/Module/CastleBehavior.h"
@@ -7166,6 +7167,14 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::DAMAGE_MEMBERS_OF_TEAM:
 			doDamageTeamMembers(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getReal());
 			return;
+		case ScriptAction::UNIT_TELEPORT_TO_WAYPOINT:
+		{
+			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			const Waypoint* waypoint = TheTerrainLogic->getWaypointByName(pAction->getParameter(1)->getString());
+			if (unit && waypoint)
+				retailTeleportObjectWithMembers(unit, *waypoint->getLocation());
+			return;
+		}
 		case ScriptAction::ATTACK_MOVE_TEAM_TO:
 		{
 			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());

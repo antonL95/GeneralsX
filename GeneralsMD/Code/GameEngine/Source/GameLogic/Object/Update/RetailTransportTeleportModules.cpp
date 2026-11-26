@@ -118,6 +118,11 @@ Bool hasObjectFilter(const SpecialPowerObjectFilter& filter)
 }
 }
 
+void retailTeleportObjectWithMembers(Object* unit, const Coord3D& destination)
+{
+	teleportObjectWithMembers(unit, destination);
+}
+
 void TemporarilyDefectUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 {
 	static const FieldParse fields[] = {
