@@ -3,23 +3,40 @@ set -eu
 export LC_ALL=C
 
 usage() {
-    printf '%s\n' "Usage: $0 [--only PACKAGE] BUILD_DIR {training|high-pass|spellbook|marsh-training|marsh-stock|zero-hour} SAVE_FRAME FRAME_COUNT" >&2
+    printf '%s\n' "Usage: $0 [--only PACKAGE[,PACKAGE...]|--shard SHARD] BUILD_DIR {training|high-pass|spellbook|marsh-training|marsh-stock|zero-hour} SAVE_FRAME FRAME_COUNT" >&2
     exit 2
 }
 
 only=
+shard=
 if [ "${1:-}" = --only ]; then
     [ "$#" -eq 6 ] || usage
     only=$2
     [ -n "$only" ] || usage
     shift 2
+elif [ "${1:-}" = --shard ]; then
+    [ "$#" -eq 6 ] || usage
+    shard=$2
+    [ -n "$shard" ] || usage
+    shift 2
 elif [ "$#" -eq 6 ] && [ "$5" = --only ]; then
     only=$6
     [ -n "$only" ] || usage
     set -- "$1" "$2" "$3" "$4"
+elif [ "$#" -eq 6 ] && [ "$5" = --shard ]; then
+    shard=$6
+    [ -n "$shard" ] || usage
+    set -- "$1" "$2" "$3" "$4"
 fi
 [ "$#" -eq 4 ] || usage
-case "$only" in *[!a-z0-9-]*) usage ;; esac
+case "$only" in *[!a-z0-9,-]*|,*|*,|*,,*) usage ;; esac
+case "$shard" in *[!a-z0-9-]*) usage ;; esac
+single_only=
+case "$only" in
+    '') ;;
+    *,*) ;;
+    *) single_only=1 ;;
+esac
 
 build=$(cd "$1" && pwd)
 mode=$2
@@ -43,12 +60,52 @@ case "$mode" in
     *) usage ;;
 esac
 
+shard_file=$registry/$fixture_mode-shards.txt
+shard_list=
+if [ -n "$shard" ]; then
+    if [ ! -f "$shard_file" ]; then
+        printf 'No shard table %s for %s\n' "$shard_file" "$mode" >&2
+        exit 2
+    fi
+    shard_list=$(awk 'NF >= 2 { if (!seen[$1]++) out = (out ? out " " : "") $1 } END { print out }' "$shard_file")
+    case " $shard_list " in
+        *" $shard "*) ;;
+        *) printf 'Unknown shard %s in %s\n' "$shard" "$shard_file" >&2; exit 2 ;;
+    esac
+fi
+
+package_in_shard() {
+    awk -v target="$shard" -v pkg="$1" '
+        NF >= 2 {
+            if (!seen[$1]++) shards[++n] = $1
+            if ($2 == pkg) assigned = $1
+        }
+        END {
+            if (assigned == "") {
+                h = 0
+                for (i = 1; i <= length(pkg); ++i) {
+                    c = substr(pkg, i, 1)
+                    h = (h * 31 + index("abcdefghijklmnopqrstuvwxyz0123456789-", c)) % 1000003
+                }
+                assigned = shards[(h % n) + 1]
+            }
+            exit (assigned == target ? 0 : 1)
+        }
+    ' "$shard_file"
+}
+
 packages=
 set --
 for directory in "$registry"/packages/*; do
     [ -d "$directory" ] || continue
     name=${directory##*/}
-    if [ -n "$only" ] && [ "$only" != "$name" ]; then
+    if [ -n "$only" ]; then
+        case ",$only," in
+            *,"$name",*) ;;
+            *) continue ;;
+        esac
+    fi
+    if [ -n "$shard" ] && ! package_in_shard "$name"; then
         continue
     fi
     if [ "$mode" = spellbook ] && [ -z "$only" ]; then
@@ -69,7 +126,7 @@ for directory in "$registry"/packages/*; do
             *[!a-z0-9-]*) printf 'Invalid fixture package directory: %s\n' "$directory" >&2; exit 2 ;;
         esac
         packages="${packages:+$packages }$name"
-        if [ -n "$only" ]; then
+        if [ -n "$single_only" ]; then
             for file in "$directory"/"$fixture_mode"-alone.txt "$directory"/"$fixture_mode"-alone.ini; do
                 [ ! -f "$file" ] || set -- "$@" "$file"
             done
@@ -77,7 +134,7 @@ for directory in "$registry"/packages/*; do
     fi
 done
 if [ -z "$packages" ] && { [ "$mode" != zero-hour ] || [ -n "$only" ]; }; then
-    printf 'No fixture package %s for %s\n' "${only:-registered}" "$mode" >&2
+    printf 'No fixture package %s for %s\n' "${only:-${shard:+shard $shard}}" "$mode" >&2
     exit 2
 fi
 if [ "$#" -gt 0 ]; then
@@ -89,7 +146,7 @@ if [ -n "$out" ]; then
     mkdir -p "$out"
     out=$(cd "$out" && pwd)
 else
-    out=$(mktemp -d "$build/pkgs1-$mode.XXXXXX")
+    out=$(mktemp -d "$build/pkgs1-$mode${shard:+-shard$shard}.XXXXXX")
 fi
 printf '%s\n' "$out"
 
@@ -241,11 +298,13 @@ expect() {
 run save start -file "$map"
 expect save "TEST snapshot-save frame=$save_frame code=0"
 
+shard_tag=${shard:+ [shard $shard]}
+
 check_package_step() {
     if check_output=$(package_step "$@" 2>&1); then
         [ -z "$check_output" ] || printf '%s\n' "$check_output"
     else
-        printf 'Package assertion failed: %s (%s%s)\n' "$1" "$2" "${3:+ $3}" >&2
+        printf 'Package assertion failed%s: %s (%s%s)\n' "$shard_tag" "$1" "$2" "${3:+ $3}" >&2
         [ -z "$check_output" ] || printf '%s\n' "$check_output" >&2
         return 1
     fi
@@ -298,16 +357,16 @@ check_packages() {
             if [ "$(cat "$isolated/status")" = 0 ]; then
                 case " $diverged " in
                     *" $name "*)
-                        printf 'Save divergence only when combined: %s (%s)\n' "$name" "$isolated" >&2
+                        printf 'Save divergence only when combined%s: %s (%s)\n' "$shard_tag" "$name" "$isolated" >&2
                         hard="${hard:+$hard }$name"
                         ;;
                     *)
-                        printf 'Fixture interference (warning): %s passes alone and fails an assertion combined (%s)\n' "$name" "$isolated" >&2
+                        printf 'Fixture interference (warning)%s: %s passes alone and fails an assertion combined (%s)\n' "$shard_tag" "$name" "$isolated" >&2
                         ;;
                 esac
                 continue
             fi
-            printf 'Fixture failed both alone and combined: %s (%s)\n' "$name" "$isolated" >&2
+            printf 'Fixture failed both alone and combined%s: %s (%s)\n' "$shard_tag" "$name" "$isolated" >&2
         else
             printf 'Fixture failed: %s (%s)\n' "$name" "$out" >&2
         fi
