@@ -1,0 +1,2 @@
+13 Player_1 Amb_WaterCreek2Loop 2520 1100 0.6
+600 Player_1 MenFortressCitadel 2958 700 0.6

@@ -1,0 +1,12 @@
+10 audio-loop-trace - - 0 virtual
+11 cash Player_1 - 0 90000
+12 create Player_1 Amb_WaterCreek2Loop 0 2500,1010,0
+12 create Player_1 Amb_WaterCreek2Loop 0 2560,1010,0
+20 queue Player_1 MenFortressCitadel 0 GondorPippin
+25 heroes Player_1 - 0
+200 audio-loop-emitters - - 0 Amb_Water
+800 heroes Player_1 - 0
+800 kill Player_1 GondorPippin 0
+880 queue Player_1 MenFortressCitadel 0 GondorPippin
+882 heroes Player_1 - 0
+2500 heroes Player_1 - 0

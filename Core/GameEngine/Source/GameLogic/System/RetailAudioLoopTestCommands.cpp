@@ -8,11 +8,14 @@
 #include "Common/MessageStream.h"
 #include "GameClient/CommandXlat.h"
 #include "GameClient/Drawable.h"
+#include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string_view>
 
 namespace
@@ -38,6 +41,21 @@ void handleAudioLoop(const RetailTestCommands::Context& ctx)
 		{
 			TheAudio->setTraceEnabled(FALSE);
 			TheAudio->setHeadlessVirtualPlayback(FALSE);
+		}
+		return;
+	}
+	if (cmd == "emitters")
+	{
+		if (!TheGameClient)
+			return;
+		for (Drawable* draw = TheGameClient->firstDrawable(); draw; draw = draw->getNextDrawable())
+		{
+			const AudioEventRTS* ambient = draw->getAmbientSound();
+			if (!ambient || !std::strstr(ambient->getEventName().str(), ctx.argument))
+				continue;
+			const Coord3D* pos = draw->getPosition();
+			std::fprintf(stderr, "AUDIO EMITTER event=%s x=%.0f y=%.0f playing=%d\n", ambient->getEventName().str(),
+				pos->x, pos->y, ambient->isCurrentlyPlaying() ? 1 : 0);
 		}
 		return;
 	}
