@@ -52,15 +52,21 @@
 
 namespace
 {
-void setModelParticleTint(RenderObjClass& model, unsigned tint, bool additive)
+void setModelParticleAppearance(RenderObjClass& model, Real opacity, unsigned tint, bool additive)
 {
-	model.Set_Particle_Tint(tint, additive);
-	for (int i = 0; i < model.Get_Num_Sub_Objects(); ++i)
+	const int subCount = model.Get_Num_Sub_Objects();
+	if (subCount == 0)
+	{
+		model.Set_Sub_Object_Opacity(opacity);
+		model.Set_Particle_Tint(tint, additive);
+		return;
+	}
+	for (int i = 0; i < subCount; ++i)
 	{
 		auto* child = model.Get_Sub_Object(i);
 		if (child)
 		{
-			setModelParticleTint(*child, tint, additive);
+			setModelParticleAppearance(*child, opacity, tint, additive);
 			child->Release_Ref();
 		}
 	}
@@ -126,7 +132,6 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 			model->Set_Transform(transform);
 			if (overridesMaterial)
 			{
-				model->Set_Animation_Opacity(opacity);
 				unsigned tint = 0xFFFFFFFF;
 				if (materialMode != MaterialMode::Opacity)
 				{
@@ -134,7 +139,7 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 					const auto channel = [](Real value) { return static_cast<unsigned>(std::clamp(value, 0.0f, 1.0f) * 255.0f); };
 					tint = 0xFF000000 | channel(color->red) << 16 | channel(color->green) << 8 | channel(color->blue);
 				}
-				setModelParticleTint(*model, tint, materialMode == MaterialMode::Emissive);
+				setModelParticleAppearance(*model, opacity, tint, materialMode == MaterialMode::Emissive);
 			}
 			model->Render(info);
 			drawn.push_back(model);
