@@ -176,8 +176,17 @@ protected:
 		ObjectID builder = INVALID_ID;
 		ObjectID site = INVALID_ID;
 		UnsignedInt nextFrame = 0;
+		UnsignedInt timeoutFrame = 0;
 	};
 	RetailLumberMill m_retailLumberMill;
+	struct RetailExpansionPlan
+	{
+		ObjectID builder = INVALID_ID;
+		ObjectID site = INVALID_ID;
+		Coord3D point{};
+		Int state = 0;
+	};
+	RetailExpansionPlan m_retailExpansion;
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	UnsignedInt m_retailLastFarmFrame = 0;
 	UnsignedInt m_retailSavings = 0;
