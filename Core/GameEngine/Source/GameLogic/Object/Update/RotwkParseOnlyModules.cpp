@@ -3,6 +3,8 @@
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 
 #include "Common/AttributeModifierRules.h"
+#include "Common/AudioEventRTS.h"
+#include "Common/GameAudio.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
 #include "Common/Xfer.h"
@@ -179,7 +181,45 @@ void HordeMemberCollide::onCollide(Object* other, const Coord3D*, const Coord3D*
 {
 	HordeAIUpdate::memberCollided(getObject(), other);
 }
-CastleMemberBehavior::~CastleMemberBehavior() = default;
+CastleMemberBehavior::~CastleMemberBehavior()
+{
+	stopBeingBuiltSound();
+}
+
+void CastleMemberBehavior::onDelete()
+{
+	stopBeingBuiltSound();
+	BehaviorModule::onDelete();
+}
+
+void CastleMemberBehavior::stopBeingBuiltSound()
+{
+	if (m_beingBuiltHandle == 0)
+		return;
+	if (TheAudio)
+		TheAudio->removeAudioEvent(m_beingBuiltHandle);
+	m_beingBuiltHandle = 0;
+}
+
+void CastleMemberBehavior::onModelConditionChanged(const ModelConditionFlags& previous, const ModelConditionFlags& current)
+{
+	const Bool wasBuilding = previous.test(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED);
+	const Bool isBuilding = current.test(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED);
+	if (!isBuilding)
+	{
+		if (wasBuilding)
+			stopBeingBuiltSound();
+		return;
+	}
+	const AsciiString& soundName = getCastleMemberBehaviorModuleData()->m_beingBuiltSound;
+	if (soundName.isEmpty() || soundName.compareNoCase("None") == 0 || !TheAudio)
+		return;
+	if (m_beingBuiltHandle != 0 && TheAudio->isCurrentlyPlaying(m_beingBuiltHandle))
+		return;
+	AudioEventRTS sound(soundName);
+	sound.setObjectID(getObject()->getID());
+	m_beingBuiltHandle = TheAudio->addAudioEvent(&sound);
+}
 
 CastleMemberBehavior* CastleMemberBehavior::find(const Object* object)
 {

@@ -29,6 +29,8 @@
 #include "GameLogic/Damage.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/CastleBehavior.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -134,6 +136,7 @@ UnsignedInt s_quietUntil = 0;
 std::map<std::pair<ObjectID, UnsignedInt>, const SpecialPowerTemplate *> s_recharging;
 std::set<ObjectID> s_seenRings;
 std::set<ObjectID> s_seenEnemies;
+std::set<ObjectID> s_breachedCastles;
 const Player *s_viewer = nullptr;
 
 void parseSideSound(INI *ini, void *, void *store, const void *)
@@ -208,6 +211,7 @@ void resetPlayback()
 	s_recharging.clear();
 	s_seenRings.clear();
 	s_seenEnemies.clear();
+	s_breachedCastles.clear();
 	s_viewer = nullptr;
 	s_speech.setPlayingHandle(0);
 	s_quietUntil = 0;
@@ -627,8 +631,21 @@ void update()
 void underAttack(Object &object, const DamageInfo &damage)
 {
 	const Player *owner = object.getControllingPlayer();
-	if (!owner || !TheGameLogic || owner != rts::getObservedOrLocalPlayer_Safe())
+	const Player *viewer = rts::getObservedOrLocalPlayer_Safe();
+	if (!owner || !viewer || !TheGameLogic)
 		return;
+
+	const CastleMemberBehavior *member = CastleMemberBehavior::find(&object);
+	if (owner != viewer)
+	{
+		if (member && member->isKeep() && viewer->getRelationship(object.getTeam()) == ALLIES)
+		{
+			const AsciiString &allyEvent = member->getUnderAttackAllyEvaEventIfKeep();
+			if (allyEvent.isNotEmpty() && allyEvent.compareNoCase("None") != 0)
+				queue(viewer, allyEvent, object.getPosition(), object.friend_getRadarData() ? Ping::Attack : Ping::None);
+		}
+		return;
+	}
 
 	const auto &events = object.getTemplate()->getRotWKObjectData();
 	const Object *source = TheGameLogic->findObjectByID(damage.in.m_sourceID);
@@ -651,6 +668,13 @@ void underAttack(Object &object, const DamageInfo &damage)
 		source->getDrawable()->getFullyObscuredByShroud())
 		name = &events.evaEventDamagedFromShroudedSourceOwner;
 
+	if (member && member->isKeep())
+	{
+		const AsciiString &keepEvent = member->getUnderAttackEvaEventIfKeep();
+		if (keepEvent.isNotEmpty() && keepEvent.compareNoCase("None") != 0)
+			name = &keepEvent;
+	}
+
 	queue(owner, name->isEmpty() ? AsciiString(object.isKindOf(KINDOF_STRUCTURE) ? "StructureUnderAttack" : "UnitUnderAttack") : *name,
 		object.getPosition(), object.friend_getRadarData() ? Ping::Attack : Ping::None);
 }
@@ -665,7 +689,18 @@ void destroyed(const Object &object)
 
 	const auto &data = object.getTemplate()->getRotWKObjectData();
 	if (owner == viewer)
+	{
 		queue(viewer, data.evaEventDieOwner, object.getPosition(), Ping::JumpOnly);
+		const CastleMemberBehavior *member = CastleMemberBehavior::find(&object);
+		if (member && member->countsForEvaCastleBreached() && member->getCastleID() != INVALID_ID)
+		{
+			const CastleBehavior *castle = TheGameLogic
+				? CastleBehavior::find(TheGameLogic->findObjectByID(member->getCastleID()))
+				: nullptr;
+			if ((!castle || castle->getKeep() != nullptr) && s_breachedCastles.insert(member->getCastleID()).second)
+				queue(viewer, "CastleBreached", object.getPosition(), Ping::JumpOnly);
+		}
+	}
 	else
 	{
 		const Relationship relationship = viewer->getRelationship(object.getTeam());
@@ -681,5 +716,38 @@ void destroyed(const Object &object)
 		else if (relationship == ENEMIES)
 			queue(viewer, data.evaEventDieEnemy, object.getPosition(), Ping::JumpOnly);
 	}
+}
+
+void castleDestroyed(const Object &castle, const Object *keep)
+{
+	s_breachedCastles.erase(castle.getID());
+	const Player *owner = keep && keep->getControllingPlayer() ? keep->getControllingPlayer() : castle.getControllingPlayer();
+	const Player *viewer = rts::getObservedOrLocalPlayer_Safe();
+	if (!owner || !viewer)
+		return;
+
+	const CastleMemberBehavior *member = keep ? CastleMemberBehavior::find(keep) : nullptr;
+	const Coord3D *position = keep ? keep->getPosition() : castle.getPosition();
+	AsciiString eventName;
+	if (owner == viewer)
+	{
+		eventName = member && member->getCampDestroyedOwnerEvaEvent().isNotEmpty()
+			? member->getCampDestroyedOwnerEvaEvent()
+			: AsciiString("CampDestroyed");
+	}
+	else
+	{
+		const Relationship relationship = viewer->getRelationship(owner->getDefaultTeam());
+		if (relationship == ALLIES)
+			eventName = member && member->getCampDestroyedAllyEvaEvent().isNotEmpty()
+				? member->getCampDestroyedAllyEvaEvent()
+				: AsciiString("AllyCampDestroyed");
+		else if (relationship == ENEMIES)
+			eventName = member && member->getCampDestroyedAttackerEvaEvent().isNotEmpty()
+				? member->getCampDestroyedAttackerEvaEvent()
+				: AsciiString("EnemyCampDestroyed");
+	}
+	if (eventName.isNotEmpty() && eventName.compareNoCase("None") != 0)
+		queue(viewer, eventName, position, Ping::JumpOnly);
 }
 }

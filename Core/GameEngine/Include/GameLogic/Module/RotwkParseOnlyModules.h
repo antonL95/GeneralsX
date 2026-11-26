@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common/ModelState.h"
 #include "Common/SpecialPowerINI.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/CollideModule.h"
@@ -187,6 +188,7 @@ class CastleMemberBehavior final : public BehaviorModule
 
 public:
 	CastleMemberBehavior(Thing* thing, const ModuleData* data) : BehaviorModule(thing, data) {}
+	void onDelete() override;
 	static CastleMemberBehavior* find(const Object* object);
 	static void linkToCastle(Object& object, ObjectID castleID, ObjectID keepID, Bool isKeep, Bool ownedByCastle);
 	static void recordUpgradePrice(Object& object, UnsignedInt cost);
@@ -195,14 +197,23 @@ public:
 	Bool isKeep() const { return m_isKeep; }
 	Bool isOwnedByCastle() const { return m_ownedByCastle; }
 	Bool countsForEvaCastleBreached() const { return getCastleMemberBehaviorModuleData()->m_countsForEvaCastleBreached; }
+	const AsciiString& getBeingBuiltSound() const { return getCastleMemberBehaviorModuleData()->m_beingBuiltSound; }
+	const AsciiString& getUnderAttackEvaEventIfKeep() const { return getCastleMemberBehaviorModuleData()->m_underAttackEvaEventIfKeep; }
+	const AsciiString& getUnderAttackAllyEvaEventIfKeep() const { return getCastleMemberBehaviorModuleData()->m_underAttackAllyEvaEventIfKeep; }
+	const AsciiString& getCampDestroyedAllyEvaEvent() const { return getCastleMemberBehaviorModuleData()->m_campDestroyedAllyEvaEvent; }
+	const AsciiString& getCampDestroyedAttackerEvaEvent() const { return getCastleMemberBehaviorModuleData()->m_campDestroyedAttackerEvaEvent; }
+	const AsciiString& getCampDestroyedOwnerEvaEvent() const { return getCastleMemberBehaviorModuleData()->m_campDestroyedOwnerEvaEvent; }
 	UnsignedInt getStoredUpgradePrice() const { return m_storedUpgradePrice; }
+	void onModelConditionChanged(const ModelConditionFlags& previous, const ModelConditionFlags& current);
 
 private:
 	void xferRetailBlocks(Xfer* xfer, Bool present);
+	void stopBeingBuiltSound();
 
 	ObjectID m_castleID = INVALID_ID;
 	ObjectID m_keepID = INVALID_ID;
 	Bool m_isKeep = FALSE;
 	Bool m_ownedByCastle = FALSE;
 	UnsignedInt m_storedUpgradePrice = 0;
+	AudioHandle m_beingBuiltHandle = 0;
 };

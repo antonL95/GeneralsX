@@ -26,6 +26,7 @@
 #include "Common/AudioEventRTS.h"
 #include "Common/GameAudio.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
+#include "GameLogic/Module/RotwkParseOnlyModules.h"
 #endif
 #include "Common/RetailFileLayers.h"
 #include "Common/SpecialPower.h"
@@ -537,7 +538,11 @@ void dispatchModelConditions(Object& object, const ModelConditionFlags& previous
 void RetailBuildingEvents::modelConditionsChanged(Object& object, const ModelConditionFlags& previous)
 {
 	if (!TheGameState || !TheGameState->isInLoadGame())
+	{
 		dispatchModelConditions(object, previous, DispatchMode::ModelCondition);
+		if (CastleMemberBehavior* member = CastleMemberBehavior::find(&object))
+			member->onModelConditionChanged(previous, object.getLogicModelConditions());
+	}
 }
 
 void RetailBuildingEvents::restoreHordeConditionUpgrades()

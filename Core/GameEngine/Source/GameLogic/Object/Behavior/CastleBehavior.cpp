@@ -18,6 +18,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameClient/RetailEva.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/CastleRules.h"
@@ -183,6 +184,7 @@ void CastleBehavior::checkKeep()
 	case CastleRules::KeepAction::Lost:
 	{
 		m_keepLost = TRUE;
+		RetailEva::castleDestroyed(*getObject(), keep);
 		const Real time = getCastleBehaviorModuleData()->m_fadeTime;
 		const Real delay = std::isfinite(time) ? std::clamp(time, 0.0f, 300.0f) : 0.0f;
 		m_unpackFrame = TheGameLogic->getFrame() + static_cast<UnsignedInt>(delay * LOGICFRAMES_PER_SECOND);
@@ -190,6 +192,7 @@ void CastleBehavior::checkKeep()
 	}
 	case CastleRules::KeepAction::KillEverything:
 		m_keepLost = TRUE;
+		RetailEva::castleDestroyed(*getObject(), keep);
 		killEverything();
 		return;
 	}

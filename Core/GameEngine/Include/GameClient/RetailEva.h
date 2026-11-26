@@ -39,6 +39,7 @@ void markFirstSighted(const Object& object);
 void underAttack(Object &object, const DamageInfo &damage);
 #endif
 void destroyed(const Object &object);
+void castleDestroyed(const Object &castle, const Object *keep);
 void watchRecharge(const Object &object, const SpecialPowerTemplate &power);
 Bool getLastPlayed(const AsciiString &name, UnsignedInt &frame, Coord3D *position = nullptr);
 }
