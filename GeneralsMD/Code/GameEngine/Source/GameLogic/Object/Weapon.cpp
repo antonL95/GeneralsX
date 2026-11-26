@@ -2072,15 +2072,7 @@ void WeaponStore::xferRetailDelayedDamage(Xfer* xfer)
 		xfer->xferObjectID(&hit.m_delaySourceID);
 		xfer->xferObjectID(&hit.m_delayIntendedVictimID);
 		hit.m_bonus.xfer(xfer);
-		Int savedIndex = hit.m_nuggetIndex;
-		if (!loading && savedIndex >= 0)
-		{
-			const auto& nuggets = hit.m_delayedWeapon->m_nuggets;
-			for (Int index = 0; index < hit.m_nuggetIndex; ++index)
-				if (nuggets[index].isUtilityNugget())
-					--savedIndex;
-		}
-		xfer->xferInt(&savedIndex);
+		xfer->xferInt(&hit.m_nuggetIndex);
 		xfer->xferBool(&hit.m_dotTick);
 		xfer->xferBool(&hit.m_contactHit);
 		Int trigger = hit.m_launchTrigger;
@@ -2092,22 +2084,10 @@ void WeaponStore::xferRetailDelayedDamage(Xfer* xfer)
 		if (loading)
 		{
 			hit.m_delayedWeapon = findWeaponTemplatePrivate(TheNameKeyGenerator->nameToKey(weapon));
-			if (!hit.m_delayedWeapon || savedIndex < -1 ||
+			if (!hit.m_delayedWeapon || hit.m_nuggetIndex < -1 ||
+				(hit.m_nuggetIndex >= 0 && static_cast<size_t>(hit.m_nuggetIndex) >= hit.m_delayedWeapon->m_nuggets.size()) ||
 				trigger < RETAIL_DAMAGE_FX_NONE || trigger > RETAIL_DAMAGE_FX_TREBUCHET_ROCK)
 				throw SC_INVALID_DATA;
-			hit.m_nuggetIndex = -1;
-			if (savedIndex >= 0)
-			{
-				const auto& nuggets = hit.m_delayedWeapon->m_nuggets;
-				for (size_t index = 0; index < nuggets.size(); ++index)
-					if (!nuggets[index].isUtilityNugget() && savedIndex-- == 0)
-					{
-						hit.m_nuggetIndex = static_cast<Int>(index);
-						break;
-					}
-				if (hit.m_nuggetIndex < 0)
-					throw SC_INVALID_DATA;
-			}
 			hit.m_launchTrigger = static_cast<RetailDamageFXTrigger>(trigger);
 		}
 	};

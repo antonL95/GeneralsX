@@ -908,7 +908,7 @@ void WeaponTemplate::applyUtilityNugget(const WeaponNugget& nugget, const Object
 	}
 	const Real radius = kind == WEAPON_NUGGET_LUA_EVENT ? nugget.m_radius : std::max(1.0f, nugget.m_radius);
 	const DistanceCalculationType distance = kind == WEAPON_NUGGET_LUA_EVENT ? FROM_CENTER_3D : FROM_BOUNDINGSPHERE_3D;
-	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(pos, radius, distance);
+	SimpleObjectIterator* iter = ThePartitionManager->iterateObjectsInRange(pos, radius, distance, nullptr, ITER_SORTED_BY_ID);
 	MemoryPoolObjectHolder holder(iter);
 	for (Object* victim = iter->first(); victim; victim = iter->next())
 		if (victim != primary || kind == WEAPON_NUGGET_LUA_EVENT)
@@ -977,7 +977,7 @@ void WeaponTemplate::applyMetaImpactNugget(Int nuggetIndex, const Object* source
 	const Bool fullArc = nugget.m_shockWaveArc <= 0.0f || nugget.m_shockWaveArc >= 360.0f;
 	const Real cosHalfArc = fullArc ? -1.0f : WWMath::CosTrig(nugget.m_shockWaveArc * (PI / 360.0f));
 	SimpleObjectIterator* iter = radius > 0.0f ? ThePartitionManager->iterateObjectsInRange(&pos, radius, FROM_CENTER_2D, nullptr,
-		impactFrame ? ITER_SORTED_BY_ID : ITER_FASTEST) : nullptr;
+		(impactFrame || nugget.m_shockWaveSpeed > 0.0f) ? ITER_SORTED_BY_ID : ITER_FASTEST) : nullptr;
 	MemoryPoolObjectHolder hold(iter);
 	const auto affect = [&](Object* victim)
 	{
