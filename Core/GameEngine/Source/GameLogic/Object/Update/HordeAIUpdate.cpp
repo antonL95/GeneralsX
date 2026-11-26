@@ -34,14 +34,10 @@ constexpr Real FORMATION_REPATH_DISTANCE = 30.0f;
 constexpr Real FORMATION_REFORM_ANGLE = PI / 6.0f;
 constexpr Int MAX_ADVANCE_ATTEMPTS = 2;
 
-Bool exitHandsOverToFormation(const Object* anchor, const HordeContain* contain, const Object* member)
+Bool exitHandsOverToFormation(const Object* anchor, const Object* member)
 {
-	const Coord3D slot = contain->getMemberPosition(member->getID(), FALSE);
-	const Real slotX = slot.x - member->getPosition()->x;
-	const Real slotY = slot.y - member->getPosition()->y;
-	if (slotX * slotX + slotY * slotY >= FORMATION_PATHFIND_DISTANCE * FORMATION_PATHFIND_DISTANCE)
-		return FALSE;
-	const Object* producer = TheGameLogic->findObjectByID(anchor->getProducerID());
+	const ObjectID producerID = member->getProducerID() != INVALID_ID ? member->getProducerID() : anchor->getProducerID();
+	const Object* producer = TheGameLogic->findObjectByID(producerID);
 	if (!producer)
 		return TRUE;
 	const Real dx = producer->getPosition()->x - member->getPosition()->x;
@@ -602,7 +598,7 @@ UpdateSleepTime HordeAIUpdate::update()
 		if (!ai || member->isEffectivelyDead())
 			continue;
 		if (RetailFileLayers::enabled() && ai->getCurrentStateID() == AI_FOLLOW_EXITPRODUCTION_PATH &&
-			!exitHandsOverToFormation(horde, contain, member))
+			!exitHandsOverToFormation(horde, member))
 			continue;
 #if RTS_ZEROHOUR
 		if (comboEnabled)

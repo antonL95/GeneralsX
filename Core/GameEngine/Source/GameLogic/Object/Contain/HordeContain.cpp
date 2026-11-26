@@ -1675,8 +1675,7 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 	const AIUpdateInterface* anchorAI = horde->getObject()->getAI();
 	const Bool cavalryBanner = cavalry && horde->isBannerCarrier(member);
 	const Bool cavalrySettling = cavalry && (!anchorAI || !anchorAI->isMoving());
-	const Bool alternate = horde->isAlternateFormation();
-	const Int memberSlot = alternate ? horde->getMemberSlot(member->getID()) : -1;
+	const Int memberSlot = horde->getMemberSlot(member->getID());
 	const auto& slots = horde->getActiveFormation()->m_layout.slots();
 	const Coord3D& origin = *member->getPosition();
 	const auto layer = member->getLayer();
@@ -1699,8 +1698,18 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 		const Int otherSlot = memberSlot >= 0 ? horde->getMemberSlot(other->getID()) : -1;
 		if (otherSlot >= 0)
 		{
-			const HordePoint& a = slots[memberSlot].position;
-			const HordePoint& b = slots[otherSlot].position;
+			HordePoint a = slots[memberSlot].position;
+			HordePoint b = slots[otherSlot].position;
+			if (memberSlot < static_cast<Int>(horde->m_slotOffsets.size()))
+			{
+				a.x += horde->m_slotOffsets[memberSlot].x;
+				a.y += horde->m_slotOffsets[memberSlot].y;
+			}
+			if (otherSlot < static_cast<Int>(horde->m_slotOffsets.size()))
+			{
+				b.x += horde->m_slotOffsets[otherSlot].x;
+				b.y += horde->m_slotOffsets[otherSlot].y;
+			}
 			diameter = std::min(diameter, WWMath::SqrtfOrigin(sqr(a.x - b.x) + sqr(a.y - b.y)));
 		}
 		const Real dx = next.x - position.x;
