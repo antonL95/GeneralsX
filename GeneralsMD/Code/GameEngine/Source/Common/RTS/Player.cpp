@@ -51,6 +51,7 @@
 #include "Common/CRCDebug.h"
 #include "Common/DisabledTypes.h"
 #include "Common/GameState.h"
+#include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/MessageStream.h"
 #include "Common/MiscAudio.h"
@@ -3309,6 +3310,22 @@ Bool Player::hasUpgradeInProduction( const UpgradeTemplate *upgradeTemplate )
 
 //=================================================================================================
 /** Give the player an upgrade or change status on an existing upgrade entry */
+namespace
+{
+void announceRetailUpgradeGain(const Player& owner, const UpgradeTemplate& upgrade)
+{
+	const Player* viewer = rts::getObservedOrLocalPlayer_Safe();
+	if (!viewer)
+		return;
+	if (viewer == &owner)
+		RetailEva::queue(viewer, upgrade.getLocalPlayerGainsUpgradeEvaEvent());
+	else if (viewer->getRelationship(owner.getDefaultTeam()) == ALLIES)
+		RetailEva::queue(viewer, upgrade.getAlliedPlayerGainsUpgradeEvaEvent());
+	else
+		RetailEva::queue(viewer, upgrade.getEnemyPlayerGainsUpgradeEvaEvent());
+}
+}
+
 //=================================================================================================
 Upgrade *Player::addUpgrade( const UpgradeTemplate *upgradeTemplate, UpgradeStatusType status )
 {
@@ -3329,6 +3346,9 @@ Upgrade *Player::addUpgrade( const UpgradeTemplate *upgradeTemplate, UpgradeStat
 		m_upgradeList = u;
 
 	}
+
+	if (RetailFileLayers::enabled() && status == UPGRADE_STATUS_COMPLETE && !hasUpgradeComplete(upgradeTemplate))
+		announceRetailUpgradeGain(*this, *upgradeTemplate);
 
 	// set the new status for the upgrade
 	u->setStatus( status );

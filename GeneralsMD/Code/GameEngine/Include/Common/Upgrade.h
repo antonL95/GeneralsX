@@ -190,6 +190,9 @@ public:
 	const AudioEventRTS* getResearchCompleteSound() const { return &m_researchSound; }
 	const AsciiString &getResearchCompleteEvaEvent() const { return m_researchCompleteEvaEvent; }
 	const AsciiString& getGroupName() const { return m_groupName; }
+	const AsciiString& getLocalPlayerGainsUpgradeEvaEvent() const { return m_localPlayerGainsUpgradeEvaEvent; }
+	const AsciiString& getAlliedPlayerGainsUpgradeEvaEvent() const { return m_alliedPlayerGainsUpgradeEvaEvent; }
+	const AsciiString& getEnemyPlayerGainsUpgradeEvaEvent() const { return m_enemyPlayerGainsUpgradeEvaEvent; }
 	const AsciiString& getLocalPlayerLosesUpgradeEvaEvent() const { return m_localPlayerLosesUpgradeEvaEvent; }
 	const AsciiString& getAlliedPlayerLosesUpgradeEvaEvent() const { return m_alliedPlayerLosesUpgradeEvaEvent; }
 	const AsciiString& getEnemyPlayerLosesUpgradeEvaEvent() const { return m_enemyPlayerLosesUpgradeEvaEvent; }
