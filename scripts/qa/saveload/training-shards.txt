@@ -93,3 +93,4 @@
 4 locked-weapon
 4 spawn-angle
 3 default-states
+3 powers-fire

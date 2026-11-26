@@ -1,0 +1,10 @@
+220 create Player_1 MordorWitchKing 0 2000,3540,0
+220 create Player_1 IsengardExplosiveMine 0 2260,1180,0
+225 powers-fire-state Player_1 MordorWitchKing 0 Upgrade_ObjectLevel1
+226 powers-fire-state Player_1 MordorWitchKing 0 ElrondRingOfAir
+230 powers-fire-cast Player_1 MordorWitchKing 0 Command_HourOfTheWitchKingDualButton 2040 3540
+232 powers-fire-cast Player_1 IsengardExplosiveMine 0 Command_DeployMine 2340 1180
+250 powers-fire-state Player_1 IsengardDeployedExplosiveMine 0 -
+330 powers-fire-state Player_1 MordorWitchKing 0 ElrondRingOfAir
+400 powers-fire-state Player_1 IsengardDeployedExplosiveMine 0 -
+400 powers-fire-state Player_1 IsengardExplosiveMine 0 -
