@@ -73,7 +73,10 @@ UpdateSleepTime BezierProjectileBehavior::update()
 			if (getObject()->getRelationship(target) == ENEMIES)
 				EmotionTrackerUpdate::signal(target, EMOTION_DOOM, getObject());
 	}
-	return DumbProjectileBehavior::update();
+	const UpdateSleepTime sleep = DumbProjectileBehavior::update();
+	if ((isSelfFlight() || isPassengerFlight()) && isWithinLandingTime(data->m_preLandingStateTime))
+		getObject()->setModelConditionState(MODELCONDITION_ABOUT_TO_HIT);
+	return sleep;
 }
 
 void BezierProjectileBehavior::projectileLaunchAtObjectOrPosition(const Object* victim, const Coord3D* victimPos,

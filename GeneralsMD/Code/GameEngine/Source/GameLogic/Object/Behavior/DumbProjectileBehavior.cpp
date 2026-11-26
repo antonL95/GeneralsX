@@ -348,7 +348,7 @@ void DumbProjectileBehavior::projectileLaunchAtObjectOrPosition(
 
 	if (!isSelfFlight())
 		Weapon::positionProjectileForLaunch(projectile, launcher, wslot, specificBarrelToUse, !isPassengerFlight());
-	if (isPassengerFlight())
+	if (isSelfFlight() || isPassengerFlight())
 		projectile->setModelConditionState(MODELCONDITION_THROWN_PROJECTILE);
 
 	projectileFireAtObjectOrPosition( victim, victimPos, detWeap, exhaustSysOverride );
@@ -647,6 +647,12 @@ Bool DumbProjectileBehavior::isApproachingLanding(UnsignedInt lead) const
 	return steps && static_cast<size_t>(m_currentFlightPathStep) == steps - std::min(steps, static_cast<size_t>(std::max(1u, lead)));
 }
 
+Bool DumbProjectileBehavior::isWithinLandingTime(UnsignedInt lead) const
+{
+	const auto steps = m_flightPath.size();
+	return lead && steps && static_cast<size_t>(m_currentFlightPathStep) + lead >= steps;
+}
+
 Bool DumbProjectileBehavior::isSelfFlight() const
 {
 	return RetailFileLayers::enabled() && m_launcherID != INVALID_ID && m_launcherID == getObject()->getID();
@@ -660,8 +666,11 @@ Bool DumbProjectileBehavior::isPassengerFlight() const
 
 void DumbProjectileBehavior::clearFlight()
 {
-	if (isPassengerFlight())
+	if (isSelfFlight() || isPassengerFlight())
+	{
 		getObject()->clearModelConditionState(MODELCONDITION_THROWN_PROJECTILE);
+		getObject()->clearModelConditionState(MODELCONDITION_ABOUT_TO_HIT);
+	}
 	m_launcherID = INVALID_ID;
 	m_victimID = INVALID_ID;
 	m_detonationWeaponTmpl = nullptr;
