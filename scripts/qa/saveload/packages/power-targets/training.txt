@@ -1,0 +1,38 @@
+100 create Player_1 MorgulWitchKing 0 1540,450,0
+101 objupgrade Player_1 MorgulWitchKing 0 Upgrade_DwarvenMithrilMail
+181 power Player_1 MorgulWitchKingOnFellBeastUpgrade 0 SpecialAbilityToggleMounted
+244 pt-dismount-check Player_1 MorgulWitchKingOnFellBeast 0 Command_WitchKingDismount 1540 450
+244 pt-dismount-check Player_1 MorgulWitchKingOnFellBeast 0 Command_WitchKingDismount 1990 450
+250 pt-dismount-cast Player_1 MorgulWitchKingOnFellBeast 0 Command_WitchKingDismount 1540 450
+270 pt-dismount-state Player_1 MorgulWitchKingOnFellBeast 0
+270 pt-dismount-state Player_1 MorgulWitchKingOnFellBeastUpgrade 0
+100 create Player_1 RohanEntOak 0 2200,500,0
+100 create PlyrCreeps GenericThrowableRock 0 2225,500,0
+100 create Player_1 RohanEntFir 0 2200,680,0
+100 create PlyrCreeps TDHDwarfCampWall 0 2225,680,0
+115 pt-grab Player_1 RohanEntOak 0 PlyrCreeps:GenericThrowableRock:0 0 0
+115 pt-grab Player_1 RohanEntFir 0 PlyrCreeps:TDHDwarfCampWall:0 1 0
+120 pt-toggle Player_1 RohanEntOak 0 Command_ToggleEntRockThrow
+120 pt-toggle Player_1 RohanEntFir 0 Command_ToggleEntRockThrow
+130 pt-grab Player_1 RohanEntOak 0 PlyrCreeps:GenericThrowableRock:0 0 0
+130 pt-grab Player_1 RohanEntFir 0 PlyrCreeps:TDHDwarfCampWall:0 1 0
+244 pt-held Player_1 RohanEntOak 0
+244 pt-held Player_1 RohanEntFir 0
+260 pt-held Player_1 RohanEntOak 0
+260 pt-held Player_1 RohanEntFir 0
+100 create Player_1 MordorMountainTroll 0 1100,450,0
+100 create PlyrCreeps TheOneTree 0 1125,450,0
+110 pt-troll-check Player_1 MordorMountainTroll 0 Command_SpecialAbilityTrollFindTastyOrcFakeTrigger
+115 pt-contain-add Player_1 MordorMountainTroll 0 PlyrCreeps:TheOneTree:0
+120 pt-troll-check Player_1 MordorMountainTroll 0 Command_SpecialAbilityTrollFindTastyOrcFakeTrigger
+250 pt-troll-check Player_1 MordorMountainTroll 0 Command_SpecialAbilityTrollFindTastyOrcFakeTrigger
+260 create Player_1 PowerTargetsCarrier 0 1100,650,0
+260 create PlyrCreeps TheOneTree 1 1120,650,0
+260 create Player_1 MordorFighter1 0 1120,670,0
+265 pt-contain-add Player_1 PowerTargetsCarrier 0 PlyrCreeps:TheOneTree:1
+266 pt-contain-add Player_1 PowerTargetsCarrier 0 Player_1:MordorFighter1:0
+270 pt-carrier-state Player_1 PowerTargetsCarrier 0
+275 pt-contain-remove Player_1 PowerTargetsCarrier 0 Player_1:MordorFighter1:0
+280 pt-carrier-state Player_1 PowerTargetsCarrier 0
+285 pt-contain-remove Player_1 PowerTargetsCarrier 0 PlyrCreeps:TheOneTree:1
+290 pt-carrier-state Player_1 PowerTargetsCarrier 0
