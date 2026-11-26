@@ -656,6 +656,7 @@ bool probeMapSides(const std::string& name, const Entry& entry, const char *heig
 			record("map-teams", name, "Teams", "", sides.getNumTeams());
 			record("map-side-flag", name, "SidesList", "", sides.getMapSideFlag());
 			record("map-standing-water", name, "StandingWaterAreas", "", map->getStandingWater().size());
+			record("map-standing-waves", name, "StandingWaveAreas", "", map->getRetailStandingWaves().size());
 			record("map-trigger-areas", name, "TriggerAreas", "", map->getTriggerAreas().size());
 			if (std::getenv("GENERALSX_MAP_TRIGGER_DUMP"))
 			{

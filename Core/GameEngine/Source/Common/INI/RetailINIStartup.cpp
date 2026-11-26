@@ -4,8 +4,10 @@
 #include "Common/FileSystem.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <map>
+#include <sstream>
 #include <string_view>
 #include <vector>
 
@@ -28,6 +30,45 @@ struct LegendSection
 
 std::map<std::string, LegendSection> legend;
 std::array<std::string, 2> environmentFiles;
+RetailINIStartup::ShadowSettings baseShadowSettings;
+RetailINIStartup::ShadowSettings mapShadowSettings;
+
+bool validShadowViewDistance(Real value)
+{
+	return value > 0.0f && std::isfinite(value) && std::isfinite(1.0f / value);
+}
+
+void readEnvironmentShadowSettings(const std::string& content)
+{
+	std::istringstream input(content);
+	bool inShadowMap = false;
+	for (std::string line; std::getline(input, line); )
+	{
+		std::istringstream row(line);
+		std::string name;
+		if (!(row >> name))
+			continue;
+		if (stricmp(name.c_str(), "ShadowMap") == 0)
+		{
+			inShadowMap = true;
+			continue;
+		}
+		if (!inShadowMap)
+			continue;
+		if (stricmp(name.c_str(), "End") == 0)
+			break;
+		char separator = 0;
+		Real value = 0.0f;
+		if (!(row >> separator >> value) || separator != '=' || !std::isfinite(value))
+			continue;
+		if (stricmp(name.c_str(), "MapSize") == 0 && value >= 256 && value <= 4096)
+			baseShadowSettings.mapSize = static_cast<Int>(value);
+		else if (stricmp(name.c_str(), "MaxViewDistance") == 0 && validShadowViewDistance(value))
+			baseShadowSettings.maxViewDistance = value;
+		else if (stricmp(name.c_str(), "MinShadowedTerrainHeight") == 0)
+			baseShadowSettings.minTerrainHeight = value;
+	}
+}
 
 const char* const environmentPaths[] = {
 	"Data\\INI\\Default\\Environment.ini",
@@ -196,11 +237,42 @@ void loadFile(const char* path, Xfer* xfer)
 
 void loadEnvironment()
 {
+	baseShadowSettings = {};
 	for (std::size_t i = 0; i < environmentFiles.size(); ++i)
 	{
 		const char* path = environmentPaths[i];
 		environmentFiles[i] = TheFileSystem->doesFileExist(path) ? INI::preprocessFile(path) : std::string();
+		readEnvironmentShadowSettings(environmentFiles[i]);
 	}
+	resetMapShadowSettings();
+}
+
+void resetMapShadowSettings()
+{
+	mapShadowSettings = baseShadowSettings;
+}
+
+const ShadowSettings& shadowSettings()
+{
+	return mapShadowSettings;
+}
+
+void parseShadowMap(INI* ini)
+{
+	static const FieldParse fields[] = {
+		{ "MapSize", INI::parseInt, nullptr, offsetof(ShadowSettings, mapSize) },
+		{ "MaxViewDistance", INI::parseReal, nullptr, offsetof(ShadowSettings, maxViewDistance) },
+		{ "MinShadowedTerrainHeight", INI::parseReal, nullptr, offsetof(ShadowSettings, minTerrainHeight) },
+		{ nullptr, nullptr, nullptr, 0 },
+	};
+	ShadowSettings parsed = mapShadowSettings;
+	ini->initFromINI(&parsed, fields);
+	if (parsed.mapSize >= 256 && parsed.mapSize <= 4096)
+		mapShadowSettings.mapSize = parsed.mapSize;
+	if (validShadowViewDistance(parsed.maxViewDistance))
+		mapShadowSettings.maxViewDistance = parsed.maxViewDistance;
+	if (std::isfinite(parsed.minTerrainHeight))
+		mapShadowSettings.minTerrainHeight = parsed.minTerrainHeight;
 }
 
 const std::array<std::string, 2>& environment()

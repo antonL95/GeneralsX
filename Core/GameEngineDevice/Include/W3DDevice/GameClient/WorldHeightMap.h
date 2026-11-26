@@ -30,6 +30,7 @@
 #pragma once
 
 #include "Lib/BaseType.h"
+#include "Lib/Coord2D.h"
 #include "WWLib/refcount.h"
 #include "WWLib/ref_ptr.h"
 #include "WWMath/vector3.h"
@@ -40,6 +41,27 @@
 #include "Common/STLTypedefs.h"
 #include <memory>
 typedef std::vector<ICoord2D> VecICoord2D;
+
+struct RetailStandingWaveArea
+{
+	UnsignedInt id;
+	AsciiString name;
+	AsciiString layer;
+	Real uvScroll;
+	Bool additive;
+	std::vector<Coord2D> points;
+	Int finalWidth;
+	Int finalHeight;
+	Int initialWidthFraction;
+	Int initialHeightFraction;
+	Int initialVelocity;
+	Int timeToFade;
+	Int timeToCompress;
+	Int secondaryWaveOffset;
+	Int distanceFromShore;
+	AsciiString texture;
+	Bool enablePcaWave = FALSE;
+};
 
 
 /** MapObject class
@@ -253,8 +275,10 @@ private:
 	Bool m_retailMacroStretched = FALSE;
 	Real m_retailWaterMaxAlphaDepth = -1.0f;
 	Real m_retailDeepWaterAlpha = -1.0f;
+	std::vector<RetailStandingWaveArea> m_retailStandingWaves;
 	static Bool ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	static Bool ParseRetailEnvironment(DataChunkInput &file, DataChunkInfo *info, void *userData);
+	static Bool ParseRetailStandingWaves(DataChunkInput &file, DataChunkInfo *info, void *userData);
 	struct MapPolygonDeleter
 	{
 		void operator()(PolygonTrigger *polygon) const;
@@ -278,6 +302,7 @@ public: // constructors/destructors
 	Bool hasRetailEnvironment() const { return m_retailEnvironment; }
 	Real getRetailWaterMaxAlphaDepth() const { return m_retailWaterMaxAlphaDepth; }
 	Real getRetailDeepWaterAlpha() const { return m_retailDeepWaterAlpha; }
+	const std::vector<RetailStandingWaveArea>& getRetailStandingWaves() const { return m_retailStandingWaves; }
 	Bool usesRetailOverbright() const;
 	const AsciiString &getRetailMacroTexture() const { return m_retailMacroTexture; }
 	const AsciiString &getRetailCloudTexture() const { return m_retailCloudTexture; }

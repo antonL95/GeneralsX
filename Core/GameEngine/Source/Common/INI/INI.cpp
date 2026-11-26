@@ -198,6 +198,7 @@ static const BlockParse theTypeTable[] =
 	{ "Campaign",                       INI::parseCampaignDefinition },
 	{ "ChallengeGenerals",              INI::parseChallengeModeDefinition },
 	{ "CloudEffect",                    INI::parseCloudEffectDefinition },
+	{ "ShadowMap",                      RetailINIStartup::parseShadowMap },
 	{ "WeatherData",                    WeatherSetting::parseRetailPreset },
 	{ "CommandButton",                  INI::parseCommandButtonDefinition },
 	{ "CommandMap",                     INI::parseMetaMapDefinition },

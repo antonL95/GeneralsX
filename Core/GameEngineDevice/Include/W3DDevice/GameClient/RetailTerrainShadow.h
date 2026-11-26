@@ -45,7 +45,6 @@ private:
 	DWORD m_cutoutShader = 0;
 	DWORD m_receiveShader = 0;
 	Int m_size = 0;
-	Int m_authoredSize = 0;
 	Real m_viewDistance = 1500.0f;
 	bool m_ready = false;
 	bool m_floatDepth = false;

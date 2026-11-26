@@ -17,7 +17,6 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <sstream>
 
 RetailTerrainShadow *TheRetailTerrainShadow = nullptr;
 
@@ -134,33 +133,6 @@ RGBColor terrainLightWithoutSun()
 RetailTerrainShadow::RetailTerrainShadow()
 {
 	DX8Wrapper::AddCleanupHook(this);
-	for (const std::string& content : RetailINIStartup::environment())
-	{
-		std::istringstream input(content);
-		bool shadowBlock = false;
-		for (std::string line; std::getline(input, line); )
-		{
-			std::istringstream row(line);
-			std::string name;
-			row >> name;
-			if (stricmp(name.c_str(), "ShadowMap") == 0)
-				shadowBlock = true;
-			else if (shadowBlock && stricmp(name.c_str(), "End") == 0)
-				break;
-			else if (shadowBlock)
-			{
-				char separator = 0;
-				Real value = 0;
-				if (row >> separator >> value && separator == '=' && std::isfinite(value))
-				{
-					if (stricmp(name.c_str(), "MapSize") == 0 && value >= 256 && value <= 4096)
-						m_authoredSize = static_cast<Int>(value);
-					else if (stricmp(name.c_str(), "MaxViewDistance") == 0 && value > 0.0f)
-						m_viewDistance = value;
-				}
-			}
-		}
-	}
 }
 
 RetailTerrainShadow::~RetailTerrainShadow()
@@ -319,8 +291,10 @@ void RetailTerrainShadow::castObject(RenderObjClass &object)
 void RetailTerrainShadow::render(SceneClass &scene, const Vector3 &centre, Int size)
 {
 	m_ready = false;
-	if (m_authoredSize)
-		size = std::min(size, m_authoredSize);
+	const auto& settings = RetailINIStartup::shadowSettings();
+	if (settings.mapSize)
+		size = std::min(size, settings.mapSize);
+	m_viewDistance = settings.maxViewDistance;
 	const auto &sun = TheGlobalData->m_terrainObjectsLighting[TheGlobalData->m_timeOfDay][0].lightPos;
 	if (sun.z >= -0.01f || !prepare(std::clamp(size, 256, 4096)))
 		return;
@@ -406,8 +380,9 @@ void RetailTerrainShadow::render(SceneClass &scene, const Vector3 &centre, Int s
 	}
 	if (tracingShadows())
 		std::fprintf(stderr,
-			"[Retail Shadow] pass=%u game=%u center=(%.3f,%.3f,%.3f) size=%d float=%d target=%08x clear=%08x props=%u trees=%u cutouts=%u hash=%08x failures=%u coord=%u texTransform=%u zBias=%u casterStage1Mismatches=%u\n",
-			shadowTrace.sequence, TheGameLogic->getFrame(), centre.X, centre.Y, centre.Z, m_size, m_floatDepth,
+			"[Retail Shadow] pass=%u game=%u center=(%.3f,%.3f,%.3f) size=%d view=%.3f minTerrain=%.3f float=%d target=%08x clear=%08x props=%u trees=%u cutouts=%u hash=%08x failures=%u coord=%u texTransform=%u zBias=%u casterStage1Mismatches=%u\n",
+			shadowTrace.sequence, TheGameLogic->getFrame(), centre.X, centre.Y, centre.Z, m_size,
+			m_viewDistance, settings.minTerrainHeight, m_floatDepth,
 			static_cast<unsigned>(targetResult), static_cast<unsigned>(clearResult), shadowTrace.props, shadowTrace.trees,
 			shadowTrace.treeCutouts, shadowTrace.treeHash, shadowTrace.failures, static_cast<unsigned>(coordIndex),
 			static_cast<unsigned>(texTransform), static_cast<unsigned>(zBias), shadowTrace.casterStage1Mismatches);

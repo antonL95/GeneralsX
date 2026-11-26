@@ -129,6 +129,7 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/RetailTerrainFire.h"
+#include "Common/RetailINIStartup.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptConditions.h"
@@ -2740,6 +2741,7 @@ static void findAndSelectCommandCenter(Object *obj, void* alreadyFound)
 // ------------------------------------------------------------------------------------------------
 void GameLogic::loadMapINI( AsciiString mapName )
 {
+	RetailINIStartup::resetMapShadowSettings();
 	RetailTerrainFire::restoreSettings();
 	if (RetailFileLayers::enabled())
 		RetailSkirmishSpending::resetMapPolicies();

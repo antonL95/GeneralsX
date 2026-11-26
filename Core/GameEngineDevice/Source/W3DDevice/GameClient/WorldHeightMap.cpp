@@ -518,7 +518,7 @@ void WorldHeightMap::RegisterLogicalMapParsers(DataChunkInput &file, Bool metada
 	file.registerVersionedParser("TriggerAreas", root, ParseTriggerAreas, 1);
 	file.registerVersionedParser("StandingWaterAreas", root, ParseStandingWaterAreas, 2);
 	file.registerVersionedParser("RiverAreas", root, ParseRiverAreas, 2);
-	file.registerVersionedParser("StandingWaveAreas", root, nullptr, 2);
+	file.registerVersionedParser("StandingWaveAreas", root, ParseRetailStandingWaves, 2);
 	file.registerVersionedParser("PostEffectsChunk", root, nullptr, 1);
 	file.registerVersionedParser("EnvironmentData", root, nullptr, 3);
 	file.registerVersionedParser("NamedCameras", root, nullptr, 2);
@@ -610,6 +610,7 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly, Bo
 		{
 			file.registerVersionedParser("PostEffectsChunk", root, ParseRetailPostEffects, 1);
 			file.registerVersionedParser("EnvironmentData", root, ParseRetailEnvironment, 3);
+			file.registerVersionedParser("StandingWaveAreas", root, ParseRetailStandingWaves, 2);
 		}
 		if (!legacyBlendOnly && std::getenv("GENERALSX_ASSET_SMOKE_TERRAIN"))
 			file.registerVersionedParser("StandingWaterAreas", root, ParseStandingWaterAreas, 2);
@@ -915,6 +916,75 @@ static AsciiString readRetailChunkString(DataChunkInput &file)
 		buffer[length] = '\0';
 	}
 	return value;
+}
+
+Bool WorldHeightMap::ParseRetailStandingWaves(DataChunkInput &file, DataChunkInfo *info, void *userData)
+{
+	if (info->version < 1)
+		return TRUE;
+	const Bool hasPcaFlag = info->version >= 2;
+	const UnsignedInt controlBytes = 9 * sizeof(Int);
+	const UnsignedInt tailBytes = sizeof(Int) + controlBytes + sizeof(UnsignedShort) +
+		(hasPcaFlag ? sizeof(Int) : 0);
+	const UnsignedInt minimumAreaBytes = sizeof(Int) + 2 * sizeof(UnsignedShort) +
+		sizeof(Real) + sizeof(Byte) + sizeof(Int) + tailBytes;
+	requireRetailChunkBytes(file, sizeof(Int));
+	const UnsignedInt count = file.readInt();
+	if (count > file.getChunkDataSizeLeft() / minimumAreaBytes)
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	std::vector<RetailStandingWaveArea> areas;
+	areas.reserve(count);
+	for (UnsignedInt i = 0; i < count; ++i)
+	{
+		requireRetailChunkBytes(file, minimumAreaBytes);
+		RetailStandingWaveArea area{};
+		area.id = file.readInt();
+		area.name = readRetailChunkString(file);
+		area.layer = readRetailChunkString(file);
+		requireRetailChunkBytes(file, sizeof(Real) + sizeof(Byte) + sizeof(Int) + tailBytes);
+		area.uvScroll = file.readReal();
+		const UnsignedByte additive = file.readByte();
+		if (!std::isfinite(area.uvScroll) || additive > 1)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		area.additive = additive != 0;
+		const UnsignedInt pointCount = file.readInt();
+		if (pointCount > (file.getChunkDataSizeLeft() - tailBytes) / (2 * sizeof(Real)))
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		area.points.reserve(pointCount);
+		for (UnsignedInt point = 0; point < pointCount; ++point)
+		{
+			const Coord2D position{file.readReal(), file.readReal()};
+			if (!std::isfinite(position.x) || !std::isfinite(position.y))
+				throw ERROR_CORRUPT_FILE_FORMAT;
+			area.points.push_back(position);
+		}
+		if (file.readInt() != 0)
+			throw ERROR_CORRUPT_FILE_FORMAT;
+		area.finalWidth = file.readInt();
+		area.finalHeight = file.readInt();
+		area.initialWidthFraction = file.readInt();
+		area.initialHeightFraction = file.readInt();
+		area.initialVelocity = file.readInt();
+		area.timeToFade = file.readInt();
+		area.timeToCompress = file.readInt();
+		area.secondaryWaveOffset = file.readInt();
+		area.distanceFromShore = file.readInt();
+		area.texture = readRetailChunkString(file);
+		if (hasPcaFlag)
+		{
+			requireRetailChunkBytes(file, sizeof(Int));
+			const UnsignedInt pcaFlag = file.readInt();
+			if (pcaFlag > 1)
+				throw ERROR_CORRUPT_FILE_FORMAT;
+			area.enablePcaWave = pcaFlag != 0;
+		}
+		areas.push_back(std::move(area));
+	}
+	if (!file.atEndOfChunk())
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	auto& map = *static_cast<WorldHeightMap*>(userData);
+	map.m_retailStandingWaves = std::move(areas);
+	return TRUE;
 }
 
 Bool WorldHeightMap::ParseRetailPostEffects(DataChunkInput &file, DataChunkInfo *info, void *userData)

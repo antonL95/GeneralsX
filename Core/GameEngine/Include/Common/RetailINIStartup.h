@@ -8,6 +8,17 @@
 
 namespace RetailINIStartup
 {
+	struct ShadowSettings
+	{
+		Int mapSize = 0;
+		Real maxViewDistance = 1500.0f;
+		Real minTerrainHeight = 0.0f;
+	};
+
+	void parseShadowMap(INI* ini);
+	void resetMapShadowSettings();
+	const ShadowSettings& shadowSettings();
+
 	void loadLegend();
 	bool hasSubsystem(const char* name);
 	bool visitSubsystemFiles(const char* name, const std::function<void(const char*)>& load);

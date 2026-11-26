@@ -1,0 +1,2 @@
+18 reveal Player_1 MenFortressCitadel 0
+22 create Player_1 GondorFighterHorde 0 2880,680,0
