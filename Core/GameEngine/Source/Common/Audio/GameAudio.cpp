@@ -50,6 +50,7 @@
 #include "Common/AudioEventRTS.h"
 #include "Common/AudioHandleSpecialValues.h"
 #include "Common/AudioRequest.h"
+#include "Common/AudioRandomValue.h"
 #include "Common/AudioSettings.h"
 #include "Common/INIAudit.h"
 #include "Common/RetailFileLayers.h"
@@ -510,6 +511,10 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 	audioEvent->generateFilename();	// which file are we actually going to play?
 	eventToAdd->setPlayingAudioIndex( audioEvent->getPlayingAudioIndex() );
 	audioEvent->generatePlayInfo();	// generate pitch shift and volume shift now as well
+	const Real probability = audioEvent->getAudioEventInfo()->m_playFraction;
+	if (probability <= 0.0f ||
+		(probability < 1.0f && GameAudioRandomValueReal(0.0f, 1.0f) >= probability))
+		return AHSV_NoSound;
 
 	std::list<std::pair<AsciiString, Real>/**/>::iterator it;
 	for (it = m_adjustedVolumes.begin(); it != m_adjustedVolumes.end(); ++it) {

@@ -116,6 +116,7 @@ public:
 	Real m_volume;						// Desired volume of this audio
 	Real m_volumeShift;				// Desired volume shift of the audio
 	Real m_minVolume;					// Clamped minimum value, useful when muting sound effects
+	Real m_playFraction = 1.0f;
 	Real m_pitchShiftMin;			// minimum pitch shift value
 	Real m_pitchShiftMax;			// maximum pitch shift value
 	Int m_delayMin;						// minimum delay before we'll fire up another one of these

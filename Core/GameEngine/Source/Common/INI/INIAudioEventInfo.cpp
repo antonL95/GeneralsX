@@ -202,6 +202,7 @@ static constexpr bool WeightedSoundList = true;
 
 const FieldParse AudioEventInfo::m_audioEventInfo[] =
 {
+	{ "PlayPercent", INI::parsePercentToReal, nullptr, offsetof(AudioEventInfo, m_playFraction) },
 	{ "Filename",							INI::parseAsciiString,		nullptr,								offsetof( AudioEventInfo, m_filename) },
 	{ "Volume",								INI::parsePercentToReal,	nullptr,								offsetof( AudioEventInfo, m_volume ) },
 	{ "VolumeShift",					INI::parsePercentToReal,	nullptr,								offsetof( AudioEventInfo, m_volumeShift ) },

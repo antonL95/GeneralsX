@@ -1,0 +1,5 @@
+10 audio-loop-trace - - 0 virtual
+12 create Player_1 GondorEarnur 0 2520,1010,0
+25 audio-loop-music - - 0 AudioPlayPercentNever
+26 audio-loop-music - - 0 AudioPlayPercentAlways
+27 audio-loop-music - - 0 AudioPlayPercentDefault
