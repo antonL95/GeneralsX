@@ -237,8 +237,10 @@ void collectHero(Object *obj, void *userData)
 	Census &census = *static_cast<Census *>(userData);
 	if (obj->isEffectivelyDead() || obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 		return;
-	if (obj->isKindOf(KINDOF_DOZER))
+	if (!obj->isKindOf(KINDOF_HERO))
 	{
+		if (!obj->isKindOf(KINDOF_PORTER))
+			return;
 		if (!obj->isSelectable())
 			return;
 		AIUpdateInterface *ai = obj->getAI();
@@ -258,8 +260,6 @@ void collectHero(Object *obj, void *userData)
 		builders.selected = builders.selected || (draw && draw->isSelected());
 		return;
 	}
-	if (!obj->isKindOf(KINDOF_HERO))
-		return;
 	const ThingTemplate *identity = obj->getHeroIdentityTemplate();
 	const Int rosterIndex = HeroRoster::findIndex(census.player, identity);
 	const ThingTemplate *hero = rosterIndex >= 0 ? HeroRoster::heroAt(census.player, rosterIndex) : identity;
@@ -459,7 +459,7 @@ struct BuilderCensus
 
 void collectBuilder(Object *obj, void *userData)
 {
-	if (!obj->isKindOf(KINDOF_DOZER) || !obj->isSelectable() || obj->isEffectivelyDead() ||
+	if (!obj->isKindOf(KINDOF_PORTER) || !obj->isSelectable() || obj->isEffectivelyDead() ||
 		obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
 		return;
 	BuilderCensus &census = *static_cast<BuilderCensus *>(userData);
@@ -938,6 +938,16 @@ Bool selectHeroSlot(ObjectID id)
 		return FALSE;
 	selectObject(TheGameLogic->findObjectByID(id), FALSE);
 	return TRUE;
+}
+
+void dump(UnsignedInt frame)
+{
+	for (size_t i = 0; i < s_bar.slots.size(); ++i)
+	{
+		const HeroSlot &slot = s_bar.slots[i];
+		std::fprintf(stderr, "TEST roster %u slot=%d %s builders=%d\n", frame, static_cast<int>(i),
+			slot.builder ? "builder" : slot.hero->getName().str(), slot.idleBuilders);
+	}
 }
 
 Bool selectAllHeroes()
