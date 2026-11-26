@@ -101,6 +101,7 @@
 3 summon-rules
 3 aod-payload
 3 tree-buffer
+3 siege-portal
 4 pkg34-nuggets
 3 death-debris
 3 context-commands

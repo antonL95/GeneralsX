@@ -180,6 +180,7 @@ public:
 	Bool getClimbEntryPosition(Coord3D& position) const;
 	Bool getClimbWaypoints(std::vector<Coord3D>& positions) const;
 	Bool getTopAttackPosition(Coord3D& position) const;
+	Real getTopAttackRadius() const { return getDynamicPortalBehaviourModuleData()->m_topAttackRadius; }
 	Bool isWithinTopAttackRange(const Object& attacker) const;
 	Bool allowsClimber(const Object& unit) const;
 	UpdateSleepTime update() override;
