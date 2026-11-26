@@ -1,0 +1,23 @@
+10 create Player_1 MordorMountainTroll 0 150,2295,0
+10 create Player_1 MordorFighterHorde 0 1800,1200,0
+10 create PlyrCivilian ContextCaptureTargetA 0 1855,1255,0
+10 create Player_1 GuldurGreatSpider 0 2600,1200,0
+10 create PlyrCivilian ContextCaptureTargetB 0 2655,1255,0
+10 create Player_1 ArbiterofZigurHorde 0 1800,2800,0
+10 create PlyrCivilian ContextCaptureTargetC 0 1855,2855,0
+10 create Player_1 HaradCultistsofZigurHorde 0 2600,2800,0
+10 create PlyrCivilian ContextCaptureTargetD 0 2655,2855,0
+100 context-click Player_1 MordorFighterHorde 0 ContextCaptureTargetA
+101 context-click Player_1 GuldurGreatSpider 0 ContextCaptureTargetB
+102 context-click Player_1 ArbiterofZigurHorde 0 ContextCaptureTargetC
+103 context-click Player_1 HaradCultistsofZigurHorde 0 ContextCaptureTargetD
+110 context-click Player_1 MordorMountainTroll 0 tree
+400 context-held Player_1 MordorMountainTroll 0
+410 create Player_1 MordorFighter 0 175,2295,0
+420 context-eat Player_1 MordorMountainTroll 0 Command_SpecialAbilityTrollFindTastyOrcFakeTrigger
+430 context-held Player_1 MordorMountainTroll 0
+430 context-power Player_1 MordorMountainTroll 0 Command_SpecialAbilityTrollFindTastyOrcFakeTrigger
+800 context-owner Player_1 ContextCaptureTargetA 0
+800 context-owner Player_1 ContextCaptureTargetB 0
+800 context-owner Player_1 ContextCaptureTargetC 0
+800 context-owner Player_1 ContextCaptureTargetD 0
