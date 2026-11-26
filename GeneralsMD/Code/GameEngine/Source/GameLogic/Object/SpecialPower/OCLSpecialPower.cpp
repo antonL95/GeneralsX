@@ -41,6 +41,22 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/OCLSpecialPower.h"
+#include "GameLogic/Module/UnpauseSpecialPowerUpgrade.h"
+
+namespace
+{
+Bool hasUnpauseUpgrade(const Object* object, const SpecialPowerTemplate* power)
+{
+	const NameKeyType unpause = NAMEKEY("UnpauseSpecialPowerUpgrade");
+	for (BehaviorModule** module = object->getBehaviorModules(); *module; ++module)
+	{
+		if ((*module)->getModuleNameKey() == unpause &&
+			static_cast<const UnpauseSpecialPowerUpgrade*>(*module)->getUnpauseData()->m_specialPower == power)
+			return TRUE;
+	}
+	return FALSE;
+}
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // MODULE DATA ////////////////////////////////////////////////////////////////////////////////////
@@ -185,7 +201,9 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 	SpecialPowerModule::doSpecialPowerAtLocation( &targetCoord, angle, commandOptions );
 
 	const Bool internalPausedBypass = (commandOptions & COMMAND_OPTION_INTERNAL_AUTO) != 0 &&
-		m_pausedCount > 0 && !getSpecialPowerModuleData()->m_updateModuleStartsAttack;
+		m_pausedCount == 1 && getSpecialPowerModuleData()->m_startsPaused &&
+		!getSpecialPowerModuleData()->m_updateModuleStartsAttack &&
+		!hasUnpauseUpgrade(getObject(), getSpecialPowerTemplate());
 	if (m_availableOnFrame == 0xFFFFFFFF || (!wasLastCastAccepted() && !internalPausedBypass))
 		return;
 
@@ -245,7 +263,7 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 			break;
 		case CREATE_AT_EDGE_FARTHEST_FROM_TARGET:
 			creationCoord = TheTerrainLogic->findFarthestEdgePoint(&targetCoord);
-			creationCoord.z += CREATE_ABOVE_LOCATION_HEIGHT;
+			creationCoord.z += static_cast<Real>(CREATE_ABOVE_LOCATION_HEIGHT);
 			ObjectCreationList::create( ocl, getObject(), &creationCoord, &targetCoord, angle );
 			break;
 		case CREATE_AT_LOCATION:
@@ -258,7 +276,7 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 		case CREATE_ABOVE_LOCATION:
 			// this is the case where the special power stuff originates above the location of the mouse click
 			creationCoord = targetCoord;
-			creationCoord.z += CREATE_ABOVE_LOCATION_HEIGHT;
+			creationCoord.z += static_cast<Real>(CREATE_ABOVE_LOCATION_HEIGHT);
 			ObjectCreationList::create( ocl, getObject(), &creationCoord, &targetCoord, angle );
 			break;
 	}
@@ -289,7 +307,9 @@ void OCLSpecialPower::doSpecialPower( UnsignedInt commandOptions )
 	SpecialPowerModule::doSpecialPowerAtLocation( &creationCoord, INVALID_ANGLE, commandOptions );
 
 	const Bool internalPausedBypass = (commandOptions & COMMAND_OPTION_INTERNAL_AUTO) != 0 &&
-		m_pausedCount > 0 && !getSpecialPowerModuleData()->m_updateModuleStartsAttack;
+		m_pausedCount == 1 && getSpecialPowerModuleData()->m_startsPaused &&
+		!getSpecialPowerModuleData()->m_updateModuleStartsAttack &&
+		!hasUnpauseUpgrade(getObject(), getSpecialPowerTemplate());
 	if (m_availableOnFrame == 0xFFFFFFFF || (!wasLastCastAccepted() && !internalPausedBypass))
 		return;
 

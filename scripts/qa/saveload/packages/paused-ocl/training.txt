@@ -1,0 +1,58 @@
+180 create Player_1 PausedOclFortress 0 2000,3540,0
+180 create Player_1 PausedOclGothmog 0 2150,3540,0
+180 create Player_1 PausedOclRazari 0 3000,800,0
+180 create Player_1 PausedOclRazari 1 3000,1100,0
+180 create Player_1 PausedOclGuldurFortress 0 2700,800,0
+180 create PlyrCreeps PausedOclEnemy 0 3080,800,0
+180 create PlyrCreeps PausedOclEnemy 1 3080,1100,0
+180 create PlyrCreeps PausedOclEnemy 2 2780,800,0
+181 reveal Player_1 PausedOclRazari 0
+181 reveal Player_1 PausedOclRazari 1
+181 reveal Player_1 PausedOclGuldurFortress 0
+182 power Player_1 PausedOclGothmog 0 SpecialAbilityToggleMounted
+185 power Player_1 PausedOclFortress 0 CallofBelegaer
+186 power Player_1 PausedOclGuldurFortress 0 SpecialAbilityGuldurFortressEnsnareCaster
+186 aim Player_1 PausedOclGuldurFortress 0 PlyrCreeps:PausedOclEnemy:2
+187 objupgrade Player_1 PausedOclRazari 0 Upgrade_ObjectLevel10
+190 power Player_1 PausedOclRazari 0 SpecialAbilityWhispersOfVoidCaster
+190 aim Player_1 PausedOclRazari 0 PlyrCreeps:PausedOclEnemy:0
+195 paused-ocl-state Player_1 PausedOclCirdanMarker 0
+195 paused-ocl-state Player_1 PausedOclFortressMarker 0
+200 objupgrade Player_1 PausedOclFortress 0 Upgrade_ArnorFortressIvoryTower
+200 objupgrade Player_1 PausedOclGuldurFortress 0 Upgrade_GuldurFortressSorcery
+205 power Player_1 PausedOclFortress 0 CallofBelegaer
+210 power Player_1 PausedOclGuldurFortress 0 SpecialAbilityGuldurFortressEnsnareCaster
+210 aim Player_1 PausedOclGuldurFortress 0 PlyrCreeps:PausedOclEnemy:2
+225 paused-ocl-state Player_1 PausedOclMarker 0
+226 destroy Player_1 PausedOclMarker 0
+230 objupgrade Player_1 PausedOclRazari 1 Upgrade_ObjectLevel10
+230 objupgrade Player_1 PausedOclRazari 1 Upgrade_ObjectLevel7
+235 paused-ocl-state Player_1 PausedOclCirdanMarker 0
+235 paused-ocl-state Player_1 PausedOclFortressMarker 0
+236 power Player_1 PausedOclRazari 1 SpecialAbilityWhispersOfVoidCaster
+236 aim Player_1 PausedOclRazari 1 PlyrCreeps:PausedOclEnemy:1
+330 ability Player_1 PausedOclGothmog 0
+331 power Player_1 PausedOclGothmog 0 SpecialAbilityGothmogSummon
+340 paused-ocl-state Player_1 PausedOclGothmogMarker 0
+350 objupgrade Player_1 PausedOclGothmog 0 Upgrade_ObjectLevel3
+275 paused-ocl-state Player_1 PausedOclMarker 0
+360 power Player_1 PausedOclGothmog 0 SpecialAbilityGothmogSummon
+390 paused-ocl-state Player_1 PausedOclGothmogMarker 0
+446 paused-ocl-state Player_1 PausedOclCirdanMarker 0
+446 paused-ocl-state Player_1 PausedOclGothmogMarker 0
+446 paused-ocl-state Player_1 PausedOclFortressMarker 0
+450 destroy Player_1 PausedOclCirdanMarker 0
+450 destroy Player_1 PausedOclGothmogMarker 0
+450 destroy Player_1 PausedOclFortressMarker 0
+450 destroy Player_1 PausedOclMarker 0
+450 destroy Player_1 PausedOclGothmog 0
+450 destroy Player_1 PausedOclFortress 0
+450 destroy Player_1 PausedOclGuldurFortress 0
+450 destroy Player_1 PausedOclRazari 0
+450 destroy Player_1 PausedOclRazari 0
+450 destroy PlyrCreeps PausedOclEnemy 0
+450 destroy PlyrCreeps PausedOclEnemy 0
+450 destroy PlyrCreeps PausedOclEnemy 0
+189 paused-ocl-probe Player_1 PausedOclRazari 0 Command_SpecialAbilityWrathoftheBalchoth 3080 800
+209 paused-ocl-probe Player_1 PausedOclGuldurFortress 0 Command_SpecialAbilityGuldurEnsnareCaster 2780 800
+234 paused-ocl-probe Player_1 PausedOclRazari 1 Command_SpecialAbilityWrathoftheBalchoth 3080 1100
