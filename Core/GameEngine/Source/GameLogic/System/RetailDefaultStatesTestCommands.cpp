@@ -4,6 +4,7 @@
 #if !RTS_GENERALS
 #include <cstdio>
 
+#include "Common/ActionManager.h"
 #include "Common/MessageStream.h"
 #include "Common/Player.h"
 #include "Common/SpecialPower.h"
@@ -39,12 +40,14 @@ void castDefaultPower(const RetailTestCommands::Context& ctx)
 	const CommandButton* button = TheRetailCommandCatalog->findCommandButton(ctx.argument);
 	if (!player || !button || !button->getSpecialPowerTemplate())
 		return;
-	const Object* source = player->getRetailSpellBook();
+	const Object* source = ctx.requireObject();
 	if (!source)
 		return;
 	const SpecialPowerTemplate* power = button->getSpecialPowerTemplate();
 	const SpecialPowerModuleInterface* module = source->getSpecialPowerModule(power);
-	std::fprintf(stderr, "TEST default-cast %u %s ready=%d\n", ctx.frame, ctx.argument, module && module->isReady());
+	const Coord3D point = ctx.groundLocation();
+	std::fprintf(stderr, "TEST default-cast %u %s ready=%d valid=%d\n", ctx.frame, ctx.argument, module && module->isReady(),
+		TheActionManager->canDoSpecialPowerAtLocation(source, &point, CMD_FROM_PLAYER, power, nullptr, button->getOptions()));
 	GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION);
 	message->friend_setPlayerIndex(player->getPlayerIndex());
 	message->appendIntegerArgument(power->getID());

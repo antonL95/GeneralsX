@@ -6,7 +6,14 @@
 230 default-state Player_1 DefaultStatesTower 0
 230 default-state Player_1 DefaultStatesSentries 0
 232 move Player_1 DefaultStatesSentries 0 - 3230 3030
+232 create Player_1 DefaultStatesCaster 0 2400,3300,0
+233 science Player_1 - 0 SCIENCE_DragonStrike
+236 default-cast Player_1 DefaultStatesCaster 0 Command_SpellBookDragonStrike 3200 2860
+240 default-state Player_1 DefaultStatesDrake 0
+250 default-order Player_1 DefaultStatesDrake 0 - 3000 2800
+260 default-state Player_1 DefaultStatesDrake 0
 300 default-state Player_1 GuldurRuinousTower 0
 300 default-state Player_1 DefaultStatesTower 0
 420 default-state Player_1 DefaultStatesSentries 0
 420 default-state Player_1 DefaultStatesTower 0
+1200 default-state Player_1 DefaultStatesDrake 0

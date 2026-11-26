@@ -12,15 +12,14 @@ check() {
     default_state 300 'DefaultStatesTower stealthed=0 camo=0 trees=0 selectable=1 idle=1' || return 1
     default_state 420 'DefaultStatesSentries stealthed=1 camo=1 trees=1 selectable=1 idle=1' || return 1
     default_state 420 'DefaultStatesTower stealthed=0 camo=0 trees=0 selectable=1 idle=1' || return 1
-    grep -q default-cast "$out/$phase.txt" || return 0
-    if covers 306; then
-        expect 'TEST default-cast 306 Command_SpellBookDragonStrike ready=1' || return 1
+    if covers 236; then
+        expect 'TEST default-cast 236 Command_SpellBookDragonStrike ready=1 valid=1' || return 1
     fi
-    default_state 310 'SpellBookDragonStrikeDragon stealthed=0 camo=0 trees=0 selectable=0 idle=0' || return 1
-    if covers 340; then
-        expect 'TEST default-order 340 selectable=0' || return 1
+    default_state 240 'DefaultStatesDrake stealthed=0 camo=0 trees=0 selectable=0 idle=0' || return 1
+    if covers 250; then
+        expect 'TEST default-order 250 selectable=0' || return 1
     fi
-    default_state 1440 absent || return 1
+    default_state 1200 absent || return 1
 }
 
 compare() {
