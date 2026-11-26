@@ -20,7 +20,7 @@ check() {
     if covers 600; then
         awk '
             $1 == "TEST" && $2 == "scales-walls" && $3 == "frame=600" && $4 == "name=ScalesWallsUnit" {
-                split($8, y, "="); if (y[2] < 2377) crossed = 1
+                split($8, y, "="); split($6, layer, "="); if (y[2] < 2867 && layer[2] == 1) crossed = 1
             }
             END { if (!crossed) { print "Wall scaler did not cross the wall"; exit 1 } }
         ' "$log"
