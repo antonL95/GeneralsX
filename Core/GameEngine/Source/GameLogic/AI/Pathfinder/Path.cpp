@@ -44,6 +44,7 @@ m_cpopValid(FALSE)
 {
 	m_cpopIn.zero();
 	m_cpopOut.distAlongPath=0;
+	m_cpopOut.arcTurn = 0.0f;
 	m_cpopOut.layer = LAYER_GROUND;
 	m_cpopOut.posOnPath.zero();
 }
@@ -90,7 +91,9 @@ void Path::xferRetailBlocks(Xfer* xfer, Bool present)
 		}, [this] {
 			for (PathNode* node = m_path; node; node = node->getNext())
 				node->setGeneratedArc(FALSE);
-		}}
+		}},
+		{"path-cached-arc-turn", [this](Xfer* transfer) { transfer->xferReal(&m_cpopOut.arcTurn); },
+			[this] { m_cpopOut.arcTurn = 0.0f; }}
 	});
 }
 
