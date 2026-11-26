@@ -1503,22 +1503,56 @@ static void Validate_Reduction(const TextureBaseClass* texture, unsigned& reduct
 static constexpr const unsigned MinTextureDim = 4u;
 static constexpr const unsigned MinTextureDepth = 1u;
 
-// If the size doesn't match, try and see if texture reduction would help...
-// (mainly for cases where loaded texture is larger than hardware limit)
+static bool Compressed_Dimensions_Fit(unsigned width, unsigned height, unsigned depth)
+{
+	const DX8Caps* current_caps = DX8Wrapper::Get_Current_Caps();
+	if (current_caps == nullptr)
+	{
+		return true;
+	}
+
+	const D3DCAPS8& dx8caps = current_caps->Get_DX8_Caps();
+	if (width == 0 || height == 0 || depth == 0)
+	{
+		return false;
+	}
+	if (dx8caps.MaxTextureWidth != 0 && width > dx8caps.MaxTextureWidth)
+	{
+		return false;
+	}
+	if (dx8caps.MaxTextureHeight != 0 && height > dx8caps.MaxTextureHeight)
+	{
+		return false;
+	}
+	if (depth > 1 && dx8caps.MaxVolumeExtent != 0 && depth > dx8caps.MaxVolumeExtent)
+	{
+		return false;
+	}
+
+	const unsigned maxTextureAspectRatio = dx8caps.MaxTextureAspectRatio;
+	if (maxTextureAspectRatio != 0)
+	{
+		if (width > height && width / height > maxTextureAspectRatio)
+		{
+			return false;
+		}
+		if (height > width && height / width > maxTextureAspectRatio)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 static void Apply_Dim_Reduction(unsigned& width, unsigned& height, unsigned& reduction, unsigned mip_count)
 {
-	unsigned dummy_depth = 1;
-
 	for (unsigned r = reduction; r < mip_count; ++r)
 	{
 		unsigned w = max(width >> r, MinTextureDim);
 		unsigned h = max(height >> r, MinTextureDim);
-		unsigned tmp_w = w;
-		unsigned tmp_h = h;
 
-		TextureLoader::Validate_Texture_Size(w, h, dummy_depth);
-
-		if (w == tmp_w && h == tmp_h)
+		if (Compressed_Dimensions_Fit(w, h, 1))
 		{
 			width = w;
 			height = h;
@@ -1528,8 +1562,6 @@ static void Apply_Dim_Reduction(unsigned& width, unsigned& height, unsigned& red
 	}
 }
 
-// If the size doesn't match, try and see if texture reduction would help...
-// (mainly for cases where loaded texture is larger than hardware limit)
 static void Apply_Dim_Reduction_With_Depth(unsigned& width, unsigned& height, unsigned& depth, unsigned& reduction, unsigned mip_count)
 {
 	for (unsigned r = reduction; r < mip_count; ++r)
@@ -1537,13 +1569,8 @@ static void Apply_Dim_Reduction_With_Depth(unsigned& width, unsigned& height, un
 		unsigned w = max(width >> r, MinTextureDim);
 		unsigned h = max(height >> r, MinTextureDim);
 		unsigned d = max(depth >> r, MinTextureDepth);
-		unsigned tmp_w = w;
-		unsigned tmp_h = h;
-		unsigned tmp_d = d;
 
-		TextureLoader::Validate_Texture_Size(w, h, d);
-
-		if (w == tmp_w && h == tmp_h && d == tmp_d)
+		if (Compressed_Dimensions_Fit(w, h, d))
 		{
 			width = w;
 			height = h;
@@ -1557,25 +1584,13 @@ static void Apply_Dim_Reduction_With_Depth(unsigned& width, unsigned& height, un
 
 static void Apply_Mip_Reduction(unsigned& mip_level_count, unsigned reduction, unsigned width, unsigned height, unsigned mip_count)
 {
-	// If texture wants all mip levels, take as many as the file contains (not necessarily all)
-	// Otherwise take as many mip levels as the texture wants, not to exceed the count in file...
-	if (mip_level_count == MIP_LEVELS_ALL)
+	const unsigned available_mips = reduction < mip_count ? mip_count - reduction : 1u;
+	if (mip_level_count == MIP_LEVELS_ALL || mip_level_count > available_mips)
 	{
-		mip_level_count = mip_count;
-	}
-	else
-	{
-		if (mip_level_count > mip_count)
-			mip_level_count = mip_count;
+		mip_level_count = available_mips;
 	}
 
-	// Reduce requested number by those removed.
-	WWASSERT(reduction < mip_level_count);
-	mip_level_count -= reduction;
-
-	// Once more, verify that the mip level count is correct (in case it was changed here it might not
-	// match the size...well actually it doesn't have to match but it can't be bigger than the size)
-	unsigned int max_mip_level_count=Get_Full_Mip_Level_Count(width,height);
+	unsigned int max_mip_level_count = Get_Full_Mip_Level_Count(width, height);
 
 	if (mip_level_count > max_mip_level_count)
 		mip_level_count = max_mip_level_count;
