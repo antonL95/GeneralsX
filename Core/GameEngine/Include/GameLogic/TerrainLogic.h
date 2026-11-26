@@ -343,6 +343,8 @@ public:
 	std::uint64_t harvestMapTrees(const Coord3D& origin, Real radius, const FXList* fx);
 	void paintRetailTaint(const Coord3D& position, Real radius, ObjectID owner);
 	ObjectID retailTaintOwner(Real x, Real y) const;
+	Bool hasRetailTaint() const { return !m_retailTaint.empty(); }
+	Real retailTaintWeight(Real x, Real y) const;
 	void removeRetailTaint(ObjectID owner);
 
 protected:

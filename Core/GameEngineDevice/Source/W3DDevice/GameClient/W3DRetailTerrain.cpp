@@ -88,15 +88,32 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera, bool &autho
 	const auto cloud = W3DShaderManager::getRetailCloudUV();
 	const RGBColor weatherScale = TheSnowManager ? TheSnowManager->getRetailCloudyLightScale() : RGBColor{1.0f, 1.0f, 1.0f};
 	const bool scaleWeather = weatherScale.red < 1.0f || weatherScale.green < 1.0f || weatherScale.blue < 1.0f;
-	const auto applyWeatherScale = [&](uint32_t rgba) -> uint32_t {
-		if (!scaleWeather)
+	const bool applyTaint = TheGlobalData->m_taintOn && TheTerrainLogic->hasRetailTaint();
+	const RGBColor &taintColor = TheGlobalData->m_taintColor;
+	const auto tintTerrainVertex = [&](uint32_t rgba, float wx, float wy) -> uint32_t {
+		float redScale = weatherScale.red;
+		float greenScale = weatherScale.green;
+		float blueScale = weatherScale.blue;
+		bool tinted = scaleWeather;
+		if (applyTaint)
+		{
+			const float weight = TheTerrainLogic->retailTaintWeight(wx, wy);
+			if (weight > 0.0f)
+			{
+				redScale *= 1.0f + (taintColor.red - 1.0f) * weight;
+				greenScale *= 1.0f + (taintColor.green - 1.0f) * weight;
+				blueScale *= 1.0f + (taintColor.blue - 1.0f) * weight;
+				tinted = true;
+			}
+		}
+		if (!tinted)
 			return rgba;
 		const auto scaleChannel = [rgba](unsigned shift, float factor) {
 			const float scaled = static_cast<float>((rgba >> shift) & 255u) * factor;
 			return static_cast<uint32_t>(std::clamp(scaled, 0.0f, 255.0f) + 0.5f) << shift;
 		};
-		return (rgba & 0xff000000u) | scaleChannel(16, weatherScale.red) |
-			scaleChannel(8, weatherScale.green) | scaleChannel(0, weatherScale.blue);
+		return (rgba & 0xff000000u) | scaleChannel(16, redScale) |
+			scaleChannel(8, greenScale) | scaleChannel(0, blueScale);
 	};
 	RGBColor sun = TheGlobalData->m_terrainDiffuse[0];
 	if (scaleWeather)
@@ -160,7 +177,7 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera, bool &autho
 				const float z = m_map->toWorldHeight(heights[px[corner] + py[corner] * m_map->getXExtent()]);
 				Coord3D normal{0.0f, 0.0f, 1.0f};
 				TheTerrainLogic->getGroundHeight(wx, wy, &normal);
-				const uint32_t color = applyWeatherScale((getStaticDiffuse(px[corner], py[corner]) & 0xffffffu) | (uint32_t(alpha[corner]) << 24));
+				const uint32_t color = tintTerrainVertex((getStaticDiffuse(px[corner], py[corner]) & 0xffffffu) | (uint32_t(alpha[corner]) << 24), wx, wy);
 				runtime.third.push_back({{wx, wy, z}, {normal.x, normal.y, normal.z}, color, {u[corner], v[corner]},
 					encodeFill(color, normal, encodingScale)});
 			}
@@ -252,7 +269,7 @@ bool HeightMapRenderObjClass::drawRetailTerrain(CameraClass &camera, bool &autho
 						const auto &input = quad[i];
 						Coord3D normal{0.0f, 0.0f, 1.0f};
 						TheTerrainLogic->getGroundHeight(input.x, input.y, &normal);
-						const auto color = applyWeatherScale(static_cast<uint32_t>(input.diffuse));
+						const auto color = tintTerrainVertex(static_cast<uint32_t>(input.diffuse), input.x, input.y);
 						const auto fill = shadowReady ? encodeFill(color, normal, 1.0f) : color;
 						RetailFX::TerrainVertex vertex{{input.x, input.y, input.z}, {normal.x, normal.y, normal.z},
 							color | 0xff000000u, {input.u1, input.v1}, fill | 0xff000000u};

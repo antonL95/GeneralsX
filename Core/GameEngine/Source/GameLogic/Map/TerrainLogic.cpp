@@ -3204,6 +3204,27 @@ ObjectID TerrainLogic::retailTaintOwner(Real x, Real y) const
 	return cell != m_retailTaint.end() ? cell->second : INVALID_ID;
 }
 
+Real TerrainLogic::retailTaintWeight(Real x, Real y) const
+{
+	const Real cellSize = TheGlobalData->m_partitionCellSize;
+	if (m_retailTaint.empty() || !(cellSize > 0.0f) || !std::isfinite(cellSize))
+		return 0.0f;
+	Region3D extent;
+	getExtent(&extent);
+	const Real gx = (x - extent.lo.x) / cellSize - 0.5f;
+	const Real gy = (y - extent.lo.y) / cellSize - 0.5f;
+	const Int x0 = static_cast<Int>(WWMath::Floor(gx));
+	const Int y0 = static_cast<Int>(WWMath::Floor(gy));
+	const Real fx = std::clamp(gx - static_cast<Real>(x0), 0.0f, 1.0f);
+	const Real fy = std::clamp(gy - static_cast<Real>(y0), 0.0f, 1.0f);
+	const auto sample = [&](Int cx, Int cy) -> Real {
+		return m_retailTaint.find({cx, cy}) != m_retailTaint.end() ? 1.0f : 0.0f;
+	};
+	const Real bottom = sample(x0, y0) * (1.0f - fx) + sample(x0 + 1, y0) * fx;
+	const Real top = sample(x0, y0 + 1) * (1.0f - fx) + sample(x0 + 1, y0 + 1) * fx;
+	return bottom * (1.0f - fy) + top * fy;
+}
+
 void TerrainLogic::removeRetailTaint(ObjectID owner)
 {
 	std::erase_if(m_retailTaint, [owner](const auto& cell) { return cell.second == owner; });

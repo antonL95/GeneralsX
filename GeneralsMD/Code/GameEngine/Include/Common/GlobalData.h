@@ -561,6 +561,10 @@ public:
 	UnsignedByte m_clearAlpha;				///< 255 means perfect visibility
 	UnsignedByte m_fogAlpha;					///< 127 means fog is half as obscuring as shroud
 	UnsignedByte m_shroudAlpha;				///< 0 makes this opaque, but they may get fancy
+	Bool m_taintOn;
+	RGBColor m_taintColor;
+	UnsignedByte m_taintAlpha;
+	RGBColor m_elvenWoodColor;
 
 	// network timing values.
 	UnsignedInt m_networkFPSHistoryLength;		      	///< The number of fps history entries

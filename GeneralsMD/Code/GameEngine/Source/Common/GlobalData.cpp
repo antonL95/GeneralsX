@@ -541,6 +541,10 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "ClearAlpha",			INI::parseUnsignedByte,				nullptr,	offsetof( GlobalData, m_clearAlpha) },
 	{ "FogAlpha",				INI::parseUnsignedByte,				nullptr,	offsetof( GlobalData, m_fogAlpha) },
 	{ "ShroudAlpha",		INI::parseUnsignedByte,				nullptr,	offsetof( GlobalData, m_shroudAlpha) },
+	{ "TaintOn",			INI::parseBool,						nullptr,	offsetof( GlobalData, m_taintOn) },
+	{ "TaintColor",			INI::parseRGBColor,					nullptr,	offsetof( GlobalData, m_taintColor) },
+	{ "TaintAlpha",			INI::parseUnsignedByte,				nullptr,	offsetof( GlobalData, m_taintAlpha) },
+	{ "ElvenWoodColor",		INI::parseRGBColor,					nullptr,	offsetof( GlobalData, m_elvenWoodColor) },
 
 	{ "HotKeyTextColor",										INI::parseColorInt,					nullptr,	offsetof( GlobalData, m_hotKeyTextColor ) },
 
@@ -1013,6 +1017,10 @@ GlobalData::GlobalData()
 	m_clearAlpha = 255;
 	m_fogAlpha = 127;
 	m_shroudAlpha = 0;
+	m_taintOn = FALSE;
+	m_taintColor.setFromInt( 0x00FFFFFF );
+	m_taintAlpha = 0;
+	m_elvenWoodColor.setFromInt( 0x00FFFFFF );
 
 	m_powerBarBase = 7;
 	m_powerBarIntervals = 3;
