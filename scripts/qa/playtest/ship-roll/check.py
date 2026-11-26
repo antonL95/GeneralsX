@@ -34,6 +34,20 @@ def track(log, ship, locomotor):
     return samples
 
 
+def airborne(log):
+    rows = [dict(field.split("=", 1) for field in line.split()[2:])
+            for line in log.splitlines() if line.startswith("TEST ship-roll ")]
+    rows = [row for row in rows if row["ship"] == "MordorFellBeast"]
+    if [int(row["frame"]) for row in rows] != list(range(35, 346, 10)):
+        raise RuntimeError(f"Airborne control has incomplete render samples: {len(rows)}")
+    if any(not row["loco"].startswith("FellBeastLocomotor:") for row in rows):
+        raise RuntimeError("Airborne control did not stay on FellBeastLocomotor")
+    error = max(abs(float(row["drawn"])) for row in rows)
+    if error > POSE_TOLERANCE:
+        raise RuntimeError(f"Airborne locomotor with authored aeleron correction rolled by {error:.8f} rad")
+    return error
+
+
 def check(log):
     active = track(log, "ShipRollFixtureAuthored", "TransportShipLocomotor")
     control = track(log, "ShipRollFixtureZero", "ShipRollFixtureZeroLocomotor")
@@ -61,6 +75,8 @@ def check(log):
     error = max(abs(roll - direction * AMPLITUDE * sin(RATE * (frame - origin))) for frame, roll in active)
     if error > 0.0005:
         raise RuntimeError(f"Ship roll differs from the authored sine by {error:.8f} rad")
+    bird_roll = airborne(log)
     period = sum(periods) / len(periods)
     print(f"Ship roll [{lo:.8f}, {hi:.8f}] rad, period {period:.3f} frames ({period / FRAMES_PER_SECOND:.3f} s), "
-          f"zero-amplitude control {flat_error:.8f} rad", file=sys.stderr)
+          f"zero-amplitude control {flat_error:.8f} rad, "
+          f"airborne authored correction {bird_roll:.8f} rad", file=sys.stderr)

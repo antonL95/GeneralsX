@@ -27,7 +27,7 @@ void sampleShipRoll(const RetailTestCommands::Context& ctx)
 	if (!ship || !ship->getDrawable() || !ship->getAI())
 		return;
 	const Locomotor* locomotor = ship->getAI()->getCurLocomotor();
-	if (!locomotor || locomotor->getAppearance() != LOCO_SHIP)
+	if (!locomotor)
 		return;
 
 	const NameKeyType hull = TheNameKeyGenerator->nameToKey(ctx.argument);
