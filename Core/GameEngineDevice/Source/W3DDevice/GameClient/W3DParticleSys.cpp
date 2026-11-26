@@ -223,9 +223,6 @@ UnsignedInt W3DParticleSystemManager::drawGpuParticles(ParticleSystem &system)
 	const auto *first = system.getFirstParticle();
 	if (!definition->canDrawGpuParticles() || !first || !W3DDisplay::m_assetManager)
 		return 0;
-	const auto& name = definition->getName();
-	if (name.compareNoCase("BarrageExplosion") == 0 || name.compareNoCase("BarrageExplosionFire") == 0)
-		return 0;
 	auto *device = DX8Wrapper::Get_Effect_Device9();
 	if (!device)
 		return 0;
