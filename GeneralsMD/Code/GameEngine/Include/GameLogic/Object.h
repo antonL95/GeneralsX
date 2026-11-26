@@ -414,6 +414,8 @@ public:
 	Real getConstructionPercent() const { return m_constructionPercent; }
 	void setConstructionCostPaid(UnsignedInt cost) { m_constructionCostPaid = static_cast<Int>(cost); }
 	Int getConstructionCostPaid() const { return m_constructionCostPaid; }
+	Real getRetailNearbyThreat(Real radius);
+	void recordRetailThreatUpgrade(Int cost, Bool objectUpgrade);
 
   void setLayer( PathfindLayerEnum layer );
 	PathfindLayerEnum getLayer() const { return m_layer; }
@@ -810,6 +812,11 @@ private:
 		UnsignedInt nextCheck = 0;
 	};
 	DominationState m_domination;
+	Real getRetailThreatValue() const;
+	Real m_retailNearbyThreat = 0.0f;
+	UnsignedInt m_retailThreatValidThrough = 0;
+	Real m_retailThreatBaseOverride = 0.0f;
+	Real m_retailThreatUpgradeCost = 0.0f;
 	TemporarilyDefectUpdate* m_temporaryDefection = nullptr;
 	void setDominationState(const DominationState& state);
 	const ThingTemplate* m_mountedHeroIdentity = nullptr;

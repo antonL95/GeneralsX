@@ -5374,6 +5374,64 @@ void Object::setDominationState(const DominationState& state)
 	}
 }
 
+void Object::recordRetailThreatUpgrade(Int cost, Bool objectUpgrade)
+{
+	const CastleMemberBehavior* castle = CastleMemberBehavior::find(this);
+	if (castle && castle->storesUpgradePrice())
+		m_retailThreatBaseOverride = INT_TO_REAL(cost);
+	else if (objectUpgrade)
+		m_retailThreatUpgradeCost += INT_TO_REAL(cost);
+}
+
+Real Object::getRetailThreatValue() const
+{
+	const CastleMemberBehavior* castle = CastleMemberBehavior::find(this);
+	Real paidBase = m_retailThreatBaseOverride;
+	if (paidBase == 0.0f && castle && getConstructionCostPaid() >= 0)
+		paidBase = INT_TO_REAL(getConstructionCostPaid()) - static_cast<Real>(castle->getStoredUpgradePrice());
+	const Real authored = getTemplate()->getRotWKObjectData().threatLevel;
+	Real threat = paidBase + m_retailThreatUpgradeCost;
+	if (isKindOf(KINDOF_STRUCTURE))
+	{
+		if (!isKindOf(KINDOF_CAN_ATTACK))
+			return 0.0f;
+		if (isKindOf(KINDOF_FS_BASE_DEFENSE))
+			return threat;
+		threat = authored > 100.0f ? authored : 150.0f;
+	}
+	else
+	{
+		const Int rank = m_experienceTracker ? m_experienceTracker->getRetailStartingRank() : 1;
+		const Real rankScale = 0.8f + 0.2f * INT_TO_REAL(rank);
+		threat = paidBase * rankScale + m_retailThreatUpgradeCost;
+		if (threat == 0.0f)
+			threat = authored * rankScale;
+	}
+	const BodyModuleInterface* body = getBodyModule();
+	const Real maximum = body ? body->getMaxHealth() : 0.0f;
+	return maximum > 0.0f ? threat * (body->getHealth() / maximum) : 0.0f;
+}
+
+Real Object::getRetailNearbyThreat(Real radius)
+{
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	if (frame > m_retailThreatValidThrough)
+	{
+		PartitionFilterAlive alive;
+		PartitionFilterSameMapStatus sameMap(this);
+		PartitionFilterRelationship enemies(this, PartitionFilterRelationship::ALLOW_ENEMIES);
+		PartitionFilter* filters[] = { &alive, &sameMap, &enemies, nullptr };
+		SimpleObjectIterator* objects = ThePartitionManager->iterateObjectsInRange(
+			getPosition(), radius, FROM_CENTER_2D, filters, ITER_SORTED_BY_ID);
+		MemoryPoolObjectHolder holder(objects);
+		m_retailNearbyThreat = 0.0f;
+		for (const Object* object = objects->first(); object; object = objects->next())
+			m_retailNearbyThreat += object->getRetailThreatValue();
+		m_retailThreatValidThrough = frame + 5 * LOGICFRAMES_PER_SECOND;
+	}
+	return m_retailNearbyThreat;
+}
+
 void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	const Bool loading = xfer->getXferMode() == XFER_LOAD;
@@ -5381,6 +5439,7 @@ void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 	auto* emotion = static_cast<EmotionTrackerUpdate*>(findUpdateModule(emotionKey));
 	if (!loading && m_domination.deadline == 0 && m_timedModelConditions.empty() &&
 		(!emotion || !emotion->hasPromotionEmotions()) &&
+		m_retailThreatValidThrough == 0 && m_retailThreatBaseOverride == 0.0f && m_retailThreatUpgradeCost == 0.0f &&
 		m_disabledTillFrame[DISABLED_USER_PARALYZED] == NEVER && m_disabledTillFrame[DISABLED_USER_FROZEN] == NEVER)
 	{
 		RetailSaveBlocks::transferSection<Xfer>(xfer, FALSE, present, {});
@@ -5420,6 +5479,17 @@ void Object::xferRetailBlocks(Xfer* xfer, Bool present)
 		}, [this] {
 			m_disabledTillFrame[DISABLED_USER_PARALYZED] = NEVER;
 			m_disabledTillFrame[DISABLED_USER_FROZEN] = NEVER;
+		}},
+		{"unit-threat", [this](Xfer* x) {
+			x->xferReal(&m_retailNearbyThreat);
+			x->xferUnsignedInt(&m_retailThreatValidThrough);
+			x->xferReal(&m_retailThreatBaseOverride);
+			x->xferReal(&m_retailThreatUpgradeCost);
+		}, [this] {
+			m_retailNearbyThreat = 0.0f;
+			m_retailThreatValidThrough = 0;
+			m_retailThreatBaseOverride = 0.0f;
+			m_retailThreatUpgradeCost = 0.0f;
 		}},
 	});
 }

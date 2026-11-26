@@ -3055,6 +3055,14 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 			return team && BfmeScriptRules::compare(pCondition->getParameter(1)->getInt(),
 				getRetailTeamThreat(team, pCondition->getParameter(3)->getReal()), pCondition->getParameter(2)->getReal());
 		}
+		case Condition::UNIT_THREAT_LEVEL:
+		{
+			Object* unit = TheScriptEngine->getUnitNamed(pCondition->getParameter(0)->getString());
+			const Real radius = pCondition->getParameter(3)->getReal();
+			return unit && std::isfinite(radius) && radius >= 0.0f &&
+				BfmeScriptRules::compare(pCondition->getParameter(1)->getInt(), unit->getRetailNearbyThreat(radius),
+					pCondition->getParameter(2)->getReal());
+		}
 		case Condition::ENEMY_SIGHTED_BY_TEAM:
 		{
 			Team* team = TheScriptEngine->getTeamNamed(pCondition->getParameter(0)->getString());

@@ -378,7 +378,10 @@ Bool ProductionUpdate::queueUpgrade( const UpgradeTemplate *upgrade )
 	production->m_type = PRODUCTION_UPGRADE;
 	production->m_upgradeToResearch = upgrade;
 	if (RetailFileLayers::enabled())
+	{
 		production->m_costPaid = cost;
+		getObject()->recordRetailThreatUpgrade(cost, upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT);
+	}
 	production->m_productionID = PRODUCTIONID_INVALID;  // not needed for upgrades, you can only have one of
 																	 // this type in the queue
 

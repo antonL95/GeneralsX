@@ -203,6 +203,7 @@ public:
 	const AsciiString& getCampDestroyedAllyEvaEvent() const { return getCastleMemberBehaviorModuleData()->m_campDestroyedAllyEvaEvent; }
 	const AsciiString& getCampDestroyedAttackerEvaEvent() const { return getCastleMemberBehaviorModuleData()->m_campDestroyedAttackerEvaEvent; }
 	const AsciiString& getCampDestroyedOwnerEvaEvent() const { return getCastleMemberBehaviorModuleData()->m_campDestroyedOwnerEvaEvent; }
+	Bool storesUpgradePrice() const { return getCastleMemberBehaviorModuleData()->m_storeUpgradePrice; }
 	UnsignedInt getStoredUpgradePrice() const { return m_storedUpgradePrice; }
 	AudioHandle getBeingBuiltHandle() const { return m_beingBuiltHandle; }
 	void onModelConditionChanged(const ModelConditionFlags& previous, const ModelConditionFlags& current);

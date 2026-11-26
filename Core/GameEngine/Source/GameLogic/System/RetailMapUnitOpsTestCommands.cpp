@@ -8,6 +8,7 @@
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -63,6 +64,51 @@ Bool teamHealthCondition(Team* team, Int comparison, Int percent)
 		return result;
 	}
 	return FALSE;
+}
+
+Bool unitThreatCondition(const char* unit, Int comparison, Real threshold, Real radius)
+{
+	const Int type = ScriptEngine::findRotwkConditionByRetailIndex(115);
+	if (type < 0)
+		return FALSE;
+	const Template* definition = TheScriptEngine->getConditionTemplate(type);
+	if (definition->m_internalName != "UNIT_THREAT_LEVEL" || definition->getNumParameters() != 4 ||
+		definition->getParameterType(0) != Parameter::UNIT || definition->getParameterType(1) != Parameter::COMPARISON ||
+		definition->getParameterType(2) != Parameter::REAL || definition->getParameterType(3) != Parameter::REAL)
+		return FALSE;
+	auto* condition = newInstance(Condition)(static_cast<Condition::ConditionType>(type));
+	condition->getParameter(0)->friend_setString(unit);
+	condition->getParameter(1)->friend_setInt(comparison);
+	condition->getParameter(2)->friend_setReal(threshold);
+	condition->getParameter(3)->friend_setReal(radius);
+	auto* clause = newInstance(OrCondition);
+	clause->setFirstAndCondition(condition);
+	auto* script = newInstance(Script);
+	script->setOrCondition(clause);
+	const Bool result = TheScriptEngine->evaluateConditions(script, nullptr);
+	deleteInstance(script);
+	return result;
+}
+
+void threatProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* unit = ctx.requireObject();
+	Object* enemy = ctx.findTarget(std::string_view("PlyrCreeps:MapScriptThreatProbe:0"), true);
+	if (!unit || !enemy)
+		return;
+	if (unit->getName().isEmpty())
+	{
+		unit->setName("MapScriptThreatAnchor");
+		TheScriptEngine->addObjectToCache(unit);
+		enemy->getBodyModule()->setInitialHealth(50);
+		enemy->getExperienceTracker()->setRetailStartingRank(2);
+	}
+	const Real radius = ctx.frame == 242 ? 30.0f : 1.0f;
+	const Bool match = unitThreatCondition("MapScriptThreatAnchor", 2, 24.0f, radius);
+	const Bool reject = !unitThreatCondition("MapScriptThreatAnchor", 2, 40.0f, 30.0f) &&
+		!unitThreatCondition("MapScriptThreatMissing", 2, 0.0f, 30.0f);
+	const Bool cached = unitThreatCondition("MapScriptThreatAnchor", 2, 24.0f, 1.0f);
+	std::fprintf(stderr, "TEST map-unit-ops threat frame=%u match=%d reject=%d cached=%d\n", ctx.frame, match, reject, cached);
 }
 
 void removeHordeMember(const RetailTestCommands::Context& ctx)
@@ -323,6 +369,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-team-xp", teamExperienceProbe);
 	registerAction("map-unit-ops-horde-remove", removeHordeMember);
 	registerAction("map-unit-ops-health", teamHealthProbe);
+	registerAction("map-unit-ops-threat", threatProbe);
 #endif
 }
 }
