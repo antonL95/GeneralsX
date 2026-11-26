@@ -110,6 +110,8 @@ public:
 	virtual void addProp(const ThingTemplate *tt, const Coord3D *pos, Real angle) override;
 	Bool placeMapVegetation(const ThingTemplate& thing, const Dict& properties, const Coord3D& pos, Real angle) override;
 	void removeMapTree(const Coord3D& pos) override;
+	void fellMapTree(const Coord3D& pos, const Coord3D& harvesterPos) override;
+	void sinkMapTree(const Coord3D& pos) override;
 
 	virtual void removeTreesAndPropsForConstruction(
 		const Coord3D* pos,

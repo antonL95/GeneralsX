@@ -2051,6 +2051,18 @@ void BaseHeightMapRenderObjClass::removeMapTree(const Coord3D& pos)
 		m_treeBuffer->removeTreeAt(pos);
 }
 
+void BaseHeightMapRenderObjClass::fellMapTree(const Coord3D& pos, const Coord3D& harvesterPos)
+{
+	if (m_treeBuffer)
+		m_treeBuffer->fellTreeAt(pos, harvesterPos);
+}
+
+void BaseHeightMapRenderObjClass::sinkMapTree(const Coord3D& pos)
+{
+	if (m_treeBuffer)
+		m_treeBuffer->sinkTreeAt(pos);
+}
+
 //=============================================================================
 // BaseHeightMapRenderObjClass::addTree
 //=============================================================================

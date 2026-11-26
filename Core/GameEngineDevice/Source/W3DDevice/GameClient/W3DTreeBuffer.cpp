@@ -49,7 +49,8 @@ enum
 {
 	W3D_TOPPLE_OPTIONS_NONE			 = 0x00000000,
 	W3D_TOPPLE_OPTIONS_NO_BOUNCE = 0x00000001,  ///< do not bounce when hit the ground
-	W3D_TOPPLE_OPTIONS_NO_FX		 = 0x00000002	///< do not play any FX when hit the ground
+	W3D_TOPPLE_OPTIONS_NO_FX		 = 0x00000002,
+	W3D_TOPPLE_OPTIONS_SINK		 = 0x00000004
 };
 //-----------------------------------------------------------------------------
 //         Includes
@@ -1499,6 +1500,45 @@ void W3DTreeBuffer::removeTreeAt(const Coord3D& pos)
 	}
 }
 
+void W3DTreeBuffer::fellTreeAt(const Coord3D& pos, const Coord3D& harvesterPos)
+{
+	if (TTree* tree = findTreeAt(pos))
+	{
+		Coord3D direction;
+		direction.set(pos.x - harvesterPos.x, pos.y - harvesterPos.y, 0);
+		applyTopplingForce(tree, &direction, 0, W3D_TOPPLE_OPTIONS_NONE);
+	}
+}
+
+void W3DTreeBuffer::sinkTreeAt(const Coord3D& pos)
+{
+	TTree* tree = findTreeAt(pos);
+	if (!tree)
+		return;
+	const W3DTreeDrawModuleData* data = m_treeTypes[tree->treeType].m_data;
+	if (data == nullptr || tree->m_toppleState == TOPPLE_UPRIGHT)
+	{
+		tree->treeType = DELETED_TREE_TYPE;
+		m_anythingChanged = true;
+		return;
+	}
+	tree->m_options |= W3D_TOPPLE_OPTIONS_SINK;
+	if (tree->m_toppleState == TOPPLE_DOWN)
+		tree->m_sinkFramesLeft = data->m_sinkFrames;
+}
+
+TTree* W3DTreeBuffer::findTreeAt(const Coord3D& pos)
+{
+	for (Int i = 0; i < m_numTrees; ++i)
+	{
+		TTree& tree = m_trees[i];
+		if (tree.treeType >= 0 && tree.treeType < m_numTreeTypes &&
+			tree.location.X == pos.x && tree.location.Y == pos.y && tree.location.Z == pos.z)
+			return &tree;
+	}
+	return nullptr;
+}
+
 //=============================================================================
 // W3DTreeBuffer::removeTree
 //=============================================================================
@@ -1931,7 +1971,7 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 			 m_trees[curTree].m_toppleState == TOPPLE_FOGGED) {
 			updateTopplingTree(m_trees+curTree, timeScale);
 		} else if(m_trees[curTree].m_toppleState == TOPPLE_DOWN) {
-			if (moduleData->m_killWhenToppled) {
+			if (moduleData->m_killWhenToppled || BitIsSet(m_trees[curTree].m_options, W3D_TOPPLE_OPTIONS_SINK)) {
 				if (m_trees[curTree].m_sinkFramesLeft <= 0.0f) {
 					m_trees[curTree].treeType = DELETED_TREE_TYPE; // delete it. [7/11/2003]
 					m_anythingChanged = true; // need to regenerate trees. [7/11/2003]
@@ -2215,7 +2255,7 @@ void W3DTreeBuffer::updateTopplingTree(TTree *tree, Real timeScale)
 		tree->m_toppleState = TOPPLE_DOWN;
 		tree->m_mtx.In_Place_Pre_Rotate_X(-ANGULAR_LIMIT * tree->m_toppleDirection.y);
 		tree->m_mtx.In_Place_Pre_Rotate_Y(ANGULAR_LIMIT * tree->m_toppleDirection.x);
-		if (d->m_killWhenToppled) {
+		if (d->m_killWhenToppled || BitIsSet(tree->m_options, W3D_TOPPLE_OPTIONS_SINK)) {
 			// If got killed in the fog, just remove. jba [8/11/2003]
 			tree->m_sinkFramesLeft = 0.0f;
 		}
@@ -2243,7 +2283,7 @@ void W3DTreeBuffer::updateTopplingTree(TTree *tree, Real timeScale)
 			// too slow, just stop
 			tree->m_angularVelocity = 0;
 			tree->m_toppleState = TOPPLE_DOWN;
-			if (d->m_killWhenToppled) {
+			if (d->m_killWhenToppled || BitIsSet(tree->m_options, W3D_TOPPLE_OPTIONS_SINK)) {
 				tree->m_sinkFramesLeft = d->m_sinkFrames;
 			}
 		}

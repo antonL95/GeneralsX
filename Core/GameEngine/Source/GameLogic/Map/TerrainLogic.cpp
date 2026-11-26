@@ -2933,7 +2933,7 @@ void TerrainLogic::registerMapTree(const ThingTemplate& thing, const Coord3D& po
 		return;
 
 	const Int boxes = tree.supplyOverride > 0 ? tree.supplyOverride : TheGlobalData->m_supplyBoxesPerTree;
-	m_mapTrees.push_back({pos, tree.isHarvestable ? std::max(0, boxes) : 0});
+	m_mapTrees.push_back({pos, tree.isHarvestable ? std::max(0, boxes) : 0, FALSE});
 }
 
 void TerrainLogic::ensureGrabbableTreeProxy()
@@ -3065,6 +3065,40 @@ Bool TerrainLogic::findNearestHarvestTree(const Coord3D& origin, Real radius, co
 	return found;
 }
 
+const TerrainLogic::MapTree* TerrainLogic::findMapTree(const Coord3D& position) const
+{
+	const auto tree = std::find_if(m_mapTrees.begin(), m_mapTrees.end(), [&](const MapTree& candidate)
+		{
+			return candidate.position == position;
+		});
+	return tree == m_mapTrees.end() ? nullptr : &*tree;
+}
+
+Int TerrainLogic::getMapTreeBoxes(const Coord3D& position) const
+{
+	const MapTree* tree = findMapTree(position);
+	return tree ? tree->boxes : 0;
+}
+
+Bool TerrainLogic::isMapTreeToppled(const Coord3D& position) const
+{
+	const MapTree* tree = findMapTree(position);
+	return tree && tree->toppled;
+}
+
+void TerrainLogic::toppleMapTree(const Coord3D& position, const Coord3D& harvesterPos)
+{
+	for (auto& tree : m_mapTrees)
+	{
+		if (tree.toppled || !(tree.position == position))
+			continue;
+		tree.toppled = TRUE;
+		if (TheTerrainVisual)
+			TheTerrainVisual->fellMapTree(tree.position, harvesterPos);
+		return;
+	}
+}
+
 Int TerrainLogic::takeMapTreeBoxes(const Coord3D& position, Int capacity)
 {
 	if (capacity <= 0)
@@ -3078,7 +3112,7 @@ Int TerrainLogic::takeMapTreeBoxes(const Coord3D& position, Int capacity)
 		if (it->boxes == 0)
 		{
 			if (TheTerrainVisual)
-				TheTerrainVisual->removeMapTree(it->position);
+				TheTerrainVisual->sinkMapTree(it->position);
 			m_mapTrees.erase(it);
 		}
 		return taken;
@@ -3212,11 +3246,19 @@ void TerrainLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 	const RetailSaveBlocks::Block<Xfer> taint{
 		"terrain-taint", [this](Xfer* block) { xferRetailTaint(block); }, [this] { m_retailTaint.clear(); }
 	};
+	const RetailSaveBlocks::Block<Xfer> toppledTrees{
+		"toppled-trees", [this](Xfer* block) { xferToppledMapTrees(block); }, [this]
+		{
+			for (auto& tree : m_mapTrees)
+				tree.toppled = FALSE;
+		}
+	};
 	if (hasRiverState)
 	{
 		RetailSaveBlocks::transferSection(xfer, loading, present, {
 			fire,
 			taint,
+			toppledTrees,
 			{"river-water", [this](Xfer* block) { xferImportedRiverState(block); }, []
 				{
 					for (PolygonTrigger* river = PolygonTrigger::getFirstPolygonTrigger(); river; river = river->getNext())
@@ -3227,7 +3269,7 @@ void TerrainLogic::xferRetailBlocks(Xfer* xfer, Bool present)
 	}
 	else
 	{
-		RetailSaveBlocks::transferSection(xfer, loading, present, {fire, taint});
+		RetailSaveBlocks::transferSection(xfer, loading, present, {fire, taint, toppledTrees});
 	}
 }
 
@@ -3332,6 +3374,12 @@ void TerrainLogic::xferMapTrees(Xfer* xfer)
 		xfer->xferCoord3D(&tree.position);
 		xfer->xferInt(&tree.boxes);
 	}
+}
+
+void TerrainLogic::xferToppledMapTrees(Xfer* xfer)
+{
+	for (auto& tree : m_mapTrees)
+		xfer->xferBool(&tree.toppled);
 }
 
 void TerrainLogic::restoreLegacyMapTrees(const std::vector<Coord3D>& deletedTrees)

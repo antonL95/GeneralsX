@@ -266,6 +266,8 @@ public:
 	virtual void addProp(const ThingTemplate *tt, const Coord3D *pos, Real angle) = 0;
 	virtual Bool placeMapVegetation(const ThingTemplate& thing, const Dict& properties, const Coord3D& pos, Real angle) = 0;
 	virtual void removeMapTree(const Coord3D& pos) = 0;
+	virtual void fellMapTree(const Coord3D& pos, const Coord3D& harvesterPos) = 0;
+	virtual void sinkMapTree(const Coord3D& pos) = 0;
 
 	//
 	// Modify height.

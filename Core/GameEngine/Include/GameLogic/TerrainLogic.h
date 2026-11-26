@@ -337,6 +337,9 @@ public:
 	Bool findNearestHarvestTree(const Coord3D& origin, Real radius, const std::vector<Coord3D>& excluded,
 		Coord3D& position) const;
 	Int takeMapTreeBoxes(const Coord3D& position, Int capacity);
+	Int getMapTreeBoxes(const Coord3D& position) const;
+	Bool isMapTreeToppled(const Coord3D& position) const;
+	void toppleMapTree(const Coord3D& position, const Coord3D& harvesterPos);
 	std::uint64_t harvestMapTrees(const Coord3D& origin, Real radius, const FXList* fx);
 	void paintRetailTaint(const Coord3D& position, Real radius, ObjectID owner);
 	ObjectID retailTaintOwner(Real x, Real y) const;
@@ -350,6 +353,7 @@ protected:
 	virtual void loadPostProcess() override;
 
 	void xferMapTrees(Xfer* xfer);
+	void xferToppledMapTrees(Xfer* xfer);
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 	void xferRetailTaint(Xfer* xfer);
 	Bool hasImportedRiverUpdates() const;
@@ -385,7 +389,9 @@ protected:
 	{
 		Coord3D position;
 		Int boxes;
+		Bool toppled;
 	};
+	const MapTree* findMapTree(const Coord3D& position) const;
 	std::vector<MapTree> m_mapTrees;
 	std::vector<MapTree> m_mapTreesBeforeLegacyLoad;
 	Bool m_legacyMapTreesHaveLedger = FALSE;

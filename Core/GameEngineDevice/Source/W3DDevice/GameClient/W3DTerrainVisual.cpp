@@ -1092,6 +1092,18 @@ void W3DTerrainVisual::removeMapTree(const Coord3D& pos)
 		m_terrainRenderObject->removeMapTree(pos);
 }
 
+void W3DTerrainVisual::fellMapTree(const Coord3D& pos, const Coord3D& harvesterPos)
+{
+	if (m_terrainRenderObject)
+		m_terrainRenderObject->fellMapTree(pos, harvesterPos);
+}
+
+void W3DTerrainVisual::sinkMapTree(const Coord3D& pos)
+{
+	if (m_terrainRenderObject)
+		m_terrainRenderObject->sinkMapTree(pos);
+}
+
 void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *pos, Real angle)
 {
 	ModelConditionFlags state;

@@ -169,8 +169,9 @@ Bool WorkerAIUpdate::updateRetailHarvest()
 			break;
 
 		case HARVEST_PREPARE:
-			if (frame >= m_harvestDeadline)
+			if (frame >= m_harvestDeadline || TheTerrainLogic->isMapTreeToppled(m_harvestTree))
 			{
+				TheTerrainLogic->toppleMapTree(m_harvestTree, position);
 				worker->clearModelConditionState(MODELCONDITION_HARVEST_PREPARATION);
 				worker->setModelConditionState(MODELCONDITION_HARVEST_ACTION);
 				m_harvestState = HARVEST_GATHER;

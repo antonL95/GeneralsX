@@ -199,6 +199,8 @@ public:
 	/// Remove a tree.
 	void removeTree(DrawableID id);
 	void removeTreeAt(const Coord3D& pos);
+	void fellTreeAt(const Coord3D& pos, const Coord3D& harvesterPos);
+	void sinkTreeAt(const Coord3D& pos);
 	/// Remove trees that would be under a building.
 	void removeTreesForConstruction(
 		const Coord3D* pos,
@@ -317,6 +319,7 @@ protected:
 
 	Int  getPartitionBucket(const Coord3D &pos) const;
 
+	TTree* findTreeAt(const Coord3D& pos);
 	void updateTopplingTree(TTree *tree, Real timeScale);
 	void applyTopplingForce( TTree *tree, const Coord3D* toppleDirection, Real toppleSpeed,
 																			 UnsignedInt options );
