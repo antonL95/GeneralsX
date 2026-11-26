@@ -2427,15 +2427,16 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	setPauseAnimation( !getDrawable()->getShouldAnimate(getW3DModelDrawModuleData()->m_animationsRequirePower) );
 
 	Matrix3D scaledTransform;
-	if (getDrawable()->getInstanceScale() != 1.0f)
+	const Real instanceScale = getDrawable()->getInstanceScale();
+	const Real relativeScale = m_renderObjectScale > 0.0f ? instanceScale / m_renderObjectScale : instanceScale;
+	if (WWMath::Fabs(relativeScale - 1.0f) > 1e-4f)
 	{
-		// do custom scaling of the W3D model.
 		scaledTransform = *transformMtx;
-		scaledTransform.Scale(getDrawable()->getInstanceScale());
+		scaledTransform.Scale(relativeScale);
 		transformMtx = &scaledTransform;
-		if (m_renderObject)
-			m_renderObject->Set_ObjectScale(getDrawable()->getInstanceScale());
 	}
+	if (m_renderObject)
+		m_renderObject->Set_ObjectScale(relativeScale);
 
 	if ((m_curState && m_curState->m_transitionSig != NO_TRANSITION && m_whichAnimInCurState < 0) ||
 		isAnimationComplete(m_renderObject))
@@ -4028,14 +4029,15 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		nukeCurrentRender(&transform);
 		Drawable* draw = getDrawable();
 
-		// create a new render object and set into drawable
 		if (newState->m_modelName.isEmpty())
 		{
 			m_renderObject = nullptr;
+			m_renderObjectScale = 1.0f;
 		}
 		else
 		{
-			m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(newState->m_modelName.str(), draw->getScale(), m_hexColor);
+			m_renderObjectScale = draw->getScale();
+			m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(newState->m_modelName.str(), m_renderObjectScale, m_hexColor);
 			if (m_renderObject && RetailFileLayers::enabled())
 			{
 				auto* assets = W3DDisplay::m_assetManager;

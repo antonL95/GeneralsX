@@ -1,0 +1,4 @@
+20 create Player_1 DwarvenRoac 0 3150,850,0
+20 create Player_1 IsengardWulfgarCrebain 0 3210,850,0
+20 create Player_1 GondorGwaihirHero_Summoned 0 3290,850,0
+21 reveal Player_1 DwarvenRoac 0
