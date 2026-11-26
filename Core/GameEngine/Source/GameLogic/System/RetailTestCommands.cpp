@@ -51,6 +51,8 @@
 #include "GameClient/KeyDefs.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Mouse.h"
+#include "GameClient/RetailHudExtras.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
@@ -539,6 +541,8 @@ void dumpProduction(const Command& command, unsigned int frame)
 
 void dumpHud(unsigned int frame)
 {
+	RetailHeroBar::dump(frame);
+	TheMouse->dumpTooltip(frame);
 	for (int slot = 0; slot < MAX_COMMANDS_PER_SET + 3 + 12; ++slot)
 	{
 		GameWindow* window = retailSlotWindow(slot);
@@ -2543,6 +2547,27 @@ void execute(const Command& command, unsigned int frame)
 		if (player && science != SCIENCE_INVALID)
 			std::fprintf(stderr, "TEST frame %u: science %s %s granted=%d\n", frame, command.player.c_str(), command.structure.c_str(),
 				player->grantScience(science) ? 1 : 0);
+		return;
+	}
+	if (command.action == "screenpos" && TheTacticalView)
+	{
+		if (const Object* obj = findObject(command))
+		{
+			Coord3D middle = *obj->getPosition();
+			middle.z += obj->getGeometryInfo().getMaxHeightAbovePosition() * 0.5f;
+			ICoord2D screen = {};
+			TheTacticalView->worldToScreen(&middle, &screen);
+			std::fprintf(stderr, "TEST frame %u: screenpos %d %d\n", frame, screen.x, screen.y);
+		}
+		return;
+	}
+	if (command.action == "look" && TheTacticalView)
+	{
+		if (const Object* obj = findObject(command))
+		{
+			TheTacticalView->lookAt(obj->getPosition());
+			std::fprintf(stderr, "TEST frame %u: look %s\n", frame, command.target.c_str());
+		}
 		return;
 	}
 	if (command.action == "spawn")
