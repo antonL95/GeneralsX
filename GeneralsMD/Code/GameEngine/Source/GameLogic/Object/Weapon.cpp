@@ -1682,7 +1682,7 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 		Real radius = max(primaryRadius, secondaryRadius);
 		if (radius > 0.0f)
 		{
-			iter = ThePartitionManager->iterateObjectsInRange(pos, radius, DAMAGE_RANGE_CALC_TYPE);
+			iter = ThePartitionManager->iterateObjectsInRange(pos, radius, DAMAGE_RANGE_CALC_TYPE, nullptr, ITER_SORTED_BY_ID);
 			curVictim = iter->firstWithNumeric(&curVictimDistSqr);
 		}
 		else

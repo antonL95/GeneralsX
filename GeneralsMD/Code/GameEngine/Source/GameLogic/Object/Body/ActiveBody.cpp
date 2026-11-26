@@ -853,7 +853,7 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 
 
 			Real distance = TheAI->getAiData()->m_retaliateFriendsRadius + obj->getGeometryInfo().getBoundingCircleRadius();
-			SimpleObjectIterator *iter = ThePartitionManager->iterateObjectsInRange( obj->getPosition(), distance, FROM_CENTER_2D, filters, ITER_FASTEST );
+			SimpleObjectIterator *iter = ThePartitionManager->iterateObjectsInRange( obj->getPosition(), distance, FROM_CENTER_2D, filters, ITER_SORTED_BY_ID );
 			MemoryPoolObjectHolder hold( iter );
 			for( Object *them = iter->first(); them; them = iter->next() )
 			{
