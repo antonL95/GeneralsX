@@ -1,0 +1,40 @@
+8 create Player_1 GuldurPorter 0 3250,500,0
+8 create Player_1 GuldurPorter 0 3250,650,0
+8 create Player_1 GuldurPorter 0 3000,500,0
+9 fund Player_1 GuldurPorter 0
+10 shroudmap Player_1 GuldurPorter 0
+12 create Player_1 TradeCaravanDeployed 0 3300,1300,0
+14 hordespawn Player_1 HarondorArcherHorde 0 - 3105 1300 0
+14 hordespawn Player_1 HarondorArcherHorde 0 - 3510 1300 0
+14 hordespawn Player_1 HarondorArcherHorde 0 - 3300 1800 0
+16 objupgrade Player_1 TradeCaravanDeployed 0 Upgrade_StructureLevel1
+20 construct Player_1 GuldurPorter 0 GuldurSlaveMill 3350 500
+20 construct Player_1 GuldurPorter 1 GuldurSlaveMill 3350 700
+20 construct Player_1 GuldurPorter 2 GuldurSlaveMill 2800 500
+22 cancelbuild Player_1 GuldurSlaveMill 2
+25 bcaravan-census Player_1 GuldurPorter 0
+25 bcaravan-census Player_1 GuldurSlaveMill 0
+120 buttons Player_1 HarondorArcherHorde 0
+120 buttons Player_1 HarondorArcherHorde 1
+220 bcaravan-census Player_1 GuldurPorter 0
+220 bcaravan-census Player_1 GuldurSlaveMill 0
+230 cancelbuild Player_1 GuldurSlaveMill 1
+236 bcaravan-census Player_1 GuldurPorter 0
+236 bcaravan-census Player_1 GuldurSlaveMill 0
+240 objupgrade Player_1 TradeCaravanDeployed 0 Upgrade_StructureLevel2
+360 buttons Player_1 HarondorArcherHorde 0
+360 buttons Player_1 HarondorArcherHorde 1
+370 objupgrade Player_1 TradeCaravanDeployed 0 Upgrade_StructureLevel3
+500 buttons Player_1 HarondorArcherHorde 0
+500 buttons Player_1 HarondorArcherHorde 1
+502 bcaravan-buy Player_1 HarondorArcherHorde 0 Upgrade_AngmarDarkIronArmor
+502 bcaravan-buy Player_1 HarondorArcherHorde 1 Upgrade_AngmarDarkIronArmor
+900 bcaravan-census Player_1 GuldurPorter 0
+900 bcaravan-census Player_1 GuldurSlaveMill 0
+900 buttons Player_1 HarondorArcherHorde 0
+520 move Player_1 HarondorArcherHorde 2 - 3300 1420
+780 bcaravan-census Player_1 HarondorArcherHorde 0
+780 bcaravan-census Player_1 HaradHarondorArcher 0
+780 buttons Player_1 HarondorArcherHorde 2
+900 bcaravan-owned Player_1 HarondorArcherHorde 0 Upgrade_AngmarDarkIronArmor
+900 bcaravan-owned Player_1 HarondorArcherHorde 1 Upgrade_AngmarDarkIronArmor
