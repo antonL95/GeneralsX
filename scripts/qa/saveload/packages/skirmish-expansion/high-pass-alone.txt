@@ -1,0 +1,7 @@
+45 destroy Player_2 MordorPorter 1
+45 destroy Player_2 MordorPorter 0
+45 create Player_2 SkirmishExpansionPorter 0 2780,3240,0
+45 pkg23-set-cash Player_2 - 0 20000
+50 skirmish-tactic-expansion Player_2 SkirmishExpansionPorter 0 Player_1_Start
+132 skirmish-tactic-expansion Player_2 SkirmishExpansionPorter 0 Player_1_Start
+300 skirmish-tactic-expansion Player_2 SkirmishExpansionPorter 0 Player_1_Start
