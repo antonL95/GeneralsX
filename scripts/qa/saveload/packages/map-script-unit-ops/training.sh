@@ -1,4 +1,7 @@
 check() {
+    if covers 247; then
+        expect "TEST map-unit-ops guard area frame=247 area=1 matched=1"
+    fi
     if covers 243; then
         expect "TEST map-unit-ops team path frame=243 path=1 ordered=1 modes=0"
     fi

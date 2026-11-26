@@ -30,6 +30,7 @@
 245 map-unit-ops-team-path Player_1 MapScriptUnitOpsProbe 1 Player_1:MapScriptUnitOpsProbe:2
 246 map-unit-ops-attack Player_1 MapScriptUnitOpsProbe 0
 247 map-unit-ops-teleport Player_1 MapScriptUnitOpsProbe 0
+247 map-unit-ops-guard-area Player_1 MapScriptUnitOpsProbe 0
 
 248 map-unit-ops-xp Player_1 MapScriptUnitOpsXP 0
 248 map-unit-ops-team-xp Player_1 MapScriptUnitOpsXP 0

@@ -7517,6 +7517,14 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::TEAM_GUARD_AREA:
 			doTeamGuardArea(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString());
 			return;
+		case ScriptAction::UNIT_GUARD_AREA:
+		{
+			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			const PolygonTrigger* area = TheScriptEngine->getQualifiedTriggerAreaByName(pAction->getParameter(1)->getString());
+			if (unit && unit->getAI() && area)
+				unit->getAI()->aiGuardArea(area, GUARDMODE_NORMAL, CMD_FROM_SCRIPT);
+			return;
+		}
 		case ScriptAction::TEAM_GUARD_AREA_FROM_POSITION:
 		{
 			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());

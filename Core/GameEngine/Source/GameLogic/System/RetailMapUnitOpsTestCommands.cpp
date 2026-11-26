@@ -13,6 +13,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
 #include "GameLogic/TerrainLogic.h"
@@ -164,6 +165,35 @@ void namedAttackPathProbe(const RetailTestCommands::Context& ctx)
 		hasWaypointGoal(ai, point);
 	std::fprintf(stderr, "TEST map-unit-ops named path frame=%u path=%d ordered=%d missing=%d\n",
 		ctx.frame, point != nullptr, ordered, missing);
+}
+
+void guardAreaProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* unit = ctx.requireObject();
+	AIUpdateInterface* ai = unit ? unit->getAI() : nullptr;
+	if (!ai)
+		return;
+	PolygonTrigger* area = PolygonTrigger::getFirstPolygonTrigger();
+	while (area && (area->isRetired() || area->getTriggerName().isEmpty()))
+		area = area->getNext();
+	const Int type = ScriptEngine::findRotwkActionByRetailIndex(454);
+	const Template* definition = type >= 0 ? TheScriptEngine->getActionTemplate(type) : nullptr;
+	Bool matched = FALSE;
+	if (area && definition && definition->m_internalName == "UNIT_GUARD_AREA" && definition->getNumParameters() == 2 &&
+		definition->getParameterType(0) == Parameter::UNIT && definition->getParameterType(1) == Parameter::TRIGGER_AREA)
+	{
+		auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
+		action->getParameter(0)->friend_setString(unit->getName());
+		action->getParameter(1)->friend_setString(area->getTriggerName());
+		TheScriptEngine->friend_executeAction(action, nullptr);
+		deleteInstance(action);
+		Coord3D center;
+		area->getCenterPoint(&center);
+		const Coord3D* goal = ai->getGuardLocation();
+		matched = ai->getCurrentStateID() == AI_GUARD && ai->getGuardTargetType() == GUARDTARGET_AREA &&
+			goal->x == center.x && goal->y == center.y;
+	}
+	std::fprintf(stderr, "TEST map-unit-ops guard area frame=%u area=%d matched=%d\n", ctx.frame, area != nullptr, matched);
 }
 
 void teamAttackPathProbe(const RetailTestCommands::Context& ctx)
@@ -541,6 +571,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-health", teamHealthProbe);
 	registerAction("map-unit-ops-threat", threatProbe);
 	registerAction("map-unit-ops-named-path", namedAttackPathProbe);
+	registerAction("map-unit-ops-guard-area", guardAreaProbe);
 	registerAction("map-unit-ops-team-path", teamAttackPathProbe);
 	registerAction("map-unit-ops-kill", killTarget);
 	registerAction("map-unit-ops-kill-count", killCountProbe);
