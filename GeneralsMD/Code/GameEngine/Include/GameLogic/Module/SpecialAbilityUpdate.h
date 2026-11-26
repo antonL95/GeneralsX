@@ -314,6 +314,7 @@ protected:
 	virtual void onPackingProgress(Bool packing, UnsignedInt remaining) {}
 	virtual void onAbilityExit() {}
 	virtual UnsignedInt holdFramesAfterTrigger() const;
+	Bool continuesPreparationWhileHolding() const;
 	virtual void addAbilityConditions( ModelConditionFlags &flags ) const;
 	virtual Bool acceptsIntent( const Object *targetObj, const Coord3D *targetPos ) const;
 	void startTimedCondition( Int condition, UnsignedInt frames );

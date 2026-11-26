@@ -564,6 +564,8 @@ Bool SpecialAbilityUpdate::initiateIntentToDoSpecialPower( const SpecialPowerTem
   if( usesRotwkRules() )
   {
     m_rotwkTriggers = 0;
+    if( m_holdFrames > 0 && continuesPreparationWhileHolding() )
+      getObject()->clearModelConditionState( MODELCONDITION_PREPARING );
     m_holdFrames = 0;
     getObject()->clearModelConditionFlags( m_rotwkConditions );
     m_rotwkConditions.clear();
@@ -2415,14 +2417,24 @@ Bool SpecialAbilityUpdate::beginHold()
 	traceRetailWeaponAbility(*this, getObject(), getTemplate(), "hold", m_holdFrames);
 	if( m_holdFrames == 0 )
 		return FALSE;
+	if( continuesPreparationWhileHolding() )
+		getObject()->setModelConditionState( MODELCONDITION_PREPARING );
 	AIUpdateInterface *ai = getObject()->getAI();
 	if( ai )
 		ai->aiBusy( CMD_FROM_AI );
 	return TRUE;
 }
 
+Bool SpecialAbilityUpdate::continuesPreparationWhileHolding() const
+{
+	return !skipsContinue() && getSpecialAbilityUpdateModuleData()->m_persistentCount == 0 &&
+		getSpecialAbilityUpdateModuleData()->m_persistentPrepFrames > 0;
+}
+
 void SpecialAbilityUpdate::finishTriggeredAbility()
 {
+	if( continuesPreparationWhileHolding() )
+		getObject()->clearModelConditionState( MODELCONDITION_PREPARING );
 	if( needToPack() )
 		startPacking( true );
 	else

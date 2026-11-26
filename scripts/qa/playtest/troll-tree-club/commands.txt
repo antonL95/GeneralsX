@@ -1,0 +1,5 @@
+20 create Player_1 MordorMountainTroll 0 145,2295,0
+21 reveal Player_1 MordorMountainTroll 0
+23 select Player_1 MordorMountainTroll 0
+40 tree-proxies-order Player_1 MordorMountainTroll 0
+320 button Player_1 MordorMountainTroll 0 4
