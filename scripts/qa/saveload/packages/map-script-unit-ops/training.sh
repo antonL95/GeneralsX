@@ -1,4 +1,14 @@
 check() {
+    for frame in 240 241 242 248; do
+        if covers "$frame"; then
+            expect "TEST map-unit-ops victim frame=$frame dead=1"
+        fi
+    done
+    for frame in 243 249; do
+        if covers "$frame"; then
+            expect "TEST map-unit-ops kills frame=$frame single=1 list=1 owner=1"
+        fi
+    done
     for frame in 242 249; do
         if covers "$frame"; then
             expect "TEST map-unit-ops threat frame=$frame match=1 reject=1 cached=1"

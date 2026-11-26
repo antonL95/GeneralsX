@@ -5,6 +5,7 @@
 #include <cstdio>
 #include "Common/Team.h"
 #include "Common/INI.h"
+#include "GameLogic/Damage.h"
 #include "GameLogic/ExperienceLevelStore.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -109,6 +110,64 @@ void threatProbe(const RetailTestCommands::Context& ctx)
 		!unitThreatCondition("MapScriptThreatMissing", 2, 0.0f, 30.0f);
 	const Bool cached = unitThreatCondition("MapScriptThreatAnchor", 2, 24.0f, 1.0f);
 	std::fprintf(stderr, "TEST map-unit-ops threat frame=%u match=%d reject=%d cached=%d\n", ctx.frame, match, reject, cached);
+}
+
+void killTarget(const RetailTestCommands::Context& ctx)
+{
+	const Object* killer = ctx.requireObject();
+	Object* victim = ctx.findTarget();
+	if (!killer || !victim)
+		return;
+	DamageInfo damage;
+	damage.in.m_sourceID = killer->getID();
+	damage.in.m_damageType = DAMAGE_UNRESISTABLE;
+	damage.in.m_amount = victim->getBodyModule()->getHealth();
+	damage.in.m_deathType = DEATH_NORMAL;
+	victim->attemptDamage(&damage);
+	std::fprintf(stderr, "TEST map-unit-ops victim frame=%u dead=%d\n", ctx.frame, victim->isEffectivelyDead());
+}
+
+Bool killedTypeCondition(const char* player, Int count, const char* typeName)
+{
+	const Int type = ScriptEngine::findRotwkConditionByRetailIndex(129);
+	if (type < 0)
+		return FALSE;
+	const Template* definition = TheScriptEngine->getConditionTemplate(type);
+	if (definition->m_internalName != "PLAYER_HAS_KILLED_TYPE_UNITS" || definition->getNumParameters() != 3 ||
+		definition->getParameterType(0) != Parameter::SIDE || definition->getParameterType(1) != Parameter::INT ||
+		definition->getParameterType(2) != Parameter::OBJECT_TYPE)
+		return FALSE;
+	auto* condition = newInstance(Condition)(static_cast<Condition::ConditionType>(type));
+	condition->getParameter(0)->friend_setString(player);
+	condition->getParameter(1)->friend_setInt(count);
+	condition->getParameter(2)->friend_setString(typeName);
+	auto* clause = newInstance(OrCondition);
+	clause->setFirstAndCondition(condition);
+	auto* script = newInstance(Script);
+	script->setOrCondition(clause);
+	const Bool result = TheScriptEngine->evaluateConditions(script, nullptr);
+	deleteInstance(script);
+	return result;
+}
+
+void killCountProbe(const RetailTestCommands::Context& ctx)
+{
+	const Int firstCount = ctx.frame == 243 ? 1 : 2;
+	const char* first = "MapScriptScoreTarget";
+	const char* second = "MapScriptScoreBuilding";
+	const char* list = "MapScriptScoreTypes";
+	TheScriptEngine->doObjectTypeListMaintenance(list, first, TRUE);
+	TheScriptEngine->doObjectTypeListMaintenance(list, second, TRUE);
+	const Bool single = killedTypeCondition("Player_1", firstCount, first) &&
+		!killedTypeCondition("Player_1", firstCount + 1, first);
+	const Bool all = killedTypeCondition("Player_1", firstCount + 1, list) &&
+		!killedTypeCondition("Player_1", firstCount + 2, list);
+	const Bool separated = !killedTypeCondition("PlyrCreeps", 1, list) &&
+		!killedTypeCondition("MapScriptMissingPlayer", 0, list) &&
+		!killedTypeCondition("Player_1", 1, "MapScriptUnitOpsXP");
+	TheScriptEngine->doObjectTypeListMaintenance(list, first, FALSE);
+	TheScriptEngine->doObjectTypeListMaintenance(list, second, FALSE);
+	std::fprintf(stderr, "TEST map-unit-ops kills frame=%u single=%d list=%d owner=%d\n", ctx.frame, single, all, separated);
 }
 
 void removeHordeMember(const RetailTestCommands::Context& ctx)
@@ -370,6 +429,8 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-horde-remove", removeHordeMember);
 	registerAction("map-unit-ops-health", teamHealthProbe);
 	registerAction("map-unit-ops-threat", threatProbe);
+	registerAction("map-unit-ops-kill", killTarget);
+	registerAction("map-unit-ops-kill-count", killCountProbe);
 #endif
 }
 }

@@ -3155,6 +3155,36 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 					++count;
 			return count < pCondition->getParameter(1)->getInt();
 		}
+		case Condition::PLAYER_HAS_KILLED_TYPE_UNITS:
+		{
+			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pCondition->getParameter(0)->getString());
+			const Player* player = nullptr;
+			for (Int i = 0; players && i < ThePlayerList->getPlayerCount(); ++i)
+			{
+				const Player* candidate = ThePlayerList->getNthPlayer(i);
+				if (candidate && (candidate->getPlayerMask() & players))
+				{
+					player = candidate;
+					break;
+				}
+			}
+			if (!player)
+				return FALSE;
+			const Int quantity = pCondition->getParameter(1)->getInt();
+			if (quantity <= 0)
+				return TRUE;
+			UnsignedInt remaining = static_cast<UnsignedInt>(quantity);
+			ObjectTypesTemp types;
+			objectTypesFromParam(pCondition->getParameter(2), types.m_types);
+			for (size_t i = 0; i < types.m_types->getListSize(); ++i)
+			{
+				const UnsignedInt killed = player->getRetailKillsOfType(types.m_types->getNthInList(i));
+				if (killed >= remaining)
+					return TRUE;
+				remaining -= killed;
+			}
+			return FALSE;
+		}
 		case Condition::PLAYER_HAS_OBJECT_OF_VETERANCY:
 		{
 			const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pCondition->getParameter(0)->getString());

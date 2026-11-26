@@ -367,6 +367,7 @@ Player::Player( Int playerIndex )
 void Player::init(const PlayerTemplate* pt)
 {
 	m_retailSpellBookID = INVALID_ID;
+	m_retailKillCounts.clear();
 	m_powerProductionBonuses.clear();
 
 	DEBUG_ASSERTCRASH(m_playerTeamPrototypes.empty(), ("Player::m_playerTeamPrototypes is not empty at game start!"));
@@ -4905,6 +4906,25 @@ void Player::xfer( Xfer *xfer )
 
 }
 
+void Player::recordRetailKill(const Object& victim)
+{
+	if (!TheGameLogic->isScoringEnabled() || victim.testStatus(OBJECT_STATUS_DO_NOT_SCORE))
+		return;
+	const Bool scoredStructure = victim.isKindOf(KINDOF_STRUCTURE) &&
+		(victim.isKindOf(KINDOF_SCORE) || victim.isKindOf(KINDOF_SCORE_DESTROY));
+	if (!scoredStructure && !TheGlobalData->m_objectsThatScore.matchesObject(nullptr, &victim))
+		return;
+	UnsignedInt& count = m_retailKillCounts[victim.getTemplate()->getName()];
+	if (count < UINT_MAX)
+		++count;
+}
+
+UnsignedInt Player::getRetailKillsOfType(const AsciiString& type) const
+{
+	const auto entry = m_retailKillCounts.find(type);
+	return entry == m_retailKillCounts.end() ? 0 : entry->second;
+}
+
 void Player::xferRetailBlocks(Xfer* xfer, Bool present)
 {
 	RetailSaveBlocks::transferSection<Xfer>(xfer, xfer->getXferMode() == XFER_LOAD, present, {
@@ -4913,6 +4933,32 @@ void Player::xferRetailBlocks(Xfer* xfer, Bool present)
 			x->xferInt(&m_commandPointOverrideTotal);
 			x->xferInt(&m_commandPointOverrideMaximum);
 		}, {}},
+		{"killed-object-types", [this](Xfer* x) {
+			UnsignedInt entries = static_cast<UnsignedInt>(m_retailKillCounts.size());
+			x->xferUnsignedInt(&entries);
+			if (x->getXferMode() == XFER_LOAD)
+			{
+				m_retailKillCounts.clear();
+				for (UnsignedInt i = 0; i < entries; ++i)
+				{
+					AsciiString name;
+					UnsignedInt count = 0;
+					x->xferAsciiString(&name);
+					x->xferUnsignedInt(&count);
+					m_retailKillCounts.emplace(name, count);
+				}
+			}
+			else
+			{
+				for (const auto& [name, count] : m_retailKillCounts)
+				{
+					AsciiString savedName = name;
+					UnsignedInt savedCount = count;
+					x->xferAsciiString(&savedName);
+					x->xferUnsignedInt(&savedCount);
+				}
+			}
+		}, [this] { m_retailKillCounts.clear(); }},
 	});
 }
 

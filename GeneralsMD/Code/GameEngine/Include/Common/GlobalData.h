@@ -245,6 +245,7 @@ public:
 	Real m_cameraPitch;
 	SpecialPowerObjectFilter m_victoryStructureFilter;
 	SpecialPowerObjectFilter m_veterancyPipDrawFilter;
+	SpecialPowerObjectFilter m_objectsThatScore;
 	Real m_terrainResourceCellSize = 20.0f;
 	Bool m_useSimpleHordeDecals = FALSE;
 	Bool m_useSimpleMergeDecals = FALSE;

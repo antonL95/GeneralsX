@@ -44,6 +44,8 @@
 
 #pragma once
 
+#include <map>
+
 #include "Common/AcademyStats.h"
 #include "Common/Debug.h"
 #include "Common/Energy.h"
@@ -639,6 +641,8 @@ public:
 
 	/// Grab the scorekeeper so we can score up in here!
 	ScoreKeeper* getScoreKeeper() { return &m_scoreKeeper; }
+	void recordRetailKill(const Object& victim);
+	UnsignedInt getRetailKillsOfType(const AsciiString& type) const;
 
 	/// time to create a hotkey team based on this GameMessage
 	void processCreateTeamGameMessage(Int hotkeyNum, const GameMessage *msg);
@@ -872,4 +876,5 @@ private:
 	Bool m_hasCommandPointOverride = FALSE;
 	Int m_commandPointOverrideTotal = 0;
 	Int m_commandPointOverrideMaximum = 0;
+	std::map<AsciiString, UnsignedInt> m_retailKillCounts;
 };

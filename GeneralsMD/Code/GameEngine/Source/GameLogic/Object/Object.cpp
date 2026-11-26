@@ -3474,6 +3474,9 @@ void Object::scoreTheKill( const Object *victim )
 	{
 		ExperienceLevelStore::scoreKill(this, victim);
 		RetailEva::scoredKill(*this, *victim);
+		Player* killer = getControllingPlayer();
+		if (killer && killer != victim->getControllingPlayer() && getRelationship(victim) == ENEMIES)
+			killer->recordRetailKill(*victim);
 	}
 	// Do stuff that has nothing to do with experience points here, like tell our Player we killed something
 	/// @todo Multiplayer score hook location?
