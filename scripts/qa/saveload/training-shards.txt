@@ -117,3 +117,4 @@
 4 lua-logic
 4 map-script-audio
 3 siege-horde-deploy
+3 lua-inventory

@@ -1,0 +1,14 @@
+218 lua-player-upgrade Player_1 - 0 Upgrade_AmrothKnights
+219 create Player_1 LuaInventoryMixedCreation 0 3005,2840,0
+239 lua-player-upgrade Player_1 - 0 Upgrade_AmrothKnights
+240 checkobjupgrade Player_1 LuaInventoryMixedCreation 0 Upgrade_MiniHordeLvl2
+243 lua-visibility Player_1 LuaInventoryMixedCreation 0 HOOD
+243 lua-visibility Player_1 LuaInventoryMixedCreation 0 HOODDOWN
+243 lua-visibility Player_1 LuaInventoryMixedCreation 0 BODY
+243 lua-visibility Player_1 LuaInventoryMixedCreation 0 BODYDUSTER
+245 lua-visibility Player_1 LuaInventoryMixedCreation 0 HOOD
+245 lua-visibility Player_1 LuaInventoryMixedCreation 0 HOODDOWN
+245 lua-visibility Player_1 LuaInventoryMixedCreation 0 BODY
+245 lua-visibility Player_1 LuaInventoryMixedCreation 0 BODYDUSTER
+246 lua-player-upgrade Player_1 - 0 Upgrade_AmrothKnights
+247 checkobjupgrade Player_1 LuaInventoryMixedCreation 0 Upgrade_MiniHordeLvl2
