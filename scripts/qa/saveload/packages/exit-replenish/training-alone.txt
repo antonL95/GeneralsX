@@ -1,0 +1,10 @@
+200 create Player_1 HarondorOutpost 0 3324.69,657.16,-127.4
+200 create Player_1 AngmarFortressCitadel 0 3050,640,0
+201 cash Player_1 - 0 100000
+205 objupgrade Player_1 AngmarFortressCitadel 0 Upgrade_AngmarFortressHouseOfLamentation
+206 objupgrade Player_1 HarondorOutpost 0 UpgradeAngmarBarracksLevel2
+210 rally Player_1 HarondorOutpost 0 - 3067.75 1253.43
+250 production-exit-queue Player_1 HarondorOutpost 0 HaradHarondorSpearmenHorde
+260 production-exit-queue Player_1 HarondorOutpost 0 HaradHarondorSpearmenHorde
+270 production-exit-queue Player_1 HarondorOutpost 0 HaradHarondorSpearmenHorde
+1500 exit-stuck-move Player_1 HarondorOutpost 0 2585,485,HaradHarondorSpearmenHorde

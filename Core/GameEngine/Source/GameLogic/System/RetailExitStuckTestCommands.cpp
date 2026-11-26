@@ -83,10 +83,20 @@ void sampleExitStuck(const RetailTestCommands::Context& ctx)
 		const auto target = s_targets.find(anchor->getID());
 		const Bool hasTarget = target != s_targets.end();
 		const AIUpdateInterface* anchorAI = anchor->getAI();
-		std::fprintf(stderr, "TEST exit-stuck-anchor %u %s %u orders=%d state=%d moving=%d pos=%.1f,%.1f target=%.1f,%.1f\n", ctx.frame,
+		int members = 0;
+		int unslotted = 0;
+		for (const Object* member : *horde->getContainedItemsList())
+		{
+			if (member->isEffectivelyDead() || horde->isBannerCarrier(member))
+				continue;
+			++members;
+			if (horde->getMemberSlot(member->getID()) < 0)
+				++unslotted;
+		}
+		std::fprintf(stderr, "TEST exit-stuck-anchor %u %s %u orders=%d state=%d moving=%d pos=%.1f,%.1f target=%.1f,%.1f members=%d unslotted=%d\n", ctx.frame,
 			anchor->getTemplate()->getName().str(), static_cast<unsigned>(anchor->getID()), hasTarget ? s_orders[anchor->getID()] : 0,
 			anchorAI ? static_cast<int>(anchorAI->getCurrentStateID()) : -1, anchorAI ? static_cast<int>(anchorAI->isMoving()) : 0,
-			anchor->getPosition()->x, anchor->getPosition()->y, hasTarget ? target->second.x : 0.0f, hasTarget ? target->second.y : 0.0f);
+			anchor->getPosition()->x, anchor->getPosition()->y, hasTarget ? target->second.x : 0.0f, hasTarget ? target->second.y : 0.0f, members, unslotted);
 		for (Object* member : *horde->getContainedItemsList())
 		{
 			if (member->isEffectivelyDead() || horde->getMemberSlot(member->getID()) < 0)
