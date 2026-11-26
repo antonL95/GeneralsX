@@ -8,10 +8,10 @@
 223 aim Player_1 HordeClimbHorde 0 PlyrCivilian:HordeClimbWall:0
 228 horde-climb-probe Player_1 HordeClimbHorde 0 -
 250 horde-climb-probe Player_1 HordeClimbHorde 0 -
-270 horde-climb-probe Player_1 HordeClimbHorde 0 -
 270 create Player_1 HordeClimbHorde 1 800,2480,60
 275 horde-climb-ai-order Player_1 HordeClimbHorde 1 PlyrCivilian:HordeClimbWall:0
 278 horde-climb-probe Player_1 HordeClimbHorde 1 -
-350 horde-climb-probe Player_1 HordeClimbHorde 0 -
-350 horde-climb-probe Player_1 HordeClimbHorde 1 -
 350 horde-climb-probe Player_1 HordeClimbLadder 0 -
+678 horde-climb-probe Player_1 HordeClimbHorde 0 -
+735 horde-climb-probe Player_1 HordeClimbHorde 0 -
+735 horde-climb-probe Player_1 HordeClimbHorde 1 -
