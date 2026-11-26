@@ -1,0 +1,2 @@
+20 Player_1 HaradMumakilMatriarch 3150 1335 0.8
+100 Player_1 MordorMumakil 3500 1310 0.7

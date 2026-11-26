@@ -7,11 +7,13 @@
 
 #include "Common/ActionManager.h"
 #include "Common/SpecialPower.h"
+#include "Common/ThingTemplate.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/Module/GrabPassengerSpecialPower.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/WeaponSet.h"
 
@@ -137,6 +139,31 @@ void handleTransportContain(const RetailTestCommands::Context& ctx)
 			return;
 		const Bool accepted = grab->requestGrab(target, OPTION_ONE);
 		std::fprintf(stderr, "TEST tc frame=%u action=cast-grab label=%s accepted=%d\n", ctx.frame, tag.str(), accepted);
+		std::fflush(stderr);
+		return;
+	}
+
+	if (ctx.action == "tc-seats")
+	{
+		const ContainModuleInterface* contain = source->getContain();
+		const auto* seats = dynamic_cast<const OpenContain*>(contain);
+		if (!seats)
+			return;
+		Int index = 0;
+		for (const Object* rider : *contain->getContainedItemsList())
+		{
+			const AsciiString* bone = seats->getPassengerBone(rider->getID());
+			Coord3D seat = *source->getPosition();
+			const Bool found = bone && source->getSingleLogicalBonePosition(bone->str(), &seat, nullptr);
+			const Coord3D* position = rider->getPosition();
+			const Int error = static_cast<Int>(fabs(position->x - seat.x) + fabs(position->y - seat.y) + fabs(position->z - seat.z));
+			std::fprintf(stderr, "TEST tc frame=%u action=seat label=%s index=%d bone=%s found=%d error=%d height=%d hidden=%d opacity=%d model=%s\n",
+				ctx.frame, label, index++, bone ? bone->str() : "-", found ? 1 : 0, error,
+				static_cast<Int>(position->z - source->getPosition()->z),
+				rider->getDrawable() ? rider->getDrawable()->isDrawableEffectivelyHidden() : TRUE,
+				rider->getDrawable() ? static_cast<Int>(rider->getDrawable()->getEffectiveOpacity() * 100.0f) : 0,
+				rider->getTemplate()->getName().str());
+		}
 		std::fflush(stderr);
 		return;
 	}

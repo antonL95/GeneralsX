@@ -14,6 +14,7 @@
 230 create Player_1 TcFadeCarrier 0 110,2575,0
 230 create Player_1 TcOrc 2 115,2575,0
 230 create Player_1 TcFadeMonster 0 120,2575,0
+230 create Player_1 HaradMumakilMatriarch 0 500,2575,0
 232 tc-can-contain Player_1 TcMountedCarrier 0 Player_1:FellowshipPippin:0,unmounted
 233 tc-set-mounted Player_1 TcMountedCarrier 0
 234 tc-can-contain Player_1 TcMountedCarrier 0 Player_1:FellowshipPippin:0,mounted
@@ -42,6 +43,7 @@
 250 tc-probe Player_1 DwarvenBattleWagonAxeThrower 0 bone-slot1-after
 250 tc-probe Player_1 DwarvenBattleWagonAxeThrower 1 bone-slot2-after
 250 tc-probe Player_1 TcKaradd 0 karadd-orc-after
+250 tc-seats Player_1 HaradMumakilMatriarch 0 howdah
 251 tc-eject Player_1 TcBoneCarrier 0 Player_1:DwarvenBattleWagonAxeThrower:0,bone-eject1
 251 tc-eject Player_1 TcKaradd 0 Player_1:TcOrc:1,karadd-eject-orc
 251 tc-eject Player_1 TcFadeCarrier 0 Player_1:TcOrc:2,fade-exit-match
@@ -84,6 +86,7 @@
 265 destroy Player_1 TcFadeCarrier 0
 265 destroy Player_1 TcOrc 2
 265 destroy Player_1 TcFadeMonster 0
+265 destroy Player_1 HaradMumakilMatriarch 0
 265 destroy Player_1 TcGrabNoVictim 0
 265 destroy PlyrCreeps TcOrc 0
 265 destroy PlyrCreeps TcOrc 1

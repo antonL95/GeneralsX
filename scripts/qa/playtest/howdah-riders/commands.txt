@@ -1,0 +1,5 @@
+10 create Player_1 HaradMumakilMatriarch 0 3150,1250,0
+10 create Player_1 MordorMumakil 0 3500,1250,0
+11 reveal Player_1 HaradMumakilMatriarch 0
+60 tc-seats Player_1 HaradMumakilMatriarch 0 matriarch
+60 tc-seats Player_1 MordorMumakil 0 mumakil
