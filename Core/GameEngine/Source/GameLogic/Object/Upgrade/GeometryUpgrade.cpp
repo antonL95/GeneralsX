@@ -221,6 +221,42 @@ Bool GeometryUpgrade::collectCollisionParts(const Object& object, std::vector<Co
 	return TRUE;
 }
 
+Bool GeometryUpgrade::collectLocalShapes(const Object& object, std::vector<LocalShape>& shapes)
+{
+	const ThingTemplate* definition = object.getTemplate();
+	const auto& data = definition->getRotWKObjectData();
+	const auto& primary = data.primaryGeometry;
+	const Bool hasAdditional = !data.additionalGeometries.empty();
+	const Bool hasOffset = primary.offset.x != 0.0f || primary.offset.y != 0.0f || primary.offset.z != 0.0f;
+	const auto upgrades = activeUpgrades(object, nullptr);
+	if (!hasAdditional && !hasOffset && primary.active && upgrades.empty())
+	{
+		shapes.push_back({&object.getGeometryInfo(), {0.0f, 0.0f, 0.0f}});
+		return TRUE;
+	}
+
+	const auto hasUpgrade = [&](const ThingTemplate::GeometryDetails& details)
+	{
+		return std::any_of(upgrades.begin(), upgrades.end(),
+			[&](const auto* upgrade) { return affectsGeometry(*upgrade, details.name); });
+	};
+	const Bool upgraded = !upgrades.empty() && (hasUpgrade(primary) ||
+		std::any_of(data.additionalGeometries.begin(), data.additionalGeometries.end(),
+			[&](const auto& geometry) { return hasUpgrade(geometry.details); }));
+	const GeometryInfo& baseShape = definition->getTemplateGeometryInfo();
+	const GeometryInfo& currentShape = object.getGeometryInfo();
+	if (isActive(primary, upgrades))
+		shapes.push_back({upgraded ? &baseShape : &currentShape, primary.offset});
+	for (const auto& geometry : data.additionalGeometries)
+	{
+		if (isActive(geometry.details, upgrades))
+			shapes.push_back({&geometry.shape, geometry.details.offset});
+	}
+	if (shapes.empty())
+		shapes.push_back({&currentShape, {0.0f, 0.0f, 0.0f}});
+	return TRUE;
+}
+
 thread_local const GeometryUpgrade::ScopedPathfindDeferral* GeometryUpgrade::ScopedPathfindDeferral::s_current = nullptr;
 
 GeometryUpgrade::ScopedPathfindDeferral::ScopedPathfindDeferral(const Object* object) :

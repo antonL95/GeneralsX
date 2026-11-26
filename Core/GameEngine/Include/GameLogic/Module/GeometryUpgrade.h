@@ -34,6 +34,12 @@ public:
 		Coord3D position;
 	};
 
+	struct LocalShape
+	{
+		const GeometryInfo* shape;
+		Coord3D offset;
+	};
+
 	class ScopedPathfindDeferral
 	{
 	public:
@@ -53,6 +59,7 @@ public:
 	static Bool constructionFootprintsOverlap(const ThingTemplate& build, const Coord3D& position, Real angle, const Object& obstacle);
 	static Bool collectCollisionParts(const Object& object, std::vector<CollisionPart>& parts,
 		Bool includeAuthored = FALSE);
+	static Bool collectLocalShapes(const Object& object, std::vector<LocalShape>& shapes);
 	const GeometryUpgradeModuleData* getWallRampData() const { return getGeometryUpgradeModuleData(); }
 
 	Bool isSubObjectsUpgrade() override { return FALSE; }

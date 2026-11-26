@@ -7,8 +7,10 @@
 #include "Common/INI.h"
 #include "Common/GameEngine.h"
 #include "Common/ThingTemplate.h"
+#include "GameLogic/Module/GeometryUpgrade.h"
 #include "GameLogic/Object.h"
 #include "Lib/trig.h"
+#include "WWMath/wwmath.h"
 
 namespace
 {
@@ -105,16 +107,84 @@ void parseSelection(INI* ini, void* instance, void*, const void*)
 	assistant->m_selections.push_back(selection);
 }
 
+Real combinedBoundingCircleRadius(const std::vector<GeometryUpgrade::LocalShape>& shapes)
+{
+	if (shapes.size() == 1 && shapes[0].offset.x == 0.0f && shapes[0].offset.y == 0.0f)
+		return shapes[0].shape->getBoundingCircleRadius();
+
+	Real radius = 0.0f;
+	for (const GeometryUpgrade::LocalShape& entry : shapes)
+	{
+		const GeometryInfo& shape = *entry.shape;
+		Real extent = 0.0f;
+		if (shape.getGeomType() == GEOMETRY_BOX)
+		{
+			const Real dx = fabs(entry.offset.x) + shape.getMajorRadius();
+			const Real dy = fabs(entry.offset.y) + shape.getMinorRadius();
+			extent = WWMath::SqrtOrigin(dx * dx + dy * dy);
+		}
+		else
+		{
+			extent = WWMath::SqrtOrigin(entry.offset.x * entry.offset.x + entry.offset.y * entry.offset.y)
+				+ shape.getMajorRadius();
+		}
+		radius = std::max(radius, extent);
+	}
+	return radius;
+}
+
 void cellSize(const Object& unit, Int& width, Int& depth)
 {
-	const GeometryInfo& geometry = unit.getGeometryInfo();
-	if (unit.isKindOf(KINDOF_HORDE))
+	std::vector<GeometryUpgrade::LocalShape> shapes;
+	GeometryUpgrade::collectLocalShapes(unit, shapes);
+	const Real radius = combinedBoundingCircleRadius(shapes);
+	if (!unit.isKindOf(KINDOF_HORDE))
 	{
-		width = static_cast<Int>(geometry.getMinorRadius() * 2.0f + 4.0f);
-		depth = static_cast<Int>(geometry.getMajorRadius() * 2.0f + 4.0f);
+		width = depth = static_cast<Int>(radius * 2.0f + 1.0f);
 		return;
 	}
-	width = depth = static_cast<Int>(geometry.getBoundingCircleRadius() * 2.0f + 1.0f);
+
+	Real major = radius;
+	Real minor = radius;
+	if (shapes.size() == 1)
+	{
+		const GeometryInfo& shape = *shapes[0].shape;
+		if (shape.getGeomType() == GEOMETRY_BOX)
+		{
+			major = shape.getMajorRadius();
+			minor = shape.getMinorRadius();
+		}
+	}
+	else
+	{
+		Real minX = 0.0f;
+		Real maxX = 0.0f;
+		Real minY = 0.0f;
+		Real maxY = 0.0f;
+		Bool allBoxes = TRUE;
+		for (const GeometryUpgrade::LocalShape& entry : shapes)
+		{
+			const GeometryInfo& shape = *entry.shape;
+			if (shape.getMajorRadius() < 1.0f && shape.getMinorRadius() < 1.0f && shape.getMaxHeightAbovePosition() < 1.0f)
+				continue;
+			if (shape.getGeomType() != GEOMETRY_BOX)
+			{
+				allBoxes = FALSE;
+				break;
+			}
+			minX = std::min(minX, entry.offset.x - shape.getMajorRadius());
+			maxX = std::max(maxX, entry.offset.x + shape.getMajorRadius());
+			minY = std::min(minY, entry.offset.y - shape.getMinorRadius());
+			maxY = std::max(maxY, entry.offset.y + shape.getMinorRadius());
+		}
+		if (allBoxes)
+		{
+			major = (maxX - minX) * 0.5f;
+			minor = (maxY - minY) * 0.5f;
+		}
+	}
+	width = static_cast<Int>(minor * 2.0f + 4.0f);
+	depth = static_cast<Int>(major * 2.0f + 4.0f);
 }
 
 Bool matches(const FormationUnitDefinition& definition, const Object& unit)
