@@ -34,6 +34,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/GameMemory.h"
+#include "Common/KindOf.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class ObjectCreationNugget;
@@ -85,6 +86,7 @@ public:
 	virtual Object* createFromImpact(const Object* source, const Coord3D* position, const Coord3D* attackerPosition,
 		const Coord3D& velocity) const;
 	virtual Bool hasStrafeSpawnOrder() const { return FALSE; }
+	virtual Bool createsKindOf(KindOfType) const { return FALSE; }
 
 	/**
 		the object-based version... by default, just call the location-based implementation.
@@ -134,6 +136,7 @@ public:
 	void clear();
 
 	void addObjectCreationNugget(ObjectCreationNugget* nugget);
+	Bool createsKindOf(KindOfType kind) const;
 	Bool hasStrafeSpawnOrder() const;
 
 	// Kris: August 23, 2003

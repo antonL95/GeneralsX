@@ -108,6 +108,7 @@
 #include "GameLogic/CastleRules.h"
 #include "GameLogic/CastleTemplateStore.h"
 #include "GameLogic/RetailTestCommands.h"
+#include "GameLogic/RetailRingDrop.h"
 #include "GameLogic/RetailSkirmishProbe.h"
 #include "GameLogic/CaveSystem.h"
 #include "GameLogic/CrateSystem.h"
@@ -4340,6 +4341,8 @@ void GameLogic::update()
 	if (m_weatherModifier.endFrame && m_frame >= m_weatherModifier.endFrame)
 		clearRetailWeatherModifier();
 	RetailTestCommands::runFrame( m_frame );
+	if (getGameMode() == GAME_SKIRMISH)
+		RetailRingDrop::update(m_frame);
 
 	// process client commands
 	{

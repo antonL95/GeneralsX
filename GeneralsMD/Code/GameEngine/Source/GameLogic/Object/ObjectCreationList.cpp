@@ -769,6 +769,14 @@ class GenericObjectCreationNugget : public ObjectCreationNugget
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(GenericObjectCreationNugget, "GenericObjectCreationNugget")
 public:
+
+	virtual Bool createsKindOf(KindOfType kind) const override
+	{
+		return m_nameAreObjects && std::any_of(m_names.begin(), m_names.end(), [kind](const AsciiString& name) {
+			const ThingTemplate* tmpl = TheThingFactory->findTemplate(name, FALSE);
+			return tmpl && tmpl->isKindOf(kind);
+		});
+	}
 	Bool hasStrafeSpawnOrder() const override
 	{
 		return m_nameAreObjects && m_issueMoveAfterCreation && m_moveUsesStrafeUpdate;
@@ -1865,6 +1873,13 @@ Bool ObjectCreationList::hasStrafeSpawnOrder() const
 {
 	return std::any_of(m_nuggets.begin(), m_nuggets.end(),
 		[](const ObjectCreationNugget* nugget) { return nugget->hasStrafeSpawnOrder(); });
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool ObjectCreationList::createsKindOf(KindOfType kind) const
+{
+	return std::any_of(m_nuggets.begin(), m_nuggets.end(),
+		[kind](const ObjectCreationNugget* nugget) { return nugget->createsKindOf(kind); });
 }
 
 //-------------------------------------------------------------------------------------------------
