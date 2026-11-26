@@ -1,0 +1,5 @@
+20 create Player_1 WildGoblinKing 0 3120,890,0
+21 reveal Player_1 WildGoblinKing 0
+22 science Player_1 - 0 SCIENCE_BalrogAlly
+32 power-cast Player_1 - 11 at 3210 860
+180 default-order Player_1 MordorBalrog 0 - 3450 860
