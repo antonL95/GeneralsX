@@ -260,6 +260,71 @@ def check_spellbook():
         sync(display, 0)
 
 
+def patch_metrics(cx, cy, half=12):
+    size = half * 2
+    image = get_image(display, root, cx - half, cy - half, size, size, 0xFFFFFFFF, 2)
+    try:
+        pixels = [rgb_tuple(get_pixel(image, x, y)) for y in range(0, size, 2) for x in range(0, size, 2)]
+    finally:
+        destroy_image(image)
+    lumas = [0.299 * r + 0.587 * g + 0.114 * b for r, g, b in pixels]
+    spread = max(lumas) - min(lumas)
+    chroma = max(max(p) - min(p) for p in pixels)
+    return pixels, spread, chroma
+
+
+def check_dolguldur_buttons():
+    wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
+    time.sleep(2)
+    start_match(10)
+    wait_for("Dol Guldur skirmish is running", lambda: faction_history() == ["FactionGuldur"], 100)
+    wait_for("GuldurPorter build column is selected", lambda: log_count("TEST hud 50 ") >= 1, 100)
+    wait_for("Dol Guldur skirmish reaches frame 60", lambda: log_count("TEST powerstate 60 Player_1") >= 1, 60)
+    porter_slots = hud_slots_at(50)
+    build_slots = [s for s in porter_slots if "ConstructGuldur" in s[1]]
+    if len(build_slots) < 4:
+        sys.exit(f"FAIL GuldurPorter build column missing construct buttons: {porter_slots}")
+    capture("dolguldur-porter-hud", 0, 440, 460, 328)
+    porter_slot1, spread1, _ = patch_metrics(288, 578, 8)
+    porter_slot2, spread2, _ = patch_metrics(335, 596, 8)
+    print(f"INFO GuldurPorter palantir slot1_spread={spread1:.1f} slot2_spread={spread2:.1f}", flush=True)
+    if spread2 < 40.0:
+        sys.exit(f"FAIL GuldurPorter slot 2 (GuldurShade) is blank/flat (luma_spread={spread2:.1f})")
+    arena = title_signature(380, 110, 264, 72)
+    click(128, 553, settle=0)
+    wait_for("Dol Guldur spellbook opens",
+             lambda: sum(abs((before & 0xFF) - (after & 0xFF)) > 24
+                         for before, after in zip(arena, title_signature(380, 110, 264, 72)))
+                         > len(arena) // 4, interval=0.02)
+    time.sleep(0.8)
+    capture("dolguldur-spellbook", 220, 60, 584, 660)
+    spell_centers = [(386, 246), (512, 246), (638, 246)]
+    patches = []
+    for idx, (cx, cy) in enumerate(spell_centers, 1):
+        pixels, spread, chroma = patch_metrics(cx, cy, 14)
+        print(f"INFO spellbook slot {idx} ({cx},{cy}): luma_spread={spread:.1f} max_chroma={chroma}", flush=True)
+        if spread < 40.0:
+            sys.exit(f"FAIL Dol Guldur spellbook slot {idx} is blank/flat (luma_spread={spread:.1f})")
+        patches.append(pixels)
+    for i in range(len(patches)):
+        for j in range(i + 1, len(patches)):
+            mean_diff = sum(
+                abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])
+                for a, b in zip(patches[i], patches[j])
+            ) / (3 * len(patches[i]))
+            print(f"INFO spellbook slots {i + 1} vs {j + 1}: mean_diff={mean_diff:.1f}", flush=True)
+            if mean_diff < 12.0:
+                sys.exit(f"FAIL Dol Guldur spellbook slots {i + 1} and {j + 1} look identical (mean_diff={mean_diff:.1f})")
+    click(386, 246)
+    click(568, 684)
+    wait_for("Dol Guldur tier 1 spell purchased", lambda: power_points() and power_points()[-1] <= 10, 60)
+    key(0xFF1B)
+    wait_for("Dol Guldur spellbook closes", lambda: not menu_visible(), 10)
+    time.sleep(0.5)
+    capture("dolguldur-left-column", 0, 100, 120, 520)
+    print(f"PASS Dol Guldur spellbook and builder buttons rendered ({len(build_slots)} build buttons)", flush=True)
+
+
 def check_shell_load():
     wait_for("main menu opens", lambda: log_count("Shell::doPush() completed successfully") >= 1, 100)
     time.sleep(2)
@@ -1000,6 +1065,14 @@ commands.write_text(("15 pkg44-points Player_1 - 0 10\n" if "--spellbook" in sys
     f"{frame} powerstate Player_1 - 0\n" for frame in range(60, 3600, 30)
 ) + ("".join(f"{frame} xpcrc - - 0\n" for frame in range(60, 900))
      if "--save-load" in sys.argv or "--all" in sys.argv else ""))
+if "--dolguldur-buttons" in sys.argv:
+    commands.write_text(
+        "15 pkg44-points Player_1 - 0 10\n"
+        "30 player Player_1 - 0\n"
+        "40 select Player_1 GuldurPorter 0\n"
+        "50 hud - - 0\n"
+        + "".join(f"{frame} powerstate Player_1 - 0\n" for frame in range(60, 3600, 30))
+    )
 if "--shell-load" in sys.argv:
     commands.write_text("30 shell-setup - - 0\n89 shell-crc - - 0\n90 snapshot-save - - 0 shell-qa.sav\n91 shell-crc - - 0\n")
 if "--palantir-bars" in sys.argv:
@@ -1095,6 +1168,8 @@ elif "--hero-roster" in sys.argv:
     run(check_hero_roster)
 elif "--multi-select" in sys.argv:
     run(check_multi_select)
+elif "--dolguldur-buttons" in sys.argv:
+    run(check_dolguldur_buttons)
 elif "--shell-load" in sys.argv:
     run(check_shell_load)
 elif "--options" in sys.argv:
