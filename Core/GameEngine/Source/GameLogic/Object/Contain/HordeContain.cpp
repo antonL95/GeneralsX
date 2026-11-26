@@ -135,7 +135,7 @@ HordeContainModuleData::HordeContainModuleData()
 	m_leaderRank = 0;
 	m_splitHordeNumber = 0;
 	m_forcedLocomotorSet = -1;
-	m_bannerCarrierMinLevel = 0;
+	m_bannerCarrierMinLevel = 2;
 	m_showPips = FALSE;
 	m_thisFormationIsTheMainFormation = FALSE;
 	m_bannerCarrierDestroyHordeOnDeath = FALSE;
@@ -444,6 +444,7 @@ void HordeContain::suppressInitialPayload()
 void HordeContain::finishInitialPayload()
 {
 	m_initialPayloadPending = FALSE;
+	onRankAdvanced(getObject()->getExperienceTracker()->getRank());
 }
 
 Int HordeContain::getInitialPayloadCount() const
@@ -1069,7 +1070,7 @@ void HordeContain::onRankAdvanced(Int rank, Bool feedback)
 {
 	const auto* data = getHordeContainModuleData();
 	if (RetailFileLayers::enabled() && m_payloadCreated && getContainCount() > 0 && !m_bannerRespawnFrame &&
-		rank >= std::max<Int>(2, data->m_bannerCarrierMinLevel))
+		rank >= data->m_bannerCarrierMinLevel)
 		addBannerCarrier(feedback);
 }
 
