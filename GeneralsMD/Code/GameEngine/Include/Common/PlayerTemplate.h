@@ -274,12 +274,12 @@ public:
 	void getAllSideStrings(AsciiStringList *outStringList);
 
 private:
+	struct Definition;
 
-	typedef std::vector<PlayerTemplate> PlayerTemplateVector;
+	Definition* findDefinition(NameKeyType namekey) const;
+	void clear();
 
-	PlayerTemplateVector m_playerTemplates;
-	PlayerTemplateVector m_mapBaseTemplates;
-	Bool m_hasMapTemplates = FALSE;
+	std::vector<Definition*> m_playerTemplates;
 };
 
 // ----------------------------------------------------------------------------------------------

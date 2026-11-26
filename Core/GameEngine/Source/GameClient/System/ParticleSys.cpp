@@ -3877,7 +3877,9 @@ void ParticleSystemManager::saveMapTemplate(const AsciiString& name)
 			return;
 	ParticleSystemTemplate* current = findTemplate(name);
 	ParticleSystemTemplate* original = current ? newInstance(ParticleSystemTemplate)(*current) : nullptr;
+	MemoryPoolObjectHolder owned(original);
 	m_mapBaseTemplates.emplace_back(name, original);
+	owned.release();
 }
 
 void ParticleSystemManager::restoreMapTemplates()

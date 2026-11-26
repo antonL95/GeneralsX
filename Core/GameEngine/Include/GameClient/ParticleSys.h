@@ -1125,7 +1125,6 @@ public:
 	// which are unfortunately needed to preserve the correct logic crc.
 #else
 	virtual void init() override;
-	virtual void reset() override {}
 #endif
 	virtual void update() override {}
 	virtual void draw() override {}

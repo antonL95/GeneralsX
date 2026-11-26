@@ -24,6 +24,7 @@ enum class Ping
 };
 
 void load();
+void unload();
 void reset();
 void update();
 void parseEvent(INI *ini);

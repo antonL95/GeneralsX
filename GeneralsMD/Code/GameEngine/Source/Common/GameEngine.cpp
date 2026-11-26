@@ -451,6 +451,7 @@ GameEngine::~GameEngine()
 	// Reset all subsystems before deletion to prevent crashing due to cross dependencies.
 	reset();
 
+	RetailEva::unload();
 	TheSubsystemList->shutdownAll();
 	delete TheSubsystemList;
 	TheSubsystemList = nullptr;

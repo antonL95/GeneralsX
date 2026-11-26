@@ -2734,8 +2734,6 @@ static void findAndSelectCommandCenter(Object *obj, void* alreadyFound)
 // ------------------------------------------------------------------------------------------------
 void GameLogic::loadMapINI( AsciiString mapName )
 {
-	if (TheParticleSystemManager)
-		TheParticleSystemManager->restoreMapTemplates();
 	RetailTerrainFire::restoreSettings();
 	if (RetailFileLayers::enabled())
 		RetailSkirmishSpending::resetMapPolicies();

@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <deque>
 #include <map>
-#include <memory>
 #include <set>
 #include <utility>
 
@@ -16,6 +15,7 @@
 #include "Common/GameUtility.h"
 #include "GameClient/ClientRandomValue.h"
 #include "Common/INI.h"
+#include "Common/Overridable.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
@@ -56,9 +56,21 @@ struct Event
 	Bool jumpTo = TRUE;
 	std::vector<AsciiString> blocks;
 	std::vector<SideSound> sides;
-	std::shared_ptr<Event> mapBase;
-	Bool mapOnly = FALSE;
 };
+
+struct EventDefinition : Overridable
+{
+	MEMORY_POOL_GLUE_WITH_EXPLICIT_CREATE(EventDefinition, "RetailEvaEventDefinition", 32, 16)
+
+public:
+	explicit EventDefinition(Event&& event) : data(std::move(event)) {}
+
+	const Event& effective() const { return static_cast<const EventDefinition*>(getFinalOverride())->data; }
+
+	Event data;
+};
+
+EMPTY_DTOR(EventDefinition)
 
 struct Pending
 {
@@ -110,10 +122,10 @@ struct ScoredKillAnnouncer
 	std::array<KillWindow, MAX_PLAYER_COUNT> kills;
 };
 
-Event s_defaults;
+EventDefinition* s_defaults = nullptr;
 std::vector<ScoredKillAnnouncer> s_defaultScoredKills;
 std::vector<ScoredKillAnnouncer> s_scoredKills;
-std::map<AsciiString, Event> s_events;
+std::map<AsciiString, EventDefinition*> s_events;
 std::vector<Pending> s_pending;
 std::map<AsciiString, UnsignedInt> s_lastPlayed;
 std::map<AsciiString, PlayedEvent> s_playedEvents;
@@ -174,6 +186,12 @@ AsciiString eventKey(AsciiString name)
 {
 	name.toLower();
 	return name;
+}
+
+const Event* findEvent(const AsciiString& key)
+{
+	const auto entry = s_events.find(key);
+	return entry != s_events.end() && entry->second ? &entry->second->effective() : nullptr;
 }
 
 void resetScoredKills()
@@ -290,33 +308,24 @@ void parseEvent(INI *ini)
 	};
 
 	const AsciiString name = ini->getNextToken();
-	Event event = s_defaults;
-	event.mapBase.reset();
-	event.mapOnly = FALSE;
+	Event event = s_defaults ? s_defaults->effective() : Event{};
 	ini->initFromINI(&event, fields);
-	if (name.compareNoCase("DefaultEvaEvent") == 0)
+
+	EventDefinition*& definition = name.compareNoCase("DefaultEvaEvent") == 0 ? s_defaults : s_events[eventKey(name)];
+	const Bool isOverride = ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES;
+	EventDefinition* previous = definition ? static_cast<EventDefinition*>(definition->friend_getFinalOverride()) : nullptr;
+	if (previous && !isOverride)
 	{
-		if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
-			event.mapBase = s_defaults.mapBase ? s_defaults.mapBase : std::make_shared<Event>(s_defaults);
-		s_defaults = event;
+		previous->data = std::move(event);
+		return;
 	}
+
+	EventDefinition* next = newInstance(EventDefinition)(std::move(event));
+	next->markAsOverride(isOverride);
+	if (previous)
+		previous->setNextOverride(next);
 	else
-	{
-		const AsciiString key = eventKey(name);
-		if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
-		{
-			const auto previous = s_events.find(key);
-			if (previous == s_events.end())
-				event.mapOnly = TRUE;
-			else
-			{
-				event.mapOnly = previous->second.mapOnly;
-				if (!event.mapOnly)
-					event.mapBase = previous->second.mapBase ? previous->second.mapBase : std::make_shared<Event>(previous->second);
-			}
-		}
-		s_events[key] = event;
-	}
+		definition = next;
 }
 
 void parseSettings(INI *ini)
@@ -338,25 +347,25 @@ void reset()
 {
 	resetPlayback();
 	s_scoredKills = s_defaultScoredKills;
-	if (s_defaults.mapBase)
-	{
-		Event original = *s_defaults.mapBase;
-		s_defaults = std::move(original);
-	}
+	if (s_defaults)
+		s_defaults = static_cast<EventDefinition*>(s_defaults->deleteOverrides());
 	for (auto it = s_events.begin(); it != s_events.end();)
 	{
-		if (it->second.mapOnly)
-			it = s_events.erase(it);
-		else
-		{
-			if (it->second.mapBase)
-			{
-				Event original = *it->second.mapBase;
-				it->second = std::move(original);
-			}
+		if (it->second && it->second->deleteOverrides())
 			++it;
-		}
+		else
+			it = s_events.erase(it);
 	}
+}
+
+void unload()
+{
+	resetPlayback();
+	deleteInstance(s_defaults);
+	s_defaults = nullptr;
+	for (const auto& entry : s_events)
+		deleteInstance(entry.second);
+	s_events.clear();
 }
 
 void parseScoredKillAnnouncer(INI* ini)
@@ -442,33 +451,32 @@ void queue(const Player *recipient, const AsciiString &name, const Coord3D *posi
 	if (!RetailFileLayers::enabled() || !recipient || !ThePlayerList || recipient != rts::getObservedOrLocalPlayer_Safe() || !TheGameLogic)
 		return;
 	const auto key = eventKey(name);
-	const auto it = s_events.find(key);
+	const Event* event = findEvent(key);
 	const Coord3D* location = radarPosition ? radarPosition : position;
 	if (location && TheRadar && ping != Ping::None)
 	{
-		const Bool jumpTo = ping == Ping::Attack || it == s_events.end() || it->second.jumpTo;
+		const Bool jumpTo = ping == Ping::Attack || !event || event->jumpTo;
 		const RadarEventType type = radarType(ping);
 		if (ping == Ping::Generic || ping == Ping::Upgrade)
 			TheRadar->createEvent(location, type, 4.0f, jumpTo);
 		else if (ping == Ping::JumpOnly)
 		{
-			if (it != s_events.end() && jumpTo)
+			if (event && jumpTo)
 				TheRadar->tryEvent(type, location);
 		}
-		else if (ping == Ping::Attack || it != s_events.end() || name.isEmpty())
+		else if (ping == Ping::Attack || event || name.isEmpty())
 			TheRadar->tryEvent(type, location, jumpTo);
 	}
-	if (it == s_events.end())
+	if (!event)
 		return;
 
 	const auto frame = TheGameLogic->getFrame();
-	const Event &event = it->second;
 	const auto last = s_lastPlayed.find(key);
-	if (last != s_lastPlayed.end() && frame - last->second < event.repeat)
+	if (last != s_lastPlayed.end() && frame - last->second < event->repeat)
 		return;
-	if (std::any_of(s_pending.begin(), s_pending.end(), [&event](const Pending &pending) { return pending.event == &event; }))
+	if (std::any_of(s_pending.begin(), s_pending.end(), [event](const Pending &pending) { return pending.event == event; }))
 		return;
-	s_pending.push_back({&event, name, frame, position ? *position : Coord3D{}, position != nullptr});
+	s_pending.push_back({event, name, frame, position ? *position : Coord3D{}, position != nullptr});
 }
 
 Bool getLastPlayed(const AsciiString &name, UnsignedInt &frame, Coord3D *position)
@@ -579,11 +587,12 @@ void update()
 	s_quietUntil = frame + event.quiet;
 	for (const AsciiString &name : event.blocks)
 	{
-		const auto blocked = s_events.find(eventKey(name));
-		if (blocked == s_events.end())
+		const auto key = eventKey(name);
+		const Event* blocked = findEvent(key);
+		if (!blocked)
 			continue;
-		s_lastPlayed[blocked->first] = frame;
-		std::erase_if(s_pending, [&blocked](const Pending &other) { return other.event == &blocked->second; });
+		s_lastPlayed[key] = frame;
+		std::erase_if(s_pending, [blocked](const Pending &other) { return other.event == blocked; });
 	}
 
 	Coord3D position = pending.position;

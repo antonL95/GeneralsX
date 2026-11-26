@@ -52,6 +52,7 @@
 #include "Common/Player.h"
 #include "Common/INI.h"
 #include "Common/INIAudit.h"
+#include "Common/Overridable.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/Science.h"
 #include "GameClient/Image.h"
@@ -337,6 +338,19 @@ const Image *PlayerTemplate::getEnabledImage() const
 
 /*extern*/ PlayerTemplateStore *ThePlayerTemplateStore = nullptr;
 
+struct PlayerTemplateStore::Definition : Overridable
+{
+	MEMORY_POOL_GLUE_WITH_EXPLICIT_CREATE(Definition, "PlayerTemplateDefinition", 32, 16)
+
+public:
+	Definition() = default;
+	explicit Definition(const PlayerTemplate& source) : data(source) {}
+
+	PlayerTemplate data;
+};
+
+PlayerTemplateStore::Definition::~Definition() = default;
+
 //-----------------------------------------------------------------------------
 PlayerTemplateStore::PlayerTemplateStore()
 {
@@ -346,25 +360,31 @@ PlayerTemplateStore::PlayerTemplateStore()
 //-----------------------------------------------------------------------------
 PlayerTemplateStore::~PlayerTemplateStore()
 {
-	// nothing
+	clear();
 }
 
 //-----------------------------------------------------------------------------
 void PlayerTemplateStore::init()
 {
+	clear();
+}
+
+void PlayerTemplateStore::clear()
+{
+	for (Definition* definition : m_playerTemplates)
+		deleteInstance(definition);
 	m_playerTemplates.clear();
-	m_mapBaseTemplates.clear();
-	m_hasMapTemplates = FALSE;
 }
 
 //-----------------------------------------------------------------------------
 void PlayerTemplateStore::reset()
 {
-	if (m_hasMapTemplates)
+	for (auto it = m_playerTemplates.begin(); it != m_playerTemplates.end();)
 	{
-		m_playerTemplates = m_mapBaseTemplates;
-		m_mapBaseTemplates.clear();
-		m_hasMapTemplates = FALSE;
+		if ((*it)->deleteOverrides())
+			++it;
+		else
+			it = m_playerTemplates.erase(it);
 	}
 }
 
@@ -379,7 +399,7 @@ Int PlayerTemplateStore::getTemplateNumByName(AsciiString name) const
 {
 	for (Int num = 0; num < m_playerTemplates.size(); num++)
 	{
-		if (m_playerTemplates[num].getName().compareNoCase(name.str()) == 0)
+		if (getNthPlayerTemplate(num)->getName().compareNoCase(name.str()) == 0)
 			return num;
 	}
 	DEBUG_CRASH(("Template doesn't exist for given name"));
@@ -388,6 +408,12 @@ Int PlayerTemplateStore::getTemplateNumByName(AsciiString name) const
 
 //-----------------------------------------------------------------------------
 const PlayerTemplate* PlayerTemplateStore::findPlayerTemplate(NameKeyType namekey) const
+{
+	const Definition* definition = findDefinition(namekey);
+	return definition ? &static_cast<const Definition*>(definition->getFinalOverride())->data : nullptr;
+}
+
+PlayerTemplateStore::Definition* PlayerTemplateStore::findDefinition(NameKeyType namekey) const
 {
 // begin ugly, hokey code to quietly load old maps...
 	static NameKeyType a0 = NAMEKEY("FactionAmerica");
@@ -416,17 +442,9 @@ const PlayerTemplate* PlayerTemplateStore::findPlayerTemplate(NameKeyType nameke
 		namekey = g0;
 // end ugly, hokey code to quietly load old maps...
 
-	#ifdef RTS_DEBUG
-	AsciiString nn = KEYNAME(namekey);
-	#endif
-  for (PlayerTemplateVector::const_iterator it = m_playerTemplates.begin(); it != m_playerTemplates.end(); ++it)
-	{
-		#ifdef RTS_DEBUG
-		AsciiString n = KEYNAME((*it).getNameKey());
-		#endif
-		if ((*it).getNameKey() == namekey)
-			return &(*it);
-	}
+	for (Definition* definition : m_playerTemplates)
+		if (definition->data.getNameKey() == namekey)
+			return definition;
 	return nullptr;
 }
 
@@ -434,7 +452,7 @@ const PlayerTemplate* PlayerTemplateStore::findPlayerTemplate(NameKeyType nameke
 const PlayerTemplate* PlayerTemplateStore::getNthPlayerTemplate(Int i) const
 {
 	if (i >= 0 && i < m_playerTemplates.size())
-		return &m_playerTemplates[i];
+		return &static_cast<const Definition*>(m_playerTemplates[i]->getFinalOverride())->data;
 
 	return nullptr;
 }
@@ -472,30 +490,32 @@ void PlayerTemplateStore::getAllSideStrings(AsciiStringList *outStringList)
 }
 
 //-------------------------------------------------------------------------------------------------
-/*static*/ void PlayerTemplateStore::parsePlayerTemplateDefinition( INI* ini )
+void PlayerTemplateStore::parsePlayerTemplateDefinition(INI* ini)
 {
-	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES && !ThePlayerTemplateStore->m_hasMapTemplates)
-	{
-		ThePlayerTemplateStore->m_mapBaseTemplates = ThePlayerTemplateStore->m_playerTemplates;
-		ThePlayerTemplateStore->m_hasMapTemplates = TRUE;
-	}
-	const char* c = ini->getNextToken();
-	NameKeyType namekey = NAMEKEY(c);
+	const NameKeyType namekey = NAMEKEY(ini->getNextToken());
+	const Bool isOverride = ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES;
+	auto& store = *ThePlayerTemplateStore;
+	Definition* base = store.findDefinition(namekey);
+	Definition* previous = base ? static_cast<Definition*>(base->friend_getFinalOverride()) : nullptr;
 
-	PlayerTemplate* pt = const_cast<PlayerTemplate*>(ThePlayerTemplateStore->findPlayerTemplate(namekey));
-	if (pt)
+	Definition* definition = previous;
+	MemoryPoolObjectHolder owned;
+	if (!definition || isOverride)
 	{
-		ini->initFromINI(pt, pt->getFieldParse() );
-		pt->setNameKey(namekey);
+		definition = previous ? newInstance(Definition)(previous->data) : newInstance(Definition);
+		owned.hold(definition);
+		definition->markAsOverride(isOverride);
 	}
-	else
+	ini->initFromINI(&definition->data, PlayerTemplate::getFieldParse());
+	definition->data.setNameKey(namekey);
+	if (definition != previous)
 	{
-		PlayerTemplate npt;
-		ini->initFromINI( &npt, npt.getFieldParse() );
-		npt.setNameKey(namekey);
-		ThePlayerTemplateStore->m_playerTemplates.push_back(npt);
+		if (previous)
+			previous->setNextOverride(definition);
+		else
+			store.m_playerTemplates.push_back(definition);
+		owned.release();
 	}
-
 }
 
 //-------------------------------------------------------------------------------------------------
