@@ -1611,7 +1611,6 @@ void Object::clearAndSetModelConditionState( ModelConditionFlagType clr, ModelCo
 	}
 }
 
-//=============================================================================
 void Object::notifyConstructionConditionChange( const ModelConditionFlags& previous )
 {
 	if (previous.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_PARTIALLY_CONSTRUCTED))
