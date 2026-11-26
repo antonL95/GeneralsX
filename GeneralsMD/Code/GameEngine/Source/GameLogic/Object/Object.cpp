@@ -1612,36 +1612,49 @@ void Object::clearAndSetModelConditionState( ModelConditionFlagType clr, ModelCo
 }
 
 //=============================================================================
+void Object::notifyConstructionConditionChange( const ModelConditionFlags& previous )
+{
+	if (previous.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_PARTIALLY_CONSTRUCTED))
+		RetailBuildingEvents::modelConditionsChanged(*this, previous);
+}
+
+//=============================================================================
 void Object::clearModelConditionFlags( const ModelConditionFlags& clr )
 {
+	const ModelConditionFlags previousConditions = m_logicModelConditions;
 	if (RetailFileLayers::enabled())
 		m_logicModelConditions.clear(clr);
 	if (m_drawable)
 	{
 		m_drawable->clearModelConditionFlags(clr);
 	}
+	notifyConstructionConditionChange(previousConditions);
 }
 
 //=============================================================================
 void Object::setModelConditionFlags( const ModelConditionFlags& set )
 {
+	const ModelConditionFlags previousConditions = m_logicModelConditions;
 	if (RetailFileLayers::enabled())
 		m_logicModelConditions.set(set);
 	if (m_drawable)
 	{
 		m_drawable->setModelConditionFlags(set);
 	}
+	notifyConstructionConditionChange(previousConditions);
 }
 
 //=============================================================================
 void Object::clearAndSetModelConditionFlags( const ModelConditionFlags& clr, const ModelConditionFlags& set )
 {
+	const ModelConditionFlags previousConditions = m_logicModelConditions;
 	if (RetailFileLayers::enabled())
 		m_logicModelConditions.clearAndSet(clr, set);
 	if (m_drawable)
 	{
 		m_drawable->clearAndSetModelConditionFlags(clr, set);
 	}
+	notifyConstructionConditionChange(previousConditions);
 }
 
 //=============================================================================
