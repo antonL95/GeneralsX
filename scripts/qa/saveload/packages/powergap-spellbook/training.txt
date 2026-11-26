@@ -1,0 +1,24 @@
+220 create Player_1 IsengardSpellBook 0 3300,2500,0
+220 create Player_1 DolAmrothSpellBook 0 3300,2500,0
+220 create Player_1 PowerGapTaintAlly 0 3350,2500,0
+220 create Player_1 PowerGapTaintOutside 0 3300,2780,0
+220 create PlyrCreeps PowerGapTaintEnemy 0 3250,2500,0
+220 create PlyrCreeps PowerGapFloodEnemy 0 3300,3200,0
+220 create Player_1 PowerGapFloodAlly 0 3300,3215,0
+220 create PlyrCreeps PowerGapFloodOutside 0 3300,3600,0
+222 science Player_1 - 0 SCIENCE_IsengardTaint
+222 science Player_1 - 0 SCIENCE_EagleAllies
+230 powergap-cast Player_1 IsengardSpellBook 0 Command_SpellBookIsengardTaint 3300 2500
+231 powergap-cast Player_1 DolAmrothSpellBook 0 Command_SpellBookWrathofBelegaer 3300 3200
+240 powergap-objects Player_1 - 0 IsengardTaintLand
+240 powergap-objects Player_1 - 0 SpellBookWrathOfBelegaer
+255 powergap-objects Player_1 - 0 WrathOfBelegaerDamageObject
+320 powergap-unit Player_1 PowerGapTaintAlly 0 TaintOutlawLeadership
+320 powergap-unit Player_1 PowerGapTaintOutside 0 TaintOutlawLeadership
+320 powergap-unit PlyrCreeps PowerGapTaintEnemy 0 TaintOutlawLeadership
+580 powergap-unit PlyrCreeps PowerGapFloodEnemy 0 -
+580 powergap-unit Player_1 PowerGapFloodAlly 0 -
+580 powergap-unit PlyrCreeps PowerGapFloodOutside 0 -
+580 powergap-objects Player_1 - 0 SpellBookWrathOfBelegaer
+580 powergap-objects Player_1 - 0 WrathOfBelegaerDamageObject
+580 powergap-objects Player_1 - 0 IsengardTaintLand
