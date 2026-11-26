@@ -79,6 +79,9 @@ check() {
         expect_re '^TEST pkg11 state frame=943 name=Pkg20Ruins .*vendor=EntThrownBuildingRock grab=0,16,0,1 '
         expect_re '^TEST pkg11 state frame=943 name=Pkg20RuinsControl .*vendor=GenericThrowableRock grab=490,8,10,0 '
         expect_re '^TEST pkg20 held frame=943 caster=Pkg20ImmediateEnt id=[1-9][0-9]* name=EntThrownBuildingRock '
+        rock=$(sed -n 's/^TEST frame 880: create Pkg20ThrowableRock for PlyrCreeps id=\([0-9][0-9]*\).*/\1/p' "$log")
+        [ -n "$rock" ] || rock=$(sed -n 's/^TEST frame 880: create Pkg20ThrowableRock for PlyrCreeps id=\([0-9][0-9]*\).*/\1/p' "$out/continue.log")
+        expect_re "^TEST pkg20 held frame=943 caster=Pkg20EntOak id=$rock name=Pkg20ThrowableRock "
         expect_re '^TEST pkg20 ownership frame=943 caster=Pkg20ImmediateEnt vendor-hostile=1 stock=GenericThrowableRock neutral=1 producer=1$'
     fi
     if covers 945; then
@@ -103,6 +106,7 @@ check() {
     fi
     if covers 1140; then
         expect_re '^TEST pkg20 held frame=1140 caster=Pkg20Troll id=0 name=- '
+        expect 'TEST pkg20 ownership frame=1140 caster=Pkg20FindRockEnt vendor-hostile=1 stock=GenericThrowableRock neutral=1 producer=1'
     fi
 }
 

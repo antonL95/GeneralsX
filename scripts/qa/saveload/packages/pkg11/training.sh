@@ -25,7 +25,15 @@ check() {
     if covers 1042; then
         expect_re '^TEST projectile frame=1042 weapon=Pkg11SiegeLaunch .*warhead=Pkg11SiegeWarhead '
     fi
+    if covers 1043; then
+        expect_re '^TEST pkg11 held frame=1043 id=[1-9][0-9]* name=EntThrownBuildingRock$'
+        expect_re '^TEST pkg11 state frame=1043 name=Pkg11Wall hp=1910.0/2400.0 .*grab=490,16,0,1 '
+    fi
+    if covers 1044; then
+        expect_re '^TEST pkg11 held frame=1044 id=[1-9][0-9]* name=EntThrownBuildingRock$'
+    fi
     if covers 1045; then
+        expect_re '^TEST pkg11 held frame=1045 id=[1-9][0-9]* name=EntThrownBuildingRock$'
         expect_re '^TEST pkg11 state frame=1045 name=Pkg11Captain hp=800.0/800.0 '
     fi
     if covers 1092; then
@@ -37,4 +45,20 @@ check() {
     if covers 1101; then
         expect_re '^TEST pkg11 state frame=1101 name=Pkg11Guardhouse hp=2010.0/3000.0 '
     fi
+    if covers 1270; then
+        expect_re '^TEST pkg11 state frame=1270 name=Pkg11EntOak .*items=0 '
+        expect_re '^TEST pkg11 state frame=1270 name=Pkg11WallControl hp=2400.0/2400.0 .*grab=0,0,0,0 '
+    fi
+}
+
+compare() {
+    for frame in 1044 1045; do
+        if [ "$frame" -ge "$save_frame" ] && [ "$frame" -le "$end" ]; then
+            held=$(grep -E "^TEST pkg11 held frame=$frame id=[1-9][0-9]* name=EntThrownBuildingRock$" "$out/continue.log")
+            grep -Fx "$held" "$out/resume.log" > /dev/null || {
+                printf 'Mismatch in resume for: %s\n' "$held" >&2
+                return 1
+            }
+        fi
+    done
 }

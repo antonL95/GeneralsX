@@ -1,3 +1,7 @@
+930 create Player_1 Pkg11EntFir 0 2280,660,0
+930 create PlyrCreeps Pkg11Wall 0 2300,660,180
+931 weapon-upgrade-toggle Player_1 Pkg11EntFir 0 Command_ToggleEntRockThrow
+933 pkg11-power Player_1 Pkg11EntFir 0 PlyrCreeps:Pkg11Wall:0
 980 create PlyrCreeps Pkg11Source 0 2230,820,180
 980 create Player_1 Pkg11Guardhouse 0 1950,820,0
 981 create Player_1 Pkg11Captain 0 2100,720,0
@@ -29,12 +33,26 @@
 1040 pkg11-state Player_1 Pkg11Guardhouse 0
 1042 pkg11-shoot PlyrCreeps Pkg11Source 0 Player_1:Pkg11Guardhouse:0 2 1
 1043 pkg11-power Player_1 Pkg11Captain 0 Pkg11Athelas
+1043 pkg11-held Player_1 Pkg11EntFir 0
+1043 pkg11-state PlyrCreeps Pkg11Wall 0
+1044 pkg11-held Player_1 Pkg11EntFir 0
+1045 pkg11-held Player_1 Pkg11EntFir 0
 1045 pkg11-state Player_1 Pkg11Captain 0
 1047 destroy Player_1 Pkg11Captain 0
+1047 destroy Player_1 Pkg11EntFir 0
+1047 destroy PlyrCreeps Pkg11Wall 0
 1050 pkg11-damage PlyrCreeps Pkg11Source 0 Player_1:Pkg11Guardhouse:0 350 1
 1051 pkg11-state Player_1 Pkg11Guardhouse 0
 1052 pkg11-debris Player_1 Pkg11Guardhouse 0 BuildingGBBarracksN2D2BitA
 1092 pkg11-debris Player_1 Pkg11Guardhouse 0 BuildingDamageBits
 1101 pkg11-state Player_1 Pkg11Guardhouse 0
 1110 destroy Player_1 Pkg11Guardhouse 0
-1110 destroy PlyrCreeps Pkg11Source 0
+1140 create Player_1 Pkg11EntOak 0 2280,540,0
+1140 create PlyrCreeps Pkg11WallControl 0 2300,540,180
+1141 weapon-upgrade-toggle Player_1 Pkg11EntOak 0 Command_ToggleEntRockThrow
+1143 pkg11-power Player_1 Pkg11EntOak 0 PlyrCreeps:Pkg11WallControl:0
+1270 pkg11-state Player_1 Pkg11EntOak 0
+1270 pkg11-state PlyrCreeps Pkg11WallControl 0
+1272 destroy Player_1 Pkg11EntOak 0
+1272 destroy PlyrCreeps Pkg11WallControl 0
+1272 destroy PlyrCreeps Pkg11Source 0
