@@ -58,6 +58,15 @@ void logHordeSpeed(const RetailTestCommands::Context& ctx)
 		total += error;
 		speeds += planarSpeed(*member);
 		memberAuthored = std::max(memberAuthored, authoredSpeed(*member));
+		if (ctx.frame == 800 || ctx.frame == 1000 || ctx.frame == 1100)
+		{
+			HordeContain::FormationGoal goal = {};
+			if (horde->getFormationGoal(member, goal))
+				std::fprintf(stderr, "TEST horde-speed-member %u %s %u pos=%.2f,%.2f slot=%.2f,%.2f goal=%.2f,%.2f speed=%.2f target=%.2f facing=%.2f\n",
+					ctx.frame, anchor->getTemplate()->getName().str(), static_cast<unsigned>(member->getID()),
+					member->getPosition()->x, member->getPosition()->y, slot.x, slot.y, goal.position.x, goal.position.y,
+					planarSpeed(*member), goal.speed * LOGICFRAMES_PER_SECOND, member->getOrientation());
+		}
 	}
 	std::fprintf(stderr, "TEST horde-speed %u %s %.2f %.2f %.2f %.2f %u %.2f %.2f %.2f %.2f\n", ctx.frame,
 		anchor->getTemplate()->getName().str(), anchor->getPosition()->x, anchor->getPosition()->y,
