@@ -724,8 +724,6 @@ public:
 	Bool isMovingWithRetailGroup() const;
 	void clearRetailGroupIdentity();
 	void endRetailGroupRoute(Bool arrived);
-	void setRetailGroupPacing(const std::vector<ObjectID>& peers, Real speed, Real distance);
-	void updateRetailGroupPacing(Real distance);
 #ifdef DEBUG_LOGGING
 	inline const Coord3D *friend_getRequestedDestination() const { return &m_requestedDestination; }
 	inline const Coord3D *friend_getRequestedDestination2() const { return &m_requestedDestination2; }
@@ -875,9 +873,6 @@ private:
 	Bool m_retailRingReturn = FALSE;
 	ObjectID m_retailGroupRouteLeader = INVALID_ID;
 	UnsignedInt m_retailGroupRouteFrame = 0;
-	std::vector<ObjectID> m_retailGroupPeers;
-	Real m_retailGroupRemainingDistance = 0.0f;
-	Real m_retailGroupSpeed = FAST_AS_POSSIBLE;
 	UnsignedInt m_retailPlannerIssuedFrame = 0;
 	UnsignedInt m_retailPlannerPathRevision = 0;
 	UnsignedInt m_retailPlannerBlockedRevision = 0;

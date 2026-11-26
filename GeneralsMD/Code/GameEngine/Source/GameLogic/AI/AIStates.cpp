@@ -3418,18 +3418,6 @@ StateReturnType AIFollowPathState::update()
 	Object *obj = getMachineOwner();
 	AIUpdateInterface *ai = obj->getAI();
 	const Bool groupRoute = ai->isFollowingRetailGroupRoute();
-	if (groupRoute)
-	{
-		const Coord3D* from = &m_goalPosition;
-		const Coord3D delta = m_goalPosition - *obj->getPosition();
-		Real remainingDistance = WWMath::SqrtfOrigin(sqr(delta.x) + sqr(delta.y));
-		for (Int index = m_index + 1; const Coord3D* point = ai->friend_getGoalPathPosition(index); ++index)
-		{
-			remainingDistance += WWMath::SqrtfOrigin(sqr(point->x - from->x) + sqr(point->y - from->y));
-			from = point;
-		}
-		ai->updateRetailGroupPacing(remainingDistance);
-	}
 	// do movement
 	StateReturnType status = AIInternalMoveToState::update();
 	// if move to has finished, move to next point on path

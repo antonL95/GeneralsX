@@ -3977,40 +3977,6 @@ void AIUpdateInterface::endRetailGroupRoute(Bool arrived)
 		clearRetailGroupIdentity();
 	m_waitingForPath = FALSE;
 	TheAI->pathfinder()->removeGoal(getObject());
-	m_retailGroupPeers.clear();
-	m_retailGroupRemainingDistance = 0.0f;
-	m_retailGroupSpeed = FAST_AS_POSSIBLE;
-}
-
-void AIUpdateInterface::setRetailGroupPacing(const std::vector<ObjectID>& peers, Real speed, Real distance)
-{
-	m_retailGroupPeers = peers;
-	m_retailGroupSpeed = speed;
-	m_retailGroupRemainingDistance = distance;
-}
-
-void AIUpdateInterface::updateRetailGroupPacing(Real distance)
-{
-	if (m_retailGroupSpeed >= FAST_AS_POSSIBLE || distance <= 0.0f)
-		return;
-	const Real formationScale = hordeFormationSpeedScale();
-	m_retailGroupRemainingDistance = formationScale > 0.0f ? distance / formationScale : distance;
-	Real longestDistance = m_retailGroupRemainingDistance;
-	for (ObjectID id : m_retailGroupPeers)
-	{
-		if (id == getObject()->getID())
-			continue;
-		const Object* peer = TheGameLogic->findObjectByID(id);
-		if (!peer || peer->isEffectivelyDead() || !peer->isMobile() || peer->isDisabledByType(DISABLED_HELD))
-			continue;
-		const AIUpdateInterface* ai = peer->getAI();
-		if (!ai || !ai->isFollowingRetailGroupRoute() || ai->m_retailGroupRouteLeader != m_retailGroupRouteLeader ||
-			ai->m_retailGroupRouteFrame != m_retailGroupRouteFrame)
-			continue;
-		longestDistance = std::max(longestDistance, ai->m_retailGroupRemainingDistance);
-	}
-	const Real minimumSpeed = std::min(m_retailGroupSpeed, PATHFIND_CELL_SIZE_F / LOGICFRAMES_PER_SECOND);
-	setDesiredSpeed(std::max(minimumSpeed, m_retailGroupSpeed * (m_retailGroupRemainingDistance / longestDistance)));
 }
 
 //----------------------------------------------------------------------------------------
@@ -6119,15 +6085,6 @@ void AIUpdateInterface::xferRetailBlocks(Xfer* xfer, Bool present)
 		}, [this] {
 			m_retailGroupRouteLeader = INVALID_ID;
 			m_retailGroupRouteFrame = 0;
-		} },
-		{ "group-pacing", [this](Xfer* x) {
-			x->xferSTLObjectIDVector(&m_retailGroupPeers);
-			x->xferReal(&m_retailGroupRemainingDistance);
-			x->xferReal(&m_retailGroupSpeed);
-		}, [this] {
-			m_retailGroupPeers.clear();
-			m_retailGroupRemainingDistance = 0.0f;
-			m_retailGroupSpeed = FAST_AS_POSSIBLE;
 		} },
 		{ "rampage-weapon", [this](Xfer* x) {
 			x->xferBool(&m_rampageWeaponPrimed);

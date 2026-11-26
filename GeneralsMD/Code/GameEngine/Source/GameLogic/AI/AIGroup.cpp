@@ -1590,27 +1590,6 @@ void clampWaypointPosition( Coord3D &position, Int margin )
 /**
  * Move to given position(s)
  */
-Real AIGroup::getRotwkMoveSpeed() const
-{
-	Real speed = FAST_AS_POSSIBLE;
-	Int movers = 0;
-	for (const Object* obj : m_memberList)
-	{
-		const AIUpdateInterface* ai = obj->getAI();
-		if (!ai || !ai->getCurLocomotor() || !obj->isMobile() || obj->isEffectivelyDead() ||
-			obj->isDisabledByType(DISABLED_HELD))
-			continue;
-		++movers;
-		if (IS_CONDITION_BETTER(obj->getBodyModule()->getDamageState(), TheGlobalData->m_movementPenaltyDamageState))
-		{
-			const Real maxSpeed = ai->getCurLocomotorSpeed();
-			if (maxSpeed > 0.0f)
-				speed = std::min(speed, maxSpeed);
-		}
-	}
-	return movers > 1 ? speed : FAST_AS_POSSIBLE;
-}
-
 namespace
 {
 struct RotwkGroupMove
@@ -1757,7 +1736,7 @@ Bool tryRotwkGroupCorridor(std::vector<RotwkGroupMove>& movers, const Coord3D& f
 }
 }
 
-Bool AIGroup::friend_moveRotwkBlockToPos(const Coord3D* pos, CommandSourceType cmdSource, Real speed, Bool& useIndividualGroundOrders)
+Bool AIGroup::friend_moveRotwkBlockToPos(const Coord3D* pos, CommandSourceType cmdSource, Bool& useIndividualGroundOrders)
 {
 	const Real REARRANGE_ANGLE = PI / 4.0f;
 	const Real MAX_OFFSET_RADII = 6.0f;
@@ -1853,9 +1832,6 @@ Bool AIGroup::friend_moveRotwkBlockToPos(const Coord3D* pos, CommandSourceType c
 				}
 			}
 		}
-		const Real maxSpeed = ai->getCurLocomotorSpeed();
-		if (maxSpeed > 0.0f)
-			speed = std::min(speed, maxSpeed);
 	}
 
 	std::set<ObjectID> departingGroup;
@@ -1894,23 +1870,7 @@ Bool AIGroup::friend_moveRotwkBlockToPos(const Coord3D* pos, CommandSourceType c
 		}
 	}
 
-	if (allGround && !representative)
-	{
-		for (RotwkGroupMove& move : movers)
-		{
-			move.distance = rotwkGroupTravelDistance(*move.object->getPosition(), move.destination);
-			longestDistance = std::max(longestDistance, move.distance);
-		}
-	}
-
 	Object* leader = sharedRoute ? representative->object : movers.front().object;
-	std::vector<ObjectID> routePeers;
-	if (sharedRoute)
-	{
-		for (const RotwkGroupMove& move : movers)
-			if (move.waypoints.size() > 1)
-				routePeers.push_back(move.object->getID());
-	}
 
 	for (RotwkGroupMove& move : movers)
 	{
@@ -1921,19 +1881,10 @@ Bool AIGroup::friend_moveRotwkBlockToPos(const Coord3D* pos, CommandSourceType c
 		{
 			ai->aiFollowRetailGroupPath(&move.waypoints, leader, cmdSource);
 			if (ai->isFollowingRetailGroupRoute())
-			{
 				pathfinder->updateGoal(obj, &move.destination, layer);
-				ai->setRetailGroupPacing(routePeers, speed, move.distance);
-			}
 		}
 		else
 			ai->aiMoveToRetailGroupSlot(&move.destination, leader, cmdSource);
-		if (speed < FAST_AS_POSSIBLE)
-		{
-			const Real cap = move.distance > 0.0f && longestDistance > 0.0f ?
-				speed * (move.distance / longestDistance) : speed;
-			ai->setDesiredSpeed(cap);
-		}
 	}
 	return TRUE;
 }
@@ -1962,11 +1913,10 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
   }
 
 	const Bool retailMove = !addWaypoint && !isFormation && RetailFileLayers::enabled();
-	const Real retailSpeed = retailMove ? getRotwkMoveSpeed() : FAST_AS_POSSIBLE;
 	if (retailMove)
 	{
 		clampWaypointPosition( position, STD_WAYPOINT_CLAMP_MARGIN );
-		didRotwkBlock = friend_moveRotwkBlockToPos(pos, cmdSource, retailSpeed, useIndividualGroundOrders);
+		didRotwkBlock = friend_moveRotwkBlockToPos(pos, cmdSource, useIndividualGroundOrders);
 	}
 
 
@@ -2148,8 +2098,6 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		if( !addWaypoint )
 		{
 			ai->aiMoveToPosition( &dest, cmdSource );
-			if (retailMove && !useIndividualGroundOrders)
-				ai->setDesiredSpeed(retailSpeed);
 		}
 		else
 		{
