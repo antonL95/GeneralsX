@@ -1,0 +1,10 @@
+3 cash Player_1 - 0 90000
+6 create Player_1 FireWyrmLair 0 2600,600,0
+6 create Player_1 WildFortressCitadel 0 2600,1000,0
+10 unlock-button-state Player_1 FireWyrmLair 0 Command_ConstructWildColdDrake
+12 fortress-purchase Player_1 FireWyrmLair 0 Command_UpgradeWyrmLairLevel2
+950 unlock-button-state Player_1 FireWyrmLair 0 Command_ConstructWildColdDrake
+960 fortress-purchase Player_1 WildFortressCitadel 0 Command_PurchaseUpgradeWildFortressNorthernWastes
+1950 unlock-button-state Player_1 FireWyrmLair 0 Command_ConstructWildColdDrake
+1960 queuebutton Player_1 FireWyrmLair 0 Command_ConstructWildColdDrake
+3900 unlock-button-state Player_1 FireWyrmLair 0 Command_ConstructWildColdDrake
