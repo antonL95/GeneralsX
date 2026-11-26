@@ -923,7 +923,10 @@ void Object::friend_setContainedBy(Object* containedBy)
 	m_containedBy = containedBy;
 
 #if !RETAIL_COMPATIBLE_CRC
-	m_containedByFrame = containedBy ? TheGameLogic->getFrame() : 0;
+	const Bool restoring = containedBy && containedBy->getID() == m_xferContainedByID &&
+		RetailFileLayers::enabled() && TheGameState && TheGameState->isInLoadGame();
+	if (!restoring)
+		m_containedByFrame = containedBy ? TheGameLogic->getFrame() : 0;
 #endif
 }
 
