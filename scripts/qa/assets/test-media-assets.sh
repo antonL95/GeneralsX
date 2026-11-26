@@ -4,7 +4,7 @@ set -eu
 build=$(cd "${1:?build directory required}" && pwd)
 fixtures=$(cd "$(dirname "$0")" && pwd)
 case "${2:-}" in
-	weighted-audio|ambient-streams) fixture="$fixtures/$2" ;;
+	weighted-audio|ambient-streams|vp6-video) fixture="$fixtures/$2" ;;
 	*) exit 2 ;;
 esac
 out="$build/$2"

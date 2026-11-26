@@ -235,6 +235,10 @@ WW3DFormat W3DVideoBuffer::TypeToW3DFormat( VideoBuffer::Type format )
 	WW3DFormat w3dFormat = WW3D_FORMAT_UNKNOWN;
 	switch ( format )
 	{
+		case TYPE_A8R8G8B8:
+			w3dFormat = WW3D_FORMAT_A8R8G8B8;
+			break;
+
 		case TYPE_X8R8G8B8:
 			w3dFormat = WW3D_FORMAT_X8R8G8B8;
 			break;

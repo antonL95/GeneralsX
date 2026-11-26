@@ -66,9 +66,6 @@ extern "C" {
 //----------------------------------------------------------------------------
 //         Defines
 //----------------------------------------------------------------------------
-#define VIDEO_LANG_PATH_FORMAT "Data/%s/Movies/%s.%s"
-#define VIDEO_PATH	"Data\\Movies"
-#define VIDEO_EXT		"bik"
 
 
 
@@ -197,7 +194,7 @@ VideoStreamInterface* FFmpegVideoPlayer::createStream( File* file )
 	}
 
 	FFmpegFile* ffmpegHandle = NEW FFmpegFile();
-	if(!ffmpegHandle->open(file))
+	if (!ffmpegHandle->open(file) || ffmpegHandle->getWidth() <= 0 || ffmpegHandle->getHeight() <= 0)
 	{
 		delete ffmpegHandle;
 		return nullptr;
@@ -207,6 +204,11 @@ VideoStreamInterface* FFmpegVideoPlayer::createStream( File* file )
 
 	if ( stream )
 	{
+		if (!stream->m_gotFrame)
+		{
+			delete stream;
+			return nullptr;
+		}
 
 		stream->m_next = m_firstStream;
 		stream->m_player = this;
@@ -230,41 +232,30 @@ VideoStreamInterface* FFmpegVideoPlayer::createStream( File* file )
 
 VideoStreamInterface*	FFmpegVideoPlayer::open( AsciiString movieTitle )
 {
-	VideoStreamInterface*	stream = nullptr;
-
 	const Video* pVideo = getVideo(movieTitle);
-	if (pVideo) {
-		DEBUG_LOG(("FFmpegVideoPlayer::createStream() - About to open bink file"));
+	if (!pVideo || pVideo->m_filename.isEmpty())
+		return nullptr;
 
+	const auto language = GetRegistryLanguage();
+	const char* name = pVideo->m_filename.str();
+	for (const char* extension : {"vp6", "bik"})
+	{
+		AsciiString path;
 		if (TheGlobalData->m_modDir.isNotEmpty())
 		{
-			char filePath[ _MAX_PATH ];
-			snprintf( filePath, ARRAY_SIZE(filePath), "%s%s\\%s.%s", TheGlobalData->m_modDir.str(), VIDEO_PATH, pVideo->m_filename.str(), VIDEO_EXT );
-			File* file =  TheFileSystem->openFile(filePath);
-			DEBUG_ASSERTLOG(!file, ("opened bink file %s", filePath));
-			if (file)
-			{
-				return createStream( file );
-			}
+			path.format("%sData\\Movies\\%s.%s", TheGlobalData->m_modDir.str(), name, extension);
+			if (auto* stream = createStream(TheFileSystem->openFile(path.str())))
+				return stream;
 		}
-
-		char localizedFilePath[ _MAX_PATH ];
-		snprintf( localizedFilePath, ARRAY_SIZE(localizedFilePath), VIDEO_LANG_PATH_FORMAT, GetRegistryLanguage().str(), pVideo->m_filename.str(), VIDEO_EXT );
-		File* file =  TheFileSystem->openFile(localizedFilePath);
-		DEBUG_ASSERTLOG(!file, ("opened localized bink file %s", localizedFilePath));
-		if (!file)
-		{
-			char filePath[ _MAX_PATH ];
-			snprintf( filePath, ARRAY_SIZE(filePath), "%s\\%s.%s", VIDEO_PATH, pVideo->m_filename.str(), VIDEO_EXT );
-			file = TheFileSystem->openFile(filePath);
-			DEBUG_ASSERTLOG(!file, ("opened bink file %s", filePath));
-		}
-
-		DEBUG_LOG(("FFmpegVideoPlayer::createStream() - About to create stream"));
-		stream = createStream( file );
+		path.format("Data\\%s\\Movies\\%s.%s", language.str(), name, extension);
+		if (auto* stream = createStream(TheFileSystem->openFile(path.str())))
+			return stream;
+		path.format("Data\\Movies\\%s.%s", name, extension);
+		if (auto* stream = createStream(TheFileSystem->openFile(path.str())))
+			return stream;
 	}
 
-	return stream;
+	return nullptr;
 }
 
 //============================================================================
@@ -320,6 +311,8 @@ void FFmpegVideoPlayer::initializeBinkWithMiles()
 FFmpegVideoStream::FFmpegVideoStream(FFmpegFile* file)
 : m_ffmpegFile(file)
 {
+	m_videoStreamIndex = file->getVideoStreamIndex();
+	m_alphaStreamIndex = file->getAlphaStreamIndex();
 	m_ffmpegFile->setFrameCallback(onFrame);
 	m_ffmpegFile->setUserData(this);
 
@@ -377,6 +370,7 @@ FFmpegVideoStream::~FFmpegVideoStream()
 #endif
 	av_freep(&m_audioBuffer);
 	av_frame_free(&m_frame);
+	av_frame_free(&m_alphaFrame);
 	sws_freeContext(m_swsContext);
 	delete m_ffmpegFile;
 }
@@ -385,9 +379,20 @@ void FFmpegVideoStream::onFrame(AVFrame *frame, int stream_idx, int stream_type,
 {
 	FFmpegVideoStream *videoStream = static_cast<FFmpegVideoStream *>(user_data);
 	if (stream_type == AVMEDIA_TYPE_VIDEO) {
-		av_frame_free(&videoStream->m_frame);
-		videoStream->m_frame = av_frame_clone(frame);
-		videoStream->m_gotFrame = true;
+		if (stream_idx == videoStream->m_videoStreamIndex)
+		{
+			av_frame_free(&videoStream->m_frame);
+			videoStream->m_frame = av_frame_clone(frame);
+			videoStream->m_newVideoFrame = videoStream->m_frame != nullptr;
+		}
+		else if (stream_idx == videoStream->m_alphaStreamIndex)
+		{
+			av_frame_free(&videoStream->m_alphaFrame);
+			videoStream->m_alphaFrame = av_frame_clone(frame);
+			videoStream->m_newAlphaFrame = videoStream->m_alphaFrame != nullptr;
+		}
+		videoStream->m_gotFrame = videoStream->m_newVideoFrame &&
+			(videoStream->m_alphaStreamIndex < 0 || videoStream->m_newAlphaFrame);
 	}
 #if defined(SAGE_USE_OPENAL) || defined(SAGE_USE_MINIAUDIO)
 	else if (stream_type == AVMEDIA_TYPE_AUDIO) {
@@ -536,21 +541,16 @@ void FFmpegVideoStream::frameDecompress()
 
 void FFmpegVideoStream::frameRender( VideoBuffer *buffer )
 {
-	if (buffer == nullptr) {
-		return;
-	}
-
-	if (m_frame == nullptr) {
-		return;
-	}
-
-	if (m_frame->data == nullptr) {
+	if (!buffer || !m_gotFrame || !m_frame || !m_frame->data[0]) {
 		return;
 	}
 
 	AVPixelFormat dst_pix_fmt;
 
 	switch (buffer->format()) {
+		case VideoBuffer::TYPE_A8R8G8B8:
+			dst_pix_fmt = AV_PIX_FMT_BGRA;
+			break;
 		case VideoBuffer::TYPE_R8G8B8:
 			dst_pix_fmt = AV_PIX_FMT_RGB24;
 			break;
@@ -567,10 +567,21 @@ void FFmpegVideoStream::frameRender( VideoBuffer *buffer )
 			return;
 	}
 
+	const auto source_format = static_cast<AVPixelFormat>(m_frame->format);
+	const bool separate_alpha = source_format == AV_PIX_FMT_YUV420P && m_alphaFrame && m_alphaFrame->data[0] &&
+		m_alphaFrame->width == m_frame->width && m_alphaFrame->height == m_frame->height;
+	const uint8_t* source_data[4] = {
+		m_frame->data[0], m_frame->data[1], m_frame->data[2],
+		separate_alpha ? m_alphaFrame->data[0] : m_frame->data[3]
+	};
+	const int source_strides[4] = {
+		m_frame->linesize[0], m_frame->linesize[1], m_frame->linesize[2],
+		separate_alpha ? m_alphaFrame->linesize[0] : m_frame->linesize[3]
+	};
 	m_swsContext = sws_getCachedContext(m_swsContext,
-		width(),
-		height(),
-		static_cast<AVPixelFormat>(m_frame->format),
+		m_frame->width,
+		m_frame->height,
+		separate_alpha ? AV_PIX_FMT_YUVA420P : source_format,
 		buffer->width(),
 		buffer->height(),
 		dst_pix_fmt,
@@ -578,6 +589,8 @@ void FFmpegVideoStream::frameRender( VideoBuffer *buffer )
 		nullptr,
 		nullptr,
 		nullptr);
+	if (!m_swsContext)
+		return;
 
 	uint8_t *buffer_data = static_cast<uint8_t *>(buffer->lock());
 	if (buffer_data == nullptr) {
@@ -585,10 +598,10 @@ void FFmpegVideoStream::frameRender( VideoBuffer *buffer )
 		return;
 	}
 
-	int dst_strides[] = { (int)buffer->pitch() };
-	uint8_t *dst_data[] = { buffer_data };
+	int dst_strides[4] = { static_cast<int>(buffer->pitch()) };
+	uint8_t* dst_data[4] = { buffer_data };
 	[[maybe_unused]] int result =
-		sws_scale(m_swsContext, m_frame->data, m_frame->linesize, 0, height(), dst_data, dst_strides);
+		sws_scale(m_swsContext, source_data, source_strides, 0, m_frame->height, dst_data, dst_strides);
 	DEBUG_ASSERTLOG(result >= 0, ("Failed to scale frame"));
 	buffer->unlock();
 }
@@ -600,6 +613,8 @@ void FFmpegVideoStream::frameRender( VideoBuffer *buffer )
 void FFmpegVideoStream::frameNext()
 {
 	m_gotFrame = false;
+	m_newVideoFrame = false;
+	m_newAlphaFrame = false;
 	// Decode until we have our next video frame
 	while (m_good && m_gotFrame == false)
 		m_good = m_ffmpegFile->decodePacket();

@@ -58,6 +58,11 @@ class FFmpegVideoStream : public VideoStream
 		Bool 			m_good = true;			///< Is the stream valid
 		Bool 			m_gotFrame = false;		///< Is the frame ready to be displayed
 		AVFrame 		*m_frame = nullptr;		///< Current frame
+		AVFrame		*m_alphaFrame = nullptr;
+		Int			m_videoStreamIndex = -1;
+		Int			m_alphaStreamIndex = -1;
+		Bool		m_newVideoFrame = false;
+		Bool		m_newAlphaFrame = false;
 		SwsContext 		*m_swsContext = nullptr;///< SWSContext for scaling
 		FFmpegFile		*m_ffmpegFile;			///< The AVUI abstraction											///< Bink streaming handle;
 		Char			*m_memFile;				///< Pointer to memory resident file

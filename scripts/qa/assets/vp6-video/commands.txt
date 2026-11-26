@@ -1,0 +1,4 @@
+16 video-asset-probe - - 0 LoadingRing
+17 video-asset-probe - - 0 movieCredits
+18 video-asset-probe - - 0 movieSkirmishGondor
+19 quit - - 0

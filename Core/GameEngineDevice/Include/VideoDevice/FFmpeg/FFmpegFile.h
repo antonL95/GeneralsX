@@ -70,6 +70,8 @@ public:
 	Int getNumFrames() const;
 	Int getCurrentFrame() const;
 	Int getPixelFormat() const;
+	Int getVideoStreamIndex() const;
+	Int getAlphaStreamIndex() const;
 	UnsignedInt getFrameTime() const;
 
 private:

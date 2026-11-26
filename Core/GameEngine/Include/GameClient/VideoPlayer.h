@@ -95,6 +95,7 @@ class VideoBuffer
 			TYPE_X8R8G8B8,
 			TYPE_R5G6B5,
 			TYPE_X1R5G5B5,
+			TYPE_A8R8G8B8,
 			NUM_TYPES
 		};
 

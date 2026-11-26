@@ -29,6 +29,9 @@
 #include "VideoDevice/FFmpeg/FFmpegFile.h"
 #include "Common/file.h"
 
+#include <cstring>
+#include <limits>
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -207,15 +210,20 @@ Bool FFmpegFile::decodePacket()
 	DEBUG_ASSERTCRASH(m_packet != nullptr, ("null packet pointer"));
 
 	int result = av_read_frame(m_fmtCtx, m_packet);
-	if (result == AVERROR_EOF)
+	if (result < 0)
 		return false;
 
 	const int stream_idx = m_packet->stream_index;
-	DEBUG_ASSERTCRASH(m_streams.size() > stream_idx, ("stream index out of bounds"));
+	if (stream_idx < 0 || static_cast<std::size_t>(stream_idx) >= m_streams.size())
+	{
+		av_packet_unref(m_packet);
+		return false;
+	}
 
 	auto &stream = m_streams[stream_idx];
 	AVCodecContext *codec_ctx = stream.codec_ctx;
 	result = avcodec_send_packet(codec_ctx, m_packet);
+	av_packet_unref(m_packet);
 	// Check if we need more data
 	if (result == AVERROR(EAGAIN))
 		return true;
@@ -227,7 +235,6 @@ Bool FFmpegFile::decodePacket()
 		DEBUG_LOG(("Failed 'avcodec_send_packet': %s", error_buffer));
 		return false;
 	}
-	av_packet_unref(m_packet);
 
 	// Get all frames in this packet
 	while (result >= 0) {
@@ -344,7 +351,13 @@ Int FFmpegFile::getNumFrames() const
 	if (m_fmtCtx == nullptr || stream == nullptr || m_fmtCtx->streams[stream->stream_idx] == nullptr)
 		return 0;
 
-	return (m_fmtCtx->duration / (double)AV_TIME_BASE) * av_q2d(m_fmtCtx->streams[stream->stream_idx]->avg_frame_rate);
+	const AVStream* video = m_fmtCtx->streams[stream->stream_idx];
+	if (video->nb_frames > 0)
+		return video->nb_frames <= std::numeric_limits<Int>::max() ? static_cast<Int>(video->nb_frames) : 0;
+	if (m_fmtCtx->duration <= 0 || video->avg_frame_rate.num <= 0 || video->avg_frame_rate.den <= 0)
+		return 0;
+	const auto frames = av_rescale_q(m_fmtCtx->duration, AVRational{1, AV_TIME_BASE}, av_inv_q(video->avg_frame_rate));
+	return frames > 0 && frames <= std::numeric_limits<Int>::max() ? static_cast<Int>(frames) : 0;
 }
 
 Int FFmpegFile::getCurrentFrame() const
@@ -362,6 +375,28 @@ Int FFmpegFile::getPixelFormat() const
 		return AV_PIX_FMT_NONE;
 
 	return stream->codec_ctx->pix_fmt;
+}
+
+Int FFmpegFile::getVideoStreamIndex() const
+{
+	const auto* stream = findMatch(AVMEDIA_TYPE_VIDEO);
+	return stream ? stream->stream_idx : -1;
+}
+
+Int FFmpegFile::getAlphaStreamIndex() const
+{
+	if (!m_fmtCtx || !m_fmtCtx->iformat || std::strcmp(m_fmtCtx->iformat->name, "ea") != 0)
+		return -1;
+	const auto* video = findMatch(AVMEDIA_TYPE_VIDEO);
+	if (!video || video->codec->id != AV_CODEC_ID_VP6)
+		return -1;
+	for (const auto& stream : m_streams)
+	{
+		if (&stream != video && stream.codec->id == AV_CODEC_ID_VP6 &&
+			stream.codec_ctx->width == video->codec_ctx->width && stream.codec_ctx->height == video->codec_ctx->height)
+			return stream.stream_idx;
+	}
+	return -1;
 }
 
 UnsignedInt FFmpegFile::getFrameTime() const

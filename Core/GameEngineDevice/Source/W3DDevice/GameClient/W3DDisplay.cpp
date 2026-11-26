@@ -3961,6 +3961,13 @@ void W3DDisplay::drawImageUV( const Image *image, Int startX, Int startY, Int en
 
 VideoBuffer*	W3DDisplay::createVideoBuffer()
 {
+	const DX8Caps* caps = DX8Wrapper::Get_Current_Caps();
+	if (!caps)
+		return nullptr;
+#ifdef RTS_HAS_FFMPEG
+	if (caps->Support_Texture_Format(WW3D_FORMAT_A8R8G8B8))
+		return NEW W3DVideoBuffer(VideoBuffer::TYPE_A8R8G8B8);
+#endif
 	VideoBuffer::Type format = VideoBuffer::TYPE_UNKNOWN;
 
 	/// @todo query video player for supported formats - we assume bink formats here
