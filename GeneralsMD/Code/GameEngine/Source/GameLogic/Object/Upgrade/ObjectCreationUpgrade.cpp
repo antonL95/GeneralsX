@@ -320,7 +320,10 @@ UpdateSleepTime RetailObjectCreationUpgrade::update()
 			object->giveUpgrade(upgrade);
 	}
 	if (const auto* upgrade = TheUpgradeCenter->findUpgrade(data->m_removeUpgrade); upgrade && object->hasUpgrade(upgrade))
+	{
 		object->removeUpgrade(upgrade);
+		object->updateUpgradeModules();
+	}
 	return m_spawned != INVALID_ID ? UPDATE_SLEEP(15) : UPDATE_SLEEP_FOREVER;
 }
 
