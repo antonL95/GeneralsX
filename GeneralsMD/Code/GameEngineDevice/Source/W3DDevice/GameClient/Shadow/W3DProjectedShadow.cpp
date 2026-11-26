@@ -48,6 +48,7 @@
 #include "d3dx8math.h"
 #include "Common/GlobalData.h"
 #include "Common/RetailFileLayers.h"
+#include "W3DDevice/GameClient/RetailTerrainShadow.h"
 #include "W3DDevice/GameClient/W3DProjectedShadow.h"
 #include "WW3D2/statistics.h"
 #include "Common/Debug.h"
@@ -1489,6 +1490,8 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 			{
 				if (shadow->m_type & SHADOW_DECAL)
 				{
+					if (TheRetailTerrainShadow && TheRetailTerrainShadow->isReady())
+						continue;
 					if (lastShadowDecalTexture == nullptr)
 						lastShadowDecalTexture=shadow->m_shadowTexture[0];
 					if (lastShadowType == SHADOW_NONE)
