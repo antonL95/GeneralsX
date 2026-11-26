@@ -96,3 +96,4 @@
 3 default-states
 3 powers-fire
 3 summon-rules
+4 pkg34-nuggets
