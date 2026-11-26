@@ -92,3 +92,4 @@
 4 building-collapse
 4 locked-weapon
 4 spawn-angle
+3 default-states

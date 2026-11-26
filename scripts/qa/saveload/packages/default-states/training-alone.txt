@@ -1,0 +1,7 @@
+300 science Player_1 - 0 SCIENCE_DragonStrike
+306 default-cast Player_1 - 0 Command_SpellBookDragonStrike 2250 2000
+310 default-state Player_1 SpellBookDragonStrikeDragon 0
+340 default-order Player_1 SpellBookDragonStrikeDragon 0 - 2600 2400
+380 default-state Player_1 SpellBookDragonStrikeDragon 0
+520 default-state Player_1 SpellBookDragonStrikeDragon 0
+1440 default-state Player_1 SpellBookDragonStrikeDragon 0

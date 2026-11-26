@@ -1,0 +1,12 @@
+205 create Player_1 DefaultStatesTower 0 3200,2940,0
+206 create Player_1 DefaultStatesArchers 0 3200,3000,0
+207 create Player_1 GuldurRuinousTower 0 3320,3000,0
+207 create Player_1 DefaultStatesSentries 0 3140,2940,0
+209 objupgrade Player_1 GuldurRuinousTower 0 Upgrade_TowerDarkPresence
+230 default-state Player_1 DefaultStatesTower 0
+230 default-state Player_1 DefaultStatesSentries 0
+232 move Player_1 DefaultStatesSentries 0 - 3230 3030
+300 default-state Player_1 GuldurRuinousTower 0
+300 default-state Player_1 DefaultStatesTower 0
+420 default-state Player_1 DefaultStatesSentries 0
+420 default-state Player_1 DefaultStatesTower 0
