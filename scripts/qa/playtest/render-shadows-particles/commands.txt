@@ -1,0 +1,6 @@
+18 reveal Player_1 MenFortressCitadel 0
+22 create Player_1 GondorFighterHorde 0 2880,680,0
+30 particle-systems Player_1 - 0 ExpBonus
+35 particle-fx Player_1 - 0 FX_BombardExplosion 2850 620 0
+42 particle-systems Player_1 - 0 BarrageExplosion
+42 particle-systems Player_1 - 0 BarrageExplosionFire
