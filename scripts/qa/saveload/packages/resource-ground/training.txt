@@ -1,0 +1,14 @@
+30 create Player_1 ResGroundPorter 0 2700,1200,0
+30 create Player_1 ResGroundPorter 0 2900,1500,0
+100 resground-preview Player_1 - 0 ResGroundFarm 3300 1200
+100 resground-preview Player_1 - 0 ResGroundFarm 3500 1200
+200 construct Player_1 ResGroundPorter 0 ResGroundFarm 3300 1200 0
+260 resground-site Player_1 ResGroundFarm 0 -
+260 resground-preview Player_1 - 0 ResGroundFarm 3500 1200
+270 construct Player_1 ResGroundPorter 1 ResGroundFarm 3500 1200 0
+280 resground-site Player_1 ResGroundFarm 0 -
+280 resground-site Player_1 ResGroundFarm 1 -
+1900 resground-site Player_1 ResGroundFarm 0 -
+1900 resground-site Player_1 ResGroundFarm 1 -
+1950 resground-kill Player_1 ResGroundFarm 1 -
+1951 resground-kill Player_1 ResGroundFarm 0 -
