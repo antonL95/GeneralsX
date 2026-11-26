@@ -66,6 +66,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/RetailGate.h"
@@ -449,11 +450,47 @@ void AIUpdateInterface::setGoalPositionClipped(const Coord3D* in, CommandSourceT
 	}
 }
 
-/* Called by the pathfinder when it processes the pathfind queue.  Basically, it's our turn
-to call use the PathfindServicesInterface to do a pathfind operation.  This shouldn't be called
-(and in fact is very hard to do because PathfindServicesInterace is private to the pathfinder)
-except by the pathfinder during pathfind queue processing.  jba */
-//-------------------------------------------------------------------------------------------------
+static Bool findCastleStandBackPoint(PathfindServicesInterface& pathfinder, Object* source,
+	const Object* victim, const LocomotorSet& locomotors, Coord3D& goal)
+{
+	const Real distance = TheAI->getAiData()->m_castleSiegeStandBackDistance;
+	if (!(distance > 0.0f) || source->isKindOf(KINDOF_HORDE) || HordeContain::getAnchor(source) ||
+		(victim->getLayer() != LAYER_WALL && !victim->testStatus(OBJECT_STATUS_INSIDE_CASTLE) &&
+			!CastleBehavior::findForMember(*victim)))
+		return FALSE;
+
+	const Coord3D& from = *source->getPosition();
+	goal = *victim->getPosition();
+	const Real dx = goal.x - from.x;
+	const Real dy = goal.y - from.y;
+	const Real length = WWMath::SqrtfOrigin(dx * dx + dy * dy);
+	const Real standBack = distance + source->getGeometryInfo().getBoundingCircleRadius();
+	if (length <= standBack)
+	{
+		goal = from;
+		return TRUE;
+	}
+
+	Path* path = pathfinder.findClosestPath(source, locomotors, &from, &goal, FALSE, 0.2f, FALSE);
+	if (!path)
+		return FALSE;
+
+	const Coord3D reachable = *path->getLastNode()->getPosition();
+	deleteInstance(path);
+	const Real forwardX = dx / length;
+	const Real forwardY = dy / length;
+	const Real progress = (reachable.x - from.x) * forwardX + (reachable.y - from.y) * forwardY;
+	if (progress < standBack + PATHFIND_CELL_SIZE_F)
+		goal = from;
+	else
+	{
+		goal.x = reachable.x - forwardX * standBack;
+		goal.y = reachable.y - forwardY * standBack;
+		goal.z = TheTerrainLogic->getLayerHeight(goal.x, goal.y, source->getLayer());
+	}
+	return TRUE;
+}
+
 void AIUpdateInterface::doPathfind( PathfindServicesInterface *pathfinder )
 {
 	if (!m_waitingForPath) {
@@ -512,10 +549,24 @@ void AIUpdateInterface::doPathfind( PathfindServicesInterface *pathfinder )
 		//CRCDEBUG_LOG(("AIUpdateInterface::doPathfind() - m_isAttackPath = FALSE after computeAttackPath()"));
 		m_isAttackPath = FALSE;
 		if (victim) {
-			m_requestedDestination = *victim->getPosition();
-			/* find a pathable destination near the victim.*/
-			TheAI->pathfinder()->adjustToPossibleDestination(getObject(), getLocomotorSet(), &m_requestedDestination);
-			ignoreObstacle(victim);
+			Object* source = getObject();
+			if (isDoingGroundMovement() &&
+				findCastleStandBackPoint(*pathfinder, source, victim, m_locomotorSet, m_requestedDestination))
+			{
+				ignoreObstacle(nullptr);
+				m_isFinalGoal = TRUE;
+				if (m_requestedDestination.x == source->getPosition()->x && m_requestedDestination.y == source->getPosition()->y)
+				{
+					destroyPath();
+					return;
+				}
+			}
+			else
+			{
+				m_requestedDestination = *victim->getPosition();
+				TheAI->pathfinder()->adjustToPossibleDestination(source, getLocomotorSet(), &m_requestedDestination);
+				ignoreObstacle(victim);
+			}
 		}
 	}
 	computePath(pathfinder, &m_requestedDestination);
@@ -2227,8 +2278,11 @@ Bool AIUpdateInterface::computeAttackPath( PathfindServicesInterface *pathServic
 		}
 	}
 
-	// Contact weapon
-	if (weapon->isContactWeapon())
+	const Bool needsWallAttackPath = victimLayer == LAYER_WALL && source->getLayer() != LAYER_WALL &&
+		weapon->getTemplate()->isMeleeWeapon() && isDoingGroundMovement() &&
+		!source->isKindOf(KINDOF_HORDE) && !HordeContain::getAnchor(source) &&
+		TheAI->getAiData()->m_castleSiegeStandBackDistance > 0.0f;
+	if (weapon->isContactWeapon() && !needsWallAttackPath)
 	{
 		// Weapon is basically a contact weapon, like a car bomb.  The approach target logic
 		// has been modified to let it approach the object, so just approach the target position.	jba.

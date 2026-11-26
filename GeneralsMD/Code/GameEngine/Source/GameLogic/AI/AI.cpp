@@ -236,6 +236,11 @@ static const FieldParse TheAIFieldParseTable[] =
  	{ "MaxRetaliationDistance",	INI::parseReal,nullptr,			offsetof( TAiData, m_maxRetaliateDistance ) },
  	{ "MaxRetaliateDistance",	INI::parseReal,nullptr,			offsetof( TAiData, m_maxRetaliateDistance ) },
  	{ "RetaliationFriendsRadius",	INI::parseReal,nullptr,			offsetof( TAiData, m_retaliateFriendsRadius ) },
+	{ "MaxRetaliateDistance", INI::parseReal, nullptr, offsetof(TAiData, m_maxRetaliateDistance) },
+	{ "ChaseFromBehindLimit", INI::parseReal, nullptr, offsetof(TAiData, m_chaseFromBehindLimit) },
+	{ "MeleeApproachDist", INI::parseReal, nullptr, offsetof(TAiData, m_meleeApproachDistance) },
+	{ "MeleeApproachTolerance", INI::parseReal, nullptr, offsetof(TAiData, m_meleeApproachTolerance) },
+	{ "CastleSiegeStandBackDistance", INI::parseReal, nullptr, offsetof(TAiData, m_castleSiegeStandBackDistance) },
 
 
 	{ nullptr,					nullptr,						nullptr,						0 }
@@ -1091,7 +1096,7 @@ m_structuresPoorMod(0.0f),
 m_teamWealthyMod(0.0f),
 m_aiDozerBoredRadiusModifier(2.0),
 m_aiCrushesInfantry(true),
-m_maxRetaliateDistance(210.0f),
+m_maxRetaliateDistance(200.0f),
 m_retaliateFriendsRadius(120.0f)
 {
 }
@@ -1148,6 +1153,11 @@ void TAiData::crc( Xfer *xfer )
 			}
 		}
 	}
+	xfer->xferReal(&m_maxRetaliateDistance);
+	xfer->xferReal(&m_chaseFromBehindLimit);
+	xfer->xferReal(&m_meleeApproachDistance);
+	xfer->xferReal(&m_meleeApproachTolerance);
+	xfer->xferReal(&m_castleSiegeStandBackDistance);
 	CRCGEN_LOG(("CRC after AI TAiData for frame %d is 0x%8.8X", TheGameLogic->getFrame(), ((XferCRC *)xfer)->getCRC()));
 
 }

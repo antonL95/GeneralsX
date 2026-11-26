@@ -2532,6 +2532,31 @@ Bool AIAttackApproachTargetState::computePath()
 			return false;  // break out, and do the pursuit state.
 		}
 		setAdjustsDestination(true);
+		const TAiData* tuning = TheAI->getAiData();
+		if (weapon->getTemplate()->isMeleeWeapon() && ai->isDoingGroundMovement() &&
+			source->getLayer() == victim->getLayer() && !HordeContain::getAnchor(source) &&
+			!source->isKindOf(KINDOF_HORDE) &&
+			tuning->m_meleeApproachDistance > 0.0f)
+		{
+			const Coord3D& from = *source->getPosition();
+			const Real dx = from.x - m_prevVictimPos.x;
+			const Real dy = from.y - m_prevVictimPos.y;
+			const Real distanceSquared = dx * dx + dy * dy;
+			const Real approach = tuning->m_meleeApproachDistance;
+			const Real threshold = approach + std::max(0.0f, tuning->m_meleeApproachTolerance);
+			if (distanceSquared >= sqr(threshold))
+			{
+				const Real scale = approach / WWMath::SqrtfOrigin(distanceSquared);
+				m_goalPosition = m_prevVictimPos;
+				m_goalPosition.x += dx * scale;
+				m_goalPosition.y += dy * scale;
+				m_goalPosition.z = TheTerrainLogic->getLayerHeight(m_goalPosition.x, m_goalPosition.y, source->getLayer());
+				ai->requestApproachPath(&m_goalPosition);
+				m_waitingForPath = true;
+				m_stopIfInRange = true;
+				return true;
+			}
+		}
 		if (weapon->isContactWeapon())
 		{
 			// Weapon is basically a contact weapon, so let the attacker pathfind into the target.
@@ -2813,6 +2838,14 @@ StateReturnType AIAttackApproachTargetState::updateInternal()
 			return STATE_SUCCESS;
 		code = AIInternalMoveToState::update();
 
+		if (code == STATE_SUCCESS && m_follow && weapon && weapon->getTemplate()->isMeleeWeapon() &&
+			!ai->isAttackPath() &&
+			(m_goalPosition.x != m_prevVictimPos.x || m_goalPosition.y != m_prevVictimPos.y))
+		{
+			ai->destroyPath();
+			if (computePath())
+				return STATE_CONTINUE;
+		}
 
 		if (code != STATE_CONTINUE)
 		{
@@ -5864,10 +5897,20 @@ StateReturnType AIAttackState::onEnter()
 	return retType;
 }
 
-//----------------------------------------------------------------------------------------------------------
-/**
- * Execute one frame of "attack enemy" behavior.
- */
+static Bool isRunningDownFromBehind(Object* source, const Object* target, const Weapon* weapon)
+{
+	if (!target || !weapon->getTemplate()->isMeleeWeapon() ||
+		!source->getAI()->isDoingGroundMovement() || source->getLayer() != target->getLayer() ||
+		!source->isMobile() || source->isKindOf(KINDOF_HORDE) || HordeContain::getAnchor(source) ||
+		!target->getPhysics() || !target->isMobile())
+		return FALSE;
+
+	const Coord3D delta = *target->getPosition() - *source->getPosition();
+	const Coord3D& velocity = *target->getPhysics()->getVelocity();
+	const Coord3D& direction = *target->getUnitDirectionVector2D();
+	return delta.x * direction.x + delta.y * direction.y >= 0.0f &&
+		velocity.x * delta.x + velocity.y * delta.y > 0.0f;
+}
 
 StateReturnType AIAttackState::update()
 {
@@ -5997,6 +6040,14 @@ StateReturnType AIAttackState::update()
 	if (curWeapon == nullptr || curWeapon->getMaxShotCount() <= 0)
 		return STATE_FAILURE;
 
+	const StateID attackState = m_attackMachine->getCurrentStateID();
+	const Bool wasRunningDown = source->testStatus(OBJECT_STATUS_RUNNING_DOWN_FROM_BEHIND);
+	const Bool runningDown = m_isAttackingObject && (wasRunningDown ||
+		attackState == AttackStateMachine::CHASE_TARGET || attackState == AttackStateMachine::APPROACH_TARGET) &&
+		isRunningDownFromBehind(source, getMachineGoalObject(), curWeapon);
+	if (wasRunningDown != runningDown)
+		source->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_RUNNING_DOWN_FROM_BEHIND), runningDown);
+
 	/**
 	 * Run the attack state sub-machine.
 	 * If the attack state machine returns anything other than CONTINUE,
@@ -6032,10 +6083,9 @@ void AIAttackState::onExit( StateExitType status )
 	m_attackMachine = nullptr;
 
 	Object *obj = getMachineOwner();
-	obj->clearStatus( MAKE_OBJECT_STATUS_MASK4( OBJECT_STATUS_IS_FIRING_WEAPON,
-																							OBJECT_STATUS_IS_AIMING_WEAPON,
-																							OBJECT_STATUS_IS_ATTACKING,
-																							OBJECT_STATUS_IGNORING_STEALTH ) );
+	obj->clearStatus(MAKE_OBJECT_STATUS_MASK5(OBJECT_STATUS_IS_FIRING_WEAPON,
+		OBJECT_STATUS_IS_AIMING_WEAPON, OBJECT_STATUS_IS_ATTACKING, OBJECT_STATUS_IGNORING_STEALTH,
+		OBJECT_STATUS_RUNNING_DOWN_FROM_BEHIND));
 	obj->clearModelConditionState( MODELCONDITION_ATTACKING );
 
 	const Weapon* weapon = obj->getCurrentWeapon();

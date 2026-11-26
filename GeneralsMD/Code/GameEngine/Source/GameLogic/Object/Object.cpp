@@ -4627,6 +4627,8 @@ void Object::crc( Xfer *xfer )
 		xfer->xferUnsignedByte(&deathStatus);
 		Bool chanting = testStatus(OBJECT_STATUS_CHANTING);
 		xfer->xferBool(&chanting);
+		Bool runningDown = testStatus(OBJECT_STATUS_RUNNING_DOWN_FROM_BEHIND);
+		xfer->xferBool(&runningDown);
 		xferRotwkPowerState(xfer);
 		xferRetailInvisibilitySources(xfer);
 		xferMountedTemplateState(xfer);

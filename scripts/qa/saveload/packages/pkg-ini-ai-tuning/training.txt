@@ -1,0 +1,39 @@
+224 create Player_1 AiTuningFixtureRanged 0 2290,1600,0
+224 create PlyrCreeps AiTuningFixtureRanged 0 2525,1600,180
+224 create Player_1 AiTuningFixtureRanged 1 2290,1870,0
+224 create PlyrCreeps AiTuningFixtureRanged 1 2565,1870,180
+225 attack PlyrCreeps AiTuningFixtureRanged 0 Player_1:AiTuningFixtureRanged:0
+233 create Player_1 AiTuningFixtureMelee 0 2290,2130,0
+233 create PlyrCreeps AiTuningFixtureRanged 2 2525,2130,180
+233 create Player_1 AiTuningFixtureRanged 2 2325,2400,0
+233 create PlyrCreeps AiTuningFixtureMelee 0 2290,2400,0
+234 orderattack Player_1 AiTuningFixtureMelee 0 PlyrCreeps:AiTuningFixtureRanged:2
+235 move Player_1 AiTuningFixtureRanged 2 - 2650 2400
+239 attack PlyrCreeps AiTuningFixtureMelee 0 Player_1:AiTuningFixtureRanged:2
+243 steering-path Player_1 AiTuningFixtureMelee 0
+
+247 steering-path Player_1 AiTuningFixtureMelee 0
+
+252 attack PlyrCreeps AiTuningFixtureRanged 1 Player_1:AiTuningFixtureRanged:1
+253 create Player_1 AiTuningFixtureMelee 1 2400,2700,0
+253 create PlyrCreeps AiTuningFixtureRanged 3 3200,2700,180
+254 pkg61-wall-layer Player_1 AiTuningFixtureMelee 1 PlyrCreeps:AiTuningFixtureRanged:3 80 0
+255 orderattack Player_1 AiTuningFixtureMelee 1 PlyrCreeps:AiTuningFixtureRanged:3
+282 health Player_1 AiTuningFixtureRanged 0
+282 health PlyrCreeps AiTuningFixtureRanged 0
+283 health Player_1 AiTuningFixtureRanged 1
+283 health PlyrCreeps AiTuningFixtureRanged 1
+294 health Player_1 AiTuningFixtureRanged 2
+300 steering-path Player_1 AiTuningFixtureMelee 1
+520 health PlyrCreeps AiTuningFixtureRanged 2
+520 health PlyrCreeps AiTuningFixtureRanged 3
+521 destroy Player_1 AiTuningFixtureMelee 0
+521 destroy Player_1 AiTuningFixtureMelee 1
+521 destroy Player_1 AiTuningFixtureRanged 0
+521 destroy Player_1 AiTuningFixtureRanged 1
+521 destroy Player_1 AiTuningFixtureRanged 2
+521 destroy PlyrCreeps AiTuningFixtureMelee 0
+521 destroy PlyrCreeps AiTuningFixtureRanged 0
+521 destroy PlyrCreeps AiTuningFixtureRanged 1
+521 destroy PlyrCreeps AiTuningFixtureRanged 2
+521 destroy PlyrCreeps AiTuningFixtureRanged 3

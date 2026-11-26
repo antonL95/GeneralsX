@@ -64,6 +64,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/RetailLogicBenchmark.h"
 #include "GameLogic/RetailTestCommands.h"
+#include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -101,6 +102,20 @@
 
 // damage is ALWAYS 3d
 const DistanceCalculationType DAMAGE_RANGE_CALC_TYPE = FROM_BOUNDINGSPHERE_3D;
+
+static Bool isWithinRunningDownRange(const WeaponTemplate& weapon, const Object* source, const Object* target)
+{
+	if (!target || !weapon.isMeleeWeapon() || !source->testStatus(OBJECT_STATUS_RUNNING_DOWN_FROM_BEHIND) ||
+		source->getLayer() != target->getLayer() || !target->isMobile() || target->isAirborneTarget())
+		return FALSE;
+
+	const AIUpdateInterface* ai = source->getAI();
+	if (!ai || ai->getCurrentVictim() != target)
+		return FALSE;
+
+	const Real limit = TheAI->getAiData()->m_chaseFromBehindLimit;
+	return limit > 0.0f && ThePartitionManager->getDistanceSquared(source, target, FROM_BOUNDINGSPHERE_2D) < sqr(limit);
+}
 
 //-------------------------------------------------------------------------------------------------
 static void parsePerVetLevelAsciiString( INI* ini, void* /*instance*/, void * store, const void* /*userData*/ )
@@ -1088,7 +1103,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	if( !ignoreRanges && !isLeechRangeWeapon() )
 	{
 		Real attackRangeSqr = sqr(getAttackRange(bonus, sourcePos->z - victimPos->z));
-		if (distSqr > attackRangeSqr)
+		if (distSqr > attackRangeSqr && !isWithinRunningDownRange(*this, sourceObj, victimObj))
 		{
 			//DEBUG_ASSERTCRASH(distSqr < 5*5 || distSqr < attackRangeSqr*1.2f, ("*** victim is out of range (%f vs %f) of this weapon -- why did we attempt to fire?",WWMath::SqrtfOrigin(distSqr),WWMath::SqrtfOrigin(attackRangeSqr)));
 
@@ -2740,6 +2755,14 @@ Bool Weapon::isWithinAttackRange(const Object *source, const Coord3D* pos) const
 }
 
 //-------------------------------------------------------------------------------------------------
+static Bool meleeCannotReachWallLayer(const WeaponTemplate* weapon, const Object* source,
+	const Object* target, PathfindLayerEnum attackLayer)
+{
+	return weapon->isMeleeWeapon() && target && attackLayer == LAYER_GROUND &&
+		target->getLayer() == LAYER_WALL && !target->isKindOf(KINDOF_WALL_UPGRADE) &&
+		!source->isKindOf(KINDOF_HORDE) && !source->testStatus(OBJECT_STATUS_HORDE_MEMBER);
+}
+
 Bool Weapon::isWithinAttackRange(const Object *source, const Object *target) const
 {
 	if (RetailFileLayers::enabled() && isContactWeapon() && source && target)
@@ -2754,6 +2777,9 @@ Bool Weapon::isWithinAttackRange(const Object *source, const Object *target) con
 			return portal && portal->isWithinTopAttackRange(*source);
 		}
 	}
+
+	if (isWithinRunningDownRange(*m_template, source, target))
+		return TRUE;
 
 	Real distSqr;
 	Real attackRangeSqr;
@@ -2850,6 +2876,10 @@ Bool Weapon::isTooClose( const Object *source, const Coord3D *pos ) const
 //-------------------------------------------------------------------------------------------------
 Bool Weapon::isGoalPosWithinAttackRange(const Object *source, const Coord3D* goalPos, const Object *target, const Coord3D* targetPos)	const
 {
+	if (target && target->getLayer() == LAYER_WALL && m_template->isMeleeWeapon() &&
+		meleeCannotReachWallLayer(m_template, source, target, TheTerrainLogic->getLayerForDestination(goalPos)))
+		return FALSE;
+
 	Real distSqr;
 	// Note - undersize by 1/4 of a pathfind cell, so that the goal is not teetering on the edge
 	// of firing range.  jba.

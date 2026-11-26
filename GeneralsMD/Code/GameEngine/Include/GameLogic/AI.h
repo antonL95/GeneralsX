@@ -250,6 +250,10 @@ public:
 	// Retaliate params. [8/25/2003]
 	Real	m_maxRetaliateDistance; // If attacker is > this distance, don't retaliate. [8/25/2003]
 	Real	m_retaliateFriendsRadius; // If we have friends within this radius, get them to help retaliate. [8/25/2003]
+	Real m_chaseFromBehindLimit = 50.0f;
+	Real m_meleeApproachDistance = 360.0f;
+	Real m_meleeApproachTolerance = 20.0f;
+	Real m_castleSiegeStandBackDistance = 0.0f;
 
 
 	AISideInfo *m_sideInfo;
