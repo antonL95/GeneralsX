@@ -1,0 +1,72 @@
+130 create Player_1 Pkg11EntFir 0 2280,660,0
+130 create PlyrCreeps Pkg11Wall 0 2300,660,180
+132 pkg11-power Player_1 Pkg11EntFir 0 PlyrCreeps:Pkg11Wall:0
+180 create PlyrCreeps Pkg11Source 0 2230,820,180
+180 create Player_1 Pkg11Guardhouse 0 1950,820,0
+180 create Player_1 Pkg11GuardhouseControl 0 1950,720,0
+181 create Player_1 Pkg11Captain 0 2100,720,0
+181 create Player_1 Pkg11Militia 0 2180,720,0
+183 create Player_1 Pkg11Horde 0 2320,830,0
+183 create Player_1 Pkg11HordeControl 0 2320,770,0
+183 create Player_1 Pkg11HordeNoContained 0 2320,710,0
+190 pkg11-damage PlyrCreeps Pkg11Source 0 Player_1:Pkg11Captain:0 250 0
+190 pkg11-shoot PlyrCreeps Pkg11Source 0 Player_1:Pkg11Guardhouse:0 3 1
+196 pkg11-hurt-members Player_1 Pkg11Horde 0 - 100 0
+196 pkg11-hurt-members Player_1 Pkg11HordeControl 0 - 100 0
+196 pkg11-hurt-members Player_1 Pkg11HordeNoContained 0 - 100 0
+197 pkg11-state Player_1 Pkg11Horde 0
+197 pkg11-state Player_1 Pkg11HordeControl 0
+197 pkg11-state Player_1 Pkg11HordeNoContained 0
+198 objupgrade Player_1 Pkg11HordeNoContained 0 Upgrade_TechnologyRivendellMedicine
+209 objupgrade Player_1 Pkg11Horde 0 Upgrade_TechnologyRivendellMedicine
+209 objupgrade Player_1 Pkg11HordeControl 0 Upgrade_TechnologyRivendellMedicine
+209 pkg11-pulse Player_1 Pkg11Horde 0 Player_1:Pkg11Guardhouse:0
+209 pkg11-pulse Player_1 Pkg11HordeControl 0 Player_1:Pkg11Guardhouse:0
+209 pkg11-state Player_1 Pkg11Horde 0
+209 pkg11-state Player_1 Pkg11HordeControl 0
+212 pkg11-state Player_1 Pkg11Horde 0
+212 pkg11-state Player_1 Pkg11HordeNoContained 0
+215 destroy Player_1 Pkg11Horde 0
+215 destroy Player_1 Pkg11HordeControl 0
+215 destroy Player_1 Pkg11HordeNoContained 0
+235 pkg11-damage PlyrCreeps Pkg11Source 0 Player_1:Pkg11Militia:0 10000 2
+239 pkg11-state Player_1 Pkg11Captain 0
+239 pkg11-damage PlyrCreeps Pkg11Source 0 Player_1:Pkg11Guardhouse:0 350 1
+239 pkg11-damage PlyrCreeps Pkg11Source 0 Player_1:Pkg11GuardhouseControl:0 350 1
+240 pkg11-state Player_1 Pkg11Guardhouse 0
+242 pkg11-shoot PlyrCreeps Pkg11Source 0 Player_1:Pkg11Guardhouse:0 2 1
+243 pkg11-power Player_1 Pkg11Captain 0 Pkg11Athelas
+243 pkg11-held Player_1 Pkg11EntFir 0
+243 pkg11-state PlyrCreeps Pkg11Wall 0
+244 pkg11-held Player_1 Pkg11EntFir 0
+245 pkg11-held Player_1 Pkg11EntFir 0
+245 pkg11-state Player_1 Pkg11Captain 0
+247 destroy Player_1 Pkg11Captain 0
+247 destroy Player_1 Pkg11EntFir 0
+247 destroy PlyrCreeps Pkg11Wall 0
+250 pkg11-damage PlyrCreeps Pkg11Source 0 Player_1:Pkg11Guardhouse:0 350 1
+250 pkg11-damage PlyrCreeps Pkg11Source 0 Player_1:Pkg11GuardhouseControl:0 350 1
+251 pkg11-state Player_1 Pkg11Guardhouse 0
+251 pkg11-state Player_1 Pkg11GuardhouseControl 0
+252 pkg11-debris Player_1 Pkg11Guardhouse 0 BuildingGBBarracksN2D2BitA
+292 pkg11-debris Player_1 Pkg11Guardhouse 0 BuildingDamageBits
+301 pkg11-state Player_1 Pkg11Guardhouse 0
+325 pkg11-damage PlyrCreeps Pkg11Source 0 Player_1:Pkg11Guardhouse:0 1300 0
+326 pkg11-state Player_1 Pkg11Guardhouse 0
+327 pkg11-heal Player_1 Pkg11Guardhouse 0 - 2000 0
+328 pkg11-state Player_1 Pkg11Guardhouse 0
+330 destroy Player_1 Pkg11Guardhouse 0
+330 destroy Player_1 Pkg11GuardhouseControl 0
+340 create Player_1 Pkg11EntOak 0 2280,540,0
+340 create PlyrCreeps Pkg11WallControl 0 2300,540,180
+342 pkg11-power Player_1 Pkg11EntOak 0 PlyrCreeps:Pkg11WallControl:0
+380 create PlyrCreeps Pkg11Cheerer 0 2180,720,0
+384 pkg11-state PlyrCreeps Pkg11Cheerer 0
+386 pkg11-state PlyrCreeps Pkg11Cheerer 0
+388 destroy PlyrCreeps Pkg11Cheerer 0
+388 destroy Player_1 Pkg11Militia 0
+470 pkg11-state Player_1 Pkg11EntOak 0
+470 pkg11-state PlyrCreeps Pkg11WallControl 0
+472 destroy Player_1 Pkg11EntOak 0
+472 destroy PlyrCreeps Pkg11WallControl 0
+472 destroy PlyrCreeps Pkg11Source 0
