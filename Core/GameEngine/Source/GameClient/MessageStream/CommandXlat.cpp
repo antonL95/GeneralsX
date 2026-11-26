@@ -2308,7 +2308,7 @@ GameMessage::Type CommandTranslator::handleHackCommand( Drawable *draw, Object *
 		const CommandSet *set = TheControlBar->findCommandSet( source->getCommandSetString() );
 		if( set )
 		{
-			for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+			for( Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; i++ )
 			{
 				// get command button
 				const CommandButton *command = set->getCommandButton(i);
@@ -3222,7 +3222,7 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 				const CommandSet *set = TheControlBar->findCommandSet( source->getCommandSetString() );
 				if( set )
 				{
-					for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+					for( Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; i++ )
 					{
 						// get command button
 						const CommandButton *command = set->getCommandButton(i);
@@ -3258,7 +3258,7 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 				const CommandSet *set = TheControlBar->findCommandSet( source->getCommandSetString() );
 				if( set )
 				{
-					for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+					for( Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; i++ )
 					{
 						// get command button
 						const CommandButton *command = set->getCommandButton(i);
@@ -3294,7 +3294,7 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 				const CommandSet *set = TheControlBar->findCommandSet( source->getCommandSetString() );
 				if( set )
 				{
-					for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+					for( Int i = 0; i < CommandButtonRules::RETAIL_COMMANDS_PER_SET; i++ )
 					{
 						// get command button
 						const CommandButton *command = set->getCommandButton(i);
