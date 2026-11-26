@@ -1,0 +1,7 @@
+20 create Player_1 SteerDroppedNomads 0 3150,2500,0
+20 create Player_1 SteerDroppedBlocker 0 3300,2500,0
+240 steer-dropped-sample Player_1 SteerDroppedNomads 0
+241 move Player_1 SteerDroppedNomads 0 - 2900 2500
+270 steer-dropped-sample Player_1 SteerDroppedNomads 0
+400 destroy Player_1 SteerDroppedNomads 0
+400 destroy Player_1 SteerDroppedBlocker 0
