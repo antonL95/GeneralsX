@@ -111,3 +111,4 @@
 3 combat-leftovers
 4 castle-repack
 1 castle-area-backfill
+4 lua-logic

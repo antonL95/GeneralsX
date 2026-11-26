@@ -1,0 +1,26 @@
+215 create Player_1 LuaFixtureLevy 0 3050,2935,0
+216 create Player_1 LuaFixtureConditionProbe 0 3065,2935,0
+217 create Player_1 LuaFixtureConditionProbe 1 3080,2935,0
+218 create Player_1 LuaFixtureFortress 0 3100,2935,0
+220 objupgrade Player_1 LuaFixtureConditionProbe 0 LuaFixtureCondition
+222 checkobjupgrade Player_1 LuaFixtureConditionProbe 0 Upgrade_Drafted
+223 checkobjupgrade Player_1 LuaFixtureConditionProbe 1 Upgrade_Drafted
+243 lua-appearance Player_1 LuaFixtureLevy 0
+243 lua-geometry Player_1 LuaFixtureFortress 0 HighTowerGeom
+245 lua-appearance Player_1 LuaFixtureLevy 0
+245 lua-geometry Player_1 LuaFixtureFortress 0 HighTowerGeom
+245 checkobjupgrade Player_1 LuaFixtureConditionProbe 0 Upgrade_Drafted
+246 objupgrade Player_1 LuaFixtureConditionProbe 1 LuaFixtureCondition
+248 checkobjupgrade Player_1 LuaFixtureConditionProbe 1 Upgrade_Drafted
+251 create Player_1 LuaFixtureLevy 1 3050,2915,0
+253 lua-appearance Player_1 LuaFixtureLevy 1
+271 create Player_1 LuaFixtureTerrorTarget 0 3240,2905,0
+272 lua-fear Player_1 LuaFixtureTerrorTarget 0
+273 create PlyrCreeps LuaFixtureTerrorSource 0 3270,2905,0
+303 lua-fear Player_1 LuaFixtureTerrorTarget 0
+310 destroy PlyrCreeps LuaFixtureTerrorSource 0
+322 create Player_1 LuaFixtureBlastCaster 0 3110,2875,0
+323 create PlyrCreeps LuaFixtureBlastTarget 0 3145,2875,0
+325 lua-blast-health PlyrCreeps LuaFixtureBlastTarget 0
+326 objupgrade Player_1 LuaFixtureBlastCaster 0 LuaFixtureBlast
+345 lua-blast-health PlyrCreeps LuaFixtureBlastTarget 0
