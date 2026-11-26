@@ -615,6 +615,7 @@ public:
 		MSG_RETAIL_CANCEL_WALL_SPAN = 1896,
 		MSG_RETAIL_BLOODTHIRSTY = 1897,
 		MSG_RETAIL_TRIBUTE = 1898,
+		MSG_DO_MOVETO_FORMATION = 1899,
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 
