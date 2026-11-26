@@ -406,7 +406,10 @@ void TransportContain::updatePassengerWeaponState(const Object* rider)
 void TransportContain::applyPassengerFade(Object* rider, Real timeMsec, Bool fadeOut) const
 {
 	const TransportContainModuleData* data = getTransportContainModuleData();
-	if (!rider || timeMsec <= 0.0f || !data->m_fadeFilter.matchesObject(nullptr, rider))
+	const SpecialPowerObjectFilter& filter = data->m_fadeFilter;
+	const Bool authored = filter.m_rules != 0 || filter.m_includeKinds.any() || filter.m_excludeKinds.any() ||
+		!filter.m_includeObjects.empty() || !filter.m_excludeObjects.empty();
+	if (!rider || timeMsec <= 0.0f || !authored || !filter.matchesObject(nullptr, rider))
 		return;
 
 	const UnsignedInt frames = static_cast<UnsignedInt>(REAL_TO_INT_FLOOR(ConvertDurationFromMsecsToFrames(timeMsec)));
@@ -480,7 +483,7 @@ void TransportContain::onContaining( Object *rider, Bool wasSelected )
 	if (data->m_fadePassengerOnEnter)
 		applyPassengerFade(rider, data->m_enterFadeTime, data->m_fadeReverse);
 
-  if ( d->m_armedRidersUpgradeWeaponSet )
+  if ( data->m_armedRidersUpgradeWeaponSet )
     letRidersUpgradeWeaponSet();
 
 	//Kris: October 20, 2003 - Patch 1.01
