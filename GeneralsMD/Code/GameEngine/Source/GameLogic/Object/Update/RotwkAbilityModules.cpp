@@ -349,6 +349,18 @@ Bool StrafeAreaUpdate::controlsAttackFlight(const Object& object)
 	return module && module->m_phase == STRAFE && !object.isEffectivelyDead();
 }
 
+Bool StrafeAreaUpdate::isFlying(const Object& object)
+{
+	const auto* module = static_cast<const StrafeAreaUpdate*>(object.findUpdateModule(NAMEKEY("StrafeAreaUpdate")));
+	return module && module->m_phase != IDLE;
+}
+
+Bool StrafeAreaUpdate::acceptsCommand(const Object& object, CommandSourceType source)
+{
+	const auto* module = static_cast<const StrafeAreaUpdate*>(object.findUpdateModule(NAMEKEY("StrafeAreaUpdate")));
+	return !module || module->m_phase == IDLE || module->m_issuingFlightOrder || source == CMD_FROM_SCRIPT;
+}
+
 void StrafeAreaUpdate::start(const Coord3D& center)
 {
 	Object* self = getObject();
@@ -364,7 +376,9 @@ void StrafeAreaUpdate::start(const Coord3D& center)
 		self->setOrientation(WWMath::Atan2Origin(dy, dx));
 	AIUpdateInterface* ai = self->getAI();
 	ai->chooseLocomotorSet(LOCOMOTORSET_SUPERSONIC);
+	m_issuingFlightOrder = TRUE;
 	ai->aiMoveToPosition(&m_center, CMD_FROM_AI);
+	m_issuingFlightOrder = FALSE;
 	setWakeFrame(self, UPDATE_SLEEP(RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND)));
 }
 
@@ -398,7 +412,9 @@ void StrafeAreaUpdate::orderDeparture(AIUpdateInterface* ai)
 		0.0f
 	};
 	exit.z = TheTerrainLogic->getGroundHeight(exit.x, exit.y);
+	m_issuingFlightOrder = TRUE;
 	ai->aiMoveToPosition(&exit, CMD_FROM_AI);
+	m_issuingFlightOrder = FALSE;
 	m_departureOrdered = TRUE;
 }
 

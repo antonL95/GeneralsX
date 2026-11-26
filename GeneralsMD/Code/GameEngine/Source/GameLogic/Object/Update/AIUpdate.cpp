@@ -62,6 +62,7 @@
 #include "GameLogic/RetailSkirmishProbe.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
@@ -3076,6 +3077,8 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 	// These variables could relate to a deleted object when a pending command is reconstituted.
 
 	if (!isAllowedToRespondToAiCommands(parms))
+		return;
+	if (!StrafeAreaUpdate::acceptsCommand(*getObject(), parms->m_cmdSource))
 		return;
 	if (parms->m_cmdSource != CMD_FROM_AI && !isFollowingRetailGroupRoute())
 		clearRetailGroupIdentity();

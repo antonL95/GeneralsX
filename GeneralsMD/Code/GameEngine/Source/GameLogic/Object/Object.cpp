@@ -3569,6 +3569,9 @@ Bool Object::isSelectable() const
 //						);
 
 
+	if (StrafeAreaUpdate::isFlying(*this))
+		return FALSE;
+
 	if (RetailFileLayers::enabled() && isKindOf(KINDOF_TREE) && isKindOf(KINDOF_SHRUBBERY))
 		return FALSE;
 

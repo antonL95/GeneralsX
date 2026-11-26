@@ -64,6 +64,8 @@ public:
 	StrafeAreaUpdate(Thing* thing, const ModuleData* data);
 	static Bool startForObject(Object* object, const Coord3D& center);
 	static Bool controlsAttackFlight(const Object& object);
+	static Bool isFlying(const Object& object);
+	static Bool acceptsCommand(const Object& object, CommandSourceType source);
 	UpdateSleepTime update() override;
 
 private:
@@ -79,6 +81,7 @@ private:
 	Real m_sweepPhase = 0.0f;
 	UnsignedInt m_firstShotFrame = 0;
 	Bool m_departureOrdered = FALSE;
+	Bool m_issuingFlightOrder = FALSE;
 };
 
 class SpecialDisguiseUpdate final : public SpecialAbilityUpdate
