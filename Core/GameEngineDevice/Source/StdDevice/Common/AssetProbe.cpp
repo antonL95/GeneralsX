@@ -836,9 +836,10 @@ bool probeTexture(const std::string& path)
 		const std::string fourCC(header + 84, 4);
 		DDSFileClass texture(path.c_str(), 0);
 		const WW3DFormat format = texture.Get_Format();
-		record("texture-format", path, fourCC, "dds");
-		if (format < WW3D_FORMAT_DXT1 || format > WW3D_FORMAT_DXT5 ||
-			texture.Get_Width(0) == 0 || texture.Get_Height(0) == 0 || size < 128)
+		StringClass formatName;
+		Get_WW3D_Format_Name(format, formatName);
+		record("texture-format", path, DDSFileClass::Is_RGB_Format(format) ? formatName.str() : fourCC, "dds");
+		if (!texture.Is_Available() || size < 128)
 			return false;
 		return texture.Get_Level_Size(0) <= static_cast<unsigned>(size - 128) && texture.Load();
 	}
@@ -846,6 +847,55 @@ bool probeTexture(const std::string& path)
 	const long result = texture.Load(path.c_str(), TGAF_IMAGE | TGAF_PAL);
 	record("texture-format", path, std::to_string(result), "tga");
 	return result == 0 && texture.GetImage() != nullptr;
+}
+
+int probeRgbTextures(const char* manifest, const Inventory& inventory)
+{
+	std::unique_ptr<std::FILE, decltype(&std::fclose)> list(std::fopen(manifest, "r"), std::fclose);
+	if (!list)
+		return 1;
+	unsigned tested = 0;
+	unsigned failed = 0;
+	char name[256];
+	while (std::fscanf(list.get(), "%255s", name) == 1)
+	{
+		++tested;
+		const auto entry = inventory.find(name);
+		if (entry == inventory.end())
+		{
+			record("dds-rgb", name, "missing");
+			++failed;
+			continue;
+		}
+		DDSFileClass texture(name, 0);
+		const bool loaded = texture.Is_Available() &&
+			texture.Get_Format() == WW3D_FORMAT_A8R8G8B8 && texture.Load();
+		bool copied = false;
+		if (loaded)
+		{
+			const unsigned width = texture.Get_Width(0);
+			const unsigned height = texture.Get_Height(0);
+			const unsigned rowBytes = width * 4;
+			const unsigned pitch = rowBytes + 4;
+			if (width && height && texture.Get_Level_Size(0) / height == rowBytes)
+			{
+				std::vector<unsigned char> pixels(static_cast<std::size_t>(pitch) * height, 0x7f);
+				texture.Copy_Level_To_Surface(0, WW3D_FORMAT_A8R8G8B8, width, height, pixels.data(), pitch);
+				const unsigned char* source = texture.Get_Memory_Pointer(0);
+				copied = true;
+				for (unsigned y = 0; copied && y < height; ++y)
+				{
+					const auto* row = pixels.data() + static_cast<std::size_t>(y) * pitch;
+					copied = std::equal(row, row + rowBytes, source + static_cast<std::size_t>(y) * rowBytes) &&
+						std::all_of(row + rowBytes, row + pitch, [](unsigned char byte) { return byte == 0x7f; });
+				}
+			}
+		}
+		record("dds-rgb", name, copied ? "pass" : loaded ? "copy failed" : "load failed");
+		failed += !copied;
+	}
+	record("dds-rgb-summary", std::to_string(tested), std::to_string(failed));
+	return tested == 0 || failed || std::ferror(list.get());
 }
 
 std::string resolveTexture(const Inventory& inventory, const std::string& reference)
@@ -941,6 +991,14 @@ int RunAssetProbe(const char *reportPath, bool mapSidesOnly)
 		return probeMapSides(inventory);
 	ProbeFileFactory factory(inventory);
 	_TheFileFactory = &factory;
+	if (const char* manifest = std::getenv("GENERALSX_TEST_RGB_DDS"))
+	{
+		const int result = probeRgbTextures(manifest, inventory);
+		const int closeResult = std::fclose(report);
+		_TheFileFactory = _TheSimpleFileFactory;
+		TheLocalFileSystem = nullptr;
+		return result || closeResult;
+	}
 
 	std::set<std::string> modelNames;
 	for (const auto& [name, entry] : inventory)

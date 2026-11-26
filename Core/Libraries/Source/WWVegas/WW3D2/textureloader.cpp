@@ -267,6 +267,8 @@ IDirect3DTexture8* Load_Compressed_Texture(
 		dest_format,
 		(MipCountType)mips
 	);
+	if (!d3d_texture)
+		return nullptr;
 
 	for (unsigned level=0;level<mips;++level) {
 		IDirect3DSurface8* d3d_surface=nullptr;
@@ -1227,20 +1229,8 @@ bool TextureLoadTaskClass::Begin_Load()
 {
 	WWASSERT(TextureLoader::Is_DX8_Thread());
 
-	bool loaded = false;
-
-	// if allowed, begin a compressed load
-	if (Texture->Is_Compression_Allowed()) {
-		loaded = Begin_Compressed_Load();
-	}
-
-	// otherwise, begin an uncompressed load
-	if (!loaded) {
-		loaded = Begin_Uncompressed_Load();
-	}
-
-	// if not loaded, abort.
-	if (!loaded) {
+	LoadDDS = (Texture->Is_Compression_Allowed() || Texture->As_TextureClass()) && Begin_Compressed_Load();
+	if (!LoadDDS && !Begin_Uncompressed_Load()) {
 		return false;
 	}
 
@@ -1267,8 +1257,7 @@ bool TextureLoadTaskClass::Load()
 
 	bool loaded = false;
 
-	// if allowed, try to load compressed mipmaps
-	if (Texture->Is_Compression_Allowed()) {
+	if (LoadDDS) {
 		loaded = Load_Compressed_Mipmap();
 	}
 
@@ -1421,7 +1410,9 @@ static bool	Get_Texture_Information
 {
 	ThumbnailClass* thumb=ThumbnailManagerClass::Peek_Thumbnail_Instance_From_Any_Manager(filename);
 
-	if (!thumb)
+	const WW3DFormat thumbnail_format = thumb ? thumb->Get_Original_Texture_Format() : WW3D_FORMAT_UNKNOWN;
+	const bool dxt_thumbnail = thumbnail_format >= WW3D_FORMAT_DXT1 && thumbnail_format <= WW3D_FORMAT_DXT5;
+	if (!thumb || (compressed && !dxt_thumbnail))
 	{
 		if (compressed)
 		{
@@ -1460,15 +1451,6 @@ static bool	Get_Texture_Information
 		reduction = Get_Requested_Reduction(w, h, mip_count);
 
 		return true;
-	}
-
-	if (compressed &&
-		thumb->Get_Original_Texture_Format()!=WW3D_FORMAT_DXT1 &&
-		thumb->Get_Original_Texture_Format()!=WW3D_FORMAT_DXT2 &&
-		thumb->Get_Original_Texture_Format()!=WW3D_FORMAT_DXT3 &&
-		thumb->Get_Original_Texture_Format()!=WW3D_FORMAT_DXT4 &&
-		thumb->Get_Original_Texture_Format()!=WW3D_FORMAT_DXT5) {
-		return false;
 	}
 
 	w=thumb->Get_Original_Texture_Width();
@@ -1545,12 +1527,12 @@ static bool Compressed_Dimensions_Fit(unsigned width, unsigned height, unsigned 
 	return true;
 }
 
-static void Apply_Dim_Reduction(unsigned& width, unsigned& height, unsigned& reduction, unsigned mip_count)
+static void Apply_Dim_Reduction(unsigned& width, unsigned& height, unsigned& reduction, unsigned mip_count, unsigned minimum_dimension = MinTextureDim)
 {
 	for (unsigned r = reduction; r < mip_count; ++r)
 	{
-		unsigned w = max(width >> r, MinTextureDim);
-		unsigned h = max(height >> r, MinTextureDim);
+		unsigned w = max(width >> r, minimum_dimension);
+		unsigned h = max(height >> r, minimum_dimension);
 
 		if (Compressed_Dimensions_Fit(w, h, 1))
 		{
@@ -1628,6 +1610,9 @@ bool TextureLoadTaskClass::Begin_Compressed_Load()
 		return false;
 	}
 
+	const bool rgb = DDSFileClass::Is_RGB_Format(orig_format);
+	if (!rgb && !Texture->Is_Compression_Allowed())
+		return false;
 	Format = Get_Valid_Texture_Format(orig_format, Texture->Is_Compression_Allowed());
 
 	Reduction = orig_reduction;
@@ -1635,7 +1620,7 @@ bool TextureLoadTaskClass::Begin_Compressed_Load()
 
 	Width = orig_width;
 	Height = orig_height;
-	Apply_Dim_Reduction(Width, Height, Reduction, orig_mip_count);
+	Apply_Dim_Reduction(Width, Height, Reduction, orig_mip_count, rgb ? 1u : MinTextureDim);
 
 	Apply_Mip_Reduction(MipLevelCount, Reduction, Width, Height, orig_mip_count);
 
@@ -1798,13 +1783,17 @@ bool TextureLoadTaskClass::Load_Compressed_Mipmap()
 		return false;
 	}
 
-	// regular 2d texture
+	const bool rgb = DDSFileClass::Is_RGB_Format(dds_file.Get_Format());
+	if (rgb && (Get_Mip_Level_Count() > dds_file.Get_Mip_Level_Count() ||
+		Get_Width() != dds_file.Get_Width(0) || Get_Height() != dds_file.Get_Height(0)))
+		return false;
+
 	unsigned int width = Get_Width();
 	unsigned int height = Get_Height();
 
 	for (unsigned int level = 0; level < Get_Mip_Level_Count(); ++level)
 	{
-		WWASSERT(width >= MinTextureDim && height >= MinTextureDim);
+		WWASSERT(rgb || (width >= MinTextureDim && height >= MinTextureDim));
 
 		dds_file.Copy_Level_To_Surface
 		(
@@ -1817,8 +1806,8 @@ bool TextureLoadTaskClass::Load_Compressed_Mipmap()
 			HSVShift
 		);
 
-		width >>= 1;
-		height >>= 1;
+		width = max(width >> 1, 1u);
+		height = max(height >> 1, 1u);
 	}
 
 	return true;

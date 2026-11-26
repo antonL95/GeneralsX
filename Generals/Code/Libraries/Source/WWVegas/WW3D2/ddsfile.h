@@ -222,6 +222,9 @@ public:
 	const unsigned char* Get_Memory_Pointer(unsigned level) const;
 	unsigned Get_Level_Size(unsigned level) const;
 	WW3DFormat Get_Format() const { return Format; }
+	static bool Is_RGB_Format(WW3DFormat format) {
+		return format==WW3D_FORMAT_A8R8G8B8 || format==WW3D_FORMAT_X8R8G8B8;
+	}
 
 	DDSType Get_Type() const { return Type; }
 

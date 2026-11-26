@@ -258,6 +258,7 @@ class TextureLoadTaskClass : public TextureLoadTaskListNodeClass
 		unsigned	int			MipLevelCount;
 		unsigned	int			Reduction;
 		Vector3					HSVShift;
+		bool					LoadDDS{false};
 
 		unsigned char *		LockedSurfacePtr[MIP_LEVELS_MAX];
 		unsigned	int			LockedSurfacePitch[MIP_LEVELS_MAX];

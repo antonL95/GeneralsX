@@ -1,0 +1,16 @@
+art/compiledtextures/db/dbchainspec.dds
+art/compiledtextures/ex/exdanheir.dds
+art/compiledtextures/ex/exdarkglow2.dds
+art/compiledtextures/ex/exglow04.dds
+art/compiledtextures/ex/exmorgulshield.dds
+art/compiledtextures/ex/exritualsacrifice12.dds
+art/compiledtextures/ex/exswanbuff.dds
+art/compiledtextures/he/heroui_024.dds
+art/compiledtextures/hi/hielrond.dds
+art/compiledtextures/hi/hielrond_res.dds
+art/compiledtextures/ie/iexfocusglow.dds
+art/compiledtextures/kb/kbfortressb_angmar.dds
+art/compiledtextures/kb/kbfortressb_angmar_d.dds
+art/compiledtextures/mb/mbblastedcliff_snow.dds
+art/compiledtextures/ru/ruelrond2_m.dds
+art/compiledtextures/ru/rueomerkingcloakshield.dds

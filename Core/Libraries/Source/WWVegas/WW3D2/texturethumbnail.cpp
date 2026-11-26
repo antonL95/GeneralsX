@@ -44,7 +44,7 @@ static void Create_Hash_Name(StringClass& name, const StringClass& thumb_name)
 
 static bool Is_DDS_Thumbnail_Format_Supported(WW3DFormat format)
 {
-	return format==WW3D_FORMAT_DXT1 || format==WW3D_FORMAT_DXT5;
+	return format==WW3D_FORMAT_DXT1 || format==WW3D_FORMAT_DXT5 || DDSFileClass::Is_RGB_Format(format);
 }
 
 // GeneralsX @bugfix Copilot 24/08/2026 Downsample sparse DDS levels directly into bounded thumbnail storage.
@@ -57,20 +57,25 @@ static void Copy_Scaled_DDS_Thumbnail(
 {
 	const unsigned source_width=dds_file.Get_Width(level);
 	const unsigned source_height=dds_file.Get_Height(level);
+	const bool rgb = DDSFileClass::Is_RGB_Format(dds_file.Get_Format());
 	unsigned block[16]={0};
 
 	for (unsigned y=0;y<height;++y) {
 		const unsigned source_y=y*source_height/height;
 		for (unsigned x=0;x<width;++x) {
 			const unsigned source_x=x*source_width/width;
-			dds_file.Get_4x4_Block(
-				(unsigned char*)block,
-				sizeof(unsigned)*4,
-				WW3D_FORMAT_A8R8G8B8,
-				level,
-				source_x&~3u,
-				source_y&~3u);
-			const unsigned color=block[(source_y&3u)*4+(source_x&3u)];
+			unsigned color;
+			if (rgb)
+			{
+				color = dds_file.Get_Pixel(level, source_x, source_y);
+			}
+			else
+			{
+				dds_file.Get_4x4_Block(
+					(unsigned char*)block, sizeof(unsigned)*4, WW3D_FORMAT_A8R8G8B8,
+					level, source_x&~3u, source_y&~3u);
+				color = block[(source_y&3u)*4+(source_x&3u)];
+			}
 			BitmapHandlerClass::Write_B8G8R8A8(
 				bitmap+(y*width+x)*2,
 				WW3D_FORMAT_A4R4G4B4,

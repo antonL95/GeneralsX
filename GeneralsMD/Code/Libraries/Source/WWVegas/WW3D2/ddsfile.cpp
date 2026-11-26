@@ -26,6 +26,10 @@
 #include "bitmaphandler.h"
 #include "colorspace.h"
 
+#include <bit>
+#include <cstring>
+#include <limits>
+
 // GeneralsX @build fbraz 10/02/2026 DirectDraw header Windows-only
 // Linux: Define DDS constants locally (fighter19 pattern)
 #ifdef _WIN32
@@ -34,6 +38,38 @@
 #define DDSCAPS2_CUBEMAP 0x00000200
 #define DDSCAPS2_VOLUME  0x00200000
 #endif
+
+namespace
+{
+constexpr unsigned DdsPitchFlag = 0x8;
+constexpr unsigned DdsAlphaPixelsFlag = 0x1;
+constexpr unsigned DdsFourCCFlag = 0x4;
+constexpr unsigned DdsRgbFlag = 0x40;
+constexpr unsigned DdsAlphaMask = 0xff000000;
+constexpr unsigned DdsBytesPerPixel = 4;
+constexpr unsigned DdsHeaderSize = 4 + sizeof(LegacyDDSURFACEDESC2);
+
+WW3DFormat Get_DDS_Format(const LegacyDDPIXELFORMAT& pixel)
+{
+	if (pixel.Size != sizeof(pixel))
+		return WW3D_FORMAT_UNKNOWN;
+
+	if (pixel.Flags & DdsFourCCFlag)
+	{
+		const auto format = D3DFormat_To_WW3DFormat(static_cast<D3DFORMAT>(pixel.FourCC));
+		return format >= WW3D_FORMAT_DXT1 && format <= WW3D_FORMAT_DXT5 ? format : WW3D_FORMAT_UNKNOWN;
+	}
+
+	if (!(pixel.Flags & DdsRgbFlag) || pixel.RGBBitCount != 32 ||
+		pixel.RBitMask != 0x00ff0000 || pixel.GBitMask != 0x0000ff00 || pixel.BBitMask != 0x000000ff)
+		return WW3D_FORMAT_UNKNOWN;
+
+	const bool alpha = (pixel.Flags & DdsAlphaPixelsFlag) != 0;
+	if (pixel.RGBAlphaBitMask != (alpha ? DdsAlphaMask : 0))
+		return WW3D_FORMAT_UNKNOWN;
+	return alpha ? WW3D_FORMAT_A8R8G8B8 : WW3D_FORMAT_X8R8G8B8;
+}
+}
 
 // ----------------------------------------------------------------------------
 
@@ -58,6 +94,8 @@ DDSFileClass::DDSFileClass(const char* name,unsigned reduction_factor)
 	strlcpy(Name,name,sizeof(Name));
 	// The name could be given in .tga or .dds format, so ensure we're opening .dds...
 	int len=strlen(Name);
+	if (len < 4 || Name[len-4] != '.')
+		return;
 	Name[len-3]='d';
 	Name[len-2]='d';
 	Name[len-1]='s';
@@ -78,41 +116,14 @@ DDSFileClass::DDSFileClass(const char* name,unsigned reduction_factor)
 	DateTime=file->Get_Date_Time();
 	char header[4];
 
-	unsigned read_bytes=file->Read(header,4);
-	if (!read_bytes)
-	{
-		WWASSERT("File loading failed trying to read header");
+	if (file->Read(header, sizeof(header)) != sizeof(header) || std::memcmp(header, "DDS ", sizeof(header)) != 0)
 		return;
-	}
-	// Now, we read DDSURFACEDESC2 defining the compressed data
-	read_bytes=file->Read(&SurfaceDesc,sizeof(LegacyDDSURFACEDESC2));
-	// Verify the structure size matches the read size
-	if (read_bytes==0 || read_bytes!=SurfaceDesc.Size)
-	{
-		StringClass tmp(0,true);
-		tmp.Format("File %s loading failed.\nTried to read %d bytes, got %d. (SurfDesc.size=%d)",name,sizeof(LegacyDDSURFACEDESC2),read_bytes,SurfaceDesc.Size);
-		WWASSERT_PRINT(0,tmp.str());
+	if (file->Read(&SurfaceDesc, sizeof(SurfaceDesc)) != sizeof(SurfaceDesc) || SurfaceDesc.Size != sizeof(SurfaceDesc))
 		return;
-	}
 
-	Format=D3DFormat_To_WW3DFormat((D3DFORMAT)SurfaceDesc.PixelFormat.FourCC);
-	WWASSERT(
-		Format==WW3D_FORMAT_DXT1 ||
-		Format==WW3D_FORMAT_DXT2 ||
-		Format==WW3D_FORMAT_DXT3 ||
-		Format==WW3D_FORMAT_DXT4 ||
-		Format==WW3D_FORMAT_DXT5);
-
-	MipLevels=SurfaceDesc.MipMapCount;
-	if (MipLevels==0) MipLevels=1;
-
-	// GeneralsX @bugfix Copilot 24/08/2026 Clamp DDS reduction to authored levels so thumbnail loads cannot skip past the file data.
-	if (ReductionFactor >= MipLevels) ReductionFactor = MipLevels - 1;
-	MipLevels -= ReductionFactor;
-
-	// Drop the two lowest miplevels!
-	if (MipLevels>2) MipLevels-=2;
-	else MipLevels=1;
+	Format=Get_DDS_Format(SurfaceDesc.PixelFormat);
+	if (Format==WW3D_FORMAT_UNKNOWN || !SurfaceDesc.Width || !SurfaceDesc.Height)
+		return;
 
 	// check texture type, normal, cube or volume
 	if (SurfaceDesc.Caps.Caps2&DDSCAPS2_CUBEMAP)
@@ -124,6 +135,22 @@ DDSFileClass::DDSFileClass(const char* name,unsigned reduction_factor)
 		Type=DDS_VOLUME;
 	}
 
+	MipLevels=SurfaceDesc.MipMapCount ? SurfaceDesc.MipMapCount : 1;
+	if (MipLevels > std::numeric_limits<unsigned>::digits)
+		return;
+
+	const bool rgb = Is_RGB_Format(Format);
+	if (rgb)
+	{
+		const int file_size = file->Size();
+		if (Type != DDS_TEXTURE || file_size <= static_cast<int>(DdsHeaderSize) ||
+			!Validate_RGB_Mips(static_cast<unsigned>(file_size) - DdsHeaderSize))
+			return;
+	}
+
+	if (ReductionFactor >= MipLevels) ReductionFactor = MipLevels - 1;
+	MipLevels -= ReductionFactor;
+	if (!rgb) MipLevels = MipLevels > 2 ? MipLevels - 2 : 1;
 
 	FullWidth=SurfaceDesc.Width;
 	FullHeight=SurfaceDesc.Height;
@@ -145,11 +172,9 @@ DDSFileClass::DDSFileClass(const char* name,unsigned reduction_factor)
 		if (level_height>1) level_height/=2;
 		if (Type==DDS_VOLUME && level_depth>1) level_depth/=2;
 	}
-	// GeneralsX @bugfix Copilot 26/08/2026 Derive each compressed mip size from its logical dimensions.
 	for (level=0;level<MipLevels;++level)
 	{
-		unsigned level_size=Calculate_DXTC_Surface_Size(level_width,level_height,Format);
-		if (Type==DDS_VOLUME) level_size*=level_depth;
+		const unsigned level_size=Calculate_Level_Size(level_width, level_height, level_depth, level+ReductionFactor);
 		LevelSizes[level]=level_size;
 		LevelOffsets[level]=level_offset;
 		level_offset+=level_size;
@@ -184,17 +209,13 @@ DDSFileClass::~DDSFileClass()
 unsigned DDSFileClass::Get_Width(unsigned level) const
 {
 	WWASSERT(level<MipLevels);
-	unsigned width=Width>>level;
-	if (width<4) width=4;
-	return width;
+	return max(Width>>level, Is_RGB_Format(Format) ? 1u : 4u);
 }
 
 unsigned DDSFileClass::Get_Height(unsigned level) const
 {
 	WWASSERT(level<MipLevels);
-	unsigned height=Height>>level;
-	if (height<4) height=4;
-	return height;
+	return max(Height>>level, Is_RGB_Format(Format) ? 1u : 4u);
 }
 
 unsigned DDSFileClass::Get_Depth(unsigned level) const
@@ -215,6 +236,41 @@ unsigned DDSFileClass::Get_Level_Size(unsigned level) const
 {
 	WWASSERT(level<MipLevels);
 	return LevelSizes[level];
+}
+
+unsigned DDSFileClass::Get_RGB_Pitch(unsigned width, unsigned authored_level) const
+{
+	if (authored_level == 0 && (SurfaceDesc.Flags & DdsPitchFlag))
+		return SurfaceDesc.Pitch;
+	return width * DdsBytesPerPixel;
+}
+
+bool DDSFileClass::Validate_RGB_Mips(unsigned data_size) const
+{
+	unsigned width = SurfaceDesc.Width;
+	unsigned height = SurfaceDesc.Height;
+	if (MipLevels > std::bit_width(max(width, height)))
+		return false;
+	for (unsigned level = 0; level < MipLevels; ++level)
+	{
+		if (width > data_size / DdsBytesPerPixel / height)
+			return false;
+		const unsigned pitch = Get_RGB_Pitch(width, level);
+		if (pitch < width * DdsBytesPerPixel || pitch % DdsBytesPerPixel || pitch > data_size / height)
+			return false;
+		data_size -= pitch * height;
+		width = max(width >> 1, 1u);
+		height = max(height >> 1, 1u);
+	}
+	return true;
+}
+
+unsigned DDSFileClass::Calculate_Level_Size(unsigned width, unsigned height, unsigned depth, unsigned authored_level) const
+{
+	if (Is_RGB_Format(Format))
+		return Get_RGB_Pitch(width, authored_level) * height;
+	const unsigned size = Calculate_DXTC_Surface_Size(width, height, Format);
+	return Type == DDS_VOLUME ? size * depth : size;
 }
 
 // For some reason DX-Tex tool doesn't fill the surface size field, so we need to calculate it...
@@ -256,14 +312,12 @@ bool DDSFileClass::Load()
 		return false;
 	}
 
-	file->Open();
-	// Data size is file size minus the header and info block
-	unsigned size=file->Size()-SurfaceDesc.Size-4;
-
-	if (!size)
-	{
+	if (!file->Open())
 		return false;
-	}
+	const int file_size = file->Size();
+	if (file_size <= static_cast<int>(DdsHeaderSize))
+		return false;
+	unsigned size = static_cast<unsigned>(file_size) - DdsHeaderSize;
 
 	// Skip mip levels if reduction factor is not zero
 	unsigned skipped_offset=0;
@@ -272,8 +326,9 @@ bool DDSFileClass::Load()
 	unsigned level_depth=SurfaceDesc.Depth;
 	for (unsigned i=0;i<ReductionFactor;++i)
 	{
-		unsigned level_size=Calculate_DXTC_Surface_Size(level_width,level_height,Format);
-		if (Type==DDS_VOLUME) level_size*=level_depth;
+		const unsigned level_size=Calculate_Level_Size(level_width, level_height, level_depth, i);
+		if (level_size >= size)
+			return false;
 		skipped_offset+=level_size;
 		size-=level_size;
 		if (level_width>1) level_width/=2;
@@ -281,20 +336,23 @@ bool DDSFileClass::Load()
 		if (Type==DDS_VOLUME && level_depth>1) level_depth/=2;
 	}
 
-	// Skip the header and info block and possible unused mip levels
-	unsigned seek_size=file->Seek(SurfaceDesc.Size+4+skipped_offset);
-	(void)seek_size;
-	WWASSERT(seek_size==(SurfaceDesc.Size+4+skipped_offset));
-
-	if (size && size<0x80000000)
+	if (Is_RGB_Format(Format))
 	{
-		// Allocate memory for the data excluding the headers
-		DDSMemory=MSGW3DNEWARRAY("DDSMemory") unsigned char[size];
-		// Read data
-		unsigned read_size=file->Read(DDSMemory,size);
-		(void)read_size;
-		// Verify we got all the data
-		WWASSERT(read_size==size);
+		const unsigned last = MipLevels - 1;
+		const unsigned required = LevelOffsets[last] + LevelSizes[last];
+		if (required > size)
+			return false;
+		size = required;
+	}
+	const int offset = DdsHeaderSize + skipped_offset;
+	if (file->Seek(offset, SEEK_SET) != offset)
+		return false;
+	DDSMemory=MSGW3DNEWARRAY("DDSMemory") unsigned char[size];
+	if (file->Read(DDSMemory, size) != static_cast<int>(size))
+	{
+		delete[] DDSMemory;
+		DDSMemory=nullptr;
+		return false;
 	}
 	file->Close();
 	return true;
@@ -376,6 +434,36 @@ void DDSFileClass::Copy_Level_To_Surface
 {
 	WWASSERT(DDSMemory);
 	WWASSERT(dest_surface);
+
+	if (Is_RGB_Format(Format))
+	{
+		if (!DDSMemory || !dest_surface || level >= MipLevels ||
+			dest_width != Get_Width(level) || dest_height != Get_Height(level))
+			return;
+		const unsigned dest_bpp = Get_Bytes_Per_Pixel(dest_format);
+		if (!dest_bpp || dest_width > dest_pitch / dest_bpp)
+			return;
+		const bool shift = hsv_shift[0] != 0.0f || hsv_shift[1] != 0.0f || hsv_shift[2] != 0.0f;
+		const auto* source = Get_Memory_Pointer(level);
+		const unsigned src_pitch = Get_RGB_Pitch(dest_width, level + ReductionFactor);
+		for (unsigned y = 0; y < dest_height; ++y)
+		{
+			auto* row = dest_surface + static_cast<std::size_t>(y) * dest_pitch;
+			if (dest_format == Format && !shift)
+			{
+				std::memcpy(row, source + y * src_pitch, dest_width * DdsBytesPerPixel);
+				continue;
+			}
+			for (unsigned x = 0; x < dest_width; ++x)
+			{
+				unsigned color = Get_Pixel(level, x, y);
+				if (shift)
+					Recolor(color, hsv_shift);
+				BitmapHandlerClass::Write_B8G8R8A8(row + x * dest_bpp, dest_format, color);
+			}
+		}
+		return;
+	}
 
 	if (!DDSMemory || !Get_Memory_Pointer(level))
 	{
@@ -906,6 +994,14 @@ unsigned DDSFileClass::Get_Pixel(unsigned level,unsigned x,unsigned y) const
 	WWASSERT(y<Get_Height(level));
 
 	switch (Format) {
+	case WW3D_FORMAT_A8R8G8B8:
+	case WW3D_FORMAT_X8R8G8B8:
+		{
+			const unsigned pitch = Get_RGB_Pitch(Get_Width(level), level + ReductionFactor);
+			unsigned color;
+			std::memcpy(&color, Get_Memory_Pointer(level) + y * pitch + x * DdsBytesPerPixel, sizeof(color));
+			return Format == WW3D_FORMAT_X8R8G8B8 ? color | DdsAlphaMask : color;
+		}
 	// Note that we don't currently really support alpha on DXT1 - all alpha textures should use DXT5.
 	// The reason for this is that when converting from DXT1 to 16 bit uncompressed texture we want
 	// to be able to use RGB565 format instead of ARGB4444. As the alpha is encoded in DXT1 per-block

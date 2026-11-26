@@ -1,0 +1,3 @@
+20 create Player_1 ArnorElrond 0 3225,850,0
+21 reveal Player_1 ArnorElrond 0
+35 select Player_1 ArnorElrond 0
