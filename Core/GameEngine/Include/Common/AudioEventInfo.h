@@ -37,6 +37,7 @@
 
 // FORWARD DECLARATIONS ///////////////////////////////////////////////////////////////////////////
 struct FieldParse;
+class INI;
 
 struct WeightedAudioName
 {
@@ -55,7 +56,8 @@ enum AudioType CPP_11(: Int)
 {
 	AT_Music,
 	AT_Streaming,
-	AT_SoundEffect
+	AT_SoundEffect,
+	AT_AmbientStream
 };
 
 extern const char* const theAudioPriorityNames[];
@@ -107,6 +109,7 @@ struct AudioEventInfo : public MemoryPoolObject
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( AudioEventInfo, "AudioEventInfo" )
 
 public:
+	static void parseAmbientStream(INI* ini);
 	AsciiString m_audioName;	// This name matches the name of the AudioEventRTS
 	AsciiString m_filename;		// For music tracks, this is the filename of the track
 

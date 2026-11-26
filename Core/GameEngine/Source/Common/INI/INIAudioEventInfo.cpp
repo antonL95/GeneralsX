@@ -179,6 +179,19 @@ void INI::parseDialogDefinition( INI* ini )
 	ini->initFromINI( track, track->getFieldParse() );
 }
 
+void AudioEventInfo::parseAmbientStream(INI* ini)
+{
+	const AsciiString name = ini->getNextAsciiString();
+	AudioEventInfo* stream = TheAudio->newAudioEventInfo(name);
+	if (!stream)
+		return;
+	if (const AudioEventInfo* defaults = TheAudio->findAudioEventInfo("DefaultAmbientStream"); defaults && defaults != stream)
+		*stream = *defaults;
+	stream->m_audioName = name;
+	stream->m_soundType = AT_AmbientStream;
+	ini->initFromINI(stream, stream->getFieldParse());
+}
+
 
 //-------------------------------------------------------------------------------------------------
 static void parseDelay( INI* ini, void *instance, void *store, const void* /*userData*/ );

@@ -336,7 +336,8 @@ void AudioEventRTS::generateFilename(Bool randomByDefault, Bool forTiming)
 
 	Int which = 0;
 
-	if (m_eventInfo->m_soundType == AT_Music || m_eventInfo->m_soundType == AT_Streaming) {
+	if (m_eventInfo->m_soundType == AT_Music || m_eventInfo->m_soundType == AT_Streaming ||
+		m_eventInfo->m_soundType == AT_AmbientStream) {
 		m_filenameToLoad.concat(m_eventInfo->m_filename);
 		adjustForLocalization(m_filenameToLoad);
 		return;
@@ -780,6 +781,8 @@ AsciiString AudioEventRTS::generateFilenamePrefix( AudioType audioTypeToPlay, Bo
 		retStr.concat(TheAudio->getAudioSettings()->m_musicFolder);
 	} else if (audioTypeToPlay == AT_Streaming) {
 		retStr.concat(TheAudio->getAudioSettings()->m_streamingFolder);
+	} else if (audioTypeToPlay == AT_AmbientStream) {
+		retStr.concat(TheAudio->getAudioSettings()->m_ambientStreamFolder);
 	} else {
 		retStr.concat(TheAudio->getAudioSettings()->m_soundsFolder);
 	}

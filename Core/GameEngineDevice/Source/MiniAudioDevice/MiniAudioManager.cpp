@@ -45,6 +45,7 @@
 #include "Common/AudioSettings.h"
 #include "Common/AsciiString.h"
 #include "Common/AudioEventInfo.h"
+#include "Common/AudioRandomValue.h"
 #include "Common/FileSystem.h"
 #include "Common/GameCommon.h"
 #include "Common/GameSounds.h"
@@ -425,6 +426,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	case AT_Streaming:
 		groupToUse = &m_speechGroup;
 		break;
+	case AT_AmbientStream:
 	case AT_SoundEffect:
 		if (event->isPositionalAudio()) {
 			groupToUse = &m_sound3DGroup;
@@ -505,7 +507,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	delete ffmpegFile;
 	ffmpegFile = NULL;
 
-	if (pcmData.empty() || sampleRate == 0 || bytesPerSample == 0) {
+	if (pcmData.empty() || sampleRate <= 0 || channels <= 0 || bytesPerSample <= 0) {
 		if (m_headlessVirtualPlayback) {
 			std::fprintf(stderr, "AUDIO TRACE unknown duration event=%s\n", event->getEventName().str());
 			std::abort();
@@ -515,21 +517,23 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		return;
 	}
 
+	const auto pcmFrames = pcmData.size() / (channels * bytesPerSample);
+	const bool ambientStream = info->m_soundType == AT_AmbientStream;
+	const ma_uint64 startFrame = ambientStream && pcmFrames > 1 && (info->m_control & AC_RANDOMSTART)
+		? static_cast<ma_uint64>(static_cast<double>(pcmFrames - 1) * GameAudioRandomValueReal(0.0f, 1.0f))
+		: 0;
 	if (m_headlessVirtualPlayback)
 	{
-		if (channels <= 0) {
-			std::fprintf(stderr, "AUDIO TRACE unknown duration event=%s\n", event->getEventName().str());
-			std::abort();
-		}
 		audio->m_virtualDurationMs = static_cast<Real>(pcmData.size()) * 1000.0f /
 			static_cast<Real>(sampleRate * channels * bytesPerSample);
+		audio->m_virtualElapsedMs = static_cast<Real>(startFrame) * 1000.0f / sampleRate;
 		audio->m_virtualLastFrame = TheGameLogic ? TheGameLogic->getFrame() : 0;
 		if (m_traceEnabled)
 			std::fprintf(stderr, "AUDIO DURATION handle=%u ms=%.3f bytes=%zu rate=%d channels=%d samplebytes=%d\n",
 				static_cast<UnsignedInt>(event->getPlayingHandle()), audio->m_virtualDurationMs,
 				pcmData.size(), sampleRate, channels, bytesPerSample);
 		audio->m_type = info->m_soundType == AT_Music || info->m_soundType == AT_Streaming ? PAT_Stream :
-			(event->isPositionalAudio() ? PAT_3DSample : PAT_Sample);
+			(event->isPositionalAudio() ? PAT_3DSample : ambientStream ? PAT_Stream : PAT_Sample);
 		audio->m_fadeIn = event->getShouldFade();
 		m_playingSounds.push_back(audio);
 		if (m_traceEnabled) {
@@ -557,9 +561,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	// Create audio buffer — init_copy copies data into internal storage
 	// so it's safe when pcmData goes out of scope after this function returns.
 	ma_audio_buffer *audioBuffer = (ma_audio_buffer *)malloc(sizeof(ma_audio_buffer));
-	ma_audio_buffer_config abConfig = ma_audio_buffer_config_init(maFmt, channels,
-		pcmData.size() / ma_get_bytes_per_frame(maFmt, channels),
-		pcmData.data(), NULL);
+	ma_audio_buffer_config abConfig = ma_audio_buffer_config_init(maFmt, channels, pcmFrames, pcmData.data(), nullptr);
 
 	ma_result result = ma_audio_buffer_init_copy(&abConfig, audioBuffer);
 	if (result != MA_SUCCESS) {
@@ -605,6 +607,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		break;
 	}
 
+	case AT_AmbientStream:
 	case AT_SoundEffect:
 	{
 		if (event->isPositionalAudio()) {
@@ -624,7 +627,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 
 		}
 		else {
-			audio->m_type = PAT_Sample;
+			audio->m_type = ambientStream ? PAT_Stream : PAT_Sample;
 
 		}
 		break;
@@ -639,6 +642,8 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		ma_sound_set_fade_in_milliseconds(sound, 0.0f, 1.0f, duration);
 	}
 
+	if (startFrame > 0)
+		ma_sound_seek_to_pcm_frame(sound, startFrame);
 	result = ma_sound_start(sound);
 	if (result != MA_SUCCESS) {
 		DEBUG_LOG(("MiniAudio: Failed to start sound: %d for '%s'\n", result, fileToPlay.str()));
@@ -1741,7 +1746,7 @@ Real MiniAudioManager::getEffectiveVolume(AudioEventRTS *event) const
 	if (info && (info->m_soundType == AT_Streaming || (info->m_type & ST_VOICE)))
 		return gain * m_speechVolume;
 	const Bool positional = event->isPositionalAudio();
-	if (event->isAmbient() && m_ambientVolume >= 0.0f)
+	if ((event->isAmbient() || (info && info->m_soundType == AT_AmbientStream)) && m_ambientVolume >= 0.0f)
 		return gain * m_ambientVolume * (positional ? m_scriptSound3DVolume : m_scriptSoundVolume);
 	return gain * (positional ? m_sound3DVolume : m_soundVolume);
 }
@@ -1785,6 +1790,7 @@ void MiniAudioManager::friend_forcePlayAudioEventRTS(const AudioEventRTS *eventT
 	switch (eventToPlay->getAudioEventInfo()->m_soundType)
 	{
 	case AT_Music:     if (!isOn(AudioAffect_Music))  return; break;
+	case AT_AmbientStream:
 	case AT_SoundEffect:
 		if (!isOn(AudioAffect_Sound) || !isOn(AudioAffect_Sound3D)) return;
 		break;

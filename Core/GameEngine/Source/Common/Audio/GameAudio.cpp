@@ -98,6 +98,7 @@ static const FieldParse audioSettingsFieldParseTable[] =
 	{ "SoundsFolder",					INI::parseAsciiString,							nullptr,							offsetof( AudioSettings, m_soundsFolder) },
 	{ "MusicFolder",					INI::parseAsciiString,							nullptr,							offsetof( AudioSettings, m_musicFolder) },
 	{ "StreamingFolder",			INI::parseAsciiString,							nullptr,							offsetof( AudioSettings, m_streamingFolder) },
+	{ "AmbientStreamFolder", INI::parseAsciiString, nullptr, offsetof(AudioSettings, m_ambientStreamFolder) },
 	{ "SoundsExtension",			INI::parseAsciiString,							nullptr,							offsetof( AudioSettings, m_soundsExtension) },
 
 	{ "UseDigital",						INI::parseBool,											nullptr,							offsetof( AudioSettings, m_useDigital) },
@@ -232,6 +233,9 @@ void AudioManager::init()
 
 	ini.loadFileDirectory( "Data\\INI\\Default\\Speech", INI_LOAD_OVERWRITE, nullptr );
 	ini.loadFileDirectory( "Data\\INI\\Speech", INI_LOAD_OVERWRITE, nullptr );
+
+	ini.loadFileDirectory("Data\\INI\\Default\\AmbientStream", INI_LOAD_OVERWRITE, nullptr);
+	ini.loadFileDirectory("Data\\INI\\AmbientStream", INI_LOAD_OVERWRITE, nullptr);
 
 	ini.loadFileDirectory( "Data\\INI\\Default\\Voice", INI_LOAD_OVERWRITE, nullptr );
 	ini.loadFileDirectory( "Data\\INI\\Voice", INI_LOAD_OVERWRITE, nullptr );
@@ -459,6 +463,9 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 	}
 
 	const AudioType soundType = eventToAdd->getAudioEventInfo()->m_soundType;
+	if (soundType == AT_AmbientStream &&
+		(eventToAdd->getAudioEventInfo()->m_filename.isEmpty() || (eventToAdd->getAudioEventInfo()->m_type & ST_DEFAULT)))
+		return AHSV_NoSound;
 
 	if (!m_headlessVirtualPlayback)
 	{
@@ -468,6 +475,7 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 				if (!isOn(AudioAffect_Music))
 					return AHSV_NoSound;
 				break;
+			case AT_AmbientStream:
 			case AT_SoundEffect:
 				if (!isOn(AudioAffect_Sound) || !isOn(AudioAffect_Sound3D))
 					return AHSV_NoSound;
@@ -1066,6 +1074,9 @@ Real AudioManager::getAudioLengthMS( const AudioEventRTS *event )
 			return 0.0f;
 		}
 	}
+
+	if (event->getAudioEventInfo()->m_soundType == AT_AmbientStream)
+		return 0.0f;
 
 	AudioEventRTS tmpEvent = *event;
 

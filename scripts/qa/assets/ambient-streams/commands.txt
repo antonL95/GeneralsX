@@ -1,0 +1,5 @@
+12 audio-loop-trace - - 0 virtual
+13 audio-loop-music - - 0 AmbientShirePub
+14 audio-loop-music - - 0 AmbientPelargirDock1
+15 audio-loop-music - - 0 DefaultAmbientStream
+18 quit - - 0

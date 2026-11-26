@@ -50,6 +50,7 @@ struct AudioSettings
 	AsciiString m_soundsFolder;
 	AsciiString m_musicFolder;
 	AsciiString m_streamingFolder;
+	AsciiString m_ambientStreamFolder;
 	AsciiString m_soundsExtension;
 	Bool m_useDigital;
 	Bool m_useMidi;
