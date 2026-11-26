@@ -1690,7 +1690,8 @@ void GameLogic::processMountedTemplateSwaps()
 			replacement->setCustomIndicatorColor(swap.indicatorColor);
 
 		replacement->setTransformMatrix(&swap.transform);
-		replacement->handlePartitionCellMaintenance();
+		if (PartitionData* partition = replacement->friend_getPartitionData())
+			partition->friend_updateCellsTouched();
 		replacement->m_objectUpgradesCompleted.set(swap.upgrades);
 		replacement->updateUpgradeModules();
 		ExperienceTracker* tracker = replacement->getExperienceTracker();
