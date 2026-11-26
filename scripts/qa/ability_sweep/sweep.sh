@@ -18,7 +18,7 @@ COMPOSE_PROGRESS=quiet devbox run --build=false tools \
     python -I "/app/engine/$worktree/scripts/qa/ability_sweep/cases.py" "$@" </dev/null > "$cases"
 if [ -n "${ABILITY_SWEEP_FILTER:-}" ]; then
     awk -v pattern="$ABILITY_SWEEP_FILTER" 'NR == 1 || $0 ~ pattern' "$cases" > "$cases.filtered"
-    mv "$cases.filtered" "$cases"
+    cases="$cases.filtered"
     table=game/analysis/ability-sweep-filtered.tsv
 fi
 COMPOSE_PROGRESS=quiet devbox run --build=false engine \

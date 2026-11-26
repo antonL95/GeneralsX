@@ -1,8 +1,11 @@
 import csv
+import os
 from pathlib import Path
 import runpy
+import signal
 import sys
 import tempfile
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parent
@@ -14,12 +17,13 @@ LANES = ((3090, 535), (3150, 690), (2260, 1180), (2520, 1010))
 FIRST_FRAME = 44
 WATCH_FRAMES = 600
 PREPARE_AT = 3
-CLICK_AT = 12
-SETTLE_FRAMES = 6
+CLICK_AT = 90
+SETTLE_FRAMES = 30
 SESSION_SECONDS = 600
 FACTION_SECONDS = 1800
 SESSION_CASES = 30
-RESULT_FIELDS = "animation objects caster ally enemy structure flags recharge ended remaining".split()
+STALL_SECONDS = 120
+RESULT_FIELDS = "animation objects caster ally enemy structure flags recharge ended remaining no_window".split()
 TABLE_FIELDS = "faction unit hero command_set button command power verdict problems result".split() + RESULT_FIELDS
 
 
@@ -59,8 +63,6 @@ def judge(values):
         return "passive", []
     if result == "not_shown":
         return "not shown", []
-    if result == "no_hud_button":
-        return "no hud button", ["no hud button"]
     if result != "accepted":
         return "rejected", ["rejected"]
     reactions = [values["caster"].replace("moved;", ""), values["ally"], values["enemy"], values["structure"]]
@@ -78,6 +80,27 @@ def judge(values):
     return problems[0] if problems else "ok", problems
 
 
+def kill_engine():
+    for entry in Path("/proc").iterdir():
+        try:
+            if entry.name.isdigit() and b"GeneralsMD/GeneralsXZH" in (entry / "cmdline").read_bytes() and int(entry.name) != os.getpid():
+                os.kill(int(entry.name), signal.SIGKILL)
+        except OSError:
+            continue
+
+
+def watch_for_stall(log, finished, stalled):
+    size, changed = -1, time.monotonic()
+    while not finished.wait(5):
+        current = log.stat().st_size if log.exists() else -1
+        if current != size:
+            size, changed = current, time.monotonic()
+        elif time.monotonic() - changed > STALL_SECONDS:
+            stalled.set()
+            kill_engine()
+            return
+
+
 def session(build, cases, seconds):
     map_path = PLAYTEST["INSTALL"] / (ROOT / "map.txt").read_text().strip()
     commands, end_frame = schedule(cases)
@@ -87,13 +110,20 @@ def session(build, cases, seconds):
         output = state / "results"
         output.mkdir()
         failure = None
+        log = output / "session.log"
+        finished, stalled = threading.Event(), threading.Event()
+        watcher = threading.Thread(target=watch_for_stall, args=(log, finished, stalled))
+        watcher.start()
         try:
             PLAYTEST["render"](build, output, state, map_path, [30], [], end_frame, commands, 28,
                                ROOT / "map.ini", checks, (1280, 720))
         except RuntimeError as error:
             failure = str(error)
-        log = output / "session.log"
-        return (log.read_text(errors="replace") if log.exists() else ""), failure
+        finally:
+            finished.set()
+            watcher.join()
+        hung = stalled.is_set() or bool(failure and ("exit 124" in failure or "exit 137" in failure))
+        return (log.read_text(errors="replace") if log.exists() else ""), failure, hung
 
 
 def result_row(case, values):
@@ -111,7 +141,7 @@ def run_faction(build, faction, pending, writer):
     deadline = time.monotonic() + FACTION_SECONDS
     while pending and time.monotonic() < deadline:
         batch = pending[:SESSION_CASES]
-        log, failure = session(build, batch, min(SESSION_SECONDS, int(deadline - time.monotonic()) + 1))
+        log, failure, hung = session(build, batch, min(SESSION_SECONDS, int(deadline - time.monotonic()) + 1))
         results = parse(log)
         finished = 0
         for case in batch:
@@ -121,7 +151,8 @@ def run_faction(build, faction, pending, writer):
             finished += 1
         print(f"{faction}: {finished}/{len(batch)} cases, {failure or 'completed'}", file=sys.stderr)
         if finished < len(batch):
-            writer.writerow(unfinished_row(batch[finished], "session failed", failure or "no result line"))
+            last = next((line for line in reversed(log.splitlines()) if line.startswith("TEST ")), "no log line")
+            writer.writerow(unfinished_row(batch[finished], "hang" if hung else "session failed", last[:200]))
             print("\n".join(log.splitlines()[-30:]), file=sys.stderr)
             finished += 1
         pending = pending[finished:]

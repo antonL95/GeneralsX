@@ -71,7 +71,7 @@ struct Case
 	std::string result = "no_click";
 	Int type = 0;
 	Actor actors[ACTOR_COUNT];
-	ObjectID before = INVALID_ID;
+	Bool noWindow = FALSE;
 	ObjectID previous = INVALID_ID;
 	ModelConditionFlags conditions;
 	WeaponSetFlags weaponSet;
@@ -83,11 +83,38 @@ struct Case
 	std::string remaining;
 	const SpecialPowerTemplate* powerTemplate = nullptr;
 	Bool recharged = FALSE;
+	Bool running = FALSE;
+	std::set<std::string> persisting;
 	UnsignedInt clickFrame = 0;
 	UnsignedInt lastActive = 0;
 };
 
 Case s_case;
+ObjectID s_sessionObjects = INVALID_ID;
+UpgradeMaskType s_sessionUpgrades;
+Bool s_sessionRecorded = FALSE;
+
+void destroyObjectsAfter(ObjectID last)
+{
+	for (Object* object = TheGameLogic->getFirstObject(); object;)
+	{
+		Object* next = object->getNextObject();
+		if (object->getID() > last)
+			TheGameLogic->destroyObject(object);
+		object = next;
+	}
+}
+
+void restorePlayerUpgrades(Player* player)
+{
+	std::vector<const UpgradeTemplate*> added;
+	for (const UpgradeTemplate* upgrade = TheUpgradeCenter->firstUpgradeTemplate(); upgrade; upgrade = upgrade->friend_getNext())
+		if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER && player->getCompletedUpgradeMask().testForAny(upgrade->getUpgradeMask()) &&
+			!s_sessionUpgrades.testForAny(upgrade->getUpgradeMask()))
+			added.push_back(upgrade);
+	for (const UpgradeTemplate* upgrade : added)
+		player->removeUpgrade(upgrade);
+}
 
 std::string joined(const std::set<std::string>& values)
 {
@@ -142,10 +169,17 @@ void setup(const RetailTestCommands::Context& ctx)
 	char enemyPlayer[64] = {};
 	if (std::sscanf(ctx.argument, "%127[^,],%127[^,],%127[^,],%63s", ally, enemy, structure, enemyPlayer) != 4 || !ctx.player)
 		return;
+	if (!s_sessionRecorded)
+	{
+		s_sessionRecorded = TRUE;
+		s_sessionObjects = highestObjectId();
+		s_sessionUpgrades = ctx.player->getCompletedUpgradeMask();
+	}
+	destroyObjectsAfter(s_sessionObjects);
+	restorePlayerUpgrades(ctx.player);
 	s_case.active = TRUE;
 	s_case.id = ctx.ordinal;
 	s_case.templateName = ctx.targetName;
-	s_case.before = highestObjectId();
 	Player* opponent = ctx.findPlayer(enemyPlayer);
 	const Real x = ctx.position.x;
 	const Real y = ctx.position.y;
@@ -291,6 +325,71 @@ void snapshot(Actor& actor)
 	actor.owner = object->getControllingPlayer();
 }
 
+std::string aim(Object* caster, const CommandButton* pending);
+
+std::string issueWithoutWindow(Object* caster, const CommandButton* button)
+{
+	if (button->getCommandType() == GUI_COMMAND_SPECIAL_POWER_TOGGLE)
+		button = button->resolveRetailToggleButton(caster);
+	if (BitIsSet(button->getOptions(), COMMAND_OPTION_NEED_TARGET))
+		return aim(caster, button);
+	const SpecialPowerTemplate* power = button->getSpecialPowerTemplate();
+	switch (button->getCommandType())
+	{
+		case GUI_COMMAND_SPECIAL_POWER:
+		case GUI_COMMAND_SPECIAL_POWER_TOGGLE:
+		{
+			if (!power)
+				return "rejected:no_power";
+			GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_DO_SPECIAL_POWER);
+			message->appendIntegerArgument(power->getID());
+			message->appendIntegerArgument(button->getOptions());
+			message->appendObjectIDArgument(button->getCommandType() == GUI_COMMAND_SPECIAL_POWER_TOGGLE ? caster->getID() : INVALID_ID);
+			return "accepted";
+		}
+		case GUI_COMMAND_FIRE_WEAPON:
+		{
+			GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_DO_WEAPON);
+			message->appendIntegerArgument(button->getWeaponSlot());
+			message->appendIntegerArgument(button->getMaxShotsToFire());
+			return "accepted";
+		}
+		case GUI_COMMAND_SWITCH_WEAPON:
+			TheMessageStream->appendMessage(GameMessage::MSG_SWITCH_WEAPONS)->appendIntegerArgument(button->getWeaponSlot());
+			return "accepted";
+		case GUI_COMMAND_TOGGLE_WEAPONSET:
+		case GUI_COMMAND_ONE_RING:
+		case GUI_COMMAND_WAKE_AUTO_PICKUP:
+		{
+			const CommandSet* set = TheControlBar->findCommandSet(caster->getCommandSetString());
+			for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+				if (set->getCommandButton(slot) == button)
+				{
+					GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_RETAIL_HORDE_COMMAND);
+					message->appendObjectIDArgument(caster->getID());
+					message->appendIntegerArgument(slot);
+					message->appendIntegerArgument(-1);
+					return "accepted";
+				}
+			return "rejected:not_in_command_set";
+		}
+		default:
+			return "rejected:unsupported_command";
+	}
+}
+
+void recordBaseline(Object* caster, UnsignedInt frame)
+{
+	for (Actor& actor : s_case.actors)
+		snapshot(actor);
+	s_case.conditions = conditionsOf(caster);
+	s_case.weaponSet = caster->getWeaponSetFlags();
+	s_case.commandSet = caster->getCommandSetString();
+	s_case.previous = highestObjectId();
+	s_case.clickFrame = frame;
+	s_case.clicked = TRUE;
+}
+
 std::string aim(Object* caster, const CommandButton* pending)
 {
 	const UnsignedInt options = pending->getOptions();
@@ -376,31 +475,31 @@ void click(const RetailTestCommands::Context& ctx)
 		if (!button->isShowButton() || !button->isModelConditionAllowed(caster) ||
 			(mounted && button->hasRotwkOption(CommandButtonRules::ROTWK_UNMOUNTED_ONLY)) ||
 			(!mounted && button->hasRotwkOption(CommandButtonRules::ROTWK_MOUNTED_ONLY)))
+		{
 			s_case.result = "not_shown";
-		else
-			s_case.result = window ? "rejected:button_hidden" : "no_hud_button";
-		return;
+			return;
+		}
+		s_case.noWindow = TRUE;
 	}
-	const CommandAvailability availability = TheControlBar->getRetailButtonAvailability(window);
+	const CommandAvailability availability = s_case.noWindow
+		? TheControlBar->queryRetailCommandAvailability(button, caster) : TheControlBar->getRetailButtonAvailability(window);
 	if (availability != COMMAND_AVAILABLE && availability != COMMAND_ACTIVE)
 	{
 		s_case.result = availability == COMMAND_PASSIVE ? "passive" : std::string("rejected:") + availabilityName(availability);
 		return;
 	}
-	if (!BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED))
+	if (!s_case.noWindow && !BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED))
 	{
 		s_case.result = "rejected:button_disabled";
 		return;
 	}
-	for (Actor& actor : s_case.actors)
-		snapshot(actor);
-	s_case.conditions = conditionsOf(caster);
-	s_case.weaponSet = caster->getWeaponSetFlags();
-	s_case.commandSet = caster->getCommandSetString();
-	s_case.previous = highestObjectId();
-	s_case.clickFrame = ctx.frame;
-	s_case.clicked = TRUE;
+	recordBaseline(caster, ctx.frame);
 	TheInGameUI->setGUICommand(nullptr);
+	if (s_case.noWindow)
+	{
+		s_case.result = issueWithoutWindow(caster, button);
+		return;
+	}
 	TheWindowManager->winSendSystemMsg(window->winGetOwner(), GBM_SELECTED, (WindowMsgData)window, window->winGetWindowId());
 	s_case.result = "accepted";
 	if (const CommandButton* pending = TheInGameUI->getGUICommand())
@@ -410,7 +509,7 @@ void click(const RetailTestCommands::Context& ctx)
 	}
 }
 
-void watchActor(Actor& actor, Bool& active, const char* label)
+void watchActor(Actor& actor, Bool& active, const char* label, UnsignedInt frame)
 {
 	const Object* object = TheGameLogic->findObjectByID(actor.id);
 	if (!object || object->isEffectivelyDead())
@@ -418,12 +517,21 @@ void watchActor(Actor& actor, Bool& active, const char* label)
 		actor.died = actor.id != INVALID_ID;
 		return;
 	}
-	for (const std::string& name : modifierNames(object))
-		if (!actor.modifiers.count(name))
+	if (const AttributeModifierHelper* helper = object->getAttributeModifierHelper())
+		for (const auto& applied : helper->getStack().active())
 		{
-			actor.newModifiers.insert(name);
-			s_case.remaining += s_case.remaining.empty() ? "" : ",";
-			s_case.remaining += std::string(label) + ".mod." + name;
+			const ModifierListTemplate* list = TheAttributeModifierStore->get(applied.list);
+			if (!list || actor.modifiers.count(list->m_name.str()))
+				continue;
+			actor.newModifiers.insert(list->m_name.str());
+			const Bool running = applied.endFrame > frame ||
+				frame - s_case.clickFrame < TheAttributeModifierStore->def(applied.list).durationFrames;
+			if (running)
+			{
+				s_case.running = TRUE;
+				continue;
+			}
+			s_case.remaining += (s_case.remaining.empty() ? "" : ",") + std::string(label) + ".mod." + list->m_name.str();
 			active = TRUE;
 		}
 	const ObjectStatusMaskType status = object->getStatusBits();
@@ -445,11 +553,16 @@ void watch(const RetailTestCommands::Context& ctx)
 		return;
 	Bool active = FALSE;
 	s_case.remaining.clear();
+	s_case.running = FALSE;
 	for (Int i = 0; i < ACTOR_COUNT; ++i)
-		watchActor(s_case.actors[i], active, ACTOR_NAMES[i]);
+		watchActor(s_case.actors[i], active, ACTOR_NAMES[i], ctx.frame);
 	if (Object* caster = TheGameLogic->findObjectByID(s_case.actors[CASTER].id))
 	{
 		const ModelConditionFlags current = conditionsOf(caster);
+		std::set<Int> modifierConditions;
+		if (const AttributeModifierHelper* helper = caster->getAttributeModifierHelper())
+			for (const Int condition : helper->getAppliedModelConditions())
+				modifierConditions.insert(condition);
 		for (Int bit = 0; bit < current.size(); ++bit)
 		{
 			if (!current.test(bit) || s_case.conditions.test(bit))
@@ -458,6 +571,8 @@ void watch(const RetailTestCommands::Context& ctx)
 			if (name == "SELECTED" || name == "MOVING" || name.rfind("TURN_", 0) == 0 || name == "ACCELERATE" || name == "DECELERATE" || name == "ENGAGED" || name.rfind("EMOTION_", 0) == 0)
 				continue;
 			s_case.animation.insert(name);
+			if (modifierConditions.count(bit))
+				continue;
 			s_case.remaining += (s_case.remaining.empty() ? "" : ",") + std::string("anim.") + name;
 			active = TRUE;
 		}
@@ -476,13 +591,11 @@ void watch(const RetailTestCommands::Context& ctx)
 			if (!object->isKindOf(KINDOF_PROJECTILE) && !object->findUpdateModule(NAMEKEY("LifetimeUpdate")))
 				s_case.lingering.insert(object->getID());
 		}
+	s_case.persisting.clear();
 	for (const ObjectID id : s_case.lingering)
 		if (const Object* object = TheGameLogic->findObjectByID(id))
 			if (!object->isEffectivelyDead())
-			{
-				s_case.remaining += (s_case.remaining.empty() ? "" : ",") + std::string("object.") + object->getTemplate()->getName().str();
-				active = TRUE;
-			}
+				s_case.persisting.insert(object->getTemplate()->getName().str());
 	if (active)
 		s_case.lastActive = ctx.frame;
 }
@@ -515,24 +628,24 @@ void finish(const RetailTestCommands::Context& ctx)
 	std::string ended = "none";
 	if (s_case.lastActive)
 		ended = s_case.lastActive >= ctx.frame - 2 ? "never" : std::to_string(s_case.lastActive - s_case.clickFrame);
+	if (s_case.running && ended != "never")
+		ended = "running";
+	for (const std::string& name : s_case.persisting)
+		s_case.flags.insert("persists." + name);
 	std::fprintf(stderr, "TEST ability-sweep case=%d\ttemplate=%s\tbutton=%s\ttype=%d\tpower=%s\tresult=%s\tanimation=%s\tobjects=%s\t"
-		"caster=%s\tally=%s\tenemy=%s\tstructure=%s\tflags=%s\trecharge=%s\tended=%s\tremaining=%s\n",
+		"caster=%s\tally=%s\tenemy=%s\tstructure=%s\tflags=%s\trecharge=%s\tended=%s\tremaining=%s\tno_window=%d\n",
 		s_case.id, s_case.templateName.c_str(), s_case.button.c_str(), s_case.type, s_case.power.empty() ? "-" : s_case.power.c_str(),
 		s_case.result.c_str(), joined(s_case.animation).c_str(), joined(s_case.objects).c_str(),
 		describeActor(s_case.actors[CASTER]).c_str(), describeActor(s_case.actors[ALLY]).c_str(),
 		describeActor(s_case.actors[ENEMY]).c_str(), describeActor(s_case.actors[STRUCTURE]).c_str(),
 		joined(s_case.flags).c_str(), s_case.powerTemplate ? (s_case.recharged ? "yes" : "no") : "n/a", ended.c_str(),
-		ended == "never" && !s_case.remaining.empty() ? s_case.remaining.c_str() : "-");
+		ended == "never" && !s_case.remaining.empty() ? s_case.remaining.c_str() : "-", s_case.noWindow ? 1 : 0);
 	TheInGameUI->setGUICommand(nullptr);
 	TheControlBar->closeRetailTray();
 	TheInGameUI->deselectAllDrawables();
-	for (Object* object = TheGameLogic->getFirstObject(); object;)
-	{
-		Object* next = object->getNextObject();
-		if (object->getID() > s_case.before)
-			TheGameLogic->destroyObject(object);
-		object = next;
-	}
+	destroyObjectsAfter(s_sessionObjects);
+	if (ctx.player)
+		restorePlayerUpgrades(ctx.player);
 	s_case = Case();
 }
 }
