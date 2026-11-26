@@ -106,3 +106,4 @@
 3 attack-move-resume
 3 power-targets
 3 smaug-levels
+3 combat-leftovers

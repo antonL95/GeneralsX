@@ -1,0 +1,23 @@
+200 create Player_1 MordorGothmog 0 1300,1300,0
+201 pw-rank Player_1 MordorGothmog 0 3
+220 create Player_1 CombatLeftoverAttacker 0 1100,1200,0
+220 create PlyrCreeps CombatLeftoverVictim 0 1140,1200,180
+220 create PlyrCreeps CombatLeftoverVictim 1 1140,1240,180
+220 create PlyrCreeps CombatLeftoverKiller 0 1180,1220,180
+230 firetestweapon Player_1 CombatLeftoverAttacker 0 CombatLeftoverDotWeapon,PlyrCreeps:CombatLeftoverVictim:0
+230 firetestweapon Player_1 CombatLeftoverAttacker 0 CombatLeftoverDotWeapon,PlyrCreeps:CombatLeftoverVictim:1
+235 destroy Player_1 CombatLeftoverAttacker 0
+240 combat-leftovers-gothmog Player_1 MordorGothmog 0 mounted-before-save
+250 firetestweapon PlyrCreeps CombatLeftoverKiller 0 CombatLeftoverKillWeapon,PlyrCreeps:CombatLeftoverVictim:0
+252 combat-leftovers-gothmog Player_1 MordorGothmog 0 mounted-after-save
+253 combat-leftovers-cast Player_1 MordorGothmog 0 SpecialAbilityGothmogSummon
+255 combat-leftovers-converted Player_1 - 0 before-expiry
+255 combat-leftovers-converted PlyrCreeps - 0 before-expiry-creeps
+258 combat-leftovers-gothmog Player_1 MordorGothmog 0 mounted-after-cast
+260 firetestweapon PlyrCreeps CombatLeftoverKiller 0 CombatLeftoverKillWeapon,PlyrCreeps:CombatLeftoverVictim:1
+260 combat-leftovers-cast Player_1 MordorGothmog 0 SpecialAbilityToggleMounted
+265 combat-leftovers-converted Player_1 - 0 at-boundary
+265 combat-leftovers-converted PlyrCreeps - 0 at-boundary-creeps
+340 combat-leftovers-gothmog Player_1 MordorGothmog 0 unmounted-before-cast
+342 combat-leftovers-cast Player_1 MordorGothmog 0 SpecialAbilityGothmogSummon
+352 combat-leftovers-gothmog Player_1 MordorGothmog 0 unmounted-after-cast
