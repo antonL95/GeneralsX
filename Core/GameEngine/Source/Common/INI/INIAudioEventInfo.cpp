@@ -32,6 +32,64 @@
 #include "Common/INI.h"
 #include "Common/GameAudio.h"
 #include "Common/AudioEventInfo.h"
+#include "Common/AudioRandomValue.h"
+
+#include <algorithm>
+#include <charconv>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+
+WeightedAudioName::WeightedAudioName(const char* token) : name(token)
+{
+	const char* suffix = std::strrchr(token, ':');
+	if (!suffix || suffix == token)
+		return;
+	const char* end = token + std::strlen(token);
+	Int parsed;
+	const auto result = std::from_chars(suffix + 1, end, parsed);
+	if (result.ec != std::errc() || result.ptr != end || parsed < 1)
+		return;
+	authoredName = name;
+	name.set(token, static_cast<Int>(suffix - token));
+	weight = parsed;
+}
+
+const AsciiString& WeightedAudioName::getName(Bool useAuthoredName) const
+{
+	return useAuthoredName && !authoredName.isEmpty() ? authoredName : name;
+}
+
+Int pickWeightedAudioName(const std::vector<WeightedAudioName>& names, Int previous)
+{
+	const Int count = static_cast<Int>(names.size());
+	if (count < 2)
+		return count - 1;
+	if (previous < 0 || previous >= count)
+		previous = -1;
+
+	std::uint64_t total = 0;
+	for (Int i = 0; i < count; ++i)
+		if (i != previous)
+			total += names[i].weight;
+
+	std::uint64_t draw;
+	if (total <= std::numeric_limits<Int>::max())
+		draw = GameAudioRandomValue(0, static_cast<Int>(total) - 1);
+	else
+		draw = std::min(total - 1, static_cast<std::uint64_t>(GameAudioRandomValueReal(0.0f, 1.0f) * static_cast<double>(total)));
+
+	for (Int i = 0; i < count; ++i)
+	{
+		if (i == previous)
+			continue;
+		const auto weight = static_cast<std::uint64_t>(names[i].weight);
+		if (draw < weight)
+			return i;
+		draw -= weight;
+	}
+	return -1;
+}
 
 AudioEventInfo::~AudioEventInfo()
 {
@@ -127,6 +185,8 @@ static void parseDelay( INI* ini, void *instance, void *store, const void* /*use
 static void parsePitchShift( INI* ini, void *instance, void *store, const void* /*userData*/ );
 
 //-------------------------------------------------------------------------------------------------
+static constexpr bool WeightedSoundList = true;
+
 const FieldParse AudioEventInfo::m_audioEventInfo[] =
 {
 	{ "Filename",							INI::parseAsciiString,		nullptr,								offsetof( AudioEventInfo, m_filename) },
@@ -140,12 +200,12 @@ const FieldParse AudioEventInfo::m_audioEventInfo[] =
 	{ "Priority",							INI::parseIndexList,			theAudioPriorityNames,	offsetof( AudioEventInfo, m_priority ) },
 	{ "Type",									INI::parseBitString32,		theSoundTypeNames,			offsetof( AudioEventInfo, m_type ) },
 	{ "Control",							INI::parseBitString32,		theAudioControlNames,	offsetof( AudioEventInfo, m_control ) },
-	{ "Sounds",								INI::parseSoundsList,			nullptr,								offsetof( AudioEventInfo, m_sounds ) },
-	{ "SoundsNight",					INI::parseSoundsList,			nullptr,								offsetof( AudioEventInfo, m_soundsNight ) },
-	{ "SoundsEvening",				INI::parseSoundsList,			nullptr,								offsetof( AudioEventInfo, m_soundsEvening ) },
-	{ "SoundsMorning",				INI::parseSoundsList,			nullptr,								offsetof( AudioEventInfo, m_soundsMorning ) },
-	{ "Attack",								INI::parseSoundsList,			nullptr,								offsetof( AudioEventInfo, m_attackSounds ) },
-	{ "Decay",								INI::parseSoundsList,			nullptr,								offsetof( AudioEventInfo, m_decaySounds ) },
+	{ "Sounds",								INI::parseSoundsList,			&WeightedSoundList,								offsetof( AudioEventInfo, m_sounds ) },
+	{ "SoundsNight",					INI::parseSoundsList,			&WeightedSoundList,								offsetof( AudioEventInfo, m_soundsNight ) },
+	{ "SoundsEvening",				INI::parseSoundsList,			&WeightedSoundList,								offsetof( AudioEventInfo, m_soundsEvening ) },
+	{ "SoundsMorning",				INI::parseSoundsList,			&WeightedSoundList,								offsetof( AudioEventInfo, m_soundsMorning ) },
+	{ "Attack",								INI::parseSoundsList,			&WeightedSoundList,								offsetof( AudioEventInfo, m_attackSounds ) },
+	{ "Decay",								INI::parseSoundsList,			&WeightedSoundList,								offsetof( AudioEventInfo, m_decaySounds ) },
 	{ "MinRange",							INI::parseReal,						nullptr,								offsetof( AudioEventInfo, m_minDistance) },
 	{ "MaxRange",							INI::parseReal,						nullptr,								offsetof( AudioEventInfo, m_maxDistance) },
 	{ "LowPassCutoff",				INI::parsePercentToReal,	nullptr,								offsetof( AudioEventInfo, m_lowPassFreq) },

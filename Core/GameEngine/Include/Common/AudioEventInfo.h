@@ -38,6 +38,18 @@
 // FORWARD DECLARATIONS ///////////////////////////////////////////////////////////////////////////
 struct FieldParse;
 
+struct WeightedAudioName
+{
+	explicit WeightedAudioName(const char* token);
+	const AsciiString& getName(Bool useAuthoredName = FALSE) const;
+
+	AsciiString name;
+	AsciiString authoredName;
+	Int weight = 1000;
+};
+
+Int pickWeightedAudioName(const std::vector<WeightedAudioName>& names, Int previous = -1);
+
 // USEFUL DECLARATIONS ////////////////////////////////////////////////////////////////////////////
 enum AudioType CPP_11(: Int)
 {
@@ -112,13 +124,13 @@ public:
 	UnsignedInt m_type;								// Type of sound
 	UnsignedInt m_control;						// control of sound
 
-	std::vector<AsciiString> m_soundsMorning;	// Sounds to play in the wee hours of the morning
-	std::vector<AsciiString> m_sounds;				// Default sounds to play
-	std::vector<AsciiString> m_soundsNight;		// Sounds to play at night
-	std::vector<AsciiString> m_soundsEvening;	// Sounds to play in the evening
+	std::vector<WeightedAudioName> m_soundsMorning;
+	std::vector<WeightedAudioName> m_sounds;
+	std::vector<WeightedAudioName> m_soundsNight;
+	std::vector<WeightedAudioName> m_soundsEvening;
 
-	std::vector<AsciiString> m_attackSounds;
-	std::vector<AsciiString> m_decaySounds;
+	std::vector<WeightedAudioName> m_attackSounds;
+	std::vector<WeightedAudioName> m_decaySounds;
 
 	Real m_lowPassFreq;			// When performing low pass filters, what is the maximum frequency heard, expressed as a percentage?
 	Real m_minDistance;			// less than this distance and the sound behaves as though it is at minDistance

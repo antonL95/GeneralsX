@@ -1827,11 +1827,11 @@ void MiniAudioManager::dumpAllAssetsUsed()
 			if (!aei) { missingEvents.push_back(astr); continue; }
 
 			for (auto asIt = aei->m_attackSounds.begin(); asIt != aei->m_attackSounds.end(); ++asIt)
-				usedFiles.push_back(*asIt);
+				usedFiles.push_back(asIt->name);
 			for (auto asIt = aei->m_sounds.begin(); asIt != aei->m_sounds.end(); ++asIt)
-				usedFiles.push_back(*asIt);
+				usedFiles.push_back(asIt->name);
 			for (auto asIt = aei->m_decaySounds.begin(); asIt != aei->m_decaySounds.end(); ++asIt)
-				usedFiles.push_back(*asIt);
+				usedFiles.push_back(asIt->name);
 			if (!aei->m_filename.isEmpty())
 				usedFiles.push_back(aei->m_filename);
 		}

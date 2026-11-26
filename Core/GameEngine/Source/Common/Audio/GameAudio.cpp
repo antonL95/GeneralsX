@@ -1069,8 +1069,8 @@ Real AudioManager::getAudioLengthMS( const AudioEventRTS *event )
 
 	AudioEventRTS tmpEvent = *event;
 
-	tmpEvent.generateFilename(FALSE);
-	tmpEvent.generatePlayInfo();
+	tmpEvent.generateFilename(FALSE, TRUE);
+	tmpEvent.generatePlayInfo(TRUE);
 	return getFileLengthMS(tmpEvent.getAttackFilename()) +
 				 getFileLengthMS(tmpEvent.getFilename()) +
 				 getFileLengthMS(tmpEvent.getDecayFilename());

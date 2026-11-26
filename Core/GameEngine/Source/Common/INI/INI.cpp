@@ -63,6 +63,7 @@
 #include "Common/DamageFX.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
+#include "Common/AudioEventInfo.h"
 #include "Common/GameAudio.h"
 #include "Common/KindOf.h"
 #include "Common/ObjectStatusTypes.h"
@@ -2565,16 +2566,18 @@ void INI::parseVeterancyLevelFlags(INI* ini, void* /*instance*/, void* store, co
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-void INI::parseSoundsList( INI* ini, void *instance, void *store, const void* /*userData*/ )
+void INI::parseSoundsList( INI* ini, void*, void *store, const void* userData )
 {
-	std::vector<AsciiString> *vec = (std::vector<AsciiString>*) store;
-	vec->clear();
-
-	constexpr const char* Seps = " \t,=";
-	for (const char* token = ini->getNextTokenOrNull(Seps); token; token = ini->getNextTokenOrNull(Seps))
-	{
-		vec->push_back(token);
-	}
+	const auto readList = [ini](auto& names) {
+		names.clear();
+		constexpr const char* separators = " \t,=";
+		for (const char* token = ini->getNextTokenOrNull(separators); token; token = ini->getNextTokenOrNull(separators))
+			names.emplace_back(token);
+	};
+	if (userData)
+		readList(*static_cast<std::vector<WeightedAudioName>*>(store));
+	else
+		readList(*static_cast<std::vector<AsciiString>*>(store));
 }
 
 //-------------------------------------------------------------------------------------------------

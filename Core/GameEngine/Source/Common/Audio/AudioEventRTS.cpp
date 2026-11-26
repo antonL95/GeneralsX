@@ -42,6 +42,8 @@
 
 #include "Common/AudioEventInfo.h"
 #include "Common/AudioRandomValue.h"
+
+#include <algorithm>
 #include "Common/AudioSettings.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
@@ -321,7 +323,7 @@ void AudioEventRTS::setEventName( AsciiString name )
 }
 
 //-------------------------------------------------------------------------------------------------
-void AudioEventRTS::generateFilename(Bool randomByDefault)
+void AudioEventRTS::generateFilename(Bool randomByDefault, Bool forTiming)
 {
 	// A Logic Random Value is used because we may ask "How long will it take to play this sound?"
 	// In that case, we need the same answer across all pcs.
@@ -346,22 +348,26 @@ void AudioEventRTS::generateFilename(Bool randomByDefault)
 
 
 
+		const auto& sounds = m_eventInfo->m_sounds;
 		const Bool authoredRandom = BitIsSet(m_eventInfo->m_control, AC_RANDOM);
 		if (authoredRandom || (randomByDefault && !BitIsSet(m_eventInfo->m_control, AC_SEQUENTIAL)))
 		{
-			if (m_isLogicalAudio && authoredRandom)
+			const bool weighted = !forTiming && std::any_of(sounds.begin(), sounds.end(),
+				[](const WeightedAudioName& name) { return !name.authoredName.isEmpty(); });
+			if (weighted)
 			{
-				which = GameLogicRandomValueUnchanged(0, m_eventInfo->m_sounds.size() - 1);
+				which = pickWeightedAudioName(sounds, sounds.size() > 2 ? m_playingAudioIndex : -1);
 			}
 			else
 			{
-				which = GameAudioRandomValue(0, m_eventInfo->m_sounds.size() - 1);
+				which = m_isLogicalAudio && authoredRandom
+					? GameLogicRandomValueUnchanged(0, sounds.size() - 1)
+					: GameAudioRandomValue(0, sounds.size() - 1);
+				if (which == m_playingAudioIndex && sounds.size() > 2)
+					which = (which + 1) % sounds.size();
 			}
 
-			if (which == m_playingAudioIndex && m_eventInfo->m_sounds.size() > 2)
-				which = ( which + 1 ) % m_eventInfo->m_sounds.size();
-
-			m_playingAudioIndex = which;//caching random choice to compare next call
+			m_playingAudioIndex = which;
 
 		}
 		else
@@ -370,7 +376,7 @@ void AudioEventRTS::generateFilename(Bool randomByDefault)
 
 	}
 
-	m_filenameToLoad.concat(m_eventInfo->m_sounds[which]);
+	m_filenameToLoad.concat(m_eventInfo->m_sounds[which].getName(forTiming));
 	m_filenameToLoad.concat(generateFilenameExtension(m_eventInfo->m_soundType));
 	adjustForLocalization(m_filenameToLoad);
 
@@ -386,7 +392,7 @@ AsciiString AudioEventRTS::getFilename()
 }
 
 //-------------------------------------------------------------------------------------------------
-void AudioEventRTS::generatePlayInfo()
+void AudioEventRTS::generatePlayInfo(Bool forTiming)
 {
 	m_pitchShift = GameAudioRandomValueReal(m_eventInfo->m_pitchShiftMin, m_eventInfo->m_pitchShiftMax);
 	m_volumeShift = GameAudioRandomValueReal(1.0f + m_eventInfo->m_volumeShift, 1.0f);
@@ -394,36 +400,26 @@ void AudioEventRTS::generatePlayInfo()
 		m_loopCount = m_eventInfo->m_loopCount;
 
 	m_portionToPlayNext = PP_Attack;
-	Int attackSize = m_eventInfo->m_attackSounds.size();
-	if (attackSize > 0) {
+	const auto choosePortion = [&](const std::vector<WeightedAudioName>& names) -> const AsciiString& {
+		const Int last = static_cast<Int>(names.size() - 1);
+		if (!forTiming && std::any_of(names.begin(), names.end(),
+			[](const WeightedAudioName& name) { return !name.authoredName.isEmpty(); }))
+			return names[pickWeightedAudioName(names)].name;
+		const Int choice = m_isLogicalAudio ? GameLogicRandomValueUnchanged(0, last) : GameAudioRandomValue(0, last);
+		return names[choice].getName(forTiming);
+	};
+	if (!m_eventInfo->m_attackSounds.empty()) {
 		m_attackName = generateFilenamePrefix(m_eventInfo->m_soundType, false);
-		// needs to be logic because it needs to be the same on all systems.
-		Int attackToPlay;
-		if (m_isLogicalAudio) {
-			attackToPlay = GameLogicRandomValueUnchanged(0, attackSize - 1);
-		} else {
-			attackToPlay = GameAudioRandomValue(0, attackSize - 1);
-		}
-
-		m_attackName.concat(m_eventInfo->m_attackSounds[attackToPlay]);
+		m_attackName.concat(choosePortion(m_eventInfo->m_attackSounds));
 		m_attackName.concat(generateFilenameExtension(m_eventInfo->m_soundType));
 		adjustForLocalization(m_attackName);
 	} else {
 		m_portionToPlayNext = PP_Sound;
 	}
 
-	Int decaySize = m_eventInfo->m_decaySounds.size();
-	if (decaySize > 0) {
+	if (!m_eventInfo->m_decaySounds.empty()) {
 		m_decayName = generateFilenamePrefix(m_eventInfo->m_soundType, false);
-		// needs to be logic because it needs to be the same on all systems.
-		Int decayToPlay;
-		if (m_isLogicalAudio) {
-			decayToPlay = GameLogicRandomValueUnchanged(0, decaySize - 1);
-		} else {
-			decayToPlay = GameAudioRandomValue(0, decaySize - 1);
-		}
-
-		m_decayName.concat(m_eventInfo->m_decaySounds[decayToPlay]);
+		m_decayName.concat(choosePortion(m_eventInfo->m_decaySounds));
 		m_decayName.concat(generateFilenameExtension(m_eventInfo->m_soundType));
 		adjustForLocalization(m_decayName);
 	}

@@ -3,13 +3,16 @@
 #include "GameLogic/RetailTestCommands.h"
 
 #if !RTS_GENERALS
+#include "Common/AudioEventInfo.h"
 #include "Common/AudioEventRTS.h"
+#include "Common/FileSystem.h"
 #include "Common/GameAudio.h"
 #include "Common/MessageStream.h"
 #include "GameClient/CommandXlat.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/RetailLargeGroupAudio.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 
@@ -17,12 +20,73 @@
 #include <cstdlib>
 #include <cstring>
 #include <string_view>
+#include <vector>
 
 namespace
 {
+void traceAudioRequestFiles(const char* name)
+{
+	AudioEventRTS event{AsciiString(name)};
+	TheAudio->getInfoForAudioEvent(&event);
+	const AudioEventInfo* info = event.getAudioEventInfo();
+	if (!info)
+		return;
+	for (Int i = 0; i < static_cast<Int>(info->m_sounds.size()); ++i)
+	{
+		event.setPlayingAudioIndex(i - 1);
+		event.generateFilename(FALSE);
+		const AsciiString filename = event.getFilename();
+		std::fprintf(stderr, "AUDIO REQUEST %s %s %d\n", name, filename.str(),
+			TheFileSystem->doesFileExist(filename.str()) ? 1 : 0);
+	}
+}
+
+void traceAudioPicks(const char* name)
+{
+	AudioEventRTS event{AsciiString(name)};
+	TheAudio->getInfoForAudioEvent(&event);
+	const AudioEventInfo* info = event.getAudioEventInfo();
+	for (Int i = 0; i < 64; ++i)
+	{
+		if (info)
+		{
+			event.setPlayingAudioIndex(-1);
+			event.generateFilename();
+			std::fprintf(stderr, "AUDIO PICK %s file %s\n", name, event.getFilename().str());
+		}
+		else
+		{
+			std::vector<AsciiString> children;
+			Bool loop = FALSE;
+			if (RetailLargeGroupAudio::expandMultiSound(name, children, loop) && children.size() == 1)
+				std::fprintf(stderr, "AUDIO PICK %s expand %s\n", name, children.front().str());
+		}
+	}
+	if (!info)
+	{
+		for (Int i = 0; i < 64; ++i)
+		{
+			const AsciiString track = RetailLargeGroupAudio::chooseMultiSoundTrack(name);
+			std::fprintf(stderr, "AUDIO PICK %s track %s\n", name, track.str());
+		}
+	}
+}
+
 void handleAudioLoop(const RetailTestCommands::Context& ctx)
 {
 	const std::string_view cmd = ctx.action.substr(sizeof("audio-loop-") - 1);
+	if (cmd == "request-file")
+	{
+		if (TheAudio && TheFileSystem)
+			traceAudioRequestFiles(ctx.argument);
+		return;
+	}
+	if (cmd == "picks")
+	{
+		if (TheAudio)
+			traceAudioPicks(ctx.argument);
+		return;
+	}
 	if (cmd == "trace")
 	{
 		if (!TheAudio)

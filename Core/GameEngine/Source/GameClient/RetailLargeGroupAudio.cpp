@@ -8,9 +8,9 @@
 #include <map>
 #include <string_view>
 
+#include "Common/AudioEventInfo.h"
 #include "Common/AudioEventRTS.h"
 #include "Common/AudioHandleSpecialValues.h"
-#include "Common/AudioRandomValue.h"
 #include "Common/FileSystem.h"
 #include "Common/GameUtility.h"
 #include "Common/INI.h"
@@ -45,9 +45,16 @@ struct Sound
 
 struct MultiSound
 {
-	std::vector<AsciiString> sounds;
+	std::vector<WeightedAudioName> sounds;
 	Bool playOne = FALSE;
 	Bool loop = FALSE;
+	mutable Int lastChoice = -1;
+
+	const AsciiString& pick() const
+	{
+		lastChoice = pickWeightedAudioName(sounds, lastChoice);
+		return sounds[lastChoice].name;
+	}
 };
 
 struct AudioMap
@@ -576,7 +583,12 @@ void parseMultiSound(INI* ini)
 {
 	const AsciiString name = lower(ini->getNextAsciiString());
 	static const FieldParse fields[] = {
-		{ "Subsounds", INI::parseAsciiStringVectorAppend, nullptr, offsetof(MultiSound, sounds) },
+		{ "Subsounds", [](INI* ini, void* instance, void*, const void*)
+			{
+				auto& sounds = static_cast<MultiSound*>(instance)->sounds;
+				for (const char* token = ini->getNextTokenOrNull(); token; token = ini->getNextTokenOrNull())
+					sounds.emplace_back(token);
+			}, nullptr, 0 },
 		{ "Control", [](INI* ini, void* instance, void*, const void*)
 			{
 				for (const char* flag = ini->getNextToken(); flag; flag = ini->getNextTokenOrNull())
@@ -612,7 +624,7 @@ AsciiString chooseMultiSoundTrack(const AsciiString& event)
 			std::find(parents.begin(), parents.end(), key) != parents.end())
 			return AsciiString();
 		parents.push_back(key);
-		track = children[GameAudioRandomValue(0, static_cast<Int>(children.size() - 1))];
+		track = found.playOne ? found.pick() : children.front().name;
 	}
 }
 
@@ -635,10 +647,10 @@ Bool expandMultiSound(const AsciiString& name, std::vector<AsciiString>& events,
 			return;
 		parents.push_back(key);
 		if (multi.playOne)
-			self(self, multi.sounds[GameAudioRandomValue(0, static_cast<Int>(multi.sounds.size() - 1))]);
+			self(self, multi.pick());
 		else
-			for (const AsciiString& child : multi.sounds)
-				self(self, child);
+			for (const auto& child : multi.sounds)
+				self(self, child.name);
 		parents.pop_back();
 	};
 	expand(expand, name);

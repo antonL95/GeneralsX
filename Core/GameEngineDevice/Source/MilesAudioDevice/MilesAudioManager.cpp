@@ -3327,7 +3327,7 @@ void MilesAudioManager::dumpAllAssetsUsed()
 	fprintf(logfile, "\nAudio Asset Report - BEGIN\n");
 	{
 		SetAsciiStringIt it;
-		std::vector<AsciiString>::iterator asIt;
+		std::vector<WeightedAudioName>::iterator asIt;
 		for (it = m_allEventsLoaded.begin(); it != m_allEventsLoaded.end(); ++it) {
 			AsciiString astr = *it;
 			AudioEventInfo *aei = findAudioEventInfo(astr);
@@ -3337,15 +3337,15 @@ void MilesAudioManager::dumpAllAssetsUsed()
 			}
 
 			for (asIt = aei->m_attackSounds.begin(); asIt != aei->m_attackSounds.end(); ++asIt) {
-				usedFiles.push_back(*asIt);
+				usedFiles.push_back(asIt->name);
 			}
 
 			for (asIt = aei->m_sounds.begin(); asIt != aei->m_sounds.end(); ++asIt) {
-				usedFiles.push_back(*asIt);
+				usedFiles.push_back(asIt->name);
 			}
 
 			for (asIt = aei->m_decaySounds.begin(); asIt != aei->m_decaySounds.end(); ++asIt) {
-				usedFiles.push_back(*asIt);
+				usedFiles.push_back(asIt->name);
 			}
 
 			if (!aei->m_filename.isEmpty()) {
