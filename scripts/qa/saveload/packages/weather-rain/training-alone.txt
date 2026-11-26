@@ -1,0 +1,37 @@
+25 create Player_1 WeatherNuggetProbe 0 2480,540,0
+25 create PlyrCreeps WeatherNuggetProbe 0 2540,540,0
+26 science Player_1 - 0 SCIENCE_FreezingRain
+28 create Player_1 WeatherNuggetIgnition 0 2511,451,0
+38 weathernugget-actor Player_1 WeatherNuggetProbe 0 FreezingRainDebuff
+38 weathernugget-actor PlyrCreeps WeatherNuggetProbe 0 FreezingRainDebuff
+39 terrain-fire-state Player_1 WeatherNuggetIgnition 0 - 2605 455 0
+40 power-cast Player_1 - 9
+42 weatherstate - - 0
+140 weatherstate - - 0
+140 pkg35-count Player_1 - 0 FreezingRainCaster
+140 pkg35-count Player_1 - 0 FreezingRainWeatherTrigger
+140 pkg35-count neutral - 0 RainFX
+140 weathernugget-actor Player_1 WeatherNuggetProbe 0 FreezingRainDebuff
+140 weathernugget-actor PlyrCreeps WeatherNuggetProbe 0 FreezingRainDebuff
+140 terrain-fire-state Player_1 WeatherNuggetIgnition 0 - 2605 455 0
+160 destroy Player_1 WeatherNuggetIgnition 0
+1100 weatherstate - - 0
+1100 pkg35-count Player_1 - 0 FreezingRainCaster
+1100 pkg35-count Player_1 - 0 FreezingRainWeatherTrigger
+1100 pkg35-count neutral - 0 RainFX
+1100 weathernugget-actor Player_1 WeatherNuggetProbe 0 FreezingRainDebuff
+1100 weathernugget-actor PlyrCreeps WeatherNuggetProbe 0 FreezingRainDebuff
+5400 weatherstate - - 0
+5400 pkg35-count Player_1 - 0 FreezingRainCaster
+5400 pkg35-count Player_1 - 0 FreezingRainWeatherTrigger
+5400 pkg35-count neutral - 0 RainFX
+5400 weathernugget-actor Player_1 WeatherNuggetProbe 0 FreezingRainDebuff
+5400 weathernugget-actor PlyrCreeps WeatherNuggetProbe 0 FreezingRainDebuff
+5600 weatherstate - - 0
+5600 pkg35-count Player_1 - 0 FreezingRainCaster
+5600 pkg35-count Player_1 - 0 FreezingRainWeatherTrigger
+5600 pkg35-count neutral - 0 RainFX
+5600 weathernugget-actor Player_1 WeatherNuggetProbe 0 FreezingRainDebuff
+5600 weathernugget-actor PlyrCreeps WeatherNuggetProbe 0 FreezingRainDebuff
+5610 create Player_1 WeatherNuggetIgnition 0 2711,451,0
+5690 terrain-fire-state Player_1 WeatherNuggetIgnition 0 - 2805 455 0

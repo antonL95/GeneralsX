@@ -1,0 +1,38 @@
+25 create Player_1 WeatherNuggetProbe 0 2480,540,0
+25 create PlyrCreeps WeatherNuggetProbe 0 2540,540,0
+26 science Player_1 - 0 SCIENCE_WhiteWinter
+27 weathernugget-book Player_1 - 0 WildSpellBookCommandSet
+28 create Player_1 WeatherNuggetIgnition 0 2511,451,0
+38 weathernugget-actor Player_1 WeatherNuggetProbe 0 WhiteWinterDebuff
+38 weathernugget-actor PlyrCreeps WeatherNuggetProbe 0 WhiteWinterDebuff
+39 terrain-fire-state Player_1 WeatherNuggetIgnition 0 - 2605 455 0
+40 power-cast Player_1 - 9
+42 weatherstate - - 0
+140 weatherstate - - 0
+140 pkg35-count Player_1 - 0 WhiteWinterCaster
+140 pkg35-count Player_1 - 0 WhiteWinterWeatherTrigger
+140 pkg35-count neutral - 0 WhiteWinterFX
+140 weathernugget-actor Player_1 WeatherNuggetProbe 0 WhiteWinterDebuff
+140 weathernugget-actor PlyrCreeps WeatherNuggetProbe 0 WhiteWinterDebuff
+140 terrain-fire-state Player_1 WeatherNuggetIgnition 0 - 2605 455 0
+160 destroy Player_1 WeatherNuggetIgnition 0
+1100 weatherstate - - 0
+1100 pkg35-count Player_1 - 0 WhiteWinterCaster
+1100 pkg35-count Player_1 - 0 WhiteWinterWeatherTrigger
+1100 pkg35-count neutral - 0 WhiteWinterFX
+1100 weathernugget-actor Player_1 WeatherNuggetProbe 0 WhiteWinterDebuff
+1100 weathernugget-actor PlyrCreeps WeatherNuggetProbe 0 WhiteWinterDebuff
+5400 weatherstate - - 0
+5400 pkg35-count Player_1 - 0 WhiteWinterCaster
+5400 pkg35-count Player_1 - 0 WhiteWinterWeatherTrigger
+5400 pkg35-count neutral - 0 WhiteWinterFX
+5400 weathernugget-actor Player_1 WeatherNuggetProbe 0 WhiteWinterDebuff
+5400 weathernugget-actor PlyrCreeps WeatherNuggetProbe 0 WhiteWinterDebuff
+5600 weatherstate - - 0
+5600 pkg35-count Player_1 - 0 WhiteWinterCaster
+5600 pkg35-count Player_1 - 0 WhiteWinterWeatherTrigger
+5600 pkg35-count neutral - 0 WhiteWinterFX
+5600 weathernugget-actor Player_1 WeatherNuggetProbe 0 WhiteWinterDebuff
+5600 weathernugget-actor PlyrCreeps WeatherNuggetProbe 0 WhiteWinterDebuff
+5610 create Player_1 WeatherNuggetIgnition 0 2711,451,0
+5690 terrain-fire-state Player_1 WeatherNuggetIgnition 0 - 2805 455 0
