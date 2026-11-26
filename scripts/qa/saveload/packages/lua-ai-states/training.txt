@@ -1,0 +1,12 @@
+223 create Player_1 LuaAIChantHorde 0 2160,2820,0
+224 create Player_1 LuaAIStateProbe 0 2110,2670,0
+225 create PlyrCreeps LuaAIStateProbe 0 2250,2670,0
+230 lua-ai-probe Player_1 LuaAIStateProbe 0 ProbeAlert
+231 lua-ai-chant Player_1 LuaAIChantHorde 0
+232 lua-ai-chant-event Player_1 LuaAIChantHorde 0 BeginChanting
+243 lua-ai-chant Player_1 LuaAIChantHorde 0
+245 lua-ai-chant Player_1 LuaAIChantHorde 0
+246 lua-ai-probe Player_1 LuaAIStateProbe 0 ProbeDescription
+247 lua-ai-fear-probe Player_1 LuaAIStateProbe 0 PlyrCreeps:LuaAIStateProbe:0
+251 lua-ai-chant-event Player_1 LuaAIChantHorde 0 StopChanting
+252 lua-ai-chant Player_1 LuaAIChantHorde 0

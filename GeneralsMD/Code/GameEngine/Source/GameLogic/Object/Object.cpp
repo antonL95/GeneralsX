@@ -266,21 +266,25 @@ AsciiString DebugDescribeObject(const Object *obj)
 	if (!obj)
 		return "<No Object>";
 
+	Player* owner = obj->getControllingPlayer();
+	const Int ownerIndex = owner ? owner->getPlayerIndex() : 0;
+	AsciiString ownerName("<unknown>");
+	if (owner)
+		ownerName.translate(owner->getPlayerDisplayName());
+
 	AsciiString ret;
 
 	if (obj->getName().isNotEmpty())
 	{
-		ret.format("Object %d (%s) [%s, owned by player %d (%ls)]",
+		ret.format("Object %d (%s) [%s, owned by player %d (%s)]",
 			obj->getID(), obj->getName().str(), obj->getTemplate()->getName().str(),
-			obj->getControllingPlayer()->getPlayerIndex(),
-			obj->getControllingPlayer()->getPlayerDisplayName().str());
+			ownerIndex, ownerName.str());
 	}
 	else
 	{
-		ret.format("Object %d [%s, owned by player %d (%ls)]",
+		ret.format("Object %d [%s, owned by player %d (%s)]",
 			obj->getID(), obj->getTemplate()->getName().str(),
-			obj->getControllingPlayer()->getPlayerIndex(),
-			obj->getControllingPlayer()->getPlayerDisplayName().str());
+			ownerIndex, ownerName.str());
 	}
 
 	return ret;
@@ -4612,6 +4616,8 @@ void Object::crc( Xfer *xfer )
 			if (m_status.test(static_cast<ObjectStatusTypes>(bit)))
 				deathStatus |= 1u << (bit - OBJECT_STATUS_DEATH_1);
 		xfer->xferUnsignedByte(&deathStatus);
+		Bool chanting = testStatus(OBJECT_STATUS_CHANTING);
+		xfer->xferBool(&chanting);
 		xferRotwkPowerState(xfer);
 		xferRetailInvisibilitySources(xfer);
 		xferMountedTemplateState(xfer);

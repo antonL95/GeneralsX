@@ -289,14 +289,32 @@ int executeAction(lua_State* state)
 	return luaL_error(state, "unsupported ExecuteAction %s", name);
 }
 
-template<EmotionType type>
+template<EmotionType type, bool requiresSource = false>
 int enterFearState(lua_State* state)
 {
 	Object* object = getObject(state, 1);
 	const Object* source = getObject(state, 2);
-	if (object)
+	if (object && (!requiresSource || source))
 		EmotionTrackerUpdate::signalWeaponEmotion(object, type, source, 0);
 	return 0;
+}
+
+int enterAlertState(lua_State* state)
+{
+	Object* object = getObject(state, 1);
+	if (!object)
+		return 0;
+	while (Object* container = object->getContainedBy())
+		object = container;
+	EmotionTrackerUpdate::signal(object, EMOTION_ALERT, nullptr);
+	return 0;
+}
+
+int objectDescription(lua_State* state)
+{
+	const AsciiString description = DebugDescribeObject(getObject(state, 1));
+	lua_pushstring(state, description.str());
+	return 1;
 }
 
 int enterRampageState(lua_State* state)
@@ -325,8 +343,27 @@ int testCanSufferFear(lua_State* state)
 
 int setChanting(lua_State* state)
 {
-	return luaL_error(state, "ObjectSetChanting has no corresponding AI state");
+	Object* object = getObject(state, 1);
+	if (!object || !lua_isboolean(state, 2))
+		return 0;
+
+	const Bool chanting = lua_toboolean(state, 2);
+	do
+	{
+		object->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_CHANTING), chanting);
+		object = object->getContainedBy();
+	} while (object && object->isKindOf(KINDOF_HORDE));
+	lua_pushboolean(state, chanting);
+	return 1;
 }
+}
+
+void pushLuaObject(lua_State* state, const Object* object)
+{
+	if (object)
+		*static_cast<ObjectID*>(lua_newuserdatauv(state, sizeof(ObjectID), 0)) = object->getID();
+	else
+		lua_pushnil(state);
 }
 
 void applyLuaUpgrade(const LuaUpgradeChange& change)
@@ -372,6 +409,7 @@ void bindLogicLua(LuaState& state)
 		{ "ObjectDoSpecialPower", doSpecialPower },
 		{ "ObjectSetGeometryActive", setGeometryActive },
 		{ "ObjectTestModelCondition", testModelCondition },
+		{ "ObjectDescription", objectDescription },
 		{ "ObjectPlaySound", playSound },
 		{ "ObjectPlayerSide", playerSide },
 		{ "ObjectCapturingObjectPlayerSide", playerSide },
@@ -382,6 +420,8 @@ void bindLogicLua(LuaState& state)
 		{ "ObjectForbidPlayerCommands", forbidPlayerCommands },
 		{ "ObjectChangeAllegianceFromNonPlayablePlayer", changeAllegianceFromNonPlayablePlayer },
 		{ "ExecuteAction", executeAction },
+		{ "ObjectEnterAlertState", enterAlertState },
+		{ "ObjectEnterFearState", enterFearState<EMOTION_FEAR, true> },
 		{ "ObjectEnterCowerState", enterFearState<EMOTION_FEAR> },
 		{ "ObjectEnterRunAwayPanicState", enterFearState<EMOTION_TERROR> },
 		{ "ObjectEnterUncontrollableCowerState", enterFearState<EMOTION_UNCONTROLLABLE_FEAR> },

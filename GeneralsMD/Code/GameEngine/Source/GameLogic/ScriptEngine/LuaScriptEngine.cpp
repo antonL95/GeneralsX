@@ -93,20 +93,12 @@ struct EventList
 	std::vector<const ModelEvent*> modelEvents;
 };
 
-void pushObject(lua_State* state, const Object* object)
-{
-	if (object)
-		*static_cast<ObjectID*>(lua_newuserdatauv(state, sizeof(ObjectID), 0)) = object->getID();
-	else
-		lua_pushnil(state);
-}
-
 struct PushArgument
 {
 	lua_State* state;
 
 	void operator()(std::monostate) const { lua_pushnil(state); }
-	void operator()(const Object* object) const { pushObject(state, object); }
+	void operator()(const Object* object) const { pushLuaObject(state, object); }
 	void operator()(std::string_view text) const { lua_pushlstring(state, text.data(), text.size()); }
 	void operator()(Real number) const { lua_pushnumber(state, number); }
 };
@@ -121,7 +113,7 @@ struct DispatchArguments
 int pushArguments(lua_State* state, void* data)
 {
 	const auto& args = *static_cast<const DispatchArguments*>(data);
-	pushObject(state, &args.object);
+	pushLuaObject(state, &args.object);
 	if (!std::holds_alternative<std::monostate>(args.third))
 	{
 		std::visit(PushArgument{state}, args.second);

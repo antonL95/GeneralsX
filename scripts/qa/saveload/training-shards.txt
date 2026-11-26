@@ -118,3 +118,4 @@
 4 map-script-audio
 3 siege-horde-deploy
 3 lua-inventory
+3 lua-ai-states

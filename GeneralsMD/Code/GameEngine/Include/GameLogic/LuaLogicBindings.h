@@ -5,7 +5,9 @@
 #include <vector>
 
 class LuaState;
+class Object;
 class UpgradeTemplate;
+struct lua_State;
 
 struct LuaUpgradeChange
 {
@@ -16,4 +18,5 @@ struct LuaUpgradeChange
 
 void bindLogicLua(LuaState& state);
 void bindRestoringLua(LuaState& state, std::vector<LuaUpgradeChange>& changes);
+void pushLuaObject(lua_State* state, const Object* object);
 void applyLuaUpgrade(const LuaUpgradeChange& change);
