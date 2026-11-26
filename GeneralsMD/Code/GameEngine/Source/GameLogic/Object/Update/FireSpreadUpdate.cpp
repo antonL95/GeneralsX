@@ -31,11 +31,13 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/RandomValue.h"
+#include "Common/RetailFileLayers.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/FireSpreadUpdate.h"
 #include "GameLogic/Module/FlammableUpdate.h"
 
@@ -145,6 +147,8 @@ UpdateSleepTime FireSpreadUpdate::update()
 // but the first (closest).
 //
 			Object* objectToLight = ThePartitionManager->getClosestObject(getObject(), d->m_spreadTryRange, FROM_CENTER_3D, filters);
+			if (!objectToLight && RetailFileLayers::enabled() && TheTerrainLogic)
+				objectToLight = TheTerrainLogic->materializeFlammableMapTree(*me->getPosition(), d->m_spreadTryRange);
 			if( objectToLight )
 			{
 				static NameKeyType key_FlammableUpdate = NAMEKEY("FlammableUpdate");

@@ -114,6 +114,7 @@ public:
 	virtual Bool getWallRampMeshes(AsciiString&, AsciiString&, AsciiString&, AsciiString&) const { return FALSE; }
 	// ugh, hack
 	virtual const W3DTreeDrawModuleData* getAsW3DTreeDrawModuleData() const { return nullptr; }
+	virtual Bool canToppleMapTree() const { return FALSE; }
 	virtual const HordeLayout* getAsHordeLayout() const { return nullptr; }
 	virtual StaticGameLODLevel getMinimumRequiredGameLOD() const { return (StaticGameLODLevel)0;}
 

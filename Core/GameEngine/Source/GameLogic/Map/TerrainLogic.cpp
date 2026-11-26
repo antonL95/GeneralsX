@@ -46,6 +46,7 @@
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
 
+#include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
@@ -3007,14 +3008,158 @@ void TerrainLogic::createCraterInTerrain(Object *obj)
 
 }
 
-void TerrainLogic::registerMapTree(const ThingTemplate& thing, const Coord3D& pos)
+namespace
+{
+Bool canTemplateToppleMapTree(const ThingTemplate& thing)
+{
+	const ModuleInfo& modules = thing.getDrawModuleInfo();
+	for (Int i = 0; i < modules.getCount(); ++i)
+	{
+		const ModuleData* module = modules.getNthData(i);
+		if (module && module->canToppleMapTree())
+			return TRUE;
+	}
+	return FALSE;
+}
+
+Real resolveMapTreeScale(const ThingTemplate& thing, const Dict* properties)
+{
+	Bool hasScale = FALSE;
+	const Real mapScale = properties ? properties->getReal(NAMEKEY("objectPrototypeScale"), &hasScale) : 1.0f;
+	const Real instanceScale = thing.getAssetScale() * (hasScale ? mapScale : 1.0f);
+	return std::isfinite(instanceScale) && instanceScale > 0.0f ? instanceScale : 1.0f;
+}
+}
+
+void TerrainLogic::registerMapTree(const ThingTemplate& thing, const Coord3D& pos, Real angle, Real scale)
 {
 	const auto& tree = thing.getRotWKObjectData();
 	if (!thing.isKindOf(KINDOF_TREE))
 		return;
 
 	const Int boxes = tree.supplyOverride > 0 ? tree.supplyOverride : TheGlobalData->m_supplyBoxesPerTree;
-	m_mapTrees.push_back({pos, tree.isHarvestable ? std::max(0, boxes) : 0, FALSE});
+	const Real validScale = std::isfinite(scale) && scale > 0.0f ? scale : 1.0f;
+	m_mapTrees.push_back({
+		pos,
+		tree.isHarvestable ? std::max(0, boxes) : 0,
+		FALSE,
+		&thing,
+		normalizeAngle(angle),
+		validScale,
+		tree.isGrabbable,
+		tree.isHarvestable,
+		canTemplateToppleMapTree(thing)
+	});
+}
+
+void TerrainLogic::populateMapTreeMetadata()
+{
+	std::vector<MapObject*> mapTrees;
+	for (MapObject* mapObject = MapObject::getFirstMapObject(); mapObject; mapObject = mapObject->getNext())
+	{
+		const ThingTemplate* thing = mapObject->getThingTemplate();
+		if (thing && thing->isKindOf(KINDOF_TREE))
+			mapTrees.push_back(mapObject);
+	}
+	std::vector<Bool> used(mapTrees.size(), FALSE);
+	for (MapTree& tree : m_mapTrees)
+	{
+		if (tree.thing)
+			continue;
+		for (size_t i = 0; i < mapTrees.size(); ++i)
+		{
+			if (used[i])
+				continue;
+			const Coord3D& point = *mapTrees[i]->getLocation();
+			if (tree.position.x != point.x || tree.position.y != point.y)
+				continue;
+			const ThingTemplate* thing = mapTrees[i]->getThingTemplate();
+			const auto& data = thing->getRotWKObjectData();
+			tree.thing = thing;
+			tree.angle = normalizeAngle(mapTrees[i]->getAngle());
+			tree.scale = resolveMapTreeScale(*thing, mapTrees[i]->getProperties());
+			tree.grabbable = data.isGrabbable;
+			tree.harvestable = data.isHarvestable;
+			tree.doTopple = canTemplateToppleMapTree(*thing);
+			used[i] = TRUE;
+			break;
+		}
+	}
+}
+
+Object* TerrainLogic::materializeFlammableMapTree(const Coord3D& origin, Real radius)
+{
+	if (!(radius > 0.0f) || !std::isfinite(radius) || !ThePlayerList || !ThePlayerList->getNeutralPlayer())
+		return nullptr;
+
+	const Real searchRadiusSqr = sqr(radius + 7.0f);
+	size_t bestIndex = m_mapTrees.size();
+	Real bestDist2DSqr = 0.0f;
+	for (size_t i = 0; i < m_mapTrees.size(); ++i)
+	{
+		const MapTree& tree = m_mapTrees[i];
+		if (tree.toppled || !tree.thing)
+			continue;
+		const Real dx = tree.position.x - origin.x;
+		const Real dy = tree.position.y - origin.y;
+		const Real dz = tree.position.z - origin.z;
+		const Real dist2DSqr = dx * dx + dy * dy;
+		if (dist2DSqr + dz * dz >= searchRadiusSqr)
+			continue;
+		if (bestIndex == m_mapTrees.size() || dist2DSqr < bestDist2DSqr)
+		{
+			bestIndex = i;
+			bestDist2DSqr = dist2DSqr;
+		}
+	}
+	if (bestIndex == m_mapTrees.size())
+		return nullptr;
+
+	const MapTree chosen = m_mapTrees[bestIndex];
+	Object* materialized = TheThingFactory->newObjectFromExactTemplate(
+		chosen.thing,
+		ThePlayerList->getNeutralPlayer()->getDefaultTeam(),
+		OBJECT_STATUS_MASK_NONE);
+	if (!materialized)
+		return nullptr;
+
+	materialized->setPosition(&chosen.position);
+	materialized->setOrientation(chosen.angle);
+	if (materialized->getDrawable())
+		materialized->getDrawable()->setInstanceScale(chosen.scale);
+	if (TheTerrainVisual)
+		TheTerrainVisual->removeMapTree(chosen.position);
+	m_mapTrees.erase(m_mapTrees.begin() + static_cast<std::ptrdiff_t>(bestIndex));
+	return materialized;
+}
+
+void TerrainLogic::notifyObjectMoved(Object* unit)
+{
+	if (!unit || unit->isKindOf(KINDOF_IMMOBILE) || unit->isKindOf(KINDOF_ARMY_OF_DEAD))
+		return;
+	if (unit->getCrusherLevel() <= 1 && !unit->isKindOf(KINDOF_MACHINE))
+		return;
+
+	const GeometryInfo& geom = unit->getGeometryInfo();
+	const Coord3D pos = *unit->getPosition();
+	const Real angle = unit->getOrientation();
+	const Real radiusSqr = sqr(geom.getBoundingCircleRadius() + 7.0f);
+	const GeometryInfo treeGeom(GEOMETRY_CYLINDER, FALSE, 20.0f, 7.0f, 7.0f);
+	for (MapTree& tree : m_mapTrees)
+	{
+		if (tree.toppled || !tree.doTopple)
+			continue;
+		const Real dx = tree.position.x - pos.x;
+		const Real dy = tree.position.y - pos.y;
+		const Real dz = tree.position.z - pos.z;
+		if (dx * dx + dy * dy + dz * dz >= radiusSqr)
+			continue;
+		if (!ThePartitionManager->geomCollidesWithGeom(&pos, geom, angle, &tree.position, treeGeom, 0.0f))
+			continue;
+		tree.toppled = TRUE;
+		if (TheTerrainVisual)
+			TheTerrainVisual->fellMapTree(tree.position, pos);
+	}
 }
 
 void TerrainLogic::ensureGrabbableTreeProxy()
@@ -3564,6 +3709,7 @@ void TerrainLogic::loadPostProcess()
 	if (RetailFileLayers::enabled())
 	{
 		restoreLegacyMapTrees({});
+		populateMapTreeMetadata();
 		m_retailFire.restoreLegacySlice(TheGameLogic->getFrame());
 	}
 

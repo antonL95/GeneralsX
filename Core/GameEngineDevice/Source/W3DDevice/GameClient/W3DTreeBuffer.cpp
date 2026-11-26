@@ -1354,7 +1354,7 @@ void W3DTreeBuffer::unitMoved(Object *unit)
 				delta.set(m_trees[treeNdx].location.X, m_trees[treeNdx].location.Y, m_trees[treeNdx].location.Z );
 				delta.sub(pos);
 				if (radius*radius>delta.lengthSqr()) {
-					bool canTopple = unit->getCrusherLevel() > 1;
+					bool canTopple = !RetailFileLayers::enabled() && unit->getCrusherLevel() > 1;
 					if (canTopple && treeData->m_doTopple) {
 						// Give a vector with direction to thing.
 						Coord3D toppleVector;

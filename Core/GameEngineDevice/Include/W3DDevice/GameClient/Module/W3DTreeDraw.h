@@ -74,6 +74,7 @@ public:
 	static void buildFieldParse(MultiIniFieldParse& p);
 	// ugh, hack
 	virtual const W3DTreeDrawModuleData* getAsW3DTreeDrawModuleData() const override { return this; }
+	virtual Bool canToppleMapTree() const override { return m_doTopple; }
 };
 
 //-------------------------------------------------------------------------------------------------

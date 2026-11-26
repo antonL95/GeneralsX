@@ -3150,7 +3150,11 @@ void Object::setTriggerAreaFlagsForChangeInPosition(Bool refresh)
 	}
 
 	if (!refresh && !isKindOf(KINDOF_IMMOBILE)) {
-		if (isKindOf(KINDOF_INFANTRY) || isKindOf(KINDOF_VEHICLE) ) {
+		if (RetailFileLayers::enabled() && TheTerrainLogic) {
+			TheTerrainLogic->notifyObjectMoved(this);
+		}
+		if (isKindOf(KINDOF_INFANTRY) || isKindOf(KINDOF_VEHICLE) ||
+			(RetailFileLayers::enabled() && (isKindOf(KINDOF_CAVALRY) || isKindOf(KINDOF_MONSTER) || isKindOf(KINDOF_MACHINE)))) {
 			TheGameClient->notifyTerrainObjectMoved(this);
 		}
 	}

@@ -2074,7 +2074,10 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			if (RetailFileLayers::enabled() &&
 				TheTerrainVisual->placeMapVegetation(*thingTemplate, *pMapObj->getProperties(), pos, angle))
 			{
-				TheTerrainLogic->registerMapTree(*thingTemplate, pos);
+				Bool hasScale = FALSE;
+				const Real mapScale = pMapObj->getProperties()->getReal(NAMEKEY("objectPrototypeScale"), &hasScale);
+				const Real instanceScale = thingTemplate->getAssetScale() * (hasScale ? mapScale : 1.0f);
+				TheTerrainLogic->registerMapTree(*thingTemplate, pos, angle, instanceScale);
 				continue;
 			}
 
@@ -2125,7 +2128,10 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			if (RetailFileLayers::enabled() &&
 				TheTerrainVisual->placeMapVegetation(*thingTemplate, *pMapObj->getProperties(), pos, angle))
 			{
-				TheTerrainLogic->registerMapTree(*thingTemplate, pos);
+				Bool hasScale = FALSE;
+				const Real mapScale = pMapObj->getProperties()->getReal(NAMEKEY("objectPrototypeScale"), &hasScale);
+				const Real instanceScale = thingTemplate->getAssetScale() * (hasScale ? mapScale : 1.0f);
+				TheTerrainLogic->registerMapTree(*thingTemplate, pos, angle, instanceScale);
 				continue;
 			}
 
