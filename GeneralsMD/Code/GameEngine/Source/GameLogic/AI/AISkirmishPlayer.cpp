@@ -3274,6 +3274,8 @@ void AISkirmishPlayer::updateRetail()
 				if (!timedOut && site->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && dozer &&
 					dozer->getTaskTarget(DOZER_TASK_BUILD) == plan.site)
 					return TRUE;
+				if (timedOut && dozer)
+					dozer->cancelTask(DOZER_TASK_BUILD, FALSE);
 				if (timedOut || (!site->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && dozer && !dozer->isAnyTaskPending()))
 					recallBuilder(builder);
 			}
