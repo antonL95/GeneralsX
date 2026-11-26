@@ -69,7 +69,7 @@ namespace
 				continue;
 			const Real x = object->getPosition()->x - fortress.getPosition()->x;
 			const Real y = object->getPosition()->y - fortress.getPosition()->y;
-			const Real distance = sqrt(x * x + y * y);
+			const Real distance = WWMath::Sqrt(x * x + y * y);
 			if (distance <= searched)
 				reach = max(reach, distance + object->getGeometryInfo().getBoundingCircleRadius());
 		}

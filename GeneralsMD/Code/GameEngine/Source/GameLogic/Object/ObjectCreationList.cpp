@@ -1875,7 +1875,6 @@ Bool ObjectCreationList::hasStrafeSpawnOrder() const
 		[](const ObjectCreationNugget* nugget) { return nugget->hasStrafeSpawnOrder(); });
 }
 
-//-------------------------------------------------------------------------------------------------
 Bool ObjectCreationList::createsKindOf(KindOfType kind) const
 {
 	return std::any_of(m_nuggets.begin(), m_nuggets.end(),
