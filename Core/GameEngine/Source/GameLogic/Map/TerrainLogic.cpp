@@ -3621,7 +3621,7 @@ void TerrainLogic::xferMapTrees(Xfer* xfer)
 	UnsignedInt count = m_mapTrees.size();
 	xfer->xferUnsignedInt(&count);
 	if (xfer->getXferMode() == XFER_LOAD)
-		m_mapTrees.resize(count);
+		m_mapTrees.assign(count, MapTree{});
 	for (auto& tree : m_mapTrees)
 	{
 		xfer->xferCoord3D(&tree.position);
