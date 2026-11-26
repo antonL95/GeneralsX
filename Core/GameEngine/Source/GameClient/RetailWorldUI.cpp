@@ -679,7 +679,7 @@ void RetailWorldUI::drawFormationPreview(std::deque<WorldGroundDecal>& decals)
 	}
 
 	std::vector<Object*> units;
-	for (const Drawable* drawable : *TheInGameUI->getAllSelectedDrawables())
+	for (Drawable* drawable : *TheInGameUI->getAllSelectedDrawables())
 	{
 		Object* object = drawable ? drawable->getObject() : nullptr;
 		if (!object || !object->getAI() || object->isKindOf(KINDOF_IMMOBILE))

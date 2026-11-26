@@ -79,6 +79,57 @@ void dragFormationSelection(const RetailTestCommands::Context& ctx)
 {
 	std::fprintf(stderr, "TEST drag-selection %u %zu\n", ctx.frame, TheInGameUI->getAllSelectedDrawables()->size());
 }
+
+void dragFormationHold(const RetailTestCommands::Context& ctx)
+{
+	const Coord3D anchor = ctx.groundLocation();
+	ICoord2D point;
+	if (!TheTacticalView->worldToScreen(&anchor, &point))
+		return;
+	TheMouse->setPosition(point.x, point.y);
+	const Bool leftFirst = std::string_view(ctx.argument) == "left";
+	const auto firstDown = leftFirst ? GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN : GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN;
+	const auto secondDown = leftFirst ? GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN : GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN;
+	for (const auto type : {firstDown, secondDown, GameMessage::MSG_RAW_MOUSE_POSITION})
+	{
+		if (type == GameMessage::MSG_RAW_MOUSE_POSITION)
+		{
+			point.x += 140;
+			point.y -= 20;
+		}
+		GameMessage* message = TheMessageStream->appendMessage(type);
+		message->appendPixelArgument(point);
+		message->appendIntegerArgument(0);
+		message->appendIntegerArgument(TheMouse->getMouseStatus()->time);
+	}
+}
+
+void dragFormationRelease(const RetailTestCommands::Context& ctx)
+{
+	const Coord3D anchor = ctx.groundLocation();
+	ICoord2D point;
+	if (!TheTacticalView->worldToScreen(&anchor, &point))
+		return;
+	point.x += 140;
+	point.y -= 20;
+	const Bool leftFirst = std::string_view(ctx.argument) == "left";
+	const auto firstUp = leftFirst ? GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP : GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP;
+	const auto secondUp = leftFirst ? GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP : GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP;
+	for (const auto type : {firstUp, secondUp})
+	{
+		GameMessage* message = TheMessageStream->appendMessage(type);
+		message->appendPixelArgument(point);
+		message->appendIntegerArgument(0);
+		message->appendIntegerArgument(TheMouse->getMouseStatus()->time);
+	}
+}
+
+void dragFormationPreview(const RetailTestCommands::Context& ctx)
+{
+	const InGameUI::FormationDragPreview& preview = TheInGameUI->getFormationDragPreview();
+	std::fprintf(stderr, "TEST drag-preview %u %d %d %.1f\n", ctx.frame, preview.active ? 1 : 0,
+		preview.templateIndex, preview.dragLength);
+}
 }
 #endif
 
@@ -91,6 +142,9 @@ void registerRetailDragFormationTestCommands()
 	registerAction("drag-formation-state", dragFormationState);
 	registerAction("drag-formation-input", dragFormationInput);
 	registerAction("drag-formation-selection", dragFormationSelection);
+	registerAction("drag-formation-hold", dragFormationHold);
+	registerAction("drag-formation-release", dragFormationRelease);
+	registerAction("drag-formation-preview", dragFormationPreview);
 #endif
 }
 }

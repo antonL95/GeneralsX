@@ -9,6 +9,10 @@
 23 drag-formation-selection Player_1 - 0
 26 drag-formation-input Player_1 - 0 left 1500 1075
 27 drag-formation-selection Player_1 - 0
+30 drag-formation-hold Player_1 - 0 right 1500 1075
+32 drag-formation-preview Player_1 - 0
+36 drag-formation-release Player_1 - 0 right 1500 1075
+37 drag-formation-preview Player_1 - 0
 180 drag-formation-state Player_1 GondorFighterHorde 0
 180 drag-formation-state Player_1 GondorFighterHorde 1
 180 drag-formation-state Player_1 GondorArcherHorde 0
