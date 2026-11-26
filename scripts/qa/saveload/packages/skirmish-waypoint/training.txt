@@ -1,5 +1,6 @@
 234 skirmish-waypoint-create * SkirmishWaypointWalker 0 - 1680 510
 235 skirmish-waypoint-create * SkirmishWaypointStatic 0 - 1660 510
+236 skirmish-waypoint-promote * SkirmishWaypointStatic 0
 236 skirmish-waypoint-probe * SkirmishWaypointStatic 0
 240 skirmish-waypoint-promote * SkirmishWaypointWalker 0
 242 skirmish-waypoint-probe * SkirmishWaypointWalker 0

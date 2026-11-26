@@ -5,6 +5,7 @@
 14 castle-rank-one-finish Player_1 CastleRankOneControl 0
 20 castle-rank-one-state Player_1 CastleRankOneControl 0
 20 castle-rank-one-state Player_1 WildFortressCitadel 0
+21 destroy Player_1 CastleRankOneControl 0
 33 fortress-purchase Player_1 WildFortressCitadel 0 Command_PurchaseUpgradeWildFortressGoblinTown
 244 castle-rank-one-state Player_1 WildFortressCitadel 0
 942 castle-rank-one-state Player_1 WildFortressCitadel 0

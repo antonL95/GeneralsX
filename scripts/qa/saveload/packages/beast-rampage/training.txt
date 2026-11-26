@@ -1,27 +1,27 @@
 206 create Player_1 BeastRampageBound 0 2750,3480,-90
 206 create Player_1 BeastRampageBound 0 2910,3480,-90
 206 create Player_1 BeastRampageBound 0 3070,3480,0
-206 create Player_1 MordorGreatBeast 0 3230,3480,0
-206 create Player_1 MordorGreatBeast 0 2590,3480,0
+206 create Player_1 BeastRampageUnbound 0 3230,3480,0
+206 create Player_1 BeastRampageUnbound 0 2590,3480,0
 208 create Player_1 MordorArcherOnBeast 0 2910,3450,0
 208 create Player_1 MordorArcherOnBeast 0 3230,3450,0
 209 beast-rampage-seat Player_1 MordorArcherOnBeast 0 Player_1:BeastRampageBound:1
-209 beast-rampage-seat Player_1 MordorArcherOnBeast 1 Player_1:MordorGreatBeast:0
+209 beast-rampage-seat Player_1 MordorArcherOnBeast 1 Player_1:BeastRampageUnbound:0
 235 beast-rampage-state Player_1 BeastRampageBound 1 crew-before-fire
 236 beast-rampage-fire Player_1 BeastRampageBound 0
 236 beast-rampage-fire Player_1 BeastRampageBound 1
-236 beast-rampage-fire Player_1 MordorGreatBeast 0
-236 beast-rampage-fire Player_1 MordorGreatBeast 1
+236 beast-rampage-fire Player_1 BeastRampageUnbound 0
+236 beast-rampage-fire Player_1 BeastRampageUnbound 1
 239 beast-rampage-state Player_1 BeastRampageBound 0 bound-empty
 239 beast-rampage-state Player_1 BeastRampageBound 1 bound-crewed
 239 beast-rampage-state Player_1 BeastRampageBound 2 dry
-239 beast-rampage-state Player_1 MordorGreatBeast 0 unbound-crewed
-239 beast-rampage-state Player_1 MordorGreatBeast 1 unbound-empty
+239 beast-rampage-state Player_1 BeastRampageUnbound 0 unbound-crewed
+239 beast-rampage-state Player_1 BeastRampageUnbound 1 unbound-empty
 250 beast-rampage-state Player_1 BeastRampageBound 0 bound-empty
 250 beast-rampage-state Player_1 BeastRampageBound 1 bound-crewed
 250 beast-rampage-state Player_1 BeastRampageBound 2 dry
-250 beast-rampage-state Player_1 MordorGreatBeast 0 unbound-crewed
-250 beast-rampage-state Player_1 MordorGreatBeast 1 unbound-empty
+250 beast-rampage-state Player_1 BeastRampageUnbound 0 unbound-crewed
+250 beast-rampage-state Player_1 BeastRampageUnbound 1 unbound-empty
 280 beast-rampage-state Player_1 BeastRampageBound 1 ejected
 282 destroy Player_1 MordorArcherOnBeast 1
 282 destroy Player_1 MordorArcherOnBeast 0
@@ -29,5 +29,5 @@
 302 destroy Player_1 BeastRampageBound 2
 302 destroy Player_1 BeastRampageBound 1
 302 destroy Player_1 BeastRampageBound 0
-282 destroy Player_1 MordorGreatBeast 1
-282 destroy Player_1 MordorGreatBeast 0
+282 destroy Player_1 BeastRampageUnbound 1
+282 destroy Player_1 BeastRampageUnbound 0
