@@ -897,8 +897,8 @@ def near_color(rgb, target, tol=16):
     return all(abs(a - b) <= tol for a, b in zip(rgb, target))
 
 
-def measure_palantir_bar():
-    image = get_image(display, root, 240, 700, 100, 16, 0xFFFFFFFF, 2)
+def measure_palantir_bar(x_offset=0):
+    image = get_image(display, root, 240 + x_offset, 700, 100, 16, 0xFFFFFFFF, 2)
     try:
         border = (199, 164, 94)
         fill = (232, 183, 51)
@@ -907,7 +907,7 @@ def measure_palantir_bar():
             for dx in range(100):
                 rgb = rgb_tuple(get_pixel(image, dx, dy))
                 if near_color(rgb, border, 18) or near_color(rgb, fill, 18):
-                    hits.append((240 + dx, 700 + dy))
+                    hits.append((240 + x_offset + dx, 700 + dy))
         return hits
     finally:
         destroy_image(image)
@@ -1024,14 +1024,109 @@ def check_multi_select():
     wait_for("mixed battalion+porter hides level bar", lambda: len(measure_palantir_bar()) < 20, 15)
 
 
-def launch_game(*options, log_mode="wb"):
+def count_red_pixels(x, y, width, height):
+    image = get_image(display, root, x, y, width, height, 0xFFFFFFFF, 2)
+    try:
+        hits = 0
+        for dy in range(height):
+            for dx in range(width):
+                r, g, b = rgb_tuple(get_pixel(image, dx, dy))
+                if r > g + 60 and r > b + 60:
+                    hits += 1
+        return hits
+    finally:
+        destroy_image(image)
+
+
+def prepare_ui_vfs_override():
+    override_mod = out / "override-mod"
+    override_mod.mkdir()
+    aotr_root = Path("/game-install/aotr")
+    for entry in aotr_root.iterdir():
+        if entry.name.lower() == "data":
+            continue
+        (override_mod / entry.name).symlink_to(entry)
+    data_dir = override_mod / "data"
+    data_dir.mkdir()
+    for entry in (aotr_root / "data").iterdir():
+        if entry.name.lower() == "ini":
+            continue
+        (data_dir / entry.name).symlink_to(entry)
+    ini_dir = data_dir / "ini"
+    ini_dir.mkdir()
+    for entry in (aotr_root / "data" / "ini").iterdir():
+        (ini_dir / entry.name).symlink_to(entry)
+    (ini_dir / "UiFrames.ini").write_text(
+        "UiFrame MenuButtonMed\n"
+        "\tColor = R:255 G:32 B:32 A:255\n"
+        "End\n"
+    )
+    wnd_source = Path(__file__).resolve().parents[2] / "Core/GameEngine/Source/GameClient/RetailHud.wnd"
+    wnd_text = wnd_source.read_text()
+    target = (
+        '\t\tNAME = "ControlBar.wnd:Palantir";\n'
+        '\t\tSTATUS = ENABLED;\n'
+        '\t\tSTYLE = USER;\n'
+        '\t\tANCHOR = LEFT BOTTOM;\n'
+        '\t\tOFFSET = 0 0;\n'
+    )
+    replacement = target.replace("OFFSET = 0 0;", "OFFSET = 120 0;")
+    if wnd_text.count(target) != 1:
+        sys.exit("FAIL could not patch Palantir offset in RetailHud.wnd fixture")
+    wnd_dir = data_dir / "window"
+    wnd_dir.mkdir()
+    (wnd_dir / "RetailHud.wnd").write_text(wnd_text.replace(target, replacement, 1))
+    return override_mod
+
+
+def check_ui_vfs():
+    wait_for("baseline main menu opens", lambda: log_count("Shell::doPush() completed successfully"), 100)
+    time.sleep(2)
+    click(512, 296)
+    capture("ui-vfs-baseline-menu", 735, 664, 190, 52)
+    baseline_red = count_red_pixels(739, 668, 181, 44)
+    configure_match(0)
+    wait_for("baseline Aragorn HUD logged", lambda: log_count("TEST hud 40 ") >= 1, 100)
+    wait_for("baseline Palantir bar is at default x", lambda: len(measure_palantir_bar(0)) >= 40, 15)
+    capture("ui-vfs-baseline-hud", 0, 500, 620, 268)
+    baseline_slots = hud_slots_at(40)
+    baseline_at_0 = len(measure_palantir_bar(0))
+    baseline_at_120 = len(measure_palantir_bar(120))
+    if baseline_at_120 >= 20:
+        sys.exit(f"FAIL baseline Palantir bar unexpectedly present at +120: {baseline_at_120}")
+    print(f"PASS ui-vfs baseline: red={baseline_red} bar_at_0={baseline_at_0} bar_at_120={baseline_at_120}", flush=True)
+
+    override_mod = prepare_ui_vfs_override()
+    restart_game(mod_dir=str(override_mod))
+    wait_for("override main menu opens", lambda: log_count("Shell::doPush() completed successfully"), 100)
+    time.sleep(2)
+    click(512, 296)
+    capture("ui-vfs-override-menu", 735, 664, 190, 52)
+    override_red = count_red_pixels(739, 668, 181, 44)
+    if override_red <= baseline_red + 200:
+        sys.exit(f"FAIL partial UiFrames.ini override did not tint MenuButtonMed: baseline_red={baseline_red} override_red={override_red}")
+    configure_match(0)
+    wait_for("override Aragorn HUD logged", lambda: log_count("TEST hud 40 ") >= 1, 100)
+    wait_for("override Palantir bar moved +120px", lambda: len(measure_palantir_bar(120)) >= 40, 15)
+    capture("ui-vfs-override-hud", 0, 500, 620, 268)
+    override_at_0 = len(measure_palantir_bar(0))
+    override_at_120 = len(measure_palantir_bar(120))
+    if override_at_0 >= 20:
+        sys.exit(f"FAIL override Palantir bar still at default x: {override_at_0}")
+    override_slots = hud_slots_at(40)
+    if override_slots != baseline_slots:
+        sys.exit(f"FAIL override HUD slots changed: {override_slots} != {baseline_slots}")
+    print(f"PASS ui-vfs override: red={override_red} bar_at_0={override_at_0} bar_at_120={override_at_120}", flush=True)
+
+
+def launch_game(*options, log_mode="wb", mod_dir="/game-install/aotr"):
     speed = ["-fps", "120"] if "--create-a-hero" in sys.argv else []
     with (out / "game.log").open(log_mode) as log:
         return subprocess.Popen(
             ["timeout", "300", str(build / "GeneralsMD/GeneralsXZH"),
              "-win", "-xres", "1024", "-yres", "768",
              "-noaudio", "-nomusic", "-novideo", "-noshellmap",
-             "-mod", "/game-install/aotr", "-bfme2", "/game-install/bfme2", *speed, *options],
+             "-mod", mod_dir, "-bfme2", "/game-install/bfme2", *speed, *options],
             cwd="/game-install/rotwk", env=env, stdout=log, stderr=subprocess.STDOUT,
         )
 
@@ -1046,10 +1141,10 @@ def stop_game(process=None):
         target.wait()
 
 
-def restart_game(*options, log_mode="wb"):
+def restart_game(*options, log_mode="wb", mod_dir="/game-install/aotr"):
     global game
     stop_game()
-    game = launch_game(*options, log_mode=log_mode)
+    game = launch_game(*options, log_mode=log_mode, mod_dir=mod_dir)
 
 
 build = Path(sys.argv[1]).resolve()
@@ -1083,6 +1178,12 @@ if "--palantir-bars" in sys.argv:
         "70 spawn Player_1 DwarvenPhalanxHorde_Summoned 0\n"
         "80 select Player_1 DwarvenPhalanxHorde_Summoned 0\n"
         "90 hud - - 0\n"
+    )
+if "--ui-vfs" in sys.argv:
+    commands.write_text(
+        "20 spawn Player_1 GondorAragorn 0\n"
+        "30 select Player_1 GondorAragorn 0\n"
+        "40 hud - - 0\n"
     )
 if "--hero-roster" in sys.argv:
     commands.write_text(
@@ -1172,6 +1273,8 @@ elif "--dolguldur-buttons" in sys.argv:
     run(check_dolguldur_buttons)
 elif "--shell-load" in sys.argv:
     run(check_shell_load)
+elif "--ui-vfs" in sys.argv:
+    run(check_ui_vfs)
 elif "--options" in sys.argv:
     run(check_options)
     run(lambda: check_options(restarted=True))
