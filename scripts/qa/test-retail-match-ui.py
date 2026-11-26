@@ -1119,11 +1119,51 @@ def check_ui_vfs():
     print(f"PASS ui-vfs override: red={override_red} bar_at_0={override_at_0} bar_at_120={override_at_120}", flush=True)
 
 
+def roster_at(frame):
+    text = (out / "game.log").read_text(errors="replace")
+    rows = re.findall(rf"TEST roster {frame} slot=\d+ (\S+) builders=(\d+)", text)
+    heroes = sorted(name for name, _ in rows if name != "builder")
+    builders = sum(int(count) for name, count in rows if name == "builder")
+    return heroes, builders
+
+
+def hover_world(frame, expected, kind, image=None):
+    wait_for(f"camera moves for hover {frame}", lambda: log_count(f"TEST frame {frame}: look ") >= 1, 100)
+    wait_for(f"screen position {frame + 30}", lambda: log_count(f"TEST frame {frame + 30}: screenpos ") >= 1, 100)
+    x, y = map(int, re.search(rf"TEST frame {frame + 30}: screenpos (\d+) (\d+)", (out / "game.log").read_text(errors="replace")).groups())
+    motion(display, 0, x - 40, y - 40, 0)
+    sync(display, 0)
+    time.sleep(0.3)
+    motion(display, 0, x, y, 0)
+    sync(display, 0)
+    dumped = frame + 120
+    wait_for(f"tooltip dump {dumped}", lambda: log_count(f"TEST tooltip {dumped} ") >= 1, 100)
+    text = (out / "game.log").read_text(errors="replace")
+    line = re.search(rf"TEST tooltip {dumped} shown=(\d) kind=(\w+) text=(.*)", text)
+    if line.group(1) != "1" or line.group(2) != kind or expected not in line.group(3):
+        sys.exit(f"FAIL hover {frame}: expected {kind} with {expected!r}, got {line.group(0)}")
+    print(f"PASS hover {line.group(0)}", flush=True)
+    if image:
+        capture(image, 0, 0, 1024, 768)
+
+
+def check_hover_roster():
+    wait_for("roster logged after spawns", lambda: log_count("TEST hud 90 ") + log_count("TEST tooltip 90 ") >= 1, 100)
+    before_heroes, before_builders = roster_at(45)
+    heroes, builders = roster_at(90)
+    if heroes != sorted(before_heroes + ["GondorAragorn", "GondorBoromir"]) or builders != before_builders + 1:
+        sys.exit(f"FAIL roster heroes={heroes} builders={builders} before={before_heroes},{before_builders}")
+    print(f"PASS roster heroes={heroes} builders={builders}", flush=True)
+    hover_world(100, "Builder", "box", "hover-info")
+    hover_world(230, "Troll", "label")
+    hover_world(360, "Fortress", "box")
+
+
 def launch_game(*options, log_mode="wb", mod_dir="/game-install/aotr"):
     speed = ["-fps", "120"] if "--create-a-hero" in sys.argv else []
     with (out / "game.log").open(log_mode) as log:
         return subprocess.Popen(
-            ["timeout", "300", str(build / "GeneralsMD/GeneralsXZH"),
+            ["timeout", "600" if "--hover-roster" in sys.argv else "300", str(build / "GeneralsMD/GeneralsXZH"),
              "-win", "-xres", "1024", "-yres", "768",
              "-noaudio", "-nomusic", "-novideo", "-noshellmap",
              "-mod", mod_dir, "-bfme2", "/game-install/bfme2", *speed, *options],
@@ -1191,6 +1231,27 @@ if "--hero-roster" in sys.argv:
         "30 select Player_1 ElvenHaldir 0\n"
         "45 hud - - 0\n"
     )
+if "--hover-roster" in sys.argv:
+    commands.write_text(
+        "45 hud - - 0\n"
+        "50 spawn Player_1 GondorAragorn 0 220,0\n"
+        "51 spawn Player_1 GondorBoromir 0 220,60\n"
+        "52 spawn Player_1 MenPorter 0 220,-60\n"
+        "53 spawn Player_1 GondorWorker 0 260,-60\n"
+        "54 spawn Player_1 DunharrowSleeplessDead_Summoned 0 260,0\n"
+        "55 create PlyrCreeps MordorMountainTroll 0 1000,1750,0\n"
+        "56 reveal Player_1 MenFortressCitadel 0\n"
+        "90 hud - - 0\n"
+        "100 look Player_1 MenPorter 0\n"
+        "130 screenpos Player_1 MenPorter 0\n"
+        "220 hud - - 0\n"
+        "230 look PlyrCreeps MordorMountainTroll 0\n"
+        "260 screenpos PlyrCreeps MordorMountainTroll 0\n"
+        "350 hud - - 0\n"
+        "360 look Player_1 MenFortressCitadel 0\n"
+        "390 screenpos Player_1 MenFortressCitadel 0\n"
+        "480 hud - - 0\n"
+    )
 if "--multi-select" in sys.argv:
     commands.write_text(
         "20 spawn Player_1 GondorAragorn 0\n"
@@ -1229,12 +1290,13 @@ env = os.environ | {
     "LP_NUM_THREADS": "3",
     "GENERALSX_TEST_COMMANDS": str(commands),
 }
-if "--create-a-hero" in sys.argv:
+if "--create-a-hero" in sys.argv or "--hover-roster" in sys.argv:
     map_dir = out / "data/GeneralsX/GeneralsZH/Maps/aotr training grounds"
     map_dir.mkdir(parents=True)
     source = Path("/game/UserData/Maps/AotR Training Grounds")
     for file in source.iterdir():
         shutil.copy2(file, map_dir / (file.name.lower() if file.suffix.lower() == ".map" else file.name))
+if "--create-a-hero" in sys.argv:
     commands.write_text(
         "10 cash Player_1 - 0 10000\n"
         "20 select Player_1 MenFortressCitadel 0\n"
@@ -1252,9 +1314,9 @@ if "--create-a-hero" in sys.argv:
         "2284 pkg18-award-xp Player_1 CreateAHero 0 100000\n"
         "2285 pkg18-hero-state Player_1 CreateAHero 0 Upgrade_CreateAHeroCreateAHeroTrainAllies_Level_1\n"
     )
-def run(check_session):
+def run(check_session, *options):
     global game
-    game = launch_game()
+    game = launch_game(*options)
     try:
         check_session()
     finally:
@@ -1267,6 +1329,8 @@ elif "--palantir-bars" in sys.argv:
     run(check_palantir_bars)
 elif "--hero-roster" in sys.argv:
     run(check_hero_roster)
+elif "--hover-roster" in sys.argv:
+    run(check_hover_roster, "-file", str(map_dir / "aotr training grounds.map"))
 elif "--multi-select" in sys.argv:
     run(check_multi_select)
 elif "--dolguldur-buttons" in sys.argv:
