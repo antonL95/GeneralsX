@@ -1,0 +1,14 @@
+8 create Player_1 RohanPorter 0 3150,2390,0
+10 fund Player_1 RohanPorter 0
+11 shroudmap Player_1 RohanPorter 0
+20 pkg08-queue Player_1 RohanPorter 0 RohanFarm 3200 2500
+30 pkg08-queue-state Player_1 RohanPorter 0
+100 toggle-state Player_1 RohanFarm 0 Upgrade_BuildArmyPikes,Upgrade_BuildArmySwords
+600 toggle-state Player_1 RohanFarm 0 Upgrade_BuildArmyPikes,Upgrade_BuildArmySwords
+700 toggle-state Player_1 RohanFarm 0 Upgrade_BuildArmyPikes,Upgrade_BuildArmySwords
+899 toggle-state Player_1 RohanFarm 0 Upgrade_BuildArmyPikes,Upgrade_BuildArmySwords
+900 buttons Player_1 RohanFarm 0
+910 weapon-upgrade-buy Player_1 RohanFarm 0 Upgrade_BuildArmyPikes
+970 toggle-state Player_1 RohanFarm 0 Upgrade_BuildArmyPikes,Upgrade_BuildArmySwords
+1100 toggle-state Player_1 RohanFarm 0 Upgrade_BuildArmyPikes,Upgrade_BuildArmySwords
+1101 buttons Player_1 RohanFarm 0
