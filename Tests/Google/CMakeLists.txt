@@ -2,6 +2,7 @@ add_subdirectory(Dependencies)
 add_subdirectory(Core)
 
 if(RTS_BUILD_ZEROHOUR)
+    add_subdirectory(Lua)
     add_executable(z_googletest)
     target_link_libraries(z_googletest PRIVATE
         corei_googletest

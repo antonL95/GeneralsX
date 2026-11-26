@@ -52,7 +52,7 @@ if (NOT IS_VS6_BUILD)
         # Prevent FMA contraction to avoid cross-platform divergence
         add_compile_options(/fp:precise)
     else()
-        add_compile_options(-Wsuggest-override)
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wsuggest-override>)
         # GeneralsX @build fbraz 03/05/2026 Disable FMA contraction to avoid
         # cross-platform rounding divergence in deterministic math paths.
         # Upstream reference: Okladnoj, PR #2670

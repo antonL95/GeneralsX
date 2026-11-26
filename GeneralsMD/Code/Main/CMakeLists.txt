@@ -1,5 +1,12 @@
 add_executable(z_generals WIN32)
 
+include(lua)
+target_link_libraries(z_generals PRIVATE z_lua)
+target_sources(z_generals PRIVATE
+    ../GameEngine/Include/GameLogic/LuaState.h
+    ../GameEngine/Source/GameLogic/ScriptEngine/LuaState.cpp
+)
+
 # Use a binary name that doesn't conflict with original game.
 # GeneralsX @build BenderAI 15/02/2026 Linux branding update
 # GeneralsX @build fbraz3 19/08/2026 Standardize executable name across all platforms
