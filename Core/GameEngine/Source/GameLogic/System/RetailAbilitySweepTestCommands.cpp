@@ -87,7 +87,7 @@ struct Case
 	Int type = 0;
 	Actor actors[ACTOR_COUNT];
 	Bool noWindow = FALSE;
-	ObjectID previous = INVALID_ID;
+	std::set<ObjectID> previous;
 	const ThingTemplate* templateAtClick = nullptr;
 	ModelConditionFlags conditions;
 	WeaponSetFlags weaponSet;
@@ -106,16 +106,16 @@ struct Case
 };
 
 Case s_case;
-ObjectID s_sessionObjects = INVALID_ID;
+std::set<ObjectID> s_sessionObjects;
 UpgradeMaskType s_sessionUpgrades;
 Bool s_sessionRecorded = FALSE;
 
-void destroyObjectsAfter(ObjectID last)
+void destroyObjectsOutside(const std::set<ObjectID>& kept)
 {
 	for (Object* object = TheGameLogic->getFirstObject(); object;)
 	{
 		Object* next = object->getNextObject();
-		if (object->getID() > last)
+		if (!kept.count(object->getID()))
 			TheGameLogic->destroyObject(object);
 		object = next;
 	}
@@ -140,13 +140,12 @@ std::string joined(const std::set<std::string>& values)
 	return result.empty() ? "-" : result;
 }
 
-ObjectID highestObjectId()
+std::set<ObjectID> currentObjectIds()
 {
-	ObjectID highest = INVALID_ID;
+	std::set<ObjectID> ids;
 	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
-		if (object->getID() > highest)
-			highest = object->getID();
-	return highest;
+		ids.insert(object->getID());
+	return ids;
 }
 
 std::set<std::string> modifierNames(const Object* object)
@@ -188,10 +187,10 @@ void setup(const RetailTestCommands::Context& ctx)
 	if (!s_sessionRecorded)
 	{
 		s_sessionRecorded = TRUE;
-		s_sessionObjects = highestObjectId();
+		s_sessionObjects = currentObjectIds();
 		s_sessionUpgrades = ctx.player->getCompletedUpgradeMask();
 	}
-	destroyObjectsAfter(s_sessionObjects);
+	destroyObjectsOutside(s_sessionObjects);
 	restorePlayerUpgrades(ctx.player);
 	s_case.active = TRUE;
 	s_case.id = ctx.ordinal;
@@ -450,7 +449,7 @@ void recordBaseline(Object* caster, UnsignedInt frame)
 	s_case.weaponSet = caster->getWeaponSetFlags();
 	s_case.templateAtClick = caster->getTemplate();
 	s_case.commandSet = caster->getCommandSetString();
-	s_case.previous = highestObjectId();
+	s_case.previous = currentObjectIds();
 	s_case.clickFrame = frame;
 	s_case.clicked = TRUE;
 }
@@ -477,7 +476,17 @@ std::string aim(Object* caster, const CommandButton* pending)
 	if (!target && !BitIsSet(options, NEED_TARGET_POS))
 		return "rejected:no_valid_target";
 	const Object* enemy = TheGameLogic->findObjectByID(s_case.actors[ENEMY].id);
-	const Coord3D point = target ? *target->getPosition() : enemy ? *enemy->getPosition() : *caster->getPosition();
+	const Object* filtered = nullptr;
+	if (!target && power && power->hasRetailFlag(SpecialPowerTemplate::RETAIL_NEEDS_OBJECT_FILTER))
+		for (const Int candidate : { ENEMY, STRUCTURE, HERO, CAPTURE, ALLY })
+			if (const Object* object = TheGameLogic->findObjectByID(s_case.actors[candidate].id);
+				object && power->getObjectFilter().matchesObject(caster, object))
+			{
+				filtered = object;
+				break;
+			}
+	const Coord3D point = target ? *target->getPosition() : filtered ? *filtered->getPosition() :
+		enemy ? *enemy->getPosition() : *caster->getPosition();
 	GameMessage* message = nullptr;
 	if (weapon)
 	{
@@ -767,7 +776,7 @@ void watch(const RetailTestCommands::Context& ctx)
 				s_case.recharged = s_case.recharged || !module->isReady();
 	}
 	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
-		if (object->getID() > s_case.previous)
+		if (!s_case.previous.count(object->getID()))
 		{
 			s_case.objects.insert(object->getTemplate()->getName().str());
 			if (!object->isKindOf(KINDOF_PROJECTILE) && !object->findUpdateModule(NAMEKEY("LifetimeUpdate")))
@@ -846,7 +855,7 @@ void finish(const RetailTestCommands::Context& ctx)
 	TheInGameUI->setGUICommand(nullptr);
 	TheControlBar->closeRetailTray();
 	TheInGameUI->deselectAllDrawables();
-	destroyObjectsAfter(s_sessionObjects);
+	destroyObjectsOutside(s_sessionObjects);
 	if (ctx.player)
 		restorePlayerUpgrades(ctx.player);
 	s_case = Case();
