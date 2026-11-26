@@ -1,0 +1,8 @@
+5 create Player_1 MordorDrummerTroll 0 2950,650,0
+5 create PlyrCreeps GondorFarm 0 3050,650,0
+5 create Player_1 MordorDrummerTroll 1 2950,500,0
+5 create PlyrCreeps GondorBoromir 0 3000,500,0
+6 reveal Player_1 MordorDrummerTroll 0
+6 reveal Player_1 MordorDrummerTroll 1
+20 orderattack Player_1 MordorDrummerTroll 0 PlyrCreeps:GondorFarm:0
+20 orderattack Player_1 MordorDrummerTroll 1 PlyrCreeps:GondorBoromir:0
