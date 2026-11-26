@@ -208,6 +208,7 @@ private:
 	HordePoint getBannerOffset() const;
 	AsciiString getBannerUnitType() const;
 	Bool addBannerCarrier(Bool feedback);
+	void assignMemberSlot(Object* member);
 	void updateReplenishment();
 	void updateFlankState();
 	Object* replenishMember(const BannerCarrierUpdateModuleData& banner);

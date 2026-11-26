@@ -479,6 +479,11 @@ void HordeContain::addProducedMember(Object* member)
 void HordeContain::addToContainList( Object *rider )
 {
 	TransportContain::addToContainList( rider );
+	assignMemberSlot( rider );
+}
+
+void HordeContain::assignMemberSlot( Object *rider )
+{
 	if (isBannerCarrier(rider) || getMemberSlot( rider->getID() ) >= 0)
 		return;
 
@@ -610,6 +615,9 @@ void HordeContain::onRemoving( Object *rider )
 	{
 		m_slotMembers[slot->second] = INVALID_ID;
 		m_memberSlots.erase(slot);
+		for (Object* member : getContainList())
+			if (!member->isEffectivelyDead())
+				assignMemberSlot(member);
 	}
 	if (m_backingMoves.erase(rider->getID()))
 	{
