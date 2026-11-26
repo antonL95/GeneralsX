@@ -347,6 +347,7 @@ public:
 	const AttackPriorityInfo *getAttackInfo(const AsciiString& name);
 
 	const TCounter *getCounter(const AsciiString& counterName);
+	Int getCounterValue(const AsciiString& counterName);
 	void setCounterValue(Parameter &counter, Int value);
 
 	void createNamedMapReveal(const AsciiString& revealName, const AsciiString& waypointName, Real radiusToReveal, const AsciiString& playerName);

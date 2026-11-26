@@ -1,0 +1,10 @@
+232 create Player_1 MapScriptCountersFixtureUnit 0 650,200,0
+232 create Player_1 MapScriptCountersFixtureUnit 1 658,200,0
+232 create PlyrCreeps MapScriptCountersFixtureUnit 0 669,200,0
+234 map-script-counters-calculate Player_1 MapScriptCountersFixtureUnit 0
+236 map-script-counters-ownership Player_1 MapScriptCountersFixtureUnit 1
+242 map-script-counters-probe Player_1 MapScriptCountersFixtureUnit 0
+246 map-script-counters-probe Player_1 MapScriptCountersFixtureUnit 0
+250 destroy Player_1 MapScriptCountersFixtureUnit 0
+250 destroy Player_1 MapScriptCountersFixtureUnit 1
+250 destroy PlyrCreeps MapScriptCountersFixtureUnit 0

@@ -2919,9 +2919,30 @@ Bool evaluateDistanceBetween(Condition *condition)
 }
 }
 
-//-------------------------------------------------------------------------------------------------
-/** Evaluate a condition */
-//-------------------------------------------------------------------------------------------------
+namespace
+{
+Real retailThreatAround(const Player& player, const Coord3D& center, Real radius)
+{
+	PartitionFilterAlive alive;
+	PartitionFilter* filters[] = { &alive, nullptr };
+	SimpleObjectIterator* objects = ThePartitionManager->iterateObjectsInRange(&center, radius, FROM_CENTER_2D, filters);
+	MemoryPoolObjectHolder holder(objects);
+	Real threat = 0.0f;
+	for (const Object* object = objects->first(); object; object = objects->next())
+		if (object->getTeam() && player.getRelationship(object->getTeam()) == ENEMIES &&
+			!object->getContainedBy() && !object->isKindOf(KINDOF_INERT))
+			threat += object->getTemplate()->getThreatValue();
+	return threat;
+}
+}
+
+Real ScriptConditions::getRetailUnitThreat(const Object& unit, Real radius)
+{
+	const Player* player = unit.getControllingPlayer();
+	return player && std::isfinite(radius) && radius >= 0.0f
+		? retailThreatAround(*player, *unit.getPosition(), radius) : 0.0f;
+}
+
 Real ScriptConditions::getRetailTeamThreat(Team* team, Real radius)
 {
 	if (!team || !team->getControllingPlayer() || !std::isfinite(radius) || radius < 0.0f)
@@ -2943,17 +2964,7 @@ Real ScriptConditions::getRetailTeamThreat(Team* team, Real radius)
 	center.x /= INT_TO_REAL(count);
 	center.y /= INT_TO_REAL(count);
 	center.z /= INT_TO_REAL(count);
-	const Player* player = team->getControllingPlayer();
-	PartitionFilterAlive alive;
-	PartitionFilter* filters[] = { &alive, nullptr };
-	SimpleObjectIterator* objects = ThePartitionManager->iterateObjectsInRange(&center, radius, FROM_CENTER_2D, filters);
-	MemoryPoolObjectHolder holder(objects);
-	Real threat = 0.0f;
-	for (const Object* object = objects->first(); object; object = objects->next())
-		if (object->getTeam() && player->getRelationship(object->getTeam()) == ENEMIES &&
-			!object->getContainedBy() && !object->isKindOf(KINDOF_INERT))
-			threat += object->getTemplate()->getThreatValue();
-	return threat;
+	return retailThreatAround(*team->getControllingPlayer(), center, radius);
 }
 
 namespace
@@ -3029,6 +3040,10 @@ Bool evaluateRetailUnitsNearPosition(Condition& condition, const Coord3D& positi
 Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 {
 	switch (pCondition->getConditionType()) {
+		case Condition::COUNTER_COUNTER:
+			return BfmeScriptRules::compare(pCondition->getParameter(1)->getInt(),
+				TheScriptEngine->getCounterValue(pCondition->getParameter(0)->getString()),
+				TheScriptEngine->getCounterValue(pCondition->getParameter(2)->getString()));
 		default:
 			if (pCondition->getConditionType() >= Condition::FIRST_ROTWK)
 			{

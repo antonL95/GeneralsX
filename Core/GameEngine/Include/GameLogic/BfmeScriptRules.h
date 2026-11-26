@@ -12,6 +12,7 @@ enum class WireKind
 	ModelCondition,
 	AudioName,
 	ReverbRoom,
+	CounterArithmetic,
 	ObjectType,
 	EvaEvent,
 	NotificationType,
@@ -27,6 +28,7 @@ struct WireType
 constexpr int WIRE_INSERTED = 29;
 constexpr int WIRE_LAST_LEGACY = 52;
 constexpr int WIRE_UNIT_REFERENCE = 54;
+constexpr int WIRE_COUNTER_ARITHMETIC = 57;
 constexpr int WIRE_MODEL_CONDITION = 58;
 constexpr int WIRE_AUDIO_NAME = 59;
 constexpr int WIRE_REVERB_ROOM = 60;
@@ -43,6 +45,7 @@ constexpr WireType classifyWire(int wire)
 	switch (wire)
 	{
 		case WIRE_UNIT_REFERENCE: return { WireKind::UnitReference, -1 };
+		case WIRE_COUNTER_ARITHMETIC: return { WireKind::CounterArithmetic, -1 };
 		case WIRE_MODEL_CONDITION: return { WireKind::ModelCondition, -1 };
 		case WIRE_AUDIO_NAME: return { WireKind::AudioName, -1 };
 		case WIRE_REVERB_ROOM: return { WireKind::ReverbRoom, -1 };

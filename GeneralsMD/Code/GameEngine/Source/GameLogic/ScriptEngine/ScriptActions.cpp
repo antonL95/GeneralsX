@@ -73,6 +73,7 @@
 #include "GameLogic/AI.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/BfmeScriptRules.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/RetailTransportTeleportModules.h"
@@ -6717,6 +6718,62 @@ void ScriptActions::doNamedSetTrainHeld( const AsciiString &locoName, const Bool
 //-------------------------------------------------------------------------------------------------
 namespace
 {
+Int counterArithmetic(Int operation, Int left, Int right)
+{
+	const UnsignedInt a = static_cast<UnsignedInt>(left);
+	const UnsignedInt b = static_cast<UnsignedInt>(right);
+	switch (operation)
+	{
+		case Parameter::ADD: return static_cast<Int>(a + b);
+		case Parameter::SUBTRACT: return static_cast<Int>(a - b);
+		case Parameter::MULTIPLY: return static_cast<Int>(a * b);
+		case Parameter::DIVIDE:
+			return right != 0 && !(left == INT_MIN && right == -1) ? left / right : left;
+		default: return left;
+	}
+}
+
+Int counterMeasurement(Real value)
+{
+	if (!std::isfinite(value))
+		return 0;
+	if (value >= static_cast<Real>(INT_MAX))
+		return INT_MAX;
+	if (value <= static_cast<Real>(INT_MIN))
+		return INT_MIN;
+	return static_cast<Int>(value);
+}
+
+void countRetailPlayerOwnership(ScriptAction& action)
+{
+	const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(action.getParameter(1)->getString());
+	const AsciiString type = action.getParameter(0)->getString();
+	std::vector<const ThingTemplate*> templates;
+	std::vector<Int> counts;
+	if (ObjectTypes* list = TheScriptEngine->getObjectTypes(type))
+		list->prepForPlayerCounting(templates, counts);
+	else if (const ThingTemplate* entry = TheThingFactory->findTemplate(type, FALSE))
+	{
+		templates.push_back(entry);
+		counts.push_back(0);
+	}
+	if (templates.empty() || !players)
+		return;
+
+	const Bool ignoreDead = action.getActionType() == ScriptAction::SET_PLAYER_OWNERSHIP_OF_TYPE_COUNTER;
+	Int total = 0;
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		const Player* player = ThePlayerList->getNthPlayer(i);
+		if (!player || !(player->getPlayerMask() & players))
+			continue;
+		player->countObjectsByThingTemplate(static_cast<Int>(templates.size()), templates.data(), ignoreDead, counts.data());
+		for (const Int count : counts)
+			total += count;
+	}
+	TheScriptEngine->setCounterValue(*action.getParameter(2), total);
+}
+
 Bool matchesRetailScriptType(const Object& object, const AsciiString& type, const ObjectTypes* list)
 {
 	return list ? list->isInSet(object.getTemplate()) : object.getTemplate()->getName().compareNoCase(type.str()) == 0;
@@ -7106,6 +7163,41 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				value = value > used ? value - used : 0;
 			}
 			TheScriptEngine->setCounterValue(*pAction->getParameter(1), value);
+			return;
+		}
+		case ScriptAction::SET_COUNTER_TO_COUNTER:
+			TheScriptEngine->setCounterValue(*pAction->getParameter(0),
+				TheScriptEngine->getCounterValue(pAction->getParameter(1)->getString()));
+			return;
+		case ScriptAction::COUNTER_MATH_COUNTER:
+		case ScriptAction::COUNTER_MATH_VALUE:
+		{
+			Parameter& destination = *pAction->getParameter(0);
+			const Parameter& operand = *pAction->getParameter(2);
+			const Int left = TheScriptEngine->getCounterValue(destination.getString());
+			const Int right = pAction->getActionType() == ScriptAction::COUNTER_MATH_COUNTER
+				? TheScriptEngine->getCounterValue(operand.getString()) : operand.getInt();
+			TheScriptEngine->setCounterValue(destination, counterArithmetic(pAction->getParameter(1)->getInt(), left, right));
+			return;
+		}
+		case ScriptAction::SET_PLAYER_OWNERSHIP_OF_TYPE_COUNTER:
+		case ScriptAction::SET_PLAYER_OWNERSHIP_OF_TYPE_COUNTER_INCLUDE_DEAD:
+			countRetailPlayerOwnership(*pAction);
+			return;
+		case ScriptAction::SET_UNIT_EXPERIENCE_TO_COUNTER:
+		{
+			const Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			if (unit && unit->getExperienceTracker())
+				TheScriptEngine->setCounterValue(*pAction->getParameter(1),
+					counterMeasurement(unit->getExperienceTracker()->getRetailExperience()));
+			return;
+		}
+		case ScriptAction::SET_COUNTER_TO_UNIT_THREAT:
+		{
+			const Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(1)->getString());
+			if (unit)
+				TheScriptEngine->setCounterValue(*pAction->getParameter(0),
+					counterMeasurement(ScriptConditions::getRetailUnitThreat(*unit, pAction->getParameter(2)->getReal())));
 			return;
 		}
 		case ScriptAction::TEAM_UPGRADE:

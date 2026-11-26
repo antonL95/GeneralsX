@@ -6298,6 +6298,12 @@ const TCounter *ScriptEngine::getCounter(const AsciiString& counterName)
 }
 
 //-------------------------------------------------------------------------------------------------
+Int ScriptEngine::getCounterValue(const AsciiString& counterName)
+{
+	const TCounter* counter = getCounter(counterName);
+	return counter ? counter->value : 0;
+}
+
 void ScriptEngine::createNamedMapReveal(const AsciiString& revealName, const AsciiString& waypointName, Real radiusToReveal, const AsciiString& playerName)
 {
 	VecNamedRevealIt it;

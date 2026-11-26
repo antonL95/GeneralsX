@@ -80,6 +80,7 @@ public:
 
 	virtual Bool evaluateCondition( Condition *pCondition ) override;
 	static Real getRetailTeamThreat(Team* team, Real radius);
+	static Real getRetailUnitThreat(const Object& unit, Real radius);
 
 protected:
 	Player *playerFromParam(Parameter *pSideParm);			// Gets a player from a parameter.

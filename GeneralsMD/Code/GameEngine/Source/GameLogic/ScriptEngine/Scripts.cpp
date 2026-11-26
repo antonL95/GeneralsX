@@ -2174,6 +2174,7 @@ Parameter::ParameterType Parameter::fromBfmeWireType(Int wireType)
 	{
 		case BfmeScriptRules::WireKind::Legacy: return static_cast<ParameterType>(wire.legacy);
 		case BfmeScriptRules::WireKind::UnitReference: return UNIT_REFERENCE;
+		case BfmeScriptRules::WireKind::CounterArithmetic: return COUNTER_ARITHMETIC;
 		case BfmeScriptRules::WireKind::ModelCondition: return MODEL_CONDITION;
 		case BfmeScriptRules::WireKind::AudioName: return SOUND;
 		case BfmeScriptRules::WireKind::ReverbRoom: return REVERB_ROOM;
