@@ -1,0 +1,10 @@
+20 create Player_1 GondorFighter 0 2480,540,0
+20 create PlyrCreeps GondorFighter 0 2600,540,0
+21 reveal Player_1 GondorFighter 0
+22 science Player_1 - 0 SCIENCE_FreezingRain
+22 science Player_1 - 0 SCIENCE_WhiteWinter
+30 power-cast Player_1 - 9
+172 weatherstate - - 0
+172 weathernugget-book Player_1 - 0 WildSpellBookCommandSet
+174 power-cast Player_1 - 9
+262 weatherstate - - 0
