@@ -1,5 +1,5 @@
 check() {
-    covers 440 || return 0
+    covers 810 || return 0
     awk '
         $1 == "TEST" && $2 == "fg-reform" && $4 == "FountainGuardReformHorde" {
             frame = $3 + 0
@@ -20,11 +20,12 @@ check() {
                     snap_lateral = lateral
                 }
             }
-            if (frame == 360) {
+            if (frame == 700) {
+                alt_end_active = (alt == 1 && members == 15 && speed == 0)
                 alt_end_err = maxErr
                 alt_end_piles = piles
             }
-            if (frame == 440) {
+            if (frame == 810) {
                 main_alt = alt
                 main_members = members
                 main_err = maxErr
@@ -37,12 +38,12 @@ check() {
             frame = $3 + 0
             split($5, r, "="); rank = r[2] + 0
             split($6, b, "="); hasBanner = b[2] + 0
-            if (frame == 440) b1 = (rank == 1 && hasBanner == 0)
+            if (frame == 810) b1 = (rank == 1 && hasBanner == 0)
         }
         END {
             printf "fg-reform snap_frame=%d snap_speed=%.4f snap_lateral=%.4f alt_err=%.3f alt_piles=%d main_alt=%d main_members=%d main_err=%.3f main_piles=%d b1=%d\n",
                 snap_frame, snap_speed, snap_lateral, alt_end_err, alt_end_piles, main_alt, main_members, main_err, main_piles, b1
-            ok = (snap_frame > 0 && snap_speed > 0 && snap_lateral <= 0.15 && alt_end_err <= 35 && alt_end_piles == 0 && main_alt == 0 && main_members == 15 && main_err <= 35 && main_piles == 0 && b1)
+            ok = (snap_frame > 0 && snap_speed > 0 && snap_lateral <= 0.15 && alt_end_active && alt_end_err <= 20 && alt_end_piles == 0 && main_alt == 0 && main_members == 15 && main_err <= 35 && main_piles == 0 && b1)
             exit !ok
         }
     ' "$log"

@@ -18,7 +18,20 @@
 280 fg-reform-probe Player_1 FountainGuardReformHorde 0
 285 fg-reform-probe Player_1 FountainGuardReformHorde 0
 360 fg-reform-probe Player_1 FountainGuardReformHorde 0
-364 select Player_1 FountainGuardReformHorde 0
-365 formation-message Player_1 FountainGuardReformHorde 0 off
+370 fg-reform-probe Player_1 FountainGuardReformHorde 0
+380 fg-reform-probe Player_1 FountainGuardReformHorde 0
+390 fg-reform-probe Player_1 FountainGuardReformHorde 0
+400 fg-reform-probe Player_1 FountainGuardReformHorde 0
+410 fg-reform-probe Player_1 FountainGuardReformHorde 0
+420 fg-reform-probe Player_1 FountainGuardReformHorde 0
+430 fg-reform-probe Player_1 FountainGuardReformHorde 0
 440 fg-reform-probe Player_1 FountainGuardReformHorde 0
-440 fg-banner-check Player_1 FountainGuardReformHorde 0
+500 fg-reform-probe Player_1 FountainGuardReformHorde 0
+550 fg-reform-probe Player_1 FountainGuardReformHorde 0
+600 fg-reform-probe Player_1 FountainGuardReformHorde 0
+650 fg-reform-probe Player_1 FountainGuardReformHorde 0
+700 fg-reform-probe Player_1 FountainGuardReformHorde 0
+709 select Player_1 FountainGuardReformHorde 0
+710 formation-message Player_1 FountainGuardReformHorde 0 off
+810 fg-reform-probe Player_1 FountainGuardReformHorde 0
+810 fg-banner-check Player_1 FountainGuardReformHorde 0
