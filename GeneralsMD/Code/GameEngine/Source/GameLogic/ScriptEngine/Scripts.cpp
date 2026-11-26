@@ -2172,6 +2172,7 @@ Parameter::ParameterType Parameter::fromBfmeWireType(Int wireType)
 		case BfmeScriptRules::WireKind::Legacy: return static_cast<ParameterType>(wire.legacy);
 		case BfmeScriptRules::WireKind::UnitReference: return UNIT_REFERENCE;
 		case BfmeScriptRules::WireKind::ModelCondition: return MODEL_CONDITION;
+		case BfmeScriptRules::WireKind::AudioName: return SOUND;
 		case BfmeScriptRules::WireKind::ObjectType: return OBJECT_TYPE;
 		case BfmeScriptRules::WireKind::EvaEvent: return EVA_EVENT;
 		case BfmeScriptRules::WireKind::NotificationType: return NOTIFICATION_TYPE;
