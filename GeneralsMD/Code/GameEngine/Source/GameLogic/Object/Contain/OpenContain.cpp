@@ -952,6 +952,18 @@ Bool OpenContain::getContainerPipsToShow(Int& numTotal, Int& numFull)
 	return ContainModuleInterface::getContainerPipsToShow(numTotal, numFull);
 }
 
+Int OpenContain::getPassengerSeatNumber(const AsciiString& bone) const
+{
+	for (const auto& entry : getOpenContainModuleData()->m_passengerBonePrefixes)
+	{
+		if (stricmp(entry.bonePrefix.str(), bone.str()) == 0)
+			return 1;
+		if (strnicmp(entry.bonePrefix.str(), bone.str(), entry.bonePrefix.getLength()) == 0)
+			return atoi(bone.str() + entry.bonePrefix.getLength());
+	}
+	return 1;
+}
+
 void OpenContain::applyBoneSpecificConditionState(Object* rider, Int slot) const
 {
 	if (isHordeContain())
@@ -959,10 +971,8 @@ void OpenContain::applyBoneSpecificConditionState(Object* rider, Int slot) const
 	const auto& states = getOpenContainModuleData()->m_boneSpecificConditionStates;
 	if (states.empty())
 		return;
-	rider->clearModelConditionFlags(passengerVariationMask());
 	const auto it = states.find(slot);
-	if (it != states.end())
-		rider->setModelConditionFlags(it->second);
+	rider->clearAndSetModelConditionFlags(passengerVariationMask(), it != states.end() ? it->second : ModelConditionFlags());
 }
 
 void OpenContain::onContaining( Object *rider, Bool wasSelected )
@@ -1542,6 +1552,7 @@ void OpenContain::putObjAtNextFirePoint( Object *obj )
 			Coord3D position;
 			Matrix3D bone;
 			getObject()->getSingleLogicalBonePosition(name->str(), &position, &bone);
+			applyBoneSpecificConditionState(obj, getPassengerSeatNumber(*name));
 			if (forcePassengerOrientation() && !isEnclosingContainerFor(obj))
 			{
 				obj->setTransformMatrix(&bone);

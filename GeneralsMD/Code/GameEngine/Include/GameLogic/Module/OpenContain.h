@@ -268,6 +268,7 @@ protected:
 
 	Bool allowsPassenger(const ThingTemplate& passenger, Relationship relationship, Bool ownPlayer = FALSE) const;
 	void addToContain(Object* rider, Bool validateAdmission);
+	Int getPassengerSeatNumber(const AsciiString& bone) const;
 	void applyBoneSpecificConditionState(Object* rider, Int slot) const;
 	virtual void onPassengerBoarding(Object*) {}
 
