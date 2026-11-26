@@ -5,15 +5,30 @@
 #include <cstdio>
 #include <string_view>
 
+#include "Common/GameAudio.h"
 #include "Common/Player.h"
 #include "GameClient/RetailEva.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/CastleBehavior.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Object.h"
 
 namespace
 {
+void unpackCastle(const RetailTestCommands::Context& ctx)
+{
+	Object* packed = ctx.requireObject();
+	if (!packed)
+		return;
+	if (CastleBehavior* castle = CastleBehavior::find(packed))
+	{
+		castle->unpackFree();
+		if (Object* keep = castle->getKeep())
+			keep->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_ATTACK));
+	}
+}
+
 void linkMember(const RetailTestCommands::Context& ctx)
 {
 	Object* member = ctx.requireObject();
@@ -31,7 +46,14 @@ void setConstruction(const RetailTestCommands::Context& ctx)
 		return;
 	const std::string_view arg(ctx.argument);
 	if (arg == "start")
+	{
+		if (TheAudio)
+		{
+			const Coord3D orientation = {0.0f, 1.0f, 0.0f};
+			TheAudio->setListenerPosition(member->getPosition(), &orientation);
+		}
 		member->setModelConditionState(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED);
+	}
 	else if (arg == "stop")
 		member->clearModelConditionState(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED);
 }
@@ -70,6 +92,7 @@ namespace RetailTestCommands
 void registerRetailCastleMemberEvaTestCommands()
 {
 #if !RTS_GENERALS
+	registerAction("castle-member-eva-unpack", unpackCastle);
 	registerAction("castle-member-eva-link", linkMember);
 	registerAction("castle-member-eva-link-keep", linkMember);
 	registerAction("castle-member-eva-construct", setConstruction);

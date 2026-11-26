@@ -3,7 +3,7 @@
 220 create Player_1 CastleMemberEvaTower 0 3705,2650,0
 220 create Player_1 CastleMemberEvaKeep 0 3720,2650,0
 220 create PlyrCreeps CastleMemberEvaAttacker 0 3735,2650,0
-222 fortress-expansion-unpack Player_1 CastleMemberEvaPacked 0
+222 castle-member-eva-unpack Player_1 CastleMemberEvaPacked 0
 224 castle-member-eva-link Player_1 CastleMemberEvaWall 0 Player_1:CastleMemberEvaPacked:0
 224 castle-member-eva-link Player_1 CastleMemberEvaTower 0 Player_1:CastleMemberEvaPacked:0
 224 castle-member-eva-link-keep Player_1 CastleMemberEvaKeep 0 Player_1:CastleMemberEvaPacked:0
