@@ -104,6 +104,7 @@
 // die includes
 #include "GameLogic/Module/CreateCrateDie.h"
 #include "GameLogic/Module/CreateObjectDie.h"
+#include "GameLogic/Module/DamageFilteredCreateObjectDie.h"
 #include "GameLogic/Module/CrushDie.h"
 #include "GameLogic/Module/DamDie.h"
 #include "GameLogic/Module/DestroyDie.h"
@@ -494,6 +495,7 @@ void ModuleFactory::init()
 	{
 		addModule( DamageFieldUpdate );
 		addModule( OilSpillUpdate );
+		addModule( DamageFilteredCreateObjectDie );
 	}
 	addModule( FlammableUpdate );
 	addModule( FloatUpdate );

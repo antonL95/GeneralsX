@@ -297,6 +297,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/CreateCrateDie.h
     Include/GameLogic/Module/CreateModule.h
     Include/GameLogic/Module/CreateObjectDie.h
+    Include/GameLogic/Module/DamageFilteredCreateObjectDie.h
     Include/GameLogic/Module/CrushDie.h
     Include/GameLogic/Module/DamageModule.h
     Include/GameLogic/Module/DamDie.h
@@ -944,6 +945,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Destroy/DestroyModule.cpp
     Source/GameLogic/Object/Die/CreateCrateDie.cpp
     Source/GameLogic/Object/Die/CreateObjectDie.cpp
+    Source/GameLogic/Object/Die/DamageFilteredCreateObjectDie.cpp
     Source/GameLogic/Object/Die/CrushDie.cpp
     Source/GameLogic/Object/Die/DamDie.cpp
     Source/GameLogic/Object/Die/DestroyDie.cpp

@@ -978,6 +978,7 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 		damageInfo.retailFXTrigger = trigger;
 		if (RetailFileLayers::enabled())
 			damageInfo.retailWeaponName = launchWeapon ? launchWeapon->m_name : m_name;
+		damageInfo.retailDamageSubType = nugget.m_damageSubType;
 		damageInfo.shouldPlayUnderAttackEvaEvent = m_shouldPlayUnderAttackEvaEvent;
 		if (impactVelocity)
 			damageInfo.impactVelocity = *impactVelocity;
@@ -1015,6 +1016,9 @@ void WeaponTemplate::dealNuggetDamage(Int nuggetIndex, ObjectID sourceID, Object
 			dotTicks.size() > 1 ? ITER_SORTED_BY_ID : ITER_FASTEST);
 		curVictim = iter->firstWithNumeric(&curVictimDistSqr);
 	}
+	else if (!curVictim && source && (m_affectsMask & WEAPON_AFFECTS_SELF) &&
+		source->getPosition()->x == pos->x && source->getPosition()->y == pos->y)
+		curVictim = source;
 	MemoryPoolObjectHolder hold(iter);
 
 	for (; curVictim != nullptr; curVictim = iter ? iter->nextWithNumeric(&curVictimDistSqr) : nullptr)
