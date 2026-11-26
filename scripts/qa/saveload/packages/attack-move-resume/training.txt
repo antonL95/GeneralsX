@@ -1,0 +1,13 @@
+200 create Player_1 AttackMoveResumeHorde 0 1440,700,0
+200 create PlyrCreeps AttackMoveResumeEnemy 0 1530,740,0
+204 attack-move-resume-probe Player_1 AttackMoveResumeHorde 0 PlyrCreeps:AttackMoveResumeEnemy:0
+205 attackmove Player_1 AttackMoveResumeHorde 0 210,-95
+230 attack-move-resume-probe Player_1 AttackMoveResumeHorde 0 PlyrCreeps:AttackMoveResumeEnemy:0
+244 attack-move-resume-probe Player_1 AttackMoveResumeHorde 0 PlyrCreeps:AttackMoveResumeEnemy:0
+280 attack-move-resume-probe Player_1 AttackMoveResumeHorde 0 PlyrCreeps:AttackMoveResumeEnemy:0
+330 attack-move-resume-probe Player_1 AttackMoveResumeHorde 0 PlyrCreeps:AttackMoveResumeEnemy:0
+420 attack-move-resume-probe Player_1 AttackMoveResumeHorde 0 PlyrCreeps:AttackMoveResumeEnemy:0
+550 attack-move-resume-probe Player_1 AttackMoveResumeHorde 0 PlyrCreeps:AttackMoveResumeEnemy:0
+690 attack-move-resume-probe Player_1 AttackMoveResumeHorde 0 PlyrCreeps:AttackMoveResumeEnemy:0
+695 destroy Player_1 AttackMoveResumeHorde 0
+695 destroy PlyrCreeps AttackMoveResumeEnemy 0

@@ -102,3 +102,4 @@
 3 death-debris
 3 context-commands
 3 giant-bird-swoop
+3 attack-move-resume
