@@ -2,15 +2,18 @@
 #include "GameLogic/RetailTestCommands.h"
 
 #include <cstdio>
-#include <cstdlib>
-#include <string>
 
-#include "Common/INI.h"
+#include "Common/GameEngine.h"
+#include "Common/GlobalData.h"
+#include "Common/MessageStream.h"
 #include "Common/PlayerTemplate.h"
+#include "Common/RandomValue.h"
+#include "GameClient/MapUtil.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/RetailEva.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/RetailTerrainFire.h"
+#include "GameNetwork/GameInfo.h"
 
 namespace
 {
@@ -26,9 +29,32 @@ void probe(const RetailTestCommands::Context& ctx)
 	std::fprintf(stderr, "TEST map-ini extras %s player=%d particle=%d\n", ctx.argument,
 		ThePlayerTemplateStore->findPlayerTemplate(NAMEKEY("MapIniResetPlayerFixture")) != nullptr,
 		TheParticleSystemManager->findTemplate("MapIniResetParticleFixture") != nullptr);
-	const auto* existing = TheParticleSystemManager->findTemplate("MapIniResetExistingParticleFixture");
-	if (existing)
-		std::fprintf(stderr, "TEST map-ini existing-particle %s wind=%.1f\n", ctx.argument, existing->getWindStrength());
+}
+
+void startNextMap(const RetailTestCommands::Context& ctx)
+{
+	const MapMetaData* next = TheMapCache->ensureRetailLaunchMap(ctx.argument);
+	if (!next || !TheSkirmishGameInfo)
+		return;
+
+	if (TheGlobalData->m_mapName.compareNoCase(next->m_fileName) == 0)
+	{
+		std::fprintf(stderr, "TEST map-ini finished %s\n", next->m_fileName.str());
+		TheGameEngine->setQuitting(TRUE);
+		return;
+	}
+
+	std::fprintf(stderr, "TEST map-ini leaving %s\n", TheGlobalData->m_mapName.str());
+	TheWritableGlobalData->m_initialFile.clear();
+	TheGameLogic->exitGame();
+	TheWritableGlobalData->m_pendingFile = next->m_fileName;
+	TheSkirmishGameInfo->setMap(next->m_fileName);
+	TheSkirmishGameInfo->setMapCRC(next->m_CRC);
+	TheSkirmishGameInfo->setMapSize(next->m_filesize);
+	GameMessage* start = TheMessageStream->appendMessage(GameMessage::MSG_NEW_GAME);
+	start->appendIntegerArgument(GAME_SKIRMISH);
+	start->appendIntegerArgument(DIFFICULTY_NORMAL);
+	InitRandom(TheSkirmishGameInfo->getSeed());
 }
 }
 
@@ -53,28 +79,6 @@ void registerRetailMapIniResetTestCommands()
 		std::fprintf(stderr, "TEST map-ini existing %s played=%d\n", ctx.argument,
 			RetailEva::getLastPlayed("BuildingCaptured", frame));
 	});
-	registerAction("map-ini-existing-particle", [](const Context&) {
-		TheParticleSystemManager->newTemplate("MapIniResetExistingParticleFixture");
-		const char* commands = std::getenv("GENERALSX_TEST_COMMANDS");
-		if (!commands)
-			return;
-		std::string path(commands);
-		const auto slash = path.find_last_of('/');
-		if (slash == std::string::npos)
-			return;
-		path.resize(slash + 1);
-		path += "map-ini-existing.ini";
-		INI ini;
-		ini.load(path.c_str(), INI_LOAD_CREATE_OVERRIDES, nullptr);
-	});
-	registerAction("map-ini-reset", [](const Context& ctx) {
-		ThePlayerTemplateStore->reset();
-		TheParticleSystemManager->reset();
-		RetailEva::reset();
-		TheGameLogic->loadMapINI("map-ini-reset-empty/empty.map");
-		probe(ctx);
-		RetailEva::queue(ctx.player, "MapIniResetFixture");
-		RetailEva::queue(ctx.player, "BuildingCaptured");
-	});
+	registerAction("map-ini-next", startNextMap);
 }
 }

@@ -4,10 +4,7 @@
 240 map-ini-eva-queue Player_1 - 0 first
 242 map-ini-eva-probe Player_1 - 0 first
 245 map-ini-probe Player_1 - 0 saved
-245 map-ini-eva-queue Player_1 - 0 saved
-246 map-ini-existing-particle Player_1 - 0 -
-247 map-ini-eva-probe Player_1 - 0 saved
-248 map-ini-probe Player_1 - 0 override
-280 map-ini-reset Player_1 - 0 second
-282 map-ini-eva-probe Player_1 - 0 second
-282 map-ini-existing-probe Player_1 - 0 second
+245 map-ini-existing-queue Player_1 - 0 saved
+247 map-ini-existing-probe Player_1 - 0 saved
+251 map-ini-eva-queue Player_1 - 0 saved
+253 map-ini-eva-probe Player_1 - 0 saved
