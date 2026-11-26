@@ -346,7 +346,6 @@ GameLogic::GameLogic()
 #endif
 }
 
-//-------------------------------------------------------------------------------------------------
 GameMode GameLogic::getSimulationGameMode() const
 {
 	if (rts::isReplayGame(m_gameMode) && TheRecorder && TheRecorder->isPlaybackMode())
