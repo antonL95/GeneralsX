@@ -1,12 +1,12 @@
-10 create Player_1 Pkg33Guard 0 910,500,0
-10 create Player_1 Pkg33Archers 0 890,590,0
-10 create Player_1 Pkg33Knights 0 940,690,0
-10 create Player_1 Pkg33Citadel 0 1050,500,0
+10 create Player_1 Pkg33Guard 0 910,400,0
+10 create Player_1 Pkg33Archers 0 890,490,0
+10 create Player_1 Pkg33Knights 0 940,590,0
+10 create Player_1 Pkg33Citadel 0 1050,400,0
 15 snapshot-obstacle-count Player_1 Pkg33Citadel 0
-32 select Player_1 Pkg33Guard 0
-32 selectadd Player_1 Pkg33Archers 0
-32 selectadd Player_1 Pkg33Knights 0
-32 movesel - - 0 - 1270 560
+120 select Player_1 Pkg33Guard 0
+120 selectadd Player_1 Pkg33Archers 0
+120 selectadd Player_1 Pkg33Knights 0
+120 movesel - - 0 - 1270 460
 240 steering-path Player_1 Pkg33Guard 0
 240 steering-path Player_1 Pkg33Archers 0
 240 steering-path Player_1 Pkg33Knights 0
@@ -16,11 +16,11 @@
 1210 select Player_1 Pkg33Guard 0
 1210 selectadd Player_1 Pkg33Archers 0
 1210 selectadd Player_1 Pkg33Knights 0
-1210 movesel - - 0 - 900 520
+1210 movesel - - 0 - 900 420
 1220 steering-path Player_1 Pkg33Guard 0
 1220 steering-path Player_1 Pkg33Archers 0
 1220 steering-path Player_1 Pkg33Knights 0
-1230 movesel - - 0 - 1400 540
+1230 movesel - - 0 - 1400 440
 1248 steering-path Player_1 Pkg33Guard 0
 1248 steering-path Player_1 Pkg33Archers 0
 1248 steering-path Player_1 Pkg33Knights 0

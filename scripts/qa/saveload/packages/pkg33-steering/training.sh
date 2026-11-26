@@ -17,16 +17,16 @@ check() {
     if covers 1200; then
         awk '
             BEGIN {
-                x["Pkg33Guard"] = 1265; y["Pkg33Guard"] = 465
-                x["Pkg33Archers"] = 1245; y["Pkg33Archers"] = 555
-                x["Pkg33Knights"] = 1295; y["Pkg33Knights"] = 655
+                x["Pkg33Guard"] = 1265; y["Pkg33Guard"] = 365
+                x["Pkg33Archers"] = 1245; y["Pkg33Archers"] = 455
+                x["Pkg33Knights"] = 1295; y["Pkg33Knights"] = 555
             }
             $1 == "TEST" && $2 == "track" && $3 == 246 && ($5 in x) {
                 anchor[$4] = $5
             }
             $1 == "TEST" && $2 == "pos" && ($4 in anchor) {
                 if ($6 >= 1050 && !($4 in crossing))
-                    crossing[$4] = $7 < 500 ? -1 : ($7 > 500 ? 1 : 0)
+                    crossing[$4] = $7 < 400 ? -1 : ($7 > 400 ? 1 : 0)
                 if ($3 == 1200 && $9 == 0 && $10 == 0) {
                     name = anchor[$4]
                     dx = $6 - x[name]
