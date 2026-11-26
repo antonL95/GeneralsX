@@ -1,0 +1,24 @@
+225 create Player_1 ElvenRivendellKnightHorde 0 3750,2650,0
+225 create Player_1 GondorFaramir 0 3750,2780,0
+229 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
+229 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
+230 weapon-switch-anim-toggle Player_1 ElvenRivendellKnightHorde 0 Command_ToggleRivendellKnightWeapon
+231 weapon-switch-anim-toggle Player_1 GondorFaramir 0 Command_ToggleFaramirWeapon
+232 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
+233 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
+244 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
+244 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
+261 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
+262 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
+262 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
+263 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
+265 weapon-switch-anim-toggle Player_1 ElvenRivendellKnightHorde 0 Command_ToggleRivendellKnightWeapon
+266 weapon-switch-anim-toggle Player_1 GondorFaramir 0 Command_ToggleFaramirWeapon
+267 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
+268 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
+296 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
+297 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
+297 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
+298 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
+300 destroy Player_1 ElvenRivendellKnightHorde 0
+300 destroy Player_1 GondorFaramir 0
