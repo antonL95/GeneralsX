@@ -1965,6 +1965,7 @@ AsciiString Parameter::getUiText() const
 		case COUNTER:
 			uiText.format("'%s'", uiString.str());
 			break;
+		case EMOTION:
 		case INT:
 			uiText.format(" %d ", m_int);
 			break;
@@ -2179,6 +2180,7 @@ Parameter::ParameterType Parameter::fromBfmeWireType(Int wireType)
 		case BfmeScriptRules::WireKind::AudioName: return SOUND;
 		case BfmeScriptRules::WireKind::ReverbRoom: return REVERB_ROOM;
 		case BfmeScriptRules::WireKind::ObjectType: return OBJECT_TYPE;
+		case BfmeScriptRules::WireKind::Emotion: return EMOTION;
 		case BfmeScriptRules::WireKind::EvaEvent: return EVA_EVENT;
 		case BfmeScriptRules::WireKind::NotificationType: return NOTIFICATION_TYPE;
 		default: return NUM_ITEMS;

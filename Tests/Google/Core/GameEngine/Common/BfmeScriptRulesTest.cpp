@@ -33,6 +33,7 @@ TEST(BfmeScriptRules, MapsTheRotwkParameterTypes)
 	EXPECT_EQ(classifyWire(57).kind, WireKind::CounterArithmetic);
 	EXPECT_EQ(classifyWire(58).kind, WireKind::ModelCondition);
 	EXPECT_EQ(classifyWire(61).kind, WireKind::ObjectType);
+	EXPECT_EQ(classifyWire(63).kind, WireKind::Emotion);
 	EXPECT_EQ(classifyWire(76).kind, WireKind::EvaEvent);
 	EXPECT_EQ(classifyWire(77).kind, WireKind::NotificationType);
 	for (int wire : { -1, 53, 55, 62, 75, 78, 1000 })
