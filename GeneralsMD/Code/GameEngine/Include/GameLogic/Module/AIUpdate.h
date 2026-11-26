@@ -686,7 +686,6 @@ protected:
 	virtual UpdateSleepTime doLocomotor();	// virtual so subclasses can override
 	Bool steerInFormation();
 	void updateAirborneTargetStatus();
-	Real hordeFormationSpeedScale() const;
 	void chooseGoodLocomotorFromCurrentSet();
 
 	void setLastCommandSource( CommandSourceType source );

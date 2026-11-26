@@ -91,7 +91,9 @@ void probeYieldStall(const RetailTestCommands::Context& ctx)
 		static_cast<int>(idle), idleShort, ai ? static_cast<int>(ai->getCurrentStateID()) : -1,
 		anchor->getPosition()->x, anchor->getPosition()->y, ai ? ai->getGoalPosition()->x : 0.0f, ai ? ai->getGoalPosition()->y : 0.0f,
 		pathEnd ? pathEnd->x : 0.0f, pathEnd ? pathEnd->y : 0.0f,
-		ai ? ai->getDesiredSpeed() : 0.0f, horde ? horde->getFormationSpeedScale() : 1.0f, ai ? ai->getNumFramesBlocked() : 0);
+		ai ? ai->getDesiredSpeed() : 0.0f,
+		horde ? (horde->isHeadingAligned(anchor->getOrientation()) ? 1.0f : 0.1f) : 1.0f,
+		ai ? ai->getNumFramesBlocked() : 0);
 }
 }
 #endif

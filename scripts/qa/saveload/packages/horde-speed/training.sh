@@ -26,7 +26,7 @@ check() {
                 to[name] = frame; endx[name] = $5; endy[name] = $6; authored[name] = auth
                 if (speed < low[name]) low[name] = speed
                 if (members < min_members[name]) min_members[name] = members
-                if (frame >= 1000 && slot > endslot[name]) endslot[name] = slot
+                if (frame == last) endslot[name] = slot
             }
         }
         END {

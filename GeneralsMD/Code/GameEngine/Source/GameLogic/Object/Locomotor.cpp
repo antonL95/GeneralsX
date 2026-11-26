@@ -3330,17 +3330,25 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 	if (desiredSpeed > maxSpeed)
 		desiredSpeed = maxSpeed;
 
-	if (usesCavalrySteering(obj))
-	{
-		moveCavalryForward(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
-		return;
-	}
 	const Coord3D* pos = obj->getPosition();
 	Coord3D dirToApplyForce;
 	dirToApplyForce.x = goalPos.x - pos->x;
 	dirToApplyForce.y = goalPos.y - pos->y;
 	dirToApplyForce.z = 0.0f;
 	const Real distToGoal = dirToApplyForce.length();
+	const Real desiredAngle = distToGoal >= SLIDE_IN_PLACE_DISTANCE
+		? WWMath::Atan2Origin(dirToApplyForce.y, dirToApplyForce.x) : obj->getOrientation();
+	if (RetailFileLayers::enabled() && m_retailScalarSpeed <= 0.25f * maxSpeed && obj->isKindOf(KINDOF_CAVALRY))
+	{
+		if (const HordeContain* horde = HordeContain::get(obj); horde && !horde->isHeadingAligned(desiredAngle))
+			desiredSpeed *= 0.1f;
+	}
+
+	if (usesCavalrySteering(obj))
+	{
+		moveCavalryForward(obj, physics, goalPos, onPathDistToGoal, desiredSpeed);
+		return;
+	}
 	if (distToGoal < SLIDE_IN_PLACE_DISTANCE)
 	{
 		dirToApplyForce = *obj->getUnitDirectionVector2D();
@@ -3350,7 +3358,6 @@ void Locomotor::moveTowardsPositionHorde(Object* obj, PhysicsBehavior *physics, 
 	{
 		dirToApplyForce.x /= distToGoal;
 		dirToApplyForce.y /= distToGoal;
-		const Real desiredAngle = WWMath::Atan2Origin(dirToApplyForce.y, dirToApplyForce.x);
 		const Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
 		const HordeContain* formation = HordeContain::get(obj);
 		if (formation && formation->isAlternateFormation() && m_template->m_waitForFormation)

@@ -161,7 +161,7 @@ public:
 	static Bool canSteerToFormationGoal(const Object* member, const FormationGoal& goal);
 	static void constrainGroundMovement(const Object* member, Coord3D& movement);
 	static void separateGroundMovement(const Object* member, Coord3D& movement);
-	Real getFormationSpeedScale() const;
+	virtual Bool isHeadingAligned(Real heading) const { return TRUE; }
 #if RTS_ZEROHOUR
 	Real getFormationWheelRate(Real radius) const;
 	UnsignedInt getFormationReformTravelFrames() const;
@@ -318,6 +318,7 @@ class HorseHordeContain final : public HordeContain
 
 public:
 	HorseHordeContain(Thing* thing, const ModuleData* data) : HordeContain(thing, data) {}
+	Bool isHeadingAligned(Real heading) const override;
 
 private:
 	Bool m_legacySnapshot = FALSE;

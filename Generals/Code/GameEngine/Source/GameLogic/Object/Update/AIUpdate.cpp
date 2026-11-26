@@ -2149,14 +2149,6 @@ Bool AIUpdateInterface::steerInFormation()
 	return TRUE;
 }
 
-Real AIUpdateInterface::hordeFormationSpeedScale() const
-{
-	if (!RetailFileLayers::enabled())
-		return 1.0f;
-	const HordeContain* horde = HordeContain::get(getObject());
-	return horde ? horde->getFormationSpeedScale() : 1.0f;
-}
-
 UpdateSleepTime AIUpdateInterface::doLocomotor()
 {
 	USE_PERF_TIMER(doLocomotor)
@@ -2246,7 +2238,6 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 						Real myMaxSpeed = m_curLocomotor->getMaxSpeedForCondition(getObject()->getBodyModule()->getDamageState());
 						if( speed == FAST_AS_POSSIBLE || speed > myMaxSpeed )
 							speed = myMaxSpeed;
-						speed *= hordeFormationSpeedScale();
 
 						if (blocked && speed>m_curMaxBlockedSpeed)
 						{

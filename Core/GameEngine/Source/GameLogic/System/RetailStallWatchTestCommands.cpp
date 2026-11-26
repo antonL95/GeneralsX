@@ -80,7 +80,8 @@ void report(UnsignedInt frame, const Object* object, const Object* anchor, const
 		HordeContain::FormationGoal formation = {};
 		const Bool hasGoal = horde && horde->getFormationGoal(object, formation);
 		std::fprintf(stderr, " horde=%u hordeScale=%.2f anchorStuck=%d anchorWaitPath=%d", anchor->getID(),
-			horde ? horde->getFormationSpeedScale() : -1.0f, orderAi->isBlockedAndStuck() ? 1 : 0,
+			horde ? (horde->isHeadingAligned(anchor->getOrientation()) ? 1.0f : 0.1f) : -1.0f,
+			orderAi->isBlockedAndStuck() ? 1 : 0,
 			orderAi->isWaitingForPath() ? 1 : 0);
 		if (hasGoal)
 			std::fprintf(stderr, " slotErr=%.1f slotSpeed=%.2f slot=%.1f,%.1f hordeMoving=%d backing=%d",

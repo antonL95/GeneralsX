@@ -335,6 +335,30 @@ void HorseHordeContain::loadPostProcess()
 	HordeContain::loadPostProcess();
 }
 
+Bool HorseHordeContain::isHeadingAligned(Real heading) const
+{
+	constexpr Real RETAIL_LOGIC_STEP_SCALE = static_cast<Real>(LOGICFRAMES_PER_SECOND) / 5.0f;
+	Real turnStep = 0.0f;
+	for (const Object* member : getContainList())
+	{
+		if (member->isEffectivelyDead())
+			continue;
+		if (turnStep == 0.0f)
+		{
+			const AIUpdateInterface* ai = member->getAI();
+			const Locomotor* locomotor = ai ? ai->getCurLocomotor() : nullptr;
+			if (locomotor)
+			{
+				const BodyDamageType damage = member->getBodyModule()->getDamageState();
+				turnStep = locomotor->getMaxTurnRate(damage) * RETAIL_LOGIC_STEP_SCALE;
+			}
+		}
+		if (fabs(stdAngleDiff(heading, member->getOrientation())) > turnStep)
+			return FALSE;
+	}
+	return TRUE;
+}
+
 AODHordeContain::~AODHordeContain() = default;
 void AODHordeContain::crc(Xfer* xfer) { HordeContain::crc(xfer); }
 void AODHordeContain::xfer(Xfer* xfer)
@@ -1434,11 +1458,6 @@ namespace
 {
 constexpr Real FORMATION_LEAD_FRAMES = 8.0f;
 constexpr Real FORMATION_CATCH_UP_PER_FRAME = 0.1f;
-constexpr Real FORMATION_SLOW_ERROR = 25.0f;
-constexpr Real FORMATION_STOP_ERROR = 65.0f;
-constexpr Real FORMATION_MIN_SPEED_SCALE = 0.25f;
-constexpr Real FORMATION_STRAGGLER_LIMIT = 120.0f;
-constexpr Real FORMATION_STRAGGLER_WEIGHT = 0.5f;
 
 void avoidBlockingRanks(const HordeContain& horde, const Object& anchor, const Object& banner, HordeContain::FormationGoal& goal)
 {
@@ -1795,34 +1814,6 @@ void HordeContain::separateGroundMovement(const Object* member, Coord3D& movemen
 
 	movement.x = next.x - origin.x;
 	movement.y = next.y - origin.y;
-}
-
-Real HordeContain::getFormationSpeedScale() const
-{
-	Real total = 0.0f;
-	Real worst = 0.0f;
-	Int count = 0;
-	for (const Object* member : getContainList())
-	{
-		const AIUpdateInterface* ai = member->getAI();
-		if (member->isEffectivelyDead() || getMemberSlot(member->getID()) < 0 || (ai && ai->isAttacking()))
-			continue;
-		const Coord3D slot = getMemberPosition(member->getID(), FALSE);
-		const Real dx = slot.x - member->getPosition()->x;
-		const Real dy = slot.y - member->getPosition()->y;
-		const Real error = sqrtf(dx * dx + dy * dy);
-		total += error;
-		++count;
-		if (error < FORMATION_STRAGGLER_LIMIT)
-			worst = std::max(worst, error);
-	}
-	if (count == 0)
-		return 1.0f;
-	const Real lag = std::max(total / count, worst * FORMATION_STRAGGLER_WEIGHT);
-	if (lag <= FORMATION_SLOW_ERROR)
-		return 1.0f;
-	const Real scale = 1.0f - (lag - FORMATION_SLOW_ERROR) / (FORMATION_STOP_ERROR - FORMATION_SLOW_ERROR);
-	return std::max(FORMATION_MIN_SPEED_SCALE, scale);
 }
 
 #if RTS_ZEROHOUR
