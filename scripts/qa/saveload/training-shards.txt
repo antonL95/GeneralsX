@@ -93,6 +93,7 @@
 4 building-collapse
 4 locked-weapon
 4 spawn-angle
+4 weapon-switch-anim
 3 default-states
 3 powers-fire
 3 summon-rules
