@@ -1,11 +1,15 @@
 check() {
-    if covers 255; then
-        if ! grep -Eq 'AUDIO TRACE frame=251 kind=sound-queue owner=[0-9]+ handle=[0-9]+ event=BuildingBigConstructionLoop' "$log"; then
-            printf 'Missing BuildingBigConstructionLoop sound-queue trace in %s\n' "$phase" >&2
+    if covers 256; then
+        if ! grep -Eq 'AUDIO TRACE frame=251 kind=sound-queue owner=[0-9]+ handle=[0-9]+ event=CastleMemberEvaBuildLoop' "$log"; then
+            printf 'Missing CastleMemberEvaBuildLoop sound-queue trace in %s\n' "$phase" >&2
             return 1
         fi
-        if ! grep -Eq 'AUDIO TRACE frame=25[56] kind=stop owner=[0-9]+ handle=[0-9]+ event=BuildingBigConstructionLoop' "$log"; then
-            printf 'Missing BuildingBigConstructionLoop stop trace in %s\n' "$phase" >&2
+        if ! grep -Eq 'AUDIO TRACE frame=252 kind=start owner=[0-9]+ handle=[0-9]+ event=CastleMemberEvaBuildLoop detail=attack' "$log"; then
+            printf 'Missing CastleMemberEvaBuildLoop start trace in %s\n' "$phase" >&2
+            return 1
+        fi
+        if ! grep -Eq 'AUDIO TRACE frame=256 kind=segment owner=[0-9]+ handle=[0-9]+ event=CastleMemberEvaBuildLoop detail=decay' "$log"; then
+            printf 'Missing CastleMemberEvaBuildLoop decay stop trace in %s\n' "$phase" >&2
             return 1
         fi
     fi
