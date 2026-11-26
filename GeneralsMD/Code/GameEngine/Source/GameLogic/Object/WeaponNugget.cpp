@@ -175,6 +175,18 @@ const FieldParse s_dotFields[] =
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
+const FieldParse s_damageContainedFields[] =
+{
+	{ "KillCount", INI::parseInt, nullptr, offsetof(WeaponNugget, m_containedKillCount) },
+	{ "KillKindof", SpecialPowerObjectFilter::parse, nullptr, offsetof(WeaponNugget, m_killObjectFilter) },
+	{ "KillKindofNot", [](INI* ini, void*, void* store, const void*) {
+		auto& exclusions = *static_cast<std::optional<SpecialPowerObjectFilter>*>(store);
+		SpecialPowerObjectFilter::parse(ini, nullptr, &exclusions.emplace(), nullptr);
+	}, nullptr, offsetof(WeaponNugget, m_containedKillExclusions) },
+	{ "DeathType", INI::parseIndexList, TheDeathNames, offsetof(WeaponNugget, m_deathType) },
+	{ nullptr, nullptr, nullptr, 0 }
+};
+
 const FieldParse s_projectileFields[] =
 {
 	{ "ProjectileTemplateName", INI::parseAsciiString, nullptr, offsetof(WeaponNugget, m_projectileTemplateName) },
@@ -342,6 +354,7 @@ const char* nuggetTypeName(WeaponNuggetType type)
 	switch (type)
 	{
 		case WEAPON_NUGGET_DAMAGE: return "DamageNugget";
+		case WEAPON_NUGGET_DAMAGE_CONTAINED: return "DamageContainedNugget";
 		case WEAPON_NUGGET_DOT: return "DOTNugget";
 		case WEAPON_NUGGET_PROJECTILE: return "ProjectileNugget";
 		case WEAPON_NUGGET_META_IMPACT: return "MetaImpactNugget";
@@ -370,6 +383,63 @@ Real nuggetDamage(const WeaponNugget& nugget, Real scalar, const WeaponBonus& bo
 	return base * bonus.getNuggetDamageMultiplier(nugget.m_damageType) * bonus.getField(WeaponBonus::DAMAGE);
 }
 
+void killContainedPassengers(const WeaponNugget& nugget, const Object* source, Object* target)
+{
+	const auto* contain = target->getContain();
+	if (nugget.m_containedKillCount <= 0 || !contain || !contain->isEnclosingContainerFor(nullptr))
+		return;
+	const auto* passengers = contain->getContainedItemsList();
+	if (!passengers)
+		return;
+
+	const auto matches = [&](const Object* passenger) -> Bool {
+		if (!passenger || passenger->isEffectivelyDead() || passenger->isDestroyed())
+			return FALSE;
+		const ThingTemplate& thing = *passenger->getTemplate();
+		return nugget.m_killObjectFilter.matchesTemplate(thing) &&
+			thing.isKindOfMulti(nugget.m_killObjectFilter.m_includeKinds, nugget.m_killObjectFilter.m_excludeKinds) &&
+			(!nugget.m_containedKillExclusions || !nugget.m_containedKillExclusions->matchesTemplate(thing));
+	};
+	std::vector<ObjectID> victims;
+	const auto addVictim = [&](Object* passenger) {
+		if (std::ssize(victims) < nugget.m_containedKillCount && matches(passenger))
+			victims.push_back(passenger->getID());
+	};
+	for (Object* passenger : *passengers)
+	{
+		if (std::ssize(victims) >= nugget.m_containedKillCount)
+			break;
+		if (!matches(passenger))
+			continue;
+		if (const HordeContain* horde = HordeContain::get(passenger))
+		{
+			if (const auto* members = horde->getContainedItemsList())
+				for (Object* member : *members)
+					addVictim(member);
+		}
+		else
+			victims.push_back(passenger->getID());
+	}
+
+	const ObjectID sourceID = source->getID();
+	const Player* player = source->getControllingPlayer();
+	const PlayerMaskType sourceMask = player ? player->getPlayerMask() : 0;
+	for (ObjectID id : victims)
+	{
+		Object* victim = TheGameLogic->findObjectByID(id);
+		if (!victim || victim->isEffectivelyDead() || victim->isDestroyed() || !victim->getBodyModule())
+			continue;
+		DamageInfo damage;
+		damage.in.m_damageType = DAMAGE_UNRESISTABLE;
+		damage.in.m_deathType = nugget.m_deathType;
+		damage.in.m_sourceID = sourceID;
+		damage.in.m_sourcePlayerMask = sourceMask;
+		damage.in.m_amount = victim->getBodyModule()->getMaxHealth();
+		damage.in.m_kill = TRUE;
+		victim->attemptDamage(&damage);
+	}
+}
+
 }
 
 Bool objectFilterMatches(const SpecialPowerObjectFilter& filter, const Object* source, const Object* target)
@@ -380,6 +450,11 @@ Bool objectFilterMatches(const SpecialPowerObjectFilter& filter, const Object* s
 void WeaponNugget::parseDamageNugget(INI* ini, void*, void* store, const void*)
 {
 	parseNugget(ini, store, WEAPON_NUGGET_DAMAGE, s_damageFields);
+}
+
+void WeaponNugget::parseDamageContainedNugget(INI* ini, void*, void* store, const void*)
+{
+	parseNugget(ini, store, WEAPON_NUGGET_DAMAGE_CONTAINED, s_damageContainedFields);
 }
 
 void WeaponNugget::parseDOTNugget(INI* ini, void*, void* store, const void*)
@@ -477,6 +552,7 @@ Bool WeaponNugget::isUtilityNugget() const
 		case WEAPON_NUGGET_PARALYZE:
 		case WEAPON_NUGGET_SPECIAL_MODEL_CONDITION:
 		case WEAPON_NUGGET_STEAL_MONEY:
+		case WEAPON_NUGGET_DAMAGE_CONTAINED:
 			return TRUE;
 		default:
 			return FALSE;
@@ -892,6 +968,9 @@ void WeaponTemplate::applyUtilityNugget(const WeaponNugget& nugget, const Object
 				to->getMoney()->deposit(from->getMoney()->withdraw(amount));
 				break;
 			}
+			case WEAPON_NUGGET_DAMAGE_CONTAINED:
+				killContainedPassengers(nugget, source, victim);
+				break;
 			default:
 				break;
 		}
@@ -901,7 +980,7 @@ void WeaponTemplate::applyUtilityNugget(const WeaponNugget& nugget, const Object
 		affect(primary);
 	if (kind == WEAPON_NUGGET_STEAL_MONEY || kind == WEAPON_NUGGET_SPECIAL_MODEL_CONDITION)
 		return;
-	if (primary && nugget.m_radius <= 0.0f)
+	if (kind == WEAPON_NUGGET_DAMAGE_CONTAINED || (primary && nugget.m_radius <= 0.0f))
 	{
 		if (kind == WEAPON_NUGGET_LUA_EVENT)
 			affect(primary);

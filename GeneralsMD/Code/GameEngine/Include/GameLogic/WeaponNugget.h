@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include <vector>
 
 #include "Common/AsciiString.h"
@@ -37,6 +39,7 @@ enum WeaponNuggetType CPP_11(: Int)
 	WEAPON_NUGGET_PARALYZE,
 	WEAPON_NUGGET_SPECIAL_MODEL_CONDITION,
 	WEAPON_NUGGET_STEAL_MONEY,
+	WEAPON_NUGGET_DAMAGE_CONTAINED,
 };
 
 struct WeaponNuggetScalar
@@ -58,6 +61,7 @@ struct WeaponNugget
 	void postProcessLoad();
 
 	static void parseDamageNugget(INI* ini, void* instance, void* store, const void* userData);
+	static void parseDamageContainedNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseDOTNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseProjectileNugget(INI* ini, void* instance, void* store, const void* userData);
 	static void parseMetaImpactNugget(INI* ini, void* instance, void* store, const void* userData);
@@ -133,6 +137,8 @@ struct WeaponNugget
 	Bool m_flipDirection = FALSE;
 	Bool m_onlyWhenJustDied = FALSE;
 	SpecialPowerObjectFilter m_killObjectFilter;
+	std::optional<SpecialPowerObjectFilter> m_containedKillExclusions;
+	Int m_containedKillCount = 0;
 	Bool m_shockWaveClearRadius = FALSE;
 	Real m_shockWaveClearMult = 0.0f;
 	Int m_shockWaveClearFlingHeight = 0;

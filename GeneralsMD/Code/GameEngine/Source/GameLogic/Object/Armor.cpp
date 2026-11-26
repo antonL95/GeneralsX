@@ -64,20 +64,24 @@ void ArmorTemplate::clear()
 		m_damageCoefficient[i] = 1.0f;
 	}
 	m_flankedPenalty = 0.0f;
+	m_damageScalar = 1.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
 Real ArmorTemplate::adjustDamage(DamageType t, Real damage, Bool flanked) const
 {
-	if (t == DAMAGE_UNRESISTABLE)
-		return damage;
-	if (t == DAMAGE_SUBDUAL_UNRESISTABLE)
+	if (t == DAMAGE_HEALING)
 		return damage;
 
-	const Real coefficient = m_damageCoefficient[t];
-	damage *= flanked && m_flankedPenalty != 0.0f
-		? 1.0f - (1.0f - coefficient) * (1.0f - m_flankedPenalty)
-		: coefficient;
+	const auto applyFlank = [&](Real multiplier) {
+		return flanked && m_flankedPenalty != 0.0f
+			? 1.0f - (1.0f - multiplier) * (1.0f - m_flankedPenalty)
+			: multiplier;
+	};
+	damage *= applyFlank(m_damageScalar);
+	if (t == DAMAGE_UNRESISTABLE || t == DAMAGE_SUBDUAL_UNRESISTABLE)
+		return damage;
+	damage *= applyFlank(m_damageCoefficient[t]);
 
 	if (damage < 0.0f)
 		damage = 0.0f;
@@ -165,6 +169,7 @@ const ArmorTemplate* ArmorStore::findArmorTemplate(const char* name) const
 		static const FieldParse rotwkFieldParse[] =
 		{
 			{ "FlankedPenalty", INI::parsePercentToReal, nullptr, offsetof(ArmorTemplate, m_flankedPenalty) },
+			{ "DamageScalar", INI::parsePercentToReal, nullptr, offsetof(ArmorTemplate, m_damageScalar) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 		MultiIniFieldParse fields;

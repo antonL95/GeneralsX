@@ -712,6 +712,13 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 				break;
 			}
 
+			if (button->getCommandType() == GUI_COMMAND_TOGGLE_WEAPON)
+			{
+				if (state == -1 && source->getControllingPlayer() == msgPlayer && button->canUseRetailToggle(source, state))
+					source->doCommandButton(button, CMD_FROM_PLAYER);
+				break;
+			}
+
 			if (button->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION)
 			{
 				const Bool multiSelect = BitIsSet(button->getOptions(), OK_FOR_MULTI_SELECT);

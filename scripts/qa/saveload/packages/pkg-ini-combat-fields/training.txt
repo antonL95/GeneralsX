@@ -1,0 +1,33 @@
+222 create Player_1 CombatFieldsShooter 0 2630,2020,0
+222 create PlyrCreeps CombatFieldsTarget 0 2680,2020,180
+222 create PlyrCreeps CombatFieldsCarrier 0 2680,2060,180
+222 create PlyrCreeps CombatFieldsOtherPassenger 0 2680,2080,180
+222 create PlyrCreeps CombatFieldsPassenger 0 2685,2080,180
+222 create PlyrCreeps CombatFieldsPassenger 1 2690,2080,180
+224 testcontain PlyrCreeps CombatFieldsCarrier 0 PlyrCreeps:CombatFieldsOtherPassenger:0
+224 testcontain PlyrCreeps CombatFieldsCarrier 0 PlyrCreeps:CombatFieldsPassenger:0
+224 testcontain PlyrCreeps CombatFieldsCarrier 0 PlyrCreeps:CombatFieldsPassenger:1
+225 combat-fields-cargo PlyrCreeps CombatFieldsCarrier 0
+225 firetestweapon Player_1 CombatFieldsShooter 0 CombatFieldsSlash,PlyrCreeps:CombatFieldsTarget:0
+226 fireweapon-cadence-health PlyrCreeps CombatFieldsTarget 0 scaled-slash
+226 firetestweapon Player_1 CombatFieldsShooter 0 CombatFieldsUnresistable,PlyrCreeps:CombatFieldsTarget:0
+227 fireweapon-cadence-health PlyrCreeps CombatFieldsTarget 0 scaled-unresistable
+229 select Player_1 CombatFieldsShooter 0
+235 combat-fields-slot Player_1 CombatFieldsShooter 0 CombatFieldsToggle
+236 combat-fields-command Player_1 CombatFieldsShooter 0 CombatFieldsToggle
+239 combat-fields-slot Player_1 CombatFieldsShooter 0 CombatFieldsToggle
+240 firetestweapon Player_1 CombatFieldsShooter 0 CombatFieldsContained,PlyrCreeps:CombatFieldsCarrier:0
+241 combat-fields-cargo PlyrCreeps CombatFieldsCarrier 0
+241 fireweapon-cadence-health PlyrCreeps CombatFieldsCarrier 0 carrier
+249 select Player_1 CombatFieldsShooter 0
+255 combat-fields-slot Player_1 CombatFieldsShooter 0 CombatFieldsToggle
+256 combat-fields-command Player_1 CombatFieldsShooter 0 CombatFieldsToggle
+259 combat-fields-slot Player_1 CombatFieldsShooter 0 CombatFieldsToggle
+260 combat-fields-script Player_1 CombatFieldsShooter 0 CombatFieldsToggle
+262 combat-fields-slot Player_1 CombatFieldsShooter 0 CombatFieldsToggle
+260 firetestweapon Player_1 CombatFieldsShooter 0 CombatFieldsContained,PlyrCreeps:CombatFieldsCarrier:0
+263 combat-fields-cargo PlyrCreeps CombatFieldsCarrier 0
+269 destroy Player_1 CombatFieldsShooter 0
+269 destroy PlyrCreeps CombatFieldsTarget 0
+269 destroy PlyrCreeps CombatFieldsOtherPassenger 0
+269 destroy PlyrCreeps CombatFieldsCarrier 0

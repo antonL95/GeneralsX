@@ -1622,6 +1622,7 @@ CommandAvailability ControlBar::getRetailCommandAvailability(const CommandButton
 			const SpecialPowerModuleInterface* mod = (obj && power) ? obj->getSpecialPowerModule(power) : nullptr;
 			return mod && mod->isReady() ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		}
+		case GUI_COMMAND_TOGGLE_WEAPON:
 		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
 			return command->canUseRetailToggle(obj, -1) ? COMMAND_AVAILABLE : COMMAND_RESTRICTED;
 		case GUI_COMMAND_TOGGLE_WEAPONSET:
@@ -1744,6 +1745,7 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 			return CBC_COMMAND_USED;
 		}
 		case GUI_COMMAND_HORDE_TOGGLE_FORMATION:
+		case GUI_COMMAND_TOGGLE_WEAPON:
 		case GUI_COMMAND_TOGGLE_WEAPONSET:
 		{
 			const Bool formation = command->getCommandType() == GUI_COMMAND_HORDE_TOGGLE_FORMATION;
@@ -1830,7 +1832,8 @@ CBCommandStatus ControlBar::processRetailCommand(const CommandButton *command, G
 
 Bool CommandButton::canUseRetailToggle(const Object* object, Int state) const
 {
-	if (getCommandType() != GUI_COMMAND_HORDE_TOGGLE_FORMATION && getCommandType() != GUI_COMMAND_TOGGLE_WEAPONSET)
+	if (getCommandType() != GUI_COMMAND_HORDE_TOGGLE_FORMATION && getCommandType() != GUI_COMMAND_TOGGLE_WEAPONSET &&
+		getCommandType() != GUI_COMMAND_TOGGLE_WEAPON)
 		return FALSE;
 	if (!object || object->isEffectivelyDead() || object->isDisabled() ||
 		object->testScriptStatusBit(OBJECT_STATUS_SCRIPT_DISABLED) ||
@@ -1852,6 +1855,8 @@ Bool CommandButton::canUseRetailToggle(const Object* object, Int state) const
 		return FALSE;
 	if (BitIsSet(getOptions(), MUST_BE_STOPPED) && object->getAI() && object->getAI()->isMoving())
 		return FALSE;
+	if (getCommandType() == GUI_COMMAND_TOGGLE_WEAPON)
+		return getNextWeaponToggleSlot(object) != WEAPONSLOT_COUNT;
 	if (getCommandType() == GUI_COMMAND_TOGGLE_WEAPONSET)
 		return getFlagsUsedForToggle().any();
 	const HordeContain* horde = HordeContain::get(object);
@@ -2010,6 +2015,18 @@ const Image* ControlBar::getRetailButtonImage(GameWindow *window) const
 		const CommandButton* effective = command->resolveRetailToggleButton(obj);
 		if (effective && effective != command && effective->getButtonImage())
 			return effective->getButtonImage();
+		return image;
+	}
+	if (command && obj && command->getCommandType() == GUI_COMMAND_TOGGLE_WEAPON &&
+		command->hasRotwkOption(CommandButtonRules::ROTWK_TOGGLE_IMAGE_ON_WEAPON))
+	{
+		const Int index = command->getWeaponToggleIndex(obj);
+		if (index == 1 && command->getToggleButtonImage())
+			return command->getToggleButtonImage();
+		const auto& names = command->getStateImageNames();
+		if (index == 2 && index < static_cast<Int>(names.size()))
+			if (const Image* alternate = findImage(names[index].str()))
+				return alternate;
 		return image;
 	}
 	if (!command || !obj || !command->getToggleButtonImage() ||

@@ -167,6 +167,9 @@ const FieldParse CommandButton::s_commandButtonFieldParseTable[] =
 
 const FieldParse CommandButton::s_rotwkCommandButtonFieldParseTable[] =
 {
+	{ "WeaponSlotToggle1", INI::parseLookupList, TheWeaponSlotTypeNamesLookupList, offsetof(CommandButton, m_weaponSlotToggle1) },
+	{ "WeaponSlotToggle2", INI::parseLookupList, TheWeaponSlotTypeNamesLookupList, offsetof(CommandButton, m_weaponSlotToggle2) },
+	{ "WeaponSlotToggle3", INI::parseLookupList, TheWeaponSlotTypeNamesLookupList, offsetof(CommandButton, m_weaponSlotToggle3) },
 	{ "IsClickable", INI::parseBool, nullptr, offsetof(CommandButton, m_isClickable) },
 	{ "ShowButton", INI::parseBool, nullptr, offsetof(CommandButton, m_showButton) },
 	{ "DoubleClick", INI::parseBool, nullptr, offsetof(CommandButton, m_doubleClick) },
@@ -946,6 +949,32 @@ Bool CommandButton::isRetailPassive() const
 		m_command == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT ||
 		m_command == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
 		m_command == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT);
+}
+
+Int CommandButton::getWeaponToggleIndex(const Object* object) const
+{
+	WeaponSlotType slot = WEAPONSLOT_COUNT;
+	if (!object || !object->getCurrentWeapon(&slot))
+		return -1;
+	if (slot == m_weaponSlotToggle1)
+		return 0;
+	if (slot == m_weaponSlotToggle2)
+		return 1;
+	if (slot == m_weaponSlotToggle3)
+		return 2;
+	return -1;
+}
+
+WeaponSlotType CommandButton::getNextWeaponToggleSlot(const Object* object) const
+{
+	const Int index = getWeaponToggleIndex(object);
+	if (index < 0)
+		return WEAPONSLOT_COUNT;
+	const std::array<WeaponSlotType, 3> slots{m_weaponSlotToggle1, m_weaponSlotToggle2, m_weaponSlotToggle3};
+	WeaponSlotType next = slots[(index + 1) % slots.size()];
+	if (next == WEAPONSLOT_COUNT)
+		next = slots.front();
+	return next != WEAPONSLOT_COUNT && next != slots[index] && object->getWeaponInWeaponSlot(next) ? next : WEAPONSLOT_COUNT;
 }
 
 Bool CommandButton::isRetailButtonUsable() const

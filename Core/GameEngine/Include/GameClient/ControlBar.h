@@ -393,6 +393,8 @@ public:
 	const SpecialPowerTemplate* getSpecialPowerTemplate() const { return m_specialPower; }
 	RadiusCursorType getRadiusCursorType() const { return m_radiusCursor; }
 	WeaponSlotType getWeaponSlot() const { return m_weaponSlot; }
+	WeaponSlotType getNextWeaponToggleSlot(const Object* object) const;
+	Int getWeaponToggleIndex(const Object* object) const;
 	Int getMaxShotsToFire() const { return m_maxShotsToFire; }
 	const ScienceVec& getScienceVec() const { return m_science; }
 	CommandButtonMappedBorderType getCommandButtonMappedBorderType() const { return m_commandButtonBorder; }
@@ -486,6 +488,9 @@ private:
 	AsciiString										m_purchasedLabel;							///< Description for the current command if it has already been purchased.
 	AsciiString										m_conflictingLabel;						///< Description for the current command if it can't be selected due to multually-exclusive choice.
 	WeaponSlotType								m_weaponSlot;									///< for commands that refer to a weapon slot
+	WeaponSlotType m_weaponSlotToggle1 = WEAPONSLOT_COUNT;
+	WeaponSlotType m_weaponSlotToggle2 = WEAPONSLOT_COUNT;
+	WeaponSlotType m_weaponSlotToggle3 = WEAPONSLOT_COUNT;
 	Int														m_maxShotsToFire;							///< for commands that fire weapons
 	ScienceVec										m_science;										///< actual science
 	CommandButtonMappedBorderType	m_commandButtonBorder;

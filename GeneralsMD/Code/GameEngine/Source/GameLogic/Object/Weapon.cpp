@@ -284,6 +284,7 @@ const FieldParse WeaponTemplate::TheRotwkWeaponFieldParseTable[] =
 	{ "RangeBonusPerFoot", INI::parseReal, nullptr, offsetof(WeaponTemplate, m_rangeBonusPerFoot) },
 	{ "ScatterIndependently", INI::parseBool, nullptr, offsetof(WeaponTemplate, m_scatterIndependently) },
 	{ "DamageNugget", WeaponNugget::parseDamageNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
+	{ "DamageContainedNugget", WeaponNugget::parseDamageContainedNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "DOTNugget", WeaponNugget::parseDOTNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "ProjectileNugget", WeaponNugget::parseProjectileNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },
 	{ "MetaImpactNugget", WeaponNugget::parseMetaImpactNugget, nullptr, offsetof(WeaponTemplate, m_nuggets) },

@@ -7024,6 +7024,14 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 					return;
 				}
 
+			case GUI_COMMAND_TOGGLE_WEAPON:
+				{
+					const WeaponSlotType slot = commandButton->getNextWeaponToggleSlot(this);
+					if (slot != WEAPONSLOT_COUNT)
+						setWeaponLock(slot, LOCKED_PERMANENTLY);
+					return;
+				}
+
 			case GUI_COMMAND_FIRE_WEAPON:
 				if( ai )
 				{
