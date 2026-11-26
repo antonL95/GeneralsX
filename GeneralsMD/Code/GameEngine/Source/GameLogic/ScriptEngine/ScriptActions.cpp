@@ -88,6 +88,7 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
 #include "GameLogic/Module/TransportContain.h"
+#include "GameLogic/Module/RotwkAbilityModules.h"
 #include "GameLogic/Module/RotwkModifierModules.h"
 #include "GameLogic/Module/RotwkParseOnlyModules.h"
 #include "GameLogic/Module/MobNexusContain.h"
@@ -6721,6 +6722,96 @@ Bool matchesRetailScriptType(const Object& object, const AsciiString& type, cons
 	return list ? list->isInSet(object.getTemplate()) : object.getTemplate()->getName().compareNoCase(type.str()) == 0;
 }
 
+Bool retailScriptPowerCenter(Team* team, Coord3D& center)
+{
+	if (!team)
+		return FALSE;
+	Int count = 0;
+	for (auto it = team->iterate_TeamMemberList(); !it.done(); it.advance())
+	{
+		const Object* object = it.cur();
+		if (object->isEffectivelyDead() || object->isDestroyed())
+			continue;
+		center.x += object->getPosition()->x;
+		center.y += object->getPosition()->y;
+		center.z += object->getPosition()->z;
+		++count;
+	}
+	if (!count)
+		return FALSE;
+	center.scale(1.0f / static_cast<Real>(count));
+	return TRUE;
+}
+
+const Object* nearestRetailScriptPowerTarget(const Coord3D& center, const AsciiString& type, const Player* owner)
+{
+	const ObjectTypes* list = TheScriptEngine->getObjectTypes(type);
+	const Object* nearest = nullptr;
+	Real distance = 0.0f;
+	for (const Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+	{
+		if ((owner && object->getControllingPlayer() != owner) || object->isEffectivelyDead() ||
+			object->isDestroyed() || !matchesRetailScriptType(*object, type, list))
+			continue;
+		const Real candidate = ThePartitionManager->getDistanceSquared(object, &center, FROM_CENTER_3D);
+		if (!nearest || candidate < distance || (candidate == distance && object->getID() < nearest->getID()))
+		{
+			distance = candidate;
+			nearest = object;
+		}
+	}
+	return nearest;
+}
+
+void fireRetailScriptPlayerPower(const AsciiString& playerName, const AsciiString& powerName, const Coord3D& target)
+{
+	const SpecialPowerTemplate* power = TheSpecialPowerStore->findSpecialPowerTemplate(powerName);
+	if (!power)
+		return;
+	const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(playerName);
+	for (Int index = 0; index < ThePlayerList->getPlayerCount(); ++index)
+	{
+		Player* player = ThePlayerList->getNthPlayer(index);
+		if (!player || !(players & player->getPlayerMask()))
+			continue;
+		for (TeamPrototype* prototype : *player->getPlayerTeams())
+			for (auto teams = prototype->iterate_TeamInstanceList(); !teams.done(); teams.advance())
+				for (auto members = teams.cur()->iterate_TeamMemberList(); !members.done(); members.advance())
+				{
+					Object* caster = members.cur();
+					if (caster->isEffectivelyDead() || caster->isDestroyed())
+						continue;
+					if (SpecialPowerModuleInterface* module = caster->getSpecialPowerModule(power))
+					{
+						module->doSpecialPowerAtLocation(&target, INVALID_ANGLE, COMMAND_FIRED_BY_SCRIPT);
+						return;
+					}
+				}
+	}
+}
+
+void setRetailTeamAutoAbility(Team* team, const AsciiString& name, Bool enable)
+{
+	const CommandButton* button = TheRetailCommandCatalog ? TheRetailCommandCatalog->findCommandButton(name) : nullptr;
+	if (!team || !button || !button->isAutoAbility() || !button->getSpecialPowerTemplate())
+		return;
+	for (auto it = team->iterate_TeamMemberList(); !it.done(); it.advance())
+	{
+		Object* member = it.cur();
+		if (member->isEffectivelyDead() || member->isDestroyed())
+			continue;
+		const CommandSet* set = TheRetailCommandCatalog->findCommandSet(member->getCommandSetString());
+		for (Int slot = 0; set && slot < CommandButtonRules::RETAIL_COMMANDS_PER_SET; ++slot)
+		{
+			if (set->getCommandButton(slot) != button)
+				continue;
+			if (AutoAbilityBehavior* behavior = AutoAbilityBehavior::find(member, button->getSpecialPowerTemplate()))
+				behavior->setToggledState(enable ? 1 : -1);
+			break;
+		}
+	}
+}
+
 Object* findRetailScriptTarget(Team& team, PlayerMaskType players,
 	const AsciiString& type, Int kind, Bool unnamed)
 {
@@ -6808,6 +6899,46 @@ Object* findRetailScriptHome(PlayerMaskType players, Bool insideMap)
 void ScriptActions::executeAction( ScriptAction *pAction )
 {
 	switch (pAction->getActionType()) {
+		case ScriptAction::FIRE_SPECIAL_POWER_ON_NEAREST_OBJECTTYPE:
+		case ScriptAction::FIRE_SPECIAL_POWER_ON_NEAREST_OBJECTTYPE_BY_PLAYER:
+		{
+			Coord3D center{};
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(3)->getString());
+			if (!retailScriptPowerCenter(team, center))
+				return;
+			const AsciiString& type = pAction->getParameter(2)->getString();
+			const Object* target = nullptr;
+			if (pAction->getActionType() == ScriptAction::FIRE_SPECIAL_POWER_ON_NEAREST_OBJECTTYPE_BY_PLAYER)
+			{
+				const PlayerMaskType players = TheScriptEngine->getRetailScriptPlayers(pAction->getParameter(4)->getString());
+				for (Int index = 0; !target && index < ThePlayerList->getPlayerCount(); ++index)
+				{
+					const Player* player = ThePlayerList->getNthPlayer(index);
+					if (player && (players & player->getPlayerMask()))
+					target = nearestRetailScriptPowerTarget(center, type, player);
+				}
+			}
+			else
+				target = nearestRetailScriptPowerTarget(center, type, nullptr);
+			if (target)
+				fireRetailScriptPlayerPower(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), *target->getPosition());
+			return;
+		}
+		case ScriptAction::FIRE_SPECIAL_POWER_ON_TEAM:
+		{
+			Coord3D center{};
+			if (retailScriptPowerCenter(TheScriptEngine->getTeamNamed(pAction->getParameter(2)->getString()), center))
+				fireRetailScriptPlayerPower(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), center);
+			return;
+		}
+		case ScriptAction::PLAYER_FIRE_SPECIAL_POWER_AT_WAYPOINT:
+			if (const Waypoint* waypoint = TheTerrainLogic->getWaypointByName(pAction->getParameter(2)->getString()))
+				fireRetailScriptPlayerPower(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), *waypoint->getLocation());
+			return;
+		case ScriptAction::TEAM_SET_AUTO_ABILITY:
+			setRetailTeamAutoAbility(TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString()),
+				pAction->getParameter(1)->getString(), pAction->getParameter(2)->getInt() != 0);
+			return;
 		case ScriptAction::SHOW_MISSION_OBJECTIVE:
 		case ScriptAction::HIDE_MISSION_OBJECTIVE:
 			if (const Parameter* objective = pAction->getParameter(0))

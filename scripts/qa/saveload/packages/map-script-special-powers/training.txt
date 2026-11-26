@@ -1,0 +1,26 @@
+228 create Player_1 MapScriptPowerCaster 0 2500,2100,0
+228 create PlyrCreeps MapScriptPowerReference 0 2520,2080,0
+228 create PlyrCreeps MapScriptPowerTarget 0 2540,2080,0
+228 create Player_1 MapScriptPowerTarget 0 2560,2140,0
+230 map-script-power-auto Player_1 MapScriptPowerCaster 0
+232 map-script-power-fire Player_1 MapScriptPowerCaster 0 447
+234 map-script-power-marker Player_1 MapScriptPowerMarker 0 team
+236 map-script-power-fire Player_1 MapScriptPowerCaster 0 445
+238 map-script-power-marker Player_1 MapScriptPowerMarker 1 nearest
+240 map-script-power-fire Player_1 MapScriptPowerCaster 0 482
+242 map-script-power-auto Player_1 MapScriptPowerCaster 0
+248 map-script-power-auto Player_1 MapScriptPowerCaster 0
+250 map-script-power-fire Player_1 MapScriptPowerCaster 0 446
+252 map-script-power-marker Player_1 MapScriptPowerMarker 2 owned
+254 map-script-power-fire Player_1 MapScriptPowerCaster 0 -482
+256 map-script-power-auto Player_1 MapScriptPowerCaster 0
+258 map-script-power-fire Player_1 MapScriptPowerCaster 0 571
+260 map-script-power-marker Player_1 MapScriptPowerMarker 3 waypoint
+263 destroy Player_1 MapScriptPowerMarker 3
+263 destroy Player_1 MapScriptPowerMarker 2
+263 destroy Player_1 MapScriptPowerMarker 1
+263 destroy Player_1 MapScriptPowerMarker 0
+263 destroy Player_1 MapScriptPowerCaster 0
+263 destroy PlyrCreeps MapScriptPowerReference 0
+263 destroy PlyrCreeps MapScriptPowerTarget 0
+263 destroy Player_1 MapScriptPowerTarget 0

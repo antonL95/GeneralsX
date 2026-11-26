@@ -129,3 +129,4 @@
 3 lua-creation-bulk
 3 pkg-ini-combat-fields
 3 hc-combat-flanking-armor
+3 map-script-special-powers
