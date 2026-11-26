@@ -1,13 +1,16 @@
-206 create Player_1 DragFormationFoot 0 1700,3000,0
+206 create Player_1 DragFormationWideFoot 0 1700,3000,0
 206 create Player_1 DragFormationFoot 0 1700,3150,0
 206 create Player_1 DragFormationBow 0 1580,3075,0
-240 select Player_1 DragFormationFoot 0
-240 selectadd Player_1 DragFormationFoot 1
+240 select Player_1 DragFormationWideFoot 0
+240 selectadd Player_1 DragFormationFoot 0
 240 selectadd Player_1 DragFormationBow 0
 240 drag-formation Player_1 - 0 1 1950 3075 1.5707964
+530 select Player_1 DragFormationBow 0
+530 drag-formation Player_1 - 0 0 1950 3001 -1.5707964
+535 drag-formation-state Player_1 DragFormationBow 0
+700 drag-formation-state Player_1 DragFormationWideFoot 0
 700 drag-formation-state Player_1 DragFormationFoot 0
-700 drag-formation-state Player_1 DragFormationFoot 1
 700 drag-formation-state Player_1 DragFormationBow 0
-720 destroy Player_1 DragFormationFoot 1
+720 destroy Player_1 DragFormationWideFoot 0
 720 destroy Player_1 DragFormationFoot 0
 720 destroy Player_1 DragFormationBow 0

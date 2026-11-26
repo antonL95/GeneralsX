@@ -11,6 +11,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/View.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Object.h"
 
 namespace
@@ -29,9 +30,11 @@ void dragFormationState(const RetailTestCommands::Context& ctx)
 	const Object* object = ctx.requireObject();
 	if (!object)
 		return;
-	std::fprintf(stderr, "TEST drag-formation-state %u %s %d %.1f %.1f %.2f\n", ctx.frame,
+	const AIUpdateInterface* ai = object->getAI();
+	const Int idle = ai ? (ai->isIdle() ? 1 : 0) : -1;
+	std::fprintf(stderr, "TEST drag-formation-state %u %s %d %.1f %.1f %.2f %d\n", ctx.frame,
 		object->getTemplate()->getName().str(), ctx.ordinal, object->getPosition()->x, object->getPosition()->y,
-		object->getOrientation());
+		object->getOrientation(), idle);
 }
 
 void dragFormationInput(const RetailTestCommands::Context& ctx)
