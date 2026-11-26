@@ -1,0 +1,2 @@
+932 cash Player_2 - 0 6000
+1203 heroes Player_2 - 0
