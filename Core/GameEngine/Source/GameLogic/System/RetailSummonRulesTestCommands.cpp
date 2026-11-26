@@ -3,6 +3,7 @@
 
 #if !RTS_GENERALS
 #include <cstdio>
+#include <cstdlib>
 
 #include "Common/MessageStream.h"
 #include "Common/NameKeyGenerator.h"
@@ -22,6 +23,9 @@ namespace
 void census(const RetailTestCommands::Context& ctx)
 {
 	const Player* player = ctx.findPlayer();
+	const Real radius = std::strtof(ctx.argument, nullptr);
+	if (!ctx.hasPosition || radius <= 0.0f)
+		return;
 	static const NameKeyType lifetimeKey = NAMEKEY("LifetimeUpdate");
 	Int count = 0;
 	Int timed = 0;
@@ -32,6 +36,11 @@ void census(const RetailTestCommands::Context& ctx)
 	{
 		if (object->getControllingPlayer() != player || object->isDestroyed() || object->isEffectivelyDead() ||
 			object->getTemplate()->getName().compare(ctx.targetName) != 0)
+			continue;
+		const Coord3D* position = object->getPosition();
+		const Real dx = position->x - ctx.position.x;
+		const Real dy = position->y - ctx.position.y;
+		if (dx * dx + dy * dy > radius * radius)
 			continue;
 		++count;
 		if (object->findUpdateModule(lifetimeKey))

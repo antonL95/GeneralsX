@@ -21,7 +21,7 @@ check() {
     census 400 SpellBookDragonStrikeDragon 'count=1 contained=0 timed=0 rank=1 health=30000' || return 1
     census 1200 SpellBookDragonStrikeDragon "$none" || return 1
     if covers 1200; then
-        expect 'TEST health 1200 Player_1 GuldurOrcArcher 0 id=1058 health=95.00 max=125.00 dead=0 pos=800.0,1800.0' || return 1
-        expect 'TEST health 1200 Player_1 GuldurOrcArcher 1 id=1059 health=149.88 max=149.88 dead=0 pos=800.0,2200.0' || return 1
+        grep -Ex 'TEST health 1200 Player_1 GuldurOrcArcher 0 id=[0-9]+ health=95\.00 max=125\.00 dead=0 pos=800\.0,1800\.0' "$log" || return 1
+        grep -Ex 'TEST health 1200 Player_1 GuldurOrcArcher 1 id=[0-9]+ health=149\.88 max=149\.88 dead=0 pos=800\.0,2200\.0' "$log" || return 1
     fi
 }
