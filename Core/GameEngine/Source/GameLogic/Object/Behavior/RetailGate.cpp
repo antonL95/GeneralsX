@@ -1,6 +1,7 @@
 #include "PreRTS.h"
 
 #include "GameLogic/Module/RetailGate.h"
+#include "GameLogic/Module/RetailSiegeDocking.h"
 #include "GameLogic/Module/WallHubBehavior.h"
 
 #include <algorithm>
@@ -542,6 +543,8 @@ Bool DynamicPortalBehaviour::shouldActivate() const
 		}
 		return FALSE;
 	}
+	if (const auto* siege = SiegeAIUpdate::find(self))
+		return siege->isDocked();
 	return data->m_generateNow || data->m_customAnim.m_condition >= 0;
 }
 
@@ -557,7 +560,8 @@ UpdateSleepTime DynamicPortalBehaviour::update()
 		return UPDATE_SLEEP_FOREVER;
 	}
 	const auto* data = getDynamicPortalBehaviourModuleData();
-	const Bool changesWithUpgrades = !data->m_triggeredBy.empty() || !data->m_conflictsWith.empty();
+	const Bool changesWithUpgrades = !data->m_triggeredBy.empty() || !data->m_conflictsWith.empty() ||
+		SiegeAIUpdate::find(self) != nullptr;
 	if (!shouldActivate())
 	{
 		if (m_activationScheduled && data->m_customAnim.m_condition >= 0)
@@ -643,6 +647,50 @@ Bool DynamicPortalBehaviour::getClimbEntryPosition(Coord3D& position) const
 	const auto* data = getDynamicPortalBehaviourModuleData();
 	return data->m_numberOfBones > 0 && !data->m_bonePrefix.isEmpty() &&
 		getObject()->getMultiLogicalBonePosition(data->m_bonePrefix.str(), 1, &position, nullptr) == 1;
+}
+
+Bool DynamicPortalBehaviour::getTopAttackPosition(Coord3D& position) const
+{
+	const Object* self = getObject();
+	const auto* data = getDynamicPortalBehaviourModuleData();
+	if (!self || data->m_topAttackRadius <= 0.0f)
+		return FALSE;
+	const Coord3D unitX = {1.0f, 0.0f, 0.0f};
+	Coord3D worldX;
+	self->convertBonePosToWorldPos(&unitX, nullptr, &worldX, nullptr);
+	const Coord3D* origin = self->getPosition();
+	const Real dx = worldX.x - origin->x;
+	const Real dy = worldX.y - origin->y;
+	const Real maxAxis = std::max(std::fabs(dx), std::fabs(dy));
+	Real factor = 1.0f;
+	if (maxAxis > 0.0f)
+	{
+		const Real inv = 1.0f / maxAxis;
+		const Real sx = dx * inv;
+		const Real sy = dy * inv;
+		factor = WWMath::Sqrt(sx * sx + sy * sy);
+	}
+	const Coord3D localPos = {data->m_topAttackPos.x * factor, data->m_topAttackPos.y * factor, data->m_topAttackPos.z};
+	self->convertBonePosToWorldPos(&localPos, nullptr, &position, nullptr);
+	return TRUE;
+}
+
+Bool DynamicPortalBehaviour::isWithinTopAttackRange(const Object& attacker) const
+{
+	const Object* self = getObject();
+	const auto* siege = SiegeAIUpdate::find(self);
+	if (!m_active || !siege || !siege->isDocked())
+		return FALSE;
+	Coord3D topPos;
+	if (!getTopAttackPosition(topPos))
+		return FALSE;
+	const Coord3D* attackerPos = attacker.getPosition();
+	if (std::fabs(topPos.z - attackerPos->z) >= 20.0f)
+		return FALSE;
+	const Real radius = attacker.getGeometryInfo().getMajorRadius() +
+		getDynamicPortalBehaviourModuleData()->m_topAttackRadius;
+	return std::fabs(topPos.x - attackerPos->x) < radius &&
+		std::fabs(topPos.y - attackerPos->y) < radius;
 }
 
 void DynamicPortalBehaviour::xferRetailBlocks(Xfer* xfer, Bool present)

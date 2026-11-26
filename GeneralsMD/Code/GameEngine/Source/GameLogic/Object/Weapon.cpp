@@ -70,6 +70,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/HordeContain.h"
 #include "GameLogic/Module/LaserUpdate.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Module/SpecialPowerCompletionDie.h"
 #include "GameLogic/Module/AssaultTransportAIUpdate.h"
@@ -2705,6 +2706,19 @@ Bool Weapon::isWithinAttackRange(const Object *source, const Coord3D* pos) const
 //-------------------------------------------------------------------------------------------------
 Bool Weapon::isWithinAttackRange(const Object *source, const Object *target) const
 {
+	if (RetailFileLayers::enabled() && isContactWeapon() && source && target)
+	{
+		const PathfindLayerEnum sourceLayer = source->getLayer();
+		const PathfindLayerEnum targetLayer = target->getLayer();
+		if (sourceLayer == LAYER_GROUND && targetLayer == LAYER_WALL)
+			return FALSE;
+		if (sourceLayer == LAYER_WALL && targetLayer == LAYER_GROUND)
+		{
+			const auto* portal = DynamicPortalBehaviour::find(target);
+			return portal && portal->isWithinTopAttackRange(*source);
+		}
+	}
+
 	Real distSqr;
 	Real attackRangeSqr;
 

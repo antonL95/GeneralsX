@@ -158,7 +158,7 @@ public:
 	Real m_activationDelaySeconds = 0.0f;
 	Int m_aboveWall = 0;
 	Coord3D m_topAttackPos = {0.0f, 0.0f, 0.0f};
-	Real m_topAttackRadius = 0.0f;
+	Real m_topAttackRadius = 5.0f;
 	SpecialPowerObjectFilter m_objectFilter;
 
 private:
@@ -178,6 +178,8 @@ public:
 	Bool permits(const Object& unit) const;
 	Bool getAboveWallPosition(Coord3D& position) const;
 	Bool getClimbEntryPosition(Coord3D& position) const;
+	Bool getTopAttackPosition(Coord3D& position) const;
+	Bool isWithinTopAttackRange(const Object& attacker) const;
 	Bool allowsClimber(const Object& unit) const;
 	UpdateSleepTime update() override;
 

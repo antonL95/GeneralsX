@@ -67,6 +67,7 @@
 #include "GameLogic/Weapon.h"
 
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/RetailGate.h"
 #include "GameLogic/Module/RetailSiegeDocking.h"
 #include "GameLogic/Module/GiantBirdAIUpdate.h"
 #include "GameLogic/Module/HordeContain.h"
@@ -2535,6 +2536,20 @@ Bool AIAttackApproachTargetState::computePath()
 		m_waitingForPath = true;
 
 		Coord3D pos;
+		if (RetailFileLayers::enabled() && weapon->isContactWeapon() &&
+			source->getLayer() == LAYER_WALL && victim->getLayer() == LAYER_GROUND)
+		{
+			const auto* siege = SiegeAIUpdate::find(victim);
+			const auto* portal = DynamicPortalBehaviour::find(victim);
+			if (siege && siege->isDocked() && portal && portal->isActive() &&
+				siege->getReleasePosition(pos))
+			{
+				m_goalPosition = pos;
+				ai->requestAttackPath(INVALID_ID, &pos);
+				m_stopIfInRange = false;
+				return true;
+			}
+		}
 		victim->getGeometryInfo().getCenterPosition( *victim->getPosition(), pos );
 
 		CRCDEBUG_LOG(("AIAttackApproachTargetState::computePath - requestAttackPath() for object %d", getMachineOwner()->getID()));
@@ -2647,6 +2662,11 @@ StateReturnType AIAttackApproachTargetState::onEnter()
 		}
 		if (weapon->isWithinAttackRange(source, victim))
 		{
+			if (RetailFileLayers::enabled() && weapon->isContactWeapon() &&
+				source->getLayer() == LAYER_WALL && victim->getLayer() == LAYER_GROUND)
+			{
+				return STATE_SUCCESS;
+			}
 			Bool viewBlocked = false;
 			if (source && victim && ai->isDoingGroundMovement() && !victim->isSignificantlyAboveTerrain())
 			{
