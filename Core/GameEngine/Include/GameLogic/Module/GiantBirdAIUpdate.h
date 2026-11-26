@@ -39,6 +39,7 @@ private:
 	void startFollowThrough();
 	void setSwooping(Bool swooping);
 	void releaseGrabbedPassenger();
+	void tryGrabDebrisPortion(Object* victim);
 	void xferFlightState(Xfer* xfer);
 	void xferRetailBlocks(Xfer* xfer, Bool present);
 
@@ -46,6 +47,7 @@ private:
 	Bool m_followingThrough = FALSE;
 	Bool m_swooping = FALSE;
 	ObjectID m_grabbedPassenger = INVALID_ID;
+	ObjectID m_swoopVictim = INVALID_ID;
 	Coord3D m_pullUpOrigin = {};
 	Bool m_pullUpActive = FALSE;
 };

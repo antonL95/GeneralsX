@@ -1,0 +1,25 @@
+110 create Player_1 SwoopTestEagle 0 1840,3150,0
+110 stance Player_1 SwoopTestEagle 0 HoldGround
+185 create PlyrCreeps SwoopTestTarget 0 2070,3150,0
+186 orderattack Player_1 SwoopTestEagle 0 PlyrCreeps:SwoopTestTarget:0
+187 orderattack Player_1 SwoopTestEagle 0 PlyrCreeps:SwoopTestTarget:0
+189 stance Player_1 SwoopTestEagle 0 Battle
+371 destroy Player_1 SwoopTestEagle 0
+371 destroy PlyrCreeps SwoopTestTarget 0
+372 create Player_1 SwoopTestFellBeast 0 1840,3150,0
+372 stance Player_1 SwoopTestFellBeast 0 HoldGround
+447 create PlyrCreeps SwoopTestTarget 0 2070,3150,0
+448 orderattack Player_1 SwoopTestFellBeast 0 PlyrCreeps:SwoopTestTarget:0
+449 orderattack Player_1 SwoopTestFellBeast 0 PlyrCreeps:SwoopTestTarget:0
+451 stance Player_1 SwoopTestFellBeast 0 Battle
+633 destroy Player_1 SwoopTestFellBeast 0
+633 destroy PlyrCreeps SwoopTestTarget 0
+634 create Player_1 SwoopTestEagle 0 1840,3150,0
+634 stance Player_1 SwoopTestEagle 0 HoldGround
+709 create PlyrCreeps SwoopTestTrebuchet 0 2070,3150,0
+710 orderattack Player_1 SwoopTestEagle 0 PlyrCreeps:SwoopTestTrebuchet:0
+711 orderattack Player_1 SwoopTestEagle 0 PlyrCreeps:SwoopTestTrebuchet:0
+713 stance Player_1 SwoopTestEagle 0 Battle
+921 destroy Player_1 SwoopTestEagle 0
+921 destroy PlyrCreeps SwoopTestTrebuchet 0
+921 destroy PlyrCreeps GondorTrebuchetDebrisPiece 0

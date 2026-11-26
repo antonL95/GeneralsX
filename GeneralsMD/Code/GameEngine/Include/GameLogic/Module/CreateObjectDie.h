@@ -70,5 +70,6 @@ public:
 	// virtual destructor prototype provided by memory pool declaration
 
 	virtual void onDie( const DamageInfo *damageInfo ) override;
+	const AsciiString& getDebrisPortionOfSelf() const { return getCreateObjectDieModuleData()->m_debrisPortionOfSelf; }
 
 };

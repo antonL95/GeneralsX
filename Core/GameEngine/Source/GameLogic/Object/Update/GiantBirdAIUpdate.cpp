@@ -7,12 +7,17 @@
 #include "Common/INI.h"
 #include "Common/RetailFileLayers.h"
 #include "Common/RetailSaveBlocks.h"
+#include "Common/RotwkDuration.h"
+#include "Common/ThingFactory.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#if !RTS_GENERALS
+#include "GameLogic/Module/CreateObjectDie.h"
+#endif
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/RetailSlowDeath.h"
 #include "GameLogic/Object.h"
@@ -27,6 +32,8 @@ constexpr Real CONTACT_HEIGHT_TOLERANCE = 12.0f;
 constexpr Real FOLLOW_THROUGH_ARRIVAL_DISTANCE = 6.0f;
 #if !RTS_GENERALS
 constexpr Real PULL_UP_DISTANCE = 7.0f;
+constexpr Real GRAB_TOSS_SPEED_SCALE = 0.5f;
+constexpr Real GRAB_TOSS_VERTICAL_VELOCITY = -6.0f;
 #endif
 
 Real planarDistanceSquared(const Coord3D& a, const Coord3D& b)
@@ -68,6 +75,7 @@ void GiantBirdAIUpdate::aiDoCommand(const AICommandParms* parms)
 	{
 		m_followingThrough = FALSE;
 		m_pullUpActive = FALSE;
+		m_swoopVictim = INVALID_ID;
 	}
 	AIUpdateInterface::aiDoCommand(parms);
 }
@@ -133,13 +141,95 @@ void GiantBirdAIUpdate::releaseGrabbedPassenger()
 
 	m_grabbedPassenger = INVALID_ID;
 	bird->getContain()->removeFromContain(passenger);
+	passenger->setOrientation(bird->getOrientation());
 	if (auto* physics = passenger->getPhysics())
 	{
+#if !RTS_GENERALS
+		if (getCurLocomotor())
+		{
+			Vector3 forward = bird->getTransformMatrix()->Get_X_Vector();
+			const Real forwardLength = WWMath::SqrtfOrigin(
+				forward.X * forward.X + forward.Y * forward.Y + forward.Z * forward.Z);
+			if (forwardLength > 0.0f)
+			{
+				forward.X /= forwardLength;
+				forward.Y /= forwardLength;
+				forward.Z /= forwardLength;
+			}
+			else
+			{
+				const Coord3D& heading = *bird->getUnitDirectionVector2D();
+				forward.Set(heading.x, heading.y, 0.0f);
+			}
+			constexpr Real framesPerRetailTick =
+				static_cast<Real>(LOGICFRAMES_PER_SECOND) / RotwkDuration::FRAMES_PER_SECOND;
+			const Real birdSpeed = bird->getPhysics() ? bird->getPhysics()->getVelocityMagnitude() : getCurLocomotorSpeed();
+			const Real halfRetailSpeed = birdSpeed * framesPerRetailTick * GRAB_TOSS_SPEED_SCALE;
+			const Coord3D launchVelocity = {
+				forward.X * halfRetailSpeed,
+				forward.Y * halfRetailSpeed,
+				GRAB_TOSS_VERTICAL_VELOCITY
+			};
+			physics->launchFromContainment(launchVelocity);
+			FXList::doFXObj(data->m_tossFX, passenger, bird);
+		}
+#else
 		if (const auto* carrierPhysics = bird->getPhysics())
 			carrierPhysics->transferVelocityTo(physics);
 		physics->setAllowToFall(TRUE);
+		FXList::doFXObj(data->m_tossFX, passenger, bird);
+#endif
 	}
-	FXList::doFXObj(data->m_tossFX, passenger, bird);
+	passenger->setModelConditionState(MODELCONDITION_FREEFALL);
+}
+
+void GiantBirdAIUpdate::tryGrabDebrisPortion(Object* victim)
+{
+#if !RTS_GENERALS
+	if (!RetailFileLayers::enabled() || m_grabbedPassenger != INVALID_ID || !victim ||
+		!victim->isEffectivelyDead() || !victim->isKindOf(KINDOF_MACHINE))
+		return;
+	Object* bird = getObject();
+	ContainModuleInterface* contain = bird->getContain();
+	if (!contain || contain->getContainCount() >= contain->getContainMax())
+		return;
+	static const NameKeyType createDieKey = NAMEKEY("CreateObjectDie");
+	AsciiString debrisName;
+	if (BehaviorModule** behaviors = victim->getBehaviorModules())
+	{
+		for (; *behaviors; ++behaviors)
+		{
+			if ((*behaviors)->getModuleNameKey() == createDieKey)
+			{
+				const auto* createDie = static_cast<const CreateObjectDie*>(*behaviors);
+				if (!createDie->getDebrisPortionOfSelf().isEmpty())
+				{
+					debrisName = createDie->getDebrisPortionOfSelf();
+					break;
+				}
+			}
+		}
+	}
+	if (debrisName.isEmpty())
+		return;
+	const ThingTemplate* debrisTemplate = TheThingFactory->findTemplate(debrisName, FALSE);
+	if (!debrisTemplate)
+		return;
+	Object* debris = TheThingFactory->newObject(debrisTemplate, victim->getTeam());
+	if (!debris)
+		return;
+	debris->setTransformMatrix(bird->getTransformMatrix());
+	contain->addToContain(debris);
+	if (debris->getContainedBy() == bird)
+	{
+		m_grabbedPassenger = debris->getID();
+		m_swoopVictim = INVALID_ID;
+	}
+	else
+		TheGameLogic->destroyObject(debris);
+#else
+	(void)victim;
+#endif
 }
 
 void GiantBirdAIUpdate::startFollowThrough()
@@ -207,6 +297,12 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 			const Weapon* weapon = bird->getWeaponInWeaponSlot(static_cast<WeaponSlotType>(slot));
 			if (weapon && weapon->getLastShotFrame() == TheGameLogic->getFrame())
 			{
+				Object* shotVictim = m_swoopVictim != INVALID_ID
+					? TheGameLogic->findObjectByID(m_swoopVictim)
+					: getCurrentVictim();
+				if (shotVictim && m_swoopVictim == INVALID_ID)
+					m_swoopVictim = shotVictim->getID();
+				tryGrabDebrisPortion(shotVictim);
 				setSwooping(FALSE);
 				startFollowThrough();
 				break;
@@ -216,6 +312,13 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 	const Coord3D& at = *bird->getPosition();
 	if (m_followingThrough)
 	{
+		if (m_swoopVictim != INVALID_ID && m_grabbedPassenger == INVALID_ID)
+		{
+			if (Object* shotVictim = TheGameLogic->findObjectByID(m_swoopVictim))
+				tryGrabDebrisPortion(shotVictim);
+			else
+				m_swoopVictim = INVALID_ID;
+		}
 		const Real remaining = planarDistanceSquared(at, m_followThroughGoal);
 		if (remaining > FOLLOW_THROUGH_ARRIVAL_DISTANCE * FOLLOW_THROUGH_ARRIVAL_DISTANCE)
 		{
@@ -239,6 +342,7 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 		}
 		m_followingThrough = FALSE;
 		m_pullUpActive = FALSE;
+		m_swoopVictim = INVALID_ID;
 	}
 
 	const Object* victim = isAttacking() ? getCurrentVictim() : nullptr;
@@ -270,6 +374,7 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 	setSwooping(swooping);
 	if (swooping)
 	{
+		m_swoopVictim = victim ? victim->getID() : INVALID_ID;
 		const AsciiString& authored = getGiantBirdAIUpdateModuleData()->m_attackLocomotorType;
 		const Int set = authored.isEmpty() ? LOCOMOTORSET_PANIC : AIUpdateModuleData::findLocomotorSetType(authored);
 		if (set >= LOCOMOTORSET_NORMAL && set < LOCOMOTORSET_COUNT && set != LOCOMOTORSET_NORMAL_UPGRADED)
@@ -311,6 +416,7 @@ UpdateSleepTime GiantBirdAIUpdate::doLocomotor()
 	}
 	else
 	{
+		m_swoopVictim = INVALID_ID;
 		chooseLocomotorSet(LOCOMOTORSET_NORMAL);
 		if (Locomotor* normalLoco = getCurLocomotor())
 		{
@@ -344,7 +450,9 @@ void GiantBirdAIUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
 		{
 			m_pullUpOrigin = {};
 			m_pullUpActive = FALSE;
-		} }
+		} },
+		{ "swoop-victim", [this](Xfer* x) { x->xferObjectID(&m_swoopVictim); },
+			[this] { m_swoopVictim = INVALID_ID; } }
 	});
 }
 
