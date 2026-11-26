@@ -64,6 +64,45 @@ Bool veteranCondition(const char* owner, const char* type, Int comparison, Int r
 	return FALSE;
 }
 
+void teamExperienceProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* source = ctx.requireObject();
+	Object* receiver = ctx.findTarget(std::string_view("Player_1:MapScriptUnitOpsXP:1"));
+	Object* control = ctx.findTarget(std::string_view("Player_1:MapScriptUnitOpsXP:2"));
+	if (!source || !receiver || !control)
+		return;
+	Team* original = source->getTeam();
+	Team* team = newInstance(Team)(const_cast<TeamPrototype*>(original->getPrototype()), TEAM_ID_INVALID);
+	source->setTemporaryTeam(team);
+	control->setTemporaryTeam(team);
+	const Real sourceBefore = source->getExperienceTracker()->getRetailExperience();
+	const Real receiverBefore = receiver->getExperienceTracker()->getRetailExperience();
+	const Real controlBefore = control->getExperienceTracker()->getRetailExperience();
+	Bool registered = FALSE;
+	for (Int i = 0; i < ScriptEngine::getActionTemplateCount(); ++i)
+	{
+		const Template* definition = TheScriptEngine->getActionTemplate(i);
+		if (definition->m_internalName != "TEAM_GIVE_EXPERIENCE_POINTS" ||
+			ScriptEngine::findRotwkActionByRetailIndex(356) != i || definition->getNumParameters() != 2 ||
+			definition->getParameterType(0) != Parameter::TEAM || definition->getParameterType(1) != Parameter::INT)
+			continue;
+		auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(i));
+		action->getParameter(0)->friend_setString("<This Team>");
+		action->getParameter(1)->friend_setInt(10);
+		TheScriptEngine->friend_executeAction(action, team);
+		deleteInstance(action);
+		registered = TRUE;
+	}
+	const Real receiverGain = receiver->getExperienceTracker()->getRetailExperience() - receiverBefore;
+	const Real controlGain = control->getExperienceTracker()->getRetailExperience() - controlBefore;
+	const Bool sink = source->getExperienceTracker()->getRetailExperience() == sourceBefore && receiverGain > 0.0f;
+	const Bool members = registered && controlGain > 0.0f && controlGain == 2.0f * receiverGain;
+	source->setTemporaryTeam(original);
+	control->setTemporaryTeam(original);
+	deleteInstance(team);
+	std::fprintf(stderr, "TEST map-unit-ops team-xp frame=%u sink=%d members=%d\n", ctx.frame, sink, members);
+}
+
 void veterancyProbe(const RetailTestCommands::Context& ctx)
 {
 	Object* unit = ctx.requireObject();
@@ -222,6 +261,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-teleport", teleportProbe);
 	registerAction("map-unit-ops-xp", experienceProbe);
 	registerAction("map-unit-ops-veterancy", veterancyProbe);
+	registerAction("map-unit-ops-team-xp", teamExperienceProbe);
 #endif
 }
 }

@@ -7168,6 +7168,17 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::DAMAGE_MEMBERS_OF_TEAM:
 			doDamageTeamMembers(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getReal());
 			return;
+		case ScriptAction::TEAM_GIVE_EXPERIENCE_POINTS:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			if (team)
+			{
+				const Real amount = static_cast<Real>(pAction->getParameter(1)->getInt());
+				for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+					member.cur()->getExperienceTracker()->addScriptRetailExperience(amount);
+			}
+			return;
+		}
 		case ScriptAction::UNIT_GIVE_EXPERIENCE_POINTS:
 		{
 			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
