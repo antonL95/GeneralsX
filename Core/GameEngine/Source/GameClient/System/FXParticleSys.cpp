@@ -170,6 +170,10 @@ void ParticleSystemTemplate::resetForFXDefinition()
 		setZero(m_modelSizeRate[axis]);
 		m_modelSizeDamping[axis].setRange(1.0f, 1.0f, GameClientRandomVariable::CONSTANT);
 	}
+	setZero(m_modelAngleX);
+	setZero(m_modelAngleY);
+	setZero(m_modelAngularRateX);
+	setZero(m_modelAngularRateY);
 	m_windStrength = DEFAULT_WIND_STRENGTH;
 	m_turbulenceAmplitude = 0.0f;
 	m_turbulenceFrequency = 0.0f;
@@ -422,11 +426,11 @@ const FieldParse ParticleSystemTemplate::m_fxDefaultUpdateFieldParseTable[] =
 
 const FieldParse ParticleSystemTemplate::m_fxRenderObjectUpdateFieldParseTable[] =
 {
-	{ "AngleX",         ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "AngleY",         ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "AngleX",         INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelAngleX) },
+	{ "AngleY",         INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelAngleY) },
 	{ "AngleZ",         INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_angleZ) },
-	{ "AngularRateX",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
-	{ "AngularRateY",   ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "AngularRateX",   INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelAngularRateX) },
+	{ "AngularRateY",   INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelAngularRateY) },
 	{ "AngularRateZ",   INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_angularRateZ) },
 	{ "AngularDamping", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_angularDamping) },
 	{ "StartSizeX", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelStartSize[0]) },
@@ -438,7 +442,7 @@ const FieldParse ParticleSystemTemplate::m_fxRenderObjectUpdateFieldParseTable[]
 	{ "SizeDampingX", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelSizeDamping[0]) },
 	{ "SizeDampingY", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelSizeDamping[1]) },
 	{ "SizeDampingZ", INI::parseGameClientRandomVariable, nullptr, offsetof(ParticleSystemTemplate, m_modelSizeDamping[2]) },
-	{ "Rotation",       ParticleSystemTemplate::parseFXUnrendered, nullptr, 0 },
+	{ "Rotation",       INI::parseIndexList, fxRotationNames, offsetof(ParticleSystemTemplate, m_fxRotation) },
 	{ nullptr,          nullptr,                                   nullptr, 0 }
 };
 

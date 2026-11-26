@@ -203,6 +203,8 @@ public:
 	const Coord3D& getModelSize() const { return m_modelSize; }
 	Real getAngle() { return m_angleZ; }
 	Real getAngleXY() const { return m_angleXY; }
+	Real getModelAngleX() const { return m_modelAngleX; }
+	Real getModelAngleY() const { return m_modelAngleY; }
 	void initializeFXRotation(const ParticleSystemTemplate &definition);
 	Real getAlpha() { return m_alpha; }
 	const RGBColor *getColor() { return &m_color; }
@@ -271,6 +273,10 @@ protected:
 	Real m_angleXY = 0.0f;
 	Real m_angularRateXY = 0.0f;
 	Real m_angularDampingXY = 1.0f;
+	Real m_modelAngleX = 0.0f;
+	Real m_modelAngleY = 0.0f;
+	Real m_modelAngularRateX = 0.0f;
+	Real m_modelAngularRateY = 0.0f;
 public:
 	Bool							m_inSystemList;
 	Bool							m_inOverallList;
@@ -646,6 +652,10 @@ public:
 	Real sampleAngleXY() const { return m_gpuAngleXY.getValue(); }
 	Real sampleAngularRateXY() const { return m_gpuAngularRateXY.getValue(); }
 	Real sampleAngularDampingXY() const { return m_gpuAngularDampingXY.getValue(); }
+	Real sampleModelAngleX() const { return m_modelAngleX.getValue(); }
+	Real sampleModelAngleY() const { return m_modelAngleY.getValue(); }
+	Real sampleModelAngularRateX() const { return m_modelAngularRateX.getValue(); }
+	Real sampleModelAngularRateY() const { return m_modelAngularRateY.getValue(); }
 	Real getWindFullStrengthDistance() const { return m_windFullStrengthDistance; }
 	Real getWindZeroStrengthDistance() const { return m_windZeroStrengthDistance; }
 	const Coord3D *getCylinderOffset() const { return &m_cylinderOffset; }
@@ -721,6 +731,10 @@ protected:
 	GameClientRandomVariable m_modelStartSize[3];
 	GameClientRandomVariable m_modelSizeRate[3];
 	GameClientRandomVariable m_modelSizeDamping[3];
+	GameClientRandomVariable m_modelAngleX;
+	GameClientRandomVariable m_modelAngleY;
+	GameClientRandomVariable m_modelAngularRateX;
+	GameClientRandomVariable m_modelAngularRateY;
 	Bool m_modelHasAlpha = FALSE;
 	ModelMaterialMode m_modelMaterialMode = ModelMaterialMode::Authored;
 	Bool m_isGpuParticle = FALSE;

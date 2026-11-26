@@ -503,6 +503,8 @@ Bool Particle::update()
 #endif
 	m_angularRateZ *= m_angularDamping;
 	m_angularRateXY *= m_angularDampingXY;
+	m_modelAngularRateX *= m_angularDamping;
+	m_modelAngularRateY *= m_angularDamping;
 
 	m_sizeRate *= m_sizeRateDamping;
 	const Bool usesModel = RetailFileLayers::enabled() && m_system->isUsingDrawables();
@@ -620,6 +622,8 @@ void Particle::draw(Real timeScale)
 #endif
 	m_angleZ += m_angularRateZ * timeScale;
 	m_angleXY += m_angularRateXY * timeScale;
+	m_modelAngleX += m_modelAngularRateX * timeScale;
+	m_modelAngleY += m_modelAngularRateY * timeScale;
 
 	if (m_particleUpTowardsEmitter)
 	{
@@ -906,7 +910,18 @@ void Particle::xfer( Xfer *xfer )
 				block->xferReal(&m_angleXY);
 				block->xferReal(&m_angularRateXY);
 				block->xferReal(&m_angularDampingXY);
-			}, [this] { m_angleXY = 0.0f; m_angularRateXY = 0.0f; m_angularDampingXY = 1.0f; }}
+			}, [this] { m_angleXY = 0.0f; m_angularRateXY = 0.0f; m_angularDampingXY = 1.0f; }},
+			{"particle-model-xy-rotation", [this](Xfer *block) {
+				block->xferReal(&m_modelAngleX);
+				block->xferReal(&m_modelAngleY);
+				block->xferReal(&m_modelAngularRateX);
+				block->xferReal(&m_modelAngularRateY);
+			}, [this] {
+				m_modelAngleX = 0.0f;
+				m_modelAngleY = 0.0f;
+				m_modelAngularRateX = 0.0f;
+				m_modelAngularRateY = 0.0f;
+			}}
 		});
 	if (xfer->getXferMode() == XFER_LOAD && usesGpuDraw())
 	{
@@ -2077,6 +2092,10 @@ void Particle::initializeFXRotation(const ParticleSystemTemplate &definition)
 	m_angleXY = definition.sampleAngleXY();
 	m_angularRateXY = definition.sampleAngularRateXY();
 	m_angularDampingXY = definition.sampleAngularDampingXY();
+	m_modelAngleX = definition.sampleModelAngleX();
+	m_modelAngleY = definition.sampleModelAngleY();
+	m_modelAngularRateX = definition.sampleModelAngularRateX();
+	m_modelAngularRateY = definition.sampleModelAngularRateY();
 }
 
 // ------------------------------------------------------------------------------------------------

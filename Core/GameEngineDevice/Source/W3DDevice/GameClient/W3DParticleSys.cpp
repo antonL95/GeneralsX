@@ -113,6 +113,12 @@ void renderModelParticles(RenderInfoClass& info, ParticleSystemManager::Particle
 			const Real xy = particle->getAngleXY();
 			if (xy != 0.0f)
 				transform.Rotate_X(xy);
+			const Real modelAngleX = particle->getModelAngleX();
+			if (modelAngleX != 0.0f)
+				transform.Rotate_X(modelAngleX);
+			const Real modelAngleY = particle->getModelAngleY();
+			if (modelAngleY != 0.0f)
+				transform.Rotate_Y(modelAngleY);
 			const Int rotation = definition ? definition->getFXRotation() : ParticleSystemTemplate::ROTATION_Z;
 			if (rotation == ParticleSystemTemplate::ROTATION_X)
 				transform.Rotate_X(angle);
