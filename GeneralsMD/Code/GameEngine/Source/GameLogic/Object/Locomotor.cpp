@@ -2388,7 +2388,9 @@ void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* p
 	{
 		physics->scrubVelocity2D(0.0f);
 		obj->clearModelConditionState(MODELCONDITION_MOVING);
-		updateRetailGait(obj, onPathDistToGoal, 0.0f, FALSE, 0.0f);
+		const Real scalarBefore = m_retailScalarSpeed;
+		advanceRetailScalarSpeed(obj, 0.0f);
+		updateRetailGait(obj, onPathDistToGoal, 0.0f, FALSE, 0.0f, scalarBefore);
 		return;
 	}
 
@@ -2429,7 +2431,10 @@ void Locomotor::moveRetailBackwardsCapableWheels(Object* obj, PhysicsBehavior* p
 		Coord3D force{(dx / dist) * physics->getMass() * nextSpeed, (dy / dist) * physics->getMass() * nextSpeed, 0.0f};
 		physics->applyMotiveForce(&force);
 	}
-	updateRetailGait(obj, onPathDistToGoal, curSpeed, targetSpeed + MIN_GAIT_SPEED < curSpeed, nextSpeed);
+	const Real scalarBefore = m_retailScalarSpeed;
+	advanceRetailScalarSpeed(obj, targetSpeed);
+	updateRetailGait(obj, onPathDistToGoal, curSpeed, targetSpeed + MIN_GAIT_SPEED <
+		(rules.accelDecelTrigger >= 0.0f ? scalarBefore : curSpeed), nextSpeed, scalarBefore);
 }
 
 //-------------------------------------------------------------------------------------------------
