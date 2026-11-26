@@ -16,6 +16,20 @@ void handleWeaponSwitchAnim(const RetailTestCommands::Context& ctx)
 	if (!source)
 		return;
 
+	if (ctx.action == "weapon-switch-anim-repeat")
+	{
+		const Bool enabled = source->testWeaponSetFlag(WEAPONSET_TOGGLE_1);
+		if (enabled)
+			source->setWeaponSetFlag(WEAPONSET_TOGGLE_1);
+		else
+			source->clearWeaponSetFlag(WEAPONSET_TOGGLE_1);
+		WeaponSetFlags flags;
+		flags.set(WEAPONSET_TOGGLE_1);
+		source->setWeaponSetFlags(flags, enabled);
+		std::fprintf(stderr, "WEAPON-SWITCH-ANIM repeat frame=%u enabled=%d\n", ctx.frame, enabled);
+		return;
+	}
+
 	if (ctx.action == "weapon-switch-anim-toggle")
 	{
 		const CommandSet* set = TheRetailCommandCatalog->findCommandSet(source->getCommandSetString());
@@ -84,6 +98,7 @@ void registerRetailWeaponSwitchAnimTestCommands()
 {
 #if !RTS_GENERALS
 	registerAction("weapon-switch-anim-toggle", handleWeaponSwitchAnim);
+	registerAction("weapon-switch-anim-repeat", handleWeaponSwitchAnim);
 	registerAction("weapon-switch-anim-trace", handleWeaponSwitchAnim);
 #endif
 }

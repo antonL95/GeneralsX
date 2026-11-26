@@ -8,6 +8,7 @@
 233 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
 244 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
 244 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
+250 weapon-switch-anim-repeat Player_1 GondorFaramir 0 -
 261 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
 262 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
 262 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
@@ -16,6 +17,7 @@
 266 weapon-switch-anim-toggle Player_1 GondorFaramir 0 Command_ToggleFaramirWeapon
 267 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
 268 weapon-switch-anim-trace Player_1 GondorFaramir 0 -
+280 weapon-switch-anim-repeat Player_1 GondorFaramir 0 -
 296 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
 297 weapon-switch-anim-trace Player_1 ElvenRivendellKnightHorde 0 -
 297 weapon-switch-anim-trace Player_1 GondorFaramir 0 -

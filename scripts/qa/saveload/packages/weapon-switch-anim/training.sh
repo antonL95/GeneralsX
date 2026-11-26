@@ -1,4 +1,10 @@
 check() {
+    if covers 250; then
+        expect "WEAPON-SWITCH-ANIM repeat frame=250 enabled=1" || return
+    fi
+    if covers 280; then
+        expect "WEAPON-SWITCH-ANIM repeat frame=280 enabled=0" || return
+    fi
     if covers 229; then
         expect "WEAPON-SWITCH-ANIM frame=229 actor=ElvenRivendellKnightHorde toggle1=0 swapping1=0 members=0/10 weapon=RivendellKnightSpear reloading=0 readyAfter=0" || return
         expect "WEAPON-SWITCH-ANIM frame=229 actor=GondorFaramir toggle1=0 swapping1=0 members=0/0 weapon=FaramirBow reloading=1 readyAfter=1" || return

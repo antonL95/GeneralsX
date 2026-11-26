@@ -3684,6 +3684,7 @@ ModelConditionFlags CommandButton::getRetailCommandModelConditions(const Object*
 
 void Object::setWeaponSetFlag(WeaponSetType wst)
 {
+	const Bool changed = !m_curWeaponSetFlags.test(wst);
 	m_curWeaponSetFlags.set(wst);
 	m_weaponSet.updateWeaponSet(this);
 	const ModelConditionFlagType condition = TheWeaponSetTypeToModelConditionTypeMap[wst];
@@ -3692,12 +3693,13 @@ void Object::setWeaponSetFlag(WeaponSetType wst)
 		m_drawable->setModelConditionState(condition);
 	}
 	const ModelConditionFlagType swapping = swappingModelConditionFor(condition);
-	if (swapping != MODELCONDITION_INVALID)
+	if (changed && swapping != MODELCONDITION_INVALID)
 		setTimedModelCondition(swapping, LOGICFRAMES_PER_SECOND);
 }
 
 void Object::clearWeaponSetFlag(WeaponSetType wst)
 {
+	const Bool changed = m_curWeaponSetFlags.test(wst);
 	m_curWeaponSetFlags.set(wst, 0);
 	m_weaponSet.updateWeaponSet(this);
 	const ModelConditionFlagType condition = TheWeaponSetTypeToModelConditionTypeMap[wst];
@@ -3706,7 +3708,7 @@ void Object::clearWeaponSetFlag(WeaponSetType wst)
 		m_drawable->clearModelConditionState(condition);
 	}
 	const ModelConditionFlagType swapping = swappingModelConditionFor(condition);
-	if (swapping != MODELCONDITION_INVALID)
+	if (changed && swapping != MODELCONDITION_INVALID)
 		setTimedModelCondition(swapping, LOGICFRAMES_PER_SECOND);
 }
 
