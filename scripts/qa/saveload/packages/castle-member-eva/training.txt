@@ -17,7 +17,7 @@
 274 castle-member-eva-probe - - 0 CastleBreached
 280 castle-member-eva-kill PlyrCreeps CastleMemberEvaAttacker 0 Player_1:CastleMemberEvaWall:0
 284 castle-member-eva-probe - - 0 CastleBreached
-295 castle-member-eva-kill PlyrCreeps CastleMemberEvaAttacker 0 Player_1:MenFortressCitadel:0
+295 castle-member-eva-kill PlyrCreeps CastleMemberEvaAttacker 0 Player_1:DwarvenFortressCitadel:0
 305 castle-member-eva-probe - - 0 CampDestroyed
 310 destroy Player_1 CastleMemberEvaKeep 0
 310 destroy PlyrCreeps CastleMemberEvaAttacker 0

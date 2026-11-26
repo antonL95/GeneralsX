@@ -1568,8 +1568,8 @@ void Object::setFiringConditionForCurrentWeapon() const
 //=============================================================================
 void Object::setModelConditionState( ModelConditionFlagType a )
 {
-	const Bool constructionStarted = a == MODELCONDITION_ACTIVELY_CONSTRUCTING && RetailFileLayers::enabled() &&
-		!m_logicModelConditions.test(a);
+	const Bool constructionStarted = (a == MODELCONDITION_ACTIVELY_CONSTRUCTING || a == MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED) &&
+		RetailFileLayers::enabled() && !m_logicModelConditions.test(a);
 	const ModelConditionFlags previousConditions = m_logicModelConditions;
 	const Bool userSixStarted = a == MODELCONDITION_USER_6 && RetailFileLayers::enabled() &&
 		!m_logicModelConditions.test(a);
@@ -1585,11 +1585,10 @@ void Object::setModelConditionState( ModelConditionFlagType a )
 		RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
 }
 
-//=============================================================================
 void Object::clearModelConditionState( ModelConditionFlagType a )
 {
-	const Bool constructionStopped = a == MODELCONDITION_ACTIVELY_CONSTRUCTING && RetailFileLayers::enabled() &&
-		m_logicModelConditions.test(a);
+	const Bool constructionStopped = (a == MODELCONDITION_ACTIVELY_CONSTRUCTING || a == MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED) &&
+		RetailFileLayers::enabled() && m_logicModelConditions.test(a);
 	const ModelConditionFlags previousConditions = m_logicModelConditions;
 	const Bool userSixStopped = a == MODELCONDITION_USER_6 && RetailFileLayers::enabled() &&
 		m_logicModelConditions.test(a);
@@ -1605,9 +1604,9 @@ void Object::clearModelConditionState( ModelConditionFlagType a )
 		RetailBuildingEvents::modelConditionsChanged(*this, previousConditions);
 }
 
-//=============================================================================
 void Object::clearAndSetModelConditionState( ModelConditionFlagType clr, ModelConditionFlagType set )
 {
+	const ModelConditionFlags previousConditions = m_logicModelConditions;
 	if (RetailFileLayers::enabled())
 	{
 		if (clr != MODELCONDITION_INVALID)
@@ -1619,11 +1618,13 @@ void Object::clearAndSetModelConditionState( ModelConditionFlagType clr, ModelCo
 	{
 		m_drawable->clearAndSetModelConditionState(clr, set);
 	}
+	notifyConstructionConditionChange(previousConditions);
 }
 
 void Object::notifyConstructionConditionChange( const ModelConditionFlags& previous )
 {
-	if (previous.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_PARTIALLY_CONSTRUCTED))
+	if (previous.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_PARTIALLY_CONSTRUCTED) ||
+		previous.test(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED) != m_logicModelConditions.test(MODELCONDITION_ACTIVELY_BEING_CONSTRUCTED))
 		RetailBuildingEvents::modelConditionsChanged(*this, previous);
 }
 
