@@ -1,0 +1,3 @@
+11 power-reveal - - 0
+15 create PlyrCreeps TreeDepletionDevastator 0 1850,200,0
+100 tree-depletion-devastate PlyrCreeps TreeDepletionDevastator 0 - 1850 45

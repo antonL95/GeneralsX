@@ -1,0 +1,1 @@
+20 PlyrCreeps TreeDepletionDevastator 1850 60 0.5
