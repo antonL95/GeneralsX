@@ -112,6 +112,60 @@ void threatProbe(const RetailTestCommands::Context& ctx)
 	std::fprintf(stderr, "TEST map-unit-ops threat frame=%u match=%d reject=%d cached=%d\n", ctx.frame, match, reject, cached);
 }
 
+const Waypoint* nearestAttackPathPoint(const Coord3D& position)
+{
+	const Waypoint* start = TheTerrainLogic->getWaypointByName("AOR_Random Waypoint_03");
+	const Waypoint* end = TheTerrainLogic->getWaypointByName("AOR_Random Waypoint_01");
+	if (!start || !end || start->getPathLabel1() != "MapScriptAttackPath" ||
+		end->getPathLabel1() != "MapScriptAttackPath" || start->getNumLinks() != 1 || start->getLink(0) != end)
+		return nullptr;
+	const auto distance = [&](const Waypoint* point) {
+		const Real x = point->getLocation()->x - position.x;
+		const Real y = point->getLocation()->y - position.y;
+		return x * x + y * y;
+	};
+	return distance(start) < distance(end) ? start : end;
+}
+
+Bool hasWaypointGoal(AIUpdateInterface* ai, const Waypoint* waypoint)
+{
+	const Coord3D* goal = ai->getGoalPosition();
+	const Coord3D* expected = waypoint->getLocation();
+	return goal && goal->x == expected->x && goal->y == expected->y;
+}
+
+void namedAttackPathProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* unit = ctx.requireObject();
+	if (!unit || !unit->getAI())
+		return;
+	const Waypoint* point = nearestAttackPathPoint(*unit->getPosition());
+	AIUpdateInterface* ai = unit->getAI();
+	const Int type = ScriptEngine::findRotwkActionByRetailIndex(547);
+	const Template* definition = type >= 0 ? TheScriptEngine->getActionTemplate(type) : nullptr;
+	Bool missing = FALSE;
+	if (definition && definition->m_internalName == "NAMED_ATTACK_FOLLOW_WAYPOINTS" &&
+		definition->getNumParameters() == 2 && definition->getParameterType(0) == Parameter::UNIT &&
+		definition->getParameterType(1) == Parameter::WAYPOINT_PATH)
+	{
+		auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
+		action->getParameter(0)->friend_setString(unit->getName());
+		if (ctx.frame == 243)
+		{
+			action->getParameter(1)->friend_setString("MapScriptAttackPath");
+			TheScriptEngine->friend_executeAction(action, nullptr);
+		}
+		action->getParameter(1)->friend_setString("MapScriptMissingPath");
+		TheScriptEngine->friend_executeAction(action, nullptr);
+		missing = ai->getCurrentStateID() == AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS;
+		deleteInstance(action);
+	}
+	const Bool ordered = point && ai->getCurrentStateID() == AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS &&
+		hasWaypointGoal(ai, point);
+	std::fprintf(stderr, "TEST map-unit-ops named path frame=%u path=%d ordered=%d missing=%d\n",
+		ctx.frame, point != nullptr, ordered, missing);
+}
+
 void killTarget(const RetailTestCommands::Context& ctx)
 {
 	const Object* killer = ctx.requireObject();
@@ -429,6 +483,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-horde-remove", removeHordeMember);
 	registerAction("map-unit-ops-health", teamHealthProbe);
 	registerAction("map-unit-ops-threat", threatProbe);
+	registerAction("map-unit-ops-named-path", namedAttackPathProbe);
 	registerAction("map-unit-ops-kill", killTarget);
 	registerAction("map-unit-ops-kill-count", killCountProbe);
 #endif

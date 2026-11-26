@@ -1,4 +1,9 @@
 check() {
+    for frame in 243 245; do
+        if covers "$frame"; then
+            expect "TEST map-unit-ops named path frame=$frame path=1 ordered=1 missing=1"
+        fi
+    done
     for frame in 240 241 242 248; do
         if covers "$frame"; then
             expect "TEST map-unit-ops victim frame=$frame dead=1"

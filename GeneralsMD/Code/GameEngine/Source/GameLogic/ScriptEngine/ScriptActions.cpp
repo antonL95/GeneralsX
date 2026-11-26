@@ -7194,6 +7194,19 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				retailTeleportObjectWithMembers(unit, *waypoint->getLocation());
 			return;
 		}
+		case ScriptAction::NAMED_ATTACK_FOLLOW_WAYPOINTS:
+		{
+			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
+			AIUpdateInterface* ai = unit ? unit->getAI() : nullptr;
+			const Waypoint* waypoint = ai ? TheTerrainLogic->getClosestWaypointOnPath(
+				unit->getPosition(), pAction->getParameter(1)->getString()) : nullptr;
+			if (waypoint)
+			{
+				unit->leaveGroup();
+				ai->aiAttackFollowWaypointPath(waypoint, NO_MAX_SHOTS_LIMIT, CMD_FROM_SCRIPT);
+			}
+			return;
+		}
 		case ScriptAction::ATTACK_MOVE_TEAM_TO:
 		{
 			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
