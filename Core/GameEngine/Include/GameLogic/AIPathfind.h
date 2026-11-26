@@ -315,7 +315,7 @@ protected:
 	Int examineNeighboringCells(PathfindCell *parentCell, PathfindCell *goalCell,
 										const LocomotorSet& locomotorSet, Bool isHumanPlayer,
 										Bool centerInCell, Int radius, const ICoord2D &startCellNdx,
-										const Object *obj, Int attackDistance);
+										const Object *obj, Int attackDistance, UnsignedInt64* remainingGoalProbes = nullptr);
 
 	Int checkPathCost(Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 		const Coord3D *to);

@@ -1,0 +1,6 @@
+200 create Player_1 RetailPathBudgetProbe 0 914,404,0
+235 pathfind-budget-route Player_1 RetailPathBudgetProbe 0 adjacent 924 404
+235 pathfind-budget-route Player_1 RetailPathBudgetProbe 0 distant 1275 465
+255 pathfind-budget-route Player_1 RetailPathBudgetProbe 0 adjacent 924 404
+255 pathfind-budget-route Player_1 RetailPathBudgetProbe 0 distant 1275 465
+256 destroy Player_1 RetailPathBudgetProbe 0

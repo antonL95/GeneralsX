@@ -98,6 +98,14 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "MaxCellsPatchPath", INI::parseInt, nullptr, offsetof(GlobalData, m_maxCellsPatchPath) },
 	{ "MaxCellsFindAttackPath", INI::parseInt, nullptr, offsetof(GlobalData, m_maxCellsFindAttackPath) },
 	{ "Windowed",									INI::parseBool,				nullptr,			offsetof( GlobalData, m_windowed ) },
+	{ "MaxCellsFindPathLimit", [](INI*, void* instance, void*, const void*)
+		{
+			static_cast<GlobalData*>(instance)->m_maxCellsFindPathLimit = INI::scanUnsignedInt(INI::getNextToken());
+		}, nullptr, 0 },
+	{ "MaxCellsToExamineTowardsGoal", [](INI*, void* instance, void*, const void*)
+		{
+			static_cast<GlobalData*>(instance)->m_maxCellsToExamineTowardsGoal = INI::scanUnsignedInt(INI::getNextToken());
+		}, nullptr, 0 },
 	// GeneralsX @feature BenderAI 21/04/2026 Opt-out for in-game update checker via Options.ini
 	{ "CheckForUpdates",					INI::parseBool,				nullptr,			offsetof( GlobalData, m_checkForUpdates ) },
 	{ "XResolution",							INI::parseInt,				nullptr,			offsetof( GlobalData, m_xResolution ) },

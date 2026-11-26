@@ -2864,11 +2864,18 @@ struct ExamineCellsStruct
 	Int									radius;
 	const Object				*obj;
 	PathfindCell				*goalCell;
+	UnsignedInt64* remainingGoalProbes;
 };
 
 /*static*/ Int Pathfinder::examineCellsCallback(Pathfinder* pathfinder, PathfindCell* from, PathfindCell* to, Int to_x, Int to_y, void* userData)
 {
 	ExamineCellsStruct* d = (ExamineCellsStruct*)userData;
+	if (d->remainingGoalProbes)
+	{
+		if (*d->remainingGoalProbes == 0)
+			return 1;
+		--*d->remainingGoalProbes;
+	}
 	if (d->thePathfinder->m_isTunneling) return 1; // abort.
 	if (from && to) {
 			if (from->getWallHeightBand() && to->getLayer() != LAYER_WALL)
@@ -2960,7 +2967,7 @@ struct ExamineCellsStruct
 
 Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *goalCell, const LocomotorSet& locomotorSet,
 																				 Bool isHuman, Bool centerInCell, Int radius, const ICoord2D &startCellNdx,
-																				 const Object *obj, Int attackDistance)
+																				 const Object *obj, Int attackDistance, UnsignedInt64* remainingGoalProbes)
 {
 		Bool canPathThroughUnits = false;
 		if (obj && obj->getAIUpdateInterface()) {
@@ -2978,6 +2985,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			info.isHuman = isHuman;
 			info.isCrusher = isCrusher;
 			info.goalCell = goalCell;
+			info.remainingGoalProbes = remainingGoalProbes;
 			ICoord2D start, end;
 			start.x = parentCell->getXIndex();
 			start.y = parentCell->getYIndex();
@@ -3396,6 +3404,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 	m_closedList.reset();
 
 	Int cellCount = 0;
+	UnsignedInt64 remainingGoalProbes = static_cast<UnsignedInt64>(TheGlobalData->m_maxCellsToExamineTowardsGoal) + 1;
 
 	//
 	// Continue search until "open" list is empty, or
@@ -3450,10 +3459,13 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 		// put parent cell onto closed list - its evaluation is finished
 		parentCell->putOnClosedList( m_closedList );
 
+		if (static_cast<UnsignedInt>(cellCount) > TheGlobalData->m_maxCellsFindPathLimit)
+			break;
+
 		checkChangeLayers(parentCell);
 		checkScaleWallTransitions(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, obj);
 
-		cellCount += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
+		cellCount += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK, &remainingGoalProbes);
 
 	}
 
@@ -3519,19 +3531,12 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 #endif
 
 	m_isTunneling = false;
+	cleanOpenAndClosedLists();
 #if RETAIL_COMPATIBLE_PATHFINDING
-	if (!s_useFixedPathfinding)
-	{
-		goalCell->releaseInfo();
-		cleanOpenAndClosedLists();
-	}
-	else
+	if (s_useFixedPathfinding)
 #endif
-	{
-		cleanOpenAndClosedLists();
 		parentCell->releaseInfo();
-		goalCell->releaseInfo();
-	}
+	goalCell->releaseInfo();
 	return nullptr;
 }
 
@@ -5659,6 +5664,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 	// "closed" list is initially empty
 	m_closedList.reset();
 	Int count = 0;
+	UnsignedInt64 remainingGoalProbes = static_cast<UnsignedInt64>(TheGlobalData->m_maxCellsToExamineTowardsGoal) + 1;
 	//
 	// Continue search until "open" list is empty, or
 	// until goal is found.
@@ -5770,7 +5776,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 		if (!foundGoal) {
 			checkChangeLayers(parentCell);
 			checkScaleWallTransitions(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, obj);
-			count += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
+			count += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK, &remainingGoalProbes);
 		}
 	}
 

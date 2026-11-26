@@ -104,6 +104,9 @@ public:
 	static void parseGameDataDefinition( INI* ini );
 	void parseCustomDefinition();
 
+	UnsignedInt m_maxCellsFindPathLimit = 15000;
+	UnsignedInt m_maxCellsToExamineTowardsGoal = 25000;
+
 	//-----------------------------------------------------------------------------------------------
 	struct TerrainLighting
 	{
