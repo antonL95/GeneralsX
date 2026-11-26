@@ -780,25 +780,29 @@ void watch(const RetailTestCommands::Context& ctx)
 		{
 			if (const SpecialPowerModuleInterface* module = caster->getSpecialPowerModule(s_case.powerTemplate))
 				s_case.recharged = s_case.recharged || !module->isReady();
-			if (const SpecialAbilityUpdate* ability = caster->findSpecialAbilityUpdate(s_case.powerTemplate->getSpecialPowerType()))
-			{
-				const SpecialAbilityUpdateModuleData* data = ability->getAuthoredAbilityData();
-				const UnsignedInt duration = std::max({ data->m_effectDuration, data->m_attributeModifierDuration,
-					data->m_customAnimAndDuration.m_duration, data->m_grabPassengerAnimAndDuration.m_duration });
-				const Real variation = data->m_packUnpackVariationFactor < 0 ? -data->m_packUnpackVariationFactor : data->m_packUnpackVariationFactor;
-				const double bound = static_cast<double>(duration) + data->m_preparationFrames + data->m_persistentPrepFrames +
-					(static_cast<double>(data->m_packTime) + data->m_unpackTime) * (1.0 + variation);
-				watchAbilityState(s_case.abilityStates[0], ability->isActive(), bound, ctx.frame);
-				abilityFound[0] = TRUE;
-			}
 			for (BehaviorModule** module = caster->getBehaviorModules(); module && *module; ++module)
+			{
+				if (const auto* ability = dynamic_cast<const SpecialAbilityUpdate*>(*module))
+				{
+					const SpecialAbilityUpdateModuleData* data = ability->getAuthoredAbilityData();
+					if (!abilityFound[0] && data->m_specialPowerTemplate == s_case.powerTemplate)
+					{
+						const UnsignedInt duration = std::max({ data->m_effectDuration, data->m_attributeModifierDuration,
+							data->m_customAnimAndDuration.m_duration, data->m_grabPassengerAnimAndDuration.m_duration });
+						const Real variation = data->m_packUnpackVariationFactor < 0 ? -data->m_packUnpackVariationFactor : data->m_packUnpackVariationFactor;
+						const double bound = static_cast<double>(duration) + data->m_preparationFrames + data->m_persistentPrepFrames +
+							(static_cast<double>(data->m_packTime) + data->m_unpackTime) * (1.0 + variation);
+						watchAbilityState(s_case.abilityStates[0], ability->isActive(), bound, ctx.frame);
+						abilityFound[0] = TRUE;
+					}
+				}
 				if (const auto* mode = dynamic_cast<const WeaponModeSpecialPowerUpdate*>(*module))
-					if (mode->isModuleForPower(s_case.powerTemplate))
+					if (!abilityFound[1] && mode->isModuleForPower(s_case.powerTemplate))
 					{
 						watchAbilityState(s_case.abilityStates[1], mode->isActive(), mode->getAuthoredModeDuration(), ctx.frame);
 						abilityFound[1] = TRUE;
-						break;
 					}
+			}
 		}
 	}
 	for (Int i = 0; i < 2; ++i)
