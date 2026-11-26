@@ -321,7 +321,7 @@ typedef std::map< TransitionSig, ModelConditionInfo, std::less<TransitionSig>/**
 //-------------------------------------------------------------------------------------------------
 struct TransitionContext
 {
-	const Drawable* drawable = nullptr;
+	Drawable* drawable = nullptr;
 	Int previousAnimation = -1;
 	Real previousFraction = 0.0f;
 };

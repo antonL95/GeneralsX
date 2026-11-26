@@ -4619,7 +4619,7 @@ void Drawable::updateHiddenStatus()
 		TheInGameUI->deselectDrawable( this );
 
 	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
-		(*dm)->setDrawableHidden(hidden != 0);
+		(*dm)->setDrawableHidden(hidden || (*dm)->isHiddenByScript());
 
 }
 

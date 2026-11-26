@@ -32,6 +32,16 @@
 #include "PreRTS.h"
 #include "Common/DrawModule.h"
 #include "Common/Xfer.h"
+#include "GameClient/Drawable.h"
+
+void DrawModule::setHiddenByScript(Bool hidden)
+{
+	if (m_hiddenByScript == hidden)
+		return;
+
+	m_hiddenByScript = hidden;
+	setDrawableHidden(hidden || getDrawable()->isDrawableEffectivelyHidden());
+}
 
 // ------------------------------------------------------------------------------------------------
 /** CRC */

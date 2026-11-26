@@ -96,7 +96,7 @@ void W3DTornadoDraw::doDrawModule(const Matrix3D* transformMtx)
 	const auto& decal = data->m_decal;
 	const Object* object = getDrawable()->getObject();
 	const Player* owner = object ? object->getControllingPlayer() : nullptr;
-	if (m_obscured || getDrawable()->isDrawableEffectivelyHidden() || !owner ||
+	if (m_obscured || isHiddenByScript() || getDrawable()->isDrawableEffectivelyHidden() || !owner ||
 		(decal.ownerOnly && (!ThePlayerList || owner != ThePlayerList->getLocalPlayer())))
 	{
 		releaseShadows();

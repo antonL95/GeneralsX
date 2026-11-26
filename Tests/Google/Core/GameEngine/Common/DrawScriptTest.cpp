@@ -12,10 +12,12 @@ struct RecordingHost : DrawScript::Host
 	std::string previous;
 	std::string previousAnimation;
 	std::string targetKind;
+	DrawScript::Value targetBearing;
 	double fraction = 0.0;
 	std::string transition;
 	bool allowed = false;
 	std::vector<std::string> subObjectLog;
+	std::vector<std::string> clientActions;
 	DrawScript::Value returned;
 
 	DrawScript::Value call(const std::string& function, const std::vector<DrawScript::Value>& arguments) override
@@ -40,6 +42,13 @@ struct RecordingHost : DrawScript::Host
 			subObjectLog.push_back("show_perm:" + arguments.front().text);
 		if (function == "CurDrawableIsCurrentTargetKindof" && !arguments.empty())
 			return DrawScript::Value::of(!targetKind.empty() && arguments.front().text == targetKind);
+		if (function == "CurDrawableGetCurrentTargetBearing")
+			return targetBearing;
+		if (function == "CurDrawablePlaySound" || function == "CurDrawableHideModule" || function == "CurDrawableShowModule")
+		{
+			if (arguments.size() == 1 && arguments.front().type == DrawScript::Value::Type::String)
+				clientActions.push_back(function + ":" + arguments.front().text);
+		}
 		return {};
 	}
 };
@@ -231,4 +240,43 @@ TEST(DrawScript, SameStateReentryReadsPreviousAnimationWithNilState)
 	reentryHost.previous = "";
 	reentryHost.previousAnimation = "IdleA";
 	EXPECT_EQ(script->run(reentryHost).text, "IdleB");
+}
+
+TEST(DrawScript, SoundRequestRunsOnlyThroughTheSelectedBranch)
+{
+	const RecordingHost host = run(
+		"if CurDrawablePrevAnimationState() == \"Idle\" then CurDrawablePlaySound(\"Start\") "
+		"else CurDrawablePlaySound(\"Stop\") end", "Idle");
+	EXPECT_EQ(host.clientActions, (std::vector<std::string>{"CurDrawablePlaySound:Start"}));
+}
+
+TEST(DrawScript, HideModuleReceivesTheAuthoredTag)
+{
+	const RecordingHost host = run("CurDrawableHideModule(\"Draw_Overlay\")", "");
+	EXPECT_EQ(host.clientActions, (std::vector<std::string>{"CurDrawableHideModule:Draw_Overlay"}));
+}
+
+TEST(DrawScript, ShowModuleReceivesTheAuthoredTag)
+{
+	const RecordingHost host = run("CurDrawableShowModule(\"Draw_Overlay\")", "");
+	EXPECT_EQ(host.clientActions, (std::vector<std::string>{"CurDrawableShowModule:Draw_Overlay"}));
+}
+
+TEST(DrawScript, SignedBearingSelectsAnAnimation)
+{
+	const auto script = DrawScript::compile(
+		"angle = CurDrawableGetCurrentTargetBearing() "
+		"if angle == nil then return \"Idle\" "
+		"elseif angle < -.10 then return \"Right\" "
+		"elseif angle > .10 then return \"Left\" else return \"Straight\" end");
+	ASSERT_NE(script, nullptr);
+
+	RecordingHost host;
+	EXPECT_EQ(script->run(host).text, "Idle");
+	host.targetBearing = DrawScript::Value::of(-0.5);
+	EXPECT_EQ(script->run(host).text, "Right");
+	host.targetBearing = DrawScript::Value::of(0.5);
+	EXPECT_EQ(script->run(host).text, "Left");
+	host.targetBearing = DrawScript::Value::of(0.0);
+	EXPECT_EQ(script->run(host).text, "Straight");
 }

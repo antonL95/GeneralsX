@@ -1,0 +1,7 @@
+4 audio-loop-trace - - 0 virtual
+5 create Player_1 DrawBindingProbe 0 2980,650,0
+6 reveal Player_1 DrawBindingProbe 0
+40 audio-loop-condition Player_1 DrawBindingProbe 0 raising-on
+60 audio-loop-condition Player_1 DrawBindingProbe 0 raising-off
+77 create PlyrCreeps GondorFarm 0 3060,650,0
+78 orderattack Player_1 DrawBindingProbe 0 PlyrCreeps:GondorFarm:0

@@ -1941,7 +1941,7 @@ W3DModelDraw::~W3DModelDraw()
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::doStartOrStopParticleSys()
 {
-	Bool hidden = getDrawable()->isDrawableEffectivelyHidden() || m_fullyObscuredByShroud;
+	Bool hidden = isHiddenByScript() || getDrawable()->isDrawableEffectivelyHidden() || m_fullyObscuredByShroud;
 
 	for (std::vector<ParticleSysTrackerType>::const_iterator it = m_particleSystemIDs.begin(); it != m_particleSystemIDs.end(); ++it)
 	//for (std::vector<ParticleSystemID>::const_iterator it = m_particleSystemIDs.begin(); it != m_particleSystemIDs.end(); ++it)
@@ -1967,7 +1967,7 @@ void W3DModelDraw::setHidden(Bool hidden)
 	if (m_shadow)
 		m_shadow->enableShadowRender(!hidden);
 
-	m_shadowEnabled = hidden;
+	m_shadowEnabled = !hidden;
 
 	if (m_terrainDecal)
 		m_terrainDecal->enableShadowRender(!hidden);
@@ -2202,7 +2202,7 @@ void W3DModelDraw::allocateShadows()
 void W3DModelDraw::setShadowsEnabled(Bool enable)
 {
 	if (m_shadow)
-		m_shadow->enableShadowRender(enable);
+		m_shadow->enableShadowRender(enable && !isHiddenByScript());
 	m_shadowEnabled = enable;
 }
 
@@ -3371,7 +3371,7 @@ void W3DModelDraw::setTerrainDecal(TerrainDecalType type)
 		m_terrainDecal = TheProjectedShadowManager->addDecal(m_renderObject,&decalInfo);
 	if (m_terrainDecal)
 	{	m_terrainDecal->enableShadowInvisible(m_fullyObscuredByShroud);
-		m_terrainDecal->enableShadowRender(m_shadowEnabled);
+		m_terrainDecal->enableShadowRender(m_shadowEnabled && !isHiddenByScript());
 	}
 }
 
@@ -4286,7 +4286,7 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 
 			//We created a new render object so we need to preserve the visibility state
 			//of the previous render object.
-			if (draw->isDrawableEffectivelyHidden())
+			if (isHiddenByScript() || draw->isDrawableEffectivelyHidden())
 			{
 				m_renderObject->Set_Hidden(TRUE);
 				if (m_shadow)
@@ -5218,6 +5218,10 @@ void W3DModelDraw::traceAnimationState(const Matrix3D& drawTransform) const
 		}
 	}
 	const char* model = m_curState != nullptr && m_curState->m_modelName.isNotEmpty() ? m_curState->m_modelName.str() : "-";
+	if (m_renderObject)
+		std::fprintf(stderr, "TEST draw-visibility frame %u id %u %s module %s hidden %d\n",
+			TheGameLogic->getFrame(), static_cast<unsigned>(draw->getID()), name.str(),
+			TheNameKeyGenerator->keyToName(getModuleTagNameKey()).str(), m_renderObject->Is_Hidden());
 	std::fprintf(stderr, "TEST draw frame %u id %u %s module %s model %s clip %s at %.1f/%d speed %.2f timing end %u flags %s subobjects %s\n",
 		TheGameLogic->getFrame(), static_cast<unsigned>(draw->getID()), name.str(),
 		TheNameKeyGenerator->keyToName(getModuleTagNameKey()).str(), model, clip, frame, numFrames, multiplier,

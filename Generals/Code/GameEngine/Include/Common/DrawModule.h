@@ -86,6 +86,8 @@ public:
 
 	virtual void setFullyObscuredByShroud(Bool fullyObscured) = 0;
 	virtual void setDrawableHidden(Bool hidden);
+	void setHiddenByScript(Bool hidden);
+	Bool isHiddenByScript() const { return m_hiddenByScript; }
 	virtual void showDrawableSubObject(const AsciiString& name, Bool show);
 
 	virtual Bool isVisible() const { return true; }	///< for limiting tree sway, etc to visible objects
@@ -110,6 +112,9 @@ public:
 
 	virtual LaserDrawInterface* getLaserDrawInterface() { return nullptr; }
 	virtual const LaserDrawInterface* getLaserDrawInterface() const { return nullptr; }
+
+private:
+	Bool m_hiddenByScript = FALSE;
 
 };
 inline DrawModule::DrawModule( Thing *thing, const ModuleData* moduleData ) : DrawableModule( thing, moduleData ) { }

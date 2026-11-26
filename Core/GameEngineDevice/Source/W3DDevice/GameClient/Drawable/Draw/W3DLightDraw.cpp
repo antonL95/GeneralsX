@@ -70,7 +70,7 @@ void W3DLightDraw::setFullyObscuredByShroud(Bool obscured)
 void W3DLightDraw::doDrawModule(const Matrix3D* transformMtx)
 {
 	const auto* data = getW3DLightDrawModuleData();
-	if (m_obscured || getDrawable()->isDrawableEffectivelyHidden() || data->m_radius <= 0.0f)
+	if (m_obscured || isHiddenByScript() || getDrawable()->isDrawableEffectivelyHidden() || data->m_radius <= 0.0f)
 	{
 		releaseLight();
 		return;

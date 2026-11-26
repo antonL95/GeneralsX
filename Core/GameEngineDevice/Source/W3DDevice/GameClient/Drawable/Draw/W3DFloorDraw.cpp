@@ -231,7 +231,7 @@ void W3DFloorDraw::showDrawableSubObject(const AsciiString& name, Bool show)
 void W3DFloorDraw::updateVisibility(Bool hidden, Bool obscured)
 {
 	if (m_model)
-		m_model->Set_Hidden(hidden || obscured || m_hiddenBySubObject ||
+		m_model->Set_Hidden(hidden || obscured || m_hiddenBySubObject || isHiddenByScript() ||
 			getW3DFloorDrawModuleData()->isHidden(getDrawable()->getModelConditionFlags()));
 }
 

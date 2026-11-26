@@ -2,6 +2,8 @@
 #define DEFINE_WEAPONSLOTTYPE_NAMES
 
 #include "W3DDevice/GameClient/Module/W3DScriptedModelDraw.h"
+#include "Common/AudioEventRTS.h"
+#include "Common/GameAudio.h"
 #include "GameClient/FXList.h"
 #include "Common/ModuleFactory.h"
 #include "Common/BitFlagsIO.h"
@@ -20,6 +22,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -108,6 +111,28 @@ public:
 		{
 			recordSubObject(argument, FALSE, TRUE);
 		}
+		else if (function == "CurDrawablePlaySound")
+		{
+			if (argument && *argument && m_context.drawable && TheAudio && m_context.drawable->getID() != INVALID_DRAWABLE_ID)
+			{
+				const AudioEventRTS event(AsciiString(argument), m_context.drawable->getID());
+				TheAudio->addAudioEvent(&event);
+			}
+		}
+		else if (function == "CurDrawableHideModule" || function == "CurDrawableShowModule")
+		{
+			if (argument && *argument && m_context.drawable && TheNameKeyGenerator)
+			{
+				for (auto modules = m_context.drawable->getDrawModulesNonDirty(); modules && *modules; ++modules)
+				{
+					if (TheNameKeyGenerator->keyToName((*modules)->getModuleTagNameKey()).compare(argument) == 0)
+					{
+						(*modules)->setHiddenByScript(function == "CurDrawableHideModule");
+						break;
+					}
+				}
+			}
+		}
 		else if (function == "CurDrawablePrevAnimationState")
 		{
 			if (!m_sameState && m_previous && m_previous->stateName.isNotEmpty())
@@ -136,6 +161,21 @@ public:
 			const Object* target = ai ? ai->getCurrentVictim() : nullptr;
 			const Int bit = argument ? KindOfMaskType::getSingleBitFromName(argument) : -1;
 			return Value::of(target != nullptr && bit >= 0 && target->isKindOf(static_cast<KindOfType>(bit)));
+		}
+		else if (function == "CurDrawableGetCurrentTargetBearing")
+		{
+			const Object* object = m_context.drawable ? m_context.drawable->getObject() : nullptr;
+			const AIUpdateInterface* ai = object ? object->getAI() : nullptr;
+			const Object* victim = ai ? ai->getCurrentVictim() : nullptr;
+			const Coord3D* target = victim ? victim->getPosition() : (ai ? ai->getCurrentVictimPos() : nullptr);
+			if (target)
+			{
+				const Coord3D& origin = *m_context.drawable->getPosition();
+				const Real dx = target->x - origin.x;
+				const Real dy = target->y - origin.y;
+				return Value::of(dx == 0.0f && dy == 0.0f ? 0.0 :
+					static_cast<double>(normalizeAngle(std::atan2(dy, dx) - m_context.drawable->getOrientation())));
+			}
 		}
 		else if (function == "GetClientRandomNumberReal")
 		{
