@@ -5,7 +5,10 @@
 #include <cstdio>
 #include <vector>
 
-#include "Common/GlobalData.h"
+#include "Common/Money.h"
+#include "Common/Player.h"
+#include "Common/SpecialPower.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
 
@@ -25,11 +28,31 @@ void survey()
 	}
 }
 
+void castDevastation(const RetailTestCommands::Context& ctx)
+{
+	Object* caster = ctx.requireObject();
+	const auto* power = TheSpecialPowerStore->findSpecialPowerTemplate("SpellBookDevastation");
+	if (!caster || !power)
+		return;
+	SpecialPowerModuleInterface* module = caster->getSpecialPowerModule(power);
+	const UnsignedInt before = caster->getControllingPlayer()->getMoney()->countMoney();
+	const Coord3D point = ctx.groundLocation();
+	if (module)
+		caster->doSpecialPowerAtLocation(power, &point, INVALID_ANGLE, 0, TRUE);
+	std::fprintf(stderr, "TEST tree-depletion devastate frame=%u module=%d payout=%u\n", ctx.frame, module != nullptr,
+		caster->getControllingPlayer()->getMoney()->countMoney() - before);
+}
+
 void handleTreeDepletion(const RetailTestCommands::Context& ctx)
 {
 	if (ctx.action == "tree-depletion-survey")
 	{
 		survey();
+		return;
+	}
+	if (ctx.action == "tree-depletion-devastate")
+	{
+		castDevastation(ctx);
 		return;
 	}
 	Coord3D tree;

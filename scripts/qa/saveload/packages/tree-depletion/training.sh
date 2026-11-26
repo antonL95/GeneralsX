@@ -16,4 +16,11 @@ check() {
     expect_tree 910 3 2 1
     expect_tree 990 3 0 0
     expect_tree 1430 0 1 1
+    expect_tree 290 5 90 0
+    expect_tree 330 5 0 0
+    expect_tree 330 6 0 0
+    expect_tree 330 7 0 0
+    if covers 300; then
+        expect "TEST tree-depletion devastate frame=300 module=1 payout=1300"
+    fi
 }

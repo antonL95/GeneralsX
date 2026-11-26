@@ -3134,7 +3134,11 @@ std::uint64_t TerrainLogic::harvestMapTrees(const Coord3D& origin, Real radius, 
 
 		boxes += tree.boxes;
 		if (TheTerrainVisual)
-			TheTerrainVisual->removeMapTree(tree.position);
+		{
+			if (!tree.toppled)
+				TheTerrainVisual->fellMapTree(tree.position, origin);
+			TheTerrainVisual->sinkMapTree(tree.position);
+		}
 		if (fx)
 			FXList::doFXPos(fx, &tree.position);
 		return true;

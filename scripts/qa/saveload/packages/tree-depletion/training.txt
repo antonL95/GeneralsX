@@ -184,3 +184,14 @@
 1430 tree-depletion-state PlyrCreeps - 0 2 1023 62
 1430 tree-depletion-state PlyrCreeps - 0 3 1072 81
 1430 tree-depletion-state PlyrCreeps - 0 4 1137 52
+15 create PlyrCreeps TreeDepletionDevastator 0 1850,200,0
+290 tree-depletion-state PlyrCreeps - 0 5 1813 44
+290 tree-depletion-state PlyrCreeps - 0 6 1824 41
+290 tree-depletion-state PlyrCreeps - 0 7 1890 39
+330 tree-depletion-state PlyrCreeps - 0 5 1813 44
+330 tree-depletion-state PlyrCreeps - 0 6 1824 41
+330 tree-depletion-state PlyrCreeps - 0 7 1890 39
+790 tree-depletion-state PlyrCreeps - 0 5 1813 44
+790 tree-depletion-state PlyrCreeps - 0 6 1824 41
+790 tree-depletion-state PlyrCreeps - 0 7 1890 39
+300 tree-depletion-devastate PlyrCreeps TreeDepletionDevastator 0 - 1850 45
