@@ -132,3 +132,4 @@
 3 map-script-special-powers
 3 hc-stances-melee
 3 hc-crush-knockback
+3 summon-busy

@@ -38,6 +38,7 @@
 #include "Common/ModuleFactory.h"
 #include "Common/RandomValue.h"
 #include "Common/RetailFileLayers.h"
+#include "Common/RotwkDuration.h"
 #include "Common/Thing.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -287,12 +288,19 @@ void SlowDeathBehavior::beginSlowDeath(const DamageInfo *damageInfo)
 			}
 			else
 			{
-				m_sinkFrame = timeScale * (d->m_sinkDelay + GameLogicRandomValue(0, d->m_sinkDelayVariance));
-				m_destructionFrame = timeScale * (d->m_destructionDelay + GameLogicRandomValue(0, d->m_destructionDelayVariance));
-				if (d->m_doNotRandomizeMidpoint)
-					m_midpointFrame = m_destructionFrame / 2;
-				else
-					m_midpointFrame = GameLogicRandomValue( BEGIN_MIDPOINT_RATIO * m_destructionFrame, END_MIDPOINT_RATIO * m_destructionFrame );
+				const UnsignedInt framesPerTick = RetailFileLayers::enabled() ?
+					RotwkDuration::engineFrames(1, LOGICFRAMES_PER_SECOND) : 1;
+				const auto delayTicks = [timeScale, framesPerTick](UnsignedInt delay, UnsignedInt variance)
+				{
+					return static_cast<UnsignedInt>(timeScale *
+						(delay / framesPerTick + GameLogicRandomValue(0, variance / framesPerTick)));
+				};
+				m_sinkFrame = delayTicks(d->m_sinkDelay, d->m_sinkDelayVariance) * framesPerTick;
+				const UnsignedInt destructionTicks = delayTicks(d->m_destructionDelay, d->m_destructionDelayVariance);
+				const UnsignedInt midpointTicks = d->m_doNotRandomizeMidpoint ? destructionTicks / 2 :
+					GameLogicRandomValue(BEGIN_MIDPOINT_RATIO * destructionTicks, END_MIDPOINT_RATIO * destructionTicks);
+				m_destructionFrame = destructionTicks * framesPerTick;
+				m_midpointFrame = midpointTicks * framesPerTick;
 				m_acceleratedTimeScale = timeScale;
 			}
 		}
