@@ -222,6 +222,7 @@ public:
 	static void parseMapDataDefinition( INI *ini );
 	static void parseAnim2DDefinition( INI *ini );
 	static void parseAudioEventDefinition( INI *ini );
+	static void parseStreamedSoundDefinition(INI* ini);
 	static void parseDialogDefinition( INI *ini );
 	static void parseMusicTrackDefinition( INI *ini );
 	static void parseWebpageURLDefinition( INI *ini );

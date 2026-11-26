@@ -644,7 +644,8 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 
 	// GeneralsX @bugfix Mr. Meeseeks 19/06/2026 - Initialize volume using adjustPlayingVolume
 	adjustPlayingVolume(audio);
-	if (event->getPlayMusicOnce() && event->getShouldFade())
+	if ((event->getPlayMusicOnce() && event->getShouldFade()) ||
+		((info->m_control & AC_FADE_ON_START) && !req->m_isContinuation))
 	{
 		const auto duration = static_cast<ma_uint64>(getAudioSettings()->m_fadeAudioFrames) * MSEC_PER_SECOND / LOGICFRAMES_PER_SECOND;
 		ma_sound_set_fade_in_milliseconds(sound, 0.0f, 1.0f, duration);
@@ -720,7 +721,14 @@ void MiniAudioManager::stopAudioEvent(AudioHandle handle)
 		PlayingAudio *audio = (*it);
 		if (!audio || !audio->m_audioEventRTS) continue;
 		if (audio->m_audioEventRTS->getPlayingHandle() == handle) {
-			audio->m_requestStop = true;
+			const AudioEventInfo* info = audio->m_audioEventRTS->getAudioEventInfo();
+			if (info && (info->m_control & AC_FADE_ON_KILL)) {
+				m_fadingAudio.push_back(audio);
+				m_playingSounds.erase(it);
+			}
+			else {
+				audio->m_requestStop = true;
+			}
 			break;
 		}
 	}

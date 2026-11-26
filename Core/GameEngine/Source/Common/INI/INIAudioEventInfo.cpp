@@ -153,6 +153,22 @@ void INI::parseAudioEventDefinition( INI* ini )
 }
 
 //-------------------------------------------------------------------------------------------------
+void INI::parseStreamedSoundDefinition(INI* ini)
+{
+	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
+		throw INI_INVALID_DATA;
+	const AsciiString name(ini->getNextToken());
+	AudioEventInfo* stream = TheAudio->newAudioEventInfo(name);
+	if (!stream)
+		return;
+	const AudioEventInfo* defaults = TheAudio->findAudioEventInfo("DefaultStreamedSound");
+	if (defaults && defaults != stream)
+		*stream = *defaults;
+	stream->m_audioName = name;
+	stream->m_soundType = AT_SoundEffect;
+	ini->initFromINI(stream, stream->getFieldParse());
+}
+
 void INI::parseDialogDefinition( INI* ini )
 {
 	AsciiString name;
