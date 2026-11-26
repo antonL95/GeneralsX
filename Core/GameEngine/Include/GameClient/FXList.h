@@ -86,6 +86,7 @@ public:
 	virtual void doFXPosWithObjects(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
 		const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const;
 	virtual Bool isBuffNugget() const { return FALSE; }
+	virtual Bool refreshObj(const Object*) const { return FALSE; }
 	virtual const SoundFXNugget* asSoundNugget() const { return nullptr; }
 
 	/**

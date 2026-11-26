@@ -1185,6 +1185,48 @@ public:
 		}
 	}
 
+	Bool refreshObj(const Object* primary) const override
+	{
+		if (!primary || !TheParticleSystemManager)
+			return FALSE;
+		const ParticleSystemTemplate* tmp = TheParticleSystemManager->findTemplate(m_name);
+		if (!tmp)
+			return FALSE;
+		const Drawable* drawable = primary->getDrawable();
+		const DrawableID attachedId = drawable ? drawable->getID() : INVALID_DRAWABLE_ID;
+		Coord3D expected = *primary->getPosition();
+		Coord3D offset = m_offset;
+		if (const Matrix3D* mtx = primary->getTransformMatrix())
+			adjustVector(&offset, mtx);
+		expected.x += offset.x;
+		expected.y += offset.y;
+		expected.z += offset.z;
+		const Real tolerance = std::max(2.0f, m_radius.getMaximumValue() + 2.0f);
+		const Real toleranceSq = tolerance * tolerance;
+		for (ParticleSystem* sys : TheParticleSystemManager->getAllParticleSystems())
+		{
+			if (!sys || sys->isDestroyed() || sys->getTemplate() != tmp)
+				continue;
+			Bool matches = attachedId != INVALID_DRAWABLE_ID && sys->getAttachedDrawable() == attachedId;
+			if (!matches)
+			{
+				Coord3D pos;
+				sys->getPosition(&pos);
+				const Real dx = pos.x - expected.x;
+				const Real dy = pos.y - expected.y;
+				const Real dz = pos.z - expected.z;
+				matches = dx * dx + dy * dy + dz * dz <= toleranceSq;
+			}
+			if (!matches)
+				continue;
+			if (sys->isSystemForever())
+				return TRUE;
+			sys->destroy();
+		}
+		doFXObj(primary, nullptr);
+		return TRUE;
+	}
+
 	void doFXPosWithObjects(const Coord3D* primary, const Matrix3D* primaryMtx, Real primarySpeed,
 		const Coord3D* secondary, Real overrideRadius, const Object* source, const Object* target) const override
 	{
@@ -1734,9 +1776,14 @@ void FXList::doFXObj(const Object* primary, const Object* secondary, Bool buffsO
 	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
 	{
 
-		// HERE THE PRIMARY IS THE GUY RECEIVING THE FX, AND SECONDARY MIGHT BE THE GUY DEALING IT
-		if (buffsOnly && !(*it)->isBuffNugget())
+		if (buffsOnly)
+		{
+			if ((*it)->isBuffNugget())
+				(*it)->doFXObj(primary, secondary);
+			else
+				(*it)->refreshObj(primary);
 			continue;
+		}
 		if (const SoundFXNugget* sound = retail ? (*it)->asSoundNugget() : nullptr)
 			sound->playRetail(primary ? primary->getPosition() : nullptr, primary, primary, playedSound);
 		else
