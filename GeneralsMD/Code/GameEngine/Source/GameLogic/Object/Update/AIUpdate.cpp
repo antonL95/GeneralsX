@@ -2482,26 +2482,24 @@ Bool AIUpdateInterface::isValidLocomotorPosition(const Coord3D* pos) const
 
 //-------------------------------------------------------------------------------------------------
 DECLARE_PERF_TIMER(doLocomotor)
-void AIUpdateInterface::setArrivalFacing(Real angle)
+Bool AIUpdateInterface::stepMoveOrientation()
 {
-	m_arrivalFacing = angle;
-	m_hasArrivalFacing = TRUE;
-	wakeUpNow();
-}
-
-Bool AIUpdateInterface::turnToArrivalFacing()
-{
-	if (!m_hasArrivalFacing || !isIdle())
+	if (!m_hasArrivalFacing)
 		return FALSE;
-	const Real FACING_TOLERANCE = 0.05f;
+	if (!m_curLocomotor || m_curLocomotor->getMinSpeed() != 0.0f)
+	{
+		m_hasArrivalFacing = FALSE;
+		return FALSE;
+	}
+	constexpr Real facingTolerance = 0.035f;
 	Object* object = getObject();
-	if (fabs(stdAngleDiff(m_arrivalFacing, object->getOrientation())) <= FACING_TOLERANCE)
+	if (fabs(stdAngleDiff(m_arrivalFacing, object->getOrientation())) <= facingTolerance)
 	{
 		object->setOrientation(m_arrivalFacing);
 		m_hasArrivalFacing = FALSE;
 		return FALSE;
 	}
-	m_curLocomotor->locoUpdate_moveTowardsAngle(object, m_arrivalFacing);
+	setLocomotorGoalOrientation(m_arrivalFacing);
 	return TRUE;
 }
 
@@ -2704,7 +2702,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 					{
 						if (m_curLocomotor && m_curLocomotor->isScalingWall())
 							m_curLocomotor->stopScalingWall(getObject());
-						if (!m_doFinalPosition && (steerInFormation() || turnToArrivalFacing()))
+						if (!m_doFinalPosition && steerInFormation())
 							break;
 						if (m_doFinalPosition)
 						{
@@ -3148,6 +3146,14 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 				m_retailGroupRouteFrame = TheGameLogic->getFrame();
 			}
 			break;
+		case AICMD_MOVE_TO_POSITION_AND_ORIENT:
+			privateMoveToPosition(&parms->m_pos, parms->m_cmdSource);
+			if (getAIStateType() == AI_MOVE_TO)
+			{
+				m_arrivalFacing = parms->m_angle;
+				m_hasArrivalFacing = TRUE;
+			}
+			break;
 		case AICMD_MOVE_TO_OBJECT:
 			privateMoveToObject(parms->m_obj, parms->m_cmdSource);
 			break;
@@ -3216,6 +3222,14 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 			break;
 		case AICMD_ATTACKMOVE_TO_POSITION:
 			privateAttackMoveToPosition(&parms->m_pos, parms->m_intValue, parms->m_cmdSource);
+			break;
+		case AICMD_ATTACKMOVE_TO_POSITION_AND_ORIENT:
+			privateAttackMoveToPosition(&parms->m_pos, parms->m_intValue, parms->m_cmdSource);
+			if (getAIStateType() == AI_ATTACK_MOVE_TO)
+			{
+				m_arrivalFacing = parms->m_angle;
+				m_hasArrivalFacing = TRUE;
+			}
 			break;
 		case AICMD_ATTACKFOLLOW_WAYPOINT_PATH:
 			privateAttackFollowWaypointPath(parms->m_waypoint, parms->m_intValue, FALSE, parms->m_cmdSource);

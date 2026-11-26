@@ -416,6 +416,8 @@ enum AICommandType CPP_11(: Int)	// Stored in save file, do not reorder/renumber
 	AICMD_RETAIL_HORDE_ATTACK_OBJECT,
 	AICMD_RETAIL_HORDE_ATTACK_POSITION,
 	AICMD_GUARD_AREA_FROM_POSITION,
+	AICMD_MOVE_TO_POSITION_AND_ORIENT,
+	AICMD_ATTACKMOVE_TO_POSITION_AND_ORIENT,
 };
 
 struct AICommandParms
@@ -433,6 +435,7 @@ struct AICommandParms
   DamageInfo							m_damage;
 	const CommandButton*		m_commandButton;
 	Path*										m_path;
+	Real m_angle = 0.0f;
 	Bool m_retailPlannerOrder = FALSE;
 
 	AICommandParms(AICommandType cmd, CommandSourceType cmdSource);
@@ -479,6 +482,23 @@ public:
 	{
 		AICommandParms parms(AICMD_MOVE_TO_POSITION, cmdSource);
 		parms.m_pos = *pos;
+		aiDoCommand(&parms);
+	}
+
+	void aiMoveToPositionAndOrient(const Coord3D* pos, Real angle, CommandSourceType cmdSource)
+	{
+		AICommandParms parms(AICMD_MOVE_TO_POSITION_AND_ORIENT, cmdSource);
+		parms.m_pos = *pos;
+		parms.m_angle = angle;
+		aiDoCommand(&parms);
+	}
+
+	void aiAttackMoveToPositionAndOrient(const Coord3D* pos, Real angle, Int maxShotsToFire, CommandSourceType cmdSource)
+	{
+		AICommandParms parms(AICMD_ATTACKMOVE_TO_POSITION_AND_ORIENT, cmdSource);
+		parms.m_pos = *pos;
+		parms.m_angle = angle;
+		parms.m_intValue = maxShotsToFire;
 		aiDoCommand(&parms);
 	}
 

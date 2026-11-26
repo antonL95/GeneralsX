@@ -1975,7 +1975,8 @@ StateReturnType AIInternalMoveToState::update()
 				return STATE_CONTINUE;
 			}
 		}
-		// we have reached the end of the path
+		if ((getID() == AI_MOVE_TO || getID() == AI_ATTACK_MOVE_TO) && ai->stepMoveOrientation())
+			return STATE_CONTINUE;
 		if (getAdjustsDestination())
 		{
 			ai->setLocomotorGoalNone();

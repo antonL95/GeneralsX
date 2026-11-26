@@ -2143,10 +2143,9 @@ void AIGroup::groupMoveToFormation(const Coord3D* position, Real angle, Int temp
 		slot.m_unit->setFormationID(NO_FORMATION_ID);
 		AIUpdateInterface* ai = slot.m_unit->getAIUpdateInterface();
 		if (attackMove)
-			ai->aiAttackMoveToPosition(&slot.m_position, NO_MAX_SHOTS_LIMIT, cmdSource);
+			ai->aiAttackMoveToPositionAndOrient(&slot.m_position, angle, NO_MAX_SHOTS_LIMIT, cmdSource);
 		else
-			ai->aiMoveToPosition(&slot.m_position, cmdSource);
-		ai->setArrivalFacing(angle);
+			ai->aiMoveToPositionAndOrient(&slot.m_position, angle, cmdSource);
 	}
 }
 
