@@ -603,8 +603,9 @@ void Particle::draw(Real timeScale)
 			owner = TheGameClient->findDrawableByID(id);
 		if (owner)
 		{
-			const Coord3D *center = owner->getPosition();
-			Coord3D radial = {m_pos.x - center->x, m_pos.y - center->y, 0.0f};
+			Coord3D center = *owner->getPosition();
+			owner->findNearestBonePosition(m_pos, center);
+			Coord3D radial = {m_pos.x - center.x, m_pos.y - center.y, 0.0f};
 			const Real distance = radial.length();
 			if (distance > 0.0f)
 			{

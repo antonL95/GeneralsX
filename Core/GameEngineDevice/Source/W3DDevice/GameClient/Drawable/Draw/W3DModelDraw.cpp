@@ -4720,6 +4720,34 @@ Bool W3DModelDraw::getCurrentWorldspaceClientBonePositions(const char* boneName,
 	return true;
 }
 
+Bool W3DModelDraw::clientOnly_findNearestBonePosition(const Coord3D& worldPos, Coord3D& nearestWorld) const
+{
+	if (!m_renderObject)
+		return FALSE;
+	const Int numBones = m_renderObject->Get_Num_Bones();
+	if (numBones <= 0)
+		return FALSE;
+	Bool found = FALSE;
+	Real bestDistSq = 0.0f;
+	for (Int i = 0; i < numBones; ++i)
+	{
+		const Vector3 bone = m_renderObject->Get_Bone_Transform(i).Get_Translation();
+		const Real dx = worldPos.x - bone.X;
+		const Real dy = worldPos.y - bone.Y;
+		const Real dz = worldPos.z - bone.Z;
+		const Real distSq = dx * dx + dy * dy + dz * dz;
+		if (!found || distSq < bestDistSq)
+		{
+			found = TRUE;
+			bestDistSq = distSq;
+			nearestWorld.x = bone.X;
+			nearestWorld.y = bone.Y;
+			nearestWorld.z = bone.Z;
+		}
+	}
+	return found;
+}
+
 //-------------------------------------------------------------------------------------------------
 Int W3DModelDraw::getCurrentBonePositions(
 	const char* boneNamePrefix,

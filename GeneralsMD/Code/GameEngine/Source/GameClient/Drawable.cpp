@@ -882,7 +882,30 @@ Bool Drawable::getCurrentWorldspaceClientBonePositions(const char* boneName, Mat
 	return false;
 }
 
-//-------------------------------------------------------------------------------------------------
+Bool Drawable::findNearestBonePosition(const Coord3D& worldPos, Coord3D& nearestWorld) const
+{
+	Bool found = FALSE;
+	Real bestDistSq = 0.0f;
+	for (const DrawModule** dm = getDrawModules(); *dm; ++dm)
+	{
+		const ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
+		Coord3D candidate;
+		if (!di || !di->clientOnly_findNearestBonePosition(worldPos, candidate))
+			continue;
+		const Real dx = worldPos.x - candidate.x;
+		const Real dy = worldPos.y - candidate.y;
+		const Real dz = worldPos.z - candidate.z;
+		const Real distSq = dx * dx + dy * dy + dz * dz;
+		if (!found || distSq < bestDistSq)
+		{
+			found = TRUE;
+			bestDistSq = distSq;
+			nearestWorld = candidate;
+		}
+	}
+	return found;
+}
+
 void Drawable::setTerrainDecal(TerrainDecalType type)
 {
 	if (m_terrainDecalType == type)
