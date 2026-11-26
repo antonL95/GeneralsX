@@ -1647,7 +1647,7 @@ Bool Pathfinder::checkDestination(const Object *obj, Int cellX, Int cellY, Pathf
 				return false;
 			}
 			Object *unit = TheGameLogic->findObjectByID(goalUnitID);
-			if (!unit) {
+			if (!unit || unit->isEffectivelyDead()) {
 				continue;
 			}
 			if (isSameHorde(obj, unit)) {

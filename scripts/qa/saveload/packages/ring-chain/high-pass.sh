@@ -21,6 +21,7 @@ check() {
     step right-click-pickup 110 'TEST ringchain-order frame=110 target=ring command=pickup' &&
     step carrier 240 "$(state 240 'rings=1 holder=RingChainCarrier upgrade=0 fortress-upgrade=0 fortress-flag=0 recruitable=0 hero=0')" &&
     step carrier-death 270 "$(state 270 'rings=1 holder=- upgrade=0 fortress-upgrade=0 fortress-flag=0 recruitable=0 hero=0')" &&
+    step pickup-near-corpse 400 "$(state 400 'rings=1 holder=RingChainCarrier upgrade=0 fortress-upgrade=0 fortress-flag=0 recruitable=0 hero=0')" &&
     step second-carrier 730 "$(state 730 'rings=1 holder=RingChainCarrier upgrade=0 fortress-upgrade=0 fortress-flag=0 recruitable=0 hero=0')" &&
     step right-click-fortress 760 'TEST ringchain-order frame=760 target=fortress command=enter' &&
     step delivery 1300 "$(state 1300 'rings=0 holder=- upgrade=1 fortress-upgrade=1 fortress-flag=1 recruitable=1 hero=0')" &&
