@@ -977,6 +977,14 @@ UpdateSleepTime PhysicsBehavior::update()
 	if (impactFlight && m_impactFlightFrames == 0)
 		finishImpactFlight();
 
+	if (getFlag(KILL_WHEN_LANDING) && !airborneAtEnd)
+	{
+		setFlag(KILL_WHEN_LANDING, false);
+		obj->setModelConditionState(MODELCONDITION_SPLATTED);
+		if (!obj->isEffectivelyDead())
+			obj->kill(DAMAGE_FALLING, DEATH_NORMAL);
+	}
+
 	// If we are effectively dead, we shouldn't recall kill.
 	if (d->m_killWhenRestingOnGround && !airborneAtEnd && isVerySmall3D(m_vel))
 	{
@@ -1269,6 +1277,15 @@ void PhysicsBehavior::finishImpactFlight()
 	victim->clearModelConditionState(MODELCONDITION_STUNNED_FLAILING);
 	if (data->m_orientToFlightPath)
 		setAngles(victim->getOrientation(), 0.0f, 0.0f);
+	if (getFlag(KILL_WHEN_LANDING) || data->m_killWhenRestingOnGround)
+	{
+		setFlag(KILL_WHEN_LANDING, false);
+		victim->setModelConditionState(MODELCONDITION_SPLATTED);
+		if (!victim->isEffectivelyDead())
+			victim->kill(DAMAGE_FALLING, DEATH_NORMAL);
+		updateImpactRecovery();
+		return;
+	}
 	if (victim->isEffectivelyDead())
 	{
 		updateImpactRecovery();

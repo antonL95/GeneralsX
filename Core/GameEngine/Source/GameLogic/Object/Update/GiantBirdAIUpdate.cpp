@@ -114,7 +114,10 @@ void GiantBirdAIUpdate::trackGrabbedPassenger(Object& bird, const Object& passen
 {
 	if (RetailFileLayers::enabled())
 		if (auto* ai = static_cast<GiantBirdAIUpdate*>(bird.findUpdateModule(NAMEKEY("GiantBirdAIUpdate"))))
+		{
 			ai->m_grabbedPassenger = passenger.getID();
+			ai->m_killPassengerOnLanding = passenger.isKindOf(KINDOF_GRAB_AND_DROP);
+		}
 }
 
 void GiantBirdAIUpdate::releaseGrabbedPassenger()
@@ -126,6 +129,7 @@ void GiantBirdAIUpdate::releaseGrabbedPassenger()
 	if (!passenger || passenger->getContainedBy() != bird || !bird->getContain())
 	{
 		m_grabbedPassenger = INVALID_ID;
+		m_killPassengerOnLanding = FALSE;
 		return;
 	}
 
@@ -139,7 +143,9 @@ void GiantBirdAIUpdate::releaseGrabbedPassenger()
 	if (!timeReached && !heightReached)
 		return;
 
+	const Bool killOnLanding = m_killPassengerOnLanding;
 	m_grabbedPassenger = INVALID_ID;
+	m_killPassengerOnLanding = FALSE;
 	bird->getContain()->removeFromContain(passenger);
 	passenger->setOrientation(bird->getOrientation());
 	if (auto* physics = passenger->getPhysics())
@@ -172,8 +178,14 @@ void GiantBirdAIUpdate::releaseGrabbedPassenger()
 			};
 			physics->launchFromContainment(launchVelocity);
 			FXList::doFXObj(data->m_tossFX, passenger, bird);
+			if (killOnLanding)
+			{
+				bird->scoreTheKill(passenger);
+				physics->setKillWhenLanding(TRUE);
+			}
 		}
 #else
+		(void)killOnLanding;
 		if (const auto* carrierPhysics = bird->getPhysics())
 			carrierPhysics->transferVelocityTo(physics);
 		physics->setAllowToFall(TRUE);
@@ -223,6 +235,7 @@ void GiantBirdAIUpdate::tryGrabDebrisPortion(Object* victim)
 	if (debris->getContainedBy() == bird)
 	{
 		m_grabbedPassenger = debris->getID();
+		m_killPassengerOnLanding = FALSE;
 		m_swoopVictim = INVALID_ID;
 	}
 	else
@@ -452,7 +465,9 @@ void GiantBirdAIUpdate::xferRetailBlocks(Xfer* xfer, Bool present)
 			m_pullUpActive = FALSE;
 		} },
 		{ "swoop-victim", [this](Xfer* x) { x->xferObjectID(&m_swoopVictim); },
-			[this] { m_swoopVictim = INVALID_ID; } }
+			[this] { m_swoopVictim = INVALID_ID; } },
+		{ "grab-kill-on-landing", [this](Xfer* x) { x->xferBool(&m_killPassengerOnLanding); },
+			[this] { m_killPassengerOnLanding = FALSE; } }
 	});
 }
 

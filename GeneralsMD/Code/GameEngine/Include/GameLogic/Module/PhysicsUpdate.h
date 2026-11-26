@@ -213,6 +213,8 @@ public:
 
 	void setIsInFreeFall(Bool allow) { setFlag(IS_IN_FREEFALL, allow); }
 	Bool getIsInFreeFall() const { return getFlag(IS_IN_FREEFALL); }
+	void setKillWhenLanding(Bool kill) { setFlag(KILL_WHEN_LANDING, kill); }
+	Bool getKillWhenLanding() const { return getFlag(KILL_WHEN_LANDING); }
 
 	Bool getIsStunned() const { return getFlag(IS_STUNNED); }
 
@@ -283,7 +285,8 @@ private:
 		IMMUNE_TO_FALLING_DAMAGE				= 0x0100,
 		IS_IN_FREEFALL									= 0x0200,
 		IS_IN_UPDATE										= 0x0400,
-		IS_STUNNED											= 0x0800, // Added in Zero Hour
+		IS_STUNNED											= 0x0800,
+		KILL_WHEN_LANDING									= 0x1000,
 	};
 
 	/*

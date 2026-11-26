@@ -1,10 +1,10 @@
 prepare() {
     awk -v end="$end" 'BEGIN {
-        for (frame = 185; frame <= 370 && frame <= end; ++frame)
+        for (frame = 185; frame <= 430 && frame <= end; ++frame)
             print frame, "giant-bird-swoop-trace Player_1 SwoopTestEagle 0 PlyrCreeps:SwoopTestTarget:0"
-        for (frame = 447; frame <= 632 && frame <= end; ++frame)
+        for (frame = 507; frame <= 752 && frame <= end; ++frame)
             print frame, "giant-bird-swoop-trace Player_1 SwoopTestFellBeast 0 PlyrCreeps:SwoopTestTarget:0"
-        for (frame = 709; frame <= 920 && frame <= end; ++frame)
+        for (frame = 829; frame <= 1040 && frame <= end; ++frame)
             print frame, "giant-bird-swoop-trace Player_1 SwoopTestEagle 0 PlyrCreeps:GondorTrebuchetDebrisPiece:0"
     }'
 }
@@ -30,31 +30,37 @@ check_swoop_toss() {
                 release_frame = frame
                 release_freefall = sample["freefall"] + 0
                 release_impact = sample["impact"] + 0
+                release_dead = sample["dead"] + 0
                 release_tvx = sample["tvx"] + 0
                 release_tvy = sample["tvy"] + 0
                 release_tvz = sample["tvz"] + 0
                 release_tz = sample["tz"] + 0
             }
+            if (release_frame && frame > release_frame && !landed_frame && sample["dead"] == "1") {
+                landed_frame = frame
+                landed_splatted = sample["splatted"] + 0
+            }
         }
         END {
-            printf "%s dive=%u shot=%u grab=%u release=%u freefall=%u impact=%u tv=(%.3f,%.3f,%.3f) tz=%.3f\n",
-                label, dive_start, shot, grab_frame, release_frame, release_freefall, release_impact,
-                release_tvx, release_tvy, release_tvz, release_tz
+            printf "%s dive=%u shot=%u grab=%u release=%u freefall=%u impact=%u release_dead=%u tv=(%.3f,%.3f,%.3f) tz=%.3f landed_dead=%u splatted=%u\n",
+                label, dive_start, shot, grab_frame, release_frame, release_freefall, release_impact, release_dead,
+                release_tvx, release_tvy, release_tvz, release_tz, landed_frame, landed_splatted
             ok = dive_start > 0 && shot > dive_start && grab_frame > 0 && release_frame > grab_frame &&
-                release_freefall == 1 && release_impact == 1 && release_tvx > 0 && release_tvz < 0
+                release_freefall == 1 && release_impact == 1 && release_dead == 0 &&
+                release_tvx > 0 && release_tvz < 0 && landed_frame > release_frame && landed_splatted == 1
             exit !ok
         }
     ' "$log"
 }
 
 check() {
-    if covers 370; then
-        check_swoop_toss "eagle" "SwoopTestEagle" 185 370 || return
+    if covers 430; then
+        check_swoop_toss "eagle" "SwoopTestEagle" 185 430 || return
     fi
-    if covers 632; then
-        check_swoop_toss "fellbeast" "SwoopTestFellBeast" 447 632 || return
+    if covers 752; then
+        check_swoop_toss "fellbeast" "SwoopTestFellBeast" 507 752 || return
     fi
-    if covers 920; then
+    if covers 1040; then
         awk '
             /^TEST giant-bird-swoop / {
                 for (i = 3; i <= NF; ++i) {
@@ -62,7 +68,7 @@ check() {
                     sample[field[1]] = field[2]
                 }
                 frame = sample["frame"] + 0
-                if (frame < 709 || frame > 920)
+                if (frame < 829 || frame > 1040)
                     next
                 if (sample["passenger"] == "GondorTrebuchetDebrisPiece" && !debris_grab)
                     debris_grab = frame

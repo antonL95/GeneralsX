@@ -47,6 +47,7 @@ private:
 	Bool m_followingThrough = FALSE;
 	Bool m_swooping = FALSE;
 	ObjectID m_grabbedPassenger = INVALID_ID;
+	Bool m_killPassengerOnLanding = FALSE;
 	ObjectID m_swoopVictim = INVALID_ID;
 	Coord3D m_pullUpOrigin = {};
 	Bool m_pullUpActive = FALSE;

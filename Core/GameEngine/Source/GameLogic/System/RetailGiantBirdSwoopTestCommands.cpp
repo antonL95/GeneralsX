@@ -41,7 +41,7 @@ void traceGiantBirdSwoop(const RetailTestCommands::Context& ctx)
 	}
 
 	std::fprintf(stderr,
-		"TEST giant-bird-swoop frame=%u bird=%s:%d swoop=%d height=%.3f bvx=%.3f bvy=%.3f bvz=%.3f shot=%u contain=%u passenger=%s target=%s carrier=%s freefall=%d impact=%d tvx=%.3f tvy=%.3f tvz=%.3f tz=%.3f\n",
+		"TEST giant-bird-swoop frame=%u bird=%s:%d swoop=%d height=%.3f bvx=%.3f bvy=%.3f bvz=%.3f shot=%u contain=%u passenger=%s target=%s carrier=%s freefall=%d impact=%d dead=%d splatted=%d tvx=%.3f tvy=%.3f tvz=%.3f tz=%.3f\n",
 		ctx.frame, ctx.targetName, ctx.ordinal,
 		bird->getLogicModelConditions().test(MODELCONDITION_SWOOPING) ? 1 : 0,
 		pos.z - TheTerrainLogic->getGroundHeight(pos.x, pos.y),
@@ -53,6 +53,8 @@ void traceGiantBirdSwoop(const RetailTestCommands::Context& ctx)
 		carrier ? carrier->getTemplate()->getName().str() : "-",
 		target && target->getLogicModelConditions().test(MODELCONDITION_FREEFALL) ? 1 : 0,
 		targetPhysics && targetPhysics->isInRetailImpact() ? 1 : 0,
+		target && target->isEffectivelyDead() ? 1 : 0,
+		target && target->getLogicModelConditions().test(MODELCONDITION_SPLATTED) ? 1 : 0,
 		targetVel.x, targetVel.y, targetVel.z, targetZ);
 }
 }
