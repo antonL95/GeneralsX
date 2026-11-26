@@ -5,7 +5,11 @@ check() {
     if covers 1300; then
         expect 'TEST ringchain frame=1300 rings=0 holder=- upgrade=1 fortress-upgrade=1 fortress-flag=1 recruitable=1 hero=0' || return 1
     fi
+    if covers 1305; then
+        expect 'TEST check-upgrade frame=1305 found=1' || return 1
+    fi
     if covers 1350; then
+        expect 'TEST check-upgrade frame=1350 found=1' || return 1
         expect 'TEST ringchain frame=1350 rings=1 holder=- upgrade=0 fortress-upgrade=0 fortress-flag=0 recruitable=0 hero=0' || return 1
         if covers 1305; then
         awk '

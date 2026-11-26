@@ -19,3 +19,5 @@
 1310 pkg11-damage Player_1 MordorFortressCitadel 0 Player_1:MordorFortressCitadel:0 10000000 0
 1350 ringchain-state Player_1 - 0
 1350 logall - - 0
+1305 checkobjupgrade Player_1 MordorFortressCitadel 0 Upgrade_FortressRingHero
+1350 checkobjupgrade Player_1 MordorFortressCitadel 0 Upgrade_FortressRingHero
