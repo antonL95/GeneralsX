@@ -1,4 +1,10 @@
 check() {
+    if covers 243; then
+        expect "TEST map-unit-ops team path frame=243 path=1 ordered=1 modes=0"
+    fi
+    if covers 245; then
+        expect "TEST map-unit-ops team path frame=245 path=1 ordered=1 modes=1"
+    fi
     for frame in 243 245; do
         if covers "$frame"; then
             expect "TEST map-unit-ops named path frame=$frame path=1 ordered=1 missing=1"

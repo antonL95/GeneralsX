@@ -166,6 +166,63 @@ void namedAttackPathProbe(const RetailTestCommands::Context& ctx)
 		ctx.frame, point != nullptr, ordered, missing);
 }
 
+void teamAttackPathProbe(const RetailTestCommands::Context& ctx)
+{
+	Object* first = ctx.requireObject();
+	Object* second = ctx.findTarget();
+	if (!first || !second || !first->getAI() || !second->getAI())
+		return;
+	const Coord3D& a = *first->getPosition();
+	const Coord3D& b = *second->getPosition();
+	const Coord3D center = {(a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f, (a.z + b.z) * 0.5f};
+	const Waypoint* point = nearestAttackPathPoint(center);
+	const Int type = ScriptEngine::findRotwkActionByRetailIndex(545);
+	const Template* definition = type >= 0 ? TheScriptEngine->getActionTemplate(type) : nullptr;
+	Bool ordered = FALSE;
+	Bool modes = FALSE;
+	if (definition && definition->m_internalName == "TEAM_ATTACK_MOVE_FOLLOW_WAYPOINTS" &&
+		definition->getNumParameters() == 4 && definition->getParameterType(0) == Parameter::TEAM &&
+		definition->getParameterType(1) == Parameter::WAYPOINT_PATH && definition->getParameterType(2) == Parameter::BOOLEAN &&
+		definition->getParameterType(3) == Parameter::BOOLEAN)
+	{
+		Team* original = first->getTeam();
+		Team* team = newInstance(Team)(const_cast<TeamPrototype*>(original->getPrototype()), TEAM_ID_INVALID);
+		first->setTemporaryTeam(team);
+		second->setTemporaryTeam(team);
+		auto* action = newInstance(ScriptAction)(static_cast<ScriptAction::ScriptActionType>(type));
+		action->getParameter(0)->friend_setString("<This Team>");
+		action->getParameter(1)->friend_setString("MapScriptAttackPath");
+		const auto follows = [&](StateID state) {
+			return point && first->getAI()->getCurrentStateID() == state && second->getAI()->getCurrentStateID() == state &&
+				hasWaypointGoal(first->getAI(), point) && hasWaypointGoal(second->getAI(), point);
+		};
+		if (ctx.frame == 243)
+		{
+			action->getParameter(2)->friend_setInt(0);
+			action->getParameter(3)->friend_setInt(0);
+			TheScriptEngine->friend_executeAction(action, team);
+		}
+		ordered = follows(AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS);
+		action->getParameter(2)->friend_setInt(1);
+		action->getParameter(3)->friend_setInt(0);
+		if (ctx.frame == 245)
+		{
+			TheScriptEngine->friend_executeAction(action, team);
+			modes = follows(AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM);
+			action->getParameter(2)->friend_setInt(0);
+			action->getParameter(3)->friend_setInt(1);
+			TheScriptEngine->friend_executeAction(action, team);
+			modes = modes && follows(AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM);
+		}
+		deleteInstance(action);
+		first->setTemporaryTeam(original);
+		second->setTemporaryTeam(original);
+		deleteInstance(team);
+	}
+	std::fprintf(stderr, "TEST map-unit-ops team path frame=%u path=%d ordered=%d modes=%d\n",
+		ctx.frame, point != nullptr, ordered, modes);
+}
+
 void killTarget(const RetailTestCommands::Context& ctx)
 {
 	const Object* killer = ctx.requireObject();
@@ -484,6 +541,7 @@ void registerRetailMapUnitOpsTestCommands()
 	registerAction("map-unit-ops-health", teamHealthProbe);
 	registerAction("map-unit-ops-threat", threatProbe);
 	registerAction("map-unit-ops-named-path", namedAttackPathProbe);
+	registerAction("map-unit-ops-team-path", teamAttackPathProbe);
 	registerAction("map-unit-ops-kill", killTarget);
 	registerAction("map-unit-ops-kill-count", killCountProbe);
 #endif

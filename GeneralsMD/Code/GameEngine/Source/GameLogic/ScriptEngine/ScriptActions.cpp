@@ -7194,6 +7194,47 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 				retailTeleportObjectWithMembers(unit, *waypoint->getLocation());
 			return;
 		}
+		case ScriptAction::TEAM_ATTACK_MOVE_FOLLOW_WAYPOINTS:
+		{
+			Team* team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			if (!team)
+				return;
+			Coord3D center{};
+			Int count = 0;
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+			{
+				const Object* unit = member.cur();
+				if (unit->isEffectivelyDead())
+					continue;
+				center.x += unit->getPosition()->x;
+				center.y += unit->getPosition()->y;
+				center.z += unit->getPosition()->z;
+				++count;
+			}
+			if (!count)
+				return;
+			const Real inverseCount = 1.0f / INT_TO_REAL(count);
+			center.x *= inverseCount;
+			center.y *= inverseCount;
+			center.z *= inverseCount;
+			const Waypoint* waypoint = TheTerrainLogic->getClosestWaypointOnPath(&center, pAction->getParameter(1)->getString());
+			if (!waypoint)
+				return;
+			const Bool asTeam = pAction->getParameter(2)->getInt() != 0 || pAction->getParameter(3)->getInt() != 0;
+			for (auto member = team->iterate_TeamMemberList(); !member.done(); member.advance())
+			{
+				Object* unit = member.cur();
+				AIUpdateInterface* ai = unit->getAI();
+				if (!ai || unit->isEffectivelyDead())
+					continue;
+				unit->leaveGroup();
+				if (asTeam)
+					ai->aiAttackFollowWaypointPathAsTeam(waypoint, NO_MAX_SHOTS_LIMIT, CMD_FROM_SCRIPT);
+				else
+					ai->aiAttackFollowWaypointPath(waypoint, NO_MAX_SHOTS_LIMIT, CMD_FROM_SCRIPT);
+			}
+			return;
+		}
 		case ScriptAction::NAMED_ATTACK_FOLLOW_WAYPOINTS:
 		{
 			Object* unit = TheScriptEngine->getUnitNamed(pAction->getParameter(0)->getString());
