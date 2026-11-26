@@ -2482,9 +2482,6 @@ Bool AIUpdateInterface::isValidLocomotorPosition(const Coord3D* pos) const
 
 //-------------------------------------------------------------------------------------------------
 DECLARE_PERF_TIMER(doLocomotor)
-/**
- * Compute drive forces
- */
 void AIUpdateInterface::setArrivalFacing(Real angle)
 {
 	m_arrivalFacing = angle;

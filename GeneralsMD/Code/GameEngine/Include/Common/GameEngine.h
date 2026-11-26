@@ -33,6 +33,7 @@
 
 #include "Common/SubsystemInterface.h"
 #include "Common/GameType.h"
+#include "GameLogic/FormationAssistant.h"
 
 // forward declarations
 class AudioManager;
@@ -77,6 +78,7 @@ public:
 	virtual void serviceWindowsOS() {};		///< service the native OS
 	virtual Bool isActive() {return m_isActive;}	///< returns whether app has OS focus.
 	virtual void setIsActive(Bool isActive) { m_isActive = isActive; };
+	FormationAssistant& formationAssistant() { return m_formationAssistant; }
 
 protected:
 
@@ -104,6 +106,7 @@ protected:
 
 	Bool m_quitting; ///< true when we need to quit the game
 	Bool m_isActive; ///< app has OS focus.
+	FormationAssistant m_formationAssistant;
 };
 
 // GeneralsX @bugfix fbraz3 12/03/2026 Restore inline definitions lost during upstream merge conflict resolution

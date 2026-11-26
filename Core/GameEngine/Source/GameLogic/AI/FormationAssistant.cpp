@@ -5,14 +5,13 @@
 #include <string_view>
 
 #include "Common/INI.h"
+#include "Common/GameEngine.h"
 #include "Common/ThingTemplate.h"
 #include "GameLogic/Object.h"
 #include "Lib/trig.h"
 
 namespace
 {
-FormationAssistant s_formationAssistant;
-
 void skipName(INI* ini, void*, void*, const void*)
 {
 	ini->getNextToken();
@@ -34,7 +33,7 @@ void parseUnitDefinition(INI* ini, void* instance, void*, const void*)
 
 Int findDefinition(const std::string_view name)
 {
-	const std::vector<FormationUnitDefinition>& definitions = s_formationAssistant.m_definitions;
+	const std::vector<FormationUnitDefinition>& definitions = FormationAssistant::get().m_definitions;
 	for (size_t i = 0; i < definitions.size(); ++i)
 	{
 		if (name == definitions[i].m_name.str())
@@ -193,7 +192,7 @@ void uncross(std::vector<FormationSlot>& slots)
 
 const FormationAssistant& FormationAssistant::get()
 {
-	return s_formationAssistant;
+	return TheGameEngine->formationAssistant();
 }
 
 void FormationAssistant::parseDefinition(INI* ini)
@@ -211,8 +210,9 @@ void FormationAssistant::parseDefinition(INI* ini)
 		{ "FormationSelection", parseSelection, nullptr, 0 },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
-	s_formationAssistant = FormationAssistant();
-	ini->initFromINI(&s_formationAssistant, fields);
+	FormationAssistant& assistant = TheGameEngine->formationAssistant();
+	assistant = FormationAssistant();
+	ini->initFromINI(&assistant, fields);
 }
 
 Int FormationAssistant::chooseTemplate(const Real dragLength, const UnsignedInt unitCount) const
