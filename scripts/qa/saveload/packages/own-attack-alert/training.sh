@@ -13,7 +13,7 @@ check() {
         count=$(grep -c "^TEST own-attack-event victim=$victim source=$friendly$" "$log" || true)
         printf 'Own sourced fire alert events: %s\n' "$count"
         [ "$count" -eq 0 ] || return 1
-        count=$(sed -n '/TEST own-attack-cast frame=230/,/TEST own-attack-probe frame=320 case=own/p' "$log" | grep -c "^TEST own-attack-event victim=$victim source=0$" || true)
+        count=$(sed '/^TEST own-attack-probe frame=320 case=own /q' "$log" | grep -c "^TEST own-attack-event victim=$victim source=0$" || true)
         printf 'Unattributed terrain fire alert events: %s\n' "$count"
         [ "$count" -gt 0 ] || return 1
     fi
@@ -29,7 +29,7 @@ check() {
         enemy=$(object_id 415 OwnAttackAlertEnemy PlyrCreeps)
         [ -n "$enemy" ] || return 1
         grep -E 'weapon=OwnAttackAlertEnemyWeapon .*victim=.*OwnAttackAlertVictim.*dealt=20\.00' "$log" || return 1
-        count=$(grep -c "^TEST own-attack-event victim=$victim source=$enemy$" "$log" || true)
+        count=$(sed '/^TEST own-attack-probe frame=500 case=enemy /q' "$log" | grep -c "^TEST own-attack-event victim=$victim source=$enemy$" || true)
         printf 'Enemy attack alert events: %s\n' "$count"
         [ "$count" -eq 1 ] || return 1
     fi

@@ -11,3 +11,4 @@
 415 create PlyrCreeps OwnAttackAlertEnemy 0 2690,455,0
 420 attack PlyrCreeps OwnAttackAlertEnemy 0 Player_1:OwnAttackAlertVictim:0
 500 own-attack-probe Player_1 OwnAttackAlertVictim 0 enemy
+505 destroy PlyrCreeps OwnAttackAlertEnemy 0
