@@ -91,6 +91,12 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /*static*/ const FieldParse GlobalData::s_GlobalDataFieldParseTable[] =
 {
+	{ "MaxPathfindCellsPerFrame", INI::parseInt, nullptr, offsetof(GlobalData, m_maxPathfindCellsPerFrame) },
+	{ "MaxCellsAdjustDestination", INI::parseInt, nullptr, offsetof(GlobalData, m_maxCellsAdjustDestination) },
+	{ "MaxCellsAdjustTargetDestination", INI::parseInt, nullptr, offsetof(GlobalData, m_maxCellsAdjustTargetDestination) },
+	{ "MaxCellsAdjustToPossibleDestination", INI::parseInt, nullptr, offsetof(GlobalData, m_maxCellsAdjustToPossibleDestination) },
+	{ "MaxCellsPatchPath", INI::parseInt, nullptr, offsetof(GlobalData, m_maxCellsPatchPath) },
+	{ "MaxCellsFindAttackPath", INI::parseInt, nullptr, offsetof(GlobalData, m_maxCellsFindAttackPath) },
 	{ "Windowed",									INI::parseBool,				nullptr,			offsetof( GlobalData, m_windowed ) },
 	// GeneralsX @feature BenderAI 21/04/2026 Opt-out for in-game update checker via Options.ini
 	{ "CheckForUpdates",					INI::parseBool,				nullptr,			offsetof( GlobalData, m_checkForUpdates ) },

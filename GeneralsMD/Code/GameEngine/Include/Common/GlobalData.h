@@ -92,6 +92,13 @@ public:
 	virtual void reset() override;
 	virtual void update() override { }
 
+	Int m_maxPathfindCellsPerFrame = 5000;
+	Int m_maxCellsAdjustDestination = 400;
+	Int m_maxCellsAdjustTargetDestination = 400;
+	Int m_maxCellsAdjustToPossibleDestination = 400;
+	Int m_maxCellsPatchPath = 2000;
+	Int m_maxCellsFindAttackPath = 2500;
+
 	Bool setTimeOfDay( TimeOfDay tod );		///< Use this function to set the Time of day;
 
 	static void parseGameDataDefinition( INI* ini );

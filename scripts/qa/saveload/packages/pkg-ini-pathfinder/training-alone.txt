@@ -1,0 +1,4 @@
+10 create Player_1 PkgPathBudgetGuard 0 910,400,0
+20 select Player_1 PkgPathBudgetGuard 0
+20 movesel - - 0 - 1270 460
+25 track Player_1 PkgPathBudgetGuard 0

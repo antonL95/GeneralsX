@@ -2114,7 +2114,7 @@ Bool Pathfinder::adjustDestination(Object *obj, const LocomotorSet& locomotorSet
 	//    5  C  1  10
 	//    6  7  8  9
 	//
-	Int limit = MAX_ADJUSTMENT_CELL_COUNT;
+	Int limit = TheGlobalData->m_maxCellsAdjustDestination;
 	Int segmentLength = 1;
 	const ICoord2D directions[4] = {
 		{1, 0},
@@ -2180,7 +2180,7 @@ Bool Pathfinder::adjustTargetDestination(const Object *obj, const Object *target
 		return false; // outside of bounds.
 	}
 
-	Int limit = MAX_ADJUSTMENT_CELL_COUNT;
+	Int limit = TheGlobalData->m_maxCellsAdjustTargetDestination;
 	Int i, j;
 	i = cell.x;
 	j = cell.y;
@@ -2307,7 +2307,7 @@ Bool Pathfinder::adjustToPossibleDestination(Object *obj, const LocomotorSet& lo
 		}
 	}
 
-	Int limit = MAX_ADJUSTMENT_CELL_COUNT;
+	Int limit = TheGlobalData->m_maxCellsAdjustToPossibleDestination;
 	Int i, j;
 	i = goalCellNdx.x;
 	j = goalCellNdx.y;
@@ -2633,7 +2633,7 @@ void Pathfinder::processPathfindQueue()
 
 	m_cumulativeCellsAllocated = 0;	// Number of pathfind cells examined.
 	Int pathsFound = 0;
-	while (m_cumulativeCellsAllocated < PATHFIND_CELLS_PER_FRAME &&
+	while (m_cumulativeCellsAllocated < TheGlobalData->m_maxPathfindCellsPerFrame &&
 		m_queuePRTail!=m_queuePRHead) {
 		Object *obj = TheGameLogic->findObjectByID(m_queuedPathfindRequests[m_queuePRHead]);
 		m_queuedPathfindRequests[m_queuePRHead] = INVALID_ID;
@@ -7405,7 +7405,7 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 
 	DEBUG_ASSERTCRASH(m_openList.empty() && m_closedList.empty(), ("Dangling lists."));
 
-	enum {CELL_LIMIT = 2000}; // max cells to examine.
+	const Int cellLimit = TheGlobalData->m_maxCellsPatchPath;
 	Int cellCount = 0;
 
 	Coord3D currentPosition = *obj->getPosition();
@@ -7582,7 +7582,7 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 		// put parent cell onto closed list - its evaluation is finished
 		parentCell->putOnClosedList( m_closedList );
 
-		if (cellCount < CELL_LIMIT) {
+		if (cellCount < cellLimit) {
 			checkChangeLayers(parentCell);
 			checkScaleWallTransitions(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, obj);
 			cellCount += examineNeighboringCells(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
@@ -7676,7 +7676,7 @@ Path *Pathfinder::findAttackPath( const Object *obj, const LocomotorSet& locomot
 		}
 	}
 
-	const Int ATTACK_CELL_LIMIT = 2500; // this is a rather expensive operation, so limit the search.
+	const Int attackCellLimit = TheGlobalData->m_maxCellsFindAttackPath;
 
 	Bool isHuman = true;
 	if (obj && obj->getControllingPlayer() && (obj->getControllingPlayer()->getPlayerType()==PLAYER_COMPUTER)) {
@@ -7925,7 +7925,7 @@ Path *Pathfinder::findAttackPath( const Object *obj, const LocomotorSet& locomot
 		// put parent cell onto closed list - its evaluation is finished
 		parentCell->putOnClosedList( m_closedList );
 
-		if (cellCount < ATTACK_CELL_LIMIT) {
+		if (cellCount < attackCellLimit) {
 			checkChangeLayers(parentCell);
 			checkScaleWallTransitions(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, obj);
 			cellCount += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell,
