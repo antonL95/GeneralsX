@@ -211,6 +211,8 @@ protected:
 	// Playing attributes
 	Real m_pitchShift;							///< Pitch shift that should occur on this piece of audio
 	Real m_volumeShift;							///< Volume shift that should occur on this piece of audio
+	Real m_filePitch = 1.0f;
+	Real m_fileVolume = 1.0f;
 	Real m_delay;										///< Amount to delay before playing this sound
 	Int m_loopCount;								///< The current loop count value. Only valid if this is a looping type event or the override has been set.
 	mutable Int m_playingAudioIndex;	///< The sound index we are currently playing. In the case of non-random, we increment this to move to the next sound

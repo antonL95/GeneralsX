@@ -67,6 +67,8 @@
 #include "Common/file.h"
 #include "VideoDevice/FFmpeg/FFmpegFile.h"
 
+#include <cmath>
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 }
@@ -418,6 +420,8 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 
 	ma_sound_group *groupToUse = NULL;
 	ma_uint32 flags = MA_SOUND_FLAG_NO_SPATIALIZATION | MA_SOUND_FLAG_NO_PITCH;
+	const Real requestedPitch = event->getPitchShift();
+	const Real pitch = std::isfinite(requestedPitch) && requestedPitch > 0.0f ? requestedPitch : 1.0f;
 	switch (info->m_soundType)
 	{
 	case AT_Music:
@@ -438,6 +442,8 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		break;
 	}
 
+	if (pitch != 1.0f)
+		flags &= ~MA_SOUND_FLAG_NO_PITCH;
 	if (!m_deviceOpened && !m_headlessVirtualPlayback) {
 		releasePlayingAudio(audio);
 		return;
@@ -525,8 +531,8 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	if (m_headlessVirtualPlayback)
 	{
 		audio->m_virtualDurationMs = static_cast<Real>(pcmData.size()) * 1000.0f /
-			static_cast<Real>(sampleRate * channels * bytesPerSample);
-		audio->m_virtualElapsedMs = static_cast<Real>(startFrame) * 1000.0f / sampleRate;
+			(static_cast<Real>(sampleRate * channels * bytesPerSample) * pitch);
+		audio->m_virtualElapsedMs = static_cast<Real>(startFrame) * 1000.0f / (sampleRate * pitch);
 		audio->m_virtualLastFrame = TheGameLogic ? TheGameLogic->getFrame() : 0;
 		if (m_traceEnabled)
 			std::fprintf(stderr, "AUDIO DURATION handle=%u ms=%.3f bytes=%zu rate=%d channels=%d samplebytes=%d\n",
@@ -586,6 +592,8 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	// Assign to PlayingAudio before any early returns below
 	audio->m_sound = sound;
 	audio->m_audioBuffer = audioBuffer;
+	if (pitch != 1.0f)
+		ma_sound_set_pitch(sound, pitch);
 
 	switch (info->m_soundType)
 	{

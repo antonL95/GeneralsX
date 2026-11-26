@@ -42,7 +42,6 @@
 
 #include "Common/AudioEventInfo.h"
 #include "Common/AudioRandomValue.h"
-
 #include <algorithm>
 #include "Common/AudioSettings.h"
 #include "Common/file.h"
@@ -234,6 +233,8 @@ AudioEventRTS::AudioEventRTS( const AudioEventRTS& right )
 	m_isLogicalAudio			= right.m_isLogicalAudio;
 	m_pitchShift					= right.m_pitchShift;
 	m_volumeShift					= right.m_volumeShift;
+	m_filePitch = right.m_filePitch;
+	m_fileVolume = right.m_fileVolume;
 	m_loopCount						= right.m_loopCount;
 	m_playingAudioIndex		= right.m_playingAudioIndex;
 	m_allCount						= right.m_allCount;
@@ -280,6 +281,8 @@ AudioEventRTS& AudioEventRTS::operator=( const AudioEventRTS& right )
 	m_isLogicalAudio			= right.m_isLogicalAudio;
 	m_pitchShift					= right.m_pitchShift;
 	m_volumeShift					= right.m_volumeShift;
+	m_filePitch = right.m_filePitch;
+	m_fileVolume = right.m_fileVolume;
 	m_loopCount						= right.m_loopCount;
 	m_playingAudioIndex		= right.m_playingAudioIndex;
 	m_allCount						= right.m_allCount;
@@ -332,6 +335,11 @@ void AudioEventRTS::generateFilename(Bool randomByDefault, Bool forTiming)
 		return;
 	}
 
+	m_filePitch = m_eventInfo->m_perFilePitchMin == m_eventInfo->m_perFilePitchMax
+		? m_eventInfo->m_perFilePitchMin
+		: GameAudioRandomValueReal(m_eventInfo->m_perFilePitchMin, m_eventInfo->m_perFilePitchMax);
+	const Real volumeFloor = std::clamp(1.0f + m_eventInfo->m_perFileVolumeShift, 0.0f, 1.0f);
+	m_fileVolume = volumeFloor < 1.0f ? GameAudioRandomValueReal(volumeFloor, 1.0f) : 1.0f;
 	m_filenameToLoad = generateFilenamePrefix(m_eventInfo->m_soundType, false);
 
 	Int which = 0;
@@ -431,15 +439,15 @@ void AudioEventRTS::generatePlayInfo(Bool forTiming)
 //-------------------------------------------------------------------------------------------------
 Real AudioEventRTS::getPitchShift() const
 {
-	return m_pitchShift;
+	return m_pitchShift * m_filePitch;
 }
 
 //-------------------------------------------------------------------------------------------------
 Real AudioEventRTS::getVolumeShift() const
 {
 	if (m_retailEmitter)
-		return m_volumeShift * m_retailEmitter->gain;
-	return m_volumeShift;
+		return m_volumeShift * m_fileVolume * m_retailEmitter->gain;
+	return m_volumeShift * m_fileVolume;
 }
 
 //-------------------------------------------------------------------------------------------------

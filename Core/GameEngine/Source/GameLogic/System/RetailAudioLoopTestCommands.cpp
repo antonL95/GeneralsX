@@ -137,6 +137,20 @@ void handleAudioLoop(const RetailTestCommands::Context& ctx)
 		TheAudio->addAudioEvent(&event);
 		return;
 	}
+	if (cmd == "variation")
+	{
+		if (!TheAudio)
+			return;
+		AudioEventRTS event{AsciiString(ctx.argument)};
+		TheAudio->getInfoForAudioEvent(&event);
+		if (!event.getAudioEventInfo())
+			return;
+		event.generateFilename();
+		event.generatePlayInfo();
+		std::fprintf(stderr, "AUDIO VARIATION event=%s pitch=%.3f volume=%.3f\n",
+			ctx.argument, event.getPitchShift(), event.getVolumeShift());
+		return;
+	}
 	if (cmd == "advance-music")
 	{
 		if (TheAudio)

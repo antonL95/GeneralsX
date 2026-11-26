@@ -140,7 +140,10 @@ public:
 	Real m_minDistance;			// less than this distance and the sound behaves as though it is at minDistance
 	Real m_maxDistance;			// greater than this distance and the sound behaves as though it is muted
 
-	AudioType m_soundType;	// This should be either Music, Streaming or SoundEffect
+	AudioType m_soundType;
+	Real m_perFileVolumeShift = 0.0f;
+	Real m_perFilePitchMin = 1.0f;
+	Real m_perFilePitchMax = 1.0f;
 
 
   // DynamicAudioEventInfo interfacing functions

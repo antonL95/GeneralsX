@@ -1,0 +1,2 @@
+12 create Player_1 GondorEarnur 0 2520,1010,0
+25 audio-loop-variation - - 0 AudioFileShiftProbe

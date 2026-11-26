@@ -197,12 +197,25 @@ void AudioEventInfo::parseAmbientStream(INI* ini)
 static void parseDelay( INI* ini, void *instance, void *store, const void* /*userData*/ );
 static void parsePitchShift( INI* ini, void *instance, void *store, const void* /*userData*/ );
 
+static void parsePerFilePitchShift(INI* ini, void* instance, void*, const void*)
+{
+	AudioEventInfo& info = *static_cast<AudioEventInfo*>(instance);
+	const Real low = ini->scanReal(ini->getNextToken());
+	const Real high = ini->scanReal(ini->getNextToken());
+	if (!(low > -100.0f && high >= low))
+		throw INI_INVALID_DATA;
+	info.m_perFilePitchMin = 1.0f + low * 0.01f;
+	info.m_perFilePitchMax = 1.0f + high * 0.01f;
+}
+
 //-------------------------------------------------------------------------------------------------
 static constexpr bool WeightedSoundList = true;
 
 const FieldParse AudioEventInfo::m_audioEventInfo[] =
 {
 	{ "PlayPercent", INI::parsePercentToReal, nullptr, offsetof(AudioEventInfo, m_playFraction) },
+	{ "PerFileVolumeShift", INI::parsePercentToReal, nullptr, offsetof(AudioEventInfo, m_perFileVolumeShift) },
+	{ "PerFilePitchShift", parsePerFilePitchShift, nullptr, 0 },
 	{ "Filename",							INI::parseAsciiString,		nullptr,								offsetof( AudioEventInfo, m_filename) },
 	{ "Volume",								INI::parsePercentToReal,	nullptr,								offsetof( AudioEventInfo, m_volume ) },
 	{ "VolumeShift",					INI::parsePercentToReal,	nullptr,								offsetof( AudioEventInfo, m_volumeShift ) },
