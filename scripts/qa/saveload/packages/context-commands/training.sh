@@ -4,7 +4,7 @@ check() {
         expect 'TEST context-click frame=101 unit=GuldurGreatSpider target=ContextCaptureTargetB sent=0 special=0'
         expect 'TEST context-click frame=102 unit=ArbiterofZigurHorde target=ContextCaptureTargetC sent=1 special=1'
         expect 'TEST context-click frame=103 unit=HaradCultistsofZigurHorde target=ContextCaptureTargetD sent=1 special=1'
-        expect 'TEST context-click frame=110 unit=MordorMountainTroll target=tree sent=1 special=1'
+        expect 'TEST context-click frame=110 unit=ContextTreeGrabber target=tree sent=1 special=1'
     fi
     if covers 400; then
         expect 'TEST context-held frame=400 tree=1 club=1'

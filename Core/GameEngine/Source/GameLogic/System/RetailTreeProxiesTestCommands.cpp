@@ -56,7 +56,7 @@ void inspectTree(const RetailTestCommands::Context& ctx)
 			Coord3D pos = *closest->getLocation();
 			pos.z += TheTerrainLogic->getGroundHeight(pos.x, pos.y);
 			ctx.selectObject(source);
-			Object* occupied = ctx.findTarget(std::string_view("Player_1:MordorMountainTroll:0"));
+			Object* occupied = ctx.findTarget(std::string_view("Player_1:TreeProxiesGrabber:0"));
 			if (occupied && occupied->getDrawable())
 				TheInGameUI->selectDrawable(occupied->getDrawable());
 			TheInGameUI->setGUICommand(button);

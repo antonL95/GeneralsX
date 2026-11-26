@@ -1,15 +1,15 @@
-10 create Player_1 MordorMountainTroll 0 145,2295,0
-15 select Player_1 MordorMountainTroll 0
-18 tree-proxies-state Player_1 MordorMountainTroll 0
+10 create Player_1 TreeProxiesGrabber 0 145,2295,0
+15 select Player_1 TreeProxiesGrabber 0
+18 tree-proxies-state Player_1 TreeProxiesGrabber 0
 
-20 tree-proxies-order Player_1 MordorMountainTroll 0
-200 tree-proxies-state Player_1 MordorMountainTroll 0
-245 tree-proxies-state Player_1 MordorMountainTroll 0
-254 tree-proxies-state Player_1 MordorMountainTroll 0
-10 create Player_1 MordorMountainTroll 0 150,2295,0
-220 tree-proxies-direct Player_1 MordorMountainTroll 1
-230 tree-proxies-held Player_1 MordorMountainTroll 1
-400 tree-proxies-held Player_1 MordorMountainTroll 1
+20 tree-proxies-order Player_1 TreeProxiesGrabber 0
+200 tree-proxies-state Player_1 TreeProxiesGrabber 0
+245 tree-proxies-state Player_1 TreeProxiesGrabber 0
+254 tree-proxies-state Player_1 TreeProxiesGrabber 0
+10 create Player_1 TreeProxiesGrabber 0 150,2295,0
+220 tree-proxies-direct Player_1 TreeProxiesGrabber 1
+230 tree-proxies-held Player_1 TreeProxiesGrabber 1
+400 tree-proxies-held Player_1 TreeProxiesGrabber 1
 
-245 tree-proxies-held Player_1 MordorMountainTroll 1
-254 tree-proxies-held Player_1 MordorMountainTroll 1
+245 tree-proxies-held Player_1 TreeProxiesGrabber 1
+254 tree-proxies-held Player_1 TreeProxiesGrabber 1
