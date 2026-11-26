@@ -1,0 +1,23 @@
+220 create Player_1 CastleMemberEvaPacked 0 3650,2650,0
+220 create Player_1 CastleMemberEvaWall 0 3690,2650,0
+220 create Player_1 CastleMemberEvaTower 0 3705,2650,0
+220 create Player_1 CastleMemberEvaKeep 0 3720,2650,0
+220 create PlyrCreeps CastleMemberEvaAttacker 0 3735,2650,0
+222 fortress-expansion-unpack Player_1 CastleMemberEvaPacked 0
+224 castle-member-eva-link Player_1 CastleMemberEvaWall 0 Player_1:CastleMemberEvaPacked:0
+224 castle-member-eva-link Player_1 CastleMemberEvaTower 0 Player_1:CastleMemberEvaPacked:0
+224 castle-member-eva-link-keep Player_1 CastleMemberEvaKeep 0 Player_1:CastleMemberEvaPacked:0
+250 audio-loop-trace - - 0 virtual
+251 castle-member-eva-construct Player_1 CastleMemberEvaWall 0 start
+255 castle-member-eva-construct Player_1 CastleMemberEvaWall 0 stop
+257 audio-loop-trace - - 0 off
+260 castle-member-eva-damage PlyrCreeps CastleMemberEvaAttacker 0 Player_1:CastleMemberEvaKeep:0
+264 castle-member-eva-probe - - 0 CastleMemberEvaKeepAttack
+270 castle-member-eva-kill PlyrCreeps CastleMemberEvaAttacker 0 Player_1:CastleMemberEvaTower:0
+274 castle-member-eva-probe - - 0 CastleBreached
+280 castle-member-eva-kill PlyrCreeps CastleMemberEvaAttacker 0 Player_1:CastleMemberEvaWall:0
+284 castle-member-eva-probe - - 0 CastleBreached
+295 castle-member-eva-kill PlyrCreeps CastleMemberEvaAttacker 0 Player_1:MenFortressCitadel:0
+305 castle-member-eva-probe - - 0 CampDestroyed
+310 destroy Player_1 CastleMemberEvaKeep 0
+310 destroy PlyrCreeps CastleMemberEvaAttacker 0
