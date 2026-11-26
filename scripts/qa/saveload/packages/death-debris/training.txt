@@ -1,0 +1,13 @@
+230 create Player_1 DeathDebrisVictim 0 3200,2900,0
+230 create Player_1 DeathDebrisAttacker 0 3220,2900,0
+230 create Player_1 DeathDebrisAttacker 1 3220,2950,0
+230 create PlyrCreeps DeathDebrisConversionVictim 0 3250,2900,0
+230 create PlyrCreeps DeathDebrisConversionVictim 1 3250,2950,0
+240 firetestweapon Player_1 DeathDebrisAttacker 1 DeathDebrisDelayedWeapon,PlyrCreeps:DeathDebrisConversionVictim:1
+241 destroy Player_1 DeathDebrisAttacker 1
+250 kill Player_1 DeathDebrisVictim 0
+250 firetestweapon Player_1 DeathDebrisAttacker 0 DeathDebrisInstantWeapon,PlyrCreeps:DeathDebrisConversionVictim:0
+280 death-debris-count Player_1 DeathDebrisAttacker 0 DeathDebrisSpawn
+280 death-debris-count Player_1 DeathDebrisAttacker 0 DeathDebrisPiece
+280 death-debris-count Player_1 DeathDebrisAttacker 0 DeathDebrisConverted
+280 death-debris-count Player_1 DeathDebrisAttacker 0 DeathDebrisConversionVictim
