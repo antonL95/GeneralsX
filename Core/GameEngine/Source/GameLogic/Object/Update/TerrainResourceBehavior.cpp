@@ -55,10 +55,14 @@ Claim makeClaim(const Coord3D& pos, Real radius, TerrainResourceRules::ClaimOrde
 	};
 }
 
+Bool isStanding(const Object& object)
+{
+	return !object.isDestroyed() && !object.isEffectivelyDead();
+}
+
 Bool isComplete(const Object& object)
 {
-	return !object.isDestroyed() && !object.isEffectivelyDead() &&
-		object.getConstructionPercent() == CONSTRUCTION_COMPLETE;
+	return isStanding(object) && object.getConstructionPercent() == CONSTRUCTION_COMPLETE;
 }
 
 Bool isClaimableTerrain(const Coord3D& point)
@@ -162,11 +166,9 @@ Bool TerrainResourceBehavior::getDisplayInfo(const ThingTemplate& type, const Co
 				continue;
 			const auto* resource = static_cast<const TerrainResourceBehavior*>(*module);
 			data = resource->getTerrainResourceBehaviorModuleData();
+			id = static_cast<UnsignedInt>(object->getID());
 			if (resource->m_claiming)
-			{
 				frame = resource->m_claimFrame;
-				id = static_cast<UnsignedInt>(object->getID());
-			}
 			break;
 		}
 	}
@@ -218,9 +220,10 @@ TerrainResourceBehavior::ClaimYield TerrainResourceBehavior::calculateClaim(
 	const NameKeyType moduleKey = NAMEKEY("TerrainResourceBehavior");
 	for (Object* other = TheGameLogic->getFirstObject(); other; other = other->getNextObject())
 	{
-		if (!isComplete(*other) || !other->getControllingPlayer())
+		if (!isStanding(*other) || !other->getControllingPlayer())
 			continue;
-		if (other->getControllingPlayer() == &player)
+		const Bool otherComplete = isComplete(*other);
+		if (otherComplete && other->getControllingPlayer() == &player)
 		{
 			if (useModifier && modifierFilter.matchesTemplate(*other->getTemplate()))
 				++buildingCount;
@@ -235,9 +238,11 @@ TerrainResourceBehavior::ClaimYield TerrainResourceBehavior::calculateClaim(
 				continue;
 			const auto* resource = static_cast<const TerrainResourceBehavior*>(*module);
 			const auto* otherData = resource->getTerrainResourceBehaviorModuleData();
-			if (!resource->m_claiming || !std::isfinite(otherData->m_radius))
+			if ((resource->m_claiming && !otherComplete) || !std::isfinite(otherData->m_radius))
 				continue;
-			const TerrainResourceRules::ClaimOrder order{otherData->m_highPriority != FALSE, resource->m_claimFrame,
+			const UnsignedInt otherFrame = resource->m_claiming ? resource->m_claimFrame :
+				std::numeric_limits<UnsignedInt>::max();
+			const TerrainResourceRules::ClaimOrder order{otherData->m_highPriority != FALSE, otherFrame,
 				static_cast<UnsignedInt>(other->getID()), other->getControllingPlayer()->getPlayerIndex()};
 			if (!TerrainResourceRules::blocks(claim.order, order))
 				continue;
